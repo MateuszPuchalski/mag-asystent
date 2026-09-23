@@ -4,6 +4,7 @@ import { config } from "../config.js";
 import type { SubiektAdapter } from "../adapters/subiekt.js";
 import { kartotekaOferty, kartotekaPoSku } from "./dopasowanie-sku.js";
 import { podzielZamienniki } from "./zamienniki.js";
+import { zamiennicyOem } from "./zamiennosc-oem.js";
 import { doborRozmowy, DROGI_DOBORU, type DrogaDoboru } from "./dobor.js";
 import { kluczModelu, zastosowaniaModelu } from "./wiedza.js";
 import { silnikZTekstu, zabudowyMaszyny } from "./silniki.js";
@@ -289,6 +290,16 @@ export function kandydaciDoboru(
          mówi, do której maszyny — to trzeba sprawdzić parametrami. */
       dodaj({ twId: z.tw_id, symbol: z.symbol, nazwa: z.nazwa, stan: Number(z.dostepne), droga: "zamiennik",
         pewnosc: "wymaga_danych", zrodlo: `Zamiennik z opisu kartoteki „${w.symbol}”`, ostrzezenia: [] });
+    }
+    /* Para przez wspólny numer oryginału, ZATWIERDZONA w bazie wiedzy.
+       `prawdopodobne`, nie `wymaga_danych`: tu człowiek już porównał obie
+       części — ale nie `potwierdzone`, bo kartoteka oferty sama jest tylko
+       prawdopodobna, a zamiennik nie bywa pewniejszy od tego, co zastępuje. */
+    for (const { kartoteka: k, zamiennosc: zam } of zamiennicyOem(w.tw_id, database)) {
+      const z = towar(database, k.twId); if (!z) continue;
+      ile++;
+      dodaj({ twId: z.tw_id, symbol: z.symbol, nazwa: z.nazwa, stan: Number(z.dostepne), droga: "zamiennik",
+        pewnosc: "prawdopodobne", zrodlo: zam.zdanie, ostrzezenia: [] });
     }
     drogi.set("zamiennik", { droga: "zamiennik", sprawdzona: true, wynikow: ile });
   }

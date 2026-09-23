@@ -781,6 +781,48 @@ CREATE TABLE IF NOT EXISTS towar_identyfikator (
 CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_norm ON towar_identyfikator(wartosc_norm);
 CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_tw ON towar_identyfikator(tw_id);
 
+-- ── Zamienność przez wspólny numer OEM ──────────────────────────────────────
+-- Dwie kartoteki z tym samym numerem OEM albo oryginalnym w opisie to
+-- KANDYDAT na zamiennik — mechanizm katalogów motoryzacyjnych, w których rynek
+-- wtórny spina się przez numer oryginału. Kandydata liczy się przy odczycie
+-- z `towar_identyfikator`; ta tabela trzyma wyłącznie DECYZJĘ człowieka.
+--
+-- DLACZEGO NIE AUTOMAT. Pomiar na seedzie (23 września 2026): wspólny numer dzielą
+-- nóż lewy i prawy, filtr główny i wstępny, zestaw mocowań i jego nakrętka,
+-- bębny sprzęgła o innej podziałce, dysze o sąsiednich numerach. Mniej więcej
+-- połowa nowych par. Zamiennik z automatu przeszedłby dalej przez pasowania
+-- i dobór — do klienta, jako zły nóż.
+--
+-- PARA BEZ KIERUNKU (`tw_a < tw_b`): wspólny numer oryginału jest symetryczny,
+-- inaczej niż zamiennik z opisu, który mówi tylko za SWOJĄ kartotekę.
+-- Odrzucenie jest decyzją tak samo jak zatwierdzenie — odrzucona para nie
+-- wraca do kolejki przy każdym imporcie. Wycofanie zwalnia parę.
+-- `numery` (JSON) zapisuje, na czym człowiek się oparł: opis w Subiekcie
+-- może się zmienić, decyzja i jej podstawa zostają.
+CREATE TABLE IF NOT EXISTS zamiennosc_oem (
+  id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+  tw_a                 INTEGER NOT NULL,
+  tw_a_symbol          TEXT NOT NULL,
+  tw_b                 INTEGER NOT NULL,
+  tw_b_symbol          TEXT NOT NULL,
+  stan                 TEXT NOT NULL CHECK (stan IN ('zatwierdzone','odrzucone','wycofane')),
+  numery               TEXT NOT NULL,
+  powod                TEXT,
+  rozstrzygnal         TEXT NOT NULL,
+  rozstrzygnal_user_id INTEGER REFERENCES app_user(user_id),
+  rozstrzygnieto_at    TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  wycofal              TEXT,
+  wycofal_user_id      INTEGER REFERENCES app_user(user_id),
+  wycofano_at          TEXT,
+  powod_wycofania      TEXT,
+  CHECK (tw_a < tw_b),
+  CHECK (stan != 'odrzucone' OR powod IS NOT NULL)
+);
+-- Jedna żywa decyzja na parę; wycofane stoją obok jako historia.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_zamiennosc_oem_zywa ON zamiennosc_oem(tw_a, tw_b)
+  WHERE stan IN ('zatwierdzone','odrzucone');
+CREATE INDEX IF NOT EXISTS ix_zamiennosc_oem_b ON zamiennosc_oem(tw_b, stan);
+
 -- Wymiary z nazw i opisów kartotek — szczebel „zgodne wymiary" (§11.2).
 -- Blizna: klient pytał o „linkę 148 cm", katalog miał „1170x1480", a żaden
 -- szczebel liczby nie czytał. TABELA POCHODNA jak `towar_identyfikator`:

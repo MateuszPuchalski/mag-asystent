@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import type {
   Identyfikator, Pasowanie, PasowaniaTowaru, RodzajDowodu, RodzajIdentyfikatora,
-  TrafieniePasowania, Zastosowanie,
+  TrafieniePasowania, Zamiennosc, Zastosowanie,
 } from "../api/typy";
 import {
   useCofnijIdentyfikatorZOferty, useDodajDowod, useDodajIdentyfikator, useIdentyfikatory,
-  useWiedzaTowaru, useWycofajPasowanie, useWycofajZastosowanie, useZaproponujPasowanie,
+  useWiedzaTowaru, useWycofajPasowanie, useWycofajZamiennosc, useWycofajZastosowanie, useZaproponujPasowanie,
 } from "../api/wiedza";
 import { PasowanieForm } from "./PasowanieForm";
 import { NaglowekSekcji, Pole, Przycisk, czas } from "../ui";
@@ -34,6 +34,8 @@ export function WiedzaTowaru({ poczatkowy = null }: {
       <Sekcja tytul="Nie pasuje do" lista={wiedza.data.negatywne} pusto="brak negatywnych dopasowań" negatyw />
       <Sekcja tytul="Czeka w kolejce" lista={wiedza.data.propozycje} pusto="nic nie czeka" tylkoOdczyt />
       {wiedza.data.pasowania && <Pasowania towar={{ twId: towar!.id, symbol: towar!.sym, nazwa: towar!.name }} dane={wiedza.data.pasowania} />}
+      {wiedza.data.zamiennosciOem && wiedza.data.zamiennosciOem.length > 0 &&
+        <Zamiennosci twId={towar!.id} lista={wiedza.data.zamiennosciOem} />}
     </>}
     {towar && <Identyfikatory twId={towar.id} />}
   </div>;
@@ -232,6 +234,46 @@ function Wycofanie({ p }: { p: Pasowanie }) {
       placeholder={negatyw ? "powód — negatyw nie schodzi bez powodu" : "powód (opcjonalnie)"} onChange={(e) => setPowod(e.target.value)} />
     <Przycisk wariant="glowny" className="text-xs" disabled={wycofaj.isPending || (negatyw && !powod.trim())}
       onClick={() => wycofaj.mutate({ id: p.id, powod: powod.trim() || null }, { onSuccess: () => setCofam(false) })}>Potwierdź wycofanie</Przycisk>
+    <Przycisk className="text-xs" onClick={() => setCofam(false)}>Wróć</Przycisk>
+    {wycofaj.error && <span className="text-xs text-red-700">{(wycofaj.error as Error).message}</span>}
+  </span>;
+}
+
+/**
+ * Decyzje o zamienności przez wspólny numer oryginału — tu, bo tu się je
+ * cofa. Sekcja pojawia się tylko, gdy decyzja jest: pusty nagłówek przy
+ * każdej kartotece mówiłby „nie ma", choć nikt jeszcze nie pytał.
+ */
+function Zamiennosci({ twId, lista }: { twId: number; lista: Zamiennosc[] }) {
+  return <section aria-label="Zamienność przez numer oryginału">
+    <NaglowekSekcji>Zamienność przez numer oryginału</NaglowekSekcji>
+    <ul className="mt-1 space-y-1">{lista.map((z) => {
+      const druga = z.a.twId === twId ? z.b : z.a;
+      const nie = z.stan === "odrzucone";
+      return <li key={z.id} className={`flex flex-wrap items-center gap-2 rounded border px-2 py-1 text-sm ${
+        nie ? "border-red-200" : "border-slate-200"}`}>
+        <span className="text-slate-500">{nie ? "nie zastępuje" : "zamienna z"}</span>
+        <b className="font-mono">{druga.symbol}</b>
+        <span className="text-slate-600">{druga.nazwa}</span>
+        <span className="basis-full text-podpis text-slate-500">{z.zdanie}</span>
+        <WycofanieZamiennosci z={z} />
+      </li>;
+    })}</ul>
+  </section>;
+}
+
+/** Odrzucenie schodzi wyłącznie z powodem — to ostrzeżenie (§14.2); zatwierdzenie bez. */
+function WycofanieZamiennosci({ z }: { z: Zamiennosc }) {
+  const wycofaj = useWycofajZamiennosc();
+  const [cofam, setCofam] = useState(false);
+  const [powod, setPowod] = useState("");
+  const nie = z.stan === "odrzucone";
+  if (!cofam) return <Przycisk className="ml-auto text-xs" onClick={() => setCofam(true)}>Wycofaj</Przycisk>;
+  return <span className="flex basis-full flex-wrap items-center gap-2">
+    <Pole className="w-64" aria-label={`Powód wycofania: ${z.a.symbol} ⟷ ${z.b.symbol}`} value={powod}
+      placeholder={nie ? "powód — odrzucenie nie schodzi bez powodu" : "powód (opcjonalnie)"} onChange={(e) => setPowod(e.target.value)} />
+    <Przycisk wariant="glowny" className="text-xs" disabled={wycofaj.isPending || (nie && !powod.trim())}
+      onClick={() => wycofaj.mutate({ id: z.id, powod: powod.trim() || null }, { onSuccess: () => setCofam(false) })}>Potwierdź wycofanie</Przycisk>
     <Przycisk className="text-xs" onClick={() => setCofam(false)}>Wróć</Przycisk>
     {wycofaj.error && <span className="text-xs text-red-700">{(wycofaj.error as Error).message}</span>}
   </span>;

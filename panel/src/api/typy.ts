@@ -1893,6 +1893,32 @@ export type PasowaniaTowaru = {
   pasujeDo: TrafieniePasowania[]; pasujace: TrafieniePasowania[]; negatywne: Pasowanie[]; propozycje: Pasowanie[];
 };
 
+/* Zamienność przez wspólny numer oryginału. Kandydat nie ma wiersza — serwer
+   liczy go przy odczycie z identyfikatorów; wiersz ma dopiero DECYZJA. Kształt
+   z `services/zamiennosc-oem.ts`. */
+export type KandydatZamiennosci = {
+  a: KartotekaPasowania;
+  b: KartotekaPasowania;
+  /** Wspólne numery w zapisie z opisu — po nich człowiek rozstrzyga. */
+  numery: string[];
+};
+
+export type Zamiennosc = {
+  id: number;
+  a: KartotekaPasowania;
+  b: KartotekaPasowania;
+  stan: "zatwierdzone" | "odrzucone" | "wycofane";
+  numery: string[];
+  powod: string | null;
+  rozstrzygnal: string;
+  rozstrzygnietoAt: string;
+  wycofal: string | null;
+  wycofanoAt: string | null;
+  powodWycofania: string | null;
+  /** Zdanie z serwera. Panel go nie układa. */
+  zdanie: string;
+};
+
 /* Sieć wiedzy (widok „Sieć"): cztery warstwy — pasowania część→część,
    zastosowania część→maszyna/silnik, zabudowy silnik→maszyna i zamienniki
    z opisów. Kształt z `services/siec-wiedzy.ts`. Krawędź zamiennika to odczyt

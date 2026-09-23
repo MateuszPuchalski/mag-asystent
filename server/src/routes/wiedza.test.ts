@@ -118,6 +118,9 @@ const TRASY = () => [
     payload: { twId: GAZ, doTwId: SZR, rola: "inne", polaryzacja: "pasuje", rodzajDowodu: "producent", dowodTresc: "x" } },
   { method: "POST" as const, url: `/api/obsluga/wiedza/pasowania/${pasowanie}/rozstrzygnij`, payload: { decyzja: "zatwierdz" } },
   { method: "POST" as const, url: `/api/obsluga/wiedza/pasowania/${pasowanie}/wycofaj`, payload: { powod: "x" } },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij",
+    payload: { twA: GAZ, twB: SZR, decyzja: "odrzuc", powod: "x" } },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/zamiennosci-oem/1/wycofaj", payload: { powod: "x" } },
 ];
 
 test("bez sesji żadna trasa wiedzy nie odpowiada danymi", async () => {
@@ -135,7 +138,7 @@ test("hala nie widzi wiedzy — także na odczycie", async () => {
   }
 });
 
-test("tras zapisu jest dziewiętnaście — licznik jest umową", () => {
+test("tras zapisu jest dwadzieścia jeden — licznik jest umową", () => {
   /* Trzy przy zabudowie silnika (0.229.0) i trzy przy pasowaniu części:
      propozycja, rozstrzygnięcie i wycofanie. Każda z tych relacji ma ten sam
      cykl życia co zastosowanie, a bez własnego wycofania zatwierdzona pomyłka
@@ -158,15 +161,21 @@ test("tras zapisu jest dziewiętnaście — licznik jest umową", () => {
      bo nie ma z czego go odtworzyć. Bez tej trasy zły numer wpisany jednym
      kliknięciem zostawałby przy kartotece na zawsze i wracał do klienta jako
      zły towar. Serwis odmawia dla pozostałych źródeł, więc trasa nie jest
-     drogą do wycięcia wiedzy z opisów jednym żądaniem. */
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 19);
+     drogą do wycięcia wiedzy z opisów jednym żądaniem.
+
+     DWUDZIESTA I DWUDZIESTA PIERWSZA: decyzja o zamienności przez wspólny
+     numer oryginału i jej wycofanie. Trzeciej — propozycji — nie ma, bo
+     kandydat nie jest wierszem: liczy się przy odczycie z identyfikatorów.
+     Zapisem jest wyłącznie decyzja człowieka, a wycofanie jest jedyną drogą
+     powrotu po pomyłce (nóż lewy zatwierdzony z prawym). */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 21);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {
   const b = login("biuro", "Anna");
   const stan = () => ["events", "zastosowanie", "dowod_zastosowania", "model_urzadzenia", "model_z_opisu",
     "towar_identyfikator", "zabudowa_silnika", "pasowanie_czesci", "alias_silnika", "token_silnika",
-    "token_silnika_kartoteka"].map(liczba);
+    "token_silnika_kartoteka", "zamiennosc_oem"].map(liczba);
   const przed = stan();
   for (const t of TRASY().filter((t) => t.method === "GET")) {
     const r = await app.inject({ method: "GET", url: t.url, headers: b.naglowki });
@@ -301,7 +310,8 @@ test("żądanie bez ciała nie wywala się na pustym JSON-ie", async () => {
   for (const url of [`/api/obsluga/wiedza/silniki/${zabudowa}/rozstrzygnij`,
     `/api/obsluga/wiedza/silniki/${zabudowa}/wycofaj`, "/api/obsluga/wiedza/silniki",
     `/api/obsluga/wiedza/pasowania/${pasowanie}/rozstrzygnij`,
-    `/api/obsluga/wiedza/pasowania/${pasowanie}/wycofaj`, "/api/obsluga/wiedza/pasowania"]) {
+    `/api/obsluga/wiedza/pasowania/${pasowanie}/wycofaj`, "/api/obsluga/wiedza/pasowania",
+    "/api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij", "/api/obsluga/wiedza/zamiennosci-oem/1/wycofaj"]) {
     const r = await app.inject({ method: "POST", url, headers: b.naglowki });
     assert.equal(r.statusCode, 400, url);
     assert.doesNotMatch(r.body, /FST_ERR_CTP_EMPTY_JSON_BODY/, url);

@@ -17,10 +17,13 @@ import {
   type NowePasowanie,
 } from "../services/pasowania.js";
 import { siecWiedzy } from "../services/siec-wiedzy.js";
+import {
+  kandydaciZamiennosci, rozstrzygnijZamiennosc, wycofajZamiennosc, zamiennosciTowaru,
+} from "../services/zamiennosc-oem.js";
 import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   DZIEWIĘTNAŚCIE ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   DWADZIEŚCIA JEDEN ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
    przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
    (E3), trzy przy zabudowie silnika (0.229.0), trzy przy pasowaniu części:
    propozycja, rozstrzygnięcie i wycofanie, dwa przy słowniku silników
@@ -35,6 +38,9 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    Dziewiętnasty doszedł w 0.264.0 i jest cofnięciem numeru dopisanego
    z oferty — jedynego wpisu, którego nie cofa ani poprawka w Subiekcie,
    ani przebudowa po imporcie.
+   Dwudziesty i dwudziesty pierwszy to decyzja o zamienności przez wspólny
+   numer oryginału i jej wycofanie. Kandydat nie ma wiersza, więc nie ma
+   trasy propozycji — jest tylko decyzja człowieka i droga powrotu.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
 
@@ -61,12 +67,16 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     ? reply.code(409).send({ error: e.message, ...e.details }) : blad(reply, e);
   const ja = () => sesjaZadania()!.user;
 
-  /* Jedna kolejka, dwa rodzaje propozycji. Pola nazwane OSOBNO (lekcja
-     0.229.0: dwa `liczba` w jednym obiekcie nadpisują się po cichu). */
+  /* Jedna kolejka, trzy rodzaje decyzji. Pola nazwane OSOBNO (lekcja
+     0.229.0: dwa `liczba` w jednym obiekcie nadpisują się po cichu).
+     Kandydaci na zamienność przez wspólny numer oryginału nie są wierszami —
+     liczą się tu, przy odczycie, i niczego nie zapisują. */
   app.get("/api/obsluga/wiedza/kolejka", async (_req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
     const pasowania = kolejkaPasowan();
-    return { ...kolejkaPropozycji(), pasowania: pasowania.propozycje, pasowanDoRozstrzygniecia: pasowania.liczba };
+    const zamiennosci = kandydaciZamiennosci();
+    return { ...kolejkaPropozycji(), pasowania: pasowania.propozycje, pasowanDoRozstrzygniecia: pasowania.liczba,
+      zamiennosciOem: zamiennosci.kandydaci, zamiennosciOemDoRozstrzygniecia: zamiennosci.liczba };
   });
 
   app.get<{ Querystring: { q?: string } }>("/api/obsluga/wiedza/modele", async (req, reply) =>
@@ -77,7 +87,8 @@ export async function wiedzaRoutes(app: FastifyInstance) {
   app.get("/api/obsluga/wiedza/siec", async (_req, reply) => odmowa(reply) ?? siecWiedzy());
 
   app.get<{ Params: { twId: string } }>("/api/obsluga/wiedza/towar/:twId", async (req, reply) =>
-    odmowa(reply) ?? { ...zastosowaniaTowaru(Number(req.params.twId)), pasowania: pasowaniaTowaru(Number(req.params.twId)) });
+    odmowa(reply) ?? { ...zastosowaniaTowaru(Number(req.params.twId)), pasowania: pasowaniaTowaru(Number(req.params.twId)),
+      zamiennosciOem: zamiennosciTowaru(Number(req.params.twId)) });
 
   /* Ręczna propozycja z ekranu Wiedza. Autor to sesja — nigdy pole z ciała. */
   app.post<{ Body: Partial<NowaPropozycja> }>("/api/obsluga/wiedza/propozycje", async (req, reply) => {
@@ -283,6 +294,27 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     "/api/obsluga/wiedza/pasowania/:id/wycofaj", async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
       try { return wycofajPasowanie(Number(req.params.id), req.body?.powod ?? null, ja().userId); }
+      catch (e) { return blad(reply, e); }
+    });
+
+  /* Zamienność przez wspólny numer oryginału: decyzja o PARZE kartotek, nie
+     o wierszu — kandydat wiersza nie ma. Serwis przyjmuje wyłącznie parę,
+     która dziś dzieli numer, więc trasa nie jest furtką do dowolnego
+     zamiennika. Druga decyzja o tej samej parze → 409 z tym, kto był pierwszy. */
+  app.post<{ Body: { twA?: number; twB?: number; decyzja?: string; powod?: string | null } }>(
+    "/api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        const b = req.body ?? {};
+        return rozstrzygnijZamiennosc(Number(b.twA), Number(b.twB),
+          (b.decyzja ?? "") as "zatwierdz" | "odrzuc", b.powod ?? null, ja().userId);
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { powod?: string | null } }>(
+    "/api/obsluga/wiedza/zamiennosci-oem/:id/wycofaj", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try { return wycofajZamiennosc(Number(req.params.id), req.body?.powod ?? null, ja().userId); }
       catch (e) { return blad(reply, e); }
     });
 

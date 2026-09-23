@@ -9,6 +9,7 @@ import {
 import type { Autor, PewnoscZastosowania, Polaryzacja, PowodNegatywny, RodzajDowodu, StanZastosowania } from "./wiedza.js";
 import { podzielZamienniki } from "./zamienniki.js";
 import { kartotekaPoSku } from "./dopasowanie-sku.js";
+import { zamiennicyOem } from "./zamiennosc-oem.js";
 
 /**
  * Pasowanie części: uszczelka pasuje DO gaźnika (§11.2).
@@ -21,8 +22,9 @@ import { kartotekaPoSku } from "./dopasowanie-sku.js";
  * zapisany.
  *
  * ── HIERARCHIA PLIKÓW ─────────────────────────────────────────────────────
- * Importuje `wiedza.ts`, `zamienniki.ts` i `dopasowanie-sku.ts`; NIGDY
- * `dobor.ts` ani `kandydaci.ts` — tamte importują ten. Jak `silniki.ts`.
+ * Importuje `wiedza.ts`, `zamienniki.ts`, `dopasowanie-sku.ts`
+ * i `zamiennosc-oem.ts`; NIGDY `dobor.ts` ani `kandydaci.ts` — tamte importują
+ * ten. Jak `silniki.ts`.
  *
  * ── PRZECHODNIOŚĆ PRZEZ ZAMIENNIKI — PRZY ODCZYCIE, NIGDY W TABELI ────────
  * Ta sama uszczelka stoi pod kilkoma symbolami od różnych dostawców
@@ -36,6 +38,11 @@ import { kartotekaPoSku } from "./dopasowanie-sku.js";
  * nic), a wniosek nigdy nie jest `potwierdzone`: „zamiennik" gaźnika bywa
  * produktem nadrzędnym (gaźnik z zestawem serwisowym) i pozycja uszczelki może
  * się w nim różnić.
+ *
+ * Drugie źródło zamiennika to para ze wspólnym numerem oryginału, którą
+ * ZATWIERDZIŁ człowiek (`zamiennosc-oem.ts`). Ta ma wiersz, bo jest decyzją,
+ * nie odczytem — ale wniosek przez nią dalej jest tylko `prawdopodobne`,
+ * z tego samego powodu co wyżej.
  */
 
 export const ROLE_PASOWANIA = ["uszczelka", "membrana", "zestaw_naprawczy", "lacznik", "element_zestawu", "inne"] as const;
@@ -170,19 +177,35 @@ export function towar(database: DatabaseSync, twId: number): (Kartoteka & { opis
 }
 
 /**
- * Zamienniki z opisu TEJ kartoteki, rozwiązane do kartotek. Tylko `znane`
- * i tylko jednoznaczne (`stan === "jedno"`): symbol zdublowany w Subiekcie
- * nie ma prawa wskazać cudzej części.
+ * Zamiennik kartoteki z dwóch źródeł. `opis` — wolny tekst TEJ kartoteki,
+ * jednokierunkowy (doktryna `zamienniki.ts`). `oem` — para ze wspólnym
+ * numerem oryginału, ZATWIERDZONA przez człowieka (`zamiennosc-oem.ts`),
+ * z natury bez kierunku. `zdanie` mówi, skąd wiadomo — szkic i ekran cytują
+ * je zamiast składać własne.
  */
-export function zamiennikiKartoteki(database: DatabaseSync, t: Kartoteka & { opis: string }): Kartoteka[] {
-  if (!t.opis) return [];
-  const { znane } = podzielZamienniki(t.opis, t.symbol, (s) => kartotekaPoSku(database, s).stan !== "brak");
-  const out: Kartoteka[] = [];
-  for (const s of znane) {
-    const k = kartotekaPoSku(database, s);
-    if (k.stan !== "jedno" || k.twId === t.twId) continue;
-    const w = towar(database, k.twId);
-    if (w) out.push({ twId: w.twId, symbol: w.symbol, nazwa: w.nazwa });
+export type ZamiennikKartoteki = Kartoteka & { zrodlo: "opis" | "oem"; zdanie: string; decyzjaId: number | null };
+
+/**
+ * Zamienniki TEJ kartoteki, rozwiązane do kartotek. Z opisu tylko `znane`
+ * i tylko jednoznaczne (`stan === "jedno"`): symbol zdublowany w Subiekcie
+ * nie ma prawa wskazać cudzej części. Para z opisu wygrywa z parą przez OEM —
+ * kandydaci OEM i tak pomijają pary, które opis już zna.
+ */
+export function zamiennikiKartoteki(database: DatabaseSync, t: Kartoteka & { opis: string }): ZamiennikKartoteki[] {
+  const out: ZamiennikKartoteki[] = [];
+  if (t.opis) {
+    const { znane } = podzielZamienniki(t.opis, t.symbol, (s) => kartotekaPoSku(database, s).stan !== "brak");
+    for (const s of znane) {
+      const k = kartotekaPoSku(database, s);
+      if (k.stan !== "jedno" || k.twId === t.twId) continue;
+      const w = towar(database, k.twId);
+      if (w) out.push({ twId: w.twId, symbol: w.symbol, nazwa: w.nazwa, zrodlo: "opis", decyzjaId: null,
+        zdanie: `${t.symbol} podaje ${w.symbol} jako zamiennik w opisie` });
+    }
+  }
+  for (const { kartoteka: k, zamiennosc: z } of zamiennicyOem(t.twId, database)) {
+    if (out.some((o) => o.twId === k.twId)) continue;
+    out.push({ ...k, zrodlo: "oem", zdanie: z.zdanie, decyzjaId: z.id });
   }
   return out;
 }
@@ -190,10 +213,12 @@ export function zamiennikiKartoteki(database: DatabaseSync, t: Kartoteka & { opi
 const wprost = (p: Pasowanie): TrafieniePasowania =>
   ({ czesc: p.czesc, doCzego: p.doCzego, pasowanie: p, przezZamiennik: null, pewnosc: p.pewnosc, zdanie: p.zdanieZrodla });
 
+/* `kto` zostaje w podpisie, choć zdanie niesie już zamiennik: to on mówi,
+   CZYJ opis czytamy, a dla pary przez OEM kierunku i tak nie ma. */
 function przezZamiennik(
-  p: Pasowanie, czesc: Kartoteka, doCzego: Kartoteka, kto: Kartoteka, zamiennik: Kartoteka,
+  p: Pasowanie, czesc: Kartoteka, doCzego: Kartoteka, _kto: Kartoteka, zamiennik: ZamiennikKartoteki,
 ): TrafieniePasowania {
-  const przez = `${kto.symbol} podaje ${zamiennik.symbol} jako zamiennik w opisie`;
+  const przez = zamiennik.zdanie;
   return { czesc, doCzego, pasowanie: p, przezZamiennik: przez, pewnosc: "prawdopodobne",
     zdanie: `${p.zdanieZrodla}; ${przez}` };
 }

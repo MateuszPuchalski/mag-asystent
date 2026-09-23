@@ -34,6 +34,38 @@ historii nie przepisujemy.
 ---
 
 
+## 0.466.0 — 23 września 2026
+
+**Numer oryginału łączy zamienniki: kolejka „Wspólny numer oryginału”
+w bazie wiedzy.** Zamiennik stał dotąd wyłącznie w wolnym tekście opisu.
+Teraz dwie kartoteki z tym samym numerem OEM albo oryginalnym trafiają do
+kolejki jako kandydat. Zamiennikiem stają się dopiero po decyzji biura.
+
+- **Dlaczego decyzja, a nie automat.** Pomiar na kartotece z seeda: wspólny
+  numer dzieli też nóż lewy z mielącym, filtr główny z wstępnym, zestaw
+  mocowań z nakrętką i bębny o innej podziałce. To mniej więcej połowa
+  nowych par.
+- **Filtr śmieci.** Numer musi mieć co najmniej sześć znaków i pięć cyfr.
+  Odpadają modele maszyn wczytane jako OEM (`245R`, `272XP`) i kody typu
+  `0000`. Numer wspólny dla więcej niż trzech kartotek to rodzina, nie
+  zamienność.
+- **Pary znane z opisu nie wracają.** Na seedzie zostaje 36 kandydatów,
+  najwięcej wspólnych numerów pierwsze.
+- **Karta kandydata** pokazuje pełne nazwy obu kartotek i wspólne numery.
+  „Zamienne” zatwierdza, „Nie są zamienne” wymaga powodu. Odrzucona para
+  nie wraca przy następnym imporcie.
+- **„Sprawdź kartotekę”** pokazuje decyzje o zamienności z przyciskiem
+  „Wycofaj”. Odrzucenie schodzi wyłącznie z powodem.
+- **Zatwierdzona para działa dalej.** Pasowanie do jednej części obowiązuje
+  też drugą, jako prawdopodobne. Para staje w sieci i w szczeblu
+  „zamiennik” doboru, ze zdaniem, kto i na jakim numerze ją zatwierdził.
+
+Nowa tabela `zamiennosc_oem` trzyma wyłącznie decyzje; powstaje sama przy
+starcie serwera. Kandydat nie ma wiersza — liczy się przy odczycie
+z `towar_identyfikator`. Dwie nowe trasy zapisu:
+`POST /api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij` i
+`…/zamiennosci-oem/:id/wycofaj`. Licznik w `routes/wiedza.test.ts`: 21.
+
 ## 0.465.0 — 23 września 2026
 
 **Baza wiedzy dostaje zakładkę „Sieć”: cała wiedza o zgodności części na
