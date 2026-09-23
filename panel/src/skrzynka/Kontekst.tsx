@@ -12,6 +12,7 @@ import { Dobor } from "./Dobor";
 import { Klient } from "./Klient";
 import { Wiedza } from "./Wiedza";
 import { PasmoOdpowiedzi } from "./PasmoOdpowiedzi";
+import { useHistoriaKlienta, useWiedzaDoboru } from "../api/rozmowy";
 import type { Towar } from "../wyszukiwarka";
 
 /**
@@ -77,6 +78,19 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe 
      ofertę sam, więc ten przypadek nie dochodzi do tego zdania. */
   const pozycji = dane.zamowienie?.pobrane?.pozycje.length ?? 0;
   const kilkaPozycji = pozycji > 1 ? pozycji : 0;
+  /* ── LICZNIKI NA ZAKŁADKACH (23 września 2026) ─────────────────────────────
+     Zgłoszenie właściciela ze zrzutami: „prawa kolumna jest wciąż chaotyczna".
+     Klient i Wiedza miały po jednym zdaniu „nic tu nie ma", a żeby to wiedzieć,
+     trzeba było kliknąć. Zero na zakładce odpowiada bez kliknięcia (dekalog,
+     punkt 1: mniej interakcji). Oba zapytania to te same klucze, które
+     zakładki i tak wołają — przy otwarciu zakładki nic nie idzie drugi raz.
+     To są odczyty: zero zapisu przy patrzeniu zostaje nietknięte. */
+  const historia = useHistoriaKlienta(dane.rozmowa.id);
+  const wiedza = useWiedzaDoboru(dane.rozmowa.id);
+  const ileKlient = historia.data
+    ? historia.data.wpisy.length + historia.data.maszyny.length : undefined;
+  const ileWiedza = wiedza.data
+    ? (wiedza.data.zastosowanie?.dowody.length ?? 0) + wiedza.data.pomiary.length : undefined;
 
   return <section className="card flex min-h-0 flex-col overflow-hidden" aria-label="Kontekst">
     {/* ── PASMO ODPOWIEDZI NAD ZAKŁADKAMI (0.404.0) ───────────────────────────
@@ -88,8 +102,8 @@ export function Kontekst({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe 
     <Zakladki<Widok> wybrana={widok} onWybierz={setWidok} pozycje={[
       { klucz: "towar", etykieta: "Oferta i towar" },
       { klucz: "dobor", etykieta: "Dobór" },
-      { klucz: "klient", etykieta: "Klient" },
-      { klucz: "wiedza", etykieta: "Wiedza" },
+      { klucz: "klient", etykieta: "Klient", ile: ileKlient },
+      { klucz: "wiedza", etykieta: "Wiedza", ile: ileWiedza },
     ]} />
 
     {/* JEDEN scroller na kolumnę, jak przy zwrotach: dwa zagnieżdżone dają

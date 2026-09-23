@@ -341,18 +341,37 @@ export function kandydaciDoboru(
     pomin("zastosowanie", "agent nie wpisał marki i modelu maszyny", DANE("markę i model"));
   } else {
     const klucz = kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, dobor.dane.wariant);
+    /* ── BEZ WARIANTU, GDY DOKŁADNY KLUCZ MILCZY (23 września 2026) ─────────
+       Decyzja właściciela po zrzucie: agent wpisał HECHT 1803S z wariantem
+       DYM1182c, a lista zgodności oferty dała wiedzę „Hecht 1803S" — bez
+       wariantu. Klucz jest dokładny, więc szczebel oddał zero i właściwy nóż
+       stał wśród trafień po samym tekście.
+
+       Druga próba idzie po marce i modelu, ale TYLKO gdy pierwsza nic nie
+       dała: wpis dla wariantu jest mocniejszy i nie wolno go rozmyć. Kandydat
+       z drugiej próby ma co najwyżej „prawdopodobne", bo wariant bywa właśnie
+       tym, co zmienia część. Negatyw z drugiej próby też stoi — ostrzeżenie
+       o modelu bazowym jest warte zobaczenia, a podpis mówi, skąd jest. */
+    const bezWariantu = dobor.dane.wariant
+      ? kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, null) : null;
+    const dokladne = zastosowaniaModelu(klucz, database);
+    const zapas = bezWariantu && !dokladne.some((z) => z.polaryzacja !== "nie_pasuje")
+      ? zastosowaniaModelu(bezWariantu, database) : [];
+    const dopisek = ` — wpis dla ${dobor.dane.marka} ${dobor.dane.model} bez wariantu, wariant niesprawdzony`;
     let ile = 0;
-    for (const z of zastosowaniaModelu(klucz, database)) {
+    for (const [z, zZapasu] of [...dokladne.map((z) => [z, false] as const), ...zapas.map((z) => [z, true] as const)]) {
       const w = towar(database, z.twId);
       if (z.polaryzacja === "nie_pasuje") {
         negatywne.push({ twId: z.twId, symbol: w?.symbol ?? z.symbol, nazwa: w?.nazwa ?? null,
-          powod: z.zdaniePowodu ?? "nie pasuje", zrodlo: z.zdanieZrodla, at: z.rozstrzygnietoAt ?? z.zaproponowanoAt });
+          powod: z.zdaniePowodu ?? "nie pasuje", zrodlo: z.zdanieZrodla + (zZapasu ? dopisek : ""),
+          at: z.rozstrzygnietoAt ?? z.zaproponowanoAt });
         continue;
       }
       if (!w) continue;
       ile++;
       dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "zastosowanie",
-        pewnosc: z.pewnosc, zrodlo: z.zdanieZrodla, ostrzezenia: [] });
+        pewnosc: zZapasu && z.pewnosc === "potwierdzone" ? "prawdopodobne" : z.pewnosc,
+        zrodlo: z.zdanieZrodla + (zZapasu ? dopisek : ""), ostrzezenia: [] });
     }
     drogi.set("zastosowanie", { droga: "zastosowanie", sprawdzona: true, wynikow: ile });
   }

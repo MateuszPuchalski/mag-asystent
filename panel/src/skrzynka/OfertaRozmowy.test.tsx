@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { OfertaRozmowy as Dane, StanZdjeciaOferty } from "../api/typy";
 
 /* Zdjęcie oferty (0.213.0): pobranie idzie `fetch`em, a w jsdomie nie ma dokąd
@@ -17,10 +18,11 @@ const BEZ_KARTOTEKI: Dane["kartoteka"] = {
   zrodlo: "Oferty jeszcze nie pobrano z Allegro", powod: "oferta_niepobrana",
 };
 
-const dane = (pobrana: Dane["pobrana"], kartoteka = BEZ_KARTOTEKI): Dane => ({
+const dane = (pobrana: Dane["pobrana"], kartoteka = BEZ_KARTOTEKI, zgodnosc: Dane["zgodnosc"] = null): Dane => ({
   externalId: "12096815384",
   link: "https://allegro.pl/oferta/12096815384",
   zrodlo: "wiadomosc",
+  zgodnosc,
   pobrana,
   kartoteka,
 });
@@ -98,5 +100,39 @@ describe("zdjęcie listingowe oferty", () => {
     /* Zdanie, nie milczenie: brak obrazu naprawi się sam przy najbliższej
        synchronizacji, a agent ma prawo o tym wiedzieć. */
     expect(screen.getByText(/Zdjęcie oferty dociągnie/)).toBeInTheDocument();
+  });
+});
+
+/* ── Lista „Pasuje do" (23 września 2026) ────────────────────────────────────
+   Zwinięta, bo bywa na dwieście pozycji. Na wierzchu stoi odpowiedź — czy
+   maszyna z doboru jest na liście — a „nie ma" nie udaje „nie pasuje". */
+describe("lista zgodności oferty", () => {
+  const Z = (n: Partial<NonNullable<Dane["zgodnosc"]>> = {}): NonNullable<Dane["zgodnosc"]> => ({
+    lista: ["Faworyt 4618", "Hecht 1803S", "Honda HRX 476"], maszyna: null, trafienia: [],
+    wariantSprawdzony: true, ...n,
+  });
+
+  it("zwinięta z liczbą, rozwija się na miejscu", async () => {
+    render(<OfertaRozmowy oferta={dane(null, BEZ_KARTOTEKI, Z())} />);
+    const p = screen.getByRole("button", { name: /Pasuje do \(3\)/ });
+    expect(screen.queryByText("Hecht 1803S")).toBeNull();
+    await userEvent.click(p);
+    expect(screen.getByText("Faworyt 4618")).toBeInTheDocument();
+  });
+
+  it("maszyna z doboru na liście: widać bez rozwijania, a pozycja jest podświetlona", async () => {
+    render(<OfertaRozmowy oferta={dane(null, BEZ_KARTOTEKI, Z({
+      maszyna: "HECHT 1803S DYM1182c", trafienia: ["Hecht 1803S"], wariantSprawdzony: false }))} />);
+    expect(screen.getByText(/HECHT 1803S DYM1182c jest na liście/)).toBeInTheDocument();
+    expect(screen.getByText(/wariant niesprawdzony/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Pasuje do/ }));
+    expect(screen.getByText("Hecht 1803S").closest("li")).toHaveTextContent("maszyna klienta");
+  });
+
+  it("brak na liście mówi, że to nie dowód; bez listy bloku nie ma", () => {
+    const { rerender } = render(<OfertaRozmowy oferta={dane(null, BEZ_KARTOTEKI, Z({ maszyna: "Stiga Combi 48" }))} />);
+    expect(screen.getByText(/nie ma na liście; to nie dowód, że nie pasuje/)).toBeInTheDocument();
+    rerender(<OfertaRozmowy oferta={dane(null)} />);
+    expect(screen.queryByLabelText("Pasuje do")).toBeNull();
   });
 });

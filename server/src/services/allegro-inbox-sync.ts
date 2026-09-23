@@ -453,7 +453,14 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
     "SELECT id FROM conversation WHERE channel_account_id=? AND external_conversation_id=?",
   ).get(konto, thread.id) as { id: number }).id);
 
-  for (const message of messages) {
+  /* OD NAJSTARSZEJ (23 września 2026). Allegro oddaje wiadomości od
+     najnowszej, a wpis w tej kolejności dawał starszemu dopiskowi klienta
+     wyższe `id` — i wysyłka odmawiała 409, bo kontrola świeżości szła po
+     `id`. Kontrola czyta już po czasie; ten porządek sprawia, że nowe wiersze
+     w ogóle nie mają rozjazdu. `createdAt` to ISO 8601, więc porównanie
+     napisów jest porównaniem chwil. */
+  const odNajstarszej = [...messages].sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
+  for (const message of odNajstarszej) {
     /* KIERUNEK Z `isInterlocutor`. Rozmówca to ten, który nie jest nami,
        więc jego wiadomość jest przychodząca. Do 0.151.0 stało tu porównanie
        z rolą `SELLER`, której Allegro nie przysyła — na prawdziwej

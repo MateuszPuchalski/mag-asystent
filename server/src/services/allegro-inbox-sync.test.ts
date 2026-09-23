@@ -189,6 +189,24 @@ test("wiadomość niesie własną datę i temat, nie datę wątku", async () => 
   assert.equal(temat, "Rozrusznik 148", "temat rozmowy to temat, nie login rozmówcy");
 });
 
+/* Allegro oddaje wiadomości OD NAJNOWSZEJ (23 września 2026). Wpis w tej
+   kolejności dawał starszemu dopiskowi wyższe `id`, a kontrola świeżości
+   wysyłki odmawiała wtedy 409 przy każdej odpowiedzi w takiej rozmowie. */
+test("paczka od najnowszej wchodzi od najstarszej: id rosną razem z czasem", async () => {
+  const database = mkDb();
+  const query = async (url: string): Promise<unknown> => url.includes("/messages")
+    ? { messages: [
+        message("m-2", { createdAt: "2026-09-22T21:57:00Z" }),
+        message("m-1", { createdAt: "2026-09-22T21:56:00Z" }),
+      ], offset: 0, limit: 20 }
+    : { threads: Number(new URL(url).searchParams.get("offset")) ? [] : [thread(1)],
+        offset: 0, limit: 20 };
+  await synchronizujAllegroInbox({ database, query, apiUrl: "https://api.test" });
+  const kolejnosc = (database.prepare("SELECT external_message_id AS e FROM message ORDER BY id")
+    .all() as Array<{ e: string }>).map((w) => w.e);
+  assert.deepEqual(kolejnosc, ["m-1", "m-2"]);
+});
+
 /* Powtórny przebieg nie może podmienić wiersza wiadomości: wiszą na nim szkic
    (`expected_last_message_id`) i `zadanie_terenowe.message_id`. */
 test("powtórna synchronizacja nie dubluje ani nie podmienia wiadomości", async () => {

@@ -43,7 +43,7 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
   const wskaz = useWskazOferte();
   const z = zamowienie.pobrane;
   const doWskazania = Boolean(z && z.pozycje.length > 1 && ofertaRozmowy === null);
-  return <section className="border-b bg-slate-50 px-4 py-3 text-sm" aria-label="Zamówienie">
+  return <section className="border-b px-4 py-3 text-sm" aria-label="Zamówienie">
     <div className="flex flex-wrap items-center gap-2">
       <NaglowekSekcji ikona={<ShoppingCart size={13} />}>Zamówienie</NaglowekSekcji>
       {/* UUID SKRÓCONY (0.249.0). Pełne trzydzieści sześć znaków w wadze treści
@@ -77,7 +77,7 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
       ? <>
           <ul className="mt-2 space-y-1">
             {z.pozycje.map((p, i) => <li key={`${p.offerId}-${i}`}
-              className="flex items-start gap-2 rounded bg-white px-2 py-1.5 text-xs"
+              className="flex items-start gap-2 rounded bg-slate-50 px-2 py-1.5 text-xs"
               aria-label={`Pozycja: ${p.nazwa}`}>
               {/* `stan` od 0.217.0: bez niego kafel pisał „bez zdjęcia" także
                   wtedy, gdy o obraz nikt jeszcze nie pytał — ta sama pomyłka,
