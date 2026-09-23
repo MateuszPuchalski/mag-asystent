@@ -34,6 +34,12 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.8 — 23 września 2026
+
+**Reguła 3 szkicu bez słowa „teraz”.** Zdanie „ta lista niesie teraz
+sprzeczności” odnosiło się do wcześniejszej instrukcji, której model nie
+widział. Jest „też”. Ósma z dziewięciu poprawek audytu promptów.
+
 ## 0.482.7 — 23 września 2026
 
 **Reguła 1b szkicu bez opowieści o przedfiltrze.** Zasada zostaje: zdanie
