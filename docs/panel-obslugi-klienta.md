@@ -4867,6 +4867,49 @@ już `n`.
 `zwrot_rozliczony_bez_korekty` stała wyłącznie w stanie systemu. Teraz jest też
 w pasku rozjazdów zwrotów.
 
+### 25a.26. Mniej kliknięć przy zwrocie (0.479.0)
+
+Drugi przegląd z 23 września 2026, tym razem samego ekranu. Siedem poprawek
+wybranych przez właściciela. Każda zdejmuje ruch, który operator i tak
+wykonywał za każdym razem.
+
+**Wyjątki z klawiatury.** `-` otwiera „wróciło mniej" przy pierwszej
+nieprzeliczonej pozycji z kilkoma sztukami. `D` w DO ZWROTU otwiera
+potrącenie przy pierwszej pozycji bez potrącenia. Klawisz tylko otwiera
+formularz: kwotę i powód wpisuje człowiek. Enter w polu zapisuje, Escape
+zamyka.
+
+**Pasek etapów po korekcie.** Zwrot z korektą, a bez wypłaty, stoi od 0.476.0
+w DO ZWROTU. Pasek pokazywał go wtedy przed korektą. Teraz rysuje drogę
+decyzja, ocena, korekta, pieniądze i pyta „Oddać pieniądze?".
+
+**Paczki w drodze na końcu listy.** Zwrot bez terminu to paczka, która
+jeszcze nie przyszła. Stoi pod przegródką „Paczka jeszcze w drodze", pod
+zwrotami, przy których jest co robić.
+
+**Krótsze napisy.** Pudełko korekty mówi jedno zdanie zamiast trzech. Błąd
+automatu ZW pokazuje pierwsze zdanie, a zrzut pól chowa pod rozwinięciem.
+Zdanie o przycisku pieniędzy zeszło, bo pieniądze mają od 0.476.0 własny
+pasek. Nieznany kod mówi „Nieodebrana paczka? Szukaj po kliencie", a listę
+przeszukanych pól trzyma w podpowiedzi.
+
+**Pewne kartoteki jednym ruchem.** Przy więcej niż jednej propozycji `sku`
+albo `pamiec` staje przycisk „Zatwierdź pewne kartoteki". Propozycje
+`jedyna_pozycja` i `nazwa_w_zamowieniu` to zgadywanie, więc zostają przy
+pozycji. Pomyłka kartoteki wraca towarem na złej półce.
+
+**Podsunięty dokument sprzedaży.** Jedyny kandydat albo jedyny pewny stoi
+wyróżniony z przyciskiem „To ten dokument". Kilku niepewnych ekran nie
+podsuwa, bo ich kolejność to sama data. W DO KOREKTY pierwszy Enter
+przyjmuje podsunięty dokument, bo automat ZW bez niego nie ruszy. Pasek
+skrótów mówi wtedy „przyjmij dokument sprzedaży".
+
+**Nieznany kod otwiera szukanie po kliencie.** Po chybionym skanie pole
+loginu, nazwiska albo telefonu otwiera się samo i ma kursor. Przy
+nieodebranej paczce numer z naklejki nie trafia nigdy, więc ten klik
+następował zawsze. Po Escape przycisk „Szukaj po kliencie" otwiera pole
+z powrotem.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi

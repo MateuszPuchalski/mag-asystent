@@ -2582,7 +2582,7 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
-### Aktualizacja do 0.479.0 — „Pasuje do” ze wszystkich ofert
+### Aktualizacja do 0.480.0 — „Pasuje do” ze wszystkich ofert
 
 **Panel trzeba przebudować, a serwer zrestartować.** Kolumna
 `offer_snapshot.pasuje_do_zebrano_at` dochodzi sama przy starcie.

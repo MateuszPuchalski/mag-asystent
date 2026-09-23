@@ -49,6 +49,16 @@ export interface AkcjeKlawiszy {
    * dostaje stan z serwera. Ekran zna klawisze, nie reguły pieniędzy.
    */
   oddajPieniadze?: () => void;
+  /**
+   * DO OCENY i DO ZWROTU, klawisz `-` (0.479.0): otwiera „wróciło mniej"
+   * przy pierwszej pozycji z więcej niż jedną sztuką, jeszcze nieprzeliczonej.
+   */
+  ilosc?: () => void;
+  /**
+   * DO ZWROTU, klawisz `D` (0.479.0): otwiera potrącenie przy pierwszej
+   * pozycji bez potrącenia. Tylko OTWIERA — kwotę i powód wpisuje człowiek.
+   */
+  potracenie?: () => void;
 }
 
 /**

@@ -19,6 +19,17 @@ import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
    wiersz produktu (`Pozycje.tsx`) — operator ocenia towar, patrząc na towar,
    a nie na jego nazwę wypisaną drugi raz obok.                              */
 
+/**
+ * Pierwsze zdanie komunikatu (0.479.0). Błąd automatu ZW bywa ścianą:
+ * zrzut kilkudziesięciu pól. Pierwsze zdanie mówi, co się stało — reszta jest
+ * materiałem dla serwisu i rozwija się na żądanie.
+ */
+export function pierwszeZdanie(tekst: string, max = 160): string {
+  const m = /^.*?[.!?](\s|$)/.exec(tekst);
+  const zdanie = (m ? m[0] : tekst).trim();
+  return zdanie.length <= max ? zdanie : zdanie.slice(0, max - 1) + "…";
+}
+
 type Props = {
   zwrot: Zwrot;
   onWerdykt: (decyzja: "przyjety" | "odrzucony", powod: string | null) => void;
@@ -171,20 +182,33 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
           robiło to wyłącznie biuro. Przy zleconym automacie zdanie mówi, że numer
           przyjdzie sam — inaczej biuro wystawiłoby drugi dokument obok. Pole
           numeru zostaje: wpisany numer anuluje czekające zlecenie. */}
+      {/* JEDNA LINIJKA ZAMIAST AKAPITU (0.479.0) — przegląd zwrotów
+          z 23 września: pudełko powtarzało dwa, trzy zdania przy każdym
+          zwrocie. Zostaje to, co każe coś zrobić albo czegoś nie robić;
+          reszta idzie do podpowiedzi. Błąd automatu niesie od 0.456.0 cały
+          zrzut pól, więc na ekranie stoi jego PIERWSZE zdanie, a całość
+          rozwija się na żądanie. */}
       {zwWDrodze
-        ? <p className="mb-2 text-xs text-slate-500">
-            Automat wystawia ZW w Subiekcie — numer wpisze się tu sam w ciągu minuty.
-            Nie wystawiaj go ręcznie.
-            {zw?.blad && <span className="block">Czeka: {zw.blad}</span>}
+        ? <p className="mb-2 text-xs text-slate-600"
+            title="Numer wpisze się tu sam w ciągu minuty. Wpisany ręcznie anuluje zlecenie automatu.">
+            Automat wystawia ZW — nie wystawiaj go ręcznie.
+            {zw?.blad && <span className="block">Czeka: {pierwszeZdanie(zw.blad)}</span>}
           </p>
         : zw?.status === "error"
-          ? <p className="mb-2 text-xs text-ranga-zle">
-              Automat nie wystawił ZW: {zw.blad ?? "bez opisu błędu."} Wystaw go w Subiekcie
-              i przepisz tu numer — to zamyka zwrot.
-            </p>
-          : <p className="mb-2 text-xs text-slate-500">
+          ? <div className="mb-2 text-xs text-ranga-zle">
+              <p title="Wystaw ZW w Subiekcie i przepisz tu numer — to zamyka zwrot.">
+                Automat nie wystawił ZW: {pierwszeZdanie(zw.blad ?? "bez opisu błędu.")}
+                {" "}Wystaw go ręcznie.</p>
+              {zw.blad && zw.blad.length > pierwszeZdanie(zw.blad).length &&
+                <details className="mt-1 text-slate-600">
+                  <summary className="cursor-pointer">pełna treść błędu</summary>
+                  <p className="mt-1 max-h-40 overflow-y-auto break-words">{zw.blad}</p>
+                </details>}
+            </div>
+          : <p className="mb-2 text-xs text-slate-600"
+              title="Numer zamyka zwrot. Wpisany ręcznie wygrywa z automatem.">
               {/* Wprost, bo inaczej ekran obiecywałby, że zrobi to sam. */}
-              Korektę wystawiasz w Subiekcie. Tu przepisz jej numer — to zamyka zwrot.
+              Korektę wystawiasz w Subiekcie — tu przepisz jej numer.
             </p>}
       <div className="flex flex-wrap items-center gap-2">
         <Pole id="numer-korekty" className="w-56" value={numer} aria-label="Numer korekty"
@@ -195,14 +219,10 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
           <kbd className="rounded border border-black/20 px-1 text-xs">Enter</kbd> Zapisz korektę
         </Przycisk>
       </div>
-      {/* ZDANIE O PIENIĄDZACH MÓWI PRAWDĘ OD AUDYTU (15 września 2026). Stało
-          tu „oddajesz w panelu Allegro; panel ich nie przelewa" — prawdziwe
-          w 0.162.0, fałszywe od 0.190.0. Na nagraniu z pracy operator oddawał
-          pieniądze w Sales Center, obok gotowego przycisku. Korekta zamyka
-          zwrot, ale przycisku już nie chowa. */}
-      <p className="mt-1 text-xs text-slate-500">
-        Pieniądze oddajesz przyciskiem ODDAJ PIENIĄDZE niżej — także po zapisaniu korekty.
-      </p>
+      {/* Zdanie o pieniądzach ZESZŁO (0.479.0). Od 0.476.0 zwrot
+          z korektą, a bez wypłaty, wraca do DO ZWROTU z własnym paskiem
+          pieniędzy — przypominanie o tym tutaj przy każdym zwrocie mówiło
+          to samo drugi raz, zanim było potrzebne. */}
       {blad && <Blad>{blad}</Blad>}
     </div>;
   }

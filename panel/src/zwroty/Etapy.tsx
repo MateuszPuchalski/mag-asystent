@@ -43,10 +43,24 @@ const NAZWY: Record<Kubelek, string> = {
 
 const DROGA: Kubelek[] = ["decyzja", "ocena", "zwrot", "korekta", "zamkniety"];
 
-export function Etapy({ kubelek }: { kubelek: Kubelek }) {
-  const droga: Kubelek[] = kubelek === "odrzucony" ? ["decyzja", "odrzucony"] : DROGA;
+/* ── PIENIĄDZE PO KOREKCIE (0.479.0) ────────────────────────────────────
+   Od 0.476.0 zwrot z korektą wraca do DO ZWROTU, póki pieniądze nie wyjdą.
+   Oś rysowała wtedy korektę jako krok PRZED nami, choć numer już stał —
+   przegląd zwrotów z 23 września. Kolejność idzie więc za faktem: korekta za
+   nami, zwrot pieniędzy teraz. Podpowiedź mówi, na co ten przystanek czeka. */
+const DROGA_PO_KOREKCIE: Kubelek[] = ["decyzja", "ocena", "korekta", "zwrot", "zamkniety"];
+
+export function Etapy({ kubelek, poKorekcie = false }: {
+  kubelek: Kubelek;
+  /** Zwrot ma już korektę, a czeka na wyjście pieniędzy (0.479.0). */
+  poKorekcie?: boolean;
+}) {
+  const droga: Kubelek[] = kubelek === "odrzucony" ? ["decyzja", "odrzucony"]
+    : poKorekcie && kubelek === "zwrot" ? DROGA_PO_KOREKCIE : DROGA;
   const teraz = droga.indexOf(kubelek);
-  const pytanie = (k: Kubelek) => KUBELKI.find((b) => b.id === k)?.pytanie ?? "";
+  const pytanie = (k: Kubelek) => poKorekcie && k === "zwrot"
+    ? "Oddać pieniądze?"
+    : KUBELKI.find((b) => b.id === k)?.pytanie ?? "";
 
   return <ol aria-label="Etapy zwrotu"
     className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 px-4 py-2">

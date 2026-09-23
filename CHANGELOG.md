@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.479.0 — 23 września 2026
+## 0.480.0 — 23 września 2026
 
 **„Pasuje do” ze wszystkich ofert Allegro: zbiórka do wiedzy i sprawdzenie
 ofert.** Lista „Pasuje do” to nasze spisane twierdzenie, do czego pasuje
@@ -69,6 +69,27 @@ zapytał, po dwadzieścia pozycji na szkic. Oferta bez pytania nie oddawała nic
 
 Kolumna `offer_snapshot.pasuje_do_zebrano_at`, dwie trasy zapisu (licznik 28),
 429 z czasem przerwy w kliencie panelu.
+
+## 0.479.0 — 23 września 2026
+
+**Zwroty: mniej kliknięć i mniej czytania.** Siedem poprawek z przeglądu
+ekranu zwrotów, wybranych przez właściciela. Opis w
+`docs/panel-obslugi-klienta.md` §25a.26.
+
+- **Wyjątki z klawiatury:** `-` otwiera „wróciło mniej", `D` w DO ZWROTU
+  otwiera potrącenie. Enter zapisuje, Escape zamyka.
+- **Pasek etapów** zwrotu czekającego na pieniądze po korekcie pokazuje
+  korektę jako zrobioną i pyta „Oddać pieniądze?".
+- **Paczki jeszcze w drodze** stoją na końcu listy, pod własną przegródką.
+- **Krótsze napisy:** pudełko korekty w jednym zdaniu, błąd automatu ZW
+  z rozwijanym zrzutem pól, nieznany kod bez akapitu.
+- **„Zatwierdź pewne kartoteki”** zatwierdza jednym ruchem propozycje `sku`
+  i `pamiec`. Zgadywane zostają przy pozycji.
+- **Podsunięty dokument sprzedaży:** jedyny albo jedyny pewny kandydat stoi
+  wyróżniony. W DO KOREKTY przyjmuje go Enter.
+- **Nieznany kod** otwiera od razu szukanie po kliencie, z kursorem w polu.
+
+Bez migracji i bez zmian w `wertis.env`.
 
 ## 0.477.0 — 23 września 2026
 

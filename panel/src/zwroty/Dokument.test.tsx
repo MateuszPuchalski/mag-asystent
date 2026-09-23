@@ -59,6 +59,34 @@ describe("Dokument sprzedaży przy zwrocie", () => {
     expect(onWskaz).toHaveBeenCalledWith(501);
   });
 
+  it("jedyny kandydat stoi podsunięty — jeden przycisk, bez szukania wzrokiem (0.479.0)", async () => {
+    const onWskaz = pokaz(BRAK, [KANDYDAT()]);
+    await userEvent.click(screen.getByRole("button", { name: /To ten dokument/ }));
+    expect(onWskaz).toHaveBeenCalledWith(500);
+  });
+
+  it("jedyny PEWNY z kilku jest podsunięty, reszta czeka pod „Albo inny”", () => {
+    pokaz(BRAK, [KANDYDAT({ dokId: 501, numer: "PA 88/2026" }),
+      KANDYDAT({ dokId: 500, pewny: true, powody: ["numer zamówienia stoi na dokumencie"] })]);
+    expect(screen.getByRole("button", { name: /To ten dokument/ })).toBeInTheDocument();
+    expect(screen.getByText(/Albo inny/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "PA 88/2026" })).toBeInTheDocument();
+  });
+
+  it("kilku niepewnych NIE podsuwa nikogo — kolejność to sama data", () => {
+    /* Data przy sprzedaży codziennej nie mówi nic, a zły dokument to korekta
+       do cudzej sprzedaży. Wybiera człowiek, patrząc na wszystkich. */
+    pokaz(BRAK, [KANDYDAT(), KANDYDAT({ dokId: 501, numer: "PA 88/2026" })]);
+    expect(screen.queryByRole("button", { name: /To ten dokument/ })).toBeNull();
+    expect(screen.getByText(/wskaż właściwy/)).toBeInTheDocument();
+  });
+
+  it("Enter na przycisku pokazuje się tylko, gdy ekran go naprawdę obsługuje", () => {
+    render(<Dokument faktura={BRAK} kandydaci={[KANDYDAT()]} trwa={false} blad=""
+      onWskaz={vi.fn()} enter />);
+    expect(screen.getByRole("button", { name: /To ten dokument/ })).toHaveTextContent("Enter");
+  });
+
   it("brak kandydatów tłumaczy się, zamiast wyglądać na awarię", () => {
     /* „Nie znalazłem" bez powodu czyta się jak zepsuty import, a bywa po
        prostu starą sprzedażą albo pozycją bez kartoteki. */
