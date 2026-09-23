@@ -34,6 +34,13 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.6 — 23 września 2026
+
+**Instrukcja szkicu mówi, co odrzuca system, zamiast „nie wolno złamać”.**
+Nagłówek zasad nazywa teraz odrzucenia: fakt albo zdjęcie spoza listy, numer
+bez twierdzenia i tekst ponad limit znaków. To ta sama wiedza, którą sprawdza
+`copilot-szkic.ts`. Szósta z dziewięciu poprawek audytu promptów.
+
 ## 0.482.5 — 23 września 2026
 
 **Uzasadnienie klasyfikacji bez sufitu „do piętnastu słów”.** Instrukcja mówi
