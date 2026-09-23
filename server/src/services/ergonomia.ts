@@ -23,8 +23,8 @@ import { etykietaUrzadzenia } from "./szukanie-kolektora.js";
 
    DWA POMIARY CZASU I RAPORT MÓWI, KTÓRY JEST KTÓRY. `scan_timing` wysyła
    wyłącznie wspólna droga skanu (`ScanRouter`), a woła ją tylko ekran
-   główny. Do 0.481.0 była to jedyna liczba o czasie — i „p95 hali" w panelu
-   mówiło o jednej czynności. Od 0.481.0 kolektor mierzy KAŻDE żądanie
+   główny. Do 0.482.0 była to jedyna liczba o czasie — i „p95 hali" w panelu
+   mówiło o jednej czynności. Od 0.482.0 kolektor mierzy KAŻDE żądanie
    (`czasy_zadan`, kubełki per ekran i trasa), więc rozkładanie dostaw, koszy
    i kartonów ma wreszcie własne liczby. Stary pomiar zostaje pod własną,
    wąską nazwą, bo to jedyna historia sprzed tego wydania.

@@ -23,7 +23,7 @@ const ALLOWED = new Set([
      aplikacji. Biuro czyta to w zakładce DZIENNIK ZDARZEŃ, z filtrem
      po urządzeniu. */
   "siec_przerwa",
-  /* Czasy odpowiedzi każdego żądania, per ekran i trasa (0.481.0). Paczka
+  /* Czasy odpowiedzi każdego żądania, per ekran i trasa (0.482.0). Paczka
      z kubełkami co 5 minut — reguły w `android/core/.../net/CzasyZadan.kt`,
      odczyt w `services/ergonomia.ts`. */
   "czasy_zadan",
