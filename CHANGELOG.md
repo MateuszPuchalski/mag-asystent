@@ -34,6 +34,15 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.3 — 23 września 2026
+
+**Wysiłek idzie tylko do modeli, które go przyjmują, przy każdym zadaniu
+Copilota.** Haiku 4.5 i Sonnet 4.5 odrzucają `output_config.effort` błędem
+400. Warunek `wspieraWysilek` stał dotąd tylko przy klasyfikacji. Po
+ustawieniu `COPILOT_MODEL` na taki model padałby każdy szkic, dopytanie,
+klucz modelu i karta reklamacyjna. Test obok pilnuje szkicu i klucza.
+Trzecia z dziewięciu poprawek audytu promptów.
+
 ## 0.482.2 — 23 września 2026
 
 **Instrukcje Copilota nie każą już „zwrócić wyłącznie JSON”.** Kształt

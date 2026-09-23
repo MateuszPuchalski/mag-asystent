@@ -617,8 +617,10 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
       max_tokens: 4500,
       system: [{ type: "text", text: INSTRUKCJA_SZKICU, cache_control: { type: "ephemeral" } }],
       output_config: {
-        /* Średni wysiłek: tu powstaje tekst dla klienta, nie etykieta. */
-        effort: "medium",
+        /* Średni wysiłek: tu powstaje tekst dla klienta, nie etykieta.
+           Warunek jak przy klasyfikacji: `COPILOT_MODEL` na Haiku 4.5 dałby
+           inaczej 400 na każdym szkicu. */
+        ...(wspieraWysilek(config.copilot.model) ? { effort: "medium" as const } : {}),
         format: zodOutputFormat(Szkic),
       },
       /* ── OBRAZY PRZED TEKSTEM ─────────────────────────────────────────────
@@ -751,7 +753,7 @@ export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<Odpowi
       system: [{ type: "text", text: INSTRUKCJA_PYTANIA, cache_control: { type: "ephemeral" } }],
       output_config: {
         /* Średni wysiłek: to jest rozstrzyganie wątpliwości, nie etykieta. */
-        effort: "medium",
+        ...(wspieraWysilek(config.copilot.model) ? { effort: "medium" as const } : {}),
         format: zodOutputFormat(OdpowiedzPytania),
       },
       messages: [{
@@ -847,7 +849,7 @@ export async function nadawcaKluczaAnthropic(
       system: [{ type: "text", text: INSTRUKCJA_KLUCZA, cache_control: { type: "ephemeral" } }],
       output_config: {
         /* Niski wysiłek: to jest rozpoznanie oznaczenia, nie rozumowanie. */
-        effort: "low",
+        ...(wspieraWysilek(config.copilot.model) ? { effort: "low" as const } : {}),
         format: zodOutputFormat(KluczModelu),
       },
       messages: [{
@@ -1076,7 +1078,7 @@ export const nadawcaRozpoznaniaAnthropic: NadawcaRozpoznania =
         output_config: {
           /* Wyżej niż przy klasyfikacji: to czytanie ze zrozumieniem długiej,
              bywa że trójstronnej rozmowy, a nie przypisanie etykiety. */
-          effort: "medium",
+          ...(wspieraWysilek(config.copilot.model) ? { effort: "medium" as const } : {}),
           format: zodOutputFormat(Karta),
         },
         /* ── OBRAZY PRZED TEKSTEM (0.283.0) ──────────────────────────────

@@ -2,7 +2,8 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import Anthropic from "@anthropic-ai/sdk";
 import {
-  _ustawKlienta, nadawcaAnthropic, nadawcaSzkicuAnthropic, wspieraWysilek,
+  _ustawKlienta, nadawcaAnthropic, nadawcaKluczaAnthropic, nadawcaSzkicuAnthropic,
+  wspieraWysilek,
 } from "./copilot.anthropic.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
@@ -169,6 +170,31 @@ test("klasyfikacja wysyła model z modelKlasyfikacji i oddaje go w odpowiedzi", 
     assert.equal(odp.model, "claude-haiku-4-5", "księga ma zapisać model, którym naprawdę liczono");
   } finally {
     (config.copilot as { modelKlasyfikacji: string }).modelKlasyfikacji = bylo;
+    _ustawKlienta(null);
+  }
+});
+
+/* Ten sam warunek przy pozostałych zadaniach: `COPILOT_MODEL` na Haiku 4.5
+   dawał 400 na każdym szkicu, dopytaniu, kluczu i karcie reklamacyjnej. */
+test("szkic i klucz modelu też nie wysyłają wysiłku do Haiku 4.5", async () => {
+  const { config } = await import("../config.js");
+  const bylo = config.copilot.model;
+  (config.copilot as { model: string }).model = "claude-haiku-4-5";
+  const wyslane: Record<string, unknown>[] = [];
+  _ustawKlienta({ messages: { parse: async (p: Record<string, unknown>) => {
+    wyslane.push(p);
+    return { parsed_output: null, model: undefined, stop_reason: "end_turn",
+      usage: { input_tokens: 1, output_tokens: 1 } };
+  } } } as unknown as Anthropic);
+  try {
+    await nadawcaSzkicuAnthropic(TRESC, FAKTY).catch(() => null);
+    await nadawcaKluczaAnthropic("FS450", { kartoteka: "Nóż", oferta: null, marki: [] });
+    assert.equal(wyslane.length, 2);
+    for (const p of wyslane) {
+      assert.equal("effort" in (p.output_config as object), false, "Haiku 4.5 odrzuca effort");
+    }
+  } finally {
+    (config.copilot as { model: string }).model = bylo;
     _ustawKlienta(null);
   }
 });
