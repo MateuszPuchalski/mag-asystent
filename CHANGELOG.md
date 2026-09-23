@@ -34,6 +34,13 @@ historii nie przepisujemy.
 ---
 
 
+## 0.468.1 — 23 września 2026
+
+**Automatyczny ZW działa: przyczyną odmów była pusta kategoria wydania.**
+Właściciel potwierdził, że po wpisaniu `SFERA_ZW_WYDANIE_KAT_ID` do
+`wertis.env` worker wystawia ZW sam. Wynik i nauczka stoją w
+`docs/sfera-com.md` §2m. Kodu to wydanie nie zmienia.
+
 ## 0.468.0 — 23 września 2026
 
 **Zakładka zwrotów słucha czytnika zawsze i odróżnia etykietę od EAN-u towaru.**

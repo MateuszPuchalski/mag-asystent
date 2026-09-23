@@ -711,7 +711,18 @@ Kategorii nie zgaduje. Numer bierze z `wertis.env` (`SFERA_ZW_WYDANIE_KAT_ID`),
 a odczytuje go `--zrzut` ZW biura. Zrzut podaje od tego wydania wartości
 `WydanieKatId` i `PrzyjecieKatId`.
 
-`[WERYFIKUJ]` Czy ZW z `Wystawil` i `WydanieKatId` przechodzi zapis.
+**Przyczyna znaleziona: pusta kategoria wydania** (właściciel, 23 września
+2026). Po wpisaniu `SFERA_ZW_WYDANIE_KAT_ID` do `wertis.env` worker wystawia
+ZW sam. Odmowa `0x80040F20` znaczyła więc brak kategorii, której okno
+Subiekta nigdy nie pokazuje, bo wypełnia ją samo. Sfera przy tym nie podała
+słowa o przyczynie, a `SprawdzPoprawnosc()` przepuściło szkic.
+
+Nauczka dla następnego dokumentu z COM: zestawić PEŁNY zrzut szkicu z ręcznym
+dokumentem, a nie tylko pola z listy. Od 0.456.0 do 0.461.0 szukanie szło
+wśród pól, które zrzut wypisywał, a przyczyna stała w polu spoza listy.
+
+Bez klucza worker dalej próbuje zapisać i treść odmowy mówi, czego zabrakło.
+Klucz opisuje `wertis.env.example`.
 
 **Od 0.456.0 worker robi ten zrzut sam, w chwili odmowy.** Właściciel zapytany,
 czy uruchomi sondę z komunikatu, odpowiedział: „niech robi to sam". Po odmowie
