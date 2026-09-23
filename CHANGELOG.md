@@ -48,7 +48,8 @@ zamówienie w panelu Allegro, więc numeru nie trzeba przepisywać. Przy
 nieznanym kodzie ta sama droga stoi jako „Szukaj po kliencie".
 
 Wcześniej zarejestrowane paczki zostają w kolejce ze swoim znacznikiem.
-Trasa rejestracji na serwerze zostaje, ale panel jej nie woła.
+Trasa `POST /api/obsluga/zwroty/nieodebrana` zniknęła z serwera, więc
+umowa tras POST zwrotów schodzi z 36 do 35.
 
 - **[wymaga działania]** Przebuduj panel.
 

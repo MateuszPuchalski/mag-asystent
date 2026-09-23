@@ -1443,6 +1443,14 @@ export function wskazSklad(
 /**
  * Rejestracja paczki, która wróciła NIEODEBRANA (0.172.0).
  *
+ * ── BEZ TRASY OD 0.451.0 ───────────────────────────────────────────────────
+ * Decyzją właściciela rejestracja zniknęła z panelu i z serwera. Funkcja
+ * zostaje, bo jest JEDYNĄ definicją kształtu takiego wiersza: przedrostek
+ * identyfikatora, klucze pozycji, daty powrotu. Baza produkcyjna ma te wiersze,
+ * a testy odczytu — skan po numerze listu, migracja, szukanie — budują je
+ * właśnie nią. Wiersz złożony w teście ręcznie rozjechałby się z prawdziwym
+ * przy pierwszej zmianie. Nowa trasa do niej wraca tylko nową decyzją.
+ *
  * Allegro takiego bytu nie zna: `CustomerReturn` powstaje z DEKLARACJI klienta,
  * a nieodebrana przesyłka wraca sama i zwrotem nigdy nie zostanie. Pieniądze
  * i tak trzeba oddać, więc paczka idzie TĄ SAMĄ kolejką — ale z jawnym

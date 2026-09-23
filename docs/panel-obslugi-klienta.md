@@ -3969,7 +3969,7 @@ i tak trzeba oddać, więc paczka musi wejść do kolejki.
 Formularz zakładał zwrot od zera, a biuro brało z niego tylko szukanie
 klienta. Zostało samo szukanie: przycisk „Paczki klienta" przy polu i „Szukaj
 po kliencie" przy nieznanym kodzie. Wiersz wyniku prowadzi do zamówienia
-w panelu Allegro. Trasa `nieodebrana` na serwerze zostaje, bez wołającego.
+w panelu Allegro. Trasa `nieodebrana` zniknęła też z serwera.
 Wiersze zarejestrowane wcześniej zostają w kolejce ze znacznikiem.
 
 **Wiersz jest JAWNIE oznaczony**, kolumną `zrodlo`. Panel pisze przy nim

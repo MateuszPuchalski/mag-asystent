@@ -15,7 +15,6 @@ import {
   bilansKartotek, cofnijKorekte, cofnijKwote, cofnijWerdykt, licznikiKubelkow, listaZwrotow, ocenPozycje, osZwrotu,
   potwierdzKartoteke, rozstrzygnijZwrot, zapiszIloscZwrocona, zapiszKorekte, zapiszKwote,
   zapiszPotracenie,
-  zarejestrujNieodebrana,
   znajdzZwrotPoKodzie,
   ZwrotConflict,
   dopiszPozycje, doDopisania, usunDopisanaPozycje,
@@ -616,38 +615,14 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
-  /* Paczka, której klient nie odebrał (0.172.0). Allegro takiego bytu nie zna,
-     więc wiersz zakłada BIURO — i to jest jedyna trasa zwrotów tworząca zwrot
-     od zera. Pieniądze i tak trzeba oddać, więc idzie tą samą kolejką, ale
-     `zrodlo` mówi wprost, że to nie zgłoszenie klienta. */
-  app.post<{ Body: {
-    waybill?: string; orderId?: string | null; notatka?: string | null; login?: string | null;
-    odbiorcaNazwa?: string | null; przewoznik?: string | null;
-  } }>(
-    "/api/obsluga/zwroty/nieodebrana", async (req, reply) => {
-      const nie = odmowa(reply);
-      if (nie) return nie;
-      try {
-        return zarejestrujNieodebrana(db(), {
-          waybill: String(req.body?.waybill ?? ""),
-          orderId: req.body?.orderId ?? null,
-          notatka: req.body?.notatka ?? null,
-          /* Login kupującego (0.365.0) — przy nieodebranej to często jedyny
-             uchwyt, po którym biuro wróci do tej paczki. Serwer przycina go
-             i chowa w kolumnie zwrotu; walidacji kształtu nie ma, bo Allegro
-             nie zamyka listy dopuszczalnych loginów. */
-          login: req.body?.login ?? null,
-          /* Nazwa odbiorcy i przewoźnik Z NAKLEJKI (0.367.0). Numeru listu
-             z wracającej paczki nasz system nie widział nigdy — paczki nakleja
-             klient albo kurier — więc to jedyne dwa uchwyty, które zostają po
-             tym, jak pierwszy skan chybi. Serwer przycina je i chowa
-             w kolumnach zwrotu; walidacji kształtu nie ma, bo naklejki nie
-             wypisuje Allegro. */
-          odbiorcaNazwa: req.body?.odbiorcaNazwa ?? null,
-          przewoznik: req.body?.przewoznik ?? null,
-        }, kto());
-      } catch (e) { return konflikt(reply, e); }
-    });
+  /* ── TRASY REJESTRACJI PACZKI NIEODEBRANEJ JUŻ NIE MA (0.451.0) ─────────
+     Stała tu od 0.172.0 jako jedyna trasa zwrotów tworząca zwrot od zera.
+     Decyzja właściciela: „usuń opcję rejestracji paczki — ja tylko wyszukuję
+     ją w Allegro", a zaraz potem „usuń też trasę rejestracji z serwera".
+     Panel przestał ją wołać w tym samym wydaniu, więc trasa bez wołającego
+     byłaby już tylko drzwiami do zapisu, którego nikt nie pilnuje.
+
+     Serwis `zarejestrujNieodebrana` zostaje — patrz jego nagłówek. */
 
   /* Potrącenie za utratę wartości (0.170.0). To JEDYNA liczba o pieniądzach,
      jaką panel wolno mu przysłać — i dlatego jest walidowana w widełkach
