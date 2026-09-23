@@ -34,6 +34,26 @@ historii nie przepisujemy.
 ---
 
 
+## 0.474.0 — 23 września 2026
+
+**Szkic odpowiada według rozpoznanej kategorii.** Zgłoszenie właściciela:
+„gdy pytanie jest sklasyfikowane, ułóż odpowiedź odpowiednio do tego”.
+Szkic dostawał rozpoznanie od 22 września, ale z jedną ogólną regułą.
+Teraz fakt rozpoznania niesie wzorzec odpowiedzi dla TEJ kategorii.
+
+- **Piętnaście wzorców**, po jednym na kategorię (`wzorce-odpowiedzi.ts`).
+  Przykłady: pytanie o paczkę dostaje stan przesyłki z faktów, bez pytań
+  o maszynę. Faktura — prośbę tylko o brakujące dane firmy. Anulowanie —
+  sprawdzenie, czy paczka już wyszła.
+- **Wzorzec nie obiecuje rozstrzygnięć.** Zwrot pieniędzy, wymianę,
+  uznanie reklamacji i anulowanie robi człowiek. Terminów, kosztów i kwot
+  wzorzec nie podaje.
+- Model widzi tylko wzorzec bieżącej kategorii. Reguły szkicu i rozmowa są
+  od niego ważniejsze.
+
+Szkic nie powstaje jeszcze sam po kliknięciu „Rozpoznaj” — to osobna
+decyzja. Bez migracji.
+
 ## 0.472.0 — 23 września 2026
 
 **Pięć zmian użyteczności panelu: jedna lista pracy, szukanie Ctrl+K, jedna
