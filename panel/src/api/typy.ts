@@ -725,6 +725,8 @@ export type Zastosowanie = {
   warunki: WarunkiZastosowania;
   /** „roczniki 2014–2018, nr seryjny od 175000000" — pisze SERWER; `null` = bez warunków. */
   zdanieWarunkow: string | null;
+  /** Wykaz części, z którego przyszła propozycja; `null` = inne źródło. Brak pola = serwer sprzed przeglądu wykazów. */
+  importId?: number | null;
   /** Zdanie źródła pisze SERWER (§14.3). */
   zdanieZrodla: string;
 };
@@ -805,6 +807,14 @@ export type RaportWykazu = {
   przyklady: ParaWykazu[];
   inneWarunki: ParaWykazu[];
   zapisano: { importId: number; propozycji: number } | null;
+};
+
+/** Czekające propozycje jednego wykazu — przegląd listą w kolejce. */
+export type PozycjaPrzegladu = {
+  id: number; twId: number; symbol: string; nazwa: string | null; maszyna: string; warunki: string | null; dowod: string;
+};
+export type PrzegladWykazu = {
+  id: number; zrodlo: string; link: string | null; rodzaj: "maszyna" | "silnik"; pozycje: PozycjaPrzegladu[];
 };
 
 export type ImportWykazu = {
