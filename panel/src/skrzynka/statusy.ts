@@ -1,6 +1,6 @@
 import type {
   Akcja, DrogaDoboru, Kategoria, Pewnosc, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, StatusDoboru,
-  StatusRozmowy, ZrodloPropozycji, RolaPasowania } from "../api/typy";
+  StatusRozmowy, ZrodloPropozycji, RolaPasowania, ZrodloZakonczenia } from "../api/typy";
 
 /* Nazwy statusów PO POLSKU w jednym miejscu. Lista jest zamknięta i pochodzi
    z §7 — `Record<StatusRozmowy, string>` sprawia, że dołożenie statusu
@@ -17,9 +17,21 @@ export const NAZWA: Record<StatusRozmowy, string> = {
      w rozwijanym menu i wyglądał jak coś, co agent ma wybrać ręką. */
   waiting_for_internal: "Czeka na halę",
   snoozed: "Odłożona",
-  resolved: "Rozwiązana",
-  closed: "Zamknięta",
+  /* JEDEN WERDYKT (23 września 2026, decyzja właściciela). „Rozwiązana"
+     i „Zamknięta" różniły się tylko tym, komu wraca obudzona rozmowa —
+     dziś wraca do prowadzącego w obu przypadkach, więc nazwa jest jedna. */
+  resolved: "Zakończona",
+  closed: "Zakończona",
   spam: "Spam",
+};
+
+/* Skąd zakończenie — słowo na plakietkę i dymek. Zakończenie bez źródła
+   byłoby werdyktem nie do sprawdzenia, więc źródło stoi zawsze. */
+export const ZRODLO_ZAKONCZENIA: Record<ZrodloZakonczenia, string> = {
+  agent: "zakończona ręcznie",
+  podziekowanie: "klient podziękował",
+  cisza: "2 dni bez odpowiedzi klienta",
+  allegro: "wątek zamknięty w Allegro",
 };
 
 /* Statusy DOBORU (§7, etap E1) — ta sama zasada: polszczyzna na ekran, klucze

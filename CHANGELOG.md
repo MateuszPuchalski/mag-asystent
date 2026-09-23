@@ -60,6 +60,28 @@ Trasa `GET /api/obsluga/wiedza/siec`, serwis `siecPasowan` w
 `services/pasowania.ts`. Układ liczy panel, bez nowej biblioteki: ten sam stan
 bazy daje zawsze ten sam obrazek.
 
+## 0.464.0 — 23 września 2026
+
+**Rozmowę da się zakończyć — ręką albo samą.** Zgłoszenie właściciela:
+„potrzebuję sposobu, żeby rozmowa była rozwiązana". Opis: §10.2e projektu
+panelu.
+
+- Przycisk „Zakończ" w nagłówku rozmowy i klawisz `Z`. Gdy klient czeka na
+  odpowiedź, przycisk pyta raz; serwer pilnuje tego samego.
+- „Wyślij i zakończ" obok wysyłki i `Ctrl+Shift+Enter`. Werdykt jedzie
+  w tej samej transakcji co wiadomość.
+- Rozmowa kończy się sama: klient podziękował, dwa dni ciszy po naszej
+  odpowiedzi albo Allegro zamknęło wątek. Plakietka mówi, skąd koniec.
+- Pytanie klienta bez odpowiedzi nie kończy się samo nigdy.
+- „Otwórz ponownie" cofa zakończenie, także wyliczone.
+- Kubełki: „Nieprzypisane" i „Moje" trzymają tylko nasz ruch. Czekanie
+  stoi w „Oczekujących", koniec w nowych „Zakończonych".
+- „Rozwiązana" i „Zamknięta" to jeden werdykt „Zakończona"; prowadzący
+  zostaje, gdy klient napisze znowu.
+
+- **[wymaga działania]** Przebuduj panel i zrestartuj serwer. Nowa kolumna
+  `conversation.otwarta_recznie_at` zakłada się sama przy starcie.
+
 ## 0.463.0 — 23 września 2026
 
 **[wymaga działania] ZW: „Wystawił” i kategoria wydania przed zapisem.**

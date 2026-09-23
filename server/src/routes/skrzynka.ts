@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania, subiekt } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, typPodgladu, zlecPomiar } from "../services/skrzynka.js";
-import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, ustawPriorytet,
+import { ConversationConflict, dodajKomentarz, otworzRozmowe, zakonczRozmowe, przejmijRozmowe, przekazRozmowe, ustawPriorytet,
   ustawReklamacyjna, wskazKartoteke, wskazOferte, zapiszSzkic } from "../services/conversations.js";
 import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
@@ -548,7 +548,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
      przycisku. */
   app.post<{ Params: { id: string }; Body: {
     body?: string; expectedVersion?: number; expectedLastMessageId?: number | null;
-    mimoNowejWiadomosci?: boolean; mimoObecnosci?: boolean;
+    mimoNowejWiadomosci?: boolean; mimoObecnosci?: boolean; zakoncz?: boolean;
   } }>("/api/conversations/:id/send", async (req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
     const s = sesjaZadania()!;
@@ -561,9 +561,31 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
         expectedLastMessageId: req.body?.expectedLastMessageId ?? null,
         mimoNowejWiadomosci: Boolean(req.body?.mimoNowejWiadomosci),
         mimoObecnosci: Boolean(req.body?.mimoObecnosci),
+        zakoncz: Boolean(req.body?.zakoncz),
       });
     } catch (e) { return konflikt(reply, e); }
   });
+
+  /* ── ZAKOŃCZ / OTWÓRZ PONOWNIE (23 września 2026) ──────────────────────────
+     Jeden werdykt zamiast menu statusów — powód w `conversations.ts` przy
+     `wyliczStatus`. Zakończenie z pytaniem klienta bez odpowiedzi wymaga
+     jawnej zgody (`mimoPytania`): bez niej 409, a ekran pyta raz. */
+  app.post<{ Params: { id: string }; Body: { mimoPytania?: boolean } }>(
+    "/api/conversations/:id/zakoncz", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return zakonczRozmowe(db(), Number(req.params.id), sesjaZadania()!.user.userId,
+          Boolean(req.body?.mimoPytania));
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string } }>(
+    "/api/conversations/:id/otworz", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        return otworzRozmowe(db(), Number(req.params.id), sesjaZadania()!.user.userId);
+      } catch (e) { return konflikt(reply, e); }
+    });
 
   /* ── Załączniki do odpowiedzi (0.195.0) ────────────────────────────────────
      Plik jedzie base64 w JSON, jak zdjęcia dowodowe z kolektora — `bodyLimit`

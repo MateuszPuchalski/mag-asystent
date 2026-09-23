@@ -36,7 +36,40 @@ describe("Status rozmowy", () => {
   it("werdykt zapisany przed zmianą widać dalej, bo stoi w bazie", () => {
     render(<Status rozmowa={rozmowa({ status: "closed" })} blad=""
       onPriorytet={() => {}} zapisujePriorytet={false} />);
-    expect(screen.getByLabelText("Status rozmowy")).toHaveTextContent("Zamknięta");
+    /* „Zamknięta" czyta się od 23 września 2026 jak „Zakończona" — jeden werdykt. */
+    expect(screen.getByLabelText("Status rozmowy")).toHaveTextContent("Zakończona");
+  });
+
+  /* ── Zakończ / Otwórz ponownie (23 września 2026) ────────────────────────
+     Jeden werdykt; pytanie raz, gdy klient czeka na odpowiedź — to jedyna
+     pomyłka przycisku, która kosztuje klienta. */
+  it("Zakończ bez pytania, gdy piłka jest u klienta", async () => {
+    const onZakoncz = vi.fn();
+    render(<Status rozmowa={rozmowa({ status: "waiting_for_customer" })} blad="" onPriorytet={() => {}}
+      zapisujePriorytet={false} onZakoncz={onZakoncz} onOtworz={() => {}} />);
+    await userEvent.click(screen.getByRole("button", { name: /Zakończ/ }));
+    expect(onZakoncz).toHaveBeenCalledWith(false);
+  });
+
+  it("klient czeka: najpierw pytanie, potem „Zakończ mimo to”; klawisz Z idzie tą samą drogą", async () => {
+    const onZakoncz = vi.fn();
+    render(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} blad="" onPriorytet={() => {}}
+      zapisujePriorytet={false} onZakoncz={onZakoncz} onOtworz={() => {}} />);
+    await userEvent.keyboard("z");
+    expect(onZakoncz).not.toHaveBeenCalled();
+    expect(screen.getByRole("alert")).toHaveTextContent(/Klient czeka na odpowiedź/);
+    await userEvent.click(screen.getByRole("button", { name: "Zakończ mimo to" }));
+    expect(onZakoncz).toHaveBeenCalledWith(true);
+  });
+
+  it("zakończona samo: źródło słowem i „Otwórz ponownie”", async () => {
+    const onOtworz = vi.fn();
+    render(<Status rozmowa={rozmowa({ status: "resolved", zakonczenie: "cisza" })} blad=""
+      onPriorytet={() => {}} zapisujePriorytet={false} onZakoncz={() => {}} onOtworz={onOtworz} />);
+    expect(screen.getByText("2 dni bez odpowiedzi klienta")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Zakończ/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Otwórz ponownie/ }));
+    expect(onOtworz).toHaveBeenCalled();
   });
 
   it("odmowa serwera ląduje przy przełącznikach, nie w ogólnym pasku błędów", () => {

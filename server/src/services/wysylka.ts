@@ -21,6 +21,8 @@ export interface ZadanieWysylki {
   mimoNowejWiadomosci?: boolean;
   /** Druga jawna zgoda: „odpowiadam, choć przy rozmowie siedzi kto inny". */
   mimoObecnosci?: boolean;
+  /** „Wyślij i zakończ" (23 września 2026): po udanej wysyłce rozmowa jest zakończona. */
+  zakoncz?: boolean;
   database?: DatabaseSync;
   wyslij?: WyslijDoAllegro;
   /** Znacznik „przeczytane" w Allegro. Wstrzykiwany, żeby test nie szedł w sieć. */
@@ -300,7 +302,14 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
     /* ODPOWIEDŹ PRZESTAWIA ROZMOWĘ NA CZEKANIE (§7, 0.158.0). Piłka jest po
        stronie klienta i kolejka ma to pokazywać sama — status wymagający
        osobnego kliknięcia po każdej wysyłce zostałby pomijany. */
-    zmienStatus(database, z.conversationId, "waiting_for_customer", z.autor.id, null);
+    /* „WYŚLIJ I ZAKOŃCZ" (23 września 2026). Większość spraw kończy się
+       w chwili ostatniej odpowiedzi, więc werdykt jedzie w TEJ SAMEJ
+       transakcji co wiadomość: wysyłka nieudana nie zostawia rozmowy
+       zakończonej bez odpowiedzi, a udana nie wymaga drugiego kliknięcia. */
+    zmienStatus(database, z.conversationId, z.zakoncz ? "resolved" : "waiting_for_customer", z.autor.id, null);
+    if (z.zakoncz) {
+      database.prepare("UPDATE conversation SET otwarta_recznie_at=NULL WHERE id=?").run(z.conversationId);
+    }
 
     /* ODPOWIEDŹ PRZYDZIELA NA STAŁE (0.159.0). Kto odpisał klientowi, ten
        prowadzi sprawę — bez tego rozmowa wracałaby do puli zaraz po tym, jak

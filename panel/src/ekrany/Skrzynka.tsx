@@ -5,7 +5,7 @@ import { Konflikt } from "../api/klient";
 import { naBase64 } from "../api/plik";
 import {
   useAgenci, useDodajKomentarz, useJa,
-  usePrzekaz, useRozmowa, useUstawReklamacyjna,
+  usePrzekaz, useRozmowa, useUstawReklamacyjna, useZakoncz, useOtworz,
   usePisze, useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useWskazOferte, useWyslij,
   useZapiszSzkic, useZdrowie, useZlecPomiar,
   useDodajZalacznik, useUsunZalacznik, useZalaczniki,
@@ -89,6 +89,8 @@ export function Skrzynka() {
 
   const priorytet = useUstawPriorytet();
   const reklamacyjna = useUstawReklamacyjna();
+  const zakoncz = useZakoncz();
+  const otworz = useOtworz();
   const agenci = useAgenci();
   const dodajKomentarz = useDodajKomentarz();
 
@@ -224,7 +226,7 @@ export function Skrzynka() {
     return () => window.removeEventListener("beforeunload", f);
   }, [czekajace]);
 
-  function wyslijOdpowiedz(mimoNowejWiadomosci = false, mimoObecnosci = false) {
+  function wyslijOdpowiedz(mimoNowejWiadomosci = false, mimoObecnosci = false, zakonczPo = false) {
     if (!rozmowa.data) return;
     /* Zwykłe „Wyślij" idzie przez dziesięć sekund na cofnięcie i od razu
        prowadzi do następnej rozmowy. Wysyłka PO JAWNEJ ZGODZIE z dialogu
@@ -236,7 +238,8 @@ export function Skrzynka() {
         klient: rozmowa.data.rozmowa.klient, body: szkic,
         stan: { rodzaj: "czeka", doKiedy: Date.now() + OKNO_COFNIECIA_MS },
         paczka: { id: rozmowa.data.rozmowa.id, body: szkic,
-          expectedVersion: rozmowa.data.rozmowa.wersja, expectedLastMessageId: ostatniaKlienta },
+          expectedVersion: rozmowa.data.rozmowa.wersja, expectedLastMessageId: ostatniaKlienta,
+          zakoncz: zakonczPo },
       };
       setOdlozone((l) => [...l, w]);
       timery.current.set(w.klucz, setTimeout(() => wyslijOdlozona(w), OKNO_COFNIECIA_MS));
@@ -250,7 +253,7 @@ export function Skrzynka() {
     wyslij.mutate({
       id: rozmowa.data.rozmowa.id, body: szkic,
       expectedVersion: rozmowa.data.rozmowa.wersja,
-      expectedLastMessageId: ostatniaKlienta, mimoNowejWiadomosci, mimoObecnosci,
+      expectedLastMessageId: ostatniaKlienta, mimoNowejWiadomosci, mimoObecnosci, zakoncz: zakonczPo,
     }, {
       onSuccess: (w) => {
         setKonfliktWysylki(null);
@@ -527,6 +530,30 @@ export function Skrzynka() {
         reklamacyjna.mutate({ id: rozmowa.data.rozmowa.id, reklamacyjna: nowy },
           { onError: (e) => setBladStatusu((e as Error).message) });
       }}
+      /* ── ZAKOŃCZ (23 września 2026) ─────────────────────────────────────
+         Po zakończeniu ekran idzie do następnej rozmowy, jak po wysyłce:
+         zakończona i tak schodzi z kubełka roboczego, więc zostanie przy
+         niej znaczyłoby patrzenie na coś, czego na liście już nie ma. */
+      zmieniaStatus={zakoncz.isPending || otworz.isPending}
+      onZakoncz={(mimoPytania) => {
+        if (!rozmowa.data) return;
+        setBladStatusu("");
+        const id = rozmowa.data.rozmowa.id;
+        zakoncz.mutate({ id, mimoPytania }, {
+          onSuccess: () => {
+            const nast = nastepnaRozmowa(widoczne.current, id);
+            if (nast !== null) nawiguj(`/obsluga/skrzynka/${nast}`);
+          },
+          onError: (e) => setBladStatusu((e as Error).message),
+        });
+      }}
+      onOtworz={() => {
+        if (!rozmowa.data) return;
+        setBladStatusu("");
+        otworz.mutate({ id: rozmowa.data.rozmowa.id },
+          { onError: (e) => setBladStatusu((e as Error).message) });
+      }}
+      onWyslijIZakoncz={() => wyslijOdpowiedz(false, false, true)}
       bladStatusu={bladStatusu}
       onDopytajOOferte={() => setSzkic((s) => s
         || "Dzień dobry, proszę o numer oferty, której dotyczy pytanie — dobiorę wtedy właściwą część.")}

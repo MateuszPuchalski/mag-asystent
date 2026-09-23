@@ -483,26 +483,80 @@ const WYLICZANE_Z_WIADOMOSCI: ReadonlySet<string> = new Set([
   "new", "open", "waiting_for_customer", "waiting_for_us",
 ]);
 
+/* ── ZAKOŃCZENIE ROZMOWY (23 września 2026) ──────────────────────────────────
+   Decyzja właściciela: „potrzebuję sposobu, żeby rozmowa była rozwiązana".
+   Od 22 września nic nie ustawiało `resolved` ani `closed` — trasa ręczna
+   odeszła razem z menu dziewięciu statusów. Skutek: rozmowa po naszej
+   odpowiedzi stała w „Moje" na zawsze, bo kubełki robocze patrzą na
+   prowadzącego, a jedynym wyjściem było zamknięcie, którego nikt nie mógł
+   nadać.
+
+   DWA PYTANIA, NIE JEDNO. „Kto ma ruch" liczy się z wiadomości i nikt go
+   nie nadaje. „Czy sprawa jest skończona" to JEDEN werdykt — Zakończona —
+   i tylko on wraca do rąk agenta. Menu statusów nie wraca: kosztowało już
+   jedno wydanie, bo nikt go nie używał dobrze.
+
+   Werdykt zapada na dwa sposoby. Ręką agenta: kolumna `resolved`. Sam,
+   przy odczycie, bez tickera i bez zapisu — w trzech przypadkach, każdy
+   decyzją właściciela: klient podziękował, po naszej odpowiedzi minęły dwa
+   dni ciszy, Allegro zamknęło wątek. Każde zakończenie niesie źródło, bo
+   „zakończona" bez „dlaczego" to werdykt nie do sprawdzenia.
+
+   PYTANIE BEZ ODPOWIEDZI NIGDY NIE KOŃCZY SIĘ SAMO. Gdy ostatnia prawdziwa
+   wiadomość jest klienta i nie jest podziękowaniem, rozmowa czeka na nas —
+   także w wątku, który Allegro zamknęło. Pomyłka w drugą stronę kosztuje
+   klienta bez odpowiedzi, a tego nikt by nie zauważył.
+
+   `closed` sprzed tej wersji czyta się jak `resolved` — dwa werdykty
+   różniły się tylko tym, czy obudzona rozmowa wraca do puli. Właściciel
+   zdecydował: jeden werdykt, a prowadzący zostaje. Migracji nie ma. */
+
+export type ZrodloZakonczenia = "agent" | "podziekowanie" | "cisza" | "allegro";
+
+/** Po tylu milisekundach ciszy od NASZEJ odpowiedzi rozmowa kończy się sama. */
+export const CISZA_ZAKONCZENIA_MS = 2 * 86_400_000;
+
+export interface WejscieStatusu {
+  zapisany: StatusRozmowy;
+  /** Kierunek ostatniej PRAWDZIWEJ wiadomości (bez autoodpowiedzi); `null` — wątek pusty. */
+  ostatniKierunek: string | null;
+  podziekowal: boolean;
+  /** Chwila ostatniej prawdziwej wiadomości — od niej liczy się cisza. */
+  ostatniRuchAt: string | null;
+  /** Allegro oddało wątek jako `CLOSED` (`ThreadVBeta1.status`). */
+  watekZamkniety: boolean;
+  /** Agent otworzył rozmowę ręcznie; do następnej prawdziwej wiadomości nic nie kończy jej samo. */
+  otwartaRecznieAt: string | null;
+  teraz: number;
+}
+
 /**
- * Kto ma następny ruch, wprost z ostatniej wiadomości.
- *
- * Funkcja jest CZYSTA i to jest jej sens: tę samą regułę stosuje `statusRozmowy`
- * (jedna rozmowa, osobne zapytanie) i `naRozmowe` w skrzynce (cała lista,
- * kierunek już w wierszu). Dwie kopie rozjechałyby się przy pierwszej poprawce,
- * a objawem byłaby kolejka mówiąca co innego niż otwarta rozmowa.
- *
- * `null` w kierunku znaczy „wątek bez ani jednej wiadomości" — Allegro takie
- * oddaje. Wtedy nie ma z czego wywieść ruchu i zostaje stan zapisany.
+ * Status rozmowy i źródło zakończenia — JEDNA reguła dla otwartej rozmowy
+ * i dla wiersza kolejki. Czysta funkcja: gdyby każde z tych miejsc liczyło
+ * po swojemu, kolejka mówiłaby co innego niż rozmowa.
  */
-export function statusZKierunku(
-  zapisany: StatusRozmowy, ostatniKierunek: string | null, podziekowal = false,
-): StatusRozmowy {
-  if (!WYLICZANE_Z_WIADOMOSCI.has(zapisany) || ostatniKierunek == null) return zapisany;
-  if (ostatniKierunek !== "incoming") return "waiting_for_customer";
-  /* Podziękowanie klienta nie jest ruchem po NASZEJ stronie — patrz
-     `klientPodziekowal`. Piłka zostaje u klienta, więc stan jest ten sam,
-     co tuż po naszej odpowiedzi. */
-  return podziekowal ? "waiting_for_customer" : "waiting_for_us";
+export function wyliczStatus(w: WejscieStatusu): {
+  status: StatusRozmowy; zakonczenie: ZrodloZakonczenia | null;
+} {
+  if (w.zapisany === "resolved" || w.zapisany === "closed") {
+    return { status: "resolved", zakonczenie: "agent" };
+  }
+  if (!WYLICZANE_Z_WIADOMOSCI.has(w.zapisany) || w.ostatniKierunek == null) {
+    return { status: w.zapisany, zakonczenie: null };
+  }
+  const wstrzymane = w.otwartaRecznieAt !== null
+    && (w.ostatniRuchAt === null || w.otwartaRecznieAt >= w.ostatniRuchAt);
+  if (w.ostatniKierunek === "incoming") {
+    return w.podziekowal && !wstrzymane
+      ? { status: "resolved", zakonczenie: "podziekowanie" }
+      : { status: "waiting_for_us", zakonczenie: null };
+  }
+  if (wstrzymane) return { status: "waiting_for_customer", zakonczenie: null };
+  if (w.watekZamkniety) return { status: "resolved", zakonczenie: "allegro" };
+  if (w.ostatniRuchAt && w.teraz - Date.parse(w.ostatniRuchAt) >= CISZA_ZAKONCZENIA_MS) {
+    return { status: "resolved", zakonczenie: "cisza" };
+  }
+  return { status: "waiting_for_customer", zakonczenie: null };
 }
 
 /** Pola aktywnej decyzji klasyfikatora, z których wynika podziękowanie. */
@@ -611,9 +665,6 @@ function statusZapisany(
 export function statusRozmowy(
   database: DatabaseSync, conversationId: number, teraz = Date.now(),
 ): StatusRozmowy {
-  const zapisany = statusZapisany(database, conversationId, teraz);
-  if (!WYLICZANE_Z_WIADOMOSCI.has(zapisany)) return zapisany;
-
   /* Kierunek OSTATNIEJ PRAWDZIWEJ wiadomości. Po `sent_at`, a `id` tylko
      rozstrzyga remis w tej samej sekundzie — tak stoi oś rozmowy. Do
      23 września 2026 stało tu samo `id` z uzasadnieniem „tak samo jak oś",
@@ -626,12 +677,30 @@ export function statusRozmowy(
      a liczone jako nasza wiadomość przestawiało rozmowę na „czeka na klienta"
      i zdejmowało ją z listy tych, które czekają na odpowiedź. Pytanie klienta
      ginęło przez to, że skrzynka grzecznie potwierdziła jego odbiór. */
+  return statusIZakonczenie(database, conversationId, teraz).status;
+}
+
+/** Status razem ze źródłem zakończenia — dla otwartej rozmowy i jej tras. */
+export function statusIZakonczenie(
+  database: DatabaseSync, conversationId: number, teraz = Date.now(),
+): { status: StatusRozmowy; zakonczenie: ZrodloZakonczenia | null } {
+  const zapisany = statusZapisany(database, conversationId, teraz);
   const ost = database.prepare(
-    `SELECT direction FROM message WHERE conversation_id=? AND auto_odpowiedz=0
+    `SELECT direction, sent_at FROM message WHERE conversation_id=? AND auto_odpowiedz=0
       ORDER BY sent_at DESC, id DESC LIMIT 1`,
-  ).get(conversationId) as { direction: string } | undefined;
-  return statusZKierunku(zapisany, ost?.direction ?? null,
-    ost?.direction === "incoming" && podziekowanieWRozmowie(database, conversationId));
+  ).get(conversationId) as { direction: string; sent_at: string } | undefined;
+  const watek = database.prepare(`SELECT c.otwarta_recznie_at AS otwarta,
+      (SELECT t.watek_status FROM allegro_inbox_thread t WHERE t.id = c.external_conversation_id) AS s
+      FROM conversation c WHERE c.id=?`)
+    .get(conversationId) as { s: string | null; otwarta: string | null } | undefined;
+  return wyliczStatus({
+    zapisany, ostatniKierunek: ost?.direction ?? null,
+    podziekowal: ost?.direction === "incoming" && podziekowanieWRozmowie(database, conversationId),
+    ostatniRuchAt: ost?.sent_at ?? null,
+    watekZamkniety: watek?.s === "CLOSED",
+    otwartaRecznieAt: watek?.otwarta ?? null,
+    teraz,
+  });
 }
 
 /**
@@ -676,6 +745,64 @@ export function ustawStatus(
   }
   return transaction(database, () =>
     zmienStatus(database, conversationId, status, userId, doKiedy, teraz))();
+}
+
+/**
+ * Werdykt „Zakończona" z ręki agenta (23 września 2026).
+ *
+ * STRAŻ PYTANIA BEZ ODPOWIEDZI. Gdy ruch jest po naszej stronie — ostatnie
+ * słowo klienta i to nie podziękowanie — zakończenie wymaga jawnej zgody
+ * (`mimoPytania`). To jedyna pomyłka tego przycisku, która kosztuje
+ * klienta, i dlatego pilnuje jej serwer, a nie tylko ekran.
+ *
+ * Prowadzący ZOSTAJE (decyzja właściciela): gdy klient napisze znowu,
+ * rozmowa budzi się u tego, kto zna jej historię.
+ */
+export function zakonczRozmowe(
+  database: DatabaseSync, conversationId: number, userId: number,
+  mimoPytania = false, teraz = new Date(),
+): { status: StatusRozmowy } {
+  const wynik = transaction(database, () => {
+    const teraz_ = statusIZakonczenie(database, conversationId, teraz.getTime());
+    if (teraz_.status === "resolved" && teraz_.zakonczenie === "agent") return { status: teraz_.status };
+    if (teraz_.status === "waiting_for_us" && !mimoPytania) {
+      throw new ConversationConflict("Klient czeka na odpowiedź — zakończyć bez odpowiedzi?",
+        { pytanieBezOdpowiedzi: true });
+    }
+    zmienStatus(database, conversationId, "resolved", userId, null, teraz);
+    database.prepare("UPDATE conversation SET otwarta_recznie_at=NULL WHERE id=?").run(conversationId);
+    return { status: "resolved" as StatusRozmowy };
+  })();
+  publishConversationEvent("assignment.changed", conversationId, { status: wynik.status });
+  return wynik;
+}
+
+/**
+ * „Otwórz ponownie" — cofa werdykt agenta ALBO zakończenie wyliczone.
+ *
+ * Wyliczonego nie da się cofnąć zapisem statusu: `open` i tak policzyłby
+ * się z powrotem na „zakończona". Dlatego znacznik `otwarta_recznie_at`
+ * wstrzymuje reguły do następnej prawdziwej wiadomości.
+ */
+export function otworzRozmowe(
+  database: DatabaseSync, conversationId: number, userId: number, teraz = new Date(),
+): { status: StatusRozmowy } {
+  const wynik = transaction(database, () => {
+    const przed = statusZapisany(database, conversationId, teraz.getTime());
+    if (przed === "spam") throw new Error("Spam otwiera się w menu rozmowy, nie tym przyciskiem");
+    if (przed === "resolved" || przed === "closed") {
+      zmienStatus(database, conversationId, "open", userId, null, teraz);
+    } else {
+      /* Zakończenie wyliczone: kolumna się nie zmienia, więc ślad na osi
+         piszemy sami — inaczej otwarcie nie zostawiłoby po sobie nic. */
+      zapiszZmianeStatusu(database, conversationId, "resolved", "open", imieAutora(database, userId), userId);
+    }
+    database.prepare("UPDATE conversation SET otwarta_recznie_at=? WHERE id=?")
+      .run(teraz.toISOString(), conversationId);
+    return { status: statusIZakonczenie(database, conversationId, teraz.getTime()).status };
+  })();
+  publishConversationEvent("assignment.changed", conversationId, { status: wynik.status });
+  return wynik;
 }
 
 export type PriorytetRozmowy = "normalny" | "pilny";

@@ -553,3 +553,26 @@ test("szkic ułożony na STARSZE pytanie nie liczy się do losu", async () => {
     database: d, wyslij: udany(), oznaczPrzeczytany: async () => {} });
   assert.equal(los(d), null);
 });
+
+/* „Wyślij i zakończ" (23 września 2026): werdykt jedzie w tej samej
+   transakcji co wiadomość — nieudana wysyłka nie zostawia rozmowy
+   zakończonej bez odpowiedzi. */
+test("wyślij i zakończ: udana wysyłka kończy rozmowę, nieudana — nie", async () => {
+  const { statusIZakonczenie } = await import("./conversations.js");
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  przejmijRozmowe(rozmowa, ala, 1, d);
+  await wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Nie da się.", zakoncz: true,
+    expectedVersion: 2, expectedLastMessageId: pytanie, database: d,
+    wyslij: async () => { throw new Error("Allegro odmówiło"); },
+  }).catch(() => undefined);
+  assert.notEqual(statusIZakonczenie(d, rozmowa).status, "resolved");
+
+  const w = await wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Pasuje, rozstaw 148 mm.", zakoncz: true,
+    expectedVersion: 2, expectedLastMessageId: pytanie, database: d, wyslij: udany(),
+  });
+  assert.ok(w);
+  assert.deepEqual(statusIZakonczenie(d, rozmowa), { status: "resolved", zakonczenie: "agent" });
+});
+

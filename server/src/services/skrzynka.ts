@@ -1,7 +1,7 @@
 import { db } from "../db/db.js";
 import { utworzZadanie } from "./zadania-terenowe.js";
 import { uchwyty } from "./conversation-realtime.js";
-import { klientPodziekowal, statusZKierunku, ustawStatus } from "./conversations.js";
+import { klientPodziekowal, ustawStatus, wyliczStatus, type ZrodloZakonczenia } from "./conversations.js";
 import type { StatusRozmowy } from "./conversations.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import {
@@ -82,11 +82,13 @@ export interface RozmowaSkrzynki {
      inny otwarty — a to właśnie ten, o którym ktoś zapomniał. */
   poTerminie: boolean;
   /* Ostatnia wiadomość klienta to podziękowanie po naszej odpowiedzi
-     (22 września 2026). Rozmowa jest wtedy „Czeka na klienta", a znacznik
-     mówi dlaczego — inaczej wiersz z wiadomością klienta na podglądzie
-     wyglądałby jak pytanie, które ktoś przeoczył. Liczy SERWER, regułą
-     `klientPodziekowal`, tą samą co przy jednej rozmowie. */
+     (22 września 2026). Od 23 września rozmowa jest wtedy ZAKOŃCZONA, a
+     znacznik mówi dlaczego — inaczej wiersz z wiadomością klienta na
+     podglądzie wyglądałby jak pytanie, które ktoś przeoczył. Liczy SERWER,
+     regułą `klientPodziekowal`, tą samą co przy jednej rozmowie. */
   podziekowal: boolean;
+  /** Skąd zakończenie, gdy `status` to `resolved`; inaczej `null` (patrz `wyliczStatus`). */
+  zakonczenie: ZrodloZakonczenia | null;
   /* Rozpoznanie Copilota (§14, etap F). `null` znaczy „nierozpoznana" i liczy
      się PRZY ODCZYCIE — brak wiersza w `decyzja_klasyfikacji` niczego nie
      wstawia, więc otwarcie kolejki dalej nic nie mutuje.
@@ -317,6 +319,14 @@ const LISTA = `
          (SELECT m.direction FROM message m
            WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
            ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuch,
+         -- Chwila tego ruchu i stan wątku u Allegro: z nich zakończenie
+         -- liczy się samo (23 września 2026, reguła w wyliczStatus).
+         (SELECT m.sent_at FROM message m
+           WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
+           ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuchAt,
+         (SELECT t.watek_status FROM allegro_inbox_thread t
+           WHERE t.id = c.external_conversation_id) AS watekStatus,
+         c.otwarta_recznie_at AS otwartaRecznieAt,
          -- Czas oczekiwania liczy się od ostatniej wiadomości KLIENTA, nie od
          -- ostatniaWiadomoscAt: tamto ma COALESCE na updated_at, więc wątek
          -- zaczęty przez nas dostałby zegar, którego nikt nie odmierza.
@@ -375,15 +385,20 @@ const naRozmowe = (
     wymagaCzlowieka: Boolean(Number(w.kopWymaga ?? 0)),
     nieaktualna: Boolean(Number(w.kopNieaktualna ?? 0)),
   }, Boolean(Number(w.naszaOdpowiedz ?? 0)));
-  /* Te same DWIE reguły co w `statusRozmowy`, liczone tu bez dodatkowego
-     zapytania na wiersz — kierunek ostatniej wiadomości niesie już `LISTA`.
-     Najpierw wygasa odłożenie (kolumna zostaje `snoozed`), potem rozmowa
-     mówi, kto ma następny ruch. Regułę drugą trzyma `statusZKierunku`:
-     gdyby kolejka liczyła ją po swojemu, mówiłaby co innego niż otwarta
-     rozmowa. */
-  const status = statusZKierunku(
-    (String(w.status) === "snoozed" && minal ? "open" : String(w.status)) as StatusRozmowy,
-    ostatniRuch, podziekowal);
+  /* Te same reguły co w `statusRozmowy`, liczone tu bez dodatkowego
+     zapytania na wiersz — kierunek, chwila ostatniego ruchu i stan wątku
+     jadą już w `LISTA`. Najpierw wygasa odłożenie (kolumna zostaje
+     `snoozed`), potem `wyliczStatus` mówi, kto ma ruch i czy sprawa się
+     skończyła. Gdyby kolejka liczyła to po swojemu, mówiłaby co innego niż
+     otwarta rozmowa. */
+  const { status, zakonczenie } = wyliczStatus({
+    zapisany: (String(w.status) === "snoozed" && minal ? "open" : String(w.status)) as StatusRozmowy,
+    ostatniKierunek: ostatniRuch, podziekowal,
+    ostatniRuchAt: w.ostatniRuchAt == null ? null : String(w.ostatniRuchAt),
+    watekZamkniety: w.watekStatus === "CLOSED",
+    otwartaRecznieAt: w.otwartaRecznieAt == null ? null : String(w.otwartaRecznieAt),
+    teraz,
+  });
   return {
     id: Number(w.id), klient: String(w.klient ?? "Klient"),
     ostatniaWiadomosc: String(w.ostatniaWiadomosc ?? ""),
@@ -406,7 +421,8 @@ const naRozmowe = (
     /* Znacznik tylko tam, gdzie reguła naprawdę zmieniła stan: przy
        werdykcie zapisanym ręką przed 22 września status jej nie słucha,
        a „Czeka na klienta" po wiadomości klienta daje wyłącznie ona. */
-    podziekowal: podziekowal && status === "waiting_for_customer",
+    podziekowal: zakonczenie === "podziekowanie",
+    zakonczenie,
     kopilot: w.kopKategoria == null ? null : {
       kategoria: String(w.kopKategoria) as Kategoria,
       dodatkowe: JSON.parse(String(w.kopDodatkowe ?? "[]")) as Kategoria[],
