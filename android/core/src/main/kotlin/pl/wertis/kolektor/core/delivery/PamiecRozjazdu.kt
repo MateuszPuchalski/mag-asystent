@@ -15,6 +15,15 @@ import pl.wertis.kolektor.core.net.LocApplyAction
    to inna decyzja i musi zapytać. I UMIERA RAZEM Z DOSTAWĄ — to rozstrzygnięcie
    o TYM kartonie, nie reguła magazynu.
 
+   ZAMIEŃ PAMIĘTA SIĘ PER TOWAR, DODAJ — PER PARA (audyt z 22 września 2026).
+   Do tej wersji obie decyzje szły per para adresów, bez towaru. ZAMIEŃ
+   podjęte dla towaru X zastępowało więc adres towaru Y z tą samą parą półek,
+   a jedynym śladem był toast na 2,6 s. ZAMIEŃ kasuje adres pickingowy, więc
+   powtórzone za człowieka o CUDZYM towarze jest cichą pomyłką adresową.
+   DODAJ niczego nie kasuje — najgorszy skutek to adres nadmiarowy — i ono
+   dalej oszczędza dziesięć pytań przy dziesięciu pozycjach z kartonu.
+   Cena jest jawna: przeprowadzka całej półki pyta ZAMIEŃ raz na towar.
+
    Zwykła mapa, bez `mutableStateMapOf`: nic nie czyta jej podczas komponowania
    (zapis idzie z callbacku wiersza, odczyt z korutyny zapisu), więc stan
    Compose'a kupowałby tu wyłącznie zależność od Androida — i wypchnięcie tej
@@ -38,23 +47,36 @@ sealed interface DecyzjaRozjazdu {
 }
 
 class PamiecRozjazdu {
-    private val decyzje = mutableMapOf<Pair<String, String>, LocApplyAction>()
+    /** ZAMIEŃ — per towar i para adresów; kasuje adres, więc nie przechodzi na inny towar. */
+    private val zamien = mutableSetOf<Triple<Long, String, String>>()
+
+    /** DODAJ — per para adresów, dla każdego towaru z tego kartonu. */
+    private val dodaj = mutableSetOf<Pair<String, String>>()
 
     /**
+     * @param twId towar, którego dotyczy zapis — patrz nagłówek pliku
      * @param oczekiwana adres z kartoteki; `null` albo pusty = kartoteka nie wie,
      *   a wtedy nie ma z czym się rozjechać
      * @param zeskanowana adres, który magazynier właśnie podał
      */
-    fun rozstrzygnij(oczekiwana: String?, zeskanowana: String): DecyzjaRozjazdu = when {
+    fun rozstrzygnij(twId: Long, oczekiwana: String?, zeskanowana: String): DecyzjaRozjazdu = when {
         oczekiwana.isNullOrBlank() || oczekiwana == zeskanowana -> DecyzjaRozjazdu.Zgodna
-        else -> decyzje[oczekiwana to zeskanowana]
-            ?.let { DecyzjaRozjazdu.Powtorz(it) }
-            ?: DecyzjaRozjazdu.Zapytaj
+        Triple(twId, oczekiwana, zeskanowana) in zamien -> DecyzjaRozjazdu.Powtorz(LocApplyAction.REPLACE)
+        (oczekiwana to zeskanowana) in dodaj -> DecyzjaRozjazdu.Powtorz(LocApplyAction.ADD)
+        else -> DecyzjaRozjazdu.Zapytaj
     }
 
-    /** Odpowiedź człowieka — obowiązuje do końca tej dostawy, dla tej pary. */
-    fun zapamietaj(oczekiwana: String?, zeskanowana: String, akcja: LocApplyAction) {
+    /** Odpowiedź człowieka — obowiązuje do końca tej dostawy, w zakresie z nagłówka. */
+    fun zapamietaj(twId: Long, oczekiwana: String?, zeskanowana: String, akcja: LocApplyAction) {
         if (oczekiwana.isNullOrBlank()) return
-        decyzje[oczekiwana to zeskanowana] = akcja
+        val klucz = Triple(twId, oczekiwana, zeskanowana)
+        when (akcja) {
+            LocApplyAction.REPLACE -> zamien.add(klucz)
+            // zmiana zdania dla TEGO towaru: DODAJ zdejmuje jego ZAMIEŃ
+            LocApplyAction.ADD -> {
+                zamien.remove(klucz)
+                dodaj.add(oczekiwana to zeskanowana)
+            }
+        }
     }
 }

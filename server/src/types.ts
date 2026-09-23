@@ -254,6 +254,29 @@ export interface DeliveryLineView {
    * kosztuje trzydziestu zapytań; agregacja chodzi raz na dziesięć minut.
    */
   zlotaStrefa?: ZlotaStrefa;
+  /**
+   * Ostatnie odłożenie, które da się jeszcze cofnąć — `null`, gdy nie ma czego.
+   *
+   * Kolektor pokazuje z tego COFNIJ i ZMIEŃ PÓŁKĘ. Znika po korekcie ilości
+   * i po samym cofnięciu, bo wtedy liczba nie wynika już z tamtego skanu.
+   */
+  cofnij?: { qty: number; lok: string } | null;
+  /**
+   * Wszystkie odłożenia pozycji, które da się cofnąć, najstarsze pierwsze.
+   * `locActual` trzyma tylko ostatnią półkę; pozycja rozłożona na dwie
+   * półki ma tu obie.
+   */
+  odlozenia?: Array<{ qty: number; lok: string }>;
+  /**
+   * Kody kreskowe towaru (EAN z kartoteki i kody nadane w WERTIS). Kolektor
+   * dopasowuje po nich skan bez sieci — patrz `kodyTowarow` w serwisie.
+   */
+  kody?: string[];
+  /**
+   * Najnowsze nierozstrzygnięte zgłoszenie CZŁOWIEKA przy tej pozycji.
+   * Kolektor stawia przy nim WYCOFAJ; serwer i tak sprawdza, kto zgłaszał.
+   */
+  zgloszenie?: { id: number; typLabel: string; autor: string } | null;
 }
 
 export interface DeliveryView {
@@ -288,6 +311,12 @@ export interface DeliveryView {
    * identyfikatorów z konfiguracji serwera, żeby ukryć skrót „PRZESUŃ".
    */
   sourceMagId: number | null;
+  /**
+   * Czy zamkniętą dostawę da się otworzyć ponownie, a jeśli nie — dlaczego.
+   * `null` na dostawie otwartej. Powód idzie gotowym zdaniem, bo kolektor
+   * ma go pokazać zamiast wyszarzonego przycisku bez słowa.
+   */
+  otwarcie?: { mozna: boolean; powod: string | null } | null;
   lines: DeliveryLineView[];
 }
 

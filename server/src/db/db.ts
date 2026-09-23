@@ -866,6 +866,13 @@ export function migrate(database: DatabaseSync) {
      `schema.sql`. Stare wysyłki mają NULL: wtedy nikt tego nie liczył. */
   addColumn("outbox", "szkic_los",
     "TEXT CHECK (szkic_los IS NULL OR szkic_los IN ('bez_zmian','poprawiony'))");
+  /* Cofanie pomyłek przy rozkładaniu dostawy — patrz `delivery_line.cofniecie`
+     i `problem.zrodlo` w `schema.sql`. Stare wiersze mają NULL, a to znaczy
+     dokładnie to, co było prawdą przed tym wydaniem: odłożenia sprzed niego
+     nie da się cofnąć, a każde stare zgłoszenie złożył człowiek. */
+  addColumn("delivery_line", "cofniecie", "TEXT");
+  addColumn("problem", "zrodlo",
+    "TEXT CHECK (zrodlo IS NULL OR zrodlo IN ('zakonczenie','nadmiar'))");
   doborZnaDrogi(database);
   identyfikatorZamiennika(database);
   typZakonczeniaWSkrzynce(database);

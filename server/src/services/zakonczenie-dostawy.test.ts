@@ -124,20 +124,43 @@ test("brak ilościowy staje się wyjątkiem „zła ilość” z obiema liczbami
   assert.deepEqual(statusy(id), ["problem"]);
 });
 
-test("pozycja nietknięta jest POMINIĘTA, a nie zgłoszona dostawcy", () => {
-  /* To jest cała granica tej operacji: nikt nie otworzył tego kartonu, więc
-     twierdzenie wobec dostawcy nie miałoby pokrycia. */
+test("nietknięte bez wyboru: zakończenie odmawia z kodem i niczego nie zapisuje", () => {
+  /* Decyzja właściciela po audycie z 22 września 2026: ZAKOŃCZ przy
+     nietkniętych wymaga jawnego wyboru. Dotąd szły po cichu do pominiętych,
+     więc 0 z 10 nie dawało zgłoszenia, a 1 z 10 dawało. */
+  const id = dostawa([{ dok: 10, odlozone: 7 }, { dok: 5, odlozone: 0 }]);
+  const r = D.zakonczDostawe(id, "Jan z hali");
+  assert.ok("error" in r);
+  assert.equal(r.kod, "wybor_nietknietych");
+  assert.deepEqual(statusy(id), ["partial", "todo"], "odmowa nie rusza żadnej pozycji");
+  assert.equal(P.listUnresolved().length, 0);
+  assert.equal(stanDostawy(id), "open");
+});
+
+test("POMIŃ: nietknięta jest POMINIĘTA, a nie zgłoszona dostawcy", () => {
+  // towar jest na palecie, tylko nie tu go rozłożono — twierdzenie bez pokrycia
   const id = dostawa([{ dok: 5, odlozone: 0 }]);
-  D.zakonczDostawe(id, "Jan z hali");
+  D.zakonczDostawe(id, "Jan z hali", { nietkniete: "pomin" });
   assert.deepEqual(statusy(id), ["skipped"]);
-  assert.equal(P.listUnresolved().length, 0, "brak pracy to nie brak towaru");
+  assert.equal(P.listUnresolved().length, 0, "świadome pominięcie to nie brak towaru");
+});
+
+test("BRAK: nietknięta staje się zgłoszeniem „brak w przesyłce” na całą ilość", () => {
+  const id = dostawa([{ dok: 5, odlozone: 0 }]);
+  D.zakonczDostawe(id, "Jan z hali", { nietkniete: "brak" });
+  const w = P.listUnresolved();
+  assert.equal(w.length, 1);
+  assert.equal(w[0].typ, "missing_item");
+  assert.equal(w[0].qty, 5, "brakuje wszystkiego z dokumentu");
+  assert.deepEqual(statusy(id), ["problem"]);
+  assert.equal(stanDostawy(id), "done");
 });
 
 test("dostawa domyka się po zakończeniu, razem z pozycjami nietkniętymi", () => {
   // `raiseProblem` woła domknięcie po drodze, gdy nietknięte są jeszcze otwarte
   // — bez domknięcia NA KOŃCU dostawa zostawałaby otwarta mimo zakończenia
   const id = dostawa([{ dok: 10, odlozone: 7 }, { dok: 5, odlozone: 0 }]);
-  D.zakonczDostawe(id, "Jan z hali");
+  D.zakonczDostawe(id, "Jan z hali", { nietkniete: "pomin" });
   assert.deepEqual(statusy(id), ["problem", "skipped"]);
   assert.equal(stanDostawy(id), "done");
 });
@@ -146,7 +169,7 @@ test("zakończenie oddaje to samo podsumowanie, co podgląd", () => {
   // kolektor pokazuje po zapisie dokładnie to, co obiecał przed nim
   const id = dostawa([{ dok: 10, odlozone: 7 }, { dok: 5, odlozone: 0 }]);
   const przed = D.podgladZakonczenia(id);
-  const po = D.zakonczDostawe(id, "Jan z hali");
+  const po = D.zakonczDostawe(id, "Jan z hali", { nietkniete: "pomin" });
   assert.deepEqual(po, przed);
 });
 
@@ -186,7 +209,7 @@ test("dostawa domknięta po ostatnim odłożeniu odmawia z kodem, nie zdaniem", 
 
 test("zakończenie zostawia ślad w audycie z liczbami", () => {
   const id = dostawa([{ dok: 10, odlozone: 7 }, { dok: 5, odlozone: 0 }]);
-  D.zakonczDostawe(id, "Jan z hali");
+  D.zakonczDostawe(id, "Jan z hali", { nietkniete: "pomin" });
   const e = db()
     .prepare("SELECT user_id, payload FROM events WHERE type = 'delivery_finished'")
     .get() as { user_id: string; payload: string };
@@ -194,6 +217,7 @@ test("zakończenie zostawia ślad w audycie z liczbami", () => {
   const p = JSON.parse(e.payload);
   assert.equal(p.braki, 1);
   assert.equal(p.nietkniete, 1);
+  assert.equal(p.losNietknietych, "pomin", "wybór człowieka zostaje w audycie");
 });
 
 test("nieistniejąca dostawa to błąd, nie ciche nic", () => {
