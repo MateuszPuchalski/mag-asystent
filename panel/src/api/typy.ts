@@ -1884,6 +1884,27 @@ export type PasowaniaTowaru = {
   pasujeDo: TrafieniePasowania[]; pasujace: TrafieniePasowania[]; negatywne: Pasowanie[]; propozycje: Pasowanie[];
 };
 
+/* Sieć pasowań (widok „Sieć"). Krawędź zamiennika to odczyt opisu kartoteki,
+   nie wiersz w bazie — stąd `pasowanieId: null` i pewność najwyżej `prawdopodobne`. */
+export type RodzajKrawedzi = "pasuje" | "nie_pasuje" | "propozycja" | "zamiennik";
+
+export type KrawedzSieci = {
+  /** Pasowanie: część, która pasuje. Zamiennik: kartoteka, której opis go podaje. */
+  z: number;
+  /** Pasowanie: do czego pasuje. Zamiennik: symbol wymieniony w opisie. */
+  do: number;
+  rodzaj: RodzajKrawedzi;
+  polaryzacja: "pasuje" | "nie_pasuje" | null;
+  pasowanieId: number | null;
+  rola: RolaPasowania | null;
+  pewnosc: "potwierdzone" | "prawdopodobne";
+  obustronnie: boolean;
+  /** Zdanie z serwera. Panel go nie układa. */
+  zdanie: string;
+};
+
+export type SiecPasowan = { wezly: KartotekaPasowania[]; krawedzie: KrawedzSieci[] };
+
 export type NowePasowanie = {
   twId: number; doTwId: number; rola: RolaPasowania; pozycja?: string | null;
   polaryzacja: "pasuje" | "nie_pasuje"; powodNegatywny?: PowodNegatywny | null;

@@ -99,6 +99,7 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/wiedza/identyfikatory", payload: { twId: SZR, rodzaj: "katalog_obcy", wartosc: "AB-1234" } },
   { method: "POST" as const, url: "/api/obsluga/wiedza/identyfikatory/1/cofnij-z-oferty" },
   { method: "GET" as const, url: "/api/obsluga/wiedza/silniki" },
+  { method: "GET" as const, url: "/api/obsluga/wiedza/siec" },
   { method: "POST" as const, url: "/api/obsluga/wiedza/silniki",
     payload: { maszyna: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 51" },
       silnik: { rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E" },

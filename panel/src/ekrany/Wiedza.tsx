@@ -12,21 +12,23 @@ import { NowaPropozycja } from "../wiedza/NowaPropozycja";
 import { WiedzaTowaru } from "../wiedza/WiedzaTowaru";
 import { ZOpisow } from "../wiedza/ZOpisow";
 import { Silniki } from "../wiedza/Silniki";
+import { Siec } from "../wiedza/Siec";
 
 /* Baza wiedzy zastosowań (§12, etap E2).
 
-   Pięć widoków jednego ekranu: KOLEJKA propozycji do rozstrzygnięcia (z doboru,
+   Sześć widoków jednego ekranu: KOLEJKA propozycji do rozstrzygnięcia (z doboru,
    z pomiaru, ręcznych), NOWA PROPOZYCJA dla wiedzy z katalogów i z głowy
    właściciela, SPRAWDŹ KARTOTEKĘ — co wiemy o części, oraz od E3 Z OPISÓW —
    sekcje „Modele:" z opisów kartotek, które człowiek zamienia na propozycje,
    oraz SILNIKI — które silniki stoją w których maszynach, z listą luk
-   ułożoną po częstości pytań.
+   ułożoną po częstości pytań. SIEĆ dochodzi jako szósty: wszystkie pasowania
+   części na jednym obrazku, bez żadnego zapisu.
 
    Zatwierdza każdy z biura, także autor — decyzja właściciela. Automat nigdy:
    propozycja z zatwierdzonego doboru ląduje TU, nie w wiedzy.
 
    Otwarcie ekranu niczego nie zapisuje — „zero zapisu przy patrzeniu". */
-type Widok = "kolejka" | "nowa" | "kartoteka" | "z-opisow" | "silniki";
+type Widok = "kolejka" | "nowa" | "kartoteka" | "z-opisow" | "silniki" | "siec";
 
 export function Wiedza() {
   const kolejka = useKolejkaWiedzy();
@@ -70,6 +72,12 @@ export function Wiedza() {
         /* Zakładka liczy LUKI, nagłówek — propozycje. Dwie różne prawdy: luka
            to praca do zrobienia, propozycja to decyzja do podjęcia. */
         { klucz: "silniki", etykieta: silniki.data?.lukiRazem ? `Silniki (${silniki.data.lukiRazem})` : "Silniki" },
+        /* Szósta zakładka, choć pasowania w kolejce szóstej nie dostały.
+           Tamte to ta sama decyzja co zastosowania, więc zostały w kolejce.
+           Sieć to inny widok, nie inna decyzja. Zrzut przy 1024 px mieści
+           sześć etykiet w rzędzie; na telefonie rząd wychodzi za kadr,
+           tak jak górna nawigacja panelu, bo biuro pracuje przy biurku. */
+        { klucz: "siec", etykieta: "Sieć" },
       ]} />
       <div className="p-4">
         <Blad>{blad || (kolejka.error as Error | null)?.message}</Blad>
@@ -110,6 +118,7 @@ export function Wiedza() {
         {widok === "kartoteka" && <WiedzaTowaru />}
         {widok === "z-opisow" && <ZOpisow />}
         {widok === "silniki" && <Silniki />}
+        {widok === "siec" && <Siec />}
       </div>
     </Karta>
   </div>;

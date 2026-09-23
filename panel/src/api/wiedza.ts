@@ -3,8 +3,8 @@ import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
   AliasSilnika, Identyfikator, LukaSilnika, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
-  NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, TokenSilnika,
-  Zabudowa, Zastosowanie,
+  NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, SiecPasowan,
+  TokenSilnika, Zabudowa, Zastosowanie,
 } from "./typy";
 
 /* ── Baza wiedzy (§12, etap E2) ──────────────────────────────────────────────
@@ -21,6 +21,7 @@ export const kluczeWiedzy = {
   identyfikatory: (twId: number) => ["wiedza", "identyfikatory", twId] as const,
   silniki: ["wiedza", "silniki"] as const,
   tokeny: ["wiedza", "tokeny"] as const,
+  siec: ["wiedza", "siec"] as const,
 };
 
 /**
@@ -67,6 +68,7 @@ function poWiedzy(qc: ReturnType<typeof useQueryClient>, twId?: number) {
   qc.invalidateQueries({ queryKey: ["wiedza", "towar"] });
   qc.invalidateQueries({ queryKey: kluczeWiedzy.silniki });
   qc.invalidateQueries({ queryKey: kluczeWiedzy.tokeny });
+  qc.invalidateQueries({ queryKey: kluczeWiedzy.siec });
   qc.invalidateQueries({ queryKey: ["kandydaci"] });
   qc.invalidateQueries({ queryKey: ["wiedzaDoboru"] });
   if (twId !== undefined) qc.invalidateQueries({ queryKey: klucze.towar(twId) });
@@ -300,6 +302,18 @@ export function useWycofajZabudowe() {
 
 /* ── Pasowanie części (§11.2) ────────────────────────────────────────────────
    Adresy WYŁĄCZNIE tutaj — strażnik w `routes/wiedza.test.ts` czyta ten plik. */
+
+/**
+ * Cała sieć pasowań jednym odczytem. Bez zegara, inaczej niż kolejka: sieć
+ * to wgląd, nie praca, a przerysowany co pół minuty układ przesuwałby węzły
+ * spod kursora. Świeżość daje `poWiedzy` po każdym zapisie z tego panelu.
+ */
+export function useSiecPasowan() {
+  return useQuery({
+    queryKey: kluczeWiedzy.siec,
+    queryFn: () => api<SiecPasowan>("/api/obsluga/wiedza/siec"),
+  });
+}
 export function useZaproponujPasowanie() {
   const qc = useQueryClient();
   return useMutation({

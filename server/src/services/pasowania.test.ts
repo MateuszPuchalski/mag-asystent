@@ -169,3 +169,73 @@ test("aktywnePasowanie widzi propozycję i zatwierdzone w obu polaryzacjach, a o
   P.wycofajPasowanie(n.id, "pomyłka", biuro);
   assert.equal(P.aktywnePasowanie(ID["170430138-0001"], gaz), false);
 });
+
+/* ── Sieć pasowań (widok „Sieć" w bazie wiedzy) ──────────────────────────────
+   Sieć rysuje PRZESŁANKI: wiersze pasowań i zamienniki z opisów ich końców.
+   Pilnujemy, żeby nie wniosła wniosków, nie zeszła głębiej niż jeden krok
+   po opisach i nie pokazała tego, co człowiek odrzucił.                   */
+
+const para = (s: { z: number; do: number }) => `${s.z}~${s.do}`;
+const symbolTw = (tw: number) => Object.entries(ID).find(([, v]) => v === tw)?.[0] ?? String(tw);
+
+test("sieć: pusta baza daje pustą sieć, nie zamienniki całej kartoteki", () => {
+  assert.deepEqual(P.siecPasowan(), { wezly: [], krawedzie: [] });
+});
+
+test("sieć: trzy rodzaje wierszy, odrzucone znika, zamienniki końców dochodzą obustronnie", () => {
+  zatwierdz("LC170430140-0001", "W09-0211", { pozycja: "od strony filtra" });
+  zaproponuj("170430138-0001", "W09-0211", { pozycja: "od strony kolektora" });
+  zatwierdz("W53-0202", "W09-0211", { polaryzacja: "nie_pasuje", powodNegatywny: "tylko_inny_wariant" });
+  const odrzucone = zaproponuj("06-12038", "EX055")!;
+  P.rozstrzygnijPasowanie(odrzucone.id, "odrzuc", "nie ten gaźnik", biuro);
+
+  const s = P.siecPasowan();
+  const pasowania = s.krawedzie.filter((k) => k.rodzaj !== "zamiennik")
+    .map((k) => `${symbolTw(k.z)}>${symbolTw(k.do)}:${k.rodzaj}`);
+  assert.deepEqual(pasowania, [
+    "LC170430140-0001>W09-0211:pasuje", "170430138-0001>W09-0211:propozycja", "W53-0202>W09-0211:nie_pasuje",
+  ], "odrzucone nie wchodzi, kierunek to część → do czego");
+  const negatyw = s.krawedzie.find((k) => k.rodzaj === "nie_pasuje")!;
+  assert.match(negatyw.zdanie, /nie pasuje do W09-0211/, "zdanie z serwera, panel go nie układa");
+
+  const zam = s.krawedzie.filter((k) => k.rodzaj === "zamiennik");
+  assert.equal(new Set(zam.map((k) => [k.z, k.do].sort((a, b) => a - b).join("~"))).size, zam.length,
+    "„A podaje B” i „B podaje A” to jedna linia");
+  const gazniki = zam.find((k) => [k.z, k.do].includes(ID["W09-0211"]) && [k.z, k.do].includes(ID["EX055"]))!;
+  assert.ok(gazniki, "EX055 dochodzi z opisu W09-0211");
+  assert.equal(gazniki.obustronnie, true);
+  assert.match(gazniki.zdanie, /podają się nawzajem/);
+  assert.ok(zam.every((k) => k.pasowanieId === null && k.pewnosc === "prawdopodobne"),
+    "zamiennik to odczyt opisu, nigdy wiersz i nigdy potwierdzenie");
+
+  const tw = new Set(s.wezly.map((w) => w.twId));
+  assert.ok(s.krawedzie.every((k) => tw.has(k.z) && tw.has(k.do)), "krawędź bez węzła rysowałaby się w próżnię");
+  assert.ok(!tw.has(ID["06-12038"]) || zam.some((k) => [k.z, k.do].includes(ID["06-12038"])),
+    "06-12038 wchodzi wyłącznie jako zamiennik LC170430140-0001, nie z odrzuconego wiersza");
+  assert.ok(!s.krawedzie.some((k) => k.pasowanieId === odrzucone.id));
+});
+
+test("sieć: opis dołożonego zamiennika nie wnosi nowych węzłów — głębokość jeden", () => {
+  const d = db();
+  const przed = (d.prepare("SELECT opis FROM sgt_towar WHERE tw_id=?").get(ID["EX055"]) as { opis: string }).opis;
+  /* EX055 nie jest końcem żadnego pasowania — wchodzi wyłącznie z opisu W09-0211.
+     Symbol dopisany do JEGO opisu nie ma prawa pojawić się w sieci. */
+  d.prepare("UPDATE sgt_towar SET opis=? WHERE tw_id=?").run(`${przed} // W53-0202`, ID["EX055"]);
+  try {
+    zatwierdz("LC170430140-0001", "W09-0211");
+    const s = P.siecPasowan();
+    assert.ok(s.wezly.some((w) => w.twId === ID["EX055"]));
+    assert.ok(!s.wezly.some((w) => w.twId === ID["W53-0202"]), "drugi krok po opisach to już nie jest nasza wiedza");
+    assert.ok(!s.krawedzie.some((k) => para(k) === `${ID["EX055"]}~${ID["W53-0202"]}`));
+  } finally {
+    d.prepare("UPDATE sgt_towar SET opis=? WHERE tw_id=?").run(przed, ID["EX055"]);
+  }
+});
+
+test("sieć: odczyt niczego nie zapisuje", () => {
+  zatwierdz("LC170430140-0001", "W09-0211");
+  const licz = () => (db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
+  const przed = licz();
+  P.siecPasowan();
+  assert.equal(licz(), przed);
+});

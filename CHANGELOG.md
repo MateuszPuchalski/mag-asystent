@@ -34,6 +34,32 @@ historii nie przepisujemy.
 ---
 
 
+## 0.465.0 — 23 września 2026
+
+**Baza wiedzy dostaje zakładkę „Sieć”: wszystkie pasowania części na jednym
+obrazku.** Do tej pory pasowanie widziało się tylko od strony jednej kartoteki,
+w „Sprawdź kartotekę”. Teraz widać całość: co do czego pasuje, gdzie stoi
+negatyw, co czeka w kolejce i które symbole łączy tylko opis.
+
+- Sieć rozpada się na **wyspy**, czyli grupy części połączonych ze sobą. Każda
+  wyspa ma własną kartę, nazwaną częścią, do której pasuje najwięcej.
+- Zieleń znaczy „pasuje”, czerwień „nie pasuje”, bursztyn „czeka w kolejce”.
+  Kropkowana szarość to zamiennik wyczytany z opisu kartoteki. Rodzaj niesie też
+  kreska, więc rysunek czyta się bez rozróżniania barw.
+- Strzałka biegnie od części do tego, do czego ona pasuje. Grubsza linia to
+  pasowanie z dowodem technicznym.
+- Klik w węzeł wygasza resztę wyspy i wypisuje jego połączenia zdaniami
+  z serwera. Pole szukania zawęża widok do wysp z danym symbolem lub nazwą.
+- Przełącznik „Zamienniki z opisów” chowa to, czego nikt nie wpisał ręcznie.
+- Zamienniki sięgają jeden krok, jak przy odczycie kartoteki. Opis dołożonego
+  zamiennika nie wnosi już nowych węzłów.
+- Ekran niczego nie zapisuje. Rozstrzyga się dalej w kolejce, a dopisuje
+  w „Sprawdź kartotekę”.
+
+Trasa `GET /api/obsluga/wiedza/siec`, serwis `siecPasowan` w
+`services/pasowania.ts`. Układ liczy panel, bez nowej biblioteki: ten sam stan
+bazy daje zawsze ten sam obrazek.
+
 ## 0.463.0 — 23 września 2026
 
 **[wymaga działania] ZW: „Wystawił” i kategoria wydania przed zapisem.**
