@@ -885,6 +885,16 @@ export function migrate(database: DatabaseSync) {
   identyfikatorZOferty(database);
   identyfikatorOdDostawcy(database);
   zrodloPropozycjiZOferty(database);
+  /* Warunki zastosowania — PO przebudowie wyżej, bo jej `CREATE TABLE` tych
+     kolumn nie zna: dodane wcześniej zniknęłyby przy przepisaniu tabeli na
+     bazie sprzed 0.264.0. Stare wpisy dostają NULL, czyli „bez warunków" —
+     dokładnie to, co twierdziły dotąd. */
+  for (const [kolumna, typ] of [["rok_od", "INTEGER"], ["rok_do", "INTEGER"], ["seryjny_od", "TEXT"],
+    ["seryjny_do", "TEXT"], ["warunek", "TEXT"]] as const) {
+    if (database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='zastosowanie'").get()) {
+      addColumn("zastosowanie", kolumna, typ);
+    }
+  }
   /* NA KOŃCU, po przebudowach: kasowanie ma zastać tabele już w docelowym
      kształcie. */
   sprzatnijSprzedGranicy(database);

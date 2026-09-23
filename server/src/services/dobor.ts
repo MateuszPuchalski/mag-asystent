@@ -11,6 +11,7 @@ import { silnikZTekstu, zabudowaPary, zabudowyMaszyny, type AliasSilnika, type Z
 import { pasowaniaTowaru, type TrafieniePasowania } from "./pasowania.js";
 import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
 import { bezPodpisu, zwin } from "../tekst.js";
+import { ocenWarunki } from "./warunki-zastosowania.js";
 
 /**
  * Dobór części przy rozmowie (§11, etap E1).
@@ -174,21 +175,31 @@ function zdanieDoSzkicu(
   dane: DaneDoboru, symbol: string, droga: DrogaDoboru, status: StatusDoboru,
   podparcie: { zastosowanie: Zastosowanie; zabudowa: Zabudowa | null } | null,
   pasowanie: TrafieniePasowania | null,
+  pozaZakresem: { zastosowanie: Zastosowanie; zdanie: string } | null = null,
 ): string {
   /* Do klienta idzie źródło z datą, BEZ nazwiska pracownika (0.232.1) — to samo,
      co dostaje szkic Copilota. Ekran biura autora nadal widzi w `zdanieZrodla`
      kandydata i wiedzy; szkic czyta klient. Wycięcie na wyjściu, w jednym
      miejscu, bo każda gałąź niżej wkleja czyjś podpis. */
-  return bezPodpisu(zdanieDoSzkicuZPodpisem(dane, symbol, droga, status, podparcie, pasowanie));
+  return bezPodpisu(zdanieDoSzkicuZPodpisem(dane, symbol, droga, status, podparcie, pasowanie, pozaZakresem));
 }
 
 function zdanieDoSzkicuZPodpisem(
   dane: DaneDoboru, symbol: string, droga: DrogaDoboru, status: StatusDoboru,
   podparcie: { zastosowanie: Zastosowanie; zabudowa: Zabudowa | null } | null,
   pasowanie: TrafieniePasowania | null,
+  pozaZakresem: { zastosowanie: Zastosowanie; zdanie: string } | null,
 ): string {
   const maszyna = urzadzenie(dane);
   const zrodlo = `źródło: ${ZRODLO_DROGI[droga]}`;
+  /* Wpis w bazie jest, ale rocznik albo numer z doboru leży POZA jego
+     zakresem. Zdanie ogólne powiedziałoby „źródło: potwierdzone zastosowanie;
+     dobór bez potwierdzonego zastosowania" — sprzeczność w jednej linijce.
+     Mówimy więc wprost, że wybór stoi w poprzek wiedzy, i dlaczego. */
+  if (!podparcie && pozaZakresem && maszyna) {
+    return `${symbol} do ${maszyna} może nie pasować — ${pozaZakresem.zdanie};`
+      + ` źródło: ${pozaZakresem.zastosowanie.zdanieZrodla}.`;
+  }
   /* Zastosowanie zatwierdzone na samym śladzie rozmowy to nadal „prawdopodobnie":
      zdanie źródła mówi wprost, że dowodu technicznego nie ma. */
   if (podparcie && maszyna) {
@@ -196,7 +207,11 @@ function zdanieDoSzkicuZPodpisem(
     /* Łańcuch przez silnik jest wart tyle, co jego słabsze ogniwo — tak samo
        liczy szczebel w `kandydaci.ts`. Zdanie MUSI nazwać oba ogniwa (§14.3):
        klient ma prawo wiedzieć, że dopasowanie idzie przez silnik. */
-    const pewne = zastosowanie.pewnosc === "potwierdzone"
+    /* Warunek, którego dobór nie umie sprawdzić („nr seryjny od X", a numeru
+       w danych brak), zdejmuje „pasuje" do „prawdopodobnie" — tak samo jak
+       kandydat schodzi na „wymaga danych". Zdanie źródła niesie warunek. */
+    const warunkowo = ocenWarunki(zastosowanie.warunki, dane, zabudowa ? "silnika" : "maszyny").ocena === "nieznane";
+    const pewne = zastosowanie.pewnosc === "potwierdzone" && !warunkowo
       && (zabudowa === null || zabudowa.pewnosc === "potwierdzone");
     const orzeczenie = pewne ? "pasuje" : "prawdopodobnie pasuje";
     if (zabudowa) {
@@ -234,13 +249,35 @@ function zastosowanieWyboru(
 ): { zastosowanie: Zastosowanie; zabudowa: Zabudowa | null } | null {
   if (!dane.marka || !dane.model) return null;
   const kluczMaszyny = kluczModelu("maszyna", dane.marka, dane.model, dane.wariant);
+  /* Wpis ZŁAMANY przez rocznik albo numer z doboru nie podpiera wyboru:
+     katalog, który mówi „od nr X", pod X wskazuje inną część. Cytowanie go
+     w szkicu jako źródła byłoby cytowaniem przeciw sobie. */
   const wprost = zastosowaniaModelu(kluczMaszyny, database)
-    .find((z) => z.twId === twId && z.polaryzacja === "pasuje");
+    .find((z) => z.twId === twId && z.polaryzacja === "pasuje"
+      && ocenWarunki(z.warunki, dane, "maszyny").ocena !== "niespelnione");
   if (wprost) return { zastosowanie: wprost, zabudowa: null };
   for (const zab of zabudowyMaszyny(kluczMaszyny, database)) {
+    /* Wpisu do silnika tabliczka maszyny nie łamie — patrz `ocenWarunki`. */
     const przezSilnik = zastosowaniaModelu(zab.silnik.klucz, database)
       .find((z) => z.twId === twId && z.polaryzacja === "pasuje");
     if (przezSilnik) return { zastosowanie: przezSilnik, zabudowa: zab };
+  }
+  return null;
+}
+
+/**
+ * Wpis o wybranej części do TEJ maszyny, którego zakres rocznik albo numer
+ * z doboru łamie. Tylko do zdania szkicu — `wiedzaDoboru` go nie pokazuje
+ * jako podparcia, bo nim nie jest.
+ */
+function pozaZakresemWyboru(
+  database: DatabaseSync, dane: DaneDoboru, twId: number,
+): { zastosowanie: Zastosowanie; zdanie: string } | null {
+  if (!dane.marka || !dane.model) return null;
+  for (const z of zastosowaniaModelu(kluczModelu("maszyna", dane.marka, dane.model, dane.wariant), database)) {
+    if (z.twId !== twId || z.polaryzacja !== "pasuje") continue;
+    const o = ocenWarunki(z.warunki, dane, "maszyny");
+    if (o.ocena === "niespelnione") return { zastosowanie: z, zdanie: o.zdanie! };
   }
   return null;
 }
@@ -283,7 +320,8 @@ function naDobor(w: Record<string, unknown> | undefined, database: DatabaseSync)
       przez: String(w.wybrano_przez ?? "?"), at: String(w.wybrano_at ?? ""),
       zdanieDoSzkicu: zdanieDoSzkicu(dane, String(w.wybrany_symbol), droga, status,
         zastosowanieWyboru(database, dane, Number(w.wybrany_tw_id)),
-        pasowanieWyboru(database, dane, Number(w.wybrany_tw_id))),
+        pasowanieWyboru(database, dane, Number(w.wybrany_tw_id)),
+        pozaZakresemWyboru(database, dane, Number(w.wybrany_tw_id))),
     },
     updatedBy: w.updated_by == null ? null : String(w.updated_by),
     updatedAt: w.updated_at == null ? null : String(w.updated_at),

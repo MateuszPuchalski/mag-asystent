@@ -103,11 +103,15 @@ export async function wiedzaRoutes(app: FastifyInstance) {
       const z = zaproponujZastosowanie({
         twId: Number(b.twId), model: b.model!, polaryzacja: b.polaryzacja!,
         powodNegatywny: b.powodNegatywny ?? null, komentarz: b.komentarz ?? null,
-        zrodlo: "reczne", dowod: b.dowod!, zastepujeId: b.zastepujeId ?? null,
+        zrodlo: "reczne", dowod: b.dowod!, zastepujeId: b.zastepujeId ?? null, warunki: b.warunki ?? null,
       }, { userId: ja().userId, name: ja().name });
       /* Duplikat to odmowa ze zdaniem, nie cichy sukces: agent ma wiedzieć,
-         że ta para już czeka albo stoi. */
-      if (!z) return reply.code(409).send({ error: "Ta para kartoteka–model już czeka w kolejce albo jest zatwierdzona" });
+         że ta para już czeka albo stoi — i jak zmienić jej warunki, bo drugi
+         wpis tej samej pary z innymi latami serwis odbija jako dubel. */
+      if (!z) {
+        return reply.code(409).send({ error: "Ta para kartoteka–model już czeka w kolejce albo jest zatwierdzona"
+          + " — warunki zatwierdzonego wpisu zmienisz przyciskiem „Popraw warunki” przy kartotece" });
+      }
       return z;
     } catch (e) { return blad(reply, e); }
   });

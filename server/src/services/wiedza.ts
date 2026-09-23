@@ -3,6 +3,7 @@ import { db, transaction } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 import { sqlZwin, zwin } from "../tekst.js";
+import { sprawdzWarunki, zdanieWarunkow, type WarunkiZastosowania } from "./warunki-zastosowania.js";
 
 /**
  * Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2).
@@ -95,6 +96,10 @@ export interface Zastosowanie {
   rozstrzygnal: string | null; rozstrzygnietoAt: string | null; powodRozstrzygniecia: string | null;
   dowody: DowodZastosowania[];
   pewnosc: PewnoscZastosowania;
+  /** Kwalifikatory: lata, zakres numerów seryjnych, warunek słowny. Wszystkie `null` = bez warunków. */
+  warunki: WarunkiZastosowania;
+  /** „roczniki 2014–2018, nr seryjny od 175000000" — albo `null`. */
+  zdanieWarunkow: string | null;
   /** Zdanie źródła (§14.3) — dla kandydata, ostrzeżenia i szkicu. */
   zdanieZrodla: string;
 }
@@ -265,12 +270,17 @@ function najmocniejszy(lista: DowodZastosowania[]): DowodZastosowania | null {
 export function zdanieZrodla(z: Omit<Zastosowanie, "zdanieZrodla" | "pewnosc"> & { pewnosc: PewnoscZastosowania }): string {
   const d = najmocniejszy(z.dowody);
   const podpisDowodu = d ? `${d.nazwaRodzaju}, ${dzien(d.at)}, ${d.autor}` : "bez dowodu";
+  /* Warunki stoją PRZY maszynie, w nawiasie, nie na końcu zdania. Szkic,
+     sieć i kandydat cytują to zdanie w całości albo ucinają ogon — a „pasuje
+     do MS 250" bez „od nr 175000000" to dokładnie ta nieprawda, przed którą
+     warunki chronią. */
+  const maszyna = z.zdanieWarunkow ? `${z.model.etykieta} (${z.zdanieWarunkow})` : z.model.etykieta;
   if (z.polaryzacja === "nie_pasuje") {
-    return `nie pasuje do ${z.model.etykieta}: ${z.zdaniePowodu} — ${podpisDowodu}`;
+    return `nie pasuje do ${maszyna}: ${z.zdaniePowodu} — ${podpisDowodu}`;
   }
   return z.pewnosc === "potwierdzone"
-    ? `potwierdzone zastosowanie do ${z.model.etykieta} — ${podpisDowodu}`
-    : `zastosowanie do ${z.model.etykieta} zatwierdzone na podstawie rozmowy — ${podpisDowodu}; bez dowodu technicznego`;
+    ? `potwierdzone zastosowanie do ${maszyna} — ${podpisDowodu}`
+    : `zastosowanie do ${maszyna} zatwierdzone na podstawie rozmowy — ${podpisDowodu}; bez dowodu technicznego`;
 }
 
 function naZastosowania(database: DatabaseSync, wiersze: Array<Record<string, unknown>>): Zastosowanie[] {
@@ -280,6 +290,14 @@ function naZastosowania(database: DatabaseSync, wiersze: Array<Record<string, un
       wariant: w.m_wariant, lata: w.m_lata, klucz: w.m_klucz });
     const powod = w.powod_negatywny == null ? null : String(w.powod_negatywny) as PowodNegatywny;
     const lista = d.get(Number(w.id)) ?? [];
+    /* Z bazy bez ponownej walidacji: wiersz przeszedł `sprawdzWarunki` przy
+       zapisie, a odczyt, który rzuca na starym wierszu, gasi cały ekran. */
+    const warunki: WarunkiZastosowania = {
+      rokOd: w.rok_od == null ? null : Number(w.rok_od), rokDo: w.rok_do == null ? null : Number(w.rok_do),
+      seryjnyOd: w.seryjny_od == null ? null : String(w.seryjny_od),
+      seryjnyDo: w.seryjny_do == null ? null : String(w.seryjny_do),
+      warunek: w.warunek == null ? null : String(w.warunek),
+    };
     const bez = {
       id: Number(w.id), twId: Number(w.tw_id), symbol: String(w.tw_symbol), model,
       polaryzacja: String(w.polaryzacja) as Polaryzacja, powodNegatywny: powod,
@@ -293,6 +311,7 @@ function naZastosowania(database: DatabaseSync, wiersze: Array<Record<string, un
       rozstrzygnietoAt: w.rozstrzygnieto_at == null ? null : String(w.rozstrzygnieto_at),
       powodRozstrzygniecia: w.powod_rozstrzygniecia == null ? null : String(w.powod_rozstrzygniecia),
       dowody: lista, pewnosc: pewnoscZastosowania(lista),
+      warunki, zdanieWarunkow: zdanieWarunkow(warunki),
     };
     return { ...bez, zdanieZrodla: zdanieZrodla(bez) };
   });
@@ -381,6 +400,8 @@ export interface NowaPropozycja {
   conversationId?: number | null;
   dowod: NowyDowod;
   zastepujeId?: number | null;
+  /** Kwalifikatory prosto z ciała żądania — typy sprawdza `sprawdzWarunki`; brak = bez warunków. */
+  warunki?: Partial<Record<keyof WarunkiZastosowania, unknown>> | null;
 }
 
 /**
@@ -404,12 +425,18 @@ export function zaproponujZastosowanie(
   const t = database.prepare("SELECT symbol FROM sgt_towar WHERE tw_id=?").get(p.twId) as { symbol: string } | undefined;
   if (!t) throw new Error("Nie ma takiej kartoteki w Subiekcie");
   const dowod = sprawdzDowod(p.dowod);
+  const warunki = sprawdzWarunki(p.warunki);
   const kto = podpis(autor);
 
   const wynik = wTransakcji(database, () => {
     if (p.zastepujeId != null) {
-      const stare = database.prepare("SELECT stan FROM zastosowanie WHERE id=?").get(p.zastepujeId) as { stan: string } | undefined;
+      const stare = database.prepare("SELECT stan, tw_id FROM zastosowanie WHERE id=?").get(p.zastepujeId) as
+        { stan: string; tw_id: number } | undefined;
       if (!stare || stare.stan !== "zatwierdzone") throw new Error("Zastąpić można tylko zatwierdzone zastosowanie");
+      /* Poprawka warunków przyszła z ekranu kartoteki, więc wskazuje wpis
+         TEJ kartoteki. Zastąpienie cudzego wpisu wycofałoby go przy
+         zatwierdzeniu — a nowy stanąłby przy innej części. */
+      if (Number(stare.tw_id) !== p.twId) throw new Error("Poprawka zastępuje wpis tej samej kartoteki, nie innej");
     }
     const model = upewnijModel(p.model, autor, database);
     /* Zastępowane zastosowanie nie liczy się jako duplikat: poprawka celowo
@@ -419,10 +446,12 @@ export function zaproponujZastosowanie(
       .get(p.twId, model.id, p.polaryzacja, p.zastepujeId ?? null);
     if (dubel) return null;
     const id = Number(database.prepare(`INSERT INTO zastosowanie(tw_id,tw_symbol,model_id,polaryzacja,powod_negatywny,
-      zrodlo_propozycji,komentarz,conversation_id,zastepuje_id,zaproponowal,zaproponowal_user_id)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?)`)
+      zrodlo_propozycji,komentarz,conversation_id,zastepuje_id,zaproponowal,zaproponowal_user_id,
+      rok_od,rok_do,seryjny_od,seryjny_do,warunek)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(p.twId, t.symbol, model.id, p.polaryzacja, powod, p.zrodlo, oczysc(p.komentarz),
-        p.conversationId ?? null, p.zastepujeId ?? null, kto.name, kto.userId).lastInsertRowid);
+        p.conversationId ?? null, p.zastepujeId ?? null, kto.name, kto.userId,
+        warunki.rokOd, warunki.rokDo, warunki.seryjnyOd, warunki.seryjnyDo, warunki.warunek).lastInsertRowid);
     wstawDowod(database, id, dowod, p.conversationId ?? null, kto);
     const z = zastosowanie(id, database)!;
     logEvent("wiedza_propozycja", kto.name, p.twId, { zastosowanie: z }, kto.userId, database);

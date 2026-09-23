@@ -45,6 +45,13 @@ export function Propozycja({ z, trwa, onRozstrzygnij }: {
       </div>
     </div>
     {z.zdaniePowodu && <p className="mt-1 text-sm text-red-900">{z.zdaniePowodu}</p>}
+    {/* Warunki NAD dowodami, bo zatwierdza się twierdzenie razem z nimi:
+        „pasuje od nr X" to inne zdanie niż „pasuje", a dowód trzeba czytać
+        pod kątem właśnie tej granicy. */}
+    {z.zdanieWarunkow && <p className="mt-1 text-sm text-amber-900">
+      <b>Tylko:</b> {z.zdanieWarunkow}</p>}
+    {z.zastepujeId !== null && <p className="mt-1 text-xs text-slate-600">
+      Poprawka wpisu #{z.zastepujeId} — po zatwierdzeniu tamten schodzi na wycofane</p>}
     {z.komentarz && <p className="mt-1 text-sm text-slate-700">{z.komentarz}</p>}
     {z.conversationId !== null && <Link className="mt-1 inline-block text-xs text-slate-500 underline underline-offset-2"
       to={`/obsluga/skrzynka/${z.conversationId}`}>z rozmowy #{z.conversationId}</Link>}

@@ -34,6 +34,40 @@ historii nie przepisujemy.
 ---
 
 
+## 0.469.0 — 23 września 2026
+
+**Warunki na zastosowaniu: lata i zakres numerów seryjnych.** Punkt trzeci
+z przeglądu katalogowania części, kwalifikatory w rozumieniu ACES i TecDoc.
+„Pasuje do STIHL MS 250” rzadko jest pełną prawdą. Katalog producenta mówi
+raczej „od numeru seryjnego X” albo „roczniki 2014–2018”. Rocznik i numer
+seryjny stały w danych doboru od dawna, ale żaden szczebel ich nie czytał.
+
+- **Trzy warunki, wszystkie opcjonalne.** Roczniki od–do, numer seryjny
+  od–do i warunek słowny, np. „tylko z gaźnikiem Zama”. Wpis bez warunków
+  mówi dokładnie to, co mówił dotąd.
+- **Gdzie się je wpisuje.** Wiedza → „Nowa propozycja”, w zwiniętej sekcji
+  „Warunki”. Przy zatwierdzonym wpisie w „Sprawdź kartotekę” stoi przycisk
+  „Popraw warunki”. Poprawka to nowy wpis z dowodem w kolejce, a stary
+  obowiązuje do jej zatwierdzenia.
+- **Dobór sprawdza je sam.** Rocznik i numer z danych doboru mieszczą się
+  w zakresie: kandydat jak dotąd, a źródło mówi, co sprawdzono. Leżą poza
+  zakresem: zamiast kandydata staje ostrzeżenie „poza zakresem wpisu”.
+- **Brak danych to osobny wynik.** Bez rocznika albo numeru kandydat zostaje
+  z pewnością „wymaga danych” i ostrzeżeniem, o co zapytać klienta. Stoi na
+  wierzchu listy, nie wśród słabych trafień po tekście.
+- **Numer seryjny porównuje się tylko uczciwie.** Cyfry z cyframi, ten sam
+  przedrostek i ta sama liczba cyfr. Inny kształt daje „sprawdź ręcznie”,
+  nigdy porównanie po alfabecie.
+- **Warunki silnika nie łamią się tabliczką maszyny.** Wpis do silnika
+  z latami daje najwyżej prośbę o tabliczkę silnika.
+- **Zdanie źródła niesie warunek przy maszynie.** Widać go w kolejce,
+  w „Sprawdź kartotekę”, w sieci i w szkicu. Wybór poza zakresem wpisu
+  daje w szkicu zdanie „może nie pasować” z powodem.
+
+Pięć kolumn w `zastosowanie` dochodzi migracją, po przebudowie z 0.264.0.
+Nowy serwis `warunki-zastosowania.ts` z testami, testy szczebli doboru,
+zdania szkicu, migracji i ekranów Wiedzy oraz Doboru.
+
 ## 0.468.1 — 23 września 2026
 
 **Automatyczny ZW działa po uzupełnieniu „Wystawił” i kategorii wydania.**

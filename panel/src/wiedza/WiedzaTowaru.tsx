@@ -6,8 +6,10 @@ import type {
 import {
   useCofnijIdentyfikatorZOferty, useDodajDowod, useDodajIdentyfikator, useIdentyfikatory,
   useWiedzaTowaru, useWycofajPasowanie, useWycofajZamiennosc, useWycofajZastosowanie, useZaproponujPasowanie,
+  useZaproponujZastosowanie,
 } from "../api/wiedza";
 import { PasowanieForm } from "./PasowanieForm";
+import { naWarunki, PolaWarunkow, tekstWarunkow, type TekstWarunkow } from "./PolaWarunkow";
 import { NaglowekSekcji, Pole, Przycisk, czas } from "../ui";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import {
@@ -115,13 +117,18 @@ function Sekcja({ tytul, lista, pusto, negatyw = false, tylkoOdczyt = false }: {
 function Wpis({ z, tylkoOdczyt }: { z: Zastosowanie; tylkoOdczyt: boolean }) {
   const wycofaj = useWycofajZastosowanie();
   const dowod = useDodajDowod();
+  const popraw = useZaproponujZastosowanie();
   const [cofam, setCofam] = useState(false);
   const [powod, setPowod] = useState("");
   const [dopisuje, setDopisuje] = useState(false);
+  const [poprawiam, setPoprawiam] = useState(false);
+  const [warunki, setWarunki] = useState<TekstWarunkow>(tekstWarunkow(z.warunki));
+  const [ok, setOk] = useState("");
   const [rodzaj, setRodzaj] = useState<RodzajDowodu>("katalog_dostawcy");
   const [tresc, setTresc] = useState("");
   const negatyw = z.polaryzacja === "nie_pasuje";
-  const blad = (wycofaj.error ?? dowod.error) as Error | null;
+  const blad = (wycofaj.error ?? dowod.error ?? popraw.error) as Error | null;
+  const nic = !cofam && !dopisuje && !poprawiam;
 
   return <li className={`rounded-lg border p-3 text-sm ${negatyw ? "border-red-200" : "border-slate-200"}`}>
     <div className="flex flex-wrap items-center gap-2">
@@ -131,14 +138,40 @@ function Wpis({ z, tylkoOdczyt }: { z: Zastosowanie; tylkoOdczyt: boolean }) {
       <span className="ml-auto text-xs text-slate-500">{z.zdanieZrodla}</span>
     </div>
     {z.zdaniePowodu && <p className="text-red-900">{z.zdaniePowodu}</p>}
+    {z.zdanieWarunkow && <p className="text-amber-900"><b>Tylko:</b> {z.zdanieWarunkow}</p>}
     <ul className="mt-1 text-xs text-slate-600">
       {z.dowody.map((d) => <li key={d.id}>· {d.nazwaRodzaju}, {czas(d.at)}, {d.autor}: {d.tresc}</li>)}
     </ul>
+    {ok && <p className="mt-1 text-xs text-emerald-800">{ok}</p>}
     {!tylkoOdczyt && <div className="mt-2 flex flex-wrap items-end gap-2">
-      {!cofam && !dopisuje && <>
+      {nic && <>
         <Przycisk className="text-xs" onClick={() => setDopisuje(true)}>Dopisz dowód</Przycisk>
+        <Przycisk className="text-xs" onClick={() => { setPoprawiam(true); setOk(""); }}>Popraw warunki</Przycisk>
         <Przycisk className="text-xs" onClick={() => setCofam(true)}>Wycofaj</Przycisk>
       </>}
+      {/* Poprawka warunków to NOWY wpis z `zastepujeId` i z dowodem na nową
+          granicę — wiersz zastosowania jest niezmienny poza stanem. Stary
+          stoi, dopóki ktoś z biura nie zatwierdzi poprawki w kolejce. */}
+      {poprawiam && <div className="w-full space-y-2 rounded-lg bg-slate-50 p-2">
+        <PolaWarunkow dane={warunki} onZmiana={setWarunki} />
+        <div className="flex flex-wrap items-end gap-2">
+          <select className="field w-auto" aria-label="Rodzaj dowodu poprawki" value={rodzaj}
+            onChange={(e) => setRodzaj(e.target.value as RodzajDowodu)}>
+            {DOWODY_DO_WYBORU.map((r) => <option key={r} value={r}>{NAZWA_DOWODU[r]}</option>)}</select>
+          <Pole className="flex-1" aria-label="Dowód na nowe warunki" value={tresc}
+            placeholder="np. IPL STIHL 2024: od nr 175000000 nowy gaźnik" onChange={(e) => setTresc(e.target.value)} />
+          <Przycisk wariant="glowny" disabled={popraw.isPending || tresc.trim() === ""}
+            onClick={() => popraw.mutate({
+              twId: z.twId, zastepujeId: z.id, polaryzacja: z.polaryzacja, powodNegatywny: z.powodNegatywny,
+              model: { rodzaj: z.model.rodzaj, marka: z.model.marka, nazwa: z.model.nazwa, wariant: z.model.wariant },
+              komentarz: z.komentarz, warunki: naWarunki(warunki),
+              dowod: { rodzaj, tresc: tresc.trim() },
+            }, { onSuccess: () => { setPoprawiam(false); setTresc("");
+              setOk("Poprawka czeka w kolejce — ten wpis obowiązuje do jej zatwierdzenia."); } })}>
+            Zaproponuj poprawkę</Przycisk>
+          <Przycisk onClick={() => { setPoprawiam(false); setWarunki(tekstWarunkow(z.warunki)); }}>Wróć</Przycisk>
+        </div>
+      </div>}
       {cofam && <>
         <label className="flex-1 text-xs font-bold text-slate-600">
           {negatyw ? "Powód wycofania — negatyw nie schodzi bez powodu" : "Powód wycofania (opcjonalnie)"}

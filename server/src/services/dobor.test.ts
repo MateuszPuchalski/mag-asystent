@@ -247,6 +247,25 @@ test("zatwierdzone zastosowanie z dowodem technicznym wchodzi do zdania szkicu",
   assert.equal(liczba("events"), przed);
 });
 
+test("warunek wpisu decyduje o zdaniu: nieznany zbija do „prawdopodobnie”, złamany nie jest źródłem", () => {
+  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  const z = W.zaproponujZastosowanie({ twId: SZARPAK, model: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46-450" },
+    polaryzacja: "pasuje", zrodlo: "reczne", dowod: { rodzaj: "producent", tresc: "IPL 2024" },
+    warunki: { seryjnyOd: "175000000" } }, { userId: biuro, name: "A. Lewandowska" })!;
+  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
+  wybierzKandydata(rozmowa, SZARPAK, "zastosowanie", 2, biuro);
+  /* Numeru w danych brak: dowód producenta jest, ale nie wiemy, czy ten egzemplarz się łapie. */
+  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu,
+    /^Do NAC LS 46-450 prawdopodobnie pasuje SZR-148\/82 — źródło: potwierdzone zastosowanie do NAC LS 46-450 \(nr seryjny od 175000000\)/);
+  zapiszDane(rozmowa, { nrSeryjny: "175 000 001" }, 3, biuro);
+  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, /^Do NAC LS 46-450 pasuje SZR-148\/82 — źródło: potwierdzone/);
+  /* Pod granicą wpis mówi o INNYCH egzemplarzach — cytowany jako źródło kłamałby. */
+  zapiszDane(rozmowa, { nrSeryjny: "174999999" }, 4, biuro);
+  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, new RegExp("^SZR-148/82 do NAC LS 46-450 może nie pasować"
+    + " — wpis obejmuje nr seryjny od 175000000, a w doborze nr 174999999; źródło: potwierdzone zastosowanie do NAC LS 46-450 \\("));
+  assert.equal(W.zastosowanie(z.id)!.stan, "zatwierdzone", "odczyt doboru niczego w wiedzy nie rusza");
+});
+
 /* ── Silnik jako drugie ogniwo: zdanie do szkicu i wybór przy zatwierdzeniu ── */
 
 const NAC = { rodzaj: "maszyna" as const, marka: "NAC", nazwa: "LS 46-450" };

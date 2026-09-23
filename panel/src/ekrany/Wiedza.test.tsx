@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -18,6 +18,7 @@ const propozycja = (n: Partial<Zastosowanie> = {}): Zastosowanie => ({
   stan: "propozycja", zrodlo: "dobor", komentarz: null, conversationId: 4821, zastepujeId: null,
   zaproponowal: "A. Lewandowska", zaproponowanoAt: "2026-09-02T08:00:00Z", rozstrzygnal: null,
   rozstrzygnietoAt: null, powodRozstrzygniecia: null, pewnosc: "prawdopodobne",
+  warunki: { rokOd: null, rokDo: null, seryjnyOd: null, seryjnyDo: null, warunek: null }, zdanieWarunkow: null,
   zdanieZrodla: "zastosowanie do NAC LS 46-450 zatwierdzone na podstawie rozmowy — rozmowa, 2.09.2026, A. Lewandowska; bez dowodu technicznego",
   dowody: [{ id: 9, rodzaj: "rozmowa", nazwaRodzaju: "rozmowa", tresc: "dobór zatwierdzony w rozmowie #4821",
     link: null, zadanieId: null, conversationId: 4821, autor: "A. Lewandowska", at: "2026-09-02T08:00:00Z" }],
@@ -180,6 +181,59 @@ describe("Ekran wiedzy", () => {
       model: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46-450", wariant: null },
       dowod: { rodzaj: "katalog_dostawcy", tresc: "katalog 2024, s. 34", link: null },
     }), expect.anything());
+  });
+
+  /* Warunki wpisu: zatwierdza się twierdzenie RAZEM z granicą, więc karta
+     kolejki ją pokazuje — a poprawka mówi, który wpis zastąpi. */
+  it("karta kolejki pokazuje warunki i to, który wpis poprawka zastąpi", () => {
+    LISTA = [propozycja({ zastepujeId: 2, zdanieWarunkow: "roczniki 2014–2018, nr seryjny od 175000000",
+      warunki: { rokOd: 2014, rokDo: 2018, seryjnyOd: "175000000", seryjnyDo: null, warunek: null } })];
+    pokaz();
+    expect(screen.getByText("roczniki 2014–2018, nr seryjny od 175000000")).toBeInTheDocument();
+    expect(screen.getByText(/Poprawka wpisu #2 — po zatwierdzeniu tamten schodzi na wycofane/)).toBeInTheDocument();
+  });
+
+  it("ręczna propozycja z warunkami niesie je w ciele — pusta sekcja to `null`, nie pięć pustych pól", async () => {
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: "Nowa propozycja" }));
+    await userEvent.click(screen.getByRole("button", { name: "wybierz towar" }));
+    await userEvent.type(screen.getByLabelText("Marka"), "STIHL");
+    await userEvent.type(screen.getByLabelText("Model"), "MS 250");
+    await userEvent.type(screen.getByLabelText("Treść dowodu"), "IPL 2024");
+    await userEvent.click(screen.getByRole("button", { name: /ZAPROPONUJ DO KOLEJKI/ }));
+    expect(zaproponuj).toHaveBeenLastCalledWith(expect.objectContaining({ warunki: null }), expect.anything());
+
+    await userEvent.click(screen.getByText("Warunki — lata, numer seryjny (opcjonalnie)"));
+    await userEvent.type(screen.getByLabelText("Rocznik od"), "2014");
+    await userEvent.type(screen.getByLabelText("Nr seryjny od"), " 175000000 ");
+    await userEvent.click(screen.getByRole("button", { name: /ZAPROPONUJ DO KOLEJKI/ }));
+    expect(zaproponuj).toHaveBeenLastCalledWith(expect.objectContaining({
+      warunki: { rokOd: 2014, rokDo: null, seryjnyOd: "175000000", seryjnyDo: null, warunek: null },
+    }), expect.anything());
+  });
+
+  it("„Popraw warunki” przy zatwierdzonym wpisie składa POPRAWKĘ z dowodem, nie edycję w miejscu", async () => {
+    WIEDZA = { potwierdzone: [propozycja({ id: 5, stan: "zatwierdzone", pewnosc: "potwierdzone",
+      zdanieWarunkow: "rocznik od 2014", warunki: { rokOd: 2014, rokDo: null, seryjnyOd: null, seryjnyDo: null, warunek: null } })],
+    negatywne: [], propozycje: [], pasowania: { pasujeDo: [], pasujace: [], negatywne: [], propozycje: [] }, zamiennosciOem: [] };
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: "Sprawdź kartotekę" }));
+    await userEvent.click(screen.getByRole("button", { name: "wybierz towar" }));
+    const sekcja = screen.getByRole("region", { name: "Potwierdzone zastosowania" });
+    expect(sekcja).toHaveTextContent("Tylko: rocznik od 2014");
+    await userEvent.click(within(sekcja).getByRole("button", { name: "Popraw warunki" }));
+    expect(within(sekcja).getByLabelText("Rocznik od")).toHaveValue("2014");
+    await userEvent.type(within(sekcja).getByLabelText("Rocznik do"), "2018");
+    const wyslij = within(sekcja).getByRole("button", { name: "Zaproponuj poprawkę" });
+    expect(wyslij).toBeDisabled();
+    await userEvent.type(within(sekcja).getByLabelText("Dowód na nowe warunki"), "IPL 2024, s. 12");
+    await userEvent.click(wyslij);
+    expect(zaproponuj).toHaveBeenCalledWith({
+      twId: 14, zastepujeId: 5, polaryzacja: "pasuje", powodNegatywny: null,
+      model: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46-450", wariant: null }, komentarz: null,
+      warunki: { rokOd: 2014, rokDo: 2018, seryjnyOd: null, seryjnyDo: null, warunek: null },
+      dowod: { rodzaj: "katalog_dostawcy", tresc: "IPL 2024, s. 12" },
+    }, expect.anything());
   });
 
   /* Przejście z Sieci (0.465.0): wskazana część ląduje w „Sprawdź kartotekę”

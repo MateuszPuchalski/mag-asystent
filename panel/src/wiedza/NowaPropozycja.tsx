@@ -3,6 +3,7 @@ import { BookMarked } from "lucide-react";
 import type { NowaPropozycja as NowaPropozycjaTyp, PowodNegatywny, RodzajDowodu } from "../api/typy";
 import { Pole, Przycisk } from "../ui";
 import { PolaModelu, type DaneModelu } from "./PolaModelu";
+import { naWarunki, PolaWarunkow, PUSTE_WARUNKI, type TekstWarunkow } from "./PolaWarunkow";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { DOWODY_DO_WYBORU, NAZWA_DOWODU, NAZWA_POWODU } from "../skrzynka/statusy";
 
@@ -26,6 +27,7 @@ export function NowaPropozycja({ trwa, blad, onWyslij }: {
   const [tresc, setTresc] = useState("");
   const [link, setLink] = useState("");
   const [komentarz, setKomentarz] = useState("");
+  const [warunki, setWarunki] = useState<TekstWarunkow>(PUSTE_WARUNKI);
   const gotowe = Boolean(towar && marka.trim() && nazwa.trim() && tresc.trim());
 
   return <form className="space-y-3" aria-label="Nowa propozycja"
@@ -38,6 +40,7 @@ export function NowaPropozycja({ trwa, blad, onWyslij }: {
         polaryzacja, powodNegatywny: polaryzacja === "nie_pasuje" ? powod : null,
         komentarz: komentarz.trim() || null,
         dowod: { rodzaj: rodzajDowodu, tresc: tresc.trim(), link: link.trim() || null },
+        warunki: naWarunki(warunki),
       });
     }}>
     <div>
@@ -57,6 +60,13 @@ export function NowaPropozycja({ trwa, blad, onWyslij }: {
         {(Object.keys(NAZWA_POWODU) as PowodNegatywny[]).map((k) => <option key={k} value={k}>{NAZWA_POWODU[k]}</option>)}
       </select>}
     </div>
+
+    {/* Zwinięte, bo większość wpisów warunków nie ma: pięć pustych pól na
+        wierzchu to pięć decyzji „czy coś tu wpisać" przy każdej propozycji. */}
+    <details className="rounded-lg border border-slate-200 px-3 py-2">
+      <summary className="cursor-pointer text-sm font-semibold">Warunki — lata, numer seryjny (opcjonalnie)</summary>
+      <div className="mt-2"><PolaWarunkow dane={warunki} onZmiana={setWarunki} /></div>
+    </details>
 
     <div className="grid gap-2 md:grid-cols-[180px_minmax(0,1fr)]">
       <label className="text-xs font-bold text-slate-600">Rodzaj dowodu
