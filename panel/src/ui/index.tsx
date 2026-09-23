@@ -312,6 +312,18 @@ export const czas = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleString("pl", { dateStyle: "short", timeStyle: "short" }) : "—";
 
 /**
+ * Data i godzina Z SEKUNDAMI — „10.09.2026, 14:23:05" (0.440.0).
+ *
+ * Jedyny wyjątek od `czas()` i ma jednego odbiorcę: DZIENNIK. Ślad audytowy
+ * to diagnostyka, a tam sekunda rozstrzyga — kolejność skanu i odrzucenia,
+ * które przyszły w tej samej minucie, albo dwa kliknięcia jednej osoby.
+ * Biuro pokazywało sekundy w dzienniku od zawsze i przeprowadzka ich nie
+ * zabiera. Stoi tutaj, bo `Czas.test.ts` trzyma formaty dat w jednym pliku.
+ */
+export const stempel = (v: string | null | undefined) =>
+  v ? new Date(v).toLocaleString("pl", { dateStyle: "short", timeStyle: "medium" }) : "—";
+
+/**
  * Wiek po ludzku — „41 min", „2 g 36 min", „3 dni".
  *
  * Mieszkał w `skrzynka/AlarmSynchronizacji.tsx` od 0.152.0 i miał tam jednego

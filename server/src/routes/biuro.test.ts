@@ -179,8 +179,13 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    11,
-    "Licznik SPADŁ z 13 do 11 w 0.438.0: kosze przeszły do panelu, do " +
+    10,
+    "Licznik SPADŁ z 11 do 10 w 0.440.0: ANALIZA przeszła do panelu, a z nią " +
+      "import zbiórek strefy złotej. Ta sama trasa, to samo `{ csv }` — woła ją " +
+      "teraz `analiza/Strefa.tsx`, a jedyność tego zapisu przy patrzeniu " +
+      "pilnuje `ekrany/Analiza.test.tsx`. DZIENNIK nie zapisywał niczego, więc " +
+      "przeprowadzka nie zmieniła tu nic więcej.\n\n" +
+      "Licznik SPADŁ z 13 do 11 w 0.438.0: kosze przeszły do panelu, do " +
       "zakładki Zwroty, a z nimi dwa zapisy — załatwienie pominiętej pozycji " +
       "i PRZELICZ ZE ZWROTÓW. Zero zapisu przy patrzeniu pilnuje tam " +
       "`ekrany/Kosze.test.tsx`.\n\n" +
@@ -246,7 +251,8 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   /* Zapisy dostaw są w panelu, nie w dwóch miejscach naraz (0.435.0). */
   assert.doesNotMatch(html, /dokument\/\$\{dokId\}\/(zamknij|otworz|notatka)/,
     "zapisy dostaw przeszły do panelu");
-  assert.match(html, /zbiorki\/import/, "import zbiórek z Sellasist");
+  /* Import zbiórek przeszedł z ANALIZĄ do panelu (0.440.0). */
+  assert.doesNotMatch(html, /zbiorki\/import/, "import zbiórek przeszedł do panelu");
   assert.match(html, /biuro\/dostawcy\/\$\{khId\}\/logo/, "wgranie logo dostawcy");
   /* Konwersja formatów MUSI zostać po stronie przeglądarki: serwer przyjmuje
      wyłącznie PNG, a loga przychodzą też jako SVG i WebP. Bez `<canvas>`
@@ -413,6 +419,25 @@ test("panel nie woła funkcji, której nie ma", () => {
 
 });
 
+test("strona nie sięga po element, którego nie ma (0.440.0)", () => {
+  /* Przeprowadzka DZIENNIKA i ANALIZY zostawiła w `pokaz()` dwie linie
+     `$("widokDziennik").hidden = …`. Test wywołań milczał, bo to nie jest
+     wywołanie funkcji, tylko sięgnięcie po element — `$()` oddaje `null`,
+     a przypisanie do `null.hidden` wywraca start strony. Biuro wstawało
+     puste i dopiero przeglądarka to pokazała. Każde następne wydanie
+     przeprowadzki kasuje kolejne elementy, więc ta sama pomyłka czeka
+     w każdym z nich.
+
+     Identyfikator liczy się jako istniejący także wtedy, gdy stoi w napisie
+     HTML składanym przez skrypt (`innerHTML`) — tak powstają przyciski
+     parowania i arkusza. Wystarczy, że `id="…"` jest gdziekolwiek w pliku. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  const skrypt = html.slice(html.lastIndexOf("<script>"));
+  const szukane = new Set([...skrypt.matchAll(/\$\("([A-Za-z0-9_]+)"\)/g)].map((m) => m[1]));
+  const brak = [...szukane].filter((id) => !html.includes(`id="${id}"`));
+  assert.deepEqual(brak, [], "skrypt sięga po elementy, których strona już nie ma");
+});
+
 test("panel wstaje z zapamiętanego tokenu i sam napędza cykl", () => {
   /* Strażnik odwrotnej strony niż test wyżej. Tamten pilnuje funkcji WOŁANEJ,
      a nieistniejącej; ta blizna była lustrzana — funkcja istniała, a wywołanie
@@ -466,8 +491,10 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     widoki,
-    ["analiza", "dziennik", "nadzor"],
-    "Od 0.435.0 DOSTAWY, a od 0.438.0 MAGAZYN ZWROTÓW nie są już zakładkami " +
+    ["nadzor"],
+    "Od 0.440.0 także ANALIZA i DZIENNIK prowadzą do panelu — zakładką tej " +
+      "strony został sam STAN SYSTEMU. " +
+      "Od 0.435.0 DOSTAWY, a od 0.438.0 MAGAZYN ZWROTÓW nie są już zakładkami " +
       "tej strony — prowadzą do panelu (`data-panel`), sprawdzane niżej. " +
       "Pasek boczny po 0.140.0: SPRAWY i REJESTRY odeszły razem z obsługą " +
       "klienta, zostaje praca magazynu i wgląd. REJESTRY nie mogą wrócić " +
@@ -493,6 +520,9 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const praca = nav.match(/<div class="grupa-btny">([\s\S]*?)<\/div>/)?.[1] ?? "";
   assert.match(praca, /data-panel="\/obsluga\/dostawy"/, "DOSTAWY prowadzą do panelu z grupy Praca");
   assert.match(praca, /data-panel="\/obsluga\/zwroty\/kosze"/, "KOSZE prowadzą do zakładki Zwroty w panelu");
+  const wglad = [...nav.matchAll(/<div class="grupa-btny">([\s\S]*?)<\/div>/g)][1]?.[1] ?? "";
+  assert.match(wglad, /data-panel="\/obsluga\/analiza"/, "ANALIZA prowadzi do panelu z grupy Wgląd (0.440.0)");
+  assert.match(wglad, /data-panel="\/obsluga\/dziennik"/, "DZIENNIK prowadzi do panelu z grupy Wgląd (0.440.0)");
 
   assert.equal(
     (nav.match(/class="grupa-nazwa"/g) ?? []).length,
@@ -645,14 +675,23 @@ test("raport per osoba jedzie z podstawą prawną — nigdy bez niej", () => {
      pilnuje więc tego, co przy tej decyzji pozostaje niezbywalne: sekcja
      imienna istnieje RAZEM z miejscem na podstawę prawną, którą serwer
      wysyła w odpowiedzi. Zniknięcie któregokolwiek z tych elementów to
-     regresja prawna, nie kosmetyczna. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
+     regresja prawna, nie kosmetyczna.
+
+     Od 0.440.0 sekcja mieszka w analizie PANELU i test czyta tamto źródło.
+     Gwarancja przeszła razem z widokiem, a nie została w pliku, z którego
+     widok zniknął — zielony test nad pustym miejscem niczego by nie pilnował.
+     Zachowanie (karta z podstawą dla admina, brak karty dla roli biuro)
+     sprawdza `panel/src/ekrany/Analiza.test.tsx`. */
+  const zrodlo = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src/analiza/ZakresHali.tsx"),
     "utf8"
   );
-  assert.match(html, /WYDAJNOŚĆ PER OSOBA/, "sekcja imienna zniknęła ze strony");
-  assert.match(html, /podstawaPrawna/, "strona nie pokazuje podstawy prawnej monitoringu");
-  assert.match(html, /nie są miarą błędu/, "zdanie o problemach jako nie-błędach musi zostać");
+  assert.match(zrodlo, /Wydajność per osoba/, "sekcja imienna zniknęła z analizy");
+  assert.match(zrodlo, /wydajnosc\.podstawaPrawna/, "analiza nie pokazuje podstawy prawnej monitoringu");
+  assert.match(zrodlo, /nie są miarą błędu/, "zdanie o problemach jako nie-błędach musi zostać");
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  assert.doesNotMatch(html, /WYDAJNOŚĆ PER OSOBA/,
+    "raport per osoba wrócił do biura — dwa miejsca to dwie podstawy prawne do pilnowania");
 });
 
 test("zdjęcie dostawy z listy jest zastrzeżone dla biura", async () => {
@@ -741,9 +780,13 @@ test("konfiguracja siedzi za zębatką, nie na zakładkach pracy", () => {
     assert.ok(ustawienia.includes(`id="${pole}"`), `${pole} należy do ustawień`);
   }
 
-  const analiza = wycinek('id="widokAnaliza"', 'id="widokDostawcy"');
-  assert.ok(!analiza.includes('id="reguly"'), "reguły zeszły z ANALIZY");
-  assert.ok(analiza.includes("Ustawieniach"), "ANALIZA mówi, gdzie ustawia się reguły");
+  /* ANALIZA mieszka od 0.440.0 w panelu. Drogowskaz do reguł przeszedł
+     z nią i dalej prowadzi DO USTAWIEŃ tutaj — mostem, z sesją — dopóki
+     reguły nie przeprowadzą się razem z ustawieniami (F5). */
+  const strefa = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src/analiza/Strefa.tsx"), "utf8");
+  assert.ok(!strefa.includes("/api/biuro/strefa"), "reguły nie zeszły z ustawień do analizy");
+  assert.match(strefa, /doBiura\("dostawcy"/, "analiza prowadzi do reguł za zębatką biura");
 });
 
 test("widok SPRAW nie wraca bokiem (0.140.0)", () => {
@@ -859,74 +902,31 @@ test("dostawy odeszły do panelu razem ze swoimi strażnikami (0.435.0)", () => 
 });
 
 test("filtr stoi w pasku wtedy i tylko wtedy, gdy rządzi całą zakładką", () => {
-  /* Od 0.94.0 zakładki wglądu — STAN SYSTEMU, DZIENNIK, ANALIZA — mają jedną
-     strefę i pasek filtrów, zamiast wyglądać dokładnie jak zakładki pracy.
+  /* Od 0.94.0 zakładki wglądu mają jedną strefę i pasek filtrów. PASEK NAD
+     KARTAMI OBIECUJE, ŻE RZĄDZI CAŁYM WIDOKIEM. Przy dzienniku i analizie to
+     była prawda — i obie przeszły w 0.440.0 do panelu, gdzie filtry stoją
+     w rzędzie nad kartami (`ekrany/Dziennik.tsx`, `ekrany/Analiza.tsx`).
 
-     Ten test pilnuje reguły, a nie samego istnienia paska. PASEK NAD KARTAMI
-     OBIECUJE, ŻE RZĄDZI CAŁYM WIDOKIEM. Przy dzienniku i analizie to prawda:
-     każda kontrolka zmienia wszystko, co niżej. Przy stanie systemu prawdą
-     NIE jest — OKNO dotyczy wyłącznie metryk, bo kolejka zapisów, kolizje
-     kodów i stan serwera mówią o TERAZ i żaden zakres dni ich nie rusza.
-     Dlatego STAN SYSTEMU paska nie ma, a jego OKNO siedzi w karcie metryk.
-
-     Wyniesienie go „dla spójności" byłoby regresją, która nie wygląda na
-     regresję: układ zrobiłby się równiejszy, a interfejs zacząłby kłamać. */
+     Przy stanie systemu prawdą to NIE jest: kolejka zapisów, kolizje kodów
+     i stan serwera mówią o TERAZ i żaden zakres dni ich nie rusza. Dlatego
+     STAN SYSTEMU paska nie ma, a jedyne OKNO — od 0.440.0 tabeli wymiany,
+     bo metryki odeszły do analizy — siedzi w swojej karcie. Wyniesienie go
+     „dla spójności" byłoby regresją, która nie wygląda na regresję. */
   const html = fs.readFileSync(
     path.resolve(import.meta.dirname, "../web/biuro.html"),
     "utf8"
   );
-  const wycinek = (od: string, doo: string) => {
-    const a = html.indexOf(od);
-    assert.notEqual(a, -1, `brak ${od}`);
-    const b = html.indexOf(doo, a);
-    assert.notEqual(b, -1, `brak ${doo} po ${od}`);
-    return html.slice(a, b);
-  };
-
-  for (const w of ["widokNadzor", "widokDziennik", "widokAnaliza"]) {
-    assert.match(html, new RegExp(`id="${w}" class="widok wglad"`),
-      `${w} jest zakładką wglądu, nie pracy`);
+  assert.match(html, /id="widokNadzor" class="widok wglad"/, "STAN SYSTEMU jest zakładką wglądu, nie pracy");
+  for (const w of ["widokDziennik", "widokAnaliza"]) {
+    assert.ok(!html.includes(`id="${w}"`), `${w} przeszedł do panelu i nie wraca`);
   }
-
-  /* Pasek to CHROM, nie treść — i dlatego nie nosi klasy `card`. Nosił ją
-     w pierwszym podejściu i przegrywał specyficznością z regułą `.card`
-     stojącą niżej w arkuszu: renderował się jako biała płachta z cieniem,
-     przy analizie prawie pusta. */
-  assert.ok(!/class="[^"]*card[^"]*pasekFiltrow/.test(html),
-    "pasek filtrów nie jest kartą");
-
-  const dziennik = wycinek('id="widokDziennik"', 'id="widokAnaliza"');
-  const analiza = wycinek('id="widokAnaliza"', 'id="widokDostawcy"');
-  for (const [nazwa, widok, pola] of [
-    ["dziennik", dziennik, ["fOd", "fDo", "fTyp", "fTw", "fDev", "fLimit",
-                            "szukajDziennik", "csvDziennik"]],
-    /* Od 0.96.0 pasek analizy niesie też ZAKRES i OSOBĘ, a OKNO jest czipami,
-       nie `<select>`-em — stąd `oknoAnalizy` zamiast `dniAnalizy`. Reguła
-       została ta sama: w pasku stoi to, co rządzi całym widokiem. ZAKRES
-       rządzi nim najdosłowniej ze wszystkiego — decyduje, które karty w ogóle
-       są na ekranie. */
-    ["analiza", analiza, ["oknoAnalizy", "zakresAnalizy", "csvAnalizy"]],
-  ] as [string, string, string[]][]) {
-    const pasek = widok.indexOf('class="pelna pasekFiltrow"');
-    assert.notEqual(pasek, -1, `${nazwa} ma pasek filtrów`);
-    /* Prefiks, nie pełny literał: od 0.96.0 karty analizy noszą obok `card`
-       także `zakresPytania`/`zakresAudyt`, więc `<section class="card">`
-       w tym widoku nie występuje już wcale — a `indexOf` zwracał wtedy -1
-       i asercja przechodziła przez przypadek w drugą stronę. */
-    assert.ok(pasek < widok.indexOf('<section class="card'),
-      `pasek ${nazwa} stoi NAD kartami, nie w środku pierwszej`);
-    const koniec = widok.indexOf("</section>", pasek);
-    for (const pole of pola) {
-      const gdzie = widok.indexOf(`id="${pole}"`);
-      assert.ok(gdzie > pasek && gdzie < koniec,
-        `${pole} rządzi całą zakładką ${nazwa}, więc mieszka w pasku`);
-    }
-  }
-
-  const nadzor = wycinek('id="widokNadzor"', 'id="widokDziennik"');
+  const a = html.indexOf('id="widokNadzor"');
+  const nadzor = html.slice(a, html.indexOf('id="widokDostawcy"', a));
   assert.ok(!nadzor.includes("pasekFiltrow"),
     "STAN SYSTEMU nie ma paska — nie ma filtra, który rządziłby całą zakładką");
-  assert.ok(nadzor.includes('id="dniMetryk"'), "OKNO metryk zostaje przy metrykach");
+  const wymiana = nadzor.slice(nadzor.indexOf('id="kartaWymiany"'));
+  assert.ok(wymiana.slice(0, wymiana.indexOf("</section>")).includes('id="dniWymiany"'),
+    "OKNO tabeli wymiany stoi w jej karcie");
 });
 
 test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
@@ -940,7 +940,10 @@ test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
   );
   const ikony = html.match(/class="info"/g) ?? [];
   const bloki = html.match(/class="objasnienie"/g) ?? [];
-  assert.ok(ikony.length >= 10, `ikon objaśnień: ${ikony.length}`);
+  /* Dziewięć od 0.440.0: DZIENNIK i STREFA ZŁOTA zabrały swoje objaśnienia
+     do panelu, gdzie zdanie „jak czytać tę liczbę" stoi jawnie pod nagłówkiem
+     karty (`analiza/wspolne.tsx`), zamiast za ikoną. */
+  assert.ok(ikony.length >= 9, `ikon objaśnień: ${ikony.length}`);
   assert.equal(ikony.length, bloki.length, "każda ikona ma swój blok");
   assert.match(
     html,
@@ -989,7 +992,10 @@ test("panel naprawia, nie tylko patrzy: kolejka, ratunek serwera, konta (0.111.0
   assert.match(html, /data-konto-wyloguj/, "zgubiony kolektor ma swój przycisk");
   assert.match(html, /\$\("widokNadzor"\)\.addEventListener\("click"/, "nadzór deleguje z sekcji");
   assert.match(html, /\$\("kontaKarta"\)\.addEventListener\("click"/, "konta delegują z sekcji");
-  assert.match(html, /id="fOsoba"/, "dziennik filtruje po osobie, nie tylko urządzeniu");
+  /* Dziennik przeszedł do panelu (0.440.0) razem z filtrem osoby. */
+  const dziennik = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src/ekrany/Dziennik.tsx"), "utf8");
+  assert.match(dziennik, /zmien\("userRef"/, "dziennik filtruje po osobie, nie tylko urządzeniu");
   /* Do 0.113.0 kulejący cykl miał własny znacznik `#cyklBlad`; od 0.114.0
      jest bursztynem ikony zdrowia — sygnał zostaje, znacznik nie. */
   assert.match(html, /kulawyCykl/, "kulejący cykl nadal ma sygnał — jako składnik ikony zdrowia");
@@ -1325,7 +1331,7 @@ test("każda karta panelu stoi wewnątrz swojego widoku (0.427.0)", () => {
 
 test("STAN SYSTEMU zaczyna od tego, co czeka na biuro (0.427.0)", () => {
   const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  const nadzor = html.slice(html.indexOf('id="widokNadzor"'), html.indexOf('id="widokDziennik"'));
+  const nadzor = html.slice(html.indexOf('id="widokNadzor"'), html.indexOf('id="widokDostawcy"'));
   const poz = (id: string) => {
     const i = nadzor.indexOf(`id="${id}"`);
     assert.ok(i >= 0, `${id} jest w STANIE SYSTEMU`);
@@ -1334,7 +1340,9 @@ test("STAN SYSTEMU zaczyna od tego, co czeka na biuro (0.427.0)", () => {
   // Najpierw rzeczy z przyciskiem do naciśnięcia, potem rzeczy do czytania.
   assert.ok(poz("kolejka") < poz("rozjazdy"), "kolejka zapisów przed rekoncyliacją");
   assert.ok(poz("rozjazdy") < poz("kolizje"), "rekoncyliacja przed kolizjami");
-  assert.ok(poz("kolizje") < poz("dniMetryk"), "kolizje przed metrykami");
+  /* Metryki odeszły do analizy panelu (0.440.0); czytaną kartą po
+     kolizjach jest teraz tabela wymiany z halą. */
+  assert.ok(poz("kolizje") < poz("kartaWymiany"), "kolizje przed tabelą wymiany");
   // Arkusz zostaje pod kolejką — ta kolejka wykonuje jego skutek (0.138.0).
   assert.ok(poz("kolejka") < poz("arkuszLokalizacjiKarta") &&
     poz("arkuszLokalizacjiKarta") < poz("rozjazdy"), "arkusz tuż pod kolejką");
