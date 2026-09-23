@@ -46,8 +46,11 @@ beforeEach(() => {
     .run().lastInsertRowid);
   zwrot = Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,
     reference_number,order_id,created_at,paczka_at,synced_at)
-    VALUES (?,'zw-1','REF-1','ord-1','2026-08-25T09:00:00Z','2026-08-28T09:00:00Z','2026-09-01T09:00:00Z')`)
-    .run(konto).lastInsertRowid);
+    VALUES (?,'zw-1','REF-1','ord-1',?,'2026-08-28T09:00:00Z','2026-09-01T09:00:00Z')`)
+    /* Zgłoszenie WCZORAJ, nie stała data (0.452.0): zwrot bez decyzji
+       starszy niż `ZWROT_WYGASA_DNI` wychodzi z kolejki, a te testy pytają
+       o kolejkę, nie o wiek. Stała data zamieniłaby je w bombę zegarową. */
+    .run(konto, new Date(Date.now() - 86_400_000).toISOString()).lastInsertRowid);
   d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,powod,klucz)
     VALUES (?,'111','Sekator NAC',1,4999,'PLN','DONT_LIKE_IT','111|Sekator NAC')`).run(zwrot);
 });
@@ -400,8 +403,12 @@ test("dokument sprzedaży wskazuje człowiek, a szczegół podaje kandydatów", 
   /* Numer paragonu to ostatnia pozycja z listy biura zwrotów. Bez niego
      pracownik szukał sprzedaży w Subiekcie po dacie i nazwisku. */
   const d = db();
+  /* Data wystawienia PRZED zgłoszeniem, liczona od niego (0.452.0).
+     Zgłoszenie w fixture jest „wczoraj", a kandydaci szukają w oknie
+     wokół niego — stała data wypadłaby z okna za kilka tygodni. */
   d.prepare(`INSERT INTO sgt_faktura(dok_id,typ,nr_pelny,nr_oryg,data_wyst)
-    VALUES (500,'FS','FS 140/2026','REF-1','2026-08-20')`).run();
+    VALUES (500,'FS','FS 140/2026','REF-1',?)`)
+    .run(new Date(Date.now() - 6 * 86_400_000).toISOString().slice(0, 10));
   const { naglowki } = login("biuro", "Ala wskazuje");
 
   const szczegol = await app.inject({

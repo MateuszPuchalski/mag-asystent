@@ -530,7 +530,10 @@ export function usePaczkiKlienta(szukane: string) {
  * serwer i tak odrzuci. Serwer sprawdza drugi raz, bo panel nie jest bramką.
  */
 export function wygladaNaLogin(uchwyt: string): boolean {
-  return /^[\p{L}\p{N}._-]{2,64}$/u.test(uchwyt.trim());
+  const u = uchwyt.trim();
+  /* Drugi wzór to login bez pseudonimu, `client:124843816` (0.452.0) —
+     Sales Center pokazuje go wprost jako login kupującego. */
+  return /^[\p{L}\p{N}._-]{2,64}$/u.test(u) || /^client:\d{3,20}$/i.test(u);
 }
 
 /**

@@ -529,6 +529,12 @@ test("nazwisko ze spacją nie jedzie do Allegro — tam szuka się wyłącznie p
   assert.equal(wygladaNaLogin("+48 600 100 200"), false);
   assert.equal(wygladaNaLogin("a"), false, "jeden znak to nie uchwyt");
   assert.equal(wygladaNaLogin("Łąka-ogród_2"), true);
+  /* Login bez pseudonimu (0.452.0) — Sales Center pokazuje go wprost. Wzór
+     jest wąski: sam przedrostek i cyfry, nie „dowolny dwukropek". */
+  assert.equal(wygladaNaLogin("client:124843816"), true);
+  assert.equal(wygladaNaLogin(" Client:124843816 "), true);
+  assert.equal(wygladaNaLogin("12:30"), false);
+  assert.equal(wygladaNaLogin("client:abc"), false);
 
   let pytano = false;
   const ile = await pobierzZamowieniaKupujacego("Jan Kowalski", {
@@ -546,4 +552,36 @@ test("limit Allegro wraca jako błąd, a baza zostaje nietknięta", async () => 
     query: (async () => { throw new BladLimituAllegro("Allegro prosi o przerwę", 60_000); }) as never,
   }), BladLimituAllegro);
   assert.equal((d.prepare("SELECT COUNT(*) AS n FROM zamowienie_klienta").get() as { n: number }).n, 0);
+});
+
+test("login bez pseudonimu pyta małą literą, a przy pustej odpowiedzi wielką (0.452.0)", async () => {
+  /* Zgłoszenie właściciela: Sales Center znajdował „Client:124843816",
+     a panel mówił „nie mam paczek". Nie wiemy, czy filtr rozróżnia wielkość
+     liter — więc drugi wariant idzie wyłącznie po pustej odpowiedzi. */
+  const d = stanowisko();
+  const pytania: string[] = [];
+  const ile = await pobierzZamowieniaKupujacego("Client:124843816", {
+    database: d, apiUrl: "https://api.test", accountId: "k",
+    query: (async (url: string) => {
+      pytania.push(url);
+      return url.includes("buyer.login=Client")
+        ? { checkoutForms: [zamowienie("ord-c", { buyer: { id: "b-9", login: "Client:124843816" } })] }
+        : { checkoutForms: [] };
+    }) as never,
+  });
+  assert.equal(ile, 1);
+  assert.deepEqual(pytania.map((u) => new URL(u).searchParams.get("buyer.login")),
+    ["client:124843816", "Client:124843816"]);
+  /* Nasze szukanie porównuje bez wielkości liter, więc wpisane małą trafia. */
+  assert.deepEqual(paczkiKlienta(KONTO, "client:124843816", d).map((p) => p.orderId), ["ord-c"]);
+
+  const pytania2: string[] = [];
+  await pobierzZamowieniaKupujacego("client:5550001", {
+    database: stanowisko(), apiUrl: "https://api.test", accountId: "k",
+    query: (async (url: string) => {
+      pytania2.push(url);
+      return { checkoutForms: [zamowienie("ord-d")] };
+    }) as never,
+  });
+  assert.equal(pytania2.length, 1, "trafienie za pierwszym razem kończy pytania");
 });

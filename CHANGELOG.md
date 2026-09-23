@@ -34,6 +34,29 @@ historii nie przepisujemy.
 ---
 
 
+## 0.452.0 — 23 września 2026
+
+Dwie zmiany z wywiadu z właścicielem o procesie zwrotów.
+
+**Stare zwroty wychodzą z „Do decyzji".** Kolejka liczyła 743 sprawy,
+„głównie stare". Sprzedawca ma siedem dni na oddanie pieniędzy, a ósmego
+dnia Allegro oddaje je samo. Zwrot bez decyzji starszy niż 45 dni od
+zgłoszenia trafia więc do „Zamknięte". Reguła jest liczona przy każdym
+odczycie, bez zapisu w bazie. Próg zmienia `ZWROT_WYGASA_DNI` w `wertis.env`
+i działa od razu w obie strony. Nie dotyczy zwrotów przyjętych, które czekają
+na ocenę, kwotę albo korektę. Nie dotyczy też paczek nieodebranych, bo tych
+Allegro samo nie rozlicza.
+
+**Login `client:124843816` znajduje paczkę w Allegro.** Kupujący bez własnego
+pseudonimu ma w Allegro właśnie taki login. Sales Center go znajdował,
+a panel odpowiadał „nie mam paczek”, bo nie wysyłał pytania z dwukropkiem.
+Teraz wysyła, najpierw z „client:”, a przy pustej odpowiedzi z „Client:”.
+
+Przy okazji trzy testy przestały zależeć od daty w kalendarzu. Stałe daty
+w ich atrapach za kilka tygodni przekroczyłyby próg i wywróciły CI.
+
+- **[wymaga działania]** Przebuduj panel.
+
 ## 0.451.0 — 23 września 2026
 
 **Rejestracji paczki nieodebranej w panelu już nie ma.** Decyzja
