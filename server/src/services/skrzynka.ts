@@ -17,6 +17,7 @@ import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
+import { zgodnoscOferty, type ZgodnoscOferty } from "./zgodnosc-oferty.js";
 import { szkicCopilota, type SzkicCopilota } from "./copilot-szkic.js";
 import { AKTYWNA_DECYZJA, CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
 import type {
@@ -241,6 +242,12 @@ export interface OfertaRozmowy {
    * zamówienie nazywa towar dokładniej niż oferta.
    */
   zrodlo: "wiadomosc" | "reczne" | "zamowienie";
+  /**
+   * Lista „Pasuje do" z oferty i trafienia maszyny z doboru (23 września
+   * 2026). `null`, gdy treści oferty jeszcze nie pobrano albo lista jest
+   * pusta — dociąga ją układanie szkicu, nie otwarcie rozmowy.
+   */
+  zgodnosc: ZgodnoscOferty | null;
   pobrana: {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
@@ -304,9 +311,12 @@ const LISTA = `
          -- kontakt" wychodzi samo, w sekundę po pytaniu, i nie odpowiada na
          -- nic. Liczona jako nasza wiadomość zdejmowała rozmowę z listy tych,
          -- które czekają na odpowiedź.
+         -- PO CZASIE, NIE PO id (23 września 2026): synchronizacja wpisywała
+         -- paczkę od najnowszej, więc id nie rośnie z czasem. Ta sama reguła
+         -- co kontrola świeżości wysyłki i klasyfikator.
          (SELECT m.direction FROM message m
            WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
-           ORDER BY m.id DESC LIMIT 1) AS ostatniRuch,
+           ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuch,
          -- Czas oczekiwania liczy się od ostatniej wiadomości KLIENTA, nie od
          -- ostatniaWiadomoscAt: tamto ma COALESCE na updated_at, więc wątek
          -- zaczęty przez nas dostałby zegar, którego nikt nie odmierza.
@@ -349,7 +359,7 @@ const LISTA = `
     LEFT JOIN decyzja_klasyfikacji kop ON kop.id = ${AKTYWNA_DECYZJA}
     LEFT JOIN message o ON o.id = (
       SELECT m.id FROM message m WHERE m.conversation_id=c.id
-       ORDER BY (m.direction='incoming') DESC, m.id DESC LIMIT 1)`;
+       ORDER BY (m.direction='incoming') DESC, m.sent_at DESC, m.id DESC LIMIT 1)`;
 
 const naRozmowe = (
   w: Record<string, unknown>,
@@ -730,6 +740,9 @@ export function osRozmowy(id: number): {
      dróg, bo wskazanie ręczne bywa właśnie kliknięciem przy pozycji. */
   const skuZPozycji = (ofertaId: string) =>
     zamowienie?.pobrane?.pozycje.find((p) => p.offerId === ofertaId)?.sku ?? null;
+  /* Dobór czytany RAZ, przed ofertą: maszyna z jego danych podświetla listę
+     zgodności, a ten sam wiersz jedzie niżej do zakładki doboru. */
+  const dobor = doborRozmowy(id);
   const zOferty = (konto: number, ofertaId: string, zrodlo: OfertaRozmowy["zrodlo"]): OfertaRozmowy => {
     const pobrana = snapshotOferty(konto, ofertaId);
     const skuZapas = skuZPozycji(ofertaId);
@@ -737,6 +750,7 @@ export function osRozmowy(id: number): {
       externalId: ofertaId,
       link: linkOferty(ofertaId),
       zrodlo,
+      zgodnosc: zgodnoscOferty(db(), konto, ofertaId, dobor.dane),
       pobrana,
       /* `undefined` zamiast `null`, gdy snapshotu nie ma wcale: mostek odróżnia
          „oferty jeszcze nie pobrano" od „oferta nie ma sygnatury", a to dwa
@@ -971,7 +985,7 @@ export function osRozmowy(id: number): {
     /* Dobór jedzie z rozmową, bo jest lekki (jeden wiersz); KANDYDACI nie —
        to wyszukiwarka i parser opisu, a ten odczyt odświeża się na każde
        zdarzenie szyny. */
-    dobor: doborRozmowy(id),
+    dobor,
     szkicCopilota: szkicCopilota(id),
   };
 }

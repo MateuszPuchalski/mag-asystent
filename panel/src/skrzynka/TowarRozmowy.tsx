@@ -53,73 +53,70 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
     { id: rozmowaId, ofertaId: oferta.externalId, twId },
     { onSuccess: () => setSzukam(false) });
 
+  /* ── JEDEN RAZ KAŻDY FAKT (23 września 2026) ──────────────────────────────
+     Zrzut właściciela: „prawa kolumna jest wciąż chaotyczna". Nazwa towaru
+     stała na ekranie trzy razy, symbol cztery, stan i półka dwa. Pasmo
+     odpowiedzi nad zakładkami (`PasmoOdpowiedzi.tsx`) mówi już „to jest",
+     „mamy" i półkę — pod tym samym warunkiem, pod którym rysuje się ta sekcja:
+     kartoteka potwierdzona i odczytana. Tu zostaje więc to, czego pasmo NIE
+     mówi: zdjęcie z półki, proporcja wolne–zarezerwowane, identyfikatory,
+     ceny i opis.
+
+     ŹRÓDŁO I RUCH W NAGŁÓWKU. „SKU oferty…" i „wskaż inną kartotekę" stały
+     każde w osobnym wierszu pod nazwą. Stoją teraz w linii nagłówka: źródło
+     jest podpisem sekcji (§4.3), a zmiana kartoteki — jej jedynym ruchem. */
   return <div className="space-y-3 p-4">
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       {/* Ten sam kształt, co „Oferta" i „Zamówienie" wyżej (0.249.0): trzy
           sekcje tej samej rangi miały trzy różne kształty, więc nie było jak
-          odczytać, że stoją na jednym poziomie. Plakietka z obwódką ważyła
-          przy tym więcej niż nazwa towaru pod nią. */}
+          odczytać, że stoją na jednym poziomie. */}
       <NaglowekSekcji ikona={<Database size={13} />}>Subiekt GT</NaglowekSekcji>
-      {/* OSOBNA plakietka, poza blokiem Subiekta: §4.3 nie miesza źródeł, a to
-          jest nasza baza wiedzy, nie dane z ERP. */}
+      {/* Puste `sku` w pamięci znaczy „wskazał człowiek". Serwer pisze to
+          zdanie; panel go nie układa drugi raz. */}
+      {potwierdzona !== null && <span className="text-podpis text-slate-500">{k.zrodlo}</span>}
+      {/* OSOBNA plakietka: §4.3 nie miesza źródeł, a to jest nasza baza
+          wiedzy, nie dane z ERP. */}
       {wiedza.data && (wiedza.data.potwierdzone.length > 0 || wiedza.data.negatywne.length > 0) &&
         <span className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-podpis font-bold uppercase tracking-wide text-emerald-800">
           Wiedza: {wiedza.data.potwierdzone.length} potwierdzonych · {wiedza.data.negatywne.length} negatywnych
         </span>}
+      {/* Powiązanie po sygnaturze nie ma czego zdjąć — wróciłoby przy
+          następnym odczycie; właściwym ruchem jest wskazanie INNEJ kartoteki.
+          Zdjąć da się WSKAZANIE człowieka (kasuje pamięć). */}
+      {potwierdzona !== null && k.pewnosc === "sku" && !szukam && <button type="button"
+        onClick={() => setSzukam(true)}
+        className="ml-auto text-podpis text-slate-500 underline underline-offset-2 hover:text-slate-800">
+        wskaż inną kartotekę</button>}
+      {potwierdzona !== null && k.pewnosc === "pamiec" && <button type="button" title="Zdejmij powiązanie"
+        disabled={zapisz.isPending} onClick={() => ustaw(null)}
+        className="ml-auto h-6 shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
+        <Krzyzyk size={14} />
+      </button>}
     </div>
 
     {potwierdzona !== null
       ? <>
+          {k.pewnosc === "sku" && szukam && <Wyszukiwarka wybrany={null} etykieta="Wskazana przez Ciebie"
+            onWybierz={(t: TowarZWyszukiwarki | null) => t && ustaw(t.id)} />}
           <div className="flex items-start gap-3">
-            <Kafel twId={potwierdzona} rozmiar={72} nazwa={karta.data?.name ?? k.symbol ?? ""}
+            <Kafel twId={potwierdzona} rozmiar={56} nazwa={karta.data?.name ?? k.symbol ?? ""}
               symbol={k.symbol} />
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">{karta.data?.name ?? k.symbol}</p>
-              <p className="mt-0.5 font-mono text-xs text-slate-600">{k.symbol}</p>
-              <p className="mt-1 text-xs text-slate-500">
-                {/* Puste `sku` w pamięci znaczy „wskazał człowiek". Serwer pisze
-                    to zdanie; panel go nie układa drugi raz. */}
-                {k.zrodlo}
-              </p>
+            <div className="min-w-0 flex-1">
+              {karta.isLoading && <p className="text-xs text-slate-500">Wczytuję stan z Subiekta…</p>}
+              {karta.error && <p className="text-xs text-red-700">{(karta.error as Error).message}</p>}
+              {karta.data && <StanTowaru karta={karta.data} />}
             </div>
-            {/* Zdjąć da się WSKAZANIE człowieka (kasuje pamięć). Powiązanie
-                po sygnaturze nie ma czego zdjąć — wróciłoby przy następnym
-                odczycie; tu właściwym ruchem jest wskazanie INNEJ kartoteki. */}
-            {k.pewnosc === "pamiec" && <button type="button" title="Zdejmij powiązanie" disabled={zapisz.isPending}
-              onClick={() => ustaw(null)}
-              className="ml-auto h-6 shrink-0 rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
-              <Krzyzyk size={14} />
-            </button>}
           </div>
-          {k.pewnosc === "sku" && (szukam
-            ? <Wyszukiwarka wybrany={null} etykieta="Wskazana przez Ciebie"
-                onWybierz={(t: TowarZWyszukiwarki | null) => t && ustaw(t.id)} />
-            : <button type="button" onClick={() => setSzukam(true)}
-                className="block text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
-                wskaż inną kartotekę</button>)}
-
-          {karta.isLoading && <p className="text-xs text-slate-500">Wczytuję stan z Subiekta…</p>}
-          {karta.error && <p className="text-xs text-red-700">{(karta.error as Error).message}</p>}
           {karta.data && <>
-            <StanTowaru karta={karta.data} />
-            <CenyKartoteki ceny={karta.data.ceny ?? []} />
-            {/* WYŁĄCZNIE ODCZYT — blok jest „Źródło: Subiekt GT" (§4.3 nie miesza
-                źródeł), a wiedza stoi tu jako osobna plakietka. Dopisuje się
-                w Doborze (z pracy) albo w Wiedza → Sprawdź kartotekę. */}
+            <CenyKartoteki ceny={karta.data.ceny ?? []} ramka={false} />
+            {/* WYŁĄCZNIE ODCZYT — sekcja jest „Źródło: Subiekt GT" (§4.3 nie
+                miesza źródeł), a wiedza stoi tu jako osobna plakietka.
+                Dopisuje się w Doborze albo w Wiedza → Sprawdź kartotekę. */}
             {wiedza.data?.pasowania && <PasowaniaKartoteki dane={wiedza.data.pasowania} />}
             <OpisKartoteki desc={karta.data.desc} />
-            {/* ── WSTAWKA ZESZŁA NA GÓRĘ KOLUMNY (0.404.0) ────────────────────
-                Stała TUTAJ, pod tabelą, i argument za tym miejscem był dobry:
-                agent najpierw sprawdza, czy to ta kartoteka, a dopiero potem
-                przepisuje ją do odpowiedzi. Zepsuła to WYSOKOŚĆ kolumny —
-                przycisk leżał po sześciu sekcjach, około dziewięciuset pikseli
-                w dół, w kolumnie innej niż pole do pisania.
-
-                Pasmo odpowiedzi (`PasmoOdpowiedzi.tsx`) spełnia tamten warunek
-                mocniej: „to jest" i „mamy" stoją bezpośrednio NAD przyciskiem,
-                bez przewijania. Wstawia dokładnie to samo. Drugiego przycisku
-                tu nie ma i nie będzie — dwoje drzwi do jednego pola to ta sama
-                usterka, którą to wydanie naprawia. */}
+            {/* Wstawki do szkicu tu NIE MA od 0.404.0 — stoi w paśmie
+                odpowiedzi nad zakładkami. Dwoje drzwi do jednego pola to
+                usterka, którą tamto wydanie naprawiło. */}
           </>}
         </>
       : <div className="text-xs">
@@ -192,7 +189,7 @@ function OpisKartoteki({ desc }: { desc?: string }) {
   const tresc = (desc ?? "").trim();
   if (!tresc) return null;
 
-  return <div className="rounded-lg border border-slate-200 p-3">
+  return <div className="border-t border-slate-200 pt-3">
     <NaglowekSekcji jako="p" className="mb-1">Opis kartoteki</NaglowekSekcji>
     <p className={`whitespace-pre-wrap text-tresc text-slate-700 ${calosc ? "" : "line-clamp-6"}`}>
       {tresc}</p>
@@ -236,27 +233,13 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
      Reszta zostaje w całości — §4.3 nie pozwala chować faktów — ale wartości
      „brak" gasną. Brak identyfikatorów jest normą, a norma nie ma prawa
      wyglądać jak ustalenie. */
-  const jednostka = karta.unit ?? "szt.";
-  const brakStanu = karta.mag.avail <= 0;
-  const lokalizacje = karta.locs.length ? karta.locs.join(" · ") : null;
-
-  return <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-    <div className="flex flex-wrap items-end gap-x-3 gap-y-1">
-      <div>
-        <EtykietaWartosci className="block">Dostępny</EtykietaWartosci>
-        <div className={`flex items-baseline gap-1 tabular-nums ${
-          brakStanu ? "text-ranga-zle" : "text-slate-900"}`}>
-          <span className="text-2xl font-bold leading-none">{karta.mag.avail}</span>
-          <span className="text-xs font-semibold">{jednostka}</span>
-        </div>
-      </div>
-      {/* Lokalizacja jako plakietka, nie wiersz tabeli: to jedyna wartość z tej
-          grupy, którą ktoś przepisuje na kartkę i niesie na halę. */}
-      {lokalizacje
-        ? <span className="rounded bg-white px-2 py-1 font-mono text-xs font-semibold text-slate-800 shadow-sm">
-            {lokalizacje}</span>
-        : <span className="text-xs text-slate-500">bez lokalizacji</span>}
-    </div>
+  /* ── LICZBA I PÓŁKA STOJĄ W PAŚMIE (23 września 2026) ──────────────────────
+     Od 0.249.0 „Dostępny" był tu liczbą widoczną z drugiego końca biurka,
+     a od 0.404.0 ta sama liczba i ta sama półka stoją w paśmie odpowiedzi nad
+     zakładkami. Dwa razy to samo w jednej kolumnie to był chaos ze zrzutu
+     właściciela. Zostaje pasek: pasmo mówi „ile", pasek — ile z tego jest
+     już czyjeś. */
+  return <div>
     {/* ── STAN JAKO PASEK (23 września 2026, „za dużo tekstu") ─────────────
         „stan 342 · rezerwacje 6" było drugim zdaniem o tej samej liczbie.
         Pasek pokazuje proporcję jednym spojrzeniem: zieleń to wolne, bursztyn
@@ -264,7 +247,7 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
         bo §4.3 nie pozwala chować faktów — wolno je wyciszyć. */}
     <PasekStanu stan={karta.mag.stan} wolne={karta.mag.avail} rezerwacje={karta.mag.rez} />
 
-    <div className="mt-2.5 space-y-1 border-t border-slate-200 pt-2.5">
+    <div className="mt-2 space-y-1">
       {pozostale.filter(([, w]) => w !== "brak").map(([nazwa, wartosc]) =>
         <div key={nazwa} className="flex items-baseline gap-2 text-xs">
           <span className="w-24 shrink-0 text-slate-500">{nazwa}</span>
@@ -297,7 +280,7 @@ export function PasekStanu({ stan, wolne, rezerwacje }: { stan: number; wolne: n
   const baza = Math.max(stan, wolne + rezerwacje, 0);
   const proc = (x: number) => (baza > 0 ? Math.max(0, Math.min(100, (x / baza) * 100)) : 0);
   const zdanie = `stan ${stan}: ${Math.max(0, wolne)} wolnych, ${rezerwacje} w rezerwacji`;
-  return <div title={zdanie} className="mt-2">
+  return <div title={zdanie} className="mt-1">
     <div aria-hidden="true" className="flex h-2 overflow-hidden rounded-full bg-slate-200">
       <span className="bg-emerald-600" style={{ width: `${proc(wolne)}%` }} />
       <span className="bg-amber-500" style={{ width: `${proc(rezerwacje)}%` }} />
@@ -356,10 +339,18 @@ function brakBrutto(c: CenaPoziomu): boolean {
   return c.bruttoGrosze === null || c.bruttoGrosze === 0;
 }
 
-export function CenyKartoteki({ ceny }: { ceny: CenaPoziomu[] }) {
+export function CenyKartoteki({ ceny, ramka = true }: {
+  ceny: CenaPoziomu[];
+  /* `false` w skrzynce (23 września 2026): tam ceny stoją W sekcji „Subiekt
+     GT", więc ramka i drugi podpis źródła byłyby pudełkiem w pudełku.
+     Reklamacje stawiają blok samodzielnie i ramkę zostawiają. */
+  ramka?: boolean;
+}) {
   if (ceny.length === 0) return null;
-  return <div className="rounded-lg border border-slate-200 p-3">
-    <EtykietaWartosci className="block">Ceny · Subiekt GT</EtykietaWartosci>
+  return <div className={ramka ? "rounded-lg border border-slate-200 p-3" : "border-t border-slate-200 pt-3"}>
+    {ramka
+      ? <EtykietaWartosci className="block">Ceny · Subiekt GT</EtykietaWartosci>
+      : <NaglowekSekcji jako="p">Ceny</NaglowekSekcji>}
     <ul className="mt-1 space-y-0.5">
       {grupujCeny(ceny).map(({ cena: c, nazwy }) => <li key={c.poziom}
         className="flex items-baseline gap-2 text-xs">
@@ -417,7 +408,7 @@ function PasowaniaKartoteki({ dane }: { dane: PasowaniaTowaru }) {
       {t.przezZamiennik && <span className="ml-1 text-podpis text-slate-500">przez zamiennik</span>}
       <p className="text-podpis text-slate-500">{t.zdanie}</p>
     </li>;
-  return <div className="rounded-lg border border-emerald-200 p-3">
+  return <div className="border-t border-slate-200 pt-3">
     <NaglowekSekcji jako="p" ton="text-emerald-800" className="mb-1">Wiedza: pasowania części</NaglowekSekcji>
     {dane.pasujace.length > 0 && <>
       <p className="text-podpis font-semibold text-slate-600">Do tej części pasują</p>

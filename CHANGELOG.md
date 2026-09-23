@@ -34,6 +34,43 @@ historii nie przepisujemy.
 ---
 
 
+## 0.447.0 — 23 września 2026
+
+**Prawa kolumna skrzynki bez powtórzeń i bez ramek w ramkach, a wysyłka bez
+fałszywego „klient dopisał".** Zgłoszenie
+właściciela ze zrzutami: „wciąż chaotyczna". Opis: §10.2c projektu panelu.
+
+- Sekcja „Subiekt GT" nie powtarza nazwy, stanu ani półki z pasma nad
+  zakładkami. Źródło i „wskaż inną kartotekę" stoją w linii nagłówka.
+- Sekcje dzieli kreska zamiast ramek; podpis pod zdjęciem oferty zszedł
+  do czytnika ekranu.
+- Zakładki Klient i Wiedza niosą licznik.
+- Dobór: status raz, w polu wyboru z kropką barwy. Drogi bez wyniku
+  i słabsze trafienia pod rozwinięciem. „Wybierz" z obrysem.
+
+**Naprawa: fałszywe „klient dopisał wiadomość" przy wysyłce.** Zgłoszenie
+właściciela: dialog padał często, choć wszystkie wiadomości stały na
+ekranie. Synchronizacja wpisywała paczkę od najnowszej, więc starszy dopisek
+dostawał wyższe `id`. Kontrola świeżości brała najwyższe `id`, a panel —
+ostatnią wiadomość po czasie.
+
+- Kontrola świeżości wysyłki i zapis szkicu biorą ostatnią wiadomość po
+  czasie, jak oś, klasyfikator i Copilot.
+- Ta sama reguła w stanie rozmowy, w podglądzie wiersza kolejki, w aktywnej
+  decyzji klasyfikatora i w czasie odpowiedzi.
+- Synchronizacja wpisuje paczkę od najstarszej, więc nowe `id` rosną
+  z czasem. Stare wiersze obsługuje reguła po czasie; migracji nie ma.
+
+**Lista „Pasuje do" z oferty w doborze, w szkicu i w panelu.** Opis: §10.2d.
+
+- Dobór szuka zastosowań także bez wariantu, gdy dokładny klucz milczy.
+  Taki kandydat ma „prawdopodobne" i dopisek „wariant niesprawdzony".
+- Szkic dostaje jedno zdanie: maszyna z doboru JEST albo NIE MA na liście.
+  „Nie ma" mówi wprost, że to nie dowód.
+- Sekcja „Oferta" pokazuje zwiniętą listę z maszyną klienta na wierzchu.
+
+- **[wymaga działania]** Przebuduj panel.
+
 ## 0.446.0 — 23 września 2026
 
 **Biuro ma jeden adres: `/obsluga`.** Ostatni krok przeprowadzki

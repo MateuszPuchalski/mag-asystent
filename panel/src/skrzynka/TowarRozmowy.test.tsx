@@ -18,7 +18,7 @@ vi.mock("../towar/Powiekszenie", () => ({ Powiekszenie: () => null }));
 const { TowarRozmowy } = await import("./TowarRozmowy");
 
 const oferta = (kartoteka: DopasowanieKartoteki): OfertaRozmowy => ({
-  externalId: "12096815384", link: null, zrodlo: "wiadomosc", pobrana: null, kartoteka,
+  externalId: "12096815384", link: null, zrodlo: "wiadomosc", zgodnosc: null, pobrana: null, kartoteka,
 });
 
 const PUSTA = { data: undefined, isLoading: false, error: null };
@@ -53,11 +53,11 @@ describe("towar przy rozmowie", () => {
     expect(karta).toHaveBeenCalledWith(7701);
     expect(screen.queryByRole("button", { name: /Zatwierdź/ })).toBeNull();
     expect(screen.getByText(/SKU oferty/)).toBeInTheDocument();
-    /* Od 0.249.0 dostępny stan jest LICZBĄ w nagłówku bloku, nie wierszem
-       tabeli: to on rozstrzyga, czy odpowiedź brzmi „wysyłamy dziś". Liczba
-       i jednostka są osobnymi elementami, bo mają różną wagę. */
-    expect(screen.getByText("Dostępny")).toBeInTheDocument();
-    expect(screen.getByText("5")).toBeInTheDocument();
+    /* Liczba „dostępny" stoi od 23 września 2026 WYŁĄCZNIE w paśmie
+       odpowiedzi nad zakładkami (`PasmoOdpowiedzi.test.tsx`). Tu zostaje
+       proporcja wolne–zarezerwowane, której pasmo nie pokazuje. */
+    expect(screen.getByTitle("stan 7: 5 wolnych, 2 w rezerwacji")).toBeInTheDocument();
+    expect(screen.queryByText("Dostępny")).toBeNull();
     /* Powiązania po sygnaturze nie da się „zdjąć" — wróciłoby; można wskazać inną. */
     expect(screen.queryByTitle("Zdejmij powiązanie")).toBeNull();
     expect(screen.getByRole("button", { name: /wskaż inną kartotekę/ })).toBeInTheDocument();
@@ -73,7 +73,12 @@ describe("towar przy rozmowie", () => {
     expect(karta).toHaveBeenCalledWith(null);
   });
 
-  it("potwierdzona kartoteka pokazuje stan, dostępny i półkę", () => {
+  /* ── JEDEN RAZ KAŻDY FAKT (23 września 2026) ────────────────────────────
+     Zrzut właściciela: nazwa towaru trzy razy w kolumnie, symbol cztery, stan
+     i półka dwa. Nazwę, liczbę i półkę mówi pasmo odpowiedzi nad zakładkami —
+     pod tym samym warunkiem, pod którym stoi ta sekcja. Test pilnuje, że
+     sekcja ich NIE powtarza, a mówi to, czego pasmo nie ma. */
+  it("potwierdzona kartoteka nie powtarza pasma: bez nazwy, liczby i półki", () => {
     karta.mockReturnValue({
       isLoading: false, error: null,
       data: {
@@ -89,12 +94,9 @@ describe("towar przy rozmowie", () => {
       zrodlo: "Wskazane wcześniej przez: A. Lewandowska", powod: null,
     })} />);
     expect(karta).toHaveBeenCalledWith(7701);
-    expect(screen.getByText("Nóż do kosiarki 43 cm")).toBeInTheDocument();
-    /* Lokalizacja to plakietka obok liczby (0.249.0) — jedyna wartość z tej
-       grupy, którą ktoś przepisuje na kartkę i niesie na halę. */
-    expect(screen.getByText("R12-B3")).toBeInTheDocument();
-    expect(screen.getByText("5")).toBeInTheDocument();
-    expect(screen.getByText("szt.")).toBeInTheDocument();
+    expect(screen.queryByText("Nóż do kosiarki 43 cm")).toBeNull();
+    expect(screen.queryByText("R12-B3")).toBeNull();
+    expect(screen.queryByText("5")).toBeNull();
     /* Stan i rezerwacje ZOSTAJĄ — od 23 września 2026 jako pasek, z liczbami
        w dymku i dla czytnika ekranu, a nie jako drugie zdanie. */
     expect(screen.getByTitle("stan 7: 5 wolnych, 2 w rezerwacji")).toBeInTheDocument();

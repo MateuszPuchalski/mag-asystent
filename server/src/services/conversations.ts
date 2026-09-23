@@ -319,7 +319,11 @@ export function wskazKartoteke(conversationId: number, ofertaId: string, twId: n
 export function zapiszSzkic(conversationId: number, userId: number, body: string,
   expectedLastMessageId: number | null, expectedVersion: number | null, database: DatabaseSync = db()) {
   return transaction(database, () => {
-    const last = database.prepare("SELECT id FROM message WHERE conversation_id=? ORDER BY id DESC LIMIT 1")
+    /* Po czasie, nie po `id` — ta sama blizna i ta sama reguła, co kontrola
+       świeżości w `wysylka.ts` (23 września 2026): panel bierze ostatnią
+       wiadomość z osi, a oś stoi po czasie. */
+    const last = database.prepare(
+      "SELECT id FROM message WHERE conversation_id=? ORDER BY sent_at DESC, id DESC LIMIT 1")
       .get(conversationId) as { id: number } | undefined;
     if ((last?.id ?? null) !== expectedLastMessageId) throw new ConversationConflict(
       "Szkic powstał dla nieaktualnej osi rozmowy", { lastMessageId: last?.id ?? null });
@@ -610,9 +614,12 @@ export function statusRozmowy(
   const zapisany = statusZapisany(database, conversationId, teraz);
   if (!WYLICZANE_Z_WIADOMOSCI.has(zapisany)) return zapisany;
 
-  /* Kierunek OSTATNIEJ PRAWDZIWEJ wiadomości. Kolejność po `id`, nie po
-     `sent_at` — tak samo jak oś rozmowy (dwie wiadomości z tej samej sekundy
-     zdarzają się, a identyfikator jest stabilny).
+  /* Kierunek OSTATNIEJ PRAWDZIWEJ wiadomości. Po `sent_at`, a `id` tylko
+     rozstrzyga remis w tej samej sekundzie — tak stoi oś rozmowy. Do
+     23 września 2026 stało tu samo `id` z uzasadnieniem „tak samo jak oś",
+     a oś sortuje po czasie. Synchronizacja wpisywała paczkę od najnowszej,
+     więc nasza odpowiedź z panelu Allegro i dopisek klienta z jednej paczki
+     potrafiły zamienić się miejscami — i rozmowa „czekała na klienta".
 
      AUTOODPOWIEDŹ NIE LICZY SIĘ JAKO NASZ RUCH (0.227.0). „Dziękujemy za
      kontakt" wychodzi samo, w sekundę po pytaniu, i nie odpowiada na nic —
@@ -620,7 +627,8 @@ export function statusRozmowy(
      i zdejmowało ją z listy tych, które czekają na odpowiedź. Pytanie klienta
      ginęło przez to, że skrzynka grzecznie potwierdziła jego odbiór. */
   const ost = database.prepare(
-    "SELECT direction FROM message WHERE conversation_id=? AND auto_odpowiedz=0 ORDER BY id DESC LIMIT 1",
+    `SELECT direction FROM message WHERE conversation_id=? AND auto_odpowiedz=0
+      ORDER BY sent_at DESC, id DESC LIMIT 1`,
   ).get(conversationId) as { direction: string } | undefined;
   return statusZKierunku(zapisany, ost?.direction ?? null,
     ost?.direction === "incoming" && podziekowanieWRozmowie(database, conversationId));

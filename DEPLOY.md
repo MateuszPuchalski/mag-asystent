@@ -2582,6 +2582,22 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.447.0 — prawa kolumna bez powtórzeń
+
+**Migracji nie ma. Panel trzeba przebudować, a serwer zrestartować.** Serwer
+naprawia fałszywe „klient dopisał wiadomość" przy wysyłce.
+
+Sprawdzenie: otwórz rozmowę pod ofertą z kartoteką. Nazwa towaru i półka
+stoją tylko w paśmie nad zakładkami. Zakładki Klient i Wiedza pokazują
+liczbę. W Doborze drogi bez wyniku kryją się pod „+N bez wyniku".
+
+Wysyłkę sprawdź w rozmowie, w której klient napisał dwie wiadomości pod
+rząd. Odpowiedź ma wyjść bez dialogu o dopisku.
+
+Listę zgodności sprawdź w rozmowie pod ofertą z sekcją „Pasuje do". Wpisz
+w doborze markę i model z tej listy i ułóż szkic. Pod ofertą stanie
+„Pasuje do (N)" z zieloną plakietką maszyny.
+
 ### Aktualizacja do 0.446.0 — `/biuro` przekierowuje do panelu
 
 **Migracji nie ma. Przebuduj panel i serwer** (`npm run build` w korzeniu).

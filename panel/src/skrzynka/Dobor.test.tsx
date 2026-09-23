@@ -125,7 +125,8 @@ beforeEach(() => {
 describe("zakładka doboru", () => {
   it("pusty dobór mówi, czego brakuje, a pominięte drogi niosą powód", () => {
     pokaz(dobor());
-    expect(screen.getByText("Nierozpoczęty", { selector: "span" })).toBeInTheDocument();
+    /* Status stoi raz — w polu wyboru; plakietka obok powtarzała go (23 września 2026). */
+    expect(screen.getByLabelText("Status doboru")).toHaveDisplayValue("Nierozpoczęty");
     expect(screen.getByText(/o jaką maszynę i część chodzi/)).toBeInTheDocument();
     expect(screen.getByText(/Żadna sprawdzona droga nic nie dała/)).toBeInTheDocument();
     /* Szczebel pominięty NIE wygląda jak „zero wyników" (blizna 0.153.1). */
@@ -240,7 +241,7 @@ describe("zakładka doboru", () => {
   it("zatwierdzony dobór nie ma drugiego przycisku zatwierdzania", () => {
     pokaz(dobor({ status: "confirmed", wybrany: {
       twId: 14, symbol: "FTC272", droga: "oferta", przez: "A. Lewandowska", at: "", zdanieDoSzkicu: "Do X pasuje FTC272 — źródło: kartoteka oferty." } }));
-    expect(screen.getByText("Dobór zatwierdzony", { selector: "span" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Status doboru")).toHaveDisplayValue("Dobór zatwierdzony");
     expect(screen.queryByRole("button", { name: /ZATWIERDŹ DOBÓR/ })).not.toBeInTheDocument();
   });
 
@@ -509,5 +510,43 @@ describe("Dobór a silnik maszyny", () => {
     await userEvent.click(screen.getByRole("button", { name: /ZATWIERDŹ DOBÓR/ }));
     expect(status.mutate).toHaveBeenCalledWith(
       { id: 4821, status: "confirmed", brakuje: null, silnikModelId: 7 }, expect.anything());
+  });
+});
+
+/* ── Mniej hałasu w doborze (23 września 2026) ───────────────────────────────
+   Zrzut właściciela: jedenaście pigułek dróg, sześć przekreślonych, i pełne
+   karty rękojeści, noża wertykulatora i noża Boscha przy pytaniu o nóż do
+   kosiarki. Słabe trafienia i drogi bez wyniku nie znikają — schodzą pod
+   jedno rozwinięcie, a wybrany zostaje na wierzchu zawsze. */
+describe("hałas w doborze", () => {
+  it("drogi bez wyniku stoją pod jednym przyciskiem, z wynikiem — na wierzchu", async () => {
+    kandydaci.mockReturnValue({ data: Z_KANDYDATAMI, isLoading: false, error: null });
+    pokaz(dobor({ status: "searching" }));
+    const drogi = screen.getByLabelText("Sprawdzone drogi");
+    expect(within(drogi).getByText("oferta 1")).toBeVisible();
+    expect(within(drogi).getByTitle(/pominięty: agent nie wpisał EAN/)).not.toBeVisible();
+    await userEvent.click(within(drogi).getByRole("button", { name: "+9 bez wyniku" }));
+    expect(within(drogi).getByTitle(/pominięty: agent nie wpisał EAN/)).toBeVisible();
+  });
+
+  it("słabe trafienia schodzą pod rozwinięcie, gdy jest mocniejszy kandydat", () => {
+    kandydaci.mockReturnValue({ data: Z_KANDYDATAMI, isLoading: false, error: null });
+    pokaz(dobor({ status: "searching" }));
+    const slabe = screen.getByText(/Słabsze trafienia \(1\)/).closest("details")!;
+    expect(within(slabe).getByText("24-04003")).toBeInTheDocument();
+    expect(slabe.contains(screen.getByText("FTC272"))).toBe(false);
+  });
+
+  it("wybrany zostaje na wierzchu, choćby był słaby; same słabe — bez zwijania", () => {
+    kandydaci.mockReturnValue({ data: Z_KANDYDATAMI, isLoading: false, error: null });
+    pokaz(dobor({ status: "searching", wybrany: {
+      twId: 1654, symbol: "24-04003", droga: "zamiennik", przez: "A", at: "", zdanieDoSzkicu: "x" } }));
+    expect(screen.queryByText(/Słabsze trafienia/)).toBeNull();
+
+    kandydaci.mockReturnValue({ data: { ...Z_KANDYDATAMI,
+      kandydaci: Z_KANDYDATAMI.kandydaci.map((k) => ({ ...k, pewnosc: "wymaga_danych" as const })) },
+      isLoading: false, error: null });
+    pokaz(dobor({ status: "searching" }));
+    expect(screen.queryByText(/Słabsze trafienia/)).toBeNull();
   });
 });
