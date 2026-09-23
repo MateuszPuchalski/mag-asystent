@@ -34,6 +34,21 @@ historii nie przepisujemy.
 ---
 
 
+## 0.463.0 — 23 września 2026
+
+**[wymaga działania] ZW: „Wystawił” i kategoria wydania przed zapisem.**
+Nowy `wertis-sfera-worker.exe` z artefaktu CI i jedna linia w `wertis.env`.
+
+Pełny zrzut z 0.462.0 zestawił ręczny ZW 748 z odmową. Wiersze zgadzają się
+w każdym polu. Nagłówek różni się dwoma polami, które okno Subiekta wypełnia
+samo, a worker zostawiał puste: `Wystawil` i `WydanieKatId`.
+
+- Worker wpisuje w `Wystawil` nazwę operatora sesji, jak okno Subiekta.
+- `WydanieKatId` bierze z nowego klucza `SFERA_ZW_WYDANIE_KAT_ID`. Numer
+  odczytuje `wertis-sfera-worker.exe --zrzut 9253431`, pole `WydanieKatId`.
+  Wpisz go do `wertis.env` i zrestartuj `wertis-sfera`.
+- Treść odmowy mówi, co worker uzupełnił, a czego nie.
+
 ## 0.462.0 — 23 września 2026
 
 **[wymaga działania] Zrzut odmowy ZW obejmuje wszystkie pola.** Nowy

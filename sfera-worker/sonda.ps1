@@ -623,7 +623,7 @@ if ($SzkicZW -or $WzorZW -gt 0) {
     }
     # Ten sam zestaw co `Pola` w ZrzutDokumentu.cs (0.457.0) - zrzut workera
     # i -WzorZW maja sie dac zestawic pole w pole.
-    $polaDokumentu = 'Rodzaj|Zwrot|Plat|Zaplac|Przelew|Gotow|Kart|Kredyt|Przedplat|Zaliczk|Kasa|Termin|Skutek|DoDokumentu|Typ|Kategoria|Magazyn|Wartosc|Kwota|Waluta|Data|Numer'
+    $polaDokumentu = 'Rodzaj|Zwrot|Plat|Zaplac|Przelew|Gotow|Kart|Kredyt|Przedplat|Zaliczk|Kasa|Termin|Skutek|DoDokumentu|Typ|Kategoria|Magazyn|Wartosc|Kwota|Waluta|Data|Numer|WydanieKat|PrzyjecieKat'
 
     # WIERSZE POLE W POLE (0.458.0). Zrzut #1481 i ZW 748/MAG/09/2026 do tego
     # samego paragonu maja IDENTYCZNY naglowek - platnosc, kasa, termin, nabywca,

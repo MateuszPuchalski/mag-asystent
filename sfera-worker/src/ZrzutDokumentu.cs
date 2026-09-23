@@ -41,10 +41,13 @@ internal static class ZrzutDokumentu
      * numeru, typu, kategorii i magazynu. Następny krok diagnozy to zestawienie
      * zrzutu workera z `-WzorZW` na ZW, który przeszedł, a tego nie da się
      * zrobić pole w pole, gdy dwie strony patrzą na różne pola.
+     *
+     * `WydanieKat|PrzyjecieKat` (0.463.0): numery kategorii, nie dane osobowe.
+     * `--zrzut` ZW biura podaje stąd wartość `SFERA_ZW_WYDANIE_KAT_ID`.
      */
     private static readonly Regex Pola = new(
         "Rodzaj|Zwrot|Plat|Zaplac|Przelew|Gotow|Kart|Kredyt|Przedplat|Zaliczk|Kasa|Termin|" +
-        "Skutek|DoDokumentu|Typ|Kategoria|Magazyn|Wartosc|Kwota|Waluta|Data|Numer",
+        "Skutek|DoDokumentu|Typ|Kategoria|Magazyn|Wartosc|Kwota|Waluta|Data|Numer|WydanieKat|PrzyjecieKat",
         RegexOptions.IgnoreCase);
 
     /** Pola, o których mówimy tylko „puste/wypełnione" — lustro `$prywatne`. */

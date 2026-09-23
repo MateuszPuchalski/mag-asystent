@@ -696,7 +696,22 @@ bo pod nieznaną nazwą może stać nazwisko albo adres.
 
 `--zrzut 9253431` i następna odmowa dadzą dwie listy do zestawienia pole w pole.
 
-`[WERYFIKUJ]` Które z pozostałych pól różni szkic workera od ZW biura.
+**Pełny zrzut wskazał dwa pola** (23 września 2026). `--zrzut 9253431` i odmowa
+z PA 11458 różnią się w nagłówku `Identyfikatorem` i `DokumentyZrodlowe`.
+To naturalna różnica między dokumentem zapisanym a szkicem. Poza tym różnią się
+jeszcze dwa pola:
+- `Wystawil` — wypełnione na ZW biura, puste na szkicu workera.
+- `WydanieKatId` — wypełnione na ZW biura, puste na szkicu workera.
+
+Wiersze zgadzają się w każdym polu. Oba pola wypełnia okno Subiekta, a worker
+nie ustawiał ich nigdy.
+
+Od 0.463.0 worker wpisuje w `Wystawil` nazwę operatora sesji, jak okno.
+Kategorii nie zgaduje. Numer bierze z `wertis.env` (`SFERA_ZW_WYDANIE_KAT_ID`),
+a odczytuje go `--zrzut` ZW biura. Zrzut podaje od tego wydania wartości
+`WydanieKatId` i `PrzyjecieKatId`.
+
+`[WERYFIKUJ]` Czy ZW z `Wystawil` i `WydanieKatId` przechodzi zapis.
 
 **Od 0.456.0 worker robi ten zrzut sam, w chwili odmowy.** Właściciel zapytany,
 czy uruchomi sondę z komunikatu, odpowiedział: „niech robi to sam". Po odmowie
