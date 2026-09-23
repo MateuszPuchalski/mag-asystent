@@ -422,7 +422,40 @@ public sealed class SferaComAdapter : ISferaAdapter
                 $"rodzaj zwrotu 1, skutek magazynowy {skutek}, wierszy {ile}. " +
                 "Tę samą odmowę pokaże sonda BEZ zapisu: sonda.ps1 -PlikEnv C:\\wertis\\wertis.env " +
                 $"-SzkicZW -Paragon {z.DokId} -Towary \"{towary}\" -Sprawdz";
+            /* WartoscVatPP = 0 (0.461.0). Zrzut `--zrzut` ręcznego ZW 748/MAG/09/2026
+               tą samą drogą z C# zgadza się ze zrzutami odmów w KAŻDYM polu
+               nagłówka i wierszy — łącznie z `PozycjaTypPromocji`, które odmawia
+               kodem `0x8004197F` także na dokumencie zapisanym. Różni się JEDNO
+               pole: `WartoscVatPP` (VAT płatności podzielonej) — `0.0000` na
+               zapisanym ZW, `null` na każdym szkicu z COM.
+
+               To nie jest zgadnięta wartość: przepisujemy tę, którą niesie ZW
+               zapisany przez biuro, przy `PodzielonaPlatnosc = False` po obu
+               stronach. Ustawiamy wyłącznie pustkę; setter, który odmówi,
+               zostawia dokument jak dotąd, a treść odmowy mówi, co zaszło. */
+            string vatPP;
+            try
+            {
+                object? w = (object?)zw.WartoscVatPP;
+                if (w is null || w is DBNull)
+                {
+                    zw.WartoscVatPP = 0m;
+                    vatPP = "WartoscVatPP ustawione z null na 0";
+                }
+                else
+                {
+                    vatPP = "WartoscVatPP już niepuste";
+                }
+            }
+            catch (Exception e)
+            {
+                vatPP = $"WartoscVatPP nie dało się ustawić ({e.Message.Trim()})";
+            }
+            // Na początku, nie na końcu: koniec stanu to komenda sondy do skopiowania.
+            stan = $"{vatPP} (0.461.0); {stan}";
+
             ZapiszZeSzczegolami((object)zw, "ZW", stan, zrzutPol: true);
+            Console.WriteLine($"[sfera] ZW zapisany ({vatPP})");
             return Krok("ZW.NumerPelny", 6, () => (string)zw.NumerPelny);
         }
         finally
@@ -579,7 +612,9 @@ public sealed class SferaComAdapter : ISferaAdapter
         }
         finally
         {
-            ZamknijSesje();
+            /* Zrzut to koniec pracy procesu, nie błąd — do 0.460.0 dziennik mówił
+               tu „po błędzie", choć zrzut ZW 748 przeszedł w całości. */
+            ZamknijSesje("po zrzucie");
         }
     }
 
@@ -803,7 +838,7 @@ public sealed class SferaComAdapter : ISferaAdapter
         return _subiekt!;
     }
 
-    private void ZamknijSesje()
+    private void ZamknijSesje(string powod = "po błędzie — następne zadanie otworzy nową")
     {
         if (_subiekt is null) return;
         try
@@ -815,6 +850,6 @@ public sealed class SferaComAdapter : ISferaAdapter
             // zwalnianie martwego uchwytu COM nie ma prawa ubić procesu
         }
         _subiekt = null;
-        Console.WriteLine("[sfera] sesja Subiekta zamknięta po błędzie — następne zadanie otworzy nową");
+        Console.WriteLine($"[sfera] sesja Subiekta zamknięta {powod}");
     }
 }

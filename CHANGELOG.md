@@ -34,6 +34,21 @@ historii nie przepisujemy.
 ---
 
 
+## 0.461.0 — 23 września 2026
+
+**[wymaga działania] ZW: `WartoscVatPP = 0` przed zapisem.** Nowy
+`wertis-sfera-worker.exe` z artefaktu CI: zatrzymaj `wertis-sfera`, podmień
+plik i uruchom usługę.
+
+Zrzut `--zrzut 9253431` ręcznego ZW 748 zgadza się z odmową `#1481` w każdym
+polu, także w `PozycjaTypPromocji`. To pole odmawia odczytu również na
+zapisanym dokumencie, więc odpada. Różni się tylko `WartoscVatPP`: `0.0000`
+na ZW biura i `null` na każdym szkicu z COM.
+
+Worker przepisuje więc zero z ZW biura, gdy szkic ma tam pustkę. Treść
+odmowy mówi, czy Sfera przyjęła to zero. Dziennik `--zrzut` nie pisze już
+„po błędzie” po udanym zrzucie.
+
 ## 0.460.0 — 23 września 2026
 
 **[wymaga działania] Koniec eksperymentu z odłożonym skutkiem; nowy tryb
