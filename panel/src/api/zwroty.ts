@@ -231,13 +231,17 @@ export function useOcena() {
        jego pasek — inaczej licznik na ekranie stałby w miejscu, a operator
        nie wiedziałby, ile już zebrał (0.192.0). */
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+      void qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
       /* I lista outletu: ocena „na outlet" dopisuje do niej pozycję, a zmiana
          na inną — zabiera. */
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.outlet });
+      void qc.invalidateQueries({ queryKey: kluczeZwrotow.outlet });
       /* I szczegół — po ocenie zmienia się `wKoszyku` każdego składnika. */
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
+      void qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly });
+      /* OBIETNICA KOLEJKI WRACA (0.476.0) — reguła `odswiez` wyżej. Do tego
+         wydania ocena kończyła się przed odświeżeniem kolejki, więc szybkie
+         `s s s` wysyłało drugą ocenę ze starą wersją i odbijało się od
+         blokady optymistycznej. Przegląd zwrotów z 23 września. */
+      return qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
     },
   });
 }
@@ -639,8 +643,10 @@ export function useIloscZwrocona() {
         `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/ilosc`,
         { method: "POST", body: JSON.stringify({ ilosc: v.ilosc, wersja: v.wersja }) }),
     onSettled: () => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+      void qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+      /* Obietnica kolejki, jak przy ocenie (0.476.0): `Enter` zaraz po
+         zapisie liczby ma trafić w świeży kubełek i wersję. */
+      return qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
     },
   });
 }

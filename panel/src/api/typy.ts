@@ -1294,6 +1294,11 @@ export interface Zwrot {
    */
   waybill: string | null;
   kubelek: Kubelek;
+  /**
+   * Kwota ustalona, pieniądze jeszcze nie wyszły (0.476.0). Trzyma zwrot
+   * w DO ZWROTU także po korekcie — do dnia, w którym Allegro oddaje samo.
+   */
+  pieniadzeCzekaja?: boolean;
   sygnaly: Sygnal[];
   /**
    * Termin OBSŁUGI: siedem dni od paczki u nas (0.341.0).
@@ -1591,6 +1596,8 @@ export interface KoszZwrotow {
     ilosc: number;
     /** Wiersz przyszedł z oceny zwrotu; tamten schodzi cofnięciem oceny. */
     zeZwrotu: boolean;
+    /** Zwrot, z którego wiersz przyszedł; `null` przy dołożonym ręką (0.476.0). */
+    zwrotId?: number | null;
   }>;
 }
 

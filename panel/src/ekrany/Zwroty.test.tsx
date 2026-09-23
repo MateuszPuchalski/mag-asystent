@@ -509,6 +509,17 @@ describe("Klawisze kubełka", () => {
       dane: { id: 1, decyzja: "przyjety", powod: null, wersja: 1 } }]));
   });
 
+  it("`S` w DO DECYZJI przyjmuje i ocenia pierwszą pozycję — jednym klawiszem", async () => {
+    /* Przegląd zwrotów z 23 września: kto ocenia towar na stan, ten zwrot
+       przyjął. Ocena idzie z wersją ODDANĄ przez przyjęcie. */
+    scena.wolano = [];
+    pokaz("/obsluga/zwroty/1");
+    await userEvent.keyboard("s");
+    await waitFor(() => expect(scena.wolano.map((w) => w.co)).toEqual(["werdykt", "ocena"]));
+    expect(scena.wolano[0].dane).toEqual({ id: 1, decyzja: "przyjety", powod: null, wersja: 1 });
+    expect(scena.wolano[1].dane).toMatchObject({ ocena: "stan", wersja: 2 });
+  });
+
   it("`O` OTWIERA POWÓD, a nie zapisuje odmowy", async () => {
     /* Odmowa jest nieodwracalna, więc §25a.5 daje jej potwierdzenie. Klawisz
        ma skracać drogę do pytania, nie omijać samo pytanie. */
@@ -579,10 +590,11 @@ describe("Klawisze kubełka", () => {
     await userEvent.click(screen.getByRole("button", { name: /Skróty klawiszowe/ }));
     expect(screen.getByText("przyjmij")).toBeInTheDocument();
     expect(screen.queryByText("zapisz kwotę")).toBeNull();
-    /* SITA DOSZŁY W 0.315.0. Do 0.313.0 stała tu odwrotna asercja i była
-       prawdziwa: zwrot nie nosił prowadzącego, więc pasek nie miał prawa
-       obiecywać `n`. Decyzja właściciela z 13 września to odwróciła. */
-    expect(screen.getByText(/niczyje/)).toBeInTheDocument();
+    /* SITA ZESZŁY W 0.370.0 razem z klawiszami `m` i `n` (komentarz przy
+       `useSkaner` w `Zwroty.tsx`). Pomoc obiecywała `n` jeszcze do 0.476.0,
+       a klawisz nie robił nic — przegląd zwrotów z 23 września. Asercja wraca
+       więc do postaci sprzed 0.315.0: pomoc nie ma prawa obiecywać `n`. */
+    expect(screen.queryByText(/niczyje/)).toBeNull();
   });
 
   it("`Enter` w DO KOREKTY stawia kursor w polu numeru, niczego nie zapisując", async () => {

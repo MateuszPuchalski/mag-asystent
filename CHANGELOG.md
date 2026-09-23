@@ -70,6 +70,27 @@ zapytał, po dwadzieścia pozycji na szkic. Oferta bez pytania nie oddawała nic
 Kolumna `offer_snapshot.pasuje_do_zebrano_at`, dwie trasy zapisu (licznik 28),
 429 z czasem przerwy w kliencie panelu.
 
+## 0.476.0 — 23 września 2026
+
+**Zwroty: pieniądze trzymają zwrot w pracy, powód potrącenia dociera do
+klienta.** Przegląd procesu zwrotów, sześć poprawek wybranych przez
+właściciela. Opis w `docs/panel-obslugi-klienta.md` §25a.25.
+
+- **Zwrot czeka na pieniądze w „Do zwrotu”.** Automatyczny ZW zamykał zwrot
+  minutę po kwocie. Zapomniany zwrot oddawało ósmego dnia Allegro, w całości,
+  bez potrącenia. Teraz wraca do „Do zwrotu”, póki pieniądze nie wyjdą.
+  Pasek podaje, kiedy Allegro odda samo.
+- **Powód potrącenia jedzie do klienta** w `sellerComment` zwrotu pieniędzy.
+- **Gotowe wiadomości do klienta** pod pozycjami zwrotu: pomniejszony zwrot,
+  uszkodzony towar, odmowa, zwrot przyjęty. Do skopiowania i poprawienia.
+- **ZW dla paragonu związanego po zapisie kwoty** zleca się sam po takcie.
+- **Dostawa zaznaczona**, gdy wraca całe zamówienie. **`S`/`U` w „Do decyzji”**
+  przyjmują i oceniają jednym klawiszem.
+- **Klawisze przy kilku pudłach** trafiają do pudła z towarem tego zwrotu.
+  Szybkie `s s s` nie odbija się od blokady, a pomoc nie obiecuje `n`.
+- **Zwrot rozliczony w Allegro bez korekty** widać w pasku rozjazdów zwrotów.
+
+
 ## 0.474.0 — 23 września 2026
 
 **Szkic odpowiada według rozpoznanej kategorii.** Zgłoszenie właściciela:
