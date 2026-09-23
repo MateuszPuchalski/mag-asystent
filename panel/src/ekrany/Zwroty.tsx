@@ -11,7 +11,7 @@ import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
   useNieodebrana,
-  usePaczkiKlienta, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
+  usePaczkiKlienta, useZamowieniaZAllegro, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
@@ -407,6 +407,11 @@ export function Zwroty() {
      znaku. Pusty nie pyta wcale. */
   const [loginPaczek, setLoginPaczek] = useState("");
   const paczkiKlienta = usePaczkiKlienta(loginPaczek);
+  /* Uchwyt, o który Allegro JUŻ zapytaliśmy (0.447.0). Enter i wyjście
+     z pola wołają `onLogin` oba, a drugi strzał do Allegro o ten sam login
+     niczego by nie dodał — kosztowałby tylko żądanie. */
+  const zAllegro = useZamowieniaZAllegro();
+  const pytanyLogin = useRef("");
   const [wynikSkanu, setWynikSkanu] = useState<WynikSkanu | null>(null);
   const [bladSkanu, setBladSkanu] = useState("");
 
@@ -757,7 +762,25 @@ export function Zwroty() {
         rejestruje={nieodebrana.isPending}
         paczki={loginPaczek ? paczkiKlienta.data?.paczki ?? null : null}
         szukaPaczek={paczkiKlienta.isFetching}
-        onLogin={setLoginPaczek}
+        /* LOGIN IDZIE TEŻ DO ALLEGRO (0.447.0). Lista wyżej czyta naszą
+           bazę, a ta nie zna zamówienia paczki nieodebranej — nic do niego nie
+           prowadzi. Bez tego biuro szukało takiej paczki na stronie Allegro.
+           Pobrane zamówienia serwer zapisuje, a mutacja odświeża listę, więc
+           wynik pokazuje ta sama lista, w tym samym miejscu. */
+        onLogin={(v) => {
+          setLoginPaczek(v);
+          const klucz = v.trim().toLowerCase();
+          if (!wygladaNaLogin(v) || pytanyLogin.current === klucz) return;
+          pytanyLogin.current = klucz;
+          zAllegro.reset();
+          zAllegro.mutate(v, {
+            /* Odmowa nie zapamiętuje uchwytu: następny Enter ma prawo spytać
+               jeszcze raz, bo przerwa Allegro mija, a login zostaje ten sam. */
+            onError: () => { pytanyLogin.current = ""; },
+          });
+        }}
+        pytaAllegro={zAllegro.isPending}
+        bladAllegro={zAllegro.error ? (zAllegro.error as Error).message : ""}
         /* SYNCHRONIZACJA WCHODZI DO RZĘDU POLA (0.370.0). Stała we własnym
            paśmie razem z filtrami; po ich zdjęciu zostałaby sama i kosztowała
            całe pasmo na jeden przycisk. Ta sama droga, którą w audycie

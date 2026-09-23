@@ -522,6 +522,38 @@ export function usePaczkiKlienta(szukane: string) {
 }
 
 /**
+ * Czy uchwyt może być loginem Allegro — lustro `wygladaNaLogin` z serwera.
+ *
+ * Panel sprawdza sam, żeby nazwisko ze spacją nie wysyłało żądania, które
+ * serwer i tak odrzuci. Serwer sprawdza drugi raz, bo panel nie jest bramką.
+ */
+export function wygladaNaLogin(uchwyt: string): boolean {
+  return /^[\p{L}\p{N}._-]{2,64}$/u.test(uchwyt.trim());
+}
+
+/**
+ * Zamówienia kupującego prosto z Allegro, po loginie (0.447.0).
+ *
+ * Nasza baza zna tylko zamówienia, do których prowadzi zwrot, wiadomość albo
+ * reklamacja. Paczka nieodebrana nie ma żadnego z nich, więc lista paczek
+ * klienta wychodziła przy niej pusta, a biuro szukało na stronie Allegro.
+ *
+ * MUTACJA, nie zapytanie: serwer zapisuje pobrane zamówienia, a żądanie do
+ * Allegro ma wyjść z ręki operatora, nie z odświeżenia okna. Po sukcesie
+ * odświeżamy listę paczek — to ona pokazuje wynik, ta mutacja tylko go
+ * sprowadza.
+ */
+export function useZamowieniaZAllegro() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (login: string) => api<{ pobrano: number }>(
+      "/api/obsluga/zwroty/paczki-klienta/allegro",
+      { method: "POST", body: JSON.stringify({ login: login.trim() }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["paczki-klienta"] }),
+  });
+}
+
+/**
  * Rejestracja paczki, której klient nie odebrał (0.172.0).
  *
  * Allegro takiego bytu nie zna, więc wiersz zakłada biuro — to jedyne miejsce

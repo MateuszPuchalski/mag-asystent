@@ -89,6 +89,22 @@ export function urlZamowienia(apiUrl: string, id: string): string {
 }
 
 /**
+ * Zamówienia JEDNEGO kupującego, po loginie — dla paczki nieodebranej.
+ *
+ * `buyer.login` jest parametrem tej samej listy, z której czytamy zamówienia
+ * zawsze (`allegro:api:orders:read`), więc nowe uprawnienie nie jest potrzebne.
+ * Sortowania nie podajemy: domyślne jest malejące po `lineItems.boughtAt`,
+ * czyli najnowsze zakupy pierwsze — a paczka wracająca nieodebrana jest
+ * zawsze świeża.
+ *
+ * Pięćdziesiąt, nie sto: klient z pięćdziesięcioma zamówieniami u nas to
+ * rzadkość, a nieodebrana paczka nie leży w ogonie jego historii.
+ */
+export function urlZamowienKupujacego(apiUrl: string, login: string): string {
+  return `${apiUrl}/order/checkout-forms?buyer.login=${encodeURIComponent(login)}&limit=50`;
+}
+
+/**
  * Jedna oferta (`/sale/product-offers/{id}`) — po zdjęcia.
  *
  * Wchodzi dopiero tam, gdzie SKU nie trafił w kartotekę, bo kosztuje

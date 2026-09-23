@@ -92,6 +92,9 @@ const TRASY = () => [
      z naklejki, a adres ląduje w logu żądań. Bramka roli ta sama: to lista
      cudzych zakupów, czyli praca biura. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/paczki-klienta" },
+  /* Zamówienia kupującego z Allegro (0.447.0) — zapisuje i kosztuje
+     żądanie do Allegro, więc bramka roli stoi tak samo jak przy odczycie. */
+  { method: "POST" as const, url: "/api/obsluga/zwroty/paczki-klienta/allegro" },
   /* Wypuszczenie MM mimo brakujących korekt (0.368.0). Wyjście awaryjne obok
      bramki z 0.200.0 — hala nie ma prawa go nawet zobaczyć, bo decyzję bierze
      na siebie człowiek przy biurku. */
@@ -112,6 +115,19 @@ test("hala nie widzi zwrotów — bramka roli stoi też na odczycie", async () =
     assert.equal(r.statusCode, 403, `${t.method} ${t.url} wpuścił halę`);
     assert.match(r.json().error, /biuro/, "odmowa mówi, kto to prowadzi");
   }
+});
+
+test("nazwisko ze spacją nie jedzie do Allegro — trasa mówi, po czym Allegro szuka", async () => {
+  /* Filtr `buyer.login` dopasowuje całość, więc „Jan Kowalski" nie trafiłby
+     w nic, a kosztowałby żądanie. Odmowa ma powiedzieć dlaczego — lista
+     z naszej bazy szuka po nazwisku dalej, osobną trasą. */
+  const { naglowki } = login("biuro", "Ala z biura");
+  const r = await app.inject({
+    method: "POST", url: "/api/obsluga/zwroty/paczki-klienta/allegro",
+    headers: naglowki, payload: { login: "Jan Kowalski" },
+  });
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /login/);
 });
 
 test("biuro dostaje kolejkę z kubełkiem, terminem i licznikami", async () => {
@@ -157,7 +173,7 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("zwroty mają trzydzieści dwie trasy POST, a trzy wychodzą do Allegro", async () => {
+test("zwroty mają trzydzieści sześć tras POST, każda z uzasadnieniem", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -338,15 +354,24 @@ test("zwroty mają trzydzieści dwie trasy POST, a trzy wychodzą do Allegro", a
      koszyk staje się dokumentem dopiero przy zamknięciu, a porzucenie dotyczy
      wyłącznie pustego. Druga trasa jest warunkiem pierwszej — bez niej NOWY
      KOSZYK byłby drogą w jedną stronę, bo pustego kosza nie da się zamknąć. */
-  assert.equal(posty.length, 35,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu pięciu`);
+  /* Trzydziesta szósta (0.447.0): zamówienia kupującego prosto z Allegro,
+     po loginie. Zgłoszenie właściciela: paczki nieodebrane biuro szukało na
+     stronie Allegro, bo nasza baza zna tylko zamówienia, do których prowadzi
+     zwrot, wiadomość albo reklamacja — a przy takiej paczce nie prowadzi nic.
+
+     Osobna trasa, nie flaga przy `paczki-klienta`: tamta jest odczytem
+     i panel odpytuje ją `useQuery`, więc potrafi wrócić sama przy odświeżeniu
+     okna. Ta zapisuje zamówienia i kosztuje żądanie do Allegro, więc idzie
+     wyłącznie z ręki operatora. Pieniędzy ani dokumentów nie rusza. */
+  assert.equal(posty.length, 36,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu sześciu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
     "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono",
-    "kosz/nowy", "kosz/usun"]) {
+    "kosz/nowy", "kosz/usun", "paczki-klienta/allegro"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

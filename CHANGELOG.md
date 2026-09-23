@@ -34,6 +34,26 @@ historii nie przepisujemy.
 ---
 
 
+## 0.447.0 — 23 września 2026
+
+**Paczkę nieodebraną znajdziesz po loginie bez strony Allegro.** Zgłoszenie
+właściciela: takie paczki biuro szukało w panelu Allegro. Pole loginu
+w formularzu „Nieodebrana" istniało od 0.365.0, ale czytało tylko naszą bazę.
+A ta zna wyłącznie zamówienia, do których prowadzi zwrot, wiadomość albo
+reklamacja. Paczka nieodebrana nie ma żadnego z nich, więc lista wychodziła
+pusta.
+
+Enter w polu loginu pyta teraz także Allegro (`buyer.login` na liście
+zamówień). Pobrane zamówienia zapisują się u nas z pozycjami, więc
+zarejestrowana paczka od razu ma co wycenić. Nazwisko ze spacją i telefon
+dalej szukają tylko u nas, bo Allegro szuka wyłącznie po loginie.
+
+Nowa trasa `POST /api/obsluga/zwroty/paczki-klienta/allegro` zapisuje,
+więc woła `logEvent` z liczbą pobranych, bez loginu. Uprawnienie Allegro
+zostaje to samo co przy zamówieniach.
+
+- **[wymaga działania]** Przebuduj panel.
+
 ## 0.444.0 — 23 września 2026
 
 **Ustawienia biura przeszły do panelu.** Piąty krok przeprowadzki biura

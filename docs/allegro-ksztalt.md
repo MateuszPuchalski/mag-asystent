@@ -958,6 +958,22 @@ przypadkową.
 Oferta (`OfferReference`) ma `id`, `name` i **`external`**. To ostatnie pole
 jest powodem, dla którego w ogóle pobieramy zamówienia.
 
+### `GET /order/checkout-forms?buyer.login=…` — paczka nieodebrana (0.447.0)
+
+Lista zamówień ma parametr `buyer.login`, a opis w schemacie brzmi „Find
+checkout-forms having specified buyer login". Odpowiedź to `CheckoutForms`:
+`checkoutForms[]` z pełnym `CheckoutForm`, plus `count` i `totalCount`. Zapis
+idzie więc tą samą funkcją co pojedyncze zamówienie, przez to samo
+oczyszczanie.
+
+Uprawnienie to `allegro:api:orders:read`, to samo co przy pojedynczym
+zamówieniu. `limit` ma w schemacie maksimum 100; bierzemy 50. Sortowania nie
+podajemy, bo domyślne jest malejące po `lineItems.boughtAt`.
+
+Po co: nasza baza zna tylko zamówienia, do których prowadzi zwrot, wiadomość
+albo reklamacja. Paczka nieodebrana nie ma żadnego z nich, więc jej
+zamówienia u nas nie było. Biuro szukało go na stronie Allegro.
+
 ### `external.id` — mostek do kartoteki
 
 Schemat `ExternalId` opisuje je jako „The ID of the offer in the external
