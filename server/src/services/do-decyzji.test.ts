@@ -90,7 +90,8 @@ test("zapis do Subiekta w błędzie jest pilny i idzie przed starszą sprawą", 
   const [pierwsza, druga] = D.doDecyzji().pozycje;
   assert.equal(pierwsza.zrodlo, "zapisy", "pilne przebija wiek");
   assert.equal(pierwsza.pilne, true);
-  assert.deepEqual(pierwsza.cel, { biuro: "nadzor" }, "stan systemu mieszka jeszcze w biurze");
+  assert.deepEqual(pierwsza.cel, { panel: "/obsluga/stan?karta=kolejka" },
+    "zapis w błędzie prowadzi do karty kolejki w stanie systemu (0.441.0)");
   assert.equal(druga.zrodlo, "dostawy");
 });
 

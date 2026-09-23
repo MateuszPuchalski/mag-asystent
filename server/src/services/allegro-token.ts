@@ -175,7 +175,7 @@ let odswiezanie: Promise<string> | null = null;
 export async function wazneBearer(): Promise<string> {
   const t = wiersz();
   if (!t) {
-    throw new Error("Konto Allegro niepołączone — /biuro → STAN SYSTEMU → KONTO ALLEGRO → POŁĄCZ.");
+    throw new Error("Konto Allegro niepołączone — /obsluga → STAN SYSTEMU → KONTO ALLEGRO → POŁĄCZ.");
   }
   if (t.srodowisko !== srodowisko()) {
     throw new Error(
@@ -197,7 +197,7 @@ export async function wazneBearer(): Promise<string> {
           throw new Error(
             "Allegro odmówiło odświeżenia tokena" +
               (typeof json.error === "string" ? ` (${json.error})` : "") +
-              " — sparuj konto ponownie: /biuro → STAN SYSTEMU → KONTO ALLEGRO."
+              " — sparuj konto ponownie: /obsluga → STAN SYSTEMU → KONTO ALLEGRO."
           );
         }
         zapisz(
@@ -421,14 +421,14 @@ export function problemAllegro(): string | null {
   const s = stanPolaczenia();
   if (s.stan === "niepolaczone") {
     return (
-      "ALLEGRO_CLIENT_ID ustawione, ale konto niepołączone — /biuro → STAN SYSTEMU → " +
+      "ALLEGRO_CLIENT_ID ustawione, ale konto niepołączone — /obsluga → STAN SYSTEMU → " +
       "KONTO ALLEGRO → POŁĄCZ (rola admin)."
     );
   }
   if (s.stan === "zle_srodowisko") {
     return (
       "Token Allegro pochodzi z innego środowiska niż ALLEGRO_SANDBOX wskazuje — " +
-      "sparuj konto ponownie w /biuro → STAN SYSTEMU → KONTO ALLEGRO."
+      "sparuj konto ponownie w /obsluga → STAN SYSTEMU → KONTO ALLEGRO."
     );
   }
   return null;
@@ -484,14 +484,14 @@ export function powodBrakuKonta(
       );
     case "niepolaczone":
       return (
-        "Konto Allegro niepołączone — sparuj je w panelu: /biuro → STAN SYSTEMU → " +
+        "Konto Allegro niepołączone — sparuj je w panelu: /obsluga → STAN SYSTEMU → " +
         "KONTO ALLEGRO → POŁĄCZ (rola admin). " +
         zrodloKonfiguracji(plikEnv)
       );
     case "zle_srodowisko":
       return (
         "Token pochodzi z innego środowiska, niż wskazuje ALLEGRO_SANDBOX — sparuj " +
-        "konto ponownie: /biuro → STAN SYSTEMU → KONTO ALLEGRO. " +
+        "konto ponownie: /obsluga → STAN SYSTEMU → KONTO ALLEGRO. " +
         zrodloKonfiguracji(plikEnv)
       );
   }

@@ -5,7 +5,7 @@ import { useImportZbiorek, useKandydaci, type WynikImportuZbiorek } from "../api
 import { useJa } from "../api/rozmowy";
 import { doBiura } from "../mostBiura";
 import { Blad, Przycisk } from "../ui";
-import { KartaWgladu, Tabela, Td } from "./wspolne";
+import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
 /* ── Strefa złota — kandydaci do przeniesienia (0.440.0) ────────────────
    Towary z górnych 15% rotacji, które stoją poza strefą złotą. Dane bierzemy

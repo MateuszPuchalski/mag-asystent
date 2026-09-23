@@ -11,8 +11,8 @@ export type ZrodloDecyzji =
   | "dostawy" | "odpowiedzi" | "kosze" | "zapisy" | "kody" | "allegro"
   | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje";
 
-/** Adres w panelu albo widok, który jeszcze mieszka w `biuro.html`. */
-export type CelDecyzji = { panel: string } | { biuro: "nadzor" };
+/** Adres w panelu — od 0.441.0 każdy wiersz prowadzi do ekranu panelu. */
+export type CelDecyzji = { panel: string };
 
 export interface PozycjaDecyzji {
   klucz: string;

@@ -938,6 +938,14 @@ export type Zdrowie = {
     wysylkiDoSprawdzenia: number;
   };
   worker?: { zyje: boolean; mode: string; widziany: string | null };
+  /* Pola karty SERWER w stanie systemu (0.441.0). Trasa oddawała je
+     zawsze; panel ich nie czytał, bo karta mieszkała w `biuro.html`. */
+  wersja?: string;
+  mode?: string;
+  srodowisko?: string;
+  configZPliku?: string | null;
+  ok?: boolean;
+  audyt?: { zdarzen?: number; najstarsze?: string | null; bazaBajtow?: number } | null;
 };
 
 /** Konflikt przejęcia — kształt szczegółów, które serwer zwraca przy 409. */

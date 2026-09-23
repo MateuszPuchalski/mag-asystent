@@ -1,11 +1,10 @@
 import React, { useState } from "react";
 import { Settings } from "lucide-react";
 import {
-  useEskalacja, usePokrycieSygnatur, usePokrycieWiedzy, useSkutecznoscDoboru, useWiedzaAutomat, useZdrowie,
+  useEskalacja, usePokrycieSygnatur, usePokrycieWiedzy, useSkutecznoscDoboru, useWiedzaAutomat,
 } from "../api/rozmowy";
 import { useCopilot, usePomiarCopilota } from "../api/copilot";
 import { Karta } from "../ui";
-import { StanIntegracji } from "../skrzynka/StanIntegracji";
 import { PokrycieSygnatur } from "../ustawienia/PokrycieSygnatur";
 import { PokrycieWiedzy } from "../ustawienia/PokrycieWiedzy";
 import { PomiarCopilota } from "../ustawienia/PomiarCopilota";
@@ -34,7 +33,6 @@ import { useTagi, useZmienTag } from "../api/tagi";
    w biurze zaczynały tak samo. Miejsce jest, więc następne ustawienie obsługi
    trafi tutaj, zamiast dokładać się do ekranu pracy. */
 export function Ustawienia() {
-  const zdrowie = useZdrowie();
   const sygnatury = usePokrycieSygnatur();
   const wiedza = usePokrycieWiedzy();
   /* Pomiar ciągniemy dopiero po wejściu na ten ekran — na skrzynce byłby
@@ -64,7 +62,9 @@ export function Ustawienia() {
       <span className="text-sm text-slate-500">Tło pracy obsługi · zmienia się tu tylko słownik tagów</span>
     </Karta>
 
-    <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
+    {/* STAN INTEGRACJI przeszedł w 0.441.0 do stanu systemu — jedno
+        miejsce na pytanie „czemu nie działa", obok kolejki zapisów i serwera.
+        Tu zostały ustawienia i miary obsługi. */}
     <PokrycieSygnatur dane={sygnatury.data} />
     <PokrycieWiedzy dane={wiedza.data} />
     {/* Zaraz POD pokryciem wiedzy: tamta karta mówi, ile czeka w kolejce,

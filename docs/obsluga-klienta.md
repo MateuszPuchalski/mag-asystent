@@ -367,6 +367,15 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > brakuje mu źródła danych, a przeprowadzka nie wymyśla liczb. To luka do
 > osobnej decyzji. Reguły strefy złotej zostają za zębatką biura do F5;
 > analiza prowadzi do nich mostem, z sesją.
+>
+> **F4b w 0.441.0.** STAN SYSTEMU przeszedł do panelu jako ostatni widok
+> wglądu. W `biuro.html` zostały wyłącznie ustawienia za zębatką. Stan
+> integracji zszedł spod zębatki panelu do stanu systemu, więc jest jedno
+> miejsce na pytanie „czemu nie działa". Wiersze DO DECYZJI prowadzą wprost
+> do właściwej karty, a ostatni most z panelu do `/biuro` służy regułom
+> strefy złotej. Dwie zmiany kształtu. Arkusz lokalizacji widzi tylko admin,
+> bo pozostałym serwer i tak odmawia. Rekoncyliacja nazywa wszystkie
+> dziewięć rodzajów rozjazdu, a nie cztery.
 
 ### 8. Kiedy nowa obsługa jest gotowa?
 

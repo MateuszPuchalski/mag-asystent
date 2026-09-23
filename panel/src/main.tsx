@@ -2,11 +2,10 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Activity, ArrowUpRight, AtSign, BarChart3, BookMarked, Briefcase, ClipboardList, FileText, Inbox, ListChecks, LogOut, MessagesSquare, Settings, ShieldQuestion, Truck, Undo2, Warehouse } from "lucide-react";
+import { Activity, AtSign, BarChart3, BookMarked, Briefcase, ClipboardList, FileText, Inbox, ListChecks, LogOut, MessagesSquare, Settings, ShieldQuestion, Truck, Undo2, Warehouse } from "lucide-react";
 import { BrakSesji, SESJA_WYGASLA, token, wyczyscToken, zglosBrakSesji } from "./api/klient";
 import { useJa, useWzmianki, useZdrowie } from "./api/rozmowy";
 import { BrakDostepu } from "./ekrany/BrakDostepu";
-import { doBiura, type WidokBiura } from "./mostBiura";
 import { useKolejkaWiedzy } from "./api/wiedza";
 import { useDoDecyzji } from "./api/decyzje";
 import { czas, godzina } from "./ui";
@@ -25,6 +24,7 @@ import { Dostawy } from "./ekrany/Dostawy";
 import { Kosze } from "./ekrany/Kosze";
 import { Dziennik } from "./ekrany/Dziennik";
 import { Analiza } from "./ekrany/Analiza";
+import { Stan } from "./ekrany/Stan";
 import { Protokol } from "./druk/Protokol";
 import "./index.css";
 
@@ -85,49 +85,33 @@ const ZAKLADKI = [
    stanu, zębatką i wyjściem potrzebuje ~1280 px, a laptop obok Subiekta ma
    1180. Stan, zębatka i wyjście stoją więc na prawym końcu DOLNEGO rzędu.
 
-   MOST DO STAREGO BIURA. Widoku, który jeszcze nie przeszedł, panel nie ma —
-   pozycja prowadzi wtedy do `/biuro` na właściwą zakładkę. Oba fronty stoją
-   na jednym originie i jednych sesjach, więc panel zostawia biuru swój token
-   i nazwę widoku w kluczach, które `biuro.html` czyta przy starcie. Człowiek
-   nie loguje się drugi raz. Pozycja z `biuro` znika z tej tablicy razem
-   z przeprowadzką jej widoku; ostatnia zabiera ze sobą cały most (F6). */
-/* Pozycja PRZENIESIONA niesie adres panelu (`do`), jeszcze nieprzeniesiona —
-   widok biura (`biuro`). Dwa pola zamiast jednego z prefiksem, bo inaczej
-   wygląda i inaczej się zachowuje: pierwsza jest zakładką, druga wyjściem. */
-type PozycjaDrugiegoRzedu = { etykieta: string; ikona: React.ReactNode }
-  & ({ do: string } | { biuro: WidokBiura });
+   MOST DO STAREGO BIURA ZNIKNĄŁ Z TEGO RZĘDU w 0.441.0. Pozycje prowadziły
+   do `/biuro` na zakładkę, która jeszcze nie przeszła; stan systemu był
+   ostatnią. Cały dolny rząd to zakładki panelu. Most został w `mostBiura.ts`
+   dla jednej drogi: reguł strefy złotej za zębatką biura, do F5. */
+type PozycjaDrugiegoRzedu = { etykieta: string; ikona: React.ReactNode; do: string };
 const DRUGI_RZAD: Array<PozycjaDrugiegoRzedu | "kreska"> = [
   { etykieta: "Dostawy", ikona: <Truck size={16} />, do: "/obsluga/dostawy" },
   /* KOSZY TU NIE MA od 0.438.0 — decyzją właściciela mieszkają w zakładce
      Zwroty, bo są dalszym ciągiem zwrotu. Powód przy `zwroty/Przelacznik.tsx`. */
   "kreska",
-  { etykieta: "Stan systemu", ikona: <Activity size={16} />, biuro: "nadzor" },
-  /* Dziennik i analiza przeszły w 0.440.0; stan systemu idzie następnym
-     wydaniem, bo niesie siedem zapisów i czytnik arkuszy. */
+  /* Dziennik i analiza przeszły w 0.440.0, stan systemu w 0.441.0 —
+     cały wgląd mieszka już w panelu. */
+  { etykieta: "Stan systemu", ikona: <Activity size={16} />, do: "/obsluga/stan" },
   { etykieta: "Dziennik", ikona: <FileText size={16} />, do: "/obsluga/dziennik" },
   { etykieta: "Analiza", ikona: <BarChart3 size={16} />, do: "/obsluga/analiza" },
 ];
 
 function DrugiRzad() {
-  const ja = useJa();
   const { pathname } = useLocation();
   return <nav aria-label="Magazyn i wgląd" className="flex rounded-lg bg-white/5 p-1">
     {DRUGI_RZAD.map((z, i) => z === "kreska"
       ? <span key={i} aria-hidden="true" className="mx-1.5 my-1 w-px bg-white/15" />
-      /* Przeniesiony ekran jest zwykłą zakładką — ta sama barwa aktywnej co
-         w górnym rzędzie, bo to ten sam rodzaj przejścia.
-         bursztyn: zakładka na ciemnym tle jest marką */
-      : "do" in z
-        ? <Link key={z.do} to={z.do}
-            className={`flex items-center gap-2 rounded px-2.5 py-1.5 text-sm font-semibold ${
-              pathname.startsWith(z.do) ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
-            {z.ikona}{z.etykieta}</Link>
-      /* Link do STAREGO ekranu dostaje strzałkę „na zewnątrz": człowiek ma
-         wiedzieć, że wychodzi z panelu, zanim zobaczy inny wygląd. */
-      : <a key={z.biuro} href="/biuro" onClick={() => doBiura(z.biuro, ja.data?.user.name ?? "")}
-          title={`${z.etykieta} — jeszcze w dawnym biurze`}
-          className="flex items-center gap-2 rounded px-2.5 py-1.5 text-sm font-semibold text-slate-300 hover:bg-white/10">
-          {z.ikona}{z.etykieta}<ArrowUpRight size={12} className="text-slate-500" /></a>)}
+      /* bursztyn: zakładka na ciemnym tle jest marką */
+      : <Link key={z.do} to={z.do}
+          className={`flex items-center gap-2 rounded px-2.5 py-1.5 text-sm font-semibold ${
+            pathname.startsWith(z.do) ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
+          {z.ikona}{z.etykieta}</Link>)}
   </nav>;
 }
 
@@ -347,6 +331,7 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         <Route path="/obsluga/reklamacje/:id" element={<Reklamacje />} />
     <Route path="/obsluga/dyskusje" element={<Dyskusje />} />
     <Route path="/obsluga/dyskusje/:id" element={<Dyskusje />} />
+        <Route path="/obsluga/stan" element={<Stan />} />
         <Route path="/obsluga/dziennik" element={<Dziennik />} />
         <Route path="/obsluga/analiza" element={<Analiza />} />
         <Route path="/obsluga/moje" element={<Moje />} />

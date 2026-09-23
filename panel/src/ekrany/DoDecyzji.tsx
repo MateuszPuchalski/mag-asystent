@@ -1,12 +1,10 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
-  AlertTriangle, ArrowUpRight, Barcode, ChevronRight, CircleCheck, Inbox, MessageSquareReply,
+  AlertTriangle, Barcode, ChevronRight, CircleCheck, Inbox, MessageSquareReply,
   MessagesSquare, Package, PlugZap, ShieldQuestion, Truck, Undo2,
 } from "lucide-react";
 import { useDoDecyzji, type Obszar, type PozycjaDecyzji, type ZrodloDecyzji } from "../api/decyzje";
-import { useJa } from "../api/rozmowy";
-import { doBiura } from "../mostBiura";
 import { Blad, FiltrSegmentowy, Karta, Pusto, wiek } from "../ui";
 
 /* ── DO DECYZJI — ekran startowy biura (0.435.0) ───────────────────────────
@@ -49,7 +47,7 @@ function Wiek({ p }: { p: PozycjaDecyzji }) {
     title={p.pilne ? "Termin minął albo mija" : "Od kiedy czeka"}>{wiek(ms)}</span>;
 }
 
-function Wiersz({ p, kto }: { p: PozycjaDecyzji; kto: string }) {
+function Wiersz({ p }: { p: PozycjaDecyzji }) {
   const Ikona = IKONY[p.zrodlo];
   const tresc = <>
     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
@@ -63,18 +61,13 @@ function Wiersz({ p, kto }: { p: PozycjaDecyzji; kto: string }) {
   </>;
   const klasa = "flex items-center gap-3 px-4 py-3 hover:bg-slate-50";
   return <li className="border-t border-slate-200 first:border-t-0">
-    {"panel" in p.cel
-      ? <Link to={p.cel.panel} className={klasa}>{tresc}
-          <ChevronRight size={18} className="shrink-0 text-slate-400" /></Link>
-      : <a href="/biuro" className={klasa} title="Otwiera się w dawnym biurze"
-          onClick={() => doBiura((p.cel as { biuro: "nadzor" }).biuro, kto)}>{tresc}
-          <ArrowUpRight size={18} className="shrink-0 text-slate-400" /></a>}
+    <Link to={p.cel.panel} className={klasa}>{tresc}
+      <ChevronRight size={18} className="shrink-0 text-slate-400" /></Link>
   </li>;
 }
 
 export function DoDecyzji() {
   const dane = useDoDecyzji();
-  const ja = useJa();
   const [filtr, setFiltr] = useState<Filtr>("wszystko");
   const pozycje = (dane.data?.pozycje ?? []).filter((p) => filtr === "wszystko" || p.obszar === filtr);
   const l = dane.data?.liczniki;
@@ -105,7 +98,7 @@ export function DoDecyzji() {
         ? <Pusto waga="lista">Wczytuję…</Pusto>
         : pozycje.length === 0
           ? <Pusto ikona={CircleCheck}>Nic nie czeka na biuro.</Pusto>
-          : <ul>{pozycje.map((p) => <Wiersz key={p.klucz} p={p} kto={ja.data?.user.name ?? ""} />)}</ul>}
+          : <ul>{pozycje.map((p) => <Wiersz key={p.klucz} p={p} />)}</ul>}
     </Karta>
   </div>;
 }

@@ -34,6 +34,40 @@ historii nie przepisujemy.
 ---
 
 
+## 0.441.0 — 23 września 2026
+
+**Stan systemu przeszedł do panelu.** Druga połowa czwartego kroku
+przeprowadzki biura (`docs/obsluga-klienta.md` §7, F4b). Cały wgląd — stan
+systemu, dziennik i analiza — mieszka już pod `/obsluga`. W `biuro.html`
+zostały wyłącznie ustawienia za zębatką.
+
+**Ekran `/obsluga/stan` niesie osiem kart**, w kolejności z 0.427.0: najpierw
+to, co czeka na ruch biura. Kolejka zapisów do Subiekta ma PONÓW przy błędzie
+i ANULUJ przy oczekującym. Masową zmianę lokalizacji z arkusza widzi tylko
+admin, bo pozostałym serwer i tak odmawia. Dalej stoją kolizje kodów
+z decyzją, rekoncyliacja na żądanie, czas wymiany z halą z alarmem, stan
+integracji, konto Allegro i serwer z operacjami ratunkowymi. Groźne ruchy
+pytają w miejscu przycisku, a nie oknem na środku ekranu.
+
+**Stan integracji wyszedł spod zębatki panelu.** Tabela z `/api/health` stała
+w ustawieniach, a stan serwera w biurze. Teraz jest jedno miejsce na pytanie
+„czemu nie działa".
+
+**DO DECYZJI prowadzi wprost do karty.** Zapis w błędzie otwiera
+`/obsluga/stan?karta=kolejka`, kolizja — kartę kodów, rozłączone Allegro —
+kartę konta. Ostatnie wiersze prowadzące mostem do `/biuro` zniknęły.
+
+**Poprawki przy przeprowadzce.** Rekoncyliacja nazywa wszystkie dziewięć
+rodzajów rozjazdu; biuro znało cztery i resztę pokazywało surowym kluczem.
+Czytnik arkusza .xlsx dostał pierwsze testy, na plikach budowanych w teście.
+Komunikaty serwera o koncie Allegro odsyłają do `/obsluga → STAN SYSTEMU`.
+
+**NADZÓR zniknął z `biuro.html`.** Licznik zapisów strony spadł z 10 do 4 POST
+i z 2 do 1 DELETE. Ikony zdrowia i Allegro oraz plakietka spóźnień prowadzą
+do stanu systemu w panelu, z sesją. Strona wstaje na ustawieniach. Gwarancje
+usuniętych testów strony przejął `ekrany/Stan.test.tsx`: jedna pętla
+parowania, rytm serwera, zero zapisu przy otwarciu.
+
 ## 0.440.0 — 23 września 2026
 
 **Dziennik i analiza przeszły do panelu.** Pierwsza połowa czwartego kroku

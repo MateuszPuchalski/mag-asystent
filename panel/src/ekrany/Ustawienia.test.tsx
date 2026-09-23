@@ -6,6 +6,7 @@ import type { Zdrowie } from "../api/typy";
 /* Źródło jako tekst (`?raw`) — Vite umie to podać bez typów Node'a. */
 import zrodloSkrzynki from "./Skrzynka.tsx?raw";
 import zrodloRamy from "../main.tsx?raw";
+import zrodloStanu from "./Stan.tsx?raw";
 
 /* ── Stan integracji za zębatką (0.168.0) ────────────────────────────────────
    Decyzja właściciela: trzynastowierszowa tabela z `/api/health` schodzi
@@ -92,10 +93,17 @@ vi.mock("../api/tagi", () => ({
 const { Ustawienia } = await import("./Ustawienia");
 
 describe("Ustawienia obsługi", () => {
-  it("niosą tabelę stanu integracji", () => {
+  it("tabela stanu integracji przeszła do stanu systemu (0.441.0)", () => {
+    /* Jedno miejsce stanu: od 0.441.0 tabela z `/api/health` stoi
+       w stanie systemu, obok kolejki zapisów i serwera. Dwa miejsca to dwie
+       odpowiedzi na „czemu nie działa" i żadna nie mówiła o drugiej. */
     render(<MemoryRouter><Ustawienia /></MemoryRouter>);
-    expect(screen.getByText("Stan integracji")).toBeInTheDocument();
-    expect(screen.getByText("Połączenie Allegro")).toBeInTheDocument();
+    expect(screen.queryByText("Stan integracji")).toBeNull();
+    expect(zrodloStanu).toContain("<StanIntegracji");
+  });
+
+  it("niosą karty ustawień i miar obsługi", () => {
+    render(<MemoryRouter><Ustawienia /></MemoryRouter>);
     expect(screen.getByText("Sygnatura → kartoteka Subiekta")).toBeInTheDocument();
     /* Trzecia karta (E3): brak FTS5 ma być widoczny, nie cicho pominięty. */
     expect(screen.getByText("Wiedza z opisów kartotek i ofert")).toBeInTheDocument();

@@ -1,17 +1,20 @@
 import React from "react";
-import { Karta, Pusto } from "../ui";
+import { Karta, Pusto } from "./index";
 
-/* ── Rama kart analizy (0.440.0) ─────────────────────────────────────────
-   Biuro miało na ANALIZIE jedenaście kart w jednym kształcie: wersalikowy
-   nagłówek, zdanie „co ta liczba znaczy" i tabela. Tu ten kształt stoi raz,
-   żeby następna karta nie wymyślała go od nowa. Zdanie pod nagłówkiem nie
-   jest ozdobą — przy każdej karcie mówi, jak NIE czytać liczby (np. że
-   zgłoszony problem nie jest miarą błędu). */
+/* ── Rama kart wglądu (0.440.0, w `ui/` od 0.441.0) ──────────────────────
+   Biuro miało na ANALIZIE i w STANIE SYSTEMU kilkanaście kart w jednym
+   kształcie: nagłówek, zdanie „co ta liczba znaczy" i tabela. Tu ten kształt
+   stoi raz, żeby następna karta nie wymyślała go od nowa. Mieszkał
+   w `analiza/`, dopóki miał jednego odbiorcę; stan systemu jest drugim.
+   Zdanie pod nagłówkiem nie jest ozdobą — mówi, jak NIE czytać liczby. */
 
-export function KartaWgladu({ tytul, opis, akcje, children }: {
-  tytul: string; opis?: React.ReactNode; akcje?: React.ReactNode; children: React.ReactNode;
+export function KartaWgladu({ tytul, opis, akcje, id, children }: {
+  tytul: string; opis?: React.ReactNode; akcje?: React.ReactNode;
+  /** Kotwica dla głębokiego linku (`?karta=…`) — stan systemu skacze do karty. */
+  id?: string;
+  children: React.ReactNode;
 }) {
-  return <Karta className="overflow-hidden">
+  return <Karta id={id} className="scroll-mt-4 overflow-hidden">
     <header className="flex flex-wrap items-baseline gap-2 border-b px-4 py-3">
       <h2 className="text-naglowek mr-auto font-bold">{tytul}</h2>
       {akcje}

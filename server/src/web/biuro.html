@@ -275,8 +275,6 @@
   /* Wybór, które obecne adresy zdjąć przy imporcie z arkusza (0.139.0).
      Kody stoją JEDEN POD DRUGIM, nie w rzędzie: przy kilku adresach rząd
      rozpychał kolumnę tabeli szerzej niż reszta wiersza. */
-  .wyborKodu { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
-  .wyborKodu + .wyborKodu { margin-top: 3px; }
 
   /* Karta na cały rząd. `1 / -1` celuje w koniec siatki JAWNEJ, więc przy
      jednej kolumnie znaczy „ta jedna", a przy trzech „wszystkie trzy" — jest
@@ -519,50 +517,11 @@
   #stan { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   #stan .badge { cursor: pointer; }
 
-  /* Kafle metryk: liczba w kondensacie (headlineMedium kolektora), opis pod
-     spodem jak etykieta sekcji. Liczba nosi znaczenie, opis tylko podpisuje. */
-  .kafle { display: flex; gap: 8px; flex-wrap: wrap; }
-  .kafel { flex: 1 1 130px; background: var(--card); border: 1px solid var(--card-border); border-radius: 12px; padding: 8px 12px; box-shadow: var(--cien); }
-  .kafel .liczba { font: 800 26px/1.05 var(--font-cond); }
-  .kafel .liczba.zle { color: var(--err); }
-  /* Ten sam sens co wyżej, ale poza kaflem: liczba, która ma zapalić się na
-     czerwono w zwykłym akapicie (licznik znaków odpowiedzi). */
+  /* Liczba, która ma zapalić się na czerwono w zwykłym akapicie. */
   .zle { color: var(--err); }
-  .kafel .opis { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); }
 
   .filtry { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 8px; }
 
-  /* ── Sekcja zwijana ────────────────────────────────────────────────────────
-     Natywny <details>, bo daje klawiaturę, czytnik ekranu i Ctrl+F za darmo,
-     a strona nie ma kroku budowania, w którym dałoby się to dorobić taniej.
-
-     Nagłówek zachowuje się jak `h2` sekcji: strzałka zamiast domyślnego
-     trójkąta przeglądarki, bo tamten ma własny kolor i własny rozmiar. */
-  details.zwijana { border-top: 1px solid var(--border); padding-top: 8px; margin-top: 8px; }
-  details.zwijana > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; }
-  details.zwijana > summary::-webkit-details-marker { display: none; }
-  details.zwijana > summary h2 { margin-bottom: 0; }
-  details.zwijana > summary::before { content: "▸"; color: var(--ink-mute); font-size: 12px; transition: transform .12s; }
-  details.zwijana[open] > summary::before { transform: rotate(90deg); }
-  details.zwijana[open] > summary { margin-bottom: 8px; }
-  /* Konto Allegro jest KARTĄ od 0.427.0 — jako goła sekcja zwijana leżało
-     na papierze między kartami i wyglądało na coś, co odpadło od sąsiadki. */
-  details.card.zwijana { border-top: 1px solid var(--card-border); margin-top: 0; padding-top: 12px; }
-  .widok.wglad details.card > summary h2 {
-    font: 700 20px/1.25 var(--font-cond); letter-spacing: .3px; color: var(--ink);
-  }
-  details.zwijana > summary:hover h2 { color: var(--amber-ink); }
-  /* Zdanie w zwiniętym nagłówku mówi, czego się spodziewać po otwarciu.
-     Liczb tam nie ma świadomie — pokazanie ich wymagałoby pobrania danych,
-     czyli zniszczenia całej oszczędności. */
-  details.zwijana > summary .podpis { margin-left: auto; font-size: 11px; color: var(--ink-mute); }
-  /* Zwijana, która JEST kartą (a nie sekcją w jej środku): kreska i odstępy
-     `.zwijana` są pomyślane dla drugiego przypadku i tutaj dublowałyby ramkę. */
-  details.card.zwijana { border-top: 1px solid var(--card-border); padding-top: 12px; margin-top: 0; }
-  details.zwijana[open] > summary .podpis { display: none; }
-  /* Sekcja zwinięta jako CAŁA treść karty (statystyki pytań): kreska u góry
-     wypadłaby wtedy tuż pod krawędzią karty i udawała pustą sekcję nad sobą. */
-  .card > details.zwijana:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
   .filtry label { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); display: block; }
   .filtry input, .filtry select {
     border: 1px solid var(--border); border-radius: 12px; padding: 7px 10px; font: inherit; background: var(--card);
@@ -650,9 +609,12 @@
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
           <span class="et">DZIENNIK ↗</span>
         </button>
-        <button data-widok="nadzor" title="Stan systemu">
+        <!-- STAN SYSTEMU PRZESZEDŁ DO PANELU (0.441.0) — ostatnia zakładka
+             wglądu. Pasek niesie już same wyjścia do panelu; zakładką tej
+             strony zostały ustawienia za zębatką. -->
+        <button data-panel="/obsluga/stan" title="Stan systemu — w panelu biura">
           <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 8L9 4l-3 8H2"/></svg>
-          <span class="et">STAN SYSTEMU</span>
+          <span class="et">STAN SYSTEMU ↗</span>
         </button>
       </div>
     </div>
@@ -663,8 +625,8 @@
          pytanie biura („czy coś się dzieje?"), pełne zdania jadą w `title`.
          Plakietka odpowiedzi na notatki zostaje OSOBNA: sygnał roboczy
          z własną drogą (od 0.435.0: dostawy w panelu), nie zdrowie systemu. -->
-    <button class="ikonaStanu" id="ikonaZdrowia" title="Czekam na pierwszy odczyt stanu…" hidden><i></i><span class="et">SYSTEM</span></button>
-    <button class="ikonaStanu" id="ikonaAllegro" title="Stan konta Allegro jeszcze nieznany" hidden><i></i><span class="et">ALLEGRO</span></button>
+    <button class="ikonaStanu" id="ikonaZdrowia" data-panel="/obsluga/stan" title="Czekam na pierwszy odczyt stanu…" hidden><i></i><span class="et">SYSTEM</span></button>
+    <button class="ikonaStanu" id="ikonaAllegro" data-panel="/obsluga/stan?karta=allegro" title="Stan konta Allegro jeszcze nieznany" hidden><i></i><span class="et">ALLEGRO</span></button>
     <div id="stan"></div>
     <span class="kto" id="kto"></span>
     <div class="sesjaRzad">
@@ -696,163 +658,10 @@
 </main>
 
 <main id="panel" hidden>
-  <!-- ── STAN SYSTEMU ────────────────────────────────────────────────────── -->
-  <div id="widokNadzor" class="widok wglad" hidden>
-    <!-- KOLEJNOŚĆ: NAJPIERW TO, CO CZEKA NA BIURO (0.427.0, dekalog pkt 1 i 5).
-         Kolejka zapisów, rekoncyliacja i kolizje kodów mają przyciski, które
-         ktoś musi nacisnąć; metryki, czasy wymiany i serwer się tylko czyta.
-         Do tej wersji na górze stały metryki, a zadanie w błędzie — jedyna
-         rzecz na tej zakładce, przez którą stan w Subiekcie się nie zgadza —
-         leżało pod nimi, poza ekranem laptopa. Arkusz lokalizacji zostaje
-         tuż pod kolejką, jak od 0.138.0 — powód stoi przy nim. Identyfikatory
-         kart bez zmian: skoki z paska stanu (`data-cel`) trafiają tam, gdzie
-         trafiały. -->
-    <section class="card">
-      <h2>KOLEJKA ZAPISÓW DO SUBIEKTA <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
-          Zadanie w błędzie znaczy, że magazynier zrobił swoje, a do bazy firmy nic
-          nie weszło. Ponawia się je <b>na kolektorze</b> — ta strona tylko czyta.
-        </p>
-      </div>
-      <div class="kafle" id="kafleKolejki"></div>
-      <table id="kolejka" style="margin-top:12px"></table>
-    </section>
-
-    <!-- ── Masowa zmiana adresów z arkusza (0.138.0) ─────────────────────────
-         Stoi POD kolejką zapisów świadomie: to ta kolejka wykona skutek tej
-         karty, a sto zadań, które się w niej pojawią, ma być widoczne w tym
-         samym spojrzeniu. Karta wyżej mówi „ta strona tylko czyta" o PONÓW —
-         i to nadal prawda, bo ponawianie zostaje na kolektorze.
-
-         Rola NIE jest w przeglądarce znana i nie zaczynamy jej tu trzymać:
-         kartę widzą wszyscy, odmowę wypowiada serwer. Ta sama konwencja, co
-         przy kontach w ustawieniach. -->
-    <section class="card" id="arkuszLokalizacjiKarta">
-      <h2>MASOWA ZMIANA LOKALIZACJI Z ARKUSZA <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
-          Wykonuje wyłącznie <b>administrator</b>. Wyeksportuj kartoteki
-          z Subiekta, popraw kolumnę <b>Lokalizacja</b> w Excelu i wgraj plik
-          z powrotem. Przyjmujemy <b>.xlsx</b> i <b>.csv</b>; kolumny
-          rozpoznajemy po nagłówkach <b>Symbol</b> i <b>Lokalizacja</b>.
-        </p>
-        <p class="mute" style="margin-bottom:10px">
-          Arkusz <b>podmienia</b> całe pole adresu. Wiersze, które mówią to samo,
-          co Subiekt, są pomijane — wgranie własnego eksportu bez zmian nie
-          zrobi nic. Wiersz z błędnym adresem odpada w całości, żeby zapis nie
-          skasował po cichu adresu, którego nikt nie kazał kasować.
-        </p>
-        <p class="mute" style="margin-bottom:10px">
-          Nic nie idzie do Subiekta przed kliknięciem <b>ZASTOSUJ</b>. Każda
-          zmiana to osobne zadanie w kolejce wyżej i osobny wpis w dzienniku.
-        </p>
-      </div>
-      <div class="filtry">
-        <div>
-          <button class="akcja" id="wgrajArkuszLok">WGRAJ ARKUSZ</button>
-          <input type="file" id="plikArkuszLok"
-            accept=".xlsx,.csv,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" hidden>
-        </div>
-        <div><button class="akcja" id="zastosujArkuszLok" hidden>ZASTOSUJ</button></div>
-      </div>
-      <p class="mute" id="wynikArkuszLok"></p>
-      <div id="arkuszLokPodglad"></div>
-    </section>
-
-    <section class="card">
-      <h2>REKONCYLIACJA · CZY SUBIEKT MA TO, CO ZAPISALIŚMY <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
-          Porównuje adres w Subiekcie z ostatnim udanym zapisem oraz wyławia zadania,
-          o których wszyscy zapomnieli. Pusty wynik to wynik dobry.
-        </p>
-      </div>
-      <button class="akcja" id="sprawdzRozjazdy">SPRAWDŹ TERAZ</button>
-      <button class="akcja cichy" id="csvRozjazdy" hidden>CSV</button>
-      <table id="rozjazdy" style="margin-top:12px"></table>
-    </section>
-
-    <section class="card">
-      <h2>KOLIZJE KODÓW KRESKOWYCH <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
-          Jeden kod na kilku kartotekach zatrzymuje pracę w alejce. Ta lista mówi,
-          które poprawić najpierw — licznik to liczba zatrzymań.
-        </p>
-      </div>
-      <table id="kolizje"></table>
-    </section>
-
-    <!-- METRYKI PRZESZŁY DO ANALIZY PANELU (0.440.0), razem z oknem
-         7/30/90 dni. Mówią o pracy hali w oknie, nie o stanie serwera TERAZ,
-         a stojąc tutaj miały drugi przełącznik okna obok tego z analizy. -->
-    <section class="card" id="kartaWymiany">
-      <h2>ILE TRWA WYMIANA Z HALĄ <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
-          Znaczniki obu końców każdej sprawy leżą w bazie od lat — ta tabela
-          jako pierwsza liczy różnicę. MEDIANA mówi, jak wygląda zwykły dzień,
-          OGON (p90) — jak wygląda zły. Średniej tu nie ma celowo: jedna sprawa
-          sprzed tygodnia utopiłaby sto załatwionych w kwadrans.
-          Kolumna OTWARTE liczy sprawy, które trwają DO DZIŚ i dlatego nie
-          mają czasu zamknięcia; bez niej tabela pokazywałaby wyłącznie to,
-          co ktoś domknął. Notatka do dostawy jest tu od 0.369.0 i jest
-          jedynym kanałem, w którym brak odpowiedzi WSTRZYMUJE pracę —
-          dostawy nie da się domknąć, póki pytanie wisi bez odpowiedzi.
-          Kiedy zaczyna być za długo, mówi blok niżej: próg bierze się
-          z historii tego samego kanału, nie z niczyjego ustalenia.
-        </p>
-      </div>
-      <!-- OKNO tabeli wymiany. Do 0.440.0 było wspólne z metrykami obok;
-           metryki odeszły do panelu, a tabela została ze swoim suwakiem.
-           Alarm pod nią dalej liczy z okna stałego. -->
-      <div class="filtry">
-        <div>
-          <label for="dniWymiany">OKNO</label>
-          <select id="dniWymiany">
-            <option value="7">7 dni</option>
-            <option value="30">30 dni</option>
-            <option value="90">90 dni</option>
-          </select>
-        </div>
-      </div>
-      <table id="wymiana"></table>
-      <!-- Alarm liczy z OKNA STAŁEGO (30 dni), a tabela wyżej z suwaka obok.
-           Dlatego stoi pod własnym nagłówkiem i sam mówi, z czego liczy —
-           dwie liczby z różnych okresów bez podpisu to gotowy sprzeczny
-           wniosek. -->
-      <div id="alarmWymiany" style="margin-top:12px"></div>
-    </section>
-
-    <!-- Konto Allegro stoi od 0.140.0 w STANIE SYSTEMU. Do 0.137.2 miało
-         własną zakładkę REJESTRY razem z czterema rejestrami obsługi klienta;
-         po ich kasacji zakładka niosłaby jedną kartę. Stan połączenia to
-         informacja o tle pracy — dokładnie to, co reszta tego widoku. -->
-    <details class="card zwijana" id="kontoAllegroKarta">
-      <summary><h2>KONTO ALLEGRO</h2></summary>
-      <div id="allegroStan" class="mute" style="margin-bottom:8px"></div>
-      <div id="allegroAkcje"></div>
-    </details>
-
-    <section class="card">
-      <h2>SERWER</h2>
-      <table id="zdrowie"></table>
-      <!-- Dwie operacje ratunkowe, które żyły dotąd wyłącznie w DEPLOY.md
-           jako polecenia curl. Odmowę roli wypowiada serwer (konwencja
-           ustawień); oba przyciski stoją za groźnym potwierdzeniem, bo
-           resync na produkcji to pełny import z Subiekta. -->
-      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
-        <button class="akcja cichy" id="serwerResync">PEŁNY RESYNC Z SUBIEKTA</button>
-        <button class="akcja cichy" id="serwerZdjecia">ODŚWIEŻ BRAKUJĄCE ZDJĘCIA</button>
-      </div>
-    </section>
-  </div>
+  <!-- STAN SYSTEMU przeszedł do panelu w 0.441.0 (`/obsluga/stan`), razem
+       z kolejką zapisów, arkuszem lokalizacji, rekoncyliacją, kolizjami kodów,
+       wymianą z halą, kontem Allegro i kartą serwera. Ikony w pasku i pozycja
+       STAN SYSTEMU prowadzą tam z sesją. Na tej stronie zostały ustawienia. -->
 
   <!-- DZIENNIK i ANALIZA przeszły do panelu w 0.440.0 (`/obsluga/dziennik`,
        `/obsluga/analiza`). Pozycje w pasku zostały i prowadzą tam z sesją. -->
@@ -1053,28 +862,25 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
 
 let token = localStorage.getItem("wertis.token") || "";
 let kto = localStorage.getItem("wertis.kto") || "";
-let widok = localStorage.getItem("wertis.widok") || "nadzor";
+let widok = localStorage.getItem("wertis.widok") || "dostawcy";
 /* Zapamiętana nazwa widoku, którego już nie ma, daje PUSTY panel: `pokaz()`
    chowa wszystkie sześć i nie odsłania żadnego. Do 0.427.0 stała tu mapa
    ZWROTY/PYTANIA → SPRAWY — a SPRAWY też zniknęły, więc mapa prowadziła
    wprost w tę pustkę. Lista ISTNIEJĄCYCH widoków zamiast listy dawnych:
    następne przemianowanie nie wymaga pamiętania o tej linii. */
-/* „dostawy", „magazyn", „dziennik" i „analiza" w pamięci przeglądarki to
-   ślady sprzed 0.435.0, 0.438.0 i 0.440.0 — te widoki przeszły do panelu.
-   Biuro wstaje wtedy na STANIE SYSTEMU, bo tam prowadzą wiersze DO DECYZJI,
-   które jeszcze mieszkają tutaj. */
-if (!["nadzor", "dostawcy"].includes(widok)) widok = "nadzor";
-let ostatnieRozjazdy = null;
-/* Alarm wymiany (0.364.0) — jak `ostatnieRozjazdy`: pobierany w cyklu,
+/* „dostawy", „magazyn", „dziennik", „analiza" i „nadzor" w pamięci
+   przeglądarki to ślady sprzed 0.435.0, 0.438.0, 0.440.0 i 0.441.0 —
+   te widoki przeszły do panelu. Na tej stronie zostały USTAWIENIA za
+   zębatką i na nich strona wstaje. */
+if (!["dostawcy"].includes(widok)) widok = "dostawcy";
+/* Alarm wymiany (0.364.0) — pobierany w cyklu,
    czytany przy każdym przerysowaniu paska stanu, niezależnie od zakładki. */
 let ostatnieAlarmy = null;
 /** Odpowiedzi na notatki, których biuro jeszcze nie widziało (0.57.0). */
 let odpowiedziNaNotatki = [];
-/* Stan konta Allegro i flaga trwającego parowania. Do 0.137.2 stały przy
-   ekranie SPRAW i odeszły razem z nim, choć czyta je ikona w pasku bocznym —
-   widoczna na KAŻDYM ekranie, więc odczyt bywa pierwszy. */
+/* Stan konta Allegro dla ikony w pasku bocznym. Czyta go `/api/health`
+   w cyklu; parowanie przeszło z kartą konta do panelu (0.441.0). */
 let stanAllegro = null;
-let parowanieTrwa = false;
 
 async function api(sciezka, opts = {}) {
   /* `content-type` TYLKO wtedy, gdy jest co opisywać. Nagłówek wysyłany zawsze
@@ -1109,7 +915,6 @@ async function api(sciezka, opts = {}) {
 function wyloguj() {
   token = ""; kto = "";
   zwolnijLoga();
-  parowanieTrwa = false;
   localStorage.removeItem("wertis.token");
   localStorage.removeItem("wertis.kto");
   $("panel").hidden = true; $("wyloguj").hidden = true; $("ustawienia").hidden = true;
@@ -1145,7 +950,6 @@ async function zaloguj() {
 function pokaz(nowy) {
   widok = nowy;
   localStorage.setItem("wertis.widok", nowy);
-  $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDostawcy").hidden = nowy !== "dostawcy";
   /* Selektor celowo NIE jest zawężony do paska: od 0.76.0 jeden z przycisków
      z `data-widok` (zębatka ustawień) stoi w nagłówku, poza `nav`. Przy starym
@@ -1153,9 +957,6 @@ function pokaz(nowy) {
   for (const b of document.querySelectorAll("button[data-widok]")) {
     b.setAttribute("aria-current", String(b.dataset.widok === nowy));
   }
-  /* Magazyn odświeża się na WEJŚCIU, nie w cyklu — cykl 30 s należy do
-     widoku, na który się patrzy. */
-  if (nowy === "nadzor") { odswiezNadzor(); odswiezStanAllegro(); }
   /* Ustawienia pobierają swoje trzy komplety dopiero przy wejściu za zębatkę.
      Do 0.85.0 prompt jechał przy każdym wejściu na PYTANIA, a reguły strefy
      przy każdym wejściu na ANALIZĘ — obie rzeczy zmieniane razy kilka w roku. */
@@ -1216,11 +1017,6 @@ function rysujStan(health, kolejka) {
         : `kolejka bez błędów` + (s.pending ? ` · ${s.pending} w drodze` : "")
     );
   }
-  if (ostatnieRozjazdy) {
-    const n = ostatnieRozjazdy.rozjazdy.length;
-    if (n) czerwone.push("rozjazdy");
-    linie.push(n ? `${n} rozjazdów z Subiektem` : "bez rozjazdów z Subiektem");
-  }
   /* Zdania z `problemy[]` w całości — to dla nich biuro najedzie na ikonę. */
   for (const p of health?.problemy || []) { czerwone.push("problem"); linie.push(`⚠ ${p}`); }
   /* Kulejący cykl (0.111.0, do 0.113.0 osobny znacznik `#cyklBlad`):
@@ -1233,7 +1029,7 @@ function rysujStan(health, kolejka) {
   const ik = $("ikonaZdrowia");
   ik.className = "ikonaStanu " + (czerwone.length ? "err" : bursztynowe.length ? "amber" : "ok");
   /* Natywny `title` łamie wiersze po \n — jedno zdanie na linię. */
-  ik.title = linie.join("\n") + "\nKliknij: STAN SYSTEMU.";
+  ik.title = linie.join("\n") + "\nKliknij: STAN SYSTEMU w panelu.";
 
   /* Odpowiedzi na notatki (0.57.0) zostają plakietką OBOK ikon: mają własną
      drogę, a zgłoszenie z 20 sierpnia nauczyło, że sygnał bez drogi do treści
@@ -1259,7 +1055,7 @@ function rysujStan(health, kolejka) {
   const sp = ostatnieAlarmy?.spoznionychRazem || 0;
   if (sp) {
     const opis = sp === 1 ? "spóźniona sprawa" : "spóźnione sprawy";
-    plakietki.push(`<span class="badge amber" data-do="nadzor" data-cel="kartaWymiany"
+    plakietki.push(`<span class="badge amber" data-panel="/obsluga/stan?karta=wymiana"
       title="${sp} ${opis} — stoją dłużej niż dziewięć na dziesięć domkniętych w tym kanale. Kliknij, żeby zobaczyć które."
       >${sp}<span class="et">${opis}</span></span>`);
   }
@@ -1277,16 +1073,16 @@ const IKONY_STANU = ["ikonaZdrowia", "ikonaAllegro"];
 
 /* Ikona Allegro obok ikony zdrowia. Osobna, bo Allegro ma osobny cykl życia
    (parowanie, wygaśnięcie tokenu) i osobne wejście: klik prowadzi do karty
-   KONTO ALLEGRO — karta zostaje miejscem pracy, ikona jest tylko drzwiami. */
+   KONTO ALLEGRO w stanie systemu panelu — karta jest miejscem pracy, ikona
+   tylko drzwiami. Do 0.441.0 klik przy rozłączonym koncie sam zaczynał
+   parowanie; teraz zaczyna je admin przyciskiem na karcie, jednym ruchem
+   więcej, ale bez startu pętli do allegro.pl z nieuwagi. */
 function rysujIkoneAllegro() {
   const ik = $("ikonaAllegro");
   const s = stanAllegro;
   let kolor = "";
   let tip = "Stan konta Allegro jeszcze nieznany";
-  if (parowanieTrwa) {
-    kolor = "amber";
-    tip = "Parowanie w toku — kod czeka na potwierdzenie w Allegro.\nKliknij, aby wrócić do karty KONTO ALLEGRO.";
-  } else if (s) {
+  if (s) {
     if (s.stan === "polaczone") {
       kolor = "ok";
       tip = `Połączone · środowisko ${s.srodowisko}` +
@@ -1300,19 +1096,11 @@ function rysujIkoneAllegro() {
       tip = (s.stan === "zle_srodowisko"
         ? `Token z innego środowiska niż ${s.srodowisko} — sparuj ponownie.`
         : `Niepołączone — skan etykiety nie zadziała (środowisko ${s.srodowisko}).`) +
-        "\nKliknij, aby sparować — parowanie wykonuje admin.";
+        "\nKliknij: karta KONTO ALLEGRO w panelu — parowanie wykonuje admin.";
     }
   }
   ik.className = "ikonaStanu" + (kolor ? " " + kolor : "");
   ik.title = tip;
-}
-
-/* Kafel liczby z podpisem. Do 0.440.0 rysował też metryki i analizę —
-   odeszły do panelu. Został przy kolejce zapisów, która liczy nim swoje
-   trzy liczby. */
-function kafel(liczba, opis, zle) {
-  return `<div class="kafel"><div class="liczba${zle ? " zle" : ""}">${esc(liczba)}</div>
-          <div class="opis">${esc(opis)}</div></div>`;
 }
 
 /* ── Logo dostawców ──────────────────────────────────────────────────────────
@@ -1626,119 +1414,6 @@ async function zapiszStrefe() {
 }
 
 /* ── Kolejka ── */
-function odznaka(status) {
-  if (status === "error") return '<span class="badge err">BŁĄD</span>';
-  if (status === "done") return '<span class="badge ok">ZAPISANE</span>';
-  if (status === "waiting_for_doc") return '<span class="badge amber">CZEKA NA DOKUMENT</span>';
-  /* Anulowane NIE jest „w drodze" — bursztyn obiecywałby zapis, który
-     świadomie wycofano. Szare i po sprawie. */
-  if (status === "cancelled") return '<span class="badge mute2">ANULOWANE</span>';
-  return '<span class="badge amber">W DRODZE</span>';
-}
-
-function rysujKolejke(q) {
-  const s = q.summary || {};
-  $("kafleKolejki").innerHTML = [
-    kafel(s.error ?? 0, "w błędzie · wymaga reakcji", (s.error ?? 0) > 0),
-    kafel(s.pending ?? 0, "czeka na workera", false),
-    kafel(s.done ?? 0, "zapisane (ostatnie 100)", false),
-  ].join("");
-  /* Najpierw błędy, potem reszta. Lista jest przycięta do dwudziestu wierszy,
-     bo to podgląd stanu, a nie kolejka do obsługi — tę ma kolektor. */
-  const wiersze = [...q.items].sort((a, b) =>
-    (a.status === "error" ? 0 : 1) - (b.status === "error" ? 0 : 1)).slice(0, 20);
-  /* Miejsce, w którym problem WIDAĆ, jest od 0.111.0 miejscem, w którym da
-     się go naprawić: PONÓW przy błędzie i ANULUJ przy oczekującym używają
-     tych samych tras, co przyciski na kolektorze — biuro nie musi po niego
-     iść, żeby ruszyć zapis do Subiekta. */
-  $("kolejka").innerHTML =
-    "<tr><th>GODZ.</th><th>ZADANIE</th><th>SZCZEGÓŁ</th><th>STATUS</th><th></th></tr>" +
-    (wiersze.map((i) => `<tr>
-        <td class="mute">${esc(i.time)}</td>
-        <td class="b">${esc(i.label)}</td>
-        <td>${esc(i.detail)}${i.errMsg ? `<br><span class="mute">${esc(i.errMsg)}</span>` : ""}</td>
-        <td>${odznaka(i.status)}</td>
-        <td style="white-space:nowrap">${i.status === "error"
-          ? `<button class="akcja cichy maly" data-kolejka-ponow="${i.id}">PONÓW</button>`
-          : i.status === "pending"
-            ? `<button class="akcja cichy maly" data-kolejka-anuluj="${i.id}">ANULUJ</button>`
-            : ""}</td>
-      </tr>`).join("") ||
-      '<tr><td colspan="5" class="mute">Kolejka pusta — wszystko zapisane</td></tr>');
-}
-
-/* ── Nadzór działa, nie tylko patrzy (0.111.0) ───────────────────────────────
-   Te same trasy, których używa PONÓW na kolektorze — biuro widzi błąd
-   w kolejce, biuro go ponawia. ANULUJ tylko dla oczekujących (trasa i tak
-   odmówi w trakcie zapisu). Operacje ratunkowe serwera za groźnym
-   potwierdzeniem: pełny resync na produkcji to import całej kartoteki. */
-$("widokNadzor").addEventListener("click", async (e) => {
-  /* Delegacja stoi na WIDOKU, nie na tabeli kolizji — ta sama reguła co przy
-     kolejce Sfery obok, i ta sama, której pilnuje test delegacji. Tabela
-     przerysowuje się w całości przy każdym odświeżeniu, więc nasłuch wpięty
-     w nią ginąłby po pierwszym odczycie. */
-  const kolizja = e.target.closest("[data-kolizja]");
-  if (kolizja) {
-    const ean = kolizja.dataset.ean;
-    const rodzaj = kolizja.dataset.kolizja;
-    const notatka = await zapytaj({
-      tytul: rodzaj === "poprawione" ? "KOD POPRAWIONY" : "KOLIZJA DOPUSZCZONA",
-      /* Opis mówi HALI, co z tego wynika, bo to ona zobaczy skutek na ekranie
-         wyjątków. Biuro klika, ale odbiorcą decyzji jest magazynier. */
-      opis: rodzaj === "poprawione"
-        ? "Kartoteki naprawione — kolizja ma zniknąć. Kolejne trafienie pokaże się jako nieudana poprawka."
-        : "Ten kod stoi na kilku kartotekach zgodnie z prawdą. Hala ma wybierać po symbolu i nie zgłaszać go drugi raz.",
-      potwierdz: rodzaj === "poprawione" ? "ZAPISZ POPRAWIONE" : "ZAPISZ DOPUSZCZONE",
-    });
-    if (notatka === null) return;
-    try {
-      await api(`/api/ean-conflicts/${encodeURIComponent(ean)}/rozstrzygnij`, {
-        method: "POST",
-        body: JSON.stringify({ rodzaj, notatka: notatka || undefined }),
-      });
-      await odswiezNadzor();
-    } catch (err) {
-      alert(err.message || "Nie udało się zapisać decyzji");
-    }
-    return;
-  }
-  const ponow = e.target.closest("[data-kolejka-ponow]");
-  const anuluj = e.target.closest("[data-kolejka-anuluj]");
-  if (ponow || anuluj) {
-    if (anuluj && !(await potwierdz({
-      tytul: "ANULOWANIE ZADANIA",
-      opis: "Zadanie zniknie z kolejki — zapis do Subiekta NIE nastąpi.",
-      potwierdz: "ANULUJ ZADANIE", grozny: true,
-    }))) return;
-    try {
-      const id = ponow ? ponow.dataset.kolejkaPonow : anuluj.dataset.kolejkaAnuluj;
-      await api(`/api/queue/${id}/${ponow ? "retry" : "cancel"}`, { method: "POST", body: "{}" });
-      toast(ponow ? "Zadanie wróciło do kolejki" : "Zadanie anulowane");
-      await odswiezNadzor();
-    } catch (bl) { toast(bl.message, "blad"); }
-    return;
-  }
-  if (e.target.closest("#serwerResync")) {
-    if (!(await potwierdz({
-      tytul: "PEŁNY RESYNC Z SUBIEKTA",
-      opis: "Read-model przeładuje się z bazy Subiekta. Na dużej kartotece to trwa.",
-      potwierdz: "RESYNC", grozny: true,
-    }))) return;
-    try {
-      const d = await (await api("/api/admin/resync", { method: "POST", body: "{}" })).json();
-      toast(`Resync zakończony ✓ (${JSON.stringify(d.stats || {}).slice(0, 80)})`);
-      await odswiezNadzor();
-    } catch (bl) { toast(bl.message, "blad"); }
-    return;
-  }
-  if (e.target.closest("#serwerZdjecia")) {
-    try {
-      const d = await (await api("/api/admin/zdjecia/odswiez", { method: "POST", body: "{}" })).json();
-      toast(`Zapomniano ${d.zapomniano ?? 0} braków — kolektory zapytają o zdjęcia ponownie`);
-    } catch (bl) { toast(bl.message, "blad"); }
-  }
-});
-
 /* ── Konta i sesje (0.111.0) ─────────────────────────────────────────────────
    Wszystkie mutacje na istniejących trasach admina (routes/auth.ts) —
    dotąd wołanych wyłącznie z curl. Kont się nie kasuje; sesje tnie się
@@ -1840,175 +1515,6 @@ $("kontaKarta").addEventListener("click", async (e) => {
   }
 });
 
-/* ── Rekoncyliacja ── */
-const NAZWA_ROZJAZDU = {
-  lokalizacja: "adres w Subiekcie",
-  zadanie_w_bledzie: "zadanie w błędzie",
-  utknelo_w_buforze: "utknęło w buforze",
-  mm_czeka: "MM czeka na wykonanie",
-};
-
-function rysujRozjazdy(r) {
-  ostatnieRozjazdy = r;
-  $("csvRozjazdy").hidden = r.rozjazdy.length === 0;
-  $("rozjazdy").innerHTML =
-    "<tr><th>RODZAJ</th><th>CZEGO DOTYCZY</th><th>OPIS</th><th>OD KIEDY</th></tr>" +
-    (r.rozjazdy.map((x) => `<tr>
-        <td><span class="badge err">${esc(NAZWA_ROZJAZDU[x.rodzaj] || x.rodzaj)}</span></td>
-        <td class="b">${esc(x.klucz)}</td>
-        <td>${esc(x.opis)}</td>
-        <td class="mute">${esc((x.odKiedy || "").replace("T", " ").slice(0, 16))}</td>
-      </tr>`).join("") ||
-      `<tr><td colspan="4" class="mute">Bez rozjazdów — sprawdzono ${r.sprawdzono.kartotek} kartotek
-       i ${r.sprawdzono.zadan} zadań</td></tr>`);
-}
-
-/** CSV budowany na miejscu: rekoncyliacja nie ma trasy eksportu, a plik z crona
-    leży na serwerze, do którego biuro nie ma dostępu. */
-function csvRozjazdow(r) {
-  const esc2 = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const linie = [["rodzaj", "klucz", "opis", "od_kiedy"].join(";")];
-  for (const x of r.rozjazdy) {
-    linie.push([x.rodzaj, x.klucz, x.opis, x.odKiedy ?? ""].map(esc2).join(";"));
-  }
-  // BOM — bez niego Excel PL rozjeżdża polskie znaki
-  const blob = new Blob(["﻿" + linie.join("\r\n") + "\r\n"], { type: "text/csv;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = `wertis-rozjazdy-${r.at.slice(0, 10)}.csv`;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
-/* ── Kolizje kodów ── */
-/* ── Ile trwa wymiana z halą (0.361.0) ─────────────────────────────────────
-   Pierwsza w tym repo liczba mówiąca, ILE trwa sprawa między halą a biurem.
-   §22 wymienia „czas realizacji zadania magazynowego" wśród metryk i nie
-   podaje przy nim ani progu, ani miejsca — a w kodzie nie było go wcale. */
-const NAZWA_KANALU = {
-  zadanie: "Zadanie terenowe",
-  niezgodnosc: "Niezgodność w dostawie",
-  pominiecie: "Pominięcie w koszu",
-  kolizja: "Kolizja kodu",
-  notatka: "Notatka do dostawy",
-};
-
-/* Minuty na zdanie dla człowieka. Doba rozbija się na dni z tego samego
-   powodu co w panelu obsługi: „4320 min" trzeba podzielić w głowie, żeby się
-   przestraszyć. */
-function czasWymiany(min) {
-  if (min === null || min === undefined) return '<span class="mute">—</span>';
-  if (min < 60) return `${min} min`;
-  const g = Math.floor(min / 60);
-  if (g < 24) return `${g} g ${min % 60} min`;
-  const dni = Math.floor(g / 24);
-  return dni === 1 ? "1 dzień" : `${dni} dni`;
-}
-
-function rysujWymiane(r) {
-  const w = (r && r.wiersze) || [];
-  $("wymiana").innerHTML =
-    "<tr><th>KANAŁ</th><th>KIERUNEK</th><th>ZAMKNIĘTYCH</th><th>MEDIANA</th><th>OGON (p90)</th><th>OTWARTE</th><th>NAJSTARSZA OTWARTA</th></tr>" +
-    (w.map((x) => `<tr>
-        <td class="b">${esc(NAZWA_KANALU[x.kanal] || x.kanal)}</td>
-        <td class="mute">${esc(x.kierunek)}</td>
-        <td>${x.zamknietych}</td>
-        <td>${czasWymiany(x.medianaMin)}</td>
-        <td class="mute">${czasWymiany(x.p90Min)}</td>
-        <td>${x.otwartych}</td>
-        <td class="mute">${czasWymiany(x.najstarszaOtwartaMin)}</td>
-      </tr>`).join("") ||
-      '<tr><td colspan="7" class="mute">Brak spraw w tym oknie</td></tr>');
-}
-
-/* ── Co stoi dłużej, niż stoi zwykle (0.364.0) ──────────────────────────────
-   Próg nie jest niczyim werdyktem: to `p90` spraw DOMKNIĘTYCH w tym samym
-   kanale. Ekran mówi to wprost przy każdym wierszu, bo liczba bez pochodzenia
-   jest wyrocznią, a wyroczni nie da się podważyć danymi. */
-function rysujAlarmWymiany(a) {
-  const k = (a && a.kanaly) || [];
-  const spoznione = k.filter((x) => x.spoznionych > 0);
-  const cel = $("alarmWymiany");
-  if (!cel) return;
-
-  /* Kanały bez progu wymieniamy Z NAZWY, zamiast milczeć. Cisza znaczyłaby
-     „nic nie stoi", a znaczy „jeszcze nie ma z czego liczyć" — i biuro nie
-     ma jak tych dwóch rzeczy odróżnić, jeśli ekran ich nie odróżnia. */
-  const bezProgu = k.filter((x) => x.progMin === null);
-
-  const naglowek = spoznione.length
-    ? `<p class="b" style="margin:0 0 8px">CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE — ${
-        spoznione.reduce((s2, x) => s2 + x.spoznionych, 0)}</p>`
-    : '<p class="b mute" style="margin:0 0 8px">CO STOI DŁUŻEJ, NIŻ STOI ZWYKLE — nic</p>';
-
-  const wiersze = spoznione.map((x) => `<tr>
-      <td class="b">${esc(NAZWA_KANALU[x.kanal] || x.kanal)}</td>
-      <td>${x.spoznionych}</td>
-      <td class="mute">próg ${czasWymiany(x.progMin)}${
-        x.podstawa === "podloga" ? " (podłoga)" : ` (p90 z ${x.n})`}</td>
-      <td>najdłuższa: ${czasWymiany(x.najstarszaSpoznionaMin)}</td>
-    </tr>`).join("");
-
-  cel.innerHTML = naglowek +
-    (wiersze ? `<table>${wiersze}</table>` : "") +
-    (bezProgu.length
-      ? `<p class="mute" style="margin:8px 0 0">Bez progu — za mało domkniętych
-         spraw (potrzeba ${a.minSpraw}): ${
-           bezProgu.map((x) => `${esc(NAZWA_KANALU[x.kanal] || x.kanal)} (${x.n})`).join(", ")}.</p>`
-      : "") +
-    `<p class="mute" style="margin:8px 0 0">Próg liczony osobno dla każdego kanału
-     z ostatnich ${a && a.dni ? a.dni : 30} dni; nie zależy od OKNA wybranego
-     przy tabeli wyżej.</p>`;
-}
-
-/* ── DECYZJA BIURA O KODZIE (0.360.0) ───────────────────────────────────────
-   Do 0.358.0 ta tabela była dziennikiem bez wyjścia: kolizja wpadała na listę
-   i zostawała na zawsze w tej samej postaci co pierwszego dnia. Hala patrzyła
-   na TĘ SAMĄ listę na ekranie wyjątków i też nie mogła nic zrobić — obie
-   strony widziały problem, żadna nie mogła drugiej nic powiedzieć.
-
-   Dwa rodzaje, bo hala reaguje na nie ODWROTNIE. `poprawione` znaczy „kolizja
-   zniknie", więc kolejne trafienie jest dowodem, że poprawka nie zadziałała.
-   `dopuszczone` znaczy „zostanie i ma zostać" — wybieraj po symbolu i nie
-   zgłaszaj drugi raz. Serwer liczy trafienia PO decyzji, więc nieudana
-   poprawka ujawnia się sama, bez niczyjej oceny. */
-function decyzjaKolizji(k) {
-  const r = k.rozstrzygniecie;
-  if (!r) return '<span class="mute">—</span>';
-  /* Ten sam format znacznika co reszta tej tabeli — inaczej jedna kolumna
-     pokazywałaby czas inaczej niż sąsiednia i to wyglądałoby na usterkę. */
-  const kiedy = esc((r.at || "").replace("T", " ").slice(0, 16));
-  const kto = esc(r.przez || "biuro");
-  const nota = r.notatka ? `<div class="mute">${esc(r.notatka)}</div>` : "";
-  /* Trafienia po obiecanej poprawce to jedyny sygnał BŁĘDU w tej tabeli —
-     i nie jest opinią, tylko liczbą. Przy `dopuszczone` te same trafienia
-     nie znaczą nic złego, więc tam nie zapala się nic. */
-  const wraca = r.rodzaj === "poprawione" && k.trafienPoDecyzji > 0
-    ? `<div class="badge err">POPRAWKA NIE ZADZIAŁAŁA — ${k.trafienPoDecyzji}× po decyzji</div>`
-    : "";
-  return `<b>${r.rodzaj === "poprawione" ? "POPRAWIONE" : "DOPUSZCZONE"}</b>
-    <div class="mute">${kto} · ${kiedy}</div>${nota}${wraca}`;
-}
-
-function rysujKolizje(lista) {
-  $("kolizje").innerHTML =
-    "<tr><th>KOD</th><th>ZATRZYMAŃ</th><th>ROZSTRZYGNIĘTE DOKUMENTEM</th><th>KARTOTEKI</th><th>OSTATNIO</th><th>DECYZJA BIURA</th></tr>" +
-    (lista.map((k) => `<tr>
-        <td class="b">${esc(k.ean)}</td>
-        <td>${k.hits}×</td>
-        <td class="mute">${k.autoResolved}×</td>
-        <td class="mute">${esc((k.twIds || []).join(", "))}</td>
-        <td class="mute">${esc((k.lastSeen || "").replace("T", " ").slice(0, 16))}</td>
-        <td>${decyzjaKolizji(k)}
-          <div style="margin-top:4px">
-            <button class="akcja cichy maly" data-kolizja="poprawione" data-ean="${esc(k.ean)}">POPRAWIONE</button>
-            <button class="akcja cichy maly" data-kolizja="dopuszczone" data-ean="${esc(k.ean)}">DOPUSZCZONE</button>
-          </div>
-        </td>
-      </tr>`).join("") ||
-      '<tr><td colspan="6" class="mute">Brak kolizji — każdy kod wskazuje jedną kartotekę</td></tr>');
-}
-
 /* Znaczniki z API są w UTC — do pokazania trzeba czasu lokalnego przeglądarki.
    Wcześniej stało tu odcięcie znaków z ciągu ISO, czyli UTC pokazany jako
    godzina zegarowa: latem dwie godziny wstecz, a przy wpisach z okolic
@@ -2027,31 +1533,6 @@ function stempelLokalny(iso) {
   if (isNaN(d)) return String(iso ?? "");
   return `${dataLokalna(iso)} ` +
     `${dwaZnaki(d.getHours())}:${dwaZnaki(d.getMinutes())}:${dwaZnaki(d.getSeconds())}`;
-}
-
-/* ── Serwer ── */
-function bajty(n) {
-  if (!n) return "—";
-  const mb = n / 1024 / 1024;
-  return mb >= 1 ? mb.toFixed(1) + " MB" : Math.round(n / 1024) + " kB";
-}
-
-function rysujZdrowie(h) {
-  const w = h.worker || {};
-  const a = h.audyt || {};
-  const wiersz = (k, v) => `<tr><td class="mute">${esc(k)}</td><td>${v}</td></tr>`;
-  const problemy = (h.problemy || [])
-    .map((p) => `<div><span class="badge err">uwaga</span> ${esc(p)}</div>`).join("");
-  $("zdrowie").innerHTML = [
-    wiersz("wersja serwera", esc(h.wersja)),
-    wiersz("źródło danych", `${esc(h.mode)}${h.mode === "seeded" ? ' <span class="badge mute2">demo</span>' : ""}`),
-    wiersz("worker Sfery", w.zyje
-      ? `<span class="badge ok">pracuje</span> <span class="mute">${esc(w.widziany || "")}</span>`
-      : '<span class="badge err">nie żyje</span> — zapisy do Subiekta NIE wchodzą'),
-    wiersz("plik konfiguracji", esc(h.configZPliku || "—")),
-    wiersz("ślad audytowy", `${a.zdarzen ?? 0} zdarzeń · od ${esc(a.najstarsze ? dataLokalna(a.najstarsze) : "—")} · baza ${bajty(a.bazaBajtow)}`),
-    problemy ? wiersz("do sprawdzenia", problemy) : "",
-  ].join("");
 }
 
 /* ── Dane firmy do formularzy dostawców ───────────────────────────────────────
@@ -2111,30 +1592,6 @@ async function odswiezStan() {
   } catch (e) { cichaAwaria("stan serwera", e); return {}; }
 }
 
-async function odswiezNadzor() {
-  const { h, q } = await odswiezStan();
-  if (h) rysujZdrowie(h);
-  if (q) rysujKolejke(q);
-  try {
-    const [k, wym] = await Promise.all([
-      (await api("/api/ean-conflicts")).json(),
-      /* `.catch` na CAŁYM łańcuchu, nie na samym `.json()`. Do 0.364.0 stał
-         za `.json()` i nie łapał nic, co naprawdę pada: `api()` rzuca przy
-         każdej odpowiedzi spoza 2xx, czyli PRZED `.json()`. Awaria najmłodszej
-         i najmniej ważnej tabeli wywracała przez to dwie starsze na tym samym
-         ekranie — kolizje (a do 0.440.0 także metryki). */
-      api(`/api/biuro/wymiana?dni=${$("dniWymiany").value}`)
-        .then((r) => r.json())
-        .catch(() => ({ wiersze: [] })),
-    ]);
-    rysujKolizje(k.conflicts || []);
-    rysujWymiane(wym);
-    /* Alarm rysuje się z danych POBRANYCH W CYKLU, a nie tu: wejście na
-       zakładkę nie ma czekać na własne żądanie, skoro liczba już jest. */
-    if (ostatnieAlarmy) rysujAlarmWymiany(ostatnieAlarmy);
-  } catch (e) { cichaAwaria("metryki", e); }
-}
-
 /* ── Sygnał kulejącego cyklu (0.111.0) ───────────────────────────────────────
    Pięć odświeżaczy łykało błędy w console.warn — słusznie nie wywracały
    cyklu, ale awaria wyglądała dla biura jak „nic nowego nie przyszło".
@@ -2153,7 +1610,6 @@ function pokazZdrowieCyklu() {
 
 async function odswiez() {
   await odswiezStan();
-  if (widok === "nadzor") await odswiezNadzor();
   /* Liczniki na zakładkach chodzą ZAWSZE, nie tylko przy otwartej zakładce —
      w tym cała ich wartość: biuro ma zobaczyć nowe pytanie i przeterminowaną
      reklamację, siedząc na dostawach. Osobne, tanie trasy. */
@@ -2173,179 +1629,11 @@ async function odswiez() {
 async function odswiezLiczniki() {
   try {
     ostatnieAlarmy = await (await api("/api/biuro/alarm-wymiany")).json();
-    if (widok === "nadzor") rysujAlarmWymiany(ostatnieAlarmy);
   } catch (e) {
     /* Bez `cichaAwaria`: alarm ma NIE psuć werdyktu o cyklu. Gdy padnie,
        plakietka po prostu nie urośnie — a bursztyn od jego awarii zabrałby
        ten kolor sprawom, o których alarm miał mówić. */
     console.warn("[alarm wymiany]", e);
-  }
-}
-
-/* ── Sekcje wglądu: pamięć i leniwe pobieranie ──────────────────────────────
-   Zwinięta sekcja NIE PYTA serwera — to jest cały sens jej zwinięcia. Stan
-   otwarcia siedzi w localStorage obok `wertis.widok`, bo to ta sama klasa
-   decyzji: układ ekranu, nie dane.
-
-   Od 0.99.0 została tu JEDNA sekcja: raport, statystyki i czasy pojechały do
-   ANALIZY, gdzie wgląd jest treścią zakładki, a nie doczepką do pracy. Cały
-   ten mechanizm zostaje dla konta Allegro i dla następnej sekcji, która się
-   tu pojawi — kosztuje kilkanaście wierszy i pamięta układ między wejściami. */
-const SEKCJE_WGLADU = ["kontoAllegroKarta"];
-const WGLAD_DOMYSLNIE = [];
-
-/** Otwarte sekcje jako jeden porównywalny napis — klucz i wartość w jednym. */
-const stanWgladu = () => JSON.stringify(SEKCJE_WGLADU.filter((x) => $(x).open));
-
-function wczytajWglad() {
-  let otwarte;
-  try { otwarte = JSON.parse(localStorage.getItem("wertis.wglad")); } catch { /* nieczytelne = domyślne */ }
-  if (!Array.isArray(otwarte)) otwarte = WGLAD_DOMYSLNIE;
-  for (const id of SEKCJE_WGLADU) $(id).open = otwarte.includes(id);
-  /* Zapis TEGO, co faktycznie ustawiliśmy — także przy pierwszym uruchomieniu,
-     gdy w pamięci nic nie było. Bez tego nasłuch niżej nie miałby z czym
-     porównać przywróconego układu i wziąłby go za kliknięcie. */
-  localStorage.setItem("wertis.wglad", stanWgladu());
-}
-
-/* Czym się wypełnia sekcja i po czym poznać, że jest jeszcze pusta. Mapa,
-   a nie drabinka `if`-ów: przy piątej sekcji lista czyta się szybciej niż
-   ciąg warunków, a dopisanie szóstej jest jednym wierszem. Sekcja spoza mapy
-   nie pobiera niczego i to jest poprawne — nie każda ma co dociągać. */
-const ZRODLA_WGLADU = {};
-
-/** Otwarta i pusta sekcja ma się wypełnić — od razu, nie po najbliższym cyklu. */
-function dociagnijWglad(id) {
-  if (!$(id).open) return;
-  const zrodlo = ZRODLA_WGLADU[id];
-  if (zrodlo && !$(zrodlo[0]).innerHTML) zrodlo[1]();
-}
-
-/* ── Konto Allegro (device flow) ── */
-
-/** Stan połączenia w STANIE SYSTEMU. Jedna tania trasa, bez ruchu do Allegro. */
-async function odswiezStanAllegro() {
-  try {
-    stanAllegro = await (await api("/api/biuro/allegro/status")).json();
-    rysujKontoAllegro();
-    rysujIkoneAllegro();
-  } catch {
-    /* Stan konta jest informacją o tle pracy, nie samą pracą — jego awaria
-       nie ma prawa zgasić ekranu stanu systemu. */
-  }
-}
-
-function rysujKontoAllegro() {
-  const s = stanAllegro;
-  if (!s) { $("allegroStan").textContent = ""; $("allegroAkcje").innerHTML = ""; return; }
-  if (parowanieTrwa) return; // trwające parowanie rysuje pollParowania
-  const akcje = [];
-  if (s.stan === "dev") {
-    /* Adapter dev odszedł z obsługą klienta (0.140.0) i nic go dziś nie
-       zastępuje — w trybie demo nie ma czego łączyć ani czego parować. */
-    $("allegroStan").innerHTML = 'Tryb <b>demo</b> — bez kontaktu z Allegro. ' +
-      'Parowanie konta działa wyłącznie przy pracy na danych Subiekta.';
-  } else if (s.stan === "wylaczone") {
-    $("allegroStan").innerHTML = 'Funkcja wyłączona — ustaw <b>ALLEGRO_CLIENT_ID</b> i ' +
-      '<b>ALLEGRO_CLIENT_SECRET</b> w wertis.env (rejestracja aplikacji: developer.allegro.pl).';
-  } else if (s.stan === "polaczone") {
-    $("allegroStan").innerHTML = `<span class="badge ok">POŁĄCZONE</span> środowisko <b>${esc(s.srodowisko)}</b>` +
-      (s.wygasa ? ` · token ważny do ${esc(s.wygasa.slice(0, 16).replace("T", " "))} (odświeża się sam)` : "");
-    akcje.push('<button class="akcja cichy" data-rozlacz>ROZŁĄCZ KONTO</button>');
-  } else {
-    $("allegroStan").innerHTML = (s.stan === "zle_srodowisko"
-      ? '<span class="badge err">TOKEN Z INNEGO ŚRODOWISKA</span> zmieniono ALLEGRO_SANDBOX — sparuj ponownie. '
-      : '<span class="badge err">NIEPOŁĄCZONE</span> odczyt z Allegro nie zadziała bez konta. ')
-      + `środowisko <b>${esc(s.srodowisko)}</b>`;
-    akcje.push('<button class="akcja" data-polacz>POŁĄCZ Z ALLEGRO</button>');
-    akcje.push('<span class="mute" style="margin-left:8px">parowanie wykonuje admin</span>');
-  }
-  /* ALARM SIĘ NIE CHOWA. Sekcja jest domyślnie zwinięta, ale rozerwane
-     parowanie znaczy, że skan etykiety nie zadziała — a to nie jest rzecz do
-     odkrycia przez rozwinięcie sekcji. Otwieramy ją wtedy sami, raz:
-     `open` ustawione ręką biura zostaje, bo zapis do localStorage idzie
-     dopiero ze zdarzenia `toggle`, a to jest właśnie ten przypadek. */
-  if (s.stan !== "polaczone" && s.stan !== "dev" && s.stan !== "wylaczone") {
-    $("kontoAllegroKarta").open = true;
-  }
-  $("allegroAkcje").innerHTML = akcje.join(" ");
-}
-
-async function rozpocznijParowanieAllegro() {
-  /* Drugi klik NIE startuje drugiej pętli. Dwie pętle to podwojony rytm
-     żądań do allegro.pl — a endpoint parowania stoi na tym samym hoście co
-     sklep, więc liczy go anti-bot. Serwer i tak oddaje ten sam kod. */
-  if (parowanieTrwa) return;
-  parowanieTrwa = true;
-  rysujIkoneAllegro();
-  try {
-    const d = await (await api("/api/biuro/allegro/parowanie", { method: "POST", body: "{}" })).json();
-    $("allegroStan").innerHTML = `Na SWOIM zalogowanym koncie Allegro otwórz
-      <a href="${esc(d.link)}" target="_blank" rel="noopener">link potwierdzenia</a>
-      i przepisz kod: <span style="font-size:22px;font-weight:700;letter-spacing:3px">${esc(d.userCode)}</span>
-      <div class="mute" style="margin-top:8px">
-        Gdy Allegro pokaże stronę blokady, nie klikaj w kółko. Kliknij PRZERWIJ,
-        odczekaj kilkanaście minut i otwórz link z innej sieci — najprościej
-        z telefonu po danych komórkowych. Nie otwieraj go przez pulpit zdalny
-        na serwerze: wychodzi wtedy adres, który Allegro właśnie zablokowało.
-      </div>`;
-    $("allegroAkcje").innerHTML =
-      '<span class="mute">Czekam na potwierdzenie w Allegro…</span> ' +
-      '<button class="akcja cichy" id="allegroPrzerwij">PRZERWIJ</button>';
-    pollParowania();
-  } catch (e) {
-    parowanieTrwa = false;
-    rysujIkoneAllegro();
-    toast(e.message, "blad");
-    odswiezStanAllegro();
-  }
-}
-
-/* Zatrzymanie odpytywania. Nie ma tu żadnego żądania do serwera i nie musi
-   być: bez pytania z przeglądarki serwer do Allegro nic nie wysyła, a kod
-   sam wygaśnie. Zamknięcie zakładki działa tak samo — tylko ten przycisk
-   mówi o tym wprost. */
-function przerwijParowanie() {
-  parowanieTrwa = false;
-  rysujIkoneAllegro();
-  odswiezStanAllegro();
-}
-
-async function pollParowania() {
-  if (!parowanieTrwa) return;
-  try {
-    const d = await (await api("/api/biuro/allegro/parowanie")).json();
-    if (d.stan === "czekam") {
-      /* Rytm dyktuje SERWER: rośnie z czasem czekania, żeby zostawiona
-         zakładka nie pytała równo co trzy sekundy przez godzinę. */
-      setTimeout(pollParowania, d.nastepnyPollMs ?? 5000);
-      return;
-    }
-    parowanieTrwa = false;
-    if (d.stan === "brak") {
-      /* Sesja parowania żyje w PAMIĘCI procesu serwera — restart w trakcie
-         (typowo: wdrożenie) ją zjada i serwer uczciwie mówi „brak". Do
-         0.113.0 `brak` kręcił się tu jak `czekam`, w nieskończoność:
-         `parowanieTrwa` zostawało true, a guardy w rozpocznij/rysuj czyniły
-         guzik POŁĄCZ martwym aż do przeładowania strony. To był zgłoszony
-         „niedziałający guzik" — dlatego `brak` KOŃCZY pętlę i oddaje guzik. */
-      $("allegroStan").innerHTML = '<span class="badge err">SESJA PAROWANIA PRZEPADŁA</span> ' +
-        'najpewniej restart serwera w trakcie — zacznij od nowa.';
-      $("allegroAkcje").innerHTML = '<button class="akcja" data-polacz>POŁĄCZ Z ALLEGRO</button>';
-      rysujIkoneAllegro();
-      return;
-    }
-    if (d.stan === "polaczone") { rysujIkoneAllegro(); odswiezStanAllegro(); return; }
-    $("allegroStan").innerHTML = d.stan === "odmowa"
-      ? '<span class="badge err">ODMOWA W ALLEGRO</span> spróbuj ponownie'
-      : '<span class="badge err">KOD WYGASŁ</span> spróbuj ponownie';
-    $("allegroAkcje").innerHTML = '<button class="akcja" data-polacz>POŁĄCZ Z ALLEGRO</button>';
-    rysujIkoneAllegro();
-  } catch (e) {
-    parowanieTrwa = false;
-    toast(e.message, "blad");
-    rysujIkoneAllegro();
-    odswiezStanAllegro();
   }
 }
 
@@ -2361,21 +1649,6 @@ function start() {
   for (const id of IKONY_STANU) $(id).hidden = false;
   $("kto").textContent = kto;
   wczytajFirme();
-  wczytajWglad();
-  /* `toggle` nie bąbelkuje, więc delegacja na dokumencie tu nie zadziała. */
-  for (const id of SEKCJE_WGLADU) {
-    $(id).addEventListener("toggle", () => {
-      /* `open` ustawione z kodu też wywołuje `toggle` — i to ASYNCHRONICZNIE,
-         więc przeniesienie nasłuchu za `wczytajWglad()` nie wystarcza. Tym,
-         co odróżnia przywrócenie układu od kliknięcia, jest fakt, że przy
-         przywróceniu NIC się nie zmieniło. Bez tego porównania strona pytała
-         o raport dwa razy przy każdym wejściu na zakładkę. */
-      const teraz = stanWgladu();
-      if (teraz === localStorage.getItem("wertis.wglad")) return;
-      localStorage.setItem("wertis.wglad", teraz);
-      dociagnijWglad(id);
-    });
-  }
   pokaz(widok);
   odswiezStan();
 }
@@ -2390,7 +1663,7 @@ function start() {
    `wysoka` dostają listy o nieograniczonej długości. Reszta ma sam poziom —
    krótka tabela z ośmioma kolumnami też potrafi rozepchać kartę. */
 const TABELE_DLUGIE = new Set([
-  "kolejka", "dostawcy", "statystykiProdukty", "reguly",
+  "dostawcy", "statystykiProdukty", "reguly",
   "pytaniaLista", "pytaniaProdukty", "pytaniaPozaOferta",
 ]);
 for (const t of document.querySelectorAll("#panel table")) {
@@ -2440,379 +1713,11 @@ document.addEventListener("click", (e) => {
   blok.hidden = !blok.hidden;
   i.setAttribute("aria-expanded", String(!blok.hidden));
 });
-/* Delegacja z poziomu PASKA BOCZNEGO, nie z plakietek w środku — plakietki
-   przerysowuje co pół minuty `rysujStan`, a nasłuch ma to przeżyć.
-
-   Nasłuch przeprowadza się razem z ikonami PO RAZ TRZECI (`#chrome` → nagłówek
-   w 0.119.1 → aside w 0.125.0) i za każdym razem w tym samym commicie co
-   znacznik. Zostawiony w starym domu byłby kolejną odsłoną usterki z 0.92.0,
-   0.96.0, 0.97.0, 0.98.0 i 0.101.0 — tym razem głośną, bo znacznik nagłówka
-   już nie istnieje i `querySelector` oddałby `null`.
-
-   Pasek niesie też zakładki z własną delegacją na `[data-widok]`. Obie żyją
-   obok siebie, bo szukają rozłącznych markerów, a ta kończy się na
-   `[data-do]` — zębatka USTAWIENIA ma `data-widok` i musi trafić do tamtej. */
-$("bok").addEventListener("click", (e) => {
-  if (e.target.closest("#ikonaZdrowia")) return pokaz("nadzor");
-  if (e.target.closest("#ikonaAllegro")) {
-    /* Ikona to drzwi, karta KONTO ALLEGRO — miejsce pracy. Gdy stan woła
-       o parowanie, klik od razu je zaczyna: to była cała droga właściciela
-       („guzik do połączenia"), a rozpocznij… sam pilnuje podwójnego kliku
-       i sam pokaże 403, gdy klika ktoś bez roli admin. */
-    /* KONTO ALLEGRO mieszka od 0.140.0 w STANIE SYSTEMU — ikona prowadzi
-       tam, gdzie karta naprawdę stoi. */
-    pokaz("nadzor");
-    const karta = $("kontoAllegroKarta");
-    karta.open = true;
-    karta.scrollIntoView({ block: "start", behavior: "smooth" });
-    const s = stanAllegro;
-    if (s && (s.stan === "niepolaczone" || s.stan === "zle_srodowisko")) {
-      rozpocznijParowanieAllegro();
-    }
-    return;
-  }
-  const b = e.target.closest("[data-do]");
-  if (!b) return;
-  pokaz(b.dataset.do);
-  /* `data-cel` jest opcjonalny i mają go tylko te kafle, które prowadzą na
-     zakładkę OGLĄDANĄ WŁAŚNIE PRZEZ BIURO. Dla nich samo `pokaz()` nic nie
-     zmienia na ekranie, a szukana karta bywa ekran niżej — dokładnie tak
-     zgubił się licznik odpowiedzi na notatki. Kafle bez celu (wszystkie
-     z NADZORU) działają jak dotąd, bo tam zmiana zakładki jest widoczna. */
-  const cel = b.dataset.cel && $(b.dataset.cel);
-  if (!cel || cel.hidden) return;
-  cel.scrollIntoView({ block: "start", behavior: "smooth" });
-  cel.classList.add("wskazana");
-  setTimeout(() => cel.classList.remove("wskazana"), 2000);
-});
-$("dniWymiany").addEventListener("change", odswiezNadzor);
-
-/* ── Masowa zmiana lokalizacji z arkusza (0.138.0) ───────────────────────────
-   ARKUSZ ROZBIERA PRZEGLĄDARKA, nie serwer. Ta sama zasada, dla której obrazy
-   przerabia przeglądarka: na serwer jedzie STRUKTURA — lista `{symbol,
-   lokalizacja}` — a nigdy bajty pliku. Inaczej serwer o dwóch zależnościach
-   musiałby dostać trzecią, do rozpakowywania ZIP-a.
-
-   Bo .xlsx to ZIP z XML-ami w środku, a przeglądarka umie oba: `DecompressionStream`
-   rozpakowuje, `DOMParser` czyta. Zero bibliotek, zero builda — czyli dokładnie
-   to, na czym stoi ta strona.                                                 */
-
-/** Nagłówki, po których poznajemy kolumny. Ta sama reguła, co na serwerze. */
-const ARK_SYMBOL = "symbol";
-const ARK_LOKALIZACJA = "lokalizacja";
-
-/**
- * Rozbiór ZIP-a przez STOPKĘ (EOCD) i centralny katalog, a nie przez skanowanie
- * nagłówków lokalnych od początku pliku.
- *
- * Nagłówek lokalny przy ustawionym bicie 3 flagi ma zera w polach rozmiaru —
- * prawdziwe wartości leżą w deskryptorze ZA danymi. Skan sekwencyjny rozjeżdża
- * się wtedy na pierwszym takim wpisie i zwraca śmieci. Centralny katalog ma
- * rozmiary ZAWSZE.
- */
-async function rozpakujZip(bufor) {
-  const b = new Uint8Array(bufor);
-  const dv = new DataView(bufor);
-  // EOCD ma sygnaturę PK\x05\x06 i komentarz do 64 kB, więc szukamy od końca.
-  let eocd = -1;
-  for (let i = b.length - 22; i >= 0 && i >= b.length - 22 - 65535; i--) {
-    if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
-  }
-  if (eocd === -1) throw new Error("To nie jest plik .xlsx (brak stopki ZIP)");
-  const ile = dv.getUint16(eocd + 10, true);
-  let p = dv.getUint32(eocd + 16, true);
-
-  const pliki = {};
-  for (let n = 0; n < ile; n++) {
-    if (dv.getUint32(p, true) !== 0x02014b50) throw new Error("Uszkodzony katalog ZIP");
-    const metoda = dv.getUint16(p + 10, true);
-    const skompr = dv.getUint32(p + 20, true);
-    const dlNazwy = dv.getUint16(p + 28, true);
-    const dlExtra = dv.getUint16(p + 30, true);
-    const dlKom = dv.getUint16(p + 32, true);
-    const offset = dv.getUint32(p + 42, true);
-    const nazwa = new TextDecoder().decode(b.subarray(p + 46, p + 46 + dlNazwy));
-    p += 46 + dlNazwy + dlExtra + dlKom;
-
-    // Dane zaczynają się za nagłówkiem LOKALNYM — jego pola długości bywają
-    // inne niż w katalogu (extra field), więc czytamy je stąd, nie stamtąd.
-    const lokDlNazwy = dv.getUint16(offset + 26, true);
-    const lokDlExtra = dv.getUint16(offset + 28, true);
-    const od = offset + 30 + lokDlNazwy + lokDlExtra;
-    const dane = b.subarray(od, od + skompr);
-    // Metoda 0 = bez kompresji. Plik z Subiekta ma OBIE, więc obie obsługujemy.
-    pliki[nazwa] = metoda === 0 ? dane : await rozdmuchaj(dane);
-  }
-  return pliki;
-}
-
-/** Deflate bez nagłówka zlib — tak trzyma dane ZIP. */
-async function rozdmuchaj(dane) {
-  const s = new Blob([dane]).stream().pipeThrough(new DecompressionStream("deflate-raw"));
-  return new Uint8Array(await new Response(s).arrayBuffer());
-}
-
-/** Litera kolumny z adresu komórki: `C12` → `C`. */
-const kolumnaZAdresu = (ref) => (ref || "").replace(/\d+/g, "");
-
-/**
- * Wiersze arkusza .xlsx jako tablice tekstów.
- *
- * Numer kolumny bierze się z ADRESU komórki, nie z jej pozycji w wierszu:
- * Excel pomija komórki puste, więc liczenie po kolei przesuwa wszystko w lewo
- * i „Nazwa" ląduje tam, gdzie miał być adres.
- */
-async function wierszeZXlsx(bufor) {
-  const pliki = await rozpakujZip(bufor);
-  const arkusz = Object.keys(pliki).find((n) => /^xl\/worksheets\/sheet\d+\.xml$/.test(n));
-  if (!arkusz) throw new Error("Plik nie zawiera arkusza");
-  const tekst = (u8) => new TextDecoder().decode(u8);
-  const xml = (u8) => new DOMParser().parseFromString(tekst(u8), "application/xml");
-
-  /* Teksty współdzielone: Excel trzyma powtarzalne napisy raz, a komórka
-     `t="s"` niesie tylko indeks. Plik właściciela ich nie ma (komórki `t="str"`),
-     ale eksport z innej wersji Excela będzie je miał — bez tego całe kolumny
-     wróciłyby jako liczby. */
-  /* Szukamy po NAZWIE LOKALNEJ (`getElementsByTagNameNS("*", …)`), a nie po
-     nazwie kwalifikowanej. Eksport z Subiekta prefiksuje wszystko przestrzenią
-     nazw — `<x:row>`, `<x:c>`, `<x:v>` — i wtedy `getElementsByTagName("row")`
-     nie znajduje NICZEGO, bo pyta o element o nazwie dokładnie „row". Plik
-     wyglądał na pusty, choć miał 125 wierszy. Inne arkusze mają domyślną
-     przestrzeń i gołe `<row>`; ta forma zapytania obsługuje obie. */
-  const poNazwie = (el, nazwa) => el.getElementsByTagNameNS("*", nazwa);
-
-  const wsp = [];
-  if (pliki["xl/sharedStrings.xml"]) {
-    for (const si of poNazwie(xml(pliki["xl/sharedStrings.xml"]), "si")) {
-      wsp.push([...poNazwie(si, "t")].map((t) => t.textContent).join(""));
-    }
-  }
-
-  const wiersze = [];
-  for (const row of poNazwie(xml(pliki[arkusz]), "row")) {
-    const komorki = {};
-    for (const c of poNazwie(row, "c")) {
-      const typ = c.getAttribute("t");
-      let v;
-      if (typ === "inlineStr") {
-        v = [...poNazwie(c, "t")].map((t) => t.textContent).join("");
-      } else {
-        const el = poNazwie(c, "v")[0];
-        v = el ? el.textContent : "";
-        // `t="s"` to INDEKS do tablicy tekstów, nie treść komórki.
-        if (typ === "s") v = wsp[Number(v)] ?? "";
-      }
-      komorki[kolumnaZAdresu(c.getAttribute("r"))] = v ?? "";
-    }
-    wiersze.push(komorki);
-  }
-  return wiersze;
-}
-
-/**
- * Znajduje kolumny po nagłówku i wyciąga pary symbol–lokalizacja.
- *
- * Symbol jedzie dalej jako TEKST. Excel podaje „440117" jako liczbę i bez tego
- * wiersz nie dopasowałby się do żadnej kartoteki — po cichu, bo lista
- * nieznanych symboli i tak bywa długa.
- */
-function paryZArkusza(wiersze) {
-  if (!wiersze.length) throw new Error("Arkusz jest pusty");
-  const naglowek = wiersze[0];
-  let kSym = null;
-  let kLok = null;
-  for (const [kol, wartosc] of Object.entries(naglowek)) {
-    const h = String(wartosc).trim().toLowerCase();
-    if (h === ARK_SYMBOL) kSym = kol;
-    // „Lokalizacja SIE" — sufiks bywa różny, więc dopasowanie po przedrostku.
-    else if (h.startsWith(ARK_LOKALIZACJA)) kLok = kol;
-  }
-  if (!kSym || !kLok) {
-    throw new Error("Arkusz musi mieć kolumny „Symbol” i „Lokalizacja” w pierwszym wierszu");
-  }
-  return wiersze.slice(1).map((w) => ({
-    symbol: String(w[kSym] ?? "").trim(),
-    lokalizacja: String(w[kLok] ?? "").trim(),
-  }));
-}
-
-/** Ostatni wczytany arkusz — treść żądania dla podglądu i dla zapisu. */
-let arkuszLokWiersze = null;
-/* Ostatni policzony raport. Liczby biorą się STĄD, a nie z policzonych wierszy
-   tabeli w DOM-ie: podgląd zawiera też tabelę odrzuconych, więc licznik po
-   wierszach mylił się o tyle, ile ich w niej było. */
-let arkuszLokRaport = null;
-/* Które obecne kody człowiek kazał ZOSTAWIĆ, per symbol (0.139.0). Stan żyje
-   TUTAJ, a nie w polach wyboru: każde przeliczenie przerysowuje tabelę od zera,
-   więc zaznaczenia trzymane w DOM-ie znikałyby przy pierwszym kliknięciu. */
-let arkuszLokZachowane = new Map();
-
-async function wyslijArkuszLok(zastosuj) {
-  /* Wybory jadą OBOK wierszy, mapą symbol → kody. CSV rozbiera serwer, więc
-     przeglądarka nie ma tam wierszy, do których mogłaby je dokleić — jedna
-     mapa działa tak samo dla arkusza i dla CSV. */
-  const zachowaj = {};
-  for (const [symbol, kody] of arkuszLokZachowane) {
-    if (kody.size) zachowaj[symbol] = [...kody];
-  }
-  const cialo = { ...arkuszLokWiersze, zastosuj, zachowaj };
-  const o = await api("/api/biuro/lokalizacje/arkusz", {
-    method: "POST", body: JSON.stringify(cialo),
-  });
-  return o.json();
-}
-
-/**
- * Pola wyboru przy kodach, które podmiana ZDEJMIE.
- *
- * Pokazujemy wyłącznie kody, których w arkuszu nie ma — kod obecny w obu i tak
- * zostaje, więc pytanie o niego byłoby wyborem bez różnicy. Zaznaczone znaczy
- * „zdejmij" i takie są domyślnie: arkusz PODMIENIA pole, a to jest opcja na
- * wyjątek od tej reguły, nie nowa reguła.
- */
-function wyborKodow(z) {
-  if (!z.znikaja.length) return '<span class="mute">—</span>';
-  return z.znikaja.map((kod) => {
-    const zdejmij = !z.zachowane.includes(kod);
-    return `<label class="wyborKodu"><input type="checkbox" data-zdejmij="${esc(kod)}"
-      data-symbol="${esc(z.symbol)}"${zdejmij ? " checked" : ""}><span>${esc(kod)}</span></label>`;
-  }).join("");
-}
-
-function rysujArkuszLok(r, poZapisie) {
-  const czesci = [`Wierszy w arkuszu: <b>${r.wierszy}</b>`,
-                  `do zmiany: <b>${r.doZmiany.length}</b>`,
-                  `bez zmian: ${r.bezZmian}`];
-  // Pokazujemy TYLKO gdy niezerowe — pusty licznik przy pierwszym wgraniu
-  // byłby pytaniem bez powodu.
-  if (r.wKolejce) czesci.push(`już czeka w kolejce: ${r.wKolejce}`);
-  if (r.nieznane.length) czesci.push(`nieznane symbole: ${r.nieznane.length}`);
-  if (r.odrzucone.length) czesci.push(`odrzucone: ${r.odrzucone.length}`);
-  const naglowek = poZapisie
-    ? `<b>Zakolejkowano ${r.zakolejkowano} zmian.</b> Wykonuje je kolejka wyżej.`
-    : czesci.join(" · ");
-
-  const zmiany = r.doZmiany.length
-    ? '<table><tr><th>SYMBOL</th><th>NAZWA</th><th>BYŁO</th><th>BĘDZIE</th>' +
-      "<th>ZDJĄĆ OBECNE</th></tr>" +
-      r.doZmiany.map((z) =>
-        `<tr><td class="b">${esc(z.symbol)}</td><td>${esc(z.nazwa)}</td>
-         <td class="mute">${esc(z.przed || "—")}</td><td class="b">${esc(z.po)}</td>
-         <td>${wyborKodow(z)}</td></tr>`).join("") +
-      "</table>"
-    : r.wKolejce
-      ? '<p class="mute">Wszystkie zmiany z tego arkusza już czekają w kolejce wyżej — nie kolejkujemy ich drugi raz.</p>'
-      : '<p class="mute">Żaden wiersz nie zmienia adresu — arkusz mówi to samo, co Subiekt.</p>';
-
-  /* Odrzucone i nieznane pokazujemy Z NAZWY, nie samą liczbą: to jest lista
-     do poprawienia w arkuszu, a „5 błędów" nie mówi, których wierszy szukać. */
-  const problemy = [];
-  if (r.odrzucone.length) {
-    problemy.push('<h2 style="margin-top:12px">ODRZUCONE WIERSZE</h2><table>' +
-      r.odrzucone.map((o) =>
-        `<tr><td class="b">${esc(o.symbol)}</td><td>${esc(o.powod)}</td></tr>`).join("") +
-      "</table>");
-  }
-  if (r.nieznane.length) {
-    problemy.push('<h2 style="margin-top:12px">SYMBOLE SPOZA KARTOTEKI</h2>' +
-      `<p class="mute">${esc(r.nieznane.join(", "))}</p>`);
-  }
-
-  /* Osiemdziesiąt wierszy odklikanych po jednym to nie jest opcja, więc obok
-     wyboru per wiersz stoi ten sam wybór dla całego pliku. */
-  const hurt = !poZapisie && r.doZmiany.some((z) => z.znikaja.length)
-    ? '<p class="mute" style="margin-top:8px">Obecne adresy spoza arkusza: ' +
-      '<button class="akcja cichy" data-hurt="zdejmij">ZDEJMIJ WSZYSTKIE</button> ' +
-      '<button class="akcja cichy" data-hurt="zostaw">ZOSTAW WSZYSTKIE</button></p>'
-    : "";
-  $("wynikArkuszLok").innerHTML = naglowek + hurt;
-  $("arkuszLokPodglad").innerHTML = poZapisie ? problemy.join("") : zmiany + problemy.join("");
-  // Przycisk pojawia się TYLKO wtedy, gdy jest co zastosować.
-  $("zastosujArkuszLok").hidden = poZapisie || r.doZmiany.length === 0;
-}
-
-async function wczytajArkuszLok(plik) {
-  $("wynikArkuszLok").textContent = `Czytam ${plik.name}…`;
-  $("arkuszLokPodglad").innerHTML = "";
-  $("zastosujArkuszLok").hidden = true;
-  try {
-    /* CSV jedzie na serwer TEKSTEM: parser CSV jest tam już napisany
-       i przetestowany (import zbiórek). Drugi w przeglądarce byłby drugim
-       miejscem do poprawiania tego samego błędu. */
-    arkuszLokWiersze = /\.csv$/i.test(plik.name)
-      ? { csv: await plik.text() }
-      : { wiersze: paryZArkusza(await wierszeZXlsx(await plik.arrayBuffer())) };
-    // Nowy plik = nowe wybory. Zaznaczenia z poprzedniego dotyczyły innych
-    // wierszy i po cichu przeniosłyby się na te same symbole.
-    arkuszLokZachowane = new Map();
-    arkuszLokRaport = await wyslijArkuszLok(false);
-    rysujArkuszLok(arkuszLokRaport, false);
-  } catch (e) {
-    arkuszLokWiersze = null;
-    $("wynikArkuszLok").textContent = e.message;
-  }
-}
-
-/** Przelicza podgląd po zmianie wyborów — tą samą trasą, co pierwsze wgranie. */
-async function przeliczArkuszLok() {
-  try {
-    arkuszLokRaport = await wyslijArkuszLok(false);
-    rysujArkuszLok(arkuszLokRaport, false);
-  } catch (e) {
-    toast(e.message, "blad");
-  }
-}
-
-async function zastosujArkuszLok() {
-  const ile = arkuszLokRaport ? arkuszLokRaport.doZmiany.length : 0;
-  const tak = await potwierdz({
-    tytul: "Zapisać adresy do Subiekta?",
-    opis: `Zmian do wykonania: ${ile}. Każda pojedzie do bazy firmy przez kolejkę ` +
-      "zapisów i nie ma po niej cofnięcia jednym kliknięciem.",
-    potwierdz: "ZASTOSUJ",
-    grozny: true,
-  });
-  if (!tak) return;
-  try {
-    rysujArkuszLok(await wyslijArkuszLok(true), true);
-    arkuszLokWiersze = null;
-    arkuszLokRaport = null;
-    odswiezNadzor();
-  } catch (e) {
-    toast(e.message, "blad");
-  }
-}
-
-$("wgrajArkuszLok").addEventListener("click", () => $("plikArkuszLok").click());
-$("plikArkuszLok").addEventListener("change", (e) => {
-  const plik = e.target.files?.[0];
-  if (plik) wczytajArkuszLok(plik);
-  e.target.value = ""; // ten sam plik wybrany drugi raz też ma odpalić `change`
-});
-$("zastosujArkuszLok").addEventListener("click", zastosujArkuszLok);
-/* Delegacja stoi na SEKCJI, nie na tabeli podglądu: tabela jest przerysowywana
-   przy każdym przeliczeniu, więc słuchacz na niej ginąłby razem z nią. */
-$("arkuszLokalizacjiKarta").addEventListener("change", (e) => {
-  const p = e.target.closest("[data-zdejmij]");
-  if (!p) return;
-  const zostaw = arkuszLokZachowane.get(p.dataset.symbol) ?? new Set();
-  // zaznaczone = ZDEJMIJ, więc lista „zostaw" jest jego dopełnieniem
-  if (p.checked) zostaw.delete(p.dataset.zdejmij);
-  else zostaw.add(p.dataset.zdejmij);
-  arkuszLokZachowane.set(p.dataset.symbol, zostaw);
-  przeliczArkuszLok();
-});
-$("wynikArkuszLok").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-hurt]");
-  if (!b || !arkuszLokRaport) return;
-  arkuszLokZachowane = new Map();
-  if (b.dataset.hurt === "zostaw") {
-    for (const z of arkuszLokRaport.doZmiany) {
-      if (z.znikaja.length) arkuszLokZachowane.set(z.symbol, new Set(z.znikaja));
-    }
-  }
-  przeliczArkuszLok();
-});
+/* Pasek boczny nie ma już własnego nasłuchu (0.441.0). Ikony zdrowia
+   i Allegro oraz plakietka spóźnień prowadzą do stanu systemu w panelu
+   przez `data-panel`, obsługiwany delegacją na dokumencie wyżej — ta sama
+   droga co pozycje paska. Do tego wydania pasek miał osobną delegację, bo
+   jego cele (`data-do`, `data-cel`) mieszkały na tej stronie. */
 /* Który dostawca czeka na plik — `<input type="file">` jest jeden na całą
    tabelę, bo dialog systemowy i tak obsługuje jeden wybór naraz. */
 let logoDla = null;
@@ -2838,41 +1743,7 @@ $("reguly").addEventListener("click", (e) => {
   if (b) b.closest("tr").remove();
 });
 $("zapiszStrefe").addEventListener("click", zapiszStrefe);
-$("sprawdzRozjazdy").addEventListener("click", async () => {
-  $("rozjazdy").innerHTML = '<tr><td class="mute">Liczę…</td></tr>';
-  try {
-    const r = await (await api("/api/reconcile")).json();
-    rysujRozjazdy(r);
-    await odswiezStan();
-  } catch (e) {
-    $("rozjazdy").innerHTML = `<tr><td class="mute">${esc(e.message)}</td></tr>`;
-  }
-});
-$("csvRozjazdy").addEventListener("click", () => {
-  if (ostatnieRozjazdy) csvRozjazdow(ostatnieRozjazdy);
-});
 $("zapiszFirme").addEventListener("click", zapiszFirme);
-/* ── Konto Allegro — zdarzenia ── */
-
-$("allegroAkcje").addEventListener("click", async (e) => {
-  if (e.target.closest("[data-polacz]")) return rozpocznijParowanieAllegro();
-  if (e.target.closest("#allegroPrzerwij")) return przerwijParowanie();
-  if (e.target.closest("[data-rozlacz]")) {
-    const zgoda = await potwierdz({
-      tytul: "ROZŁĄCZENIE KONTA ALLEGRO",
-      opis: "Odczyt zamówień i sonda kształtu przestaną działać do ponownego parowania.",
-      potwierdz: "ROZŁĄCZ",
-      grozny: true,
-    });
-    if (!zgoda) return;
-    try {
-      await api("/api/biuro/allegro", { method: "DELETE" });
-      await odswiezStanAllegro();
-    } catch (err) { toast(err.message, "blad"); }
-  }
-});
-
-
 /* ── Rozruch strony (0.373.0 — przywrócone po 0.138.0) ───────────────────────
    Te dwie linijki stały tu od początku i wyszły jako SKUTEK UBOCZNY kasowania
    obsługi klienta w 0.138.0: leżały w tym samym ogonie pliku, co przyciski

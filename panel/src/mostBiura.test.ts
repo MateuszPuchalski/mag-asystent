@@ -7,10 +7,10 @@ import tsx from "./main.tsx?raw";
 describe("most do starego biura (0.431.0)", () => {
   it("zostawia biuru token, nazwę i zakładkę — człowiek nie loguje się drugi raz", () => {
     zapiszToken("tok-123");
-    doBiura("nadzor", "Anna Kowalska");
+    doBiura("dostawcy", "Anna Kowalska");
     expect(localStorage.getItem("wertis.token")).toBe("tok-123");
     expect(localStorage.getItem("wertis.kto")).toBe("Anna Kowalska");
-    expect(localStorage.getItem("wertis.widok")).toBe("nadzor");
+    expect(localStorage.getItem("wertis.widok")).toBe("dostawcy");
   });
 
   it("każda zakładka mostu istnieje w biuro.html — link w pustkę to pusty panel", () => {

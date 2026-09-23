@@ -2079,7 +2079,7 @@ aplikacja dotąd NIE MIAŁA: `allegro:api:payments:write`. To nie to samo, co
 `allegro:api:orders:write` z 0.164.0; odmowa wypłaty korzysta z tego drugiego.
 
 Na developer.allegro.pl dodaj aplikacji `allegro:api:payments:write`, a potem
-sparuj konto ponownie: /biuro → STAN SYSTEMU → KONTO ALLEGRO → POŁĄCZ. Token
+sparuj konto ponownie: /obsluga → STAN SYSTEMU → KONTO ALLEGRO → POŁĄCZ. Token
 wydany pod stary zakres sam się nie rozszerzy. Bez tego przycisk ODDAJ
 PIENIĄDZE zwróci odmowę z nazwą brakującego uprawnienia.
 
@@ -2104,7 +2104,7 @@ zapis tego systemu do Allegro, a zapis na zamówieniach chodzi na osobnym
 uprawnieniu.
 
 Na developer.allegro.pl dodaj aplikacji `allegro:api:orders:write`, a potem
-sparuj konto ponownie: /biuro → STAN SYSTEMU → KONTO ALLEGRO → POŁĄCZ. Token
+sparuj konto ponownie: /obsluga → STAN SYSTEMU → KONTO ALLEGRO → POŁĄCZ. Token
 wydany pod stary zakres sam się nie rozszerzy. Bez tego przycisk zwróci odmowę
 z nazwą brakującego uprawnienia — i to jest poprawne zachowanie, nie usterka.
 
@@ -2583,6 +2583,24 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.441.0 — stan systemu w panelu
+
+**Migracji nie ma. Panel trzeba przebudować.** Trasy serwera zostają te same.
+Zmieniają się teksty komunikatów o koncie Allegro: odsyłają do
+`/obsluga → STAN SYSTEMU → KONTO ALLEGRO`.
+
+Co zmienia się dla biura:
+
+- **Stan systemu jest w panelu**, w drugim rzędzie nagłówka. W `/biuro`
+  zostały same ustawienia; ikony w pasku prowadzą do panelu z sesją.
+- **Tabela stanu integracji zeszła spod zębatki panelu** do stanu systemu.
+- **Parowanie Allegro zaczyna admin przyciskiem na karcie konta.** Klik
+  w ikonę Allegro w biurze prowadzi już do karty, a nie startuje parowania.
+
+Sprawdzenie po wdrożeniu idzie tak. Otwórz DO DECYZJI i kliknij wiersz zapisu
+w błędzie, jeśli jest. Ma otworzyć się stan systemu na karcie kolejki. Kontem
+biura karty „Masowa zmiana lokalizacji" ma nie być, kontem admina — ma stać.
 
 ### Aktualizacja do 0.440.0 — dziennik i analiza w panelu
 
