@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
   bilansKartotek,
-  dniDoTerminu, kubelekZwrotu, licznikiKubelkow, listaZwrotow, ocenPozycje,
+  dniDoTerminu, kubelekZwrotu, licznikiKubelkow, pieniadzeCzekaja, listaZwrotow, ocenPozycje,
   pozycjeNaOutlet, przeniesionoNaOutlet,
   zapiszPotracenie, zarejestrujNieodebrana,
   rozstrzygnijZwrot, sumaPozycji, sygnalyZwrotu, terminZwrotu, zapiszKorekte, zapiszKwote,
@@ -2106,4 +2106,51 @@ test("zwrot bez decyzji starszy niż próg jest zamknięty — liczone, nie zapi
   assert.equal(zwrot(100, { zrodlo: "nieodebrana" }), "decyzja");
   /* Bez daty zgłoszenia nie ma czego mierzyć — zostaje w pracy. */
   assert.equal(zwrot(100, { utworzono: null }), "decyzja");
+});
+
+/* ── Pieniądze trzymają zwrot w pracy (0.476.0) ──────────────────────────
+   Przegląd zwrotów z 23 września: automatyczny ZW zamykał zwrot minutę po
+   kwocie, a pieniądze biuro oddaje ręką w Allegro. Zapomniany zwrot oddawało
+   ósmego dnia samo Allegro — w całości, bez potrącenia. */
+
+const TERAZ_P = Date.parse("2026-09-20T12:00:00Z");
+const zaplacony = {
+  werdykt: "przyjety", rejectionCode: null, kwotaGrosze: 4999,
+  terminAt: "2026-09-22T12:00:00Z", utworzono: "2026-09-10T12:00:00Z",
+};
+
+test("kwota bez śladu wypłaty czeka — do dnia, w którym Allegro oddaje samo", () => {
+  assert.equal(pieniadzeCzekaja(zaplacony, TERAZ_P), true);
+  /* Dzień po terminie jeszcze czeka, dwa dni po — już nie: Allegro oddało. */
+  assert.equal(pieniadzeCzekaja(zaplacony, Date.parse("2026-09-23T11:00:00Z")), true);
+  assert.equal(pieniadzeCzekaja(zaplacony, Date.parse("2026-09-23T13:00:00Z")), false);
+});
+
+test("każdy ślad wypłaty zdejmuje czekanie", () => {
+  assert.equal(pieniadzeCzekaja({ ...zaplacony, zlecono: true }, TERAZ_P), false);
+  assert.equal(pieniadzeCzekaja({ ...zaplacony, odmowaKod: "REFUND_REJECTED" }, TERAZ_P), false);
+  assert.equal(pieniadzeCzekaja({ ...zaplacony, przelewAt: "2026-09-20T10:00:00Z" }, TERAZ_P), false);
+  assert.equal(pieniadzeCzekaja({ ...zaplacony, statusAllegro: "FINISHED" }, TERAZ_P), false);
+  assert.equal(pieniadzeCzekaja({ ...zaplacony, rozliczonyAllegroAt: "2026-09-20T10:00:00Z" }, TERAZ_P), false);
+  assert.equal(pieniadzeCzekaja({ ...zaplacony, kwotaGrosze: 0 }, TERAZ_P), false);
+  assert.equal(pieniadzeCzekaja({ ...zaplacony, werdykt: "odrzucony" }, TERAZ_P), false);
+});
+
+test("pobranie czeka dłużej, bo za nie Allegro nie oddaje wcale", () => {
+  const pobranie = { ...zaplacony, platnoscTyp: "CASH_ON_DELIVERY" };
+  assert.equal(pieniadzeCzekaja(pobranie, Date.parse("2026-10-01T12:00:00Z")), true);
+  assert.equal(pieniadzeCzekaja(pobranie, Date.parse("2026-11-01T12:00:00Z")), false);
+});
+
+test("zamknięty korektą, a niezapłacony — wraca do DO ZWROTU", () => {
+  const z = {
+    rejectionCode: null, werdykt: "przyjety", zamknietyAt: "2026-09-19T12:00:00Z",
+    kwotaGrosze: 4999, korektaNumer: "ZW 1/MAG/09/2026", pozycje: [{ ocena: "stan" }],
+  };
+  assert.equal(kubelekZwrotu({ ...z, pieniadzeCzekaja: true }, TERAZ_P), "zwrot");
+  assert.equal(kubelekZwrotu({ ...z, pieniadzeCzekaja: false }, TERAZ_P), "zamkniety");
+  /* Korekta jeszcze nie przyszła: pierwszeństwo ma korekta, pieniądze czekają
+     dalej i wrócą do DO ZWROTU po niej. */
+  assert.equal(kubelekZwrotu({ ...z, zamknietyAt: null, korektaNumer: null, pieniadzeCzekaja: true },
+    TERAZ_P), "korekta");
 });

@@ -296,9 +296,9 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   /** Rejestr akcji dla klawiszy kubełka (`zwroty/klawisze.ts`). */
   akcje?: MutableRefObject<AkcjeKlawiszy>;
 }) {
-  /* Pozycje startują ZAZNACZONE — to one wracają do nas. Dostawa nie:
-     o niej decyduje człowiek, bo zależy od tego, czy klient odstępuje od
-     całego zamówienia, czy oddaje jedną rzecz z pięciu.
+  /* Pozycje startują ZAZNACZONE — to one wracają do nas. Dostawa zależy od
+     tego, czy klient odstępuje od całego zamówienia, czy oddaje jedną rzecz
+     z pięciu — od 0.476.0 rozstrzyga to zamówienie, niżej przy `dostawa`.
 
      STAN TRZYMA ODZNACZONE, nie zaznaczone — i to jest naprawa błędu, nie
      upodobanie. Lista zaznaczonych była KOPIĄ listy pozycji, więc rozjeżdżała
@@ -317,9 +317,23 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   const wybrane = useMemo(
     () => zwrot.pozycje.filter((p) => !odznaczone.has(p.id)).map((p) => p.id),
     [zwrot.pozycje, odznaczone]);
-  const [dostawa, setDostawa] = useState(false);
+  /* ── DOSTAWA ZAZNACZONA, GDY WRACA CAŁE ZAMÓWIENIE (0.476.0) ──────────
+     Przegląd zwrotów z 23 września: pole zaczynało puste zawsze, choć
+     zamówienie mówi samo, czy klient oddaje wszystko. Przy odstąpieniu od
+     całej umowy koszt dostawy się oddaje — więc to jest odpowiedź, którą ekran
+     zna, a nie decyzja, którą ma zadać człowiekowi.
 
-  const wycena = zwrot.kubelek === "zwrot";
+     Przy zwrocie części pole dalej zaczyna puste i decyduje człowiek. Brak
+     zamówienia to „nie wiem", a nie „wszystko wraca". */
+  const [dostawa, setDostawa] = useState(() => {
+    const poz = zwrot.zamowienie?.pozycje ?? [];
+    return poz.length > 0 && poz.every((p) => p.zwracana && p.wracaIlosc >= p.ilosc);
+  });
+
+  /* Wycena tylko PRZED kwotą (0.476.0). Od tego wydania zwrot wraca do DO
+     ZWROTU także po korekcie, gdy pieniądze jeszcze nie wyszły — a wtedy
+     kwota stoi i drugi raz jej się nie zaznacza. */
+  const wycena = zwrot.kubelek === "zwrot" && zwrot.kwotaGrosze === null;
   const ocenianie = zwrot.kubelek === "ocena";
   /* Ocenę cofa się wszędzie, gdzie zwrot jest jeszcze w pracy — pomyłkę widać
      równie dobrze przy wycenie, co przy ocenianiu. Zamknięty i odrzucony
@@ -347,7 +361,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
      opisuje `zwroty/klawisze.ts`. Rejestrujemy zawsze, a nie tylko przy
      wycenie: ekran woła akcję wyłącznie we właściwym kubełku, a warunek tutaj
      byłby drugą kopią tej samej reguły. */
-  useAkcjaKlawisza(akcje, "zapiszKwote", () => { if (!trwa) onKwota(wybrane, dostawa); });
+  useAkcjaKlawisza(akcje, "zapiszKwote", () => { if (!trwa && wycena) onKwota(wybrane, dostawa); });
 
   const nieocenione = zwrot.pozycje.filter((p) => !p.ocena);
 

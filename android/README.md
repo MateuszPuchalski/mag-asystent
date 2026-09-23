@@ -436,7 +436,7 @@ przed którą ta pozycja broni.
       blokad pozycji nie ma od 0.47.0 i nic już nie „proponuje odebrania",
 - [ ] w kreatorze kont są TRZY role: magazynier, biuro, administrator.
 
-**Zgubiony kolektor** (0.473.0)
+**Zgubiony kolektor** (0.477.0)
 
 - [ ] Ustawienia pokazują znak tego kolektora, np. `#A3F9`,
 - [ ] ZNAJDŹ KOLEKTOR nie pokazuje na liście własnego kolektora,
@@ -451,7 +451,7 @@ przed którą ta pozycja broni.
 - [ ] wylogowany kolektor ma w panelu „Wylogowany — nie zadzwoni",
 - [ ] DZIENNIK ZDARZEŃ ma `kolektor_wezwany` i `kolektor_odnaleziony`.
 
-**Czasy odpowiedzi w raporcie ergonomii** (0.475.0)
+**Czasy odpowiedzi w raporcie ergonomii** (0.478.0)
 
 - [ ] po 5 minutach pracy panel pokazuje w ANALIZIE → Praca hali żądania z tego kolektora,
 - [ ] ekran rozkładania dostawy ma w tabeli „Gdzie jest wolno” nazwę „Dostawa”,

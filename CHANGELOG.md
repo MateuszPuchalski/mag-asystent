@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.475.0 — 23 września 2026
+## 0.478.0 — 23 września 2026
 
 **Ergonomia w liczbach: gdzie kolektor przeszkadza w pracy.** Pytanie
 właściciela brzmiało: „jak sprawić, żeby kolektor był przyjemny w pracy?”.
@@ -68,27 +68,7 @@ analizy, nowy typ telemetrii z limitem 500 wierszy na paczkę. W `:core`
 licznik `CzasyZadan.kt` z testami. Test pilnuje, że granice kubełków
 są te same w kolektorze i na serwerze.
 
-## 0.474.0 — 23 września 2026
-
-**Szkic odpowiada według rozpoznanej kategorii.** Zgłoszenie właściciela:
-„gdy pytanie jest sklasyfikowane, ułóż odpowiedź odpowiednio do tego”.
-Szkic dostawał rozpoznanie od 22 września, ale z jedną ogólną regułą.
-Teraz fakt rozpoznania niesie wzorzec odpowiedzi dla TEJ kategorii.
-
-- **Piętnaście wzorców**, po jednym na kategorię (`wzorce-odpowiedzi.ts`).
-  Przykłady: pytanie o paczkę dostaje stan przesyłki z faktów, bez pytań
-  o maszynę. Faktura — prośbę tylko o brakujące dane firmy. Anulowanie —
-  sprawdzenie, czy paczka już wyszła.
-- **Wzorzec nie obiecuje rozstrzygnięć.** Zwrot pieniędzy, wymianę,
-  uznanie reklamacji i anulowanie robi człowiek. Terminów, kosztów i kwot
-  wzorzec nie podaje.
-- Model widzi tylko wzorzec bieżącej kategorii. Reguły szkicu i rozmowa są
-  od niego ważniejsze.
-
-Szkic nie powstaje jeszcze sam po kliknięciu „Rozpoznaj” — to osobna
-decyzja. Bez migracji.
-
-## 0.473.0 — 23 września 2026
+## 0.477.0 — 23 września 2026
 
 **Szukanie zgubionego kolektora.** Magazynier odkłada kolektor „na chwilę”
 na regale albo na wózku i zapomina gdzie. Teraz ktoś inny każe mu zadzwonić
@@ -120,6 +100,46 @@ dzwoni dopiero z nowym APK. Stary kolektor jest na liście, ale ma „cisza”.
 Nowe trasy `/api/kolektory…` i `/api/kolektor/wezwanie`, serwis
 `szukanie-kolektora.ts` z testami, karta panelu z testem, reguły w `:core`
 (`SzukanieKolektora.kt`) z testami, nowy ekran kolektora KOLEKTORY.
+
+## 0.476.0 — 23 września 2026
+
+**Zwroty: pieniądze trzymają zwrot w pracy, powód potrącenia dociera do
+klienta.** Przegląd procesu zwrotów, sześć poprawek wybranych przez
+właściciela. Opis w `docs/panel-obslugi-klienta.md` §25a.25.
+
+- **Zwrot czeka na pieniądze w „Do zwrotu”.** Automatyczny ZW zamykał zwrot
+  minutę po kwocie. Zapomniany zwrot oddawało ósmego dnia Allegro, w całości,
+  bez potrącenia. Teraz wraca do „Do zwrotu”, póki pieniądze nie wyjdą.
+  Pasek podaje, kiedy Allegro odda samo.
+- **Powód potrącenia jedzie do klienta** w `sellerComment` zwrotu pieniędzy.
+- **Gotowe wiadomości do klienta** pod pozycjami zwrotu: pomniejszony zwrot,
+  uszkodzony towar, odmowa, zwrot przyjęty. Do skopiowania i poprawienia.
+- **ZW dla paragonu związanego po zapisie kwoty** zleca się sam po takcie.
+- **Dostawa zaznaczona**, gdy wraca całe zamówienie. **`S`/`U` w „Do decyzji”**
+  przyjmują i oceniają jednym klawiszem.
+- **Klawisze przy kilku pudłach** trafiają do pudła z towarem tego zwrotu.
+  Szybkie `s s s` nie odbija się od blokady, a pomoc nie obiecuje `n`.
+- **Zwrot rozliczony w Allegro bez korekty** widać w pasku rozjazdów zwrotów.
+
+## 0.474.0 — 23 września 2026
+
+**Szkic odpowiada według rozpoznanej kategorii.** Zgłoszenie właściciela:
+„gdy pytanie jest sklasyfikowane, ułóż odpowiedź odpowiednio do tego”.
+Szkic dostawał rozpoznanie od 22 września, ale z jedną ogólną regułą.
+Teraz fakt rozpoznania niesie wzorzec odpowiedzi dla TEJ kategorii.
+
+- **Piętnaście wzorców**, po jednym na kategorię (`wzorce-odpowiedzi.ts`).
+  Przykłady: pytanie o paczkę dostaje stan przesyłki z faktów, bez pytań
+  o maszynę. Faktura — prośbę tylko o brakujące dane firmy. Anulowanie —
+  sprawdzenie, czy paczka już wyszła.
+- **Wzorzec nie obiecuje rozstrzygnięć.** Zwrot pieniędzy, wymianę,
+  uznanie reklamacji i anulowanie robi człowiek. Terminów, kosztów i kwot
+  wzorzec nie podaje.
+- Model widzi tylko wzorzec bieżącej kategorii. Reguły szkicu i rozmowa są
+  od niego ważniejsze.
+
+Szkic nie powstaje jeszcze sam po kliknięciu „Rozpoznaj” — to osobna
+decyzja. Bez migracji.
 
 ## 0.472.0 — 23 września 2026
 

@@ -59,7 +59,7 @@ export function zadanieZw(database: Db, zwrotId: number): ZadanieZw | null {
 
 export type WynikZleceniaZw = { queueId: number } | { pominiety: string } | null;
 
-type Kto = { id: number; name: string };
+type Kto = { id: number | null; name: string };
 
 /**
  * Zwrot, przy którym automat NIE zlecił ZW, dostaje zdanie w osi.
@@ -67,7 +67,10 @@ type Kto = { id: number; name: string };
  * Bez niego biuro widziałoby zwrot w DO KOREKTY i czekało na numer, który nie
  * przyjdzie. Zdanie mówi, co zatrzymało automat, więc wiadomo, co poprawić.
  */
-function pomin(database: Db, zwrotId: number, powod: string, kto: Kto, teraz: Date): WynikZleceniaZw {
+function pomin(
+  database: Db, zwrotId: number, powod: string, kto: Kto, teraz: Date, cicho = false,
+): WynikZleceniaZw {
+  if (cicho) return { pominiety: powod };
   database.prepare(`INSERT INTO zwrot_zdarzenie(zwrot_id, rodzaj, tresc, dane_json, kiedy_at, kto, kto_user_id)
     VALUES (?,'zw_pominiety',?,?,?,?,?)`)
     .run(zwrotId, `ZW wystawia biuro: ${powod}`, JSON.stringify({ powod }),
@@ -91,6 +94,7 @@ function pomin(database: Db, zwrotId: number, powod: string, kto: Kto, teraz: Da
  */
 export function zakolejkujZw(
   database: Db, zwrotId: number, kto: Kto, teraz = new Date(), opcje: OpcjeZw = zKonfiguracji(),
+  { cicho = false }: { cicho?: boolean } = {},
 ): WynikZleceniaZw {
   if (!opcje.wlaczony) return null;
 
@@ -117,12 +121,12 @@ export function zakolejkujZw(
       WHERE zwrot_id=? AND w_zwrocie=1 ORDER BY id`).all(zwrotId) as Array<{
       id: number; nazwa: string; cena_grosze: number; ilosc: number; ilosc_zwrocona: number | null }>;
   if (!wybrane.length) {
-    return pomin(database, zwrotId, "zwrot samej dostawy — ZW bez towaru", kto, teraz);
+    return pomin(database, zwrotId, "zwrot samej dostawy — ZW bez towaru", kto, teraz, cicho);
   }
 
   const dostawa = Number(z.kwota_dostawa_grosze ?? 0);
   if (dostawa > 0 && opcje.twIdPrzesylki <= 0) {
-    return pomin(database, zwrotId, "brak TW_ID_PRZESYLKA, a zwrot oddaje koszt dostawy", kto, teraz);
+    return pomin(database, zwrotId, "brak TW_ID_PRZESYLKA, a zwrot oddaje koszt dostawy", kto, teraz, cicho);
   }
 
   /* KARTOTEKI TĄ SAMĄ DROGĄ CO KOSZYK. Komplet sprzedany jako jedna oferta
@@ -134,14 +138,14 @@ export function zakolejkujZw(
     const sklad = skladPozycji(database, Number(p.id));
     if (!sklad.skladniki.length) {
       return pomin(database, zwrotId,
-        `„${p.nazwa}" nie ma ustalonej kartoteki (${sklad.powod ?? "brak składu"})`, kto, teraz);
+        `„${p.nazwa}" nie ma ustalonej kartoteki (${sklad.powod ?? "brak składu"})`, kto, teraz, cicho);
     }
     for (const s of sklad.skladniki) {
       naTowar.set(s.twId, (naTowar.get(s.twId) ?? 0) + Number(s.ilosc));
     }
   }
   if (opcje.twIdPrzesylki > 0 && naTowar.has(opcje.twIdPrzesylki)) {
-    return pomin(database, zwrotId, "pozycja zwrotu wskazuje kartotekę przesyłki", kto, teraz);
+    return pomin(database, zwrotId, "pozycja zwrotu wskazuje kartotekę przesyłki", kto, teraz, cicho);
   }
 
   /* PEŁNA WARTOŚĆ, bez `potracenie_grosze` — decyzja właściciela. Ta sama
@@ -173,6 +177,53 @@ export function zakolejkujZw(
     return id;
   })();
   return { queueId };
+}
+
+/**
+ * ZW dla zwrotów, przy których zapis kwoty trafił na brak paragonu (0.476.0).
+ *
+ * Przegląd zwrotów z 23 września: `zakolejkujZw` woła wyłącznie zapis kwoty.
+ * Paragon wiąże się z opóźnieniem — takt Allegro co pięć minut, import
+ * Subiekta co minutę — więc zwrot zapisany o chwilę za wcześnie nie dostawał
+ * ZW nigdy. Nikt nie wiedział, że czeka: automat milczy przy braku paragonu,
+ * bo do tej chwili był to zwykle zwrot do faktury.
+ *
+ * Woła to `powiazZaleglosci` po każdym takcie, zaraz po wiązaniu dokumentów.
+ *
+ * TRZY BRAMKI PRZECIW DRUGIEMU DOKUMENTOWI, bo ZW to dokument fiskalny:
+ * • zwrot bez żadnego zadania ZW przy sobie — błąd i czekanie ma już swoją
+ *   drogę w kolejce;
+ * • żadne zadanie ZW tego zwrotu nie żyje ani nie powstało — po cofniętej
+ *   korekcie dokument stoi w Subiekcie, choć zwrot nie ma już do niego linku;
+ * • zwrot bez zdania „ZW wystawia biuro". Biuro mogło je przeczytać
+ *   i wystawiać ZW ręką — automat obok niego dałby dubel.
+ *
+ * Tryb cichy, bo przebieg idzie co kilka minut, a zdanie w osi przy każdym
+ * zapisałoby oś tym samym powodem kilkaset razy.
+ */
+export function dokolejkujZalegleZw(
+  database: Db, teraz = new Date(), opcje: OpcjeZw = zKonfiguracji(),
+): number {
+  if (!opcje.wlaczony) return 0;
+  const kandydaci = database.prepare(
+    `SELECT z.id FROM zwrot_klienta z
+      WHERE z.werdykt='przyjety' AND z.kwota_grosze IS NOT NULL
+        AND z.korekta_numer IS NULL AND z.zamkniety_at IS NULL
+        AND z.faktura_typ='PA' AND z.faktura_dok_id IS NOT NULL
+        AND z.korekta_queue_id IS NULL
+        AND NOT EXISTS (SELECT 1 FROM sfera_queue q WHERE q.type='zw'
+              AND json_extract(q.payload,'$.zwrotId') = z.id
+              AND q.status IN ('pending','waiting_for_doc','processing','done'))
+        AND NOT EXISTS (SELECT 1 FROM zwrot_zdarzenie e
+              WHERE e.zwrot_id = z.id AND e.rodzaj='zw_pominiety')`)
+    .all() as Array<{ id: number }>;
+  let zlecone = 0;
+  for (const k of kandydaci) {
+    const w = zakolejkujZw(database, Number(k.id), { id: null, name: AUTOMAT_ZW }, teraz, opcje,
+      { cicho: true });
+    if (w && "queueId" in w) zlecone++;
+  }
+  return zlecone;
 }
 
 /**

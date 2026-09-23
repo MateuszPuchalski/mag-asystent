@@ -862,14 +862,15 @@ test("dociągnięcie po skanie wymaga sparowanego konta", async () => {
 test("rozjazdy oddają WYŁĄCZNIE kontrole zwrotów, nie całą halę", async () => {
   /* `/api/reconcile` niesie też lokalizacje kartotek i zadania w błędzie,
      a do tego nie ma bramki ról (`routes/device.ts`). Panel obsługi dostaje
-     wąską trasę: cztery kontrole i nic poza tym. */
+     wąską trasę: pięć kontroli i nic poza tym (piąta od 0.476.0). */
   const { naglowki } = login("biuro", "Biuro Basia");
   const r = await app.inject({
     method: "GET", url: "/api/obsluga/zwroty/rozjazdy", headers: naglowki });
   assert.equal(r.statusCode, 200);
   const rodzaje: string[] = r.json().rozjazdy.map((x: { rodzaj: string }) => x.rodzaj);
   const wolno = new Set([
-    "zwrot_po_terminie", "zwrot_bez_przelewu", "kosz_czeka_na_korekte", "kosz_bez_powrotu"]);
+    "zwrot_po_terminie", "zwrot_bez_przelewu", "kosz_czeka_na_korekte", "kosz_bez_powrotu",
+    "zwrot_rozliczony_bez_korekty"]);
   for (const x of rodzaje) assert.ok(wolno.has(x), `rozjazd ${x} nie należy do zwrotów`);
 });
 

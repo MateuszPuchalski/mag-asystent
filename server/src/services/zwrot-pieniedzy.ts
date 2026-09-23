@@ -356,6 +356,29 @@ export type NadawcaOdmowy = (
  * zaznaczeniu (`zapiszKwote`) — panel nie ma prawa podać liczby, a i ten
  * serwis nie ma prawa jej poprawić.
  */
+/** `maxLength` pola `sellerComment` ze schematu `InitializeRefund`. */
+const LIMIT_KOMENTARZA = 250;
+
+/**
+ * Powody potrąceń jednym zdaniem dla klienta, `null` bez potrąceń (0.476.0).
+ *
+ * Nazwa pozycji przy powodzie, bo zwrot bywa wielopozycyjny, a klient ma
+ * wiedzieć, której rzeczy dotyczy mniejsza kwota. Za długie urywamy znakiem
+ * wielokropka — Allegro odrzuciłoby całe żądanie, a nie tylko komentarz.
+ */
+export function komentarzPotracen(database: Db, zwrotId: number): string | null {
+  const wiersze = database.prepare(
+    `SELECT nazwa, potracenie_grosze, potracenie_powod FROM zwrot_klienta_pozycja
+      WHERE zwrot_id=? AND w_zwrocie=1 AND potracenie_grosze > 0 ORDER BY id`)
+    .all(zwrotId) as Array<{ nazwa: string; potracenie_grosze: number; potracenie_powod: string | null }>;
+  if (!wiersze.length) return null;
+  const tekst = "Pomniejszony zwrot: " + wiersze
+    .map((w) => `${w.nazwa} — ${(w.potracenie_powod ?? "").trim() || "potrącenie"} `
+      + `(−${naZlote(Number(w.potracenie_grosze)).replace(".", ",")} zł)`)
+    .join("; ");
+  return tekst.length <= LIMIT_KOMENTARZA ? tekst : tekst.slice(0, LIMIT_KOMENTARZA - 1) + "…";
+}
+
 export async function zwrocPieniadze(
   database: Db, zwrotId: number, wersja: number, kto: { id: number; name: string },
   nadaj: NadawcaZwrotu, teraz = new Date(),
@@ -400,6 +423,13 @@ export async function zwrocPieniadze(
   if (dostawa > 0) {
     ciało.delivery = { value: { amount: naZlote(dostawa), currency: waluta } };
   }
+  /* POWÓD POTRĄCENIA IDZIE DO KLIENTA (0.476.0). Formularz potrącenia mówi
+     „to jego treść zobaczy klient", a do tego wydania nie docierała nigdzie:
+     żądanie niosło sam kod `REFUND`. Schemat `InitializeRefund` ma na to
+     opcjonalne `sellerComment` (`maxLength: 250`) — przegląd zwrotów
+     z 23 września. Bez potrącenia pola nie wysyłamy wcale, jak `delivery`. */
+  const komentarz = komentarzPotracen(database, zwrotId);
+  if (komentarz) ciało.sellerComment = komentarz;
 
   const odp = await nadaj(ciało);
   const refundId = typeof odp?.id === "string" ? odp.id : null;
