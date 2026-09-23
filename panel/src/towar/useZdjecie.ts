@@ -282,6 +282,35 @@ export function useZdjecieZadania(
   return { url, blad, ponow };
 }
 
+/**
+ * SZÓSTE I SIÓDME ŹRÓDŁO: zdjęcie dowodowe z hali i logo dostawcy (0.435.0).
+ *
+ * Przyszły z `biuro.html` razem z ekranem dostaw. Tam miały własną kolejkę
+ * i własną pamięć — tę samą mechanikę, z której ten plik powstał w 0.152.0.
+ * Druga kopia w panelu byłaby dokładnie tym rozjazdem, przed którym ostrzega
+ * nagłówek: lista dostaw dobijałaby serwer o obrazy, których nie ma.
+ *
+ * Zdjęcie dowodowe to PODSTAWA REKLAMACJI u dostawcy, więc jego brak ma powód
+ * na ekranie, jak w skrzynce — a nie cichy pusty kafel.
+ */
+export function useZdjecieDowodu(problemId: number | null | undefined): {
+  url: string | null | undefined; blad: string | null; ponow: () => void;
+} {
+  const sciezka = problemId == null ? null : `/api/problems/${problemId}/photo`;
+  const url = useObraz(sciezka);
+  const { blad, ponow } = useBladObrazu(sciezka);
+  return { url, blad, ponow };
+}
+
+/**
+ * Logo dostawcy. `maLogo` przychodzi z listy — pytamy WYŁĄCZNIE wtedy, gdy
+ * logo jest. Próba „na ślepo" przy każdym dostawcy dała kiedyś 355 wpisów 404
+ * na tysiąc w dzienniku produkcyjnym (komentarz przy `DeliveryDocument.maLogo`).
+ */
+export function useLogoDostawcy(khId: number | null | undefined, maLogo: boolean): string | null | undefined {
+  return useObraz(khId == null || !maLogo ? null : `/api/dostawcy/${khId}/logo`);
+}
+
 /** Tylko do testów — mapa i kolejka są modułowe, więc żyją między nimi. */
 export function _wyczyscPamiecZdjec() {
   pamiec.clear();

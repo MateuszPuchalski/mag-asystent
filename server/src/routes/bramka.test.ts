@@ -123,6 +123,18 @@ test("operacje ratunkowe serwera odmawiają magazynierowi (0.431.0)", async () =
   }
 });
 
+test("DO DECYZJI widzi biuro, nie hala i nie ktoś bez sesji (0.435.0)", async () => {
+  /* Lista niesie liczby kolejek klienta i odpowiedzi hali — rozstrzyga je
+     biuro. Magazynier ma kolektor i tam jego praca. */
+  assert.equal((await app.inject({ url: "/api/biuro/do-decyzji" })).statusCode, 401);
+  const mag = await app.inject({ url: "/api/biuro/do-decyzji", headers: { "x-session": zalogowany() } });
+  assert.equal(mag.statusCode, 403);
+  const biuro = await app.inject({ url: "/api/biuro/do-decyzji",
+    headers: { "x-session": zalogowany("biuro") } });
+  assert.equal(biuro.statusCode, 200);
+  assert.ok(Array.isArray(biuro.json().pozycje));
+});
+
 test("nieznany token jest traktowany jak brak tokenu", async () => {
   const r = await app.inject({
     url: "/api/analiza",

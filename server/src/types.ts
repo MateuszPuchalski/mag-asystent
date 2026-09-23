@@ -354,6 +354,15 @@ export interface ProblemView {
   resolvedBy: string | null;
   /** Kontekst do listy „nierozwiązane" — bez wchodzenia w dostawę. */
   docNumber: string | null;
+  /**
+   * Numer dokumentu w Subiekcie (0.435.0) — adres dokumentu w panelu biura.
+   *
+   * Sam `docNumber` nie wystarcza: dokument, który wypadł z okna importu, nie
+   * ma wiersza na liście dostaw, a jego otwarty wyjątek dalej czeka na biuro.
+   * Kolektor tego pola nie czyta (`ignoreUnknownKeys` w `Dtos.kt`), więc
+   * dopisanie nie wymaga nowego APK.
+   */
+  dokId: number | null;
   sym: string | null;
   name: string | null;
   /** Jednostka z kartoteki — wyjątek niesie ilość, więc musi ją podpisać. */

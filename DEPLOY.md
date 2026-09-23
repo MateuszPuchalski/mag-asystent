@@ -844,7 +844,7 @@ Zastrzeżone są trzy rzeczy:
 
 | operacja | kto | gdzie |
 |---|---|---|
-| zdjęcie dostawy z listy jako rozłożonej poza WERTIS | biuro, admin | przeglądarka: `/biuro` → DOSTAWY |
+| zdjęcie dostawy z listy jako rozłożonej poza WERTIS | biuro, admin | przeglądarka: `/obsluga` → Dostawy |
 | zakładanie kont magazynierów | biuro, admin | kolektor: Ustawienia → DODAJ OSOBY, albo `curl` |
 | konta o roli `biuro`/`admin`, wyłączanie kont, odbieranie haseł | **tylko admin** | `curl` |
 
@@ -899,10 +899,9 @@ siedemdziesiąt pozycji nie wypycha już wszystkiego poniżej poza ekran.
 **Zwinięta sekcja nie pyta serwera** — to nie jest chowanie pikseli, tylko
 oszczędność żądań. Wybór, co jest rozwinięte, zapamiętuje przeglądarka.
 
-**Szczegół obok listy.** Wejście w dostawę na oknie szerszym niż 1280 px
-zostawia listę widoczną po lewej, a szczegół stawia obok niej. Otwarty wiersz
-jest podświetlony. Na węższym oknie szczegół zasłania listę, jak wcześniej —
-dwie kolumny nie mieszczą się na laptopie obok siebie.
+**Dostawy są w panelu od 0.435.0.** Kolejka, dokument i kontekst stoją
+w trzech kolumnach `/obsluga/dostawy`, jak Zwroty. Pozycja DOSTAWY w pasku
+biura prowadzi tam razem z sesją.
 
 ## 6. Przejście na prawdziwe dane Subiekta (etapy wg spec §10)
 
@@ -1326,9 +1325,10 @@ ilość z jednostką z kartoteki, adres docelowy oraz **stany wszystkich magazyn
 z niezerowym stanem**. Ta ostatnia linijka odpowiada na pytanie, ile z kosza
 zostało jeszcze na regale zwrotów.
 
-Biuro sprawdza zawartość kosza w `/biuro` → MAGAZYN ZWROTÓW, karta KOSZE
-ZWROTOWE. Kliknięcie wiersza rozwija podgląd pozycji z adresem odłożenia
-i stanem każdej z nich; kosz z pominięciem jest podpisany jako niekompletny.
+Biuro sprawdza zawartość kosza w panelu: `/obsluga` → Zwroty → Kosze (od
+0.438.0; wcześniej `/biuro` → MAGAZYN ZWROTÓW). Wybór kosza pokazuje pozycje
+z adresem odłożenia i stanem każdej z nich; kosz z pominięciem jest podpisany
+jako niekompletny.
 
 Od 0.84.0 lista niesie kolumnę **ROZŁOŻYŁ**: nazwisko i godzinę. Podgląd
 pokazuje cały cykl życia kosza — kto go zamknął i kto rozłożył, z godzinami.
@@ -1371,8 +1371,7 @@ go miał**: towar nie opuścił magazynu, więc żaden stan się nie zmienia.
    rozłożenia — ten sam ekran, ten sam skan półki, ten sam ZAKOŃCZ.
 4. ZAKOŃCZ zapisuje **wyłącznie adresy półek**. Żadnego dokumentu w Subiekcie.
 
-Kartony pojawiają się w `/biuro` → MAGAZYN ZWROTÓW, karta KOSZE ZWROTOWE, z pastylką
-KARTON. Biuro je tylko ogląda: zawartość zna hala, bo tylko ona widziała, co
+Kartony pojawiają się w `/obsluga` → Zwroty → Kosze, z pastylką KARTON. Biuro je tylko ogląda: zawartość zna hala, bo tylko ona widziała, co
 ktoś włożył do pudła. Kilka kartonów naraz jest stanem normalnym.
 
 Wpisywanie w polu u góry **szuka w kartotece** (0.123.0), a nie dodaje w
@@ -2585,6 +2584,26 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.438.0 — kosze w zakładce Zwroty
+
+**Migracji nie ma. Panel trzeba przebudować.** Szczegół zwrotu niesie odtąd
+listę koszy z jego towarem (`kosze`). Kolektor tego nie czyta.
+
+Co zmienia się dla biura:
+
+- **Kosze są w panelu, w zakładce Zwroty**, pod przełącznikiem Zwroty · Kosze.
+  Decyzja właściciela: kosz jest dalszym ciągiem zwrotu, więc mieszka obok
+  niego, a nie w osobnym rzędzie nagłówka.
+- **MAGAZYN ZWROTÓW zniknął z `biuro.html`.** Pozycja KOSZE w pasku biura
+  prowadzi do panelu z sesją. Biuro wstaje odtąd na STANIE SYSTEMU.
+- **Karta zwrotu mówi, w którym koszu jedzie jego towar**, i prowadzi do niego.
+  Kosz od dawna prowadził do swoich zwrotów — teraz wiązanie działa w obie
+  strony.
+
+Sprawdzenie po wdrożeniu idzie tak. Wejdź w Zwroty → Kosze kontem biura.
+Otwórz kosz z pominiętą pozycją i kliknij „Załatwione” z notatką. Pozycja ma
+zejść z kubełka Pominięte i zostać w koszu jako pominięta z notatką.
+
 ### Aktualizacja do 0.436.0 — podziękowanie nie czeka na nas
 
 **Migracji nie ma. Panel trzeba przebudować.**
@@ -2598,6 +2617,27 @@ odpowiedzi. Po rozpoznaniu wiersz ma status „Czeka na klienta" i znacznik
 „podziękowanie, bez odpowiedzi". Gdyby znacznik stał przy prawdziwym
 pytaniu, popraw kategorię plakietką — rozmowa wraca na listę od razu.
 
+### Aktualizacja do 0.435.0 — DO DECYZJI i dostawy w panelu
+
+**Migracji nie ma. Panel trzeba przebudować.** Serwer dokłada jedną trasę
+odczytu, `GET /api/biuro/do-decyzji`, i jedno pole w wyjątkach (`dokId`).
+Kolektor tego pola nie czyta, więc APK zostaje ten sam.
+
+Co zmienia się dla biura:
+
+- **Panel otwiera się na DO DECYZJI**, a Zadania mają adres
+  `/obsluga/zadania`. Zakładka niesie licznik spraw — widać go z każdego
+  ekranu.
+- **Dostawy są w panelu**, a z `biuro.html` zniknęły. Pozycja DOSTAWY w pasku
+  biura i plakietka odpowiedzi na notatki prowadzą do panelu z sesją.
+- **Protokół dla dostawcy** otwiera się w nowej karcie pod własnym adresem.
+  Dane firmy do druków GEKO i PARTNER zostają w przeglądarce, pod tym samym
+  kluczem co dotąd. Kto drukował dotąd na tym komputerze, nie wpisuje ich
+  drugi raz.
+
+Sprawdzenie po wdrożeniu idzie tak. Wejdź do `/obsluga` kontem biura — ekran
+startowy to DO DECYZJI. Otwórz dostawę z wyjątkiem i kliknij „Protokół dla
+dostawcy”. Druk ma mieć numer faktury, dostawcę i zdjęcia z hali w aneksie.
 ### Aktualizacja do 0.434.0 — mniej przycisków w skrzynce
 
 **Migracja kasuje tabelę `szablon_odpowiedzi`. Panel trzeba przebudować.**

@@ -1,4 +1,4 @@
-import { db, nowIso, transaction } from "../db/db.js";
+import { db, nowIso, transaction, type Db } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
 import { enqueueMM, enqueueSetLocation } from "./queue.js";
@@ -256,6 +256,31 @@ export interface WierszListyKoszy {
    * halę rozkłada kosz z TAMTEGO dokumentu. Kolektor go nie dostaje.
    */
   wirtualny: boolean;
+}
+
+/** Kosz, do którego trafił towar jednego zwrotu — lekki wiersz do wiązania. */
+export interface KoszZwrotu { id: number; kod: string; status: string }
+
+/**
+ * Kosze, do których trafił towar TEGO zwrotu (0.438.0).
+ *
+ * Druga połowa wiązania, którego pierwsza stoi w `szczegolKosza` (`zwroty`).
+ * Kosz wiedział, czyje zwroty wiezie; zwrot nie wiedział, w którym koszu
+ * jedzie jego towar — karta pisała „w koszyku zwrotów" bez nazwy i bez drogi.
+ * Wiązanie jednostronne to wiązanie, którego nie ma (`CLAUDE.md`), a pytanie
+ * „gdzie jest towar z tego zwrotu" pada przy zwrocie, nie przy koszu.
+ *
+ * TO SAMO ZŁĄCZENIE co tamto, tylko czytane od drugiej strony — dwa różne
+ * zapytania o jedno wiązanie rozjechałyby się przy pierwszej zmianie schematu.
+ */
+export function koszeZwrotu(zwrotId: number, database: Db = db()): KoszZwrotu[] {
+  return (database.prepare(
+    `SELECT DISTINCT k.id AS id, k.kod AS kod, k.status AS status
+       FROM kosz_pozycja p
+       JOIN zwrot_klienta_pozycja zp ON zp.id = p.zwrot_pozycja_id
+       JOIN kosz k ON k.id = p.kosz_id
+      WHERE zp.zwrot_id = ? ORDER BY k.id`).all(zwrotId) as Array<Record<string, unknown>>)
+    .map((k) => ({ id: Number(k.id), kod: String(k.kod), status: String(k.status) }));
 }
 
 /** Kod z etykiety kosza — po trim/upper, żeby skan i wpis ręczny się spotkały. */
