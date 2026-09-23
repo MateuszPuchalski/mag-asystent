@@ -1,8 +1,5 @@
-import fs from "node:fs";
 import { alarmyWymiany, czasyWymiany } from "../services/wymiana.js";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { autoryzuj } from "../services/auth.js";
 import {
@@ -21,93 +18,37 @@ import { archiwumDostaw } from "../services/archiwum-dostaw.js";
 import { doDecyzji } from "../services/do-decyzji.js";
 import { BladFirmy, daneFirmy, zapiszDaneFirmy, type PoleFirmy } from "../services/firma.js";
 
-/* ── Podgląd biura — jedna strona pod /biuro ─────────────────────────────────
-   Wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał, którym biuro widziało
-   stan dostaw. CSV i REST istniały dalej, ale „wywołaj curlem z tokenem" nie
-   jest interfejsem dla księgowości. Ta strona jest tym interfejsem: status
-   rozkładania + gotowy do druku protokół rozbieżności ze zdjęciami dowodowymi.
+/* ── Trasy biura (strona `/biuro` zniknęła w 0.446.0) ─────────────────────
+   Do 0.446.0 ten plik serwował też stronę biura: jeden HTML bez builda,
+   jej ikonę i fonty Barlow. Biuro przeszło do panelu widok po widoku
+   (`docs/obsluga-klienta.md` §7), a ostatnie wydanie zostawiło stronę jako
+   drogowskaz. Teraz zostały tu TRASY API biura — dostawy zdjęte poza WERTIS,
+   notatki, archiwum, DO DECYZJI, dane firmy — i przekierowanie starych adresów.
 
-   ŚWIADOMIE jeden plik HTML bez builda i bez frameworka. Poprzedni podgląd
-   (/lookup) zniknął razem z całym klientem PWA, bo dwa fronty to dwa razy
-   utrzymanie — więc nowy nie ma prawa być drugim frontem. Strona jest cienka:
-   sam odczyt istniejących tras API, z tokenem sesji w nagłówku, tak samo jak
-   kolektor.
-
-   OD 0.40.0 NIE JEST JUŻ CZYSTYM ODCZYTEM i to zdanie stało tu wcześniej jako
-   „zero zapisu". Doszły dwie trasy zapisu: oznaczenie dostawy jako rozłożonej
-   POZA WERTIS i cofnięcie tego. Trafiły akurat tutaj, bo są jedyną operacją
-   w całej aplikacji, której NIE WOLNO wykonać z hali — zdejmują pracę z listy
-   bez ani jednego skanu, więc mieszkają tam, gdzie czyta się protokoły
-   rozbieżności, i za rolą `biuro`. Cienkość strony to nadal reguła: obie trasy
-   mają całą logikę w `services/delivery.ts`, razem z resztą reguł dostaw.
-
-   Plik jest wczytywany RAZ, przy rejestracji tras — nie per żądanie. Zmiana
-   strony wymaga restartu usługi, dokładnie jak zmiana kodu.                  */
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+   Zapisy dostaw mieszkają dalej tutaj, a nie przy trasach kolektora: to
+   jedyne operacje w aplikacji, których NIE WOLNO wykonać z hali. Zdejmują
+   pracę z listy bez ani jednego skanu, więc stoją za rolą `biuro`, a logika
+   siedzi w `services/delivery.ts` razem z resztą reguł dostaw.             */
 
 export async function biuroRoutes(app: FastifyInstance) {
-  const html = fs.readFileSync(path.join(__dirname, "../web/biuro.html"), "utf8");
+  /* ── STARE ADRESY PROWADZĄ DO PANELU (0.446.0) ─────────────────────────
+     Zakładka w przeglądarce, skrót na pulpicie i nawyk ręki prowadzą pod
+     `/biuro` jeszcze długo po przeprowadzce. 404 wyglądałoby na awarię
+     serwera; przekierowanie mówi „jesteś w dobrym miejscu, tylko pod nowym
+     adresem". Łapiemy też to, co leżało pod `/biuro/` (ikona, fonty):
+     przeglądarka pamięta takie adresy w historii i w podpowiedziach.
 
-  app.get("/biuro", async (_req, reply) => reply.type("text/html; charset=utf-8").send(html));
+     302, nie 301. Stały 301 przeglądarka zapamiętuje na zawsze — gdyby pod
+     `/biuro` kiedyś wróciło cokolwiek, stare przeglądarki nie zapytałyby
+     serwera już nigdy. Tymczasowe przekierowanie kosztuje jedno żądanie.
 
-  /* ── IKONA KARTY PRZEGLĄDARKI (0.419.0) ───────────────────────────────────
-     Decyzja właściciela: obie karty mają nosić znak firmy — magazyn dla biura,
-     słuchawki dla obsługi klienta. Do tego wydania biuro rysowało literę „W"
-     z wklejonego SVG, a panel obsługi nie miał ikony wcale.
-
-     TEN SAM WZORZEC CO FONTY, i to jest cały powód, dla którego wolno było
-     zejść z wklejonego obrazka: plik czyta się RAZ przy rejestracji tras,
-     wychodzi z tygodniowym cache'em i nie dotyka dysku przy żądaniu. Zarzut
-     z poprzedniego komentarza — „drugi zasób do serwowania i 404 w logu" —
-     dotyczył `/favicon.ico`, czyli adresu, o który przeglądarka pyta sama
-     i którego nikt nie obsługiwał. Ten adres jest nazwany w `<link>`.
-
-     WEBP, nie PNG: tak przyszedł plik od właściciela, a biuro i obsługa
-     pracują w Chrome, który czyta webp w ikonie karty od 2014 roku.
-     Przerobienie go na PNG wymagałoby narzędzia, którego to repo nie ma. */
-  /* ── OZDOBA NIE KŁADZIE USŁUGI (0.420.1) ──────────────────────────────────
-     Blizna z 0.419.0, zgłoszona przez właściciela z produkcji: `build` serwera
-     kopiował do `dist/web` trzy rzeczy WYMIENIONE Z NAZWY, a ikona nie była
-     jedną z nich. `readFileSync` przy rejestracji tras rzucił ENOENT i cała
-     usługa nie wstała — przez plik, który rysuje obrazek w pasku karty.
-
-     Dwie poprawki, bo jedna by nie wystarczyła. Pierwsza: `build` kopiuje CAŁY
-     `src/web`, więc następny plik nie ma jak zostać zapomniany. Druga: ta,
-     tutaj — brak OZDOBY oddaje 404, a nie zabija startu. Fonty zostają
-     surowe świadomie: bez nich strona biura rysuje się inną krojówką i chcemy
-     o tym wiedzieć przy starcie, a nie z trzeciej ręki. */
-  const ikona = (() => {
-    try { return fs.readFileSync(path.join(__dirname, "../web/ikona-biuro.webp")); }
-    catch { return null; }
-  })();
-  app.get("/biuro/ikona.webp", async (_req, reply) =>
-    ikona
-      ? reply.type("image/webp").header("cache-control", "public, max-age=604800").send(ikona)
-      : reply.code(404).send()
-  );
-
-  /* Fonty Barlow — TE SAME pliki, którymi rysuje kolektor (kopie z zasobów
-     Androida). Serwowane z własnego serwera, bo biuro pracuje w LAN-ie bez
-     wyjścia w świat: link do Google Fonts dawałby pustą czcionkę i timeout.
-     Wczytane raz przy rejestracji, jak sam HTML; tydzień cache'u, bo plik
-     zmienia się wyłącznie z wydaniem, a wydanie restartuje usługę. */
-  for (const plik of [
-    "barlow_regular.ttf",
-    "barlow_semibold.ttf",
-    "barlow_bold.ttf",
-    "barlowcondensed_bold.ttf",
-    "barlowcondensed_extrabold.ttf",
-  ]) {
-    const font = fs.readFileSync(path.join(__dirname, "../web/fonty", plik));
-    app.get(`/biuro/fonty/${plik}`, async (_req, reply) =>
-      reply.type("font/ttf").header("cache-control", "public, max-age=604800").send(font)
-    );
-  }
-
-  // korzeń przekierowuje do podglądu: adres `http://serwer:3001` w pasku
-  // przeglądarki biura ma pokazać COŚ, a nie 404
-  app.get("/", async (_req, reply) => reply.redirect("/biuro"));
+     Korzeń prowadzi tu samo: `http://serwer:3001` w pasku przeglądarki biura
+     ma pokazać panel, a nie 404. Panel sam odsyła niezalogowanych do
+     logowania, a zalogowanych — na DO DECYZJI. */
+  const doPanelu = async (_req: unknown, reply: FastifyReply) => reply.redirect("/obsluga/");
+  app.get("/", doPanelu);
+  app.get("/biuro", doPanelu);
+  app.get("/biuro/*", doPanelu);
 
   /**
    * Pozycje dokumentu dla biura — CZYTA, nigdy nie otwiera dostawy.
@@ -116,7 +57,7 @@ export async function biuroRoutes(app: FastifyInstance) {
    * o bezpieczeństwie, nie o porządku: jej sąsiadem byłby `POST
    * /api/delivery/documents/:dokId/open`, czyli zapis różniący się o jeden
    * człon ścieżki. `routes/delivery.ts` zostaje o ścieżce pracy kolektora,
-   * a to jedyna trasa czytana wyłącznie przez `/biuro`.
+   * a to jedyna trasa czytana wyłącznie przez biuro (dziś: Dostawy w panelu).
    *
    * Klucz to `dokId` (numer dokumentu w Subiekcie), a nie lokalne `deliveryId`,
    * bo dokument, którego nikt nie tknął, żadnego `deliveryId` jeszcze nie ma —

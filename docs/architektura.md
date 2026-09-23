@@ -102,9 +102,10 @@ przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
 └ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
 ```
 
-**Biuro przechodzi do panelu (0.431.0).** Poniżej historia `/biuro` tak, jak
-powstawało. Od 0.431.0 obowiązuje jeden front, decyzją właściciela z
-`docs/obsluga-klienta.md` §7, a `biuro.html` znika widok po widoku. Zdanie
+**Biuro przeszło do panelu (0.431.0–0.446.0).** Poniżej historia `/biuro` tak,
+jak powstawało. Od 0.431.0 obowiązuje jeden front, decyzją właściciela z
+`docs/obsluga-klienta.md` §7. `biuro.html` znikał widok po widoku, a w
+0.446.0 zniknął cały; `/biuro` przekierowuje do `/obsluga/`. Zdanie
 „zero frameworka, zero zapisu" przestało być prawdą dużo wcześniej: audyt
 0.427.0 policzył w biurze dwadzieścia dwa zapisy. Z tamtej reguły został jej
 rdzeń — **zero zapisu przy patrzeniu** — i ten obowiązuje panel tak samo.
@@ -113,7 +114,7 @@ Cel, od którego liczy się każdy ekran biura: biuro rozstrzyga to, czego hala
 nie rozstrzygnie sama — w drodze towaru przez magazyn. Reszta jest nadzorem
 albo ustawieniem.
 
-**Biuro ma podgląd pod `/biuro`** — jedną stronę HTML bez builda
+**Biuro miało podgląd pod `/biuro`** — jedną stronę HTML bez builda
 (`server/src/web/biuro.html`), serwowaną przez API i czytającą istniejące trasy
 z tokenem sesji. Wcześniejszy `/lookup` zniknął razem z klientem PWA; nowy
 podgląd świadomie nie był drugim frontem: zero frameworka, zero zapisu.
@@ -502,7 +503,7 @@ Dwie operacje są zastrzeżone dla ról:
 - **domknięcie dostawy jako rozłożonej poza WERTIS** (`biuro`) — jedyna
   operacja zdejmująca pracę z listy bez ani jednego skanu. Hali tu nie ma
   świadomie: to *orzeka*, że pracy nie ma. Wymaga powodu wpisanego z ręki
-  i zawsze idzie do `events`; dostępna wyłącznie z `/biuro`, nigdy z kolektora.
+  i zawsze idzie do `events`; dostępna wyłącznie z panelu biura, nigdy z kolektora.
 
 Trzecia — zdjęcie cudzej blokady pozycji — zniknęła w 0.47.0 razem z samymi
 blokadami i rolą brygadzisty, która istniała głównie dla niej.

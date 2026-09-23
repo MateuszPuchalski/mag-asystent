@@ -1058,7 +1058,7 @@ ponownie. Otwarcie rozmowy czyta wyłącznie stan zapisany wcześniej.
 odbiorcy, a ten do modelu nie wychodzi. Fakt mówi, że klient ma numer przy
 zamówieniu w Allegro. Szkic odsyła go tam, zamiast zmyślać numer.
 
-### 10.2c. Prawa kolumna bez powtórzeń (0.445.0)
+### 10.2c. Prawa kolumna bez powtórzeń (0.447.0)
 
 Zgłoszenie właściciela ze zrzutami czterech zakładek: „prawa kolumna jest
 wciąż chaotyczna". Zrzut pokazał cztery przyczyny i każda ma swoją poprawkę.
@@ -1087,7 +1087,7 @@ dowodu. Gdy żaden kandydat nie jest mocny, lista się nie zwija.
 Otwarcie rozmowy pyta o historię klienta i wiedzę od razu, nie po
 kliknięciu. To są odczyty, więc zasada zera zapisu przy patrzeniu stoi.
 
-### 10.2d. Lista „Pasuje do" z oferty (0.445.0)
+### 10.2d. Lista „Pasuje do" z oferty (0.447.0)
 
 Zgłoszenie właściciela ze zrzutem sekcji „Pasuje do kosiarek" z Allegro.
 Listę mamy od 0.253.0, ale do tej wersji czytał ją tylko model. Na zrzucie

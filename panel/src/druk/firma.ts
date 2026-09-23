@@ -12,7 +12,13 @@ import type { Firma } from "./szablony";
    zastaje serwer pusty, a dane w przeglądarce; bez zapasu pierwszy protokół
    po aktualizacji wyszedłby bez nagłówka. Zapas działa WYŁĄCZNIE, dopóki nikt
    nie zapisał danych na serwerze — potem serwer wygrywa zawsze, także pustym
-   polem, bo puste pole zapisał człowiek. Zapas znika przy przełączeniu (F6).
+   polem, bo puste pole zapisał człowiek.
+
+   ZAPAS PRZEŻYŁ PRZEŁĄCZENIE (0.446.0), choć plan kazał go zdjąć. Wydania
+   wchodzą na serwer przez `git pull`, więc biuro może przeskoczyć z wersji
+   sprzed 0.444.0 wprost na tę — i wtedy nikt jeszcze nie kliknął
+   „Przenieś na serwer". Zapas nic nie kosztuje, a jego brak to protokół bez
+   nagłówka. Zejdzie, gdy serwer ma dane na każdej instalacji.
 
    Automatycznego przepisania z przeglądarki na serwer nie ma: otwarcie druku
    nie może niczego zapisywać. Robi to przycisk w Ustawieniach. */

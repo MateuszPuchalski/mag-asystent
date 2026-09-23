@@ -678,8 +678,7 @@ maskowane, a „Ustaw" czeka na osiem znaków.
 Bramka reguł: usuń ostatnią regułę strefy. „Zapisz reguły" gaśnie, a obok
 stoi zdanie, czemu pusty komplet nie ma sensu.
 
-`/biuro` pokazuje już tylko kartę „Biuro przeszło do panelu" z przyciskiem
-do panelu. Pasek, ikony stanu i zębatka prowadzą do panelu z sesją.
+`/biuro` przekierowuje do `/obsluga/` — strony biura już nie ma.
 
 ## Kosze z regału zwrotów
 
@@ -732,7 +731,7 @@ w stanie „czeka". ZAKOŃCZ ma jej nadal nie przepuścić. Po zakończeniu kosz
 przycisk **COFNIJ ZAKOŃCZENIE** ma go otworzyć z powrotem, z pozycjami
 w stanie sprzed kliknięcia.
 
-Biuro po rozłożeniu. W `/biuro` → SPRAWY kolumna **ROZŁOŻYŁ** ma
+Biuro po rozłożeniu. W panelu → Zwroty · Kosze kolumna **ROZŁOŻYŁ** ma
 pokazać nazwisko i godzinę, a podgląd kosza — cały cykl życia: kto zamknął,
 kto rozłożył. Kliknij COFNIJ ZAKOŃCZENIE: kolumna ma wrócić do myślnika.
 Nazwisko, które zostałoby po cofnięciu, mówiłoby o pracy, której już nie ma.

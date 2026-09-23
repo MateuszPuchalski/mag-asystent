@@ -434,7 +434,7 @@ export function openDelivery(dokId: number, user: string): number {
        pokazałby pustą listę pracy i wyglądałoby to na awarię. */
     if (existing.status === "external") {
       throw new Error(
-        "Dostawa jest oznaczona jako rozłożona poza WERTIS — cofa ją biuro w panelu /biuro"
+        "Dostawa jest oznaczona jako rozłożona poza WERTIS — cofa ją biuro w panelu: /obsluga → DOSTAWY"
       );
     }
     usunPozycjeUslugowe(existing.id);

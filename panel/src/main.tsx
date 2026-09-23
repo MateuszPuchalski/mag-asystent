@@ -7,6 +7,8 @@ import logo from "./assets/wertis-logo.png";
 import { BrakSesji, SESJA_WYGASLA, token, wyczyscToken, zglosBrakSesji } from "./api/klient";
 import { useJa, useWzmianki, useZdrowie } from "./api/rozmowy";
 import { BrakDostepu } from "./ekrany/BrakDostepu";
+import { EtykietaInstancji } from "./stan/Instancja";
+import { PlakietkaSpoznien } from "./stan/Spoznione";
 import { useKolejkaWiedzy } from "./api/wiedza";
 import { useDoDecyzji } from "./api/decyzje";
 import { czas, godzina } from "./ui";
@@ -176,7 +178,7 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
      `flex-wrap` kosztuje drugi rząd na wąskim oknie i to jest cena świadoma:
      rząd zabiera kilkadziesiąt pikseli wysokości, brak wylogowania zabiera
      całą funkcję. `min-w-0` na tytule, żeby to on oddawał miejsce pierwszy —
-     „WERTIS · Obsługa klienta" wolno ucinać, przyciskom nie. */
+     podpis „Biuro" wolno ucinać, przyciskom nie. */
   return <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-wertis-ink text-white">
     <div className="flex flex-wrap items-center gap-4 px-5 py-3">
       {/* LOGO ZAMIAST IKONY MAGAZYNU (23 września 2026). Znak ma grafitowe
@@ -223,6 +225,14 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
     <div className="flex flex-wrap items-center gap-3 px-5 pb-3">
       <DrugiRzad />
       <span className="mr-auto" />
+      {/* Plakietka spóźnień STOI OBOK pigułki, a nie w niej: pigułka mówi,
+          czy system działa, plakietka — że praca idzie wolniej niż zwykle.
+          Powód w `stan/Spoznione.tsx`. */}
+      {/* Etykieta instancji w DOLNYM rzędzie, obok stanu: górny ma przy
+          1180 px kilkanaście pikseli luzu i nawet „DEV" spychało zakładki
+          do osobnego rzędu. Tu stoi obok pytania „czy system działa". */}
+      <EtykietaInstancji />
+      <PlakietkaSpoznien />
       <PigulkaSynchronizacji />
       {/* ZĘBATKA STOI POZA `ZAKLADKI` i to jest wybór, nie niedopatrzenie.
           Pasek niesie PRACĘ — cztery kolejki, do których agent wraca w kółko.

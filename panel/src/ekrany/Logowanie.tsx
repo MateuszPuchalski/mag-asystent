@@ -35,7 +35,9 @@ export function Logowanie({ zalogowano }: { zalogowano: () => void }) {
           ekran, jaki widzi nowa osoba w biurze, więc ma wyglądać jak ta firma. */}
       <div className="mb-7">
         <h1 className="m-0"><img src={logo} alt="WERTIS — sklep z częściami" className="h-14 w-auto" /></h1>
-        <p className="mt-2 text-sm text-slate-500">Obsługa klienta</p>
+        {/* „Biuro", nie „Obsługa klienta", od 0.446.0: pod tym adresem jest
+            całe biuro — dostawy, kosze, wgląd i ustawienia, nie tylko skrzynka. */}
+        <p className="mt-2 text-sm text-slate-500">Biuro</p>
       </div>
       <label className="mb-4 block text-sm font-semibold">Login
         <input className="field mt-1" autoFocus {...register("login")} />

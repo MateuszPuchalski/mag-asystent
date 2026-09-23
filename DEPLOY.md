@@ -2,15 +2,16 @@
 
 Instrukcja wdrożenia na firmowej maszynie Windows — tej, na której działa
 **Subiekt GT ze Sferą**. API + worker działają na jednym hoście w sieci LAN
-magazynu; kolektory (aplikacja Android) łączą się przez WiFi. Biuro ma **podgląd pod
-`http://serwer:3001/biuro`** — status dostaw i protokoły rozbieżności do
-wydruku; operacje wykonuje się wyłącznie na kolektorze. Zero chmury.
+magazynu; kolektory (aplikacja Android) łączą się przez WiFi. Biuro ma **panel pod
+`http://serwer:3001/obsluga`** — dostawy, kosze, stan systemu, analiza,
+obsługa klienta i ustawienia; operacje na towarze wykonuje się wyłącznie na
+kolektorze. Stary adres `/biuro` przekierowuje do panelu. Zero chmury.
 
 ```
 Kolektory Zebra/Honeywell (APK, WiFi LAN) ─── http://mag.wertis.local:3001
         ▼
 Maszyna z Subiektem GT (Windows)
-  ├─ wertis-api     Fastify: REST + podgląd biura pod /biuro
+  ├─ wertis-api     Fastify: REST + panel biura pod /obsluga
   ├─ wertis-worker  worker Sfery: kolejka → zapis do SGT
   ├─ wertis.db      SQLite: faktury zakupu z postępem per pozycja, wyjątki,
   │                 kolejka, audyt events
@@ -152,7 +153,7 @@ cd /c
 git clone https://github.com/MateuszPuchalski/mag-asystent.git wertis
 cd /c/wertis
 npm ci
-npm run build      # panel → dist/web/obsluga, server → server/dist (API, /biuro, /obsluga)
+npm run build      # panel → dist/web/obsluga, server → server/dist (API, /obsluga)
 npm run seed       # zasila SQLite danymi demo (tryb seeded)
 ```
 
@@ -253,7 +254,7 @@ ukośników:
 ```bash
 mkdir -p /c/wertis/logs
 
-# API (razem z podglądem biura pod /biuro)
+# API (razem z panelem biura pod /obsluga)
 nssm install wertis-api 'C:\Program Files\nodejs\node.exe' 'C:\wertis\server\dist\index.js'
 nssm set wertis-api AppDirectory 'C:\wertis'
 # Nazwy plików MUSZĄ zgadzać się z instalatorem (`instalator/uslugi.ps1`),
@@ -1279,7 +1280,7 @@ Kosz otwarty przed wdrożeniem, którego dokument z tego okna już wypadł, powr
 nie dostanie: kierunku się nie zgaduje. Takie kosze wypisuje rekoncyliacja
 (`kosz_bez_powrotu`) i zamyka je biuro ręką, tak jak dotąd.
 
-Stan powrotu widać na karcie kosza w `/biuro` jako trzeci etap: „powrót MM
+Stan powrotu widać w panelu na karcie kosza (Zwroty · Kosze). To trzeci etap: „powrót MM
 1241/ZWR/2026", „powrót MM zamówiony, czeka na dokument" albo „powrót MM
 w błędzie". Dokument wychodzi z kolejki, więc przy wyłączonym workerze Sfery
 (etap 1a wyżej) zadanie stanie w błędzie i powrót trzeba wystawić ręką.
@@ -1399,10 +1400,8 @@ z niego odczyt zamówień i sonda kształtu (`npm run sonda`), a nowa obsługa
 klienta wystartuje z tego samego parowania. Bez `ALLEGRO_CLIENT_ID` funkcja
 jest **wyłączona** i reszta aplikacji pracuje normalnie.
 
-Stan połączenia stoi w `/biuro` → STAN SYSTEMU, karta KONTO ALLEGRO. Do
-0.137.2 karta mieszkała na zakładce REJESTRY, która odeszła razem z rejestrami
-obsługi klienta. Czerwona ikona ALLEGRO w pasku bocznym prowadzi wprost do
-tej karty.
+Stan połączenia stoi w panelu: `/obsluga → STAN SYSTEMU`, karta KONTO
+ALLEGRO. Rozłączone konto pokazuje też DO DECYZJI, z drogą do tej karty.
 
 ### Włączenie na produkcji
 
@@ -1423,10 +1422,9 @@ tej karty.
    export ALLEGRO_USER_AGENT=...
    ```
 
-2. **Restart usługi** `wertis-api`, potem **parowanie konta** w `/biuro` —
-   najkrócej przez czerwoną ikonę ALLEGRO w pasku na górze (rola **admin**).
-   Klik otwiera kartę KONTO ALLEGRO w STANIE SYSTEMU i sam zaczyna parowanie.
-   Strona pokaże kod i link — otwórz go na zalogowanym koncie sprzedawcy
+2. **Restart usługi** `wertis-api`, potem **parowanie konta** w panelu —
+   `/obsluga → STAN SYSTEMU`, karta KONTO ALLEGRO, przycisk „Połącz
+   z Allegro" (rola **admin**). Karta pokaże kod i link — otwórz go na zalogowanym koncie sprzedawcy
    i potwierdź. Token zapisuje się w bazie aplikacji i odświeża sam. Wygasa
    dopiero po ~3 miesiącach nieużywania — wtedy `/api/health` każe sparować
    ponownie.
@@ -1559,8 +1557,8 @@ nadgorliwość: każda z tych pomyłek kończy się rozstrojoną produkcją.
 
 Jedno urządzenie na stałe wskazane na dev: w aplikacji, na ekranie startowym,
 adres `http://<IP-serwera>:3002`. Górny pasek pokazuje wtedy czerwoną
-pastylkę **DEV** na każdym ekranie. Biuro pod `:3002/biuro` ma czerwony kafel
-w pasku stanu. Pomylenie instancji ma być widoczne, nie możliwe do
+pastylkę **DEV** na każdym ekranie. Panel biura pod `:3002/obsluga` ma taką
+samą czerwoną pigułkę w nagłówku, obok pigułki synchronizacji. Pomylenie instancji ma być widoczne, nie możliwe do
 przeoczenia.
 
 Buildy testowe wgrywa się przez `adb install` (debug z Android Studio) albo
@@ -1606,7 +1604,7 @@ Konfigurację czyta z `wertis.env` w katalogu roboczym albo nad nim; inną
 ## 6d. Masowa zmiana lokalizacji z arkusza (0.138.0)
 
 Przestawienie całego regału bez chodzenia od kartoteki do kartoteki. Wykonuje
-**wyłącznie administrator**, w `/biuro` → **STAN SYSTEMU**.
+**wyłącznie administrator**, w panelu: `/obsluga → STAN SYSTEMU`.
 
 **Wdrożenie nie wymaga niczego.** Ani zmiennej w `wertis.env`, ani nowego
 uprawnienia SQL: zapis idzie istniejącym zadaniem `set_location`, czyli tą samą
@@ -1618,7 +1616,7 @@ drogą, co zmiana adresu z kolektora. Grant na `tw_Lokalizacja` jest już nadany
    **Symbol** i **Lokalizacja** — reszta może zostać.
 2. Popraw kolumnę adresu w Excelu i zapisz plik. Przyjmujemy **.xlsx** oraz
    **.csv**.
-3. `/biuro` → STAN SYSTEMU → **WGRAJ ARKUSZ**. Zobaczysz podgląd: tabelę
+3. `/obsluga → STAN SYSTEMU`, karta masowej zmiany lokalizacji → **Wgraj arkusz**. Zobaczysz podgląd: tabelę
    BYŁO → BĘDZIE, listę odrzuconych wierszy z powodem i listę symboli spoza
    kartoteki. Do Subiekta nie poszło jeszcze nic.
 4. Jeśli towar stoi w **kilku miejscach**, w kolumnie ZDJĄĆ OBECNE odznacz te
@@ -2584,7 +2582,7 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
-### Aktualizacja do 0.445.0 — prawa kolumna bez powtórzeń
+### Aktualizacja do 0.447.0 — prawa kolumna bez powtórzeń
 
 **Migracji nie ma. Panel trzeba przebudować, a serwer zrestartować.** Serwer
 naprawia fałszywe „klient dopisał wiadomość" przy wysyłce.
@@ -2599,6 +2597,20 @@ rząd. Odpowiedź ma wyjść bez dialogu o dopisku.
 Listę zgodności sprawdź w rozmowie pod ofertą z sekcją „Pasuje do". Wpisz
 w doborze markę i model z tej listy i ułóż szkic. Pod ofertą stanie
 „Pasuje do (N)" z zieloną plakietką maszyny.
+
+### Aktualizacja do 0.446.0 — `/biuro` przekierowuje do panelu
+
+**Migracji nie ma. Przebuduj panel i serwer** (`npm run build` w korzeniu).
+Build serwera nie kopiuje już `src/web` — tego katalogu nie ma. Stare pliki
+w `server/dist/web` (strona, fonty, ikona) zostają po poprzednim buildzie,
+ale nikt ich nie serwuje; można je skasować, poza podkatalogiem `obsluga`.
+
+Jeśli ta aktualizacja przeskakuje 0.444.0, zrób też krok z tamtego akapitu:
+w panelu → zębatka kliknij „Przenieś na serwer" przy danych firmy.
+
+Sprawdzenie: `http://serwer:3001/biuro` ma otworzyć `/obsluga/`. Na
+instancji dev nagłówek panelu ma czerwoną pigułkę DEV, na produkcji —
+żadnej.
 
 ### Aktualizacja do 0.444.0 — ustawienia biura w panelu
 
