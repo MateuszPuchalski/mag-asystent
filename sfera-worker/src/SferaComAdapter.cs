@@ -274,7 +274,7 @@ public sealed class SferaComAdapter : ISferaAdapter
 
         try
         {
-            return WystawZw((object)Sesja(), z);
+            return WystawZw((object)Sesja(), z, _env.GetInt("SFERA_ZW_WYDANIE_KAT_ID", 0));
         }
         /* Blokada paragonu i odmowa merytoryczna nie psują SESJI — Sfera
            odpowiedziała poprawnie. Restart sesji kosztuje sekundy przy każdym
@@ -294,7 +294,7 @@ public sealed class SferaComAdapter : ISferaAdapter
      * ZW do paragonu (0.349.0). Każdy krok stoi na pomiarze sondy — nazwy
      * i zachowania z docs/sfera-com.md §2m, nie z dokumentacji producenta.
      */
-    private static string WystawZw(object sesja, ZlecenieZw z)
+    private static string WystawZw(object sesja, ZlecenieZw z, int wydanieKatId)
     {
         dynamic su = sesja;
         dynamic zw = Krok("SuDokumentyManager.DodajZW()", 6, () => su.SuDokumentyManager.DodajZW());
@@ -451,11 +451,65 @@ public sealed class SferaComAdapter : ISferaAdapter
             {
                 vatPP = $"WartoscVatPP nie dało się ustawić ({e.Message.Trim()})";
             }
+            /* WYSTAWIŁ I KATEGORIA WYDANIA (0.463.0). Zrzut 0.462.0 wypisał
+               WSZYSTKIE pola. Ręczny ZW 748 i odmowa z PA 11458 różnią się poza
+               numerem i identyfikatorem w dwóch polach nagłówka: `Wystawil`
+               i `WydanieKatId` — wypełnione u biura, puste u workera. Oba
+               wypełnia samo okno Subiekta, worker nie ustawiał ich nigdy.
+
+               `Wystawil` bierze nazwę operatora sesji — tak robi okno. Wartość
+               zostaje w Subiekcie; do treści błędu idzie tylko to, że ją
+               ustawiono. Kategorii NIE zgadujemy: jej numer jest w bazie
+               biura, a nie w kodzie. Bierze się ją z `wertis.env`
+               (`SFERA_ZW_WYDANIE_KAT_ID`), odczytaną `--zrzut` z ZW biura. */
+            var uzupelnione = new List<string> { vatPP };
+            try
+            {
+                string wystawil = (Convert.ToString((object)zw.Wystawil) ?? "").Trim();
+                if (wystawil.Length == 0)
+                {
+                    string operatorNazwa = (Convert.ToString((object)su.OperatorNazwa) ?? "").Trim();
+                    if (operatorNazwa.Length > 0)
+                    {
+                        zw.Wystawil = operatorNazwa;
+                        uzupelnione.Add("Wystawil = operator sesji");
+                    }
+                    else
+                    {
+                        uzupelnione.Add("Wystawil puste, a sesja nie podała nazwy operatora");
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                uzupelnione.Add($"Wystawil nie dało się ustawić ({e.Message.Trim()})");
+            }
+            try
+            {
+                object? kat = (object?)zw.WydanieKatId;
+                string katTekst = (Convert.ToString(kat, System.Globalization.CultureInfo.InvariantCulture) ?? "").Trim();
+                if (kat is null || kat is DBNull || katTekst.Length == 0 || katTekst == "0")
+                {
+                    if (wydanieKatId > 0)
+                    {
+                        zw.WydanieKatId = wydanieKatId;
+                        uzupelnione.Add($"WydanieKatId = {wydanieKatId} z wertis.env");
+                    }
+                    else
+                    {
+                        uzupelnione.Add("WydanieKatId puste — SFERA_ZW_WYDANIE_KAT_ID nieustawione");
+                    }
+                }
+            }
+            catch (Exception e)
+            {
+                uzupelnione.Add($"WydanieKatId nie dało się ustawić ({e.Message.Trim()})");
+            }
             // Na początku, nie na końcu: koniec stanu to komenda sondy do skopiowania.
-            stan = $"{vatPP} (0.461.0); {stan}";
+            stan = $"{string.Join(", ", uzupelnione)} (0.463.0); {stan}";
 
             ZapiszZeSzczegolami((object)zw, "ZW", stan, zrzutPol: true);
-            Console.WriteLine($"[sfera] ZW zapisany ({vatPP})");
+            Console.WriteLine($"[sfera] ZW zapisany ({string.Join(", ", uzupelnione)})");
             return Krok("ZW.NumerPelny", 6, () => (string)zw.NumerPelny);
         }
         finally
