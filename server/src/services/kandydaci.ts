@@ -6,7 +6,8 @@ import { kartotekaOferty, kartotekaPoSku } from "./dopasowanie-sku.js";
 import { podzielZamienniki } from "./zamienniki.js";
 import { zamiennicyOem } from "./zamiennosc-oem.js";
 import { doborRozmowy, DROGI_DOBORU, type DrogaDoboru } from "./dobor.js";
-import { kluczModelu, zastosowaniaModelu } from "./wiedza.js";
+import { kluczModelu, zastosowaniaModelu, type Zastosowanie } from "./wiedza.js";
+import { ocenWarunki, type MaszynaKlienta } from "./warunki-zastosowania.js";
 import { silnikZTekstu, zabudowyMaszyny } from "./silniki.js";
 import { pasowaniaTowaru, type Kartoteka } from "./pasowania.js";
 import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
@@ -194,6 +195,42 @@ function towar(database: DatabaseSync, twId: number) {
     { tw_id: number; symbol: string; nazwa: string; opis: string | null; dostepne: number } | undefined;
 }
 
+/**
+ * Wpis z warunkami przeciw maszynie z doboru — jedna reguła dla szczebla
+ * maszyny i szczebla silnika, żeby oba mówiły to samo tymi samymi słowami.
+ *
+ * POZYTYW:
+ *   - warunki spełnione albo ich brak → kandydat jak dotąd;
+ *   - „nie wiem" → kandydat zostaje, ale z pewnością `wymaga_danych`
+ *     i z ostrzeżeniem, O CO zapytać. Zgubić go byłoby gorzej: to często
+ *     jedyna właściwa część, a brakuje tylko tabliczki;
+ *   - złamane → NIE kandydat, tylko ostrzeżenie „poza zakresem wpisu".
+ *     Katalog, który mówi „od nr X", pod X wskazuje INNĄ część — więc przy
+ *     tej maszynie to jest wiedza negatywna, nie brak wiedzy.
+ * NEGATYW:
+ *   - spełnione, brak warunków albo „nie wiem" → ostrzeżenie stoi, przy
+ *     „nie wiem" z dopiskiem, czego nie wiemy;
+ *   - złamane → negatyw dotyczy innych egzemplarzy i milknie.
+ */
+type Werdykt =
+  | { rodzaj: "kandydat"; pewnosc: PewnoscKandydata | null; ostrzezenie: string | null; dopisek: string }
+  | { rodzaj: "negatyw"; powod: string }
+  | { rodzaj: "nic" };
+
+export function werdyktWarunkow(z: Zastosowanie, maszyna: MaszynaKlienta, czyje: "maszyny" | "silnika"): Werdykt {
+  const { ocena, zdanie } = ocenWarunki(z.warunki, maszyna, czyje);
+  if (z.polaryzacja === "nie_pasuje") {
+    if (ocena === "niespelnione") return { rodzaj: "nic" };
+    const powod = z.zdaniePowodu ?? "nie pasuje";
+    return { rodzaj: "negatyw", powod: ocena === "nieznane" ? `${powod} — o ile: ${zdanie}` : powod };
+  }
+  if (ocena === "niespelnione") return { rodzaj: "negatyw", powod: `poza zakresem wpisu: ${zdanie}` };
+  if (ocena === "nieznane") {
+    return { rodzaj: "kandydat", pewnosc: "wymaga_danych", ostrzezenie: `pasuje warunkowo: ${zdanie}`, dopisek: "" };
+  }
+  return { rodzaj: "kandydat", pewnosc: null, ostrzezenie: null, dopisek: ocena === "spelnione" ? `; ${zdanie}` : "" };
+}
+
 export function kandydaciDoboru(
   conversationId: number, subiekt: SubiektAdapter, database: DatabaseSync = db(),
 ): { kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[]; negatywne: NegatywDoboru[]; kotwice: Kartoteka[] } {
@@ -376,17 +413,21 @@ export function kandydaciDoboru(
     let ile = 0;
     for (const [z, zZapasu] of [...dokladne.map((z) => [z, false] as const), ...zapas.map((z) => [z, true] as const)]) {
       const w = towar(database, z.twId);
-      if (z.polaryzacja === "nie_pasuje") {
+      const werdykt = werdyktWarunkow(z, dobor.dane, "maszyny");
+      if (werdykt.rodzaj === "nic") continue;
+      if (werdykt.rodzaj === "negatyw") {
         negatywne.push({ twId: z.twId, symbol: w?.symbol ?? z.symbol, nazwa: w?.nazwa ?? null,
-          powod: z.zdaniePowodu ?? "nie pasuje", zrodlo: z.zdanieZrodla + (zZapasu ? dopisek : ""),
+          powod: werdykt.powod, zrodlo: z.zdanieZrodla + (zZapasu ? dopisek : ""),
           at: z.rozstrzygnietoAt ?? z.zaproponowanoAt });
         continue;
       }
       if (!w) continue;
       ile++;
+      const pewnosc = zZapasu && z.pewnosc === "potwierdzone" ? "prawdopodobne" : z.pewnosc;
       dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "zastosowanie",
-        pewnosc: zZapasu && z.pewnosc === "potwierdzone" ? "prawdopodobne" : z.pewnosc,
-        zrodlo: z.zdanieZrodla + (zZapasu ? dopisek : ""), ostrzezenia: [] });
+        pewnosc: werdykt.pewnosc ?? pewnosc,
+        zrodlo: z.zdanieZrodla + werdykt.dopisek + (zZapasu ? dopisek : ""),
+        ostrzezenia: werdykt.ostrzezenie ? [werdykt.ostrzezenie] : [] });
     }
     drogi.set("zastosowanie", { droga: "zastosowanie", sprawdzona: true, wynikow: ile });
   }
@@ -441,9 +482,13 @@ export function kandydaciDoboru(
       for (const zab of zabudowy) {
         for (const z of zastosowaniaModelu(zab.silnik.klucz, database)) {
           const w = towar(database, z.twId);
-          if (z.polaryzacja === "nie_pasuje") {
+          /* Warunki wpisu do SILNIKA dotyczą silnika, a dobór zna tabliczkę
+             maszyny — stąd „silnika": wynik to najwyżej „nie wiem". */
+          const werdykt = werdyktWarunkow(z, dobor.dane, "silnika");
+          if (werdykt.rodzaj === "nic") continue;
+          if (werdykt.rodzaj === "negatyw") {
             negatywne.push({ twId: z.twId, symbol: w?.symbol ?? z.symbol, nazwa: w?.nazwa ?? null,
-              powod: z.zdaniePowodu ?? "nie pasuje",
+              powod: werdykt.powod,
               zrodlo: `${z.zdanieZrodla}; ${zab.zdanieZrodla}`,
               at: z.rozstrzygnietoAt ?? z.zaproponowanoAt });
             continue;
@@ -452,8 +497,9 @@ export function kandydaciDoboru(
           ile++;
           const pewne = z.pewnosc === "potwierdzone" && zab.pewnosc === "potwierdzone" && kilka.length === 0;
           dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne),
-            droga: "silnik", pewnosc: pewne ? "potwierdzone" : "prawdopodobne",
-            zrodlo: `${z.zdanieZrodla}; ${zab.zdanieZrodla}`, ostrzezenia: [...kilka] });
+            droga: "silnik", pewnosc: werdykt.pewnosc ?? (pewne ? "potwierdzone" : "prawdopodobne"),
+            zrodlo: `${z.zdanieZrodla}; ${zab.zdanieZrodla}`,
+            ostrzezenia: [...kilka, ...(werdykt.ostrzezenie ? [werdykt.ostrzezenie] : [])] });
         }
       }
       /* Silnik znany, ale bez zastosowań to `sprawdzona: true, wynikow: 0` —

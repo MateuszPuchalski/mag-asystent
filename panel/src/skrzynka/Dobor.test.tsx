@@ -537,6 +537,21 @@ describe("hałas w doborze", () => {
     expect(slabe.contains(screen.getByText("FTC272"))).toBe(false);
   });
 
+  /* Wpis z bazy wiedzy z warunkiem, którego dobór nie sprawdzi, ma dowód —
+     brakuje mu tylko tabliczki klienta. Pod „bez dowodu" kłamałby i chował
+     jedyną właściwą część, a ostrzeżenie mówi agentowi, o co zapytać. */
+  it("warunkowy kandydat z bazy wiedzy stoi na wierzchu z ostrzeżeniem, nie wśród słabych", () => {
+    kandydaci.mockReturnValue({ data: { ...Z_KANDYDATAMI, kandydaci: [...Z_KANDYDATAMI.kandydaci,
+      { nr: 3, twId: 77, symbol: "W09-0211", nazwa: "Gaźnik GX160", stan: 5, droga: "zastosowanie" as const,
+        pewnosc: "wymaga_danych" as const, zrodlo: "potwierdzone zastosowanie do NAC LS 46-450 (roczniki 2014–2018) — producent",
+        ostrzezenia: ["pasuje warunkowo: roczniki 2014–2018 — w doborze brak rocznika, zapytaj klienta"] }] },
+    isLoading: false, error: null });
+    pokaz(dobor({ status: "searching" }));
+    const slabe = screen.getByText(/Słabsze trafienia \(1\)/).closest("details")!;
+    expect(slabe.contains(screen.getByText("W09-0211"))).toBe(false);
+    expect(screen.getByText(/pasuje warunkowo: roczniki 2014–2018/)).toBeVisible();
+  });
+
   it("wybrany zostaje na wierzchu, choćby był słaby; same słabe — bez zwijania", () => {
     kandydaci.mockReturnValue({ data: Z_KANDYDATAMI, isLoading: false, error: null });
     pokaz(dobor({ status: "searching", wybrany: {

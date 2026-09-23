@@ -171,6 +171,32 @@ test("poprawka to nowy wiersz z zastepujeId — stare schodzi na wycofane przy z
   assert.deepEqual(W.zastosowaniaModelu("maszyna|nacls46450hs").map((z) => z.id), [nowe.id]);
 });
 
+test("warunki: zapis z oczyszczeniem, zdanie źródła z warunkiem przy maszynie, zły zakres odbity bez śladu", () => {
+  const z = propozycja({ warunki: { rokOd: "2014", rokDo: 2018, seryjnyOd: " 175000000 ", warunek: "" } })!;
+  assert.deepEqual(z.warunki, { rokOd: 2014, rokDo: 2018, seryjnyOd: "175000000", seryjnyDo: null, warunek: null });
+  assert.equal(z.zdanieWarunkow, "roczniki 2014–2018, nr seryjny od 175000000");
+  assert.match(z.zdanieZrodla, /^zastosowanie do NAC LS 46-450 \(roczniki 2014–2018, nr seryjny od 175000000\) zatwierdzone/);
+  const przed = liczba("zastosowanie");
+  assert.throws(() => propozycja({ twId: SZR_ALT, warunki: { rokOd: 2019, rokDo: 2014 } }), /późniejszy/);
+  assert.equal(liczba("zastosowanie"), przed, "odmowa przed transakcją — ani wiersza, ani modelu w połowie");
+  /* Wpis bez warunków mówi tak jak przed wydaniem — słowo w słowo. */
+  const bez = propozycja({ twId: SZR_ALT })!;
+  assert.equal(bez.zdanieWarunkow, null);
+  assert.match(bez.zdanieZrodla, /^zastosowanie do NAC LS 46-450 zatwierdzone na podstawie rozmowy/);
+});
+
+test("poprawka warunków zastępuje wpis TEJ kartoteki — cudzego nie wolno", () => {
+  const stare = propozycja({ dowod: { rodzaj: "katalog_dostawcy", tresc: "katalog 2021" } })!;
+  W.rozstrzygnijZastosowanie(stare.id, "zatwierdz", null, biuro);
+  assert.throws(() => propozycja({ twId: SZR_ALT, zastepujeId: stare.id }), /tej samej kartoteki/);
+  const nowe = propozycja({ zastepujeId: stare.id, warunki: { seryjnyOd: "175000000" },
+    dowod: { rodzaj: "producent", tresc: "IPL 2024: od nr 175000000" } })!;
+  W.rozstrzygnijZastosowanie(nowe.id, "zatwierdz", null, druga);
+  assert.equal(W.zastosowanie(stare.id)!.stan, "wycofane");
+  assert.deepEqual(W.zastosowaniaModelu("maszyna|nacls46450").map((z) => [z.id, z.zdanieWarunkow]),
+    [[nowe.id, "nr seryjny od 175000000"]]);
+});
+
 test("pomiar z hali staje się dowodem, nie faktem — i dopisuje się do istniejącej pary", () => {
   const d = db();
   const zadanie = Number(d.prepare(`INSERT INTO zadanie_terenowe(rodzaj,tytul,instrukcja,tw_id,status,utworzono_at,

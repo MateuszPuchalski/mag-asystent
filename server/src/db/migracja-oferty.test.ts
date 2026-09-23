@@ -146,6 +146,21 @@ test("identyfikatory `id` przeżywają przebudowę, więc odnośniki dalej trafi
   d.close();
 });
 
+test("kolumny warunków dochodzą PO przebudowie — baza sprzed 0.264.0 ich nie gubi", () => {
+  /* Przebudowa przepisuje `zastosowanie` własnym `CREATE TABLE`, który
+     warunków nie zna. Dodane przed nią kolumny zniknęłyby przy przepisaniu,
+     a pierwszy zapis wpisu z latami wywróciłby się na brakującej kolumnie. */
+  const d = bazaSprzed();
+  zapelnij(d);
+  migrate(d);
+  const kolumny = (d.prepare("PRAGMA table_info(zastosowanie)").all() as Array<{ name: string }>).map((k) => k.name);
+  for (const k of ["rok_od", "rok_do", "seryjny_od", "seryjny_do", "warunek"]) assert.ok(kolumny.includes(k), k);
+  assert.deepEqual({ ...d.prepare("SELECT rok_od, seryjny_od, warunek FROM zastosowanie WHERE id=11").get() },
+    { rok_od: null, seryjny_od: null, warunek: null }, "stary wpis to „bez warunków”, czyli to, co twierdził dotąd");
+  migrate(d);
+  d.close();
+});
+
 test("klucze obce wracają WŁĄCZONE — także wtedy, gdy przebudowa się wywróci", () => {
   /* Gdyby `PRAGMA foreign_keys = ON` stało w środku transakcji, a nie
      w `finally`, jeden wyjątek zostawiłby proces z wyłączonymi kluczami na

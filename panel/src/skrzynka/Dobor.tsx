@@ -437,10 +437,17 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
           „Wybierz". „Wymaga danych" znaczy trafienie po samym tekście, bez
           dowodu. Gdy jest choć jeden mocniejszy kandydat, słabe schodzą pod
           jedno rozwinięcie: nie znikają (§4.3), ale nie kosztują uwagi.
-          Wybrany zostaje na wierzchu zawsze, choćby był słaby. */}
+          Wybrany zostaje na wierzchu zawsze, choćby był słaby.
+
+          WYJĄTEK: wpis z bazy wiedzy z WARUNKIEM, którego dobór nie umie
+          sprawdzić („roczniki 2014–2018", a rocznika brak). Ma dowód, brakuje
+          mu tylko tabliczki klienta — zwinięty pod „bez dowodu" mówiłby
+          nieprawdę i chował jedyną właściwą część. Rozróżnia go DROGA, nie
+          zdanie: drogi wiedzy „wymaga danych" dają wyłącznie przez warunek. */}
       {(() => {
         const lista = kandydaci.data?.kandydaci ?? [];
         const mocny = (k: KandydatDoboru) => k.pewnosc !== "wymaga_danych"
+          || k.droga === "zastosowanie" || k.droga === "silnik"
           || (k.twId !== null && dobor.wybrany?.twId === k.twId);
         const zwijaj = lista.some((k) => k.pewnosc !== "wymaga_danych");
         const wierzch = zwijaj ? lista.filter(mocny) : lista;

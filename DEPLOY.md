@@ -2582,6 +2582,17 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.469.0 — warunki na zastosowaniu
+
+**Panel trzeba przebudować, a serwer zrestartować.** Pięć kolumn warunków
+w `zastosowanie` dochodzi samo przy starcie, bez przepisywania tabeli.
+Stare wpisy dostają puste warunki, czyli to, co twierdziły dotąd.
+
+Sprawdzenie: Wiedza → „Sprawdź kartotekę” → wybierz część z potwierdzonym
+zastosowaniem → „Popraw warunki”. Wpisz roczniki i dowód, zatwierdź poprawkę
+w kolejce. W rozmowie o tej maszynie wpisz rocznik spoza zakresu. Dobór ma
+pokazać ostrzeżenie „poza zakresem wpisu”.
+
 ### Aktualizacja do 0.467.0 — odsyłacze od dostawców
 
 **Zrób kopię bazy przed startem.** Migracja przebudowuje `towar_identyfikator`

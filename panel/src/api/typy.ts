@@ -708,6 +708,11 @@ export type DowodZastosowania = {
   zadanieId: number | null; conversationId: number | null; autor: string; at: string;
 };
 
+/** Kwalifikatory wpisu: lata, zakres numerów seryjnych, warunek słowny. Wszystkie `null` = bez warunków. */
+export type WarunkiZastosowania = {
+  rokOd: number | null; rokDo: number | null; seryjnyOd: string | null; seryjnyDo: string | null; warunek: string | null;
+};
+
 export type Zastosowanie = {
   id: number; twId: number; symbol: string; model: ModelUrzadzenia;
   polaryzacja: "pasuje" | "nie_pasuje"; powodNegatywny: PowodNegatywny | null; zdaniePowodu: string | null;
@@ -717,6 +722,9 @@ export type Zastosowanie = {
   rozstrzygnal: string | null; rozstrzygnietoAt: string | null; powodRozstrzygniecia: string | null;
   dowody: DowodZastosowania[];
   pewnosc: "potwierdzone" | "prawdopodobne";
+  warunki: WarunkiZastosowania;
+  /** „roczniki 2014–2018, nr seryjny od 175000000" — pisze SERWER; `null` = bez warunków. */
+  zdanieWarunkow: string | null;
   /** Zdanie źródła pisze SERWER (§14.3). */
   zdanieZrodla: string;
 };
@@ -847,7 +855,12 @@ export type NowaPropozycja = {
   komentarz?: string | null;
   dowod: { rodzaj: RodzajDowodu; tresc: string; link?: string | null };
   zastepujeId?: number | null;
+  warunki?: WarunkiDoZapisu | null;
 };
+
+/* Rok jedzie tak, jak go wpisano, gdy nie jest liczbą — serwer odpowiada
+   zdaniem „rok z czterech cyfr", zamiast przyjąć wpis bez granicy. */
+export type WarunkiDoZapisu = { [K in keyof WarunkiZastosowania]: string | number | null };
 
 export type PomiarRozmowy = {
   zadanieId: number; tytul: string; wynik: string; wykonanoAt: string; wykonanoPrzez: string;

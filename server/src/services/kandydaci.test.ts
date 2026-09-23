@@ -290,6 +290,57 @@ test("wpis DLA wariantu wygrywa — druga próba nie rozmywa go wpisem ogólnym"
   assert.deepEqual(z.map((x) => [x.twId, x.pewnosc]), [[FTC272, "potwierdzone"]]);
 });
 
+/* ── Warunki na zastosowaniu: lata i numer seryjny (kwalifikatory) ─────────
+   Rocznik i numer seryjny stały w danych doboru od E1, ale żaden szczebel
+   ich nie czytał. Teraz wpis „od nr 175000000" daje trzy różne ekrany:
+   kandydata, ostrzeżenie albo pytanie do klienta.                          */
+test("warunek spełniony: kandydat jak dotąd, a źródło mówi, CO sprawdziliśmy", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250", rocznik: "2016", nrSeryjny: "175 123 456" }, 1, biuro);
+  W.rozstrzygnijZastosowanie(zaproponuj(ZAMIENNIK_FTC272,
+    { warunki: { rokOd: 2014, rokDo: 2018, seryjnyOd: "175000000" } }).id, "zatwierdz", null, biuro);
+  const k = kandydaciDoboru(rozmowa, subiekt).kandydaci.find((x) => x.droga === "zastosowanie")!;
+  assert.equal(k.pewnosc, "potwierdzone");
+  assert.match(k.zrodlo, /^potwierdzone zastosowanie do STIHL FS 250 \(roczniki 2014–2018, nr seryjny od 175000000\) — katalog dostawcy/);
+  assert.match(k.zrodlo, /; rocznik 2016 mieści się w: roczniki 2014–2018; nr seryjny 175 123 456 mieści się w/);
+  assert.deepEqual(k.ostrzezenia, []);
+});
+
+test("warunek nieznany: kandydat zostaje, ale „wymaga danych” i mówi, o co zapytać", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250" }, 1, biuro);
+  W.rozstrzygnijZastosowanie(zaproponuj(ZAMIENNIK_FTC272, { warunki: { seryjnyOd: "175000000" } }).id, "zatwierdz", null, biuro);
+  const { kandydaci, negatywne, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  const k = kandydaci.find((x) => x.droga === "zastosowanie")!;
+  assert.equal(szczebel(drogi, "zastosowanie").wynikow, 1, "zgubić go byłoby gorzej — często to jedyna właściwa część");
+  assert.equal(k.pewnosc, "wymaga_danych");
+  assert.deepEqual(k.ostrzezenia, ["pasuje warunkowo: nr seryjny od 175000000 — w doborze brak numeru seryjnego, zapytaj o tabliczkę"]);
+  assert.deepEqual(negatywne, []);
+});
+
+test("warunek złamany: nie kandydat, tylko ostrzeżenie — także przy tej samej części z innej drogi", () => {
+  pytaniePodOferta("14892374512", "FTC272");
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250", rocznik: "2012" }, 1, biuro);
+  W.rozstrzygnijZastosowanie(zaproponuj(FTC272, { warunki: { rokOd: 2014 } }).id, "zatwierdz", null, biuro);
+  const { kandydaci, negatywne, drogi } = kandydaciDoboru(rozmowa, subiekt);
+  assert.equal(szczebel(drogi, "zastosowanie").wynikow, 0);
+  assert.deepEqual(negatywne.map((n) => [n.twId, n.powod]),
+    [[FTC272, "poza zakresem wpisu: wpis obejmuje rocznik od 2014, a w doborze rocznik 2012"]]);
+  const oferta = kandydaci.find((k) => k.twId === FTC272)!;
+  assert.equal(oferta.droga, "oferta", "ta sama kartoteka z oferty zostaje — z ostrzeżeniem obok");
+  assert.match(oferta.ostrzezenia[0], /^poza zakresem wpisu: .* — potwierdzone zastosowanie do STIHL FS 250 \(rocznik od 2014\)/);
+});
+
+test("negatyw z warunkiem: złamany milknie, nieznany ostrzega z dopiskiem „o ile”", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250", rocznik: "2012" }, 1, biuro);
+  W.rozstrzygnijZastosowanie(zaproponuj(FTC272, { polaryzacja: "nie_pasuje", powodNegatywny: "niewlasciwy_rozstaw",
+    warunki: { rokOd: 2014 } }).id, "zatwierdz", null, biuro);
+  W.rozstrzygnijZastosowanie(zaproponuj(1, { polaryzacja: "nie_pasuje", powodNegatywny: "niewlasciwy_rozstaw",
+    warunki: { warunek: "wersja z gaźnikiem Walbro" } }).id, "zatwierdz", null, biuro);
+  const { negatywne } = kandydaciDoboru(rozmowa, subiekt);
+  assert.deepEqual(negatywne.map((n) => [n.twId, n.powod]), [[1,
+    "niewłaściwy rozstaw — o ile: warunek: wersja z gaźnikiem Walbro — sprawdź z klientem"]],
+    "negatyw dla roczników od 2014 nie dotyczy egzemplarza z 2012");
+});
+
 /* ── Szczeble OEM i pełnego tekstu (E3) ──────────────────────────────────── */
 
 /* Numer z tabeli odsyłaczy dostawcy działa w szczeblu OEM jak numer z opisu —
@@ -494,6 +545,19 @@ test("ślad rozmowy po którejkolwiek stronie łańcucha zbija pewność do „p
   zastosowanieDoSilnika(FTC272, BS450);
   const k = kandydaciDoboru(rozmowa, subiekt).kandydaci.find((x) => x.twId === FTC272)!;
   assert.equal(k.pewnosc, "prawdopodobne", "łańcuch jest wart tyle, co słabsze ogniwo");
+});
+
+test("warunek wpisu do SILNIKA to zawsze pytanie o tabliczkę silnika, nigdy wyrok z rocznika maszyny", () => {
+  zapiszDane(rozmowa, { marka: "STIHL", model: "FS 250", rocznik: "2022" }, 1, biuro);
+  zabuduj(BS450);
+  const z = W.zaproponujZastosowanie({ twId: FTC272, model: BS450, polaryzacja: "pasuje", zrodlo: "reczne",
+    dowod: { rodzaj: "katalog_dostawcy", tresc: "katalog 2024" }, warunki: { rokDo: 2018 } },
+  { userId: biuro, name: "A. Lewandowska" })!;
+  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
+  const k = kandydaciDoboru(rozmowa, subiekt).kandydaci.find((x) => x.twId === FTC272)!;
+  assert.equal(k.droga, "silnik");
+  assert.equal(k.pewnosc, "wymaga_danych");
+  assert.deepEqual(k.ostrzezenia, ["pasuje warunkowo: rocznik do 2018 silnika — sprawdź z tabliczki silnika"]);
 });
 
 test("negatyw przez silnik jest widoczny i cytuje oba dowody", () => {

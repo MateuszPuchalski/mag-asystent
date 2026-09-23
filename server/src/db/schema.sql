@@ -551,6 +551,20 @@ CREATE TABLE IF NOT EXISTS zastosowanie (
   rozstrzygnal_user_id  INTEGER REFERENCES app_user(user_id),
   rozstrzygnieto_at     TEXT,
   powod_rozstrzygniecia TEXT,
+  -- ── WARUNKI (kwalifikatory ACES/TecDoc) ────────────────────────────────
+  -- „Pasuje do MS 250" rzadko jest pełną prawdą: katalog mówi „od numeru
+  -- seryjnego X" albo „roczniki 2014–2018". Granice opcjonalne i domknięte;
+  -- poprawność zakresu i kształt numeru pilnuje `warunki-zastosowania.ts`,
+  -- bo porównanie numerów seryjnych nie jest porównaniem tekstu. Warunek
+  -- słowny („tylko z gaźnikiem Zama") czyta człowiek — kod go nie ocenia.
+  -- Wiersz jest niezmienny poza stanem, więc zmiana warunków to nowy wiersz
+  -- z `zastepuje_id`, jak każda poprawka. Kolumny dochodzą w `migrate()`
+  -- PO przebudowie `zrodloPropozycjiZOferty`, która ich nie zna.
+  rok_od                INTEGER,
+  rok_do                INTEGER,
+  seryjny_od            TEXT,
+  seryjny_do            TEXT,
+  warunek               TEXT,
   -- Ograniczenie tabelowe MUSI stać po kolumnach — SQLite inaczej nie parsuje.
   CHECK ((polaryzacja = 'nie_pasuje') = (powod_negatywny IS NOT NULL))
 );
