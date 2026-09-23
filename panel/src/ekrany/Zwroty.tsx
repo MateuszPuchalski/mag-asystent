@@ -14,7 +14,7 @@ import {
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
-  useDolozTowar, szukajTowaruDoKosza, type TowarDoKosza, useKosz,
+  useDolozTowar, szukajTowaruDoKosza, type TowarDoKosza, useKosz, usePotwierdzKartoteke,
 } from "../api/zwroty";
 import { wygladaNaEan } from "../zwroty/rodzajKodu";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
@@ -24,6 +24,8 @@ import { Etapy, IKONA_KUBELKA } from "../zwroty/Etapy";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { polecanyKandydat } from "../zwroty/Dokument";
+import { SzybkiZwrot } from "../zwroty/SzybkiZwrot";
+import { calaDostawa, pewnaPropozycja, szybkaSciezka } from "../zwroty/szybkiZwrot";
 import { Szukanie } from "../zwroty/Szukanie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { Koszyk } from "../zwroty/Koszyk";
@@ -667,6 +669,52 @@ export function Zwroty() {
     return zTymZwrotem.length === 1 ? zTymZwrotem[0].id : undefined;
   };
 
+  /* ── SZYBKA ŚCIEŻKA (0.481.0) — reguła w `zwroty/szybkiZwrot.ts` ─────
+     Cały ciąg typowego zwrotu jednym ruchem: przyjęcie, pewne kartoteki,
+     ocena „na stan", pełna kwota, a na końcu zwrot w Allegro do wypłaty.
+
+     PO KOLEI, z wersją oddaną przez poprzedni zapis — ta sama zasada co przy
+     ocenie hurtem. Pierwszy błąd zatrzymuje ciąg; to, co już się zapisało,
+     zostaje i widać to na osi, a reszta czeka na zwykłe przyciski.
+
+     KARTA ALLEGRO OTWIERA SIĘ OD RAZU, PUSTA. Przeglądarka pozwala otworzyć
+     okno tylko w chwili kliknięcia — po czterech żądaniach blokada okienek
+     już by je zdjęła. Adres dostaje dopiero po udanym zapisie kwoty, a przy
+     błędzie karta się zamyka: wypłata nie może wyprzedzić zapisu u nas. */
+  const stanSzybkiej = zwrot ? szybkaSciezka(zwrot, pudla) : { pokaz: false as const };
+  const potwierdzKartoteke = usePotwierdzKartoteke();
+  const [szybka, setSzybka] = useState<{ trwa: boolean; blad: string }>({ trwa: false, blad: "" });
+  const szybkiZwrot = () => {
+    if (!zwrot || !stanSzybkiej.pokaz || stanSzybkiej.przeszkoda || szybka.trwa) return;
+    const z = zwrot;
+    const okno = window.open("", "_blank");
+    setSzybka({ trwa: true, blad: "" });
+    void (async () => {
+      let wersja = z.wersja;
+      if (z.werdykt !== "przyjety") {
+        wersja = (await werdykt.mutateAsync(
+          { id: z.id, decyzja: "przyjety", powod: null, wersja })).wersja;
+      }
+      for (const p of z.pozycje.filter((x) => x.twId === null && pewnaPropozycja(x))) {
+        await potwierdzKartoteke.mutateAsync(
+          { pozycjaId: p.id, twId: p.propozycja!.twId, zrodlo: "sku" });
+      }
+      const koszId = pudloTegoZwrotu("stan");
+      for (const p of z.pozycje.filter((x) => x.ocena === null)) {
+        wersja = (await ocena2.mutateAsync(
+          { pozycjaId: p.id, ocena: "stan", wersja, koszId })).wersja;
+      }
+      await kwota.mutateAsync({ id: z.id, pozycjeIds: z.pozycje.map((p) => p.id),
+        dostawa: calaDostawa(z), wersja });
+    })().then(() => {
+      setSzybka({ trwa: false, blad: "" });
+      if (okno) { okno.opener = null; okno.location.href = z.linkZwrotu!; }
+    }, (e: Error) => {
+      okno?.close();
+      setSzybka({ trwa: false, blad: `Zatrzymałem się: ${e.message}` });
+    });
+  };
+
   /**
    * Klawisze KUBEŁKA — tabela §25a.2 wreszcie z nasłuchem (0.284.0).
    *
@@ -690,6 +738,13 @@ export function Zwroty() {
     if (e.key === "z" || e.key === "Z") {
       e.preventDefault();
       akcje.current.oddajPieniadze?.();
+      return;
+    }
+    /* `W` — szybka ścieżka, w każdym kubełku, w którym przycisk stoi.
+       Klawisz jest gestem użytkownika, więc karta Allegro się otworzy. */
+    if ((e.key === "w" || e.key === "W") && stanSzybkiej.pokaz) {
+      e.preventDefault();
+      szybkiZwrot();
       return;
     }
     /* WYJĄTKI Z KLAWIATURY (0.479.0): `-` otwiera „wróciło mniej", `D`
@@ -898,6 +953,10 @@ export function Zwroty() {
               : KLAWISZE_KUBELKA[zwrot?.kubelek ?? kubelek ?? "wszystkie"] ?? []),
             ...(stanPieniedzy?.moznaZwrocic
               ? [["Z", "oddaj pieniądze"] as const] : []),
+            /* `W` tylko wtedy, gdy przycisk naprawdę puści ciąg — przy
+               przeszkodzie klawisz milczałby, a pasek kłamał. */
+            ...(stanSzybkiej.pokaz && !stanSzybkiej.przeszkoda
+              ? [["W", "wszystko OK — na półkę i wypłata"] as const] : []),
           ]} />
       </div>
       </nav>
@@ -988,6 +1047,8 @@ export function Zwroty() {
             {/* Pasek stoi NAD produktami i nie przewija się razem z nimi:
                 decyzja o całym zwrocie ma być pod ręką także wtedy, gdy
                 operator zjechał na dziewiątą pozycję. */}
+            <SzybkiZwrot zwrot={zwrot} stan={stanSzybkiej} trwa={szybka.trwa || trwa}
+              blad={szybka.blad} onStart={szybkiZwrot} />
             <Decyzje zwrot={zwrot} trwa={trwa} blad={bladDecyzji} akcje={akcje}
               /* KURSOR SCHODZI PO TYCH DWÓCH DECYZJACH, i tylko po nich
                  (§25a.2). Odmowa i zapisany numer korekty WYPROWADZAJĄ zwrot

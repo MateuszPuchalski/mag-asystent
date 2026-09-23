@@ -34,6 +34,28 @@ historii nie przepisujemy.
 ---
 
 
+## 0.481.0 — 23 września 2026
+
+**Zwroty: szybka ścieżka — „Wszystko OK” jednym przyciskiem albo klawiszem
+`W`.** Zgłoszenie właściciela: większość zwrotów jest w porządku i może od
+razu jechać na półkę.
+
+- **Jeden ruch po skanie.** Przyjmuje zwrot, zatwierdza pewne kartoteki
+  i ocenia wszystko „na stan”, czyli do pudła i na MM. Zapisuje pełną
+  kwotę, z dostawą przy zwrocie całego zamówienia. Potem otwiera zwrot
+  w Allegro do wypłaty.
+- **Kwota stoi na przycisku**, zanim się go naciśnie.
+- **Odmawia przed pierwszym zapisem** i mówi dlaczego:
+  - inna ocena, potrącenie albo brak sztuk;
+  - brak pewnej kartoteki;
+  - kilka pudeł bez wyboru;
+  - brak odnośnika do Allegro.
+- **Karta Allegro dostaje adres dopiero po zapisie kwoty.** Przy błędzie się
+  zamyka, więc wypłata nie wyprzedzi zapisu u nas.
+
+Opis w `docs/panel-obslugi-klienta.md` §25a.27. Bez migracji i bez zmian
+w `wertis.env`.
+
 ## 0.480.0 — 23 września 2026
 
 **„Pasuje do” ze wszystkich ofert Allegro: zbiórka do wiedzy i sprawdzenie
