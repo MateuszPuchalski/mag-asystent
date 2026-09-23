@@ -63,6 +63,16 @@ Magazynowo-biurowy asystent firmy ogrodniczej: serwer Fastify + `node:sqlite`
 - **Tickery wyłącznie w `main()`**, nigdy w `buildApp()` (testy tras nie
   strzelają do Allegro). Wszystkie idą przez `uruchomTakt` z `services/takt.ts`
   (rozrzut, respekt dla 429); lista stoi w `main()` w `index.ts`.
+- **Copilot (model językowy) woła się wyłącznie z `adapters/copilot.anthropic.ts`.**
+  Cztery reguły z audytu promptów w 0.482.x, każda po awarii albo o krok od niej:
+  - `output_config.effort` idzie tylko przez `wspieraWysilek`, bo Haiku 4.5
+    i Sonnet 4.5 odrzucają go błędem 400.
+  - `max_tokens` liczy też myślenie, domyślnie włączone na claude-opus-5.
+    Ucięty JSON to wywołanie zapłacone za nic, a sufit nie kosztuje nic.
+  - Kształt odpowiedzi wymusza `zodOutputFormat`. Instrukcja opisuje pola,
+    nie każe „zwrócić JSON”.
+  - Powód reguły i opis incydentu stoją w komentarzu obok instrukcji, nie
+    w jej tekście. Model przejmuje przykłady i rejestr instrukcji, także myślniki.
 - **Prywatność:** adres DOSTAWY przechodzi przez mapowanie od 0.422.0,
   decyzją właściciela, i to jest wyjątek, nie nowa zasada. Wchodzą cztery pola
   `delivery.address` — ulica, miasto, kod i telefon — plus nazwa odbiorcy
