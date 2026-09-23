@@ -44,6 +44,7 @@ const POWODY: Record<string, string> = {
 };
 
 import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
+import { calaDostawa, pewnaPropozycja } from "./szybkiZwrot";
 
 /* TRZY PRZYCISKI OD 0.375.0, i trzeci ma warunek. „Na przecenę" zeszła stąd
    w 0.209.0, bo nie prowadziła donikąd: nie dokładała do koszyka, nie ruszała
@@ -325,10 +326,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
 
      Przy zwrocie części pole dalej zaczyna puste i decyduje człowiek. Brak
      zamówienia to „nie wiem", a nie „wszystko wraca". */
-  const [dostawa, setDostawa] = useState(() => {
-    const poz = zwrot.zamowienie?.pozycje ?? [];
-    return poz.length > 0 && poz.every((p) => p.zwracana && p.wracaIlosc >= p.ilosc);
-  });
+  const [dostawa, setDostawa] = useState(() => calaDostawa(zwrot));
 
   /* Wycena tylko PRZED kwotą (0.476.0). Od tego wydania zwrot wraca do DO
      ZWROTU także po korekcie, gdy pieniądze jeszcze nie wyszły — a wtedy
@@ -387,8 +385,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   /* Pewne propozycje kartoteki — patrz przycisk nad listą. Po jednej, po
      kolei: trasa zapisu jest na pozycję, a pierwsza odmowa zatrzymuje
      resztę, żeby ekran nie zostawił połowy powiązań bez słowa. */
-  const pewne = zwrot.pozycje.filter((p) => p.twId === null && p.propozycja?.twId != null
-    && (p.propozycja.pewnosc === "sku" || p.propozycja.pewnosc === "pamiec"));
+  const pewne = zwrot.pozycje.filter((p) => p.twId === null && pewnaPropozycja(p));
   const potwierdz = usePotwierdzKartoteke();
   const [hurt, setHurt] = useState<{ trwa: boolean; blad: string }>({ trwa: false, blad: "" });
   const zatwierdzPewne = async () => {

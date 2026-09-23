@@ -4910,6 +4910,40 @@ nieodebranej paczce numer z naklejki nie trafia nigdy, więc ten klik
 następował zawsze. Po Escape przycisk „Szukaj po kliencie" otwiera pole
 z powrotem.
 
+### 25a.27. Szybka ścieżka — `W` (0.481.0)
+
+Zgłoszenie właściciela: większość zwrotów jest w porządku i może od razu
+jechać na półkę. Po skanie etykiety ekran pokazuje zawartość zwrotu, a nad
+decyzjami stoi przycisk „Wszystko OK — na półkę i oddaj …". Klawisz `W` robi
+to samo.
+
+**Co robi, po kolei.** Przyjmuje zwrot i zatwierdza pewne kartoteki. Każdą
+nieocenioną pozycję ocenia „na stan", czyli do pudła i na MM. Zapisuje pełną
+kwotę, z dostawą przy zwrocie całego zamówienia. Na końcu otwiera zwrot
+w Allegro, gdzie operator oddaje pieniądze. ZW wystawia potem automat, jak
+przy każdym zapisie kwoty.
+
+**Kwota stoi na przycisku**, bo to jedyna liczba, która wychodzi do klienta.
+
+**Kiedy przycisk odmawia.** Zatrzymuje się przed pierwszym zapisem i mówi
+dlaczego, gdy:
+
+- pozycja ma inną ocenę niż „na stan", potrącenie albo brak sztuk;
+- pozycja nie ma kartoteki albo ma tylko zgadywaną propozycję;
+- przy biurku stoi kilka otwartych pudeł, a żadne nie ma jeszcze towaru
+  tego zwrotu — pudła nie zgadujemy (0.379.0);
+- zwrot nie ma pozycji albo odnośnika do Allegro.
+
+Paczki nieodebranej przycisk nie dotyczy, bo nie ma jej zwrotu w Allegro.
+
+**Karta Allegro otwiera się pusta, w chwili kliknięcia.** Przeglądarka
+blokuje okna otwierane później, po kilku żądaniach. Adres karta dostaje
+dopiero po zapisie kwoty. Przy błędzie karta się zamyka, a ekran mówi, na
+którym kroku stanął. Wypłata nie może wyprzedzić zapisu u nas.
+
+Zwrot zostaje potem w DO ZWROTU z paskiem pieniędzy (0.476.0). Schodzi sam,
+gdy synchronizacja zobaczy wypłatę z Allegro.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi

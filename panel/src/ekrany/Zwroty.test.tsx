@@ -63,6 +63,8 @@ const scena = vi.hoisted(() => ({
   /* Kartoteka dla skanu EAN-u (0.468.0): kod → towar. Pusta = kartoteka kodu
      nie zna, więc skan wraca do szukania zwrotu. */
   kartoteka: {} as Record<string, { twId: number; symbol: string }>,
+  /* Odmowa zapisu kwoty dla szybkiej ścieżki (0.481.0); pusta = zapis przechodzi. */
+  odmowaKwoty: "",
 }));
 
 vi.mock("../api/zwroty", async () => {
@@ -87,9 +89,17 @@ vi.mock("../api/zwroty", async () => {
     useWerdykt: () => atrapa("werdykt"),
     useOcena: () => atrapa("ocena"),
     useKorekta: () => atrapa("korekta"),
-    useKwota: () => atrapa("kwota"),
+    useKwota: () => {
+      /* Odmowa zapisu kwoty — szybka ścieżka musi wtedy zamknąć kartę Allegro. */
+      const a = atrapa("kwota");
+      return { ...a, mutateAsync: async (dane: Record<string, unknown>) => {
+        if (scena.odmowaKwoty) throw new Error(scena.odmowaKwoty);
+        return a.mutateAsync(dane);
+      } };
+    },
     useCofnijKorekte: () => atrapa("cofnijKorekte"),
     useFaktura: () => atrapa("faktura"),
+    usePotwierdzKartoteke: () => atrapa("kartoteka"),
     useZwrot: () => ({ data: scena.szczegol, isLoading: false, error: null }),
     useZwrocPieniadze: () => atrapa("zwrocPieniadze"),
     /* Skan i dołożenie towaru jako atrapy: test sprawdza, KTÓRĄ drogą poszedł
@@ -520,6 +530,77 @@ describe("Klawisze kubełka", () => {
     await waitFor(() => expect(scena.wolano.map((w) => w.co)).toEqual(["werdykt", "ocena"]));
     expect(scena.wolano[0].dane).toEqual({ id: 1, decyzja: "przyjety", powod: null, wersja: 1 });
     expect(scena.wolano[1].dane).toMatchObject({ ocena: "stan", wersja: 2 });
+  });
+
+  describe("Szybka ścieżka — `W` (0.481.0)", () => {
+    /* Zwrot „wszystko w porządku": dwie pozycje, jedna z pewną propozycją
+       kartoteki, druga już powiązana; wraca całe zamówienie z dostawą. */
+    const pewny = (): Zwrot => {
+      const z = zwrot(8, "decyzja", "ZW-8");
+      return { ...z, linkZwrotu: "https://salescenter.allegro.com/returns?q=ZW-8",
+        zamowienie: { externalId: "ord-8", status: null, kupujacyLogin: null,
+          dostawaGrosze: 1500, dostawaMetoda: "InPost", platnoscTyp: null, platnoscAt: null,
+          fakturaZadana: null, sumaGrosze: 6499, waluta: "PLN", kupionoAt: null, link: null,
+          pozycje: [{ offerId: "1", nazwa: "Sekator", sku: null, ilosc: 1, cenaGrosze: 4999,
+            waluta: "PLN", zwracana: true, wracaIlosc: 1 }] } as unknown as Zwrot["zamowienie"],
+        pozycje: [
+          { ...z.pozycje[0], id: 81, propozycja: { pewnosc: "sku", twId: 10, symbol: "SEK",
+            zrodlo: "x", powod: null, poKolumnie: null } },
+          { ...z.pozycje[0], id: 82, twId: 11, twSymbol: "FIL" },
+        ] };
+    };
+
+    it("jeden klawisz: przyjęcie, kartoteka, ocena wszystkiego, kwota — potem Allegro", async () => {
+      scena.wolano = [];
+      scena.zwroty = [pewny()];
+      /* Karta otwiera się PUSTA w chwili klawisza, adres dostaje po kwocie. */
+      const karta = { opener: {} as unknown, location: { href: "" }, close: vi.fn() };
+      const otworz = vi.spyOn(window, "open").mockReturnValue(karta as unknown as Window);
+      try {
+        pokaz("/obsluga/zwroty/8");
+        expect(screen.getByRole("button", { name: /Wszystko OK/ })).toHaveTextContent("114,98");
+        await userEvent.keyboard("w");
+        await waitFor(() => expect(karta.location.href).toContain("salescenter"));
+        expect(otworz).toHaveBeenCalledTimes(1);
+        expect(karta.opener).toBeNull();
+        expect(scena.wolano.map((w) => w.co))
+          .toEqual(["werdykt", "kartoteka", "ocena", "ocena", "kwota"]);
+        /* Każdy zapis z wersją ODDANĄ przez poprzedni — blokada optymistyczna. */
+        expect(scena.wolano[2].dane).toMatchObject({ pozycjaId: 81, ocena: "stan", wersja: 2 });
+        expect(scena.wolano[3].dane).toMatchObject({ pozycjaId: 82, wersja: 3 });
+        expect(scena.wolano[4].dane).toEqual({ id: 8, pozycjeIds: [81, 82], dostawa: true, wersja: 4 });
+      } finally { scena.zwroty = null; otworz.mockRestore(); }
+    });
+
+    it("odmowa w połowie zamyka kartę Allegro — wypłata nie wyprzedza zapisu", async () => {
+      scena.wolano = [];
+      scena.zwroty = [pewny()];
+      scena.odmowaKwoty = "Zwrot zmienił się w międzyczasie";
+      const karta = { opener: {} as unknown, location: { href: "" }, close: vi.fn() };
+      const otworz = vi.spyOn(window, "open").mockReturnValue(karta as unknown as Window);
+      try {
+        pokaz("/obsluga/zwroty/8");
+        await userEvent.keyboard("w");
+        expect(await screen.findByText(/Zatrzymałem się: Zwrot zmienił się/)).toBeInTheDocument();
+        expect(karta.close).toHaveBeenCalled();
+        expect(karta.location.href).toBe("");
+      } finally { scena.zwroty = null; scena.odmowaKwoty = ""; otworz.mockRestore(); }
+    });
+
+    it("przeszkoda zatrzymuje PRZED pierwszym zapisem i mówi dlaczego", async () => {
+      scena.wolano = [];
+      const z = pewny();
+      scena.zwroty = [{ ...z, pozycje: [{ ...z.pozycje[1], potracenieGrosze: 500 }] }];
+      const otworz = vi.spyOn(window, "open");
+      try {
+        pokaz("/obsluga/zwroty/8");
+        expect(screen.getByRole("button", { name: /Wszystko OK/ })).toBeDisabled();
+        expect(screen.getByText(/potrącenie albo brak sztuk/)).toBeInTheDocument();
+        await userEvent.keyboard("w");
+        expect(scena.wolano).toEqual([]);
+        expect(otworz).not.toHaveBeenCalled();
+      } finally { scena.zwroty = null; otworz.mockRestore(); }
+    });
   });
 
   it("`O` OTWIERA POWÓD, a nie zapisuje odmowy", async () => {
