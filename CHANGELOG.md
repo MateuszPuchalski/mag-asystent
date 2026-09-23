@@ -34,6 +34,21 @@ historii nie przepisujemy.
 ---
 
 
+## 0.462.0 — 23 września 2026
+
+**[wymaga działania] Zrzut odmowy ZW obejmuje wszystkie pola.** Nowy
+`wertis-sfera-worker.exe` z artefaktu CI: zatrzymaj `wertis-sfera`, podmień
+plik i uruchom usługę.
+
+Po `WartoscVatPP = 0` szkic zgadza się z ręcznym ZW 748 w każdym wypisywanym
+polu, a zapis dalej odmawia. Zrzut widział jednak tylko pola z dwóch list.
+Teraz dopisuje resztę właściwości nagłówka i każdego wiersza jako „puste”,
+„wypełnione” albo kod odmowy odczytu. Wartości tych pól nie wychodzą, bo pod
+nieznaną nazwą może stać dana osobowa.
+
+Po podmianie uruchom `wertis-sfera-worker.exe --zrzut 9253431` i **Ponów**
+jeden odrzucony ZW. Dwie listy obok siebie wskażą różnicę.
+
 ## 0.461.0 — 23 września 2026
 
 **[wymaga działania] ZW: `WartoscVatPP = 0` przed zapisem.** Nowy
