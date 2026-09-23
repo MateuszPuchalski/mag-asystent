@@ -565,10 +565,26 @@ dokumencie stoją dwie formy, a ich suma jest dwa razy za duża.
 Drugi kandydat to nabywca. Worker nie ustawia go nigdy, a dokument, który
 przeszedł, go niesie.
 
-`[WERYFIKUJ]` Czy po ustawieniu przelewu suma form płatności na szkicu równa
-się kwocie do zapłaty.
+**Pierwszy zrzut workera zamknął obie hipotezy** (23 września 2026, zadanie
+`#1474`, PA 4242/MAG/09/2026, dwa wiersze, 46,09 zł). Zrzut powstał w chwili
+odmowy, na dokumencie, który nie przeszedł.
 
-`[WERYFIKUJ]` Czy ZW wymaga nabywcy i czy `NaPodstawie` bierze go z paragonu.
+Płatność się zgadza. Przelew 46,09 zł równa się kwocie do zapłaty i wartości
+brutto. Gotówka, karta, kredyt, zaliczka i przedpłaty gotówkowe mają po zero,
+a kwota rat jest pusta. Drugiej formy płatności na szkicu nie ma.
+
+Nabywca jest. `KontrahentId` i `OdbiorcaId` są wypełnione, więc `NaPodstawie`
+bierze nabywcę z paragonu. Pusty nabywca nie jest więc przyczyną odmowy.
+
+Jedna rzecz została niepewna i to przez błąd zrzutu, nie przez Sferę. Do
+0.456.0 pola prywatne sprawdzały zero jako napis „0", więc `0.0000` i `False`
+wychodziły jako „wypełnione". Tak wyszły `PrzedplatyBankowe`
+i `BankOperacjaGotowkowa`. Poprawka jest w 0.457.0.
+
+`[WERYFIKUJ]` Czy `PrzedplatyBankowe` na szkicu ZW są zerem.
+
+Następny krok to zestawienie pole w pole z ZW, który przeszedł. Zrzut workera
+i `-WzorZW` sondy biorą od 0.457.0 ten sam zestaw pól.
 
 Obie rzeczy mierzy sonda, bez zapisu. Po ustawieniu „jak worker" wypisuje
 wszystkie pola płatności i kwoty. O polach nabywcy i rachunku mówi wyłącznie

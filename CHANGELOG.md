@@ -34,6 +34,25 @@ historii nie przepisujemy.
 ---
 
 
+## 0.457.0 — 23 września 2026
+
+**[wymaga działania] Zrzut pól przy odmowie ZW: poprawka po pierwszym użyciu.**
+Nowy `wertis-sfera-worker.exe` z artefaktu CI: zatrzymaj `wertis-sfera`,
+podmień plik i uruchom usługę.
+
+Pierwszy zrzut z produkcji (zadanie `#1474`, PA 4242/MAG/09/2026) zamknął obie
+hipotezy z `docs/sfera-com.md` §2m. Suma form płatności zgadza się z kwotą do
+zapłaty, a nabywca jest wypełniony. Wyniki stoją w §2m.
+
+Ten sam zrzut pokazał trzy usterki, poprawione w tym wydaniu:
+- Zero w polach nabywcy i rachunku liczyło się jako „wypełnione”, gdy Sfera
+  podawała `0.0000` albo `False`. Teraz liczy się jako liczba. Poprawka
+  dotyczy też sondy.
+- Zrzut urywał się po 1800 znakach, w środku listy pól. Granica wynosi teraz
+  4000.
+- Worker brał węższy zestaw pól niż `-WzorZW` w sondzie. Teraz oba biorą ten
+  sam, więc zrzut z odmowy da się zestawić pole w pole z ZW, który przeszedł.
+
 ## 0.456.0 — 23 września 2026
 
 **[wymaga działania] Odmowa zapisu ZW niesie zrzut pól dokumentu, bez sondy.**
