@@ -109,3 +109,14 @@ test("typy sprzed tej zmiany dalej przechodzą", async () => {
     assert.equal((await wyslij({ type, ms: 120 })).statusCode, 200, type);
   }
 });
+
+test("paczka czasów odpowiedzi przechodzi, paczka bez listy albo za duża odpada", async () => {
+  /* Nazwa `czasy_zadan` stoi DOSŁOWNIE w `TelemetryRepository.wysylajCzasy`
+     po stronie kolektora — ten sam rodzaj cichej literówki co przy przerwach. */
+  const wiersz = { ekran: "HOME", trasa: "/api/x", n: 1, kubelki: [1, 0, 0, 0, 0, 0] };
+  assert.equal((await wyslij({ type: "czasy_zadan", czasy: [wiersz] })).statusCode, 200);
+  assert.equal((await wyslij({ type: "czasy_zadan" })).statusCode, 400);
+  assert.equal((await wyslij({ type: "czasy_zadan", czasy: new Array(501).fill(wiersz) })).statusCode, 400);
+  const { n } = db().prepare("SELECT COUNT(*) AS n FROM events WHERE type = 'czasy_zadan'").get() as { n: number };
+  assert.equal(n, 1);
+});

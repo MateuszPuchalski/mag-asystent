@@ -16,6 +16,7 @@ import pl.wertis.kolektor.data.MagazynyRepository
 import pl.wertis.kolektor.data.ProblemsRepository
 import pl.wertis.kolektor.data.QueueRepository
 import pl.wertis.kolektor.core.net.DziennikCiszy
+import pl.wertis.kolektor.core.net.LicznikCzasow
 import pl.wertis.kolektor.data.wyslijPrzerwy
 import pl.wertis.kolektor.data.RecentStore
 import pl.wertis.kolektor.data.SessionRepository
@@ -73,12 +74,19 @@ class AppGraph(context: Context) {
        cykl, bo typ `api` jest znany bez zaglądania do `apiClient`. */
     val session: SessionRepository = SessionRepository({ api }, appScope, context)
 
+    /* Czasy odpowiedzi per ekran i trasa (0.475.0). Licznik powstaje PRZED
+       klientem HTTP, bo klient do niego pisze; wysyłkę prowadzi telemetria. */
+    val czasy = LicznikCzasow()
+
     val apiClient: ApiClient = ApiClient(
         currentUser = { session.currentUser },
         sessionToken = { session.token },
         deviceId = settings.deviceId,
         initialBaseUrl = settings.current.serverUrl,
         cacheDir = context.cacheDir,
+        czasy = czasy,
+        // `nav` powstaje niżej; żądanie sprzed jego narodzin dostaje „?"
+        ekran = { runCatching { nav.screen.value.name }.getOrNull() ?: "?" },
     )
     val api: ApiService get() = apiClient.service
 
@@ -192,6 +200,7 @@ class AppGraph(context: Context) {
         aktualizacja.sprzatnij()
         // w zasięgu aplikacji, nie ekranu — powód w `WezwanieRepository`
         wezwanie.start()
+        telemetry.wysylajCzasy(czasy)
         // zmiana adresu serwera w Ustawieniach działa od ręki
         appScope.launch {
             settings.settings.collect { apiClient.setBaseUrl(it.serverUrl) }

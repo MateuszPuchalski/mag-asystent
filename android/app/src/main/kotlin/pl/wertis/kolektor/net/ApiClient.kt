@@ -12,9 +12,11 @@ import okhttp3.Response
 import pl.wertis.kolektor.core.net.ApiError
 import pl.wertis.kolektor.core.net.ApiErrorBody
 import pl.wertis.kolektor.core.net.EanOdmowa
+import pl.wertis.kolektor.core.net.LicznikCzasow
 import pl.wertis.kolektor.core.net.MmConflict
 import pl.wertis.kolektor.core.net.WertisJson
 import pl.wertis.kolektor.core.net.dlugiePobranie
+import pl.wertis.kolektor.core.net.mierzyc
 import pl.wertis.kolektor.core.net.naglowekHttp
 import retrofit2.HttpException
 import retrofit2.Retrofit
@@ -109,6 +111,30 @@ class LimityCzasuInterceptor : Interceptor {
     }
 }
 
+/* ── Czas odpowiedzi każdego żądania (0.475.0) ──────────────────────────────
+   Reguły i powód stoją w `core/net/CzasyZadan.kt`. Tu tylko pomiar: od
+   wysłania do nagłówków odpowiedzi, czyli sieć i serwer bez rysowania.
+
+   Żądanie zerwane timeoutem też się liczy — i trafia do najwolniejszego
+   przedziału, bo człowiek na nie czekał. Pominięcie go wycięłoby z raportu
+   dokładnie martwe strefy Wi-Fi, o które raport pyta. */
+class CzasyInterceptor(
+    private val licznik: LicznikCzasow,
+    private val ekran: () -> String,
+) : Interceptor {
+    override fun intercept(chain: Interceptor.Chain): Response {
+        val req = chain.request()
+        val sciezka = req.url.encodedPath
+        if (!mierzyc(sciezka)) return chain.proceed(req)
+        val start = System.nanoTime()
+        try {
+            return chain.proceed(req)
+        } finally {
+            runCatching { licznik.zapisz(ekran(), sciezka, (System.nanoTime() - start) / 1_000_000) }
+        }
+    }
+}
+
 class ApiClient(
     currentUser: () -> String,
     sessionToken: () -> String?,
@@ -116,6 +142,10 @@ class ApiClient(
     initialBaseUrl: String,
     /** Katalog na cache HTTP; null = bez cache (testy). */
     cacheDir: File? = null,
+    /** Licznik czasów odpowiedzi; null = bez pomiaru (testy). */
+    czasy: LicznikCzasow? = null,
+    /** Otwarty ekran w chwili żądania — klucz rozbicia w raporcie. */
+    ekran: () -> String = { "?" },
 ) {
     val hostSelection = HostSelectionInterceptor(initialBaseUrl.toHttpUrlOrNull())
 
@@ -139,6 +169,8 @@ class ApiClient(
            która akurat działa, jest zależnością do złamania przy pierwszej
            zmianie w tamtym interceptorze. */
         .addInterceptor(LimityCzasuInterceptor())
+        // OSTATNI z aplikacyjnych: mierzy wszystko pod sobą — cache, sieć, serwer
+        .apply { czasy?.let { addInterceptor(CzasyInterceptor(it, ekran)) } }
         .build()
 
     /**

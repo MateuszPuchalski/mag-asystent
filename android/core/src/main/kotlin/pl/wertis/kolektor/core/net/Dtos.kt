@@ -528,6 +528,8 @@ data class DeviceEventBody(
     val adres: String? = null,
     /** Adres serwera z ustawień kolektora — bywa różny na różnych sztukach. */
     val serwer: String? = null,
+    /** `czasy_zadan`: paczka czasów odpowiedzi per ekran i trasa (`CzasyZadan.kt`). */
+    val czasy: List<WierszCzasow>? = null,
 )
 
 /* ── Odpowiedzi ───────────────────────────────────────────────────────── */

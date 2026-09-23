@@ -196,6 +196,35 @@ export function useMetryki(dni: number, wlaczona: boolean) {
   });
 }
 
+/* ── Ergonomia w liczbach (`services/ergonomia.ts`) ──────────────────────── */
+
+export interface Kubelki { n: number; powyzejProgu: number; udzialPowyzejProgu: number; p95: string | null }
+export interface CzasySkanu { n: number; p50: number | null; p95: number | null }
+
+export interface Ergonomia {
+  days: number;
+  daneDo: string | null;
+  progMs: number;
+  czasy: Kubelki & {
+    wgTrasy: Array<Kubelki & { ekran: string; trasa: string }>;
+    wgKolektora: Array<Kubelki & { device: string | null; etykieta: string }>;
+  };
+  skanGlowny: CzasySkanu & { wgKolektora: Array<CzasySkanu & { device: string | null; etykieta: string }> };
+  powtorzoneSkany: Array<{ device: string | null; etykieta: string; skanow: number; powtorzonych: number; udzial: number }>;
+  odrzucenia: Array<{ trasa: string; status: number | null; powod: string; ile: number; urzadzen: number }>;
+  przerwy: Array<{ device: string | null; etykieta: string; przerw: number; minutRazem: number; najdluzszaMin: number }>;
+  poprawki: Array<{ czynnosc: string; wykonane: number; poprawek: number; udzial: number | null; rozbicie: Record<string, number> }>;
+}
+
+export function useErgonomia(dni: number, wlaczona: boolean) {
+  return useQuery({
+    queryKey: ["analiza", "ergonomia", dni],
+    queryFn: () => api<Ergonomia>(`/api/analiza/ergonomia?days=${dni}`),
+    enabled: wlaczona,
+    placeholderData: (poprzednie) => poprzednie,
+  });
+}
+
 /* ── Analiza dostaw (`services/podglad-dostawy.ts`) ───────────────────────── */
 
 export interface AnalizaDostaw {

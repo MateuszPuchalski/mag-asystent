@@ -34,6 +34,40 @@ historii nie przepisujemy.
 ---
 
 
+## 0.475.0 — 23 września 2026
+
+**Ergonomia w liczbach: gdzie kolektor przeszkadza w pracy.** Pytanie
+właściciela brzmiało: „jak sprawić, żeby kolektor był przyjemny w pracy?”.
+Nowa karta w ANALIZIE → Praca hali odpowiada liczbami z naszej hali, a nie
+opinią. Liczy z dziennika zdarzeń, per ekran, kolektor i czynność. Nazwisk
+nie ma w niej wcale: karta mierzy narzędzie, nie ludzi.
+
+- **Gdzie jest wolno.** Udział odpowiedzi wolniejszych niż 300 ms per ekran
+  i trasa oraz per kolektor. Od tego progu ludzie skanują dwa razy.
+- **Najczęstsze odrzucenia.** Trasa, kod i powód bez numerów, z liczbą
+  kolektorów. Każdy wiersz to zdanie do przepisania na „zrób X zamiast tego”.
+- **Przerwy w łączności per kolektor.** Liczba, suma minut i najdłuższa.
+- **Poprawki na czynność.** Cofnięcia, korekty, zmiany półki i ponowne
+  otwarcia na sto wykonanych pozycji: dostawy, kosze i kartony osobno.
+- **Skan na ekranie głównym.** Stary pomiar pod uczciwą nazwą, razem
+  z powtórzonymi skanami tego samego kodu w 2 s.
+
+**Poprawka opisu, nie liczby.** „p95 skan → odpowiedź” w metrykach mierzyło
+wyłącznie skan z ekranu głównego, bo tylko ten ekran woła wspólną drogę
+skanu. Rozkładanie dostaw, koszy i kartonów nie miało pomiaru czasu wcale.
+Podpis mówi teraz „p95 skanu na ekranie głównym”.
+
+**Nowy pomiar w kolektorze.** Klient HTTP mierzy czas KAŻDEGO żądania, od
+wysłania do odpowiedzi. Kolektor wysyła co 5 minut jedną paczkę kubełków per
+ekran i trasa (`czasy_zadan`). Nieudana wysyłka wraca do licznika. Pomiar
+pomija samą telemetrię, pytanie o wezwanie i pobranie APK. Liczby czasu
+pojawią się dopiero z nowym APK; do tego czasu karta mówi to zdaniem.
+
+Serwis `ergonomia.ts` z testami, trasa `/api/analiza/ergonomia` za bramką
+analizy, nowy typ telemetrii z limitem 500 wierszy na paczkę. W `:core`
+licznik `CzasyZadan.kt` z testami. Test pilnuje, że granice kubełków
+są te same w kolektorze i na serwerze.
+
 ## 0.473.0 — 23 września 2026
 
 **Szukanie zgubionego kolektora.** Magazynier odkłada kolektor „na chwilę”

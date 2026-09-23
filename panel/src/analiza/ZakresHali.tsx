@@ -52,7 +52,7 @@ export function ZakresHali({ a, m }: { a: AnalizaAudytu; m: Metryki | undefined 
       <div className="flex flex-wrap gap-8">
         <Liczba ile={liczbaPl(m.dotknieciaNaPozycje)} etykieta="dotknięć na pozycję · cel < 0,3"
           ton={m.dotknieciaNaPozycje != null && m.dotknieciaNaPozycje >= 0.3 ? "text-ranga-zle" : ""} />
-        <Liczba ile={m.p95OdpowiedziMs != null ? `${m.p95OdpowiedziMs} ms` : "—"} etykieta="p95 skan → odpowiedź · cel < 150 ms"
+        <Liczba ile={m.p95OdpowiedziMs != null ? `${m.p95OdpowiedziMs} ms` : "—"} etykieta="p95 skanu na ekranie głównym · cel < 150 ms"
           ton={m.p95OdpowiedziMs != null && m.p95OdpowiedziMs > 300 ? "text-ranga-zle" : ""} />
         <Liczba ile={m.zdarzen} etykieta={`zdarzeń w oknie ${m.days} dni`} />
       </div>

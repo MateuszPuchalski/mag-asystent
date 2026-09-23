@@ -7,6 +7,7 @@ import { logEvent } from "../services/events.js";
 import { sesjaZadania } from "../context.js";
 import { czasOdpowiedzi } from "../services/czas-odpowiedzi.js";
 import { raportUzycia } from "../services/uzycie.js";
+import { ergonomia } from "../services/ergonomia.js";
 
 /* ── Analiza śladu audytowego dla biura ──────────────────────────────────────
    Jedna trasa z kompletem sekcji (zakładka ANALIZA robi jeden fetch) + CSV.
@@ -108,6 +109,17 @@ export async function analizaRoutes(app: FastifyInstance) {
        kilkanaście dni. Trzydzieści dni to próg z pytania właściciela. */
     const n = Number(req.query.days);
     return raportUzycia(n === 7 || n === 90 ? n : 30);
+  });
+
+  /**
+   * Ergonomia w liczbach — zakres „Praca hali". Ta sama bramka i to samo okno
+   * co ślad audytowy, bo liczy z tego samego dziennika. Dane per urządzenie
+   * i per czynność, nigdy per osoba — powód w nagłówku `services/ergonomia.ts`.
+   */
+  app.get<{ Querystring: { days?: string } }>("/api/analiza/ergonomia", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return ergonomia(dniZQuery(req.query.days));
   });
 
   app.get<{ Querystring: { days?: string } }>("/api/analiza/csv", async (req, reply) => {
