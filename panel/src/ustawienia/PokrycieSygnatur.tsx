@@ -20,11 +20,11 @@ import type { PokrycieSygnatur as Pokrycie } from "../api/typy";
    `ranga-uwaga` (#92400e) daje 7.09:1 i znaczy dokładnie „uwaga" — sąsiednie
    liczby biorą już `ranga-ok` z tej samej rodziny. Przy okazji realizuje
    decyzję właściciela o rozdzieleniu barwy MARKI od barwy OSTRZEŻENIA. */
-export const Liczba = ({ etykieta, ile, ton = "" }: { etykieta: string; ile: number; ton?: string }) =>
-  <div className="flex flex-col">
-    <span className={`text-2xl font-bold ${ton}`}>{ile}</span>
-    <span className="text-xs text-slate-500">{etykieta}</span>
-  </div>;
+/* Sam komponent mieszka od 0.440.0 w `ui/wykres.tsx` — analiza biura jest
+   jego drugim odbiorcą. Ten eksport zostaje, żeby karty ustawień nie musiały
+   wiedzieć o przeprowadzce. */
+import { Liczba } from "../ui/wykres";
+export { Liczba };
 
 const Lista = ({ tytul, opis, wiersze }: {
   tytul: string; opis: string; wiersze: Pokrycie["pudla"];

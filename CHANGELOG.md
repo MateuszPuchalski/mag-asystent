@@ -34,6 +34,45 @@ historii nie przepisujemy.
 ---
 
 
+## 0.440.0 — 23 września 2026
+
+**Dziennik i analiza przeszły do panelu.** Pierwsza połowa czwartego kroku
+przeprowadzki biura (`docs/obsluga-klienta.md` §7, F4a). Stan systemu idzie
+osobnym wydaniem: niesie siedem zapisów, czytnik arkuszy i parowanie Allegro.
+Oba ekrany stoją w drugim rzędzie nagłówka, pod `/obsluga/dziennik`
+i `/obsluga/analiza`.
+
+**Dziennik filtruje od razu, bez przycisku SZUKAJ.** Pola tekstowe czekają
+ćwierć sekundy, listy i daty działają natychmiast. W biurze zapomniany
+przycisk zostawiał pod nowym filtrem stare wiersze. Doba filtra jest odtąd
+LOKALNA: biuro wysyłało gołą datę, a serwer porównywał ją z czasem w UTC,
+więc „od 22.09" gubiło dwie pierwsze godziny doby. Rodzina zdarzenia barwi
+pastylkę jak w 0.427.0, a czas ma sekundy — w śladzie audytowym rozstrzygają.
+
+**Analiza ma dwa zakresy, każdy ze swoim oknem.** Dostawy (30/90/180 dni)
+odpowiadają, u kogo się psuje. Praca hali (7/30/90 dni) niesie tempo, szczyty,
+szukania, kolektory i strefę złotą. Każdy zakres pamięta swoje okno.
+Wykresy są rysowane w panelu, bez biblioteki. Słupki mają ciemniejszy stopień
+bursztynu: barwa marki dawała na bieli 2,02:1, poniżej progu dla znaków
+graficznych. Wydajność per osoba dalej widzi wyłącznie admin — rozstrzyga
+serwer, a karta dla roli biuro nie stoi pusta, tylko jej nie ma.
+
+**Metryki przeszły ze stanu systemu do analizy.** Etykiety do przedruku
+i kartoteki bez kodu mówią o pracy hali w oknie. W biurze miały własny
+przełącznik okna, drugi obok tego z analizy. Tabela wymiany z halą, która
+dzieliła z nimi okno, dostała własny wybór w swojej karcie.
+
+**Zakresu „Obsługa klienta" z makiety F0 nie ma.** Brakuje mu źródła danych,
+a przeprowadzka nie wymyśla liczb. Reguły strefy złotej zostają za zębatką
+biura do F5; analiza prowadzi do nich mostem, z sesją.
+
+**DZIENNIK i ANALIZA zniknęły z `biuro.html`** razem z importem zbiórek.
+Licznik zapisów strony spadł z 11 do 10 POST. Pozycje w pasku prowadzą do
+panelu z sesją. Strażnik raportu per osoba czyta teraz źródło analizy
+w panelu. Nowy strażnik pilnuje, żeby skrypt biura nie sięgał po element,
+którego strona już nie ma — ta pomyłka wywracała start strony przy
+przeprowadzce i złapała ją dopiero przeglądarka.
+
 ## 0.438.0 — 22 września 2026
 
 **Kosze mieszkają w zakładce Zwroty.** Trzeci krok przeprowadzki biura

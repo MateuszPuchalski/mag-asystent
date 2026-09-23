@@ -200,8 +200,6 @@
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--kol)), 1fr));
   }
   .widok > * { min-width: 0; }
-  /* Jedna karta na widok — siatka nie ma czego układać. */
-  #widokDziennik { grid-template-columns: 1fr; }
 
   /* ── USTAWIENIA: jedna tafla, nie pięć kartek ──────────────────────────────
      Trzecie zgłoszenie tej samej treści od właściciela: „pozbądź się zaokrągleń
@@ -253,7 +251,7 @@
      ten sam odstęp bez pamiętania o nim. */
   #widokDostawcy > .card > * + * { margin-top: 8px; }
   /* Rząd pól kończy sekcję, więc jego własny dolny odstęp dokładałby się do
-     dopełnienia karty. Ten sam powód, co przy `.pasekFiltrow .filtry`. */
+     dopełnienia karty. */
   #widokDostawcy .filtry { margin-bottom: 0; }
   /* Wiersz wyniku (zapis reguł, zapis logo, stan konfiguracji pytań) jest
      pusty do pierwszej akcji. Bez tego zabierałby odstęp za zdanie, którego
@@ -290,45 +288,10 @@
      nie mają się z czym sparować. Szerokość karty niesie `--kol`, nie wyjątki. */
   .widok > .pelna { grid-column: 1 / -1; }
 
-  /* ── Słupek w komórce tabeli ────────────────────────────────────────────────
-     Liczba w kolumnie mówi „trzydzieści cztery" i nie mówi, czy to dużo.
-     Odpowiedź na to drugie pytanie jest w tabeli — w pierwszym wierszu — ale
-     żeby ją dostać, trzeba porównać cyfry oczami. Słupek robi to porównanie za
-     czytelnika i nic poza tym: skala jest ZAWSZE względem największej wartości
-     w tej tabeli, więc pełny tor znaczy „to jest ten największy", a nie żadną
-     wartość bezwzględną.
-
-     Liczba ZOSTAJE pod słupkiem. Sam pasek mówi o proporcji i milczy o skali;
-     tabela, w której nie da się odczytać wartości, przestaje być tabelą. */
-  .slupek { height: 6px; background: var(--secondary); border-radius: 6px; overflow: hidden; }
-  .slupek i { display: block; height: 6px; background: var(--amber); }
-  /* Kolumna ze słupkiem nie ma prawa się zwężać do szerokości liczby. */
-  td.zeSlupkiem { width: 120px; }
-
-  /* ── Czipy: filtr, który widać bez rozwijania ───────────────────────────────
-     `<select>` chowa pozostałe możliwości za kliknięciem i nie mówi, ile ich
-     jest. Przy trzech stanach skrzynki to strata: biuro ma wiedzieć, że
-     „wysłane" są jeden ruch dalej, zanim zacznie ich szukać. Wybrany czip
-     jest GRAFITOWY, nie bursztynowy — bursztyn znaczy „zrób to", a filtr
-     niczego nie każe robić, tylko mówi, gdzie się jest. */
-  .czipy { display: flex; gap: 4px; flex-wrap: wrap; }
-  .czip {
-    background: none; border: 1px solid var(--border); border-radius: 999px;
-    padding: 6px 13px; font: 600 13px var(--font-cond); letter-spacing: .4px;
-    color: var(--ink-soft); cursor: pointer;
-  }
-  .czip:hover { border-color: var(--ink-mute); color: var(--ink); }
-  .czip[aria-pressed="true"] {
-    background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 700;
-  }
   .prowadzi { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
               font: 700 11.5px/1.4 var(--font-sans); color: var(--amber-ink); }
   .prowadzi i { width: 6px; height: 6px; border-radius: 999px; background: var(--amber);
                 flex: none; }
-  /* Czip z zerem zostaje na miejscu, tylko przygaszony: znikający czip zmienia
-     szerokość rzędu przy każdym odświeżeniu i gubi miejsce pod kursorem. */
-  .czip .n { font-weight: 700; margin-left: 5px; opacity: .75; }
-
   /* ── Stan jako kropka i słowo ───────────────────────────────────────────────
      Wypełniona pigułka krzyczy, a stan zwykły nie ma czego krzyczeć: pięć
      pigułek w wierszu przestaje być sygnałem i robi się tapetą. Kropka niesie
@@ -365,29 +328,6 @@
     font: 700 20px/1.25 var(--font-cond); letter-spacing: .3px;
     color: var(--ink); margin-bottom: 11px;
   }
-
-  /* Pasek filtrów — własne pasmo NAD treścią, nie pole w środku pierwszej
-     karty. Filtry zakładki wglądu rządzą CAŁYM widokiem, a stojąc wewnątrz
-     karty udawały, że rządzą tylko nią. Zostaje przyklejony pod chromem, bo
-     przy tysiącu wierszy dziennika zmiana zakresu wymagała przewinięcia na
-     samą górę. `z-index` niżej niż pasek zakładek (20) i nagłówek (30). */
-  .pasekFiltrow {
-    position: sticky; top: calc(var(--hChrome, 130px) - var(--luz)); z-index: 10;
-    /* PASMO, nie karta — i dlatego element nie nosi klasy `card`. Pierwsza
-       wersja ją nosiła i przy analizie, gdzie filtry to jeden wybór okna
-       i jeden przycisk, dawała metr pustej bieli z cieniem; biała płachta
-       bez treści czyta się jak coś, czego nie wczytano. Filtry są chromem,
-       nie treścią: papier pod spodem, kreska od dołu, zero cienia.
-       Papier jest nieprzezroczysty świadomie — pasek stoi przyklejony,
-       więc treść ma pod nim ZNIKAĆ, a nie prześwitywać. */
-    background: var(--paper); border-bottom: 1px solid var(--border);
-    /* Górne dopełnienie MUSI pokryć `--luz` odjęty wyżej. Pasek przykleja
-       się o ten luz WYŻEJ niż kończy się chrom — świadomie, żeby papier
-       zasłonił szparę, przez którą inaczej przejeżdżałaby treść. Bez tego
-       dopełnienia etykieta „OKNO" wjeżdża pod pasek zakładek i ucina się. */
-    padding: calc(var(--luz) + 6px) 2px 10px;
-  }
-  .pasekFiltrow .filtry { margin: 0; }
 
   /* Karta = cardSurface: biel, promień 14, cienka ramka POD cieniem. */
   .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 12px 14px; box-shadow: var(--cien); }
@@ -627,13 +567,6 @@
   .filtry input, .filtry select {
     border: 1px solid var(--border); border-radius: 12px; padding: 7px 10px; font: inherit; background: var(--card);
   }
-  code.payload { font-size: 11px; color: var(--ink-soft); word-break: break-all; }
-
-  .typZd { display: inline-block; white-space: nowrap; border-radius: 999px; padding: 1px 9px;
-           font: 600 12px/1.5 var(--font-sans); background: var(--secondary); color: var(--ink-soft); }
-  .typZd.blad { background: var(--err-bg); color: var(--err); }
-  .typZd.dostawa { background: var(--amber-bg); color: var(--amber-ink); }
-  .typZd.zwrot { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink-mute); }
   /* ── Własne okno dialogowe i toast — zamiast prompt/confirm/alert ─────────
      Systemowe okno („Komunikat ze strony…") wygląda jak z innej aplikacji
      i ignoruje cały język wizualny. <dialog> jest natywny (Esc, fokus,
@@ -707,13 +640,15 @@
     <div class="grupa">
       <span class="grupa-nazwa">Wgląd</span>
       <div class="grupa-btny">
-        <button data-widok="analiza" title="Analiza">
+        <!-- ANALIZA i DZIENNIK PRZESZŁY DO PANELU (0.440.0). Jak DOSTAWY:
+             pozycja zostaje, bo ręka jej tu szuka, i prowadzi tam z sesją. -->
+        <button data-panel="/obsluga/analiza" title="Analiza — w panelu biura">
           <svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
-          <span class="et">ANALIZA</span>
+          <span class="et">ANALIZA ↗</span>
         </button>
-        <button data-widok="dziennik" title="Dziennik zdarzeń">
+        <button data-panel="/obsluga/dziennik" title="Dziennik zdarzeń — w panelu biura">
           <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg>
-          <span class="et">DZIENNIK</span>
+          <span class="et">DZIENNIK ↗</span>
         </button>
         <button data-widok="nadzor" title="Stan systemu">
           <svg viewBox="0 0 24 24"><path d="M22 12h-4l-3 8L9 4l-3 8H2"/></svg>
@@ -853,38 +788,9 @@
       <table id="kolizje"></table>
     </section>
 
-    <section class="card">
-      <h2>METRYKI · LICZBY, KTÓRE MÓWIĄ CO ZROBIĆ</h2>
-      <!-- OKNO zostaje TUTAJ, a nie w pasku filtrów jak przy dzienniku
-           i analizie. Zakres dotyczy wyłącznie metryk: kolejka zapisów,
-           rekoncyliacja, kolizje kodów i stan serwera mówią o TERAZ i żaden
-           zakres dni ich nie zmienia. Pasek nad kartami obiecywałby, że
-           filtruje całą zakładkę — a filtrowałby jedną kartę. -->
-      <div class="filtry">
-        <div>
-          <label for="dniMetryk">OKNO</label>
-          <select id="dniMetryk">
-            <option value="7">7 dni</option>
-            <option value="30">30 dni</option>
-            <option value="90">90 dni</option>
-          </select>
-        </div>
-      </div>
-      <div class="kafle" id="kafleMetryk"></div>
-      <div style="display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
-        <div>
-          <h2>ETYKIETY DO PRZEDRUKU</h2>
-          <p class="mute" style="margin-bottom:6px">Regały, których kod trzeba wpisywać z ręki.</p>
-          <table id="etykiety"></table>
-        </div>
-        <div>
-          <h2>KARTOTEKI BEZ CZYTELNEGO KODU</h2>
-          <p class="mute" style="margin-bottom:6px">Wpisywane zamiast skanowane — kod do naprawy.</p>
-          <table id="bezKodu"></table>
-        </div>
-      </div>
-    </section>
-
+    <!-- METRYKI PRZESZŁY DO ANALIZY PANELU (0.440.0), razem z oknem
+         7/30/90 dni. Mówią o pracy hali w oknie, nie o stanie serwera TERAZ,
+         a stojąc tutaj miały drugi przełącznik okna obok tego z analizy. -->
     <section class="card" id="kartaWymiany">
       <h2>ILE TRWA WYMIANA Z HALĄ <button class="info" type="button"
         aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
@@ -902,6 +808,19 @@
           Kiedy zaczyna być za długo, mówi blok niżej: próg bierze się
           z historii tego samego kanału, nie z niczyjego ustalenia.
         </p>
+      </div>
+      <!-- OKNO tabeli wymiany. Do 0.440.0 było wspólne z metrykami obok;
+           metryki odeszły do panelu, a tabela została ze swoim suwakiem.
+           Alarm pod nią dalej liczy z okna stałego. -->
+      <div class="filtry">
+        <div>
+          <label for="dniWymiany">OKNO</label>
+          <select id="dniWymiany">
+            <option value="7">7 dni</option>
+            <option value="30">30 dni</option>
+            <option value="90">90 dni</option>
+          </select>
+        </div>
       </div>
       <table id="wymiana"></table>
       <!-- Alarm liczy z OKNA STAŁEGO (30 dni), a tabela wyżej z suwaka obok.
@@ -935,203 +854,8 @@
     </section>
   </div>
 
-  <!-- ── DZIENNIK ────────────────────────────────────────────────────────── -->
-  <div id="widokDziennik" class="widok wglad" hidden>
-    <!-- Osiem kontrolek, które rządzą CAŁYM widokiem — i jedna tabela pod
-         nimi. Stały dotąd w środku karty, między objaśnieniem a wynikami,
-         czyli wyglądały jak jeszcze jeden wiersz treści. -->
-    <section class="pelna pasekFiltrow">
-      <div class="filtry">
-        <div><label for="fOd">OD</label><input type="date" id="fOd"></div>
-        <div><label for="fDo">DO</label><input type="date" id="fDo"></div>
-        <div><label for="fTyp">TYP</label><select id="fTyp"><option value="">wszystkie</option></select></div>
-        <div><label for="fTw">TOWAR (tw_id)</label><input id="fTw" size="8" inputmode="numeric"></div>
-        <div><label for="fDev">URZĄDZENIE</label><input id="fDev" size="12"></div>
-        <div><label for="fOsoba">OSOBA</label>
-          <select id="fOsoba"><option value="">wszystkie</option></select></div>
-        <div><label for="fLimit">WIERSZY</label>
-          <select id="fLimit"><option>100</option><option>500</option><option>1000</option></select></div>
-        <div><button class="akcja" id="szukajDziennik">SZUKAJ</button></div>
-        <div><button class="akcja cichy" id="csvDziennik">CSV</button></div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>ŚLAD AUDYTOWY <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
-          Każdy skan, każda decyzja i każdy błąd — z osobą, urządzeniem i czasem.
-          Kto pobierze CSV, sam trafia do śladu.
-        </p>
-      </div>
-      <p class="mute" id="licznikDziennik"></p>
-      <table id="dziennik"></table>
-    </section>
-  </div>
-
-  <!-- ── ANALIZA ─────────────────────────────────────────────────────────── -->
-  <div id="widokAnaliza" class="widok wglad" hidden>
-    <!-- OKNO rządzi CAŁĄ zakładką: kafle, oba wykresy, wydajność per osoba,
-         wyszukiwania i urządzenia liczą się z tego samego zakresu. Stojąc
-         w pierwszej karcie obiecywało, że dotyczy tylko jej. -->
-    <section class="pelna pasekFiltrow">
-      <div class="filtry">
-        <!-- OKNO jako CZIPY, nie `<select>`: trzy możliwości są krótsze niż ich
-             schowanie, a przy wglądzie zakres czasu czyta się przy każdym
-             spojrzeniu na liczbę. Rozwijana lista każe go najpierw odsłonić. -->
-        <div>
-          <label>OKNO</label>
-          <!-- Czipy rysuje skrypt: okna zależą od ZAKRESU. Ślad audytowy mierzy
-               tempo pracy i sensownie patrzy się na niego od tygodnia; pytania
-               klientów są rzadsze i tydzień bywa w nich pusty. Jedna wspólna
-               lista kazałaby jednej stronie kłamać — trasa i tak odrzuciłaby
-               okno spoza swojego zbioru i cicho podstawiła własne domyślne. -->
-          <div class="czipy" id="oknoAnalizy"></div>
-        </div>
-        <div>
-          <label for="zakresAnalizy">ZAKRES</label>
-          <select id="zakresAnalizy">
-            <option value="audyt">Ślad audytowy</option>
-            <option value="dostawy">Dostawy</option>
-          </select>
-        </div>
-        <!-- CSV ma tylko ślad audytowy: zakres DOSTAWY nie ma trasy eksportu.
-             Przycisk, który przy jednym zakresie pobiera plik z innego, jest
-             gorszy od przycisku, którego nie ma. -->
-        <div><button class="akcja cichy" id="csvAnalizy">POBIERZ CSV</button></div>
-        <!-- „Dane do…" — DO KTÓREJ CHWILI zestawienie sięga, liczone
-             z najświeższego rekordu, nie z zegara serwera. Zegar powiedziałby
-             tylko, że zapytanie właśnie poszło; ta data mówi, czy dane w ogóle
-             dochodzą. Cichnie, gdy nie ma z czego jej policzyć. -->
-        <div style="margin-left:auto;align-self:flex-end">
-          <span class="mute" id="daneDo"></span>
-        </div>
-      </div>
-    </section>
-
-    <!-- ── ZAKRES: DOSTAWY ─────────────────────────────────────────────────
-         Czwarty zakres i jedyny, który nie powstał z przenosin. Trzy pozostałe
-         miały swoje liczby już policzone gdzie indziej; zakładka DOSTAWY nie
-         miała ANI JEDNEJ karty wglądu, a jedyne liczby o dostawcy stały
-         w kontekście otwartej faktury — po jednym dostawcy naraz.
-
-         Pytanie brzmi „U KOGO SĄ PROBLEMY" i do 0.100.0 panel odpowiadał na nie
-         tylko przez otwieranie faktur po kolei. -->
-    <section class="card pelna zakresDostawy" hidden>
-      <h2>DOSTAWY W OKNIE</h2>
-      <div class="kafle" id="dostawyKafle"></div>
-
-      <h2 style="margin-top:18px">DOSTAWCY · GDZIE SIĘ PSUJE</h2>
-      <!-- Sortowanie po UDZIALE, nie po liczbie dostaw, i to jest cała treść
-           tej tabeli. Dostawca z dwiema fakturami i połową pozycji do
-           wyjaśnienia jest ważniejszy od tego z czterdziestoma bez ani jednej;
-           kolejność po liczbie zepchnęłaby go na dół. -->
-      <p class="mute" style="margin-bottom:8px">
-        Najpierw ci z największym udziałem pozycji do wyjaśnienia, a nie ci
-        z największą liczbą dostaw. Mediana czasu liczy się z dostaw rozłożonych
-        u nas — te zdjęte poza WERTIS wchodzą do liczby, ale nie do czasu.
-      </p>
-      <table id="dostawyDostawcy"></table>
-    </section>
-
-    <section class="card pelna zakresDostawy" hidden>
-      <h2>NAJCZĘSTSZE WYJĄTKI</h2>
-      <p class="mute" style="margin-bottom:8px">
-        Liczone po dacie zgłoszenia, nie po dacie domknięcia dostawy. Otwarte
-        i rozwiązane osobno — to dwie różne wiadomości: ile się psuje i ile
-        biuro nadąża domykać.
-      </p>
-      <table id="dostawyWyjatki"></table>
-
-      <h2 style="margin-top:18px">DOSTAWY PER TYDZIEŃ
-        <span class="mute">· tydzień z zerem zostaje na osi</span></h2>
-      <div id="dostawyTygodnie" style="margin-top:6px"></div>
-      <p class="mute" id="dostawySzczyt" style="margin-top:12px"></p>
-    </section>
-
-    <section class="card zakresAudyt">
-      <h2>ANALIZA ŚLADU AUDYTOWEGO</h2>
-      <div class="kafle" id="kafleAnalizy"></div>
-      <div style="display:grid;gap:16px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
-        <div>
-          <h2>OPERACJE PER DZIEŃ</h2>
-          <p class="mute" style="margin-bottom:6px">Wykonane pozycje — dni według zegara magazynu.</p>
-          <div id="wykresDni"></div>
-          <p class="mute" id="audytSzczyt" style="margin-top:12px"></p>
-        </div>
-        <div>
-          <h2>ROZKŁAD PO GODZINACH</h2>
-          <p class="mute" style="margin-bottom:6px">O której naprawdę jest szczyt.</p>
-          <div id="wykresGodzin"></div>
-        </div>
-      </div>
-    </section>
-
-    <section class="card zakresAudyt">
-      <h2>WYDAJNOŚĆ PER OSOBA</h2>
-      <p class="mute" id="podstawaPrawna" style="margin-bottom:10px"></p>
-      <p class="mute" style="margin-bottom:10px">
-        Zgłoszone problemy to osobna kolumna i <b>nie są miarą błędu</b> —
-        zgłoszenie wyjątku jest pracą wykonaną dobrze, nie wpadką.
-      </p>
-      <table id="wydajnosc"></table>
-    </section>
-
-    <div class="pelna zakresAudyt" style="display:grid;gap:20px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))">
-      <section class="card zakresAudyt">
-        <h2>NAJCZĘŚCIEJ SZUKANE</h2>
-        <table id="szukaneTop"></table>
-      </section>
-      <section class="card zakresAudyt">
-        <h2>SZUKANE BEZ WYNIKU</h2>
-        <p class="mute" style="margin-bottom:6px">
-          Towary, których ludzie szukają, a kartoteka ich nie zna — najtańsza
-          lista braków.
-        </p>
-        <table id="szukaneBrak"></table>
-      </section>
-    </div>
-
-    <section class="card zakresAudyt">
-      <h2>URZĄDZENIA</h2>
-      <p class="mute" style="margin-bottom:6px">Upadki, baterie i odrzucone operacje — per kolektor, nie per osoba.</p>
-      <table id="urzadzenia"></table>
-    </section>
-
-    <section class="card zakresAudyt">
-      <h2>STREFA ZŁOTA — KANDYDACI DO PRZENIESIENIA <button class="info"
-        type="button" aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
-          Towary z górnych 15% rotacji, które stoją poza strefą złotą. Dane
-          bierzemy z eksportu zbiórek (Sellasist, CSV) — wgranie tego samego
-          okresu drugi raz niczego nie zdubluje. Kandydat dostaje też adnotację
-          na karcie towaru w kolektorze.
-        </p>
-      </div>
-      <div class="filtry">
-        <div>
-          <button class="akcja" id="wgrajZbiorki">WGRAJ CSV ZBIÓREK</button>
-          <input type="file" id="plikZbiorek" accept=".csv,text/csv" hidden>
-        </div>
-        <div><button class="akcja cichy" id="csvKandydatow">POBIERZ CSV</button></div>
-      </div>
-      <p class="mute" id="wynikImportu"></p>
-      <p class="mute" id="oknoKandydatow" style="margin-bottom:6px"></p>
-      <table id="kandydaci"></table>
-      <!-- Drogowskaz, a nie ozdoba: reguły wyjechały stąd za zębatkę w 0.86.0,
-           a lista kandydatów jest ich jedynym widocznym skutkiem. Bez tego
-           zdania pusta lista wygląda na awarię zamiast na brak reguł. -->
-      <p class="mute" style="margin-top:10px">
-        Które poziomy regałów są „złote", ustawia się w <b>Ustawieniach</b> —
-        ikona koła zębatego w prawym górnym rogu.
-      </p>
-    </section>
-
-
-
-  </div>
+  <!-- DZIENNIK i ANALIZA przeszły do panelu w 0.440.0 (`/obsluga/dziennik`,
+       `/obsluga/analiza`). Pozycje w pasku zostały i prowadzą tam z sesją. -->
 
   <!-- ── USTAWIENIA (za zębatką) ───────────────────────────────────────────
        Do 0.85.0 stało tu jedno logo dostawców, a konfiguracja rozłaziła się
@@ -1335,10 +1059,11 @@ let widok = localStorage.getItem("wertis.widok") || "nadzor";
    ZWROTY/PYTANIA → SPRAWY — a SPRAWY też zniknęły, więc mapa prowadziła
    wprost w tę pustkę. Lista ISTNIEJĄCYCH widoków zamiast listy dawnych:
    następne przemianowanie nie wymaga pamiętania o tej linii. */
-/* „dostawy" i „magazyn" w pamięci przeglądarki to ślady sprzed 0.435.0
-   i 0.438.0 — oba widoki przeszły do panelu. Biuro wstaje wtedy na STANIE
-   SYSTEMU, bo tam prowadzą wiersze DO DECYZJI, które jeszcze mieszkają tutaj. */
-if (!["nadzor", "dziennik", "analiza", "dostawcy"].includes(widok)) widok = "nadzor";
+/* „dostawy", „magazyn", „dziennik" i „analiza" w pamięci przeglądarki to
+   ślady sprzed 0.435.0, 0.438.0 i 0.440.0 — te widoki przeszły do panelu.
+   Biuro wstaje wtedy na STANIE SYSTEMU, bo tam prowadzą wiersze DO DECYZJI,
+   które jeszcze mieszkają tutaj. */
+if (!["nadzor", "dostawcy"].includes(widok)) widok = "nadzor";
 let ostatnieRozjazdy = null;
 /* Alarm wymiany (0.364.0) — jak `ostatnieRozjazdy`: pobierany w cyklu,
    czytany przy każdym przerysowaniu paska stanu, niezależnie od zakładki. */
@@ -1381,16 +1106,6 @@ async function api(sciezka, opts = {}) {
   return r;
 }
 
-/** Pobranie pliku zza sesji: nagłówka nie da się dołożyć do zwykłego linku. */
-async function pobierz(sciezka, nazwa) {
-  const blob = await (await api(sciezka)).blob();
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = nazwa;
-  a.click();
-  URL.revokeObjectURL(a.href);
-}
-
 function wyloguj() {
   token = ""; kto = "";
   zwolnijLoga();
@@ -1431,8 +1146,6 @@ function pokaz(nowy) {
   widok = nowy;
   localStorage.setItem("wertis.widok", nowy);
   $("widokNadzor").hidden = nowy !== "nadzor";
-  $("widokDziennik").hidden = nowy !== "dziennik";
-  $("widokAnaliza").hidden = nowy !== "analiza";
   $("widokDostawcy").hidden = nowy !== "dostawcy";
   /* Selektor celowo NIE jest zawężony do paska: od 0.76.0 jeden z przycisków
      z `data-widok` (zębatka ustawień) stoi w nagłówku, poza `nav`. Przy starym
@@ -1443,8 +1156,6 @@ function pokaz(nowy) {
   /* Magazyn odświeża się na WEJŚCIU, nie w cyklu — cykl 30 s należy do
      widoku, na który się patrzy. */
   if (nowy === "nadzor") { odswiezNadzor(); odswiezStanAllegro(); }
-  if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
-  if (nowy === "analiza") odswiezAnalize();
   /* Ustawienia pobierają swoje trzy komplety dopiero przy wejściu za zębatkę.
      Do 0.85.0 prompt jechał przy każdym wejściu na PYTANIA, a reguły strefy
      przy każdym wejściu na ANALIZĘ — obie rzeczy zmieniane razy kilka w roku. */
@@ -1596,434 +1307,12 @@ function rysujIkoneAllegro() {
   ik.title = tip;
 }
 
-/* ── Metryki ──────────────────────────────────────────────────────────────────
-   Cele stoją obok liczb, bo liczba bez celu nie mówi, czy jest źle. `p95`
-   powyżej 300 ms znaczy, że ludzie zaczynają skanować podwójnie, a podwójny
-   skan przy liczeniu pozycji to błąd ILOŚCIOWY na fakturze. */
-/* Polska odmiana przez liczbę — „1 zwroty" pod kaflem czyta się jak usterka
-   danych, a nie jak liczba. Reguła: 1 → pojedyncza, 2–4 → mnoga, reszta →
-   dopełniacz, z wyjątkiem nastek (12, 13, 14 idą do dopełniacza). */
-function odmiana(n, [jeden, kilka, wiele]) {
-  const a = Math.abs(n) % 100;
-  if (n === 1) return jeden;
-  if (a >= 12 && a <= 14) return wiele;
-  return Math.abs(n) % 10 >= 2 && Math.abs(n) % 10 <= 4 ? kilka : wiele;
-}
-
+/* Kafel liczby z podpisem. Do 0.440.0 rysował też metryki i analizę —
+   odeszły do panelu. Został przy kolejce zapisów, która liczy nim swoje
+   trzy liczby. */
 function kafel(liczba, opis, zle) {
   return `<div class="kafel"><div class="liczba${zle ? " zle" : ""}">${esc(liczba)}</div>
           <div class="opis">${esc(opis)}</div></div>`;
-}
-
-function rysujMetryki(m) {
-  const dot = m.dotknieciaNaPozycje;
-  const p95 = m.p95OdpowiedziMs;
-  $("kafleMetryk").innerHTML = [
-    kafel(dot ?? "—", "dotknięć na pozycję · cel < 0,3", dot != null && dot >= 0.3),
-    kafel(p95 != null ? p95 + " ms" : "—", "p95 skan → odpowiedź · cel < 150 ms", p95 != null && p95 > 300),
-    kafel(m.zdarzen, `zdarzeń w oknie ${m.days} dni`, false),
-  ].join("");
-  $("etykiety").innerHTML =
-    "<tr><th>REGAŁ</th><th>RĘCZNIE</th><th>UDZIAŁ</th></tr>" +
-    (m.etykietyDoPrzedruku.map((e) =>
-      `<tr><td class="b">${esc(e.code)}</td><td>${e.reczne} z ${e.razem}</td>
-       <td>${Math.round(e.udzial * 100)}%</td></tr>`).join("") ||
-      '<tr><td colspan="3" class="mute">Wszystkie etykiety czytelne</td></tr>');
-  $("bezKodu").innerHTML =
-    "<tr><th>KOD</th><th>WPISANO RĘCZNIE</th></tr>" +
-    (m.towaryBezCzytelnegoKodu.map((t) =>
-      `<tr><td class="b">${esc(t.code)}</td><td>${t.reczne}×</td></tr>`).join("") ||
-      '<tr><td colspan="2" class="mute">Brak kartotek wpisywanych z ręki</td></tr>');
-}
-
-/* ── Analiza ──────────────────────────────────────────────────────────────────
-   Wykresy to inline SVG składane tutaj — strona ma zero zależności i zero
-   builda, a dwa słupkowe wykresy jednej serii nie uzasadniają biblioteki.
-   Jedna seria = bez legendy (nazwę niesie nagłówek sekcji); wartości nie
-   siedzą na każdym słupku, tylko na najwyższym; resztę mówi dymek `title`.  */
-
-/**
- * Komórka tabeli ze słupkiem proporcji. `max` to największa wartość W TEJ
- * TABELI — pełny tor znaczy „to jest ten największy", nie żadną wartość
- * bezwzględną. Liczba zostaje pod słupkiem: pasek mówi o proporcji i milczy
- * o skali, a tabela bez odczytywalnych wartości przestaje być tabelą.
- */
-function komorkaSlupka(ile, max, etykieta) {
-  /* Podłoga 2% jest po to, żeby wartość MAŁA, ale niezerowa, dalej rysowała
-     kreskę — inaczej „1 przy stu" wygląda jak zero. Samo zero nie ma prawa jej
-     dostać: pusty tor to jedyna rzecz, którą można odczytać jako „nic". */
-  const proc = max > 0 && ile > 0 ? Math.max(2, Math.round((ile / max) * 100)) : 0;
-  return `<td class="zeSlupkiem">
-    <div class="slupek"><i style="width:${proc}%"></i></div>
-    <div class="mute" style="margin-top:3px">${esc(etykieta ?? ile)}</div>
-  </td>`;
-}
-
-/**
- * Zdanie o szczycie — z FAKTÓW, nie z interpretacji.
- *
- * Makieta pisze pod wykresem zdanie w rodzaju „szczyt zbiega się z sezonem
- * kosiarek". Drugiej połowy takiego zdania nie da się policzyć: to sąd
- * człowieka, a nie liczba w bazie. Serwer zwraca więc sam szczyt i medianę
- * reszty (`wyliczSzczyt` w services/pytania.ts), a gdy próbka jest za cienka,
- * żeby cokolwiek twierdzić — `null`, i wtedy zdania po prostu nie ma.
- * Milczenie jest lepsze od zdania, które brzmi jak wniosek, a jest szumem.
- */
-function zdanieOSzczycie(szczyt, co, nazwijOs, rzeczownik, ogon) {
-  if (!szczyt) return "";
-  const ile = szczyt[co];
-  const razy = szczyt.medianaPozostalych > 0
-    ? (ile / szczyt.medianaPozostalych).toFixed(1).replace(".", ",")
-    : null;
-  /* Bez porównania zdanie mówi tylko, gdzie jest najwyższy słupek — a to widać
-     bez zdania. Gdy mediana reszty wynosi zero, ilorazu nie ma, więc mówimy
-     wprost, ile ta mediana wynosi. NIE „w pozostałych nie było nic": mediana
-     zero znaczy, że połowa okresów jest pusta, a nie że wszystkie — przy
-     dziewięciu pytaniach w sześciu tygodniach z dziewięćdziesięciu dni jedno
-     i drugie jest prawdą o czym innym. */
-  return `Szczyt ${esc(nazwijOs)} — ${ile} ${esc(rzeczownik)}${
-    razy
-      ? `, czyli ${razy}× mediana pozostałych (${liczbaPl(szczyt.medianaPozostalych)})`
-      : ", przy medianie 0 w pozostałych"
-  }.${ogon || ""}`;
-}
-
-/** Liczba po polsku: przecinek dziesiętny, bez zbędnego „,0". */
-const liczbaPl = (n) =>
-  n == null ? "—" : String(Number.isInteger(n) ? n : n).replace(".", ",");
-
-/**
- * Liczba dni z właściwą końcówką. Ułamek idzie do dopełniacza liczby
- * pojedynczej — „1,2 dnia", nie „1,2 dni" — bo połowa dnia nie jest dniami.
- */
-const dniPl = (n) =>
-  n == null
-    ? "—"
-    : `${liczbaPl(n)} ${Number.isInteger(n) ? odmiana(n, ["dzień", "dni", "dni"]) : "dnia"}`;
-
-/** Dzień jako „26.08" — tak, jak w makiecie i jak czyta go człowiek. */
-const dzienSkrot = (iso) => `${iso.slice(8, 10)}.${iso.slice(5, 7)}`;
-
-/**
- * Słupki jednej serii. `etykietaCo` przerzedza podpisy osi — przy 90 dniach
- * podpis pod każdym słupkiem byłby nieczytelną kaszą.
- */
-function slupkiSvg(dane, etykietaCo) {
-  const W = 560, H = 150, DOL = 22, GORA = 14;
-  if (!dane.length) return '<p class="mute">Brak danych w tym oknie.</p>';
-  const max = Math.max(...dane.map((d) => d.ile), 1);
-  const najlepszy = dane.findIndex((d) => d.ile === max);
-  const krok = W / dane.length;
-  const szer = Math.max(2, Math.min(26, krok - 2)); // 2px odstępu między słupkami
-  const wszystkiePodpisy = krok >= 18;
-  const czesci = dane.map((d, i) => {
-    const h = Math.round(((H - DOL - GORA) * d.ile) / max);
-    const x = (i * krok + (krok - szer) / 2).toFixed(1);
-    const y = H - DOL - h;
-    // zaokrąglone TYLKO końce danych: słupek zakotwiczony w osi, rx u góry
-    const r = Math.min(2, szer / 2, h);
-    const slupek = h === 0 ? "" :
-      `<path d="M${x} ${H - DOL} v${-(h - r)} q0 ${-r} ${r} ${-r} h${(szer - 2 * r).toFixed(1)} q${r} 0 ${r} ${r} v${h - r} z"
-         fill="var(--amber)"><title>${esc(d.tytul)}: ${d.ile}</title></path>`;
-    const podpis = i % etykietaCo === 0 ?
-      `<text x="${(i * krok + krok / 2).toFixed(1)}" y="${H - 6}" text-anchor="middle"
-         font-size="10" fill="var(--ink-mute)">${esc(d.podpis)}</text>` : "";
-    /* WARTOŚĆ NA KAŻDYM SŁUPKU, gdy się mieści (0.427.0, dekalog pkt 2).
-       Do tej wersji podpisany był tylko najwyższy, a resztę trzeba było
-       szacować wzrokiem albo wodzić myszą po `title`. 18 px na słupek mieści
-       trzycyfrową liczbę 10 px; przy 90 dniach słupek ma 6 px i podpis na
-       każdym zlałby się w pasek — wtedy zostaje stary podpis maksimum. */
-    const podpisany = max > 0 && (i === najlepszy || (wszystkiePodpisy && d.ile > 0));
-    const wartosc = podpisany ?
-      `<text x="${(i * krok + krok / 2).toFixed(1)}" y="${y - 3}" text-anchor="middle"
-         font-size="10" font-weight="${i === najlepszy ? 700 : 600}" fill="var(--ink-soft)">${d.ile}</text>` : "";
-    return slupek + podpis + wartosc;
-  });
-  /* `max-width` jest tu obowiązkowe, nie kosmetyczne. SVG skaluje się w CAŁOŚCI
-     — razem z wysokością i z rozmiarem podpisów osi — więc wykres wpuszczony
-     w kartę na całą szerokość ekranu urósłby do czterystu pikseli wysokości
-     i podpisów wielkości nagłówka. Wykres jednej serii ma być paskiem pod
-     tekstem, nie plakatem: dalej niż tu rośnie już tylko pusta biel między
-     słupkami. Do 0.99.0 wszystkie pięć wykresów stało w wąskich kolumnach
-     i ograniczenie nie było potrzebne. */
-  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;max-width:${W}px;height:auto" role="img">
-    <line x1="0" y1="${H - DOL}" x2="${W}" y2="${H - DOL}" stroke="var(--border)" stroke-width="1"/>
-    ${czesci.join("")}
-  </svg>`;
-}
-
-function rysujAnalize(a) {
-  ustawDaneDo(a.daneDo);
-  const r = a.rytm;
-  $("kafleAnalizy").innerHTML = [
-    kafel(a.dni.reduce((s, d) => s + d.pozycje, 0), `pozycji w oknie ${a.days} dni`, false),
-    kafel(r.dostawZamknietych, "dostaw rozłożonych", false),
-    kafel(r.medianaMinutDostawy != null ? r.medianaMinutDostawy + " min" : "—",
-      "mediana czasu dostawy", false),
-    kafel(r.problemyOtwarte, "problemów czeka na biuro", r.problemyOtwarte > 0),
-  ].join("");
-
-  $("wykresDni").innerHTML = slupkiSvg(
-    a.dni.map((d) => ({ ile: d.pozycje, podpis: d.data.slice(5), tytul: d.data })),
-    a.days > 30 ? 14 : a.days > 7 ? 7 : 1
-  );
-  $("audytSzczyt").innerHTML = zdanieOSzczycie(
-    a.szczyt,
-    "pozycje",
-    a.szczyt ? dzienSkrot(a.szczyt.data) : "",
-    odmiana(a.szczyt?.pozycje ?? 0, ["pozycja", "pozycje", "pozycji"])
-  );
-  $("wykresGodzin").innerHTML = slupkiSvg(
-    a.godziny.map((ile, g) => ({ ile, podpis: String(g), tytul: `godzina ${g}:00` })),
-    3
-  );
-
-  const w = a.wydajnosc;
-  /* Raport per osoba jest od 0.431.0 wyłącznie administratora — serwer nie
-     wysyła go roli biuro wcale (`null`). Karta mówi to zdaniem, zamiast pustej
-     tabeli, która wyglądałaby na brak pracy w oknie. */
-  if (!w) {
-    $("podstawaPrawna").textContent = "Raport per osoba widzi wyłącznie administrator.";
-    $("wydajnosc").innerHTML = "";
-  } else {
-  $("podstawaPrawna").textContent = w.podstawaPrawna;
-  $("wydajnosc").innerHTML =
-    "<tr><th>OSOBA</th><th>POZYCJE</th><th>CZAS AKTYWNY</th><th>TEMPO/H</th><th>ZGŁOSZONE PROBLEMY</th></tr>" +
-    (w.wiersze.map((o) =>
-      `<tr><td class="b">${esc(o.osoba)}</td><td>${o.pozycje}</td>
-       <td>${Math.round(o.minutyAktywne)} min</td>
-       <td>${o.wiarygodne ? o.tempo : '<span class="badge mute2">MAŁO DANYCH</span>'}</td>
-       <td>${o.zgloszoneProblemy}</td></tr>`).join("") ||
-      '<tr><td colspan="5" class="mute">Brak pracy w tym oknie</td></tr>') +
-    (w.nieprzypisanychZdarzen > 0 ?
-      `<tr><td class="mute" colspan="5">+ ${w.nieprzypisanychZdarzen} zdarzeń bez konta — nie doklejamy ich nikomu</td></tr>` : "");
-  }
-
-  const listaSzukan = (el, lista, pusto) => {
-    const max = Math.max(...lista.map((t) => t.ile), 0);
-    $(el).innerHTML =
-      "<tr><th>ZAPYTANIE</th><th>RAZY</th></tr>" +
-      (lista.map((t) =>
-        `<tr><td class="b">${esc(t.q)}</td>${komorkaSlupka(t.ile, max)}</tr>`).join("") ||
-        `<tr><td colspan="2" class="mute">${pusto}</td></tr>`);
-  };
-  listaSzukan("szukaneTop", a.szukania.top, "Nikt nic nie szukał");
-  listaSzukan("szukaneBrak", a.szukania.bezWynikow, "Wszystko, czego szukano, znajdowało się");
-
-  $("urzadzenia").innerHTML =
-    "<tr><th>URZĄDZENIE</th><th>UPADKI</th><th>NISKIE BATERIE</th><th>ODRZUCONE</th><th>ZDARZEŃ</th></tr>" +
-    (a.urzadzenia.map((u) =>
-      `<tr><td class="b">${esc(u.device)}</td>
-       <td>${u.upadki ? `<span class="badge err">${u.upadki}</span>` : 0}</td>
-       <td>${u.niskieBaterie}</td>
-       <td>${u.odrzucone ? `<span class="badge err">${u.odrzucone}</span>` : 0}</td>
-       <td>${u.zdarzen}</td></tr>`).join("") ||
-      '<tr><td colspan="5" class="mute">Brak zdarzeń z urządzeń w tym oknie</td></tr>');
-}
-
-/* Stan paska filtrów ANALIZY. Okno jest wspólne dla obu zakresów, bo obie
-   trasy przyjmują liczbę dni; zakres decyduje, które karty w ogóle stoją na
-   ekranie i którą trasę odpytujemy. */
-let dniAnalizy = 7;
-const zakresAnalizy = () => $("zakresAnalizy").value;
-
-/* Okna, które przyjmuje trasa każdego zakresu. Te listy MUSZĄ się zgadzać
-   z `dniZQuery` (routes/analiza.ts) i `OKNA_DNI` (services/pytania.ts) —
-   czip spoza zbioru wyglądałby na wybrany, a serwer liczyłby swoje domyślne
-   i kafel mówiłby „w 90 dniach" przy zaznaczonym „7 dni". Tak było przez
-   pierwszą godzinę życia tego paska. */
-const OKNA_ANALIZY = { audyt: [7, 30, 90], dostawy: [30, 90, 180] };
-
-/** Które okno wybrać, gdy poprzednie nie mieści się w nowym zakresie. */
-const OKNO_DOMYSLNE = { audyt: 7, dostawy: 90 };
-
-/** Zakresy, które mają trasę CSV. Reszta chowa przycisk zamiast pobierać cudzy plik. */
-const ZAKRESY_Z_CSV = ["audyt"];
-
-/** Pokazuje karty wybranego zakresu i chowa pozostałe — bez pobierania danych. */
-function ustawZakresAnalizy() {
-  const zakres = zakresAnalizy();
-  /* Jedna klasa na zakres, jedna pętla: przy dwóch zakresach para „hidden =
-     pytania / hidden = !pytania" jeszcze się czytała, przy trzech byłaby
-     drabinką negacji, w której czwarty zakres łatwo pominąć po cichu. */
-  for (const z of Object.keys(OKNA_ANALIZY)) {
-    const klasa = "zakres" + z[0].toUpperCase() + z.slice(1);
-    for (const el of $("widokAnaliza").querySelectorAll("." + klasa)) el.hidden = z !== zakres;
-  }
-  $("csvAnalizy").hidden = !ZAKRESY_Z_CSV.includes(zakres);
-
-  const okna = OKNA_ANALIZY[zakres];
-  // wybór zostaje, gdy nowy zakres go zna; inaczej domyślne okno tego zakresu
-  if (!okna.includes(dniAnalizy)) dniAnalizy = OKNO_DOMYSLNE[zakres];
-  $("oknoAnalizy").innerHTML = okna.map((d) =>
-    `<button class="czip" data-dni="${d}" aria-pressed="${d === dniAnalizy}">${d} dni</button>`
-  ).join("");
-}
-
-/**
- * „Dane do…" w pasku filtrów — DO KTÓREJ CHWILI sięga to, na co patrzysz.
- *
- * Liczone z najświeższego rekordu w zestawieniu, nie z zegara. Zegar serwera
- * mówiłby zawsze „przed chwilą", niezależnie od tego, czy synchronizacja
- * z Allegro stanęła wczoraj. Milczy, gdy nie ma z czego policzyć — pusty
- * zakres i tak powie o sobie kartami.
- */
-function ustawDaneDo(at) {
-  const d = at ? new Date(at) : null;
-  /* Bez sekund i bez roku: „Dane do 25.08, 14:20". Pełny znacznik z sekundami
-     jest do diagnostyki i tam zostaje (pasek stanu, ticker zapowiedzi). Tutaj
-     odpowiada się na pytanie „czy to jest świeże", a sekundy w nim nie pomagają
-     — za to wydłużają wiersz, który ma zmieścić się obok czterech filtrów. */
-  $("daneDo").textContent = d && !isNaN(d)
-    ? `Dane do ${dzienSkrot(dataLokalna(at))}, ${dwaZnaki(d.getHours())}:${dwaZnaki(d.getMinutes())}`
-    : "";
-}
-
-async function odswiezAnalize() {
-  ustawZakresAnalizy();
-  /* Odpytujemy WYŁĄCZNIE wybrany zakres. Ta sama zasada, która trzymała
-     statystyki pytań za zwinięciem do 0.96.0: nie pobiera się danych, na
-     które nikt nie patrzy. Zmienił się mechanizm, nie reguła. */
-  if (zakresAnalizy() === "dostawy") return odswiezAnalizeDostaw();
-
-  try {
-    rysujAnalize(await (await api(`/api/analiza?days=${dniAnalizy}`)).json());
-  } catch (e) {
-    $("kafleAnalizy").innerHTML = `<p class="mute">${esc(e.message)}</p>`;
-  }
-  // kandydaci mają własną trasę — i własny try/catch, żeby błąd jednej sekcji
-  // nie gasił drugiej. Reguły, którymi się ich liczy, stoją za zębatką.
-  odswiezKandydatow();
-}
-
-/**
- * Zakres DOSTAWY — jedna trasa, dwie karty.
- *
- * Jedyny zakres, którego liczb nikt wcześniej nie liczył: `statystykiDostawcy`
- * daje trzy liczby dla JEDNEGO dostawcy, na kartę otwartej faktury. Tutaj
- * chodzi o zestawienie po wszystkich naraz — inaczej „u kogo są problemy"
- * sprawdza się przez otwieranie faktur po kolei.
- */
-async function odswiezAnalizeDostaw() {
-  try {
-    const d = (await (await api(`/api/biuro/dostawy/analiza?dni=${dniAnalizy}`)).json()).analiza;
-    rysujAnalizeDostaw(d);
-    ustawDaneDo(d.daneDo);
-  } catch (e) {
-    $("dostawyKafle").innerHTML = `<p class="mute">${esc(e.message)}</p>`;
-    ustawDaneDo(null);
-  }
-}
-
-function rysujAnalizeDostaw(a) {
-  $("dostawyKafle").innerHTML = [
-    kafel(a.zamknietych,
-      `${odmiana(a.zamknietych, ["dostawa domknięta", "dostawy domknięte", "dostaw domkniętych"])
-       } w ${a.dni} dniach`),
-    kafel(a.pozycjiRozlozonych,
-      odmiana(a.pozycjiRozlozonych, ["pozycja rozłożona", "pozycje rozłożone", "pozycji rozłożonych"])),
-    kafel(a.medianaDni == null ? "—" : dniPl(a.medianaDni), "mediana czasu rozłożenia"),
-    /* Bursztyn od 10%: nie próg z ustawy, tylko wartość, przy której warto
-       spojrzeć na dostawcę. Ten sam próg co przy wskaźniku zwrotów. */
-    kafel(a.udzialWyjatkow == null ? "—" : `${liczbaPl(a.udzialWyjatkow)}%`,
-      "pozycji z wyjątkiem", a.udzialWyjatkow != null && a.udzialWyjatkow >= 10),
-    /* Bez czerwieni: zamknięcie poza WERTIS jest legalną drogą, nie wpadką.
-       Czerwony kafel robiłby z niej zarzut wobec tego, kto ją wybrał. */
-    kafel(a.pozaWertis, "z tego poza WERTIS"),
-  ].join("");
-
-  const maxUdzial = Math.max(...a.dostawcy.map((x) => x.udzialWyjatkow ?? 0), 0);
-  $("dostawyDostawcy").innerHTML = !a.dostawcy.length
-    ? '<tr><td class="mute">Żadna dostawa nie domknęła się w tym oknie.</td></tr>'
-    : "<tr><th>DOSTAWCA</th><th>DOSTAW</th><th>POZYCJI</th><th>Z WYJĄTKIEM</th><th>MEDIANA</th></tr>" +
-      a.dostawcy.map((x) => `<tr>
-          <td class="b">${esc(x.dostawca)}</td>
-          <td>${x.dostaw}</td>
-          <td class="mute">${x.pozycji}</td>
-          ${x.udzialWyjatkow == null
-            ? '<td><span class="mute">—</span></td>'
-            : komorkaSlupka(x.udzialWyjatkow, maxUdzial, `${liczbaPl(x.udzialWyjatkow)}%`)}
-          <td>${x.medianaDni == null
-            ? '<span class="mute">—</span>'
-            : esc(dniPl(x.medianaDni))}</td>
-        </tr>`).join("");
-
-  /* Skala słupków to największa liczba ZGŁOSZEŃ w tabeli, licząc obie kolumny
-     razem — inaczej dwie kolumny miałyby dwie różne skale i pasek „otwarte"
-     przy jednym typie byłby dłuższy od „rozwiązane" przy innym mimo mniejszej
-     liczby. Jedna skala na tabelę albo żadna. */
-  const maxWyjatkow = Math.max(
-    ...a.wyjatki.flatMap((w) => [w.otwartych, w.rozwiazanych]), 0
-  );
-  $("dostawyWyjatki").innerHTML = !a.wyjatki.length
-    ? '<tr><td class="mute">Nikt nie zgłosił wyjątku w tym oknie.</td></tr>'
-    : "<tr><th>WYJĄTEK</th><th>OTWARTE</th><th>ROZWIĄZANE</th></tr>" +
-      a.wyjatki.map((w) => `<tr>
-          <td class="b">${esc(w.nazwa)}</td>
-          ${komorkaSlupka(w.otwartych, maxWyjatkow)}
-          ${komorkaSlupka(w.rozwiazanych, maxWyjatkow)}
-        </tr>`).join("");
-
-  $("dostawyTygodnie").innerHTML = slupkiSvg(
-    a.tygodnie.map((t) => ({ ile: t.ile, podpis: "t" + t.tydzien.slice(-2), tytul: `tydzień ${t.tydzien}` })),
-    a.tygodnie.length > 12 ? 4 : 1
-  );
-  $("dostawySzczyt").innerHTML = zdanieOSzczycie(
-    a.szczyt,
-    "ile",
-    a.szczyt ? "w tygodniu " + a.szczyt.tydzien.slice(-2) : "",
-    odmiana(a.szczyt?.ile ?? 0, ["dostawa", "dostawy", "dostaw"])
-  );
-}
-
-/* ── Strefa złota: kandydaci i reguły ────────────────────────────────────────
-   Wgranie CSV idzie przez FileReader + zwykły POST `{ csv }` — bez multipart,
-   bo ten sam POST ma w przyszłości wołać integracja z Sellasist. Serwer mówi
-   PRAWDĘ o dopasowaniu (ile wierszy poznał) i odrzuca plik z dopasowaniem
-   poniżej połowy — wynik importu pokazujemy w całości, łącznie z przykładami
-   niedopasowanych symboli.                                                   */
-
-function rysujKandydatow(r) {
-  $("oknoKandydatow").textContent = r.okno
-    ? `Dane ${r.okno.od} – ${r.okno.do} (${r.okno.dni} dni) · próg górnych 15%: ` +
-      `${r.prog} zbiórek · już w strefie: ${r.juzWStrefie} · regał bez reguły: ${r.bezReguly}`
-    : "Brak danych — wgraj CSV zbiórek.";
-  $("kandydaci").innerHTML =
-    "<tr><th>SYMBOL</th><th>NAZWA</th><th>ZBIÓRKI</th><th>NA DZIEŃ</th><th>OBECNY ADRES</th><th>DOKĄD</th></tr>" +
-    (r.kandydaci.map((k) =>
-      `<tr><td class="b">${esc(k.sym)}</td><td>${esc(k.nazwa)}</td>
-       <td>${k.zbiorki}</td><td>${k.zbiorekNaDzien}</td>
-       <td>${esc(k.adres ?? "—")}</td><td>poziom ${esc(k.poziomy)}</td></tr>`).join("") ||
-      '<tr><td colspan="6" class="mute">Nie ma kandydatów — szybka rotacja stoi tam, gdzie ma stać</td></tr>');
-}
-
-async function odswiezKandydatow() {
-  try {
-    rysujKandydatow(await (await api("/api/biuro/zbiorki/kandydaci")).json());
-  } catch (e) {
-    $("oknoKandydatow").textContent = e.message;
-    $("kandydaci").innerHTML = "";
-  }
-}
-
-async function wyslijZbiorki(plik) {
-  $("wynikImportu").textContent = `Wysyłam ${plik.name}…`;
-  try {
-    const csv = await plik.text();
-    const w = await (await api("/api/biuro/zbiorki/import", {
-      method: "POST", body: JSON.stringify({ csv }),
-    })).json();
-    $("wynikImportu").textContent =
-      `Wgrano: ${w.wierszy} wierszy (${w.okres ? `${w.okres.od} – ${w.okres.do}` : "?"}), ` +
-      `nowych ${w.nowych}, duplikatów ${w.pominietychDuplikatow}, ` +
-      `niedopasowanych ${w.niedopasowanych}` +
-      (w.przykladyNiedopasowanych.length
-        ? ` (np. ${w.przykladyNiedopasowanych.slice(0, 5).join(", ")})` : "") +
-      (w.odrzuconychWierszy ? ` · uciętych wierszy: ${w.odrzuconychWierszy}` : "");
-    await odswiezKandydatow();
-  } catch (e) {
-    $("wynikImportu").textContent = `Import odrzucony: ${e.message}`;
-  }
 }
 
 /* ── Logo dostawców ──────────────────────────────────────────────────────────
@@ -2328,8 +1617,9 @@ async function zapiszStrefe() {
   }).filter((r) => r.alejka || r.od || r.do || r.poziomy);
   try {
     await api("/api/biuro/strefa", { method: "PUT", body: JSON.stringify({ reguly }) });
-    $("wynikStrefy").textContent = `Zapisano ${reguly.length} reguł — kandydaci przeliczeni.`;
-    await odswiezKandydatow();
+    /* Lista kandydatów mieszka od 0.440.0 w analizie panelu i liczy się
+       tam przy następnym wejściu — serwer zresetował jej pamięć przy zapisie. */
+    $("wynikStrefy").textContent = `Zapisano ${reguly.length} reguł — kandydaci przeliczą się w analizie panelu.`;
   } catch (e) {
     $("wynikStrefy").textContent = e.message;
   }
@@ -2764,77 +2054,6 @@ function rysujZdrowie(h) {
   ].join("");
 }
 
-/* ── Dziennik ── */
-function paramyDziennika() {
-  const p = new URLSearchParams();
-  const dodaj = (k, v) => { if (v) p.set(k, v); };
-  dodaj("od", $("fOd").value);
-  dodaj("do", $("fDo").value);
-  dodaj("typ", $("fTyp").value);
-  dodaj("twId", $("fTw").value.trim());
-  dodaj("device", $("fDev").value.trim());
-  dodaj("userRef", $("fOsoba").value);
-  dodaj("limit", $("fLimit").value);
-  return p.toString();
-}
-
-/* RODZINA ZDARZENIA KOLOREM (0.427.0, dekalog pkt 2). Kolumna TYP była
-   pogrubionym kluczem technicznym i przy dwustu wierszach wszystkie wyglądały
-   tak samo — „co się tu psuło" wymagało przeczytania każdego klucza. Cztery
-   rodziny na ISTNIEJĄCYCH żetonach, bez nowego koloru w palecie: błędy
-   i urządzenia czerwienią, praca przy dostawach bursztynem, zwroty obrysem,
-   reszta szarością. Kolejność testów ma znaczenie — `queue_failed` jest
-   najpierw błędem, dopiero potem czymkolwiek innym. Klucz zostaje tekstem
-   pastylki: to po nim filtruje się TYP i szuka w CSV. */
-const RODZINY_ZDARZEN = [
-  ["blad", /failed|rejected|conflict|konflikt|mismatch|odmowa|blad|device_drop|battery/],
-  ["dostawa", /^(putaway|delivery|location|problem|przyjecie|brak_na_serwis|przesuniecie|notatka|zdjecie|manual_entry)/],
-  ["zwrot", /^(zwrot|kosz|karton|reklamacja|klient)/],
-];
-function typZdarzenia(typ) {
-  const rodzina = RODZINY_ZDARZEN.find(([, wzor]) => wzor.test(typ || ""))?.[0] ?? "inne";
-  return `<span class="typZd ${rodzina}">${esc(typ)}</span>`;
-}
-
-async function szukajDziennik() {
-  try {
-    const d = await (await api(`/api/events?${paramyDziennika()}`)).json();
-    if ($("fTyp").options.length === 1) {
-      for (const t of d.typy || []) {
-        $("fTyp").add(new Option(t, t));
-      }
-    }
-    /* „Co robił wczoraj Jan" nie może wymagać CSV i Excela — trasa audytu
-       od dawna przyjmuje userRef, brakowało tylko kontrolki. Lista kont
-       ładuje się raz; awaria (rola bez dostępu do listy) zostawia filtr
-       pusty i działający dziennik. */
-    if ($("fOsoba").options.length === 1) {
-      try {
-        const u = await (await api("/api/users")).json();
-        for (const k of u.users || []) $("fOsoba").add(new Option(k.name, String(k.userId)));
-      } catch { /* filtr jest wygodą, nie warunkiem działania dziennika */ }
-    }
-    $("licznikDziennik").textContent =
-      `pokazano ${d.wpisy.length} z ${d.razem} pasujących wpisów`;
-    $("dziennik").innerHTML =
-      "<tr><th>CZAS</th><th>TYP</th><th>OSOBA</th><th>URZĄDZENIE</th><th>TOWAR</th><th>SZCZEGÓŁY</th></tr>" +
-      (d.wpisy.map((w) => `<tr>
-          <td class="mute" style="white-space:nowrap">${esc(stempelLokalny(w.czas))}</td>
-          <td>${typZdarzenia(w.typ)}</td>
-          <td>${esc(w.uzytkownik)}${w.userRef == null ? ' <span class="badge mute2">bez konta</span>' : ""}</td>
-          <td class="mute">${esc(w.device || "—")}</td>
-          <td class="mute">${w.twId ?? "—"}</td>
-          <td><code class="payload">${esc((w.payload || "").slice(0, 160))}</code></td>
-        </tr>`).join("") ||
-        '<tr><td colspan="6" class="mute">Brak wpisów dla tego filtra</td></tr>');
-  } catch (e) {
-    /* 403 znaczy „ta rola nie ogląda śladu" i jest poprawną odpowiedzią, nie
-       awarią — magazynier zalogowany w biurze ma to zobaczyć wprost. */
-    $("licznikDziennik").textContent = "";
-    $("dziennik").innerHTML = `<tr><td class="mute">${esc(e.message)}</td></tr>`;
-  }
-}
-
 /* ── Dane firmy do formularzy dostawców ───────────────────────────────────────
    Druki dostawców pytają o dane ZGŁASZAJĄCEGO (nazwa, NIP, adres, osoba
    kontaktowa) — a tych system nigdzie nie ma, bo nie są danymi magazynu.
@@ -2897,21 +2116,17 @@ async function odswiezNadzor() {
   if (h) rysujZdrowie(h);
   if (q) rysujKolejke(q);
   try {
-    const [m, k, wym] = await Promise.all([
-      (await api(`/api/metrics?days=${$("dniMetryk").value}`)).json(),
+    const [k, wym] = await Promise.all([
       (await api("/api/ean-conflicts")).json(),
-      /* To samo okno co metryki obok: dwie tabele na jednym ekranie liczące
-         z różnych okresów to najprostszy sposób na sprzeczne wnioski. */
       /* `.catch` na CAŁYM łańcuchu, nie na samym `.json()`. Do 0.364.0 stał
          za `.json()` i nie łapał nic, co naprawdę pada: `api()` rzuca przy
          każdej odpowiedzi spoza 2xx, czyli PRZED `.json()`. Awaria najmłodszej
          i najmniej ważnej tabeli wywracała przez to dwie starsze na tym samym
-         ekranie — metryki i kolizje. */
-      api(`/api/biuro/wymiana?dni=${$("dniMetryk").value}`)
+         ekranie — kolizje (a do 0.440.0 także metryki). */
+      api(`/api/biuro/wymiana?dni=${$("dniWymiany").value}`)
         .then((r) => r.json())
         .catch(() => ({ wiersze: [] })),
     ]);
-    rysujMetryki(m);
     rysujKolizje(k.conflicts || []);
     rysujWymiane(wym);
     /* Alarm rysuje się z danych POBRANYCH W CYKLU, a nie tu: wejście na
@@ -3175,8 +2390,7 @@ function start() {
    `wysoka` dostają listy o nieograniczonej długości. Reszta ma sam poziom —
    krótka tabela z ośmioma kolumnami też potrafi rozepchać kartę. */
 const TABELE_DLUGIE = new Set([
-  "dziennik",
-  "kolejka", "kandydaci", "dostawcy", "statystykiProdukty", "wydajnosc", "reguly",
+  "kolejka", "dostawcy", "statystykiProdukty", "reguly",
   "pytaniaLista", "pytaniaProdukty", "pytaniaPozaOferta",
 ]);
 for (const t of document.querySelectorAll("#panel table")) {
@@ -3271,16 +2485,7 @@ $("bok").addEventListener("click", (e) => {
   cel.classList.add("wskazana");
   setTimeout(() => cel.classList.remove("wskazana"), 2000);
 });
-$("dniMetryk").addEventListener("change", odswiezNadzor);
-$("oknoAnalizy").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-dni]");
-  if (!b) return;
-  dniAnalizy = Number(b.dataset.dni);
-  odswiezAnalize();                  // przerysuje czipy razem z zakresem
-});
-$("zakresAnalizy").addEventListener("change", odswiezAnalize);
-$("csvAnalizy").addEventListener("click", () =>
-  pobierz(`/api/analiza/csv?days=${dniAnalizy}`, "wertis-analiza.csv"));
+$("dniWymiany").addEventListener("change", odswiezNadzor);
 
 /* ── Masowa zmiana lokalizacji z arkusza (0.138.0) ───────────────────────────
    ARKUSZ ROZBIERA PRZEGLĄDARKA, nie serwer. Ta sama zasada, dla której obrazy
@@ -3608,12 +2813,6 @@ $("wynikArkuszLok").addEventListener("click", (e) => {
   }
   przeliczArkuszLok();
 });
-$("wgrajZbiorki").addEventListener("click", () => $("plikZbiorek").click());
-$("plikZbiorek").addEventListener("change", (e) => {
-  const plik = e.target.files?.[0];
-  if (plik) wyslijZbiorki(plik);
-  e.target.value = ""; // ten sam plik wybrany drugi raz też ma odpalić `change`
-});
 /* Który dostawca czeka na plik — `<input type="file">` jest jeden na całą
    tabelę, bo dialog systemowy i tak obsługuje jeden wybór naraz. */
 let logoDla = null;
@@ -3632,8 +2831,6 @@ $("plikLogo").addEventListener("change", (e) => {
   if (plik && logoDla != null) wyslijLogo(logoDla, plik);
   e.target.value = ""; // ten sam plik wybrany drugi raz też ma odpalić `change`
 });
-$("csvKandydatow").addEventListener("click", () =>
-  pobierz("/api/biuro/zbiorki/kandydaci/csv", "wertis-strefa-kandydaci.csv"));
 $("dodajRegule").addEventListener("click", () =>
   $("reguly").insertAdjacentHTML("beforeend", wierszReguly()));
 $("reguly").addEventListener("click", (e) => {
@@ -3655,9 +2852,6 @@ $("csvRozjazdy").addEventListener("click", () => {
   if (ostatnieRozjazdy) csvRozjazdow(ostatnieRozjazdy);
 });
 $("zapiszFirme").addEventListener("click", zapiszFirme);
-$("szukajDziennik").addEventListener("click", szukajDziennik);
-$("csvDziennik").addEventListener("click", () =>
-  pobierz(`/api/events/csv?${paramyDziennika()}`, "wertis-audyt.csv"));
 /* ── Konto Allegro — zdarzenia ── */
 
 $("allegroAkcje").addEventListener("click", async (e) => {

@@ -354,6 +354,19 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > Zwroty, pod przełącznikiem Zwroty · Kosze, bo kosz jest dalszym ciągiem
 > zwrotu. Wiązanie kosz ↔ zwrot działa odtąd w obie strony. MAGAZYN ZWROTÓW
 > zniknął z `biuro.html`; dolny rząd panelu niesie już tylko Dostawy i wgląd.
+>
+> **F4 idzie dwoma wydaniami, nie jednym.** Stan systemu niesie siedem
+> zapisów, czytnik arkuszy i parowanie Allegro, więcej niż F2 i F3 razem.
+> Krótszy PR to mniej zderzeń numerów, które kosztowały już kilka wydań.
+>
+> **F4a w 0.440.0.** DZIENNIK i ANALIZA przeszły do panelu i zniknęły
+> z `biuro.html`. Trzy zmiany kształtu. Metryki etykiet i kodów przeszły ze
+> stanu systemu do analizy, bo mówią o pracy hali w oknie i słuchają tego
+> samego okna. Dziennik filtruje bez przycisku „szukaj", a doba filtra jest
+> lokalna, nie UTC. Analiza NIE ma zakresu „Obsługa klienta" z makiety F0:
+> brakuje mu źródła danych, a przeprowadzka nie wymyśla liczb. To luka do
+> osobnej decyzji. Reguły strefy złotej zostają za zębatką biura do F5;
+> analiza prowadzi do nich mostem, z sesją.
 
 ### 8. Kiedy nowa obsługa jest gotowa?
 

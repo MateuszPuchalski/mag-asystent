@@ -635,7 +635,7 @@ Ziarno zakłada osiem domkniętych dostaw u czterech dostawców, rozłożonych n
 sześć tygodni. Do 0.99.0 domknięta dostawa była jedna — a jedna nie odpowiada
 na pytanie „u kogo są problemy" wcale.
 
-Wejdź w `/biuro` → **ANALIZA**, zakres **dostawy**, okno **90 dni**.
+Wejdź w `/obsluga/analiza` — zakres **Dostawy** i okno **90 dni** są domyślne.
 
 Tabela „dostawcy" jest posortowana po **udziale** pozycji z wyjątkiem, a nie po
 liczbie dostaw. IMPORT SHANGHAI ma stać na górze mimo najmniejszej liczby
@@ -678,8 +678,9 @@ a przed zapisem nie ma tam pustego pasa po nim.
 Otwórz objaśnienie ikoną „i" przy dowolnej sekcji. Akapity mają mieć odstęp
 między sobą, a po zamknięciu nie zostaje po nich pusta przerwa.
 
-Reszta zakładek zostaje **na kartach**: ANALIZA, NADZÓR i DZIENNIK dalej mają
-promień, cień i odstęp między kartami. To jest osobny wygląd i ma taki zostać.
+Reszta zakładek zostaje **na kartach**: NADZÓR dalej ma promień, cień i odstęp
+między kartami. To jest osobny wygląd i ma taki zostać. ANALIZA i DZIENNIK
+przeszły do panelu biura.
 
 ## Kosze z regału zwrotów
 

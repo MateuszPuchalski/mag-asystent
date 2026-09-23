@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { czas, godzina } from "./ui";
+import { czas, godzina, stempel } from "./ui";
 
 /* Źródła przez `?raw`, jak w pozostałych strażnikach — `tsconfig.json` zapisuje,
    że panel jest aplikacją przeglądarki, więc żadnego `node:fs`. `ui/index.tsx`
@@ -83,6 +83,13 @@ describe("czas() i godzina(): co dokładnie oddają", () => {
        godzinie i minucie NIE MA trzeciej liczby. */
     expect(czas(KIEDY)).toMatch(/^\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}$/);
     expect(czas(KIEDY)).not.toMatch(/:\d{2}:\d{2}/);
+  });
+
+  it("`stempel()` — jedyny format z sekundą, dla dziennika (0.440.0)", () => {
+    /* Ślad audytowy to diagnostyka: kolejność dwóch zdarzeń z tej samej minuty
+       rozstrzyga sekunda. Poza dziennikiem obowiązuje `czas()`. */
+    expect(stempel(KIEDY)).toMatch(/^\d{2}\.\d{2}\.\d{4}, \d{2}:\d{2}:\d{2}$/);
+    expect(stempel(null)).toBe("—");
   });
 
   it("`godzina()` oddaje samą godzinę i minutę", () => {

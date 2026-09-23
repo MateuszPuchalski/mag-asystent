@@ -12,8 +12,13 @@ import { token } from "./api/klient";
 
 /** Zakładki `biuro.html`, do których panel umie jeszcze prowadzić. Każde wydanie
     przeprowadzki skreśla tu swój widok — DOSTAWY odeszły w 0.435.0, MAGAZYN
-    ZWROTÓW (kosze) w 0.438.0. */
-export const WIDOKI_BIURA = ["nadzor", "dziennik", "analiza"] as const;
+    ZWROTÓW (kosze) w 0.438.0, DZIENNIK i ANALIZA w 0.440.0.
+
+    `dostawcy` to USTAWIENIA za zębatką biura (nazwa widoku została po
+    dawnej zakładce, żeby nie migrować `localStorage`). Doszły tu w 0.440.0,
+    bo strefa złota w analizie panelu prowadzi do swoich reguł, które
+    przeprowadzą się dopiero z ustawieniami (F5). */
+export const WIDOKI_BIURA = ["nadzor", "dostawcy"] as const;
 export type WidokBiura = (typeof WIDOKI_BIURA)[number];
 
 /** Przejście do widoku, który jeszcze mieszka w `biuro.html`. */

@@ -23,6 +23,8 @@ import { Ustawienia } from "./ekrany/Ustawienia";
 import { DoDecyzji } from "./ekrany/DoDecyzji";
 import { Dostawy } from "./ekrany/Dostawy";
 import { Kosze } from "./ekrany/Kosze";
+import { Dziennik } from "./ekrany/Dziennik";
+import { Analiza } from "./ekrany/Analiza";
 import { Protokol } from "./druk/Protokol";
 import "./index.css";
 
@@ -100,8 +102,10 @@ const DRUGI_RZAD: Array<PozycjaDrugiegoRzedu | "kreska"> = [
      Zwroty, bo są dalszym ciągiem zwrotu. Powód przy `zwroty/Przelacznik.tsx`. */
   "kreska",
   { etykieta: "Stan systemu", ikona: <Activity size={16} />, biuro: "nadzor" },
-  { etykieta: "Dziennik", ikona: <FileText size={16} />, biuro: "dziennik" },
-  { etykieta: "Analiza", ikona: <BarChart3 size={16} />, biuro: "analiza" },
+  /* Dziennik i analiza przeszły w 0.440.0; stan systemu idzie następnym
+     wydaniem, bo niesie siedem zapisów i czytnik arkuszy. */
+  { etykieta: "Dziennik", ikona: <FileText size={16} />, do: "/obsluga/dziennik" },
+  { etykieta: "Analiza", ikona: <BarChart3 size={16} />, do: "/obsluga/analiza" },
 ];
 
 function DrugiRzad() {
@@ -343,6 +347,8 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         <Route path="/obsluga/reklamacje/:id" element={<Reklamacje />} />
     <Route path="/obsluga/dyskusje" element={<Dyskusje />} />
     <Route path="/obsluga/dyskusje/:id" element={<Dyskusje />} />
+        <Route path="/obsluga/dziennik" element={<Dziennik />} />
+        <Route path="/obsluga/analiza" element={<Analiza />} />
         <Route path="/obsluga/moje" element={<Moje />} />
         <Route path="/obsluga/wzmianki" element={<Wzmianki />} />
         <Route path="/obsluga/wiedza" element={<Wiedza />} />

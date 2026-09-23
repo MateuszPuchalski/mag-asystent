@@ -418,7 +418,7 @@ Lista w kolektorze odpowiada tylko temu, kto trzyma to urządzenie. Pierwsze
 pytanie przy takiej awarii brzmi jednak inaczej: **to jedno urządzenie czy
 wszystkie?**. Dlatego przerwa jedzie też na serwer.
 
-**Gdzie to czytać:** panel biura → **DZIENNIK ZDARZEŃ**, typ `siec_przerwa`.
+**Gdzie to czytać:** panel biura (`/obsluga`) → **Dziennik**, typ `siec_przerwa`.
 Filtr po urządzeniu stoi obok. Wpis niesie godzinę początku, czas trwania,
 liczbę prób, powód, rodzaj sieci, adres kolektora i adres serwera z jego
 ustawień.
@@ -2583,6 +2583,26 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.440.0 — dziennik i analiza w panelu
+
+**Migracji nie ma. Panel trzeba przebudować.** Trasy serwera zostają te same;
+zmienia się front, który je woła.
+
+Co zmienia się dla biura:
+
+- **Dziennik i Analiza są w panelu**, w drugim rzędzie nagłówka. Pozycje
+  ANALIZA i DZIENNIK w pasku `biuro.html` prowadzą tam z sesją.
+- **Dziennik filtruje bez przycisku SZUKAJ**, a daty liczy według doby
+  lokalnej. Wynik bywa przez to inny niż w starym biurze przy wpisach z nocy.
+- **Metryki etykiet i kodów są w analizie**, w zakresie Praca hali. W stanie
+  systemu została tabela wymiany z halą z własnym oknem.
+- **Import zbiórek i kandydaci strefy złotej są w analizie.** Reguły strefy
+  zostają za zębatką biura.
+
+Sprawdzenie po wdrożeniu idzie tak. Wejdź w Analizę kontem admina, zakres
+Praca hali: karta „Wydajność per osoba" ma stać z podstawą prawną. Kontem
+biura tej karty ma nie być wcale.
 
 ### Aktualizacja do 0.438.0 — kosze w zakładce Zwroty
 

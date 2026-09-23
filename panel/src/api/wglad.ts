@@ -1,0 +1,234 @@
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { api } from "./klient";
+
+/* ── Wgląd biura: dziennik i analiza (0.440.0) ──────────────────────────
+   Przeniesione z DZIENNIKA i ANALIZY w `biuro.html`. Trasy są TE SAME, którymi
+   jeździło biuro — przeprowadzka zmienia front, nie umowę z serwerem. Typy
+   stoją tutaj, a nie w `typy.ts`, z powodu podanego przy `api/dostawy.ts`:
+   to kształty tylko dla biura, nie kontrakt z kolektorem. Wzór każdego z nich
+   leży na serwerze obok funkcji, która go liczy — przy rozjeździe wygrywa
+   serwer, a `panel-adresy.test.ts` pilnuje przynajmniej samych adresów. */
+
+/* ── Dziennik (`routes/audyt.ts`) ─────────────────────────────────────────── */
+
+export interface WpisAudytu {
+  id: number;
+  typ: string;
+  czas: string;
+  uzytkownik: string;
+  userRef: number | null;
+  device: string | null;
+  twId: number | null;
+  payload: string | null;
+}
+
+export interface Dziennik {
+  wpisy: WpisAudytu[];
+  /** Wszystkie pasujące, nie długość strony — stąd „pokazano N z M". */
+  razem: number;
+  typy: string[];
+}
+
+/** Filtr dziennika tak, jak go trzyma ekran — daty jako „2026-09-22" z pola. */
+export interface FiltrDziennika {
+  od: string;
+  do: string;
+  typ: string;
+  twId: string;
+  device: string;
+  userRef: string;
+  limit: number;
+}
+
+export const FILTR_PUSTY: FiltrDziennika = { od: "", do: "", typ: "", twId: "", device: "", userRef: "", limit: 100 };
+
+/**
+ * Doba LOKALNA jako przedział w UTC.
+ *
+ * Biuro wysyłało gołe „2026-09-22", a serwer porównuje je napisowo ze
+ * znacznikami w UTC (`created_at` ma kształt `toISOString()`). Wpis z 00:30
+ * czasu polskiego to 22:30 dnia poprzedniego w UTC — więc filtr „od 22.09"
+ * gubił pierwsze dwie godziny doby, a „do 22.09" łapał dwie godziny
+ * z następnej. Tu doba zaczyna się o północy PRZEGLĄDARKI, tak jak czyta ją
+ * człowiek, a serwer dostaje pełny znacznik i nic nie musi zgadywać.
+ */
+export function granicaDoby(data: string, koniec: boolean): string {
+  const [r, m, d] = data.split("-").map(Number);
+  if (!r || !m || !d) return "";
+  return (koniec ? new Date(r, m - 1, d, 23, 59, 59, 999) : new Date(r, m - 1, d)).toISOString();
+}
+
+/** Query string filtra — puste pola znikają, jak w biurze. */
+export function paramyDziennika(f: FiltrDziennika): string {
+  const p = new URLSearchParams();
+  const dodaj = (k: string, v: string) => { if (v) p.set(k, v); };
+  dodaj("od", f.od ? granicaDoby(f.od, false) : "");
+  dodaj("do", f.do ? granicaDoby(f.do, true) : "");
+  dodaj("typ", f.typ);
+  dodaj("twId", f.twId.trim());
+  dodaj("device", f.device.trim());
+  dodaj("userRef", f.userRef);
+  p.set("limit", String(f.limit));
+  return p.toString();
+}
+
+export function useDziennik(f: FiltrDziennika) {
+  return useQuery({
+    queryKey: ["dziennik", f],
+    queryFn: () => api<Dziennik>(`/api/events?${paramyDziennika(f)}`),
+    /* Poprzedni wynik stoi, dopóki nowy nie dojdzie — tabela nie mruga przy
+       każdym znaku w polu urządzenia. */
+    placeholderData: (poprzednie) => poprzednie,
+  });
+}
+
+/* ── Analiza śladu audytowego (`services/raporty.ts`) ─────────────────────── */
+
+export interface WierszWydajnosci {
+  userId: number | null;
+  osoba: string;
+  pozycje: number;
+  minutyAktywne: number;
+  tempo: number | null;
+  zgloszoneProblemy: number;
+  recznePrzepisania: number;
+  wiarygodne: boolean;
+}
+
+export interface RaportWydajnosci {
+  days: number;
+  podstawaPrawna: string;
+  progWiarygodnosci: number;
+  wiersze: WierszWydajnosci[];
+  nieprzypisanychZdarzen: number;
+}
+
+export interface AnalizaAudytu {
+  days: number;
+  dni: Array<{ data: string; pozycje: number; zdarzen: number }>;
+  godziny: number[];
+  rytm: {
+    dostawZamknietych: number;
+    medianaMinutDostawy: number | null;
+    pozycjiNaDostawe: number | null;
+    problemyZgloszone: number;
+    problemyRozwiazane: number;
+    problemyOtwarte: number;
+  };
+  szukania: { top: Array<{ q: string; ile: number }>; bezWynikow: Array<{ q: string; ile: number }> };
+  urzadzenia: Array<{ device: string; upadki: number; niskieBaterie: number; odrzucone: number; zdarzen: number }>;
+  /** `null` dla każdego poza administratorem — serwer tego raportu wtedy NIE LICZY. */
+  wydajnosc: RaportWydajnosci | null;
+  szczyt: { data: string; pozycje: number; medianaPozostalych: number } | null;
+  daneDo: string | null;
+}
+
+export function useAnaliza(dni: number, wlaczona: boolean) {
+  return useQuery({
+    queryKey: ["analiza", dni],
+    queryFn: () => api<AnalizaAudytu>(`/api/analiza?days=${dni}`),
+    /* Zakres, na który nikt nie patrzy, nie jest pobierany — ta sama reguła
+       co w biurze (`odswiezAnalize`). */
+    enabled: wlaczona,
+    placeholderData: (poprzednie) => poprzednie,
+  });
+}
+
+/* ── Metryki (`services/raporty.ts` `metrics`) ─────────────────────────────── */
+
+export interface Metryki {
+  days: number;
+  dotknieciaNaPozycje: number | null;
+  p95OdpowiedziMs: number | null;
+  etykietyDoPrzedruku: Array<{ code: string; reczne: number; razem: number; udzial: number }>;
+  towaryBezCzytelnegoKodu: Array<{ code: string; reczne: number }>;
+  zdarzen: number;
+}
+
+export function useMetryki(dni: number, wlaczona: boolean) {
+  return useQuery({
+    queryKey: ["metryki", dni],
+    queryFn: () => api<Metryki>(`/api/metrics?days=${dni}`),
+    enabled: wlaczona,
+    placeholderData: (poprzednie) => poprzednie,
+  });
+}
+
+/* ── Analiza dostaw (`services/podglad-dostawy.ts`) ───────────────────────── */
+
+export interface AnalizaDostaw {
+  dni: number;
+  zamknietych: number;
+  pozaWertis: number;
+  pozycjiRozlozonych: number;
+  udzialWyjatkow: number | null;
+  medianaDni: number | null;
+  dostawcy: Array<{ dostawca: string; dostaw: number; pozycji: number; udzialWyjatkow: number | null; medianaDni: number | null }>;
+  wyjatki: Array<{ typ: string; nazwa: string; otwartych: number; rozwiazanych: number }>;
+  tygodnie: Array<{ tydzien: string; ile: number }>;
+  szczyt: { tydzien: string; ile: number; medianaPozostalych: number } | null;
+  daneDo: string | null;
+}
+
+export function useAnalizaDostaw(dni: number, wlaczona: boolean) {
+  return useQuery({
+    queryKey: ["analizaDostaw", dni],
+    queryFn: () => api<{ analiza: AnalizaDostaw }>(`/api/biuro/dostawy/analiza?dni=${dni}`)
+      .then((d) => d.analiza),
+    enabled: wlaczona,
+    placeholderData: (poprzednie) => poprzednie,
+  });
+}
+
+/* ── Strefa złota (`routes/zbiorki.ts`) ───────────────────────────────────── */
+
+export interface KandydatStrefy {
+  twId: number;
+  sym: string;
+  nazwa: string;
+  zbiorki: number;
+  zbiorekNaDzien: number;
+  adres: string | null;
+  poziomy: string;
+}
+
+export interface RaportKandydatow {
+  okno: { od: string; do: string; dni: number } | null;
+  prog: number;
+  kandydaci: KandydatStrefy[];
+  juzWStrefie: number;
+  bezReguly: number;
+}
+
+export interface WynikImportuZbiorek {
+  wierszy: number;
+  nowych: number;
+  pominietychDuplikatow: number;
+  dopasowanych: number;
+  niedopasowanych: number;
+  przykladyNiedopasowanych: string[];
+  odrzuconychWierszy: number;
+  okres: { od: string; do: string } | null;
+}
+
+export function useKandydaci(wlaczona: boolean) {
+  return useQuery({
+    queryKey: ["kandydaciStrefy"],
+    queryFn: () => api<RaportKandydatow>("/api/biuro/zbiorki/kandydaci"),
+    enabled: wlaczona,
+  });
+}
+
+/**
+ * Wgranie CSV zbiórek — zwykły POST `{ csv }`, bez multipart. Powód z biura:
+ * ten sam POST ma w przyszłości wołać integracja z Sellasist.
+ */
+export function useImportZbiorek() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (csv: string) => api<WynikImportuZbiorek>("/api/biuro/zbiorki/import", {
+      method: "POST", body: JSON.stringify({ csv }),
+    }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["kandydaciStrefy"] }),
+  });
+}

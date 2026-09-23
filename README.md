@@ -22,6 +22,9 @@ każdy do swojej roli:
   reklamacyjnym (GEKO, PARTNER) dostaje od 0.28.0 swój formularz. Jedna strona
   bez builda i logowanie loginem — operacje magazynowe wykonuje się wyłącznie
   na kolektorze.
+- **Biuro przechodzi do panelu pod `/obsluga`** (od 0.435.0), widok po
+  widoku. Dostawy, kosze, dziennik i analiza już tam są; w `/biuro` zostały
+  stan systemu i ustawienia.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym
@@ -603,17 +606,17 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   formacie — **PNG, JPG, WEBP albo SVG** — bo przerabia go przeglądarka, zanim
   cokolwiek pojedzie na serwer. Logo wiąże się z identyfikatorem kontrahenta
   z Subiekta, więc przeżywa poprawkę nazwy. Bez konfiguracji: działa od razu.
-- **STAN SYSTEMU** — metryki w oknie 7, 30 albo 90 dni: dotknięcia na pozycję,
-  p95 skanu, etykiety do przedruku i kartoteki bez czytelnego kodu. Niżej
-  kolejka zapisów, rekoncyliacja na żądanie z eksportem CSV, kolizje kodów
-  i meldunek serwera.
-- **DZIENNIK** — ślad audytowy z filtrami po dacie, typie, towarze i urządzeniu
-  oraz eksport CSV. Wymaga roli biura albo admina; magazynier
-  dostaje tu odmowę zamiast danych.
-- **Kolejki się stąd nie ponawia i wydajności per osoba tu nie ma.** Pierwsze
-  jest zapisem do Subiekta i zostaje na kolektorze, drugie jest monitoringiem
-  pracowniczym (Kodeks pracy art. 22²). Od 0.431.0 widzi je wyłącznie admin,
-  w ANALIZIE; osobna trasa `/api/wydajnosc` zniknęła.
+- **STAN SYSTEMU** — kolejka zapisów, rekoncyliacja na żądanie z eksportem
+  CSV, kolizje kodów, czas wymiany z halą i meldunek serwera.
+- **DZIENNIK ↗ i ANALIZA ↗** przeszły w 0.440.0 do panelu biura
+  (`/obsluga/dziennik`, `/obsluga/analiza`). Dziennik to ślad audytowy
+  z filtrami po dacie, typie, osobie, towarze i urządzeniu, filtrujący od
+  razu, oraz eksport CSV; wymaga roli biura albo admina. Analiza ma dwa
+  zakresy: **Dostawy** (dostawcy, wyjątki, tygodnie) i **Praca hali** (tempo,
+  szczyty, szukania, kolektory, metryki etykiet i kodów, strefa złota).
+- **Wydajność per osoba jest monitoringiem pracowniczym** (Kodeks pracy
+  art. 22²). Od 0.431.0 widzi ją wyłącznie admin, w analizie; osobna trasa
+  `/api/wydajnosc` zniknęła.
 
 ## Struktura repo
 
