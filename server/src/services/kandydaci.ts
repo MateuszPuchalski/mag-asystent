@@ -173,10 +173,11 @@ export function ofertaRozmowy(database: DatabaseSync, conversationId: number): {
     if (p.ofertaId) return { konto: Number(konto.konto), ofertaId: p.ofertaId };
   }
   /* Ta sama reguła co w `osRozmowy`: numer z najnowszej wiadomości KLIENTA,
-     a gdy klient go nie podał — z najnowszej naszej. */
+     a gdy klient go nie podał — z najnowszej naszej. Najnowszej PO CZASIE:
+     `id` starych wierszy nie rośnie z czasem (patrz `numerZamowieniaRozmowy`). */
   const m = database.prepare(`SELECT related_object_id AS oferta FROM message
     WHERE conversation_id=? AND related_object_type='OFFER' AND related_object_id IS NOT NULL
-    ORDER BY (direction='incoming') DESC, id DESC LIMIT 1`)
+    ORDER BY (direction='incoming') DESC, sent_at DESC, id DESC LIMIT 1`)
     .get(conversationId) as { oferta: string } | undefined;
   return m ? { konto: Number(konto.konto), ofertaId: String(m.oferta) } : null;
 }
