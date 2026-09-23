@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.11 — 23 września 2026
+
+**CLAUDE.md dostaje cztery reguły dla Copilota.** Wysiłek tylko przez
+`wspieraWysilek`. Sufit `max_tokens` liczy myślenie. Instrukcja opisuje pola
+zamiast kazać „zwrócić JSON”. Powód reguły stoi w komentarzu, nie w tekście
+dla modelu. Każda z nich wyszła z audytu promptów w 0.482.1–0.482.10.
+Kodu to wydanie nie zmienia.
+
 ## 0.482.10 — 23 września 2026
 
 **Komentarz przy zakazie półpauzy mówi prawdę.** Twierdził, że właściciel
