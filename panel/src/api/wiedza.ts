@@ -2,9 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  AliasSilnika, Identyfikator, LukaSilnika, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
+  AliasSilnika, Identyfikator, KandydatZamiennosci, LukaSilnika, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
   NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, SiecWiedzy,
-  TokenSilnika, Zabudowa, Zastosowanie,
+  TokenSilnika, Zabudowa, Zamiennosc, Zastosowanie,
 } from "./typy";
 
 /* ── Baza wiedzy (§12, etap E2) ──────────────────────────────────────────────
@@ -32,9 +32,11 @@ export const kluczeWiedzy = {
 export function useKolejkaWiedzy() {
   return useQuery({
     queryKey: kluczeWiedzy.kolejka,
-    /* Dwa rodzaje propozycji w jednej kolejce; liczniki OSOBNO (lekcja 0.229.0). */
-    queryFn: () => api<{ propozycje: Zastosowanie[]; liczba: number; pasowania: Pasowanie[]; pasowanDoRozstrzygniecia: number }>(
-      `/api/obsluga/wiedza/kolejka`),
+    /* Trzy rodzaje decyzji w jednej kolejce; liczniki OSOBNO (lekcja 0.229.0). */
+    queryFn: () => api<{
+      propozycje: Zastosowanie[]; liczba: number; pasowania: Pasowanie[]; pasowanDoRozstrzygniecia: number;
+      zamiennosciOem: KandydatZamiennosci[]; zamiennosciOemDoRozstrzygniecia: number;
+    }>(`/api/obsluga/wiedza/kolejka`),
     refetchInterval: 30_000,
   });
 }
@@ -54,6 +56,8 @@ export function useWiedzaTowaru(twId: number | null) {
       potwierdzone: Zastosowanie[]; negatywne: Zastosowanie[]; propozycje: Zastosowanie[];
       /** Pasowania część↔część — ta sama trasa, drugi strzał po to samo byłby zbędny. */
       pasowania: PasowaniaTowaru;
+      /** Żywe decyzje o zamienności przez wspólny numer oryginału — zatwierdzone i odrzucone. */
+      zamiennosciOem: Zamiennosc[];
     }>(`/api/obsluga/wiedza/towar/${twId}`),
     enabled: twId !== null,
   });
@@ -302,6 +306,30 @@ export function useWycofajZabudowe() {
 
 /* ── Pasowanie części (§11.2) ────────────────────────────────────────────────
    Adresy WYŁĄCZNIE tutaj — strażnik w `routes/wiedza.test.ts` czyta ten plik. */
+
+/* ── Zamienność przez wspólny numer oryginału ────────────────────────────────
+   Decyzja o PARZE kartotek, nie o wierszu — kandydat wiersza nie ma. */
+export function useRozstrzygnijZamiennosc() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { twA: number; twB: number; decyzja: "zatwierdz" | "odrzuc"; powod?: string | null }) =>
+      api<Zamiennosc>(`/api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij`, {
+        method: "POST", body: JSON.stringify({ twA: v.twA, twB: v.twB, decyzja: v.decyzja, powod: v.powod ?? null }),
+      }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+export function useWycofajZamiennosc() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; powod?: string | null }) =>
+      api<Zamiennosc>(`/api/obsluga/wiedza/zamiennosci-oem/${v.id}/wycofaj`, {
+        method: "POST", body: JSON.stringify({ powod: v.powod ?? null }),
+      }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
 
 /**
  * Cała sieć wiedzy jednym odczytem: pasowania, zastosowania, zabudowy

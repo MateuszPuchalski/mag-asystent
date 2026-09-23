@@ -1,11 +1,13 @@
 import React, { useState } from "react";
 import { BookMarked } from "lucide-react";
 import {
-  useKolejkaWiedzy, useModeleZOpisow, useRozstrzygnijPasowanie, useRozstrzygnijZastosowanie, useSilniki,
+  useKolejkaWiedzy, useModeleZOpisow, useRozstrzygnijPasowanie, useRozstrzygnijZamiennosc,
+  useRozstrzygnijZastosowanie, useSilniki,
   useTokenySilnikow,
   useZaproponujZastosowanie,
 } from "../api/wiedza";
 import { PropozycjaPasowania } from "../wiedza/PropozycjaPasowania";
+import { KandydatZamiennosci } from "../wiedza/KandydatZamiennosci";
 import { Blad, Karta, Pusto, Zakladki, ile } from "../ui";
 import { Propozycja } from "../wiedza/Propozycja";
 import { NowaPropozycja } from "../wiedza/NowaPropozycja";
@@ -41,6 +43,7 @@ export function Wiedza() {
   const zOpisowRazem = (zOpisow.data?.liczba ?? 0) + (tokeny.data?.nowychRazem ?? 0);
   const rozstrzygnij = useRozstrzygnijZastosowanie();
   const rozstrzygnijPasowanie = useRozstrzygnijPasowanie();
+  const rozstrzygnijZamiennosc = useRozstrzygnijZamiennosc();
   const zaproponuj = useZaproponujZastosowanie();
   const [widok, setWidok] = useState<Widok>("kolejka");
   const [blad, setBlad] = useState("");
@@ -51,6 +54,7 @@ export function Wiedza() {
 
   const propozycje = kolejka.data?.propozycje ?? [];
   const pasowania = kolejka.data?.pasowania ?? [];
+  const zamiennosci = kolejka.data?.zamiennosciOem ?? [];
 
   /* Własny scroller — patrz `Wzmianki`; rama panelu nie przewija za ekrany. */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
@@ -61,7 +65,8 @@ export function Wiedza() {
       <span className="text-sm text-slate-500">
         {kolejka.data ? `${kolejka.data.liczba} do rozstrzygnięcia` : "Wczytuję…"}
         {kolejka.data?.pasowanDoRozstrzygniecia ? ` · ${ile(kolejka.data.pasowanDoRozstrzygniecia, "pasowanie", "pasowania", "pasowań")} do rozstrzygnięcia` : ""}
-        {silniki.data?.doRozstrzygniecia ? ` · ${silniki.data.doRozstrzygniecia} silników do rozstrzygnięcia` : ""}</span>
+        {silniki.data?.doRozstrzygniecia ? ` · ${silniki.data.doRozstrzygniecia} silników do rozstrzygnięcia` : ""}
+        {zamiennosci.length ? ` · ${ile(zamiennosci.length, "para", "pary", "par")} ze wspólnym numerem` : ""}</span>
     </Karta>
 
     <Karta className="overflow-hidden">
@@ -87,7 +92,7 @@ export function Wiedza() {
         <Blad>{blad || (kolejka.error as Error | null)?.message}</Blad>
 
         {widok === "kolejka" && <>
-          {!kolejka.isLoading && propozycje.length === 0 && pasowania.length === 0 &&
+          {!kolejka.isLoading && propozycje.length === 0 && pasowania.length === 0 && zamiennosci.length === 0 &&
             <Pusto ikona={BookMarked}>
               Nic nie czeka. Propozycje biorą się z zatwierdzonych doborów, z pomiarów hali i z ręcznych wpisów.
             </Pusto>}
@@ -105,6 +110,23 @@ export function Wiedza() {
               {pasowania.map((p) => <PropozycjaPasowania key={p.id} p={p} trwa={rozstrzygnijPasowanie.isPending}
                 onDecyzja={(decyzja, powod) => { setBlad("");
                   rozstrzygnijPasowanie.mutate({ id: p.id, decyzja, powod }, { onError: (e) => setBlad((e as Error).message) }); }} />)}
+            </div>
+          </section>}
+          {/* TRZECIA SEKCJA tej samej kolejki, z tego samego powodu co druga:
+              ta sama decyzja tego samego człowieka. Zdanie nad listą mówi,
+              czego szukać, bo pomiar na seedzie znalazł dokładnie te trzy
+              pułapki — a wiedza przed kliknięciem kosztuje mniej niż wycofanie. */}
+          {zamiennosci.length > 0 && <section className="mt-4" aria-label="Wspólny numer oryginału">
+            <h3 className="text-naglowek font-bold">Wspólny numer oryginału ({zamiennosci.length})</h3>
+            <p className="mb-2 text-sm text-slate-600">
+              Dwie kartoteki wskazują ten sam numer OEM. Zamienne zwykle są — ale nie lewy z prawym, nie zestaw
+              ze swoją nakrętką i nie filtr wstępny z głównym. Porównaj nazwy.</p>
+            <div className="space-y-3">
+              {zamiennosci.map((k) => <KandydatZamiennosci key={`${k.a.twId}~${k.b.twId}`} k={k}
+                trwa={rozstrzygnijZamiennosc.isPending}
+                onDecyzja={(decyzja, powod) => { setBlad("");
+                  rozstrzygnijZamiennosc.mutate({ twA: k.a.twId, twB: k.b.twId, decyzja, powod },
+                    { onError: (e) => setBlad((e as Error).message) }); }} />)}
             </div>
           </section>}
         </>}

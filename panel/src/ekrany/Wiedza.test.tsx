@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { Pasowanie, Zastosowanie } from "../api/typy";
+import type { KandydatZamiennosci, Pasowanie, Zastosowanie } from "../api/typy";
 
 /* ── Ekran wiedzy (E2) ───────────────────────────────────────────────────────
    Kolejka ma nieść to, po czym biuro rozstrzyga: kartotekę, maszynę, dowód.
@@ -40,6 +40,10 @@ const pasowanie = (n: Partial<Pasowanie> = {}): Pasowanie => ({
 
 let LISTA: Zastosowanie[] = [];
 let PASOWANIA: Pasowanie[] = [];
+let ZAMIENNOSCI: KandydatZamiennosci[] = [];
+let WIEDZA: unknown = undefined;
+const rozstrzygnijZamiennosc = vi.fn();
+const wycofajZamiennosc = vi.fn();
 const rozstrzygnij = vi.fn();
 const rozstrzygnijPasowanie = vi.fn();
 const zaproponuj = vi.fn();
@@ -49,12 +53,15 @@ vi.mock("../api/wiedza", async () => {
   return {
     ...rzeczywisty,
     useKolejkaWiedzy: () => ({ data: { propozycje: LISTA, liczba: LISTA.length,
-      pasowania: PASOWANIA, pasowanDoRozstrzygniecia: PASOWANIA.length }, isLoading: false, error: null }),
+      pasowania: PASOWANIA, pasowanDoRozstrzygniecia: PASOWANIA.length,
+      zamiennosciOem: ZAMIENNOSCI, zamiennosciOemDoRozstrzygniecia: ZAMIENNOSCI.length }, isLoading: false, error: null }),
+    useRozstrzygnijZamiennosc: () => ({ mutate: rozstrzygnijZamiennosc, isPending: false }),
+    useWycofajZamiennosc: () => ({ mutate: wycofajZamiennosc, isPending: false, error: null }),
     useRozstrzygnijZastosowanie: () => ({ mutate: rozstrzygnij, isPending: false }),
     useRozstrzygnijPasowanie: () => ({ mutate: rozstrzygnijPasowanie, isPending: false }),
     useZaproponujZastosowanie: () => ({ mutate: zaproponuj, isPending: false }),
     useModele: () => ({ data: { modele: [] } }),
-    useWiedzaTowaru: () => ({ data: undefined, isLoading: false, error: null }),
+    useWiedzaTowaru: (twId: number | null) => ({ data: twId === null ? undefined : WIEDZA, isLoading: false, error: null }),
     useModeleZOpisow: () => ({ data: { wiersze: [], liczba: 2 }, isLoading: false, error: null }),
     /* Tokeny (0.239.0) dokładają się do liczby na zakładce „Z opisów": 2 + 3 = 5. */
     useTokenySilnikow: () => ({ data: { tokeny: [], nowychRazem: 3 }, isLoading: false, error: null }),
@@ -94,7 +101,11 @@ const pokaz = () => render(
     </MemoryRouter>
   </QueryClientProvider>);
 
-beforeEach(() => { rozstrzygnij.mockReset(); rozstrzygnijPasowanie.mockReset(); zaproponuj.mockReset(); LISTA = []; PASOWANIA = []; });
+beforeEach(() => {
+  rozstrzygnij.mockReset(); rozstrzygnijPasowanie.mockReset(); zaproponuj.mockReset();
+  rozstrzygnijZamiennosc.mockReset(); wycofajZamiennosc.mockReset();
+  LISTA = []; PASOWANIA = []; ZAMIENNOSCI = []; WIEDZA = undefined;
+});
 
 describe("Ekran wiedzy", () => {
   /* Pasowania część↔część (0.230.0) czekają w TEJ SAMEJ kolejce jako druga
@@ -180,5 +191,43 @@ describe("Ekran wiedzy", () => {
     await userEvent.click(screen.getByRole("button", { name: /Otwórz w „Sprawdź kartotekę"/ }));
     expect(screen.getByRole("button", { name: "Sprawdź kartotekę" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByText("wybrano LC170430140-0001")).toBeInTheDocument();
+  });
+
+  /* Zamienność przez wspólny numer oryginału: trzecia sekcja tej samej
+     kolejki. Decyzja idzie o PARZE kartotek — kandydat nie ma numeru. */
+  it("pary ze wspólnym numerem oryginału stoją jako trzecia sekcja kolejki i oddają decyzję o parze", async () => {
+    ZAMIENNOSCI = [{ a: { twId: 11, symbol: "W09-1307", nazwa: "Gaźnik do traktorka B&S" },
+      b: { twId: 12, symbol: "76-080", nazwa: "Gaźnik do traktorka B&S" }, numery: ["281707", "390811"] }];
+    pokaz();
+    expect(screen.getByText(/1 para ze wspólnym numerem/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nic nie czeka/)).toBeNull();
+    const sekcja = screen.getByRole("region", { name: "Wspólny numer oryginału" });
+    expect(sekcja).toHaveTextContent("Wspólny numer oryginału (1)");
+    expect(sekcja).toHaveTextContent(/nie lewy z prawym/);
+    await userEvent.click(screen.getByRole("button", { name: "Zamienne" }));
+    expect(rozstrzygnijZamiennosc).toHaveBeenCalledWith({ twA: 11, twB: 12, decyzja: "zatwierdz", powod: null }, expect.anything());
+  });
+
+  it("„Sprawdź kartotekę” pokazuje decyzję o zamienności i cofa odrzucenie wyłącznie z powodem", async () => {
+    WIEDZA = { potwierdzone: [], negatywne: [], propozycje: [],
+      pasowania: { pasujeDo: [], pasujace: [], negatywne: [], propozycje: [] },
+      zamiennosciOem: [{ id: 7, a: { twId: 14, symbol: "SZR-148/82", nazwa: "Szarpak" },
+        b: { twId: 15, symbol: "SZR-150", nazwa: "Szarpak prawy" }, stan: "odrzucone", numery: ["545008032"],
+        powod: "lewy i prawy", rozstrzygnal: "A. Lewandowska", rozstrzygnietoAt: "2026-09-23T10:00:00Z",
+        wycofal: null, wycofanoAt: null, powodWycofania: null,
+        zdanie: "SZR-148/82 i SZR-150 NIE są zamienne mimo wspólnego numeru 545008032: lewy i prawy — A. Lewandowska, 23.09.2026" }] };
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: "Sprawdź kartotekę" }));
+    await userEvent.click(screen.getByRole("button", { name: "wybierz towar" }));
+    const sekcja = screen.getByRole("region", { name: "Zamienność przez numer oryginału" });
+    expect(sekcja).toHaveTextContent("nie zastępuje");
+    expect(sekcja).toHaveTextContent("SZR-150");
+    expect(sekcja).toHaveTextContent(/NIE są zamienne mimo wspólnego numeru 545008032/);
+    await userEvent.click(screen.getByRole("button", { name: "Wycofaj" }));
+    const potwierdz = screen.getByRole("button", { name: "Potwierdź wycofanie" });
+    expect(potwierdz).toBeDisabled();
+    await userEvent.type(screen.getByRole("textbox", { name: "Powód wycofania: SZR-148/82 ⟷ SZR-150" }), "sprawdzone na półce");
+    await userEvent.click(potwierdz);
+    expect(wycofajZamiennosc).toHaveBeenCalledWith({ id: 7, powod: "sprawdzone na półce" }, expect.anything());
   });
 });

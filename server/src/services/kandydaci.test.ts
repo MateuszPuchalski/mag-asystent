@@ -66,7 +66,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika",
+  for (const t of ["zamiennosc_oem", "pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika",
     "token_silnika_kartoteka", "token_silnika", "model_urzadzenia",
     "dobor_rozmowy", "offer_snapshot",
     "oferta_kartoteka", "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
@@ -148,6 +148,23 @@ test("kartoteka oferty i jej zamiennik z opisu dają kandydatów z drogą i źr�
   assert.equal(szczebel(drogi, "oferta").wynikow, 1);
   assert.equal(szczebel(drogi, "zamiennik").wynikow, 1);
   assert.equal(szczebel(drogi, "symbol").sprawdzona, false, "bez wpisanego symbolu szczebel jest pominięty");
+});
+
+/* Zamienność przez wspólny numer oryginału: `W09-1307` i `76-080` dzielą
+   cztery numery B&S, a żaden opis nie wymienia drugiego. Kandydat w kolejce
+   wiedzy niczego do doboru nie wnosi — dopiero decyzja biura. */
+test("zatwierdzona para przez numer oryginału wchodzi do szczebla zamiennika — kandydat w kolejce nie", async () => {
+  const Z = await import("./zamiennosc-oem.js");
+  const tw = (s: string) => (db().prepare("SELECT tw_id FROM sgt_towar WHERE symbol=?").get(s) as { tw_id: number }).tw_id;
+  pytaniePodOferta("14892374513", "W09-1307");
+  const przed = kandydaciDoboru(rozmowa, subiekt).kandydaci;
+  assert.ok(!przed.some((k) => k.symbol === "76-080"), "sam wspólny numer nie jest zamiennikiem");
+  Z.rozstrzygnijZamiennosc(tw("W09-1307"), tw("76-080"), "zatwierdz", null, biuro);
+  const k = kandydaciDoboru(rozmowa, subiekt).kandydaci.find((x) => x.symbol === "76-080");
+  assert.ok(k);
+  assert.equal(k.droga, "zamiennik");
+  assert.equal(k.pewnosc, "prawdopodobne", "człowiek porównał części — mocniej niż goły opis, słabiej niż oferta");
+  assert.match(k.zrodlo, /W09-1307 i 76-080 są zamienne: wspólne numery oryginału .* — zatwierdził A\. Lewandowska/);
 });
 
 test("oferta bez SKU pomija szczebel z ZDANIEM z mostka, a zamienniki nie mają skąd się wziąć", () => {

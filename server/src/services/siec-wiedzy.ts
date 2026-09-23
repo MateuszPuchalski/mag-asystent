@@ -3,7 +3,9 @@ import { db } from "../db/db.js";
 import type { ModelUrzadzenia, PewnoscZastosowania, Polaryzacja } from "./wiedza.js";
 import { zyweZastosowania } from "./wiedza.js";
 import { kolejkaZabudow, zatwierdzoneZabudowy } from "./silniki.js";
-import { towar, zamiennikiKartoteki, zywePasowania, type Kartoteka, type RolaPasowania } from "./pasowania.js";
+import {
+  towar, zamiennikiKartoteki, zywePasowania, type Kartoteka, type RolaPasowania, type ZamiennikKartoteki,
+} from "./pasowania.js";
 
 /**
  * Sieć wiedzy: co z czym pasuje, na jednym rysunku (zakładka „Sieć").
@@ -13,7 +15,8 @@ import { towar, zamiennikiKartoteki, zywePasowania, type Kartoteka, type RolaPas
  *   pasowania     część → część           `pasowanie_czesci`
  *   zastosowania  część → maszyna/silnik  `zastosowanie`
  *   zabudowy      silnik → maszyna        `zabudowa_silnika`
- *   zamienniki    część ~ część           opis kartoteki, bez tabeli
+ *   zamienniki    część ~ część           opis kartoteki (bez tabeli) i pary
+ *                                         przez numer oryginału `zamiennosc_oem`
  * Każdy ekran wiedzy pokazuje jedną z nich. Pytanie klienta chodzi jednak
  * po wszystkich naraz: uszczelka pasuje do gaźnika, gaźnik do silnika GX160,
  * a GX160 stoi w trzech kosiarkach. Dopiero razem widać, że to jeden łańcuch.
@@ -70,7 +73,8 @@ export interface KrawedzSieci {
   rodzaj: RodzajKrawedzi;
   /** Polaryzacja wiersza; przy propozycji mówi, czy czeka pozytyw, czy negatyw. */
   polaryzacja: Polaryzacja | null;
-  /** Numer wiersza w tabeli warstwy. `null` przy zamienniku — on wiersza nie ma. */
+  /** Numer wiersza w tabeli warstwy. Przy zamienniku z opisu `null` — on
+   *  wiersza nie ma; przy parze przez numer oryginału to numer decyzji. */
   wierszId: number | null;
   rola: RolaPasowania | null;
   pewnosc: PewnoscZastosowania;
@@ -131,16 +135,18 @@ export function siecWiedzy(database: DatabaseSync = db()): SiecWiedzy {
   }
 
   /* Zamienniki: klucz bez kierunku, bo „A podaje B" i „B podaje A" to jedna
-     linia na rysunku. Drugi kierunek zmienia zdanie, nie rysunek. */
+     linia na rysunku. Drugi kierunek zmienia zdanie, nie rysunek. Para przez
+     wspólny numer oryginału jest z natury obustronna i niesie numer decyzji —
+     rysunek nie daje jej grotu, bo żaden opis „nie mówi" tu za drugi. */
   const zamienniki = new Map<string, KrawedzSieci>();
-  const dopisz = (kto: Kartoteka, zam: Kartoteka) => {
+  const dopisz = (kto: Kartoteka, zam: ZamiennikKartoteki) => {
     const [a, b] = kto.twId < zam.twId ? [kto.twId, zam.twId] : [zam.twId, kto.twId];
     const juz = zamienniki.get(`${a}~${b}`);
     if (!juz) {
       zamienniki.set(`${a}~${b}`, { z: kluczTw(kto.twId), do: kluczTw(zam.twId), warstwa: "zamienniki",
-        rodzaj: "zamiennik", polaryzacja: null, wierszId: null, rola: null, pewnosc: "prawdopodobne",
-        obustronnie: false, zdanie: `${kto.symbol} podaje ${zam.symbol} jako zamiennik w opisie` });
-    } else if (juz.z !== kluczTw(kto.twId)) {
+        rodzaj: "zamiennik", polaryzacja: null, wierszId: zam.decyzjaId, rola: null, pewnosc: "prawdopodobne",
+        obustronnie: zam.zrodlo === "oem", zdanie: zam.zdanie });
+    } else if (zam.zrodlo === "opis" && juz.wierszId === null && juz.z !== kluczTw(kto.twId)) {
       juz.obustronnie = true;
       juz.zdanie = `${wezly.get(juz.z)!.etykieta} i ${wezly.get(juz.do)!.etykieta} podają się nawzajem jako zamienniki w opisach`;
     }
