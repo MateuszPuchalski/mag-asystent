@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.9 — 23 września 2026
+
+**Instrukcja szkicu nie używa półpauzy, której zakazuje.** Dziewiętnaście
+myślników w zdaniach instrukcji zastąpiły przecinek, dwukropek, średnik albo
+„bo”. Model przejmuje rejestr instrukcji, więc zakaz stał sam przeciw własnym
+przykładom. Zostały dwa znaki cytowane w samej regule zakazu. Ostatnia
+z dziewięciu poprawek audytu promptów.
+
 ## 0.482.8 — 23 września 2026
 
 **Reguła 3 szkicu bez słowa „teraz”.** Zdanie „ta lista niesie teraz
