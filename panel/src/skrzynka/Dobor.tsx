@@ -52,12 +52,15 @@ const PEWNOSC: Record<KandydatDoboru["pewnosc"], { etykieta: string; klasa: stri
   wymaga_danych: { etykieta: "wymaga danych", klasa: "bg-slate-100 text-slate-600" },
 };
 
-const KLASA_STATUSU: Partial<Record<StatusDoboru, string>> = {
-  confirmed: "bg-emerald-100 text-emerald-800",
-  missing_information: "bg-red-100 text-ranga-zle",
-  candidates_found: "bg-amber-100 text-amber-800",
-  requires_expert: "bg-violet-100 text-violet-800",
-  rejected: "bg-slate-200 text-slate-700",
+/* Barwa stanu jako kropka przed polem wyboru — te same znaczenia, co
+   dawna plakietka: zieleń zatwierdza, czerwień czeka na klienta, bursztyn
+   ma kandydatów, fiolet czeka na człowieka z wiedzą. */
+const KROPKA_STATUSU: Partial<Record<StatusDoboru, string>> = {
+  confirmed: "bg-emerald-600",
+  missing_information: "bg-red-600",
+  candidates_found: "bg-amber-500",
+  requires_expert: "bg-violet-600",
+  rejected: "bg-slate-500",
 };
 
 /** Parametry jako tekst „klucz: wartość" wiersz po wierszu — lista jest otwarta. */
@@ -181,14 +184,82 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
 
   const wypelnione = POLA.filter((p) => dobor.dane[p.klucz]);
 
+  /* Karta jednego kandydata — jedna definicja dla listy na wierzchu i dla
+     słabszych trafień pod rozwinięciem. */
+  const kartaKandydata = (k: KandydatDoboru) => {
+    /* Kandydat bez kartoteki (E3): numer OEM, którego nie ma w żadnym
+       opisie. Nie ma stanu i nie ma Wybierz — `twId: null` w wyborze
+       znaczy „zdejmij", więc przycisk zrobiłby odwrotność obietnicy. */
+    const bezKartoteki = k.twId === null;
+    const wybrany = !bezKartoteki && dobor.wybrany?.twId === k.twId;
+    return <li key={k.twId ?? `bez-kartoteki-${k.symbol}`} className={`rounded-lg border p-2 ${wybrany
+      /* Wypełnienie szare, obwódka marki zostaje: to jest ZAZNACZENIE,
+         a bursztynowe tło myliło je z ostrzeżeniem (0.265.0). */
+      ? "border-wertis-amber bg-slate-200" : bezKartoteki ? "border-dashed border-slate-300" : "border-slate-200"}`}>
+      {/* ── CO CZYTA SIĘ PIERWSZE (0.203.0) ─────────────────────────
+          Wiersz kandydata zaczynał się od symbolu, a nazwa leżała pod
+          nim, w tym samym rozmiarze co źródło i droga. Cztery linijki
+          jednej wagi każą przeczytać wszystkie, żeby wybrać jedną.
+
+          Dobór rozstrzyga pytanie „czy TO jest ta część", a odpowiada
+          na nie kształt przedmiotu i jego nazwa. Zdjęcie idzie więc na
+          lewo, nazwa dostaje pierwszy plan, symbol i pewność schodzą
+          do podpisu, a droga ze źródłem — na trzeci plan. Symbol
+          zostaje, bo to on jedzie na dokument i na halę.
+
+          DOSTĘPNOŚĆ MA BARWĘ W OBIE STRONY. Do 0.202.0 tylko zero
+          było czerwone, a dodatnie liczby były szare jak reszta —
+          choć „mamy 28 sztuk" kończy rozmowę z klientem jednym
+          zdaniem, a zero każe szukać dalej. */}
+      {/* `items-start`: kafle mają stać w JEDNEJ pionowej linii, bo
+          wzrok jedzie po nich w dół. Wyśrodkowane skakałyby wraz
+          z długością nazwy — a nazwa raz się łamie, raz nie. */}
+      <div className="flex items-start gap-2">
+        <Kafel twId={k.twId} rozmiar={56} nazwa={k.nazwa} symbol={k.symbol} />
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start gap-2">
+            <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded bg-slate-100 text-podpis font-bold text-slate-600">{k.nr}</span>
+            <b className="min-w-0 flex-1 text-tresc text-slate-900">{k.nazwa}</b>
+            {k.stan === null
+              ? <span className="shrink-0 text-podpis font-bold text-slate-500">brak w kartotece</span>
+              : <span className={`shrink-0 text-podpis font-bold ${k.stan <= 0
+                  ? "text-ranga-zle" : "text-emerald-700"}`}>dostępne {k.stan}</span>}
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5">
+            <span className="font-mono text-xs text-slate-600">{k.symbol}</span>
+            <span className={`rounded px-1.5 py-0.5 text-podpis font-bold ${PEWNOSC[k.pewnosc].klasa}`}>
+              {PEWNOSC[k.pewnosc].etykieta}</span>
+          </div>
+          {/* Źródło w JEDNEJ linii z pełnym zdaniem w dymku: zdanie
+              „trafienie po treści kartoteki dla…" łamało się na dwie
+              linie przy każdym kandydacie. */}
+          <p className="mt-1 truncate text-podpis text-slate-500" title={k.zrodlo}>
+            <span className="rounded bg-slate-100 px-1 py-0.5 font-semibold text-slate-600">droga: {NAZWA_DROGI[k.droga]}</span>
+            {" "}{k.zrodlo}</p>
+        </div>
+      </div>
+      {k.ostrzezenia.map((o) => <p key={o} className="mt-1 flex items-center gap-1 rounded border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-podpis text-amber-900">
+        <AlertTriangle size={12} />{o}</p>)}
+      {/* OBRYS, NIE PEŁNA ZIELEŃ (23 września 2026). Pięć pełnych
+          zielonych przycisków jeden pod drugim było najgłośniejszą
+          rzeczą w kolumnie — a to ruch dostępny, nie zalecany. */}
+      {!wybrany && !bezKartoteki && <button type="button" disabled={wybierz.isPending}
+        onClick={() => wybierzTowar(k.twId, k.droga)}
+        className="mt-1.5 inline-flex items-center gap-1 rounded border border-emerald-600 px-2 py-0.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
+        <Check size={12} />Wybierz</button>}
+    </li>;
+  };
+
   return <div className="flex min-h-0 flex-col text-sm">
     {/* ── Status ─────────────────────────────────────────────────────────── */}
     <div className="flex flex-wrap items-center gap-2 border-b p-3">
-      <span className={`rounded px-1.5 py-0.5 text-podpis font-bold uppercase tracking-wide ${
-        KLASA_STATUSU[dobor.status] ?? "bg-slate-100 text-slate-600"}`}>{NAZWA_DOBORU[dobor.status]}</span>
-      {dobor.updatedBy && <span className="text-xs text-slate-500">· {dobor.updatedBy}</span>}
-      <label className="ml-auto flex items-center gap-1 text-xs text-slate-500">
-        Status
+      {/* ── STATUS RAZ, NIE DWA (23 września 2026) ─────────────────────────
+          Plakietka „SZUKAMY" stała obok pola wyboru, które też mówiło
+          „Szukamy". Zostaje pole, bo to w nim zmienia się stan, a barwę
+          stanu niesie kropka przed nim. */}
+      <label className="flex items-center gap-1.5 text-xs text-slate-500">
+        <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${
+          KROPKA_STATUSU[dobor.status] ?? "bg-slate-300"}`} />
         <select className="field w-auto py-1 text-xs" aria-label="Status doboru" value={dobor.status}
           disabled={status.isPending}
           onChange={(e) => {
@@ -203,6 +274,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
           {DO_WYBORU_DOBORU.map((s) => <option key={s} value={s}>{NAZWA_DOBORU[s]}</option>)}
         </select>
       </label>
+      {dobor.updatedBy && <span className="text-xs text-slate-500">ustawił: {dobor.updatedBy}</span>}
       {(pytamOBrak || dobor.status === "missing_information") &&
         <div className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-900">
           <AlertTriangle size={14} className="shrink-0" />
@@ -359,65 +431,29 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
           onDane={() => { setFormularz(naFormularz(dobor.dane)); setKonflikt(""); setEdycja(true); }}
           onZabudowa={zPola ? zaproponujZPola : null}
           trwa={zaproponujZabudowe.isPending} />}
-      <ul className="mt-2 space-y-2">
-        {kandydaci.data?.kandydaci.map((k) => {
-          /* Kandydat bez kartoteki (E3): numer OEM, którego nie ma w żadnym
-             opisie. Nie ma stanu i nie ma Wybierz — `twId: null` w wyborze
-             znaczy „zdejmij", więc przycisk zrobiłby odwrotność obietnicy. */
-          const bezKartoteki = k.twId === null;
-          const wybrany = !bezKartoteki && dobor.wybrany?.twId === k.twId;
-          return <li key={k.twId ?? `bez-kartoteki-${k.symbol}`} className={`rounded-lg border p-2 ${wybrany
-            /* Wypełnienie szare, obwódka marki zostaje: to jest ZAZNACZENIE,
-               a bursztynowe tło myliło je z ostrzeżeniem (0.265.0). */
-            ? "border-wertis-amber bg-slate-200" : bezKartoteki ? "border-dashed border-slate-300" : "border-slate-200"}`}>
-            {/* ── CO CZYTA SIĘ PIERWSZE (0.203.0) ─────────────────────────
-                Wiersz kandydata zaczynał się od symbolu, a nazwa leżała pod
-                nim, w tym samym rozmiarze co źródło i droga. Cztery linijki
-                jednej wagi każą przeczytać wszystkie, żeby wybrać jedną.
-
-                Dobór rozstrzyga pytanie „czy TO jest ta część", a odpowiada
-                na nie kształt przedmiotu i jego nazwa. Zdjęcie idzie więc na
-                lewo, nazwa dostaje pierwszy plan, symbol i pewność schodzą
-                do podpisu, a droga ze źródłem — na trzeci plan. Symbol
-                zostaje, bo to on jedzie na dokument i na halę.
-
-                DOSTĘPNOŚĆ MA BARWĘ W OBIE STRONY. Do 0.202.0 tylko zero
-                było czerwone, a dodatnie liczby były szare jak reszta —
-                choć „mamy 28 sztuk" kończy rozmowę z klientem jednym
-                zdaniem, a zero każe szukać dalej. */}
-            {/* `items-start`: kafle mają stać w JEDNEJ pionowej linii, bo
-                wzrok jedzie po nich w dół. Wyśrodkowane skakałyby wraz
-                z długością nazwy — a nazwa raz się łamie, raz nie. */}
-            <div className="flex items-start gap-2">
-              <Kafel twId={k.twId} rozmiar={56} nazwa={k.nazwa} symbol={k.symbol} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-start gap-2">
-                  <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded bg-slate-100 text-podpis font-bold text-slate-600">{k.nr}</span>
-                  <b className="min-w-0 flex-1 text-tresc text-slate-900">{k.nazwa}</b>
-                  {k.stan === null
-                    ? <span className="shrink-0 text-podpis font-bold text-slate-500">brak w kartotece</span>
-                    : <span className={`shrink-0 text-podpis font-bold ${k.stan <= 0
-                        ? "text-ranga-zle" : "text-emerald-700"}`}>dostępne {k.stan}</span>}
-                </div>
-                <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                  <span className="font-mono text-xs text-slate-600">{k.symbol}</span>
-                  <span className={`rounded px-1.5 py-0.5 text-podpis font-bold ${PEWNOSC[k.pewnosc].klasa}`}>
-                    {PEWNOSC[k.pewnosc].etykieta}</span>
-                </div>
-                <p className="mt-1 text-podpis text-slate-500">
-                  <span className="rounded bg-slate-100 px-1 py-0.5 font-semibold text-slate-600">droga: {NAZWA_DROGI[k.droga]}</span>
-                  {" "}{k.zrodlo}</p>
-              </div>
-            </div>
-            {k.ostrzezenia.map((o) => <p key={o} className="mt-1 flex items-center gap-1 rounded border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-podpis text-amber-900">
-              <AlertTriangle size={12} />{o}</p>)}
-            {!wybrany && !bezKartoteki && <button type="button" disabled={wybierz.isPending}
-              onClick={() => wybierzTowar(k.twId, k.droga)}
-              className="mt-1.5 inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
-              <Check size={12} />Wybierz</button>}
-          </li>;
-        })}
-      </ul>
+      {/* ── SŁABE TRAFIENIA ZWINIĘTE (23 września 2026) ─────────────────────
+          Zrzut właściciela: przy noża do kosiarki lista niosła rękojeść noża,
+          nóż wertykulatora i nóż Boscha — każdy w pełnej karcie z zieloną
+          „Wybierz". „Wymaga danych" znaczy trafienie po samym tekście, bez
+          dowodu. Gdy jest choć jeden mocniejszy kandydat, słabe schodzą pod
+          jedno rozwinięcie: nie znikają (§4.3), ale nie kosztują uwagi.
+          Wybrany zostaje na wierzchu zawsze, choćby był słaby. */}
+      {(() => {
+        const lista = kandydaci.data?.kandydaci ?? [];
+        const mocny = (k: KandydatDoboru) => k.pewnosc !== "wymaga_danych"
+          || (k.twId !== null && dobor.wybrany?.twId === k.twId);
+        const zwijaj = lista.some((k) => k.pewnosc !== "wymaga_danych");
+        const wierzch = zwijaj ? lista.filter(mocny) : lista;
+        const spod = zwijaj ? lista.filter((k) => !mocny(k)) : [];
+        return <>
+          <ul className="mt-2 space-y-2">{wierzch.map(kartaKandydata)}</ul>
+          {spod.length > 0 && <details className="mt-2">
+            <summary className="cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-900">
+              Słabsze trafienia ({spod.length}) — bez dowodu, wymagają danych</summary>
+            <ul className="mt-2 space-y-2">{spod.map(kartaKandydata)}</ul>
+          </details>}
+        </>;
+      })()}
       {kandydaci.data && kandydaci.data.negatywne.length > 0 &&
         <Negatywne lista={kandydaci.data.negatywne} />}
       {/* Wyszukiwarka klikana ręcznie NIE jest kandydatem — to od razu wybór
@@ -610,11 +646,34 @@ function CzegoBrakuje({ drogi, onDane, onZabudowa, trwa }: {
   </div>;
 }
 
+/**
+ * Drogi doboru: na wierzchu tylko te, które coś dały (23 września 2026).
+ *
+ * Zrzut właściciela: jedenaście pigułek nad kandydatami, sześć z nich
+ * przekreślonych, trzy z zerem. Pytanie agenta brzmi „skąd ci kandydaci",
+ * a odpowiadają na nie drogi z wynikiem. Reszta — zero i pominięte z powodem
+ * — stoi pod jednym rozwinięciem, bo przydaje się dopiero, gdy kandydatów
+ * brak. Wtedy i tak mówi o nich „Czego brakuje" niżej.
+ */
 function Szczeble({ drogi }: { drogi: SzczebelDoboru[] }) {
-  return <div className="mt-1 flex flex-wrap gap-1" aria-label="Sprawdzone drogi">
-    {drogi.map((d) => <span key={d.droga} title={d.sprawdzona ? `${d.wynikow} wyników` : `pominięty: ${d.powod ?? ""}`}
-      className={`rounded px-1.5 py-0.5 text-podpis font-semibold ${d.sprawdzona
-        ? "bg-slate-200 text-slate-700" : "bg-slate-50 text-slate-500 line-through"}`}>
-      {NAZWA_DROGI[d.droga]}{d.sprawdzona ? ` ${d.wynikow}` : ""}</span>)}
+  const pigulka = (d: SzczebelDoboru) => <span key={d.droga}
+    title={d.sprawdzona ? `${d.wynikow} wyników` : `pominięty: ${d.powod ?? ""}`}
+    className={`rounded px-1.5 py-0.5 text-podpis font-semibold ${d.sprawdzona
+      ? "bg-slate-200 text-slate-700" : "bg-slate-50 text-slate-500 line-through"}`}>
+    {NAZWA_DROGI[d.droga]}{d.sprawdzona ? ` ${d.wynikow}` : ""}</span>;
+  const [wszystkie, setWszystkie] = useState(false);
+  const dalo = drogi.filter((d) => d.sprawdzona && d.wynikow > 0);
+  const reszta = drogi.filter((d) => !(d.sprawdzona && d.wynikow > 0));
+  return <div className="mt-1 flex flex-wrap items-center gap-1" aria-label="Sprawdzone drogi">
+    {dalo.map(pigulka)}
+    {reszta.length > 0 && <button type="button" aria-expanded={wszystkie}
+      onClick={() => setWszystkie((w) => !w)}
+      className="rounded px-1.5 py-0.5 text-podpis text-slate-500 underline-offset-2 hover:text-slate-800 hover:underline">
+      {wszystkie ? "zwiń" : `+${reszta.length} bez wyniku`}</button>}
+    {/* `hidden`, nie brak w drzewie: powód pominięcia stoi w dymku pigułki
+        i ma być pod ręką od razu po rozwinięciu. Klasa idzie razem
+        z atrybutem, bo `flex` z Tailwinda przebija `[hidden]` przeglądarki. */}
+    <div hidden={!wszystkie} className={wszystkie ? "flex w-full flex-wrap gap-1" : "hidden"}>
+      {reszta.map(pigulka)}</div>
   </div>;
 }

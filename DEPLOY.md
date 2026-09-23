@@ -2584,6 +2584,14 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.444.0 — prawa kolumna bez powtórzeń
+
+**Migracji nie ma. Panel trzeba przebudować.** Serwer się nie zmienia.
+
+Sprawdzenie: otwórz rozmowę pod ofertą z kartoteką. Nazwa towaru i półka
+stoją tylko w paśmie nad zakładkami. Zakładki Klient i Wiedza pokazują
+liczbę. W Doborze drogi bez wyniku kryją się pod „+N bez wyniku".
+
 ### Aktualizacja do 0.443.0 — tempo skrzynki, stan paczki
 
 **Migracji nie ma. Panel trzeba przebudować.** Serwer dostaje dwie trasy:

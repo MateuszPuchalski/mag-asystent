@@ -33,6 +33,15 @@ vi.mock("./PasmoOdpowiedzi", () => ({
   PasmoOdpowiedzi: () => <div data-testid="pasmo">pasmo odpowiedzi</div>,
 }));
 
+/* Liczniki zakładek (23 września 2026) czytają historię klienta i wiedzę.
+   Ten plik pilnuje UKŁADU, więc hak oddaje stałe dane. */
+const historia = { data: undefined as unknown };
+const wiedza = { data: undefined as unknown };
+vi.mock("../api/rozmowy", () => ({
+  useHistoriaKlienta: () => historia,
+  useWiedzaDoboru: () => wiedza,
+}));
+
 const { Kontekst } = await import("./Kontekst");
 
 const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
@@ -117,7 +126,7 @@ describe("kolumna kontekstu", () => {
     for (const nazwa of ["Oferta", "Towar"]) {
       expect(screen.queryByRole("button", { name: nazwa })).not.toBeInTheDocument();
     }
-    for (const nazwa of ["Oferta i towar", "Dobór", "Klient", "Wiedza"]) {
+    for (const nazwa of ["Oferta i towar", "Dobór", /^Klient/, /^Wiedza/]) {
       expect(screen.getByRole("button", { name: nazwa })).toBeInTheDocument();
     }
     /* Bez oferty dobór ISTNIEJE: klient bywa bez numeru oferty, a maszynę
@@ -132,5 +141,20 @@ describe("kolumna kontekstu", () => {
   it("dobór zostaje osobną zakładką — nie doklejamy go pod towar", () => {
     render(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
     expect(screen.queryByTestId("dobor")).not.toBeInTheDocument();
+  });
+
+  /* Zakładka z zerem mówi „tu nic nie ma" bez kliknięcia — zrzut właściciela
+     pokazał dwie zakładki po jednym zdaniu, a każda kosztowała klik. */
+  it("Klient i Wiedza niosą licznik, a przed odczytem — żadnego", () => {
+    const { rerender } = render(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}}
+      onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
+    expect(screen.getByRole("button", { name: "Klient" })).toBeInTheDocument();
+    historia.data = { login: "pasikonik5", maszyny: [], wpisy: [] };
+    wiedza.data = { zastosowanie: null, pomiary: [{ zadanieId: 1 }], silniki: [] };
+    rerender(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}}
+      onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
+    expect(screen.getByRole("button", { name: "Klient 0" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Wiedza 1" })).toBeInTheDocument();
+    historia.data = undefined; wiedza.data = undefined;
   });
 });

@@ -205,7 +205,10 @@ export function FiltrSegmentowy<T extends string | number | null>({
 export function Zakladki<T extends string>({ wybrana, onWybierz, pozycje }: {
   wybrana: T;
   onWybierz: (v: T) => void;
-  pozycje: Array<{ klucz: T; etykieta: string }>;
+  /* `ile` od 23 września 2026: zakładka z zerem mówi „tu nic nie ma" bez
+     klikania. Zrzut właściciela pokazał dwie z czterech zakładek z jednym
+     zdaniem w środku — każda kosztowała kliknięcie, żeby się tego dowiedzieć. */
+  pozycje: Array<PozycjaFiltra<T>>;
 }) {
   return <div className="flex gap-1 border-b border-slate-200 px-2 py-2">
     <FiltrSegmentowy<T> wybrany={wybrana} onWybierz={onWybierz} pozycje={pozycje} rowne />

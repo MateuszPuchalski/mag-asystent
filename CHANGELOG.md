@@ -34,6 +34,22 @@ historii nie przepisujemy.
 ---
 
 
+## 0.444.0 — 23 września 2026
+
+**Prawa kolumna skrzynki bez powtórzeń i bez ramek w ramkach.** Zgłoszenie
+właściciela ze zrzutami: „wciąż chaotyczna". Opis: §10.2c projektu panelu.
+
+- Sekcja „Subiekt GT" nie powtarza nazwy, stanu ani półki z pasma nad
+  zakładkami. Źródło i „wskaż inną kartotekę" stoją w linii nagłówka.
+- Sekcje dzieli kreska zamiast ramek; podpis pod zdjęciem oferty zszedł
+  do czytnika ekranu.
+- Zakładki Klient i Wiedza niosą licznik.
+- Dobór: status raz, w polu wyboru z kropką barwy. Drogi bez wyniku
+  i słabsze trafienia pod rozwinięciem. „Wybierz" z obrysem.
+
+- **[wymaga działania]** Przebuduj panel.
+
+
 ## 0.443.0 — 23 września 2026
 
 **Skrzynka szybsza w pracy i mówi, gdzie jest paczka.** Zgłoszenie

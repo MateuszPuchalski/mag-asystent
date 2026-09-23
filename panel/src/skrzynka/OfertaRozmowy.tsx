@@ -38,7 +38,10 @@ import { ZnakAllegro } from "../ui/ZnakAllegro";
  */
 export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
   const o = oferta.pobrana;
-  return <section className="border-b bg-slate-50 px-4 py-3 text-sm" aria-label="Oferta">
+  /* PŁASKO, BEZ KARTY W KARCIE (23 września 2026). Zrzut właściciela: pięć
+     ramek w jednej kolumnie, każda z innym tłem. Sekcje dzieli kreska, a nie
+     pudełko — ten sam kształt co „Subiekt GT" i „Zamówienie" niżej. */
+  return <section className="border-b px-4 py-3 text-sm" aria-label="Oferta">
     <div className="flex flex-wrap items-center gap-2">
       <NaglowekSekcji ikona={<Package size={13} />}>Oferta</NaglowekSekcji>
       <span className="font-mono text-podpis text-slate-500">{oferta.externalId}</span>
@@ -69,7 +72,7 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
     </div>
 
     {o
-      ? <div className="mt-2 flex items-start gap-3 rounded bg-white px-2 py-1.5">
+      ? <div className="mt-2 flex items-start gap-3">
           {/* Kafel tylko wtedy, gdy Allegro podało adres. Stan liczy SERWER —
               bez niego oferta bez obrazu pytałaby naszej trasy o 404 przy
               każdym otwarciu rozmowy. */}
@@ -86,7 +89,11 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
             {/* PODPIS ŹRÓDŁA. Blok towaru niżej pokazuje zdjęcie z Subiekta,
                 a §4.3 nie pozwala mieszać źródeł — bez tej linijki dwa obrazy
                 obok siebie wyglądałyby jak dwa ujęcia tej samej rzeczy. */}
-            {o.zdjecie === "jest" && <span className="w-full text-podpis text-slate-500">
+            {/* Od 23 września 2026 podpis czyta tylko czytnik ekranu. Źródło
+                widać i tak: kafel stoi pod nagłówkiem „Oferta" z odnośnikiem
+                do Allegro, a zdjęcie Subiekta — pod „Subiekt GT". Zdanie pod
+                każdym zdjęciem było trzecim podpisem tego samego. */}
+            {o.zdjecie === "jest" && <span className="sr-only">
               Zdjęcie z oferty Allegro — to widział klient.</span>}
             {/* ── MILCZENIE WYGLĄDAŁO JAK BRAK (0.214.0) ────────────────────
                 Snapshot sprzed 0.213.0 nie ma jeszcze kolumny z adresem, więc
