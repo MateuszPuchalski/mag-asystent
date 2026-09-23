@@ -888,9 +888,10 @@ export function migrate(database: DatabaseSync) {
   /* Warunki zastosowania — PO przebudowie wyżej, bo jej `CREATE TABLE` tych
      kolumn nie zna: dodane wcześniej zniknęłyby przy przepisaniu tabeli na
      bazie sprzed 0.264.0. Stare wpisy dostają NULL, czyli „bez warunków" —
-     dokładnie to, co twierdziły dotąd. */
+     dokładnie to, co twierdziły dotąd. `import_id` z tego samego powodu:
+     wskazuje wykaz części, z którego przyszła propozycja. */
   for (const [kolumna, typ] of [["rok_od", "INTEGER"], ["rok_do", "INTEGER"], ["seryjny_od", "TEXT"],
-    ["seryjny_do", "TEXT"], ["warunek", "TEXT"]] as const) {
+    ["seryjny_do", "TEXT"], ["warunek", "TEXT"], ["import_id", "INTEGER"]] as const) {
     if (database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='zastosowanie'").get()) {
       addColumn("zastosowanie", kolumna, typ);
     }

@@ -775,6 +775,44 @@ export type ImportOdsylaczy = {
   wycofal: string | null; wycofanoAt: string | null;
 };
 
+/* ── Wykaz części producenta (IPL) ───────────────────────────────────────────
+   Kształt z `services/wykaz-czesci.ts`. Marka, model i wariant to kolumna
+   ALBO jedna wartość dla całego pliku — wykaz jednej maszyny nie ma kolumny
+   „model". */
+export type PoleWykazu = { kolumna: number } | { tekst: string } | null;
+
+export type MapowanieWykazu = {
+  marka: PoleWykazu; model: PoleWykazu; wariant: PoleWykazu; numery: number[];
+  rokOd: number | null; rokDo: number | null; seryjnyOd: number | null; seryjnyDo: number | null;
+  rodzaj: "maszyna" | "silnik";
+};
+
+export type ParaWykazu = { symbol: string; nazwa: string; maszyna: string; numery: string[]; warunki: string | null };
+
+export type RaportWykazu = {
+  naglowki: string[];
+  probka: string[][];
+  mapowanie: MapowanieWykazu | null;
+  zgadniete: boolean;
+  wierszy: number;
+  dopasowanych: number;
+  bezMaszyny: number;
+  bezNumerow: number;
+  bledneWarunki: { liczba: number; przyklady: string[] };
+  bezKartoteki: { liczba: number; przyklady: string[] };
+  maszyn: { nowych: number; znanych: number };
+  par: { nowych: number; znanych: number; znanychInneWarunki: number };
+  przyklady: ParaWykazu[];
+  inneWarunki: ParaWykazu[];
+  zapisano: { importId: number; propozycji: number } | null;
+};
+
+export type ImportWykazu = {
+  id: number; zrodlo: string; link: string | null; plik: string | null; rodzaj: "maszyna" | "silnik";
+  wierszy: number; par: number; propozycji: number; czeka: number; zatwierdzonych: number;
+  stan: "aktywny" | "wycofany"; zaimportowal: string; at: string; wycofal: string | null; wycofanoAt: string | null;
+};
+
 /**
  * Tekst, z którego CZŁOWIEK składa klucz modelu, i który zamienia na
  * propozycję albo odrzuca. Od 0.264.0 kolejka niesie dwa źródła: sekcję

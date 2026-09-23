@@ -2582,6 +2582,17 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.470.0 — wykaz części producenta
+
+**Panel trzeba przebudować, a serwer zrestartować.** Tabela `import_wykazu`
+i kolumna `zastosowanie.import_id` dochodzą same przy starcie, bez
+przepisywania tabeli.
+
+Sprawdzenie: Wiedza → „Z opisów i ofert” → „Wykaz części producenta”. Wgraj
+plik z kolumną modelu i kolumną numerów części, wpisz markę. Podgląd ma
+pokazać, ile par trafia w kartoteki. Po zapisie propozycje czekają
+w zakładce Kolejka.
+
 ### Aktualizacja do 0.469.0 — warunki na zastosowaniu
 
 **Panel trzeba przebudować, a serwer zrestartować.** Pięć kolumn warunków

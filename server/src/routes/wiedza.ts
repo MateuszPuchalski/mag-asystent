@@ -23,10 +23,11 @@ import {
 import {
   historiaImportow, importujOdsylacze, wycofajImport, type ZadanieImportu,
 } from "../services/odsylacze-dostawcow.js";
+import { historiaWykazow, importujWykaz, wycofajWykaz, type ZadanieWykazu } from "../services/wykaz-czesci.js";
 import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   DWADZIEŚCIA TRZY ZAPISY: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   DWADZIEŚCIA PIĘĆ ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
    przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
    (E3), trzy przy zabudowie silnika (0.229.0), trzy przy pasowaniu części:
    propozycja, rozstrzygnięcie i wycofanie, dwa przy słowniku silników
@@ -46,6 +47,8 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    trasy propozycji — jest tylko decyzja człowieka i droga powrotu.
    Dwudziesty drugi i dwudziesty trzeci to import odsyłaczy od dostawcy
    (podgląd i zapis jedną trasą) i wycofanie importu w całości.
+   Dwudziesty czwarty i dwudziesty piąty to wykaz części producenta — ten
+   sam kształt: podgląd i zapis jedną trasą, wycofanie czekających propozycji.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
 
@@ -347,6 +350,28 @@ export async function wiedzaRoutes(app: FastifyInstance) {
   app.post<{ Params: { id: string } }>("/api/obsluga/wiedza/odsylacze/:id/wycofaj", async (req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
     try { return wycofajImport(Number(req.params.id), ja().userId); }
+    catch (e) { return blad(reply, e); }
+  });
+
+  /* Wykaz części producenta (IPL) → propozycje zastosowań. Ten sam kształt
+     co odsyłacze: jedna trasa na podgląd i zapis, bo to jeden rachunek.
+     Podgląd nie tworzy nawet modelu maszyny — pilnuje tego test tras. */
+  app.get("/api/obsluga/wiedza/wykazy", async (_req, reply) => odmowa(reply) ?? historiaWykazow());
+
+  app.post<{ Body: Partial<ZadanieWykazu> & { zastosuj?: boolean } }>(
+    "/api/obsluga/wiedza/wykazy", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        const b = req.body ?? {};
+        return importujWykaz({ zrodlo: String(b.zrodlo ?? ""), link: b.link ?? null, plik: b.plik ?? null,
+          rodzajDowodu: b.rodzajDowodu, tresc: b.tresc ?? {}, mapowanie: b.mapowanie ?? null },
+        b.zastosuj === true, ja().userId);
+      } catch (e) { return blad(reply, e); }
+    });
+
+  app.post<{ Params: { id: string } }>("/api/obsluga/wiedza/wykazy/:id/wycofaj", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    try { return wycofajWykaz(Number(req.params.id), ja().userId); }
     catch (e) { return blad(reply, e); }
   });
 

@@ -34,6 +34,41 @@ historii nie przepisujemy.
 ---
 
 
+## 0.470.0 — 23 września 2026
+
+**Wykaz części producenta: plik „model → numery części” staje się propozycjami
+zastosowań.** Warstwa „część → maszyna” jest prawie pusta. Sekcję „Modele:”
+w opisie ma 39 kartotek na 3415, więc opisy jej nie wypełnią. Wykaz części
+producenta mówi dokładnie to, czego brakuje, i często podaje zakres numerów
+seryjnych. Numery OEM kartotek już znamy z opisów i od dostawców.
+
+- **Gdzie.** Wiedza → „Z opisów i ofert” → karta „Wykaz części producenta”,
+  pod odsyłaczami. Plik CSV albo `.xlsx`.
+- **Kolumny wskazuje człowiek.** Serwer zgaduje model, numery części i zakresy
+  z nagłówków, a kolumnę „Poz.” pomija. Markę, model i wariant bierze się
+  z kolumny albo wpisuje raz dla całego pliku. Wykaz jednej pilarki nie ma
+  kolumny „model”.
+- **Wykaz maszyny albo silnika.** Wykaz silnika karmi szczebel „przez silnik”.
+  Jeden wpis obsługuje wtedy każdą maszynę z zatwierdzoną zabudową.
+- **Numer trafia w kartotekę** przez numer OEM zapisany przy niej albo przez
+  nasz symbol równy numerowi. Numer krótszy niż 6 znaków i 5 cyfr nie trafia
+  w nic, jak w kolejce zamienności. Numer przy dwóch kartotekach daje dwie
+  propozycje.
+- **Zapis rodzi propozycje, nie wpisy.** Dowód to „producent” albo „katalog
+  dostawcy” z nazwą wykazu. Rocznik i numer seryjny z pliku stają się
+  warunkami z 0.469.0. Ogniwo „numer → nasza kartoteka” sprawdza człowiek
+  w kolejce, przy zdjęciu części.
+- **Podgląd niczego nie zapisuje**, nawet modelu maszyny. Mówi, ile par
+  wejdzie i których numerów nie mamy. Wiersz z zepsutym zakresem pokazuje
+  osobno i nie wpuszcza go bez warunku. Pary już znane z innymi warunkami
+  wskazuje do przycisku „Popraw warunki”.
+- **Wycofanie wykazu** zdejmuje propozycje, które jeszcze czekają.
+  Zatwierdzone zostają, bo rozstrzygnął je człowiek.
+
+Tabela `import_wykazu`, kolumna `zastosowanie.import_id`, dwie trasy zapisu
+(licznik 25). Źródło propozycji zostaje `reczne`: nowa wartość w CHECK to
+przebudowa tabeli z czterema kluczami obcymi.
+
 ## 0.469.0 — 23 września 2026
 
 **Warunki na zastosowaniu: lata i zakres numerów seryjnych.** Punkt trzeci

@@ -49,7 +49,7 @@ beforeEach(() => {
   const d = db();
   for (const t of ["token_silnika_kartoteka", "token_silnika", "pasowanie_czesci", "model_z_opisu", "towar_identyfikator",
     "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika", "model_urzadzenia", "events",
-    "device_session", "import_odsylaczy", "zamiennosc_oem", "app_user"]) {
+    "device_session", "import_odsylaczy", "import_wykazu", "zamiennosc_oem", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   zOpisu = Number(d.prepare(`INSERT INTO model_z_opisu(tw_id,tw_symbol,tekst,tekst_norm)
@@ -125,6 +125,10 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/wiedza/odsylacze",
     payload: { dostawca: "Kramp", tresc: { csv: "Symbol;OEM\nX;123456" }, zastosuj: false } },
   { method: "POST" as const, url: "/api/obsluga/wiedza/odsylacze/1/wycofaj" },
+  { method: "GET" as const, url: "/api/obsluga/wiedza/wykazy" },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/wykazy",
+    payload: { zrodlo: "IPL", tresc: { csv: "Model;Numer części\nLS 51;16100-ZH8-W61" }, zastosuj: false } },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/wykazy/1/wycofaj" },
 ];
 
 test("bez sesji żadna trasa wiedzy nie odpowiada danymi", async () => {
@@ -142,7 +146,7 @@ test("hala nie widzi wiedzy — także na odczycie", async () => {
   }
 });
 
-test("tras zapisu jest dwadzieścia trzy — licznik jest umową", () => {
+test("tras zapisu jest dwadzieścia pięć — licznik jest umową", () => {
   /* Trzy przy zabudowie silnika (0.229.0) i trzy przy pasowaniu części:
      propozycja, rozstrzygnięcie i wycofanie. Każda z tych relacji ma ten sam
      cykl życia co zastosowanie, a bez własnego wycofania zatwierdzona pomyłka
@@ -177,15 +181,18 @@ test("tras zapisu jest dwadzieścia trzy — licznik jest umową", () => {
      i wycofanie importu. Podgląd i zapis to JEDNA trasa z flagą `zastosuj`,
      jak przy arkuszu lokalizacji — dwie dawałyby dwie drogi do jednego
      rachunku. Podgląd jest POST-em, ale nie zapisem; pilnuje tego osobny
-     test niżej, bo licznik tras tego nie widzi. */
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 23);
+     test niżej, bo licznik tras tego nie widzi.
+
+     DWUDZIESTA CZWARTA I DWUDZIESTA PIĄTA: wykaz części producenta i jego
+     wycofanie — ten sam kształt co odsyłacze, z tego samego powodu. */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 25);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {
   const b = login("biuro", "Anna");
   const stan = () => ["events", "zastosowanie", "dowod_zastosowania", "model_urzadzenia", "model_z_opisu",
     "towar_identyfikator", "zabudowa_silnika", "pasowanie_czesci", "alias_silnika", "token_silnika",
-    "token_silnika_kartoteka", "zamiennosc_oem", "import_odsylaczy"].map(liczba);
+    "token_silnika_kartoteka", "zamiennosc_oem", "import_odsylaczy", "import_wykazu"].map(liczba);
   const przed = stan();
   for (const t of TRASY().filter((t) => t.method === "GET")) {
     const r = await app.inject({ method: "GET", url: t.url, headers: b.naglowki });
@@ -322,7 +329,8 @@ test("żądanie bez ciała nie wywala się na pustym JSON-ie", async () => {
     `/api/obsluga/wiedza/pasowania/${pasowanie}/rozstrzygnij`,
     `/api/obsluga/wiedza/pasowania/${pasowanie}/wycofaj`, "/api/obsluga/wiedza/pasowania",
     "/api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij", "/api/obsluga/wiedza/zamiennosci-oem/1/wycofaj",
-    "/api/obsluga/wiedza/odsylacze", "/api/obsluga/wiedza/odsylacze/1/wycofaj"]) {
+    "/api/obsluga/wiedza/odsylacze", "/api/obsluga/wiedza/odsylacze/1/wycofaj",
+    "/api/obsluga/wiedza/wykazy", "/api/obsluga/wiedza/wykazy/1/wycofaj"]) {
     const r = await app.inject({ method: "POST", url, headers: b.naglowki });
     assert.equal(r.statusCode, 400, url);
     assert.doesNotMatch(r.body, /FST_ERR_CTP_EMPTY_JSON_BODY/, url);
@@ -348,6 +356,34 @@ test("podgląd importu odsyłaczy to POST, który niczego nie zostawia; zapis pr
   assert.equal(r.json<{ zapisano: { numerow: number } }>().zapisano.numerow, 1);
   r = await app.inject({ method: "GET", url: "/api/obsluga/wiedza/odsylacze", headers: b.naglowki });
   assert.deepEqual(r.json<Array<{ dostawca: string; stan: string }>>().map((i) => [i.dostawca, i.stan]), [["Kramp", "aktywny"]]);
+});
+
+test("podgląd wykazu części nie zostawia nawet modelu maszyny; zapis rodzi propozycje z dowodem producenta", async () => {
+  const b = login("biuro", "Anna");
+  db().prepare(`INSERT INTO towar_identyfikator(tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal)
+    SELECT tw_id, symbol, 'oem', '16100-ZH8-W61', '16100zh8w61', 'reczne', 'Anna' FROM sgt_towar WHERE tw_id=?`).run(GAZ);
+  const stan = () => ["events", "zastosowanie", "dowod_zastosowania", "model_urzadzenia", "import_wykazu"].map(liczba);
+  const csv = "Model;Numer części;Nr seryjny od\nMS 999;16100-ZH8-W61;175000000\nMS 999;999999999;";
+  const mapowanie = { marka: { tekst: "STIHL" }, model: { kolumna: 0 }, wariant: null, numery: [1],
+    rokOd: null, rokDo: null, seryjnyOd: 2, seryjnyDo: null, rodzaj: "maszyna" };
+  const przed = stan();
+  let r = await app.inject({ method: "POST", url: "/api/obsluga/wiedza/wykazy", headers: b.naglowki,
+    payload: { zrodlo: "IPL STIHL MS 999", tresc: { csv }, mapowanie, zastosuj: false } });
+  assert.equal(r.statusCode, 200, r.body);
+  const p = r.json<{ par: { nowych: number }; bezKartoteki: { liczba: number }; maszyn: { nowych: number } }>();
+  assert.deepEqual([p.par.nowych, p.bezKartoteki.liczba, p.maszyn.nowych], [1, 1, 1]);
+  assert.deepEqual(stan(), przed, "podgląd nie zostawia wiersza, zdarzenia ani modelu");
+  r = await app.inject({ method: "POST", url: "/api/obsluga/wiedza/wykazy", headers: b.naglowki,
+    payload: { zrodlo: "IPL STIHL MS 999", tresc: { csv }, mapowanie, zastosuj: true } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json<{ zapisano: { propozycji: number } }>().zapisano.propozycji, 1);
+  r = await app.inject({ method: "GET", url: "/api/obsluga/wiedza/kolejka", headers: b.naglowki });
+  const z = r.json<{ propozycje: Array<{ symbol: string; zdanieWarunkow: string | null; dowody: Array<{ rodzaj: string; tresc: string }> }> }>()
+    .propozycje.find((x) => x.dowody.some((d) => d.tresc.startsWith("IPL STIHL MS 999")))!;
+  assert.equal(z.zdanieWarunkow, "nr seryjny od 175000000");
+  assert.deepEqual(z.dowody.map((d) => [d.rodzaj, d.tresc]), [["producent", "IPL STIHL MS 999: STIHL MS 999 — numer 16100-ZH8-W61"]]);
+  r = await app.inject({ method: "GET", url: "/api/obsluga/wiedza/wykazy", headers: b.naglowki });
+  assert.deepEqual(r.json<Array<{ zrodlo: string; czeka: number }>>().map((i) => [i.zrodlo, i.czeka]), [["IPL STIHL MS 999", 1]]);
 });
 
 test("luki idą razem z kolejką jednym odczytem", async () => {
