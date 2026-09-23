@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import {
-  CalendarClock, History, MessageSquare, NotebookPen, Package, Receipt, RefreshCw, Scale,
-  ShoppingCart, UserCheck,
+  CalendarClock, CalendarDays, CreditCard, History, MessageSquare, NotebookPen, Package, Receipt,
+  RefreshCw, Scale, ShoppingCart, Truck, Undo2, UserCheck, Wallet,
 } from "lucide-react";
 import type { Tag } from "../api/typy";
 import type { KandydatFaktury, PozycjaZwrotu, PrzystanekDrogi, SprawaZakupu, WpisOsiZwrotu, Zwrot }
@@ -150,6 +150,18 @@ function Notatka({ zwrot, trwa, blad, onZapisz, onCofnij }: {
   </div>;
 }
 
+/**
+ * Etykieta wiersza zamówienia jako ikona (0.455.0).
+ *
+ * `<dt>` dalej NIESIE słowo — w `sr-only` i w podpowiedzi — więc lista opisów
+ * zostaje listą opisów dla czytnika ekranu, a nie rzędem wartości bez pytań.
+ */
+function Etykieta({ ikona, nazwa }: { ikona: React.ReactNode; nazwa: string }) {
+  return <dt title={nazwa} className="flex text-slate-500">
+    <span aria-hidden="true">{ikona}</span><span className="sr-only">{nazwa}</span>
+  </dt>;
+}
+
 export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
   fakturaBlad = "", onFaktura, os = [], sprawy = [], droga = [], kosze = [],
   trwaNotatka = false, bladNotatki = "", onNotatka, onCofnijNotatke,
@@ -225,16 +237,23 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
               <Link href={zam.link}>Otwórz w <ZnakAllegro wysokosc={11} /></Link>
               <Skopiuj tekst={zam.externalId} />
             </div>
-            <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1">
-              {zam.kupionoAt && <><dt className="text-slate-500">Kupione</dt>
+            {/* ── IKONA ZAMIAST ETYKIETY (0.455.0) ──────────────────────────
+                Zgłoszenie właściciela: „ulżyj przeładowaniu tekstem". Pięć
+                etykiet stało przy każdym zwrocie w tej samej kolejności, więc
+                po tygodniu czyta się je miejscem, nie słowem. Ikona trzyma
+                miejsce, słowo zostaje w podpowiedzi i dla czytnika ekranu —
+                „Klient chciał faktury" dalej brzmi jak zdanie, a nie jak
+                sama wartość bez pytania. */}
+            <dl className="mt-2 grid grid-cols-[1rem_1fr] items-center gap-x-2.5 gap-y-1">
+              {zam.kupionoAt && <><Etykieta ikona={<CalendarDays size={15} />} nazwa="Kupione" />
                 <dd>{czas(zam.kupionoAt)}</dd></>}
-              {zam.dostawaMetoda && <><dt className="text-slate-500">Dostawa</dt>
+              {zam.dostawaMetoda && <><Etykieta ikona={<Truck size={15} />} nazwa="Dostawa" />
                 <dd>{zam.dostawaMetoda} · {zlote(zam.dostawaGrosze, zam.waluta)}</dd></>}
-              <dt className="text-slate-500">Zapłacono</dt>
+              <Etykieta ikona={<Wallet size={15} />} nazwa="Zapłacono" />
               <dd className="tabular-nums">{zlote(zam.sumaGrosze, zam.waluta)}</dd>
               {/* Forma płatności to przy zwrocie nie ciekawostka: przy pobraniu
                   nie ma karty, na którą oddać pieniądze. */}
-              {zam.platnoscTyp && <><dt className="text-slate-500">Płatność</dt>
+              {zam.platnoscTyp && <><Etykieta ikona={<CreditCard size={15} />} nazwa="Płatność" />
                 <dd>{PLATNOSCI[zam.platnoscTyp] ?? zam.platnoscTyp}</dd></>}
               {/* NAZWA WIERSZA, nie treść (0.176.0). Stało tu „Dokument" i to
                   samo słowo tytułowało sekcję z numerem paragonu z Subiekta —
@@ -244,7 +263,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
 
                   `null` znaczy „nie wiadomo" i tak się pokazuje — paragon
                   wpisany na ślepo kazałby wystawić niewłaściwą korektę. */}
-              <dt className="text-slate-500">Klient chciał</dt>
+              <Etykieta ikona={<Receipt size={15} />} nazwa="Klient chciał" />
               <dd>{zam.fakturaZadana == null
                 ? <span className="text-slate-500">nie wiadomo</span>
                 : zam.fakturaZadana ? "faktury" : "paragonu"}</dd>
@@ -290,8 +309,13 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                     jako „wracają dwie" przy zwrocie jednej. Przy zwrocie
                     całości „z 2" byłoby szumem — dlatego pada tylko wtedy,
                     gdy część zakupu zostaje u klienta. */}
-                    {p.zwracana && <span className="shrink-0 rounded bg-amber-200 px-1 text-podpis uppercase">
-                      wraca {p.wracaIlosc}{p.wracaIlosc < p.ilosc ? ` z ${p.ilosc}` : ""}</span>}
+                    {/* STRZAŁKA POWROTU zamiast wersalików (0.455.0). Słowo
+                        „wraca" zostaje dla czytnika ekranu i w podpowiedzi,
+                        a liczba — jedyne, co się tu zmienia — stoi obok ikony. */}
+                    {p.zwracana && <span title="Wraca w tym zwrocie"
+                      className="inline-flex shrink-0 items-center gap-0.5 rounded-full bg-amber-200 px-1.5 text-podpis font-bold">
+                      <Undo2 size={11} aria-hidden="true" /><span className="sr-only">wraca </span>
+                      {p.wracaIlosc}{p.wracaIlosc < p.ilosc ? ` z ${p.ilosc}` : ""}</span>}
                   </span>
                 </span>
               </li>)}

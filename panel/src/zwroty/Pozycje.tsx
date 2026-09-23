@@ -1,5 +1,5 @@
 import React, { useMemo, useState, type MutableRefObject } from "react";
-import { Check, X as Krzyzyk } from "lucide-react";
+import { Barcode, Check, CircleHelp, ExternalLink, Layers, Link2, Tag, X as Krzyzyk } from "lucide-react";
 import type { DoDopisania, Ocena, PozycjaZwrotu, SkladPozycji, WierszDokumentu, Zwrot } from "../api/typy";
 import {
   useKosz, usePotwierdzKartoteke, useWskazSklad, useZaznaczSkladnik, zlote,
@@ -79,25 +79,34 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
     zapisz.mutate({ pozycjaId: p.id, twId, zrodlo }, { onSuccess: () => setSzukam(false) });
 
   if (p.twId !== null) {
-    return <p className="mt-1 flex items-center gap-1 text-xs text-emerald-700">
-      Kartoteka <b>{p.twSymbol}</b>
-      <span className="text-slate-500">
-        {/* „zatwierdzona propozycja", a nie „z SKU oferty": od 0.154.0 automat
-            proponuje z czterech źródeł (SKU, pamięć wskazań, jedyna pozycja
-            zamówienia, nazwa w zamówieniu), a wszystkie zapisują się tym samym
-            `sku`. Dawny podpis kłamałby przy trzech z czterech. */}
-        {p.twZrodlo === "sku" ? "· zatwierdzona propozycja" : "· wskazana ręcznie"}
-      </span>
-      <button type="button" title="Zdejmij powiązanie" disabled={zapisz.isPending}
-        onClick={() => ustaw(null, "reczne")}
-        className="rounded p-0.5 text-slate-400 hover:bg-slate-200 hover:text-slate-700">
-        <Krzyzyk size={12} />
+    /* ── ZNACZNIK ZAMIAST ZDANIA (0.455.0) ─────────────────────────────────
+       Zgłoszenie właściciela: „ulżyj przeładowaniu tekstem". Powiązana
+       kartoteka to stan DOBRY i najczęstszy, a zdanie „Kartoteka X ·
+       zatwierdzona propozycja" stało przy każdej pozycji każdego zwrotu.
+       Zielony znacznik z ikoną ogniwa mówi „powiązane" na pierwszy rzut oka;
+       źródło zostaje w podpowiedzi. „Zatwierdzona propozycja", a nie
+       „z SKU oferty": od 0.154.0 automat proponuje z czterech źródeł, a
+       wszystkie zapisują się tym samym `sku`. */
+    const skad = p.twZrodlo === "sku" ? "zatwierdzona propozycja" : "wskazana ręcznie";
+    return <span title={`Kartoteka Subiekta — ${skad}`}
+      className="inline-flex h-6 items-center gap-1 rounded-full bg-emerald-50 pl-2 pr-1 text-xs font-semibold text-emerald-800">
+      <Link2 size={12} aria-hidden="true" />
+      <span className="sr-only">Kartoteka </span>
+      <span className="font-mono">{p.twSymbol}</span>
+      <span className="sr-only"> — {skad}</span>
+      <button type="button" aria-label="Zdejmij powiązanie" title="Zdejmij powiązanie"
+        disabled={zapisz.isPending} onClick={() => ustaw(null, "reczne")}
+        className="rounded-full p-0.5 text-emerald-800 hover:bg-emerald-100">
+        <Krzyzyk size={12} aria-hidden="true" />
       </button>
-    </p>;
+    </span>;
   }
 
   const prop = p.propozycja;
-  return <div className="mt-1 text-xs">
+  /* `w-full`: propozycja i brak kartoteki to BLOKI z treścią do przeczytania
+     i przyciskiem — w rzędzie znaczników zawijają się pod nie, zamiast
+     ściskać znacznik rabatu obok. */
+  return <div className="w-full text-xs">
     {prop?.twId != null
       /* Propozycja nie udaje faktu: mówi, skąd się wzięła, i czeka na
          zatwierdzenie. Projekt panelu §4.3 i §11.3. Warunek stoi na `twId`,
@@ -410,35 +419,48 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             <span className="ml-auto shrink-0 tabular-nums">
               {zlote(Math.round(p.cenaGrosze * p.ilosc), p.waluta)}</span>
           </div>
-          <div className="text-xs text-slate-600">
-            {p.ilosc} szt.{p.powod ? ` · ${POWODY[p.powod] ?? p.powod}` : ""}
-          </div>
-          {/* Kody, po których pracownik szuka towaru na półce i w Subiekcie.
+          {/* ── SZCZEGÓŁY Z IKONAMI, JEDEN RZĄD (0.455.0) ─────────────────────
+              Do 0.454.0 trzy linijki: „2 szt. · powód", „EAN … SKU …"
+              i „Zobacz ofertę". Ikona zastępuje etykietę, a pełna nazwa stoi
+              w podpowiedzi i w nazwie dostępnej. Kody zostają pismem stałej
+              szerokości, bo po nich szuka się na półce i w Subiekcie.
+
               EAN wisi przy KARTOTECE, więc pojawia się dopiero po jej
               potwierdzeniu; SKU jest sprzedawcy i idzie z pozycji ZAMÓWIENIA,
-              bo pozycja zwrotu własnego SKU w specyfikacji nie ma. */}
-          {(p.ean || p.sku) && <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-slate-500">
-            {p.ean && <span>EAN <b className="font-mono text-slate-700">{p.ean}</b></span>}
-            {p.sku && <span>SKU <b className="font-mono text-slate-700">{p.sku}</b></span>}
-          </div>}
-          {/* Odnośnik JAWNY i podpisany. Od 0.153.0 był nim sama nazwa towaru —
-              istniał, ale nikt go nie widział: podkreślenie nie mówi, dokąd
-              prowadzi. Gdy adresu nie ma, ekran mówi to wprost — milczenie
-              wygląda jak usterka panelu, a jest brakiem danych po stronie
-              Allegro. */}
-          <p className="mt-0.5 text-xs">
+              bo pozycja zwrotu własnego SKU w specyfikacji nie ma. Pustych
+              etykiet nie ma: brak kodu to brak znacznika. */}
+          <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
+            <span title="Ilość w zwrocie" className="inline-flex items-center gap-1">
+              <Layers size={13} aria-hidden="true" />{p.ilosc} szt</span>
+            {p.powod && <span title="Powód zwrotu" className="inline-flex items-center gap-1">
+              <CircleHelp size={13} aria-hidden="true" />{POWODY[p.powod] ?? p.powod}</span>}
+            {p.ean && <span title="EAN" className="inline-flex items-center gap-1">
+              <Barcode size={13} aria-hidden="true" /><span className="sr-only">EAN </span>
+              <b className="font-mono font-normal text-slate-800">{p.ean}</b></span>}
+            {p.sku && <span title="SKU oferty" className="inline-flex items-center gap-1">
+              <Tag size={13} aria-hidden="true" /><span className="sr-only">SKU </span>
+              <b className="font-mono font-normal text-slate-800">{p.sku}</b></span>}
+            {/* Odnośnik JAWNY (0.153.0): ikona wyjścia i słowo „oferta", pełna
+                nazwa w `aria-label`. Gdy adresu nie ma, ekran dalej to mówi —
+                krótko, a całe zdanie w podpowiedzi. Milczenie wyglądałoby jak
+                usterka panelu, a jest brakiem danych po stronie Allegro. */}
             {p.url
-              ? <Link href={p.url}>Zobacz ofertę</Link>
-              : <span className="text-slate-500">Allegro nie podało adresu oferty</span>}
-          </p>
+              ? <a href={p.url} target="_blank" rel="noopener noreferrer"
+                  aria-label="Zobacz ofertę w Allegro" title="Zobacz ofertę w Allegro"
+                  className="inline-flex items-center gap-1 font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
+                  <ExternalLink size={13} aria-hidden="true" />oferta</a>
+              : <span title="Allegro nie podało adresu oferty" className="text-slate-500">bez adresu oferty</span>}
+          </div>
           {p.powodKomentarz && <p className="mt-1 text-xs italic text-slate-600">
             „{p.powodKomentarz}"</p>}
-          <Kartoteka p={p} />
-          {/* Rabat stoi przy POZYCJI, nie przy zwrocie: wniosek składa się
-              na pozycję zamówienia, więc zwrot z dwiema pozycjami ma dwa
-              osobne rabaty i dwa osobne przyciski. */}
-          <Rabat rabat={p.rabat} trwa={trwaRabat} blad={bladRabatu}
-            onZglos={() => onZglosRabat?.(p.id)} />
+          {/* Kartoteka i rabat W JEDNYM RZĘDZIE znaczników (0.455.0). Rabat
+              stoi przy POZYCJI, nie przy zwrocie: wniosek składa się na pozycję
+              zamówienia, więc zwrot z dwiema pozycjami ma dwa osobne rabaty. */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <Kartoteka p={p} />
+            <Rabat rabat={p.rabat} trwa={trwaRabat} blad={bladRabatu}
+              onZglos={() => onZglosRabat?.(p.id)} />
+          </div>
 
           {/* Ocena towaru: pytanie kubełka DO OCENY, zadane przy towarze,
               którego dotyczy. Zapisana ocena zostaje widoczna w każdym

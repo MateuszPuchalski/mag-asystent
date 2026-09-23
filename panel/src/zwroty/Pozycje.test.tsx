@@ -77,7 +77,10 @@ describe("Produkty ze zwrotu", () => {
   it("brak adresu oferty mówi o sobie, zamiast milczeć", () => {
     /* Milczenie wygląda na usterkę panelu, a jest brakiem danych z Allegro. */
     lista(zwrot({ pozycje: [POZYCJA()] }));
-    expect(screen.getByText(/Allegro nie podało adresu oferty/)).toBeInTheDocument();
+    /* Od 0.455.0 krótko na ekranie, całe zdanie w podpowiedzi — ale dalej
+       słowem, nie ciszą. */
+    expect(screen.getByText("bez adresu oferty"))
+      .toHaveAttribute("title", "Allegro nie podało adresu oferty");
   });
 
   it("ocena stoi PRZY towarze, nie obok listy nazw", async () => {
@@ -297,6 +300,10 @@ describe("Produkty ze zwrotu", () => {
     lista(zwrot({ pozycje: [POZYCJA({ ean: "5901234123457", sku: "SEK-46" })] }));
     expect(screen.getByText("5901234123457")).toBeInTheDocument();
     expect(screen.getByText("SEK-46")).toBeInTheDocument();
+    /* Od 0.455.0 etykietę zastępuje ikona, ale nazwa kodu nie ginie:
+       stoi w podpowiedzi i w tekście dla czytnika ekranu. */
+    expect(screen.getByTitle("EAN")).toHaveTextContent("EAN 5901234123457");
+    expect(screen.getByTitle("SKU oferty")).toHaveTextContent("SKU SEK-46");
   });
 
   it("bez kodów wiersz nie pokazuje pustych etykiet", () => {

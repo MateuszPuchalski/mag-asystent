@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.455.0 — 23 września 2026
+
+**Zwroty: karty produktów i kolumna zamówienia z ikonami.** Ostatni krok
+projektu „Zwroty — mniej tekstu".
+
+- Szczegóły pozycji stoją w jednym rzędzie z ikonami: ilość, powód, EAN, SKU
+  i odnośnik do oferty. Nazwa każdego szczegółu jest w podpowiedzi i dla
+  czytnika ekranu.
+- Powiązana kartoteka to zielony znacznik z symbolem i krzyżykiem. Źródło
+  (zatwierdzona propozycja albo wskazana ręcznie) jest w podpowiedzi.
+  Propozycja i brak kartoteki zostają blokami z treścią.
+- Rabat transakcyjny to znacznik stanu z kwotą, obok kartoteki. Pełne
+  zdanie jest w podpowiedzi, a potwierdzenie wniosku bez zmian.
+- W kolumnie zamówienia ikony zastąpiły etykiety wierszy. Znacznik „wraca"
+  to strzałka powrotu z liczbą sztuk.
+
+- **[wymaga działania]** Przebuduj panel.
+
 ## 0.454.0 — 23 września 2026
 
 **Zwroty: kubełki jako kafle z ikonami.** Drugi krok projektu „Zwroty —
