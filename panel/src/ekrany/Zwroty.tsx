@@ -10,7 +10,6 @@ import { DolozTowar } from "../zwroty/DolozTowar";
 import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
-  useNieodebrana,
   usePaczkiKlienta, useZamowieniaZAllegro, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
@@ -338,7 +337,6 @@ export function Zwroty() {
   const pieniadze = useZwrocPieniadze();
   const odmowaPlatnosci = useOdmowPlatnosci();
   const potracenie = usePotracenie();
-  const nieodebrana = useNieodebrana();
   const faktura = useFaktura();
   const dopisz = useDopiszPozycje();
   const zdejmij = useZdejmijPozycje();
@@ -759,7 +757,6 @@ export function Zwroty() {
         onDociagnij={(v) => dociagnij.mutate(v, {
           onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
         onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }}
-        rejestruje={nieodebrana.isPending}
         paczki={loginPaczek ? paczkiKlienta.data?.paczki ?? null : null}
         szukaPaczek={paczkiKlienta.isFetching}
         /* LOGIN IDZIE TEŻ DO ALLEGRO (0.450.0). Lista wyżej czyta naszą
@@ -789,21 +786,9 @@ export function Zwroty() {
         bladSync={bladSync}
         onSynchronizuj={() => { setBladSync(""); synchronizuj.mutate(undefined,
           { onError: (e) => setBladSync((e as Error).message) }); }}
-        /* JEDEN OBIEKT zamiast sześciu pozycyjnych argumentów (0.367.0).
-           Przy czterech dało się jeszcze policzyć na palcach; przy sześciu
-           zamiana dwóch sąsiednich napisów jest błędem, którego kompilator
-           nie zobaczy, a zapisze się jako czyjeś nazwisko w polu loginu. */
-        onNieodebrana={(d) => {
-          setBladSkanu("");
-          nieodebrana.mutate({
-            waybill: d.waybill, orderId: d.orderId || null, notatka: d.notatka || null,
-            login: d.login || null, odbiorcaNazwa: d.odbiorcaNazwa || null,
-            przewoznik: d.przewoznik || null,
-          }, {
-            onSuccess: (w) => { setWynikSkanu(null); setFraza(""); nawiguj(`/obsluga/zwroty/${w.zwrotId}`); },
-            onError: (e) => setBladSkanu((e as Error).message),
-          });
-        }} />
+        /* REJESTRACJI PACZKI NIE MA od 0.451.0 — decyzja właściciela,
+           „ja tylko wyszukuję ją w Allegro". Uzasadnienie stoi w `Szukanie`. */
+      />
 
       {/* ── PYTANIE KUBEŁKA I SITO W JEDNYM PAŚMIE (audyt, 15 września 2026) ──
           Stały w dwóch, po 33 i 37 px, i mówiły o TEJ SAMEJ liście: kubełek

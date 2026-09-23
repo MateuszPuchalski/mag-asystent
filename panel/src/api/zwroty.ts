@@ -490,6 +490,8 @@ export interface PaczkaKlienta {
   odbiorcaUlica: string | null;
   odbiorcaMiasto: string | null;
   odbiorcaKod: string | null;
+  /** Zamówienie w panelu Allegro (0.451.0); `null` bez wzorca adresu. */
+  link: string | null;
 }
 
 /**
@@ -550,28 +552,6 @@ export function useZamowieniaZAllegro() {
       "/api/obsluga/zwroty/paczki-klienta/allegro",
       { method: "POST", body: JSON.stringify({ login: login.trim() }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["paczki-klienta"] }),
-  });
-}
-
-/**
- * Rejestracja paczki, której klient nie odebrał (0.172.0).
- *
- * Allegro takiego bytu nie zna, więc wiersz zakłada biuro — to jedyne miejsce
- * w panelu, gdzie zwrot powstaje od zera, a nie z synchronizacji.
- */
-export function useNieodebrana() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: {
-      waybill: string; orderId?: string | null; notatka?: string | null;
-      /** Login kupującego (0.365.0) — przy nieodebranej często jedyny uchwyt. */
-      login?: string | null;
-      /** Nazwa odbiorcy i przewoźnik Z NAKLEJKI (0.367.0) — patrz `Szukanie`. */
-      odbiorcaNazwa?: string | null; przewoznik?: string | null;
-    }) =>
-      api<{ zwrotId: number; pozycji: number }>("/api/obsluga/zwroty/nieodebrana",
-        { method: "POST", body: JSON.stringify(v) }),
-    onSettled: () => odswiez(qc),
   });
 }
 

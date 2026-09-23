@@ -1,5 +1,5 @@
 import React, { useRef, useState } from "react";
-import { PackageX, RefreshCw, ScanLine, Search, X } from "lucide-react";
+import { ExternalLink, RefreshCw, ScanLine, Search, UserSearch, X } from "lucide-react";
 import { zlote, type PaczkaKlienta, type WynikSkanu } from "../api/zwroty";
 import { czas } from "../ui";
 import { SeriaWPolu } from "../skaner";
@@ -28,30 +28,11 @@ import { ile as liczba } from "../ui";
    znajdowało nic. Rozpoznaje to `SeriaWPolu` tym samym podpisem czytnika,
    którego używa hook: gęsta seria dłuższa niż `MIN_DLUGOSC`.                */
 
-/**
- * Przewoźnicy, których operator rozpoznaje z naklejki (0.367.0).
- *
- * Kody są TE SAME, co przychodzą z Allegro przy zwrotach — inaczej paczka
- * nieodebrana i zwrot od tej samej firmy byłyby w danych dwiema firmami,
- * a lista rozwijana nad kolejką pokazywałaby obie. Lista jest krótka
- * świadomie: to wybór z pudła w ręku, nie katalog branży.
- */
-const PRZEWOZNICY_NAKLEJKI: Array<[string, string]> = [
-  ["INPOST", "InPost / Paczkomat"],
-  ["DPD", "DPD"],
-  ["POCZTA", "Poczta Polska"],
-  ["DHL", "DHL"],
-  ["GLS", "GLS"],
-  ["UPS", "UPS"],
-  ["FEDEX", "FedEx"],
-  ["UNKNOWN", "Inny"],
-];
-
 export function Szukanie({
-  wynik, kod, fraza, szuka, dociaga, blad, ile, rejestruje = false,
+  wynik, kod, fraza, szuka, dociaga, blad, ile,
   paczki = null, szukaPaczek = false, pytaAllegro = false, bladAllegro = "",
   synchronizuje = false, bladSync = "",
-  onFraza, onSzukaj, onDociagnij, onWybierz, onNieodebrana, onLogin, onSynchronizuj,
+  onFraza, onSzukaj, onDociagnij, onWybierz, onLogin, onSynchronizuj,
 }: {
   wynik: WynikSkanu | null;
   kod: string;
@@ -65,16 +46,13 @@ export function Szukanie({
   onSzukaj: (kod: string) => void;
   onDociagnij: (kod: string) => void;
   onWybierz: (id: number) => void;
-  /** Rejestracja paczki nieodebranej; brak = ekran jej nie proponuje. */
-  rejestruje?: boolean;
-  onNieodebrana?: (dane: {
-    waybill: string; orderId: string; notatka: string;
-    login: string; odbiorcaNazwa: string; przewoznik: string;
-  }) => void;
   /** Paczki z historii tego klienta; `null` = jeszcze o nie nie pytano. */
   paczki?: PaczkaKlienta[] | null;
   szukaPaczek?: boolean;
-  /** Prośba o historię klienta — wysyłana po dopisaniu uchwytu, nie z każdego znaku. */
+  /**
+   * Prośba o paczki klienta — wysyłana po dopisaniu uchwytu, nie z każdego
+   * znaku. Brak = ekran nie proponuje szukania paczek wcale.
+   */
   onLogin?: (szukane: string) => void;
   /** Allegro właśnie szuka zamówień tego loginu (0.450.0). */
   pytaAllegro?: boolean;
@@ -97,100 +75,50 @@ export function Szukanie({
      stanu przerysowuje ekran, a czytnik wysyła kolejny znak po kilku
      milisekundach. */
   const seria = useRef(new SeriaWPolu());
-  const [nieodebrana, setNieodebrana] = useState(false);
-  const [zamowienie, setZamowienie] = useState("");
-  /* JEDNO POLE NA UCHWYT CZŁOWIEKA (0.367.0): login albo nazwisko z naklejki.
-     Do 0.366.0 pytaliśmy o sam login, a przy paczce nieodebranej operator
-     najczęściej go nie ma — ma karton, a na nim nazwisko. Dwa pola kazałyby
-     mu najpierw rozstrzygnąć, czym jest to, co przepisuje; zasady dopasowania
-     rozstrzyga serwer. */
+  /* ── REJESTRACJI PACZKI JUŻ NIE MA (0.451.0) ─────────────────────────
+     Decyzja właściciela: „usuń opcję rejestracji paczki — ja tylko wyszukuję
+     ją w Allegro". Od 0.172.0 formularz zakładał tu zwrot od zera: numer
+     listu, zamówienie, przewoźnik, notatka. Biuro z niego nie korzystało,
+     a sześć pól zasłaniało jedno, po które przychodziło — login.
+
+     Zostaje SAMO SZUKANIE. Wynik prowadzi do zamówienia w panelu Allegro,
+     bo tam ta praca się kończy. Zwroty zarejestrowane wcześniej zostają
+     i dalej noszą znacznik „nieodebrana" — ich nikt nie wycofuje. */
+  const [szukaKlienta, setSzukaKlienta] = useState(false);
+  /* JEDNO POLE NA UCHWYT CZŁOWIEKA (0.367.0): login, nazwisko z naklejki albo
+     telefon. Zasady dopasowania rozstrzyga serwer, nie operator. */
   const [kto, setKto] = useState("");
-  /* Co wybór z listy USTALIŁ. Trzymamy osobno od `kto`, bo w polu zostaje to,
-     co człowiek wpisał — a na serwer jedzie to, co wskazał. */
-  const [login, setLogin] = useState("");
-  const [odbiorca, setOdbiorca] = useState("");
-  const [przewoznik, setPrzewoznik] = useState("");
-  const [notatka, setNotatka] = useState("");
-  /* Numer listu WPISANY, gdy formularz otwarto przyciskiem, a nie po nieudanym
-     skanie (0.338.0). Przy skanie numer jest już w `kod` i pola nie ma. */
-  const [list, setList] = useState("");
   const brak = wynik?.trafienie === null;
   const wiele = wynik?.trafienie === "wiele";
-  /* Numer listu: ze skanu, gdy formularz wyszedł z nieudanego szukania,
-     a z pola, gdy operator otworzył go sam. */
-  const zeSkanu = brak && Boolean(kod);
-  const numerListu = (zeSkanu ? kod : list).trim();
 
-  const formularz = onNieodebrana
-    ? <div className="mt-2 rounded-lg border border-amber-300 bg-white p-2 text-xs">
-        <p className="text-slate-600">
-          Klient nie odebrał przesyłki i wróciła do nas. To NIE jest zwrot
-          zgłoszony przez klienta — panel oznaczy ją wprost.</p>
-        {zeSkanu
-          ? <p className="mt-1 text-slate-500">
-              Numer listu: <b className="break-all font-mono">{kod}</b></p>
-          /* Bez skanu numer trzeba WPISAĆ: to jedyny uchwyt takiej paczki,
-             bo Allegro nie zna zwrotu, którego klient nie zgłosił. */
-          : <input className="field mt-2 h-7 text-xs" value={list} autoFocus
-              aria-label="Numer listu przewozowego" placeholder="Numer listu z naklejki"
-              onChange={(e) => setList(e.target.value)} />}
-        <input className="field mt-2 h-7 text-xs" value={zamowienie}
-          aria-label="Numer zamówienia" placeholder="Numer zamówienia (jeśli znasz)"
-          onChange={(e) => setZamowienie(e.target.value)} />
-        <p className="mt-1 text-slate-500">
-          Z numerem zamówienia paczka dostanie pozycje i będzie co wycenić.</p>
-        {/* ── KTO TO: LOGIN ALBO NAZWISKO Z NAKLEJKI (0.367.0) ───────────────
+  const panelKlienta = onLogin
+    ? <div className="mt-2 rounded-lg border border-sky-200 bg-white p-2 text-xs">
+        {/* ── KTO TO: LOGIN, NAZWISKO Z NAKLEJKI ALBO TELEFON (0.367.0) ──────
             Zgłoszenie właściciela: „szukanie nieodebranych paczek odbywa się
             głównie za pomocą loginu użytkownika i innych informacji na
-            przesyłce". Login przyszedł w 0.365.0 i był połową odpowiedzi:
-            przy paczce, której klient nie odebrał, operator loginu najczęściej
-            NIE MA — ma karton, a na nim nazwisko i logo przewoźnika.
+            przesyłce". JEDNO POLE NA TRZY, bo człowiek przepisuje to, co widzi,
+            a nie to, co system woli. Login dopasowuje się w całości, nazwisko
+            po fragmencie, telefon po końcówce cyfr — rozstrzyga serwer.
 
-            JEDNO POLE NA TRZY, bo człowiek przepisuje to, co widzi, a nie to,
-            co system woli. Login dopasowuje się w całości, nazwisko po
-            fragmencie, telefon po końcówce cyfr — ale to rozstrzyga serwer,
-            nie operator. Telefon doszedł w 0.422.0 razem ze zdjęciem blokady
-            adresu: klient pisze „gdzie moja paczka" i podaje sam numer. */}
-        <input className="field mt-2 h-7 text-xs" value={kto}
+            AUTOFOCUS, bo to pole jest jedynym powodem otwarcia tego panelu. */}
+        <input className="field h-7 text-xs" value={kto} autoFocus
           aria-label="Login, nazwisko albo telefon"
-          placeholder="Login, nazwisko z naklejki albo telefon"
+          placeholder="Login klienta, nazwisko z naklejki albo telefon"
           onChange={(e) => setKto(e.target.value)}
           /* PYTAMY PO DOPISANIU UCHWYTU, nie po każdym znaku (0.365.0). Enter
              i wyjście z pola to dwa ruchy, które operator i tak wykonuje —
              a zapytanie na znak byłoby dwunastoma odczytami na jedno nazwisko,
              i dwunastoma wpisami w dzienniku odczytów cudzych danych. */
-          onBlur={() => onLogin?.(kto.trim())}
+          onBlur={() => onLogin(kto.trim())}
           onKeyDown={(e) => {
+            if (e.key === "Escape") { setSzukaKlienta(false); return; }
             if (e.key !== "Enter") return;
             e.preventDefault();
-            onLogin?.(kto.trim());
+            onLogin(kto.trim());
           }} />
         <p className="mt-1 text-slate-500">
-          Po tym znajdziesz paczkę później. Enter pokaże paczki tego klienta —
-          login sprawdzam też w Allegro, więc znajdę zamówienie, którego u nas
-          jeszcze nie było.</p>
-
-        {/* ── PRZEWOŹNIK Z NAKLEJKI (0.367.0) ────────────────────────────────
-            Przy paczce nieodebranej Allegro nie zna przewoźnika wcale, więc
-            kolumna zostawała pusta — a operator ma logo przed oczami. Lista,
-            nie pole: wybór nie wymaga pisania, a wpisane „inpost" i „InPost"
-            byłyby dwiema różnymi firmami w danych. */}
-        <select className="field mt-2 h-7 text-xs" value={przewoznik}
-          aria-label="Przewoźnik" onChange={(e) => setPrzewoznik(e.target.value)}>
-          <option value="">Przewoźnik z naklejki (jeśli widzisz)</option>
-          {PRZEWOZNICY_NAKLEJKI.map(([kod, nazwa]) =>
-            <option key={kod} value={kod}>{nazwa}</option>)}
-        </select>
-
-        {/* ── WYBÓR PACZKI Z HISTORII KLIENTA (0.365.0) ──────────────────────
-            Zgłoszenie właściciela: „kupujący może mieć wiele paczek kupionych
-            w historii sklepu, więc muszę mieć możliwość wybrania paczki".
-            Numer zamówienia przepisywany z panelu Allegro był jedyną drogą,
-            a to przepisywanie dwudziestu znaków z drugiego ekranu.
-
-            Wybór WPISUJE numer do pola wyżej, zamiast trzymać go osobno:
-            operator ma widzieć, co pojedzie na serwer, a nie ufać, że klik
-            gdzieś się zapamiętał. */}
+          Enter pokaże zamówienia tego klienta. Login sprawdzam też w Allegro,
+          więc znajdę zamówienie, którego u nas jeszcze nie było.</p>
         {/* „Szukam" trwa, DOPÓKI pyta którakolwiek strona. Pusta lista
             z naszej bazy pokazana w trakcie pytania do Allegro mówiłaby „nie
             ma", a sekundę później lista by się pojawiła — czyli ekran
@@ -202,26 +130,18 @@ export function Szukanie({
         {paczki !== null && !szukaPaczek && !pytaAllegro && (paczki.length === 0
           ? <p className="mt-1 text-slate-500">
               Nie mam paczek tego klienta — ani u nas, ani pod tym loginem
-              w Allegro. Numer zamówienia wpisz ręcznie albo zostaw puste,
-              paczka i tak się zarejestruje.</p>
+              w Allegro. Allegro szuka wyłącznie po pełnym loginie.</p>
           : <ul className="mt-2 space-y-1">
               {paczki.map((k) => {
-                const wybrana = k.orderId === zamowienie;
-                return <li key={k.orderId}>
-                  {/* Klik USTALA trzy rzeczy naraz (0.367.0): numer zamówienia,
-                      login i nazwę odbiorcy. Do 0.366.0 wpisywał sam numer,
-                      a login jechał z pola — więc paczka wskazana po nazwisku
-                      zapisywała się bez loginu, choć serwer go właśnie podał. */}
-                  <button type="button" onClick={() => {
-                    setZamowienie(k.orderId);
-                    setOdbiorca(k.odbiorcaNazwa ?? "");
-                    setLogin(k.kupujacyLogin ?? "");
-                  }}
-                    className={`w-full rounded border p-1.5 text-left text-xs ${wybrana
-                      ? "border-sky-400 bg-sky-50 text-sky-900"
-                      : "border-slate-200 hover:bg-slate-50"}`}>
+                /* CAŁY WIERSZ JEST ODNOŚNIKIEM do zamówienia w panelu Allegro
+                   (0.451.0). Do tego wydania klik wpisywał numer do
+                   rejestracji; rejestracja odeszła, a praca kończy się na
+                   stronie zamówienia. Bez skonfigurowanego adresu wiersz
+                   zostaje samym opisem — link donikąd jest gorszy od braku. */
+                const tresc = <>
                     <span className="flex flex-wrap items-baseline gap-x-2">
-                      <b className="font-mono">{k.orderId}</b>
+                      <b className="inline-flex items-center gap-1 font-mono">{k.orderId}
+                        {k.link && <ExternalLink size={11} className="text-sky-700" />}</b>
                       <span className="text-slate-500">{czas(k.kupionoAt)}</span>
                       <span className="tabular-nums">{zlote(k.sumaGrosze, k.waluta)}</span>
                       {/* Zwrot na tym zamówieniu NIE blokuje: jedno zamówienie
@@ -249,32 +169,19 @@ export function Szukanie({
                           k.odbiorcaTelefon].filter(Boolean).join(" · ")}
                       </span>}
                     <span className="mt-0.5 block truncate text-slate-600">{k.zawartosc}</span>
-                  </button>
+                </>;
+                const klasa = "block w-full rounded border border-slate-200 p-1.5 text-left text-xs";
+                return <li key={k.orderId}>
+                  {k.link
+                    ? <a href={k.link} target="_blank" rel="noopener noreferrer"
+                        title="Otwórz zamówienie w Allegro"
+                        className={`${klasa} hover:border-sky-300 hover:bg-sky-50`}>{tresc}</a>
+                    : <div className={klasa}>{tresc}</div>}
                 </li>;
               })}
             </ul>)}
-        <input className="field mt-2 h-7 text-xs" value={notatka}
-          aria-label="Notatka" placeholder="Notatka, np. awizo dwa razy"
-          onChange={(e) => setNotatka(e.target.value)} />
-        <div className="mt-2 flex gap-2">
-          <button type="button" disabled={rejestruje || !numerListu}
-            /* Uchwyt z pola idzie jako LOGIN, gdy nic go nie ustaliło. Serwer
-               i tak przytnie go i zapisze do kolumny, a fałszywy login przy
-               paczce nieodebranej jest mniej szkodliwy niż brak uchwytu:
-               szukanie porównuje obie kolumny tak samo. */
-            onClick={() => onNieodebrana({
-              waybill: numerListu, orderId: zamowienie.trim(), notatka: notatka.trim(),
-              login: (login || kto).trim(), odbiorcaNazwa: odbiorca.trim(),
-              przewoznik,
-            })}
-            className="btn-primary text-xs">
-            {rejestruje ? "Rejestruję…" : "Zarejestruj paczkę"}</button>
-          <button type="button" className="btn-secondary text-xs"
-            onClick={() => {
-              setNieodebrana(false); setList(""); setKto("");
-              setLogin(""); setOdbiorca(""); setPrzewoznik("");
-            }}>Wróć</button>
-        </div>
+        <button type="button" className="mt-2 text-slate-500 underline underline-offset-2"
+          onClick={() => { setSzukaKlienta(false); setKto(""); }}>Zamknij</button>
       </div>
     : null;
 
@@ -315,23 +222,16 @@ export function Szukanie({
       </div>
       {szuka && <span className="shrink-0 text-xs text-slate-500">Szukam…</span>}
 
-      {/* DROGA PIERWSZOPLANOWA, TERAZ W RZĘDZIE POLA (0.338.0; audyt, 15
-          września 2026). Zgłoszenie właściciela: „jest sporo paczek, które po
-          prostu zostały nieodebrane i wracają do nas — znajdź sposób, aby
-          wyświetlały mi się w zakładce zwroty". Wyświetlały się od 0.172.0 —
-          tylko DROGA DO NICH szła przez ślepy zaułek: trzeba było najpierw
-          zeskanować kod, dostać „nie znam kodu" i dopiero wtedy zobaczyć
-          przycisk.
-
-          Front zostaje, schodzi tylko z własnego wiersza: stał pod polem
-          i kosztował 35 px kolumny kolejki na stałe. Etykieta krótsza, pełne
-          zdanie w `title` — przycisk dalej widać bez skanowania czegokolwiek,
-          a to było w tamtym zgłoszeniu całą rzeczą. */}
-      {onNieodebrana && !nieodebrana && !brak &&
-        <button type="button" onClick={() => setNieodebrana(true)}
-          title="Paczka nieodebrana — klient nie zgłosił zwrotu, przesyłka wróciła sama"
+      {/* DROGA PIERWSZOPLANOWA W RZĘDZIE POLA (0.338.0, przemianowana
+          w 0.451.0). Stał tu przycisk NIEODEBRANA otwierający
+          rejestrację paczki. Rejestracja odeszła decyzją właściciela, a z tego
+          formularza biuro brało tylko jedno — szukanie klienta po loginie.
+          Przycisk mówi więc wprost, co robi. */}
+      {onLogin && !szukaKlienta &&
+        <button type="button" onClick={() => setSzukaKlienta(true)}
+          title="Znajdź zamówienia klienta po loginie, nazwisku albo telefonie"
           className="btn-secondary h-8 shrink-0 gap-1 px-2 text-xs">
-          <PackageX size={12} />Nieodebrana</button>}
+          <UserSearch size={12} />Paczki klienta</button>}
 
       {/* Takt zwrotów chodzi rzadko, bo zwrot ma termin w dniach. Biuro, które
           właśnie przyjęło paczkę, wie o zwrocie wcześniej niż panel. */}
@@ -377,10 +277,12 @@ export function Szukanie({
         zamówienia, numerze korekty, loginie i nazwisku — we wszystkich
         kubełkach. Przy paczce, której klient nie odebrał, to normalne:
         naklejał ją klient albo kurier, więc tego numeru nigdy u nas nie było.</p>
-      {onNieodebrana && !nieodebrana &&
-        <button type="button" onClick={() => setNieodebrana(true)}
-          className="btn-primary mt-2 inline-flex items-center gap-1 text-xs">
-          <PackageX size={12} />To nieodebrana paczka</button>}
+      {/* Drugie wyjście: szukanie po kliencie. Przy nieodebranej paczce
+          numer listu nie trafi nigdy, a login albo nazwisko z naklejki tak. */}
+      {onLogin && !szukaKlienta &&
+        <button type="button" onClick={() => setSzukaKlienta(true)}
+          className="btn-secondary mt-2 inline-flex items-center gap-1 text-xs">
+          <UserSearch size={12} />Szukaj po kliencie</button>}
       <button type="button" disabled={dociaga}
         onClick={() => onDociagnij(kod)}
         className="btn-secondary ml-2 mt-2 inline-flex items-center gap-1 text-xs">
@@ -389,7 +291,7 @@ export function Szukanie({
     </div>}
 
 
-    {onNieodebrana && nieodebrana && formularz}
+    {szukaKlienta && panelKlienta}
 
     {/* Dwa trafienia to brak trafienia — wybiera człowiek, patrząc na oba. */}
     {wiele && <div className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-900">

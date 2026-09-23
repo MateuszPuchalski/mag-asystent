@@ -173,7 +173,7 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("zwroty mają trzydzieści sześć tras POST, każda z uzasadnieniem", async () => {
+test("zwroty mają trzydzieści pięć tras POST, każda z uzasadnieniem", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -363,17 +363,26 @@ test("zwroty mają trzydzieści sześć tras POST, każda z uzasadnieniem", asyn
      i panel odpytuje ją `useQuery`, więc potrafi wrócić sama przy odświeżeniu
      okna. Ta zapisuje zamówienia i kosztuje żądanie do Allegro, więc idzie
      wyłącznie z ręki operatora. Pieniędzy ani dokumentów nie rusza. */
-  assert.equal(posty.length, 36,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu sześciu`);
+  /* LICZNIK SCHODZI O JEDEN W 0.451.0 — drugi raz w historii tej umowy.
+     Odchodzi DWUNASTA, rejestracja paczki nieodebranej. Decyzja właściciela:
+     „usuń opcję rejestracji paczki — ja tylko wyszukuję ją w Allegro", a potem
+     „usuń też trasę rejestracji z serwera". Zwroty zarejestrowane wcześniej
+     zostają w kolejce; nowych ta aplikacja już nie zakłada. */
+  assert.equal(posty.length, 35,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu pięciu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
-    "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie", "nieodebrana",
+    "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
     "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono",
     "kosz/nowy", "kosz/usun", "paczki-klienta/allegro"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
+  /* Rejestracji nie ma i nie ma wrócić przypadkiem — np. przy scaleniu
+     z gałęzią sprzed 0.451.0. */
+  assert.equal(zrodlo.includes('"/api/obsluga/zwroty/nieodebrana"'), false,
+    "trasa rejestracji paczki odeszła decyzją właściciela");
 });
 
 test("bilans kartotek jedzie razem z kolejką", async () => {

@@ -19,21 +19,24 @@ const PACZKI: PaczkaKlienta[] = [
     /* Dwie paczki tego samego nazwiska z RÓŻNYCH ulic — tak wygląda przypadek,
        dla którego adres wszedł do wiersza w 0.422.0. */
     odbiorcaTelefon: "++48 663 509 353", odbiorcaUlica: "Polna 7",
-    odbiorcaMiasto: "Poznań", odbiorcaKod: "61-001" },
+    odbiorcaMiasto: "Poznań", odbiorcaKod: "61-001",
+    link: "https://allegro.pl/moje-allegro/sprzedaz/zamowienia/ord-nowy" },
   { orderId: "ord-stary", kupionoAt: "2026-06-01T10:00:00Z", sumaGrosze: 9900,
     waluta: "PLN", pozycji: 2, zawartosc: "Wąż 20 m ×1 · Złączka ×2", maZwrot: true,
     odbiorcaNazwa: "Jan Kowalski", kupujacyLogin: "jan_k",
     /* Bez telefonu — `phoneNumber` nie stoi w `required` schematu Allegro,
        więc wiersz musi to znieść i nie pokazać samego separatora. */
     odbiorcaTelefon: null, odbiorcaUlica: "Leśna 2",
-    odbiorcaMiasto: "Poznań", odbiorcaKod: "61-002" },
+    odbiorcaMiasto: "Poznań", odbiorcaKod: "61-002",
+    /* Bez wzorca adresu serwer oddaje `null` — wiersz zostaje samym opisem. */
+    link: null },
 ];
 
 const pokaz = (wynik: WynikSkanu | null, n: Partial<React.ComponentProps<typeof Szukanie>> = {}) => {
   const p = {
     wynik, kod: ETYKIETA, fraza: "", ile: null, szuka: false, dociaga: false, blad: "",
     onFraza: vi.fn(), onSzukaj: vi.fn(), onDociagnij: vi.fn(), onWybierz: vi.fn(),
-    onNieodebrana: vi.fn(), onLogin: vi.fn(), ...n,
+    onLogin: vi.fn(), ...n,
   };
   render(<Szukanie {...p} />);
   return p;
@@ -173,66 +176,63 @@ describe("Pole szukania zwrotu", () => {
     expect(screen.queryByText(/kubełkach/)).not.toBeInTheDocument();
   });
 
-  it("nieznany kod daje DWIE drogi wyjścia, nie jedną", async () => {
-    /* Allegro nie zna zwrotu, którego klient nie zgłosił: nieodebrana
-       przesyłka wraca sama i zwrotem nigdy nie zostanie. */
+  it("nieznany kod daje DWIE drogi wyjścia: Allegro albo klient", async () => {
+    /* Przy nieodebranej paczce numer listu nie trafi nigdy — naklejał ją
+       klient albo kurier. Login albo nazwisko z naklejki tak. */
     const p = pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
     expect(screen.getByRole("button", { name: /Poszukaj w Allegro/ })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /To nieodebrana paczka/ }));
-
-    await userEvent.type(screen.getByLabelText("Numer zamówienia"), "ord-9");
-    await userEvent.type(screen.getByLabelText("Notatka"), "awizo dwa razy");
-    await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
-    expect(p.onNieodebrana).toHaveBeenCalledWith(expect.objectContaining({
-      waybill: ETYKIETA, orderId: "ord-9", notatka: "awizo dwa razy" }));
+    await userEvent.click(screen.getByRole("button", { name: /Szukaj po kliencie/ }));
+    await userEvent.type(screen.getByLabelText("Login, nazwisko albo telefon"), "jan_k{Enter}");
+    expect(p.onLogin).toHaveBeenCalledWith("jan_k");
   });
 
-  it("rejestracja mówi wprost, że to nie jest zgłoszenie klienta", async () => {
-    pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
-    await userEvent.click(screen.getByRole("button", { name: /To nieodebrana paczka/ }));
-    expect(screen.getByText(/NIE jest zwrot/)).toBeInTheDocument();
-    /* Numer zamówienia jest opcjonalny, ale ekran mówi, co za niego dostaje. */
-    expect(screen.getByText(/będzie co wycenić/)).toBeInTheDocument();
+  it("rejestracji paczki NIE MA — decyzja właściciela (0.451.0)", async () => {
+    /* „Usuń opcję rejestracji paczki — ja tylko wyszukuję ją w Allegro".
+       Z formularza zostaje jedno pole; numer listu, zamówienie, przewoźnik
+       i notatka odeszły razem z przyciskiem zapisu. */
+    pokaz({ trafienie: null, zwrotId: null, zwroty: [] }, { paczki: PACZKI });
+    expect(screen.queryByRole("button", { name: /nieodebrana/i })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Szukaj po kliencie/ }));
+    expect(screen.queryByRole("button", { name: /Zarejestruj/ })).toBeNull();
+    expect(screen.queryByLabelText("Numer listu przewozowego")).toBeNull();
+    expect(screen.queryByLabelText("Numer zamówienia")).toBeNull();
+    expect(screen.queryByLabelText("Przewoźnik")).toBeNull();
   });
 
-  it("paczkę nieodebraną da się zarejestrować BEZ nieudanego skanu (0.338.0)", async () => {
-    /* Zgłoszenie właściciela: „jest sporo paczek, które po prostu zostały
-       nieodebrane i wracają do nas". Droga istniała od 0.172.0, ale szła przez
-       ślepy zaułek — najpierw zeskanuj kod, dostań „nie znam kodu", dopiero
-       wtedy zobacz przycisk. Przy paczce na krzyż to przechodzi; przy „sporo
-       paczek" to codzienna praca schowana za komunikatem o błędzie. */
+  it("szukanie klienta otwiera się z rzędu pola, bez nieudanego skanu", async () => {
+    /* Zgłoszenie właściciela (0.338.0): droga szła przez ślepy zaułek —
+       najpierw zeskanuj, dostań „nie znam kodu", dopiero wtedy zobacz ją. */
     const p = pokaz(null);
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
-    /* Bez skanu numer listu trzeba WPISAĆ: to jedyny uchwyt takiej paczki. */
-    await userEvent.type(screen.getByLabelText("Numer listu przewozowego"), "PACZ-1");
-    await userEvent.type(screen.getByLabelText("Numer zamówienia"), "ord-4");
-    await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
-    expect(p.onNieodebrana).toHaveBeenCalledWith(expect.objectContaining({
-      waybill: "PACZ-1", orderId: "ord-4" }));
+    await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
+    const pole = screen.getByLabelText("Login, nazwisko albo telefon");
+    expect(pole).toHaveFocus();
+    /* Pytamy po dopisaniu uchwytu, nie po każdym znaku: zapytanie na znak
+       byłoby dwunastoma odczytami na jedno nazwisko — i dwunastoma wpisami
+       w dzienniku odczytów cudzych danych. */
+    await userEvent.type(pole, "Kowalski");
+    expect(p.onLogin).not.toHaveBeenCalled();
+    await userEvent.type(pole, "{Enter}");
+    expect(p.onLogin).toHaveBeenCalledWith("Kowalski");
   });
 
-  it("uchwyt człowieka to JEDNO pole: login albo nazwisko z naklejki", async () => {
-    /* Zgłoszenie właściciela: „szukanie nieodebranych paczek odbywa się głównie
-       za pomocą loginu użytkownika i innych informacji na przesyłce". Przy
-       paczce, której klient nie odebrał, loginu najczęściej NIE MA — jest
-       karton, a na nim nazwisko. Dwa pola kazałyby operatorowi najpierw
-       rozstrzygnąć, czym jest to, co przepisuje. */
-    const p = pokaz(null);
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
-    await userEvent.type(screen.getByLabelText("Numer listu przewozowego"), "PACZ-7");
-    await userEvent.type(screen.getByLabelText("Login, nazwisko albo telefon"), "Kowalski");
-    await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
-    expect(p.onNieodebrana).toHaveBeenCalledWith(expect.objectContaining({
-      waybill: "PACZ-7", login: "Kowalski" }));
+  it("wiersz PROWADZI do zamówienia w Allegro — tam kończy się ta praca", async () => {
+    /* Biuro szukało paczki w Allegro i tam jej szuka dalej. Lista oszczędza
+       tylko przepisywanie: wiersz jest odnośnikiem do strony zamówienia. */
+    pokaz(null, { paczki: PACZKI });
+    await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
+    const link = screen.getByRole("link", { name: /ord-nowy/ });
+    expect(link).toHaveAttribute("href", "https://allegro.pl/moje-allegro/sprzedaz/zamowienia/ord-nowy");
+    expect(link).toHaveAttribute("target", "_blank");
+    /* Bez adresu nie ma linku donikąd — wiersz zostaje opisem. */
+    expect(screen.queryByRole("link", { name: /ord-stary/ })).toBeNull();
+    expect(screen.getByText("ord-stary")).toBeInTheDocument();
   });
 
   it("wiersz paczki niesie ULICĘ — bez niej dwaj Kowalscy są nierozróżnialni", async () => {
     /* Szukanie po fragmencie nazwiska świadomie pokazuje cudze zakupy przy
-       zbieżności nazwisk (0.367.0). Do 0.421.1 operator nie miał czym tych
-       dwoje rozróżnić: wiersz niósł samą nazwę. Z tego ekranu wychodzi się
-       z czyimś numerem zamówienia w ręku, więc to nie jest ozdoba. */
+       zbieżności nazwisk (0.367.0). Ulica rozstrzyga w jednym spojrzeniu. */
     pokaz(null, { paczki: PACZKI });
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
     expect(screen.getByText(/Polna 7/)).toBeInTheDocument();
     expect(screen.getByText(/Leśna 2/)).toBeInTheDocument();
   });
@@ -241,72 +241,27 @@ describe("Pole szukania zwrotu", () => {
     /* `phoneNumber` nie stoi w `required` schematu `CheckoutFormDeliveryAddress`,
        więc brak numeru to normalny stan, nie usterka synchronizacji. */
     pokaz(null, { paczki: PACZKI });
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
-    const wiersz = screen.getByText(/Leśna 2/).textContent ?? "";
-    expect(wiersz).toBe("Leśna 2 · 61-002 Poznań");
+    await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
+    expect(screen.getByText(/Leśna 2/).textContent).toBe("Leśna 2 · 61-002 Poznań");
     expect(screen.getByText(/Polna 7/).textContent)
       .toBe("Polna 7 · 61-001 Poznań · ++48 663 509 353");
   });
 
-  it("przewoźnik z naklejki idzie z LISTY, nie z pisania", async () => {
-    /* Przy nieodebranej Allegro nie zna przewoźnika wcale, a operator ma logo
-       przed oczami. Wpisane „inpost" i „InPost" byłyby dwiema firmami. */
-    const p = pokaz(null);
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
-    await userEvent.type(screen.getByLabelText("Numer listu przewozowego"), "PACZ-8");
-    await userEvent.selectOptions(screen.getByLabelText("Przewoźnik"), "INPOST");
-    await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
-    expect(p.onNieodebrana).toHaveBeenCalledWith(expect.objectContaining({
-      waybill: "PACZ-8", przewoznik: "INPOST" }));
-  });
-
-  it("Enter w polu uchwytu PYTA o paczki tego klienta", async () => {
-    /* Pytamy po dopisaniu uchwytu, nie po każdym znaku: zapytanie na znak
-       byłoby dwunastoma odczytami na jedno nazwisko — i dwunastoma wpisami
-       w dzienniku odczytów cudzych danych. */
-    const p = pokaz(null);
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
-    const pole = screen.getByLabelText("Login, nazwisko albo telefon");
-    await userEvent.type(pole, "Kowalski");
-    expect(p.onLogin).not.toHaveBeenCalled();
-    await userEvent.type(pole, "{Enter}");
-    expect(p.onLogin).toHaveBeenCalledWith("Kowalski");
-  });
-
-  it("wybrana paczka WPISUJE numer zamówienia, a ten jedzie do rejestracji", async () => {
-    /* Wybór wpisuje numer do pola wyżej, zamiast trzymać go osobno: operator
-       ma widzieć, co pojedzie na serwer, a nie ufać, że klik się zapamiętał. */
-    const p = pokaz(null, { paczki: PACZKI });
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
-    await userEvent.type(screen.getByLabelText("Numer listu przewozowego"), "PACZ-9");
-    await userEvent.click(screen.getByRole("button", { name: /ord-nowy/ }));
-    expect(screen.getByLabelText("Numer zamówienia")).toHaveValue("ord-nowy");
-
-    await userEvent.click(screen.getByRole("button", { name: /Zarejestruj paczkę/ }));
-    /* Klik USTALA TRZY RZECZY naraz (0.367.0): numer, login i nazwę odbiorcy.
-       Paczkę znalezioną po nazwisku trzeba zapisać z loginem, a operator go
-       wtedy nie zna — zna go serwer, który tę paczkę właśnie wskazał. */
-    expect(p.onNieodebrana).toHaveBeenCalledWith(expect.objectContaining({
-      waybill: "PACZ-9", orderId: "ord-nowy",
-      login: "jan_k", odbiorcaNazwa: "Jan Kowalski" }));
-  });
-
-  it("paczka ze zwrotem jest OZNACZONA, ale wybieralna", async () => {
+  it("paczka ze zwrotem jest OZNACZONA", async () => {
     /* Jedno zamówienie bywa dwiema paczkami, a klient potrafi nie odebrać
-       drugiej po zwrocie pierwszej. Blokada kazałaby wtedy kłamać. */
+       drugiej po zwrocie pierwszej. Ostrzeżenie, którego operator sam by nie miał. */
     pokaz(null, { paczki: PACZKI });
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
     expect(screen.getByText("ma już zwrot")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /ord-stary/ }));
-    expect(screen.getByLabelText("Numer zamówienia")).toHaveValue("ord-stary");
   });
 
   it("klient bez historii dostaje ZDANIE, nie pustkę", async () => {
-    /* Pusta lista wygląda jak zepsute szukanie. Operator ma wiedzieć, że może
-       iść dalej bez numeru zamówienia. */
+    /* Pusta lista wygląda jak zepsute szukanie. Zdanie mówi, po czym
+       szuka Allegro — przy nazwisku to wyjaśnia pustkę od razu. */
     pokaz(null, { paczki: [] });
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
     expect(screen.getByText(/Nie mam paczek tego klienta/)).toBeInTheDocument();
+    expect(screen.getByText(/pełnym loginie/)).toBeInTheDocument();
   });
 
   it("pytanie do Allegro WSTRZYMUJE zdanie „nie mam paczek” (0.450.0)", async () => {
@@ -314,45 +269,22 @@ describe("Pole szukania zwrotu", () => {
        przychodzi pusta pierwsza, a Allegro odpowiada chwilę później. Zdanie
        „nie mam" w tej chwili byłoby kłamstwem, które operator zdąży przeczytać. */
     pokaz(null, { paczki: [], pytaAllegro: true });
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
     expect(screen.getByText(/pytam też Allegro/)).toBeInTheDocument();
     expect(screen.queryByText(/Nie mam paczek tego klienta/)).not.toBeInTheDocument();
   });
 
   it("odmowa Allegro mówi swoje, a lista z naszej bazy stoi dalej", async () => {
     pokaz(null, { paczki: PACZKI, bladAllegro: "Allegro prosi o przerwę." });
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
     expect(screen.getByText(/Allegro nie odpowiedziało: Allegro prosi o przerwę/)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /ord-nowy/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /ord-nowy/ })).toBeInTheDocument();
   });
 
-  it("ekran mówi, PO CO ten login", async () => {
-    /* Pole bez powodu wygląda na kolejną rubrykę do wypełnienia. To zdanie
-       jest całą różnicą między „wypełnij" a „to się przyda tobie". */
-    pokaz(null);
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
-    expect(screen.getByText(/znajdziesz paczkę później/)).toBeInTheDocument();
-  });
-
-  it("bez numeru listu rejestracja MILCZY", async () => {
-    /* Serwer i tak odmówi („numer listu jest tu jedynym uchwytem"), a odmowa
-       po kliknięciu kosztuje przejście w obie strony. */
-    pokaz(null);
-    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
-    expect(screen.getByRole("button", { name: /Zarejestruj paczkę/ })).toBeDisabled();
-  });
-
-  it("po nieudanym skanie numer BIERZE SIĘ ZE SKANU, bez drugiego pola", async () => {
-    /* Dwa pola na ten sam numer byłyby pytaniem o to, co czytnik już podał. */
-    pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
-    await userEvent.click(screen.getByRole("button", { name: /To nieodebrana paczka/ }));
-    expect(screen.queryByLabelText("Numer listu przewozowego")).toBeNull();
-  });
-
-  it("bez podpiętej obsługi ekran nie proponuje rejestracji", () => {
+  it("bez podpiętej obsługi ekran nie proponuje szukania klienta", () => {
     /* Przycisk bez działania obiecywałby drogę, której nie ma. */
-    pokaz({ trafienie: null, zwrotId: null, zwroty: [] }, { onNieodebrana: undefined });
-    expect(screen.queryByRole("button", { name: /nieodebrana paczka/ })).toBeNull();
+    pokaz({ trafienie: null, zwrotId: null, zwroty: [] }, { onLogin: undefined });
+    expect(screen.queryByRole("button", { name: /kliencie|Paczki klienta/ })).toBeNull();
   });
 
   it("odmowa serwera ląduje przy polu, a nie w konsoli", () => {

@@ -3964,10 +3964,13 @@ kurier odesłał ją po dwóch awizach — Allegro takiego zdarzenia nie zna,
 bo `CustomerReturn` powstaje wyłącznie ze zgłoszenia klienta. Pieniądze
 i tak trzeba oddać, więc paczka musi wejść do kolejki.
 
-**Rejestruje ją operator, drugim wyjściem z nieznanego kodu.** Skan nie
-trafia, ekran pokazuje „Poszukaj w Allegro" i obok „To nieodebrana paczka".
-Pytanie do Allegro zostaje pierwsze, bo paczka bywa u nas szybciej niż
-synchronizacja i większość nietrafionych skanów to zwykły wyścig.
+**Rejestracji w panelu już nie ma (0.451.0).** Decyzja właściciela:
+„usuń opcję rejestracji paczki — ja tylko wyszukuję ją w Allegro".
+Formularz zakładał zwrot od zera, a biuro brało z niego tylko szukanie
+klienta. Zostało samo szukanie: przycisk „Paczki klienta" przy polu i „Szukaj
+po kliencie" przy nieznanym kodzie. Wiersz wyniku prowadzi do zamówienia
+w panelu Allegro. Trasa `nieodebrana` zniknęła też z serwera.
+Wiersze zarejestrowane wcześniej zostają w kolejce ze znacznikiem.
 
 **Wiersz jest JAWNIE oznaczony**, kolumną `zrodlo`. Panel pisze przy nim
 „Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana", a plakietka
@@ -5724,7 +5727,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Dokument sprzedaży (FS/PA) przy zwrocie | **działa** od 0.174.0 | `sgt_faktura`, `services/faktury.ts` |
 | Data doręczenia paczki zwrotnej | **działa** od 0.187.0 | `services/allegro-tracking.ts`, `zwrot_klienta.dostarczono_at` |
 | Produkt dopisany do zwrotu przez biuro | **działa** od 0.184.0 | `dopiszPozycje`, `zwrot_klienta_pozycja.zrodlo` |
-| Paczka nieodebrana jako osobny byt | **działa** od 0.172.0 | `zwrot_klienta.zrodlo`, `zarejestrujNieodebrana` |
+| Paczka nieodebrana jako osobny byt | **wycofana z panelu** w 0.451.0 | wiersze `zwrot_klienta.zrodlo` zostają; zostało szukanie klienta |
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
 | Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |
 | Ręczna synchronizacja zwrotów | **działa** od 0.232.0 | `POST /api/obsluga/zwroty/synchronizuj`, przycisk w paśmie filtrów kolejki |

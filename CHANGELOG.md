@@ -34,6 +34,25 @@ historii nie przepisujemy.
 ---
 
 
+## 0.451.0 — 23 września 2026
+
+**Rejestracji paczki nieodebranej w panelu już nie ma.** Decyzja
+właściciela: „usuń opcję rejestracji paczki — ja tylko wyszukuję ją
+w Allegro". Formularz miał sześć pól, a biuro brało z niego tylko szukanie
+klienta.
+
+Zostało samo szukanie. Przycisk „Paczki klienta" przy polu szukania otwiera
+jedno pole: login, nazwisko z naklejki albo telefon. Enter pokazuje zamówienia
+klienta, a login sprawdza też w Allegro jak w 0.450.0. Wiersz wyniku otwiera
+zamówienie w panelu Allegro, więc numeru nie trzeba przepisywać. Przy
+nieznanym kodzie ta sama droga stoi jako „Szukaj po kliencie".
+
+Wcześniej zarejestrowane paczki zostają w kolejce ze swoim znacznikiem.
+Trasa `POST /api/obsluga/zwroty/nieodebrana` zniknęła z serwera, więc
+umowa tras POST zwrotów schodzi z 36 do 35.
+
+- **[wymaga działania]** Przebuduj panel.
+
 ## 0.450.0 — 23 września 2026
 
 **Paczkę nieodebraną znajdziesz po loginie bez strony Allegro.** Zgłoszenie
