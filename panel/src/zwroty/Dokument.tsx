@@ -19,12 +19,30 @@ import { Skopiuj } from "../ui";
    dokumencie" bywa prawdą o kilkunastu dokumentach naraz — a zły dokument
    znaczy korektę do cudzej sprzedaży.                                        */
 
-export function Dokument({ faktura, kandydaci, trwa, blad, onWskaz }: {
+/**
+ * Kandydat, którego ekran PODSUWA (0.479.0) — jedyny na liście albo jedyny
+ * pewny. Przegląd zwrotów z 23 września: przy jednym kandydacie operator
+ * i tak klikał ten jeden numer, szukając go wzrokiem w akapicie.
+ *
+ * PODSUWA, NIE WIĄŻE. Wiązanie dalej robi człowiek — przyciskiem albo
+ * Enterem — bo nagłówek wyżej mówi, czemu nakładka pozycji wiązać sama nie
+ * może. Przy kilku niepewnych kandydatach nie podsuwa nic: kolejność listy
+ * to sama data, a data przy sprzedaży codziennej nie mówi nic (`faktury.ts`).
+ */
+export function polecanyKandydat(kandydaci: KandydatFaktury[]): KandydatFaktury | null {
+  if (kandydaci.length === 1) return kandydaci[0]!;
+  const pewne = kandydaci.filter((k) => k.pewny);
+  return pewne.length === 1 ? pewne[0]! : null;
+}
+
+export function Dokument({ faktura, kandydaci, trwa, blad, onWskaz, enter = false }: {
   faktura: FakturaZwrotu;
   kandydaci: KandydatFaktury[];
   trwa: boolean;
   blad: string;
   onWskaz: (dokId: number | null) => void;
+  /** Czy klawisz Enter ekranu przyjmuje podsuniętego kandydata — wtedy przycisk go pokazuje. */
+  enter?: boolean;
 }) {
   if (faktura.dokId !== null) {
     return <div className="text-xs">
@@ -72,12 +90,22 @@ export function Dokument({ faktura, kandydaci, trwa, blad, onWskaz }: {
     </div>;
   }
 
+  const polecany = polecanyKandydat(kandydaci);
+  const reszta = kandydaci.filter((k) => k !== polecany);
   return <div className="text-xs">
-    <p className="text-slate-600">
-      Nie wiem, który to dokument. {kandydaci.length === 1 ? "Jeden pasuje" : "Pasuje kilka"} —
-      wskaż właściwy:</p>
+    {polecany && <div className="rounded-lg border border-sky-200 bg-sky-50 px-2 py-1.5">
+      <p className="flex items-center gap-1 font-semibold text-naglowek">
+        {polecany.numer}<span className="font-normal text-slate-600">{polecany.data}</span></p>
+      <p className="mt-0.5 text-slate-600">{polecany.powody.join("; ")}</p>
+      <button type="button" disabled={trwa} onClick={() => onWskaz(polecany.dokId)}
+        className="mt-1 inline-flex items-center gap-1 rounded bg-sky-700 px-2 py-0.5 font-bold text-white hover:bg-sky-800 disabled:opacity-50">
+        {enter && <kbd className="rounded border border-sky-300 px-1 font-normal">Enter</kbd>}
+        To ten dokument</button>
+    </div>}
+    {reszta.length > 0 && <p className={`text-slate-600 ${polecany ? "mt-2" : ""}`}>
+      {polecany ? "Albo inny:" : "Pasuje kilka — wskaż właściwy:"}</p>}
     <ul className="mt-1 space-y-1">
-      {kandydaci.map((k) => <li key={k.dokId}
+      {reszta.map((k) => <li key={k.dokId}
         className="rounded-lg bg-slate-50 px-2 py-1">
         <button type="button" disabled={trwa} onClick={() => onWskaz(k.dokId)}
           className="font-semibold text-sky-700 underline underline-offset-2">

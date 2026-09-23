@@ -132,11 +132,23 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz }: {
         ? "Żaden zwrot nie pasuje do tego, czego szukasz."
         : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</Pusto>;
   }
+  /* Pierwsza paczka w drodze dostaje nad sobą przegródkę (0.479.0). Ekran
+     ustawia takie zwroty na końcu (`Zwroty.tsx`), a przegródka mówi, że od
+     tego miejsca nie ma już czego obsługiwać — zamiast kazać to czytać
+     z pastylki w każdym wierszu. */
+  const wDrodze = (z: Zwrot) => z.dniDoTerminu === null
+    && z.kubelek !== "zamkniety" && z.kubelek !== "odrzucony";
+  const pierwszaWDrodze = zwroty.findIndex(wDrodze);
+  const ileWDrodze = zwroty.filter(wDrodze).length;
   return <ul className="divide-y divide-slate-200">
-    {zwroty.map((z) => {
+    {zwroty.map((z, i) => {
       const aktywny = z.id === wybrany;
+      const przegrodka = i === pierwszaWDrodze && i > 0
+        ? <li key={`w-drodze-${z.id}`} className="bg-slate-50 px-3 py-1 text-xs text-slate-600">
+            Paczka jeszcze w drodze · {ileWDrodze}</li>
+        : null;
       const sztuki = z.pozycje.reduce((s, p) => s + p.ilosc, 0);
-      return <li key={z.id}>
+      return <React.Fragment key={z.id}>{przegrodka}<li>
         <button
           /* `aria-current` zamiast samego koloru: wiersz wybrany klawiaturą
              ma być wybrany także dla czytnika ekranu. */
@@ -209,7 +221,7 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz }: {
           </div>
           </div>
         </button>
-      </li>;
+      </li></React.Fragment>;
     })}
   </ul>;
 }

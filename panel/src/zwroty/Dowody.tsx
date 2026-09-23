@@ -347,7 +347,8 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         <NaglowekSekcji jako="p" ikona={ikonaDokumentu} className="mb-1">
           Dokument sprzedaży</NaglowekSekcji>
         <Dokument faktura={zwrot.faktura} kandydaci={kandydaciFaktury}
-          trwa={fakturaTrwa} blad={fakturaBlad} onWskaz={onFaktura} />
+          trwa={fakturaTrwa} blad={fakturaBlad} onWskaz={onFaktura}
+          enter={zwrot.kubelek === "korekta"} />
       </div>}
     </Sekcja>
 

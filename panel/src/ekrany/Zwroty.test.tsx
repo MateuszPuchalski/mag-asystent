@@ -58,7 +58,8 @@ const scena = vi.hoisted(() => ({
      zapis korekty wolno przewinąć na następny zwrot. `undefined` znaczy „nie
      pobrano" i tak zachowuje się ekran bez serwera — czyli tak, jak we
      wszystkich pozostałych testach tego pliku. */
-  szczegol: undefined as { pieniadze?: Record<string, unknown> } | undefined,
+  szczegol: undefined as { pieniadze?: Record<string, unknown>; zwrot?: { id: number };
+    kandydaciFaktury?: unknown[] } | undefined,
   /* Kartoteka dla skanu EAN-u (0.468.0): kod → towar. Pusta = kartoteka kodu
      nie zna, więc skan wraca do szukania zwrotu. */
   kartoteka: {} as Record<string, { twId: number; symbol: string }>,
@@ -88,6 +89,7 @@ vi.mock("../api/zwroty", async () => {
     useKorekta: () => atrapa("korekta"),
     useKwota: () => atrapa("kwota"),
     useCofnijKorekte: () => atrapa("cofnijKorekte"),
+    useFaktura: () => atrapa("faktura"),
     useZwrot: () => ({ data: scena.szczegol, isLoading: false, error: null }),
     useZwrocPieniadze: () => atrapa("zwrocPieniadze"),
     /* Skan i dołożenie towaru jako atrapy: test sprawdza, KTÓRĄ drogą poszedł
@@ -687,6 +689,25 @@ describe("Klawisze kubełka", () => {
       await userEvent.keyboard("z");
       await waitFor(() => expect(scena.wolano.map((w) => w.co)).toEqual(["zwrocPieniadze"]));
       expect(scena.wolano[0].dane).toMatchObject({ id: 6 });
+    } finally { scena.zwroty = null; scena.szczegol = undefined; }
+  });
+
+  it("Enter w DO KOREKTY najpierw przyjmuje podsunięty dokument sprzedaży (0.479.0)", async () => {
+    /* Automat ZW bez dokumentu nie ruszy, więc brak dokumentu jest w tym
+       kubełku pierwszą rzeczą do zrobienia. Pasek mówi to wprost. */
+    scena.wolano = [];
+    scena.zwroty = dwieKorekty();
+    scena.szczegol = { ...pieniadze({}), zwrot: { id: 6 }, kandydaciFaktury: [
+      { dokId: 500, numer: "PA 88/2026", typ: "PA", data: "2026-08-20",
+        powody: ["numer zamówienia stoi w uwagach dokumentu"], pewny: true }] };
+    try {
+      pokaz("/obsluga/zwroty/6");
+      await userEvent.keyboard("{Enter}");
+      await waitFor(() => expect(scena.wolano.map((w) => w.co)).toEqual(["faktura"]));
+      expect(scena.wolano[0].dane).toEqual({ id: 6, dokId: 500 });
+      await userEvent.click(screen.getByRole("button", { name: /Skróty klawiszowe/ }));
+      expect(screen.getByText("przyjmij dokument sprzedaży")).toBeInTheDocument();
+      expect(screen.queryByText("wpisz numer korekty")).toBeNull();
     } finally { scena.zwroty = null; scena.szczegol = undefined; }
   });
 

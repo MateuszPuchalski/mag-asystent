@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ExternalLink, RefreshCw, ScanLine, Search, UserSearch, X } from "lucide-react";
 import { zlote, type PaczkaKlienta, type WynikSkanu } from "../api/zwroty";
 import { czas } from "../ui";
@@ -98,6 +98,16 @@ export function Szukanie({
   const [kto, setKto] = useState("");
   const brak = wynik?.trafienie === null;
   const wiele = wynik?.trafienie === "wiele";
+  /* NIEZNANY KOD OTWIERA SZUKANIE PO KLIENCIE (0.479.0). Przegląd
+     zwrotów z 23 września: po chybionym skanie operator i tak klikał „Szukaj
+     po kliencie" — przy nieodebranej paczce numer z naklejki nie trafia
+     z definicji (0.367.0), a login albo nazwisko tak. Klik, który zawsze
+     następuje, to klik do zdjęcia. Kluczem jest WYNIK, nie `brak`: każdy
+     kolejny chybiony skan otwiera pole od nowa, także po Escape. Następny
+     skan etykiety w tym polu i tak rozpoznaje nasłuch ekranu (0.468.0). */
+  useEffect(() => {
+    if (brak && onLogin) setSzukaKlienta(true);
+  }, [wynik]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const panelKlienta = onLogin
     ? <div className="mt-2 rounded-lg border border-sky-200 bg-white p-2 text-xs">
@@ -299,13 +309,17 @@ export function Szukanie({
           Pytanie do Allegro zostaje, bo etykieta zwrotna ZGŁOSZONEGO zwrotu
           wygląda tak samo i tamtą drogą się ją znajduje. Schodzi na drugie
           miejsce, nie znika. */}
-      <p className="mt-1 text-amber-800">
-        Szukałem po numerze listu, numerze i identyfikatorze zwrotu, numerze
-        zamówienia, numerze korekty, loginie i nazwisku — we wszystkich
-        kubełkach. Przy paczce, której klient nie odebrał, to normalne:
-        naklejał ją klient albo kurier, więc tego numeru nigdy u nas nie było.</p>
+      {/* JEDNA LINIJKA ZAMIAST AKAPITU (0.479.0). Lista pól, po których
+          szukałem, stała tu przy każdym chybionym skanie, a czytało się ją
+          raz. Zostaje w podpowiedzi; na ekranie zostaje to, co robić dalej. */}
+      <p className="mt-1 text-amber-800"
+        title={"Szukałem po numerze listu, numerze i identyfikatorze zwrotu, numerze zamówienia, "
+          + "numerze korekty, loginie i nazwisku — we wszystkich kubełkach. "
+          + "Paczkę nieodebraną naklejał klient albo kurier, więc tego numeru nigdy u nas nie było."}>
+        {onLogin ? "Nieodebrana paczka? Szukaj po kliencie." : "Szukałem we wszystkich kubełkach."}</p>
       {/* Drugie wyjście: szukanie po kliencie. Przy nieodebranej paczce
-          numer listu nie trafi nigdy, a login albo nazwisko z naklejki tak. */}
+          numer listu nie trafi nigdy, a login albo nazwisko z naklejki tak.
+          Od 0.479.0 otwiera się samo; przycisk zostaje na powrót po Escape. */}
       {onLogin && !szukaKlienta &&
         <button type="button" onClick={() => setSzukaKlienta(true)}
           className="btn-secondary mt-2 inline-flex items-center gap-1 text-xs">

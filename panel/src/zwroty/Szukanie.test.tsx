@@ -87,7 +87,9 @@ describe("Pole szukania zwrotu", () => {
     const p = pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
     /* Kod na ekranie, bo naklejka bywa pomięta i skan urwany w połowie. */
     expect(screen.getByText(ETYKIETA)).toBeInTheDocument();
-    expect(screen.getByText(/Szukałem po numerze listu/)).toBeInTheDocument();
+    /* Lista przeszukanych pól zeszła do podpowiedzi (0.479.0) — na
+       ekranie zostaje zdanie, które mówi, co robić dalej. */
+    expect(screen.getByTitle(/Szukałem po numerze listu/)).toHaveTextContent(/Szukaj po kliencie/);
 
     await userEvent.click(screen.getByRole("button", { name: /Poszukaj w Allegro/ }));
     expect(p.onDociagnij).toHaveBeenCalledWith(ETYKIETA);
@@ -181,9 +183,22 @@ describe("Pole szukania zwrotu", () => {
        klient albo kurier. Login albo nazwisko z naklejki tak. */
     const p = pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
     expect(screen.getByRole("button", { name: /Poszukaj w Allegro/ })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Szukaj po kliencie/ }));
-    await userEvent.type(screen.getByLabelText("Login, nazwisko albo telefon"), "jan_k{Enter}");
+    /* Od 0.479.0 pole klienta otwiera się SAMO i ma fokus — klik, który
+       po chybionym skanie następował zawsze, zszedł z drogi. */
+    const pole = screen.getByLabelText("Login, nazwisko albo telefon");
+    expect(pole).toHaveFocus();
+    await userEvent.type(pole, "jan_k{Enter}");
     expect(p.onLogin).toHaveBeenCalledWith("jan_k");
+  });
+
+  it("po Escape przycisk „Szukaj po kliencie” otwiera pole z powrotem", async () => {
+    /* Samo otwarcie nie może zabrać drogi powrotnej: kto zamknął pole,
+       bo szukał w Allegro, musi móc do niego wrócić bez nowego skanu. */
+    pokaz({ trafienie: null, zwrotId: null, zwroty: [] });
+    fireEvent.keyDown(screen.getByLabelText("Login, nazwisko albo telefon"), { key: "Escape" });
+    expect(screen.queryByLabelText("Login, nazwisko albo telefon")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Szukaj po kliencie/ }));
+    expect(screen.getByLabelText("Login, nazwisko albo telefon")).toHaveFocus();
   });
 
   it("rejestracji paczki NIE MA — decyzja właściciela (0.451.0)", async () => {
@@ -192,7 +207,8 @@ describe("Pole szukania zwrotu", () => {
        i notatka odeszły razem z przyciskiem zapisu. */
     pokaz({ trafienie: null, zwrotId: null, zwroty: [] }, { paczki: PACZKI });
     expect(screen.queryByRole("button", { name: /nieodebrana/i })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: /Szukaj po kliencie/ }));
+    /* Pole klienta stoi otwarte samo (0.479.0) — i dalej bez rejestracji. */
+    expect(screen.getByLabelText("Login, nazwisko albo telefon")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Zarejestruj/ })).toBeNull();
     expect(screen.queryByLabelText("Numer listu przewozowego")).toBeNull();
     expect(screen.queryByLabelText("Numer zamówienia")).toBeNull();
