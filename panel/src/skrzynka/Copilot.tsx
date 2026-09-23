@@ -55,6 +55,10 @@ function podsumowanie(w: WynikPartii): string {
      człowiekowi jedyną informację, po której pozna, czy dopłacił za nic. */
   if (w.pominiete.length) czesci.push(`${w.pominiete.length} pominięto`);
   if (w.bledy.length) czesci.push(`${w.bledy.length} bez rozstrzygnięcia`);
+  /* Szkice po rozpoznaniu (23 września 2026) układa serwer w tle — zdanie
+     mówi, że przyjdą, bo inaczej agent kliknąłby „Ułóż odpowiedź" i zapłacił
+     drugi raz za to samo. */
+  if (w.szkicow) czesci.push(`układam ${w.szkicow} ${odmien(w.szkicow, "szkic", "szkice", "szkiców")} do zatwierdzenia`);
   return `${czesci.join(", ")}.`;
 }
 
@@ -109,7 +113,8 @@ export function PasekCopilota({ stan, kandydaci, trwa = false, wynik = null, bla
     return <div className="shrink-0 border-b bg-amber-50 px-4 py-2 text-xs text-amber-900">
       {/* Potwierdzenie mówi TRZY rzeczy, bo bez każdej z nich agent klika
           w ciemno: ile, co wychodzi na zewnątrz i że to kosztuje. */}
-      <p>Rozpoznam <b>{partia.length}</b> rozmów. Treść pytań — bez danych
+      <p>Rozpoznam <b>{partia.length}</b> rozmów{stan.szkicPoRozpoznaniu
+        ? " i ułożę szkice odpowiedzi" : ""}. Treść pytań — bez danych
         osobowych — pójdzie do dostawcy i <b>to kosztuje</b>.</p>
       <div className="mt-2 flex gap-2">
         <button type="button" className="btn-primary text-xs"

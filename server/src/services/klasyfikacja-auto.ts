@@ -47,6 +47,8 @@ export interface AutoKlasyfikacjaDeps {
 
 export interface WynikAutoKlasyfikacji {
   sklasyfikowanych: number;
+  /** Rozmowy wzięte w tym przebiegu — po nich takt układa szkic (23 września 2026). */
+  rozmowy: number[];
   bledow: number;
   przerwane: string | null;
   budzet: number;
@@ -98,13 +100,13 @@ export async function sklasyfikujNowe(deps: AutoKlasyfikacjaDeps = {}): Promise<
        nie wie, że takt stoi. */
     logEvent("copilot_auto_klasyfikacja_sufit", AUTOMAT_KLASYFIKACJI.name, null,
       { naGodzine, zuzyte: naGodzine - budzet }, null, database);
-    return { sklasyfikowanych: 0, bledow: 0, przerwane: "sufit godzinowy wyczerpany", budzet };
+    return { sklasyfikowanych: 0, rozmowy: [], bledow: 0, przerwane: "sufit godzinowy wyczerpany", budzet };
   }
 
   const od = new Date(teraz.getTime() - oknoDni * 86_400_000).toISOString();
   const rozmowy = (database.prepare(CZEKAJACE).all(od, ile) as Array<{ rozmowa: number }>)
     .map((r) => Number(r.rozmowa));
-  if (rozmowy.length === 0) return { sklasyfikowanych: 0, bledow: 0, przerwane: null, budzet };
+  if (rozmowy.length === 0) return { sklasyfikowanych: 0, rozmowy: [], bledow: 0, przerwane: null, budzet };
 
   const w = await sklasyfikujRozmowy(database, rozmowy, AUTOMAT_KLASYFIKACJI,
     deps.nadaj ?? nadawcaAnthropic, teraz);
@@ -113,5 +115,5 @@ export async function sklasyfikujNowe(deps: AutoKlasyfikacjaDeps = {}): Promise<
   logEvent("copilot_auto_klasyfikacja", AUTOMAT_KLASYFIKACJI.name, null,
     { sklasyfikowanych: w.sklasyfikowane, bledow: w.bledy.length,
       pominietych: w.pominiete.length, przerwane: w.przerwane, budzet }, null, database);
-  return { sklasyfikowanych: w.sklasyfikowane, bledow: w.bledy.length, przerwane: w.przerwane, budzet };
+  return { sklasyfikowanych: w.sklasyfikowane, rozmowy, bledow: w.bledy.length, przerwane: w.przerwane, budzet };
 }

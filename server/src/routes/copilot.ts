@@ -9,6 +9,7 @@ import {
   nadawcaAnthropic, nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
 } from "../adapters/copilot.anthropic.js";
 import { wymianyRozmowy, zadajPytanie } from "../services/copilot-pytania.js";
+import { czekajaNaSzkic, zlecSzkicPoRozpoznaniu } from "../services/copilot-szkic-po-rozpoznaniu.js";
 import {
   ocenSzkic, odrzucDaneDoboru, odrzucPasowanie, przyjmijDaneDoboru, przyjmijPasowanie, ulozSzkic,
 } from "../services/copilot-szkic.js";
@@ -80,6 +81,20 @@ const kto = () => {
 };
 
 /** Jedno zdanie o tym, dlaczego przycisku nie ma. Pisze je SERWER. */
+/**
+ * Szkic zaraz po rozpoznaniu (23 września 2026) — W TLE, bo partia ma do
+ * dwudziestu rozmów po kilka sekund każda. Oddaje, ile szkiców zlecono, żeby
+ * panel mógł powiedzieć „układam szkic" zamiast milczeć. Wyłączony Copilot
+ * i przełącznik w `wertis.env` nie zlecają niczego — testy tras nie mają
+ * prawa wołać dostawcy modelu w tle.
+ */
+function szkicPoRozpoznaniu(ids: number[]): number {
+  if (!config.copilot.szkicPoRozpoznaniu || czemuWylaczony() !== null) return 0;
+  const czekaja = czekajaNaSzkic(db(), ids);
+  if (czekaja.length > 0) void zlecSzkicPoRozpoznaniu(czekaja);
+  return czekaja.length;
+}
+
 function czemuWylaczony(): string | null {
   if (config.copilot.mode === "off") {
     return "Copilot jest wyłączony. Włącz go w wertis.env (COPILOT_MODE=anthropic).";
@@ -109,6 +124,7 @@ export async function copilotRoutes(app: FastifyInstance) {
          samo co takt, uczyłby płacić dwa razy za jedną etykietę. */
       autoKlasyfikacja: config.copilot.autoKlasyfikacja,
       autoSzkic: config.copilot.autoSzkic,
+      szkicPoRozpoznaniu: config.copilot.szkicPoRozpoznaniu,
     };
   });
 
@@ -153,8 +169,9 @@ export async function copilotRoutes(app: FastifyInstance) {
          ekranowi wyrzucić wynik, za który już zapłaciliśmy. */
       /* `ponowNieudane`: kliknięcie człowieka to jawne ponowienie decyzji
          FAILED i tworzy jej nową wersję. Takt tego nie robi — patrz serwis. */
-      return await sklasyfikujRozmowy(db(), ids, kto(), nadawcaAnthropic, new Date(),
+      const wynik = await sklasyfikujRozmowy(db(), ids, kto(), nadawcaAnthropic, new Date(),
         { ponowNieudane: true });
+      return { ...wynik, szkicow: szkicPoRozpoznaniu(ids) };
     });
 
   /**
@@ -169,8 +186,11 @@ export async function copilotRoutes(app: FastifyInstance) {
       const nie = odmowa(reply);
       if (nie) return nie;
       try {
-        return poprawKlasyfikacje(db(), Number(req.params.id), String(req.body?.kategoria ?? ""),
+        const wynik = poprawKlasyfikacje(db(), Number(req.params.id), String(req.body?.kategoria ?? ""),
           req.body?.powod ?? null, kto());
+        /* Poprawka kategorii to nowa decyzja — szkic pod starą przestaje
+           pasować i układa się od nowa, pod kategorię człowieka. */
+        return { ...wynik, szkicow: szkicPoRozpoznaniu([Number(req.params.id)]) };
       } catch (e) {
         return reply.code(400).send({ error: (e as Error).message });
       }

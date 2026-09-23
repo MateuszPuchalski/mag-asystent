@@ -34,6 +34,29 @@ historii nie przepisujemy.
 ---
 
 
+## 0.477.0 — 23 września 2026
+
+**Szkic układa się sam zaraz po rozpoznaniu i czeka na zatwierdzenie
+agenta.** Decyzja właściciela: „ułóż odpowiedź automatycznie po klasyfikacji,
+gotową do zatwierdzenia”. Do tej wersji po „Rozpoznaj” agent klikał jeszcze
+„Ułóż odpowiedź” i czekał.
+
+- **Trzy wejścia:** przycisk „Rozpoznaj”, takt rozpoznania
+  (`COPILOT_AUTO_KLASYFIKACJA=1`) i poprawka kategorii przez agenta.
+  Poprawka układa szkic od nowa, pod kategorię człowieka i jej wzorzec
+  z 0.474.0.
+- **Gotowy do zatwierdzenia.** Karta szkicu czeka na agenta: `E` wstawia go
+  do edytora, Ctrl+Enter wysyła. Do klienta nic nie idzie samo.
+- **Pasek nad kolejką mówi, że szkice są w drodze** („układam 2 szkice do
+  zatwierdzenia”), żeby nikt nie płacił drugi raz przyciskiem „Ułóż”.
+- **Koszt:** ten sam sufit godzinowy co szkic z taktu. „Nic do zrobienia”
+  i rozpoznanie zastępcze szkicu nie dają. Drugi przebieg na tej samej
+  decyzji nie płaci.
+- **[wymaga uwagi]** Włączone domyślnie, bo tak zdecydował właściciel.
+  Wyłącza je `COPILOT_SZKIC_PO_ROZPOZNANIU=0` w `wertis.env`.
+
+Kolumna `szkic_copilota.decyzja_id` dochodzi sama przy starcie.
+
 ## 0.476.0 — 23 września 2026
 
 **Zwroty: pieniądze trzymają zwrot w pracy, powód potrącenia dociera do
@@ -53,7 +76,6 @@ właściciela. Opis w `docs/panel-obslugi-klienta.md` §25a.25.
 - **Klawisze przy kilku pudłach** trafiają do pudła z towarem tego zwrotu.
   Szybkie `s s s` nie odbija się od blokady, a pomoc nie obiecuje `n`.
 - **Zwrot rozliczony w Allegro bez korekty** widać w pasku rozjazdów zwrotów.
-
 
 ## 0.474.0 — 23 września 2026
 

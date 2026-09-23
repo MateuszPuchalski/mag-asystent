@@ -2660,7 +2660,8 @@ ma powstać: bramka per klasa, dowody z tygodnia pracy i wyłącznik awaryjny.
 
 Zgłoszenie właściciela: „gdy pytanie jest sklasyfikowane, ułóż odpowiedź
 odpowiednio do tego". Z trzech propozycji wybrał wzorzec dla kategorii.
-Szkic po rozpoznaniu i fakty dobierane pod kategorię zostały na później.
+Szkic po rozpoznaniu doszedł w 0.477.0 (§14.6c); fakty dobierane pod
+kategorię zostały na później.
 
 **Fakt „rozpoznanie" niesie „jak odpowiedzieć"** — jeden wzorzec, ten dla
 bieżącej kategorii (`services/wzorce-odpowiedzi.ts`). Wzorzec mówi, co
@@ -2674,6 +2675,29 @@ w cache dostawcy. Kategoria bez wzorca się nie skompiluje.
 **Wzorzec nie rozstrzyga sprawy.** Zwrot pieniędzy, wymianę, uznanie
 reklamacji i anulowanie robi człowiek. Terminów, kosztów i kwot wzorzec
 nie podaje, bo polityki sklepu nie ma w faktach.
+
+### 14.6c. Szkic zaraz po rozpoznaniu (0.477.0)
+
+Decyzja właściciela: „ułóż odpowiedź automatycznie po klasyfikacji, gotową
+do zatwierdzenia przez agenta". Do tej wersji po „Rozpoznaj" agent klikał
+jeszcze „Ułóż odpowiedź" i czekał.
+
+**Trzy wejścia, jedna funkcja** (`services/copilot-szkic-po-rozpoznaniu.ts`):
+przycisk „Rozpoznaj", takt rozpoznania i poprawka kategorii przez agenta.
+Przycisk i poprawka zlecają szkic W TLE, bo partia ma do dwudziestu rozmów.
+Takt układa go w tym samym przebiegu, więc w `main()`.
+
+**Szkic pamięta decyzję** (`szkic_copilota.decyzja_id`). Poprawka kategorii
+tworzy nową decyzję, więc szkic pod starą jest nieświeży i układa się od nowa.
+Drugi przebieg na tej samej decyzji nie płaci drugi raz.
+
+**Gotowy do zatwierdzenia, nie wysłany.** Karta szkicu czeka z pustą oceną.
+Agent wstawia go klawiszem `E`, poprawia i wysyła. Wysyłki bez człowieka
+w kodzie nie ma.
+
+**Koszt.** Ten sam sufit godzinowy co szkic z taktu (`autoNaGodzine`).
+„Nic do zrobienia" i rozpoznanie zastępcze szkicu nie dają. Włączone
+domyślnie decyzją właściciela; wyłącza je `COPILOT_SZKIC_PO_ROZPOZNANIU=0`.
 
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
@@ -5841,6 +5865,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Takt klasyfikacji każdej nowej wiadomości (§14.5a) | **działa** od 22 września 2026, wyłączony domyślnie | `services/klasyfikacja-auto.ts`, `COPILOT_AUTO_KLASYFIKACJA` |
 | Rozpoznanie w faktach szkicu, intake tylko przy towarze (§14.6a) | **działa** od 22 września 2026 | `kontekstSzkicu`, `zRozpoznaniaNiepewne` w `services/copilot-szkic.ts` |
 | Szkic z taktu dla rozmów bez oferty (§14.6a) | **działa** od 22 września 2026, przy `COPILOT_AUTO_SZKIC=1` | `services/copilot-auto-szkic.ts` |
+| Szkic zaraz po rozpoznaniu (§14.6c) | **działa** od 0.477.0, domyślnie włączony (`COPILOT_SZKIC_PO_ROZPOZNANIU`) | `services/copilot-szkic-po-rozpoznaniu.ts`, `szkic_copilota.decyzja_id` |
 | Los szkicu przy wysyłce i uzgodnienie `send_uncertain` (§14.6a) | **działa** od 22 września 2026 | `outbox.szkic_los`, `losSzkicu` w `wysylka.ts`, `uzgodnijNiepewna` w `allegro-inbox-sync.ts` |
 | Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa** od 22 września 2026, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
