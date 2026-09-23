@@ -177,7 +177,10 @@ describe("Korekta zwrotu (0.162.0)", () => {
        operator oddawał pieniądze w Sales Center, obok gotowego przycisku. */
     pasek(doKorekty());
     expect(screen.queryByText(/w panelu Allegro/i)).toBeNull();
-    expect(screen.getByText(/ODDAJ PIENIĄDZE/)).toBeInTheDocument();
+    /* Zdanie o przycisku ODDAJ PIENIĄDZE zeszło w 0.479.0: od 0.476.0
+       zwrot z korektą, a bez wypłaty, wraca do DO ZWROTU z paskiem
+       pieniędzy. Pudełko korekty nie mówi już o pieniądzach wcale. */
+    expect(screen.queryByText(/ODDAJ PIENIĄDZE/)).toBeNull();
   });
 
   it("kwota ma tu DROGĘ WYJŚCIA — to ostatni ekran przed korektą", async () => {
@@ -252,6 +255,17 @@ describe("Korekta zwrotu (0.162.0)", () => {
     pasek(doKorekty({ zw: { status: "error", numer: null,
       blad: "Wartość ZW 10,00 zł nie zgadza się z pełną wartością zwrotu 12,00 zł." } }));
     expect(screen.getByText(/Automat nie wystawił ZW/)).toHaveTextContent(/Wartość ZW 10,00 zł/);
+  });
+
+  it("długi błąd automatu pokazuje pierwsze zdanie, a zrzut pól chowa (0.479.0)", () => {
+    /* Błąd Sfery niesie od 0.456.0 zrzut kilkudziesięciu pól. Na ekranie
+       ma stać, co się stało; zrzut jest dla serwisu i czeka pod rozwinięciem. */
+    const zrzut = "Subiekt nie zapisał ZW. Zrzut pól: " + "Pole=wartość; ".repeat(40);
+    pasek(doKorekty({ zw: { status: "error", numer: null, blad: zrzut } }));
+    const zdanie = screen.getByText(/Automat nie wystawił ZW/);
+    expect(zdanie).toHaveTextContent(/Subiekt nie zapisał ZW\./);
+    expect(zdanie).not.toHaveTextContent(/Zrzut pól/);
+    expect(screen.getByText("pełna treść błędu")).toBeInTheDocument();
   });
 
   it("numer z automatu podpisuje się jako wystawiony automatycznie", () => {

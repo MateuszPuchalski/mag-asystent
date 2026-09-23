@@ -21,6 +21,11 @@ export function zglosBrakSesji(blad: unknown): void {
 }
 
 /** Konflikt wersji (409). Szczegóły rysują ekran, więc jadą dalej w całości. */
+/** Serwer przekazał limit Allegro; `poIluMs` = ile czekać, `null` = Allegro nie podało. */
+export class PrzerwaAllegro extends Error {
+  constructor(komunikat: string, public readonly poIluMs: number | null) { super(komunikat); }
+}
+
 export class Konflikt extends Error {
   constructor(message: string, public readonly szczegoly: Record<string, unknown>) {
     super(message);
@@ -62,6 +67,9 @@ export async function api<T = any>(sciezka: string, init: RequestInit = {}): Pro
     const { error, ...reszta } = dane;
     throw new Konflikt(error ?? "Konflikt wersji", reszta);
   }
+  /* 429 z czasem przerwy: ekran, który prowadzi długą zbiórkę, ma poczekać
+     tyle, ile prosi Allegro, a nie pytać od razu i pogłębiać przerwę. */
+  if (odp.status === 429) throw new PrzerwaAllegro(dane.error ?? "Allegro prosi o przerwę", dane.poIluMs ?? null);
   if (!odp.ok) throw new Error(dane.error ?? `Błąd ${odp.status}`);
   return dane as T;
 }

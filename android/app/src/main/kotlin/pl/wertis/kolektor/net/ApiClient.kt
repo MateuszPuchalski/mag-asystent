@@ -111,7 +111,7 @@ class LimityCzasuInterceptor : Interceptor {
     }
 }
 
-/* ── Czas odpowiedzi każdego żądania (0.478.0) ──────────────────────────────
+/* ── Czas odpowiedzi każdego żądania (0.481.0) ──────────────────────────────
    Reguły i powód stoją w `core/net/CzasyZadan.kt`. Tu tylko pomiar: od
    wysłania do nagłówków odpowiedzi, czyli sieć i serwer bez rysowania.
 

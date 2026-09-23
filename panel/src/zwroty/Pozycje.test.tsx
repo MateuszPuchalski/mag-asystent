@@ -11,6 +11,7 @@ import type { PozycjaZwrotu, Zwrot } from "../api/typy";
    jest `api/klient.test.ts`. */
 const zaznacz = vi.fn();
 const wskaz = vi.fn();
+const potwierdz = vi.fn(async (_v: { pozycjaId: number; twId: number | null; zrodlo: string }) => ({}));
 /* Otwarte pudła — przy kilku ocena pyta, do którego (0.379.0). Stan jest
    zmienny, bo każdy test ustawia swoją liczbę kartonów przy biurku. */
 const pudla: { kosze: Array<{ id: number; kod: string; rodzaj: "zwroty" | "odpad" }> } = {
@@ -21,6 +22,7 @@ vi.mock("../api/zwroty", async (orig) => ({
   useZaznaczSkladnik: () => ({ mutate: zaznacz, isPending: false, error: null }),
   useWskazSklad: () => ({ mutate: wskaz, isPending: false, error: null }),
   useKosz: () => ({ data: pudla }),
+  usePotwierdzKartoteke: () => ({ mutate: vi.fn(), mutateAsync: potwierdz, isPending: false, error: null }),
 }));
 
 /* ── Produkty ze zwrotu (0.167.0) ────────────────────────────────────────────
@@ -283,6 +285,30 @@ describe("Produkty ze zwrotu", () => {
       poKolumnie: null } })] }));
     expect(screen.getByRole("button", { name: /Zatwierdź/ })).toBeInTheDocument();
     expect(screen.getByText(/Wskazane wcześniej przez/)).toBeInTheDocument();
+  });
+
+  it("pewne kartoteki zatwierdza JEDEN ruch, zgadywane zostają przy pozycji (0.479.0)", async () => {
+    /* `sku` i `pamiec` idą hurtem; `jedyna_pozycja` to zgadywanie, a pomyłka
+       kartoteki wraca towarem na złej półce — ta zostaje pod okiem. */
+    potwierdz.mockClear();
+    const prop = (pewnosc: "sku" | "pamiec" | "jedyna_pozycja", twId: number) =>
+      ({ pewnosc, twId, symbol: `S-${twId}`, zrodlo: "x", powod: null, poKolumnie: null });
+    lista(zwrot({ pozycje: [
+      POZYCJA({ id: 1, propozycja: prop("sku", 10) }),
+      POZYCJA({ id: 2, propozycja: prop("pamiec", 20) }),
+      POZYCJA({ id: 3, propozycja: prop("jedyna_pozycja", 30) }),
+    ] }));
+    await userEvent.click(screen.getByRole("button", { name: /Zatwierdź pewne kartoteki \(2\)/ }));
+    expect(potwierdz.mock.calls.map(([v]) => v)).toEqual([
+      { pozycjaId: 1, twId: 10, zrodlo: "sku" },
+      { pozycjaId: 2, twId: 20, zrodlo: "sku" },
+    ]);
+  });
+
+  it("jedna pewna propozycja nie dostaje drugiego przycisku o tym samym znaczeniu", () => {
+    lista(zwrot({ pozycje: [POZYCJA({ propozycja: { pewnosc: "sku", twId: 10,
+      symbol: "SEK-46", zrodlo: "x", powod: null, poKolumnie: null } })] }));
+    expect(screen.queryByRole("button", { name: /Zatwierdź pewne/ })).toBeNull();
   });
 
   it("brak kartoteki niesie POWÓD, a nie samo »Bez kartoteki«", () => {

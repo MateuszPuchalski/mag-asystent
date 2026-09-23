@@ -31,4 +31,12 @@ describe("Etapy zwrotu", () => {
     expect(within(os).getByText("Odrzucony")).toHaveAttribute("aria-current", "step");
     expect(within(os).queryByText("Korekta")).toBeNull();
   });
+
+  it("pieniądze po korekcie: korekta za nami, zwrot pieniędzy teraz (0.479.0)", () => {
+    render(<Etapy kubelek="zwrot" poKorekcie />);
+    const os = screen.getByRole("list", { name: "Etapy zwrotu" });
+    const nazwy = within(os).getAllByRole("listitem").map((li) => li.textContent);
+    expect(nazwy).toEqual(["Decyzja", "Ocena", "Korekta", "Zwrot", "Zamknięty"]);
+    expect(within(os).getByText("Zwrot")).toHaveAttribute("title", "Teraz: Oddać pieniądze?");
+  });
 });

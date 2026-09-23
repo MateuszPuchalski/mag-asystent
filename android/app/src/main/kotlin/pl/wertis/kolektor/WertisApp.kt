@@ -74,7 +74,7 @@ class AppGraph(context: Context) {
        cykl, bo typ `api` jest znany bez zaglądania do `apiClient`. */
     val session: SessionRepository = SessionRepository({ api }, appScope, context)
 
-    /* Czasy odpowiedzi per ekran i trasa (0.478.0). Licznik powstaje PRZED
+    /* Czasy odpowiedzi per ekran i trasa (0.481.0). Licznik powstaje PRZED
        klientem HTTP, bo klient do niego pisze; wysyłkę prowadzi telemetria. */
     val czasy = LicznikCzasow()
 

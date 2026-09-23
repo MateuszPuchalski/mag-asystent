@@ -139,6 +139,20 @@ export function markaZKontekstu(
     : "";
   const korpus = zwin(`${t} ${o}`);
   if (!korpus) return null;
+  /* ── TEKST Z WŁASNĄ MARKĄ NIE DOSTAJE CUDZEJ ─────────────────────────────
+     Źródło 3 jest dla tekstu BEZ marki: „GX200", „LS 46-450", „1803S". Zbiórka
+     „Pasuje do" ze wszystkich ofert pokazała drugą stronę na pierwszej ofercie:
+     gaźnik z tytułem „Honda GX160 GX200" ma na liście „Lifan 168F" i „Loncin
+     G200F" — silniki innych marek, których słownik jeszcze nie zna. Źródło 3
+     skleiło je z Hondą i automat zatwierdził „Honda Lifan 168F".
+
+     Reguła: gdy tekst zaczyna się słowem z samych liter, dłuższym niż trzy,
+     to słowo jest najpewniej marką („Lifan", „Loncin") albo opisem
+     („Kosiarka"), a nie przedrostkiem modelu („LS", „FS", „HRX"). Wtedy
+     źródło 3 milczy i wiersz czeka na człowieka. Przy wątpliwości kolejka
+     jest tańsza niż zła część wysłana do klienta. */
+  const pierwsze = tekst.trim().split(/\s+/)[0] ?? "";
+  if (/^\p{L}{4,}$/u.test(pierwsze)) return null;
   /* Marka z tekstu wiersza nie może wrócić jako nazwa: „STIHL" znalezione
      w tytule i „STIHL" na początku tekstu to ten sam przypadek, a obsługuje
      go źródło 1. Tutaj interesuje nas tekst BEZ marki. */

@@ -363,7 +363,45 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
      byłby drugą kopią tej samej reguły. */
   useAkcjaKlawisza(akcje, "zapiszKwote", () => { if (!trwa && wycena) onKwota(wybrane, dostawa); });
 
+  /* ── `-` i `D` OTWIERAJĄ WYJĄTKI (0.479.0) ─────────────────────────────
+     Przegląd zwrotów z 23 września: „wróciło mniej" i potrącenie były
+     wyłącznie dla myszy, więc każdy wyjątek zrywał pracę z klawiatury.
+     PIERWSZA PASUJĄCA POZYCJA, jak przy ocenie `S` — klawisz idzie tą samą
+     drogą, którą wędruje wzrok. Znacznik rośnie przy każdym naciśnięciu,
+     więc drugi klawisz po „Wróć" otwiera pole jeszcze raz. */
+  const [otworzIlosc, setOtworzIlosc] = useState<{ id: number; n: number } | null>(null);
+  const [otworzPotracenie, setOtworzPotracenie] = useState<{ id: number; n: number } | null>(null);
+  useAkcjaKlawisza(akcje, "ilosc", () => {
+    if (!(ocenianie || wycena)) return;
+    const p = zwrot.pozycje.find((x) => x.ilosc > 1 && x.iloscZwrocona == null);
+    if (p) setOtworzIlosc((o) => ({ id: p.id, n: (o?.n ?? 0) + 1 }));
+  });
+  useAkcjaKlawisza(akcje, "potracenie", () => {
+    if (!wycena) return;
+    const p = zwrot.pozycje.find((x) => x.potracenieGrosze == null && !odznaczone.has(x.id));
+    if (p) setOtworzPotracenie((o) => ({ id: p.id, n: (o?.n ?? 0) + 1 }));
+  });
+
   const nieocenione = zwrot.pozycje.filter((p) => !p.ocena);
+
+  /* Pewne propozycje kartoteki — patrz przycisk nad listą. Po jednej, po
+     kolei: trasa zapisu jest na pozycję, a pierwsza odmowa zatrzymuje
+     resztę, żeby ekran nie zostawił połowy powiązań bez słowa. */
+  const pewne = zwrot.pozycje.filter((p) => p.twId === null && p.propozycja?.twId != null
+    && (p.propozycja.pewnosc === "sku" || p.propozycja.pewnosc === "pamiec"));
+  const potwierdz = usePotwierdzKartoteke();
+  const [hurt, setHurt] = useState<{ trwa: boolean; blad: string }>({ trwa: false, blad: "" });
+  const zatwierdzPewne = async () => {
+    setHurt({ trwa: true, blad: "" });
+    try {
+      for (const p of pewne) {
+        await potwierdz.mutateAsync({ pozycjaId: p.id, twId: p.propozycja!.twId, zrodlo: "sku" });
+      }
+      setHurt({ trwa: false, blad: "" });
+    } catch (e) {
+      setHurt({ trwa: false, blad: (e as Error).message });
+    }
+  };
 
   if (!zwrot.pozycje.length) {
     /* PUSTKA TEŻ MÓWI, CO ZROBIĆ (audyt, 15 września 2026). Zwrot bez pozycji
@@ -376,6 +414,26 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
   }
 
   return <div className="p-4">
+    {pewne.length > 1 &&
+      /* ── PEWNE KARTOTEKI JEDNYM RUCHEM (0.479.0) ────────────────────
+         Przegląd zwrotów z 23 września: przy zwrocie wielopozycyjnym
+         „Zatwierdź" klikało się po kolei przy każdej pozycji, choć żadna nie
+         wymagała namysłu. Hurtem idą WYŁĄCZNIE `sku` i `pamiec` — trafienie
+         sygnatury i decyzja człowieka z innego zwrotu. `jedyna_pozycja`
+         i `nazwa_w_zamowieniu` to zgadywanie (`services/sygnatury.ts`),
+         a pomyłka kartoteki wraca towarem na złej półce, więc te zostają
+         przy pozycji, pod okiem. Próg „więcej niż jedna" z tego samego
+         powodu co ocena hurtem niżej: przy jednej to drugi przycisk
+         o tym samym znaczeniu. */
+      <div className="mb-2 flex items-center gap-2">
+        <Przycisk className="text-xs" disabled={hurt.trwa}
+          title="Zatwierdza propozycje z SKU oferty i z pamięci wskazań. Zgadywane zostają przy pozycjach."
+          onClick={zatwierdzPewne}>
+          <Check size={12} aria-hidden="true" />
+          {hurt.trwa ? " Zatwierdzam…" : ` Zatwierdź pewne kartoteki (${pewne.length})`}
+        </Przycisk>
+        {hurt.blad && <span className="text-xs text-red-700">{hurt.blad}</span>}
+      </div>}
     {/* OCENA HURTEM (0.284.0). Zwrot bywa wielopozycyjny, a ocena jest tu
         naciskana najczęściej ze wszystkiego — przy pięciu pozycjach to pięć
         kliknięć w to samo. Przycisk staje TYLKO przy więcej niż jednej
@@ -567,6 +625,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               zwrotu to ona tłumaczy, czemu wypłata była niższa. */}
           {onIlosc && (ocenianie || wycena || p.iloscZwrocona != null) &&
             <IloscZwrocona p={p} trwa={trwa} blad={blad}
+              otworz={otworzIlosc?.id === p.id ? otworzIlosc.n : 0}
               onZapisz={(ile) => onIlosc(p.id, ile)} />}
 
           {/* Potrącenie proponuje się TAM, gdzie zapada decyzja o pieniądzach,
@@ -574,6 +633,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               — jak ocena hali. */}
           {onPotracenie && (wycena || p.potracenieGrosze != null) &&
             <Potracenie p={p} trwa={trwa} blad={blad}
+              otworz={otworzPotracenie?.id === p.id ? otworzPotracenie.n : 0}
               onZapisz={(g, powod) => onPotracenie(p.id, g, powod)} />}
 
           {/* Cofnięcie zamiast potwierdzenia (§25a.5). Tylko przy pozycji

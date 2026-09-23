@@ -29,7 +29,7 @@ class TelemetryRepository(private val api: ApiService, private val scope: Corout
     }
 
     /**
-     * Paczka czasów odpowiedzi co 5 minut (0.478.0) — reguły w `CzasyZadan.kt`.
+     * Paczka czasów odpowiedzi co 5 minut (0.481.0) — reguły w `CzasyZadan.kt`.
      *
      * Rytm to kompromis: częściej i telemetria zaczęłaby się liczyć w ruchu,
      * który mierzy; rzadziej i przerwana zmiana (bateria, restart) zabrałaby
