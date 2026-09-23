@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.2 — 23 września 2026
+
+**Instrukcje Copilota nie każą już „zwrócić wyłącznie JSON”.** Kształt
+odpowiedzi wymusza wyjście strukturalne (`output_config.format`) przy każdym
+wywołaniu, więc to zdanie było zbędne. Szkic i dopytanie zachowują opis pól
+jako „Pola odpowiedzi”. Z instrukcji klucza modelu zdanie zeszło w całości.
+Druga z dziewięciu poprawek audytu promptów.
+
 ## 0.482.1 — 23 września 2026
 
 **CLAUDE.md mówi prawdę o tickerach.** Zdanie „Dziś żadnego nie ma” było

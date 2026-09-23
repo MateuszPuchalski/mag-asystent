@@ -582,7 +582,7 @@ const INSTRUKCJA_SZKICU = [
   "FORMA: po polsku, forma grzecznościowa przez „Państwo” (np. „mają Państwo”,",
   "„proszę Państwa o”), NIGDY dosłownie „Pan/Pani” ani imię; zwięźle, bez wstępów",
   `o firmie. Najwyżej ${LIMIT_ZNAKOW - 200} znaków. Jedno twierdzenie na zdanie.`,
-  "Zwróć wyłącznie JSON według schematu: `tresc` (szkic), `uzyteFakty` (lista",
+  "Pola odpowiedzi: `tresc` (szkic), `uzyteFakty` (lista",
   "identyfikatorów faktów, które cytujesz), `zastrzezenia` (czego zabrakło),",
   "`daneDoboru` (dane maszyny i części z rozmowy, reguła 3a), `pasowanie` (para",
   "kartotek z faktów wg reguły 3b albo null), `twierdzenia` (skąd wiesz to,",
@@ -725,7 +725,7 @@ const INSTRUKCJA_PYTANIA = [
   "6. Gdy pytanie dotyczy zdjęcia, opisuj TO, CO WIDAĆ, i cytuj numer zdjęcia.",
   "   Nieczytelnego nie zgaduj.",
   "",
-  "Zwróć wyłącznie JSON: `tresc` (odpowiedź dla agenta) oraz `twierdzenia`.",
+  "Pola odpowiedzi: `tresc` (odpowiedź dla agenta) oraz `twierdzenia`.",
 ].join("\n");
 
 export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<OdpowiedzNaPytanie> => {
@@ -827,8 +827,6 @@ const INSTRUKCJA_KLUCZA = [
   "   kilka oznaczeń naraz (na przykład „236; 240”) albo gdy to samo oznaczenie",
   "   nosi kilka marek. Odpowiedź „nie wiem” kosztuje jeden wiersz w kolejce,",
   "   a zła marka kosztuje część wysłaną do złej maszyny.",
-  "",
-  "Odpowiadaj wyłącznie JSON-em według schematu.",
 ].join("\n");
 
 export type WynikKlucza = {
