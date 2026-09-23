@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
@@ -19,16 +19,21 @@ const wpis = (n: Partial<WpisWzmianki> = {}): WpisWzmianki => ({
 
 const odhacz = vi.fn();
 let LISTA: WpisWzmianki[] = [];
+/* `PRAWDZIWE` oddaje ekranowi prawdziwe haki nad atrapą `fetch`. Atrapa
+   `useOdhaczWzmianke` łapie tylko kliknięcie — odhaczenie wysłane z efektu
+   przy otwarciu poszłoby prawdziwą siecią i przeszło obok niej. */
+let PRAWDZIWE = false;
 
 vi.mock("../api/rozmowy", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/rozmowy")>("../api/rozmowy");
   return {
     ...rzeczywisty,
-    useWzmianki: () => ({
+    useWzmianki: () => PRAWDZIWE ? rzeczywisty.useWzmianki() : ({
       data: { wzmianki: LISTA, nowe: LISTA.filter((w) => !w.odhaczona).length },
       isLoading: false, error: null,
     }),
-    useOdhaczWzmianke: () => ({ mutate: odhacz, isPending: false }),
+    useOdhaczWzmianke: () => PRAWDZIWE ? rzeczywisty.useOdhaczWzmianke()
+      : ({ mutate: odhacz, isPending: false }),
   };
 });
 
@@ -44,7 +49,30 @@ const pokaz = () => render(
     </MemoryRouter>
   </QueryClientProvider>);
 
+beforeEach(() => { PRAWDZIWE = false; });
+afterEach(() => { vi.unstubAllGlobals(); });
+
 describe("Skrzynka wzmianek", () => {
+  it("otwarcie listy to sam odczyt — żadna wzmianka nie gaśnie od spojrzenia", async () => {
+    /* Test niżej pilnuje kliknięcia w rozmowę, ale przez atrapę haka. Ten
+       idzie przez sieć, więc łapie też zapis z efektu, którego żaden
+       przycisk nie woła. */
+    PRAWDZIWE = true;
+    const zapisy: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      const metoda = init?.method ?? "GET";
+      if (metoda !== "GET") zapisy.push(`${metoda} ${url}`);
+      if (metoda === "GET" && url === "/api/obsluga/wzmianki") {
+        return new Response(JSON.stringify({ wzmianki: [wpis()], nowe: 1 }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ error: "poza tym testem" }), { status: 404 });
+    }));
+
+    pokaz();
+    await screen.findByText(/zerkniesz na ten szarpak/);
+    expect(zapisy).toEqual([]);
+  });
+
   it("niesie autora, klienta i fragment — czyli to, po czym poznać swoją sprawę", () => {
     LISTA = [wpis()];
     pokaz();

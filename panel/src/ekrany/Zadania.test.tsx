@@ -1,7 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
+import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Zadanie } from "../api/typy";
 
@@ -43,15 +44,20 @@ vi.mock("../towar/useZdjecie", () => ({
 const ponow = vi.fn();
 const anuluj = vi.fn();
 let LISTA: Zadanie[] = [];
+/* `PRAWDZIWE` oddaje ekranowi prawdziwe haki nad atrapą `fetch`. Atrapy
+   mutacji łapią wyłącznie kliknięcia; ponowienie albo anulowanie wysłane
+   z efektu przy otwarciu przeszłoby obok nich prawdziwą siecią. */
+let PRAWDZIWE = false;
 
 vi.mock("../api/rozmowy", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/rozmowy")>("../api/rozmowy");
   return {
     ...rzeczywisty,
-    useZadania: () => ({ data: { zadania: LISTA }, isLoading: false, error: null }),
-    useNoweZadanie: () => ({ mutate: vi.fn(), isPending: false }),
-    usePonowZadanie: () => ({ mutate: ponow, isPending: false }),
-    useAnulujZadanie: () => ({ mutate: anuluj, isPending: false }),
+    useZadania: () => PRAWDZIWE ? rzeczywisty.useZadania()
+      : ({ data: { zadania: LISTA }, isLoading: false, error: null }),
+    useNoweZadanie: () => PRAWDZIWE ? rzeczywisty.useNoweZadanie() : ({ mutate: vi.fn(), isPending: false }),
+    usePonowZadanie: () => PRAWDZIWE ? rzeczywisty.usePonowZadanie() : ({ mutate: ponow, isPending: false }),
+    useAnulujZadanie: () => PRAWDZIWE ? rzeczywisty.useAnulujZadanie() : ({ mutate: anuluj, isPending: false }),
   };
 });
 
@@ -61,6 +67,32 @@ const pokaz = () => render(
   <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <Zadania />
   </QueryClientProvider>);
+
+beforeEach(() => { PRAWDZIWE = false; });
+afterEach(() => { vi.unstubAllGlobals(); });
+
+describe("Zadania terenowe — zero zapisu przy patrzeniu", () => {
+  it("otwarcie ekranu to sam odczyt — odesłane nie wraca do hali samo", async () => {
+    /* Karta odesłanego ma dwa wyjścia biura. Żadne nie może zadziałać od
+       samego spojrzenia: ponowienie wysłałoby magazyniera drugi raz na
+       pustą półkę, a anulowanie zgubiłoby pytanie klienta. */
+    PRAWDZIWE = true;
+    const zapisy: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      const metoda = init?.method ?? "GET";
+      if (metoda !== "GET") zapisy.push(`${metoda} ${url}`);
+      if (metoda === "GET" && url === "/api/zadania-terenowe") {
+        return new Response(JSON.stringify({ zadania: [odeslane()] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ error: "poza tym testem" }), { status: 404 });
+    }));
+
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter><Zadania /></MemoryRouter></QueryClientProvider>);
+    await screen.findByText("Zmierz rozstaw otworów");
+    expect(zapisy).toEqual([]);
+  });
+});
 
 describe("Zadania terenowe — droga powrotna z hali", () => {
   it("odesłane stoi w widoku DOMYŚLNYM, nie tylko w swojej zakładce", () => {

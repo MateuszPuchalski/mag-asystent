@@ -1,4 +1,4 @@
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
@@ -44,10 +44,17 @@ const rozstrzygnij = vi.fn();
 const rozstrzygnijPasowanie = vi.fn();
 const zaproponuj = vi.fn();
 
+/* `PRAWDZIWE` oddaje ekranowi prawdziwe haki nad atrapą `fetch`. Atrapy
+   mutacji łapią wyłącznie kliknięcia; rozstrzygnięcie wysłane z efektu przy
+   otwarciu przeszłoby obok nich prawdziwą siecią. Zwrotnica obejmuje WSZYSTKIE
+   atrapy naraz, bo hak dołożony do atrap bez zwrotnicy zostałby w teście
+   zapisu ślepy — a nikt by tego nie zauważył. */
+let PRAWDZIWE = false;
+
 vi.mock("../api/wiedza", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/wiedza")>("../api/wiedza");
-  return {
-    ...rzeczywisty,
+  type Hak = (...a: never[]) => unknown;
+  const atrapy: Record<string, Hak> = {
     useKolejkaWiedzy: () => ({ data: { propozycje: LISTA, liczba: LISTA.length,
       pasowania: PASOWANIA, pasowanDoRozstrzygniecia: PASOWANIA.length }, isLoading: false, error: null }),
     useRozstrzygnijZastosowanie: () => ({ mutate: rozstrzygnij, isPending: false }),
@@ -66,6 +73,10 @@ vi.mock("../api/wiedza", async () => {
     useIdentyfikatory: () => ({ data: [], isLoading: false, error: null }),
     useDodajIdentyfikator: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   };
+  const zwrotnica = Object.fromEntries(Object.entries(atrapy).map(([nazwa, atrapa]) =>
+    [nazwa, (...a: never[]) => (PRAWDZIWE
+      ? (rzeczywisty[nazwa as keyof typeof rzeczywisty] as Hak)(...a) : atrapa(...a))]));
+  return { ...rzeczywisty, ...zwrotnica };
 });
 vi.mock("../wyszukiwarka", () => ({
   Wyszukiwarka: ({ onWybierz }: { onWybierz: (t: unknown) => void }) =>
@@ -84,9 +95,37 @@ const pokaz = () => render(
     </MemoryRouter>
   </QueryClientProvider>);
 
-beforeEach(() => { rozstrzygnij.mockReset(); rozstrzygnijPasowanie.mockReset(); zaproponuj.mockReset(); LISTA = []; PASOWANIA = []; });
+beforeEach(() => { rozstrzygnij.mockReset(); rozstrzygnijPasowanie.mockReset(); zaproponuj.mockReset(); LISTA = []; PASOWANIA = []; PRAWDZIWE = false; });
+afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("Ekran wiedzy", () => {
+  it("otwarcie kolejki to same odczyty — propozycja nie rozstrzyga się od spojrzenia", async () => {
+    /* Zatwierdzona propozycja wchodzi do wiedzy, z której dobór odpowiada
+       klientom. Zapis przy otwarciu byłby więc decyzją biura, której nikt
+       nie podjął — dokładnie tym, czego automat nie ma prawa robić. */
+    PRAWDZIWE = true;
+    const zapisy: string[] = [];
+    const DANE: Record<string, unknown> = {
+      "/api/obsluga/wiedza/kolejka": { propozycje: [propozycja()], liczba: 1,
+        pasowania: [pasowanie()], pasowanDoRozstrzygniecia: 1 },
+      "/api/obsluga/wiedza/z-opisow": { wiersze: [], liczba: 0 },
+      "/api/obsluga/wiedza/tokeny": { tokeny: [], nowychRazem: 0 },
+    };
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      const metoda = init?.method ?? "GET";
+      if (metoda !== "GET") zapisy.push(`${metoda} ${url}`);
+      if (metoda === "GET" && url in DANE) return new Response(JSON.stringify(DANE[url]), { status: 200 });
+      /* Silniki i reszta zakładek to nie pytanie tego testu — odmowa zamiast
+         wymyślonego kształtu, a zapis i tak zostanie złapany wyżej. */
+      return new Response(JSON.stringify({ error: "poza tym testem" }), { status: 404 });
+    }));
+
+    pokaz();
+    await screen.findByText("SZR-148/82");
+    await screen.findByText("LC170430140-0001");
+    expect(zapisy).toEqual([]);
+  });
+
   /* Pasowania część↔część (0.230.0) czekają w TEJ SAMEJ kolejce jako druga
      sekcja — ta sama decyzja tego samego człowieka. Osobna zakładka łamałaby
      etykiety, a osobny licznik bez sekcji kłamałby przez pominięcie. */

@@ -34,6 +34,28 @@ historii nie przepisujemy.
 ---
 
 
+## 0.446.1 — 23 września 2026
+
+**Pięć ekranów panelu dostało strażnika „zero zapisu przy patrzeniu".**
+Do 0.446.0 regułę trzymały też liczniki `method:` po źródle `biuro.html`.
+Strona odeszła, a razem z nią ta część pilnowania. Sprawdzenie pokazało pięć
+ekranów bez testu, który liczyłby zapisy przy otwarciu.
+
+- **Skrzynka** nie miała testu ekranu wcale. Nowy `ekrany/Skrzynka.test.tsx`
+  wymaga zera zapisów przy samym otwarciu. Wejście w rozmowę może wysłać
+  wyłącznie zgłoszenie obecności z 0.159.0. To zapis tylko z nazwy: stan
+  żyje w pamięci procesu i do bazy nie idzie nic. Druga mutacja dołożona do
+  wejścia wywróci test.
+- **Moje, Wiedza, Zadania i Wzmianki** miały testy, ale na podmienionych
+  hakach. Atrapa haka nie widzi sieci, więc zapisu z efektu nie złapałaby
+  nigdy. Każdy plik dostał przełącznik `PRAWDZIWE`: jeden test biegnie przez
+  prawdziwe haki nad atrapą `fetch` i oczekuje pustej listy zapisów.
+
+Strażnik został sprawdzony odwrotnie: zapis wstawiony na próbę do każdego
+z pięciu ekranów wywrócił dokładnie te sześć nowych testów i żaden inny.
+
+Bez działania przy wdrożeniu — zmiana dotyczy wyłącznie testów.
+
 ## 0.446.0 — 23 września 2026
 
 **Biuro ma jeden adres: `/obsluga`.** Ostatni krok przeprowadzki

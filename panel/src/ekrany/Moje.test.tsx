@@ -1,7 +1,8 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import React from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { MojaSprawa } from "../api/typy";
 
 /* ── Jedno „Moje" ponad kolejkami (S4 spoiwa) ───────────────────────────────
@@ -14,7 +15,14 @@ import type { MojaSprawa } from "../api/typy";
       byłby nakładką ze wspólnym statusem — kształtem z blizny 0.140.0.     */
 
 const moje = vi.fn();
-vi.mock("../api/rozmowy", () => ({ useMojeSprawy: () => moje() }));
+/* `PRAWDZIWE` przełącza ekran na prawdziwy hak nad atrapą `fetch`. Atrapa
+   haka nie widzi sieci, więc zapisu dołożonego przy otwarciu nie złapałaby
+   nigdy — a tego pilnował dawniej licznik po źródle `biuro.html`. */
+let PRAWDZIWE = false;
+vi.mock("../api/rozmowy", async () => {
+  const rzeczywisty = await vi.importActual<typeof import("../api/rozmowy")>("../api/rozmowy");
+  return { ...rzeczywisty, useMojeSprawy: () => (PRAWDZIWE ? rzeczywisty.useMojeSprawy() : moje()) };
+});
 
 const { Moje } = await import("./Moje");
 
@@ -23,9 +31,31 @@ const sprawa = (n: Partial<MojaSprawa> = {}): MojaSprawa => ({
   at: "2026-09-10T08:00:00Z", terminDo: null, ...n,
 });
 
-beforeEach(() => moje.mockReset());
+beforeEach(() => { moje.mockReset(); PRAWDZIWE = false; });
+afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("Ekran Moje", () => {
+  it("otwarcie to sam odczyt — ekran nad kolejkami niczego nie przypisuje ani nie gasi", async () => {
+    /* „Moje" zbiera sprawy z trzech kolejek. Kusi, żeby przy okazji odhaczyć
+       „widziane" albo odświeżyć terminy — i to byłby zapis przy patrzeniu,
+       tylko w trzech kolejkach naraz. */
+    PRAWDZIWE = true;
+    const zapisy: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      const metoda = init?.method ?? "GET";
+      if (metoda !== "GET") zapisy.push(`${metoda} ${url}`);
+      if (metoda === "GET" && url === "/api/obsluga/moje") {
+        return new Response(JSON.stringify({ sprawy: [sprawa()] }), { status: 200 });
+      }
+      return new Response(JSON.stringify({ error: "poza tym testem" }), { status: 404 });
+    }));
+
+    render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+      <MemoryRouter><Moje /></MemoryRouter></QueryClientProvider>);
+    await screen.findByText("Nie działa");
+    expect(zapisy).toEqual([]);
+  });
+
   it("składa trzy kolejki w jedną listę i prowadzi do właściwej", () => {
     moje.mockReturnValue({ data: { sprawy: [
       sprawa({ kolejka: "reklamacja", id: 7 }),
