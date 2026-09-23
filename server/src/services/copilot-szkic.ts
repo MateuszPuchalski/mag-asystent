@@ -115,6 +115,8 @@ export interface KontekstSzkicu {
   ostatniaWiadomoscId: number | null;
   /** Wersja doboru w chwili układania — zmiana danych po szkicu czyni go nieświeżym. */
   doborWersja: number;
+  /** Aktywna decyzja klasyfikatora, której fakt wszedł do szkicu; `null` — bez rozpoznania. */
+  decyzjaId: number | null;
   /**
    * BIAŁA LISTA kartotek, które serwer sam położył na stole (przyrost
    * czwarty): kartoteka oferty, kandydaci z faktów, kotwice, strony pasowań.
@@ -981,11 +983,11 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
      szyty pod dobór części i prosił o tabliczkę znamionową także klienta,
      który pytał, gdzie jest paczka. Decyzja NIEAKTUALNA (klient dopisał po
      rozpoznaniu) nie wchodzi — opisywałaby pytanie, którego już nie zadaje. */
-  const rozpoznanie = ostatniaKlienta ? db().prepare(`SELECT kategoria, akcja, wymaga_czlowieka,
+  const rozpoznanie = ostatniaKlienta ? db().prepare(`SELECT id, kategoria, akcja, wymaga_czlowieka,
       brak_danych_zamowienia, brak_danych_produktu FROM decyzja_klasyfikacji
       WHERE message_id=? AND aktywna=1 AND taksonomia_wersja=?`)
     .get(ostatniaKlienta.id, TAKSONOMIA_WERSJA) as {
-      kategoria: string; akcja: string; wymaga_czlowieka: number;
+      id: number; kategoria: string; akcja: string; wymaga_czlowieka: number;
       brak_danych_zamowienia: number; brak_danych_produktu: number } | undefined : undefined;
   if (rozpoznanie) {
     dodaj("rozpoznanie", `Rozpoznanie bieżącej prośby klienta (automat, może się mylić): `
@@ -1047,6 +1049,7 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
     watek: zamaskujWatek(watek, login),
     ostatniaWiadomoscId: ostatniaKlienta ? Number(ostatniaKlienta.id) : null,
     doborWersja: dobor.wersja,
+    decyzjaId: rozpoznanie ? Number(rozpoznanie.id) : null,
     kartoteki,
   };
 }
@@ -1321,8 +1324,8 @@ export async function ulozSzkic(
   transaction(db(), () => {
     db().prepare(`INSERT INTO szkic_copilota
       (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id,
-       dane_doboru,dobor_wersja,pasowanie_propozycja,twierdzenia,luki_kartoteki,odczyt_zdjec)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       dane_doboru,dobor_wersja,pasowanie_propozycja,twierdzenia,luki_kartoteki,odczyt_zdjec,decyzja_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(conversation_id) DO UPDATE SET
         tresc=excluded.tresc, zastrzezenia=excluded.zastrzezenia, uzyte_fakty=excluded.uzyte_fakty,
         message_id=excluded.message_id, model=excluded.model, at=excluded.at,
@@ -1330,7 +1333,7 @@ export async function ulozSzkic(
         dane_doboru=excluded.dane_doboru, dobor_wersja=excluded.dobor_wersja,
         pasowanie_propozycja=excluded.pasowanie_propozycja,
         twierdzenia=excluded.twierdzenia, luki_kartoteki=excluded.luki_kartoteki,
-        odczyt_zdjec=excluded.odczyt_zdjec,
+        odczyt_zdjec=excluded.odczyt_zdjec, decyzja_id=excluded.decyzja_id,
         /* Nowa propozycja — stara ocena jej nie dotyczy; danych i pasowania też. */
         ocena=NULL, ocena_at=NULL, dane_ocena=NULL, dane_ocena_at=NULL,
         pasowanie_ocena=NULL, pasowanie_ocena_at=NULL`)
@@ -1339,7 +1342,7 @@ export async function ulozSzkic(
         propozycja.dane ? JSON.stringify(propozycja.dane) : null, wersjaDoboru,
         para.propozycja ? JSON.stringify(para.propozycja) : null,
         JSON.stringify(twierdzenia), JSON.stringify(pokwitowanie),
-        JSON.stringify(odp.odczytZeZdjec));
+        JSON.stringify(odp.odczytZeZdjec), k.decyzjaId);
     /* Los propozycji danych ustawiamy OD RAZU, bo nie ma już czego klikać.
        `dane_ocena_at` niesie czas, a KTO wpisał, mówi `dobor_rozmowy`:
        `updated_by='automat (szkic)'` przy pustym `updated_user_id`. */

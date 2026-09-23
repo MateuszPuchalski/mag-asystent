@@ -2582,6 +2582,21 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.476.0 — szkic zaraz po rozpoznaniu
+
+**Panel trzeba przebudować, a serwer zrestartować.** Kolumna
+`szkic_copilota.decyzja_id` dochodzi sama przy starcie.
+
+**[wymaga uwagi] To wydaje pieniądze po każdym rozpoznaniu.** Szkic układa się
+sam po „Rozpoznaj", po poprawce kategorii i po takcie rozpoznania, jeśli
+jest włączony. Sufit to `COPILOT_AUTO_NA_GODZINE` (domyślnie 30 szkiców na
+godzinę, wspólny z taktem szkiców). Wyłącza się
+`COPILOT_SZKIC_PO_ROZPOZNANIU=0` w `wertis.env`.
+
+Sprawdzenie: kliknij „Rozpoznaj" nad kolejką. Pasek ma powiedzieć „układam N
+szkiców do zatwierdzenia", a po kilku sekundach karta szkicu ma stać
+w rozmowie, podpisana „automat".
+
 ### Aktualizacja do 0.474.0 — wzorzec odpowiedzi dla kategorii
 
 **Wystarczy restart serwera.** Bez migracji i bez zmian w panelu.

@@ -132,6 +132,8 @@ export type StanCopilota = {
   autoKlasyfikacja: boolean;
   /** Takt sam układa szkic (`COPILOT_AUTO_SZKIC`). */
   autoSzkic: boolean;
+  /** Szkic układa się sam zaraz po rozpoznaniu (23 września 2026). Starszy serwer go nie zna. */
+  szkicPoRozpoznaniu?: boolean;
 };
 
 /** Wynik partii. `przerwane` niepuste znaczy: część zapłacona, reszta czeka. */
@@ -143,6 +145,8 @@ export type WynikPartii = {
   zuzycie: {
     wej: number; wyj: number; cacheZapis: number; cacheOdczyt: number; kosztUsd: number;
   };
+  /** Ile szkiców serwer zlecił w tle po tym rozpoznaniu (23 września 2026). */
+  szkicow?: number;
 };
 
 /** Udział z przedziałem Wilsona 95 %. Liczy SERWER. */
