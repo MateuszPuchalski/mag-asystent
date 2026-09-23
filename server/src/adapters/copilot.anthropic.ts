@@ -56,7 +56,7 @@ const Wynik = z.object({
  * a bez numeru nie da się oddzielić decyzji starej instrukcji od nowej.
  * ZMIENIASZ `INSTRUKCJA` — podnosisz numer.
  */
-export const PROMPT_KLASYFIKACJI = "k3";
+export const PROMPT_KLASYFIKACJI = "k4";
 
 /* INSTRUKCJA JEST STAŁA I STOI PIERWSZA — na tym stoi cache. Dopasowanie idzie
    po prefiksie, więc jeden zmienny bajt tutaj (data, numer rozmowy, imię
@@ -110,7 +110,7 @@ const INSTRUKCJA = [
   "",
   "Pewność: wysoka, srednia albo niska — twoja ocena, nie procent.",
   "powodInne: tylko przy OTHER — poza_slownikiem (rozumiesz, ale nie pasuje) albo za_malo_tresci; przy innych kategoriach null.",
-  "Uzasadnienie: jedno krótkie zdanie po polsku, do piętnastu słów. NIE powtarzaj danych osobowych ani numerów z wiadomości.",
+  "Uzasadnienie: jedno krótkie zdanie po polsku, które agent przeczyta jednym spojrzeniem na liście. NIE powtarzaj danych osobowych ani numerów z wiadomości.",
   "Znaczniki [e-mail], [telefon], [adres], [konto], [login] to wycięte dane — traktuj je jako informację, że klient je podał, i nie zgaduj treści.",
   "",
   "Przykłady etykietowania (nie wyniki):",

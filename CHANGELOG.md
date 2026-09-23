@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.5 — 23 września 2026
+
+**Uzasadnienie klasyfikacji bez sufitu „do piętnastu słów”.** Instrukcja mówi
+teraz, po co to zdanie jest: agent ma je przeczytać jednym spojrzeniem na
+liście. Wersja instrukcji rośnie z `k3` do `k4`, bo tak każe reguła przy
+`PROMPT_KLASYFIKACJI`. Decyzji sprzed i po tym wydaniu nie porównuje się
+wprost. Piąta z dziewięciu poprawek audytu promptów.
+
 ## 0.482.4 — 23 września 2026
 
 **Karta reklamacyjna i klucz modelu mają sufit liczony z myśleniem.** Na
