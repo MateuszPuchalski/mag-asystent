@@ -2582,7 +2582,7 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
-### Aktualizacja do 0.477.0 — „Pasuje do” ze wszystkich ofert
+### Aktualizacja do 0.479.0 — „Pasuje do” ze wszystkich ofert
 
 **Panel trzeba przebudować, a serwer zrestartować.** Kolumna
 `offer_snapshot.pasuje_do_zebrano_at` dochodzi sama przy starcie.
@@ -2594,6 +2594,21 @@ oferta to osobne żądanie z odstępem.
 
 Sprawdzenie: Wiedza → „Z opisów i ofert” → „Zbierz z wszystkich ofert”.
 Licznik „do zebrania” ma spadać, a pod kartą pojawić się „Oferty a wiedza”.
+
+### Aktualizacja do 0.477.0 — szkic zaraz po rozpoznaniu
+
+**Panel trzeba przebudować, a serwer zrestartować.** Kolumna
+`szkic_copilota.decyzja_id` dochodzi sama przy starcie.
+
+**[wymaga uwagi] To wydaje pieniądze po każdym rozpoznaniu.** Szkic układa się
+sam po „Rozpoznaj", po poprawce kategorii i po takcie rozpoznania, jeśli
+jest włączony. Sufit to `COPILOT_AUTO_NA_GODZINE` (domyślnie 30 szkiców na
+godzinę, wspólny z taktem szkiców). Wyłącza się
+`COPILOT_SZKIC_PO_ROZPOZNANIU=0` w `wertis.env`.
+
+Sprawdzenie: kliknij „Rozpoznaj" nad kolejką. Pasek ma powiedzieć „układam N
+szkiców do zatwierdzenia", a po kilku sekundach karta szkicu ma stać
+w rozmowie, podpisana „automat".
 
 ### Aktualizacja do 0.474.0 — wzorzec odpowiedzi dla kategorii
 

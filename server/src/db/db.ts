@@ -203,6 +203,11 @@ export function migrate(database: DatabaseSync) {
      zestawił obie listy obok siebie. */
   addColumn("szkic_copilota", "luki_kartoteki", "TEXT NOT NULL DEFAULT '[]'");
   addColumn("szkic_copilota", "odczyt_zdjec", "TEXT NOT NULL DEFAULT '[]'");
+  /* Decyzja klasyfikatora, na której szkic powstał (23 września 2026). Szkic
+     po rozpoznaniu układa się sam, a poprawka kategorii tworzy NOWĄ decyzję —
+     bez tej kolumny nie dałoby się poznać, że szkic pisano pod starą. Stare
+     szkice mają NULL, czyli „nie wiadomo" — i pierwsza poprawka je odświeży. */
+  addColumn("szkic_copilota", "decyzja_id", "INTEGER");
   /* Dopytanie Copilota (0.332.0). Tabela nowa, więc `schema.sql` załatwia
      świeże bazy; ta linia jest dla istniejących instalacji. */
   database.exec(`CREATE TABLE IF NOT EXISTS copilot_pytanie (

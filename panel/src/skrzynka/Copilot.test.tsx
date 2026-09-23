@@ -123,6 +123,16 @@ describe("pasek Copilota nad kolejką", () => {
     expect(screen.getByText(/Rozpoznano 8/)).toBeTruthy();
   });
 
+  it("po rozpoznaniu pasek mówi, że szkice do zatwierdzenia są w drodze (23 września 2026)", async () => {
+    /* Bez tego zdania agent kliknąłby „Ułóż odpowiedź" i zapłacił drugi raz. */
+    render(<PasekCopilota stan={{ ...WLACZONY, szkicPoRozpoznaniu: true }} kandydaci={[]} onRozpoznaj={vi.fn()}
+      wynik={{
+        sklasyfikowane: 3, pominiete: [], bledy: [], przerwane: null, szkicow: 2,
+        zuzycie: { wej: 1, wyj: 1, cacheZapis: 0, cacheOdczyt: 0, kosztUsd: 0 },
+      }} />);
+    expect(screen.getByText(/Rozpoznano 3, układam 2 szkice do zatwierdzenia/)).toBeTruthy();
+  });
+
   it("przeciążenie dostawcy nazywa dostawcę, a nie sąd modelu", () => {
     render(<PasekCopilota stan={WLACZONY} kandydaci={[]} onRozpoznaj={vi.fn()}
       wynik={{
