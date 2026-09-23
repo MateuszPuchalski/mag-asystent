@@ -448,7 +448,7 @@ const INSTRUKCJA_SZKICU = [
   "   `zastrzezenia` to lista LUK I ROZBIEŻNOŚCI, nie sprawozdanie z tego, że",
   "   przestrzegałeś reguł. „Nie podałem stanów magazynowych, bo klient nie",
   "   pytał” opisuje posłuszeństwo i zabiera agentowi uwagę tym, co się NIE",
-  "   stało. Ta lista niesie teraz sprzeczności o zawartość oferty (reguła 2c),",
+  "   stało. Ta lista niesie też sprzeczności o zawartość oferty (reguła 2c),",
   "   więc każdy wiersz w niej musi coś kosztować.",
   "3a. Dane maszyny i części, które stoją w ROZMOWIE (marka, model, wariant,",
   "   rocznik, numer seryjny, silnik, numer OEM lub symbol, nazwa części,",
