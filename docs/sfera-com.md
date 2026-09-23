@@ -711,11 +711,19 @@ Kategorii nie zgaduje. Numer bierze z `wertis.env` (`SFERA_ZW_WYDANIE_KAT_ID`),
 a odczytuje go `--zrzut` ZW biura. Zrzut podaje od tego wydania wartości
 `WydanieKatId` i `PrzyjecieKatId`.
 
-**Przyczyna znaleziona: pusta kategoria wydania** (właściciel, 23 września
-2026). Po wpisaniu `SFERA_ZW_WYDANIE_KAT_ID` do `wertis.env` worker wystawia
-ZW sam. Odmowa `0x80040F20` znaczyła więc brak kategorii, której okno
-Subiekta nigdy nie pokazuje, bo wypełnia ją samo. Sfera przy tym nie podała
-słowa o przyczynie, a `SprawdzPoprawnosc()` przepuściło szkic.
+**ZW przechodzi: po uzupełnieniu `Wystawil` i `WydanieKatId`** (właściciel,
+23 września 2026). Po wpisaniu `SFERA_ZW_WYDANIE_KAT_ID` do `wertis.env` worker
+wystawia ZW sam. Oba pola wypełnia okno Subiekta, nie pokazując ich wcale.
+Sfera przy odmowie nie podała słowa o przyczynie, a `SprawdzPoprawnosc()`
+przepuściło szkic.
+
+Które z dwóch pól rozstrzygało, tego nie wiadomo. 0.463.0 ustawia oba naraz.
+Właściciel stawia na podpis konta, czyli `Wystawil`. Rozstrzygnęłaby to odmowa
+z nowym exe przed wpisaniem klucza: treść mówi wtedy „Wystawil = operator
+sesji" i „WydanieKatId puste".
+
+`[WERYFIKUJ]` Czy do zapisu ZW wystarcza `Wystawil`, czy potrzebna jest też
+`WydanieKatId`.
 
 Nauczka dla następnego dokumentu z COM: zestawić PEŁNY zrzut szkicu z ręcznym
 dokumentem, a nie tylko pola z listy. Od 0.456.0 do 0.461.0 szukanie szło
