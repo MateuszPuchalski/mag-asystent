@@ -87,3 +87,15 @@ describe("czytnik .xlsx", () => {
     await expect(wierszeZXlsx(enc.encode("symbol;lokalizacja").buffer as ArrayBuffer)).rejects.toThrow(/brak stopki ZIP/);
   });
 });
+
+describe("tabelaZWierszy", () => {
+  it("kolumny stoją po pozycji, a komórka pominięta przez Excela zostaje pustym tekstem", async () => {
+    const { tabelaZWierszy } = await import("./xlsx");
+    expect(tabelaZWierszy([{ A: "Indeks", C: "EAN", D: "OEM" }, { A: "W80-2005", D: "6.904-143.0" }, { AA: "x" }]))
+      .toEqual([
+        ["Indeks", "", "EAN", "OEM", ...new Array(23).fill("")],
+        ["W80-2005", "", "", "6.904-143.0", ...new Array(23).fill("")],
+        [...new Array(26).fill(""), "x"],
+      ]);
+  });
+});

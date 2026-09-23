@@ -129,11 +129,11 @@ const RANGA: Record<DrogaDoboru, number> = {
  */
 /**
  * Skąd wzięliśmy numer, który trafił w tę kartotekę. Osobna funkcja, nie
- * wybór w miejscu wywołania: gałęzi jest trzy, a czwarta wartość `zrodlo`
+ * wybór w miejscu wywołania: gałęzi jest cztery, a piąta wartość `zrodlo`
  * ma się nie przemycić jako „z opisu kartoteki" bez ani jednego błędu.
  */
 function zdanieZrodlaNumeru(
-  t: { zrodlo: string; nazwaRodzaju: string; wartosc: string; dodal: string; ofertaId: string | null },
+  t: { zrodlo: string; nazwaRodzaju: string; wartosc: string; dodal: string; ofertaId: string | null; dostawca: string | null },
   symbol: string,
 ): string {
   const czolo = `numer ${t.nazwaRodzaju} ${t.wartosc}`;
@@ -143,6 +143,9 @@ function zdanieZrodlaNumeru(
   if (t.zrodlo === "oferta") {
     return `${czolo} z opisu NASZEJ oferty${t.ofertaId ? ` ${t.ofertaId}` : ""}`
       + ` przy kartotece „${symbol}” ${PO_IDENTYFIKATORZE}`;
+  }
+  if (t.zrodlo === "dostawca") {
+    return `${czolo} z tabeli odsyłaczy dostawcy ${t.dostawca ?? "(bez nazwy)"} przy kartotece „${symbol}” ${PO_IDENTYFIKATORZE}`;
   }
   return `${czolo} z opisu kartoteki „${symbol}” ${PO_IDENTYFIKATORZE}`;
 }

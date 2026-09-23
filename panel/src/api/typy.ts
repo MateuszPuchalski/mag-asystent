@@ -583,8 +583,9 @@ export type WymianaCopilota = {
   przez: string;
 };
 
-/** Skąd wziął się wiersz identyfikatora. `oferta` doszło w 0.264.0. */
-export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta";
+/** Skąd wziął się wiersz identyfikatora. `oferta` doszło w 0.264.0, `dostawca`
+ *  z importem odsyłaczy od dostawców. */
+export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta" | "dostawca";
 
 /**
  * Skąd wzięło się twierdzenie: nasza baza, opis oferty, ZDJĘCIE od klienta,
@@ -729,6 +730,41 @@ export type Identyfikator = {
   zrodlo: ZrodloIdentyfikatora; dodal: string; at: string;
   /** Z KTÓREJ oferty; `null` dla `opis` i `reczne`. */
   ofertaId: string | null;
+  /** Od KOGO — nazwa dostawcy z importu odsyłaczy; `null` poza źródłem `dostawca`. */
+  dostawca: string | null;
+};
+
+/* ── Import odsyłaczy od dostawców ───────────────────────────────────────────
+   Kształt z `services/odsylacze-dostawcow.ts`. Kolumny wskazuje MAPOWANIE po
+   pozycji, bo każdy cennik ma inne nagłówki. */
+export type MapowanieOdsylaczy = {
+  symbol: number | null; ean: number | null; numery: number[]; rodzaj: "oem" | "katalog_obcy";
+};
+
+export type TrescImportu = { csv?: string; tabela?: string[][] };
+
+export type RaportImportuOdsylaczy = {
+  naglowki: string[];
+  probka: string[][];
+  mapowanie: MapowanieOdsylaczy | null;
+  zgadniete: boolean;
+  wierszy: number;
+  dopasowanych: number;
+  kartotek: number;
+  bezKartoteki: { liczba: number; przyklady: string[] };
+  niejednoznaczne: { liczba: number; przyklady: string[] };
+  bezNumerow: number;
+  numerow: { nowych: number; znanych: number };
+  zastapi: number;
+  noweKandydaty: number;
+  przyklady: Array<{ symbol: string; nazwa: string; numery: string[] }>;
+  zapisano: { importId: number; numerow: number } | null;
+};
+
+export type ImportOdsylaczy = {
+  id: number; dostawca: string; plik: string | null; wierszy: number; dopasowanych: number; numerow: number;
+  stan: "aktywny" | "zastapiony" | "wycofany"; zaimportowal: string; at: string;
+  wycofal: string | null; wycofanoAt: string | null;
 };
 
 /**

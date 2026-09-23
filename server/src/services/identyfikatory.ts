@@ -153,7 +153,8 @@ export function naszeSymbole(database: DatabaseSync): Set<string> {
  * `INSERT OR IGNORE` po `(tw_id, rodzaj, wartosc_norm)`: gdy biuro dopisało
  * ręcznie to, co stoi w opisie, zostaje wpis ręczny — z podpisem człowieka.
  *
- * Od 0.264.0 omija także `zrodlo='oferta'`, i to bez żadnej poprawki tutaj:
+ * Od 0.264.0 omija także `zrodlo='oferta'`, a od importu odsyłaczy
+ * `zrodlo='dostawca'` — i to bez żadnej poprawki tutaj:
  * `DELETE` był zawężony do `'opis'` od początku. Zdanie stoi w komentarzu,
  * bo zdanie wyżej wymienia dwa źródła i wygląda na wyczerpujące — a numeru
  * z oferty ta funkcja nie umiałaby odtworzyć: czyta opisy KARTOTEK.
@@ -211,8 +212,9 @@ export function przebudujModeleZOpisu(database: DatabaseSync = db()): { nowych: 
 
 /* ── Odczyt ────────────────────────────────────────────────────────────── */
 
-/** Skąd wziął się wiersz. `oferta` doszło w 0.264.0 — patrz `wiedza-z-oferty.ts`. */
-export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta";
+/** Skąd wziął się wiersz. `oferta` doszło w 0.264.0 — patrz `wiedza-z-oferty.ts`;
+ *  `dostawca` z importu odsyłaczy — patrz `odsylacze-dostawcow.ts`. */
+export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta" | "dostawca";
 
 export interface WierszIdentyfikatora {
   id: number; twId: number; symbol: string; nazwa: string | null;
@@ -220,6 +222,8 @@ export interface WierszIdentyfikatora {
   zrodlo: ZrodloIdentyfikatora; dodal: string; at: string;
   /** Z KTÓREJ oferty; NULL dla `opis` i `reczne`. Bez tego „skąd to się wzięło" nie ma odpowiedzi. */
   ofertaId: string | null;
+  /** Od KOGO — nazwa dostawcy z importu odsyłaczy; NULL poza `zrodlo='dostawca'`. */
+  dostawca: string | null;
 }
 
 const SELECT = `SELECT i.*, t.nazwa FROM towar_identyfikator i LEFT JOIN sgt_towar t ON t.tw_id = i.tw_id`;
@@ -232,6 +236,7 @@ const naWiersz = (w: Record<string, unknown>): WierszIdentyfikatora => ({
   wartosc: String(w.wartosc), zrodlo: String(w.zrodlo) as ZrodloIdentyfikatora,
   dodal: String(w.dodal), at: String(w.at),
   ofertaId: w.oferta_id == null ? null : String(w.oferta_id),
+  dostawca: w.dostawca == null ? null : String(w.dostawca),
 });
 
 /** Kartoteki, w których stoi ten numer — po formie zwiniętej, więc `532 16 56-30` = `5321656-30`. */

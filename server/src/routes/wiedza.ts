@@ -20,10 +20,13 @@ import { siecWiedzy } from "../services/siec-wiedzy.js";
 import {
   kandydaciZamiennosci, rozstrzygnijZamiennosc, wycofajZamiennosc, zamiennosciTowaru,
 } from "../services/zamiennosc-oem.js";
+import {
+  historiaImportow, importujOdsylacze, wycofajImport, type ZadanieImportu,
+} from "../services/odsylacze-dostawcow.js";
 import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   DWADZIEŚCIA JEDEN ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   DWADZIEŚCIA TRZY ZAPISY: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
    przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
    (E3), trzy przy zabudowie silnika (0.229.0), trzy przy pasowaniu części:
    propozycja, rozstrzygnięcie i wycofanie, dwa przy słowniku silników
@@ -41,6 +44,8 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    Dwudziesty i dwudziesty pierwszy to decyzja o zamienności przez wspólny
    numer oryginału i jej wycofanie. Kandydat nie ma wiersza, więc nie ma
    trasy propozycji — jest tylko decyzja człowieka i droga powrotu.
+   Dwudziesty drugi i dwudziesty trzeci to import odsyłaczy od dostawcy
+   (podgląd i zapis jedną trasą) i wycofanie importu w całości.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
 
@@ -317,6 +322,29 @@ export async function wiedzaRoutes(app: FastifyInstance) {
       try { return wycofajZamiennosc(Number(req.params.id), req.body?.powod ?? null, ja().userId); }
       catch (e) { return blad(reply, e); }
     });
+
+  /* Import odsyłaczy od dostawców. JEDNA trasa na podgląd i zapis, jak przy
+     arkuszu lokalizacji: `zastosuj: false` liczy raport i niczego nie zostawia
+     (symulacja kandydatów zamienności idzie w punkcie zapisu, który cofa),
+     `zastosuj: true` liczy ten sam raport jeszcze raz i dopiero wtedy pisze.
+     Dwie trasy dawałyby dwie drogi do jednego rachunku. */
+  app.get("/api/obsluga/wiedza/odsylacze", async (_req, reply) => odmowa(reply) ?? historiaImportow());
+
+  app.post<{ Body: Partial<ZadanieImportu> & { zastosuj?: boolean } }>(
+    "/api/obsluga/wiedza/odsylacze", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        const b = req.body ?? {};
+        return importujOdsylacze({ dostawca: String(b.dostawca ?? ""), plik: b.plik ?? null, tresc: b.tresc ?? {},
+          mapowanie: b.mapowanie ?? null }, b.zastosuj === true, ja().userId);
+      } catch (e) { return blad(reply, e); }
+    });
+
+  app.post<{ Params: { id: string } }>("/api/obsluga/wiedza/odsylacze/:id/wycofaj", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    try { return wycofajImport(Number(req.params.id), ja().userId); }
+    catch (e) { return blad(reply, e); }
+  });
 
   /* Ręczny identyfikator z katalogu, którego nie ma w opisie. Duplikat → 409. */
   app.post<{ Body: { twId?: number; rodzaj?: string; wartosc?: string } }>(

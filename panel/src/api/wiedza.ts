@@ -2,8 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  AliasSilnika, Identyfikator, KandydatZamiennosci, LukaSilnika, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
-  NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, SiecWiedzy,
+  AliasSilnika, Identyfikator, ImportOdsylaczy, KandydatZamiennosci, LukaSilnika, MapowanieOdsylaczy, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
+  NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RaportImportuOdsylaczy, RodzajDowodu,
+  RodzajIdentyfikatora, SiecWiedzy, TrescImportu,
   TokenSilnika, Zabudowa, Zamiennosc, Zastosowanie,
 } from "./typy";
 
@@ -22,6 +23,7 @@ export const kluczeWiedzy = {
   silniki: ["wiedza", "silniki"] as const,
   tokeny: ["wiedza", "tokeny"] as const,
   siec: ["wiedza", "siec"] as const,
+  odsylacze: ["wiedza", "odsylacze"] as const,
 };
 
 /**
@@ -73,6 +75,7 @@ function poWiedzy(qc: ReturnType<typeof useQueryClient>, twId?: number) {
   qc.invalidateQueries({ queryKey: kluczeWiedzy.silniki });
   qc.invalidateQueries({ queryKey: kluczeWiedzy.tokeny });
   qc.invalidateQueries({ queryKey: kluczeWiedzy.siec });
+  qc.invalidateQueries({ queryKey: kluczeWiedzy.odsylacze });
   qc.invalidateQueries({ queryKey: ["kandydaci"] });
   qc.invalidateQueries({ queryKey: ["wiedzaDoboru"] });
   if (twId !== undefined) qc.invalidateQueries({ queryKey: klucze.towar(twId) });
@@ -306,6 +309,35 @@ export function useWycofajZabudowe() {
 
 /* ── Pasowanie części (§11.2) ────────────────────────────────────────────────
    Adresy WYŁĄCZNIE tutaj — strażnik w `routes/wiedza.test.ts` czyta ten plik. */
+
+/* ── Import odsyłaczy od dostawców ───────────────────────────────────────────
+   Podgląd i zapis to JEDNA trasa z flagą `zastosuj`. Podgląd niczego nie
+   unieważnia, bo niczego nie zapisał; zapis odświeża całą wiedzę — nowe numery
+   działają w szukaniu, w doborze i w kolejce zamienności. */
+export function useImportOdsylaczy() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { dostawca: string; plik: string | null; tresc: TrescImportu;
+      mapowanie: MapowanieOdsylaczy | null; zastosuj: boolean }) =>
+      api<RaportImportuOdsylaczy>(`/api/obsluga/wiedza/odsylacze`, { method: "POST", body: JSON.stringify(v) }),
+    onSuccess: (r) => { if (r.zapisano) poWiedzy(qc); },
+  });
+}
+
+export function useHistoriaImportow() {
+  return useQuery({
+    queryKey: kluczeWiedzy.odsylacze,
+    queryFn: () => api<ImportOdsylaczy[]>(`/api/obsluga/wiedza/odsylacze`),
+  });
+}
+
+export function useWycofajImport() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<ImportOdsylaczy>(`/api/obsluga/wiedza/odsylacze/${id}/wycofaj`, { method: "POST" }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
 
 /* ── Zamienność przez wspólny numer oryginału ────────────────────────────────
    Decyzja o PARZE kartotek, nie o wierszu — kandydat wiersza nie ma. */

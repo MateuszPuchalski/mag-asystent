@@ -2582,6 +2582,26 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.467.0 — odsyłacze od dostawców
+
+**Zrób kopię bazy przed startem.** Migracja przebudowuje `towar_identyfikator`
+trzeci raz, bo SQLite nie rozszerza listy źródeł w miejscu. Wiersze
+przepisuje wszystkie, z numerami, a drugi start niczego już nie rusza.
+Kopia jest na wypadek przerwania w połowie.
+
+Przy zatrzymanych usługach:
+
+```powershell
+Copy-Item 'C:\wertis\server\data\wertis.db' 'C:\wertis\server\data\wertis-przed-0467.db'
+```
+
+**Panel trzeba przebudować, a serwer zrestartować.** Tabela `import_odsylaczy`
+powstaje sama.
+
+Sprawdzenie: Wiedza → „Z opisów i ofert” → „Odsyłacze od dostawców”. Wgraj
+cennik z kolumną symbolu i kolumną numerów OEM. Podgląd ma pokazać, ile
+wierszy trafia w kartoteki. Dopiero potem wpisz dostawcę i zapisz.
+
 ### Aktualizacja do 0.464.0 — zakończenie rozmowy
 
 **Panel trzeba przebudować, a serwer zrestartować.** Serwer przy starcie

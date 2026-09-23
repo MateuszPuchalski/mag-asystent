@@ -66,7 +66,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["zamiennosc_oem", "pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika",
+  for (const t of ["import_odsylaczy", "zamiennosc_oem", "pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika",
     "token_silnika_kartoteka", "token_silnika", "model_urzadzenia",
     "dobor_rozmowy", "offer_snapshot",
     "oferta_kartoteka", "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
@@ -291,6 +291,24 @@ test("wpis DLA wariantu wygrywa — druga próba nie rozmywa go wpisem ogólnym"
 });
 
 /* ── Szczeble OEM i pełnego tekstu (E3) ──────────────────────────────────── */
+
+/* Numer z tabeli odsyłaczy dostawcy działa w szczeblu OEM jak numer z opisu —
+   i MÓWI, skąd jest. Czwarta gałąź `zdanieZrodlaNumeru` nie ma prawa
+   przemycić się jako „z opisu kartoteki". */
+test("numer z tabeli odsyłaczy dostawcy trafia szczeblem OEM ze zdaniem o dostawcy", async () => {
+  const O = await import("./odsylacze-dostawcow.js");
+  try {
+    O.importujOdsylacze({ dostawca: "Kramp", tresc: { csv: "Symbol;OEM\nFTC272;4130 713 9999" },
+      mapowanie: { symbol: 0, ean: null, numery: [1], rodzaj: "oem" } }, true, biuro);
+    zapiszDane(rozmowa, { oem: "41307139999" }, 1, biuro);
+    const k = kandydaciDoboru(rozmowa, subiekt).kandydaci.find((x) => x.twId === FTC272);
+    assert.ok(k);
+    assert.equal(k.droga, "oem");
+    assert.match(k.zrodlo, /numer OEM 4130 713 9999 z tabeli odsyłaczy dostawcy Kramp przy kartotece „FTC272”/);
+  } finally {
+    db().prepare("DELETE FROM towar_identyfikator WHERE zrodlo='dostawca'").run();
+  }
+});
 
 test("numer OEM z opisu trafia w kartotekę drogą `oem`, a ta sama kartoteka z zamiennika to JEDEN kandydat", () => {
   pytaniePodOferta("14892374512", "FTC272");
