@@ -3,7 +3,7 @@ import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
   AliasSilnika, Identyfikator, LukaSilnika, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
-  NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, SiecPasowan,
+  NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, SiecWiedzy,
   TokenSilnika, Zabudowa, Zastosowanie,
 } from "./typy";
 
@@ -304,14 +304,15 @@ export function useWycofajZabudowe() {
    Adresy WYŁĄCZNIE tutaj — strażnik w `routes/wiedza.test.ts` czyta ten plik. */
 
 /**
- * Cała sieć pasowań jednym odczytem. Bez zegara, inaczej niż kolejka: sieć
+ * Cała sieć wiedzy jednym odczytem: pasowania, zastosowania, zabudowy
+ * i zamienniki. Bez zegara, inaczej niż kolejka: sieć
  * to wgląd, nie praca, a przerysowany co pół minuty układ przesuwałby węzły
  * spod kursora. Świeżość daje `poWiedzy` po każdym zapisie z tego panelu.
  */
-export function useSiecPasowan() {
+export function useSiecWiedzy() {
   return useQuery({
     queryKey: kluczeWiedzy.siec,
-    queryFn: () => api<SiecPasowan>("/api/obsluga/wiedza/siec"),
+    queryFn: () => api<SiecWiedzy>("/api/obsluga/wiedza/siec"),
   });
 }
 export function useZaproponujPasowanie() {

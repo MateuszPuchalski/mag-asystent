@@ -13,6 +13,7 @@ import { WiedzaTowaru } from "../wiedza/WiedzaTowaru";
 import { ZOpisow } from "../wiedza/ZOpisow";
 import { Silniki } from "../wiedza/Silniki";
 import { Siec } from "../wiedza/Siec";
+import type { Towar } from "../wyszukiwarka";
 
 /* Baza wiedzy zastosowań (§12, etap E2).
 
@@ -21,8 +22,8 @@ import { Siec } from "../wiedza/Siec";
    właściciela, SPRAWDŹ KARTOTEKĘ — co wiemy o części, oraz od E3 Z OPISÓW —
    sekcje „Modele:" z opisów kartotek, które człowiek zamienia na propozycje,
    oraz SILNIKI — które silniki stoją w których maszynach, z listą luk
-   ułożoną po częstości pytań. SIEĆ dochodzi jako szósty: wszystkie pasowania
-   części na jednym obrazku, bez żadnego zapisu.
+   ułożoną po częstości pytań. SIEĆ dochodzi jako szósty: pasowania,
+   zastosowania, silniki i zamienniki na jednym obrazku, bez żadnego zapisu.
 
    Zatwierdza każdy z biura, także autor — decyzja właściciela. Automat nigdy:
    propozycja z zatwierdzonego doboru ląduje TU, nie w wiedzy.
@@ -44,6 +45,9 @@ export function Wiedza() {
   const [widok, setWidok] = useState<Widok>("kolejka");
   const [blad, setBlad] = useState("");
   const [wyslano, setWyslano] = useState("");
+  /* Kartoteka wskazana w sieci. Przejście do „Sprawdź kartotekę" niesie ją
+     ze sobą, bo szukanie tego samego symbolu drugi raz to czysta strata. */
+  const [zSieci, setZSieci] = useState<Towar | null>(null);
 
   const propozycje = kolejka.data?.propozycje ?? [];
   const pasowania = kolejka.data?.pasowania ?? [];
@@ -115,10 +119,13 @@ export function Wiedza() {
               }); }} />
         </>}
 
-        {widok === "kartoteka" && <WiedzaTowaru />}
+        {widok === "kartoteka" && <WiedzaTowaru key={zSieci?.id ?? 0} poczatkowy={zSieci} />}
         {widok === "z-opisow" && <ZOpisow />}
         {widok === "silniki" && <Silniki />}
-        {widok === "siec" && <Siec />}
+        {widok === "siec" && <Siec onOtworzKartoteke={(k) => {
+          setZSieci({ id: k.twId, sym: k.symbol, name: k.nazwa, locs: [] });
+          setWidok("kartoteka");
+        }} />}
       </div>
     </Karta>
   </div>;

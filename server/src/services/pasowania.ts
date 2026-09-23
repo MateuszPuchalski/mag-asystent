@@ -163,7 +163,7 @@ export function aktywnePasowanie(twId: number, doTwId: number, database: Databas
     WHERE tw_id=? AND do_tw_id=? AND stan IN ('propozycja','zatwierdzone') LIMIT 1`).get(twId, doTwId));
 }
 
-function towar(database: DatabaseSync, twId: number): (Kartoteka & { opis: string }) | null {
+export function towar(database: DatabaseSync, twId: number): (Kartoteka & { opis: string }) | null {
   const w = database.prepare("SELECT tw_id, symbol, nazwa, opis FROM sgt_towar WHERE tw_id=?").get(twId) as
     { tw_id: number; symbol: string; nazwa: string; opis: string | null } | undefined;
   return w ? { twId: Number(w.tw_id), symbol: w.symbol, nazwa: w.nazwa, opis: w.opis ?? "" } : null;
@@ -174,7 +174,7 @@ function towar(database: DatabaseSync, twId: number): (Kartoteka & { opis: strin
  * i tylko jednoznaczne (`stan === "jedno"`): symbol zdublowany w Subiekcie
  * nie ma prawa wskazać cudzej części.
  */
-function zamiennikiKartoteki(database: DatabaseSync, t: Kartoteka & { opis: string }): Kartoteka[] {
+export function zamiennikiKartoteki(database: DatabaseSync, t: Kartoteka & { opis: string }): Kartoteka[] {
   if (!t.opis) return [];
   const { znane } = podzielZamienniki(t.opis, t.symbol, (s) => kartotekaPoSku(database, s).stan !== "brak");
   const out: Kartoteka[] = [];
@@ -262,102 +262,12 @@ export function pasowaniaTowaru(twId: number, database: DatabaseSync = db()): {
   };
 }
 
-/* ── Sieć: cała wiedza o pasowaniach naraz ─────────────────────────────── */
-
 /**
- * `pasuje` i `nie_pasuje` to zatwierdzone wiersze, `propozycja` czeka
- * w kolejce, `zamiennik` to odczyt opisu kartoteki. Krawędź zamiennika nie ma
- * wiersza w bazie — tak samo jak przy odczycie `pasowaniaTowaru`.
+ * Wszystkie żywe wiersze: zatwierdzone obu polaryzacji i propozycje. Dla sieci
+ * wiedzy (`siec-wiedzy.ts`), która rysuje całość naraz.
  */
-export type RodzajKrawedzi = "pasuje" | "nie_pasuje" | "propozycja" | "zamiennik";
-
-export interface KrawedzSieci {
-  /** Pasowanie: część, która pasuje. Zamiennik: kartoteka, której opis go podaje. */
-  z: number;
-  /** Pasowanie: do czego pasuje. Zamiennik: symbol wymieniony w opisie. */
-  do: number;
-  rodzaj: RodzajKrawedzi;
-  /** Polaryzacja propozycji — kolejka niesie też negatywy. `null` przy zamienniku. */
-  polaryzacja: Polaryzacja | null;
-  pasowanieId: number | null;
-  rola: RolaPasowania | null;
-  pewnosc: PewnoscZastosowania;
-  /** Oba opisy wymieniają się nawzajem. Tylko przy zamienniku. */
-  obustronnie: boolean;
-  zdanie: string;
-}
-
-export interface SiecPasowan {
-  wezly: Kartoteka[];
-  krawedzie: KrawedzSieci[];
-}
-
-/**
- * Sieć pasowań dla widoku „Sieć" w bazie wiedzy: wszystkie żywe wiersze
- * `pasowanie_czesci` (zatwierdzone obu polaryzacji i propozycje) plus
- * zamienniki z opisów ich końców.
- *
- * DLACZEGO KRAWĘDZIE ZAMIENNIKÓW, A NIE WNIOSKI. `pasowaniaTowaru` liczy
- * przechodniość i oddaje gotowe trafienia „przez zamiennik". Tu tego nie
- * robimy: sieć rysuje PRZESŁANKI, a wniosek widać okiem — uszczelka strzałką
- * do gaźnika, gaźnik kropkami do swojego zamiennika. Narysowane wnioski
- * podwoiłyby krawędzie, a przy gaźniku z pięcioma zamiennikami zasłoniłyby
- * to, co ktoś naprawdę wpisał.
- *
- * GŁĘBOKOŚĆ JEDEN, jak przy odczycie kartoteki. Nowe węzły wnosi wyłącznie
- * opis końca pasowania. Opis zamiennika czytamy tylko po to, żeby poznać
- * krawędź obustronną z węzłem, który już stoi w sieci — inaczej jeden gaźnik
- * z opisem na trzydzieści symboli wciągnąłby pół kartoteki.
- */
-export function siecPasowan(database: DatabaseSync = db()): SiecPasowan {
-  const zywe = wiersze(database, "WHERE p.stan IN ('zatwierdzone','propozycja') ORDER BY p.id");
-  const wezly = new Map<number, Kartoteka>();
-  const krawedzie: KrawedzSieci[] = [];
-
-  for (const p of zywe) {
-    wezly.set(p.czesc.twId, p.czesc);
-    wezly.set(p.doCzego.twId, p.doCzego);
-    const rodzaj: RodzajKrawedzi = p.stan === "propozycja" ? "propozycja" : p.polaryzacja;
-    krawedzie.push({ z: p.czesc.twId, do: p.doCzego.twId, rodzaj, polaryzacja: p.polaryzacja,
-      pasowanieId: p.id, rola: p.rola, pewnosc: p.pewnosc, obustronnie: false, zdanie: p.zdanieZrodla });
-  }
-
-  /* Zamienniki: klucz bez kierunku, bo „A podaje B" i „B podaje A" to jedna
-     linia na rysunku. Drugi kierunek dopisuje się do zdania, nie do rysunku. */
-  const zamienniki = new Map<string, KrawedzSieci>();
-  const dopisz = (kto: Kartoteka, zam: Kartoteka) => {
-    const klucz = kto.twId < zam.twId ? `${kto.twId}~${zam.twId}` : `${zam.twId}~${kto.twId}`;
-    const juz = zamienniki.get(klucz);
-    if (!juz) {
-      zamienniki.set(klucz, { z: kto.twId, do: zam.twId, rodzaj: "zamiennik", polaryzacja: null, pasowanieId: null,
-        rola: null, pewnosc: "prawdopodobne", obustronnie: false,
-        zdanie: `${kto.symbol} podaje ${zam.symbol} jako zamiennik w opisie` });
-    } else if (juz.z !== kto.twId) {
-      juz.obustronnie = true;
-      juz.zdanie = `${wezly.get(juz.z)?.symbol ?? juz.z} i ${wezly.get(juz.do)?.symbol ?? juz.do} podają się nawzajem jako zamienniki w opisach`;
-    }
-  };
-  const konce = [...wezly.values()];
-  for (const k of konce) {
-    const t = towar(database, k.twId);
-    if (!t) continue;
-    for (const z of zamiennikiKartoteki(database, t)) {
-      if (!wezly.has(z.twId)) wezly.set(z.twId, z);
-      dopisz(k, z);
-    }
-  }
-  /* Opisy dołożonych zamienników — wyłącznie po krawędź do węzła, który już stoi. */
-  const konceSet = new Set(konce.map((k) => k.twId));
-  for (const w of [...wezly.values()].filter((w) => !konceSet.has(w.twId))) {
-    const t = towar(database, w.twId);
-    if (!t) continue;
-    for (const z of zamiennikiKartoteki(database, t)) if (wezly.has(z.twId)) dopisz(w, z);
-  }
-
-  return {
-    wezly: [...wezly.values()].sort((a, b) => a.symbol.localeCompare(b.symbol, "pl")),
-    krawedzie: [...krawedzie, ...zamienniki.values()],
-  };
+export function zywePasowania(database: DatabaseSync = db()): Pasowanie[] {
+  return wiersze(database, "WHERE p.stan IN ('zatwierdzone','propozycja') ORDER BY p.id");
 }
 
 /* ── Mutacje ───────────────────────────────────────────────────────────── */

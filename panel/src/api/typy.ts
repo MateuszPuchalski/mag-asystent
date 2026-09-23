@@ -1893,18 +1893,34 @@ export type PasowaniaTowaru = {
   pasujeDo: TrafieniePasowania[]; pasujace: TrafieniePasowania[]; negatywne: Pasowanie[]; propozycje: Pasowanie[];
 };
 
-/* Sieć pasowań (widok „Sieć"). Krawędź zamiennika to odczyt opisu kartoteki,
-   nie wiersz w bazie — stąd `pasowanieId: null` i pewność najwyżej `prawdopodobne`. */
-export type RodzajKrawedzi = "pasuje" | "nie_pasuje" | "propozycja" | "zamiennik";
+/* Sieć wiedzy (widok „Sieć"): cztery warstwy — pasowania część→część,
+   zastosowania część→maszyna/silnik, zabudowy silnik→maszyna i zamienniki
+   z opisów. Kształt z `services/siec-wiedzy.ts`. Krawędź zamiennika to odczyt
+   opisu, nie wiersz — stąd `wierszId: null` i pewność najwyżej `prawdopodobne`. */
+export type RodzajWezla = "kartoteka" | "maszyna" | "silnik";
+
+export type WezelSieci = {
+  /** `tw:<tw_id>` albo `model:<id>`. */
+  klucz: string;
+  rodzaj: RodzajWezla;
+  twId: number | null;
+  /** Krótko, pod węzłem: symbol kartoteki albo „Honda GX160". */
+  etykieta: string;
+  nazwa: string;
+};
+
+export type WarstwaSieci = "pasowania" | "zastosowania" | "zabudowy" | "zamienniki";
+export type RodzajKrawedzi = "pasuje" | "nie_pasuje" | "propozycja" | "zabudowa" | "zamiennik";
 
 export type KrawedzSieci = {
-  /** Pasowanie: część, która pasuje. Zamiennik: kartoteka, której opis go podaje. */
-  z: number;
-  /** Pasowanie: do czego pasuje. Zamiennik: symbol wymieniony w opisie. */
-  do: number;
+  /** Część, silnik albo kartoteka, której opis podaje zamiennik. */
+  z: string;
+  /** Do czego pasuje, w czym stoi albo symbol wymieniony w opisie. */
+  do: string;
+  warstwa: WarstwaSieci;
   rodzaj: RodzajKrawedzi;
   polaryzacja: "pasuje" | "nie_pasuje" | null;
-  pasowanieId: number | null;
+  wierszId: number | null;
   rola: RolaPasowania | null;
   pewnosc: "potwierdzone" | "prawdopodobne";
   obustronnie: boolean;
@@ -1912,7 +1928,7 @@ export type KrawedzSieci = {
   zdanie: string;
 };
 
-export type SiecPasowan = { wezly: KartotekaPasowania[]; krawedzie: KrawedzSieci[] };
+export type SiecWiedzy = { wezly: WezelSieci[]; krawedzie: KrawedzSieci[] };
 
 export type NowePasowanie = {
   twId: number; doTwId: number; rola: RolaPasowania; pozycja?: string | null;

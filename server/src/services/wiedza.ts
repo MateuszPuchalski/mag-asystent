@@ -325,6 +325,16 @@ export function zastosowaniaTowaru(twId: number, database: DatabaseSync = db()):
   };
 }
 
+/**
+ * Wszystkie żywe zastosowania naraz — zatwierdzone obu polaryzacji
+ * i propozycje. Dla sieci wiedzy, która rysuje część → maszynę.
+ */
+export function zyweZastosowania(database: DatabaseSync = db()): Zastosowanie[] {
+  return naZastosowania(database, database.prepare(
+    `${SELECT} WHERE z.stan IN ('zatwierdzone','propozycja') ORDER BY z.id`)
+    .all() as Array<Record<string, unknown>>);
+}
+
 /** ZATWIERDZONE zastosowania modelu — to z nich biorą się kandydaci i ostrzeżenia. */
 export function zastosowaniaModelu(klucz: string, database: DatabaseSync = db()): Zastosowanie[] {
   return naZastosowania(database, database.prepare(
