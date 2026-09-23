@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.460.0 — 23 września 2026
+
+**[wymaga działania] Koniec eksperymentu z odłożonym skutkiem; nowy tryb
+`--zrzut`.** Nowy `wertis-sfera-worker.exe` z artefaktu CI: zatrzymaj
+`wertis-sfera`, podmień plik i uruchom usługę.
+
+Zadania `#1490`–`#1494` odmówiły zapisu także z odłożonym skutkiem
+magazynowym. Przyczyna nie siedzi więc w magazynie, a worker wraca do zapisu
+ze skutkiem. Tego dnia odpadły też wydruk po zapisie i ukryte okno Subiekta.
+Przebieg z widocznym oknem odmówił tak samo i bez komunikatu.
+
+Jedyny ślad: `PozycjaTypPromocji` odmawia na każdym wierszu odrzuconego szkicu
+kodem `0x8004197F`. Nowy tryb `--zrzut <dok_Id>` czyta istniejący dokument
+tą samą drogą z C#, bez kolejki i bez zapisu. Przebieg na ręcznym ZW pokaże,
+czy zapisany dokument też odmawia tego pola.
+
+Opis i komenda stoją w `docs/sfera-com.md` §2m.
+
 ## 0.459.0 — 23 września 2026
 
 **[wymaga działania] Eksperyment: ZW z odłożonym skutkiem magazynowym.**

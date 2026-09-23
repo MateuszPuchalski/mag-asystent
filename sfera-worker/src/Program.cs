@@ -11,7 +11,8 @@ namespace WertisSferaWorker;
 
    Flagi:
      --dry-run  pętla bez Sfery (DryRunAdapter) — przebieg próbny, także Linux
-     --once     jeden tick i koniec — do testów                                */
+     --once     jeden tick i koniec — do testów
+     --zrzut N  zrzut pól istniejącego dokumentu o dok_Id N, tylko odczyt     */
 
 public static class Program
 {
@@ -28,6 +29,29 @@ public static class Program
            jako LocalSystem — i tam Subiekt w tle oddał pusty obiekt. Bez tej
            linii nie było jak odróżnić złego konta od złej nazwy. */
         Console.WriteLine($"[sfera] konto Windows: {SferaComAdapter.KontoProcesu()}");
+
+        /* ZRZUT ISTNIEJĄCEGO DOKUMENTU (0.460.0) — przed strażą SFERA_WORKER,
+           bo nie dotyka kolejki: wczytuje dokument, wypisuje pola, zamyka.
+           Służy zestawieniu ręcznego ZW z odmową tą samą drogą odczytu. */
+        int iz = Array.IndexOf(args, "--zrzut");
+        if (iz >= 0)
+        {
+            if (iz + 1 >= args.Length || !int.TryParse(args[iz + 1], out var dokId) || dokId <= 0)
+            {
+                Console.Error.WriteLine("[sfera] --zrzut wymaga dok_Id, np. --zrzut 9253431");
+                return 1;
+            }
+            try
+            {
+                Console.WriteLine(new SferaComAdapter(env).ZrzutIstniejacego(dokId));
+                return 0;
+            }
+            catch (Exception e)
+            {
+                Console.Error.WriteLine($"[sfera] zrzut dokumentu {dokId} nieudany: {e.Message}");
+                return 1;
+            }
+        }
 
         /* Bez SFERA_WORKER=1 zadania mm bierze worker Node — drugi wykonawca
            tej samej kolejki to wyścig, w dry-run tym groźniejszy, że oznaczałby
