@@ -103,6 +103,9 @@ const TRASY = () => [
      czego szukać. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/zamowienie`,
     payload: { externalId: "ord-1" } },
+  /* Paczka zamówienia rozmowy (23 września 2026) — ta sama bramka: stan
+     przesyłki należy do cudzego zakupu. */
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/przesylka` },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/kartoteka`,
     payload: { ofertaId: "14892374512", twId: null } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/send`,

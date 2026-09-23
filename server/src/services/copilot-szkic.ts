@@ -27,6 +27,12 @@ import { bezPodpisu, zwin } from "../tekst.js";
 import { identyfikatoryZOpisu, type RodzajIdentyfikatora } from "./identyfikatory.js";
 import { zapiszWiedzeZOferty } from "./wiedza-z-oferty.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
+import { numerZamowieniaRozmowy } from "./zamowienia-kandydaci.js";
+import {
+  idZamowienia, przesylkaDoOdswiezenia, przesylkaZamowienia, sprawdzPrzesylke, zdaniePrzesylki,
+  type PrzesylkaDeps,
+} from "./przesylka-zamowienia.js";
+import { config } from "../config.js";
 import { ofertyPoSygnaturze, type LinkDoOferty } from "./allegro-oferty-po-sygnaturze.js";
 import {
   przygotujZdjeciaRozmowy, spisZdjec, type Pobieracz, type WynikZdjec, type ZdjecieZBramki,
@@ -69,7 +75,11 @@ export type RodzajFaktu =
      jest następny krok. Osobny rodzaj, bo to jedyny fakt, który jest
      PRZYPUSZCZENIEM automatu, a nie danymi firmy — model ma go użyć do
      wyboru tematu odpowiedzi, nie cytować jako prawdy. */
-  | "rozpoznanie";
+  | "rozpoznanie"
+  /* Stan paczki zamówienia rozmowy (23 września 2026). Osobny rodzaj, bo
+     niesie datę sprawdzenia: to stan z chwili pytania Allegro, nie z chwili
+     czytania szkicu, i model ma go podać jako taki. */
+  | "przesylka";
 
 export interface Fakt { id: string; rodzaj: RodzajFaktu; zdanie: string }
 
@@ -971,6 +981,16 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
         ? "; sprawa wymaga decyzji człowieka — nie obiecuj rozstrzygnięcia" : ""));
   }
 
+  /* PRZESYŁKA, GDY KLIENT PISZE POD ZAMÓWIENIEM (23 września 2026). Fakt
+     stoi przy każdej rozmowie z zamówieniem, nie tylko przy rozpoznaniu
+     „gdzie paczka": pytanie o fakturę czy zwrot też bywa odpowiadane
+     zdaniem „paczka jest jeszcze w drodze". Czytamy ZAPISANY stan — świeży
+     dociąga `ulozSzkic`, bo ta funkcja zostaje czystym odczytem. */
+  const numerZam = numerZamowieniaRozmowy(conversationId);
+  const idZam = numerZam ? idZamowienia(db(), numerZam.konto, numerZam.externalId) : null;
+  const zdanieP = idZam === null ? null : zdaniePrzesylki(przesylkaZamowienia(db(), idZam));
+  if (zdanieP) dodaj("przesylka", zdanieP);
+
   /* Intake dopiero, gdy nie ma wyboru POTWIERDZONEGO: przy dowodzie w bazie
      pytania o wymiary byłyby udawaniem, że nie wiemy. I tylko przy prośbie
      o TOWAR (22 września 2026): pytania o maszynę przy „gdzie paczka"
@@ -1055,6 +1075,23 @@ export function dopiszLinkiOfert(
 }
 
 /**
+ * Dociąga stan paczki zamówienia rozmowy, gdy zapisany jest pusty albo stary.
+ *
+ * Bez sparowanego konta nie pytamy — wzorzec tras reklamacji i dyskusji. Deps
+ * przekazane jawnie (testy) omijają ten wyłącznik, bo wstrzykują własne
+ * zapytanie i nie dotykają sieci.
+ */
+export async function odswiezPrzesylke(
+  conversationId: number, deps?: PrzesylkaDeps, teraz = Date.now(),
+): Promise<void> {
+  if (!deps && !config.allegro.clientId) return;
+  const numer = numerZamowieniaRozmowy(conversationId);
+  const id = numer ? idZamowienia(db(), numer.konto, numer.externalId) : null;
+  if (id === null || !przesylkaDoOdswiezenia(przesylkaZamowienia(db(), id), teraz)) return;
+  await sprawdzPrzesylke(db(), id, deps).catch(() => undefined);
+}
+
+/**
  * Ułożenie szkicu: fakty → model → SPRAWDZENIE → zapis. Rzuca, gdy dostawca
  * odmówił albo gdy model wyszedł poza fakty; w obu razach wywołanie było
  * płatne i ląduje w księdze jako `blad`.
@@ -1074,7 +1111,7 @@ export type AutorSzkicu = { id: number | null; name: string };
 export async function ulozSzkic(
   conversationId: number, kto: AutorSzkicu,
   nadaj: NadawcaSzkicu, subiekt: SubiektAdapter, teraz = new Date(),
-  pobierzZdjecie?: Pobieracz,
+  pobierzZdjecie?: Pobieracz, przesylka?: PrzesylkaDeps,
 ): Promise<SzkicCopilota> {
   /* TREŚĆ OFERTY PRZED KONTEKSTEM (0.253.0). Opis, parametry i lista
      zgodności kosztują żądanie NA OFERTĘ, więc idą po nie wyłącznie stąd:
@@ -1086,6 +1123,12 @@ export async function ulozSzkic(
      do 0.252.0. Limit z Allegro przerywa, bo drugie żądanie pogłębia przerwę. */
   const oferta = ofertaRozmowy(db(), conversationId);
   if (oferta) await dociagnijTresc(oferta.konto, oferta.ofertaId);
+
+  /* STAN PACZKI PRZED KONTEKSTEM (23 września 2026), z tego samego powodu co
+     treść oferty: dwa żądania do Allegro wolno wysłać tylko stąd, a nie
+     z otwarcia rozmowy. Odmowa Allegro nie przerywa szkicu — zostaje stan
+     zapisany wcześniej albo milczenie, a to jest szkic sprzed tego wydania. */
+  await odswiezPrzesylke(conversationId, przesylka);
 
   const kontekst = kontekstSzkicu(conversationId, subiekt);
 

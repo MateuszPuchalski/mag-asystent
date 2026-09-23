@@ -63,6 +63,13 @@ beforeEach(() => {
     if (url.startsWith("/api/biuro/dostawy/analiza?dni=")) return new Response(JSON.stringify({ analiza: DOSTAWY }));
     if (url.startsWith("/api/analiza?days=")) return new Response(JSON.stringify(hala(wydajnosc)));
     if (url.startsWith("/api/metrics?days=")) return new Response(JSON.stringify(METRYKI));
+    if (url.startsWith("/api/analiza/obsluga?days=")) return new Response(JSON.stringify({
+      dni: 30, daneDo: "2026-09-22T12:31:00.000Z",
+      ogolem: { n: 42, medianaMin: 38, p90Min: 250 },
+      wgKategorii: [{ klucz: "PRODUCT_COMPATIBILITY", n: 20, medianaMin: 95 },
+        { klucz: "nierozpoznane", n: 3, medianaMin: 12 }],
+      wgOsoby: null, czekaTeraz: { n: 2, najdluzejMin: 130 },
+    }));
     if (url === "/api/biuro/zbiorki/kandydaci") {
       return new Response(JSON.stringify({ okno: null, prog: 0, kandydaci: [], juzWStrefie: 0, bezReguly: 0 }));
     }
@@ -145,5 +152,24 @@ describe("Analiza w panelu", () => {
     await userEvent.upload(screen.getByLabelText("Plik CSV zbiórek"), plik);
     await screen.findByText(/Wgrano 3 wierszy/);
     expect(zapisy).toEqual([`POST /api/biuro/zbiorki/import ${JSON.stringify({ csv: "symbol;data\nHM-1;2026-09-01" })}`]);
+  });
+});
+
+/* ── Zakres OBSŁUGA KLIENTA (23 września 2026) ───────────────────────────────
+   Luka zapisana w ekranie od 0.440.0. Pilnujemy trzech rzeczy: zakres pobiera
+   tylko siebie, nie zapisuje nic i nie rysuje karty osób, gdy serwer jej
+   nie przysłał (rola biuro). */
+describe("zakres Obsługa klienta", () => {
+  it("pokazuje medianę i kategorie, bez karty osób dla biura, bez zapisu", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    await userEvent.click(screen.getByRole("button", { name: "Obsługa klienta" }));
+    await screen.findByText("Czas odpowiedzi klientowi");
+    expect(adresy).toContain("/api/analiza/obsluga?days=30");
+    expect(screen.getByText("38 min")).toBeInTheDocument();
+    expect(screen.getByText("Dobór")).toBeInTheDocument();
+    expect(screen.getByText("nierozpoznane")).toBeInTheDocument();
+    expect(screen.queryByText("Według osoby")).toBeNull();
+    expect(zapisy).toEqual([]);
   });
 });

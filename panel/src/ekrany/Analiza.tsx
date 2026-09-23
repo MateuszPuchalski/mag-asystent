@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 import { BarChart3, Download } from "lucide-react";
 import { pobierzPlik } from "../api/klient";
-import { useAnaliza, useAnalizaDostaw, useMetryki } from "../api/wglad";
+import { useAnaliza, useAnalizaDostaw, useCzasOdpowiedzi, useMetryki } from "../api/wglad";
 import { Blad, FiltrSegmentowy, Karta, Przycisk, czas } from "../ui";
 import { ZakresDostaw } from "../analiza/ZakresDostaw";
 import { ZakresHali } from "../analiza/ZakresHali";
 import { Strefa } from "../analiza/Strefa";
+import { ZakresObslugi } from "../analiza/ZakresObslugi";
 
 /* ── ANALIZA (0.440.0) ───────────────────────────────────────────────────
    Przeniesiona z ANALIZY w `biuro.html`. Wgląd, nie praca: nic tu nie czeka
@@ -22,26 +23,29 @@ import { Strefa } from "../analiza/Strefa";
    są problemy" jest pytaniem, z którym się tu przychodzi. Makieta F0 stawia
    je na starcie tak samo.
 
-   ZAKRESU „OBSŁUGA KLIENTA" NIE MA, choć makieta F0 go pokazała: nie ma dla
-   niego źródła danych, a przeprowadzka nie wymyśla liczb. Luka stoi w §7.
+   ZAKRES „OBSŁUGA KLIENTA" doszedł 23 września 2026. Do tej wersji go nie
+   było, choć makieta F0 go pokazała: brakowało źródła danych, a przeprowadzka
+   nie wymyśla liczb. Źródłem jest czas odpowiedzi liczony z wiadomości —
+   patrz `analiza/ZakresObslugi.tsx`.
 
    Pobierany jest WYŁĄCZNIE widoczny zakres — ta sama zasada, która trzymała
    biuro: nie pobiera się danych, na które nikt nie patrzy. */
 
-type Zakres = "dostawy" | "hala";
+type Zakres = "dostawy" | "hala" | "obsluga";
 
-const OKNA: Record<Zakres, number[]> = { dostawy: [30, 90, 180], hala: [7, 30, 90] };
+const OKNA: Record<Zakres, number[]> = { dostawy: [30, 90, 180], hala: [7, 30, 90], obsluga: [7, 30, 90] };
 
 export function Analiza() {
   const [zakres, setZakres] = useState<Zakres>("dostawy");
-  const [okna, setOkna] = useState<Record<Zakres, number>>({ dostawy: 90, hala: 7 });
+  const [okna, setOkna] = useState<Record<Zakres, number>>({ dostawy: 90, hala: 7, obsluga: 30 });
   const dni = okna[zakres];
   const dostawy = useAnalizaDostaw(okna.dostawy, zakres === "dostawy");
   const hala = useAnaliza(okna.hala, zakres === "hala");
   const metryki = useMetryki(okna.hala, zakres === "hala");
+  const obsluga = useCzasOdpowiedzi(okna.obsluga, zakres === "obsluga");
   const [bladCsv, setBladCsv] = useState("");
 
-  const biezacy = zakres === "dostawy" ? dostawy : hala;
+  const biezacy = zakres === "dostawy" ? dostawy : zakres === "hala" ? hala : obsluga;
   /* „Dane do…" — DO KTÓREJ CHWILI sięga zestawienie, liczone z najświeższego
      rekordu, nie z zegara serwera. Zegar mówiłby „przed chwilą" nawet wtedy,
      gdy kolektory od wczoraj nic nie dosyłają. */
@@ -67,6 +71,7 @@ export function Analiza() {
           <FiltrSegmentowy<Zakres> wybrany={zakres} onWybierz={setZakres} pozycje={[
             { klucz: "dostawy", etykieta: "Dostawy", podpowiedz: "U kogo są problemy — dostawcy i wyjątki" },
             { klucz: "hala", etykieta: "Praca hali", podpowiedz: "Tempo, szczyty, wyszukiwania, kolektory" },
+            { klucz: "obsluga", etykieta: "Obsługa klienta", podpowiedz: "Czas odpowiedzi klientowi" },
           ]} /></nav>
         <div role="group" aria-label="Okno analizy" className="flex gap-1">
           <FiltrSegmentowy<number> wybrany={dni} onWybierz={(d) => setOkna((o) => ({ ...o, [zakres]: d }))}
@@ -80,6 +85,7 @@ export function Analiza() {
         pustką — liczby nie skaczą do zera i z powrotem. */}
     <div className={`space-y-4 ${biezacy.isPlaceholderData ? "opacity-60" : ""}`}>
       {zakres === "dostawy" && dostawy.data && <ZakresDostaw a={dostawy.data} />}
+      {zakres === "obsluga" && obsluga.data && <ZakresObslugi a={obsluga.data} />}
       {zakres === "hala" && hala.data && <>
         <ZakresHali a={hala.data} m={metryki.data} />
         <Strefa />

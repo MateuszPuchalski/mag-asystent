@@ -47,7 +47,7 @@ function zalogowany(rola: Rola): string {
 /* Analiza dostaw (0.100.0) dzieli tę bramkę, choć jej dane nie są imienne.
    Powód jest inny i wypisany przy trasie: karta odpowiada na „u którego
    dostawcy jest problem", a to ocena kontrahenta, nie stan magazynu. */
-const CHRONIONE = ["/api/analiza", "/api/analiza/csv", "/api/biuro/dostawy/analiza"];
+const CHRONIONE = ["/api/analiza", "/api/analiza/csv", "/api/biuro/dostawy/analiza", "/api/analiza/obsluga"];
 
 test("bez sesji 401 — dane o ludziach nie mają prawa być otwarte", async () => {
   for (const url of CHRONIONE) {
@@ -169,3 +169,16 @@ test("eksport CSV zostawia ślad w audycie", async () => {
   assert.equal(wpis.n, 1);
 });
 
+
+test("czas odpowiedzi: biuro bez rozbicia na osoby, administrator z nim", async () => {
+  /* 23 września 2026. Ta sama reguła co raport wydajności: dane o pracy
+     ludzi opuszczają serwer wyłącznie w odpowiedzi dla administratora. */
+  const czytaj = async (t: string) => (await app.inject({
+    method: "GET", url: "/api/analiza/obsluga?days=30", headers: { "x-session": t } })).json();
+  const biuro = await czytaj(zalogowany("biuro"));
+  assert.equal(biuro.dni, 30);
+  assert.equal(biuro.wgOsoby, null);
+  assert.ok(Array.isArray(biuro.wgKategorii));
+  const admin = await czytaj(zalogowany("admin"));
+  assert.ok(Array.isArray(admin.wgOsoby));
+});

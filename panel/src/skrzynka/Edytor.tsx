@@ -154,8 +154,16 @@ export function Edytor({
 
               `resize-y`: kto pisze dłuższą odpowiedź, rozciąga pole sam. */}
           <textarea className="field min-h-[200px] resize-y text-tresc" value={szkic}
-            aria-label="Szkic odpowiedzi"
+            aria-label="Szkic odpowiedzi" aria-keyshortcuts="Control+Enter"
             onChange={(e) => onZmiana(e.target.value)}
+            /* CTRL+ENTER WYSYŁA (23 września 2026). Ten sam warunek co przycisk
+               niżej — skrót nie ma prawa ominąć blokady cudzej rozmowy. Sam
+               Enter zostaje nową linią, bo odpowiedź ma akapity. */
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
+              e.preventDefault();
+              if (!cudza && !wysyla && szkic.trim()) onWyslij();
+            }}
             placeholder="Szkic odpowiedzi — współdzielony z zespołem" />
           {/* ── JEDNO DZIAŁANIE MA BYĆ NAJGŁOŚNIEJSZE (0.247.0) ───────────────
               Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na
@@ -175,7 +183,11 @@ export function Edytor({
           <div className="mt-3 flex items-center gap-3">
             <Przycisk wariant="glowny" onClick={onWyslij} disabled={cudza || wysyla || !szkic.trim()}
               className="px-5 py-2.5 text-tresc shadow-sm">
-              <Send size={17} />{wysyla ? "Wysyłam…" : "Wyślij do klienta"}</Przycisk>
+              <Send size={17} />{wysyla ? "Wysyłam…" : "Wyślij do klienta"}
+              {/* Skrót NA PRZYCISKU (dekalog, punkt 2): o skrócie, o którym nikt
+                  nie wie, nikt nie skorzysta. Poza nazwą dostępną przycisku. */}
+              <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans text-podpis">Ctrl+Enter</kbd>
+            </Przycisk>
             <button type="button" onClick={onZapisz} disabled={cudza || zapisuje}
               className="text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:text-slate-300">
               {zapisuje ? "Zapisuję…" : "Zapisz szkic"}</button>

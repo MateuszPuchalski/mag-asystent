@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
@@ -23,6 +23,30 @@ import { paraPasowania, propozycjaDoboru } from "../skrzynka/propozycjaDoboru";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
+import { OKNO_COFNIECIA_MS, Odlozone, nastepnaRozmowa, type Odlozona } from "../skrzynka/Odlozone";
+import { useSygnaly } from "../skrzynka/Sygnaly";
+
+type Paczka = Parameters<ReturnType<typeof useWyslij>["mutateAsync"]>[0];
+
+/** Odłożona wysyłka z tym, czego trzeba, żeby ją wysłać albo cofnąć. */
+interface Wpis extends Odlozona {
+  paczka: Paczka;
+  body: string;
+  /** Błąd z serwera, gdy wysyłka odpadła — z nim wraca się do rozmowy. */
+  blad?: unknown;
+}
+
+/* Zdanie o odmowie serwera do dymka pod ekranem. Konflikty mają własne
+   zdania, bo to one mówią agentowi, CO zastanie po powrocie do rozmowy. */
+function opisBledu(e: unknown): string {
+  if (e instanceof Konflikt) {
+    const s = e.szczegoly as SzczegolyWysylki & SzczegolyKonfliktu;
+    if (s?.nowaWiadomosc !== undefined) return "klient dopisał w międzyczasie";
+    if (s?.trzymajacyName) return `przy rozmowie siedzi ${s.trzymajacyName}`;
+    if (s?.assignedUserId != null) return "rozmowę prowadzi ktoś inny";
+  }
+  return e instanceof Error ? e.message : String(e);
+}
 
 export function Skrzynka() {
   /* Wybrana rozmowa siedzi w ADRESIE, nie w stanie komponentu. Do 0.146.0
@@ -89,7 +113,18 @@ export function Skrzynka() {
   const [bladStatusu, setBladStatusu] = useState("");
   const [przyRozmowie, setPrzyRozmowie] = useState<string | null>(null);
 
+  /* ── ODŁOŻONE WYSYŁKI I NASTĘPNA ROZMOWA (23 września 2026) ─────────────
+     Patrz `skrzynka/Odlozone.tsx`. Kolejka podaje listę WIDOCZNYCH rozmów
+     (po kubełku i szukaniu), bo „następna" ma znaczyć następną w tym, co
+     agent właśnie przerabia — nie w całej skrzynce. */
+  const [odlozone, setOdlozone] = useState<Wpis[]>([]);
+  const timery = useRef(new Map<number, ReturnType<typeof setTimeout>>());
+  const widoczne = useRef<number[]>([]);
+  const przywroc = useRef<{ rozmowaId: number; body: string; blad?: unknown } | null>(null);
+
   const { obecnosc } = useSzynaZdarzen(wybranaId, () => setNowa(true));
+  /* Licznik w tytule karty i powiadomienia systemowe — `skrzynka/Sygnaly.ts`. */
+  const sygnaly = useSygnaly(lista.data?.rozmowy, (x) => nawiguj(`/obsluga/skrzynka/${x}`));
   /* Samo wejście w pytanie trzyma je dla tego agenta — do wyjścia albo do
      odpowiedzi, która przydziela je na stałe (decyzja właściciela, 0.159.0). */
   useUchwytRozmowy(wybranaId);
@@ -106,6 +141,20 @@ export function Skrzynka() {
     setKonflikt(null); setBladKonfliktu(""); setBladOferty("");
     setKonfliktWysylki(null); setBladWysylki(""); setBladStatusu(""); setPrzyRozmowie(null);
     setBladSzkicu("");
+    /* Powrót po „Cofnij" albo po odmowie odłożonej wysyłki: treść wraca do
+       pola, a konflikt — do swojego dialogu. Dopiero gdy rozmowa się wczytała,
+       inaczej szkic z serwera nadpisałby przywróconą treść chwilę później. */
+    const p = przywroc.current;
+    if (p && rozmowa.data?.rozmowa.id === p.rozmowaId) {
+      przywroc.current = null;
+      setSzkic(p.body);
+      if (p.blad instanceof Konflikt) {
+        const sz = p.blad.szczegoly as SzczegolyWysylki & SzczegolyKonfliktu;
+        if (sz?.nowaWiadomosc !== undefined) setKonfliktWysylki(sz);
+        else if (sz?.trzymajacyName) setPrzyRozmowie(sz.trzymajacyName);
+        else if (sz?.assignedUserId != null) setKonflikt(sz);
+      }
+    }
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
 
   const zglos = (e: unknown) =>
@@ -117,8 +166,86 @@ export function Skrzynka() {
   const ostatniaKlienta = [...(rozmowa.data?.os ?? [])].reverse()
     .find((w) => w.rodzaj === "wiadomosc" && w.odKlienta)?.messageId ?? null;
 
+  const zmienOdlozona = (klucz: number, zmiana: Partial<Wpis>) =>
+    setOdlozone((l) => l.map((o) => (o.klucz === klucz ? { ...o, ...zmiana } : o)));
+  const usunOdlozona = (klucz: number) => {
+    clearTimeout(timery.current.get(klucz));
+    timery.current.delete(klucz);
+    setOdlozone((l) => l.filter((o) => o.klucz !== klucz));
+  };
+
+  /* `mutateAsync`, nie `mutate`: kilka odłożonych wysyłek bywa w locie naraz,
+     a wywołania zwrotne `mutate` dostaje wyłącznie OSTATNIE wywołanie. */
+  function wyslijOdlozona(w: Wpis) {
+    timery.current.delete(w.klucz);
+    zmienOdlozona(w.klucz, { stan: { rodzaj: "wysyla" } });
+    wyslij.mutateAsync(w.paczka).then((r) => {
+      if (r.status === "sent") {
+        zmienOdlozona(w.klucz, { stan: { rodzaj: "wyslana" } });
+        setTimeout(() => setOdlozone((l) => l.filter((o) => o.klucz !== w.klucz)), 4000);
+      } else {
+        zmienOdlozona(w.klucz, { stan: { rodzaj: "blad",
+          komunikat: "wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj wątek" } });
+      }
+    }).catch((e: unknown) => zmienOdlozona(w.klucz, { blad: e, stan: { rodzaj: "blad", komunikat: opisBledu(e) } }));
+  }
+
+  /** Powrót do rozmowy z treścią — po „Cofnij" albo po odmowie serwera. */
+  function wrocDo(w: Wpis, blad?: unknown) {
+    usunOdlozona(w.klucz);
+    if (wybranaId === w.rozmowaId && rozmowa.data?.rozmowa.id === w.rozmowaId) {
+      /* Agent nie odszedł — efekt zmiany rozmowy się nie odpali. */
+      przywroc.current = null;
+      setSzkic(w.body);
+      if (blad) zglos(blad);
+      return;
+    }
+    przywroc.current = { rozmowaId: w.rozmowaId, body: w.body, blad };
+    nawiguj(`/obsluga/skrzynka/${w.rozmowaId}`);
+  }
+
+  /* Wyjście z ekranu skrzynki w trakcie odliczania to NIE cofnięcie: agent
+     kliknął „Wyślij", więc odpowiedź wychodzi od razu, zamiast przepaść.
+     Zamknięcie karty to inna sprawa — o nie pyta `beforeunload` niżej. */
+  const odlozoneRef = useRef(odlozone);
+  odlozoneRef.current = odlozone;
+  useEffect(() => () => {
+    for (const w of odlozoneRef.current) {
+      if (w.stan.rodzaj !== "czeka") continue;
+      clearTimeout(timery.current.get(w.klucz));
+      void wyslij.mutateAsync(w.paczka).catch(() => {});
+    }
+  }, []);
+  const czekajace = odlozone.some((o) => o.stan.rodzaj === "czeka" || o.stan.rodzaj === "wysyla");
+  useEffect(() => {
+    if (!czekajace) return;
+    const f = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", f);
+    return () => window.removeEventListener("beforeunload", f);
+  }, [czekajace]);
+
   function wyslijOdpowiedz(mimoNowejWiadomosci = false, mimoObecnosci = false) {
     if (!rozmowa.data) return;
+    /* Zwykłe „Wyślij" idzie przez dziesięć sekund na cofnięcie i od razu
+       prowadzi do następnej rozmowy. Wysyłka PO JAWNEJ ZGODZIE z dialogu
+       konfliktu („odpowiedz mimo to") idzie wprost: agent właśnie tę decyzję
+       podjął przy tej rozmowie i czeka na jej wynik tutaj. */
+    if (!mimoNowejWiadomosci && !mimoObecnosci) {
+      const w: Wpis = {
+        klucz: Date.now() + Math.random(), rozmowaId: rozmowa.data.rozmowa.id,
+        klient: rozmowa.data.rozmowa.klient, body: szkic,
+        stan: { rodzaj: "czeka", doKiedy: Date.now() + OKNO_COFNIECIA_MS },
+        paczka: { id: rozmowa.data.rozmowa.id, body: szkic,
+          expectedVersion: rozmowa.data.rozmowa.wersja, expectedLastMessageId: ostatniaKlienta },
+      };
+      setOdlozone((l) => [...l, w]);
+      timery.current.set(w.klucz, setTimeout(() => wyslijOdlozona(w), OKNO_COFNIECIA_MS));
+      setSzkic("");
+      /* NASTĘPNA W TYM, CO WIDAĆ — patrz `nastepnaRozmowa`. */
+      const nast = nastepnaRozmowa(widoczne.current, w.rozmowaId);
+      if (nast !== null) nawiguj(`/obsluga/skrzynka/${nast}`);
+      return;
+    }
     setBladWysylki("");
     wyslij.mutate({
       id: rozmowa.data.rozmowa.id, body: szkic,
@@ -154,6 +281,45 @@ export function Skrzynka() {
       },
     });
   }
+
+  /* JEDEN PRZYCISK (22 września 2026): pusty szkic dostaje treść, pełny
+     jest zastępowany — napis przycisku mówi to agentowi PRZED kliknięciem.
+     Ocena zostaje zapisana, bo to ona chowa kartę po użyciu; los szkicu
+     liczy już wysyłka (`szkic_los`), nie to kliknięcie. */
+  function poprawSzkicem() {
+    const t = rozmowa.data?.szkicCopilota?.tresc;
+    if (!rozmowa.data || !t) return;
+    const zastepuje = szkic.trim() !== "";
+    setSzkic(t);
+    ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id,
+      ocena: zastepuje ? "zastapiony" : "wstawiony" });
+  }
+  function odrzucSzkic() {
+    if (rozmowa.data) ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "odrzucony" });
+  }
+
+  /* ── E I R PRZY KARCIE SZKICU (23 września 2026) ────────────────────────
+     „Popraw w edytorze" i „Odrzuć" z klawiatury, ten sam strażnik co
+     w kolejce: pole tekstowe wygrywa zawsze, bo „e" w słowie „jest" nie może
+     wstawiać szkicu. Klawisze działają tylko przy karcie na ekranie —
+     z cudzą rozmową albo bez propozycji nie robią nic. */
+  const kartaWidoczna = Boolean(rozmowa.data?.szkicCopilota && rozmowa.data.szkicCopilota.ocena === null)
+    && !(rozmowa.data?.rozmowa.wlascicielId != null
+      && rozmowa.data.rozmowa.wlascicielId !== (ja.data?.user.userId ?? null));
+  const skrot = useRef({ popraw: poprawSzkicem, odrzuc: odrzucSzkic, widoczna: kartaWidoczna });
+  skrot.current = { popraw: poprawSzkicem, odrzuc: odrzucSzkic, widoczna: kartaWidoczna };
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT"
+        || el.isContentEditable)) return;
+      if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing || !skrot.current.widoczna) return;
+      if (e.key === "e" || e.key === "E") { e.preventDefault(); skrot.current.popraw(); }
+      if (e.key === "r" || e.key === "R") { e.preventDefault(); skrot.current.odrzuc(); }
+    };
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, []);
 
   const jestemAdminem = ja.data?.user.role === "admin";
   const alarm = Boolean(zdrowie.data?.allegroInbox.alarm);
@@ -197,6 +363,8 @@ export function Skrzynka() {
       mojeId={ja.data?.user.userId ?? null}
       laduje={lista.isLoading}
       onOdswiez={() => lista.refetch()}
+      onWidoczne={(ids) => { widoczne.current = ids; }}
+      powiadomienia={sygnaly}
       onWybierz={(x) => nawiguj(`/obsluga/skrzynka/${x}`)} />
 
     <div className="flex min-h-0 flex-col gap-4">
@@ -262,16 +430,8 @@ export function Skrzynka() {
            jest zastępowany — napis przycisku mówi to agentowi PRZED kliknięciem.
            Ocena zostaje zapisana, bo to ona chowa kartę po użyciu; los szkicu
            liczy już wysyłka (`szkic_los`), nie to kliknięcie. */
-        onPopraw: () => {
-          const t = rozmowa.data?.szkicCopilota?.tresc;
-          if (!rozmowa.data || !t) return;
-          const zastepuje = szkic.trim() !== "";
-          setSzkic(t);
-          ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id,
-            ocena: zastepuje ? "zastapiony" : "wstawiony" });
-        },
-        onOdrzuc: () => rozmowa.data
-          && ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "odrzucony" }),
+        onPopraw: poprawSzkicem,
+        onOdrzuc: odrzucSzkic,
         /* DOPYTANIE (0.332.0). Bez `onSuccess` czyszczącego szkic czy oś:
            odpowiedź czyta agent, a do klienta nie idzie stąd nic. */
         dopytanie: {
@@ -400,5 +560,10 @@ export function Skrzynka() {
     <div className="shrink-0 space-y-4">
       <Blad>{blad || (lista.error as Error | null)?.message}</Blad>
     </div>
+
+    <Odlozone lista={odlozone}
+      onCofnij={(k) => { const w = odlozone.find((o) => o.klucz === k); if (w) wrocDo(w); }}
+      onWroc={(k) => { const w = odlozone.find((o) => o.klucz === k); if (w) wrocDo(w, w.blad); }}
+      onZamknij={usunOdlozona} />
   </div>;
 }

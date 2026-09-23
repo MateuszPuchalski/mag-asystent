@@ -6,7 +6,7 @@ import type {
   SkutecznoscDoboru,
   PowodNegatywny,
   HistoriaKlienta, MiesiacEskalacji, MojaSprawa,
-  Rozmowa, StanSkrzynki, StatusDoboru, StatusRozmowy, WiedzaDoboru, WpisWzmianki,
+  Rozmowa, StanPrzesylki, StanSkrzynki, StatusDoboru, StatusRozmowy, WiedzaDoboru, WpisWzmianki,
   WpisAutomatu,
   WynikWysylki, Zadanie, Zastosowanie, Zdrowie,
 } from "./typy";
@@ -354,6 +354,23 @@ export function useWskazOferte() {
       api(`/api/conversations/${v.id}/oferta`, {
         method: "POST", body: JSON.stringify({ ofertaId: v.ofertaId }),
       }),
+    onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) }),
+  });
+}
+
+/**
+ * Gdzie jest paczka zamówienia tej rozmowy (23 września 2026).
+ *
+ * Bliźniak `useSprawdzPrzesylke` z reklamacji: dwa żądania u Allegro, więc
+ * na jawne kliknięcie. Unieważniamy samą rozmowę — stan paczki stoi w jej
+ * bloku zamówienia, nie w kolejce.
+ */
+export function useSprawdzPrzesylkeRozmowy() {
+  const qc = useQueryClient();
+  return useMutation({
+    /* Bez ciała — i dlatego bez `body`: pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`. */
+    mutationFn: (v: { id: number }) =>
+      api<StanPrzesylki>(`/api/conversations/${v.id}/przesylka`, { method: "POST" }),
     onSettled: (_d, _e, v) => qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) }),
   });
 }

@@ -140,6 +140,32 @@ export function zamowienieWskazane(
 }
 
 /**
+ * Numer zamówienia, którego dotyczy rozmowa — JEDNA reguła dla ekranu i szkicu.
+ *
+ * Numer z najnowszej wiadomości KLIENTA, która go niesie; gdy klient go nie
+ * podał — z najnowszej naszej; gdy nie ma żadnej — wskazanie człowieka.
+ * Wiadomość bije wskazanie, bo numer z Allegro jest faktem, a wskazanie
+ * wnioskiem (0.397.0). Reguła mieszkała w `osRozmowy` i trafiła tutaj, gdy
+ * szkic Copilota zaczął pytać o przesyłkę tego samego zamówienia: druga kopia
+ * rozjechałaby się przy pierwszej poprawce i szkic mówiłby o innej paczce,
+ * niż pokazuje ekran.
+ */
+export function numerZamowieniaRozmowy(
+  conversationId: number, database: DatabaseSync = db(),
+): { konto: number; externalId: string } | null {
+  const w = database.prepare(`SELECT related_order_id AS numer, channel_account_id AS konto
+      FROM message WHERE conversation_id=? AND related_order_id IS NOT NULL
+     ORDER BY direction='incoming' DESC, id DESC LIMIT 1`)
+    .get(conversationId) as { numer: string; konto: number } | undefined;
+  if (w) return { konto: Number(w.konto), externalId: String(w.numer) };
+  const wskazane = zamowienieWskazane(conversationId, database);
+  if (!wskazane) return null;
+  const r = database.prepare("SELECT channel_account_id AS konto FROM conversation WHERE id=?")
+    .get(conversationId) as { konto: number } | undefined;
+  return r ? { konto: Number(r.konto), externalId: wskazane.externalId } : null;
+}
+
+/**
  * Ręczne wskazanie zamówienia dla rozmowy (0.397.0).
  *
  * WOLNO WSKAZAĆ WYŁĄCZNIE ZAKUP TEGO KUPUJĄCEGO. Nie jest to formalność:

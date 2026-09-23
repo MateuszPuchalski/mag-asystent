@@ -108,3 +108,31 @@ describe("Komentarz na osi rozmowy", () => {
     expect(screen.queryByText(/Zleć z tej wiadomości/)).toBeNull();
   });
 });
+
+/* ── Ctrl+Enter wysyła (23 września 2026) ────────────────────────────────────
+   Skrót ma ten sam warunek co przycisk: cudza rozmowa i pusty szkic nie
+   wysyłają. Sam Enter zostaje nową linią — odpowiedź ma akapity. */
+describe("Ctrl+Enter w polu odpowiedzi", () => {
+  it("wysyła z klawiatury, a sam Enter nie", async () => {
+    const onWyslij = vi.fn();
+    edytor({ szkic: "Dzień dobry", onWyslij });
+    const pole = screen.getByLabelText("Szkic odpowiedzi");
+    pole.focus();
+    await userEvent.keyboard("{Enter}");
+    expect(onWyslij).not.toHaveBeenCalled();
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    expect(onWyslij).toHaveBeenCalledTimes(1);
+  });
+
+  it("cudza rozmowa i pusty szkic nie wysyłają skrótem", async () => {
+    const onWyslij = vi.fn();
+    const { unmount } = edytor({ szkic: "Dzień dobry", cudza: true, onWyslij });
+    screen.getByLabelText("Szkic odpowiedzi").focus();
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    unmount();
+    edytor({ szkic: "   ", onWyslij });
+    screen.getByLabelText("Szkic odpowiedzi").focus();
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    expect(onWyslij).not.toHaveBeenCalled();
+  });
+});

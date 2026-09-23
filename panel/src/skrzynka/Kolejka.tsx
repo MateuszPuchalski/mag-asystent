@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AlarmClock, Eye, Inbox, MessageSquare, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
+  AlarmClock, Bell, BellOff, Eye, Inbox, MessageSquare, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
 } from "lucide-react";
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
@@ -11,6 +11,7 @@ import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { CZESTE, KafelKategorii, PasekCopilota, ZnakCopilota, doRozpoznania, nazwaNaPlakietce } from "./Copilot";
 import { Czekanie } from "./Czekanie";
 import { SlownikZnakow } from "./SlownikZnakow";
+import type { StanPowiadomien } from "./Sygnaly";
 
 /* Kubełki kolejki z §10.1: „Nieprzypisane, Moje, Oczekujące". Filtr jest po
    stronie EKRANU, bo lista i tak przyjeżdża w całości — dokładanie parametru
@@ -102,7 +103,7 @@ function wKubelku(r: Rozmowa, kubelek: Kubelek, mojeId: number | null): boolean 
    znaczy co innego, gdy synchronizator stanął o 6:00, a co innego, gdy
    przebiegł minutę temu. Bez tej daty ekran kłamałby ciszą. */
 export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = () => {},
-  wybranaId, mojeId = null, onWybierz, onOdswiez, laduje, nieswieza }: {
+  wybranaId, mojeId = null, onWybierz, onWidoczne, powiadomienia, onOdswiez, laduje, nieswieza }: {
   rozmowy: Rozmowa[];
   stan: StanSkrzynki;
   /** Stan Copilota (§14, etap F). `undefined` = jeszcze nie wiadomo, milcz. */
@@ -115,6 +116,12 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   /** Bez tego „Moje" nie ma znaczenia — kubełek zostaje wtedy pusty, nie mylący. */
   mojeId?: number | null;
   onWybierz: (id: number) => void;
+  /** Identyfikatory WIDOCZNYCH wierszy po kubełku i szukaniu — dla „następnej
+      rozmowy" po wysyłce (23 września 2026). Kolejka trzyma te sita u siebie. */
+  onWidoczne?: (ids: number[]) => void;
+  /** Przełącznik powiadomień systemowych (23 września 2026) — patrz `Sygnaly.ts`.
+      Brak = przeglądarka ich nie zna, więc przycisku nie ma. */
+  powiadomienia?: { stan: StanPowiadomien; przelacz: () => void };
   onOdswiez: () => void;
   laduje: boolean;
   /* Kolejka nieświeża wygląda inaczej, bo znaczy co innego. Pusta lista przy
@@ -159,6 +166,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
      Znacznik nazywa więc powód trafienia i pojawia się WYŁĄCZNIE tam, gdzie
      login się nie zgadza. Na trafieniu po loginie milczy: znak zapalany przy
      każdym wierszu przestaje być znakiem. */
+  const kluczWidocznych = widoczne.map((r) => r.id).join(",");
+  useEffect(() => { onWidoczne?.(widoczne.map((r) => r.id)); }, [kluczWidocznych]);
+
   const powodTrafienia = (r: { klient: string; wlasciciel?: string | null }): string | null => {
     if (szukane === "" || r.klient.toLowerCase().includes(szukane)) return null;
     return (r.wlasciciel ?? "").toLowerCase().includes(szukane)
@@ -237,6 +247,19 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
       </p>
       <SlownikZnakow />
+      {powiadomienia && powiadomienia.stan !== "brak" && <button type="button"
+        aria-pressed={powiadomienia.stan === "wlaczone"}
+        disabled={powiadomienia.stan === "zablokowane"}
+        onClick={powiadomienia.przelacz}
+        aria-label="Powiadomienia o pilnych rozmowach"
+        title={powiadomienia.stan === "wlaczone"
+          ? "Powiadomienia włączone: prośba o człowieka i czekanie ponad godzinę. Kliknij, żeby wyłączyć."
+          : powiadomienia.stan === "zablokowane"
+            ? "Przeglądarka zablokowała powiadomienia — zmień to w ustawieniach strony."
+            : "Włącz powiadomienia: prośba o człowieka i czekanie ponad godzinę."}
+        className={`rounded p-1 hover:bg-slate-100 disabled:opacity-50 ${
+          powiadomienia.stan === "wlaczone" ? "text-wertis-ink" : "text-slate-500"}`}>
+        {powiadomienia.stan === "wlaczone" ? <Bell size={16} /> : <BellOff size={16} />}</button>}
       <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)} />
       {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-podpis font-bold text-ranga-zle">
         STAN Z {godzina(stan.ostatniaSynchronizacja)}</span>}

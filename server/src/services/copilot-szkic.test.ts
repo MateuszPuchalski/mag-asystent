@@ -62,7 +62,7 @@ beforeEach(() => {
     "dowod_zastosowania", "zastosowanie",
     "alias_silnika", "model_urzadzenia", "pasowanie_czesci", "dobor_rozmowy",
     "conversation_event", "message", "conversation", "offer_snapshot", "allegro_inbox_thread",
-    "channel_account", "events", "app_user"]) {
+    "zamowienie_klienta", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   biuro = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')").run().lastInsertRowid);
@@ -1104,4 +1104,66 @@ test("twierdzenie oparte na rozpoznaniu schodzi do „niepewne” ze źródłem 
   assert.equal(b.pewnosc, "niepewne");
   assert.equal(b.zrodlo, "model");
   assert.equal(b.obnizona, true);
+});
+
+/* ── Przesyłka w faktach szkicu (23 września 2026) ──────────────────────────
+   Klient pytający pod zamówieniem pyta najczęściej „gdzie paczka". Pilnujemy
+   trzech decyzji: fakt stoi tylko po sprawdzeniu (milczenie zamiast zgadywania),
+   numer przesyłki NIE idzie do dostawcy modelu, a Allegro pytamy wyłącznie
+   z układania szkicu — kontekst zostaje czystym odczytem. */
+
+function podZamowieniem(stan: Record<string, string | null> = {}) {
+  db().prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    sent_at,related_order_id) VALUES (?,?,'m-z','incoming','Kiedy dojdzie paczka?','2026-09-07T12:00:00Z','ord-9')`)
+    .run(rozmowa, konto);
+  return Number(db().prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,synced_at,
+    przesylka_waybill,przesylka_przewoznik,przesylka_status,przesylka_dostarczono_at,przesylka_sprawdzono_at)
+    VALUES (?,'ord-9','2026-09-07T00:00:00Z',?,?,?,?,?)`).run(konto, stan.waybill ?? null,
+    stan.przewoznik ?? null, stan.status ?? null, stan.dostarczono ?? null, stan.sprawdzono ?? null)
+    .lastInsertRowid);
+}
+
+test("przesyłka wchodzi do faktów po polsku i bez numeru przesyłki", () => {
+  podZamowieniem({ waybill: "620012345678", przewoznik: "INPOST", status: "AVAILABLE_FOR_PICKUP",
+    sprawdzono: "2026-09-07T12:05:00Z" });
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  const f = k.fakty.find((x) => x.rodzaj === "przesylka");
+  assert.match(String(f?.zdanie), /czeka na klienta w punkcie odbioru; przewoźnik INPOST/);
+  assert.match(String(f?.zdanie), /numer przesyłki klient widzi w Allegro/);
+  assert.equal(k.tekstFaktow.includes("620012345678"), false, "numer przesyłki prowadzi do adresu odbiorcy");
+});
+
+test("bez sprawdzenia fakt milczy, a kontekst nie pyta Allegro", () => {
+  podZamowieniem();
+  const przed = liczba("events");
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  assert.equal(k.fakty.some((x) => x.rodzaj === "przesylka"), false);
+  assert.equal(liczba("events"), przed, "kontekst szkicu jest czystym odczytem");
+});
+
+test("przed szkicem pytamy Allegro o stan pusty albo stary, o doręczoną już nie", async () => {
+  const id = podZamowieniem();
+  const wolane: string[] = [];
+  const deps = {
+    apiUrl: "https://api.test", teraz: () => "2026-09-07T12:10:00Z",
+    query: async (url: string) => {
+      wolane.push(url);
+      return url.includes("/shipments")
+        ? { shipments: [{ waybill: "W1", carrierId: "DPD" }] }
+        : { waybills: [{ waybill: "W1", trackingDetails: { statuses: [
+            { code: "IN_TRANSIT", occurredAt: "2026-09-07T09:00:00Z" }] } }] };
+    },
+  };
+  await S.odswiezPrzesylke(rozmowa, deps, Date.parse("2026-09-07T12:10:00Z"));
+  assert.equal(wolane.length, 2, "numer, potem status");
+  assert.match(String(S.kontekstSzkicu(rozmowa, subiekt).fakty
+    .find((x) => x.rodzaj === "przesylka")?.zdanie), /w drodze do klienta; przewoźnik DPD/);
+
+  wolane.length = 0;
+  await S.odswiezPrzesylke(rozmowa, deps, Date.parse("2026-09-07T12:20:00Z"));
+  assert.equal(wolane.length, 0, "stan sprzed dziesięciu minut wystarcza");
+
+  db().prepare("UPDATE zamowienie_klienta SET przesylka_dostarczono_at='2026-09-07T11:00:00Z' WHERE id=?").run(id);
+  await S.odswiezPrzesylke(rozmowa, deps, Date.parse("2026-09-08T12:00:00Z"));
+  assert.equal(wolane.length, 0, "doręczona już się nie zmieni");
 });

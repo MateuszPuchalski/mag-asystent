@@ -71,6 +71,13 @@ export function przesylkaZamowienia(
   };
 }
 
+/** Wiersz zamówienia po numerze z Allegro; `null`, gdy ticker go jeszcze nie dociągnął. */
+export function idZamowienia(database: Db, konto: number, externalId: string): number | null {
+  const w = database.prepare("SELECT id FROM zamowienie_klienta WHERE channel_account_id=? AND external_id=?")
+    .get(konto, externalId) as { id: number } | undefined;
+  return w ? Number(w.id) : null;
+}
+
 /**
  * Pyta Allegro o przesyłkę tego zamówienia i zapisuje wynik.
  *
@@ -134,4 +141,59 @@ export async function sprawdzPrzesylke(
     { zamowienieId, znaleziono: waybill !== null, status }, undefined, database);
 
   return { waybill, przewoznik, status, dostarczonoAt, sprawdzonoAt: teraz };
+}
+
+/* ── PRZESYŁKA W SZKICU COPILOTA (23 września 2026) ──────────────────────────
+   Zgłoszenie właściciela: „informacje o statusie przesyłki powinny zostać
+   dodane, jeśli klient zadaje pytanie pod zamówieniem". Klient pytający pod
+   zamówieniem pyta najczęściej „gdzie paczka", a szkic nie wiedział o niej
+   nic — agent szedł do panelu Allegro i przepisywał status ręcznie.
+
+   NUMERU PRZESYŁKI MODEL NIE DOSTAJE. Prowadzi do adresu odbiorcy, a ten
+   nie wychodzi do dostawcy modelu (`CLAUDE.md`, prywatność). Klient ma numer
+   przy zamówieniu w Allegro i fakt mówi to wprost, żeby szkic odesłał go
+   tam, zamiast zmyślać numer albo przepraszać, że go nie zna.
+
+   Kody statusu tłumaczymy na zdanie Z PERSPEKTYWY KLIENTA. Słownik zwrotów
+   (`zwroty/Dowody.tsx`) mówi „w drodze do nas" — tu paczka jedzie do niego,
+   więc wspólny słownik dałby szkicowi zdanie odwrotne. */
+const STATUS_DLA_KLIENTA: Record<string, string> = {
+  PENDING: "przygotowana, czeka na nadanie",
+  IN_TRANSIT: "w drodze do klienta",
+  RELEASED_FOR_DELIVERY: "wydana kurierowi do doręczenia",
+  AVAILABLE_FOR_PICKUP: "czeka na klienta w punkcie odbioru",
+  NOTICE_LEFT: "po nieudanej próbie doręczenia, zostawiono awizo",
+  ISSUE: "przewoźnik zgłosił problem z przesyłką",
+  RETURNED: "wraca albo wróciła do nadawcy",
+};
+
+/** Zdanie faktu o paczce; `null`, gdy nigdy nie pytaliśmy — milczenie zamiast zgadywania. */
+export function zdaniePrzesylki(s: StanPrzesylkiZamowienia): string | null {
+  if (s.sprawdzonoAt === null) return null;
+  const kiedy = `(stan z ${s.sprawdzonoAt.slice(0, 16).replace("T", " ")} UTC)`;
+  if (s.waybill === null) {
+    return `Przesyłka zamówienia: Allegro nie ma numeru przesyłki — paczka jeszcze nienadana`
+      + ` albo nadana poza Allegro ${kiedy}`;
+  }
+  const stan = s.dostarczonoAt
+    ? `doręczona ${s.dostarczonoAt.slice(0, 10)}`
+    : s.status ? (STATUS_DLA_KLIENTA[s.status] ?? `ostatni status przewoźnika ${s.status}`)
+      : "przewoźnik nie podał jeszcze statusu";
+  return `Przesyłka zamówienia: ${stan}; przewoźnik ${s.przewoznik ?? "nieznany"}; numer przesyłki`
+    + ` klient widzi w Allegro przy zamówieniu ${kiedy}`;
+}
+
+/** Stan starszy niż tyle wymaga ponownego pytania przed szkicem. */
+export const SWIEZOSC_PRZESYLKI_MS = 30 * 60_000;
+
+/**
+ * Czy przed szkicem warto zapytać Allegro jeszcze raz. Doręczona już się nie
+ * zmieni, więc pytanie o nią kosztowałoby dwa żądania za nic; świeży stan
+ * sprzed pół godziny wystarcza, bo automat układa szkic co kilka minut, a
+ * każde przejście przez limit 429 zatrzymuje także synchronizację skrzynki.
+ */
+export function przesylkaDoOdswiezenia(s: StanPrzesylkiZamowienia, teraz: number): boolean {
+  if (s.sprawdzonoAt === null) return true;
+  if (s.dostarczonoAt) return false;
+  return teraz - Date.parse(s.sprawdzonoAt) >= SWIEZOSC_PRZESYLKI_MS;
 }

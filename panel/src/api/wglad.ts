@@ -134,6 +134,29 @@ export function useAnaliza(dni: number, wlaczona: boolean) {
   });
 }
 
+/* ── Czas odpowiedzi klientowi (`services/czas-odpowiedzi.ts`, 23.09.2026) ── */
+
+export interface WierszCzasu { klucz: string; n: number; medianaMin: number | null }
+
+export interface CzasOdpowiedzi {
+  dni: number;
+  daneDo: string | null;
+  ogolem: { n: number; medianaMin: number | null; p90Min: number | null };
+  wgKategorii: WierszCzasu[];
+  /** `null` dla roli biuro — rozbicie na ludzi liczy serwer wyłącznie adminowi. */
+  wgOsoby: WierszCzasu[] | null;
+  czekaTeraz: { n: number; najdluzejMin: number | null };
+}
+
+export function useCzasOdpowiedzi(dni: number, wlaczona: boolean) {
+  return useQuery({
+    queryKey: ["analiza", "obsluga", dni],
+    queryFn: () => api<CzasOdpowiedzi>(`/api/analiza/obsluga?days=${dni}`),
+    enabled: wlaczona,
+    placeholderData: (poprzednie) => poprzednie,
+  });
+}
+
 /* ── Metryki (`services/raporty.ts` `metrics`) ─────────────────────────────── */
 
 export interface Metryki {
