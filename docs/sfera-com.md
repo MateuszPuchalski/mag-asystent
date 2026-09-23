@@ -615,8 +615,36 @@ Zostają wiersze. Zrzut workera i sonda wypisywały dotąd z wierszy najwyżej
 towar, ilość i numer. Od 0.458.0 oba wypisują ten sam szerszy zestaw pól
 każdego wiersza. `-WzorZW` działa też bez `-SzkicZW`.
 
-`[WERYFIKUJ]` Czym wiersze ZW z workera różnią się od wierszy ZW wystawionego
-ręcznie do tego samego paragonu.
+**Wiersze też się zgadzają** (23 września 2026, zadanie `#1484`, PA
+9186/MAG/09/2026, jeden wiersz za 25 zł). Zrzut workera ma ten sam komplet pól
+wiersza co ZW 748: ceny, VAT, magazyn, cenę magazynową i obie ilości.
+
+Jedno pole różni się tylko pozornie. `PozycjaTypPromocji` u workera odmawia
+kodem `0x8004197F`, a w sondzie stoi `null`. PowerShell zamienia jednak odmowę
+odczytu COM w `null`. Tak samo wyszły w sondzie pola, które worker czyta jako
+`E_NOTIMPL`, np. `MagazynOdbiorczyId`. Sonda nie rozróżnia więc tych dwóch
+stanów.
+
+Właściciel potwierdził, że MM z workera zapisują się w Subiekcie. Sesja umie
+więc pisać, a dokument wygląda jak ręczny. Zostaje to, czego pola nie
+pokazują: co `Zapisz()` robi przy okazji. ZW przyjmuje towar na magazyn, a MM
+tylko go przesuwa.
+
+**Eksperyment od 0.459.0, za zgodą właściciela.** Worker ustawia
+`SkutekMagazynowy = False` i zapisuje ZW z odłożonym skutkiem. Potem zamyka
+dokument i woła `SkutekMagazynowyWywolaj(dok_Id)` na managerze. Setter, który
+odmówi, zostawia starą drogę.
+
+Trzy możliwe wyniki:
+- Zapis odmawia dalej: przyczyna nie siedzi w przyjęciu na magazyn.
+- Zapis przechodzi, skutek odmawia: błąd niesie odmowę skutku, a ZW stoi
+  w Subiekcie z odłożonym skutkiem. Biuro wywołuje go ręcznie, zanim koszyk
+  pójdzie MM.
+- Oba przechodzą: ZW powstaje w całości, a przyczyną był skutek wołany
+  w środku zapisu.
+
+`[WERYFIKUJ]` Nazwa identyfikatora na `SuDokument`. Worker sprawdza
+`Identyfikator`, potem `ObiektId`, i bierze tylko wartość dodatnią.
 
 **Od 0.456.0 worker robi ten zrzut sam, w chwili odmowy.** Właściciel zapytany,
 czy uruchomi sondę z komunikatu, odpowiedział: „niech robi to sam". Po odmowie

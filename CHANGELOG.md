@@ -34,6 +34,26 @@ historii nie przepisujemy.
 ---
 
 
+## 0.459.0 — 23 września 2026
+
+**[wymaga działania] Eksperyment: ZW z odłożonym skutkiem magazynowym.**
+Nowy `wertis-sfera-worker.exe` z artefaktu CI: zatrzymaj `wertis-sfera`,
+podmień plik i uruchom usługę.
+
+Zrzut odmowy `#1484` pokazał wiersze. Zgadzają się z ręcznym ZW 748/MAG/09/2026
+tak samo jak nagłówek. MM z workera się zapisują, więc sesja umie pisać.
+Podejrzany zostaje skutek magazynowy wołany w środku zapisu.
+
+Worker zapisuje więc ZW z odłożonym skutkiem, a skutek wywołuje osobno
+(`SkutekMagazynowyWywolaj`). Zgodę dał właściciel. Co może wyjść:
+- Zapis dalej odmawia: przyczyna nie siedzi w magazynie, błąd mówi to wprost.
+- Zapis przechodzi, a skutek odmawia: błąd niesie powód odmowy skutku. ZW stoi
+  w Subiekcie z odłożonym skutkiem. **Wywołaj skutek ręcznie, zanim koszyk
+  z tym zwrotem pójdzie MM.**
+- Oba przechodzą: ZW powstaje sam, jak powinien.
+
+Wyniki i dalszy plan stoją w `docs/sfera-com.md` §2m.
+
 ## 0.458.0 — 23 września 2026
 
 **[wymaga działania] Zrzut przy odmowie ZW obejmuje wiersze; `-WzorZW` działa sam.**
