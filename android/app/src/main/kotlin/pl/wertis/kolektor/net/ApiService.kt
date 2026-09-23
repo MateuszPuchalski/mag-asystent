@@ -469,4 +469,28 @@ interface ApiService {
 
     @POST("api/magazyny/widocznosc")
     suspend fun setWidocznoscMagazynow(@Body body: WidocznoscRequest): MagazynyResponse
+
+    /* ── Szukanie zgubionego kolektora ────────────────────────────────────
+       Oba zapisy BEZ CIAŁA, więc z `EMPTY_BODY` — żądanie bez treści nie ma
+       prawa deklarować typu treści. Identyfikator urządzenia to UUID, więc
+       w ścieżce jedzie bez kodowania. */
+    @GET("api/kolektory")
+    suspend fun kolektory(): pl.wertis.kolektor.core.net.KolektoryResponse
+
+    @POST("api/kolektory/{deviceId}/wezwij")
+    suspend fun wezwijKolektor(
+        @Path("deviceId") deviceId: String,
+        @Body body: RequestBody = EMPTY_BODY,
+    ): pl.wertis.kolektor.core.net.WezwijResponse
+
+    /** Koniec szukania — z listy (odwołanie) albo z samego kolektora (ZNALAZŁEM). */
+    @POST("api/kolektory/{deviceId}/odwolaj")
+    suspend fun zakonczSzukanie(
+        @Path("deviceId") deviceId: String,
+        @Body body: RequestBody = EMPTY_BODY,
+    ): pl.wertis.kolektor.core.net.KoniecSzukaniaResponse
+
+    /** Czy ktoś szuka TEGO kolektora — serwer zna go po nagłówku `x-device`. */
+    @GET("api/kolektor/wezwanie")
+    suspend fun mojeWezwanie(): pl.wertis.kolektor.core.net.WezwanieResponse
 }

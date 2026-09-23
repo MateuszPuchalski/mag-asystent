@@ -19,6 +19,8 @@ class NavModelTest {
         assertEquals(Screen.HOME, backTarget(Screen.SETTINGS, null))
         // diagnostyka łączności otwiera się z Ustawień i tam wraca
         assertEquals(Screen.SETTINGS, backTarget(Screen.POLACZENIE, null))
+        // szukanie kolektora też — wejście do niego stoi w Ustawieniach
+        assertEquals(Screen.SETTINGS, backTarget(Screen.KOLEKTORY, null))
     }
 
     @Test fun `kazdy ekran ma tytul w pasku gornym`() {

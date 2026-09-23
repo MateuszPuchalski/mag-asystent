@@ -13,6 +13,7 @@ import { problemRoutes } from "./routes/problems.js";
 import { locationRoutes } from "./routes/locations.js";
 import { withEtag } from "./routes/etag.js";
 import { deviceRoutes } from "./routes/device.js";
+import { kolektoryRoutes } from "./routes/kolektory.js";
 import { authRoutes } from "./routes/auth.js";
 import { audytRoutes } from "./routes/audyt.js";
 import { analizaRoutes } from "./routes/analiza.js";
@@ -395,6 +396,7 @@ export async function buildApp() {
   await app.register(problemRoutes);
   await app.register(locationRoutes);
   await app.register(deviceRoutes);
+  await app.register(kolektoryRoutes);
   await app.register(authRoutes);
   await app.register(magazynRoutes);
   await app.register(audytRoutes);

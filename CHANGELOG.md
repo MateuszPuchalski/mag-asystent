@@ -34,6 +34,39 @@ historii nie przepisujemy.
 ---
 
 
+## 0.471.0 — 23 września 2026
+
+**Szukanie zgubionego kolektora.** Magazynier odkłada kolektor „na chwilę”
+na regale albo na wózku i zapomina gdzie. Teraz ktoś inny każe mu zadzwonić
+i idzie na dźwięk.
+
+- **Kto może wezwać.** Każdy zalogowany. Biuro robi to w panelu: STAN
+  SYSTEMU → karta „Zgubiony kolektor”. Kolega z hali robi to ze swojego
+  kolektora: Ustawienia → ZNAJDŹ KOLEKTOR.
+- **Po czym poznać kolektor.** Wiersz niesie znak z czterech ostatnich znaków
+  identyfikatora, np. `#A3F9`, i osobę, która na nim ostatnio pracowała.
+  Każdy kolektor pokazuje własny znak w Ustawieniach, więc da się go nakleić.
+- **Co robi kolektor.** Gra świergot na strumieniu alarmu, na pełnej głośności
+  i z wibracją, także ściszony do zera. Syrena trwa najwyżej 5 minut. Potem
+  głośność alarmu wraca do poprzedniej.
+- **Jak ją uciszyć.** Dotknięcie w dowolnym miejscu nakładki ZNALAZŁEM.
+  Szukający może też nacisnąć PRZESTAŃ w panelu albo na liście.
+- **Karta mówi, czy kolektor słyszy.** Kolektor sam pyta o wezwanie co 10 s.
+  Panel odróżnia stany „słucha”, „cisza — uśpiony albo bez baterii”,
+  „wylogowany — nie zadzwoni” i „dzwoni”.
+- **Granica.** Kolektor wylogowany albo uśpiony przez Androida nie zadzwoni,
+  dopóki się nie obudzi. Przy domyślnym „ekranie zawsze włączonym” kolektor
+  z otwartą aplikacją pyta do wyczerpania baterii.
+- **Ślad w audycie.** Zdarzenia `kolektor_wezwany`, `kolektor_odnaleziony`
+  i `kolektor_wezwanie_odwolane` trafiają do DZIENNIKA ZDARZEŃ.
+
+Stan wezwania żyje w pamięci procesu API, nie w bazie. Pytanie kolektora
+niczego nie zapisuje, a restart usługi gubi trwające wezwanie. Kolektor
+dzwoni dopiero z nowym APK. Stary kolektor jest na liście, ale ma „cisza”.
+Nowe trasy `/api/kolektory…` i `/api/kolektor/wezwanie`, serwis
+`szukanie-kolektora.ts` z testami, karta panelu z testem, reguły w `:core`
+(`SzukanieKolektora.kt`) z testami, nowy ekran kolektora KOLEKTORY.
+
 ## 0.470.0 — 23 września 2026
 
 **Wykaz części producenta: plik „model → numery części” staje się propozycjami

@@ -11,8 +11,8 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze, rozpoznanie skanu bez sieci, diagnoza łączności (podsieć, powód odmowy, dziennik przerw i ich zgłaszanie) — **326 testów** | działa bez Android SDK (`./gradlew :core:test`) |
-| `:app` | aplikacja Compose (17 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze, rozpoznanie skanu bez sieci, diagnoza łączności (podsieć, powód odmowy, dziennik przerw i ich zgłaszanie), szukanie zgubionego kolektora (znak urządzenia, stan, wyciszenie po ZNALAZŁEM) — **332 testy** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:app` | aplikacja Compose (18 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
 przechodzą także w środowiskach bez Androida (CI sandbox). Pełny build APK robi
@@ -435,6 +435,21 @@ przed którą ta pozycja broni.
 - [ ] skan towaru rozkładanego przez kolegę otwiera pozycję normalnie —
       blokad pozycji nie ma od 0.47.0 i nic już nie „proponuje odebrania",
 - [ ] w kreatorze kont są TRZY role: magazynier, biuro, administrator.
+
+**Zgubiony kolektor** (0.471.0)
+
+- [ ] Ustawienia pokazują znak tego kolektora, np. `#A3F9`,
+- [ ] ZNAJDŹ KOLEKTOR nie pokazuje na liście własnego kolektora,
+- [ ] ZADZWOŃ na drugi kolektor: syrena gra najpóźniej po 10 s,
+- [ ] syrena gra także przy głośności ściszonej do zera (strumień alarmu),
+- [ ] po syrenie głośność alarmu wraca do poprzedniej,
+- [ ] dotknięcie w dowolnym miejscu nakładki ucisza syrenę,
+- [ ] to dotknięcie nie otwiera niczego na ekranie pod nakładką,
+- [ ] panel biura pokazuje „Dzwoni", a po ZNALAZŁEM wiersz wraca do spokoju,
+- [ ] PRZESTAŃ z listy albo z panelu ucisza kolektor najpóźniej po 10 s,
+- [ ] wyłączone Wi-Fi w trakcie syreny: gra dalej, ale cichnie po 5 minutach,
+- [ ] wylogowany kolektor ma w panelu „Wylogowany — nie zadzwoni",
+- [ ] DZIENNIK ZDARZEŃ ma `kolektor_wezwany` i `kolektor_odnaleziony`.
 
 **Aktualizacja z serwera**
 

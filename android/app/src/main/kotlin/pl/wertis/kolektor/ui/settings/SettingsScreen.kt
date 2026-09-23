@@ -32,6 +32,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import pl.wertis.kolektor.AppGraph
 import pl.wertis.kolektor.BuildConfig
+import pl.wertis.kolektor.core.kolektor.etykietaKolektora
 import pl.wertis.kolektor.core.nav.Screen
 import pl.wertis.kolektor.core.net.MagazynInfo
 import pl.wertis.kolektor.core.net.WidocznoscRequest
@@ -175,6 +176,22 @@ fun SettingsScreen(graph: AppGraph) {
                 "DIAGNOSTYKA POŁĄCZENIA",
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             ) { graph.nav.go(Screen.POLACZENIE) }
+        }
+
+        /* Szukanie zgubionego kolektora. Znak TEGO kolektora stoi obok, bo to
+           po nim ktoś inny wybierze go z listy — warto go nakleić na obudowę. */
+        SectionLabel("Zgubiony kolektor")
+        SectionCard {
+            Text(
+                "Ten kolektor: ${etykietaKolektora(graph.settings.deviceId)}",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                color = Ink,
+            )
+            OutlineButton(
+                "ZNAJDŹ KOLEKTOR",
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+            ) { graph.nav.go(Screen.KOLEKTORY) }
         }
 
         SectionLabel("Funkcje urządzenia")
