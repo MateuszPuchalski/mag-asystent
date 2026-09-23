@@ -66,7 +66,8 @@ param(
     # i platnosc przeliczaja sie same po zmianie ilosci. Dotyczy -SzkicZW.
     [string]$Ilosci = "",
     # dok_Id ZW wystawionego RECZNIE przez biuro. Sonda go tylko WCZYTUJE,
-    # zeby odczytac liczbe, ktora znaczy "zwrot ze sprzedazy". Dotyczy -SzkicZW.
+    # zeby odczytac liczbe, ktora znaczy "zwrot ze sprzedazy". Dziala sam albo
+    # razem z -SzkicZW - wtedy oba dokumenty stoja w jednym pliku.
     [int]$WzorZW = 0,
     # Kartoteki zwracane jak w zadaniu zw workera: "TowarId=ilosc" po przecinku,
     # np. "9280=1". Reszta wierszy dostaje zero. Nadal w pamieci. Dotyczy -SzkicZW.
@@ -565,7 +566,7 @@ if ($SzkicMM) {
 # DANYCH KONTRAHENTA NIE WYPISUJEMY. ZW po powiazaniu niesie nabywce z paragonu,
 # a plik wynikowy wraca do repozytorium. Wlasciwosci o kontrahencie, adresie
 # i uwagach odsiewa wzorzec $prywatne; zostaje tylko to, czego potrzebuje kod.
-if ($SzkicZW) {
+if ($SzkicZW -or $WzorZW -gt 0) {
     # Wartosc bez wywracania sondy. Brak nazwy to co innego niz null: COM na
     # nieznanej nazwie oddaje w PowerShellu cichy $null.
     function Wartosc($obiekt, [string]$nazwa) {
@@ -624,187 +625,213 @@ if ($SzkicZW) {
     # i -WzorZW maja sie dac zestawic pole w pole.
     $polaDokumentu = 'Rodzaj|Zwrot|Plat|Zaplac|Przelew|Gotow|Kart|Kredyt|Przedplat|Zaliczk|Kasa|Termin|Skutek|DoDokumentu|Typ|Kategoria|Magazyn|Wartosc|Kwota|Waluta|Data|Numer'
 
-    Write-Wynik ""
-    Write-Wynik "SZKIC ZW - zwrot do paragonu w pamieci, BEZ Zapisz()"
-    Write-Wynik "  Uwaga: dokument NIE jest zapisywany; po odczytaniu nazw sesja sie konczy."
-
-    # Sygnatury wszystkiego, co dotyczy zwrotu do paragonu: ZW, ZWn, PAk. Gdyby
-    # DodajZW() odmowil, ta lista mowi, jak nazywa sie wlasciwa metoda.
-    Write-Wynik ""
-    Write-Wynik "--- SuDokumentyManager - metody zwrotow i korekt paragonu ---"
-    try {
-        Get-Member -InputObject $sgt.SuDokumentyManager -MemberType Method -ErrorAction Stop |
-            Where-Object { $_.Name -match 'ZW|PAk|Zwrot' } |
-            ForEach-Object { Write-Wynik ("  {0}" -f ($_.Definition -replace '\s+', ' ')) }
-    } catch {
-        Write-Wynik "  (nie udalo sie odczytac: $($_.Exception.Message))"
+    # WIERSZE POLE W POLE (0.458.0). Zrzut #1481 i ZW 748/MAG/09/2026 do tego
+    # samego paragonu maja IDENTYCZNY naglowek - platnosc, kasa, termin, nabywca,
+    # komunikat kontrahenta, wartosc magazynowa. Roznica, jesli jest, siedzi
+    # w wierszach, a tych do dzis nikt nie porownal. Ten sam zestaw co
+    # `PolaPozycji` w ZrzutDokumentu.cs.
+    $polaPozycji = 'Towar|Ilosc|Jm|Lp|Cena|Wartosc|Rabat|Vat|Magazyn|Dostep|Oznaczenie|Akcyz|Orygin|Korekt|Rodzaj|Typ'
+    function Pozycje-Wartosci($dokument, [string]$etykieta) {
+        $pozycje = $null
+        try { $pozycje = $dokument.Pozycje } catch { }
+        if ($null -eq $pozycje) { Write-Wynik ""; Write-Wynik "--- $etykieta - pozycje niedostepne ---"; return }
+        $ile = 0
+        try { $ile = [int]$pozycje.Liczba } catch { }
+        # Element liczy OD JEDYNKI - zmierzone przy szkicu MM (docs/sfera-com.md 2l).
+        for ($i = 1; $i -le $ile; $i++) {
+            try { Wlasciwosci-Wg $pozycje.Element($i) $polaPozycji ("{0} - wiersz {1} z {2}" -f $etykieta, $i, $ile) }
+            catch { Write-Wynik ("  [{0}] odmowa: {1}" -f $i, $_.Exception.Message) }
+        }
     }
 
-    $zw = $null
-    try {
-        $zw = $sgt.SuDokumentyManager.DodajZW()
-        Write-Wynik "  JEST  DodajZW() oddal obiekt dokumentu"
-        Wlasciwosci-Wg $zw $polaDokumentu "ZW PRZED powiazaniem"
+    # -WzorZW dziala tez BEZ -SzkicZW (0.458.0). Do tego wydania wzor czytal sie
+    # wylacznie w srodku szkicu, wiec sam przelacznik dawal gole managery - i tak
+    # wlasnie wrocil pierwszy przebieg na ZW 748/MAG/09/2026.
+    if ($SzkicZW) {
+        Write-Wynik ""
+        Write-Wynik "SZKIC ZW - zwrot do paragonu w pamieci, BEZ Zapisz()"
+        Write-Wynik "  Uwaga: dokument NIE jest zapisywany; po odczytaniu nazw sesja sie konczy."
 
-        if ($Paragon -le 0) {
-            Write-Wynik ""
-            Write-Wynik "  BRAK  paragonu: podaj -Paragon <dok_Id>, zeby zobaczyc pozycje po NaPodstawie."
-            Write-Wynik "        dok_Id znajdziesz w SSMS na bazie podmiotu:"
-            Write-Wynik "        SELECT dok_Id, dok_NrPelny FROM dok__Dokument WHERE dok_NrPelny = 'PA 1/MAG/09/2026'"
-        } else {
-            Write-Wynik ""
-            Write-Wynik "NaPodstawie($Paragon) - nadal BEZ Zapisz()"
-            $powiazany = $false
-            try {
-                $zw.NaPodstawie($Paragon)
-                $powiazany = $true
-                Write-Wynik "  JEST  NaPodstawie przyjal dok_Id paragonu"
-            } catch {
-                Write-Wynik "  BRAK  NaPodstawie odmowil: $($_.Exception.Message)"
-                # Drugi przebieg na tym samym PA (15 wrzesnia 2026) odbil sie od blokady:
-                # NaPodstawie BLOKUJE paragon, a do 0.348.3 sonda nie zamykala szkicu.
-                # Trzyma ja okno Subiekta z tym paragonem albo niezamkniety szkic.
-                if ($_.Exception.Message -match 'zablokowa') {
-                    Write-Wynik "        Paragon trzyma inna sesja: zamknij go w Subiekcie albo wez inny PA."
-                } elseif ($_.Exception.Message -match 'wystawi. korekty') {
-                    # Trzeci przebieg dostal dok_Id WZ zamiast PA - numer w komunikacie
-                    # mowi, jaki to dokument, ale nie mowi, gdzie szukac wlasciwego.
-                    Write-Wynik "        To nie paragon albo Subiekt nie pozwala go korygowac. Paragon ma dok_Typ = 21:"
-                    Write-Wynik "        SELECT dok_Id, dok_NrPelny, dok_Typ FROM dok__Dokument WHERE dok_Id = $Paragon"
-                }
-            }
+        # Sygnatury wszystkiego, co dotyczy zwrotu do paragonu: ZW, ZWn, PAk. Gdyby
+        # DodajZW() odmowil, ta lista mowi, jak nazywa sie wlasciwa metoda.
+        Write-Wynik ""
+        Write-Wynik "--- SuDokumentyManager - metody zwrotow i korekt paragonu ---"
+        try {
+            Get-Member -InputObject $sgt.SuDokumentyManager -MemberType Method -ErrorAction Stop |
+                Where-Object { $_.Name -match 'ZW|PAk|Zwrot' } |
+                ForEach-Object { Write-Wynik ("  {0}" -f ($_.Definition -replace '\s+', ' ')) }
+        } catch {
+            Write-Wynik "  (nie udalo sie odczytac: $($_.Exception.Message))"
+        }
 
-            # Bez powiazania ZW jest pusty - drugi wydruk tych samych zer i "Pozycje: 0"
-            # wygladalby jak wynik, a jest tylko skutkiem odmowy.
-            $pozycjeZw = $null
-            if ($powiazany) {
-                Wlasciwosci-Wg $zw $polaDokumentu "ZW PO powiazaniu"
-                try { $pozycjeZw = $zw.Pozycje } catch { Write-Wynik "  BRAK  odczyt Pozycje odmowil: $($_.Exception.Message)" }
-            }
-            if (-not $powiazany) {
-                Write-Wynik "  (pozycji nie czytam - bez powiazania szkic ZW jest pusty)"
-            } elseif ($null -eq $pozycjeZw) {
-                Write-Wynik "  (Pozycje null - NaPodstawie nie przepisal pozycji)"
-            } else {
-                $liczba = 0
-                try { $liczba = [int]$pozycjeZw.Liczba } catch { }
+        $zw = $null
+        try {
+            $zw = $sgt.SuDokumentyManager.DodajZW()
+            Write-Wynik "  JEST  DodajZW() oddal obiekt dokumentu"
+            Wlasciwosci-Wg $zw $polaDokumentu "ZW PRZED powiazaniem"
+
+            if ($Paragon -le 0) {
                 Write-Wynik ""
-                Write-Wynik ("--- Pozycje ZW po powiazaniu: {0} ---" -f $liczba)
-                # Element liczy OD JEDYNKI - zmierzone przy szkicu MM (docs/sfera-com.md 2l).
-                for ($i = 1; $i -le $liczba; $i++) {
-                    try {
-                        $el = $pozycjeZw.Element($i)
-                        Write-Wynik ("  [{0}] TowarId={1} Symbol={2} IloscJm={3} Ilosc={4}" -f $i,
-                            (Wartosc $el "TowarId"), (Wartosc $el "TowarSymbol"),
-                            (Wartosc $el "IloscJm"), (Wartosc $el "Ilosc"))
-                        if ($i -eq 1) {
-                            Wlasciwosci-Wg $el 'Ilosc|Cena|Wartosc|Rabat|Vat|Lp|Orygin|Korekt|Magazyn' "Pierwsza pozycja ZW"
-                        }
-                    } catch {
-                        Write-Wynik ("  [{0}] odmowa: {1}" -f $i, $_.Exception.Message)
+                Write-Wynik "  BRAK  paragonu: podaj -Paragon <dok_Id>, zeby zobaczyc pozycje po NaPodstawie."
+                Write-Wynik "        dok_Id znajdziesz w SSMS na bazie podmiotu:"
+                Write-Wynik "        SELECT dok_Id, dok_NrPelny FROM dok__Dokument WHERE dok_NrPelny = 'PA 1/MAG/09/2026'"
+            } else {
+                Write-Wynik ""
+                Write-Wynik "NaPodstawie($Paragon) - nadal BEZ Zapisz()"
+                $powiazany = $false
+                try {
+                    $zw.NaPodstawie($Paragon)
+                    $powiazany = $true
+                    Write-Wynik "  JEST  NaPodstawie przyjal dok_Id paragonu"
+                } catch {
+                    Write-Wynik "  BRAK  NaPodstawie odmowil: $($_.Exception.Message)"
+                    # Drugi przebieg na tym samym PA (15 wrzesnia 2026) odbil sie od blokady:
+                    # NaPodstawie BLOKUJE paragon, a do 0.348.3 sonda nie zamykala szkicu.
+                    # Trzyma ja okno Subiekta z tym paragonem albo niezamkniety szkic.
+                    if ($_.Exception.Message -match 'zablokowa') {
+                        Write-Wynik "        Paragon trzyma inna sesja: zamknij go w Subiekcie albo wez inny PA."
+                    } elseif ($_.Exception.Message -match 'wystawi. korekty') {
+                        # Trzeci przebieg dostal dok_Id WZ zamiast PA - numer w komunikacie
+                        # mowi, jaki to dokument, ale nie mowi, gdzie szukac wlasciwego.
+                        Write-Wynik "        To nie paragon albo Subiekt nie pozwala go korygowac. Paragon ma dok_Typ = 21:"
+                        Write-Wynik "        SELECT dok_Id, dok_NrPelny, dok_Typ FROM dok__Dokument WHERE dok_Id = $Paragon"
                     }
                 }
 
-                # Biuro zeruje w oknie ZW pozycje, ktore nie wrocily - ilosc z paragonu
-                # zostaje przy tych, ktore wrocily (wlasciciel, 15 wrzesnia 2026). Worker
-                # zrobi to samo, wiec sprawdzamy dokladnie ten ruch: czy po zerze wartosc
-                # i przelew przeliczaja sie same, czy kod musi je ustawic.
-                if ($Ilosci) {
-                    Write-Wynik ""
-                    Write-Wynik "ZMIANA ILOSCI - $Ilosci, nadal BEZ Zapisz()"
-                    foreach ($para in ($Ilosci -split ',')) {
-                        $czesci = $para.Trim() -split '='
-                        if ($czesci.Count -ne 2) { Write-Wynik "  BRAK  zly zapis '$para' - ma byc Lp=ilosc"; continue }
-                        try {
-                            $lp = [int]$czesci[0]
-                            $ile = [decimal]::Parse($czesci[1], [Globalization.CultureInfo]::InvariantCulture)
-                            $pozycjeZw.Element($lp).IloscJm = $ile
-                            Write-Wynik ("  JEST  [{0}] IloscJm = {1}" -f $lp, $ile)
-                        } catch {
-                            Write-Wynik ("  BRAK  [{0}] odmowa: {1}" -f $czesci[0], $_.Exception.Message)
-                        }
-                    }
+                # Bez powiazania ZW jest pusty - drugi wydruk tych samych zer i "Pozycje: 0"
+                # wygladalby jak wynik, a jest tylko skutkiem odmowy.
+                $pozycjeZw = $null
+                if ($powiazany) {
+                    Wlasciwosci-Wg $zw $polaDokumentu "ZW PO powiazaniu"
+                    try { $pozycjeZw = $zw.Pozycje } catch { Write-Wynik "  BRAK  odczyt Pozycje odmowil: $($_.Exception.Message)" }
+                }
+                if (-not $powiazany) {
+                    Write-Wynik "  (pozycji nie czytam - bez powiazania szkic ZW jest pusty)"
+                } elseif ($null -eq $pozycjeZw) {
+                    Write-Wynik "  (Pozycje null - NaPodstawie nie przepisal pozycji)"
+                } else {
+                    $liczba = 0
                     try { $liczba = [int]$pozycjeZw.Liczba } catch { }
-                    # Liczba pozycji po zerach mowi, czy zero USUWA wiersz, czy go zostawia.
-                    Write-Wynik ("--- Pozycje ZW po zmianie ilosci: {0} ---" -f $liczba)
+                    Write-Wynik ""
+                    Write-Wynik ("--- Pozycje ZW po powiazaniu: {0} ---" -f $liczba)
+                    # Element liczy OD JEDYNKI - zmierzone przy szkicu MM (docs/sfera-com.md 2l).
                     for ($i = 1; $i -le $liczba; $i++) {
                         try {
                             $el = $pozycjeZw.Element($i)
-                            Write-Wynik ("  [{0}] TowarId={1} IloscJm={2} WartoscBruttoPoRabacie={3}" -f $i,
-                                (Wartosc $el "TowarId"), (Wartosc $el "IloscJm"), (Wartosc $el "WartoscBruttoPoRabacie"))
+                            Write-Wynik ("  [{0}] TowarId={1} Symbol={2} IloscJm={3} Ilosc={4}" -f $i,
+                                (Wartosc $el "TowarId"), (Wartosc $el "TowarSymbol"),
+                                (Wartosc $el "IloscJm"), (Wartosc $el "Ilosc"))
+                            if ($i -eq 1) {
+                                Wlasciwosci-Wg $el 'Ilosc|Cena|Wartosc|Rabat|Vat|Lp|Orygin|Korekt|Magazyn' "Pierwsza pozycja ZW"
+                            }
                         } catch {
                             Write-Wynik ("  [{0}] odmowa: {1}" -f $i, $_.Exception.Message)
                         }
                     }
-                    Wlasciwosci-Wg $zw 'Wartosc|Kwota|Plat|Przelew|Gotow|Kart' "ZW PO zmianie ilosci"
-                }
 
-                # JAK WORKER (0.349.1). Na produkcji Zapisz() odmowil zdaniem "Nie mozna
-                # zapisac dokumentu" bez przyczyny. Przyczyne trzyma SzczegolyOstatniegoBledu,
-                # a SprawdzPoprawnosc() pokazuje ja bez zapisu - wiec sonda dalej nic nie wystawia.
-                if ($Towary -or $Sprawdz) {
-                    Write-Wynik ""
-                    Write-Wynik "JAK WORKER - Towary '$Towary', nadal BEZ Zapisz()"
-                    $chce = @{}
-                    foreach ($para in ($Towary -split ',')) {
-                        if (-not $para.Trim()) { continue }
-                        $cz = $para.Trim() -split '='
-                        if ($cz.Count -eq 2) {
-                            $chce[[int]$cz[0]] = [decimal]::Parse($cz[1], [Globalization.CultureInfo]::InvariantCulture)
+                    # Biuro zeruje w oknie ZW pozycje, ktore nie wrocily - ilosc z paragonu
+                    # zostaje przy tych, ktore wrocily (wlasciciel, 15 wrzesnia 2026). Worker
+                    # zrobi to samo, wiec sprawdzamy dokladnie ten ruch: czy po zerze wartosc
+                    # i przelew przeliczaja sie same, czy kod musi je ustawic.
+                    if ($Ilosci) {
+                        Write-Wynik ""
+                        Write-Wynik "ZMIANA ILOSCI - $Ilosci, nadal BEZ Zapisz()"
+                        foreach ($para in ($Ilosci -split ',')) {
+                            $czesci = $para.Trim() -split '='
+                            if ($czesci.Count -ne 2) { Write-Wynik "  BRAK  zly zapis '$para' - ma byc Lp=ilosc"; continue }
+                            try {
+                                $lp = [int]$czesci[0]
+                                $ile = [decimal]::Parse($czesci[1], [Globalization.CultureInfo]::InvariantCulture)
+                                $pozycjeZw.Element($lp).IloscJm = $ile
+                                Write-Wynik ("  JEST  [{0}] IloscJm = {1}" -f $lp, $ile)
+                            } catch {
+                                Write-Wynik ("  BRAK  [{0}] odmowa: {1}" -f $czesci[0], $_.Exception.Message)
+                            }
                         }
-                    }
-                    if ($Towary) {
                         try { $liczba = [int]$pozycjeZw.Liczba } catch { }
+                        # Liczba pozycji po zerach mowi, czy zero USUWA wiersz, czy go zostawia.
+                        Write-Wynik ("--- Pozycje ZW po zmianie ilosci: {0} ---" -f $liczba)
                         for ($i = 1; $i -le $liczba; $i++) {
                             try {
                                 $el = $pozycjeZw.Element($i)
-                                $tw = [int]$el.TowarId
-                                $ilosc = [decimal]$el.IloscJm
-                                $nowa = [decimal]0
-                                if ($chce.ContainsKey($tw) -and $chce[$tw] -gt 0) {
-                                    $nowa = [Math]::Min($ilosc, $chce[$tw])
-                                    $chce[$tw] = $chce[$tw] - $nowa
-                                }
-                                if ($nowa -ne $ilosc) { $el.IloscJm = [double]$nowa }
-                                Write-Wynik ("  [{0}] TowarId={1} IloscJm {2} -> {3}" -f $i, $tw, $ilosc, $nowa)
+                                Write-Wynik ("  [{0}] TowarId={1} IloscJm={2} WartoscBruttoPoRabacie={3}" -f $i,
+                                    (Wartosc $el "TowarId"), (Wartosc $el "IloscJm"), (Wartosc $el "WartoscBruttoPoRabacie"))
                             } catch {
                                 Write-Wynik ("  [{0}] odmowa: {1}" -f $i, $_.Exception.Message)
                             }
                         }
+                        Wlasciwosci-Wg $zw 'Wartosc|Kwota|Plat|Przelew|Gotow|Kart' "ZW PO zmianie ilosci"
                     }
-                    try { $zw.RodzajZwrotuDetal = 1; Write-Wynik "  JEST  RodzajZwrotuDetal = 1" }
-                    catch { Write-Wynik "  BRAK  RodzajZwrotuDetal: $($_.Exception.Message)" }
-                    try {
-                        $zw.PlatnoscPrzelewKwota = $zw.WartoscBrutto
-                        Write-Wynik ("  JEST  PlatnoscPrzelewKwota = {0}" -f $zw.WartoscBrutto)
-                    } catch { Write-Wynik "  BRAK  PlatnoscPrzelewKwota: $($_.Exception.Message)" }
-                    try {
-                        $zw.SprawdzPoprawnosc()
-                        Write-Wynik "  JEST  SprawdzPoprawnosc() nie zglosil bledu"
-                    } catch {
-                        Write-Wynik "  BRAK  SprawdzPoprawnosc() odmowil: $($_.Exception.Message)"
-                    }
-                    Write-Wynik ("  SzczegolyOstatniegoBledu = {0}" -f (Wartosc $zw "SzczegolyOstatniegoBledu"))
 
-                    # OBRAZ PO USTAWIENIU, nie przed. Worker ustawia JEDNA forme
-                    # platnosci - przelew. Jesli szkic niesie druga (gotowka,
-                    # karta) z paragonu, suma form rozjedzie sie z kwota do
-                    # zaplaty, a Subiekt odmawia takiego dokumentu jednym zdaniem
-                    # bez szczegolow. Bez tego zrzutu nie wiemy nawet, czy tak jest.
-                    Wlasciwosci-Wg $zw $polaDokumentu "ZW JAK WORKER, przed Zapisz()"
-                    Wlasciwosci-Czy-Puste $zw $prywatne "ZW JAK WORKER - pola nabywcy i rachunku"
+                    # JAK WORKER (0.349.1). Na produkcji Zapisz() odmowil zdaniem "Nie mozna
+                    # zapisac dokumentu" bez przyczyny. Przyczyne trzyma SzczegolyOstatniegoBledu,
+                    # a SprawdzPoprawnosc() pokazuje ja bez zapisu - wiec sonda dalej nic nie wystawia.
+                    if ($Towary -or $Sprawdz) {
+                        Write-Wynik ""
+                        Write-Wynik "JAK WORKER - Towary '$Towary', nadal BEZ Zapisz()"
+                        $chce = @{}
+                        foreach ($para in ($Towary -split ',')) {
+                            if (-not $para.Trim()) { continue }
+                            $cz = $para.Trim() -split '='
+                            if ($cz.Count -eq 2) {
+                                $chce[[int]$cz[0]] = [decimal]::Parse($cz[1], [Globalization.CultureInfo]::InvariantCulture)
+                            }
+                        }
+                        if ($Towary) {
+                            try { $liczba = [int]$pozycjeZw.Liczba } catch { }
+                            for ($i = 1; $i -le $liczba; $i++) {
+                                try {
+                                    $el = $pozycjeZw.Element($i)
+                                    $tw = [int]$el.TowarId
+                                    $ilosc = [decimal]$el.IloscJm
+                                    $nowa = [decimal]0
+                                    if ($chce.ContainsKey($tw) -and $chce[$tw] -gt 0) {
+                                        $nowa = [Math]::Min($ilosc, $chce[$tw])
+                                        $chce[$tw] = $chce[$tw] - $nowa
+                                    }
+                                    if ($nowa -ne $ilosc) { $el.IloscJm = [double]$nowa }
+                                    Write-Wynik ("  [{0}] TowarId={1} IloscJm {2} -> {3}" -f $i, $tw, $ilosc, $nowa)
+                                } catch {
+                                    Write-Wynik ("  [{0}] odmowa: {1}" -f $i, $_.Exception.Message)
+                                }
+                            }
+                        }
+                        try { $zw.RodzajZwrotuDetal = 1; Write-Wynik "  JEST  RodzajZwrotuDetal = 1" }
+                        catch { Write-Wynik "  BRAK  RodzajZwrotuDetal: $($_.Exception.Message)" }
+                        try {
+                            $zw.PlatnoscPrzelewKwota = $zw.WartoscBrutto
+                            Write-Wynik ("  JEST  PlatnoscPrzelewKwota = {0}" -f $zw.WartoscBrutto)
+                        } catch { Write-Wynik "  BRAK  PlatnoscPrzelewKwota: $($_.Exception.Message)" }
+                        try {
+                            $zw.SprawdzPoprawnosc()
+                            Write-Wynik "  JEST  SprawdzPoprawnosc() nie zglosil bledu"
+                        } catch {
+                            Write-Wynik "  BRAK  SprawdzPoprawnosc() odmowil: $($_.Exception.Message)"
+                        }
+                        Write-Wynik ("  SzczegolyOstatniegoBledu = {0}" -f (Wartosc $zw "SzczegolyOstatniegoBledu"))
+
+                        # OBRAZ PO USTAWIENIU, nie przed. Worker ustawia JEDNA forme
+                        # platnosci - przelew. Jesli szkic niesie druga (gotowka,
+                        # karta) z paragonu, suma form rozjedzie sie z kwota do
+                        # zaplaty, a Subiekt odmawia takiego dokumentu jednym zdaniem
+                        # bez szczegolow. Bez tego zrzutu nie wiemy nawet, czy tak jest.
+                        Wlasciwosci-Wg $zw $polaDokumentu "ZW JAK WORKER, przed Zapisz()"
+                        Wlasciwosci-Czy-Puste $zw $prywatne "ZW JAK WORKER - pola nabywcy i rachunku"
+                        Pozycje-Wartosci $zw "ZW JAK WORKER"
+                    }
                 }
             }
-        }
-    } catch {
-        Write-Wynik "  BRAK  DodajZW() odmowil: $($_.Exception.Message)"
-    } finally {
-        # Zamknij() zwalnia blokade paragonu. Bez tego nastepny przebieg na tym samym
-        # PA dostawal "Nie mozna zablokowac obiektu" (sonda-zw.txt, 15:51).
-        if ($null -ne $zw) {
-            try { $zw.Zamknij() } catch { Write-Wynik "  UWAGA  Zamknij() szkicu ZW odmowil: $($_.Exception.Message)" }
+        } catch {
+            Write-Wynik "  BRAK  DodajZW() odmowil: $($_.Exception.Message)"
+        } finally {
+            # Zamknij() zwalnia blokade paragonu. Bez tego nastepny przebieg na tym samym
+            # PA dostawal "Nie mozna zablokowac obiektu" (sonda-zw.txt, 15:51).
+            if ($null -ne $zw) {
+                try { $zw.Zamknij() } catch { Write-Wynik "  UWAGA  Zamknij() szkicu ZW odmowil: $($_.Exception.Message)" }
+            }
         }
     }
+
 
     # ZW wystawiony RECZNIE - jedyne zrodlo liczby "zwrot ze sprzedazy" w polu
     # RodzajZwrotuDetal. Szkic ma tam 0, a zgadniecie wartosci na dokumencie
@@ -821,6 +848,7 @@ if ($SzkicZW) {
             } else {
                 Wlasciwosci-Wg $wzor $polaDokumentu "ZW wystawiony recznie"
                 Wlasciwosci-Czy-Puste $wzor $prywatne "ZW wystawiony recznie - pola nabywcy i rachunku"
+                Pozycje-Wartosci $wzor "ZW wystawiony recznie"
                 $pozycjeWzoru = $null
                 try { $pozycjeWzoru = $wzor.Pozycje } catch { }
                 if ($null -ne $pozycjeWzoru) {

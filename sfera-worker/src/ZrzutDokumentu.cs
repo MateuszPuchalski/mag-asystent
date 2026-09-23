@@ -53,6 +53,24 @@ internal static class ZrzutDokumentu
         RegexOptions.IgnoreCase);
 
     /**
+     * Pola WIERSZA — te same co `$polaPozycji` w sondzie (0.458.0).
+     *
+     * Zrzut `#1481` i ZW 748/MAG/09/2026, wystawiony ręcznie do tego samego
+     * paragonu, mają nagłówek identyczny pole w pole: płatność, kasa, termin,
+     * nabywca, komunikat kontrahenta i wartość magazynowa. Nagłówek przestał
+     * więc być podejrzany. Zostały wiersze, których zrzut do dziś nie widział.
+     */
+    private static readonly Regex PolaPozycji = new(
+        "Towar|Ilosc|Jm|Lp|Cena|Wartosc|Rabat|Vat|Magazyn|Dostep|Oznaczenie|Akcyz|Orygin|Korekt|Rodzaj|Typ",
+        RegexOptions.IgnoreCase);
+
+    /**
+     * Osobna granica dla wierszy, żeby długi paragon nie zjadł nagłówka.
+     * Sześć wierszy z `#1116` po trzydzieści pól to około sześciu tysięcy znaków.
+     */
+    private const int MaksZnakowPozycji = 6000;
+
+    /**
      * Górna granica długości — treść błędu ląduje w jednym wierszu kolejki.
      *
      * 4000, nie 1800 (0.457.0): pierwszy prawdziwy zrzut (zadanie `#1474`)
@@ -98,6 +116,50 @@ internal static class ZrzutDokumentu
         string wynik = $"pola: {(wartosci.Count > 0 ? string.Join("; ", wartosci) : "(żadne nie pasuje)")}";
         if (prywatne.Count > 0) wynik += $" · nabywca/rachunek: {string.Join(", ", prywatne)}";
         return wynik.Length <= MaksZnakow ? wynik : wynik[..MaksZnakow] + "…";
+    }
+
+    /**
+     * Wiersze dokumentu: „pozycje (2): [1] TowarId=7725; IloscJm=1 | [2] …".
+     * Pola prywatne nie wchodzą wcale — w wierszu nie ma nic, czego porównanie
+     * potrzebuje, a opis pozycji bywa wpisany ręcznie.
+     */
+    public static string OpisPozycji(object dokument)
+    {
+        object pozycje;
+        int ile;
+        try
+        {
+            object? p = Pobierz(dokument, "Pozycje");
+            if (p is null) return "(pozycje: null)";
+            pozycje = p;
+            ile = Convert.ToInt32(Pobierz(pozycje, "Liczba"), System.Globalization.CultureInfo.InvariantCulture);
+        }
+        catch (Exception e)
+        {
+            return $"(pozycje niedostępne: {(e.InnerException ?? e).Message.Trim()})";
+        }
+
+        var wiersze = new List<string>();
+        // `Element` liczy od jedynki — `PIERWSZA_POZYCJA` w adapterze, §2l.
+        for (int i = 1; i <= ile; i++)
+        {
+            try
+            {
+                object el = pozycje.GetType().InvokeMember(
+                    "Element", BindingFlags.GetProperty, null, pozycje, new object[] { i })!;
+                var pola = new List<string>();
+                foreach (string n in NazwyWlasciwosci(el))
+                    if (!Prywatne.IsMatch(n) && PolaPozycji.IsMatch(n))
+                        pola.Add($"{n}={Wartosc(el, n)}");
+                wiersze.Add($"[{i}] {(pola.Count > 0 ? string.Join("; ", pola) : "(żadne pole nie pasuje)")}");
+            }
+            catch (Exception e)
+            {
+                wiersze.Add($"[{i}] (odmowa: {(e.InnerException ?? e).Message.Trim()})");
+            }
+        }
+        string wynik = $"pozycje ({ile}): {string.Join(" | ", wiersze)}";
+        return wynik.Length <= MaksZnakowPozycji ? wynik : wynik[..MaksZnakowPozycji] + "…";
     }
 
     /**

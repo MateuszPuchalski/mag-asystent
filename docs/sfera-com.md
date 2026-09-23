@@ -581,7 +581,8 @@ Jedna rzecz została niepewna i to przez błąd zrzutu, nie przez Sferę. Do
 wychodziły jako „wypełnione". Tak wyszły `PrzedplatyBankowe`
 i `BankOperacjaGotowkowa`. Poprawka jest w 0.457.0.
 
-`[WERYFIKUJ]` Czy `PrzedplatyBankowe` na szkicu ZW są zerem.
+**`PrzedplatyBankowe` są zerem** (zadanie `#1481`, zrzut po poprawce 0.457.0).
+`BankOperacjaGotowkowa` też jest puste. Płatność jest więc zamknięta w całości.
 
 Następny krok to zestawienie pole w pole z ZW, który przeszedł. Zrzut workera
 i `-WzorZW` sondy biorą od 0.457.0 ten sam zestaw pól.
@@ -592,6 +593,30 @@ wszystkie pola płatności i kwoty. O polach nabywcy i rachunku mówi wyłączni
 ma prawa stąd wyjść. Ten sam zrzut robi `-WzorZW` na dokumencie, który
 przeszedł. Dwie kolumny obok siebie rozstrzygają obie hipotezy w jednym
 przebiegu.
+
+**Nagłówek odmówionego ZW jest identyczny z ręcznym** (23 września 2026).
+Zadanie `#1481` padło na PA 12083/MAG/09/2026, jeden towar za 45 zł. Biuro
+wystawiło potem ręcznie ZW 748/MAG/09/2026 do tego samego paragonu. Sonda
+`-WzorZW` przeczytała go tym samym zestawem pól, co zrzut workera.
+
+Zgadza się każde pole z wartością. Przelew, kwota do zapłaty i brutto mają po
+45 zł, a wartość magazynowa 23,76 zł. `KasaId` 1, `KasaKatId` 8, termin
+kredytu, rodzaj zwrotu 1 i skutek magazynowy są te same.
+
+Pola nabywcy i rachunku też się zgadzają, łącznie z `OstatniKomunikatKontrahenta`
+wypełnionym po obu stronach. Oba dokumenty mają dwa wiersze: zwracany z ilością 1
+i drugi z zerem.
+
+Jedyna różnica to `WartoscVatPP`: `null` na szkicu, `0.0000` na zapisanym ZW.
+Niezapisany szkic sondy ma tam też `null`, więc to raczej ślad samego zapisu.
+Kasa, termin, komunikat kontrahenta i rachunek przestają być podejrzane.
+
+Zostają wiersze. Zrzut workera i sonda wypisywały dotąd z wierszy najwyżej
+towar, ilość i numer. Od 0.458.0 oba wypisują ten sam szerszy zestaw pól
+każdego wiersza. `-WzorZW` działa też bez `-SzkicZW`.
+
+`[WERYFIKUJ]` Czym wiersze ZW z workera różnią się od wierszy ZW wystawionego
+ręcznie do tego samego paragonu.
 
 **Od 0.456.0 worker robi ten zrzut sam, w chwili odmowy.** Właściciel zapytany,
 czy uruchomi sondę z komunikatu, odpowiedział: „niech robi to sam". Po odmowie

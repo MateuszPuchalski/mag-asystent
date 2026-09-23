@@ -513,7 +513,9 @@ public sealed class SferaComAdapter : ISferaAdapter
             string zrzut = "";
             if (zrzutPol && OperatingSystem.IsWindows())
             {
-                try { zrzut = ZrzutDokumentu.Opis(dokument); }
+                /* Wiersze osobnym wywołaniem (0.458.0): nagłówek `#1481` okazał się
+                   identyczny z ręcznym ZW, więc bez wierszy zrzut nic już nie rozróżnia. */
+                try { zrzut = $"{ZrzutDokumentu.Opis(dokument)} · {ZrzutDokumentu.OpisPozycji(dokument)}"; }
                 catch (Exception z) { zrzut = $"(zrzut pól nieudany: {z.Message.Trim()})"; }
             }
             throw new BladTrwalyException(

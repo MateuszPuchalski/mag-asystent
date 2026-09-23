@@ -34,6 +34,26 @@ historii nie przepisujemy.
 ---
 
 
+## 0.458.0 — 23 września 2026
+
+**[wymaga działania] Zrzut przy odmowie ZW obejmuje wiersze; `-WzorZW` działa sam.**
+Nowy `wertis-sfera-worker.exe` z artefaktu CI: zatrzymaj `wertis-sfera`,
+podmień plik i uruchom usługę.
+
+Sonda `-WzorZW` przeczytała ZW 748/MAG/09/2026, wystawiony ręcznie do PA
+12083/MAG/09/2026. To ten sam paragon, na którym padło zadanie `#1481`. Nagłówek
+obu dokumentów zgadza się pole w pole. Kasa, termin kredytu, komunikat
+kontrahenta i rachunek przestały więc być podejrzane. Szczegóły stoją
+w `docs/sfera-com.md` §2m.
+
+Zostały wiersze, których dotąd nikt nie porównał:
+- Po odmowie zapisu worker dopisuje do błędu pola każdego wiersza ZW: towar,
+  ilości, ceny, wartości, VAT, magazyn. Pól prywatnych nie wypisuje wcale.
+- Sonda wypisuje ten sam zestaw pól wierszy dla szkicu „jak worker” i dla
+  `-WzorZW`.
+- `-WzorZW` działa także bez `-SzkicZW`. Do 0.457.0 sam przełącznik dawał
+  tylko listę managerów.
+
 ## 0.457.0 — 23 września 2026
 
 **[wymaga działania] Zrzut pól przy odmowie ZW: poprawka po pierwszym użyciu.**
