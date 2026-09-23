@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  AliasSilnika, Identyfikator, ImportOdsylaczy, ImportWykazu, MapowanieWykazu, RaportWykazu, KandydatZamiennosci, LukaSilnika, MapowanieOdsylaczy, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
+  AliasSilnika, Identyfikator, ImportOdsylaczy, ImportWykazu, MapowanieWykazu, PrzegladWykazu, RaportWykazu, KandydatZamiennosci, LukaSilnika, MapowanieOdsylaczy, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
   NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RaportImportuOdsylaczy, RodzajDowodu,
   RodzajIdentyfikatora, SiecWiedzy, TrescImportu,
   TokenSilnika, Zabudowa, Zamiennosc, Zastosowanie,
@@ -39,6 +39,8 @@ export function useKolejkaWiedzy() {
     queryFn: () => api<{
       propozycje: Zastosowanie[]; liczba: number; pasowania: Pasowanie[]; pasowanDoRozstrzygniecia: number;
       zamiennosciOem: KandydatZamiennosci[]; zamiennosciOemDoRozstrzygniecia: number;
+      /** Propozycje z wykazów części pogrupowane do przeglądu listą; brak = starszy serwer. */
+      wykazy?: PrzegladWykazu[];
     }>(`/api/obsluga/wiedza/kolejka`),
     refetchInterval: 30_000,
   });
@@ -357,6 +359,17 @@ export function useHistoriaWykazow() {
   return useQuery({
     queryKey: kluczeWiedzy.wykazy,
     queryFn: () => api<ImportWykazu[]>(`/api/obsluga/wiedza/wykazy`),
+  });
+}
+
+/** Zatwierdzenie listą — identyfikatory, które człowiek zostawił zaznaczone. */
+export function useZatwierdzZWykazu() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { importId: number; ids: number[] }) =>
+      api<{ zatwierdzono: number; pominieto: number; wykaz: ImportWykazu }>(`/api/obsluga/wiedza/wykazy/${v.importId}/zatwierdz`,
+        { method: "POST", body: JSON.stringify({ ids: v.ids }) }),
+    onSettled: () => poWiedzy(qc),
   });
 }
 

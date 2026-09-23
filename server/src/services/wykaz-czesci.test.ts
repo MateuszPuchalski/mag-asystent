@@ -144,3 +144,47 @@ test("wycofanie wykazu zdejmuje czekające propozycje, zatwierdzonych nie rusza"
   assert.equal(W.kolejkaPropozycji().propozycje.filter((z) => z.dowody.some((d) => d.tresc.startsWith("IPL Honda"))).length, 0);
   assert.throws(() => Wk.wycofajWykaz(zapisano!.importId, biuro), /już wycofany/);
 });
+
+test("przegląd grupuje czekające po wykazie, z nazwą kartoteki i dowodem bez nazwy wykazu w czole", () => {
+  const { zapisano } = Wk.importujWykaz(zadanie(), true, biuro);
+  /* Propozycja spoza wykazu stoi w kolejce, ale nie w przeglądzie. */
+  W.zaproponujZastosowanie({ twId: FILTR, model: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46" }, polaryzacja: "pasuje",
+    zrodlo: "reczne", dowod: { rodzaj: "producent", tresc: "karta" } }, { userId: biuro, name: "A. Lewandowska" });
+  const przeglad = Wk.przegladWykazow(W.kolejkaPropozycji().propozycje);
+  assert.equal(przeglad.length, 1);
+  assert.equal(przeglad[0].id, zapisano!.importId);
+  const gaznik = przeglad[0].pozycje.find((p) => p.twId === GAZNIK)!;
+  assert.deepEqual({ nazwa: gaznik.nazwa, maszyna: gaznik.maszyna, warunki: gaznik.warunki, dowod: gaznik.dowod },
+    { nazwa: "Gaźnik GX160", maszyna: "silnik Honda GX160", warunki: "roczniki 2012–2018", dowod: "silnik Honda GX160 — numer 16100-ZH8-W61" });
+  assert.equal(przeglad[0].pozycje.length, 4);
+  /* Wykaz wycofany znika z przeglądu razem ze swoimi propozycjami. */
+  Wk.wycofajWykaz(zapisano!.importId, biuro);
+  assert.deepEqual(Wk.przegladWykazow(W.kolejkaPropozycji().propozycje), []);
+});
+
+test("zatwierdzenie listą bierze wyłącznie zaznaczone z TEGO wykazu; rozstrzygnięte w międzyczasie liczy jako pominięte", () => {
+  const { zapisano } = Wk.importujWykaz(zadanie(), true, biuro);
+  const id = zapisano!.importId;
+  const [a, b, c, d] = Wk.przegladWykazow(W.kolejkaPropozycji().propozycje)[0].pozycje.map((p) => p.id);
+  const obca = W.zaproponujZastosowanie({ twId: FILTR, model: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46" },
+    polaryzacja: "pasuje", zrodlo: "reczne", dowod: { rodzaj: "producent", tresc: "karta" } },
+  { userId: biuro, name: "A. Lewandowska" })!;
+  const hala = Number(db().prepare("INSERT INTO app_user(login,name,role) VALUES ('bob','B. Nowak','magazynier')").run().lastInsertRowid);
+
+  assert.throws(() => Wk.zatwierdzZWykazu(id, [a], hala), /biura/);
+  assert.throws(() => Wk.zatwierdzZWykazu(id, [], biuro), /Zaznacz/);
+  assert.throws(() => Wk.zatwierdzZWykazu(id, [a, obca.id], biuro), /spoza tego wykazu/);
+  assert.equal(W.zastosowanie(a)!.stan, "propozycja", "odmowa całości — nawet własna pozycja nie przeszła");
+
+  /* Ktoś odrzucił „b" między otwarciem ekranu a kliknięciem. */
+  W.rozstrzygnijZastosowanie(b, "odrzuc", "to nie ten gaźnik", biuro);
+  const w = Wk.zatwierdzZWykazu(id, [a, b, c], biuro);
+  assert.deepEqual([w.zatwierdzono, w.pominieto], [2, 1]);
+  assert.deepEqual([a, b, c, d].map((i) => W.zastosowanie(i)!.stan), ["zatwierdzone", "odrzucone", "zatwierdzone", "propozycja"],
+    "niezaznaczone czeka dalej — lista nie rozstrzyga tego, czego człowiek nie wybrał");
+  assert.equal(W.zastosowanie(a)!.rozstrzygnal, "A. Lewandowska");
+  assert.deepEqual([w.wykaz.czeka, w.wykaz.zatwierdzonych], [1, 2]);
+
+  Wk.wycofajWykaz(id, biuro);
+  assert.throws(() => Wk.zatwierdzZWykazu(id, [d], biuro), /wycofany/);
+});

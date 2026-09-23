@@ -100,6 +100,8 @@ export interface Zastosowanie {
   warunki: WarunkiZastosowania;
   /** „roczniki 2014–2018, nr seryjny od 175000000" — albo `null`. */
   zdanieWarunkow: string | null;
+  /** Wykaz części, z którego przyszła propozycja — kolejka grupuje po nim przegląd. */
+  importId: number | null;
   /** Zdanie źródła (§14.3) — dla kandydata, ostrzeżenia i szkicu. */
   zdanieZrodla: string;
 }
@@ -312,6 +314,7 @@ function naZastosowania(database: DatabaseSync, wiersze: Array<Record<string, un
       powodRozstrzygniecia: w.powod_rozstrzygniecia == null ? null : String(w.powod_rozstrzygniecia),
       dowody: lista, pewnosc: pewnoscZastosowania(lista),
       warunki, zdanieWarunkow: zdanieWarunkow(warunki),
+      importId: w.import_id == null ? null : Number(w.import_id),
     };
     return { ...bez, zdanieZrodla: zdanieZrodla(bez) };
   });
