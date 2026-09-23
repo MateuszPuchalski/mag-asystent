@@ -74,6 +74,7 @@ import { uzupelnijZamowienia } from "./services/allegro-zamowienia-sync.js";
 import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
 import { sklasyfikujNowe } from "./services/klasyfikacja-auto.js";
+import { szkicujPoRozpoznaniu } from "./services/copilot-szkic-po-rozpoznaniu.js";
 import { oproznijKolejke } from "./services/wiedza-automat.js";
 import { nadawcaKluczaAnthropic } from "./adapters/copilot.anthropic.js";
 import { uruchomTakt } from "./services/takt.js";
@@ -551,6 +552,13 @@ async function main() {
     uruchomTakt("copilot-auto-klasyfikacja", config.copilot.autoKlasyfikacjaMs, async () => {
       const w = await sklasyfikujNowe();
       if (w.przerwane) console.warn(`[copilot-auto-klasyfikacja] przebieg przerwany: ${w.przerwane}`);
+      /* Szkic zaraz po rozpoznaniu (23 września 2026) — w TYM SAMYM takcie,
+         więc w `main()`, jak każde wywołanie modelu bez kliknięcia. Powód
+         i sufit w `services/copilot-szkic-po-rozpoznaniu.ts`. */
+      if (config.copilot.szkicPoRozpoznaniu && w.rozmowy.length > 0) {
+        const s = await szkicujPoRozpoznaniu(w.rozmowy);
+        if (s.przerwane) console.warn(`[szkic-po-rozpoznaniu] przebieg przerwany: ${s.przerwane}`);
+      }
     });
   }
 

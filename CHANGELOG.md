@@ -36,6 +36,40 @@ historii nie przepisujemy.
 
 ## 0.478.0 — 23 września 2026
 
+Dwie funkcje dla hali w jednym wydaniu: szukanie zgubionego kolektora
+i ergonomia w liczbach. Dzwonienie i pomiar czasów ruszą z nowym APK.
+
+**Szukanie zgubionego kolektora.** Magazynier odkłada kolektor „na chwilę”
+na regale albo na wózku i zapomina gdzie. Teraz ktoś inny każe mu zadzwonić
+i idzie na dźwięk.
+
+- **Kto może wezwać.** Każdy zalogowany. Biuro robi to w panelu: STAN
+  SYSTEMU → karta „Zgubiony kolektor”. Kolega z hali robi to ze swojego
+  kolektora: Ustawienia → ZNAJDŹ KOLEKTOR.
+- **Po czym poznać kolektor.** Wiersz niesie znak z czterech ostatnich znaków
+  identyfikatora, np. `#A3F9`, i osobę, która na nim ostatnio pracowała.
+  Każdy kolektor pokazuje własny znak w Ustawieniach, więc da się go nakleić.
+- **Co robi kolektor.** Gra świergot na strumieniu alarmu, na pełnej głośności
+  i z wibracją, także ściszony do zera. Syrena trwa najwyżej 5 minut. Potem
+  głośność alarmu wraca do poprzedniej.
+- **Jak ją uciszyć.** Dotknięcie w dowolnym miejscu nakładki ZNALAZŁEM.
+  Szukający może też nacisnąć PRZESTAŃ w panelu albo na liście.
+- **Karta mówi, czy kolektor słyszy.** Kolektor sam pyta o wezwanie co 10 s.
+  Panel odróżnia stany „słucha”, „cisza — uśpiony albo bez baterii”,
+  „wylogowany — nie zadzwoni” i „dzwoni”.
+- **Granica.** Kolektor wylogowany albo uśpiony przez Androida nie zadzwoni,
+  dopóki się nie obudzi. Przy domyślnym „ekranie zawsze włączonym” kolektor
+  z otwartą aplikacją pyta do wyczerpania baterii.
+- **Ślad w audycie.** Zdarzenia `kolektor_wezwany`, `kolektor_odnaleziony`
+  i `kolektor_wezwanie_odwolane` trafiają do DZIENNIKA ZDARZEŃ.
+
+Stan wezwania żyje w pamięci procesu API, nie w bazie. Pytanie kolektora
+niczego nie zapisuje, a restart usługi gubi trwające wezwanie. Kolektor
+dzwoni dopiero z nowym APK. Stary kolektor jest na liście, ale ma „cisza”.
+Nowe trasy `/api/kolektory…` i `/api/kolektor/wezwanie`, serwis
+`szukanie-kolektora.ts` z testami, karta panelu z testem, reguły w `:core`
+(`SzukanieKolektora.kt`) z testami, nowy ekran kolektora KOLEKTORY.
+
 **Ergonomia w liczbach: gdzie kolektor przeszkadza w pracy.** Pytanie
 właściciela brzmiało: „jak sprawić, żeby kolektor był przyjemny w pracy?”.
 Nowa karta w ANALIZIE → Praca hali odpowiada liczbami z naszej hali, a nie
@@ -70,36 +104,26 @@ są te same w kolektorze i na serwerze.
 
 ## 0.477.0 — 23 września 2026
 
-**Szukanie zgubionego kolektora.** Magazynier odkłada kolektor „na chwilę”
-na regale albo na wózku i zapomina gdzie. Teraz ktoś inny każe mu zadzwonić
-i idzie na dźwięk.
+**Szkic układa się sam zaraz po rozpoznaniu i czeka na zatwierdzenie
+agenta.** Decyzja właściciela: „ułóż odpowiedź automatycznie po klasyfikacji,
+gotową do zatwierdzenia”. Do tej wersji po „Rozpoznaj” agent klikał jeszcze
+„Ułóż odpowiedź” i czekał.
 
-- **Kto może wezwać.** Każdy zalogowany. Biuro robi to w panelu: STAN
-  SYSTEMU → karta „Zgubiony kolektor”. Kolega z hali robi to ze swojego
-  kolektora: Ustawienia → ZNAJDŹ KOLEKTOR.
-- **Po czym poznać kolektor.** Wiersz niesie znak z czterech ostatnich znaków
-  identyfikatora, np. `#A3F9`, i osobę, która na nim ostatnio pracowała.
-  Każdy kolektor pokazuje własny znak w Ustawieniach, więc da się go nakleić.
-- **Co robi kolektor.** Gra świergot na strumieniu alarmu, na pełnej głośności
-  i z wibracją, także ściszony do zera. Syrena trwa najwyżej 5 minut. Potem
-  głośność alarmu wraca do poprzedniej.
-- **Jak ją uciszyć.** Dotknięcie w dowolnym miejscu nakładki ZNALAZŁEM.
-  Szukający może też nacisnąć PRZESTAŃ w panelu albo na liście.
-- **Karta mówi, czy kolektor słyszy.** Kolektor sam pyta o wezwanie co 10 s.
-  Panel odróżnia stany „słucha”, „cisza — uśpiony albo bez baterii”,
-  „wylogowany — nie zadzwoni” i „dzwoni”.
-- **Granica.** Kolektor wylogowany albo uśpiony przez Androida nie zadzwoni,
-  dopóki się nie obudzi. Przy domyślnym „ekranie zawsze włączonym” kolektor
-  z otwartą aplikacją pyta do wyczerpania baterii.
-- **Ślad w audycie.** Zdarzenia `kolektor_wezwany`, `kolektor_odnaleziony`
-  i `kolektor_wezwanie_odwolane` trafiają do DZIENNIKA ZDARZEŃ.
+- **Trzy wejścia:** przycisk „Rozpoznaj”, takt rozpoznania
+  (`COPILOT_AUTO_KLASYFIKACJA=1`) i poprawka kategorii przez agenta.
+  Poprawka układa szkic od nowa, pod kategorię człowieka i jej wzorzec
+  z 0.474.0.
+- **Gotowy do zatwierdzenia.** Karta szkicu czeka na agenta: `E` wstawia go
+  do edytora, Ctrl+Enter wysyła. Do klienta nic nie idzie samo.
+- **Pasek nad kolejką mówi, że szkice są w drodze** („układam 2 szkice do
+  zatwierdzenia”), żeby nikt nie płacił drugi raz przyciskiem „Ułóż”.
+- **Koszt:** ten sam sufit godzinowy co szkic z taktu. „Nic do zrobienia”
+  i rozpoznanie zastępcze szkicu nie dają. Drugi przebieg na tej samej
+  decyzji nie płaci.
+- **[wymaga uwagi]** Włączone domyślnie, bo tak zdecydował właściciel.
+  Wyłącza je `COPILOT_SZKIC_PO_ROZPOZNANIU=0` w `wertis.env`.
 
-Stan wezwania żyje w pamięci procesu API, nie w bazie. Pytanie kolektora
-niczego nie zapisuje, a restart usługi gubi trwające wezwanie. Kolektor
-dzwoni dopiero z nowym APK. Stary kolektor jest na liście, ale ma „cisza”.
-Nowe trasy `/api/kolektory…` i `/api/kolektor/wezwanie`, serwis
-`szukanie-kolektora.ts` z testami, karta panelu z testem, reguły w `:core`
-(`SzukanieKolektora.kt`) z testami, nowy ekran kolektora KOLEKTORY.
+Kolumna `szkic_copilota.decyzja_id` dochodzi sama przy starcie.
 
 ## 0.476.0 — 23 września 2026
 

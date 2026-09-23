@@ -436,7 +436,7 @@ przed którą ta pozycja broni.
       blokad pozycji nie ma od 0.47.0 i nic już nie „proponuje odebrania",
 - [ ] w kreatorze kont są TRZY role: magazynier, biuro, administrator.
 
-**Zgubiony kolektor** (0.477.0)
+**Zgubiony kolektor** (0.478.0)
 
 - [ ] Ustawienia pokazują znak tego kolektora, np. `#A3F9`,
 - [ ] ZNAJDŹ KOLEKTOR nie pokazuje na liście własnego kolektora,

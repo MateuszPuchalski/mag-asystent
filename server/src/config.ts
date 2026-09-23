@@ -993,6 +993,18 @@ export const config = {
      */
     autoKlasyfikacja: process.env.COPILOT_AUTO_KLASYFIKACJA === "1",
     /**
+     * SZKIC ZARAZ PO ROZPOZNANIU (23 września 2026, decyzja właściciela:
+     * „ułóż odpowiedź automatycznie po klasyfikacji, gotową do zatwierdzenia").
+     *
+     * WŁĄCZONE DOMYŚLNIE i to jest świadomy wyjątek od reguły dwóch pól wyżej.
+     * Tamte wydają pieniądze bez żadnego kliknięcia; ten idzie za rozpoznaniem,
+     * które było albo kliknięciem agenta, albo taktem włączonym już decyzją
+     * przy `wertis.env`. Właściciel poprosił o to wprost. Wyłącza się
+     * `COPILOT_SZKIC_PO_ROZPOZNANIU=0`, a koszt trzyma ten sam sufit godzinowy
+     * co szkic z taktu (`autoNaGodzine`).
+     */
+    szkicPoRozpoznaniu: process.env.COPILOT_SZKIC_PO_ROZPOZNANIU !== "0",
+    /**
      * Rytm krótszy niż przy szkicu, bo rozpoznanie ma stać przy wiadomości,
      * ZANIM agent ją otworzy — a jedno wywołanie trwa sekundę, nie kilka.
      */

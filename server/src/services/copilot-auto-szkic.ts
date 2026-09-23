@@ -146,7 +146,7 @@ const CZEKAJACE = `
    LIMIT ?`;
 
 /** Ile wywołań szkicu poszło w ostatniej godzinie — z księgi, razem z błędami. */
-function zuzyteWGodzinie(database: DatabaseSync): number {
+export function zuzyteWGodzinie(database: DatabaseSync): number {
   return Number((database.prepare(
     `SELECT count(*) n FROM copilot_wywolanie
       WHERE zadanie='szkic' AND at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 hours')`)
