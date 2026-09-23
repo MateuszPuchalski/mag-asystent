@@ -262,7 +262,38 @@ export async function uzupelnijZamowienia(deps: ZamowieniaSyncDeps = {}): Promis
  * operator wkleił coś innego (telefon ze spacjami, adres), a nie login.
  */
 export function wygladaNaLogin(uchwyt: string): boolean {
-  return /^[\p{L}\p{N}._-]{2,64}$/u.test(uchwyt.trim());
+  const u = uchwyt.trim();
+  return /^[\p{L}\p{N}._-]{2,64}$/u.test(u) || LOGIN_KLIENTA.test(u);
+}
+
+/**
+ * Login kupującego bez własnego pseudonimu: `client:124843816` (0.452.0).
+ *
+ * Zgłoszenie właściciela ze zrzutem Sales Center: kupujący stał tam jako
+ * „Client:124843816", a nasz panel odpowiadał „nie mam paczek". Dwukropek
+ * nie mieścił się w liście znaków wyżej, więc pytanie do Allegro nie wychodziło
+ * wcale. Do tego wydania braliśmy ten kształt za MASKĘ — tak opisuje go
+ * blizna 0.56.6 przy rozmówcy w wiadomościach. W zamówieniu to jest po prostu
+ * login, bo Allegro nim go pokazuje i po nim go wyszukuje.
+ *
+ * Wzór jest wąski — sam przedrostek i cyfry. Dwukropek w dowolnym miejscu
+ * przepuściłby godzinę albo wklejony adres.
+ */
+const LOGIN_KLIENTA = /^client:\d{3,20}$/i;
+
+/**
+ * Warianty pisowni loginu do zapytania.
+ *
+ * Sales Center pokazuje „Client:…" wielką literą, a nasze dane z API mają
+ * „client:…" małą. Specyfikacja nie mówi, czy filtr `buyer.login` rozróżnia
+ * wielkość liter. Dla tego jednego kształtu pytamy więc najpierw małą,
+ * a przy pustej odpowiedzi wielką. To najwyżej jedno żądanie więcej,
+ * i tylko wtedy, gdy pierwsze nic nie dało.
+ */
+function wariantyLoginu(login: string): string[] {
+  if (!LOGIN_KLIENTA.test(login)) return [login];
+  const cyfry = login.slice(login.indexOf(":") + 1);
+  return [`client:${cyfry}`, `Client:${cyfry}`];
 }
 
 /**
@@ -296,9 +327,13 @@ export async function pobierzZamowieniaKupujacego(
   if (!wygladaNaLogin(czysty)) return 0;
 
   /* Sieć PRZED transakcją, jak w każdym przebiegu synchronizacji. */
-  const body = (await query(urlZamowienKupujacego(apiUrl, czysty))) as
-    { checkoutForms?: Zamowienie[] } | null;
-  const pobrane = (body?.checkoutForms ?? []).filter((z) => typeof z?.id === "string");
+  let pobrane: Zamowienie[] = [];
+  for (const wariant of wariantyLoginu(czysty)) {
+    const body = (await query(urlZamowienKupujacego(apiUrl, wariant))) as
+      { checkoutForms?: Zamowienie[] } | null;
+    pobrane = (body?.checkoutForms ?? []).filter((z) => typeof z?.id === "string");
+    if (pobrane.length) break;
+  }
   if (!pobrane.length) return 0;
 
   const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);

@@ -447,6 +447,21 @@ export const config = {
      */
     zwrotTerminDni: num(process.env.ZWROT_TERMIN_DNI, 7, "ZWROT_TERMIN_DNI"),
     /**
+     * Po ilu dniach od ZGŁOSZENIA zwrot bez decyzji uznajemy za rozliczony
+     * (0.452.0).
+     *
+     * Wywiad z właścicielem, 23 września 2026: kolejka „Do decyzji" liczyła
+     * 743 sprawy, „głównie stare". Sprzedawca ma siedem dni na oddanie
+     * pieniędzy, a ósmego dnia Allegro oddaje je samo. Po czterdziestu pięciu
+     * dniach wypłata jest więc faktem, nawet gdy zatrzask z operacji płatniczych
+     * (0.426.0) go nie złapał. Liczbę wybrał właściciel, z zapasem na paczki,
+     * które długo jechały.
+     *
+     * W env z tego samego powodu co termin wyżej: to liczba z cudzego
+     * regulaminu i z naszej ostrożności, a nie z kodu.
+     */
+    zwrotWygasaDni: num(process.env.ZWROT_WYGASA_DNI, 45, "ZWROT_WYGASA_DNI"),
+    /**
      * Od kiedy widzimy zwroty. Decyzja właściciela: 20 SIERPNIA 2026, północ
      * czasu lokalnego (stąd 19 sierpnia 22:00 UTC — Polska jest w sierpniu
      * na UTC+2). Do 0.152.0 stało tu 20 lipca; właściciel przesunął próg

@@ -974,6 +974,17 @@ Po co: nasza baza zna tylko zamówienia, do których prowadzi zwrot, wiadomość
 albo reklamacja. Paczka nieodebrana nie ma żadnego z nich, więc jej
 zamówienia u nas nie było. Biuro szukało go na stronie Allegro.
 
+**Login bez pseudonimu: `client:124843816` (0.452.0).** Zrzut Sales Center
+od właściciela pokazał kupującego z loginem „Client:124843816”. Sales Center
+wyszukiwał go po tym napisie, a nasz panel nie pytał Allegro wcale. Dwukropek
+nie mieścił się w dopuszczonych znakach. Ten kształt braliśmy dotąd za MASKĘ
+rozmówcy (blizna 0.56.6); w zamówieniu jest zwykłym loginem.
+
+Schemat nie mówi, czy filtr `buyer.login` rozróżnia wielkość liter. Dla tego
+kształtu pytamy więc najpierw „client:”, a przy pustej odpowiedzi „Client:”.
+Znacznik weryfikacji przy rozmówcy w wiadomościach zostaje: zrzut dotyczy
+zamówienia, a nie wątku.
+
 ### `external.id` — mostek do kartoteki
 
 Schemat `ExternalId` opisuje je jako „The ID of the offer in the external

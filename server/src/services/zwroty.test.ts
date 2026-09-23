@@ -569,7 +569,9 @@ function zwrotDoDecyzji(d: Db) {
   const id = Number(d.prepare(`INSERT INTO zwrot_klienta
     (channel_account_id,external_id,order_id,created_at,synced_at)
     VALUES (?,?,?,?,?)`).run(konto, `z-${n}`, `ord-${n}`,
-      "2026-09-01T08:00:00Z", "2026-09-01T08:00:00Z").lastInsertRowid);
+      /* Wczoraj, nie stała data (0.452.0) — zwrot bez decyzji po
+         `ZWROT_WYGASA_DNI` wychodzi z kolejki, a ten pomocnik ma stać W NIEJ. */
+      new Date(Date.now() - 86_400_000).toISOString(), "2026-09-01T08:00:00Z").lastInsertRowid);
   const poz = [1, 2].map((i) => Number(d.prepare(`INSERT INTO zwrot_klienta_pozycja
     (zwrot_id,klucz,offer_id,nazwa,ilosc,cena_grosze,waluta)
     VALUES (?,?,?,?,?,?,?)`).run(id, `of-${n}-${i}`, `of-${n}-${i}`, `Część ${i}`, 1, 5000 * i, "PLN")
@@ -2076,4 +2078,32 @@ test("przeniesienia nie da się zameldować dla pozycji BEZ tej oceny", () => {
   ocenPozycje(d, poz[0], "stan", 2, KTO);
 
   assert.throws(() => przeniesionoNaOutlet(d, poz[0], KTO), /nie jest oceniona na outlet/);
+});
+
+/* ── Stary zwrot bez decyzji wychodzi z kolejki (0.452.0) ────────────────────
+   Wywiad z właścicielem: „Do decyzji" liczyło 743 sprawy, „głównie stare".
+   Sprzedawca ma siedem dni na oddanie pieniędzy, a ósmego Allegro oddaje je
+   samo — po progu pytanie „przyjąć czy odrzucić?" nie ma już treści. */
+test("zwrot bez decyzji starszy niż próg jest zamknięty — liczone, nie zapisane", () => {
+  const TERAZ = Date.parse("2026-10-20T12:00:00Z");
+  const DZIEN = 86_400_000;
+  const zwrot = (dniTemu: number, extra: Partial<Parameters<typeof kubelekZwrotu>[0]> = {}) =>
+    kubelekZwrotu({
+      rejectionCode: null, werdykt: null, zamknietyAt: null, kwotaGrosze: null,
+      korektaNumer: null, pozycje: [], statusAllegro: "COMMISSION_REFUNDED",
+      rozliczonyAllegroAt: null,
+      utworzono: new Date(TERAZ - dniTemu * DZIEN).toISOString(), zrodlo: "allegro",
+      ...extra,
+    }, TERAZ, 45);
+
+  assert.equal(zwrot(46), "zamkniety", "po progu pieniądze są u klienta tak czy inaczej");
+  assert.equal(zwrot(44), "decyzja", "przed progiem to dalej prawdziwa praca");
+
+  /* Przyjęty czeka na ocenę, kwotę albo korektę — dokumentu w Subiekcie
+     Allegro za nas nie wystawi, więc wiek niczego tu nie załatwia. */
+  assert.equal(zwrot(100, { werdykt: "przyjety" }), "ocena");
+  /* Paczki nieodebranej Allegro nie zna, więc niczego za nas nie oddaje. */
+  assert.equal(zwrot(100, { zrodlo: "nieodebrana" }), "decyzja");
+  /* Bez daty zgłoszenia nie ma czego mierzyć — zostaje w pracy. */
+  assert.equal(zwrot(100, { utworzono: null }), "decyzja");
 });

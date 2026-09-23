@@ -925,8 +925,11 @@ test("zwrot tego zamówienia jedzie z rozmową — po numerze zamówienia, nigdy
     '2026-09-06T12:00:00.000Z')`).run(r, konto);
   /* Zwrot INNEGO zamówienia tego samego kupującego nie ma prawa się tu pokazać. */
   const zw1 = Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,order_id,created_at,synced_at,
-    kupujacy_login,paczka_at) VALUES (?,'zwrot-1','zam-zw-1','2026-09-01T10:00:00.000Z','2026-09-06T11:00:00.000Z',
-    'kupujacy_44','2026-09-03T08:00:00.000Z')`).run(konto).lastInsertRowid);
+    kupujacy_login,paczka_at) VALUES (?,'zwrot-1','zam-zw-1',?,'2026-09-06T11:00:00.000Z',
+    'kupujacy_44','2026-09-03T08:00:00.000Z')`)
+    /* Zgłoszenie wczoraj (0.452.0): test sprawdza kubełek „decyzja", a stary
+       zwrot bez decyzji wychodzi z kolejki po `ZWROT_WYGASA_DNI`. */
+    .run(konto, new Date(Date.now() - 86_400_000).toISOString()).lastInsertRowid);
   d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,offer_id,nazwa,ilosc,cena_grosze,waluta,powod,klucz)
     VALUES (?,'oferta-9','Szarpak do NAC',1,4599,'PLN','DAMAGED','oferta-9')`).run(zw1);
   const zw2 = Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,order_id,created_at,synced_at,

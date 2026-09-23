@@ -287,7 +287,10 @@ export function kubelekZwrotu(z: {
   statusAllegro?: string | null;
   /** Kiedy Allegro PIERWSZY RAZ powiedziało, że pieniądze wróciły (0.345.0). */
   rozliczonyAllegroAt?: string | null;
-}): Kubelek {
+  /** Data zgłoszenia i źródło — do reguły wieku (0.452.0). */
+  utworzono?: string | null;
+  zrodlo?: string | null;
+}, teraz = Date.now(), wygasaDni = config.allegro.zwrotWygasaDni): Kubelek {
   if (z.zamknietyAt) return "zamkniety";
   if (z.werdykt === "odrzucony" || z.rejectionCode) return "odrzucony";
   /* ALLEGRO ROZLICZYŁO — SPRAWA ZAMKNIĘTA (0.339.0). Zgłoszenie właściciela:
@@ -324,6 +327,28 @@ export function kubelekZwrotu(z: {
      zsynchronizowany zwrot bywa wcześniejsze niż zapis zatrzasku, a dwa
      źródła tej samej prawdy nie kłócą się — oba mówią „pieniądze wróciły". */
   if (z.rozliczonyAllegroAt || STATUSY_ODDANE.has(String(z.statusAllegro ?? ""))) {
+    return "zamkniety";
+  }
+  /* ── STARY ZWROT BEZ DECYZJI JEST ROZLICZONY (0.452.0) ─────────────────
+     Wywiad z właścicielem: „Do decyzji" liczyło 743 sprawy, „głównie stare".
+     Zatrzask z 0.426.0 łapie tylko wypłatę z obciążeniem `REFUND_CHARGE`,
+     a reszta starych zwrotów stała w kolejce na zawsze.
+
+     Fakt, na którym stoi reguła, podał właściciel: sprzedawca ma siedem dni,
+     a ósmego dnia Allegro oddaje pieniądze samo. Po `wygasaDni` od zgłoszenia
+     pytanie „przyjąć czy odrzucić?" nie ma już treści — pieniądze są
+     u klienta tak czy inaczej.
+
+     TYLKO BEZ DECYZJI. Zwrot przyjęty czeka dalej na ocenę, kwotę albo
+     korektę — to praca z dokumentem w Subiekcie, której Allegro za nas nie
+     zrobi. TYLKO ZE ZGŁOSZENIA: paczki nieodebranej Allegro nie zna, więc
+     niczego za nas nie oddaje.
+
+     LICZONE, NIE ZAPISANE. Kubełek wynika z faktów przy każdym odczycie,
+     więc zmiana progu w `ZWROT_WYGASA_DNI` działa od razu i w obie strony.
+     Zapis w bazie byłby decyzją bez człowieka, której nie dałoby się cofnąć. */
+  if (!z.werdykt && z.utworzono && (z.zrodlo ?? "allegro") !== "nieodebrana"
+      && teraz - Date.parse(z.utworzono) > wygasaDni * 86_400_000) {
     return "zamkniety";
   }
   if (z.werdykt !== "przyjety") return "decyzja";
@@ -528,7 +553,9 @@ function zloz(
     pozycje,
     statusAllegro: (z.status_allegro as string) ?? null,
     rozliczonyAllegroAt: (z.rozliczony_allegro_at as string) ?? null,
-  });
+    utworzono,
+    zrodlo: String(z.zrodlo ?? "allegro"),
+  }, teraz);
   const suma = sumaPozycji(pozycje);
   return {
     id: Number(z.id),
