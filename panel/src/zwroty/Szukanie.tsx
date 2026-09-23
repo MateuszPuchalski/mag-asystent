@@ -49,7 +49,8 @@ const PRZEWOZNICY_NAKLEJKI: Array<[string, string]> = [
 
 export function Szukanie({
   wynik, kod, fraza, szuka, dociaga, blad, ile, rejestruje = false,
-  paczki = null, szukaPaczek = false, synchronizuje = false, bladSync = "",
+  paczki = null, szukaPaczek = false, pytaAllegro = false, bladAllegro = "",
+  synchronizuje = false, bladSync = "",
   onFraza, onSzukaj, onDociagnij, onWybierz, onNieodebrana, onLogin, onSynchronizuj,
 }: {
   wynik: WynikSkanu | null;
@@ -75,6 +76,10 @@ export function Szukanie({
   szukaPaczek?: boolean;
   /** Prośba o historię klienta — wysyłana po dopisaniu uchwytu, nie z każdego znaku. */
   onLogin?: (szukane: string) => void;
+  /** Allegro właśnie szuka zamówień tego loginu (0.450.0). */
+  pytaAllegro?: boolean;
+  /** Odmowa Allegro całym zdaniem; lista z naszej bazy stoi mimo niej. */
+  bladAllegro?: string;
   /**
    * Synchronizacja z Allegro (0.370.0).
    *
@@ -161,8 +166,9 @@ export function Szukanie({
             onLogin?.(kto.trim());
           }} />
         <p className="mt-1 text-slate-500">
-          Po tym znajdziesz paczkę później — szukanie zna login i nazwisko tak
-          samo jak numery. Enter pokaże paczki tego klienta.</p>
+          Po tym znajdziesz paczkę później. Enter pokaże paczki tego klienta —
+          login sprawdzam też w Allegro, więc znajdę zamówienie, którego u nas
+          jeszcze nie było.</p>
 
         {/* ── PRZEWOŹNIK Z NAKLEJKI (0.367.0) ────────────────────────────────
             Przy paczce nieodebranej Allegro nie zna przewoźnika wcale, więc
@@ -185,11 +191,19 @@ export function Szukanie({
             Wybór WPISUJE numer do pola wyżej, zamiast trzymać go osobno:
             operator ma widzieć, co pojedzie na serwer, a nie ufać, że klik
             gdzieś się zapamiętał. */}
-        {szukaPaczek && <p className="mt-1 text-slate-500">Szukam paczek…</p>}
-        {paczki !== null && !szukaPaczek && (paczki.length === 0
+        {/* „Szukam" trwa, DOPÓKI pyta którakolwiek strona. Pusta lista
+            z naszej bazy pokazana w trakcie pytania do Allegro mówiłaby „nie
+            ma", a sekundę później lista by się pojawiła — czyli ekran
+            skłamałby dokładnie w chwili, w której operator czyta. */}
+        {(szukaPaczek || pytaAllegro) && <p className="mt-1 text-slate-500">
+          {pytaAllegro ? "Szukam paczek, pytam też Allegro…" : "Szukam paczek…"}</p>}
+        {bladAllegro && <p className="mt-1 text-red-700">
+          Allegro nie odpowiedziało: {bladAllegro} Pokazuję to, co mamy u siebie.</p>}
+        {paczki !== null && !szukaPaczek && !pytaAllegro && (paczki.length === 0
           ? <p className="mt-1 text-slate-500">
-              Nie mam paczek tego klienta. Numer zamówienia wpisz ręcznie —
-              albo zostaw puste, paczka i tak się zarejestruje.</p>
+              Nie mam paczek tego klienta — ani u nas, ani pod tym loginem
+              w Allegro. Numer zamówienia wpisz ręcznie albo zostaw puste,
+              paczka i tak się zarejestruje.</p>
           : <ul className="mt-2 space-y-1">
               {paczki.map((k) => {
                 const wybrana = k.orderId === zamowienie;

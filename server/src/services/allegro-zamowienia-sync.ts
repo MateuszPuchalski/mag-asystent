@@ -1,6 +1,6 @@
 import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
-import { urlZamowienia, zapytajAllegro } from "../adapters/allegro.http.js";
+import { urlZamowienia, urlZamowienKupujacego, zapytajAllegro } from "../adapters/allegro.http.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { kontoKanalu } from "./kanal-konto.js";
 import { logEvent } from "./events.js";
@@ -241,6 +241,67 @@ export async function uzupelnijZamowienia(deps: ZamowieniaSyncDeps = {}): Promis
   if (brakujace.length) zapiszBraki(database, konto, brakujace, now());
   if (limit) throw limit;
 
+  const at = now().toISOString();
+  transaction(database, () => {
+    for (const z of pobrane) zapisz(database, z, konto, at);
+  })();
+  return pobrane.length;
+}
+
+/**
+ * Czy uchwyt może być loginem Allegro.
+ *
+ * Login nie ma spacji, więc „Jan Kowalski" z naklejki nie pojedzie do Allegro
+ * jako login — tam i tak nie trafiłby w nic, a kosztowałby żądanie. Samo
+ * nazwisko bez spacji przejdzie i to jest w porządku: filtr `buyer.login`
+ * dopasowuje CAŁOŚĆ, więc oddaje wyłącznie zakupy kogoś, kto takiego loginu
+ * naprawdę używa.
+ *
+ * Dopuszczamy litery, cyfry, kropkę, myślnik i podkreślnik — to, z czego
+ * składają się loginy widziane w danych. Znak spoza tej listy znaczy, że
+ * operator wkleił coś innego (telefon ze spacjami, adres), a nie login.
+ */
+export function wygladaNaLogin(uchwyt: string): boolean {
+  return /^[\p{L}\p{N}._-]{2,64}$/u.test(uchwyt.trim());
+}
+
+/**
+ * Zamówienia jednego kupującego prosto z Allegro (0.450.0).
+ *
+ * Zgłoszenie właściciela: „sporo paczek wraca bez zgłoszonego odstąpienia,
+ * po prostu nieodebrane — do nich muszę korzystać ze strony Allegro, aby
+ * znaleźć paczkę". Pole loginu w rejestracji nieodebranej istniało od
+ * 0.365.0, ale czytało WYŁĄCZNIE naszą bazę. A ta zna tylko zamówienia,
+ * do których prowadzi zwrot, wiadomość albo reklamacja
+ * (`brakujaceZamowienia`). Paczka nieodebrana nie ma żadnego z tych trzech,
+ * więc jej zamówienia u nas nie było z definicji i lista wychodziła pusta.
+ *
+ * ZAPISUJEMY, nie tylko pokazujemy. Rejestracja paczki bierze pozycje
+ * z `zamowienie_klienta`, więc zamówienie pokazane, a niezapisane dałoby
+ * zwrot bez pozycji — czyli bez niczego do wyceny. Zapis idzie tą samą
+ * funkcją co synchronizacja, więc przez to samo oczyszczanie i tę samą
+ * politykę danych.
+ *
+ * JEDNO ŻĄDANIE na uchwyt, wysyłane ręką operatora. 429 wraca jako błąd
+ * z własnym zdaniem — tu nie ma taktu, który by je przeczekał.
+ */
+export async function pobierzZamowieniaKupujacego(
+  login: string, deps: ZamowieniaSyncDeps = {},
+): Promise<number> {
+  const database = deps.database ?? defaultDb();
+  const query = deps.query ?? zapytajAllegro;
+  const now = deps.now ?? (() => new Date());
+  const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
+  const czysty = login.trim();
+  if (!wygladaNaLogin(czysty)) return 0;
+
+  /* Sieć PRZED transakcją, jak w każdym przebiegu synchronizacji. */
+  const body = (await query(urlZamowienKupujacego(apiUrl, czysty))) as
+    { checkoutForms?: Zamowienie[] } | null;
+  const pobrane = (body?.checkoutForms ?? []).filter((z) => typeof z?.id === "string");
+  if (!pobrane.length) return 0;
+
+  const konto = kontoKanalu(database, deps.accountId ?? config.allegro.clientId);
   const at = now().toISOString();
   transaction(database, () => {
     for (const z of pobrane) zapisz(database, z, konto, at);

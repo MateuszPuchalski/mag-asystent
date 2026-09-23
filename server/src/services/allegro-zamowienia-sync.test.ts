@@ -3,7 +3,10 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
-import { brakujaceZamowienia, uzupelnijZamowienia } from "./allegro-zamowienia-sync.js";
+import {
+  brakujaceZamowienia, pobierzZamowieniaKupujacego, uzupelnijZamowienia, wygladaNaLogin,
+} from "./allegro-zamowienia-sync.js";
+import { paczkiKlienta } from "./zamowienia.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { zostalyWrazliwe } from "./allegro-oczyszczanie.js";
 
@@ -470,4 +473,73 @@ test("zapamiętany brak zostawia ślad w events", async () => {
     .all() as Array<{ payload: string }>;
   assert.equal(zd.length, 1, "jeden wiersz na przebieg");
   assert.equal((JSON.parse(zd[0].payload) as { ile: number }).ile, 2);
+});
+
+/* ── Zamówienia kupującego prosto z Allegro (0.450.0) ────────────────────
+   Paczka nieodebrana nie ma zwrotu, wiadomości ani reklamacji, więc
+   `brakujaceZamowienia` nigdy nie prowadzi do jej zamówienia. Lista paczek
+   klienta czytała tylko naszą bazę i przy takiej paczce wychodziła pusta —
+   biuro szukało jej na stronie Allegro. */
+
+test("login idzie do Allegro filtrem buyer.login, a pobrane zamówienia lądują w bazie", async () => {
+  const d = stanowisko();
+  const pytania: string[] = [];
+  const ile = await pobierzZamowieniaKupujacego(" kowal_ski.77 ", {
+    database: d, apiUrl: "https://api.test", accountId: "k",
+    now: () => new Date("2026-09-23T10:00:00Z"),
+    query: (async (url: string) => {
+      pytania.push(url);
+      return { count: 2, totalCount: 2, checkoutForms: [
+        zamowienie("ord-a", { buyer: { id: "b-1", login: "kowal_ski.77" } }),
+        zamowienie("ord-b", { buyer: { id: "b-1", login: "kowal_ski.77" } }),
+      ] };
+    }) as never,
+  });
+  assert.equal(ile, 2);
+  assert.deepEqual(pytania,
+    ["https://api.test/order/checkout-forms?buyer.login=kowal_ski.77&limit=50"],
+    "jedno żądanie, uchwyt przycięty i zakodowany");
+
+  /* Cała wartość zmiany: to, czego szuka panel, jest teraz w naszej bazie —
+     z pozycjami, bo rejestracja bierze je stąd. */
+  const paczki = paczkiKlienta(KONTO, "KOWAL_SKI.77", d);
+  assert.deepEqual(paczki.map((p) => p.orderId).sort(), ["ord-a", "ord-b"]);
+  assert.equal(paczki[0].pozycji, 2);
+  assert.equal(paczki[0].odbiorcaNazwa, "Jan Kowalski");
+});
+
+test("zapis przechodzi przez to samo oczyszczanie co synchronizacja", async () => {
+  const d = stanowisko();
+  await pobierzZamowieniaKupujacego("jan", {
+    database: d, apiUrl: "https://api.test", accountId: "k",
+    query: (async () => ({ checkoutForms: [zamowienie("ord-a")] })) as never,
+  });
+  const surowe = (d.prepare("SELECT surowe_json FROM allegro_zamowienie WHERE id='ord-a'")
+    .get() as { surowe_json: string }).surowe_json;
+  assert.equal(zostalyWrazliwe(surowe), false,
+    "e-mail i adres kupującego nie mają prawa wejść do lądowiska tą nową drogą");
+});
+
+test("nazwisko ze spacją nie jedzie do Allegro — tam szuka się wyłącznie po loginie", async () => {
+  assert.equal(wygladaNaLogin("Jan Kowalski"), false);
+  assert.equal(wygladaNaLogin("+48 600 100 200"), false);
+  assert.equal(wygladaNaLogin("a"), false, "jeden znak to nie uchwyt");
+  assert.equal(wygladaNaLogin("Łąka-ogród_2"), true);
+
+  let pytano = false;
+  const ile = await pobierzZamowieniaKupujacego("Jan Kowalski", {
+    database: stanowisko(), apiUrl: "https://api.test",
+    query: (async () => { pytano = true; return null; }) as never,
+  });
+  assert.equal(ile, 0);
+  assert.equal(pytano, false, "żądanie, które nie może trafić, nie wychodzi");
+});
+
+test("limit Allegro wraca jako błąd, a baza zostaje nietknięta", async () => {
+  const d = stanowisko();
+  await assert.rejects(pobierzZamowieniaKupujacego("jan", {
+    database: d, apiUrl: "https://api.test", accountId: "k",
+    query: (async () => { throw new BladLimituAllegro("Allegro prosi o przerwę", 60_000); }) as never,
+  }), BladLimituAllegro);
+  assert.equal((d.prepare("SELECT COUNT(*) AS n FROM zamowienie_klienta").get() as { n: number }).n, 0);
 });

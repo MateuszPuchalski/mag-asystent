@@ -309,6 +309,23 @@ describe("Pole szukania zwrotu", () => {
     expect(screen.getByText(/Nie mam paczek tego klienta/)).toBeInTheDocument();
   });
 
+  it("pytanie do Allegro WSTRZYMUJE zdanie „nie mam paczek” (0.450.0)", async () => {
+    /* Nasza baza nie zna zamówienia paczki nieodebranej, więc jej lista
+       przychodzi pusta pierwsza, a Allegro odpowiada chwilę później. Zdanie
+       „nie mam" w tej chwili byłoby kłamstwem, które operator zdąży przeczytać. */
+    pokaz(null, { paczki: [], pytaAllegro: true });
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    expect(screen.getByText(/pytam też Allegro/)).toBeInTheDocument();
+    expect(screen.queryByText(/Nie mam paczek tego klienta/)).not.toBeInTheDocument();
+  });
+
+  it("odmowa Allegro mówi swoje, a lista z naszej bazy stoi dalej", async () => {
+    pokaz(null, { paczki: PACZKI, bladAllegro: "Allegro prosi o przerwę." });
+    await userEvent.click(screen.getByRole("button", { name: /Nieodebrana/ }));
+    expect(screen.getByText(/Allegro nie odpowiedziało: Allegro prosi o przerwę/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ord-nowy/ })).toBeInTheDocument();
+  });
+
   it("ekran mówi, PO CO ten login", async () => {
     /* Pole bez powodu wygląda na kolejną rubrykę do wypełnienia. To zdanie
        jest całą różnicą między „wypełnij" a „to się przyda tobie". */

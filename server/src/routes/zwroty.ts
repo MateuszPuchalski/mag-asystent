@@ -30,7 +30,9 @@ import {
   cofnijPrzelew, odmowZwrotuPieniedzy, stanZwrotuPieniedzy, zapiszPrzelew,
   zwrocPieniadze, ZwrotPieniedzyConflict,
 } from "../services/zwrot-pieniedzy.js";
-import { uzupelnijZamowienia } from "../services/allegro-zamowienia-sync.js";
+import {
+  pobierzZamowieniaKupujacego, uzupelnijZamowienia, wygladaNaLogin,
+} from "../services/allegro-zamowienia-sync.js";
 import { paczkiKlienta } from "../services/zamowienia.js";
 import { powiazZaleglosci } from "../services/wiazania.js";
 import { kandydaciFaktury, wskazFakture } from "../services/faktury.js";
@@ -577,6 +579,41 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       logEvent("zwrot_paczki_klienta", kto().name, null,
         { trafien: paczki.length, dlugosc: szukane.length }, kto().id, db());
       return { paczki };
+    });
+
+  /* Zamówienia kupującego PROSTO Z ALLEGRO (0.450.0). Trasa wyżej czyta
+     tylko naszą bazę, a ta nie zna zamówienia paczki nieodebranej: nic do
+     niego nie prowadzi, bo klient niczego nie zgłosił. Do tego wydania biuro
+     szukało takiej paczki na stronie Allegro i przepisywało numer.
+
+     OSOBNA TRASA, nie flaga tamtej. Tamta jest odczytem (`useQuery`, może
+     wrócić przy odświeżeniu okna), a ta zapisuje zamówienia i kosztuje
+     żądanie do Allegro — więc idzie wyłącznie z ręki operatora, raz na uchwyt.
+
+     W dzienniku liczba pobranych i długość uchwytu, nigdy sam login — ta
+     sama zasada co przy `zwrot_paczki_klienta` wyżej. */
+  app.post<{ Body: { login?: string } }>(
+    "/api/obsluga/zwroty/paczki-klienta/allegro", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const login = String(req.body?.login ?? "").trim();
+      if (!wygladaNaLogin(login)) {
+        return reply.code(400).send({ error: "To nie wygląda na login Allegro — Allegro szuka tylko po loginie." });
+      }
+      if (!config.allegro.clientId) {
+        return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+      }
+      try {
+        const pobrano = await pobierzZamowieniaKupujacego(login);
+        logEvent("zwrot_zamowienia_kupujacego", kto().name, null,
+          { pobrano, dlugosc: login.length }, kto().id, db());
+        return { pobrano };
+      } catch (e) {
+        /* Zdanie z adaptera mówi, co naprawić — token, uprawnienie, przerwę.
+           Lista z naszej bazy stoi obok niezależnie, więc odmowa Allegro nie
+           zabiera operatorowi tego, co już wiemy. */
+        return reply.code(502).send({ error: (e as Error).message });
+      }
     });
 
   /* Paczka, której klient nie odebrał (0.172.0). Allegro takiego bytu nie zna,
