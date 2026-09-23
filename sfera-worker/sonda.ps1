@@ -606,14 +606,23 @@ if ($SzkicZW) {
             foreach ($n in $nazwy) {
                 $v = Wartosc $obiekt $n
                 $stan = "wypelnione"
-                if ($null -eq $v -or "$v".Trim() -eq "" -or "$v" -eq "0") { $stan = "puste" }
+                # Zero to LICZBA (0.457.0): "0.0000" i "False" to tez puste.
+                # Do tego wydania oba wychodzily jako "wypelnione" - zrzut #1474
+                # pokazal przez to przedplate bankowa, ktorej najpewniej nie ma.
+                $liczba = 0.0
+                $jestLiczba = [double]::TryParse("$v", [Globalization.NumberStyles]::Any,
+                    [Globalization.CultureInfo]::InvariantCulture, [ref]$liczba)
+                if ($null -eq $v -or "$v".Trim() -eq "" -or "$v" -eq "False" -or
+                    ($jestLiczba -and $liczba -eq 0)) { $stan = "puste" }
                 Write-Wynik ("  {0,-34} : {1}" -f $n, $stan)
             }
         } catch {
             Write-Wynik "  (Get-Member odmowil: $($_.Exception.Message))"
         }
     }
-    $polaDokumentu = 'Rodzaj|Zwrot|Plat|Zaplac|Przelew|Gotow|Kart|Kredyt|Skutek|DoDokumentu|Typ|Kategoria|Magazyn|Wartosc|Kwota|Waluta|Data|Numer'
+    # Ten sam zestaw co `Pola` w ZrzutDokumentu.cs (0.457.0) - zrzut workera
+    # i -WzorZW maja sie dac zestawic pole w pole.
+    $polaDokumentu = 'Rodzaj|Zwrot|Plat|Zaplac|Przelew|Gotow|Kart|Kredyt|Przedplat|Zaliczk|Kasa|Termin|Skutek|DoDokumentu|Typ|Kategoria|Magazyn|Wartosc|Kwota|Waluta|Data|Numer'
 
     Write-Wynik ""
     Write-Wynik "SZKIC ZW - zwrot do paragonu w pamieci, BEZ Zapisz()"

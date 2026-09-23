@@ -35,9 +35,16 @@ namespace WertisSferaWorker;
 [SupportedOSPlatform("windows")]
 internal static class ZrzutDokumentu
 {
-    /** Pola, których WARTOŚCI trafiają do zrzutu — płatność, kwoty, rodzaj. */
+    /**
+     * Pola, których WARTOŚCI trafiają do zrzutu — TE SAME co `$polaDokumentu`
+     * w sondzie (0.457.0). Do 0.456.0 worker brał węższy zestaw, bez dat,
+     * numeru, typu, kategorii i magazynu. Następny krok diagnozy to zestawienie
+     * zrzutu workera z `-WzorZW` na ZW, który przeszedł, a tego nie da się
+     * zrobić pole w pole, gdy dwie strony patrzą na różne pola.
+     */
     private static readonly Regex Pola = new(
-        "Plat|Zaplac|Przelew|Gotow|Kart|Kredyt|Przedplat|Kwota|Wartosc|Rodzaj|Skutek|Kasa|Waluta|Termin",
+        "Rodzaj|Zwrot|Plat|Zaplac|Przelew|Gotow|Kart|Kredyt|Przedplat|Zaliczk|Kasa|Termin|" +
+        "Skutek|DoDokumentu|Typ|Kategoria|Magazyn|Wartosc|Kwota|Waluta|Data|Numer",
         RegexOptions.IgnoreCase);
 
     /** Pola, o których mówimy tylko „puste/wypełnione" — lustro `$prywatne`. */
@@ -45,8 +52,16 @@ internal static class ZrzutDokumentu
         "Kontrahent|Nabywca|Odbiorca|Adres|Nip|Pesel|Telefon|Email|Mail|Uwagi|Opis|Osoba|Imie|Nazwisko|Bank|Konto|Rachun",
         RegexOptions.IgnoreCase);
 
-    /** Górna granica długości — treść błędu ląduje w jednym wierszu kolejki. */
-    private const int MaksZnakow = 1800;
+    /**
+     * Górna granica długości — treść błędu ląduje w jednym wierszu kolejki.
+     *
+     * 4000, nie 1800 (0.457.0): pierwszy prawdziwy zrzut (zadanie `#1474`)
+     * urwał się w środku listy pól nabywcy, a szerszy zestaw pól z sondy
+     * dokłada kilkanaście pozycji. Kolumna błędu w kolejce jest tekstem bez
+     * limitu, więc granica chroni tylko przed zrzutem obiektu, który ma setki
+     * właściwości.
+     */
+    private const int MaksZnakow = 4000;
 
     /* IDispatch widziany tylko do `GetTypeInfo`. Kolejność metod jest kolejnością
        w tablicy wirtualnej IDispatch, więc deklaracja kończy się na drugiej —
@@ -158,8 +173,15 @@ internal static class ZrzutDokumentu
     }
 
     /**
-     * „Puste" jak w sondzie: null, pusty napis albo zero. Wartość NIE opuszcza
-     * tej funkcji — to jest cała gwarancja prywatności tego pliku.
+     * „Puste": null, pusty napis, liczba równa zeru albo fałsz. Wartość NIE
+     * opuszcza tej funkcji — to jest cała gwarancja prywatności tego pliku.
+     *
+     * ZERO TO LICZBA, NIE NAPIS (0.457.0). Do 0.456.0 stało tu porównanie
+     * z napisem „0" — lustro sondy — więc kwota `0.0000` z Sfery i `False`
+     * wychodziły jako „wypełnione". Pierwszy zrzut z produkcji (`#1474`)
+     * pokazał przez to `PrzedplatyBankowe wypełnione`, choć w tej samej linijce
+     * `PrzedplatyGotowkowe=0.0000`, a to przedpłata jest jedynym tropem płatności,
+     * którego ten zrzut nie zamknął.
      */
     private static bool CzyPuste(object com, string nazwa)
     {
@@ -168,6 +190,13 @@ internal static class ZrzutDokumentu
             object? w = Pobierz(com, nazwa);
             if (w is null) return true;
             if (Marshal.IsComObject(w)) return false;
+            if (w is bool b) return !b;
+            if (w is IConvertible && decimal.TryParse(
+                    Convert.ToString(w, System.Globalization.CultureInfo.InvariantCulture),
+                    System.Globalization.NumberStyles.Any,
+                    System.Globalization.CultureInfo.InvariantCulture, out decimal liczba)
+                && w is not string)
+                return liczba == 0m;
             string tekst = (Convert.ToString(w, System.Globalization.CultureInfo.InvariantCulture) ?? "").Trim();
             return tekst.Length == 0 || tekst == "0";
         }
