@@ -631,7 +631,7 @@ export function osRozmowy(id: number): {
                  AND m.related_object_type = 'OFFER' AND p.offer_id = m.related_object_id
                ORDER BY p.id DESC LIMIT 1)) AS nazwaOferty
       FROM message m JOIN conversation c ON c.id=m.conversation_id
-     WHERE m.conversation_id=? ORDER BY m.id
+     WHERE m.conversation_id=? ORDER BY m.sent_at, m.id
   `).all(id) as Array<Record<string, unknown>>;
 
   /* Załączniki jednym zapytaniem dla całej rozmowy, nie po jednym na
