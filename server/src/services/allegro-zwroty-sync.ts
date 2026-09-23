@@ -328,9 +328,20 @@ async function odswiezZnane(
   database: Db, konto: number, query: (url: string) => Promise<unknown | null>,
   apiUrl: string, od: string | null, pobraneTeraz: Set<string>, at: string,
 ): Promise<number> {
+  /* ZAMKNIĘTY, ALE NIEZAPŁACONY TEŻ SIĘ ODŚWIEŻA (0.476.0). Zwrot po
+     korekcie czeka w DO ZWROTU na wyjście pieniędzy (`pieniadzeCzekaja`),
+     a jedynym śladem pieniędzy oddanych ręką w Allegro jest status zwrotu.
+     Bez odświeżania taki zwrot stałby w pracy do dnia automatu Allegro.
+     Okno czternastu dni od zamknięcia: termin to siedem dni od paczki, więc
+     starszy zwrot nie ma już czego czekać — a okno ciągnie zapytanie w tył. */
+  const odKiedyZamkniete = new Date(Date.parse(at) - 14 * 86_400_000).toISOString();
   const otwarte = database.prepare(`SELECT external_id, created_at FROM zwrot_klienta
-    WHERE channel_account_id = ? AND zamkniety_at IS NULL AND rozliczony_allegro_at IS NULL`)
-    .all(konto) as Array<{ external_id: string; created_at: string }>;
+    WHERE channel_account_id = ? AND rozliczony_allegro_at IS NULL
+      AND (zamkniety_at IS NULL
+        OR (zamkniety_at >= ? AND werdykt = 'przyjety' AND kwota_grosze > 0
+            AND zwrot_pieniedzy_id IS NULL AND zwrot_pieniedzy_command_id IS NULL
+            AND odmowa_kod IS NULL AND przelew_at IS NULL))`)
+    .all(konto, odKiedyZamkniete) as Array<{ external_id: string; created_at: string }>;
   const doOdswiezenia = new Set(
     otwarte.map((z) => z.external_id).filter((id) => !pobraneTeraz.has(id)));
   if (!doOdswiezenia.size) return 0;

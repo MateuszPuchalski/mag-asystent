@@ -4795,6 +4795,54 @@ Ekran nie tyle milczał, co odradzał ruch, który sam oferował.
 to nowa końcówka, nie zdanie. Dopóki jej nie ma, brak dokumentu kończy się
 informacją, że zwrotu to nie zatrzymuje (§25a.23 wyżej).
 
+### 25a.25. Przegląd procesu zwrotów (0.476.0)
+
+Przegląd z 23 września 2026: dwa przejścia po kodzie, serwer i ekran biura,
+i sześć poprawek wybranych przez właściciela. Szczęśliwa ścieżka była już
+krótka: skan, `P`, `S`, `Enter`, `Z`. Luki leżały gdzie indziej.
+
+**Pieniądze trzymają zwrot w pracy.** Automatyczny ZW zamyka zwrot minutę po
+kwocie, a pieniądze biuro oddaje ręką w Allegro. Zapomniany zwrot schodził więc
+z kolejki, a ósmego dnia Allegro oddawało całość samo — potrącenie przepadało.
+Od tego wydania `pieniadzeCzekaja` wraca taki zwrot do DO ZWROTU, póki nie ma
+śladu wypłaty. Śladem jest nasze polecenie, odmowa, zapisany przelew albo
+status z Allegro.
+
+Okno kończy się dzień po terminie, bo wtedy Allegro oddaje samo. Pobranie
+czeka `ZWROT_WYGASA_DNI`, bo tych pieniędzy Allegro nie oddaje wcale.
+Synchronizacja odświeża też zwroty zamknięte, a niezapłacone, z ostatnich
+czternastu dni. Bez tego ręczny zwrot w Allegro nie docierałby do nas wcale.
+Pasek nad pozycjami mówi, ile oddać i kiedy Allegro odda samo.
+
+**Powód potrącenia dociera do klienta.** Formularz obiecywał „to jego treść
+zobaczy klient", a żądanie niosło sam kod `REFUND`. Teraz idzie
+`sellerComment` ze schematu `InitializeRefund`, najwyżej 250 znaków.
+Pod pozycjami stoją gotowe wiadomości: pomniejszony zwrot, uszkodzony towar,
+odmowa, zwrot przyjęty. Treść bierze się z faktów zwrotu. Wiadomość się
+kopiuje, a nie wysyła, bo panel nie zakłada nowych wątków.
+
+**ZW dla paragonu związanego po kwocie.** Zapis kwoty zlecał ZW raz. Paragon
+wiązany chwilę później zostawiał zwrot bez ZW na zawsze. `dokolejkujZalegleZw`
+dociąga go po każdym takcie. Nie rusza zwrotu z cofniętą korektą ani takiego,
+przy którym oś mówi „ZW wystawia biuro". W obu przypadkach dokument może już
+stać w Subiekcie.
+
+**Ekran odpowiada, gdy zna odpowiedź.** Dostawa jest zaznaczona, gdy wraca
+całe zamówienie. `S` i `U` w DO DECYZJI przyjmują zwrot i od razu oceniają,
+a odmowa zostaje osobną drogą pod `O`. Zapis kwoty i zwrot pieniędzy zostają
+dwoma krokami: `Z` wymaga uprawnienia `payments:write`, którego firma jeszcze
+nie ma.
+
+**Klawisze nie spadają do myszy.** Przy kilku otwartych pudłach ocena
+klawiszem trafia do pudła, w którym leży już towar tego zwrotu. Zgadywania
+nie ma, decyzja właściciela z 0.379.0 zostaje. Ocena czeka na odświeżenie
+kolejki, więc szybkie `s s s` nie odbija się od blokady. Pomoc nie obiecuje
+już `n`.
+
+**Rozliczony bez korekty widać na tym ekranie.** Kontrola
+`zwrot_rozliczony_bez_korekty` stała wyłącznie w stanie systemu. Teraz jest też
+w pasku rozjazdów zwrotów.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi

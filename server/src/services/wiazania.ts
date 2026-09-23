@@ -1,6 +1,7 @@
 import { db as defaultDb, type Db } from "../db/db.js";
 import { zwiazFakturyPewne, zwiazKorektyPewne } from "./faktury.js";
 import { wypuscGotoweKoszyki } from "./kosze-zwrotow.js";
+import { dokolejkujZalegleZw } from "./zw-automat.js";
 import { zwiazPewne } from "./sygnatury.js";
 
 /* ── Wiązanie zaległości (0.220.0) ───────────────────────────────────────────
@@ -28,6 +29,8 @@ import { zwiazPewne } from "./sygnatury.js";
 export interface WynikWiazania {
   kartoteki: number;
   faktury: number;
+  /** ZW zlecone zwrotom, którym paragon przyszedł po zapisie kwoty (0.476.0). */
+  zw: number;
   korekty: number;
   koszyki: number;
 }
@@ -53,6 +56,9 @@ export function powiazZaleglosci(
   return {
     kartoteki: krok("kartoteki", () => zwiazPewne(database, teraz)),
     faktury: krok("faktury", () => zwiazFakturyPewne(database, teraz)),
+    /* Zaraz PO dokumentach: paragon związany w tym przebiegu ma od razu
+       dostać ZW, a nie czekać pięć minut na następny takt. */
+    zw: krok("zw", () => dokolejkujZalegleZw(database, teraz)),
     korekty: krok("korekty", () => zwiazKorektyPewne(database, teraz)),
     koszyki: krok("koszyki", () => wypuscGotoweKoszyki(database, teraz)),
   };

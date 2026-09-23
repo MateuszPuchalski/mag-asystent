@@ -1,6 +1,6 @@
 import React, { useState, type MutableRefObject } from "react";
 import type { Zwrot } from "../api/typy";
-import { Przycisk, Pole, Blad, Skopiuj } from "../ui";
+import { Przycisk, Pole, Blad, Skopiuj, dzien } from "../ui";
 import { zlote } from "../api/zwroty";
 import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 
@@ -109,6 +109,35 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
 
      Po pierwszej ocenie klawisz znika, bo serwer i tak by odmówił — schodzi
      się po jednym szczeblu, a ocena jest szczebel niżej. */
+  /* ── PIENIĄDZE CZEKAJĄ (0.476.0) ────────────────────────────────────
+     Zwrot z ustaloną kwotą wraca do DO ZWROTU, póki pieniądze nie wyjdą —
+     także po korekcie, którą automat ZW wystawia minutę po kwocie. Pasek mówi,
+     DLACZEGO zwrot tu stoi i ILE czasu zostało. Bez tego zdania zwrot
+     z numerem korekty w kubełku „do zwrotu" wyglądałby jak usterka.
+
+     Data jest datą automatu Allegro, a nie naszą: tego dnia pieniądze wyjdą
+     same, w całości — potrącenie przepada. To jest powód, dla którego ten
+     zwrot w ogóle wraca do pracy (przegląd zwrotów, 23 września 2026). */
+  if (zwrot.kubelek === "zwrot" && zwrot.kwotaGrosze !== null) {
+    const pobranie = zwrot.zamowienie?.platnoscTyp === "CASH_ON_DELIVERY";
+    const automat = zwrot.terminAt
+      ? new Date(Date.parse(zwrot.terminAt) + 86_400_000).toISOString() : null;
+    return <div className={ramka}>
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <span className="text-slate-500">Do oddania</span>
+        <b className="tabular-nums">{zlote(zwrot.kwotaGrosze, zwrot.waluta)}</b>
+        {zwrot.korektaNumer && <span className="text-xs text-slate-500">
+          korekta {zwrot.korektaNumer}</span>}
+      </div>
+      <p className="mt-1 text-xs text-slate-600">
+        {pobranie
+          ? "Pieniądze jeszcze nie wyszły. Oddaj je przelewem i zapisz przelew niżej."
+          : <>Pieniądze jeszcze nie wyszły — oddaj je w Allegro albo klawiszem <kbd>Z</kbd>.
+            {automat && <> Allegro odda całość samo {dzien(automat)}, bez potrącenia.</>}</>}
+      </p>
+    </div>;
+  }
+
   if (zwrot.kubelek === "ocena" || zwrot.kubelek === "zwrot") {
     const nieoceniony = zwrot.kubelek === "ocena" && zwrot.pozycje.every((p) => !p.ocena);
     if (!nieoceniony) return null;
