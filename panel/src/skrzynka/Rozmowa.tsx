@@ -1,5 +1,5 @@
 import React from "react";
-import { Bell, Inbox, Ruler, UserCheck } from "lucide-react";
+import { Bell, Inbox, Ruler } from "lucide-react";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import type { Kategoria, OsRozmowy, SzczegolyKonfliktu, WpisOsi } from "../api/typy";
 import type { Obecnosc } from "../api/zdarzenia";
@@ -10,8 +10,8 @@ import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
 import { BrakOferty } from "./BrakOferty";
 import { Status } from "./Status";
 import { EtykietaKategorii } from "./Copilot";
+import { ProwadziZnak } from "./ProwadziZnak";
 import { Obecni } from "./Obecni";
-import { Prowadzi } from "../sprawy/Prowadzi";
 
 /**
  * Pytanie bez żadnego powiązania z towarem (§4.3).
@@ -144,9 +144,12 @@ export function Rozmowa(p: {
             uchwyt obecności (§6.3) i jawna zgoda „odpowiedz mimo to" — ta
             sama droga, którą i tak trzeba było przejść, gdy kolega siedział
             przy rozmowie nieprzejętej. */}
-          <Prowadzi prowadzi={rozmowa.wlasciciel} jaProwadze={moja} trwa={false}
-            wWierszu gdyNikt="nikt — przypisze pierwsza odpowiedź" />
         </div>
+          {/* PROWADZĄCY ZNAKIEM (23 września 2026, „za dużo tekstu"). Zdanie
+              „Prowadzi nikt — przypisze pierwsza odpowiedź" zajmowało linię
+              pod loginem. Zostaje kółko: puste przerywane, gdy nikt, z inicjałem,
+              gdy ktoś — a całe zdanie w dymku i dla czytnika ekranu. */}
+          <ProwadziZnak prowadzi={rozmowa.wlasciciel} ja={moja} />
       {/* Status stoi w nagłówku, nie przy edytorze: odpowiada na pytanie „co
           z tą sprawą", a nie „co napisać". Zmienić go może każdy z biura,
           także bez prowadzenia rozmowy — zamknięcie cudzej sprawy załatwionej

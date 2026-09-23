@@ -9,7 +9,13 @@ export default {
   theme: {
     extend: {
       colors: {
-        wertis: { amber: "#F7A600", ink: "#2A2A2C", paper: "#F6F5F2", tlo: "#f1f5f9" },
+        /* BARWY Z LOGO (23 września 2026, prośba właściciela „keep the brand").
+           Do tej wersji stał tu bursztyn #F7A600 i atrament #2A2A2C — bliskie
+           logo, ale nie te: obok pliku z logo różnica była widoczna. Wartości
+           odczytane z pikseli pliku logo: pomarańcz #FF9100, grafit #303030.
+           Pomarańcz dalej NIE jest pismem (`Kontrast.test.ts`): na bieli daje
+           2,26:1. Pod grafitowym pismem daje 5,84:1 i zostaje barwą akcji. */
+        wertis: { amber: "#FF9100", ink: "#303030", paper: "#F6F5F2", tlo: "#f1f5f9" },
 
         /* Statusy rozmowy z §7. Para tło–tekst, żeby plakietki nie dobierało
            się ręcznie przy każdym użyciu. */

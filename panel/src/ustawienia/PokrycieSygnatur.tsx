@@ -13,7 +13,8 @@ import type { PokrycieSygnatur as Pokrycie } from "../api/typy";
 
 /* ── TON OSTRZEGAWCZY TO `ranga-uwaga`, NIE BARWA MARKI (0.255.0) ────────────
    Do 0.254.0 liczby wymagające reakcji dostawały `text-wertis-amber`. Zmierzone
-   w przeglądarce: #F7A600 przy 24 px i wadze 700 daje na bieli 2.02:1, przy
+   w przeglądarce: #F7A600 przy 24 px i wadze 700 daje na bieli 2.02:1 (od
+   23 września 2026 marka to #FF9100 — 2.26:1, dalej poniżej), przy
    progu 3:1 dla tekstu tej wielkości. Ta barwa jest tłem pod ciemnym pismem
    (tak działa `.btn-primary`) i nie nadaje się na samo pismo.
 

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AlarmClock, Eye, Handshake, Inbox, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
+  AlarmClock, Eye, Inbox, MessageSquare, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
 } from "lucide-react";
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
@@ -8,7 +8,9 @@ import type {
 import { czas, FiltrSegmentowy, godzina, Plakietka, Pusto } from "../ui";
 import { NAZWA, NAZWA_DOBORU } from "./statusy";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
-import { PasekCopilota, PlakietkaKategorii, ZnakCopilota, doRozpoznania } from "./Copilot";
+import { CZESTE, KafelKategorii, PasekCopilota, ZnakCopilota, doRozpoznania, nazwaNaPlakietce } from "./Copilot";
+import { Czekanie } from "./Czekanie";
+import { SlownikZnakow } from "./SlownikZnakow";
 
 /* Kubełki kolejki z §10.1: „Nieprzypisane, Moje, Oczekujące". Filtr jest po
    stronie EKRANU, bo lista i tak przyjeżdża w całości — dokładanie parametru
@@ -59,18 +61,6 @@ const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
    widać je w „Wszystkie". Ukrycie ich wszędzie znaczyłoby, że pomyłkowego
    zamknięcia nie da się cofnąć — a nikt nie szuka sprawy, której nie ma. */
 const ZESZLA_Z_BIURKA = ["closed", "spam"];
-
-/**
- * Czas oczekiwania po ludzku. Minuty do godziny, potem godziny do doby, dalej
- * dni — bo „czeka 3140 min" nie mówi nic, a „czeka 2 d" mówi wszystko.
- */
-export function czekaOd(ms: number): string {
-  const minuty = Math.floor(ms / 60_000);
-  if (minuty < 60) return `${minuty} min`;
-  const godziny = Math.floor(minuty / 60);
-  if (godziny < 24) return `${godziny} g ${minuty % 60} min`;
-  return `${Math.floor(godziny / 24)} d ${godziny % 24} g`;
-}
 
 /* ── KTÓRY STATUS ZASŁUGUJE NA PLAKIETKĘ (0.251.0) ───────────────────────────
    Do 0.249.1 każdy wiersz zaczynał się od plakietki statusu — a w kubełkach
@@ -246,6 +236,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         synchronizacja {czas(stan.ostatniaSynchronizacja)}
         {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
       </p>
+      <SlownikZnakow />
       <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)} />
       {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-podpis font-bold text-ranga-zle">
         STAN Z {godzina(stan.ostatniaSynchronizacja)}</span>}
@@ -359,10 +350,15 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
              `border-l-[3px]` stoi PRZY KAŻDYM wierszu, nie tylko przy wybranym:
              dokładana dopiero przy zaznaczeniu przesuwała treść o trzy piksele
              w prawo, więc kliknięcie w wiersz szarpało tekstem. */
-          className={`block w-full border-b border-l-[3px] px-4 py-3 text-left ${
+          className={`flex w-full items-start gap-3 border-b border-l-[3px] px-3 py-2.5 text-left ${
             wybranaId === r.id
               ? "border-l-wertis-amber bg-slate-200"
               : "border-l-transparent hover:bg-slate-50"}`}>
+          {/* ZNAK NA POCZĄTKU WIERSZA (23 września 2026). Kategoria, prośba
+              o człowieka i podziękowanie czytają się, zanim wzrok dojdzie do
+              treści — patrz `KafelKategorii`. */}
+          <KafelKategorii kopilot={r.kopilot} podziekowal={r.podziekowal} />
+          <span className="block min-w-0 flex-1">
           {/* ── CO CZYTA SIĘ PIERWSZE (0.193.0, doprecyzowane w 0.251.0) ────
               0.193.0 oddało pierwszy plan TREŚCI: login Allegro nie mówi nic,
               a triaż robi się po pytaniu. Ta decyzja zostaje. Zepsuł ją górny
@@ -373,7 +369,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
               Górny rząd pojawia się więc tylko wtedy, gdy niesie WYJĄTEK:
               ręczną flagę „pilne" albo status, którego z reszty wiersza nie
               da się odczytać. Zwykły wiersz zaczyna się od pytania klienta. */}
-          {glosne && <div className="mb-1.5 flex items-center gap-2">
+          {glosne && <span className="mb-1.5 flex items-center gap-2">
             {/* PILNE przed statusem: „co się pali" czyta się przed „co z tym
                 zrobiono". Flagę stawia człowiek — patrz `ustawPriorytet`. */}
             {r.priorytet === "pilny" &&
@@ -386,11 +382,17 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
               <span className="rounded bg-violet-100 px-1.5 py-0.5 text-podpis font-bold text-violet-900">
                 REKLAMACYJNA</span>}
             {wyjatkowy && <Plakietka status={r.status}>{NAZWA[r.status]}</Plakietka>}
-          </div>}
+          </span>}
           {/* Podgląd to słowa KLIENTA (0.166.0). Gdy klient nic nie napisał, stoi
               nasza wiadomość — ale z podpisem, bo bez niego czytałoby się ją jak
               pytanie. Autoodpowiedź konta Allegro wyglądała tak przez pół roku. */}
-          <p className="line-clamp-2 text-tresc font-medium text-slate-800">
+          {/* JEDNA LINIA PODGLĄDU (23 września 2026, „za dużo tekstu"). Dwie
+              linie zjadały połowę wysokości wiersza, a triaż i tak robi się po
+              pierwszych słowach; resztę daje kliknięcie. Podziękowanie jest
+              przygaszone, bo nie czeka na nas — przez barwę pisma, nie przez
+              przezroczystość, która zbiłaby kontrast poniżej progu. */}
+          <span className={`block truncate text-tresc font-medium ${
+            r.podziekowal ? "text-slate-600" : "text-slate-800"}`}>
             {/* KROPKA, NIE SŁOWO (0.193.0). Stało tu „NOWE", a obok, w plakietce
                 statusu, „NOWA" — dwa różne fakty jednym wyrazem. Kropka to znak
                 nieprzeczytanego znany ze wszystkich skrzynek; nazwę niesie
@@ -404,21 +406,18 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
               <span className="sr-only">NOWE</span></span>}
             {!r.ostatniaOdKlienta && r.ostatniaWiadomosc &&
               <span className="font-semibold text-slate-500">Biuro: </span>}
-            {r.ostatniaWiadomosc}</p>
-          <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-podpis text-slate-500">
+            {r.ostatniaWiadomosc}</span>
+          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-podpis text-slate-500">
             {/* Czas OCZEKIWANIA, nie data: „czeka 2 g" odpowiada na pytanie
                 „za co się wziąć", a data każe je dopiero policzyć w głowie.
                 Otwiera podpis, bo to jedyna liczba w wierszu, po której układa
                 się kolejność pracy — i jedyna, która wiersze RÓŻNI. */}
-            {zegar !== null && <span className={`shrink-0 text-xs font-bold tabular-nums ${
-              r.poTerminie ? "text-ranga-zle" : "text-wertis-ink"}`}>
-              czeka {czekaOd(zegar)}</span>}
             {/* Status bez plakietki nie znika — schodzi do podpisu. §4.3: fakt
                 wolno wyciszyć, nie wolno schować. Milczy tylko tam, gdzie zegar
                 mówi to samo innymi słowami. */}
             {zegar === null && !wyjatkowy &&
               <span className="shrink-0 text-slate-500">{NAZWA[r.status]}</span>}
-            <span className="font-semibold text-slate-500">{r.klient}</span>
+            <span className="font-mono font-semibold text-slate-500">{r.klient}</span>
             {/* Powód trafienia STOI PRZY LOGINIE, bo to jego dotyczy: mówi
                 „ten login nie zawiera tego, czego szukasz". Dalej od loginu
                 byłby zagadką. */}
@@ -433,40 +432,50 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
                 „nieprzeczytane": tego Allegro nie podaje, a ekran nie ma prawa
                 obiecywać pomiaru, którego nie robi. */}
             {r.nowychOdOdpowiedzi > 1 &&
-              <span className="font-semibold text-slate-600">
-                {r.nowychOdOdpowiedzi} dopiski klienta</span>}
-            {r.zadanieWToku && <span className="flex items-center gap-1 font-semibold text-slate-600">
-              <Ruler size={12} />zadanie w toku</span>}
+              <span title={`${r.nowychOdOdpowiedzi} wiadomości klienta od naszej odpowiedzi`}
+                className="flex items-center gap-0.5 font-bold text-slate-600">
+                <MessageSquare size={12} aria-hidden="true" />{r.nowychOdOdpowiedzi}
+                <span className="sr-only"> dopiski klienta</span></span>}
+            {r.zadanieWToku && <span title="zadanie w toku" className="flex items-center text-slate-600">
+              <Ruler size={13} aria-hidden="true" /><span className="sr-only">zadanie w toku</span></span>}
             {/* Status DOBORU (§10.2, E1). `not_started` i `not_applicable` milczą:
                 plakietka „nierozpoczęty" na każdym wierszu nie mówiłaby niczego,
                 a „nie dotyczy" to wiersz, przy którym doboru NIE trzeba robić. */}
+            {/* Stan doboru ZNAKIEM (23 września 2026): barwa niesie wagę —
+                zieleń zatwierdzony, czerwień brak danych, reszta w toku — a nazwę
+                `title` i czytnik ekranu. */}
             {r.dobor !== "not_started" && r.dobor !== "not_applicable" &&
-              <span className={`flex items-center gap-1 font-semibold ${
+              <span title={`dobór: ${NAZWA_DOBORU[r.dobor]}`} className={`flex items-center ${
                 r.dobor === "confirmed" ? "text-emerald-700"
                   : r.dobor === "missing_information" ? "text-ranga-zle" : "text-amber-700"}`}>
-                <Wrench size={12} />{NAZWA_DOBORU[r.dobor]}</span>}
-            {/* Plakietka Copilota PO statusie doboru: dobór jest faktem
-                zapisanym przez człowieka, kategoria — przypuszczeniem maszyny,
-                a kolejność na wierszu ma odpowiadać wadze. */}
-            {r.kopilot && <PlakietkaKategorii kopilot={r.kopilot} />}
+                <Wrench size={13} aria-hidden="true" />
+                <span className="sr-only">{NAZWA_DOBORU[r.dobor]}</span></span>}
+            {/* Rzadka kategoria dostaje SŁOWO obok kafla — patrz `CZESTE`. */}
+            {r.kopilot && r.kopilot.status !== "FAILED" && !r.podziekowal
+              && !CZESTE.has(r.kopilot.kategoria) &&
+              <span className="font-semibold text-violet-800">{nazwaNaPlakietce(r.kopilot)}</span>}
             {r.wlasciciel && <span className="flex items-center gap-1 font-semibold text-slate-600">
               <UserCheck size={12} />{r.wlasciciel}</span>}
-            {r.poTerminie && <span className="flex items-center gap-1 font-bold text-ranga-uwaga">
-              <AlarmClock size={12} />po terminie</span>}
+            {r.poTerminie && <span title="termin odłożenia minął" className="flex items-center text-ranga-uwaga">
+              <AlarmClock size={13} aria-hidden="true" /><span className="sr-only">po terminie</span></span>}
             {/* PODZIĘKOWANIE BEZ ODPOWIEDZI (22 września 2026). Podgląd wiersza
                 to słowa klienta, a status mówi „Czeka na klienta" — bez tego
                 znacznika wiersz wyglądałby jak pytanie, które ktoś przeoczył.
                 Mówi też agentowi, że o zdjęciu z listy zdecydował klasyfikator,
                 więc pomyłkę poprawia się plakietką kategorii. */}
-            {r.podziekowal && <span className="flex items-center gap-1 text-slate-600">
-              <Handshake size={12} />podziękowanie, bez odpowiedzi</span>}
+            {/* Samo podziękowanie niesie już kafel z sercem; tu zostaje tylko
+                tekst dla czytnika, który kafla nie widzi jako obrazka. */}
             {/* Kolega SIEDZI przy tym pytaniu (0.159.0). Bez tego znaku dwóch
                 agentów pisze tę samą odpowiedź, a dowiadują się o tym dopiero
                 przy wysyłce — czyli po straconej pracy. */}
             {r.oglada && r.oglada.userId !== mojeId &&
               <span className="flex items-center gap-1 font-semibold text-violet-700">
                 <Eye size={12} />{r.oglada.name}</span>}
-          </div>
+          </span>
+          </span>
+          {/* Czas oczekiwania NA PRAWEJ KRAWĘDZI, kreskami — `Czekanie`. Stoi
+              osobno, żeby w przewijanej liście układał się w jedną kolumnę. */}
+          {zegar !== null && <span className="self-center"><Czekanie ms={zegar} /></span>}
         </button>;
       })}
       {nieswieza && <p className="border-t bg-red-50 px-4 py-2 text-xs text-red-800">

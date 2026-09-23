@@ -67,12 +67,14 @@ describe("Nagłówek rozmowy", () => {
     /* To zdanie jest ceną zdjęcia przycisku: bez niego znika czynność i nie
        przychodzi nic, co by ją wytłumaczyło. */
     render(<EkranRozmowy {...props()} />);
-    expect(screen.getByText("nikt — przypisze pierwsza odpowiedź")).toBeInTheDocument();
+    /* Od 23 września 2026 zdanie stoi w dymku kółka i dla czytnika ekranu —
+       linia pod loginem odeszła z „za dużo tekstu". */
+    expect(screen.getByTitle("Prowadzi nikt — przypisze pierwsza odpowiedź")).toBeInTheDocument();
   });
 
   it("przy cudzej rozmowie pokazuje IMIĘ prowadzącego", () => {
     render(<EkranRozmowy {...props({ wlascicielId: 9, wlasciciel: "M. Wójcik" })} />);
-    expect(screen.getByText("M. Wójcik")).toBeInTheDocument();
+    expect(screen.getByTitle("Prowadzi M. Wójcik")).toHaveTextContent("M");
     expect(screen.queryByText(/przypisze pierwsza odpowiedź/)).not.toBeInTheDocument();
   });
 

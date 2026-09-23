@@ -2584,6 +2584,14 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.442.0 — skrzynka znakami, barwy z logo
+
+**Migracji nie ma. Panel trzeba przebudować** — logo jedzie w jego paczce.
+
+Sprawdzenie: otwórz skrzynkę. Wiersze zaczynają się od kafla z ikoną, a czas
+oczekiwania stoi na prawej krawędzi jako kreski. Przycisk „?" nad kolejką
+otwiera słownik znaków. W pasku stoi logo sklepu na białej tabliczce.
+
 ### Aktualizacja do 0.441.0 — stan systemu w panelu
 
 **Migracji nie ma. Panel trzeba przebudować.** Trasy serwera zostają te same.

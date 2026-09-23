@@ -36,7 +36,7 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
    ZWOLNIENIA SĄ JAWNE. Komentarz `bursztyn: <powód>` w linii albo do sześciu
    linii nad nią, powód co najmniej trzy wyrazy — ten sam mechanizm i próg co
    `kontrast:`, `skala:`, `segment:` i `ergonomia:`. Dziś jest jedno i jest
-   prawdziwe: pasek nawigacji stoi na `#2A2A2C`, a tam bursztynowa zakładka
+   prawdziwe: pasek nawigacji stoi na `#303030`, a tam bursztynowa zakładka
    jest MARKĄ na ciemnym tle, nie zaznaczeniem wiersza na bieli.            */
 
 /** Powód zwolnienia — co najmniej trzy wyrazy po dwukropku. */

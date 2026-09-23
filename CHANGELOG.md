@@ -34,6 +34,26 @@ historii nie przepisujemy.
 ---
 
 
+## 0.442.0 — 23 września 2026
+
+**Skrzynka mówi znakami, nie zdaniami — i nosi barwy z logo.** Zgłoszenie
+właściciela: „za dużo tekstu". Opis i tabela zmian: §10.2a projektu panelu.
+
+- Wiersz kolejki: kafel kategorii z ikoną, czerwona kropka przy prośbie
+  o człowieka, kreski czasu oczekiwania, dymek z liczbą dopisków, jedna linia
+  podglądu. Rzadkie kategorie dostają słowo obok kafla.
+- Pod „?" nad kolejką stoi słownik znaków.
+- Nieudane rozpoznanie mówi „nierozpoznane", nie „Inne".
+- Nagłówek rozmowy: prowadzący jako kółko, „pilne" i „reklamacyjna" jako
+  ikony, dopóki flaga nie jest podniesiona.
+- Kolumna towaru: pasek wolne–zarezerwowane, równe poziomy cen w jednym
+  wierszu, braki jako przerywane plakietki.
+- Barwy marki z pliku logo: `#FF9100` i `#303030`. Logo w pasku i na ekranie
+  logowania.
+
+- **[wymaga działania]** Przebuduj panel.
+
+
 ## 0.441.0 — 23 września 2026
 
 **Stan systemu przeszedł do panelu.** Druga połowa czwartego kroku

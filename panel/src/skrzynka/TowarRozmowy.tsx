@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Check, Database, PackageSearch, X as Krzyzyk } from "lucide-react";
-import { EtykietaWartosci, NaglowekSekcji } from "../ui";
+import { EtykietaWartosci, NaglowekSekcji, odmien } from "../ui";
 import type { CenaPoziomu, KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
@@ -256,22 +256,73 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
         ? <span className="rounded bg-white px-2 py-1 font-mono text-xs font-semibold text-slate-800 shadow-sm">
             {lokalizacje}</span>
         : <span className="text-xs text-slate-500">bez lokalizacji</span>}
-      <span className="ml-auto text-podpis text-slate-500">
-        stan {karta.mag.stan} · rezerwacje {karta.mag.rez}
-      </span>
     </div>
+    {/* ── STAN JAKO PASEK (23 września 2026, „za dużo tekstu") ─────────────
+        „stan 342 · rezerwacje 6" było drugim zdaniem o tej samej liczbie.
+        Pasek pokazuje proporcję jednym spojrzeniem: zieleń to wolne, bursztyn
+        to zarezerwowane. Obie liczby stoją w dymku i dla czytnika ekranu,
+        bo §4.3 nie pozwala chować faktów — wolno je wyciszyć. */}
+    <PasekStanu stan={karta.mag.stan} wolne={karta.mag.avail} rezerwacje={karta.mag.rez} />
 
     <div className="mt-2.5 space-y-1 border-t border-slate-200 pt-2.5">
-      {pozostale.map(([nazwa, wartosc]) => <div key={nazwa} className="flex items-baseline gap-2 text-xs">
-        <span className="w-24 shrink-0 text-slate-500">{nazwa}</span>
-        <span className={wartosc === "brak" ? "text-slate-500" : "font-semibold text-slate-900"}>
-          {wartosc}</span>
-      </div>)}
+      {pozostale.filter(([, w]) => w !== "brak").map(([nazwa, wartosc]) =>
+        <div key={nazwa} className="flex items-baseline gap-2 text-xs">
+          <span className="w-24 shrink-0 text-slate-500">{nazwa}</span>
+          <span className="font-semibold text-slate-900">{wartosc}</span>
+        </div>)}
+      {/* BRAK JAKO OBRYS, NIE WIERSZ (23 września 2026). Trzy wiersze „brak"
+          zajmowały tyle miejsca co wartości. Zostają przerywane plakietki
+          z nazwą — fakt „tego nie mamy" widać, ale nie waży jak ustalenie. */}
+      {pozostale.some(([, w]) => w === "brak") && <div className="flex flex-wrap gap-1.5 pt-0.5">
+        {pozostale.filter(([, w]) => w === "brak").map(([nazwa]) =>
+          <span key={nazwa} title={`${nazwa}: brak`}
+            className="rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-podpis text-slate-600">
+            {nazwa}<span className="sr-only">: brak</span></span>)}
+      </div>}
       {karta.magazyny.length > 0 && <p className="pt-0.5 text-podpis text-slate-500">
         Inne magazyny: {karta.magazyny.map((m) => `${m.kod} ${m.stan}`).join(" · ")}
       </p>}
     </div>
   </div>;
+}
+
+/**
+ * Wolne i zarezerwowane jako jeden pasek (23 września 2026).
+ *
+ * Szerokości liczą się od STANU, nie od sumy wolnych i rezerwacji: Subiekt
+ * bywa niespójny (rezerwacje ponad stan), a pasek dłuższy niż sto procent
+ * kłamałby geometrią. Stan zero rysuje pusty tor — „nie ma" też jest odpowiedzią.
+ */
+export function PasekStanu({ stan, wolne, rezerwacje }: { stan: number; wolne: number; rezerwacje: number }) {
+  const baza = Math.max(stan, wolne + rezerwacje, 0);
+  const proc = (x: number) => (baza > 0 ? Math.max(0, Math.min(100, (x / baza) * 100)) : 0);
+  const zdanie = `stan ${stan}: ${Math.max(0, wolne)} wolnych, ${rezerwacje} w rezerwacji`;
+  return <div title={zdanie} className="mt-2">
+    <div aria-hidden="true" className="flex h-2 overflow-hidden rounded-full bg-slate-200">
+      <span className="bg-emerald-600" style={{ width: `${proc(wolne)}%` }} />
+      <span className="bg-amber-500" style={{ width: `${proc(rezerwacje)}%` }} />
+    </div>
+    <span className="sr-only">{zdanie}</span>
+  </div>;
+}
+
+/**
+ * Poziomy o TEJ SAMEJ parze brutto–netto sklejone w jeden wiersz (23 września 2026).
+ *
+ * Zrzut właściciela: sześć poziomów, pięć z nich co do grosza równych. Agent
+ * czytał sześć wierszy, żeby dowiedzieć się jednej ceny. Kolejność grup to
+ * kolejność Subiekta — decyzja z 0.396.0 zostaje: wiersz stoi tam, gdzie
+ * pierwszy poziom tej ceny.
+ */
+export function grupujCeny(ceny: CenaPoziomu[]): Array<{ cena: CenaPoziomu; nazwy: string[] }> {
+  const grupy = new Map<string, { cena: CenaPoziomu; nazwy: string[] }>();
+  for (const c of ceny) {
+    const klucz = `${c.bruttoGrosze ?? "-"}|${c.nettoGrosze ?? "-"}|${c.waluta}`;
+    const nazwa = c.nazwa || `poziom ${c.poziom}`;
+    const g = grupy.get(klucz);
+    if (g) g.nazwy.push(nazwa); else grupy.set(klucz, { cena: c, nazwy: [nazwa] });
+  }
+  return [...grupy.values()];
 }
 
 /**
@@ -310,12 +361,15 @@ export function CenyKartoteki({ ceny }: { ceny: CenaPoziomu[] }) {
   return <div className="rounded-lg border border-slate-200 p-3">
     <EtykietaWartosci className="block">Ceny · Subiekt GT</EtykietaWartosci>
     <ul className="mt-1 space-y-0.5">
-      {ceny.map((c) => <li key={c.poziom}
+      {grupujCeny(ceny).map(({ cena: c, nazwy }) => <li key={c.poziom}
         className="flex items-baseline gap-2 text-xs">
         {/* Nazwa poziomu, a gdy baza jej nie trzyma — sam numer. Wymyślona
-            nazwa byłaby gorsza od numeru: agent uwierzyłby, że to detaliczna. */}
-        <span className="min-w-0 flex-1 truncate text-slate-600">
-          {c.nazwa || `poziom ${c.poziom}`}</span>
+            nazwa byłaby gorsza od numeru: agent uwierzyłby, że to detaliczna.
+            Grupa kilku poziomów mówi liczbę, a nazwy stoją w dymku. */}
+        <span className="min-w-0 flex-1 truncate text-slate-600" title={nazwy.join(", ")}>
+          {nazwy.length > 1
+            ? `${nazwy[0]} i ${nazwy.length - 1} ${odmien(nazwy.length - 1, "inny", "inne", "innych")}`
+            : nazwy[0]}</span>
         {/* ── ZERO TO BRAK, NIE CENA (0.412.0) ────────────────────────────
             Poziom zakupu (numer 0) nie ma u nas ceny brutto — Subiekt trzyma
             tam parę „netto 18,64 / brutto 0,00". Do tego wydania wiersz

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
-import { Warehouse } from "lucide-react";
+import logo from "../assets/wertis-logo.png";
 import { api, zapiszToken } from "../api/klient";
 import { Blad, Przycisk } from "../ui";
 
@@ -31,12 +31,11 @@ export function Logowanie({ zalogowano }: { zalogowano: () => void }) {
 
   return <main className="grid min-h-screen place-items-center bg-wertis-ink p-5">
     <form onSubmit={handleSubmit(wyslij)} className="card w-full max-w-sm p-7">
-      <div className="mb-7 flex items-center gap-3">
-        <div className="rounded-xl bg-wertis-amber p-3"><Warehouse /></div>
-        <div>
-          <h1 className="text-tytul font-bold">WERTIS</h1>
-          <p className="text-sm text-slate-500">Obsługa klienta</p>
-        </div>
+      {/* Logo sklepu zamiast ikony i słowa (23 września 2026) — to pierwszy
+          ekran, jaki widzi nowa osoba w biurze, więc ma wyglądać jak ta firma. */}
+      <div className="mb-7">
+        <h1 className="m-0"><img src={logo} alt="WERTIS — sklep z częściami" className="h-14 w-auto" /></h1>
+        <p className="mt-2 text-sm text-slate-500">Obsługa klienta</p>
       </div>
       <label className="mb-4 block text-sm font-semibold">Login
         <input className="field mt-1" autoFocus {...register("login")} />

@@ -1,5 +1,9 @@
 import React, { useState } from "react";
-import { Check, Sparkles, UserRound } from "lucide-react";
+import {
+  Ban, Bandage, Check, CircleDashed, CircleHelp, HeartHandshake, MapPinOff, MessageCircle,
+  PackageMinus, PackageOpen, PackageSearch, Puzzle, ReceiptText, ShieldAlert, Shuffle, Sparkles,
+  Truck, Undo2, UserRound, Warehouse, type LucideIcon,
+} from "lucide-react";
 import type { Kategoria, Kopilot, Rozmowa, StanCopilota, WynikPartii } from "../api/typy";
 import { NAZWA_AKCJI, NAZWA_KATEGORII, NAZWA_KODU, NAZWA_PEWNOSCI } from "./statusy";
 import { odmien } from "../ui";
@@ -200,9 +204,92 @@ export function PlakietkaKategorii({ kopilot }: { kopilot: Kopilot }) {
   return <span title={dymek(kopilot)}
     className={`flex items-center gap-1 rounded px-1.5 py-0.5 font-semibold ${
       szara ? "bg-slate-100 text-slate-600" : "bg-violet-100 text-violet-800"}`}>
-    <Sparkles size={11} />{NAZWA_KATEGORII[kopilot.kategoria] ?? kopilot.kategoria}
+    <Sparkles size={11} />{nazwaNaPlakietce(kopilot)}
     {kopilot.wymagaCzlowieka && !kopilot.nieaktualna
       && <UserRound size={11} aria-label="wymaga człowieka" />}</span>;
+}
+
+/**
+ * Nazwa na plakietce i w dymku kafla.
+ *
+ * NIEUDANE ROZPOZNANIE NIE UDAJE KATEGORII (23 września 2026). Decyzja
+ * zastępcza przy awarii dostawcy zapisuje `OTHER`, bo kolumna kategorii nie
+ * zna pustki. Na wierszu czytało się to jako „model uznał, że to inne" —
+ * pierwsza noc z błędnym identyfikatorem modelu oznaczyła tak trzynaście
+ * rozmów, z podziękowaniem włącznie. Stąd osobne słowo.
+ */
+export function nazwaNaPlakietce(k: Kopilot): string {
+  if (k.status === "FAILED") return "nierozpoznane";
+  return NAZWA_KATEGORII[k.kategoria] ?? k.kategoria;
+}
+
+/* ── ZNAK KATEGORII (23 września 2026) ────────────────────────────────────────
+   Zgłoszenie właściciela ze zrzutem skrzynki: „za dużo tekstu". Wiersz kolejki
+   niósł kategorię SŁOWEM w trzecim rzędzie, pod treścią i podpisem. Kafel
+   z ikoną stoi teraz na początku wiersza, gdzie wzrok wchodzi pierwszy.
+
+   Fiolet zostaje barwą KAŻDEGO kafla, bo kategoria dalej jest przypuszczeniem
+   maszyny (0.261.0) — kształt ikony niesie rodzaj, barwa niesie pewność. Nazwę
+   niesie `title` i tekst dla czytnika, a pełną listę słownik pod „?".
+
+   Rzadkie kategorie dostają słowo obok znaku na wierszu. Ikonę, którą agent
+   widzi raz w miesiącu, trzeba by za każdym razem sprawdzać w słowniku — a to
+   jest dokładnie to „pamiętanie", którego dekalog ergonomii każe unikać. */
+export const IKONA_KATEGORII: Record<Kategoria, LucideIcon> = {
+  ORDER_STATUS: PackageSearch,
+  DELIVERY_DELAY: Truck,
+  DELIVERY_LOST: MapPinOff,
+  DELIVERY_DAMAGED: PackageOpen,
+  PRODUCT_COMPATIBILITY: Puzzle,
+  PRODUCT_QUESTION: CircleHelp,
+  PRODUCT_AVAILABILITY: Warehouse,
+  WRONG_PRODUCT: Shuffle,
+  MISSING_PRODUCT: PackageMinus,
+  DAMAGED_PRODUCT: Bandage,
+  RETURN: Undo2,
+  COMPLAINT: ShieldAlert,
+  CANCEL_ORDER: Ban,
+  INVOICE: ReceiptText,
+  OTHER: MessageCircle,
+};
+
+/** Kategorie, które na wierszu stoją samym znakiem. Reszta dostaje też słowo. */
+export const CZESTE: ReadonlySet<Kategoria> = new Set<Kategoria>([
+  "PRODUCT_COMPATIBILITY", "OTHER", "RETURN", "COMPLAINT", "MISSING_PRODUCT",
+]);
+
+/**
+ * Kafel kategorii na początku wiersza kolejki.
+ *
+ * Czerwona kropka to `wymagaCzlowieka` — jedyna rzecz z decyzji, która zmienia,
+ * KTO ma się sprawą zająć. Podziękowanie ma kafel szary z sercem: rozmowa nie
+ * czeka na nas i wiersz ma to mówić, zanim ktoś przeczyta treść. Nieudane
+ * rozpoznanie i brak rozpoznania mają obrys przerywany — „nie wiem" wygląda
+ * inaczej niż każda odpowiedź.
+ */
+export function KafelKategorii({ kopilot, podziekowal = false }: {
+  kopilot: Kopilot | null;
+  podziekowal?: boolean;
+}) {
+  const nieWiem = kopilot === null || kopilot.status === "FAILED";
+  const Ikona = podziekowal ? HeartHandshake
+    : nieWiem ? CircleDashed : IKONA_KATEGORII[kopilot.kategoria] ?? MessageCircle;
+  const nazwa = podziekowal ? "podziękowanie, bez odpowiedzi"
+    : kopilot === null ? "nierozpoznana" : nazwaNaPlakietce(kopilot);
+  const czlowiek = !!kopilot && kopilot.wymagaCzlowieka && !kopilot.nieaktualna && !podziekowal;
+  const opis = kopilot && !podziekowal ? dymek(kopilot) : nazwa;
+  const ton = podziekowal || nieWiem || kopilot?.nieaktualna
+    ? "border-slate-200 bg-slate-50 text-slate-600"
+    : "border-violet-200 bg-violet-50 text-violet-800";
+  return <span title={opis}
+    className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
+      nieWiem && !podziekowal ? "border-dashed" : ""} ${ton}`}>
+    <Ikona size={18} aria-hidden="true" />
+    <span className="sr-only">{nazwa}{czlowiek ? ", wymaga człowieka" : ""}</span>
+    {czlowiek && <span aria-hidden="true"
+      className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-ranga-zle text-white">
+      <UserRound size={8} /></span>}
+  </span>;
 }
 
 /**

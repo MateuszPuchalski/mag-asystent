@@ -17,13 +17,13 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
 
      `text-slate-400` na tekście       #94A3B8 na bieli        = 2.56:1
      `text-slate-500` na `bg-slate-100` #64748B na #F1F5F9     = 4.34:1
-     `text-wertis-amber` na tekście     #F7A600 na bieli        = 2.02:1
+     `text-wertis-amber` na tekście     #FF9100 na bieli        = 2.26:1
 
    Próg dla pisma poniżej 18 px to 4.5:1, dla 24 px/700 — 3:1. Żadna z tych
    trzech par nie przechodzi nigdzie, więc zakaz jest bezwarunkowy.
 
    Bursztyn jest zakazany jako PISMO, nie w ogóle: `bg-wertis-amber` pod
-   `text-wertis-ink` daje 7.10:1 i zostaje barwą marki. Usterką było użycie
+   `text-wertis-ink` daje 5.84:1 i zostaje barwą marki. Usterką było użycie
    barwy tła jako barwy liter.
 
    CZEGO NIE PILNUJE. Nie liczy kontrastu. Czyta tekst źródła, więc nie wie,
@@ -38,9 +38,9 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
    linii nad nią zdejmuje zgłoszenie, a powód musi mieć co najmniej trzy
    wyrazy — ten sam mechanizm i ten sam próg co `ergonomia: <powód>`
    w `tools/ergonomia_check.py`, bo zwolnienie bez uzasadnienia to brak
-   zwolnienia. Zwolnienia są prawdziwe: pasek nawigacji stoi na `#2A2A2C`
-   i tam `slate-400` daje 5.59:1, czyli lepiej, niż `slate-600` dałoby
-   na bieli.                                                                 */
+   zwolnienia. Zwolnienia są prawdziwe: pasek nawigacji stoi na `#303030`
+   i tam `slate-400` daje 5.14:1, powyżej progu 4.5:1 (barwy z logo
+   od 23 września 2026; wcześniej, na `#2A2A2C`, było 5.59:1).                                                                 */
 
 /** Powód zwolnienia — co najmniej trzy wyrazy po dwukropku. */
 const ZWOLNIENIE = /kontrast:\s*\S+(?:\s+\S+){2,}/;
@@ -123,8 +123,8 @@ describe("Czytelność: trzy pary barw, które nie przechodzą nigdzie", () => {
   });
 
   it("`text-wertis-amber` nie istnieje — bursztyn jest tłem, nie pismem", () => {
-    /* 2.02:1 przy 24 px i wadze 700, przy progu 3:1. `bg-wertis-amber` pod
-       ciemnym pismem daje 7.10:1 i zostaje — zakaz dotyczy wyłącznie liter. */
+    /* 2.26:1 przy 24 px i wadze 700, przy progu 3:1. `bg-wertis-amber` pod
+       ciemnym pismem daje 5.84:1 i zostaje — zakaz dotyczy wyłącznie liter. */
     expect(znajdz(/text-wertis-amber/)).toEqual([]);
   });
 });

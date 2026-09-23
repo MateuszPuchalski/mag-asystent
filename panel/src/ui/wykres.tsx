@@ -7,7 +7,7 @@ import React from "react";
    decyzja, którą biuro zapisało przy swoim SVG.
 
    BARWA SŁUPKA: CIEMNIEJSZY STOPIEŃ BURSZTYNU. Biuro malowało słupki barwą
-   marki (#F7A600), a ta na bieli daje 2,02:1 — poniżej progu 3:1, który WCAG
+   marki (dziś #FF9100), a ta na bieli daje 2,26:1 — poniżej progu 3:1, który WCAG
    stawia znakom graficznym, i dokładnie ta liczba, dla której `Kontrast.test`
    zakazuje bursztynu jako pisma. `amber-600` (#D97706) zostaje w rodzinie
    marki i przechodzi walidator palety: pasmo jasności, nasycenie i kontrast
