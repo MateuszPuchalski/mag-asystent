@@ -162,6 +162,32 @@ test("dopisek klienta zatrzymuje wysyłkę, a szkic zostaje nietknięty", async 
   assert.equal(szkic.body, "Pasuje, rozstaw 148 mm.", "409 nie ma prawa skasować szkicu");
 });
 
+/* ── Ostatnia wiadomość klienta PO CZASIE (23 września 2026) ─────────────────
+   Zgłoszenie właściciela ze zrzutem: dialog „klient dopisał wiadomość" padał
+   często, choć wszystko stało na ekranie. Synchronizacja wpisywała paczkę od
+   najnowszej, więc STARSZY dopisek dostawał wyższe `id`, a kontrola brała
+   najwyższe `id`. Panel bierze ostatnią z osi, czyli po czasie. */
+test("wiadomość nowsza w czasie, choć z niższym id, jest tą ostatnią — bez fałszywego 409", async () => {
+  const { d, ala, rozmowa, pytanie } = stanowisko();
+  const wpisz = (tresc: string, ext: string, at: string) => Number(d.prepare(
+    `INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
+     VALUES (?,(SELECT channel_account_id FROM conversation WHERE id=?),?,'incoming',?,?)`)
+    .run(rozmowa, rozmowa, ext, tresc, at).lastInsertRowid);
+  /* Kolejność wpisu jak z Allegro: najpierw zdjęcie (21:57), potem „Numer" (21:56). */
+  const zdjecie = wpisz("[zdjęcie tabliczki]", "m-2", "2026-09-22T21:57:00.000Z");
+  const numer = wpisz("Numer", "m-1", "2026-09-22T21:56:00.000Z");
+  assert.ok(numer > zdjecie && pytanie < zdjecie, "warunek zrzutu: starszy dopisek ma wyższe id");
+  przejmijRozmowe(rozmowa, ala, 1, d);
+
+  /* Szkic zapisuje się pod tę samą ostatnią wiadomość, którą widzi panel. */
+  zapiszSzkic(rozmowa, ala, "Dziękujemy za zdjęcie.", zdjecie, null, d);
+  const w = await wyslijOdpowiedz({
+    conversationId: rozmowa, autor: autorAli(ala), body: "Dziękujemy za zdjęcie.",
+    expectedVersion: 2, expectedLastMessageId: zdjecie, database: d, wyslij: udany(),
+  });
+  assert.ok(w, "wysyłka przeszła bez dialogu dopisku");
+});
+
 test("„wyślij mimo to\" przechodzi dopiero na jawną zgodę", async () => {
   const { d, ala, rozmowa, pytanie, wiadomosc } = stanowisko();
   przejmijRozmowe(rozmowa, ala, 1, d);

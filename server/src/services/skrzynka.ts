@@ -304,9 +304,12 @@ const LISTA = `
          -- kontakt" wychodzi samo, w sekundę po pytaniu, i nie odpowiada na
          -- nic. Liczona jako nasza wiadomość zdejmowała rozmowę z listy tych,
          -- które czekają na odpowiedź.
+         -- PO CZASIE, NIE PO id (23 września 2026): synchronizacja wpisywała
+         -- paczkę od najnowszej, więc id nie rośnie z czasem. Ta sama reguła
+         -- co kontrola świeżości wysyłki i klasyfikator.
          (SELECT m.direction FROM message m
            WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
-           ORDER BY m.id DESC LIMIT 1) AS ostatniRuch,
+           ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuch,
          -- Czas oczekiwania liczy się od ostatniej wiadomości KLIENTA, nie od
          -- ostatniaWiadomoscAt: tamto ma COALESCE na updated_at, więc wątek
          -- zaczęty przez nas dostałby zegar, którego nikt nie odmierza.
@@ -349,7 +352,7 @@ const LISTA = `
     LEFT JOIN decyzja_klasyfikacji kop ON kop.id = ${AKTYWNA_DECYZJA}
     LEFT JOIN message o ON o.id = (
       SELECT m.id FROM message m WHERE m.conversation_id=c.id
-       ORDER BY (m.direction='incoming') DESC, m.id DESC LIMIT 1)`;
+       ORDER BY (m.direction='incoming') DESC, m.sent_at DESC, m.id DESC LIMIT 1)`;
 
 const naRozmowe = (
   w: Record<string, unknown>,

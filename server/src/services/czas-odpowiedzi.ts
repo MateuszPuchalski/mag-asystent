@@ -70,7 +70,7 @@ export function p90(liczby: number[]): number | null {
 const zaokragl = (x: number | null) => (x === null ? null : Math.round(x));
 
 /**
- * Próbki czekania z listy wiadomości JEDNEJ rozmowy, w kolejności `id`.
+ * Próbki czekania z listy wiadomości JEDNEJ rozmowy, w kolejności czasu (`sent_at`, remis po `id`).
  * Czysta funkcja — reguła próbki ma jeden zapis i jeden test.
  */
 export function probkiRozmowy(wiadomosci: Wiadomosc[]): { probki: Probka[]; czekaOd: string | null } {
@@ -106,7 +106,7 @@ export function czasOdpowiedzi(
       sent_at, external_message_id FROM message
      WHERE conversation_id IN (SELECT DISTINCT conversation_id FROM message WHERE sent_at >= ?)
        AND sent_at >= ?
-     ORDER BY conversation_id, id`).all(start, zapas) as unknown as Wiadomosc[];
+     ORDER BY conversation_id, sent_at, id`).all(start, zapas) as unknown as Wiadomosc[];
 
   const wgRozmowy = new Map<number, Wiadomosc[]>();
   for (const w of wiadomosci) {

@@ -62,8 +62,21 @@ function kontekst(database: DatabaseSync, conversationId: number): Kontekst {
      ostatniej wiadomości klienta", i to nie jest drobiazg: własna odpowiedź
      przesuwałaby ten punkt, więc druga wysyłka w tej samej rozmowie zawsze
      wyglądałaby na pisaną do nieaktualnego pytania. */
+  /* ── PO CZASIE, NIE PO NUMERZE (23 września 2026) ──────────────────────────
+     Zgłoszenie właściciela ze zrzutem: „Wysyłka zatrzymana — klient dopisał
+     wiadomość" padało często, choć wszystkie wiadomości klienta stały na
+     ekranie. Synchronizacja wpisywała paczkę wiadomości w kolejności Allegro,
+     od najnowszej — więc z dwóch dopisków klienta STARSZY dostawał wyższe
+     `id`. Panel bierze ostatnią wiadomość klienta z osi, czyli po czasie; ten
+     odczyt brał najwyższe `id`. Dwie reguły dla jednego pojęcia dawały 409
+     przy każdej wysyłce w takiej rozmowie.
+
+     Reguła jest teraz jedna i ta sama, co w klasyfikatorze i w szkicu
+     Copilota: czas, a przy remisie `id` — tak rozstrzyga remis także oś
+     panelu (sortowanie stabilne po wierszach wziętych po `id`). */
   const m = database.prepare(
-    "SELECT id FROM message WHERE conversation_id=? AND direction='incoming' ORDER BY id DESC LIMIT 1")
+    `SELECT id FROM message WHERE conversation_id=? AND direction='incoming'
+      ORDER BY sent_at DESC, id DESC LIMIT 1`)
     .get(conversationId) as { id: number } | undefined;
   return {
     externalConversationId: c.external_conversation_id,
