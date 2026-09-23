@@ -40,6 +40,13 @@ ALLOWED_MISSING = {
     # opisywał. Wpisy CHANGELOG-a od 0.128.0 do 0.137.1 nazywają go po imieniu
     # i mają do tego prawo: opisują wydania, w których ten plik istniał.
     "docs/architektura-spraw.md",
+    # Strona biura — skasowana w 0.446.0, gdy ostatni jej widok przeszedł
+    # do panelu. Wpisy CHANGELOG-a od 0.18.0 i historia w architektura.md
+    # nazywają ją po imieniu, bo opisują czas, w którym istniała.
+    "server/src/web/biuro.html",
+    # Katalog wyniku builda serwera — w świeżym klonie go nie ma, a DEPLOY
+    # musi móc powiedzieć, co w nim zostaje po aktualizacji.
+    "server/dist/web",
 }
 
 # Byty usunięte z kodu — odwołanie do nich w dokumentacji znaczy, że opis

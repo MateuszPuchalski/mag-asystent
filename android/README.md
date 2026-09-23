@@ -287,13 +287,13 @@ przed którą ta pozycja broni.
 
 **Notatki biura**
 
-- [ ] notatka dodana w `/biuro` pojawia się na GÓRZE ekranu rozkładania,
+- [ ] notatka dodana w panelu biura (Dostawy) pojawia się na GÓRZE ekranu rozkładania,
 - [ ] nieodpowiedziana jest bursztynowa i klikalna,
 - [ ] „ZAKOŃCZ DOSTAWĘ" odmawia i CYTUJE treść notatki,
 - [ ] odłożenie ostatniej pozycji też NIE domyka dostawy (regresja: bramka
       musi stać w `closeIfComplete`, nie tylko przy przycisku),
 - [ ] po odpowiedzi dostawa domyka się normalnie,
-- [ ] odpowiedź widać w `/biuro` z nazwiskiem i czasem.
+- [ ] odpowiedź widać w panelu biura z nazwiskiem i czasem.
 
 **W dostawie, nierozłożone**
 
@@ -352,7 +352,7 @@ przed którą ta pozycja broni.
 - [ ] `+` ponad ilość z faktury pyta raz i mówi o zgłoszeniu do biura,
 - [ ] po potwierdzeniu licznik idzie dalej bez kolejnych pytań,
 - [ ] ANULUJ zostawia liczbę z faktury i niczego nie zapisuje,
-- [ ] po zamknięciu dostawy nadmiar jest w wyjątkach w `/biuro`,
+- [ ] po zamknięciu dostawy nadmiar jest w wyjątkach w panelu biura,
 - [ ] pozycja z nadmiarem jest odłożona, nie wraca do roboty.
 - [ ] logo dostawcy na liście dostaw jest szersze niż wysokie,
 - [ ] wiersz bez logo ma kafelek stanu w tym samym miejscu i nie przeskakuje.

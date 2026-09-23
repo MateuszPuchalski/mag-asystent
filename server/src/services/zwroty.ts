@@ -1501,7 +1501,7 @@ export function zarejestrujNieodebrana(
 
   const konto = database.prepare("SELECT id FROM channel_account ORDER BY id LIMIT 1")
     .get() as { id: number } | undefined;
-  if (!konto) throw new Error("Brak konta kanału — sparuj konto Allegro w /biuro.");
+  if (!konto) throw new Error("Brak konta kanału — sparuj konto Allegro: /obsluga → STAN SYSTEMU → KONTO ALLEGRO.");
 
   const external = `nieodebrana:${waybill}`;
   const juz = database.prepare(

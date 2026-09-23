@@ -1,8 +1,8 @@
 # WERTIS — zasady pracy w tym repo
 
 Magazynowo-biurowy asystent firmy ogrodniczej: serwer Fastify + `node:sqlite`
-(`server/`), panel biura (`panel/`, React + Vite; dawny `biuro.html` znika
-z niego widok po widoku), kolektor Android (`android/`). Architektura i decyzje:
+(`server/`), panel biura (`panel/`, React + Vite, pod `/obsluga`; dawny
+`biuro.html` zniknął w 0.446.0), kolektor Android (`android/`). Architektura i decyzje:
 `docs/architektura.md`. Ten plik mówi tylko, CZEGO pilnować przy zmianach.
 
 ## Twarde zasady
@@ -10,16 +10,14 @@ z niego widok po widoku), kolektor Android (`android/`). Architektura i decyzje:
 - **Komentarze po polsku i wyjaśniają DLACZEGO**, nie co robi następna linia.
   Decyzja bez uzasadnienia w komentarzu to decyzja do wycofania.
 - **Jeden front: `panel/`.** Od 0.431.0, decyzją właściciela z
-  `docs/obsluga-klienta.md` §7, całe biuro przechodzi do `panel/` (React +
-  Vite, build do `dist/web/obsluga`). `biuro.html` nie dostaje NICZEGO nowego:
-  jego widoki przechodzą do panelu jeden po drugim i znikają z pliku w tym
-  samym wydaniu. Nowy ekran biura — magazynowy czy obsługi — idzie do
-  `panel/`. Kształt ekranu wynika z celu biura (§7): praca na górnym rzędzie,
-  wgląd na dolnym, ustawienia za zębatką. Dopóki `biuro.html` istnieje, jego
-  strażnicy działają: funkcje w `<script>` nie mogą się powtarzać z nazwy
-  (test dubli) ani wołać funkcji, której nie ma (test wywołań), a delegacje
-  kliknięć stoją na SEKCJACH (test delegacji). Przenosząc widok, przenosisz
-  też gwarancję jego strażnika na ekran w panelu.
+  `docs/obsluga-klienta.md` §7, całe biuro mieszka w `panel/` (React + Vite,
+  build do `dist/web/obsluga`). Przeprowadzka skończyła się w 0.446.0:
+  `biuro.html` zniknął, a `/` i `/biuro` przekierowują do `/obsluga/`.
+  Drugiego frontu nie ma i nie będzie — nowy ekran biura, magazynowy czy
+  obsługi, idzie do `panel/`. Kształt ekranu wynika z celu biura (§7): praca
+  na górnym rzędzie, wgląd na dolnym, ustawienia za zębatką. Gwarancje
+  strażników `biuro.html` przejęły testy ekranów panelu, każdy nazwany
+  w wydaniu, które przeniosło jego widok.
 - **Ekran magazynowy projektuje się pod ergonomię, nie pod wygląd.** Reguły
   stoją w `docs/ergonomia-magazynu.md`. Rozstrzygają spór o kształt ekranu na
   korzyść tego, który wymaga mniej decyzji, mniej interakcji, mniej uwagi,
@@ -44,14 +42,16 @@ z niego widok po widoku), kolektor Android (`android/`). Architektura i decyzje:
 
 - **Reguła klienta HTTP obowiązuje KAŻDY front z osobna.** Żądanie bez ciała
   nie deklaruje typu treści — pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`
-  i gołe „Bad Request" na ekranie. Pilnują tego trzy niezależne strażnice:
-  `routes/biuro.test.ts` (po źródle `biuro.html`), `panel/src/api/klient.test.ts`
-  (po zachowaniu) i `EMPTY_BODY` w kolektorze. Panel obsługi kupił tę bliznę
-  drugi raz, bo strażnik istniał tylko dla jednego pliku. Dokładając front,
-  dokładasz też jego strażnika.
+  i gołe „Bad Request" na ekranie. Pilnują tego dwie niezależne strażnice:
+  `panel/src/api/klient.test.ts` (po zachowaniu) i `EMPTY_BODY` w kolektorze.
+  Trzecia, po źródle `biuro.html`, odeszła z tą stroną. Panel obsługi kupił
+  tę bliznę drugi raz, bo strażnik istniał tylko dla jednego pliku.
+  Dokładając front, dokładasz też jego strażnika.
 - **Zero zapisu przy patrzeniu.** Otwarcie ekranu niczego nie mutuje.
-  Liczniki `method: "POST"/"PUT"/"DELETE"` w `routes/biuro.test.ts` są
-  UMOWĄ — każdy nowy zapis podnosi licznik i dostaje zdanie w uzasadnieniu.
+  Pilnują tego testy ekranów (`ekrany/*.test.tsx`): liczą żądania inne niż
+  GET przy samym otwarciu i oczekują zera. Nowy ekran dostaje taki test —
+  bez niego reguła nie ma strażnika. Do 0.446.0 umową były też liczniki
+  zapisów po źródle `biuro.html`; odeszły razem z tą stroną.
   Od 0.410.0 jest JEDEN wyjątek, decyzją właściciela: wejście w reklamację
   odświeża ją z Allegro. Powód jest mierzalny — przebieg synchronizacji czyta
   najwyżej tysiąc spraw, więc ogona archiwum nie odświeżał NIGDY. Wyjątek
@@ -132,6 +132,7 @@ wyłącznie testy serwera, więc dało się przejść wszystkie bramki na zielon
 i wypchnąć panel z czerwonymi testami. CI je łapało (`server.yml`, krok „Testy
 panelu obsługi"), ale dopiero po wypchnięciu. Dwie ostatnie dotyczą Kotlina i biegną
 w sekundy — moduł `:app` nie kompiluje się poza CI, więc to jedyne, co łapie
-mały cel dotyku i brakujący import przed wypchnięciem. `npm test` to także testy-strażnicy
-struktury `biuro.html` — ich odmowa zwykle znaczy, że łamiesz jedną
-z zasad wyżej, nie że test jest do poprawienia.
+mały cel dotyku i brakujący import przed wypchnięciem. Testy-strażnicy źródeł
+panelu (`Bursztyn`, `Kontrast`, `Skala`, `Czas`) i zero zapisu przy otwarciu
+ekranu to zasady wyżej zapisane w kodzie — ich odmowa zwykle znaczy, że
+łamiesz jedną z nich, nie że test jest do poprawienia.

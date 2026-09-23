@@ -34,6 +34,30 @@ historii nie przepisujemy.
 ---
 
 
+## 0.446.0 — 23 września 2026
+
+**Biuro ma jeden adres: `/obsluga`.** Ostatni krok przeprowadzki
+(`docs/obsluga-klienta.md` §7, F6). Strona `biuro.html` zniknęła razem ze
+swoimi fontami i ikoną. Adresy `/` i `/biuro` przekierowują do panelu, więc
+stare zakładki w przeglądarce trafiają na DO DECYZJI.
+
+**Dwa sygnały paska biura przeszły do nagłówka panelu**, bo nie miały jeszcze
+miejsca. Serwer inny niż produkcja ma czerwoną pigułkę z nazwą środowiska
+(„DEV") obok pigułki synchronizacji, na każdym ekranie; dymek mówi, że to nie
+produkcja. Spóźnione sprawy między halą a biurem mają obok bursztynową
+plakietkę; klik otwiera kartę wymiany w stanie systemu.
+
+**Panel nazywa się „WERTIS · Biuro"** — w karcie przeglądarki i na ekranie
+logowania. Komunikaty serwera odsyłają do zakładek panelu, nie do `/biuro`.
+
+**Testy.** Trasy biura mają własny plik `routes/biuro-api.test.ts`:
+przekierowania, bramki sesji i ról, archiwum dostaw, zdrowie bez sesji.
+Strażnicy struktury strony odeszli z nią; ich gwarancje przejęły testy
+ekranów panelu. `CLAUDE.md` mówi o jednym froncie w czasie teraźniejszym.
+
+- **[wymaga działania]** Przebuduj panel i serwer: build serwera nie kopiuje
+  już `src/web`.
+
 ## 0.444.0 — 23 września 2026
 
 **Ustawienia biura przeszły do panelu.** Piąty krok przeprowadzki biura
