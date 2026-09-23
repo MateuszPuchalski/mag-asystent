@@ -19,6 +19,7 @@ process.env.SGT_MODE = "seeded";
 
 let db: typeof import("../db/db.js").db;
 let historiaKlienta: typeof import("./klient-historia.js").historiaKlienta;
+let historiaSprawy: typeof import("./klient-historia.js").historiaSprawy;
 
 let konto = 0;
 let biezaca = 0;
@@ -27,7 +28,7 @@ let obca = 0;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
-  ({ historiaKlienta } = await import("./klient-historia.js"));
+  ({ historiaKlienta, historiaSprawy } = await import("./klient-historia.js"));
 });
 
 /** Rozmowa razem z jej wątkiem — login mieszka w lądowisku, nie w rozmowie. */
@@ -189,4 +190,38 @@ test("dyskusja bez tematu bierze podpis, a nie pustą linię", () => {
 
   const w = historiaKlienta(biezaca).wpisy.find((x) => x.rodzaj === "dyskusja")!;
   assert.equal(w.tresc, "Sprawa bez tematu");
+});
+
+/* ── Historia ze zwrotu i ze sprawy (23 września 2026) ───────────────────────
+   Login bierze się z SAMEJ sprawy, a rozmowy dochodzą wyłącznie numerem
+   zamówienia. Rozmowa, której wątek ma ten sam login rozmówcy, ale żadnego
+   numeru — NIE wchodzi: `[WERYFIKUJ]` przy `interlocutor_login`. */
+test("ze zwrotu: zakupy i sprawy po loginie, rozmowy tylko numerem zamówienia, bez samego zwrotu", () => {
+  zakup("chips20", "ord-1", "Nóż kosiarki", "2026-09-01T10:00:00Z");
+  const poNumerze = rozmowa("w-num", null, "gdzie paczka", "2026-09-02T10:00:00Z");
+  db().prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    related_order_id,sent_at) VALUES (?,?,'m-n','incoming','?','ord-1','2026-09-02T10:00:00Z')`).run(poNumerze, konto);
+  const poLoginie = rozmowa("w-log", "chips20", "inne pytanie", "2026-09-03T10:00:00Z");
+  const zw = zwrotKlienta("chips20", "ZW-1", "2026-09-05T10:00:00Z");
+  const rk = sprawaKlienta("chips20", "CLAIM", "Pęknięty", "2026-09-06T10:00:00Z");
+  zwrotKlienta("obcy", "ZW-2", "2026-09-07T10:00:00Z");
+
+  const h = historiaSprawy("zwrot", zw, db());
+  assert.equal(h.login, "chips20");
+  const rodzaje = h.wpisy.map((w) => `${w.rodzaj}:${w.rozmowaId ?? w.sprawaId ?? w.zamowienieId}`);
+  assert.ok(rodzaje.includes(`rozmowa:${poNumerze}`));
+  assert.ok(!rodzaje.includes(`rozmowa:${poLoginie}`), "po loginie rozmówcy nie wiążemy");
+  assert.ok(rodzaje.includes(`reklamacja:${rk}`));
+  assert.ok(rodzaje.includes("zakup:ord-1"));
+  assert.ok(!rodzaje.includes(`zwrot:${zw}`), "bieżący zwrot stoi obok");
+  assert.equal(h.wpisy.filter((w) => w.rodzaj === "zwrot").length, 0, "cudzy zwrot nie wchodzi");
+
+  const zReklamacji = historiaSprawy("sprawa", rk, db());
+  assert.ok(zReklamacji.wpisy.some((w) => w.rodzaj === "zwrot" && w.sprawaId === zw));
+  assert.ok(!zReklamacji.wpisy.some((w) => w.rodzaj === "reklamacja" && w.sprawaId === rk));
+});
+
+test("sprawa bez loginu kupującego daje pustą historię", () => {
+  const rk = sprawaKlienta("", "DISPUTE", "x", "2026-09-06T10:00:00Z");
+  assert.deepEqual(historiaSprawy("sprawa", rk, db()).wpisy, []);
 });

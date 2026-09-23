@@ -1149,6 +1149,35 @@ Kiedy Allegro go nadaje, nie sprawdziliśmy [WERYFIKUJ].
 klienta, na halę i odłożenie stoją w „Oczekujących". Koniec stoi
 w „Zakończonych".
 
+### 10.2f. Użyteczność: jedna lista, Ctrl+K, skróty, użycie, historia (0.472.0)
+
+Zgłoszenie właściciela: „jak poprawić użyteczność”. Pięć zmian przyjął
+wprost.
+
+**Jedna lista „Do zrobienia”.** Trzy zakładki odpowiadały na pytanie „co
+teraz”. Są dziś trzema sekcjami ekranu startowego, w kolejności: wzmianki,
+moje sprawy, decyzje biura. To dalej trzy odczyty, nie piąta kolejka —
+każda sekcja prowadzi tam, gdzie sprawę się załatwia.
+
+**Szukanie Ctrl+K** (`services/szukaj-wszedzie.ts`). Mostem między bytami
+jest numer zamówienia, jak w `droga-klienta.ts`. Login kupującego trafia
+w zakupy, zwroty i sprawy. Rozmowy po loginie rozmówcy nie szuka, dopóki
+przy `interlocutor_login` stoi znacznik weryfikacji w `allegro-ksztalt.md`.
+Rozmowa bez numeru zamówienia po loginie się więc nie znajdzie.
+
+**Jedna lista skrótów pod `?`** (`nawigacja/Klawisze.tsx`). Te same
+klawisze na każdej kolejce: `j`/`k`, cyfry kubełków, Ctrl+Enter przy
+odpowiedzi. `Z` zostaje różny, bo w zwrotach oddaje pieniądze od 0.284.0.
+
+**Raport użycia** (`services/uzycie.ts`). Czynności z dziennika zdarzeń
+według obszaru; „nigdy” bierze się z rejestru typów. Rejestr pilnuje test
+skanujący źródła. Raport nie widzi wejść na ekran — to cena zasady „zero
+zapisu przy patrzeniu”.
+
+**Historia klienta ze zwrotu i ze sprawy** (`historiaSprawy`). Szuflada
+z tym samym widokiem co zakładka KLIENT. Login z samej sprawy, rozmowy
+wyłącznie numerem zamówienia.
+
 ### 10.3. Oś rozmowy
 
 Oś zawiera wiadomości klienta, odpowiedzi firmy, komentarze wewnętrzne, zmiany

@@ -6,6 +6,7 @@ import type {
 } from "../api/typy";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
+import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
 import { zlote } from "../api/zwroty";
 import {
   EtykietaWartosci, NaglowekSekcji, czas, dzien, dniSlowo, ile, LoginKlienta, odmien, Przycisk,
@@ -434,7 +435,9 @@ export function Dowody({
             <Skopiuj tekst={r.numer ?? r.externalId} tytul="Kopiuj numer reklamacji" />
           </Wiersz>
           <Wiersz etykieta="Kupujący">{r.kupujacyLogin
-            ? <LoginKlienta login={r.kupujacyLogin} /> : "—"}</Wiersz>
+            ? <span className="inline-flex flex-wrap items-center gap-2"><LoginKlienta login={r.kupujacyLogin} />
+                <PrzyciskHistorii rodzaj="sprawa" id={r.id} tutaj="tą reklamacją" /></span>
+            : "—"}</Wiersz>
           <Wiersz etykieta="Zgłoszono">{czas(r.otwartoAt)}</Wiersz>
           {/* Statusu Allegro tu NIE MA i to nie jest przeoczenie: stoi
               znacznikiem w głowicy. Dwa miejsca na jedną wartość to dwa

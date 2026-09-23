@@ -2,7 +2,7 @@ import React from "react";
 import { ExternalLink, MessageSquare, MessagesSquare, Scale, Tractor, Undo2, UserRound }
   from "lucide-react";
 import { Link } from "react-router-dom";
-import type { MaszynaKlienta, WpisHistorii } from "../api/typy";
+import type { HistoriaKlienta, MaszynaKlienta, WpisHistorii } from "../api/typy";
 import { useHistoriaKlienta } from "../api/rozmowy";
 import { czas, LoginKlienta, NaglowekSekcji, Pusto } from "../ui";
 
@@ -44,7 +44,22 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
     </p>;
   }
 
-  const { login, maszyny, wpisy } = h.data;
+  return <WidokHistorii historia={{ ...h.data, login: h.data.login }} tutaj="tą rozmową"
+    onOtworzRozmowe={onOtworzRozmowe} />;
+}
+
+/**
+ * Sama historia, bez pobierania — rysuje ją zakładka KLIENT w skrzynce i szuflada
+ * historii przy zwrocie, reklamacji i dyskusji (23 września 2026). Jeden widok
+ * na cztery wejścia: agent czyta klienta tak samo, skądkolwiek przyszedł.
+ */
+export function WidokHistorii({ historia, tutaj, onOtworzRozmowe }: {
+  historia: HistoriaKlienta & { login: string };
+  /** „tą rozmową", „tym zwrotem" — o czym mówi pusta oś. */
+  tutaj: string;
+  onOtworzRozmowe: (id: number) => void;
+}) {
+  const { login, maszyny, wpisy } = historia;
 
   return <div className="p-3" aria-label="Historia klienta">
     <NaglowekSekcji jako="p">Historia u nas</NaglowekSekcji>
@@ -65,7 +80,7 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
         ? <p className="text-xs text-slate-500">
             {maszyny.length === 0
               ? "Pierwszy kontakt — nie mamy u tego klienta ani zakupu, ani wcześniejszej rozmowy."
-              : "Poza tą rozmową nie mamy u tego klienta nic więcej."}
+              : `Poza ${tutaj} nie mamy u tego klienta nic więcej.`}
           </p>
         : <ul className="space-y-1">
             {wpisy.map((w, i) => <Wpis key={`${w.rodzaj}-${w.sprawaId ?? w.zamowienieId ?? w.rozmowaId}-${i}`}

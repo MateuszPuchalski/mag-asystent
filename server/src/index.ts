@@ -39,6 +39,7 @@ import { tagiRoutes } from "./routes/tagi.js";
 import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { wiedzaRoutes } from "./routes/wiedza.js";
 import { koszeRoutes } from "./routes/kosze.js";
+import { spoiwoRoutes } from "./routes/spoiwo.js";
 import {
   bladImportuFaktur,
   brakKolumnyNrOryg,
@@ -406,6 +407,7 @@ export async function buildApp() {
   await app.register(lokalizacjeMasoweRoutes);
   await app.register(dostawcyRoutes);
   await app.register(koszeRoutes);
+  await app.register(spoiwoRoutes);
   await app.register(kartonRoutes);
   await app.register(allegroRoutes);
   await app.register(zadaniaTerenoweRoutes);
