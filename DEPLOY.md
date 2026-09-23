@@ -2582,6 +2582,17 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.472.0 — użyteczność: jedna lista, Ctrl+K, historia klienta
+
+**Panel trzeba przebudować, a serwer zrestartować.** Bez migracji — nowe trasy
+są odczytami.
+
+Sprawdzenie: górny rząd nie ma już zakładek „Moje” i „Wzmianki”; obie są
+sekcjami ekranu „Do zrobienia”. Ctrl+K otwiera szukanie; wpisz numer
+zamówienia z ostatniego tygodnia i sprawdź, że przy wyniku stoi powód
+trafienia. `?` poza polem tekstowym otwiera listę skrótów. Analiza → Użycie
+pokazuje czynności bez użycia z ostatnich 30 dni.
+
 ### Aktualizacja do 0.470.0 — wykaz części producenta
 
 **Panel trzeba przebudować, a serwer zrestartować.** Tabela `import_wykazu`

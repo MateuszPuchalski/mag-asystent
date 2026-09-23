@@ -4,6 +4,7 @@ import type { Dyskusja, SzczegolDyskusji, Tag } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
+import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
 import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
 
 /* ── Kolumna faktów o dyskusji ───────────────────────────────────────────────
@@ -127,7 +128,9 @@ export function Fakty({
     <Sekcja tytul="Sprawa">
       <Wiersz etykieta="Temat">{d.temat ?? "bez tematu"}</Wiersz>
       <Wiersz etykieta="Kupujący">{d.kupujacyLogin
-        ? <LoginKlienta login={d.kupujacyLogin} /> : "—"}</Wiersz>
+        ? <span className="inline-flex flex-wrap items-center gap-2"><LoginKlienta login={d.kupujacyLogin} />
+            <PrzyciskHistorii rodzaj="sprawa" id={d.id} tutaj="tą dyskusją" /></span>
+        : "—"}</Wiersz>
       <Wiersz etykieta="Otwarto">{czas(d.otwartoAt)}</Wiersz>
     </Sekcja>
 

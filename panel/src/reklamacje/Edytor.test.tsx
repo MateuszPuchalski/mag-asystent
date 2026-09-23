@@ -117,4 +117,15 @@ describe("Edytor reklamacji bez szablonów", () => {
       onZmiana={vi.fn()} onWyslij={vi.fn()} />);
     expect(screen.queryByRole("button", { name: /Szablony/ })).not.toBeInTheDocument();
   });
+  it("Ctrl+Enter wysyła jak przycisk — i jak on milczy przy pustej treści (23 września 2026)", async () => {
+    const pelny = props({ tresc: "Dobrze" });
+    const { rerender } = render(<Edytor {...pelny} />);
+    screen.getByLabelText("Odpowiedź w sprawie").focus();
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    expect(pelny.onWyslij).toHaveBeenCalledTimes(1);
+    const pusty = props({ tresc: "  " });
+    rerender(<Edytor {...pusty} />);
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    expect(pusty.onWyslij).not.toHaveBeenCalled();
+  });
 });

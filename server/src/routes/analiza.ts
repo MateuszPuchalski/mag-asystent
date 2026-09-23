@@ -6,6 +6,7 @@ import { wierszCsv, zbudujCsv } from "../services/csv.js";
 import { logEvent } from "../services/events.js";
 import { sesjaZadania } from "../context.js";
 import { czasOdpowiedzi } from "../services/czas-odpowiedzi.js";
+import { raportUzycia } from "../services/uzycie.js";
 
 /* ── Analiza śladu audytowego dla biura ──────────────────────────────────────
    Jedna trasa z kompletem sekcji (zakładka ANALIZA robi jeden fetch) + CSV.
@@ -94,6 +95,19 @@ export async function analizaRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return czasOdpowiedzi(dniZQuery(req.query.days), mozeWidziecLudzi());
+  });
+
+  /* Czego nikt nie używa (23 września 2026) — raport z dziennika zdarzeń,
+     bez ludzi: liczy CZYNNOŚCI, nie osoby, więc bramka biura wystarcza.
+     Odczyt niczego nie zapisuje. Powód i granice przy `services/uzycie.ts`. */
+  app.get<{ Querystring: { days?: string } }>("/api/analiza/uzycie", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    /* Domyślnie MIESIĄC, nie tydzień jak ślad audytowy: funkcja nieużyta przez
+       tydzień bywa po prostu rzadka — zwrot za pobraniem zdarza się raz na
+       kilkanaście dni. Trzydzieści dni to próg z pytania właściciela. */
+    const n = Number(req.query.days);
+    return raportUzycia(n === 7 || n === 90 ? n : 30);
   });
 
   app.get<{ Querystring: { days?: string } }>("/api/analiza/csv", async (req, reply) => {

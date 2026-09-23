@@ -157,6 +157,25 @@ export function useCzasOdpowiedzi(dni: number, wlaczona: boolean) {
   });
 }
 
+/* ── Użycie (`services/uzycie.ts`, 23 września 2026) ────────────────────── */
+
+export interface WpisUzycia { typ: string; ile: number; ostatnio: string | null }
+
+export interface RaportUzycia {
+  dni: number;
+  obszary: Array<{ obszar: string; nieuzywane: WpisUzycia[]; uzywane: WpisUzycia[] }>;
+  spozaRejestru: WpisUzycia[];
+}
+
+export function useUzycie(dni: number, wlaczona: boolean) {
+  return useQuery({
+    queryKey: ["analiza", "uzycie", dni],
+    queryFn: () => api<RaportUzycia>(`/api/analiza/uzycie?days=${dni}`),
+    enabled: wlaczona,
+    placeholderData: (poprzednie) => poprzednie,
+  });
+}
+
 /* ── Metryki (`services/raporty.ts` `metrics`) ─────────────────────────────── */
 
 export interface Metryki {
