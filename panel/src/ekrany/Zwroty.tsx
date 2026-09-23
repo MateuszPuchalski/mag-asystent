@@ -23,6 +23,7 @@ import { Naglowek } from "../zwroty/Naglowek";
 import { Etapy, IKONA_KUBELKA } from "../zwroty/Etapy";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
+import { polecanyKandydat } from "../zwroty/Dokument";
 import { Szukanie } from "../zwroty/Szukanie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { Koszyk } from "../zwroty/Koszyk";
@@ -59,8 +60,8 @@ const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, string]>>
   decyzja: [["P", "przyjmij"], ["S", "przyjmij i na stan"], ["U", "przyjmij i utylizacja"],
     ["O", "odrzuć"]],
   ocena: [["S", "na stan"], ["U", "utylizacja"], ["O", "na outlet"],
-    ["Shift+S", "wszystkie na stan"]],
-  zwrot: [["Enter", "zapisz kwotę"]],
+    ["Shift+S", "wszystkie na stan"], ["-", "wróciło mniej"]],
+  zwrot: [["Enter", "zapisz kwotę"], ["D", "potrącenie"], ["-", "wróciło mniej"]],
   korekta: [["Enter", "wpisz numer korekty"]],
   zamkniety: [["R", "cofnij korektę"]],
 };
@@ -461,13 +462,22 @@ export function Zwroty() {
      przy KAŻDYM zwrocie; `kwotaGrosze` bywa pusta do czasu decyzji, a dwie
      różne kwoty pod jedną etykietą to dokładnie blizna 0.121.0 w innym
      miejscu. */
-  const widoczne = useMemo(
-    () => posortuj(pasujace ?? wKubelku, porzadek, {
+  /* ── PACZKA W DRODZE NA KOŃCU (0.479.0) ────────────────────────────────
+     Przegląd zwrotów z 23 września: DO DECYZJI mieszało zwroty, przy których
+     jest co zrobić, z paczkami, które jeszcze nie przyszły. Porządek po
+     terminie spychał je w dół sam, ale porządek po dacie albo kwocie wplatał
+     je między pracę. Podział stoi PO sortowaniu i go nie łamie: w obu
+     częściach zostaje kolejność, którą wybrał człowiek. */
+  const widoczne = useMemo(() => {
+    const posortowane = posortuj(pasujace ?? wKubelku, porzadek, {
       otwarto: (z) => z.utworzono,
       termin: (z) => z.terminAt,
       kwota: (z) => z.sumaPozycjiGrosze,
-    }),
-    [pasujace, wKubelku, porzadek]);
+    });
+    const wDrodze = (z: Zwrot) => z.dniDoTerminu === null
+      && z.kubelek !== "zamkniety" && z.kubelek !== "odrzucony";
+    return [...posortowane.filter((z) => !wDrodze(z)), ...posortowane.filter(wDrodze)];
+  }, [pasujace, wKubelku, porzadek]);
 
   /* Trafienie otwiera zwrot od razu — po to jest ten skan. Adres jest tu
      źródłem prawdy i sam dociąga kubełek, więc zwrot otwiera się także wtedy,
@@ -535,6 +545,15 @@ export function Zwroty() {
      kolejka: liczą się z okna sześćdziesięciu dni sprzedaży, a kolejka ma
      dziesiątki wierszy. Jeden otwarty zwrot to jedno takie liczenie. */
   const szczegol = useZwrot(wybrany);
+  /* Dokument sprzedaży, który Enter w DO KOREKTY przyjmuje (0.479.0).
+     Automat ZW bez dokumentu nie ruszy (`wiazania.ts`), więc w tym kubełku
+     brak dokumentu jest PIERWSZĄ rzeczą do zrobienia — pierwszy Enter
+     przyjmuje podsuniętego kandydata, następny stawia kursor w numerze
+     korekty. Szczegół musi być TEGO zwrotu: przy przełączaniu kandydaci
+     poprzedniego stoją w pamięci podręcznej jeszcze chwilę. */
+  const polecany = zwrot?.kubelek === "korekta" && zwrot.faktura.dokId === null
+    && szczegol.data?.zwrot?.id === zwrot.id
+    ? polecanyKandydat(szczegol.data.kandydaciFaktury ?? []) : null;
 
   /* Wejście z paska adresu na zwrot z innego kubełka ma pokazać ten zwrot,
      a nie pustą listę. Adres jest tu źródłem prawdy, kubełek za nim idzie. */
@@ -673,6 +692,18 @@ export function Zwroty() {
       akcje.current.oddajPieniadze?.();
       return;
     }
+    /* WYJĄTKI Z KLAWIATURY (0.479.0): `-` otwiera „wróciło mniej", `D`
+       potrącenie. Gdzie formularza nie ma, akcja w `Pozycje.tsx` milczy. */
+    if (e.key === "-" && (zwrot.kubelek === "ocena" || zwrot.kubelek === "zwrot")) {
+      e.preventDefault();
+      akcje.current.ilosc?.();
+      return;
+    }
+    if ((e.key === "d" || e.key === "D") && zwrot.kubelek === "zwrot") {
+      e.preventDefault();
+      akcje.current.potracenie?.();
+      return;
+    }
     if (zwrot.kubelek === "decyzja") {
       if (e.key === "p" || e.key === "P") {
         e.preventDefault();
@@ -737,6 +768,12 @@ export function Zwroty() {
          stawia kursor w polu. Drugi Enter, już w polu, zapisuje numer. Do
          audytu z 15 września 2026 pasek obiecywał tu Enter, a klawisz milczał. */
       e.preventDefault();
+      if (polecany) {
+        setBladFaktury("");
+        faktura.mutate({ id: zwrot.id, dokId: polecany.dokId },
+          { onError: (err) => setBladFaktury((err as Error).message) });
+        return;
+      }
       akcje.current.korekta?.();
       return;
     }
@@ -855,7 +892,10 @@ export function Zwroty() {
              czyli byłby dokładnie tym martwym klawiszem, przeciw któremu
              powstał `SkrotyKlawiszy`. */
           dodatkowe={[
-            ...KLAWISZE_KUBELKA[zwrot?.kubelek ?? kubelek ?? "wszystkie"] ?? [],
+            /* Pasek mówi, co Enter zrobi TERAZ — przy podsuniętym dokumencie
+               przyjmie go, a nie postawi kursora w numerze korekty. */
+            ...(polecany ? [["Enter", "przyjmij dokument sprzedaży"] as const]
+              : KLAWISZE_KUBELKA[zwrot?.kubelek ?? kubelek ?? "wszystkie"] ?? []),
             ...(stanPieniedzy?.moznaZwrocic
               ? [["Z", "oddaj pieniądze"] as const] : []),
           ]} />
@@ -944,7 +984,7 @@ export function Zwroty() {
             <Naglowek zwrot={zwrot} />
             {/* Oś etapów (0.453.0): gdzie jest sprawa i co jeszcze przed nią —
                 zamiast zdań rozsianych po sekcjach. */}
-            <Etapy kubelek={zwrot.kubelek} />
+            <Etapy kubelek={zwrot.kubelek} poKorekcie={Boolean(zwrot.korektaNumer)} />
             {/* Pasek stoi NAD produktami i nie przewija się razem z nimi:
                 decyzja o całym zwrocie ma być pod ręką także wtedy, gdy
                 operator zjechał na dziewiątą pozycję. */}

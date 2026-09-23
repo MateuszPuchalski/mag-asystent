@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Sigma } from "lucide-react";
 import type { PozycjaZwrotu } from "../api/typy";
 import { Przycisk, Pole } from "../ui";
@@ -17,14 +17,21 @@ import { Przycisk, Pole } from "../ui";
    „wróciło zero" znaczy to samo co odznaczenie, a dwie drogi do tej samej
    rzeczy kosztują namysł przy każdym wierszu.                                */
 
-export function IloscZwrocona({ p, trwa, blad, onZapisz }: {
+export function IloscZwrocona({ p, trwa, blad, onZapisz, otworz = 0 }: {
   p: PozycjaZwrotu;
   trwa: boolean;
   blad: string;
   onZapisz: (ilosc: number | null) => void;
+  /**
+   * Znacznik klawisza `-` (0.479.0): każda nowa wartość otwiera pole. Liczba,
+   * nie `boolean` — drugi `-` po zamknięciu ma otworzyć pole jeszcze raz.
+   */
+  otworz?: number;
 }) {
   const [otwarte, setOtwarte] = useState(false);
   const [ile, setIle] = useState("");
+  useEffect(() => { if (otworz > 0) setOtwarte(true); }, [otworz]);
+  const zamknij = () => { setOtwarte(false); setIle(""); };
 
   const liczba = /^\d+$/.test(ile.trim()) ? Number(ile.trim()) : null;
   const zaDuzo = liczba !== null && liczba > p.ilosc;
@@ -72,11 +79,15 @@ export function IloscZwrocona({ p, trwa, blad, onZapisz }: {
     <div className="flex flex-wrap items-center gap-2">
       <Pole id={`ilosc-${p.id}`} className="w-20" value={ile} autoFocus inputMode="numeric"
         placeholder={String(p.ilosc)} onChange={(e) => setIle(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Enter" && gotowe) onZapisz(liczba); }} />
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && gotowe) onZapisz(liczba);
+          /* Escape oddaje klawisze ekranowi — pole otwarte klawiszem ma się
+             dać zamknąć bez myszy (0.479.0). */
+          if (e.key === "Escape") { e.preventDefault(); zamknij(); }
+        }} />
       <Przycisk wariant="glowny" className="text-xs" disabled={trwa || !gotowe}
         onClick={() => onZapisz(liczba)}>Zapisz</Przycisk>
-      <Przycisk className="text-xs"
-        onClick={() => { setOtwarte(false); setIle(""); }}>Wróć</Przycisk>
+      <Przycisk className="text-xs" onClick={zamknij}>Wróć</Przycisk>
     </div>
     {/* Więcej niż zgłoszono odpada po stronie serwera; ekran mówi to WCZEŚNIEJ,
         żeby nie kosztowało kliknięcia i odmowy. */}
