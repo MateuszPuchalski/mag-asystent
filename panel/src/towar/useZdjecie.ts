@@ -90,7 +90,14 @@ const KODY_BRAKU = new Set([404, 415]);
 async function pobierz(sciezka: string): Promise<string | null> {
   let odp: Response;
   try {
-    odp = await fetch(sciezka, { headers: { "x-session": token() } });
+    /* Logo dostawcy PODMIENIA SIĘ pod tym samym adresem, a serwer daje mu
+       `max-age=86400` (kolektor pyta o nie przy każdej liście). Bez
+       `no-cache` przeglądarka oddałaby stary obraz przez dobę także innemu
+       biurku. Rewalidacja idzie ETagiem, więc niezmienione logo to 304. */
+    odp = await fetch(sciezka, {
+      headers: { "x-session": token() },
+      ...(sciezka.startsWith("/api/dostawcy/") ? { cache: "no-cache" as const } : {}),
+    });
   } catch {
     throw new Error("Serwer nie odpowiada — sprawdź połączenie z siecią firmy.");
   }
@@ -308,7 +315,26 @@ export function useZdjecieDowodu(problemId: number | null | undefined): {
  * na tysiąc w dzienniku produkcyjnym (komentarz przy `DeliveryDocument.maLogo`).
  */
 export function useLogoDostawcy(khId: number | null | undefined, maLogo: boolean): string | null | undefined {
-  return useObraz(khId == null || !maLogo ? null : `/api/dostawcy/${khId}/logo`);
+  return useObraz(khId == null || !maLogo ? null : sciezkaLogo(khId));
+}
+
+export const sciezkaLogo = (khId: number) => `/api/dostawcy/${khId}/logo`;
+
+/**
+ * Zapomina obraz pod ścieżką i każe go pobrać od nowa (0.444.0).
+ *
+ * Pamięć tego pliku trzyma obraz do przeładowania panelu — i to jest dobre
+ * dla zdjęć, które się nie zmieniają. Logo dostawcy zmienia się z ustawień
+ * i bez tego nowe logo pokazałoby się dopiero po F5, a skasowane wisiałoby
+ * w liście dostaw. Nasłuchy dostają sygnał, więc każde miejsce z tym logo
+ * zamówi je na nowo przy najbliższym renderze.
+ */
+export function zapomnijObraz(sciezka: string): void {
+  const stary = pamiec.get(sciezka);
+  if (stary) URL.revokeObjectURL(stary);
+  pamiec.delete(sciezka);
+  bledy.delete(sciezka);
+  ogloś(sciezka);
 }
 
 /** Tylko do testów — mapa i kolejka są modułowe, więc żyją między nimi. */

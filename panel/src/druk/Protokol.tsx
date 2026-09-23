@@ -3,7 +3,7 @@ import { useParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { useDokument, wyjatkiDostawy, type Wyjatek } from "../api/dostawy";
 import { useZdjecieDowodu } from "../towar/useZdjecie";
-import { firma } from "./firma";
+import { useFirmaDruku } from "./firma";
 import { STYL_ANEKSU, protokol } from "./szablony";
 
 /* ── Druk protokołu dla dostawcy (0.435.0) ─────────────────────────────────
@@ -38,9 +38,10 @@ export function Protokol() {
     enabled: deliveryId != null,
   });
 
-  const druk = dok.data && wyjatki.data
+  const firma = useFirmaDruku();
+  const druk = dok.data && wyjatki.data && firma
     ? protokol({ nrPelny: dok.data.nrPelny, dostawca: dok.data.dostawca, dataWyst: dok.data.dataWyst },
-        wyjatki.data.problems, firma())
+        wyjatki.data.problems, firma)
     : null;
   useEffect(() => { if (druk) document.title = druk.tytul; }, [druk?.tytul]);
 

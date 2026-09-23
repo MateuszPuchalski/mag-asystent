@@ -19,6 +19,7 @@ import {
 import { podgladDokumentu } from "../services/podglad-dostawy.js";
 import { archiwumDostaw } from "../services/archiwum-dostaw.js";
 import { doDecyzji } from "../services/do-decyzji.js";
+import { BladFirmy, daneFirmy, zapiszDaneFirmy, type PoleFirmy } from "../services/firma.js";
 
 /* ── Podgląd biura — jedna strona pod /biuro ─────────────────────────────────
    Wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał, którym biuro widziało
@@ -293,6 +294,36 @@ export async function biuroRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "Decyzje biura podejmuje biuro" });
     }
     return doDecyzji();
+  });
+
+  /* ── Dane firmy na wydrukach (0.444.0) ─────────────────────────────────
+     Przeszły z localStorage przeglądarki na serwer: jedna firma, jedna kopia.
+     Bramka lekka, jak reguły strefy — to zapis konfiguracji, który ludzie
+     drukujący protokoły robią kilka razy w roku, a nie orzeczenie o pracy,
+     więc bez `autoryzuj()` i wpisu `privileged`. Ślad `firma_zapis` pisze
+     serwis. Magazynier nie drukuje protokołów i nie ma tu czego zmieniać. */
+  function odmowaFirmy(): { kod: number; error: string } | null {
+    const s = sesjaZadania();
+    if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
+    if (!ORZEKAJACY.includes(s.user.role)) return { kod: 403, error: "Dane firmy prowadzi biuro" };
+    return null;
+  }
+
+  app.get("/api/biuro/firma", async (_req, reply) => {
+    const nie = odmowaFirmy();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return daneFirmy();
+  });
+
+  app.put<{ Body: Partial<Record<PoleFirmy, unknown>> }>("/api/biuro/firma", async (req, reply) => {
+    const nie = odmowaFirmy();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    try {
+      return zapiszDaneFirmy(req.body ?? {}, sesjaZadania()?.user.name ?? "?");
+    } catch (e) {
+      if (e instanceof BladFirmy) return reply.code(400).send({ error: e.message });
+      throw e;
+    }
   });
 
   app.get("/api/biuro/notatki/odpowiedzi", async (_req, reply) => {

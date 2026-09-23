@@ -1515,6 +1515,26 @@ CREATE TABLE IF NOT EXISTS strefa_regula (
   poziomy  TEXT NOT NULL            -- CSV numerów poziomów, np. '2,3,4'
 );
 
+-- ── Dane firmy na wydrukach (0.444.0) ─────────────────────────────────────
+-- Nagłówek protokołu rozbieżności: nazwa, NIP, adres, osoba do kontaktu.
+-- Do tej wersji leżały w localStorage przeglądarki (`wertis.firma`), więc
+-- każde biurko miało własną kopię, a nowe biurko drukowało protokół bez
+-- nagłówka — i nikt tego nie widział przed wysyłką do dostawcy. Jeden wiersz,
+-- bo firma jest jedna; CHECK robi z tego regułę, nie zwyczaj (jak przy
+-- `allegro_token`). To dane SPRZEDAWCY, nie kupującego: reguła prywatności
+-- z CLAUDE.md dotyczy adresu klienta i tu nie sięga.
+CREATE TABLE IF NOT EXISTS firma (
+  id              INTEGER PRIMARY KEY CHECK (id = 1),
+  nazwa           TEXT NOT NULL DEFAULT '',
+  nip             TEXT NOT NULL DEFAULT '',
+  adres           TEXT NOT NULL DEFAULT '',
+  miejscowosc     TEXT NOT NULL DEFAULT '',
+  osoba           TEXT NOT NULL DEFAULT '',
+  telefon         TEXT NOT NULL DEFAULT '',
+  zmieniono_at    TEXT NOT NULL,
+  zmieniono_przez TEXT NOT NULL
+);
+
 -- ── Obsługa klienta: skasowana w 0.140.0 ───────────────────────────────────
 -- Stały tu rejestry pytań, dyskusji, opinii i zwrotów Allegro plus nakładka
 -- spraw. Wszystkie zniknęły razem z kodem, który je czytał: model danych stał

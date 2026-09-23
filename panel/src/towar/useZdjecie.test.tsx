@@ -2,12 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, waitFor } from "@testing-library/react";
 import React from "react";
 import { Zdjecie } from "./Zdjecie";
-import { _wyczyscPamiecZdjec, useZdjecieZalacznika, useZdjecieZalacznikaReklamacji } from "./useZdjecie";
+import {
+  _wyczyscPamiecZdjec, sciezkaLogo, useLogoDostawcy, useZdjecieZalacznika, useZdjecieZalacznikaReklamacji, zapomnijObraz,
+} from "./useZdjecie";
 
 /* Trzy lekcje z `biuro.html`, każda kupiona tam osobno. Ten plik pilnuje, żeby
    panel obsługi nie kupił ich drugi raz. */
 
-let odpowiedzi: Array<{ url: string; rozwiaz: (ok: boolean, status?: number, tresc?: unknown) => void }> = [];
+let odpowiedzi: Array<{ url: string; init?: RequestInit; rozwiaz: (ok: boolean, status?: number, tresc?: unknown) => void }> = [];
 
 beforeEach(() => {
   _wyczyscPamiecZdjec();
@@ -15,9 +17,9 @@ beforeEach(() => {
   localStorage.setItem("wertis-panel-token", "t");
   /* URL.createObjectURL nie istnieje w jsdom. */
   (URL as any).createObjectURL = (b: Blob) => `blob:${(b as any).__id ?? "x"}`;
-  vi.stubGlobal("fetch", (url: string) => new Promise((resolve) => {
+  vi.stubGlobal("fetch", (url: string, init?: RequestInit) => new Promise((resolve) => {
     odpowiedzi.push({
-      url,
+      url, init,
       /* Atrapa mówi PRAWDĘ o kodzie: `ok:false` bez statusu było do tego
          wydania „jakąś porażką", a hak od dziś rozróżnia 404 od 503. */
       rozwiaz: (ok, status = ok ? 200 : 404, tresc = {}) => resolve({
@@ -201,5 +203,37 @@ describe("Załącznik reklamacji — zdanie i ponowienie", () => {
     render(<ZalacznikReklamacji id={null} />);
     await new Promise((r) => setTimeout(r, 20));
     expect(odpowiedzi).toHaveLength(0);
+  });
+});
+
+/* ── Logo podmienione z ustawień (0.444.0) ─────────────────────────────────
+   Pamięć trzyma obraz do przeładowania panelu, a serwer daje logo `max-age`
+   na dobę. Bez tych dwóch rzeczy nowe logo pokazałoby się po F5, a w drugiej
+   przeglądarce — po dobie. */
+function Logo({ khId }: { khId: number }) {
+  const url = useLogoDostawcy(khId, true);
+  return url ? <img alt="logo" src={url} /> : <span>bez logo</span>;
+}
+
+describe("Logo dostawcy", () => {
+  it("pyta z rewalidacją, a `zapomnijObraz` każe pobrać je od nowa", async () => {
+    const zwolnione: string[] = [];
+    (URL as any).revokeObjectURL = (u: string) => zwolnione.push(u);
+    render(<Logo khId={5} />);
+    await waitFor(() => expect(odpowiedzi).toHaveLength(1));
+    expect(odpowiedzi[0].init?.cache).toBe("no-cache");
+    odpowiedzi[0].rozwiaz(true);
+    await waitFor(() => expect(screen.getByRole("img")).toHaveAttribute("src", "blob:/api/dostawcy/5/logo"));
+
+    zapomnijObraz(sciezkaLogo(5));
+    await waitFor(() => expect(odpowiedzi).toHaveLength(2));
+    expect(zwolnione).toEqual(["blob:/api/dostawcy/5/logo"]);
+    expect(odpowiedzi[1].url).toBe("/api/dostawcy/5/logo");
+  });
+
+  it("zdjęcia kartotek NIE rewalidują — nie zmieniają się pod tym samym adresem", async () => {
+    render(<Zdjecie twId={7} />);
+    await waitFor(() => expect(odpowiedzi).toHaveLength(1));
+    expect(odpowiedzi[0].init?.cache).toBeUndefined();
   });
 });

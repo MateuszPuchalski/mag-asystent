@@ -34,21 +34,25 @@ import { NAZWA_DROGI } from "../skrzynka/statusy";
 
 const OKNA = [7, 30, 90];
 
+/* SELEKTOR OKNA JEST OPCJONALNY od 0.444.0. W analizie karta stoi pod
+   nagłówkiem, który ma już okno 7/30/90 dla całego zakresu „Obsługa
+   klienta" — drugi selektor obok pierwszego to dwie decyzje o tym samym
+   (dekalog pkt 5). Bez `onDni` karta pokazuje okno, które dostała. */
 export function SkutecznoscDoboru({ dane, dni, onDni }: {
-  dane: Raport | undefined; dni: number; onDni: (d: number) => void;
+  dane: Raport | undefined; dni: number; onDni?: (d: number) => void;
 }) {
   if (!dane) return null;
   const zeroDrog = dane.drogi.filter((d) => d.wybranych === 0);
   return <Karta className="overflow-hidden">
     <header className="flex flex-wrap items-baseline gap-2 border-b p-4">
       <b className="text-naglowek mr-auto">Skuteczność doboru — którędy przychodzi odpowiedź</b>
-      <div className="flex gap-1" role="group" aria-label="Okno raportu">
+      {onDni ? <div className="flex gap-1" role="group" aria-label="Okno raportu">
         {OKNA.map((d) => <button key={d} type="button" onClick={() => onDni(d)}
           aria-pressed={d === dni}
           className={`rounded px-2 py-0.5 text-xs ${d === dni
             ? "bg-slate-200 font-semibold text-slate-900" : "text-slate-500 hover:text-slate-800"}`}>
           {d} dni</button>)}
-      </div>
+      </div> : <span className="text-sm text-slate-600">okno {dni} dni</span>}
     </header>
 
     <div className="flex flex-wrap gap-8 p-4">

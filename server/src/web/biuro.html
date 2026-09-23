@@ -200,132 +200,13 @@
     grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--kol)), 1fr));
   }
   .widok > * { min-width: 0; }
+  /* Od 0.444.0 w widoku stoi JEDNA karta drogowskazu. Rozciągnięta przez
+     `auto-fit` na cały monitor miała przycisk przy lewej krawędzi i metr
+     pustej bieli po prawej — jedna kolumna miary `--kol` czyta się jak list. */
+  #panel .widok { grid-template-columns: minmax(0, var(--kol)); }
 
-  /* ── USTAWIENIA: jedna tafla, nie pięć kartek ──────────────────────────────
-     Trzecie zgłoszenie tej samej treści od właściciela: „pozbądź się zaokrągleń
-     i niepotrzebnych marginesów". Dwa pierwsze (0.112.0 konsola spraw, 0.116.0
-     cała zakładka SPRAWY) zostawiły regułę: KONSOLA PRACY TO TAFLE,
-     POWIERZCHNIA DO CZYTANIA TO KARTY. Ustawienia były ostatnią zakładką,
-     która jej nie przeszła.
 
-     Ustawienia nie są ani jednym, ani drugim — to KOMPLET rzeczy ustawianych
-     raz. Pięć kartek z cieniem, rozrzuconych przez `auto-fit` na dwie kolumny
-     różnej wysokości, czytało się jak pięć niezależnych dokumentów. Jest to
-     jeden arkusz, więc dostaje wygląd arkusza: jedna kolumna, sekcje stykają
-     się kreską.
 
-     Promień zdejmujemy WYŁĄCZNIE tutaj. `.card` jest jedną klasą na cały
-     panel, więc globalne `border-radius: 0` skasowałoby różnicę między
-     stanowiskiem pracy a zestawieniem do czytania — pilnuje tego test
-     „konsola to tafle, a powierzchnia do czytania zostaje kartą". */
-  #widokDostawcy {
-    grid-template-columns: 1fr;
-    gap: 0;
-    /* Sekcje to FORMULARZE — sześć pól firmy i dwa pola tekstowe. Rozciągnięte
-       na 2560 px zostawiają metr pustego papieru po prawej, a pole promptu
-       robi się nie do redagowania. Tabele (konta, dostawcy, reguły) mieszczą
-       się w tej mierze z zapasem. */
-    max-width: 60rem;
-    background: var(--card);
-    border: 1px solid var(--card-border);
-  }
-  /* Sam `gap: 0` nie wystarczy: zostawiłby stykające się zaokrąglone rogi
-     i cienie wchodzące jeden na drugi. Ta sama uwaga, co przy konsoli. */
-  #widokDostawcy > .card {
-    border-radius: 0; box-shadow: none;
-    border-left: 0; border-right: 0; border-bottom: 0;
-    border-top: 1px solid var(--border);
-  }
-  #widokDostawcy > .card:first-child { border-top: 0; }
-  /* Ślad po kliknięciu kafla w pasku stanu musi przeżyć spłaszczenie:
-     `.card.wskazana` maluje obwódkę cieniem, a `box-shadow: none` wyżej
-     wygrywa z nią specyficznością identyfikatora. Na tafli to i tak jest
-     belka przy krawędzi, nie obwódka — dokładnie jak `tr.aktywny`. */
-  #widokDostawcy > .card.wskazana { box-shadow: inset 3px 0 0 var(--amber); }
-
-  /* ── Rytm pionowy JEDNĄ regułą ─────────────────────────────────────────────
-     Widok niósł osiemnaście atrybutów `style` na 135 wierszach, w tym osiem
-     marginesów dobranych z palca: 4, 6, 8, 10 i 14 px. Żaden nie wynikał
-     z reguły — każdy z osobnego przymiarkowania przy dopisywaniu sekcji.
-     Jedna liczba w arkuszu zastępuje wszystkie i następna sekcja dostaje
-     ten sam odstęp bez pamiętania o nim. */
-  #widokDostawcy > .card > * + * { margin-top: 8px; }
-  /* Rząd pól kończy sekcję, więc jego własny dolny odstęp dokładałby się do
-     dopełnienia karty. */
-  #widokDostawcy .filtry { margin-bottom: 0; }
-  /* Wiersz wyniku (zapis reguł, zapis logo, stan konfiguracji pytań) jest
-     pusty do pierwszej akcji. Bez tego zabierałby odstęp za zdanie, którego
-     jeszcze nie ma — czyli dokładnie taki margines, jak te zdejmowane. */
-  #widokDostawcy > .card > p:empty { display: none; }
-  /* `.objasnienie` nie ma reguły w arkuszu wcale — odstępy niosło mu
-     siedemnaście powtórzonych atrybutów w HTML. Reguła stoi na razie pod
-     identyfikatorem, bo pozostałe dwanaście bloków w panelu wciąż ma swoje
-     marginesy w znaczniku i globalna zdublowałaby im odstęp. */
-  #widokDostawcy .objasnienie { display: grid; gap: 8px; margin-bottom: 8px; }
-  /* Etykieta pola = podpis sekcji, jak w `.filtry`. Bez tej reguły dwie
-     etykiety nad polami tekstowymi stały zwykłym tekstem 14 px i wyglądały
-     na treść, a nie na podpis. */
-  #widokDostawcy label { display: block; font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); }
-  /* Pole na całą szerokość sekcji. Miary do czytania NIE dokładamy drugi raz:
-     `max-width` arkusza trzyma już cały widok na 60 rem, a druga granica
-     zostawiała po prawej stronie pola pas pustej sekcji — wyglądało to na
-     pole, którego nie dociągnięto, a nie na pole odmierzone. */
-  #widokDostawcy textarea { width: 100%; }
-
-  /* Wybór, które obecne adresy zdjąć przy imporcie z arkusza (0.139.0).
-     Kody stoją JEDEN POD DRUGIM, nie w rzędzie: przy kilku adresach rząd
-     rozpychał kolumnę tabeli szerzej niż reszta wiersza. */
-
-  /* Karta na cały rząd. `1 / -1` celuje w koniec siatki JAWNEJ, więc przy
-     jednej kolumnie znaczy „ta jedna", a przy trzech „wszystkie trzy" — jest
-     bezpieczne w każdej szerokości i nie potrzebuje żadnego zapytania.
-
-     Klasy „na dwie kolumny" tu NIE MA świadomie. `span 2` w siatce
-     jednokolumnowej tworzy niejawną drugą kolumnę i wypycha treść poza ekran,
-     a przy trzech kolumnach zostawia trzecią pustą, bo karty rozpięte na dwie
-     nie mają się z czym sparować. Szerokość karty niesie `--kol`, nie wyjątki. */
-  .widok > .pelna { grid-column: 1 / -1; }
-
-  .prowadzi { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
-              font: 700 11.5px/1.4 var(--font-sans); color: var(--amber-ink); }
-  .prowadzi i { width: 6px; height: 6px; border-radius: 999px; background: var(--amber);
-                flex: none; }
-  /* ── Stan jako kropka i słowo ───────────────────────────────────────────────
-     Wypełniona pigułka krzyczy, a stan zwykły nie ma czego krzyczeć: pięć
-     pigułek w wierszu przestaje być sygnałem i robi się tapetą. Kropka niesie
-     ten sam kolor przy jednej dziesiątej powierzchni. WYPEŁNIONA PIGUŁKA
-     ZOSTAJE DLA WYJĄTKÓW — „poza ofertą", „po terminie" — i dopiero wtedy
-     znów coś znaczy. */
-  .stan { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-  .stan i {
-    width: 7px; height: 7px; border-radius: 999px; background: var(--ink-mute);
-    flex: none;
-  }
-  .stan.zrobione i { background: var(--ok); }
-
-  /* ── Zakładki wglądu: jedna strefa i pasek filtrów ──────────────────────────
-     STAN SYSTEMU, DZIENNIK i ANALIZA nie mają kolejki — nie ma tu spraw do
-     wzięcia, jest jedna powierzchnia do czytania. Do 0.94.0 wyglądały jednak
-     dokładnie jak zakładki pracy: ten sam stos białych kart na tej samej
-     siatce. Dwie rzeczy to psuły.
-
-     PIERWSZA: karty w jednym rzędzie siatki ROZCIĄGAJĄ SIĘ do wysokości
-     najwyższej sąsiadki. Karta REKONCYLIACJA to jeden przycisk, a stała obok
-     kolejki na kilkanaście wierszy — i miała pod tym przyciskiem trzysta
-     pikseli pustej bieli. To wygląda na usterkę, nie na układ. `start`
-     zdejmuje rozciąganie: karta jest tak wysoka, jak jej treść.
-
-     DRUGA: nagłówek karty to 10 px wersalikami. Na zakładce pracy to stopień
-     słuszny, bo PODPISUJE sprawę stojącą obok i ma z nią nie konkurować.
-     Tutaj sprawy nie ma — bloki SĄ treścią, więc ich tytuły muszą być
-     tytułami. Selektor bierze wyłącznie nagłówek będący bezpośrednim
-     dzieckiem karty; podnagłówki w środku (ETYKIETY DO PRZEDRUKU, OPERACJE
-     PER DZIEŃ) siedzą głębiej i zostają ciche. */
-  .widok.wglad { align-items: start; }
-  .widok.wglad section.card > h2 {
-    font: 700 20px/1.25 var(--font-cond); letter-spacing: .3px;
-    color: var(--ink); margin-bottom: 11px;
-  }
 
   /* Karta = cardSurface: biel, promień 14, cienka ramka POD cieniem. */
   .card { background: var(--card); border: 1px solid var(--card-border); border-radius: 14px; padding: 12px 14px; box-shadow: var(--cien); }
@@ -346,67 +227,8 @@
      klasy są drugą połową tej samej zmiany. */
   .temat { font: 700 20px/1.25 var(--font-cond); letter-spacing: .3px; color: var(--ink); }
 
-  /* ── Objaśnienie za ikoną (0.86.0) ─────────────────────────────────────────
-     Prawie każda karta miała pod nagłówkiem akapit tłumaczący, co ta karta
-     robi. Tekst czyta się RAZ, a pion zabierał na okrągło — na laptopie suma
-     tych akapitów spychała pracę pod krawędź ekranu.
 
-     Kasowanie ich byłoby stratą: niosą wiedzę, której nie ma nigdzie indziej,
-     a nowa osoba przy biurku dostaje ją właśnie stąd. Więc tekst zostaje,
-     tylko schodzi o jedno kliknięcie niżej.
 
-     Stanu NIE pamiętamy świadomie. Objaśnienie otwiera się, gdy ktoś go
-     potrzebuje, i znika przy następnym wejściu — inaczej jedno kliknięcie
-     z ciekawości zostawiałoby akapit na ekranie na zawsze. */
-  h2 .info {
-    display: inline-grid; place-items: center; width: 16px; height: 16px; padding: 0;
-    margin-left: 4px; vertical-align: -3px; border: 1px solid var(--border);
-    border-radius: 999px; background: none; color: var(--ink-mute); cursor: pointer;
-    font: 700 10px/1 var(--font-sans); text-transform: none;
-  }
-  h2 .info:hover { border-color: var(--amber); color: var(--amber-ink); }
-  h2 .info[aria-expanded="true"] { border-color: var(--amber); color: var(--amber-ink); background: var(--amber-bg); }
-
-  table { width: 100%; border-collapse: collapse; }
-
-  /* ── Ramka tabeli ──────────────────────────────────────────────────────────
-     Poziomo ZAWSZE: tabela o ośmiu kolumnach nie ma jak zmieścić się w kolumnie
-     siatki i bez własnego przewijania rozsadziłaby kartę.
-
-     Pionowo tylko tam, gdzie lista bywa długa. Bez tego jedna dostawa na
-     siedemdziesiąt pozycji wypycha WSZYSTKO poniżej poza ekran — czyli robi
-     dokładnie to, przed czym cała ta przebudowa ma bronić. */
-  .tabelaBox { overflow-x: auto; overscroll-behavior-x: contain; max-width: 100%; }
-  .tabelaBox.wysoka { max-height: min(52vh, 34rem); overflow-y: auto; }
-  /* Nagłówek przyklejony TYLKO w pudle z własnym przewijaniem pionowym —
-     inaczej przykleiłby się do okna i przejechał przez sąsiednie karty.
-     Selektor celuje w `tr:first-child th`, a NIE w `thead th`, bo strona
-     nigdzie nie emituje `<thead>`: nagłówki to zwykłe `<tr><th>` wstawiane
-     przez `innerHTML`, więc parser wkłada je do niejawnego `<tbody>`. */
-  .tabelaBox.wysoka tr:first-child th {
-    position: sticky; top: 0; z-index: 1; background: var(--card);
-    /* `border-collapse: collapse` oddaje obramowanie tabeli, nie komórce,
-       więc kreska odjeżdża razem z wierszem. Cień zostaje na miejscu. */
-    border-bottom: 0; box-shadow: inset 0 -2px 0 var(--border);
-  }
-  th { text-align: left; font: 600 11px var(--font-sans); letter-spacing: 1px; color: var(--ink-mute); padding: 5px 8px; border-bottom: 2px solid var(--border); }
-  /* 6 px zamiast 9 — przy dwudziestu wierszach to 120 px, czyli różnica
-     między „lista mieści się w oknie" a „lista wypycha wszystko pod ekran".
-     Numery przesyłek i EAN-y nie mają spacji, więc `overflow-wrap` broni
-     kolumny przed jednym długim ciągiem ustawiającym jej szerokość. */
-  /* `break-word`, a nie `anywhere`: to drugie łamie także tam, gdzie miejsce
-     jeszcze jest, i robiło z „FZ 9007/08/2026" dwa wiersze. Łamiemy dopiero
-     wtedy, gdy pojedynczy wyraz sam nie mieści się w kolumnie. */
-  td { padding: 6px 8px; border-bottom: 1px solid var(--border); vertical-align: top; overflow-wrap: break-word; }
-  tr:last-child td { border-bottom: none; }
-  /* wiersz-wejście (klikalny) mówi to najazdem, jak dotknięcie na kolektorze */
-  tr[data-dok]:hover td, tr[data-zwrot]:hover td { background: var(--paper); }
-  /* Wiersz, którego szczegół stoi obok listy (tryb szeroki od 0.83.0). */
-  tr.aktywny td { background: var(--amber-bg); box-shadow: inset 3px 0 0 var(--amber); }
-
-  /* Wyróżnienia liczbowe i identyfikatory — kondensat, jak tytuły wierszy
-     na kolektorze (symbol 17sp BarlowCond Bold). */
-  .b { font: 700 15px/1.35 var(--font-cond); letter-spacing: .2px; }
   .mute { color: var(--ink-mute); font-size: 12px; }
   /* Karta rozciągnięta na 700 px daje 140 znaków w wierszu, a to pogorszenie
      czytelności, nie korzyść z szerokiego ekranu. Akapity objaśniające mają
@@ -420,14 +242,7 @@
      master–detail łamała się regularnie. Wąska kolumna ma przewijać tabelę,
      nie rozrywać etykiety. */
   .badge { display: inline-block; white-space: nowrap; border-radius: 999px; padding: 2px 10px; font: 700 11px/1.5 var(--font-cond); letter-spacing: .6px; text-transform: uppercase; }
-  .badge.ok { background: var(--ok-bg); color: var(--ok); }
   .badge.amber { background: var(--amber-bg); color: var(--amber-ink); }
-  .badge.err { background: var(--err-bg); color: var(--err); }
-  .badge.mute2 { background: var(--secondary); color: var(--ink-soft); }
-
-  .pasek { height: 6px; background: var(--secondary); border-radius: 6px; overflow: hidden; width: 120px; }
-  .pasek i { display: block; height: 6px; background: var(--amber); }
-  .pasek.done i { background: var(--ok); }
 
   /* Przyciski = PrimaryButton / OutlineButton kolektora: akcja główna jest
      BURSZTYNOWA z grafitowym napisem (nie odwrotnie — tak odróżnia się od
@@ -441,17 +256,8 @@
   #login { max-width: 380px; margin: 80px auto; }
   #login input { width: 100%; font-size: 18px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; margin: 8px 0; font-family: inherit; }
   #login .blad { color: var(--err); font-size: 13px; min-height: 18px; }
-  .odswiezono { text-align: right; font-size: 11px; color: var(--ink-mute); }
-  input.szukaj { border: 1px solid var(--border); border-radius: 12px; padding: 8px 12px; width: 240px; margin-bottom: 10px; font-family: inherit; }
-  /* Pola wielowierszowe dziedziczą krój strony i wygląd pozostałych pól.
-     Bez tego przeglądarka daje `textarea` domyślny monospace bez ramki — a
-     redaguje się w nich ODPOWIEDZI DO KLIENTÓW, treść pytania z poczty oraz
-     prompt eksperta. Reguła istniała dotąd wyłącznie dla `dialog textarea`,
-     więc jedyne poprawnie wyglądające pole stało w oknie dialogowym. */
-  textarea { font: inherit; border: 1px solid var(--border); border-radius: 12px;
-             padding: 8px 10px; resize: vertical; }
   /* fokus pola = bursztynowa ramka WertisTextField */
-  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-bg); }
+  input:focus { outline: none; border-color: var(--amber); box-shadow: 0 0 0 2px var(--amber-bg); }
 
   /* ── Zakładki w pasku bocznym (0.125.0) ────────────────────────────────────
      Historia domu: karta pod nagłówkiem (0.74.1) → ciemny nagłówek (0.95.0)
@@ -517,47 +323,6 @@
   #stan { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
   #stan .badge { cursor: pointer; }
 
-  /* Liczba, która ma zapalić się na czerwono w zwykłym akapicie. */
-  .zle { color: var(--err); }
-
-  .filtry { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; margin-bottom: 8px; }
-
-  .filtry label { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); display: block; }
-  .filtry input, .filtry select {
-    border: 1px solid var(--border); border-radius: 12px; padding: 7px 10px; font: inherit; background: var(--card);
-  }
-  /* ── Własne okno dialogowe i toast — zamiast prompt/confirm/alert ─────────
-     Systemowe okno („Komunikat ze strony…") wygląda jak z innej aplikacji
-     i ignoruje cały język wizualny. <dialog> jest natywny (Esc, fokus,
-     przyciemnienie), więc nadal zero builda i zero zależności. */
-  /* `margin: auto` wraca jawnie — globalny reset (* { margin: 0 }) zabija
-     natywne wyśrodkowanie elementu <dialog>. */
-  dialog { margin: auto; border: 1px solid var(--card-border); border-radius: 14px; padding: 18px 20px; max-width: 440px; width: calc(100% - 40px); box-shadow: 0 10px 32px rgba(42, 42, 44, 0.25); background: var(--card); color: var(--ink); }
-  dialog::backdrop { background: rgba(42, 42, 44, 0.45); }
-  /* Reszta wyglądu przyszła regułą `textarea` wyżej — tu zostaje tylko to,
-     co dotyczy pola W DIALOGU. */
-  dialog textarea { width: 100%; margin-top: 8px; }
-  dialog .dialogAkcje { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
-  button.akcja:disabled { opacity: .45; cursor: not-allowed; box-shadow: none; }
-  button.akcja:disabled:hover { background: var(--amber); }
-  button.akcja.cichy:disabled:hover { background: var(--card); }
-  button.akcja.grozny { background: var(--err); color: #fff; }
-  button.akcja.grozny:hover { background: #9c3232; }
-  #toasty { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); display: grid; gap: 8px; z-index: 50; }
-  .toast { background: var(--ink); color: #fff; border-radius: 12px; padding: 10px 16px; font-size: 13px; box-shadow: 0 6px 20px rgba(42, 42, 44, 0.35); max-width: 520px; }
-  /* DYMEK BŁĘDU (0.427.0, dekalog pkt 6). Do tej wersji błąd znikał po 6 s
-     jak potwierdzenie zapisu — kto akurat patrzył w Subiekta, nie widział go
-     wcale. Błąd zostaje do kliknięcia i ma inną twarz niż „zapisano": biel
-     z czerwoną obwódką, bo grafit z bielą znaczy tu „wszystko poszło". */
-  .toast.blad { background: var(--card); color: var(--ink); border: 1.5px solid var(--err);
-                cursor: pointer; display: flex; gap: 12px; align-items: flex-start; }
-  .toast.blad::before { content: "BŁĄD"; font: 800 11px/1.8 var(--font-cond); letter-spacing: .6px; color: var(--err); flex: none; }
-  .toast.blad::after { content: "×"; font: 700 16px/1 var(--font-sans); color: var(--ink-mute); margin-left: auto; flex: none; }
-  /* PRZYCISK MAŁY (0.427.0). Dziewięć miejsc niosło ten sam rozmiar stylem
-     w linii, w dwóch wariantach kolejności — i już się rozjechały o piksel
-     paddingu. Klasa robi z tego jeden wymiar do zmiany w jednym miejscu. */
-  button.akcja.maly { padding: 3px 9px; font-size: 11px; border-radius: 10px; }
-  button.akcja.maly + button.akcja.maly { margin-left: 4px; }
 </style>
 </head>
 <body>
@@ -630,10 +395,12 @@
     <div id="stan"></div>
     <span class="kto" id="kto"></span>
     <div class="sesjaRzad">
-      <!-- USTAWIENIA ZA ZĘBATKĄ (0.76.0). `data-widok` wpina zębatkę w TEN SAM
-           mechanizm co pasek: jedna delegacja, jedna pętla `aria-current`. -->
-      <button id="ustawienia" class="ikona" data-widok="dostawcy"
-              title="Ustawienia" aria-label="Ustawienia" hidden>
+      <!-- USTAWIENIA ZA ZĘBATKĄ (0.76.0) PROWADZĄ DO PANELU od 0.444.0.
+           Ustawienia przeszły jako ostatni widok tej strony; zębatka zostaje
+           tam, gdzie ręka jej szuka, i jak pozycje paska jest wyjściem
+           (`data-panel`), a nie zakładką. -->
+      <button id="ustawienia" class="ikona" data-panel="/obsluga/ustawienia"
+              title="Ustawienia — w panelu biura" aria-label="Ustawienia" hidden>
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none"
              stroke="currentColor" stroke-width="2" stroke-linecap="round"
              stroke-linejoin="round" aria-hidden="true" focusable="false">
@@ -658,127 +425,25 @@
 </main>
 
 <main id="panel" hidden>
-  <!-- STAN SYSTEMU przeszedł do panelu w 0.441.0 (`/obsluga/stan`), razem
-       z kolejką zapisów, arkuszem lokalizacji, rekoncyliacją, kolizjami kodów,
-       wymianą z halą, kontem Allegro i kartą serwera. Ikony w pasku i pozycja
-       STAN SYSTEMU prowadzą tam z sesją. Na tej stronie zostały ustawienia. -->
+  <!-- ── BIURO PRZESZŁO DO PANELU (0.444.0) ──────────────────────────────
+       Ostatni widok tej strony — ustawienia za zębatką — przeszedł do panelu
+       (`/obsluga/ustawienia`). Wcześniej odeszły dostawy (0.435.0), kosze
+       (0.438.0), dziennik z analizą (0.440.0) i stan systemu (0.441.0).
 
-  <!-- DZIENNIK i ANALIZA przeszły do panelu w 0.440.0 (`/obsluga/dziennik`,
-       `/obsluga/analiza`). Pozycje w pasku zostały i prowadzą tam z sesją. -->
-
-  <!-- ── USTAWIENIA (za zębatką) ───────────────────────────────────────────
-       Do 0.85.0 stało tu jedno logo dostawców, a konfiguracja rozłaziła się
-       po zakładkach pracy: prompt eksperta na PYTANIACH, reguły strefy na
-       ANALIZIE, dane firmy w środku karty REKLAMACJE. Każda z nich zabierała
-       pion tam, gdzie liczy się rytm dnia, a otwiera się je razy kilka w roku.
-
-       Wspólne kryterium: to są rzeczy ustawiane RAZ i obowiązujące wszystkich,
-       nie sprawy do załatwienia. Kolejność wewnątrz — od najczęściej
-       dotykanej do najrzadszej.
-
-       Widok zachował id `widokDostawcy`, bo tak nazywa go zębatka i pamięć
-       ostatniego widoku w przeglądarce. Przemianowanie id kosztowałoby
-       migrację localStorage za zero zysku dla człowieka. -->
-  <div id="widokDostawcy" class="widok" hidden>
-    <!-- Zapis wymaga roli admin i mówi o tym serwer, nie przeglądarka: rola
-         nie jest tu znana, więc przycisk widzą wszyscy, a odmowę wypowiada
-         trasa. Pola stoją jawnie — w widoku ustawień nie ma czego chować. -->
-
-    <!-- Jedyna karta na tym widoku zapisywana w przeglądarce, nie na serwerze:
-         protokół reklamacyjny drukuje się z tego stanowiska i tu też stoi jego
-         nagłówek. Nazwa w tytule karty mówi o tym wprost, bo dwa biurka mają
-         dwa niezależne komplety. -->
+       Strona zostaje JEDNO wydanie jako drogowskaz, decyzją właściciela:
+       zakładka w przeglądarce i nawyk ręki prowadzą tu jeszcze przez jakiś
+       czas, a pusta strona wyglądałaby na awarię. Pasek, ikony stanu i cykl
+       30 s działają dalej, każde kliknięcie prowadzi do panelu z sesją.
+       W następnym wydaniu `/biuro` przekierowuje do `/obsluga/` sam. -->
+  <div class="widok">
     <section class="card">
-      <h2>DANE FIRMY DO FORMULARZY DOSTAWCÓW <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute">
-          Nagłówek protokołu reklamacyjnego drukowanego z karty REKLAMACJE.
-          Zapisuje się w tej przeglądarce, więc drugie biurko ma własny komplet.
-        </p>
-      </div>
-      <div class="filtry">
-        <div><label for="firmaNazwa">NAZWA FIRMY</label><input id="firmaNazwa" size="26"></div>
-        <div><label for="firmaNip">NIP</label><input id="firmaNip" size="12"></div>
-        <div><label for="firmaAdres">ADRES</label><input id="firmaAdres" size="30"></div>
-        <div><label for="firmaMiejscowosc">MIEJSCOWOŚĆ</label><input id="firmaMiejscowosc" size="14"></div>
-        <div><label for="firmaOsoba">OSOBA KONTAKTOWA</label><input id="firmaOsoba" size="18"></div>
-        <div><label for="firmaTelefon">TELEFON</label><input id="firmaTelefon" size="12"></div>
-        <div><button class="akcja" id="zapiszFirme">ZAPISZ</button></div>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>REGUŁY STREFY ZŁOTEJ <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute">
-          Które poziomy regałów są „złote" (75–140 cm — bez schylania i bez
-          drabiny). Reguła obejmuje całą alejkę <b>albo</b> zakres regałów —
-          nie oba naraz. Regał bez żadnej reguły nie dostaje adnotacji: „nie
-          wiem" to nie „nie". Zapis podmienia komplet reguł i od razu przelicza
-          kandydatów.
-        </p>
-      </div>
-      <table id="reguly"></table>
-      <div class="filtry">
-        <div><button class="akcja cichy" id="dodajRegule">+ REGUŁA</button></div>
-        <div><button class="akcja" id="zapiszStrefe">ZAPISZ REGUŁY</button></div>
-      </div>
-      <p class="mute" id="wynikStrefy"></p>
-      <p class="mute">
-        Kandydatów do przeniesienia pokazuje zakładka <b>ANALIZA</b>.
-      </p>
-    </section>
-
-    <!-- KONTA I SESJE (0.111.0). Do tej wersji reset hasła, wyłączenie konta
-         i unieważnienie sesji zgubionego kolektora żyły wyłącznie jako
-         polecenia curl w DEPLOY.md — a zakładanie kont na kolektorze.
-         Odmowę roli wypowiada serwer (konwencja ustawień): przyciski widzą
-         wszyscy, mutacje przechodzą tylko adminowi. Kont się nie kasuje —
-         historia w dzienniku musi mieć na co wskazywać. -->
-    <section class="card" id="kontaKarta">
-      <h2>KONTA I SESJE <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute">
-          Zmienia wyłącznie admin. RESET nadaje nowe hasło (osoba zmieni je
-          sobie przy kolektorze), WYŁĄCZ odbiera dostęp od zaraz — wyłączone
-          konto nie przejdzie żadną sesją. SESJE pokazują, co jest zalogowane
-          i kiedy ostatnio żyło; WYLOGUJ WSZĘDZIE tnie wszystkie sesje konta —
-          to jest przycisk na zgubiony kolektor.
-        </p>
-      </div>
-      <table id="kontaLista"></table>
-      <div id="kontaSesje"></div>
-    </section>
-
-    <section class="card">
-      <h2>LOGO DOSTAWCÓW <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute">
-          Logo pokazuje się magazynierowi po lewej stronie wiersza na liście
-          dostaw — zamiast szarego kafelka. Firmę poznaje się wtedy wzrokiem,
-          zanim przeczyta się numer dokumentu. To samo logo stoi przy dostawcy
-          w tabeli dostaw tego panelu i w nagłówku otwartego dokumentu.
-        </p>
-        <p class="mute">
-          Wybierz dowolny plik graficzny: <b>PNG, JPG, WEBP albo SVG</b>.
-          Przeglądarka zmniejszy go, obetnie przezroczysty margines i przerobi
-          na jeden format, zanim cokolwiek pojedzie na serwer. Lista poniżej
-          pokazuje dostawców z dokumentów dostaw, także tych bez logo.
-        </p>
-        <p class="mute">
-          <b>Logo wgrane przed 0.87.0 warto wgrać jeszcze raz.</b> Zapisywaliśmy
-          je wtedy w kwadracie, więc szeroki logotyp miał nad sobą i pod sobą
-          przezroczyste powietrze — i to ono, a nie logo, rosło na ekranie
-          kolektora.
-        </p>
-      </div>
-      <input type="file" id="plikLogo" accept="image/*,.svg" hidden>
-      <p class="mute" id="wynikLogo"></p>
-      <table id="dostawcy"></table>
+      <h2>BIURO PRZESZŁO DO PANELU</h2>
+      <p class="temat">Cała praca biura jest teraz w panelu.</p>
+      <p class="mute">Dostawy, kosze, stan systemu, dziennik, analiza i ustawienia —
+         wszystko pod jednym adresem, z tym samym logowaniem. Ten adres
+         w następnym wydaniu sam przekieruje do panelu.</p>
+      <p><button class="akcja" data-panel="/obsluga/">OTWÓRZ PANEL</button>
+         <button class="akcja cichy" data-panel="/obsluga/ustawienia">USTAWIENIA</button></p>
     </section>
   </div>
 </main>
@@ -789,90 +454,20 @@
    a każde zapytanie API niesie go w nagłówku `x-session` — dokładnie tak samo
    jak kolektor. Strona nie ma własnych uprawnień: widzi to, co sesja.
 
-   ZERO ZAPISU. Podgląd czyta, a operacje wykonuje się na kolektorze — łącznie
-   z ponowieniem zadania z kolejki. Ta reguła jest starsza niż zakładki i one
-   jej nie zmieniają: przycisk „PONÓW" w biurze znaczyłby zapis do Subiekta
-   wykonany przez osobę, która nie stoi przy półce.
-
-   Raport wydajności per osoba JEST na zakładce ANALIZA — od 0.48.0, decyzją
-   właściciela ODWRACAJĄCĄ wcześniejszą (do 0.47.x strona celowo go nie miała).
-   To monitoring pracowniczy w rozumieniu Kodeksu pracy: wymaga zapisu
-   w regulaminie/obwieszczeniu i uprzedzenia załogi na 2 tygodnie przed użyciem
-   kadrowym. Dlatego podstawa prawna stoi NAD tabelą, na stałe, bez zwijania —
-   a serwer wysyła ją w odpowiedzi, żeby nie dała się pominąć. */
+   OD 0.444.0 STRONA JEST DROGOWSKAZEM. Wszystkie widoki przeszły do panelu
+   (`/obsluga`), a jedynym zapisem tej strony zostało logowanie. Zostały
+   pasek z wyjściami do panelu, ikony stanu i cykl 30 s, który je zasila —
+   ktoś, kto wejdzie tu z nawyku, ma zobaczyć stan i drogę dalej, a nie
+   pustkę. Następne wydanie zastąpi stronę przekierowaniem. */
 const $ = (id) => document.getElementById(id);
 /* Pasek zakładek szuka się po KLASIE, nie po id — i tak ma zostać. Wycinek
    z `biuro.test.ts` zaczyna się od literału `<nav class="zakladki"`, więc id
    wstawione przed klasą rozjechałoby test o rzecz czysto kosmetyczną. */
 const zakladki = () => document.querySelector("nav.zakladki");
 
-/* ── Własne okna zamiast dialogów przeglądarki ────────────────────────────────
-   `prompt`/`confirm`/`alert` były świadomą oszczędnością małej strony — do
-   chwili, gdy proces zwrotów dołożył notatki i potwierdzenia w środku pracy.
-   Systemowe okno zasłania kontekst, wygląda jak z innej aplikacji i nie umie
-   wyglądać jak WERTIS. Jeden <dialog> i toast zastępują je wszystkie. */
-function otworzDialog({ tytul, opis = "", pole = false, przyklad = "", potwierdz = "ZAPISZ", grozny = false }) {
-  return new Promise((resolve) => {
-    const d = $("dialogW");
-    d.innerHTML = `
-      <h2>${esc(tytul)}</h2>
-      ${opis ? `<p class="mute">${esc(opis)}</p>` : ""}
-      ${pole ? `<textarea id="dialogPole" rows="3" placeholder="${esc(przyklad)}"></textarea>` : ""}
-      <div class="dialogAkcje">
-        <button class="akcja cichy" data-nie>ANULUJ</button>
-        <button class="akcja${grozny ? " grozny" : ""}" data-tak>${esc(potwierdz)}</button>
-      </div>`;
-    d.querySelector("[data-nie]").onclick = () => d.close("");
-    d.querySelector("[data-tak]").onclick = () => d.close("tak");
-    /* Esc = natywny cancel = returnValue "" — ta sama droga co ANULUJ. */
-    d.onclose = () => {
-      const tak = d.returnValue === "tak";
-      resolve(pole ? (tak ? d.querySelector("#dialogPole").value : null) : tak);
-    };
-    d.showModal();
-    if (pole) d.querySelector("#dialogPole").focus();
-  });
-}
-/** Pytanie z polem tekstowym → treść albo `null` przy ANULUJ/Esc. */
-const zapytaj = (o) => otworzDialog({ ...o, pole: true });
-/** Potwierdzenie → true/false. `grozny: true` barwi przycisk na czerwono. */
-const potwierdz = (o) => otworzDialog(o);
-
-/** Komunikat nieblokujący — błędy operacji, których nie pokazuje żaden panel. */
-/* `rodzaj: "blad"` — dymek zostaje do kliknięcia (dekalog pkt 6). Każdy
-   `catch` w tym pliku woła tę wersję: błąd, który sam znika, to błąd, którego
-   nikt nie przeczytał. Potwierdzenia dalej gasną po 6 s — nie ma czego klikać. */
-function toast(tekst, rodzaj) {
-  const t = document.createElement("div");
-  t.className = rodzaj === "blad" ? "toast blad" : "toast";
-  t.textContent = tekst;
-  $("toasty").appendChild(t);
-  if (rodzaj === "blad") {
-    t.title = "Kliknij, żeby zamknąć";
-    t.addEventListener("click", () => t.remove());
-    return;
-  }
-  setTimeout(() => t.remove(), 6000);
-}
-/* Etykietę typu daje SERWER (`typLabel`). Ta strona miała kiedyś własną kopię
-   słownika — trzecią obok serwera i kolektora, jedyną bez testu. Dopisanie
-   typu na serwerze zostawiało tu surowy klucz na wydruku dla dostawcy. */
-const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
-  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
 let token = localStorage.getItem("wertis.token") || "";
 let kto = localStorage.getItem("wertis.kto") || "";
-let widok = localStorage.getItem("wertis.widok") || "dostawcy";
-/* Zapamiętana nazwa widoku, którego już nie ma, daje PUSTY panel: `pokaz()`
-   chowa wszystkie sześć i nie odsłania żadnego. Do 0.427.0 stała tu mapa
-   ZWROTY/PYTANIA → SPRAWY — a SPRAWY też zniknęły, więc mapa prowadziła
-   wprost w tę pustkę. Lista ISTNIEJĄCYCH widoków zamiast listy dawnych:
-   następne przemianowanie nie wymaga pamiętania o tej linii. */
-/* „dostawy", „magazyn", „dziennik", „analiza" i „nadzor" w pamięci
-   przeglądarki to ślady sprzed 0.435.0, 0.438.0, 0.440.0 i 0.441.0 —
-   te widoki przeszły do panelu. Na tej stronie zostały USTAWIENIA za
-   zębatką i na nich strona wstaje. */
-if (!["dostawcy"].includes(widok)) widok = "dostawcy";
 /* Alarm wymiany (0.364.0) — pobierany w cyklu,
    czytany przy każdym przerysowaniu paska stanu, niezależnie od zakładki. */
 let ostatnieAlarmy = null;
@@ -914,7 +509,6 @@ async function api(sciezka, opts = {}) {
 
 function wyloguj() {
   token = ""; kto = "";
-  zwolnijLoga();
   localStorage.removeItem("wertis.token");
   localStorage.removeItem("wertis.kto");
   $("panel").hidden = true; $("wyloguj").hidden = true; $("ustawienia").hidden = true;
@@ -946,22 +540,6 @@ async function zaloguj() {
   } catch (e) { $("loginBlad").textContent = e.message; }
 }
 
-/* ── Zakładki ── */
-function pokaz(nowy) {
-  widok = nowy;
-  localStorage.setItem("wertis.widok", nowy);
-  $("widokDostawcy").hidden = nowy !== "dostawcy";
-  /* Selektor celowo NIE jest zawężony do paska: od 0.76.0 jeden z przycisków
-     z `data-widok` (zębatka ustawień) stoi w nagłówku, poza `nav`. Przy starym
-     selektorze świeciłby na stałe albo wcale. */
-  for (const b of document.querySelectorAll("button[data-widok]")) {
-    b.setAttribute("aria-current", String(b.dataset.widok === nowy));
-  }
-  /* Ustawienia pobierają swoje trzy komplety dopiero przy wejściu za zębatkę.
-     Do 0.85.0 prompt jechał przy każdym wejściu na PYTANIA, a reguły strefy
-     przy każdym wejściu na ANALIZĘ — obie rzeczy zmieniane razy kilka w roku. */
-  if (nowy === "dostawcy") { odswiezDostawcow(); odswiezStrefe(); odswiezKonta(); }
-}
 
 /* ── Pasek stanu ──────────────────────────────────────────────────────────────
    Od 0.114.0 jedna ikona zamiast rzędu kafli. Kafle odpowiadały na cztery
@@ -1103,468 +681,11 @@ function rysujIkoneAllegro() {
   ik.title = tip;
 }
 
-/* ── Logo dostawców ──────────────────────────────────────────────────────────
-   CAŁA obsługa formatów siedzi TUTAJ i to jest sedno tej funkcji.
-
-   Loga przychodzą w czym popadnie — webp, svg, png, jpg. Serwer nie ma czym
-   ich przerabiać (dwie zależności, zero modułów natywnych) i nie będzie miał;
-   kolektor rysuje przez `BitmapFactory`, który nie zna SVG. Ale konwerter już
-   tu jest: przeglądarka rysuje wszystkie te formaty natywnie, więc `<canvas>`
-   zamienia dowolny z nich na JEDEN PNG przycięty do samego znaku. Serwer
-   i kolektor nigdy nie dowiadują się, że SVG istnieje.                       */
-
-/**
- * Dłuższy bok zapisywanego logo w pikselach.
- *
- * 256 zamiast 128 od 0.87.0: kolektor rysuje logo szerzej, niż rysował w 0.56.0,
- * a obraz 128 px rozciągnięty na 80 dp ekranu o gęstości ×3 jest już rozmyty.
- * Waga rośnie o kilka kB przy limicie 64 kB, więc płaci za to tylko baza.
- */
-const LOGO_BOK = 256;
-/** Roboczy bok przed przycięciem — tyle wystarczy, żeby znaleźć granice logo. */
-const LOGO_BOK_ROBOCZY = 512;
-/** Poniżej tej przezroczystości piksel uznajemy za pusty (0–255). */
-const LOGO_PROG_ALFA = 8;
-/* Ile znaków może mieć `data:`-URL, żeby po dekodowaniu zmieścić się w limicie
-   serwera (128 kB, `MAX_BAJTOW` w services/logo-dostawcy.ts). Base64 puchnie
-   o jedną trzecią, a margines bierze się z nagłówka `data:image/png;base64,`. */
-const LOGO_MAX_ZNAKOW = Math.floor(120 * 1024 * 4 / 3);
-let dostawcyLista = [];
-/* Blob-URL-e logo: JEDEN na kontrahenta, na całe życie karty.
-   Do 0.87.0 zwalnialiśmy je przy każdym przerysowaniu listy dostawców — wtedy
-   logo oglądała wyłącznie ta jedna tabela. Dziś to samo logo rysuje się także
-   w liście dostaw i w panelu szczegółu, więc zwolnienie URL-a pod jednym
-   widokiem gasiło obraz w dwóch pozostałych. Kilkanaście plików po parę kB
-   zostaje w pamięci do przeładowania strony — taniej niż pobierać je po trzy
-   razy przy każdym kliknięciu w dokument. */
-const logoUrl = new Map();
-const logoWToku = new Map();
-
-/** Blob-URL logo albo `null`, gdy dostawca go nie ma. Pobiera RAZ na kontrahenta. */
-function logoDostawcy(khId) {
-  if (logoUrl.has(khId)) return Promise.resolve(logoUrl.get(khId));
-  if (logoWToku.has(khId)) return logoWToku.get(khId);
-  const robota = api(`/api/dostawcy/${khId}/logo`)
-    .then(async (odp) => {
-      const url = URL.createObjectURL(await odp.blob());
-      logoUrl.set(khId, url);
-      return url;
-    })
-    // `api()` rzuca na każdym !ok, w tym na 404 — brak logo to nie awaria
-    .catch(() => {
-      logoUrl.set(khId, null);
-      return null;
-    })
-    .finally(() => logoWToku.delete(khId));
-  logoWToku.set(khId, robota);
-  return robota;
-}
-
-/**
- * Puste miejsce na logo w dowolnym widoku — wypełnia je `dolozLoga`.
- *
- * Miejsce ma WYMIARY od razu, jeszcze przed obrazem: inaczej wiersz podskakuje
- * w chwili doczytania logo, a tabela dostaw przerysowuje się co dziesięć sekund.
- *
- * `rezerwuj` trzyma tę samą szerokość TAKŻE dla dostawcy bez logo. W tabeli
- * jest to konieczne — inaczej nazwy zaczynałyby się w dwóch różnych miejscach
- * i kolumna przestałaby się czytać jednym spojrzeniem w dół. W nagłówku
- * pojedynczego dokumentu nie ma czego wyrównywać, więc puste miejsce byłoby
- * tam samą dziurą.
- */
-function slotLogo(khId, maLogo, wys, szer, rezerwuj = false) {
-  if (!maLogo || !khId) {
-    return rezerwuj
-      ? `<span style="display:inline-block;width:${szer}px;margin-right:6px"></span>`
-      : "";
-  }
-  return `<span data-logo-slot="${khId}" style="display:inline-block;vertical-align:middle;` +
-    `width:${szer}px;height:${wys}px;margin-right:6px"></span>`;
-}
-
-/** Wstawia obrazy do slotów, które jeszcze ich nie mają. */
-async function dolozLoga() {
-  const sloty = [...document.querySelectorAll("[data-logo-slot]")].filter((s) => !s.dataset.gotowe);
-  for (const s of sloty) {
-    const khId = Number(s.dataset.logoSlot);
-    s.dataset.gotowe = "1";
-    const url = await logoDostawcy(khId);
-    if (!url) continue;
-    const img = document.createElement("img");
-    img.src = url;
-    img.alt = "";
-    img.style.cssText = "width:100%;height:100%;object-fit:contain;object-position:left center";
-    s.replaceChildren(img);
-  }
-}
-
-/**
- * Dowolny obraz → PNG PRZYCIĘTY DO SAMEGO LOGA, dłuższy bok `LOGO_BOK`.
- *
- * Przycięcie jest tu najważniejsze i powstało ze zgłoszenia „logo za małe na
- * liście dostaw". Do 0.87.0 rysowaliśmy każde logo wyśrodkowane w KWADRACIE
- * 128×128 — a logotypy są szerokimi paskami z nazwą firmy, więc taki kwadrat
- * to w dwóch trzecich przezroczyste powietrze. Kolektor dostawał obraz, którego
- * nie miał jak powiększyć: szerszy slot skalował się do wysokości kwadratu,
- * czyli razem z tym powietrzem. Poszerzanie slotu nic nie dawało i stąd brało
- * się wrażenie „za duży margines".
- *
- * Teraz płótno ma dokładnie wymiary widocznej treści. Przezroczystość zostaje
- * przezroczystością — tła nie wypełniamy, bo biały prostokąt wyglądałby na
- * kolektorze jak naklejka.
- */
-function naPng(plik) {
-  return new Promise((resolve, reject) => {
-    const czyt = new FileReader();
-    czyt.onerror = () => reject(new Error("Nie udało się odczytać pliku"));
-    czyt.onload = () => {
-      const img = new Image();
-      img.onerror = () => reject(new Error("To nie jest obraz, który przeglądarka umie otworzyć"));
-      img.onload = () => {
-        /* SVG bez atrybutów width/height zgłasza wymiar 0 i narysowałby się
-           jako nic. Wtedy przyjmujemy bok roboczy — lepiej logo lekko
-           rozciągnięte niż pusty obrazek bez śladu, dlaczego jest pusty. */
-        const w = img.naturalWidth || LOGO_BOK_ROBOCZY;
-        const h = img.naturalHeight || LOGO_BOK_ROBOCZY;
-        /* Najpierw kopia robocza, dopiero z niej czytamy piksele: plik
-           z aparatu potrafi mieć 4000 px boku, a `getImageData` na takim
-           obrazie to 64 MB przepisane po nic. */
-        const skalaR = Math.min(1, LOGO_BOK_ROBOCZY / Math.max(w, h));
-        const rw = Math.max(1, Math.round(w * skalaR));
-        const rh = Math.max(1, Math.round(h * skalaR));
-        const robocze = document.createElement("canvas");
-        robocze.width = rw;
-        robocze.height = rh;
-        robocze.getContext("2d").drawImage(img, 0, 0, rw, rh);
-
-        const ramka = ramkaWidoczna(robocze) || { x: 0, y: 0, w: rw, h: rh };
-        /* Logotyp to zwykle płaska grafika i w PNG waży kilka kB. Ale bywa
-           wgrywane zdjęcie szyldu — takie 256 px potrafi przekroczyć limit
-           serwera, a odmowa „wgraj przez panel" byłaby wtedy ślepym zaułkiem:
-           panel WŁAŚNIE to zrobił. Więc zmniejszamy, aż się zmieści. */
-        let bok = LOGO_BOK;
-        let png = przeskaluj(robocze, ramka, bok);
-        while (png.length > LOGO_MAX_ZNAKOW && bok > 64) {
-          bok = Math.round(bok / 2);
-          png = przeskaluj(robocze, ramka, bok);
-        }
-        resolve(png);
-      };
-      img.src = czyt.result;
-    };
-    czyt.readAsDataURL(plik);
-  });
-}
-
-/** Wycinek `ramka` z płótna roboczego, przeskalowany do `bok` na dłuższym boku. */
-function przeskaluj(robocze, ramka, bok) {
-  const skala = Math.min(1, bok / Math.max(ramka.w, ramka.h));
-  const dw = Math.max(1, Math.round(ramka.w * skala));
-  const dh = Math.max(1, Math.round(ramka.h * skala));
-  const c = document.createElement("canvas");
-  c.width = dw;
-  c.height = dh;
-  // BEZ wypełniania tła: logo bywa przezroczyste, a biały prostokąt pod nim
-  // wyglądałby na kolektorze jak naklejka na jasnym wierszu
-  c.getContext("2d").drawImage(robocze, ramka.x, ramka.y, ramka.w, ramka.h, 0, 0, dw, dh);
-  return c.toDataURL("image/png");
-}
-
-/**
- * Prostokąt zajęty przez widoczne piksele; `null`, gdy obraz jest cały pusty.
- *
- * Obraz bez ANI JEDNEGO widocznego piksela zwraca `null`, a wtedy zapisujemy
- * go w całości — pusty plik jest wtedy tym, co człowiek wybrał, i lepiej, żeby
- * to zobaczył, niż żeby aplikacja po cichu zapisała jeden przezroczysty piksel.
- */
-function ramkaWidoczna(plotno) {
-  let dane;
-  try {
-    dane = plotno.getContext("2d").getImageData(0, 0, plotno.width, plotno.height).data;
-  } catch {
-    return null;                       // obraz z innego źródła — czytać nie wolno
-  }
-  let x1 = plotno.width, y1 = plotno.height, x2 = -1, y2 = -1;
-  for (let y = 0; y < plotno.height; y++) {
-    for (let x = 0; x < plotno.width; x++) {
-      if (dane[(y * plotno.width + x) * 4 + 3] <= LOGO_PROG_ALFA) continue;
-      if (x < x1) x1 = x;
-      if (x > x2) x2 = x;
-      if (y < y1) y1 = y;
-      if (y > y2) y2 = y;
-    }
-  }
-  if (x2 < 0) return null;
-  return { x: x1, y: y1, w: x2 - x1 + 1, h: y2 - y1 + 1 };
-}
-
-function rysujDostawcow() {
-  const wiersze = dostawcyLista.map((d) => `<tr>
-    <td style="width:76px">${slotLogo(d.khId, d.maLogo, 30, 72)}</td>
-    <td><b>${esc(d.nazwa)}</b></td>
-    <td class="mute">${d.dokumentow} dok.</td>
-    <td><button class="akcja cichy" data-logo="${d.khId}">${d.maLogo ? "ZMIEŃ" : "WGRAJ"}</button></td>
-    <td>${d.maLogo ? `<button class="akcja cichy" data-logo-usun="${d.khId}">✕</button>` : ""}</td>
-  </tr>`);
-  $("dostawcy").innerHTML = wiersze.length
-    ? `<tr><th></th><th>DOSTAWCA</th><th>DOKUMENTY</th><th></th><th></th></tr>${wiersze.join("")}`
-    : '<tr><td class="mute">Nie ma jeszcze dokumentów dostaw — nie ma czego opisać logo</td></tr>';
-  dolozLoga();
-}
-
-/** Zwolnienie kompletu — jedyne miejsce to wylogowanie, tak jak przy zdjęciach. */
-function zwolnijLoga() {
-  for (const u of logoUrl.values()) if (u) URL.revokeObjectURL(u);
-  logoUrl.clear();
-}
-
-/** Podmiana i skasowanie muszą wyrzucić stary obraz — inaczej wisi do F5. */
-function zapomnijLogo(khId) {
-  const stary = logoUrl.get(khId);
-  if (stary) URL.revokeObjectURL(stary);
-  logoUrl.delete(khId);
-}
-
-async function odswiezDostawcow() {
-  try {
-    dostawcyLista = (await (await api("/api/biuro/dostawcy")).json()).dostawcy;
-    rysujDostawcow();
-  } catch (e) {
-    $("wynikLogo").textContent = e.message;
-  }
-}
-
-async function wyslijLogo(khId, plik) {
-  const d = dostawcyLista.find((x) => x.khId === khId);
-  $("wynikLogo").textContent = `Przetwarzam ${plik.name}…`;
-  try {
-    const logoBase64 = await naPng(plik);
-    await api(`/api/biuro/dostawcy/${khId}/logo`, {
-      method: "PUT",
-      body: JSON.stringify({ nazwa: d?.nazwa ?? "", logoBase64 }),
-    });
-    $("wynikLogo").textContent = `Logo dla ${d?.nazwa ?? khId} zapisane.`;
-    zapomnijLogo(khId);
-    await odswiezDostawcow();
-  } catch (e) {
-    $("wynikLogo").textContent = `Nie zapisano: ${e.message}`;
-  }
-}
-
-async function usunLogo(khId) {
-  const d = dostawcyLista.find((x) => x.khId === khId);
-  const zgoda = await potwierdz({
-    tytul: "USUNIĘCIE LOGA",
-    opis: `Logo dostawcy ${d?.nazwa ?? khId} zniknie z listy dostaw na kolektorach.`,
-    potwierdz: "USUŃ",
-    grozny: true,
-  });
-  if (!zgoda) return;
-  try {
-    await api(`/api/biuro/dostawcy/${khId}/logo`, { method: "DELETE" });
-    $("wynikLogo").textContent = "Logo usunięte.";
-    zapomnijLogo(khId);
-    await odswiezDostawcow();
-  } catch (e) {
-    $("wynikLogo").textContent = `Nie usunięto: ${e.message}`;
-  }
-}
-
-/* Edytor reguł: wiersze z polami, ZAPISZ wysyła KOMPLET — tak jak trasa.
-   Wiersz całkiem pusty jest pomijany, więc „usuń" to po prostu wyczyszczenie
-   pól albo krzyżyk z boku. */
-function wierszReguly(r = { alejka: "", od: "", do: "", poziomy: "" }) {
-  return `<tr>
-    <td><input data-p="alejka" size="3" maxlength="1" value="${esc(r.alejka)}" placeholder="A"></td>
-    <td><input data-p="od" size="5" maxlength="3" value="${esc(r.od)}" placeholder="D01"></td>
-    <td><input data-p="do" size="5" maxlength="3" value="${esc(r.do)}" placeholder="D05"></td>
-    <td><input data-p="poziomy" size="8" value="${esc(r.poziomy)}" placeholder="2,3"></td>
-    <td><button class="akcja cichy" data-usun>✕</button></td>
-  </tr>`;
-}
-
-function rysujReguly(reguly) {
-  $("reguly").innerHTML =
-    "<tr><th>ALEJKA</th><th>REGAŁ OD</th><th>REGAŁ DO</th><th>POZIOMY</th><th></th></tr>" +
-    reguly.map(wierszReguly).join("");
-}
-
-async function odswiezStrefe() {
-  try {
-    rysujReguly((await (await api("/api/biuro/strefa")).json()).reguly);
-    $("wynikStrefy").textContent = "";
-  } catch (e) {
-    $("wynikStrefy").textContent = e.message;
-  }
-}
-
-async function zapiszStrefe() {
-  const reguly = [...$("reguly").querySelectorAll("tr")].map((tr) => {
-    const p = (n) => tr.querySelector(`input[data-p="${n}"]`)?.value.trim() ?? "";
-    return { alejka: p("alejka"), od: p("od"), do: p("do"), poziomy: p("poziomy") };
-  }).filter((r) => r.alejka || r.od || r.do || r.poziomy);
-  try {
-    await api("/api/biuro/strefa", { method: "PUT", body: JSON.stringify({ reguly }) });
-    /* Lista kandydatów mieszka od 0.440.0 w analizie panelu i liczy się
-       tam przy następnym wejściu — serwer zresetował jej pamięć przy zapisie. */
-    $("wynikStrefy").textContent = `Zapisano ${reguly.length} reguł — kandydaci przeliczą się w analizie panelu.`;
-  } catch (e) {
-    $("wynikStrefy").textContent = e.message;
-  }
-}
-
-/* ── Kolejka ── */
-/* ── Konta i sesje (0.111.0) ─────────────────────────────────────────────────
-   Wszystkie mutacje na istniejących trasach admina (routes/auth.ts) —
-   dotąd wołanych wyłącznie z curl. Kont się nie kasuje; sesje tnie się
-   revoked_at, więc ślad „co było zalogowane" zostaje. */
-async function odswiezKonta() {
-  try {
-    const d = await (await api("/api/users")).json();
-    rysujKonta(d.users || []);
-  } catch (e) {
-    $("kontaLista").innerHTML = `<tr><td><span class="badge err">${esc(e.message)}</span></td></tr>`;
-  }
-}
-
-function rysujKonta(konta) {
-  $("kontaLista").innerHTML =
-    "<tr><th>OSOBA</th><th>LOGIN</th><th>ROLA</th><th>STAN</th><th></th></tr>" +
-    konta.map((k) => `<tr${k.active ? "" : ' style="opacity:.55"'}>
-        <td class="b">${esc(k.name)}</td>
-        <td class="mute">${esc(k.login || "—")}</td>
-        <td>${esc(k.role)}</td>
-        <td>${k.active ? '<span class="badge ok">AKTYWNE</span>' : '<span class="badge mute2">WYŁĄCZONE</span>'}</td>
-        <td style="white-space:nowrap">
-          <button class="akcja cichy maly" data-konto-sesje="${k.userId}" data-konto-nazwa="${esc(k.name)}">SESJE</button>
-          <button class="akcja cichy maly" data-konto-haslo="${k.userId}">RESET HASŁA</button>
-          <button class="akcja cichy maly" data-konto-active="${k.userId}" data-konto-na="${k.active ? "0" : "1"}">${k.active ? "WYŁĄCZ" : "WŁĄCZ"}</button>
-        </td>
-      </tr>`).join("");
-}
-
-$("kontaKarta").addEventListener("click", async (e) => {
-  const sesje = e.target.closest("[data-konto-sesje]");
-  if (sesje) {
-    try {
-      const d = await (await api(`/api/users/${sesje.dataset.kontoSesje}/sesje`)).json();
-      $("kontaSesje").innerHTML = `<h2>SESJE · ${esc(sesje.dataset.kontoNazwa)}</h2>` +
-        ((d.sesje || []).length
-          ? `<table><tr><th>URZĄDZENIE</th><th>ZALOGOWANO</th><th>OSTATNIO WIDZIANE</th></tr>` +
-            d.sesje.map((x) => `<tr>
-                <td class="b">${esc(x.deviceId || "—")}</td>
-                <td class="mute">${esc(stempelLokalny(x.createdAt))}</td>
-                <td class="mute">${x.lastSeen ? esc(stempelLokalny(x.lastSeen)) : "—"}</td>
-              </tr>`).join("") + "</table>"
-          : '<p class="mute">Brak czynnych sesji.</p>') +
-        `<div style="margin-top:8px"><button class="akcja cichy" data-konto-wyloguj="${sesje.dataset.kontoSesje}">
-           WYLOGUJ WSZĘDZIE</button></div>`;
-    } catch (bl) { toast(bl.message, "blad"); }
-    return;
-  }
-  const wyloguj = e.target.closest("[data-konto-wyloguj]");
-  if (wyloguj) {
-    /* Cięcie własnego konta wylogowuje też tę przeglądarkę — potwierdzenie
-       ma to powiedzieć, zanim ekran wróci do logowania. */
-    if (!(await potwierdz({
-      tytul: "WYLOGOWANIE WSZĘDZIE",
-      opis: "Wszystkie sesje tego konta zostaną ucięte — także ta przeglądarka, jeśli to Twoje konto.",
-      potwierdz: "WYLOGUJ", grozny: true,
-    }))) return;
-    try {
-      const d = await (await api(`/api/users/${wyloguj.dataset.kontoWyloguj}/wyloguj`, {
-        method: "POST", body: "{}",
-      })).json();
-      toast(`Ucięto sesji: ${d.sesji}`);
-      $("kontaSesje").innerHTML = "";
-    } catch (bl) { toast(bl.message, "blad"); }
-    return;
-  }
-  const haslo = e.target.closest("[data-konto-haslo]");
-  if (haslo) {
-    const nowe = await zapytaj({
-      tytul: "RESET HASŁA",
-      opis: "Nowe hasło (min. 8 znaków). Przekaż je osobie bezpośrednio.",
-      przyklad: "nowe hasło",
-      potwierdz: "USTAW",
-    });
-    if (nowe === null || nowe === "") return;
-    try {
-      await api(`/api/users/${haslo.dataset.kontoHaslo}/haslo`, {
-        method: "POST", body: JSON.stringify({ haslo: nowe }),
-      });
-      toast("Hasło ustawione ✓");
-    } catch (bl) { toast(bl.message, "blad"); }
-    return;
-  }
-  const active = e.target.closest("[data-konto-active]");
-  if (active) {
-    const wlacz = active.dataset.kontoNa === "1";
-    if (!wlacz && !(await potwierdz({
-      tytul: "WYŁĄCZENIE KONTA",
-      opis: "Konto straci dostęp od zaraz — wszystkie jego sesje przestaną przechodzić.",
-      potwierdz: "WYŁĄCZ", grozny: true,
-    }))) return;
-    try {
-      await api(`/api/users/${active.dataset.kontoActive}/active`, {
-        method: "POST", body: JSON.stringify({ active: wlacz }),
-      });
-      toast(wlacz ? "Konto włączone ✓" : "Konto wyłączone ✓");
-      await odswiezKonta();
-    } catch (bl) { toast(bl.message, "blad"); }
-  }
-});
-
-/* Znaczniki z API są w UTC — do pokazania trzeba czasu lokalnego przeglądarki.
-   Wcześniej stało tu odcięcie znaków z ciągu ISO, czyli UTC pokazany jako
-   godzina zegarowa: latem dwie godziny wstecz, a przy wpisach z okolic
-   północy myliła się także data. Popsuty znacznik wraca niezmieniony,
-   bo wiersz dziennika ma dalej nieść typ, osobę i szczegóły. */
-const dwaZnaki = (n) => String(n).padStart(2, "0");
-
-function dataLokalna(iso) {
-  const d = new Date(iso);
-  if (isNaN(d)) return String(iso ?? "");
-  return `${d.getFullYear()}-${dwaZnaki(d.getMonth() + 1)}-${dwaZnaki(d.getDate())}`;
-}
-
-function stempelLokalny(iso) {
-  const d = new Date(iso);
-  if (isNaN(d)) return String(iso ?? "");
-  return `${dataLokalna(iso)} ` +
-    `${dwaZnaki(d.getHours())}:${dwaZnaki(d.getMinutes())}:${dwaZnaki(d.getSeconds())}`;
-}
-
-/* ── Dane firmy do formularzy dostawców ───────────────────────────────────────
-   Druki dostawców pytają o dane ZGŁASZAJĄCEGO (nazwa, NIP, adres, osoba
-   kontaktowa) — a tych system nigdzie nie ma, bo nie są danymi magazynu.
-   Mieszkają w localStorage tej przeglądarki, jak token sesji: biuro drukuje
-   z jednego komputera, a serwer nie musi wiedzieć, jak firma się nazywa.
-
-   Od 0.435.0 druk protokołu stoi w panelu (`panel/src/druk/`) i czyta TEN
-   SAM klucz — oba fronty są na jednym originie. Formularz zostaje tutaj do
-   wydania z ustawieniami, które przeniesie dane na serwer. */
-const FIRMA_POLA = ["Nazwa", "Nip", "Adres", "Miejscowosc", "Osoba", "Telefon"];
-function firma() {
-  try { return JSON.parse(localStorage.getItem("wertis.firma")) || {}; }
-  catch { return {}; }
-}
-function wczytajFirme() {
-  const f = firma();
-  for (const p of FIRMA_POLA) $(`firma${p}`).value = f[p] || "";
-}
-function zapiszFirme() {
-  const f = {};
-  for (const p of FIRMA_POLA) f[p] = $(`firma${p}`).value.trim();
-  localStorage.setItem("wertis.firma", JSON.stringify(f));
-  $("zapiszFirme").textContent = "ZAPISANO ✓";
-  setTimeout(() => { $("zapiszFirme").textContent = "ZAPISZ"; }, 1500);
-}
 
 /* ── Cykl życia ───────────────────────────────────────────────────────────────
-   Pasek stanu odświeża się zawsze, reszta tylko dla otwartej zakładki. Strona
-   wisi w biurze cały dzień, a `/api/reconcile` liczy się na żądanie — nie ma
-   powodu, żeby robiła to co pół minuty w tle. */
+   Od 0.444.0 cykl zasila wyłącznie pasek: ikony stanu i dwie plakietki.
+   Strona wisi w biurze cały dzień, więc sygnał ma zostać żywy, dopóki
+   ktoś tu zagląda z nawyku. */
 async function odswiezStan() {
   try {
     /* Licznik odpowiedzi jedzie WŁASNĄ trasą za sesją, a nie w `/api/health`:
@@ -1642,35 +763,12 @@ function start() {
   $("panel").hidden = false;
   $("wyloguj").hidden = false;
   $("ustawienia").hidden = false;
-  /* Podtytuł schodzi, gdy wjeżdżają zakładki: „Podgląd biura" mówi to samo,
-     co podświetlona pastylka, a w jednym rzędzie z sześcioma innymi zabiera
-     szerokość, której na laptopie nie ma. */
+  /* Podtytuł schodzi, gdy wjeżdża pasek z wyjściami do panelu — na ekranie
+     logowania mówi, co to za strona, a po nim mówi to karta w treści. */
   zakladki().hidden = false; $("podtytul").hidden = true;
   for (const id of IKONY_STANU) $(id).hidden = false;
   $("kto").textContent = kto;
-  wczytajFirme();
-  pokaz(widok);
   odswiezStan();
-}
-
-/* ── Ramki tabel ─────────────────────────────────────────────────────────────
-   Każda tabela panelu dostaje pudełko z własnym przewijaniem. Robimy to raz
-   w JS, bo `<table>` jest CELEM `innerHTML` w kilkudziesięciu miejscach —
-   wrapper dopisany w HTML byłby czterdziestoma miejscami do zapomnienia przy
-   pierwszej nowej liście. Przeniesienie węzła nie rusza ani `id`, ani nasłuchów:
-   te wiszą na samych elementach `<table>`, nie na rodzicu.
-
-   `wysoka` dostają listy o nieograniczonej długości. Reszta ma sam poziom —
-   krótka tabela z ośmioma kolumnami też potrafi rozepchać kartę. */
-const TABELE_DLUGIE = new Set([
-  "dostawcy", "statystykiProdukty", "reguly",
-  "pytaniaLista", "pytaniaProdukty", "pytaniaPozaOferta",
-]);
-for (const t of document.querySelectorAll("#panel table")) {
-  const box = document.createElement("div");
-  box.className = "tabelaBox" + (TABELE_DLUGIE.has(t.id) ? " wysoka" : "");
-  t.replaceWith(box);
-  box.appendChild(t);
 }
 
 $("zaloguj").addEventListener("click", zaloguj);
@@ -1678,20 +776,12 @@ for (const id of ["poleLogin", "poleHaslo"]) {
   $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") zaloguj(); });
 }
 $("wyloguj").addEventListener("click", wyloguj);
-/* Delegacja siedzi na dokumencie, nie na `nav`: przyciski widoków stoją od
-   0.76.0 w dwóch miejscach (pasek i zębatka w nagłówku), a `data-widok` jest
-   jedyną rzeczą, która je łączy. Przypięcie do `nav` zostawiłoby zębatkę
-   martwą — klikalną i bez skutku. */
-document.addEventListener("click", (e) => {
-  const b = e.target.closest("button[data-widok]");
-  if (b) pokaz(b.dataset.widok);
-});
 
 /* Widok PRZENIESIONY do panelu (0.435.0) — pozycja paska i plakietka
    odpowiedzi prowadzą tam z tokenem tej sesji. Panel trzyma sesję pod własnym
    kluczem, a oba fronty stoją na jednym originie, więc wystarczy go podać;
-   bez tego każde przejście kończyłoby się drugim logowaniem. Most w drugą
-   stronę stoi w `panel/src/mostBiura.ts`. */
+   bez tego każde przejście kończyłoby się drugim logowaniem. Mostu w drugą
+   stronę nie ma od 0.444.0 — panel nie ma już po co tu prowadzić. */
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-panel]");
   if (!b) return;
@@ -1699,51 +789,11 @@ document.addEventListener("click", (e) => {
   location.href = b.dataset.panel;
 });
 
-/* Objaśnienia kart: jedna delegacja na siedemnaście ikon. Blok z tekstem jest
-   NASTĘPNYM rodzeństwem nagłówka, więc ikona nie potrzebuje ani `id`, ani
-   `data-cel` — dopisanie osiemnastej karty to sam HTML.
-
-   `aria-expanded` niesie stan dla czytnika ekranu i dla CSS naraz, więc nie
-   ma drugiego miejsca, w którym prawda o otwarciu mogłaby się rozjechać. */
-document.addEventListener("click", (e) => {
-  const i = e.target.closest("h2 .info");
-  if (!i) return;
-  const blok = i.closest("h2").nextElementSibling;
-  if (!blok || !blok.classList.contains("objasnienie")) return;
-  blok.hidden = !blok.hidden;
-  i.setAttribute("aria-expanded", String(!blok.hidden));
-});
 /* Pasek boczny nie ma już własnego nasłuchu (0.441.0). Ikony zdrowia
    i Allegro oraz plakietka spóźnień prowadzą do stanu systemu w panelu
    przez `data-panel`, obsługiwany delegacją na dokumencie wyżej — ta sama
    droga co pozycje paska. Do tego wydania pasek miał osobną delegację, bo
    jego cele (`data-do`, `data-cel`) mieszkały na tej stronie. */
-/* Który dostawca czeka na plik — `<input type="file">` jest jeden na całą
-   tabelę, bo dialog systemowy i tak obsługuje jeden wybór naraz. */
-let logoDla = null;
-$("dostawcy").addEventListener("click", (e) => {
-  const wgraj = e.target.closest("[data-logo]");
-  if (wgraj) {
-    logoDla = Number(wgraj.dataset.logo);
-    $("plikLogo").click();
-    return;
-  }
-  const usun = e.target.closest("[data-logo-usun]");
-  if (usun) usunLogo(Number(usun.dataset.logoUsun));
-});
-$("plikLogo").addEventListener("change", (e) => {
-  const plik = e.target.files?.[0];
-  if (plik && logoDla != null) wyslijLogo(logoDla, plik);
-  e.target.value = ""; // ten sam plik wybrany drugi raz też ma odpalić `change`
-});
-$("dodajRegule").addEventListener("click", () =>
-  $("reguly").insertAdjacentHTML("beforeend", wierszReguly()));
-$("reguly").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-usun]");
-  if (b) b.closest("tr").remove();
-});
-$("zapiszStrefe").addEventListener("click", zapiszStrefe);
-$("zapiszFirme").addEventListener("click", zapiszFirme);
 /* ── Rozruch strony (0.373.0 — przywrócone po 0.138.0) ───────────────────────
    Te dwie linijki stały tu od początku i wyszły jako SKUTEK UBOCZNY kasowania
    obsługi klienta w 0.138.0: leżały w tym samym ogonie pliku, co przyciski
@@ -1767,7 +817,5 @@ setInterval(() => { if (token) odswiez(); }, 30_000);
 
 if (token) start();
 </script>
-<dialog id="dialogW"></dialog>
-<div id="toasty"></div>
 </body>
 </html>

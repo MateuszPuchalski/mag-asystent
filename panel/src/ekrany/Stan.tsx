@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from "react";
-import { useSearchParams } from "react-router-dom";
-import { useIsFetching } from "@tanstack/react-query";
+import React from "react";
 import { Activity } from "lucide-react";
 import { useJa, useZdrowie } from "../api/rozmowy";
 import { Karta } from "../ui";
+import { useSkokDoKarty } from "../ui/useSkokDoKarty";
 import { StanIntegracji } from "../skrzynka/StanIntegracji";
 import { KartaKolejki } from "../stan/Kolejka";
 import { KartaArkusza } from "../stan/Arkusz";
@@ -37,27 +36,8 @@ export function Stan() {
   const zdrowie = useZdrowie();
   const ja = useJa();
   const admin = ja.data?.user.role === "admin";
-  const [adres] = useSearchParams();
-  const karta = adres.get("karta");
-
-  /* Skok do karty — na wejściu i JESZCZE RAZ, gdy ucichną pierwsze odczyty.
-     Kotwica istnieje od razu, ale karty nad nią rosną, kiedy dochodzą ich
-     dane: skok po samym narysowaniu lądował w kolejce zapisów, a nie przy
-     koncie Allegro. Przy pierwszym narysowaniu nic jeszcze nie jest „w toku"
-     (zapytania startują po nim), więc sam licznik odczytów kłamie — dlatego
-     koniec liczy się dopiero po tym, jak ruch był widać.
-
-     Potem skoku już nie ma: odświeżenie co 30 s nie ma szarpać ekranem, który
-     człowiek zdążył przewinąć gdzie indziej. */
-  const wToku = useIsFetching();
-  const [ruch, setRuch] = useState(false);
-  const [skoczono, setSkoczono] = useState<string | null>(null);
-  useEffect(() => { if (wToku > 0) setRuch(true); }, [wToku]);
-  useEffect(() => {
-    if (!karta || skoczono === karta || wToku > 0) return;
-    document.getElementById(`karta-${karta}`)?.scrollIntoView({ block: "start" });
-    if (ruch) setSkoczono(karta);
-  }, [karta, wToku, ruch, skoczono]);
+  /* Skok do karty z adresu — logika i jej uzasadnienie w `ui/useSkokDoKarty.ts`. */
+  useSkokDoKarty();
 
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
     <Karta className="flex flex-wrap items-center gap-3 p-4">

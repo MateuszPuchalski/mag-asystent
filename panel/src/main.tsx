@@ -88,8 +88,9 @@ const ZAKLADKI = [
 
    MOST DO STAREGO BIURA ZNIKNĄŁ Z TEGO RZĘDU w 0.441.0. Pozycje prowadziły
    do `/biuro` na zakładkę, która jeszcze nie przeszła; stan systemu był
-   ostatnią. Cały dolny rząd to zakładki panelu. Most został w `mostBiura.ts`
-   dla jednej drogi: reguł strefy złotej za zębatką biura, do F5. */
+   ostatnią. Cały dolny rząd to zakładki panelu. Ostatnia droga mostu —
+   reguły strefy złotej za zębatką biura — przeszła do ustawień panelu
+   w 0.444.0 i `mostBiura.ts` zniknął razem z nią. */
 type PozycjaDrugiegoRzedu = { etykieta: string; ikona: React.ReactNode; do: string };
 const DRUGI_RZAD: Array<PozycjaDrugiegoRzedu | "kreska"> = [
   { etykieta: "Dostawy", ikona: <Truck size={16} />, do: "/obsluga/dostawy" },

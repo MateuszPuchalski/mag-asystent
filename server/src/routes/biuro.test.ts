@@ -130,8 +130,12 @@ test("formularze dostawców przeszły do panelu razem z dostawami (0.435.0)", ()
      ich formularz, nie jak nasz protokół. Do 0.435.0 szablony siedziały
      tutaj; przeszły do panelu z ekranem dostaw, a ich treść pilnuje
      `panel/src/druk/szablony.test.ts`. Tu zostają dwie rzeczy: szablonów
-     nie ma w dwóch miejscach naraz, a dane firmy oba fronty czytają spod
-     TEGO SAMEGO klucza — formularz jest jeszcze tutaj, druk już tam. */
+     nie ma w dwóch miejscach naraz, a dane firmy mają JEDNO źródło.
+
+     Od 0.444.0 tym źródłem jest serwer (`/api/biuro/firma`). Formularz
+     w tej stronie zniknął; druk czyta serwer, a klucz przeglądarki zostaje
+     w panelu wyłącznie jako zapas na dzień wdrożenia — zachowanie sprawdza
+     `panel/src/druk/firma.test.tsx`. */
   const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
   const druk = fs.readFileSync(
     path.resolve(import.meta.dirname, "../../../panel/src/druk/szablony.ts"), "utf8");
@@ -140,8 +144,9 @@ test("formularze dostawców przeszły do panelu razem z dostawami (0.435.0)", ()
   assert.doesNotMatch(html, /SZABLONY_DOSTAWCOW/, "drugi egzemplarz szablonów rozjechałby się z pierwszym");
   assert.match(druk, /Protokół zgłoszenia reklamacji B2B/, "szablon GEKO w panelu");
   assert.match(druk, /PROTOKÓŁ ZGŁOSZENIA REKLAMACJI/, "szablon PARTNER w panelu");
-  assert.match(html, /"wertis\.firma"/, "formularz danych firmy zostaje w biurze do F5");
-  assert.match(firma, /"wertis\.firma"/, "druk w panelu czyta ten sam klucz");
+  assert.doesNotMatch(html, /wertis\.firma/, "formularz danych firmy przeszedł do panelu (0.444.0)");
+  assert.match(firma, /useFirma\(\)/, "druk czyta dane firmy z serwera");
+  assert.match(firma, /f\.data\?\.zmieniono/, "zapas z przeglądarki działa tylko przy pustym serwerze");
 });
 
 test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
@@ -179,8 +184,12 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    4,
-    "Licznik SPADŁ z 10 do 4 w 0.441.0: STAN SYSTEMU przeszedł do panelu, " +
+    1,
+    "Licznik SPADŁ z 4 do 1 w 0.444.0: ustawienia przeszły do panelu, a z nimi " +
+      "trzy mutacje kont admina — reset hasła, włącz/wyłącz, wyloguj wszędzie. Te " +
+      "same trasy woła `panel/src/api/ustawienia.ts`, a zero zapisu przy patrzeniu " +
+      "pilnuje `ekrany/Ustawienia.test.tsx`. Zostało jedno: logowanie.\n\n" +
+      "Licznik SPADŁ z 10 do 4 w 0.441.0: STAN SYSTEMU przeszedł do panelu, " +
       "a z nim sześć zapisów — PONÓW/ANULUJ kolejki Sfery, decyzja o kolizji " +
       "kodu, RESYNC, odświeżenie zdjęć, parowanie Allegro i masowa zmiana " +
       "lokalizacji z arkusza. Te same trasy woła `panel/src/api/stan.ts`, a zero " +
@@ -235,15 +244,16 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"PUT"/g) ?? []).length,
-    2,
-    "PUT to komplet reguł strefy złotej i wgranie logo dostawcy — obie " +
-      "rzeczy z ustawień, obie po jawnym kliknięciu ZAPISZ"
+    0,
+    "PUT zszedł do zera w 0.444.0: komplet reguł strefy złotej i wgranie logo " +
+      "dostawcy przeszły z ustawieniami do panelu. Do nich doszedł trzeci PUT, " +
+      "danych firmy — wcześniej zapisywanych w przeglądarce, bez serwera."
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,
-    1,
-    "DELETE został jeden: skasowanie logo dostawcy z ustawień. Rozłączenie " +
-      "konta Allegro przeszło w 0.441.0 do stanu systemu w panelu."
+    0,
+    "DELETE zszedł do zera w 0.444.0: skasowanie logo dostawcy przeszło " +
+      "z ustawieniami do panelu. Rozłączenie konta Allegro odeszło w 0.441.0."
   );
   /* Jedna strona, jeden <script> — więc dwie funkcje o tej samej nazwie nie
      są kolizją teoretyczną, tylko cichym przesłonięciem. Tak zniknęła lista
@@ -259,11 +269,13 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
     "zapisy dostaw przeszły do panelu");
   /* Import zbiórek przeszedł z ANALIZĄ do panelu (0.440.0). */
   assert.doesNotMatch(html, /zbiorki\/import/, "import zbiórek przeszedł do panelu");
-  assert.match(html, /biuro\/dostawcy\/\$\{khId\}\/logo/, "wgranie logo dostawcy");
   /* Konwersja formatów MUSI zostać po stronie przeglądarki: serwer przyjmuje
      wyłącznie PNG, a loga przychodzą też jako SVG i WebP. Bez `<canvas>`
-     panel odsyłałby plik w oryginale i połowa wgrań kończyłaby się odmową. */
-  assert.match(html, /toDataURL\("image\/png"\)/, "normalizacja logo do PNG");
+     panel odsyłałby plik w oryginale i połowa wgrań kończyłaby się odmową.
+     Od 0.444.0 robi to panel (`lib/logo.ts`, rachunek w `logo.test.ts`). */
+  assert.doesNotMatch(html, /dostawcy\/\$\{khId\}\/logo/, "logo dostawcy przeszło do panelu");
+  const logo = fs.readFileSync(path.resolve(import.meta.dirname, "../../../panel/src/lib/logo.ts"), "utf8");
+  assert.match(logo, /toDataURL\("image\/png"\)/, "normalizacja logo do PNG");
   assert.doesNotMatch(html, /problems\/\$\{id\}\/resolve/, "wyjątek zamyka się w panelu, przy fakturze");
   assert.doesNotMatch(html, /pominiete\/\$\{[^}]+\}\/zalatwione/, "pominięcia zamyka się w panelu, przy koszu");
   /* Po 0.140.0 panel NIE MA ani jednej drogi do klienta i to jest teraz
@@ -500,7 +512,7 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
     [],
     "Od 0.441.0 pasek nie niesie ANI JEDNEJ zakładki tej strony — STAN " +
       "SYSTEMU poszedł ostatni. Każda pozycja to wyjście do panelu (`data-panel`), " +
-      "a jedynym widokiem strony są ustawienia za zębatką. " +
+      "a ustawienia za zębatką przeszły do panelu w 0.444.0. " +
       "Od 0.440.0 ANALIZA i DZIENNIK prowadzą do panelu. " +
       "Od 0.435.0 DOSTAWY, a od 0.438.0 MAGAZYN ZWROTÓW nie są już zakładkami " +
       "tej strony — prowadzą do panelu (`data-panel`), sprawdzane niżej. " +
@@ -540,14 +552,14 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
       "razem z rejestrami obsługi klienta"
   );
 
-  /* Druga cicha droga: widok zostaje w pliku, ale przestaje do niego cokolwiek
-     prowadzić. Wtedy wszystko wygląda dobrze — po prostu nie da się już wejść
-     w DOSTAWCÓW. Zębatka jest jedynym wejściem, więc musi być dokładnie jedna
-     i musi nieść ten sam `data-widok`, po którym działa cały mechanizm. */
+  /* Zębatka zostaje tam, gdzie ręka jej szuka, ale od 0.444.0 jest
+     wyjściem do ustawień PANELU, jak pozycje paska — ustawienia były
+     ostatnim widokiem tej strony. */
   const zebatki = [...html.matchAll(/<button id="ustawienia"[\s\S]*?>/g)];
   assert.equal(zebatki.length, 1, "jedna zębatka w nagłówku");
-  assert.match(zebatki[0][0], /data-widok="dostawcy"/, "zębatka prowadzi do dostawców");
+  assert.match(zebatki[0][0], /data-panel="\/obsluga\/ustawienia"/, "zębatka prowadzi do ustawień panelu");
   assert.match(zebatki[0][0], /aria-label="Ustawienia"/, "ikona bez napisu musi mieć nazwę");
+  assert.doesNotMatch(html, /data-widok=/, "strona nie ma już ani jednej zakładki własnej");
 
   /* Delegacja kliknięcia MUSI stać poza `nav` — zębatka jest w nagłówku,
      a przy dawnym `nav.zakladki` byłaby klikalna i bez skutku. */
@@ -665,12 +677,12 @@ test("żądania BEZ CIAŁA nie deklarują typu treści", () => {
     "nagłówek nie ma prawa wrócić do bezwarunkowego obiektu"
   );
 
-  // wywołania bez ciała, które ta reguła utrzymuje przy życiu
-  /* Do 0.435.0 stało tu przywrócenie dostawy, do 0.438.0 przeliczenie
-     kosza, do 0.441.0 rozłączenie konta Allegro — odeszły do panelu,
-     który ma własnego strażnika tej reguły (`panel/src/api/klient.test.ts`).
-     Zostało jedno wywołanie bez ciała. */
-  assert.match(html, /dostawcy\/\$\{khId\}\/logo`,\s*\{\s*method:\s*"DELETE"/);
+  /* Wywołania bez ciała odeszły do panelu jedno po drugim: przywrócenie
+     dostawy (0.435.0), przeliczenie kosza (0.438.0), rozłączenie Allegro
+     (0.441.0), a w 0.444.0 skasowanie logo i WYLOGUJ WSZĘDZIE. Panel ma
+     własnego strażnika tej reguły (`panel/src/api/klient.test.ts`), a oba
+     ostatnie wywołania sprawdza po zachowaniu `ekrany/Ustawienia.test.tsx`.
+     Tutaj reguła zostaje, bo `api()` zostaje — cykl paska jeździ przez nie. */
 });
 
 test("raport per osoba jedzie z podstawą prawną — nigdy bez niej", () => {
@@ -765,37 +777,37 @@ test("kosze odeszły do panelu razem ze swoimi strażnikami (0.438.0)", () => {
     "strażnik koszy w panelu");
 });
 
-test("konfiguracja siedzi za zębatką, nie na zakładkach pracy", () => {
-  /* Prompt eksperta stał do 0.85.0 na PYTANIACH, reguły strefy na ANALIZIE,
-     a dane firmy w środku karty REKLAMACJE. Wspólne dla nich jest to, że
-     ustawia się je razy kilka w roku, a pion zabierały codziennie.
+test("ustawienia przeszły do panelu razem ze swoimi strażnikami (0.444.0)", () => {
+  /* Ostatni widok tej strony. Stały tu trzy testy ustawień: położenie
+     konfiguracji za zębatką, arkusz bez zaokrągleń i ikony objaśnień.
+     Gwarancje zmieniły adres, jak każe `CLAUDE.md`:
 
-     Test celuje w POŁOŻENIE, bo nic innego go nie trzyma: pola mają te same
-     `id` co przedtem, więc zapis działałby tak samo z powrotem wklejony na
-     zakładkę pracy — i nikt by tego nie zauważył do następnego zrzutu ekranu. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  const wycinek = (od: string, doo: string) => {
-    const a = html.indexOf(od);
-    assert.notEqual(a, -1, `brak ${od}`);
-    const b = html.indexOf(doo, a);
-    assert.notEqual(b, -1, `brak ${doo} po ${od}`);
-    return html.slice(a, b);
-  };
-  const ustawienia = wycinek('id="widokDostawcy"', "</main>");
-  for (const pole of ["reguly", "firmaNazwa", "dostawcy"]) {
-    assert.ok(ustawienia.includes(`id="${pole}"`), `${pole} należy do ustawień`);
+       konfiguracja za zębatką, nie na pracy  → ten test, po źródle panelu
+       zero zapisu przy otwarciu, role kont,
+       przeniesienie danych firmy przyciskiem → `panel/src/ekrany/Ustawienia.test.tsx`
+       normalizacja logo do PNG               → `panel/src/lib/logo.test.ts`
+       dane firmy na serwerze                 → `routes/firma.test.ts`
+
+     Arkusz bez zaokrągleń i ikony „i" odeszły bez następcy: panel ma jeden
+     kształt karty (`KartaWgladu`) ze zdaniem pod nagłówkiem, jawnie. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  for (const slad of ['id="widokDostawcy"', 'id="kontaKarta"', 'id="reguly"', 'id="firmaNazwa"',
+    'id="plikLogo"', 'id="dialogW"', 'id="toasty"', 'class="info"', 'class="objasnienie"',
+    "function naPng", "function pokaz(", "function toast", "wertis.widok"]) {
+    assert.ok(!html.includes(slad), `ślad po ustawieniach: ${slad}`);
   }
-
-  /* ANALIZA mieszka od 0.440.0 w panelu. Drogowskaz do reguł przeszedł
-     z nią i dalej prowadzi DO USTAWIEŃ tutaj — mostem, z sesją — dopóki
-     reguły nie przeprowadzą się razem z ustawieniami (F5). */
-  const strefa = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../../../panel/src/analiza/Strefa.tsx"), "utf8");
+  const panel = (plik: string) => fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src", plik), "utf8");
+  const ekran = panel("ekrany/Ustawienia.tsx");
+  for (const karta of ["<DaneFirmy", "<RegulyStrefy", "<Konta", "<SlownikTagow", "<LogoDostawcow"]) {
+    assert.ok(ekran.includes(karta), `${karta} stoi w ustawieniach panelu`);
+  }
+  /* Analiza prowadzi do reguł strefy — już nie mostem do tej strony. */
+  const strefa = panel("analiza/Strefa.tsx");
   assert.ok(!strefa.includes("/api/biuro/strefa"), "reguły nie zeszły z ustawień do analizy");
-  assert.match(strefa, /doBiura\("dostawcy"/, "analiza prowadzi do reguł za zębatką biura");
+  assert.match(strefa, /\/obsluga\/ustawienia\?karta=strefa/, "analiza prowadzi do karty reguł w panelu");
+  assert.ok(!fs.existsSync(path.resolve(import.meta.dirname, "../../../panel/src/mostBiura.ts")),
+    "most do biura zniknął razem z ostatnim widokiem");
 });
 
 test("widok SPRAW nie wraca bokiem (0.140.0)", () => {
@@ -833,55 +845,6 @@ test("karta zostaje kartą, a jej wygląd stoi w JEDNYM miejscu", () => {
      miejsca do rozjazdu — ta sama reguła, co przy progach szerokości. */
   assert.match(html, /--brzeg:/, "margines strony ma własną zmienną");
   assert.match(html, /padding: 0 var\(--brzeg\)/, "strona bierze margines ze zmiennej");
-});
-
-test("ustawienia to jedna tafla, a odstępy niesie arkusz", () => {
-  /* Trzecie zgłoszenie tej samej treści od właściciela: „pozbądź się zaokrągleń
-     i niepotrzebnych marginesów". Po konsoli spraw (0.112.0) i całej zakładce
-     SPRAWY (0.116.0) ustawienia były ostatnią zakładką na pięciu pływających
-     kartkach — a są JEDNYM kompletem rzeczy ustawianych raz.
-
-     Test pilnuje obu połówek, tak jak ten wyżej pilnuje ich dla konsoli:
-     ustawienia spłaszczyły się, a `.card` NIE stracił promienia globalnie.
-     Trzecia asercja jest o odstępach: widok niósł osiemnaście atrybutów
-     `style` z ośmioma różnymi marginesami dobranymi z palca. Liczba zamiast
-     opisu, bo liczba nie zestarzeje się po cichu. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  const a = html.indexOf('id="widokDostawcy"');
-  assert.notEqual(a, -1, "widok ustawień istnieje");
-  const ustawienia = html.slice(a, html.indexOf("</main>", a));
-  assert.equal(
-    (ustawienia.match(/style="/g) ?? []).length,
-    0,
-    "odstępy w ustawieniach niesie arkusz, nie atrybuty w znaczniku"
-  );
-
-  assert.match(
-    html,
-    /#widokDostawcy > \.card \{[\s\S]{0,80}border-radius: 0; box-shadow: none/,
-    "sekcje ustawień tracą promień i cień"
-  );
-  assert.match(
-    html,
-    /#widokDostawcy \{[\s\S]{0,400}gap: 0/,
-    "sekcje ustawień stykają się bez odstępu"
-  );
-  assert.match(
-    html,
-    /#widokDostawcy > \.card \{[\s\S]{0,160}border-top: 1px solid var\(--border\)/,
-    "sekcje rozdziela kreska, skoro nie rozdziela ich odstęp"
-  );
-
-  /* Druga połówka. Ktoś porządkujący USTAWIENIA sięgnąłby po globalne
-     `border-radius: 0` — i skasowałby różnicę, której pilnuje test wyżej. */
-  assert.match(
-    html,
-    /\.card \{ background: var\(--card\);[^}]*border-radius: 14px/,
-    "karta poza ustawieniami dalej ma promień 14"
-  );
 });
 
 test("dostawy odeszły do panelu razem ze swoimi strażnikami (0.435.0)", () => {
@@ -932,33 +895,6 @@ test("filtr stoi w pasku wtedy i tylko wtedy, gdy rządzi całą zakładką", ()
     "okno tabeli wymiany stoi w nagłówku JEJ karty");
 });
 
-test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
-  /* Ikona bez bloku obok siebie jest przyciskiem, który nic nie robi, a blok
-     bez ikony jest tekstem, którego nie da się otworzyć. Delegacja szuka
-     bloku jako NASTĘPNEGO rodzeństwa nagłówka, więc obie połówki muszą
-     istnieć w równej liczbie — i w tej samej karcie. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  const ikony = html.match(/class="info"/g) ?? [];
-  const bloki = html.match(/class="objasnienie"/g) ?? [];
-  /* Dziewięć od 0.440.0: DZIENNIK i STREFA ZŁOTA zabrały swoje objaśnienia
-     do panelu, gdzie zdanie „jak czytać tę liczbę" stoi jawnie pod nagłówkiem
-     karty (`analiza/wspolne.tsx`), zamiast za ikoną. */
-  /* Cztery od 0.441.0: stan systemu zabrał do panelu pięć kart z ikoną,
-     a panel pisze zdanie „jak czytać tę kartę" jawnie pod nagłówkiem. Zostały
-     objaśnienia ustawień. */
-  assert.ok(ikony.length >= 4, `ikon objaśnień: ${ikony.length}`);
-  assert.equal(ikony.length, bloki.length, "każda ikona ma swój blok");
-  assert.match(
-    html,
-    /<\/h2>\s*<div class="objasnienie" hidden>/,
-    "blok stoi bezpośrednio po nagłówku — inaczej delegacja go nie znajdzie"
-  );
-  assert.match(html, /h2 \.info/, "ikona ma własny styl");
-});
-
 test("parowanie Allegro nie wygląda jak robot (0.106.0)", () => {
   /* Endpoint parowania stoi na apeksie allegro.pl — tym samym hoście co
      sklep — więc to jedyne odpytywanie, które widzi anti-bot Allegro.
@@ -986,15 +922,18 @@ test("panel naprawia, nie tylko patrzy: kolejka, ratunek serwera, konta (0.111.0
 
      Od 0.441.0 kolejka i serwer mieszkają w stanie systemu panelu — test
      czyta tamte źródła, a zachowanie (PONÓW bez pytania, ANULUJ za
-     potwierdzeniem) sprawdza `ekrany/Stan.test.tsx`. Konta zostały tutaj. */
+     potwierdzeniem) sprawdza `ekrany/Stan.test.tsx`. Konta przeszły
+     w 0.444.0 do ustawień panelu; ich zachowanie sprawdza
+     `ekrany/Ustawienia.test.tsx`. */
   const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
   const stan = fs.readFileSync(path.resolve(import.meta.dirname, "../../../panel/src/api/stan.ts"), "utf8");
   assert.match(stan, /\/api\/queue\/\$\{id\}\/\$\{ruch\}/, "błąd kolejki ponawia się i anuluje z panelu");
   assert.match(stan, /\/api\/admin\/resync/, "resync zszedł z DEPLOY.md na przycisk");
   assert.match(stan, /\/api\/admin\/zdjecia\/odswiez/, "odświeżenie zdjęć też");
-  assert.match(html, /id="kontaKarta"/, "karta kont w ustawieniach");
-  assert.match(html, /data-konto-wyloguj/, "zgubiony kolektor ma swój przycisk");
-  assert.match(html, /\$\("kontaKarta"\)\.addEventListener\("click"/, "konta delegują z sekcji");
+  const konta = fs.readFileSync(path.resolve(import.meta.dirname, "../../../panel/src/ustawienia/Konta.tsx"), "utf8");
+  assert.match(konta, /useWylogujWszedzie/, "zgubiony kolektor ma swój przycisk");
+  assert.match(konta, /useResetHasla/, "reset hasła zszedł z curl na przycisk");
+  assert.match(konta, /type="password"/, "nowe hasło wpisuje się w pole maskowane, nie w prompt()");
   /* Dziennik przeszedł do panelu (0.440.0) razem z filtrem osoby. */
   const dziennik = fs.readFileSync(
     path.resolve(import.meta.dirname, "../../../panel/src/ekrany/Dziennik.tsx"), "utf8");
@@ -1362,38 +1301,20 @@ test("STAN SYSTEMU zaczyna od tego, co czeka na biuro (0.427.0)", () => {
   assert.ok(!html.includes('id="widokNadzor"'), "STAN SYSTEMU przeszedł do panelu i nie wraca");
 });
 
-test("błąd w dymku zostaje do kliknięcia (0.427.0)", () => {
-  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  assert.match(html, /\.toast\.blad \{/, "dymek błędu ma własny wygląd");
-  const fn = html.slice(html.indexOf("function toast(tekst, rodzaj)"));
-  assert.ok(fn.length < html.length, "toast przyjmuje rodzaj");
-  const cialo = fn.slice(0, fn.indexOf("\n}\n"));
-  assert.match(cialo, /if \(rodzaj === "blad"\) \{[\s\S]*addEventListener\("click"[\s\S]*return;/,
-    "błąd znika kliknięciem i NIE ustawia licznika 6 s");
-  /* Każdy `catch` pokazuje błąd wariantem błędu — bez tego zielone
-     potwierdzenie i czerwona odmowa gasłyby tak samo po 6 s. */
-  assert.doesNotMatch(html, /toast\((e|bl|err)\.message\)/, "błąd z catch pokazany jak potwierdzenie");
-});
+test("strona jest drogowskazem: karta do panelu, bez pamięci widoku (0.444.0)", () => {
+  /* Do 0.444.0 stał tu strażnik pamięci widoku: nazwa zakładki sprzed
+     przeprowadzki dawała pusty panel, więc lista ISTNIEJĄCYCH widoków
+     cofała ją na ustawienia. Widoków nie ma już żadnych, więc nie ma
+     czego pamiętać — a stara nazwa w `localStorage` niczego nie psuje.
 
-test("zapamiętany widok, którego nie ma, wraca na USTAWIENIA (0.427.0, 0.441.0)", () => {
+     Dymek błędu (0.427.0) i mały przycisk odeszły z ostatnimi zapisami:
+     strona nie ma już czynności, której błąd trzeba by pokazać. W panelu
+     błąd stoi przy karcie, w `Blad`, i zostaje do następnej próby. */
   const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  assert.doesNotMatch(html, /widok = "sprawy"/, "mapa na SPRAWY prowadziła w pusty panel");
-  /* Każdy widok pracy i wglądu przeszedł do panelu; STAN SYSTEMU poszedł
-     ostatni (0.441.0). Zapamiętana nazwa któregokolwiek z nich wraca na
-     USTAWIENIA za zębatką — jedyny widok, który tu został. */
-  const lista = html.match(/if \(!\[([^\]]+)\]\.includes\(widok\)\) widok = "dostawcy";/);
-  assert.ok(lista, "strażnik zapamiętanego widoku istnieje");
-  const nazwy = [...lista[1].matchAll(/"(\w+)"/g)].map((m) => m[1]);
-  const zPaska = [...new Set([...html.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]))];
-  assert.deepEqual([...nazwy].sort(), [...zPaska].sort(), "lista strażnika = widoki z paska i zębatki");
-  for (const n of nazwy) {
-    assert.match(html, new RegExp(`id="widok${n[0].toUpperCase()}${n.slice(1)}"`), `widok ${n} istnieje`);
-  }
-});
-
-test("mały przycisk jest klasą, nie stylem w linii (0.427.0)", () => {
-  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  assert.match(html, /button\.akcja\.maly \{/);
-  assert.doesNotMatch(html, /style="(font-size:11px;padding:3px|padding:3px 9px;font-size:11px)/,
-    "rozmiar małego przycisku wrócił do stylu w linii");
+  const start = html.indexOf('<main id="panel"');
+  const panel = html.slice(start, html.indexOf("</main>", start));
+  assert.match(panel, /BIURO PRZESZŁO DO PANELU/, "karta mówi, gdzie jest praca");
+  assert.match(panel, /data-panel="\/obsluga\/"/, "karta prowadzi do panelu, z sesją");
+  assert.match(panel, /przekieruje/, "karta zapowiada przekierowanie w następnym wydaniu");
+  assert.doesNotMatch(html, /localStorage\.(get|set)Item\("wertis\.widok"/, "pamięci widoku już nie ma");
 });

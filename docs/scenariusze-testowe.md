@@ -605,12 +605,14 @@ samej liście dostaw, więc widać oba warianty wiersza obok siebie.
 Po lewej stronie wiersza `FALON-TECH` jest logo. Po lewej stronie wiersza
 `STIHL Polska` zostaje dotychczasowy kafelek z ikoną i kolorem stanu.
 
-W `/biuro` → **DOSTAWCY** obaj są na liście. `FALON-TECH` ma podgląd logo
-i przyciski `ZMIEŃ` oraz `✕`, `STIHL Polska` ma sam przycisk `WGRAJ`.
+W panelu → zębatka → **Logo dostawców** obaj są na liście. `FALON-TECH` ma
+podgląd logo i przyciski `Zmień` oraz `Usuń`, `STIHL Polska` ma sam `Wgraj`.
 
 Bramka formatów: wgraj plik **SVG**, potem **WEBP**, potem **PNG**. Każdy ma
 się zapisać i wyglądać na liście tak samo — przeglądarka przerabia je na jeden
 format przed wysyłką. Serwer przyjmuje wyłącznie PNG i to jest celowe.
+Podmienione logo ma się pokazać od razu, bez odświeżania strony — także
+w Dostawach.
 
 Bramka audytu: otwórz listę dostaw kilka razy i sprawdź dziennik. Zapytania
 o logo, którego nie ma, **nie mogą** zostawiać w nim wpisów.
@@ -656,30 +658,28 @@ jednym typie byłby dłuższy od paska przy innym mimo mniejszej liczby.
 Przełącz okno na **30 dni**. Dostawcy sprzed miesiąca mają zniknąć z tabeli,
 a mediana i udziały przeliczyć się na krótszym oknie.
 
-### S79 — ustawienia jako jeden arkusz
+### S79 — ustawienia biura w panelu
 
-Wejdź w `/biuro` → zębatka → **USTAWIENIA** na oknie szerszym niż 1400 px.
+Wejdź w `/obsluga` → zębatka. Karty stoją w kolejności: dane firmy, reguły
+strefy złotej, konta i sesje, słownik tagów, logo dostawców. Pomiarów obsługi
+tu nie ma — przeszły do **Analiza → Obsługa klienta**.
 
-Sekcje mają stać **jedna pod drugą, w jednej kolumnie**, rozdzielone cienką
-kreską. Żadnych zaokrąglonych rogów, żadnych cieni i żadnych przerw z papierem
-między nimi. Do 0.119.0 było to pięć kartek z cieniem, które siatka rozkładała
-na dwie kolumny różnej wysokości.
+Bramka przeniesienia: w przeglądarce, która pamięta dane firmy z dawnego
+`/biuro`, przy pustym serwerze stoi przycisk „Przenieś na serwer". Kliknij go.
+Druga przeglądarka ma od razu pokazać te same dane, a przycisk ma zniknąć.
 
-Arkusz nie rozciąga się na całą szerokość monitora. Sekcje są formularzami,
-a pole promptu eksperta ma szerokość do redagowania, nie do oglądania.
+Bramka druku: protokół dostawcy GEKO albo PARTNER bierze nagłówek z serwera.
+Zmień telefon w ustawieniach i otwórz protokół jeszcze raz.
 
-Odstępy w środku sekcji mają być **równe**. Sprawdź to na karcie PROMPT
-EKSPERTA I FAKTY FIRMOWE. Ten sam odstęp ma dzielić etykietę od pola, pole od
-przycisku i przycisk od następnej etykiety.
+Bramka ról: zaloguj się kontem `biuro`. Lista kont stoi bez przycisków.
+Konto `admin` widzi Sesje, Reset hasła i Wyłącz. Hasło wpisuje się w pole
+maskowane, a „Ustaw" czeka na osiem znaków.
 
-Zapisz reguły strefy złotej. Zdanie z wynikiem pojawia się **pod tabelą**,
-a przed zapisem nie ma tam pustego pasa po nim.
+Bramka reguł: usuń ostatnią regułę strefy. „Zapisz reguły" gaśnie, a obok
+stoi zdanie, czemu pusty komplet nie ma sensu.
 
-Otwórz objaśnienie ikoną „i" przy dowolnej sekcji. Akapity mają mieć odstęp
-między sobą, a po zamknięciu nie zostaje po nich pusta przerwa.
-
-Zakładki wglądu — NADZÓR, ANALIZA i DZIENNIK — przeszły do panelu biura,
-gdzie stoją na kartach panelu.
+`/biuro` pokazuje już tylko kartę „Biuro przeszło do panelu" z przyciskiem
+do panelu. Pasek, ikony stanu i zębatka prowadzą do panelu z sesją.
 
 ## Kosze z regału zwrotów
 

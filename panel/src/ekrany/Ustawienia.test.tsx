@@ -1,166 +1,261 @@
-import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
-import type { Zdrowie } from "../api/typy";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Ustawienia } from "./Ustawienia";
+import { _wyczyscPamiecZdjec } from "../towar/useZdjecie";
 /* Źródło jako tekst (`?raw`) — Vite umie to podać bez typów Node'a. */
 import zrodloSkrzynki from "./Skrzynka.tsx?raw";
 import zrodloRamy from "../main.tsx?raw";
 import zrodloStanu from "./Stan.tsx?raw";
+import zrodloAnalizy from "./Analiza.tsx?raw";
 
-/* ── Stan integracji za zębatką (0.168.0) ────────────────────────────────────
-   Decyzja właściciela: trzynastowierszowa tabela z `/api/health` schodzi
-   z ekranu pracy. Test pilnuje OBU stron tej zmiany — że tabela jest tam,
-   gdzie ma być, i że alarm NIE poszedł razem z nią. Zasada 10 projektu mówi
-   „awaria integracji musi być widoczna", a §21 żąda trwałego alarmu; ekran
-   bez tabeli jest w porządku, ekran bez ostrzeżenia już nie.               */
+/* ── USTAWIENIA w panelu (0.444.0) ─────────────────────────────────────
+   Gwarancje przeniesione z testów widoku ustawień w
+   `server/src/routes/biuro.test.ts` oraz te, które ekran miał wcześniej:
 
-const zdrowie: Zdrowie = {
-  allegro: { stan: "polaczone" },
-  allegroInbox: {
-    status: "current", alarm: false,
-    ostatniaProba: "2026-09-02T09:38:00.000Z",
-    ostatniaUdanaSynchronizacja: "2026-09-02T09:38:00.000Z",
-    kodOstatniegoBledu: null, tekstOstatniegoBledu: null, liczbaBledow: 0,
-    watkiZBledem: 0, opoznienieMs: 0, nastepnaProba: null, interwalMs: 60_000,
-  },
-  obsluga: { rozmowyOczekujace: 0, zadaniaTerenowe: 0, najstarszeZadanieMs: null,
-    kolejkaWysylek: "pusta — nic jeszcze nie poszło", wysylkiDoSprawdzenia: 0 },
-};
+   1. ZERO ZAPISU PRZY PATRZENIU — także przeniesienie danych firmy
+      z przeglądarki stoi za przyciskiem, nie dzieje się przy otwarciu.
+   2. Przycisk przeniesienia TYLKO przy pustym serwerze i danych w przeglądarce.
+   3. Akcje kont widzi admin; biuro widzi listę bez przycisków.
+   4. Żądania bez ciała nie deklarują typu treści (WYLOGUJ WSZĘDZIE, USUŃ
+      LOGO) — strażnik pustego ciała z `biuro.test.ts` przeszedł tu.
+   5. Reguły strefy: pusty komplet nie wyjeżdża, zapis niesie komplet.
+   6. Słownik tagów: wyłączone widać, kasowania nie ma, sufit jest widoczny.
+   7. Miary obsługi i stan integracji mieszkają gdzie indziej. */
 
-vi.mock("../api/rozmowy", async () => {
-  const rzeczywisty = await vi.importActual<typeof import("../api/rozmowy")>("../api/rozmowy");
-  return {
-    ...rzeczywisty,
-    useZdrowie: () => ({ data: zdrowie, dataUpdatedAt: 0 }),
-    /* Ekran od 0.169.0 niesie drugą kartę. Atrapa jest tu, a nie w osobnym
-       teście, bo ten sprawdza SKŁAD ekranu — dane obu kart mają własne testy. */
-    usePokrycieSygnatur: () => ({
-      data: { pozycji: 0, bezSygnatury: 0, trafia: 0, sygnatur: 0, pudla: [], zdublowane: [] },
-    }),
-    usePokrycieWiedzy: () => ({
-      data: { kartotek: 3200, zOpisem: 1400, zIdentyfikatorem: 460, identyfikatorow: 1900, identyfikatorowRecznych: 0,
-        modeleZOpisu: { nowych: 37, przerobionych: 0, odrzuconych: 0 },
-        zastosowania: { zatwierdzonych: 0, negatywnych: 0, propozycji: 0 },
-        tokeny: { tokenow: 0, nowych: 0, zatwierdzonych: 0 }, wymiary: { kartotek: 0, wymiarow: 0 },
-        fts: { dostepne: false, wpisow: 0 } },
-    }),
-    /* Automat wiedzy (0.331.0): pusta lista, bo ten test sprawdza SKŁAD
-       ekranu, a treść karty ma własny. Atrapa MUSI tu być — bez niej hook
-       idzie po dane naprawdę i przewraca cały plik na braku QueryClienta. */
-    useWiedzaAutomat: () => ({ data: [] }),
-    /* Eskalacja (S5 spoiwa) — atrapa z tego samego powodu, co wyżej: bez niej
-       hook idzie po dane naprawdę i przewraca plik na braku QueryClienta. */
-    useEskalacja: () => ({ data: { miesiace: [] } }),
-    /* Skuteczność doboru (0.267.0): jedenaście dróg i dziewięć statusów, bo
-       karta wypisuje je co do jednego — także te z zerem. */
-    useSkutecznoscDoboru: () => ({
-      data: {
-        dni: 30, granicaHistorii: "2026-08-31T22:00:00Z", wyborow: 4,
-        drogi: ["oferta", "zamiennik", "symbol", "ean", "wyszukiwarka", "zastosowanie",
-          "silnik", "pasowanie", "oem", "pelnotekst", "wymiar"]
-          .map((droga) => ({ droga, wybranych: droga === "oem" ? 4 : 0, zatwierdzonych: 0 })),
-        medianaDoWyboruMin: 12, wyborowZCzasem: 4,
-        osoby: [], bezKonta: 0,
-        naStole: { doborow: 0, statusy: [] },
-        progWiarygodnosci: 20, podstawaPrawna: "Monitoring pracowniczy (Kodeks pracy art. 22² i nast.).",
-      },
-    }),
-  };
+let wyslane: Array<{ metoda: string; url: string; body?: string; typ?: string }> = [];
+let rola = "admin";
+let firmaNaSerwerze: { dane: Record<string, string>; zmieniono: { at: string; przez: string } | null };
+
+const PUSTA_FIRMA = { nazwa: "", nip: "", adres: "", miejscowosc: "", osoba: "", telefon: "" };
+
+beforeEach(() => {
+  wyslane = []; rola = "admin";
+  firmaNaSerwerze = { dane: { ...PUSTA_FIRMA }, zmieniono: null };
+  localStorage.clear();
+  /* Pamięć obrazów jest modułowa i żyje między testami. */
+  _wyczyscPamiecZdjec();
+  Element.prototype.scrollIntoView = vi.fn();
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    const metoda = init?.method ?? "GET";
+    const odp = (x: unknown) => new Response(JSON.stringify(x), { status: 200 });
+    if (metoda !== "GET") {
+      const naglowki = (init?.headers ?? {}) as Record<string, string>;
+      wyslane.push({ metoda, url, body: init?.body as string | undefined, typ: naglowki["content-type"] });
+      if (url === "/api/biuro/firma") {
+        firmaNaSerwerze = { dane: JSON.parse(init!.body as string), zmieniono: { at: "2026-09-23T08:00:00.000Z", przez: "Anna" } };
+        return odp(firmaNaSerwerze);
+      }
+      if (url === "/api/biuro/strefa") return odp({ ok: true, regul: JSON.parse(init!.body as string).reguly.length });
+      if (url.endsWith("/wyloguj")) return odp({ ok: true, sesji: 2 });
+      return odp({ ok: true });
+    }
+    if (url === "/api/auth/me") return odp({ user: { userId: 1, name: "Anna", role: rola } });
+    if (url === "/api/biuro/firma") return odp(firmaNaSerwerze);
+    if (url === "/api/biuro/strefa") return odp({ reguly: [{ alejka: "A", od: "", do: "", poziomy: "2,3" }] });
+    if (url === "/api/users") return odp({ users: [
+      { userId: 1, login: "anna", name: "Anna", role: "admin", active: true, maHaslo: true },
+      { userId: 2, login: "jan", name: "Jan Wrona", role: "magazynier", active: true, maHaslo: true },
+    ] });
+    if (url === "/api/users/2/sesje") return odp({ sesje: [
+      { deviceId: "KOL-03", createdAt: "2026-09-22T06:00:00.000Z", lastSeen: "2026-09-23T07:00:00.000Z" }] });
+    if (url === "/api/biuro/dostawcy") return odp({ dostawcy: [
+      { khId: 5, nazwa: "Rosa-Pol", dokumentow: 11, maLogo: true },
+      { khId: 6, nazwa: "Hydro-Mat", dokumentow: 3, maLogo: false }] });
+    /* Obraz jako atrapa odpowiedzi, jak w `Dostawy.test.tsx`: `Response`
+       z Node'a nie przyjmuje `Blob` z jsdom. */
+    if (url === "/api/dostawcy/5/logo") return { ok: true, status: 200, blob: async () => new Blob() } as unknown as Response;
+    if (url === "/api/obsluga/tagi") return odp({ tagi: [
+      { id: 1, nazwa: "u producenta / u dostawcy", aktywny: true },
+      { id: 2, nazwa: "stary tag", aktywny: false }] });
+    throw new Error(`nieoczekiwany adres w teście: ${url}`);
+  }));
+  /* jsdom nie ma `URL.createObjectURL` — logo idzie przez `blob:`. */
+  URL.createObjectURL = vi.fn(() => "blob:logo");
+  URL.revokeObjectURL = vi.fn();
 });
+afterEach(() => vi.unstubAllGlobals());
 
-/* Czwarta karta (etap F). Copilot WYŁĄCZONY, bo to jest stan domyślny wdrożenia
-   i ten ekran ma się w nim otwierać — karta pomiaru wtedy milczy, a nie
-   pokazuje tabeli zer, którą łatwo wziąć za „model nic nie trafia". */
-vi.mock("../api/copilot", () => ({
-  useCopilot: () => ({ data: { wlaczony: false, powod: "Copilot jest wyłączony.",
-    model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20,
-    autoKlasyfikacja: false, autoSzkic: false } }),
-  usePomiarCopilota: () => ({ data: undefined }),
-}));
+function pokaz(adres = "/obsluga/ustawienia") {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}><MemoryRouter initialEntries={[adres]}><Ustawienia /></MemoryRouter></QueryClientProvider>);
+}
 
-/* Piąta karta (0.279.0): słownik tagów. To jedyne miejsce na tym ekranie,
-   które coś ZMIENIA, więc atrapa niesie także mutację — bez niej `useMutation`
-   szuka klienta zapytań, którego ten test świadomie nie stawia. */
-vi.mock("../api/tagi", () => ({
-  useTagi: () => ({ data: { tagi: [
-    { id: 1, nazwa: "u producenta / u dostawcy", aktywny: true },
-    { id: 2, nazwa: "stary tag", aktywny: false },
-  ] } }),
-  useZmienTag: () => ({ mutate: () => {}, isPending: false }),
-}));
+const karta = (tytul: string) => screen.getByRole("heading", { name: tytul }).closest(".card") as HTMLElement;
 
-const { Ustawienia } = await import("./Ustawienia");
-
-describe("Ustawienia obsługi", () => {
-  it("tabela stanu integracji przeszła do stanu systemu (0.441.0)", () => {
-    /* Jedno miejsce stanu: od 0.441.0 tabela z `/api/health` stoi
-       w stanie systemu, obok kolejki zapisów i serwera. Dwa miejsca to dwie
-       odpowiedzi na „czemu nie działa" i żadna nie mówiła o drugiej. */
-    render(<MemoryRouter><Ustawienia /></MemoryRouter>);
-    expect(screen.queryByText("Stan integracji")).toBeNull();
-    expect(zrodloStanu).toContain("<StanIntegracji");
+describe("Ustawienia w panelu", () => {
+  it("otwarcie to same odczyty — nawet z danymi firmy w przeglądarce", async () => {
+    localStorage.setItem("wertis.firma", JSON.stringify({ Nazwa: "WERTIS", Nip: "123" }));
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    await screen.findByText("Jan Wrona");
+    await screen.findByDisplayValue("2,3");
+    expect(wyslane).toEqual([]);
+    /* Karty w kolejności makiety. */
+    const tytuly = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    expect(tytuly).toEqual(["Dane firmy do protokołów", "Reguły strefy złotej", "Konta i sesje", "Logo dostawców"]);
   });
 
-  it("niosą karty ustawień i miar obsługi", () => {
-    render(<MemoryRouter><Ustawienia /></MemoryRouter>);
-    expect(screen.getByText("Sygnatura → kartoteka Subiekta")).toBeInTheDocument();
-    /* Trzecia karta (E3): brak FTS5 ma być widoczny, nie cicho pominięty. */
-    expect(screen.getByText("Wiedza z opisów kartotek i ofert")).toBeInTheDocument();
-    /* Ekran bez drzwi to ekran, którego nie ma — nagłówek nowej karty
-       jest jedynym dowodem, że wpięcie doszło do skutku. */
-    expect(screen.getByText(/Skuteczność doboru/)).toBeInTheDocument();
-    expect(screen.getByText(/SQLite bez FTS5/)).toBeInTheDocument();
-    /* Wyłączony Copilot nie zostawia po sobie pustej karty na ekranie. */
-    expect(screen.queryByText(/Copilot — rozpoznawanie kategorii/)).not.toBeInTheDocument();
-    /* Piąta karta (0.279.0) — słownik tagów. */
-    expect(screen.getByText("Tagi spraw")).toBeInTheDocument();
+  it("przeniesienie z przeglądarki: tylko przy pustym serwerze, jednym kliknięciem", async () => {
+    localStorage.setItem("wertis.firma", JSON.stringify({ Nazwa: "WERTIS", Nip: "123", Telefon: "600" }));
+    pokaz();
+    const przycisk = await screen.findByRole("button", { name: /Przenieś na serwer/ });
+    await userEvent.click(przycisk);
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0].metoda).toBe("PUT");
+    expect(JSON.parse(wyslane[0].body!)).toEqual({ ...PUSTA_FIRMA, nazwa: "WERTIS", nip: "123", telefon: "600" });
+    /* Po zapisie serwer nie jest pusty — propozycja znika. */
+    await waitFor(() => expect(screen.queryByRole("button", { name: /Przenieś na serwer/ })).toBeNull());
+    expect(await screen.findByDisplayValue("WERTIS")).toBeInTheDocument();
   });
 
-  it("słownik tagów pokazuje WYŁĄCZONE i mówi, że kasowania nie ma", () => {
-    /* Skasowany tag zniknąłby po cichu ze spraw historycznych, a wtedy
-       pytanie „dlaczego ta sprawa stała trzy tygodnie" traci odpowiedź. */
-    render(<MemoryRouter><Ustawienia /></MemoryRouter>);
-    expect(screen.getByText("stary tag")).toBeInTheDocument();
+  it("serwer z danymi wygrywa — przeglądarka nie proponuje nadpisania", async () => {
+    localStorage.setItem("wertis.firma", JSON.stringify({ Nazwa: "Stara nazwa" }));
+    firmaNaSerwerze = { dane: { ...PUSTA_FIRMA, nazwa: "WERTIS Sp. z o.o." }, zmieniono: { at: "2026-09-20T10:00:00.000Z", przez: "Ola" } };
+    pokaz();
+    expect(await screen.findByDisplayValue("WERTIS Sp. z o.o.")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Przenieś na serwer/ })).toBeNull();
+    expect(screen.getByText(/Ostatnio zmienił\(a\) Ola/)).toBeInTheDocument();
+  });
+
+  it("pusta przeglądarka i pusty serwer — nie ma czego przenosić", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    expect(screen.queryByRole("button", { name: /Przenieś na serwer/ })).toBeNull();
+  });
+
+  it("zapis danych firmy wysyła komplet sześciu pól", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Dane firmy do protokołów"));
+    await userEvent.type(within(k).getByRole("textbox", { name: "Miejscowość" }), "Kraków");
+    await userEvent.click(within(k).getByRole("button", { name: "Zapisz" }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(JSON.parse(wyslane[0].body!)).toEqual({ ...PUSTA_FIRMA, miejscowosc: "Kraków" });
+  });
+
+  it("reguły strefy: pusty komplet nie wyjeżdża, pełny idzie w całości", async () => {
+    pokaz();
+    await screen.findByDisplayValue("2,3");
+    const k = karta("Reguły strefy złotej");
+    await userEvent.click(within(k).getByRole("button", { name: "Usuń regułę 1" }));
+    expect(within(k).getByRole("button", { name: "Zapisz reguły" })).toBeDisabled();
+    expect(within(k).getByText(/Bez reguł żaden towar/)).toBeInTheDocument();
+    await userEvent.click(within(k).getByRole("button", { name: /Reguła/ }));
+    await userEvent.type(within(k).getByRole("textbox", { name: "Alejka, reguła 1" }), "P");
+    await userEvent.type(within(k).getByRole("textbox", { name: "Poziomy, reguła 1" }), "1");
+    await userEvent.click(within(k).getByRole("button", { name: "Zapisz reguły" }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(JSON.parse(wyslane[0].body!)).toEqual({ reguly: [{ alejka: "P", od: "", do: "", poziomy: "1" }] });
+  });
+
+  it("biuro widzi konta bez przycisków — serwer i tak by odmówił", async () => {
+    rola = "biuro";
+    pokaz();
+    await screen.findByText("Jan Wrona");
+    const k = karta("Konta i sesje");
+    expect(within(k).queryByRole("button")).toBeNull();
+    expect(within(k).getByText(/Konta zmienia administrator/)).toBeInTheDocument();
+  });
+
+  it("admin: reset hasła w polu hasła, minimum 8 znaków", async () => {
+    pokaz();
+    await screen.findByText("Jan Wrona");
+    const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
+    await userEvent.click(within(wiersz).getByRole("button", { name: /Reset hasła/ }));
+    const pole = within(wiersz).getByLabelText("Nowe hasło dla Jan Wrona");
+    expect(pole.getAttribute("type")).toBe("password");
+    await userEvent.type(pole, "krotkie");
+    expect(within(wiersz).getByRole("button", { name: "Ustaw" })).toBeDisabled();
+    await userEvent.type(pole, "8");
+    await userEvent.click(within(wiersz).getByRole("button", { name: "Ustaw" }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0]).toMatchObject({ metoda: "POST", url: "/api/users/2/haslo", body: JSON.stringify({ haslo: "krotkie8" }) });
+  });
+
+  it("admin: wyloguj wszędzie pyta, a potem idzie BEZ ciała i bez typu treści", async () => {
+    pokaz();
+    await screen.findByText("Jan Wrona");
+    const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
+    await userEvent.click(within(wiersz).getByRole("button", { name: "Sesje" }));
+    const sesje = await screen.findByRole("region", { name: "Sesje: Jan Wrona" });
+    await within(sesje).findByText("KOL-03");
+    await userEvent.click(within(sesje).getByRole("button", { name: /Wyloguj wszędzie/ }));
+    expect(wyslane).toEqual([]);
+    await userEvent.click(within(sesje).getByRole("button", { name: "Wyloguj" }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0]).toEqual({ metoda: "POST", url: "/api/users/2/wyloguj", body: undefined, typ: undefined });
+    expect(await within(sesje).findByText("Ucięto sesji: 2.")).toBeInTheDocument();
+  });
+
+  it("admin: wyłączenie konta za potwierdzeniem", async () => {
+    pokaz();
+    await screen.findByText("Jan Wrona");
+    const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
+    await userEvent.click(within(wiersz).getByRole("button", { name: /Wyłącz/ }));
+    expect(wyslane).toEqual([]);
+    await userEvent.click(within(wiersz).getByRole("button", { name: "Wyłącz konto" }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0]).toMatchObject({ url: "/api/users/2/active", body: JSON.stringify({ active: false }) });
+  });
+
+  it("usunięcie logo pyta, idzie bez ciała i wyrzuca stary obraz z pamięci", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    const wiersz = screen.getByText("Rosa-Pol").closest("tr") as HTMLElement;
+    /* `alt=""` robi z obrazu ozdobę bez roli — szukamy go po znaczniku. */
+    await waitFor(() => expect(wiersz.querySelector("img")?.getAttribute("src")).toBe("blob:logo"));
+    await userEvent.click(within(wiersz).getByRole("button", { name: /Usuń/ }));
+    await userEvent.click(within(wiersz).getByRole("button", { name: "Usuń logo" }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0]).toEqual({ metoda: "DELETE", url: "/api/biuro/dostawcy/5/logo", body: undefined, typ: undefined });
+    await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:logo"));
+    /* Dostawca bez logo ma „Wgraj", nie „Zmień" — i nie ma czego usuwać. */
+    const bez = screen.getByText("Hydro-Mat").closest("tr") as HTMLElement;
+    expect(within(bez).getByRole("button", { name: /Wgraj/ })).toBeInTheDocument();
+    expect(within(bez).queryByRole("button", { name: /Usuń/ })).toBeNull();
+  });
+
+  it("słownik tagów pokazuje WYŁĄCZONE, mówi, że kasowania nie ma, i pokazuje sufit", async () => {
+    /* Skasowany tag zniknąłby po cichu ze spraw historycznych, a odmowa przy
+       dwudziestym pierwszym tagu byłaby ścianą w połowie czynności. */
+    pokaz();
+    await screen.findByText("stary tag");
     expect(screen.getByText("wyłączony")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Włącz z powrotem" })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Usuń|Skasuj/ })).not.toBeInTheDocument();
     expect(screen.getByText(/nie ma kasowania/)).toBeInTheDocument();
-  });
-
-  it("sufit aktywnych jest WIDOCZNY, nie tylko pilnowany przez serwer", () => {
-    /* Odmowa przy dwudziestym pierwszym tagu, wpisanym w biegu przy sprawie,
-       byłaby ścianą w połowie czynności. */
-    render(<MemoryRouter><Ustawienia /></MemoryRouter>);
     expect(screen.getByText(/Aktywnych:/)).toBeInTheDocument();
     expect(screen.getByText(/z 20/)).toBeInTheDocument();
   });
 
-  it("SKRZYNKA już jej nie renderuje, ale alarm na niej ZOSTAJE", () => {
-    /* Sprawdzenie po źródle, nie po renderze: postawienie całej Skrzynki
-       wymaga atrapy siedmiu zapytań, a pytanie jest o jedną rzecz — czy
-       tabela ma dokładnie jedno miejsce w panelu. */
-    const skrzynka = zrodloSkrzynki;
-    /* Szukamy IMPORTU i ZNACZNIKA, nie samej nazwy: komentarz w Skrzynce
-       nazywa ten komponent celowo, bo mówi następnemu czytelnikowi, dokąd
-       tabela poszła. Dopasowanie po fragmencie kasowałoby ten trop. */
-    expect(skrzynka).not.toContain('from "../skrzynka/StanIntegracji"');
-    expect(skrzynka).not.toContain("<StanIntegracji");
-    expect(skrzynka).toContain("<AlarmSynchronizacji");
+  it("miary obsługi i stan integracji mieszkają gdzie indziej", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    expect(screen.queryByText("Sygnatura → kartoteka Subiekta")).toBeNull();
+    expect(screen.queryByText("Stan integracji")).toBeNull();
+    expect(zrodloAnalizy).toContain("<MiaryObslugi");
+    expect(zrodloStanu).toContain("<StanIntegracji");
+  });
+
+  it("SKRZYNKA nie renderuje tabeli integracji, ale alarm na niej ZOSTAJE", () => {
+    /* Sprawdzenie po źródle: pytanie jest o jedną rzecz — czy tabela ma
+       dokładnie jedno miejsce w panelu. Zasada 10 projektu mówi „awaria
+       integracji musi być widoczna", a §21 żąda trwałego alarmu. */
+    expect(zrodloSkrzynki).not.toContain('from "../skrzynka/StanIntegracji"');
+    expect(zrodloSkrzynki).not.toContain("<StanIntegracji");
+    expect(zrodloSkrzynki).toContain("<AlarmSynchronizacji");
   });
 
   it("zębatka i trasa istnieją — ekran bez drzwi to ekran, którego nie ma", () => {
-    const rama = zrodloRamy;
-    expect(rama).toContain('const USTAWIENIA = "/obsluga/ustawienia"');
-    expect(rama).toContain("<Route path={USTAWIENIA}");
-    expect(rama).toContain("<Link to={USTAWIENIA}");
-    /* Zębatka NIE wchodzi na pasek zakładek: pasek niesie pracę, a ustawienia
-       otwiera się razy kilka w miesiącu. Ten sam podział co w biurze. */
-    const zakladki = rama.slice(rama.indexOf("const ZAKLADKI"), rama.indexOf("]", rama.indexOf("const ZAKLADKI")));
+    expect(zrodloRamy).toContain('const USTAWIENIA = "/obsluga/ustawienia"');
+    expect(zrodloRamy).toContain("<Route path={USTAWIENIA}");
+    expect(zrodloRamy).toContain("<Link to={USTAWIENIA}");
+    /* Zębatka NIE wchodzi na pasek zakładek: pasek niesie pracę. */
+    const zakladki = zrodloRamy.slice(zrodloRamy.indexOf("const ZAKLADKI"),
+      zrodloRamy.indexOf("]", zrodloRamy.indexOf("const ZAKLADKI")));
     expect(zakladki).not.toContain("ustawienia");
-    /* Wiedza (E2) to PRACA — kolejka propozycji do rozstrzygnięcia — więc
-       stoi na pasku, z trasą, jak wzmianki. */
     expect(zakladki).toContain('"/obsluga/wiedza"');
-    expect(rama).toContain('<Route path="/obsluga/wiedza"');
   });
 });

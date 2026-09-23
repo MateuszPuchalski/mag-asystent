@@ -4,7 +4,7 @@ import { useArkuszLokalizacji, type RaportArkusza, type TrescArkusza } from "../
 import { paryZArkusza, wierszeZXlsx } from "../lib/xlsx";
 import { Blad, Przycisk } from "../ui";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
-import { Potwierdz } from "./Potwierdz";
+import { Potwierdz } from "../ui/Potwierdz";
 
 /* ── Masowa zmiana lokalizacji z arkusza (z `biuro.html` 0.138.0, 0.441.0) ─
    Stoi POD kolejką zapisów świadomie: to ta kolejka wykona skutek tej karty,
