@@ -1,7 +1,7 @@
 import React, { useState } from "react";
-import { Copy, ExternalLink, ShoppingCart } from "lucide-react";
-import type { ZamowienieRozmowy as Dane } from "../api/typy";
-import { useWskazOferte } from "../api/rozmowy";
+import { Copy, ExternalLink, ShoppingCart, Truck } from "lucide-react";
+import type { StanPrzesylki, ZamowienieRozmowy as Dane } from "../api/typy";
+import { useSprawdzPrzesylkeRozmowy, useWskazOferte } from "../api/rozmowy";
 import { zlote } from "../api/zwroty";
 import { NaglowekSekcji, czas } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
@@ -126,5 +126,51 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
       : <p className="mt-1 text-xs text-slate-500">
           Treści zamówienia jeszcze nie pobrano — dociągnie ją najbliższa synchronizacja (do 10 min).
         </p>}
+    {zamowienie.przesylka && <Paczka przesylka={zamowienie.przesylka} rozmowaId={rozmowaId} />}
   </section>;
+}
+
+/* Kody przewoźnika słowem, z perspektywy KLIENTA — paczka jedzie do niego.
+   Słownik zwrotów mówi „w drodze do nas" i tu dałby zdanie odwrotne. Nieznany
+   kod stoi surowy, jak u przewoźnika. */
+const STATUS: Record<string, string> = {
+  PENDING: "czeka na nadanie",
+  IN_TRANSIT: "w drodze do klienta",
+  RELEASED_FOR_DELIVERY: "wydana do doręczenia",
+  AVAILABLE_FOR_PICKUP: "czeka w punkcie odbioru",
+  NOTICE_LEFT: "awizo — nieudana próba doręczenia",
+  ISSUE: "problem z przesyłką",
+  RETURNED: "wraca do nadawcy",
+};
+
+/**
+ * Gdzie jest paczka (23 września 2026). Klient pod zamówieniem pyta
+ * najczęściej o to, a agent szedł po odpowiedź do panelu Allegro.
+ *
+ * „Sprawdź" to JAWNE kliknięcie: dwa żądania u Allegro nie wychodzą
+ * z otwarcia rozmowy. Świeży stan dociąga też układanie szkicu, więc po
+ * „Ułóż odpowiedź" linijka zwykle jest już wypełniona.
+ */
+function Paczka({ przesylka, rozmowaId }: { przesylka: StanPrzesylki; rozmowaId: number }) {
+  const sprawdz = useSprawdzPrzesylkeRozmowy();
+  return <div className="mt-2 flex flex-wrap items-baseline gap-x-2 text-xs" aria-label="Przesyłka">
+    <Truck size={13} className="self-center text-slate-500" aria-hidden="true" />
+    {przesylka.sprawdzonoAt === null
+      ? <span className="text-slate-600">nie pytaliśmy jeszcze Allegro o paczkę</span>
+      : przesylka.waybill === null
+        ? <span className="text-slate-600">Allegro nie ma numeru — paczka nienadana albo nadana poza Allegro</span>
+        : <>
+            {przesylka.dostarczonoAt
+              ? <b className="text-ranga-ok">doręczona {czas(przesylka.dostarczonoAt)}</b>
+              : <b>{przesylka.status ? STATUS[przesylka.status] ?? przesylka.status
+                : "przewoźnik nie podał statusu"}</b>}
+            <span className="text-slate-600">{przesylka.przewoznik}{" "}
+              <span className="font-mono">{przesylka.waybill}</span></span>
+          </>}
+    {przesylka.sprawdzonoAt && <span className="text-slate-500">stan z {czas(przesylka.sprawdzonoAt)}</span>}
+    <button type="button" disabled={sprawdz.isPending} onClick={() => sprawdz.mutate({ id: rozmowaId })}
+      className="font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900 disabled:opacity-50">
+      {sprawdz.isPending ? "pytam…" : "sprawdź"}</button>
+    {sprawdz.error && <p className="w-full text-red-700">{(sprawdz.error as Error).message}</p>}
+  </div>;
 }

@@ -2584,6 +2584,20 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.443.0 — tempo skrzynki, stan paczki
+
+**Migracji nie ma. Panel trzeba przebudować.** Serwer dostaje dwie trasy:
+odczyt `GET /api/analiza/obsluga` i kliknięcie
+`POST /api/conversations/:id/przesylka`.
+
+Sprawdzenie po wdrożeniu idzie tak. Otwórz Analizę i wybierz „Obsługa
+klienta" — ma stanąć mediana czasu odpowiedzi. W skrzynce wyślij odpowiedź:
+u dołu pojawi się dymek z „Cofnij", a ekran przejdzie do następnej rozmowy.
+W rozmowie pod zamówieniem kliknij „sprawdź" przy paczce.
+
+Stan paczki przed szkicem pyta Allegro tylko przy sparowanym koncie. Bez
+`ALLEGRO_CLIENT_ID` szkic powstaje jak dotąd, bez faktu o przesyłce.
+
 ### Aktualizacja do 0.442.0 — skrzynka znakami, barwy z logo
 
 **Migracji nie ma. Panel trzeba przebudować** — logo jedzie w jego paczce.

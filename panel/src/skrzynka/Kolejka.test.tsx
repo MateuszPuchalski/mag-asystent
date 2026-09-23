@@ -597,3 +597,20 @@ describe("słownik znaków pod „?”", () => {
     expect(screen.queryByRole("region", { name: "Co znaczą znaki" })).not.toBeInTheDocument();
   });
 });
+
+/* ── Lista widocznych dla „następnej rozmowy" (23 września 2026) ─────────────
+   Następna po wysyłce ma być następną w TYM, co agent przerabia — po kubełku
+   i szukaniu. Kolejka trzyma te sita u siebie, więc musi je podać wyżej. */
+describe("kolejka podaje widoczne wiersze", () => {
+  it("po zmianie kubełka podaje nową listę", async () => {
+    const onWidoczne = vi.fn();
+    render(<Kolejka rozmowy={[
+      rozmowa({ id: 1, klient: "A" }),
+      rozmowa({ id: 2, klient: "B", wlascicielId: 9, wlasciciel: "Kolega" }),
+    ]} stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}}
+      onWidoczne={onWidoczne} />);
+    expect(onWidoczne).toHaveBeenLastCalledWith([1, 2]);
+    await userEvent.click(screen.getByRole("button", { name: /^Nieprzypisane/ }));
+    expect(onWidoczne).toHaveBeenLastCalledWith([1]);
+  });
+});

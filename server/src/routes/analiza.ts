@@ -5,6 +5,7 @@ import { analizaDostaw } from "../services/podglad-dostawy.js";
 import { wierszCsv, zbudujCsv } from "../services/csv.js";
 import { logEvent } from "../services/events.js";
 import { sesjaZadania } from "../context.js";
+import { czasOdpowiedzi } from "../services/czas-odpowiedzi.js";
 
 /* ── Analiza śladu audytowego dla biura ──────────────────────────────────────
    Jedna trasa z kompletem sekcji (zakładka ANALIZA robi jeden fetch) + CSV.
@@ -79,6 +80,20 @@ export async function analizaRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return { analiza: analizaDostaw(dniDostaw(req.query.dni)) };
+  });
+
+  /**
+   * Czas odpowiedzi klientowi (23 września 2026) — zakres „Obsługa klienta".
+   *
+   * Ta sama bramka co ślad audytowy i to samo okno 7/30/90: to tempo pracy,
+   * patrzy się na nie od tygodnia. Rozbicie na osoby tą samą regułą co raport
+   * wydajności — liczy się wyłącznie dla administratora, więc dla biura nie
+   * opuszcza serwera wcale. Odczyt niczego nie zapisuje.
+   */
+  app.get<{ Querystring: { days?: string } }>("/api/analiza/obsluga", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return czasOdpowiedzi(dniZQuery(req.query.days), mozeWidziecLudzi());
   });
 
   app.get<{ Querystring: { days?: string } }>("/api/analiza/csv", async (req, reply) => {

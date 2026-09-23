@@ -5,9 +5,12 @@ import { klientPodziekowal, statusZKierunku, ustawStatus } from "./conversations
 import type { StatusRozmowy } from "./conversations.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import {
-  kandydaciZamowien, zamowienieWskazane, type KandydatZamowienia,
+  kandydaciZamowien, numerZamowieniaRozmowy, type KandydatZamowienia,
 } from "./zamowienia-kandydaci.js";
 import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
+import {
+  idZamowienia, przesylkaZamowienia, type StanPrzesylkiZamowienia,
+} from "./przesylka-zamowienia.js";
 import { drogaZakupu, sprawyZakupu, type PrzystanekDrogi, type SprawaZakupu }
   from "./droga-klienta.js";
 import { linkOferty, linkZamowienia } from "./allegro-linki.js";
@@ -220,6 +223,8 @@ export interface StanSkrzynki { ostatniaSynchronizacja: string | null; bledy: nu
    `uzupelnijZamowienia` go nie dociągnie — numer i odnośnik są od razu. */
 export interface ZamowienieRozmowy {
   externalId: string; link: string | null; pobrane: Zamowienie | null;
+  /** Co wiemy o paczce — `null`, dopóki zamówienia nie ma w bazie (nie ma czego pytać). */
+  przesylka: StanPrzesylkiZamowienia | null;
 }
 
 /* Oferta, pod którą padło pytanie (0.178.0). `pobrana` jest `null`, dopóki
@@ -528,6 +533,14 @@ function snapshotOferty(konto: number, ofertaId: string): OfertaRozmowy["pobrana
   };
 }
 
+/* Stan paczki przy zamówieniu rozmowy (23 września 2026). Czysty odczyt tego,
+   co zapisało ostatnie sprawdzenie — pytanie Allegro wisi na kliknięciu
+   „sprawdź" i na układaniu szkicu, nigdy na otwarciu rozmowy. */
+function przesylkaRozmowy(konto: number, externalId: string): StanPrzesylkiZamowienia | null {
+  const id = idZamowienia(db(), konto, externalId);
+  return id === null ? null : przesylkaZamowienia(db(), id);
+}
+
 /** Oś rozmowy: wiadomości kanału przeplecione wynikami zadań z hali. */
 export function osRozmowy(id: number): {
   rozmowa: RozmowaSkrzynki; os: WpisOsi[]; szkic: Szkic | null;
@@ -683,8 +696,6 @@ export function osRozmowy(id: number): {
      z najnowszej naszej. Treść jest, gdy ticker już dociągnął; odczyt niczego
      nie pobiera („zero zapisu przy patrzeniu"). */
   const zNumerem = [...wiadomosci].reverse();
-  const zrodloZamowienia = zNumerem.find((m) => m.zamowienie != null && String(m.direction) === "incoming")
-    ?? zNumerem.find((m) => m.zamowienie != null);
   /* ── WSKAZANIE RĘCZNE JAKO ZAPASOWA DROGA (0.397.0) ─────────────────────────
      Zgłoszenie właściciela: klient napisał pod OFERTĄ o braku w paczce, a
      rozmowa nie miała zamówienia wcale. Ładunek wątku niesie JEDEN obiekt
@@ -692,18 +703,17 @@ export function osRozmowy(id: number): {
 
      WIADOMOŚĆ BIJE WSKAZANIE, nie odwrotnie: numer z Allegro jest faktem,
      a wskazanie wnioskiem człowieka. Gdy klient dopisze wiadomość niosącą
-     numer, ekran ma pokazać właśnie ten, choćby ktoś wcześniej wskazał inny. */
-  const wskazane = zrodloZamowienia ? null : zamowienieWskazane(id);
-  const numerZamowienia = zrodloZamowienia
-    ? String(zrodloZamowienia.zamowienie) : wskazane?.externalId ?? null;
-  const kontoZamowienia = zrodloZamowienia
-    ? Number(zrodloZamowienia.konto)
-    : Number((db().prepare("SELECT channel_account_id AS konto FROM conversation WHERE id=?")
-      .get(id) as { konto: number }).konto);
+     numer, ekran ma pokazać właśnie ten, choćby ktoś wcześniej wskazał inny.
+     Reguła ma jeden zapis w `numerZamowieniaRozmowy`, bo czyta ją też szkic
+     Copilota, pytając o przesyłkę tego samego zamówienia. */
+  const numer = numerZamowieniaRozmowy(id);
+  const numerZamowienia = numer?.externalId ?? null;
+  const kontoZamowienia = numer?.konto ?? 0;
   const zamowienie: ZamowienieRozmowy | null = numerZamowienia ? {
     externalId: numerZamowienia,
     link: linkZamowienia(numerZamowienia),
     pobrane: zamowienieRozmowy(kontoZamowienia, numerZamowienia),
+    przesylka: przesylkaRozmowy(kontoZamowienia, numerZamowienia),
   } : null;
 
   /* JEDNA oferta na rozmowę, tą samą regułą co zamówienie: numer z najnowszej

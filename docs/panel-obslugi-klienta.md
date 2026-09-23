@@ -1019,6 +1019,45 @@ Tak rozstrzygnął audyt 0.265.0 i pilnuje tego `Bursztyn.test.ts`.
 **Barwy marki pochodzą z pliku logo:** pomarańcz `#FF9100` i grafit `#303030`.
 Logo stoi na białej tabliczce w pasku i na ekranie logowania.
 
+### 10.2b. Tempo pracy w skrzynce (0.443.0)
+
+Zgłoszenie właściciela po przeglądzie UX: „do 1, 2, 3", a w trakcie jeszcze
+status przesyłki. Cztery zmiany, każda odpowiada na inną stratę czasu.
+
+| co | gdzie | dlaczego |
+|---|---|---|
+| Czas odpowiedzi klientowi | Analiza → „Obsługa klienta" | Dwa wydania przebudowały skrzynkę bez jednej liczby, która mówi, czy agent odpisuje szybciej. |
+| Następna rozmowa po wysyłce | skrzynka | Kolejkę przerabia się z góry na dół, a po wysyłce agent wracał do listy ręcznie. |
+| Dziesięć sekund na „Cofnij" | dymek u dołu ekranu | Pomyłka ma trzy kształty: zła rozmowa, zły szkic, przypadkowy klawisz. |
+| `Ctrl+Enter`, `E`, `R` | pole odpowiedzi i szkic Copilota | Wyślij, popraw szkic, odrzuć szkic bez sięgania po mysz. |
+| Licznik w tytule karty | pasek kart przeglądarki | Agent pracuje też w Subiekcie i w panelu Allegro. |
+| Powiadomienia na zgodę | dzwonek nad kolejką | Tylko prośba o człowieka i czekanie ponad godzinę; bez dźwięku. |
+| Stan paczki | blok zamówienia i fakty szkicu | Klient pod zamówieniem pyta najczęściej, gdzie jest paczka. |
+
+**Czas odpowiedzi liczy się z wiadomości, które już stoją w bazie.** Próbka
+zaczyna się od PIERWSZEJ wiadomości klienta po naszej odpowiedzi. Kończy ją
+nasza następna prawdziwa odpowiedź. Autoodpowiedź czekania nie kończy.
+Rozbicie na osoby widzi wyłącznie administrator, jak każdy raport o ludziach
+od 0.431.0.
+
+**Cofnięcie mieszka w przeglądarce, nie na serwerze.** Zamknięcie karty
+w tych dziesięciu sekundach zatrzymuje wysyłkę, a ekran o to pyta. Wyjście
+ze skrzynki wysyła od razu. Serwer sprawdza świeżość przy właściwym
+wysłaniu, więc dopisek klienta dalej zatrzymuje odpowiedź.
+
+**Powiadomienie przy każdej wiadomości przestaje być czytane pierwszego
+dnia.** Dlatego są tylko dwa powody. Pierwszy odczyt po otwarciu skrzynki
+niczego nie ogłasza — rano byłaby to lawina z całej nocy.
+
+**Stan paczki pyta Allegro tylko w dwóch miejscach.** Pierwsze to kliknięcie
+„sprawdź" w bloku zamówienia. Drugie to układanie szkicu, gdy zapisany stan
+jest pusty albo starszy niż pół godziny. Doręczonej paczki nie sprawdzamy
+ponownie. Otwarcie rozmowy czyta wyłącznie stan zapisany wcześniej.
+
+**Numer przesyłki nie idzie do dostawcy modelu.** Prowadzi do adresu
+odbiorcy, a ten do modelu nie wychodzi. Fakt mówi, że klient ma numer przy
+zamówieniu w Allegro. Szkic odsyła go tam, zamiast zmyślać numer.
+
 ### 10.3. Oś rozmowy
 
 Oś zawiera wiadomości klienta, odpowiedzi firmy, komentarze wewnętrzne, zmiany

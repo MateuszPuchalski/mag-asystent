@@ -8,7 +8,8 @@ import { ConversationConflict, dodajKomentarz, przejmijRozmowe, przekazRozmowe, 
 import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
 } from "../services/conversation-realtime.js";
-import { wskazZamowienie } from "../services/zamowienia-kandydaci.js";
+import { numerZamowieniaRozmowy, wskazZamowienie } from "../services/zamowienia-kandydaci.js";
+import { idZamowienia, sprawdzPrzesylke } from "../services/przesylka-zamowienia.js";
 import { autoryzuj } from "../services/auth.js";
 import { config } from "../config.js";
 import { db } from "../db/db.js";
@@ -494,6 +495,33 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
         return wskazZamowienie(Number(req.params.id), req.body?.externalId ?? "",
           sesjaZadania()!.user.userId);
       } catch (e) { return blad(reply, e); }
+    });
+
+  /* ── PACZKA ZAMÓWIENIA ROZMOWY NA KLIKNIĘCIE (23 września 2026) ─────────────
+     Bliźniak tras reklamacji i dyskusji z 0.393.0. Rozmowa pod zamówieniem
+     pyta najczęściej „gdzie paczka", a blok zamówienia tego nie mówił.
+     Dwa żądania do Allegro, więc na JAWNE kliknięcie: otwarcie rozmowy czyta
+     wyłącznie stan zapisany wcześniej (zero zapisu przy patrzeniu). */
+  app.post<{ Params: { id: string } }>(
+    "/api/conversations/:id/przesylka", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      if (!config.allegro.clientId) {
+        return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+      }
+      const numer = numerZamowieniaRozmowy(Number(req.params.id));
+      const id = numer ? idZamowienia(db(), numer.konto, numer.externalId) : null;
+      if (id === null) {
+        return reply.code(400).send({
+          error: "Zamówienia tej rozmowy jeszcze nie pobraliśmy — nie ma czego szukać.",
+        });
+      }
+      logEvent("rozmowa_przesylka_reczna", sesjaZadania()!.user.name, null,
+        { rozmowaId: Number(req.params.id), zamowienieId: id });
+      try {
+        return await sprawdzPrzesylke(db(), id);
+      } catch (e) {
+        return reply.code(502).send({ error: (e as Error).message });
+      }
     });
 
   /* Ręczne wskazanie KARTOTEKI dla oferty z rozmowy (0.179.0). SKU sprzedawcy

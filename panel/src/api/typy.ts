@@ -257,6 +257,8 @@ export type OfertaWskazana = { ofertaId: string; autor: string };
    nie dociągnie treści — numer i odnośnik do panelu Allegro są od razu. */
 export type ZamowienieRozmowy = {
   externalId: string; link: string | null; pobrane: Zamowienie | null;
+  /** Stan paczki z ostatniego sprawdzenia; `null`, dopóki zamówienia nie ma w bazie. */
+  przesylka: StanPrzesylki | null;
 };
 
 /* Oferta przy rozmowie (0.178.0). `pobrana` jest `null`, dopóki ticker nie

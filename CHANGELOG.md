@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.443.0 — 23 września 2026
+
+**Skrzynka szybsza w pracy i mówi, gdzie jest paczka.** Zgłoszenie
+właściciela po przeglądzie UX. Opis i powody: §10.2b projektu panelu.
+
+- Analiza ma zakres „Obsługa klienta": mediana i p90 czasu odpowiedzi,
+  rozbicie na kategorie, a dla administratora na osoby.
+- Po wysłaniu ekran przechodzi do następnej rozmowy. Odpowiedź wychodzi
+  po dziesięciu sekundach i do tego czasu da się ją cofnąć.
+- Klawisze: `Ctrl+Enter` wysyła, `E` poprawia szkic Copilota, `R` go odrzuca.
+- Tytuł karty niesie liczbę nieprzeczytanych. Dzwonek nad kolejką włącza
+  powiadomienia o prośbie o człowieka i czekaniu ponad godzinę.
+- Blok zamówienia w rozmowie pokazuje stan paczki z przyciskiem „sprawdź".
+  Szkic Copilota dostaje ten stan jako fakt, bez numeru przesyłki.
+
+- **[wymaga działania]** Przebuduj panel.
+
+
 ## 0.442.0 — 23 września 2026
 
 **Skrzynka mówi znakami, nie zdaniami — i nosi barwy z logo.** Zgłoszenie

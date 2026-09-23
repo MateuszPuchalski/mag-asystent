@@ -72,7 +72,7 @@ describe("kolumna kontekstu", () => {
      rozmowa", tylko jedno przed zakupem, a drugie po. */
   it("zamówienie jedzie razem z ofertą, nie osobną zakładką", () => {
     render(<Kontekst dane={dane({
-      zamowienie: { externalId: "zam-77", link: null, pobrane: null },
+      zamowienie: { externalId: "zam-77", link: null, pobrane: null, przesylka: null },
     })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
     expect(screen.getByTestId("zamowienie")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Zamówienie" })).not.toBeInTheDocument();
@@ -80,7 +80,7 @@ describe("kolumna kontekstu", () => {
 
   it("zwroty tego zamówienia stoją pod zamówieniem, każdy osobno", () => {
     render(<Kontekst dane={dane({
-      zamowienie: { externalId: "zam-77", link: null, pobrane: null },
+      zamowienie: { externalId: "zam-77", link: null, pobrane: null, przesylka: null },
       zwroty: [{ id: 5 } as never, { id: 9 } as never],
     })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
     expect(screen.getAllByTestId("zwrot").map((e) => e.textContent)).toEqual(["zwrot 5", "zwrot 9"]);
@@ -98,7 +98,7 @@ describe("kolumna kontekstu", () => {
   it("zamówienie z kilku pozycji bez oferty każe wskazać pozycję, nie wpisywać numer", () => {
     const pozycja = { offerId: "1", nazwa: "A", sku: null, ilosc: 1, cenaGrosze: 100, waluta: "PLN",
       zwracana: false, wracaIlosc: 0, twId: null, twSymbol: null, twZrodlo: null, ofertaZdjecie: "nieznane" as const };
-    render(<Kontekst dane={dane({ oferta: null, zamowienie: { externalId: "zam-77", link: null, pobrane: {
+    render(<Kontekst dane={dane({ oferta: null, zamowienie: { externalId: "zam-77", link: null, przesylka: null, pobrane: {
       externalId: "zam-77", status: null, kupujacyLogin: null, dostawaGrosze: null, dostawaMetoda: null,
       platnoscTyp: null, platnoscAt: null, fakturaZadana: null, sumaGrosze: 200, waluta: "PLN", kupionoAt: null,
       link: null, pozycje: [pozycja, { ...pozycja, offerId: "2", nazwa: "B" }],

@@ -6,7 +6,11 @@ import type { PozycjaZamowienia, WpisOsi, ZamowienieRozmowy as Dane } from "../a
 /* Kafle zdjęć zastępujemy płytkami z ich wejściem: test pilnuje, ŻE oba
    źródła stoją przy pozycji i co dostają, a nie jak wygląda obraz. */
 const wskaz = vi.fn();
-vi.mock("../api/rozmowy", () => ({ useWskazOferte: () => ({ mutate: wskaz, isPending: false, error: null }) }));
+const sprawdz = vi.fn();
+vi.mock("../api/rozmowy", () => ({
+  useWskazOferte: () => ({ mutate: wskaz, isPending: false, error: null }),
+  useSprawdzPrzesylkeRozmowy: () => ({ mutate: sprawdz, isPending: false, error: null }),
+}));
 vi.mock("../towar/Kafel", () => ({
   Kafel: ({ twId }: { twId: number | null }) => <div data-testid="kafel-subiekt" data-tw={twId ?? "brak"} />,
   KafelOferty: ({ externalId }: { externalId: string | null }) =>
@@ -20,7 +24,7 @@ const { brakPowiazania } = await import("./Rozmowa");
    przyjedzie — milczenie w tym miejscu wyglądałoby jak usterka. */
 const dane = (n: Partial<Dane> = {}): Dane => ({
   externalId: "2f8c1a3e-9b7d-4c1e-8a2b-000000000001",
-  link: "https://salescenter.allegro.com/orders/2f8c1a3e", pobrane: null, ...n,
+  link: "https://salescenter.allegro.com/orders/2f8c1a3e", pobrane: null, przesylka: null, ...n,
 });
 
 describe("Zamówienie przy rozmowie", () => {
@@ -112,5 +116,41 @@ describe("brak powiązania z towarem", () => {
     expect(brakPowiazania([w({ zamowienieId: "zam-1" })])).toBe(false);
     expect(brakPowiazania([w({ ofertaId: "1" })])).toBe(false);
     expect(brakPowiazania([w({}), w({ id: "msg-2", odKlienta: false, zamowienieId: "zam-1" })])).toBe(false);
+  });
+});
+
+/* ── Paczka przy zamówieniu (23 września 2026) ───────────────────────────────
+   Klient pod zamówieniem pyta najczęściej „gdzie paczka". Pilnujemy, że stan
+   mówi po polsku i z perspektywy klienta, a Allegro pytamy wyłącznie
+   kliknięciem — otwarcie rozmowy niczego nie woła. */
+describe("Paczka przy zamówieniu rozmowy", () => {
+  const stan = (n: Partial<NonNullable<Dane["przesylka"]>> = {}): NonNullable<Dane["przesylka"]> => ({
+    waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null, ...n,
+  });
+
+  it("bez zamówienia w bazie linijki nie ma wcale", () => {
+    render(<ZamowienieRozmowy zamowienie={dane()} rozmowaId={1} />);
+    expect(screen.queryByLabelText("Przesyłka")).toBeNull();
+  });
+
+  it("status słowem z perspektywy klienta, a pytanie Allegro dopiero na kliknięcie", async () => {
+    sprawdz.mockClear();
+    render(<ZamowienieRozmowy rozmowaId={7} zamowienie={dane({ przesylka: stan({
+      waybill: "620012345678", przewoznik: "INPOST", status: "IN_TRANSIT",
+      sprawdzonoAt: "2026-09-23T10:00:00Z" }) })} />);
+    const p = screen.getByLabelText("Przesyłka");
+    expect(p).toHaveTextContent("w drodze do klienta");
+    expect(p).toHaveTextContent("INPOST 620012345678");
+    expect(sprawdz).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "sprawdź" }));
+    expect(sprawdz).toHaveBeenCalledWith({ id: 7 });
+  });
+
+  it("„nie pytaliśmy” i „Allegro nie ma numeru” to dwa różne zdania", () => {
+    const { rerender } = render(<ZamowienieRozmowy rozmowaId={1} zamowienie={dane({ przesylka: stan() })} />);
+    expect(screen.getByLabelText("Przesyłka")).toHaveTextContent("nie pytaliśmy jeszcze Allegro");
+    rerender(<ZamowienieRozmowy rozmowaId={1}
+      zamowienie={dane({ przesylka: stan({ sprawdzonoAt: "2026-09-23T10:00:00Z" }) })} />);
+    expect(screen.getByLabelText("Przesyłka")).toHaveTextContent("Allegro nie ma numeru");
   });
 });

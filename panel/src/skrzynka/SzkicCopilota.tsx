@@ -128,9 +128,12 @@ export function KartaSzkicu({ p }: { p: PropsSzkicuCopilota }) {
         <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
           dane doboru zmieniły się od szkicu — ułóż ponownie</span>}
       <span className="ml-auto flex flex-wrap items-center gap-2">
-        <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onPopraw}>
-          {p.maSzkicAgenta ? "Zastąp mój szkic" : "Popraw w edytorze"}</Przycisk>
-        <Przycisk className="text-xs" onClick={p.onOdrzuc}>Odrzuć</Przycisk>
+        <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onPopraw}
+          aria-keyshortcuts="E">
+          {p.maSzkicAgenta ? "Zastąp mój szkic" : "Popraw w edytorze"}
+          <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans">E</kbd></Przycisk>
+        <Przycisk className="text-xs" onClick={p.onOdrzuc} aria-keyshortcuts="R">Odrzuć
+          <kbd aria-hidden="true" className="ml-1 rounded bg-slate-100 px-1 font-sans">R</kbd></Przycisk>
       </span>
     </div>
     {/* ── SZKIC PŁYNIE, NIE PRZEWIJA SIĘ W OKIENKU (0.342.0) ─────────────────
