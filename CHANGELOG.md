@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.7 — 23 września 2026
+
+**Reguła 1b szkicu bez opowieści o przedfiltrze.** Zasada zostaje: zdanie
+sklejone z faktu i wniosku rozbija się na dwa twierdzenia. Zdanie o incydencie
+z 0.261.0 zeszło, bo tę samą sprawę niesie reguła 2c. Konkretny incydent
+w instrukcji ciągnie model w stronę tego jednego przypadku. Siódma z
+dziewięciu poprawek audytu promptów.
+
 ## 0.482.6 — 23 września 2026
 
 **Instrukcja szkicu mówi, co odrzuca system, zamiast „nie wolno złamać”.**
