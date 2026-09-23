@@ -102,7 +102,10 @@ export function DolozTowar(
     </li>)}
   </ul>;
 
+  /* `data-skan-wlasny` (0.468.0): to pole samo czyta czytnik i dokłada towar.
+     Nasłuch ekranu zwrotów omija je, bo inaczej zabrałby mu skan EAN-u. */
   const pole = <input className="field h-8 min-w-0 flex-1 text-sm" autoFocus={!wiersz} value={fraza}
+    data-skan-wlasny=""
     aria-label="Towar do koszyka"
     placeholder={wiersz ? "Skanuj towar · symbol · EAN" : "Zeskanuj towar albo wpisz symbol, EAN lub nazwę"}
     title={wiersz ? CO_ROBI : undefined}

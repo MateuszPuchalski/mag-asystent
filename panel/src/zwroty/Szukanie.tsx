@@ -31,8 +31,8 @@ import { ile as liczba } from "../ui";
 export function Szukanie({
   wynik, kod, fraza, szuka, dociaga, blad, ile,
   paczki = null, szukaPaczek = false, pytaAllegro = false, bladAllegro = "",
-  synchronizuje = false, bladSync = "",
-  onFraza, onSzukaj, onDociagnij, onWybierz, onLogin, onSynchronizuj,
+  synchronizuje = false, bladSync = "", towar = null,
+  onFraza, onSzukaj, onSkan, onDociagnij, onWybierz, onLogin, onSynchronizuj,
 }: {
   wynik: WynikSkanu | null;
   kod: string;
@@ -44,6 +44,14 @@ export function Szukanie({
   ile: number | null;
   onFraza: (v: string) => void;
   onSzukaj: (kod: string) => void;
+  /**
+   * Kod, który przyszedł SERIĄ CZYTNIKA, a nie ręką (0.468.0). Ekran sam
+   * rozstrzyga, czy to etykieta, czy EAN towaru. Enter po wpisaniu ręką
+   * dalej tylko szuka — człowiek, który przepisuje cyfry, pyta o zwrot.
+   */
+  onSkan?: (kod: string) => void;
+  /** Co zrobił ostatni skan towaru — jedno zdanie albo odmowa. */
+  towar?: { tekst: string; blad: boolean } | null;
   onDociagnij: (kod: string) => void;
   onWybierz: (id: number) => void;
   /** Paczki z historii tego klienta; `null` = jeszcze o nie nie pytano. */
@@ -189,7 +197,11 @@ export function Szukanie({
     <div className="flex items-center gap-2">
       <ScanLine size={16} className="shrink-0 text-slate-400" />
       <div className="relative flex min-w-0 flex-1 items-center">
+      {/* `data-skan-wlasny` (0.468.0): to pole czyta czytnik samo, przez
+          `SeriaWPolu`. Nasłuch ekranu je omija — dwie drogi naraz szukałyby
+          tego samego kodu dwa razy. */}
       <input
+        data-skan-wlasny=""
         className={`field h-8 w-full text-sm ${fraza ? "pr-8" : ""}`}
         placeholder="Zeskanuj etykietę albo szukaj: numer, login, nazwisko, przewoźnik, notatka"
         value={fraza}
@@ -205,6 +217,9 @@ export function Szukanie({
              kodu doleciałby jeszcze do starej treści. */
           if (podmien !== null) { e.preventDefault(); onFraza(podmien); return; }
           if (e.key !== "Enter") return;
+          /* Seria czytnika idzie tą samą drogą co skan poza polem — tam ekran
+             odróżnia etykietę od EAN-u towaru. */
+          if (kod !== null && onSkan) { e.preventDefault(); onSkan(kod.trim()); return; }
           const v = (kod ?? fraza).trim();
           if (!v) return;
           /* Pole pokazuje to, po czym naprawdę szukamy. Zostawienie w nim
@@ -249,6 +264,11 @@ export function Szukanie({
           {/* Obrót ikony mówi „pobieram" — napis przestał być potrzebny. */}
           <RefreshCw size={16} aria-hidden="true" className={synchronizuje ? "animate-spin" : ""} /></button>}
     </div>
+
+    {/* Skan towaru mówi, CO SIĘ STAŁO z produktem — koszyk i liczba sztuk.
+        Bez tego zdania skan EAN-u wyglądałby jak skan, który nic nie zrobił. */}
+    {towar && <p role="status"
+      className={`mt-1 text-xs ${towar.blad ? "text-red-700" : "text-emerald-800"}`}>{towar.tekst}</p>}
 
     {/* Odmowa Allegro CAŁYM zdaniem: mówi, co naprawić — token, uprawnienie,
         przerwę — a sam kod HTTP nie mówi nic. */}
