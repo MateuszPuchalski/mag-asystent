@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  AliasSilnika, Identyfikator, ImportOdsylaczy, KandydatZamiennosci, LukaSilnika, MapowanieOdsylaczy, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
+  AliasSilnika, Identyfikator, ImportOdsylaczy, ImportWykazu, MapowanieWykazu, RaportWykazu, KandydatZamiennosci, LukaSilnika, MapowanieOdsylaczy, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
   NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RaportImportuOdsylaczy, RodzajDowodu,
   RodzajIdentyfikatora, SiecWiedzy, TrescImportu,
   TokenSilnika, Zabudowa, Zamiennosc, Zastosowanie,
@@ -24,6 +24,7 @@ export const kluczeWiedzy = {
   tokeny: ["wiedza", "tokeny"] as const,
   siec: ["wiedza", "siec"] as const,
   odsylacze: ["wiedza", "odsylacze"] as const,
+  wykazy: ["wiedza", "wykazy"] as const,
 };
 
 /**
@@ -76,6 +77,7 @@ function poWiedzy(qc: ReturnType<typeof useQueryClient>, twId?: number) {
   qc.invalidateQueries({ queryKey: kluczeWiedzy.tokeny });
   qc.invalidateQueries({ queryKey: kluczeWiedzy.siec });
   qc.invalidateQueries({ queryKey: kluczeWiedzy.odsylacze });
+  qc.invalidateQueries({ queryKey: kluczeWiedzy.wykazy });
   qc.invalidateQueries({ queryKey: ["kandydaci"] });
   qc.invalidateQueries({ queryKey: ["wiedzaDoboru"] });
   if (twId !== undefined) qc.invalidateQueries({ queryKey: klucze.towar(twId) });
@@ -335,6 +337,33 @@ export function useWycofajImport() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) => api<ImportOdsylaczy>(`/api/obsluga/wiedza/odsylacze/${id}/wycofaj`, { method: "POST" }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
+/* ── Wykaz części producenta: podgląd i zapis jedną trasą, jak odsyłacze ─── */
+export function useImportWykazu() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { zrodlo: string; link: string | null; plik: string | null;
+      rodzajDowodu: "producent" | "katalog_dostawcy"; tresc: TrescImportu;
+      mapowanie: MapowanieWykazu | null; zastosuj: boolean }) =>
+      api<RaportWykazu>(`/api/obsluga/wiedza/wykazy`, { method: "POST", body: JSON.stringify(v) }),
+    onSuccess: (r) => { if (r.zapisano) poWiedzy(qc); },
+  });
+}
+
+export function useHistoriaWykazow() {
+  return useQuery({
+    queryKey: kluczeWiedzy.wykazy,
+    queryFn: () => api<ImportWykazu[]>(`/api/obsluga/wiedza/wykazy`),
+  });
+}
+
+export function useWycofajWykaz() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<ImportWykazu>(`/api/obsluga/wiedza/wykazy/${id}/wycofaj`, { method: "POST" }),
     onSettled: () => poWiedzy(qc),
   });
 }

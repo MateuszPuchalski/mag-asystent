@@ -565,6 +565,12 @@ CREATE TABLE IF NOT EXISTS zastosowanie (
   seryjny_od            TEXT,
   seryjny_do            TEXT,
   warunek               TEXT,
+  -- Wykaz części producenta, z którego przyszła propozycja (`import_wykazu`).
+  -- Bez klucza obcego z tego samego powodu co kolumny wyżej: dochodzi przez
+  -- `ADD COLUMN`, a ten w SQLite klucza obcego nie przyjmuje. Po nim cofa się
+  -- cały wykaz naraz — pojedyncze propozycje z pliku na trzysta wierszy
+  -- wycofywane ręcznie to robota, której nikt nie skończy.
+  import_id             INTEGER,
   -- Ograniczenie tabelowe MUSI stać po kolumnach — SQLite inaczej nie parsuje.
   CHECK ((polaryzacja = 'nie_pasuje') = (powod_negatywny IS NOT NULL))
 );
@@ -830,6 +836,33 @@ CREATE TABLE IF NOT EXISTS import_odsylaczy (
   wycofano_at     TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_import_odsylaczy_dostawca ON import_odsylaczy(dostawca, stan);
+
+-- ── Wykazy części producenta (IPL) ─────────────────────────────────────────
+-- Historia plików „model maszyny → numery OEM części", z których wyszły
+-- propozycje zastosowań. Wykaz daje zastosowania z dowodem producenta,
+-- a numer OEM wskazuje kartotekę przez `towar_identyfikator` — i to ogniwo
+-- sprawdza człowiek w kolejce, dlatego wykaz rodzi PROPOZYCJE, nie wpisy.
+--
+-- Bez stanu `zastapiony`, inaczej niż odsyłacze: dwa wykazy tej samej marki
+-- to zwykle dwa różne modele, a nie nowsza wersja jednego cennika.
+-- `wycofany` zdejmuje propozycje, które jeszcze czekają; zatwierdzone zostają,
+-- bo rozstrzygnął je człowiek i tylko człowiek je wycofa.
+CREATE TABLE IF NOT EXISTS import_wykazu (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  zrodlo          TEXT NOT NULL,
+  link            TEXT,
+  plik            TEXT,
+  rodzaj          TEXT NOT NULL CHECK (rodzaj IN ('maszyna','silnik')),
+  wierszy         INTEGER NOT NULL,
+  par             INTEGER NOT NULL,
+  propozycji      INTEGER NOT NULL,
+  stan            TEXT NOT NULL DEFAULT 'aktywny' CHECK (stan IN ('aktywny','wycofany')),
+  zaimportowal    TEXT NOT NULL,
+  user_id         INTEGER REFERENCES app_user(user_id),
+  at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  wycofal         TEXT,
+  wycofano_at     TEXT
+);
 
 -- ── Zamienność przez wspólny numer OEM ──────────────────────────────────────
 -- Dwie kartoteki z tym samym numerem OEM albo oryginalnym w opisie to

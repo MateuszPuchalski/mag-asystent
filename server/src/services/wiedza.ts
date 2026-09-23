@@ -402,6 +402,8 @@ export interface NowaPropozycja {
   zastepujeId?: number | null;
   /** Kwalifikatory prosto z ciała żądania — typy sprawdza `sprawdzWarunki`; brak = bez warunków. */
   warunki?: Partial<Record<keyof WarunkiZastosowania, unknown>> | null;
+  /** Wykaz części, z którego przyszła propozycja. Tylko z serwisu wykazów — trasa go nie przekazuje. */
+  importId?: number | null;
 }
 
 /**
@@ -447,11 +449,12 @@ export function zaproponujZastosowanie(
     if (dubel) return null;
     const id = Number(database.prepare(`INSERT INTO zastosowanie(tw_id,tw_symbol,model_id,polaryzacja,powod_negatywny,
       zrodlo_propozycji,komentarz,conversation_id,zastepuje_id,zaproponowal,zaproponowal_user_id,
-      rok_od,rok_do,seryjny_od,seryjny_do,warunek)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
+      rok_od,rok_do,seryjny_od,seryjny_do,warunek,import_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(p.twId, t.symbol, model.id, p.polaryzacja, powod, p.zrodlo, oczysc(p.komentarz),
         p.conversationId ?? null, p.zastepujeId ?? null, kto.name, kto.userId,
-        warunki.rokOd, warunki.rokDo, warunki.seryjnyOd, warunki.seryjnyDo, warunki.warunek).lastInsertRowid);
+        warunki.rokOd, warunki.rokDo, warunki.seryjnyOd, warunki.seryjnyDo, warunki.warunek,
+        p.importId ?? null).lastInsertRowid);
     wstawDowod(database, id, dowod, p.conversationId ?? null, kto);
     const z = zastosowanie(id, database)!;
     logEvent("wiedza_propozycja", kto.name, p.twId, { zastosowanie: z }, kto.userId, database);

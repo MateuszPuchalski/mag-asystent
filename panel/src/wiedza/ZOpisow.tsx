@@ -7,6 +7,7 @@ import { PolaModelu, type DaneModelu } from "./PolaModelu";
 import { Kafel } from "../towar/Kafel";
 import { Tokeny } from "./Tokeny";
 import { Odsylacze } from "./Odsylacze";
+import { WykazCzesci } from "./WykazCzesci";
 
 /**
  * „Z opisów i ofert" (E3, rozszerzone w 0.264.0): teksty, z których człowiek
@@ -35,6 +36,7 @@ export function ZOpisow() {
 
   return <div className="space-y-3">
     <Odsylacze />
+    <WykazCzesci />
     <p className="text-xs text-slate-500">
       Teksty z opisów kartotek i z list zgodności naszych ofert. Wskaż markę i model —
       powstanie propozycja do kolejki. Odrzuć, gdy to nie jest lista modeli;
