@@ -554,7 +554,7 @@ export function migrate(database: DatabaseSync) {
   addColumn("zamowienie_klienta", "faktura_zadana", "INTEGER");
   /* Powód porażki SŁOWEM, nie tylko kodem HTTP (0.152.0). Przez sześćdziesiąt
      dwa przebiegi panel mówił „failed", bo skrzynka stała na błędzie BEZ kodu
-     („Konto Allegro niepołączone — /biuro → …"). Serwer znał to zdanie
+     („Konto Allegro niepołączone — idź do biura"). Serwer znał to zdanie
      i pisał je do dziennika; na ekran nie trafiało nic. */
   addColumn("allegro_inbox_sync_state", "last_error_text", "TEXT");
   /* Dno przejrzanej listy (0.164.1). Bez tej kolumny sufit stron musiałby

@@ -17,7 +17,7 @@ import {
    strefy orzekają o magazynie — to nie są operacje z hali.
 
    Import jest zwykłym POST-em z JSON-em `{ csv }` ŚWIADOMIE: dziś woła go
-   formularz w /biuro, docelowo integracja z Sellasist — i ma go wołać tym
+   formularz w analizie panelu, docelowo integracja z Sellasist — i ma go wołać tym
    samym żądaniem, bez zmian po naszej stronie. Multipart dałby formularzowi
    wygodę, a integracji zależność.                                            */
 

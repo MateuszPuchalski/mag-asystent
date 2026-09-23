@@ -12,19 +12,18 @@ każdy do swojej roli:
   **magazynier dodaje z niego zdjęcie kartoteki**: dotyka pustego slotu na
   karcie towaru, robi zdjęcie albo wybiera je z galerii, a serwer wycina tło.
   Wdrożenie: [`DEPLOY.md`](DEPLOY.md) §5 i §6 etap 2a.
-- **Biuro ma podgląd pod `/biuro`** (od 0.18.0): status rozkładania dostaw
+- **Biuro miało podgląd pod `/biuro`** (0.18.0–0.446.0): status rozkładania dostaw
   i protokoły rozbieżności do wydruku ze zdjęciami. Od 0.27.0 także metryki,
   kolejka zapisów, rekoncyliacja i ślad audytowy. Od 0.48.0 zakładka ANALIZA:
   wykresy operacji, rytm dostaw, szukane bez wyniku, zdrowie urządzeń
   i wydajność per osoba (z podstawą prawną monitoringu). Od 0.50.0 także
   import zbiórek z Sellasist i kandydaci do strefy złotej z edytorem reguł
   strefy, a od 0.87.0 przy dostawcy stoi jego logo. Dostawca z własnym drukiem
-  reklamacyjnym (GEKO, PARTNER) dostaje od 0.28.0 swój formularz. Jedna strona
-  bez builda i logowanie loginem — operacje magazynowe wykonuje się wyłącznie
-  na kolektorze.
-- **Biuro przechodzi do panelu pod `/obsluga`** (od 0.435.0), widok po
-  widoku. Od 0.444.0 są tam wszystkie, z ustawieniami za zębatką panelu;
-  `/biuro` jest już tylko drogowskazem do panelu.
+  reklamacyjnym (GEKO, PARTNER) dostaje od 0.28.0 swój formularz. Wszystko to
+  mieszka dziś w panelu pod `/obsluga`; operacje magazynowe wykonuje się
+  wyłącznie na kolektorze.
+- **Biuro jest w panelu pod `/obsluga`** (przeprowadzka 0.435.0–0.446.0).
+  Strona `biuro.html` zniknęła; `/` i `/biuro` przekierowują do panelu.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym
@@ -80,8 +79,8 @@ pole `type`.
 
 Panel nie wymaga osobnych poleceń. `npm run dev` podnosi go razem z API
 i workerem: Vite na porcie 5174, proxy `/api` na 3001. `npm run build`
-wkłada gotowy panel do `dist/web/obsluga`, skąd serwuje go ten sam proces
-co `/biuro`. Sam front bez reszty: `npm run dev:panel`.
+wkłada gotowy panel do `dist/web/obsluga`, skąd serwuje go proces API.
+Sam front bez reszty: `npm run dev:panel`.
 
 Strefa przyjęć nazywa się **MGP**.
 
@@ -186,7 +185,7 @@ wpisz `http://10.0.2.2:3001`.
 Ekran startowy jest twardą bramką: bez konta nie ma jak podpisać operacji, więc
 nie ma przejścia dalej. **W trybie `seeded` konto jest od razu**: start API na
 pustej bazie sam zakłada konto demo — login `admin`, hasło `admin` (0.53.2).
-Kolektor i `/biuro` logują się nim bez żadnego kroku ręcznego.
+Kolektor i panel biura logują się nim bez żadnego kroku ręcznego.
 
 Konto demo powstaje wyłącznie przy `SGT_MODE=seeded` i wyłącznie w bazie bez
 żadnego konta z loginem. Na produkcji (`mssql`) nie powstaje nigdy, a w demo
@@ -576,19 +575,18 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   > nie wstając z krzesła. ORZEKA, że pracy nie ma, więc należy do roli, która
   > czyta protokoły rozbieżności.
 
-**Biuro pod `/biuro` — drogowskaz do panelu**
-- Od 0.431.0 biuro przechodzi do panelu pod `/obsluga`, widok po widoku.
-  Decyzja i kolejność stoją w `docs/obsluga-klienta.md` §7. Od 0.444.0
-  w `biuro.html` nie ma już żadnego widoku: strona pokazuje kartę „Biuro
-  przeszło do panelu", a następne wydanie zastąpi ją przekierowaniem.
-- Zostały logowanie, pasek z wyjściami do panelu (z sesją) i **dwie ikony
-  stanu** (0.114.0). Ikona SYSTEM zmienia kolor: zielony — wszystko gra,
-  bursztyn — działa, ale kuleje, czerwień — coś stoi. Najechanie pokazuje
-  pełne zdania z `/api/health`, a kliknięcie prowadzi do stanu systemu
-  w panelu. Ikona ALLEGRO prowadzi do karty konta Allegro.
-- **Odpowiedź na notatkę wraca sama** (0.57.0): pasek pokazuje licznik
-  nieprzeczytanych odpowiedzi, a kliknięcie prowadzi do dostaw w panelu. Stan
-  „przeczytane" siedzi w bazie, więc gaśnie także na drugim biurku.
+**Biuro w panelu pod `/obsluga`**
+- Od 0.431.0 biuro przechodziło do panelu widok po widoku; skończyło się
+  w 0.446.0. Decyzja i kolejność stoją w `docs/obsluga-klienta.md` §7.
+  Strona `biuro.html` zniknęła, a `/` i `/biuro` przekierowują (302) do
+  `/obsluga/`, żeby stare zakładki w przeglądarce trafiały na miejsce.
+- **Praca na górnym rzędzie, wgląd na dolnym, ustawienia za zębatką.** Start
+  to DO DECYZJI: jedna lista wszystkiego, co czeka na biuro. Pigułka
+  synchronizacji w nagłówku mówi, czy integracje żyją, a stan systemu —
+  dlaczego nie.
+- **Odpowiedź na notatkę wraca sama** (0.57.0): DO DECYZJI pokazuje
+  nieprzeczytane odpowiedzi hali i prowadzi do dostawy. Stan „przeczytane"
+  siedzi w bazie, więc gaśnie także na drugim biurku.
 - **USTAWIENIA** przeszły w 0.444.0 za zębatkę panelu
   (`/obsluga/ustawienia`). Stoją tam dane firmy do protokołów, reguły strefy
   złotej, konta i sesje, słownik tagów i logo dostawców. Dane firmy są na

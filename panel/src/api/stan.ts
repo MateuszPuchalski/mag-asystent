@@ -135,9 +135,13 @@ export const useWymiana = (dni: number) => useQuery({
 /* Okno alarmu jest STAŁE (30 dni, bez parametru) — suwak przy tabeli rządzi
    tabelą, a sygnał, który zmienia treść przy przestawieniu listy, przestaje
    być sygnałem. Powód stoi przy trasie w `routes/biuro.ts`. */
+/* Rytm 30 s od 0.446.0: plakietka w nagłówku ma urosnąć sama, jak w cyklu
+   biura, a nie dopiero po wejściu na stan systemu. Odczyt jest tani (GET po
+   jednym zapytaniu na kanał) i nic nie zapisuje. */
 export const useAlarmWymiany = () => useQuery({
   queryKey: ["alarmWymiany"],
   queryFn: () => api<AlarmWymiany>("/api/biuro/alarm-wymiany"),
+  refetchInterval: 30_000,
 });
 
 /* ── Konto Allegro ─────────────────────────────────────────────────────── */
