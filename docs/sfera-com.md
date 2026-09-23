@@ -672,8 +672,19 @@ zapisany dokument też odmawia tego pola.
 & C:\wertis\sfera-worker\wertis-sfera-worker.exe --zrzut 9253431
 ```
 
-`[WERYFIKUJ]` Czy `PozycjaTypPromocji` na zapisanym ZW 748/MAG/09/2026 odmawia
-kodem `0x8004197F`, czy oddaje wartość.
+**`PozycjaTypPromocji` odpadła** (23 września 2026). `--zrzut 9253431` odczytał
+ZW 748 z C#. Pole odmawia kodem `0x8004197F` także na zapisanym dokumencie.
+To zwykła cecha pola, nie przyczyna odmowy.
+
+Ten sam zrzut zestawiony z odmową `#1481` zgadza się w każdym polu nagłówka
+i wierszy. Wyjątki to numer, nadawany przy zapisie, i jedno pole:
+`WartoscVatPP`. Zapisany ZW ma tam `0.0000`, każdy szkic z COM ma `null`.
+
+**Od 0.461.0 worker ustawia `WartoscVatPP = 0`, gdy szkic ma tam pustkę.**
+To wartość przepisana z ZW biura, przy `PodzielonaPlatnosc = False` po obu
+stronach. Treść odmowy i dziennik mówią, czy setter przyjął zero.
+
+`[WERYFIKUJ]` Czy ZW z `WartoscVatPP = 0` przechodzi zapis.
 
 **Od 0.456.0 worker robi ten zrzut sam, w chwili odmowy.** Właściciel zapytany,
 czy uruchomi sondę z komunikatu, odpowiedział: „niech robi to sam". Po odmowie
