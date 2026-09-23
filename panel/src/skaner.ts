@@ -29,6 +29,43 @@ export const MIN_DLUGOSC = 6;
 export const ZWLOKA_MS = 40;
 
 /**
+ * Odstęp, poniżej którego seria W POLU TEKSTOWYM jest czytnikiem (0.468.0).
+ *
+ * Sześć razy ostrzej niż `PRZERWA_MS`, bo tu pomyłka kosztuje więcej: poza
+ * polem zbyt gorliwy nasłuch przełączy najwyżej kubełek, a w polu ZJADŁBY
+ * wpisaną notatkę. Czytnik wysyła znak co kilka milisekund. Człowiek
+ * piszący 50 ms na znak pisałby 240 słów na minutę, i to przez sześć znaków
+ * bez jednej zwłoki.
+ */
+export const PRZERWA_W_POLU_MS = 50;
+
+export interface OpcjeSkanera {
+  /**
+   * Słuchaj także w polach tekstowych (0.468.0). Seria czytnika w zwykłym
+   * polu nie zostaje w nim — pole wraca do treści sprzed serii, a kod idzie
+   * do `onSkan`. Pole, które skan obsługuje samo, nosi `data-skan-wlasny`.
+   */
+  wPolach?: boolean;
+}
+
+/** Typy pól, w których czytnik pisze jak klawiatura. Hasło — nigdy. */
+const POLE_TEKSTOWE = /^(text|search|number|tel|email|url)$/;
+
+/**
+ * Przywraca treść pola TĄ DROGĄ, którą React widzi jako pisanie.
+ *
+ * Samo `value = …` React by zignorował: pole kontrolowane ma swój stan
+ * i przy następnym przerysowaniu wstawiłoby z powrotem cyfry czytnika.
+ * Setter z prototypu plus zdarzenie `input` trafia do `onChange`.
+ */
+function ustawTresc(pole: HTMLInputElement | HTMLTextAreaElement, tresc: string) {
+  const proto = pole instanceof HTMLTextAreaElement
+    ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype;
+  Object.getOwnPropertyDescriptor(proto, "value")?.set?.call(pole, tresc);
+  pole.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+/**
  * Nasłuch czytnika. `onSkan` dostaje gotowy kod, `onZnak` — pojedynczy klawisz,
  * który okazał się NIE być częścią serii (czyli zwykły skrót).
  *
@@ -38,11 +75,76 @@ export const ZWLOKA_MS = 40;
 export function useSkaner(
   onSkan: (kod: string) => void,
   onZnak?: (e: KeyboardEvent) => void,
+  opcje?: OpcjeSkanera,
 ) {
   const naSkan = useRef(onSkan);
   const naZnak = useRef(onZnak);
+  const wPolach = useRef(Boolean(opcje?.wPolach));
   naSkan.current = onSkan;
   naZnak.current = onZnak;
+  wPolach.current = Boolean(opcje?.wPolach);
+
+  /* ── SKAN W POLU (0.468.0) ───────────────────────────────────────────────
+     Zgłoszenie właściciela: „zakładka zwrotów powinna CAŁY CZAS nasłuchiwać
+     skanu etykiety". Nasłuch niżej milczy, gdy kursor stoi w polu — więc
+     etykieta zeskanowana przy kursorze w notatce albo w kwocie wpisywała się
+     tam jak tekst, a Enter czytnika zapisywał tę kwotę.
+
+     Osobny nasłuch w FAZIE PRZECHWYTYWANIA, na oknie. Tylko ta faza jest
+     przed obsługą pola w Reakcie, więc Enter czytnika nie dociera do pola
+     wcale. Znaki serii już w polu stoją — przy Enterze pole wraca do treści
+     sprzed serii.
+
+     Nasłuch niżej zostaje BEZ ZMIAN. Działa w fazie bąbelkowej i ma swoje
+     zwłoki pod skróty — przestawienie go dotknęłoby każdego klawisza ekranu. */
+  useEffect(() => {
+    let pole: HTMLInputElement | HTMLTextAreaElement | null = null;
+    let seria = "";
+    let przedSeria = "";
+    let ostatni = 0;
+    const zeruj = () => { pole = null; seria = ""; przedSeria = ""; };
+
+    const naKlawiszWPolu = (e: KeyboardEvent) => {
+      if (!wPolach.current) return;
+      const cel = e.target;
+      const tekstowe = cel instanceof HTMLTextAreaElement
+        || (cel instanceof HTMLInputElement && POLE_TEKSTOWE.test(cel.type));
+      if (!tekstowe) return;
+      if (cel.closest("[data-skan-wlasny]")) return;
+      /* Przytrzymany klawisz powtarza się co ~30 ms — gęściej niż próg. To nie
+         czytnik, więc przerywa serię, zamiast ją budować. */
+      if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) { zeruj(); return; }
+
+      const teraz = Date.now();
+      const wSerii = cel === pole && teraz - ostatni <= PRZERWA_W_POLU_MS;
+      ostatni = teraz;
+
+      if (e.key === "Enter" || e.key === "Tab") {
+        const kod = wSerii ? seria : "";
+        const bylo = przedSeria;
+        zeruj();
+        if (kod.length < MIN_DLUGOSC) return;
+        e.preventDefault();
+        e.stopPropagation();
+        ustawTresc(cel, bylo);
+        naSkan.current(kod);
+        return;
+      }
+      if (e.key.length !== 1) { zeruj(); return; }
+      if (!wSerii) {
+        /* `keydown` przychodzi PRZED wstawieniem znaku — to jest treść,
+           do której pole wróci, jeśli seria okaże się skanem. */
+        pole = cel;
+        seria = e.key;
+        przedSeria = cel.value;
+        return;
+      }
+      seria += e.key;
+    };
+
+    window.addEventListener("keydown", naKlawiszWPolu, true);
+    return () => window.removeEventListener("keydown", naKlawiszWPolu, true);
+  }, []);
 
   useEffect(() => {
     let bufor = "";

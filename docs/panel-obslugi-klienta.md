@@ -3852,6 +3852,29 @@ Próg jest sześcioznakowy, nie dwuznakowy, i to jest cała ostrożność tej re
 Zbyt gorliwa kasowałaby numer wpisywany ręką w środku pisania — a tego biuro
 nie zgłosi jako usterki, tylko powie „znowu mi zjadło".
 
+**Zakładka słucha czytnika zawsze i odróżnia etykietę od towaru (0.468.0).**
+Zgłoszenie właściciela: „zakładka zwrotów powinna cały czas nasłuchiwać skanu
+etykiety zwrotowej oraz odróżniać ją od skanu EAN-u produktu".
+
+Skan działa teraz także przy kursorze w notatce, kwocie czy loginie. Osobny
+nasłuch w fazie przechwytywania łapie serię, zanim zobaczy ją pole. Pole wraca
+do treści sprzed serii, a Enter czytnika nie zapisuje kwoty. Próg jest tu
+ostrzejszy: 50 ms między znakami, nie 300. Pomyłka w polu zjadłaby wpisany
+tekst, a tak gęsto człowiek nie pisze. Przytrzymany klawisz też serii nie
+buduje.
+
+Dwa pola czytają czytnik same i nasłuch je omija: szukanie zwrotu i „Skanuj
+towar" przy pudle. Noszą znacznik `data-skan-wlasny`.
+
+EAN rozpoznaje kształt: 8, 12, 13 albo 14 cyfr z poprawną cyfrą kontrolną
+(`zwroty/rodzajKodu.ts`). Ostatnie słowo ma kartoteka. Jedno dokładne trafienie
+dokłada sztukę do koszyka, decyzją właściciela, jak pole przy pudle. Kod
+w kształcie EAN-u nieznany kartotece wraca do szukania zwrotu, bo cyfrowa
+etykieta przewoźnika bywa przypadkiem zgodna z cyfrą kontrolną.
+
+Enter wpisany ręką w polu szukania dalej tylko szuka. Człowiek, który przepisuje
+cyfry, pyta o zwrot, a nie wkłada towaru do pudła.
+
 **Szukanie przebija kubełek.** Lista pokazuje wtedy wyniki ze wszystkich
 kubełków, a wiersz niesie etykietę swojego. Bez tego operator wpisuje numer,
 widzi „ten kubełek jest pusty" i nie ma jak się dowiedzieć, że zwrot stoi

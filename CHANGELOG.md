@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.468.0 — 23 września 2026
+
+**Zakładka zwrotów słucha czytnika zawsze i odróżnia etykietę od EAN-u towaru.**
+Zgłoszenie właściciela: „zakładka zwrotów powinna cały czas nasłuchiwać skanu
+etykiety zwrotowej oraz odróżniać ją od skanu EAN-u produktu”.
+
+- **Etykieta** otwiera zwrot, jak dotąd.
+- **EAN towaru** znany kartotece dokłada sztukę do koszyka, jak pole „Skanuj
+  towar” przy pudle. Pod polem szukania staje zdanie z symbolem, koszykiem
+  i liczbą sztuk. Do tego wydania EAN kończył się komunikatem „Nie znam kodu”.
+- **Skan działa także przy kursorze w polu**, np. w notatce, kwocie czy loginie.
+  Seria czytnika nie zostaje w polu, a jego Enter niczego tam nie zapisuje.
+  Pisanie ręką zostaje w polu: próg to 50 ms między znakami.
+- Kod w kształcie EAN-u, którego kartoteka nie zna, idzie do szukania zwrotu.
+
+Szczegóły w `docs/panel-obslugi-klienta.md`, przy czytniku.
+
 ## 0.467.0 — 23 września 2026
 
 **[wymaga działania] Import odsyłaczy od dostawców: cennik z numerami OEM

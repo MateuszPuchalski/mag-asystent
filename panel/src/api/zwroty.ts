@@ -376,9 +376,20 @@ export function useTowaryDoKosza(q: string) {
   return useQuery({
     queryKey: ["kosz-towary", czysty] as const,
     enabled: czysty.length > 0,
-    queryFn: () => api<{ towary: TowarDoKosza[]; dokladne: boolean; przyblizone: boolean }>(
-      `/api/obsluga/zwroty/kosz/towary?q=${encodeURIComponent(czysty)}`),
+    queryFn: () => szukajTowaruDoKosza(czysty),
   });
+}
+
+/**
+ * To samo pytanie bez hooka — dla skanu z nasłuchu ekranu (0.468.0).
+ *
+ * Skan EAN-u na zakładce zwrotów pyta kartotekę RAZ i od odpowiedzi zależy,
+ * dokąd kod pójdzie dalej. Zapytanie kluczowane frazą trzymałoby w pamięci
+ * każdy zeskanowany kod, a tu wynik jest potrzebny tylko w tej jednej chwili.
+ */
+export function szukajTowaruDoKosza(q: string) {
+  return api<{ towary: TowarDoKosza[]; dokladne: boolean; przyblizone: boolean }>(
+    `/api/obsluga/zwroty/kosz/towary?q=${encodeURIComponent(q.trim())}`);
 }
 
 /**

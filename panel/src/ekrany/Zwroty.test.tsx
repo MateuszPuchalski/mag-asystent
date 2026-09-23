@@ -59,6 +59,9 @@ const scena = vi.hoisted(() => ({
      pobrano" i tak zachowuje się ekran bez serwera — czyli tak, jak we
      wszystkich pozostałych testach tego pliku. */
   szczegol: undefined as { pieniadze?: Record<string, unknown> } | undefined,
+  /* Kartoteka dla skanu EAN-u (0.468.0): kod → towar. Pusta = kartoteka kodu
+     nie zna, więc skan wraca do szukania zwrotu. */
+  kartoteka: {} as Record<string, { twId: number; symbol: string }>,
 }));
 
 vi.mock("../api/zwroty", async () => {
@@ -87,6 +90,22 @@ vi.mock("../api/zwroty", async () => {
     useCofnijKorekte: () => atrapa("cofnijKorekte"),
     useZwrot: () => ({ data: scena.szczegol, isLoading: false, error: null }),
     useZwrocPieniadze: () => atrapa("zwrocPieniadze"),
+    /* Skan i dołożenie towaru jako atrapy: test sprawdza, KTÓRĄ drogą poszedł
+       kod, a prawdziwe mutacje strzelałyby `fetch`-em w nieistniejący serwer. */
+    useSkanZwrotu: () => atrapa("skan"),
+    useDolozTowar: () => ({
+      isPending: false,
+      mutate: (dane: Record<string, unknown>, opcje?: { onSuccess?: (w: unknown) => void }) => {
+        scena.wolano.push({ co: "dolozTowar", dane });
+        opcje?.onSuccess?.({ kod: "K-7", ilosc: 2 });
+      },
+    }),
+    szukajTowaruDoKosza: async (q: string) => {
+      const t = scena.kartoteka[q];
+      return t
+        ? { towary: [{ ...t, nazwa: "", ean: q, stanMag: null }], dokladne: true, przyblizone: false }
+        : { towary: [], dokladne: false, przyblizone: false };
+    },
   };
 });
 
@@ -770,5 +789,61 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
       /* Sam wiersz zostaje nietknięty — zeszły sita, nie kolejka. */
       expect(screen.getAllByRole("listitem").length).toBe(1);
     } finally { scena.zwroty = null; }
+  });
+
+  /* ── ETYKIETA CZY TOWAR (0.468.0) ──────────────────────────────────────
+     Zgłoszenie właściciela: „zakładka zwrotów powinna cały czas nasłuchiwać
+     skanu etykiety zwrotowej oraz odróżniać ją od skanu EAN-u produktu".
+     Decyzja: EAN znany kartotece idzie do koszyka. */
+
+  /** Czytnik poza polem: seria znaków bez przerwy, na końcu Enter. */
+  const czytnik = (kod: string) => {
+    for (const znak of kod) window.dispatchEvent(new KeyboardEvent("keydown", { key: znak }));
+    window.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", cancelable: true }));
+  };
+
+  it("EAN towaru z kartoteki idzie do koszyka, nie do szukania zwrotu", async () => {
+    scena.wolano.length = 0;
+    scena.kartoteka = { "5901234123457": { twId: 504, symbol: "FT0114" } };
+    pokaz();
+    czytnik("5901234123457");
+    expect(await screen.findByText("FT0114 → koszyk K-7: 2 szt.")).toBeInTheDocument();
+    expect(scena.wolano).toEqual([{ co: "dolozTowar", dane: { twId: 504, ilosc: 1, rodzaj: "zwroty" } }]);
+    scena.kartoteka = {};
+  });
+
+  it("etykieta zwrotu idzie do szukania, nie do koszyka", async () => {
+    scena.wolano.length = 0;
+    pokaz();
+    czytnik("600000367616070023174201");
+    await waitFor(() => expect(scena.wolano.map((w) => w.co)).toEqual(["skan"]));
+  });
+
+  it("kod w kształcie EAN-u, którego kartoteka nie zna, wraca do szukania zwrotu", async () => {
+    /* Cyfrowa etykieta przewoźnika bywa przypadkiem zgodna z cyfrą kontrolną. */
+    scena.wolano.length = 0;
+    scena.kartoteka = {};
+    pokaz();
+    czytnik("5901234123457");
+    await waitFor(() => expect(scena.wolano.map((w) => w.co)).toEqual(["skan"]));
+  });
+
+  it("etykieta zeskanowana przy kursorze w polu loginu nie zostaje w polu", async () => {
+    /* „Cały czas nasłuchiwać" — także wtedy, gdy kursor stoi w innym polu. */
+    scena.wolano.length = 0;
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: "Paczki klienta" }));
+    const login = screen.getByLabelText("Login, nazwisko albo telefon");
+    await userEvent.type(login, "jan");
+    /* `userEvent` pisze szybciej niż czytnik. Człowiek robi pauzę, zanim
+       sięgnie po czytnik — bez niej „jan" byłby początkiem serii skanu. */
+    await new Promise((r) => setTimeout(r, 80));
+    for (const znak of "600000367616070023174201") {
+      login.dispatchEvent(new KeyboardEvent("keydown", { key: znak, bubbles: true, cancelable: true }));
+    }
+    login.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", bubbles: true, cancelable: true }));
+    await waitFor(() => expect(scena.wolano).toEqual(
+      [{ co: "skan", dane: "600000367616070023174201" }]));
+    expect(login).toHaveValue("jan");
   });
 });

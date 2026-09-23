@@ -14,7 +14,9 @@ import {
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
+  useDolozTowar, szukajTowaruDoKosza, type TowarDoKosza,
 } from "../api/zwroty";
+import { wygladaNaEan } from "../zwroty/rodzajKodu";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 import { Naglowek } from "../zwroty/Naglowek";
@@ -482,6 +484,46 @@ export function Zwroty() {
     skan.mutate(v, { onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) });
   };
 
+  /* ── SKAN: ETYKIETA ALBO TOWAR (0.468.0) ─────────────────────────────────
+     Zgłoszenie właściciela: „zakładka zwrotów powinna cały czas nasłuchiwać
+     skanu etykiety zwrotowej oraz odróżniać ją od skanu EAN-u produktu".
+     Decyzja właściciela co do EAN-u: DOŁÓŻ DO KOSZYKA — tak jak pole „Skanuj
+     towar" przy pudle, tylko bez klikania w nie.
+
+     Kształt EAN-u to podejrzenie, rozstrzyga kartoteka. Jedno dokładne
+     trafienie idzie do koszyka. Brak trafienia albo odmowa serwera wraca do
+     szukania zwrotu, bo cyfrowa etykieta bywa przypadkiem podobna do EAN-u.
+     Skan towaru NIE rusza frazy: lista kolejki zostaje taka, jaka była. */
+  const dolozTowar = useDolozTowar();
+  const [skanTowaru, setSkanTowaru] = useState<{ tekst: string; blad: boolean } | null>(null);
+  const naSkan = async (v: string) => {
+    setSkanTowaru(null);
+    if (wygladaNaEan(v)) {
+      let towar: TowarDoKosza | null = null;
+      try {
+        const w = await szukajTowaruDoKosza(v);
+        if (w.dokladne && w.towary.length === 1) towar = w.towary[0];
+      } catch {
+        /* Kartoteka nie odpowiedziała — kod idzie do szukania zwrotu, które
+           powie „nie znam", zamiast zgubić skan w ciszy. */
+      }
+      if (towar) {
+        const t = towar;
+        dolozTowar.mutate({ twId: t.twId, ilosc: 1, rodzaj: "zwroty" }, {
+          onSuccess: (w) => {
+            setSkanTowaru({ tekst: `${t.symbol} → koszyk ${w.kod}: ${w.ilosc} szt.`, blad: false });
+            /* EAN zeskanowany w polu szukania stoi w nim po podmianie serii.
+               Zostawiony filtrowałby kolejkę po kodzie towaru do zera. */
+            setFraza((f) => (f === v ? "" : f));
+          },
+          onError: (e) => setSkanTowaru({ tekst: (e as Error).message, blad: true }),
+        });
+        return;
+      }
+    }
+    szukaj(v);
+  };
+
   const wybrany = id ? Number(id) : null;
   const zwrot = data?.zwroty.find((z) => z.id === wybrany) ?? null;
   /* Kandydatów na dokument sprzedaży niesie DOPIERO szczegół zwrotu, nie
@@ -660,8 +702,11 @@ export function Zwroty() {
   /* Skróty idą TĄ SAMĄ drogą co czytnik (0.163.0). Dwa niezależne nasłuchy
      nie umiałyby się dogadać, który klawisz jest czyj — a numer listu
      `600000367616070023174201` zawiera wszystkie cyfry kubełków. */
+  /* `wPolach` (0.468.0): skan działa także przy kursorze w notatce, kwocie
+     czy loginie. Seria czytnika nie zostaje w polu — właściciel chce, żeby
+     zakładka słuchała etykiety CAŁY CZAS. */
   useSkaner(
-    (kod) => szukaj(kod),
+    (kod) => { void naSkan(kod); },
     (e) => {
       if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idz(1); }
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
@@ -671,6 +716,7 @@ export function Zwroty() {
          w nasłuchu jest gorszy niż jego brak: milczy i uczy, że nie działa. */
       else klawiszKubelka(e);
     },
+    { wPolach: true },
   );
 
   if (error) return <Blad>{(error as Error).message}</Blad>;
@@ -770,6 +816,8 @@ export function Zwroty() {
         szuka={skan.isPending} dociaga={dociagnij.isPending} blad={bladSkanu}
         onFraza={(v) => { setFraza(v); if (!v) setWynikSkanu(null); }}
         onSzukaj={szukaj}
+        onSkan={(v) => { void naSkan(v); }}
+        towar={skanTowaru}
         onDociagnij={(v) => dociagnij.mutate(v, {
           onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
         onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }}
