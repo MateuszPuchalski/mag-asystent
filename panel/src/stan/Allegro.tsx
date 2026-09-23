@@ -3,7 +3,7 @@ import { Link2, Unlink } from "lucide-react";
 import { useRozlaczAllegro, useStanAllegro } from "../api/stan";
 import { Blad, Przycisk, czas } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
-import { Potwierdz } from "./Potwierdz";
+import { Potwierdz } from "../ui/Potwierdz";
 import { useParowanie } from "./parowanie";
 
 /* ── Konto Allegro (z `biuro.html`, 0.441.0) ────────────────────────────

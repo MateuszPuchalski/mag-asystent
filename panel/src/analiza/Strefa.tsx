@@ -1,9 +1,8 @@
 import React, { useRef, useState } from "react";
 import { Download, Upload } from "lucide-react";
+import { Link } from "react-router-dom";
 import { pobierzPlik } from "../api/klient";
 import { useImportZbiorek, useKandydaci, type WynikImportuZbiorek } from "../api/wglad";
-import { useJa } from "../api/rozmowy";
-import { doBiura } from "../mostBiura";
 import { Blad, Przycisk } from "../ui";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
@@ -13,15 +12,14 @@ import { KartaWgladu, Tabela, Td } from "../ui/wglad";
    niczego nie zdubluje. Kandydat dostaje też adnotację na karcie towaru
    w kolektorze.
 
-   REGUŁY ZOSTAJĄ ZA ZĘBATKĄ BIURA do F5 — przeprowadzka ustawień idzie
-   osobnym wydaniem. Zdanie o nich jest drogowskazem, nie ozdobą: pusta lista
-   bez niego wygląda na awarię, a nie na brak reguł. Dlatego prowadzi
-   mostem wprost do ustawień w `/biuro`, zamiast opisywać, gdzie kliknąć. */
+   REGUŁY STOJĄ ZA ZĘBATKĄ PANELU (od 0.444.0, wcześniej w `/biuro`).
+   Zdanie o nich jest drogowskazem, nie ozdobą: pusta lista bez niego wygląda
+   na awarię, a nie na brak reguł. Dlatego prowadzi wprost do karty reguł
+   (`?karta=strefa`), zamiast opisywać, gdzie kliknąć. */
 
 export function Strefa() {
   const kandydaci = useKandydaci(true);
   const wgraj = useImportZbiorek();
-  const ja = useJa();
   const plik = useRef<HTMLInputElement | null>(null);
   const [wynik, setWynik] = useState<WynikImportuZbiorek | null>(null);
   const [blad, setBlad] = useState("");
@@ -73,7 +71,6 @@ export function Strefa() {
     </>}
     <p className="mt-3 text-sm text-slate-600">
       Które poziomy regałów są „złote", ustawia się w ustawieniach biura —{" "}
-      <a href="/biuro" className="font-semibold underline"
-        onClick={() => doBiura("dostawcy", ja.data?.user.name ?? "")}>reguły strefy złotej ↗</a>.</p>
+      <Link to="/obsluga/ustawienia?karta=strefa" className="font-semibold underline">reguły strefy złotej</Link>.</p>
   </KartaWgladu>;
 }

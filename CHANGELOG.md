@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.444.0 — 23 września 2026
+## 0.445.0 — 23 września 2026
 
 **Prawa kolumna skrzynki bez powtórzeń i bez ramek w ramkach, a wysyłka bez
 fałszywego „klient dopisał".** Zgłoszenie
@@ -63,6 +63,41 @@ ostatnią wiadomość po czasie.
 
 - **[wymaga działania]** Przebuduj panel.
 
+
+## 0.444.0 — 23 września 2026
+
+**Ustawienia biura przeszły do panelu.** Piąty krok przeprowadzki biura
+(`docs/obsluga-klienta.md` §7, F5). Za zębatką panelu stoją odtąd dane firmy,
+reguły strefy złotej, konta i sesje, słownik tagów i logo dostawców.
+
+**Dane firmy są na serwerze, nie w przeglądarce.** Nagłówek protokołu dla
+dostawcy mieszkał w pamięci jednej przeglądarki, więc nowe biurko drukowało
+protokół bez niego. Nowa tabela `firma` ma jeden wiersz, a trasy to
+`GET` i `PUT /api/biuro/firma`. Przy pustym serwerze karta proponuje
+„Przenieś na serwer" — przyciskiem, bo otwarcie ekranu niczego nie zapisuje.
+Druk bierze dane z serwera, a do pierwszego zapisu z przeglądarki.
+
+**Konta widzi każdy, zmienia admin.** Przyciski resetu, wyłączenia i sesji
+stoją tylko u administratora; biuro widzi listę. Nowe hasło wpisuje się
+w pole maskowane, a nie w okienko przeglądarki.
+
+**Logo podmienia się od razu.** Nowe logo pokazuje się w ustawieniach
+i w Dostawach bez odświeżania strony. Przeglądarka pyta serwer o zmianę
+zamiast trzymać stary obraz przez dobę.
+
+**Pomiary obsługi przeszły do Analizy.** Sześć kart z ustawień stoi
+w zakresie „Obsługa klienta", pod czasem odpowiedzi. Skuteczność doboru
+słucha okna zakresu, zamiast mieć drugi przełącznik obok pierwszego.
+
+**`/biuro` jest drogowskazem.** Strona pokazuje jedną kartę z drogą do
+panelu. Pasek, ikony stanu i zębatka prowadzą tam z sesją. Licznik zapisów
+strony spadł do jednego POST, czyli logowania. W następnym wydaniu adres
+przekieruje do panelu sam.
+
+- **[wymaga działania]** Przebuduj panel. Tabelę `firma` serwer zakłada sam
+  przy starcie.
+- **[wymaga działania]** Na biurku, które drukowało protokoły, otwórz
+  ustawienia panelu i kliknij „Przenieś na serwer".
 
 ## 0.443.0 — 23 września 2026
 

@@ -4,7 +4,7 @@ import { useKolejka, useRuchKolejki, type ZadanieKolejki } from "../api/stan";
 import { Blad, Przycisk } from "../ui";
 import { Liczba } from "../ui/wykres";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
-import { Potwierdz } from "./Potwierdz";
+import { Potwierdz } from "../ui/Potwierdz";
 
 /* ── Kolejka zapisów do Subiekta (z `biuro.html`, 0.441.0) ───────────────
    Jedyna rzecz w stanie systemu, przez którą stan w Subiekcie może się nie

@@ -70,6 +70,24 @@ beforeEach(() => {
         { klucz: "nierozpoznane", n: 3, medianaMin: 12 }],
       wgOsoby: null, czekaTeraz: { n: 2, najdluzejMin: 130 },
     }));
+    /* Miary obsługi (0.444.0, przyszły z ustawień). Kształty minimalne —
+       treść każdej karty ma własny test obok niej; tu liczy się skład. */
+    if (url === "/api/obsluga/sygnatury") return new Response(JSON.stringify(
+      { pozycji: 0, bezSygnatury: 0, trafia: 0, sygnatur: 0, pudla: [], zdublowane: [] }));
+    if (url === "/api/obsluga/pokrycie-wiedzy") return new Response(JSON.stringify({
+      kartotek: 3200, zOpisem: 1400, zIdentyfikatorem: 460, identyfikatorow: 1900, identyfikatorowRecznych: 0,
+      modeleZOpisu: { nowych: 0, przerobionych: 0, odrzuconych: 0 },
+      zastosowania: { zatwierdzonych: 0, negatywnych: 0, propozycji: 0 },
+      tokeny: { tokenow: 0, nowych: 0, zatwierdzonych: 0 }, wymiary: { kartotek: 0, wymiarow: 0 },
+      fts: { dostepne: true, wpisow: 0 } }));
+    if (url === "/api/obsluga/wiedza-automat") return new Response(JSON.stringify([]));
+    if (url === "/api/obsluga/eskalacja") return new Response(JSON.stringify({ miesiace: [] }));
+    if (url === "/api/obsluga/copilot") return new Response(JSON.stringify({ wlaczony: false, powod: "wyłączony",
+      model: "x", modelKlasyfikacji: "x", maxPartia: 20, autoKlasyfikacja: false, autoSzkic: false }));
+    if (url.startsWith("/api/obsluga/skutecznosc-doboru?dni=")) return new Response(JSON.stringify({
+      dni: 30, granicaHistorii: null, wyborow: 4, drogi: [{ droga: "oem", wybranych: 4, zatwierdzonych: 0 }],
+      medianaDoWyboruMin: 12, wyborowZCzasem: 4, osoby: [], bezKonta: 0,
+      naStole: { doborow: 0, statusy: [] }, progWiarygodnosci: 20, podstawaPrawna: "art. 22²" }));
     if (url === "/api/biuro/zbiorki/kandydaci") {
       return new Response(JSON.stringify({ okno: null, prog: 0, kandydaci: [], juzWStrefie: 0, bezReguly: 0 }));
     }
@@ -170,6 +188,27 @@ describe("zakres Obsługa klienta", () => {
     expect(screen.getByText("Dobór")).toBeInTheDocument();
     expect(screen.getByText("nierozpoznane")).toBeInTheDocument();
     expect(screen.queryByText("Według osoby")).toBeNull();
+    expect(zapisy).toEqual([]);
+  });
+
+  /* Miary obsługi przeszły tu z ustawień w 0.444.0. Pilnujemy trzech
+     rzeczy: stoją pod czasem odpowiedzi, dobór słucha okna ZAKRESU (jeden
+     selektor, nie dwa) i żadna z nich nie pobiera się w innym zakresie. */
+  it("niesie miary obsługi z ustawień; dobór idzie za oknem zakresu", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    expect(adresy.some((a) => a.startsWith("/api/obsluga/"))).toBe(false);
+    await userEvent.click(screen.getByRole("button", { name: "Obsługa klienta" }));
+    await screen.findByText("Sygnatura → kartoteka Subiekta");
+    expect(screen.getByText("Wiedza z opisów kartotek i ofert")).toBeInTheDocument();
+    await screen.findByText(/Skuteczność doboru/);
+    expect(adresy).toContain("/api/obsluga/skutecznosc-doboru?dni=30");
+    /* Karta doboru nie ma już własnego selektora okna. */
+    expect(screen.queryByRole("group", { name: "Okno raportu" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "7 dni" }));
+    await waitFor(() => expect(adresy).toContain("/api/obsluga/skutecznosc-doboru?dni=7"));
+    /* Wyłączony Copilot nie zostawia po sobie pustej karty. */
+    expect(screen.queryByText(/Copilot — rozpoznawanie kategorii/)).toBeNull();
     expect(zapisy).toEqual([]);
   });
 });
