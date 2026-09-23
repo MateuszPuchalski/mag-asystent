@@ -916,7 +916,7 @@ export function putawayLine(
 
 /**
  * Dostawa zamyka się sama, gdy każda pozycja jest odłożona. Pozycja z wyjątkiem
- * nie blokuje ZAKOŃCZ (liczy się jako rozstrzygnięta, D8), ale od 0.437.0 nie
+ * nie blokuje ZAKOŃCZ (liczy się jako rozstrzygnięta, D8), ale od 0.439.0 nie
  * zamyka dostawy sama — patrz komentarz w środku funkcji.
  */
 export function closeIfComplete(

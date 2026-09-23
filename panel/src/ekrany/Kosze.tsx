@@ -1,0 +1,127 @@
+import React, { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Package } from "lucide-react";
+import {
+  useKosze, usePominiete, usePrzeliczKosz, useSzczegolKosza, useSzukajWKoszach, useZalatwPominiecie,
+} from "../api/kosze";
+import { Blad, FiltrSegmentowy, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { KUBELKI_KOSZY, KolejkaKoszy, KolejkaPominietych, WynikiSzukania, kubelekKosza,
+  type KubelekKoszy } from "../kosze/Kolejka";
+import { Kosz } from "../kosze/Kosz";
+import { KontekstKosza } from "../kosze/Kontekst";
+import { Koszyk } from "../zwroty/Koszyk";
+import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
+
+/* ── KOSZE W ZAKŁADCE ZWROTY (0.438.0) ─────────────────────────────────────
+   Przeniesione z MAGAZYNU ZWROTÓW w `biuro.html`, decyzją właściciela do
+   zakładki Zwroty — powód przy `zwroty/Przelacznik.tsx`. Gramatyka ta sama co
+   w Zwrotach i Dostawach: kolejka, sprawa, kontekst.
+
+   PASEK OTWARTEGO KOSZYKA STOI TU TAK SAMO jak na liście zwrotów. To ten sam
+   komponent, bo koszyk zamyka się w jednym miejscu, jedną trasą — dwie drogi
+   zamknięcia tego samego pudła to dwa miejsca, w których może się ono
+   rozjechać. W biurze stał przy koszu przycisk ZAMKNIJ bez obsługi; teraz
+   zamyka go ten pasek.
+
+   ADRES NIESIE KOSZ (`/obsluga/zwroty/kosze/:id`): odświeżenie nie gubi
+   sprawy, a karta zwrotu i ANALIZA w biurze prowadzą wprost do niego. */
+
+export function Kosze() {
+  const { id } = useParams();
+  const nawiguj = useNavigate();
+  const wybrany = id ? Number(id) : null;
+  const [kubelek, setKubelek] = useState<KubelekKoszy>("praca");
+  const [fraza, setFraza] = useState("");
+  /* Szukanie liczy SERWER — ćwierć sekundy przerwy, jak przy archiwum dostaw. */
+  const [q, setQ] = useState("");
+  useEffect(() => { const t = setTimeout(() => setQ(fraza.trim()), 250); return () => clearTimeout(t); }, [fraza]);
+
+  const kosze = useKosze();
+  const pominiete = usePominiete();
+  const szczegol = useSzczegolKosza(wybrany);
+  const szukaj = useSzukajWKoszach(q);
+  const przelicz = usePrzeliczKosz();
+  const zalatw = useZalatwPominiecie();
+  const [bladPrzelicz, setBladPrzelicz] = useState("");
+  const [wynikPrzelicz, setWynikPrzelicz] = useState("");
+  const [bladZalatw, setBladZalatw] = useState("");
+  useEffect(() => { setBladPrzelicz(""); setWynikPrzelicz(""); setBladZalatw(""); }, [id]);
+
+  const lista = kosze.data?.kosze ?? [];
+  const liczniki: Record<KubelekKoszy, number> = {
+    praca: lista.filter((k) => kubelekKosza(k) === "praca").length,
+    pominiete: pominiete.data?.pominiete.length ?? 0,
+    rozlozone: lista.filter((k) => kubelekKosza(k) === "rozlozone").length,
+    anulowane: lista.filter((k) => kubelekKosza(k) === "anulowane").length,
+  };
+  const opis = KUBELKI_KOSZY.find((k) => k.id === kubelek);
+  const idz = (x: number) => nawiguj(`/obsluga/zwroty/kosze/${x}`);
+  const szuka = q.length >= 2;
+
+  const lewa = kosze.isLoading ? <Pusto waga="lista">Wczytuję kosze…</Pusto>
+    : szuka ? (szukaj.isLoading ? <Pusto waga="lista">Szukam w koszach…</Pusto>
+        : <WynikiSzukania lista={szukaj.data?.znalezione ?? []} onWybierz={idz} />)
+      : kubelek === "pominiete"
+        ? <KolejkaPominietych lista={pominiete.data?.pominiete ?? []} wybranyKosz={wybrany} onWybierz={idz} />
+        : <KolejkaKoszy kosze={lista.filter((k) => kubelekKosza(k) === kubelek)} wybrany={wybrany} onWybierz={idz} />;
+
+  return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
+    <PrzelacznikZwrotow teraz="kosze" />
+    <Koszyk />
+    <div className={SIATKA_TRZECH_KOLUMN}>
+      <Karta className="flex min-h-0 flex-col overflow-hidden">
+        <div className="flex shrink-0 items-center gap-2 px-4 pt-3">
+          <Package size={18} /><b className="text-naglowek">Kosze</b>
+        </div>
+        <nav className="flex shrink-0 flex-wrap gap-1 p-2">
+          <FiltrSegmentowy<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
+            pozycje={KUBELKI_KOSZY.map((k) => ({ klucz: k.id, etykieta: k.etykieta,
+              ile: liczniki[k.id], podpowiedz: k.pytanie }))} />
+        </nav>
+        <div className="shrink-0 border-t border-slate-200 p-2">
+          {/* „W którym koszu jechał ten towar?" — pytanie pada po fakcie: towar
+              zniknął albo klient dopomina się o zwrot. */}
+          <Pole value={fraza} onChange={(e) => setFraza(e.target.value)}
+            placeholder="W którym koszu? Symbol, nazwa albo kod" aria-label="Szukaj towaru w koszach" />
+        </div>
+        {!szuka && <div className="shrink-0 border-y border-slate-200 bg-slate-50 px-2 py-1">
+          <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
+        </div>}
+        <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
+        <Blad>{(kosze.error ?? szukaj.error) ? ((kosze.error ?? szukaj.error) as Error).message : ""}</Blad>
+      </Karta>
+
+      <Karta className="flex min-h-0 flex-col overflow-hidden">
+        {wybrany === null
+          ? <Pusto ikona={Package}>Wybierz kosz z kolejki.</Pusto>
+          : szczegol.isLoading ? <Pusto waga="lista">Wczytuję zawartość kosza…</Pusto>
+            : szczegol.data
+              ? <Kosz k={szczegol.data.kosz} przelicz={{
+                  trwa: przelicz.isPending, blad: bladPrzelicz, wynik: wynikPrzelicz,
+                  onPrzelicz: () => {
+                    setBladPrzelicz(""); setWynikPrzelicz("");
+                    przelicz.mutate(wybrany, {
+                      onSuccess: (w) => setWynikPrzelicz(`Przeliczono: ${w.przed} → ${w.po} kartotek.`),
+                      /* Odmowa ma zdanie („kosz ma już dokument MM") — schowana
+                         wyglądałaby jak przycisk, który nic nie robi. */
+                      onError: (e) => setBladPrzelicz((e as Error).message),
+                    });
+                  } }} />
+              : <Pusto waga="lista">{szczegol.error ? (szczegol.error as Error).message : "Nie znaleziono kosza."}</Pusto>}
+      </Karta>
+
+      <Karta className="flex min-h-0 flex-col overflow-hidden">
+        <div className="min-h-0 flex-1 overflow-y-auto">
+          {szczegol.data
+            ? <KontekstKosza k={szczegol.data.kosz} zalatw={{
+                trwa: zalatw.isPending, blad: bladZalatw,
+                onZalatw: (pozycjaId, notatka) => {
+                  setBladZalatw("");
+                  zalatw.mutate({ pozycjaId, notatka }, { onError: (e) => setBladZalatw((e as Error).message) });
+                } }} />
+            : <Pusto waga="lista">Zwroty i pominięte pozycje pokażą się po wybraniu kosza.</Pusto>}
+        </div>
+      </Karta>
+    </div>
+  </div>;
+}

@@ -394,7 +394,7 @@ export function raiseProblem(
   // linia z problemem wypada z rutyny — nie blokuje zamknięcia reszty dostawy
   if (input.lineId && !input.zachowajStatusLinii) {
     db().prepare("UPDATE delivery_line SET status='problem' WHERE id=?").run(input.lineId);
-    // wyjątek NIE domyka dostawy sam (od 0.437.0 — patrz `closeIfComplete`);
+    // wyjątek NIE domyka dostawy sam (od 0.439.0 — patrz `closeIfComplete`);
     // wołanie zostaje, bo reguła domknięcia ma jedno miejsce, nie dwa
     closeIfComplete(input.deliveryId, user);
   }
@@ -429,6 +429,7 @@ function mapRow(r: any): ProblemView {
     resolvedNote: r.resolved_note,
     resolvedBy: r.resolved_by ?? null,
     docNumber: r.doc_number ?? null,
+    dokId: r.dok_id ?? null,
     sym: r.sym ?? null,
     name: r.name ?? null,
     unit: r.unit ?? "",
@@ -440,7 +441,7 @@ function mapRow(r: any): ProblemView {
    Wszystkie złączenia LEWE: wyjątek zgłoszony luzem nie ma pozycji, a pozycja
    przeżywa zniknięcie kartoteki z read-modelu. */
 const SELECT_JOIN = `
-  SELECT p.*, d.sgt_dok_numer AS doc_number, l.tw_symbol AS sym, l.tw_nazwa AS name, t.unit
+  SELECT p.*, d.sgt_dok_numer AS doc_number, d.sgt_dok_id AS dok_id, l.tw_symbol AS sym, l.tw_nazwa AS name, t.unit
   FROM problem p
   LEFT JOIN delivery d ON d.id = p.delivery_id
   LEFT JOIN delivery_line l ON l.id = p.line_id

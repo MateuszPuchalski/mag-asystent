@@ -290,159 +290,6 @@
      nie mają się z czym sparować. Szerokość karty niesie `--kol`, nie wyjątki. */
   .widok > .pelna { grid-column: 1 / -1; }
 
-  /* ── PASMO ŚREDNIE: szyna zostaje, kontekst chowa się do szuflady ─────────
-     Między 1024 a 1280 px trzy strefy obok siebie się nie mieszczą — kolumna
-     sprawy schodziłaby poniżej miary, przy której da się czytać wątek. Ale
-     zasłanianie kolejki, czyli to, co panel robił poniżej 1280 px do 0.101.0,
-     jest w tym paśmie stratą: biuro traci z oczu listę, nad którą pracuje,
-     i po powrocie wraca na jej górę.
-
-     Rozwiązanie z makiety `Waski`: zostają DWIE strefy, a trzecia wjeżdża na
-     żądanie jako szuflada z prawej. Kontekst jest z tych trzech najrzadziej
-     potrzebny — do dopasowanego towaru albo notatki zagląda się raz na sprawę,
-     a wątek i kolejkę ma się przed oczami cały czas.
-
-     Reguły stoją PRZED blokiem 1280 px i mają z nim równą specyficzność, więc
-     powyżej progu wygrywa tamten — kolejnością w źródle, nie `!important`. */
-  @media (min-width: 1024px) {
-
-    .widok.zSzczegolem { grid-template-columns: minmax(17rem, 21rem) 1fr; }
-    .widok.zSzczegolem > .card { grid-column: 1; }
-    .widok.zSzczegolem > .szczegol {
-      grid-column: 2; grid-row: 1 / span 50;
-      position: sticky; top: var(--hChrome, 130px);
-      height: calc(100dvh - var(--hChrome, 130px));
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-    .widok.zSzczegolem > .szczegol > .sprawaSzyna { align-self: stretch; }
-    .widok.zSzczegolem .sprawa-tresc {
-      flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
-    }
-  }
-
-  /* ── Szuflada kontekstu ────────────────────────────────────────────────────
-     Dwie klasy, bo to dwie różne rzeczy: `zSzuflada` mówi, że jesteśmy
-     w paśmie, w którym kontekst JEST szufladą, a `szufladaOtwarta` — czy
-     akurat jest wysunięta. Obie ustawia skrypt, żeby stan otwarcia nie musiał
-     żyć w arkuszu, a pasmo nie musiało się dublować w dwóch miejscach.
-
-     Panel jest `fixed`, nie `sticky`: ma zasłonić sprawę, a nie zabrać jej
-     szerokość — o to całe w tym chodzi. `--hChrome` trzyma go pod nagłówkiem
-     i paskiem stanu, żeby zakładki zostały klikalne. */
-  .widok.zSzuflada > .kontekst { display: none; }
-  .widok.zSzuflada.szufladaOtwarta > .kontekst {
-    display: block;
-    position: fixed; top: var(--hChrome, 130px); right: 0; bottom: 0;
-    width: min(24rem, 92vw); z-index: 40;
-    border-radius: 0; border-right: 0; border-top: 0; border-bottom: 0;
-    box-shadow: -12px 0 28px rgba(42, 42, 44, .16);
-    overflow: auto; overscroll-behavior: contain;
-  }
-  /* Cień jest JEDEN na całą stronę i leży poza widokami — trzy kopie, po jednej
-     na zakładkę, znaczyłyby trzy miejsca do zapomnienia przy czwartej. */
-  #szufladaCien {
-    position: fixed; inset: var(--hChrome, 130px) 0 0 0; z-index: 39;
-    background: rgba(42, 42, 44, .28);
-  }
-  /* Przycisk wywołujący istnieje tylko tam, gdzie kontekst jest szufladą.
-     Poza pasmem kontekst stoi na ekranie sam — przycisk otwierałby coś, co
-     już widać, albo nie robił nic. */
-  .widok:not(.zSzuflada) .szufladaPrzycisk { display: none; }
-  .sprawaSzyna { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-  .sprawaSzyna .szufladaPrzycisk { margin-left: auto; }
-  /* Głowa szuflady istnieje tylko w szufladzie — poza pasmem kontekst jest
-     kolumną i nie ma czego zamykać. */
-  .szufladaGlowa { display: none; }
-  .widok.zSzuflada.szufladaOtwarta > .kontekst > .szufladaGlowa {
-    display: flex; align-items: center; gap: 10px;
-    position: sticky; top: 0; z-index: 1;
-    margin: -12px -14px 10px; padding: 10px 14px;
-    background: var(--card); border-bottom: 1px solid var(--border);
-  }
-  .szufladaGlowa button { margin-left: auto; }
-
-  @media (min-width: 1280px) {
-
-    /* ── Szczegół OBOK listy ─────────────────────────────────────────────────
-       Ten sam próg co `SZEROKO` w skrypcie — jeden literał na dwa miejsca.
-       Poniżej niego szczegół zasłania listę, jak przed 0.83.0: dwie kolumny
-       po 30 rem nie mieszczą się na laptopie obok siebie.
-
-       Panel szczegółu jedzie ze stroną i ma WŁASNE przewijanie, więc długa
-       lista pozycji faktury nie każe przewijać całej strony, żeby wrócić do
-       listy dokumentów. `overscroll-behavior` zatrzymuje przewijanie na jego
-       końcu, zamiast przerzucać je na stronę. */
-    .widok.zSzczegolem { grid-template-columns: minmax(30rem, 38rem) 1fr; }
-    .widok.zSzczegolem > .card { grid-column: 1; }
-    .widok.zSzczegolem > .szczegol {
-      grid-column: 2; grid-row: 1 / span 50;
-      position: sticky; top: var(--hChrome, 130px);
-      height: calc(100dvh - var(--hChrome, 130px));
-      overflow: auto; overscroll-behavior: contain;
-    }
-
-    /* Dostawy dostają ten sam trójpodział: lista dokumentów, pozycje na
-       środku, dostawca z notatkami po prawej. Kolumna środkowa jest szersza
-       niż przy pytaniach, bo niesie tabelę na pięć kolumn, nie tekst. */
-    #widokDostawy.zSzczegolem { grid-template-columns: 21rem minmax(0, 1fr) 20rem; }
-    #widokDostawy.zSzczegolem > .kontekst {
-      grid-column: 3; grid-row: 1 / span 50;
-      position: sticky; top: var(--hChrome, 130px);
-      height: calc(100dvh - var(--hChrome, 130px));
-      overflow: auto; overscroll-behavior: contain;
-    }
-    #widokDostawy.zSzczegolem > .szczegol {
-      display: flex; flex-direction: column; overflow: hidden;
-    }
-    #widokDostawy.zSzczegolem > .szczegol > .sprawaSzyna { align-self: flex-start; }
-    #widokDostawy.zSzczegolem .sprawa-tresc {
-      flex: 1; min-height: 0; overflow: auto; overscroll-behavior: contain;
-    }
-
-  }
-
-  /* ── Zwarte warianty list z zakładki PYTANIA ────────────────────────────────
-     Kolejka w szynie i kartoteka w kontekście nie mieszczą się w kolumnach
-     tabeli: 22 rem i 21 rem to nie 44 rem, dla których projektowano tamte
-     nagłówki. Oba układy pakują wiersz w jedną komórkę i łamią go w pionie. */
-  .sprawaWiersz { display: block; padding: 9px 6px; }
-  .sprawaGora { display: flex; align-items: baseline; gap: 8px; }
-  .sprawaGora .b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .sprawaGora .mute { margin-left: auto; white-space: nowrap; }
-  .sprawaTemat {
-    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
-    overflow: hidden; color: var(--ink-soft); font-size: 13px; margin-top: 2px;
-  }
-  /* Stopka ŁAMIE SIĘ, zamiast ściskać elementy. W szynie 21 rem plakietka
-     „OCENIONY · CZEKA NA ŚRODKI" zjada całą linię, a licznik pozycji i numer
-     dokumentu rozpadały się wtedy w środku — „3/3" nad „poz.". */
-  .sprawaStopka { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 7px; margin-top: 6px; }
-  .sprawaStopka > .mute { white-space: nowrap; }
-
-  /* ── Wiersz dostawy w dwóch liniach (0.427.0) ──────────────────────────────
-     Siatka, nie flex: kolumna sygnałów ma STAŁĄ szerokość, więc odznaki stoją
-     jedna pod drugą przez całą listę i czyta się je ruchem oka w dół. Kolejność
-     dzieci w znaczniku: góra, wiek, sygnały, pasek, licznik. Pusta kolumna
-     sygnałów ZOSTAJE w układzie szerokim — schowana, oddałaby swoje miejsce
-     paskowi, który wskoczyłby wtedy w pierwszą linię. */
-  .dostWiersz { display: grid; grid-template-columns: minmax(0, 1fr) auto 12.5rem;
-                column-gap: 14px; row-gap: 5px; align-items: center; padding: 8px 8px; }
-  .dostGora { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
-  .dostGora .b { white-space: nowrap; }
-  .dostKto { color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .dostWiek, .dostIle { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .dostSygnaly { grid-row: span 2; display: flex; flex-wrap: wrap; gap: 4px 5px; justify-content: flex-end; }
-  .dostWiersz .pasek { width: auto; }
-  /* W szynie obok otwartego dokumentu (21 rem) na trzy kolumny nie ma miejsca:
-     dostawca schodzi pod numer, a sygnały pod pasek. Pusta kolumna sygnałów
-     znika całkiem — inaczej każdy wiersz dostawałby pustą linię. */
-  .widok.zSzczegolem .dostWiersz { grid-template-columns: minmax(0, 1fr) auto; }
-  .widok.zSzczegolem .dostGora { flex-direction: column; align-items: stretch; gap: 1px; }
-  .widok.zSzczegolem .dostSygnaly { grid-row: auto; grid-column: 1 / -1; justify-content: flex-start; order: 1; }
-  .widok.zSzczegolem .dostSygnaly:empty { display: none; }
-  tr.grupaDostaw td { padding: 12px 8px 4px; border-bottom: 2px solid var(--border); }
-  tr.grupaDostaw .grupaNazwa { font: 700 10px var(--font-cond); letter-spacing: 1.4px; color: var(--ink-mute); }
-
   /* ── Słupek w komórce tabeli ────────────────────────────────────────────────
      Liczba w kolumnie mówi „trzydzieści cztery" i nie mówi, czy to dużo.
      Odpowiedź na to drugie pytanie jest w tabeli — w pierwszym wierszu — ale
@@ -782,77 +629,11 @@
   }
   code.payload { font-size: 11px; color: var(--ink-soft); word-break: break-all; }
 
-  /* ── Panel pozycji dokumentu ───────────────────────────────────────────────
-     Zdjęcie ma stały rozmiar, żeby wiersze nie skakały w trakcie doładowywania
-     — kartoteki mają obrazki w różnych proporcjach, a lista dogrywa je po
-     kolei już po narysowaniu tabeli. */
-  #dostawy tr[data-dok] { cursor: pointer; }
-  td.kolFoto { width: 56px; }
-  .foto, .brakfoto { width: 48px; height: 48px; border-radius: 10px; display: block; }
-  .foto { object-fit: cover; border: 1px solid var(--border); }
-  /* Miniatura w wierszu ma 48 px, a pytanie „czy to TA część" pada przy
-     kartotekach różniących się końcówką nazwy. Kursor mówi, że da się
-     powiększyć — bez niego nikt nie zgadnie, że obrazek jest klikalny. */
-  #szczegol img { cursor: zoom-in; }
-  #lupa {
-    position: fixed; inset: 0; z-index: 60; display: flex; cursor: zoom-out;
-    align-items: center; justify-content: center; background: rgba(15,23,42,.85);
-  }
-  #lupa[hidden] { display: none; }
-  #lupa img { max-width: 92vw; max-height: 92vh; border-radius: 12px; }
-  .brakfoto {
-    border: 1px dashed var(--border); color: var(--ink-mute); font-size: 9px;
-    display: flex; align-items: center; justify-content: center; text-align: center;
-  }
-  .wyjatek { margin-top: 5px; font-size: 12px; }
-  /* Wyjątek pod pozycją to PLAMA, nie kolejny wiersz tekstu (0.427.0): blady
-     czerwony blok odróżnia zgłoszenie od pozycji nad nim bez czytania, a stan
-     z przyciskiem stoją zawsze na prawym brzegu — tam, gdzie ręka już jest. */
-  .szczegol .wyjatek, .kontekst .wyjatek {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px;
-    background: var(--err-bg); border-radius: 10px; padding: 6px 10px;
-  }
-  .szczegol .wyjatek > .badge.err:first-child { background: var(--card); }
-  .wyjatekAkcja { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
-  .wyjatekAkcja .badge.err { background: var(--card); }
-  .kolIlosc { width: 8.5rem; }
-  .kolIlosc .pasek { width: 100%; max-width: 110px; margin: 4px 0 5px; }
-  .kolGdzie { width: 12rem; }
   .typZd { display: inline-block; white-space: nowrap; border-radius: 999px; padding: 1px 9px;
            font: 600 12px/1.5 var(--font-sans); background: var(--secondary); color: var(--ink-soft); }
   .typZd.blad { background: var(--err-bg); color: var(--err); }
   .typZd.dostawa { background: var(--amber-bg); color: var(--amber-ink); }
   .typZd.zwrot { background: var(--card); color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink-mute); }
-  /* Pasek kroków kosza — te same pastylki co `.badge`, żeby nie było trzeciego
-     języka stanów obok pastylek i kropek. */
-  .cykl { display: inline-flex; align-items: center; gap: 3px; white-space: nowrap; vertical-align: middle; }
-  .cykl .krok { border-radius: 999px; padding: 1px 9px; font: 700 11px/1.5 var(--font-cond);
-                letter-spacing: .6px; color: var(--ink-mute); border: 1px dashed var(--border); }
-  .cykl .krok.za { background: var(--ok-bg); color: var(--ok); border-color: transparent; }
-  .cykl .krok.teraz { background: var(--ink); color: #fff; border-color: var(--ink); }
-  .cykl .krok.teraz.blad { background: var(--err); border-color: var(--err); }
-  .cykl .krokLacznik { width: 10px; height: 2px; background: var(--border); flex: none; }
-  /* Reklamacje: nagłówek dokumentu jako pasek na papierze nad jego wierszami. */
-  tr.rekDok td { background: var(--paper); padding: 7px 8px; border-bottom: 1px solid var(--border); }
-  #reklamacje td { vertical-align: middle; }
-  .rekGlowa { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-  .rekKto { color: var(--ink-soft); }
-  .rekAkcje { margin-left: auto; display: inline-flex; gap: 4px; }
-  .rekIle, .rekKiedy { white-space: nowrap; font-variant-numeric: tabular-nums; }
-  .rekFoto { width: 20px; color: var(--ink-soft); }
-  .rekAkcja { text-align: right; width: 1%; }
-  .ikonaFoto { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2;
-               stroke-linecap: round; stroke-linejoin: round; display: block; }
-  .wyjatek img { max-width: 120px; border-radius: 10px; margin-top: 4px; display: block; }
-
-  /* Rozmowa z klientem: strona nadawcy niesie tu całe znaczenie, więc
-     odróżnia ją wcięcie i tło, nie sama etykieta z imieniem. */
-  .wiad { border-radius: 12px; padding: 8px 11px; margin: 6px 0; max-width: 78%; }
-  .wiad.klient { background: var(--amber-bg); border: 1px solid var(--amber-line); }
-  .wiad.my { background: var(--secondary); border: 1px solid var(--border); margin-left: auto; }
-  .wiad .kto { font-size: 11px; letter-spacing: 1px; color: var(--ink-mute); margin-bottom: 3px; }
-  .wiad .tresc { white-space: pre-wrap; font-size: 15px; line-height: 1.6; }
-
   /* ── Własne okno dialogowe i toast — zamiast prompt/confirm/alert ─────────
      Systemowe okno („Komunikat ze strony…") wygląda jak z innej aplikacji
      i ignoruje cały język wizualny. <dialog> jest natywny (Esc, fokus,
@@ -906,16 +687,20 @@
     <div class="grupa">
       <span class="grupa-nazwa">Praca</span>
       <div class="grupa-btny">
-        <button data-widok="dostawy" aria-current="true" title="Dostawy i reklamacje">
+        <!-- DOSTAWY PRZESZŁY DO PANELU (0.435.0, `docs/obsluga-klienta.md` §7).
+             Pozycja zostaje w pasku, bo ręka jej tu szuka — ale prowadzi do
+             panelu, z sesją, żeby nikt nie logował się drugi raz. `data-panel`
+             zamiast `data-widok`: to wyjście ze strony, a nie jej zakładka. -->
+        <button data-panel="/obsluga/dostawy" title="Dostawy — w panelu biura">
           <svg viewBox="0 0 24 24"><path d="M1 3h15v13H1zM16 8h4l3 3v5h-7z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
-          <span class="et">DOSTAWY</span>
+          <span class="et">DOSTAWY ↗</span>
         </button>
-        <!-- Praca FIZYCZNA przy zwrotach: kosze z dokumentu MM i pominięte
-             pozycje. Kropka alarmu zamiast pigułki: tu nie liczy się ILE,
-             tylko CZY coś czeka. -->
-        <button data-widok="magazyn" title="Magazyn zwrotów">
+        <!-- MAGAZYN ZWROTÓW PRZESZEDŁ DO PANELU (0.438.0) — kosze mieszkają
+             w zakładce Zwroty, decyzją właściciela. Pozycja zostaje w pasku,
+             bo ręka jej tu szuka, i prowadzi tam z sesją, jak DOSTAWY. -->
+        <button data-panel="/obsluga/zwroty/kosze" title="Kosze — w panelu biura, w zakładce Zwroty">
           <svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v11a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1z"/><path d="M3.3 7.4L12 12l8.7-4.6M12 12v9"/></svg>
-          <span class="et">MAGAZYN ZWROTÓW</span><i class="kropka" id="magazynKropka" hidden></i>
+          <span class="et">KOSZE ↗</span>
         </button>
       </div>
     </div>
@@ -942,7 +727,7 @@
     <!-- STAN NA DOLE PASKA (0.119.1 → 0.125.0). Kolor odpowiada na jedyne
          pytanie biura („czy coś się dzieje?"), pełne zdania jadą w `title`.
          Plakietka odpowiedzi na notatki zostaje OSOBNA: sygnał roboczy
-         z własną drogą (dostawy → karta odpowiedzi), nie zdrowie systemu. -->
+         z własną drogą (od 0.435.0: dostawy w panelu), nie zdrowie systemu. -->
     <button class="ikonaStanu" id="ikonaZdrowia" title="Czekam na pierwszy odczyt stanu…" hidden><i></i><span class="et">SYSTEM</span></button>
     <button class="ikonaStanu" id="ikonaAllegro" title="Stan konta Allegro jeszcze nieznany" hidden><i></i><span class="et">ALLEGRO</span></button>
     <div id="stan"></div>
@@ -976,178 +761,6 @@
 </main>
 
 <main id="panel" hidden>
-  <!-- ── DOSTAWY ─────────────────────────────────────────────────────────── -->
-  <div id="widokDostawy" class="widok">
-    <!-- Pozycje jednego dokumentu. Zasłania karty poniżej, zamiast doklejać
-         się pod nimi: to jest wejście W dokument, nie dodatek obok. -->
-    <section class="card pelna szczegol" id="szczegol" hidden>
-      <!-- Rząd wyjścia i wejścia: po lewej wyjście ZE sprawy, po prawej
-           wejście w jej kontekst. Przycisk KONTEKST widać tylko w paśmie,
-           w którym kontekst jest szufladą — poza nim stoi na ekranie sam.
-
-           Bez licznika przy napisie, choć makieta go rysuje. Liczyłby co
-           innego na każdej z trzech zakładek: dopasowane towary przy pytaniu,
-           notatki przy dostawie, kandydatów na dokument przy zwrocie. Jedna
-           pigułka o trzech znaczeniach jest gorsza od braku pigułki. -->
-      <div class="sprawaSzyna">
-        <button class="akcja cichy" id="wrocDoListy">← WSZYSTKIE DOSTAWY</button>
-        <button class="akcja cichy szufladaPrzycisk" data-szuflada>KONTEKST →</button>
-      </div>
-      <div id="szczegolNaglowek" style="margin-top:12px"></div>
-      <div class="sprawa-tresc">
-        <!-- Wyjątki NAD tabelą pozycji: to po nie biuro wchodzi w dokument. -->
-        <div id="szczegolWyjatki"></div>
-        <table id="szczegolLinie"></table>
-        <div id="szczegolBezLinii"></div>
-      </div>
-    </section>
-
-    <!-- KONTEKST dostawy: kto ją przysłał, o co pytaliśmy halę i co z nią
-         zrobić. Do 0.92.0 wszystko to siedziało w nagłówku NAD tabelą pozycji,
-         więc notatka wypadała z ekranu, gdy tylko dokument miał więcej niż
-         kilkanaście wierszy — a to jest rozmowa, na którą czeka domknięcie. -->
-    <section class="card pelna kontekst" id="dostawaKontekst" hidden>
-      <!-- Głowa szuflady: widoczna TYLKO wtedy, gdy kontekst jest wysunięty.
-           Escape i klik w cień też zamykają, ale wysunięty panel bez widocznego
-           wyjścia czyta się jak coś, co się zacięło — a mysz nie ma jak zgadnąć
-           dwóch pozostałych dróg. -->
-      <div class="szufladaGlowa">
-        <h2 style="margin:0">KONTEKST SPRAWY</h2>
-        <button class="akcja cichy" data-szuflada-zamknij>ZAMKNIJ</button>
-      </div>
-      <div id="dostawaDostawca"></div>
-      <div id="dostawaNotatki" style="margin-top:14px"></div>
-      <div id="dostawaAkcja" style="margin-top:14px"></div>
-    </section>
-
-    <!-- Odpowiedzi na notatki. Karta chowa się, gdy nie ma na co patrzeć —
-         pusty blok „brak odpowiedzi" byłby szumem na ekranie, który biuro ma
-         przed sobą cały dzień.
-
-         KOLEJNOŚĆ NIE JEST PRZYPADKOWA (0.60.1). Karta stoi NAD tabelą dostaw,
-         bo tabela bywa na kilkadziesiąt wierszy i wszystko pod nią wypada ekran
-         niżej. Tak właśnie zgubiła się w 0.57.0: licznik w pasku stanu świecił,
-         a biuro nie miało jak trafić do odpowiedzi. Ukryta karta nie kosztuje
-         ani piksela, więc w spokojny dzień ta kolejność niczego nie psuje. -->
-    <section class="card" id="kartaOdpowiedzi" hidden>
-      <h2>ODPOWIEDZI NA NOTATKI <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
-          Magazynier odpowiedział na pytanie z notatki. Po przeczytaniu naciśnij
-          PRZECZYTANE — sygnał zgaśnie także na drugim biurku.
-        </p>
-      </div>
-      <table id="odpowiedzi"></table>
-    </section>
-
-    <section class="card" id="kartaDostaw">
-      <!-- DO ROZŁOŻENIA, nie „STATUS ROZKŁADANIA". Nagłówek niesie liczbę
-           dokumentów i pozycji, które za nimi stoją: „cztery faktury" i „cztery
-           faktury na sto osiemnaście pozycji" to dwie różne wiadomości o dniu,
-           który przed kimś stoi, a druga nie kosztuje ani jednego zapytania —
-           liczby są w danych, które lista i tak dostaje. -->
-      <h2>DO ROZŁOŻENIA</h2>
-      <p id="dostawyPodsumowanie" style="margin-bottom:9px"></p>
-      <!-- Czipy zamiast trzech osobnych kart. „Poza WERTIS" stało dotąd własną
-           kartą na dole zakładki i biuro trafiało tam przypadkiem; jako trzeci
-           stan tej samej kolejki jest tam, gdzie się go szuka — obok pytania
-           „co jeszcze jest z tym dokumentem". -->
-      <div class="czipy" id="dostawyCzipy">
-        <button class="czip" data-stan="praca" aria-pressed="true">W toku</button>
-        <button class="czip" data-stan="done" aria-pressed="false">Zamknięte</button>
-        <button class="czip" data-stan="external" aria-pressed="false">Poza WERTIS</button>
-        <!-- ARCHIWUM to czwarty stan tej samej kolejki, nie osobna zakładka.
-             Pytanie „a co było z fakturą z zeszłego miesiąca" pada przy tej
-             liście i tutaj ma dostać odpowiedź — zakładka obok kazałaby
-             najpierw wiedzieć, że istnieje. Wiersz wygląda identycznie jak
-             w pracy, bo niesie dokładnie to samo. -->
-        <button class="czip" data-stan="archiwum" aria-pressed="false">Archiwum</button>
-      </div>
-      <input class="szukaj" id="szukaj" style="margin-top:10px" placeholder="szukaj: numer albo dostawca">
-      <table id="dostawy"></table>
-      <p class="odswiezono" id="odswiezono"></p>
-    </section>
-
-    <!-- REKLAMACJE STOJĄ PRZED „POZA WERTIS" (0.86.0). Tu są wyjątki czekające
-         na człowieka, tam dokumenty już zamknięte. Kolejność w kodzie jest
-         kolejnością na ekranie, bo siatka układa karty po DOM — archiwum
-         wypychało pracę o komórkę niżej w każdy dzień, w którym coś zdjęto
-         z listy.
-
-         Dane firmy do formularzy wyjechały stąd za zębatkę. Wypełnia się je
-         raz na przeglądarkę, a wydruk protokołu czyta pola po id i nie
-         obchodzi go, w którym widoku stoją. -->
-    <section class="card" id="kartaReklamacji">
-      <h2>REKLAMACJE · NIEROZWIĄZANE WYJĄTKI <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:10px">
-          FORMULARZ otwiera protokół do wydruku (ze zdjęciami dowodowymi). Dostawca
-          z własnym drukiem reklamacyjnym (GEKO, PARTNER) dostaje SWÓJ formularz —
-          rozpoznanie idzie po nazwie dostawcy z dokumentu. CSV pobiera te same
-          dane do arkusza (średnik + BOM, Excel PL).
-        </p>
-      </div>
-      <table id="reklamacje"></table>
-    </section>
-
-    <!-- Dostawy zdjęte z listy pracy. Osobna karta, a nie wiersze wyszarzone
-         w tabeli wyżej: tamta odpowiada na „co magazyn ma do zrobienia", a te
-         dokumenty właśnie z tego pytania wypadły. Karta istnieje po to, żeby
-         pomyłkowe zamknięcie dało się zauważyć i cofnąć — bez niej dokument
-         znika bez śladu widocznego dla człowieka.
-
-         ZWINIĘTA OD 0.121.1, bo to archiwum, nie praca: ta sama lista jedzie
-         pod czip „Poza WERTIS" w tabeli wyżej, a karta niesie ponad to jedną
-         rzecz — przycisk PRZYWRÓĆ. Rozwinięta rosła z każdym zamknięciem
-         i spychała reklamacje, czyli wyjątki CZEKAJĄCE na człowieka, coraz
-         niżej. Liczba w nagłówku mówi, czy w ogóle warto tam zaglądać, więc
-         zwinięcie niczego nie ukrywa. -->
-    <details class="card zwijana" id="kartaPozaWertis" hidden>
-      <summary><h2>ROZŁOŻONE POZA WERTIS</h2>
-        <span class="podpis" id="pozaWertisIle"></span></summary>
-      <p class="mute">Zdjęte z listy rozkładania decyzją biura. Towar odłożono
-        bez tej aplikacji, więc nie ma z tego ani jednego skanu.</p>
-      <table id="pozaWertis"></table>
-    </details>
-  </div>
-
-  <div id="widokMagazyn" class="widok" hidden>
-
-    <section class="card" id="koszeKarta">
-      <h2>KOSZE ZWROTOWE <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-      Kosz powstaje z dokumentu MM ZWROTY wystawionego w Subiekcie i od razu
-      jedzie na halę — kolektor prowadzi rozkładanie i zapisuje adresy.
-      Kliknij wiersz, żeby zobaczyć zawartość i to, co hala pominęła.
-      </p>
-      </div>
-      <div class="filtry" style="margin-bottom:10px">
-        <div><label for="koszSzukaj">SZUKAJ TOWARU W KOSZACH</label>
-          <input id="koszSzukaj" placeholder="symbol, nazwa albo kod kreskowy"></div>
-      </div>
-      <div id="koszWyniki"></div>
-      <table id="koszeLista"></table>
-      <div id="koszPodglad" style="margin-top:12px"></div>
-    </section>
-
-    <section class="card" id="pominieteKarta" hidden>
-      <h2>POMINIĘTE POZYCJE · CZEGO NIE BYŁO W KOSZU <button class="info" type="button"
-        aria-expanded="false" aria-label="Objaśnienie">i</button></h2>
-      <div class="objasnienie" hidden>
-        <p class="mute" style="margin-bottom:8px">
-      Hala zgłosiła, że towaru nie ma. Każdy wiersz czeka na rozstrzygnięcie:
-      szukać dalej, reklamować u przewoźnika czy poprawić dokument.
-      Najdłużej czekające są na górze.
-      </p>
-      </div>
-      <table id="pominieteLista"></table>
-    </section>
-  </div>
-
   <!-- ── STAN SYSTEMU ────────────────────────────────────────────────────── -->
   <div id="widokNadzor" class="widok wglad" hidden>
     <!-- KOLEJNOŚĆ: NAJPIERW TO, CO CZEKA NA BIURO (0.427.0, dekalog pkt 1 i 5).
@@ -1520,11 +1133,6 @@
 
   </div>
 
-  <!-- Przyciemnienie pod wysuniętą szufladą. Stoi POZA widokami, bo jest
-       jedno na całą stronę; kopia w każdej zakładce byłaby trzecim miejscem
-       do zapomnienia przy czwartej. Klik zamyka — tak samo jak Escape. -->
-  <div id="szufladaCien" hidden></div>
-
   <!-- ── USTAWIENIA (za zębatką) ───────────────────────────────────────────
        Do 0.85.0 stało tu jedno logo dostawców, a konfiguracja rozłaziła się
        po zakładkach pracy: prompt eksperta na PYTANIACH, reguły strefy na
@@ -1642,12 +1250,6 @@
   </div>
 </main>
 
-<!-- Powiększenie zdjęcia. Jeden element na całą stronę, poza widokami: żyje
-     NAD nimi, a nie w którymś z nich. Stoi PRZED skryptem, bo nasłuch
-     zamknięcia rejestruje się przy starcie — za skryptem `$("lupa")`
-     oddałoby `null` i położyło cały panel. -->
-<div id="lupa" hidden><img alt=""></div>
-
 <script>
 "use strict";
 /* Jedna strona, zero zależności, zero builda. Token sesji żyje w localStorage,
@@ -1727,22 +1329,22 @@ const esc = (v) => String(v ?? "").replace(/[&<>"']/g, (c) =>
 
 let token = localStorage.getItem("wertis.token") || "";
 let kto = localStorage.getItem("wertis.kto") || "";
-let widok = localStorage.getItem("wertis.widok") || "dostawy";
+let widok = localStorage.getItem("wertis.widok") || "nadzor";
 /* Zapamiętana nazwa widoku, którego już nie ma, daje PUSTY panel: `pokaz()`
    chowa wszystkie sześć i nie odsłania żadnego. Do 0.427.0 stała tu mapa
    ZWROTY/PYTANIA → SPRAWY — a SPRAWY też zniknęły, więc mapa prowadziła
    wprost w tę pustkę. Lista ISTNIEJĄCYCH widoków zamiast listy dawnych:
    następne przemianowanie nie wymaga pamiętania o tej linii. */
-if (!["dostawy", "magazyn", "nadzor", "dziennik", "analiza", "dostawcy"].includes(widok)) widok = "dostawy";
-let dokumenty = [];
+/* „dostawy" i „magazyn" w pamięci przeglądarki to ślady sprzed 0.435.0
+   i 0.438.0 — oba widoki przeszły do panelu. Biuro wstaje wtedy na STANIE
+   SYSTEMU, bo tam prowadzą wiersze DO DECYZJI, które jeszcze mieszkają tutaj. */
+if (!["nadzor", "dziennik", "analiza", "dostawcy"].includes(widok)) widok = "nadzor";
 let ostatnieRozjazdy = null;
 /* Alarm wymiany (0.364.0) — jak `ostatnieRozjazdy`: pobierany w cyklu,
    czytany przy każdym przerysowaniu paska stanu, niezależnie od zakładki. */
 let ostatnieAlarmy = null;
 /** Odpowiedzi na notatki, których biuro jeszcze nie widziało (0.57.0). */
 let odpowiedziNaNotatki = [];
-/** Czy serwer w ogóle ma skąd brać zdjęcia kartotek (ustawiane z /api/health). */
-let zdjeciaWlaczone = false;
 /* Stan konta Allegro i flaga trwającego parowania. Do 0.137.2 stały przy
    ekranie SPRAW i odeszły razem z nim, choć czyta je ikona w pasku bocznym —
    widoczna na KAŻDYM ekranie, więc odczyt bywa pierwszy. */
@@ -1791,14 +1393,7 @@ async function pobierz(sciezka, nazwa) {
 
 function wyloguj() {
   token = ""; kto = "";
-  // blob-URL-e zdjęć trzymamy przez całą sesję (patrz `dolozZdjecia`), więc to
-  // jest jedyne miejsce, w którym wolno je zwolnić
-  for (const url of zdjecia.values()) if (url) URL.revokeObjectURL(url);
-  zdjecia.clear();
   zwolnijLoga();
-  kolejkaFoto.length = 0;
-  sesjaPodgladu++;
-  zamknijDokument();
   parowanieTrwa = false;
   localStorage.removeItem("wertis.token");
   localStorage.removeItem("wertis.kto");
@@ -1835,12 +1430,6 @@ async function zaloguj() {
 function pokaz(nowy) {
   widok = nowy;
   localStorage.setItem("wertis.widok", nowy);
-  /* Otwarty dokument to drill-down, nie widok — inaczej powrót na zakładkę
-     DOSTAWY pokazywałby fakturę sprzed kwadransa jako stan bieżący. Z tego
-     samego powodu stan panelu NIE idzie do localStorage. */
-  zamknijDokument();
-  $("widokDostawy").hidden = nowy !== "dostawy";
-  $("widokMagazyn").hidden = nowy !== "magazyn";
   $("widokNadzor").hidden = nowy !== "nadzor";
   $("widokDziennik").hidden = nowy !== "dziennik";
   $("widokAnaliza").hidden = nowy !== "analiza";
@@ -1853,8 +1442,6 @@ function pokaz(nowy) {
   }
   /* Magazyn odświeża się na WEJŚCIU, nie w cyklu — cykl 30 s należy do
      widoku, na który się patrzy. */
-  if (nowy === "magazyn") odswiezEtap3();
-  if (nowy === "dostawy") rysujOdpowiedzi();
   if (nowy === "nadzor") { odswiezNadzor(); odswiezStanAllegro(); }
   if (nowy === "dziennik" && !$("dziennik").innerHTML) szukajDziennik();
   if (nowy === "analiza") odswiezAnalize();
@@ -1883,11 +1470,6 @@ function rysujStan(health, kolejka) {
   ostatniHealth = health ?? ostatniHealth;
   ostatniaKolejka = kolejka ?? ostatniaKolejka;
   health = ostatniHealth; kolejka = ostatniaKolejka;
-  /* `/api/health` niesie sekcję `zdjecia` TYLKO wtedy, gdy funkcja jest w ogóle
-     włączona (`ZDJECIA_ZRODLO`). Na instalacji bez zdjęć kolumna z ramkami
-     „bez zdjęcia" przy każdej pozycji byłaby czystym szumem — mówiłaby
-     o brakującej kartotece, choć brakuje ustawienia. */
-  if (health) zdjeciaWlaczone = !!health.zdjecia;
 
   const czerwone = [];
   const bursztynowe = [];
@@ -1943,12 +1525,12 @@ function rysujStan(health, kolejka) {
   ik.title = linie.join("\n") + "\nKliknij: STAN SYSTEMU.";
 
   /* Odpowiedzi na notatki (0.57.0) zostają plakietką OBOK ikon: mają własną
-     drogę (dostawy → karta odpowiedzi), a zgłoszenie z 20 sierpnia nauczyło,
-     że sygnał bez drogi do treści jest sygnałem zgubionym. */
+     drogę, a zgłoszenie z 20 sierpnia nauczyło, że sygnał bez drogi do treści
+     jest sygnałem zgubionym. Od 0.435.0 ta droga prowadzi do dostaw w panelu. */
   const plakietki = [];
   const n = odpowiedziNaNotatki.length;
   if (n) {
-    plakietki.push(`<span class="badge amber" data-do="dostawy" data-cel="kartaOdpowiedzi"
+    plakietki.push(`<span class="badge amber" data-panel="/obsluga/dostawy"
       title="${n} ${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"} — kliknij, żeby przeczytać."
       >${n}<span class="et">${n === 1 ? "odpowiedź na notatkę" : "odpowiedzi na notatki"}</span></span>`);
   }
@@ -2012,712 +1594,6 @@ function rysujIkoneAllegro() {
   }
   ik.className = "ikonaStanu" + (kolor ? " " + kolor : "");
   ik.title = tip;
-}
-
-/* ── Dostawy ── */
-function statusDostawy(d) {
-  if (d.status === "done") return '<span class="badge ok">ROZŁOŻONA</span>';
-  // `external` nie trafia na listę dostaw, ale trafia do panelu szczegółu —
-  // i tam MUSI się różnić od „ROZŁOŻONA", bo to jest cała różnica między
-  // „mamy z tego skany" a „ktoś orzekł, że nie trzeba"
-  if (d.status === "external") return '<span class="badge mute2">POZA WERTIS</span>';
-  if (d.status === "open") return '<span class="badge amber">W TOKU</span>';
-  return '<span class="badge mute2">NIETKNIĘTA</span>';
-}
-
-/**
- * Lista dostaw w dwóch wariantach — z tego samego powodu co kolejka pytań
- * (0.91.0). Sześć kolumn mieści się w karcie na całą szerokość, ale nie
- * w szynie 21 rem: status z licznikiem wyjątków uciekał poza krawędź karty.
- */
-/* Wybrany czip kolejki dostaw: `praca` (nietknięte i w toku), `done`,
-   `external`. Trzeci czyta INNĄ listę — dostawy zdjęte poza WERTIS nie są
-   stanem dokumentu w oknie importu, tylko osobnym zapisem naszej bazy. */
-let filtrDostaw = "praca";
-let pozaWertisLista = [];
-/* Archiwum: dostawy, których dokument wypadł już z okna importu. Trzyma się
-   osobno od `dokumenty`, bo pochodzi z INNEGO źródła — naszego snapshotu,
-   nie z read-modelu Subiekta — i wolno mu być obcięte.
-
-   Szuka SERWER, nie ta strona. Filtrowanie po stronie przeglądarki znaczyłoby,
-   że faktura sprzed roku nie znajduje się mimo poprawnego numeru, i wyglądałoby
-   dokładnie tak, jak faktura, której nigdy nie było. */
-let archiwumLista = [];
-let archiwumIle = 0;
-/* Pusta historia i historia jeszcze niepobrana wyglądają w tabeli identycznie.
-   Ta flaga jest jedyną rzeczą, która je rozróżnia. */
-let archiwumWczytane = false;
-/* Okno importu z ostatniej odpowiedzi — stopka mówi nim, gdzie kończy się
-   praca, a zaczyna historia. */
-let oknoDni = 14;
-
-/**
- * Polska odmiana po liczbie: 1 dokument, 2 dokumenty, 5 dokumentów.
- *
- * Wyjęta z `podsumujDostawy`, bo stopka archiwum liczy dostawy tą samą regułą.
- * Dwie kopie tego wyrażenia rozjechałyby się przy pierwszej poprawce — a „1
- * dostaw" na ekranie wygląda jak usterka i nią jest.
- */
-function slowo(n, a, b, c) {
-  return n === 1 ? a : n % 10 >= 2 && n % 10 <= 4 && (n % 100 < 12 || n % 100 > 14) ? b : c;
-}
-
-/** Ile dokumentów i pozycji za nimi stoi — nagłówek szyny liczy z tego, co widać. */
-function podsumujDostawy(lista) {
-  const pozycji = lista.reduce((n, d) => n + (d.linesTotal || d.positions || 0), 0);
-  $("dostawyPodsumowanie").innerHTML = lista.length
-    ? `<span class="temat">${lista.length}</span>
-       <span class="mute">${slowo(lista.length, "dokument", "dokumenty", "dokumentów")}
-       · ${pozycji} ${slowo(pozycji, "pozycja", "pozycje", "pozycji")}</span>`
-    : "";
-}
-
-/**
- * Podświetlenie otwartego wiersza listy.
- *
- * Wspólna z kolejką spraw do 0.137.2 i skasowana razem z nią — a szczegół
- * dostawy woła ją przy każdym otwarciu dokumentu.
- */
-function zaznaczWiersz(tabelaId, klucz, id) {
-  for (const tr of $(tabelaId).querySelectorAll(`tr[data-${klucz}]`)) {
-    tr.classList.toggle("aktywny", id != null && Number(tr.dataset[klucz]) === id);
-  }
-}
-
-/**
- * Wiek wiersza słowami: „przed chwilą", „5 godz.", „3 dni".
- *
- * Do 0.137.2 mieszkała przy kolejce spraw i nazywała się od pytania klienta.
- * Lista dostaw wołała ją od 0.97.0 — kasując sprawy, zabraliśmy dostawom
- * datę na wierszu i cała tabela przestawała się rysować w ciszy.
- */
-function wiekWiersza(at) {
-  if (!at) return "—";
-  const ms = Date.now() - Date.parse(at.replace(" ", "T") + (at.endsWith("Z") ? "" : "Z"));
-  if (!Number.isFinite(ms)) return "—";
-  const godzin = Math.floor(ms / 3_600_000);
-  if (godzin < 1) return "przed chwilą";
-  if (godzin < 24) return `${godzin} godz.`;
-  const dni = Math.floor(godzin / 24);
-  /* „1 dni" na wierszu wygląda jak usterka i nią jest. */
-  return dni === 1 ? "1 dzień" : `${dni} dni`;
-}
-
-/**
- * JEDEN wiersz listy dostaw — praca i archiwum rysują się tym samym kodem.
- *
- * Wspólny, bo niosą DOKŁADNIE to samo: numer, wiek, dostawcę, liczbę pozycji,
- * postęp i sygnały. Drugi wariant wiersza dla historii zacząłby się od
- * jednej różnicy i skończył na dwóch listach, które trzeba czytać inaczej —
- * a to jest ta sama faktura, tylko starsza.
- *
- * WIERSZ W DWÓCH LINIACH (0.427.0, dekalog pkt 2). Do tej wersji cztery:
- * numer, dostawca, pasek przez całą szerokość, stopka ze stanem. Zmierzone przy
- * 1440×900: 100 px na wiersz, siedem dostaw na ekranie. Teraz numer z dostawcą
- * i wiekiem, pod nimi pasek z licznikiem — a sygnały w STAŁEJ kolumnie po
- * prawej, więc wyjątki czyta się jednym ruchem oka w dół listy.
- *
- * Pastylka stanu (W TOKU / NIETKNIĘTA) zeszła z wiersza: mówiła to samo co
- * pasek i licznik obok — 0/40 to nietknięta, 12/40 to w toku. W wierszu
- * zostają wyłącznie sygnały, po które biuro wchodzi w dokument: otwarte
- * wyjątki i odpowiedź z hali. Stan słowem stoi dalej w nagłówku dokumentu.
- *
- * Pasek NIE schodzi do kolumny obok licznika — zostaje przez całą szerokość
- * pierwszej kolumny, bo tak czyta się go jednym rzutem oka przez całą kolejkę
- * (decyzja sprzed tej wersji, nietknięta).
- */
-function wierszDostawy(d) {
-  const total = d.linesTotal || d.positions;
-  const frac = d.linesTotal ? Math.min(100, Math.round((d.linesDone / d.linesTotal) * 100)) : 0;
-  const sygnaly = [
-    dokiZOdpowiedzia().has(d.dokId) ? '<span class="badge amber">odpowiedź z hali</span>' : "",
-    d.wyjatkiOtwarte
-      ? `<span class="badge err">${d.wyjatkiOtwarte} ${d.wyjatkiOtwarte === 1 ? "wyjątek" : "wyjątki"}</span>`
-      : "",
-  ].join("");
-  return `<tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""} style="cursor:pointer">
-    <td class="dostWiersz">
-      <span class="dostGora"><span class="b">${esc(d.nrPelny)}</span><span class="dostKto">${esc(d.dostawca)} · ${total} poz.</span></span>
-      <span class="mute dostWiek">${esc(wiekWiersza(d.dataWyst))}</span>
-      <span class="dostSygnaly">${sygnaly}</span>
-      <span class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></span>
-      <span class="mute dostIle">${d.linesDone}/${total}</span>
-    </td>
-  </tr>`;
-}
-
-/** Dokumenty z odpowiedzią hali, której biuro jeszcze nie przeczytało. */
-function dokiZOdpowiedzia() {
-  return new Set(odpowiedziNaNotatki.map((o) => o.dokId));
-}
-
-/* CZEKA NA BIURO (0.427.0, dekalog pkt 5). Lista w toku ma dwie grupy:
-   najpierw dokumenty, w których coś czeka na biuro — otwarty wyjątek albo
-   nieprzeczytana odpowiedź z hali — potem reszta w dotychczasowej kolejności.
-   Do tej wersji taki dokument stał tam, gdzie wypadła mu data, i trzeba go
-   było wyłowić wzrokiem spośród kilkudziesięciu. Bez żadnego czekającego
-   nagłówków nie ma: jedna grupa z nagłówkiem to nagłówek bez treści. */
-function wierszeWGrupach(lista) {
-  const odp = dokiZOdpowiedzia();
-  const czeka = lista.filter((d) => d.wyjatkiOtwarte > 0 || odp.has(d.dokId));
-  if (!czeka.length) return lista.map(wierszDostawy).join("");
-  const reszta = lista.filter((d) => !czeka.includes(d));
-  const naglowek = (tytul, n) =>
-    `<tr class="grupaDostaw"><td><span class="grupaNazwa">${tytul}</span> <span class="mute">${n}</span></td></tr>`;
-  return naglowek("CZEKA NA BIURO", czeka.length) + czeka.map(wierszDostawy).join("") +
-    (reszta.length ? naglowek("POZOSTAŁE", reszta.length) + reszta.map(wierszDostawy).join("") : "");
-}
-
-function rysujDostawy() {
-  const q = $("szukaj").value.trim().toLowerCase();
-  const pasuje = (nr, kto) => !q || nr.toLowerCase().includes(q) || (kto || "").toLowerCase().includes(q);
-
-  /* „Poza WERTIS" idzie z własnego źródła i ma własny wiersz: numer, dostawca
-     oraz kto i dlaczego zdjął dokument z listy. Postępu nie ma czego rysować —
-     nikt tego tutaj nie rozkładał i to jest cała treść tego stanu. */
-  if (filtrDostaw === "external") {
-    const lista = pozaWertisLista.filter((d) => pasuje(d.nrPelny, d.dostawca));
-    podsumujDostawy([]);
-    $("dostawy").innerHTML = lista.map((d) => `
-      <tr data-dok="${d.dokId}"${d.dokId === otwartyDok ? ' class="aktywny"' : ""} style="cursor:pointer">
-        <td class="sprawaWiersz">
-          <span class="sprawaGora">
-            <span class="b">${esc(d.nrPelny)}</span>
-            <span class="mute">${esc(d.dataWyst)}</span>
-          </span>
-          <span class="sprawaTemat">${esc(d.dostawca)}</span>
-          <span class="sprawaStopka"><span class="stan"><i></i>Poza WERTIS</span>
-            <span class="mute">${esc(d.zamknietaBy)}</span></span>
-          <span class="mute" style="display:block;margin-top:4px">${esc(d.powod)}</span>
-        </td>
-      </tr>`).join("") || '<tr><td class="mute">Nic nie zdjęto z listy w tym oknie</td></tr>';
-    dolozLoga();
-    return;
-  }
-
-  /* Archiwum przychodzi z serwera już zawężone — filtrowanie go tutaj jeszcze
-     raz zawężałoby stronę wyników, a nie zbiór, i cicho gubiło faktury spoza
-     pierwszych dwustu. */
-  if (filtrDostaw === "archiwum") {
-    podsumujDostawy(archiwumLista);
-    $("dostawy").innerHTML =
-      archiwumLista.map(wierszDostawy).join("") ||
-      `<tr><td class="mute">${
-        !archiwumWczytane
-          ? "Wczytywanie…"
-          : q
-            ? "Nic w archiwum nie pasuje do wyszukiwania"
-            : "Archiwum jest puste — nic jeszcze nie wypadło z okna importu"
-      }</td></tr>`;
-    dolozLoga();
-    return;
-  }
-
-  const pasujace = dokumenty
-    .filter((d) => (filtrDostaw === "done" ? d.status === "done" : d.status !== "done"))
-    .filter((d) => pasuje(d.nrPelny, d.dostawca));
-  podsumujDostawy(pasujace);
-
-  /* JEDEN WARIANT WIERSZA, nie dwa. Do 0.97.0 lista miała postać tabeli na
-     sześć kolumn przy zamkniętym dokumencie i wiersz łamany w pionie po
-     otwarciu. Tabela była ciasna wszędzie poniżej pełnej szerokości ekranu:
-     przy dwóch kolumnach siatki „2026-08-26" łamało się na dwie linie, a nazwa
-     dostawcy na trzy. Wiersz zwarty niesie DOKŁADNIE to samo — numer, wiek,
-     dostawcę, liczbę pozycji, postęp, stan i wyjątki — więc drugi wariant
-     został po tym, że kiedyś nie było pierwszego.
-
-     Zniknął z nim przycisk POZYCJE (cały wiersz otwiera dokument od 0.83.0)
-     i logo dostawcy, które przeniosło się do kontekstu sprawy — tam stoi przy
-     nazwie, dużo większe, i mówi to samo. */
-  $("dostawy").innerHTML =
-      (filtrDostaw === "done" ? pasujace.map(wierszDostawy).join("") : wierszeWGrupach(pasujace)) ||
-      '<tr><td class="mute">Brak dostaw w oknie importu</td></tr>';
-  dolozLoga();
-}
-
-/* ── Pozycje jednego dokumentu ────────────────────────────────────────────────
-   Pasek postępu mówił „12/30" i na tym się kończyło — biuro nie miało jak
-   sprawdzić, KTÓRE dwanaście, kto je odłożył ani gdzie faktycznie wylądowały.
-   Odpowiedź wymagała otwarcia Subiekta obok.
-
-   Wejść da się w KAŻDY dokument, także taki, którego nikt nie zaczął — wtedy
-   serwer liczy pozycje wprost z faktury i mówi o tym w nagłówku. Podgląd jest
-   CZYTANIEM: kliknięcie tutaj nie otwiera dostawy i nie zabiera nikomu blokad,
-   bo to zrobiłoby z patrzenia zmianę stanu magazynu.                          */
-let otwartyDok = null;
-/* Token unieważniający dogrywanie zdjęć. Wyjście z dokumentu w połowie
-   ładowania zostawiłoby wpisy lądujące w tabeli, której już nie ma. */
-let sesjaPodgladu = 0;
-/* Surowa odpowiedź z poprzedniego cyklu. Bez tego odpytywanie co pół minuty
-   przerysowywałoby tabelę, w której nic się nie zmieniło — gubiąc przewinięcie
-   i mrugając zdjęciami. */
-let ostatniSzczegol = "";
-
-/* Ta sama zasada co przy zwrotach: wąsko szczegół zasłania, szeroko staje
-   obok listy. Reklamacje schodzą w OBU trybach — nie są kontekstem tej
-   faktury, tylko osobną kolejką pracy. */
-function ustawRodzenstwoDostaw() {
-  const otwarty = otwartyDok != null;
-  $("kartaDostaw").hidden = otwarty && !kolejkaZostaje();
-  $("kartaReklamacji").hidden = otwarty;
-  /* Kontekst żyje i ginie razem z dokumentem — pusta trzecia strefa przy
-     zamkniętej dostawie byłaby nagłówkiem bez treści. */
-  $("dostawaKontekst").hidden = !otwarty;
-  rysujDostawy();               // wariant listy zależy od tego, co ustawiamy tu
-  rysujOdpowiedzi();            // ma własną regułę pustki
-  $("widokDostawy").classList.toggle("zSzczegolem", otwarty);
-  ustawPasmoSzuflady("widokDostawy", otwarty);
-  zaznaczWiersz("dostawy", "dok", otwartyDok);
-}
-
-function otworzDokument(dokId) {
-  otwartyDok = dokId;
-  ostatniSzczegol = "";
-  $("szczegol").hidden = false;
-  ustawRodzenstwoDostaw();
-  $("szczegolNaglowek").innerHTML = '<p class="mute">Wczytywanie…</p>';
-  $("szczegolLinie").innerHTML = "";
-  $("szczegolBezLinii").innerHTML = "";
-  for (const id of ["dostawaDostawca", "dostawaNotatki", "dostawaAkcja", "szczegolWyjatki"]) {
-    $(id).innerHTML = "";
-  }
-  odswiezSzczegol();
-}
-
-function zamknijDokument() {
-  if (otwartyDok == null) return;
-  otwartyDok = null;
-  sesjaPodgladu++;              // to, co jeszcze leci, ma nie trafić do DOM
-  $("szczegol").hidden = true;
-  ustawRodzenstwoDostaw();
-  odswiezDostawy();
-}
-
-async function odswiezSzczegol() {
-  const dok = otwartyDok;
-  try {
-    const tekst = await (await api(`/api/biuro/dokument/${dok}`)).text();
-    if (otwartyDok !== dok) return;
-    if (tekst === ostatniSzczegol) return;
-    ostatniSzczegol = tekst;
-    rysujSzczegol(JSON.parse(tekst));
-  } catch (e) {
-    $("szczegolNaglowek").innerHTML = `<p class="mute">${esc(e.message)}</p>`;
-  }
-}
-
-function rysujSzczegol(d) {
-  const frac = d.progress.total ? Math.round((d.progress.done / d.progress.total) * 100) : 0;
-  const prognoza = d.zamkniecie
-    ? '<p class="mute">Dostawa zdjęta z listy pracy — poniżej pozycje z faktury, bo w WERTIS nikt tego nie rozkładał.</p>'
-    : d.zrodlo === "podglad"
-      ? '<p class="mute">Nikt jeszcze nie otwierał tego dokumentu — to pozycje z faktury, tak jak zobaczy je kolektor.</p>'
-      : "";
-  /* Zdanie osobne, nie dopisek do `prognoza`: te dwie rzeczy mówią o czym
-     innym. Tamto o tym, CZY ktoś to rozkładał, to o tym, SKĄD są liczby.
-     Ekran bez tego wygląda jak każdy inny dokument, a nie jest: faktura mogła
-     się w Subiekcie od tamtej pory zmienić i nie mamy jak tego zobaczyć. */
-  const archiwum = d.archiwalny
-    ? '<p class="mute">Dokument wypadł z okna importu — poniżej NASZ zapis z chwili rozkładania, nie dzisiejsza faktura z Subiekta.</p>'
-    : "";
-  /* Dostawy domkniętej normalnie nie ma czego zdejmować z listy — praca
-     została wykonana TUTAJ i ma pokrycie w skanach. Przycisku wtedy nie ma
-     wcale, zamiast wyszarzonego, który zaprasza do kliknięcia i odmawia. */
-  const akcja = d.zamkniecie
-    ? `<div class="mute" style="margin-top:8px">Rozłożone poza WERTIS ·
-         ${esc(d.zamkniecie.kto)} · ${esc(stempelLokalny(d.zamkniecie.at))}<br>
-         powód: ${esc(d.zamkniecie.powod)}</div>
-       <button class="akcja cichy" style="margin-top:6px"
-               data-przywroc="${d.dokId}">PRZYWRÓĆ NA LISTĘ</button>`
-    : d.status === "done"
-      ? ""
-      : `<button class="akcja cichy" style="margin-top:8px"
-                 data-zamknij-poza="${d.dokId}" data-nr="${esc(d.nrPelny)}"
-         >ROZŁOŻONE POZA WERTIS</button>`;
-  /* Numer dokumentu JEST tytułem sprawy — dostaje stopień tytułu, tak jak
-     temat oferty przy pytaniach klientów. */
-  $("szczegolNaglowek").innerHTML = `
-    <div class="temat">${esc(d.nrPelny)}
-      ${d.wBuforze ? '<span class="badge amber">bufor</span>' : ""}
-      ${d.wPrzyjeciach ? '<span class="badge amber">w przyjęciach</span>' : ""}
-      ${statusDostawy(d)}</div>
-    <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
-      <div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div>
-      <span class="mute">${d.progress.done}/${d.progress.total} poz.${
-        d.progress.problems ? ` · ${d.progress.problems} z wyjątkiem` : ""}</span>
-    </div>
-    ${archiwum}${prognoza}`;
-
-  /* Trzy liczby o dostawcy stoją PRZY wyjątku, który się właśnie rozstrzyga.
-     Biuro patrzy na jedną pozycję jednej faktury i bez nich nie ma z czego
-     wiedzieć, czy niedobór u tego dostawcy zdarza się co drugi raz, czy
-     pierwszy raz w tym roku — a to jest cała różnica między „policzyć
-     ponownie" a „reklamować". */
-  const st = d.dostawcaStat;
-  $("dostawaDostawca").innerHTML = `
-    <h2>DOSTAWCA</h2>
-    <div style="display:flex;gap:10px;align-items:center">
-      ${slotLogo(d.khId, d.maLogo, 34, 84)}
-      <span>
-        <span class="b" style="display:block">${esc(d.dostawca)}</span>
-        <span class="mute">${st && st.dostawWRoku
-          ? `${st.dostawWRoku} ${st.dostawWRoku === 1 ? "dostawa" : "dostaw"} w tym roku`
-          : "pierwsza dostawa w WERTIS"}</span>
-      </span>
-    </div>
-    ${st && (st.udzialWyjatkow != null || st.medianaDni != null) ? `
-      <div class="kafle" style="margin-top:10px">
-        ${kafel(st.udzialWyjatkow == null ? "—" : `${String(st.udzialWyjatkow).replace(".", ",")}%`,
-                "pozycji z wyjątkiem", (st.udzialWyjatkow ?? 0) > 5)}
-        ${kafel(st.medianaDni == null ? "—" : `${String(st.medianaDni).replace(".", ",")} dn.`,
-                "mediana rozłożenia")}
-      </div>` : ""}
-    <div class="mute" style="margin-top:8px">Dokument z ${esc(d.dataWyst)}</div>`;
-  $("dostawaNotatki").innerHTML = notatki(d);
-  $("dostawaAkcja").innerHTML = akcja;
-
-  /* POZYCJE WYMAGAJĄCE BIURA STOJĄ OSOBNO I NA GÓRZE.
-     Tabela na trzydzieści cztery wiersze zawiera zwykle dwa, przy których
-     ktoś czeka na decyzję — i do 0.97.0 stały w niej wymieszane z resztą,
-     rozpoznawalne po czerwonej plakietce w czwartej kolumnie. Biuro wchodzi
-     w dokument WŁAŚNIE po nie; reszta jest dowodem, że praca idzie.
-
-     Podział liczy się z tego samego pola, po którym rysuje się status —
-     `problem` znaczy „magazynier zgłosił i odłożył sprawę". */
-  /* TRZY KOLUMNY ZAMIAST PIĘCIU (0.427.0, dekalog pkt 2). Środkowa kolumna
-     przy 1440 px ma około 480 px — pięć kolumn łamało symbol na trzy linie,
-     a „KTO ODŁOŻYŁ" z datą na pięć (zmierzone na scenariuszach). Stan idzie
-     pod ilość, bo odpowiadają na jedno pytanie: ile i czy skończone. Osoba
-     idzie pod adres, bo odpowiadają na drugie: gdzie i kto tam położył. */
-  const kolumn = zdjeciaWlaczone ? 4 : 3;
-  const naglowek = `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
-    "<th>TOWAR</th><th>ILOŚĆ · STAN</th><th>GDZIE · KTO ODŁOŻYŁ</th></tr>";
-  const wyjatkowe = d.lines.filter((l) => l.status === "problem");
-  const reszta = d.lines.filter((l) => l.status !== "problem");
-
-  /* Nagłówek liczy POZYCJE, plakietka liczy OTWARTE WYJĄTKI — i to są dwie
-     różne liczby. Pozycja zostaje tutaj także po zamknięciu zgłoszenia, bo
-     dalej nie jest odłożona; plakietka gaśnie, bo nic już nie czeka na
-     decyzję. Jedna liczba na oba pytania mówiła „2 wyjątki" przy jednym
-     otwartym, zaraz po kliknięciu ROZWIĄŻ. Ten sam licznik co w szynie. */
-  const otwarteWyjatki = wyjatkowe
-    .reduce((n, l) => n + l.problemy.filter((x) => !x.resolvedAt).length, 0);
-  $("szczegolWyjatki").innerHTML = wyjatkowe.length
-    ? `<h2>POZYCJE WYMAGAJĄCE BIURA · ${wyjatkowe.length}${
-         otwarteWyjatki
-           ? ` <span class="badge err">${otwarteWyjatki} ${
-               otwarteWyjatki === 1 ? "otwarty wyjątek" : "otwartych wyjątków"}</span>`
-           : ' <span class="badge ok">wyjątki zamknięte</span>'
-       }</h2>
-       <table>${naglowek}${wyjatkowe.map(wierszPozycji).join("")}</table>`
-    : "";
-
-  $("szczegolLinie").innerHTML =
-    (wyjatkowe.length
-      ? `<tr><th colspan="${kolumn}" style="padding-top:16px">POZOSTAŁE POZYCJE · ${reszta.length}</th></tr>`
-      : "") +
-    naglowek +
-    (reszta.map(wierszPozycji).join("") ||
-      `<tr><td colspan="${kolumn}" class="mute">${
-        wyjatkowe.length ? "Poza wyjątkami nie ma pozycji" : "Dokument nie ma pozycji do rozłożenia"
-      }</td></tr>`);
-
-  /* Wyjątki bez linii to towar SPOZA dokumentu — nie mają w której pozycji
-     usiąść, a schowanie ich byłoby zgubieniem zgłoszenia. */
-  $("szczegolBezLinii").innerHTML = d.problemyBezLinii.length
-    ? `<h2 style="margin-top:18px">WYJĄTKI POZA POZYCJAMI DOKUMENTU</h2>` +
-      d.problemyBezLinii.map(wyjatek).join("")
-    : "";
-
-  dolozZdjecia(d);
-  dolozLoga();
-}
-
-function wierszPozycji(l) {
-  const frac = l.qtyDoc ? Math.min(100, Math.round((l.qtyDone / l.qtyDoc) * 100)) : 0;
-  const adres = l.mismatch
-    ? `<span class="badge err">${esc(l.locActual)}</span>
-       <div class="mute">zamiast ${esc(l.locExpected)}</div>`
-    : l.bezLokalizacji
-      ? '<span class="badge amber">BEZ LOKALIZACJI</span>'
-      : `<span class="b">${esc(l.locActual || l.locExpected)}</span>`;
-  const kto = l.doneBy
-    ? `<div class="mute">${esc(l.doneBy)} · ${esc(stempelLokalny(l.doneAt))}</div>`
-    : "";
-  return `<tr>
-    ${zdjeciaWlaczone ? `<td class="kolFoto" data-tw="${l.twId}"></td>` : ""}
-    <td><span class="b">${esc(l.sym)}</span><div class="mute">${esc(l.name)}</div></td>
-    <td class="kolIlosc"><b>${esc(formatIlosc(l.qtyDone))}/${esc(formatIlosc(l.qtyDoc))}</b>
-        <div class="pasek${frac >= 100 ? " done" : ""}"><i style="width:${frac}%"></i></div>
-        ${statusPozycji(l.status)}</td>
-    <td class="kolGdzie">${adres}${kto}</td>
-  </tr>${
-    /* Wyjątek dostaje WŁASNY wiersz na całą szerokość, a nie komórkę TOWAR.
-       Wciśnięty do komórki na dwie piąte tabeli łamał się na cztery linie
-       i wypychał sąsiednie kolumny w górę — wiersz wyglądał na rozjechany,
-       a zgłoszenie magazyniera było najgorzej czytelną rzeczą w tabeli, choć
-       to po nie biuro tu wchodzi. */
-    l.problemy.length
-      ? `<tr><td colspan="${zdjeciaWlaczone ? 4 : 3}" style="padding-top:0">
-           ${l.problemy.map(wyjatek).join("")}</td></tr>`
-      : ""
-  }`;
-}
-
-function statusPozycji(s) {
-  if (s === "done") return '<span class="badge ok">ROZŁOŻONA</span>';
-  if (s === "partial") return '<span class="badge amber">CZĘŚCIOWO</span>';
-  if (s === "problem") return '<span class="badge err">WYJĄTEK</span>';
-  if (s === "skipped") return '<span class="badge mute2">POMINIĘTA</span>';
-  return '<span class="badge mute2">DO ZROBIENIA</span>';
-}
-
-/** Ilość bez sztucznych zer: 6 zamiast „6.00", ale 2.5 zostaje 2.5. */
-const formatIlosc = (n) => String(Math.round(Number(n) * 1000) / 1000);
-
-function wyjatek(p) {
-  /* „OTWARTY" pisany WPROST. Wcześniej brak plakietki „rozwiązany" trzeba było
-     zinterpretować jako otwarty — a brak czegoś nie jest komunikatem. */
-  return `<div class="wyjatek">
-    <span class="badge err">${esc(p.typLabel || p.typ)}</span>
-    ${p.symObcy ? `<b>${esc(p.symObcy)}</b>` : ""}
-    ${p.qty != null ? `policzone: ${esc(formatIlosc(p.qty))}${p.qtyDok != null ? ` z ${esc(formatIlosc(p.qtyDok))}` : ""}` : ""}
-    ${p.zamiastIlosc != null ? `· zamiast ${esc(formatIlosc(p.zamiastIlosc))}` : ""}
-    ${p.opis ? esc(p.opis) : ""}
-    <span class="mute">${esc(p.createdBy || "")} ${esc(stempelLokalny(p.createdAt))}</span>
-    ${p.resolvedAt
-      ? `<span class="badge ok">rozwiązany</span>${p.resolvedNote ? ` <span class="mute">${esc(p.resolvedNote)}</span>` : ""}`
-      : `<span class="wyjatekAkcja"><span class="badge err">OTWARTY</span> <button class="akcja cichy maly" data-rozwiaz="${p.id}">ROZWIĄŻ</button></span>`}
-    ${p.hasPhoto ? `<span data-foto="${p.id}"></span>` : ""}
-  </div>`;
-}
-
-/* ── Reklamacje ── */
-/**
- * Notatki biura do dostawy.
- *
- * Stoją w panelu dokumentu, a nie w osobnej zakładce, bo pytanie dotyczy TEJ
- * faktury i czyta się je razem z jej pozycjami. Nieodpowiedziana jest
- * wyróżniona, bo to ona trzyma dostawę otwartą — i to jest jedyny powód,
- * dla którego rozkładający nie może skończyć.
- */
-/*
- * Notatki jako ROZMOWA, nie karta z doklejoną odpowiedzią.
- *
- * To jest wymiana zdań między biurem a halą i tak ma wyglądać: pytanie biura
- * bursztynowym dymkiem po lewej, odpowiedź z hali szarym po prawej — te same
- * dymki, którymi od 0.89.0 czyta się wątek klienta. Do 0.97.0 obie strony
- * siedziały w jednym prostokącie, a odpowiedź zaczynała się od słowa
- * „Odpowiedź:", bo inaczej nie dało się poznać, gdzie kończy się pytanie.
- */
-function notatki(d) {
-  const lista = (d.notatki || []).map((n) => `
-    <div class="wiad klient" style="max-width:none">
-      <div class="kto">${esc(n.createdBy)} · ${esc(stempelLokalny(n.createdAt))}</div>
-      <div class="tresc">${esc(n.tresc)}</div>
-    </div>
-    ${n.odpowiedz
-      ? `<div class="wiad my" style="max-width:none">
-           <div class="kto">${esc(n.odpBy)} · ${esc(stempelLokalny(n.odpAt))}</div>
-           <div class="tresc">${esc(n.odpowiedz)}</div>
-           ${n.odpWidzianaAt ? "" : `<button class="akcja cichy" data-przeczytane="${n.id}" style="margin-top:7px">PRZECZYTANE</button>`}
-         </div>`
-      : `<p class="mute" style="margin:2px 0 8px"><b>Czeka na odpowiedź</b> —
-           dostawa się nie domknie, dopóki jej nie ma.</p>`}`).join("");
-  return `<h2 style="margin-top:18px">NOTATKA DO HALI</h2>
-    ${lista || '<p class="mute">Brak notatek.</p>'}
-    <button class="akcja cichy" data-notatka="${d.dokId}" style="margin-top:10px">+ DODAJ NOTATKĘ</button>`;
-}
-
-/** Nowa notatka. Treść i tak waliduje serwer — okno tylko pyta. */
-async function dodajNotatke(dokId) {
-  const tresc = await zapytaj({
-    tytul: "NOTATKA DLA ROZKŁADAJĄCEGO",
-    opis: "Na tę notatkę trzeba będzie odpowiedzieć, żeby zamknąć dostawę.",
-    przyklad: "np. „Dostawca dosyła brakujące 3 szt W32-0203 — sprawdź, czy są w paczce”",
-    potwierdz: "DODAJ NOTATKĘ",
-  });
-  if (tresc === null) return;
-  try {
-    await api(`/api/biuro/dokument/${dokId}/notatka`, {
-      method: "POST",
-      body: JSON.stringify({ tresc }),
-    });
-    ostatniSzczegol = "";           // wymuś przerysowanie panelu
-    await odswiezSzczegol();
-  } catch (e) { toast(e.message, "blad"); }
-}
-
-/* ── Rozłożone poza WERTIS ──────────────────────────────────────────────────
-   Karta chowa się, gdy nie ma czego pokazać. Pusta tabela z nagłówkiem
-   sugerowałaby, że to zwykły element ekranu — a to jest wyjątek i ma tak
-   wyglądać: pojawia się dopiero, gdy ktoś z niego skorzystał.               */
-function rysujPozaWertis(lista) {
-  /* Lista jedzie też do szyny, pod czip „Poza WERTIS" (0.97.0). Karta zostaje
-     dla trybu wąskiego i dla akcji PRZYWRÓĆ, której nie da się sensownie
-     wcisnąć w wiersz szyny. */
-  pozaWertisLista = lista;
-  $("kartaPozaWertis").hidden = lista.length === 0;
-  if (!lista.length) return;
-  $("pozaWertisIle").textContent = `${lista.length} ${
-    odmiana(lista.length, ["dokument", "dokumenty", "dokumentów"])}`;
-  $("pozaWertis").innerHTML =
-    "<tr><th>DOKUMENT</th><th>DOSTAWCA</th><th>ZAMKNĄŁ</th><th>POWÓD</th><th></th></tr>" +
-    lista.map((d) => `<tr>
-      <td class="b">${esc(d.nrPelny)}<div class="mute">${esc(d.dataWyst)}</div></td>
-      <td>${esc(d.dostawca)}</td>
-      <td>${esc(d.zamknietaBy)}<div class="mute">${esc(stempelLokalny(d.zamknietaAt))}</div></td>
-      <td>${esc(d.powod)}${
-        d.linie ? `<div class="mute">${d.linie} poz. zapisanych przed zamknięciem</div>` : ""}</td>
-      <td style="white-space:nowrap">
-        <button class="akcja cichy" data-dok="${d.dokId}">POZYCJE</button>
-        <button class="akcja cichy" data-przywroc="${d.dokId}">PRZYWRÓĆ</button></td>
-    </tr>`).join("");
-}
-
-/**
- * Zdjęcie dostawy z listy pracy.
- *
- * Do 0.60.1 pytał o powód `prompt` — świadoma oszczędność, która przestała
- * wystarczać, gdy okien zrobiło się osiem. Powód i tak waliduje serwer:
- * pusty kończy się czytelnym błędem, nie cichym zapisem.
- */
-async function oznaczPozaWertis(dokId, nrPelny) {
-  const powod = await zapytaj({
-    tytul: "ROZŁOŻONE POZA WERTIS",
-    opis: `Dostawa ${nrPelny} zniknie z listy rozkładania. Dlaczego?`,
-    przyklad: "np. „rozłożone starą aplikacją przed wdrożeniem WERTIS”",
-    potwierdz: "ZAMKNIJ DOSTAWĘ",
-    grozny: true,
-  });
-  if (powod === null) return;                  // ANULUJ to nie jest pusty powód
-  try {
-    await api(`/api/biuro/dokument/${dokId}/zamknij`, {
-      method: "POST",
-      body: JSON.stringify({ powod }),
-    });
-    zamknijDokument();
-  } catch (e) { toast(e.message, "blad"); }
-}
-
-/** Zwraca `true`, gdy przywrócenie przeszło — wołający decyduje, co odświeżyć. */
-async function przywrocDostawe(dokId) {
-  try {
-    await api(`/api/biuro/dokument/${dokId}/otworz`, { method: "POST" });
-    return true;
-  } catch (e) { toast(e.message, "blad"); return false; }
-}
-
-/* ── Odpowiedzi na notatki (0.57.0) ──────────────────────────────────────── */
-
-function rysujOdpowiedzi() {
-  const lista = odpowiedziNaNotatki;
-  /* Przy otwartym dokumencie karta znika tylko wtedy, gdy szczegół ZASŁANIA
-     listę. W trybie szerokim lista stoi obok i licznik odpowiedzi ma prawo
-     stać nad nią — to on jest drogą do notatki czekającej na odpowiedź. */
-  $("kartaOdpowiedzi").hidden =
-    lista.length === 0 || (otwartyDok != null && !kolejkaZostaje());
-  if (!lista.length) return;
-  $("odpowiedzi").innerHTML =
-    "<tr><th>DOKUMENT</th><th>PYTANIE I ODPOWIEDŹ</th><th></th></tr>" +
-    lista.map((o) => `<tr>
-      <td class="b">${esc(o.nrPelny || "—")}</td>
-      <td>
-        <div class="mute">${esc(o.tresc)}</div>
-        <div><b>${esc(o.odpowiedz)}</b></div>
-        <div class="mute">${esc(o.odpBy || "")} · ${esc(stempelLokalny(o.odpAt))}</div>
-      </td>
-      <td style="white-space:nowrap">
-        <button class="akcja cichy" data-otworz-dok="${o.dokId}">POZYCJE</button>
-        <button class="akcja" data-przeczytane="${o.id}">PRZECZYTANE</button>
-      </td>
-    </tr>`).join("");
-}
-
-/** Potwierdzenie odczytu. Powtórka z drugiego biurka jest nieszkodliwa. */
-async function oznaczPrzeczytane(id) {
-  try {
-    await api(`/api/biuro/notatki/${id}/przeczytane`, { method: "POST", body: JSON.stringify({}) });
-    odpowiedziNaNotatki = odpowiedziNaNotatki.filter((o) => o.id !== id);
-    rysujOdpowiedzi();
-    rysujDostawy();   // sygnał „odpowiedź z hali" gaśnie w wierszu od razu, nie po cyklu
-    odswiezStan();
-  } catch (e) { toast(e.message, "blad"); }
-}
-
-/**
- * Zamknięcie wyjątku przez BIURO (0.57.0).
- *
- * Trasa istniała od dawna i działała — ale jej jedynym klientem był kolektor,
- * więc reklamację prowadziło biuro, a domykał ją magazynier na hali. Notatka
- * jest opcjonalna i idzie do `resolvedNote`, czyli tam, skąd czyta ją protokół.
- *
- */
-async function rozwiazWyjatek(id) {
-  const note = await zapytaj({
-    tytul: "ZAMKNIĘCIE WYJĄTKU",
-    opis: "Jak to załatwiono? Wpis jest opcjonalny i trafia do protokołu.",
-    potwierdz: "ZAMKNIJ WYJĄTEK",
-  });
-  if (note === null) return false;
-  try {
-    await api(`/api/problems/${id}/resolve`, {
-      method: "POST",
-      body: JSON.stringify({ note: note.trim() }),
-    });
-    return true;
-  } catch (e) { toast(e.message, "blad"); return false; }
-}
-
-function rysujReklamacje(problemy) {
-  const wgDok = new Map();
-  for (const p of problemy) {
-    const k = p.docNumber || "(poza dostawą)";
-    if (!wgDok.has(k)) wgDok.set(k, []);
-    wgDok.get(k).push(p);
-  }
-  /* BLOK NA DOKUMENT, WYJĄTEK W WIERSZU (0.427.0, dekalog pkt 2). Do tej
-     wersji wszystkie wyjątki dokumentu siedziały w JEDNEJ komórce jako ciąg
-     zdań z pełnowymiarowym ROZWIĄŻ po każdym — przy sześciu wyjątkach karta
-     miała 700 px, a typ, towar i ilość stały za każdym razem gdzie indziej.
-     Teraz nagłówek dokumentu niesie numer, dostawcę, licznik i akcje na całą
-     fakturę, a wyjątek jest wierszem z kolumnami: typ, towar, ilość, kto,
-     zdjęcie, ROZWIĄŻ. Porównanie idzie w pionie, nie przez czytanie zdań.
-
-     Dostawcę bierzemy z listy dostaw po numerze — ta sama tabela, żadnego
-     nowego zapytania. Dokument spoza okna importu zostaje bez nazwy. */
-  const dostawcaWgNr = new Map(dokumenty.map((d) => [d.nrPelny, d.dostawca]));
-  const aparat = '<svg class="ikonaFoto" viewBox="0 0 24 24" role="img" aria-label="jest zdjęcie"><title>jest zdjęcie</title>' +
-    '<path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>';
-  const rows = [...wgDok.entries()].map(([dok, lista]) => {
-    const dId = lista.find((p) => p.deliveryId != null)?.deliveryId;
-    const akcje = dId != null
-      ? `<button class="akcja maly" data-formularz="${dId}" data-nr="${esc(dok)}">FORMULARZ</button>
-         <button class="akcja cichy maly" data-csv="${dId}" data-nr="${esc(dok)}">CSV</button>`
-      : "";
-    const glowa = `<tr class="rekDok"><td colspan="6"><span class="rekGlowa">
-      <span class="b">${esc(dok)}</span>
-      ${dostawcaWgNr.has(dok) ? `<span class="rekKto">${esc(dostawcaWgNr.get(dok))}</span>` : ""}
-      <span class="badge err">${lista.length} ${lista.length === 1 ? "wyjątek" : "wyjątki"}</span>
-      <span class="rekAkcje">${akcje}</span></span></td></tr>`;
-    /* Komplet danych, nie skrót. Serwer wysyła `qtyDok`, `opis`, `createdAt`
-       i `symObcy` od dawna — panel je wyrzucał, więc biuro dzwoniło na halę
-       po rzeczy, które miało na ekranie. */
-    const wiersze = lista.map((p) => `<tr>
-      <td><span class="badge err">${esc(p.typLabel || p.typ)}</span></td>
-      <td><b>${esc(p.sym || p.symObcy || "")}</b> ${esc(p.name || "")}${p.opis ? `<div class="mute">${esc(p.opis)}</div>` : ""}</td>
-      <td class="rekIle">${p.qty != null
-        ? `${esc(formatIlosc(p.qty))}${p.qtyDok != null ? ` z ${esc(formatIlosc(p.qtyDok))}` : ""} ${esc(p.unit || "")}`
-        : '<span class="mute">—</span>'}</td>
-      <td class="mute rekKiedy">${esc(p.createdBy || "")} · ${esc(stempelLokalny(p.createdAt))}</td>
-      <td class="rekFoto">${p.hasPhoto ? aparat : ""}</td>
-      <td class="rekAkcja"><button class="akcja cichy maly" data-rozwiaz="${p.id}">ROZWIĄŻ</button></td>
-    </tr>`).join("");
-    return glowa + wiersze;
-  }).join("");
-  $("reklamacje").innerHTML =
-    "<tr><th>TYP</th><th>TOWAR</th><th>POLICZONE</th><th>ZGŁOSIŁ</th><th></th><th></th></tr>" +
-    (rows || '<tr><td colspan="6" class="mute">Brak nierozwiązanych wyjątków</td></tr>');
 }
 
 /* ── Metryki ──────────────────────────────────────────────────────────────────
@@ -3959,130 +2835,15 @@ async function szukajDziennik() {
   }
 }
 
-/* ── Formularz reklamacyjny (wydruk) ──────────────────────────────────────────
-   Zdjęcia dowodowe leżą za sesją (`/api/problems/:id/photo` wymaga nagłówka),
-   więc <img src> wprost nie zadziała. Pobieramy fetchem i wstawiamy blob-URL:
-   ten sam mechanizm, dzięki któremu zdjęcia NIE są publiczne w LAN. */
-async function fotoUrl(problemId) {
-  try {
-    const r = await api(`/api/problems/${problemId}/photo`);
-    return URL.createObjectURL(await r.blob());
-  } catch { return null; }
-}
-
-/* ── Zdjęcia w pozycjach dokumentu ────────────────────────────────────────────
-   Tą samą drogą co wyżej — zdjęcia kartotek też stoją za sesją. Trzy rzeczy
-   są tu jednak inne i każda ma swój powód:
-
-   1. TRZY POBRANIA NARAZ, nie czterdzieści. Przy pierwszym trafieniu serwer
-      ciągnie plik z Subiekta (`zapewnijZdjecie`) — tą samą drogą, z której
-      korzystają kolektory stojące przy regale. Otwarcie dużej dostawy nie ma
-      prawa ich zagłodzić.
-   2. BRAK ZDJĘCIA PAMIĘTAMY. Kartoteka bez obrazka odpowiada 404, a dokument
-      z czterdziestoma takimi pytałby czterdzieści razy co pół minuty, w kółko,
-      przez cały dzień.
-   3. BLOB-URL-E ŻYJĄ DO WYLOGOWANIA. Zwolnienie ich przy zamknięciu panelu
-      kasowałoby cache i kazało pobierać wszystko od nowa przy każdym wejściu
-      w ten sam dokument.                                                      */
-const zdjecia = new Map();      // klucz → blobUrl | null (null = na pewno brak)
-const kolejkaFoto = [];
-let pobieraczy = 0;
-const ROWNOLEGLE = 3;
-
-function dolozZdjecia(d) {
-  const moja = ++sesjaPodgladu;
-  const aktualne = () => moja === sesjaPodgladu;
-  const zadania = [];
-  for (const l of d.lines) {
-    if (zdjeciaWlaczone) {
-      zadania.push({ klucz: `t${l.twId}`, url: `/api/products/${l.twId}/zdjecie`,
-                     sel: `#szczegolLinie td.kolFoto[data-tw="${l.twId}"]`, klasa: "foto" });
-    }
-    for (const p of l.problemy) if (p.hasPhoto) zadania.push(zadanieDowodu(p));
-  }
-  for (const p of d.problemyBezLinii) if (p.hasPhoto) zadania.push(zadanieDowodu(p));
-
-  zakolejkuj(zadania, aktualne);
-}
-
-/* Wspólne wejście do kolejki dla wszystkich ekranów ze zdjęciami. Zadanie
-   niesie ze sobą pytanie „czy warto jeszcze pobierać" — bo ekran, z którego
-   pochodzi, mógł się w międzyczasie przerysować albo zniknąć. */
-function zakolejkuj(zadania, aktualne) {
-  for (const z of zadania) {
-    if (zdjecia.has(z.klucz)) { wstawZdjecie(z, zdjecia.get(z.klucz)); continue; }
-    kolejkaFoto.push({ ...z, aktualne });
-  }
-  while (pobieraczy < ROWNOLEGLE && kolejkaFoto.length) pobieracz();
-}
-
-/** Pusta komórka na zdjęcie; wypełni ją kolejka. Bez kartoteki nie ma czego pytać. */
-const kolFoto = (twId) =>
-  !zdjeciaWlaczone ? "" : `<td class="kolFoto"${twId == null ? "" : ` data-tw="${twId}"`}></td>`;
-
-const zadanieDowodu = (p) => ({
-  klucz: `p${p.id}`, url: `/api/problems/${p.id}/photo`,
-  sel: `#szczegol [data-foto="${p.id}"]`, klasa: "",
-});
-
-async function pobieracz() {
-  pobieraczy++;
-  while (kolejkaFoto.length) {
-    const z = kolejkaFoto.shift();
-    // zadanie z poprzedniego dokumentu albo z poprzedniego przerysowania
-    if (!z.aktualne()) continue;
-    let url = zdjecia.get(z.klucz);
-    if (url === undefined) {
-      try { url = URL.createObjectURL(await (await api(z.url)).blob()); }
-      catch { url = null; }
-      zdjecia.set(z.klucz, url);
-    }
-    if (!z.aktualne()) continue;
-    wstawZdjecie(z, url);
-  }
-  pobieraczy--;
-}
-
-function wstawZdjecie(z, url) {
-  const tresc = url
-    ? `<img class="${z.klasa}" src="${url}" alt="">`
-    : z.klasa ? '<div class="brakfoto">bez zdjęcia</div>' : "";
-  for (const cel of document.querySelectorAll(z.sel)) cel.innerHTML = tresc;
-}
-
-/* ── Powiększenie zdjęcia w dostawie (0.205.0) ────────────────────────────────
-   Zgłoszenie właściciela. Miniatura ma 48 px, a pytanie, przy którym się jej
-   używa, brzmi „czy to TA część" — przy kartotekach różniących się końcówką
-   nazwy („szarpak NAC LS46" obok „LS51") 48 px nie wystarcza. Sprawdzenie
-   znaczyło otwarcie Subiekta na drugim monitorze.
-
-   Delegacja stoi na SEKCJI `#szczegol`, nie na tabeli pozycji: tabelę
-   przerysowuje każde wejście w dokument, a `#szczegol` obejmuje przy okazji
-   zdjęcia dowodowe problemów — te same 48 px i to samo pytanie.
-
-   BEZ POBIERANIA. Adres blobu leży już w miniaturze, bo kolejka zdjęć
-   ściągnęła go raz i trzyma do wylogowania. Powiększenie to ten sam plik
-   w większym pudełku, nie drugie żądanie do serwera.
-
-   ZAMYKA KAŻDE KLIKNIĘCIE, nie tylko krzyżyk — „po ponownym kliknięciu ma
-   zniknąć". Escape robi to samo, bo ręka bywa na klawiaturze. */
-$("szczegol").addEventListener("click", (e) => {
-  if (e.target.tagName !== "IMG") return;
-  const lupa = $("lupa");
-  lupa.querySelector("img").src = e.target.src;
-  lupa.hidden = false;
-});
-
-$("lupa").addEventListener("click", () => { $("lupa").hidden = true; });
-document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && !$("lupa").hidden) $("lupa").hidden = true;
-});
-
 /* ── Dane firmy do formularzy dostawców ───────────────────────────────────────
    Druki dostawców pytają o dane ZGŁASZAJĄCEGO (nazwa, NIP, adres, osoba
    kontaktowa) — a tych system nigdzie nie ma, bo nie są danymi magazynu.
    Mieszkają w localStorage tej przeglądarki, jak token sesji: biuro drukuje
-   z jednego komputera, a serwer nie musi wiedzieć, jak firma się nazywa. */
+   z jednego komputera, a serwer nie musi wiedzieć, jak firma się nazywa.
+
+   Od 0.435.0 druk protokołu stoi w panelu (`panel/src/druk/`) i czyta TEN
+   SAM klucz — oba fronty są na jednym originie. Formularz zostaje tutaj do
+   wydania z ustawieniami, które przeniesie dane na serwer. */
 const FIRMA_POLA = ["Nazwa", "Nip", "Adres", "Miejscowosc", "Osoba", "Telefon"];
 function firma() {
   try { return JSON.parse(localStorage.getItem("wertis.firma")) || {}; }
@@ -4098,230 +2859,6 @@ function zapiszFirme() {
   localStorage.setItem("wertis.firma", JSON.stringify(f));
   $("zapiszFirme").textContent = "ZAPISANO ✓";
   setTimeout(() => { $("zapiszFirme").textContent = "ZAPISZ"; }, 1500);
-}
-
-/* Wartość albo kropki do ręcznego wypełnienia — druk ma wyglądać jak oryginał
-   dostawcy także wtedy, gdy dane firmy nie są jeszcze zapisane. */
-const albo = (v) => (v ? esc(v) : "");
-
-/* Data LOKALNA, nie doba UTC. Formularz reklamacyjny idzie do dostawcy
-   z datą sporządzenia — wystawiony po północy czasu polskiego nosiłby datę
-   dnia poprzedniego. */
-const dzis = () => dataLokalna(new Date().toISOString());
-
-/** Zdjęcia dowodowe jako aneks — wspólny dla wszystkich szablonów. */
-function aneksZdjec(zdjecia) {
-  if (!zdjecia.length) return "";
-  const fotki = zdjecia.map(({ p, url }) =>
-    `<figure><img src="${url}"><figcaption>${esc(p.sym || "")} · ${esc(p.typLabel || p.typ)}${p.opis ? " · " + esc(p.opis) : ""}</figcaption></figure>`).join("");
-  return `<section class="aneks"><h1>Zdjęcia dowodowe</h1>${fotki}</section>`;
-}
-
-/* ── Szablon domyślny: protokół rozbieżności WERTIS ─────────────────────────── */
-function formularzWertis(dok, nrDok, problemy, zdjecia) {
-  const wiersze = problemy.map((p, i) => `<tr>
-    <td>${i + 1}</td><td>${esc(p.sym || "")}<br><small>${esc(p.name || "")}</small></td>
-    <td>${esc(p.typLabel || p.typ)}</td><td>${p.qty ?? "—"}</td>
-    <td>${esc(p.opis || "")}</td><td>${esc(p.createdBy || "")}<br><small>${esc(p.createdAt ? dataLokalna(p.createdAt) : "")}</small></td>
-    <td>${p.resolvedAt ? "rozwiązany" : "OTWARTY"}</td>
-  </tr>`).join("");
-  return {
-    tytul: `Protokół rozbieżności · ${esc(nrDok)}`,
-    styl: `
-      body{font:13px/1.5 system-ui,sans-serif;color:#222;max-width:820px;margin:24px auto;padding:0 16px}
-      h1{font-size:18px} h1 small{color:#888;font-weight:400}
-      table{width:100%;border-collapse:collapse;margin:14px 0}
-      th,td{border:1px solid #999;padding:5px 7px;text-align:left;font-size:12px}
-      th{background:#eee}
-      .podpisy{display:flex;gap:60px;margin-top:50px}
-      .podpisy div{flex:1;border-top:1px solid #222;padding-top:4px;font-size:11px;color:#555;text-align:center}`,
-    tresc: `
-    <h1>Protokół rozbieżności w dostawie <small>WERTIS</small></h1>
-    <p><b>Dokument:</b> ${esc(nrDok)} &nbsp; <b>Dostawca:</b> ${esc(dok.dostawca || "—")}
-       &nbsp; <b>Data dostawy:</b> ${esc(dok.dataWyst || "—")}
-       &nbsp; <b>Sporządzono:</b> ${dzis()}</p>
-    <table><tr><th>Lp</th><th>Towar</th><th>Rozbieżność</th><th>Policzone</th><th>Opis</th><th>Zgłosił</th><th>Stan</th></tr>
-    ${wiersze}</table>
-    <div class="podpisy"><div>sporządził</div><div>zatwierdził (dostawca)</div></div>`,
-  };
-}
-
-/* ── Szablon GEKO: „Protokół zgłoszenia reklamacji B2B" ───────────────────────
-   Wierna kopia druku serwisu GEKO (tabela poziomo, checkboxy do ręki, przypisy
-   1–4 i klauzula RODO). Wypełniamy to, co system wie: numer FZ, kod i nazwę
-   towaru, ilość, opis usterki oraz dane firmy z ustawień. Rodzaj usterki
-   i dowód zakupu zaznacza biuro — o tym system wiedzieć nie może. */
-function formularzGeko(dok, nrDok, problemy, zdjecia) {
-  const f = firma();
-  const dealer = [f.Nazwa, f.Nip && `NIP ${f.Nip}`, f.Adres].filter(Boolean).map(esc).join("<br>");
-  const wiersze = problemy.map((p) => `
-    <tr>
-      <td class="wask">${esc(nrDok)}</td>
-      <td><b>${esc(p.symObcy || p.sym || "")}</b><br><small>${esc(p.name || "")}</small></td>
-      <td class="wask">${p.qty ?? ""}</td>
-      <td class="check">☐ Mechaniczny&nbsp;&nbsp;☐ Elektryczny</td>
-      <td class="check">☐ Faktura&nbsp;&nbsp;☐ Paragon&nbsp;&nbsp;☐ Brak*</td>
-      <td rowspan="2" class="osoba">Imię i nazwisko: ${albo(f.Osoba)}<br><br>Nr telefonu: ${albo(f.Telefon)}<br><br>Podpis*:</td>
-      <td rowspan="2" class="osoba">${dealer}</td>
-    </tr>
-    <tr><td colspan="5" class="usterka">Opis usterki: <b>${esc(p.typLabel || p.typ)}</b>${p.opis ? " — " + esc(p.opis) : ""}${p.typ === "qty_mismatch" && p.qtyDok != null ? ` (na dokumencie: ${p.qtyDok}, policzone: ${p.qty})` : ""}</td></tr>`).join("");
-  return {
-    tytul: `Reklamacja GEKO · ${esc(nrDok)}`,
-    styl: `
-      @page{size:A4 landscape;margin:10mm}
-      body{font:11px/1.4 system-ui,sans-serif;color:#111;margin:0 auto;padding:0 8px}
-      .naglowek{display:flex;justify-content:space-between;align-items:flex-start;margin:4px 0 10px}
-      .naglowek h1{font-size:12px;font-weight:400;flex:1;text-align:center;margin:0}
-      .adres{font-size:9px;text-align:right;line-height:1.35}
-      .adres b{font-size:13px}
-      h2{font-size:11px;text-decoration:underline;font-weight:700;margin:8px 0 4px}
-      table{width:100%;border-collapse:collapse}
-      th,td{border:1px solid #000;padding:4px 6px;text-align:left;vertical-align:top}
-      th{font-size:9px;text-align:center;font-weight:700}
-      th small{font-weight:400}
-      td.wask{white-space:nowrap}
-      td.check{white-space:nowrap;text-align:center;vertical-align:middle}
-      td.usterka{min-height:40px;height:44px}
-      td.osoba{font-size:10px;min-width:130px}
-      .przypisy{font-size:8px;line-height:1.35;margin-top:10px}
-      .przypisy p{margin:1px 0}
-      .rodo{font-size:7px;line-height:1.3;margin-top:6px;color:#222}`,
-    tresc: `
-    <div class="naglowek">
-      <h1>Protokół zgłoszenia reklamacji B2B</h1>
-      <div class="adres"><b>GEKO</b><br>GEKO Sp. z o.o. Sp. K<br>97-500 Kietlin, Spacerowa 3<br>NIP 7722420459<br>serwis@geko.pl<br>698 642 358</div>
-    </div>
-    <h2>Dane dotyczące reklamowanego towaru:</h2>
-    <table>
-      <tr>
-        <th>Nr faktury zakupu<br>[w GEKO]*</th>
-        <th>Produkt – kod GEKO<br><small>[KOD konieczny w przypadku produktu,<br>którego ciężko zidentyfikować]</small></th>
-        <th>Ilość<br>[szt]</th>
-        <th>Rodzaj usterki<br><small>[zaznaczyć odpowiednie]</small></th>
-        <th>Kopia dowodu zakupu klienta<br>ostatecznego dołożona do reklamacji<br><small>[zaznaczyć odpowiednie]*</small></th>
-        <th>Osoba kontaktowa<br><small>[będąca w temacie reklamacji]<br>*akceptacja poniższych informacji</small></th>
-        <th>Nazwa Dealera / NIP (pieczątka)<br><small>[w przypadku oddziału wpisać adres filii]</small></th>
-      </tr>
-      ${wiersze}
-    </table>
-    <div class="przypisy">
-      <p><b>* akceptacja poniższych informacji</b></p>
-      <p>1) Wyrażam zgodę na wystawienie korekty w przypadku uznania słuszności reklamacji w przypadku podjęcia takiej decyzji przez Serwis GEKO.</p>
-      <p>2) Przyjmuję do wiadomości, że brak uzupełnionej kolumny „NR FAKTURY ZAKUPU" powoduje wystawienie ewentualnej korekty do faktury wybranej przez Księgowość GEKO. Nie ma możliwości naniesienia zmian w późniejszym terminie do wystawionego dokumentu.</p>
-      <p>3) Gwarancja nie obejmuje wad powstałych w czasie transportu lub z winy kupującego. Odpowiednie zabezpieczenie produktu na czas transportu leży po stronie zgłaszającego reklamację.</p>
-      <p>4) W przypadku braku dowodu zakupu, reklamacja będzie rozpatrywana jako pogwarancyjna (płatna). Wycena zostanie podana Osobie podanej w formularzu reklamacyjnym. Serwis oczekuje odpowiedzi Klienta i decyzji dotyczącej kosztów naprawy w ciągu 48 godzin od daty wysłania wiadomości e-mail. Po upływie określonego czasu serwis odsyła urządzenie do nadawcy.</p>
-      <p class="rodo"><b>Klauzula RODO:</b> Administratorem Twoich danych osobowych jest GEKO Sp. z o.o. Sp.k z siedzibą 97-500 Kietlin, Spacerowa 3 (dalej GEKO). Przekazane przez Państwa dane osobowe będą przetwarzane przez GEKO w celach związanych z wykonaniem Państwa reklamacji na zasadach zgodnie z art. 6. ust. 1 lit. B lub F „RODO". Dane mogą być archiwizowane w razie konieczności obrony przed ewentualnymi roszczeniami wobec GEKO jednak nie dłużej niż moment przedawnienia. Podanie danych jest dobrowolne, ale konieczne do rozpatrzenia reklamacji. Przysługuje Państwu prawo do żądania od GEKO dostępu do swoich danych, ich sprostowania, usunięcia lub ograniczenia przetwarzania, lub sprzeciwu wobec przetwarzania, a także prawo wniesienia skargi do organu nadzorczego.</p>
-    </div>`,
-  };
-}
-
-/* ── Szablon PARTNER: „Protokół zgłoszenia reklamacji" ────────────────────────
-   Druk PARTNER opisuje JEDEN towar, więc każdy wyjątek dostaje własną stronę.
-   Kropkowane linie zostają tam, gdzie system nie zna odpowiedzi (proponowane
-   rozwiązanie to decyzja biura, nie zapis magazyniera). */
-function formularzPartner(dok, nrDok, problemy, zdjecia) {
-  const f = firma();
-  const linia = (v, min) => v
-    ? `<span class="wpis">${esc(v)}</span>`
-    : `<span class="kropki" style="min-width:${min || 320}px"></span>`;
-  const strony = problemy.map((p) => {
-    const towar = [p.name, p.symObcy || p.sym].filter(Boolean).join(", ");
-    const wada = [
-      p.typLabel || p.typ,
-      p.opis,
-      p.qty != null ? `policzone: ${p.qty}` : null,
-      p.typ === "qty_mismatch" && p.qtyDok != null ? `na dokumencie: ${p.qtyDok}` : null,
-      p.typ === "wrong_item" && p.zamiastIlosc != null ? `zamówiono: ${p.zamiastIlosc}` : null,
-    ].filter(Boolean).join(" — ");
-    return `
-    <section class="strona">
-      <h1>PROTOKÓŁ ZGŁOSZENIA REKLAMACJI</h1>
-      <p class="data">${f.Miejscowosc ? esc(f.Miejscowosc) + ", " : ""}${dzis()}<br><small>miejscowość, data</small></p>
-      <p class="etykieta">DANE KUPUJĄCEGO:</p>
-      <p>NAZWA FIRMY: ${linia(f.Nazwa)}</p>
-      <p>NIP: ${linia(f.Nip)}</p>
-      <p>ADRES: ${linia(f.Adres)}</p>
-      <br>
-      <p>NR DOKUMENTU ZAKUPU*: <b>${esc(nrDok)}</b></p>
-      <p>DATA ZAKUPU: <b>${esc(dok.dataWyst || "")}</b></p>
-      <p class="mala">*(warunkiem rozpatrzenia reklamacji jest załączenie kopii dokumentu)</p>
-      <br>
-      <p class="etykieta">OPIS TOWARU (nazwa, numer katalogowy, producent):</p>
-      <p><b>${esc(towar)}</b></p>
-      <p class="etykieta">DOKŁADNY OPIS WADY:</p>
-      <p><b>${esc(wada)}</b></p>
-      <br>
-      <p class="etykieta">PROPONOWANE ROZWIĄZANIE (naprawa, faktura korygująca, wymiana):</p>
-      <p><span class="kropki" style="min-width:100%"></span></p>
-      <p class="oswiadczenie">✓&nbsp; <i>Oświadczam, że zapoznałem się z Informacją o przetwarzaniu danych
-        osobowych, która jest dostępna na stronie internetowej
-        http://partner-parts.com/polityka-prywatnosci-2/ w Polityce prywatności lub pod adresem
-        e-mail: partner@partner-parts.pl.</i></p>
-      <p class="podpis"><span class="kropki" style="min-width:220px"></span><br><small>(podpis)</small></p>
-    </section>`;
-  }).join("");
-  return {
-    tytul: `Reklamacja PARTNER · ${esc(nrDok)}`,
-    styl: `
-      @page{size:A4;margin:18mm}
-      body{font:13px/1.7 system-ui,sans-serif;color:#111;max-width:700px;margin:0 auto;padding:0 8px}
-      .strona{page-break-after:always}
-      .strona:last-of-type{page-break-after:auto}
-      h1{font-size:19px;text-align:center;margin:18px 0 6px;letter-spacing:.5px}
-      .data{text-align:right;margin:0 0 18px} .data small{color:#555}
-      .etykieta{font-weight:700;margin:14px 0 4px}
-      .mala{font-size:11px;color:#333}
-      .kropki{display:inline-block;border-bottom:1px dotted #333;height:1.1em;vertical-align:bottom}
-      .wpis{font-weight:700;border-bottom:1px dotted #999;padding:0 4px}
-      .oswiadczenie{font-size:11px;margin-top:34px;color:#222}
-      .podpis{text-align:right;margin-top:40px} .podpis small{color:#555}`,
-    tresc: strony,
-  };
-}
-
-/* Dopasowanie druku do dostawcy — po nazwie z dokumentu FZ. Fragment, nie
-   równość: w Subiekcie dostawca to pełna nazwa rejestrowa („GEKO Sp. z o.o.
-   Sp. K"), a wzorzec ma przeżyć jej korekty. Bez dopasowania zostaje
-   protokół WERTIS. */
-const SZABLONY_DOSTAWCOW = [
-  { wzorzec: /\bgeko\b/i, render: formularzGeko },
-  { wzorzec: /\bpartner\b/i, render: formularzPartner },
-];
-
-async function otworzFormularz(deliveryId, nrDok) {
-  const problemy = (await (await api(`/api/delivery/${deliveryId}/problems`)).json()).problems;
-  const dok = dokumenty.find((d) => d.nrPelny === nrDok) || {};
-  const zdjecia = [];
-  for (const p of problemy) {
-    if (p.hasPhoto) {
-      const url = await fotoUrl(p.id);
-      if (url) zdjecia.push({ p, url });
-    }
-  }
-  const szablon = SZABLONY_DOSTAWCOW.find((s) => s.wzorzec.test(dok.dostawca || ""));
-  const render = szablon ? szablon.render : formularzWertis;
-  const { tytul, styl, tresc } = render(dok, nrDok, problemy, zdjecia);
-
-  const w = window.open("", "_blank");
-  w.document.write(`<!doctype html><html lang="pl"><head><meta charset="utf-8">
-    <title>${tytul}</title>
-    <style>
-      ${styl}
-      .aneks{page-break-before:always}
-      .aneks h1{font-size:16px}
-      figure{margin:14px 0;page-break-inside:avoid}
-      img{max-width:100%;max-height:420px;border:1px solid #ccc}
-      figcaption{font-size:11px;color:#555}
-      button.drukuj{position:fixed;top:8px;right:8px;padding:6px 14px}
-      @media print { button.drukuj{display:none} }
-    </style></head><body>
-    <button class="drukuj" onclick="print()">DRUKUJ</button>
-    ${tresc}
-    ${aneksZdjec(zdjecia)}
-    <dialog id="dialogW"></dialog>
-<div id="toasty"></div>
-</body></html>`);
-  w.document.close();
 }
 
 /* ── Cykl życia ───────────────────────────────────────────────────────────────
@@ -4350,71 +2887,9 @@ async function odswiezStan() {
        aktualna z KAŻDEJ zakładki, nie dopiero po wejściu na SPRAWY. Zakładka
        SPRAWY dalej nadpisuje świeższym odczytem z /api/biuro/zwroty. */
     if (h.allegro) stanAllegro = h.allegro;
-    rysujOdpowiedzi();
     rysujStan(h, q);
     return { h, q };
   } catch (e) { cichaAwaria("stan serwera", e); return {}; }
-}
-
-/**
- * Stopka listy — GDZIE KOŃCZY SIĘ TO, NA CO PATRZYSZ.
- *
- * Przy pracy jest to okno importu, przy archiwum granica tego okna i liczba
- * dostaw za nią. Obcięta lista archiwum musi to powiedzieć wprost: z ekranu
- * wygląda identycznie jak pełna, a to jest dokładnie ta pomyłka, po której
- * ktoś orzeka, że faktury nie ma.
- */
-function opiszOdswiezono() {
-  const czas = `odświeżono ${new Date().toLocaleTimeString("pl-PL")}`;
-  if (filtrDostaw !== "archiwum") {
-    $("odswiezono").textContent = `okno: ostatnie ${oknoDni} dni · ${czas}`;
-    return;
-  }
-  const ile =
-    archiwumIle > archiwumLista.length
-      ? `pokazano ${archiwumLista.length} z ${archiwumIle} — zawęź wyszukiwaniem`
-      : `${archiwumIle} ${slowo(archiwumIle, "dostawa", "dostawy", "dostaw")}`;
-  $("odswiezono").textContent = `archiwum: starsze niż ${oknoDni} dni · ${ile} · ${czas}`;
-}
-
-/**
- * Archiwum z serwera — pobierane WYŁĄCZNIE przy wybranym czipie.
- *
- * Lista pracy jedzie co pół minuty i musi. Archiwum zmienia się raz na dobę,
- * gdy okno importu przesunie się o dzień, więc ciągnięcie go w tle byłoby
- * dwustoma wierszami na cykl za odpowiedź, na którą nikt nie patrzy.
- */
-async function odswiezArchiwum() {
-  const q = $("szukaj").value.trim();
-  try {
-    const a = await (await api(`/api/biuro/dostawy/archiwum?q=${encodeURIComponent(q)}`)).json();
-    /* Odpowiedź na PORZUCONE zapytanie nie ma prawa trafić na ekran. Przy
-       wpisywaniu „FZ 512" leci kilka żądań i wracają w dowolnej kolejności —
-       bez tego warunku na liście osiadałby wynik dla „FZ 5". */
-    if ($("szukaj").value.trim() !== q || filtrDostaw !== "archiwum") return;
-    archiwumLista = a.documents || [];
-    archiwumIle = a.ile ?? archiwumLista.length;
-    archiwumWczytane = true;
-    rysujDostawy();
-    opiszOdswiezono();
-  } catch (e) { cichaAwaria("archiwum dostaw", e); }
-}
-
-async function odswiezDostawy() {
-  try {
-    const [dok, prob, poza] = await Promise.all([
-      (await api("/api/delivery/documents")).json(),
-      (await api("/api/problems/unresolved")).json(),
-      (await api("/api/biuro/zamkniete-poza")).json(),
-    ]);
-    dokumenty = dok.documents || [];
-    oknoDni = dok.dniWstecz ?? oknoDni;
-    rysujDostawy();
-    rysujReklamacje(prob.problems || []);
-    rysujPozaWertis(poza.documents || []);
-    opiszOdswiezono();
-    if (filtrDostaw === "archiwum") await odswiezArchiwum();
-  } catch (e) { cichaAwaria("dostawy", e); }
 }
 
 async function odswiezNadzor() {
@@ -4463,16 +2938,7 @@ function pokazZdrowieCyklu() {
 
 async function odswiez() {
   await odswiezStan();
-  if (widok === "dostawy") {
-    // przy otwartym dokumencie lista i reklamacje są schowane — odpytywanie ich
-    // byłoby pracą dla nikogo, a biuro chce widzieć postęp TEJ faktury na żywo
-    if (otwartyDok != null) {
-      await odswiezSzczegol();
-      /* W trybie szerokim lista stoi obok szczegółu — postęp innych faktur
-         ma być widać na żywo, tak samo jak postęp tej otwartej. */
-      if (kolejkaZostaje()) await odswiezDostawy();
-    } else await odswiezDostawy();
-  } else if (widok === "nadzor") await odswiezNadzor();
+  if (widok === "nadzor") await odswiezNadzor();
   /* Liczniki na zakładkach chodzą ZAWSZE, nie tylko przy otwartej zakładce —
      w tym cała ich wartość: biuro ma zobaczyć nowe pytanie i przeterminowaną
      reklamację, siedząc na dostawach. Osobne, tanie trasy. */
@@ -4483,7 +2949,7 @@ async function odswiez() {
 
 /* Liczniki zakładek odeszły razem z obsługą klienta (0.140.0). Pigułka
    mówiła, ile spraw czeka; magazyn takiej liczby nie ma — praca hali stoi
-   w koszach, a te widać na własnej zakładce. Nowa obsługa przyniesie własny
+   w koszach, a te od 0.438.0 widać w panelu, w Zwrotach. Nowa obsługa przyniesie własny
    licznik razem z własną kolejką.
 
    Od 0.364.0 funkcja znów ma treść i jest nią DOKŁADNIE to, po co powstała:
@@ -4498,23 +2964,6 @@ async function odswiezLiczniki() {
        plakietka po prostu nie urośnie — a bursztyn od jego awarii zabrałby
        ten kolor sprawom, o których alarm miał mówić. */
     console.warn("[alarm wymiany]", e);
-  }
-}
-
-/* Kosze i pominięte pozycje — praca hali widziana z biura. Jedna funkcja,
-   bo odświeżają się razem z zakładką MAGAZYN i żadne z nich nie jest na
-   ścieżce krytycznej skanu. Reklamacje, zapowiedzi i raport zwrotów odeszły
-   stąd w 0.140.0 razem z rejestrem zwrotów. */
-async function odswiezEtap3() {
-  try {
-    const [k, pom] = await Promise.all([
-      (await api("/api/biuro/kosze")).json(),
-      (await api("/api/biuro/kosze/pominiete")).json(),
-    ]);
-    rysujKosze(k.kosze || []);
-    rysujPominiete(pom.pominiete || []);
-  } catch (e) {
-    cichaAwaria("kosze", e);
   }
 }
 
@@ -4556,346 +3005,6 @@ function dociagnijWglad(id) {
   const zrodlo = ZRODLA_WGLADU[id];
   if (zrodlo && !$(zrodlo[0]).innerHTML) zrodlo[1]();
 }
-
-/* Karta jest ALARMEM, nie ewidencją: pokazuje się dopiero, gdy jakieś
-   zgłoszenie przekroczy próg dni bez paczki, i znika po skanie etykiety. */
-/* Kropka przy pozycji MAGAZYN ZWROTÓW. Alarmy wyjechały ze SPRAW do własnego
-   widoku (0.125.0) i bez sygnału przy pozycji paska nikt by tam nie zaglądał —
-   dokładnie ta ślepota, przez którą karta odpowiedzi na notatki dostała
-   plakietkę w 0.57.0. Karmią ją renderery (jadą z cyklem etapu 3), więc nie
-   ma osobnego zapytania ani drugiego źródła prawdy. */
-const alarmyMagazynu = { paczki: 0, pominiete: 0 };
-function rysujKropkeMagazynu() {
-  const ile = alarmyMagazynu.paczki + alarmyMagazynu.pominiete;
-  $("magazynKropka").hidden = ile === 0;
-  $("magazynKropka").title = ile
-    ? `${ile} ${odmiana(ile, ["sprawa czeka", "sprawy czekają", "spraw czeka"])} w magazynie zwrotów`
-    : "";
-}
-
-function badgeKosza(status) {
-  if (status === "otwarty") return '<span class="badge amber">OTWARTY</span>';
-  if (status === "zamkniety") return '<span class="badge ok">NA HALĘ</span>';
-  /* Anulowany (0.123.0) NIE jest odcieniem rozłożonego, tylko jego
-     przeciwieństwem: praca się nie wydarzyła. Czerwień, bo to jedyny stan
-     kosza, o który ktoś w biurze może chcieć zapytać halę. */
-  if (status === "anulowany") return '<span class="badge err">ANULOWANY</span>';
-  return '<span class="badge mute2">ROZŁOŻONY</span>';
-}
-
-/* ── Na czym stoi dokument MM kosza (0.333.0) ────────────────────────────────
-   Zgłoszenie właściciela: „nie utworzyło MM przy zamknięciu zwrotu, nie widzę
-   MM w Subiekcie". Dokument NIE JEST spóźniony ani zgubiony — czeka, i to
-   z powodu, który aplikacja zna od 0.200.0: towar wraca na magazyn główny
-   dopiero korektą, więc MM wystawione wcześniej przesuwałoby stan, którego
-   tam jeszcze nie ma.
-
-   Ekran o tym MILCZAŁ. Kosz zamknięty, bez numeru, z pastylką NA HALĘ wygląda
-   dokładnie jak awaria — i tak został zgłoszony. Pastylka mówi teraz, na co
-   kosz czeka i czyja to praca: korekta w Subiekcie czy kolejka Sfery.        */
-function stanMmKosza(k) {
-  if (k.rodzaj === "karton" || k.mmNumer) return "";
-  if (k.mmStan === "czeka_na_korekte") {
-    return `<span class="badge amber">CZEKA NA KOREKTĘ${
-      k.brakujeKorekt ? ` — ${k.brakujeKorekt} ZWR.` : ""}</span>`;
-  }
-  if (k.mmStan === "zamowiona") return '<span class="badge mute2">MM ZAMÓWIONA</span>';
-  if (k.mmStan === "blad") return '<span class="badge err">MM W BŁĘDZIE — SPRAWDŹ KOLEJKĘ</span>';
-  return "";
-}
-
-/* ── Cykl kosza jako pasek kroków (0.427.0, dekalog pkt 2 i 5) ─────────────
-   Wiersz kosza niósł dwie pastylki obok siebie — stan kosza i stan jego MM —
-   i żeby odpowiedzieć „gdzie ten kosz jest", trzeba było przeczytać obie
-   i złożyć je w głowie. Pasek kroków pokazuje MIEJSCE w cyklu: co za nim
-   (zielone), gdzie stoi (grafit), co przed nim (przerywane). MM zostaje
-   dopiskiem przy pasku, bo to osobny tor — kosz bywa rozłożony, zanim
-   Subiekt wystawi dokument, i pasek nie ma prawa udawać, że to jeden krok.
-
-   Anulowany nie jest krokiem cyklu, tylko wyjściem z niego — zostaje sam,
-   czerwoną pastylką, jak dotąd. MM w błędzie barwi bieżący krok na czerwono:
-   to jedyny stan, w którym kosz stoi z powodu, który ma naprawić biuro. */
-const KROKI_KOSZA = [["otwarty", "OTWARTY"], ["zamkniety", "NA HALĘ"], ["rozlozony", "ROZŁOŻONY"]];
-function cyklKosza(k, zMm) {
-  if (k.status === "anulowany") return badgeKosza(k.status);
-  const idx = KROKI_KOSZA.findIndex(([st]) => st === k.status);
-  const teraz = idx < 0 ? KROKI_KOSZA.length - 1 : idx;
-  const blad = zMm && k.mmStan === "blad" && !k.mmNumer && k.rodzaj !== "karton";
-  const kroki = KROKI_KOSZA.map(([, et], n) =>
-    `<span class="krok${n < teraz ? " za" : n === teraz ? (blad ? " teraz blad" : " teraz") : ""}">${et}</span>`)
-    .join('<i class="krokLacznik"></i>');
-  return `<span class="cykl" title="Kosz: ${KROKI_KOSZA[teraz][1]}">${kroki}</span>${zMm ? stanMmKosza(k) : ""}`;
-}
-
-/* Kolumna ROZŁOŻYŁ: osoba nad godziną, jak KTO ODŁOŻYŁ przy pozycjach dostawy.
-   Kosz nierozłożony dostaje MYŚLNIK, nie pustkę — pusta komórka wygląda na brak
-   danych, a to jest odpowiedź „jeszcze nikt". Ślad znika sam po COFNIJ
-   ZAKOŃCZENIE, bo serwer kasuje oba pola: kolumna nie zostaje z nazwiskiem
-   przy koszu, który wrócił do rozkładania. */
-function rysujKosze(kosze) {
-  /* Wiersz pionowy — w szynie nie ma tabel (0.121.0). Pięciu kolumn nie da się
-     złożyć w 352 px: do tej wersji ta tabela była tu ucięta w pół.
-
-     KARTONY (0.122.0) stoją na tej samej liście i to jest zamierzone: dla
-     biura „co jest na hali do rozłożenia" jest jednym pytaniem. Bez pastylki
-     karton wyglądałby jednak jak kosz zepsuty — zero zwrotów, brak MM, a mimo
-     to praca w toku. Biuro go tu WYŁĄCZNIE ogląda: zawartość zbiera hala,
-     bo tylko ona wie, co ktoś włożył do pudła. */
-  $("koszeLista").innerHTML = kosze.length
-    ? kosze.map((k) => {
-        const karton = k.rodzaj === "karton";
-        return `<tr data-kosz="${k.id}" style="cursor:pointer">
-          <td class="sprawaWiersz">
-            <span class="sprawaGora">
-              <span class="b">${esc(k.kod)}</span>
-              <span class="mute">${karton
-                ? `${k.pozycji} poz.`
-                : k.mmNumer ? `MM ${esc(k.mmNumer)}` : `${k.zwrotow ?? 0} zwr.`}</span>
-            </span>
-            <span class="sprawaTemat">${k.status === "anulowany"
-              ? `Anulowany${k.anulowanoPrzez ? ` przez ${esc(k.anulowanoPrzez)}` : ""} — ${
-                  k.odlozonych} z ${k.pozycji} poz. zdążyło wrócić na półki.`
-              : k.status === "otwarty"
-              ? (karton
-                  ? "Hala zbiera zawartość — pudło jeszcze otwarte."
-                  : "Przyjmuje zwroty — rozkładanie jeszcze nie ruszyło.")
-              : `Rozłożono ${k.odlozonych}/${k.pozycji} poz.${k.rozlozonoPrzez
-                  ? ` · ${esc(k.rozlozonoPrzez)}` : ""}`}</span>
-            <span class="sprawaStopka">
-              ${karton ? '<span class="badge mute2">KARTON</span>' : ""}
-              ${cyklKosza(k, true)}
-              ${k.pominietych ? `<span class="badge amber">${k.pominietych} POMINIĘTA</span>` : ""}
-              ${k.status === "otwarty" && !karton
-                ? `<button class="akcja cichy maly" data-zamknij-kosz="${k.id}">ZAMKNIJ — NA HALĘ</button>`
-                : ""}
-            </span>
-          </td>
-        </tr>`;
-      }).join("")
-    : '<tr><td class="mute">Brak koszy — pierwszy powstanie przy skanie kodu na karcie zwrotu.</td></tr>';
-  // podgląd otwartego kosza odświeża się razem z listą, bez mrugania
-  if (koszPodgladId != null && !kosze.some((k) => k.id === koszPodgladId)) zamknijPodgladKosza();
-  else if (koszPodgladId != null) pokazPodgladKosza(koszPodgladId, true);
-}
-
-/* ── Pominięte pozycje ze wszystkich koszy ───────────────────────────────────
-   To jest LISTA PRACY, nie historia: każdy wiersz znaczy towar, którego nie
-   było, i czeka na decyzję człowieka. Sortowanie po wieku jest treścią —
-   sprawa sprzed tygodnia kosztuje więcej niż wczorajsza.                     */
-
-function rysujPominiete(lista) {
-  /* Karta mieszka od 0.125.0 w MAGAZYNIE ZWROTÓW — otwarta dyskusja na
-     SPRAWACH nie ma jej już czym zasłaniać. */
-  $("pominieteKarta").hidden = lista.length === 0;
-  alarmyMagazynu.pominiete = lista.length;
-  rysujKropkeMagazynu();
-  if (!lista.length) { $("pominieteLista").innerHTML = ""; return; }
-  /* Wiersz pionowy — w szynie nie ma tabel (0.121.0). Zdjęcie zostaje, bo przy
-     „czego nie było w koszu" to ono najszybciej mówi, o który towar chodzi. */
-  $("pominieteLista").innerHTML = lista.map((p) => `<tr>
-        ${kolFoto(p.twId)}
-        <td class="sprawaWiersz">
-          <span class="sprawaGora">
-            <span class="b">${esc(p.symbol || p.kod)}</span>
-            <span class="mute">${p.dni > 0 ? `${p.dni} dni` : "dziś"}</span>
-          </span>
-          <span class="sprawaTemat">${esc(p.nazwa)} · ${p.ilosc} szt.</span>
-          <span class="sprawaStopka">
-            <span class="badge mute2">KOSZ ${esc(p.kod)}</span>
-            <span class="badge amber">${esc(p.powod || "bez powodu")}</span>
-            <button class="akcja cichy maly" data-zalatw="${p.pozycjaId}">ZAŁATWIONE</button>
-          </span>
-        </td>
-      </tr>`).join("");
-  dolozZdjeciaListy(lista, "pominieteLista", "sesjaPominietych");
-}
-
-/* ── „W którym koszu jechał ten towar?" ──────────────────────────────────────
-   Pytanie pada po fakcie: towar zniknął albo klient dopomina się o zwrot.
-   Szukanie idzie po SNAPSHOCIE z kosza, więc odpowiada na pytanie o to, co
-   w koszu naprawdę leżało — nawet gdy kartoteka zdążyła się zmienić.         */
-
-async function szukajWKoszach(q) {
-  const cel = $("koszWyniki");
-  if (q.trim().length < 2) { cel.innerHTML = ""; return; }
-  try {
-    const d = await (await api(`/api/biuro/kosze/szukaj?q=${encodeURIComponent(q.trim())}`)).json();
-    const lista = d.znalezione || [];
-    cel.innerHTML = !lista.length
-      ? `<p class="mute">Nic w koszach nie pasuje do „${esc(q.trim())}".</p>`
-      : `<p class="mute" style="margin-bottom:4px">Znalezione w koszach: ${lista.length}</p>
-         <table style="margin-bottom:12px">
-          <tr><th>KOSZ</th><th>TOWAR</th><th>ILOŚĆ</th><th>GDZIE</th><th>KIEDY</th></tr>` +
-        lista.map((z) => `<tr>
-            <td><span class="b">${esc(z.kod)}</span> ${badgeKosza(z.koszStatus)}${z.mmNumer
-              ? `<div class="mute">MM ${esc(z.mmNumer)}</div>` : ""}</td>
-            <td>${z.symbol ? `<span class="b">${esc(z.symbol)}</span><br>` : ""}${esc(z.nazwa)}</td>
-            <td class="b">${z.ilosc}</td>
-            <td>${z.status === "skipped"
-              ? `<span class="badge amber">POMINIĘTA</span><div class="mute">„${esc(z.powod || "")}”</div>`
-              : z.lokFaktyczna
-                ? `<span class="badge ok">${esc(z.lokFaktyczna)}</span>`
-                : '<span class="mute">czeka na hali</span>'}</td>
-            <td class="mute" style="white-space:nowrap">${z.kiedy
-              /* Przez `stempelLokalny`, nie własnym cięciem napisu: strefa jest
-                 tu istotna (znacznik z bazy jest w UTC), a druga metoda
-                 formatowania w tym samym pliku prędzej czy później rozjedzie
-                 się z pierwszą o godzinę. */
-              ? esc(stempelLokalny(z.kiedy)) : "—"}</td>
-          </tr>`).join("") + "</table>";
-  } catch (e) {
-    cel.innerHTML = `<p><span class="badge err">${esc(e.message)}</span></p>`;
-  }
-}
-
-/* ── Podgląd zawartości kosza ────────────────────────────────────────────────
-   Biuro widziało dotąd sam licznik „3/6 poz." i nie miało jak sprawdzić, CO
-   w koszu leży ani gdzie hala to odłożyła. Przy pominięciu (0.77.0) było to
-   już nie tylko niewygodne, ale mylące: kosz wracał niekompletny, a ekran
-   pokazywał zwykły postęp.
-
-   Podgląd czyta tę samą trasę co karta zwrotu (`/api/biuro/kosze/:id`), więc
-   nie ma tu drugiego źródła prawdy o zawartości.                              */
-
-let koszPodgladId = null;
-
-function zamknijPodgladKosza() {
-  koszPodgladId = null;
-  $("koszPodglad").innerHTML = "";
-}
-
-async function pokazPodgladKosza(id, cichy) {
-  const cel = $("koszPodglad");
-  koszPodgladId = id;
-  if (!cichy) cel.innerHTML = '<p class="mute">Wczytuję zawartość kosza…</p>';
-  try {
-    const k = (await (await api(`/api/biuro/kosze/${id}`)).json()).kosz;
-    if (koszPodgladId !== id) return; // ktoś w międzyczasie otworzył inny
-    /* Zdanie o źródle mówiło do 0.276.x, że powrót wystawia biuro. Od 0.277.0
-       nie wystawia — dokument zamawia aplikacja, a etap „powrót MM" niżej mówi,
-       na czym stanął. Zdanie, które zostało nieprawdą, jest gorsze niż jego
-       brak: uczy chodzić do Subiekta po robotę, której tam już nie ma. */
-    /* `k.zwroty ?? []` nie jest ostrożnością na wyrost: to pole serwer zaczął
-       oddawać dopiero w 0.333.0, a przedtem ta linijka wywracała cały podgląd
-       kosza złożonego w aplikacji („cannot read properties of undefined"). */
-    const zwroty = k.zwroty ?? [];
-    const bezKorekty = zwroty.filter((z) => !z.korektaNumer);
-    const zrodlo = k.mmNumer
-      ? `z przesunięcia MM ${esc(k.mmNumer)}`
-      : `${zwroty.length} zwr. przypiętych w aplikacji`;
-    const pominiete = k.pozycje.filter((p) => p.status === "skipped");
-    /* Cykl życia kosza jedną linią. Lista odpowiada rzutem oka „czy zrobione
-       i przez kogo"; podgląd odpowiada przy sprawie „co się z tym działo".
-       Kosz otwarty nie pokazuje niczego, bo nic się jeszcze nie stało. */
-    /* Powrót z bufora dopisany jako trzeci etap (0.266.0). Bez niego karta
-       kończyła się na „rozłożył" i nie odpowiadała na pytanie, po którym
-       biuro sięgało do Subiekta: czy stan wrócił z regału zwrotów na halę. */
-    const powrot = !k.powrot ? null
-      : k.powrot.numer ? `powrót MM ${esc(k.powrot.numer)}`
-      : k.powrot.status === "error" ? "powrót MM w błędzie — sprawdź kolejkę"
-      : "powrót MM zamówiony, czeka na dokument";
-    const etapy = [
-      k.zamknietoPrzez && `zamknął ${esc(k.zamknietoPrzez)} · ${esc(stempelLokalny(k.zamknietoAt))}`,
-      k.rozlozonoPrzez && `rozłożył ${esc(k.rozlozonoPrzez)} · ${esc(stempelLokalny(k.rozlozonoAt))}`,
-      powrot,
-    ].filter(Boolean);
-    cel.innerHTML = `<h2 style="display:flex;align-items:center;gap:8px">
-        KOSZ ${esc(k.kod)} ${cyklKosza(k, false)}
-        ${k.doEdycji
-          ? `<button class="akcja cichy" data-przelicz-kosz="${k.id}"
-               style="margin-left:auto">PRZELICZ ZE ZWROTÓW</button>
-             <button class="akcja cichy" data-kosz-zamknij-podglad>ZWIŃ</button>`
-          : '<button class="akcja cichy" data-kosz-zamknij-podglad style="margin-left:auto">ZWIŃ</button>'}
-      </h2>
-      <p class="mute" style="margin-bottom:8px">${zrodlo}</p>
-      ${etapy.length ? `<p class="mute" style="margin-bottom:8px">${etapy.join(" → ")}</p>` : ""}
-      ${k.doEdycji
-        ? `<p class="mute">Dokumentu jeszcze nie ma, więc zawartość da się poprawić.
-             PRZELICZ ZE ZWROTÓW układa ją od nowa z ocen „na stan" — zestaw
-             sprzedany jedną ofertą wchodzi wtedy rozbity, tak jak leży na
-             magazynie.</p>`
-        : ""}
-      ${bezKorekty.length
-        ? `<p><span class="badge amber">CZEKA NA KOREKTĘ</span>
-             MM wyjdzie, gdy dojdą numery korekt do ${bezKorekty.length} zwr.:
-             ${bezKorekty.slice(0, 8).map((z) => esc(z.numer)).join(", ")}${
-               bezKorekty.length > 8 ? " …" : ""}</p>`
-        : ""}
-      ${pominiete.length
-        ? `<p><span class="badge amber">KOSZ NIEKOMPLETNY</span>
-             hala pominęła ${pominiete.length} poz. — powód przy wierszu niżej</p>`
-        : ""}
-      <table>${
-        `<tr>${zdjeciaWlaczone ? "<th></th>" : ""}` +
-        "<th>TOWAR</th><th>ILOŚĆ</th><th>ADRES</th><th>STAN</th></tr>" +
-        k.pozycje.map((p) => `<tr>
-            ${kolFoto(p.twId)}
-            <td>${p.symbol ? `<span class="b">${esc(p.symbol)}</span><br>` : ""}${esc(p.nazwa)}</td>
-            <td class="b" style="white-space:nowrap">${p.ilosc}${p.unit ? ` ${esc(p.unit)}` : ""}</td>
-            <td style="white-space:nowrap">${p.lokFaktyczna
-              ? `<span class="badge ok">${esc(p.lokFaktyczna)}</span>`
-              : p.lokOczekiwana
-                ? `<span class="mute">${esc(p.lokOczekiwana)}</span>`
-                : '<span class="mute">—</span>'}</td>
-            <td>${stanPozycjiKosza(p)}</td>
-          </tr>`).join("")
-      }</table>`;
-    dolozZdjeciaKosza(k.pozycje);
-  } catch (e) {
-    cel.innerHTML = `<p><span class="badge err">${esc(e.message)}</span></p>`;
-  }
-}
-
-/** Jedno zdanie o pozycji: co się z nią stało i kto to zrobił. */
-function stanPozycjiKosza(p) {
-  if (p.status === "skipped") {
-    /* Załatwienie NIE kasuje pominięcia — dopisuje się do niego. Kosz na
-       zawsze zostaje niekompletny, zmienia się tylko to, czy sprawa wisi. */
-    const zamkniete = p.zalatwioneAt
-      ? `<div class="mute">załatwione${p.zalatwionePrzez ? ` · ${esc(p.zalatwionePrzez)}` : ""}${
-          p.zalatwioneNotatka ? `<br>„${esc(p.zalatwioneNotatka)}”` : ""
-        }</div>`
-      : "";
-    return `<span class="badge amber">POMINIĘTA</span>
-      <div class="mute">„${esc(p.powod || "bez powodu")}”</div>${zamkniete}`;
-  }
-  if (p.status === "done") {
-    /* Stan MM mówi, czy bufor NAPRAWDĘ się cofnął w Subiekcie. Kolejka zapisów
-       pokazuje błędy globalnie, ale nie wiąże ich z koszem — a to jest właśnie
-       pytanie, które biuro zadaje przy tej pozycji. */
-    const mm = p.mmNumer
-      ? `<div class="mute">MM ${esc(p.mmNumer)}</div>`
-      : p.mmStatus === "error"
-        ? '<div><span class="badge err">MM W BŁĘDZIE</span></div>'
-        : p.mmStatus
-          ? `<div class="mute">MM: ${esc(p.mmStatus)}</div>`
-          : "";
-    return `<span class="badge ok">ODŁOŻONA</span>${p.odlozonoPrzez
-      ? `<div class="mute">${esc(p.odlozonoPrzez)}${p.odlozonoAt
-          ? ` · ${esc(stempelLokalny(p.odlozonoAt))}` : ""}</div>`
-      : ""}${mm}`;
-  }
-  return '<span class="mute">czeka na hali</span>';
-}
-
-/* Zdjęcia w tabelach koszy. Każda tabela ma WŁASNY licznik sesji: odświeżają
-   się różnym rytmem, a zdjęcie dorysowane do zwiniętego już panelu trafiłoby
-   w nieistniejącą komórkę. */
-const sesjeFoto = {};
-function dolozZdjeciaListy(wiersze, tabela, klucz) {
-  if (!zdjeciaWlaczone) return;
-  const moja = (sesjeFoto[klucz] = (sesjeFoto[klucz] || 0) + 1);
-  const aktualne = () => moja === sesjeFoto[klucz];
-  zakolejkuj(
-    wiersze.filter((w) => w.twId != null).map((w) => ({
-      klucz: `t${w.twId}`, url: `/api/products/${w.twId}/zdjecie`,
-      sel: `#${tabela} td.kolFoto[data-tw="${w.twId}"]`, klasa: "foto",
-    })),
-    aktualne
-  );
-}
-
-const dolozZdjeciaKosza = (pozycje) => dolozZdjeciaListy(pozycje, "koszPodglad", "sesjaKosza");
 
 /* ── Konto Allegro (device flow) ── */
 
@@ -5053,7 +3162,6 @@ function start() {
     });
   }
   pokaz(widok);
-  odswiezDostawy();
   odswiezStan();
 }
 
@@ -5067,9 +3175,8 @@ function start() {
    `wysoka` dostają listy o nieograniczonej długości. Reszta ma sam poziom —
    krótka tabela z ośmioma kolumnami też potrafi rozepchać kartę. */
 const TABELE_DLUGIE = new Set([
-  "dostawy", "koszeLista", "dziennik", "pominieteLista",
+  "dziennik",
   "kolejka", "kandydaci", "dostawcy", "statystykiProdukty", "wydajnosc", "reguly",
-  "szczegolLinie",
   "pytaniaLista", "pytaniaProdukty", "pytaniaPozaOferta",
 ]);
 for (const t of document.querySelectorAll("#panel table")) {
@@ -5084,29 +3191,6 @@ for (const id of ["poleLogin", "poleHaslo"]) {
   $(id).addEventListener("keydown", (e) => { if (e.key === "Enter") zaloguj(); });
 }
 $("wyloguj").addEventListener("click", wyloguj);
-/* Szukanie w archiwum liczy SERWER, więc każde naciśnięcie klawisza byłoby
-   osobnym żądaniem. Ćwierć sekundy to próg, poniżej którego pisanie i tak
-   trwa — a lista pracy, filtrowana u siebie, odpowiada jak dotąd od razu. */
-let szukanieOdliczanie = null;
-$("szukaj").addEventListener("input", () => {
-  if (filtrDostaw !== "archiwum") { rysujDostawy(); return; }
-  clearTimeout(szukanieOdliczanie);
-  szukanieOdliczanie = setTimeout(odswiezArchiwum, 250);
-});
-$("dostawyCzipy").addEventListener("click", (e) => {
-  const b = e.target.closest("[data-stan]");
-  if (!b) return;
-  filtrDostaw = b.dataset.stan;
-  for (const c of $("dostawyCzipy").querySelectorAll(".czip")) {
-    c.setAttribute("aria-pressed", String(c === b));
-  }
-  rysujDostawy();
-  opiszOdswiezono();
-  /* Archiwum ciągniemy dopiero tutaj — patrz `odswiezArchiwum`. Do czasu
-     odpowiedzi tabela mówi „wczytywanie", a nie „pusto": pusta historia
-     i historia jeszcze niepobrana to dwie różne wiadomości. */
-  if (filtrDostaw === "archiwum") odswiezArchiwum();
-});
 /* Delegacja siedzi na dokumencie, nie na `nav`: przyciski widoków stoją od
    0.76.0 w dwóch miejscach (pasek i zębatka w nagłówku), a `data-widok` jest
    jedyną rzeczą, która je łączy. Przypięcie do `nav` zostawiłoby zębatkę
@@ -5114,6 +3198,18 @@ $("dostawyCzipy").addEventListener("click", (e) => {
 document.addEventListener("click", (e) => {
   const b = e.target.closest("button[data-widok]");
   if (b) pokaz(b.dataset.widok);
+});
+
+/* Widok PRZENIESIONY do panelu (0.435.0) — pozycja paska i plakietka
+   odpowiedzi prowadzą tam z tokenem tej sesji. Panel trzyma sesję pod własnym
+   kluczem, a oba fronty stoją na jednym originie, więc wystarczy go podać;
+   bez tego każde przejście kończyłoby się drugim logowaniem. Most w drugą
+   stronę stoi w `panel/src/mostBiura.ts`. */
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-panel]");
+  if (!b) return;
+  localStorage.setItem("wertis-panel-token", token);
+  location.href = b.dataset.panel;
 });
 
 /* Objaśnienia kart: jedna delegacja na siedemnaście ikon. Blok z tekstem jest
@@ -5562,243 +3658,7 @@ $("zapiszFirme").addEventListener("click", zapiszFirme);
 $("szukajDziennik").addEventListener("click", szukajDziennik);
 $("csvDziennik").addEventListener("click", () =>
   pobierz(`/api/events/csv?${paramyDziennika()}`, "wertis-audyt.csv"));
-$("odpowiedzi").addEventListener("click", (e) => {
-  const p = e.target.closest("[data-przeczytane]");
-  if (p) return oznaczPrzeczytane(Number(p.dataset.przeczytane));
-  const d = e.target.closest("[data-otworz-dok]");
-  if (d) return otworzDokument(Number(d.dataset.otworzDok));
-});
-$("reklamacje").addEventListener("click", (e) => {
-  const f = e.target.closest("[data-formularz]");
-  if (f) return otworzFormularz(Number(f.dataset.formularz), f.dataset.nr);
-  const c = e.target.closest("[data-csv]");
-  if (c) return pobierz(`/api/delivery/${c.dataset.csv}/problems.csv`,
-    `reklamacja-${c.dataset.nr.replace(/[^\w-]+/g, "_")}.csv`);
-  const r = e.target.closest("[data-rozwiaz]");
-  if (r) {
-    return rozwiazWyjatek(Number(r.dataset.rozwiaz)).then((ok) => {
-      if (ok) odswiezDostawy();
-    });
-  }
-});
-$("dostawy").addEventListener("click", (e) => {
-  const w = e.target.closest("[data-dok]");
-  if (w) otworzDokument(Number(w.dataset.dok));
-});
-$("pozaWertis").addEventListener("click", (e) => {
-  const p = e.target.closest("[data-przywroc]");
-  if (p) {
-    przywrocDostawe(Number(p.dataset.przywroc)).then((ok) => { if (ok) odswiezDostawy(); });
-    return;
-  }
-  // wejście w pozycje PRZED przywróceniem: powód bywa jednym zdaniem, a decyzja
-  // wymaga zobaczenia, co na tej fakturze w ogóle stało
-  const w = e.target.closest("[data-dok]");
-  if (w) otworzDokument(Number(w.dataset.dok));
-});
-/* Notatki i decyzja o dostawie mieszkają od 0.92.0 w strefie kontekstu,
-   nie w nagłówku — delegacja idzie za nimi. */
-$("dostawaKontekst").addEventListener("click", (e) => {
-  const n = e.target.closest("[data-notatka]");
-  if (n) return dodajNotatke(Number(n.dataset.notatka));
-  const p = e.target.closest("[data-przeczytane]");
-  if (p) {
-    return oznaczPrzeczytane(Number(p.dataset.przeczytane)).then(() => {
-      ostatniSzczegol = "";
-      odswiezSzczegol();
-    });
-  }
-  const z = e.target.closest("[data-zamknij-poza]");
-  if (z) oznaczPozaWertis(Number(z.dataset.zamknijPoza), z.dataset.nr);
-  const o = e.target.closest("[data-przywroc]");
-  if (o) przywrocDostawe(Number(o.dataset.przywroc)).then((ok) => { if (ok) zamknijDokument(); });
-});
-/* Zamykanie wyjątku działa WSZĘDZIE, gdzie wyjątek widać, i dlatego nasłuch
-   siedzi na CAŁEJ sekcji sprawy, a nie na wyliczonych kontenerach.
-
-   Do 0.97.0 stała tu pętla po dwóch nazwach — „w wierszu pozycji" i „poza
-   pozycjami dokumentu" — a 0.97.0 dołożyło trzecie miejsce: POZYCJE
-   WYMAGAJĄCE BIURA na górze sprawy. Lista nazw jest zaproszeniem do tego
-   błędu przy każdej kolejnej zmianie układu; sekcja przeżyje je wszystkie.
-   To ta sama usterka, co przy dostawach w 0.92.0 i przy pytaniach w 0.96.0,
-   i za każdym razem wygląda tak samo: przycisk klika się bez skutku, a testy
-   i zrzut ekranu są zielone. */
-$("szczegol").addEventListener("click", (e) => {
-  const r = e.target.closest("[data-rozwiaz]");
-  if (r) {
-    rozwiazWyjatek(Number(r.dataset.rozwiaz)).then((ok) => {
-      // `ostatniSzczegol` wyzerowane, bo inaczej odświeżenie uzna, że nic
-      // się nie zmieniło, i nie przerysuje tabeli
-      if (ok) { ostatniSzczegol = ""; odswiezSzczegol(); }
-    });
-  }
-});
-$("wrocDoListy").addEventListener("click", zamknijDokument);
-// panel zasłania listę, więc musi mieć wyjście pod ręką także z klawiatury
-document.addEventListener("keydown", (e) => {
-  // Esc w otwartym dialogu zamyka DIALOG (natywnie) — nie kartę pod nim
-  if ($("dialogW").open) return;
-  if (e.key !== "Escape") return;
-  /* KOLEJNOŚĆ MA ZNACZENIE: Escape zamyka NAJWYŻSZĄ warstwę, czyli szufladę,
-     i na tym kończy. Bez tego `return` jeden klawisz zdejmowałby szufladę
-     i sprawę pod nią naraz — a to jest wyjście z pracy, nie z panelu obok. */
-  if (szufladaW) return ustawSzuflade(szufladaW, false);
-  zamknijDokument();
-});
-
-/* ── Pasma szerokości i szuflada kontekstu ── */
-
-const SZEROKO = window.matchMedia("(min-width: 1280px)");
-
-/* Drugi próg, ten sam warunek co blok `@media (min-width: 1024px)` w arkuszu.
-   Między nim a 1280 px stoi PASMO ŚREDNIE: kolejka zostaje obok sprawy, a
-   kontekst schodzi do szuflady wywoływanej przyciskiem. Poniżej 1024 px
-   zostaje zachowanie sprzed 0.101.0 — sprawa zasłania wszystko. */
-const SREDNIO = window.matchMedia("(min-width: 1024px)");
-/** Czy kontekst jest w tym paśmie szufladą, a nie trzecią kolumną. */
-const wSzufladzie = () => SREDNIO.matches && !SZEROKO.matches;
-
-/**
- * Czy kolejka zostaje widoczna OBOK otwartej sprawy.
- *
- * Zastąpiło `kolejkaZostaje()` w 0.101.0 i to nie jest przemianowanie. Każde
- * pytanie, które kod zadawał przez tamten próg, brzmiało naprawdę „czy sprawa
- * ZASŁANIA listę" — czy odświeżać kolejkę, czy rysować ją wariantem zwartym,
- * czy zostawić nad nią licznik odpowiedzi. Odpowiedź zmieniła się na 1024 px,
- * nie na 1280: w paśmie średnim lista stoi obok, choć trzech stref już nie ma.
- * Trzymanie starego progu dawało kolejkę odświeżaną i rysowaną tak, jakby jej
- * nie było widać — a widać ją.
- */
-const kolejkaZostaje = () => SREDNIO.matches;
-
-/* Która zakładka ma wysuniętą szufladę; `null` = żadna. Trzyma się ID widoku,
-   nie samego `true`, bo sprawy na dwóch zakładkach bywają otwarte naraz
-   (`otwartyDok` i `otwartyZwrot` żyją niezależnie) i szuflada jednej nie ma
-   prawa świecić nad drugą. */
-let szufladaW = null;
-
-function ustawSzuflade(widokId, otwarta) {
-  szufladaW = otwarta ? widokId : null;
-  for (const el of document.querySelectorAll(".widok")) {
-    el.classList.toggle("szufladaOtwarta", el.id === szufladaW);
-  }
-  $("szufladaCien").hidden = szufladaW == null;
-}
-
-/**
- * Klasa pasma na widoku + sprzątanie stanu szuflady.
- *
- * Wołana z każdego `ustawRodzenstwo*` i przy zmianie szerokości okna, bo
- * odpowiada na pytanie „czy kontekst jest tu szufladą" — a to zmienia się
- * i przy otwarciu sprawy, i przy przeciągnięciu krawędzi okna.
- *
- * Wysunięta szuflada gaśnie, gdy przestaje być szufladą: powyżej 1280 px
- * kontekst staje się kolumną i wysunięty panel zasłaniałby ją samą sobą,
- * a poniżej 1024 px wraca pod sprawę. Zamknięta sprawa też ją gasi — panel
- * bez sprawy nie ma czego pokazywać.
- */
-function ustawPasmoSzuflady(widokId, sprawaOtwarta) {
-  const el = $(widokId);
-  const szuflada = sprawaOtwarta && wSzufladzie();
-  el.classList.toggle("zSzuflada", szuflada);
-  if (!szuflada && szufladaW === widokId) ustawSzuflade(widokId, false);
-}
-
-/* PRZECIĄGNIĘCIE KRAWĘDZI OKNA (0.427.0). Komentarz wyżej obiecywał to od
-   0.101.0, ale nikt nie słuchał zmiany progów: pasmo liczyło się wyłącznie
-   przy otwarciu i zamknięciu dokumentu. Zmierzone: dokument otwarty przy
-   1440 px i okno zwężone do 1180 px zostawało bez szuflady — kontekstu nie
-   było wcale — a w drugą stronę zostawała klasa szuflady nad trzecią kolumną.
-   Oba progi, bo lista przy 1024 px też zmienia się z zasłoniętej na obok. */
-for (const prog of [SZEROKO, SREDNIO]) {
-  prog.addEventListener("change", () => { if (otwartyDok != null) ustawRodzenstwoDostaw(); });
-}
-
-
-/* ── Magazyn zwrotów i konto Allegro — zdarzenia ── */
-
-/* Zamknięcie sprawy pominięcia. Notatka jest dobrowolna — najczęstszym
-   zakończeniem jest „znalazło się", a wymuszanie zdania przy każdym kliknięciu
-   kosztowałoby więcej, niż warte jest to zdanie. */
-$("pominieteLista").addEventListener("click", async (e) => {
-  const b = e.target.closest("[data-zalatw]");
-  if (!b) return;
-  const notatka = await potwierdz({
-    tytul: "SPRAWA ZAŁATWIONA",
-    opis: "Pozycja zostaje pominięta — to fakt z hali. Znika tylko z listy pracy.",
-    pole: true,
-    przyklad: "np. znalazło się na regale / reklamacja u kuriera / korekta dokumentu",
-    potwierdz: "ZAŁATWIONE",
-  });
-  if (notatka === null) return;
-  try {
-    const d = await api(`/api/biuro/kosze/pominiete/${b.dataset.zalatw}/zalatwione`, {
-      method: "POST",
-      body: JSON.stringify({ notatka }),
-    });
-    rysujPominiete((await d.json()).pominiete || []);
-  } catch (err) { toast(err.message, "blad"); }
-});
-
-
-/* Wiersz z koszem w ANALIZIE prowadzi TAM, gdzie się z nim coś robi — do jego
-   podglądu na zakładce MAGAZYN. Wiersz musi więc najpierw przełączyć zakładkę;
-   bez tego klik gasł bez śladu, bo `#koszPodglad` przewijał się w schowanym
-   widoku.
-
-   Nasłuch siedzi na `#widokAnaliza`, nie na `#czasyKarta`. Ta karta właśnie
-   przyjechała z innej zakładki i przy następnej przeprowadzce zabrałaby
-   nasłuch ze sobą albo go zgubiła — piąty raz z rzędu ta sama usterka
-   (0.92.0, 0.96.0, 0.97.0, 0.98.0). Zakładka stoi w miejscu. */
-$("widokAnaliza").addEventListener("click", async (e) => {
-  const k = e.target.closest("[data-kosz]");
-  if (!k) return;
-  pokaz("magazyn");
-  await pokazPodgladKosza(Number(k.dataset.kosz));
-  $("koszPodglad").scrollIntoView({ behavior: "smooth", block: "center" });
-});
-
-let koszSzukajTimer = null;
-$("koszSzukaj").addEventListener("input", (e) => {
-  clearTimeout(koszSzukajTimer);
-  const q = e.target.value;
-  koszSzukajTimer = setTimeout(() => szukajWKoszach(q), 250);
-});
-
-$("koszPodglad").addEventListener("click", async (e) => {
-  if (e.target.closest("[data-kosz-zamknij-podglad]")) { zamknijPodgladKosza(); return; }
-  const przelicz = e.target.closest("[data-przelicz-kosz]");
-  if (!przelicz) return;
-  /* BEZ PYTANIA O ZGODĘ (§25a.5): przeliczenie niczego nie wysyła i niczego nie
-     traci — układa zawartość od nowa z tych samych ocen. Nieodwracalny jest
-     dopiero dokument, a tego tu jeszcze nie ma. */
-  const id = Number(przelicz.dataset.przeliczKosz);
-  przelicz.disabled = true;
-  try {
-    const w = await (await api(`/api/biuro/kosze/${id}/przelicz`, { method: "POST" })).json();
-    toast(`Przeliczono: ${w.przed} → ${w.po} kartotek`);
-    await odswiezEtap3();
-  } catch (err) {
-    /* TOAST, nie `cichaAwaria`: to czynność KLIKNIĘTA, a serwis odmawia
-       zdaniem („kosz ma już dokument MM"). Odmowa schowana w konsoli wygląda
-       jak przycisk, który nic nie robi. */
-    toast(err.message, "blad");
-  } finally {
-    przelicz.disabled = false;
-  }
-});
-
-/* Kosz otwiera się KLIKNIĘCIEM WIERSZA, a drugie kliknięcie go zwija — to samo
-   dotknięcie, dwa kierunki, bez osobnego przycisku w tabeli. Przycisku
-   ZAMKNIJ KOSZ nie ma od 0.140.0: kosz przyjeżdża dokumentem MM z Subiekta
-   i rodzi się zamknięty, więc nie ma czego domykać ręką. */
-$("koszeLista").addEventListener("click", async (e) => {
-  const wiersz = e.target.closest("[data-kosz]");
-  if (!wiersz) return;
-  const id = Number(wiersz.dataset.kosz);
-  if (koszPodgladId === id) zamknijPodgladKosza();
-  else await pokazPodgladKosza(id);
-});
+/* ── Konto Allegro — zdarzenia ── */
 
 $("allegroAkcje").addEventListener("click", async (e) => {
   if (e.target.closest("[data-polacz]")) return rozpocznijParowanieAllegro();
@@ -5818,23 +3678,6 @@ $("allegroAkcje").addEventListener("click", async (e) => {
   }
 });
 
-
-/* ── Szuflada kontekstu (0.101.0) ────────────────────────────────────────────
-   Nasłuch na DOKUMENCIE, nie na trzech sprawach z osobna. Przycisk stoi
-   w rzędzie wyjścia każdej z nich, a rzędy te przebudowują się przy każdym
-   rysowaniu sprawy — nasłuch przypięty do rzędu urywałby się dokładnie tak,
-   jak urywał się w 0.92.0, 0.96.0, 0.97.0 i 0.98.0. Który widok otwieramy,
-   mówi `closest(".widok")`, więc jedna obsługa starcza na trzy zakładki
-   i wystarczy na czwartą. */
-document.addEventListener("click", (e) => {
-  if (e.target.closest("[data-szuflada-zamknij]") || e.target.id === "szufladaCien") {
-    return ustawSzuflade(szufladaW, false);
-  }
-  const b = e.target.closest("[data-szuflada]");
-  if (!b) return;
-  const widok = b.closest(".widok");
-  if (widok) ustawSzuflade(widok.id, szufladaW !== widok.id);
-});
 
 /* ── Rozruch strony (0.373.0 — przywrócone po 0.138.0) ───────────────────────
    Te dwie linijki stały tu od początku i wyszły jako SKUTEK UBOCZNY kasowania

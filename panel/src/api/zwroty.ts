@@ -66,6 +66,9 @@ export function useZwrot(id: number | null) {
          droga. Tylko w szczególe — powód ten sam, co przy składach wyżej. */
       sprawy: SprawaZakupu[];
       droga: PrzystanekDrogi[];
+      /* Kosze z towarem tego zwrotu (0.438.0) — wiązanie kosz ↔ zwrot
+         od strony zwrotu. Tylko w szczególe, z tego samego powodu co wyżej. */
+      kosze: Array<{ id: number; kod: string; status: string }>;
     }>(
       `/api/obsluga/zwroty/${id}`),
     enabled: id !== null,
