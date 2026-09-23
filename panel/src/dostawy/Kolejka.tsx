@@ -1,5 +1,6 @@
 import React from "react";
 import type { DokumentDostawy, ZamknietaPoza } from "../api/dostawy";
+import { useLogoDostawcy } from "../towar/useZdjecie";
 import { Pusto, WierszKolejki, czas, ile, wiek } from "../ui";
 
 /* ── Kolejka dostaw (0.435.0) ──────────────────────────────────────────────
@@ -13,7 +14,25 @@ import { Pusto, WierszKolejki, czas, ile, wiek } from "../ui";
      wyjątki i nieprzeczytana odpowiedź z hali.
    - CZEKA NA BIURO jest tu KUBEŁKIEM, a nie grupą na górze listy. W biurze
      był grupą, bo tamta lista nie miała kubełków; tu ma, a ta sama sprawa
-     w dwóch miejscach listy to dwa kliknięcia do jednej rzeczy. */
+     w dwóch miejscach listy to dwa kliknięcia do jednej rzeczy.
+   - LOGO DOSTAWCY Z LEWEJ (0.449.0, prośba właściciela). Po to logo
+     powstało w 0.56.0: firmę poznaje się wzrokiem, zanim przeczyta się numer.
+     Kolektor ma je tak od dawna, a panel pokazywał je tylko w kontekście
+     otwartego dokumentu — czyli dopiero po wyborze, kiedy już nie pomaga. */
+
+/* Miejsce na logo ma WYMIARY OD RAZU i stoi także przy dostawcy bez logo:
+   nazwy zaczynają się wtedy w jednej kolumnie, a wiersz nie podskakuje
+   w chwili doczytania obrazu (ta sama reguła, co `slotLogo` w biurze).
+   Pytamy wyłącznie o logo, które jest — `maLogo` przychodzi z listy, więc
+   dostawca bez logo nie dobija serwera o 404. Obraz WYPEŁNIA miejsce
+   (`object-contain`), a nie tylko się w nim mieści: `max-w-full` nie
+   powiększa, więc małe logo stało kropką w rogu pustego pola. */
+function LogoWiersza({ d }: { d: DokumentDostawy }) {
+  const url = useLogoDostawcy(d.khId, d.maLogo);
+  return <span className="flex h-8 w-14 shrink-0 items-center" aria-hidden="true">
+    {url && <img src={url} alt="" className="h-full w-full object-contain object-left" />}
+  </span>;
+}
 
 export type KubelekDostaw = "decyzja" | "toku" | "nietkniete" | "zamkniete" | "poza" | "archiwum";
 
@@ -76,22 +95,27 @@ export function KolejkaDostaw({ dokumenty, zOdpowiedzia, wybrany, onWybierz, pus
     {dokumenty.map((d) => {
       const wszystkie = d.linesTotal || d.positions;
       return <Wiersz key={d.dokId} aktywny={d.dokId === wybrany} onKlik={() => onWybierz(d.dokId)}>
-        <span className="flex w-full items-baseline gap-2">
-          <span className="truncate font-bold">{d.nrPelny}</span>
-          <span className="ml-auto shrink-0 text-xs text-slate-600">{wiekDokumentu(d.dataWyst)}</span>
+        <span className="flex w-full items-start gap-3">
+          <LogoWiersza d={d} />
+          <span className="flex min-w-0 flex-1 flex-col">
+            <span className="flex w-full items-baseline gap-2">
+              <span className="truncate font-bold">{d.nrPelny}</span>
+              <span className="ml-auto shrink-0 text-xs text-slate-600">{wiekDokumentu(d.dataWyst)}</span>
+            </span>
+            <span className="w-full truncate text-sm text-slate-600">
+              {d.dostawca} · {ile(wszystkie, "pozycja", "pozycje", "pozycji")}</span>
+            <span className="w-full"><Pasek zrobione={d.linesDone} wszystkie={wszystkie} /></span>
+            {(zOdpowiedzia.has(d.dokId) || d.wyjatkiOtwarte > 0) &&
+              <span className="mt-1 flex flex-wrap gap-1.5">
+                {zOdpowiedzia.has(d.dokId) &&
+                  <span className="rounded bg-stan-open px-1.5 py-0.5 text-xs font-bold text-stan-open-tekst">
+                    odpowiedź z hali</span>}
+                {d.wyjatkiOtwarte > 0 &&
+                  <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">
+                    {ile(d.wyjatkiOtwarte, "wyjątek", "wyjątki", "wyjątków")}</span>}
+              </span>}
+          </span>
         </span>
-        <span className="w-full truncate text-sm text-slate-600">
-          {d.dostawca} · {ile(wszystkie, "pozycja", "pozycje", "pozycji")}</span>
-        <span className="w-full"><Pasek zrobione={d.linesDone} wszystkie={wszystkie} /></span>
-        {(zOdpowiedzia.has(d.dokId) || d.wyjatkiOtwarte > 0) &&
-          <span className="mt-1 flex flex-wrap gap-1.5">
-            {zOdpowiedzia.has(d.dokId) &&
-              <span className="rounded bg-stan-open px-1.5 py-0.5 text-xs font-bold text-stan-open-tekst">
-                odpowiedź z hali</span>}
-            {d.wyjatkiOtwarte > 0 &&
-              <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">
-                {ile(d.wyjatkiOtwarte, "wyjątek", "wyjątki", "wyjątków")}</span>}
-          </span>}
       </Wiersz>;
     })}
   </ul>;

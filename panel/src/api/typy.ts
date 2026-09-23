@@ -962,6 +962,11 @@ export type Zdrowie = {
   configZPliku?: string | null;
   ok?: boolean;
   audyt?: { zdarzen?: number; najstarsze?: string | null; bazaBajtow?: number } | null;
+  /* Obecność tych dwóch pól mówi, czy w tej instalacji w ogóle SĄ zdjęcia
+     kartotek: z Subiekta (`zdjecia`) albo z kolektora (`zdjeciaWlasne`).
+     Treść liczników panel ignoruje — liczy się, że trasa je przysłała. */
+  zdjecia?: unknown;
+  zdjeciaWlasne?: unknown;
 };
 
 /** Konflikt przejęcia — kształt szczegółów, które serwer zwraca przy 409. */

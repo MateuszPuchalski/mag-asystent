@@ -30,7 +30,7 @@ function Miniatura({ d }: { d: DostawcaZLogo }) {
   /* Miejsce ma wymiary od razu, także bez logo: nazwy zaczynają się wtedy
      w jednej kolumnie, a wiersz nie podskakuje po doczytaniu obrazu. */
   return <span className="inline-flex h-[30px] w-[72px] items-center">
-    {url ? <img src={url} alt="" className="max-h-full max-w-full object-contain object-left" />
+    {url ? <img src={url} alt="" className="h-full w-full object-contain object-left" />
       : !d.maLogo && <span className="text-xs text-slate-500">brak</span>}
   </span>;
 }

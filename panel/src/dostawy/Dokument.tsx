@@ -4,6 +4,7 @@ import type { Dokument as DokumentDostawy, PozycjaDostawy, Wyjatek as WyjatekHal
 import { ilosc } from "../api/dostawy";
 import { pobierzPlik } from "../api/klient";
 import { Zdjecie } from "../towar/Zdjecie";
+import { useZdrowie } from "../api/rozmowy";
 import { Blad, NaglowekSekcji, Plakietka, Przycisk, czas, dzien } from "../ui";
 import { Wyjatek } from "./Wyjatek";
 
@@ -19,7 +20,17 @@ import { Wyjatek } from "./Wyjatek";
    - PROTOKÓŁ STOI W NAGŁÓWKU DOKUMENTU, nie w osobnej karcie reklamacji.
      W biurze karta REKLAMACJE listowała wyjątki wszystkich faktur osobno od
      faktur — dwie listy o tym samym. Reklamuje się fakturę, więc druk
-     mieszka przy fakturze. */
+     mieszka przy fakturze.
+
+   ── ZDJĘCIE PRZY KAŻDEJ POZYCJI (0.449.0) ──────────────────────────────
+   Przeprowadzka zgubiła kolumnę zdjęć: `biuro.html` miało ją w tabeli
+   pozycji od 0.36.0, a panel pokazywał zdjęcie tylko przy wyjątku. Zgłosił
+   to właściciel na nietkniętej fakturze — czternaście symboli bez jednego
+   obrazu, a biuro rozpoznaje towar po wyglądzie szybciej niż po numerze.
+   Kolumna stoi wtedy, gdy instalacja MA zdjęcia (pola `zdjecia` albo
+   `zdjeciaWlasne` w `/api/health`), jak w biurze: bez źródła byłaby rzędem
+   kafli „bez zdjęcia" na każdej fakturze. Pobieranie idzie wspólną kolejką
+   `towar/useZdjecie.ts` — trzy naraz, brak zapamiętany. */
 
 const STAN_DOKUMENTU: Record<string, { slowo: string; klasa: string }> = {
   done: { slowo: "rozłożona", klasa: "bg-emerald-100 text-ranga-ok" },
@@ -38,7 +49,9 @@ const STAN_POZYCJI: Record<string, { slowo: string; klasa: string }> = {
 
 function StanPozycji({ s }: { s: string }) {
   const st = STAN_POZYCJI[s] ?? { slowo: "do zrobienia", klasa: "bg-slate-200 text-slate-700" };
-  return <span className={`rounded px-1.5 py-0.5 text-podpis font-bold uppercase tracking-wide ${st.klasa}`}>
+  /* `nowrap`: pastylka to JEDNO słowo znaczeniowe. Na zrzucie właściciela
+     „DO / ZROBIENIA" łamało się pod „0/100" i przestawało wyglądać na stan. */
+  return <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-podpis font-bold uppercase tracking-wide ${st.klasa}`}>
     {st.slowo}</span>;
 }
 
@@ -74,6 +87,8 @@ type RozwiazProps = { trwa: boolean; blad: string; onRozwiaz: (id: number, note:
 
 export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazProps }) {
   const [bladCsv, setBladCsv] = useState("");
+  const zdrowie = useZdrowie();
+  const zdjecia = zdrowie.data?.zdjecia != null || zdrowie.data?.zdjeciaWlasne != null;
   const wyjatkowe = d.lines.filter((l) => l.status === "problem");
   const reszta = d.lines.filter((l) => l.status !== "problem");
   const stan = STAN_DOKUMENTU[d.status ?? ""] ?? { slowo: "nietknięta", klasa: "bg-slate-200 text-slate-700" };
@@ -139,12 +154,17 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
       {reszta.length
         ? <table className="mt-1 w-full text-sm">
             <thead><tr className="border-b border-slate-200 text-left text-xs text-slate-600">
+              {zdjecia && <th className="w-12 py-1.5 pr-2"><span className="sr-only">Zdjęcie</span></th>}
               <th className="py-1.5 pr-2 font-bold">Towar</th>
               <th className="w-32 py-1.5 pr-2 font-bold">Ilość · stan</th>
               <th className="w-44 py-1.5 font-bold">Gdzie · kto odłożył</th></tr></thead>
             <tbody className="divide-y divide-slate-100">
               {reszta.map((l) => <tr key={l.lineId ?? `t${l.twId}`} className="align-top">
-                <td className="py-2 pr-2"><b>{l.sym}</b><div className="text-xs text-slate-600">{l.name}</div></td>
+                {zdjecia && <td className="py-2 pr-2"><Zdjecie twId={l.twId} rozmiar={40} nazwa={l.name} /></td>}
+                {/* Symbol w jednej linii: przy 1180 px kolumna zdjęć zabiera Towarowi
+                    miejsce, a symbol łamany na łącznikach („TEST- / JEDNA- / POZ")
+                    przestaje być tym, co hala ma na etykiecie. Łamie się nazwa. */}
+                <td className="py-2 pr-2"><b className="whitespace-nowrap">{l.sym}</b><div className="text-xs text-slate-600">{l.name}</div></td>
                 <td className="py-2 pr-2 tabular-nums"><b>{ilosc(l.qtyDone)}/{ilosc(l.qtyDoc)}</b>{" "}
                   <StanPozycji s={l.status} /></td>
                 <td className="py-2"><Gdzie l={l} /></td>
