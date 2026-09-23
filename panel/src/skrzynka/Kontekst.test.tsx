@@ -57,7 +57,7 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
   dobor: { status: "not_started", wersja: 1, brakuje: null, wybrany: null, updatedBy: null, updatedAt: null,
     dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
       oem: null, nazwaCzesci: null, parametry: {} } },
-  oferta: { externalId: "12096815384", link: null, zrodlo: "wiadomosc", pobrana: null,
+  oferta: { externalId: "12096815384", link: null, zrodlo: "wiadomosc", zgodnosc: null, pobrana: null,
     kartoteka: { pewnosc: "brak", twId: null, symbol: null, zrodlo: "—", powod: null } },
   ...n,
 });

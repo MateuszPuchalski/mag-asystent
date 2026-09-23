@@ -61,6 +61,14 @@ ostatnią wiadomość po czasie.
 - Synchronizacja wpisuje paczkę od najstarszej, więc nowe `id` rosną
   z czasem. Stare wiersze obsługuje reguła po czasie; migracji nie ma.
 
+**Lista „Pasuje do" z oferty w doborze, w szkicu i w panelu.** Opis: §10.2d.
+
+- Dobór szuka zastosowań także bez wariantu, gdy dokładny klucz milczy.
+  Taki kandydat ma „prawdopodobne" i dopisek „wariant niesprawdzony".
+- Szkic dostaje jedno zdanie: maszyna z doboru JEST albo NIE MA na liście.
+  „Nie ma" mówi wprost, że to nie dowód.
+- Sekcja „Oferta" pokazuje zwiniętą listę z maszyną klienta na wierzchu.
+
 - **[wymaga działania]** Przebuduj panel.
 
 

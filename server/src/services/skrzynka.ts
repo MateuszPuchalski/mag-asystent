@@ -17,6 +17,7 @@ import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
+import { zgodnoscOferty, type ZgodnoscOferty } from "./zgodnosc-oferty.js";
 import { szkicCopilota, type SzkicCopilota } from "./copilot-szkic.js";
 import { AKTYWNA_DECYZJA, CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
 import type {
@@ -241,6 +242,12 @@ export interface OfertaRozmowy {
    * zamówienie nazywa towar dokładniej niż oferta.
    */
   zrodlo: "wiadomosc" | "reczne" | "zamowienie";
+  /**
+   * Lista „Pasuje do" z oferty i trafienia maszyny z doboru (23 września
+   * 2026). `null`, gdy treści oferty jeszcze nie pobrano albo lista jest
+   * pusta — dociąga ją układanie szkicu, nie otwarcie rozmowy.
+   */
+  zgodnosc: ZgodnoscOferty | null;
   pobrana: {
     nazwa: string; sku: string | null; cenaGrosze: number | null;
     waluta: string | null; status: string | null; syncedAt: string;
@@ -733,6 +740,9 @@ export function osRozmowy(id: number): {
      dróg, bo wskazanie ręczne bywa właśnie kliknięciem przy pozycji. */
   const skuZPozycji = (ofertaId: string) =>
     zamowienie?.pobrane?.pozycje.find((p) => p.offerId === ofertaId)?.sku ?? null;
+  /* Dobór czytany RAZ, przed ofertą: maszyna z jego danych podświetla listę
+     zgodności, a ten sam wiersz jedzie niżej do zakładki doboru. */
+  const dobor = doborRozmowy(id);
   const zOferty = (konto: number, ofertaId: string, zrodlo: OfertaRozmowy["zrodlo"]): OfertaRozmowy => {
     const pobrana = snapshotOferty(konto, ofertaId);
     const skuZapas = skuZPozycji(ofertaId);
@@ -740,6 +750,7 @@ export function osRozmowy(id: number): {
       externalId: ofertaId,
       link: linkOferty(ofertaId),
       zrodlo,
+      zgodnosc: zgodnoscOferty(db(), konto, ofertaId, dobor.dane),
       pobrana,
       /* `undefined` zamiast `null`, gdy snapshotu nie ma wcale: mostek odróżnia
          „oferty jeszcze nie pobrano" od „oferta nie ma sygnatury", a to dwa
@@ -974,7 +985,7 @@ export function osRozmowy(id: number): {
     /* Dobór jedzie z rozmową, bo jest lekki (jeden wiersz); KANDYDACI nie —
        to wyszukiwarka i parser opisu, a ten odczyt odświeża się na każde
        zdarzenie szyny. */
-    dobor: doborRozmowy(id),
+    dobor,
     szkicCopilota: szkicCopilota(id),
   };
 }

@@ -2596,6 +2596,10 @@ liczbę. W Doborze drogi bez wyniku kryją się pod „+N bez wyniku".
 Wysyłkę sprawdź w rozmowie, w której klient napisał dwie wiadomości pod
 rząd. Odpowiedź ma wyjść bez dialogu o dopisku.
 
+Listę zgodności sprawdź w rozmowie pod ofertą z sekcją „Pasuje do". Wpisz
+w doborze markę i model z tej listy i ułóż szkic. Pod ofertą stanie
+„Pasuje do (N)" z zieloną plakietką maszyny.
+
 ### Aktualizacja do 0.444.0 — ustawienia biura w panelu
 
 **Migracja dokłada tabelę `firma` sama** — `schema.sql` biegnie przy każdym

@@ -1167,3 +1167,19 @@ test("przed szkicem pytamy Allegro o stan pusty albo stary, o doręczoną już n
   await S.odswiezPrzesylke(rozmowa, deps, Date.parse("2026-09-08T12:00:00Z"));
   assert.equal(wolane.length, 0, "doręczona już się nie zmieni");
 });
+
+/* ── Jest / nie ma na liście zgodności (23 września 2026) ────────────────────
+   Serwer sam sprawdza maszynę z danych AGENTA na całej liście oferty i daje
+   jedno zdanie — model nie przeczesuje listy przyciętej do trzydziestu. */
+test("maszyna z danych doboru dostaje zdanie JEST albo NIE MA na liście oferty", () => {
+  db().prepare("UPDATE offer_snapshot SET pasuje_do_json=? WHERE external_id='of-1'")
+    .run(JSON.stringify(["Honda GX160", "Honda GX200"]));
+  const zgodnosc = () => S.kontekstSzkicu(rozmowa, subiekt).fakty
+    .filter((f) => f.rodzaj === "oferta_zgodnosc").map((f) => f.zdanie);
+
+  assert.equal(zgodnosc().some((z) => /JEST|NIE MA/.test(z)), false, "bez maszyny agenta zdania nie ma");
+  D.zapiszDane(rozmowa, { marka: "Honda", model: "GX160" }, 1, biuro);
+  assert.ok(zgodnosc().some((z) => z.includes("Honda GX160 JEST na liście zgodności")));
+  D.zapiszDane(rozmowa, { marka: "Honda", model: "GX390" }, D.doborRozmowy(rozmowa).wersja, biuro);
+  assert.ok(zgodnosc().some((z) => z.includes("Honda GX390 NIE MA na liście") && z.includes("NIE znaczy")));
+});

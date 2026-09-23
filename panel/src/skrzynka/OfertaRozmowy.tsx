@@ -1,6 +1,6 @@
-import React from "react";
-import { ExternalLink, Package, Tag } from "lucide-react";
-import type { OfertaRozmowy as Dane } from "../api/typy";
+import React, { useState } from "react";
+import { Check, ChevronRight, ExternalLink, Package, Tag } from "lucide-react";
+import type { OfertaRozmowy as Dane, ZgodnoscOferty } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { KafelOferty } from "../towar/Kafel";
 import { NaglowekSekcji } from "../ui";
@@ -108,5 +108,48 @@ export function OfertaRozmowy({ oferta }: { oferta: Dane }) {
       : <p className="mt-1 text-xs text-slate-500">
           Tytułu oferty jeszcze nie pobrano — dociągnie go najbliższa synchronizacja (do 7 min).
         </p>}
+    {oferta.zgodnosc && <PasujeDo z={oferta.zgodnosc} />}
   </section>;
+}
+
+/**
+ * Lista „Pasuje do" z oferty (23 września 2026).
+ *
+ * Decyzja właściciela po zrzucie sekcji „Pasuje do kosiarek" z Allegro.
+ * Listę mieliśmy od 0.253.0 i czytał ją wyłącznie model; agent szedł po nią
+ * do Allegro. Tamto wyjście zabrania §25.
+ *
+ * ZWINIĘTA, BO BYWA NA DWIEŚCIE POZYCJI. Na wierzchu stoi jedna rzecz, która
+ * rozstrzyga: czy maszyna z doboru jest na liście. Dopasowanie liczy serwer
+ * tą samą funkcją, która pisze fakt szkicu — ekran i szkic nie mogą mówić
+ * o dwóch różnych pozycjach.
+ *
+ * „NIE MA NA LIŚCIE" NIE JEST „NIE PASUJE". Lista to deklaracja sprzedawcy
+ * i bywa niepełna; zdanie mówi to wprost, żeby nie przeszło do odpowiedzi.
+ * Treść oferty dociąga układanie szkicu, więc bez niego bloku nie ma —
+ * otwarcie rozmowy niczego nie pobiera.
+ */
+function PasujeDo({ z }: { z: ZgodnoscOferty }) {
+  const [otwarta, setOtwarta] = useState(false);
+  const trafienia = new Set(z.trafienia);
+  return <div className="mt-2 text-xs" aria-label="Pasuje do">
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+      <button type="button" aria-expanded={otwarta} onClick={() => setOtwarta((o) => !o)}
+        title="Lista zgodności z oferty Allegro — deklaracja sprzedawcy, nie pomiar"
+        className="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-slate-900">
+        <ChevronRight size={12} aria-hidden="true" className={otwarta ? "rotate-90" : ""} />
+        Pasuje do ({z.lista.length})</button>
+      {z.maszyna && (z.trafienia.length > 0
+        ? <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 font-semibold text-emerald-900">
+            <Check size={11} aria-hidden="true" />{z.maszyna} jest na liście
+            {!z.wariantSprawdzony && <span className="font-normal"> · wariant niesprawdzony</span>}</span>
+        : <span className="text-slate-600">
+            {z.maszyna} — nie ma na liście; to nie dowód, że nie pasuje</span>)}
+    </div>
+    {otwarta && <ul className="mt-1.5 columns-2 gap-4">
+      {z.lista.map((p, i) => <li key={`${p}-${i}`} className={`break-inside-avoid py-0.5 ${trafienia.has(p)
+        ? "rounded bg-emerald-100 px-1 font-semibold text-emerald-900" : "text-slate-700"}`}>
+        {p}{trafienia.has(p) && <span className="sr-only"> — maszyna klienta</span>}</li>)}
+    </ul>}
+  </div>;
 }

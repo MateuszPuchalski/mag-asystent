@@ -18,7 +18,7 @@ vi.mock("../towar/Powiekszenie", () => ({ Powiekszenie: () => null }));
 const { TowarRozmowy } = await import("./TowarRozmowy");
 
 const oferta = (kartoteka: DopasowanieKartoteki): OfertaRozmowy => ({
-  externalId: "12096815384", link: null, zrodlo: "wiadomosc", pobrana: null, kartoteka,
+  externalId: "12096815384", link: null, zrodlo: "wiadomosc", zgodnosc: null, pobrana: null, kartoteka,
 });
 
 const PUSTA = { data: undefined, isLoading: false, error: null };

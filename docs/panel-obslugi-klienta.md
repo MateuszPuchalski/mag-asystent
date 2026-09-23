@@ -1087,6 +1087,33 @@ dowodu. Gdy żaden kandydat nie jest mocny, lista się nie zwija.
 Otwarcie rozmowy pyta o historię klienta i wiedzę od razu, nie po
 kliknięciu. To są odczyty, więc zasada zera zapisu przy patrzeniu stoi.
 
+### 10.2d. Lista „Pasuje do" z oferty (0.445.0)
+
+Zgłoszenie właściciela ze zrzutem sekcji „Pasuje do kosiarek" z Allegro.
+Listę mamy od 0.253.0, ale do tej wersji czytał ją tylko model. Na zrzucie
+klient miał HECHT 1803S i ten model stał na liście. Dobór oddał jednak zero,
+a panel listy nie pokazywał wcale.
+
+| co | gdzie | reguła |
+|---|---|---|
+| Szukanie bez wariantu | szczebel „zastosowanie" w doborze | Gdy dokładny klucz nic nie da, druga próba idzie po marce i modelu. Kandydat ma co najwyżej „prawdopodobne" i dopisek „wariant niesprawdzony". |
+| Zdanie „jest / nie ma na liście" | fakt szkicu Copilota | Serwer sprawdza maszynę z danych doboru na całej liście. „Nie ma" niesie zastrzeżenie, że to nie dowód. |
+| Lista w panelu | sekcja „Oferta" | Zwinięta „Pasuje do (N)". Maszyna z doboru stoi na wierzchu, a jej pozycja jest podświetlona. |
+
+**Jedno dopasowanie dla szkicu i ekranu** — `services/zgodnosc-oferty.ts`.
+Model musi stać w pozycji jako ciąg całych słów, więc „46" nie trafia
+w „Stiga 460". Marka musi stać w pozycji, chyba że pozycja jest samym
+modelem.
+
+**Maszyna pochodzi wyłącznie z danych wpisanych przez agenta.** Maszyna
+wyczytana z treści pytania nie wchodzi — blizna szarpaka.
+
+**Wpis dla wariantu wygrywa.** Druga próba rusza tylko wtedy, gdy dokładny
+klucz nie dał ani jednego kandydata. Inaczej rozmyłaby mocniejszą wiedzę.
+
+**Listę dociąga układanie szkicu.** Otwarcie rozmowy jej nie pobiera, więc
+przed pierwszym szkicem bloku nie ma.
+
 ### 10.3. Oś rozmowy
 
 Oś zawiera wiadomości klienta, odpowiedzi firmy, komentarze wewnętrzne, zmiany
