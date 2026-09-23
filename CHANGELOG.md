@@ -34,6 +34,42 @@ historii nie przepisujemy.
 ---
 
 
+## 0.467.0 — 23 września 2026
+
+**[wymaga działania] Import odsyłaczy od dostawców: cennik z numerami OEM
+wchodzi do kartotek jednym plikiem.** Numery oryginału stały dotąd tylko
+w opisach, wpisywane ręcznie latami. Dostawcy części prowadzą to samo
+w tabelach. Teraz taki plik trafia do kartotek w całości.
+
+Przed startem zrób kopię bazy. Migracja przebudowuje `towar_identyfikator`
+— szczegóły w `DEPLOY.md`.
+
+- **Gdzie.** Wiedza → „Z opisów i ofert” → karta „Odsyłacze od dostawców”.
+  Plik CSV (przecinek, średnik albo tabulator) albo arkusz `.xlsx`.
+- **Kolumny wskazuje człowiek.** Serwer zgaduje je z nagłówków: symbol, EAN
+  i numery. Listy wyboru pokazują zgadnięte mapowanie, a zapis bierze
+  wyłącznie to, co na nich widać.
+- **Kartotekę wskazuje nasz symbol albo EAN.** Wiersz bez trafienia idzie
+  do listy „bez kartoteki”. Symbol zdublowany w Subiekcie nie wskazuje
+  niczego.
+- **Komórka z kilkoma numerami.** Przecinek, średnik i ukośnik dzielą
+  numery. Zapis STIHL `1130 400 1300` i Husqvarny `532 16 56-30` zostaje
+  jednym numerem, a nazwa marki przed numerem odpada.
+- **Podgląd niczego nie zapisuje.** Mówi, ile wierszy trafia, ile numerów
+  jest nowych, a ile znamy. Mówi też, o ile urośnie kolejka „Wspólny numer
+  oryginału”.
+- **Nowy plik tego samego dostawcy zastępuje poprzedni.** Numery z opisu,
+  wpisane ręcznie i z ofert zostają nietknięte.
+- **Import cofa się w całości** z historii pod kartą.
+- **Numer z pliku działa wszędzie tam, gdzie numer z opisu.** Szukanie po
+  numerze klienta, szczebel OEM doboru ze zdaniem „z tabeli odsyłaczy
+  dostawcy …” i węzeł zamienności z 0.466.0.
+
+Nowe źródło identyfikatora `dostawca` z kolumnami `dostawca` i `import_id`,
+tabela `import_odsylaczy`. Dwie nowe trasy zapisu (licznik 23): import
+z flagą `zastosuj` i wycofanie importu. Parser CSV z `zbiorki.ts` dostał
+wykrywanie separatora.
+
 ## 0.466.0 — 23 września 2026
 
 **Numer oryginału łączy zamienniki: kolejka „Wspólny numer oryginału”

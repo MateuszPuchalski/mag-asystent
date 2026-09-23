@@ -49,7 +49,7 @@ beforeEach(() => {
   const d = db();
   for (const t of ["token_silnika_kartoteka", "token_silnika", "pasowanie_czesci", "model_z_opisu", "towar_identyfikator",
     "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika", "model_urzadzenia", "events",
-    "device_session", "app_user"]) {
+    "device_session", "import_odsylaczy", "zamiennosc_oem", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   zOpisu = Number(d.prepare(`INSERT INTO model_z_opisu(tw_id,tw_symbol,tekst,tekst_norm)
@@ -121,6 +121,10 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij",
     payload: { twA: GAZ, twB: SZR, decyzja: "odrzuc", powod: "x" } },
   { method: "POST" as const, url: "/api/obsluga/wiedza/zamiennosci-oem/1/wycofaj", payload: { powod: "x" } },
+  { method: "GET" as const, url: "/api/obsluga/wiedza/odsylacze" },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/odsylacze",
+    payload: { dostawca: "Kramp", tresc: { csv: "Symbol;OEM\nX;123456" }, zastosuj: false } },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/odsylacze/1/wycofaj" },
 ];
 
 test("bez sesji żadna trasa wiedzy nie odpowiada danymi", async () => {
@@ -138,7 +142,7 @@ test("hala nie widzi wiedzy — także na odczycie", async () => {
   }
 });
 
-test("tras zapisu jest dwadzieścia jeden — licznik jest umową", () => {
+test("tras zapisu jest dwadzieścia trzy — licznik jest umową", () => {
   /* Trzy przy zabudowie silnika (0.229.0) i trzy przy pasowaniu części:
      propozycja, rozstrzygnięcie i wycofanie. Każda z tych relacji ma ten sam
      cykl życia co zastosowanie, a bez własnego wycofania zatwierdzona pomyłka
@@ -167,15 +171,21 @@ test("tras zapisu jest dwadzieścia jeden — licznik jest umową", () => {
      numer oryginału i jej wycofanie. Trzeciej — propozycji — nie ma, bo
      kandydat nie jest wierszem: liczy się przy odczycie z identyfikatorów.
      Zapisem jest wyłącznie decyzja człowieka, a wycofanie jest jedyną drogą
-     powrotu po pomyłce (nóż lewy zatwierdzony z prawym). */
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 21);
+     powrotu po pomyłce (nóż lewy zatwierdzony z prawym).
+
+     DWUDZIESTA DRUGA I DWUDZIESTA TRZECIA: import odsyłaczy od dostawcy
+     i wycofanie importu. Podgląd i zapis to JEDNA trasa z flagą `zastosuj`,
+     jak przy arkuszu lokalizacji — dwie dawałyby dwie drogi do jednego
+     rachunku. Podgląd jest POST-em, ale nie zapisem; pilnuje tego osobny
+     test niżej, bo licznik tras tego nie widzi. */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 23);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {
   const b = login("biuro", "Anna");
   const stan = () => ["events", "zastosowanie", "dowod_zastosowania", "model_urzadzenia", "model_z_opisu",
     "towar_identyfikator", "zabudowa_silnika", "pasowanie_czesci", "alias_silnika", "token_silnika",
-    "token_silnika_kartoteka", "zamiennosc_oem"].map(liczba);
+    "token_silnika_kartoteka", "zamiennosc_oem", "import_odsylaczy"].map(liczba);
   const przed = stan();
   for (const t of TRASY().filter((t) => t.method === "GET")) {
     const r = await app.inject({ method: "GET", url: t.url, headers: b.naglowki });
@@ -311,11 +321,33 @@ test("żądanie bez ciała nie wywala się na pustym JSON-ie", async () => {
     `/api/obsluga/wiedza/silniki/${zabudowa}/wycofaj`, "/api/obsluga/wiedza/silniki",
     `/api/obsluga/wiedza/pasowania/${pasowanie}/rozstrzygnij`,
     `/api/obsluga/wiedza/pasowania/${pasowanie}/wycofaj`, "/api/obsluga/wiedza/pasowania",
-    "/api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij", "/api/obsluga/wiedza/zamiennosci-oem/1/wycofaj"]) {
+    "/api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij", "/api/obsluga/wiedza/zamiennosci-oem/1/wycofaj",
+    "/api/obsluga/wiedza/odsylacze", "/api/obsluga/wiedza/odsylacze/1/wycofaj"]) {
     const r = await app.inject({ method: "POST", url, headers: b.naglowki });
     assert.equal(r.statusCode, 400, url);
     assert.doesNotMatch(r.body, /FST_ERR_CTP_EMPTY_JSON_BODY/, url);
   }
+});
+
+test("podgląd importu odsyłaczy to POST, który niczego nie zostawia; zapis przez tę samą trasę pisze", async () => {
+  const b = login("biuro", "Anna");
+  const stan = () => ["events", "towar_identyfikator", "import_odsylaczy"].map(liczba);
+  const csv = "Symbol;Numery OEM\nGAZ-1;16100-ZH8-W61\nNIE-MA;123456";
+  const przed = stan();
+  let r = await app.inject({ method: "POST", url: "/api/obsluga/wiedza/odsylacze", headers: b.naglowki,
+    payload: { dostawca: "Kramp", tresc: { csv }, zastosuj: false } });
+  assert.equal(r.statusCode, 200, r.body);
+  const podglad = r.json<{ zgadniete: boolean; dopasowanych: number; bezKartoteki: { liczba: number }; mapowanie: unknown }>();
+  assert.equal(podglad.zgadniete, true);
+  assert.equal(podglad.dopasowanych, 1);
+  assert.equal(podglad.bezKartoteki.liczba, 1);
+  assert.deepEqual(stan(), przed, "podgląd nie zostawia ani wiersza, ani zdarzenia");
+  r = await app.inject({ method: "POST", url: "/api/obsluga/wiedza/odsylacze", headers: b.naglowki,
+    payload: { dostawca: "Kramp", tresc: { csv }, mapowanie: podglad.mapowanie, zastosuj: true } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json<{ zapisano: { numerow: number } }>().zapisano.numerow, 1);
+  r = await app.inject({ method: "GET", url: "/api/obsluga/wiedza/odsylacze", headers: b.naglowki });
+  assert.deepEqual(r.json<Array<{ dostawca: string; stan: string }>>().map((i) => [i.dostawca, i.stan]), [["Kramp", "aktywny"]]);
 });
 
 test("luki idą razem z kolejką jednym odczytem", async () => {

@@ -769,17 +769,53 @@ CREATE TABLE IF NOT EXISTS towar_identyfikator (
   -- a nie `opis`, bo tamte wiersze kasuje przebudowa po każdym imporcie
   -- z Subiekta, a numeru z oferty nie ma z czego odtworzyć. I nie `reczne`,
   -- bo agent go nie napisał — kliknął przycisk, a to mówi dziennik.
-  zrodlo          TEXT NOT NULL CHECK (zrodlo IN ('opis','reczne','oferta')),
+  --
+  -- `dostawca` doszło przy imporcie odsyłaczy od dostawców i kosztowało
+  -- trzecią przebudowę. Tabela odsyłaczy dostawcy (jego numer ↔ numery OEM)
+  -- to te same numery, które opis kartoteki niesie ręcznie — tylko z pliku,
+  -- setkami naraz. Osobne źródło, bo przebudowa po imporcie z Subiekta kasuje
+  -- `opis`, a import dostawcy ZASTĘPUJE wyłącznie własne wiersze.
+  zrodlo          TEXT NOT NULL CHECK (zrodlo IN ('opis','reczne','oferta','dostawca')),
   dodal           TEXT NOT NULL,
   dodal_user_id   INTEGER REFERENCES app_user(user_id),
   -- Z KTÓREJ oferty. NULL dla `opis` i `reczne`. Bez tego nie da się
   -- odpowiedzieć na pytanie „skąd to się wzięło", gdy numer okaże się błędny.
   oferta_id       TEXT,
+  -- Od KOGO i z którego importu. NULL poza `zrodlo='dostawca'`. Nowy plik
+  -- tego samego dostawcy zastępuje jego wiersze — cennik z marca nie ma prawa
+  -- żyć obok cennika z września, gdy ten drugi numer wycofał.
+  dostawca        TEXT,
+  import_id       INTEGER,
   at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   UNIQUE (tw_id, rodzaj, wartosc_norm)
 );
 CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_norm ON towar_identyfikator(wartosc_norm);
 CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_tw ON towar_identyfikator(tw_id);
+
+-- ── Importy odsyłaczy od dostawców ──────────────────────────────────────────
+-- Historia plików, z których przyszły wiersze `towar_identyfikator` ze źródłem
+-- `dostawca`. Plik niesie numer dostawcy i numery oryginału; kartotekę
+-- wskazuje symbol albo EAN. Bez tej tabeli „skąd ten numer" kończy się na
+-- nazwie dostawcy, a złego pliku nie da się cofnąć w całości.
+--
+-- `aktywny` → `zastapiony`, gdy przyjdzie nowszy plik tego samego dostawcy;
+-- `wycofany`, gdy biuro cofnie import ręcznie. Wiersze identyfikatorów giną
+-- w obu przypadkach — historia importu zostaje.
+CREATE TABLE IF NOT EXISTS import_odsylaczy (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  dostawca        TEXT NOT NULL,
+  plik            TEXT,
+  wierszy         INTEGER NOT NULL,
+  dopasowanych    INTEGER NOT NULL,
+  numerow         INTEGER NOT NULL,
+  stan            TEXT NOT NULL DEFAULT 'aktywny' CHECK (stan IN ('aktywny','zastapiony','wycofany')),
+  zaimportowal    TEXT NOT NULL,
+  user_id         INTEGER REFERENCES app_user(user_id),
+  at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  wycofal         TEXT,
+  wycofano_at     TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_import_odsylaczy_dostawca ON import_odsylaczy(dostawca, stan);
 
 -- ── Zamienność przez wspólny numer OEM ──────────────────────────────────────
 -- Dwie kartoteki z tym samym numerem OEM albo oryginalnym w opisie to

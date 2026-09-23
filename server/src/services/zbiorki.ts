@@ -17,12 +17,31 @@ import { progGornych } from "./reslot.js";
 // ── Parser CSV ──────────────────────────────────────────────────────────────
 
 /**
+ * Separator z PIERWSZEJ linii, poza cudzysłowami. Polski Excel zapisuje CSV
+ * średnikiem, a cenniki dostawców bywają rozdzielane tabulatorem — parser
+ * na sztywno z przecinkiem wczytałby taki plik jako jedną kolumnę. Remis
+ * i brak separatora dają przecinek, czyli dotychczasowe zachowanie.
+ */
+export function wykryjSeparator(tekst: string): "," | ";" | "\t" {
+  const ile: Record<string, number> = { ",": 0, ";": 0, "\t": 0 };
+  let wCudzyslowie = false;
+  for (const z of tekst) {
+    if (z === "\n" || z === "\r") break;
+    if (z === '"') wCudzyslowie = !wCudzyslowie;
+    else if (!wCudzyslowie && z in ile) ile[z]++;
+  }
+  if (ile[";"] > ile[","] && ile[";"] >= ile["\t"]) return ";";
+  if (ile["\t"] > ile[","] && ile["\t"] > ile[";"]) return "\t";
+  return ",";
+}
+
+/**
  * Parser CSV z cudzysłowami (RFC 4180) — pierwszy w repo, więc świadomie
  * najmniejszy możliwy: bez strumieni, bez opcji, jeden przebieg po znakach.
  * Eksport Sellasist ma pola z przecinkami I cudzysłowami w środku (HTML-owe
  * linki), więc `split(",")` nie ma tu prawa bytu.
  */
-export function parsujCsv(tekst: string): string[][] {
+export function parsujCsv(tekst: string, separator: "," | ";" | "\t" = ","): string[][] {
   const wiersze: string[][] = [];
   let pole = "";
   let wiersz: string[] = [];
@@ -40,7 +59,7 @@ export function parsujCsv(tekst: string): string[][] {
       } else pole += z;
     } else if (z === '"') {
       wCudzyslowie = true;
-    } else if (z === ",") {
+    } else if (z === separator) {
       wiersz.push(pole);
       pole = "";
     } else if (z === "\n" || z === "\r") {

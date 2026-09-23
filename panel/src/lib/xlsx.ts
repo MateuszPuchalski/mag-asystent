@@ -155,3 +155,25 @@ export function paryZArkusza(wiersze: WierszArkusza[]): ParaArkusza[] {
     lokalizacja: String(w[kLok!] ?? "").trim(),
   }));
 }
+
+/** `A` → 0, `Z` → 25, `AA` → 26 — kolejność kolumn jak w Excelu. */
+const indeksKolumny = (litery: string) =>
+  [...litery.toUpperCase()].reduce((n, z) => n * 26 + (z.charCodeAt(0) - 64), 0) - 1;
+
+/**
+ * Wiersze arkusza jako TABELA: kolumny po pozycji, nie po nagłówku.
+ *
+ * Import odsyłaczy od dostawców nie zna nagłówków z góry — każdy cennik ma
+ * inne — więc na serwer jedzie cała tabela, a kolumny wskazuje mapowanie.
+ * Pustą komórkę zapełnia pusty tekst: Excel ją pomija, a bez wypełnienia
+ * kolumna „Numery OEM" przesunęłaby się w lewo pod „EAN" w każdym wierszu,
+ * w którym EAN-u brak.
+ */
+export function tabelaZWierszy(wiersze: WierszArkusza[]): string[][] {
+  const szer = Math.max(0, ...wiersze.flatMap((w) => Object.keys(w).map((k) => indeksKolumny(k) + 1)));
+  return wiersze.map((w) => {
+    const out = new Array<string>(szer).fill("");
+    for (const [k, v] of Object.entries(w)) out[indeksKolumny(k)] = String(v ?? "");
+    return out;
+  });
+}

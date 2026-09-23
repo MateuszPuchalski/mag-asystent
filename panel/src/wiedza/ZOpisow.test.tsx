@@ -27,6 +27,10 @@ const Z_OFERTY: ModelZOpisu = {
   zastosowanieId: null, rozstrzygnal: null, rozstrzygnietoAt: null, at: "2026-09-01T07:05:00Z",
   zrodlo: "oferta", ofertaId: "14023867457",
 };
+/* Karta odsyłaczy od dostawców ma własny test (`Odsylacze.test.tsx`) — tu
+   stoi zaślepka, żeby ten plik pilnował tylko kolejki tekstów z opisów. */
+vi.mock("./Odsylacze", () => ({ Odsylacze: () => <p>odsyłacze</p> }));
+
 vi.mock("../api/wiedza", () => ({
   useModeleZOpisow: () => ({ data: { wiersze: WIERSZE, liczba: 1 }, isLoading: false, error: null }),
   usePrzerobModelZOpisu: () => ({ mutate: przerob, isPending: false }),

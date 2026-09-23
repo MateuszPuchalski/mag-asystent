@@ -883,6 +883,7 @@ export function migrate(database: DatabaseSync) {
   identyfikatorZamiennika(database);
   typZakonczeniaWSkrzynce(database);
   identyfikatorZOferty(database);
+  identyfikatorOdDostawcy(database);
   zrodloPropozycjiZOferty(database);
   /* NA KOŃCU, po przebudowach: kasowanie ma zastać tabele już w docelowym
      kształcie. */
@@ -1329,6 +1330,60 @@ function identyfikatorZOferty(database: DatabaseSync) {
       INSERT INTO towar_identyfikator_nowa
         (id,tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,dodal_user_id,at)
         SELECT id,tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,dodal_user_id,at
+        FROM towar_identyfikator;
+      DROP TABLE towar_identyfikator;
+      ALTER TABLE towar_identyfikator_nowa RENAME TO towar_identyfikator;
+      CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_norm ON towar_identyfikator(wartosc_norm);
+      CREATE INDEX IF NOT EXISTS ix_towar_identyfikator_tw ON towar_identyfikator(tw_id);
+    `);
+  })();
+}
+
+/**
+ * Źródło identyfikatora `dostawca` plus `dostawca` i `import_id` — import
+ * odsyłaczy od dostawców. Trzecia przebudowa tej tabeli, z tego samego
+ * powodu co dwie poprzednie: CHECK na `zrodlo` nie rozszerza się w miejscu.
+ *
+ * Idzie PO `identyfikatorZOferty`, więc zastaje tabelę już z `oferta_id`
+ * i przepisuje ją razem z tą kolumną. Baza, która przeskoczy oba wydania,
+ * przechodzi dwie przebudowy po kolei, a nie jedną sklejoną — każda ma swój
+ * warunek i swój test, a sklejka byłaby trzecią drogą do tej samej tabeli.
+ *
+ * Wiersze przepisujemy WSZYSTKIE, z `id`, jak wyżej: wpis biura i numer
+ * z oferty zgubione tutaj nie wróciłyby już nigdy.
+ */
+function identyfikatorOdDostawcy(database: DatabaseSync) {
+  const wiersz = database.prepare(
+    "SELECT sql FROM sqlite_master WHERE type='table' AND name='towar_identyfikator'"
+  ).get() as { sql: string } | undefined;
+  if (!wiersz) return;
+  if (wiersz.sql.includes("'dostawca'")) return;
+
+  transaction(database, () => {
+    const teraz = database.prepare(
+      "SELECT sql FROM sqlite_master WHERE type='table' AND name='towar_identyfikator'"
+    ).get() as { sql: string } | undefined;
+    if (!teraz || teraz.sql.includes("'dostawca'")) return;
+    database.exec(`
+      CREATE TABLE towar_identyfikator_nowa (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        tw_id           INTEGER NOT NULL,
+        tw_symbol       TEXT NOT NULL,
+        rodzaj          TEXT NOT NULL CHECK (rodzaj IN ('oem','nr_oryg','katalog_obcy','stare_sku','zamiennik')),
+        wartosc         TEXT NOT NULL,
+        wartosc_norm    TEXT NOT NULL,
+        zrodlo          TEXT NOT NULL CHECK (zrodlo IN ('opis','reczne','oferta','dostawca')),
+        dodal           TEXT NOT NULL,
+        dodal_user_id   INTEGER REFERENCES app_user(user_id),
+        oferta_id       TEXT,
+        dostawca        TEXT,
+        import_id       INTEGER,
+        at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        UNIQUE (tw_id, rodzaj, wartosc_norm)
+      );
+      INSERT INTO towar_identyfikator_nowa
+        (id,tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,dodal_user_id,oferta_id,at)
+        SELECT id,tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,dodal_user_id,oferta_id,at
         FROM towar_identyfikator;
       DROP TABLE towar_identyfikator;
       ALTER TABLE towar_identyfikator_nowa RENAME TO towar_identyfikator;

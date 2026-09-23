@@ -6,6 +6,7 @@ import { Blad, Pusto, Przycisk } from "../ui";
 import { PolaModelu, type DaneModelu } from "./PolaModelu";
 import { Kafel } from "../towar/Kafel";
 import { Tokeny } from "./Tokeny";
+import { Odsylacze } from "./Odsylacze";
 
 /**
  * „Z opisów i ofert" (E3, rozszerzone w 0.264.0): teksty, z których człowiek
@@ -20,7 +21,9 @@ import { Tokeny } from "./Tokeny";
  *
  * Nowego widoku dla ofert NIE MA i to jest decyzja, nie skrót: robota jest ta
  * sama co do joty, a rozdzielenie jej na dwa ekrany kazałoby człowiekowi
- * pamiętać o dwóch kolejkach zamiast o jednej.
+ * pamiętać o dwóch kolejkach zamiast o jednej. *
+ * Odsyłacze od dostawców stoją tu jako pierwsza karta z tego samego powodu:
+ * to trzecie źródło wiedzy z dokumentu, a siódma zakładka połamałaby rząd.
  */
 export function ZOpisow() {
   const lista = useModeleZOpisow();
@@ -31,6 +34,7 @@ export function ZOpisow() {
   const wiersze = lista.data?.wiersze ?? [];
 
   return <div className="space-y-3">
+    <Odsylacze />
     <p className="text-xs text-slate-500">
       Teksty z opisów kartotek i z list zgodności naszych ofert. Wskaż markę i model —
       powstanie propozycja do kolejki. Odrzuć, gdy to nie jest lista modeli;

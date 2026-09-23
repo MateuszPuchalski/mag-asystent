@@ -53,16 +53,20 @@ export function WiedzaTowaru({ poczatkowy = null }: {
  * omija. Bez tego przycisku zły numer dopisany jednym kliknięciem zostawałby
  * przy kartotece na zawsze i wracał do klienta jako zły towar.
  */
-/* TRZY kolory, bo trzy różnej wagi świadectwa (§11.3). Zrównanie oferty
-   z opisem kartoteki jednym tłem kosztowałoby dokładnie to rozróżnienie. */
+/* CZTERY kolory, bo cztery różnej wagi świadectwa (§11.3). Zrównanie oferty
+   z opisem kartoteki jednym tłem kosztowałoby dokładnie to rozróżnienie.
+   Czwarty — tabela odsyłaczy dostawcy — to cudzy katalog wgrany plikiem:
+   mocniejszy od opisu pisanego latami ręcznie, słabszy od katalogu producenta. */
 const KOLOR_ZRODLA: Record<Identyfikator["zrodlo"], string> = {
   opis: "bg-slate-100 text-slate-800",
   reczne: "bg-amber-50 text-amber-900",
   oferta: "bg-sky-50 text-sky-900",
+  dostawca: "bg-emerald-50 text-emerald-900",
 };
 
 const OPIS_ZRODLA = (i: Identyfikator) => i.zrodlo === "opis" ? "z opisu kartoteki"
   : i.zrodlo === "reczne" ? `ręcznie: ${i.dodal}`
+  : i.zrodlo === "dostawca" ? `z tabeli odsyłaczy dostawcy ${i.dostawca ?? ""}`.trim()
   : `z naszej oferty Allegro${i.ofertaId ? ` ${i.ofertaId}` : ""}`;
 
 function Identyfikatory({ twId }: { twId: number }) {
