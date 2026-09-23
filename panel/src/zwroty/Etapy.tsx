@@ -1,5 +1,5 @@
 import React from "react";
-import { Banknote, CircleCheck, CircleX, Eye, FileText, Scale } from "lucide-react";
+import { Banknote, CircleCheck, CircleX, Eye, FileText, Scale, type LucideIcon } from "lucide-react";
 import type { Kubelek } from "../api/typy";
 import { KUBELKI } from "./Kolejka";
 
@@ -23,13 +23,16 @@ import { KUBELKI } from "./Kolejka";
    wtedy dwa przystanki: decyzję i odmowę. Trzy wyszarzone kroki, na które ta
    sprawa nigdy nie wejdzie, byłyby obietnicą bez pokrycia.                   */
 
-const IKONY: Record<Kubelek, React.ReactNode> = {
-  decyzja: <Scale size={13} aria-hidden="true" />,
-  ocena: <Eye size={13} aria-hidden="true" />,
-  zwrot: <Banknote size={13} aria-hidden="true" />,
-  korekta: <FileText size={13} aria-hidden="true" />,
-  zamkniety: <CircleCheck size={13} aria-hidden="true" />,
-  odrzucony: <CircleX size={13} aria-hidden="true" />,
+/**
+ * Ikona kubełka — JEDNA dla osi etapów i kafli kolejki (0.454.0).
+ *
+ * Słownik ikon z projektu „Zwroty — mniej tekstu" ma zasadę: jedna ikona,
+ * jedno znaczenie w całym panelu. Dwie mapy — tu i przy kaflach — rozjechałyby
+ * się przy pierwszej zmianie i ta sama waga znaczyłaby dwie różne rzeczy.
+ */
+export const IKONA_KUBELKA: Record<Kubelek, LucideIcon> = {
+  decyzja: Scale, ocena: Eye, zwrot: Banknote, korekta: FileText,
+  zamkniety: CircleCheck, odrzucony: CircleX,
 };
 
 /** Krótkie nazwy przystanków — etykiety kubełków mówią „Do …", a oś „gdzie". */
@@ -64,7 +67,7 @@ export function Etapy({ kubelek }: { kubelek: Kubelek }) {
         <span title={i === teraz ? `Teraz: ${pytanie(k)}` : pytanie(k)}
           aria-current={i === teraz ? "step" : undefined}
           className={`inline-flex h-7 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 text-xs ${klasa}`}>
-          {IKONY[k]}{NAZWY[k]}
+          {React.createElement(IKONA_KUBELKA[k], { size: 13, "aria-hidden": true })}{NAZWY[k]}
         </span>
       </li>;
     })}

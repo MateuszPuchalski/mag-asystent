@@ -184,3 +184,34 @@ describe("Zakładki biorą pigułkę z filtra", () => {
       .toHaveAttribute("aria-pressed", "true");
   });
 });
+
+/* ── Tryb kafli (0.454.0) ──────────────────────────────────────────────────────
+   Kubełki zwrotów jako kafle: ikona, liczba na pierwszym planie, etykieta pod
+   nią. To TEN SAM wybór, więc pilnujemy tego, co reguła z 0.262.0 obiecuje:
+   `aria-pressed`, barwy wyboru i jedno kliknięcie na jedną pozycję. */
+describe("FiltrSegmentowy w trybie kafli", () => {
+  const pozycje = [
+    { klucz: "decyzja", etykieta: "Do decyzji", ile: 743, ikona: <svg data-testid="ikona-decyzja" /> },
+    { klucz: null, etykieta: "Wszystkie", ile: 1116 },
+  ] as const;
+
+  it("liczba stoi przed etykietą, a ikona nie wchodzi do nazwy dostępnej", () => {
+    render(<FiltrSegmentowy<string | null> kafle wybrany="decyzja" onWybierz={() => {}}
+      pozycje={[...pozycje]} />);
+    const kafel = screen.getByRole("button", { name: "743 Do decyzji" });
+    expect(kafel).toHaveAttribute("aria-pressed", "true");
+    expect(kafel.className).toContain("bg-wertis-ink");
+    expect(screen.getByTestId("ikona-decyzja").parentElement)
+      .toHaveAttribute("aria-hidden", "true");
+    expect(screen.getByRole("button", { name: "1116 Wszystkie" }))
+      .toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("kliknięcie wybiera tak samo jak pigułka", () => {
+    const wybierz = vi.fn();
+    render(<FiltrSegmentowy<string | null> kafle wybrany="decyzja" onWybierz={wybierz}
+      pozycje={[...pozycje]} />);
+    fireEvent.click(screen.getByRole("button", { name: /Wszystkie/ }));
+    expect(wybierz).toHaveBeenCalledWith(null);
+  });
+});

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { RefreshCw, Undo2 } from "lucide-react";
+import { List, RefreshCw, Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, type WynikSkanu } from "../api/zwroty";
 import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
@@ -18,7 +18,7 @@ import {
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 import { Naglowek } from "../zwroty/Naglowek";
-import { Etapy } from "../zwroty/Etapy";
+import { Etapy, IKONA_KUBELKA } from "../zwroty/Etapy";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { Szukanie } from "../zwroty/Szukanie";
@@ -710,7 +710,13 @@ export function Zwroty() {
     <Karta className="flex min-h-0 flex-col overflow-hidden">
       {/* `shrink-0` na blokach nad listą nie jest kosmetyką: lista ma bazę 0,
           więc przy ciasnym oknie kurczyłyby się WYŁĄCZNIE one. */}
-      <nav className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 p-2">
+      {/* ── KAFLE ZAMIAST PIGUŁEK (0.454.0) ──────────────────────────────────
+          Zgłoszenie właściciela: „ulżyj przeładowaniu tekstem, użyj ikon".
+          Siedem pigułek z pomocą i kolejnością łamało się na trzy nierówne
+          rzędy. Siatka trzech kolumn układa je w rzędy równe, a kolejność
+          i pomoc stają w ostatnim, obok „Wszystkie" — tam, gdzie zostaje
+          miejsce, zamiast przed kubełkami, które czyta się pierwsze. */}
+      <nav className="grid shrink-0 grid-cols-3 gap-1 border-b border-slate-200 p-2">
         {/* ── JEDEN KSZTAŁT WYBORU (0.262.0) ─────────────────────────────────
             Ten rząd stał w trzech ekranach przepisany znak w znak, w bursztynie,
             bez tła pigułki niewybranej i bez `aria-pressed`. Kształt jest teraz
@@ -724,16 +730,24 @@ export function Zwroty() {
             w reklamacjach, nie ma osobnego wiersza narzędzi: szukanie zwrotów
             to skaner z własnym rzędem (`zwroty/Szukanie.tsx`), więc dokładanie
             mu sąsiadów zrobiłoby z niego to, czym nie jest. */}
-        <PasekPorzadku porzadek={porzadek} dozwolone={["termin", "otwarto", "kwota"]}
-          onZmien={ustawPorzadek} />
-        <FiltrSegmentowy<Kubelek | null> wybrany={kubelek} onWybierz={przelacz}
+        <FiltrSegmentowy<Kubelek | null> kafle wybrany={kubelek} onWybierz={przelacz}
           pozycje={[
             ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
               ile: data?.liczniki?.[k.id] ?? 0,
+              /* Ta sama ikona co na osi etapów nad zwrotem — słownik ikon
+                 ma jedną wagę na jedno znaczenie. */
+              ikona: React.createElement(IKONA_KUBELKA[k.id], { size: 18 }),
               podpowiedz: `${k.pytanie} (klawisz ${i + 1})` })),
             { klucz: null, etykieta: "Wszystkie", ile: data?.zwroty?.length ?? 0,
+              ikona: <List size={18} />,
               podpowiedz: `Wszystkie zwroty (klawisz ${KUBELKI.length + 1})` },
           ]} />
+        <div className="flex items-center justify-center">
+          <PasekPorzadku porzadek={porzadek} dozwolone={["termin", "otwarto", "kwota"]}
+            onZmien={ustawPorzadek} />
+        </div>
+      {/* Pomoc w swojej komórce siatki — obok kolejności, na końcu rzędu. */}
+      <div className="flex items-center justify-center">
       <SkrotyKlawiszy zMoje={false} kubelkow={KUBELKI.length}
           /* Klawisze OTWARTEGO zwrotu, gdy jest (audyt, 15 września 2026). Po `P`
              zwrot stoi już w DO OCENY, a lista dalej w DO DECYZJI — pasek kubełka
@@ -748,6 +762,7 @@ export function Zwroty() {
             ...(stanPieniedzy?.moznaZwrocic
               ? [["Z", "oddaj pieniądze"] as const] : []),
           ]} />
+      </div>
       </nav>
 
       <Szukanie

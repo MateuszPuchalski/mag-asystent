@@ -227,20 +227,27 @@ export function Szukanie({
           rejestrację paczki. Rejestracja odeszła decyzją właściciela, a z tego
           formularza biuro brało tylko jedno — szukanie klienta po loginie.
           Przycisk mówi więc wprost, co robi. */}
+      {/* IKONA, NIE NAPIS (0.454.0) — zgłoszenie właściciela „ulżyj
+          przeładowaniu tekstem". Obie akcje tego rzędu są codzienne i stoją
+          zawsze w tym samym miejscu, więc rozpoznaje się je po ikonie; nazwa
+          zostaje w podpowiedzi i w nazwie dostępnej. Pole szukania zyskuje
+          szerokość, a to ono jest tu pierwszą czynnością. */}
       {onLogin && !szukaKlienta &&
         <button type="button" onClick={() => setSzukaKlienta(true)}
-          title="Znajdź zamówienia klienta po loginie, nazwisku albo telefonie"
-          className="btn-secondary h-8 shrink-0 gap-1 px-2 text-xs">
-          <UserSearch size={12} />Paczki klienta</button>}
+          aria-label="Paczki klienta"
+          title="Paczki klienta — po loginie, nazwisku albo telefonie"
+          className="btn-secondary h-8 w-8 shrink-0 justify-center p-0">
+          <UserSearch size={16} aria-hidden="true" /></button>}
 
       {/* Takt zwrotów chodzi rzadko, bo zwrot ma termin w dniach. Biuro, które
           właśnie przyjęło paczkę, wie o zwrocie wcześniej niż panel. */}
       {onSynchronizuj &&
         <button type="button" disabled={synchronizuje} onClick={onSynchronizuj}
+          aria-label={synchronizuje ? "Pobieram zwroty z Allegro…" : "Synchronizuj z Allegro"}
           title="Pobierz nowe zwroty z Allegro teraz"
-          className="btn-secondary h-8 shrink-0 gap-1 px-2 text-xs">
-          <RefreshCw size={12} className={synchronizuje ? "animate-spin" : ""} />
-          {synchronizuje ? "Pobieram…" : "Synchronizuj"}</button>}
+          className="btn-secondary h-8 w-8 shrink-0 justify-center p-0">
+          {/* Obrót ikony mówi „pobieram" — napis przestał być potrzebny. */}
+          <RefreshCw size={16} aria-hidden="true" className={synchronizuje ? "animate-spin" : ""} /></button>}
     </div>
 
     {/* Odmowa Allegro CAŁYM zdaniem: mówi, co naprawić — token, uprawnienie,

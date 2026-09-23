@@ -34,6 +34,21 @@ historii nie przepisujemy.
 ---
 
 
+## 0.454.0 — 23 września 2026
+
+**Zwroty: kubełki jako kafle z ikonami.** Drugi krok projektu „Zwroty —
+mniej tekstu".
+
+- Kubełki kolejki to siatka kafli 3 × 3: ikona, liczba na pierwszym planie,
+  etykieta pod nią. Kolejność i pomoc stoją w ostatnim rzędzie, obok
+  „Wszystkie”. Ikony są te same co na osi etapów nad zwrotem.
+- „Paczki klienta” i „Synchronizuj” w rzędzie szukania są przyciskami-ikonami.
+  Nazwa jest w podpowiedzi, a przy synchronizacji obraca się ikona.
+- `FiltrSegmentowy` dostał tryb kafli. To ten sam wybór co pigułki:
+  `aria-pressed`, barwy i próg dotyku bez zmian.
+
+- **[wymaga działania]** Przebuduj panel.
+
 ## 0.453.0 — 23 września 2026
 
 **Zwroty: koszyk w jednym wierszu i oś etapów.** Pierwszy krok przeniesienia
