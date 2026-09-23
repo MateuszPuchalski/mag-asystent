@@ -19,8 +19,11 @@ import {
  * czeka. Wycofanie negatywu wymaga powodu (§14.2), pozytywu nie; dowody
  * dopisuje się, nigdy nie poprawia (append-only).
  */
-export function WiedzaTowaru() {
-  const [towar, setTowar] = useState<Towar | null>(null);
+export function WiedzaTowaru({ poczatkowy = null }: {
+  /** Kartoteka wskazana z innego widoku (Sieć) — żeby nie szukać jej drugi raz. */
+  poczatkowy?: Towar | null;
+} = {}) {
+  const [towar, setTowar] = useState<Towar | null>(poczatkowy);
   const wiedza = useWiedzaTowaru(towar?.id ?? null);
   return <div className="space-y-3">
     <Wyszukiwarka wybrany={towar} onWybierz={setTowar} etykieta="Kartoteka do sprawdzenia" />

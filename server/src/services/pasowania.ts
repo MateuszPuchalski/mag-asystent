@@ -163,7 +163,7 @@ export function aktywnePasowanie(twId: number, doTwId: number, database: Databas
     WHERE tw_id=? AND do_tw_id=? AND stan IN ('propozycja','zatwierdzone') LIMIT 1`).get(twId, doTwId));
 }
 
-function towar(database: DatabaseSync, twId: number): (Kartoteka & { opis: string }) | null {
+export function towar(database: DatabaseSync, twId: number): (Kartoteka & { opis: string }) | null {
   const w = database.prepare("SELECT tw_id, symbol, nazwa, opis FROM sgt_towar WHERE tw_id=?").get(twId) as
     { tw_id: number; symbol: string; nazwa: string; opis: string | null } | undefined;
   return w ? { twId: Number(w.tw_id), symbol: w.symbol, nazwa: w.nazwa, opis: w.opis ?? "" } : null;
@@ -174,7 +174,7 @@ function towar(database: DatabaseSync, twId: number): (Kartoteka & { opis: strin
  * i tylko jednoznaczne (`stan === "jedno"`): symbol zdublowany w Subiekcie
  * nie ma prawa wskazać cudzej części.
  */
-function zamiennikiKartoteki(database: DatabaseSync, t: Kartoteka & { opis: string }): Kartoteka[] {
+export function zamiennikiKartoteki(database: DatabaseSync, t: Kartoteka & { opis: string }): Kartoteka[] {
   if (!t.opis) return [];
   const { znane } = podzielZamienniki(t.opis, t.symbol, (s) => kartotekaPoSku(database, s).stan !== "brak");
   const out: Kartoteka[] = [];
@@ -260,6 +260,14 @@ export function pasowaniaTowaru(twId: number, database: DatabaseSync = db()): {
     pasujace: [...pasujace.values()].sort(porzadek),
     negatywne, propozycje,
   };
+}
+
+/**
+ * Wszystkie żywe wiersze: zatwierdzone obu polaryzacji i propozycje. Dla sieci
+ * wiedzy (`siec-wiedzy.ts`), która rysuje całość naraz.
+ */
+export function zywePasowania(database: DatabaseSync = db()): Pasowanie[] {
+  return wiersze(database, "WHERE p.stan IN ('zatwierdzone','propozycja') ORDER BY p.id");
 }
 
 /* ── Mutacje ───────────────────────────────────────────────────────────── */

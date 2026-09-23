@@ -34,6 +34,45 @@ historii nie przepisujemy.
 ---
 
 
+## 0.465.0 — 23 września 2026
+
+**Baza wiedzy dostaje zakładkę „Sieć”: cała wiedza o zgodności części na
+jednym obrazku.** Do tej pory każdy ekran pokazywał jedną relację naraz.
+Teraz widać łańcuch: uszczelka pasuje do gaźnika, gaźnik do silnika GX160,
+a silnik stoi w trzech kosiarkach.
+
+- **Cztery warstwy, każda z przełącznikiem i licznikiem.** Część do części,
+  części do maszyn, silniki w maszynach i zamienniki z opisów kartotek.
+- **Wyspy.** Sieć rozpada się na grupy połączonych węzłów. Każda ma własną
+  kartę, nazwaną węzłem, do którego wchodzi najwięcej powiązań.
+- **Barwa i kreska krawędzi.** Zieleń znaczy „pasuje”, czerwień „nie pasuje”,
+  bursztyn „czeka w kolejce”, błękit „silnik stoi w maszynie”. Kropkowana
+  szarość to zamiennik z opisu. Strzałka biegnie od części do tego, do czego
+  ona pasuje, a grubsza linia to dowód techniczny.
+- **Kształt węzła.** Kółko to kartoteka, kwadrat maszyna, romb silnik. Rysunek
+  czyta się więc także bez rozróżniania barw.
+- **Najechanie i klik.** Najechanie wygasza wszystko poza sąsiadami. Klik
+  wypisuje połączenia zdaniami z serwera, a przy kartotece także wnioski przez
+  zamienniki.
+- **Otoczenie.** Szukanie podsuwa skróty, najpierw po początku symbolu. Skrót
+  pokazuje wszystko w zasięgu jednego, dwóch albo trzech kroków. To odpowiedź
+  na maszynę, do której pasuje sto części.
+- **Przejście do kartoteki.** Przycisk przy wybranej części otwiera ją
+  w „Sprawdź kartotekę” bez ponownego szukania.
+- **Wielka wyspa czeka na zgodę.** Wyspa powyżej 120 węzłów nie rysuje się
+  sama. Podpowiada szukanie i otoczenie albo rysuje całość na życzenie.
+- **Czytelność.** Rysunek stoi w naturalnej skali z przewijaniem, a nie
+  ściśnięty do karty. Podpisy mają białą obwódkę, więc linia ich nie przekreśla.
+- **Ekran niczego nie zapisuje.** Rozstrzyga się dalej w kolejce, a dopisuje
+  w „Sprawdź kartotekę”.
+
+Zamienniki sięgają jeden krok, jak przy odczycie kartoteki. Odrzucone
+i wycofane wiersze nie wchodzą na rysunek.
+
+Trasa `GET /api/obsluga/wiedza/siec`, serwis `services/siec-wiedzy.ts`.
+Układ liczy panel, bez nowej biblioteki: ten sam stan bazy daje zawsze
+ten sam obrazek.
+
 ## 0.464.0 — 23 września 2026
 
 **Rozmowę da się zakończyć — ręką albo samą.** Zgłoszenie właściciela:
@@ -55,7 +94,6 @@ panelu.
 
 - **[wymaga działania]** Przebuduj panel i zrestartuj serwer. Nowa kolumna
   `conversation.otwarta_recznie_at` zakłada się sama przy starcie.
-
 
 ## 0.463.0 — 23 września 2026
 

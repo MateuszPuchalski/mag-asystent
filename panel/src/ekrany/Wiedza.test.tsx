@@ -64,12 +64,22 @@ vi.mock("../api/wiedza", async () => {
     usePrzerobModelZOpisu: () => ({ mutate: vi.fn(), isPending: false }),
     useOdrzucModelZOpisu: () => ({ mutate: vi.fn(), isPending: false }),
     useIdentyfikatory: () => ({ data: [], isLoading: false, error: null }),
+    /* Sieć (0.465.0): jedna uszczelka do jednego gaźnika wystarczy, żeby
+       sprawdzić przejście z rysunku do „Sprawdź kartotekę". */
+    useSiecWiedzy: () => ({ data: { wezly: [
+      { klucz: "tw:811", rodzaj: "kartoteka", twId: 811, etykieta: "LC170430140-0001", nazwa: "Uszczelka gaźnika GX160" },
+      { klucz: "tw:502", rodzaj: "kartoteka", twId: 502, etykieta: "W09-0211", nazwa: "Gaźnik GX160" },
+    ], krawedzie: [{ z: "tw:811", do: "tw:502", warstwa: "pasowania", rodzaj: "pasuje", polaryzacja: "pasuje",
+      wierszId: 5, rola: "uszczelka", pewnosc: "potwierdzone", obustronnie: false, zdanie: "uszczelka pasuje do W09-0211" }] },
+    isLoading: false, error: null }),
     useDodajIdentyfikator: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   };
 });
 vi.mock("../wyszukiwarka", () => ({
-  Wyszukiwarka: ({ onWybierz }: { onWybierz: (t: unknown) => void }) =>
-    <button type="button" onClick={() => onWybierz({ id: 14, sym: "SZR-148/82", name: "Szarpak", locs: [] })}>wybierz towar</button>,
+  Wyszukiwarka: ({ wybrany, onWybierz }: { wybrany: { sym: string } | null; onWybierz: (t: unknown) => void }) => <>
+    {wybrany && <span>wybrano {wybrany.sym}</span>}
+    <button type="button" onClick={() => onWybierz({ id: 14, sym: "SZR-148/82", name: "Szarpak", locs: [] })}>wybierz towar</button>
+  </>,
 }));
 
 const { Wiedza } = await import("./Wiedza");
@@ -159,5 +169,16 @@ describe("Ekran wiedzy", () => {
       model: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46-450", wariant: null },
       dowod: { rodzaj: "katalog_dostawcy", tresc: "katalog 2024, s. 34", link: null },
     }), expect.anything());
+  });
+
+  /* Przejście z Sieci (0.465.0): wskazana część ląduje w „Sprawdź kartotekę”
+     już wybrana — szukanie tego samego symbolu drugi raz to czysta strata. */
+  it("„Otwórz w Sprawdź kartotekę” z sieci przełącza zakładkę i niesie wybraną część", async () => {
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: "Sieć" }));
+    await userEvent.click(screen.getByRole("button", { name: /^LC170430140-0001 —/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Otwórz w „Sprawdź kartotekę"/ }));
+    expect(screen.getByRole("button", { name: "Sprawdź kartotekę" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("wybrano LC170430140-0001")).toBeInTheDocument();
   });
 });

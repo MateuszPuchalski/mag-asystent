@@ -16,6 +16,7 @@ import {
   kolejkaPasowan, pasowaniaTowaru, rozstrzygnijPasowanie, wycofajPasowanie, zaproponujPasowanie,
   type NowePasowanie,
 } from "../services/pasowania.js";
+import { siecWiedzy } from "../services/siec-wiedzy.js";
 import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
@@ -70,6 +71,10 @@ export async function wiedzaRoutes(app: FastifyInstance) {
 
   app.get<{ Querystring: { q?: string } }>("/api/obsluga/wiedza/modele", async (req, reply) =>
     odmowa(reply) ?? { modele: szukajModeli(req.query.q ?? "") });
+
+  /* Cała sieć wiedzy jednym odczytem: widok „Sieć" rysuje wszystko naraz,
+     a strzał po kartotece na węzeł to setki żądań przy pierwszym otwarciu. */
+  app.get("/api/obsluga/wiedza/siec", async (_req, reply) => odmowa(reply) ?? siecWiedzy());
 
   app.get<{ Params: { twId: string } }>("/api/obsluga/wiedza/towar/:twId", async (req, reply) =>
     odmowa(reply) ?? { ...zastosowaniaTowaru(Number(req.params.twId)), pasowania: pasowaniaTowaru(Number(req.params.twId)) });
