@@ -984,6 +984,41 @@ zwrotach. PILNE zostaje na górze w obu porządkach, bo flaga ręczna przebija
 automat. Wybór pamięta przeglądarka stanowiska, nie serwer: kolejność to nawyk
 człowieka przy biurku, a nie fakt o rozmowie.
 
+### 10.2a. Znaki zamiast zdań (0.442.0)
+
+Zgłoszenie właściciela ze zrzutem skrzynki: „za dużo tekstu". Makieta stoi na
+kanwie projektu „Skrzynka — mniej tekstu". Zasada jest jedna: słowo zostaje
+tam, gdzie niesie treść, a stan idzie znakiem.
+
+| było | jest |
+|---|---|
+| kategoria słowem w trzecim rzędzie | kafel z ikoną na początku wiersza, fiolet dla przypuszczenia |
+| ludzik przy plakietce | czerwona kropka na kaflu |
+| „czeka 14 g 42 min" | cztery kreski i „14 g" na prawej krawędzi |
+| „3 dopiski klienta" | dymek i liczba |
+| „zadanie w toku", „po terminie", status doboru | ikona z dymkiem |
+| podgląd w dwóch liniach | jedna linia |
+| „Prowadzi nikt — przypisze pierwsza odpowiedź" | puste kółko, inicjał albo „Ty" |
+| „Oznacz jako pilne", „Sprawa reklamacyjna" | ikona; słowo dopiero przy podniesionej fladze |
+| „stan 342 · rezerwacje 6" | pasek wolne i zarezerwowane |
+| sześć równych poziomów cen | jeden wiersz na każdą różną cenę |
+| wiersze „brak" | przerywane plakietki z nazwą |
+
+**Cenę zna się z góry: znak trzeba raz poznać.** Dlatego każdy znak ma dymek
+i tekst dla czytnika ekranu. Pełna lista stoi pod „?" nad kolejką.
+Rzadkie kategorie dostają słowo obok kafla, bo ich znak trzeba by za każdym
+razem sprawdzać.
+
+**Nieudane rozpoznanie nie udaje kategorii.** Kafel ma obrys przerywany,
+a plakietka mówi „nierozpoznane". Do tej wersji mówiła „Inne", bo decyzja
+zastępcza przy awarii zapisuje `OTHER`.
+
+**Zaznaczenie wiersza zostaje szare**, choć makieta kolorowała je pomarańczem.
+Tak rozstrzygnął audyt 0.265.0 i pilnuje tego `Bursztyn.test.ts`.
+
+**Barwy marki pochodzą z pliku logo:** pomarańcz `#FF9100` i grafit `#303030`.
+Logo stoi na białej tabliczce w pasku i na ekranie logowania.
+
 ### 10.3. Oś rozmowy
 
 Oś zawiera wiadomości klienta, odpowiedzi firmy, komentarze wewnętrzne, zmiany

@@ -179,7 +179,7 @@ describe("plakietka należy się WYJĄTKOWI, nie normie", () => {
        ostatniej wiadomości przychodzącej. Jeden fakt, dwa miejsca. */
     pokaz([rozmowa({ status: "waiting_for_us", czekaOdMs: 3 * 3600_000 })]);
     expect(screen.queryByText("Czeka na nas")).not.toBeInTheDocument();
-    expect(screen.getByText(/czeka 3 g 0 min/)).toBeInTheDocument();
+    expect(screen.getByTitle("czeka 3 g")).toBeInTheDocument();
   });
 
   it("„czeka na klienta” NIE dostaje zegara, bo nikt nie czeka", () => {
@@ -218,9 +218,12 @@ describe("plakietka należy się WYJĄTKOWI, nie normie", () => {
 });
 
 describe("wiersz kolejki niesie to, co §10.2 wymienia", () => {
-  it("czas oczekiwania czyta się bez liczenia w głowie", () => {
+  it("czas oczekiwania czyta się bez liczenia w głowie — jedna jednostka i kreski", () => {
+    /* 23 września 2026: minuty przy godzinach odeszły razem z „za dużo tekstu".
+       Kreski mówią „jak bardzo", liczba „ile" — patrz `Czekanie.tsx`. */
     pokaz([rozmowa({ czekaOdMs: 2 * 3600_000 + 14 * 60_000 })]);
-    expect(screen.getByText(/czeka 2 g 14 min/)).toBeInTheDocument();
+    expect(screen.getByTitle("czeka 2 g")).toBeInTheDocument();
+    expect(screen.queryByText(/14 min/)).not.toBeInTheDocument();
   });
 
   it("rozmowa bez pytania klienta nie pokazuje zegara", () => {
@@ -237,8 +240,9 @@ describe("wiersz kolejki niesie to, co §10.2 wymienia", () => {
   /* Nazwa mówi, co ta liczba MIERZY. „Nieprzeczytanych przez agenta" nie
      policzymy — Allegro daje samą flagę wątku — więc ekran tak ich nie nazywa. */
   it("licznik dopisków podpisuje się tym, co liczy", () => {
+    /* Znak i liczba na wierszu, pełne zdanie w dymku i dla czytnika ekranu. */
     pokaz([rozmowa({ nowychOdOdpowiedzi: 3 })]);
-    expect(screen.getByText("3 dopiski klienta")).toBeInTheDocument();
+    expect(screen.getByTitle("3 wiadomości klienta od naszej odpowiedzi")).toHaveTextContent("3");
   });
 
   it("pojedynczy dopisek nie zaśmieca wiersza licznikiem", () => {
@@ -306,7 +310,9 @@ describe("kategorie Copilota w kolejce", () => {
       zKategoria(2, kop("PRODUCT_AVAILABILITY")),
     ]);
     expect(screen.queryByRole("button", { name: /Dostępność 2/ })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Dostępność")).toHaveLength(2);
+    /* Dostępność jest RZADKA, więc stoi słowem przy kaflu — w każdym wierszu. */
+    const wiersze = screen.getAllByRole("button", { name: /Klient/ });
+    expect(wiersze.every((w) => w.textContent?.includes("Dostępność"))).toBe(true);
   });
 });
 
@@ -574,5 +580,20 @@ describe("podziękowanie w kolejce", () => {
     render(<Kolejka rozmowy={[rozmowa({ status: "waiting_for_us", czekaOdMs: 3600_000 })]}
       stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.queryByText("podziękowanie, bez odpowiedzi")).not.toBeInTheDocument();
+  });
+});
+
+/* ── Słownik znaków (23 września 2026) ───────────────────────────────────────
+   Znaki zastąpiły słowa na wierszu, więc ich lista musi stać jedno kliknięcie
+   od kolejki — i otwarcie jej nie może niczego zapisać. */
+describe("słownik znaków pod „?”", () => {
+  it("otwiera się z kolejki i nazywa każdą kategorię", async () => {
+    pokaz([rozmowa()]);
+    await userEvent.click(screen.getByRole("button", { name: "Co znaczą znaki" }));
+    const slownik = screen.getByRole("region", { name: "Co znaczą znaki" });
+    expect(slownik).toHaveTextContent("Dobór");
+    expect(slownik).toHaveTextContent("wymaga człowieka");
+    await userEvent.click(screen.getByRole("button", { name: "Zamknij słownik" }));
+    expect(screen.queryByRole("region", { name: "Co znaczą znaki" })).not.toBeInTheDocument();
   });
 });

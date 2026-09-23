@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Activity, AtSign, BarChart3, BookMarked, Briefcase, ClipboardList, FileText, Inbox, ListChecks, LogOut, MessagesSquare, Settings, ShieldQuestion, Truck, Undo2, Warehouse } from "lucide-react";
+import { Activity, AtSign, BarChart3, BookMarked, Briefcase, ClipboardList, FileText, Inbox, ListChecks, LogOut, MessagesSquare, Settings, ShieldQuestion, Truck, Undo2 } from "lucide-react";
+import logo from "./assets/wertis-logo.png";
 import { BrakSesji, SESJA_WYGASLA, token, wyczyscToken, zglosBrakSesji } from "./api/klient";
 import { useJa, useWzmianki, useZdrowie } from "./api/rozmowy";
 import { BrakDostepu } from "./ekrany/BrakDostepu";
@@ -177,9 +178,13 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
      „WERTIS · Obsługa klienta" wolno ucinać, przyciskom nie. */
   return <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-wertis-ink text-white">
     <div className="flex flex-wrap items-center gap-4 px-5 py-3">
-      <div className="rounded-lg bg-wertis-amber p-2 text-wertis-ink"><Warehouse size={22} /></div>
-      <div className="mr-auto min-w-0"><b>WERTIS</b>
-        {/* kontrast: pasek stoi na #2A2A2C, gdzie slate-400 daje 5.59:1 */}
+      {/* LOGO ZAMIAST IKONY MAGAZYNU (23 września 2026). Znak ma grafitowe
+          litery na przezroczystym tle, więc na grafitowym pasku zniknąłby —
+          stoi na białej tabliczce, tak jak na szyldzie sklepu. */}
+      <span className="rounded-md bg-white px-2 py-1"><img src={logo} alt="WERTIS — sklep z częściami"
+        className="block h-7 w-auto" /></span>
+      <div className="mr-auto min-w-0">
+        {/* kontrast: pasek stoi na #303030, gdzie slate-400 daje 5.14:1 */}
         <span className="ml-2 text-sm text-slate-400">Biuro</span></div>
       <nav className="mr-3 flex rounded-lg bg-white/10 p-1">
         {ZAKLADKI.map((z) => {

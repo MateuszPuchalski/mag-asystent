@@ -95,10 +95,9 @@ describe("towar przy rozmowie", () => {
     expect(screen.getByText("R12-B3")).toBeInTheDocument();
     expect(screen.getByText("5")).toBeInTheDocument();
     expect(screen.getByText("szt.")).toBeInTheDocument();
-    /* Stan i rezerwacje ZOSTAJĄ — tłumaczą tę liczbę, więc schodzą pod nią
-       drobnym drukiem, a nie znikają. */
-    expect(screen.getByText((_, el) => el?.textContent === "stan 7 · rezerwacje 2"))
-      .toBeInTheDocument();
+    /* Stan i rezerwacje ZOSTAJĄ — od 23 września 2026 jako pasek, z liczbami
+       w dymku i dla czytnika ekranu, a nie jako drugie zdanie. */
+    expect(screen.getByTitle("stan 7: 5 wolnych, 2 w rezerwacji")).toBeInTheDocument();
     /* Identyfikatory z opisu (E3) — po nich klient pyta, gdy nie zna naszego symbolu. */
     expect(screen.getByText("181004341/0 · AB-1234")).toBeInTheDocument();
     /* Wskazanie człowieka jest podpisane człowiekiem (§4.3). */
@@ -312,5 +311,19 @@ describe("ceny kartoteki", () => {
     ]);
     expect(screen.getByText("netto —")).toBeInTheDocument();
     expect(screen.queryByText(/netto 0,00/)).toBeNull();
+  });
+});
+
+/* ── Ceny równe co do grosza sklejone (23 września 2026) ─────────────────────
+   Zrzut właściciela: sześć poziomów, pięć takich samych. Grupa zachowuje
+   kolejność Subiekta i nie gubi nazw — stoją w dymku. */
+describe("grupowanie cen", () => {
+  it("skleja równe poziomy, a różny zostawia osobno", async () => {
+    const { grupujCeny } = await import("./TowarRozmowy");
+    const c = (poziom: number, nazwa: string, brutto: number | null, netto: number) =>
+      ({ poziom, nazwa, bruttoGrosze: brutto, nettoGrosze: netto, waluta: "PLN" });
+    const g = grupujCeny([c(0, "", null, 622), c(1, "Detaliczna", 765, 622),
+      c(2, "Hurtowa", 765, 622), c(3, "Specjalna", 765, 622)]);
+    expect(g.map((x) => x.nazwy)).toEqual([["poziom 0"], ["Detaliczna", "Hurtowa", "Specjalna"]]);
   });
 });

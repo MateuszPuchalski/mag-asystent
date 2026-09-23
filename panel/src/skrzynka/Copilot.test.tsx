@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { EtykietaKategorii, PasekCopilota, ZnakCopilota, doRozpoznania } from "./Copilot";
+import { EtykietaKategorii, KafelKategorii, PasekCopilota, ZnakCopilota, doRozpoznania } from "./Copilot";
 import type { Kopilot, Rozmowa, StanCopilota } from "../api/typy";
 
 /* Trzy rzeczy, po których poznaje się, że pasek nadaje się do hali biurowej:
@@ -210,5 +210,27 @@ describe("plakietka i etykieta człowieka", () => {
       brakDanychZamowienia: true, brakDanychProduktu: true })} />);
     expect(screen.getByText("brak zamówienia")).toBeTruthy();
     expect(screen.getByText("brak danych towaru")).toBeTruthy();
+  });
+});
+
+/* ── Kafel kategorii (23 września 2026) ──────────────────────────────────────
+   Znak zamiast słowa na wierszu kolejki. Pilnujemy trzech rzeczy, które łatwo
+   zgubić przy zamianie tekstu na ikonę: nazwy dla czytnika, prośby
+   o człowieka i tego, że nieudane rozpoznanie nie udaje kategorii „Inne". */
+describe("kafel kategorii", () => {
+  it("niesie nazwę i prośbę o człowieka dla czytnika ekranu", () => {
+    render(<KafelKategorii kopilot={kopilot({ kategoria: "PRODUCT_COMPATIBILITY", wymagaCzlowieka: true })} />);
+    expect(screen.getByText("Dobór, wymaga człowieka")).toBeInTheDocument();
+  });
+
+  it("nieudane rozpoznanie mówi „nierozpoznane”, nie „Inne”", () => {
+    render(<KafelKategorii kopilot={kopilot({ kategoria: "OTHER", status: "FAILED", zrodlo: "FALLBACK" })} />);
+    expect(screen.getByText(/nierozpoznane/)).toBeInTheDocument();
+    expect(screen.queryByText(/^Inne/)).not.toBeInTheDocument();
+  });
+
+  it("podziękowanie ma własny znak i nie woła człowieka", () => {
+    render(<KafelKategorii kopilot={kopilot({ kategoria: "OTHER", wymagaCzlowieka: true })} podziekowal />);
+    expect(screen.getByText("podziękowanie, bez odpowiedzi")).toBeInTheDocument();
   });
 });
