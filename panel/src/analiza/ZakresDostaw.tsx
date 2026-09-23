@@ -3,7 +3,7 @@ import type { AnalizaDostaw } from "../api/wglad";
 import { odmien } from "../ui";
 import { Liczba, PasekUdzialu, Slupki } from "../ui/wykres";
 import { dniPl, liczbaPl, zdanieOSzczycie } from "./liczby";
-import { KartaWgladu, Tabela, Td } from "./wspolne";
+import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
 /* ── Zakres DOSTAWY (z `biuro.html`, w panelu od 0.440.0) ────────────────
    Pytanie brzmi „U KOGO SĄ PROBLEMY". Do 0.100.0 biuro odpowiadało na nie

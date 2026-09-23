@@ -21,7 +21,7 @@ import type { PozycjaDecyzji } from "../api/decyzje";
 
 const POZYCJE: PozycjaDecyzji[] = [
   { klucz: "zapis:1", obszar: "magazyn", zrodlo: "zapisy", pytanie: "Ponowić czy anulować zapis do Subiekta?",
-    co: "RP-2201 → R-07-1 · brak stanu", od: "2026-09-21T10:00:00.000Z", pilne: true, cel: { biuro: "nadzor" } },
+    co: "RP-2201 → R-07-1 · brak stanu", od: "2026-09-21T10:00:00.000Z", pilne: true, cel: { panel: "/obsluga/stan?karta=kolejka" } },
   { klucz: "dostawa:802", obszar: "magazyn", zrodlo: "dostawy", pytanie: "Reklamować u dostawcy czy zamknąć wyjątki?",
     co: "FZ 802/MAG/09/2026 · Rosa-Pol · 2 wyjątki", od: "2026-09-20T10:00:00.000Z", pilne: false,
     cel: { panel: "/obsluga/dostawy/802" } },
@@ -71,18 +71,16 @@ describe("DO DECYZJI", () => {
     expect(pytania).toEqual(POZYCJE.map((p) => p.pytanie));
   });
 
-  it("wiersz przeniesionego ekranu to adres panelu, a nieprzeniesionego — most do biura", async () => {
+  it("każdy wiersz prowadzi do ekranu panelu — zapis w błędzie wprost do karty kolejki (0.441.0)", async () => {
+    /* Do 0.441.0 zapis w błędzie prowadził mostem do `/biuro`, na STAN
+       SYSTEMU. Stan przeszedł do panelu, a wiersz trafia wprost do karty,
+       na której rozstrzyga się jego sprawa. */
     pokaz();
     const dostawa = await screen.findByRole("link", { name: /Reklamować u dostawcy/ });
     expect(dostawa).toHaveAttribute("href", "/obsluga/dostawy/802");
     const zapis = screen.getByRole("link", { name: /Ponowić czy anulować/ });
-    expect(zapis).toHaveAttribute("href", "/biuro");
-    /* Most zostawia biuru token i widok — bez tego drugi login przy każdym
-       przejściu. Kliknięcie w teście nie nawiguje (jsdom), zostawia klucze. */
-    zapis.addEventListener("click", (e) => e.preventDefault());
-    await userEvent.click(zapis);
-    expect(localStorage.getItem("wertis.token")).toBe("tok-biura");
-    expect(localStorage.getItem("wertis.widok")).toBe("nadzor");
+    expect(zapis).toHaveAttribute("href", "/obsluga/stan?karta=kolejka");
+    expect(screen.queryAllByRole("link").filter((a) => a.getAttribute("href") === "/biuro")).toEqual([]);
   });
 
   it("sito obszaru zawęża listę i niesie liczniki", async () => {

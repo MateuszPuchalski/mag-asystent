@@ -678,9 +678,8 @@ a przed zapisem nie ma tam pustego pasa po nim.
 Otwórz objaśnienie ikoną „i" przy dowolnej sekcji. Akapity mają mieć odstęp
 między sobą, a po zamknięciu nie zostaje po nich pusta przerwa.
 
-Reszta zakładek zostaje **na kartach**: NADZÓR dalej ma promień, cień i odstęp
-między kartami. To jest osobny wygląd i ma taki zostać. ANALIZA i DZIENNIK
-przeszły do panelu biura.
+Zakładki wglądu — NADZÓR, ANALIZA i DZIENNIK — przeszły do panelu biura,
+gdzie stoją na kartach panelu.
 
 ## Kosze z regału zwrotów
 
@@ -747,14 +746,14 @@ synchronizacji z Subiektem — a nie samego „nie znaleziono".
 
 ### S80 — masowa zmiana lokalizacji z arkusza
 
-Zaloguj się jako **admin** i wejdź w `/biuro` → **STAN SYSTEMU**. Karta
-MASOWA ZMIANA LOKALIZACJI Z ARKUSZA stoi pod kolejką zapisów do Subiekta.
+Zaloguj się jako **admin** i wejdź w `/obsluga/stan`. Karta „Masowa zmiana
+lokalizacji" stoi pod kolejką zapisów do Subiekta. Rola biuro jej nie widzi.
 
 Przygotuj arkusz z eksportu Subiekta. Muszą w nim być kolumny **Symbol**
 i **Lokalizacja** — reszta kolumn nie przeszkadza. Przyjmowany jest plik
 **.xlsx** oraz **.csv**; oba mają dać ten sam wynik.
 
-Kliknij WGRAJ ARKUSZ. Podgląd pokazuje liczby, tabelę **BYŁO → BĘDZIE**
+Kliknij „Wgraj arkusz". Podgląd pokazuje liczby, tabelę **BYŁO → BĘDZIE**
 i dwie listy z nazwami: odrzucone wiersze oraz symbole spoza kartoteki.
 **Do Subiekta nie poszło jeszcze nic** — sprawdź kolejkę wyżej.
 
@@ -766,14 +765,14 @@ Znajdź wiersz, w którym towar ma **kilka adresów** — kolumna BYŁO pokazuje
 po spacji. W kolumnie ZDJĄĆ OBECNE stoją pola wyboru, wszystkie zaznaczone.
 Odznacz jeden kod: ma dopisać się do kolumny BĘDZIE obok adresu z arkusza.
 
-Kliknij ZOSTAW WSZYSTKIE. Wszystkie obecne adresy mają dojść do kolumny BĘDZIE.
-ZDEJMIJ WSZYSTKIE wraca do podmiany całego pola.
+Kliknij „Zostaw wszystkie". Wszystkie obecne adresy mają dojść do kolumny BĘDZIE.
+„Zdejmij wszystkie" wraca do podmiany całego pola.
 
 Sprawdź to na kodzie pisanym **małą literą** (w bazie są takie, na przykład
 `paleta64`). Ma zostać z zachowaną pisownią, a nie zniknąć ani zmienić się na
 wielkie litery.
 
-Kliknij ZASTOSUJ i potwierdź. Kolejka wyżej dostaje tyle zadań, ile obiecywał
+Kliknij Zastosuj, a potem „Zapisz do Subiekta" w pytaniu obok. Kolejka wyżej dostaje tyle zadań, ile obiecywał
 podgląd — po jednym na kartotekę.
 
 Wgraj **ten sam plik** drugi raz, zanim kolejka się wykona. Wszystko ma wpaść

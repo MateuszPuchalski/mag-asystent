@@ -3,7 +3,7 @@ import type { AnalizaAudytu, Metryki } from "../api/wglad";
 import { odmien } from "../ui";
 import { Liczba, PasekUdzialu, Slupki } from "../ui/wykres";
 import { dzienSkrot, liczbaPl, zdanieOSzczycie } from "./liczby";
-import { KartaWgladu, Tabela, Td } from "./wspolne";
+import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
 /* ── Zakres PRACA HALI (z `biuro.html`, w panelu od 0.440.0) ─────────────
    Dawny zakres „Ślad audytowy" — nazwa mówiła, SKĄD są dane, a nie o CZYM.

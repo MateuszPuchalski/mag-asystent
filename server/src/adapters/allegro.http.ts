@@ -635,7 +635,7 @@ export async function zapytajAllegro(
     if (odp.status === 401) {
       throw new BladOdpowiedziAllegro(
         "Allegro odrzuciło token (401) — sparuj konto ponownie: " +
-          "/biuro → STAN SYSTEMU → KONTO ALLEGRO.",
+          "/obsluga → STAN SYSTEMU → KONTO ALLEGRO.",
         401
       );
     }

@@ -23,8 +23,8 @@ każdy do swojej roli:
   bez builda i logowanie loginem — operacje magazynowe wykonuje się wyłącznie
   na kolektorze.
 - **Biuro przechodzi do panelu pod `/obsluga`** (od 0.435.0), widok po
-  widoku. Dostawy, kosze, dziennik i analiza już tam są; w `/biuro` zostały
-  stan systemu i ustawienia.
+  widoku. Dostawy, kosze, dziennik, analiza i stan systemu już tam są;
+  w `/biuro` zostały ustawienia za zębatką.
 
 To **nie jest mock** — działa realny serwer, baza danych, kolejka i worker
 (spec §3, §7, §8). Granica do Subiekta i Sfery jest za adapterami. W tym
@@ -606,8 +606,10 @@ oznacza go pastylką **przyjęcia**, żeby było to widać przed wejściem w ale
   formacie — **PNG, JPG, WEBP albo SVG** — bo przerabia go przeglądarka, zanim
   cokolwiek pojedzie na serwer. Logo wiąże się z identyfikatorem kontrahenta
   z Subiekta, więc przeżywa poprawkę nazwy. Bez konfiguracji: działa od razu.
-- **STAN SYSTEMU** — kolejka zapisów, rekoncyliacja na żądanie z eksportem
-  CSV, kolizje kodów, czas wymiany z halą i meldunek serwera.
+- **STAN SYSTEMU ↗** przeszedł w 0.441.0 do panelu biura
+  (`/obsluga/stan`). Są tam kolejka zapisów z PONÓW/ANULUJ, masowa zmiana
+  lokalizacji z arkusza (admin), kolizje kodów i rekoncyliacja na żądanie.
+  Obok stoją czas wymiany z halą, stan integracji, konto Allegro i serwer.
 - **DZIENNIK ↗ i ANALIZA ↗** przeszły w 0.440.0 do panelu biura
   (`/obsluga/dziennik`, `/obsluga/analiza`). Dziennik to ślad audytowy
   z filtrami po dacie, typie, osobie, towarze i urządzeniu, filtrujący od

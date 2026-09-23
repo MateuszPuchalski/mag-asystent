@@ -44,11 +44,13 @@ export type ZrodloDecyzji =
   | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje";
 
 /**
- * Dokąd prowadzi wiersz. Ekran, który już przeszedł do panelu, ma adres
- * panelu; ten, który jeszcze mieszka w biurze, ma nazwę jego widoku — panel
- * otwiera go mostem, tak jak drugi rząd nagłówka.
+ * Dokąd prowadzi wiersz — adres w panelu. Do 0.441.0 był tu też wariant
+ * `{ biuro: "nadzor" }` dla stanu systemu, który mieszkał jeszcze w biurze;
+ * przeszedł, a razem z nim zniknął ostatni wiersz prowadzący poza panel.
+ * Stan systemu dostaje w adresie KARTĘ, bo wiersz ma trafić tam, gdzie
+ * rozstrzyga się jego sprawa, a nie na górę ekranu.
  */
-export type CelDecyzji = { panel: string } | { biuro: "nadzor" };
+export type CelDecyzji = { panel: string };
 
 export interface PozycjaDecyzji {
   /** Stały klucz wiersza — ta sama sprawa ma ten sam klucz w każdym odczycie. */
@@ -192,7 +194,7 @@ function zapisyWBledzie(): PozycjaDecyzji[] {
     co: [w.label || w.type, w.error_msg].filter(Boolean).join(" · "),
     od: w.created_at,
     pilne: true,
-    cel: { biuro: "nadzor" as const },
+    cel: { panel: "/obsluga/stan?karta=kolejka" },
   }));
 }
 
@@ -216,7 +218,7 @@ function kodyKreskowe(): PozycjaDecyzji[] {
         ile(k.hits, "zatrzymanie", "zatrzymania", "zatrzymań")}`,
       od: k.lastSeen,
       pilne: false,
-      cel: { biuro: "nadzor" as const },
+      cel: { panel: "/obsluga/stan?karta=kody" },
     }));
 }
 
@@ -232,7 +234,7 @@ function kontoAllegro(): PozycjaDecyzji[] {
       : "Token z innego środowiska niż ustawione",
     od: null,
     pilne: true,
-    cel: { biuro: "nadzor" },
+    cel: { panel: "/obsluga/stan?karta=allegro" },
   }];
 }
 

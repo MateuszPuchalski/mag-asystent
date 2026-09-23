@@ -24,7 +24,7 @@ const EKRANY = ["/obsluga/", "/obsluga/skrzynka", "/obsluga/skrzynka/4821",
   /* 0.435.0: dostawa po numerze dokumentu, Zadania pod własnym adresem
      i druk protokołu — link do nich wklejony koledze ma otworzyć panel. */
   "/obsluga/zadania", "/obsluga/dostawy", "/obsluga/dostawy/802", "/obsluga/druk/protokol/802",
-  "/obsluga/dziennik", "/obsluga/analiza"];
+  "/obsluga/dziennik", "/obsluga/analiza", "/obsluga/stan"];
 
 test("każdy ekran panelu odpowiada tak samo jak jego korzeń", async () => {
   const odpowiedzi = [];

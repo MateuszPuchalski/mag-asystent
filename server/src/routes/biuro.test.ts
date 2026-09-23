@@ -179,8 +179,14 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"POST"/g) ?? []).length,
-    10,
-    "Licznik SPADŁ z 11 do 10 w 0.440.0: ANALIZA przeszła do panelu, a z nią " +
+    4,
+    "Licznik SPADŁ z 10 do 4 w 0.441.0: STAN SYSTEMU przeszedł do panelu, " +
+      "a z nim sześć zapisów — PONÓW/ANULUJ kolejki Sfery, decyzja o kolizji " +
+      "kodu, RESYNC, odświeżenie zdjęć, parowanie Allegro i masowa zmiana " +
+      "lokalizacji z arkusza. Te same trasy woła `panel/src/api/stan.ts`, a zero " +
+      "zapisu przy patrzeniu pilnuje `ekrany/Stan.test.tsx`. Zostały: " +
+      "logowanie i trzy mutacje kont admina w ustawieniach.\n\n" +
+      "Licznik SPADŁ z 11 do 10 w 0.440.0: ANALIZA przeszła do panelu, a z nią " +
       "import zbiórek strefy złotej. Ta sama trasa, to samo `{ csv }` — woła ją " +
       "teraz `analiza/Strefa.tsx`, a jedyność tego zapisu przy patrzeniu " +
       "pilnuje `ekrany/Analiza.test.tsx`. DZIENNIK nie zapisywał niczego, więc " +
@@ -235,9 +241,9 @@ test("strona biura zapisuje TYLKO wyliczone rzeczy", () => {
   );
   assert.equal(
     (html.match(/method:\s*"DELETE"/g) ?? []).length,
-    2,
-    "DELETE zostały dwa: rozłączenie konta Allegro (za potwierdzeniem, rola " +
-      "admin) i skasowanie logo dostawcy z ustawień."
+    1,
+    "DELETE został jeden: skasowanie logo dostawcy z ustawień. Rozłączenie " +
+      "konta Allegro przeszło w 0.441.0 do stanu systemu w panelu."
   );
   /* Jedna strona, jeden <script> — więc dwie funkcje o tej samej nazwie nie
      są kolizją teoretyczną, tylko cichym przesłonięciem. Tak zniknęła lista
@@ -491,9 +497,11 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const widoki = [...nav.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]);
   assert.deepEqual(
     widoki,
-    ["nadzor"],
-    "Od 0.440.0 także ANALIZA i DZIENNIK prowadzą do panelu — zakładką tej " +
-      "strony został sam STAN SYSTEMU. " +
+    [],
+    "Od 0.441.0 pasek nie niesie ANI JEDNEJ zakładki tej strony — STAN " +
+      "SYSTEMU poszedł ostatni. Każda pozycja to wyjście do panelu (`data-panel`), " +
+      "a jedynym widokiem strony są ustawienia za zębatką. " +
+      "Od 0.440.0 ANALIZA i DZIENNIK prowadzą do panelu. " +
       "Od 0.435.0 DOSTAWY, a od 0.438.0 MAGAZYN ZWROTÓW nie są już zakładkami " +
       "tej strony — prowadzą do panelu (`data-panel`), sprawdzane niżej. " +
       "Pasek boczny po 0.140.0: SPRAWY i REJESTRY odeszły razem z obsługą " +
@@ -523,6 +531,7 @@ test("pasek niesie tylko pracę — ustawienia siedzą za zębatką", () => {
   const wglad = [...nav.matchAll(/<div class="grupa-btny">([\s\S]*?)<\/div>/g)][1]?.[1] ?? "";
   assert.match(wglad, /data-panel="\/obsluga\/analiza"/, "ANALIZA prowadzi do panelu z grupy Wgląd (0.440.0)");
   assert.match(wglad, /data-panel="\/obsluga\/dziennik"/, "DZIENNIK prowadzi do panelu z grupy Wgląd (0.440.0)");
+  assert.match(wglad, /data-panel="\/obsluga\/stan"/, "STAN SYSTEMU prowadzi do panelu z grupy Wgląd (0.441.0)");
 
   assert.equal(
     (nav.match(/class="grupa-nazwa"/g) ?? []).length,
@@ -658,9 +667,9 @@ test("żądania BEZ CIAŁA nie deklarują typu treści", () => {
 
   // wywołania bez ciała, które ta reguła utrzymuje przy życiu
   /* Do 0.435.0 stało tu przywrócenie dostawy, do 0.438.0 przeliczenie
-     kosza — oba odeszły do panelu, który ma własnego strażnika tej reguły
-     (`panel/src/api/klient.test.ts`). Zostały dwa wywołania bez ciała. */
-  assert.match(html, /"\/api\/biuro\/allegro",\s*\{\s*method:\s*"DELETE"/);
+     kosza, do 0.441.0 rozłączenie konta Allegro — odeszły do panelu,
+     który ma własnego strażnika tej reguły (`panel/src/api/klient.test.ts`).
+     Zostało jedno wywołanie bez ciała. */
   assert.match(html, /dostawcy\/\$\{khId\}\/logo`,\s*\{\s*method:\s*"DELETE"/);
 });
 
@@ -902,31 +911,25 @@ test("dostawy odeszły do panelu razem ze swoimi strażnikami (0.435.0)", () => 
 });
 
 test("filtr stoi w pasku wtedy i tylko wtedy, gdy rządzi całą zakładką", () => {
-  /* Od 0.94.0 zakładki wglądu mają jedną strefę i pasek filtrów. PASEK NAD
-     KARTAMI OBIECUJE, ŻE RZĄDZI CAŁYM WIDOKIEM. Przy dzienniku i analizie to
-     była prawda — i obie przeszły w 0.440.0 do panelu, gdzie filtry stoją
-     w rzędzie nad kartami (`ekrany/Dziennik.tsx`, `ekrany/Analiza.tsx`).
+  /* Od 0.94.0 reguła wglądu brzmi: PASEK NAD KARTAMI OBIECUJE, ŻE RZĄDZI
+     CAŁYM WIDOKIEM. Dziennik i analiza (0.440.0) oraz stan systemu
+     (0.441.0) przeszły do panelu i reguła przeszła z nimi — ten test
+     czyta teraz ich źródła.
 
-     Przy stanie systemu prawdą to NIE jest: kolejka zapisów, kolizje kodów
-     i stan serwera mówią o TERAZ i żaden zakres dni ich nie rusza. Dlatego
-     STAN SYSTEMU paska nie ma, a jedyne OKNO — od 0.440.0 tabeli wymiany,
-     bo metryki odeszły do analizy — siedzi w swojej karcie. Wyniesienie go
-     „dla spójności" byłoby regresją, która nie wygląda na regresję. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /id="widokNadzor" class="widok wglad"/, "STAN SYSTEMU jest zakładką wglądu, nie pracy");
-  for (const w of ["widokDziennik", "widokAnaliza"]) {
+     Przy stanie systemu pasek byłby kłamstwem: kolejka zapisów, kolizje kodów
+     i serwer mówią o TERAZ i żaden zakres dni ich nie rusza. Jedyne okno
+     należy do tabeli wymiany i stoi w JEJ karcie. Wyniesienie go „dla
+     spójności" byłoby regresją, która nie wygląda na regresję. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  for (const w of ["widokNadzor", "widokDziennik", "widokAnaliza"]) {
     assert.ok(!html.includes(`id="${w}"`), `${w} przeszedł do panelu i nie wraca`);
   }
-  const a = html.indexOf('id="widokNadzor"');
-  const nadzor = html.slice(a, html.indexOf('id="widokDostawcy"', a));
-  assert.ok(!nadzor.includes("pasekFiltrow"),
-    "STAN SYSTEMU nie ma paska — nie ma filtra, który rządziłby całą zakładką");
-  const wymiana = nadzor.slice(nadzor.indexOf('id="kartaWymiany"'));
-  assert.ok(wymiana.slice(0, wymiana.indexOf("</section>")).includes('id="dniWymiany"'),
-    "OKNO tabeli wymiany stoi w jej karcie");
+  const panel = (plik: string) => fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src", plik), "utf8");
+  assert.doesNotMatch(panel("ekrany/Stan.tsx"), /FiltrSegmentowy/,
+    "stan systemu nie ma paska filtrów — nie ma filtra, który rządziłby całą zakładką");
+  assert.match(panel("stan/Wymiana.tsx"), /akcje=\{<div role="group" aria-label="Okno tabeli wymiany"/,
+    "okno tabeli wymiany stoi w nagłówku JEJ karty");
 });
 
 test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
@@ -943,7 +946,10 @@ test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
   /* Dziewięć od 0.440.0: DZIENNIK i STREFA ZŁOTA zabrały swoje objaśnienia
      do panelu, gdzie zdanie „jak czytać tę liczbę" stoi jawnie pod nagłówkiem
      karty (`analiza/wspolne.tsx`), zamiast za ikoną. */
-  assert.ok(ikony.length >= 9, `ikon objaśnień: ${ikony.length}`);
+  /* Cztery od 0.441.0: stan systemu zabrał do panelu pięć kart z ikoną,
+     a panel pisze zdanie „jak czytać tę kartę" jawnie pod nagłówkiem. Zostały
+     objaśnienia ustawień. */
+  assert.ok(ikony.length >= 4, `ikon objaśnień: ${ikony.length}`);
   assert.equal(ikony.length, bloki.length, "każda ikona ma swój blok");
   assert.match(
     html,
@@ -955,42 +961,39 @@ test("objaśnienie karty ma ikonę, a ikona ma objaśnienie", () => {
 
 test("parowanie Allegro nie wygląda jak robot (0.106.0)", () => {
   /* Endpoint parowania stoi na apeksie allegro.pl — tym samym hoście co
-     sklep — więc to jedyne odpytywanie z tej strony, które widzi anti-bot
-     Allegro. Blokada adresu IP w sierpniu 2026 przyszła dokładnie w trakcie
-     parowania. Trzy rzeczy mają tu zostać: JEDNA pętla zamiast wielu (drugi
-     klik POŁĄCZ nie startuje kolejnej), rytm dyktowany przez serwer zamiast
-     sztywnych trzech sekund, i jawne wyjście z czekania. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /if \(parowanieTrwa\) return;/, "drugi klik nie startuje drugiej pętli");
-  assert.match(html, /d\.nastepnyPollMs \?\? 5000/, "rytm odpytywania dyktuje serwer");
-  assert.ok(
-    !/setTimeout\(pollParowania,\s*3000\)/.test(html),
-    "sztywne 3 s wróciły — to one zbudowały ślad maszyny"
-  );
-  assert.match(html, /id="allegroPrzerwij"/, "czekanie da się przerwać bez przeładowania strony");
-  assert.match(html, /stronę blokady/, "panel mówi, co zrobić, gdy Allegro zablokuje adres");
+     sklep — więc to jedyne odpytywanie, które widzi anti-bot Allegro.
+     Blokada adresu IP w sierpniu 2026 przyszła dokładnie w trakcie parowania.
+
+     Od 0.441.0 parowanie mieszka w panelu (`panel/src/stan/parowanie.ts`)
+     i tam ZACHOWANIE sprawdza `ekrany/Stan.test.tsx`: jedna pętla, rytm
+     serwera, PRZERWIJ bez żądania. Ten test pilnuje dwóch rzeczy, których
+     test zachowania nie widzi: że biuro nie ma DRUGIEJ pętli, i że zdanie
+     o stronie blokady przeszło razem z kartą. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  assert.doesNotMatch(html, /allegro\/parowanie/, "drugiej pętli parowania w biurze być nie może");
+  const panel = (plik: string) => fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src", plik), "utf8");
+  assert.match(panel("stan/parowanie.ts"), /d\.nastepnyPollMs \?\? 5000/, "rytm odpytywania dyktuje serwer");
+  assert.match(panel("stan/parowanie.ts"), /if \(trwa\.current\) return;/, "drugi klik nie startuje drugiej pętli");
+  assert.match(panel("stan/Allegro.tsx"), /stronę blokady/, "karta mówi, co zrobić, gdy Allegro zablokuje adres");
 });
 
 test("panel naprawia, nie tylko patrzy: kolejka, ratunek serwera, konta (0.111.0)", () => {
   /* Miejsce, w którym problem widać, musi być miejscem, w którym da się go
-     naprawić. Kolejka błędów dostała PONÓW/ANULUJ (te same trasy co
-     kolektor), karta SERWER dwie operacje ratunkowe zza DEPLOY.md, a karta
-     KONTA I SESJE kładzie kres administrowaniu kontami przez curl. Odmowę
-     roli wypowiada serwer (konwencja ustawień) — panel roli nie zna. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.match(html, /data-kolejka-ponow/, "błąd kolejki ponawia się z panelu");
-  assert.match(html, /data-kolejka-anuluj/, "oczekujące zadanie da się anulować");
-  assert.match(html, /id="serwerResync"/, "resync zszedł z DEPLOY.md na przycisk");
-  assert.match(html, /id="serwerZdjecia"/, "odświeżenie zdjęć też");
+     naprawić. Kolejka błędów dostała PONÓW/ANULUJ, karta SERWER dwie operacje
+     ratunkowe zza DEPLOY.md, a karta KONTA I SESJE kładzie kres
+     administrowaniu kontami przez curl.
+
+     Od 0.441.0 kolejka i serwer mieszkają w stanie systemu panelu — test
+     czyta tamte źródła, a zachowanie (PONÓW bez pytania, ANULUJ za
+     potwierdzeniem) sprawdza `ekrany/Stan.test.tsx`. Konta zostały tutaj. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  const stan = fs.readFileSync(path.resolve(import.meta.dirname, "../../../panel/src/api/stan.ts"), "utf8");
+  assert.match(stan, /\/api\/queue\/\$\{id\}\/\$\{ruch\}/, "błąd kolejki ponawia się i anuluje z panelu");
+  assert.match(stan, /\/api\/admin\/resync/, "resync zszedł z DEPLOY.md na przycisk");
+  assert.match(stan, /\/api\/admin\/zdjecia\/odswiez/, "odświeżenie zdjęć też");
   assert.match(html, /id="kontaKarta"/, "karta kont w ustawieniach");
   assert.match(html, /data-konto-wyloguj/, "zgubiony kolektor ma swój przycisk");
-  assert.match(html, /\$\("widokNadzor"\)\.addEventListener\("click"/, "nadzór deleguje z sekcji");
   assert.match(html, /\$\("kontaKarta"\)\.addEventListener\("click"/, "konta delegują z sekcji");
   /* Dziennik przeszedł do panelu (0.440.0) razem z filtrem osoby. */
   const dziennik = fs.readFileSync(
@@ -1015,24 +1018,12 @@ test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", ()
     "utf8"
   );
 
-  // 1. `brak` przestał być `czekam`: kończy pętlę i oddaje guzik.
-  assert.ok(
-    !html.includes('d.stan === "czekam" || d.stan === "brak"'),
-    "`brak` nie może kręcić pętli odpytywania jak `czekam`"
-  );
-  /* Kotwica na samej pętli — `d.stan === "brak"` pada w skrypcie także przy
-     rysowaniu tickera, a tam wolno mu znaczyć co innego. */
-  const poll = html.slice(html.indexOf("async function pollParowania"));
-  const galazBrak = poll.slice(
-    poll.indexOf('d.stan === "brak"'),
-    poll.indexOf('d.stan === "polaczone"')
-  );
-  assert.match(galazBrak, /SESJA PAROWANIA PRZEPADŁA/, "panel mówi, co się stało");
-  assert.match(galazBrak, /data-polacz/, "guzik POŁĄCZ wraca od razu, bez przeładowania");
-  assert.ok(
-    !/setTimeout\(pollParowania/.test(galazBrak),
-    "po `brak` nie ma czego odpytywać — sesji na serwerze już nie ma"
-  );
+  /* 1. `brak` kończy pętlę i oddaje guzik — od 0.441.0 w panelu,
+     sprawdzane zachowaniem w `ekrany/Stan.test.tsx`. */
+  const parowanie = fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src/stan/parowanie.ts"), "utf8");
+  assert.ok(!parowanie.includes('d.stan === "czekam" || d.stan === "brak"'),
+    "`brak` nie może kręcić pętli odpytywania jak `czekam`");
 
   // 2. Dwie ikony w pasku, każda z natywnym tooltipem i nawigacją z sekcji.
   assert.match(html, /id="ikonaZdrowia"/, "zdrowie systemu to jedna ikona, nie rząd kafli");
@@ -1056,8 +1047,14 @@ test("pasek to dwie ikony z tooltipem, a `brak` kończy parowanie (0.114.0)", ()
      w starym domu byłaby kolejną odsłoną usterki z 0.92.0, 0.96.0, 0.97.0,
      0.98.0 i 0.101.0 — tym razem głośną: starego domu nie ma, `$(…)`/
      `querySelector` oddaje `null` i wywala cały skrypt przy starcie. */
-  assert.match(html, /\$\("bok"\)\.addEventListener\("click"/,
-    "stan deleguje z paska bocznego — stamtąd, gdzie stoją ikony");
+  /* Od 0.441.0 ikony i plakietki prowadzą do panelu przez `data-panel`,
+     obsługiwany delegacją na DOKUMENCIE — przeżywa każde przerysowanie
+     i każdą przeprowadzkę ikon, bo nie wisi na żadnym ich domu. */
+  for (const id of ["ikonaZdrowia", "ikonaAllegro"]) {
+    assert.match(html, new RegExp(`id="${id}" data-panel="/obsluga/stan`), `${id} prowadzi do stanu systemu w panelu`);
+  }
+  assert.match(html, /document\.addEventListener\("click", \(e\) => \{\s*const b = e\.target\.closest\("\[data-panel\]"\)/,
+    "wyjścia do panelu delegują z dokumentu");
   assert.ok(!/\$\("chrome"\)/.test(html), "nic już nie sięga po nieistniejący #chrome");
   assert.ok(!/querySelector\("header"\)/.test(html),
     "nic już nie sięga po nieistniejący nagłówek");
@@ -1107,18 +1104,28 @@ test("żaden komunikat nie odsyła do zakładki, której nie ma", () => {
   };
   zbierz(path.resolve(import.meta.dirname, ".."));
 
+  /* Od 0.441.0 komunikaty prowadzą także do PANELU (`/obsluga → STAN
+     SYSTEMU → …`) — stan systemu przeszedł tam ostatni z wglądu. Nazwy
+     zakładek panelu stoją w `main.tsx` jako `etykieta`, w obu rzędach
+     nagłówka. Ta sama reguła: pierwszy człon musi być zakładką, która jest. */
+  const rama = fs.readFileSync(path.resolve(import.meta.dirname, "../../../panel/src/main.tsx"), "utf8");
+  const wPanelu = new Set([...rama.matchAll(/etykieta: "([^"]+)"/g)].map((m) => m[1].toUpperCase()));
+
   let znalezione = 0;
   for (const plik of pliki) {
     const tekst = fs.readFileSync(plik, "utf8");
     /* Człon zapisany WIELKIMI literami — tak wyglądają nazwy zakładek na
        pasku. Małe litery („/biuro → zębatka") opisują drogę, nie zakładkę. */
-    for (const m of tekst.matchAll(/\/biuro\s*→\s*([A-ZĄĆĘŁŃÓŚŹŻ][A-ZĄĆĘŁŃÓŚŹŻ ]*)/g)) {
-      znalezione++;
-      const cel = m[1].trim();
-      assert.ok(
-        dozwolone.has(cel),
-        `${path.basename(plik)} odsyła do „${cel}", a pasek zna: ${[...dozwolone].join(", ")}`
-      );
+    for (const [wzor, znane, gdzie] of [
+      [/\/biuro\s*→\s*([A-ZĄĆĘŁŃÓŚŹŻ][A-ZĄĆĘŁŃÓŚŹŻ ]*)/g, dozwolone, "pasek biura"],
+      [/\/obsluga\s*→\s*([A-ZĄĆĘŁŃÓŚŹŻ][A-ZĄĆĘŁŃÓŚŹŻ ]*)/g, wPanelu, "nagłówek panelu"],
+    ] as Array<[RegExp, Set<string>, string]>) {
+      for (const m of tekst.matchAll(wzor)) {
+        znalezione++;
+        const cel = m[1].trim();
+        assert.ok(znane.has(cel),
+          `${path.basename(plik)} odsyła do „${cel}", a ${gdzie} zna: ${[...znane].join(", ")}`);
+      }
     }
   }
   assert.ok(znalezione >= 5, "wzorzec przestał cokolwiek znajdować — test pilnowałby pustki");
@@ -1178,14 +1185,15 @@ test("spóźniona sprawa ma własną plakietkę i drogę do treści (0.364.0)", 
         mówi: widać, co czeka najdłużej, BEZ PYTANIA KOGOKOLWIEK. Sygnał
         pobierany dopiero po wejściu na STAN SYSTEMU odpowiadałby wyłącznie
         temu, kto już poszedł sprawdzić — czyli nikomu, kto go potrzebuje. */
-  const liczniki = html.slice(
-    html.indexOf("async function odswiezLiczniki()"),
-    html.indexOf("async function odswiezEtap3()")
-  );
+  /* Wycinek do końca funkcji, nie do `odswiezEtap3()`: takiej funkcji nie
+     ma od dawna, `indexOf` oddawał -1 i wycinek sięgał końca pliku — test
+     przechodził na czymkolwiek, co stało dalej. */
+  const odLicznikow = html.indexOf("async function odswiezLiczniki()");
+  const liczniki = html.slice(odLicznikow, html.indexOf("\n}\n", odLicznikow));
   assert.match(liczniki, /\/api\/biuro\/alarm-wymiany/,
     "alarm pobiera się w cyklu, a cykl chodzi na każdej zakładce");
 
-  /* 2. OKNO ALARMU JEST STAŁE. Suwak `dniMetryk` rządzi tabelą; plakietka
+  /* 2. OKNO ALARMU JEST STAŁE. Suwak przy tabeli rządzi tabelą; plakietka
         w nagłówku ma znaczyć jedno, niezależnie od tego, co ktoś wybrał. */
   assert.ok(
     !/alarm-wymiany\?dni=/.test(html),
@@ -1194,9 +1202,14 @@ test("spóźniona sprawa ma własną plakietkę i drogę do treści (0.364.0)", 
 
   /* 3. PLAKIETKA MA DROGĘ DO TREŚCI. Zgłoszenie z 20 sierpnia: sygnał bez
         drogi do treści jest sygnałem zgubionym. */
-  assert.match(html, /data-do="nadzor" data-cel="kartaWymiany"/,
+  /* Od 0.441.0 tabela mieszka w stanie systemu PANELU, a plakietka
+     prowadzi wprost do jej karty. */
+  assert.match(html, /data-panel="\/obsluga\/stan\?karta=wymiana"/,
     "plakietka prowadzi na tabelę, która ją wyjaśnia");
-  assert.match(html, /id="kartaWymiany"/, "cel skoku istnieje");
+  const wymiana = fs.readFileSync(path.resolve(import.meta.dirname, "../../../panel/src/stan/Wymiana.tsx"), "utf8");
+  assert.match(wymiana, /id="karta-wymiana"/, "cel skoku istnieje");
+  const alarmWPanelu = fs.readFileSync(path.resolve(import.meta.dirname, "../../../panel/src/api/stan.ts"), "utf8");
+  assert.ok(!/alarm-wymiany\?dni=/.test(alarmWPanelu), "panel też bierze alarm z okna stałego");
 
   /* 4. SPÓŹNIENIE NIE BARWI IKONY ZDROWIA. Ikona odpowiada na pytanie „czy
         system działa". Sprawa stojąca trzeci dzień to zdrowy system i
@@ -1216,22 +1229,21 @@ test("spóźniona sprawa ma własną plakietkę i drogę do treści (0.364.0)", 
 test("awaria najmłodszej tabeli nie wywraca dwóch starszych (0.364.0)", () => {
   /* Blizna z 0.361.0: `.catch` stał za `.json()`, a `api()` rzuca przy każdej
      odpowiedzi spoza 2xx — czyli PRZED `.json()`. Zabezpieczenie nie łapało
-     więc niczego, co naprawdę pada, i 500 z najmłodszej trasy zabierało
-     z ekranu metryki oraz kolizje kodów. */
-  const html = fs.readFileSync(
-    path.resolve(import.meta.dirname, "../web/biuro.html"),
-    "utf8"
-  );
-  assert.ok(
-    !/\)\)\.json\(\)\s*\.catch\(/.test(html),
-    "`.catch` za samym `.json()` nie łapie odmowy trasy — ma stać na całym łańcuchu"
-  );
-  const miara = html.slice(html.indexOf("api(`/api/biuro/wymiana?dni="));
-  assert.match(
-    miara.slice(0, 200),
-    /\.then\(\(r\) => r\.json\(\)\)\s*\.catch\(/,
-    "miara ma własne zabezpieczenie na całym łańcuchu, nie za `.json()`"
-  );
+     niczego, co naprawdę pada, i 500 z najmłodszej trasy zabierało z ekranu
+     metryki oraz kolizje kodów, bo trzy tabele czytał JEDEN `Promise.all`.
+
+     Od 0.441.0 tabele stoją w panelu i każda ma WŁASNE zapytanie — awaria
+     jednej nie ma jak dotknąć drugiej, bo nic ich nie łączy. Test pilnuje tej
+     rozłączności w źródle, a w biurze — reguły łańcucha tam, gdzie zostały
+     jeszcze odczyty z `.catch`. */
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  assert.ok(!/\)\)\.json\(\)\s*\.catch\(/.test(html),
+    "`.catch` za samym `.json()` nie łapie odmowy trasy — ma stać na całym łańcuchu");
+  const panel = (plik: string) => fs.readFileSync(
+    path.resolve(import.meta.dirname, "../../../panel/src", plik), "utf8");
+  assert.doesNotMatch(panel("ekrany/Stan.tsx"), /Promise\.all/, "karty stanu nie czytają się jednym łańcuchem");
+  assert.match(panel("stan/Wymiana.tsx"), /useWymiana\(dni\)/, "tabela wymiany ma własne zapytanie");
+  assert.match(panel("stan/Kolizje.tsx"), /useKolizje\(\)/, "kolizje mają własne zapytanie");
 });
 
 /* ── Ikona karty przeglądarki (0.419.0) ──────────────────────────────────────
@@ -1330,24 +1342,24 @@ test("każda karta panelu stoi wewnątrz swojego widoku (0.427.0)", () => {
 });
 
 test("STAN SYSTEMU zaczyna od tego, co czeka na biuro (0.427.0)", () => {
-  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
-  const nadzor = html.slice(html.indexOf('id="widokNadzor"'), html.indexOf('id="widokDostawcy"'));
-  const poz = (id: string) => {
-    const i = nadzor.indexOf(`id="${id}"`);
-    assert.ok(i >= 0, `${id} jest w STANIE SYSTEMU`);
+  /* Od 0.441.0 stan systemu stoi w panelu (`ekrany/Stan.tsx`) i test czyta
+     tamtą kolejność kart. Najpierw rzeczy, które czekają na ruch biura, potem
+     rzeczy do czytania. Powód każdego przestawienia stoi w komentarzu ekranu. */
+  const stan = fs.readFileSync(path.resolve(import.meta.dirname, "../../../panel/src/ekrany/Stan.tsx"), "utf8");
+  const karty = stan.slice(stan.indexOf("return <div"));
+  const poz = (znacznik: string) => {
+    const i = karty.indexOf(`<${znacznik}`);
+    assert.ok(i >= 0, `${znacznik} jest w STANIE SYSTEMU`);
     return i;
   };
-  // Najpierw rzeczy z przyciskiem do naciśnięcia, potem rzeczy do czytania.
-  assert.ok(poz("kolejka") < poz("rozjazdy"), "kolejka zapisów przed rekoncyliacją");
-  assert.ok(poz("rozjazdy") < poz("kolizje"), "rekoncyliacja przed kolizjami");
-  /* Metryki odeszły do analizy panelu (0.440.0); czytaną kartą po
-     kolizjach jest teraz tabela wymiany z halą. */
-  assert.ok(poz("kolizje") < poz("kartaWymiany"), "kolizje przed tabelą wymiany");
-  // Arkusz zostaje pod kolejką — ta kolejka wykonuje jego skutek (0.138.0).
-  assert.ok(poz("kolejka") < poz("arkuszLokalizacjiKarta") &&
-    poz("arkuszLokalizacjiKarta") < poz("rozjazdy"), "arkusz tuż pod kolejką");
-  assert.match(nadzor, /<details class="card zwijana" id="kontoAllegroKarta">/,
-    "konto Allegro jest kartą, nie gołą sekcją na papierze");
+  assert.ok(poz("KartaKolejki") < poz("KartaArkusza"), "arkusz tuż pod kolejką — ta kolejka wykonuje jego skutek");
+  assert.ok(poz("KartaArkusza") < poz("KartaKolizji"), "kolizje po arkuszu");
+  assert.ok(poz("KartaKolizji") < poz("KartaRekoncyliacji"), "decyzja o kolizji przed sprawdzeniem na żądanie");
+  assert.ok(poz("KartaRekoncyliacji") < poz("KartaWymiany"), "czytana tabela wymiany po kartach z przyciskiem");
+  assert.ok(poz("KartaWymiany") < poz("StanIntegracji") && poz("StanIntegracji") < poz("KartaSerwera"),
+    "tło integracji i serwer na końcu");
+  const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
+  assert.ok(!html.includes('id="widokNadzor"'), "STAN SYSTEMU przeszedł do panelu i nie wraca");
 });
 
 test("błąd w dymku zostaje do kliknięcia (0.427.0)", () => {
@@ -1363,13 +1375,13 @@ test("błąd w dymku zostaje do kliknięcia (0.427.0)", () => {
   assert.doesNotMatch(html, /toast\((e|bl|err)\.message\)/, "błąd z catch pokazany jak potwierdzenie");
 });
 
-test("zapamiętany widok, którego nie ma, wraca na STAN SYSTEMU (0.427.0, 0.438.0)", () => {
+test("zapamiętany widok, którego nie ma, wraca na USTAWIENIA (0.427.0, 0.441.0)", () => {
   const html = fs.readFileSync(path.resolve(import.meta.dirname, "../web/biuro.html"), "utf8");
   assert.doesNotMatch(html, /widok = "sprawy"/, "mapa na SPRAWY prowadziła w pusty panel");
-  /* „dostawy" w pamięci przeglądarki to ślad sprzed 0.435.0 — widok przeszedł
-     do panelu, a w 0.438.0 poszedł za nimi MAGAZYN. Strażnik kieruje na
-     STAN SYSTEMU — tam prowadzą wiersze DO DECYZJI, które jeszcze tu mieszkają. */
-  const lista = html.match(/if \(!\[([^\]]+)\]\.includes\(widok\)\) widok = "nadzor";/);
+  /* Każdy widok pracy i wglądu przeszedł do panelu; STAN SYSTEMU poszedł
+     ostatni (0.441.0). Zapamiętana nazwa któregokolwiek z nich wraca na
+     USTAWIENIA za zębatką — jedyny widok, który tu został. */
+  const lista = html.match(/if \(!\[([^\]]+)\]\.includes\(widok\)\) widok = "dostawcy";/);
   assert.ok(lista, "strażnik zapamiętanego widoku istnieje");
   const nazwy = [...lista[1].matchAll(/"(\w+)"/g)].map((m) => m[1]);
   const zPaska = [...new Set([...html.matchAll(/data-widok="(\w+)"/g)].map((m) => m[1]))];
