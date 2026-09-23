@@ -422,7 +422,7 @@ public sealed class SferaComAdapter : ISferaAdapter
                 $"rodzaj zwrotu 1, skutek magazynowy {skutek}, wierszy {ile}. " +
                 "Tę samą odmowę pokaże sonda BEZ zapisu: sonda.ps1 -PlikEnv C:\\wertis\\wertis.env " +
                 $"-SzkicZW -Paragon {z.DokId} -Towary \"{towary}\" -Sprawdz";
-            ZapiszZeSzczegolami((object)zw, "ZW", stan);
+            ZapiszZeSzczegolami((object)zw, "ZW", stan, zrzutPol: true);
             return Krok("ZW.NumerPelny", 6, () => (string)zw.NumerPelny);
         }
         finally
@@ -484,7 +484,8 @@ public sealed class SferaComAdapter : ISferaAdapter
      * trzy identyczne próby tylko opóźniały biuro. Nieznana nazwa albo pusty
      * obiekt idą dalej zwykłą drogą — to awaria, nie odmowa.
      */
-    private static void ZapiszZeSzczegolami(object dokument, string nazwa, string stan = "")
+    private static void ZapiszZeSzczegolami(object dokument, string nazwa, string stan = "",
+        bool zrzutPol = false)
     {
         dynamic dok = dokument;
         try
@@ -504,11 +505,23 @@ public sealed class SferaComAdapter : ISferaAdapter
             string numer;
             try { numer = (Convert.ToString((object)dok.NumerPelny) ?? "").Trim(); }
             catch { numer = ""; }
+            /* ZRZUT PÓL SAM, BEZ SONDY (0.456.0) — odpowiedź właściciela na
+               pytanie o sondę: „niech robi to sam". Robimy go PO odmowie, nie
+               przed zapisem: udany ZW nie płaci ani jednego dodatkowego
+               wywołania COM, a obiekt, który nie przeszedł, jest jeszcze
+               otwarty (`Zamknij()` stoi w `finally` wołającego). */
+            string zrzut = "";
+            if (zrzutPol && OperatingSystem.IsWindows())
+            {
+                try { zrzut = ZrzutDokumentu.Opis(dokument); }
+                catch (Exception z) { zrzut = $"(zrzut pól nieudany: {z.Message.Trim()})"; }
+            }
             throw new BladTrwalyException(
                 $"Subiekt nie zapisał {nazwa}: {e.Message.Trim()} " +
                 (szczegoly.Length > 0 ? $"Szczegóły: {szczegoly} " : "(Sfera nie podała szczegółów) ") +
                 $"Wyjątek: {LancuchWyjatku(e)}. " +
                 (stan.Length > 0 ? $"Dokument: {stan}. " : "") +
+                (zrzut.Length > 0 ? $"Zrzut pól w chwili odmowy — {zrzut}. " : "") +
                 (numer.Length > 0
                     ? $"Subiekt zdążył nadać numer {numer} — sprawdź w Subiekcie, także w buforze, czy dokument nie został. "
                     : "") +

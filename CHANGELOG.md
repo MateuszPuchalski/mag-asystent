@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.456.0 — 23 września 2026
+
+**[wymaga działania] Odmowa zapisu ZW niesie zrzut pól dokumentu, bez sondy.**
+Nowy `wertis-sfera-worker.exe` z artefaktu CI: zatrzymaj `wertis-sfera`,
+podmień plik i uruchom usługę. Bez podmiany nic się nie zmienia.
+
+Wywiad z właścicielem: najwięcej czasu przy zwrotach zjada ZW odrzucany
+zdaniem „Nie można zapisać dokumentu” (0x80040F20). Na pytanie o ręczne
+uruchamianie sondy padła odpowiedź „niech robi to sam”.
+
+Po odmowie worker wylicza właściwości dokumentu tak jak `Get-Member`
+w sondzie. Do błędu dopisuje wartości pól płatności, kwot i rodzaju zwrotu.
+O polach nabywcy, adresu i rachunku mówi tylko „puste” albo „wypełnione”.
+To mierzy obie hipotezy z `docs/sfera-com.md` §2m: drugą formę płatności
+odziedziczoną z paragonu i pustego nabywcę. Przy następnej odmowie wystarczy
+przesłać treść błędu z kolejki.
+
 ## 0.455.0 — 23 września 2026
 
 **Zwroty: karty produktów i kolumna zamówienia z ikonami.** Ostatni krok

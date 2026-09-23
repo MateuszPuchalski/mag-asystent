@@ -577,6 +577,18 @@ ma prawa stąd wyjść. Ten sam zrzut robi `-WzorZW` na dokumencie, który
 przeszedł. Dwie kolumny obok siebie rozstrzygają obie hipotezy w jednym
 przebiegu.
 
+**Od 0.456.0 worker robi ten zrzut sam, w chwili odmowy.** Właściciel zapytany,
+czy uruchomi sondę z komunikatu, odpowiedział: „niech robi to sam". Po odmowie
+zapisu ZW worker wylicza właściwości dokumentu z informacji o typie IDispatch.
+To ta sama droga, którą idzie `Get-Member` w sondzie.
+
+Do treści błędu dopisuje wartości pól płatności, kwot i rodzaju. O polach
+nabywcy, adresu i rachunku mówi tylko „puste" albo „wypełnione". Zrzut powstaje na obiekcie, który nie przeszedł,
+zanim worker go zamknie. Udany ZW nie płaci ani jednego wywołania więcej.
+
+Porównanie z dokumentem, który przeszedł, dalej robi sonda `-WzorZW`. Worker
+nie wie, który ZW biuro uzna za wzór.
+
 **Odmowa zapisu potrafi zostawić numer, którego nie ma** (15 września 2026).
 Worker w 0.349.1 powtórzył zapis dwa razy, a `SprawdzPoprawnosc()` przeszło
 także na szkicu z sondy. Subiekt odmówił bez szczegółów. Dziewięć sekund później
