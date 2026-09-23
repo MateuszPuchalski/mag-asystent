@@ -23,11 +23,13 @@ import {
 import {
   historiaImportow, importujOdsylacze, wycofajImport, type ZadanieImportu,
 } from "../services/odsylacze-dostawcow.js";
-import { historiaWykazow, importujWykaz, wycofajWykaz, type ZadanieWykazu } from "../services/wykaz-czesci.js";
+import {
+  historiaWykazow, importujWykaz, przegladWykazow, wycofajWykaz, zatwierdzZWykazu, type ZadanieWykazu,
+} from "../services/wykaz-czesci.js";
 import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   DWADZIEŚCIA PIĘĆ ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   DWADZIEŚCIA SZEŚĆ ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
    przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
    (E3), trzy przy zabudowie silnika (0.229.0), trzy przy pasowaniu części:
    propozycja, rozstrzygnięcie i wycofanie, dwa przy słowniku silników
@@ -49,6 +51,8 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    (podgląd i zapis jedną trasą) i wycofanie importu w całości.
    Dwudziesty czwarty i dwudziesty piąty to wykaz części producenta — ten
    sam kształt: podgląd i zapis jedną trasą, wycofanie czekających propozycji.
+   Dwudziesty szósty to zatwierdzenie propozycji z wykazu listą, którą
+   człowiek przejrzał — jedna trasa na listę, jak przy tokenach.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
 
@@ -83,7 +87,12 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     const nie = odmowa(reply); if (nie) return nie;
     const pasowania = kolejkaPasowan();
     const zamiennosci = kandydaciZamiennosci();
-    return { ...kolejkaPropozycji(), pasowania: pasowania.propozycje, pasowanDoRozstrzygniecia: pasowania.liczba,
+    const kolejka = kolejkaPropozycji();
+    /* Propozycje z wykazów części jadą DWA razy: w `propozycje` (licznik mówi
+       prawdę o całej pracy) i pogrupowane w `wykazy` do przeglądu listą.
+       Ekran pokazuje każdą raz — pojedyncze karty bez tych z przeglądu. */
+    return { ...kolejka, wykazy: przegladWykazow(kolejka.propozycje),
+      pasowania: pasowania.propozycje, pasowanDoRozstrzygniecia: pasowania.liczba,
       zamiennosciOem: zamiennosci.kandydaci, zamiennosciOemDoRozstrzygniecia: zamiennosci.liczba };
   });
 
@@ -367,6 +376,15 @@ export async function wiedzaRoutes(app: FastifyInstance) {
           rodzajDowodu: b.rodzajDowodu, tresc: b.tresc ?? {}, mapowanie: b.mapowanie ?? null },
         b.zastosuj === true, ja().userId);
       } catch (e) { return blad(reply, e); }
+    });
+
+  /* Zatwierdzenie listą: identyfikatory, które człowiek zostawił zaznaczone
+     w przeglądzie wykazu. Jedna trasa na listę — wzór rozstrzygnięcia tokenów. */
+  app.post<{ Params: { id: string }; Body: { ids?: unknown } }>(
+    "/api/obsluga/wiedza/wykazy/:id/zatwierdz", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try { return zatwierdzZWykazu(Number(req.params.id), req.body?.ids, ja().userId); }
+      catch (e) { return blad(reply, e); }
     });
 
   app.post<{ Params: { id: string } }>("/api/obsluga/wiedza/wykazy/:id/wycofaj", async (req, reply) => {

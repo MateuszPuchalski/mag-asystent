@@ -43,6 +43,8 @@ let LISTA: Zastosowanie[] = [];
 let PASOWANIA: Pasowanie[] = [];
 let ZAMIENNOSCI: KandydatZamiennosci[] = [];
 let WIEDZA: unknown = undefined;
+let WYKAZY: import("../api/typy").PrzegladWykazu[] = [];
+const zatwierdzZWykazu = vi.fn();
 const rozstrzygnijZamiennosc = vi.fn();
 const wycofajZamiennosc = vi.fn();
 const rozstrzygnij = vi.fn();
@@ -55,7 +57,9 @@ vi.mock("../api/wiedza", async () => {
     ...rzeczywisty,
     useKolejkaWiedzy: () => ({ data: { propozycje: LISTA, liczba: LISTA.length,
       pasowania: PASOWANIA, pasowanDoRozstrzygniecia: PASOWANIA.length,
-      zamiennosciOem: ZAMIENNOSCI, zamiennosciOemDoRozstrzygniecia: ZAMIENNOSCI.length }, isLoading: false, error: null }),
+      zamiennosciOem: ZAMIENNOSCI, zamiennosciOemDoRozstrzygniecia: ZAMIENNOSCI.length, wykazy: WYKAZY },
+    isLoading: false, error: null }),
+    useZatwierdzZWykazu: () => ({ mutate: zatwierdzZWykazu, isPending: false }),
     useRozstrzygnijZamiennosc: () => ({ mutate: rozstrzygnijZamiennosc, isPending: false }),
     useWycofajZamiennosc: () => ({ mutate: wycofajZamiennosc, isPending: false, error: null }),
     useRozstrzygnijZastosowanie: () => ({ mutate: rozstrzygnij, isPending: false }),
@@ -104,8 +108,8 @@ const pokaz = () => render(
 
 beforeEach(() => {
   rozstrzygnij.mockReset(); rozstrzygnijPasowanie.mockReset(); zaproponuj.mockReset();
-  rozstrzygnijZamiennosc.mockReset(); wycofajZamiennosc.mockReset();
-  LISTA = []; PASOWANIA = []; ZAMIENNOSCI = []; WIEDZA = undefined;
+  rozstrzygnijZamiennosc.mockReset(); wycofajZamiennosc.mockReset(); zatwierdzZWykazu.mockReset();
+  LISTA = []; PASOWANIA = []; ZAMIENNOSCI = []; WIEDZA = undefined; WYKAZY = [];
 });
 
 describe("Ekran wiedzy", () => {
@@ -234,6 +238,44 @@ describe("Ekran wiedzy", () => {
       warunki: { rokOd: 2014, rokDo: 2018, seryjnyOd: null, seryjnyDo: null, warunek: null },
       dowod: { rodzaj: "katalog_dostawcy", tresc: "IPL 2024, s. 12" },
     }, expect.anything());
+  });
+
+  /* Wykaz części: kilkadziesiąt propozycji z jednej decyzji. Stoją JEDNĄ
+     listą — nie jako karty — i żadna nie pojawia się drugi raz niżej. */
+  it("propozycje z wykazu stoją jedną listą, a zatwierdzenie bierze tylko zaznaczone", async () => {
+    LISTA = [propozycja({ id: 21, symbol: "W19-0201", importId: 4 }), propozycja({ id: 22, symbol: "W04-0201", importId: 4 }),
+      propozycja({ id: 3 })];
+    WYKAZY = [{ id: 4, zrodlo: "IPL Honda GX160", link: null, rodzaj: "silnik", pozycje: [
+      { id: 21, twId: 81, symbol: "W19-0201", nazwa: "Korek oleju", maszyna: "silnik Honda GX160", warunki: null,
+        dowod: "silnik Honda GX160 — numer 15600-ZE1-003" },
+      { id: 22, twId: 82, symbol: "W04-0201", nazwa: "Tłok kpl.", maszyna: "silnik Honda GX160", warunki: "roczniki 2008–2016",
+        dowod: "silnik Honda GX160 — numer 13101-ZE1-000" }] }];
+    pokaz();
+    const lista = screen.getByRole("region", { name: "Wykaz: IPL Honda GX160" });
+    expect(lista).toHaveTextContent("2 propozycje czekają");
+    expect(lista).toHaveTextContent("Tylko: roczniki 2008–2016");
+    expect(screen.queryByRole("article", { name: /Propozycja: W19-0201/ })).toBeNull();
+    expect(screen.getByRole("article", { name: /Propozycja: SZR-148\/82/ })).toBeInTheDocument();
+
+    await userEvent.click(within(lista).getByRole("checkbox", { name: "Zatwierdź: W04-0201 → silnik Honda GX160" }));
+    expect(lista).toHaveTextContent("1 odznaczona zostanie w kolejce");
+    await userEvent.click(within(lista).getByRole("button", { name: /Zatwierdź zaznaczone \(1\)/ }));
+    expect(zatwierdzZWykazu).toHaveBeenCalledWith({ importId: 4, ids: [21] }, expect.anything());
+  });
+
+  it("odrzucenie wiersza z wykazu wymaga powodu i idzie zwykłą decyzją o propozycji", async () => {
+    LISTA = [propozycja({ id: 21, importId: 4 })];
+    WYKAZY = [{ id: 4, zrodlo: "IPL Honda GX160", link: null, rodzaj: "silnik", pozycje: [
+      { id: 21, twId: 81, symbol: "W19-0201", nazwa: "Korek oleju", maszyna: "silnik Honda GX160", warunki: null, dowod: "numer" }] }];
+    pokaz();
+    const lista = screen.getByRole("region", { name: "Wykaz: IPL Honda GX160" });
+    await userEvent.click(within(lista).getByRole("button", { name: /Odrzuć/ }));
+    const potwierdz = within(lista).getByRole("button", { name: "Potwierdź odrzucenie" });
+    expect(potwierdz).toBeDisabled();
+    await userEvent.type(within(lista).getByLabelText("Powód odrzucenia: W19-0201"), "to korek GX200");
+    await userEvent.click(potwierdz);
+    expect(rozstrzygnij).toHaveBeenCalledWith({ id: 21, decyzja: "odrzuc", powod: "to korek GX200" }, expect.anything());
+    expect(zatwierdzZWykazu).not.toHaveBeenCalled();
   });
 
   /* Przejście z Sieci (0.465.0): wskazana część ląduje w „Sprawdź kartotekę”

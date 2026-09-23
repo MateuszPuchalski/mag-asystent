@@ -69,7 +69,7 @@ export const ZDARZENIA: readonly string[] = [
   "wiedza_identyfikator_dodany", "wiedza_identyfikator_z_oferty_cofniety",
   "wiedza_model_utworzony", "wiedza_model_z_opisu_odrzucony",
   "wiedza_model_z_opisu_przerobiony", "wiedza_propozycja", "wiedza_rozstrzygniecie",
-  "wiedza_wycofanie", "wiedza_z_oferty_zapisana", "wykaz_import", "wykaz_wycofanie", "wzmianka_odhaczona", "zabudowa_propozycja",
+  "wiedza_wycofanie", "wiedza_z_oferty_zapisana", "wykaz_import", "wykaz_wycofanie", "wykaz_zatwierdzenie", "wzmianka_odhaczona", "zabudowa_propozycja",
   "zabudowa_rozstrzygniecie", "zabudowa_wycofanie", "zadanie_terenowe_anulowane",
   "zadanie_terenowe_oddane", "zadanie_terenowe_odeslane", "zadanie_terenowe_ponowione",
   "zadanie_terenowe_przejete", "zadanie_terenowe_utworzone", "zadanie_terenowe_wykonane",

@@ -2,7 +2,10 @@ import type { DatabaseSync } from "node:sqlite";
 import { db } from "../db/db.js";
 import { zwin } from "../tekst.js";
 import { logEvent } from "./events.js";
-import { czlowiekZBiura, kluczModelu, wTransakcji, zaproponujZastosowanie, type RodzajDowodu } from "./wiedza.js";
+import {
+  czlowiekZBiura, kluczModelu, rozstrzygnijZastosowanie, wTransakcji, WiedzaConflict, zaproponujZastosowanie,
+  type RodzajDowodu, type Zastosowanie,
+} from "./wiedza.js";
 import { numeryZKomorki, tabelaZTresci, type TrescImportu } from "./odsylacze-dostawcow.js";
 import { sprawdzWarunki, zdanieWarunkow, type WarunkiZastosowania } from "./warunki-zastosowania.js";
 import { MIN_CYFR, MIN_ZNAKOW } from "./zamiennosc-oem.js";
@@ -404,5 +407,116 @@ export function wycofajWykaz(id: number, userId: number, database: DatabaseSync 
     logEvent("wykaz_wycofanie", autor, null, { importId: id, zrodlo: po.zrodlo, wycofanePropozycje: ids,
       zostajeZatwierdzonych: po.zatwierdzonych }, userId, database);
     return po;
+  });
+}
+
+/* ── Przegląd w kolejce i zatwierdzenie listą ─────────────────────────────
+   Wykaz jednego silnika daje kilkadziesiąt propozycji naraz. Jako osobne
+   karty zalewały kolejkę, a każda wymagała dwóch kliknięć i przewinięcia.
+   Decyzja jest jednak ta sama dla całej listy: „czy ta nasza część to ten
+   numer z wykazu". Człowiek sprawdza ją WZROKIEM, wiersz po wierszu, przy
+   zdjęciu i nazwie — i zatwierdza zaznaczone jednym żądaniem. Wzór listy
+   tokenów silników (0.239.0): osobne wywołanie na wiersz zamieniłoby jedno
+   kliknięcie w trzydzieści.
+
+   Automat nadal nie zatwierdza niczego: lista zawiera wyłącznie
+   identyfikatory, które człowiek zostawił zaznaczone na ekranie. */
+
+export interface PozycjaPrzegladu {
+  /** Identyfikator propozycji zastosowania. */
+  id: number;
+  twId: number; symbol: string;
+  /** Nazwa kartoteki — przy numerze OEM to ona mówi, czy to ta część. */
+  nazwa: string | null;
+  maszyna: string;
+  warunki: string | null;
+  /** Treść dowodu bez nazwy wykazu, która stoi w nagłówku: „silnik Honda GX160 — numer 15600-ZE1-003". */
+  dowod: string;
+}
+
+export interface PrzegladWykazu {
+  id: number; zrodlo: string; link: string | null; rodzaj: "maszyna" | "silnik";
+  pozycje: PozycjaPrzegladu[];
+}
+
+/**
+ * Czekające propozycje pogrupowane po wykazie, z którego przyszły. Czyta
+ * listę propozycji, którą kolejka i tak już ma — bez drugiego przebiegu
+ * po tabeli zastosowań.
+ */
+export function przegladWykazow(propozycje: Zastosowanie[], database: DatabaseSync = db()): PrzegladWykazu[] {
+  const zWykazu = propozycje.filter((z) => z.importId !== null);
+  if (zWykazu.length === 0) return [];
+  const ids = [...new Set(zWykazu.map((z) => z.importId!))];
+  const wykazy = new Map((database.prepare(`SELECT id, zrodlo, link, rodzaj FROM import_wykazu
+    WHERE stan='aktywny' AND id IN (${ids.map(() => "?").join(",")}) ORDER BY id`).all(...ids) as
+    Array<{ id: number; zrodlo: string; link: string | null; rodzaj: "maszyna" | "silnik" }>)
+    .map((w) => [Number(w.id), { id: Number(w.id), zrodlo: w.zrodlo, link: w.link, rodzaj: w.rodzaj, pozycje: [] as PozycjaPrzegladu[] }]));
+  const nazwa = database.prepare("SELECT nazwa FROM sgt_towar WHERE tw_id=?");
+  for (const z of zWykazu) {
+    const w = wykazy.get(z.importId!);
+    if (!w) continue;
+    /* Nazwę wykazu pisze do dowodu ten sam moduł (`importujWykaz`), więc
+       zdjęcie jej z czoła to cofnięcie własnego zapisu, nie rozbiór cudzego
+       zdania. Dowód dopisany później ręką biura zostaje w całości. */
+    const tresc = z.dowody[0]?.tresc ?? "";
+    const czolo = `${w.zrodlo}: `;
+    w.pozycje.push({
+      id: z.id, twId: z.twId, symbol: z.symbol,
+      nazwa: (nazwa.get(z.twId) as { nazwa: string } | undefined)?.nazwa ?? null,
+      maszyna: z.model.etykieta, warunki: z.zdanieWarunkow,
+      dowod: tresc.startsWith(czolo) ? tresc.slice(czolo.length) : tresc,
+    });
+  }
+  return [...wykazy.values()].filter((w) => w.pozycje.length > 0);
+}
+
+export interface WynikZatwierdzenia {
+  zatwierdzono: number;
+  /** Rozstrzygnięte przez kogoś innego między otwarciem ekranu a kliknięciem. */
+  pominieto: number;
+  wykaz: ImportWykazu;
+}
+
+/**
+ * Zatwierdzenie listą: propozycje z JEDNEGO wykazu, które człowiek zostawił
+ * zaznaczone. Wszystkie albo żadna w jednej transakcji — poza tymi, które
+ * ktoś rozstrzygnął w międzyczasie: te liczymy jako pominięte, zamiast
+ * wywracać całą listę o jeden wiersz, którego decyzja już zapadła.
+ */
+export function zatwierdzZWykazu(
+  importId: number, ids: unknown, userId: number, database: DatabaseSync = db(),
+): WynikZatwierdzenia {
+  const autor = czlowiekZBiura(database, userId);
+  if (!Array.isArray(ids) || ids.length === 0 || !ids.every((i) => Number.isInteger(i))) {
+    throw new Error("Zaznacz co najmniej jedną propozycję z wykazu");
+  }
+  const lista = [...new Set(ids as number[])];
+  return wTransakcji(database, () => {
+    const w = database.prepare("SELECT stan FROM import_wykazu WHERE id=?").get(importId) as { stan: string } | undefined;
+    if (!w) throw new Error("Nie ma takiego wykazu");
+    if (w.stan !== "aktywny") throw new Error("Ten wykaz jest wycofany — jego propozycje zeszły z kolejki");
+    /* Lista z ekranu wskazuje propozycje TEGO wykazu. Obcy identyfikator to
+       pomyłka albo podróbka żądania — odmowa całości, nie zatwierdzenie
+       czegoś, czego człowiek nie widział na tej liście. */
+    const zWykazu = new Map((database.prepare(`SELECT id, stan FROM zastosowanie
+      WHERE import_id=? AND id IN (${lista.map(() => "?").join(",")})`).all(importId, ...lista) as
+      Array<{ id: number; stan: string }>).map((r) => [Number(r.id), r.stan]));
+    const obce = lista.filter((i) => !zWykazu.has(i));
+    if (obce.length > 0) throw new Error(`Propozycje spoza tego wykazu: ${obce.join(", ")}`);
+    let zatwierdzono = 0; let pominieto = 0;
+    for (const id of lista) {
+      if (zWykazu.get(id) !== "propozycja") { pominieto++; continue; }
+      try {
+        rozstrzygnijZastosowanie(id, "zatwierdz", null, userId, database);
+        zatwierdzono++;
+      } catch (e) {
+        if (e instanceof WiedzaConflict) { pominieto++; continue; }
+        throw e;
+      }
+    }
+    logEvent("wykaz_zatwierdzenie", autor, null, { importId, zatwierdzono, pominieto, ids: lista }, userId, database);
+    return { zatwierdzono, pominieto,
+      wykaz: naImport(database, database.prepare("SELECT * FROM import_wykazu WHERE id=?").get(importId) as Record<string, unknown>) };
   });
 }
