@@ -643,8 +643,37 @@ Trzy możliwe wyniki:
 - Oba przechodzą: ZW powstaje w całości, a przyczyną był skutek wołany
   w środku zapisu.
 
-`[WERYFIKUJ]` Nazwa identyfikatora na `SuDokument`. Worker sprawdza
-`Identyfikator`, potem `ObiektId`, i bierze tylko wartość dodatnią.
+**Eksperyment odpadł: zapis odmawia także z odłożonym skutkiem** (23 września
+2026, zadania `#1490`–`#1494`). Zrzut potwierdza `SkutekMagazynowy = False`
+w chwili odmowy. Przyczyna nie siedzi więc w przyjęciu na magazyn. Od 0.460.0
+worker zapisuje ZW znowu ze skutkiem, jak przed eksperymentem.
+
+Tego samego dnia odpadły jeszcze trzy tropy:
+- **Wydruk po zapisie.** Biuro odznaczyło „Drukuj dokument po zapisie" w
+  parametrach zwrotu detalicznego. Po restarcie usługi ZW odmówił tak samo.
+- **Ukryte okno.** Przebieg `--once` z `SFERA_TRYB_URUCHOMIENIA=2` otworzył
+  widoczne okno Subiekta. Żaden komunikat się nie pojawił, a zapis odmówił tak samo.
+- **Tryb w tle.** Ten sam przebieg z oknem wyklucza też sam tryb `W_TLE`.
+
+Sygnał dźwiękowy Windows, który właściciel słyszał przy odmowach, nie ma
+z tym związku. Rozległ się także przy przebiegu `--once`, który nie wziął
+żadnego zadania i nie otworzył sesji Subiekta.
+
+Zostaje jeden ślad w zrzutach. `PozycjaTypPromocji` odmawia na KAŻDYM wierszu
+każdego odrzuconego szkicu kodem `0x8004197F`. To nie jest `E_NOTIMPL`, tylko
+własny kod Sfery. Sonda pokazała na ręcznym ZW `null`, ale PowerShell maskuje
+odmowy odczytu jako `null`.
+
+Od 0.460.0 worker ma tryb `--zrzut <dok_Id>`. Czyta istniejący dokument tą samą
+drogą z C#, która dała zrzuty odmów. Przebieg na ZW 748 rozstrzygnie, czy
+zapisany dokument też odmawia tego pola.
+
+```powershell
+& C:\wertis\sfera-worker\wertis-sfera-worker.exe --zrzut 9253431
+```
+
+`[WERYFIKUJ]` Czy `PozycjaTypPromocji` na zapisanym ZW 748/MAG/09/2026 odmawia
+kodem `0x8004197F`, czy oddaje wartość.
 
 **Od 0.456.0 worker robi ten zrzut sam, w chwili odmowy.** Właściciel zapytany,
 czy uruchomi sondę z komunikatu, odpowiedział: „niech robi to sam". Po odmowie

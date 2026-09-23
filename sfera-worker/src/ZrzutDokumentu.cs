@@ -163,17 +163,6 @@ internal static class ZrzutDokumentu
     }
 
     /**
-     * Czy obiekt ma właściwość o tej nazwie — z informacji o typie, nie z próby
-     * odczytu. Próba na nieznanej nazwie daje wyjątek bindera, którego nie
-     * odróżnisz od odmowy Sfery; lista z `ITypeInfo` mówi to wprost (0.459.0).
-     */
-    public static bool MaWlasciwosc(object com, string nazwa)
-    {
-        try { return NazwyWlasciwosci(com).Contains(nazwa); }
-        catch { return false; }
-    }
-
-    /**
      * Nazwy właściwości bez argumentów — funkcje `INVOKE_PROPERTYGET` i zmienne
      * interfejsu. Dispinterface opisuje właściwości RAZ jako funkcje, raz jako
      * zmienne, zależnie od tego, jak zbudowano bibliotekę typów; bierzemy oba.

@@ -422,61 +422,8 @@ public sealed class SferaComAdapter : ISferaAdapter
                 $"rodzaj zwrotu 1, skutek magazynowy {skutek}, wierszy {ile}. " +
                 "Tę samą odmowę pokaże sonda BEZ zapisu: sonda.ps1 -PlikEnv C:\\wertis\\wertis.env " +
                 $"-SzkicZW -Paragon {z.DokId} -Towary \"{towary}\" -Sprawdz";
-            /* EKSPERYMENT: ODŁOŻONY SKUTEK MAGAZYNOWY (0.459.0, zgoda właściciela
-               23 września 2026). Zrzuty `#1481` i `#1484` zestawione z ręcznym
-               ZW 748/MAG/09/2026 zgadzają się pole w pole, nagłówek i wiersze.
-               MM z tej samej sesji zapisują się, więc sesja umie pisać. Zostaje
-               to, czego pola nie pokazują: to, co `Zapisz()` robi przy okazji.
-               ZW przyjmuje towar na magazyn, a MM tylko go przesuwa.
-
-               Zapis bez skutku i skutek osobnym wywołaniem rozdzielają te dwa
-               kroki. Odmowa zapisu mimo to znaczy „nie magazyn". Odmowa samego
-               skutku powinna wreszcie nieść powód, jak „Brak towaru" przy MM.
-
-               Najgorszy przypadek przyjął właściciel: ZW stoi w Subiekcie
-               z odłożonym skutkiem, a biuro wywołuje go ręcznie. Setter, który
-               odmówi, zostawia starą drogę — eksperyment niczego nie psuje. */
-            bool odlozony = false;
-            try
-            {
-                zw.SkutekMagazynowy = false;
-                odlozony = !(bool)zw.SkutekMagazynowy;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine($"[sfera] ZW: SkutekMagazynowy = False odrzucone ({e.Message.Trim()}) — zapis ze skutkiem, jak dotąd");
-            }
-            // Na początku, nie na końcu: koniec stanu to komenda sondy do skopiowania.
-            if (odlozony) stan = "zapis z ODŁOŻONYM skutkiem magazynowym (eksperyment 0.459.0); " + stan;
-
             ZapiszZeSzczegolami((object)zw, "ZW", stan, zrzutPol: true);
-            string numer = Krok("ZW.NumerPelny", 6, () => (string)zw.NumerPelny);
-            if (!odlozony) return numer;
-
-            string reka = $"Wywołaj skutek magazynowy ZW {numer} ręcznie w Subiekcie, zanim koszyk z tym " +
-                "zwrotem pójdzie MM — bez tego MM zdejmie towar, którego ZW nie przyjął.";
-            int id = IdentyfikatorDokumentu((object)zw);
-            if (id <= 0)
-                throw new BladTrwalyException(
-                    $"ZW {numer} ZAPISANY z odłożonym skutkiem magazynowym, ale worker nie odczytał jego " +
-                    $"identyfikatora, więc skutku nie wywołał. {reka}");
-
-            /* Skutek woła MANAGER po identyfikatorze, a otwarty dokument trzyma
-               blokadę — zamykamy go przed wywołaniem. Drugie `Zamknij()`
-               w `finally` jest nieszkodliwe: jego błąd jest połykany. */
-            try { zw.Zamknij(); } catch { /* blokadę i tak zwolni `finally` albo sesja */ }
-            try
-            {
-                su.SuDokumentyManager.SkutekMagazynowyWywolaj(id);
-            }
-            catch (Exception e)
-            {
-                throw new BladTrwalyException(
-                    $"ZW {numer} ZAPISANY z odłożonym skutkiem magazynowym (dok_Id {id}), ale Sfera odmówiła " +
-                    $"wywołania skutku: {LancuchWyjatku(e)}. To jest szukany powód odmów ZW. {reka}");
-            }
-            Console.WriteLine($"[sfera] ZW {numer}: zapis z odłożonym skutkiem i skutek osobno — oba przeszły");
-            return numer;
+            return Krok("ZW.NumerPelny", 6, () => (string)zw.NumerPelny);
         }
         finally
         {
@@ -485,33 +432,6 @@ public sealed class SferaComAdapter : ISferaAdapter
                paragonu do restartu usługi (sonda, drugi przebieg). */
             try { zw.Zamknij(); } catch { /* zamknięcie nie ma prawa zasłonić przyczyny */ }
         }
-    }
-
-    /**
-     * dok_Id zapisanego dokumentu, 0 gdy nieznany (0.459.0).
-     *
-     * Nazwy właściwości nikt jeszcze nie zmierzył na SuDokument. `Identyfikator`
-     * stoi w opublikowanych przykładach Sfery, `ObiektId` na każdym managerze
-     * z sondy. Istnienie sprawdza informacja o typie, a nie próba odczytu —
-     * i dopiero wartość dodatnia liczy się jako odpowiedź.
-     */
-    private static int IdentyfikatorDokumentu(object dokument)
-    {
-        if (!OperatingSystem.IsWindows()) return 0;
-        foreach (string nazwa in new[] { "Identyfikator", "ObiektId" })
-        {
-            if (!ZrzutDokumentu.MaWlasciwosc(dokument, nazwa)) continue;
-            try
-            {
-                object? w = dokument.GetType().InvokeMember(
-                    nazwa, System.Reflection.BindingFlags.GetProperty, null, dokument, null);
-                if (w is not null && int.TryParse(Convert.ToString(w, System.Globalization.CultureInfo.InvariantCulture),
-                        out int id) && id > 0)
-                    return id;
-            }
-            catch { /* następna nazwa */ }
-        }
-        return 0;
     }
 
     private static bool Zawiera(Exception e, string fraza) =>
@@ -625,6 +545,42 @@ public sealed class SferaComAdapter : ISferaAdapter
         for (Exception? x = e; x is not null && czesci.Count < 5; x = x.InnerException)
             czesci.Add($"{x.GetType().Name} 0x{x.HResult:X8} „{x.Message.Trim()}”");
         return string.Join(" ← ", czesci);
+    }
+
+    /**
+     * Zrzut ISTNIEJĄCEGO dokumentu tą samą drogą co zrzut przy odmowie (0.460.0).
+     *
+     * Sonda czyta dokument przez PowerShell, a ten zamienia odmowę odczytu COM
+     * w `null`. Pole `PozycjaTypPromocji` odmawia na każdym odrzuconym szkicu
+     * kodem `0x8004197F`, a na ręcznym ZW sonda pokazała `null`. Nie wiadomo,
+     * czy to prawdziwa pustka, czy zamaskowana odmowa — rozstrzyga to dopiero
+     * odczyt z C#, ten sam, który dał zrzuty `#1481`–`#1494`.
+     *
+     * Tylko odczyt: `WczytajDokument`, zrzut, `Zamknij()`. Kolejki nie dotyka.
+     */
+    public string ZrzutIstniejacego(int dokId)
+    {
+        if (!OperatingSystem.IsWindows())
+            throw new InvalidOperationException("COM Sfery działa wyłącznie na Windows.");
+        try
+        {
+            dynamic su = Sesja();
+            dynamic dok = Krok($"SuDokumentyManager.WczytajDokument({dokId})", 6,
+                () => su.SuDokumentyManager.WczytajDokument(dokId));
+            try
+            {
+                return $"{ZrzutDokumentu.Opis((object)dok)} · {ZrzutDokumentu.OpisPozycji((object)dok)}";
+            }
+            finally
+            {
+                // Wczytany dokument trzyma blokadę — biuro nie otworzyłoby go do końca sesji.
+                try { dok.Zamknij(); } catch { /* zamknięcie nie zasłoni wyniku */ }
+            }
+        }
+        finally
+        {
+            ZamknijSesje();
+        }
     }
 
     public WynikKorekty CreateKorektaZwrotu(ZlecenieKorekty z)
