@@ -19,6 +19,14 @@ import type { AnalizaAudytu, AnalizaDostaw, Metryki, RaportWydajnosci } from "..
    5. WGRANIE ZBIÓREK to jedyny zapis i idzie jako `{ csv }`.
    6. METRYKI słuchają okna pracy hali — przeszły tu ze stanu systemu. */
 
+/* Kształt minimalny — treść karty ma własny test w `analiza/Ergonomia.test.tsx`. */
+const ERGONOMIA = {
+  days: 7, daneDo: null, progMs: 300,
+  czasy: { n: 0, powyzejProgu: 0, udzialPowyzejProgu: 0, p95: null, wgTrasy: [], wgKolektora: [] },
+  skanGlowny: { n: 0, p50: null, p95: null, wgKolektora: [] },
+  powtorzoneSkany: [], odrzucenia: [], przerwy: [], poprawki: [],
+};
+
 const DOSTAWY: AnalizaDostaw = {
   dni: 90, zamknietych: 66, pozaWertis: 2, pozycjiRozlozonych: 1874, udzialWyjatkow: 4.2, medianaDni: 2,
   dostawcy: [{ dostawca: "Rosa-Pol", dostaw: 11, pozycji: 300, udzialWyjatkow: 7, medianaDni: 2 }],
@@ -63,6 +71,7 @@ beforeEach(() => {
     if (url.startsWith("/api/biuro/dostawy/analiza?dni=")) return new Response(JSON.stringify({ analiza: DOSTAWY }));
     if (url.startsWith("/api/analiza?days=")) return new Response(JSON.stringify(hala(wydajnosc)));
     if (url.startsWith("/api/metrics?days=")) return new Response(JSON.stringify(METRYKI));
+    if (url.startsWith("/api/analiza/ergonomia?days=")) return new Response(JSON.stringify(ERGONOMIA));
     if (url.startsWith("/api/analiza/obsluga?days=")) return new Response(JSON.stringify({
       dni: 30, daneDo: "2026-09-22T12:31:00.000Z",
       ogolem: { n: 42, medianaMin: 38, p90Min: 250 },
@@ -165,6 +174,15 @@ describe("Analiza w panelu", () => {
     await naPraceHali();
     expect(await screen.findByText("R-09-4")).toBeTruthy();
     expect(adresy).toContain("/api/metrics?days=7");
+  });
+
+  it("ergonomia w liczbach stoi w pracy hali, słucha jej okna i nie idzie z innych zakresów", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    expect(adresy.some((a) => a.startsWith("/api/analiza/ergonomia"))).toBe(false);
+    await naPraceHali();
+    expect(await screen.findByText("Ergonomia w liczbach")).toBeTruthy();
+    expect(adresy).toContain("/api/analiza/ergonomia?days=7");
   });
 
   it("wgranie zbiórek to jedyny zapis i idzie jako { csv }", async () => {

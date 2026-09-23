@@ -11,6 +11,7 @@ import { KartaRekoncyliacji } from "../stan/Rekoncyliacja";
 import { KartaWymiany } from "../stan/Wymiana";
 import { KartaAllegro } from "../stan/Allegro";
 import { KartaSerwera } from "../stan/Serwer";
+import { KartaKolektorow } from "../stan/Kolektory";
 
 /* ── STAN SYSTEMU (0.441.0) ──────────────────────────────────────────────
    Przeniesiony z NADZORU w `biuro.html` — ostatni widok wglądu, który tam
@@ -23,6 +24,8 @@ import { KartaSerwera } from "../stan/Serwer";
    względem biura: kolizje kodów idą PRZED rekoncyliacją. Kolizja czeka na
    decyzję biura (stoi też w DO DECYZJI), a rekoncyliacja jest sprawdzeniem
    uruchamianym na żądanie, którego wynik zwykle brzmi „bez rozjazdów".
+   Zgubiony kolektor stoi zaraz za nią z tego samego powodu: to przycisk
+   na żądanie, nie liczba do czytania.
 
    JEDNO MIEJSCE STANU INTEGRACJI. Tabela z `/api/health` stała od 0.168.0 za
    zębatką panelu, a stan serwera — w biurze. Człowiek szukający „czemu nie
@@ -48,6 +51,7 @@ export function Stan() {
     {admin && <KartaArkusza />}
     <KartaKolizji />
     <KartaRekoncyliacji />
+    <KartaKolektorow />
     <KartaWymiany />
     <div id="karta-integracje" className="scroll-mt-4">
       <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />

@@ -58,6 +58,7 @@ beforeEach(() => {
         kodOstatniegoBledu: null, tekstOstatniegoBledu: null, liczbaBledow: 0, watkiZBledem: 0, opoznienieMs: null,
         nastepnaProba: null, interwalMs: 60000 },
       obsluga: { rozmowyOczekujace: 0, zadaniaTerenowe: 0, najstarszeZadanieMs: null, kolejkaWysylek: "pusta", wysylkiDoSprawdzenia: 0 } });
+    if (url === "/api/kolektory") return odp({ kolektory: [] });
     if (url === "/api/auth/me") return odp({ user: { userId: 1, name: "Anna", role: rola } });
     throw new Error(`nieoczekiwany adres w teście: ${url}`);
   }));

@@ -1,7 +1,9 @@
 package pl.wertis.kolektor.data
 
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import pl.wertis.kolektor.core.net.LicznikCzasow
 import pl.wertis.kolektor.core.net.DeviceEventBody
 import pl.wertis.kolektor.net.ApiService
 import pl.wertis.kolektor.net.apiCall
@@ -25,4 +27,28 @@ class TelemetryRepository(private val api: ApiService, private val scope: Corout
             runCatching { apiCall { api.deviceEvent(DeviceEventBody(type = "scan_timing", ms = ms)) } }
         }
     }
+
+    /**
+     * Paczka czasów odpowiedzi co 5 minut (0.482.0) — reguły w `CzasyZadan.kt`.
+     *
+     * Rytm to kompromis: częściej i telemetria zaczęłaby się liczyć w ruchu,
+     * który mierzy; rzadziej i przerwana zmiana (bateria, restart) zabrałaby
+     * ze sobą za dużo pomiarów. Nieudana wysyłka oddaje paczkę do licznika.
+     */
+    fun wysylajCzasy(licznik: LicznikCzasow) {
+        scope.launch {
+            while (true) {
+                delay(RYTM_CZASOW_MS)
+                val paczka = licznik.zrzut()
+                if (paczka.isEmpty()) continue
+                try {
+                    apiCall { api.deviceEvent(DeviceEventBody(type = "czasy_zadan", czasy = paczka)) }
+                } catch (_: Exception) {
+                    licznik.oddaj(paczka)
+                }
+            }
+        }
+    }
 }
+
+private const val RYTM_CZASOW_MS = 5 * 60_000L

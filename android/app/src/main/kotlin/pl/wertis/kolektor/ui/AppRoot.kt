@@ -22,6 +22,8 @@ import pl.wertis.kolektor.core.session.SessionState
 import pl.wertis.kolektor.core.session.osoba
 import pl.wertis.kolektor.scan.ScannerBus
 import androidx.compose.runtime.LaunchedEffect
+import pl.wertis.kolektor.ui.kolektory.KolektoryScreen
+import pl.wertis.kolektor.ui.kolektory.WezwanieOverlay
 import pl.wertis.kolektor.ui.chrome.BateriaBanner
 import pl.wertis.kolektor.ui.chrome.OfflineBanner
 import pl.wertis.kolektor.ui.chrome.SerwerBanner
@@ -183,6 +185,7 @@ fun AppRoot(graph: AppGraph) {
                 Screen.LOCATION -> LocationScreen(graph)
                 Screen.SETTINGS -> SettingsScreen(graph)
                 Screen.POLACZENIE -> PolaczenieScreen(graph)
+                Screen.KOLEKTORY -> KolektoryScreen(graph)
                 Screen.PROBLEMS -> ProblemsScreen(graph)
                 Screen.FIELD_TASKS -> FieldTasksScreen(graph)
                 Screen.SPLASH -> {}
@@ -206,4 +209,6 @@ fun AppRoot(graph: AppGraph) {
         }
     }
     AktualizacjaSheet(graph)
+    // OSTATNIA, czyli nad wszystkim — także nad arkuszem aktualizacji
+    WezwanieOverlay(graph)
 }

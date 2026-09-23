@@ -23,7 +23,18 @@ const ALLOWED = new Set([
      aplikacji. Biuro czyta to w zakładce DZIENNIK ZDARZEŃ, z filtrem
      po urządzeniu. */
   "siec_przerwa",
+  /* Czasy odpowiedzi każdego żądania, per ekran i trasa (0.482.0). Paczka
+     z kubełkami co 5 minut — reguły w `android/core/.../net/CzasyZadan.kt`,
+     odczyt w `services/ergonomia.ts`. */
+  "czasy_zadan",
 ]);
+
+/**
+ * Najwięcej wierszy w jednej paczce czasów. Kolektor ma kilkanaście ekranów
+ * i kilkadziesiąt tras, więc prawdziwa paczka mieści się z dużym zapasem.
+ * Granica chroni dziennik audytu przed paczką, która nie jest pomiarem.
+ */
+const MAKS_WIERSZY_CZASOW = 500;
 
 export async function deviceRoutes(app: FastifyInstance) {
   /**
@@ -53,6 +64,12 @@ export async function deviceRoutes(app: FastifyInstance) {
       const { type, ...payload } = req.body ?? {};
       if (!type || !ALLOWED.has(type)) {
         return reply.code(400).send({ error: "Nieznany typ zdarzenia urządzenia" });
+      }
+      if (type === "czasy_zadan") {
+        const czasy = (payload as { czasy?: unknown }).czasy;
+        if (!Array.isArray(czasy) || czasy.length > MAKS_WIERSZY_CZASOW) {
+          return reply.code(400).send({ error: "Paczka czasów bez listy albo za duża" });
+        }
       }
       logEvent(type, userOf(req), null, payload);
       return { ok: true };

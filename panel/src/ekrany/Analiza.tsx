@@ -1,10 +1,11 @@
 import React, { useState } from "react";
 import { BarChart3, Download } from "lucide-react";
 import { pobierzPlik } from "../api/klient";
-import { useAnaliza, useAnalizaDostaw, useCzasOdpowiedzi, useMetryki, useUzycie } from "../api/wglad";
+import { useAnaliza, useAnalizaDostaw, useCzasOdpowiedzi, useErgonomia, useMetryki, useUzycie } from "../api/wglad";
 import { Blad, FiltrSegmentowy, Karta, Przycisk, czas } from "../ui";
 import { ZakresDostaw } from "../analiza/ZakresDostaw";
 import { ZakresHali } from "../analiza/ZakresHali";
+import { KartaErgonomii } from "../analiza/Ergonomia";
 import { Strefa } from "../analiza/Strefa";
 import { ZakresObslugi } from "../analiza/ZakresObslugi";
 import { ZakresUzycia } from "../analiza/ZakresUzycia";
@@ -45,6 +46,7 @@ export function Analiza() {
   const dostawy = useAnalizaDostaw(okna.dostawy, zakres === "dostawy");
   const hala = useAnaliza(okna.hala, zakres === "hala");
   const metryki = useMetryki(okna.hala, zakres === "hala");
+  const ergonomia = useErgonomia(okna.hala, zakres === "hala");
   const obsluga = useCzasOdpowiedzi(okna.obsluga, zakres === "obsluga");
   const uzycie = useUzycie(okna.uzycie, zakres === "uzycie");
   const [bladCsv, setBladCsv] = useState("");
@@ -98,6 +100,9 @@ export function Analiza() {
       {zakres === "uzycie" && uzycie.data && <ZakresUzycia r={uzycie.data} />}
       {zakres === "hala" && hala.data && <>
         <ZakresHali a={hala.data} m={metryki.data} />
+        {/* Tuż pod metrykami: te mówią ILE, ergonomia — GDZIE i przez co. */}
+        {ergonomia.data && <KartaErgonomii e={ergonomia.data} />}
+        <Blad>{ergonomia.error?.message}</Blad>
         <Strefa />
       </>}
     </div>

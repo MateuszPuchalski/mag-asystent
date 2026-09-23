@@ -25,6 +25,8 @@ enum class Screen {
     SETUP,
     // diagnostyka łączności: co widzi kolektor, gdy „nie widzi serwera"
     POLACZENIE,
+    // szukanie zgubionego kolektora: lista urządzeń i przycisk ZADZWOŃ
+    KOLEKTORY,
 }
 
 private val BACK: Map<Screen, Screen> = mapOf(
@@ -40,6 +42,7 @@ private val BACK: Map<Screen, Screen> = mapOf(
     // z kreatora wraca się do ustawień; przy pustej instalacji nie ma dokąd
     Screen.SETUP to Screen.SETTINGS,
     Screen.POLACZENIE to Screen.SETTINGS,
+    Screen.KOLEKTORY to Screen.SETTINGS,
 )
 
 /** Cel przycisku wstecz; null = brak (splash i home pokazują logo). */
@@ -65,4 +68,5 @@ val SCREEN_TITLES: Map<Screen, String> = mapOf(
     Screen.FIELD_TASKS to "ZADANIA Z BIURA",
     Screen.SETUP to "KONTA",
     Screen.POLACZENIE to "POŁĄCZENIE",
+    Screen.KOLEKTORY to "ZNAJDŹ KOLEKTOR",
 )

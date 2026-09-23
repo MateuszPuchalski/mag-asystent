@@ -10,11 +10,13 @@ import pl.wertis.kolektor.core.cache.CardsRepository
 import pl.wertis.kolektor.core.net.DeviceEventBody
 import pl.wertis.kolektor.data.AktualizacjaRepository
 import pl.wertis.kolektor.data.TelemetryRepository
+import pl.wertis.kolektor.data.WezwanieRepository
 import pl.wertis.kolektor.data.LocationsRepository
 import pl.wertis.kolektor.data.MagazynyRepository
 import pl.wertis.kolektor.data.ProblemsRepository
 import pl.wertis.kolektor.data.QueueRepository
 import pl.wertis.kolektor.core.net.DziennikCiszy
+import pl.wertis.kolektor.core.net.LicznikCzasow
 import pl.wertis.kolektor.data.wyslijPrzerwy
 import pl.wertis.kolektor.data.RecentStore
 import pl.wertis.kolektor.data.SessionRepository
@@ -26,6 +28,7 @@ import pl.wertis.kolektor.device.BatteryAssist
 import pl.wertis.kolektor.device.ConnectivityMonitor
 import pl.wertis.kolektor.device.Feedback
 import pl.wertis.kolektor.device.MotionMonitor
+import pl.wertis.kolektor.device.Syrena
 import pl.wertis.kolektor.nav.AppNavState
 import pl.wertis.kolektor.net.ApiClient
 import pl.wertis.kolektor.net.ApiService
@@ -71,12 +74,19 @@ class AppGraph(context: Context) {
        cykl, bo typ `api` jest znany bez zaglądania do `apiClient`. */
     val session: SessionRepository = SessionRepository({ api }, appScope, context)
 
+    /* Czasy odpowiedzi per ekran i trasa (0.482.0). Licznik powstaje PRZED
+       klientem HTTP, bo klient do niego pisze; wysyłkę prowadzi telemetria. */
+    val czasy = LicznikCzasow()
+
     val apiClient: ApiClient = ApiClient(
         currentUser = { session.currentUser },
         sessionToken = { session.token },
         deviceId = settings.deviceId,
         initialBaseUrl = settings.current.serverUrl,
         cacheDir = context.cacheDir,
+        czasy = czasy,
+        // `nav` powstaje niżej; żądanie sprzed jego narodzin dostaje „?"
+        ekran = { runCatching { nav.screen.value.name }.getOrNull() ?: "?" },
     )
     val api: ApiService get() = apiClient.service
 
@@ -136,6 +146,15 @@ class AppGraph(context: Context) {
 
     val telemetry = TelemetryRepository(api, appScope)
 
+    /* Szukanie zgubionego kolektora. Pyta z sesji, bo lista `BEZ_SESJI` na
+       serwerze jest zamknięta — wylogowany kolektor nie zadzwoni i panel
+       mówi to wprost przy jego wierszu. */
+    val wezwanie = WezwanieRepository(
+        api, appScope, Syrena(context),
+        zalogowany = { session.token != null },
+        deviceId = settings.deviceId,
+    )
+
     val scanner = ScannerManager(context)
 
     val motion = MotionMonitor(
@@ -179,6 +198,9 @@ class AppGraph(context: Context) {
         session.refresh()
         // ślad po pobieraniu przerwanym w poprzednim uruchomieniu
         aktualizacja.sprzatnij()
+        // w zasięgu aplikacji, nie ekranu — powód w `WezwanieRepository`
+        wezwanie.start()
+        telemetry.wysylajCzasy(czasy)
         // zmiana adresu serwera w Ustawieniach działa od ręki
         appScope.launch {
             settings.settings.collect { apiClient.setBaseUrl(it.serverUrl) }

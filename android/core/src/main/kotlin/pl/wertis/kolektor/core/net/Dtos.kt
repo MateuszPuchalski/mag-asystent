@@ -528,6 +528,8 @@ data class DeviceEventBody(
     val adres: String? = null,
     /** Adres serwera z ustawień kolektora — bywa różny na różnych sztukach. */
     val serwer: String? = null,
+    /** `czasy_zadan`: paczka czasów odpowiedzi per ekran i trasa (`CzasyZadan.kt`). */
+    val czasy: List<WierszCzasow>? = null,
 )
 
 /* ── Odpowiedzi ───────────────────────────────────────────────────────── */
@@ -851,6 +853,45 @@ data class OtwarcieResponse(val ok: Boolean = true, val wycofane: Int = 0, val p
 
 @Serializable
 data class WycofanieResponse(val ok: Boolean = true, val statusLinii: String? = null)
+
+/* ── Szukanie zgubionego kolektora — lustro services/szukanie-kolektora.ts ── */
+
+@Serializable
+data class WezwanieKolektora(
+    val przez: String,
+    val od: String,
+    val doKiedy: String,
+    /** Kolektor zapytał od chwili wezwania, czyli dzwoni. */
+    val odebrane: Boolean = false,
+)
+
+/** Odpowiedź na pytanie kolektora o własne wezwanie; `null` = cisza. */
+@Serializable
+data class WezwanieResponse(val wezwanie: WezwanieKolektora? = null)
+
+@Serializable
+data class KolektorView(
+    val deviceId: String,
+    val etykieta: String,
+    /* `osoba` na drucie, inna nazwa tutaj: `osoba` jest już rozszerzeniem
+       stanu sesji w `core.session`, a dwa znaczenia jednej nazwy w jednym
+       ekranie to pomyłka czekająca na okazję. */
+    @SerialName("osoba") val ostatniaOsoba: String? = null,
+    val zalogowany: Boolean = false,
+    val ostatnioWidziany: String? = null,
+    val slucha: Boolean = false,
+    val wezwanie: WezwanieKolektora? = null,
+)
+
+/** `ten` to `x-device` pytającego — samego siebie się nie szuka. */
+@Serializable
+data class KolektoryResponse(val kolektory: List<KolektorView> = emptyList(), val ten: String? = null)
+
+@Serializable
+data class WezwijResponse(val ok: Boolean = true, val kolektor: KolektorView? = null)
+
+@Serializable
+data class KoniecSzukaniaResponse(val ok: Boolean = true, val bylo: Boolean = false)
 
 @Serializable
 data class PutawayLineBody(
