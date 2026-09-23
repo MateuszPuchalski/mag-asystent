@@ -844,8 +844,10 @@ export async function nadawcaKluczaAnthropic(
   try {
     const odp = await anthropic().messages.parse({
       model: config.copilot.model,
-      /* Kilka pól po kilka słów. Sufit z zapasem, nie z oszczędności. */
-      max_tokens: 300,
+      /* Kilka pól po kilka słów, ale sufit liczy też myślenie, które na
+         claude-opus-5 jest włączone domyślnie. Ucięty JSON to wywołanie
+         zapłacone za nic; sufit nic nie kosztuje, dopóki go nie użyto. */
+      max_tokens: 1024,
       system: [{ type: "text", text: INSTRUKCJA_KLUCZA, cache_control: { type: "ephemeral" } }],
       output_config: {
         /* Niski wysiłek: to jest rozpoznanie oznaczenia, nie rozumowanie. */
@@ -1072,8 +1074,10 @@ export const nadawcaRozpoznaniaAnthropic: NadawcaRozpoznania =
       const odp = await anthropic().messages.parse({
         model: config.copilot.model,
         /* Karta to kilkanaście krótkich zdań. Limit z zapasem na listę braków,
-           bo to ona bywa najdłuższa i to ona jest tu najcenniejsza. */
-        max_tokens: 1024,
+           bo to ona bywa najdłuższa i to ona jest tu najcenniejsza. Sufit
+           liczy też myślenie przy średnim wysiłku, a rozmowa bywa trójstronna
+           i ze zdjęciami. Stąd zapas większy niż sama karta. */
+        max_tokens: 4000,
         system: [{ type: "text", text: INSTRUKCJA_KARTY, cache_control: { type: "ephemeral" } }],
         output_config: {
           /* Wyżej niż przy klasyfikacji: to czytanie ze zrozumieniem długiej,
