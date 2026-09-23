@@ -21,6 +21,30 @@ const ZDANIE: Record<StanRabatu["stan"], string> = {
   nie_wiadomo: "Rabat transakcyjny: nie wiadomo",
 };
 
+/**
+ * Krótki napis znacznika (0.455.0) — pełne zdanie z `ZDANIE` stoi w podpowiedzi.
+ *
+ * „Rabat transakcyjny:" powtarzał się przy każdej pozycji każdego zwrotu. Ikona
+ * procentu mówi „rabat", a znacznik zostawia samo to, co się zmienia: stan.
+ * Cztery stany dalej mają cztery różne słowa, bo każde każe co innego zrobić.
+ */
+const KROTKO: Record<StanRabatu["stan"], string> = {
+  brak: "brak wniosku",
+  zlozony: "czeka na decyzję",
+  przyznany: "przyznany",
+  odrzucony: "odrzucony",
+  nie_wiadomo: "nie wiadomo",
+};
+
+/** Barwa znacznika: dobry, zły albo neutralny — słowo obok mówi resztę. */
+const TON: Record<StanRabatu["stan"], string> = {
+  brak: "bg-slate-100 text-slate-700",
+  zlozony: "bg-slate-100 text-slate-700",
+  przyznany: "bg-sky-50 text-sky-900",
+  odrzucony: "bg-red-50 text-red-800",
+  nie_wiadomo: "bg-slate-100 text-slate-700",
+};
+
 export function Rabat({ rabat, trwa, blad, onZglos }: {
   rabat: StanRabatu;
   trwa: boolean;
@@ -39,28 +63,28 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
      kosztowało nieodwracalny wniosek o cudze pieniądze. */
   const [pytam, setPytam] = useState(false);
 
-  const kolor = rabat.stan === "przyznany" ? "text-ranga-ok"
-    : rabat.stan === "odrzucony" ? "text-ranga-zle"
-    : rabat.stan === "nie_wiadomo" ? "text-slate-500" : "text-slate-600";
-
-  return <div className="mt-1 text-xs">
-    <div className="flex flex-wrap items-center gap-1.5">
-      <BadgePercent size={12} className="shrink-0 text-slate-400" />
-      <span className={kolor}>{ZDANIE[rabat.stan]}</span>
+  /* `contents` na korzeniu: znacznik staje w RZĘDZIE znaczników pozycji obok
+     kartoteki, a bloki niżej — potwierdzenie, powód, błąd — zawijają się pod
+     nim przez `w-full`, bo to zdania do przeczytania, nie stany. */
+  return <div className="contents text-xs">
+    <span title={ZDANIE[rabat.stan]}
+      className={`inline-flex h-6 items-center gap-1 rounded-full px-2 text-xs font-semibold ${TON[rabat.stan]}`}>
+      <BadgePercent size={12} aria-hidden="true" />
+      <span className="sr-only">Rabat transakcyjny: </span>{KROTKO[rabat.stan]}
       {rabat.prowizjaGrosze !== null && <b className="tabular-nums">
-        {zlote(rabat.prowizjaGrosze, rabat.waluta ?? "PLN")}</b>}
+        {" "}{zlote(rabat.prowizjaGrosze, rabat.waluta ?? "PLN")}</b>}
       {/* `MANUAL` czy `AUTOMATIC` — czyli czy ktoś musiał kliknąć, czy Allegro
           zrobiło to samo. To ta liczba mówi, ile pracy zdejmuje przycisk. */}
-      {rabat.typ === "AUTOMATIC" && <span className="text-slate-500">· automat Allegro</span>}
+      {rabat.typ === "AUTOMATIC" && <span className="font-normal"> · automat Allegro</span>}
+    </span>
 
-      {rabat.stan === "brak" && !pytam && <Przycisk className="ml-auto text-xs" disabled={trwa}
-        onClick={() => setPytam(true)}>ZGŁOŚ RABAT</Przycisk>}
-    </div>
+    {rabat.stan === "brak" && !pytam && <Przycisk className="text-xs" disabled={trwa}
+      onClick={() => setPytam(true)}>ZGŁOŚ RABAT</Przycisk>}
 
     {/* Zdanie mówi SKUTEK, nie „czy na pewno": pytanie bez treści uczy tylko
         odruchu klikania „tak". Po złożeniu przycisk i tak znika, więc to jedyny
         moment, w którym ta informacja kogokolwiek dosięgnie. */}
-    {rabat.stan === "brak" && pytam && <div className="mt-1 flex flex-wrap items-center gap-2
+    {rabat.stan === "brak" && pytam && <div className="flex w-full flex-wrap items-center gap-2
       rounded border border-slate-200 bg-slate-50 p-1.5">
       <span className="text-slate-600">Wniosek idzie do Allegro i panel go nie wycofa.</span>
       <Przycisk wariant="glowny" className="ml-auto text-xs" disabled={trwa}
@@ -72,7 +96,7 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
     {/* Brak dopasowania mówi POWÓD — milczenie wygląda jak usterka panelu,
         a jest zerwanym ogniwem w danych (ten sam wzorzec co przy kartotekach). */}
     {rabat.stan === "nie_wiadomo" && rabat.powod &&
-      <p className="mt-0.5 text-slate-500">{rabat.powod}</p>}
+      <p className="w-full text-slate-500">{rabat.powod}</p>}
 
     {/* WNIOSEK SPOZA PANELU (0.176.0). Złożony ręcznie w panelu Allegro albo
         przez ich automat nie ma prawa być w naszym lustrze, dopóki nie
@@ -80,10 +104,10 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
         i to on tu mówi — a ekran przyznaje się, ile z tego wie: numeru
         wniosku ani kwoty prowizji zwrot nie podaje. */}
     {rabat.zrodlo === "zwrot" && rabat.powod &&
-      <p className="mt-0.5 text-slate-500">
+      <p className="w-full text-slate-500">
         {rabat.powod} Samego wniosku jeszcze nie pobraliśmy, więc numeru
         i kwoty prowizji nie znamy.</p>}
 
-    {blad && <p className="mt-0.5 font-semibold text-ranga-zle">{blad}</p>}
+    {blad && <p className="w-full font-semibold text-ranga-zle">{blad}</p>}
   </div>;
 }

@@ -205,7 +205,11 @@ describe("Dowody", () => {
        jedną" niesie znacznik „wraca" przy jego wierszu. */
     expect(screen.getAllByText("Sekator NAC")).toHaveLength(1);
     expect(screen.getByText("Zraszacz obrotowy")).toBeInTheDocument();
-    expect(screen.getAllByText("wraca 1")).toHaveLength(1);
+    /* Od 0.455.0 znacznik to strzałka z liczbą; słowo „wraca" niesie
+       podpowiedź i tekst dla czytnika — dlatego pytamy o całą treść. */
+    const wraca = screen.getAllByTitle("Wraca w tym zwrocie");
+    expect(wraca).toHaveLength(1);
+    expect(wraca[0]).toHaveTextContent(/^wraca 1$/);
   });
 
   /* ZGŁOSZENIE WŁAŚCICIELA (0.176.0): „wraca dwie sztuki jest mylące, bo w tym
@@ -216,7 +220,7 @@ describe("Dowody", () => {
       { offerId: "111", nazwa: "Uchwyt do kosy", sku: "50-025", ilosc: 2,
         cenaGrosze: 1899, waluta: "PLN", zwracana: true, wracaIlosc: 1, twId: null, twSymbol: null, twZrodlo: null, ofertaZdjecie: "nieznane" as const },
     ] } })} />));
-    expect(screen.getByText("wraca 1 z 2")).toBeInTheDocument();
+    expect(screen.getByTitle("Wraca w tym zwrocie")).toHaveTextContent(/^wraca 1 z 2$/);
     /* Liczba kupionych sztuk NIE znika — to ona mówi, ile klient ma u siebie. */
     expect(screen.getByText("2 × 18,99 PLN")).toBeInTheDocument();
   });
@@ -238,7 +242,7 @@ describe("Dowody", () => {
       { offerId: "111", nazwa: "Uchwyt do kosy", sku: "50-025", ilosc: 2,
         cenaGrosze: 1899, waluta: "PLN", zwracana: true, wracaIlosc: 2, twId: null, twSymbol: null, twZrodlo: null, ofertaZdjecie: "nieznane" as const },
     ] } })} />));
-    expect(screen.getByText("wraca 2")).toBeInTheDocument();
+    expect(screen.getByTitle("Wraca w tym zwrocie")).toHaveTextContent(/^wraca 2$/);
   });
 
   it("bez pobranego zamówienia pokazuje identyfikator i MÓWI, CO ZROBIĆ", () => {
