@@ -50,6 +50,21 @@ dostawcy dopiero po wejściu w dokument.
 
 - **[wymaga działania]** Przebuduj panel.
 
+## 0.447.1 — 23 września 2026
+
+**Rozmowa pokazuje zamówienie z NAJNOWSZEGO pytania, nie ze starego.**
+Zgłoszenie właściciela ze zrzutem: „proszę o fv" z lipca pod jednym
+zamówieniem i „PROSZĘ O FV" z września pod drugim. Ekran, pasmo, stan paczki
+i szkic mówiły o lipcowym.
+
+Przyczyna jest ta sama co w 0.447.0. Wątek wczytany w całości jedną paczką
+dostawał `id` od najnowszej wiadomości, a wybór zamówienia i oferty szedł
+po `id`. Synchronizacja wpisuje już od najstarszej, ale stare wiersze
+zostały.
+
+- Zamówienie rozmowy, oferta rozmowy i oś czytają wiadomości po czasie.
+- Dotyczy też dopasowania oferty w zakupach klienta i w doborze.
+
 ## 0.447.0 — 23 września 2026
 
 **Prawa kolumna skrzynki bez powtórzeń i bez ramek w ramkach, a wysyłka bez

@@ -90,7 +90,7 @@ export function kandydaciZamowien(
       FROM message
      WHERE conversation_id = ? AND related_object_type = 'OFFER'
        AND related_object_id IS NOT NULL AND direction = 'incoming'
-     ORDER BY id DESC LIMIT 1`).get(conversationId) as { oferta?: unknown } | undefined)?.oferta);
+     ORDER BY sent_at DESC, id DESC LIMIT 1`).get(conversationId) as { oferta?: unknown } | undefined)?.oferta);
 
   /* `COLLATE NOCASE` na loginie i to NIE jest ostrożność na wszelki wypadek:
      Allegro oddaje ten sam login raz małymi, raz wielkimi literami — w tej
@@ -142,6 +142,13 @@ export function zamowienieWskazane(
 /**
  * Numer zamówienia, którego dotyczy rozmowa — JEDNA reguła dla ekranu i szkicu.
  *
+ * „Najnowsza" znaczy PO CZASIE, nie po `id` (23 września 2026). Zrzut
+ * właściciela: wątek z pytaniem o fakturę z lipca i drugim z września, każde
+ * pod innym zamówieniem, a ekran pokazał lipcowe. Wątek wczytany w całości
+ * jedną paczką dostawał `id` od najnowszej wiadomości, więc wrześniowa miała
+ * NIŻSZE. Synchronizacja wpisuje już od najstarszej (0.447.0), ale stare
+ * wiersze zostały — czas jest jedynym porządkiem, który ich nie myli.
+ *
  * Numer z najnowszej wiadomości KLIENTA, która go niesie; gdy klient go nie
  * podał — z najnowszej naszej; gdy nie ma żadnej — wskazanie człowieka.
  * Wiadomość bije wskazanie, bo numer z Allegro jest faktem, a wskazanie
@@ -155,7 +162,7 @@ export function numerZamowieniaRozmowy(
 ): { konto: number; externalId: string } | null {
   const w = database.prepare(`SELECT related_order_id AS numer, channel_account_id AS konto
       FROM message WHERE conversation_id=? AND related_order_id IS NOT NULL
-     ORDER BY direction='incoming' DESC, id DESC LIMIT 1`)
+     ORDER BY direction='incoming' DESC, sent_at DESC, id DESC LIMIT 1`)
     .get(conversationId) as { numer: string; konto: number } | undefined;
   if (w) return { konto: Number(w.konto), externalId: String(w.numer) };
   const wskazane = zamowienieWskazane(conversationId, database);
