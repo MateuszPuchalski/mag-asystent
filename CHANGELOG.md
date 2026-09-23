@@ -34,6 +34,22 @@ historii nie przepisujemy.
 ---
 
 
+## 0.449.0 — 23 września 2026
+
+**Dostawy pokazują towar i dostawcę obrazem.** Zgłoszenie właściciela ze
+zrzutem nietkniętej faktury: czternaście pozycji bez jednego zdjęcia, a logo
+dostawcy dopiero po wejściu w dokument.
+
+- Tabela pozycji dokumentu ma znowu kolumnę zdjęć. Przeprowadzka z `biuro.html`
+  (0.435.0) ją zgubiła — zdjęcie zostało tylko przy pozycji z wyjątkiem.
+  Kolumna stoi wtedy, gdy instalacja ma zdjęcia kartotek, jak w biurze.
+- Wiersz listy dostaw ma logo dostawcy z lewej, jak na kolektorze. Dostawca
+  bez logo zostawia puste miejsce, więc numery zaczynają się w jednej kolumnie.
+- Symbol towaru i pastylka stanu nie łamią się już w wąskiej tabeli
+  („DO / ZROBIENIA" pod „0/100" ze zrzutu właściciela).
+
+- **[wymaga działania]** Przebuduj panel.
+
 ## 0.447.0 — 23 września 2026
 
 **Prawa kolumna skrzynki bez powtórzeń i bez ramek w ramkach, a wysyłka bez
