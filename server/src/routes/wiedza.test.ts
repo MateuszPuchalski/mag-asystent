@@ -129,6 +129,7 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/wiedza/wykazy",
     payload: { zrodlo: "IPL", tresc: { csv: "Model;Numer części\nLS 51;16100-ZH8-W61" }, zastosuj: false } },
   { method: "POST" as const, url: "/api/obsluga/wiedza/wykazy/1/wycofaj" },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/wykazy/1/zatwierdz", payload: { ids: [1] } },
 ];
 
 test("bez sesji żadna trasa wiedzy nie odpowiada danymi", async () => {
@@ -146,7 +147,7 @@ test("hala nie widzi wiedzy — także na odczycie", async () => {
   }
 });
 
-test("tras zapisu jest dwadzieścia pięć — licznik jest umową", () => {
+test("tras zapisu jest dwadzieścia sześć — licznik jest umową", () => {
   /* Trzy przy zabudowie silnika (0.229.0) i trzy przy pasowaniu części:
      propozycja, rozstrzygnięcie i wycofanie. Każda z tych relacji ma ten sam
      cykl życia co zastosowanie, a bez własnego wycofania zatwierdzona pomyłka
@@ -184,8 +185,13 @@ test("tras zapisu jest dwadzieścia pięć — licznik jest umową", () => {
      test niżej, bo licznik tras tego nie widzi.
 
      DWUDZIESTA CZWARTA I DWUDZIESTA PIĄTA: wykaz części producenta i jego
-     wycofanie — ten sam kształt co odsyłacze, z tego samego powodu. */
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 25);
+     wycofanie — ten sam kształt co odsyłacze, z tego samego powodu.
+
+     DWUDZIESTA SZÓSTA: zatwierdzenie propozycji z wykazu LISTĄ, którą
+     człowiek przejrzał na ekranie. Jedna trasa na listę, jak przy tokenach —
+     trzydzieści żądań na trzydzieści wierszy to trzydzieści szans na
+     rozjazd w połowie. */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 26);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {
@@ -330,7 +336,7 @@ test("żądanie bez ciała nie wywala się na pustym JSON-ie", async () => {
     `/api/obsluga/wiedza/pasowania/${pasowanie}/wycofaj`, "/api/obsluga/wiedza/pasowania",
     "/api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij", "/api/obsluga/wiedza/zamiennosci-oem/1/wycofaj",
     "/api/obsluga/wiedza/odsylacze", "/api/obsluga/wiedza/odsylacze/1/wycofaj",
-    "/api/obsluga/wiedza/wykazy", "/api/obsluga/wiedza/wykazy/1/wycofaj"]) {
+    "/api/obsluga/wiedza/wykazy", "/api/obsluga/wiedza/wykazy/1/wycofaj", "/api/obsluga/wiedza/wykazy/1/zatwierdz"]) {
     const r = await app.inject({ method: "POST", url, headers: b.naglowki });
     assert.equal(r.statusCode, 400, url);
     assert.doesNotMatch(r.body, /FST_ERR_CTP_EMPTY_JSON_BODY/, url);
@@ -384,6 +390,18 @@ test("podgląd wykazu części nie zostawia nawet modelu maszyny; zapis rodzi pr
   assert.deepEqual(z.dowody.map((d) => [d.rodzaj, d.tresc]), [["producent", "IPL STIHL MS 999: STIHL MS 999 — numer 16100-ZH8-W61"]]);
   r = await app.inject({ method: "GET", url: "/api/obsluga/wiedza/wykazy", headers: b.naglowki });
   assert.deepEqual(r.json<Array<{ zrodlo: string; czeka: number }>>().map((i) => [i.zrodlo, i.czeka]), [["IPL STIHL MS 999", 1]]);
+
+  /* Kolejka niesie przegląd wykazu; zatwierdzenie listą idzie jedną trasą. */
+  r = await app.inject({ method: "GET", url: "/api/obsluga/wiedza/kolejka", headers: b.naglowki });
+  const [wykaz] = r.json<{ wykazy: Array<{ id: number; zrodlo: string; pozycje: Array<{ id: number; dowod: string }> }> }>().wykazy;
+  assert.equal(wykaz.zrodlo, "IPL STIHL MS 999");
+  assert.deepEqual(wykaz.pozycje.map((p) => p.dowod), ["STIHL MS 999 — numer 16100-ZH8-W61"]);
+  r = await app.inject({ method: "POST", url: `/api/obsluga/wiedza/wykazy/${wykaz.id}/zatwierdz`, headers: b.naglowki,
+    payload: { ids: wykaz.pozycje.map((p) => p.id) } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.deepEqual(r.json<{ zatwierdzono: number; pominieto: number }>(), { ...r.json(), zatwierdzono: 1, pominieto: 0 });
+  r = await app.inject({ method: "GET", url: "/api/obsluga/wiedza/kolejka", headers: b.naglowki });
+  assert.deepEqual(r.json<{ wykazy: unknown[] }>().wykazy, []);
 });
 
 test("luki idą razem z kolejką jednym odczytem", async () => {

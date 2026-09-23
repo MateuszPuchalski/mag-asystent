@@ -4,8 +4,9 @@ import {
   useKolejkaWiedzy, useModeleZOpisow, useRozstrzygnijPasowanie, useRozstrzygnijZamiennosc,
   useRozstrzygnijZastosowanie, useSilniki,
   useTokenySilnikow,
-  useZaproponujZastosowanie,
+  useZaproponujZastosowanie, useZatwierdzZWykazu,
 } from "../api/wiedza";
+import { PrzegladWykazu } from "../wiedza/PrzegladWykazu";
 import { PropozycjaPasowania } from "../wiedza/PropozycjaPasowania";
 import { KandydatZamiennosci } from "../wiedza/KandydatZamiennosci";
 import { Blad, Karta, Pusto, Zakladki, ile } from "../ui";
@@ -45,6 +46,7 @@ export function Wiedza() {
   const rozstrzygnijPasowanie = useRozstrzygnijPasowanie();
   const rozstrzygnijZamiennosc = useRozstrzygnijZamiennosc();
   const zaproponuj = useZaproponujZastosowanie();
+  const zatwierdzZWykazu = useZatwierdzZWykazu();
   const [widok, setWidok] = useState<Widok>("kolejka");
   const [blad, setBlad] = useState("");
   const [wyslano, setWyslano] = useState("");
@@ -52,7 +54,11 @@ export function Wiedza() {
      ze sobą, bo szukanie tego samego symbolu drugi raz to czysta strata. */
   const [zSieci, setZSieci] = useState<Towar | null>(null);
 
-  const propozycje = kolejka.data?.propozycje ?? [];
+  /* Propozycje z wykazów części idą przeglądem listą; pojedyncze karty
+     dostaje wyłącznie reszta. Każda propozycja stoi na ekranie RAZ. */
+  const wykazy = kolejka.data?.wykazy ?? [];
+  const wPrzegladzie = new Set(wykazy.flatMap((w) => w.pozycje.map((p) => p.id)));
+  const propozycje = (kolejka.data?.propozycje ?? []).filter((z) => !wPrzegladzie.has(z.id));
   const pasowania = kolejka.data?.pasowania ?? [];
   const zamiennosci = kolejka.data?.zamiennosciOem ?? [];
 
@@ -92,10 +98,23 @@ export function Wiedza() {
         <Blad>{blad || (kolejka.error as Error | null)?.message}</Blad>
 
         {widok === "kolejka" && <>
-          {!kolejka.isLoading && propozycje.length === 0 && pasowania.length === 0 && zamiennosci.length === 0 &&
+          {!kolejka.isLoading && propozycje.length === 0 && wykazy.length === 0 && pasowania.length === 0 && zamiennosci.length === 0 &&
             <Pusto ikona={BookMarked}>
               Nic nie czeka. Propozycje biorą się z zatwierdzonych doborów, z pomiarów hali i z ręcznych wpisów.
             </Pusto>}
+          {wyslano && <p className="mb-3 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">{wyslano}</p>}
+          {wykazy.length > 0 && <div className="mb-3 space-y-3">
+            {wykazy.map((w) => <PrzegladWykazu key={w.id} w={w} trwa={zatwierdzZWykazu.isPending || rozstrzygnij.isPending}
+              onZatwierdz={(ids) => { setBlad(""); setWyslano("");
+                zatwierdzZWykazu.mutate({ importId: w.id, ids }, {
+                  onSuccess: (r) => setWyslano(`Zatwierdzono ${ile(r.zatwierdzono, "propozycję", "propozycje", "propozycji")}`
+                    + ` z wykazu „${w.zrodlo}”.`
+                    + (r.pominieto > 0 ? ` ${r.pominieto} rozstrzygnął w międzyczasie ktoś inny — tych lista nie ruszyła.` : "")),
+                  onError: (e) => setBlad((e as Error).message),
+                }); }}
+              onOdrzuc={(id, powod) => { setBlad("");
+                rozstrzygnij.mutate({ id, decyzja: "odrzuc", powod }, { onError: (e) => setBlad((e as Error).message) }); }} />)}
+          </div>}
           <div className="space-y-3">
             {propozycje.map((z) => <Propozycja key={z.id} z={z} trwa={rozstrzygnij.isPending}
               onRozstrzygnij={(id, decyzja, powod) => { setBlad("");

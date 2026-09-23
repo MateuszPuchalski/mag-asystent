@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.471.0 — 23 września 2026
+## 0.472.0 — 23 września 2026
 
 **Szukanie zgubionego kolektora.** Magazynier odkłada kolektor „na chwilę”
 na regale albo na wózku i zapomina gdzie. Teraz ktoś inny każe mu zadzwonić
@@ -66,6 +66,29 @@ dzwoni dopiero z nowym APK. Stary kolektor jest na liście, ale ma „cisza”.
 Nowe trasy `/api/kolektory…` i `/api/kolektor/wezwanie`, serwis
 `szukanie-kolektora.ts` z testami, karta panelu z testem, reguły w `:core`
 (`SzukanieKolektora.kt`) z testami, nowy ekran kolektora KOLEKTORY.
+
+## 0.471.0 — 23 września 2026
+
+**Przegląd wykazu części w kolejce: jedna lista, zatwierdzenie zaznaczonych.**
+Wykaz jednego silnika daje kilkadziesiąt propozycji naraz. Jako osobne karty
+zalewały kolejkę, a każda wymagała przewinięcia i dwóch kliknięć. Decyzja
+przy każdej jest jednak ta sama: czy nasza część to ten numer z wykazu.
+
+- **Jedna lista na wykaz**, na górze kolejki. Wiersz niesie zdjęcie, symbol,
+  nazwę kartoteki, maszynę, numer z wykazu i warunki. Propozycja z wykazu nie
+  stoi już niżej jako osobna karta.
+- **Zaznaczone domyślnie.** Wiersz przyszedł z wykazu producenta przez numer,
+  który kartoteka sama deklaruje, więc odznacza się wyjątki. Odznaczone czeka
+  dalej w kolejce, bo lista nie ma skąd wziąć powodu odrzucenia.
+- **Odrzucenie wiersza** idzie osobno, z powodem, jak każde odrzucenie.
+- **„Zatwierdź zaznaczone”** to jedno żądanie. Zatwierdza tylko propozycje
+  tego wykazu. Obcy identyfikator odbija całą listę. Wiersz rozstrzygnięty
+  w międzyczasie przez kogoś innego liczy się jako pominięty.
+- Każda propozycja dostaje własny zapis rozstrzygnięcia z nazwiskiem, jak
+  przy zatwierdzeniu pojedynczym. Dziennik dostaje też zdarzenie całej listy.
+
+Trasa zapisu `wykazy/:id/zatwierdz` (licznik 26), pole `importId`
+w zastosowaniu, grupy `wykazy` w odczycie kolejki.
 
 ## 0.470.0 — 23 września 2026
 
