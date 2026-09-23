@@ -2656,6 +2656,25 @@ zabraniała, odeszła 22 września 2026 decyzją właściciela (§27). Kodu taki
 wysyłki jednak nie ma. Specyfikacja z 20 września opisuje warunki, na jakich
 ma powstać: bramka per klasa, dowody z tygodnia pracy i wyłącznik awaryjny.
 
+### 14.6b. Wzorzec odpowiedzi dla kategorii (0.474.0)
+
+Zgłoszenie właściciela: „gdy pytanie jest sklasyfikowane, ułóż odpowiedź
+odpowiednio do tego". Z trzech propozycji wybrał wzorzec dla kategorii.
+Szkic po rozpoznaniu i fakty dobierane pod kategorię zostały na później.
+
+**Fakt „rozpoznanie" niesie „jak odpowiedzieć"** — jeden wzorzec, ten dla
+bieżącej kategorii (`services/wzorce-odpowiedzi.ts`). Wzorzec mówi, co
+odpowiedź ma zawierać, o co zapytać i czego nie obiecywać. Instrukcja
+szkicu każe się go trzymać, ale reguły szkicu i rozmowa są od niego ważniejsze.
+
+**Jeden wzorzec w fakcie, nie piętnaście w instrukcji.** Obce wzorce
+kusiłyby model zdaniami z innej sprawy, a stała instrukcja dalej trafia
+w cache dostawcy. Kategoria bez wzorca się nie skompiluje.
+
+**Wzorzec nie rozstrzyga sprawy.** Zwrot pieniędzy, wymianę, uznanie
+reklamacji i anulowanie robi człowiek. Terminów, kosztów i kwot wzorzec
+nie podaje, bo polityki sklepu nie ma w faktach.
+
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
 Pytanie właściciela z 8 września 2026, nad szkicem o śrubę noża do kosiarki

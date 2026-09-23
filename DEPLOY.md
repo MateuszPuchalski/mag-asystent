@@ -2582,6 +2582,13 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.474.0 — wzorzec odpowiedzi dla kategorii
+
+**Wystarczy restart serwera.** Bez migracji i bez zmian w panelu.
+
+Sprawdzenie: w rozmowie z pytaniem o paczkę kliknij „Rozpoznaj”, potem
+„Ułóż odpowiedź”. Szkic ma podać stan przesyłki i nie pytać o maszynę.
+
 ### Aktualizacja do 0.472.0 — użyteczność: jedna lista, Ctrl+K, historia klienta
 
 **Panel trzeba przebudować, a serwer zrestartować.** Bez migracji — nowe trasy
