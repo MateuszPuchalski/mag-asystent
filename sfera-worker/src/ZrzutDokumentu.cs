@@ -67,11 +67,14 @@ internal static class ZrzutDokumentu
     /**
      * Osobna granica dla wierszy, żeby długi paragon nie zjadł nagłówka.
      * Sześć wierszy z `#1116` po trzydzieści pól to około sześciu tysięcy znaków.
+     * Od 0.462.0 dwa razy tyle, bo każdy wiersz niesie też pozostałe pola.
      */
-    private const int MaksZnakowPozycji = 6000;
+    private const int MaksZnakowPozycji = 12000;
 
     /**
      * Górna granica długości — treść błędu ląduje w jednym wierszu kolejki.
+     *
+     * 8000, nie 4000 (0.462.0): zrzut dostał listę pozostałych pól.
      *
      * 4000, nie 1800 (0.457.0): pierwszy prawdziwy zrzut (zadanie `#1474`)
      * urwał się w środku listy pól nabywcy, a szerszy zestaw pól z sondy
@@ -79,7 +82,7 @@ internal static class ZrzutDokumentu
      * limitu, więc granica chroni tylko przed zrzutem obiektu, który ma setki
      * właściwości.
      */
-    private const int MaksZnakow = 4000;
+    private const int MaksZnakow = 8000;
 
     /* IDispatch widziany tylko do `GetTypeInfo`. Kolejność metod jest kolejnością
        w tablicy wirtualnej IDispatch, więc deklaracja kończy się na drugiej —
@@ -105,16 +108,20 @@ internal static class ZrzutDokumentu
 
         var wartosci = new List<string>();
         var prywatne = new List<string>();
+        var inne = new List<string>();
         foreach (string n in nazwy)
         {
             if (Prywatne.IsMatch(n))
                 prywatne.Add($"{n} {(CzyPuste(dokument, n) ? "puste" : "wypełnione")}");
             else if (Pola.IsMatch(n))
                 wartosci.Add($"{n}={Wartosc(dokument, n)}");
+            else
+                inne.Add($"{n} {StanPola(dokument, n)}");
         }
 
         string wynik = $"pola: {(wartosci.Count > 0 ? string.Join("; ", wartosci) : "(żadne nie pasuje)")}";
         if (prywatne.Count > 0) wynik += $" · nabywca/rachunek: {string.Join(", ", prywatne)}";
+        if (inne.Count > 0) wynik += $" · pozostałe: {string.Join(", ", inne)}";
         return wynik.Length <= MaksZnakow ? wynik : wynik[..MaksZnakow] + "…";
     }
 
@@ -148,10 +155,15 @@ internal static class ZrzutDokumentu
                 object el = pozycje.GetType().InvokeMember(
                     "Element", BindingFlags.GetProperty, null, pozycje, new object[] { i })!;
                 var pola = new List<string>();
+                var inne = new List<string>();
                 foreach (string n in NazwyWlasciwosci(el))
-                    if (!Prywatne.IsMatch(n) && PolaPozycji.IsMatch(n))
-                        pola.Add($"{n}={Wartosc(el, n)}");
-                wiersze.Add($"[{i}] {(pola.Count > 0 ? string.Join("; ", pola) : "(żadne pole nie pasuje)")}");
+                {
+                    if (Prywatne.IsMatch(n)) continue;
+                    if (PolaPozycji.IsMatch(n)) pola.Add($"{n}={Wartosc(el, n)}");
+                    else inne.Add($"{n} {StanPola(el, n)}");
+                }
+                string reszta = inne.Count > 0 ? $"; pozostałe: {string.Join(", ", inne)}" : "";
+                wiersze.Add($"[{i}] {(pola.Count > 0 ? string.Join("; ", pola) : "(żadne pole nie pasuje)")}{reszta}");
             }
             catch (Exception e)
             {
@@ -232,6 +244,29 @@ internal static class ZrzutDokumentu
         {
             return $"(odmowa: {(e.InnerException ?? e).Message.Trim()})";
         }
+    }
+
+    /**
+     * Stan pola spoza list — „puste", „wypełnione" albo odmowa z kodem (0.462.0).
+     *
+     * Od 0.461.0 zrzut odmowy i ręczny ZW 748 zgadzają się w KAŻDYM polu, które
+     * zrzut wypisywał — a zapis dalej odmawia. Zrzut widział jednak wyłącznie
+     * pola z list `Pola` i `Prywatne`; reszty nikt nie oglądał. Wartości tych
+     * pól nie wychodzą, bo nie wiemy, co niosą — mogą to być nazwisko albo
+     * adres pod nazwą, której `Prywatne` nie zna. Do zestawienia wystarcza
+     * stan, a odmowa zostaje odmową, bo i ona różni szkic od dokumentu.
+     */
+    private static string StanPola(object com, string nazwa)
+    {
+        try
+        {
+            Pobierz(com, nazwa);
+        }
+        catch (Exception e)
+        {
+            return $"odmowa 0x{(e.InnerException ?? e).HResult:X8}";
+        }
+        return CzyPuste(com, nazwa) ? "puste" : "wypełnione";
     }
 
     /**

@@ -684,7 +684,19 @@ i wierszy. Wyjątki to numer, nadawany przy zapisie, i jedno pole:
 To wartość przepisana z ZW biura, przy `PodzielonaPlatnosc = False` po obu
 stronach. Treść odmowy i dziennik mówią, czy setter przyjął zero.
 
-`[WERYFIKUJ]` Czy ZW z `WartoscVatPP = 0` przechodzi zapis.
+**`WartoscVatPP = 0` nie pomogło** (23 września 2026, PA 11458/MAG/09/2026).
+Setter przyjął zero, zrzut pokazuje `0.0000`, a zapis odmówił tym samym
+`0x80040F20`. Szkic zgadza się teraz z ręcznym ZW w każdym polu, które zrzut
+wypisywał.
+
+Zrzut wypisywał jednak tylko pola z dwóch list: płatności i kwot oraz nabywcy.
+Od 0.462.0 dopisuje resztę właściwości nagłówka i wierszy. O każdej mówi
+„puste", „wypełnione" albo kod odmowy odczytu. Wartości tych pól nie wychodzą,
+bo pod nieznaną nazwą może stać nazwisko albo adres.
+
+`--zrzut 9253431` i następna odmowa dadzą dwie listy do zestawienia pole w pole.
+
+`[WERYFIKUJ]` Które z pozostałych pól różni szkic workera od ZW biura.
 
 **Od 0.456.0 worker robi ten zrzut sam, w chwili odmowy.** Właściciel zapytany,
 czy uruchomi sondę z komunikatu, odpowiedział: „niech robi to sam". Po odmowie
