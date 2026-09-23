@@ -26,10 +26,12 @@ import {
 import {
   historiaWykazow, importujWykaz, przegladWykazow, wycofajWykaz, zatwierdzZWykazu, type ZadanieWykazu,
 } from "../services/wykaz-czesci.js";
+import { spiszOferty, sprawdzOferty, stanPasujeDo, zbierzPartie } from "../services/pasuje-do-ofert.js";
+import { BladLimituAllegro } from "../adapters/allegro.js";
 import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   DWADZIEŚCIA SZEŚĆ ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   DWADZIEŚCIA OSIEM ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
    przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
    (E3), trzy przy zabudowie silnika (0.229.0), trzy przy pasowaniu części:
    propozycja, rozstrzygnięcie i wycofanie, dwa przy słowniku silników
@@ -53,6 +55,9 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    sam kształt: podgląd i zapis jedną trasą, wycofanie czekających propozycji.
    Dwudziesty szósty to zatwierdzenie propozycji z wykazu listą, którą
    człowiek przejrzał — jedna trasa na listę, jak przy tokenach.
+   Dwudziesty siódmy i dwudziesty ósmy to zbiórka „Pasuje do" z ofert:
+   strona listy ofert konta i partia treści. Obie CZYTAJĄ Allegro, a piszą
+   wyłącznie u nas — publikacji do Allegro nie ma, decyzją właściciela.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
 
@@ -391,6 +396,30 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     const nie = odmowa(reply); if (nie) return nie;
     try { return wycofajWykaz(Number(req.params.id), ja().userId); }
     catch (e) { return blad(reply, e); }
+  });
+
+  /* „Pasuje do" ze wszystkich ofert. Odczyt to stan zbiórki i sprawdzenie
+     ofert przeciw wiedzy — czysty rachunek na bazie, bez Allegro. Zapisy to
+     dwa kroki, które prowadzi ekran partiami: serwer nie trzyma przebiegu.
+     Limit Allegro wraca jako 429 z czasem, o który Allegro prosi — ekran
+     czeka tyle, zamiast pytać od razu i pogłębiać przerwę. */
+  const limit = (reply: FastifyReply, e: unknown) => e instanceof BladLimituAllegro
+    ? reply.code(429).send({ error: "Allegro prosi o przerwę — zbiórka wróci po niej", poIluMs: e.poIluMs })
+    : blad(reply, e);
+
+  app.get("/api/obsluga/wiedza/pasuje-do", async (_req, reply) =>
+    odmowa(reply) ?? { stan: stanPasujeDo(), sprawdzenie: sprawdzOferty() });
+
+  app.post<{ Body: { offset?: unknown } }>("/api/obsluga/wiedza/pasuje-do/lista", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    try { return await spiszOferty(Number(req.body?.offset ?? 0), ja().userId); }
+    catch (e) { return limit(reply, e); }
+  });
+
+  app.post("/api/obsluga/wiedza/pasuje-do/zbierz", async (_req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    try { return await zbierzPartie(ja().userId); }
+    catch (e) { return limit(reply, e); }
   });
 
   /* Ręczny identyfikator z katalogu, którego nie ma w opisie. Duplikat → 409. */

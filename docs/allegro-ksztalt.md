@@ -1150,6 +1150,12 @@ Uprawnienie to `allegro:api:sale:offers:read`, inne niż przy skrzynce.
 Konto bez niego dostanie 403, a odmowa nazwie brakujący scope po imieniu —
 `scopeDlaUrl` w `adapters/allegro.http.ts` ma dla tego adresu własną gałąź.
 
+**Cała lista ofert konta, stronami.** Zbiórka „Pasuje do" pyta tę samą
+końcówkę bez `offer.id`, z filtrem `publication.status=ACTIVE`. Strona to
+`limit=1000`, czyli sufit ze schematu, a następną wskazuje `offset`.
+Specyfikacja dopuszcza sumę `offset` i `limit` do 10 000 000. Koniec listy
+wyznacza `totalCount`, a gdy go brak — strona krótsza niż 1000.
+
 **Zdjęcie z `primaryImage` bierzemy od 0.213.0.** Schemat `OfferListingDtoImage`
 opisuje je wprost: „The image used as a thumbnail on the listings", czyli to,
 co kupujący widzi na liście ofert. Pole jedzie w TEJ SAMEJ odpowiedzi, więc nie

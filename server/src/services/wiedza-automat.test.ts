@@ -163,10 +163,14 @@ test("potknięcie na jednym wierszu nie przerywa przebiegu", async () => {
   /* Dwa wiersze prowadzące do TEGO SAMEGO klucza, różnymi źródłami: pierwszy
      ma markę w tekście, drugi trafia w jedyny znany model po nazwie. Drugi
      wywróci się na „ta para już czeka w kolejce albo jest zatwierdzona”,
-     a trzeci ma mimo to przejść. */
+     a trzeci ma mimo to przejść.
+
+     Trzeci wiersz niesie ZNANĄ markę na czele. Do zbiórki „Pasuje do" stał
+     tu „STIHL FS450" i przechodził wyłącznie dlatego, że źródło 3 doklejało
+     mu markę z kontekstu — „NAC STIHL FS450". To był błąd, nie przejście. */
   wiersz("NAC LS 46-450");
   wiersz("LS 46-450");
-  wiersz("STIHL FS450");
+  wiersz("NAC LS 51");
 
   const w = await A.oproznijKolejke({ database: db() });
   assert.ok(w.bledow >= 1, "dubel miał się wywrócić");

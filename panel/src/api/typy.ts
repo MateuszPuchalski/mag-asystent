@@ -809,6 +809,29 @@ export type RaportWykazu = {
   zapisano: { importId: number; propozycji: number } | null;
 };
 
+/* ── „Pasuje do" ze wszystkich ofert Allegro: zbiórka i sprawdzenie ──────────
+   Kształt z `services/pasuje-do-ofert.ts`. Wyłącznie czytanie Allegro —
+   publikacji listy do ofert nie ma, decyzją właściciela. */
+export type StanPasujeDo = {
+  ofert: number; zKartoteka: number; zTresca: number; zListe: number; pozycji: number; doZebrania: number;
+  listaAt: string | null;
+};
+export type RozjazdOferty = {
+  konto: number; ofertaId: string; nazwa: string; twId: number; symbol: string; link: string | null; pozycji: number;
+  sprzeczne: Array<{ pozycja: string; maszyna: string; powod: string; warunki: string | null; zrodlo: string }>;
+  brakujace: Array<{ maszyna: string; warunki: string | null; zrodlo: string }>;
+};
+export type SprawdzenieOfert = {
+  sprawdzonych: number; bezTresci: number; sprzecznych: number; brakujacych: number; oferty: RozjazdOferty[];
+};
+export type WynikListyOfert = { zapisano: number; nastepny: number | null; razem: number | null };
+export type WynikPartiiPasujeDo = {
+  przejrzano: number; pobrano: number; numerow: number; wpisanych: number; wKolejce: number; znanych: number;
+  /** Pominięte, bo wiedza mówi „nie pasuje" — pokazuje je sprawdzenie ofert. */
+  sprzecznych: number;
+  pozostalo: number; przerwano: { powod: "limit"; poIluMs: number | null } | null;
+};
+
 /** Czekające propozycje jednego wykazu — przegląd listą w kolejce. */
 export type PozycjaPrzegladu = {
   id: number; twId: number; symbol: string; nazwa: string | null; maszyna: string; warunki: string | null; dowod: string;
