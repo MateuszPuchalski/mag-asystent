@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.4 — 23 września 2026
+
+**Karta reklamacyjna i klucz modelu mają sufit liczony z myśleniem.** Na
+claude-opus-5 myślenie jest włączone domyślnie i liczy się do `max_tokens`.
+Karta dostaje 4000 zamiast 1024, klucz modelu 1024 zamiast 300. Ucięty JSON to
+wywołanie zapłacone za nic, a sufit nie kosztuje, dopóki go nie użyto.
+Czwarta z dziewięciu poprawek audytu promptów.
+
 ## 0.482.3 — 23 września 2026
 
 **Wysiłek idzie tylko do modeli, które go przyjmują, przy każdym zadaniu
