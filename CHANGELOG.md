@@ -34,6 +34,14 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.1 — 23 września 2026
+
+**CLAUDE.md mówi prawdę o tickerach.** Zdanie „Dziś żadnego nie ma” było
+nieaktualne: `main()` w `index.ts` uruchamia dziewięć tickerów przez
+`uruchomTakt`. Sesja projektująca pracę w tle zaczynała od fałszywej
+przesłanki. Pierwsza z dziewięciu poprawek audytu promptów Copilota.
+Kodu to wydanie nie zmienia.
+
 ## 0.482.0 — 23 września 2026
 
 Dwie funkcje dla hali w jednym wydaniu: szukanie zgubionego kolektora

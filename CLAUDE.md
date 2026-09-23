@@ -61,8 +61,8 @@ Magazynowo-biurowy asystent firmy ogrodniczej: serwer Fastify + `node:sqlite`
   `tsx --test`). Każda mutacja woła `logEvent`. Bramka ról: `odmowa()`
   w trasach biura, `autoryzuj()` przy operacjach uprzywilejowanych.
 - **Tickery wyłącznie w `main()`**, nigdy w `buildApp()` (testy tras nie
-  strzelają do Allegro). Dziś żadnego nie ma — gdy wróci, rytm bierze
-  z `services/takt.ts` (rozrzut, respekt dla 429).
+  strzelają do Allegro). Wszystkie idą przez `uruchomTakt` z `services/takt.ts`
+  (rozrzut, respekt dla 429); lista stoi w `main()` w `index.ts`.
 - **Prywatność:** adres DOSTAWY przechodzi przez mapowanie od 0.422.0,
   decyzją właściciela, i to jest wyjątek, nie nowa zasada. Wchodzą cztery pola
   `delivery.address` — ulica, miasto, kod i telefon — plus nazwa odbiorcy
