@@ -136,6 +136,8 @@ export type PozycjaFiltra<T> = {
   ile?: number;
   /** Podpowiedź pod kursorem — pytanie kubełka i jego klawisz skrótu. */
   podpowiedz?: string;
+  /** Ikona pozycji — rysuje się wyłącznie w trybie `kafle`. */
+  ikona?: React.ReactNode;
 };
 
 /* `number` w ograniczeniu od 0.279.0: tagi identyfikuje NUMER wiersza, a nie
@@ -143,8 +145,20 @@ export type PozycjaFiltra<T> = {
    Komponent i tak wołał już `String(p.klucz)` na klucz Reacta, więc to jest
    poszerzenie deklaracji, a nie zachowania. */
 export function FiltrSegmentowy<T extends string | number | null>({
-  wybrany, onWybierz, pozycje, rowne = false, ton = TON_FILTRA,
+  wybrany, onWybierz, pozycje, rowne = false, ton = TON_FILTRA, kafle = false,
 }: {
+  /**
+   * KAFLE zamiast pigułek (0.454.0) — kubełki zwrotów. Zgłoszenie właściciela:
+   * „ulżyj przeładowaniu tekstem, użyj ikon". Osiem pigułek w trzech rzędach
+   * czytało się jak akapit; kafel kładzie liczbę na pierwszym planie, bo to
+   * po niej operator wybiera, a etykieta schodzi pod nią, drobniej.
+   *
+   * TO JEST TRYB TEGO SAMEGO WYBORU, nie osobny komponent: ten sam
+   * `aria-pressed`, te same barwy i ten sam próg dotyku, tylko inny układ
+   * wnętrza. Reguła z 0.262.0 — jeden kształt wyboru w panelu — zostaje.
+   * Siatkę daje rodzic, bo tylko on zna szerokość kolumny.
+   */
+  kafle?: boolean;
   wybrany: T;
   onWybierz: (v: T) => void;
   pozycje: Array<PozycjaFiltra<T>>;
@@ -159,6 +173,27 @@ export function FiltrSegmentowy<T extends string | number | null>({
   ton?: [string, string];
 }) {
   const [wybrana, niewybrana] = ton;
+  if (kafle) {
+    return <>
+      {pozycje.map((p) => <button key={String(p.klucz)} type="button"
+        aria-pressed={wybrany === p.klucz}
+        title={p.podpowiedz}
+        onClick={() => onWybierz(p.klucz)}
+        className={`flex min-h-11 min-w-0 items-center gap-2 rounded-lg px-2 py-1.5 text-left ${
+          wybrany === p.klucz ? wybrana : niewybrana}`}>
+        {p.ikona && <span aria-hidden="true" className="shrink-0">{p.ikona}</span>}
+        <span className="flex min-w-0 flex-col leading-tight">
+          {/* Liczba PIERWSZA, bo po niej się wybiera; w nazwie dostępnej stoi
+              przed etykietą, a czytnik czyta „743 Do decyzji" — tak jak widać. */}
+          {/* SPACJA między liczbą a etykietą, jak w pigułce niżej: kolumna
+              flex jej nie rysuje, ale bez niej nazwa dostępna brzmi
+              „743Do decyzji". */}
+          {p.ile !== undefined && <><span className="text-sm font-bold tabular-nums">{p.ile}</span>{" "}</>}
+          <span className="truncate text-xs font-medium">{p.etykieta}</span>
+        </span>
+      </button>)}
+    </>;
+  }
   return <>
     {pozycje.map((p) => <button key={String(p.klucz)} type="button"
       aria-pressed={wybrany === p.klucz}
