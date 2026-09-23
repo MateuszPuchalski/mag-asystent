@@ -26,7 +26,7 @@ const NASZ_RUCH = new Set(["new", "waiting_for_us", "waiting_for_internal"]);
 /** Ile rozmów ma nieprzeczytaną wiadomość klienta — liczba do tytułu karty. */
 export function licznikTytulu(rozmowy: Rozmowa[]): number {
   return rozmowy.filter((r) => r.nieprzeczytana && r.ostatniaOdKlienta
-    && r.status !== "closed" && r.status !== "spam").length;
+    && r.status !== "closed" && r.status !== "spam" && r.status !== "resolved").length;
 }
 
 /**

@@ -110,6 +110,9 @@ const TRASY = () => [
     payload: { ofertaId: "14892374512", twId: null } },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/send`,
     payload: { body: "Odpowiedź", expectedVersion: 1, expectedLastMessageId: null } },
+  /* Zakończ / Otwórz ponownie (23 września 2026) — ta sama bramka. */
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/zakoncz`, payload: {} },
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/otworz` },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/priorytet`,
     payload: { priorytet: "pilny" } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/reklamacyjna`,

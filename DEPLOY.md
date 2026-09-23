@@ -2582,6 +2582,18 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.464.0 — zakończenie rozmowy
+
+**Panel trzeba przebudować, a serwer zrestartować.** Serwer przy starcie
+dokłada kolumnę `conversation.otwarta_recznie_at`. Innej migracji nie ma.
+
+Po restarcie część rozmów przejdzie sama do „Zakończonych". To te, w których
+nasza odpowiedź czeka na klienta dłużej niż dwa dni. Tak ma być; żadna nie
+znika, a każdą da się otworzyć ponownie.
+
+Sprawdzenie: otwórz rozmowę z pytaniem klienta i naciśnij `Z`. Ma paść
+pytanie „Klient czeka na odpowiedź". Potem otwórz kubełek „Zakończone".
+
 ### Aktualizacja do 0.447.0 — prawa kolumna bez powtórzeń
 
 **Migracji nie ma. Panel trzeba przebudować, a serwer zrestartować.** Serwer

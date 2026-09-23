@@ -81,6 +81,11 @@ export function Rozmowa(p: {
      ten sam komponent bywa rysowany bez obsługi. */
   onReklamacyjna?: (reklamacyjna: boolean) => void;
   zapisujeReklamacyjna?: boolean;
+  /* Zakończ / Otwórz ponownie (23 września 2026) — opcjonalne tym samym wzorcem. */
+  onWyslijIZakoncz?: () => void;
+  onZakoncz?: (mimoPytania: boolean) => void;
+  onOtworz?: () => void;
+  zmieniaStatus?: boolean;
   /* Etykieta człowieka o kategorii (22 września 2026, wcześniej kciuki).
      Opcjonalna, bo rozmowa bez rozpoznania nie ma czego potwierdzać — a każdy
      istniejący test tego ekranu opisuje właśnie taką rozmowę. */
@@ -161,7 +166,8 @@ export function Rozmowa(p: {
         zapisuje={p.poprawia} onPopraw={p.onPoprawKategorie ?? (() => {})} />}
         <Status rozmowa={rozmowa} blad={p.bladStatusu}
           onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet}
-          onReklamacyjna={p.onReklamacyjna} zapisujeReklamacyjna={p.zapisujeReklamacyjna} />
+          onReklamacyjna={p.onReklamacyjna} zapisujeReklamacyjna={p.zapisujeReklamacyjna}
+          onZakoncz={p.onZakoncz} onOtworz={p.onOtworz} zmieniaStatus={p.zmieniaStatus} />
       </div>
 
     </header>
@@ -239,6 +245,7 @@ export function Rozmowa(p: {
     <Edytor szkic={p.szkic} cudza={cudza} wlasciciel={rozmowa.wlasciciel}
       zapisuje={p.zapisuje} wysyla={p.wysyla}
       onZmiana={p.onSzkic} onZapisz={p.onZapiszSzkic} onWyslij={p.onWyslij}
+      onWyslijIZakoncz={p.onWyslijIZakoncz}
       komentarz={p.komentarz} onKomentarz={p.onKomentarz}
       onDodajKomentarz={p.onDodajKomentarz} komentuje={p.komentuje}
       agenci={p.agenci} wzmianki={p.wzmianki} onWzmianki={p.onWzmianki}

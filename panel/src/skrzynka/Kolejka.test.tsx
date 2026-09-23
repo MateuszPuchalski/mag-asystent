@@ -107,11 +107,21 @@ describe("Kolejka", () => {
     await userEvent.click(screen.getByRole("button", { name: etykieta }));
   };
 
-  it("kubełek MOJE pokazuje wyłącznie rozmowy zalogowanego agenta", async () => {
+  it("kubełek MOJE pokazuje wyłącznie rozmowy zalogowanego agenta, przy których ruch jest nasz", async () => {
     await kubelek(/^Moje/);
     expect(screen.getByText("Moja")).toBeInTheDocument();
-    expect(screen.getByText("Czeka")).toBeInTheDocument();
+    /* Od 23 września 2026 czekanie na klienta nie jest pracą — stoi
+       w „Oczekujących", nie w „Moje". */
+    expect(screen.queryByText("Czeka")).not.toBeInTheDocument();
     expect(screen.queryByText("Nieprzypisana")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /^Oczekujące/ }));
+    expect(screen.getByText("Czeka")).toBeInTheDocument();
+  });
+
+  it("zakończona schodzi z roboczych do „Zakończonych” — także zamknięta sprzed tej wersji", async () => {
+    await kubelek(/^Zakończone/);
+    expect(screen.getByText("Sprawa z archiwum")).toBeInTheDocument();
+    expect(screen.queryByText("Moja")).not.toBeInTheDocument();
   });
 
   it("kubełka PO TERMINIE nie ma — odszedł z ręcznym odłożeniem (22 września 2026)", () => {

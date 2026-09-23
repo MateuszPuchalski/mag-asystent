@@ -1,5 +1,6 @@
 import { db as defaultDb, type Db } from "../db/db.js";
 import { sprawaOtwarta } from "./statusy-spraw.js";
+import { statusRozmowy } from "./conversations.js";
 
 /* ── Droga klienta przez cztery kolejki (`docs/obsluga-klienta-calosc.md`) ───
    Panel prowadzi CZTERY kolejki: skrzynkę, zwroty, reklamacje i dyskusje.
@@ -291,6 +292,11 @@ export function mojeSprawy(
     SELECT id, subject, updated_at FROM conversation
      WHERE assigned_user_id = ?
        AND status NOT IN ('resolved','closed','spam')`).all(userId) as Wiersz[]) {
+    /* Zakończenie liczy się też SAMO, przy odczycie (23 września 2026):
+       podziękowanie, dwa dni ciszy, wątek zamknięty w Allegro. Kolumna tego
+       nie zna, więc filtr SQL zostaje tylko wstępnym sitem — rozstrzyga ta
+       sama reguła, co w skrzynce. */
+    if (statusRozmowy(database, Number(w.id)) === "resolved") continue;
     lista.push({
       kolejka: "rozmowa", id: Number(w.id),
       opis: tekst(w.subject) ?? "Rozmowa bez tematu",

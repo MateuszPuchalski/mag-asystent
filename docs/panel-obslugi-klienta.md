@@ -1114,6 +1114,41 @@ klucz nie dał ani jednego kandydata. Inaczej rozmyłaby mocniejszą wiedzę.
 **Listę dociąga układanie szkicu.** Otwarcie rozmowy jej nie pobiera, więc
 przed pierwszym szkicem bloku nie ma.
 
+### 10.2e. Zakończenie rozmowy (0.464.0)
+
+Zgłoszenie właściciela: „potrzebuję sposobu, żeby rozmowa była
+rozwiązana". Od 22 września nic nie nadawało `resolved` ani `closed`.
+Rozmowa po naszej odpowiedzi stała więc w „Moje" na zawsze.
+
+**Dwa pytania, nie jedno.** „Kto ma ruch" liczy się z wiadomości i nikt go
+nie nadaje. „Czy sprawa jest skończona" to jeden werdykt: Zakończona. Menu
+statusów nie wraca, bo kosztowało już jedno wydanie.
+
+| skąd zakończenie | kiedy | podpis na plakietce |
+|---|---|---|
+| agent | „Zakończ", `Z`, „Wyślij i zakończ" | zakończona ręcznie |
+| podziękowanie | klasyfikator rozpoznał „dziękuję" po naszej odpowiedzi | klient podziękował |
+| cisza | nasza odpowiedź, a od niej dwa dni bez klienta | 2 dni bez odpowiedzi klienta |
+| Allegro | wątek ma `status: CLOSED` w `ThreadVBeta1` | wątek zamknięty w Allegro |
+
+**Wyliczone przy odczycie, bez tickera i bez zapisu.** Jedna funkcja,
+`wyliczStatus`, liczy status dla rozmowy i dla wiersza kolejki.
+
+**Pytanie bez odpowiedzi nie kończy się samo nigdy.** Dotyczy to także
+wątku zamkniętego w Allegro. Ręczne zakończenie takiej rozmowy wymaga
+jednej zgody, a serwer odbija je bez niej kodem 409.
+
+**Allegro nie pozwala zamknąć wątku.** Specyfikacja ma dla wątku tylko
+odczyt i znacznik przeczytania. `CLOSED` jest więc sygnałem, nie ruchem.
+Kiedy Allegro go nadaje, nie sprawdziliśmy [WERYFIKUJ].
+
+**„Otwórz ponownie" cofa także zakończenie wyliczone.** Znacznik
+`otwarta_recznie_at` wstrzymuje reguły do następnej prawdziwej wiadomości.
+
+**Kubełki:** „Nieprzypisane" i „Moje" trzymają tylko nasz ruch. Czekanie na
+klienta, na halę i odłożenie stoją w „Oczekujących". Koniec stoi
+w „Zakończonych".
+
 ### 10.3. Oś rozmowy
 
 Oś zawiera wiadomości klienta, odpowiedzi firmy, komentarze wewnętrzne, zmiany

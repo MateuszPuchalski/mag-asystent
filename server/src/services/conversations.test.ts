@@ -6,6 +6,7 @@ import { migrate } from "../db/db.js";
 import {
   ConversationConflict, dodajKomentarz, obudzPrzychodzaca, przejmijRozmowe,
   klientPodziekowal, statusRozmowy, ustawStatus, zapiszSzkic, type DecyzjaDoStatusu,
+  CISZA_ZAKONCZENIA_MS, otworzRozmowe, statusIZakonczenie, wyliczStatus, zakonczRozmowe,
 } from "./conversations.js";
 
 /* Serwis rozmów nie miał testu obok do 0.145.1, choć trzyma trzy mutacje
@@ -392,7 +393,9 @@ test("status rozmowy słucha podziękowania, a nowa wiadomość klienta je uniew
     taksonomia_wersja,polityka_wersja,at,przez)
     VALUES (?,?,1,1,'MODEL','SUCCESS','OTHER','NO_ACTION',0,0,0,'wysoka','v2','p1',?,'automat')`)
     .run(rozmowa, dzieki, "2026-09-01T09:01:00.000Z");
-  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_customer");
+  /* Od 23 września 2026 podziękowanie ZAKAŃCZA rozmowę (decyzja właściciela),
+     a nie zostawia jej „czekającej na klienta". */
+  assert.equal(statusRozmowy(d, rozmowa), "resolved");
 
   /* „Dziękuję, a jeszcze jedno…" — decyzja mówi o starszej wiadomości, więc
      rozmowa wraca na listę sama, zanim takt zdąży ją rozpoznać. */
@@ -400,3 +403,73 @@ test("status rozmowy słucha podziękowania, a nowa wiadomość klienta je uniew
   d.prepare("UPDATE message SET sent_at='2026-09-01T10:00:00.000Z' WHERE external_message_id='m-4'").run();
   assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us");
 });
+
+/* ── Zakończenie rozmowy (23 września 2026) ─────────────────────────────────
+   Decyzja właściciela: jeden werdykt „Zakończona", z ręki agenta albo sam
+   — podziękowanie, dwa dni ciszy po naszej odpowiedzi, wątek zamknięty
+   w Allegro. Pytanie bez odpowiedzi nie kończy się NIGDY samo. */
+
+const TERAZ = Date.parse("2026-09-23T12:00:00.000Z");
+const wejscie = (n: Partial<Parameters<typeof wyliczStatus>[0]> = {}) => ({
+  zapisany: "open" as const, ostatniKierunek: "outgoing", podziekowal: false,
+  ostatniRuchAt: "2026-09-23T11:00:00.000Z", watekZamkniety: false, otwartaRecznieAt: null,
+  teraz: TERAZ, ...n,
+});
+
+test("zakończenie samo: podziękowanie, dwa dni ciszy, wątek zamknięty w Allegro", () => {
+  assert.deepEqual(wyliczStatus(wejscie()), { status: "waiting_for_customer", zakonczenie: null });
+  assert.deepEqual(wyliczStatus(wejscie({ ostatniKierunek: "incoming", podziekowal: true })),
+    { status: "resolved", zakonczenie: "podziekowanie" });
+  const dwaDni = new Date(TERAZ - CISZA_ZAKONCZENIA_MS).toISOString();
+  assert.deepEqual(wyliczStatus(wejscie({ ostatniRuchAt: dwaDni })),
+    { status: "resolved", zakonczenie: "cisza" });
+  assert.deepEqual(wyliczStatus(wejscie({ watekZamkniety: true })),
+    { status: "resolved", zakonczenie: "allegro" });
+});
+
+test("pytanie klienta bez odpowiedzi nie kończy się samo — nawet w wątku zamkniętym i po tygodniu", () => {
+  assert.deepEqual(wyliczStatus(wejscie({ ostatniKierunek: "incoming", watekZamkniety: true,
+    ostatniRuchAt: "2026-09-10T00:00:00.000Z" })), { status: "waiting_for_us", zakonczenie: null });
+});
+
+test("werdykt agenta, a „zamknięta” sprzed tej wersji czyta się jak zakończona", () => {
+  assert.deepEqual(wyliczStatus(wejscie({ zapisany: "resolved", ostatniKierunek: "incoming" })),
+    { status: "resolved", zakonczenie: "agent" });
+  assert.deepEqual(wyliczStatus(wejscie({ zapisany: "closed" })), { status: "resolved", zakonczenie: "agent" });
+});
+
+test("ręczne otwarcie wstrzymuje zakończenie samo do następnej prawdziwej wiadomości", () => {
+  const stare = new Date(TERAZ - 3 * 86_400_000).toISOString();
+  assert.equal(wyliczStatus(wejscie({ ostatniRuchAt: stare, otwartaRecznieAt: "2026-09-23T10:00:00.000Z" })).status,
+    "waiting_for_customer");
+  assert.equal(wyliczStatus(wejscie({ ostatniKierunek: "incoming", podziekowal: true,
+    otwartaRecznieAt: "2026-09-23T11:30:00.000Z" })).status, "waiting_for_us");
+  /* Wiadomość PO otwarciu — reguły wracają. */
+  assert.equal(wyliczStatus(wejscie({ ostatniKierunek: "incoming", podziekowal: true,
+    otwartaRecznieAt: "2026-09-23T10:00:00.000Z" })).status, "resolved");
+});
+
+test("Zakończ przy pytaniu bez odpowiedzi wymaga zgody; z nią — zakończona, z audytem", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  assert.throws(() => zakonczRozmowe(d, rozmowa, ala), (e: unknown) =>
+    e instanceof ConversationConflict && e.details.pytanieBezOdpowiedzi === true);
+  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us", "odmowa niczego nie zmienia");
+
+  zakonczRozmowe(d, rozmowa, ala, true);
+  assert.deepEqual(statusIZakonczenie(d, rozmowa), { status: "resolved", zakonczenie: "agent" });
+  assert.ok(zdarzenia(d, "rozmowa_status").some((z) => String(z.payload).includes('"po":"resolved"')));
+});
+
+test("Otwórz ponownie cofa werdykt agenta; nowa wiadomość klienta budzi zakończoną", () => {
+  const { d, ala, rozmowa, wiadomosc } = stanowisko();
+  zakonczRozmowe(d, rozmowa, ala, true);
+  otworzRozmowe(d, rozmowa, ala);
+  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us");
+
+  zakonczRozmowe(d, rozmowa, ala, true);
+  wiadomosc("A jeszcze jedno pytanie", "m-9");
+  d.prepare("UPDATE message SET sent_at='2026-09-02T07:00:00.000Z' WHERE external_message_id='m-9'").run();
+  obudzPrzychodzaca(d, rozmowa);
+  assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us");
+});
+

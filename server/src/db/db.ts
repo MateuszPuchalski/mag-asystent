@@ -405,6 +405,12 @@ export function migrate(database: DatabaseSync) {
      w `schema.sql`. Baza sprzed tego wydania dostaje go TĘDY; zero znaczy
      „nikt jeszcze nie oznaczył", a nie „to nie reklamacja". */
   addColumn("conversation", "reklamacyjna", "INTEGER NOT NULL DEFAULT 0");
+  /* Ręczne „Otwórz ponownie" (23 września 2026). Zakończenie liczy się też
+     SAMO, przy odczycie — bez tego znacznika otwarta ręką rozmowa po dwóch
+     dniach ciszy zakończyłaby się znowu przy następnym odświeżeniu, a agent
+     nie miałby jak jej zatrzymać. Znacznik działa do następnej prawdziwej
+     wiadomości; potem reguły wracają same. */
+  addColumn("conversation", "otwarta_recznie_at", "TEXT");
   /* Status przesyłki do klienta (0.393.0) — powód przy kolumnach w
      `schema.sql`. Baza sprzed tego wydania dostaje je tędy; NULL wszędzie
      znaczy „jeszcze nie pytaliśmy", a nie „przesyłki nie ma". */
