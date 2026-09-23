@@ -1075,6 +1075,8 @@ test("rozpoznanie wchodzi do faktów, a pytanie o paczkę nie dostaje intake o m
   assert.match(String(r?.zdanie), /ORDER_STATUS; następny krok: GET_SHIPMENT/);
   assert.match(String(r?.zdanie), /brakuje danych zamówienia/);
   assert.match(String(r?.zdanie), /nie obiecuj rozstrzygnięcia/);
+  /* Wzorzec odpowiedzi dla kategorii (23 września 2026) stoi w tym samym fakcie. */
+  assert.match(String(r?.zdanie), /jak odpowiedzieć: podaj stan zamówienia i przesyłki/);
   assert.equal(k.fakty.some((f) => f.rodzaj === "intake"), false);
 });
 

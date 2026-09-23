@@ -27,6 +27,7 @@ import { bezPodpisu, zwin } from "../tekst.js";
 import { identyfikatoryZOpisu, type RodzajIdentyfikatora } from "./identyfikatory.js";
 import { zapiszWiedzeZOferty } from "./wiedza-z-oferty.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
+import { wzorzecOdpowiedzi } from "./wzorce-odpowiedzi.js";
 import { numerZamowieniaRozmowy } from "./zamowienia-kandydaci.js";
 import { naLiscieZgodnosci, zdanieZgodnosci } from "./zgodnosc-oferty.js";
 import {
@@ -992,7 +993,12 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
       + (Number(rozpoznanie.brak_danych_zamowienia) ? "; w rozmowie brakuje danych zamówienia" : "")
       + (Number(rozpoznanie.brak_danych_produktu) ? "; w rozmowie brakuje danych towaru lub maszyny" : "")
       + (Number(rozpoznanie.wymaga_czlowieka)
-        ? "; sprawa wymaga decyzji człowieka — nie obiecuj rozstrzygnięcia" : ""));
+        ? "; sprawa wymaga decyzji człowieka — nie obiecuj rozstrzygnięcia" : "")
+      /* Wzorzec odpowiedzi dla TEJ kategorii (23 września 2026) — powód
+         i treść w `wzorce-odpowiedzi.ts`. Stoi w tym samym fakcie, bo jest
+         tak samo przypuszczeniem jak kategoria, z której wynika. */
+      + (wzorzecOdpowiedzi(rozpoznanie.kategoria)
+        ? `; jak odpowiedzieć: ${wzorzecOdpowiedzi(rozpoznanie.kategoria)}` : ""));
   }
 
   /* PRZESYŁKA, GDY KLIENT PISZE POD ZAMÓWIENIEM (23 września 2026). Fakt
