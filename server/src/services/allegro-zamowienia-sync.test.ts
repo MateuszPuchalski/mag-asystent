@@ -506,6 +506,10 @@ test("login idzie do Allegro filtrem buyer.login, a pobrane zamówienia lądują
   assert.deepEqual(paczki.map((p) => p.orderId).sort(), ["ord-a", "ord-b"]);
   assert.equal(paczki[0].pozycji, 2);
   assert.equal(paczki[0].odbiorcaNazwa, "Jan Kowalski");
+  /* Wiersz prowadzi do zamówienia w panelu Allegro — tam biuro kończy pracę,
+     odkąd rejestracja paczki odeszła (0.451.0). */
+  assert.ok(paczki.every((p) => p.link?.includes(p.orderId)),
+    "każde trafienie niesie odnośnik do swojego zamówienia");
 });
 
 test("zapis przechodzi przez to samo oczyszczanie co synchronizacja", async () => {

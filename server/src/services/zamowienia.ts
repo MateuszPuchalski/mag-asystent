@@ -229,6 +229,15 @@ export interface PaczkaKlienta {
    * biuro wraca do klienta.
    */
   kupujacyLogin: string | null;
+  /**
+   * Zamówienie w panelu sprzedawcy Allegro (0.451.0).
+   *
+   * Rejestracja paczki odeszła decyzją właściciela: „ja tylko wyszukuję ją
+   * w Allegro". Ta lista kończy się więc tam, gdzie kończy się praca — na
+   * stronie zamówienia, bez przepisywania numeru. `null`, gdy wzorca adresu
+   * nie skonfigurowano; ekran pokazuje wtedy sam numer.
+   */
+  link: string | null;
 }
 
 /** Od ilu znaków wolno szukać po nazwie. Poniżej trafiałoby pół sklepu. */
@@ -361,6 +370,7 @@ export function paczkiKlienta(
       odbiorcaUlica: z.odbiorca_ulica ?? null,
       odbiorcaMiasto: z.odbiorca_miasto ?? null,
       odbiorcaKod: z.odbiorca_kod ?? null,
+      link: linkZamowienia(String(z.external_id)),
     };
   });
 }
