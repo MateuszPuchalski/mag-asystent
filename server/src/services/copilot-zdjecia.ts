@@ -247,7 +247,7 @@ export async function przygotujZdjecia(
 /**
  * Pobieracz zdjęć ROZMOWY — ta sama droga, którą idzie podgląd w panelu.
  *
- * ── BLIZNA 0.484.1 ───────────────────────────────────────────────────────────
+ * ── BLIZNA 0.484.5 ───────────────────────────────────────────────────────────
  * Od 0.330.0 stał tu goły `pobierzZalacznik` z zapisanym adresem. Adres
  * Centrum Wiadomości leży na `upload.allegro.pl`, a ten odpowiada 403 na
  * brzegu (sonda właściciela z 10 września). Każde zdjęcie klienta odpadało
@@ -293,7 +293,7 @@ export function spisZdjec(w: WynikZdjec): string {
   }
   if (w.pominieto) linie.push(`Nie pokazano z braku miejsca: ${w.pominieto}`);
   if (w.ponadLimit) linie.push(`Starszych zdjęć nie pokazano: ${w.ponadLimit}`);
-  /* Wiersz o nieudanym pobraniu (0.484.1). Bez niego model nie wie, że
+  /* Wiersz o nieudanym pobraniu (0.484.5). Bez niego model nie wie, że
      klient zdjęcie PRZYSŁAŁ, i prosi go o nie drugi raz. Klient, który
      zdjęcie już wysłał, czyta taką prośbę jako znak, że nikt go nie słucha. */
   if (w.bledow) linie.push(`Klient przysłał, ale nie udało się pobrać: ${w.bledow}`);

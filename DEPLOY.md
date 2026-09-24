@@ -2582,7 +2582,7 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
-### Aktualizacja do 0.484.1 — Copilot widzi zdjęcia z rozmowy
+### Aktualizacja do 0.484.5 — Copilot widzi zdjęcia z rozmowy
 
 **Wystarczy restart serwera.** Bez migracji i bez zmian w panelu.
 

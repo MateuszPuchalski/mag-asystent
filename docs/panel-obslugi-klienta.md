@@ -2359,11 +2359,11 @@ w sprawie już były. Skrzynka została z defektem, a instrukcja szkicu uczyła
 model prosić o tabliczkę — więc w najgorszym układzie szkic prosił o zdjęcie
 tabliczki pod zdjęciem tabliczki.
 
-**Blizna 0.484.1: oczy były, wzroku nie było.** Od 0.330.0 do 0.484.0 żadne
+**Blizna 0.484.5: oczy były, wzroku nie było.** Od 0.330.0 do 0.484.0 żadne
 zdjęcie rozmowy nie doszło do modelu. `przygotujZdjeciaRozmowy` pobierał
 zapisany adres z `upload.allegro.pl`, a ten odpowiada 403 na brzegu. Błąd
 pobrania był liczony, ale nigdzie nie zapisany ani nie pokazany modelowi.
-Podgląd w panelu działał, bo chodzi końcówką API. Od 0.484.1 Copilot idzie tą
+Podgląd w panelu działał, bo chodzi końcówką API. Od 0.484.5 Copilot idzie tą
 samą drogą (`pobierzZdjecieRozmowy`), dziennik liczy zdjęcia przy szkicu,
 a spis mówi modelowi o zdjęciu, którego nie udało się pobrać.
 
@@ -4939,7 +4939,14 @@ dlaczego, gdy:
 - pozycja nie ma kartoteki albo ma tylko zgadywaną propozycję;
 - przy biurku stoi kilka otwartych pudeł, a żadne nie ma jeszcze towaru
   tego zwrotu — pudła nie zgadujemy (0.379.0);
-- zwrot nie ma pozycji albo odnośnika do Allegro.
+- zwrot nie ma pozycji albo odnośnika do Allegro;
+- pozycja jest już „na stan”, ale nie leży w pudle (od 0.484.2).
+
+**Pozycja poza pudłem zatrzymuje ciąg (0.484.2).** Serwer zapisuje ocenę
+„na stan” także wtedy, gdy do pudła jej nie dołożył. Tak bywa przy komplecie
+bez składu, przy składniku poza magazynem i bez magazynu docelowego. Ciąg
+zatrzymuje się wtedy przed zapisem kwoty i zamyka kartę Allegro. Powód stoi
+przy pozycji, a zwrot czeka w DO OCENY albo w DO ZWROTU.
 
 Paczki nieodebranej przycisk nie dotyczy, bo nie ma jej zwrotu w Allegro.
 
@@ -5966,7 +5973,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wiązanie kartoteki po sygnaturze BEZ zatwierdzania | **działa** od 0.169.0 | `zwiazPewne` w `services/sygnatury.ts`; od 0.220.0 pod parasolem `powiazZaleglosci`, więc błąd Allegro go nie zabiera |
 | Pokrycie sygnatur na ekranie ustawień | **działa** od 0.169.0 | `GET /api/obsluga/sygnatury`, `panel/src/ustawienia/PokrycieSygnatur.tsx` |
 | Szkic sam dla nowego pytania (§14.6) | **działa** od 0.317.0 | `services/copilot-auto-szkic.ts`, takt `copilot-auto-szkic`: wyłącznie pytania pod ofertą, limit na przebieg i sufit godzinowy z księgi wywołań, autor `automat` bez konta; domyślnie wyłączone (`COPILOT_AUTO_SZKIC`) |
-| Zdjęcia z rozmowy w szkicu (§14.6) | **działa** od 0.484.1 (od 0.330.0 do 0.484.0 każde pobranie padało 403 na zapisanym adresie) | `services/copilot-zdjecia.ts` (`kandydaciRozmowy`, `przygotujZdjeciaRozmowy`), kolumna `szkic_copilota.odczyt_zdjec`, blok `skrzynka/OdczytZdjec.tsx`; tylko `SAFE` i tylko przychodzące, sufit sztuk, źródło twierdzenia `zdjecie` z sufitem „prawdopodobne" |
+| Zdjęcia z rozmowy w szkicu (§14.6) | **działa** od 0.484.5 (od 0.330.0 do 0.484.0 każde pobranie padało 403 na zapisanym adresie) | `services/copilot-zdjecia.ts` (`kandydaciRozmowy`, `przygotujZdjeciaRozmowy`), kolumna `szkic_copilota.odczyt_zdjec`, blok `skrzynka/OdczytZdjec.tsx`; tylko `SAFE` i tylko przychodzące, sufit sztuk, źródło twierdzenia `zdjecie` z sufitem „prawdopodobne" |
 | Kolejka wiedzy opróżnia się sama (§11.3) | **działa** od 0.331.0 | `services/wiedza-automat.ts`, takt `wiedza-automat`: cztery źródła marki, podpis `automat (wiedza)` bez konta, karta „Co automat dopisał" w ustawieniach; domyślnie wyłączone (`WIEDZA_AUTOMAT`), model językowy osobno (`WIEDZA_AUTOMAT_MODEL`) |
 | Karta Copilota bez ścisku (§14.6) | **działa** od 0.342.0 | `skrzynka/Zwijka.tsx` jako jedno zwijanie dla trzech bloków; szkic bez własnego przewijania, trzy paski scalone w jeden, licznik znaków w nagłówku |
 | Dane wejściowe wchodzą same (§11.2) | **działa** od 0.341.0 | `copilot-szkic.ts`: wpis w puste pola przed zapisem szkicu, podpis `automat (szkic)`; zmiana wersji doboru budzi takt `copilot-auto-szkic` |

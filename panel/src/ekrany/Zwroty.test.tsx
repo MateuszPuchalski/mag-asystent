@@ -65,6 +65,9 @@ const scena = vi.hoisted(() => ({
   kartoteka: {} as Record<string, { twId: number; symbol: string }>,
   /* Odmowa zapisu kwoty dla szybkiej ścieżki (0.481.0); pusta = zapis przechodzi. */
   odmowaKwoty: "",
+  /* Pudło, do którego serwer dołożył ocenioną pozycję. `null` znaczy „nie
+     dołożył” — szybka ścieżka musi się wtedy zatrzymać przed kwotą. */
+  koszykOceny: null as number | null,
 }));
 
 vi.mock("../api/zwroty", async () => {
@@ -131,7 +134,8 @@ vi.mock("../api/zwroty", async () => {
 function atrapa(co: string) {
   const zapisz = (dane: Record<string, unknown>) => {
     scena.wolano.push({ co, dane });
-    return { wersja: Number(dane.wersja ?? 1) + 1, koszyk: null };
+    return { wersja: Number(dane.wersja ?? 1) + 1,
+      koszyk: co === "ocena" ? scena.koszykOceny : null };
   };
   return {
     isPending: false, error: null,
@@ -553,6 +557,7 @@ describe("Klawisze kubełka", () => {
     it("jeden klawisz: przyjęcie, kartoteka, ocena wszystkiego, kwota — potem Allegro", async () => {
       scena.wolano = [];
       scena.zwroty = [pewny()];
+      scena.koszykOceny = 7;
       /* Karta otwiera się PUSTA w chwili klawisza, adres dostaje po kwocie. */
       const karta = { opener: {} as unknown, location: { href: "" }, close: vi.fn() };
       const otworz = vi.spyOn(window, "open").mockReturnValue(karta as unknown as Window);
@@ -569,12 +574,13 @@ describe("Klawisze kubełka", () => {
         expect(scena.wolano[2].dane).toMatchObject({ pozycjaId: 81, ocena: "stan", wersja: 2 });
         expect(scena.wolano[3].dane).toMatchObject({ pozycjaId: 82, wersja: 3 });
         expect(scena.wolano[4].dane).toEqual({ id: 8, pozycjeIds: [81, 82], dostawa: true, wersja: 4 });
-      } finally { scena.zwroty = null; otworz.mockRestore(); }
+      } finally { scena.zwroty = null; scena.koszykOceny = null; otworz.mockRestore(); }
     });
 
     it("odmowa w połowie zamyka kartę Allegro — wypłata nie wyprzedza zapisu", async () => {
       scena.wolano = [];
       scena.zwroty = [pewny()];
+      scena.koszykOceny = 7;
       scena.odmowaKwoty = "Zwrot zmienił się w międzyczasie";
       const karta = { opener: {} as unknown, location: { href: "" }, close: vi.fn() };
       const otworz = vi.spyOn(window, "open").mockReturnValue(karta as unknown as Window);
@@ -584,7 +590,26 @@ describe("Klawisze kubełka", () => {
         expect(await screen.findByText(/Zatrzymałem się: Zwrot zmienił się/)).toBeInTheDocument();
         expect(karta.close).toHaveBeenCalled();
         expect(karta.location.href).toBe("");
-      } finally { scena.zwroty = null; scena.odmowaKwoty = ""; otworz.mockRestore(); }
+      } finally { scena.zwroty = null; scena.odmowaKwoty = ""; scena.koszykOceny = null; otworz.mockRestore(); }
+    });
+
+    it("pozycja poza pudłem zatrzymuje ciąg PRZED kwotą i zamyka kartę (0.484.2)", async () => {
+      /* Serwer zapisał ocenę, ale do pudła nie dołożył (`koszyk: null`) —
+         komplet bez składu, składnik poza magazynem. Pieniądze za towar,
+         którego nie ma na MM, to dokładnie ten błąd, którego ciąg ma unikać. */
+      scena.wolano = [];
+      scena.zwroty = [pewny()];
+      scena.koszykOceny = null;
+      const karta = { opener: {} as unknown, location: { href: "" }, close: vi.fn() };
+      const otworz = vi.spyOn(window, "open").mockReturnValue(karta as unknown as Window);
+      try {
+        pokaz("/obsluga/zwroty/8");
+        await userEvent.keyboard("w");
+        expect(await screen.findByText(/Sekator” nie weszła do pudła/)).toBeInTheDocument();
+        expect(scena.wolano.map((w) => w.co)).toEqual(["werdykt", "kartoteka", "ocena"]);
+        expect(karta.close).toHaveBeenCalled();
+        expect(karta.location.href).toBe("");
+      } finally { scena.zwroty = null; otworz.mockRestore(); }
     });
 
     it("przeszkoda zatrzymuje PRZED pierwszym zapisem i mówi dlaczego", async () => {

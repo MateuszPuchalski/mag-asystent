@@ -34,7 +34,9 @@ historii nie przepisujemy.
 ---
 
 
-## 0.484.1 — 24 września 2026
+## 0.484.5 — 24 września 2026
+
+Numer wydania: 0.484.3 i 0.484.4 zajmował otwarty #579, stąd 0.484.5.
 
 **Copilot wreszcie widzi zdjęcia, które klient przysłał w rozmowie.**
 Zgłoszenie właściciela: „copilot prawdopodobnie nie czyta zdjęć”. Nie czytał,
@@ -60,6 +62,21 @@ Karta reklamacji tego błędu nie miała, bo jej załączniki leżą na
 i nigdy nie czytało — to osobna decyzja, nie ten błąd.
 
 Wystarczy restart serwera.
+
+## 0.484.2 — 24 września 2026
+
+**„Wszystko OK” nie oddaje pieniędzy za towar spoza pudła.** Serwer zapisuje
+ocenę „na stan” także wtedy, gdy pozycji do pudła nie dołożył. Tak bywa przy
+komplecie bez składu, przy składniku poza magazynem i bez magazynu
+docelowego. Szybka ścieżka szła wtedy dalej: zapisywała kwotę i otwierała
+Allegro, a napis przy pozycji znikał pod nową kartą.
+
+- **W trakcie ciągu:** ocena bez pudła zatrzymuje go przed kwotą, zamyka
+  kartę Allegro i mówi, która pozycja nie weszła.
+- **Przed ciągiem:** pozycja już „na stan”, a nie w pudle, wyszarza przycisk.
+  Ciąg ocenia tylko pozycje bez oceny, więc taką by pominął.
+
+Opis w `docs/panel-obslugi-klienta.md` §25a.27.
 
 ## 0.484.0 — 24 września 2026
 
