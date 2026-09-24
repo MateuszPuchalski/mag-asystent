@@ -701,8 +701,16 @@ export function Zwroty() {
       }
       const koszId = pudloTegoZwrotu("stan");
       for (const p of z.pozycje.filter((x) => x.ocena === null)) {
-        wersja = (await ocena2.mutateAsync(
-          { pozycjaId: p.id, ocena: "stan", wersja, koszId })).wersja;
+        const w = await ocena2.mutateAsync({ pozycjaId: p.id, ocena: "stan", wersja, koszId });
+        wersja = w.wersja;
+        /* POZYCJA POZA PUDŁEM ZATRZYMUJE CIĄG (0.484.2). Serwer zapisuje
+           ocenę także wtedy, gdy do pudła jej nie dołożył, i mówi to
+           `koszyk: null`. Iść dalej znaczyłoby oddać pieniądze za towar,
+           którego nie ma na MM — a zakładka Allegro zasłoniłaby napis przy
+           pozycji. Kwota zostaje niezapisana, więc zwrot czeka w DO ZWROTU. */
+        if (w.koszyk === null) {
+          throw new Error(`„${p.nazwa}” nie weszła do pudła — powód stoi przy pozycji. Kwoty nie zapisałem.`);
+        }
       }
       await kwota.mutateAsync({ id: z.id, pozycjeIds: z.pozycje.map((p) => p.id),
         dostawa: calaDostawa(z), wersja });

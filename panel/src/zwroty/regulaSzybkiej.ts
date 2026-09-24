@@ -61,6 +61,15 @@ export function szybkaSciezka(zwrot: Zwrot, pudla: PudloSzybkie[]): SzybkaSciezk
     || (p.iloscZwrocona !== null && p.iloscZwrocona < p.ilosc))) {
     return stop("Jest potrącenie albo brak sztuk — dokończ ręcznie.");
   }
+  /* OCENIONA, A NIE W PUDLE (0.484.2). Ocena „na stan" zapisuje się
+     także wtedy, gdy serwer pozycji do pudła nie dołożył: komplet bez składu,
+     składnik poza magazynem, brak magazynu docelowego. Ciąg ocenia wyłącznie
+     pozycje bez oceny, więc taką by pominął — i oddał pieniądze za towar,
+     którego nie ma na MM. Powód stoi przy pozycji (`sklady`), stąd odesłanie. */
+  const pozaPudlem = zwrot.pozycje.find((p) => p.ocena === "stan" && !p.wKoszyku);
+  if (pozaPudlem) {
+    return stop(`„${pozaPudlem.nazwa}” jest „na stan”, ale nie leży w pudle — powód stoi przy pozycji.`);
+  }
   /* Bez kartoteki towar nie wejdzie na MM, czyli nie trafi na półkę
      w Subiekcie. Zgadywana propozycja zostaje pod okiem (`sygnatury.ts`). */
   const bezKartoteki = zwrot.pozycje.find((p) => p.twId === null && !pewnaPropozycja(p));
