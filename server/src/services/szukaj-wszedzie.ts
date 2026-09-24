@@ -11,12 +11,12 @@ import { linkZamowienia } from "./allegro-linki.js";
    kartotek pisze zdarzenie `search`, ale to jest miara braków w kartotece,
    a tu szukamy spraw, nie towaru do zamówienia.
 
-   PO LOGINIE ROZMÓWCY TU NIE WIĄŻEMY. `interlocutor_login` stoi pod
-   `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` i `CLAUDE.md` zabrania trzeciej
-   funkcji, która po nim chodzi. Login kupującego trafia więc w zakupy, zwroty
-   i sprawy — pola z Allegro, pewne. Rozmowy dochodzą przez NUMER ZAMÓWIENIA,
-   tym samym mostkiem co `droga-klienta.ts`. Cena jest jawna: rozmowa bez
-   numeru zamówienia po loginie się nie znajdzie. */
+   LOGIN TRAFIA TEŻ W ROZMOWY od 24 września 2026. Login rozmówcy z wątku
+   to login kupującego — zweryfikował to właściciel (`docs/allegro-ksztalt.md`).
+   Do tej daty rozmowy dochodziły wyłącznie numerem zamówienia, więc pytanie
+   sprzed zakupu po loginie się nie znajdowało. Numer zamówienia zostaje
+   drugim mostkiem, tym samym co w `droga-klienta.ts`. Login porównuje się
+   bez wielkości liter. */
 
 export type RodzajTrafienia =
   | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja" | "dostawa" | "towar" | "zamowienie";
@@ -109,6 +109,19 @@ export function szukajWszedzie(
   if (q.length >= 6 && !/\s/.test(q)) numery.push(q);
   const dlaczegoNumeru = (orderId: string) =>
     zamowienia.find((z) => String(z.external_id) === orderId)?.dlaczego ?? "numer zamówienia";
+
+  /* Rozmowy po loginie rozmówcy PRZED rozmowami po numerze: trafienie wprost
+     w login ma nieść powód „login kupującego", nie „numer zamówienia". */
+  for (const w of database.prepare(`
+    SELECT c.id, c.subject
+      FROM conversation c JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
+     WHERE t.interlocutor_login = ? COLLATE NOCASE
+     ORDER BY c.updated_at DESC LIMIT ?`).all(q, NA_RODZAJ) as Wiersz[]) {
+    dodaj({
+      rodzaj: "rozmowa", id: String(w.id), tytul: tekst(w.subject) ?? "Rozmowa bez tematu",
+      dlaczego: "login kupującego", cel: `/obsluga/skrzynka/${w.id}`, link: null,
+    });
+  }
 
   if (numery.length > 0) {
     const miejsca = numery.map(() => "?").join(",");

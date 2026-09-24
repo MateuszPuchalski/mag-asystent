@@ -209,8 +209,10 @@ Mimo tego dwie funkcje wiążą się po tym właśnie polu. Zakładka KLIENT zbi
 po nim rozmowy i zakupy (S2). Kandydaci zamówień szukają po nim zakupów (S1).
 Wydanie 0.397.0 widziało w nim zwykły login.
 
-Która strona ma rację, trzeba sprawdzić na żywym Allegro. Pytanie niesie
-znacznik `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`, rozdział
+**Rozstrzygnięte 24 września 2026.** Właściciel potwierdził na żywym koncie,
+że to login kupującego. `client:44300444` to login kupującego bez konta,
+nie maska. Rozbieżność brała się z wielkości liter, więc login porównuje się
+wszędzie bez niej. Opis stoi w `docs/allegro-ksztalt.md`, rozdział
 `GET /messaging/threads`.
 
 **Do tego czasu obowiązuje jedno.** Żadna NOWA funkcja nie wiąże po loginie

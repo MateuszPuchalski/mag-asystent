@@ -20,11 +20,14 @@ import { linkZamowienia } from "./allegro-linki.js";
    ekran mówi, że nie wie — zgadywanie klienta z treści rozmowy byłoby
    pokazaniem cudzych zakupów pod nazwiskiem, którego nikt nie potwierdził.
 
-   LOGIN ROZMÓWCY JEST TU NIEPEWNY. Oś zakładki bierze się
-   z `allegro_inbox_thread.interlocutor_login`, a blizna 0.56.6 opisuje
-   właśnie to pole jako zamaskowane (`client:44300444`). Wydanie 0.397.0
-   widziało w nim zwykły login. Sprawdzenie czeka pod `[WERYFIKUJ]`
-   w `docs/allegro-ksztalt.md`; pomyłka daje najpewniej pustą historię. */
+   LOGIN ROZMÓWCY TO LOGIN KUPUJĄCEGO — zweryfikował to właściciel
+   24 września 2026 (`docs/allegro-ksztalt.md`). `client:44300444` z blizny
+   0.56.6 to login kupującego bez konta, nie maska.
+
+   PORÓWNANIE ZAWSZE BEZ WIELKOŚCI LITER (`COLLATE NOCASE`). Wątek i zamówienie
+   potrafią podać ten sam login różnie zapisany („Chips20" i „chips20").
+   Dokładne porównanie dawało wtedy pustą historię klientowi, który u nas
+   kupował, a zakładka stała tak do 24 września 2026. */
 
 export interface MaszynaKlienta {
   marka: string;
@@ -45,9 +48,8 @@ export interface WpisHistorii {
      o kliencie, który miesiąc temu odesłał towar.
 
      Wiązanie idzie po LOGINIE, bo to oś tej zakładki. Zwrot i sprawa niosą
-     `kupujacy_login` wprost z Allegro. Rozmowy wiążą się po loginie z wątku
-     (`interlocutor_login`), choć do 0.426.1 ten komentarz twierdził, że tego
-     nie robimy — patrz nagłówek pliku i `[WERYFIKUJ]` przy tym polu. */
+     `kupujacy_login` wprost z Allegro, a rozmowy — login z wątku
+     (`interlocutor_login`). To jedno i to samo pole kupującego. */
   rodzaj: "zakup" | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja";
   at: string;
   /** Zdanie na oś: „Zakup szarpaka SZR-148/82" albo temat rozmowy. */
@@ -118,7 +120,7 @@ export function historiaKlienta(
     SELECT c.id, c.subject, c.updated_at
       FROM conversation c
       JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
-     WHERE c.channel_account_id = ? AND t.interlocutor_login = ?
+     WHERE c.channel_account_id = ? AND t.interlocutor_login = ? COLLATE NOCASE
      ORDER BY c.updated_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
 
   return zbierz(database, konto, login, rozmowyKlienta, { rodzaj: "rozmowa", id: conversationId });
@@ -132,12 +134,11 @@ export function historiaKlienta(
  * kupujący pisał tydzień temu o tej samej części.
  *
  * LOGIN BIERZE SIĘ Z SAMEJ SPRAWY, nie z wątku. `kupujacy_login` zwrotu
- * i sprawy przychodzi z Allegro wprost i jest pewny — zamówienia wiążą się po
- * nim od zawsze. ROZMOWY dochodzą wyłącznie NUMEREM ZAMÓWIENIA: z zakupów
- * tego loginu i z samej sprawy. Po `interlocutor_login` ta droga nie chodzi,
- * bo `CLAUDE.md` zabrania trzeciej funkcji na tym polu, dopóki stoi przy nim
- * `[WERYFIKUJ]`. Cena jest jawna: rozmowa bez numeru zamówienia tu nie
- * wejdzie, choć zakładka KLIENT w skrzynce ją pokaże.
+ * i sprawy przychodzi z Allegro wprost. ROZMOWY dochodzą DWIEMA drogami:
+ * numerem zamówienia (z zakupów tego loginu i z samej sprawy) oraz loginem
+ * rozmówcy z wątku. Druga doszła 24 września 2026, gdy właściciel potwierdził,
+ * że to login kupującego. Bez niej pytanie sprzed zakupu, które nie niesie
+ * numeru zamówienia, nie trafiało do historii ze zwrotu.
  */
 export function historiaSprawy(
   rodzaj: "zwrot" | "sprawa", id: number, database: DatabaseSync = db(),
@@ -152,16 +153,23 @@ export function historiaSprawy(
   if (!login) return PUSTA;
 
   const numery = new Set((database.prepare(
-    "SELECT external_id FROM zamowienie_klienta WHERE channel_account_id = ? AND kupujacy_login = ?",
+    "SELECT external_id FROM zamowienie_klienta WHERE channel_account_id = ? AND kupujacy_login = ? COLLATE NOCASE",
   ).all(konto, login) as Array<Record<string, unknown>>).map((z) => String(z.external_id)));
   const wlasny = tekst(w.order_id);
   if (wlasny) numery.add(wlasny);
   const lista = [...numery];
-  const rozmowy = lista.length === 0 ? [] : database.prepare(`
-    SELECT DISTINCT c.id, c.subject, c.updated_at
-      FROM conversation c JOIN message m ON m.conversation_id = c.id
-     WHERE c.channel_account_id = ? AND m.related_order_id IN (${lista.map(() => "?").join(",")})
-     ORDER BY c.updated_at DESC`).all(konto, ...lista) as Array<Record<string, unknown>>;
+  /* `IN ()` z pustą listą to błąd składni SQLite, więc przy braku numerów
+     warunek na zamówienie dostaje wartość, której nie ma żaden wiersz. */
+  const numeryWarunek = lista.length ? lista : [""];
+  const rozmowy = database.prepare(`
+    SELECT c.id, c.subject, c.updated_at
+      FROM conversation c
+      LEFT JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
+     WHERE c.channel_account_id = ?
+       AND (t.interlocutor_login = ? COLLATE NOCASE
+            OR EXISTS (SELECT 1 FROM message m WHERE m.conversation_id = c.id
+                        AND m.related_order_id IN (${numeryWarunek.map(() => "?").join(",")})))
+     ORDER BY c.updated_at DESC`).all(konto, login, ...numeryWarunek) as Array<Record<string, unknown>>;
 
   const pomin = rodzaj === "zwrot"
     ? { rodzaj: "zwrot" as const, id }
@@ -184,7 +192,7 @@ function zbierz(
            (SELECT group_concat(p.nazwa, ', ') FROM zamowienie_klienta_pozycja p
              WHERE p.zamowienie_id = k.id) AS pozycje
       FROM zamowienie_klienta k
-     WHERE k.channel_account_id = ? AND k.kupujacy_login = ?
+     WHERE k.channel_account_id = ? AND k.kupujacy_login = ? COLLATE NOCASE
      ORDER BY k.kupiono_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
 
   /* Zwroty i sprawy posprzedażowe tego kupującego (S2 spoiwa). Oba niosą
@@ -194,13 +202,13 @@ function zbierz(
      już u nas był", nie „co z tą paczką". */
   const zwroty = database.prepare(`
     SELECT id, reference_number, order_id, created_at FROM zwrot_klienta
-     WHERE channel_account_id = ? AND kupujacy_login = ?
+     WHERE channel_account_id = ? AND kupujacy_login = ? COLLATE NOCASE
      ORDER BY created_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
 
   const sprawy = database.prepare(`
     SELECT id, typ, reference_number, temat, order_id, otwarto_at
       FROM reklamacja_klienta
-     WHERE channel_account_id = ? AND kupujacy_login = ?
+     WHERE channel_account_id = ? AND kupujacy_login = ? COLLATE NOCASE
      ORDER BY otwarto_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
 
   /* Maszyny: dobory domknięte w rozmowach tego klienta. `marka` I `model`

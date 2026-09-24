@@ -420,7 +420,7 @@ ale nie ma prawa kupić ich drugi raz.
 | wydanie | blizna | czego nie wolno zgubić |
 |---|---|---|
 | 0.18.0 | zapis przy samym patrzeniu na ekran | otwarcie ekranu niczego nie mutuje; liczniki zapisów w teście panelu są umową |
-| 0.56.6 | „brak korespondencji" przy istniejącym wątku — Allegro MASKUJE rozmówcę jako `client:44300444` | rozmowy szuka się po identyfikatorze kupującego, nigdy po loginie; zakładka KLIENT i kandydaci zamówień łamią to od 0.386.0 i 0.397.0 — sprawdzenie czeka pod `[WERYFIKUJ]` w `allegro-ksztalt.md` |
+| 0.56.6 | „brak korespondencji" przy istniejącym wątku — Allegro MASKUJE rozmówcę jako `client:44300444` | rozmowy szukano po identyfikatorze kupującego, nie po loginie; 24 września 2026 właściciel potwierdził, że to login kupującego bez konta, nie maska — rozbieżność dawała wielkość liter, więc login porównuje się bez niej (`allegro-ksztalt.md`) |
 | 0.102.1 | pobranie przerabiało 60 rozmów i zakładało zero pytań | kto pisał, ustala się po roli autora (`BUYER`/`SELLER`), a login rozmówcy jest dopiero zapasem |
 | 0.105.0 | szkic dostawał szum, a Allegro zbędne strzały | kontekst dociąga się pod PYTANIE, nie do każdej sprawy |
 | 0.110.0 | dopisek klienta zakładał drugą sprawę, a odpowiedź szła na starą wersję pytania | kontrola świeżości przy wysyłce: 409 i jawne „wyślij mimo to", nigdy ciche nadpisanie |

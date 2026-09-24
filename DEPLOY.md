@@ -2582,6 +2582,14 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.483.0 — login rozmówcy to login kupującego
+
+**Wystarczy restart serwera.** Bez migracji i bez zmian w panelu.
+
+Sprawdzenie: Ctrl+K, wpisz login klienta, który pytał przed zakupem. Rozmowa
+ma się znaleźć z powodem „login kupującego”. Zakładka KLIENT tej rozmowy ma
+pokazać jego zakupy, także gdy login w zamówieniu ma inną wielkość liter.
+
 ### Aktualizacja do 0.480.0 — „Pasuje do” ze wszystkich ofert
 
 **Panel trzeba przebudować, a serwer zrestartować.** Kolumna

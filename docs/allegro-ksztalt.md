@@ -75,22 +75,20 @@ Kursor synchronizacji porównuje się PARĄ (data, id), więc wątek bez daty ni
 jak w tej parze stanąć i kursora nie przesuwa. Bierze go najnowszy wątek,
 który datę ma.
 
-`[WERYFIKUJ]` **Czy `interlocutor.login` to login kupującego z zamówienia.**
-Dwa zapisy w tym repo mówią o tym polu przeciwnie. Blizna 0.56.6 opisuje je
-jako zamaskowane: stało tam `client:44300444`, a nie `buyer.login`. Wydanie
-0.397.0 widziało w nim zwykły login „chips20", różny od podpisu tylko
-wielkością liter.
+**`interlocutor.login` to login kupującego — zweryfikowane przez właściciela
+24 września 2026** na żywym koncie. Do tej daty stał tu znacznik weryfikacji,
+bo dwa zapisy w repo mówiły o tym polu przeciwnie. Blizna 0.56.6 widziała
+w nim `client:44300444` i uznała to za maskę. Wydanie 0.397.0 widziało zwykły
+login „chips20", różny od podpisu zamówienia tylko wielkością liter.
 
-Na tym polu wiążą się dziś dwie funkcje. Zakładka KLIENT
-(`services/klient-historia.ts`) zbiera po nim rozmowy, zakupy, zwroty i sprawy.
-Kandydaci zamówień rozmowy (`services/zamowienia-kandydaci.ts`) szukają po nim
-zakupów. Pomyłka daje najpewniej pustą historię, a nie cudze dane: zamaskowany
-login nie trafi w `zamowienie_klienta.kupujacy_login`.
+Oba zapisy da się pogodzić. Kupujący bez konta na Allegro dostaje login
+nadany automatycznie, w kształcie `Client:<liczba>` [pewność umiarkowana —
+znajomość Allegro, nie pomiar]. To jest jego prawdziwy login, nie maska.
+Porównanie z 0.56.6 najpewniej nie trafiło przez wielkość liter.
 
-Do sprawdzenia na żywym koncie trzy rzeczy. Kiedy Allegro maskuje rozmówcę.
-Czy maska dotyczy wątku z kupującym, czy tylko innych rozmówców. Czy wielkość
-liter różni się także między wątkiem a zamówieniem. Zakładka KLIENT porównuje
-bez `COLLATE NOCASE`, kandydaci — z nim.
+Z tego wynika jedna reguła: **login porównuje się bez wielkości liter**
+(`COLLATE NOCASE`), wszędzie. Zakładka KLIENT porównywała do 0.483.0 dokładnie
+i przez to potrafiła oddać pustą historię klientowi, który u nas kupował.
 
 Awatara nie mapujemy: panel pokazuje login, a obrazek z serwera Allegro
 znaczyłby wyjście przeglądarki biura poza własną sieć przy każdym otwarciu

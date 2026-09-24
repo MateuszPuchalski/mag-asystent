@@ -685,10 +685,11 @@ export function migrate(database: DatabaseSync) {
      0.80.0, więc kolumny muszą dojść migracją — bazy z tamtego wydania nie
      przechodzą przez CREATE TABLE. Nullowalne: sprawa bez prowadzącego jest
      stanem normalnym, nie brakiem danych. */
-  /* Odmaskowany identyfikator kupującego (0.128.0) — ten sam wzorzec co
-     `zwrot.kupujacy_id`: po nim, nie po loginie-masce, pytanie spotyka
-     zwroty tego samego klienta. */
-  dosypIdZMaski(database);
+  /* `dosypIdZMaski` (0.128.0) ZESZŁO 24 września 2026. Wpisywało liczbę
+     z loginu `client:<liczba>` jako identyfikator kupującego, a to nie maska,
+     tylko login kupującego bez konta (`docs/allegro-ksztalt.md`). Tabela
+     `pytanie`, do której pisało, jest kasowana przy starcie, a kolumny nikt
+     nie czytał — zeszła martwa dosypka na fałszywym założeniu. */
   /* Konta pracowników (§7). `events.user_id` ZOSTAJE jako tekst — to snapshot
      tego, co aplikacja wtedy wiedziała, i jedyny ślad po zdarzeniach sprzed
      kont. Obok dochodzi `user_ref` wskazujące na app_user. Historii się nie
@@ -2512,28 +2513,6 @@ function usunSesjeRozkladania(database: DatabaseSync) {
  * raz, zamiast kazać biuru zakładać te zwroty od nowa. Brak `json_extract`
  * w SQLite tylko zostawia kolumnę pustą; migracja nie zatrzyma startu.
  */
-/**
- * Uzupełnia `pytanie.kupujacy_id` z maski loginu (0.128.0).
- *
- * Centrum wiadomości oddaje rozmówcę jako `client:44300444`, a liczba spod
- * maski to buyer.id (dowód: test `normalizujRef` i adapter dev). GLOB jest
- * celowo wąski — prawdziwy login nie jest identyfikatorem i lepszy uczciwy
- * NULL niż zgadywanie. Wzorzec `dosypIdKupujacego`: idempotentny UPDATE
- * z warunkiem, try/catch, start serwera ważniejszy niż dosypka.
- */
-function dosypIdZMaski(database: DatabaseSync) {
-  try {
-    database.exec(
-      `UPDATE pytanie
-          SET kupujacy_id = substr(kupujacy_login, 8)
-        WHERE kupujacy_id IS NULL
-          AND kupujacy_login GLOB 'client:[0-9]*'`
-    );
-  } catch {
-    /* Pytanie bez identyfikatora dalej łączy się najwyżej po loginie. */
-  }
-}
-
 /**
  * Uzupełnia `message.related_order_id` z lądowiska (0.166.0).
  *
