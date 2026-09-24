@@ -18,9 +18,10 @@ export const pewnaPropozycja = (p: PozycjaZwrotu): boolean =>
 /**
  * Czy oddajemy koszt dostawy — wraca CAŁE zamówienie (0.476.0).
  *
- * Jedno miejsce tej reguły. Do 0.481.0 żyła wyłącznie w `Pozycje.tsx`,
- * a szybka ścieżka potrzebuje tej samej odpowiedzi — druga kopia rozjechałaby
- * się przy pierwszej poprawce, i to na pieniądzach klienta.
+ * Podpowiedź dla HACZYKA na ekranie ręcznym (`Pozycje.tsx`), nie decyzja.
+ * Od 0.484.5 szybka ścieżka z niej nie korzysta: decyzją właściciela „Wszystko
+ * OK" oddaje sumę pozycji bez dostawy. Reguła stoi tu dalej, bo ekran ręczny
+ * ją czyta, a jej test mieszka obok.
  */
 export function calaDostawa(zwrot: Zwrot): boolean {
   const poz = zwrot.zamowienie?.pozycje ?? [];

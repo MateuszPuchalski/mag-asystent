@@ -4917,8 +4917,9 @@ decyzjami stoi przycisk „Wszystko OK — na półkę i oddaj …". Klawisz `W`
 to samo.
 
 **Co robi, po kolei.** Przyjmuje zwrot i zatwierdza pewne kartoteki. Każdą
-nieocenioną pozycję ocenia „na stan", czyli do pudła i na MM. Zapisuje pełną
-kwotę, z dostawą przy zwrocie całego zamówienia. Na końcu otwiera zwrot
+nieocenioną pozycję ocenia „na stan", czyli do pudła i na MM. Zapisuje sumę
+pozycji BEZ kosztu dostawy (od 0.484.5, decyzja właściciela). Kto chce oddać
+dostawę, zapisuje kwotę ręcznie z haczykiem. Na końcu otwiera zwrot
 w Allegro, gdzie operator oddaje pieniądze. ZW wystawia potem automat, jak
 przy każdym zapisie kwoty.
 

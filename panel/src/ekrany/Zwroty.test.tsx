@@ -563,7 +563,8 @@ describe("Klawisze kubełka", () => {
       const otworz = vi.spyOn(window, "open").mockReturnValue(karta as unknown as Window);
       try {
         pokaz("/obsluga/zwroty/8");
-        expect(screen.getByRole("button", { name: /Wszystko OK/ })).toHaveTextContent("114,98");
+        /* Bez dostawy (0.484.5), choć wraca całe zamówienie — decyzja właściciela. */
+        expect(screen.getByRole("button", { name: /Wszystko OK/ })).toHaveTextContent("99,98");
         await userEvent.keyboard("w");
         await waitFor(() => expect(karta.location.href).toContain("salescenter"));
         expect(otworz).toHaveBeenCalledTimes(1);
@@ -573,7 +574,7 @@ describe("Klawisze kubełka", () => {
         /* Każdy zapis z wersją ODDANĄ przez poprzedni — blokada optymistyczna. */
         expect(scena.wolano[2].dane).toMatchObject({ pozycjaId: 81, ocena: "stan", wersja: 2 });
         expect(scena.wolano[3].dane).toMatchObject({ pozycjaId: 82, wersja: 3 });
-        expect(scena.wolano[4].dane).toEqual({ id: 8, pozycjeIds: [81, 82], dostawa: true, wersja: 4 });
+        expect(scena.wolano[4].dane).toEqual({ id: 8, pozycjeIds: [81, 82], dostawa: false, wersja: 4 });
       } finally { scena.zwroty = null; scena.koszykOceny = null; otworz.mockRestore(); }
     });
 
