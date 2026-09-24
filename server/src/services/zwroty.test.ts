@@ -2239,6 +2239,32 @@ test("pobranie czeka dłużej, bo za nie Allegro nie oddaje wcale", () => {
   assert.equal(pieniadzeCzekaja(pobranie, Date.parse("2026-11-01T12:00:00Z")), false);
 });
 
+test("nieodebrana czeka na pieniądze bez terminu — Allegro jej nie zna (0.493.0)", () => {
+  const nieodebrana = { ...zaplacony, zrodlo: "nieodebrana" };
+  assert.equal(pieniadzeCzekaja(nieodebrana, Date.parse("2027-01-01T12:00:00Z")), true,
+    "po terminie Allegro NIE odda samo, więc zwrot nie może zniknąć z pracy");
+  assert.equal(pieniadzeCzekaja({ ...nieodebrana, zlecono: true }, TERAZ_P), false);
+  assert.equal(pieniadzeCzekaja({ ...nieodebrana, przelewAt: "2026-09-20T10:00:00Z" }, TERAZ_P), false);
+  assert.equal(pieniadzeCzekaja({ ...nieodebrana, rozliczonyAllegroAt: "2026-09-20T10:00:00Z" }, TERAZ_P), false);
+});
+
+test("wypłata nie zdejmuje nieodebranej z pracy przed korektą (0.493.0)", () => {
+  /* Pieniądze oddane ręką w Allegro PRZED przyjęciem paczki w panelu. */
+  const z = {
+    rejectionCode: null, werdykt: null, zamknietyAt: null, kwotaGrosze: null,
+    korektaNumer: null, pozycje: [{ ocena: null }],
+    rozliczonyAllegroAt: "2026-09-20T10:00:00Z", zrodlo: "nieodebrana",
+  };
+  assert.equal(kubelekZwrotu(z), "decyzja");
+  assert.equal(kubelekZwrotu({ ...z, werdykt: "przyjety", pozycje: [{ ocena: "stan" }],
+    kwotaGrosze: 4999 }), "korekta");
+  assert.equal(kubelekZwrotu({ ...z, werdykt: "przyjety", pozycje: [{ ocena: "stan" }],
+    kwotaGrosze: 4999, korektaNumer: "ZW 1/MAG/09/2026" }), "zamkniety",
+    "po korekcie zamyka, bo pieniądze już wyszły");
+  /* Zwrot z Allegro zamyka wypłata jak dotąd — decyzja z 0.339.0. */
+  assert.equal(kubelekZwrotu({ ...z, zrodlo: "allegro" }), "zamkniety");
+});
+
 test("zamknięty korektą, a niezapłacony — wraca do DO ZWROTU", () => {
   const z = {
     rejectionCode: null, werdykt: "przyjety", zamknietyAt: "2026-09-19T12:00:00Z",
@@ -2250,4 +2276,46 @@ test("zamknięty korektą, a niezapłacony — wraca do DO ZWROTU", () => {
      dalej i wrócą do DO ZWROTU po niej. */
   assert.equal(kubelekZwrotu({ ...z, zamknietyAt: null, korektaNumer: null, pieniadzeCzekaja: true },
     TERAZ_P), "korekta");
+});
+
+/* ── Drugi zwrot tego samego zamówienia (0.493.0) ─────────────────────────
+   Decyzja właściciela: klient z nieodebraną paczką zgłasza czasem potem
+   odstąpienie w Allegro. Dwa zwroty to dwie kwoty za jeden towar. */
+
+test("paczka nieodebrana i zwrot z Allegro na jednym zamówieniu ostrzegają się nawzajem", () => {
+  const d = stanowisko();
+  const zAllegro = dodaj(d, "2026-08-30T10:00:00Z", { order_id: "ord-2x" });
+  const nieodebrana = dodaj(d, "2026-08-29T10:00:00Z", { order_id: "ord-2x" });
+  d.prepare("UPDATE zwrot_klienta SET zrodlo='nieodebrana', external_id='nieodebrana:6200001' WHERE id=?")
+    .run(nieodebrana);
+  const lista = listaZwrotow(d, TERAZ);
+  const a = lista.find((z) => z.id === zAllegro)!;
+  const n = lista.find((z) => z.id === nieodebrana)!;
+  assert.deepEqual(a.drugiZwrot, { id: nieodebrana, numer: "6200001", zrodlo: "nieodebrana" },
+    "numer bez naszego przedrostka — tak, jak stoi na naklejce");
+  assert.equal(n.drugiZwrot?.id, zAllegro);
+  assert.ok(a.sygnaly.includes("drugi_zwrot"));
+  assert.ok(n.sygnaly.includes("drugi_zwrot"), "wiązanie w obie strony");
+  /* Szczegół jednego zwrotu czyta drugi osobno — tamten nie przeszedł filtra. */
+  assert.equal(listaZwrotow(d, TERAZ, { id: zAllegro })[0].drugiZwrot?.id, nieodebrana);
+});
+
+test("dwa zwroty z Allegro na jednym zamówieniu to zwykły zwrot w dwóch paczkach", () => {
+  const d = stanowisko();
+  dodaj(d, "2026-08-30T10:00:00Z", { order_id: "ord-2p" });
+  dodaj(d, "2026-08-31T10:00:00Z", { order_id: "ord-2p" });
+  for (const z of listaZwrotow(d, TERAZ)) {
+    assert.equal(z.drugiZwrot, null);
+    assert.ok(!z.sygnaly.includes("drugi_zwrot"));
+  }
+});
+
+test("drugi zwrot gaśnie na zwrocie zamkniętym, ale odnośnik zostaje", () => {
+  const d = stanowisko();
+  const zamkniety = dodaj(d, "2026-08-30T10:00:00Z", { order_id: "ord-2z", werdykt: "odrzucony" });
+  const nieodebrana = dodaj(d, "2026-08-29T10:00:00Z", { order_id: "ord-2z" });
+  d.prepare("UPDATE zwrot_klienta SET zrodlo='nieodebrana' WHERE id=?").run(nieodebrana);
+  const z = listaZwrotow(d, TERAZ, { id: zamkniety })[0];
+  assert.equal(z.drugiZwrot?.id, nieodebrana);
+  assert.ok(!z.sygnaly.includes("drugi_zwrot"));
 });

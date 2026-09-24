@@ -46,8 +46,15 @@ const PYTAJNIKI = STATUSY.map(() => "?").join(",");
  * sprzątać, dokładnie wtedy, gdy nasz własny automat rabatów ruszył sprawę
  * dalej.
  */
+/*
+ * PACZKA NIEODEBRANA NIGDY NIE JEST „POZA APLIKACJĄ" (0.493.0). Zakłada ją
+ * biuro, więc skasowana nie wróci z synchronizacji. A pieniądze za nią bywają
+ * oddane ręką w Allegro, zanim ktoś ją oceni — świeżo przyjęta paczka
+ * spełniała więc warunek kasowania co do joty.
+ */
 const ROZLICZONY =
-  `(z.rozliczony_allegro_at IS NOT NULL OR z.status_allegro IN (${PYTAJNIKI}))`;
+  `(z.rozliczony_allegro_at IS NOT NULL OR z.status_allegro IN (${PYTAJNIKI}))
+   AND z.zrodlo <> 'nieodebrana'`;
 
 /** Zwrot bez ŻADNEJ pozycji w koszyku — warunek wspólny dla liczenia i kasowania. */
 const BEZ_KOSZYKA = `NOT EXISTS (

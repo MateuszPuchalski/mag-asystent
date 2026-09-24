@@ -76,6 +76,19 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
       {zwrot.kupujacyLogin && <PrzyciskHistorii rodzaj="zwrot" id={zwrot.id} tutaj="tym zwrotem" />}
     </p>
 
+    {/* ── DRUGI ZWROT TEGO ZAMÓWIENIA (0.493.0) ─────────────────────────────
+        Decyzja właściciela: klient z paczką nieodebraną zgłasza czasem potem
+        odstąpienie w Allegro. Nagłówek mówi to przed kwotą i przyciskiem
+        pieniędzy, a odnośnik otwiera drugi zwrot — decyzję, który z nich
+        oddaje pieniądze, podejmuje się, patrząc na oba. */}
+    {zwrot.drugiZwrot &&
+      <p role="alert" className="mt-1 text-xs font-semibold text-ranga-zle">
+        To zamówienie ma też {zwrot.drugiZwrot.zrodlo === "nieodebrana"
+          ? "paczkę nieodebraną" : "zwrot zgłoszony w Allegro"}{" "}
+        <a href={`/obsluga/zwroty/${zwrot.drugiZwrot.id}`}
+          className="font-mono underline underline-offset-2">{zwrot.drugiZwrot.numer}</a>
+        {" "}— pieniądze oddaje się raz.</p>}
+
     {zwrot.rozmowy.length > 0 && <RozmowaWNaglowku rozmowy={zwrot.rozmowy} />}
 
     {/* NOTATKA ZESZŁA STĄD W 0.313.0. Przy paczce nieodebranej cytowaliśmy ją

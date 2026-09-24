@@ -4109,6 +4109,43 @@ po kliencie" przy nieznanym kodzie. Wiersz wyniku prowadzi do zamówienia
 w panelu Allegro. Trasa `nieodebrana` zniknęła też z serwera.
 Wiersze zarejestrowane wcześniej zostają w kolejce ze znacznikiem.
 
+**Przyjęcie wraca jednym kliknięciem (0.493.0).** Właściciel zapytał, jak
+procesujemy paczki nieodebrane, i zdecydował: mają iść drogą zwrotu. Od
+0.451.0 paczka kończyła się na stronie zamówienia w Allegro. ZW, półka
+i przelew działy się poza panelem, bez oceny, koszyka i śladu pieniędzy.
+
+Formularz z 0.451.0 nie wraca. Przy wierszu wyniku stoi przycisk „Przyjmij
+jako nieodebraną", a klik w sam wiersz dalej otwiera Allegro. Przycisk nie
+pyta o nic: pozycje, login i odbiorcę bierze z zamówienia. Numer listu
+dochodzi tylko ze skanu, który chybił, bo to numer tego kartonu. Następny
+skan tej naklejki otwiera więc już zwrot. Bez skanu uchwytem jest zamówienie.
+
+Serwer odmawia w trzech przypadkach: zamówienia nie zna, zamówienie nie ma
+pozycji albo ma już zwrot. Drugi zwrot to druga kwota za ten sam towar, więc
+przy „ma już zwrot" przycisku nie ma. Odmowa niesie numer istniejącego zwrotu
+i panel go otwiera.
+
+Po przyjęciu idą wiązania, jak po dociągnięciu: kartoteki i paragon po
+numerze zamówienia. Dalej paczka idzie zwykłą drogą: ocena, koszyk, kwota
+i ZW automatem. Pieniądze oddaje zwrot płatności po zamówieniu, który zwrotu
+klienta nie potrzebuje. Odmowy wypłaty nie ma, bo idzie do zwrotu klienta
+w Allegro, a tego tu nie ma. Szybka ścieżka i wniosek o rabat pomijają
+taką paczkę jak dotąd.
+
+Trzy reguły zamykania zwrotu dostały wyjątek dla takiej paczki. Allegro jej
+nie zna, więc niczego za nas nie odda. Czekanie na pieniądze nie wygasa więc
+po terminie. Wypłata zdejmuje tylko to czekanie, a zwrot zamyka korekta.
+Narzędzie kasowania rozliczonych poza aplikacją paczki nie rusza, bo nie
+wróciłaby z synchronizacji.
+
+**Drugi zwrot tego zamówienia ostrzega (0.493.0).** Klient z paczką
+nieodebraną zgłasza czasem potem odstąpienie w Allegro. Synchronizacja zakłada
+wtedy drugi zwrot tego samego zamówienia, a to dwie kwoty za jeden towar.
+Worker drugiego ZW nie wystawi, ale pieniędzy pilnuje już tylko człowiek.
+Oba wiersze dostają sygnał `drugi_zwrot`, a nagłówek podaje numer drugiego
+z odnośnikiem. Sygnał świeci tylko przy różnych źródłach i tylko w pracy.
+Dwa zwroty z Allegro to zwykły zwrot w dwóch paczkach.
+
 **Wiersz jest JAWNIE oznaczony**, kolumną `zrodlo`. Panel pisze przy nim
 „Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana", a plakietka
 stoi i w kolejce, i w nagłówku, i w kolumnie eksportu CSV. Bez tego biuro
@@ -6022,7 +6059,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Dokument sprzedaży (FS/PA) przy zwrocie | **działa** od 0.174.0 | `sgt_faktura`, `services/faktury.ts` |
 | Data doręczenia paczki zwrotnej | **działa** od 0.187.0 | `services/allegro-tracking.ts`, `zwrot_klienta.dostarczono_at` |
 | Produkt dopisany do zwrotu przez biuro | **działa** od 0.184.0 | `dopiszPozycje`, `zwrot_klienta_pozycja.zrodlo` |
-| Paczka nieodebrana jako osobny byt | **wycofana z panelu** w 0.451.0 | wiersze `zwrot_klienta.zrodlo` zostają; zostało szukanie klienta |
+| Paczka nieodebrana jako osobny byt | formularz **wycofany** w 0.451.0, przyjęcie **działa** od 0.493.0 | `przyjmijNieodebrana`, przycisk przy wierszu paczek klienta |
 | Zwroty klienckie — odczyt i kolejka | **działa** od 0.150.0 | `services/zwroty.ts`, `panel/src/zwroty/` |
 | Synchronizacja zwrotów z Allegro | **działa** od 0.150.0 | `services/allegro-zwroty-sync.ts` |
 | Ręczna synchronizacja zwrotów | **działa** od 0.232.0 | `POST /api/obsluga/zwroty/synchronizuj`, przycisk w paśmie filtrów kolejki |

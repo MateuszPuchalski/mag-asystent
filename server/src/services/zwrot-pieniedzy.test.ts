@@ -486,3 +486,21 @@ test("zwrot rozliczony przez Allegro nie proponuje drugiego przelewu", () => {
   assert.equal(s.moznaZwrocic, false);
   assert.match(String(s.powod), /Allegro już oddało/);
 });
+
+test("paczka nieodebrana oddaje pieniądze płatnością, ale odmówić nie ma czego (0.493.0)", async () => {
+  /* Zwrot płatności idzie po zamówieniu i działa bez zwrotu klienta.
+     Odmowa idzie do zwrotu klienta w Allegro — a tego tu nie ma. */
+  const d = stanowisko();
+  const id = zwrotGotowy(d);
+  d.prepare("UPDATE zwrot_klienta SET external_id='nieodebrana:620000111222', zrodlo='nieodebrana' WHERE id=?")
+    .run(id);
+  const s = stanZwrotuPieniedzy(d, id);
+  assert.equal(s.moznaZwrocic, true);
+  assert.equal(s.moznaOdmowic, false);
+  let wyslano = false;
+  await assert.rejects(
+    () => odmowZwrotuPieniedzy(d, id, "REFUND_REJECTED", "powód", 1, KTO,
+      async () => { wyslano = true; return null; }),
+    ZwrotPieniedzyConflict);
+  assert.equal(wyslano, false, "żądanie nie wychodzi do Allegro");
+});

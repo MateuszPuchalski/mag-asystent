@@ -33,7 +33,27 @@ export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | 
 
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
   | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna"
-  | "rozjazd_ilosci" | "przelew_czeka";
+  | "rozjazd_ilosci" | "przelew_czeka" | "drugi_zwrot";
+
+/**
+ * Zwrot tego samego zamówienia z DRUGIEGO źródła (0.493.0).
+ *
+ * Decyzja właściciela: klient, którego paczka wróciła nieodebrana, bywa, że
+ * zgłasza potem odstąpienie w Allegro. Synchronizacja zakłada wtedy drugi
+ * zwrot tego samego zamówienia, obok przyjętej przez biuro paczki. Dwa zwroty
+ * to dwie kwoty do oddania za jeden towar — worker nie wystawi drugiego ZW,
+ * ale pieniądze pilnuje już tylko człowiek.
+ *
+ * TYLKO RÓŻNE ŹRÓDŁA. Dwa zwroty z Allegro na jedno zamówienie to zwykły
+ * zwrot w dwóch paczkach, każdy z własnymi pozycjami — ostrzeżenie świeciłoby
+ * na nich bez powodu i uczyło je przewijać.
+ */
+export interface DrugiZwrot {
+  id: number;
+  /** Numer do przeczytania — bez naszego przedrostka `nieodebrana:`. */
+  numer: string;
+  zrodlo: string;
+}
 
 export interface PozycjaZwrotu {
   id: number;
@@ -207,6 +227,8 @@ export interface WierszZwrotu {
   rozliczonyAllegroAt: string | null;
   /** Rozmowy o TYM zakupie; puste znaczy „Allegro nic nie powiązało". */
   rozmowy: RozmowaZwrotu[];
+  /** Zwrot tego zamówienia z drugiego źródła; `null` = nie ma (0.493.0). */
+  drugiZwrot: DrugiZwrot | null;
   /** Dokument sprzedaży z Subiekta — snapshot numeru, nie odczyt na żywo. */
   faktura: FakturaZwrotu;
   wersja: number;
@@ -309,11 +331,19 @@ export function pieniadzeCzekaja(z: {
   zlecono?: boolean;
   odmowaKod?: string | null; przelewAt?: string | null;
   platnoscTyp?: string | null; terminAt?: string | null; utworzono?: string | null;
+  /** `allegro` albo `nieodebrana` (0.493.0). */
+  zrodlo?: string | null;
 }, teraz = Date.now(), wygasaDni = config.allegro.zwrotWygasaDni): boolean {
   if (z.werdykt !== "przyjety" || z.rejectionCode) return false;
   if (z.kwotaGrosze === null || z.kwotaGrosze <= 0) return false;
   if (z.rozliczonyAllegroAt || STATUSY_ODDANE.has(String(z.statusAllegro ?? ""))) return false;
   if (z.zlecono || z.odmowaKod || z.przelewAt) return false;
+  /* PACZKA NIEODEBRANA CZEKA BEZ TERMINU (0.493.0). „Ósmego dnia Allegro
+     oddaje samo" dotyczy zwrotu klienta, a tej paczki Allegro nie zna.
+     Z terminem zamknięty korektą, niezapłacony zwrot wychodził z kolejki
+     dzień po terminie — pieniądze nie szły nigdy i nikt by tego nie
+     zobaczył. Czeka więc, aż zobaczymy wypłatę, zlecenie albo przelew. */
+  if (z.zrodlo === "nieodebrana") return true;
   if (z.platnoscTyp === "CASH_ON_DELIVERY") {
     return Boolean(z.utworzono) && teraz - Date.parse(String(z.utworzono)) <= wygasaDni * 86_400_000;
   }
@@ -385,7 +415,15 @@ export function kubelekZwrotu(z: {
      Wskaźnik czytamy DALEJ, obok zatrzasku: pierwsze spojrzenie na świeżo
      zsynchronizowany zwrot bywa wcześniejsze niż zapis zatrzasku, a dwa
      źródła tej samej prawdy nie kłócą się — oba mówią „pieniądze wróciły". */
-  if (z.rozliczonyAllegroAt || STATUSY_ODDANE.has(String(z.statusAllegro ?? ""))) {
+  /* PACZKI NIEODEBRANEJ WYPŁATA NIE ZAMYKA (0.493.0). Zwrot z Allegro po
+     wypłacie wychodzi z pracy decyzją z 0.339.0, a braki łapie rekoncyliacja.
+     Nieodebraną biuro przyjmuje po to, żeby zrobić ZW i odłożyć towar —
+     a pieniądze bywają oddane wcześniej, ręką w Allegro. Zamknięcie po
+     wypłacie zdejmowałoby taką paczkę z kolejki w pierwszym takcie po
+     przyjęciu, zanim ktokolwiek ją oceni. Wypłata dalej zdejmuje czekanie
+     na pieniądze, więc po korekcie zwrot się zamyka. */
+  if ((z.rozliczonyAllegroAt || STATUSY_ODDANE.has(String(z.statusAllegro ?? "")))
+      && (z.zrodlo ?? "allegro") !== "nieodebrana") {
     return "zamkniety";
   }
   /* ── STARY ZWROT BEZ DECYZJI JEST ROZLICZONY (0.452.0) ─────────────────
@@ -462,6 +500,8 @@ export function sygnalyZwrotu(z: {
   kwotaUstalona?: boolean;
   /** Czy zwrot został przyjęty; odmowa nie prosi o pieniądze. */
   przyjety?: boolean;
+  /** Czy to zamówienie ma zwrot z drugiego źródła (0.493.0). */
+  drugiZwrot?: boolean;
 }, teraz = Date.now()): Sygnal[] {
   const s: Sygnal[] = [];
   /* Stany końcowe nie mają terminu do pilnowania — czerwień na nich uczyłaby
@@ -523,6 +563,11 @@ export function sygnalyZwrotu(z: {
       && !z.przelewAt && !oddane) {
     s.push("przelew_czeka");
   }
+  /* DRUGI ZWROT TEGO ZAMÓWIENIA (0.493.0). Tylko w pracy: gdy oba są
+     zamknięte, pieniądze są już rozstrzygnięte, a świecący sygnał na
+     historii uczyłby go nie czytać. Świeci na OBU wierszach, bo każdy
+     z nich może być tym, który ktoś zaraz wypłaci. */
+  if (wPracy && z.drugiZwrot) s.push("drugi_zwrot");
   /* KWOTA ROZJECHANA Z POZYCJAMI. Świeci także na zwrocie ZAMKNIĘTYM, z tego
      samego powodu co niepotwierdzony przelew: mówi o pieniądzach, które mogły
      wyjść w złej wysokości, a zwrot zamyka się zaraz po korekcie. Gaśnie
@@ -594,6 +639,7 @@ function zloz(
      z `w_zwrocie`, `cena_grosze` i `potracenie_grosze`, a DTO pozycji nie
      niesie zaznaczenia — i nie ma powodu, żeby zaczęło. */
   surowe: Wiersz[] = [],
+  drugiZwrot: DrugiZwrot | null = null,
 ): WierszZwrotu {
   const utworzono = String(z.created_at);
   const terminAt = terminZwrotu(poczatekTerminu({
@@ -612,7 +658,7 @@ function zloz(
     odmowaKod: (z.odmowa_kod as string) ?? null,
     przelewAt: (z.przelew_at as string) ?? null,
     platnoscTyp: zamowienie?.platnoscTyp ?? null,
-    terminAt, utworzono,
+    terminAt, utworzono, zrodlo: String(z.zrodlo ?? "allegro"),
   }, teraz);
   const kubelek = kubelekZwrotu({
     rejectionCode,
@@ -653,6 +699,7 @@ function zloz(
       przelewAt: (z.przelew_at as string) ?? null,
       kwotaUstalona: z.kwota_grosze != null,
       przyjety: z.werdykt === "przyjety",
+      drugiZwrot: drugiZwrot !== null,
     }, teraz),
     terminAt,
     dniDoTerminu: dni,
@@ -681,6 +728,7 @@ function zloz(
       blad: (z.zw_blad as string) ?? null,
     },
     rejectionCode,
+    drugiZwrot,
     zrodlo: String(z.zrodlo ?? "allegro"),
     notatka: (z.notatka as string) ?? null,
     notatkaAt: (z.notatka_at as string) ?? null,
@@ -773,6 +821,32 @@ export function listaZwrotow(
       : database.prepare(`${ZWROTY_Z_ZW} WHERE z.channel_account_id=? AND z.order_id=?
           ORDER BY z.created_at ASC`).all(filtr.channelAccountId, filtr.orderId)) as Wiersz[];
   const idyZwrotow = zwroty.map((z) => Number(z.id));
+  /* ZWROTY TYCH SAMYCH ZAMÓWIEŃ, do sygnału `drugi_zwrot` (0.493.0). Pełna
+     kolejka ma je już w pamięci. Szczegół jednego zwrotu pyta o jedno
+     zamówienie — jego drugi zwrot zwykle nie przeszedł filtra. */
+  type ZwrotZamowienia = { id: number; zrodlo: string; numer: string };
+  const wgZamowienia = new Map<string, ZwrotZamowienia[]>();
+  const klucz = (konto: unknown, zam: unknown) => `${konto}|${zam}`;
+  const zamowieniaZwrotow = [...new Set(zwroty.filter((z) => z.order_id != null)
+    .map((z) => klucz(z.channel_account_id, z.order_id)))];
+  const rodzenstwo = (filtr === null ? zwroty : zamowieniaZwrotow.length === 0 ? [] : database.prepare(
+    `SELECT id, channel_account_id, order_id, zrodlo, reference_number, external_id
+       FROM zwrot_klienta WHERE order_id IN (${znaki(zamowieniaZwrotow.length)})`)
+    .all(...zamowieniaZwrotow.map((k) => k.slice(k.indexOf("|") + 1)))) as Wiersz[];
+  for (const r of rodzenstwo) {
+    if (r.order_id == null) continue;
+    const k = klucz(r.channel_account_id, r.order_id);
+    const lista = wgZamowienia.get(k) ?? [];
+    lista.push({ id: Number(r.id), zrodlo: String(r.zrodlo ?? "allegro"),
+      numer: String(r.reference_number ?? r.external_id).replace(/^nieodebrana:/, "") });
+    wgZamowienia.set(k, lista);
+  }
+  const drugiZwrotDla = (z: Wiersz): DrugiZwrot | null => {
+    if (z.order_id == null) return null;
+    const wlasne = String(z.zrodlo ?? "allegro");
+    return (wgZamowienia.get(klucz(z.channel_account_id, z.order_id)) ?? [])
+      .find((r) => r.id !== Number(z.id) && r.zrodlo !== wlasne) ?? null;
+  };
   const pozycje = (filtr === null
     ? database.prepare("SELECT * FROM zwrot_klienta_pozycja ORDER BY id ASC").all()
     : idyZwrotow.length
@@ -1016,7 +1090,8 @@ export function listaZwrotow(
       }) : null;
 
       return zloz(z, zlozone, zamowienie, teraz,
-        rozmowyWgZam.get(String(z.order_id ?? "")) ?? [], surowe);
+        rozmowyWgZam.get(String(z.order_id ?? "")) ?? [], surowe,
+        drugiZwrotDla(z));
     })
     /* Najkrótszy termin na górze — to jest cała reguła kolejności i jedyna,
        jakiej ten ekran potrzebuje. ZWROTY BEZ TERMINU IDĄ NA KONIEC (0.339.0):
@@ -1574,13 +1649,10 @@ export function wskazSklad(
 /**
  * Rejestracja paczki, która wróciła NIEODEBRANA (0.172.0).
  *
- * ── BEZ TRASY OD 0.451.0 ───────────────────────────────────────────────────
- * Decyzją właściciela rejestracja zniknęła z panelu i z serwera. Funkcja
- * zostaje, bo jest JEDYNĄ definicją kształtu takiego wiersza: przedrostek
- * identyfikatora, klucze pozycji, daty powrotu. Baza produkcyjna ma te wiersze,
- * a testy odczytu — skan po numerze listu, migracja, szukanie — budują je
- * właśnie nią. Wiersz złożony w teście ręcznie rozjechałby się z prawdziwym
- * przy pierwszej zmianie. Nowa trasa do niej wraca tylko nową decyzją.
+ * ── FORMULARZ ODSZEDŁ W 0.451.0, WIERSZ WRÓCIŁ W 0.493.0 ────────────────
+ * W 0.451.0 rejestracja zniknęła z panelu i z serwera, decyzją właściciela.
+ * Funkcja została, bo jest JEDYNĄ definicją kształtu takiego wiersza. Wraca
+ * do niej `przyjmijNieodebrana`, nową decyzją — uzasadnienie stoi tam.
  *
  * Allegro takiego bytu nie zna: `CustomerReturn` powstaje z DEKLARACJI klienta,
  * a nieodebrana przesyłka wraca sama i zwrotem nigdy nie zostanie. Pieniądze
@@ -1630,25 +1702,31 @@ const LIMIT_NAZWY = 120;
 
 export function zarejestrujNieodebrana(
   database: Db, dane: {
-    waybill: string; orderId?: string | null; notatka?: string | null;
+    waybill?: string | null; orderId?: string | null; notatka?: string | null;
     login?: string | null; odbiorcaNazwa?: string | null; przewoznik?: string | null;
   },
   kto: { id: number; name: string }, teraz = new Date(),
 ): { zwrotId: number; pozycji: number } {
   const waybill = (dane.waybill ?? "").trim();
-  if (!waybill) throw new Error("Numer listu przewozowego jest tu jedynym uchwytem — podaj go.");
+  const orderId = (dane.orderId ?? "").trim() || null;
+  /* Uchwytem jest numer listu ALBO zamówienie (0.493.0). Do 0.451.0 list
+     był jedynym, bo formularz zakładał zwrot bez zamówienia. Przycisk przy
+     wyniku szukania zna zamówienie zawsze, a listu nie, gdy biuro szukało
+     klienta bez skanu naklejki. */
+  if (!waybill && !orderId) {
+    throw new Error("Numer listu przewozowego jest tu jedynym uchwytem — podaj go.");
+  }
 
   const konto = database.prepare("SELECT id FROM channel_account ORDER BY id LIMIT 1")
     .get() as { id: number } | undefined;
   if (!konto) throw new Error("Brak konta kanału — sparuj konto Allegro: /obsluga → STAN SYSTEMU → KONTO ALLEGRO.");
 
-  const external = `nieodebrana:${waybill}`;
+  const external = `nieodebrana:${waybill || orderId}`;
   const juz = database.prepare(
     "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?")
     .get(konto.id, external) as { id: number } | undefined;
   if (juz) throw new Error(`Ta paczka jest już zarejestrowana (zwrot ${juz.id}).`);
 
-  const orderId = (dane.orderId ?? "").trim() || null;
   const at = teraz.toISOString();
 
   /* Zamówienie czytamy PRZED wstawieniem, bo niesie login. Pozycje idą niżej
@@ -1684,7 +1762,7 @@ export function zarejestrujNieodebrana(
          przy paczce nieodebranej nie znamy przewoźnika, a Allegro nie zna
          samego zwrotu. Bez tego panel pytał „czy dotarła" o karton leżący
          na biurku operatora. */
-      at, at, waybill, (dane.notatka ?? "").trim() || null,
+      at, at, waybill || null, (dane.notatka ?? "").trim() || null,
       login, odbiorca, przewoznik, at);
     const zwrotId = Number((database.prepare(
       "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?")
@@ -1726,6 +1804,63 @@ export function zarejestrujNieodebrana(
         zOdbiorca: odbiorca !== null, przewoznik }, kto.id, database);
     return { zwrotId, pozycji };
   })();
+}
+
+/**
+ * Paczka nieodebrana przyjęta JEDNYM KLIKIEM z wyniku szukania (0.493.0).
+ *
+ * Decyzja właściciela, po pytaniu „jak procesujemy paczki, które wracają
+ * nieodebrane". Od 0.451.0 biuro tylko szukało zamówienia, a resztę robiło
+ * poza panelem: ZW w Subiekcie, towar na półkę, przelew w Allegro. Taka paczka
+ * nie miała ani oceny, ani koszyka, ani automatu ZW, ani śladu oddanych
+ * pieniędzy — czyli żadnej z rzeczy, dla których zwroty w ogóle są w panelu.
+ *
+ * To NIE jest powrót formularza z 0.451.0. Tamten miał sześć pól i zasłaniał
+ * login. Ten przycisk stoi przy zamówieniu, które operator już wskazał, więc
+ * pyta o nic: pozycje, login i odbiorcę bierze z zamówienia.
+ *
+ * TRZY BRAMKI, każda przed zapisem, każda z własnym zdaniem:
+ * - zamówienia nie ma w bazie — bez niego zwrot nie miałby pozycji, czyli
+ *   niczego do wyceny;
+ * - zamówienie nie ma pozycji — to samo z drugiej strony;
+ * - zamówienie ma już zwrot — drugi wiersz to druga kwota do oddania za ten
+ *   sam towar. Jedno zamówienie bywa dwiema paczkami, ale tę rzadkość biuro
+ *   rozstrzyga na istniejącym zwrocie, a nie drugim kliknięciem.
+ */
+export function przyjmijNieodebrana(
+  database: Db, dane: { orderId: string; waybill?: string | null },
+  kto: { id: number; name: string }, teraz = new Date(),
+): { zwrotId: number; pozycji: number } {
+  const orderId = (dane.orderId ?? "").trim();
+  if (!orderId) throw new Error("Wskaż zamówienie, którego paczka wróciła.");
+  const konto = database.prepare("SELECT id FROM channel_account ORDER BY id LIMIT 1")
+    .get() as { id: number } | undefined;
+  if (!konto) throw new Error("Brak konta kanału — sparuj konto Allegro: /obsluga → STAN SYSTEMU → KONTO ALLEGRO.");
+
+  const zam = database.prepare(`SELECT k.id,
+      (SELECT COUNT(*) FROM zamowienie_klienta_pozycja p WHERE p.zamowienie_id = k.id) AS pozycji
+      FROM zamowienie_klienta k WHERE k.channel_account_id=? AND k.external_id=?`)
+    .get(konto.id, orderId) as { id: number; pozycji: number } | undefined;
+  if (!zam) {
+    throw new ZwrotConflict(
+      "Nie znam tego zamówienia — wyszukaj klienta po pełnym loginie, żeby pobrać je z Allegro.",
+      { orderId });
+  }
+  if (!Number(zam.pozycji)) {
+    throw new ZwrotConflict("Zamówienie nie ma pozycji, więc zwrot nie miałby czego wycenić.",
+      { orderId });
+  }
+  const byl = database.prepare(`SELECT id, COALESCE(reference_number, external_id) AS numer
+      FROM zwrot_klienta WHERE channel_account_id=? AND order_id=? ORDER BY id LIMIT 1`)
+    .get(konto.id, orderId) as { id: number; numer: string } | undefined;
+  if (byl) {
+    throw new ZwrotConflict(
+      `To zamówienie ma już zwrot ${byl.numer.replace(/^nieodebrana:/, "")} — pracuj na nim.`,
+      /* Identyfikator jedzie z odmową, żeby panel mógł ten zwrot otworzyć:
+         odmowa, po której trzeba go jeszcze szukać, to drugi krok za darmo. */
+      { zwrotId: Number(byl.id) });
+  }
+  return zarejestrujNieodebrana(database, { orderId, waybill: dane.waybill ?? null }, kto, teraz);
 }
 
 /* ── Dopisanie produktu do zwrotu (0.184.0) ──────────────────────────────────
