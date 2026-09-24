@@ -18,6 +18,10 @@ set -euo pipefail
 
 KORZEN=$(cd "$(dirname "$0")/.." && pwd)
 WYJSCIE=${1:-"$KORZEN/dist/paczka"}
+# Ścieżka bezwzględna od razu: `zip` biegnie niżej z katalogu roboczego,
+# a względne `dist/paczka` z CI wskazywało wtedy w próżnię.
+mkdir -p "$WYJSCIE"
+WYJSCIE=$(cd "$WYJSCIE" && pwd)
 WERSJA=$(node -p "require('$KORZEN/package.json').version")
 NAZWA="wertis-$WERSJA"
 
