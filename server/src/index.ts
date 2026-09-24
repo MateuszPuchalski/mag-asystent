@@ -78,6 +78,8 @@ import { szkicujPoRozpoznaniu } from "./services/copilot-szkic-po-rozpoznaniu.js
 import { oproznijKolejke } from "./services/wiedza-automat.js";
 import { nadawcaKluczaAnthropic } from "./adapters/copilot.anthropic.js";
 import { uruchomTakt } from "./services/takt.js";
+import { czytajStan, problemyKopii } from "./services/kopie-bazy.js";
+import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
 import { powiazPoImporcieSubiekta, powiazZaleglosci } from "./services/wiazania.js";
 import { allegroTryb } from "./adapters/allegro.js";
 import { poImporcie, pochodnePuste } from "./services/po-imporcie.js";
@@ -160,8 +162,8 @@ export async function buildApp() {
      wymaga uwagi, a `problemy` mówią zdaniami co zrobić. */
   app.get("/api/health", async () => {
     /* Trasa zdrowia jest JEDYNYM sposobem, w jaki instalator i biuro poznają,
-       że system żyje — `Test-WertisHealth` odpytuje ją piętnaście razy i po
-       piętnastym wyjątku melduje „API nie odpowiedziało". Blok, który rzuci,
+       że system żyje — `Test-WertisHealth` odpytuje ją kilkadziesiąt razy i po
+       ostatnim wyjątku melduje „API nie odpowiedziało". Blok, który rzuci,
        nie ma więc prawa zabrać ze sobą całej odpowiedzi: zwraca `null`
        i melduje się zdaniem wśród problemów. Odpowiedź niepełna mówi, czego
        brakuje; brak odpowiedzi nie mówi nic. */
@@ -201,6 +203,7 @@ export async function buildApp() {
     const allegroReklamacje = bez("synchronizacja spraw", () => stanReklamacjiHealth(db()));
     const obsluga = bez("obsługa klienta", stanObslugiHealth);
     const audyt = bez("audyt", statystykiAudytu);
+    const kopie = bez("kopie bazy", () => czytajStan());
 
     const problemy = [
       worker.problem,
@@ -290,6 +293,10 @@ export async function buildApp() {
          Recepta w `DEPLOY.md` istniała przez siedemnaście wydań panelu i nie
          została uruchomiona ani razu — więc pyta o to teraz sama trasa. */
       bez("panel obsługi", () => problemPaneluObslugi(WERSJA)),
+      /* Kopie i rekoncyliacja robi serwer sam (0.487.0). Zdanie pada, gdy
+         nocna kopia zaległa dwie doby, padła, albo noc znalazła rozjazdy.
+         To jest cały alarm: panel czyta te zdania na ekranie stanu. */
+      ...(bez("kopie bazy", () => problemyKopii(kopie ?? {}, config.sgtMode)) ?? []),
       ...awarie,
     ].filter((x): x is string => x !== null);
     return {
@@ -342,6 +349,18 @@ export async function buildApp() {
          kończy się pełnym dyskiem o trzeciej w nocy, więc rozmiar i wiek
          historii widać tutaj. Decyzję o archiwum podejmuje się na liczbach. */
       audyt,
+      /* Kiedy powstały ostatnie kopie i co mówiła ostatnia rekoncyliacja.
+         Same daty i liczby; ścieżkę katalogu podaje zdanie w `problemy`,
+         gdy jest po co tam zaglądać. */
+      kopie: kopie
+        ? {
+            nocna: kopie.noc?.at ?? null,
+            przedAktualizacja: kopie.przed?.at ?? null,
+            rekoncyliacja: kopie.rekoncyliacja
+              ? { at: kopie.rekoncyliacja.at, rozjazdow: kopie.rekoncyliacja.rozjazdow }
+              : null,
+          }
+        : null,
       /* Liczby cache'u zdjęć — po to, żeby ZDJECIA_MAX_KB dobierać na danych
          z własnej bazy, a nie na przypuszczeniu, ile waży typowe zdjęcie. */
       ...(config.zdjecia.zrodlo ? { zdjecia: statystykiZdjec() } : {}),
@@ -584,6 +603,11 @@ async function main() {
       }
     });
   }
+
+  /* KOPIA BAZY I REKONCYLIACJA CO NOC (0.487.0) — bez warunku, bo dotyczą
+     każdej instalacji. Dotąd były wpisami w Harmonogramie zadań, których
+     instalator nie zakładał. Powód i okno nocne: `services/przebieg-nocny.ts`. */
+  uruchomTakt("noc", TAKT_NOCNY_MS, async () => { przebiegNocny(); });
 
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });

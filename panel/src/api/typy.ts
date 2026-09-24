@@ -1095,6 +1095,13 @@ export type Zdrowie = {
   configZPliku?: string | null;
   ok?: boolean;
   audyt?: { zdarzen?: number; najstarsze?: string | null; bazaBajtow?: number } | null;
+  /* Kopie bazy robione przez sam serwer (0.487.0). Brak pola to serwer
+     sprzed tego wydania — karta mówi wtedy „—", a nie „brak kopii". */
+  kopie?: {
+    nocna: string | null;
+    przedAktualizacja: string | null;
+    rekoncyliacja: { at: string; rozjazdow: number } | null;
+  } | null;
   /* Obecność tych dwóch pól mówi, czy w tej instalacji w ogóle SĄ zdjęcia
      kartotek: z Subiekta (`zdjecia`) albo z kolektora (`zdjeciaWlasne`).
      Treść liczników panel ignoruje — liczy się, że trasa je przysłała. */

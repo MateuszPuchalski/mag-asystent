@@ -54,6 +54,7 @@ beforeEach(() => {
     if (url === "/api/reconcile") return odp({ at: "2026-09-23T06:00:00.000Z", sprawdzono: { kartotek: 10, zadan: 4 },
       rozjazdy: [{ rodzaj: "zwrot_rozliczony_bez_korekty", klucz: "ZW-501", opis: "brak korekty", odKiedy: null }] });
     if (url === "/api/health") return odp({ wersja: "0.0.0", mode: "seeded", worker: { zyje: true, mode: "x", widziany: null },
+      kopie: { nocna: "2026-09-24T00:30:00.000Z", przedAktualizacja: null, rekoncyliacja: null },
       allegroInbox: { status: "current", alarm: false, ostatniaProba: null, ostatniaUdanaSynchronizacja: null,
         kodOstatniegoBledu: null, tekstOstatniegoBledu: null, liczbaBledow: 0, watkiZBledem: 0, opoznienieMs: null,
         nastepnaProba: null, interwalMs: 60000 },
@@ -125,6 +126,13 @@ describe("Stan systemu w panelu", () => {
       rozjazdy: [{ rodzaj: "lokalizacja", klucz: "RP-1", opis: 'adres "A"', odKiedy: null }] });
     expect(csv.startsWith("\uFEFFrodzaj;klucz;opis;od_kiedy\r\n")).toBe(true);
     expect(csv).toContain('"adres ""A"""');
+  });
+
+  it("karta serwera pokazuje, że kopie bazy powstają (0.487.0)", async () => {
+    /* Kopie robi serwer bez udziału człowieka, więc to jedyne miejsce w panelu,
+       gdzie widać, że je robi. Data lokalna: 00:30Z to 2:30 w Warszawie. */
+    pokaz();
+    expect(await screen.findByText("nocna 2026-09-24 · przed aktualizacją —")).toBeInTheDocument();
   });
 
   it("arkusz lokalizacji stoi wyłącznie u administratora", async () => {

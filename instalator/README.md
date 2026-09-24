@@ -222,9 +222,12 @@ albo `curl`-em (`DEPLOY.md` §5a).
   leży już w `<katalog>\sfera-worker\`, instalator pyta o włączenie i rejestruje
   trzecią usługę `wertis-sfera`. Bez exe dokumenty MM wystawia biuro
   w Subiekcie, jak dotąd.
-- **Nie konfiguruje kopii zapasowej ani nocnej rekoncyliacji.** Obie są
-  w `DEPLOY.md` §7 i obie trzeba ustawić, **zanim** ruszy praca na prawdziwych
-  danych.
+- **Nie musi konfigurować kopii bazy aplikacji ani nocnej rekoncyliacji.**
+  Od 0.487.0 robi je sam serwer: co noc i przed każdą migracją schematu
+  (`DEPLOY.md` §7). Do człowieka należy jedna próba odtworzenia z takiej kopii.
+- **Nie robi kopii bazy Subiekta.** Kopie serwera obejmują wyłącznie
+  `wertis.db`. Pole lokalizacji żyje w bazie podmiotu, więc jego cofnięcie
+  wymaga kopii podmiotu, robionej narzędziami InsERT-a albo SQL Servera.
 - **Nie usuwa loginu SQL przy deinstalacji.** `-Odinstaluj` zdejmuje usługi,
   zaporę i katalog, ale login `wertis` zostaje: powstał na poziomie **instancji**,
   więc pomyłka dotknęłaby wszystkich baz na serwerze. Skrypt podaje gotowe

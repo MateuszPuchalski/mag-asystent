@@ -126,10 +126,14 @@ widać — patrz sekcja „Jak odinstalować" na końcu.
 
 - `/api/queue` pokazuje zamiary, które **wyglądają sensownie**,
 - `/api/health` nie zgłasza nic poza zatrzymanym workerem,
-- **kopia zapasowa z `DEPLOY.md` §7 działa i została sprawdzona odtworzeniem.**
+- **kopia bazy Subiekta istnieje i została sprawdzona odtworzeniem**,
+- `/api/health` ma w bloku `kopie` datę nocnej kopii bazy aplikacji, a jedna
+  taka kopia została **przywrócona na próbę** (`DEPLOY.md` §7).
 
-Trzeci punkt nie jest formalnością. Audyt powie, co w polu stało, ale wpisanie
-tego z powrotem przy wielu kartotekach robi się kopią — patrz sekcja niżej.
+Dwa ostatnie punkty nie są formalnością. Audyt powie, co w polu stało, ale
+wpisanie tego z powrotem przy wielu kartotekach robi się kopią bazy
+Subiekta — patrz sekcja niżej. Kopię bazy aplikacji robi od 0.487.0 sam
+serwer, ale kopia nigdy nieodtworzona jest przypuszczeniem.
 
 **Wycofanie:** zatrzymanie usług. Kolejka zostaje, ale nic z niej nie poszło.
 
@@ -156,8 +160,9 @@ Cofnięcie już wykonanych wymaga kopii zapasowej.
 
 ### Etap 5 — pełna praca
 
-Bramek nie ma. Zostaje bieżąca obsługa z `DEPLOY.md` §7: nocna kopia,
-rekoncyliacja, przegląd `/api/health`.
+Bramek nie ma. Nocną kopię bazy aplikacji i rekoncyliację robi serwer sam
+(od 0.487.0). Człowiekowi zostaje przegląd `/api/health` — tam lądują
+zaległa kopia i rozjazdy z nocy — oraz kopia bazy Subiekta.
 
 ---
 
@@ -288,7 +293,12 @@ przed" ma więc odpowiedź — zapytanie podaje `DEPLOY.md` §7.
 samemu — z kartoteki w Subiekcie albo z kopii bazy. Przy większej liczbie
 kartotek kopia jest jedyną rozsądną drogą.
 
-Dlatego kopia zapasowa musi działać **przed etapem 4**, nie po nim.
+Chodzi tu o kopię bazy **Subiekta**, bo pole lokalizacji żyje w niej.
+Kopie robione przez serwer WERTIS od 0.487.0 obejmują wyłącznie jego własną
+bazę, czyli ślad audytowy, kolejkę i postęp dostaw. Ślad mówi, co wpisać,
+a kopia podmiotu daje to hurtem. Potrzebne są obie.
+
+Dlatego kopia bazy Subiekta musi działać **przed etapem 4**, nie po nim.
 
 ## Jak odinstalować
 

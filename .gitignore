@@ -23,6 +23,8 @@ server/data/photos/
 server/data/zdjecia/
 # raporty rekoncyliacji — dane operacyjne, nie kod
 server/data/reconcile/
+# kopie bazy robione przez sam serwer (0.487.0) — dane produkcyjne, nie kod
+server/data/kopie/
 server/data/reslot/
 # APK kolektora wystawiany kolektorom do aktualizacji (0.52.0) — artefakt
 # wydania, nie kod. Kilkanaście megabajtów binarium w repo przy pierwszym

@@ -62,6 +62,12 @@ export function KartaSerwera({ zdrowie }: { zdrowie: Zdrowie | undefined }) {
         : <><span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">nie żyje</span> — zapisy do Subiekta NIE wchodzą</>)}
       {wiersz("plik konfiguracji", h.configZPliku ?? "—")}
       {wiersz("ślad audytowy", `${a?.zdarzen ?? 0} zdarzeń · od ${a?.najstarsze ? dataLokalna(a.najstarsze) : "—"} · baza ${bajty(a?.bazaBajtow)}`)}
+      {/* Kopie robi serwer sam (0.487.0), więc tu biuro widzi, że je robi.
+          Zaległość i błąd przychodzą osobno, zdaniem w „do sprawdzenia". */}
+      {wiersz("kopie bazy", h.kopie
+        ? `nocna ${h.kopie.nocna ? dataLokalna(h.kopie.nocna) : "jeszcze nie było"} · przed aktualizacją ${
+            h.kopie.przedAktualizacja ? dataLokalna(h.kopie.przedAktualizacja) : "—"}`
+        : "—")}
       {(h.problemy ?? []).length > 0 && wiersz("do sprawdzenia", <ul className="space-y-1">
         {h.problemy!.map((p) => <li key={p}><span className="mr-1.5 rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">uwaga</span>{p}</li>)}
       </ul>)}

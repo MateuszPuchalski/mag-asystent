@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { koszykiCzekajaceNaKorekty } from "./kosze-zwrotow.js";
@@ -389,4 +391,20 @@ export function reconcileCsv(r: Rekoncyliacja): string {
     ...r.rozjazdy.map((x) => wierszCsv([x.rodzaj, x.klucz, x.opis, x.odKiedy ?? ""], ";")),
   ];
   return zbudujCsv(linie);
+}
+
+/**
+ * Raport rozjazdów do `reconcile/<data>.csv` obok bazy; `null` przy zerze.
+ *
+ * Wspólne dla `npm run reconcile` i nocnego przebiegu serwera (0.487.0).
+ * Dwie kopie tego kodu pisałyby raport w dwa różne miejsca przy pierwszej
+ * zmianie, a człowiek szuka go w jednym.
+ */
+export function zapiszRaportRekoncyliacji(r: Rekoncyliacja): string | null {
+  if (r.rozjazdy.length === 0) return null;
+  const dir = path.join(path.dirname(config.dbPath), "reconcile");
+  fs.mkdirSync(dir, { recursive: true });
+  const plik = path.join(dir, `${r.at.slice(0, 10)}.csv`);
+  fs.writeFileSync(plik, reconcileCsv(r), "utf8");
+  return plik;
 }

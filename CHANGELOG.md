@@ -34,6 +34,39 @@ historii nie przepisujemy.
 ---
 
 
+## 0.487.0 — 24 września 2026
+
+**Kopie bazy aplikacji i nocną rekoncyliację robi sam serwer.** Do tej wersji
+były to trzy czynności człowieka, zapisane tylko w dokumentacji. Wdrożenie
+kończyło się na nich, a bramka etapu 4 stała na dwóch z nich.
+
+- **Kopia przed migracją.** Pierwszy start nowej wersji zapisuje migawkę bazy,
+  zanim ruszą `schema.sql` i `migrate()`. Migracje kasowały już tabele trzy
+  razy, a `-Aktualizuj` kopii nie robił. Plik: `kopie/przed-*.db`, zostaje pięć.
+- **Kopia nocna.** Raz na noc, między 1:00 a 5:00 czasu magazynu. Plik:
+  `kopie/noc-<data>.db`, zostaje czternaście. W dzień kopia nie powstaje,
+  bo na czas zapisu wstrzymuje obsługę żądań.
+- **Rekoncyliacja nocna.** W tym samym oknie, raz na dobę. Rozjazdy lądują
+  w CSV jak dotąd, a do tego w `/api/health` do następnej czystej nocy.
+
+Kopia to `VACUUM INTO` sprawdzone `PRAGMA quick_check`. Zwykła kopia pliku
+w trybie WAL gubi ostatnie zapisy. Nieudana kopia nie zatrzymuje startu, bo
+odmowa w NSSM to pętla restartów. Melduje się zdaniem w zdrowiu.
+
+**Skąd wiadomo, że działa.** Karta „Serwer" w stanie systemu ma wiersz
+„kopie bazy” z datami. Przy `SGT_MODE=mssql` zdrowie zgłasza nocną kopię
+zaległą ponad dwie doby i każdą nieudaną. Dziennik biura dostaje wpisy
+`kopia_bazy` i `rekoncyliacja`.
+
+**[wymaga działania — jednorazowo]** Kopie leżą domyślnie obok bazy, czyli na
+tym samym dysku. Żeby chroniły przed padnięciem dysku, wpisz
+`KOPIE_KATALOG=D:\kopie-wertis` w `wertis.env` (`DEPLOY.md` §7). Wpisy
+w Harmonogramie zadań dla kopii i `npm run reconcile` można usunąć.
+
+**Bazy Subiekta serwer nie kopiuje** i dokumentacja mówi to teraz wprost.
+Pole lokalizacji żyje w bazie podmiotu, a bramka etapu 3 wymagała dotąd
+„kopii z §7”, która opisywała wyłącznie `wertis.db`.
+
 ## 0.486.5 — 24 września 2026
 
 **Odmowa „Brak towaru w magazynie” wskazuje wiersz w dwóch nowych
