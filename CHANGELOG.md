@@ -34,6 +34,15 @@ historii nie przepisujemy.
 ---
 
 
+## 0.486.4 — 24 września 2026
+
+**Rozłożone kosze stoją w kolejności rozłożenia.** Zgłoszenie właściciela:
+„rozłożone koszyki układaj kolejnością rozłożenia”. Kubełek „Rozłożone”
+w zakładce Kosze stał w porządku serwera, czyli po założeniu kosza. Kosz
+założony wcześniej bywa rozłożony później, więc lista mieszała dzień pracy
+hali. Teraz najświeżej rozłożony stoi na górze, a chwila rozłożenia stoi
+w wierszu. Kosz bez zapisanej chwili idzie na koniec.
+
 ## 0.486.3 — 24 września 2026
 
 **Worker Sfery kończy Subiekta, który uruchomił.** Na produkcji ZW do
