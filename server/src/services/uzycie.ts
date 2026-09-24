@@ -18,7 +18,7 @@ import { ZDARZENIA } from "./zdarzenia-rejestr.js";
 const AUTOMATY = new Set([
   "copilot_auto_klasyfikacja", "copilot_auto_klasyfikacja_sufit", "copilot_auto_szkic",
   "copilot_auto_szkic_sufit", "copilot_szkic_po_rozpoznaniu", "ean_conflict_autoresolved", "http_rejected", "login_failed",
-  "privileged", "read_model_po_imporcie", "wiedza_automat_przebieg", "zwrot_rabat_automat_blad",
+  "privileged", "read_model_po_imporcie", "kopia_bazy", "rekoncyliacja", "wiedza_automat_przebieg", "zwrot_rabat_automat_blad",
   "queue_applied", "queue_failed", "queue_retry", "device_drop", "battery_low", "scan_timing",
   "siec_przerwa", "rozmowa_przeczytana_blad", "rozmowa_wysylka_blad", "rozmowa_wysylka_niepewna",
   "rozmowa_wysylka_konflikt", "rozmowa_wysylka_uzgodniona", "reklamacja_wysylka_konflikt",

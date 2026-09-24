@@ -10,8 +10,8 @@ process.env.LOG_LEVEL = "silent";
 process.env.SGT_MODE = "seeded";
 
 /* `/api/health` nie miała testu do 0.149.0, choć to po niej instalator poznaje,
-   że system żyje: `Test-WertisHealth` odpytuje ją piętnaście razy i po
-   piętnastym wyjątku melduje „API nie odpowiedziało".
+   że system żyje: `Test-WertisHealth` odpytuje ją kilkadziesiąt razy i po
+   ostatnim wyjątku melduje „API nie odpowiedziało".
 
    1 września 2026 wyszło, ile to kosztuje. Trasa zdrowia zbiera kilkanaście
    liczb z bazy i z adapterów; każda z nich potrafi rzucić, a rzut jednej
@@ -136,4 +136,15 @@ test("zdrowie mówi o synchronizacji SPRAW POSPRZEDAŻOWYCH, nie tylko skrzynki"
     "ogon spraw to jedyna liczba mówiąca, czego przebieg nie wziął");
   assert.ok("ostatniaUdanaSynchronizacja" in h.allegroReklamacje);
   assert.ok("status" in h.allegroReklamacje);
+});
+
+test("zdrowie mówi, kiedy powstały kopie bazy (0.487.0)", async () => {
+  /* Kopie robi sam serwer, więc to tutaj człowiek sprawdza, że je robi.
+     Na świeżej bazie testowej nocnej jeszcze nie ma — pole jest, z `null`. */
+  const h = (await app.inject({ method: "GET", url: "/api/health" })).json();
+  assert.ok(h.kopie, `brak bloku kopii: ${JSON.stringify(h)}`);
+  assert.equal(h.kopie.nocna, null);
+  assert.ok("przedAktualizacja" in h.kopie);
+  /* Demo nie melduje zaległej kopii — patrz `problemyKopii`. */
+  assert.ok(!h.problemy.some((p: string) => p.includes("nocnej kopii")), JSON.stringify(h.problemy));
 });

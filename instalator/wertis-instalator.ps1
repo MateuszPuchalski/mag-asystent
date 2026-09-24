@@ -343,6 +343,9 @@ if ($Aktualizuj) {
     Write-Naglowek "Aktualizacja zakonczona"
     Write-Info "Wersja: $wersjaPrzed -> $wersjaPo"
     Write-Info "Nietkniete: baza aplikacji, konto SQL i GRANT-y, wertis.env, konta uzytkownikow."
+    # Kopię przed migracją robi serwer przy pierwszym starcie nowej wersji
+    # (0.487.0), więc działa też przy aktualizacji ręcznej. Tu tylko o niej mówimy.
+    Write-Info "Kopia bazy sprzed migracji: server\data\kopie\przed-*.db (robi ja serwer przy starcie)."
     Write-Info "Kolektory zaproponuja aktualizacje same, przy nastepnym otwarciu aplikacji."
     if (-not $health -and -not $DryRun) {
         Write-Uwaga "API nie odpowiedziało - sprawdź dziennik usługi wertis-api."
@@ -928,6 +931,10 @@ Write-Host "  Co dalej:" -ForegroundColor Cyan
 Write-Info "1. Adres dla kolektorów: http://$nazwaHosta`:$Port  (albo http://<IP>:$Port)"
 Write-Info "2. Konta pracowników zakłada się Z KOLEKTORA - przycisk ZAŁÓŻ KONTA"
 Write-Info "   na ekranie startowym pustej instalacji. Instrukcja: DEPLOY.md §5a."
-Write-Info "3. Nocna kopia bazy i rekoncyliacja: DEPLOY.md §7 - ustaw je, ZANIM"
-Write-Info "   ruszy praca na prawdziwych danych."
+# Do 0.487.0 stała tu prośba o dwa wpisy w Harmonogramie zadań, a bramka
+# etapu 4 wdrożenia stała na obu. Serwer robi je dziś sam; zostaje jedyna
+# rzecz, której za człowieka nie zrobi — próba odtworzenia z kopii.
+Write-Info "3. Kopia bazy i rekoncyliacja chodzą same, co noc między 1:00 a 5:00,"
+Write-Info "   oraz przed każdą migracją schematu. Leżą w server\data\kopie."
+Write-Info "   Przed pracą na prawdziwych danych SPRAWDŹ JEDNĄ ODTWORZENIEM (DEPLOY.md §7)."
 Write-Host ""

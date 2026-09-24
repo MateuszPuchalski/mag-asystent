@@ -67,8 +67,9 @@ zawiedzie w połowie albo gdy chcesz wiedzieć, co dokładnie stanęło na maszy
 
 **Rozdziały 5–8 dotyczą każdej instalacji**, także tej z instalatora.
 Instalator nie robi wszystkiego. Konta pracowników zakłada się z kolektora
-(§5a). Kopia zapasowa i nocna rekoncyliacja (§7) zostają do ustawienia ręcznie —
-obie **zanim** ruszy praca na prawdziwych danych.
+(§5a). Kopię bazy aplikacji i nocną rekoncyliację robi od 0.487.0 sam serwer
+(§7). Zostaje jedna próba odtworzenia z kopii i kopia bazy Subiekta, obie
+**zanim** ruszy praca na prawdziwych danych.
 
 ## 0a. Automatyczne scalanie PR-ów (0.194.0)
 
@@ -138,8 +139,12 @@ w interfejsie GitHuba. Draft nie jest scalany w ogóle.
 
 ## 2. Instalacja aplikacji
 
-> **Przed KAŻDĄ aktualizacją zrób kopię `server/data/wertis.db`.** Migracje
-> chodzą przy starcie i część z nich KASUJE tabele, których aplikacja już nie
+> **Kopię `server/data/wertis.db` przed aktualizacją robi sam serwer** (od
+> 0.487.0). Pierwszy start nowej wersji zapisuje migawkę w
+> `server\data\kopie\przed-*.db`, zanim ruszy migracja. Do tej wersji była
+> to prośba do człowieka, a `-Aktualizuj` jej nie spełniał.
+
+> Migracje chodzą przy starcie i część z nich KASUJE tabele, których aplikacja już nie
 > czyta. Tabela bez czytelnika nie jest archiwum, tylko pułapką dla następnej
 > osoby czytającej schemat — i tak samo tłumaczyło to cięcie z 0.140.0.
 >
@@ -2340,15 +2345,52 @@ powód, po aktualizacji nie istnieje.
 wyłącznie dokumentem MM ZWROTY z Subiekta (§6a). Decyzje o pozycjach, korekty
 sprzedaży i zwrot środków robi biuro w Subiekcie i w panelu Allegro.
 
-- **Backup:** nocna kopia `C:\wertis\server\data\wertis.db` (Harmonogram zadań):
+- **Backup bazy aplikacji robi sam serwer (0.487.0).** Harmonogramu zadań
+  nie trzeba już ustawiać. `wertis-api` zapisuje dwa rodzaje kopii do
+  `server\data\kopie\`:
 
-  ```bash
-  cp /c/wertis/server/data/wertis.db "/d/backup/wertis-$(date +%Y%m%d).db"
+  | plik | kiedy | ile zostaje |
+  |---|---|---|
+  | `przed-<czas>-<stara>-do-<nowa>.db` | pierwszy start nowej wersji, PRZED migracją | 5 |
+  | `noc-<data>.db` | raz na noc, między 1:00 a 5:00 czasu magazynu | 14 |
+
+  Każda kopia to migawka `VACUUM INTO` sprawdzona `PRAGMA quick_check`.
+  Zwykłe `cp` pliku w trybie WAL gubi ostatnie zapisy, a migawka nie.
+  Kopia nie powstaje w dzień, bo na czas zapisu wstrzymuje obsługę żądań.
+
+  **Kopie na inny dysk:** jeden wpis w `wertis.env`, potem restart usług.
+  Domyślny katalog leży obok bazy, więc chroni przed migracją i pomyłką,
+  ale nie przed padnięciem dysku.
+
   ```
+  KOPIE_KATALOG=D:\kopie-wertis
+  ```
+
+  **Skąd wiadomo, że działa.** `/api/health` ma blok `kopie` z datami
+  ostatnich kopii. Przy `SGT_MODE=mssql` zgłasza problem, gdy nocna kopia
+  zalega ponad dwie doby albo padła. Panel pokazuje to na ekranie stanu
+  systemu, a dziennik biura ma wpis `kopia_bazy` z każdej nocy.
+
+  **Przywrócenie** — przy zatrzymanych usługach, w PowerShellu:
+
+  ```powershell
+  cd C:\wertis\server\data
+  Rename-Item wertis.db wertis-uszkodzona.db
+  Remove-Item wertis.db-wal, wertis.db-shm -ErrorAction SilentlyContinue
+  Copy-Item kopie\noc-2026-09-24.db wertis.db
+  ```
+
+  Pliki `-wal` i `-shm` MUSZĄ zniknąć. Należą do starej bazy, a SQLite
+  nałożyłby je na przywróconą i zepsuł ją. Kopia jest samodzielnym plikiem
+  bez WAL-a.
 
   Plik trzyma postęp rozkładania dostaw, wyjątki, kolejkę i audyt `events`.
   Źródłem prawdy o towarach i stanach pozostaje baza Subiekta, więc to lekki
   backup.
+
+  **Bazy Subiekta serwer NIE kopiuje.** Pole lokalizacji żyje w bazie
+  podmiotu, więc jego cofnięcie wymaga kopii podmiotu. Robi się ją
+  archiwizacją InsERT GT albo backupem SQL Servera, jak dotąd.
 - **Cofnięcie zapisu lokalizacji opiera się o kopię bazy.** Ślad audytowy
   zapisuje przy każdej zmianie **starą i nową** zawartość pola oraz ekran,
   z którego zmiana wyszła:
@@ -2403,14 +2445,17 @@ sprzedaży i zwrot środków robi biuro w Subiekcie i w panelu Allegro.
   Czyści się je przez `nssm reset <usługa> <ustawienie>`, dla obu usług, po
   czym trzeba je zrestartować. To są **dwa różne ustawienia**: `Extra` dokłada
   zmienne, `AppEnvironment` zastępuje całe środowisko procesu.
-- **Nocna rekoncyliacja — ustaw ją, zanim ruszy praca na prawdziwych danych.**
-  Aplikacja pisze do Subiekta przez kolejkę, ale bez tego kroku **nikt nie
-  sprawdza, czy stan po stronie Subiekta odpowiada temu, co aplikacja myśli, że
-  zapisała**. To najtańsza obrona przed cichym błędem: kod działa, wygląda
-  dobrze i przez trzy tygodnie rozjeżdża dane.
+- **Nocna rekoncyliacja chodzi sama (0.487.0)** — w tym samym oknie co
+  nocna kopia, raz na dobę. Aplikacja pisze do Subiekta przez kolejkę, a bez
+  tego kroku **nikt nie sprawdza, czy stan po stronie Subiekta odpowiada
+  temu, co aplikacja myśli, że zapisała**. To najtańsza obrona przed cichym
+  błędem: kod działa, wygląda dobrze i przez trzy tygodnie rozjeżdża dane.
+
+  Do 0.487.0 był to wpis w Harmonogramie zadań, którego instalator nie
+  zakładał. Kto go założył, może go usunąć — drugi przebieg nic nie psuje,
+  ale niczego nie dodaje. Ręcznie, bez czekania do nocy:
 
   ```bash
-  # Harmonogram zadań Windows / cron, raz na dobę:
   cd /c/wertis && npm run reconcile
   ```
 
@@ -2424,9 +2469,10 @@ sprzedaży i zwrot środków robi biuro w Subiekcie i w panelu Allegro.
   Każda z nich mierzy zadeklarowany niezmiennik. Niezmienniki trzeba mierzyć,
   nie deklarować.
 
-  **Zerowy wynik nie tworzy pliku i kończy się kodem 0**, bo raport przychodzący
-  codziennie przestaje być czytany po tygodniu. Rozjazdy → CSV z datą w nazwie,
-  w katalogu `reconcile/` obok bazy, i **kod wyjścia 2** do podpięcia pod alert.
+  **Zerowy wynik nie tworzy pliku**, bo raport przychodzący codziennie
+  przestaje być czytany po tygodniu. Rozjazdy → CSV z datą w nazwie,
+  w katalogu `reconcile/` obok bazy, i zdanie w `problemy` na `/api/health`
+  do następnej czystej nocy. Skrypt ręczny kończy się wtedy **kodem 2**.
   Podgląd na żądanie: `GET /api/reconcile`.
 - **Raport przeslotowania — 1–2× w roku, przed sezonem.** Nie jest to funkcja
   aplikacji ani zadanie cykliczne; uruchamia się go ręcznie, gdy jest czas na
@@ -2595,6 +2641,17 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.487.0 — kopie bazy robi serwer
+
+Ta aktualizacja sama zrobi pierwszą kopię sprzed migracji. Plik
+`server\data\kopie\przed-…-nieznana-do-0.487.0.db` powstanie przy starcie
+`wertis-api`. „Nieznana" znaczy tylko, że poprzednia wersja nie zapisywała
+swojego numeru.
+
+Jedna decyzja: czy kopie mają leżeć na innym dysku. Jeśli tak, dopisz
+`KOPIE_KATALOG` do `wertis.env` i zrestartuj usługi. Wpisy w Harmonogramie
+zadań dla kopii i rekoncyliacji możesz usunąć. Opis i przywracanie: §7.
 
 ### Aktualizacja do 0.486.0 — załączniki w odpowiedzi na dyskusję
 

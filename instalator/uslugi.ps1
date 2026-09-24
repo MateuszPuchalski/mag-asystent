@@ -790,7 +790,12 @@ function Test-WertisHealth {
         instalacja jest spójna. Wcześniej ten sam curl raportował wyłącznie
         API i rozjazd z workerem był przez nie niewykrywalny.
     #>
-    param([int]$Port = 3001, [int]$Prob = 15)
+    # 45 prób, czyli około półtorej minuty. Do 0.487.0 było 15 (pół minuty),
+    # ale pierwszy start nowej wersji robi teraz kopię bazy PRZED migracją,
+    # a przed nasłuchem idzie jeszcze import z Subiekta. Zbyt krótkie czekanie
+    # meldowało „API nie odpowiedziało" przy udanej aktualizacji. Zdrowe API
+    # odpowiada od razu, więc dłuższy limit kosztuje tylko przy awarii.
+    param([int]$Port = 3001, [int]$Prob = 45)
     if (Test-DryRun "Odpytałbym http://localhost:$Port/api/health.") { return $null }
 
     for ($i = 1; $i -le $Prob; $i++) {

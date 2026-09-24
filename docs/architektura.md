@@ -763,6 +763,7 @@ przy `AppGraph`.
 | Polling 2 s zamiast WebSocketów | kolektor traci Wi-Fi kilkanaście razy dziennie; reconnect WS to kod, którego przy pollingu nie ma |
 | Konta się nie kasuje | historia w `events` musi mieć na co wskazywać; jest `active = 0` |
 | `events` bez retencji | przy szacowanych kilkuset zdarzeniach dziennie to rząd 10⁵ wierszy rocznie — SQLite z indeksami tego nie zauważa. To ślad audytu, więc automatyczne kasowanie byłoby gorsze niż wzrost. Gdyby tabela urosła ponad oczekiwania, decyzję o archiwizacji podejmuje właściciel, nie kod |
+| Kopie bazy i rekoncyliację robi serwer API, nie Harmonogram zadań (0.487.0) | wpis w Harmonogramie był krokiem człowieka, którego instalator nie robił, a bramka etapu 4 stała na nim. API ma bazę otwartą stale i wie, kiedy migruje. Kopia to `VACUUM INTO` przed migracją i w nocy, bo zwykłe `cp` w trybie WAL gubi zapisy |
 | Login wpisuje biuro, unikalności pilnuje baza | dwie osoby z tym samym loginem to jedno żądanie od pomyłki |
 
 ---

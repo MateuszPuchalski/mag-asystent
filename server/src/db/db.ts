@@ -8,6 +8,10 @@ import { zapiszZalaczniki, type ZalacznikAllegro } from "../services/zalaczniki-
 /* Serwis, nie odwrotnie: `autoresponder.ts` zna tylko `tekst.ts`, więc
    import w tę stronę nie zapętla modułów. */
 import { czyAutoresponder } from "../services/autoresponder.js";
+/* Też serwis, i też bez importu `db.js` z powrotem: kopia dostaje otwartą
+   bazę parametrem, bo powstaje w środku `db()`, zanim singleton istnieje. */
+import { kopiaPrzedMigracja, zapiszWersjeSchematu } from "../services/kopie-bazy.js";
+import { WERSJA } from "../wersja.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -109,9 +113,14 @@ export function db(): DatabaseSync {
      na PUSTEJ założyłby połowę schematu bez migracji, czyli dokładnie ten stan
      pośredni, którego ta zmiana ma nie dopuścić. */
   if (migrowac) {
+    /* Kopia PRZED `schema.sql` i `migrate()`, bo to one kasują tabele przy
+       aktualizacji. Dotąd była prośbą w DEPLOY.md, a `-Aktualizuj` jej nie
+       robił. Tylko proces migrujący, czyli ten, który coś tu zmieni. */
+    kopiaPrzedMigracja(database, WERSJA);
     const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
     database.exec(schema);
     migrate(database);
+    zapiszWersjeSchematu(WERSJA);
   }
   _db = database;
   return database;

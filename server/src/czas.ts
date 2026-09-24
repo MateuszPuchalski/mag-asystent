@@ -51,6 +51,17 @@ export function dataLokalna(iso: string): string {
   return `${p("year")}-${p("month")}-${p("day")}`;
 }
 
+/**
+ * Godzina zegara na ścianie magazynu (0–23). Nocna kopia pyta o nią, bo okno
+ * „w nocy" liczone w UTC przesuwałoby się o godzinę przy każdej zmianie czasu.
+ */
+export function godzinaLokalna(iso: string): number {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return Number.NaN;
+  const cz = formater({ hour: "2-digit", hourCycle: "h23" }, "h").formatToParts(d);
+  return Number(cz.find((c) => c.type === "hour")?.value ?? Number.NaN);
+}
+
 /** `RRRR-MM-DD HH:MM:SS` — pełny stempel do tabel audytu i eksportów. */
 export function stempelLokalny(iso: string): string {
   const d = new Date(iso);

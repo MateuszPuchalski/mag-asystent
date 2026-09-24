@@ -69,14 +69,28 @@ const data = (v: string | undefined, def: string, name: string): string | null =
   return new Date(ms).toISOString();
 };
 
+/* Wyniesione przed literał, bo z tej ścieżki wynika też katalog kopii — dwa
+   osobne wyrażenia rozjechałyby się przy pierwszej zmianie domyślnej. */
+const dbPath = process.env.DB_PATH ?? path.resolve(__dirname, "../data/wertis.db");
+
 export const config = {
   /** Port serwera API. */
   port: num(process.env.PORT, 3001, "PORT"),
   host: process.env.HOST ?? "0.0.0.0",
 
   /** Ścieżka pliku bazy SQLite aplikacji. */
-  dbPath:
-    process.env.DB_PATH ?? path.resolve(__dirname, "../data/wertis.db"),
+  dbPath,
+
+  /**
+   * Kopie bazy aplikacji robione przez sam serwer (`services/kopie-bazy.ts`).
+   *
+   * Domyślnie obok bazy, bo wtedy działa bez jednego wpisu. To chroni przed
+   * migracją i pomyłką, nie przed padnięciem dysku — dlatego klucz istnieje:
+   * `KOPIE_KATALOG=D:\kopie-wertis` przenosi kopie na inny dysk.
+   */
+  kopie: {
+    katalog: process.env.KOPIE_KATALOG || path.join(path.dirname(dbPath), "kopie"),
+  },
 
   /**
    * Etykieta instancji — „produkcja" albo nazwa środowiska (np. „dev").
