@@ -40,6 +40,8 @@ import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { wiedzaRoutes } from "./routes/wiedza.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import { spoiwoRoutes } from "./routes/spoiwo.js";
+import { konfiguracjaRoutes } from "./routes/konfiguracja.js";
+import { problemNieznanychKluczy } from "./konfiguracja-rejestr.js";
 import {
   bladImportuFaktur,
   brakKolumnyNrOryg,
@@ -80,6 +82,7 @@ import { nadawcaKluczaAnthropic } from "./adapters/copilot.anthropic.js";
 import { uruchomTakt } from "./services/takt.js";
 import { czytajStan, problemyKopii } from "./services/kopie-bazy.js";
 import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
+import { podNssm, ustawRestart } from "./services/restart.js";
 import { powiazPoImporcieSubiekta, powiazZaleglosci } from "./services/wiazania.js";
 import { allegroTryb } from "./adapters/allegro.js";
 import { poImporcie, pochodnePuste } from "./services/po-imporcie.js";
@@ -213,6 +216,11 @@ export async function buildApp() {
          wszystko, co niżej. Aplikacja czyta wtedy inną bazę, niż mówi plik,
          więc każdy kolejny objaw jest skutkiem, nie przyczyną. */
       bez("konfiguracja", () => problemPrzykrytejKonfiguracji(envFile, config.sgtMode)),
+      /* Literówka w nazwie klucza (0.488.0). Nieczytany klucz dawał cichą
+         wartość domyślną, a objaw — funkcja „nie działa" — nie prowadził do
+         pliku. Rejestr zna wszystko, co czytają trzy programy. */
+      bez("klucze konfiguracji", () =>
+        problemNieznanychKluczy([...envFile.applied, ...envFile.overridden], envFile.path)),
       /* ── OGON SPRAW, KTÓREGO PRZEBIEG NIE WZIĄŁ (0.409.0) ─────────────────
          Bezpiecznik stron czyta najwyżej tysiąc spraw na przebieg. Konto
          z dłuższym archiwum zostawia resztę po tamtej stronie — i to są
@@ -441,6 +449,7 @@ export async function buildApp() {
   await app.register(ustawieniaRoutes);
   await app.register(wiedzaRoutes);
   await app.register(aktualizacjaRoutes);
+  await app.register(konfiguracjaRoutes);
 
   await app.ready();
   return app;
@@ -608,6 +617,16 @@ async function main() {
      każdej instalacji. Dotąd były wpisami w Harmonogramie zadań, których
      instalator nie zakładał. Powód i okno nocne: `services/przebieg-nocny.ts`. */
   uruchomTakt("noc", TAKT_NOCNY_MS, async () => { przebiegNocny(); });
+
+  /* Restart po zmianie ustawienia z panelu (0.491.0). Tu, nie w buildApp():
+     test trasy zapisu nie ma prawa zakończyć procesu testów. Poza usługą NSSM
+     nikt serwera nie podniesie, więc tam restart zostaje człowiekowi. */
+  if (podNssm()) {
+    ustawRestart(() => {
+      console.log("[api] konfiguracja zmieniona z panelu — wstaję ponownie z nowym wertis.env");
+      process.exit(0);
+    });
+  }
 
   const app = await buildApp();
   await app.listen({ port: config.port, host: config.host });

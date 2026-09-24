@@ -12,6 +12,9 @@ node_modules/.tmp/
 
 # ustawienia środowiska (hasło do bazy Subiekta) — szablon: wertis.env.example
 wertis.env
+# poprzednia wersja i kandydat przy zmianie z panelu (0.491.0) — to samo hasło
+wertis.env.poprzedni
+wertis.env.kandydat
 
 # baza aplikacji (SQLite) — generowana z seedu
 server/data/*.db

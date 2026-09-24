@@ -31,7 +31,7 @@ export const ZDARZENIA: readonly string[] = [
   "ean_conflict_autoresolved", "ean_kolizja_rozstrzygnieta", "ean_set", "firma_zapis",
   "http_rejected", "karton_anulowany", "karton_ilosc", "karton_pozycja",
   "karton_pozycja_usunieta", "karton_zalozony", "karton_zatwierdzony",
-  "klasyfikacja_mapowanie_do_przegladu", "kopia_bazy", "klient_notatka", "klient_notatka_cofnieta", "klient_notatka_zdjeta", "klient_odrzucona", "kolektor_odnaleziony",
+  "klasyfikacja_mapowanie_do_przegladu", "konfiguracja_zmieniona", "kopia_bazy", "klient_notatka", "klient_notatka_cofnieta", "klient_notatka_zdjeta", "klient_odrzucona", "kolektor_odnaleziony",
   "kolektor_wezwanie_odwolane", "kolektor_wezwany", "kosz_pominiecie_cofniete",
   "kosz_pominiecie_zalatwione", "kosz_powrot_mm", "kosz_pozycja_na_pozniej",
   "kosz_pozycja_pominieta", "kosz_putaway", "kosz_putaway_cofniete", "kosz_putaway_poprawka",

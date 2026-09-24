@@ -203,8 +203,9 @@ kody `dok_Typ` i `dok_Status` odczytaliśmy wprost z oficjalnego opisu struktury
 InsERT dla wersji bazy 1.8731.31.6933 — patrz
 [`subiekt-gt-struktura.md`](subiekt-gt-struktura.md).
 
-Domyślne w `config.ts` są z niego wzięte, więc nie trzeba ich już ustalać:
-`DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`, bufor = `dok_Status = 3`.
+Stałe w `config.ts` są z niego wzięte, więc nie trzeba ich już ustalać: typ
+FZ = 1, PZ = 10, bufor = `dok_Status = 3`. Od 0.489.0 nie są to klucze
+`wertis.env`.
 
 Zostały **dwie** rzeczy, których dokumentacja nie zawiera, bo zależą od
 konkretnego podmiotu. Uruchom w SSMS na kartotece/dokumencie z §1b:
@@ -230,7 +231,7 @@ SELECT COL_LENGTH('tw__Towar','tw_Pole1');          -- → LOC_FIELD_LIMIT (spod
 
 -- odłóż dokument do bufora w Subiekcie i sprawdź, czy dostał dok_Status = 3:
 SELECT dok_Id, dok_NrPelny, dok_Typ, dok_Status FROM dok__Dokument ORDER BY dok_Id DESC;
---    → jeśli tak, MSSQL_BUFFER_EXPR zostaje domyślne
+--    → jeśli tak, stała bufora pasuje; jeśli nie, to zmiana kodu (0.489.0)
 ```
 
 ## 4. Konfiguracja i uruchomienie aplikacji
@@ -265,8 +266,7 @@ export MSSQL_LOC_COLUMN=tw_Pole1      # pole własne wybrane w §1a
 export MAG_ID_MAG=1                   # z checklisty (a)
 export MAG_ID_MGP=2
 export MAG_ID_ZWROTY=3
-# DOK_TYP_* i MSSQL_BUFFER_EXPR mają poprawne domyślne (ze struktury InsERT) —
-# ustawiaj je tylko, jeśli Twoja baza odbiega od standardu
+# kody typów dokumentów i bufor są stałymi ze struktury InsERT (0.489.0)
 ```
 
 Uruchomienie — **oba okna z tego samego pliku**:

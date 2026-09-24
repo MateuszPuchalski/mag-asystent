@@ -199,6 +199,46 @@ nie jest już potrzebne (dalej działa: zmienne środowiskowe mają pierwszeńst
 nad plikiem). Inną ścieżkę wskazuje `WERTIS_ENV_FILE` i wtedy szukanie kończy
 się na niej.
 
+**Co faktycznie jest ustawione — w panelu (0.488.0).** Ustawienia → karta
+**Konfiguracja serwera**, widoczna tylko dla administratora. Pokazuje ścieżkę
+wczytanego pliku i każdy klucz ze źródłem: z pliku, przykryty przez zmienną
+usługi albo domyślny. Hasła i klucze API widać wyłącznie jako „ustawione".
+
+**Zmiana z panelu (0.491.0).** Przy 25 decyzjach właściciela karta ma przycisk
+**Zmień**: progi dat Allegro, terminy zwrotów, Copilot i jego limity, klucze
+Allegro i API, kopie na innym dysku. Serwer robi wtedy cztery rzeczy
+w tej kolejności:
+
+1. sprawdza wartość według rodzaju (liczba, data ISO, wybór, tekst);
+2. próbuje wstać z nowym plikiem w osobnym procesie — konfiguracja, przy
+   której serwer odmówiłby startu, **nie trafia na dysk**;
+3. zapisuje `wertis.env` atomowo i zostawia poprzednią wersję
+   w `wertis.env.poprzedni`;
+4. pod NSSM kończy się sam, a NSSM podnosi go z nowym plikiem. Worker robi
+   to samo w ciągu kilkunastu sekund.
+
+Klucze instalatora, pokrętła zaawansowane i klucze workerów C# zmienia się
+dalej w pliku. Trzy decyzje właściciela też: `MAG_ID_ODP`, `MAG_ID_SERWIS`
+i `TW_ID_PRZESYLKA` wystawiają dokumenty na wskazany numer, a
+`ZDJECIA_DODAWANIE=subiekt` wymaga GRANT-u od instalatora.
+
+**Cofnięcie zmiany z panelu:** ten sam przycisk z poprzednią wartością albo
+**Domyślna**. Gdyby panel nie wstał, przy zatrzymanych usługach:
+
+```powershell
+Copy-Item C:\wertis\wertis.env.poprzedni C:\wertis\wertis.env
+```
+
+Poza usługą NSSM (`npm run dev`, ręczne `node server\dist\index.js`) serwer
+się nie restartuje, bo nikt by go nie podniósł. Panel mówi wtedy, że zmiana
+czeka na restart usług.
+
+**Literówka w nazwie klucza melduje się sama.** Klucz, którego nie czyta żaden
+z trzech programów, staje w `problemy` na `/api/health` i na czerwono w tej
+karcie. Wcześniej `ALEGRO_CLIENT_ID` zamiast `ALLEGRO_CLIENT_ID` dawał po
+cichu wartość domyślną. Listę znanych kluczy trzyma
+`server/src/konfiguracja-rejestr.ts`, a test pilnuje jej zgodności z kodem.
+
 Instalator **scala** ten plik, a nie nadpisuje. Klucz, o który kreator zapytał,
 bierze z odpowiedzi; klucza, o który nie pytał, nie rusza. Wartości dopisane
 ręką przeżywają więc kolejne przebiegi z `-TylkoKonfiguracja`. Nie przeżywają
@@ -729,6 +769,11 @@ brakujące.
 Nowe osoby dochodzą później tą samą drogą: **Ustawienia → DODAJ OSOBY**
 (widoczne dla konta biura i admina).
 
+**Albo z panelu, bez kolektora (0.490.0):** Ustawienia → karta **Konta
+i sesje** → **Dodaj osobę**. Biuro zakłada tam magazynierów. Konta biura
+i admina zakłada wyłącznie administrator, tak jak w API. Hasła panel nie
+pokazuje po zapisie; przekaż je osobiście.
+
 **1b. Alternatywa: `curl`,** gdy kolektora jeszcze nie ma pod ręką albo konta
 zakłada się skryptem.
 
@@ -973,9 +1018,9 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    którą ma firma. Patrz
    [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
 
-   Domyślne w `config.ts` są z niego wzięte i nie trzeba ich ustalać:
-   `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10` (PZ, **nie** 5 = KFZ), bufor =
-   `dok_Status = 3` (odłożony).
+   Stałe w `config.ts` są z niego wzięte i nie trzeba ich ustalać: typ FZ = 1,
+   PZ = 10 (**nie** 5 = KFZ), bufor = `dok_Status = 3` (odłożony). Od 0.489.0
+   nie są kluczami `wertis.env`, bo wpis mógł je tylko zepsuć.
 
    Do ustalenia na własnej bazie zostają **trzy** rzeczy. Ta sekcja mówi,
    **co i po co**. Zapytania, odczyt wyniku i skutki pomyłki opisuje rozdział
@@ -1117,8 +1162,8 @@ razem z nagłówkiem. Karta zwrotu Allegro, która korzystała z tego od 0.72.0,
 odeszła w 0.140.0.
 
 **Zdjęcie dodane w Subiekcie pojawia się z opóźnieniem** i to jest projektowe.
-Serwer pamięta „ta kartoteka zdjęcia nie ma" przez `ZDJECIA_BRAK_TTL_H`
-(12 godzin), a kolektor przez dobę. Inaczej setki kartotek bez zdjęcia
+Serwer pamięta „ta kartoteka zdjęcia nie ma" przez 12 godzin, a kolektor
+przez dobę. Inaczej setki kartotek bez zdjęcia
 odpytywałyby bazę przy każdym otwarciu karty. Najdalej nazajutrz obraz jest na
 ekranie. Gdy trzeba szybciej — na przykład przy sprawdzaniu, czy wdrożenie
 zadziałało — wymuś ponowne pytanie:
@@ -1319,7 +1364,8 @@ jest wtedy pusta, a `/api/health` niesie zdanie o przyczynie.
 | ustawienie | domyślnie | co ustala |
 |---|---|---|
 | `MM_ZWROTY_DNI_WSTECZ` | `30` | okno importu przesunięć na regał zwrotów — tyle, ile filtr w Subiekcie |
-| `DOK_TYP_MM` | `9` | typ dokumentu przesunięcia międzymagazynowego |
+
+Typ dokumentu MM (`9`) jest stałą ze struktury bazy, a nie ustawieniem.
 
 Gdy kosz na kolektorze pokazuje **0 pozycji**, odpowiedź stoi w `/api/health`.
 `lastSync.mm` i `lastSync.mmPozycje` mówią, ile dokumentów i ile ich pozycji
@@ -2641,6 +2687,32 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.491.0 — ustawienia zmienia się z panelu
+
+Niczego nie trzeba robić. Pierwsza zmiana z panelu dopisze do `wertis.env`
+linię `# ── zmienione z panelu ──`, jeśli klucza nie było w pliku. Po zmianie
+obok pliku stoi `wertis.env.poprzedni` z tym samym hasłem co oryginał — oba
+są w `.gitignore`.
+
+### Aktualizacja do 0.490.0 — konta z panelu
+
+Niczego nie trzeba robić. Karta **Konta i sesje** ma przycisk **Dodaj osobę**.
+Kreator na kolektorze zostaje, ale do kont biura nie jest już potrzebny.
+
+### Aktualizacja do 0.489.0 — mniej kluczy w `wertis.env`
+
+Dziewiętnaście kluczy stało się stałymi w kodzie; lista stoi w CHANGELOG.
+Jeśli któryś z nich jest w Twoim `wertis.env`, `/api/health` nazwie go
+nieznanym kluczem. Usuń wpis i zrestartuj usługi. Serwer i tak go już nie
+czyta, więc do tego czasu nic się nie psuje.
+
+### Aktualizacja do 0.488.0 — konfiguracja widoczna w panelu
+
+Niczego nie trzeba robić ręcznie. Po aktualizacji zajrzyj raz do
+`/api/health` albo do karty **Konfiguracja serwera** w ustawieniach. Zdanie
+o nieznanym kluczu znaczy literówkę albo pozostałość po starym wydaniu.
+Popraw nazwę albo usuń wpis z `wertis.env` i zrestartuj usługi.
 
 ### Aktualizacja do 0.487.0 — kopie bazy robi serwer
 

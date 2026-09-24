@@ -34,6 +34,96 @@ historii nie przepisujemy.
 ---
 
 
+## 0.491.0 — 24 września 2026
+
+**Ustawienia właściciela zmienia się z panelu.** Dotąd każda zmiana to był
+pulpit zdalny na maszynie z Subiektem, edytor tekstu na `wertis.env`
+i restart dwóch usług. Karta **Konfiguracja serwera** ma teraz przycisk
+**Zmień** przy 25 decyzjach właściciela: progach dat, terminach zwrotów,
+Copilocie i jego limitach, kluczach Allegro i API, katalogu kopii.
+
+- **Plik, z którym serwer by nie wstał, nie trafia na dysk.** Osobny proces
+  ładuje prawdziwy `config.ts` na pliku-kandydacie. Łapie to także reguły
+  krzyżowe, na przykład klucz Allegro bez sekretu. Bez tego jedna pomyłka
+  z panelu kładłaby usługę w pętlę restartów, a z nią sam panel.
+- **Jeden klucz na raz**, każdy z wpisem `konfiguracja_zmieniona` w dzienniku.
+  Sekret trafia tam tylko jako „ustawione". Druga zmiana w trakcie pierwszej
+  dostaje odmowę, zamiast po cichu nadpisać tamtą.
+- **Próba startu nie zamraża serwera.** Biegnie obok, więc kolektory w hali
+  pracują dalej, gdy administrator zapisuje zmianę.
+- **Restart robi się sam** pod NSSM: API kończy się po odpowiedzi, worker po
+  kilkunastu sekundach. Poza usługą panel mówi, że zmiana czeka na restart.
+- **Plik zostaje plikiem.** Komentarze, klucze instalatora i wpisy ręczne
+  zostają; poprzednia wersja leży w `wertis.env.poprzedni`.
+
+Czego z panelu zmienić się nie da i dlaczego, mówi `Edycja` w rejestrze
+kluczy, a pilnuje tego test: klucze instalatora, pokrętła, klucze workerów
+C# oraz `MAG_ID_ODP`, `MAG_ID_SERWIS`, `TW_ID_PRZESYLKA`
+i `ZDJECIA_DODAWANIE`.
+
+## 0.490.0 — 24 września 2026
+
+**Konta zakłada się z panelu.** Dotąd tylko kreator na kolektorze albo
+`curl`, więc konto dla nowej osoby w biurze zakładał ktoś z kolektorem
+w ręku. Karta **Konta i sesje** ma teraz przycisk **Dodaj osobę**.
+
+- **Biuro zakłada magazynierów**, administrator zakłada każdą rolę. Formularz
+  proponuje tylko role, których serwer nie odrzuci; bramkę trzyma dalej
+  serwer (`zarzadzanie_kontami`, `zarzadzanie_biurem`).
+- **Przycisk nie świeci**, dopóki login albo hasło na pewno nie przejdą.
+- **Hasła nie widać po zapisie**, tak samo jak w kreatorze na kolektorze.
+
+Zmiana dotyczy wyłącznie panelu. Trasa `POST /api/users` i jej testy ról
+stoją bez zmian od 0.24.0.
+
+## 0.489.0 — 24 września 2026
+
+**Dziewiętnaście kluczy `wertis.env` przestało być kluczami.** Zostało 117.
+Znikają trzy rodzaje, każdy z własnego powodu:
+
+- **Stałe ze struktury bazy:** sześć kodów `DOK_TYP_*` (FZ, PZ, ZD, FS, PA,
+  MM) i `MSSQL_BUFFER_EXPR`. Nie zależą od podmiotu, więc wpis mógł je tylko
+  zepsuć. Wyrażenie bufora było do tego surowym SQL-em z pliku ustawień.
+- **Pokrętła pamięci podręcznej zdjęć:** pięć `ALLEGRO_ZDJECIA_*` oraz
+  `ZDJECIA_CACHE_MB`, `ZDJECIA_TTL_H`, `ZDJECIA_BRAK_TTL_H` i
+  `ZDJECIA_BLAD_TTL_MIN`. Żaden dokument ich nie opisywał i nikt ich nie
+  ustawiał.
+- **Rytmy taktów:** `COPILOT_AUTO_MS`, `COPILOT_AUTO_KLASYFIKACJA_MS`
+  i `WIEDZA_AUTOMAT_MS`. Koszt hamują limity na przebieg i na godzinę, a te
+  zostają.
+
+Wartości się nie zmieniają; stoją teraz w kodzie. Gwarancja „pamięć braku
+zdjęcia krótsza niż doba" przeszła z odmowy startu do testu stałej.
+
+**[wymaga działania, gdy ktoś je ustawił]** Wpis, który został w
+`wertis.env`, `/api/health` zgłasza jako nieznany klucz. Usuń go i zrestartuj
+usługi. Działania nie zmienia: serwer już go nie czyta.
+
+`wertis.env.example` dostał na początku przewodnik po trzech rodzajach
+kluczy. Test pilnuje, że plik opisuje wyłącznie klucze z rejestru i każdy
+klucz instalatora i właściciela.
+
+## 0.488.0 — 24 września 2026
+
+**Konfiguracja serwera widoczna w panelu.** Pytanie „na czym ten serwer
+chodzi" wymagało dotąd pulpitu zdalnego na maszynie z Subiektem. Teraz
+odpowiada karta **Konfiguracja serwera** w ustawieniach, tylko dla
+administratora. Każdy klucz ma wartość, źródło i opis jednym zdaniem.
+Na wierzchu stoi to, co ktoś ustawił, i decyzje właściciela. Resztę
+pokazuje przełącznik.
+
+- **Sekrety nie wychodzą z serwera.** Hasła i klucze API karta zna tylko
+  jako „ustawione”.
+- **Przykryta wartość świeci na czerwono.** To ten stan, w którym plik mówi
+  jedno, a usługa pracuje na zmiennej z NSSM.
+- **Literówka w nazwie klucza melduje się sama**, w karcie i w `/api/health`.
+  Dotąd dawała cichą wartość domyślną.
+
+Pod spodem jest rejestr 136 kluczy czytanych przez serwer, worker Sfery
+i usługę tła (`server/src/konfiguracja-rejestr.ts`). Test czyta źródła
+wszystkich trzech programów i pilnuje zgodności w obie strony. Rejestr jest
+podstawą pod następne kroki: cięcie pokręteł i edycję z panelu.
+
 ## 0.487.0 — 24 września 2026
 
 **Kopie bazy aplikacji i nocną rekoncyliację robi sam serwer.** Do tej wersji

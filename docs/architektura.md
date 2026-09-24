@@ -764,6 +764,7 @@ przy `AppGraph`.
 | Konta się nie kasuje | historia w `events` musi mieć na co wskazywać; jest `active = 0` |
 | `events` bez retencji | przy szacowanych kilkuset zdarzeniach dziennie to rząd 10⁵ wierszy rocznie — SQLite z indeksami tego nie zauważa. To ślad audytu, więc automatyczne kasowanie byłoby gorsze niż wzrost. Gdyby tabela urosła ponad oczekiwania, decyzję o archiwizacji podejmuje właściciel, nie kod |
 | Kopie bazy i rekoncyliację robi serwer API, nie Harmonogram zadań (0.487.0) | wpis w Harmonogramie był krokiem człowieka, którego instalator nie robił, a bramka etapu 4 stała na nim. API ma bazę otwartą stale i wie, kiedy migruje. Kopia to `VACUUM INTO` przed migracją i w nocy, bo zwykłe `cp` w trybie WAL gubi zapisy |
+| Ustawienia z panelu zapisują `wertis.env`, nie tabelę w bazie (0.491.0) | plik zostaje jedynym źródłem konfiguracji dla czterech programów i instalatora. Przed zapisem osobny proces ładuje prawdziwy `config.ts` na kandydacie, więc panel nie zapisze pliku, z którym serwer by nie wstał |
 | Login wpisuje biuro, unikalności pilnuje baza | dwie osoby z tym samym loginem to jedno żądanie od pomyłki |
 
 ---

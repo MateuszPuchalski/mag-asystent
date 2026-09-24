@@ -107,6 +107,20 @@ export const useResetHasla = () => useMutation({
     api<{ ok: boolean }>(`/api/users/${userId}/haslo`, { method: "POST", body: JSON.stringify({ haslo }) }),
 });
 
+export type RolaKonta = "magazynier" | "biuro" | "admin";
+
+/* Zakładanie konta z panelu (0.490.0). Dotąd tylko kreator na kolektorze albo
+   `curl`. Bramkę ról trzyma serwer: biuro zakłada halę, konta biura i admina
+   zakłada admin — ekran tylko nie proponuje ról, których serwer odmówi. */
+export function useZalozKonto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (k: { name: string; login: string; haslo: string; role: RolaKonta }) =>
+      api<{ user: Konto }>("/api/users", { method: "POST", body: JSON.stringify(k) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["agenci"] }),
+  });
+}
+
 export function useAktywnosc() {
   const qc = useQueryClient();
   return useMutation({
@@ -115,6 +129,59 @@ export function useAktywnosc() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["agenci"] }),
   });
 }
+
+/* ── Konfiguracja serwera (0.488.0) ────────────────────────────────────── */
+
+export type ZrodloUstawienia = "plik" | "przykryte" | "srodowisko" | "domyslna";
+
+export interface WierszKonfiguracji {
+  klucz: string;
+  grupa: string;
+  kto: "instalator" | "wlasciciel" | "zaawansowane" | "dev";
+  opis: string;
+  czyta: string[];
+  tajny: boolean;
+  zrodlo: ZrodloUstawienia;
+  /** `null` dla sekretu i dla wartości domyślnej — serwer nie wysyła ich wcale. */
+  wartosc: string | null;
+  /** Jak zmienić z panelu (0.491.0); `null` = tylko plik albo instalator. */
+  edycja: { rodzaj: "tekst" | "liczba" | "data" | "wybor"; opcje?: string[] } | null;
+}
+
+export interface StanKonfiguracji {
+  plik: string | null;
+  grupy: Record<string, string>;
+  wiersze: WierszKonfiguracji[];
+  nieznane: string[];
+}
+
+/**
+ * Zmiana jednego klucza (0.491.0). Serwer zapisuje `wertis.env` dopiero po
+ * udanej próbie startu i sam się restartuje pod NSSM (`restart: "sam"`).
+ * Odświeżenie karty czeka, aż serwer wstanie — wcześniej pokazałaby starą
+ * wartość, bo proces czyta plik raz, przy starcie.
+ */
+export function useZmienUstawienie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (z: { klucz: string; wartosc: string | null }) =>
+      api<{ ok: boolean; klucz: string; restart: "sam" | "reczny" }>("/api/biuro/konfiguracja",
+        { method: "POST", body: JSON.stringify(z) }),
+    onSuccess: (d) => {
+      if (d.restart === "sam") {
+        setTimeout(() => void qc.invalidateQueries({ queryKey: ["konfiguracja"] }), 8000);
+      }
+    },
+  });
+}
+
+/** Trasa adminowa, więc pytamy tylko jako admin — biuro dostałoby 403. */
+export const useKonfiguracja = (admin: boolean) => useQuery({
+  queryKey: ["konfiguracja"],
+  queryFn: () => api<StanKonfiguracji>("/api/biuro/konfiguracja"),
+  enabled: admin,
+  retry: false,
+});
 
 /* ── Logo dostawców ───────────────────────────────────────────────────── */
 

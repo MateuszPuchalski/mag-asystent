@@ -272,7 +272,7 @@ export async function zapewnijZdjecieOferty(
        obroną przed galerią 20 MB jest odmowa — ta sama, co przy kartotekach.
        Zdanie mówi ILE ważyło: próg dobiera się potem na własnych liczbach. */
     zapamietaj(database, konto, externalId, url, {
-      blad: `Zdjęcie oferty ma ${kb} kB, limit ALLEGRO_ZDJECIA_MAX_KB to ${config.allegroZdjecia.maxKb} kB — pomijam.`,
+      blad: `Zdjęcie oferty ma ${kb} kB, limit to ${config.allegroZdjecia.maxKb} kB — pomijam.`,
     });
     return wpis(database, konto, externalId) ?? null;
   }

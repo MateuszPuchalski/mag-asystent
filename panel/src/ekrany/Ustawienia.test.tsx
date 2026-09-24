@@ -27,13 +27,33 @@ import zrodloAnalizy from "./Analiza.tsx?raw";
    7. Miary obsługi i stan integracji mieszkają gdzie indziej. */
 
 let wyslane: Array<{ metoda: string; url: string; body?: string; typ?: string }> = [];
+let odczyty: string[] = [];
+
+/* Serwer nie wysyła wartości sekretu ani domyślnej — atrapa też nie. */
+const KONFIGURACJA = {
+  plik: "C:\\wertis\\wertis.env",
+  grupy: { subiekt: "Połączenie z Subiektem", zwroty: "Zwroty i reklamacje" },
+  nieznane: ["ALEGRO_CLIENT_ID"],
+  wiersze: [
+    { klucz: "MSSQL_SERVER", grupa: "subiekt", kto: "instalator", opis: "Adres SQL Servera.", czyta: ["serwer"],
+      tajny: false, zrodlo: "plik", wartosc: "serwer-subiekta", edycja: null },
+    { klucz: "MSSQL_PASSWORD", grupa: "subiekt", kto: "instalator", opis: "Hasło loginu SQL.", czyta: ["serwer"],
+      tajny: true, zrodlo: "plik", wartosc: null, edycja: null },
+    { klucz: "MSSQL_SYNC_MS", grupa: "subiekt", kto: "zaawansowane", opis: "Takt odświeżania.", czyta: ["serwer"],
+      tajny: false, zrodlo: "domyslna", wartosc: null, edycja: null },
+    { klucz: "ZWROT_TERMIN_DNI", grupa: "zwroty", kto: "wlasciciel", opis: "Dni na obsłużenie zwrotu.", czyta: ["serwer"],
+      tajny: false, zrodlo: "domyslna", wartosc: null, edycja: { rodzaj: "liczba" } },
+    { klucz: "ANTHROPIC_API_KEY", grupa: "zwroty", kto: "wlasciciel", opis: "Klucz API.", czyta: ["serwer"],
+      tajny: true, zrodlo: "plik", wartosc: null, edycja: { rodzaj: "tekst" } },
+  ],
+};
 let rola = "admin";
 let firmaNaSerwerze: { dane: Record<string, string>; zmieniono: { at: string; przez: string } | null };
 
 const PUSTA_FIRMA = { nazwa: "", nip: "", adres: "", miejscowosc: "", osoba: "", telefon: "" };
 
 beforeEach(() => {
-  wyslane = []; rola = "admin";
+  wyslane = []; odczyty = []; rola = "admin";
   firmaNaSerwerze = { dane: { ...PUSTA_FIRMA }, zmieniono: null };
   localStorage.clear();
   /* Pamięć obrazów jest modułowa i żyje między testami. */
@@ -51,9 +71,18 @@ beforeEach(() => {
       }
       if (url === "/api/biuro/strefa") return odp({ ok: true, regul: JSON.parse(init!.body as string).reguly.length });
       if (url.endsWith("/wyloguj")) return odp({ ok: true, sesji: 2 });
+      if (url === "/api/biuro/konfiguracja") {
+        return odp({ ok: true, klucz: JSON.parse(init!.body as string).klucz, restart: "reczny" });
+      }
+      if (url === "/api/users") {
+        const b = JSON.parse(init!.body as string);
+        return odp({ user: { userId: 9, login: b.login, name: b.name, role: b.role, active: true, maHaslo: true } });
+      }
       return odp({ ok: true });
     }
+    odczyty.push(url);
     if (url === "/api/auth/me") return odp({ user: { userId: 1, name: "Anna", role: rola } });
+    if (url === "/api/biuro/konfiguracja") return odp(KONFIGURACJA);
     if (url === "/api/biuro/firma") return odp(firmaNaSerwerze);
     if (url === "/api/biuro/strefa") return odp({ reguly: [{ alejka: "A", od: "", do: "", poziomy: "2,3" }] });
     if (url === "/api/users") return odp({ users: [
@@ -96,7 +125,8 @@ describe("Ustawienia w panelu", () => {
     expect(wyslane).toEqual([]);
     /* Karty w kolejności makiety. */
     const tytuly = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(tytuly).toEqual(["Dane firmy do protokołów", "Reguły strefy złotej", "Konta i sesje", "Logo dostawców"]);
+    expect(tytuly).toEqual(["Dane firmy do protokołów", "Reguły strefy złotej", "Konta i sesje", "Logo dostawców",
+      "Konfiguracja serwera"]);
   });
 
   it("przeniesienie z przeglądarki: tylko przy pustym serwerze, jednym kliknięciem", async () => {
@@ -151,13 +181,99 @@ describe("Ustawienia w panelu", () => {
     expect(JSON.parse(wyslane[0].body!)).toEqual({ reguly: [{ alejka: "P", od: "", do: "", poziomy: "1" }] });
   });
 
-  it("biuro widzi konta bez przycisków — serwer i tak by odmówił", async () => {
+  it("konfiguracja: ustawione na wierzchu, sekret bez wartości, literówka na czerwono", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Konfiguracja serwera"));
+    expect(await within(k).findByText("serwer-subiekta")).toBeInTheDocument();
+    /* Dwa sekrety w atrapie — hasło SQL i klucz API — oba bez wartości. */
+    expect(within(k).getAllByText("ustawione")).toHaveLength(2);
+    expect(within(k).getByText(/ALEGRO_CLIENT_ID/)).toBeInTheDocument();
+    /* Decyzja właściciela widać zawsze, domyślne pokrętło dopiero po przełączniku. */
+    expect(within(k).getByText("ZWROT_TERMIN_DNI")).toBeInTheDocument();
+    expect(within(k).queryByText("MSSQL_SYNC_MS")).toBeNull();
+    await userEvent.click(within(k).getByRole("button", { name: /Wszystkie \(5\)/ }));
+    expect(within(k).getByText("MSSQL_SYNC_MS")).toBeInTheDocument();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("zmiana ustawienia: jeden klucz w jednym żądaniu, tylko tam, gdzie wolno", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Konfiguracja serwera"));
+    await within(k).findByText("serwer-subiekta");
+    /* Klucz instalatora nie ma przycisku — serwer by odmówił. */
+    const wiersz = (klucz: string) => within(k).getByText(klucz).closest("tr") as HTMLElement;
+    expect(within(wiersz("MSSQL_SERVER")).queryByRole("button", { name: "Zmień" })).toBeNull();
+    await userEvent.click(within(wiersz("ZWROT_TERMIN_DNI")).getByRole("button", { name: "Zmień" }));
+    expect(wyslane).toEqual([]);
+    await userEvent.type(within(k).getByLabelText("ZWROT_TERMIN_DNI"), "10");
+    await userEvent.click(within(k).getByRole("button", { name: "Zapisz" }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0]).toMatchObject({ metoda: "POST", url: "/api/biuro/konfiguracja" });
+    expect(JSON.parse(wyslane[0].body!)).toEqual({ klucz: "ZWROT_TERMIN_DNI", wartosc: "10" });
+    /* Poza NSSM restart zostaje człowiekowi — panel mówi to wprost. */
+    expect(await within(k).findByText(/Zadziała po restarcie usług/)).toBeInTheDocument();
+  });
+
+  it("sekret: pole puste na start, pustego nie zapisze", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Konfiguracja serwera"));
+    await within(k).findByText("serwer-subiekta");
+    const wiersz = within(k).getByText("ANTHROPIC_API_KEY").closest("tr") as HTMLElement;
+    await userEvent.click(within(wiersz).getByRole("button", { name: "Zmień" }));
+    const pole = within(wiersz).getByLabelText("ANTHROPIC_API_KEY") as HTMLInputElement;
+    expect(pole.type).toBe("password");
+    expect(pole.value).toBe("");
+    expect(within(wiersz).getByRole("button", { name: "Zapisz" })).toBeDisabled();
+  });
+
+  it("biuro nie widzi konfiguracji i nawet o nią nie pyta", async () => {
+    rola = "biuro";
+    pokaz();
+    await screen.findByText("Jan Wrona");
+    expect(screen.queryByRole("heading", { name: "Konfiguracja serwera" })).toBeNull();
+    expect(odczyty).not.toContain("/api/biuro/konfiguracja");
+  });
+
+  it("biuro widzi konta bez przycisków, które serwer by odrzucił — zostaje tylko dodanie osoby", async () => {
     rola = "biuro";
     pokaz();
     await screen.findByText("Jan Wrona");
     const k = karta("Konta i sesje");
-    expect(within(k).queryByRole("button")).toBeNull();
-    expect(within(k).getByText(/Konta zmienia administrator/)).toBeInTheDocument();
+    /* Biuro zakłada magazynierów (0.490.0); reset, wyłączenie i sesje są
+       adminowe i ich przyciski dalej nie istnieją. */
+    expect(within(k).getAllByRole("button").map((b) => b.textContent)).toEqual(["Dodaj osobę"]);
+    expect(within(k).getByText(/Reset hasła, wyłączenie konta i sesje są po stronie administratora/)).toBeInTheDocument();
+  });
+
+  it("biuro zakłada wyłącznie magazyniera — innej roli formularz nie proponuje", async () => {
+    rola = "biuro";
+    pokaz();
+    await screen.findByText("Jan Wrona");
+    await userEvent.click(within(karta("Konta i sesje")).getByRole("button", { name: "Dodaj osobę" }));
+    const f = screen.getByRole("form", { name: "Nowa osoba" });
+    expect(within(f).getAllByRole("option").map((o) => o.textContent)).toEqual(["magazynier"]);
+  });
+
+  it("admin zakłada konto: pełne dane w jednym żądaniu, hasła nie pokazuje", async () => {
+    pokaz();
+    await screen.findByText("Jan Wrona");
+    await userEvent.click(within(karta("Konta i sesje")).getByRole("button", { name: "Dodaj osobę" }));
+    const f = screen.getByRole("form", { name: "Nowa osoba" });
+    expect(within(f).getAllByRole("option").map((o) => o.textContent)).toEqual(["magazynier", "biuro", "admin"]);
+    const zaloz = within(f).getByRole("button", { name: "Załóż konto" });
+    await userEvent.type(within(f).getByLabelText("Imię i nazwisko"), "Ewa Kos");
+    await userEvent.type(within(f).getByLabelText("Login"), "EKos");
+    await userEvent.type(within(f).getByLabelText("Hasło"), "krotko");
+    /* Za krótkie hasło: przycisk nie świeci, bo serwer i tak by odmówił. */
+    expect(zaloz).toBeDisabled();
+    await userEvent.type(within(f).getByLabelText("Hasło"), "12");
+    await userEvent.selectOptions(within(f).getByLabelText("Rola"), "biuro");
+    await userEvent.click(zaloz);
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0]).toMatchObject({ metoda: "POST", url: "/api/users" });
+    expect(JSON.parse(wyslane[0].body!)).toEqual({ name: "Ewa Kos", login: "ekos", haslo: "krotko12", role: "biuro" });
+    expect(await within(f).findByText(/Konto „ekos” założone/)).toBeInTheDocument();
+    expect(within(f).queryByText(/krotko12/)).toBeNull();
   });
 
   it("admin: reset hasła w polu hasła, minimum 8 znaków", async () => {

@@ -169,10 +169,13 @@ export const config = {
      * zakupu. Na prawdziwej bazie aplikacja listowałaby korekty jako dostawy
      * i nie zobaczyła ani jednego PZ.
      */
-    dokTypFZ: num(process.env.DOK_TYP_FZ, 1, "DOK_TYP_FZ"),
-    dokTypPZ: num(process.env.DOK_TYP_PZ, 10, "DOK_TYP_PZ"),
+    /* STAŁE, nie klucze (0.489.0). Wynikają ze struktury bazy, a nie
+       z ustawień podmiotu, więc wpis w `wertis.env` mógł je tylko zepsuć.
+       Rejestr zgłasza pozostawiony wpis jako nieznany klucz. */
+    dokTypFZ: 1,
+    dokTypPZ: 10,
     /** Zamówienie do dostawcy — ZD. Wartość z tej samej listy, więc pewna. */
-    dokTypZD: num(process.env.DOK_TYP_ZD, 15, "DOK_TYP_ZD"),
+    dokTypZD: 15,
     /**
      * `dok_Status` zamówień, które UZNAJEMY ZA OTWARTE (CSV).
      *
@@ -250,7 +253,9 @@ export const config = {
      * 5..8-zamówienia}. Bufor to dokument **odłożony** (3); poprzednie domyślne
      * `= 0` wskazywało dokumenty **wycofane**, czyli mylił się w obie strony.
      */
-    bufferExpr: process.env.MSSQL_BUFFER_EXPR ?? "CASE WHEN d.dok_Status = 3 THEN 1 ELSE 0 END",
+    /* Stała od 0.489.0. Surowy SQL z pliku ustawień był drogą do wstrzyknięcia
+       czegokolwiek w zapytanie do bazy firmy, a wartość nie zależy od podmiotu. */
+    bufferExpr: "CASE WHEN d.dok_Status = 3 THEN 1 ELSE 0 END",
     /** Interwał odświeżania read-modelu sgt_* z MSSQL [ms]. */
     syncMs: num(process.env.MSSQL_SYNC_MS, 60000, "MSSQL_SYNC_MS"),
     /**
@@ -267,8 +272,8 @@ export const config = {
      * w tej firmie idzie OBIEMA drogami (część zamówień na fakturę, część na
      * paragon) — dlatego dwa typy, a nie jeden przełącznik.
      */
-    dokTypFS: num(process.env.DOK_TYP_FS, 2, "DOK_TYP_FS"),
-    dokTypPA: num(process.env.DOK_TYP_PA, 21, "DOK_TYP_PA"),
+    dokTypFS: 2,
+    dokTypPA: 21,
     /**
      * Ile dni wstecz czytać przesunięcia MM NA regał zwrotów — dokumenty,
      * których numery magazyn pisze na koszach. Domyślne 30 dni to okno,
@@ -279,7 +284,7 @@ export const config = {
      * `dok_Typ` przesunięcia międzymagazynowego. Wartość z oficjalnego opisu
      * struktury (9-MM), ta sama lista co pozostałe kody dokumentów.
      */
-    dokTypMM: num(process.env.DOK_TYP_MM, 9, "DOK_TYP_MM"),
+    dokTypMM: 9,
     /**
      * Ile dni wstecz czytać dokumenty sprzedaży (FS/PA) do read-modelu
      * `sgt_faktura` (0.174.0).
@@ -735,10 +740,12 @@ export const config = {
      * jedyną obroną przed kartoteką ze skanem 20 MB jest odmowa.
      */
     maxKb: num(process.env.ZDJECIA_MAX_KB, 2048, "ZDJECIA_MAX_KB"),
+    /* Cztery pokrętła pamięci podręcznej niżej są STAŁYMI od 0.489.0. Nikt ich
+       nie ustawiał, a każde było kolejnym kluczem do przeczytania. */
     /** Limit katalogu `data/zdjecia` [MB]; ponad to wypada najdawniej oglądane. */
-    cacheMb: num(process.env.ZDJECIA_CACHE_MB, 512, "ZDJECIA_CACHE_MB"),
+    cacheMb: 512,
     /** Po ilu godzinach pytamy źródło ponownie o to samo zdjęcie. */
-    ttlH: num(process.env.ZDJECIA_TTL_H, 168, "ZDJECIA_TTL_H"),
+    ttlH: 168,
     /**
      * Po ilu godzinach pytamy ponownie o kartotekę, która zdjęcia NIE MIAŁA.
      *
@@ -753,13 +760,13 @@ export const config = {
      * Koszt jest mały: to pojedyncze SELECT-y po kluczu głównym i tylko dla
      * kartotek, które ktoś naprawdę otworzył.
      */
-    brakTtlH: num(process.env.ZDJECIA_BRAK_TTL_H, 12, "ZDJECIA_BRAK_TTL_H"),
+    brakTtlH: 12,
     /**
      * Jak długo NIE ponawiamy po błędzie źródła. Bez tej przerwy zepsute
      * źródło zamienia każde wejście na kartę w kilkusekundowy timeout —
      * objaw „aplikacja zamarła", którego nikt nie skojarzy ze zdjęciami.
      */
-    bladTtlMin: num(process.env.ZDJECIA_BLAD_TTL_MIN, 5, "ZDJECIA_BLAD_TTL_MIN"),
+    bladTtlMin: 5,
 
     /* ── Dodawanie zdjęcia z kolektora (0.88.0) ──────────────────────────────
        Do 0.87.0 zdjęcia były WYŁĄCZNIE do odczytu i tak to opisywała
@@ -826,6 +833,8 @@ export const config = {
    * pobieramy tak czy owak, a plik ciągnie się dopiero wtedy, gdy ktoś na
    * ekranie na niego patrzy. Nie ma czego wyłączać, bo nie ma stałego kosztu.
    */
+  /* Wszystkie pięć pól to STAŁE od 0.489.0 — pokrętła pamięci podręcznej,
+     których nie opisywał żaden dokument i nie ustawiał nikt. */
   allegroZdjecia: {
     /**
      * Szerokość miniatury w pikselach — segment `/s{px}/` w adresie CDN-u.
@@ -837,15 +846,15 @@ export const config = {
      * częścią specyfikacji — dlatego `services/zdjecia-ofert.ts` traktuje go
      * jako PRÓBĘ z powrotem do oryginału, a nie jako pewnik.
      */
-    miniaturaPx: num(process.env.ALLEGRO_ZDJECIA_PX, 320, "ALLEGRO_ZDJECIA_PX"),
+    miniaturaPx: 320,
     /** Ponad tyle kilobajtów obrazu NIE bierzemy — serwer nie skaluje. */
-    maxKb: num(process.env.ALLEGRO_ZDJECIA_MAX_KB, 1024, "ALLEGRO_ZDJECIA_MAX_KB"),
+    maxKb: 1024,
     /** Limit katalogu `data/zdjecia-ofert` [MB]; ponad to wypada najdawniej oglądane. */
-    cacheMb: num(process.env.ALLEGRO_ZDJECIA_CACHE_MB, 256, "ALLEGRO_ZDJECIA_CACHE_MB"),
+    cacheMb: 256,
     /** Ile czekamy na CDN. Bez limitu jedno zawieszone żądanie blokuje trasę. */
-    timeoutMs: num(process.env.ALLEGRO_ZDJECIA_TIMEOUT_MS, 8000, "ALLEGRO_ZDJECIA_TIMEOUT_MS"),
+    timeoutMs: 8000,
     /** Jak długo NIE ponawiamy po błędzie — jak przy kartotekach. */
-    bladTtlMin: num(process.env.ALLEGRO_ZDJECIA_BLAD_TTL_MIN, 5, "ALLEGRO_ZDJECIA_BLAD_TTL_MIN"),
+    bladTtlMin: 5,
   },
 
   /**
@@ -983,7 +992,8 @@ export const config = {
      * partia szkiców. Skrzynka ma chodzić równo niezależnie od tego, ile
      * szkiców czeka.
      */
-    autoMs: Math.max(60_000, Number(process.env.COPILOT_AUTO_MS ?? 300_000) || 300_000),
+    /* Stała od 0.489.0; koszt hamują limity na przebieg i na godzinę. */
+    autoMs: 300_000,
     /**
      * Ile szkiców na JEDEN przebieg. Ten sam rodzaj hamulca co `maxPartia`
      * przy klasyfikacji i z tego samego powodu: pierwsze uruchomienie na
@@ -1022,8 +1032,7 @@ export const config = {
      * Rytm krótszy niż przy szkicu, bo rozpoznanie ma stać przy wiadomości,
      * ZANIM agent ją otworzy — a jedno wywołanie trwa sekundę, nie kilka.
      */
-    autoKlasyfikacjaMs: Math.max(60_000,
-      Number(process.env.COPILOT_AUTO_KLASYFIKACJA_MS ?? 120_000) || 120_000),
+    autoKlasyfikacjaMs: 120_000,
     /** Hamulec na przebieg — pierwsze włączenie zastaje zaległość okna. */
     autoKlasyfikacjaNaPrzebieg: Math.max(1,
       Number(process.env.COPILOT_AUTO_KLASYFIKACJA_NA_PRZEBIEG ?? 10) || 10),
@@ -1063,7 +1072,7 @@ export const config = {
      * pół godziny wystarcza z zapasem: kolejka rośnie po imporcie z Subiekta
      * i po synchronizacji ofert, a nie z minuty na minutę.
      */
-    ms: Math.max(60_000, Number(process.env.WIEDZA_AUTOMAT_MS ?? 1_800_000) || 1_800_000),
+    ms: 1_800_000,
     /**
      * Ile wierszy bierze JEDEN przebieg — osobno dla kluczy, zastosowań
      * i pasowań. Hamulec na pierwsze uruchomienie na zaległej kolejce:
@@ -1310,16 +1319,8 @@ export function bledyKonfiguracji(c: Config = config): string[] {
       `TLO_URL=${bezpiecznaWartosc(c.tlo.url)} — ma być adresem http(s), np. http://127.0.0.1:8791.`,
     );
   }
-  /* Kolektor pamięta własny „brak zdjęcia" przez 24 h i na tym stoi obietnica
-     „dodane dziś, widoczne jutro". Dłuższa pamięć serwera unieważnia ją po
-     cichu: kolektor pyta po dobie i dostaje 404 ze starego wpisu. */
-  if (c.zdjecia.zrodlo !== "" && c.zdjecia.brakTtlH >= 24) {
-    bledy.push(
-      `ZDJECIA_BRAK_TTL_H=${c.zdjecia.brakTtlH} — musi być mniejsze niż 24. ` +
-        "Kolektor pamięta brak zdjęcia przez dobę, więc dłuższa pamięć serwera " +
-        "opóźniałaby nowe zdjęcia o tydzień zamiast o dzień.",
-    );
-  }
+  /* Sprawdzenie `brakTtlH < 24` odeszło w 0.489.0 razem z kluczem: pamięć
+     braku jest stałą 12 h. Powód progu zostaje przy polu w `zdjecia`. */
 
   // Wzorce adresów przychodzą z env; zły regex wysypuje każdy skan, nie start.
   for (const p of c.locPatterns) {
@@ -1356,12 +1357,6 @@ export function bledyKonfiguracji(c: Config = config): string[] {
     bledy.push(
       "ALLEGRO_ZWROTY_DNI_WSTECZ zniknęło w 0.152.0 — okno względne zastąpił próg " +
         "bezwzględny ALLEGRO_ZWROTY_OD (data ISO). Usuń stary wpis z wertis.env.",
-    );
-  }
-  if (c.mssql.dokTypFS === c.mssql.dokTypPA) {
-    bledy.push(
-      `DOK_TYP_FS i DOK_TYP_PA są równe (${c.mssql.dokTypFS}) — faktura i paragon ` +
-        "to różne kody dok_Typ (lista w docs/subiekt-gt-struktura.md).",
     );
   }
 

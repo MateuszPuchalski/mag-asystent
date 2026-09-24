@@ -484,8 +484,9 @@ function Publish-WertisKonfiguracja {
         # w pliku i po to, żeby dało się je podać wywołaniem programistycznym
         "ZDJECIA_ZRODLO", "ZDJECIA_TABELA", "ZDJECIA_KOLUMNA_KLUCZA",
         "ZDJECIA_KOLUMNA", "ZDJECIA_KOLUMNA_GLOWNE", "ZDJECIA_KOLUMNA_KOLEJNOSC",
+        # pokrętła pamięci podręcznej zdjęć są od 0.489.0 stałymi serwera;
+        # pozostawiony wpis przechodzi dalej, a /api/health nazywa go nieznanym
         "ZDJECIA_KATALOG", "ZDJECIA_WZORZEC_PLIKU", "ZDJECIA_MAX_KB",
-        "ZDJECIA_CACHE_MB", "ZDJECIA_TTL_H", "ZDJECIA_BRAK_TTL_H", "ZDJECIA_BLAD_TTL_MIN",
         # dodawanie zdjęć z kolektora (0.88.0) — kreator włącza je wyłącznie
         # przełącznikiem -ZdjeciaZapis, bo kosztuje GRANT INSERT do bazy firmy
         "ZDJECIA_DODAWANIE", "ZDJECIA_UPLOAD_MAX_KB", "ZDJECIA_PODGLAD_MIN",

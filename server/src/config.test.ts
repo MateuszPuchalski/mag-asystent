@@ -135,19 +135,14 @@ test("osobna tabela zdjec bez kolumny kolejnosci nie przechodzi startu", () => {
   assert.match(bledy[0], /zd_Id/, "komunikat ma podać gotową wartość, nie tylko nazwę klucza");
 });
 
-test("pamiec braku zdjecia dluzsza niz doba nie przechodzi startu", () => {
+test("pamiec braku zdjecia krotsza niz doba i niz pamiec zdjecia", () => {
   /* Kolektor pamięta brak przez 24 h i na tym stoi obietnica „dodane dziś,
      widoczne jutro". Dłuższa pamięć serwera unieważnia ją po cichu: kolektor
-     pyta po dobie i dostaje 404 ze starego wpisu. Dokładnie ten błąd siedział
-     w kodzie do 0.32.1, tyle że jako JEDEN próg na oba stany. */
-  const zly = {
-    ...config,
-    zdjecia: { ...config.zdjecia, zrodlo: "plik" as const, katalog: "/tmp/z", brakTtlH: 24 },
-  };
-  const bledy = bledyKonfiguracji(zly as typeof config);
-  assert.equal(bledy.length, 1);
-  assert.match(bledy[0], /ZDJECIA_BRAK_TTL_H/);
-  assert.match(bledy[0], /dob/, "komunikat ma powiedzieć, skąd bierze się granica");
+     pyta po dobie i dostaje 404 ze starego wpisu. Do 0.489.0 pilnowała tego
+     odmowa startu przy kluczu ZDJECIA_BRAK_TTL_H; klucz stał się stałą, więc
+     gwarancja przeszła tutaj, żeby zmiana stałej nie mogła jej ominąć. */
+  assert.ok(config.zdjecia.brakTtlH < 24, `brakTtlH=${config.zdjecia.brakTtlH}`);
+  assert.ok(config.zdjecia.brakTtlH < config.zdjecia.ttlH);
 });
 
 test("ZDJECIA_ZRODLO=plik bez katalogu nie przechodzi startu", () => {
