@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.486.0 — 24 września 2026
+
+**Odpowiedź w dyskusji niesie załączniki.** Drugi krok po „dyskusje zostały
+w tyle”. Edytor dyskusji nie miał spinacza, choć specyfikacja Allegro przyjmuje
+załącznik w wiadomości sprawy dowolnego rodzaju. Serwer wysyłał je już tą
+samą maszynerią co przy reklamacji. Brakowało ekranu.
+
+- **Spinacz i pigułki plików** w edytorze dyskusji, ten sam komponent co
+  w reklamacjach. Te same limity: zdjęcie albo PDF, najwyżej 4 MB.
+- **Dziennik mówi, z którego ekranu.** Plik przy dyskusji zapisuje
+  `dyskusja_zalacznik_dodany` i `dyskusja_zalacznik_zdjety`.
+- **Sprawa, której nie ma, nie wgrywa pliku do Allegro.** Wcześniej wiersz
+  powstawał po wgraniu bez sprawdzenia, czy sprawa istnieje.
+- **Poprawka także dla reklamacji:** po wysyłce pigułki plików znikają
+  od razu. Wcześniej wisiały w edytorze do powrotu na kartę.
+
+Przebuduj panel i zrestartuj serwer.
+
 ## 0.485.0 — 24 września 2026
 
 **Dyskusja odświeża się z Allegro przy wejściu i na przycisk.** Zgłoszenie

@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, pobierzPlik } from "./klient";
+import { kluczeReklamacji } from "./reklamacje";
 import type {
   Dyskusja, KolejkaDyskusji, StanPrzesylki, SzczegolDyskusji,
   WynikOdpowiedziReklamacji, WynikZakonczenia,
@@ -118,6 +119,9 @@ export function useOdpowiedzWDyskusji() {
     onSettled: (_d, _e, v) => {
       void qc.invalidateQueries({ queryKey: kluczeDyskusji.dyskusja(v.id) });
       void qc.invalidateQueries({ queryKey: kluczeDyskusji.kolejka });
+      /* Załączniki wychodzące dyskusji mieszkają pod kluczem reklamacji, bo
+         trasa i tabela są wspólne (0.486.0). Wysłana odpowiedź je zdejmuje. */
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.zalacznikiWysylki(v.id) });
     },
   });
 }

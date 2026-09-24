@@ -2582,6 +2582,14 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.486.0 — załączniki w odpowiedzi na dyskusję
+
+**Panel trzeba przebudować, a serwer zrestartować.** Bez migracji.
+
+Sprawdzenie: w otwartej dyskusji kliknij spinacz i dołącz zdjęcie. Po
+wysyłce plik ma stać w rozmowie po stronie Allegro, a pigułka zniknąć
+z edytora. W dzienniku ma stanąć `dyskusja_zalacznik_dodany`.
+
 ### Aktualizacja do 0.485.0 — dyskusja odświeża się z Allegro
 
 **Panel trzeba przebudować, a serwer zrestartować.** Bez migracji.

@@ -140,3 +140,33 @@ test("cudzej sprawy nie da się okraść z załącznika po samym numerze", async
     "numer załącznika nie wystarcza za uprawnienie do sprawy");
   assert.equal(zalacznikiDoWyslania(d, reklamacja).length, 1);
 });
+
+/* ── Ten sam załącznik przy DYSKUSJI (0.486.0) ───────────────────────────────
+   Zgłoszenie właściciela: „dyskusje zostały w tyle”. Specyfikacja Allegro
+   przyjmuje załącznik w wiadomości sprawy dowolnego rodzaju („Dispute or
+   claim identifier”). Trasa i tabela zostają wspólne, a dziennik mówi, z
+   którego ekranu padło kliknięcie. Sprawa, której nie ma, nie wgrywa pliku. */
+test("dyskusja dostaje własne zdarzenia, a sprawa, której nie ma, nie wgrywa pliku", async () => {
+  const { d } = stanowisko();
+  const konto = Number((d.prepare("SELECT id FROM channel_account").get() as { id: number }).id);
+  const dyskusja = Number(d.prepare(`INSERT INTO reklamacja_klienta
+    (channel_account_id,external_id,typ,otwarto_at,synced_at)
+    VALUES (?,'d-1','DISPUTE','2026-09-01T08:00:00Z','2026-09-11T09:00:00Z')`)
+    .run(konto).lastInsertRowid);
+  const w = wgrywacz();
+
+  const z = await dodajZalacznikSprawy({
+    reklamacjaId: dyskusja, nazwa: "list.jpg", typ: "image/jpeg",
+    dane: plik(32), autor, database: d, wgraj: w.wgraj,
+  });
+  assert.ok(usunZalacznikSprawy(d, dyskusja, z.id, autor));
+  const typy = (d.prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>)
+    .map((e) => e.type);
+  assert.deepEqual(typy, ["dyskusja_zalacznik_dodany", "dyskusja_zalacznik_zdjety"]);
+
+  await assert.rejects(() => dodajZalacznikSprawy({
+    reklamacjaId: 9999, nazwa: "x.jpg", typ: "image/jpeg",
+    dane: plik(8), autor, database: d, wgraj: w.wgraj,
+  }), /nie istnieje/);
+  assert.equal(w.wywolania.length, 1, "plik dla sprawy, której nie ma, nie wyszedł do Allegro");
+});

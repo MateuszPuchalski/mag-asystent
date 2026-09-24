@@ -71,6 +71,27 @@ vi.mock("../api/tagi", () => ({
   useOdepnijTag: () => ({ mutate: () => {}, isPending: false }),
 }));
 
+/* Załączniki wychodzące dyskusji idą trasami reklamacji (0.486.0). Atrapa
+   notuje wywołania w tej samej scenie, więc „zero zapisu przy otwarciu”
+   liczy także je. */
+vi.mock("../api/reklamacje", async () => {
+  const rzeczywisty = await vi.importActual<typeof import("../api/reklamacje")>("../api/reklamacje");
+  const mutacja = (nazwa: string) => () => ({
+    mutate: (...a: unknown[]) => { scena.mutacje.push(`${nazwa}:${JSON.stringify(a[0])}`); },
+    isPending: false, error: null,
+  });
+  return {
+    ...rzeczywisty,
+    useZalacznikiSprawy: (id: number | null) => ({
+      data: id === null ? undefined : { zalaczniki: [
+        { id: 5, allegroId: "att-5", nazwa: "list-przewozowy.jpg", typ: "image/jpeg", rozmiar: 900, dodal: "Ala" },
+      ] },
+    }),
+    useDodajZalacznikSprawy: mutacja("dodajZalacznik"),
+    useUsunZalacznikSprawy: mutacja("usunZalacznik"),
+  };
+});
+
 vi.mock("../api/dyskusje", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/dyskusje")>("../api/dyskusje");
   const mutacja = (nazwa: string) => () => ({
@@ -176,6 +197,15 @@ describe("Ekran dyskusji", () => {
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ PROŚBĘ/ }));
     expect(ile()).toBe(4);
+  });
+
+  it("odpowiedź w dyskusji niesie załączniki: spinacz i zdjęcie pliku z tej sprawy", async () => {
+    /* Do 0.486.0 edytor dyskusji nie miał spinacza, choć specyfikacja
+       przyjmuje załącznik w wiadomości każdej sprawy. */
+    pokaz("/obsluga/dyskusje/1", [wiad()]);
+    expect(screen.getByRole("button", { name: "Dołącz plik" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Zdejmij list-przewozowy.jpg" }));
+    expect(scena.mutacje).toContain('usunZalacznik:{"id":1,"zalacznikId":5}');
   });
 
   it("kubełki niosą pytanie i licznik, a pytanie stoi nad listą", () => {

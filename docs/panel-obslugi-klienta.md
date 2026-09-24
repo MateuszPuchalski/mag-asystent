@@ -5690,7 +5690,13 @@ jest wyłączony. Pole, w które wolno pisać, a którego nie da się wysłać, 
 obietnicą bez pokrycia.
 
 Punktem odniesienia świeżości jest ostatnia NIE nasza wiadomość, więc także
-wypowiedź doradcy. Załączników wychodzących nie ma.
+wypowiedź doradcy.
+
+**Załączniki wychodzące są od 0.486.0.** Do tego wydania stało tu „nie ma”,
+bez powodu. Specyfikacja przyjmuje załącznik w wiadomości sprawy dowolnego
+rodzaju, a serwer wysyłał go już tą samą maszynerią. Trasy i tabela są wspólne
+z reklamacjami, rozstrzyga wiersz sprawy. Dziennik mówi
+`dyskusja_zalacznik_dodany` i `dyskusja_zalacznik_zdjety`.
 
 ### 25c.7a. Odświeżenie sprawy (0.485.0)
 

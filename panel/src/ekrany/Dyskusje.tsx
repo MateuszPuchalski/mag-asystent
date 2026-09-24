@@ -6,6 +6,10 @@ import {
   useProwadzeDyskusje, useSprawdzPrzesylkeDyskusji, useZakoncz, useCofnijNotatkeDyskusji
 } from "../api/dyskusje";
 import { useJa } from "../api/rozmowy";
+import {
+  useDodajZalacznikSprawy, useUsunZalacznikSprawy, useZalacznikiSprawy,
+} from "../api/reklamacje";
+import { naBase64 } from "../api/plik";
 import { Konflikt } from "../api/klient";
 import type {
   Dyskusja, KubelekDyskusji, SzczegolyWysylki, WiadomoscReklamacji,
@@ -108,6 +112,14 @@ export function Dyskusje() {
   const odpowiedz = useOdpowiedzWDyskusji();
   const zakoncz = useZakoncz();
   const odswiez = useOdswiezDyskusje();
+  /* ── ZAŁĄCZNIKI W ODPOWIEDZI (0.486.0) ──────────────────────────────────
+     Do tego wydania §25c.7 mówiło „załączników wychodzących nie ma”, bez
+     powodu. Specyfikacja przyjmuje załącznik w wiadomości sprawy dowolnego
+     rodzaju, a serwer wysyłał je już tą samą maszynerią. Brakowało ekranu.
+     Trasy są wspólne z reklamacjami, jak przy załącznikach przychodzących. */
+  const dodajZalacznik = useDodajZalacznikSprawy();
+  const usunZalacznik = useUsunZalacznikSprawy();
+  const [bladZalacznika, setBladZalacznika] = useState("");
   const [bladOdswiezenia, setBladOdswiezenia] = useState("");
   const trwa = prowadze.isPending || notatka.isPending;
 
@@ -167,6 +179,7 @@ export function Dyskusje() {
   const { tresc, ustaw: setTresc, wyczysc: wyczyscSzkic } = useSzkicSprawy("dyskusja", wybrana);
   const dyskusja = data?.dyskusje.find((d) => d.id === wybrana) ?? null;
   const szczegol = useDyskusja(wybrana);
+  const zalacznikiWysylki = useZalacznikiSprawy(wybrana);
 
   /* Wejście z paska adresu na sprawę z innego kubełka ma pokazać TĘ sprawę,
      a nie pustą listę. Adres jest tu źródłem prawdy, kubełek za nim idzie. */
@@ -211,6 +224,7 @@ export function Dyskusje() {
     setKonfliktWysylki(null);
     setBladZakonczenia("");
     setBladOdswiezenia("");
+    setBladZalacznika("");
   }, [wybrana]);
 
   /* ── WEJŚCIE W DYSKUSJĘ JĄ ODŚWIEŻA (24 września 2026) ────────────────────
@@ -470,6 +484,23 @@ export function Dyskusje() {
                 czat={szczegol.data.czat}
                 zalaczniki={szczegol.data.zalaczniki}
                 edytor={<Edytor tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
+                  zalaczniki={zalacznikiWysylki.data?.zalaczniki ?? []}
+                  dodajeZalacznik={dodajZalacznik.isPending}
+                  bladZalacznika={bladZalacznika}
+                  /* Plik czytamy TU, jak w reklamacjach: base64 to sprawa
+                     klienta HTTP, nie komponentu edytora. */
+                  onDodajZalacznik={(plik) => {
+                    setBladZalacznika("");
+                    void naBase64(plik).then((dane) => {
+                      if (!wybrana) return;
+                      dodajZalacznik.mutate(
+                        { id: wybrana, nazwa: plik.name, typ: plik.type, dane },
+                        { onError: (e) => setBladZalacznika((e as Error).message) });
+                    });
+                  }}
+                  onUsunZalacznik={(zid) => wybrana && usunZalacznik.mutate(
+                    { id: wybrana, zalacznikId: zid },
+                    { onError: (e) => setBladZalacznika((e as Error).message) })}
                   czatAktywny={szczegol.data.dyskusja.czatAktywny}
                   onZmiana={setTresc} onWyslij={() => wyslij()} />} />
             </>
