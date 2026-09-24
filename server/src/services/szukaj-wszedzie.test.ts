@@ -92,3 +92,16 @@ test("szukanie niczego nie zapisuje", () => {
   const po = d.prepare("SELECT total_changes() AS n").get() as { n: number };
   assert.equal(po.n, przed.n);
 });
+
+/* ── Login po kawałku (24 września 2026) ─────────────────────────────────────
+   Zrzut właściciela: „chrzanowski" nie znajdowało „Chrzanowski1234". Agent
+   pamięta nazwisko z loginu, nie cyfry dopisane przez Allegro. */
+test("kawałek loginu znajduje rozmowę, zakup i zwrot; pełny login stoi pierwszy", () => {
+  const t = S.szukajWszedzie("chips", null, db());
+  const r = rodzaje(t);
+  assert.ok(r.includes(`rozmowa:${rozmowaPoLoginie}`), "rozmowa po kawałku loginu rozmówcy");
+  assert.ok(r.includes("zamowienie:29f8e1a0-aaaa-bbbb"));
+  assert.ok(t.some((x) => x.rodzaj === "zwrot" && x.dlaczego === "login kupującego"));
+  /* Znak `%` wpisany przez agenta to znak, nie dżoker. */
+  assert.deepEqual(S.szukajWszedzie("%%%", null, db()), []);
+});

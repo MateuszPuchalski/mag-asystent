@@ -11,6 +11,11 @@ import { linkZamowienia } from "./allegro-linki.js";
    kartotek pisze zdarzenie `search`, ale to jest miara braków w kartotece,
    a tu szukamy spraw, nie towaru do zamówienia.
 
+   LOGIN SZUKA SIĘ PO KAWAŁKU, nie w całości (24 września 2026). Zgłoszenie
+   właściciela ze zrzutem: „chrzanowski" nie znajdowało „Chrzanowski1234".
+   Agent pamięta nazwisko z loginu, nie cyfry dopisane przez Allegro. Pełny
+   login stoi w wynikach pierwszy, reszta po nim.
+
    LOGIN TRAFIA TEŻ W ROZMOWY od 24 września 2026. Login rozmówcy z wątku
    to login kupującego — zweryfikował to właściciel (`docs/allegro-ksztalt.md`).
    Do tej daty rozmowy dochodziły wyłącznie numerem zamówienia, więc pytanie
@@ -83,16 +88,16 @@ export function szukajWszedzie(
            CASE
              WHEN external_id LIKE ? ESCAPE '\\' THEN 'numer zamówienia'
              WHEN przesylka_waybill LIKE ? ESCAPE '\\' THEN 'list przewozowy'
-             WHEN kupujacy_login = ? COLLATE NOCASE THEN 'login kupującego'
+             WHEN kupujacy_login LIKE ? ESCAPE '\\' THEN 'login kupującego'
              ELSE 'telefon odbiorcy' END AS dlaczego
       FROM zamowienie_klienta
      WHERE (length(?) >= 6 AND external_id LIKE ? ESCAPE '\\')
         OR (length(?) >= 6 AND przesylka_waybill LIKE ? ESCAPE '\\')
-        OR kupujacy_login = ? COLLATE NOCASE
+        OR kupujacy_login LIKE ? ESCAPE '\\'
         OR (? AND odbiorca_telefon_cyfry LIKE ?)
-     ORDER BY kupiono_at DESC LIMIT ?`).all(
-    `${naLike(q)}%`, like, q,
-    q, `${naLike(q)}%`, q, like, q, jakTelefon ? 1 : 0, `%${cyfry}`, NA_RODZAJ,
+     ORDER BY (kupujacy_login = ? COLLATE NOCASE) DESC, kupiono_at DESC LIMIT ?`).all(
+    `${naLike(q)}%`, like, like,
+    q, `${naLike(q)}%`, q, like, like, jakTelefon ? 1 : 0, `%${cyfry}`, q, NA_RODZAJ,
   ) as Wiersz[];
 
   for (const z of zamowienia) {
@@ -115,8 +120,9 @@ export function szukajWszedzie(
   for (const w of database.prepare(`
     SELECT c.id, c.subject
       FROM conversation c JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
-     WHERE t.interlocutor_login = ? COLLATE NOCASE
-     ORDER BY c.updated_at DESC LIMIT ?`).all(q, NA_RODZAJ) as Wiersz[]) {
+     WHERE t.interlocutor_login LIKE ? ESCAPE '\\'
+     ORDER BY (t.interlocutor_login = ? COLLATE NOCASE) DESC, c.updated_at DESC LIMIT ?`)
+    .all(like, q, NA_RODZAJ) as Wiersz[]) {
     dodaj({
       rodzaj: "rozmowa", id: String(w.id), tytul: tekst(w.subject) ?? "Rozmowa bez tematu",
       dlaczego: "login kupującego", cel: `/obsluga/skrzynka/${w.id}`, link: null,
@@ -144,15 +150,15 @@ export function szukajWszedzie(
            CASE
              WHEN reference_number LIKE ? ESCAPE '\\' THEN 'numer zwrotu'
              WHEN waybill LIKE ? ESCAPE '\\' THEN 'list przewozowy'
-             WHEN kupujacy_login = ? COLLATE NOCASE THEN 'login kupującego'
+             WHEN kupujacy_login LIKE ? ESCAPE '\\' THEN 'login kupującego'
              ELSE 'zamówienie' END AS dlaczego
       FROM zwrot_klienta
      WHERE reference_number LIKE ? ESCAPE '\\'
         OR (length(?) >= 6 AND waybill LIKE ? ESCAPE '\\')
-        OR kupujacy_login = ? COLLATE NOCASE
+        OR kupujacy_login LIKE ? ESCAPE '\\'
         OR order_id IN (${zamLista.map(() => "?").join(",")})
-     ORDER BY created_at DESC LIMIT ?`).all(
-    like, like, q, like, q, like, q, ...zamLista, NA_RODZAJ) as Wiersz[]) {
+     ORDER BY (kupujacy_login = ? COLLATE NOCASE) DESC, created_at DESC LIMIT ?`).all(
+    like, like, like, like, q, like, like, ...zamLista, q, NA_RODZAJ) as Wiersz[]) {
     const dl = String(w.dlaczego) === "zamówienie" ? String(dlaczegoNumeru(String(w.order_id))) : String(w.dlaczego);
     dodaj({
       rodzaj: "zwrot", id: String(w.id),
@@ -167,13 +173,14 @@ export function szukajWszedzie(
     SELECT id, typ, reference_number, temat, kupujacy_login, order_id,
            CASE
              WHEN reference_number LIKE ? ESCAPE '\\' THEN 'numer sprawy'
-             WHEN kupujacy_login = ? COLLATE NOCASE THEN 'login kupującego'
+             WHEN kupujacy_login LIKE ? ESCAPE '\\' THEN 'login kupującego'
              ELSE 'zamówienie' END AS dlaczego
       FROM reklamacja_klienta
      WHERE reference_number LIKE ? ESCAPE '\\'
-        OR kupujacy_login = ? COLLATE NOCASE
+        OR kupujacy_login LIKE ? ESCAPE '\\'
         OR order_id IN (${zamLista.map(() => "?").join(",")})
-     ORDER BY otwarto_at DESC LIMIT ?`).all(like, q, like, q, ...zamLista, NA_RODZAJ) as Wiersz[]) {
+     ORDER BY (kupujacy_login = ? COLLATE NOCASE) DESC, otwarto_at DESC LIMIT ?`)
+    .all(like, like, like, like, ...zamLista, q, NA_RODZAJ) as Wiersz[]) {
     const dyskusja = String(w.typ) === "DISPUTE";
     const dl = String(w.dlaczego) === "zamówienie" ? String(dlaczegoNumeru(String(w.order_id))) : String(w.dlaczego);
     dodaj({
