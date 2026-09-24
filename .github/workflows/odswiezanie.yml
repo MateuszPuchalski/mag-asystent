@@ -63,6 +63,16 @@ jobs:
             exit 0
           fi
 
+          # Od @wydanie za każdym scaleniem idzie, minutę później, commit
+          # wydania (`wydanie.yml`). Odświeżenie PO scaleniu, a PRZED wydaniem
+          # kosztowałoby każdy PR drugi pełny przebieg CI. Czekamy więc, aż
+          # fragmenty zmian na `main` znikną — push wydania uruchomi nas znowu.
+          oczekujace=$(gh api "repos/$GITHUB_REPOSITORY/contents/zmiany?ref=main" \
+            --jq '[.[] | select(.name | endswith(".md")) | select(.name != "README.md")] | length' 2>/dev/null || echo 0)
+          if [ "${oczekujace:-0}" != "0" ]; then
+            echo "Na main czeka $oczekujace fragment(ów) zmian — odświeżę po commicie wydania."; exit 0
+          fi
+
           # Kandydaci: otwarte, nie draft, z auto-scalaniem, do `main`,
           # bez czerwonego checka. Najstarsze pierwsze — to jest kolejka.
           gh pr list --repo "$GITHUB_REPOSITORY" --state open --base main --limit 100 \

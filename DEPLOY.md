@@ -124,10 +124,12 @@ niejednoznaczna i dawała bramkę słabszą, niż wygląda. Zmieniając nazwę z
 w workflow, zmień ją też w `main.json` — inaczej reguła będzie czekać na check,
 którego nikt nie zgłasza, i zablokuje scalanie na zawsze.
 
-**`bypass_actors` jest puste**, więc reguła obowiązuje wszystkich łącznie
-z właścicielem: bezpośredni push na `main` przestaje przechodzić. Jeśli chcesz
-zostawić sobie wyjście awaryjne, dopisz siebie jako obchodzącego regułę
-w interfejsie po imporcie.
+**`bypass_actors` ma jedną pozycję: klucz wdrożeniowy** (od @wydanie). Tym
+kluczem `wydanie.yml` wypycha commit wydania — patrz §0c. Reguła obowiązuje
+wszystkich ludzi łącznie z właścicielem, więc bezpośredni push na `main` nie
+przechodzi. Nie dopisuj tu siebie „na wszelki wypadek". Scalenie z czerwonym
+albo niedokończonym CI trafia odtąd samo do magazynu (§0b), więc obejście
+reguły obchodzi też tę bramkę.
 
 Punkt 2 działa dopiero od 0.194.0. Wcześniej workflow'y miały filtry `paths:`
 na wyzwalaczu, więc check, który się nie uruchomił, zostawał w wiecznym
@@ -142,6 +144,47 @@ bez żadnego konfliktu. Konflikt nie jest miarą ryzyka.
 
 **Jak zatrzymać pojedynczy PR.** Wyłącz na nim auto-scalanie przyciskiem
 w interfejsie GitHuba. Draft nie jest scalany w ogóle.
+
+## 0c. Numer wydania nadaje automat (@wydanie)
+
+**PR nie zmienia numeru wersji ani nie dopisuje wpisu w `CHANGELOG.md`.**
+Opisuje zmianę w pliku `zmiany/<nazwa>.md` — wzór stoi w `zmiany/README.md`.
+Po scaleniu `wydanie.yml` podbija wersję, składa wpis, kasuje fragmenty
+i wypycha commit „<wersja> — <tytuł>" z tagiem. Ten commit uruchamia
+`android.yml` i `paczka.yml`, które publikują wydanie.
+
+Powód jest w liczbach. Każdy PR zmieniał cztery te same miejsca: dwa pliki
+`package.json`, lockfile i szczyt `CHANGELOG.md`. Dwa otwarte PR-y
+konfliktowały więc zawsze, a numery zderzały się mimo `co_w_toku.sh`. Fragmenty
+mają różne nazwy plików i nie konfliktują ze sobą.
+
+**Wymaga klucza wdrożeniowego, zakładanego raz:**
+
+1. Na dowolnym komputerze: `ssh-keygen -t ed25519 -N "" -C wertis-wydanie -f wertis-wydanie`.
+2. Repozytorium → Settings → **Deploy keys → Add deploy key**. Tytuł
+   `wydanie`, treść pliku `wertis-wydanie.pub`, zaznacz **Allow write access**.
+3. Settings → Secrets and variables → Actions → **New repository secret**,
+   nazwa `WYDANIE_KLUCZ`, treść pliku `wertis-wydanie` (bez `.pub`).
+4. Zaimportuj ponownie `.github/rulesets/main.json` — dopisuje klucz
+   wdrożeniowy jako jedyny wyjątek od reguły `main`.
+5. Skasuj oba pliki klucza z komputera.
+
+> **Dlaczego klucz, a nie token workflowu.** Reguła `main` wymaga zielonych
+> checków także przy bezpośrednim pushu, a commit wydania powstaje po nich.
+> Push tokenem workflowu nie uruchamia też innych workflowów, a commit wydania
+> musi uruchomić publikację.
+
+Bez sekretu `wydanie.yml` kończy się na czerwono przy pierwszym scaleniu
+z fragmentem. Scalona zmiana nie dostaje wtedy numeru ani wydania. Po dodaniu
+sekretu uruchom workflow „Wydanie" ręcznie (Actions → Wydanie → Run workflow).
+
+**Znacznik w komentarzach.** Autor PR-a nie zna numeru swojego wydania. Pisze
+więc w komentarzach i dokumentach znacznik (`@` i `wydanie`, razem), a automat
+podmienia go na numer. Pomija pliki, które znacznik opisują dosłownie:
+`CLAUDE.md`, `zmiany/README.md` i sam `tools/wydanie.mjs` z testem.
+
+**PR z samym CI albo dokumentacją nie potrzebuje fragmentu.** Nie dostaje
+wtedy wydania; jego zmiana wejdzie z najbliższym wydaniem, które je ma.
 
 ## 0b. Aktualizacja z panelu i z paczki (0.492.0)
 
@@ -186,6 +229,39 @@ Zdrowie pokazuje porażkę przez dobę. Dziennik przebiegu:
 > **Dlaczego dane poza katalogiem aplikacji.** Podmiana całego katalogu jest
 > jedną operacją i cofa się jedną operacją. Dane w środku trzeba by przenosić
 > przy każdej aktualizacji, a przerwane przenoszenie bazy to najgorszy stan.
+
+### Aktualizacja automatyczna (@wydanie)
+
+Serwer sam klika przycisk z tej karty, przez to samo zadanie Harmonogramu.
+Karta pokazuje w jednym zdaniu, co automat zrobi i dlaczego jeszcze nie.
+Tryb ustawia klucz `AKTUALIZACJA_AUTO` w karcie konfiguracji:
+
+| tryb | kiedy wgrywa | domyślny dla |
+|---|---|---|
+| `noc` | w oknie `AKTUALIZACJA_OKNO` (domyślnie 3–5), po dziesięciu minutach bez zapisu | produkcji |
+| `zaraz` | przy najbliższym takcie, co pięć minut | instancji dev |
+| `wylaczona` | nigdy — zostaje przycisk | — |
+
+Automat NIE wgrywa wydania, gdy zachodzi którykolwiek z tych warunków:
+
+- **wpis ma „[wymaga działania]"**, także pośredni — staje na wydaniu przed nim;
+- **wydanie ma mniej niż `AKTUALIZACJA_DOJRZALOSC_H` godzin** (produkcja 6, dev 0);
+- **ta wersja już raz się nie udała** i została wycofana;
+- **CHANGELOG się nie wczytał**, więc nie wiadomo, czy coś wymaga działania;
+- **kanarek nie pracuje jeszcze na tej wersji**, gdy ustawiono
+  `AKTUALIZACJA_KANAREK` (adres instancji dev, np. `http://localhost:3002`).
+
+**Kanarek.** Dev w trybie `zaraz` dostaje każde wydanie od razu. Produkcja
+z ustawionym kanarkiem wgra najwyżej wersję, na której dev pracuje i odpowiada.
+Wydanie, które położyło dev, nie dojdzie więc do produkcji.
+
+**Wycofanie wydania z obiegu.** Na GitHubie: Releases → wydanie → Edit →
+zaznacz **Set as a pre-release**. Znika z przycisku i z automatu przy
+najbliższym sprawdzeniu, najpóźniej po godzinie.
+
+„Ruch" to zapis z sesją, nie dowolne żądanie. Panel zostawiony otwarty na
+biurku odpytuje kolejki całą noc i przy liczeniu odczytów okno nie
+otworzyłoby się nigdy.
 
 Instalacja z Gitem działa dalej po staremu, przez samo `-Aktualizuj`. Po
 pierwszej aktualizacji z paczki Gita w katalogu nie ma i instalator to mówi.

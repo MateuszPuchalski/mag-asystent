@@ -44,6 +44,23 @@ function Ostatnia({ s }: { s: StanAktualizacji }) {
   </p>;
 }
 
+/* Jedno zdanie o automacie: w jakim trybie jest i co zrobi. To samo zdanie
+   kieruje taktem na serwerze, więc panel nie zgaduje. Zmiana trybu idzie
+   przez kartę konfiguracji obok — nie ma tu drugiego miejsca na tę decyzję. */
+const TRYB: Record<string, string> = {
+  noc: "w nocy", zaraz: "od razu (dev)", wylaczona: "wyłączona",
+};
+
+function Automat({ a }: { a: NonNullable<StanAktualizacji["auto"]> }) {
+  const szczegoly = a.tryb === "noc"
+    ? ` ${a.okno.od}:00–${a.okno.do}:00, wydanie starsze niż ${a.dojrzaloscGodz} h${a.kanarek ? ", po kanarku" : ""}`
+    : "";
+  return <p className="mb-3 text-sm">
+    <b>Automatycznie:</b> {TRYB[a.tryb] ?? a.tryb}{szczegoly}. {a.powod}
+    {" "}<span className="text-slate-600">Tryb zmienisz w konfiguracji (AKTUALIZACJA_AUTO).</span>
+  </p>;
+}
+
 function Zmiany({ zmiany }: { zmiany: SekcjaZmian[] }) {
   if (!zmiany.length) return null;
   return <div className="mb-3 max-h-80 overflow-y-auto rounded border">
@@ -90,6 +107,7 @@ export function Aktualizacja({ admin }: { admin: boolean }) {
         Odśwież panel</Przycisk>
     </p>}
     {s && <Ostatnia s={s} />}
+    {s?.auto && <Automat a={s.auto} />}
     {trwa && <p className="mb-3 text-sm font-bold">Aktualizacja trwa. Karta sprawdza postęp co pięć sekund;
       przez chwilę serwer nie odpowiada i to jest w porządku.</p>}
     {s?.bladSprawdzenia && <p className="mb-3 text-sm text-ranga-zle">

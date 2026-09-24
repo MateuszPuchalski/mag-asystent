@@ -1,0 +1,77 @@
+# Wydanie po scaleniu: numer, wpis w CHANGELOG-u, commit i tag na `main`.
+#
+# Numer nadaje ten workflow, nie autor PR-a (`tools/wydanie.mjs`, nagłówek).
+# PR dokłada `zmiany/<nazwa>.md`; po scaleniu ten workflow podbija wersję,
+# składa wpis, kasuje fragmenty i wypycha commit „<wersja> — <tytuł>".
+# Commit bez fragmentów (na przykład sam commit wydania) kończy się tutaj
+# bez pracy — dlatego drugi przebieg, uruchomiony własnym pushem, nic nie robi.
+#
+# KLUCZ WDROŻENIOWY, nie `github.token`, z dwóch powodów:
+# 1. reguła `main` wymaga zielonych checków także przy pushu, a commit wydania
+#    powstaje po nich; klucz jest jedynym wyjątkiem w `.github/rulesets/main.json`;
+# 2. push tokenem Actions nie uruchamia innych workflowów, a commit wydania
+#    MUSI uruchomić `android.yml` i `paczka.yml` — to one publikują wydanie.
+# Konfiguracja klucza: DEPLOY §0a.
+name: Wydanie
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Jedno wydanie naraz i bez przerywania: drugi przebieg czeka i widzi już
+# commit pierwszego, więc nie nada tego samego numeru.
+concurrency:
+  group: wydanie
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  wydanie:
+    name: Wydanie
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          ssh-key: ${{ secrets.WYDANIE_KLUCZ }}
+      - name: Numer, wpis i commit
+        env:
+          MA_KLUCZ: ${{ secrets.WYDANIE_KLUCZ != '' }}
+        run: |
+          set -euo pipefail
+          if ! ls zmiany/*.md 2>/dev/null | grep -qv '/README\.md$'; then
+            echo "Brak fragmentów w zmiany/ — nie ma czego wydawać."; exit 0
+          fi
+          # Fragmenty są, a klucza nie ma: czerwono, bo scalona zmiana nie
+          # dostanie numeru i nie trafi do magazynu. Cisza byłaby gorsza.
+          if [ "$MA_KLUCZ" != "true" ]; then
+            echo "::error::Brak sekretu WYDANIE_KLUCZ — wydanie nie powstało. Konfiguracja: DEPLOY §0a."
+            exit 1
+          fi
+          git config user.name "wertis-wydanie"
+          git config user.email "wertis-wydanie@users.noreply.github.com"
+          # Ktoś mógł scalić coś w trakcie: wtedy od nowa na świeżym `main`.
+          for proba in 1 2 3; do
+            git fetch -q origin main
+            git reset -q --hard origin/main
+            node tools/wydanie.mjs zastosuj --json > "$RUNNER_TEMP/wydanie.json"
+            if [ "$(cat "$RUNNER_TEMP/wydanie.json")" = "null" ]; then
+              echo "Fragmenty zniknęły w międzyczasie — wydał je poprzedni przebieg."; exit 0
+            fi
+            wersja=$(node -p "require('$RUNNER_TEMP/wydanie.json').wersja")
+            tytul=$(node -p "require('$RUNNER_TEMP/wydanie.json').tytul")
+            git add -A
+            git commit -q -m "$wersja — $tytul"
+            # Tag razem z commitem: `android.yml` i `paczka.yml` publikują wydanie
+            # pod tagiem, który wskazuje TEN commit, i pod żadnym innym.
+            git tag "v$wersja"
+            if git push -q --atomic origin HEAD:main "refs/tags/v$wersja"; then
+              echo "Wydanie $wersja na main: $tytul"; exit 0
+            fi
+            git tag -d "v$wersja" >/dev/null
+            echo "Push odrzucony (main się ruszył) — próba $proba z 3."
+          done
+          echo "::error::Trzy próby wypchnięcia wydania nieudane."; exit 1

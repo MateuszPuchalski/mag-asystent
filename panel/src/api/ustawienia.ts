@@ -207,6 +207,16 @@ export interface StanAktualizacji {
   czekaZlecenie: boolean;
   /** `null` = wolno zlecić; inaczej zdanie, dlaczego nie. */
   blokada: string | null;
+  /** Decyzja automatu (@wydanie) — `services/aktualizacja-auto.ts`. */
+  auto?: {
+    tryb: "noc" | "zaraz" | "wylaczona";
+    okno: { od: number; do: number };
+    dojrzaloscGodz: number;
+    kanarek: string | null;
+    kandydat: string | null;
+    teraz: boolean;
+    powod: string;
+  };
 }
 
 /** W trakcie aktualizacji serwer znika na minutę albo dwie — pytamy co pięć

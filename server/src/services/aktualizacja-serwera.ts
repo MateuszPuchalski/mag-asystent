@@ -67,10 +67,14 @@ const WZOR_WERSJI = /^\d{1,4}\.\d{1,5}\.\d{1,6}$/;
 
 /** Wydania GitHuba → wersje wyższe niż bieżąca, od najnowszej. */
 export function wydaniaNowsze(
-  surowe: Array<{ tag_name?: string; published_at?: string | null; assets?: Array<{ name?: string }> }>,
+  surowe: Array<{ tag_name?: string; published_at?: string | null; assets?: Array<{ name?: string }>;
+    prerelease?: boolean; draft?: boolean }>,
   obecna: string,
 ): Wydanie[] {
   return surowe
+    /* Wydanie oznaczone na GitHubie jako „pre-release" jest WYCOFANE (@wydanie):
+       jedno kliknięcie zdejmuje zepsutą wersję z przycisku i z automatu. */
+    .filter((r) => !r.prerelease && !r.draft)
     .map((r) => {
       const wersja = (r.tag_name ?? "").replace(/^v/, "");
       const nazwy = new Set((r.assets ?? []).map((a) => a.name));
@@ -107,14 +111,20 @@ export function sekcjeZmian(changelog: string, obecna: string, doWersji: string)
    karty jej nie odświeża: patrzenie ma nie wychodzić do sieci za każdym
    razem, a lista wydań zmienia się co kilkadziesiąt minut. */
 
-interface Pamiec {
+export interface Pamiec {
   sprawdzono: string | null;
   wydania: Wydanie[];
   zmiany: SekcjaZmian[];
+  /** Czy CHANGELOG przeczytano. Bez niego automat nie wie o „[wymaga działania]". */
+  zmianyZnane: boolean;
   blad: string | null;
 }
 
-let pamiec: Pamiec = { sprawdzono: null, wydania: [], zmiany: [], blad: null };
+const PUSTA: Pamiec = { sprawdzono: null, wydania: [], zmiany: [], zmianyZnane: false, blad: null };
+let pamiec: Pamiec = { ...PUSTA };
+
+/** Odczyt dla automatu (`aktualizacja-auto.ts`) — kopia, nie uchwyt. */
+export const pamiecWydan = (): Pamiec => ({ ...pamiec });
 
 export type Pobieracz = (url: string) => Promise<{ ok: boolean; status: number; text: () => Promise<string> }>;
 
@@ -132,14 +142,16 @@ export async function sprawdzWydania(
     if (!r.ok) throw new Error(`GitHub odpowiedział ${r.status}`);
     const wydania = wydaniaNowsze(JSON.parse(await r.text()), obecna);
     let zmiany: SekcjaZmian[] = [];
+    let zmianyZnane = true;
     const najnowsza = wydania[0];
     if (najnowsza) {
       /* CHANGELOG z tagu NAJNOWSZEJ wersji: zawiera wpisy wszystkich
          pośrednich, a paczka CHANGELOG-u nie niesie. */
       const c = await pobierz(`https://raw.githubusercontent.com/${REPO_WYDAN}/v${najnowsza.wersja}/CHANGELOG.md`);
+      zmianyZnane = c.ok;
       if (c.ok) zmiany = sekcjeZmian(await c.text(), obecna, najnowsza.wersja);
     }
-    pamiec = { sprawdzono: teraz, wydania, zmiany, blad: null };
+    pamiec = { sprawdzono: teraz, wydania, zmiany, zmianyZnane, blad: null };
   } catch (e) {
     /* Stara lista zostaje: chwilowy brak sieci nie ma kasować tego, co już
        wiadomo, a zdanie o błędzie stoi obok niej. */
@@ -149,7 +161,7 @@ export async function sprawdzWydania(
 
 /** Tylko do testów: stan pamięci wydań od zera. */
 export function _wyczyscPamiec(): void {
-  pamiec = { sprawdzono: null, wydania: [], zmiany: [], blad: null };
+  pamiec = { ...PUSTA };
 }
 
 /* ── Zadanie Harmonogramu ─────────────────────────────────────────────────
@@ -159,6 +171,9 @@ export function _wyczyscPamiec(): void {
 
 export type Uruchamiacz = (nazwaZadania: string) => Promise<void>;
 let uruchamiacz: Uruchamiacz | null = null;
+
+/** Czy ten proces umie uruchomić zadanie (pod NSSM, patrz `main()`). */
+export const maUruchamiacz = (): boolean => uruchamiacz !== null;
 
 export function ustawUruchamiacz(fn: Uruchamiacz | null): void {
   uruchamiacz = fn;

@@ -62,6 +62,8 @@ const AKTUALIZACJA_WZOR = {
   ostatnia: { etap: "gotowe", wersja: "0.492.0", kto: "Anna", od: "2026-09-24T07:00:00.000Z", do: "2026-09-24T07:03:00.000Z" },
   czekaZlecenie: false,
   blokada: null,
+  auto: { tryb: "noc", okno: { od: 3, do: 5 }, dojrzaloscGodz: 6, kanarek: null,
+    kandydat: "0.493.0", teraz: false, powod: "Wydanie 0.494.0 wymaga działania — zaktualizuj przyciskiem po przeczytaniu." },
 };
 let rola = "admin";
 let firmaNaSerwerze: { dane: Record<string, string>; zmieniono: { at: string; przez: string } | null };
@@ -272,6 +274,15 @@ describe("Ustawienia w panelu", () => {
     expect(within(k).queryByLabelText(/co wymaga działania/)).toBeNull();
     await userEvent.type(within(k).getByLabelText("Twoje hasło"), "tajne");
     expect(within(k).getByRole("button", { name: "Zaktualizuj do 0.493.0" })).toBeEnabled();
+  });
+
+  it("automat: tryb, okno i zdanie serwera, bez żadnego zapisu", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    const linia = (await within(k).findByText(/Automatycznie:/)).closest("p") as HTMLElement;
+    expect(linia.textContent).toMatch(/w nocy 3:00–5:00, wydanie starsze niż 6 h\./);
+    expect(linia.textContent).toMatch(/0\.494\.0 wymaga działania/);
+    expect(wyslane).toEqual([]);
   });
 
   it("sprawdź teraz: POST bez ciała i bez typu treści", async () => {

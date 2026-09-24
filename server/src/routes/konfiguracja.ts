@@ -6,6 +6,7 @@ import { autoryzuj, potwierdzHaslo } from "../services/auth.js";
 import {
   BladZlecenia, sprawdzWydania, stanAktualizacji, zlecAktualizacje,
 } from "../services/aktualizacja-serwera.js";
+import { decyzjaTeraz, ustawieniaAuto } from "../services/aktualizacja-auto.js";
 import { WERSJA } from "../wersja.js";
 import { logEvent } from "../services/events.js";
 import { BladZmiany, zmienKlucz } from "../services/konfiguracja-zapis.js";
@@ -20,6 +21,14 @@ import { zaplanujRestart } from "../services/restart.js";
    BEZ `autoryzuj()`, choć to operacja admina. `autoryzuj` zapisuje wpis
    `privileged` do dziennika, a to jest zapis przy samym patrzeniu — reguła
    zero zapisu przy otwarciu ekranu obowiązuje także karty ustawień. */
+
+/* Stan z decyzją automatu (@wydanie): panel pokazuje to samo zdanie, którym
+   kieruje się takt. `decyzjaTeraz` nie pobiera niczego i niczego nie zleca. */
+function zAutomatem() {
+  const u = ustawieniaAuto();
+  return { ...stanAktualizacji(), auto: { tryb: u.tryb, okno: u.okno, dojrzaloscGodz: u.dojrzaloscGodz,
+    kanarek: u.kanarek || null, ...decyzjaTeraz() } };
+}
 
 export async function konfiguracjaRoutes(app: FastifyInstance) {
   app.get("/api/biuro/konfiguracja", async (_req, reply) => {
@@ -78,7 +87,7 @@ export async function konfiguracjaRoutes(app: FastifyInstance) {
   app.get("/api/biuro/aktualizacja", async (_req, reply) => {
     const o = tylkoAdmin();
     if (o) return reply.code(o.kod).send({ error: o.error });
-    return stanAktualizacji();
+    return zAutomatem();
   });
 
   /* Bez ciała — reguła klienta HTTP z CLAUDE.md. Zapisu w bazie nie ma, więc
@@ -87,7 +96,7 @@ export async function konfiguracjaRoutes(app: FastifyInstance) {
     const o = tylkoAdmin();
     if (o) return reply.code(o.kod).send({ error: o.error });
     await sprawdzWydania();
-    return stanAktualizacji();
+    return zAutomatem();
   });
 
   /* Zlecenie: rola, ślad `privileged`, ponowne hasło — w tej kolejności.
