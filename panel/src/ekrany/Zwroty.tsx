@@ -1135,7 +1135,10 @@ export function Zwroty() {
                   listę od nowa. Bez tego zostawał w niej stan poprzedniego —
                   zaznaczenie pozycji i haczyk przy koszcie dostawy — a zapis
                   kwoty szedł z cudzymi identyfikatorami. */}
-              <Pozycje key={zwrot.id} zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
+              {/* KLUCZ Z PRZEDROSTKIEM (0.484.4). `Wiadomosc` niżej też kluczy
+                  się zwrotem, a dwa rodzeństwa z jednym kluczem React myli:
+                  po skanie kolejnego zwrotu zostawała lista poprzedniego. */}
+              <Pozycje key={`pozycje-${zwrot.id}`} zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
                 akcje={akcje} onWszystkieNaStan={() => void wszystkieNaStan().catch(() => {})}
                 trwaRabat={rabat.isPending} bladRabatu={bladRabatu}
                 onOcena={(pozycjaId, ocena, koszId) =>
@@ -1181,7 +1184,7 @@ export function Zwroty() {
                 <DolozTowar />}
               {/* Gotowa wiadomość do klienta (0.476.0) — `key`, bo edytowana
                   treść jednego zwrotu nie ma prawa przejść na następny. */}
-              <Wiadomosc key={zwrot.id} zwrot={zwrot} />
+              <Wiadomosc key={`wiadomosc-${zwrot.id}`} zwrot={zwrot} />
             </div>
           </>}
     </Karta>

@@ -34,6 +34,22 @@ historii nie przepisujemy.
 ---
 
 
+## 0.484.4 — 24 września 2026
+
+**Po skanie kolejnego zwrotu nie zostają pozycje poprzedniego.** Zgłoszenie
+właściciela: na nowym zwrocie wisiał gaźnik z poprzedniej paczki, razem z jej
+sumą. Lista pozycji i gotowa wiadomość stały obok siebie z tym samym kluczem
+`key={zwrot.id}`, od 0.476.0. React przy zdublowanym kluczu potrafi zostawić
+stary element w drzewie i tu go zostawiał.
+
+Klucze mają teraz przedrostki. Test ekranu przechodzi klawiszem `j` do
+następnego zwrotu i sprawdza, że pozycji poprzedniego nie ma. Pilnuje też,
+żeby React nie zgłosił zdublowanego klucza.
+
+**Sprawdź przy aktualizacji:** klik w pozostałą pozycję działał na POPRZEDNI
+zwrot, bo niesie jego identyfikatory. Oceny albo kwoty z takiego ekranu widać
+na osi tamtego zwrotu, z nazwą towaru.
+
 ## 0.484.3 — 24 września 2026
 
 **Szukanie w koszach po słowach.** Zakładka Kosze szukała całą frazą w jednym
