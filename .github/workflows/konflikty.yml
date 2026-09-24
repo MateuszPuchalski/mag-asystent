@@ -7,9 +7,9 @@
 # `CREATE TABLE IF NOT EXISTS` wygrywa definicja wcześniejsza. Konflikt nie
 # jest miarą ryzyka — jego brak bywa groźniejszy.
 #
-# Ten workflow tylko CZYTA i ETYKIETUJE. Niczego nie wypycha do gałęzi:
-# odświeżanie gałęzi robi GitHub w ramach auto-scalania, gdy w regule ochrony
-# `main` włączone jest „Require branches to be up to date before merging".
+# Ten workflow tylko CZYTA i ETYKIETUJE. Niczego nie wypycha do gałęzi.
+# Odświeżanie gałęzi bez konfliktu robi `odswiezanie.yml` (0.491.1) —
+# GitHub sam tego nie robi, choć do tamtego wydania stało tu, że tak.
 name: Konflikty
 
 on:

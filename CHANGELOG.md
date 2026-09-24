@@ -34,6 +34,24 @@ historii nie przepisujemy.
 ---
 
 
+## 0.491.1 — 24 września 2026
+
+**Szybsza droga od PR-a do scalenia.** Dwie zmiany w CI, obie bez wpływu na
+serwer w magazynie.
+
+- **Testy panelu w osobnym, równoległym zadaniu `Panel`.** Check `Serwer`
+  trwał 4 min 40 s, bo testy serwera i panelu szły jedne po drugich. Teraz
+  każde zadanie trwa około dwóch i pół minuty, a oba biegną naraz.
+- **Gałęzie czekające na scalenie odświeżają się same** (`odswiezanie.yml`).
+  Reguła `main` wymaga gałęzi świeżej, a GitHub sam jej nie odświeża — DEPLOY
+  §0a twierdził dotąd inaczej. Po każdym scaleniu workflow odświeża dwa
+  najstarsze PR-y z auto-scalaniem, które zostały w tyle.
+
+**[wymaga działania w ustawieniach repozytorium]** Zaimportuj ponownie
+`.github/rulesets/main.json`, żeby `Panel` stał się wymaganym checkiem. Załóż
+sekret `ODSWIEZANIE_TOKEN` według DEPLOY §0a — bez niego odświeżanie tylko
+ostrzega.
+
 ## 0.491.0 — 24 września 2026
 
 **Ustawienia właściciela zmienia się z panelu.** Dotąd każda zmiana to był

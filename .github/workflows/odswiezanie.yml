@@ -1,0 +1,97 @@
+# Odświeżanie gałęzi czekających na scalenie (0.491.1).
+#
+# Reguła `main` wymaga gałęzi świeżej względem `main`
+# (`strict_required_status_checks_policy` w `.github/rulesets/main.json`).
+# Auto-scalanie GitHuba na to CZEKA, ale gałęzi SAMO NIE ODŚWIEŻA. Do tego
+# wydania DEPLOY §0a twierdził inaczej. Skutek był ten: każde scalenie
+# zostawiało pozostałe PR-y za `main`, a te stały do chwili, aż ktoś kliknął
+# „Update branch". Przy trzydziestu gałęziach i kilkudziesięciu wersjach dziennie
+# to była kolejka ręcznej roboty i główny hamulec wydań.
+#
+# Właściwym narzędziem jest kolejka scaleń (merge queue) GitHuba. Ta jest jednak
+# dostępna wyłącznie dla repozytoriów organizacji, a to repozytorium należy do
+# konta prywatnego. Ten workflow jest jej zastępnikiem: po każdym scaleniu
+# odświeża DWA najstarsze PR-y z włączonym auto-scalaniem, które zostały w tyle.
+#
+# DLACZEGO DWA, a nie wszystkie. Odświeżenie wszystkich puściłoby CI na każdej
+# gałęzi naraz; scaliłaby się jedna, a reszta znowu byłaby w tyle — minuty
+# runnera za nic. Dwa dają kolejkę z jednym zapasem: gdy pierwszy PR padnie na
+# testach, drugi już biegnie.
+#
+# Pomijane są drafty, gałęzie w konflikcie (tymi zajmuje się `konflikty.yml`)
+# i PR-y z czerwonym CI. Odświeżanie czerwonego PR-a to minuty bez szansy na
+# scalenie, a jako najstarszy blokowałby kolejkę na zawsze.
+#
+# WYMAGA SEKRETU `ODSWIEZANIE_TOKEN` (DEPLOY §0a). Push zrobiony tokenem
+# workflowu (`github.token`) NIE uruchamia innych workflowów — to zabezpieczenie
+# GitHuba przed pętlami. Gałąź odświeżona takim tokenem nie dostałaby CI,
+# wymagane checki nigdy by nie przyszły i auto-scalanie stałoby wiecznie.
+# Bez sekretu krok mówi to w ostrzeżeniu i nic nie robi.
+name: Odświeżanie gałęzi
+
+on:
+  push:
+    branches: [main]
+  # Zapas na PR, który włączył auto-scalanie już PO ostatnim scaleniu — bez
+  # tego czekałby na następny push do `main`, a tego bywa kilka godzin.
+  schedule:
+    - cron: "*/20 * * * *"
+  workflow_dispatch:
+
+# Jeden przebieg naraz: dwa scalenia w tej samej minucie odświeżałyby te same
+# gałęzie dwa razy.
+concurrency:
+  group: odswiezanie-galezi
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  odswiez:
+    name: Odświeżanie gałęzi
+    runs-on: ubuntu-latest
+    steps:
+      - name: Odśwież najstarsze PR-y z auto-scalaniem
+        env:
+          GH_TOKEN: ${{ secrets.ODSWIEZANIE_TOKEN }}
+          ILE: "2"
+        run: |
+          set -euo pipefail
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::Brak sekretu ODSWIEZANIE_TOKEN — gałęzie nie są odświeżane (DEPLOY §0a)."
+            exit 0
+          fi
+
+          # Kandydaci: otwarte, nie draft, z auto-scalaniem, do `main`,
+          # bez czerwonego checka. Najstarsze pierwsze — to jest kolejka.
+          gh pr list --repo "$GITHUB_REPOSITORY" --state open --base main --limit 100 \
+            --json number,isDraft,autoMergeRequest,headRefOid,createdAt,mergeable,statusCheckRollup \
+            --jq '[.[]
+                   | select(.isDraft | not)
+                   | select(.autoMergeRequest != null)
+                   | select(.mergeable != "CONFLICTING")
+                   | select([.statusCheckRollup[]? | (.conclusion // .state)]
+                            | any(. == "FAILURE" or . == "ERROR" or . == "TIMED_OUT") | not)]
+                  | sort_by(.createdAt) | .[] | "\(.number) \(.headRefOid)"' > /tmp/kandydaci.txt
+
+          odswiezone=0
+          while read -r numer sha; do
+            [ "$odswiezone" -ge "$ILE" ] && break
+            # „W tyle" liczymy porównaniem, nie polem `mergeStateStatus`:
+            # tamto GitHub liczy leniwie i zaraz po scaleniu bywa UNKNOWN.
+            w_tyle=$(gh api "repos/$GITHUB_REPOSITORY/compare/$sha...main" --jq '.ahead_by')
+            if [ "$w_tyle" = "0" ]; then
+              continue
+            fi
+            if gh api -X PUT "repos/$GITHUB_REPOSITORY/pulls/$numer/update-branch" \
+                 -f expected_head_sha="$sha" >/dev/null 2>/tmp/blad.txt; then
+              echo "Odświeżono #$numer ($w_tyle commitów za main)."
+              odswiezone=$((odswiezone + 1))
+            else
+              # 422 = konflikt albo ktoś właśnie wypchnął; oba rozstrzyga się
+              # gdzie indziej, więc idziemy do następnego.
+              echo "::notice::#$numer nie dał się odświeżyć: $(cat /tmp/blad.txt)"
+            fi
+          done < /tmp/kandydaci.txt
+          echo "Odświeżonych gałęzi: $odswiezone."
