@@ -11,6 +11,7 @@ import {
   cofnijNotatkeDyskusji, stempelProwadziDyskusje, zapiszNotatkeDyskusji,
 } from "../services/dyskusje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
+import { odswiezSprawe } from "../services/allegro-reklamacje-sync.js";
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
 import { poprosOZakonczenie } from "../services/dyskusja-zakonczenie.js";
 import { autoryzuj } from "../services/auth.js";
@@ -124,6 +125,46 @@ export async function dyskusjeRoutes(app: FastifyInstance) {
       try {
         return await sprawdzPrzesylke(db(), w.id);
       } catch (e) {
+        return reply.code(502).send({ error: (e as Error).message });
+      }
+    });
+
+  /* ── ODŚWIEŻENIE JEDNEJ DYSKUSJI (24 września 2026) ─────────────────────────
+     Zgłoszenie właściciela: „dyskusje zostały w tyle”. Ekran reklamacji od
+     0.410.0 odświeża sprawę przy wejściu, a dyskusja nie miała NICZEGO — ani
+     tego, ani przycisku, ani synchronizacji na własnym ekranie. Przebieg
+     czyta najwyżej tysiąc spraw z jednej listy, więc starszych dyskusji nie
+     odświeżał nigdy. Właściciel wybrał wprost oba: wejście i przycisk.
+
+     Wejście w sprawę rozszerza JEDYNY wyjątek od „zero zapisu przy
+     patrzeniu” z reklamacji na dyskusje. To decyzja właściciela z 24 września,
+     z tym samym powodem co w 0.410.0. Otwarcie SAMEGO ekranu nadal nie
+     mutuje niczego; pilnuje tego `ekrany/Dyskusje.test.tsx`.
+
+     Osobna trasa, nie trasa reklamacji, z dwóch powodów. Zdarzenie w dzienniku
+     ma mówić, z którego ekranu padło kliknięcie (§25c.9). Warunek `typ` nie
+     pozwala tą drogą odświeżyć reklamacji, a 404 mówi „dyskusji”. */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/dyskusje/:id/odswiez", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      /* Istnienie PRZED parowaniem: numer reklamacji ma dostać „nie ma takiej
+         dyskusji”, a nie radę, żeby sparować konto. */
+      const id = Number(req.params.id);
+      const jest = db().prepare(
+        "SELECT 1 FROM reklamacja_klienta WHERE id = ? AND typ = 'DISPUTE'").get(id);
+      if (!jest) return reply.code(404).send({ error: "Nie znaleziono dyskusji" });
+      if (!config.allegro.clientId) {
+        return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+      }
+      try {
+        if (!await odswiezSprawe(id)) {
+          return reply.code(404).send({ error: "Nie znaleziono dyskusji" });
+        }
+        logEvent("dyskusja_odswiezenie", autor(), null, { id });
+        return szczegolDyskusji(db(), id);
+      } catch (e) {
+        /* Zdanie z adaptera mówi, co naprawić — token, uprawnienie, limit. */
         return reply.code(502).send({ error: (e as Error).message });
       }
     });

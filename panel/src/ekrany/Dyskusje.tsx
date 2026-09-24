@@ -1,11 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { MessagesSquare } from "lucide-react";
+import { MessagesSquare, RefreshCw } from "lucide-react";
 import {
-  useDyskusja, useDyskusje, useNotatkaDyskusji, useOdpowiedzWDyskusji,
+  useDyskusja, useDyskusje, useNotatkaDyskusji, useOdpowiedzWDyskusji, useOdswiezDyskusje,
   useProwadzeDyskusje, useSprawdzPrzesylkeDyskusji, useZakoncz, useCofnijNotatkeDyskusji
 } from "../api/dyskusje";
 import { useJa } from "../api/rozmowy";
+import {
+  useDodajZalacznikSprawy, useUsunZalacznikSprawy, useZalacznikiSprawy,
+} from "../api/reklamacje";
+import { naBase64 } from "../api/plik";
 import { Konflikt } from "../api/klient";
 import type {
   Dyskusja, KubelekDyskusji, SzczegolyWysylki, WiadomoscReklamacji,
@@ -14,7 +18,7 @@ import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { Edytor } from "../reklamacje/Edytor";
 import { Czat } from "../reklamacje/Czat";
 import { useSzkicSprawy } from "../sprawy/useSzkicSprawy";
-import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
@@ -107,6 +111,16 @@ export function Dyskusje() {
   const notatka = useNotatkaDyskusji();
   const odpowiedz = useOdpowiedzWDyskusji();
   const zakoncz = useZakoncz();
+  const odswiez = useOdswiezDyskusje();
+  /* ── ZAŁĄCZNIKI W ODPOWIEDZI (0.486.0) ──────────────────────────────────
+     Do tego wydania §25c.7 mówiło „załączników wychodzących nie ma”, bez
+     powodu. Specyfikacja przyjmuje załącznik w wiadomości sprawy dowolnego
+     rodzaju, a serwer wysyłał je już tą samą maszynerią. Brakowało ekranu.
+     Trasy są wspólne z reklamacjami, jak przy załącznikach przychodzących. */
+  const dodajZalacznik = useDodajZalacznikSprawy();
+  const usunZalacznik = useUsunZalacznikSprawy();
+  const [bladZalacznika, setBladZalacznika] = useState("");
+  const [bladOdswiezenia, setBladOdswiezenia] = useState("");
   const trwa = prowadze.isPending || notatka.isPending;
 
   const [bladWysylki, setBladWysylki] = useState("");
@@ -165,6 +179,7 @@ export function Dyskusje() {
   const { tresc, ustaw: setTresc, wyczysc: wyczyscSzkic } = useSzkicSprawy("dyskusja", wybrana);
   const dyskusja = data?.dyskusje.find((d) => d.id === wybrana) ?? null;
   const szczegol = useDyskusja(wybrana);
+  const zalacznikiWysylki = useZalacznikiSprawy(wybrana);
 
   /* Wejście z paska adresu na sprawę z innego kubełka ma pokazać TĘ sprawę,
      a nie pustą listę. Adres jest tu źródłem prawdy, kubełek za nim idzie. */
@@ -208,6 +223,26 @@ export function Dyskusje() {
     setBladWysylki("");
     setKonfliktWysylki(null);
     setBladZakonczenia("");
+    setBladOdswiezenia("");
+    setBladZalacznika("");
+  }, [wybrana]);
+
+  /* ── WEJŚCIE W DYSKUSJĘ JĄ ODŚWIEŻA (24 września 2026) ────────────────────
+     Zgłoszenie właściciela: „dyskusje zostały w tyle”. Wybrał wprost
+     odświeżenie przy wejściu, jak w reklamacjach od 0.410.0, i przycisk.
+     To rozszerza JEDYNY wyjątek od „zero zapisu przy patrzeniu” na drugi
+     ekran, z tym samym powodem. Przebieg synchronizacji czyta najwyżej
+     tysiąc spraw z jednej listy, więc starszej dyskusji nie odświeżał nigdy.
+
+     Jedno żądanie na wejście, nie na render: `ostatnioOdswiezona` pilnuje
+     tego także w trybie ścisłym Reacta. Błąd przy wejściu milczy, bo agent
+     o nic nie prosił; zostaje stan z ostatniego przebiegu. Błąd z PRZYCISKU
+     mówi, bo tam agent prosił wprost. */
+  const ostatnioOdswiezona = useRef<number | null>(null);
+  useEffect(() => {
+    if (wybrana === null || ostatnioOdswiezona.current === wybrana) return;
+    ostatnioOdswiezona.current = wybrana;
+    odswiez.mutate({ id: wybrana });
   }, [wybrana]);
 
   /**
@@ -238,7 +273,11 @@ export function Dyskusje() {
         setKonfliktWysylki(null);
         if (w.status === "sent") wyczyscSzkic();
         else setBladWysylki(
-          "Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj sprawę, zanim spróbujesz znowu.");
+          "Wysyłka nie dała jednoznacznej odpowiedzi — odśwież sprawę, zanim spróbujesz znowu.");
+        /* Stan u Allegro zmienił się przed chwilą, a przebieg przyjdzie za
+           kilka minut. Przy wyniku niejednoznacznym to jedno żądanie
+           rozstrzyga, czy wiadomość poszła — tak samo jak w reklamacjach. */
+        odswiez.mutate({ id: d.dyskusja.id });
       },
       onError: (e) => {
         /* Dopisek ma WŁASNY ekran, bo wymaga decyzji. Reszta — zamknięta
@@ -272,6 +311,9 @@ export function Dyskusje() {
           setBladZakonczenia(
             "Prośba poszła, ale Allegro nie potwierdziło — nie wysyłaj drugiej, sprawdź w Centrum Sprzedaży.");
         }
+        /* Status po prośbie należy do Allegro (§25c.8). Dociągamy go od razu:
+           to jedyny sposób, żeby zobaczyć, co `END_REQUEST` robi naprawdę. */
+        odswiez.mutate({ id: d.dyskusja.id });
       },
       onError: (e) => setBladZakonczenia((e as Error).message),
     });
@@ -410,6 +452,22 @@ export function Dyskusje() {
                     { id: szczegol.data!.dyskusja.id, wersja: szczegol.data!.dyskusja.wersja },
                     { onError: (e) => setBladZapisu((e as Error).message) });
                 }} />
+              {/* Przycisk ZOSTAJE obok odświeżenia przy wejściu, decyzją
+                  właściciela. Agent, który czeka w sprawie na odpowiedź
+                  kupującego albo doradcy, nie musi z niej wychodzić, żeby
+                  zobaczyć nową wiadomość. */}
+              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+                <Przycisk className="!px-2 !py-1 !text-xs" disabled={odswiez.isPending}
+                  onClick={() => {
+                    setBladOdswiezenia("");
+                    odswiez.mutate({ id: szczegol.data!.dyskusja.id },
+                      { onError: (e) => setBladOdswiezenia((e as Error).message) });
+                  }}>
+                  <RefreshCw size={12} className={odswiez.isPending ? "animate-spin" : ""} />
+                  {odswiez.isPending ? "Odświeżam…" : "Odśwież z Allegro"}
+                </Przycisk>
+                {bladOdswiezenia && <span className="text-red-800">{bladOdswiezenia}</span>}
+              </div>
               <div className="mb-3">
                 <Zakonczenie dyskusja={szczegol.data.dyskusja} wysyla={zakoncz.isPending}
                   blad={bladZakonczenia} onZakoncz={wyslijZakonczenie} />
@@ -426,6 +484,23 @@ export function Dyskusje() {
                 czat={szczegol.data.czat}
                 zalaczniki={szczegol.data.zalaczniki}
                 edytor={<Edytor tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
+                  zalaczniki={zalacznikiWysylki.data?.zalaczniki ?? []}
+                  dodajeZalacznik={dodajZalacznik.isPending}
+                  bladZalacznika={bladZalacznika}
+                  /* Plik czytamy TU, jak w reklamacjach: base64 to sprawa
+                     klienta HTTP, nie komponentu edytora. */
+                  onDodajZalacznik={(plik) => {
+                    setBladZalacznika("");
+                    void naBase64(plik).then((dane) => {
+                      if (!wybrana) return;
+                      dodajZalacznik.mutate(
+                        { id: wybrana, nazwa: plik.name, typ: plik.type, dane },
+                        { onError: (e) => setBladZalacznika((e as Error).message) });
+                    });
+                  }}
+                  onUsunZalacznik={(zid) => wybrana && usunZalacznik.mutate(
+                    { id: wybrana, zalacznikId: zid },
+                    { onError: (e) => setBladZalacznika((e as Error).message) })}
                   czatAktywny={szczegol.data.dyskusja.czatAktywny}
                   onZmiana={setTresc} onWyslij={() => wyslij()} />} />
             </>

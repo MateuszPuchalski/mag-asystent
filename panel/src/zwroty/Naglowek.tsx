@@ -59,7 +59,7 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
       {zwrot.kupujacyLogin
         ? <LoginKlienta login={zwrot.kupujacyLogin} className="font-semibold text-slate-700" />
         : <span className="text-slate-500">kupujący: Allegro nie podało</span>}
-      {/* ODBIORCA I PROFIL (0.484.8) — zgłoszenie właściciela: „potrzebuję
+      {/* ODBIORCA I PROFIL (0.486.1) — zgłoszenie właściciela: „potrzebuję
           więcej informacji o kliencie w nagłówku". Login bywa ciągiem cyfr
           (`Client:105505227`), a nazwisko z adresu dostawy mówi, z kim
           rozmawiamy. Wchodzi przez mapowanie od 0.367.0 — nic nowego
@@ -88,7 +88,7 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
 }
 
 /**
- * Najnowsza rozmowa o tym zakupie — w nagłówku, nie tylko w dowodach (0.484.8).
+ * Najnowsza rozmowa o tym zakupie — w nagłówku, nie tylko w dowodach (0.486.1).
  *
  * Zgłoszenie właściciela: „szczególnie jeśli jest jakaś konwersacja
  * dotycząca tego zwrotu". Lista rozmów stała na dole kolumny dowodów, jako

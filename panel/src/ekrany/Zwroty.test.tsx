@@ -248,7 +248,7 @@ describe("Ekran zwrotów", () => {
     expect(screen.getAllByText("Do zwrotu").length).toBeGreaterThan(0);
   });
 
-  it("szuka po PRODUKCIE, bez ogonków (0.484.9)", async () => {
+  it("szuka po PRODUKCIE, bez ogonków (0.486.2)", async () => {
     /* „Gdzie jest zwrot z tym gaźnikiem" — pytanie przy kartonie bez etykiety. */
     const z = (id: number, nazwa: string, ean: string) => {
       const b = zwrot(id, "decyzja", `ZP-${id}`);

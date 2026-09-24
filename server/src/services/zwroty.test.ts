@@ -1326,7 +1326,7 @@ test("zwrot pokazuje rozmowy o TYM zakupie, po numerze zamówienia", () => {
   assert.equal(z.rozmowy[0].status, "open", "status rozmowy jedzie razem z nią");
 });
 
-test("rozmowa niesie OSTATNIE prawdziwe słowo i to, czy czeka na nas (0.484.8)", () => {
+test("rozmowa niesie OSTATNIE prawdziwe słowo i to, czy czeka na nas (0.486.1)", () => {
   /* Nagłówek zwrotu ma powiedzieć, co klient napisał i czy czeka na
      odpowiedź. Nasza autoodpowiedź nie liczy się jako odpisanie. */
   const d = stanowisko();

@@ -294,7 +294,7 @@ const kody = (z: Zwrot) =>
      NICZEGO, choć stał on na ekranie obok. Notatka jest zresztą jedynym
      miejscem, gdzie biuro pisze WŁASNYMI słowami; wykluczenie jej z szukania
      znaczyło, że im lepiej ktoś opisał sprawę, tym trudniej ją znaleźć. */
-  /* TOWAR WCHODZI DO SZUKANIA (0.484.9). Zgłoszenie właściciela: „powinienem
+  /* TOWAR WCHODZI DO SZUKANIA (0.486.2). Zgłoszenie właściciela: „powinienem
      móc wyszukiwać zwroty po produkcie". Pytanie „gdzie jest zwrot z tym
      gaźnikiem" pada przy kartonie bez etykiety i przy telefonie od klienta.
      Nazwa, symbol kartoteki, SKU sprzedawcy i EAN — te same kody, które stoją

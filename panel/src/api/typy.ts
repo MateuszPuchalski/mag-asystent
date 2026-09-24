@@ -1466,7 +1466,7 @@ export interface RozmowaZwrotu {
   temat: string | null;
   status: string;
   ostatniaAt: string | null;
-  /** Ostatnia prawdziwa wiadomość, do 280 znaków (0.484.8). Brak pola = serwer sprzed tej wersji. */
+  /** Ostatnia prawdziwa wiadomość, do 280 znaków (0.486.1). Brak pola = serwer sprzed tej wersji. */
   ostatniaTresc?: string | null;
   /** Czy ostatnie słowo napisał klient — wątek czeka na nas. */
   odKlienta?: boolean;

@@ -39,7 +39,7 @@ export function rozbij(fraza: string): string[] {
   return zloz(fraza.trim()).split(/\s+/).filter(Boolean);
 }
 
-/* ── OGONKI NIE DZIELĄ (0.484.9) ─────────────────────────────────────────────
+/* ── OGONKI NIE DZIELĄ (0.486.2) ─────────────────────────────────────────────
    Od kiedy w szukaniu zwrotów stoją nazwy towarów, „gaznik" musi trafiać
    w „Gaźnik" — magazynier wpisuje z klawiatury bez polskich znaków, a nazwy
    z Allegro je mają. Ta sama mapa co po stronie serwera (`server/src/tekst.ts`):

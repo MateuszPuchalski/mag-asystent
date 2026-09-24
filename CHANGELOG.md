@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.484.9 — 24 września 2026
+## 0.486.2 — 24 września 2026
 
 **Zwroty szuka się także po produkcie.** Zgłoszenie właściciela: „powinienem
 móc wyszukiwać zwroty po produkcie”. Pole szukania nad kolejką sprawdza teraz
@@ -46,7 +46,7 @@ Szukanie pomija polskie znaki: „gaznik” trafia w „Gaźnik”, „lopata”
 w „Łopata”. Zmiana siedzi we wspólnym pomocniku, więc reklamacje i dyskusje
 dostają to samo.
 
-## 0.484.8 — 24 września 2026
+## 0.486.1 — 24 września 2026
 
 **Nagłówek zwrotu mówi więcej o kliencie, a rozmowę o zwrocie widać od razu.**
 Zgłoszenie właściciela: „potrzebuję więcej informacji o kliencie w nagłówku,
@@ -62,6 +62,43 @@ szczególnie jeśli jest konwersacja dotycząca tego zwrotu”.
 
 Serwer dokłada do rozmów zwrotu ostatnią prawdziwą wiadomość (do 280 znaków)
 i jej kierunek. Podzapytanie idzie po istniejącym indeksie wątku.
+
+## 0.486.0 — 24 września 2026
+
+**Odpowiedź w dyskusji niesie załączniki.** Drugi krok po „dyskusje zostały
+w tyle”. Edytor dyskusji nie miał spinacza, choć specyfikacja Allegro przyjmuje
+załącznik w wiadomości sprawy dowolnego rodzaju. Serwer wysyłał je już tą
+samą maszynerią co przy reklamacji. Brakowało ekranu.
+
+- **Spinacz i pigułki plików** w edytorze dyskusji, ten sam komponent co
+  w reklamacjach. Te same limity: zdjęcie albo PDF, najwyżej 4 MB.
+- **Dziennik mówi, z którego ekranu.** Plik przy dyskusji zapisuje
+  `dyskusja_zalacznik_dodany` i `dyskusja_zalacznik_zdjety`.
+- **Sprawa, której nie ma, nie wgrywa pliku do Allegro.** Wcześniej wiersz
+  powstawał po wgraniu bez sprawdzenia, czy sprawa istnieje.
+- **Poprawka także dla reklamacji:** po wysyłce pigułki plików znikają
+  od razu. Wcześniej wisiały w edytorze do powrotu na kartę.
+
+Przebuduj panel i zrestartuj serwer.
+
+## 0.485.0 — 24 września 2026
+
+**Dyskusja odświeża się z Allegro przy wejściu i na przycisk.** Zgłoszenie
+właściciela: „dyskusje zostały w tyle”. Ekran dyskusji nie miał żadnej drogi
+do świeżego stanu sprawy. Przebieg synchronizacji czyta najwyżej tysiąc spraw
+z jednej listy, więc starszych dyskusji nie odświeżał nigdy.
+
+- **Wejście w dyskusję ją odświeża**, jak reklamację od 0.410.0. To
+  rozszerza jedyny wyjątek od „zero zapisu przy patrzeniu” na drugi ekran,
+  decyzją właściciela. Samo otwarcie ekranu nadal nie wysyła niczego.
+- **Przycisk „Odśwież z Allegro”** nad rozmową. Agent czekający w sprawie na
+  odpowiedź nie musi z niej wychodzić.
+- **Po wysyłce i po prośbie o zakończenie** sprawa dociąga się od razu.
+  To pokaże, co `END_REQUEST` robi naprawdę.
+- Nowa trasa `POST /api/obsluga/dyskusje/:id/odswiez` i zdarzenie
+  `dyskusja_odswiezenie`. Numer reklamacji dostaje tam 404.
+
+Przebuduj panel i zrestartuj serwer.
 
 ## 0.484.7 — 24 września 2026
 

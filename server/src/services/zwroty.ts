@@ -231,7 +231,7 @@ export interface RozmowaZwrotu {
   temat: string | null;
   status: string;
   ostatniaAt: string | null;
-  /** Ostatnia prawdziwa wiadomość w wątku, do 280 znaków — bez naszej autoodpowiedzi (0.484.8). */
+  /** Ostatnia prawdziwa wiadomość w wątku, do 280 znaków — bez naszej autoodpowiedzi (0.486.1). */
   ostatniaTresc: string | null;
   /** Czy to ostatnie słowo napisał klient, czyli wątek czeka na nas. */
   odKlienta: boolean;
@@ -858,7 +858,7 @@ export function listaZwrotow(
   const rozmowy = filtr !== null && !numery.length ? [] : database.prepare(`
     SELECT m.related_order_id AS zam, c.id, c.subject, c.status,
            MAX(m.sent_at) AS ostatnia,
-           /* OSTATNIE SŁOWO W WĄTKU (0.484.8) — do nagłówka zwrotu. Zgłoszenie
+           /* OSTATNIE SŁOWO W WĄTKU (0.486.1) — do nagłówka zwrotu. Zgłoszenie
               właściciela: „potrzebuję więcej informacji o kliencie w nagłówku,
               szczególnie jeśli jest konwersacja o tym zwrocie". Temat i data
               nie mówią, czy klient czeka na nas. Pomijamy naszą automatyczną

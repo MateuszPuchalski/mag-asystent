@@ -97,7 +97,7 @@ describe("Nagłówek zwrotu", () => {
     expect(screen.getByText("Fenix-Warszawa")).toBeInTheDocument();
   });
 
-  it("nagłówek mówi, kto to jest, i prowadzi do profilu (0.484.8)", () => {
+  it("nagłówek mówi, kto to jest, i prowadzi do profilu (0.486.1)", () => {
     /* Login bywa ciągiem cyfr — nazwisko odbiorcy mówi, z kim rozmawiamy. */
     render(<Naglowek zwrot={zwrot({ kupujacyLogin: "Client:105505227", odbiorcaNazwa: "Jan Kowalski" })} />);
     expect(screen.getByText("Jan Kowalski")).toBeInTheDocument();
@@ -105,7 +105,7 @@ describe("Nagłówek zwrotu", () => {
       .toHaveAttribute("href", "/obsluga/klient/Client%3A105505227");
   });
 
-  it("najnowsza rozmowa stoi w nagłówku: co napisał klient i czy czeka na nas (0.484.8)", () => {
+  it("najnowsza rozmowa stoi w nagłówku: co napisał klient i czy czeka na nas (0.486.1)", () => {
     render(<Naglowek zwrot={zwrot({ kupujacyLogin: "jan", rozmowy: [
       { id: 7, temat: "Zwrot nakrętki", status: "open", ostatniaAt: "2026-09-24T08:00:00Z",
         ostatniaTresc: "Wysłałem obie sztuki, proszę o zwrot za dwie.", odKlienta: true },

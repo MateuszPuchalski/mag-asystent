@@ -71,10 +71,36 @@ vi.mock("../api/tagi", () => ({
   useOdepnijTag: () => ({ mutate: () => {}, isPending: false }),
 }));
 
+/* Załączniki wychodzące dyskusji idą trasami reklamacji (0.486.0). Atrapa
+   notuje wywołania w tej samej scenie, więc „zero zapisu przy otwarciu”
+   liczy także je. */
+vi.mock("../api/reklamacje", async () => {
+  const rzeczywisty = await vi.importActual<typeof import("../api/reklamacje")>("../api/reklamacje");
+  const mutacja = (nazwa: string) => () => ({
+    mutate: (...a: unknown[]) => { scena.mutacje.push(`${nazwa}:${JSON.stringify(a[0])}`); },
+    isPending: false, error: null,
+  });
+  return {
+    ...rzeczywisty,
+    useZalacznikiSprawy: (id: number | null) => ({
+      data: id === null ? undefined : { zalaczniki: [
+        { id: 5, allegroId: "att-5", nazwa: "list-przewozowy.jpg", typ: "image/jpeg", rozmiar: 900, dodal: "Ala" },
+      ] },
+    }),
+    useDodajZalacznikSprawy: mutacja("dodajZalacznik"),
+    useUsunZalacznikSprawy: mutacja("usunZalacznik"),
+  };
+});
+
 vi.mock("../api/dyskusje", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/dyskusje")>("../api/dyskusje");
   const mutacja = (nazwa: string) => () => ({
-    mutate: (...a: unknown[]) => { scena.mutacje.push(`${nazwa}:${JSON.stringify(a[0])}`); },
+    mutate: (...a: unknown[]) => {
+      scena.mutacje.push(`${nazwa}:${JSON.stringify(a[0])}`);
+      /* Wysyłka i prośba kończą się sukcesem, żeby test widział, co ekran
+         robi PO nich (odświeżenie). Reszta procedur ma tylko `onError`. */
+      (a[1] as { onSuccess?: (w: unknown) => void } | undefined)?.onSuccess?.({ status: "sent" });
+    },
     isPending: false, error: null,
   });
   return {
@@ -98,6 +124,7 @@ vi.mock("../api/dyskusje", async () => {
     useNotatkaDyskusji: mutacja("notatka"),
     useOdpowiedzWDyskusji: mutacja("odpowiedz"),
     useZakoncz: mutacja("zakoncz"),
+    useOdswiezDyskusje: mutacja("odswiez"),
   };
 });
 
@@ -135,11 +162,50 @@ function pokaz(adres = "/obsluga/dyskusje", czat: WiadomoscReklamacji[] = [wiad(
 afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
 
 describe("Ekran dyskusji", () => {
-  it("otwarcie ekranu i wybranie sprawy NIE wywołują żadnej mutacji", async () => {
+  /* ── ZERO ZAPISU PRZY PATRZENIU, Z TYM SAMYM WYJĄTKIEM CO REKLAMACJE ─────
+     Do 24 września 2026 ten test pilnował, że wybranie sprawy nie wysyła
+     niczego. Właściciel rozszerzył wyjątek z 0.410.0 na dyskusje: wejście
+     w sprawę ją odświeża, bo przebieg czyta najwyżej tysiąc spraw.
+
+     TEST ZAWĘŻA SIĘ DO JEDNEJ DOZWOLONEJ MUTACJI, nie znika. Druga mutacja
+     dołożona „przy okazji” do wejścia ma go wywrócić. Samo otwarcie EKRANU
+     nadal nie wysyła niczego. */
+  it("otwarcie ekranu nie wywołuje mutacji, a wejście w sprawę TYLKO ją odświeża", async () => {
     pokaz();
     expect(scena.mutacje).toEqual([]);
     await userEvent.click(screen.getByRole("button", { name: /Przesyłka nie dotarła/ }));
-    expect(scena.mutacje).toEqual([]);
+    expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
+  });
+
+  it("powrót do TEJ SAMEJ sprawy nie pyta Allegro drugi raz", async () => {
+    pokaz("/obsluga/dyskusje/1");
+    expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
+    await userEvent.click(screen.getByRole("button", { name: /Przesyłka nie dotarła/, current: true }));
+    expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
+  });
+
+  it("przycisk odświeża na żądanie, a wysyłka i prośba dociągają sprawę", async () => {
+    pokaz("/obsluga/dyskusje/1", [wiad()]);
+    const ile = () => scena.mutacje.filter((m) => m.startsWith("odswiez:")).length;
+    expect(ile()).toBe(1);
+    await userEvent.click(screen.getByRole("button", { name: /Odśwież z Allegro/ }));
+    expect(ile()).toBe(2);
+    await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Odpisuję");
+    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ/ }));
+    expect(ile()).toBe(3);
+    await userEvent.click(screen.getByRole("button", { name: /POPROŚ O ZAKOŃCZENIE/ }));
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ PROŚBĘ/ }));
+    expect(ile()).toBe(4);
+  });
+
+  it("odpowiedź w dyskusji niesie załączniki: spinacz i zdjęcie pliku z tej sprawy", async () => {
+    /* Do 0.486.0 edytor dyskusji nie miał spinacza, choć specyfikacja
+       przyjmuje załącznik w wiadomości każdej sprawy. */
+    pokaz("/obsluga/dyskusje/1", [wiad()]);
+    expect(screen.getByRole("button", { name: "Dołącz plik" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Zdejmij list-przewozowy.jpg" }));
+    expect(scena.mutacje).toContain('usunZalacznik:{"id":1,"zalacznikId":5}');
   });
 
   it("kubełki niosą pytanie i licznik, a pytanie stoi nad listą", () => {
