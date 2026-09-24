@@ -60,6 +60,19 @@ describe("szukanie Ctrl+K", () => {
   });
 });
 
+describe("stan okna idzie za polem, nie za zapytaniem sprzed pauzy", () => {
+  it("wyczyszczone pole nie pokazuje wyniku starej frazy (zrzut 24 września 2026)", async () => {
+    pokaz();
+    await userEvent.keyboard("{Control>}k{/Control}");
+    const pole = screen.getByRole("combobox");
+    await userEvent.type(pole, "RET998");
+    await screen.findByText("gdzie paczka");
+    await userEvent.clear(pole);
+    expect(screen.getByText("Wpisz co najmniej trzy znaki.")).toBeTruthy();
+    expect(screen.queryByText("gdzie paczka")).toBeNull();
+  });
+});
+
 describe("lista skrótów pod ?", () => {
   it("`?` otwiera listę, a sekcja bieżącego ekranu stoi zaraz po klawiszach ogólnych", async () => {
     pokaz("/obsluga/zwroty/5");

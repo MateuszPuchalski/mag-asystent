@@ -34,6 +34,20 @@ historii nie przepisujemy.
 ---
 
 
+## 0.483.1 — 24 września 2026
+
+**Szukanie Ctrl+K znajduje login po kawałku.** Zgłoszenie właściciela ze
+zrzutem: „chrzanowski” nie znajdowało klienta „Chrzanowski1234”. Szukanie
+porównywało cały login, a agent pamięta nazwisko, nie cyfry dopisane przez
+Allegro.
+
+- Kawałek loginu trafia w rozmowy, zamówienia, zwroty, reklamacje
+  i dyskusje. Pełny login stoi w wynikach pierwszy.
+- Wyczyszczone pole nie pokazuje już „nic nie pasuje” do starej frazy.
+  Okno idzie za tym, co jest w polu, a serwer pyta dalej po pauzie.
+
+Wystarczy przebudować panel i zrestartować serwer.
+
 ## 0.483.0 — 24 września 2026
 
 **Login rozmówcy to login kupującego — rozstrzygnięte, i historia klienta

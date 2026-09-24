@@ -42,6 +42,12 @@ export function OknoSzukania({ onZamknij }: { onZamknij: () => void }) {
     return () => clearTimeout(t);
   }, [fraza]);
   const wynik = useSzukajWszedzie(zapytanie);
+  /* Wpisane TERAZ, nie po pauzie (24 września 2026). Zrzut właściciela:
+     pole puste, a okno dalej mówiło „nic nie pasuje do" starej frazy, bo
+     komunikat czytał zapytanie sprzed ćwierć sekundy. Stan okna idzie za
+     polem; serwer pyta się dalej po pauzie. */
+  const wpisane = fraza.trim();
+  const czeka = wpisane !== zapytanie || wynik.isFetching;
   const trafienia = useMemo(() => (zapytanie.length >= 3 ? wynik.data?.trafienia ?? [] : []),
     [wynik.data, zapytanie]);
   const [wybrany, setWybrany] = useState(0);
@@ -85,9 +91,9 @@ export function OknoSzukania({ onZamknij }: { onZamknij: () => void }) {
         <Blad>{(wynik.error as Error | null)?.message}</Blad>
         {towar !== null
           ? <PodgladTowaru twId={towar} onWstecz={() => setTowar(null)} />
-          : zapytanie.length < 3
+          : wpisane.length < 3
             ? <p className="px-4 py-3 text-sm text-slate-500">Wpisz co najmniej trzy znaki.</p>
-            : wynik.isLoading
+            : czeka && trafienia.length === 0
               ? <Pusto waga="lista">Szukam…</Pusto>
               : trafienia.length === 0
                 ? <p className="px-4 py-3 text-sm text-slate-500">Nic nie pasuje do „{zapytanie}”.</p>

@@ -1162,7 +1162,8 @@ każda sekcja prowadzi tam, gdzie sprawę się załatwia.
 **Szukanie Ctrl+K** (`services/szukaj-wszedzie.ts`). Mostem między bytami
 jest numer zamówienia, jak w `droga-klienta.ts`. Login kupującego trafia
 w zakupy, zwroty i sprawy, a od 24 września 2026 także w rozmowy po loginie
-rozmówcy. Właściciel potwierdził wtedy, że to login kupującego.
+rozmówcy. Właściciel potwierdził wtedy, że to login kupującego. Login szuka się po kawałku (0.483.1): agent pamięta nazwisko
+z loginu, nie cyfry dopisane przez Allegro. Pełny login stoi w wynikach pierwszy.
 
 **Jedna lista skrótów pod `?`** (`nawigacja/Klawisze.tsx`). Te same
 klawisze na każdej kolejce: `j`/`k`, cyfry kubełków, Ctrl+Enter przy
