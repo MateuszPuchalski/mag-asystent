@@ -34,6 +34,33 @@ historii nie przepisujemy.
 ---
 
 
+## 0.491.0 — 24 września 2026
+
+**Ustawienia właściciela zmienia się z panelu.** Dotąd każda zmiana to był
+pulpit zdalny na maszynie z Subiektem, edytor tekstu na `wertis.env`
+i restart dwóch usług. Karta **Konfiguracja serwera** ma teraz przycisk
+**Zmień** przy 25 decyzjach właściciela: progach dat, terminach zwrotów,
+Copilocie i jego limitach, kluczach Allegro i API, katalogu kopii.
+
+- **Plik, z którym serwer by nie wstał, nie trafia na dysk.** Osobny proces
+  ładuje prawdziwy `config.ts` na pliku-kandydacie. Łapie to także reguły
+  krzyżowe, na przykład klucz Allegro bez sekretu. Bez tego jedna pomyłka
+  z panelu kładłaby usługę w pętlę restartów, a z nią sam panel.
+- **Jeden klucz na raz**, każdy z wpisem `konfiguracja_zmieniona` w dzienniku.
+  Sekret trafia tam tylko jako „ustawione". Druga zmiana w trakcie pierwszej
+  dostaje odmowę, zamiast po cichu nadpisać tamtą.
+- **Próba startu nie zamraża serwera.** Biegnie obok, więc kolektory w hali
+  pracują dalej, gdy administrator zapisuje zmianę.
+- **Restart robi się sam** pod NSSM: API kończy się po odpowiedzi, worker po
+  kilkunastu sekundach. Poza usługą panel mówi, że zmiana czeka na restart.
+- **Plik zostaje plikiem.** Komentarze, klucze instalatora i wpisy ręczne
+  zostają; poprzednia wersja leży w `wertis.env.poprzedni`.
+
+Czego z panelu zmienić się nie da i dlaczego, mówi `Edycja` w rejestrze
+kluczy, a pilnuje tego test: klucze instalatora, pokrętła, klucze workerów
+C# oraz `MAG_ID_ODP`, `MAG_ID_SERWIS`, `TW_ID_PRZESYLKA`
+i `ZDJECIA_DODAWANIE`.
+
 ## 0.490.0 — 24 września 2026
 
 **Konta zakłada się z panelu.** Dotąd tylko kreator na kolektorze albo

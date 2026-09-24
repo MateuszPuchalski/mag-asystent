@@ -232,6 +232,14 @@ export type OperacjaUprzywilejowana =
   /** Zakładanie kont magazynierów, migracja historii. */
   | "zarzadzanie_kontami"
   /**
+   * Zmiana ustawienia serwera z panelu (0.491.0).
+   *
+   * Zapisuje `wertis.env` i restartuje usługi, więc jedno kliknięcie zmienia
+   * zachowanie całej firmy — od progów kolejek po to, czy Copilot wydaje
+   * pieniądze sam. Stąd sam admin i ślad `privileged` przy każdej zmianie.
+   */
+  | "konfiguracja_serwera"
+  /**
    * Odebranie rozmowy agentowi, który ją prowadzi (0.147.0).
    *
    * Przejęcie wolnej rozmowy robi każdy z biura i to nie jest ta operacja.
@@ -341,6 +349,8 @@ const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
   widocznosc_magazynow: ["biuro", "admin"],
   // Setki kartotek jednym kliknięciem — patrz uzasadnienie przy nazwie operacji.
   masowa_lokalizacja: ["admin"],
+  // Zmienia pracę wszystkich naraz i restartuje usługi — patrz opis operacji.
+  konfiguracja_serwera: ["admin"],
   /* BIURO, jak pieniądze przy zwrocie: reklamacje prowadzi biuro codziennie,
      a werdykt zamknięty dla admina znaczyłby, że orzeka ktoś, kto nie czytał
      sprawy. Magazynier zostaje poza — on ocenia towar, nie roszczenie. */

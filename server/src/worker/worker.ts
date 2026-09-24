@@ -1,7 +1,9 @@
 import { config } from "../config.js";
 import { makeSferaAdapter } from "../adapters/index.js";
-import { bezMigracji, brakujacaTabela } from "../db/db.js";
+import { bezMigracji, brakujacaTabela, db } from "../db/db.js";
 import { zamelduj } from "../services/process-state.js";
+import { konfiguracjaZmienionaPo } from "../services/konfiguracja-zapis.js";
+import { podNssm } from "../services/restart.js";
 import {
   czekaNaDokument, oznaczBlad, pickTask, powrotyPoDokumentachSfery, przetworzZadanie,
 } from "./kolejka.js";
@@ -109,12 +111,32 @@ console.log(`[worker] start · poll ${config.worker.pollMs}ms · simErrors=${con
    zostaje w dzienniku aż do pierwszego czystego taktu.                        */
 let bladTaktu: string | null = null;
 
+/* ── Nowy wertis.env z panelu (0.491.0) ─────────────────────────────────────
+   API po zapisie ustawienia kończy się samo i NSSM podnosi je z nowym plikiem.
+   Worker czyta ten sam plik, więc musi zrobić to samo — inaczej dwa procesy
+   pracowałyby na dwóch konfiguracjach, a to jest stan, przed którym
+   `/api/health` ostrzega od 0.153.0.
+
+   Sygnałem jest wpis `konfiguracja_zmieniona` młodszy niż start tego procesu.
+   Pytanie co dziesięć sekund, nie co takt: zapytanie jest tanie (indeks po
+   typie), ale takt biegnie co ~1,2 s, a zmiana konfiguracji zdarza się raz
+   na tygodnie. Poza NSSM nikt workera nie podniesie, więc tam nie pytamy. */
+const START = new Date().toISOString();
+const PYTAJ_O_KONFIGURACJE_CO = Math.max(1, Math.round(10_000 / config.worker.pollMs));
+let taktow = 0;
+const restartPoZmianie = podNssm();
+
 setInterval(() => {
   try {
     /* Brama PRZED meldunkiem: `process_state` jest jedną z tabel, których może
        nie być, a meldunek na nieistniejącej tabeli wywróciłby proces — czyli
        wróciłby dokładnie ten restart, którego unikamy. */
     if (!schematGotowy()) return;
+    if (restartPoZmianie && ++taktow % PYTAJ_O_KONFIGURACJE_CO === 0
+      && konfiguracjaZmienionaPo(START, db())) {
+      console.log("[worker] konfiguracja zmieniona z panelu — wstaję ponownie z nowym wertis.env");
+      process.exit(0);
+    }
     zamelduj("worker");
     /* Przed `tick()`, bo tamten wraca wcześnie, gdy worker jest zajęty albo
        kolejka pusta — a powrót czeka właśnie wtedy, gdy nic się nie dzieje. */

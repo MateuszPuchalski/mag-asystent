@@ -36,13 +36,15 @@ const KONFIGURACJA = {
   nieznane: ["ALEGRO_CLIENT_ID"],
   wiersze: [
     { klucz: "MSSQL_SERVER", grupa: "subiekt", kto: "instalator", opis: "Adres SQL Servera.", czyta: ["serwer"],
-      tajny: false, zrodlo: "plik", wartosc: "serwer-subiekta" },
+      tajny: false, zrodlo: "plik", wartosc: "serwer-subiekta", edycja: null },
     { klucz: "MSSQL_PASSWORD", grupa: "subiekt", kto: "instalator", opis: "Hasło loginu SQL.", czyta: ["serwer"],
-      tajny: true, zrodlo: "plik", wartosc: null },
+      tajny: true, zrodlo: "plik", wartosc: null, edycja: null },
     { klucz: "MSSQL_SYNC_MS", grupa: "subiekt", kto: "zaawansowane", opis: "Takt odświeżania.", czyta: ["serwer"],
-      tajny: false, zrodlo: "domyslna", wartosc: null },
+      tajny: false, zrodlo: "domyslna", wartosc: null, edycja: null },
     { klucz: "ZWROT_TERMIN_DNI", grupa: "zwroty", kto: "wlasciciel", opis: "Dni na obsłużenie zwrotu.", czyta: ["serwer"],
-      tajny: false, zrodlo: "domyslna", wartosc: null },
+      tajny: false, zrodlo: "domyslna", wartosc: null, edycja: { rodzaj: "liczba" } },
+    { klucz: "ANTHROPIC_API_KEY", grupa: "zwroty", kto: "wlasciciel", opis: "Klucz API.", czyta: ["serwer"],
+      tajny: true, zrodlo: "plik", wartosc: null, edycja: { rodzaj: "tekst" } },
   ],
 };
 let rola = "admin";
@@ -69,6 +71,9 @@ beforeEach(() => {
       }
       if (url === "/api/biuro/strefa") return odp({ ok: true, regul: JSON.parse(init!.body as string).reguly.length });
       if (url.endsWith("/wyloguj")) return odp({ ok: true, sesji: 2 });
+      if (url === "/api/biuro/konfiguracja") {
+        return odp({ ok: true, klucz: JSON.parse(init!.body as string).klucz, restart: "reczny" });
+      }
       if (url === "/api/users") {
         const b = JSON.parse(init!.body as string);
         return odp({ user: { userId: 9, login: b.login, name: b.name, role: b.role, active: true, maHaslo: true } });
@@ -180,14 +185,45 @@ describe("Ustawienia w panelu", () => {
     pokaz();
     const k = await waitFor(() => karta("Konfiguracja serwera"));
     expect(await within(k).findByText("serwer-subiekta")).toBeInTheDocument();
-    expect(within(k).getByText("ustawione")).toBeInTheDocument();
+    /* Dwa sekrety w atrapie — hasło SQL i klucz API — oba bez wartości. */
+    expect(within(k).getAllByText("ustawione")).toHaveLength(2);
     expect(within(k).getByText(/ALEGRO_CLIENT_ID/)).toBeInTheDocument();
     /* Decyzja właściciela widać zawsze, domyślne pokrętło dopiero po przełączniku. */
     expect(within(k).getByText("ZWROT_TERMIN_DNI")).toBeInTheDocument();
     expect(within(k).queryByText("MSSQL_SYNC_MS")).toBeNull();
-    await userEvent.click(within(k).getByRole("button", { name: /Wszystkie \(4\)/ }));
+    await userEvent.click(within(k).getByRole("button", { name: /Wszystkie \(5\)/ }));
     expect(within(k).getByText("MSSQL_SYNC_MS")).toBeInTheDocument();
     expect(wyslane).toEqual([]);
+  });
+
+  it("zmiana ustawienia: jeden klucz w jednym żądaniu, tylko tam, gdzie wolno", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Konfiguracja serwera"));
+    await within(k).findByText("serwer-subiekta");
+    /* Klucz instalatora nie ma przycisku — serwer by odmówił. */
+    const wiersz = (klucz: string) => within(k).getByText(klucz).closest("tr") as HTMLElement;
+    expect(within(wiersz("MSSQL_SERVER")).queryByRole("button", { name: "Zmień" })).toBeNull();
+    await userEvent.click(within(wiersz("ZWROT_TERMIN_DNI")).getByRole("button", { name: "Zmień" }));
+    expect(wyslane).toEqual([]);
+    await userEvent.type(within(k).getByLabelText("ZWROT_TERMIN_DNI"), "10");
+    await userEvent.click(within(k).getByRole("button", { name: "Zapisz" }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0]).toMatchObject({ metoda: "POST", url: "/api/biuro/konfiguracja" });
+    expect(JSON.parse(wyslane[0].body!)).toEqual({ klucz: "ZWROT_TERMIN_DNI", wartosc: "10" });
+    /* Poza NSSM restart zostaje człowiekowi — panel mówi to wprost. */
+    expect(await within(k).findByText(/Zadziała po restarcie usług/)).toBeInTheDocument();
+  });
+
+  it("sekret: pole puste na start, pustego nie zapisze", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Konfiguracja serwera"));
+    await within(k).findByText("serwer-subiekta");
+    const wiersz = within(k).getByText("ANTHROPIC_API_KEY").closest("tr") as HTMLElement;
+    await userEvent.click(within(wiersz).getByRole("button", { name: "Zmień" }));
+    const pole = within(wiersz).getByLabelText("ANTHROPIC_API_KEY") as HTMLInputElement;
+    expect(pole.type).toBe("password");
+    expect(pole.value).toBe("");
+    expect(within(wiersz).getByRole("button", { name: "Zapisz" })).toBeDisabled();
   });
 
   it("biuro nie widzi konfiguracji i nawet o nią nie pyta", async () => {

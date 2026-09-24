@@ -1,5 +1,5 @@
 import type { EnvFileResult } from "../env-file.js";
-import { KLUCZE, NAZWY_GRUP, type Grupa, type Kto, type Program } from "../konfiguracja-rejestr.js";
+import { KLUCZE, NAZWY_GRUP, type Edycja, type Grupa, type Kto, type Program } from "../konfiguracja-rejestr.js";
 
 /* ── Stan konfiguracji do panelu (0.488.0) ───────────────────────────────────
    Odpowiedź na pytanie „na czym ten serwer faktycznie chodzi" bez pulpitu
@@ -33,6 +33,12 @@ export interface WierszKonfiguracji {
   zrodlo: Zrodlo;
   /** `null` dla sekretu i dla wartości domyślnej. */
   wartosc: string | null;
+  /**
+   * Jak edytować z panelu (0.491.0); `null` = tylko plik albo instalator.
+   * Klucz przykryty zmienną usługi też dostaje `null`: zapis w pliku nic by
+   * nie zmienił, więc panel nie ma czego proponować.
+   */
+  edycja: Edycja | null;
 }
 
 export interface StanKonfiguracji {
@@ -64,6 +70,7 @@ export function stanKonfiguracji(
       tajny: k.tajny === true,
       zrodlo,
       wartosc: k.tajny ? null : surowa,
+      edycja: k.edycja && zrodlo !== "przykryte" && env.path ? k.edycja : null,
     };
   });
   const znane = new Set(KLUCZE.map((k) => k.klucz));

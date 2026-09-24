@@ -144,6 +144,8 @@ export interface WierszKonfiguracji {
   zrodlo: ZrodloUstawienia;
   /** `null` dla sekretu i dla wartości domyślnej — serwer nie wysyła ich wcale. */
   wartosc: string | null;
+  /** Jak zmienić z panelu (0.491.0); `null` = tylko plik albo instalator. */
+  edycja: { rodzaj: "tekst" | "liczba" | "data" | "wybor"; opcje?: string[] } | null;
 }
 
 export interface StanKonfiguracji {
@@ -151,6 +153,26 @@ export interface StanKonfiguracji {
   grupy: Record<string, string>;
   wiersze: WierszKonfiguracji[];
   nieznane: string[];
+}
+
+/**
+ * Zmiana jednego klucza (0.491.0). Serwer zapisuje `wertis.env` dopiero po
+ * udanej próbie startu i sam się restartuje pod NSSM (`restart: "sam"`).
+ * Odświeżenie karty czeka, aż serwer wstanie — wcześniej pokazałaby starą
+ * wartość, bo proces czyta plik raz, przy starcie.
+ */
+export function useZmienUstawienie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (z: { klucz: string; wartosc: string | null }) =>
+      api<{ ok: boolean; klucz: string; restart: "sam" | "reczny" }>("/api/biuro/konfiguracja",
+        { method: "POST", body: JSON.stringify(z) }),
+    onSuccess: (d) => {
+      if (d.restart === "sam") {
+        setTimeout(() => void qc.invalidateQueries({ queryKey: ["konfiguracja"] }), 8000);
+      }
+    },
+  });
 }
 
 /** Trasa adminowa, więc pytamy tylko jako admin — biuro dostałoby 403. */

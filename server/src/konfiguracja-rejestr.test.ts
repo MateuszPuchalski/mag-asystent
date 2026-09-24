@@ -88,3 +88,16 @@ test("wertis.env.example opisuje klucze z rejestru i tylko je", () => {
     .map((k) => k.klucz);
   assert.deepEqual(brak, [], "klucze instalatora i właściciela bez wpisu w wertis.env.example");
 });
+
+test("z panelu zmienia się wyłącznie decyzje właściciela czytane przez sam serwer", () => {
+  /* Klucz instalatora zmieniony z panelu odcina bazę; klucz workera C# nie
+     zadziała bez restartu usługi, której serwer nie umie zrestartować.
+     Trzy wyjątki właściciela zostają w pliku z powodem w `Edycja`. */
+  for (const k of KLUCZE.filter((x) => x.edycja)) {
+    assert.equal(k.kto, "wlasciciel", `${k.klucz}: edycja z panelu tylko dla decyzji właściciela`);
+    assert.deepEqual(k.czyta ?? ["serwer"], ["serwer"], `${k.klucz}: czyta go nie tylko serwer`);
+    if (k.edycja!.rodzaj === "wybor") assert.ok(k.edycja!.opcje?.length, `${k.klucz}: wybór bez opcji`);
+  }
+  const zPliku = KLUCZE.filter((x) => x.kto === "wlasciciel" && !x.edycja).map((x) => x.klucz).sort();
+  assert.deepEqual(zPliku, ["MAG_ID_ODP", "MAG_ID_SERWIS", "SFERA_ZW_WYDANIE_KAT_ID", "TW_ID_PRZESYLKA", "ZDJECIA_DODAWANIE"]);
+});

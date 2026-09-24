@@ -47,6 +47,24 @@ export type Kto = "instalator" | "wlasciciel" | "zaawansowane" | "dev";
 
 export type Program = "serwer" | "sfera" | "tlo";
 
+/**
+ * Jak panel ma edytować klucz (0.491.0). Brak pola = klucz zmienia się
+ * wyłącznie w pliku albo instalatorem.
+ *
+ * Pole mają TYLKO decyzje właściciela czytane przez sam serwer. Klucze
+ * instalatora zostają przy instalatorze, bo pomyłka w nich odcina bazę.
+ * Klucze workerów C# odpadają, bo serwer nie umie zrestartować ich usług.
+ * Trzy decyzje właściciela też zostają w pliku, każda z własnego powodu:
+ * `MAG_ID_ODP` i `MAG_ID_SERWIS` wystawiają dokumenty na wskazany magazyn,
+ * `TW_ID_PRZESYLKA` steruje pozycją ZW, a `ZDJECIA_DODAWANIE=subiekt`
+ * wymaga GRANT-u, który nadaje instalator. Pilnuje tego test.
+ */
+export interface Edycja {
+  rodzaj: "tekst" | "liczba" | "data" | "wybor";
+  /** Dozwolone wartości przy `wybor`. */
+  opcje?: readonly string[];
+}
+
 export interface Klucz {
   klucz: string;
   grupa: Grupa;
@@ -57,7 +75,13 @@ export interface Klucz {
   tajny?: true;
   /** Które programy go czytają. Brak pola = sam serwer. */
   czyta?: readonly Program[];
+  edycja?: Edycja;
 }
+
+const TEKST: Edycja = { rodzaj: "tekst" };
+const LICZBA: Edycja = { rodzaj: "liczba" };
+const DATA: Edycja = { rodzaj: "data" };
+const PRZELACZNIK: Edycja = { rodzaj: "wybor", opcje: ["0", "1"] };
 
 const S = ["serwer", "sfera"] as const;
 
@@ -104,13 +128,13 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "mag_Id magazynu odpadu dla towaru do utylizacji; 0 wyłącza." },
   { klucz: "MAG_ID_SERWIS", grupa: "magazyn", kto: "wlasciciel",
     opis: "mag_Id magazynu serwisowego dla braków w dostawie; 0 wyłącza." },
-  { klucz: "DOK_TYPY_DOSTAW", grupa: "magazyn", kto: "wlasciciel",
+  { klucz: "DOK_TYPY_DOSTAW", grupa: "magazyn", kto: "wlasciciel", edycja: TEKST,
     opis: "Kody dokumentów dostaw do rozkładania: 1 = sama FZ, 1,10 = FZ i PZ." },
-  { klucz: "POZYCJE_NIE_TOWAROWE", grupa: "magazyn", kto: "wlasciciel",
+  { klucz: "POZYCJE_NIE_TOWAROWE", grupa: "magazyn", kto: "wlasciciel", edycja: TEKST,
     opis: "Symbole pozycji, które nie są towarem, np. PRZESYŁKA; puste wyłącza." },
   { klucz: "TW_ID_PRZESYLKA", grupa: "magazyn", kto: "wlasciciel",
     opis: "tw_Id kartoteki PRZESYŁKA z paragonów Allegro; wymagane przy SFERA_ZW=1." },
-  { klucz: "ALLOW_MANUAL_LOC", grupa: "magazyn", kto: "wlasciciel",
+  { klucz: "ALLOW_MANUAL_LOC", grupa: "magazyn", kto: "wlasciciel", edycja: PRZELACZNIK,
     opis: "0 zabrania wpisywania lokalizacji z klawiatury kolektora." },
   { klucz: "DOK_TYPY_KOREKT", grupa: "magazyn", kto: "zaawansowane",
     opis: "Kody dokumentów oddających towar na stan po zwrocie." },
@@ -132,13 +156,13 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "0 wyłącza twarde sprawdzanie wzorca lokalizacji." },
 
   // ── Allegro ───────────────────────────────────────────────────────────────
-  { klucz: "ALLEGRO_CLIENT_ID", grupa: "allegro", kto: "wlasciciel",
+  { klucz: "ALLEGRO_CLIENT_ID", grupa: "allegro", kto: "wlasciciel", edycja: TEKST,
     opis: "Client ID aplikacji z developer.allegro.pl; puste wyłącza integrację." },
-  { klucz: "ALLEGRO_CLIENT_SECRET", grupa: "allegro", kto: "wlasciciel", tajny: true,
+  { klucz: "ALLEGRO_CLIENT_SECRET", grupa: "allegro", kto: "wlasciciel", edycja: TEKST, tajny: true,
     opis: "Client secret tej samej aplikacji." },
-  { klucz: "ALLEGRO_USER_AGENT", grupa: "allegro", kto: "wlasciciel",
+  { klucz: "ALLEGRO_USER_AGENT", grupa: "allegro", kto: "wlasciciel", edycja: TEKST,
     opis: "Nagłówek User-Agent wygenerowany na developer.allegro.pl." },
-  { klucz: "ALLEGRO_INBOX_OD", grupa: "allegro", kto: "wlasciciel",
+  { klucz: "ALLEGRO_INBOX_OD", grupa: "allegro", kto: "wlasciciel", edycja: DATA,
     opis: "Od kiedy skrzynka widzi rozmowy (data ISO w UTC)." },
   { klucz: "ALLEGRO_SELLER_ID", grupa: "allegro", kto: "zaawansowane",
     opis: "Numer sprzedawcy w linkach do Centrum Sprzedaży." },
@@ -168,15 +192,15 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "Wzorzec adresu reklamacji w Centrum Sprzedaży." },
 
   // ── Zwroty i reklamacje ───────────────────────────────────────────────────
-  { klucz: "ALLEGRO_ZWROTY_OD", grupa: "zwroty", kto: "wlasciciel",
+  { klucz: "ALLEGRO_ZWROTY_OD", grupa: "zwroty", kto: "wlasciciel", edycja: DATA,
     opis: "Od kiedy pobierane są zwroty (data ISO w UTC)." },
-  { klucz: "REKLAMACJE_OD", grupa: "zwroty", kto: "wlasciciel",
+  { klucz: "REKLAMACJE_OD", grupa: "zwroty", kto: "wlasciciel", edycja: DATA,
     opis: "Od kiedy kolejka reklamacji pokazuje sprawy; puste = bez progu." },
-  { klucz: "ZWROT_ROZLICZONE_OD", grupa: "zwroty", kto: "wlasciciel",
+  { klucz: "ZWROT_ROZLICZONE_OD", grupa: "zwroty", kto: "wlasciciel", edycja: DATA,
     opis: "Od kiedy rekoncyliacja zgłasza zwrot rozliczony poza aplikacją." },
-  { klucz: "ZWROT_TERMIN_DNI", grupa: "zwroty", kto: "wlasciciel",
+  { klucz: "ZWROT_TERMIN_DNI", grupa: "zwroty", kto: "wlasciciel", edycja: LICZBA,
     opis: "Dni na obsłużenie zwrotu od doręczenia paczki (regulamin Allegro)." },
-  { klucz: "ZWROT_WYGASA_DNI", grupa: "zwroty", kto: "wlasciciel",
+  { klucz: "ZWROT_WYGASA_DNI", grupa: "zwroty", kto: "wlasciciel", edycja: LICZBA,
     opis: "Po ilu dniach zwrot bez decyzji uznaje się za rozliczony." },
   { klucz: "ALLEGRO_ZWROTY_SYNC_MS", grupa: "zwroty", kto: "zaawansowane",
     opis: "Takt synchronizacji zwrotów w milisekundach; 0 wyłącza." },
@@ -188,23 +212,23 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "Wycofany w 0.152.0; serwer odmawia startu, dopóki stoi w pliku." },
 
   // ── Copilot ───────────────────────────────────────────────────────────────
-  { klucz: "COPILOT_MODE", grupa: "copilot", kto: "wlasciciel",
+  { klucz: "COPILOT_MODE", grupa: "copilot", kto: "wlasciciel", edycja: { rodzaj: "wybor", opcje: ["off", "anthropic"] },
     opis: "anthropic włącza Copilota; off wyłącza." },
-  { klucz: "ANTHROPIC_API_KEY", grupa: "copilot", kto: "wlasciciel", tajny: true,
+  { klucz: "ANTHROPIC_API_KEY", grupa: "copilot", kto: "wlasciciel", edycja: TEKST, tajny: true,
     opis: "Klucz API dostawcy modelu." },
-  { klucz: "COPILOT_MODEL", grupa: "copilot", kto: "wlasciciel",
+  { klucz: "COPILOT_MODEL", grupa: "copilot", kto: "wlasciciel", edycja: TEKST,
     opis: "Model do szkiców odpowiedzi." },
-  { klucz: "COPILOT_MODEL_KLASYFIKACJA", grupa: "copilot", kto: "wlasciciel",
+  { klucz: "COPILOT_MODEL_KLASYFIKACJA", grupa: "copilot", kto: "wlasciciel", edycja: TEKST,
     opis: "Model do rozpoznawania wiadomości; puste = ten sam co do szkiców." },
-  { klucz: "COPILOT_AUTO_SZKIC", grupa: "copilot", kto: "wlasciciel",
+  { klucz: "COPILOT_AUTO_SZKIC", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
     opis: "1 = szkic sam dla nowego pytania pod ofertą." },
-  { klucz: "COPILOT_AUTO_KLASYFIKACJA", grupa: "copilot", kto: "wlasciciel",
+  { klucz: "COPILOT_AUTO_KLASYFIKACJA", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
     opis: "1 = rozpoznanie każdej nowej wiadomości klienta." },
-  { klucz: "COPILOT_SZKIC_PO_ROZPOZNANIU", grupa: "copilot", kto: "wlasciciel",
+  { klucz: "COPILOT_SZKIC_PO_ROZPOZNANIU", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
     opis: "0 wyłącza szkic układany zaraz po rozpoznaniu." },
-  { klucz: "COPILOT_AUTO_NA_GODZINE", grupa: "copilot", kto: "wlasciciel",
+  { klucz: "COPILOT_AUTO_NA_GODZINE", grupa: "copilot", kto: "wlasciciel", edycja: LICZBA,
     opis: "Sufit automatycznych szkiców na godzinę; hamulec kosztów." },
-  { klucz: "COPILOT_AUTO_KLASYFIKACJA_NA_GODZINE", grupa: "copilot", kto: "wlasciciel",
+  { klucz: "COPILOT_AUTO_KLASYFIKACJA_NA_GODZINE", grupa: "copilot", kto: "wlasciciel", edycja: LICZBA,
     opis: "Sufit automatycznych rozpoznań na godzinę; hamulec kosztów." },
   { klucz: "COPILOT_MAX_PARTIA", grupa: "copilot", kto: "zaawansowane",
     opis: "Ile rozmów bierze jedno kliknięcie." },
@@ -214,9 +238,9 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "Ile rozpoznań na jeden przebieg taktu." },
   { klucz: "COPILOT_KLASYFIKACJA_OKNO_DNI", grupa: "copilot", kto: "zaawansowane",
     opis: "Z ilu dni wstecz automat bierze wiadomości do rozpoznania." },
-  { klucz: "WIEDZA_AUTOMAT", grupa: "copilot", kto: "wlasciciel",
+  { klucz: "WIEDZA_AUTOMAT", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
     opis: "1 = kolejka wiedzy opróżnia się sama." },
-  { klucz: "WIEDZA_AUTOMAT_MODEL", grupa: "copilot", kto: "wlasciciel",
+  { klucz: "WIEDZA_AUTOMAT_MODEL", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
     opis: "1 = automat wiedzy może pytać model językowy." },
   { klucz: "WIEDZA_AUTOMAT_NA_PRZEBIEG", grupa: "copilot", kto: "zaawansowane",
     opis: "Ile wierszy wiedzy na jeden przebieg." },
@@ -253,7 +277,7 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "Operator Subiekta, którym worker wystawia dokumenty." },
   { klucz: "SFERA_OPERATOR_HASLO", grupa: "sfera", kto: "instalator", tajny: true, czyta: ["sfera"],
     opis: "Hasło tego operatora." },
-  { klucz: "SFERA_ZW", grupa: "sfera", kto: "wlasciciel",
+  { klucz: "SFERA_ZW", grupa: "sfera", kto: "wlasciciel", edycja: PRZELACZNIK,
     opis: "1 = automatyczny ZW do paragonu; wymaga SFERA_WORKER=1." },
   { klucz: "SFERA_ZW_WYDANIE_KAT_ID", grupa: "sfera", kto: "wlasciciel", czyta: ["sfera"],
     opis: "Kategoria dokumentu ZW; 0 = domyślna Subiekta." },
@@ -284,7 +308,7 @@ export const KLUCZE: readonly Klucz[] = [
   { klucz: "PORT", grupa: "serwer", kto: "instalator", opis: "Port API; kolektory łączą się na ten port." },
   { klucz: "SRODOWISKO", grupa: "serwer", kto: "instalator",
     opis: "Etykieta instancji, np. dev; produkcja zostawia puste." },
-  { klucz: "KOPIE_KATALOG", grupa: "serwer", kto: "wlasciciel",
+  { klucz: "KOPIE_KATALOG", grupa: "serwer", kto: "wlasciciel", edycja: TEKST,
     opis: "Katalog kopii bazy aplikacji; najlepiej na innym dysku." },
   { klucz: "STREFA_CZASU", grupa: "serwer", kto: "zaawansowane",
     opis: "Strefa czasu magazynu do wyświetlania godzin i okna nocnej kopii." },

@@ -85,3 +85,54 @@ test("patrzenie niczego nie zapisuje — także wpisu privileged", async () => {
   await app.inject({ method: "GET", url: "/api/biuro/konfiguracja", headers: naglowki });
   assert.equal(ile(), przed);
 });
+
+/* ── Zapis z panelu (0.491.0) ───────────────────────────────────────────
+   Klucz przykryty zmienną usługi sprawdza `konfiguracja-zapis.test.ts`:
+   tutaj PORT jest przykryty, ale nie jest edytowalny, więc nie ma na czym. */
+
+const plik = () => fs.readFileSync(process.env.WERTIS_ENV_FILE!, "utf8");
+const zmien = (naglowki: Record<string, string>, klucz: string, wartosc: string | null) =>
+  app.inject({ method: "POST", url: "/api/biuro/konfiguracja", headers: naglowki, payload: { klucz, wartosc } });
+
+test("zmienia tylko admin — biuro i hala dostają 403, plik nietknięty", async () => {
+  const przed = plik();
+  for (const rola of ["biuro", "magazynier"] as const) {
+    assert.equal((await zmien(jako(rola), "ZWROT_TERMIN_DNI", "5")).statusCode, 403, rola);
+  }
+  assert.equal(plik(), przed);
+});
+
+test("admin zmienia decyzję właściciela: plik, dziennik, restart zostaje człowiekowi poza NSSM", async () => {
+  const r = await zmien(jako("admin"), "ZWROT_TERMIN_DNI", "10");
+  assert.equal(r.statusCode, 200, r.body);
+  /* W teście nie ma NSSM, więc `main()` nie ustawił restartu — odpowiedź mówi
+     to wprost, zamiast obiecywać restart, którego nikt nie zrobi. */
+  assert.deepEqual(r.json(), { ok: true, klucz: "ZWROT_TERMIN_DNI", restart: "reczny" });
+  assert.match(plik(), /^export ZWROT_TERMIN_DNI=10$/m);
+  assert.ok(plik().includes(`MSSQL_PASSWORD="${HASLO}"`), "zapis ruszył inną linię");
+  const wpis = db().prepare("SELECT payload FROM events WHERE type = 'konfiguracja_zmieniona' ORDER BY id DESC")
+    .get() as { payload: string };
+  assert.deepEqual(JSON.parse(wpis.payload), { klucz: "ZWROT_TERMIN_DNI", z: "9", na: "10" });
+});
+
+test("odmowy mówią zdaniem i nie ruszają pliku", async () => {
+  const przed = plik();
+  const naglowki = jako("admin");
+  /* klucz instalatora */
+  assert.match((await zmien(naglowki, "MSSQL_SERVER", "inny")).json().error, /nie zmienia się z panelu/);
+  /* zła wartość */
+  assert.match((await zmien(naglowki, "ZWROT_TERMIN_DNI", "tydzień")).json().error, /liczbę/);
+  /* reguła krzyżowa z `bledyKonfiguracji`: klucz Allegro bez sekretu */
+  const r = await zmien(naglowki, "ALLEGRO_CLIENT_ID", "abc");
+  assert.equal(r.statusCode, 400);
+  assert.match(r.json().error, /nie wstałby.*ALLEGRO_CLIENT_SECRET/s);
+  assert.equal(plik(), przed);
+});
+
+test("GET mówi panelowi, co wolno zmienić", async () => {
+  const k = (await app.inject({ method: "GET", url: "/api/biuro/konfiguracja", headers: jako("admin") })).json() as {
+    wiersze: Array<{ klucz: string; edycja: { rodzaj: string } | null }> };
+  const w = (klucz: string) => k.wiersze.find((x) => x.klucz === klucz)!;
+  assert.equal(w("ZWROT_TERMIN_DNI").edycja?.rodzaj, "liczba");
+  assert.equal(w("MSSQL_SERVER").edycja, null);
+});

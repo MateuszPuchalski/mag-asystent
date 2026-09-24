@@ -203,7 +203,35 @@ się na niej.
 **Konfiguracja serwera**, widoczna tylko dla administratora. Pokazuje ścieżkę
 wczytanego pliku i każdy klucz ze źródłem: z pliku, przykryty przez zmienną
 usługi albo domyślny. Hasła i klucze API widać wyłącznie jako „ustawione".
-Zmiana nadal idzie przez ten plik i restart usług.
+
+**Zmiana z panelu (0.491.0).** Przy 25 decyzjach właściciela karta ma przycisk
+**Zmień**: progi dat Allegro, terminy zwrotów, Copilot i jego limity, klucze
+Allegro i API, kopie na innym dysku. Serwer robi wtedy cztery rzeczy
+w tej kolejności:
+
+1. sprawdza wartość według rodzaju (liczba, data ISO, wybór, tekst);
+2. próbuje wstać z nowym plikiem w osobnym procesie — konfiguracja, przy
+   której serwer odmówiłby startu, **nie trafia na dysk**;
+3. zapisuje `wertis.env` atomowo i zostawia poprzednią wersję
+   w `wertis.env.poprzedni`;
+4. pod NSSM kończy się sam, a NSSM podnosi go z nowym plikiem. Worker robi
+   to samo w ciągu kilkunastu sekund.
+
+Klucze instalatora, pokrętła zaawansowane i klucze workerów C# zmienia się
+dalej w pliku. Trzy decyzje właściciela też: `MAG_ID_ODP`, `MAG_ID_SERWIS`
+i `TW_ID_PRZESYLKA` wystawiają dokumenty na wskazany numer, a
+`ZDJECIA_DODAWANIE=subiekt` wymaga GRANT-u od instalatora.
+
+**Cofnięcie zmiany z panelu:** ten sam przycisk z poprzednią wartością albo
+**Domyślna**. Gdyby panel nie wstał, przy zatrzymanych usługach:
+
+```powershell
+Copy-Item C:\wertis\wertis.env.poprzedni C:\wertis\wertis.env
+```
+
+Poza usługą NSSM (`npm run dev`, ręczne `node server\dist\index.js`) serwer
+się nie restartuje, bo nikt by go nie podniósł. Panel mówi wtedy, że zmiana
+czeka na restart usług.
 
 **Literówka w nazwie klucza melduje się sama.** Klucz, którego nie czyta żaden
 z trzech programów, staje w `problemy` na `/api/health` i na czerwono w tej
@@ -2659,6 +2687,13 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.491.0 — ustawienia zmienia się z panelu
+
+Niczego nie trzeba robić. Pierwsza zmiana z panelu dopisze do `wertis.env`
+linię `# ── zmienione z panelu ──`, jeśli klucza nie było w pliku. Po zmianie
+obok pliku stoi `wertis.env.poprzedni` z tym samym hasłem co oryginał — oba
+są w `.gitignore`.
 
 ### Aktualizacja do 0.490.0 — konta z panelu
 
