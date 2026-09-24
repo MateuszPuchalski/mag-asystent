@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { calaDostawa, szybkaSciezka } from "./szybkiZwrot";
+import { calaDostawa, szybkaSciezka } from "./regulaSzybkiej";
 import type { PozycjaZwrotu, Zwrot } from "../api/typy";
 
 /* ── Reguła szybkiej ścieżki (0.481.0) ────────────────────────────────────

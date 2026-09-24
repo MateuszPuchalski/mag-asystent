@@ -44,7 +44,7 @@ const POWODY: Record<string, string> = {
 };
 
 import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
-import { calaDostawa, pewnaPropozycja } from "./szybkiZwrot";
+import { calaDostawa, pewnaPropozycja } from "./regulaSzybkiej";
 
 /* TRZY PRZYCISKI OD 0.375.0, i trzeci ma warunek. „Na przecenę" zeszła stąd
    w 0.209.0, bo nie prowadziła donikąd: nie dokładała do koszyka, nie ruszała

@@ -34,6 +34,20 @@ historii nie przepisujemy.
 ---
 
 
+## 0.482.12 — 24 września 2026
+
+**Panel buduje się znowu na Windowsie.** 0.481.0 postawiło obok siebie
+`zwroty/SzybkiZwrot.tsx` i `zwroty/szybkiZwrot.ts`. Na Linuksie, w CI, to dwa
+pliki. Na Windowsie to jeden, więc `tsc -b` odmówił, a aktualizacja zatrzymała
+usługi. Reguła szybkiej ścieżki nazywa się teraz `zwroty/regulaSzybkiej.ts`.
+
+Strażnik `panel/src/Wielkosc.test.ts` odmawia, gdy dwie ścieżki panelu różnią
+się wyłącznie wielkością liter. Porównuje je bez rozszerzenia, bo tak
+rozwiązuje się import.
+
+**[wymaga uwagi]** Po scaleniu powtórz `.\wertis-instalator.ps1 -Aktualizuj`.
+Usługi stoją od nieudanej aktualizacji do 0.482.11.
+
 ## 0.482.11 — 23 września 2026
 
 **CLAUDE.md dostaje cztery reguły dla Copilota.** Wysiłek tylko przez

@@ -3,10 +3,10 @@ import { Zap } from "lucide-react";
 import type { Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Przycisk } from "../ui";
-import { calaDostawa, type SzybkaSciezka } from "./szybkiZwrot";
+import { calaDostawa, type SzybkaSciezka } from "./regulaSzybkiej";
 
 /**
- * Przycisk szybkiej ścieżki (0.481.0) — reguła stoi w `szybkiZwrot.ts`.
+ * Przycisk szybkiej ścieżki (0.481.0) — reguła stoi w `regulaSzybkiej.ts`.
  *
  * KWOTA STOI NA PRZYCISKU, bo to jedyna liczba, która wychodzi do klienta.
  * Kto naciska „wszystko w porządku", ma widzieć, ile to jest, zanim naciśnie
