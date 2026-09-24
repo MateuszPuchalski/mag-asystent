@@ -68,6 +68,13 @@ Przegląd drogi takiej paczki znalazł cztery błędy, poprawione w tym wydaniu:
 Raport rekoncyliacji mówił „(null)" przy zwrocie rozliczonym bez statusu.
 Mówi teraz „(operacje płatności)".
 
+**Ostrzeżenie o drugim zwrocie tego samego zamówienia**, decyzją właściciela.
+Klient z paczką nieodebraną zgłasza czasem potem odstąpienie w Allegro.
+Synchronizacja zakłada wtedy drugi zwrot obok paczki przyjętej przez biuro.
+Oba wiersze kolejki dostają czerwony znacznik „2 zwroty", a nagłówek podaje
+numer drugiego z odnośnikiem. Dwa zwroty z Allegro na jedno zamówienie to
+zwykły zwrot w dwóch paczkach i ostrzeżenia nie dostają.
+
 ## 0.492.0 — 24 września 2026
 
 **Aktualizacja serwera przyciskiem w panelu.** Ustawienia → „Aktualizacja

@@ -4138,6 +4138,14 @@ po terminie. Wypłata zdejmuje tylko to czekanie, a zwrot zamyka korekta.
 Narzędzie kasowania rozliczonych poza aplikacją paczki nie rusza, bo nie
 wróciłaby z synchronizacji.
 
+**Drugi zwrot tego zamówienia ostrzega (0.493.0).** Klient z paczką
+nieodebraną zgłasza czasem potem odstąpienie w Allegro. Synchronizacja zakłada
+wtedy drugi zwrot tego samego zamówienia, a to dwie kwoty za jeden towar.
+Worker drugiego ZW nie wystawi, ale pieniędzy pilnuje już tylko człowiek.
+Oba wiersze dostają sygnał `drugi_zwrot`, a nagłówek podaje numer drugiego
+z odnośnikiem. Sygnał świeci tylko przy różnych źródłach i tylko w pracy.
+Dwa zwroty z Allegro to zwykły zwrot w dwóch paczkach.
+
 **Wiersz jest JAWNIE oznaczony**, kolumną `zrodlo`. Panel pisze przy nim
 „Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana", a plakietka
 stoi i w kolejce, i w nagłówku, i w kolumnie eksportu CSV. Bez tego biuro

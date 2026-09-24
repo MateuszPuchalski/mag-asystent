@@ -36,6 +36,21 @@ describe("Nagłówek zwrotu", () => {
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
   });
 
+  it("drugi zwrot tego zamówienia stoi w nagłówku z odnośnikiem (0.493.0)", () => {
+    /* Paczka nieodebrana obok zwrotu z Allegro to dwie kwoty za jeden towar. */
+    render(<Naglowek zwrot={zwrot({
+      drugiZwrot: { id: 7, numer: "620000111222", zrodlo: "nieodebrana" } })} />);
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "To zamówienie ma też paczkę nieodebraną 620000111222 — pieniądze oddaje się raz.");
+    expect(screen.getByRole("link", { name: "620000111222" }))
+      .toHaveAttribute("href", "/obsluga/zwroty/7");
+  });
+
+  it("bez drugiego zwrotu nagłówek milczy o nim", () => {
+    render(<Naglowek zwrot={zwrot({ drugiZwrot: null })} />);
+    expect(screen.queryByText(/pieniądze oddaje się raz/)).toBeNull();
+  });
+
   it("bez adresu zostaje sam tekst — link donikąd jest gorszy od jego braku", () => {
     render(<Naglowek zwrot={zwrot()} />);
     expect(screen.queryByRole("link", { name: /N4QZ\/2026/ })).not.toBeInTheDocument();
