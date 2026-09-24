@@ -1261,6 +1261,14 @@ export interface KoszykCzekajacy {
     stanMag: number;
     /** Czy tego wiersza NIE DA SIĘ przesunąć: na magazynie jest go za mało. */
     brakNaMag: boolean;
+    /** Ile z `stanMag` jest zarezerwowane (0.486.5) — zarezerwowanego MM nie zabierze. */
+    rezerwacja: number;
+    /**
+     * Na magazynie JEST, ale wolnego (stan − rezerwacje) za mało (0.486.5).
+     * Osobno od `brakNaMag`, bo naprawa jest inna: zdjąć rezerwację
+     * w Subiekcie, a nie wyjmować towar z pudła.
+     */
+    brakWolnego: boolean;
   }>;
 }
 
@@ -1399,24 +1407,41 @@ export function koszykiBezDokumentu(database: Db): KoszykCzekajacy[] {
       rodzaj: RodzajKosza; blad: string | null; payload: string | null }>;
   const wiersze = database.prepare(
     `SELECT kp.id, kp.tw_id, kp.symbol, kp.nazwa, kp.ilosc, kp.zwrot_pozycja_id,
-            COALESCE(st.stan, 0) AS stan
+            COALESCE(st.stan, 0) AS stan, COALESCE(st.stan_rez, 0) AS rez
        FROM kosz_pozycja kp
        LEFT JOIN sgt_stan st ON st.tw_id = kp.tw_id AND st.mag_id = ?
       WHERE kp.kosz_id = ? ORDER BY kp.id`);
-  return kosze.map((k) => ({
-    id: Number(k.id), kod: k.kod, zamknietoAt: k.zamknieto_at, rodzaj: k.rodzaj,
-    brakuje: brakujaceKorekty(database, Number(k.id)),
-    blad: k.blad ?? null,
-    pozycje: (wiersze.all(magazynZrodlowy(k.payload), k.id) as Array<
-      { id: number; symbol: string; nazwa: string; ilosc: number;
-        zwrot_pozycja_id: number | null; stan: number }>)
-      .map((p) => ({
-        pozycjaId: Number(p.id), symbol: p.symbol, nazwa: p.nazwa, ilosc: Number(p.ilosc),
-        zeZwrotu: p.zwrot_pozycja_id !== null,
-        stanMag: Number(p.stan),
-        brakNaMag: Number(p.stan) < Number(p.ilosc),
-      })),
-  }));
+  return kosze.map((k) => {
+    const lista = wiersze.all(magazynZrodlowy(k.payload), k.id) as Array<
+      { id: number; tw_id: number; symbol: string; nazwa: string; ilosc: number;
+        zwrot_pozycja_id: number | null; stan: number; rez: number }>;
+    /* ── SUMA PO KARTOTECE, NIE PO WIERSZU (0.486.5) ──────────────────────
+       Zgłoszenie właściciela z kosza Z-29: „Brak towaru w magazynie — nie
+       pokazuje którego". Żaden wiersz nie był czerwony, bo porównanie szło
+       wierszem: dwa zwroty tej samej kartoteki po sztuce przechodziły przy
+       stanie 1, a MM prosi o dwie. Druga dziura: rezerwacje. Subiekt nie
+       zabierze zarezerwowanego towaru, a liczyliśmy sam `stan` — choć
+       gdzie indziej w aplikacji dostępne to od dawna stan − rezerwacje. */
+    const suma = new Map<number, number>();
+    for (const p of lista) suma.set(Number(p.tw_id), (suma.get(Number(p.tw_id)) ?? 0) + Number(p.ilosc));
+    return {
+      id: Number(k.id), kod: k.kod, zamknietoAt: k.zamknieto_at, rodzaj: k.rodzaj,
+      brakuje: brakujaceKorekty(database, Number(k.id)),
+      blad: k.blad ?? null,
+      pozycje: lista.map((p) => {
+        const potrzeba = suma.get(Number(p.tw_id)) ?? Number(p.ilosc);
+        const brakNaMag = Number(p.stan) < potrzeba;
+        return {
+          pozycjaId: Number(p.id), symbol: p.symbol, nazwa: p.nazwa, ilosc: Number(p.ilosc),
+          zeZwrotu: p.zwrot_pozycja_id !== null,
+          stanMag: Number(p.stan),
+          brakNaMag,
+          rezerwacja: Number(p.rez),
+          brakWolnego: !brakNaMag && Number(p.stan) - Number(p.rez) < potrzeba,
+        };
+      }),
+    };
+  });
 }
 
 /**

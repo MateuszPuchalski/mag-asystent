@@ -946,6 +946,30 @@ test("pasek mówi, KTÓREGO towaru brakuje na magazynie (0.381.0)", () => {
   assert.equal(wg.get("SYM-11")!.stanMag, 2);
 });
 
+test("zarezerwowany towar to osobny powód odmowy — liczy się WOLNE (0.486.5)", () => {
+  /* Kosz Z-29: Sfera odmówiła „Brak towaru w magazynie", a żaden wiersz nie
+     był czerwony. Subiekt nie zabierze zarezerwowanego towaru; liczyliśmy
+     sam stan. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const z = zwrotZTowarem(d, [11], KTO);
+  skorygowany(d, z.id);
+  ocenPozycje(d, z.poz[0], "stan", 2, KTO);
+  const kosz = otwarteKoszyki(d, KTO)[0];
+  /* Dwa sekatory na magazynie, oba potrzebne — ale jeden zarezerwowany. */
+  d.prepare("UPDATE sgt_stan SET stan=2, stan_rez=1 WHERE tw_id=11 AND mag_id=1").run();
+  zamknijKosz(d, kosz.id, KTO);
+  const q = (d.prepare("SELECT mm_queue_id FROM kosz WHERE id=?").get(kosz.id) as
+    { mm_queue_id: number }).mm_queue_id;
+  d.prepare("UPDATE sfera_queue SET status='error', error_msg=? WHERE id=?")
+    .run('Sfera odrzuciła "MM.Zapisz()": Brak towaru w magazynie.', q);
+
+  const [p] = koszykiBezDokumentu(d)[0].pozycje;
+  assert.equal(p.brakNaMag, false, "towar JEST na magazynie");
+  assert.equal(p.brakWolnego, true, "ale wolnego za mało — MM go nie zabierze");
+  assert.equal(p.rezerwacja, 1);
+});
+
 test("poprawka GASI stare zadanie w błędzie — PONÓW nie wskrzesi duplikatu", () => {
   /* Koszyk Z-23 zebrał tak TRZY żywe zadania MM naraz (0.420.0). W czasie
      awarii pustej sesji Sfery każde zadanie tego kosza schodziło w `error`,
