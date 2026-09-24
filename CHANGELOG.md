@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.484.8 — 24 września 2026
+
+**Nagłówek zwrotu mówi więcej o kliencie, a rozmowę o zwrocie widać od razu.**
+Zgłoszenie właściciela: „potrzebuję więcej informacji o kliencie w nagłówku,
+szczególnie jeśli jest konwersacja dotycząca tego zwrotu”.
+
+- **Kto to jest:** obok loginu stoi nazwisko odbiorcy i odnośnik „profil”
+  do profilu klienta z 0.484.0. Login bywa ciągiem cyfr (`Client:105505227`),
+  a nazwisko mówi, z kim rozmawiamy. Z adresu nie dochodzi nic nowego.
+- **Najnowsza rozmowa o tym zakupie** stoi pod loginem: temat, czas,
+  ostatnia wiadomość i znacznik „czeka na odpowiedź” albo „odpisaliśmy”.
+  Nasza autoodpowiedź się nie liczy. Reszta rozmów zostaje w dowodach,
+  nagłówek mówi tylko, ile ich jest.
+
+Serwer dokłada do rozmów zwrotu ostatnią prawdziwą wiadomość (do 280 znaków)
+i jej kierunek. Podzapytanie idzie po istniejącym indeksie wątku.
+
 ## 0.484.7 — 24 września 2026
 
 **Nadmiar z kartonu da się dopisać także w linii zgłoszonej w części.**

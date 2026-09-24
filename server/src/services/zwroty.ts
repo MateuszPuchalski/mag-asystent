@@ -231,6 +231,10 @@ export interface RozmowaZwrotu {
   temat: string | null;
   status: string;
   ostatniaAt: string | null;
+  /** Ostatnia prawdziwa wiadomość w wątku, do 280 znaków — bez naszej autoodpowiedzi (0.484.8). */
+  ostatniaTresc: string | null;
+  /** Czy to ostatnie słowo napisał klient, czyli wątek czeka na nas. */
+  odKlienta: boolean;
 }
 
 /** Ile dni przed terminem wiersz zapala się na czerwono. */
@@ -853,7 +857,19 @@ export function listaZwrotow(
   const numery = [...new Set(zwroty.filter((z) => z.order_id).map((z) => String(z.order_id)))];
   const rozmowy = filtr !== null && !numery.length ? [] : database.prepare(`
     SELECT m.related_order_id AS zam, c.id, c.subject, c.status,
-           MAX(m.sent_at) AS ostatnia
+           MAX(m.sent_at) AS ostatnia,
+           /* OSTATNIE SŁOWO W WĄTKU (0.484.8) — do nagłówka zwrotu. Zgłoszenie
+              właściciela: „potrzebuję więcej informacji o kliencie w nagłówku,
+              szczególnie jeśli jest konwersacja o tym zwrocie". Temat i data
+              nie mówią, czy klient czeka na nas. Pomijamy naszą automatyczną
+              odpowiedź: echo „dziękujemy za kontakt" udawałoby odpisanie.
+              Podzapytanie idzie po indeksie (conversation_id, sent_at). */
+           (SELECT substr(x.body, 1, 280) FROM message x
+             WHERE x.conversation_id = c.id AND x.auto_odpowiedz = 0
+             ORDER BY x.sent_at DESC LIMIT 1) AS tresc,
+           (SELECT x.direction FROM message x
+             WHERE x.conversation_id = c.id AND x.auto_odpowiedz = 0
+             ORDER BY x.sent_at DESC LIMIT 1) AS kierunek
       FROM message m JOIN conversation c ON c.id = m.conversation_id
      WHERE m.related_order_id IS NOT NULL
        ${filtr === null ? "" : `AND m.related_order_id IN (${znaki(numery.length)})`}
@@ -867,6 +883,9 @@ export function listaZwrotow(
       temat: (r.subject as string) ?? null,
       status: String(r.status),
       ostatniaAt: (r.ostatnia as string) ?? null,
+      ostatniaTresc: (r.tresc as string) ?? null,
+      /* „Czeka na nas" = ostatnie prawdziwe słowo należy do klienta. */
+      odKlienta: r.kierunek === "incoming",
     });
     rozmowyWgZam.set(klucz, lista);
   }

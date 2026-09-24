@@ -96,4 +96,31 @@ describe("Nagłówek zwrotu", () => {
     expect(screen.getByText("70X0/2026")).toBeInTheDocument();
     expect(screen.getByText("Fenix-Warszawa")).toBeInTheDocument();
   });
+
+  it("nagłówek mówi, kto to jest, i prowadzi do profilu (0.484.8)", () => {
+    /* Login bywa ciągiem cyfr — nazwisko odbiorcy mówi, z kim rozmawiamy. */
+    render(<Naglowek zwrot={zwrot({ kupujacyLogin: "Client:105505227", odbiorcaNazwa: "Jan Kowalski" })} />);
+    expect(screen.getByText("Jan Kowalski")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /profil/ }))
+      .toHaveAttribute("href", "/obsluga/klient/Client%3A105505227");
+  });
+
+  it("najnowsza rozmowa stoi w nagłówku: co napisał klient i czy czeka na nas (0.484.8)", () => {
+    render(<Naglowek zwrot={zwrot({ kupujacyLogin: "jan", rozmowy: [
+      { id: 7, temat: "Zwrot nakrętki", status: "open", ostatniaAt: "2026-09-24T08:00:00Z",
+        ostatniaTresc: "Wysłałem obie sztuki, proszę o zwrot za dwie.", odKlienta: true },
+      { id: 8, temat: "Stare pytanie", status: "closed", ostatniaAt: "2026-09-01T08:00:00Z",
+        ostatniaTresc: "Dziękuję", odKlienta: false },
+    ] })} />);
+    const wpis = screen.getByRole("link", { name: /Zwrot nakrętki/ });
+    expect(wpis).toHaveAttribute("href", "/obsluga/skrzynka/7");
+    expect(wpis).toHaveTextContent("czeka na odpowiedź");
+    expect(wpis).toHaveTextContent(/Wysłałem obie sztuki/);
+    expect(wpis).toHaveTextContent("i 1 inna rozmowa o tym zakupie");
+  });
+
+  it("bez rozmów nagłówek nie rysuje pustego pola", () => {
+    render(<Naglowek zwrot={zwrot({ kupujacyLogin: "jan", rozmowy: [] })} />);
+    expect(screen.queryByText(/czeka na odpowiedź|odpisaliśmy/)).toBeNull();
+  });
 });
