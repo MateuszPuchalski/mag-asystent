@@ -34,6 +34,21 @@ historii nie przepisujemy.
 ---
 
 
+## 0.490.0 — 24 września 2026
+
+**Konta zakłada się z panelu.** Dotąd tylko kreator na kolektorze albo
+`curl`, więc konto dla nowej osoby w biurze zakładał ktoś z kolektorem
+w ręku. Karta **Konta i sesje** ma teraz przycisk **Dodaj osobę**.
+
+- **Biuro zakłada magazynierów**, administrator zakłada każdą rolę. Formularz
+  proponuje tylko role, których serwer nie odrzuci; bramkę trzyma dalej
+  serwer (`zarzadzanie_kontami`, `zarzadzanie_biurem`).
+- **Przycisk nie świeci**, dopóki login albo hasło na pewno nie przejdą.
+- **Hasła nie widać po zapisie**, tak samo jak w kreatorze na kolektorze.
+
+Zmiana dotyczy wyłącznie panelu. Trasa `POST /api/users` i jej testy ról
+stoją bez zmian od 0.24.0.
+
 ## 0.489.0 — 24 września 2026
 
 **Dziewiętnaście kluczy `wertis.env` przestało być kluczami.** Zostało 117.

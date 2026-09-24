@@ -1,7 +1,8 @@
 import React, { useState } from "react";
-import { KeyRound, LogOut, Power, Users } from "lucide-react";
+import { KeyRound, LogOut, Power, UserPlus, Users } from "lucide-react";
 import {
-  useAktywnosc, useKonta, useResetHasla, useSesje, useWylogujWszedzie, type Konto,
+  useAktywnosc, useKonta, useResetHasla, useSesje, useWylogujWszedzie, useZalozKonto,
+  type Konto, type RolaKonta,
 } from "../api/ustawienia";
 import { Blad, Pole, Przycisk, stempel } from "../ui";
 import { Potwierdz } from "../ui/Potwierdz";
@@ -17,8 +18,12 @@ import { KartaWgladu, Tabela, Td } from "../ui/wglad";
    pkt 1). Serwer odmawia dalej (`zarzadzanie_biurem`); ekran tylko nie
    zaprasza do próby. Ten sam wzór co karta Allegro w stanie systemu.
 
-   Kont się tu nie zakłada i nie kasuje. Zakłada je kreator na kolektorze
-   (`POST /api/users`), a skasowane konto zostawiłoby dziennik bez autora.
+   Kont się tu nie kasuje: skasowane konto zostawiłoby dziennik bez autora.
+
+   ZAKŁADA SIĘ JE TU OD 0.490.0. Wcześniej tylko kreator na kolektorze albo
+   `curl` — czyli konto biura zakładał ktoś z kolektorem w ręku. Formularz
+   widzi biuro i admin; biuro dostaje wyłącznie rolę magazyniera, bo konto
+   biura albo admina serwer założy tylko adminowi (`zarzadzanie_biurem`).
 
    HASŁO W POLU `password`, nie w okienku przeglądarki. Biuro pytało przez
    `prompt()`, który pokazuje wpisywany tekst każdemu za plecami. */
@@ -101,22 +106,76 @@ function Sesje({ k, onZamknij }: { k: Konto; onZamknij: () => void }) {
   </section>;
 }
 
-export function Konta({ admin }: { admin: boolean }) {
+/* Te same zasady co serwer (`bladDanych` w `routes/auth.ts`). Przycisk nie
+   świeci, dopóki wiadomo, że żądanie skończy się odmową; resztę mówi serwer. */
+const LOGIN = /^[a-z0-9._-]{3,32}$/;
+
+function NowaOsoba({ role, onZamknij }: { role: RolaKonta[]; onZamknij: () => void }) {
+  const zaloz = useZalozKonto();
+  const [name, setName] = useState("");
+  const [login, setLogin] = useState("");
+  const [haslo, setHaslo] = useState("");
+  const [rola, setRola] = useState<RolaKonta>(role[0]!);
+  const [wynik, setWynik] = useState("");
+  const gotowe = name.trim() !== "" && LOGIN.test(login) && haslo.length >= HASLO_MIN;
+
+  return <form aria-label="Nowa osoba" className="mt-4 rounded-lg border border-slate-200 p-3"
+    onSubmit={(e) => {
+      e.preventDefault();
+      setWynik("");
+      zaloz.mutate({ name: name.trim(), login, haslo, role: rola }, {
+        onSuccess: (d) => {
+          /* Hasła nie pokazujemy ani razu — wpisał je ten sam człowiek przed
+             chwilą. Tak samo robi kreator na kolektorze. */
+          setWynik(`Konto „${d.user.login}” założone — przekaż hasło osobiście.`);
+          setName(""); setLogin(""); setHaslo("");
+        },
+      });
+    }}>
+    <h3 className="mb-2 text-sm font-bold">Nowa osoba</h3>
+    <div className="flex flex-wrap items-end gap-2">
+      <Pole aria-label="Imię i nazwisko" placeholder="Imię i nazwisko" className="w-48"
+        value={name} onChange={(e) => setName(e.target.value)} />
+      <Pole aria-label="Login" placeholder="login" autoComplete="off" className="w-36"
+        value={login} onChange={(e) => setLogin(e.target.value.trim().toLowerCase())} />
+      <Pole aria-label="Hasło" type="password" autoComplete="new-password" placeholder={`hasło, min. ${HASLO_MIN} znaków`}
+        className="w-48" value={haslo} onChange={(e) => setHaslo(e.target.value)} />
+      <select aria-label="Rola" className="field w-auto"
+        value={rola} onChange={(e) => setRola(e.target.value as RolaKonta)}>
+        {role.map((r) => <option key={r} value={r}>{r}</option>)}
+      </select>
+      <Przycisk wariant="glowny" type="submit" disabled={!gotowe || zaloz.isPending}>Załóż konto</Przycisk>
+      <Przycisk type="button" onClick={onZamknij}>Zamknij</Przycisk>
+    </div>
+    <p className="mt-1 text-xs text-slate-600">Login: 3–32 znaki, małe litery, cyfry oraz . _ -</p>
+    {wynik && <p className="mt-1 text-sm text-ranga-ok">{wynik}</p>}
+    <Blad>{zaloz.error?.message}</Blad>
+  </form>;
+}
+
+export function Konta({ admin, biuro = false }: { admin: boolean; biuro?: boolean }) {
   const konta = useKonta();
   const [sesjeDla, setSesjeDla] = useState<number | null>(null);
   const lista = konta.data?.users ?? [];
   const wybrane = lista.find((k) => k.userId === sesjeDla) ?? null;
+  const [nowa, setNowa] = useState(false);
+  const role: RolaKonta[] = admin ? ["magazynier", "biuro", "admin"] : biuro ? ["magazynier"] : [];
 
   return <KartaWgladu id="karta-konta" tytul="Konta i sesje"
     opis={admin
       ? "Reset nadaje nowe hasło, Wyłącz odbiera dostęp od zaraz. Sesje pokazują, co jest zalogowane; Wyloguj wszędzie to przycisk na zgubiony kolektor."
-      : "Konta zmienia administrator — reset hasła, wyłączenie konta i sesje są po jego stronie."}
-    akcje={<Users size={16} className="text-slate-500" aria-hidden />}>
+      : biuro
+        ? "Konta magazynierów zakładasz tutaj. Reset hasła, wyłączenie konta i sesje są po stronie administratora."
+        : "Konta zmienia administrator — reset hasła, wyłączenie konta i sesje są po jego stronie."}
+    akcje={role.length > 0 && !nowa
+      ? <Przycisk onClick={() => setNowa(true)}><UserPlus size={16} />Dodaj osobę</Przycisk>
+      : <Users size={16} className="text-slate-500" aria-hidden />}>
     <Tabela naglowki={admin ? ["Osoba", "Login", "Rola", "Stan", ""] : ["Osoba", "Login", "Rola", "Stan"]}
       pusto="Brak kont.">
       {lista.map((k) => <WierszKonta key={k.userId} k={k} admin={admin} sesjeOtwarte={sesjeDla === k.userId}
         onSesje={() => setSesjeDla((s) => (s === k.userId ? null : k.userId))} />)}
     </Tabela>
+    {nowa && role.length > 0 && <NowaOsoba role={role} onZamknij={() => setNowa(false)} />}
     {admin && wybrane && <Sesje k={wybrane} onZamknij={() => setSesjeDla(null)} />}
     <Blad>{konta.error?.message}</Blad>
   </KartaWgladu>;

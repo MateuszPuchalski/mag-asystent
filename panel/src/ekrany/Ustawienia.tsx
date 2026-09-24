@@ -46,7 +46,7 @@ export function Ustawienia() {
 
     <DaneFirmy />
     <RegulyStrefy />
-    <Konta admin={admin} />
+    <Konta admin={admin} biuro={ja.data?.user.role === "biuro"} />
     <SlownikTagow tagi={tagi.data?.tagi ?? []} trwa={zmienTag.isPending} blad={bladTagu}
       onNazwa={(tagId, nazwa) => {
         setBladTagu("");

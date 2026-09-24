@@ -107,6 +107,20 @@ export const useResetHasla = () => useMutation({
     api<{ ok: boolean }>(`/api/users/${userId}/haslo`, { method: "POST", body: JSON.stringify({ haslo }) }),
 });
 
+export type RolaKonta = "magazynier" | "biuro" | "admin";
+
+/* Zakładanie konta z panelu (0.490.0). Dotąd tylko kreator na kolektorze albo
+   `curl`. Bramkę ról trzyma serwer: biuro zakłada halę, konta biura i admina
+   zakłada admin — ekran tylko nie proponuje ról, których serwer odmówi. */
+export function useZalozKonto() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (k: { name: string; login: string; haslo: string; role: RolaKonta }) =>
+      api<{ user: Konto }>("/api/users", { method: "POST", body: JSON.stringify(k) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["agenci"] }),
+  });
+}
+
 export function useAktywnosc() {
   const qc = useQueryClient();
   return useMutation({

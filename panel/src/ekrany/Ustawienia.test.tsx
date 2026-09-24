@@ -69,6 +69,10 @@ beforeEach(() => {
       }
       if (url === "/api/biuro/strefa") return odp({ ok: true, regul: JSON.parse(init!.body as string).reguly.length });
       if (url.endsWith("/wyloguj")) return odp({ ok: true, sesji: 2 });
+      if (url === "/api/users") {
+        const b = JSON.parse(init!.body as string);
+        return odp({ user: { userId: 9, login: b.login, name: b.name, role: b.role, active: true, maHaslo: true } });
+      }
       return odp({ ok: true });
     }
     odczyty.push(url);
@@ -194,13 +198,46 @@ describe("Ustawienia w panelu", () => {
     expect(odczyty).not.toContain("/api/biuro/konfiguracja");
   });
 
-  it("biuro widzi konta bez przycisków — serwer i tak by odmówił", async () => {
+  it("biuro widzi konta bez przycisków, które serwer by odrzucił — zostaje tylko dodanie osoby", async () => {
     rola = "biuro";
     pokaz();
     await screen.findByText("Jan Wrona");
     const k = karta("Konta i sesje");
-    expect(within(k).queryByRole("button")).toBeNull();
-    expect(within(k).getByText(/Konta zmienia administrator/)).toBeInTheDocument();
+    /* Biuro zakłada magazynierów (0.490.0); reset, wyłączenie i sesje są
+       adminowe i ich przyciski dalej nie istnieją. */
+    expect(within(k).getAllByRole("button").map((b) => b.textContent)).toEqual(["Dodaj osobę"]);
+    expect(within(k).getByText(/Reset hasła, wyłączenie konta i sesje są po stronie administratora/)).toBeInTheDocument();
+  });
+
+  it("biuro zakłada wyłącznie magazyniera — innej roli formularz nie proponuje", async () => {
+    rola = "biuro";
+    pokaz();
+    await screen.findByText("Jan Wrona");
+    await userEvent.click(within(karta("Konta i sesje")).getByRole("button", { name: "Dodaj osobę" }));
+    const f = screen.getByRole("form", { name: "Nowa osoba" });
+    expect(within(f).getAllByRole("option").map((o) => o.textContent)).toEqual(["magazynier"]);
+  });
+
+  it("admin zakłada konto: pełne dane w jednym żądaniu, hasła nie pokazuje", async () => {
+    pokaz();
+    await screen.findByText("Jan Wrona");
+    await userEvent.click(within(karta("Konta i sesje")).getByRole("button", { name: "Dodaj osobę" }));
+    const f = screen.getByRole("form", { name: "Nowa osoba" });
+    expect(within(f).getAllByRole("option").map((o) => o.textContent)).toEqual(["magazynier", "biuro", "admin"]);
+    const zaloz = within(f).getByRole("button", { name: "Załóż konto" });
+    await userEvent.type(within(f).getByLabelText("Imię i nazwisko"), "Ewa Kos");
+    await userEvent.type(within(f).getByLabelText("Login"), "EKos");
+    await userEvent.type(within(f).getByLabelText("Hasło"), "krotko");
+    /* Za krótkie hasło: przycisk nie świeci, bo serwer i tak by odmówił. */
+    expect(zaloz).toBeDisabled();
+    await userEvent.type(within(f).getByLabelText("Hasło"), "12");
+    await userEvent.selectOptions(within(f).getByLabelText("Rola"), "biuro");
+    await userEvent.click(zaloz);
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0]).toMatchObject({ metoda: "POST", url: "/api/users" });
+    expect(JSON.parse(wyslane[0].body!)).toEqual({ name: "Ewa Kos", login: "ekos", haslo: "krotko12", role: "biuro" });
+    expect(await within(f).findByText(/Konto „ekos” założone/)).toBeInTheDocument();
+    expect(within(f).queryByText(/krotko12/)).toBeNull();
   });
 
   it("admin: reset hasła w polu hasła, minimum 8 znaków", async () => {

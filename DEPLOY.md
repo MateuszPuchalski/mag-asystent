@@ -741,6 +741,11 @@ brakujące.
 Nowe osoby dochodzą później tą samą drogą: **Ustawienia → DODAJ OSOBY**
 (widoczne dla konta biura i admina).
 
+**Albo z panelu, bez kolektora (0.490.0):** Ustawienia → karta **Konta
+i sesje** → **Dodaj osobę**. Biuro zakłada tam magazynierów. Konta biura
+i admina zakłada wyłącznie administrator, tak jak w API. Hasła panel nie
+pokazuje po zapisie; przekaż je osobiście.
+
 **1b. Alternatywa: `curl`,** gdy kolektora jeszcze nie ma pod ręką albo konta
 zakłada się skryptem.
 
@@ -2654,6 +2659,11 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.490.0 — konta z panelu
+
+Niczego nie trzeba robić. Karta **Konta i sesje** ma przycisk **Dodaj osobę**.
+Kreator na kolektorze zostaje, ale do kont biura nie jest już potrzebny.
 
 ### Aktualizacja do 0.489.0 — mniej kluczy w `wertis.env`
 
