@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.491.2 — 24 września 2026
+
+**Paczka wydania budowana w CI.** Do tej pory aktualizacja budowała
+aplikację na maszynie z Subiektem: `git pull`, `npm ci` na 372 MB
+i kompilacja, przez cały czas przy zatrzymanych usługach. Workflow
+`paczka.yml` robi to raz, w CI. Powstaje `wertis-<wersja>.zip`, około 22 MB,
+z sumą SHA-256, dołączany do wydania GitHuba obok APK kolektora.
+
+- **Zależności wyłącznie produkcyjne**, z tego samego lockfile'a co testy.
+- **Wsady z `dist`.** `reconcile` i `reslot` weszły do buildu produkcyjnego,
+  bo paczka nie ma tsx; `npm run reconcile` działa w niej przez `node`.
+- **Próba bez repo** (`tools/paczka-proba.sh`): paczka rozpakowana w pustym
+  katalogu musi wstać, podać panel, uruchomić workera i wsad. Paczka bez
+  jednej zależności produkcyjnej wywraca próbę — sprawdzone.
+
+Instalator jeszcze z niej nie korzysta; to następny krok.
+
 ## 0.491.1 — 24 września 2026
 
 **Szybsza droga od PR-a do scalenia.** Dwie zmiany w CI, obie bez wpływu na
