@@ -25,6 +25,39 @@ Maszyna z Subiektem GT (Windows)
 > **Jak to jest zbudowane i dlaczego tak** — [`docs/architektura.md`](docs/architektura.md).
 > Ten dokument mówi tylko, jak to uruchomić.
 
+## Na jednej stronie (@wydanie)
+
+To jest cała droga dla osoby, która stawia albo odtwarza serwer. Reszta
+dokumentu jest odniesieniem — sięga się do niej, gdy coś tu nie zadziała.
+
+**Nowy serwer albo odtworzenie po awarii** — na maszynie z Subiektem:
+
+1. Pobierz `WERTIS-Instalator.exe` z [wydań](https://github.com/MateuszPuchalski/mag-asystent/releases)
+   i uruchom go jako administrator. Nie instaluje żadnych programów.
+2. Odpowiedz na pytania: zgoda na podłączenie do Subiekta, trzy magazyny
+   (Enter przyjmuje podpowiedź) i pole lokalizacji. O bazę pyta tylko przy kilku.
+3. Otwórz `http://<serwer>:3001/obsluga/` i załóż konto administratora.
+   Formularz pokazuje się sam, dopóki baza nie ma żadnego konta.
+4. Kolektory: w panelu **Ustawienia → Nowy kolektor**. Zeskanuj kod aparatem
+   kolektora i zainstaluj aplikację.
+5. Raz, przed pracą na prawdziwych danych: **odtwórz jedną kopię bazy** (§7).
+
+Po awarii ten sam plik podpina dane z `C:\wertis-dane`, więc baza, zdjęcia
+i kopie wracają. Nowa baza powstaje tylko wtedy, gdy tego katalogu nie ma.
+
+**Na co dzień nie ma nic do zrobienia.**
+
+- **Aktualizacje** wchodzą same w nocy, między 3 a 5 (§0b). Karta
+  „Aktualizacja serwera" mówi, co i kiedy. Wydanie z „[wymaga działania]"
+  czeka na przycisk.
+- **Ustawienia** zmienia się w panelu: Ustawienia → Konfiguracja.
+- **Kopia bazy** powstaje co noc i przed każdą migracją (§7).
+- **Awaria wersji** wraca sama do poprzedniej. Panel i `/api/health` mówią
+  o tym przez dobę.
+
+**Raz, w ustawieniach repozytorium** (właściciel): klucz wydań i token
+odświeżania (§0a, §0c). Bez nich scalony kod nie staje się wydaniem.
+
 ## 0. Instalator — właściwa droga
 
 Rozdziały 1–4 i checklistę z §6 wykonuje za Ciebie
