@@ -47,9 +47,9 @@ i kopie wracają. Nowa baza powstaje tylko wtedy, gdy tego katalogu nie ma.
 
 **Na co dzień nie ma nic do zrobienia.**
 
-- **Aktualizacje** wchodzą same w nocy, między 3 a 5 (§0b). Karta
-  „Aktualizacja serwera" mówi, co i kiedy. Wydanie z „[wymaga działania]"
-  czeka na przycisk.
+- **Aktualizacje** wchodzą same tego samego dnia, gdy przez dziesięć minut
+  nikt nic nie zapisze (§0b). Karta „Aktualizacja serwera" mówi, co i kiedy.
+  Wydanie z „[wymaga działania]" czeka na przycisk.
 - **Ustawienia** zmienia się w panelu: Ustawienia → Konfiguracja.
 - **Kopia bazy** powstaje co noc i przed każdą migracją (§7).
 - **Awaria wersji** wraca sama do poprzedniej. Panel i `/api/health` mówią
@@ -278,18 +278,28 @@ Tryb ustawia klucz `AKTUALIZACJA_AUTO` w karcie konfiguracji:
 
 | tryb | kiedy wgrywa | domyślny dla |
 |---|---|---|
-| `noc` | w oknie `AKTUALIZACJA_OKNO` (domyślnie 3–5), po dziesięciu minutach bez zapisu | produkcji |
-| `zaraz` | przy najbliższym takcie, co pięć minut | instancji dev |
+| `zaraz` | przy najbliższym takcie po dziesięciu minutach bez zapisu, także w dzień | produkcji i dev |
+| `noc` | tylko w oknie `AKTUALIZACJA_OKNO` (domyślnie 3–5), po tej samej ciszy | — |
 | `wylaczona` | nigdy — zostaje przycisk | — |
 
 Automat NIE wgrywa wydania, gdy zachodzi którykolwiek z tych warunków:
 
 - **wpis ma „[wymaga działania]"**, także pośredni — staje na wydaniu przed nim;
-- **wydanie ma mniej niż `AKTUALIZACJA_DOJRZALOSC_H` godzin** (produkcja 6, dev 0);
+- **wydanie ma mniej niż `AKTUALIZACJA_DOJRZALOSC_H` godzin** (produkcja 1, dev 0);
+- **wydanie nie ma paczki** — a paczka powstaje dopiero po zielonym „Serwer"
+  na commicie wydania (`paczka.yml`), więc wersja z czerwonymi testami nie
+  wejdzie wcale;
 - **ta wersja już raz się nie udała** i została wycofana;
 - **CHANGELOG się nie wczytał**, więc nie wiadomo, czy coś wymaga działania;
 - **kanarek nie pracuje jeszcze na tej wersji**, gdy ustawiono
   `AKTUALIZACJA_KANAREK` (adres instancji dev, np. `http://localhost:3002`).
+
+**Dlaczego w dzień, a nie w nocy** (@wydanie, decyzja właściciela z wywiadu
+o wdrażaniu). Magazyn pracuje na jedną zmianę, dwie minuty postoju nie są
+problemem o żadnej porze, a zmiana ma dojść tego samego dnia. Kodu przed
+scaleniem nikt nie czyta, więc ręczny przycisk dawałby tylko zwłokę. Bramką
+są testy commita wydania, wycofanie przy porażce i godzina na wycofanie
+wydania z obiegu.
 
 **Kanarek.** Dev w trybie `zaraz` dostaje każde wydanie od razu. Produkcja
 z ustawionym kanarkiem wgra najwyżej wersję, na której dev pracuje i odpowiada.

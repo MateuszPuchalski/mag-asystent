@@ -75,7 +75,7 @@ zapisz("package.json", { name: r.name, version: wersja, private: true, engines: 
 
 /* Pieczątka paczki — instalator porównuje z nią numer, zanim cokolwiek
    zamieni, i zapisuje ją obok instalacji jako dowód, co stoi na dysku. */
-zapisz("paczka.json", { wersja, commit: process.env.GITHUB_SHA ?? null,
+zapisz("paczka.json", { wersja, commit: process.env.WERTIS_COMMIT ?? process.env.GITHUB_SHA ?? null,
   zbudowano: new Date().toISOString() });
 SKRYPT
 

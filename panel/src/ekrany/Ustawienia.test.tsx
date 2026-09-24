@@ -310,6 +310,15 @@ describe("Ustawienia w panelu", () => {
     expect(wyslane).toEqual([]);
   });
 
+  it("automat w trybie domyślnym: bez okna nocnego, z wiekiem wydania", async () => {
+    AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, auto: { ...AKTUALIZACJA_WZOR.auto, tryb: "zaraz", dojrzaloscGodz: 1 } };
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    const linia = (await within(k).findByText(/Automatycznie:/)).closest("p") as HTMLElement;
+    expect(linia.textContent).toMatch(/gdy nikt nie pracuje, wydanie starsze niż 1 h\./);
+    expect(linia.textContent).not.toMatch(/3:00/);
+  });
+
   it("sprawdź teraz: POST bez ciała i bez typu treści", async () => {
     pokaz();
     const k = await waitFor(() => karta("Aktualizacja serwera"));
