@@ -199,6 +199,18 @@ nie jest już potrzebne (dalej działa: zmienne środowiskowe mają pierwszeńst
 nad plikiem). Inną ścieżkę wskazuje `WERTIS_ENV_FILE` i wtedy szukanie kończy
 się na niej.
 
+**Co faktycznie jest ustawione — w panelu (0.488.0).** Ustawienia → karta
+**Konfiguracja serwera**, widoczna tylko dla administratora. Pokazuje ścieżkę
+wczytanego pliku i każdy klucz ze źródłem: z pliku, przykryty przez zmienną
+usługi albo domyślny. Hasła i klucze API widać wyłącznie jako „ustawione".
+Zmiana nadal idzie przez ten plik i restart usług.
+
+**Literówka w nazwie klucza melduje się sama.** Klucz, którego nie czyta żaden
+z trzech programów, staje w `problemy` na `/api/health` i na czerwono w tej
+karcie. Wcześniej `ALEGRO_CLIENT_ID` zamiast `ALLEGRO_CLIENT_ID` dawał po
+cichu wartość domyślną. Listę znanych kluczy trzyma
+`server/src/konfiguracja-rejestr.ts`, a test pilnuje jej zgodności z kodem.
+
 Instalator **scala** ten plik, a nie nadpisuje. Klucz, o który kreator zapytał,
 bierze z odpowiedzi; klucza, o który nie pytał, nie rusza. Wartości dopisane
 ręką przeżywają więc kolejne przebiegi z `-TylkoKonfiguracja`. Nie przeżywają
@@ -2641,6 +2653,13 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.488.0 — konfiguracja widoczna w panelu
+
+Niczego nie trzeba robić ręcznie. Po aktualizacji zajrzyj raz do
+`/api/health` albo do karty **Konfiguracja serwera** w ustawieniach. Zdanie
+o nieznanym kluczu znaczy literówkę albo pozostałość po starym wydaniu.
+Popraw nazwę albo usuń wpis z `wertis.env` i zrestartuj usługi.
 
 ### Aktualizacja do 0.487.0 — kopie bazy robi serwer
 

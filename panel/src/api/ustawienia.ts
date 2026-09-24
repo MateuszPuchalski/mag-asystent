@@ -116,6 +116,37 @@ export function useAktywnosc() {
   });
 }
 
+/* ── Konfiguracja serwera (0.488.0) ────────────────────────────────────── */
+
+export type ZrodloUstawienia = "plik" | "przykryte" | "srodowisko" | "domyslna";
+
+export interface WierszKonfiguracji {
+  klucz: string;
+  grupa: string;
+  kto: "instalator" | "wlasciciel" | "zaawansowane" | "dev";
+  opis: string;
+  czyta: string[];
+  tajny: boolean;
+  zrodlo: ZrodloUstawienia;
+  /** `null` dla sekretu i dla wartości domyślnej — serwer nie wysyła ich wcale. */
+  wartosc: string | null;
+}
+
+export interface StanKonfiguracji {
+  plik: string | null;
+  grupy: Record<string, string>;
+  wiersze: WierszKonfiguracji[];
+  nieznane: string[];
+}
+
+/** Trasa adminowa, więc pytamy tylko jako admin — biuro dostałoby 403. */
+export const useKonfiguracja = (admin: boolean) => useQuery({
+  queryKey: ["konfiguracja"],
+  queryFn: () => api<StanKonfiguracji>("/api/biuro/konfiguracja"),
+  enabled: admin,
+  retry: false,
+});
+
 /* ── Logo dostawców ───────────────────────────────────────────────────── */
 
 export interface DostawcaZLogo { khId: number; nazwa: string; dokumentow: number; maLogo: boolean }

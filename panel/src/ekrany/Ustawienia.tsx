@@ -9,6 +9,7 @@ import { RegulyStrefy } from "../ustawienia/RegulyStrefy";
 import { Konta } from "../ustawienia/Konta";
 import { SlownikTagow } from "../ustawienia/SlownikTagow";
 import { LogoDostawcow } from "../ustawienia/LogoDostawcow";
+import { Konfiguracja } from "../ustawienia/Konfiguracja";
 
 /* ── USTAWIENIA (0.168.0, ustawienia biura od 0.444.0) ────────────────────
    Za zębatką, bo zmienia się tu rzadko — cel biura z §7: praca na górnym
@@ -58,5 +59,8 @@ export function Ustawienia() {
           { onError: (e) => setBladTagu((e as Error).message) });
       }} />
     <LogoDostawcow />
+    {/* Na końcu: patrzy się tu przy awarii albo po wdrożeniu, nie co dzień.
+        Biuro jej nie widzi wcale — patrz nagłówek karty. */}
+    <Konfiguracja admin={admin} />
   </div>;
 }

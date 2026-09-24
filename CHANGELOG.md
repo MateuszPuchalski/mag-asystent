@@ -34,6 +34,27 @@ historii nie przepisujemy.
 ---
 
 
+## 0.488.0 — 24 września 2026
+
+**Konfiguracja serwera widoczna w panelu.** Pytanie „na czym ten serwer
+chodzi" wymagało dotąd pulpitu zdalnego na maszynie z Subiektem. Teraz
+odpowiada karta **Konfiguracja serwera** w ustawieniach, tylko dla
+administratora. Każdy klucz ma wartość, źródło i opis jednym zdaniem.
+Na wierzchu stoi to, co ktoś ustawił, i decyzje właściciela. Resztę
+pokazuje przełącznik.
+
+- **Sekrety nie wychodzą z serwera.** Hasła i klucze API karta zna tylko
+  jako „ustawione”.
+- **Przykryta wartość świeci na czerwono.** To ten stan, w którym plik mówi
+  jedno, a usługa pracuje na zmiennej z NSSM.
+- **Literówka w nazwie klucza melduje się sama**, w karcie i w `/api/health`.
+  Dotąd dawała cichą wartość domyślną.
+
+Pod spodem jest rejestr 136 kluczy czytanych przez serwer, worker Sfery
+i usługę tła (`server/src/konfiguracja-rejestr.ts`). Test czyta źródła
+wszystkich trzech programów i pilnuje zgodności w obie strony. Rejestr jest
+podstawą pod następne kroki: cięcie pokręteł i edycję z panelu.
+
 ## 0.487.0 — 24 września 2026
 
 **Kopie bazy aplikacji i nocną rekoncyliację robi sam serwer.** Do tej wersji

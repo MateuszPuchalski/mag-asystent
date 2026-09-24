@@ -27,13 +27,31 @@ import zrodloAnalizy from "./Analiza.tsx?raw";
    7. Miary obsługi i stan integracji mieszkają gdzie indziej. */
 
 let wyslane: Array<{ metoda: string; url: string; body?: string; typ?: string }> = [];
+let odczyty: string[] = [];
+
+/* Serwer nie wysyła wartości sekretu ani domyślnej — atrapa też nie. */
+const KONFIGURACJA = {
+  plik: "C:\\wertis\\wertis.env",
+  grupy: { subiekt: "Połączenie z Subiektem", zwroty: "Zwroty i reklamacje" },
+  nieznane: ["ALEGRO_CLIENT_ID"],
+  wiersze: [
+    { klucz: "MSSQL_SERVER", grupa: "subiekt", kto: "instalator", opis: "Adres SQL Servera.", czyta: ["serwer"],
+      tajny: false, zrodlo: "plik", wartosc: "serwer-subiekta" },
+    { klucz: "MSSQL_PASSWORD", grupa: "subiekt", kto: "instalator", opis: "Hasło loginu SQL.", czyta: ["serwer"],
+      tajny: true, zrodlo: "plik", wartosc: null },
+    { klucz: "MSSQL_SYNC_MS", grupa: "subiekt", kto: "zaawansowane", opis: "Takt odświeżania.", czyta: ["serwer"],
+      tajny: false, zrodlo: "domyslna", wartosc: null },
+    { klucz: "ZWROT_TERMIN_DNI", grupa: "zwroty", kto: "wlasciciel", opis: "Dni na obsłużenie zwrotu.", czyta: ["serwer"],
+      tajny: false, zrodlo: "domyslna", wartosc: null },
+  ],
+};
 let rola = "admin";
 let firmaNaSerwerze: { dane: Record<string, string>; zmieniono: { at: string; przez: string } | null };
 
 const PUSTA_FIRMA = { nazwa: "", nip: "", adres: "", miejscowosc: "", osoba: "", telefon: "" };
 
 beforeEach(() => {
-  wyslane = []; rola = "admin";
+  wyslane = []; odczyty = []; rola = "admin";
   firmaNaSerwerze = { dane: { ...PUSTA_FIRMA }, zmieniono: null };
   localStorage.clear();
   /* Pamięć obrazów jest modułowa i żyje między testami. */
@@ -53,7 +71,9 @@ beforeEach(() => {
       if (url.endsWith("/wyloguj")) return odp({ ok: true, sesji: 2 });
       return odp({ ok: true });
     }
+    odczyty.push(url);
     if (url === "/api/auth/me") return odp({ user: { userId: 1, name: "Anna", role: rola } });
+    if (url === "/api/biuro/konfiguracja") return odp(KONFIGURACJA);
     if (url === "/api/biuro/firma") return odp(firmaNaSerwerze);
     if (url === "/api/biuro/strefa") return odp({ reguly: [{ alejka: "A", od: "", do: "", poziomy: "2,3" }] });
     if (url === "/api/users") return odp({ users: [
@@ -96,7 +116,8 @@ describe("Ustawienia w panelu", () => {
     expect(wyslane).toEqual([]);
     /* Karty w kolejności makiety. */
     const tytuly = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(tytuly).toEqual(["Dane firmy do protokołów", "Reguły strefy złotej", "Konta i sesje", "Logo dostawców"]);
+    expect(tytuly).toEqual(["Dane firmy do protokołów", "Reguły strefy złotej", "Konta i sesje", "Logo dostawców",
+      "Konfiguracja serwera"]);
   });
 
   it("przeniesienie z przeglądarki: tylko przy pustym serwerze, jednym kliknięciem", async () => {
@@ -149,6 +170,28 @@ describe("Ustawienia w panelu", () => {
     await userEvent.click(within(k).getByRole("button", { name: "Zapisz reguły" }));
     await waitFor(() => expect(wyslane).toHaveLength(1));
     expect(JSON.parse(wyslane[0].body!)).toEqual({ reguly: [{ alejka: "P", od: "", do: "", poziomy: "1" }] });
+  });
+
+  it("konfiguracja: ustawione na wierzchu, sekret bez wartości, literówka na czerwono", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Konfiguracja serwera"));
+    expect(await within(k).findByText("serwer-subiekta")).toBeInTheDocument();
+    expect(within(k).getByText("ustawione")).toBeInTheDocument();
+    expect(within(k).getByText(/ALEGRO_CLIENT_ID/)).toBeInTheDocument();
+    /* Decyzja właściciela widać zawsze, domyślne pokrętło dopiero po przełączniku. */
+    expect(within(k).getByText("ZWROT_TERMIN_DNI")).toBeInTheDocument();
+    expect(within(k).queryByText("MSSQL_SYNC_MS")).toBeNull();
+    await userEvent.click(within(k).getByRole("button", { name: /Wszystkie \(4\)/ }));
+    expect(within(k).getByText("MSSQL_SYNC_MS")).toBeInTheDocument();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("biuro nie widzi konfiguracji i nawet o nią nie pyta", async () => {
+    rola = "biuro";
+    pokaz();
+    await screen.findByText("Jan Wrona");
+    expect(screen.queryByRole("heading", { name: "Konfiguracja serwera" })).toBeNull();
+    expect(odczyty).not.toContain("/api/biuro/konfiguracja");
   });
 
   it("biuro widzi konta bez przycisków — serwer i tak by odmówił", async () => {

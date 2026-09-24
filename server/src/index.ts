@@ -40,6 +40,8 @@ import { ustawieniaRoutes } from "./routes/ustawienia.js";
 import { wiedzaRoutes } from "./routes/wiedza.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import { spoiwoRoutes } from "./routes/spoiwo.js";
+import { konfiguracjaRoutes } from "./routes/konfiguracja.js";
+import { problemNieznanychKluczy } from "./konfiguracja-rejestr.js";
 import {
   bladImportuFaktur,
   brakKolumnyNrOryg,
@@ -213,6 +215,11 @@ export async function buildApp() {
          wszystko, co niżej. Aplikacja czyta wtedy inną bazę, niż mówi plik,
          więc każdy kolejny objaw jest skutkiem, nie przyczyną. */
       bez("konfiguracja", () => problemPrzykrytejKonfiguracji(envFile, config.sgtMode)),
+      /* Literówka w nazwie klucza (0.488.0). Nieczytany klucz dawał cichą
+         wartość domyślną, a objaw — funkcja „nie działa" — nie prowadził do
+         pliku. Rejestr zna wszystko, co czytają trzy programy. */
+      bez("klucze konfiguracji", () =>
+        problemNieznanychKluczy([...envFile.applied, ...envFile.overridden], envFile.path)),
       /* ── OGON SPRAW, KTÓREGO PRZEBIEG NIE WZIĄŁ (0.409.0) ─────────────────
          Bezpiecznik stron czyta najwyżej tysiąc spraw na przebieg. Konto
          z dłuższym archiwum zostawia resztę po tamtej stronie — i to są
@@ -441,6 +448,7 @@ export async function buildApp() {
   await app.register(ustawieniaRoutes);
   await app.register(wiedzaRoutes);
   await app.register(aktualizacjaRoutes);
+  await app.register(konfiguracjaRoutes);
 
   await app.ready();
   return app;
