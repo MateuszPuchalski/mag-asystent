@@ -11,7 +11,7 @@
 #    powstaje po nich; klucz jest jedynym wyjątkiem w `.github/rulesets/main.json`;
 # 2. push tokenem Actions nie uruchamia innych workflowów, a commit wydania
 #    MUSI uruchomić `android.yml` i `paczka.yml` — to one publikują wydanie.
-# Konfiguracja klucza: DEPLOY §0a.
+# Konfiguracja klucza: DEPLOY §0c.
 name: Wydanie
 
 on:
