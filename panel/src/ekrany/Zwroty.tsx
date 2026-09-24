@@ -25,7 +25,7 @@ import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { polecanyKandydat } from "../zwroty/Dokument";
 import { SzybkiZwrot } from "../zwroty/SzybkiZwrot";
-import { calaDostawa, pewnaPropozycja, szybkaSciezka } from "../zwroty/regulaSzybkiej";
+import { pewnaPropozycja, szybkaSciezka } from "../zwroty/regulaSzybkiej";
 import { Szukanie } from "../zwroty/Szukanie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
@@ -712,8 +712,14 @@ export function Zwroty() {
           throw new Error(`„${p.nazwa}” nie weszła do pudła — powód stoi przy pozycji. Kwoty nie zapisałem.`);
         }
       }
+      /* BEZ KOSZTU DOSTAWY (0.484.5) — decyzja właściciela: „przy
+         zwrotach wszystko OK koszt dostawy powinien być odznaczony". Do
+         0.484.4 ciąg brał regułę ekranu ręcznego (`calaDostawa`) i przy
+         zwrocie całego zamówienia oddawał też dostawę. Ekran ręczny ma swój
+         haczyk i tam człowiek decyduje; szybka ścieżka nie pyta, więc nie
+         dokłada pieniędzy, o które nikt nie zdecydował. */
       await kwota.mutateAsync({ id: z.id, pozycjeIds: z.pozycje.map((p) => p.id),
-        dostawa: calaDostawa(z), wersja });
+        dostawa: false, wersja });
     })().then(() => {
       setSzybka({ trwa: false, blad: "" });
       if (okno) { okno.opener = null; okno.location.href = z.linkZwrotu!; }

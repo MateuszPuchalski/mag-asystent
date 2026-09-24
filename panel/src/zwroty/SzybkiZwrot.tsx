@@ -3,7 +3,7 @@ import { Zap } from "lucide-react";
 import type { Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Przycisk } from "../ui";
-import { calaDostawa, type SzybkaSciezka } from "./regulaSzybkiej";
+import type { SzybkaSciezka } from "./regulaSzybkiej";
 
 /**
  * Przycisk szybkiej ścieżki (0.481.0) — reguła stoi w `regulaSzybkiej.ts`.
@@ -20,8 +20,9 @@ export function SzybkiZwrot({ zwrot, stan, trwa, blad, onStart }: {
   onStart: () => void;
 }) {
   if (!stan.pokaz) return null;
-  const dostawa = calaDostawa(zwrot) ? zwrot.zamowienie?.dostawaGrosze ?? 0 : 0;
-  const suma = zwrot.pozycje.reduce((s, p) => s + Math.round(p.cenaGrosze * p.ilosc), 0) + dostawa;
+  /* Sama suma pozycji, BEZ dostawy (0.484.5) — ta sama liczba, którą ciąg
+     zapisze. Kwota na przycisku i kwota w bazie nie mogą się rozjechać. */
+  const suma = zwrot.pozycje.reduce((s, p) => s + Math.round(p.cenaGrosze * p.ilosc), 0);
   const nieocenione = zwrot.pozycje.filter((p) => p.ocena === null).length;
 
   return <div className="border-b border-emerald-200 bg-emerald-50 p-4">
@@ -38,7 +39,7 @@ export function SzybkiZwrot({ zwrot, stan, trwa, blad, onStart }: {
       : <p className="mt-1 text-xs text-slate-600">
           {zwrot.werdykt === "przyjety" ? "" : "Przyjmie zwrot, "}
           {nieocenione ? `${nieocenione} poz. na stan, ` : ""}
-          zapisze kwotę{dostawa ? " z dostawą" : ""} i otworzy zwrot w Allegro do wypłaty.</p>}
+          zapisze kwotę bez dostawy i otworzy zwrot w Allegro do wypłaty.</p>}
     {blad && <p role="alert" className="mt-1 text-xs text-red-700">{blad}</p>}
   </div>;
 }

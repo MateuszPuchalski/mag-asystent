@@ -34,6 +34,17 @@ historii nie przepisujemy.
 ---
 
 
+## 0.484.5 — 24 września 2026
+
+**„Wszystko OK” oddaje sumę pozycji, bez kosztu dostawy.** Decyzja
+właściciela: „przy zwrotach wszystko OK koszt dostawy powinien być
+odznaczony”. Do 0.484.4 szybka ścieżka brała regułę ekranu ręcznego i przy
+zwrocie całego zamówienia oddawała też dostawę.
+
+Kwota na przycisku jest tą samą liczbą, którą ciąg zapisuje. Ekran ręczny
+się nie zmienia: haczyk „Koszt dostawy” stoi przy wycenie, a kto chce oddać
+dostawę, zapisuje kwotę tamtędy.
+
 ## 0.484.4 — 24 września 2026
 
 **Po skanie kolejnego zwrotu nie zostają pozycje poprzedniego.** Zgłoszenie
