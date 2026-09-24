@@ -34,6 +34,33 @@ historii nie przepisujemy.
 ---
 
 
+## 0.484.1 — 24 września 2026
+
+**Copilot wreszcie widzi zdjęcia, które klient przysłał w rozmowie.**
+Zgłoszenie właściciela: „copilot prawdopodobnie nie czyta zdjęć”. Nie czytał,
+i to od 0.330.0, czyli od wydania, które miało mu je dać.
+
+- **Przyczyna.** Szkic i pytanie do Copilota pobierały zdjęcie zapisanym
+  adresem z `upload.allegro.pl`. Ten adres odpowiada 403 na brzegu, co
+  pokazała sonda z 10 września. Każde zdjęcie odpadało jako błąd pobrania,
+  a szkic szedł bez niego. Podgląd w panelu działał, bo chodzi końcówką API.
+- **Naprawa.** Copilot pobiera zdjęcia rozmowy tą samą drogą co podgląd.
+  Zapisany adres zostaje zapasem.
+- **Model wie, że zdjęcie było.** Gdy pobranie padnie, spis mówi „klient
+  przysłał, ale nie udało się pobrać”. Model nie prosi wtedy o zdjęcie
+  drugi raz.
+- **Dziennik liczy zdjęcia** przy szkicu i przy pytaniu, jak przy
+  reklamacji. Taka dziura nie przejdzie już po cichu.
+- **Dlaczego testy tego nie złapały.** Wstrzykiwały własny pobieracz, więc
+  domyślnej drogi nie sprawdzał nikt. Nowy test idzie prawdziwą drogą
+  z podstawionym `fetch`.
+
+Karta reklamacji tego błędu nie miała, bo jej załączniki leżą na
+`api.allegro.pl`. Rozpoznanie kategorii („Rozpoznaj”) zdjęć nie czyta
+i nigdy nie czytało — to osobna decyzja, nie ten błąd.
+
+Wystarczy restart serwera.
+
 ## 0.484.0 — 24 września 2026
 
 **Profil klienta: wszystko o kupującym na jednym ekranie.** Prośba

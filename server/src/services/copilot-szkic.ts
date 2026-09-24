@@ -1361,6 +1361,11 @@ export async function ulozSzkic(
       /* Ile wiedzy odzyskaliśmy z oferty przy tym kliknięciu — jedyna liczba
          mówiąca, czy to wydanie robi cokolwiek. */
       zOfertyNumerow: pokwitowanie.numery.length, zOfertyModeli: pokwitowanie.modele.length,
+      /* Zdjęcia LICZBAMI, jak przy reklamacji (0.484.1). Od 0.330.0 żadne
+         zdjęcie rozmowy nie doszło do modelu, a dziennik tego nie pokazał,
+         bo liczby błędów nikt nie zapisywał. */
+      zdjec: zdjecia.zdjecia.length, zdjecBledow: zdjecia.bledow,
+      zdjecNieObraz: zdjecia.nieObrazy.length,
     }, kto.id, db());
     db().prepare("INSERT INTO conversation_event(conversation_id, event_type, payload) VALUES (?,?,?)")
       .run(conversationId, "copilot_szkic",

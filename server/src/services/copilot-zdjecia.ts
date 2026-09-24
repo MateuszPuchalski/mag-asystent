@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
-import { pobierzZalacznik } from "../adapters/allegro.http.js";
+import { pobierzZalacznik, pobierzZalacznikWiadomosci } from "../adapters/allegro.http.js";
+import { config } from "../config.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { typPodgladu } from "./skrzynka.js";
 
@@ -244,6 +245,22 @@ export async function przygotujZdjecia(
 }
 
 /**
+ * Pobieracz zdjęć ROZMOWY — ta sama droga, którą idzie podgląd w panelu.
+ *
+ * ── BLIZNA 0.484.1 ───────────────────────────────────────────────────────────
+ * Od 0.330.0 stał tu goły `pobierzZalacznik` z zapisanym adresem. Adres
+ * Centrum Wiadomości leży na `upload.allegro.pl`, a ten odpowiada 403 na
+ * brzegu (sonda właściciela z 10 września). Każde zdjęcie klienta odpadało
+ * więc jako błąd pobrania, a szkic szedł bez niego — po cichu. Podgląd
+ * w panelu działał, bo od 0.248.0 idzie końcówką API przez
+ * `pobierzZalacznikWiadomosci`. Właściciel zgłosił: „copilot prawdopodobnie
+ * nie czyta zdjęć". Testy tego modułu wstrzykują pobieracz, więc drogi
+ * domyślnej nie widziały; pilnuje jej `allegro-zalacznik.test.ts`.
+ */
+export const pobierzZdjecieRozmowy: Pobieracz = async (url, opcje) =>
+  (await pobierzZalacznikWiadomosci(config.allegro.apiUrl, url, opcje)).bajty;
+
+/**
  * To samo dla ROZMOWY ze skrzynki (szkic odpowiedzi).
  *
  * Różnice od ścieżki sprawy są dwie i obie stoją wyżej przy swoich stałych:
@@ -254,7 +271,7 @@ export async function przygotujZdjecia(
  * czym był do tego wydania, a szkicu nie ma dopiero wtedy, gdy padnie model.
  */
 export async function przygotujZdjeciaRozmowy(
-  database: DatabaseSync, conversationId: number, pobierz: Pobieracz = pobierzZalacznik,
+  database: DatabaseSync, conversationId: number, pobierz: Pobieracz = pobierzZdjecieRozmowy,
 ): Promise<WynikZdjec> {
   return przezBramke(kandydaciRozmowy(database, conversationId), pobierz, SUFIT_SZTUK_ROZMOWY);
 }
@@ -268,7 +285,7 @@ export async function przygotujZdjeciaRozmowy(
  * „czytelne zdjęcie zamiast dokumentu".
  */
 export function spisZdjec(w: WynikZdjec): string {
-  if (!w.zdjecia.length && !w.nieObrazy.length && !w.pominieto && !w.ponadLimit) return "";
+  if (!w.zdjecia.length && !w.nieObrazy.length && !w.pominieto && !w.ponadLimit && !w.bledow) return "";
   const linie = ["ZDJĘCIA (obrazy stoją PRZED tym tekstem, w tej kolejności):"];
   for (const z of w.zdjecia) linie.push(`[${z.numer}] plik: ${z.nazwa}`);
   if (w.nieObrazy.length) {
@@ -276,5 +293,9 @@ export function spisZdjec(w: WynikZdjec): string {
   }
   if (w.pominieto) linie.push(`Nie pokazano z braku miejsca: ${w.pominieto}`);
   if (w.ponadLimit) linie.push(`Starszych zdjęć nie pokazano: ${w.ponadLimit}`);
+  /* Wiersz o nieudanym pobraniu (0.484.1). Bez niego model nie wie, że
+     klient zdjęcie PRZYSŁAŁ, i prosi go o nie drugi raz. Klient, który
+     zdjęcie już wysłał, czyta taką prośbę jako znak, że nikt go nie słucha. */
+  if (w.bledow) linie.push(`Klient przysłał, ale nie udało się pobrać: ${w.bledow}`);
   return linie.join("\n");
 }
