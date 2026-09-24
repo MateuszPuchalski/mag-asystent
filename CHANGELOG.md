@@ -34,6 +34,23 @@ historii nie przepisujemy.
 ---
 
 
+## 0.484.3 — 24 września 2026
+
+**Szukanie w koszach po słowach.** Zakładka Kosze szukała całą frazą w jednym
+kawałku, przez `UPPER` z SQLite, który zna tylko ASCII. „Sekator felco” nie
+znajdowało „Sekator ogrodowy Felco 2”, a „łopata” nie znajdowało „Łopata”.
+
+- **Każde słowo osobno**, w dowolnej kolejności. Każde musi trafić w któreś
+  pole, więc kolejne słowo zawęża wynik.
+- **Bez ogonków i wielkości liter:** „odlozona” trafia w „odłożona”. Symbol
+  bez myślników: „ls51139” trafia w „LS51-139”.
+- **Więcej pól:** symbol, nazwa, EAN (dokładnie), kod kosza, numer MM i numer
+  zwrotu, z którego towar przyszedł.
+
+**Nagłówek zwrotów w jednym rzędzie.** Przełącznik Zwroty/Kosze, przycisk
+„Nowy koszyk” i pasek kartotek stały w trzech pasmach jedno pod drugim. Teraz
+dzielą jeden rząd, na obu ekranach zakładki.
+
 ## 0.484.2 — 24 września 2026
 
 **„Wszystko OK” nie oddaje pieniędzy za towar spoza pudła.** Serwer zapisuje

@@ -3,7 +3,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Koszyk } from "./Koszyk";
+import { Koszyk, NowyKoszyk } from "./Koszyk";
 import type { KoszZwrotow } from "../api/typy";
 
 /* ── Pasek koszyka zwrotów (0.192.0) ────────────────────────────────────────
@@ -56,7 +56,7 @@ const KOSZ = (n: Partial<KoszZwrotow> = {}): KoszZwrotow => ({
 
 const pokaz = () => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><Koszyk /></QueryClientProvider>);
+  return render(<QueryClientProvider client={qc}><NowyKoszyk /><Koszyk /></QueryClientProvider>);
 };
 
 describe("Koszyk zwrotów", () => {

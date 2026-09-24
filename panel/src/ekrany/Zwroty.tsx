@@ -28,7 +28,7 @@ import { SzybkiZwrot } from "../zwroty/SzybkiZwrot";
 import { calaDostawa, pewnaPropozycja, szybkaSciezka } from "../zwroty/regulaSzybkiej";
 import { Szukanie } from "../zwroty/Szukanie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
-import { Koszyk } from "../zwroty/Koszyk";
+import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { NaOutlet } from "../zwroty/NaOutlet";
 import { Wiadomosc } from "../zwroty/Wiadomosc";
 import type { RozjazdZwrotu } from "../api/zwroty";
@@ -893,10 +893,21 @@ export function Zwroty() {
      mierzy się do `max-content`, więc przy treści wyższej niż okno grid
      wylewałby się poza kontener zamiast przyciąć ścieżkę. */
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
-    {/* Zwroty i kosze pod jedną zakładką (0.438.0) — powód w `Przelacznik.tsx`. */}
-    <PrzelacznikZwrotow teraz="zwroty" />
+    {/* ── JEDEN RZĄD NAGŁÓWKA (0.484.3) ─────────────────────────────────
+        Zgłoszenie właściciela: „ten fragment zajmuje za dużo miejsca". Nad
+        listą stały trzy pełne pasma: przełącznik, pasek kartotek i przycisk
+        nowego koszyka — każde z własnym odstępem, treści na kilka
+        centymetrów. Teraz to jeden rząd; pasek kartotek bierze resztę
+        szerokości, a na wąskim ekranie rząd się zawija.
+        Zwroty i kosze pod jedną zakładką (0.438.0) — powód w `Przelacznik.tsx`. */}
+    <div className="flex shrink-0 flex-wrap items-start gap-2">
+      <PrzelacznikZwrotow teraz="zwroty" />
+      <NowyKoszyk />
+      <div className="min-w-0 flex-1">
+        <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []} />
+      </div>
+    </div>
     {data?.stan && <PasekOgona stan={data.stan} />}
-    <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []} />
     <Koszyk />
     {/* Obok koszyka, bo to ta sama praca: co wyjęte z pudła, gdzie idzie.
         Outlet nie ma pudła ani dokumentu — ma listę i czyjeś ręce. */}
