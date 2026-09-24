@@ -1,0 +1,82 @@
+# Paczka wydania (0.491.2): gotowa aplikacja dla serwera w magazynie.
+#
+# Do tego wydania serwer budował aplikację sam, przy każdej aktualizacji:
+# `git pull`, `npm ci` na 372 MB i kompilacja na maszynie z Subiektem, przez
+# cały czas przy zatrzymanych usługach. Tu powstaje to raz — około 22 MB ZIP-a
+# z sumą SHA-256 — i trafia do wydania GitHuba tej wersji, obok APK kolektora.
+#
+# Na PR-ze paczka powstaje i przechodzi próbę (`tools/paczka-proba.sh`), ale
+# nigdzie nie jedzie. Próba jest tym, co mówi, że paczka działa SAMA, bez repo
+# i bez tsx — testy repo tego nie widzą, bo biegną na pełnym checkoucie.
+#
+# Check nie jest wymagany w `main.json`, celowo: dopóki instalator umie też
+# starą drogę (`git pull`), czerwona paczka nie blokuje wydania, tylko mówi,
+# że tej wersji nie da się zainstalować z paczki.
+name: Paczka wydania
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  paczka:
+    name: Paczka wydania
+    runs-on: ubuntu-latest
+    # Zapis do wydania — dokładnie jak w `instalator.yml`: bez tego
+    # `gh release upload` kończy się 403, a wydanie zostaje bez paczki.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Zakres zmian
+        id: zakres
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "dotyczy=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          zmiany=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          if printf '%s\n' "$zmiany" | grep -qE '^(server/|panel/|instalator/|tools/paczka|package(-lock)?\.json|wertis\.env\.example|\.github/workflows/paczka\.yml|\.github/actions/)'; then
+            echo "dotyczy=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "dotyczy=false" >> "$GITHUB_OUTPUT"
+            echo "Zmiany nie dotyczą paczki — bramka zielona bez pracy."
+          fi
+      - name: Zależności Node
+        if: steps.zakres.outputs.dotyczy == 'true'
+        uses: ./.github/actions/zaleznosci
+      - name: Build
+        if: steps.zakres.outputs.dotyczy == 'true'
+        run: npm run build
+      - name: Paczka
+        if: steps.zakres.outputs.dotyczy == 'true'
+        run: bash tools/paczka.sh dist/paczka
+      - name: Próba paczki bez repo
+        if: steps.zakres.outputs.dotyczy == 'true'
+        run: bash tools/paczka-proba.sh "$(ls dist/paczka/wertis-*.zip)"
+      - name: Artefakt
+        if: steps.zakres.outputs.dotyczy == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: wertis-paczka
+          path: dist/paczka/*
+      # Wydanie tej wersji mogło już założyć `android.yml` (APK) — albo
+      # zakłada je w tej samej minucie. Stąd „zobacz, a jak nie ma, załóż,
+      # a jak w międzyczasie powstało, to dobrze": dwa workflowy nie mogą się
+      # wywrócić na tym, który był pierwszy.
+      - name: Dołączenie do wydania
+        if: steps.zakres.outputs.dotyczy == 'true' && github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          wersja=$(node -p "require('./package.json').version")
+          tag="v$wersja"
+          gh release view "$tag" >/dev/null 2>&1 \
+            || gh release create "$tag" --title "WERTIS $wersja" \
+                 --notes "Paczka serwera i APK kolektora $wersja. Opis zmian: CHANGELOG.md" --latest \
+            || gh release view "$tag" >/dev/null
+          gh release upload "$tag" dist/paczka/* --clobber

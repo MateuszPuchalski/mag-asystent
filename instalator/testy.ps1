@@ -24,6 +24,7 @@ $zrodlo = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $zrodlo "ui.ps1")
 . (Join-Path $zrodlo "sql.ps1")
 . (Join-Path $zrodlo "uslugi.ps1")
+. (Join-Path $zrodlo "paczka.ps1")
 
 $script:bledy = 0
 $script:zdane = 0
@@ -1371,6 +1372,193 @@ Sprawdz "SRODOWISKO jest na bialej liscie Publish-WertisKonfiguracja" {
     $kod = Get-Content (Join-Path $zrodlo "uslugi.ps1") -Raw
     $publish = $kod.Substring($kod.IndexOf("function Publish-WertisKonfiguracja"))
     Zaloz ($publish.Substring(0, $publish.IndexOf("Read-WertisEnv")) -match '"SRODOWISKO"')
+}
+
+# ── Aktualizacja z paczki wydania (0.492.0) ─────────────────────────────────
+# Wszystko, co da się sprawdzić bez usług i bez sieci. Zamianę katalogów
+# i dowiązanie widzi dopiero -DryRun w CI i pierwsza aktualizacja na serwerze.
+
+Write-Host ""
+Write-Host "Paczka wydania"
+
+Sprawdz "repozytorium z adresu git i https" {
+    Zaloz ((Get-WertisRepoGitHub "https://github.com/MateuszPuchalski/mag-asystent.git") -eq "MateuszPuchalski/mag-asystent")
+    Zaloz ((Get-WertisRepoGitHub "https://github.com/a/b") -eq "a/b")
+    Zaloz ((Get-WertisRepoGitHub "https://example.com/a/b.git") -eq "") "obcy host nie jest GitHubem"
+}
+
+Sprawdz "numer wersji przechodzi przez wąski wzorzec" {
+    Zaloz ((ConvertTo-WertisWersja "v0.492.0") -eq "0.492.0")
+    Zaloz ((ConvertTo-WertisWersja "0.492.0") -eq "0.492.0")
+    # Zlecenie z panelu leży w pliku — wszystko, co nie jest samym numerem,
+    # odpada, zanim trafi do adresu pobrania.
+    foreach ($zle in @("", "0.492", "0.492.0; rm", "../0.492.0", "0.492.0`n", "najnowsza")) {
+        Zaloz ($null -eq (ConvertTo-WertisWersja $zle)) "przepuszczone: '$zle'"
+    }
+}
+
+Sprawdz "cofnięcia z paczki nie ma, podbicie jest" {
+    Zaloz (Test-WertisWersjaNowsza -Nowa "0.492.0" -Obecna "0.491.9")
+    Zaloz (Test-WertisWersjaNowsza -Nowa "0.500.0" -Obecna "0.99.0") "porównanie liczbowe, nie tekstowe"
+    Zaloz (-not (Test-WertisWersjaNowsza -Nowa "0.492.0" -Obecna "0.492.0")) "ta sama wersja to nie aktualizacja"
+    Zaloz (-not (Test-WertisWersjaNowsza -Nowa "0.490.0" -Obecna "0.492.0"))
+    Zaloz (Test-WertisWersjaNowsza -Nowa "0.492.0" -Obecna "?") "instalacja bez package.json nie blokuje"
+}
+
+Sprawdz "adresy paczki i sumy w wydaniu wersji" {
+    $a = Get-WertisAdresyPaczki -Repo "a/b" -Wersja "0.492.0"
+    Zaloz ($a.Zip -eq "https://github.com/a/b/releases/download/v0.492.0/wertis-0.492.0.zip")
+    Zaloz ($a.Suma -eq "$($a.Zip).sha256")
+}
+
+Sprawdz "katalog danych obok, ten sam dysk, osobny dla dev" {
+    Zaloz ((Get-WertisKatalogDanych "C:\wertis") -eq "C:\wertis-dane")
+    Zaloz ((Get-WertisKatalogDanych "C:\wertis\") -eq "C:\wertis-dane")
+    Zaloz ((Get-WertisKatalogDanych "C:\wertis-dev") -eq "C:\wertis-dev-dane")
+}
+
+function Nowy-Katalog {
+    $k = Join-Path $env:TEMP ("wertis-test-" + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path $k | Out-Null
+    return $k
+}
+
+Sprawdz "przenoszone jest tylko to, co istnieje, i nic z kodu" {
+    $k = Nowy-Katalog
+    try {
+        foreach ($p in @("wertis.env", "logs", "tools", ".git", "server", "docs")) {
+            New-Item -ItemType Directory -Path (Join-Path $k $p) -Force | Out-Null
+        }
+        $lista = Get-WertisDoPrzeniesienia -Katalog $k
+        Zaloz (($lista -join ",") -eq "wertis.env,logs,tools") "dostałem: $($lista -join ',')"
+    } finally { Remove-Item $k -Recurse -Force }
+}
+
+Sprawdz "kopia bazy sprzed migracji: najnowsza dla tej wersji, obca nie" {
+    $k = Nowy-Katalog
+    try {
+        foreach ($n in @("przed-20260924-100000-0.491.2-do-0.492.0.db", "przed-20260925-100000-0.491.2-do-0.492.0.db",
+                         "przed-20260926-100000-0.492.0-do-0.493.0.db", "noc-2026-09-26.db")) {
+            Set-Content -Path (Join-Path $k $n) -Value "x"
+        }
+        $w = Get-WertisKopiaPrzedMigracja -KatalogKopii $k -Wersja "0.492.0"
+        Zaloz ((Split-Path -Leaf $w) -eq "przed-20260925-100000-0.491.2-do-0.492.0.db") "dostałem: $w"
+        Zaloz ($null -eq (Get-WertisKopiaPrzedMigracja -KatalogKopii $k -Wersja "0.494.0"))
+        Zaloz ($null -eq (Get-WertisKopiaPrzedMigracja -KatalogKopii (Join-Path $k "brak") -Wersja "0.492.0"))
+    } finally { Remove-Item $k -Recurse -Force }
+}
+
+function Nowa-Paczka {
+    param([string]$Wersja, [string]$WersjaWPieczatce)
+    $k = Nowy-Katalog
+    $srodek = Join-Path $k "wertis-$Wersja"
+    New-Item -ItemType Directory -Path (Join-Path $srodek "server") -Force | Out-Null
+    Set-Content -Path (Join-Path $srodek "paczka.json") -Value "{`"wersja`": `"$WersjaWPieczatce`"}"
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $zip = Join-Path $env:TEMP ("wertis-" + [guid]::NewGuid() + ".zip")
+    [IO.Compression.ZipFile]::CreateFromDirectory($k, $zip)
+    Remove-Item $k -Recurse -Force
+    return $zip
+}
+
+Sprawdz "rozpakowanie kładzie treść wertis-<wersja> w katalogu docelowym" {
+    $zip = Nowa-Paczka -Wersja "9.9.9" -WersjaWPieczatce "9.9.9"
+    $cel = Join-Path $env:TEMP ("wertis-nowa-" + [guid]::NewGuid())
+    try {
+        Expand-WertisPaczka -Zip $zip -Cel $cel -Wersja "9.9.9"
+        Zaloz (Test-Path (Join-Path $cel "paczka.json"))
+        Zaloz (Test-Path (Join-Path $cel "server"))
+        Zaloz (-not (Test-Path "$cel.rozpakowanie")) "katalog roboczy został"
+    } finally {
+        Remove-Item $zip -Force
+        Remove-Item $cel -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Sprawdz "paczka z inną wersją w pieczątce nie przechodzi" {
+    $zip = Nowa-Paczka -Wersja "9.9.9" -WersjaWPieczatce "9.9.8"
+    $cel = Join-Path $env:TEMP ("wertis-nowa-" + [guid]::NewGuid())
+    try {
+        $rzucil = $false
+        try { Expand-WertisPaczka -Zip $zip -Cel $cel -Wersja "9.9.9" } catch { $rzucil = $true }
+        Zaloz $rzucil "pieczątka 9.9.8 przeszła jako 9.9.9"
+        Zaloz (-not (Test-Path $cel)) "po odmowie został katalog docelowy"
+    } finally { Remove-Item $zip -Force }
+}
+
+Sprawdz "aktualizacja odmawia cofnięcia i bzdury, zanim ruszy cokolwiek" {
+    $k = Nowy-Katalog
+    try {
+        Set-Content -Path (Join-Path $k "package.json") -Value '{"version": "0.492.0"}'
+        # `-Uslugi` z nazwą, której nie ma — gdyby funkcja doszła do usług,
+        # test i tak nic by nie zatrzymał; liczy się kod i brak katalogu .nowa.
+        $kod = Update-WertisZPaczki -Katalog $k -Repo "https://github.com/a/b.git" -Paczka "0.490.0" -Uslugi @("wertis-test-brak") 6>$null
+        Zaloz ($kod -eq 1) "cofnięcie dało kod $kod"
+        $kod = Update-WertisZPaczki -Katalog $k -Repo "https://github.com/a/b.git" -Paczka "coś" -Uslugi @("wertis-test-brak") 6>$null
+        Zaloz ($kod -eq 1) "bzdura dała kod $kod"
+        Zaloz (-not (Test-Path "$k.nowa")) "powstał katalog nowej wersji"
+    } finally { Remove-Item $k -Recurse -Force }
+}
+
+Sprawdz "paczka z dysku bez pliku sumy nie przechodzi" {
+    $k = Nowy-Katalog
+    $zip = Nowa-Paczka -Wersja "9.9.9" -WersjaWPieczatce "9.9.9"
+    $nazwana = Join-Path $env:TEMP "wertis-9.9.9.zip"
+    try {
+        Move-Item $zip $nazwana -Force
+        Set-Content -Path (Join-Path $k "package.json") -Value '{"version": "0.492.0"}'
+        $kod = Update-WertisZPaczki -Katalog $k -Repo "https://github.com/a/b.git" -Paczka $nazwana -Uslugi @("wertis-test-brak") 6>$null
+        Zaloz ($kod -eq 1) "bez .sha256 dało kod $kod"
+        Zaloz (-not (Test-Path "$k.nowa"))
+    } finally {
+        Remove-Item $k -Recurse -Force
+        Remove-Item $nazwana -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Sprawdz "sprzątanie starej wersji zdejmuje dowiązanie danych, nie kasuje danych" {
+    $k = Join-Path $env:TEMP ("wertis-dowiazanie-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+    try {
+        $cel = Join-Path $k "dane"
+        $wersja = Join-Path $k "wertis.poprzednia"
+        New-Item -ItemType Directory -Force -Path $cel, (Join-Path $wersja "server") | Out-Null
+        Set-Content -LiteralPath (Join-Path $cel "wertis.db") -Value "baza"
+        # Junction na Windowsie (jak instalator), symlink tam, gdzie junction nie ma.
+        $rodzaj = if ($IsWindows -or $env:OS -eq "Windows_NT") { "Junction" } else { "SymbolicLink" }
+        New-Item -ItemType $rodzaj -Path (Join-Path $wersja "server\data") -Target $cel | Out-Null
+        Zaloz (Test-WertisDowiazanie -Sciezka (Join-Path $wersja "server\data")) "atrapa nie jest dowiązaniem"
+        Remove-WertisKatalogAplikacji -Sciezka $wersja
+        Zaloz (-not (Test-Path -LiteralPath $wersja)) "katalog wersji nie zniknął"
+        Zaloz ((Get-Content -LiteralPath (Join-Path $cel "wertis.db") -Raw).Trim() -eq "baza") "dane zniknęły razem z dowiązaniem"
+        Remove-WertisKatalogAplikacji -Sciezka $wersja   # brak katalogu to nie błąd
+    } finally {
+        Remove-Item -LiteralPath $k -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+Sprawdz "zlecenie.ps1 czyta numer wersji przez ten sam wąski wzorzec" {
+    # Wzorzec stoi w dwóch plikach, bo zlecenie.ps1 nie ładuje modułów. Ten
+    # test pilnuje, żeby się nie rozjechały.
+    $kod = Get-Content (Join-Path $zrodlo "zlecenie.ps1") -Raw
+    Zaloz ($kod -match [regex]::Escape("'^\d{1,4}\.\d{1,5}\.\d{1,6}\z'")) "wzorzec w zlecenie.ps1 inny niż w ConvertTo-WertisWersja"
+}
+
+Sprawdz "polskie cudzysłowy tylko w komentarzach — w napisie kończą napis" {
+    # PowerShell traktuje „ ” “ jak zwykły cudzysłów. Napis "zadanie „X” gotowe"
+    # kończył się po słowie „zadanie", a reszta szła jako osobny argument —
+    # komunikat wychodził ucięty albo skrypt nie parsował się wcale.
+    # Wyjątek: here-string (skrypt SQL w sql.ps1), tam kończy go tylko "@.
+    $zle = @()
+    foreach ($plik in Get-ChildItem (Join-Path $zrodlo "*.ps1")) {
+        if ($plik.Name -eq "testy.ps1") { continue }
+        $tokeny = $null; $bledyParsera = $null
+        [void][System.Management.Automation.Language.Parser]::ParseFile($plik.FullName, [ref]$tokeny, [ref]$bledyParsera)
+        foreach ($t in $tokeny) {
+            if ($t.Kind -in @("Comment", "HereStringExpandable", "HereStringLiteral")) { continue }
+            if ($t.Text -match '[„”“]') { $zle += "$($plik.Name):$($t.Extent.StartLineNumber)" }
+        }
+    }
+    Zaloz ($zle.Count -eq 0) "polski cudzysłów w napisie: $($zle -join ', ')"
 }
 
 # ── Wynik ───────────────────────────────────────────────────────────────────

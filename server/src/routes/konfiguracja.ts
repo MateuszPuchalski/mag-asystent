@@ -2,7 +2,11 @@ import type { FastifyInstance } from "fastify";
 import { envFile } from "../config.js";
 import { sesjaZadania } from "../context.js";
 import { stanKonfiguracji } from "../services/konfiguracja.js";
-import { autoryzuj } from "../services/auth.js";
+import { autoryzuj, potwierdzHaslo } from "../services/auth.js";
+import {
+  BladZlecenia, sprawdzWydania, stanAktualizacji, zlecAktualizacje,
+} from "../services/aktualizacja-serwera.js";
+import { WERSJA } from "../wersja.js";
 import { logEvent } from "../services/events.js";
 import { BladZmiany, zmienKlucz } from "../services/konfiguracja-zapis.js";
 import { zaplanujRestart } from "../services/restart.js";
@@ -58,4 +62,52 @@ export async function konfiguracjaRoutes(app: FastifyInstance) {
       }
     },
   );
+
+  /* ── Aktualizacja serwera (0.492.0) ─────────────────────────────────────
+     Odczyt jak przy konfiguracji: sam admin, bez `autoryzuj`, bo patrzenie
+     nie zostawia śladu. Lista wydań pochodzi z pamięci, którą odświeża takt
+     w `main()` albo przycisk „Sprawdź teraz" — samo otwarcie karty nie
+     wychodzi do sieci. */
+  const tylkoAdmin = () => {
+    const s = sesjaZadania();
+    if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
+    if (s.user.role !== "admin") return { kod: 403, error: "Aktualizacją serwera zajmuje się administrator" };
+    return null;
+  };
+
+  app.get("/api/biuro/aktualizacja", async (_req, reply) => {
+    const o = tylkoAdmin();
+    if (o) return reply.code(o.kod).send({ error: o.error });
+    return stanAktualizacji();
+  });
+
+  /* Bez ciała — reguła klienta HTTP z CLAUDE.md. Zapisu w bazie nie ma, więc
+     bez `autoryzuj`; zapytanie idzie do GitHuba, nie do danych firmy. */
+  app.post("/api/biuro/aktualizacja/sprawdz", async (_req, reply) => {
+    const o = tylkoAdmin();
+    if (o) return reply.code(o.kod).send({ error: o.error });
+    await sprawdzWydania();
+    return stanAktualizacji();
+  });
+
+  /* Zlecenie: rola, ślad `privileged`, ponowne hasło — w tej kolejności.
+     Hasło po roli, bo biuro i hala nie mają tu czego zgadywać. */
+  app.post<{ Body: { wersja?: string; haslo?: string } }>("/api/biuro/aktualizacja", async (req, reply) => {
+    const s = sesjaZadania();
+    if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+    const a = autoryzuj(s.user, "aktualizacja_serwera");
+    if (!a.ok) return reply.code(403).send({ error: a.powod });
+    if (!potwierdzHaslo(s.user, req.body?.haslo ?? "")) {
+      return reply.code(403).send({ error: "Błędne hasło. Po pięciu próbach formularz odpoczywa minutę." });
+    }
+    const wersja = req.body?.wersja ?? "";
+    try {
+      await zlecAktualizacje(wersja, s.user.name);
+    } catch (e) {
+      if (e instanceof BladZlecenia) return reply.code(e.kod).send({ error: e.message });
+      throw e;
+    }
+    logEvent("aktualizacja_zlecona", s.user.name, null, { z: WERSJA, na: wersja });
+    return { ok: true, wersja };
+  });
 }

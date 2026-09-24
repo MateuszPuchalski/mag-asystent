@@ -9,6 +9,22 @@ Robi to, co [`DEPLOY.md`](../DEPLOY.md) każe zrobić ręcznie. **Tamta instrukc
 zostaje i jest referencją tego katalogu.** Gdy instalator zawiedzie w połowie,
 ręczna droga nadal działa. Każdy krok da się dokończyć z palca.
 
+## Aktualizacja z paczki wydania (0.492.0)
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Aktualizuj -Paczka najnowsza
+```
+
+Zamiast `najnowsza` można podać numer wersji. Można też podać ścieżkę
+pobranego ZIP-a, z plikiem `.sha256` obok. Paczka jest zbudowana w CI, więc na serwerze nie ma
+`git pull`, `npm ci` ani kompilacji. Nowa wersja rozpakowuje się obok,
+a usługi stoją tylko na czas zamiany katalogów. Serwer, który nie wstanie,
+oddaje miejsce poprzedniej wersji razem z bazą sprzed migracji.
+
+To samo robi przycisk w panelu (Ustawienia → „Aktualizacja serwera") przez
+zadanie Harmonogramu, które zakłada instalator. Kolejność kroków i powody
+stoją w [`DEPLOY.md`](../DEPLOY.md) §0b.
+
 ## Sama aktualizacja, bez ruszania bazy
 
 W oknie **uruchomionym jako administrator**:
@@ -82,6 +98,7 @@ powershell -ExecutionPolicy Bypass -File instalator\wertis-instalator.ps1
 | *(brak)* | pełna instalacja z kreatorem i kontem SQL |
 | `-Demo` | instalacja pilotażowa: dane demonstracyjne, **Subiekt nietknięty** (Etap 0 z `DEPLOY.md` §6) |
 | `-Aktualizuj` | wgrywa nową wersję kodu i APK dla kolektorów; nie pyta o nic i nie rusza konfiguracji |
+| `-Aktualizuj -Paczka <wersja>` | jak wyżej, ale z gotowej paczki wydania: podmiana katalogu i powrót do poprzedniej wersji, gdy nowa nie wstanie |
 | `-TylkoKonfiguracja` | sam kreator na działającej instalacji — do zmiany ustawień albo dokończenia po nieudanym podłączeniu |
 | `-DryRun` | wypisuje, co by zrobił, i **nie zmienia niczego**; nie zadaje pytań |
 | `-Odinstaluj` | zdejmuje usługi, regułę zapory i katalog; **Subiekta nie rusza** — patrz [`docs/wdrozenie.md`](../docs/wdrozenie.md) |

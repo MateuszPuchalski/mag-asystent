@@ -88,12 +88,36 @@ historii. Klikanie tego ręcznie to pięć nazw checków wpisywanych z palca —
 plik robi to bez literówki.
 
 **Wymóg świeżej gałęzi** (`strict_required_status_checks_policy`) nie jest
-ozdobą. To on sprawia, że GitHub sam wciąga `main` do gałęzi PR-a i uruchamia
-CI od nowa, zamiast scalać na podstawie wyniku sprzed tygodnia. Bez niego
-gałęzie nie odświeżają się same.
+ozdobą. Dzięki niemu GitHub nie scali PR-a na podstawie wyniku CI sprzed
+tygodnia. **Gałęzi sam jednak nie odświeża** — do 0.491.1 stało tu, że tak,
+i to była nieprawda. Auto-scalanie czeka, aż gałąź dogoni `main`, a doganiała
+dopiero po kliknięciu „Update branch".
 
-**Nazwy checków to `Serwer`, `Android`, `Instalator`, `Worker Sfery`
-i `Usługa tła`** — czyli pola `name` zadań w workflow'ach. Do 0.194.1 cztery
+**Odświeżanie robi workflow `odswiezanie.yml` (0.491.1).** Po każdym scaleniu
+i co dwadzieścia minut odświeża dwa najstarsze PR-y z auto-scalaniem, które
+zostały w tyle. Pomija drafty, konflikty i PR-y z czerwonym CI. Kolejka scaleń
+GitHuba robiłaby to lepiej, ale jest dostępna tylko dla repozytoriów
+organizacji.
+
+**Wymaga jednego sekretu, zakładanego raz:**
+
+1. GitHub → Settings (konta) → Developer settings → Personal access tokens →
+   **Fine-grained tokens → Generate new token**.
+2. Repository access: tylko to repozytorium. Permissions: **Contents: Read and
+   write** oraz **Pull requests: Read and write**.
+3. Repozytorium → Settings → Secrets and variables → Actions → **New repository
+   secret**, nazwa `ODSWIEZANIE_TOKEN`, wartość: token z punktu 1.
+
+Zwykłym tokenem workflowu (`github.token`) tego się nie zrobi. Push zrobiony
+nim nie uruchamia CI, więc odświeżona gałąź nie dostałaby wymaganych checków. Bez
+sekretu workflow zostawia ostrzeżenie i nic nie robi. Token wygasa w dniu
+podanym przy tworzeniu — ustaw przypomnienie.
+
+**Nazwy checków to `Serwer`, `Panel`, `Android`, `Instalator`, `Worker Sfery`
+i `Usługa tła`** — czyli pola `name` zadań w workflow'ach. `Panel` doszedł
+w 0.491.1, gdy testy panelu wyszły z zadania `Serwer` do równoległego. **Po
+scaleniu tego wydania zaimportuj `main.json` ponownie** — do tego czasu `Panel`
+biegnie, ale nie jest wymagany. Do 0.194.1 cztery
 z nich nazywały się `build`, bo nie miały `name` i GitHub brał klucz zadania.
 Wymagany check dopasowuje się PO NAZWIE, więc reguła „wymagaj `build`" była
 niejednoznaczna i dawała bramkę słabszą, niż wygląda. Zmieniając nazwę zadania
@@ -118,6 +142,54 @@ bez żadnego konfliktu. Konflikt nie jest miarą ryzyka.
 
 **Jak zatrzymać pojedynczy PR.** Wyłącz na nim auto-scalanie przyciskiem
 w interfejsie GitHuba. Draft nie jest scalany w ogóle.
+
+## 0b. Aktualizacja z panelu i z paczki (0.492.0)
+
+Od 0.492.0 aktualizacja nie buduje niczego na serwerze. CI dokłada do każdego
+wydania paczkę `wertis-<wersja>.zip` z sumą SHA-256 (0.491.2). Instalator ją
+pobiera, sprawdza sumę i podmienia katalog aplikacji.
+
+**Z panelu.** Ustawienia → „Aktualizacja serwera", tylko dla admina. Karta
+pokazuje nowsze wydania i ich wpisy z `CHANGELOG.md`. Wybierz wersję, podaj
+hasło i kliknij. Serwer zapisuje zlecenie w `server\data\aktualizacja`
+i uruchamia zadanie Harmonogramu „WERTIS aktualizacja" (dla dev:
+„WERTIS aktualizacja-dev").
+
+**Z wiersza poleceń**, jako administrator:
+
+```powershell
+.\wertis-instalator.ps1 -Aktualizuj -Paczka najnowsza   # albo 0.492.0, albo ścieżka do ZIP-a
+```
+
+Tak wygląda przebieg, w tej kolejności:
+
+1. Pobranie paczki i sumy; paczka bez sumy nie przechodzi. Starszej wersji
+   niż obecna instalator nie wgra.
+2. Rozpakowanie do `C:\wertis.nowa` — usługi dalej pracują.
+3. Zatrzymanie usług. Za pierwszym razem `server\data` przenosi się do
+   `C:\wertis-dane`, a w aplikacji zostaje dowiązanie (junction).
+4. Przeniesienie `wertis.env`, dzienników i narzędzi z poprzedniego katalogu.
+5. Zamiana nazw: `C:\wertis` → `C:\wertis.poprzednia`, `C:\wertis.nowa` →
+   `C:\wertis`. Start usług i próba zdrowia z porównaniem wersji.
+
+**Gdy serwer nie wstanie**, nieudany katalog dostaje nazwę
+`C:\wertis.nieudana-<wersja>`, a poprzedni wraca na miejsce. Baza wraca
+z kopii `przed-*-do-<wersja>.db`, którą serwer robi przed migracją (§7).
+Zdrowie pokazuje porażkę przez dobę. Dziennik przebiegu:
+`server\data\aktualizacja\ostatnia.log`.
+
+> **Dlaczego zadanie Harmonogramu, a nie sam serwer.** Aktualizacja zatrzymuje
+> usługę `wertis-api`. NSSM kończy przy tym całe drzewo procesów usługi, więc
+> aktualizacja uruchomiona przez serwer zginęłaby razem z nim. Zadanie
+> zakłada instalator: pełna instalacja i każde `-Aktualizuj`.
+
+> **Dlaczego dane poza katalogiem aplikacji.** Podmiana całego katalogu jest
+> jedną operacją i cofa się jedną operacją. Dane w środku trzeba by przenosić
+> przy każdej aktualizacji, a przerwane przenoszenie bazy to najgorszy stan.
+
+Instalacja z Gitem działa dalej po staremu, przez samo `-Aktualizuj`. Po
+pierwszej aktualizacji z paczki Gita w katalogu nie ma i instalator to mówi.
+Dev z gałęzi (`-Galaz`) zostaje przy Gicie — paczki powstają tylko z `main`.
 
 ## 1. Wymagania
 

@@ -68,6 +68,73 @@ Przegląd drogi takiej paczki znalazł cztery błędy, poprawione w tym wydaniu:
 Raport rekoncyliacji mówił „(null)" przy zwrocie rozliczonym bez statusu.
 Mówi teraz „(operacje płatności)".
 
+## 0.492.0 — 24 września 2026
+
+**Aktualizacja serwera przyciskiem w panelu.** Ustawienia → „Aktualizacja
+serwera": lista nowszych wydań, zmiany z tego dziennika, hasło i jeden
+przycisk. Widzi ją tylko admin. Pod spodem instalator wgrywa gotową paczkę
+wydania z 0.491.2 — bez Gita, bez `npm ci` i bez kompilacji na serwerze.
+
+- **Serwer tylko zleca.** Zapisuje zlecenie i uruchamia zadanie Harmonogramu
+  „WERTIS aktualizacja". Zadanie działa jako SYSTEM, poza usługą, którą
+  aktualizacja zatrzymuje.
+- **Podmiana katalogów, nie plików.** Nowa wersja rozpakowuje się obok,
+  przy działającym serwerze. Usługi stoją tylko na czas zamiany nazw i próby
+  zdrowia.
+- **Nieudana wraca sama.** Serwer, który nie wstał, oddaje miejsce poprzedniej
+  wersji. Baza wraca z kopii sprzed migracji. Zdrowie pokazuje porażkę przez
+  dobę, a dziennik biura oba wyniki.
+- **Ponowne hasło i odhaczenie.** Zalogowany admin podaje hasło jeszcze raz.
+  Wydanie z pozycją „[wymaga działania]" czeka dodatkowo na odhaczenie.
+- **Instalator z paczki:** `-Aktualizuj -Paczka najnowsza` (albo numer, albo
+  ścieżka ZIP-a z sumą obok). Pełna instalacja z rozpakowanej paczki pomija
+  klonowanie i budowanie.
+- **Próba na prawdziwym Windowsie w CI** (`proba-podmiany.ps1`): przeniesienie
+  danych, dowiązanie, zamiana, wycofanie z bazą i dwie kolejne aktualizacje.
+  Sprzątanie starej wersji zdejmuje najpierw dowiązanie danych. Windows
+  PowerShell 5.1 potrafi przy kasowaniu wejść w dowiązanie i usunąć bazę.
+
+**[wymaga działania]** Uruchom raz `-Aktualizuj -Paczka najnowsza` jako
+administrator. To zakłada zadanie Harmonogramu — bez niego przycisk odpowiada,
+że zadania nie ma. Pierwsza aktualizacja z paczki przenosi `server\data` do
+`C:\wertis-dane` i zostawia w starym miejscu dowiązanie. Stary katalog
+z Gitem zostaje obok jako `C:\wertis.poprzednia`. Szczegóły w DEPLOY §0b.
+
+## 0.491.2 — 24 września 2026
+
+**Paczka wydania budowana w CI.** Do tej pory aktualizacja budowała
+aplikację na maszynie z Subiektem: `git pull`, `npm ci` na 372 MB
+i kompilacja, przez cały czas przy zatrzymanych usługach. Workflow
+`paczka.yml` robi to raz, w CI. Powstaje `wertis-<wersja>.zip`, około 22 MB,
+z sumą SHA-256, dołączany do wydania GitHuba obok APK kolektora.
+
+- **Zależności wyłącznie produkcyjne**, z tego samego lockfile'a co testy.
+- **Wsady z `dist`.** `reconcile` i `reslot` weszły do buildu produkcyjnego,
+  bo paczka nie ma tsx; `npm run reconcile` działa w niej przez `node`.
+- **Próba bez repo** (`tools/paczka-proba.sh`): paczka rozpakowana w pustym
+  katalogu musi wstać, podać panel, uruchomić workera i wsad. Paczka bez
+  jednej zależności produkcyjnej wywraca próbę — sprawdzone.
+
+Instalator jeszcze z niej nie korzysta; to następny krok.
+
+## 0.491.1 — 24 września 2026
+
+**Szybsza droga od PR-a do scalenia.** Dwie zmiany w CI, obie bez wpływu na
+serwer w magazynie.
+
+- **Testy panelu w osobnym, równoległym zadaniu `Panel`.** Check `Serwer`
+  trwał 4 min 40 s, bo testy serwera i panelu szły jedne po drugich. Teraz
+  każde zadanie trwa około dwóch i pół minuty, a oba biegną naraz.
+- **Gałęzie czekające na scalenie odświeżają się same** (`odswiezanie.yml`).
+  Reguła `main` wymaga gałęzi świeżej, a GitHub sam jej nie odświeża — DEPLOY
+  §0a twierdził dotąd inaczej. Po każdym scaleniu workflow odświeża dwa
+  najstarsze PR-y z auto-scalaniem, które zostały w tyle.
+
+**[wymaga działania w ustawieniach repozytorium]** Zaimportuj ponownie
+`.github/rulesets/main.json`, żeby `Panel` stał się wymaganym checkiem. Załóż
+sekret `ODSWIEZANIE_TOKEN` według DEPLOY §0a — bez niego odświeżanie tylko
+ostrzega.
+
 ## 0.491.0 — 24 września 2026
 
 **Ustawienia właściciela zmienia się z panelu.** Dotąd każda zmiana to był

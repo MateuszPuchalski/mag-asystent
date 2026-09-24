@@ -16,7 +16,7 @@
 
 export const ZDARZENIA: readonly string[] = [
   "alias_silnika_dodany", "alias_silnika_usuniety", "allegro_polaczono", "allegro_rozlaczono",
-  "allegro_zamowienie_brak", "analiza_eksport", "audyt_eksport", "battery_low",
+  "allegro_zamowienie_brak", "aktualizacja_wynik", "aktualizacja_zlecona", "analiza_eksport", "audyt_eksport", "battery_low",
   "brak_na_serwis", "brak_na_serwis_pominiety", "copilot_auto_klasyfikacja",
   "copilot_auto_klasyfikacja_sufit", "copilot_auto_szkic", "copilot_auto_szkic_sufit",
   "copilot_dane_doboru", "copilot_klasyfikacja", "copilot_klasyfikacja_niepoprawna",
