@@ -165,6 +165,29 @@ ten sam login nie znaczy „ta paczka".
 `services/klient-historia.ts` składa zakupy, rozmowy, zwroty, reklamacje
 i dyskusje po loginie kupującego.
 
+### S2a. Profil klienta (0.484.0)
+
+`services/profil-klienta.ts`, ekran `panel/src/ekrany/ProfilKlienta.tsx`
+pod `/obsluga/klient/:login`. To punkt 1 dekalogu doprowadzony do końca:
+jeden klient na jednym ekranie, bez względu na kolejkę, z której przyszedł.
+
+Tożsamością jest LOGIN, nie konto sprzedawcy. Ten sam kupujący u dwóch kont
+to jeden klient. Login porównuje się bez wielkości liter, jak od 0.483.0.
+
+**Sygnały się wylicza, nie zapisuje.** Zapisany sygnał byłby drugą prawdą
+o reklamacji czy zwrocie — tej samej, której zabrania S3. Paczka
+„niedoręczona” wymaga sprawdzenia przewoźnika. Bez niego brak doręczenia
+znaczy tylko, że nie pytaliśmy.
+
+**Notatka to jedyny zapis.** Jedna na login, bez statusu i bez kolejki, więc
+nie jest piątą tabelą nad kolejkami. Trzyma poprzednią treść, bo agent
+nadpisuje cudzą notatkę jednym kliknięciem. Dziennik zdarzeń dostaje długość,
+nie treść: notatka o kliencie to dane osobowe, a dziennik czyta analiza.
+
+**Zabrania.** Adresu, danych z `buyer` i kwot z anulowanych zamówień.
+Pilnują tego `profil-klienta.test.ts` i test ekranu (zero zapisu przy
+otwarciu).
+
 ### S3. Przeskok jako ODCZYT
 
 `drogaZakupu` wylicza drogę z momentów otwarcia, które i tak leżą w bazie.

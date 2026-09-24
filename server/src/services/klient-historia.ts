@@ -178,6 +178,31 @@ export function historiaSprawy(
 }
 
 /**
+ * Historia po SAMYM loginie, bez sprawy, z której się przyszło — dla profilu
+ * klienta (24 września 2026). Rozmowy te same dwiema drogami co przy zwrocie:
+ * login rozmówcy i numery zamówień tego loginu. Nic nie jest pomijane, bo
+ * profil nie stoi obok żadnej otwartej sprawy.
+ */
+export function historiaPoLoginie(
+  konto: number, login: string, database: DatabaseSync = db(),
+): HistoriaKlienta {
+  const numery = (database.prepare(
+    "SELECT external_id FROM zamowienie_klienta WHERE channel_account_id = ? AND kupujacy_login = ? COLLATE NOCASE",
+  ).all(konto, login) as Array<Record<string, unknown>>).map((z) => String(z.external_id));
+  const warunek = numery.length ? numery : [""];
+  const rozmowy = database.prepare(`
+    SELECT c.id, c.subject, c.updated_at
+      FROM conversation c
+      LEFT JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
+     WHERE c.channel_account_id = ?
+       AND (t.interlocutor_login = ? COLLATE NOCASE
+            OR EXISTS (SELECT 1 FROM message m WHERE m.conversation_id = c.id
+                        AND m.related_order_id IN (${warunek.map(() => "?").join(",")})))
+     ORDER BY c.updated_at DESC`).all(konto, login, ...warunek) as Array<Record<string, unknown>>;
+  return zbierz(database, konto, login, rozmowy, { rodzaj: "zakup", id: -1 });
+}
+
+/**
  * Wspólna reszta obu wejść: zakupy, zwroty i sprawy po loginie kupującego,
  * maszyny z doborów podanych rozmów. `pomin` wycina sprawę, z której ekran
  * pyta — stoi otwarta obok, a wiersz „jesteś tutaj" zabierałby miejsce.

@@ -22,6 +22,7 @@ import { SzukajIKlawisze } from "./nawigacja/Klawisze";
 import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
 import { DoDecyzji } from "./ekrany/DoDecyzji";
+import { ProfilKlienta } from "./ekrany/ProfilKlienta";
 import { Dostawy } from "./ekrany/Dostawy";
 import { Kosze } from "./ekrany/Kosze";
 import { Dziennik } from "./ekrany/Dziennik";
@@ -354,6 +355,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
             tam, zamiast w pusty ekran. */}
         <Route path="/obsluga/moje" element={<Navigate to="/obsluga/" replace />} />
         <Route path="/obsluga/wzmianki" element={<Navigate to="/obsluga/" replace />} />
+        {/* Profil klienta ma adres po loginie (24 września 2026): link da się
+            wkleić koledze, a szukanie i każda historia prowadzą tu wprost. */}
+        <Route path="/obsluga/klient/:login" element={<ProfilKlienta />} />
         <Route path="/obsluga/wiedza" element={<Wiedza />} />
         {/* Ustawienia mają własny adres jak każdy ekran: link da się wkleić
             koledze, a odświeżenie strony nie wyrzuca z powrotem do Zadań. */}
