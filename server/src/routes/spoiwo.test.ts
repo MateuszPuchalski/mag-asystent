@@ -47,7 +47,7 @@ function login(role: Rola, name: string) {
 }
 
 const TRASY = () => ["/api/obsluga/szukaj?q=kupujacy1", `/api/obsluga/zwroty/${zwrot}/klient`,
-  `/api/obsluga/sprawy/${sprawa}/klient`];
+  `/api/obsluga/sprawy/${sprawa}/klient`, "/api/obsluga/klient/kupujacy1"];
 
 test("bez sesji 401, hala 403 — także na odczycie", async () => {
   const hala = login("magazynier", "Hala");
@@ -76,4 +76,27 @@ test("nieistniejący zwrot to 404 z treścią, nie 500", async () => {
   const b = login("biuro", "Ola2");
   const r = await app.inject({ method: "GET", url: "/api/obsluga/zwroty/999999/klient", headers: b });
   assert.equal(r.statusCode, 404);
+});
+
+/* ── Profil klienta (24 września 2026) ─────────────────────────────────────── */
+test("profil: odczyt bez zapisu, nieznany login 404, notatka tylko dla biura", async () => {
+  const b = login("biuro", "Ola3");
+  const zmiany = (db().prepare("SELECT total_changes() AS n").get() as { n: number }).n;
+  const r = await app.inject({ method: "GET", url: "/api/obsluga/klient/KUPUJACY1", headers: b });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json<{ login: string }>().login, "kupujacy1");
+  assert.equal((db().prepare("SELECT total_changes() AS n").get() as { n: number }).n, zmiany);
+  assert.equal((await app.inject({ method: "GET", url: "/api/obsluga/klient/nikt", headers: b })).statusCode, 404);
+
+  const hala = login("magazynier", "Hala2");
+  const zakaz = await app.inject({ method: "POST", url: "/api/obsluga/klient/kupujacy1/notatka",
+    headers: hala, payload: { tresc: "x" } });
+  assert.equal(zakaz.statusCode, 403);
+  const n = await app.inject({ method: "POST", url: "/api/obsluga/klient/kupujacy1/notatka",
+    headers: b, payload: { tresc: "Prosi o fakturę" } });
+  assert.equal(n.statusCode, 200, n.body);
+  assert.ok(db().prepare("SELECT 1 FROM events WHERE type='klient_notatka'").get());
+  const c = await app.inject({ method: "POST", url: "/api/obsluga/klient/kupujacy1/notatka/cofnij",
+    headers: b, payload: {} });
+  assert.equal(c.statusCode, 409, "nie było poprzedniej notatki");
 });

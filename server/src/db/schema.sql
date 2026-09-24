@@ -3173,3 +3173,17 @@ CREATE TABLE IF NOT EXISTS reklamacja_outbox (
 );
 CREATE INDEX IF NOT EXISTS ix_reklamacja_outbox_sprawa
   ON reklamacja_outbox(reklamacja_id, id);
+
+-- Notatka biura o KLIENCIE (24 września 2026, profil klienta). Klucz to login
+-- Allegro bez wielkości liter — ten sam kupujący bywa zapisany „Chips20"
+-- i „chips20". Jedna notatka na klienta, nie lista: profil ma mówić, co warto
+-- wiedzieć teraz, a historia zmian stoi w dzienniku (`klient_notatka`) i jedno
+-- poprzednie brzmienie w `poprzednia` do cofnięcia — wzór notatki sprawy.
+CREATE TABLE IF NOT EXISTS klient_notatka (
+  login          TEXT PRIMARY KEY COLLATE NOCASE,
+  tresc          TEXT,
+  poprzednia     TEXT,
+  at             TEXT NOT NULL,
+  przez          TEXT NOT NULL,
+  przez_user_id  INTEGER REFERENCES app_user(user_id)
+);

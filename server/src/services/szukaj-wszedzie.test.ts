@@ -105,3 +105,14 @@ test("kawałek loginu znajduje rozmowę, zakup i zwrot; pełny login stoi pierws
   /* Znak `%` wpisany przez agenta to znak, nie dżoker. */
   assert.deepEqual(S.szukajWszedzie("%%%", null, db()), []);
 });
+
+/* ── Klient w wynikach (24 września 2026) ────────────────────────────────────
+   Login pasujący do frazy daje JEDEN wiersz „Klient" prowadzący do profilu,
+   na górze listy, bez względu na wielkość liter w różnych tabelach. */
+test("login daje jeden wiersz klienta na górze, prowadzący do profilu", () => {
+  const t = S.szukajWszedzie("chips", null, db());
+  const klienci = t.filter((x) => x.rodzaj === "klient");
+  assert.equal(klienci.length, 1, "Chips20 i chips20 to jeden klient");
+  assert.equal(t[0].rodzaj, "klient");
+  assert.match(klienci[0].cel ?? "", /^\/obsluga\/klient\/chips20$/i);
+});

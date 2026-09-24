@@ -24,7 +24,7 @@ import { linkZamowienia } from "./allegro-linki.js";
    bez wielkości liter. */
 
 export type RodzajTrafienia =
-  | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja" | "dostawa" | "towar" | "zamowienie";
+  | "klient" | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja" | "dostawa" | "towar" | "zamowienie";
 
 export interface Trafienie {
   rodzaj: RodzajTrafienia;
@@ -79,6 +79,22 @@ export function szukajWszedzie(
     const klucz = `${t.rodzaj}:${t.id}`;
     if (!wynik.has(klucz)) wynik.set(klucz, t);
   };
+
+  /* KLIENCI na górze (24 września 2026): login pasujący do frazy prowadzi do
+     profilu klienta, gdzie stoi wszystko naraz. Jeden wiersz na login, bez
+     wielkości liter — „Chips20" i „chips20" to jeden klient. */
+  for (const w of database.prepare(`
+    SELECT login FROM (
+      SELECT kupujacy_login AS login FROM zamowienie_klienta WHERE kupujacy_login LIKE ? ESCAPE '\\'
+      UNION SELECT kupujacy_login FROM zwrot_klienta WHERE kupujacy_login LIKE ? ESCAPE '\\'
+      UNION SELECT kupujacy_login FROM reklamacja_klienta WHERE kupujacy_login LIKE ? ESCAPE '\\'
+      UNION SELECT interlocutor_login FROM allegro_inbox_thread WHERE interlocutor_login LIKE ? ESCAPE '\\')
+     GROUP BY lower(login)
+     ORDER BY (login = ? COLLATE NOCASE) DESC, login LIMIT 5`).all(like, like, like, like, q) as Wiersz[]) {
+    const login = String(w.login);
+    dodaj({ rodzaj: "klient", id: login.toLowerCase(), tytul: login, dlaczego: "login",
+      cel: `/obsluga/klient/${encodeURIComponent(login)}`, link: null });
+  }
 
   /* ZAMÓWIENIA: po numerze (początek — agent wkleja kawałek), po liście
      przewozowym, po końcówce telefonu i po loginie. Z każdego idzie się dalej

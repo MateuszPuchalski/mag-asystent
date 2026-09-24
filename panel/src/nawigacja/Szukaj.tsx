@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft, ExternalLink, MessageSquare, MessagesSquare, Package, Scale, Search, ShoppingBag,
-  Truck, Undo2,
+  Truck, Undo2, UserRound,
 } from "lucide-react";
 import { useSzukajWszedzie, type RodzajTrafienia, type Trafienie } from "../api/spoiwo";
 import { useKartaTowaru } from "../api/rozmowy";
@@ -23,6 +23,7 @@ import { Blad, Pusto } from "../ui";
    koliduje z pisaniem, bo żaden edytor panelu go nie używa. */
 
 const RODZAJE: Record<RodzajTrafienia, { nazwa: string; ikona: React.ComponentType<{ size?: number; className?: string }> }> = {
+  klient: { nazwa: "Klient", ikona: UserRound },
   rozmowa: { nazwa: "Rozmowa", ikona: MessageSquare },
   zwrot: { nazwa: "Zwrot", ikona: Undo2 },
   reklamacja: { nazwa: "Reklamacja", ikona: Scale },

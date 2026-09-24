@@ -53,11 +53,13 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
  * historii przy zwrocie, reklamacji i dyskusji (23 września 2026). Jeden widok
  * na cztery wejścia: agent czyta klienta tak samo, skądkolwiek przyszedł.
  */
-export function WidokHistorii({ historia, tutaj, onOtworzRozmowe }: {
+export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = false }: {
   historia: HistoriaKlienta & { login: string };
   /** „tą rozmową", „tym zwrotem" — o czym mówi pusta oś. */
   tutaj: string;
   onOtworzRozmowe: (id: number) => void;
+  /** Na samym profilu odnośnik do profilu prowadziłby w miejsce. */
+  bezProfilu?: boolean;
 }) {
   const { login, maszyny, wpisy } = historia;
 
@@ -65,7 +67,15 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe }: {
     <NaglowekSekcji jako="p">Historia u nas</NaglowekSekcji>
     {/* Klik kopiuje (0.228.0): po loginie szuka się klienta w panelu Allegro
         i w Subiekcie, a przepisany z ekranu bywa przekręcony. */}
-    <LoginKlienta login={login} className="font-mono text-sm font-semibold text-slate-900" />
+    {/* Profil klienta (24 września 2026): cały klient na jednym ekranie —
+        liczby, sygnały, otwarte sprawy, zamówienia z pozycjami, notatka.
+        Na samym profilu login stoi w nagłówku, więc tu drugi raz go nie ma. */}
+    {!bezProfilu && <>
+      <LoginKlienta login={login} className="font-mono text-sm font-semibold text-slate-900" />
+      <Link to={`/obsluga/klient/${encodeURIComponent(login)}`}
+        className="ml-2 text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
+        Profil klienta</Link>
+    </>}
 
     {maszyny.length > 0 && <section className="mt-3" aria-label="Maszyny klienta">
       <NaglowekSekcji>Maszyny klienta</NaglowekSekcji>

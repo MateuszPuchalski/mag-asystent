@@ -183,6 +183,18 @@ export function zdaniePrzesylki(s: StanPrzesylkiZamowienia): string | null {
     + ` klient widzi w Allegro przy zamówieniu ${kiedy}`;
 }
 
+/**
+ * Stan paczki kilkoma słowami, dla ekranu (profil klienta, 24 września 2026).
+ * Ten sam słownik co zdanie dla szkicu — dwa słowniki rozjechałyby się przy
+ * pierwszym nowym statusie przewoźnika. `null`: nie wiemy nic.
+ */
+export function stanPrzesylkiKrotko(s: StanPrzesylkiZamowienia): string | null {
+  if (s.dostarczonoAt) return `doręczona ${s.dostarczonoAt.slice(0, 10)}`;
+  if (s.status) return STATUS_DLA_KLIENTA[s.status] ?? s.status;
+  if (s.waybill) return "nadana";
+  return null;
+}
+
 /** Stan starszy niż tyle wymaga ponownego pytania przed szkicem. */
 export const SWIEZOSC_PRZESYLKI_MS = 30 * 60_000;
 

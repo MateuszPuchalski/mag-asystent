@@ -34,6 +34,33 @@ historii nie przepisujemy.
 ---
 
 
+## 0.484.0 — 24 września 2026
+
+**Profil klienta: wszystko o kupującym na jednym ekranie.** Prośba
+właściciela: jeden widok ze wszystkim, co łączy się z klientem. Wchodzi się
+z Ctrl+K (wiersz „Klient” na górze wyników) albo z historii klienta w każdej
+sprawie. Adres to `/obsluga/klient/<login>`.
+
+- **Liczby na górze:** zamówienia, zapłacone, rozmowy, zwroty, reklamacje,
+  dyskusje i data pierwszego zakupu. Anulowane zamówienie nie liczy się
+  do kwoty.
+- **Sygnały ostrzegawcze**, wyliczane przy każdym otwarciu, nigdzie
+  niezapisane: otwarta reklamacja z terminem, otwarta dyskusja, rozmowa
+  czekająca na nas, dwa zwroty w 60 dni i paczka niedoręczona po tygodniu.
+  Ta ostatnia tylko wtedy, gdy przewoźnika w ogóle sprawdziliśmy.
+- **Otwarte sprawy** ze wszystkich kolejek, każda prowadzi na swój ekran.
+- **Zamówienia z pozycjami** i stanem przesyłki, rozwijane kliknięciem.
+- **Notatka o kliencie**: jedna na login, widzi ją każdy agent. To jedyny
+  zapis na ekranie. Cofnięcie przywraca poprzednią treść. Dziennik zdarzeń
+  zapisuje długość notatki, nie jej treść.
+- **Oś zdarzeń i maszyny klienta** — ta sama historia, co w zakładce KLIENT.
+
+Login łączy konta sprzedawcy i porównuje się bez wielkości liter. Profil
+nie pokazuje adresu ani niczego z `buyer`.
+
+Przebuduj panel i zrestartuj serwer. Tabela
+`klient_notatka` powstaje sama przy starcie.
+
 ## 0.483.1 — 24 września 2026
 
 **Szukanie Ctrl+K znajduje login po kawałku.** Zgłoszenie właściciela ze

@@ -30,7 +30,7 @@ const AUTOMATY = new Set([
 const OBSZARY: Array<[string, string]> = [
   ["rozmowa_", "Skrzynka"], ["skrzynka_", "Skrzynka"], ["wzmianka_", "Skrzynka"],
   ["obsluga.", "Skrzynka"], ["zamowienie_", "Skrzynka"], ["przesylka_", "Skrzynka"],
-  ["klient_", "Skrzynka"], ["copilot_", "Copilot"], ["klasyfikacja_", "Copilot"],
+  ["klient_notatka", "Profil klienta"], ["klient_", "Skrzynka"], ["copilot_", "Copilot"], ["klasyfikacja_", "Copilot"],
   ["dobor_", "Dobór części"], ["kosz_", "Kosze"], ["zwrot", "Zwroty"],
   ["reklamacj", "Reklamacje"], ["dyskusja_", "Dyskusje"], ["sprawa_tag", "Tagi spraw"],
   ["wiedza_", "Wiedza"], ["pasowanie_", "Wiedza"], ["zabudowa_", "Wiedza"], ["token_", "Wiedza"],

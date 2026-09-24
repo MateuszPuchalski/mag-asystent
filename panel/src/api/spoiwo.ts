@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { HistoriaKlienta } from "./typy";
+import type { HistoriaKlienta, MaszynaKlienta, WpisHistorii } from "./typy";
 
 /* ── Ponad kolejkami (23 września 2026) ─────────────────────────────────────
    Kształty z `server/src/services/szukaj-wszedzie.ts` i `klient-historia.ts`.
@@ -8,7 +8,7 @@ import type { HistoriaKlienta } from "./typy";
    zapisuje. */
 
 export type RodzajTrafienia =
-  | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja" | "dostawa" | "towar" | "zamowienie";
+  | "klient" | "rozmowa" | "zwrot" | "reklamacja" | "dyskusja" | "dostawa" | "towar" | "zamowienie";
 
 export interface Trafienie {
   rodzaj: RodzajTrafienia;
@@ -40,5 +40,58 @@ export function useHistoriaSprawy(rodzaj: "zwrot" | "sprawa", id: number, wlaczo
     queryFn: () => api<HistoriaKlienta>(rodzaj === "zwrot"
       ? `/api/obsluga/zwroty/${id}/klient` : `/api/obsluga/sprawy/${id}/klient`),
     enabled: wlaczona,
+  });
+}
+
+/* ── Profil klienta (24 września 2026) — kształt z `services/profil-klienta.ts` */
+
+export type RodzajSprawyKlienta = "rozmowa" | "zwrot" | "reklamacja" | "dyskusja";
+
+export interface ProfilKlienta {
+  login: string;
+  liczby: {
+    zamowien: number; wydanoGrosze: number; waluta: string | null;
+    zwrotow: number; reklamacji: number; dyskusji: number; rozmow: number;
+    pierwszyZakup: string | null; ostatniZakup: string | null;
+  };
+  sygnaly: Array<{ ton: "zle" | "uwaga"; tekst: string; cel: string | null }>;
+  otwarte: Array<{ rodzaj: RodzajSprawyKlienta; id: number; opis: string; od: string; stan: string; cel: string }>;
+  zamowienia: Array<{
+    id: string; kupionoAt: string | null; status: string | null; sumaGrosze: number | null;
+    waluta: string | null; pozycje: Array<{ nazwa: string; ilosc: number; cenaGrosze: number }>;
+    przesylka: string | null; link: string | null;
+  }>;
+  maszyny: MaszynaKlienta[];
+  os: WpisHistorii[];
+  notatka: { tresc: string; at: string; przez: string; cofalna: boolean } | null;
+}
+
+const kluczProfilu = (login: string) => ["profil-klienta", login.toLowerCase()] as const;
+
+export function useProfilKlienta(login: string) {
+  return useQuery({
+    queryKey: kluczProfilu(login),
+    queryFn: () => api<ProfilKlienta>(`/api/obsluga/klient/${encodeURIComponent(login)}`),
+    retry: false,
+  });
+}
+
+/** Zapis notatki; `tresc: null` zdejmuje. Po zapisie profil czyta się od nowa. */
+export function useNotatkaKlienta(login: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tresc: string | null) => api(`/api/obsluga/klient/${encodeURIComponent(login)}/notatka`,
+      { method: "POST", body: JSON.stringify({ tresc }) }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczProfilu(login) }),
+  });
+}
+
+/* Cofnięcie idzie BEZ ciała — reguła klienta HTTP (`CLAUDE.md`): pusty JSON
+   to „Bad Request" od Fastify. */
+export function useCofnijNotatkeKlienta(login: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api(`/api/obsluga/klient/${encodeURIComponent(login)}/notatka/cofnij`, { method: "POST" }),
+    onSettled: () => qc.invalidateQueries({ queryKey: kluczProfilu(login) }),
   });
 }

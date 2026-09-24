@@ -2582,6 +2582,15 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.484.0 — profil klienta
+
+**Panel trzeba przebudować, a serwer zrestartować.** Tabela `klient_notatka`
+powstaje sama przy starcie.
+
+Sprawdzenie: Ctrl+K, wpisz kawałek loginu klienta, który kupował. Pierwszy
+wiersz to „Klient”; Enter otwiera profil. Liczby mają się zgadzać z historią
+w zakładce KLIENT. Zapisz notatkę, odśwież stronę i sprawdź, czy została.
+
 ### Aktualizacja do 0.483.0 — login rozmówcy to login kupującego
 
 **Wystarczy restart serwera.** Bez migracji i bez zmian w panelu.
