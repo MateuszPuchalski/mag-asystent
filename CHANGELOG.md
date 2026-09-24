@@ -34,9 +34,9 @@ historii nie przepisujemy.
 ---
 
 
-## 0.484.5 — 24 września 2026
+## 0.484.6 — 24 września 2026
 
-Numer wydania: 0.484.3 i 0.484.4 zajmował otwarty #579, stąd 0.484.5.
+Numer wydania: 0.484.3–0.484.5 zajęły #579 i #580, stąd 0.484.6.
 
 **Copilot wreszcie widzi zdjęcia, które klient przysłał w rozmowie.**
 Zgłoszenie właściciela: „copilot prawdopodobnie nie czyta zdjęć”. Nie czytał,
@@ -62,6 +62,50 @@ Karta reklamacji tego błędu nie miała, bo jej załączniki leżą na
 i nigdy nie czytało — to osobna decyzja, nie ten błąd.
 
 Wystarczy restart serwera.
+
+## 0.484.5 — 24 września 2026
+
+**„Wszystko OK” oddaje sumę pozycji, bez kosztu dostawy.** Decyzja
+właściciela: „przy zwrotach wszystko OK koszt dostawy powinien być
+odznaczony”. Do 0.484.4 szybka ścieżka brała regułę ekranu ręcznego i przy
+zwrocie całego zamówienia oddawała też dostawę.
+
+Kwota na przycisku jest tą samą liczbą, którą ciąg zapisuje. Ekran ręczny
+się nie zmienia: haczyk „Koszt dostawy” stoi przy wycenie, a kto chce oddać
+dostawę, zapisuje kwotę tamtędy.
+
+## 0.484.4 — 24 września 2026
+
+**Po skanie kolejnego zwrotu nie zostają pozycje poprzedniego.** Zgłoszenie
+właściciela: na nowym zwrocie wisiał gaźnik z poprzedniej paczki, razem z jej
+sumą. Lista pozycji i gotowa wiadomość stały obok siebie z tym samym kluczem
+`key={zwrot.id}`, od 0.476.0. React przy zdublowanym kluczu potrafi zostawić
+stary element w drzewie i tu go zostawiał.
+
+Klucze mają teraz przedrostki. Test ekranu przechodzi klawiszem `j` do
+następnego zwrotu i sprawdza, że pozycji poprzedniego nie ma. Pilnuje też,
+żeby React nie zgłosił zdublowanego klucza.
+
+**Sprawdź przy aktualizacji:** klik w pozostałą pozycję działał na POPRZEDNI
+zwrot, bo niesie jego identyfikatory. Oceny albo kwoty z takiego ekranu widać
+na osi tamtego zwrotu, z nazwą towaru.
+
+## 0.484.3 — 24 września 2026
+
+**Szukanie w koszach po słowach.** Zakładka Kosze szukała całą frazą w jednym
+kawałku, przez `UPPER` z SQLite, który zna tylko ASCII. „Sekator felco” nie
+znajdowało „Sekator ogrodowy Felco 2”, a „łopata” nie znajdowało „Łopata”.
+
+- **Każde słowo osobno**, w dowolnej kolejności. Każde musi trafić w któreś
+  pole, więc kolejne słowo zawęża wynik.
+- **Bez ogonków i wielkości liter:** „odlozona” trafia w „odłożona”. Symbol
+  bez myślników: „ls51139” trafia w „LS51-139”.
+- **Więcej pól:** symbol, nazwa, EAN (dokładnie), kod kosza, numer MM i numer
+  zwrotu, z którego towar przyszedł.
+
+**Nagłówek zwrotów w jednym rzędzie.** Przełącznik Zwroty/Kosze, przycisk
+„Nowy koszyk” i pasek kartotek stały w trzech pasmach jedno pod drugim. Teraz
+dzielą jeden rząd, na obu ekranach zakładki.
 
 ## 0.484.2 — 24 września 2026
 

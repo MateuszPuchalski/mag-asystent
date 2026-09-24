@@ -9,7 +9,7 @@ import { KUBELKI_KOSZY, KolejkaKoszy, KolejkaPominietych, WynikiSzukania, kubele
   type KubelekKoszy } from "../kosze/Kolejka";
 import { Kosz } from "../kosze/Kosz";
 import { KontekstKosza } from "../kosze/Kontekst";
-import { Koszyk } from "../zwroty/Koszyk";
+import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 
 /* ── KOSZE W ZAKŁADCE ZWROTY (0.438.0) ─────────────────────────────────────
@@ -66,7 +66,11 @@ export function Kosze() {
         : <KolejkaKoszy kosze={lista.filter((k) => kubelekKosza(k) === kubelek)} wybrany={wybrany} onWybierz={idz} />;
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
-    <PrzelacznikZwrotow teraz="kosze" />
+    {/* Jeden rząd nagłówka, jak na liście zwrotów (0.484.3). */}
+    <div className="flex shrink-0 flex-wrap items-start gap-2">
+      <PrzelacznikZwrotow teraz="kosze" />
+      <NowyKoszyk />
+    </div>
     <Koszyk />
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
@@ -82,7 +86,7 @@ export function Kosze() {
           {/* „W którym koszu jechał ten towar?" — pytanie pada po fakcie: towar
               zniknął albo klient dopomina się o zwrot. */}
           <Pole value={fraza} onChange={(e) => setFraza(e.target.value)}
-            placeholder="W którym koszu? Symbol, nazwa albo kod" aria-label="Szukaj towaru w koszach" />
+            placeholder="W którym koszu? Symbol, nazwa, kod, kosz albo zwrot" aria-label="Szukaj towaru w koszach" />
         </div>
         {!szuka && <div className="shrink-0 border-y border-slate-200 bg-slate-50 px-2 py-1">
           <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>

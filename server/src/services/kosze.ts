@@ -16,6 +16,7 @@ import { parseLocs } from "../locs.js";
 import { logEvent } from "./events.js";
 import { sladZKosza } from "./zwrot-slad.js";
 import { koszDoEdycji } from "./kosze-zwrotow.js";
+import { naGlob, naLike, sqlZwinSymbol, tokeny } from "../tekst.js";
 
 /* ── Cyfrowe kosze zwrotowe (Etap 3) ─────────────────────────────────────────
    Kosz zastępuje papierową kartkę wożoną z towarem. Cykl życia:
@@ -1472,12 +1473,35 @@ export interface ZnalezionaPozycja {
  * on mówi, co naprawdę w koszu leżało — kartoteka mogła się od tego czasu
  * zmienić albo zostać zablokowana. EAN dochodzi z kartoteki, bo w koszu go nie
  * ma, a magazynier ma go pod ręką na opakowaniu.
+ *
+ * ── SŁOWA, NIE CAŁA FRAZA (0.484.3) ──────────────────────────────────────────
+ * Zgłoszenie właściciela: „dodaj szukanie produktu w koszyku po nazwie,
+ * symbolu etc.". Szukanie było — ale jako JEDEN `LIKE` na całej frazie
+ * i przez `UPPER`, który w SQLite zna tylko ASCII. „Sekator felco" nie
+ * trafiało w „Sekator ogrodowy Felco 2", a „łopata" nie trafiała w „Łopata".
+ *
+ * Teraz każde słowo musi trafić w KTÓREŚ pole — ta sama reguła co w szukaniu
+ * spraw (`panel/src/sprawy/szukanie.ts`). Nazwa idzie przez `naGlob` (ogonki
+ * i wielkość liter), symbol przez `sqlZwinSymbol` (myślnik i spacja nic nie
+ * znaczą). Oba narzędzia są z `tekst.ts`, gdzie symetrię JS ↔ SQL pilnuje test.
+ *
+ * „ETC" TO KOD KOSZA, NUMER MM I NUMER ZWROTU. Tymi uchwytami biuro
+ * rozmawia o koszu, a numer zwrotu odpowiada na „gdzie pojechał towar
+ * z tej paczki". EAN zostaje dokładny i całą frazą — to kod, nie słowo.
  */
 export function szukajWKoszach(fraza: string): ZnalezionaPozycja[] {
   const q = (fraza ?? "").trim();
   if (q.length < 2) throw new BladKosza(400, "Podaj co najmniej dwa znaki — symbol, nazwę albo kod kreskowy");
-  const like = `%${q.toUpperCase()}%`;
+  const toks = tokeny(q);
+  /* Sama interpunkcja nie ma słów, a koniunkcja po pustym zbiorze jest
+     prawdziwa — bez tego strażnika „--" oddałoby sto pierwszych wierszy. */
+  if (!toks.length) return [];
 
+  const slowo = `(p.nazwa GLOB ?
+      OR ${sqlZwinSymbol("p.symbol")} LIKE ? ESCAPE '\\'
+      OR ${sqlZwinSymbol("k.kod")} LIKE ? ESCAPE '\\'
+      OR ${sqlZwinSymbol("COALESCE(k.mm_numer, '')")} LIKE ? ESCAPE '\\'
+      OR ${sqlZwinSymbol("COALESCE(z.reference_number, '')")} LIKE ? ESCAPE '\\')`;
   const wiersze = db()
     .prepare(
       `SELECT p.kosz_id, p.symbol, p.nazwa, p.ilosc, p.status, p.lok_faktyczna, p.powod,
@@ -1486,13 +1510,17 @@ export function szukajWKoszach(fraza: string): ZnalezionaPozycja[] {
        FROM kosz_pozycja p
        JOIN kosz k ON k.id = p.kosz_id
        LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
-       WHERE UPPER(p.symbol) LIKE @like
-          OR UPPER(p.nazwa) LIKE @like
-          OR (t.ean <> '' AND t.ean = @dokladnie)
+       LEFT JOIN zwrot_klienta_pozycja zp ON zp.id = p.zwrot_pozycja_id
+       LEFT JOIN zwrot_klienta z ON z.id = zp.zwrot_id
+       WHERE (${toks.map(() => slowo).join(" AND ")})
+          OR (t.ean <> '' AND t.ean = ?)
        ORDER BY k.id DESC, p.id
        LIMIT 100`
     )
-    .all({ like, dokladnie: q }) as Array<Record<string, unknown>>;
+    .all(...toks.flatMap((t) => {
+      const like = `%${naLike(t)}%`;
+      return [naGlob(t), like, like, like, like];
+    }), q) as Array<Record<string, unknown>>;
 
   return wiersze.map((w) => ({
     koszId: w.kosz_id as number,

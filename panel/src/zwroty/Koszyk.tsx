@@ -68,6 +68,56 @@ function UsunKoszyk({ kod, pozycji, trwa, pytamy, onPytaj, onNie, onTak }: {
  */
 const MAKS_ZNACZNIKOW = 8;
 
+/**
+ * Założenie pudła wprost (0.378.0) — osobny komponent od 0.484.3.
+ *
+ * WŁASNY WIERSZ BYŁ ZA DROGI. Zgłoszenie właściciela: „ten fragment zajmuje
+ * za dużo miejsca". Nad listą zwrotów stały trzy pasma jedno pod drugim:
+ * przełącznik Zwroty/Kosze, pasek kartotek i sam ten przycisk. Każde brało
+ * pełną szerokość i odstęp, choć treści miało na kilka centymetrów. Ekran
+ * stawia teraz przycisk w rzędzie przełącznika, więc koszyk go nie rysuje.
+ *
+ * KOSZYK ZAKŁADANY WPROST — zgłoszenie właściciela: „potrzebuję tworzenia
+ * koszy zwrotowych i dodawania produktów do nich jako oddzielna opcja".
+ * Porzucanie jest warunkiem zakładania, nie ozdobą: pustego kosza nie da się
+ * zamknąć, więc bez tej drugiej drogi pomyłka stałaby w pasku na zawsze.
+ */
+export function NowyKoszyk() {
+  const kosze = useKosz().data?.kosze ?? [];
+  const nowy = useNowyKoszyk();
+  /* ── ZAŁOŻENIE PUDŁA WPROST (0.378.0) ──────────────────────────────────
+      Do tego wydania koszyk powstawał wyłącznie jako SKUTEK UBOCZNY:
+      pierwszej oceny „na stan" albo skanu w karcie otwartego zwrotu. Agent,
+      który stawia przy biurku pusty karton, ZANIM otworzy pierwszą paczkę,
+      nie miał czym go zgłosić.
+
+      Rząd stoi tu, a nie w osobnym ekranie, bo to ta sama praca co reszta
+      paska — i bo pudło dotyczy CAŁEJ sesji, nie otwartego zwrotu.
+
+      Przycisk znika, gdy koszyk zwrotów już stoi: naciśnięcie oddałoby ten
+      sam kosz (jeden na operatora, decyzja z 3 września 2026), więc byłby to
+      przycisk bez skutku. */
+  /* PRZYCISK STOI ZAWSZE OD 0.379.0. Do 0.378.0 znikał przy otwartym pudle,
+      bo obowiązywała zasada „jeden koszyk na operatora" — właściciel ją
+      odwrócił i wtedy znikający przycisk stał się dokładnie tym, czego
+      brakowało na ekranie. */
+  /* Zdanie obok przycisku odeszło do podpowiedzi (0.453.0): mówiło to samo
+      przy każdym wejściu na ekran, a przycisk z ikoną pudła i plusem mówi
+      swoje sam. */
+  return <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <button type="button" className="btn-secondary inline-flex items-center gap-1 text-xs"
+          aria-label="Nowy koszyk zwrotów"
+          title={kosze.length > 0
+            ? "Kolejne pudło — przy kilku otwartych ocena pyta, do którego."
+            : "Pudło do zbierania towaru — bez otwierania zwrotu."}
+          disabled={nowy.isPending} onClick={() => nowy.mutate({})}>
+          <PackagePlus size={12} aria-hidden="true" />
+          {nowy.isPending ? "Zakładam…" : "Nowy koszyk"}
+        </button>
+      {nowy.error && <Blad>{(nowy.error as Error).message}</Blad>}
+    </div>;
+}
+
 export function Koszyk() {
   const { data } = useKosz();
   const zamknij = useZamknijKosz();
@@ -79,12 +129,6 @@ export function Koszyk() {
      obok bramki z 0.200.0. Osobna mutacja, bo osobna trasa: tę decyzję ma być
      widać, a nie ukrywać w fladze przy zwykłym zamykaniu. */
   const mimo = useMmMimoKorekt();
-  /* KOSZYK ZAKŁADANY WPROST (0.378.0) — zgłoszenie właściciela: „potrzebuję
-     tworzenia koszy zwrotowych i dodawania produktów do nich jako oddzielna
-     opcja". Porzucanie jest warunkiem zakładania, nie ozdobą: pustego kosza
-     nie da się zamknąć, więc bez tej drugiej drogi pomyłka stałaby w pasku
-     na zawsze. */
-  const nowy = useNowyKoszyk();
   const usun = useUsunKoszyk();
   const [pewien, setPewien] = React.useState<number | null>(null);
   /* Osobny stan od `pewien`: tamten pyta o WYSTAWIENIE MM mimo korekt, ten
@@ -104,37 +148,6 @@ export function Koszyk() {
     rodzaj === "odpad" ? "Koszyk odpadu" : "Koszyk zwrotów";
 
   return <>
-    {/* ── ZAŁOŻENIE PUDŁA WPROST (0.378.0) ──────────────────────────────────
-        Do tego wydania koszyk powstawał wyłącznie jako SKUTEK UBOCZNY:
-        pierwszej oceny „na stan" albo skanu w karcie otwartego zwrotu. Agent,
-        który stawia przy biurku pusty karton, ZANIM otworzy pierwszą paczkę,
-        nie miał czym go zgłosić.
-
-        Rząd stoi tu, a nie w osobnym ekranie, bo to ta sama praca co reszta
-        paska — i bo pudło dotyczy CAŁEJ sesji, nie otwartego zwrotu.
-
-        Przycisk znika, gdy koszyk zwrotów już stoi: naciśnięcie oddałoby ten
-        sam kosz (jeden na operatora, decyzja z 3 września 2026), więc byłby to
-        przycisk bez skutku. */}
-    {/* PRZYCISK STOI ZAWSZE OD 0.379.0. Do 0.378.0 znikał przy otwartym pudle,
-        bo obowiązywała zasada „jeden koszyk na operatora" — właściciel ją
-        odwrócił i wtedy znikający przycisk stał się dokładnie tym, czego
-        brakowało na ekranie. */}
-    {/* Zdanie obok przycisku odeszło do podpowiedzi (0.453.0): mówiło to samo
-        przy każdym wejściu na ekran, a przycisk z ikoną pudła i plusem mówi
-        swoje sam. */}
-    <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <button type="button" className="btn-secondary inline-flex items-center gap-1 text-xs"
-          aria-label="Nowy koszyk zwrotów"
-          title={kosze.length > 0
-            ? "Kolejne pudło — przy kilku otwartych ocena pyta, do którego."
-            : "Pudło do zbierania towaru — bez otwierania zwrotu."}
-          disabled={nowy.isPending} onClick={() => nowy.mutate({})}>
-          <PackagePlus size={12} aria-hidden="true" />
-          {nowy.isPending ? "Zakładam…" : "Nowy koszyk"}
-        </button>
-      {nowy.error && <Blad>{(nowy.error as Error).message}</Blad>}
-    </div>
     {/* Koszyki zamknięte BEZ DOKUMENTU. Stoją NAD otwartym, bo to praca
         zaległa: kosz jest już na hali, a dokumentu wciąż nie ma.
 

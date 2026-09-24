@@ -563,7 +563,8 @@ describe("Klawisze kubełka", () => {
       const otworz = vi.spyOn(window, "open").mockReturnValue(karta as unknown as Window);
       try {
         pokaz("/obsluga/zwroty/8");
-        expect(screen.getByRole("button", { name: /Wszystko OK/ })).toHaveTextContent("114,98");
+        /* Bez dostawy (0.484.5), choć wraca całe zamówienie — decyzja właściciela. */
+        expect(screen.getByRole("button", { name: /Wszystko OK/ })).toHaveTextContent("99,98");
         await userEvent.keyboard("w");
         await waitFor(() => expect(karta.location.href).toContain("salescenter"));
         expect(otworz).toHaveBeenCalledTimes(1);
@@ -573,7 +574,7 @@ describe("Klawisze kubełka", () => {
         /* Każdy zapis z wersją ODDANĄ przez poprzedni — blokada optymistyczna. */
         expect(scena.wolano[2].dane).toMatchObject({ pozycjaId: 81, ocena: "stan", wersja: 2 });
         expect(scena.wolano[3].dane).toMatchObject({ pozycjaId: 82, wersja: 3 });
-        expect(scena.wolano[4].dane).toEqual({ id: 8, pozycjeIds: [81, 82], dostawa: true, wersja: 4 });
+        expect(scena.wolano[4].dane).toEqual({ id: 8, pozycjeIds: [81, 82], dostawa: false, wersja: 4 });
       } finally { scena.zwroty = null; scena.koszykOceny = null; otworz.mockRestore(); }
     });
 
@@ -856,6 +857,33 @@ describe("Klawisze kubełka", () => {
       await userEvent.keyboard("j");
       expect(await screen.findByRole("heading", { name: "ZD-22" })).toBeInTheDocument();
     } finally { scena.zwroty = null; }
+  });
+});
+
+/* ── Przejście do następnego zwrotu nie zostawia pozycji poprzedniego ───────
+   Zgłoszenie właściciela z 24 września: po skanie kolejnego zwrotu na ekranie
+   został gaźnik z poprzedniego. Przyczyna: `Pozycje` i `Wiadomosc` stały obok
+   siebie z tym samym `key={zwrot.id}` (od 0.476.0). Dwa rodzeństwa z jednym
+   kluczem to dla Reacta błąd, po którym stary element potrafi zostać
+   w drzewie — i został, razem z sumą i przyciskiem cudzego zwrotu. */
+describe("Zmiana zwrotu (0.484.4)", () => {
+  it("po przejściu do następnego zwrotu nie ma pozycji poprzedniego", async () => {
+    const z = (id: number, nazwa: string) => {
+      const baza = zwrot(id, "decyzja", `ZP-${id}`);
+      return { ...baza, pozycje: [{ ...baza.pozycje[0], nazwa }] };
+    };
+    scena.zwroty = [z(31, "Gaźnik OHV"), z(32, "Tarcza do cięcia")];
+    const blad = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      pokaz("/obsluga/zwroty/31");
+      expect(await screen.findByText("Gaźnik OHV")).toBeInTheDocument();
+      await userEvent.keyboard("j");
+      expect(await screen.findByText("Tarcza do cięcia")).toBeInTheDocument();
+      expect(screen.queryByText("Gaźnik OHV")).toBeNull();
+      /* React mówi o zdublowanym kluczu w konsoli — ta sama usterka, złapana
+         przed tym, zanim zostawi cudzy wiersz na ekranie. */
+      expect(blad.mock.calls.some((c) => String(c[0]).includes("same key"))).toBe(false);
+    } finally { scena.zwroty = null; blad.mockRestore(); }
   });
 });
 

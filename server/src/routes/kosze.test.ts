@@ -286,6 +286,22 @@ test("biuro: lista pominięć i szukanie po towarze, oba za bramką roli", async
   assert.equal(r.json().znalezione.length, 1);
   assert.equal(r.json().znalezione[0].symbol, "TEST-LINIA-DONE");
 
+  /* SŁOWA, NIE CAŁA FRAZA (0.484.3). Każde słowo trafia w któreś pole, bez
+     względu na kolejność, wielkość liter i ogonki — „ODŁOŻONA całości" i
+     „odlozona" to ta sama pozycja. Do 0.484.2 `UPPER` w SQLite nie znał
+     polskich liter, a fraza szła jednym kawałkiem. */
+  const szukaj = async (q: string) => (await app.inject({
+    method: "GET", url: `/api/biuro/kosze/szukaj?q=${encodeURIComponent(q)}`, headers: biuro,
+  })).json().znalezione as Array<{ symbol: string }>;
+  assert.deepEqual((await szukaj("ODŁOŻONA całości")).map((z) => z.symbol), ["TEST-LINIA-DONE"]);
+  assert.deepEqual((await szukaj("calosci odlozona")).map((z) => z.symbol), ["TEST-LINIA-DONE"]);
+  // kod kosza bez myślnika i słowo z nazwy — dwa różne pola, jedno zapytanie
+  assert.deepEqual((await szukaj("kz07 nietknieta")).map((z) => z.symbol), ["TEST-LINIA-TODO"]);
+  // słowo, które nie trafia nigdzie, zawęża do zera — nie rozszerza wyniku
+  assert.equal((await szukaj("pozycja nieistniejaca")).length, 0);
+  // sama interpunkcja nie ma słów — pusta lista, nie cała tabela
+  assert.equal((await szukaj("--")).length, 0);
+
   // jedna litera to nie zapytanie — odmowa zamiast wyrzucenia całej tabeli
   r = await app.inject({ method: "GET", url: "/api/biuro/kosze/szukaj?q=T", headers: biuro });
   assert.equal(r.statusCode, 400);

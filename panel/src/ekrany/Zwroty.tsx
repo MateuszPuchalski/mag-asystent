@@ -25,10 +25,10 @@ import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { polecanyKandydat } from "../zwroty/Dokument";
 import { SzybkiZwrot } from "../zwroty/SzybkiZwrot";
-import { calaDostawa, pewnaPropozycja, szybkaSciezka } from "../zwroty/regulaSzybkiej";
+import { pewnaPropozycja, szybkaSciezka } from "../zwroty/regulaSzybkiej";
 import { Szukanie } from "../zwroty/Szukanie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
-import { Koszyk } from "../zwroty/Koszyk";
+import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { NaOutlet } from "../zwroty/NaOutlet";
 import { Wiadomosc } from "../zwroty/Wiadomosc";
 import type { RozjazdZwrotu } from "../api/zwroty";
@@ -712,8 +712,14 @@ export function Zwroty() {
           throw new Error(`„${p.nazwa}” nie weszła do pudła — powód stoi przy pozycji. Kwoty nie zapisałem.`);
         }
       }
+      /* BEZ KOSZTU DOSTAWY (0.484.5) — decyzja właściciela: „przy
+         zwrotach wszystko OK koszt dostawy powinien być odznaczony". Do
+         0.484.4 ciąg brał regułę ekranu ręcznego (`calaDostawa`) i przy
+         zwrocie całego zamówienia oddawał też dostawę. Ekran ręczny ma swój
+         haczyk i tam człowiek decyduje; szybka ścieżka nie pyta, więc nie
+         dokłada pieniędzy, o które nikt nie zdecydował. */
       await kwota.mutateAsync({ id: z.id, pozycjeIds: z.pozycje.map((p) => p.id),
-        dostawa: calaDostawa(z), wersja });
+        dostawa: false, wersja });
     })().then(() => {
       setSzybka({ trwa: false, blad: "" });
       if (okno) { okno.opener = null; okno.location.href = z.linkZwrotu!; }
@@ -893,10 +899,21 @@ export function Zwroty() {
      mierzy się do `max-content`, więc przy treści wyższej niż okno grid
      wylewałby się poza kontener zamiast przyciąć ścieżkę. */
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
-    {/* Zwroty i kosze pod jedną zakładką (0.438.0) — powód w `Przelacznik.tsx`. */}
-    <PrzelacznikZwrotow teraz="zwroty" />
+    {/* ── JEDEN RZĄD NAGŁÓWKA (0.484.3) ─────────────────────────────────
+        Zgłoszenie właściciela: „ten fragment zajmuje za dużo miejsca". Nad
+        listą stały trzy pełne pasma: przełącznik, pasek kartotek i przycisk
+        nowego koszyka — każde z własnym odstępem, treści na kilka
+        centymetrów. Teraz to jeden rząd; pasek kartotek bierze resztę
+        szerokości, a na wąskim ekranie rząd się zawija.
+        Zwroty i kosze pod jedną zakładką (0.438.0) — powód w `Przelacznik.tsx`. */}
+    <div className="flex shrink-0 flex-wrap items-start gap-2">
+      <PrzelacznikZwrotow teraz="zwroty" />
+      <NowyKoszyk />
+      <div className="min-w-0 flex-1">
+        <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []} />
+      </div>
+    </div>
     {data?.stan && <PasekOgona stan={data.stan} />}
-    <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []} />
     <Koszyk />
     {/* Obok koszyka, bo to ta sama praca: co wyjęte z pudła, gdzie idzie.
         Outlet nie ma pudła ani dokumentu — ma listę i czyjeś ręce. */}
@@ -1124,7 +1141,10 @@ export function Zwroty() {
                   listę od nowa. Bez tego zostawał w niej stan poprzedniego —
                   zaznaczenie pozycji i haczyk przy koszcie dostawy — a zapis
                   kwoty szedł z cudzymi identyfikatorami. */}
-              <Pozycje key={zwrot.id} zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
+              {/* KLUCZ Z PRZEDROSTKIEM (0.484.4). `Wiadomosc` niżej też kluczy
+                  się zwrotem, a dwa rodzeństwa z jednym kluczem React myli:
+                  po skanie kolejnego zwrotu zostawała lista poprzedniego. */}
+              <Pozycje key={`pozycje-${zwrot.id}`} zwrot={zwrot} trwa={trwa} blad={bladDecyzji}
                 akcje={akcje} onWszystkieNaStan={() => void wszystkieNaStan().catch(() => {})}
                 trwaRabat={rabat.isPending} bladRabatu={bladRabatu}
                 onOcena={(pozycjaId, ocena, koszId) =>
@@ -1170,7 +1190,7 @@ export function Zwroty() {
                 <DolozTowar />}
               {/* Gotowa wiadomość do klienta (0.476.0) — `key`, bo edytowana
                   treść jednego zwrotu nie ma prawa przejść na następny. */}
-              <Wiadomosc key={zwrot.id} zwrot={zwrot} />
+              <Wiadomosc key={`wiadomosc-${zwrot.id}`} zwrot={zwrot} />
             </div>
           </>}
     </Karta>
