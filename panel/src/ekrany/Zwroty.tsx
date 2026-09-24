@@ -25,7 +25,7 @@ import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { polecanyKandydat } from "../zwroty/Dokument";
 import { SzybkiZwrot } from "../zwroty/SzybkiZwrot";
-import { calaDostawa, pewnaPropozycja, szybkaSciezka } from "../zwroty/szybkiZwrot";
+import { calaDostawa, pewnaPropozycja, szybkaSciezka } from "../zwroty/regulaSzybkiej";
 import { Szukanie } from "../zwroty/Szukanie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { Koszyk } from "../zwroty/Koszyk";
@@ -669,7 +669,7 @@ export function Zwroty() {
     return zTymZwrotem.length === 1 ? zTymZwrotem[0].id : undefined;
   };
 
-  /* ── SZYBKA ŚCIEŻKA (0.481.0) — reguła w `zwroty/szybkiZwrot.ts` ─────
+  /* ── SZYBKA ŚCIEŻKA (0.481.0) — reguła w `zwroty/regulaSzybkiej.ts` ─────
      Cały ciąg typowego zwrotu jednym ruchem: przyjęcie, pewne kartoteki,
      ocena „na stan", pełna kwota, a na końcu zwrot w Allegro do wypłaty.
 
