@@ -523,7 +523,14 @@ export function Zwroty() {
      Skan towaru NIE rusza frazy: lista kolejki zostaje taka, jaka była. */
   const dolozTowar = useDolozTowar();
   const [skanTowaru, setSkanTowaru] = useState<{ tekst: string; blad: boolean } | null>(null);
+  /* Kod, który przyszedł Z CZYTNIKA (0.493.0). Pole szukania woła tę samą
+     drogę Enterem, więc wpisane „kowalski" też chybia i otwiera szukanie
+     klienta. Bez tego rozróżnienia przycisk „Przyjmij jako nieodebraną"
+     zapisywał nazwisko jako numer listu, a potem wpisane nazwisko otwierało
+     ten zwrot jak skan naklejki. */
+  const kodZCzytnika = useRef("");
   const naSkan = async (v: string) => {
+    kodZCzytnika.current = v;
     setSkanTowaru(null);
     if (wygladaNaEan(v)) {
       let towar: TowarDoKosza | null = null;
@@ -1018,7 +1025,7 @@ export function Zwroty() {
         wynik={wynikSkanu} kod={kod} fraza={fraza} ile={pasujace?.length ?? null}
         szuka={skan.isPending} dociaga={dociagnij.isPending} blad={bladSkanu}
         onFraza={(v) => { setFraza(v); if (!v) setWynikSkanu(null); }}
-        onSzukaj={szukaj}
+        onSzukaj={(v) => { kodZCzytnika.current = ""; szukaj(v); }}
         onSkan={(v) => { void naSkan(v); }}
         towar={skanTowaru}
         onDociagnij={(v) => dociagnij.mutate(v, {
@@ -1043,14 +1050,16 @@ export function Zwroty() {
             onError: () => { pytanyLogin.current = ""; },
           });
         }}
-        /* PRZYJĘCIE PACZKI NIEODEBRANEJ (0.492.0). Numer z naklejki idzie
+        /* PRZYJĘCIE PACZKI NIEODEBRANEJ (0.493.0). Numer z naklejki idzie
            tylko po skanie, który CHYBIŁ — to numer tego kartonu. Trafiony skan
-           albo EAN towaru nie mają z tą paczką nic wspólnego. Po sukcesie
+           albo EAN towaru nie mają z tą paczką nic wspólnego, a fraza wpisana
+           ręką numerem listu nie jest. Po sukcesie
            otwiera się nowy zwrot, bo następnym ruchem jest ocena pozycji.
            Odmowa „ma już zwrot" niesie jego numer i też go otwiera. */
         onPrzyjmij={(orderId) => {
           przyjmijNieodebrana.mutate(
-            { orderId, waybill: wynikSkanu?.trafienie === null && kod ? kod : null },
+            { orderId, waybill: wynikSkanu?.trafienie === null && kod
+                && kod === kodZCzytnika.current ? kod : null },
             {
               onSuccess: (w) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${w.zwrotId}`); },
               onError: (e) => {

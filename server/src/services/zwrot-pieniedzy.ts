@@ -288,7 +288,7 @@ export function stanZwrotuPieniedzy(
 
   /* Odmówić wolno ZANIM zapadnie werdykt o kwocie — to jest osobna droga,
      nie wariant zwrotu. Oddać pieniądze wolno dopiero po przyjęciu. */
-  /* Paczce nieodebranej odmówić się nie da (0.492.0): odmowa idzie do
+  /* Paczce nieodebranej odmówić się nie da (0.493.0): odmowa idzie do
      zwrotu klienta w Allegro, a tu klient niczego nie zgłosił. Żądanie
      skończyłoby się 404 z identyfikatorem, którego Allegro nie zna. */
   const moznaOdmowic = !String(w.external_id).startsWith("nieodebrana:");

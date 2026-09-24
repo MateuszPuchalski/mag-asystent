@@ -487,7 +487,7 @@ test("zwrot rozliczony przez Allegro nie proponuje drugiego przelewu", () => {
   assert.match(String(s.powod), /Allegro już oddało/);
 });
 
-test("paczka nieodebrana oddaje pieniądze płatnością, ale odmówić nie ma czego (0.492.0)", async () => {
+test("paczka nieodebrana oddaje pieniądze płatnością, ale odmówić nie ma czego (0.493.0)", async () => {
   /* Zwrot płatności idzie po zamówieniu i działa bez zwrotu klienta.
      Odmowa idzie do zwrotu klienta w Allegro — a tego tu nie ma. */
   const d = stanowisko();

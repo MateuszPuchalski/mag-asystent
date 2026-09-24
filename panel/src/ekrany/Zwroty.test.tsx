@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -1021,7 +1021,7 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
     scena.kartoteka = {};
   });
 
-  it("nieodebrana: chybiony numer z naklejki idzie razem z zamówieniem, a zwrot się otwiera (0.492.0)", async () => {
+  it("nieodebrana: chybiony numer z naklejki idzie razem z zamówieniem, a zwrot się otwiera (0.493.0)", async () => {
     /* Numer z naklejki, który chybił, to numer TEGO kartonu. Zapisany przy
        zwrocie sprawia, że następny skan tej naklejki otworzy już zwrot. */
     scena.wolano.length = 0;
@@ -1040,6 +1040,31 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
       .toEqual({ orderId: "ord-9", waybill: "620000111222333" });
     /* Nowy zwrot otwiera się od razu: następnym ruchem jest ocena pozycji. */
     expect(await screen.findByText("ZW-2")).toBeInTheDocument();
+    scena.wynikSkanu = null;
+    scena.paczki = null;
+  });
+
+  it("nieodebrana: fraza wpisana ręką nie staje się numerem listu (0.493.0)", async () => {
+    /* Wpisane nazwisko też chybia i otwiera szukanie klienta. Zapisane jako
+       numer listu otwierałoby potem ten zwrot każdym wpisaniem nazwiska. */
+    scena.wolano.length = 0;
+    scena.wynikSkanu = { trafienie: null, zwrotId: null, zwroty: [] };
+    scena.paczki = [{ orderId: "ord-9", kupionoAt: null, sumaGrosze: 2900, waluta: "PLN",
+      pozycji: 1, zawartosc: "Strug ×1", maZwrot: false, odbiorcaNazwa: null,
+      kupujacyLogin: "jan_k", odbiorcaTelefon: null, odbiorcaUlica: null,
+      odbiorcaMiasto: null, odbiorcaKod: null, link: null }];
+    scena.przyjetyZwrot = 2;
+    pokaz();
+    const szukanie = screen.getByPlaceholderText(/Zeskanuj etykietę albo szukaj/);
+    /* `change`, nie `type`: `userEvent` pisze szybciej niż człowiek, więc
+       seria wyglądałaby na czytnik — a test sprawdza właśnie rękę. */
+    fireEvent.change(szukanie, { target: { value: "kowalski" } });
+    fireEvent.keyDown(szukanie, { key: "Enter" });
+    const pole = await screen.findByLabelText("Login, nazwisko albo telefon");
+    await userEvent.type(pole, "jan_k{Enter}");
+    await userEvent.click(await screen.findByRole("button", { name: "Przyjmij jako nieodebraną" }));
+    expect(scena.wolano.find((w) => w.co === "przyjmij")?.dane)
+      .toEqual({ orderId: "ord-9", waybill: null });
     scena.wynikSkanu = null;
     scena.paczki = null;
   });

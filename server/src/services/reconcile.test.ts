@@ -156,6 +156,15 @@ test("zwrot rozliczony przez Allegro, bez korekty, WOŁA w raporcie", () => {
   assert.equal(w.length, 1);
   assert.match(w[0].opis, /ROZL-1/);
   assert.match(w[0].opis, /brak numeru korekty/);
+  assert.match(w[0].opis, /\(FINISHED\)/);
+  /* Zatrzask z operacji płatności nie niesie statusu — zdanie mówiło „(null)". */
+  db().prepare(`UPDATE zwrot_klienta SET status_allegro=NULL,
+    rozliczony_allegro_at=datetime('now') WHERE reference_number='ROZL-1'`).run();
+  const bezStatusu = reconcile().rozjazdy.find((x) => x.rodzaj === "zwrot_rozliczony_bez_korekty");
+  assert.match(String(bezStatusu?.opis), /\(operacje płatności\)/);
+  assert.doesNotMatch(String(bezStatusu?.opis), /null/);
+  db().prepare(`UPDATE zwrot_klienta SET status_allegro='FINISHED', rozliczony_allegro_at=NULL
+    WHERE reference_number='ROZL-1'`).run();
   /* I NIE MA GO w kolejce pracy — o to właśnie prosił właściciel. */
   assert.equal(listaZwrotow(db()).find((z) => z.numer === "ROZL-1")?.kubelek, "zamkniety");
 });

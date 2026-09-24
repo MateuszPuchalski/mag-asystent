@@ -215,7 +215,7 @@ describe("Pole szukania zwrotu", () => {
     expect(screen.queryByLabelText("Przewoźnik")).toBeNull();
   });
 
-  it("paczkę bez zwrotu przyjmuje się jednym kliknięciem, a wiersz dalej prowadzi do Allegro (0.492.0)", async () => {
+  it("paczkę bez zwrotu przyjmuje się jednym kliknięciem, a wiersz dalej prowadzi do Allegro (0.493.0)", async () => {
     /* Decyzja właściciela: nieodebrana paczka idzie drogą zwrotu. Formularz
        z 0.451.0 nie wraca — przycisk nie pyta o nic, bierze zamówienie. */
     const onPrzyjmij = vi.fn();
@@ -229,7 +229,7 @@ describe("Pole szukania zwrotu", () => {
     expect(screen.getByRole("link", { name: /ord-nowy/ })).toBeInTheDocument();
   });
 
-  it("w trakcie przyjęcia przyciski stoją, a odmowa mówi całym zdaniem (0.492.0)", async () => {
+  it("w trakcie przyjęcia przyciski stoją, a odmowa mówi całym zdaniem (0.493.0)", async () => {
     pokaz(null, { paczki: PACZKI, onPrzyjmij: vi.fn(), przyjmuje: "ord-nowy",
       bladPrzyjecia: "To zamówienie ma już zwrot REF-1 — pracuj na nim." });
     await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));

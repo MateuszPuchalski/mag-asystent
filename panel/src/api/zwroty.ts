@@ -578,7 +578,7 @@ export function useZamowieniaZAllegro() {
 }
 
 /**
- * Paczka nieodebrana przyjęta z wyniku szukania (0.492.0).
+ * Paczka nieodebrana przyjęta z wyniku szukania (0.493.0).
  *
  * Wysyła zamówienie i — gdy panel go ma — numer z naklejki, który chybił
  * w skanie. Nic więcej: pozycje, login i odbiorcę serwer bierze z zamówienia.

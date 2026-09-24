@@ -34,7 +34,7 @@ historii nie przepisujemy.
 ---
 
 
-## 0.492.0 — 24 września 2026
+## 0.493.0 — 24 września 2026
 
 **Paczkę nieodebraną przyjmuje się jednym kliknięciem.** Właściciel zapytał,
 jak procesujemy paczki, które wracają bez odstąpienia, i zdecydował, że
@@ -54,6 +54,19 @@ w Allegro, a ZW, półka i przelew działy się poza panelem.
 
 Nowa trasa `POST /api/obsluga/zwroty/przyjmij-nieodebrana` stoi za bramką
 biura. Formularz rejestracji z 0.451.0 nie wraca.
+
+Przegląd drogi takiej paczki znalazł cztery błędy, poprawione w tym wydaniu:
+- Fraza wpisana w pole szukania zapisywała się jako numer listu. Teraz
+  numer idzie wyłącznie ze skanu czytnika.
+- Zamknięta korektą, a niezapłacona paczka wychodziła z kolejki dzień po
+  terminie. Reguła „Allegro odda samo" jej nie dotyczy, więc czeka dalej.
+- Pieniądze oddane w Allegro przed przyjęciem zamykały paczkę, zanim ktoś
+  ją ocenił. Wypłata zdejmuje teraz tylko czekanie na pieniądze.
+- Narzędzie kasowania zwrotów rozliczonych poza aplikacją mogło skasować
+  taką paczkę. Teraz jej nie rusza.
+
+Raport rekoncyliacji mówił „(null)" przy zwrocie rozliczonym bez statusu.
+Mówi teraz „(operacje płatności)".
 
 ## 0.491.0 — 24 września 2026
 

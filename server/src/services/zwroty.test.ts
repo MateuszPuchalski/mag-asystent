@@ -2239,6 +2239,32 @@ test("pobranie czeka dłużej, bo za nie Allegro nie oddaje wcale", () => {
   assert.equal(pieniadzeCzekaja(pobranie, Date.parse("2026-11-01T12:00:00Z")), false);
 });
 
+test("nieodebrana czeka na pieniądze bez terminu — Allegro jej nie zna (0.493.0)", () => {
+  const nieodebrana = { ...zaplacony, zrodlo: "nieodebrana" };
+  assert.equal(pieniadzeCzekaja(nieodebrana, Date.parse("2027-01-01T12:00:00Z")), true,
+    "po terminie Allegro NIE odda samo, więc zwrot nie może zniknąć z pracy");
+  assert.equal(pieniadzeCzekaja({ ...nieodebrana, zlecono: true }, TERAZ_P), false);
+  assert.equal(pieniadzeCzekaja({ ...nieodebrana, przelewAt: "2026-09-20T10:00:00Z" }, TERAZ_P), false);
+  assert.equal(pieniadzeCzekaja({ ...nieodebrana, rozliczonyAllegroAt: "2026-09-20T10:00:00Z" }, TERAZ_P), false);
+});
+
+test("wypłata nie zdejmuje nieodebranej z pracy przed korektą (0.493.0)", () => {
+  /* Pieniądze oddane ręką w Allegro PRZED przyjęciem paczki w panelu. */
+  const z = {
+    rejectionCode: null, werdykt: null, zamknietyAt: null, kwotaGrosze: null,
+    korektaNumer: null, pozycje: [{ ocena: null }],
+    rozliczonyAllegroAt: "2026-09-20T10:00:00Z", zrodlo: "nieodebrana",
+  };
+  assert.equal(kubelekZwrotu(z), "decyzja");
+  assert.equal(kubelekZwrotu({ ...z, werdykt: "przyjety", pozycje: [{ ocena: "stan" }],
+    kwotaGrosze: 4999 }), "korekta");
+  assert.equal(kubelekZwrotu({ ...z, werdykt: "przyjety", pozycje: [{ ocena: "stan" }],
+    kwotaGrosze: 4999, korektaNumer: "ZW 1/MAG/09/2026" }), "zamkniety",
+    "po korekcie zamyka, bo pieniądze już wyszły");
+  /* Zwrot z Allegro zamyka wypłata jak dotąd — decyzja z 0.339.0. */
+  assert.equal(kubelekZwrotu({ ...z, zrodlo: "allegro" }), "zamkniety");
+});
+
 test("zamknięty korektą, a niezapłacony — wraca do DO ZWROTU", () => {
   const z = {
     rejectionCode: null, werdykt: "przyjety", zamknietyAt: "2026-09-19T12:00:00Z",

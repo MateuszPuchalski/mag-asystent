@@ -353,8 +353,10 @@ function zwrotyRozliczoneBezKorekty(): Rozjazd[] {
       klucz: z.numer ?? z.externalId,
       /* NUMER W ZDANIU, jak w kontrolach wyżej: raport czyta się jako listę
          zdań, a nie jako tabelę z kluczem obok. */
+      /* Źródło wypłaty w nawiasie (0.493.0): zatrzask z operacji płatności
+         przychodzi bez statusu zwrotu i zdanie mówiło wtedy „(null)". */
       opis: `Zwrot ${z.numer ?? z.externalId}: Allegro oddało pieniądze ` +
-        `(${z.statusAllegro}), a u nas został${braki.length > 1 ? "y" : ""}: ` +
+        `(${z.statusAllegro ?? "operacje płatności"}), a u nas został${braki.length > 1 ? "y" : ""}: ` +
         `${braki.join(" i ")}.`,
       odKiedy: z.utworzono,
     }));

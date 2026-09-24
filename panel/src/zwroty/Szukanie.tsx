@@ -80,7 +80,7 @@ export function Szukanie({
   bladSync?: string;
   onSynchronizuj?: () => void;
   /**
-   * Przyjęcie paczki jako nieodebranej (0.492.0). Brak = wiersz zostaje
+   * Przyjęcie paczki jako nieodebranej (0.493.0). Brak = wiersz zostaje
    * samym odnośnikiem do Allegro, jak w 0.451.0.
    */
   onPrzyjmij?: (orderId: string) => void;
@@ -198,7 +198,7 @@ export function Szukanie({
                     <span className="mt-0.5 block truncate text-slate-600">{k.zawartosc}</span>
                 </>;
                 const klasa = "block min-w-0 flex-1 rounded border border-slate-200 p-1.5 text-left text-xs";
-                /* ── PRZYJMIJ JAKO NIEODEBRANĄ (0.492.0) ──────────────────
+                /* ── PRZYJMIJ JAKO NIEODEBRANĄ (0.493.0) ──────────────────
                    Decyzja właściciela: paczka, której klient nie odebrał,
                    ma iść tą samą drogą co zwrot — ocena, koszyk, ZW automatem,
                    ślad oddanych pieniędzy. Do tego wydania kończyła się na

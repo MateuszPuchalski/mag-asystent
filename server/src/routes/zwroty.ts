@@ -624,7 +624,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
-  /* ── PRZYJĘCIE PACZKI NIEODEBRANEJ (0.492.0) ──────────────────────────
+  /* ── PRZYJĘCIE PACZKI NIEODEBRANEJ (0.493.0) ──────────────────────────
      Trasa rejestracji `/nieodebrana` odeszła w 0.451.0 razem z formularzem.
      Ta wraca NOWĄ decyzją właściciela i pod inną nazwą, bo robi co innego:
      nie pyta o nic, przyjmuje zamówienie wskazane w wyniku szukania.

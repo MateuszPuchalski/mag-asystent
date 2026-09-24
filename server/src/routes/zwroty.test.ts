@@ -102,7 +102,7 @@ const TRASY = () => [
      bramki z 0.200.0 — hala nie ma prawa go nawet zobaczyć, bo decyzję bierze
      na siebie człowiek przy biurku. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/kosz/mm-mimo-korekt" },
-  /* Przyjęcie paczki nieodebranej (0.492.0) zakłada zwrot, czyli przyszłe
+  /* Przyjęcie paczki nieodebranej (0.493.0) zakłada zwrot, czyli przyszłe
      pieniądze do oddania. Decyzja biura, nie hali. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/przyjmij-nieodebrana" },
 ];
@@ -374,7 +374,7 @@ test("zwroty mają trzydzieści sześć tras POST, każda z uzasadnieniem", asyn
      „usuń opcję rejestracji paczki — ja tylko wyszukuję ją w Allegro", a potem
      „usuń też trasę rejestracji z serwera". Zwroty zarejestrowane wcześniej
      zostają w kolejce; nowych ta aplikacja już nie zakłada. */
-  /* Trzydziesta szósta (0.492.0): przyjęcie paczki nieodebranej jednym
+  /* Trzydziesta szósta (0.493.0): przyjęcie paczki nieodebranej jednym
      kliknięciem przy zamówieniu z wyniku szukania. Nowa decyzja właściciela,
      po pytaniu „jak procesujemy paczki nieodebrane". Formularz z 0.451.0 nie
      wraca: trasa niczego nie pyta, bierze zamówienie wskazane przez biuro. */
@@ -390,7 +390,7 @@ test("zwroty mają trzydzieści sześć tras POST, każda z uzasadnieniem", asyn
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
   /* Formularza rejestracji nie ma i nie ma wrócić przypadkiem — np. przy
-     scaleniu z gałęzią sprzed 0.451.0. Przyjęcie z 0.492.0 ma inną ścieżkę. */
+     scaleniu z gałęzią sprzed 0.451.0. Przyjęcie z 0.493.0 ma inną ścieżkę. */
   assert.equal(zrodlo.includes('"/api/obsluga/zwroty/nieodebrana"'), false,
     "trasa rejestracji paczki odeszła decyzją właściciela");
 });
@@ -940,7 +940,7 @@ test("notatka zapisuje się przy zwrocie ZAMKNIĘTYM i da się ją cofnąć", as
   }
 });
 
-/* ── Paczka nieodebrana jednym kliknięciem (0.492.0) ────────────────────── */
+/* ── Paczka nieodebrana jednym kliknięciem (0.493.0) ────────────────────── */
 
 function zamowienie(orderId: string, pozycji = 1) {
   const d = db();

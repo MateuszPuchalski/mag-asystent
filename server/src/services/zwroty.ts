@@ -309,11 +309,19 @@ export function pieniadzeCzekaja(z: {
   zlecono?: boolean;
   odmowaKod?: string | null; przelewAt?: string | null;
   platnoscTyp?: string | null; terminAt?: string | null; utworzono?: string | null;
+  /** `allegro` albo `nieodebrana` (0.493.0). */
+  zrodlo?: string | null;
 }, teraz = Date.now(), wygasaDni = config.allegro.zwrotWygasaDni): boolean {
   if (z.werdykt !== "przyjety" || z.rejectionCode) return false;
   if (z.kwotaGrosze === null || z.kwotaGrosze <= 0) return false;
   if (z.rozliczonyAllegroAt || STATUSY_ODDANE.has(String(z.statusAllegro ?? ""))) return false;
   if (z.zlecono || z.odmowaKod || z.przelewAt) return false;
+  /* PACZKA NIEODEBRANA CZEKA BEZ TERMINU (0.493.0). „Ósmego dnia Allegro
+     oddaje samo" dotyczy zwrotu klienta, a tej paczki Allegro nie zna.
+     Z terminem zamknięty korektą, niezapłacony zwrot wychodził z kolejki
+     dzień po terminie — pieniądze nie szły nigdy i nikt by tego nie
+     zobaczył. Czeka więc, aż zobaczymy wypłatę, zlecenie albo przelew. */
+  if (z.zrodlo === "nieodebrana") return true;
   if (z.platnoscTyp === "CASH_ON_DELIVERY") {
     return Boolean(z.utworzono) && teraz - Date.parse(String(z.utworzono)) <= wygasaDni * 86_400_000;
   }
@@ -385,7 +393,15 @@ export function kubelekZwrotu(z: {
      Wskaźnik czytamy DALEJ, obok zatrzasku: pierwsze spojrzenie na świeżo
      zsynchronizowany zwrot bywa wcześniejsze niż zapis zatrzasku, a dwa
      źródła tej samej prawdy nie kłócą się — oba mówią „pieniądze wróciły". */
-  if (z.rozliczonyAllegroAt || STATUSY_ODDANE.has(String(z.statusAllegro ?? ""))) {
+  /* PACZKI NIEODEBRANEJ WYPŁATA NIE ZAMYKA (0.493.0). Zwrot z Allegro po
+     wypłacie wychodzi z pracy decyzją z 0.339.0, a braki łapie rekoncyliacja.
+     Nieodebraną biuro przyjmuje po to, żeby zrobić ZW i odłożyć towar —
+     a pieniądze bywają oddane wcześniej, ręką w Allegro. Zamknięcie po
+     wypłacie zdejmowałoby taką paczkę z kolejki w pierwszym takcie po
+     przyjęciu, zanim ktokolwiek ją oceni. Wypłata dalej zdejmuje czekanie
+     na pieniądze, więc po korekcie zwrot się zamyka. */
+  if ((z.rozliczonyAllegroAt || STATUSY_ODDANE.has(String(z.statusAllegro ?? "")))
+      && (z.zrodlo ?? "allegro") !== "nieodebrana") {
     return "zamkniety";
   }
   /* ── STARY ZWROT BEZ DECYZJI JEST ROZLICZONY (0.452.0) ─────────────────
@@ -612,7 +628,7 @@ function zloz(
     odmowaKod: (z.odmowa_kod as string) ?? null,
     przelewAt: (z.przelew_at as string) ?? null,
     platnoscTyp: zamowienie?.platnoscTyp ?? null,
-    terminAt, utworzono,
+    terminAt, utworzono, zrodlo: String(z.zrodlo ?? "allegro"),
   }, teraz);
   const kubelek = kubelekZwrotu({
     rejectionCode,
@@ -1574,7 +1590,7 @@ export function wskazSklad(
 /**
  * Rejestracja paczki, która wróciła NIEODEBRANA (0.172.0).
  *
- * ── FORMULARZ ODSZEDŁ W 0.451.0, WIERSZ WRÓCIŁ W 0.492.0 ────────────────
+ * ── FORMULARZ ODSZEDŁ W 0.451.0, WIERSZ WRÓCIŁ W 0.493.0 ────────────────
  * W 0.451.0 rejestracja zniknęła z panelu i z serwera, decyzją właściciela.
  * Funkcja została, bo jest JEDYNĄ definicją kształtu takiego wiersza. Wraca
  * do niej `przyjmijNieodebrana`, nową decyzją — uzasadnienie stoi tam.
@@ -1634,7 +1650,7 @@ export function zarejestrujNieodebrana(
 ): { zwrotId: number; pozycji: number } {
   const waybill = (dane.waybill ?? "").trim();
   const orderId = (dane.orderId ?? "").trim() || null;
-  /* Uchwytem jest numer listu ALBO zamówienie (0.492.0). Do 0.451.0 list
+  /* Uchwytem jest numer listu ALBO zamówienie (0.493.0). Do 0.451.0 list
      był jedynym, bo formularz zakładał zwrot bez zamówienia. Przycisk przy
      wyniku szukania zna zamówienie zawsze, a listu nie, gdy biuro szukało
      klienta bez skanu naklejki. */
@@ -1732,7 +1748,7 @@ export function zarejestrujNieodebrana(
 }
 
 /**
- * Paczka nieodebrana przyjęta JEDNYM KLIKIEM z wyniku szukania (0.492.0).
+ * Paczka nieodebrana przyjęta JEDNYM KLIKIEM z wyniku szukania (0.493.0).
  *
  * Decyzja właściciela, po pytaniu „jak procesujemy paczki, które wracają
  * nieodebrane". Od 0.451.0 biuro tylko szukało zamówienia, a resztę robiło
