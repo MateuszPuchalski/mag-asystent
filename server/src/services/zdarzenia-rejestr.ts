@@ -26,6 +26,7 @@ export const ZDARZENIA: readonly string[] = [
   "delivery_finished", "delivery_note_added", "delivery_note_answered", "delivery_open",
   "delivery_reopened", "device_drop", "dobor_dane", "dobor_status", "dobor_wybor",
   "dobor_wybor_zdjety", "dyskusja_notatka", "dyskusja_notatka_cofnieta", "dyskusja_odpowiedz",
+  "dyskusja_odswiezenie", "dyskusja_zalacznik_dodany", "dyskusja_zalacznik_zdjety",
   "dyskusja_prowadzi", "dyskusja_przesylka_reczna", "dyskusja_zakonczenie", "ean_conflict",
   "ean_conflict_autoresolved", "ean_kolizja_rozstrzygnieta", "ean_set", "firma_zapis",
   "http_rejected", "karton_anulowany", "karton_ilosc", "karton_pozycja",

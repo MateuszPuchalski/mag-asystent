@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, pobierzPlik } from "./klient";
+import { kluczeReklamacji } from "./reklamacje";
 import type {
   Dyskusja, KolejkaDyskusji, StanPrzesylki, SzczegolDyskusji,
   WynikOdpowiedziReklamacji, WynikZakonczenia,
@@ -118,6 +119,9 @@ export function useOdpowiedzWDyskusji() {
     onSettled: (_d, _e, v) => {
       void qc.invalidateQueries({ queryKey: kluczeDyskusji.dyskusja(v.id) });
       void qc.invalidateQueries({ queryKey: kluczeDyskusji.kolejka });
+      /* Załączniki wychodzące dyskusji mieszkają pod kluczem reklamacji, bo
+         trasa i tabela są wspólne (0.486.0). Wysłana odpowiedź je zdejmuje. */
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.zalacznikiWysylki(v.id) });
     },
   });
 }
@@ -181,5 +185,22 @@ export function useSprawdzPrzesylkeDyskusji() {
       api<StanPrzesylki>(`/api/obsluga/dyskusje/${v.id}/przesylka`, { method: "POST" }),
     onSettled: (_d, _e, v) =>
       qc.invalidateQueries({ queryKey: kluczeDyskusji.dyskusja(v.id) }),
+  });
+}
+
+/* ── Odświeżenie jednej dyskusji z Allegro (24 września 2026) ────────────────
+   Ta sama droga co `useOdswiez` reklamacji: przy wejściu w sprawę, po wysyłce,
+   po prośbie o zakończenie i z przycisku. Bez ciała, więc bez `body` —
+   reguła klienta HTTP z CLAUDE.md. Błąd zostawia ekran w spokoju: zostaje
+   stan z ostatniego przebiegu, czyli to, co było przed tym wydaniem. */
+export function useOdswiezDyskusje() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<SzczegolDyskusji>(`/api/obsluga/dyskusje/${v.id}/odswiez`, { method: "POST" }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeDyskusji.dyskusja(v.id) });
+      void qc.invalidateQueries({ queryKey: kluczeDyskusji.kolejka });
+    },
   });
 }

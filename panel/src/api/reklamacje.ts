@@ -164,6 +164,10 @@ export function useOdpowiedz() {
     onSettled: (_d, _e, v) => {
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
       void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+      /* Wysłana odpowiedź zdejmuje załączniki po stronie serwera (0.486.0).
+         Bez tego pigułki plików wisiały w edytorze do powrotu na kartę
+         i obiecywały załącznik, którego następna wiadomość już nie niesie. */
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.zalacznikiWysylki(v.id) });
     },
   });
 }
