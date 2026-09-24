@@ -68,6 +68,12 @@ const scena = vi.hoisted(() => ({
   /* Pudło, do którego serwer dołożył ocenioną pozycję. `null` znaczy „nie
      dołożył” — szybka ścieżka musi się wtedy zatrzymać przed kwotą. */
   koszykOceny: null as number | null,
+  /* Wynik skanu etykiety. `null` = atrapa oddaje zapis jak każda inna;
+     `{ trafienie: null }` = skan CHYBIŁ, jak przy naklejce nieodebranej paczki. */
+  wynikSkanu: null as Record<string, unknown> | null,
+  /* Lista paczek klienta i identyfikator zwrotu założonego z nieodebranej. */
+  paczki: null as unknown[] | null,
+  przyjetyZwrot: 0,
 }));
 
 vi.mock("../api/zwroty", async () => {
@@ -107,7 +113,24 @@ vi.mock("../api/zwroty", async () => {
     useZwrocPieniadze: () => atrapa("zwrocPieniadze"),
     /* Skan i dołożenie towaru jako atrapy: test sprawdza, KTÓRĄ drogą poszedł
        kod, a prawdziwe mutacje strzelałyby `fetch`-em w nieistniejący serwer. */
-    useSkanZwrotu: () => atrapa("skan"),
+    useSkanZwrotu: () => {
+      const a = atrapa("skan");
+      return { ...a, mutate: (dane: Record<string, unknown>, opcje?: { onSuccess?: (w: unknown) => void }) => {
+        if (!scena.wynikSkanu) return a.mutate(dane, opcje);
+        scena.wolano.push({ co: "skan", dane });
+        opcje?.onSuccess?.(scena.wynikSkanu);
+      } };
+    },
+    usePaczkiKlienta: () => ({ data: scena.paczki ? { paczki: scena.paczki } : undefined,
+      isFetching: false }),
+    useZamowieniaZAllegro: () => ({ ...atrapa("zAllegro"), reset: () => {} }),
+    usePrzyjmijNieodebrana: () => ({
+      isPending: false, error: null, variables: undefined,
+      mutate: (dane: Record<string, unknown>, opcje?: { onSuccess?: (w: unknown) => void }) => {
+        scena.wolano.push({ co: "przyjmij", dane });
+        opcje?.onSuccess?.({ zwrotId: scena.przyjetyZwrot, pozycji: 1 });
+      },
+    }),
     useDolozTowar: () => ({
       isPending: false,
       mutate: (dane: Record<string, unknown>, opcje?: { onSuccess?: (w: unknown) => void }) => {
@@ -996,6 +1019,29 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
     expect(await screen.findByText("FT0114 → koszyk K-7: 2 szt.")).toBeInTheDocument();
     expect(scena.wolano).toEqual([{ co: "dolozTowar", dane: { twId: 504, ilosc: 1, rodzaj: "zwroty" } }]);
     scena.kartoteka = {};
+  });
+
+  it("nieodebrana: chybiony numer z naklejki idzie razem z zamówieniem, a zwrot się otwiera (0.492.0)", async () => {
+    /* Numer z naklejki, który chybił, to numer TEGO kartonu. Zapisany przy
+       zwrocie sprawia, że następny skan tej naklejki otworzy już zwrot. */
+    scena.wolano.length = 0;
+    scena.wynikSkanu = { trafienie: null, zwrotId: null, zwroty: [] };
+    scena.paczki = [{ orderId: "ord-9", kupionoAt: null, sumaGrosze: 2900, waluta: "PLN",
+      pozycji: 1, zawartosc: "Strug ×1", maZwrot: false, odbiorcaNazwa: null,
+      kupujacyLogin: "jan_k", odbiorcaTelefon: null, odbiorcaUlica: null,
+      odbiorcaMiasto: null, odbiorcaKod: null, link: null }];
+    scena.przyjetyZwrot = 2;
+    pokaz();
+    czytnik("620000111222333");
+    const pole = await screen.findByLabelText("Login, nazwisko albo telefon");
+    await userEvent.type(pole, "jan_k{Enter}");
+    await userEvent.click(await screen.findByRole("button", { name: "Przyjmij jako nieodebraną" }));
+    expect(scena.wolano.find((w) => w.co === "przyjmij")?.dane)
+      .toEqual({ orderId: "ord-9", waybill: "620000111222333" });
+    /* Nowy zwrot otwiera się od razu: następnym ruchem jest ocena pozycji. */
+    expect(await screen.findByText("ZW-2")).toBeInTheDocument();
+    scena.wynikSkanu = null;
+    scena.paczki = null;
   });
 
   it("etykieta zwrotu idzie do szukania, nie do koszyka", async () => {

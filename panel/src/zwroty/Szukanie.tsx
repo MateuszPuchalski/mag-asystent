@@ -32,7 +32,8 @@ export function Szukanie({
   wynik, kod, fraza, szuka, dociaga, blad, ile,
   paczki = null, szukaPaczek = false, pytaAllegro = false, bladAllegro = "",
   synchronizuje = false, bladSync = "", towar = null,
-  onFraza, onSzukaj, onSkan, onDociagnij, onWybierz, onLogin, onSynchronizuj,
+  przyjmuje = null, bladPrzyjecia = "",
+  onFraza, onSzukaj, onSkan, onDociagnij, onWybierz, onLogin, onSynchronizuj, onPrzyjmij,
 }: {
   wynik: WynikSkanu | null;
   kod: string;
@@ -78,6 +79,14 @@ export function Szukanie({
   synchronizuje?: boolean;
   bladSync?: string;
   onSynchronizuj?: () => void;
+  /**
+   * Przyjęcie paczki jako nieodebranej (0.492.0). Brak = wiersz zostaje
+   * samym odnośnikiem do Allegro, jak w 0.451.0.
+   */
+  onPrzyjmij?: (orderId: string) => void;
+  /** Zamówienie, którego przyjęcie właśnie trwa. */
+  przyjmuje?: string | null;
+  bladPrzyjecia?: string;
 }) {
   /* Seria żyje MIĘDZY zdarzeniami klawiszy, więc nie może być stanem: zmiana
      stanu przerysowuje ekran, a czytnik wysyła kolejny znak po kilku
@@ -188,16 +197,39 @@ export function Szukanie({
                       </span>}
                     <span className="mt-0.5 block truncate text-slate-600">{k.zawartosc}</span>
                 </>;
-                const klasa = "block w-full rounded border border-slate-200 p-1.5 text-left text-xs";
-                return <li key={k.orderId}>
+                const klasa = "block min-w-0 flex-1 rounded border border-slate-200 p-1.5 text-left text-xs";
+                /* ── PRZYJMIJ JAKO NIEODEBRANĄ (0.492.0) ──────────────────
+                   Decyzja właściciela: paczka, której klient nie odebrał,
+                   ma iść tą samą drogą co zwrot — ocena, koszyk, ZW automatem,
+                   ślad oddanych pieniędzy. Do tego wydania kończyła się na
+                   stronie zamówienia w Allegro, a reszta działa się poza
+                   panelem.
+
+                   OSOBNY PRZYCISK, nie klik w wiersz. Wiersz dalej otwiera
+                   Allegro: zajrzenie do zamówienia niczego nie może zakładać.
+
+                   ZNIKA przy „ma już zwrot" — drugi zwrot to druga kwota za
+                   ten sam towar. Serwer odmawia i tak, ale przycisk, który
+                   zawsze kończy się odmową, to przycisk do zdjęcia. */
+                const przycisk = onPrzyjmij && !k.maZwrot
+                  ? <button type="button" disabled={przyjmuje !== null}
+                      onClick={() => onPrzyjmij(k.orderId)}
+                      title="Załóż zwrot z pozycjami tego zamówienia — paczka wróciła nieodebrana"
+                      className="shrink-0 rounded border border-violet-300 bg-violet-50 px-2 text-xs font-semibold text-violet-900 hover:bg-violet-100 disabled:opacity-50">
+                      {przyjmuje === k.orderId ? "Przyjmuję…" : "Przyjmij jako nieodebraną"}
+                    </button>
+                  : null;
+                return <li key={k.orderId} className="flex items-stretch gap-1">
                   {k.link
                     ? <a href={k.link} target="_blank" rel="noopener noreferrer"
                         title="Otwórz zamówienie w Allegro"
                         className={`${klasa} hover:border-sky-300 hover:bg-sky-50`}>{tresc}</a>
                     : <div className={klasa}>{tresc}</div>}
+                  {przycisk}
                 </li>;
               })}
             </ul>)}
+        {bladPrzyjecia && <p role="alert" className="mt-1 text-red-700">{bladPrzyjecia}</p>}
         <button type="button" className="mt-2 text-slate-500 underline underline-offset-2"
           onClick={() => { setSzukaKlienta(false); setKto(""); }}>Zamknij</button>
       </div>

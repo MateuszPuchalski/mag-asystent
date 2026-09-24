@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { List, RefreshCw, Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, type WynikSkanu } from "../api/zwroty";
+import { Konflikt } from "../api/klient";
 import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pieniadze } from "../zwroty/Pieniadze";
@@ -10,7 +11,7 @@ import { DolozTowar } from "../zwroty/DolozTowar";
 import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
-  usePaczkiKlienta, useZamowieniaZAllegro, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
+  usePaczkiKlienta, useZamowieniaZAllegro, usePrzyjmijNieodebrana, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
@@ -428,6 +429,7 @@ export function Zwroty() {
      z pola wołają `onLogin` oba, a drugi strzał do Allegro o ten sam login
      niczego by nie dodał — kosztowałby tylko żądanie. */
   const zAllegro = useZamowieniaZAllegro();
+  const przyjmijNieodebrana = usePrzyjmijNieodebrana();
   const pytanyLogin = useRef("");
   const [wynikSkanu, setWynikSkanu] = useState<WynikSkanu | null>(null);
   const [bladSkanu, setBladSkanu] = useState("");
@@ -1041,6 +1043,25 @@ export function Zwroty() {
             onError: () => { pytanyLogin.current = ""; },
           });
         }}
+        /* PRZYJĘCIE PACZKI NIEODEBRANEJ (0.492.0). Numer z naklejki idzie
+           tylko po skanie, który CHYBIŁ — to numer tego kartonu. Trafiony skan
+           albo EAN towaru nie mają z tą paczką nic wspólnego. Po sukcesie
+           otwiera się nowy zwrot, bo następnym ruchem jest ocena pozycji.
+           Odmowa „ma już zwrot" niesie jego numer i też go otwiera. */
+        onPrzyjmij={(orderId) => {
+          przyjmijNieodebrana.mutate(
+            { orderId, waybill: wynikSkanu?.trafienie === null && kod ? kod : null },
+            {
+              onSuccess: (w) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${w.zwrotId}`); },
+              onError: (e) => {
+                const juz = e instanceof Konflikt ? Number(e.szczegoly.zwrotId) : NaN;
+                if (Number.isInteger(juz) && juz > 0) nawiguj(`/obsluga/zwroty/${juz}`);
+              },
+            });
+        }}
+        przyjmuje={przyjmijNieodebrana.isPending
+          ? przyjmijNieodebrana.variables?.orderId ?? null : null}
+        bladPrzyjecia={przyjmijNieodebrana.error ? (przyjmijNieodebrana.error as Error).message : ""}
         pytaAllegro={zAllegro.isPending}
         bladAllegro={zAllegro.error ? (zAllegro.error as Error).message : ""}
         /* SYNCHRONIZACJA WCHODZI DO RZĘDU POLA (0.370.0). Stała we własnym

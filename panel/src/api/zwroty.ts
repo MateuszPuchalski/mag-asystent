@@ -578,6 +578,27 @@ export function useZamowieniaZAllegro() {
 }
 
 /**
+ * Paczka nieodebrana przyjęta z wyniku szukania (0.492.0).
+ *
+ * Wysyła zamówienie i — gdy panel go ma — numer z naklejki, który chybił
+ * w skanie. Nic więcej: pozycje, login i odbiorcę serwer bierze z zamówienia.
+ * Po sukcesie odświeża kolejkę, żeby nowy zwrot dał się od razu otworzyć,
+ * i listę paczek, żeby wiersz pokazał „ma już zwrot".
+ */
+export function usePrzyjmijNieodebrana() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { orderId: string; waybill: string | null }) =>
+      api<{ zwrotId: number; pozycji: number }>("/api/obsluga/zwroty/przyjmij-nieodebrana",
+        { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["paczki-klienta"] });
+      return odswiez(qc);
+    },
+  });
+}
+
+/**
  * Potrącenie za utratę wartości pojedynczej pozycji (0.170.0).
  *
  * To JEDYNA liczba o pieniądzach, jaką panel wolno mu wysłać — i dlatego

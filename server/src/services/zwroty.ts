@@ -1574,13 +1574,10 @@ export function wskazSklad(
 /**
  * Rejestracja paczki, która wróciła NIEODEBRANA (0.172.0).
  *
- * ── BEZ TRASY OD 0.451.0 ───────────────────────────────────────────────────
- * Decyzją właściciela rejestracja zniknęła z panelu i z serwera. Funkcja
- * zostaje, bo jest JEDYNĄ definicją kształtu takiego wiersza: przedrostek
- * identyfikatora, klucze pozycji, daty powrotu. Baza produkcyjna ma te wiersze,
- * a testy odczytu — skan po numerze listu, migracja, szukanie — budują je
- * właśnie nią. Wiersz złożony w teście ręcznie rozjechałby się z prawdziwym
- * przy pierwszej zmianie. Nowa trasa do niej wraca tylko nową decyzją.
+ * ── FORMULARZ ODSZEDŁ W 0.451.0, WIERSZ WRÓCIŁ W 0.492.0 ────────────────
+ * W 0.451.0 rejestracja zniknęła z panelu i z serwera, decyzją właściciela.
+ * Funkcja została, bo jest JEDYNĄ definicją kształtu takiego wiersza. Wraca
+ * do niej `przyjmijNieodebrana`, nową decyzją — uzasadnienie stoi tam.
  *
  * Allegro takiego bytu nie zna: `CustomerReturn` powstaje z DEKLARACJI klienta,
  * a nieodebrana przesyłka wraca sama i zwrotem nigdy nie zostanie. Pieniądze
@@ -1630,25 +1627,31 @@ const LIMIT_NAZWY = 120;
 
 export function zarejestrujNieodebrana(
   database: Db, dane: {
-    waybill: string; orderId?: string | null; notatka?: string | null;
+    waybill?: string | null; orderId?: string | null; notatka?: string | null;
     login?: string | null; odbiorcaNazwa?: string | null; przewoznik?: string | null;
   },
   kto: { id: number; name: string }, teraz = new Date(),
 ): { zwrotId: number; pozycji: number } {
   const waybill = (dane.waybill ?? "").trim();
-  if (!waybill) throw new Error("Numer listu przewozowego jest tu jedynym uchwytem — podaj go.");
+  const orderId = (dane.orderId ?? "").trim() || null;
+  /* Uchwytem jest numer listu ALBO zamówienie (0.492.0). Do 0.451.0 list
+     był jedynym, bo formularz zakładał zwrot bez zamówienia. Przycisk przy
+     wyniku szukania zna zamówienie zawsze, a listu nie, gdy biuro szukało
+     klienta bez skanu naklejki. */
+  if (!waybill && !orderId) {
+    throw new Error("Numer listu przewozowego jest tu jedynym uchwytem — podaj go.");
+  }
 
   const konto = database.prepare("SELECT id FROM channel_account ORDER BY id LIMIT 1")
     .get() as { id: number } | undefined;
   if (!konto) throw new Error("Brak konta kanału — sparuj konto Allegro: /obsluga → STAN SYSTEMU → KONTO ALLEGRO.");
 
-  const external = `nieodebrana:${waybill}`;
+  const external = `nieodebrana:${waybill || orderId}`;
   const juz = database.prepare(
     "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?")
     .get(konto.id, external) as { id: number } | undefined;
   if (juz) throw new Error(`Ta paczka jest już zarejestrowana (zwrot ${juz.id}).`);
 
-  const orderId = (dane.orderId ?? "").trim() || null;
   const at = teraz.toISOString();
 
   /* Zamówienie czytamy PRZED wstawieniem, bo niesie login. Pozycje idą niżej
@@ -1684,7 +1687,7 @@ export function zarejestrujNieodebrana(
          przy paczce nieodebranej nie znamy przewoźnika, a Allegro nie zna
          samego zwrotu. Bez tego panel pytał „czy dotarła" o karton leżący
          na biurku operatora. */
-      at, at, waybill, (dane.notatka ?? "").trim() || null,
+      at, at, waybill || null, (dane.notatka ?? "").trim() || null,
       login, odbiorca, przewoznik, at);
     const zwrotId = Number((database.prepare(
       "SELECT id FROM zwrot_klienta WHERE channel_account_id=? AND external_id=?")
@@ -1726,6 +1729,63 @@ export function zarejestrujNieodebrana(
         zOdbiorca: odbiorca !== null, przewoznik }, kto.id, database);
     return { zwrotId, pozycji };
   })();
+}
+
+/**
+ * Paczka nieodebrana przyjęta JEDNYM KLIKIEM z wyniku szukania (0.492.0).
+ *
+ * Decyzja właściciela, po pytaniu „jak procesujemy paczki, które wracają
+ * nieodebrane". Od 0.451.0 biuro tylko szukało zamówienia, a resztę robiło
+ * poza panelem: ZW w Subiekcie, towar na półkę, przelew w Allegro. Taka paczka
+ * nie miała ani oceny, ani koszyka, ani automatu ZW, ani śladu oddanych
+ * pieniędzy — czyli żadnej z rzeczy, dla których zwroty w ogóle są w panelu.
+ *
+ * To NIE jest powrót formularza z 0.451.0. Tamten miał sześć pól i zasłaniał
+ * login. Ten przycisk stoi przy zamówieniu, które operator już wskazał, więc
+ * pyta o nic: pozycje, login i odbiorcę bierze z zamówienia.
+ *
+ * TRZY BRAMKI, każda przed zapisem, każda z własnym zdaniem:
+ * - zamówienia nie ma w bazie — bez niego zwrot nie miałby pozycji, czyli
+ *   niczego do wyceny;
+ * - zamówienie nie ma pozycji — to samo z drugiej strony;
+ * - zamówienie ma już zwrot — drugi wiersz to druga kwota do oddania za ten
+ *   sam towar. Jedno zamówienie bywa dwiema paczkami, ale tę rzadkość biuro
+ *   rozstrzyga na istniejącym zwrocie, a nie drugim kliknięciem.
+ */
+export function przyjmijNieodebrana(
+  database: Db, dane: { orderId: string; waybill?: string | null },
+  kto: { id: number; name: string }, teraz = new Date(),
+): { zwrotId: number; pozycji: number } {
+  const orderId = (dane.orderId ?? "").trim();
+  if (!orderId) throw new Error("Wskaż zamówienie, którego paczka wróciła.");
+  const konto = database.prepare("SELECT id FROM channel_account ORDER BY id LIMIT 1")
+    .get() as { id: number } | undefined;
+  if (!konto) throw new Error("Brak konta kanału — sparuj konto Allegro: /obsluga → STAN SYSTEMU → KONTO ALLEGRO.");
+
+  const zam = database.prepare(`SELECT k.id,
+      (SELECT COUNT(*) FROM zamowienie_klienta_pozycja p WHERE p.zamowienie_id = k.id) AS pozycji
+      FROM zamowienie_klienta k WHERE k.channel_account_id=? AND k.external_id=?`)
+    .get(konto.id, orderId) as { id: number; pozycji: number } | undefined;
+  if (!zam) {
+    throw new ZwrotConflict(
+      "Nie znam tego zamówienia — wyszukaj klienta po pełnym loginie, żeby pobrać je z Allegro.",
+      { orderId });
+  }
+  if (!Number(zam.pozycji)) {
+    throw new ZwrotConflict("Zamówienie nie ma pozycji, więc zwrot nie miałby czego wycenić.",
+      { orderId });
+  }
+  const byl = database.prepare(`SELECT id, COALESCE(reference_number, external_id) AS numer
+      FROM zwrot_klienta WHERE channel_account_id=? AND order_id=? ORDER BY id LIMIT 1`)
+    .get(konto.id, orderId) as { id: number; numer: string } | undefined;
+  if (byl) {
+    throw new ZwrotConflict(
+      `To zamówienie ma już zwrot ${byl.numer.replace(/^nieodebrana:/, "")} — pracuj na nim.`,
+      /* Identyfikator jedzie z odmową, żeby panel mógł ten zwrot otworzyć:
+         odmowa, po której trzeba go jeszcze szukać, to drugi krok za darmo. */
+      { zwrotId: Number(byl.id) });
+  }
+  return zarejestrujNieodebrana(database, { orderId, waybill: dane.waybill ?? null }, kto, teraz);
 }
 
 /* ── Dopisanie produktu do zwrotu (0.184.0) ──────────────────────────────────

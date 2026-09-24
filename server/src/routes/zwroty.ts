@@ -21,6 +21,7 @@ import {
   zapiszNotatkeZwrotu, cofnijNotatkeZwrotu,
   wskazSklad,
   pozycjeNaOutlet, przeniesionoNaOutlet,
+  przyjmijNieodebrana,
 } from "../services/zwroty.js";
 import { kontekstZwrotu } from "../services/droga-klienta.js";
 import { RabatConflict, zlozWniosekORabat } from "../services/rabaty.js";
@@ -623,14 +624,31 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
-  /* ── TRASY REJESTRACJI PACZKI NIEODEBRANEJ JUŻ NIE MA (0.451.0) ─────────
-     Stała tu od 0.172.0 jako jedyna trasa zwrotów tworząca zwrot od zera.
-     Decyzja właściciela: „usuń opcję rejestracji paczki — ja tylko wyszukuję
-     ją w Allegro", a zaraz potem „usuń też trasę rejestracji z serwera".
-     Panel przestał ją wołać w tym samym wydaniu, więc trasa bez wołającego
-     byłaby już tylko drzwiami do zapisu, którego nikt nie pilnuje.
+  /* ── PRZYJĘCIE PACZKI NIEODEBRANEJ (0.492.0) ──────────────────────────
+     Trasa rejestracji `/nieodebrana` odeszła w 0.451.0 razem z formularzem.
+     Ta wraca NOWĄ decyzją właściciela i pod inną nazwą, bo robi co innego:
+     nie pyta o nic, przyjmuje zamówienie wskazane w wyniku szukania.
+     Uzasadnienie i bramki stoją przy `przyjmijNieodebrana`.
 
-     Serwis `zarejestrujNieodebrana` zostaje — patrz jego nagłówek. */
+     Numer listu idzie tylko wtedy, gdy panel ma go ze skanu, który chybił —
+     to jest numer z naklejki tego kartonu. Następny skan tej samej naklejki
+     otworzy już ten zwrot, zamiast drugi raz odsyłać do szukania klienta.
+
+     Wiązania idą od razu, jak po dociągnięciu: kartoteki i paragon po numerze
+     zamówienia. Bez tego zwrot czekałby na takt z pustymi kartotekami. */
+  app.post<{ Body: { orderId?: string; waybill?: string | null } }>(
+    "/api/obsluga/zwroty/przyjmij-nieodebrana", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        const wynik = przyjmijNieodebrana(db(), {
+          orderId: String(req.body?.orderId ?? ""),
+          waybill: req.body?.waybill ? String(req.body.waybill) : null,
+        }, kto());
+        powiazZaleglosci(db());
+        return wynik;
+      } catch (e) { return konflikt(reply, e); }
+    });
 
   /* Potrącenie za utratę wartości (0.170.0). To JEDYNA liczba o pieniądzach,
      jaką panel wolno mu przysłać — i dlatego jest walidowana w widełkach

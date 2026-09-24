@@ -34,6 +34,27 @@ historii nie przepisujemy.
 ---
 
 
+## 0.492.0 — 24 września 2026
+
+**Paczkę nieodebraną przyjmuje się jednym kliknięciem.** Właściciel zapytał,
+jak procesujemy paczki, które wracają bez odstąpienia, i zdecydował, że
+mają iść drogą zwrotu. Od 0.451.0 praca kończyła się na stronie zamówienia
+w Allegro, a ZW, półka i przelew działy się poza panelem.
+
+- Przy wierszu w „Paczkach klienta" stoi przycisk „Przyjmij jako
+  nieodebraną". Zakłada zwrot z pozycjami zamówienia, loginem i odbiorcą,
+  potem go otwiera. Klik w sam wiersz dalej prowadzi do Allegro.
+- Numer z naklejki, który chybił w skanie, zapisuje się przy zwrocie.
+  Następny skan tego kartonu otwiera już zwrot.
+- Dalej zwykła droga: ocena, koszyk, kwota, ZW automatem i zwrot płatności.
+- Przycisku nie ma przy zamówieniu, które ma już zwrot. Serwer też odmawia
+  i otwiera istniejący zwrot, bo drugi znaczyłby drugą kwotę za ten sam towar.
+- Odmowy wypłaty dla takiej paczki nie ma. Idzie ona do zwrotu klienta
+  w Allegro, a klient niczego nie zgłosił.
+
+Nowa trasa `POST /api/obsluga/zwroty/przyjmij-nieodebrana` stoi za bramką
+biura. Formularz rejestracji z 0.451.0 nie wraca.
+
 ## 0.491.0 — 24 września 2026
 
 **Ustawienia właściciela zmienia się z panelu.** Dotąd każda zmiana to był
