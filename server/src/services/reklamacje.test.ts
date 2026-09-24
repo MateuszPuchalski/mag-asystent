@@ -347,8 +347,8 @@ test("szczegół wiąże zwroty i rozmowy PO NUMERZE ZAMÓWIENIA, nie po loginie
   d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,order_id,
     created_at,synced_at) VALUES (?,'z-1','zam-7','2026-09-02T08:00:00Z','2026-09-07T08:00:00Z')`)
     .run(konto);
-  /* Rozmowa o tym zakupie. Po loginie kupującego dobierać NIE WOLNO —
-     blizna 0.56.6: Allegro maskuje rozmówcę jako `client:44300444`. */
+  /* Rozmowa o tym zakupie — wiąże się numerem zamówienia, nie loginem:
+     ta sekcja pokazuje rozmowy o TYM zakupie. */
   const rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
     external_conversation_id,subject) VALUES (?,'w-1','Kupujący 44300444')`)
     .run(konto).lastInsertRowid);

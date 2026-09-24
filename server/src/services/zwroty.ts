@@ -220,9 +220,11 @@ export interface WierszZwrotu {
  * `relatesTo.order`. Nie ma tu ani jednego nowego żądania do Allegro: numer
  * zamówienia zwrot ma od zawsze, a wiadomości leżą już w naszej bazie.
  *
- * Po loginie kupującego dobierać NIE WOLNO — blizna 0.56.6: Allegro maskuje
- * rozmówcę jako `client:44300444`, więc rozmowy szuka się po identyfikatorze,
- * nigdy po loginie. `conversation` identyfikatora zresztą nie trzyma.
+ * NUMER ZAMÓWIENIA, NIE LOGIN, i to jest wybór zakresu, nie zakaz. Karta
+ * zwrotu pokazuje rozmowy o TYM zakupie; wszystkie rozmowy kupującego niesie
+ * historia klienta (`klient-historia.ts`), która od 24 września 2026 chodzi
+ * też po loginie. Blizna 0.56.6 brała `client:44300444` za maskę — to był
+ * login kupującego bez konta (`docs/allegro-ksztalt.md`).
  */
 export interface RozmowaZwrotu {
   id: number;

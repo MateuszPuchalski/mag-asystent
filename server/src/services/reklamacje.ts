@@ -1058,7 +1058,7 @@ export function historiaSprawy(
     SELECT ${LICZNIKI_HISTORII}
       FROM reklamacja_klienta r
      WHERE r.channel_account_id = ? AND r.typ = 'CLAIM'
-       AND r.kupujacy_login = ? AND r.id <> ?`).get(konto, login, pomin) as Wiersz | undefined);
+       AND r.kupujacy_login = ? COLLATE NOCASE AND r.id <> ?`).get(konto, login, pomin) as Wiersz | undefined);
   return { towar, klient };
 }
 

@@ -193,15 +193,15 @@ test("dyskusja bez tematu bierze podpis, a nie pustą linię", () => {
 });
 
 /* ── Historia ze zwrotu i ze sprawy (23 września 2026) ───────────────────────
-   Login bierze się z SAMEJ sprawy, a rozmowy dochodzą wyłącznie numerem
-   zamówienia. Rozmowa, której wątek ma ten sam login rozmówcy, ale żadnego
-   numeru — NIE wchodzi: `[WERYFIKUJ]` przy `interlocutor_login`. */
-test("ze zwrotu: zakupy i sprawy po loginie, rozmowy tylko numerem zamówienia, bez samego zwrotu", () => {
+   Login bierze się z SAMEJ sprawy. Rozmowy dochodzą numerem zamówienia
+   i — od 24 września 2026 — loginem rozmówcy z wątku, bez wielkości liter. */
+test("ze zwrotu: zakupy, sprawy i rozmowy obiema drogami, bez samego zwrotu", () => {
   zakup("chips20", "ord-1", "Nóż kosiarki", "2026-09-01T10:00:00Z");
   const poNumerze = rozmowa("w-num", null, "gdzie paczka", "2026-09-02T10:00:00Z");
   db().prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
     related_order_id,sent_at) VALUES (?,?,'m-n','incoming','?','ord-1','2026-09-02T10:00:00Z')`).run(poNumerze, konto);
-  const poLoginie = rozmowa("w-log", "chips20", "inne pytanie", "2026-09-03T10:00:00Z");
+  /* Wielka litera celowo: wątek i zamówienie potrafią zapisać login różnie. */
+  const poLoginie = rozmowa("w-log", "Chips20", "inne pytanie", "2026-09-03T10:00:00Z");
   const zw = zwrotKlienta("chips20", "ZW-1", "2026-09-05T10:00:00Z");
   const rk = sprawaKlienta("chips20", "CLAIM", "Pęknięty", "2026-09-06T10:00:00Z");
   zwrotKlienta("obcy", "ZW-2", "2026-09-07T10:00:00Z");
@@ -210,7 +210,7 @@ test("ze zwrotu: zakupy i sprawy po loginie, rozmowy tylko numerem zamówienia, 
   assert.equal(h.login, "chips20");
   const rodzaje = h.wpisy.map((w) => `${w.rodzaj}:${w.rozmowaId ?? w.sprawaId ?? w.zamowienieId}`);
   assert.ok(rodzaje.includes(`rozmowa:${poNumerze}`));
-  assert.ok(!rodzaje.includes(`rozmowa:${poLoginie}`), "po loginie rozmówcy nie wiążemy");
+  assert.ok(rodzaje.includes(`rozmowa:${poLoginie}`), "pytanie bez numeru zamówienia, po loginie z wątku");
   assert.ok(rodzaje.includes(`reklamacja:${rk}`));
   assert.ok(rodzaje.includes("zakup:ord-1"));
   assert.ok(!rodzaje.includes(`zwrot:${zw}`), "bieżący zwrot stoi obok");
@@ -224,4 +224,16 @@ test("ze zwrotu: zakupy i sprawy po loginie, rozmowy tylko numerem zamówienia, 
 test("sprawa bez loginu kupującego daje pustą historię", () => {
   const rk = sprawaKlienta("", "DISPUTE", "x", "2026-09-06T10:00:00Z");
   assert.deepEqual(historiaSprawy("sprawa", rk, db()).wpisy, []);
+});
+
+/* ── Login bez wielkości liter (24 września 2026) ────────────────────────────
+   Zakładka KLIENT porównywała login dokładnie, a wątek i zamówienie potrafią
+   zapisać go różnie. Klient, który u nas kupował, dostawał pustą historię. */
+test("login z wątku różny wielkością liter od zamówienia dalej znajduje zakupy i rozmowy", () => {
+  const moja = rozmowa("w-case", "Client:44300444", "pytanie", "2026-09-05T10:00:00Z");
+  const druga = rozmowa("w-case-2", "client:44300444", "wcześniejsze", "2026-09-01T10:00:00Z");
+  zakup("client:44300444", "ord-case", "Filtr powietrza", "2026-09-02T10:00:00Z");
+  const h = historiaKlienta(moja, db());
+  assert.ok(h.wpisy.some((w) => w.rodzaj === "zakup" && w.zamowienieId === "ord-case"));
+  assert.ok(h.wpisy.some((w) => w.rodzaj === "rozmowa" && w.rozmowaId === druga));
 });

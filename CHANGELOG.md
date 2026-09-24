@@ -34,6 +34,29 @@ historii nie przepisujemy.
 ---
 
 
+## 0.483.0 — 24 września 2026
+
+**Login rozmówcy to login kupującego — rozstrzygnięte, i historia klienta
+wreszcie go używa.** Właściciel potwierdził 24 września 2026, że
+`interlocutor.login` z listy wątków to login kupującego. Znacznik
+weryfikacji przy tym polu zszedł (29 zostało).
+
+- **Skąd była wątpliwość.** Blizna 0.56.6 zobaczyła `client:44300444` i uznała
+  to za maskę. To najpewniej login kupującego bez konta na Allegro, a nie
+  maska. Porównanie z zamówieniem nie trafiało przez wielkość liter.
+- **Login porównuje się bez wielkości liter, wszędzie.** Zakładka KLIENT
+  porównywała dokładnie i dawała pustą historię klientowi, który u nas
+  kupował. To samo w historii reklamacji klienta.
+- **Szukanie Ctrl+K znajduje rozmowy po loginie**, także pytanie sprzed
+  zakupu bez numeru zamówienia. Powód trafienia: „login kupującego”.
+- **Historia klienta ze zwrotu, reklamacji i dyskusji** bierze też rozmowy
+  po loginie, nie tylko po numerze zamówienia.
+- **Zeszła martwa dosypka z 0.128.0**, która wpisywała liczbę z loginu
+  `client:<liczba>` jako identyfikator kupującego. Pisała do tabeli
+  kasowanej przy starcie, a kolumny nikt nie czytał.
+
+Bez migracji. Wystarczy restart serwera.
+
 ## 0.482.12 — 24 września 2026
 
 **Panel buduje się znowu na Windowsie.** 0.481.0 postawiło obok siebie

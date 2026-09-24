@@ -6,9 +6,9 @@ import path from "node:path";
 
 /* ── Ctrl+K: jedno szukanie ponad kolejkami (23 września 2026) ───────────────
    Pilnujemy trzech rzeczy. Numer zamówienia prowadzi do WSZYSTKICH spraw tego
-   zakupu, także rozmowy. Login kupującego NIE trafia w rozmowę po loginie
-   rozmówcy — `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`, rozmowa dochodzi
-   wyłącznie numerem zamówienia. Szukanie niczego nie zapisuje. */
+   zakupu, także rozmowy. Login kupującego trafia też w rozmowę po loginie
+   rozmówcy, bez wielkości liter — od 24 września 2026, gdy właściciel
+   potwierdził, że to ten sam login. Szukanie niczego nie zapisuje. */
 
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-szukaj-")), "t.db");
 
@@ -60,11 +60,12 @@ test("numer zamówienia prowadzi do zakupu, rozmowy, zwrotu i reklamacji naraz",
   assert.ok(!t.some((x) => x.rodzaj === "dyskusja"), "cudze zamówienie nie trafia");
 });
 
-test("login kupującego NIE trafia w rozmowę po loginie rozmówcy — tylko numerem zamówienia", () => {
+test("login kupującego trafia w rozmowę po loginie rozmówcy, bez wielkości liter", () => {
   const t = S.szukajWszedzie("CHIPS20", null, db());
   const r = rodzaje(t);
   assert.ok(r.includes(`rozmowa:${rozmowaZamowienia}`), "przez zamówienie tego loginu");
-  assert.ok(!r.includes(`rozmowa:${rozmowaPoLoginie}`), "`[WERYFIKUJ]` przy interlocutor_login");
+  assert.ok(r.includes(`rozmowa:${rozmowaPoLoginie}`), "pytanie sprzed zakupu, bez numeru zamówienia");
+  assert.equal(t.find((x) => x.id === String(rozmowaPoLoginie))?.dlaczego, "login kupującego");
   assert.equal(t.find((x) => x.rodzaj === "zwrot")?.dlaczego, "login kupującego");
 });
 

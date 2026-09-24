@@ -1161,9 +1161,8 @@ każda sekcja prowadzi tam, gdzie sprawę się załatwia.
 
 **Szukanie Ctrl+K** (`services/szukaj-wszedzie.ts`). Mostem między bytami
 jest numer zamówienia, jak w `droga-klienta.ts`. Login kupującego trafia
-w zakupy, zwroty i sprawy. Rozmowy po loginie rozmówcy nie szuka, dopóki
-przy `interlocutor_login` stoi znacznik weryfikacji w `allegro-ksztalt.md`.
-Rozmowa bez numeru zamówienia po loginie się więc nie znajdzie.
+w zakupy, zwroty i sprawy, a od 24 września 2026 także w rozmowy po loginie
+rozmówcy. Właściciel potwierdził wtedy, że to login kupującego.
 
 **Jedna lista skrótów pod `?`** (`nawigacja/Klawisze.tsx`). Te same
 klawisze na każdej kolejce: `j`/`k`, cyfry kubełków, Ctrl+Enter przy
@@ -4006,11 +4005,10 @@ a nie „klient nie pisał". To dwa różne zdania i tylko pierwsze jest prawdzi
 Allegro oznacza zamówieniem część wiadomości, a klient piszący z poziomu oferty
 tym mostkiem się nie znajdzie.
 
-**Po loginie kupującego dobierać nie wolno** — blizna 0.56.6: Allegro maskuje
-rozmówcę jako `client:44300444`, więc rozmowy szuka się po identyfikatorze.
-Zakładka KLIENT i kandydaci zamówień (0.397.0) wiążą jednak właśnie po loginie
-rozmówcy. Tę sprzeczność opisuje `obsluga-klienta-calosc.md`, a sprawdzenie
-czeka pod `[WERYFIKUJ]` w `allegro-ksztalt.md`.
+**Karta zwrotu wiąże rozmowy numerem zamówienia**, bo pokazuje rozmowy o TYM
+zakupie. Blizna 0.56.6 brała `client:44300444` za maskę loginu. Właściciel
+potwierdził 24 września 2026, że to login kupującego (`allegro-ksztalt.md`).
+Wszystkie rozmowy kupującego pokazuje historia klienta.
 
 **W drugą stronę: zwrot przy rozmowie (0.221.0).** Klient często pyta pod
 zamówieniem o zwrot, którego dokonał — „czy paczka doszła", „kiedy pieniądze".
