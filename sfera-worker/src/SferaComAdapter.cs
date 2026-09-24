@@ -164,6 +164,23 @@ public sealed class SferaComAdapter : ISferaAdapter
     /** Konto Windows procesu — do dziennika i do treści błędu pustej sesji. */
     internal static string KontoProcesu() => $"{Environment.UserDomainName}\\{Environment.UserName}";
 
+    /**
+     * Co zrobić przy pustej sesji — zależnie od konta (0.486.3).
+     *
+     * Do tego wydania zdanie zawsze odsyłało do zmiany konta usługi. Na
+     * produkcji 24 września usługa CHODZIŁA już na koncie człowieka, a Subiekt
+     * nie wstawał, bo w tle wisiało sześć starych instancji — worker nie
+     * kończył ich przy zamykaniu sesji. Rada „zmień konto" prowadziła wtedy
+     * donikąd. Konto systemowe dalej dostaje tamtą radę, bo tam jest prawdziwa.
+     */
+    private static string PodpowiedzPustejSesji() =>
+        Environment.UserName.Equals("SYSTEM", StringComparison.OrdinalIgnoreCase)
+        || Environment.UserName.EndsWith("$", StringComparison.Ordinal)
+            ? "Uruchom wertis-sfera na koncie, na którym przechodzi sonda.ps1 (DEPLOY §3, konto usługi)."
+            : "Konto jest właściwe — sprawdź w Menedżerze zadań, czy w tle nie wiszą stare procesy " +
+              "„Subiekt GT”: zatrzymaj wertis-sfera, zamknij je i uruchom usługę znowu. " +
+              "Pomaga też zamknięcie okna Subiekta otwartego na tym samym operatorze.";
+
     public string CreateMM(int magFrom, int magTo, IReadOnlyList<MmItem> items)
     {
         if (!OperatingSystem.IsWindows())
@@ -876,7 +893,7 @@ public sealed class SferaComAdapter : ISferaAdapter
         if (_subiekt is null)
             throw new InvalidOperationException(
                 $"GT.Uruchom oddał pustą sesję na koncie {KontoProcesu()} — Subiekt w tle nie wstał. " +
-                "Uruchom wertis-sfera na koncie, na którym przechodzi sonda.ps1 (DEPLOY §3, konto usługi).");
+                PodpowiedzPustejSesji());
         dynamic sesja = _subiekt;
         object? manager = Krok<object?>("Subiekt.SuDokumentyManager", 4,
             () => (object?)sesja.SuDokumentyManager);
@@ -892,9 +909,31 @@ public sealed class SferaComAdapter : ISferaAdapter
         return _subiekt!;
     }
 
+    /**
+     * Kończy sesję przy zatrzymaniu usługi albo po `--once` (0.486.3).
+     * Bez tego proces Subiekta zostawał w tle po każdym restarcie usługi.
+     */
+    public void ZakonczSesje() => ZamknijSesje("przy zatrzymaniu workera");
+
     private void ZamknijSesje(string powod = "po błędzie — następne zadanie otworzy nową")
     {
         if (_subiekt is null) return;
+        /* ── ZAKONCZ() PRZED ZWOLNIENIEM UCHWYTU (0.486.3) ─────────────────────
+           Tryb `gtaUruchomNowy | gtaUruchomWTle` stawia WŁASNY proces Subiekta
+           przy każdej sesji. Samo `ReleaseComObject` zwalnia nasz uchwyt, ale
+           procesu nie kończy — po każdym błędzie i każdym restarcie zostawała
+           w tle kolejna instancja. Na produkcji 24 września wisiało ich sześć,
+           a następna sesja wracała pusta. Sonda woła `Zakoncz()` od 0.348.3
+           (`docs/sfera-com.md`); worker tego nie przejął. Odmowa zakończenia
+           nie ma prawa zasłonić błędu, po którym zamykamy. */
+        try
+        {
+            ((dynamic)_subiekt).Zakoncz();
+        }
+        catch (Exception e)
+        {
+            Console.Error.WriteLine($"[sfera] Zakoncz() odmówił: {e.Message}");
+        }
         try
         {
             if (OperatingSystem.IsWindows()) Marshal.ReleaseComObject(_subiekt);

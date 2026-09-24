@@ -34,6 +34,25 @@ historii nie przepisujemy.
 ---
 
 
+## 0.486.3 — 24 września 2026
+
+**Worker Sfery kończy Subiekta, który uruchomił.** Na produkcji ZW do
+PA 9517/MAG/09/2026 odbił się komunikatem „GT.Uruchom oddał pustą sesję”.
+Usługa chodziła na właściwym koncie, a w tle wisiało sześć procesów
+„Subiekt GT”. Worker otwiera własną instancję w tle, ale przy zamykaniu sesji
+tylko zwalniał uchwyt COM, bez `Zakoncz()`. Każdy błąd i każdy restart
+zostawiał kolejny proces.
+
+- `Zakoncz()` przy każdym zamknięciu sesji. Jego odmowa idzie do dziennika
+  i nie zasłania błędu, po którym zamykamy.
+- Sesja kończy się też przy zatrzymaniu usługi i po `--once`.
+- Komunikat pustej sesji zależy od konta. Na koncie systemowym dalej odsyła
+  do zmiany konta, na koncie człowieka — do starych procesów Subiekta.
+
+**[wymaga uwagi]** Po aktualizacji wyczyść RAZ stare procesy Subiekta w tle.
+Polecenia stoją w `DEPLOY.md` §3. ZW, które odbiły się pustą sesją, zleć
+ponownie przyciskiem „popraw kwotę” i zapisem kwoty.
+
 ## 0.486.2 — 24 września 2026
 
 **Zwroty szuka się także po produkcie.** Zgłoszenie właściciela: „powinienem

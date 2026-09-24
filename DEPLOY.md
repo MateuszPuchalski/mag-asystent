@@ -322,6 +322,20 @@ nssm set wertis-sfera ObjectName '.\NazwaKonta' 'HasloKonta'
 nssm restart wertis-sfera
 ```
 
+> **Pusta sesja na WŁAŚCIWYM koncie (0.486.3).** Do 0.486.2 worker nie kończył
+> Subiekta przy zamykaniu sesji, więc po każdym błędzie i restarcie w tle
+> zostawał proces „Subiekt GT (32-bitowy)”. Po kilku takich GT.Uruchom oddaje
+> pustą sesję. Po aktualizacji do 0.486.3 wyczyść je RAZ ręcznie:
+
+```powershell
+nssm stop wertis-sfera
+Get-Process | Where-Object { $_.Path -like '*InsERT*' -and $_.SessionId -eq 0 } | Stop-Process
+nssm start wertis-sfera
+```
+
+> `SessionId 0` to procesy w tle. Okna Subiekta otwarte przez ludzi mają inny
+> numer sesji i zostają nietknięte. Od 0.486.3 worker woła `Zakoncz()` sam.
+
 **Konfiguracja usług — nic do przepisywania.** Obie usługi mają
 `AppDirectory C:\wertis`, więc czytają `C:\wertis\wertis.env` — ten sam plik,
 który uzupełniłeś w §2a. Po jego zmianie wystarczy restart:
