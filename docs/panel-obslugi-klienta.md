@@ -4931,7 +4931,14 @@ dlaczego, gdy:
 - pozycja nie ma kartoteki albo ma tylko zgadywaną propozycję;
 - przy biurku stoi kilka otwartych pudeł, a żadne nie ma jeszcze towaru
   tego zwrotu — pudła nie zgadujemy (0.379.0);
-- zwrot nie ma pozycji albo odnośnika do Allegro.
+- zwrot nie ma pozycji albo odnośnika do Allegro;
+- pozycja jest już „na stan”, ale nie leży w pudle (od 0.484.2).
+
+**Pozycja poza pudłem zatrzymuje ciąg (0.484.2).** Serwer zapisuje ocenę
+„na stan” także wtedy, gdy do pudła jej nie dołożył. Tak bywa przy komplecie
+bez składu, przy składniku poza magazynem i bez magazynu docelowego. Ciąg
+zatrzymuje się wtedy przed zapisem kwoty i zamyka kartę Allegro. Powód stoi
+przy pozycji, a zwrot czeka w DO OCENY albo w DO ZWROTU.
 
 Paczki nieodebranej przycisk nie dotyczy, bo nie ma jej zwrotu w Allegro.
 

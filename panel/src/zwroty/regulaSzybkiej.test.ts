@@ -34,7 +34,7 @@ describe("szybka ścieżka zwrotu", () => {
     expect(przeszkoda(ZW())).toBeNull();
     expect(przeszkoda(ZW({ kubelek: "ocena", werdykt: "przyjety" }))).toBeNull();
     expect(przeszkoda(ZW({ kubelek: "zwrot", werdykt: "przyjety",
-      pozycje: [POZ({ ocena: "stan" })] }))).toBeNull();
+      pozycje: [POZ({ ocena: "stan", wKoszyku: true })] }))).toBeNull();
   });
 
   it("znika tam, gdzie nie ma czego skracać", () => {
@@ -54,6 +54,13 @@ describe("szybka ścieżka zwrotu", () => {
     expect(przeszkoda(ZW({ linkZwrotu: null }))).toMatch(/odnośnika/);
   });
 
+  it("pozycja „na stan” spoza pudła zatrzymuje — ciąg by ją pominął (0.484.2)", () => {
+    expect(przeszkoda(ZW({ kubelek: "ocena", werdykt: "przyjety",
+      pozycje: [POZ({ ocena: "stan", wKoszyku: false })] }))).toMatch(/nie leży w pudle/);
+    expect(przeszkoda(ZW({ kubelek: "ocena", werdykt: "przyjety",
+      pozycje: [POZ({ ocena: "stan", wKoszyku: true })] }))).toBeNull();
+  });
+
   it("kartoteka: pewna propozycja wystarcza, zgadywana zatrzymuje", () => {
     const prop = (pewnosc: "sku" | "jedyna_pozycja") =>
       ({ pewnosc, twId: 10, symbol: "SEK", zrodlo: "x", powod: null, poKolumnie: null });
@@ -71,7 +78,8 @@ describe("szybka ścieżka zwrotu", () => {
     /* Odpad nie liczy się do wyboru — ścieżka ocenia wyłącznie „na stan". */
     expect(przeszkoda(ZW(), [pudlo(null), { rodzaj: "odpad", pozycje: [] }])).toBeNull();
     /* Wszystko ocenione — pudło nie jest już potrzebne. */
-    expect(przeszkoda(ZW({ pozycje: [POZ({ ocena: "stan" })] }), [pudlo(null), pudlo(null)])).toBeNull();
+    expect(przeszkoda(ZW({ pozycje: [POZ({ ocena: "stan", wKoszyku: true })] }),
+      [pudlo(null), pudlo(null)])).toBeNull();
   });
 
   it("dostawa wraca tylko przy zwrocie CAŁEGO zamówienia", () => {
