@@ -1326,6 +1326,29 @@ test("zwrot pokazuje rozmowy o TYM zakupie, po numerze zamówienia", () => {
   assert.equal(z.rozmowy[0].status, "open", "status rozmowy jedzie razem z nią");
 });
 
+test("rozmowa niesie OSTATNIE prawdziwe słowo i to, czy czeka na nas (0.486.1)", () => {
+  /* Nagłówek zwrotu ma powiedzieć, co klient napisał i czy czeka na
+     odpowiedź. Nasza autoodpowiedź nie liczy się jako odpisanie. */
+  const d = stanowisko();
+  const id = rozmowa(d, "w-9", "ord-9", "Zwrot nakrętki", "2026-09-01T08:00:00Z");
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,related_order_id,sent_at,auto_odpowiedz)
+    VALUES (?,1,'m-auto','outgoing','Dziękujemy za kontakt',?,?,1)`)
+    .run(id, "ord-9", "2026-09-01T08:01:00Z");
+  dodaj(d, "2026-08-30T09:00:00Z", { order_id: "ord-9" });
+  let [z] = listaZwrotow(d, TERAZ);
+  assert.equal(z.rozmowy[0].ostatniaTresc, "Kiedy zwrot?", "echo autoodpowiedzi się nie liczy");
+  assert.equal(z.rozmowy[0].odKlienta, true);
+
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,related_order_id,sent_at)
+    VALUES (?,1,'m-my','outgoing','Pieniądze wyszły wczoraj.',?,?)`)
+    .run(id, "ord-9", "2026-09-01T09:00:00Z");
+  [z] = listaZwrotow(d, TERAZ);
+  assert.equal(z.rozmowy[0].ostatniaTresc, "Pieniądze wyszły wczoraj.");
+  assert.equal(z.rozmowy[0].odKlienta, false, "odpisaliśmy — wątek nie czeka na nas");
+});
+
 test("zwrot bez powiązanych wiadomości ma pustą listę, a nie brak pola", () => {
   /* Puste znaczy „Allegro nic nie powiązało", nie „klient nie pisał" —
      i ekran ma prawo powiedzieć to wprost. */

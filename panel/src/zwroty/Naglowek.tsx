@@ -1,6 +1,7 @@
 import React from "react";
-import type { Zwrot } from "../api/typy";
-import { LoginKlienta, Skopiuj } from "../ui";
+import { MessageSquare, UserRound } from "lucide-react";
+import type { RozmowaZwrotu, Zwrot } from "../api/typy";
+import { LoginKlienta, Skopiuj, czas, ile } from "../ui";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
 import { Link } from "./Link";
 
@@ -58,9 +59,24 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
       {zwrot.kupujacyLogin
         ? <LoginKlienta login={zwrot.kupujacyLogin} className="font-semibold text-slate-700" />
         : <span className="text-slate-500">kupujący: Allegro nie podało</span>}
+      {/* ODBIORCA I PROFIL (0.486.1) — zgłoszenie właściciela: „potrzebuję
+          więcej informacji o kliencie w nagłówku". Login bywa ciągiem cyfr
+          (`Client:105505227`), a nazwisko z adresu dostawy mówi, z kim
+          rozmawiamy. Wchodzi przez mapowanie od 0.367.0 — nic nowego
+          z adresu nie dochodzi. Profil (0.484.0) zbiera resztę: zakupy,
+          zwroty, reklamacje — nagłówek nie powtarza go, tylko do niego prowadzi. */}
+      {zwrot.odbiorcaNazwa && zwrot.odbiorcaNazwa !== zwrot.kupujacyLogin &&
+        <span className="text-slate-600">{zwrot.odbiorcaNazwa}</span>}
+      {zwrot.kupujacyLogin &&
+        <a href={`/obsluga/klient/${encodeURIComponent(zwrot.kupujacyLogin)}`}
+          title="Profil klienta — zakupy, zwroty, reklamacje i rozmowy"
+          className="inline-flex items-center gap-1 text-xs text-sky-700 underline underline-offset-2">
+          <UserRound size={12} aria-hidden="true" />profil</a>}
       {/* Historia kupującego jednym kliknięciem — powód w `sprawy/HistoriaKlienta.tsx`. */}
       {zwrot.kupujacyLogin && <PrzyciskHistorii rodzaj="zwrot" id={zwrot.id} tutaj="tym zwrotem" />}
     </p>
+
+    {zwrot.rozmowy.length > 0 && <RozmowaWNaglowku rozmowy={zwrot.rozmowy} />}
 
     {/* NOTATKA ZESZŁA STĄD W 0.313.0. Przy paczce nieodebranej cytowaliśmy ją
         tutaj, bo nie miała innego miejsca — od tego wydania ma własną sekcję
@@ -69,4 +85,39 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
     {nieodebrana && <p className="mt-1 text-xs text-violet-800">
       Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana.</p>}
   </header>;
+}
+
+/**
+ * Najnowsza rozmowa o tym zakupie — w nagłówku, nie tylko w dowodach (0.486.1).
+ *
+ * Zgłoszenie właściciela: „szczególnie jeśli jest jakaś konwersacja
+ * dotycząca tego zwrotu". Lista rozmów stała na dole kolumny dowodów, jako
+ * sam temat i data — nie mówiła, czy klient czeka na nas ani co napisał.
+ * A to jest pierwsze, co trzeba wiedzieć, zanim podejmie się decyzję
+ * o zwrocie: klient bywa w tej samej sprawie w pół zdania.
+ *
+ * JEDNA ROZMOWA, NAJNOWSZA. Reszta zostaje w dowodach; nagłówek mówi tylko,
+ * ile ich jest. „Czeka na odpowiedź" niesie niebieski, nie bursztyn —
+ * to wezwanie do ruchu, a nie ostrzeżenie o błędzie.
+ */
+function RozmowaWNaglowku({ rozmowy }: { rozmowy: RozmowaZwrotu[] }) {
+  const r = rozmowy[0]!;
+  return <a href={`/obsluga/skrzynka/${r.id}`}
+    className={`mt-2 block rounded-lg border px-3 py-2 text-sm hover:bg-white ${r.odKlienta
+      ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-slate-50"}`}>
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+      <MessageSquare size={14} aria-hidden="true" className="shrink-0 text-slate-600" />
+      <b className="text-slate-800">{r.temat?.trim() || "Rozmowa bez tematu"}</b>
+      {r.odKlienta
+        ? <span className="rounded bg-sky-100 px-1.5 py-0.5 font-semibold text-sky-800">
+            czeka na odpowiedź</span>
+        : <span className="text-slate-600">odpisaliśmy</span>}
+      <span className="ml-auto tabular-nums text-slate-600">{czas(r.ostatniaAt)}</span>
+    </span>
+    {r.ostatniaTresc && <p className="mt-1 line-clamp-2 text-slate-800">
+      <span className="font-semibold text-slate-600">{r.odKlienta ? "Klient: " : "My: "}</span>
+      „{r.ostatniaTresc}”</p>}
+    {rozmowy.length > 1 && <span className="mt-1 block text-xs text-slate-600">
+      i {ile(rozmowy.length - 1, "inna rozmowa", "inne rozmowy", "innych rozmów")} o tym zakupie — w dowodach</span>}
+  </a>;
 }

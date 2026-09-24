@@ -294,8 +294,15 @@ const kody = (z: Zwrot) =>
      NICZEGO, choć stał on na ekranie obok. Notatka jest zresztą jedynym
      miejscem, gdzie biuro pisze WŁASNYMI słowami; wykluczenie jej z szukania
      znaczyło, że im lepiej ktoś opisał sprawę, tym trudniej ją znaleźć. */
+  /* TOWAR WCHODZI DO SZUKANIA (0.486.2). Zgłoszenie właściciela: „powinienem
+     móc wyszukiwać zwroty po produkcie". Pytanie „gdzie jest zwrot z tym
+     gaźnikiem" pada przy kartonie bez etykiety i przy telefonie od klienta.
+     Nazwa, symbol kartoteki, SKU sprzedawcy i EAN — te same kody, które stoją
+     przy pozycji na ekranie. Każde słowo trafia w KTÓREŚ pole, więc
+     „kowalski gaźnik" zawęża do zwrotu tego klienta z tym towarem. */
   [z.numer, z.externalId, z.orderId, z.korektaNumer, z.kupujacyLogin, z.waybill,
-    z.odbiorcaNazwa, z.przewoznik, z.notatka, ...aliasy(z.przewoznik)]
+    z.odbiorcaNazwa, z.przewoznik, z.notatka, ...aliasy(z.przewoznik),
+    ...z.pozycje.flatMap((p) => [p.nazwa, p.twSymbol, p.sku, p.ean])]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
 /**

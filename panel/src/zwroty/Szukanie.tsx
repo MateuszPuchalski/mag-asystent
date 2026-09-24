@@ -213,7 +213,7 @@ export function Szukanie({
       <input
         data-skan-wlasny=""
         className={`field h-8 w-full text-sm ${fraza ? "pr-8" : ""}`}
-        placeholder="Zeskanuj etykietę albo szukaj: numer, login, nazwisko, przewoźnik, notatka"
+        placeholder="Zeskanuj etykietę albo szukaj: numer, login, nazwisko, produkt, EAN, notatka"
         value={fraza}
         onChange={(e) => onFraza(e.target.value)}
         onKeyDown={(e) => {

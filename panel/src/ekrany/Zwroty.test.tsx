@@ -248,6 +248,25 @@ describe("Ekran zwrotów", () => {
     expect(screen.getAllByText("Do zwrotu").length).toBeGreaterThan(0);
   });
 
+  it("szuka po PRODUKCIE, bez ogonków (0.486.2)", async () => {
+    /* „Gdzie jest zwrot z tym gaźnikiem" — pytanie przy kartonie bez etykiety. */
+    const z = (id: number, nazwa: string, ean: string) => {
+      const b = zwrot(id, "decyzja", `ZP-${id}`);
+      return { ...b, pozycje: [{ ...b.pozycje[0], nazwa, ean }] };
+    };
+    scena.zwroty = [z(41, "Gaźnik OHV T375", "5905947596577"), z(42, "Tarcza tnąca", "5900000000011")];
+    try {
+      pokaz();
+      await userEvent.type(szukajka(), "gaznik");
+      expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
+      expect(screen.getByText("ZP-41")).toBeInTheDocument();
+      expect(screen.queryByText("ZP-42")).toBeNull();
+      await userEvent.clear(szukajka());
+      await userEvent.type(szukajka(), "59000000");
+      expect(screen.getByText(/1 zwrot pasuje/)).toBeInTheDocument();
+    } finally { scena.zwroty = null; }
+  });
+
   it("szuka po LOGINIE kupującego, bo to jedyny uchwyt w rozmowie (0.337.0)", async () => {
     /* Zgłoszenie właściciela. Numery odpowiadają na pytanie „gdzie jest TA
        paczka"; login na inne — „co jeszcze mam od TEGO klienta". Pada przy

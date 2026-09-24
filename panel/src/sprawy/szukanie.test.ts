@@ -45,4 +45,13 @@ describe("Dopasowanie frazy do sprawy", () => {
     expect(pasujeDoFrazy([], "cokolwiek")).toBe(false);
     expect(pasujeDoFrazy([], "")).toBe(true);
   });
+
+  it("ogonki nie dzielą — „gaznik” trafia w „Gaźnik” (0.486.2)", () => {
+    /* Magazynier pisze bez polskich znaków, nazwy z Allegro je mają. */
+    const kody = ["gaźnik ohv t375", "łopata ogrodowa"];
+    expect(pasujeDoFrazy(kody, "gaznik")).toBe(true);
+    expect(pasujeDoFrazy(kody, "ŁOPATA")).toBe(true);
+    expect(pasujeDoFrazy(kody, "lopata gaźnik")).toBe(true);
+    expect(pasujeDoFrazy(kody, "sekator")).toBe(false);
+  });
 });
