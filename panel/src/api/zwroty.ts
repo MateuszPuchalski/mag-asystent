@@ -347,6 +347,10 @@ export interface KoszykCzekajacy {
     stanMag?: number;
     /** Czy to TEN wiersz wywrócił dokument: na magazynie jest go za mało. */
     brakNaMag?: boolean;
+    /** Ile z `stanMag` jest zarezerwowane (0.486.5). */
+    rezerwacja?: number;
+    /** Towar jest, ale wolnego (stan − rezerwacje) za mało — naprawa: rezerwacja w Subiekcie. */
+    brakWolnego?: boolean;
   }>;
 }
 

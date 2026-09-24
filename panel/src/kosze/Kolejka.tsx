@@ -25,6 +25,28 @@ export const KUBELKI_KOSZY: Array<{ id: KubelekKoszy; etykieta: string; pytanie:
   { id: "anulowane", etykieta: "Anulowane", pytanie: "Tylko wgląd." },
 ];
 
+/**
+ * Kosze jednego kubełka w kolejności, którą ten kubełek zadaje (0.486.4).
+ *
+ * ROZŁOŻONE PO CHWILI ROZŁOŻENIA, najświeższe na górze. Zgłoszenie
+ * właściciela: „rozłożone koszyki układaj kolejnością rozłożenia". Kubełek
+ * jest historią i odpowiada na „co hala właśnie skończyła" — a lista stała
+ * w porządku serwera, czyli po założeniu kosza. Kosz założony wcześniej bywa
+ * rozłożony później, więc tamten porządek mieszał dzień pracy hali.
+ *
+ * Kosz rozłożony bez zapisanej chwili (sprzed wprowadzenia pola) idzie na
+ * koniec, zamiast udawać najstarszy albo najnowszy. Pozostałe kubełki
+ * zostają w porządku serwera — tam pytanie jest inne.
+ */
+export function koszeKubelka(kosze: WierszKosza[], kubelek: KubelekKoszy): WierszKosza[] {
+  const wybrane = kosze.filter((k) => kubelekKosza(k) === kubelek);
+  if (kubelek !== "rozlozone") return wybrane;
+  return [...wybrane].sort((a, b) => {
+    if (!a.rozlozonoAt || !b.rozlozonoAt) return a.rozlozonoAt ? -1 : b.rozlozonoAt ? 1 : 0;
+    return b.rozlozonoAt.localeCompare(a.rozlozonoAt);
+  });
+}
+
 export function kubelekKosza(k: WierszKosza): KubelekKoszy {
   if (k.status === "anulowany") return "anulowane";
   if (k.status === "rozlozony") return "rozlozone";
@@ -42,7 +64,11 @@ function postep(k: WierszKosza): string {
     return karton ? "Hala zbiera zawartość — pudło jeszcze otwarte."
       : "Przyjmuje zwroty — rozkładanie jeszcze nie ruszyło.";
   }
-  return `Rozłożono ${k.odlozonych}/${k.pozycji} poz.${k.rozlozonoPrzez ? ` · ${k.rozlozonoPrzez}` : ""}`;
+  /* Chwila rozłożenia w zdaniu (0.486.4): kubełek ROZŁOŻONE układa się po
+     niej, więc porządek ma być widać, a nie trzeba go zgadywać. */
+  return `Rozłożono ${k.odlozonych}/${k.pozycji} poz.${
+    k.status === "rozlozony" && k.rozlozonoAt ? ` · ${czas(k.rozlozonoAt)}` : ""}${
+    k.rozlozonoPrzez ? ` · ${k.rozlozonoPrzez}` : ""}`;
 }
 
 export function KolejkaKoszy({ kosze, wybrany, onWybierz }: {

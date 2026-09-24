@@ -183,9 +183,17 @@ export function Koszyk() {
         title={c.blad
           ? "Dokumentu nie ma, więc zawartość da się jeszcze poprawić: zdejmij wiersz, "
             + "który tam nie pasuje, i wystaw MM jeszcze raz."
+            /* Trzy odpowiedzi, nie dwie (0.486.5). Bez czerwonego wiersza
+               zdanie „cały koszyk schodzi przyciskiem" udawało, że brak
+               towaru nie dotyczy żadnej kartoteki — a to nasza kopia stanów
+               go nie widziała. */
             + ((c.pozycje ?? []).some((p) => p.brakNaMag)
               ? " Czerwone wiersze niżej to te, których na magazynie brakuje — Sfera odrzuciła dokument przez nie."
-              : " Cały koszyk schodzi przyciskiem kosza.")
+              : (c.pozycje ?? []).some((p) => p.brakWolnego)
+                ? " Bursztynowe wiersze są na magazynie, ale zarezerwowane — MM ich nie zabierze. "
+                  + "Zdejmij rezerwację w Subiekcie albo wiersz z pudła."
+                : " Nasza kopia stanów nie widzi braku — bywa spóźniona o synchronizację. "
+                  + "Sprawdź w Subiekcie stan i rezerwacje tych kartotek na magazynie głównym.")
           : c.brakuje.length > 0
             ? "MM zdejmuje towar z magazynu głównego, a ze zwrotu wraca on tam dopiero po korekcie. "
               + "Dokument wyjdzie sam, gdy dojdzie ostatni numer."
@@ -209,7 +217,8 @@ export function Koszyk() {
           {(c.pozycje ?? []).map((p) => <span key={p.pozycjaId}
             className="inline-flex items-center gap-1 rounded border border-amber-300
               bg-white px-1">
-            <span className={`font-mono ${p.brakNaMag ? "font-bold text-ranga-zle" : ""}`}>
+            <span className={`font-mono ${p.brakNaMag ? "font-bold text-ranga-zle"
+              : p.brakWolnego ? "font-bold text-ranga-uwaga" : ""}`}>
               {p.symbol}</span>
             <span className="tabular-nums text-slate-500">×{p.ilosc}</span>
             {/* ── TEN WIERSZ WYWRÓCIŁ DOKUMENT (0.381.0) ──────────────────
@@ -220,6 +229,11 @@ export function Koszyk() {
                 stoi — tyle wystarczy, żeby kosz ruszył dalej. */}
             {p.brakNaMag && <span className="text-ranga-zle">
               na magazynie {p.stanMag ?? 0} z {p.ilosc}</span>}
+            {/* Zarezerwowane to inna naprawa niż brak (0.486.5) — rezerwację
+                zdejmuje się w Subiekcie, towaru nie trzeba wyjmować z pudła. */}
+            {p.brakWolnego && <span className="font-semibold text-ranga-uwaga"
+              title={`Na magazynie ${p.stanMag ?? 0}, zarezerwowane ${p.rezerwacja ?? 0}`}>
+              wolne {Math.max(0, (p.stanMag ?? 0) - (p.rezerwacja ?? 0))}, reszta zarezerwowana</span>}
             {p.zeZwrotu && <span className="text-amber-700" title="Zdjęcie cofnie ocenę">
               ze zwrotu</span>}
             <button type="button" disabled={zdejmij.isPending}

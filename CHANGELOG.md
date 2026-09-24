@@ -34,6 +34,32 @@ historii nie przepisujemy.
 ---
 
 
+## 0.486.5 — 24 września 2026
+
+**Odmowa „Brak towaru w magazynie” wskazuje wiersz w dwóch nowych
+przypadkach.** Zgłoszenie właściciela z kosza Z-29: Sfera odrzuciła MM, a pasek
+nie pokazał, którego towaru brakuje. Czerwony wiersz liczył się z samego stanu
+i wierszem, więc przegapiał dwie sytuacje:
+
+- **Ta sama kartoteka w kilku wierszach** (dwa zwroty po sztuce). Liczymy teraz
+  sumę po kartotece, bo tyle prosi MM.
+- **Towar zarezerwowany.** Subiekt nie zabierze rezerwacji. Taki wiersz jest
+  bursztynowy i mówi „wolne N, reszta zarezerwowana”. Naprawą jest rezerwacja
+  w Subiekcie, a nie wyjęcie towaru z pudła.
+
+Gdy nasza kopia stanów nie widzi żadnego braku, podpowiedź mówi to wprost.
+Kopia bywa spóźniona o synchronizację, więc trzeba sprawdzić stany w Subiekcie.
+Wcześniej zdanie sugerowało, że brak nie dotyczy żadnego wiersza.
+
+## 0.486.4 — 24 września 2026
+
+**Rozłożone kosze stoją w kolejności rozłożenia.** Zgłoszenie właściciela:
+„rozłożone koszyki układaj kolejnością rozłożenia”. Kubełek „Rozłożone”
+w zakładce Kosze stał w porządku serwera, czyli po założeniu kosza. Kosz
+założony wcześniej bywa rozłożony później, więc lista mieszała dzień pracy
+hali. Teraz najświeżej rozłożony stoi na górze, a chwila rozłożenia stoi
+w wierszu. Kosz bez zapisanej chwili idzie na koniec.
+
 ## 0.486.3 — 24 września 2026
 
 **Worker Sfery kończy Subiekta, który uruchomił.** Na produkcji ZW do

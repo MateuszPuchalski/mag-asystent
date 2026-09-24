@@ -5,7 +5,7 @@ import {
   useKosze, usePominiete, usePrzeliczKosz, useSzczegolKosza, useSzukajWKoszach, useZalatwPominiecie,
 } from "../api/kosze";
 import { Blad, FiltrSegmentowy, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
-import { KUBELKI_KOSZY, KolejkaKoszy, KolejkaPominietych, WynikiSzukania, kubelekKosza,
+import { KUBELKI_KOSZY, KolejkaKoszy, KolejkaPominietych, WynikiSzukania, koszeKubelka, kubelekKosza,
   type KubelekKoszy } from "../kosze/Kolejka";
 import { Kosz } from "../kosze/Kosz";
 import { KontekstKosza } from "../kosze/Kontekst";
@@ -63,7 +63,7 @@ export function Kosze() {
         : <WynikiSzukania lista={szukaj.data?.znalezione ?? []} onWybierz={idz} />)
       : kubelek === "pominiete"
         ? <KolejkaPominietych lista={pominiete.data?.pominiete ?? []} wybranyKosz={wybrany} onWybierz={idz} />
-        : <KolejkaKoszy kosze={lista.filter((k) => kubelekKosza(k) === kubelek)} wybrany={wybrany} onWybierz={idz} />;
+        : <KolejkaKoszy kosze={koszeKubelka(lista, kubelek)} wybrany={wybrany} onWybierz={idz} />;
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {/* Jeden rząd nagłówka, jak na liście zwrotów (0.484.3). */}
