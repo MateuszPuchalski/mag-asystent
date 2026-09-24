@@ -81,6 +81,7 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/odpowiedz` },
   { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/zakoncz` },
   { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/notatka/cofnij` },
+  { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/odswiez` },
   { method: "POST" as const, url: `/api/obsluga/dyskusje/${dyskusja}/tagi/1` },
   { method: "DELETE" as const, url: `/api/obsluga/dyskusje/${dyskusja}/tagi/1` },
 ];
@@ -101,7 +102,7 @@ test("hala nie widzi dyskusji — bramka roli stoi też na odczycie", async () =
   }
 });
 
-test("SIEDEM ZAPISÓW po dołożeniu cofnięcia notatki — licznik jest umową", () => {
+test("OSIEM ZAPISÓW po dołożeniu odświeżenia — licznik jest umową", () => {
   /* Trzy zostają u nas albo są zwykłą pracą biura: „prowadzę", notatka
      i odpowiedź w rozmowie. Czwarty, PROŚBA O ZAKOŃCZENIE, wychodzi do
      kupującego i nie da się jej cofnąć — jako jedyny stoi za `autoryzuj()`
@@ -116,10 +117,14 @@ test("SIEDEM ZAPISÓW po dołożeniu cofnięcia notatki — licznik jest umową"
      module z drogą powrotną. Prośba o zakończenie jej nie dostaje i dostać
      nie może: idzie do kupującego i Allegro jej nie cofnie.
 
+     Ósmy to ODŚWIEŻENIE jednej sprawy z Allegro (24 września 2026). Nie
+     zmienia niczego u kupującego, więc bramki uprzywilejowanej nie dostaje.
+     Czyta JEDNĄ sprawę, nie listę — to nie jest druga synchronizacja.
+
      Trasy „synchronizuj" tu NIE MA i to jest decyzja: dyskusje i reklamacje
      przyjeżdżają jedną listą, więc drugi przycisk byłby drugą drogą w limit 429. */
   const zapisy = TRASY().filter((t) => t.method === "POST" || t.method === "DELETE");
-  assert.equal(zapisy.length, 7);
+  assert.equal(zapisy.length, 8);
   assert.ok(!TRASY().some((t) => t.url.endsWith("synchronizuj")),
     "synchronizacja jest wspólna z reklamacjami");
 });
@@ -219,4 +224,19 @@ test("każdy adres wołany z panel/src/api/dyskusje.ts ma trasę na serwerze", a
     if (r.statusCode === 404 && /^Route /.test(tresc.message ?? "")) bledne.push(`${method} ${adres}`);
   }
   assert.deepEqual(bledne, [], "panel woła adresy bez trasy na serwerze");
+});
+
+/* ── Odświeżenie dyskusji (24 września 2026) ─────────────────────────────────
+   Trasa dyskusji nie odświeża reklamacji i mówi o tym po imieniu. Bez
+   sparowanego konta zdanie radzi parowanie, zamiast strzelać do Allegro. */
+test("odświeżenie: reklamacja dostaje 404, dyskusja bez sparowania 400", async () => {
+  const { naglowki } = login("biuro", "Ala odświeża");
+  const zla = await app.inject({
+    method: "POST", url: `/api/obsluga/dyskusje/${reklamacja}/odswiez`, headers: naglowki });
+  assert.equal(zla.statusCode, 404);
+  assert.match(zla.json().error, /dyskusji/);
+  const bezKonta = await app.inject({
+    method: "POST", url: `/api/obsluga/dyskusje/${dyskusja}/odswiez`, headers: naglowki });
+  assert.equal(bezKonta.statusCode, 400);
+  assert.match(bezKonta.json().error, /sparowane/);
 });

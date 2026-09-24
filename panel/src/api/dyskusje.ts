@@ -183,3 +183,20 @@ export function useSprawdzPrzesylkeDyskusji() {
       qc.invalidateQueries({ queryKey: kluczeDyskusji.dyskusja(v.id) }),
   });
 }
+
+/* ── Odświeżenie jednej dyskusji z Allegro (24 września 2026) ────────────────
+   Ta sama droga co `useOdswiez` reklamacji: przy wejściu w sprawę, po wysyłce,
+   po prośbie o zakończenie i z przycisku. Bez ciała, więc bez `body` —
+   reguła klienta HTTP z CLAUDE.md. Błąd zostawia ekran w spokoju: zostaje
+   stan z ostatniego przebiegu, czyli to, co było przed tym wydaniem. */
+export function useOdswiezDyskusje() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<SzczegolDyskusji>(`/api/obsluga/dyskusje/${v.id}/odswiez`, { method: "POST" }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeDyskusji.dyskusja(v.id) });
+      void qc.invalidateQueries({ queryKey: kluczeDyskusji.kolejka });
+    },
+  });
+}

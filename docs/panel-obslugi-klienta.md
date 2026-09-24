@@ -5692,6 +5692,22 @@ obietnicą bez pokrycia.
 Punktem odniesienia świeżości jest ostatnia NIE nasza wiadomość, więc także
 wypowiedź doradcy. Załączników wychodzących nie ma.
 
+### 25c.7a. Odświeżenie sprawy (0.485.0)
+
+Wejście w dyskusję odświeża ją z Allegro, tak samo jak reklamację od 0.410.0.
+To świadomy wyjątek od „zero zapisu przy patrzeniu”, rozszerzony decyzją
+właściciela z 24 września 2026. Powód jest ten sam: przebieg synchronizacji
+czyta najwyżej tysiąc spraw, więc starszych dyskusji nie odświeżał nigdy.
+
+Obok stoi przycisk „Odśwież z Allegro”, też decyzją właściciela. Agent czeka
+w sprawie na klienta albo doradcę i nie musi z niej wychodzić. Po wysyłce
+i po prośbie o zakończenie sprawa dociąga się sama.
+
+Błąd przy wejściu milczy, bo agent o nic nie prosił. Błąd z przycisku mówi.
+Trasa dyskusji nie odświeża reklamacji, a zdarzenie w dzienniku nazywa się
+`dyskusja_odswiezenie`. Pilnuje tego `ekrany/Dyskusje.test.tsx`: samo
+otwarcie ekranu wysyła zero mutacji, wejście w sprawę dokładnie jedną.
+
 ### 25c.8. Prośba o zakończenie
 
 Jedyna operacja zapisu, którą Allegro przewiduje **wyłącznie dla dyskusji**.
@@ -5731,7 +5747,9 @@ w specyfikacji opisane jako „Dispute or claim identifier". Rozróżnia je kolu
 czytający ŹRÓDŁO obu serwisów. Zwolnienie istnieje dla zapisów stojących za
 bramką i wymaga zdania z powodem, jak przy celach dotyku na kolektorze.
 
-Jedna synchronizacja, bo obie sprawy przyjeżdżają jedną listą. Drugi przycisk
+Jedna synchronizacja, bo obie sprawy przyjeżdżają jedną listą. Odświeżenie
+JEDNEJ sprawy (§25c.7a) nie jest drugą synchronizacją: czyta jedną sprawę,
+nie listę. Drugi przycisk
 „synchronizuj teraz" byłby drugim żądaniem o to samo i drugą drogą w limit 429,
 więc ekran dyskusji pokazuje stan wspólnego przebiegu i odsyła po odświeżenie
 do reklamacji.

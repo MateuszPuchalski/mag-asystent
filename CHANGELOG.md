@@ -34,6 +34,25 @@ historii nie przepisujemy.
 ---
 
 
+## 0.485.0 — 24 września 2026
+
+**Dyskusja odświeża się z Allegro przy wejściu i na przycisk.** Zgłoszenie
+właściciela: „dyskusje zostały w tyle”. Ekran dyskusji nie miał żadnej drogi
+do świeżego stanu sprawy. Przebieg synchronizacji czyta najwyżej tysiąc spraw
+z jednej listy, więc starszych dyskusji nie odświeżał nigdy.
+
+- **Wejście w dyskusję ją odświeża**, jak reklamację od 0.410.0. To
+  rozszerza jedyny wyjątek od „zero zapisu przy patrzeniu” na drugi ekran,
+  decyzją właściciela. Samo otwarcie ekranu nadal nie wysyła niczego.
+- **Przycisk „Odśwież z Allegro”** nad rozmową. Agent czekający w sprawie na
+  odpowiedź nie musi z niej wychodzić.
+- **Po wysyłce i po prośbie o zakończenie** sprawa dociąga się od razu.
+  To pokaże, co `END_REQUEST` robi naprawdę.
+- Nowa trasa `POST /api/obsluga/dyskusje/:id/odswiez` i zdarzenie
+  `dyskusja_odswiezenie`. Numer reklamacji dostaje tam 404.
+
+Przebuduj panel i zrestartuj serwer.
+
 ## 0.484.7 — 24 września 2026
 
 **Nadmiar z kartonu da się dopisać także w linii zgłoszonej w części.**
