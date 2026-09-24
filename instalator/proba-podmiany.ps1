@@ -60,10 +60,13 @@ function Atrapa-Zdrowia([string]$Wersja) {
     $js = Join-Path $korzen "zdrowie.js"
     Set-Content -LiteralPath $js -Value (
         "require('http').createServer((q, r) => { r.setHeader('content-type', 'application/json');" +
-        " r.end(JSON.stringify({ ok: true, wersja: '$Wersja' })); }).listen($PORT, '127.0.0.1');")
+        " r.end(JSON.stringify({ ok: true, wersja: '$Wersja' })); }).listen($PORT);")
+    # Bez adresu w listen(): Node słucha wtedy na IPv4 i IPv6 naraz. Windows
+    # rozwiązuje `localhost` najpierw na ::1, a sama 127.0.0.1 kończyła każde
+    # pytanie odmową po IPv6 i czekaniem dłuższym niż limit próby.
     $p = Start-Process -FilePath "node" -ArgumentList "`"$js`"" -PassThru -WindowStyle Hidden
     for ($i = 0; $i -lt 30; $i++) {
-        try { Invoke-RestMethod "http://localhost:$PORT/api/health" -TimeoutSec 2 | Out-Null; return $p } catch { Start-Sleep -Milliseconds 300 }
+        try { Invoke-RestMethod "http://localhost:$PORT/api/health" -TimeoutSec 5 | Out-Null; return $p } catch { Start-Sleep -Milliseconds 500 }
     }
     throw "Atrapa zdrowia nie wstała."
 }
