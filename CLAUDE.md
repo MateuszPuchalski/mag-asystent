@@ -97,10 +97,19 @@ Magazynowo-biurowy asystent firmy ogrodniczej: serwer Fastify + `node:sqlite`
 
 ## Wersje i wydania
 
-- Wersja stoi w DWÓCH `package.json` (korzeń + `server/`) i musi być równa.
-- Każde wydanie: wpis w `CHANGELOG.md` (MINOR = widoczna funkcja albo
-  działanie przy wdrożeniu, PATCH = reszta), często akapit w `DEPLOY.md`.
-- Commity po polsku, tytuł z numerem wersji.
+- **Numer nadaje automat po scaleniu, nie PR.** PR nie zmienia wersji
+  w `package.json` ani nie dopisuje `## ` do `CHANGELOG.md` — zatrzyma go
+  bramka `Fragmenty zmian`. Opisuje zmianę w `zmiany/<nazwa>.md` (wzór:
+  `zmiany/README.md`): `rodzaj: minor` (widoczna funkcja albo działanie przy
+  wdrożeniu) albo `patch` (reszta), `tytul:` i treść wpisu. Wersję, wpis
+  i tag robi `wydanie.yml` (DEPLOY §0c).
+- **W komentarzach i dokumentach numer swojego wydania pisz jako `@wydanie`.**
+  Automat podmieni znacznik na numer przy scaleniu.
+- `[wymaga działania]` w treści fragmentu wstrzymuje automatyczną aktualizację
+  serwera do czasu, aż ktoś kliknie ją w panelu. Nie pisz go na wyrost.
+- Wersja stoi w DWÓCH `package.json` (korzeń + `server/`) i musi być równa;
+  pilnuje tego `docs_check.py`. Często dochodzi akapit w `DEPLOY.md`.
+- Commity po polsku. Numer w tytule ma tylko commit wydania.
 
 ## Zanim zaczniesz
 
@@ -119,9 +128,9 @@ oraz **otwarte PR-y wraz z numerami, które już zajmują**. Numer nazwany
 w cudzym otwartym PR-ze podnosi głośne ostrzeżenie. Lista PR-ów wymaga `gh`
 w PATH; bez niego skrypt mówi, czego nie wie, i pracuje dalej.
 
-**Numer wydania wybieraj przy COMMICIE, nie przy pisaniu kodu.** Wpisany
-wcześniej do komentarzy kosztuje przenumerowanie kilkunastu plików, gdy
-w międzyczasie zajmie go ktoś inny. Zdarzyło się to cztery razy w jeden dzień.
+**Numerów już nie wybierasz** — nadaje je automat (`wydanie.yml`), więc
+zderzenia numerów i konflikty na `package.json` odeszły. Zostaje drugie
+ryzyko ze zdania wyżej: dwie sesje budujące TO SAMO.
 
 Gdy ktoś buduje TO SAMO: powiedz właścicielowi i **czekaj na decyzję, zanim
 napiszesz linijkę kodu**. Jedna wymiana zdań kosztuje mniej niż wydanie do

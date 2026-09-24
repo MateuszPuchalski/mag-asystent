@@ -93,6 +93,22 @@ export const config = {
   },
 
   /**
+   * Aktualizacja automatyczna (@wydanie), `services/aktualizacja-auto.ts`.
+   *
+   * Dev dostaje każde wydanie od razu i jest kanarkiem; produkcja czeka na
+   * okno nocne i na wydanie starsze niż `dojrzaloscGodz`. Stąd różne
+   * wartości domyślne — ta sama instalacja z tym samym plikiem nie istnieje.
+   */
+  aktualizacja: {
+    tryb: (process.env.AKTUALIZACJA_AUTO
+      || (process.env.SRODOWISKO === "dev" ? "zaraz" : "noc")) as string,
+    okno: process.env.AKTUALIZACJA_OKNO || "3-5",
+    dojrzaloscGodz: Number(process.env.AKTUALIZACJA_DOJRZALOSC_H
+      ?? (process.env.SRODOWISKO === "dev" ? 0 : 6)),
+    kanarek: (process.env.AKTUALIZACJA_KANAREK ?? "").trim(),
+  },
+
+  /**
    * Etykieta instancji — „produkcja" albo nazwa środowiska (np. „dev").
    *
    * Wolny tekst BEZ walidacji, bo to etykieta, nie tryb: nie zmienia żadnego
@@ -1151,6 +1167,22 @@ assertMode("COPILOT_MODE", config.copilot.mode, ["off", "anthropic"]);
 export function bledyKonfiguracji(c: Config = config): string[] {
   const bledy: string[] = [];
 
+  /* Literówka w trybie albo oknie aktualizacji nie może po cichu znaczyć
+     „wyłączona" ani „cała doba" — to są dwa przeciwne błędy. */
+  const a = c.aktualizacja;
+  if (!["noc", "zaraz", "wylaczona"].includes(a.tryb)) {
+    bledy.push(`AKTUALIZACJA_AUTO=${a.tryb} — dozwolone: noc, zaraz, wylaczona.`);
+  }
+  if (!oknoAktualizacji(a.okno)) {
+    bledy.push(`AKTUALIZACJA_OKNO=${a.okno} — oczekuję godzin „od-do", np. 3-5 albo 23-2.`);
+  }
+  if (!Number.isFinite(a.dojrzaloscGodz) || a.dojrzaloscGodz < 0) {
+    bledy.push(`AKTUALIZACJA_DOJRZALOSC_H=${a.dojrzaloscGodz} — oczekuję liczby godzin, 0 lub więcej.`);
+  }
+  if (a.kanarek && !/^https?:\/\/[^\s/]+/.test(a.kanarek)) {
+    bledy.push(`AKTUALIZACJA_KANAREK=${a.kanarek} — oczekuję adresu, np. http://localhost:3002.`);
+  }
+
   /* Magazyn skutku rozstrzyga, którym trybem idzie dokument. Dwa te same id
      znaczą, że dostawa i kontener trafiają do tej samej zakładki — a to wygląda
      jak „brakuje dostaw", nie jak błąd konfiguracji. Reguła istniała dotąd
@@ -1388,3 +1420,15 @@ if (bledy.length) {
 for (const o of ostrzezeniaKonfiguracji()) console.warn(`[konfiguracja] ${o}`);
 
 export type Config = typeof config;
+
+/**
+ * Okno aktualizacji „od-do" w pełnych godzinach czasu magazynu. `23-2` przechodzi
+ * przez północ; `od == do` odrzucamy, bo nie wiadomo, czy znaczy zero, czy dobę.
+ */
+export function oknoAktualizacji(tekst: string): { od: number; do: number } | null {
+  const m = /^\s*(\d{1,2})\s*-\s*(\d{1,2})\s*$/.exec(tekst);
+  if (!m) return null;
+  const od = Number(m[1]), doG = Number(m[2]);
+  if (od > 23 || doG > 24 || od === doG % 24) return null;
+  return { od, do: doG };
+}

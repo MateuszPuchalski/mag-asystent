@@ -28,7 +28,7 @@ const zlecenie = path.join(dir, "aktualizacja", "zlecenie.json");
 
 /* Wersja z przyszłości, żeby lista „nowszych" nie zależała od numeru
    bieżącego wydania. */
-const WYDANIA = [{ tag_name: "v9.0.0", published_at: "2026-09-25T10:00:00Z",
+const WYDANIA = [{ tag_name: "v9.0.0", published_at: "2026-09-22T10:00:00Z",
   assets: [{ name: "wertis-9.0.0.zip" }, { name: "wertis-9.0.0.zip.sha256" }] }];
 
 before(async () => {
@@ -76,8 +76,13 @@ test("patrzenie niczego nie zapisuje", async () => {
   const przed = ileZdarzen();
   const r = await app.inject({ method: "GET", url: "/api/biuro/aktualizacja", headers: naglowki });
   assert.equal(r.statusCode, 200, r.body);
-  const s = r.json() as { wydania: Array<{ wersja: string }>; zmiany: unknown[]; blokada: string | null };
+  const s = r.json() as { wydania: Array<{ wersja: string }>; zmiany: unknown[]; blokada: string | null;
+    auto: { tryb: string; okno: { od: number; do: number }; kandydat: string | null; teraz: boolean; powod: string } };
   assert.deepEqual(s.wydania.map((w) => w.wersja), ["9.0.0"]);
+  /* Decyzja automatu (@wydanie) w odpowiedzi — to samo zdanie, którym kieruje
+     się takt. Wydanie z testu ma dwa dni, więc jest dojrzałe. */
+  assert.deepEqual([s.auto.tryb, s.auto.okno, s.auto.kandydat], ["noc", { od: 3, do: 5 }, "9.0.0"]);
+  assert.ok(s.auto.powod.length > 0);
   assert.equal(s.zmiany.length, 1);
   assert.equal(ileZdarzen(), przed);
   assert.ok(!fs.existsSync(path.dirname(zlecenie)) || !fs.existsSync(zlecenie));

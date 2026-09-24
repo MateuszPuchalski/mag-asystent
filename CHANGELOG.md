@@ -31,6 +31,10 @@ dla pierwszej instalacji i dla flot, które blokują instalowanie spoza sklepu.
 Wpisy sprzed 0.52.0 mówią „nowy APK przez MDM" i tak było w dniu wydania —
 historii nie przepisujemy.
 
+**Od @wydanie wpisy składa automat.** PR opisuje zmianę w `zmiany/<nazwa>.md`,
+a `wydanie.yml` po scaleniu nadaje numer i wstawia wpis tutaj (`DEPLOY.md`
+§0c). Ręcznie dopisany nagłówek `## ` zatrzyma PR na bramce.
+
 ---
 
 

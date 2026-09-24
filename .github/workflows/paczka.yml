@@ -75,8 +75,16 @@ jobs:
           set -euo pipefail
           wersja=$(node -p "require('./package.json').version")
           tag="v$wersja"
+          # Od @wydanie numer nadaje `wydanie.yml`, a scalenie PR-a wchodzi na
+          # main ZE STARYM numerem. Publikujemy tylko wtedy, gdy tag tej wersji
+          # wskazuje ten commit albo jeszcze go nie ma — inaczej `--clobber`
+          # podmieniłby pliki poprzedniego wydania kodem, którego ono nie ma.
+          cel=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq .object.sha 2>/dev/null || true)
+          if printf '%s' "$cel" | grep -qE '^[0-9a-f]{40}$' && [ "$cel" != "$GITHUB_SHA" ]; then
+            echo "Wydanie $tag należy do commita $cel, nie do $GITHUB_SHA — nie nadpisuję."; exit 0
+          fi
           gh release view "$tag" >/dev/null 2>&1 \
-            || gh release create "$tag" --title "WERTIS $wersja" \
+            || gh release create "$tag" --target "$GITHUB_SHA" --title "WERTIS $wersja" \
                  --notes "Paczka serwera i APK kolektora $wersja. Opis zmian: CHANGELOG.md" --latest \
             || gh release view "$tag" >/dev/null
           gh release upload "$tag" dist/paczka/* --clobber

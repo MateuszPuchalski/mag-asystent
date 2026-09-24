@@ -86,6 +86,7 @@ import { podNssm, ustawRestart } from "./services/restart.js";
 import {
   problemAktualizacji, sprawdzWydania, stanZadania, uruchomSchtasks, ustawUruchamiacz, wynikDoDziennika,
 } from "./services/aktualizacja-serwera.js";
+import { taktAuto } from "./services/aktualizacja-auto.js";
 import { logEvent } from "./services/events.js";
 import { powiazPoImporcieSubiekta, powiazZaleglosci } from "./services/wiazania.js";
 import { allegroTryb } from "./adapters/allegro.js";
@@ -634,6 +635,9 @@ async function main() {
      aktualizacji trafia do dziennika raz, przy pierwszym starcie po niej. */
   if (podNssm()) ustawUruchamiacz(uruchomSchtasks);
   uruchomTakt("wydania", 60 * 60_000, () => sprawdzWydania());
+  /* Automat (@wydanie) co pięć minut: okno nocne ma dwie godziny, a czekanie
+     na dziesięć minut ciszy przy takcie godzinnym zjadłoby je całe. */
+  uruchomTakt("autoaktualizacja", 5 * 60_000, async () => { await taktAuto(); });
   try {
     wynikDoDziennika((stan) => logEvent("aktualizacja_wynik", stan.kto || "system", null, stan));
   } catch (e) {

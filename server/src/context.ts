@@ -1,4 +1,5 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { odnotujRuch } from "./services/ruch.js";
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import { SeededSubiektAdapter } from "./adapters/subiekt.seeded.js";
 import { userById } from "./services/users.js";
@@ -231,6 +232,8 @@ export function withRequestContext(app: FastifyInstance): void {
     if (s) {
       setCurrentUser(s.user.userId, s.user.name);
       dotknij(t!);
+      /* Zapis z sesją to „ktoś pracuje" — aktualizacja nocna na niego czeka. */
+      if (req.method !== "GET" && req.method !== "HEAD") odnotujRuch();
     }
 
     // Bramka dotyczy tylko API; serwer nie serwuje niczego innego, ale ta

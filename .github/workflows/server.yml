@@ -44,12 +44,21 @@ jobs:
             echo "dotyczy=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
           zmiany=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
-          if printf '%s\n' "$zmiany" | grep -qE '^(server/|panel/|tools/|docs/|package\.json|README\.md|android/README\.md|instalator/README\.md|DEPLOY\.md|CHANGELOG\.md|\.github/workflows/server\.yml|\.github/actions/)'; then
+          if printf '%s\n' "$zmiany" | grep -qE '^(server/|panel/|tools/|docs/|zmiany/|package\.json|README\.md|android/README\.md|instalator/README\.md|DEPLOY\.md|CHANGELOG\.md|\.github/workflows/server\.yml|\.github/actions/)'; then
             echo "dotyczy=true" >> "$GITHUB_OUTPUT"
           else
             echo "dotyczy=false" >> "$GITHUB_OUTPUT"
             echo "Zmiany nie dotyczą serwera ani dokumentacji — bramka zielona bez pracy."
           fi
+      # Bramka wydania (@wydanie): PR opisuje zmianę w `zmiany/<nazwa>.md`,
+      # a numer nadaje `wydanie.yml` po scaleniu. Stoi POZA zakresem, bo PR
+      # z samym fragmentem też ma przejść przez nią — i trwa sekundę.
+      - name: Fragmenty zmian
+        if: github.event_name == 'pull_request'
+        run: node tools/wydanie.mjs sprawdz "origin/${{ github.base_ref }}"
+      - name: Testy narzędzia wydań
+        if: steps.zakres.outputs.dotyczy == 'true'
+        run: node --test tools/wydanie.test.mjs
       # repo jest npm workspace (`workspaces: ["server","panel"]`), więc lockfile
       # i instalacja są w korzeniu — `npm ci` w server/ nie miałby czego użyć.
       #
@@ -104,7 +113,7 @@ jobs:
             echo "dotyczy=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
           zmiany=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
-          if printf '%s\n' "$zmiany" | grep -qE '^(server/|panel/|tools/|docs/|package\.json|README\.md|android/README\.md|instalator/README\.md|DEPLOY\.md|CHANGELOG\.md|\.github/workflows/server\.yml|\.github/actions/)'; then
+          if printf '%s\n' "$zmiany" | grep -qE '^(server/|panel/|tools/|docs/|zmiany/|package\.json|README\.md|android/README\.md|instalator/README\.md|DEPLOY\.md|CHANGELOG\.md|\.github/workflows/server\.yml|\.github/actions/)'; then
             echo "dotyczy=true" >> "$GITHUB_OUTPUT"
           else
             echo "dotyczy=false" >> "$GITHUB_OUTPUT"
