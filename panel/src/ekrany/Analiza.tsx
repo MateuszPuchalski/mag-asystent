@@ -10,6 +10,7 @@ import { Strefa } from "../analiza/Strefa";
 import { ZakresObslugi } from "../analiza/ZakresObslugi";
 import { ZakresUzycia } from "../analiza/ZakresUzycia";
 import { MiaryObslugi } from "../analiza/MiaryObslugi";
+import { ZakresTygodnia } from "../analiza/ZakresTygodnia";
 
 /* ── ANALIZA (0.440.0) ───────────────────────────────────────────────────
    Przeniesiona z ANALIZY w `biuro.html`. Wgląd, nie praca: nic tu nie czeka
@@ -32,16 +33,20 @@ import { MiaryObslugi } from "../analiza/MiaryObslugi";
    patrz `analiza/ZakresObslugi.tsx`. Pod nim od 0.444.0 stoi sześć miar
    obsługi, które mieszkały za zębatką (`analiza/MiaryObslugi.tsx`).
 
+   ZAKRES „TYDZIEŃ" (@wydanie) nie ma okna: raport tygodnia ma granice
+   stałe, od poniedziałku do poniedziałku, i liczy go serwer sam. Czipy okna
+   znikają, bo czip, który niczego nie zmienia, jest decyzją za dużo.
+
    Pobierany jest WYŁĄCZNIE widoczny zakres — ta sama zasada, która trzymała
    biuro: nie pobiera się danych, na które nikt nie patrzy. */
 
-type Zakres = "dostawy" | "hala" | "obsluga" | "uzycie";
+type Zakres = "dostawy" | "tydzien" | "hala" | "obsluga" | "uzycie";
 
-const OKNA: Record<Zakres, number[]> = { dostawy: [30, 90, 180], hala: [7, 30, 90], obsluga: [7, 30, 90], uzycie: [7, 30, 90] };
+const OKNA: Record<Zakres, number[]> = { dostawy: [30, 90, 180], tydzien: [], hala: [7, 30, 90], obsluga: [7, 30, 90], uzycie: [7, 30, 90] };
 
 export function Analiza() {
   const [zakres, setZakres] = useState<Zakres>("dostawy");
-  const [okna, setOkna] = useState<Record<Zakres, number>>({ dostawy: 90, hala: 7, obsluga: 30, uzycie: 30 });
+  const [okna, setOkna] = useState<Record<Zakres, number>>({ dostawy: 90, tydzien: 7, hala: 7, obsluga: 30, uzycie: 30 });
   const dni = okna[zakres];
   const dostawy = useAnalizaDostaw(okna.dostawy, zakres === "dostawy");
   const hala = useAnaliza(okna.hala, zakres === "hala");
@@ -51,18 +56,21 @@ export function Analiza() {
   const uzycie = useUzycie(okna.uzycie, zakres === "uzycie");
   const [bladCsv, setBladCsv] = useState("");
 
+  /* Tydzień pobiera swoje dane sam (`ZakresTygodnia`), więc tu nie ma czego
+     przygaszać ani skąd brać „dane do". */
   const biezacy = zakres === "dostawy" ? dostawy : zakres === "hala" ? hala
-    : zakres === "obsluga" ? obsluga : uzycie;
+    : zakres === "obsluga" ? obsluga : zakres === "uzycie" ? uzycie : null;
   /* „Dane do…" — DO KTÓREJ CHWILI sięga zestawienie, liczone z najświeższego
      rekordu, nie z zegara serwera. Zegar mówiłby „przed chwilą" nawet wtedy,
      gdy kolektory od wczoraj nic nie dosyłają. */
-  const daneDo = biezacy.data && "daneDo" in biezacy.data ? biezacy.data.daneDo : null;
+  const daneDo = biezacy?.data && "daneDo" in biezacy.data ? biezacy.data.daneDo : null;
 
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
     <Karta className="flex flex-wrap items-center gap-3 p-4">
       <BarChart3 size={18} /><b className="text-naglowek">Analiza</b>
       <span className="mr-auto text-sm text-slate-500">
-        Okno {dni} dni{daneDo ? ` · dane do ${czas(daneDo)}` : ""}</span>
+        {zakres === "tydzien" ? "Raport tygodnia · od poniedziałku do niedzieli"
+          : <>Okno {dni} dni{daneDo ? ` · dane do ${czas(daneDo)}` : ""}</>}</span>
       {/* CSV ma tylko praca hali — zakres dostaw nie ma trasy eksportu.
           Przycisk, który pobiera plik z innego zakresu, jest gorszy od
           przycisku, którego nie ma. */}
@@ -77,22 +85,24 @@ export function Analiza() {
         <nav aria-label="Zakres analizy" className="flex gap-1">
           <FiltrSegmentowy<Zakres> wybrany={zakres} onWybierz={setZakres} pozycje={[
             { klucz: "dostawy", etykieta: "Dostawy", podpowiedz: "U kogo są problemy — dostawcy i wyjątki" },
+            { klucz: "tydzien", etykieta: "Tydzień", podpowiedz: "Raport tygodnia: co się zmieniło wobec poprzedniego" },
             { klucz: "hala", etykieta: "Praca hali", podpowiedz: "Tempo, szczyty, wyszukiwania, kolektory" },
             { klucz: "obsluga", etykieta: "Obsługa klienta", podpowiedz: "Czas odpowiedzi, pokrycie wiedzy, dobór, eskalacje" },
             { klucz: "uzycie", etykieta: "Użycie", podpowiedz: "Czego nikt nie nacisnął — z dziennika zdarzeń" },
           ]} /></nav>
-        <div role="group" aria-label="Okno analizy" className="flex gap-1">
+        {OKNA[zakres].length > 0 && <div role="group" aria-label="Okno analizy" className="flex gap-1">
           <FiltrSegmentowy<number> wybrany={dni} onWybierz={(d) => setOkna((o) => ({ ...o, [zakres]: d }))}
-            pozycje={OKNA[zakres].map((d) => ({ klucz: d, etykieta: `${d} dni` }))} /></div>
+            pozycje={OKNA[zakres].map((d) => ({ klucz: d, etykieta: `${d} dni` }))} /></div>}
       </div>
     </Karta>
 
-    <Blad>{bladCsv || biezacy.error?.message}</Blad>
+    <Blad>{bladCsv || biezacy?.error?.message}</Blad>
 
     {/* Poprzedni wynik stoi przy zmianie okna, przygaszony, zamiast mrugać
         pustką — liczby nie skaczą do zera i z powrotem. */}
-    <div className={`space-y-4 ${biezacy.isPlaceholderData ? "opacity-60" : ""}`}>
+    <div className={`space-y-4 ${biezacy?.isPlaceholderData ? "opacity-60" : ""}`}>
       {zakres === "dostawy" && dostawy.data && <ZakresDostaw a={dostawy.data} />}
+      {zakres === "tydzien" && <ZakresTygodnia />}
       {zakres === "obsluga" && <>
         {obsluga.data && <ZakresObslugi a={obsluga.data} />}
         <MiaryObslugi dni={okna.obsluga} />

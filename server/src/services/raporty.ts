@@ -23,8 +23,9 @@ import { czasLokalny, dataLokalna } from "../czas.js";
  */
 export const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(days)))} days`;
 
-/** Zdarzenia liczone jako wykonana pozycja — wspólne dla obu raportów. */
-const PRACA = ["putaway_line_done", "putaway_confirm", "location_set", "location_removed"];
+/** Zdarzenia liczone jako wykonana pozycja — wspólne dla obu raportów
+    i dla raportu tygodnia (`raport-tygodnia.ts`), stąd eksport. */
+export const PRACA = ["putaway_line_done", "putaway_confirm", "location_set", "location_removed"];
 
 /**
  * Warunek odsiewający PODWÓJNE LICZENIE tej samej czynności.
@@ -60,7 +61,7 @@ const zrodloZdarzenia = (alias: string) =>
   `CASE WHEN json_valid(${alias}payload)
         THEN json_extract(${alias}payload,'$.zrodlo') END`;
 
-const bezDubli = (alias: string) => `(${alias}type NOT IN ('location_set','location_removed')
+export const bezDubli = (alias: string) => `(${alias}type NOT IN ('location_set','location_removed')
        OR ${zrodloZdarzenia(alias)} IS NULL
        OR ${zrodloZdarzenia(alias)} = 'karta')`;
 
@@ -86,8 +87,9 @@ export interface Metrics {
   zdarzen: number;
 }
 
-/** Percentyl z posortowanej tablicy; null gdy brak danych. */
-function p95(values: number[]): number | null {
+/** Percentyl z posortowanej tablicy; null gdy brak danych. Czyta go też
+    raport tygodnia — jedna definicja percentyla na oba ekrany. */
+export function p95(values: number[]): number | null {
   if (!values.length) return null;
   const s = [...values].sort((a, b) => a - b);
   return s[Math.min(s.length - 1, Math.ceil(0.95 * s.length) - 1)];

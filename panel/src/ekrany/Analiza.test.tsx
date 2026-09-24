@@ -5,7 +5,7 @@ import React from "react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Analiza } from "./Analiza";
-import type { AnalizaAudytu, AnalizaDostaw, Metryki, RaportWydajnosci } from "../api/wglad";
+import type { AnalizaAudytu, AnalizaDostaw, Metryki, RaportTygodnia, RaportWydajnosci } from "../api/wglad";
 
 /* ── ANALIZA w panelu (0.440.0) ──────────────────────────────────────────
    Gwarancje przeniesione z ANALIZY w `biuro.html`:
@@ -54,12 +54,33 @@ const hala = (wydajnosc: RaportWydajnosci | null): AnalizaAudytu => ({
 const METRYKI: Metryki = { days: 7, dotknieciaNaPozycje: 0.2, p95OdpowiedziMs: 120,
   etykietyDoPrzedruku: [{ code: "R-09-4", reczne: 3, razem: 10, udzial: 0.3 }], towaryBezCzytelnegoKodu: [], zdarzen: 900 };
 
+/* Raport tygodnia — kształt jak `services/raport-tygodnia.ts`. */
+const tydzien = (t: string, dni: string[], pozycje: number, migawki: RaportTygodnia["migawki"] = []): RaportTygodnia => ({
+  wersja: 1, tydzien: t, od: "x", do: "x", dni,
+  magazyn: { pozycje, pozycjeWgDnia: [pozycje, 0, 0, 0, 0, 0, 0], dostawZamknietych: 4, medianaMinutDostawy: 42,
+    problemyZgloszone: 3, problemyRozwiazane: 2, dotknieciaNaPozycje: 0.2, p95SkanuMs: 180,
+    etykietyDoPrzedruku: [{ kod: "R-11-2", reczne: 5 }], szukaniaBezWynikow: [{ q: "szarpak", ile: 2 }],
+    upadkiKolektorow: 0, odrzuconeOperacje: 0 },
+  obsluga: { wiadomosciOdKlientow: 40, odpowiedzi: 35, medianaMin: 38, p90Min: 250,
+    klientCzekaNaKoniec: { n: 1, najdluzejMin: 120 }, zwrotyNowe: 6, zwrotyZamkniete: 5,
+    reklamacjeNowe: 2, reklamacjeRozstrzygniete: 1 },
+  copilot: { wywolan: 120, bledow: 1, kosztUsd: 1.37 },
+  system: { kopieNocne: 7, rozjazdyRekoncyliacji: 0, zapisyNieudane: 0, odrzuconeZadaniaHttp: 3 },
+  migawki,
+});
+const W38 = tydzien("2026-W38", ["2026-09-14", "2026-09-15", "2026-09-16", "2026-09-17", "2026-09-18", "2026-09-19", "2026-09-20"], 412,
+  [{ data: "2026-09-21", at: "2026-09-20T22:05:00.000Z", stan: { doDecyzji: { wszystko: 9, magazyn: 4, obsluga: 5, pilne: 2, najstarszaGodz: 50 },
+    problemyOtwarte: 3, kolejka: { bledy: 1, wDrodze: 0 }, klientCzeka: { n: 1, najdluzejMin: 120 },
+    zwroty: { decyzja: 4 }, reklamacje: null } }]);
+const W37 = tydzien("2026-W37", ["2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13"], 400);
+let tygodnie: string[] = ["2026-W38", "2026-W37"];
+
 let adresy: string[] = [];
 let zapisy: string[] = [];
 let wydajnosc: RaportWydajnosci | null = WYDAJNOSC;
 
 beforeEach(() => {
-  adresy = []; zapisy = []; wydajnosc = WYDAJNOSC;
+  adresy = []; zapisy = []; wydajnosc = WYDAJNOSC; tygodnie = ["2026-W38", "2026-W37"];
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metoda = init?.method ?? "GET";
     adresy.push(url);
@@ -104,6 +125,10 @@ beforeEach(() => {
       dni: 30, spozaRejestru: [],
       obszary: [{ obszar: "Skrzynka", nieuzywane: [{ typ: "rozmowa_priorytet", ile: 0, ostatnio: null }],
         uzywane: [{ typ: "rozmowa_wyslana", ile: 12, ostatnio: "2026-09-22T10:00:00Z" }] }] }));
+    if (url === "/api/analiza/tygodnie") return new Response(JSON.stringify({ tygodnie: tygodnie.map((t) =>
+      ({ tydzien: t, od: "x", do: "x", wersja: 1, utworzono: "x" })) }));
+    if (url === "/api/analiza/tygodnie/2026-W38") return new Response(JSON.stringify({ raport: W38, poprzedni: W37 }));
+    if (url === "/api/analiza/tygodnie/2026-W37") return new Response(JSON.stringify({ raport: W37, poprzedni: null }));
     if (url === "/api/auth/me") return new Response(JSON.stringify({ user: { userId: 1, name: "Anna", role: "admin" } }));
     throw new Error(`nieoczekiwany adres w teście: ${url}`);
   }));
@@ -248,5 +273,44 @@ describe("zakres Użycie", () => {
     expect(screen.getByText("Użyte (1)")).toBeTruthy();
     expect(adresy.some((a) => a === "/api/analiza/uzycie?days=30")).toBe(true);
     expect(zapisy).toEqual([]);
+  });
+});
+
+/* ── Zakres TYDZIEŃ (@wydanie) ───────────────────────────────────────────────
+   Raport tygodnia zapisuje takt serwera, a ekran tylko czyta. Pilnujemy:
+   zero zapisu przy patrzeniu i przy zmianie tygodnia, porównanie z poprzednim
+   w sztukach, brak czipów okna i zdanie zamiast pustej karty. */
+describe("Analiza: zakres Tydzień", () => {
+  const naTydzien = async () => {
+    await screen.findByText("Rosa-Pol");
+    await userEvent.click(screen.getByRole("button", { name: "Tydzień" }));
+  };
+
+  it("najnowszy tydzień z poprzednim obok, różnica w sztukach, bez zapisu", async () => {
+    pokaz();
+    await naTydzien();
+    expect(await screen.findByText("Tydzień t38 · 14.09–20.09.2026")).toBeTruthy();
+    const wiersz = screen.getByText("Pozycje rozłożone i przeniesione").closest("tr")!;
+    expect(wiersz.textContent).toContain("412");
+    expect(wiersz.textContent).toContain("400");
+    expect(wiersz.textContent).toContain("+12");
+    // migawka: stan na zamknięcie tygodnia, a sekcja bez odczytu to kreska
+    expect(screen.getByText("21.09")).toBeTruthy();
+    expect(screen.getByText("R-11-2")).toBeTruthy();
+    // raport ma stałe granice — czip okna niczego by nie zmienił
+    expect(screen.queryByRole("group", { name: "Okno analizy" })).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "t37" }));
+    expect(await screen.findByText(/Poprzedniego tygodnia nie policzono/)).toBeTruthy();
+    expect(adresy).toContain("/api/analiza/tygodnie/2026-W37");
+    expect(zapisy).toEqual([]);
+  });
+
+  it("bez raportów mówi, kiedy powstanie pierwszy, i nie pyta o żaden tydzień", async () => {
+    tygodnie = [];
+    pokaz();
+    await naTydzien();
+    expect(await screen.findByText(/Pierwszy raport powstanie sam w poniedziałek/)).toBeTruthy();
+    expect(adresy.filter((a) => a.startsWith("/api/analiza/tygodnie/"))).toEqual([]);
   });
 });

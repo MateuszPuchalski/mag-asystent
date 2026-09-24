@@ -102,11 +102,16 @@ export function czasOdpowiedzi(
      jest próbką TEGO okna. Bez zapasu takie czekanie byłoby liczone od
      pierwszej wiadomości w oknie, czyli krócej, niż trwało naprawdę. */
   const zapas = new Date(teraz - (dni + 7) * 86_400_000).toISOString();
+  /* Górna granica okna (@wydanie). Na żywo `teraz` to zegar i nic za nim
+     nie leży. Raport tygodnia liczy jednak tydzień, który już minął, a bez
+     granicy odpowiedź z poniedziałku rana weszłaby do niedzieli, a „klient
+     czeka" mówiłby o dziś zamiast o końcu tygodnia. */
+  const koniec = new Date(teraz).toISOString();
   const wiadomosci = database.prepare(`SELECT id, conversation_id, direction, auto_odpowiedz,
       sent_at, external_message_id FROM message
      WHERE conversation_id IN (SELECT DISTINCT conversation_id FROM message WHERE sent_at >= ?)
-       AND sent_at >= ?
-     ORDER BY conversation_id, sent_at, id`).all(start, zapas) as unknown as Wiadomosc[];
+       AND sent_at >= ? AND sent_at < ?
+     ORDER BY conversation_id, sent_at, id`).all(start, zapas, koniec) as unknown as Wiadomosc[];
 
   const wgRozmowy = new Map<number, Wiadomosc[]>();
   for (const w of wiadomosci) {
