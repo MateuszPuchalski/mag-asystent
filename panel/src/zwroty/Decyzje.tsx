@@ -41,10 +41,12 @@ type Props = {
   blad: string;
   /** Rejestr akcji dla klawiszy kubełka (`zwroty/klawisze.ts`). */
   akcje?: MutableRefObject<AkcjeKlawiszy>;
+  /** Czy klawisz `Z` odda pieniądze (0.484.7) — bez tego zdanie o nim milczy. */
+  moznaZwrocic?: boolean;
 };
 
 export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnijKwote,
-  onCofnijWerdykt, trwa, blad, akcje }: Props) {
+  onCofnijWerdykt, trwa, blad, akcje, moznaZwrocic = false }: Props) {
   const [odmowa, setOdmowa] = useState(false);
   const [powod, setPowod] = useState("");
   /* PRZED gałęziami kubełków, bo to hak — a gałęzie kończą się `return`.
@@ -143,9 +145,23 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
       <p className="mt-1 text-xs text-slate-600">
         {pobranie
           ? "Pieniądze jeszcze nie wyszły. Oddaj je przelewem i zapisz przelew niżej."
-          : <>Pieniądze jeszcze nie wyszły — oddaj je w Allegro albo klawiszem <kbd>Z</kbd>.
+          /* „Albo klawiszem Z" tylko wtedy, gdy Z coś zrobi (0.484.7). */
+          : <>Pieniądze jeszcze nie wyszły — oddaj je w Allegro
+            {moznaZwrocic && <> albo klawiszem <kbd>Z</kbd></>}.
             {automat && <> Allegro odda całość samo {dzien(automat)}, bez potrącenia.</>}</>}
       </p>
+      {/* DROGA DO POPRAWKI STOI TUTAJ (0.484.7). Sygnał „kwota?" i odmowa
+          wypłaty mówiły „popraw kwotę", a w tym stanie nie było ani
+          przycisku kwoty, ani cofnięcia korekty. Z korektą najpierw schodzi
+          ona (`cofnijKwote` odmawia, dopóki stoi), bez niej — sama kwota. */}
+      {zwrot.korektaNumer
+        ? <button type="button" disabled={trwa} onClick={onCofnijKorekte}
+            className="mt-1 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
+            <kbd className="rounded border border-slate-300 px-1 no-underline">R</kbd> cofnij korektę</button>
+        : <button type="button" disabled={trwa} onClick={onCofnijKwote}
+            className="mt-1 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
+            popraw kwotę</button>}
+      {blad && <Blad>{blad}</Blad>}
     </div>;
   }
 

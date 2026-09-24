@@ -65,7 +65,8 @@ const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, string]>>
     ["Shift+S", "wszystkie na stan"], ["-", "wróciło mniej"]],
   zwrot: [["Enter", "zapisz kwotę"], ["D", "potrącenie"], ["-", "wróciło mniej"]],
   korekta: [["Enter", "wpisz numer korekty"]],
-  zamkniety: [["R", "cofnij korektę"]],
+  /* `R` doklejany ze stanu (0.484.7) — zamknięty bez korekty go nie ma. */
+  zamkniety: [],
 };
 
 /* Krótkie etykiety do LICZNIKA. Pełne zdania pisze serwer i stoją przy
@@ -883,6 +884,19 @@ export function Zwroty() {
      dwóch bramek (`zwrot-pieniedzy.ts`), więc wartość sprzed zapisu jest ta
      sama co po nim — a nie ściga się z odświeżeniem zapytania. */
   const stanPieniedzy = szczegol.data?.pieniadze;
+  /* ── KLAWISZE, KTÓRE NAPRAWDĘ DZIAŁAJĄ (0.484.7) ───────────────────────
+     Tabela kubełków mówi, co klawisz robi w typowym zwrocie; stan zwrotu
+     potrafi to wyłączyć. Z kwotą w DO ZWROTU (czeka na pieniądze) Enter, `D`
+     i `-` milczą, bo wycena się skończyła. `-` milczy też bez pozycji
+     z kilkoma sztukami do przeliczenia. Pasek bez tych wyjątków obiecywał
+     martwe klawisze — przeciw temu powstał `SkrotyKlawiszy`. */
+  const klawiszeTeraz = (KLAWISZE_KUBELKA[zwrot?.kubelek ?? kubelek ?? "wszystkie"] ?? [])
+    .filter(([k]) => {
+      if (!zwrot) return true;
+      if (zwrot.kubelek === "zwrot" && zwrot.kwotaGrosze !== null) return false;
+      if (k === "-") return zwrot.pozycje.some((p) => p.ilosc > 1 && p.iloscZwrocona == null);
+      return true;
+    });
   const pieniadzeCzekaja =
     Boolean(stanPieniedzy?.moznaZwrocic || stanPieniedzy?.moznaZapisacPrzelew);
 
@@ -975,13 +989,18 @@ export function Zwroty() {
             /* Pasek mówi, co Enter zrobi TERAZ — przy podsuniętym dokumencie
                przyjmie go, a nie postawi kursora w numerze korekty. */
             ...(polecany ? [["Enter", "przyjmij dokument sprzedaży"] as const]
-              : KLAWISZE_KUBELKA[zwrot?.kubelek ?? kubelek ?? "wszystkie"] ?? []),
+              : klawiszeTeraz),
             ...(stanPieniedzy?.moznaZwrocic
               ? [["Z", "oddaj pieniądze"] as const] : []),
             /* `W` tylko wtedy, gdy przycisk naprawdę puści ciąg — przy
                przeszkodzie klawisz milczałby, a pasek kłamał. */
             ...(stanSzybkiej.pokaz && !stanSzybkiej.przeszkoda
               ? [["W", "wszystko OK — na półkę i wypłata"] as const] : []),
+            /* `R` ZE STANU, nie z kubełka (0.484.7): klawisz działa przy
+               każdym zwrocie z numerem korekty — także w DO ZWROTU, gdzie
+               czeka na pieniądze — a w ZAMKNIĘTYCH bez korekty (rozliczonych
+               przez Allegro) milczy. */
+            ...(zwrot?.korektaNumer ? [["R", "cofnij korektę"] as const] : []),
           ]} />
       </div>
       </nav>
@@ -1075,6 +1094,7 @@ export function Zwroty() {
             <SzybkiZwrot zwrot={zwrot} stan={stanSzybkiej} trwa={szybka.trwa || trwa}
               blad={szybka.blad} onStart={szybkiZwrot} />
             <Decyzje zwrot={zwrot} trwa={trwa} blad={bladDecyzji} akcje={akcje}
+              moznaZwrocic={Boolean(stanPieniedzy?.moznaZwrocic)}
               /* KURSOR SCHODZI PO TYCH DWÓCH DECYZJACH, i tylko po nich
                  (§25a.2). Odmowa i zapisany numer korekty WYPROWADZAJĄ zwrot
                  z drabiny — nie ma przy nim następnego pytania, więc trzymanie

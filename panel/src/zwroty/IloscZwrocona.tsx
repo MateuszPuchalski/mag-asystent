@@ -17,11 +17,13 @@ import { Przycisk, Pole } from "../ui";
    „wróciło zero" znaczy to samo co odznaczenie, a dwie drogi do tej samej
    rzeczy kosztują namysł przy każdym wierszu.                                */
 
-export function IloscZwrocona({ p, trwa, blad, onZapisz, otworz = 0 }: {
+export function IloscZwrocona({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt = false }: {
   p: PozycjaZwrotu;
   trwa: boolean;
   blad: string;
   onZapisz: (ilosc: number | null) => void;
+  /** Zwrot z korektą (0.484.7): liczba zostaje widoczna, cofnięcie znika — serwer by odmówił. */
+  tylkoOdczyt?: boolean;
   /**
    * Znacznik klawisza `-` (0.479.0): każda nowa wartość otwiera pole. Liczba,
    * nie `boolean` — drugi `-` po zamknięciu ma otworzyć pole jeszcze raz.
@@ -46,9 +48,9 @@ export function IloscZwrocona({ p, trwa, blad, onZapisz, otworz = 0 }: {
       <span className="font-bold tabular-nums">
         Wróciło {p.iloscZwrocona} z {p.ilosc} szt.</span>
       <span className="ml-2">kwota liczy się z tego, co wróciło</span>
-      <button type="button" disabled={trwa} onClick={() => onZapisz(null)}
+      {!tylkoOdczyt && <button type="button" disabled={trwa} onClick={() => onZapisz(null)}
         className="ml-2 text-amber-800 underline underline-offset-2 hover:text-amber-950">
-        cofnij</button>
+        cofnij</button>}
       {blad && <p className="mt-1 text-red-700">{blad}</p>}
     </div>;
   }
@@ -58,8 +60,8 @@ export function IloscZwrocona({ p, trwa, blad, onZapisz, otworz = 0 }: {
   if (p.iloscZwrocona != null) {
     return <p className="mt-2 text-xs tabular-nums text-slate-500">
       Policzone — wróciło {p.iloscZwrocona} z {p.ilosc} szt.
-      <button type="button" disabled={trwa} onClick={() => onZapisz(null)}
-        className="ml-2 underline underline-offset-2">cofnij</button>
+      {!tylkoOdczyt && <button type="button" disabled={trwa} onClick={() => onZapisz(null)}
+        className="ml-2 underline underline-offset-2">cofnij</button>}
     </p>;
   }
 

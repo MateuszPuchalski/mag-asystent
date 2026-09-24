@@ -76,6 +76,8 @@ type Wiersz = {
   kwota_grosze: number | null; kwota_dostawa_grosze: number | null;
   waluta: string | null;
   platnosc_id: string | null; platnosc_typ: string | null;
+  /** Czy wiersz zamówienia w ogóle stoi — rozstrzyga, czy „dociągnij" coś da. */
+  zamowienie_wiersz?: number | null;
   zwrot_pieniedzy_id: string | null; zwrot_pieniedzy_command_id: string | null;
   zwrot_pieniedzy_status: string | null; zwrot_pieniedzy_at: string | null;
   odmowa_kod: string | null; odmowa_powod: string | null; odmowa_at: string | null;
@@ -91,7 +93,7 @@ const wczytaj = (database: Db, zwrotId: number): Wiersz => {
       z.zwrot_pieniedzy_status, z.zwrot_pieniedzy_at,
       z.odmowa_kod, z.odmowa_powod, z.odmowa_at, z.status_allegro, z.rozliczony_allegro_at,
       z.przelew_at, z.przelew_przez, z.przelew_referencja,
-      o.platnosc_id, o.platnosc_typ, o.waluta
+      o.platnosc_id, o.platnosc_typ, o.waluta, o.id AS zamowienie_wiersz
     FROM zwrot_klienta z
     LEFT JOIN zamowienie_klienta o
       ON o.external_id = z.order_id AND o.channel_account_id = z.channel_account_id
@@ -301,7 +303,12 @@ export function stanZwrotuPieniedzy(
   }
   if (!w.platnosc_id) {
     return { ...podstawa, moznaZwrocic: false, moznaOdmowic,
-      powod: "Nie znamy identyfikatora płatności — dociągnij zamówienie z Allegro." };
+      /* „Dociągnij" TYLKO, gdy zamówienia nie ma (0.484.7). Dociąganie pobiera
+         zamówienia BRAKUJĄCE; wiersz bez płatności stoi i przycisk nic by nie
+         zmienił. Wtedy działa już tylko panel Allegro. */
+      powod: w.zamowienie_wiersz == null
+        ? "Nie znamy identyfikatora płatności — dociągnij zamówienie z Allegro."
+        : "Zamówienie nie ma identyfikatora płatności — oddaj pieniądze w panelu Allegro." };
   }
   /* Pobranie: nie ma płatności, którą można cofnąć. Pieniądze wracają
      przelewem poza Allegro, a panel ma to powiedzieć, zamiast wysyłać
@@ -321,7 +328,9 @@ export function stanZwrotuPieniedzy(
   if (bezPozycji.length) {
     return { ...podstawa, moznaZwrocic: false, moznaOdmowic,
       powod: `Nie wiem, której pozycji zamówienia dotyczy: ${bezPozycji.join(", ")}. `
-        + "Dociągnij zamówienie albo oddaj pieniądze w panelu Allegro." };
+        /* Zamówienie tu STOI (jest płatność), więc „dociągnij" nic by nie
+           zmieniło (0.484.7) — zostaje droga, która działa. */
+        + "Oddaj pieniądze w panelu Allegro." };
   }
   /* Kwota jest migawką z chwili zaznaczenia (`kwotaRozjechana` w `zwroty.ts`).
      Gdy pozycje zmieniły się od tamtej pory, żądanie wysłałoby inną sumę niż

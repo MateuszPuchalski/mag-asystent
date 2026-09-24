@@ -19,7 +19,8 @@ export const KUBELKI: Array<{ id: Kubelek; etykieta: string; pytanie: string }> 
   { id: "decyzja", etykieta: "Do decyzji", pytanie: "Przyjąć czy odrzucić?" },
   { id: "ocena", etykieta: "Do oceny", pytanie: "Co z towarem?" },
   { id: "zwrot", etykieta: "Do zwrotu", pytanie: "Ile oddać?" },
-  { id: "korekta", etykieta: "Do korekty", pytanie: "Zlecić korektę?" },
+  /* Numer się WPISUJE, nie zleca (0.484.7) — przycisku „zleć" nie ma. */
+  { id: "korekta", etykieta: "Do korekty", pytanie: "Jest numer korekty?" },
   { id: "odrzucony", etykieta: "Odrzucone", pytanie: "Tylko wgląd." },
   { id: "zamkniety", etykieta: "Zamknięte", pytanie: "Tylko wgląd." },
 ];
@@ -56,7 +57,9 @@ export const SYGNALY: Record<Sygnal,
     /* Podpowiedź KOŃCZY SIĘ RUCHEM (audyt, 15 września 2026). Sygnał mówił,
        co jest nie tak, i milkł — a naprawa to jedno kliknięcie w kubełku
        DO ZWROTU. */
-    tytul: "Kwota nie zgadza się z pozycjami — zmieniły się po wycenie. Popraw kwotę",
+    /* Przy korekcie kwoty nie poprawi się wprost (0.484.7): `cofnijKwote`
+       odmawia, dopóki korekta stoi. Podpowiedź nazywa oba kroki. */
+    tytul: "Kwota nie zgadza się z pozycjami — zmieniły się po wycenie. Popraw kwotę; przy korekcie najpierw ją cofnij (R)",
     krotko: "kwota?", klasa: "bg-red-100 text-ranga-zle",
     ikona: <CircleHelp size={13} /> },
   /* Wróciło mniej, niż klient zgłosił. Bursztyn, nie czerwień: to nie jest

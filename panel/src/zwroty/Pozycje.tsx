@@ -195,8 +195,9 @@ function WskazSklad({ p, wiersze, zwrotId, onKoniec }: {
       /* Bez dokumentu nie ma z czego składać — i to jest INNA usterka, ze swoją
          własną drogą: wskazanie paragonu w kolumnie dowodów. */
       ? <p className="mt-1 text-slate-600">
-          Ten zwrot nie ma wskazanego dokumentu sprzedaży — wskaż go w kolumnie
-          obok, wtedy będzie z czego składać.</p>
+          Ten zwrot nie ma wskazanego dokumentu sprzedaży, więc nie ma z czego
+          składać. Dokument wskazujesz w kolumnie dowodów — o ile stoją tam
+          kandydaci.</p>
       : <ul className="mt-1 space-y-0.5">
           {wiersze.map((w) => (
             <li key={w.twId} className="flex items-center gap-2">
@@ -337,6 +338,13 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
      równie dobrze przy wycenie, co przy ocenianiu. Zamknięty i odrzucony
      odpadają, bo `podKlucz` po stronie serwera i tak ich nie wpuści. */
   const cofalne = zwrot.kubelek !== "zamkniety" && zwrot.kubelek !== "odrzucony";
+  /* KOREKTA ZAMYKA EDYCJĘ (0.484.7). Zapis korekty stawia `zamkniety_at`,
+     a `podKlucz` odmawia wtedy każdej zmiany — także w kubełku DO ZWROTU, gdzie
+     zwrot z korektą czeka na pieniądze od 0.476.0. Przyciski cofania, liczby
+     sztuk, potrącenia, zdjęcia i dopisania obiecywały tam ruch, którego serwer
+     nie przyjmie. Wyjściem jest cofnięcie korekty (`R`), więc to ono otwiera
+     edycję z powrotem. */
+  const edytowalny = cofalne && !zwrot.korektaNumer;
   const dostawaGrosze = zwrot.zamowienie?.dostawaGrosze ?? null;
 
   /* Podgląd odejmuje potrącenia tak samo jak serwer — inaczej operator
@@ -405,9 +413,18 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
        ma dwie przyczyny i obie mają wyjście: zamówienia jeszcze nie pobrano
        (kolumna dowodów, „Dociągnij teraz") albo to paczka nieodebrana, której
        klient nie zgłosił — wtedy pozycje dopisuje biuro. */
-    return <Pusto waga="lista">
-      Zwrot bez pozycji — nie ma czego wycenić. Dociągnij zamówienie w kolumnie
-      obok albo dopisz to, co naprawdę przyszło w kartonie.</Pusto>;
+    /* Obie drogi MUSZĄ stać obok zdania (0.484.7). Do tego wydania pusty
+       zwrot odsyłał do dopisania, a listy dopisania tu nie było — wczesne
+       wyjście pomijało ją razem z resztą. „Dociągnij" pada tylko przy numerze
+       zamówienia, bo bez niego przycisku w dowodach nie ma. */
+    return <div className="p-4">
+      <Pusto waga="lista">
+        Zwrot bez pozycji — nie ma czego wycenić.
+        {zwrot.orderId ? " Dociągnij zamówienie w kolumnie obok albo dopisz to, co przyszło w kartonie."
+          : " Zwrot nie ma numeru zamówienia, więc nie ma skąd dopisać pozycji."}</Pusto>
+      {onDopisz && edytowalny && <Dopisz kandydaci={doDopisania} trwa={trwa}
+        blad={bladDopisania} onDopisz={onDopisz} />}
+    </div>;
   }
 
   return <div className="p-4">
@@ -576,7 +593,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                 zamknięty i odrzucony są poza pracą, a pozycja z zamkniętego
                 koszyka dostanie zdanie z nazwą kosza dopiero po kliknięciu —
                 bo tego panel z listy pozycji nie wie. */}
-            {cofalne && <button type="button" disabled={trwa}
+            {edytowalny && <button type="button" disabled={trwa}
               className="font-normal text-slate-500 underline underline-offset-2
                 disabled:opacity-50"
               onClick={() => onOcena(p.id, null)}>cofnij ocenę</button>}</p>}
@@ -621,7 +638,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               i tam ją proponujemy. Zapisaną widać wszędzie, bo po zamknięciu
               zwrotu to ona tłumaczy, czemu wypłata była niższa. */}
           {onIlosc && (ocenianie || wycena || p.iloscZwrocona != null) &&
-            <IloscZwrocona p={p} trwa={trwa} blad={blad}
+            <IloscZwrocona p={p} trwa={trwa} blad={blad} tylkoOdczyt={!edytowalny}
               otworz={otworzIlosc?.id === p.id ? otworzIlosc.n : 0}
               onZapisz={(ile) => onIlosc(p.id, ile)} />}
 
@@ -629,14 +646,14 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               czyli przy wycenie. Zapisane widać wszędzie, bo to fakt o pozycji
               — jak ocena hali. */}
           {onPotracenie && (wycena || p.potracenieGrosze != null) &&
-            <Potracenie p={p} trwa={trwa} blad={blad}
+            <Potracenie p={p} trwa={trwa} blad={blad} tylkoOdczyt={!edytowalny}
               otworz={otworzPotracenie?.id === p.id ? otworzPotracenie.n : 0}
               onZapisz={(g, powod) => onPotracenie(p.id, g, powod)} />}
 
           {/* Cofnięcie zamiast potwierdzenia (§25a.5). Tylko przy pozycji
               biura: zgłoszona przez klienta wróciłaby przy najbliższym
               takcie, więc przycisk obiecywałby skutek, którego nie ma. */}
-          {onZdejmij && p.zrodlo === "biuro" && <button type="button" disabled={trwa}
+          {onZdejmij && edytowalny && p.zrodlo === "biuro" && <button type="button" disabled={trwa}
             onClick={() => onZdejmij(p.id)}
             className="mt-1 text-xs text-slate-500 underline underline-offset-2
               hover:text-slate-800">zdejmij ze zwrotu</button>}
@@ -646,7 +663,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
 
     {/* Pod listą, bo TAM operator zauważa różnicę: przelicza karton, patrzy
         na ekran i widzi o jedną pozycję mniej (dekalog ergonomii, punkt 1). */}
-    {onDopisz && <Dopisz kandydaci={doDopisania} trwa={trwa} blad={bladDopisania}
+    {onDopisz && edytowalny && <Dopisz kandydaci={doDopisania} trwa={trwa} blad={bladDopisania}
       onDopisz={onDopisz} />}
 
     {wycena
@@ -691,7 +708,8 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                a tego jeszcze nie pobrano. */
             ? <p className="text-xs text-slate-500">
                 Kwoty pełnej nie znamy bez zamówienia — koszt dostawy stoi przy nim.
-                Dociągnij je w kolumnie obok.</p>
+                {/* Tylko z numerem: bez niego przycisku w dowodach nie ma (0.484.7). */}
+                {zwrot.orderId && " Dociągnij je w kolumnie obok."}</p>
             : <div className="flex items-baseline justify-between">
                 <span className="font-bold">Z dostawą</span>
                 <span className="text-lg font-bold tabular-nums">

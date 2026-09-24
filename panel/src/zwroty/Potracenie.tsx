@@ -25,11 +25,13 @@ export function naGrosze(tekst: string): number | null {
   return Number(m[1]) * 100 + Number((m[2] ?? "0").padEnd(2, "0"));
 }
 
-export function Potracenie({ p, trwa, blad, onZapisz, otworz = 0 }: {
+export function Potracenie({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt = false }: {
   p: PozycjaZwrotu;
   trwa: boolean;
   blad: string;
   onZapisz: (grosze: number | null, powod: string) => void;
+  /** Zwrot z korektą (0.484.7): potrącenie widać, cofnięcia nie — serwer by odmówił. */
+  tylkoOdczyt?: boolean;
   /** Znacznik klawisza `D` (0.479.0) — zasada jak w `IloscZwrocona`. */
   otworz?: number;
 }) {
@@ -56,9 +58,9 @@ export function Potracenie({ p, trwa, blad, onZapisz, otworz = 0 }: {
       <span className="ml-2 tabular-nums">
         do oddania {zlote(wartosc - p.potracenieGrosze, p.waluta)}</span>
       <p className="mt-0.5 italic">„{p.potraceniePowod}"</p>
-      <button type="button" disabled={trwa} onClick={() => onZapisz(null, "")}
+      {!tylkoOdczyt && <button type="button" disabled={trwa} onClick={() => onZapisz(null, "")}
         className="mt-1 text-amber-800 underline underline-offset-2 hover:text-amber-950">
-        cofnij potrącenie</button>
+        cofnij potrącenie</button>}
       {blad && <p className="mt-1 text-red-700">{blad}</p>}
     </div>;
   }

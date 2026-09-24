@@ -34,6 +34,43 @@ historii nie przepisujemy.
 ---
 
 
+## 0.484.7 — 24 września 2026
+
+**Nadmiar z kartonu da się dopisać także w linii zgłoszonej w części.**
+Zgłoszenie właściciela: klient zgłosił jedną nakrętkę z dwóch, a przyszły obie.
+„Wróciło mniej” słusznie nie przyjmuje liczby większej od zgłoszonej i odsyła
+do dopisania. Lista do dopisania pomijała jednak każdą linię, która stała już
+w zwrocie. Teraz podaje resztę: „brakuje 1 z 2 szt.”. Sztuki liczy tą samą
+regułą co plakietka „↩ 1 z 2” w dowodach.
+
+**Przegląd niespójności tego samego kształtu:** komunikat albo przycisk
+odsyłał do ruchu, którego w tym stanie nie dało się wykonać.
+
+- **Zwrot z korektą jest tylko do odczytu.** Serwer odmawia wtedy każdej
+  zmiany, a przyciski cofania oceny, liczby sztuk, potrącenia, zdejmowania
+  i dopisywania dalej stały. Znikają, dopóki stoi korekta.
+- **DO ZWROTU z kwotą ma drogę do poprawki:** „cofnij korektę” (R) albo
+  „popraw kwotę”. Sygnał „kwota?” i odmowa wypłaty kazały poprawić kwotę bez
+  przycisku.
+- **Pasek skrótów obiecuje tylko żywe klawisze.** Enter, D i „-” nie stoją
+  przy zwrocie z kwotą. „-” wymaga pozycji z kilkoma sztukami, R — korekty.
+  „Albo klawiszem Z” pada tylko wtedy, gdy Z coś zrobi.
+- **Pusty zwrot pokazuje listę do dopisania,** o której mówi. „Dociągnij”
+  pada tylko przy numerze zamówienia.
+- **Potrącenie nie przerośnie wartości sztuk, które wróciły.** Linia ujemna
+  blokowała wypłatę zdaniem bez wyjścia.
+- **Cofnięcie przyjęcia** odmawia przy zapisanej kwocie. Przy towarze na
+  wystawionym MM mówi wprost, że przyjęcia nie cofnie.
+- **Poprawione zdania, które kłamały:** „dociągnij zamówienie” przy
+  zamówieniu, które stoi; „usuń ZW w Subiekcie” przy zadaniu, którego to nie
+  zmienia; „oceń na stan” przy pozycji już ocenionej; „poczekaj na MM” przy
+  MM już wystawionym; „numer przepisujesz wyżej”; „wskaż dokument” bez
+  kandydatów; „oceń w pudle” w DO DECYZJI; „Zlecić korektę?”.
+
+**Do decyzji właściciela, bez zmian w tym wydaniu:** skład kompletu przy kilku
+pudłach, zmiana werdyktu na werdykt, zdjęcie z pudła przy zwrocie z korektą,
+ponowne wiązanie korekty po jej cofnięciu i drugie ZW po cofnięciu korekty.
+
 ## 0.484.6 — 24 września 2026
 
 Numer wydania: 0.484.3–0.484.5 zajęły #579 i #580, stąd 0.484.6.

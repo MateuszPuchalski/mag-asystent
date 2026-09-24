@@ -305,10 +305,19 @@ test("brak werdyktu i brak kwoty to DWIE różne przeszkody", () => {
   assert.match(String(stanZwrotuPieniedzy(d2, bezKwoty).powod), /zaznacz/i);
 });
 
-test("brak identyfikatora płatności prowadzi do dociągnięcia zamówienia", () => {
+test("brak płatności: „dociągnij” tylko wtedy, gdy zamówienia nie ma (0.484.7)", () => {
+  /* Dociąganie pobiera zamówienia BRAKUJĄCE. Wiersz, który stoi bez
+     płatności, nie zmieni się od przycisku — wtedy zostaje panel Allegro. */
   const d = stanowisko();
-  const id = zwrotGotowy(d, { platnoscId: null });
-  assert.match(String(stanZwrotuPieniedzy(d, id).powod), /dociągnij zamówienie/i);
+  const stoi = zwrotGotowy(d, { platnoscId: null });
+  assert.match(String(stanZwrotuPieniedzy(d, stoi).powod), /panelu Allegro/i);
+  assert.doesNotMatch(String(stanZwrotuPieniedzy(d, stoi).powod), /dociągnij/i);
+
+  const d2 = stanowisko();
+  const brak = zwrotGotowy(d2);
+  d2.prepare("DELETE FROM zamowienie_klienta_pozycja").run();
+  d2.prepare("DELETE FROM zamowienie_klienta").run();
+  assert.match(String(stanZwrotuPieniedzy(d2, brak).powod), /dociągnij zamówienie/i);
 });
 
 /* ── Odmowa ────────────────────────────────────────────────────────────── */

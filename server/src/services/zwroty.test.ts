@@ -835,6 +835,39 @@ test("więcej niż zgłoszono ODPADA — nadmiar z kartonu to inna pozycja", () 
     "odmowa niczego nie zapisuje");
 });
 
+/* ── Drogi, które prowadziły donikąd (0.484.7) ──────────────────────────────
+   Przegląd niespójności: komunikat albo reguła odsyłały do ruchu, którego
+   w tym samym stanie nie dało się wykonać. */
+
+test("potrącenie nie przerośnie wartości sztuk, które wróciły", () => {
+  /* Widełki potrącenia liczyły się z deklaracji, a zmniejszenie liczby sztuk
+     po nim dawało linię ujemną — i wypłatę zablokowaną zdaniem bez wyjścia. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  d.prepare("UPDATE zwrot_klienta_pozycja SET ilosc=2 WHERE id=?").run(poz[0]);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  zapiszPotracenie(d, poz[0], 8000, "rysy", 2, KTO);
+  assert.throws(() => zapiszIloscZwrocona(d, poz[0], 1, 3, KTO), /najpierw je zmniejsz/);
+
+  /* I w drugą stronę: przy jednej sztuce, która wróciła, potrącenie ma
+     widełki jednej sztuki, nie dwóch zgłoszonych. */
+  zapiszPotracenie(d, poz[0], 1000, "rysy", 3, KTO);
+  zapiszIloscZwrocona(d, poz[0], 1, 4, KTO);
+  assert.throws(() => zapiszPotracenie(d, poz[0], 6000, "rysy", 5, KTO), /przekroczyć/);
+});
+
+test("przyjęcia z zapisaną kwotą nie cofam — kwota bez ocen istnieje", () => {
+  /* `zapiszKwote` wymaga samego przyjęcia. Cofnięcie werdyktu zostawiało
+     kwotę i zlecone ZW na zwrocie bez decyzji. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id, poz } = zwrotDoDecyzji(d);
+  rozstrzygnijZwrot(d, id, "przyjety", null, 1, KTO);
+  zapiszKwote(d, id, { pozycjeIds: poz, dostawa: false }, 2, KTO);
+  assert.throws(() => cofnijWerdykt(d, id, 3, KTO), /cofnij kwotę/);
+});
+
 /* ── Kwota rozjechana z pozycjami (0.210.0) ─────────────────────────────────
    Synchronizator nadpisuje ilość i cenę pozycji przy każdym takcie, a zapisanej
    kwoty nie dotyka nic. Zwrot poprawiony po wycenie wypłacał starą kwotę.   */
@@ -1801,6 +1834,47 @@ test("do dopisania zostaje RÓŻNICA zamówienia i zwrotu, nie całe zamówienie
   assert.equal(lista.length, 1, "Sekator jest już w zwrocie");
   assert.equal(lista[0].nazwa, "Łopata");
   assert.equal(lista[0].cenaGrosze, 2999, "cena idzie z zamówienia, nie z pola");
+});
+
+test("linia zwrócona w CZĘŚCI zostaje na liście z resztą sztuk (0.484.7)", () => {
+  /* Zgłoszenie właściciela: klient zgłosił jedną nakrętkę z dwóch, a przyszły
+     obie. „Wróciło mniej" nie przyjmuje liczby większej od zgłoszonej i odsyła
+     do dopisania — więc dopisanie musi tę resztę znać. */
+  const d = stanowisko();
+  zamowienie(d, "ord-czesc", [
+    { offerId: "111", nazwa: "Nakrętka M12", sku: null, cena: 659, ilosc: 2 },
+    { offerId: "222", nazwa: "Nóż", sku: null, cena: 1100, ilosc: 3 },
+  ]);
+  const id = dodaj(d, "2026-08-28T09:00:00Z", { order_id: "ord-czesc" }, [
+    { ilosc: 1, cena: 659, offerId: "111", nazwa: "Nakrętka M12" },
+    { ilosc: 3, cena: 1100, offerId: "222", nazwa: "Nóż" },
+  ]);
+
+  const lista = doDopisania(id, d);
+  assert.equal(lista.length, 1, "nóż wraca w całości, nakrętka w połowie");
+  assert.equal(lista[0].nazwa, "Nakrętka M12");
+  assert.equal(lista[0].ilosc, 1, "brakuje JEDNEJ sztuki, nie całej linii");
+  assert.equal(lista[0].zamowiono, 2);
+
+  /* Dopisanie wstawia resztę — i linia znika, bo teraz wracają obie sztuki. */
+  const w = dopiszPozycje(d, id, lista[0].zamPozycjaId, 1, KTO);
+  const p = d.prepare("SELECT ilosc, zrodlo FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(w.pozycjaId) as { ilosc: number; zrodlo: string };
+  assert.equal(Number(p.ilosc), 1);
+  assert.equal(p.zrodlo, "biuro");
+  assert.deepEqual(doDopisania(id, d), []);
+});
+
+test("pozycja zwrotu podpisana numerem LINII zamówienia też się liczy (0.484.7)", () => {
+  /* `offerId` pozycji zwrotu bywa identyfikatorem linii zamówienia, nie
+     oferty ([WERYFIKUJ] w docs/allegro-ksztalt.md) — ta sama reguła co
+     plakietka „↩ 1 z 2" w dowodach. */
+  const d = stanowisko();
+  zamowienie(d, "ord-linia", [{ offerId: "111", nazwa: "Sekator", sku: null, cena: 4999, ilosc: 2 }]);
+  d.prepare("UPDATE zamowienie_klienta_pozycja SET external_id='li-7' WHERE offer_id='111'").run();
+  const id = dodaj(d, "2026-08-28T09:00:00Z", { order_id: "ord-linia" },
+    [{ ilosc: 2, cena: 4999, offerId: "li-7", nazwa: "Sekator" }]);
+  assert.deepEqual(doDopisania(id, d), [], "obie sztuki już wracają");
 });
 
 test("dopisana pozycja jest oznaczona jako BIURO i podnosi wersję", () => {

@@ -1278,11 +1278,28 @@ export function cofnijWerdykt(
     if (pieniadze.zwrot_pieniedzy_id) {
       throw new Error("Pieniądze zostały już oddane — przyjęcia nie cofam.");
     }
-    const ocenione = Number((database.prepare(
-      `SELECT COUNT(*) AS n FROM zwrot_klienta_pozycja
-        WHERE zwrot_id=? AND ocena IS NOT NULL`).get(zwrotId) as { n: number }).n);
-    if (ocenione > 0) {
-      throw new Error(`Najpierw cofnij oceny (${ocenione}) — przyjęcie jest pod nimi.`);
+    /* KWOTA BEZ OCEN ISTNIEJE (0.484.7). `zapiszKwote` wymaga samego
+       przyjęcia, więc komentarz wyżej zakładał za dużo: cofnięcie werdyktu
+       zostawiało kwotę i zlecone ZW na zwrocie bez decyzji. */
+    const kwota = database.prepare("SELECT kwota_grosze FROM zwrot_klienta WHERE id=?")
+      .get(zwrotId) as { kwota_grosze: number | null };
+    if (kwota.kwota_grosze != null) {
+      throw new Error("Najpierw cofnij kwotę — przyjęcie jest pod nią.");
+    }
+    const ocenione = database.prepare(
+      `SELECT id, nazwa FROM zwrot_klienta_pozycja
+        WHERE zwrot_id=? AND ocena IS NOT NULL`).all(zwrotId) as Array<{ id: number; nazwa: string }>;
+    /* Pozycja na wystawionym MM oceny nie odda (`ocenPozycje`), więc „najpierw
+       cofnij oceny" byłoby drogą donikąd (0.484.7). Mówimy to wprost. */
+    for (const p of ocenione) {
+      const kosz = zamknietyKoszPozycji(database, Number(p.id));
+      if (kosz) {
+        throw new Error(`„${p.nazwa}” jest już na dokumencie MM koszyka ${kosz.kod} — ` +
+          "przyjęcia nie cofnę, bo towar pojechał na regał.");
+      }
+    }
+    if (ocenione.length > 0) {
+      throw new Error(`Najpierw cofnij oceny (${ocenione.length}) — przyjęcie jest pod nimi.`);
     }
 
     const kiedy = teraz.toISOString();
@@ -1716,7 +1733,10 @@ export interface DoDopisania {
   /** Stan zdjęcia oferty (0.217.0) — kandydat też jest odniesieniem do towaru. */
   ofertaZdjecie: StanZdjeciaOferty;
   nazwa: string;
+  /** Ile sztuk BRAKUJE w zwrocie — tyle wejdzie przy dopisaniu (0.484.7). */
   ilosc: number;
+  /** Ile kupiono w tej linii zamówienia; różne od `ilosc`, gdy część już wraca. */
+  zamowiono: number;
   cenaGrosze: number;
   waluta: string;
 }
@@ -1727,6 +1747,23 @@ export interface DoDopisania {
  * Lista jest RÓŻNICĄ zamówienia i zwrotu, a nie całym zamówieniem. Pokazywanie
  * pozycji już zgłoszonych kazałoby operatorowi porównywać dwie listy oczami —
  * a to jest dokładnie ta praca, którą ekran ma zdjąć (dekalog, punkt 5).
+ *
+ * ── RÓŻNICA W SZTUKACH, NIE W LINIACH (0.484.7) ─────────────────────────────
+ * Zgłoszenie właściciela: klient zgłosił jedną nakrętkę z dwóch, a w kartonie
+ * przyszły obie. Linia zamówienia stała już w zwrocie, więc lista jej nie
+ * dawała, a „wróciło mniej" słusznie nie przyjmuje liczby większej niż
+ * zgłoszona. Odmowa tamtego pola odsyłała tutaj — do drogi, której nie było.
+ *
+ * Teraz linia wypada z listy dopiero wtedy, gdy w zwrocie są WSZYSTKIE jej
+ * sztuki; przy części zostaje z resztą. Sztuki liczymy tą samą regułą co
+ * plakietkę „↩ 1 z 2" w dowodach (`listaZwrotow`): pozycja zwrotu trafia
+ * w linię po `offer_id` albo po `external_id`, bo nie wiadomo, którym z nich
+ * Allegro ją podpisuje. Pula sztuk jest WSPÓLNA dla oferty i schodzi linia po
+ * linii — dwie linie tej samej oferty nie policzą jednej sztuki dwa razy.
+ *
+ * Stary warunek po kluczu zostaje jako zapas: pozycja, której numer nie trafia
+ * w żadną kolumnę zamówienia, a klucz tak, dalej zdejmuje całą linię. Bez tego
+ * zwrot o nieznanej przestrzeni numerów dostałby do dopisania to, co już ma.
  */
 export function doDopisania(zwrotId: number, database: Db = defaultDb()): DoDopisania[] {
   const z = database.prepare(
@@ -1734,19 +1771,26 @@ export function doDopisania(zwrotId: number, database: Db = defaultDb()): DoDopi
     .get(zwrotId) as { channel_account_id: number; order_id: string | null } | undefined;
   if (!z?.order_id) return [];
 
-  const wZwrocie = new Set((database.prepare(
-    "SELECT klucz FROM zwrot_klienta_pozycja WHERE zwrot_id=?").all(zwrotId) as
-    Array<{ klucz: string }>).map((r) => String(r.klucz)));
+  const wZwrocie = database.prepare(
+    "SELECT klucz, offer_id, ilosc FROM zwrot_klienta_pozycja WHERE zwrot_id=?").all(zwrotId) as
+    Array<{ klucz: string; offer_id: string | null; ilosc: number }>;
+  const klucze = new Set(wZwrocie.map((r) => String(r.klucz)));
+  /* Sztuki w zwrocie według numeru, pod którym stoją. DEKLARACJA klienta,
+     nie `ilosc_zwrocona`: brak sztuk w kartonie to potrącenie w kwocie, a nie
+     powód, żeby ta sama linia wróciła na listę do dopisania. */
+  const pula = new Map<string, number>();
+  for (const r of wZwrocie) {
+    if (!r.offer_id) continue;
+    pula.set(r.offer_id, (pula.get(r.offer_id) ?? 0) + Number(r.ilosc ?? 0));
+  }
 
-  const poz = database.prepare(`SELECT p.id, p.offer_id, p.nazwa, p.ilosc, p.cena_grosze, p.waluta
+  const poz = database.prepare(`SELECT p.id, p.offer_id, p.external_id, p.nazwa, p.ilosc,
+         p.cena_grosze, p.waluta
       FROM zamowienie_klienta_pozycja p
       JOIN zamowienie_klienta k ON k.id = p.zamowienie_id
      WHERE k.channel_account_id=? AND k.external_id=?
      ORDER BY p.id`).all(z.channel_account_id, z.order_id) as Array<Record<string, unknown>>;
 
-  /* Klucz liczy się tak samo jak przy synchronizacji i przy paczce
-     nieodebranej: przyrostek per POWTÓRZENIE pary `offer_id|nazwa`. Dwie
-     sztuki tego samego towaru w zamówieniu to dwa osobne kandydaty. */
   /* Snapshoty ofert TEGO konta jednym zapytaniem — kandydatów bywa kilku. */
   const obrazy = new Map<string, string | null>();
   for (const o of database.prepare(
@@ -1755,18 +1799,33 @@ export function doDopisania(zwrotId: number, database: Db = defaultDb()): DoDopi
     obrazy.set(o.id, o.url);
   }
 
+  /* Klucz liczy się tak samo jak przy synchronizacji i przy paczce
+     nieodebranej: przyrostek per POWTÓRZENIE pary `offer_id|nazwa`. */
   const licznik = new Map<string, number>();
   const wynik: DoDopisania[] = [];
   for (const p of poz) {
     const baza = `${p.offer_id ?? ""}|${p.nazwa}`;
     const n = (licznik.get(baza) ?? 0) + 1;
     licznik.set(baza, n);
-    if (wZwrocie.has(n === 1 ? baza : `${baza}|#${n}`)) continue;
+    const zamowiono = Number(p.ilosc);
+
+    const numer = [p.offer_id, p.external_id].map((x) => (x as string) ?? "")
+      .find((x) => x && pula.has(x));
+    let wraca = 0;
+    if (numer) {
+      wraca = Math.min(zamowiono, pula.get(numer)!);
+      pula.set(numer, pula.get(numer)! - wraca);
+    } else if (klucze.has(n === 1 ? baza : `${baza}|#${n}`)) {
+      wraca = zamowiono;
+    }
+    const brakuje = zamowiono - wraca;
+    if (brakuje <= 0) continue;
+
     wynik.push({
       zamPozycjaId: Number(p.id), offerId: (p.offer_id as string) ?? null,
       ofertaZdjecie: (p.offer_id as string)
         ? stanZdjeciaOferty(obrazy.get(String(p.offer_id))) : "nieznane",
-      nazwa: String(p.nazwa), ilosc: Number(p.ilosc),
+      nazwa: String(p.nazwa), ilosc: brakuje, zamowiono,
       cenaGrosze: Number(p.cena_grosze), waluta: String(p.waluta ?? "PLN"),
     });
   }
@@ -1896,9 +1955,11 @@ export function zapiszIloscZwrocona(
   wersja: number, kto: { id: number; name: string },
 ): { wersja: number; iloscZwrocona: number | null } {
   const p = database.prepare(
-    "SELECT id, zwrot_id, ilosc, nazwa FROM zwrot_klienta_pozycja WHERE id=?")
+    `SELECT id, zwrot_id, ilosc, nazwa, cena_grosze, potracenie_grosze
+       FROM zwrot_klienta_pozycja WHERE id=?`)
     .get(pozycjaId) as
-    { id: number; zwrot_id: number; ilosc: number; nazwa: string } | undefined;
+    { id: number; zwrot_id: number; ilosc: number; nazwa: string;
+      cena_grosze: number; potracenie_grosze: number | null } | undefined;
   if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
 
   if (ilosc !== null) {
@@ -1910,6 +1971,16 @@ export function zapiszIloscZwrocona(
         `Klient zgłosił ${Number(p.ilosc)} szt. — więcej nie wpiszesz. ` +
         "Nadmiar z kartonu dopisz jako osobną pozycję.");
     }
+  }
+
+  /* POTRĄCENIE NIE MOŻE PRZEROSNĄĆ TEGO, CO WRÓCIŁO (0.484.7). Widełki
+     potrącenia liczyły się z deklaracji; mniejsza liczba sztuk po nim dawała
+     linię ujemną. `zapiszKwote` ją sumował, a zwrot pieniędzy pomijał — i
+     przycisk wypłaty odmawiał zdaniem „popraw kwotę", którego nie dało się
+     wykonać. */
+  const potracenie = Number(p.potracenie_grosze ?? 0);
+  if (ilosc !== null && potracenie > Math.round(Number(p.cena_grosze) * ilosc)) {
+    throw new Error("Potrącenie jest większe niż wartość tylu sztuk — najpierw je zmniejsz.");
   }
 
   return transaction(database, () => {
@@ -1931,8 +2002,9 @@ export function zapiszPotracenie(
   wersja: number, kto: { id: number; name: string }, teraz = new Date(),
 ): { wersja: number; potracenieGrosze: number | null } {
   const p = database.prepare(
-    "SELECT id, zwrot_id, cena_grosze, ilosc FROM zwrot_klienta_pozycja WHERE id=?")
-    .get(pozycjaId) as { id: number; zwrot_id: number; cena_grosze: number; ilosc: number } | undefined;
+    "SELECT id, zwrot_id, cena_grosze, ilosc, ilosc_zwrocona FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(pozycjaId) as { id: number; zwrot_id: number; cena_grosze: number; ilosc: number;
+      ilosc_zwrocona: number | null } | undefined;
   if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
 
   const uzasadnienie = (powod ?? "").trim();
@@ -1940,7 +2012,10 @@ export function zapiszPotracenie(
     if (!Number.isInteger(grosze) || grosze < 0) {
       throw new Error("Potrącenie to pełne grosze, nie mniej niż zero.");
     }
-    const wartosc = Math.round(Number(p.cena_grosze) * Number(p.ilosc));
+    /* Widełki z tego, co WRÓCIŁO, nie z deklaracji (0.484.7) — ta sama
+       liczba, z której `zapiszKwote` liczy wartość linii. Inaczej linia
+       wychodziła ujemna, a wypłata odmawiała bez drogi wyjścia. */
+    const wartosc = Math.round(Number(p.cena_grosze) * iloscLiczona(p));
     if (grosze > wartosc) {
       throw new Error(
         `Potrącenie nie może przekroczyć wartości pozycji (${(wartosc / 100).toFixed(2)}).`);
