@@ -79,6 +79,17 @@ public static class Program
 
         using var db = Db.Open(dbPath);
         ISferaAdapter sfera = dryRun ? new DryRunAdapter() : new SferaComAdapter(env);
+        /* SESJA KOŃCZY SIĘ RAZEM Z WORKEREM (0.486.3). NSSM zatrzymuje usługę
+           Ctrl+C, a `--once` wychodzi z pętli — w obu przypadkach proces
+           Subiekta zostawał w tle, bo nikt nie wołał `Zakoncz()`. Wywołanie
+           z wątku sygnału może odbić się od apartamentu STA; wtedy zostaje
+           przynajmniej ścieżka `--once` i zamykanie po błędzie. */
+        var com = sfera as SferaComAdapter;
+        if (com is not null)
+        {
+            Console.CancelKeyPress += (_, _) => com.ZakonczSesje();
+            AppDomain.CurrentDomain.ProcessExit += (_, _) => com.ZakonczSesje();
+        }
 
         // mm zastane w 'processing' po padnięciu → error z ostrzeżeniem o duplikacie
         Queue.OznaczPrzerwane(db);
@@ -105,6 +116,7 @@ public static class Program
             if (once) break;
             Thread.Sleep(pollMs);
         }
+        com?.ZakonczSesje();
         return 0;
     }
 }

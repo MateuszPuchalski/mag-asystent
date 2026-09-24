@@ -446,7 +446,9 @@ do dokumentu WZ…". Paragonem jest wyłącznie `dok_Typ = 21`.
 na stacji…". Blokadę trzymało okno Subiekta tego operatora albo szkic
 z pierwszego przebiegu. Sonda do 0.348.3 nie zamykała szkicu ani sesji.
 
-Dokument ma `void Zamknij()`, a sesja `bool Zakoncz()`. Dla automatycznego ZW
+Dokument ma `void Zamknij()`, a sesja `bool Zakoncz()`. Worker woła `Zakoncz()`
+przy każdym zamknięciu sesji od 0.486.3. Wcześniej zostawiał proces Subiekta
+w tle i po sześciu takich sesja wracała pusta. Dla automatycznego ZW
 wynikają z tego dwie zasady. Po `Zapisz()` worker zamyka dokument, bo inaczej
 biuro nie otworzy paragonu. Odmowa blokady znaczy „spróbuj później", nie błąd
 zwrotu — biuro może mieć paragon otwarty.
