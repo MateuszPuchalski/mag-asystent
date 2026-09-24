@@ -394,6 +394,35 @@ describe("Produkty ze zwrotu", () => {
   });
 });
 
+describe("Zwrot z korektą jest tylko do odczytu (0.484.6)", () => {
+  it("nie ma cofania oceny, zdejmowania ani dopisywania — serwer by odmówił", () => {
+    /* Zapis korekty stawia `zamkniety_at`, a `podKlucz` odmawia każdej zmiany
+       — także w DO ZWROTU, gdzie zwrot z korektą czeka na pieniądze. */
+    lista(zwrot({ kubelek: "zwrot", kwotaGrosze: 4999, korektaNumer: "ZW 1/2026",
+      pozycje: [POZYCJA({ ocena: "stan", zrodlo: "biuro" })] }),
+      { onZdejmij: vi.fn(), onDopisz: vi.fn(),
+        doDopisania: [{ zamPozycjaId: 1, offerId: "9", ofertaZdjecie: "nieznane", nazwa: "Grabie",
+          ilosc: 1, cenaGrosze: 100, waluta: "PLN" }] });
+    expect(screen.queryByRole("button", { name: /cofnij ocenę/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /zdejmij ze zwrotu/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /przysłał więcej/ })).toBeNull();
+  });
+
+  it("bez korekty te same przyciski stoją", () => {
+    lista(zwrot({ kubelek: "ocena", pozycje: [POZYCJA({ ocena: "stan", zrodlo: "biuro" })] }),
+      { onZdejmij: vi.fn() });
+    expect(screen.getByRole("button", { name: /cofnij ocenę/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /zdejmij ze zwrotu/ })).toBeInTheDocument();
+  });
+
+  it("pusty zwrot podaje listę do dopisania, o której mówi (0.484.6)", () => {
+    lista(zwrot({ kubelek: "ocena", pozycje: [] }), { onDopisz: vi.fn(),
+      doDopisania: [{ zamPozycjaId: 1, offerId: "9", ofertaZdjecie: "nieznane", nazwa: "Grabie",
+        ilosc: 1, cenaGrosze: 100, waluta: "PLN" }] });
+    expect(screen.getByRole("button", { name: /przysłał więcej/ })).toBeInTheDocument();
+  });
+});
+
 describe("Pozycja dopisana przez biuro", () => {
   it("niesie plakietkę i daje się zdjąć; pozycja klienta NIE", async () => {
     /* Zapis człowieka nie udaje faktu z Allegro (§4.3). Przycisk zdjęcia stoi

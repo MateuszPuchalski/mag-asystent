@@ -274,3 +274,32 @@ describe("Korekta zwrotu (0.162.0)", () => {
     expect(screen.getByText(/Wystawiona automatycznie/)).toBeInTheDocument();
   });
 });
+
+describe("DO ZWROTU z kwotą — droga do poprawki (0.484.6)", () => {
+  const czeka = (n: Partial<Zwrot> = {}) => zwrot({
+    kubelek: "zwrot", werdykt: "przyjety", kwotaGrosze: 9998, kwotaWariant: "pelna", ...n });
+
+  it("z korektą stoi „cofnij korektę”, bez niej „popraw kwotę”", async () => {
+    /* Sygnał „kwota?" i odmowa wypłaty mówiły „popraw kwotę", a w tym stanie
+       nie było ani jednego, ani drugiego przycisku. */
+    const onCofnijKorekte = vi.fn();
+    const { unmount } = pasek(czeka({ korektaNumer: "ZW 1/2026" }), { onCofnijKorekte });
+    await userEvent.click(screen.getByRole("button", { name: /cofnij korektę/ }));
+    expect(onCofnijKorekte).toHaveBeenCalled();
+    expect(screen.queryByRole("button", { name: /popraw kwotę/ })).toBeNull();
+    unmount();
+
+    const onCofnijKwote = vi.fn();
+    pasek(czeka(), { onCofnijKwote });
+    await userEvent.click(screen.getByRole("button", { name: /popraw kwotę/ }));
+    expect(onCofnijKwote).toHaveBeenCalled();
+  });
+
+  it("„albo klawiszem Z” tylko wtedy, gdy Z coś zrobi", () => {
+    const { unmount } = pasek(czeka());
+    expect(screen.queryByText(/klawiszem/)).toBeNull();
+    unmount();
+    pasek(czeka(), { moznaZwrocic: true });
+    expect(screen.getByText(/klawiszem/)).toBeInTheDocument();
+  });
+});

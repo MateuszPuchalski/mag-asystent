@@ -75,4 +75,12 @@ describe("Dopisanie produktu do zwrotu", () => {
     await userEvent.click(screen.getByRole("button", { name: /przysłał więcej/ }));
     expect(screen.getByText(/zmienił się w innej karcie/)).toBeInTheDocument();
   });
+
+  it("reszta linii mówi „brakuje 1 z 2 szt.” (0.484.6)", async () => {
+    /* Klient zgłosił jedną nakrętkę z dwóch, przyszły obie. Kandydat to
+       RESZTA tej linii, a nie drugi zakup tego samego towaru. */
+    pokaz([KANDYDAT({ nazwa: "Nakrętka M12", ilosc: 1, zamowiono: 2 })]);
+    await userEvent.click(screen.getByRole("button", { name: /przysłał więcej/ }));
+    expect(screen.getByText(/brakuje 1 z 2 szt\./)).toBeInTheDocument();
+  });
 });

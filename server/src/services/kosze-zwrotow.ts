@@ -823,6 +823,22 @@ export function zaznaczSkladnik(
       `SELECT id, kosz_id, tw_id FROM kosz_pozycja WHERE zwrot_pozycja_id=? ORDER BY id`)
       .all(pozycjaId) as Array<{ id: number; kosz_id: number; tw_id: number }>;
     if (!wiersze.length) {
+      /* OCENA JUŻ STOI, A POZYCJI W PUDLE NIE MA (0.484.6). Wtedy „oceń ją na
+         stan" odsyłało do ruchu, który przed chwilą dał ten sam wynik:
+         `dolozDoKosza` znowu zwróci `null` z tego samego powodu. Zdanie mówi
+         więc powód — ten sam, który zatrzymał dołożenie. */
+      const o = database.prepare("SELECT ocena FROM zwrot_klienta_pozycja WHERE id=?")
+        .get(pozycjaId) as { ocena: string | null } | undefined;
+      if (o?.ocena === "stan") {
+        const sklad = skladPozycji(database, pozycjaId);
+        const powod = magazynDocelowy("zwroty") <= 0
+          ? "w wertis.env nie ma magazynu zwrotów"
+          : !sklad.skladniki.length
+            ? sklad.powod
+            : sklad.skladniki.map((s) => powodPozaMagazynem(database, s.twId)).find(Boolean) ?? null;
+        throw new Error(`Pozycja jest „na stan”, ale do koszyka nie weszła${
+          powod ? `: ${powod}` : ""}. Ponowna ocena tego nie zmieni.`);
+      }
       throw new Error("Ta pozycja nie leży w żadnym koszyku — najpierw oceń ją „na stan”.");
     }
     const koszId = Number(wiersze[0].kosz_id);
@@ -858,8 +874,15 @@ export function zaznaczSkladnik(
          to jest starsza i czytelniejsza droga: cofnięcie oceny. Dwa sposoby na
          ten sam skutek kosztowałyby pytanie, czym się różnią. */
       if (stoi.length === wiersze.length) {
-        throw new Error(
-          "To ostatni składnik tej pozycji w koszyku — zdejmuje się ją cofnięciem oceny.");
+        /* Cofnięcie oceny odmawia na zwrocie z korektą (`podKlucz`) — wtedy
+           zdanie musi nazwać krok, który je odblokowuje (0.484.6). */
+        const zam = database.prepare(`SELECT z.zamkniety_at FROM zwrot_klienta z
+          JOIN zwrot_klienta_pozycja p ON p.zwrot_id = z.id WHERE p.id=?`).get(pozycjaId) as
+          { zamkniety_at: string | null } | undefined;
+        throw new Error(zam?.zamkniety_at
+          ? "To ostatni składnik tej pozycji w koszyku — zdejmuje się ją cofnięciem oceny, "
+            + "a zwrot ma już korektę: najpierw cofnij korektę na karcie zwrotu."
+          : "To ostatni składnik tej pozycji w koszyku — zdejmuje się ją cofnięciem oceny.");
       }
       const usun = database.prepare("DELETE FROM kosz_pozycja WHERE id=?");
       for (const w of stoi) usun.run(w.id);
@@ -996,7 +1019,14 @@ function uniewaznijZadanieMm(
   const z = database.prepare("SELECT status FROM sfera_queue WHERE id=?")
     .get(k.mm_queue_id) as { status: string } | undefined;
   const stan = String(z?.status ?? "");
-  if (stan === "processing" || stan === "done") {
+  /* `done` to NIE „w toku" (0.484.6): dokument już stoi, więc czekanie nic
+     nie da — zawartości po MM się nie poprawia. */
+  if (stan === "done") {
+    throw new Error(
+      `Koszyk ${k.kod} ma już wystawione MM — zawartości po dokumencie się nie poprawia. ` +
+      "Różnicę przesuń w Subiekcie osobnym dokumentem.");
+  }
+  if (stan === "processing") {
     throw new Error(
       `Koszyk ${k.kod} ma zadanie MM w toku — dokument właśnie powstaje. ` +
       "Poczekaj, aż kolejka je domknie, i popraw zawartość dopiero wtedy.");

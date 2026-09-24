@@ -1442,7 +1442,10 @@ export interface DoDopisania {
   /** Co wiadomo o zdjęciu tej oferty (0.217.0). */
   ofertaZdjecie: StanZdjeciaOferty;
   nazwa: string;
+  /** Ile sztuk BRAKUJE w zwrocie — tyle wejdzie przy dopisaniu (0.484.6). */
   ilosc: number;
+  /** Ile kupiono w tej linii; większe od `ilosc`, gdy część już wraca. Brak = serwer sprzed 0.484.6. */
+  zamowiono?: number;
   cenaGrosze: number;
   waluta: string;
 }
