@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from "react";
-import { AlertTriangle, PackageX, Ban, CircleHelp, BanknoteArrowDown } from "lucide-react";
+import { AlertTriangle, PackageX, Ban, CircleHelp, BanknoteArrowDown, Copy } from "lucide-react";
 import type { Kubelek, Sygnal, Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Zdjecie } from "../towar/Zdjecie";
@@ -73,6 +73,12 @@ export const SYGNALY: Record<Sygnal,
     tytul: "Pobranie — pieniądze oddaje się przelewem. Zapisz go w sekcji Pieniądze",
     krotko: "przelew?", klasa: "bg-amber-100 text-ranga-uwaga",
     ikona: <BanknoteArrowDown size={13} /> },
+  /* Drugi zwrot tego zamówienia z innego źródła (0.493.0). Czerwień, bo to
+     pieniądze, które mogą wyjść dwa razy — nie praca na kiedyś. */
+  drugi_zwrot: {
+    tytul: "To zamówienie ma też drugi zwrot — paczkę nieodebraną albo zwrot z Allegro. Pieniądze oddaje się raz",
+    krotko: "2 zwroty", klasa: "bg-red-100 text-ranga-zle",
+    ikona: <Copy size={13} /> },
   rozjazd_ilosci: {
     tytul: "Wróciło mniej sztuk, niż klient zgłosił",
     krotko: "mniej szt.", klasa: "bg-amber-100 text-ranga-uwaga",

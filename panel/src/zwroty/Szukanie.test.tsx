@@ -215,6 +215,28 @@ describe("Pole szukania zwrotu", () => {
     expect(screen.queryByLabelText("Przewoźnik")).toBeNull();
   });
 
+  it("paczkę bez zwrotu przyjmuje się jednym kliknięciem, a wiersz dalej prowadzi do Allegro (0.493.0)", async () => {
+    /* Decyzja właściciela: nieodebrana paczka idzie drogą zwrotu. Formularz
+       z 0.451.0 nie wraca — przycisk nie pyta o nic, bierze zamówienie. */
+    const onPrzyjmij = vi.fn();
+    pokaz(null, { paczki: PACZKI, onPrzyjmij });
+    await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
+    const przyciski = screen.getAllByRole("button", { name: "Przyjmij jako nieodebraną" });
+    /* Tylko przy paczce bez zwrotu: drugi zwrot to druga kwota za ten sam towar. */
+    expect(przyciski).toHaveLength(1);
+    await userEvent.click(przyciski[0]);
+    expect(onPrzyjmij).toHaveBeenCalledWith("ord-nowy");
+    expect(screen.getByRole("link", { name: /ord-nowy/ })).toBeInTheDocument();
+  });
+
+  it("w trakcie przyjęcia przyciski stoją, a odmowa mówi całym zdaniem (0.493.0)", async () => {
+    pokaz(null, { paczki: PACZKI, onPrzyjmij: vi.fn(), przyjmuje: "ord-nowy",
+      bladPrzyjecia: "To zamówienie ma już zwrot REF-1 — pracuj na nim." });
+    await userEvent.click(screen.getByRole("button", { name: /Paczki klienta/ }));
+    expect(screen.getByRole("button", { name: "Przyjmuję…" })).toBeDisabled();
+    expect(screen.getByRole("alert")).toHaveTextContent("ma już zwrot REF-1");
+  });
+
   it("szukanie klienta otwiera się z rzędu pola, bez nieudanego skanu", async () => {
     /* Zgłoszenie właściciela (0.338.0): droga szła przez ślepy zaułek —
        najpierw zeskanuj, dostań „nie znam kodu", dopiero wtedy zobacz ją. */

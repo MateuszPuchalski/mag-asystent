@@ -1174,7 +1174,7 @@ export interface PozycjaNaOutlet {
 }
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
   | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna"
-  | "rozjazd_ilosci" | "przelew_czeka";
+  | "rozjazd_ilosci" | "przelew_czeka" | "drugi_zwrot";
 
 /** Wynik dopasowania — §11.3 żąda widocznego źródła i pewności. */
 export interface Dopasowanie {
@@ -1377,6 +1377,11 @@ export interface Zwrot {
   odbiorcaNazwa: string | null;
   przewoznik: string | null;
   rozmowy: RozmowaZwrotu[];
+  /**
+   * Zwrot tego zamówienia z DRUGIEGO źródła (0.493.0) — paczka nieodebrana
+   * obok zwrotu z Allegro. Opcjonalne, bo starszy serwer go nie przysyła.
+   */
+  drugiZwrot?: { id: number; numer: string; zrodlo: string } | null;
   /** Dokument sprzedaży z Subiekta — snapshot numeru, nie odczyt na żywo. */
   faktura: FakturaZwrotu;
   wersja: number;

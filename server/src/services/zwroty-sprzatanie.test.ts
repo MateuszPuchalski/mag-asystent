@@ -69,6 +69,18 @@ test("znika zwrot rozliczony przez Allegro, po którym nie ma u nas śladu", () 
     .get() as { n: number }).n, 1);
 });
 
+test("paczki nieodebranej nie kasuje, choć pieniądze oddano w Allegro (0.493.0)", () => {
+  /* Biuro zakłada ją samo, więc skasowana nie wróci z synchronizacji. */
+  const d = stanowisko();
+  const KTO = biuro(d);
+  const { id } = rozliczonyPrzezAllegro(d, "nieodebrana:620000111222", "");
+  d.prepare(`UPDATE zwrot_klienta SET zrodlo='nieodebrana', status_allegro=NULL,
+    rozliczony_allegro_at='2026-09-20T10:00:00Z' WHERE id=?`).run(id);
+  assert.equal(policzRozliczonePozaAplikacja(d).doSkasowania, 0);
+  skasujRozliczonePozaAplikacja(d, KTO);
+  assert.equal((d.prepare("SELECT COUNT(*) AS n FROM zwrot_klienta").get() as { n: number }).n, 1);
+});
+
 test("NASZ ślad zatrzymuje kasowanie, a raport mówi KTÓRY", () => {
   /* Zwrot bywa zatrzymany przez dwie rzeczy naraz, a człowiek ma wiedzieć,
      która go trzyma — inaczej zdejmie jedną i zdziwi się, że wiersz stoi. */

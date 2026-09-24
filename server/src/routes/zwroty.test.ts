@@ -102,6 +102,9 @@ const TRASY = () => [
      bramki z 0.200.0 — hala nie ma prawa go nawet zobaczyć, bo decyzję bierze
      na siebie człowiek przy biurku. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/kosz/mm-mimo-korekt" },
+  /* Przyjęcie paczki nieodebranej (0.493.0) zakłada zwrot, czyli przyszłe
+     pieniądze do oddania. Decyzja biura, nie hali. */
+  { method: "POST" as const, url: "/api/obsluga/zwroty/przyjmij-nieodebrana" },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -176,7 +179,7 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("zwroty mają trzydzieści pięć tras POST, każda z uzasadnieniem", async () => {
+test("zwroty mają trzydzieści sześć tras POST, każda z uzasadnieniem", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -371,19 +374,23 @@ test("zwroty mają trzydzieści pięć tras POST, każda z uzasadnieniem", async
      „usuń opcję rejestracji paczki — ja tylko wyszukuję ją w Allegro", a potem
      „usuń też trasę rejestracji z serwera". Zwroty zarejestrowane wcześniej
      zostają w kolejce; nowych ta aplikacja już nie zakłada. */
-  assert.equal(posty.length, 35,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu pięciu`);
+  /* Trzydziesta szósta (0.493.0): przyjęcie paczki nieodebranej jednym
+     kliknięciem przy zamówieniu z wyniku szukania. Nowa decyzja właściciela,
+     po pytaniu „jak procesujemy paczki nieodebrane". Formularz z 0.451.0 nie
+     wraca: trasa niczego nie pyta, bierze zamówienie wskazane przez biuro. */
+  assert.equal(posty.length, 36,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu sześciu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
     "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono",
-    "kosz/nowy", "kosz/usun", "paczki-klienta/allegro"]) {
+    "kosz/nowy", "kosz/usun", "paczki-klienta/allegro", "przyjmij-nieodebrana"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
-  /* Rejestracji nie ma i nie ma wrócić przypadkiem — np. przy scaleniu
-     z gałęzią sprzed 0.451.0. */
+  /* Formularza rejestracji nie ma i nie ma wrócić przypadkiem — np. przy
+     scaleniu z gałęzią sprzed 0.451.0. Przyjęcie z 0.493.0 ma inną ścieżkę. */
   assert.equal(zrodlo.includes('"/api/obsluga/zwroty/nieodebrana"'), false,
     "trasa rejestracji paczki odeszła decyzją właściciela");
 });
@@ -931,4 +938,74 @@ test("notatka zapisuje się przy zwrocie ZAMKNIĘTYM i da się ją cofnąć", as
   for (const w of wpisy) {
     assert.ok(!w.payload.includes("czeka na przelew"), "treść notatki nie idzie do dziennika");
   }
+});
+
+/* ── Paczka nieodebrana jednym kliknięciem (0.493.0) ────────────────────── */
+
+function zamowienie(orderId: string, pozycji = 1) {
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta
+    (channel_account_id,external_id,kupujacy_login,odbiorca_nazwa,synced_at)
+    VALUES (?,?,'kupujacy_x','Jan Kowalski',?)`)
+    .run(konto, orderId, new Date().toISOString()).lastInsertRowid);
+  for (let i = 0; i < pozycji; i++) {
+    d.prepare(`INSERT INTO zamowienie_klienta_pozycja
+      (zamowienie_id,offer_id,nazwa,ilosc,cena_grosze,waluta)
+      VALUES (?,?,?,1,2900,'PLN')`).run(zam, `o${i}`, `Strug ${i}`);
+  }
+}
+
+test("przyjęcie nieodebranej zakłada zwrot z pozycjami zamówienia i numerem listu", async () => {
+  zamowienie("ord-n1", 2);
+  const { naglowki } = login("biuro", "Ala przyjmuje");
+  const r = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/przyjmij-nieodebrana",
+    headers: naglowki, payload: { orderId: "ord-n1", waybill: "620000111222" } });
+  assert.equal(r.statusCode, 200, r.body);
+  const w = db().prepare(`SELECT zrodlo, external_id, waybill, kupujacy_login, dostarczono_at
+    FROM zwrot_klienta WHERE id=?`).get(r.json().zwrotId) as Record<string, unknown>;
+  assert.equal(w.zrodlo, "nieodebrana");
+  assert.equal(w.external_id, "nieodebrana:620000111222");
+  assert.equal(w.waybill, "620000111222", "następny skan tej naklejki ma otworzyć ten zwrot");
+  assert.equal(w.kupujacy_login, "kupujacy_x", "login bierze się z zamówienia");
+  assert.ok(w.dostarczono_at, "karton leży na biurku — panel nie pyta, czy dotarł");
+  assert.equal(r.json().pozycji, 2);
+});
+
+test("bez skanu naklejki uchwytem jest zamówienie, a drugi klik niczego nie dubluje", async () => {
+  zamowienie("ord-n2");
+  const { naglowki } = login("biuro", "Ala klika dwa razy");
+  const raz = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/przyjmij-nieodebrana",
+    headers: naglowki, payload: { orderId: "ord-n2" } });
+  assert.equal(raz.statusCode, 200, raz.body);
+  const w = db().prepare("SELECT external_id, waybill FROM zwrot_klienta WHERE id=?")
+    .get(raz.json().zwrotId) as { external_id: string; waybill: string | null };
+  assert.equal(w.external_id, "nieodebrana:ord-n2");
+  assert.equal(w.waybill, null, "pustego numeru listu nie zapisujemy jako numeru");
+  const dwa = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/przyjmij-nieodebrana",
+    headers: naglowki, payload: { orderId: "ord-n2" } });
+  assert.equal(dwa.statusCode, 409);
+  assert.match(dwa.json().error, /ma już zwrot ord-n2/);
+});
+
+test("zamówienie ze zwrotem z Allegro nie dostaje drugiego — ta sama kwota wyszłaby dwa razy", async () => {
+  zamowienie("ord-1");
+  const { naglowki } = login("biuro", "Ala sprawdza");
+  const r = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/przyjmij-nieodebrana",
+    headers: naglowki, payload: { orderId: "ord-1", waybill: "X1" } });
+  assert.equal(r.statusCode, 409);
+  assert.match(r.json().error, /ma już zwrot REF-1/);
+  assert.equal((db().prepare("SELECT COUNT(*) AS n FROM zwrot_klienta").get() as { n: number }).n, 1);
+});
+
+test("nieznane zamówienie albo zamówienie bez pozycji nie zakłada pustego zwrotu", async () => {
+  zamowienie("ord-pusty", 0);
+  const { naglowki } = login("biuro", "Ala myli numer");
+  for (const orderId of ["ord-nie-ma", "ord-pusty"]) {
+    const r = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/przyjmij-nieodebrana",
+      headers: naglowki, payload: { orderId } });
+    assert.equal(r.statusCode, 409, orderId);
+  }
+  assert.equal((db().prepare(
+    "SELECT COUNT(*) AS n FROM zwrot_klienta WHERE zrodlo='nieodebrana'").get() as { n: number }).n, 0);
 });

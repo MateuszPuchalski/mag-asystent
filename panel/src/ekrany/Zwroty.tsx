@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { List, RefreshCw, Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, type WynikSkanu } from "../api/zwroty";
+import { Konflikt } from "../api/klient";
 import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pieniadze } from "../zwroty/Pieniadze";
@@ -10,7 +11,7 @@ import { DolozTowar } from "../zwroty/DolozTowar";
 import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
-  usePaczkiKlienta, useZamowieniaZAllegro, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
+  usePaczkiKlienta, useZamowieniaZAllegro, usePrzyjmijNieodebrana, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
@@ -428,6 +429,7 @@ export function Zwroty() {
      z pola wołają `onLogin` oba, a drugi strzał do Allegro o ten sam login
      niczego by nie dodał — kosztowałby tylko żądanie. */
   const zAllegro = useZamowieniaZAllegro();
+  const przyjmijNieodebrana = usePrzyjmijNieodebrana();
   const pytanyLogin = useRef("");
   const [wynikSkanu, setWynikSkanu] = useState<WynikSkanu | null>(null);
   const [bladSkanu, setBladSkanu] = useState("");
@@ -521,7 +523,14 @@ export function Zwroty() {
      Skan towaru NIE rusza frazy: lista kolejki zostaje taka, jaka była. */
   const dolozTowar = useDolozTowar();
   const [skanTowaru, setSkanTowaru] = useState<{ tekst: string; blad: boolean } | null>(null);
+  /* Kod, który przyszedł Z CZYTNIKA (0.493.0). Pole szukania woła tę samą
+     drogę Enterem, więc wpisane „kowalski" też chybia i otwiera szukanie
+     klienta. Bez tego rozróżnienia przycisk „Przyjmij jako nieodebraną"
+     zapisywał nazwisko jako numer listu, a potem wpisane nazwisko otwierało
+     ten zwrot jak skan naklejki. */
+  const kodZCzytnika = useRef("");
   const naSkan = async (v: string) => {
+    kodZCzytnika.current = v;
     setSkanTowaru(null);
     if (wygladaNaEan(v)) {
       let towar: TowarDoKosza | null = null;
@@ -1016,7 +1025,7 @@ export function Zwroty() {
         wynik={wynikSkanu} kod={kod} fraza={fraza} ile={pasujace?.length ?? null}
         szuka={skan.isPending} dociaga={dociagnij.isPending} blad={bladSkanu}
         onFraza={(v) => { setFraza(v); if (!v) setWynikSkanu(null); }}
-        onSzukaj={szukaj}
+        onSzukaj={(v) => { kodZCzytnika.current = ""; szukaj(v); }}
         onSkan={(v) => { void naSkan(v); }}
         towar={skanTowaru}
         onDociagnij={(v) => dociagnij.mutate(v, {
@@ -1041,6 +1050,27 @@ export function Zwroty() {
             onError: () => { pytanyLogin.current = ""; },
           });
         }}
+        /* PRZYJĘCIE PACZKI NIEODEBRANEJ (0.493.0). Numer z naklejki idzie
+           tylko po skanie, który CHYBIŁ — to numer tego kartonu. Trafiony skan
+           albo EAN towaru nie mają z tą paczką nic wspólnego, a fraza wpisana
+           ręką numerem listu nie jest. Po sukcesie
+           otwiera się nowy zwrot, bo następnym ruchem jest ocena pozycji.
+           Odmowa „ma już zwrot" niesie jego numer i też go otwiera. */
+        onPrzyjmij={(orderId) => {
+          przyjmijNieodebrana.mutate(
+            { orderId, waybill: wynikSkanu?.trafienie === null && kod
+                && kod === kodZCzytnika.current ? kod : null },
+            {
+              onSuccess: (w) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${w.zwrotId}`); },
+              onError: (e) => {
+                const juz = e instanceof Konflikt ? Number(e.szczegoly.zwrotId) : NaN;
+                if (Number.isInteger(juz) && juz > 0) nawiguj(`/obsluga/zwroty/${juz}`);
+              },
+            });
+        }}
+        przyjmuje={przyjmijNieodebrana.isPending
+          ? przyjmijNieodebrana.variables?.orderId ?? null : null}
+        bladPrzyjecia={przyjmijNieodebrana.error ? (przyjmijNieodebrana.error as Error).message : ""}
         pytaAllegro={zAllegro.isPending}
         bladAllegro={zAllegro.error ? (zAllegro.error as Error).message : ""}
         /* SYNCHRONIZACJA WCHODZI DO RZĘDU POLA (0.370.0). Stała we własnym

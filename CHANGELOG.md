@@ -34,6 +34,47 @@ historii nie przepisujemy.
 ---
 
 
+## 0.493.0 — 24 września 2026
+
+**Paczkę nieodebraną przyjmuje się jednym kliknięciem.** Właściciel zapytał,
+jak procesujemy paczki, które wracają bez odstąpienia, i zdecydował, że
+mają iść drogą zwrotu. Od 0.451.0 praca kończyła się na stronie zamówienia
+w Allegro, a ZW, półka i przelew działy się poza panelem.
+
+- Przy wierszu w „Paczkach klienta" stoi przycisk „Przyjmij jako
+  nieodebraną". Zakłada zwrot z pozycjami zamówienia, loginem i odbiorcą,
+  potem go otwiera. Klik w sam wiersz dalej prowadzi do Allegro.
+- Numer z naklejki, który chybił w skanie, zapisuje się przy zwrocie.
+  Następny skan tego kartonu otwiera już zwrot.
+- Dalej zwykła droga: ocena, koszyk, kwota, ZW automatem i zwrot płatności.
+- Przycisku nie ma przy zamówieniu, które ma już zwrot. Serwer też odmawia
+  i otwiera istniejący zwrot, bo drugi znaczyłby drugą kwotę za ten sam towar.
+- Odmowy wypłaty dla takiej paczki nie ma. Idzie ona do zwrotu klienta
+  w Allegro, a klient niczego nie zgłosił.
+
+Nowa trasa `POST /api/obsluga/zwroty/przyjmij-nieodebrana` stoi za bramką
+biura. Formularz rejestracji z 0.451.0 nie wraca.
+
+Przegląd drogi takiej paczki znalazł cztery błędy, poprawione w tym wydaniu:
+- Fraza wpisana w pole szukania zapisywała się jako numer listu. Teraz
+  numer idzie wyłącznie ze skanu czytnika.
+- Zamknięta korektą, a niezapłacona paczka wychodziła z kolejki dzień po
+  terminie. Reguła „Allegro odda samo" jej nie dotyczy, więc czeka dalej.
+- Pieniądze oddane w Allegro przed przyjęciem zamykały paczkę, zanim ktoś
+  ją ocenił. Wypłata zdejmuje teraz tylko czekanie na pieniądze.
+- Narzędzie kasowania zwrotów rozliczonych poza aplikacją mogło skasować
+  taką paczkę. Teraz jej nie rusza.
+
+Raport rekoncyliacji mówił „(null)" przy zwrocie rozliczonym bez statusu.
+Mówi teraz „(operacje płatności)".
+
+**Ostrzeżenie o drugim zwrocie tego samego zamówienia**, decyzją właściciela.
+Klient z paczką nieodebraną zgłasza czasem potem odstąpienie w Allegro.
+Synchronizacja zakłada wtedy drugi zwrot obok paczki przyjętej przez biuro.
+Oba wiersze kolejki dostają czerwony znacznik „2 zwroty", a nagłówek podaje
+numer drugiego z odnośnikiem. Dwa zwroty z Allegro na jedno zamówienie to
+zwykły zwrot w dwóch paczkach i ostrzeżenia nie dostają.
+
 ## 0.492.0 — 24 września 2026
 
 **Aktualizacja serwera przyciskiem w panelu.** Ustawienia → „Aktualizacja
