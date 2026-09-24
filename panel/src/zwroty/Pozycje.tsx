@@ -338,7 +338,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
      równie dobrze przy wycenie, co przy ocenianiu. Zamknięty i odrzucony
      odpadają, bo `podKlucz` po stronie serwera i tak ich nie wpuści. */
   const cofalne = zwrot.kubelek !== "zamkniety" && zwrot.kubelek !== "odrzucony";
-  /* KOREKTA ZAMYKA EDYCJĘ (0.484.6). Zapis korekty stawia `zamkniety_at`,
+  /* KOREKTA ZAMYKA EDYCJĘ (0.484.7). Zapis korekty stawia `zamkniety_at`,
      a `podKlucz` odmawia wtedy każdej zmiany — także w kubełku DO ZWROTU, gdzie
      zwrot z korektą czeka na pieniądze od 0.476.0. Przyciski cofania, liczby
      sztuk, potrącenia, zdjęcia i dopisania obiecywały tam ruch, którego serwer
@@ -413,7 +413,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
        ma dwie przyczyny i obie mają wyjście: zamówienia jeszcze nie pobrano
        (kolumna dowodów, „Dociągnij teraz") albo to paczka nieodebrana, której
        klient nie zgłosił — wtedy pozycje dopisuje biuro. */
-    /* Obie drogi MUSZĄ stać obok zdania (0.484.6). Do tego wydania pusty
+    /* Obie drogi MUSZĄ stać obok zdania (0.484.7). Do tego wydania pusty
        zwrot odsyłał do dopisania, a listy dopisania tu nie było — wczesne
        wyjście pomijało ją razem z resztą. „Dociągnij" pada tylko przy numerze
        zamówienia, bo bez niego przycisku w dowodach nie ma. */
@@ -708,7 +708,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                a tego jeszcze nie pobrano. */
             ? <p className="text-xs text-slate-500">
                 Kwoty pełnej nie znamy bez zamówienia — koszt dostawy stoi przy nim.
-                {/* Tylko z numerem: bez niego przycisku w dowodach nie ma (0.484.6). */}
+                {/* Tylko z numerem: bez niego przycisku w dowodach nie ma (0.484.7). */}
                 {zwrot.orderId && " Dociągnij je w kolumnie obok."}</p>
             : <div className="flex items-baseline justify-between">
                 <span className="font-bold">Z dostawą</span>

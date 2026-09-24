@@ -1278,7 +1278,7 @@ export function cofnijWerdykt(
     if (pieniadze.zwrot_pieniedzy_id) {
       throw new Error("Pieniądze zostały już oddane — przyjęcia nie cofam.");
     }
-    /* KWOTA BEZ OCEN ISTNIEJE (0.484.6). `zapiszKwote` wymaga samego
+    /* KWOTA BEZ OCEN ISTNIEJE (0.484.7). `zapiszKwote` wymaga samego
        przyjęcia, więc komentarz wyżej zakładał za dużo: cofnięcie werdyktu
        zostawiało kwotę i zlecone ZW na zwrocie bez decyzji. */
     const kwota = database.prepare("SELECT kwota_grosze FROM zwrot_klienta WHERE id=?")
@@ -1290,7 +1290,7 @@ export function cofnijWerdykt(
       `SELECT id, nazwa FROM zwrot_klienta_pozycja
         WHERE zwrot_id=? AND ocena IS NOT NULL`).all(zwrotId) as Array<{ id: number; nazwa: string }>;
     /* Pozycja na wystawionym MM oceny nie odda (`ocenPozycje`), więc „najpierw
-       cofnij oceny" byłoby drogą donikąd (0.484.6). Mówimy to wprost. */
+       cofnij oceny" byłoby drogą donikąd (0.484.7). Mówimy to wprost. */
     for (const p of ocenione) {
       const kosz = zamknietyKoszPozycji(database, Number(p.id));
       if (kosz) {
@@ -1733,7 +1733,7 @@ export interface DoDopisania {
   /** Stan zdjęcia oferty (0.217.0) — kandydat też jest odniesieniem do towaru. */
   ofertaZdjecie: StanZdjeciaOferty;
   nazwa: string;
-  /** Ile sztuk BRAKUJE w zwrocie — tyle wejdzie przy dopisaniu (0.484.6). */
+  /** Ile sztuk BRAKUJE w zwrocie — tyle wejdzie przy dopisaniu (0.484.7). */
   ilosc: number;
   /** Ile kupiono w tej linii zamówienia; różne od `ilosc`, gdy część już wraca. */
   zamowiono: number;
@@ -1748,7 +1748,7 @@ export interface DoDopisania {
  * pozycji już zgłoszonych kazałoby operatorowi porównywać dwie listy oczami —
  * a to jest dokładnie ta praca, którą ekran ma zdjąć (dekalog, punkt 5).
  *
- * ── RÓŻNICA W SZTUKACH, NIE W LINIACH (0.484.6) ─────────────────────────────
+ * ── RÓŻNICA W SZTUKACH, NIE W LINIACH (0.484.7) ─────────────────────────────
  * Zgłoszenie właściciela: klient zgłosił jedną nakrętkę z dwóch, a w kartonie
  * przyszły obie. Linia zamówienia stała już w zwrocie, więc lista jej nie
  * dawała, a „wróciło mniej" słusznie nie przyjmuje liczby większej niż
@@ -1973,7 +1973,7 @@ export function zapiszIloscZwrocona(
     }
   }
 
-  /* POTRĄCENIE NIE MOŻE PRZEROSNĄĆ TEGO, CO WRÓCIŁO (0.484.6). Widełki
+  /* POTRĄCENIE NIE MOŻE PRZEROSNĄĆ TEGO, CO WRÓCIŁO (0.484.7). Widełki
      potrącenia liczyły się z deklaracji; mniejsza liczba sztuk po nim dawała
      linię ujemną. `zapiszKwote` ją sumował, a zwrot pieniędzy pomijał — i
      przycisk wypłaty odmawiał zdaniem „popraw kwotę", którego nie dało się
@@ -2012,7 +2012,7 @@ export function zapiszPotracenie(
     if (!Number.isInteger(grosze) || grosze < 0) {
       throw new Error("Potrącenie to pełne grosze, nie mniej niż zero.");
     }
-    /* Widełki z tego, co WRÓCIŁO, nie z deklaracji (0.484.6) — ta sama
+    /* Widełki z tego, co WRÓCIŁO, nie z deklaracji (0.484.7) — ta sama
        liczba, z której `zapiszKwote` liczy wartość linii. Inaczej linia
        wychodziła ujemna, a wypłata odmawiała bez drogi wyjścia. */
     const wartosc = Math.round(Number(p.cena_grosze) * iloscLiczona(p));

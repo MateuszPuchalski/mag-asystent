@@ -305,7 +305,7 @@ test("brak werdyktu i brak kwoty to DWIE różne przeszkody", () => {
   assert.match(String(stanZwrotuPieniedzy(d2, bezKwoty).powod), /zaznacz/i);
 });
 
-test("brak płatności: „dociągnij” tylko wtedy, gdy zamówienia nie ma (0.484.6)", () => {
+test("brak płatności: „dociągnij” tylko wtedy, gdy zamówienia nie ma (0.484.7)", () => {
   /* Dociąganie pobiera zamówienia BRAKUJĄCE. Wiersz, który stoi bez
      płatności, nie zmieni się od przycisku — wtedy zostaje panel Allegro. */
   const d = stanowisko();

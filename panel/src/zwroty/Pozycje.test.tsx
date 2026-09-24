@@ -394,7 +394,7 @@ describe("Produkty ze zwrotu", () => {
   });
 });
 
-describe("Zwrot z korektą jest tylko do odczytu (0.484.6)", () => {
+describe("Zwrot z korektą jest tylko do odczytu (0.484.7)", () => {
   it("nie ma cofania oceny, zdejmowania ani dopisywania — serwer by odmówił", () => {
     /* Zapis korekty stawia `zamkniety_at`, a `podKlucz` odmawia każdej zmiany
        — także w DO ZWROTU, gdzie zwrot z korektą czeka na pieniądze. */
@@ -415,7 +415,7 @@ describe("Zwrot z korektą jest tylko do odczytu (0.484.6)", () => {
     expect(screen.getByRole("button", { name: /zdejmij ze zwrotu/ })).toBeInTheDocument();
   });
 
-  it("pusty zwrot podaje listę do dopisania, o której mówi (0.484.6)", () => {
+  it("pusty zwrot podaje listę do dopisania, o której mówi (0.484.7)", () => {
     lista(zwrot({ kubelek: "ocena", pozycje: [] }), { onDopisz: vi.fn(),
       doDopisania: [{ zamPozycjaId: 1, offerId: "9", ofertaZdjecie: "nieznane", nazwa: "Grabie",
         ilosc: 1, cenaGrosze: 100, waluta: "PLN" }] });

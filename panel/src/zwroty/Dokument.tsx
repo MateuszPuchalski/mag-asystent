@@ -84,7 +84,7 @@ export function Dokument({ faktura, kandydaci, trwa, blad, onWskaz, enter = fals
           nie umie szukać po numerze — ale zwrot da się doprowadzić do końca bez
           dokumentu, i to jest ta informacja, której tu brakowało. */}
       <p className="mt-1">
-        {/* „Wyżej" kłamało (0.484.6): pole numeru stoi w kolumnie środkowej
+        {/* „Wyżej" kłamało (0.484.7): pole numeru stoi w kolumnie środkowej
             i tylko w kubełku DO KOREKTY. */}
         Zwrotu to nie zatrzymuje: korektę wystawiasz w Subiekcie, a jej numer
         wpisujesz w środkowej kolumnie, gdy zwrot stanie w „Do korekty”. To

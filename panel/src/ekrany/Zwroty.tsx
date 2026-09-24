@@ -65,7 +65,7 @@ const KLAWISZE_KUBELKA: Record<string, ReadonlyArray<readonly [string, string]>>
     ["Shift+S", "wszystkie na stan"], ["-", "wróciło mniej"]],
   zwrot: [["Enter", "zapisz kwotę"], ["D", "potrącenie"], ["-", "wróciło mniej"]],
   korekta: [["Enter", "wpisz numer korekty"]],
-  /* `R` doklejany ze stanu (0.484.6) — zamknięty bez korekty go nie ma. */
+  /* `R` doklejany ze stanu (0.484.7) — zamknięty bez korekty go nie ma. */
   zamkniety: [],
 };
 
@@ -884,7 +884,7 @@ export function Zwroty() {
      dwóch bramek (`zwrot-pieniedzy.ts`), więc wartość sprzed zapisu jest ta
      sama co po nim — a nie ściga się z odświeżeniem zapytania. */
   const stanPieniedzy = szczegol.data?.pieniadze;
-  /* ── KLAWISZE, KTÓRE NAPRAWDĘ DZIAŁAJĄ (0.484.6) ───────────────────────
+  /* ── KLAWISZE, KTÓRE NAPRAWDĘ DZIAŁAJĄ (0.484.7) ───────────────────────
      Tabela kubełków mówi, co klawisz robi w typowym zwrocie; stan zwrotu
      potrafi to wyłączyć. Z kwotą w DO ZWROTU (czeka na pieniądze) Enter, `D`
      i `-` milczą, bo wycena się skończyła. `-` milczy też bez pozycji
@@ -996,7 +996,7 @@ export function Zwroty() {
                przeszkodzie klawisz milczałby, a pasek kłamał. */
             ...(stanSzybkiej.pokaz && !stanSzybkiej.przeszkoda
               ? [["W", "wszystko OK — na półkę i wypłata"] as const] : []),
-            /* `R` ZE STANU, nie z kubełka (0.484.6): klawisz działa przy
+            /* `R` ZE STANU, nie z kubełka (0.484.7): klawisz działa przy
                każdym zwrocie z numerem korekty — także w DO ZWROTU, gdzie
                czeka na pieniądze — a w ZAMKNIĘTYCH bez korekty (rozliczonych
                przez Allegro) milczy. */

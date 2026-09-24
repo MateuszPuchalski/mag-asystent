@@ -22,7 +22,7 @@ export function IloscZwrocona({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt
   trwa: boolean;
   blad: string;
   onZapisz: (ilosc: number | null) => void;
-  /** Zwrot z korektą (0.484.6): liczba zostaje widoczna, cofnięcie znika — serwer by odmówił. */
+  /** Zwrot z korektą (0.484.7): liczba zostaje widoczna, cofnięcie znika — serwer by odmówił. */
   tylkoOdczyt?: boolean;
   /**
    * Znacznik klawisza `-` (0.479.0): każda nowa wartość otwiera pole. Liczba,

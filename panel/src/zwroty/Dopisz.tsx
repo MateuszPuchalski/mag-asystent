@@ -80,7 +80,7 @@ export function Dopisz({ kandydaci, trwa, blad, onDopisz }: {
           <span className="min-w-0 flex-1">
             <span className="block font-semibold">{k.nazwa}</span>
             <span className="mt-0.5 block text-xs text-slate-600">
-              {/* RESZTA LINII (0.484.6): „brakuje 1 z 2" mówi, że część tej
+              {/* RESZTA LINII (0.484.7): „brakuje 1 z 2" mówi, że część tej
                   linii już wraca — bez tego dopisanie jednej nakrętki wyglądałoby
                   jak drugi zakup tego samego. */}
               {k.zamowiono != null && k.zamowiono > k.ilosc

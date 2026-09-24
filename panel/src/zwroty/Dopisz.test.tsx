@@ -76,7 +76,7 @@ describe("Dopisanie produktu do zwrotu", () => {
     expect(screen.getByText(/zmienił się w innej karcie/)).toBeInTheDocument();
   });
 
-  it("reszta linii mówi „brakuje 1 z 2 szt.” (0.484.6)", async () => {
+  it("reszta linii mówi „brakuje 1 z 2 szt.” (0.484.7)", async () => {
     /* Klient zgłosił jedną nakrętkę z dwóch, przyszły obie. Kandydat to
        RESZTA tej linii, a nie drugi zakup tego samego towaru. */
     pokaz([KANDYDAT({ nazwa: "Nakrętka M12", ilosc: 1, zamowiono: 2 })]);

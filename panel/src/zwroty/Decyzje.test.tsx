@@ -275,7 +275,7 @@ describe("Korekta zwrotu (0.162.0)", () => {
   });
 });
 
-describe("DO ZWROTU z kwotą — droga do poprawki (0.484.6)", () => {
+describe("DO ZWROTU z kwotą — droga do poprawki (0.484.7)", () => {
   const czeka = (n: Partial<Zwrot> = {}) => zwrot({
     kubelek: "zwrot", werdykt: "przyjety", kwotaGrosze: 9998, kwotaWariant: "pelna", ...n });
 

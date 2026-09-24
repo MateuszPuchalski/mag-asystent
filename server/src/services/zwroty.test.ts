@@ -835,7 +835,7 @@ test("więcej niż zgłoszono ODPADA — nadmiar z kartonu to inna pozycja", () 
     "odmowa niczego nie zapisuje");
 });
 
-/* ── Drogi, które prowadziły donikąd (0.484.6) ──────────────────────────────
+/* ── Drogi, które prowadziły donikąd (0.484.7) ──────────────────────────────
    Przegląd niespójności: komunikat albo reguła odsyłały do ruchu, którego
    w tym samym stanie nie dało się wykonać. */
 
@@ -1836,7 +1836,7 @@ test("do dopisania zostaje RÓŻNICA zamówienia i zwrotu, nie całe zamówienie
   assert.equal(lista[0].cenaGrosze, 2999, "cena idzie z zamówienia, nie z pola");
 });
 
-test("linia zwrócona w CZĘŚCI zostaje na liście z resztą sztuk (0.484.6)", () => {
+test("linia zwrócona w CZĘŚCI zostaje na liście z resztą sztuk (0.484.7)", () => {
   /* Zgłoszenie właściciela: klient zgłosił jedną nakrętkę z dwóch, a przyszły
      obie. „Wróciło mniej" nie przyjmuje liczby większej od zgłoszonej i odsyła
      do dopisania — więc dopisanie musi tę resztę znać. */
@@ -1865,7 +1865,7 @@ test("linia zwrócona w CZĘŚCI zostaje na liście z resztą sztuk (0.484.6)", 
   assert.deepEqual(doDopisania(id, d), []);
 });
 
-test("pozycja zwrotu podpisana numerem LINII zamówienia też się liczy (0.484.6)", () => {
+test("pozycja zwrotu podpisana numerem LINII zamówienia też się liczy (0.484.7)", () => {
   /* `offerId` pozycji zwrotu bywa identyfikatorem linii zamówienia, nie
      oferty ([WERYFIKUJ] w docs/allegro-ksztalt.md) — ta sama reguła co
      plakietka „↩ 1 z 2" w dowodach. */

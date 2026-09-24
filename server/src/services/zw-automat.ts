@@ -246,7 +246,7 @@ export function odsunZwPrzedRecznym(
     throw new Error(co === "korekta"
       ? `Automat wystawił już ${q.numer ?? "ZW"} — numer wpisze się sam w ciągu minuty.`
       /* Usunięcie ZW w Subiekcie nie zmienia statusu zadania, więc stare
-         zdanie odsyłało do ruchu bez skutku (0.484.6). Działa kolejność:
+         zdanie odsyłało do ruchu bez skutku (0.484.7). Działa kolejność:
          numer wpisuje się sam, potem cofnięcie korekty, potem kwota. */
       : `${q.numer ?? "ZW"} już stoi w Subiekcie — numer wpisze się tu sam w ciągu minuty. ` +
         "Potem cofnij korektę i popraw kwotę; dokument w Subiekcie skoryguj ręcznie.");

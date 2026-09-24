@@ -84,7 +84,7 @@ export function szybkaSciezka(zwrot: Zwrot, pudla: PudloSzybkie[]): SzybkaSciezk
     const zTymZwrotem = naZwroty.filter((k) => k.pozycje.some((p) => p.zwrotId === zwrot.id));
     if (naZwroty.length > 1 && zTymZwrotem.length !== 1) {
       /* W DO DECYZJI przycisków pudeł jeszcze nie ma — stoją przy ocenie,
-         więc zdanie zaczyna od przyjęcia (0.484.6). */
+         więc zdanie zaczyna od przyjęcia (0.484.7). */
       return stop(zwrot.kubelek === "decyzja"
         ? "Kilka otwartych pudeł — przyjmij zwrot (P) i oceń pierwszą pozycję w wybranym pudle, resztę zrobi przycisk."
         : "Kilka otwartych pudeł — oceń pierwszą pozycję w wybranym pudle, resztę zrobi przycisk.");

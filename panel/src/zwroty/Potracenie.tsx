@@ -30,7 +30,7 @@ export function Potracenie({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt = 
   trwa: boolean;
   blad: string;
   onZapisz: (grosze: number | null, powod: string) => void;
-  /** Zwrot z korektą (0.484.6): potrącenie widać, cofnięcia nie — serwer by odmówił. */
+  /** Zwrot z korektą (0.484.7): potrącenie widać, cofnięcia nie — serwer by odmówił. */
   tylkoOdczyt?: boolean;
   /** Znacznik klawisza `D` (0.479.0) — zasada jak w `IloscZwrocona`. */
   otworz?: number;

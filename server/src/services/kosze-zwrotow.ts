@@ -823,7 +823,7 @@ export function zaznaczSkladnik(
       `SELECT id, kosz_id, tw_id FROM kosz_pozycja WHERE zwrot_pozycja_id=? ORDER BY id`)
       .all(pozycjaId) as Array<{ id: number; kosz_id: number; tw_id: number }>;
     if (!wiersze.length) {
-      /* OCENA JUŻ STOI, A POZYCJI W PUDLE NIE MA (0.484.6). Wtedy „oceń ją na
+      /* OCENA JUŻ STOI, A POZYCJI W PUDLE NIE MA (0.484.7). Wtedy „oceń ją na
          stan" odsyłało do ruchu, który przed chwilą dał ten sam wynik:
          `dolozDoKosza` znowu zwróci `null` z tego samego powodu. Zdanie mówi
          więc powód — ten sam, który zatrzymał dołożenie. */
@@ -875,7 +875,7 @@ export function zaznaczSkladnik(
          ten sam skutek kosztowałyby pytanie, czym się różnią. */
       if (stoi.length === wiersze.length) {
         /* Cofnięcie oceny odmawia na zwrocie z korektą (`podKlucz`) — wtedy
-           zdanie musi nazwać krok, który je odblokowuje (0.484.6). */
+           zdanie musi nazwać krok, który je odblokowuje (0.484.7). */
         const zam = database.prepare(`SELECT z.zamkniety_at FROM zwrot_klienta z
           JOIN zwrot_klienta_pozycja p ON p.zwrot_id = z.id WHERE p.id=?`).get(pozycjaId) as
           { zamkniety_at: string | null } | undefined;
@@ -1019,7 +1019,7 @@ function uniewaznijZadanieMm(
   const z = database.prepare("SELECT status FROM sfera_queue WHERE id=?")
     .get(k.mm_queue_id) as { status: string } | undefined;
   const stan = String(z?.status ?? "");
-  /* `done` to NIE „w toku" (0.484.6): dokument już stoi, więc czekanie nic
+  /* `done` to NIE „w toku" (0.484.7): dokument już stoi, więc czekanie nic
      nie da — zawartości po MM się nie poprawia. */
   if (stan === "done") {
     throw new Error(

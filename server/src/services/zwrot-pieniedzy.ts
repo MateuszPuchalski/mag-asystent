@@ -303,7 +303,7 @@ export function stanZwrotuPieniedzy(
   }
   if (!w.platnosc_id) {
     return { ...podstawa, moznaZwrocic: false, moznaOdmowic,
-      /* „Dociągnij" TYLKO, gdy zamówienia nie ma (0.484.6). Dociąganie pobiera
+      /* „Dociągnij" TYLKO, gdy zamówienia nie ma (0.484.7). Dociąganie pobiera
          zamówienia BRAKUJĄCE; wiersz bez płatności stoi i przycisk nic by nie
          zmienił. Wtedy działa już tylko panel Allegro. */
       powod: w.zamowienie_wiersz == null
@@ -329,7 +329,7 @@ export function stanZwrotuPieniedzy(
     return { ...podstawa, moznaZwrocic: false, moznaOdmowic,
       powod: `Nie wiem, której pozycji zamówienia dotyczy: ${bezPozycji.join(", ")}. `
         /* Zamówienie tu STOI (jest płatność), więc „dociągnij" nic by nie
-           zmieniło (0.484.6) — zostaje droga, która działa. */
+           zmieniło (0.484.7) — zostaje droga, która działa. */
         + "Oddaj pieniądze w panelu Allegro." };
   }
   /* Kwota jest migawką z chwili zaznaczenia (`kwotaRozjechana` w `zwroty.ts`).
