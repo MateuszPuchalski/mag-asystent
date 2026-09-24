@@ -30,10 +30,22 @@
 export function pasujeDoFrazy(kody: string[], fraza: string): boolean {
   const czlony = rozbij(fraza);
   if (!czlony.length) return true;
-  return czlony.every((c) => kody.some((k) => k.includes(c)));
+  const zlozone = kody.map(zloz);
+  return czlony.every((c) => zlozone.some((k) => k.includes(c)));
 }
 
-/** Człony frazy, małymi literami, bez pustych. Pusta fraza to pusta lista. */
+/** Człony frazy, małymi literami i bez ogonków, bez pustych. Pusta fraza to pusta lista. */
 export function rozbij(fraza: string): string[] {
-  return fraza.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  return zloz(fraza.trim()).split(/\s+/).filter(Boolean);
 }
+
+/* ── OGONKI NIE DZIELĄ (0.484.9) ─────────────────────────────────────────────
+   Od kiedy w szukaniu zwrotów stoją nazwy towarów, „gaznik" musi trafiać
+   w „Gaźnik" — magazynier wpisuje z klawiatury bez polskich znaków, a nazwy
+   z Allegro je mają. Ta sama mapa co po stronie serwera (`server/src/tekst.ts`):
+   jawna, bo `ł` nie ma rozkładu kanonicznego i NFD by go przepuściło. Działa
+   na obie strony porównania, więc reklamacje i dyskusje zyskują to samo. */
+const LITERY: Record<string, string> = {
+  ą: "a", ć: "c", ę: "e", ł: "l", ń: "n", ó: "o", ś: "s", ź: "z", ż: "z",
+};
+const zloz = (s: string) => s.toLowerCase().replace(/[ąćęłńóśźż]/g, (z) => LITERY[z]!);

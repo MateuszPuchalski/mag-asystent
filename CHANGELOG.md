@@ -34,6 +34,18 @@ historii nie przepisujemy.
 ---
 
 
+## 0.484.9 — 24 września 2026
+
+**Zwroty szuka się także po produkcie.** Zgłoszenie właściciela: „powinienem
+móc wyszukiwać zwroty po produkcie”. Pole szukania nad kolejką sprawdza teraz
+też nazwę towaru, symbol kartoteki, SKU i EAN każdej pozycji. Każde słowo
+trafia w któreś pole, więc „kowalski gaźnik” zawęża do zwrotu tego klienta
+z tym towarem.
+
+Szukanie pomija polskie znaki: „gaznik” trafia w „Gaźnik”, „lopata”
+w „Łopata”. Zmiana siedzi we wspólnym pomocniku, więc reklamacje i dyskusje
+dostają to samo.
+
 ## 0.484.8 — 24 września 2026
 
 **Nagłówek zwrotu mówi więcej o kliencie, a rozmowę o zwrocie widać od razu.**
