@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle, Barcode, ChevronRight, CircleCheck, Inbox, ListChecks, MessageSquareReply,
-  MessagesSquare, Package, PlugZap, ShieldQuestion, Truck, Undo2,
+  FlaskConical, MessagesSquare, Package, PlugZap, ShieldQuestion, Truck, Undo2,
 } from "lucide-react";
 import { useDoDecyzji, type Obszar, type PozycjaDecyzji, type ZrodloDecyzji } from "../api/decyzje";
 import { Blad, FiltrSegmentowy, Karta, Pusto, wiek } from "../ui";
@@ -26,13 +26,13 @@ import { Wzmianki } from "./Wzmianki";
 const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; className?: string }>> = {
   dostawy: Truck, odpowiedzi: MessageSquareReply, kosze: Package, zapisy: AlertTriangle,
   kody: Barcode, allegro: PlugZap, reklamacje: ShieldQuestion, zwroty: Undo2,
-  skrzynka: Inbox, dyskusje: MessagesSquare,
+  skrzynka: Inbox, dyskusje: MessagesSquare, sonda: FlaskConical,
 };
 
 const NAZWY: Record<ZrodloDecyzji, string> = {
   dostawy: "Dostawy", odpowiedzi: "Odpowiedź z hali", kosze: "Kosze", zapisy: "Zapis do Subiekta",
   kody: "Kody kreskowe", allegro: "Konto Allegro", reklamacje: "Reklamacje", zwroty: "Zwroty",
-  skrzynka: "Skrzynka", dyskusje: "Dyskusje",
+  skrzynka: "Skrzynka", dyskusje: "Dyskusje", sonda: "Test na żywo",
 };
 
 type Filtr = "wszystko" | Obszar;

@@ -5,6 +5,13 @@ import { odpowiedziNieprzeczytane } from "./notatki.js";
 import { listaKoszy, pominietePozycje } from "./kosze.js";
 import { eanConflictReport } from "./ean.js";
 import { stanPolaczenia } from "./allegro-token.js";
+import { stanSondy, type KrokSondy } from "./sonda-rzeczywistosci.js";
+
+/** Nazwy kroków testu na żywo — te same słowa co karta na ekranie Stan. */
+const NAZWA_KROKU: Record<KrokSondy, string> = {
+  watki: "wątki skrzynki", sprawa: "sprawa posprzedażowa", zdjecie_rozmowy: "zdjęcie z rozmowy",
+  zdjecie_reklamacji: "zdjęcie ze sprawy", zdjecia_copilota: "zdjęcia w szkicach z doby",
+};
 import { listaZwrotow } from "./zwroty.js";
 import { listaReklamacji, progKolejki } from "./reklamacje.js";
 import { listaDyskusji } from "./dyskusje.js";
@@ -41,7 +48,7 @@ export type Obszar = "magazyn" | "obsluga";
 
 export type ZrodloDecyzji =
   | "dostawy" | "odpowiedzi" | "kosze" | "zapisy" | "kody" | "allegro"
-  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje";
+  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda";
 
 /**
  * Dokąd prowadzi wiersz — adres w panelu. Do 0.441.0 był tu też wariant
@@ -238,6 +245,27 @@ function kontoAllegro(): PozycjaDecyzji[] {
   }];
 }
 
+/**
+ * Test na żywym Allegro (@wydanie): ostatni przebieg ma krok z błędem.
+ *
+ * Droga produkcji nie działa, a nikt by tego nie zauważył — tak przez 150
+ * wydań nie działały zdjęcia Copilota. Nie „pilne”: to nie termin wobec
+ * klienta, tylko wiadomość, że coś działa inaczej, niż zakłada kod.
+ */
+function sonda(): PozycjaDecyzji[] {
+  const s = stanSondy();
+  const zle = s.kroki.filter((k) => k.wynik === "blad");
+  if (!s.przebieg || zle.length === 0) return [];
+  return [{
+    klucz: "sonda", obszar: "obsluga", zrodlo: "sonda",
+    pytanie: "Sprawdzić, co nie działa na żywym Allegro",
+    co: `${zle.length} z ${s.kroki.length} kroków testu nie przeszło: ${zle.map((k) => NAZWA_KROKU[k.krok]).join(", ")}`,
+    od: s.przebieg,
+    pilne: false,
+    cel: { panel: "/obsluga/stan?karta=sonda" },
+  }];
+}
+
 /* ── OBSŁUGA KLIENTA ────────────────────────────────────────────────────── */
 
 function kolejkiKlienta(teraz: number): PozycjaDecyzji[] {
@@ -311,7 +339,7 @@ function kolejkiKlienta(teraz: number): PozycjaDecyzji[] {
 export function doDecyzji(teraz = Date.now()): DoDecyzji {
   const pozycje = [
     ...kontoAllegro(), ...zapisyWBledzie(), ...dostawyZWyjatkiem(), ...odpowiedziHali(),
-    ...kosze(), ...kodyKreskowe(), ...kolejkiKlienta(teraz),
+    ...kosze(), ...kodyKreskowe(), ...kolejkiKlienta(teraz), ...sonda(),
   ].sort((a, b) =>
     Number(b.pilne) - Number(a.pilne)
     || Number(a.od == null) - Number(b.od == null)

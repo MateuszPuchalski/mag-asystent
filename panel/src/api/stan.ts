@@ -214,3 +214,32 @@ export function useArkuszLokalizacji() {
     onSuccess: (_r, x) => { if (x.zastosuj) qc.invalidateQueries({ queryKey: ["kolejkaSfery"] }); },
   });
 }
+
+/* ── Test na żywym Allegro (@wydanie) ─────────────────────────────────────
+   Wzór typu obok serwisu: `services/sonda-rzeczywistosci.ts`. Otwarcie
+   karty CZYTA ostatni przebieg; nowy biegnie wyłącznie na kliknięcie albo
+   raz dziennie w takcie serwera. */
+export type KrokSondy = "watki" | "sprawa" | "zdjecie_rozmowy" | "zdjecie_reklamacji" | "zdjecia_copilota";
+export interface WynikSondy {
+  krok: KrokSondy; wynik: "ok" | "blad" | "pominiety"; szczegol: string | null; ms: number;
+}
+export interface StanSondy { przebieg: string | null; kroki: WynikSondy[] }
+
+export function useSonda() {
+  return useQuery({
+    queryKey: ["stan", "sonda"],
+    queryFn: () => api<StanSondy>("/api/biuro/sonda-rzeczywistosci"),
+  });
+}
+
+export function useSondujTeraz() {
+  const qc = useQueryClient();
+  return useMutation({
+    /* Bez ciała — reguła klienta HTTP z CLAUDE.md. */
+    mutationFn: () => api<StanSondy>("/api/biuro/sonda-rzeczywistosci", { method: "POST" }),
+    onSettled: () => {
+      void qc.invalidateQueries({ queryKey: ["stan", "sonda"] });
+      void qc.invalidateQueries({ queryKey: ["do-decyzji"] });
+    },
+  });
+}
