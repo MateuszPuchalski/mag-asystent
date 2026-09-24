@@ -57,7 +57,8 @@ sprawdza, to specyfikacja i `npm run sonda` na żywym koncie.
 12-PW  13-RW   14-ZW   15-ZD   16-ZK   21-PA   29-IW  35-ZPZ 36-ZWZ
 ```
 
-Stąd domyślne w `config.ts`: `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10`.
+Stąd stałe w `config.ts`: FZ = 1, PZ = 10. Do 0.489.0 były to klucze
+`DOK_TYP_FZ` i `DOK_TYP_PZ`.
 
 > **Uwaga historyczna.** WERTIS miał wcześniej `DOK_TYP_PZ=5`, a 5 to **KFZ —
 > korekta faktury zakupu**. Na prawdziwej bazie aplikacja listowałaby korekty
@@ -152,8 +153,8 @@ którego nie używa do niczego innego — worker nadpisuje je bezwarunkowo.
 5..8-zamówienia (różne stany realizacji)
 ```
 
-Dokument „w buforze" to **odłożony (3)**. Domyślne `MSSQL_BUFFER_EXPR` sprawdza
-więc `dok_Status = 3`.
+Dokument „w buforze" to **odłożony (3)**. Stałe wyrażenie bufora (do 0.489.0
+klucz `MSSQL_BUFFER_EXPR`) sprawdza więc `dok_Status = 3`.
 
 > **Uwaga historyczna.** Wcześniej domyślne wyrażenie sprawdzało `= 0`, czyli
 > **wycofany**. Myliło się w obie strony: dokument wycofany pokazywałby się jako

@@ -34,6 +34,33 @@ historii nie przepisujemy.
 ---
 
 
+## 0.489.0 — 24 września 2026
+
+**Dziewiętnaście kluczy `wertis.env` przestało być kluczami.** Zostało 117.
+Znikają trzy rodzaje, każdy z własnego powodu:
+
+- **Stałe ze struktury bazy:** sześć kodów `DOK_TYP_*` (FZ, PZ, ZD, FS, PA,
+  MM) i `MSSQL_BUFFER_EXPR`. Nie zależą od podmiotu, więc wpis mógł je tylko
+  zepsuć. Wyrażenie bufora było do tego surowym SQL-em z pliku ustawień.
+- **Pokrętła pamięci podręcznej zdjęć:** pięć `ALLEGRO_ZDJECIA_*` oraz
+  `ZDJECIA_CACHE_MB`, `ZDJECIA_TTL_H`, `ZDJECIA_BRAK_TTL_H` i
+  `ZDJECIA_BLAD_TTL_MIN`. Żaden dokument ich nie opisywał i nikt ich nie
+  ustawiał.
+- **Rytmy taktów:** `COPILOT_AUTO_MS`, `COPILOT_AUTO_KLASYFIKACJA_MS`
+  i `WIEDZA_AUTOMAT_MS`. Koszt hamują limity na przebieg i na godzinę, a te
+  zostają.
+
+Wartości się nie zmieniają; stoją teraz w kodzie. Gwarancja „pamięć braku
+zdjęcia krótsza niż doba" przeszła z odmowy startu do testu stałej.
+
+**[wymaga działania, gdy ktoś je ustawił]** Wpis, który został w
+`wertis.env`, `/api/health` zgłasza jako nieznany klucz. Usuń go i zrestartuj
+usługi. Działania nie zmienia: serwer już go nie czyta.
+
+`wertis.env.example` dostał na początku przewodnik po trzech rodzajach
+kluczy. Test pilnuje, że plik opisuje wyłącznie klucze z rejestru i każdy
+klucz instalatora i właściciela.
+
 ## 0.488.0 — 24 września 2026
 
 **Konfiguracja serwera widoczna w panelu.** Pytanie „na czym ten serwer

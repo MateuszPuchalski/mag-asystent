@@ -48,9 +48,9 @@ test("zdejmuje cudzysłowy, zachowuje spacje w środku", () => {
 });
 
 test("wartość może zawierać znak równości", () => {
-  // MSSQL_BUFFER_EXPR to surowy SQL: CASE WHEN d.dok_Status = 3 THEN 1 ELSE 0 END
-  const v = parseEnvFile('export MSSQL_BUFFER_EXPR="CASE WHEN d.dok_Status = 3 THEN 1 ELSE 0 END"');
-  assert.equal(v.MSSQL_BUFFER_EXPR, "CASE WHEN d.dok_Status = 3 THEN 1 ELSE 0 END");
+  // hasło bywa wygenerowane z `=` w środku, a wzorzec adresu Allegro ma `?a=b`
+  const v = parseEnvFile('export ALLEGRO_PANEL_ZWROT="https://a.pl/zwroty?from={od}&search={id}"');
+  assert.equal(v.ALLEGRO_PANEL_ZWROT, "https://a.pl/zwroty?from={od}&search={id}");
 });
 
 test("pomija puste linie, komentarze i śmieci", () => {

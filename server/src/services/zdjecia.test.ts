@@ -18,8 +18,6 @@ process.env.DB_PATH = path.join(katalog, "t.db");
 process.env.ZDJECIA_ZRODLO = "plik";
 process.env.ZDJECIA_KATALOG = path.join(katalog, "zrodlo");
 process.env.ZDJECIA_MAX_KB = "64";
-process.env.ZDJECIA_TTL_H = "168";
-process.env.ZDJECIA_BLAD_TTL_MIN = "5";
 
 let db: typeof import("../db/db.js").db;
 let Z: typeof import("./zdjecia.js");

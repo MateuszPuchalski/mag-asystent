@@ -72,3 +72,19 @@ test("klucz spoza rejestru zgłasza się jako literówka, znany milczy", () => {
   assert.ok(z?.includes("ALEGRO_CLIENT_ID"), String(z));
   assert.ok(z?.includes("literówka"), String(z));
 });
+
+test("wertis.env.example opisuje klucze z rejestru i tylko je", () => {
+  /* Plik przykładowy jest instrukcją dla człowieka przy serwerze. Klucz, który
+     zniknął z kodu, a został w pliku, uczy wpisywać coś, co nic nie robi;
+     klucz instalatora albo właściciela bez wpisu nie ma gdzie mieć opisu. */
+  const t = fs.readFileSync(path.join(KORZEN, "wertis.env.example"), "utf8");
+  const wPliku = new Set([
+    ...[...t.matchAll(/^#?\s*(?:export\s+)?([A-Z][A-Z0-9_]+)=/gm)].map((m) => m[1]!),
+    ...[...t.matchAll(/\bexport\s+([A-Z][A-Z0-9_]+)=/g)].map((m) => m[1]!),
+  ]);
+  const znane = new Set(KLUCZE.map((k) => k.klucz));
+  assert.deepEqual([...wPliku].filter((k) => !znane.has(k)).sort(), [], "klucze w pliku, których nikt nie czyta");
+  const brak = KLUCZE.filter((k) => (k.kto === "instalator" || k.kto === "wlasciciel") && !wPliku.has(k.klucz))
+    .map((k) => k.klucz);
+  assert.deepEqual(brak, [], "klucze instalatora i właściciela bez wpisu w wertis.env.example");
+});

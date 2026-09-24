@@ -985,9 +985,9 @@ wyszukiwanie, kartę towaru, rozkładanie. Zero ryzyka.
    którą ma firma. Patrz
    [`docs/subiekt-gt-struktura.md`](docs/subiekt-gt-struktura.md).
 
-   Domyślne w `config.ts` są z niego wzięte i nie trzeba ich ustalać:
-   `DOK_TYP_FZ=1`, `DOK_TYP_PZ=10` (PZ, **nie** 5 = KFZ), bufor =
-   `dok_Status = 3` (odłożony).
+   Stałe w `config.ts` są z niego wzięte i nie trzeba ich ustalać: typ FZ = 1,
+   PZ = 10 (**nie** 5 = KFZ), bufor = `dok_Status = 3` (odłożony). Od 0.489.0
+   nie są kluczami `wertis.env`, bo wpis mógł je tylko zepsuć.
 
    Do ustalenia na własnej bazie zostają **trzy** rzeczy. Ta sekcja mówi,
    **co i po co**. Zapytania, odczyt wyniku i skutki pomyłki opisuje rozdział
@@ -1129,8 +1129,8 @@ razem z nagłówkiem. Karta zwrotu Allegro, która korzystała z tego od 0.72.0,
 odeszła w 0.140.0.
 
 **Zdjęcie dodane w Subiekcie pojawia się z opóźnieniem** i to jest projektowe.
-Serwer pamięta „ta kartoteka zdjęcia nie ma" przez `ZDJECIA_BRAK_TTL_H`
-(12 godzin), a kolektor przez dobę. Inaczej setki kartotek bez zdjęcia
+Serwer pamięta „ta kartoteka zdjęcia nie ma" przez 12 godzin, a kolektor
+przez dobę. Inaczej setki kartotek bez zdjęcia
 odpytywałyby bazę przy każdym otwarciu karty. Najdalej nazajutrz obraz jest na
 ekranie. Gdy trzeba szybciej — na przykład przy sprawdzaniu, czy wdrożenie
 zadziałało — wymuś ponowne pytanie:
@@ -1331,7 +1331,8 @@ jest wtedy pusta, a `/api/health` niesie zdanie o przyczynie.
 | ustawienie | domyślnie | co ustala |
 |---|---|---|
 | `MM_ZWROTY_DNI_WSTECZ` | `30` | okno importu przesunięć na regał zwrotów — tyle, ile filtr w Subiekcie |
-| `DOK_TYP_MM` | `9` | typ dokumentu przesunięcia międzymagazynowego |
+
+Typ dokumentu MM (`9`) jest stałą ze struktury bazy, a nie ustawieniem.
 
 Gdy kosz na kolektorze pokazuje **0 pozycji**, odpowiedź stoi w `/api/health`.
 `lastSync.mm` i `lastSync.mmPozycje` mówią, ile dokumentów i ile ich pozycji
@@ -2653,6 +2654,13 @@ i zobacz, czy plakietka stanęła w kolejce. Potem zerknij na kartę pomiaru:
 udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
+
+### Aktualizacja do 0.489.0 — mniej kluczy w `wertis.env`
+
+Dziewiętnaście kluczy stało się stałymi w kodzie; lista stoi w CHANGELOG.
+Jeśli któryś z nich jest w Twoim `wertis.env`, `/api/health` nazwie go
+nieznanym kluczem. Usuń wpis i zrestartuj usługi. Serwer i tak go już nie
+czyta, więc do tego czasu nic się nie psuje.
 
 ### Aktualizacja do 0.488.0 — konfiguracja widoczna w panelu
 
