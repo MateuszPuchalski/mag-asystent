@@ -47,6 +47,22 @@ const KONFIGURACJA = {
       tajny: true, zrodlo: "plik", wartosc: null, edycja: { rodzaj: "tekst" } },
   ],
 };
+/* Dwa wydania z paczką; nowsze wymaga działania poza przyciskiem. */
+let AKTUALIZACJA: Record<string, unknown>;
+const AKTUALIZACJA_WZOR = {
+  obecna: "0.492.0", sprawdzono: "2026-09-24T08:00:00.000Z", bladSprawdzenia: null,
+  wydania: [
+    { wersja: "0.494.0", opublikowano: "2026-09-25T10:00:00Z", maPaczke: true },
+    { wersja: "0.493.0", opublikowano: "2026-09-24T12:00:00Z", maPaczke: true },
+  ],
+  zmiany: [
+    { wersja: "0.494.0", tytul: "0.494.0 — 25 września 2026", tresc: "Nowy port kolektora.", wymagaDzialania: true },
+    { wersja: "0.493.0", tytul: "0.493.0 — 24 września 2026", tresc: "Poprawka zwrotów.", wymagaDzialania: false },
+  ],
+  ostatnia: { etap: "gotowe", wersja: "0.492.0", kto: "Anna", od: "2026-09-24T07:00:00.000Z", do: "2026-09-24T07:03:00.000Z" },
+  czekaZlecenie: false,
+  blokada: null,
+};
 let rola = "admin";
 let firmaNaSerwerze: { dane: Record<string, string>; zmieniono: { at: string; przez: string } | null };
 
@@ -54,6 +70,7 @@ const PUSTA_FIRMA = { nazwa: "", nip: "", adres: "", miejscowosc: "", osoba: "",
 
 beforeEach(() => {
   wyslane = []; odczyty = []; rola = "admin";
+  AKTUALIZACJA = { ...AKTUALIZACJA_WZOR };
   firmaNaSerwerze = { dane: { ...PUSTA_FIRMA }, zmieniono: null };
   localStorage.clear();
   /* Pamięć obrazów jest modułowa i żyje między testami. */
@@ -74,6 +91,8 @@ beforeEach(() => {
       if (url === "/api/biuro/konfiguracja") {
         return odp({ ok: true, klucz: JSON.parse(init!.body as string).klucz, restart: "reczny" });
       }
+      if (url === "/api/biuro/aktualizacja/sprawdz") return odp(AKTUALIZACJA);
+      if (url === "/api/biuro/aktualizacja") return odp({ ok: true, wersja: JSON.parse(init!.body as string).wersja });
       if (url === "/api/users") {
         const b = JSON.parse(init!.body as string);
         return odp({ user: { userId: 9, login: b.login, name: b.name, role: b.role, active: true, maHaslo: true } });
@@ -83,6 +102,7 @@ beforeEach(() => {
     odczyty.push(url);
     if (url === "/api/auth/me") return odp({ user: { userId: 1, name: "Anna", role: rola } });
     if (url === "/api/biuro/konfiguracja") return odp(KONFIGURACJA);
+    if (url === "/api/biuro/aktualizacja") return odp(AKTUALIZACJA);
     if (url === "/api/biuro/firma") return odp(firmaNaSerwerze);
     if (url === "/api/biuro/strefa") return odp({ reguly: [{ alejka: "A", od: "", do: "", poziomy: "2,3" }] });
     if (url === "/api/users") return odp({ users: [
@@ -126,7 +146,7 @@ describe("Ustawienia w panelu", () => {
     /* Karty w kolejności makiety. */
     const tytuly = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(tytuly).toEqual(["Dane firmy do protokołów", "Reguły strefy złotej", "Konta i sesje", "Logo dostawców",
-      "Konfiguracja serwera"]);
+      "Konfiguracja serwera", "Aktualizacja serwera"]);
   });
 
   it("przeniesienie z przeglądarki: tylko przy pustym serwerze, jednym kliknięciem", async () => {
@@ -226,12 +246,77 @@ describe("Ustawienia w panelu", () => {
     expect(within(wiersz).getByRole("button", { name: "Zapisz" })).toBeDisabled();
   });
 
+  it("aktualizacja: zmiany przed decyzją, bez hasła i odhaczenia nie ruszy", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    expect(await within(k).findByText("Nowy port kolektora.")).toBeInTheDocument();
+    expect(within(k).getByText("Poprawka zwrotów.")).toBeInTheDocument();
+    const przycisk = within(k).getByRole("button", { name: "Zaktualizuj do 0.494.0" });
+    expect(przycisk).toBeDisabled();
+    await userEvent.type(within(k).getByLabelText("Twoje hasło"), "tajne");
+    /* „wymaga działania" w zmianach — hasło nie wystarcza. */
+    expect(przycisk).toBeDisabled();
+    await userEvent.click(within(k).getByLabelText(/co wymaga działania/));
+    expect(wyslane).toEqual([]);
+    await userEvent.click(przycisk);
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0]).toMatchObject({ metoda: "POST", url: "/api/biuro/aktualizacja", typ: "application/json" });
+    expect(JSON.parse(wyslane[0].body!)).toEqual({ wersja: "0.494.0", haslo: "tajne" });
+  });
+
+  it("aktualizacja do starszego wydania: zmiany ucięte, odhaczenie niepotrzebne", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    await userEvent.selectOptions(await within(k).findByLabelText("Wersja docelowa"), "0.493.0");
+    expect(within(k).queryByText("Nowy port kolektora.")).toBeNull();
+    expect(within(k).queryByLabelText(/co wymaga działania/)).toBeNull();
+    await userEvent.type(within(k).getByLabelText("Twoje hasło"), "tajne");
+    expect(within(k).getByRole("button", { name: "Zaktualizuj do 0.493.0" })).toBeEnabled();
+  });
+
+  it("sprawdź teraz: POST bez ciała i bez typu treści", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    await within(k).findByText("Poprawka zwrotów.");
+    await userEvent.click(within(k).getByRole("button", { name: /Sprawdź teraz/ }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0]).toEqual({ metoda: "POST", url: "/api/biuro/aktualizacja/sprawdz", body: undefined, typ: undefined });
+  });
+
+  it("blokada serwera: zdanie zamiast działającego przycisku", async () => {
+    AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, blokada: "Aktualizacja z panelu działa na serwerze uruchomionym jako usługa Windows." };
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    expect(await within(k).findByText(/jako usługa Windows/)).toBeInTheDocument();
+    await userEvent.type(within(k).getByLabelText("Twoje hasło"), "tajne");
+    await userEvent.click(within(k).getByLabelText(/co wymaga działania/));
+    expect(within(k).getByRole("button", { name: "Zaktualizuj do 0.494.0" })).toBeDisabled();
+  });
+
+  it("najnowsza wersja: bez formularza", async () => {
+    AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, wydania: [], zmiany: [] };
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    expect(await within(k).findByText("To najnowsza wersja.")).toBeInTheDocument();
+    expect(within(k).queryByLabelText("Twoje hasło")).toBeNull();
+  });
+
+  it("przed pierwszym sprawdzeniem nie twierdzi, że to najnowsza wersja", async () => {
+    AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, sprawdzono: null, wydania: [], zmiany: [] };
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    expect(await within(k).findByText(/jeszcze nie sprawdzał wydań/)).toBeInTheDocument();
+    expect(within(k).queryByText("To najnowsza wersja.")).toBeNull();
+  });
+
   it("biuro nie widzi konfiguracji i nawet o nią nie pyta", async () => {
     rola = "biuro";
     pokaz();
     await screen.findByText("Jan Wrona");
     expect(screen.queryByRole("heading", { name: "Konfiguracja serwera" })).toBeNull();
     expect(odczyty).not.toContain("/api/biuro/konfiguracja");
+    expect(screen.queryByRole("heading", { name: "Aktualizacja serwera" })).toBeNull();
+    expect(odczyty).not.toContain("/api/biuro/aktualizacja");
   });
 
   it("biuro widzi konta bez przycisków, które serwer by odrzucił — zostaje tylko dodanie osoby", async () => {

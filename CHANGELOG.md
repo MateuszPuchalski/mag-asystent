@@ -34,6 +34,38 @@ historii nie przepisujemy.
 ---
 
 
+## 0.492.0 — 24 września 2026
+
+**Aktualizacja serwera przyciskiem w panelu.** Ustawienia → „Aktualizacja
+serwera": lista nowszych wydań, zmiany z tego dziennika, hasło i jeden
+przycisk. Widzi ją tylko admin. Pod spodem instalator wgrywa gotową paczkę
+wydania z 0.491.2 — bez Gita, bez `npm ci` i bez kompilacji na serwerze.
+
+- **Serwer tylko zleca.** Zapisuje zlecenie i uruchamia zadanie Harmonogramu
+  „WERTIS aktualizacja". Zadanie działa jako SYSTEM, poza usługą, którą
+  aktualizacja zatrzymuje.
+- **Podmiana katalogów, nie plików.** Nowa wersja rozpakowuje się obok,
+  przy działającym serwerze. Usługi stoją tylko na czas zamiany nazw i próby
+  zdrowia.
+- **Nieudana wraca sama.** Serwer, który nie wstał, oddaje miejsce poprzedniej
+  wersji. Baza wraca z kopii sprzed migracji. Zdrowie pokazuje porażkę przez
+  dobę, a dziennik biura oba wyniki.
+- **Ponowne hasło i odhaczenie.** Zalogowany admin podaje hasło jeszcze raz.
+  Wydanie z pozycją „[wymaga działania]" czeka dodatkowo na odhaczenie.
+- **Instalator z paczki:** `-Aktualizuj -Paczka najnowsza` (albo numer, albo
+  ścieżka ZIP-a z sumą obok). Pełna instalacja z rozpakowanej paczki pomija
+  klonowanie i budowanie.
+- **Próba na prawdziwym Windowsie w CI** (`proba-podmiany.ps1`): przeniesienie
+  danych, dowiązanie, zamiana, wycofanie z bazą i dwie kolejne aktualizacje.
+  Sprzątanie starej wersji zdejmuje najpierw dowiązanie danych. Windows
+  PowerShell 5.1 potrafi przy kasowaniu wejść w dowiązanie i usunąć bazę.
+
+**[wymaga działania]** Uruchom raz `-Aktualizuj -Paczka najnowsza` jako
+administrator. To zakłada zadanie Harmonogramu — bez niego przycisk odpowiada,
+że zadania nie ma. Pierwsza aktualizacja z paczki przenosi `server\data` do
+`C:\wertis-dane` i zostawia w starym miejscu dowiązanie. Stary katalog
+z Gitem zostaje obok jako `C:\wertis.poprzednia`. Szczegóły w DEPLOY §0b.
+
 ## 0.491.2 — 24 września 2026
 
 **Paczka wydania budowana w CI.** Do tej pory aktualizacja budowała
