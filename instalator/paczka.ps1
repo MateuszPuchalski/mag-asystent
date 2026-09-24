@@ -270,6 +270,15 @@ function Move-WertisDaneNaZewnatrz {
     $dane = Join-Path $Katalog "server\data"
     $cel = Get-WertisKatalogDanych -Katalog $Katalog
     if (Test-WertisDowiazanie -Sciezka $dane) { return }
+    # Ponowna instalacja po awarii (@wydanie): aplikacji nie ma, dane zostały.
+    # Podpinamy je, zamiast zaczynać od pustej bazy.
+    if (-not (Test-Path -LiteralPath $dane) -and (Test-Path -LiteralPath $cel)) {
+        if (Test-DryRun "Podpiąłbym istniejące dane z $cel.") { return }
+        Zapewnij-Katalog (Split-Path $dane)
+        New-Item -ItemType Junction -Path $dane -Target $cel | Out-Null
+        Write-Ok "Dane z $cel podpięte — baza i zdjęcia sprzed reinstalacji zostają."
+        return
+    }
     if (Test-Path -LiteralPath $cel) {
         throw "Katalog $cel już istnieje, a $dane jest zwykłym katalogiem. Nie wiem, które dane są prawdziwe — rozstrzygnij ręcznie."
     }
@@ -281,6 +290,29 @@ function Move-WertisDaneNaZewnatrz {
     }
     New-Item -ItemType Junction -Path $dane -Target $cel | Out-Null
     Write-Ok "Dane aplikacji mieszkają odtąd w $cel (dowiązanie: $dane)."
+}
+
+function Get-WertisNodeAplikacji {
+    <#
+        .SYNOPSIS
+        node.exe dla usług: z paczki (`<katalog>\node`), gdy jest, inaczej z PATH.
+        .DESCRIPTION
+        Paczka od @wydanie niesie Node. Instalacja z Gita go nie ma i chodzi na
+        Nodzie systemowym, jak dotąd. W przebiegu próbnym zwraca samą nazwę.
+    #>
+    param([Parameter(Mandatory)][string]$Katalog)
+    $zPaczki = Join-Path $Katalog "node\node.exe"
+    if (Test-Path -LiteralPath $zPaczki) { return $zPaczki }
+    if ($script:WertisDryRun) { return "node.exe" }
+    $c = Get-Command node -ErrorAction SilentlyContinue
+    return $(if ($c) { $c.Source } else { "node.exe" })
+}
+
+function Get-WertisNpm {
+    <# .SYNOPSIS npm z paczki, gdy jest — bez Noda systemowego `npm` nie istnieje w PATH. #>
+    param([Parameter(Mandatory)][string]$Katalog)
+    $zPaczki = Join-Path $Katalog "node\npm.cmd"
+    return $(if (Test-Path -LiteralPath $zPaczki) { $zPaczki } else { "npm" })
 }
 
 function Stop-WertisUslugi {

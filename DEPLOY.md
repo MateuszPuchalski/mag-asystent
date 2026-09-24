@@ -30,8 +30,9 @@ Maszyna z Subiektem GT (Windows)
 Rozdziały 1–4 i checklistę z §6 wykonuje za Ciebie
 [**instalator dla Windows**](instalator/README.md): pobierz
 `WERTIS-Instalator.exe` z [wydań](https://github.com/MateuszPuchalski/mag-asystent/releases)
-i uruchom jako administrator. Stawia Node i Gita, buduje aplikację, rejestruje
-obie usługi, otwiera port, wypełnia `wertis.env` **odpytując bazę Subiekta**
+i uruchom jako administrator. Pobiera paczkę wydania z Nodem w środku. Od
+@wydanie nie instaluje Gita i niczego nie buduje na serwerze. Rejestruje obie
+usługi, otwiera port, wypełnia `wertis.env` **odpytując bazę Subiekta**
 i zakłada konto SQL o minimalnych uprawnieniach.
 
 Trzy rzeczy robi lepiej niż ręczna droga, i to jest jego właściwy powód:
@@ -107,6 +108,12 @@ organizacji.
    write** oraz **Pull requests: Read and write**.
 3. Repozytorium → Settings → Secrets and variables → Actions → **New repository
    secret**, nazwa `ODSWIEZANIE_TOKEN`, wartość: token z punktu 1.
+
+**Ten sam token włącza auto-scalanie** (od @wydanie, `auto-scalanie.yml`).
+GitHub scala w imieniu tego, kto auto-scalanie włączył. Włączone tokenem
+workflowu dawało scalenie jako bot Actions, a taki push nie uruchamia na
+`main` niczego — ani wydania, ani APK. Bez sekretu scalenie działa, ale
+wydanie trzeba uruchomić ręcznie (Actions → Wydanie → Run workflow).
 
 Zwykłym tokenem workflowu (`github.token`) tego się nie zrobi. Push zrobiony
 nim nie uruchamia CI, więc odświeżona gałąź nie dostałaby wymaganych checków. Bez
@@ -880,9 +887,9 @@ także wtedy, gdy sesji nie ma.
 > urządzenie w sieci hali mogło zmienić lokalizację w Subiekcie albo pobrać
 > raport wydajności per pracownik. Podpisywało operację dowolnym nazwiskiem.
 
-**1. Zwykle konto admina zakłada już INSTALATOR.** Pyta o login i hasło zaraz
-po starcie usług. Ten punkt dotyczy więc instalacji stawianej ręcznie albo
-serwera, na którym instalator tego kroku nie wykonał.
+**1. Konto admina zakłada się w PANELU** (od @wydanie). Pusta instalacja
+pokazuje pod `/obsluga/` formularz pierwszego konta zamiast logowania. Poniższa
+droga przez kolektor działa dalej.
 
 **Załóż konta z KOLEKTORA — bez terminala.** Po instalacji APK i ustawieniu
 adresu serwera aplikacja sama sprawdza, czy instalacja jest pusta. Jeśli tak,
@@ -955,7 +962,7 @@ ją wykonać bez zastanawiania się — nie po to, żeby zostało w firmie.
 
 **Żadnych domyślnych haseł i żadnych domyślnych kont.** Ta reguła nie była
 dotąd nigdzie zapisana, choć kod trzymał się jej od początku. Instalator losuje
-hasło konta SQL i **pyta o hasło admina zamiast je wymyślać**. Kreator nie
+hasło konta SQL, a hasło admina **wpisuje człowiek w panelu**. Kreator nie
 pokazuje haseł ani razu, a konto bez hasła nie zaloguje się nigdy. Nawet
 `npm run seed` losuje hasło admina i pokazuje je raz, zamiast wpisywać stałe
 demo — wyjątek „tylko na dev" jest dokładnie tym, który jedzie potem na

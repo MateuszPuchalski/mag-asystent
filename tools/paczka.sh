@@ -100,6 +100,22 @@ if find "$DEPS/node_modules" -name '*.node' | grep -q .; then
 fi
 mv "$DEPS/node_modules" "$P/node_modules"
 
+# ── Node dla Windowsa (@wydanie) ─────────────────────────────────────────
+# Paczka niesie własny Node, więc instalator nie instaluje żadnych programów
+# wstępnych, a serwer chodzi na wersji, na której przeszła paczka. Usługi
+# wskazują `<katalog>\node\node.exe`, który podmienia się razem z wydaniem.
+. "$KORZEN/tools/node-windows.txt"
+NODE_ZIP="node-v$NODE_WERSJA-win-x64.zip"
+PAMIEC=${WERTIS_NODE_CACHE:-"${XDG_CACHE_HOME:-$HOME/.cache}/wertis-node"}
+mkdir -p "$PAMIEC"
+if ! echo "$NODE_SHA256  $PAMIEC/$NODE_ZIP" | sha256sum -c --status 2>/dev/null; then
+  curl -fsSL -o "$PAMIEC/$NODE_ZIP" "https://nodejs.org/dist/v$NODE_WERSJA/$NODE_ZIP"
+  echo "$NODE_SHA256  $PAMIEC/$NODE_ZIP" | sha256sum -c --status || {
+    echo "Suma $NODE_ZIP nie zgadza się z tools/node-windows.txt — nie pakuję." >&2; rm -f "$PAMIEC/$NODE_ZIP"; exit 1; }
+fi
+unzip -q "$PAMIEC/$NODE_ZIP" -d "$ROB/node-rozp"
+mv "$ROB/node-rozp/node-v$NODE_WERSJA-win-x64" "$P/node"
+
 mkdir -p "$WYJSCIE"
 ( cd "$ROB" && zip -qr -X "$WYJSCIE/$NAZWA.zip" "$NAZWA" )
 ( cd "$WYJSCIE" && sha256sum "$NAZWA.zip" > "$NAZWA.zip.sha256" )
