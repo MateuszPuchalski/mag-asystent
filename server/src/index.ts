@@ -83,6 +83,10 @@ import { uruchomTakt } from "./services/takt.js";
 import { czytajStan, problemyKopii } from "./services/kopie-bazy.js";
 import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
 import { podNssm, ustawRestart } from "./services/restart.js";
+import {
+  problemAktualizacji, sprawdzWydania, stanZadania, uruchomSchtasks, ustawUruchamiacz, wynikDoDziennika,
+} from "./services/aktualizacja-serwera.js";
+import { logEvent } from "./services/events.js";
 import { powiazPoImporcieSubiekta, powiazZaleglosci } from "./services/wiazania.js";
 import { allegroTryb } from "./adapters/allegro.js";
 import { poImporcie, pochodnePuste } from "./services/po-imporcie.js";
@@ -305,6 +309,9 @@ export async function buildApp() {
          nocna kopia zaległa dwie doby, padła, albo noc znalazła rozjazdy.
          To jest cały alarm: panel czyta te zdania na ekranie stanu. */
       ...(bez("kopie bazy", () => problemyKopii(kopie ?? {}, config.sgtMode)) ?? []),
+      /* Nieudana aktualizacja z panelu (0.492.0). Po wycofaniu serwer stoi na
+         starej wersji i wygląda zdrowo — bez tego zdania nikt by nie wiedział. */
+      bez("aktualizacja", () => problemAktualizacji(stanZadania())),
       ...awarie,
     ].filter((x): x is string => x !== null);
     return {
@@ -621,6 +628,18 @@ async function main() {
   /* Restart po zmianie ustawienia z panelu (0.491.0). Tu, nie w buildApp():
      test trasy zapisu nie ma prawa zakończyć procesu testów. Poza usługą NSSM
      nikt serwera nie podniesie, więc tam restart zostaje człowiekowi. */
+  /* AKTUALIZACJA Z PANELU (0.492.0). Zadanie Harmonogramu tylko pod NSSM —
+     z tego samego powodu co restart niżej. Lista wydań co godzinę, w takcie:
+     otwarcie karty w panelu nie wychodzi do sieci. Wynik ostatniej
+     aktualizacji trafia do dziennika raz, przy pierwszym starcie po niej. */
+  if (podNssm()) ustawUruchamiacz(uruchomSchtasks);
+  uruchomTakt("wydania", 60 * 60_000, () => sprawdzWydania());
+  try {
+    wynikDoDziennika((stan) => logEvent("aktualizacja_wynik", stan.kto || "system", null, stan));
+  } catch (e) {
+    console.error(`[aktualizacja] wynik do dziennika: ${e instanceof Error ? e.message : e}`);
+  }
+
   if (podNssm()) {
     ustawRestart(() => {
       console.log("[api] konfiguracja zmieniona z panelu — wstaję ponownie z nowym wertis.env");

@@ -39,6 +39,13 @@
     w wertis.env, konfiguracji Subiekta ani kont użytkowników — nie zadaje
     też ani jednego pytania.
 
+.PARAMETER Paczka
+    Tylko z -Aktualizuj (0.492.0): aktualizacja z PACZKI WYDANIA zamiast
+    budowania na tej maszynie. Wartość to numer wersji (0.492.0), słowo
+    „najnowsza" albo ścieżka pobranego ZIP-a z plikiem .sha256 obok. Paczka
+    rozpakowuje się obok działającej wersji, a nieudany start nowej wraca
+    na starą razem z bazą. Tak aktualizuje przycisk w panelu.
+
 .PARAMETER Dev
     Druga, ROZWOJOWA instancja obok produkcji: usługi z sufiksem -dev, dane
     demo, pusty kanał APK (dev niczego kolektorom nie proponuje) i etykieta
@@ -92,6 +99,7 @@ param(
     [switch]$Odinstaluj,
     [switch]$UsunDane,
     [switch]$Aktualizuj,
+    [string]$Paczka,
     [switch]$ZdjeciaZapis
 )
 
@@ -106,6 +114,7 @@ $katalogSkryptu = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $katalogSkryptu "ui.ps1")
 . (Join-Path $katalogSkryptu "sql.ps1")
 . (Join-Path $katalogSkryptu "uslugi.ps1")
+. (Join-Path $katalogSkryptu "paczka.ps1")
 # MODULY-KONIEC
 
 $script:WertisDryRun = [bool]$DryRun
@@ -248,10 +257,33 @@ if ($Odinstaluj) {
 # `npm ci` kasuje `node_modules`, więc działający worker traciłby moduły
 # w locie: objawem byłby proces, który padł „bez powodu" w połowie aktualizacji.
 
+if ($Aktualizuj -and $Paczka) {
+    # ── Aktualizacja z paczki wydania (0.492.0) ────────────────────────────
+    # Osobna droga, bo nie ma w niej ani `git pull`, ani budowania. Całą pracę
+    # i wycofanie robi `Update-WertisZPaczki` (paczka.ps1); tutaj zostaje
+    # tylko zadanie Harmonogramu dla przycisku w panelu.
+    Write-Naglowek "WERTIS - aktualizacja z paczki"
+    if (-not (Test-Path (Join-Path $Katalog "server"))) {
+        Write-Blad "W $Katalog nie ma instalacji WERTIS."
+        exit 1
+    }
+    $kod = Update-WertisZPaczki -Katalog $Katalog -Repo $Repo -Paczka $Paczka -Uslugi $instancja.Uslugi -Port $Port
+    if ($kod -eq 0) {
+        Register-WertisZadanieAktualizacji -Katalog $Katalog -Nazwa "WERTIS aktualizacja$($instancja.Sufiks)"
+    }
+    exit $kod
+}
+
 if ($Aktualizuj) {
     Write-Naglowek "WERTIS - aktualizacja"
 
     if (-not (Test-Path (Join-Path $Katalog ".git"))) {
+        if (Test-Path (Join-Path $Katalog "paczka.json")) {
+            # Instalacja z paczki nie ma repozytorium i mieć go nie musi.
+            Write-Blad "$Katalog jest instalacją z paczki wydania — nie ma tu repozytorium do git pull."
+            Write-Info "Aktualizacja: .\wertis-instalator.ps1 -Aktualizuj -Paczka najnowsza"
+            exit 1
+        }
         Write-Blad "W $Katalog nie ma repozytorium WERTIS."
         Write-Info "Aktualizacja działa na ISTNIEJĄCEJ instalacji. Do pierwszej instalacji uruchom instalator bez -Aktualizuj."
         exit 1
@@ -340,6 +372,11 @@ if ($Aktualizuj) {
     Restart-WertisUslugi -Uslugi $instancja.Uslugi
     $health = Test-WertisHealth -Port $Port
 
+    # Zadanie dla przycisku aktualizacji w panelu (0.492.0). Rejestrowane także
+    # tą drogą, bo zwykła aktualizacja jest tym, co istniejące instalacje
+    # uruchomią najpierw — i tak dostają przycisk bez pełnego instalatora.
+    Register-WertisZadanieAktualizacji -Katalog $Katalog -Nazwa "WERTIS aktualizacja$($instancja.Sufiks)"
+
     Write-Naglowek "Aktualizacja zakonczona"
     Write-Info "Wersja: $wersjaPrzed -> $wersjaPo"
     Write-Info "Nietkniete: baza aplikacji, konto SQL i GRANT-y, wertis.env, konta uzytkownikow."
@@ -364,8 +401,15 @@ if (-not $TylkoKonfiguracja) {
     if (-not ($okNode -and $okGit)) { exit 1 }
     if (-not (Test-WertisNode)) { exit 1 }
 
+    # Instalacja z paczki wydania (0.492.0) nie ma repozytorium ani źródeł.
+    # Ponowny przebieg instalatora na niej — po zmianę Subiekta albo konta —
+    # nie pobiera i nie buduje niczego; nową wersję wgrywa -Aktualizuj -Paczka.
+    $zPaczki = Test-Path (Join-Path $Katalog "paczka.json")
+
     Write-Krok "Aplikacja w $Katalog"
-    if (Test-Path (Join-Path $Katalog ".git")) {
+    if ($zPaczki) {
+        Write-Ok "Instalacja z paczki wydania $(Get-WertisWersja -Katalog $Katalog) — kodu nie pobieram."
+    } elseif (Test-Path (Join-Path $Katalog ".git")) {
         # Ponowne uruchomienie instalatora JEST aktualizacją (DEPLOY.md §7).
         if (-not (Test-DryRun "Zaktualizowałbym repozytorium (git pull).")) {
             Push-Location $Katalog
@@ -406,7 +450,9 @@ if (-not $TylkoKonfiguracja) {
     }
 
     Write-Krok "Budowanie"
-    if (-not (Test-DryRun "Uruchomiłbym npm ci i npm run build w $Katalog.")) {
+    if ($zPaczki) {
+        Write-Ok "Paczka jest już zbudowana — pomijam npm ci i build."
+    } elseif (-not (Test-DryRun "Uruchomiłbym npm ci i npm run build w $Katalog.")) {
         Push-Location $Katalog
         # Przeglądarki Playwrighta NIE schodzą na produkcję. Od 0.146.0
         # `@playwright/test` jest zależnością deweloperską panelu, a jego
@@ -434,6 +480,9 @@ if (-not $TylkoKonfiguracja) {
 
     Write-Krok "Sieć"
     Add-WertisRegulaZapory -Port $Port -Nazwa $instancja.Zapora
+
+    Write-Krok "Aktualizacja z panelu"
+    Register-WertisZadanieAktualizacji -Katalog $Katalog -Nazwa "WERTIS aktualizacja$($instancja.Sufiks)"
 } else {
     $nssm = Join-Path $Katalog "tools\nssm.exe"
 }

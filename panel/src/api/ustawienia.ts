@@ -183,6 +183,63 @@ export const useKonfiguracja = (admin: boolean) => useQuery({
   retry: false,
 });
 
+/* ── Aktualizacja serwera (0.492.0) ────────────────────────────────────
+   Wzory typów: `server/src/services/aktualizacja-serwera.ts`. */
+
+export interface WydanieSerwera { wersja: string; opublikowano: string | null; maPaczke: boolean }
+export interface SekcjaZmian { wersja: string; tytul: string; tresc: string; wymagaDzialania: boolean }
+export interface StanZadaniaAktualizacji {
+  etap: "trwa" | "gotowe" | "blad";
+  wersja: string;
+  kto?: string;
+  od?: string;
+  do?: string;
+  kod?: number;
+  komunikat?: string;
+}
+export interface StanAktualizacji {
+  obecna: string;
+  sprawdzono: string | null;
+  bladSprawdzenia: string | null;
+  wydania: WydanieSerwera[];
+  zmiany: SekcjaZmian[];
+  ostatnia: StanZadaniaAktualizacji | null;
+  czekaZlecenie: boolean;
+  /** `null` = wolno zlecić; inaczej zdanie, dlaczego nie. */
+  blokada: string | null;
+}
+
+/** W trakcie aktualizacji serwer znika na minutę albo dwie — pytamy co pięć
+ *  sekund i nie traktujemy chwilowej odmowy jako końca świata. */
+const trwa = (s: StanAktualizacji | undefined) => !!s && (s.czekaZlecenie || s.ostatnia?.etap === "trwa");
+
+/** Trasa adminowa, więc pytamy tylko jako admin — biuro dostałoby 403. */
+export const useAktualizacja = (admin: boolean) => useQuery({
+  queryKey: ["aktualizacja"],
+  queryFn: () => api<StanAktualizacji>("/api/biuro/aktualizacja"),
+  enabled: admin,
+  retry: false,
+  refetchInterval: (q) => (trwa(q.state.data) ? 5000 : false),
+});
+
+/** Bez ciała, więc bez typu treści — reguła klienta HTTP z CLAUDE.md. */
+export function useSprawdzWydania() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<StanAktualizacji>("/api/biuro/aktualizacja/sprawdz", { method: "POST" }),
+    onSuccess: (d) => qc.setQueryData(["aktualizacja"], d),
+  });
+}
+
+export function useZlecAktualizacje() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (z: { wersja: string; haslo: string }) =>
+      api<{ ok: boolean; wersja: string }>("/api/biuro/aktualizacja", { method: "POST", body: JSON.stringify(z) }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["aktualizacja"] }),
+  });
+}
+
 /* ── Logo dostawców ───────────────────────────────────────────────────── */
 
 export interface DostawcaZLogo { khId: number; nazwa: string; dokumentow: number; maLogo: boolean }

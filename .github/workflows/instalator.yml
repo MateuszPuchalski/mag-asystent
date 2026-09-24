@@ -104,6 +104,14 @@ jobs:
         if: steps.zakres.outputs.dotyczy == 'true'
         run: .\instalator\testy.ps1
 
+      # Aktualizacja z paczki naprawdę: przeniesienie danych, dowiązanie,
+      # zamiana katalogów i wycofanie z bazą (0.492.0). Ani testy, ani -DryRun
+      # tych kroków nie wykonują, a to one przy błędzie zostawiają serwer bez
+      # danych. Wszystko na podrobionej instalacji w TEMP, bez usług.
+      - name: Proba podmiany katalogow i wycofania
+        if: steps.zakres.outputs.dotyczy == 'true'
+        run: .\instalator\proba-podmiany.ps1
+
       # Scalanie sprawdza przy okazji, czy znaczniki MODULY-* nadal są na
       # miejscu i czy scalony plik się parsuje. Kopiuje też URUCHOM.cmd.
       - name: Scalenie do jednego pliku

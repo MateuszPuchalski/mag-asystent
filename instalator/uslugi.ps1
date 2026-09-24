@@ -863,7 +863,7 @@ function New-WertisKontoAdmina {
         [string]$Nazwa = "Administrator",
         [int]$Port = 3001
     )
-    if (Test-DryRun "Założyłbym konto admina „$Login” przez API.") { return $true }
+    if (Test-DryRun "Założyłbym konto admina '$Login' przez API.") { return $true }
 
     # Prawdziwy przebieg zostaje ŚCISŁY: pusty łańcuch przechodzi przez binder,
     # ale nie przez to sprawdzenie — inaczej poszedłby w żądaniu do serwera.
@@ -877,7 +877,7 @@ function New-WertisKontoAdmina {
         $odp = Invoke-RestMethod -Method Post -Uri "http://localhost:$Port/api/users" `
             -ContentType "application/json; charset=utf-8" `
             -Body ([Text.Encoding]::UTF8.GetBytes($body)) -TimeoutSec 10
-        Write-Ok "Konto „$($odp.user.login)” założone (rola: $($odp.user.role))."
+        Write-Ok "Konto '$($odp.user.login)' założone (rola: $($odp.user.role))."
         return $true
     } catch {
         # 401 = baza ma już konta; 409 = ten login jest zajęty. Obie sytuacje są
@@ -1170,9 +1170,21 @@ function Remove-WertisKatalog {
     # za chwilę ma zniknąć.
     Stop-WertisProcesyWKatalogu -Katalog $Katalog | Out-Null
 
+    # Od 0.492.0 dane po aktualizacji z paczki mieszkają w <katalog>-dane,
+    # a w server\data stoi dowiązanie. Ocalamy wtedy CEL, a samo dowiązanie
+    # zdejmujemy przed kasowaniem katalogu — patrz Remove-WertisKatalogAplikacji.
+    $dane = Join-Path $Katalog "server\data"
+    $zewnetrzne = $null
+    if (Test-WertisDowiazanie -Sciezka $dane) {
+        $zewnetrzne = Get-WertisKatalogDanych -Katalog $Katalog
+        if (-not (Test-DryRun "Zdjąłbym dowiązanie $dane (dane leżą w $zewnetrzne).")) {
+            [IO.Directory]::Delete($dane, $false)
+        }
+        $dane = $zewnetrzne
+    }
+
     if ($plan.DaneDo) {
         if (-not (Test-DryRun "Przeniósłbym dane do $($plan.DaneDo), potem skasował resztę $Katalog.")) {
-            $dane = Join-Path $Katalog "server\data"
             if (Test-Path $dane) {
                 Zapewnij-Katalog (Split-Path $plan.DaneDo)
                 Move-Item $dane $plan.DaneDo -Force
@@ -1185,6 +1197,8 @@ function Remove-WertisKatalog {
     }
 
     if (Test-DryRun "Skasował(a)bym katalog $Katalog.") { return $plan }
+    # -UsunDane: dane spoza katalogu idą razem z nim, skoro o to poproszono.
+    if ($zewnetrzne -and -not $plan.DaneDo) { Remove-Item -LiteralPath $zewnetrzne -Recurse -Force -ErrorAction SilentlyContinue }
     Remove-Item $Katalog -Recurse -Force -ErrorAction SilentlyContinue
     if (Test-Path $Katalog) {
         Write-Uwaga "Katalog $Katalog nie zniknął w całości - pliki w użyciu."

@@ -99,6 +99,27 @@ export function zaloguj(login: string, haslo: string, deviceId: string | null): 
   return { token, user };
 }
 
+/**
+ * Ponowne podanie WŁASNEGO hasła przed operacją, której sama sesja nie
+ * wystarcza (0.492.0: aktualizacja serwera z panelu).
+ *
+ * Sesje nie wygasają (architektura §6), więc token zostawiony w przeglądarce
+ * biura wystarczyłby, żeby ktoś obcy wgrał wersję na maszynę z bazą firmy.
+ * Ten sam hamulec prób co logowanie — inaczej ten formularz byłby szybszą
+ * drogą zgadywania hasła niż ekran logowania.
+ */
+export function potwierdzHaslo(user: Uzytkownik, haslo: string): boolean {
+  const login = user.login ?? "";
+  if (!login || karaLogowania(login) > 0) return false;
+  if (!sprawdzSekret(haslo ?? "", haszHasla(user.userId))) {
+    odnotujBlad(login);
+    logEvent("login_failed", normalizujLogin(login), null, { login: normalizujLogin(login), potwierdzenie: true });
+    return false;
+  }
+  proby.delete(normalizujLogin(login));
+  return true;
+}
+
 /** Zmiana własnego hasła — stare musi się zgadzać, nowe ma minimalną długość. */
 export function zmienHaslo(user: Uzytkownik, stare: string, nowe: string): { error?: string } {
   if (!sprawdzSekret(stare, haszHasla(user.userId))) return { error: "Błędne hasło" };
@@ -240,6 +261,11 @@ export type OperacjaUprzywilejowana =
    */
   | "konfiguracja_serwera"
   /**
+   * Aktualizacja serwera z panelu (0.492.0). Wymienia kod na maszynie
+   * z bazą firmy, więc obok roli wymaga ponownego hasła (`potwierdzHaslo`).
+   */
+  | "aktualizacja_serwera"
+  /**
    * Odebranie rozmowy agentowi, który ją prowadzi (0.147.0).
    *
    * Przejęcie wolnej rozmowy robi każdy z biura i to nie jest ta operacja.
@@ -351,6 +377,8 @@ const WYMAGANA_ROLA: Record<OperacjaUprzywilejowana, readonly Rola[]> = {
   masowa_lokalizacja: ["admin"],
   // Zmienia pracę wszystkich naraz i restartuje usługi — patrz opis operacji.
   konfiguracja_serwera: ["admin"],
+  // Wymienia kod całej instalacji — patrz opis operacji.
+  aktualizacja_serwera: ["admin"],
   /* BIURO, jak pieniądze przy zwrocie: reklamacje prowadzi biuro codziennie,
      a werdykt zamknięty dla admina znaczyłby, że orzeka ktoś, kto nie czytał
      sprawy. Magazynier zostaje poza — on ocenia towar, nie roszczenie. */

@@ -32,7 +32,7 @@ $zrodlo = Split-Path -Parent $MyInvocation.MyCommand.Path
 
 # Kolejność ma znaczenie: ui.ps1 definiuje Test-DryRun i Write-*, z których
 # korzystają pozostałe moduły już przy ładowaniu.
-$moduly = @("ui.ps1", "sql.ps1", "uslugi.ps1")
+$moduly = @("ui.ps1", "sql.ps1", "uslugi.ps1", "paczka.ps1")
 
 $glowny = Get-Content (Join-Path $zrodlo "wertis-instalator.ps1") -Raw -Encoding UTF8
 
