@@ -884,13 +884,15 @@ let drogaApiPotwierdzona = false;
  * adresów i bez identyfikatora (te idą do dziennika serwera, nie na ekran).
  */
 export async function pobierzZalacznikWiadomosci(
-  apiUrl: string, url: string,
+  apiUrl: string, url: string, opcje: { maksBajtow?: number } = {},
 ): Promise<{ bajty: ArrayBuffer; droga: DrogaPobrania }> {
   const proby: string[] = [];
   let ostatni: unknown = null;
   for (const k of kandydaciPobrania(apiUrl, url)) {
     try {
-      const bajty = await pobierzZalacznik(k.adres, { akcept: k.akcept });
+      /* Sufit bajtów przechodzi dalej: Copilot pobiera tędy zdjęcia rozmowy
+         i nie może dostać pliku większego, niż przyjmie dostawca modelu. */
+      const bajty = await pobierzZalacznik(k.adres, { akcept: k.akcept, maksBajtow: opcje.maksBajtow });
       if (k.droga === "api" && !drogaApiPotwierdzona) {
         drogaApiPotwierdzona = true;
         console.info(`[allegro] droga API do załączników Centrum Wiadomości działa (${bajty.byteLength} B)`);

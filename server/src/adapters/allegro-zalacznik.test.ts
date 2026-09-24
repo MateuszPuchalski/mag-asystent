@@ -121,3 +121,33 @@ test("sonda oddaje kody i typy każdej próby, nigdy bajtów", async () => {
   assert.equal(w[0]!.hostKoncowy, "api.allegro.pl");
   assert.equal(JSON.stringify(w).includes("97dc0b60"), false, "UUID nie wychodzi z sondy");
 });
+
+/* ── Zdjęcia rozmowy dla Copilota idą TĄ SAMĄ drogą co podgląd (24 września 2026) ──
+   Zgłoszenie właściciela: „copilot prawdopodobnie nie czyta zdjęć, które klient
+   podesłał". Nie czytał. `przygotujZdjeciaRozmowy` pobierał zapisany adres
+   z `upload.allegro.pl`, który na brzegu odpowiada 403 (sonda z 10 września),
+   więc każde zdjęcie odpadało jako błąd — po cichu. Podgląd w panelu działał,
+   bo szedł końcówką API. Test stoi TU, bo tylko tu jest podstawiony `fetch`:
+   testy w `copilot-zdjecia.test.ts` wstrzykują pobieracz i dlatego tego nie
+   złapały. */
+test("zdjęcia rozmowy dla Copilota idą końcówką API, nie zablokowanym adresem", async () => {
+  const { przygotujZdjeciaRozmowy } = await import("../services/copilot-zdjecia.js");
+  const d = db();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-zdj')").run().lastInsertRowid);
+  const rozmowa = Number(d.prepare(
+    "INSERT INTO conversation(channel_account_id,external_conversation_id) VALUES (?,'c-zdj')").run(konto).lastInsertRowid);
+  const msg = Number(d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,sent_at) VALUES (?,?,'m-zdj','incoming','zdjęcie tabliczki','2026-09-24T10:00:00Z')`)
+    .run(rozmowa, konto).lastInsertRowid);
+  d.prepare(`INSERT INTO message_attachment(message_id,file_name,mime_type,url,status)
+    VALUES (?,'tabliczka.png','image/png',?,'SAFE')`).run(msg, URL_ZAL);
+
+  /* Jak na żywym koncie: zapisany adres 403 na brzegu, końcówka API oddaje plik. */
+  const zebrane = podstaw((url) => ({ status: url.startsWith("https://upload.allegro.pl") ? 403 : 200 }));
+  const w = await przygotujZdjeciaRozmowy(d, rozmowa);
+  assert.equal(w.bledow, 0);
+  assert.equal(w.zdjecia.length, 1, "model dostaje zdjęcie klienta");
+  assert.equal(w.zdjecia[0]!.nazwa, "tabliczka.png");
+  assert.ok(zebrane[0]!.url.includes("/messaging/message-attachments/"), "pierwsza próba to końcówka API");
+});

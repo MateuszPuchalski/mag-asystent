@@ -177,6 +177,8 @@ export async function zadajPytanie(
   logEvent("copilot_pytanie", kto.name, null, {
     conversationId, znakowPytania: tresc.length, znakowOdpowiedzi: odp.tresc.length,
     wymiana: dotad.length + 1, model: odp.model, tokeny: odp.zuzycie,
+    /* Zdjęcia liczbami, jak przy szkicu — patrz blizna 0.484.6 w `copilot-zdjecia`. */
+    zdjec: zdjecia.zdjecia.length, zdjecBledow: zdjecia.bledow,
   }, kto.id);
 
   return wymianyRozmowy(conversationId).find((w) => w.id === id)!;

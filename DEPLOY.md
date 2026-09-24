@@ -2582,6 +2582,16 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.484.6 — Copilot widzi zdjęcia z rozmowy
+
+**Wystarczy restart serwera.** Bez migracji i bez zmian w panelu.
+
+Sprawdzenie: w rozmowie ze zdjęciem od klienta kliknij „Ułóż odpowiedź”.
+Nad szkicem ma stanąć blok „Co model odczytał ze zdjęć”. W dzienniku
+zdarzenie `copilot_szkic` ma `zdjec` większe od zera i `zdjecBledow` równe
+zero. Niezerowe `zdjecBledow` znaczy, że Allegro odmówiło obu dróg; powód
+pokaże podgląd tego zdjęcia w panelu.
+
 ### Aktualizacja do 0.484.0 — profil klienta
 
 **Panel trzeba przebudować, a serwer zrestartować.** Tabela `klient_notatka`
