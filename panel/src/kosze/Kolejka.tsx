@@ -21,7 +21,7 @@ export type KubelekKoszy = "praca" | "pominiete" | "mm" | "rozlozone" | "anulowa
 export const KUBELKI_KOSZY: Array<{ id: KubelekKoszy; etykieta: string; pytanie: string }> = [
   { id: "praca", etykieta: "W pracy", pytanie: "Co jest w drodze na regał?" },
   { id: "pominiete", etykieta: "Pominięte", pytanie: "Szukać dalej, reklamować czy poprawić dokument?" },
-  /* Problem z MM (0.501.0), zgłoszenie właściciela: „muszę sprawdzić stany
+  /* Problem z MM (@wydanie), zgłoszenie właściciela: „muszę sprawdzić stany
      z Subiektem". Kubełek PRZEKROJOWY — kosz stoi tu obok swojego kubełka
      statusu, bo kłopot z dokumentem nie zmienia tego, gdzie kosz jest. */
   { id: "mm", etykieta: "Problem z MM", pytanie: "Czy stany w Subiekcie zgadzają się z koszem?" },
@@ -107,7 +107,7 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
           {karton && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-700">karton</span>}
           <CyklKosza status={k.status} mmBlad={k.mmStan === "blad" && !k.mmNumer && !karton} />
           <StanMmKosza mmStan={k.mmStan} mmNumer={k.mmNumer} brakujeKorekt={k.brakujeKorekt} karton={karton} />
-          {/* ZNACZNIK KŁOPOTU Z MM (0.501.0) w każdym kubełku. Czerwony, gdy
+          {/* ZNACZNIK KŁOPOTU Z MM (@wydanie) w każdym kubełku. Czerwony, gdy
               zadanie stoi w błędzie teraz; bursztynowy, gdy przeszło po
               odmowie — wtedy dokument jest, ale stany trzeba sprawdzić. */}
           {k.problemMm &&

@@ -1026,7 +1026,7 @@ test("ZWIĄZANY koszyk wraca trasą z konfiguracji, choćby dokument nie znał n
   assert.equal(p.magTo, 1, "na magazyn główny — tak, jak koszyk stamtąd wyjechał");
 });
 
-/* ── Kosze z kłopotem MM (0.501.0) ─────────────────────────────────────────
+/* ── Kosze z kłopotem MM (@wydanie) ─────────────────────────────────────────
    Zgłoszenie właściciela: „zaznacz koszyki, w których był problem z MM —
    muszę sprawdzić stany z Subiektem". Wiersz kolejki pamięta tylko ostatnie
    podejście, więc MM odrzucona i przepuszczona PONÓW-em wyglądała jak czysta. */
