@@ -86,6 +86,15 @@ i kandydaci zamówień rozmowy bez numeru (S1). Właściciel potwierdził go na
 żywym koncie 24 września 2026 — rozdział „Sprzeczność: login kupującego"
 niżej. Nowe wiązania po loginie są więc dozwolone, bez wielkości liter.
 
+Trzecim mostkiem jest od @wydanie towar (`tw_id`). Stał na dziewięciu
+ekranach i nigdzie nie był odnośnikiem. Teraz jego symbol otwiera szufladę
+(`panel/src/towar/Szuflada.tsx`): stan, dostawy, wiedzę, otwarte zwroty,
+reklamacje i rozmowy o nim oraz liczby z 90 dni. Szuflada to wgląd, nie
+kolejka — nie ma statusu ani decyzji, a każdy wiersz prowadzi do sprawy.
+Oferty towaru to pamięć człowieka i sygnatura równa symbolowi, więc liczba
+sprzedaży mówi wprost, z ilu ofert powiązanych jest liczona
+(`services/przekroj-towaru.ts`).
+
 Nakładka spraw (`sprawa_klienta`) odeszła w 0.388.0. Droga zakupu robi to
 samo sama i przez cztery kolejki. Cena jest zapisana jawnie: dwóch rozmów
 o jednym problemie BEZ wspólnego zamówienia nikt już nie sklei.

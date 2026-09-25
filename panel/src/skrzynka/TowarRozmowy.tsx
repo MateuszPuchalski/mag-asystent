@@ -7,6 +7,7 @@ import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
 import { useWiedzaTowaru } from "../api/wiedza";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
+import { PrzyciskTowaru } from "../towar/Szuflada";
 
 /**
  * Towar z Subiekta przy rozmowie (0.179.0).
@@ -104,6 +105,9 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
             <div className="min-w-0 flex-1">
               {karta.isLoading && <p className="text-xs text-slate-500">Wczytuję stan z Subiekta…</p>}
               {karta.error && <p className="text-xs text-red-700">{(karta.error as Error).message}</p>}
+              {/* Wejście do przekroju towaru (@wydanie) — `towar/Szuflada.tsx`. */}
+              {karta.data && <PrzyciskTowaru twId={potwierdzona} className="text-xs font-semibold text-sky-800">
+                przekrój towaru</PrzyciskTowaru>}
               {karta.data && <StanTowaru karta={karta.data} />}
             </div>
           </div>

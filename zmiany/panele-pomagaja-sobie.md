@@ -21,6 +21,11 @@ fakt z datą. Ocena towaru i notatki biura zostają w zwrocie.
 karta w Zadaniach prowadzi do niej z powrotem, a wynik zadania ze zwrotu
 staje na osi zwrotu. Zadanie odesłane przez halę pojawia się w Do zrobienia.
 
+**Szuflada towaru.** Symbol towaru w skrzynce, zwrotach, koszach, dostawach,
+reklamacjach, zadaniach, dzienniku i szukaniu otwiera przekrój. Pokazuje stan,
+dostawy, wiedzę, otwarte zwroty, reklamacje i rozmowy o tym towarze. Dochodzą
+sprzedaż, zwroty i reklamacje z 90 dni. Każdy wiersz prowadzi do sprawy.
+
 **Drobne:**
 
 - wiersz „Pominięta pozycja" w Do zrobienia otwiera kosz w kubełku pominiętych;

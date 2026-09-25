@@ -32,6 +32,7 @@ import { Stan } from "./ekrany/Stan";
 import { Protokol } from "./druk/Protokol";
 import "./index.css";
 import { CoNowego } from "./coNowego/CoNowego";
+import { SzufladaTowaru } from "./towar/Szuflada";
 
 /* Jeden cache zapytań na cały panel — budowa i powody w `api/klient-zapytan.ts`. */
 const klient = nowyKlientZapytan();
@@ -298,7 +299,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
      deklarację, a `lg:min-h-0` skasowało już `min-h-screen` — ramie nie
      zostawał żaden limit i przewijał się cały dokument. Klasa niesie `vh`
      i `dvh` po kolei, czego jedna klasa Tailwinda zapisać nie umie. */
-  return <div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
+  /* Szuflada towaru (@wydanie) obejmuje całą ramę: przycisk towaru stoi na
+     dziewięciu ekranach, a szuflada ma otwierać się nad każdym z nich. */
+  return <SzufladaTowaru><div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
     <Naglowek wyloguj={wyloguj} />
     {/* „Nowe w panelu" (0.500.0) — pod nagłówkiem, nad pracą, tylko przy
         pierwszym wejściu po wydaniu. Powód w `coNowego/CoNowego.tsx`. */}
@@ -354,7 +357,7 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         <Route path="*" element={<Navigate to="/obsluga/" replace />} />
       </Routes>
     </main>
-  </div>;
+  </div></SzufladaTowaru>;
 }
 
 createRoot(document.getElementById("root")!).render(

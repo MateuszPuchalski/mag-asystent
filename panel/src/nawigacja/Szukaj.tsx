@@ -7,6 +7,7 @@ import {
 import { useSzukajWszedzie, type RodzajTrafienia, type Trafienie } from "../api/spoiwo";
 import { useKartaTowaru } from "../api/rozmowy";
 import { Blad, Pusto } from "../ui";
+import { PrzyciskTowaru } from "../towar/Szuflada";
 
 /* ── Szukanie ponad kolejkami, Ctrl+K (23 września 2026) ────────────────────
    Każdy ekran miał własne pole szukania i trzeba było wiedzieć, które wybrać.
@@ -132,7 +133,8 @@ function PodgladTowaru({ twId, onWstecz }: { twId: number; onWstecz: () => void 
     {k.isLoading && <Pusto waga="lista">Wczytuję kartę…</Pusto>}
     <Blad>{(k.error as Error | null)?.message}</Blad>
     {k.data && <>
-      <p className="font-mono text-xs text-slate-600">{k.data.sym}</p>
+      <p className="font-mono text-xs text-slate-600">
+        <PrzyciskTowaru twId={twId}>{k.data.sym}</PrzyciskTowaru></p>
       <p className="font-semibold text-slate-900">{k.data.name}</p>
       <p className="mt-2 text-2xl font-bold tabular-nums">{k.data.mag.avail}
         <span className="ml-1 text-sm font-normal text-slate-600">{k.data.unit ?? "szt."} dostępne</span></p>

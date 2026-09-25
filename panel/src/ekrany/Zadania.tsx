@@ -10,6 +10,7 @@ import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, czas, wiek } from "../ui
 import { Kafel } from "../towar/Kafel";
 import type { Zadanie, ZalacznikZadania } from "../api/typy";
 import { useZdjecieZadania } from "../towar/useZdjecie";
+import { PrzyciskTowaru } from "../towar/Szuflada";
 
 /** Napis odnośnika po drugim członie adresu sprawy (`/obsluga/<to>/<id>`). */
 const NAZWA_ZRODLA: Record<string, string> = {
@@ -271,7 +272,8 @@ export function Zadania() {
           <Kafel twId={t.twId} rozmiar={48} nazwa={t.nazwaTowaru ?? t.symbol} symbol={t.symbol} />
           <div className="min-w-0">
             <div className="truncate font-semibold">{t.nazwaTowaru}</div>
-            <div className="truncate font-mono text-xs text-slate-600">{t.symbol}</div>
+            <div className="truncate font-mono text-xs text-slate-600">
+              <PrzyciskTowaru twId={t.twId}>{t.symbol}</PrzyciskTowaru></div>
             <div className="text-xs text-slate-500">Lokalizacja: {t.lokalizacja || "brak"}</div>
           </div>
         </div>}

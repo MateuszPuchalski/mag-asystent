@@ -45,6 +45,7 @@ const POWODY: Record<string, string> = {
 
 import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 import { calaDostawa, pewnaPropozycja } from "./regulaSzybkiej";
+import { PrzyciskTowaru } from "../towar/Szuflada";
 
 /* TRZY PRZYCISKI OD 0.375.0, i trzeci ma warunek. „Na przecenę" zeszła stąd
    w 0.209.0, bo nie prowadziła donikąd: nie dokładała do koszyka, nie ruszała
@@ -93,7 +94,7 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
       className="inline-flex h-6 items-center gap-1 rounded-full bg-emerald-50 pl-2 pr-1 text-xs font-semibold text-emerald-800">
       <Link2 size={12} aria-hidden="true" />
       <span className="sr-only">Kartoteka </span>
-      <span className="font-mono">{p.twSymbol}</span>
+      <PrzyciskTowaru twId={p.twId}><span className="font-mono">{p.twSymbol}</span></PrzyciskTowaru>
       <span className="sr-only"> — {skad}</span>
       <button type="button" aria-label="Zdejmij powiązanie" title="Zdejmij powiązanie"
         disabled={zapisz.isPending} onClick={() => ustaw(null, "reczne")}
