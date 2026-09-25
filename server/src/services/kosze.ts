@@ -294,6 +294,63 @@ export function problemyMm(database: Db = db(), teraz = new Date()): Map<number,
   return wynik;
 }
 
+/**
+ * Treść, którą worker Sfery zostawia na zadaniu zastanym w trakcie zapisu.
+ * Po niej `Zapisz()` mógł zdążyć — ponowienie bez sprawdzenia dubluje MM.
+ */
+const PRZERWANE_W_ZAPISIE = /przerwany w trakcie zapisu/i;
+
+/**
+ * Ponowienie wszystkich MM kosza, które stoją w błędzie (@wydanie).
+ *
+ * Zgłoszenie właściciela, przy kubełku „Problem z MM": „dodaj, abym mógł
+ * wywołać ponownie". Kosz z dokumentu miewa MM na każdą pozycję osobno, więc
+ * PONÓW z kolejki kazał szukać kilku zadań po numerach. Tu jeden ruch na kosz.
+ * Zadanie wraca do kolejki dokładnie tak, jak po PONÓW w kolejce: próby od
+ * zera, bez treści błędu, z wpisem `queue_ponowione_recznie` w dzienniku.
+ *
+ * PRZERWANE W ZAPISIE WYMAGAJĄ POTWIERDZENIA. Worker po restarcie oznacza tak
+ * zadanie, przy którym Subiekt mógł zdążyć zapisać dokument, a nasza baza nie.
+ * Ślepe ponowienie wystawiłoby drugie MM i drugi raz przesunęło stany — czyli
+ * dokładnie to, czego biuro szuka w tym kubełku. Odmowa mówi więc, co
+ * sprawdzić, a drugi ruch z `sprawdzono` bierze odpowiedzialność na człowieka.
+ */
+export function ponowMmKosza(
+  database: Db, koszId: number, kto: string, sprawdzono = false,
+): { ponowione: number } {
+  const kosz = database.prepare("SELECT id, kod, mm_queue_id, powrot_queue_id FROM kosz WHERE id=?")
+    .get(koszId) as { id: number; kod: string; mm_queue_id: number | null; powrot_queue_id: number | null } | undefined;
+  if (!kosz) throw new BladKosza(404, "Nie ma takiego kosza");
+  const idy = [kosz.mm_queue_id, kosz.powrot_queue_id,
+    ...(database.prepare("SELECT mm_queue_id FROM kosz_pozycja WHERE kosz_id=? AND mm_queue_id IS NOT NULL")
+      .all(koszId) as Array<{ mm_queue_id: number }>).map((p) => p.mm_queue_id)]
+    .filter((x): x is number => x != null);
+  const bledne = idy.length === 0 ? [] : database.prepare(
+    `SELECT id, error_msg FROM sfera_queue
+      WHERE type='mm' AND status='error' AND id IN (SELECT value FROM json_each(?))`)
+    .all(JSON.stringify([...new Set(idy)])) as Array<{ id: number; error_msg: string | null }>;
+  if (!bledne.length) throw new BladKosza(409, "Żadne MM tego kosza nie stoi w błędzie — nie ma czego ponawiać.");
+  const przerwane = bledne.filter((z) => PRZERWANE_W_ZAPISIE.test(z.error_msg ?? ""));
+  if (przerwane.length && !sprawdzono) {
+    throw new BladKosza(409,
+      `${przerwane.length === 1 ? "Jedno MM przerwano" : `${przerwane.length} MM przerwano`} w trakcie zapisu. ` +
+      "Sprawdź w Subiekcie, czy dokument nie powstał — ponowienie wystawiłoby go drugi raz.");
+  }
+  transaction(database, () => {
+    const wznow = database.prepare(
+      `UPDATE sfera_queue SET status='pending', attempts=0, error_msg=NULL,
+         next_attempt_at=NULL, processed_at=NULL WHERE id=? AND status='error'`);
+    for (const z of bledne) {
+      wznow.run(z.id);
+      /* Ten sam wpis co PONÓW z kolejki — `problemyMm` liczy po nim ślad. */
+      logEvent("queue_ponowione_recznie", kto, null, { queueId: z.id }, undefined, database);
+    }
+    logEvent("kosz_mm_ponowione", kto, null,
+      { koszId, kod: kosz.kod, zadan: bledne.length, przerwanych: przerwane.length }, undefined, database);
+  })();
+  return { ponowione: bledne.length };
+}
+
 export interface WierszListyKoszy {
   id: number;
   kod: string;

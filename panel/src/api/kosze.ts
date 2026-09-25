@@ -187,6 +187,20 @@ export function useZalatwPominiecie() {
  * i niczego nie traci, układa zawartość od nowa z tych samych ocen.
  * Nieodwracalny jest dopiero dokument, a tego tu jeszcze nie ma.
  */
+/**
+ * Ponowienie MM kosza stojących w błędzie (@wydanie). `sprawdzono` wysyła się
+ * dopiero po odmowie „przerwano w trakcie zapisu" — powód przy `ponowMmKosza`.
+ */
+export function usePonowMmKosza() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; sprawdzono: boolean }) =>
+      api<{ ponowione: number }>(`/api/biuro/kosze/${v.id}/ponow-mm`,
+        { method: "POST", body: JSON.stringify({ sprawdzono: v.sprawdzono }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: kluczeKoszy.wszystko }),
+  });
+}
+
 export function usePrzeliczKosz() {
   const qc = useQueryClient();
   return useMutation({

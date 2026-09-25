@@ -1,6 +1,6 @@
 import React from "react";
 import { RefreshCw } from "lucide-react";
-import type { PozycjaWKoszu, SzczegolKosza } from "../api/kosze";
+import type { PozycjaWKoszu, SzczegolKosza, WierszKosza } from "../api/kosze";
 import { Zdjecie } from "../towar/Zdjecie";
 import { Blad, NaglowekSekcji, Przycisk, czas, ile } from "../ui";
 import { CyklKosza } from "./Cykl";
@@ -43,9 +43,21 @@ function StanPozycji({ p }: { p: PozycjaWKoszu }) {
   return <span className="text-xs text-slate-600">czeka na hali</span>;
 }
 
-export function Kosz({ k, przelicz }: {
+/** Stan ponowienia MM kosza z kłopotem (@wydanie). */
+export interface PonowienieMm {
+  problem: NonNullable<WierszKosza["problemMm"]>;
+  trwa: boolean;
+  blad: string;
+  wynik: string;
+  /** Odmowa „przerwano w trakcie zapisu" czeka na potwierdzenie człowieka. */
+  czekaNaSprawdzenie: boolean;
+  onPonow: (sprawdzono: boolean) => void;
+}
+
+export function Kosz({ k, przelicz, ponowMm = null }: {
   k: SzczegolKosza;
   przelicz: { trwa: boolean; blad: string; wynik: string; onPrzelicz: () => void };
+  ponowMm?: PonowienieMm | null;
 }) {
   const bezKorekty = k.zwroty.filter((z) => !z.korektaNumer);
   const pominiete = k.pozycje.filter((p) => p.status === "skipped");
@@ -80,6 +92,25 @@ export function Kosz({ k, przelicz }: {
         z ocen „na stan" — zestaw sprzedany jedną ofertą wchodzi rozbity, tak jak leży na magazynie.</p>}
       {przelicz.wynik && <p className="mt-1 text-sm text-ranga-ok">{przelicz.wynik}</p>}
       <Blad>{przelicz.blad}</Blad>
+      {/* ── KŁOPOT Z MM I PONOWIENIE (@wydanie) ──────────────────────────────
+          Zgłoszenie właściciela: „dodaj, abym mógł wywołać ponownie". Przycisk
+          stoi tylko przy MM w błędzie TERAZ — MM, która weszła po odmowie, nie
+          ma czego ponawiać, tam zostaje samo sprawdzenie stanów. */}
+      {ponowMm && <div className={`mt-2 rounded-lg border p-2 text-sm ${ponowMm.problem.nierozwiazany
+        ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
+        <p className={ponowMm.problem.nierozwiazany ? "text-ranga-zle" : "text-ranga-uwaga"}>
+          <b>{ponowMm.problem.nierozwiazany ? "MM w błędzie" : "MM weszło po błędzie — sprawdź stany z Subiektem"}</b>
+          {ponowMm.problem.ostatniBlad ? ` · ${ponowMm.problem.ostatniBlad}` : ""}</p>
+        {ponowMm.problem.nierozwiazany && <div className="mt-2 flex flex-wrap items-center gap-2">
+          {ponowMm.czekaNaSprawdzenie
+            ? <Przycisk wariant="glowny" disabled={ponowMm.trwa} onClick={() => ponowMm.onPonow(true)}>
+                <RefreshCw size={16} />Sprawdziłem w Subiekcie — ponów MM</Przycisk>
+            : <Przycisk wariant="glowny" disabled={ponowMm.trwa} onClick={() => ponowMm.onPonow(false)}>
+                <RefreshCw size={16} />{ponowMm.trwa ? "Ponawiam…" : "Ponów MM"}</Przycisk>}
+        </div>}
+        {ponowMm.wynik && <p className="mt-1 text-ranga-ok">{ponowMm.wynik}</p>}
+        <Blad>{ponowMm.blad}</Blad>
+      </div>}
       {bezKorekty.length > 0 && <p className="mt-1 text-sm">
         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-ranga-uwaga">czeka na korektę</span>
         {" "}MM wyjdzie, gdy dojdą numery korekt do {ile(bezKorekty.length, "zwrotu", "zwrotów", "zwrotów")}.</p>}
