@@ -50,6 +50,16 @@ export interface StanZadania {
   do?: string;
   kod?: number;
   komunikat?: string;
+  /** Bieżący krok, tylko gdy `etap === "trwa"` i instalator go zapisał. */
+  postep?: Postep;
+}
+
+/** Krok aktualizacji z `postep.json`, który pisze instalator (`Set-WertisPostep`). */
+export interface Postep {
+  krok: number;
+  z: number;
+  nazwa: string;
+  at: string;
 }
 
 /** Porównanie numerów `a.b.c` liczbowo; ujemne = `a` starsza. */
@@ -198,9 +208,29 @@ function czytajJson<T>(plik: string): T | null {
   }
 }
 
+/**
+ * Plik postępu przechodzi przez kształt, zanim dotknie panelu (0.504.0).
+ * Pisze go skrypt na tej samej maszynie, ale nazwa trafia na ekran, a plik
+ * z połową zapisu albo z poprzedniej aktualizacji nie może rysować bzdury.
+ */
+export function postepZPliku(x: unknown): Postep | null {
+  if (!x || typeof x !== "object") return null;
+  const { krok, z, nazwa, at } = x as Record<string, unknown>;
+  if (!Number.isInteger(z) || (z as number) < 1 || (z as number) > 10) return null;
+  if (!Number.isInteger(krok) || (krok as number) < 1 || (krok as number) > (z as number)) return null;
+  if (typeof nazwa !== "string" || !nazwa.trim() || nazwa.length > 120) return null;
+  if (typeof at !== "string" || Number.isNaN(Date.parse(at))) return null;
+  return { krok: krok as number, z: z as number, nazwa: nazwa.trim(), at };
+}
+
 /** Stan ostatniej aktualizacji z `stan.json`, który pisze `zlecenie.ps1`. */
 export function stanZadania(katalog: string = katalogAktualizacji()): StanZadania | null {
-  return czytajJson<StanZadania>(path.join(katalog, "stan.json"));
+  const stan = czytajJson<StanZadania>(path.join(katalog, "stan.json"));
+  if (!stan || stan.etap !== "trwa") return stan;
+  const postep = postepZPliku(czytajJson<unknown>(path.join(katalog, "postep.json")));
+  /* Krok sprzed startu TEJ aktualizacji jest z poprzedniej — `zlecenie.ps1`
+     kasuje plik, ale gdy skasowanie się nie uda, pasek i tak nie kłamie. */
+  return postep && (!stan.od || Date.parse(postep.at) >= Date.parse(stan.od)) ? { ...stan, postep } : stan;
 }
 
 /* Zadanie ma w Harmonogramie limit 30 minut. „Trwa" starsze niż 45 to

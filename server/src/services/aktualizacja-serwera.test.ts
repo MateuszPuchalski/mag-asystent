@@ -4,8 +4,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import {
-  BladZlecenia, _wyczyscPamiec, porownajWersje, problemAktualizacji, sekcjeZmian, sprawdzWydania,
-  stanAktualizacji, trwaAktualizacja, ustawUruchamiacz, wydaniaNowsze, wynikDoDziennika, zlecAktualizacje,
+  BladZlecenia, _wyczyscPamiec, porownajWersje, postepZPliku, problemAktualizacji, sekcjeZmian, sprawdzWydania,
+  stanAktualizacji, stanZadania, trwaAktualizacja, ustawUruchamiacz, wydaniaNowsze, wynikDoDziennika, zlecAktualizacje,
   type Pobieracz,
 } from "./aktualizacja-serwera.js";
 
@@ -153,4 +153,40 @@ test("nieudana aktualizacja w zdrowiu przez dobę", () => {
   assert.match(problemAktualizacji(stan, Date.parse("2026-09-25T12:00:00Z")) ?? "", /nie powiodła się/);
   assert.equal(problemAktualizacji(stan, Date.parse("2026-09-27T12:00:00Z")), null);
   assert.equal(problemAktualizacji({ ...stan, etap: "gotowe" }, Date.parse("2026-09-25T12:00:00Z")), null);
+});
+
+/* Pasek postępu (0.504.0): krok z pliku instalatora trafia do stanu tylko
+   w trakcie, tylko w poprawnym kształcie i tylko z TEJ aktualizacji. */
+test("postęp: poprawny kształt przechodzi, reszta odpada", () => {
+  const at = "2026-09-25T16:48:10.000Z";
+  assert.deepEqual(postepZPliku({ krok: 3, z: 4, nazwa: " Zamiana wersji ", at }),
+    { krok: 3, z: 4, nazwa: "Zamiana wersji", at });
+  for (const zly of [null, "x", { krok: 5, z: 4, nazwa: "a", at }, { krok: 0, z: 4, nazwa: "a", at },
+    { krok: 1.5, z: 4, nazwa: "a", at }, { krok: 1, z: 4, nazwa: "", at }, { krok: 1, z: 4, nazwa: "a".repeat(121), at },
+    { krok: 1, z: 4, nazwa: "a", at: "wczoraj" }, { krok: 1, z: 40, nazwa: "a", at }]) {
+    assert.equal(postepZPliku(zly), null, JSON.stringify(zly));
+  }
+});
+
+test("postęp dochodzi do stanu tylko w trakcie i tylko z tej aktualizacji", () => {
+  const k = kat();
+  const stan = { etap: "trwa", wersja: "0.503.0", od: "2026-09-25T16:48:00.000Z" };
+  fs.writeFileSync(path.join(k, "stan.json"), "\uFEFF" + JSON.stringify(stan));
+  assert.equal(stanZadania(k)?.postep, undefined, "bez pliku postępu nie ma kroku");
+
+  fs.writeFileSync(path.join(k, "postep.json"),
+    "\uFEFF" + JSON.stringify({ krok: 2, z: 4, nazwa: "Rozpakowanie", at: "2026-09-25T16:48:30.000Z" }));
+  assert.deepEqual(stanZadania(k)?.postep, { krok: 2, z: 4, nazwa: "Rozpakowanie", at: "2026-09-25T16:48:30.000Z" });
+
+  fs.writeFileSync(path.join(k, "postep.json"),
+    JSON.stringify({ krok: 4, z: 4, nazwa: "Stary krok", at: "2026-09-25T10:00:00.000Z" }));
+  assert.equal(stanZadania(k)?.postep, undefined, "krok sprzed startu jest z poprzedniej aktualizacji");
+
+  fs.writeFileSync(path.join(k, "postep.json"),
+    JSON.stringify({ krok: 4, z: 4, nazwa: "Uruchomienie", at: "2026-09-25T16:50:00.000Z" }));
+  fs.writeFileSync(path.join(k, "stan.json"), JSON.stringify({ ...stan, etap: "gotowe", do: "2026-09-25T16:51:00.000Z" }));
+  assert.equal(stanZadania(k)?.postep, undefined, "po zakończeniu pasek znika");
+  fs.writeFileSync(path.join(k, "postep.json"), "{\"krok\": 2, \"z\"");
+  fs.writeFileSync(path.join(k, "stan.json"), JSON.stringify(stan));
+  assert.equal(stanZadania(k)?.postep, undefined, "połowa zapisu nie rysuje niczego");
 });

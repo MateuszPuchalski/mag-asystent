@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
 import {
   useAktualizacja, useSprawdzWydania, useZlecAktualizacje, type SekcjaZmian, type StanAktualizacji,
@@ -61,6 +61,46 @@ function Automat({ a }: { a: NonNullable<StanAktualizacji["auto"]> }) {
   </p>;
 }
 
+/* ── Pasek postępu (0.504.0) ──────────────────────────────────────────
+   Kroki są PRAWDZIWE: zapisuje je instalator (`Set-WertisPostep`), a serwer
+   podaje dalej. Żadnych procentów liczonych z zegara — pobieranie zależy od
+   łącza, więc pasek z czasu kłamałby dokładnie wtedy, gdy ktoś na niego
+   patrzy. Zegar obok mówi tylko, ile już trwa.
+
+   W kroku zamiany serwer nie odpowiada. Karta zostaje wtedy przy ostatnim
+   znanym kroku i mówi, że to norma, zamiast pokazywać czerwony błąd. */
+function Postep({ s, bezOdpowiedzi }: { s: StanAktualizacji; bezOdpowiedzi: boolean }) {
+  const p = s.ostatnia?.etap === "trwa" ? s.ostatnia.postep : undefined;
+  const z = p?.z ?? 4;
+  const krok = p?.krok ?? 0;
+  const opis = p ? `Krok ${krok} z ${z}: ${p.nazwa}` : "Przygotowanie aktualizacji";
+  const trwaOd = useTrwa(s.ostatnia?.etap === "trwa" ? s.ostatnia.od : undefined);
+  return <div className="mb-3">
+    <div role="progressbar" aria-label="Postęp aktualizacji" aria-valuemin={0} aria-valuemax={z}
+      aria-valuenow={krok} aria-valuetext={opis} className="flex gap-1">
+      {Array.from({ length: z }, (_, i) => <span key={i} className={`h-2 flex-1 rounded ${
+        i + 1 < krok ? "bg-ranga-ok" : i + 1 === krok ? "animate-pulse bg-slate-700" : "bg-slate-200"}`} />)}
+    </div>
+    <p className="mt-1 text-sm font-bold">{opis}{trwaOd && <span className="font-normal text-slate-600"> · {trwaOd}</span>}</p>
+    {bezOdpowiedzi && <p className="text-sm text-slate-600">Serwer chwilowo nie odpowiada. Przy zamianie wersji
+      to norma; karta pyta dalej co pięć sekund.</p>}
+  </div>;
+}
+
+/** „m:ss" od startu, odświeżane co sekundę. To czas TRWANIA, nie data — stąd
+ *  nie przez `czas()`. */
+function useTrwa(od: string | undefined): string | null {
+  const [teraz, setTeraz] = useState(() => Date.now());
+  useEffect(() => {
+    if (!od) return;
+    const t = setInterval(() => setTeraz(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [od]);
+  if (!od) return null;
+  const sek = Math.max(0, Math.floor((teraz - Date.parse(od)) / 1000));
+  return Number.isNaN(sek) ? null : `${Math.floor(sek / 60)}:${String(sek % 60).padStart(2, "0")}`;
+}
+
 function Zmiany({ zmiany }: { zmiany: SekcjaZmian[] }) {
   if (!zmiany.length) return null;
   return <div className="mb-3 max-h-80 overflow-y-auto rounded border">
@@ -108,8 +148,7 @@ export function Aktualizacja({ admin }: { admin: boolean }) {
     </p>}
     {s && <Ostatnia s={s} />}
     {s?.auto && <Automat a={s.auto} />}
-    {trwa && <p className="mb-3 text-sm font-bold">Aktualizacja trwa. Karta sprawdza postęp co pięć sekund;
-      przez chwilę serwer nie odpowiada i to jest w porządku.</p>}
+    {trwa && s && <Postep s={s} bezOdpowiedzi={akt.isError} />}
     {s?.bladSprawdzenia && <p className="mb-3 text-sm text-ranga-zle">
       Nie udało się zapytać o wydania: {s.bladSprawdzenia}</p>}
     {/* Serwer pyta GitHuba pierwszy raz do dwudziestu minut po starcie

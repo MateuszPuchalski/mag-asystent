@@ -1440,6 +1440,32 @@ Sprawdz "zamiana bez listy z systemu to same nasze usługi, bez powtórzeń" {
     Zaloz (($u -join ",") -eq "wertis-api,wertis-worker") "dostałem: $($u -join ',')"
 }
 
+Sprawdz "krok aktualizacji trafia do pliku postępu, a bez pliku nic się nie dzieje" {
+    $k = Nowy-Katalog
+    $bylo = $script:WertisPlikPostepu
+    try {
+        $plik = Join-Path $k "postep.json"
+        $script:WertisPlikPostepu = $null
+        Set-WertisPostep -Krok 1 -Nazwa "Pobieranie"
+        Zaloz (-not (Test-Path $plik)) "bez -PlikPostepu powstał plik"
+
+        $script:WertisPlikPostepu = $plik
+        Set-WertisPostep -Krok 3 -Nazwa "Zamiana wersji, serwer na chwilę wyłączony"
+        $p = Get-Content -LiteralPath $plik -Raw -Encoding UTF8 | ConvertFrom-Json
+        Zaloz ($p.krok -eq 3 -and $p.z -eq 4) "krok $($p.krok) z $($p.z)"
+        Zaloz ($p.nazwa -eq "Zamiana wersji, serwer na chwilę wyłączony") "nazwa: $($p.nazwa)"
+        Zaloz ($p.at -match '^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$') "czas: $($p.at)"
+        Zaloz (-not (Test-Path "$plik.tmp")) "został plik tymczasowy"
+
+        # Katalog, którego nie ma (dane w trakcie przenosin): cisza, nie wyjątek.
+        $script:WertisPlikPostepu = Join-Path $k "nie-ma\postep.json"
+        Set-WertisPostep -Krok 2 -Nazwa "Rozpakowanie"
+    } finally {
+        $script:WertisPlikPostepu = $bylo
+        Remove-Item $k -Recurse -Force
+    }
+}
+
 Sprawdz "kopia bazy sprzed migracji: najnowsza dla tej wersji, obca nie" {
     $k = Nowy-Katalog
     try {
