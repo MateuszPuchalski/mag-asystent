@@ -4688,6 +4688,18 @@ w błędzie i nic jeszcze nie weszło. „MM po błędzie" jest bursztynowy: dok
 jest, ale stany trzeba sprawdzić. Kubełek „Problem z MM" zbiera wszystkie
 takie kosze, najświeższy kłopot na górze, z treścią ostatniej odmowy.
 
+**MM kosza ponawia się z karty (@wydanie).** Zgłoszenie właściciela: „dodaj,
+abym mógł wywołać ponownie". Przy „MM w błędzie" karta kosza ma przycisk
+„Ponów MM". Wraca do kolejki każde MM kosza, które stoi w błędzie: koszyka,
+powrotne i MM pozycji. Kosz z dokumentu miewa ich kilka naraz. Ponowienie
+działa jak PONÓW z kolejki i zostawia ten sam wpis w dzienniku.
+
+MM przerwane w trakcie zapisu wymaga drugiego ruchu. Subiekt mógł zdążyć je
+zapisać, więc ślepe ponowienie przesunęłoby stany drugi raz. Serwer odmawia
+zdaniem, co sprawdzić, a przycisk „Sprawdziłem w Subiekcie" dopiero wtedy
+ponawia. MM, które weszło po błędzie, przycisku nie ma — tam zostaje
+sprawdzenie stanów.
+
 ### 25a.18. Przebieg sprawy, notatka i rozjazdy (0.313.0)
 
 Trzy odpowiedzi na jedno pytanie biura: co się z tym zwrotem działo.

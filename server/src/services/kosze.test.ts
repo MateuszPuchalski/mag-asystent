@@ -1090,3 +1090,48 @@ test("kosz z kłopotem MM zostaje na liście po oknie dwóch tygodni", () => {
   assert.ok(lista.some((k) => k.id === zKlopotem.koszId), "biuro sprawdza stany także po starszych");
   assert.ok(!lista.some((k) => k.id === bez.koszId), "reszta historii zostaje w audycie");
 });
+
+/* ── Ponowienie MM kosza (@wydanie) ────────────────────────────────────────
+   Zgłoszenie właściciela przy kubełku „Problem z MM": „dodaj, abym mógł
+   wywołać ponownie". Jeden ruch na kosz, a nie PONÓW na każde zadanie. */
+
+test("ponowienie wraca do kolejki WSZYSTKIE MM kosza w błędzie, z wpisem w dzienniku", () => {
+  db().prepare("DELETE FROM events").run();
+  const { koszId, queueId } = koszZMm("Z-50", { queueStatus: "error", blad: "Brak towaru w magazynie" });
+  const drugie = Number(db().prepare(`INSERT INTO sfera_queue(type,payload,status,error_msg,created_by)
+    VALUES ('mm','{}','error','Brak towaru','Test')`).run().lastInsertRowid);
+  db().prepare(`INSERT INTO kosz_pozycja(kosz_id,tw_id,symbol,nazwa,ilosc,mm_queue_id)
+    VALUES (?,900036,'S','N',1,?)`).run(koszId, drugie);
+  const zrobione = Number(db().prepare(`INSERT INTO sfera_queue(type,payload,status,created_by)
+    VALUES ('mm','{}','done','Test')`).run().lastInsertRowid);
+  db().prepare(`INSERT INTO kosz_pozycja(kosz_id,tw_id,symbol,nazwa,ilosc,mm_queue_id)
+    VALUES (?,900037,'S2','N2',1,?)`).run(koszId, zrobione);
+
+  assert.deepEqual(K.ponowMmKosza(db(), koszId, "Ala"), { ponowione: 2 });
+  const stany = db().prepare("SELECT id, status, attempts, error_msg FROM sfera_queue WHERE id IN (?,?,?)")
+    .all(queueId, drugie, zrobione) as Array<{ id: number; status: string; attempts: number; error_msg: string | null }>;
+  assert.deepEqual(stany.map((z) => z.status).sort(), ["done", "pending", "pending"],
+    "zrobione MM nie idzie drugi raz");
+  assert.ok(stany.filter((z) => z.status === "pending").every((z) => z.attempts === 0 && z.error_msg === null));
+  assert.equal((db().prepare("SELECT COUNT(*) AS n FROM events WHERE type='queue_ponowione_recznie'")
+    .get() as { n: number }).n, 2);
+  /* Kłopot zostaje zaznaczony po ponowieniu — stany i tak trzeba sprawdzić. */
+  const w = K.listaKoszy().find((k) => k.id === koszId)!;
+  assert.equal(w.problemMm?.nierozwiazany, false);
+  assert.ok(w.problemMm);
+});
+
+test("MM przerwane w trakcie zapisu ponawia się dopiero po sprawdzeniu w Subiekcie", () => {
+  const { koszId, queueId } = koszZMm("Z-51", { queueStatus: "error",
+    blad: "Worker Sfery przerwany w trakcie zapisu — SPRAWDŹ w Subiekcie, czy dokument powstał" });
+  assert.throws(() => K.ponowMmKosza(db(), koszId, "Ala"), (e: Error & { kod?: number }) =>
+    e.kod === 409 && /Sprawdź w Subiekcie/.test(e.message));
+  assert.equal((db().prepare("SELECT status FROM sfera_queue WHERE id=?").get(queueId) as { status: string }).status,
+    "error", "odmowa niczego nie rusza");
+  assert.deepEqual(K.ponowMmKosza(db(), koszId, "Ala", true), { ponowione: 1 });
+});
+
+test("kosz bez MM w błędzie odmawia zamiast udawać ponowienie", () => {
+  const { koszId } = koszZMm("Z-52", { queueStatus: "done" });
+  assert.throws(() => K.ponowMmKosza(db(), koszId, "Ala"), (e: Error & { kod?: number }) => e.kod === 409);
+});

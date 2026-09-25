@@ -2,7 +2,8 @@ import React, { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Package } from "lucide-react";
 import {
-  useKosze, usePominiete, usePrzeliczKosz, useSzczegolKosza, useSzukajWKoszach, useZalatwPominiecie,
+  useKosze, usePominiete, usePonowMmKosza, usePrzeliczKosz, useSzczegolKosza, useSzukajWKoszach,
+  useZalatwPominiecie,
 } from "../api/kosze";
 import { Blad, FiltrSegmentowy, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI_KOSZY, KolejkaKoszy, KolejkaPominietych, WynikiSzukania, koszeKubelka, kubelekKosza,
@@ -52,9 +53,19 @@ export function Kosze() {
   const [bladPrzelicz, setBladPrzelicz] = useState("");
   const [wynikPrzelicz, setWynikPrzelicz] = useState("");
   const [bladZalatw, setBladZalatw] = useState("");
-  useEffect(() => { setBladPrzelicz(""); setWynikPrzelicz(""); setBladZalatw(""); }, [id]);
+  const ponow = usePonowMmKosza();
+  const [bladPonow, setBladPonow] = useState("");
+  const [wynikPonow, setWynikPonow] = useState("");
+  const [czekaNaSprawdzenie, setCzekaNaSprawdzenie] = useState(false);
+  useEffect(() => {
+    setBladPrzelicz(""); setWynikPrzelicz(""); setBladZalatw("");
+    setBladPonow(""); setWynikPonow(""); setCzekaNaSprawdzenie(false);
+  }, [id]);
 
   const lista = kosze.data?.kosze ?? [];
+  /* Kłopot z MM niesie wiersz LISTY, nie szczegół — liczy go ta sama funkcja
+     co kubełek, więc karta i kubełek nie mogą się rozjechać (@wydanie). */
+  const problemMm = lista.find((k) => k.id === wybrany)?.problemMm ?? null;
   const liczniki: Record<KubelekKoszy, number> = {
     praca: lista.filter((k) => kubelekKosza(k) === "praca").length,
     pominiete: pominiete.data?.pominiete.length ?? 0,
@@ -109,7 +120,25 @@ export function Kosze() {
           ? <Pusto ikona={Package}>Wybierz kosz z kolejki.</Pusto>
           : szczegol.isLoading ? <Pusto waga="lista">Wczytuję zawartość kosza…</Pusto>
             : szczegol.data
-              ? <Kosz k={szczegol.data.kosz} przelicz={{
+              ? <Kosz k={szczegol.data.kosz} ponowMm={problemMm && wybrany !== null ? {
+                  problem: problemMm, trwa: ponow.isPending, blad: bladPonow, wynik: wynikPonow,
+                  czekaNaSprawdzenie,
+                  onPonow: (sprawdzono) => {
+                    setBladPonow(""); setWynikPonow("");
+                    ponow.mutate({ id: wybrany, sprawdzono }, {
+                      onSuccess: (w) => {
+                        setCzekaNaSprawdzenie(false);
+                        setWynikPonow(`Ponowiono ${w.ponowione} MM — worker Sfery weźmie je za chwilę.`);
+                      },
+                      /* Przerwane w zapisie: serwer odmawia ZDANIEM, co sprawdzić.
+                         Drugi przycisk pojawia się dopiero po tej odmowie. */
+                      onError: (e) => {
+                        const zdanie = (e as Error).message;
+                        setBladPonow(zdanie);
+                        if (/przerwano w trakcie zapisu/.test(zdanie)) setCzekaNaSprawdzenie(true);
+                      },
+                    });
+                  } } : null} przelicz={{
                   trwa: przelicz.isPending, blad: bladPrzelicz, wynik: wynikPrzelicz,
                   onPrzelicz: () => {
                     setBladPrzelicz(""); setWynikPrzelicz("");

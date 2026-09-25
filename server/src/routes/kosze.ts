@@ -19,6 +19,7 @@ import {
   type Potwierdzenie,
   pominietePozycje,
   pominPozycjeKosza,
+  ponowMmKosza,
   przesunNaKoniec,
   skanTowaruKosza,
   szczegolKosza,
@@ -90,6 +91,17 @@ export async function koszeRoutes(app: FastifyInstance) {
       } catch (e) {
         return reply.code(400).send({ error: (e as Error).message });
       }
+    });
+
+  /* Ponowienie MM kosza stojących w błędzie (@wydanie). Bramka BIURA, bo to
+     drugi zapis do bazy firmy — uzasadnienie i wyjątek przerwanych przy
+     `ponowMmKosza`. */
+  app.post<{ Params: { id: string }; Body: { sprawdzono?: boolean } }>(
+    "/api/biuro/kosze/:id/ponow-mm", async (req, reply) => {
+      const nie = odmowaBiuro();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      return zBledem(reply, () =>
+        ponowMmKosza(db(), Number(req.params.id), autor(), req.body?.sprawdzono === true));
     });
 
   /* Pominięte pozycje ze wszystkich koszy — lista pracy biura, nie historia.

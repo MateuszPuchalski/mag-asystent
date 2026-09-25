@@ -50,10 +50,20 @@ const POMINIETE: Pominieta[] = [{ pozycjaId: 2, koszId: 14, kod: "Z-14", mmNumer
 
 let wyslane: string[] = [];
 let szukane: string[] = [];
+/* Pierwsza odmowa ponowienia MM (@wydanie): `null` = serwer ponawia od razu. */
+let odmowaPonowienia: string | null = null;
 
 function odpowiedz(url: string, init?: RequestInit): unknown {
   const metoda = init?.method ?? "GET";
-  if (metoda !== "GET") { wyslane.push(`${metoda} ${url} ${init?.body ?? ""}`); return { pominiete: [] }; }
+  if (metoda !== "GET") {
+    wyslane.push(`${metoda} ${url} ${init?.body ?? ""}`);
+    if (url.endsWith("/ponow-mm")) {
+      const blad = odmowaPonowienia; odmowaPonowienia = null;
+      return blad ? { __status: 409, error: blad } : { ponowione: 3 };
+    }
+    return { pominiete: [] };
+  }
+  if (url === "/api/biuro/kosze/16") return { kosz: { ...SZCZEGOL, id: 16, kod: "Z-16", status: "otwarty" } };
   if (url === "/api/biuro/kosze") return { kosze: [kosz(14, { pominietych: 1 }),
     /* Kłopoty z MM (0.501.0): rozłożony po odmowie i otwarty z błędem teraz. */
     kosz(15, { status: "rozlozony", problemMm: { prob: 1, ostatniBlad: "Brak towaru w magazynie",
@@ -73,11 +83,12 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
 }
 
 beforeEach(() => {
-  wyslane = []; szukane = [];
+  wyslane = []; szukane = []; odmowaPonowienia = null;
   _wyczyscPamiecZdjec();
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if (/\/zdjecie$/.test(url)) return new Response("{}", { status: 404 });
-    return new Response(JSON.stringify(odpowiedz(url, init)), { status: 200 });
+    const tresc = odpowiedz(url, init) as { __status?: number };
+    return new Response(JSON.stringify(tresc), { status: tresc.__status ?? 200 });
   }));
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -126,6 +137,32 @@ describe("Kosze w zakładce Zwroty", () => {
     expect(within(wiersze[1]).getByText(/Brak towaru w magazynie/)).toBeInTheDocument();
     expect(within(wiersze[1]).getByText("MM po błędzie")).toBeInTheDocument();
     expect(wyslane).toEqual([]);
+  });
+
+  it("MM w błędzie ponawia się z karty kosza jednym przyciskiem (@wydanie)", async () => {
+    /* Zgłoszenie właściciela: „dodaj, abym mógł wywołać ponownie". */
+    pokaz("/obsluga/zwroty/kosze/16");
+    await userEvent.click(await screen.findByRole("button", { name: "Ponów MM" }));
+    expect(wyslane).toEqual(['POST /api/biuro/kosze/16/ponow-mm {"sprawdzono":false}']);
+    expect(await screen.findByText(/Ponowiono 3 MM/)).toBeInTheDocument();
+  });
+
+  it("MM przerwane w zapisie wymaga drugiego ruchu po sprawdzeniu w Subiekcie (@wydanie)", async () => {
+    odmowaPonowienia = "Jedno MM przerwano w trakcie zapisu. Sprawdź w Subiekcie, czy dokument nie powstał.";
+    pokaz("/obsluga/zwroty/kosze/16");
+    await userEvent.click(await screen.findByRole("button", { name: "Ponów MM" }));
+    expect(await screen.findByText(/Sprawdź w Subiekcie/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /Sprawdziłem w Subiekcie/ }));
+    expect(wyslane).toEqual([
+      'POST /api/biuro/kosze/16/ponow-mm {"sprawdzono":false}',
+      'POST /api/biuro/kosze/16/ponow-mm {"sprawdzono":true}',
+    ]);
+  });
+
+  it("MM, które weszło po błędzie, nie ma przycisku — zostaje sprawdzenie stanów", async () => {
+    pokaz("/obsluga/zwroty/kosze/14");
+    expect(await screen.findByRole("heading", { name: "Z-14" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Ponów MM/ })).toBeNull();
   });
 
   it("kosz prowadzi do swoich zwrotów — połowa wiązania od strony kosza", async () => {

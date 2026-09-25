@@ -452,3 +452,19 @@ test("przeliczenie kosza: bramka biura, a kosz Z DOKUMENTEM dostaje 400 ze zdani
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /dokument MM/);
 });
+
+test("ponowienie MM kosza: bramka biura, a odmowa dochodzi zdaniem (@wydanie)", async () => {
+  /* Reguły ponowienia stoją w serwisie (`services/kosze.test.ts`). Tu dwie
+     rzeczy, których serwis nie widzi: hala tego nie kliknie, a odmowa
+     dochodzi do ekranu zdaniem z właściwym kodem. */
+  const magazynier = zalogowany("magazynier");
+  const biuro = zalogowany("biuro");
+  const koszId = koszDoRozkladania("KZ-34");
+
+  let r = await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/ponow-mm`, headers: magazynier });
+  assert.equal(r.statusCode, 403, "drugi zapis do bazy firmy zleca biuro");
+
+  r = await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/ponow-mm`, headers: biuro });
+  assert.equal(r.statusCode, 409);
+  assert.match(r.json().error, /nie stoi w błędzie/);
+});
