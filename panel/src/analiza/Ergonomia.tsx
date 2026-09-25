@@ -3,6 +3,7 @@ import type { Ergonomia } from "../api/wglad";
 import { Liczba } from "../ui/wykres";
 import { liczbaPl } from "./liczby";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
+import { Zwijka } from "../skrzynka/Zwijka";
 
 /* ── Ergonomia w liczbach (zakres PRACA HALI) ────────────────────────────
    Pytanie właściciela: „jak sprawić, żeby kolektor był przyjemny w pracy?".
@@ -62,6 +63,23 @@ function Sekcja({ tytul, co, children }: { tytul: string; co: string; children: 
   </section>;
 }
 
+/* Zwinięte (@wydanie), bo sześć otwartych tabel naraz przytłaczało: trasy,
+   kody HTTP i p95 stały ścianą, zanim ktokolwiek zadał im pytanie. Otwarta
+   zostaje pierwsza — „gdzie jest wolno" odpowiada na pytanie tej karty.
+   Tytuł widać zawsze, a pusta sekcja mówi to w podpisie, więc nikt nie
+   rozwija jej po to, żeby zobaczyć „brak". Wspólna `Zwijka` ze skrzynki,
+   nie własny przełącznik — jedna reguła, wielu wołających. */
+function SekcjaZwinieta({ tytul, co, pusta, pusto, otwarta, children }: {
+  tytul: string; co: string; pusta: boolean; pusto: string; otwarta?: boolean; children: React.ReactNode;
+}) {
+  return <Zwijka tytul={tytul} podpis={pusta ? pusto : undefined} domyslnieOtwarte={otwarta}>
+    <div className="p-3">
+      <p className="mb-2 text-xs text-slate-600">{co}</p>
+      {children}
+    </div>
+  </Zwijka>;
+}
+
 export function KartaErgonomii({ e }: { e: Ergonomia }) {
   const c = e.czasy;
   return <KartaWgladu tytul="Ergonomia w liczbach"
@@ -75,9 +93,9 @@ export function KartaErgonomii({ e }: { e: Ergonomia }) {
     </div>
     {c.n === 0 && <p className="mt-3 text-sm text-slate-600">
       Brak pomiarów czasu z pracy. Kolektory zaczną je wysyłać po aktualizacji aplikacji, paczką co 5 minut.
-      Do tego czasu czas mierzy wyłącznie skan na ekranie głównym — tabela niżej.</p>}
+      Do tego czasu czas mierzy wyłącznie skan na ekranie głównym — sekcja o nim stoi niżej, rozwinięta.</p>}
 
-    <div className="mt-5 grid gap-6 xl:grid-cols-2">
+    <div className="mt-5">
       <Sekcja tytul="Gdzie jest wolno"
         co="Ekran i trasa z największą liczbą wolnych odpowiedzi. Na górze szuka się przyczyny: ciężkie zapytanie albo słaby zasięg w tej strefie.">
         <Tabela naglowki={["Ekran", "Trasa", "Żądań", "Wolnych", "p95"]} pusto="Brak pomiarów w tym oknie.">
@@ -90,7 +108,10 @@ export function KartaErgonomii({ e }: { e: Ergonomia }) {
           </tr>)}
         </Tabela>
       </Sekcja>
-      <Sekcja tytul="Kolektory z wolnymi odpowiedziami"
+    </div>
+
+    <div className="mt-4">
+      <SekcjaZwinieta tytul="Kolektory z wolnymi odpowiedziami" pusta={c.wgKolektora.length === 0} pusto="Brak pomiarów w tym oknie."
         co="Jeden kolektor wyraźnie gorszy od reszty to zwykle jego Wi-Fi albo bateria, nie serwer.">
         <Tabela naglowki={["Kolektor", "Żądań", "Wolnych", "p95"]} pusto="Brak pomiarów w tym oknie.">
           {c.wgKolektora.map((k) => <tr key={k.device ?? "-"}>
@@ -100,9 +121,9 @@ export function KartaErgonomii({ e }: { e: Ergonomia }) {
             <Td className="whitespace-nowrap text-slate-600">{k.p95 ?? "—"}</Td>
           </tr>)}
         </Tabela>
-      </Sekcja>
+      </SekcjaZwinieta>
 
-      <Sekcja tytul="Najczęstsze odrzucenia"
+      <SekcjaZwinieta tytul="Najczęstsze odrzucenia" pusta={e.odrzucenia.length === 0} pusto="Serwer niczego nie odrzucił."
         co="Każdy wiersz to zdanie, które hala widzi najczęściej. Przepisz je na „zrób X zamiast tego” albo usuń przyczynę na ekranie.">
         <Tabela naglowki={["Trasa", "Kod", "Powód", "Razy", "Kolektorów"]} pusto="Serwer niczego nie odrzucił.">
           {e.odrzucenia.map((o) => <tr key={`${o.trasa} ${o.status} ${o.powod}`}>
@@ -113,8 +134,9 @@ export function KartaErgonomii({ e }: { e: Ergonomia }) {
             <Td className="tabular-nums">{o.urzadzen}</Td>
           </tr>)}
         </Tabela>
-      </Sekcja>
-      <Sekcja tytul="Poprawki na czynność"
+      </SekcjaZwinieta>
+
+      <SekcjaZwinieta tytul="Poprawki na czynność" pusta={e.poprawki.length === 0} pusto="Brak pracy w tym oknie."
         co="Ile zapisanej pracy trzeba było cofnąć albo poprawić. Wysoki udział to ekran, który prowokuje pomyłkę — nie ludzie, którzy ją robią.">
         <Tabela naglowki={["Czynność", "Wykonane", "Poprawki", "Na 100", "Z czego"]} pusto="Brak pracy w tym oknie.">
           {e.poprawki.map((p) => <tr key={p.czynnosc}>
@@ -126,9 +148,9 @@ export function KartaErgonomii({ e }: { e: Ergonomia }) {
               .map(([t, n]) => `${NAZWA_POPRAWKI[t] ?? t}: ${n}`).join(", ") || "—"}</Td>
           </tr>)}
         </Tabela>
-      </Sekcja>
+      </SekcjaZwinieta>
 
-      <Sekcja tytul="Przerwy w łączności"
+      <SekcjaZwinieta tytul="Przerwy w łączności" pusta={e.przerwy.length === 0} pusto="Żadnej przerwy dłuższej niż 5 s."
         co="Kolektor na górze gubi sieć najdłużej. Sprawdź jego strefę pracy i punkt dostępowy, zanim podejrzysz aplikację.">
         <Tabela naglowki={["Kolektor", "Przerw", "Razem", "Najdłuższa"]} pusto="Żadnej przerwy dłuższej niż 5 s.">
           {e.przerwy.map((p) => <tr key={p.device ?? "-"}>
@@ -138,8 +160,12 @@ export function KartaErgonomii({ e }: { e: Ergonomia }) {
             <Td className="tabular-nums">{liczbaPl(p.najdluzszaMin)} min</Td>
           </tr>)}
         </Tabela>
-      </Sekcja>
-      <Sekcja tytul="Skan na ekranie głównym"
+      </SekcjaZwinieta>
+
+      {/* Bez pomiarów z pracy to jedyny pomiar czasu na karcie, więc wtedy
+          otwiera się sam — zdanie wyżej kieruje właśnie tu. */}
+      <SekcjaZwinieta tytul="Skan na ekranie głównym" pusta={e.powtorzoneSkany.length === 0} pusto="Brak skanów w tym oknie."
+        otwarta={c.n === 0}
         co={`Stary pomiar: tylko skan z ekranu głównego, więc nie rozkładanie. Powtórka to ten sam kod z tego samego kolektora w 2 s — pierwszy skan „nie zadziałał”. p95 wszystkich: ${e.skanGlowny.p95 != null ? `${e.skanGlowny.p95} ms` : "—"}.`}>
         <Tabela naglowki={["Kolektor", "Skanów", "Powtórzonych", "p95"]} pusto="Brak skanów w tym oknie.">
           {e.powtorzoneSkany.map((s) => {
@@ -152,7 +178,7 @@ export function KartaErgonomii({ e }: { e: Ergonomia }) {
             </tr>;
           })}
         </Tabela>
-      </Sekcja>
+      </SekcjaZwinieta>
     </div>
   </KartaWgladu>;
 }
