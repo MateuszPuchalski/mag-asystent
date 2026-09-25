@@ -1,6 +1,6 @@
 import { db, type Db } from "../db/db.js";
 import { numerKosza } from "./przyjecia.js";
-import { OKNO, PRZERWA_MIN, czasAktywny, mediana } from "./raporty.js";
+import { GRANICA_OKNA, OKNO, PRZERWA_MIN, czasAktywny, mediana } from "./raporty.js";
 
 /* ── Cykl zwrotu: gdzie naprawdę schodzi czas ────────────────────────────────
    Raport powstał po rozmowie o przyspieszeniu rozkładania zwrotów. Pytanie
@@ -159,7 +159,7 @@ function koszeZOkna(database: Db, dni: number): WierszKosza[] {
          LEFT JOIN sfera_queue q ON q.id = k.mm_queue_id
          LEFT JOIN sfera_queue p ON p.id = k.powrot_queue_id
         WHERE COALESCE(k.rodzaj, ?) = ?
-          AND k.utworzono_at >= datetime('now', ?)
+          AND k.utworzono_at >= ${GRANICA_OKNA}
         ORDER BY k.id`
     )
     .all(RODZAJ_ZWROTY, RODZAJ_ZWROTY, OKNO(dni)) as unknown as WierszKosza[];
@@ -216,7 +216,7 @@ export function cyklZwrotow(dni = 90, database: Db = db()): CyklZwrotow {
     .prepare(
       `SELECT type, payload, created_at FROM events
         WHERE type IN (${ZDARZENIA_HALI.map(() => "?").join(",")})
-          AND created_at >= datetime('now', ?)
+          AND created_at >= ${GRANICA_OKNA}
         ORDER BY created_at, id`
     )
     .all(...ZDARZENIA_HALI, OKNO(dni)) as Array<{

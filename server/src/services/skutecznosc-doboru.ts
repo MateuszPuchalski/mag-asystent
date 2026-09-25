@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { DROGI_DOBORU, STATUSY_DOBORU, type DrogaDoboru, type StatusDoboru } from "./dobor.js";
-import { mediana, OKNO, PODSTAWA_PRAWNA, PROG_WIARYGODNOSCI } from "./raporty.js";
+import { GRANICA_OKNA, mediana, OKNO, PODSTAWA_PRAWNA, PROG_WIARYGODNOSCI } from "./raporty.js";
 
 /**
  * Skuteczność doboru (0.267.0) — WYŁĄCZNIE ODCZYT.
@@ -59,18 +59,9 @@ const DOMYSLNE_DNI = 30;
 const WYBOR = "dobor_wybor";
 const STATUS = "dobor_status";
 
-/**
- * Granica okna w formacie `events.created_at`, czyli ISO z `T` i `Z`.
- *
- * NIE `datetime('now', ?)`, i to nie jest kosmetyka. `datetime()` zwraca
- * `'2026-08-11 19:59:47'` — ze SPACJĄ — a znaczniki w bazie mają `'T'`.
- * W porównaniu tekstowym `'T'` (0x54) jest większe od spacji (0x20), więc
- * `'2026-08-11T00:05:00.000Z' >= datetime('now','-30 days')` daje PRAWDĘ,
- * choć 00:05 jest wcześniejsze niż 19:59. Każde okno zbudowane tamtym
- * sposobem jest do doby szersze, niż deklaruje, zawsze w stronę „więcej".
- * Sprawdzone na uruchomionym `node:sqlite`, nie wywnioskowane.
- */
-const GRANICA = "strftime('%Y-%m-%dT%H:%M:%fZ','now',?)";
+/* Granica okna ISO — powód przy `GRANICA_OKNA` w `raporty.ts`, gdzie
+   mieszka od 0.494.1 jako jedyna definicja. */
+const GRANICA = GRANICA_OKNA;
 
 export interface WierszDrogi {
   droga: DrogaDoboru;
