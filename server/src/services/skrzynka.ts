@@ -25,6 +25,7 @@ import type {
 } from "./klasyfikacja-slownik.js";
 import { podzielStopke } from "./stopka.js";
 import { czyObrazZNazwy } from "./reklamacje.js";
+import { zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -176,7 +177,9 @@ export interface WpisOsi {
   /* `odeslanie_zadania` (0.352.0) to ODPOWIEDŹ HALI BEZ WYNIKU. Osobny rodzaj,
      nie `wynik_zadania` z treścią „nie da się": agent czytający oś ma widzieć,
      że pomiaru NIE MA, a nie że pomiar brzmi jak wymówka. */
-  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania" | "komentarz" | "status" | "dobor";
+  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania" | "komentarz" | "status" | "dobor"
+    /* Kamień milowy zwrotu tego zamówienia (@wydanie) — `zwrot-na-osi.ts`. */
+    | "zwrot";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
   /**
@@ -202,7 +205,8 @@ export interface WpisOsi {
    */
   zdarzenie?:
     | { rodzaj: "status" | "dobor"; po: string | null }
-    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null };
+    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null }
+    | { rodzaj: "zwrot"; co: string; zwrotId: number; numer: string | null };
   /* Nazwa towaru przy ofercie — Z ZAMÓWIENIA, nie z oferty (§4.3: każdy fakt
      niesie źródło). Ofert nie pobieramy; nazwę znamy tylko dla oferty, która
      kiedykolwiek przeszła przez pobrane zamówienie. `null` = nie znamy. */
@@ -978,6 +982,18 @@ export function osRozmowy(id: number): {
       zdarzenie: typ === "dobor_status_changed"
         ? { rodzaj: "dobor", po: p.po ?? null }
         : { rodzaj: "dobor_wybor", wybrano: typ === "dobor_wybrano", symbol: p.symbol ?? null },
+    });
+  }
+
+  /* ZWROT NA OSI (@wydanie) — decyzja, korekta i pieniądze zwrotu tego
+     zamówienia jako zdarzenia, jak status i dobór. Powód i zakres
+     w `services/zwrot-na-osi.ts`. */
+  for (const z of zdarzeniaZwrotowRozmowy(db(), id)) {
+    os.push({
+      id: `zwrot-${z.id}`, rodzaj: "zwrot", autor: z.kto ?? "system", odKlienta: false,
+      tresc: `zwrot${z.numer ? ` ${z.numer}` : ""}: ${z.tresc ?? z.rodzaj}`,
+      at: z.kiedy, ofertaId: null,
+      zdarzenie: { rodzaj: "zwrot", co: z.rodzaj, zwrotId: z.zwrotId, numer: z.numer },
     });
   }
 

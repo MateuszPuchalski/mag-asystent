@@ -47,6 +47,50 @@ export interface ZadanieTerenowe {
  zleconeOdMs: number | null;
  /** Zdjęcia od hali — bez treści plików, sama lista (§13.3). */
  zalaczniki: ZalacznikZadania[];
+ /** Adres sprawy, z której zlecono zadanie (@wydanie); `null` przy ręcznym. */
+ cel: string | null;
+}
+
+/* ── SKĄD ZADANIE I DOKĄD WRACA (@wydanie) ───────────────────────────────────
+   Do tego wydania zlecić hali dało się tylko z rozmowy, a karta zadania nie
+   miała odnośnika z powrotem — źródło stało zdaniem w `kontekst`. Zwrot
+   („sprawdź stan towaru z kosza") i reklamacja („zdjęcie towaru z półki")
+   musiały zlecać ręcznie w Zadaniach, bez śladu, skąd. Dostawa zostaje
+   przy swojej „notatce do hali": drugi kanał do hali o tym samym dokumencie
+   rozdzieliłby jedną rozmowę na dwie.
+
+   `zrodlo` i `zrodlo_ref` stały w tabeli od początku, więc nic nie dochodzi
+   do schematu. Dochodzi SŁOWNIK źródeł z adresem sprawy: karta zadania
+   prowadzi tam, gdzie zapadnie decyzja po wyniku. Nieznane źródło (stare
+   wiersze: „reczne", „panel") po prostu nie ma odnośnika. */
+const CEL_ZRODLA: Record<string, string> = {
+ skrzynka: "/obsluga/skrzynka/", zwrot: "/obsluga/zwroty/", reklamacja: "/obsluga/reklamacje/",
+ dyskusja: "/obsluga/dyskusje/",
+};
+/** Źródła, które panel zleca spoza skrzynki — każde z numerem sprawy. */
+export const ZRODLA_SPRAW = ["zwrot", "reklamacja", "dyskusja"] as const;
+export function celZadania(zrodlo: string, ref: string | null): string | null {
+ return CEL_ZRODLA[zrodlo] && ref && /^\d+$/.test(ref) ? `${CEL_ZRODLA[zrodlo]}${ref}` : null;
+}
+/** Sprawa źródłowa musi istnieć — zadanie z odnośnikiem donikąd to gorzej niż bez. */
+function sprawdzZrodlo(zrodlo: string, ref: string | null): void {
+ if (!(ZRODLA_SPRAW as readonly string[]).includes(zrodlo)) return;
+ if (!ref || !/^\d+$/.test(ref)) throw new Error("Zadanie ze sprawy wymaga jej numeru");
+ const jest = zrodlo === "zwrot" ? db().prepare("SELECT 1 FROM zwrot_klienta WHERE id=?").get(ref)
+  : db().prepare("SELECT 1 FROM reklamacja_klienta WHERE id=? AND typ=?").get(ref, zrodlo === "reklamacja" ? "CLAIM" : "DISPUTE");
+ if (!jest) throw new Error("Nie znaleziono sprawy, z której zlecasz zadanie");
+}
+/**
+ * Wynik albo odesłanie wraca na oś ZWROTU tak jak na oś rozmowy (0.142.0).
+ * Reklamacja i dyskusja nie mają własnej osi zdarzeń biura — tam
+ * wynik czyta się z karty zadania, do której prowadzi odnośnik.
+ */
+function wrocDoZwrotu(id: number, rodzaj: "zadanie_wynik" | "zadanie_odeslane", tresc: string, autor: { id: number; name: string }): void {
+ const z = db().prepare("SELECT zrodlo, zrodlo_ref FROM zadanie_terenowe WHERE id=?").get(id) as { zrodlo: string; zrodlo_ref: string | null } | undefined;
+ if (z?.zrodlo !== "zwrot" || !z.zrodlo_ref) return;
+ db().prepare(`INSERT INTO zwrot_zdarzenie(zwrot_id, rodzaj, tresc, dane_json, kiedy_at, kto, kto_user_id)
+   SELECT id, ?, ?, json_object('zadanieId', ?), ?, ?, ? FROM zwrot_klienta WHERE id=?`)
+  .run(rodzaj, tresc, id, teraz(), autor.name, autor.id, z.zrodlo_ref);
 }
 
 export interface ZalacznikZadania {
@@ -74,7 +118,8 @@ function zalacznikiDla(ids:number[]):Map<number,ZalacznikZadania[]>{
  return out;
 }
 const zZegarem=(z:ZadanieTerenowe,chwila:number,zal:ZalacznikZadania[]=[]):ZadanieTerenowe=>({...z,
- zleconeOdMs:OTWARTE.has(z.status)?Math.max(0,chwila-Date.parse(z.utworzonoAt)):null,zalaczniki:zal});
+ zleconeOdMs:OTWARTE.has(z.status)?Math.max(0,chwila-Date.parse(z.utworzonoAt)):null,zalaczniki:zal,
+ cel:celZadania(z.zrodlo,z.zrodloRef)});
 function tekst(v:string,n:string,max:number){const t=v.trim();if(!t)throw new Error(`${n} nie może być pusty`);if(t.length>max)throw new Error(`${n} może mieć najwyżej ${max} znaków`);return t;}
 export function listaZadan(opts:{status?:string;userId?:number}={}):ZadanieTerenowe[]{
  const w:string[]=[];const a:(string|number)[]=[];
@@ -93,6 +138,7 @@ export function utworzZadanie(input:{rodzaj:RodzajZadania;tytul:string;instrukcj
     pustym, a nie wywrócić zakładanie zadania. Limit ten sam co instrukcji. */
  const k=(input.kontekst??"").trim().slice(0,2000)||null;
  if(input.twId!=null&&!db().prepare("SELECT 1 FROM sgt_towar WHERE tw_id=?").get(input.twId))throw new Error("Nie znaleziono towaru");
+ sprawdzZrodlo(input.zrodlo??"reczne",input.zrodloRef?.trim()||null);
  const id=Number(db().prepare(`INSERT INTO zadanie_terenowe(rodzaj,tytul,instrukcja,kontekst,tw_id,zrodlo,zrodlo_ref,priorytet,utworzono_at,utworzono_przez,utworzono_user_id) VALUES(?,?,?,?,?,?,?,?,?,?,?)`).run(input.rodzaj,t,i,k,input.twId??null,input.zrodlo??"reczne",input.zrodloRef?.trim()||null,p,teraz(),autor.name,autor.id).lastInsertRowid);
  logEvent("zadanie_terenowe_utworzone",autor.name,input.twId??null,{zadanieId:id,rodzaj:input.rodzaj});return zadanie(id)!;
 }
@@ -108,6 +154,7 @@ export function wykonajZadanie(id:number,wynik:string,autor:{id:number;name:stri
     wiadomości: treść napisana przez klienta ma zostać tym, czym była. */
  const rozmowa=db().prepare("SELECT conversation_id FROM zadanie_terenowe WHERE id=?").get(id) as {conversation_id:number|null};
  if(rozmowa?.conversation_id!=null)dopiszZdarzenieWyniku(rozmowa.conversation_id,id,w);
+ wrocDoZwrotu(id,"zadanie_wynik",`Hala: ${w}`,autor);
  logEvent("zadanie_terenowe_wykonane",autor.name,z.twId,{zadanieId:id});return z;
 }
 export function anulujZadanie(id:number,autor:{id:number;name:string}){const r=db().prepare("UPDATE zadanie_terenowe SET status='anulowane',anulowano_at=?,anulowano_przez=? WHERE id=? AND status IN ('nowe','w_toku','odeslane')").run(teraz(),autor.name,id);if(!r.changes)throw new Error("Zadania nie można anulować");const z=zadanie(id)!;logEvent("zadanie_terenowe_anulowane",autor.name,z.twId,{zadanieId:id});return z;}
@@ -142,6 +189,7 @@ export function odeslijZadanie(id:number,powodKod:PowodOdeslania,powod:string|nu
     a agent czekałby na pomiar, którego nikt nie zrobi. */
  const rozmowa=db().prepare("SELECT conversation_id FROM zadanie_terenowe WHERE id=?").get(id) as {conversation_id:number|null};
  if(rozmowa?.conversation_id!=null)dopiszZdarzenieOdeslania(rozmowa.conversation_id,id,powodKod,tresc);
+ wrocDoZwrotu(id,"zadanie_odeslane",`Hala odesłała zadanie: ${powodKod==="brak_towaru"?"brak towaru":"nie da się"}${tresc?` — ${tresc}`:""}`,autor);
  logEvent("zadanie_terenowe_odeslane",autor.name,z.twId,{zadanieId:id,powodKod});return z;
 }
 

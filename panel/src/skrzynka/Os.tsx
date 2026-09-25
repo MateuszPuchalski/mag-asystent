@@ -8,6 +8,7 @@ import { useZdjecieZalacznika } from "../towar/useZdjecie";
 import { Kafel } from "../towar/Kafel";
 import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
 import { PrzypietePytanie } from "./PrzypietePytanie";
+import { NAZWA_ZDARZENIA_ZWROTU } from "../zwroty/Os";
 
 /* Załączniki wiadomości (0.155.0). Sonda pokazała je w 7 z 39 wiadomości —
    do tej pory rozmowa milczała o tym, że klient coś przysłał.
@@ -432,7 +433,10 @@ export function Os({
    Gdy zdarzenie jest ostatnie i nic po nim nie padło, celem zostaje ostatnia
    wypowiedź przed nim, bo skok donikąd byłby przyciskiem bez skutku.        */
 
-const ZDARZENIE: ReadonlySet<string> = new Set(["status", "dobor"]);
+/* „zwrot" (@wydanie) MUSI tu stać: rodzaj spoza tego zbioru rysuje się jak
+   wypowiedź, a decyzja zwrotu udająca zdanie do klienta to najgorszy możliwy
+   wynik (ta sama blizna co `odeslanie_zadania`, `api/typy.ts`). */
+const ZDARZENIE: ReadonlySet<string> = new Set(["status", "dobor", "zwrot"]);
 
 type Zdarzenie = WpisOsi & { cel: string | null };
 
@@ -474,6 +478,8 @@ const BARWA_ZDARZENIA: Record<string, string> = {
   dobor: "bg-sky-100 text-sky-900",
   dobor_wybor: "bg-sky-100 text-sky-900",
   sprawa: "bg-violet-100 text-violet-900",
+  /* Zwrot barwą pieniędzy z osi zwrotu — to ta sama rodzina zdarzeń. */
+  zwrot: "bg-emerald-100 text-emerald-800",
 };
 
 function etykieta(z: Zdarzenie): string {
@@ -483,6 +489,7 @@ function etykieta(z: Zdarzenie): string {
   if (!e) return z.tresc;
   if (e.rodzaj === "status") return e.po ? NAZWA[e.po as StatusRozmowy] ?? e.po : z.tresc;
   if (e.rodzaj === "dobor") return e.po ? NAZWA_DOBORU[e.po as StatusDoboru] ?? e.po : z.tresc;
+  if (e.rodzaj === "zwrot") return `zwrot: ${NAZWA_ZDARZENIA_ZWROTU[e.co] ?? e.co.replace(/_/g, " ")}`;
   if (e.rodzaj === "dobor_wybor") {
     return `${e.wybrano ? "wybrano" : "zdjęto"} ${e.symbol ?? "?"}`;
   }

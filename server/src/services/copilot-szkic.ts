@@ -40,6 +40,7 @@ import { ofertyPoSygnaturze, type LinkDoOferty } from "./allegro-oferty-po-sygna
 import {
   przygotujZdjeciaRozmowy, spisZdjec, type Pobieracz, type WynikZdjec, type ZdjecieZBramki,
 } from "./copilot-zdjecia.js";
+import { faktZwrotu, zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
 
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
 
@@ -82,7 +83,11 @@ export type RodzajFaktu =
   /* Stan paczki zamówienia rozmowy (23 września 2026). Osobny rodzaj, bo
      niesie datę sprawdzenia: to stan z chwili pytania Allegro, nie z chwili
      czytania szkicu, i model ma go podać jako taki. */
-  | "przesylka";
+  | "przesylka"
+  /* Kamienie milowe zwrotu tego zamówienia (@wydanie) — `zwrot-na-osi.ts`.
+     Osobny rodzaj z tego samego powodu co przesyłka: to stan z naszego
+     systemu z datą, a nie obietnica, i model ma go podać jako taki. */
+  | "zwrot";
 
 export interface Fakt { id: string; rodzaj: RodzajFaktu; zdanie: string }
 
@@ -1043,6 +1048,8 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
   const idZam = numerZam ? idZamowienia(db(), numerZam.konto, numerZam.externalId) : null;
   const zdanieP = idZam === null ? null : zdaniePrzesylki(przesylkaZamowienia(db(), idZam));
   if (zdanieP) dodaj("przesylka", zdanieP);
+  const zdanieZ = faktZwrotu(zdarzeniaZwrotowRozmowy(db(), conversationId));
+  if (zdanieZ) dodaj("zwrot", zdanieZ);
 
   /* Intake dopiero, gdy nie ma wyboru POTWIERDZONEGO: przy dowodzie w bazie
      pytania o wymiary byłyby udawaniem, że nie wiemy. I tylko przy prośbie

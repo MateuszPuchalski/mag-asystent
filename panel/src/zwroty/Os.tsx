@@ -38,13 +38,17 @@ const BARWA: Record<string, string> = {
   rabat: "bg-amber-100 text-amber-900",
   rozlozenie: "bg-violet-100 text-violet-800",
   kosz_pominiety: "bg-violet-100 text-violet-800",
+  /* Zadanie zlecone hali ze zwrotu wraca tu wynikiem albo odesłaniem (@wydanie). */
+  zadanie_wynik: "bg-violet-100 text-violet-800",
+  zadanie_odeslane: "bg-amber-100 text-amber-900",
   notatka: "bg-slate-100 text-slate-700",
 };
 
 const SZARY = "bg-slate-100 text-slate-600";
 
-/** Krótkie nazwy rodzajów — czip ma się zmieścić obok godziny. */
-const NAZWA: Record<string, string> = {
+/** Krótkie nazwy rodzajów — czip ma się zmieścić obok godziny. Czyta je też
+    pasek zdarzeń rozmowy (@wydanie), żeby zwrot nazywał się tak samo w obu. */
+export const NAZWA_ZDARZENIA_ZWROTU: Record<string, string> = {
   werdykt: "decyzja",
   ocena: "ocena",
   ocena_cofnieta: "ocena cofnięta",
@@ -60,6 +64,8 @@ const NAZWA: Record<string, string> = {
   rabat: "rabat",
   rozlozenie: "hala",
   kosz_pominiety: "hala",
+  zadanie_wynik: "hala",
+  zadanie_odeslane: "hala odesłała",
   notatka: "notatka",
   notatka_zdjeta: "notatka",
   notatka_cofnieta: "notatka",
@@ -86,7 +92,7 @@ export function Os({ wpisy }: { wpisy: WpisOsiZwrotu[] }) {
     {wpisy.map((w) => <li key={w.id} className="flex gap-2">
       <span className={`mt-0.5 h-fit shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${
         BARWA[w.rodzaj] ?? SZARY}`}>
-        {NAZWA[w.rodzaj] ?? w.rodzaj}
+        {NAZWA_ZDARZENIA_ZWROTU[w.rodzaj] ?? w.rodzaj}
       </span>
       <div className="min-w-0">
         <p className="break-words">{w.tresc ?? "—"}</p>

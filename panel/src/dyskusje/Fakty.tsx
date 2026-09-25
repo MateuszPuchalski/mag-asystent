@@ -5,6 +5,7 @@ import { zlote } from "../api/zwroty";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { Link as RouterLink } from "react-router-dom";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
+import { ZlecHali } from "../sprawy/ZlecHali";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
 import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
 
@@ -233,6 +234,12 @@ export function Fakty({
     {szczegol.droga.length > 1 && <Sekcja tytul="Droga tego zakupu">
       <DrogaZakupu droga={szczegol.droga} tutaj={{ rodzaj: "dyskusja", id: d.id }} />
     </Sekcja>}
+
+    {/* Zlecenie hali z dyskusji (@wydanie) — powód w `sprawy/ZlecHali.tsx`.
+        Dyskusja nie ma numeru od Allegro (§25c.1), więc tytuł niesie temat. */}
+    <Sekcja tytul="Hala">
+      <ZlecHali zrodlo="dyskusja" zrodloRef={d.id} tytul={`Dyskusja — ${d.temat ?? `#${d.id}`}`} />
+    </Sekcja>
 
     {szczegol.rozmowy.length > 0 && <Sekcja tytul="Rozmowy o tym zakupie">
       <ul className="flex flex-col gap-1">

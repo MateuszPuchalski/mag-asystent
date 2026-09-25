@@ -206,7 +206,9 @@ export type WpisOsi = {
      rysuje się jak wypowiedź w rozmowie z klientem. Odmowa hali udająca
      zdanie wysłane kupującemu to najgorszy możliwy wynik tej zmiany. */
   rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania"
-    | "komentarz" | "status" | "dobor";
+    | "komentarz" | "status" | "dobor"
+    /* Kamień milowy zwrotu (@wydanie) — zdarzenie, nie wypowiedź; `Os.tsx` ZDARZENIE. */
+    | "zwrot";
   autor: string;
   odKlienta: boolean;
   tresc: string;
@@ -237,7 +239,9 @@ export type WpisOsi = {
    */
   zdarzenie?:
     | { rodzaj: "status" | "dobor"; po: string | null }
-    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null };
+    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null }
+    /* Kamień milowy zwrotu tego zamówienia (@wydanie) — `server/src/services/zwrot-na-osi.ts`. */
+    | { rodzaj: "zwrot"; co: string; zwrotId: number; numer: string | null };
   messageId?: number;
   zalaczniki?: ZalacznikOsi[];
   wzmianki?: Array<{ userId: number; name: string }>;
@@ -1064,6 +1068,9 @@ export type Zadanie = {
   zleconeOdMs: number | null;
   /* Zdjęcia od hali (§13.3) — sama lista, treść ciągnie `useZdjecieZadania`. */
   zalaczniki: ZalacznikZadania[];
+  /* Adres sprawy, z której zlecono zadanie (@wydanie); `null` przy ręcznym.
+     Opcjonalne, bo starszy serwer go nie niesie. */
+  cel?: string | null;
 }
 
 export type ZalacznikZadania = {

@@ -34,7 +34,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["zadanie_zalacznik", "zadanie_terenowe", "events", "app_user"]) {
+  for (const t of ["zwrot_zdarzenie", "zadanie_zalacznik", "zadanie_terenowe", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   ala = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','Ala','biuro')")
@@ -77,4 +77,54 @@ test("skasowanie zadania zabiera jego zdjęcia — załącznik bez zadania nic n
   db().prepare("DELETE FROM zadanie_terenowe WHERE id=?").run(z.id);
   assert.equal((db().prepare("SELECT count(*) n FROM zadanie_zalacznik").get() as { n: number }).n, 0,
     "CASCADE ze `schema.sql` działa — inaczej retencja zostawiałaby sieroty");
+});
+
+/* ── Zadanie ze sprawy: skąd i dokąd wraca (@wydanie) ───────────────────────
+   Zwrot, reklamacja, dyskusja i dostawa zlecają hali z numerem sprawy.
+   Karta zadania prowadzi z powrotem, wynik i odesłanie wracają na oś zwrotu,
+   a odesłane zadanie staje w Do zrobienia.                                */
+const zwrot = () => {
+  const d = db();
+  d.prepare("DELETE FROM zwrot_zdarzenie").run();
+  d.prepare("DELETE FROM zwrot_klienta").run();
+  const k = Number(d.prepare("INSERT OR IGNORE INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-z')")
+    .run().lastInsertRowid) || Number((d.prepare("SELECT id FROM channel_account WHERE external_account_id='seller-z'").get() as { id: number }).id);
+  return Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,reference_number,order_id,created_at,synced_at)
+    VALUES (?,'z-1','Z-1','ord-1','2026-09-20T08:00:00Z','2026-09-20')`).run(k).lastInsertRowid);
+};
+
+test("zadanie ze zwrotu ma odnośnik, a wynik i odesłanie wracają na oś zwrotu", () => {
+  const idZwrotu = zwrot();
+  const z = Z.utworzZadanie({ rodzaj: "weryfikacja", tytul: "Zwrot Z-1", instrukcja: "Sprawdź stan noża z kosza.",
+    zrodlo: "zwrot", zrodloRef: String(idZwrotu) }, autor());
+  assert.equal(z.cel, `/obsluga/zwroty/${idZwrotu}`);
+  Z.wezZadanie(z.id, autor());
+  Z.wykonajZadanie(z.id, "bez śladów użycia", autor());
+
+  const z2 = Z.utworzZadanie({ rodzaj: "zdjecie", tytul: "Zwrot Z-1", instrukcja: "Zdjęcie pudełka.",
+    zrodlo: "zwrot", zrodloRef: String(idZwrotu) }, autor());
+  Z.odeslijZadanie(z2.id, "brak_towaru", null, autor());
+  const os = db().prepare("SELECT rodzaj, tresc FROM zwrot_zdarzenie WHERE zwrot_id=? ORDER BY id").all(idZwrotu) as
+    Array<{ rodzaj: string; tresc: string }>;
+  assert.deepEqual(os.map((w) => w.rodzaj), ["zadanie_wynik", "zadanie_odeslane"]);
+  assert.equal(os[0].tresc, "Hala: bez śladów użycia");
+  assert.match(os[1].tresc, /brak towaru/);
+});
+
+test("zadanie ze sprawy, której nie ma, nie powstaje; ręczne nie ma odnośnika", () => {
+  assert.throws(() => Z.utworzZadanie({ rodzaj: "inne", tytul: "x", instrukcja: "y", zrodlo: "zwrot", zrodloRef: "999999" },
+    autor()), /Nie znaleziono sprawy/);
+  assert.throws(() => Z.utworzZadanie({ rodzaj: "inne", tytul: "x", instrukcja: "y", zrodlo: "reklamacja" }, autor()),
+    /wymaga jej numeru/);
+  assert.equal(noweZadanie().cel, null);
+});
+
+test("odesłane zadanie staje w Do zrobienia i prowadzi do Zadań", async () => {
+  const { doDecyzji } = await import("./do-decyzji.js");
+  const z = noweZadanie();
+  Z.odeslijZadanie(z.id, "nie_da_sie", "tabliczka zatarta", autor());
+  const w = doDecyzji().pozycje.find((p) => p.zrodlo === "zadania");
+  assert.ok(w);
+  assert.equal(w.cel.panel, "/obsluga/zadania");
+  assert.match(w.co, /Sfotografuj tabliczkę · nie da się · tabliczka zatarta/);
 });

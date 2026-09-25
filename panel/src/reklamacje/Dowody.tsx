@@ -6,6 +6,7 @@ import type {
 } from "../api/typy";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
+import { ZlecHali } from "../sprawy/ZlecHali";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
 import { zlote } from "../api/zwroty";
 import {
@@ -500,6 +501,12 @@ export function Dowody({
           <SprawyZakupu sprawy={szczegol.sprawy} wSekcji />
         </div>}
       </Sekcja>}
+
+    {/* ZLECENIE HALI Z REKLAMACJI (@wydanie) — „zdjęcie towaru z półki",
+        „sprawdź, czy partia ma tę wadę". Powód w `sprawy/ZlecHali.tsx`. */}
+    <Sekcja tytul="Hala">
+      <ZlecHali zrodlo="reklamacja" zrodloRef={r.id} tytul={`Reklamacja ${r.numer ?? r.id}`} twId={r.twId} />
+    </Sekcja>
 
     {/* ── COPILOT NA DOLE (0.403.0) ───────────────────────────────────────────
         Do tego wydania karta maszyny stała PIERWSZA, nad faktami sprawy.

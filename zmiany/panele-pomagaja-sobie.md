@@ -13,6 +13,14 @@ zamówiono u dostawcy i na kiedy. Przy stanie mówi, ile stoi jeszcze
 w przyjęciach. Szkic Copilota dostaje ilość i termin dostawcy, bez nazwy
 dostawcy, z zastrzeżeniem, że termin nie jest obietnicą.
 
+**Zwrot na osi rozmowy.** Decyzja, korekta i pieniądze zwrotu tego
+zamówienia stoją w pasku przebiegu rozmowy. Szkic Copilota dostaje je jako
+fakt z datą. Ocena towaru i notatki biura zostają w zwrocie.
+
+**„Zleć hali" ze zwrotu, reklamacji i dyskusji.** Zadanie pamięta sprawę:
+karta w Zadaniach prowadzi do niej z powrotem, a wynik zadania ze zwrotu
+staje na osi zwrotu. Zadanie odesłane przez halę pojawia się w Do zrobienia.
+
 **Drobne:**
 
 - wiersz „Pominięta pozycja" w Do zrobienia otwiera kosz w kubełku pominiętych;

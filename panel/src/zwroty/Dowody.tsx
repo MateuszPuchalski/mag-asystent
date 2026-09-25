@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  CalendarClock, CalendarDays, CreditCard, History, MessageSquare, NotebookPen, Package, Receipt,
+  CalendarClock, CalendarDays, ClipboardList, CreditCard, History, MessageSquare, NotebookPen, Package, Receipt,
   RefreshCw, Scale, ShoppingCart, Truck, Undo2, UserCheck, Wallet,
 } from "lucide-react";
 import type { Tag } from "../api/typy";
@@ -14,6 +14,7 @@ import { Link } from "./Link";
 import { ZnakAllegro } from "../ui/ZnakAllegro";
 import { KafelOferty } from "../towar/Kafel";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
+import { ZlecHali, jedynaKartoteka } from "../sprawy/ZlecHali";
 import { Link as RouterLink } from "react-router-dom";
 
 /* Kolumna dowodów: wszystko, co trzeba przeczytać, ZANIM padnie decyzja.
@@ -446,6 +447,14 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
     <Sekcja ikona={<MessageSquare size={14} />} tytul="Droga tego zakupu">
       <DrogaZakupu droga={droga} tutaj={{ rodzaj: "zwrot", id: zwrot.id }} />
     </Sekcja>}
+
+    {/* ZLECENIE HALI ZE ZWROTU (@wydanie) — powód w `sprawy/ZlecHali.tsx`.
+        Towar jedzie z zadaniem tylko wtedy, gdy zwrot ma JEDNĄ znaną
+        kartotekę: przy kilku zgadywanie wysłałoby magazyniera pod złą półkę. */}
+    <Sekcja ikona={<ClipboardList size={14} />} tytul="Hala">
+      <ZlecHali zrodlo="zwrot" zrodloRef={zwrot.id} tytul={`Zwrot ${zwrot.numer ?? zwrot.id}`}
+        twId={jedynaKartoteka(zwrot.pozycje.map((p) => p.twId))} />
+    </Sekcja>
 
     {zwrot.rozmowy.length > 0 &&
     <Sekcja ikona={<MessageSquare size={14} />} tytul="Wiadomości o tym zakupie">

@@ -1,5 +1,6 @@
 import React, { useState } from "react";
-import { AlertTriangle, CheckCircle2, ClipboardList, Clock, PackageX, Plus, RotateCcw, Ruler, Undo2, X } from "lucide-react";
+import { AlertTriangle, ArrowUpRight, CheckCircle2, ClipboardList, Clock, PackageX, Plus, RotateCcw, Ruler, Undo2, X } from "lucide-react";
+import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -9,6 +10,12 @@ import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, czas, wiek } from "../ui
 import { Kafel } from "../towar/Kafel";
 import type { Zadanie, ZalacznikZadania } from "../api/typy";
 import { useZdjecieZadania } from "../towar/useZdjecie";
+
+/** Napis odnośnika po drugim członie adresu sprawy (`/obsluga/<to>/<id>`). */
+const NAZWA_ZRODLA: Record<string, string> = {
+  skrzynka: "Otwórz rozmowę", zwroty: "Otwórz zwrot", reklamacje: "Otwórz reklamację",
+  dyskusje: "Otwórz dyskusję",
+};
 
 const Schemat = z.object({
   rodzaj: z.enum(["pomiar", "zdjecie", "weryfikacja", "inne"]),
@@ -242,6 +249,11 @@ export function Zadania() {
                 kliknięcie przy każdym powrocie po wynik. */}
             {t.kontekst && <p className="mt-2 whitespace-pre-wrap border-l-2 border-slate-200
               pl-2 text-podpis text-slate-500">{t.kontekst}</p>}
+            {/* ODNOŚNIK DO SPRAWY (@wydanie): kontekst mówił, skąd zadanie,
+                ale nie prowadził tam. Decyzja po wyniku zapada w sprawie. */}
+            {t.cel && <Link to={t.cel}
+              className="mt-1 inline-flex items-center gap-1 text-podpis font-semibold text-sky-800 underline underline-offset-2">
+              <ArrowUpRight size={12} aria-hidden="true" />{NAZWA_ZRODLA[t.cel.split("/")[2]] ?? "Otwórz sprawę"}</Link>}
           </div>
         </div>
         {/* ── PASEK TOWARU ZE ZDJĘCIEM (0.203.0) ────────────────────────

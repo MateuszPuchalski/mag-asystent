@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   AlertTriangle, Barcode, ChevronRight, CircleCheck, Inbox, ListChecks, MessageSquareReply,
   FlaskConical, MessagesSquare, Package, PlugZap, ShieldQuestion, Truck, Undo2,
+  ClipboardList,
 } from "lucide-react";
 import { useDoDecyzji, type Obszar, type PozycjaDecyzji, type ZrodloDecyzji } from "../api/decyzje";
 import { Blad, FiltrSegmentowy, Karta, Pusto, wiek } from "../ui";
@@ -24,12 +25,14 @@ const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; classNam
   dostawy: Truck, odpowiedzi: MessageSquareReply, kosze: Package, zapisy: AlertTriangle,
   kody: Barcode, allegro: PlugZap, reklamacje: ShieldQuestion, zwroty: Undo2,
   skrzynka: Inbox, dyskusje: MessagesSquare, sonda: FlaskConical,
+  /* Zadanie odesłane przez halę (@wydanie) — `odeslaneZadania` w `do-decyzji.ts`. */
+  zadania: ClipboardList,
 };
 
 const NAZWY: Record<ZrodloDecyzji, string> = {
   dostawy: "Dostawy", odpowiedzi: "Odpowiedź z hali", kosze: "Kosze", zapisy: "Zapis do Subiekta",
   kody: "Kody kreskowe", allegro: "Konto Allegro", reklamacje: "Reklamacje", zwroty: "Zwroty",
-  skrzynka: "Skrzynka", dyskusje: "Dyskusje", sonda: "Test na żywo",
+  skrzynka: "Skrzynka", dyskusje: "Dyskusje", sonda: "Test na żywo", zadania: "Zadanie hali",
 };
 
 type Filtr = "wszystko" | Obszar;

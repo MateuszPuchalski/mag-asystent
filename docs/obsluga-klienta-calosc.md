@@ -71,6 +71,16 @@ widziała więc zwrot, a zwrot jej nie. Teraz każda strona czyta jedną relacj�
 `ROZMOWA_ZAMOWIENIA`. Pilnuje jej test „rozmowy zamówienia tylko przez
 ROZMOWA_ZAMOWIENIA" w `droga-klienta.test.ts`.
 
+**Od @wydanie zwrot staje na osi rozmowy, a hala odpowiada sprawie, która ją
+wezwała.** Decyzja, korekta i pieniądze zwrotu tego zamówienia są zdarzeniami
+w pasku rozmowy i faktem w szkicu Copilota (`services/zwrot-na-osi.ts`).
+Ocena, kwota robocza i notatka biura zostają w zwrocie — to nasza kuchnia.
+Zwrot, reklamacja i dyskusja zlecają hali przyciskiem „Zleć hali"
+(`panel/src/sprawy/ZlecHali.tsx`). Karta zadania prowadzi z powrotem do
+sprawy, wynik ze zwrotu staje na jego osi, a odesłanie — w Do zrobienia.
+Dostawa zostaje przy „notatce do hali", żeby nie mieć dwóch kanałów o jednym
+dokumencie.
+
 Drugim mostkiem jest login kupującego. Chodzą po nim zakładka KLIENT (S2)
 i kandydaci zamówień rozmowy bez numeru (S1). Właściciel potwierdził go na
 żywym koncie 24 września 2026 — rozdział „Sprzeczność: login kupującego"
