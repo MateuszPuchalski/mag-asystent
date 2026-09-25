@@ -60,7 +60,7 @@ const WYBOR = "dobor_wybor";
 const STATUS = "dobor_status";
 
 /* Granica okna ISO — powód przy `GRANICA_OKNA` w `raporty.ts`, gdzie
-   mieszka od @wydanie jako jedyna definicja. */
+   mieszka od 0.494.1 jako jedyna definicja. */
 const GRANICA = GRANICA_OKNA;
 
 export interface WierszDrogi {

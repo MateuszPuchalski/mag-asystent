@@ -81,7 +81,8 @@ test("patrzenie niczego nie zapisuje", async () => {
   assert.deepEqual(s.wydania.map((w) => w.wersja), ["9.0.0"]);
   /* Decyzja automatu (0.494.0) w odpowiedzi — to samo zdanie, którym kieruje
      się takt. Wydanie z testu ma dwa dni, więc jest dojrzałe. */
-  assert.deepEqual([s.auto.tryb, s.auto.okno, s.auto.kandydat], ["noc", { od: 3, do: 5 }, "9.0.0"]);
+  /* Domyślny tryb produkcji to „zaraz" — decyzja właściciela z wywiadu. */
+  assert.deepEqual([s.auto.tryb, s.auto.okno, s.auto.kandydat], ["zaraz", { od: 3, do: 5 }, "9.0.0"]);
   assert.ok(s.auto.powod.length > 0);
   assert.equal(s.zmiany.length, 1);
   assert.equal(ileZdarzen(), przed);

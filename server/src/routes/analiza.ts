@@ -8,6 +8,7 @@ import { sesjaZadania } from "../context.js";
 import { czasOdpowiedzi } from "../services/czas-odpowiedzi.js";
 import { raportUzycia } from "../services/uzycie.js";
 import { ergonomia } from "../services/ergonomia.js";
+import { listaRaportow, raportTygodnia } from "../services/raport-tygodnia.js";
 
 /* ── Analiza śladu audytowego dla biura ──────────────────────────────────────
    Jedna trasa z kompletem sekcji (zakładka ANALIZA robi jeden fetch) + CSV.
@@ -120,6 +121,28 @@ export async function analizaRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return ergonomia(dniZQuery(req.query.days));
+  });
+
+  /* Raporty tygodni (0.497.0). Ta sama bramka biura, bo raport nie niesie
+     ludzi — patrz nagłówek `services/raport-tygodnia.ts`. Trasy tylko
+     CZYTAJĄ: raport zapisuje takt w `main()`, a tydzień niepoliczony
+     odpowiada 404, nie liczy się w locie. Inaczej pierwsze otwarcie ekranu
+     byłoby zapisem, a to łamie zasadę zera zapisu przy patrzeniu. */
+  app.get("/api/analiza/tygodnie", async (_req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return { tygodnie: listaRaportow() };
+  });
+
+  app.get<{ Params: { tydzien: string } }>("/api/analiza/tygodnie/:tydzien", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    if (!/^\d{4}-W\d{2}$/.test(req.params.tydzien)) {
+      return reply.code(400).send({ error: "Tydzień w postaci RRRR-Www, np. 2026-W38" });
+    }
+    const r = raportTygodnia(req.params.tydzien);
+    if (!r) return reply.code(404).send({ error: `Raportu tygodnia ${req.params.tydzien} nie ma` });
+    return r;
   });
 
   app.get<{ Querystring: { days?: string } }>("/api/analiza/csv", async (req, reply) => {

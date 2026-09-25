@@ -3187,3 +3187,43 @@ CREATE TABLE IF NOT EXISTS klient_notatka (
   przez          TEXT NOT NULL,
   przez_user_id  INTEGER REFERENCES app_user(user_id)
 );
+
+-- ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────────
+-- Raz dziennie serwer przechodzi te same drogi co produkcja, bez atrap, i zapisuje
+-- tu WYNIK każdego kroku. Powód: przez 150 wydań Copilot „widział zdjęcia” tylko
+-- w testach z podstawionym pobieraczem. Treści tu nie ma — krok, wynik, zdanie
+-- bez adresów i czas. Stare przebiegi odchodzą po 90 dniach.
+CREATE TABLE IF NOT EXISTS sonda_rzeczywistosci (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  przebieg  TEXT NOT NULL,
+  krok      TEXT NOT NULL,
+  wynik     TEXT NOT NULL CHECK (wynik IN ('ok','blad','pominiety')),
+  szczegol  TEXT,
+  ms        INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_sonda_rzeczywistosci_przebieg ON sonda_rzeczywistosci(przebieg);
+
+-- Migawka stanu raz na dobę lokalną (0.497.0, raport tygodnia). Dziennik
+-- `events` pamięta CZYNNOŚCI, ale nie STAN: ile czekało DO DECYZJI, ile
+-- zwrotów stało w kubełku, jak długo czekał klient. Te liczby istnieją tylko
+-- w chwili odczytu i jutro nie da się ich odtworzyć — bez migawki pytanie
+-- „czy zaległość rośnie" nie ma odpowiedzi. Pierwsza migawka doby wygrywa;
+-- `at` mówi, o której ją zrobiono, bo serwer biura bywa włączany rano.
+CREATE TABLE IF NOT EXISTS migawka_dnia (
+  data  TEXT PRIMARY KEY,            -- RRRR-MM-DD, doba lokalna magazynu
+  at    TEXT NOT NULL,               -- ISO UTC chwili odczytu
+  stan  TEXT NOT NULL                -- JSON `Migawka`, patrz services/migawka-dnia.ts
+);
+
+-- Raport tygodnia (0.497.0). ZAMROŻONY przy zapisie: liczby z tygodnia 38
+-- mają za miesiąc brzmieć tak samo jak w dniu, w którym ktoś je omawiał.
+-- Poprawka reguły liczenia zmienia raporty NASTĘPNE, a starych nie przepisuje
+-- po cichu — `wersja` mówi, którą regułą policzono dany tydzień.
+CREATE TABLE IF NOT EXISTS raport_tygodnia (
+  tydzien    TEXT PRIMARY KEY,       -- RRRR-Www (ISO 8601)
+  od         TEXT NOT NULL,          -- poniedziałek 00:00 lokalnie, ISO UTC
+  do         TEXT NOT NULL,          -- następny poniedziałek 00:00, bez niego
+  wersja     INTEGER NOT NULL,
+  utworzono  TEXT NOT NULL,
+  dane       TEXT NOT NULL           -- JSON `RaportTygodnia`
+);

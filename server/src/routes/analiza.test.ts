@@ -47,7 +47,8 @@ function zalogowany(rola: Rola): string {
 /* Analiza dostaw (0.100.0) dzieli tę bramkę, choć jej dane nie są imienne.
    Powód jest inny i wypisany przy trasie: karta odpowiada na „u którego
    dostawcy jest problem", a to ocena kontrahenta, nie stan magazynu. */
-const CHRONIONE = ["/api/analiza", "/api/analiza/csv", "/api/biuro/dostawy/analiza", "/api/analiza/obsluga"];
+const CHRONIONE = ["/api/analiza", "/api/analiza/csv", "/api/biuro/dostawy/analiza", "/api/analiza/obsluga",
+  "/api/analiza/tygodnie", "/api/analiza/tygodnie/2026-W38"];
 
 test("bez sesji 401 — dane o ludziach nie mają prawa być otwarte", async () => {
   for (const url of CHRONIONE) {
@@ -181,4 +182,35 @@ test("czas odpowiedzi: biuro bez rozbicia na osoby, administrator z nim", async 
   assert.ok(Array.isArray(biuro.wgKategorii));
   const admin = await czytaj(zalogowany("admin"));
   assert.ok(Array.isArray(admin.wgOsoby));
+});
+
+/* Raporty tygodni (0.497.0). Trasy tylko czytają: raport zapisuje takt
+   w `main()`, a tydzień niepoliczony to 404, nie liczenie w locie. */
+test("raporty tygodni: lista, raport z poprzednim, 404 i zero zapisu", async () => {
+  const token = zalogowany("biuro");
+  const { przebiegRaportow } = await import("../services/raport-tygodnia.js");
+  db().prepare("DELETE FROM raport_tygodnia").run();
+  db().prepare("INSERT INTO events(type, user_id, created_at) VALUES ('login','x','2026-09-01T08:00:00.000Z')").run();
+  przebiegRaportow(db(), Date.parse("2026-09-20T22:30:00.000Z"));
+
+  /* `http_rejected` to audyt odmowy z `context.ts`, zapisywany przy każdej
+     odpowiedzi 4xx na każdej trasie — nie mutacja tej trasy. */
+  const zdarzen = () => (db().prepare("SELECT COUNT(*) AS n FROM events WHERE type <> 'http_rejected'")
+    .get() as { n: number }).n;
+  const przed = zdarzen();
+  const lista = await app.inject({ method: "GET", url: "/api/analiza/tygodnie", headers: { "x-session": token } });
+  assert.equal(lista.statusCode, 200);
+  assert.deepEqual(lista.json().tygodnie.map((t: { tydzien: string }) => t.tydzien), ["2026-W38", "2026-W37"]);
+
+  const r = await app.inject({ method: "GET", url: "/api/analiza/tygodnie/2026-W38", headers: { "x-session": token } });
+  assert.equal(r.statusCode, 200);
+  assert.equal(r.json().raport.tydzien, "2026-W38");
+  assert.equal(r.json().poprzedni.tydzien, "2026-W37");
+
+  const brak = await app.inject({ method: "GET", url: "/api/analiza/tygodnie/2026-W39", headers: { "x-session": token } });
+  assert.equal(brak.statusCode, 404, "tydzień w toku się nie liczy przy otwarciu");
+  const zly = await app.inject({ method: "GET", url: "/api/analiza/tygodnie/wczoraj", headers: { "x-session": token } });
+  assert.equal(zly.statusCode, 400);
+  assert.equal(zdarzen(), przed, "patrzenie niczego nie zapisuje");
+  assert.equal((db().prepare("SELECT COUNT(*) AS n FROM raport_tygodnia").get() as { n: number }).n, 2);
 });

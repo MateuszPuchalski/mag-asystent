@@ -44,3 +44,30 @@ test("popsuty znacznik wraca NIEZMIENIONY, nie jako Invalid Date", () => {
   assert.equal(C.dataLokalna(""), "");
   assert.equal(C.stempelLokalny("2026-13-45"), "2026-13-45");
 });
+
+/* ── Tydzień na zegarze magazynu (raport tygodnia) ─────────────────────────── */
+
+test("północ lokalna: zimą 23:00 UTC dnia poprzedniego, latem 22:00", () => {
+  assert.equal(C.polnocLokalna("2026-01-12"), "2026-01-11T23:00:00.000Z");
+  assert.equal(C.polnocLokalna("2026-07-13"), "2026-07-12T22:00:00.000Z");
+});
+
+test("północ lokalna w dniu zmiany czasu bierze przesunięcie SPRZED zmiany", () => {
+  // 29 marca 2026 zegar skacze o 2:00 — północ jest jeszcze czasem zimowym
+  assert.equal(C.polnocLokalna("2026-03-29"), "2026-03-28T23:00:00.000Z");
+  // a następna doba zaczyna się już latem: ta niedziela miała 23 godziny
+  assert.equal(C.polnocLokalna("2026-03-30"), "2026-03-29T22:00:00.000Z");
+});
+
+test("tydzień ISO: rok tygodnia to rok czwartku", () => {
+  assert.deepEqual(C.tydzienIso("2025-12-29"), { tydzien: "2026-W01", poniedzialek: "2025-12-29" });
+  assert.deepEqual(C.tydzienIso("2027-01-01"), { tydzien: "2026-W53", poniedzialek: "2026-12-28" });
+  assert.deepEqual(C.tydzienIso("2026-09-24"), { tydzien: "2026-W39", poniedzialek: "2026-09-21" });
+  // niedziela należy do tygodnia, który zaczął się sześć dni wcześniej
+  assert.deepEqual(C.tydzienIso("2026-09-27"), { tydzien: "2026-W39", poniedzialek: "2026-09-21" });
+});
+
+test("dodajDni przechodzi przez koniec miesiąca i roku", () => {
+  assert.equal(C.dodajDni("2026-12-28", 7), "2027-01-04");
+  assert.equal(C.dodajDni("2026-03-01", -1), "2026-02-28");
+});

@@ -357,7 +357,7 @@ test("CSV otwiera się w Excelu PL bez kreatora", () => {
   assert.match(csv, /^lokalizacja;/m);
 });
 
-/* Granica okna w formacie bazy (@wydanie). `processed_at` zapisuje worker
+/* Granica okna w formacie bazy (0.494.1). `processed_at` zapisuje worker
    jako ISO z `T`. Porównanie z `datetime('now','-1 day')` (ze spacją) dawało
    `'…T…' < '… …'` = FAŁSZ dla całej doby granicznej, więc zadanie w błędzie
    od 25 godzin nie trafiało do raportu przez kolejną dobę. */

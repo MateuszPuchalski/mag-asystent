@@ -995,30 +995,6 @@ Sprawdz "hasło podane w ustawieniach NIE trafia do pliku" {
     }
 }
 
-Sprawdz "walidacja hasła admina odrzuca za krótkie" {
-    # Ta sama reguła co na serwerze (HASLO_MIN = 8). Instalator sprawdza ją
-    # SAM, żeby nie odbić się od API po tym, jak człowiek wpisał hasło dwa razy.
-    Zaloz (-not (Test-WertisHasloAdmina "krotkie")) "7 znaków ma odpaść"
-    Zaloz (Test-WertisHasloAdmina "osiemzna") "8 znaków ma przejść"
-}
-
-Sprawdz "przebieg próbny przechodzi krok konta z PUSTYM hasłem" {
-    <#
-        Regresja, która wywróciła CI przy pierwszym uruchomieniu tego kroku.
-        W `-DryRun` nikt o hasło nie pyta, więc do funkcji leci pusty łańcuch —
-        a `[Parameter(Mandatory)][string]` odrzuca go w BINDERZE, czyli zanim
-        `Test-DryRun` zdąży zwrócić $true. Przebieg próbny wywalał się na kroku,
-        który z definicji niczego nie robi.
-    #>
-    $bylo = $script:WertisDryRun
-    $script:WertisDryRun = $true
-    try {
-        Zaloz (New-WertisKontoAdmina -Login "admin" -Haslo "") "krok próbny ma przejść bez hasła"
-    } finally {
-        $script:WertisDryRun = $bylo
-    }
-}
-
 # ── Worker Sfery (usługa wertis-sfera) ──────────────────────────────────────
 # Trzecia usługa jest OPCJONALNA (wymaga licencji Sfery i zbudowanego exe),
 # więc reguły wokół niej to głównie „nic nie psuj, gdy jej nie ma".
@@ -1130,7 +1106,6 @@ $galazKod = ($galaz -split "\r?\n" |
     Where-Object { $_.TrimStart() -notmatch '^#' -and $_.TrimStart() -notmatch '^Write-' }) -join "`n"
 
 foreach ($zakazane in @(
-    "New-WertisKontoAdmina",          # konta użytkowników
     "Publish-WertisKonfiguracja",     # wertis.env i środowisko usług
     "Add-WertisRegulaZapory",         # zapora
     "Register-WertisUsluga",          # rejestracja usług w NSSM
@@ -1534,6 +1509,63 @@ Sprawdz "sprzątanie starej wersji zdejmuje dowiązanie danych, nie kasuje danyc
     } finally {
         Remove-Item -LiteralPath $k -Recurse -Force -ErrorAction SilentlyContinue
     }
+}
+
+Sprawdz "instancja SQL bez pytania: INSERTGT, potem jedyna, przy kilku pytanie" {
+    Zaloz ((Select-WertisInstancjaSql -Dostepne @("SQLEXPRESS", "INSERTGT")) -eq "INSERTGT")
+    Zaloz ((Select-WertisInstancjaSql -Dostepne @("SUBIEKT")) -eq "SUBIEKT")
+    Zaloz ($null -eq (Select-WertisInstancjaSql -Dostepne @("A", "B"))) "przy kilku bez INSERTGT pytamy"
+    Zaloz ($null -eq (Select-WertisInstancjaSql -Dostepne @())) "bez rejestru (SQL gdzie indziej) pytamy"
+    # Tak to przychodzi naprawdę: pusta tablica z Get-WertisInstancjeSql to $null.
+    Zaloz ($null -eq (Select-WertisInstancjaSql -Dostepne (Get-WertisInstancjeSql))) "brak instancji to pytanie, nie wyjątek"
+    Zaloz ($null -eq (Select-WertisInstancjaSql -Dostepne $null))
+}
+
+Sprawdz "podpowiedź magazynu tylko przy jednym trafieniu" {
+    $m = @(
+        [pscustomobject]@{ mag_Symbol = "MAG"; mag_Nazwa = "Magazyn główny" },
+        [pscustomobject]@{ mag_Symbol = "MGP"; mag_Nazwa = "Przyjęcia" },
+        [pscustomobject]@{ mag_Symbol = "ZWR"; mag_Nazwa = "Zwroty klientów" })
+    Zaloz ((Get-WertisSugerowanyMagazyn -Magazyny $m -Wzorzec "MGP|PRZYJ") -eq 1)
+    Zaloz ((Get-WertisSugerowanyMagazyn -Magazyny $m -Wzorzec "ZWR|ZWROT") -eq 2)
+    $m += [pscustomobject]@{ mag_Symbol = "ZWR2"; mag_Nazwa = "Zwroty hurt" }
+    Zaloz ((Get-WertisSugerowanyMagazyn -Magazyny $m -Wzorzec "ZWR|ZWROT") -eq -1) "dwa trafienia to brak podpowiedzi"
+}
+
+Sprawdz "Node i npm z paczki, gdy są; inaczej systemowe" {
+    $k = Join-Path $env:TEMP ("wertis-node-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+    try {
+        New-Item -ItemType Directory -Force -Path (Join-Path $k "node") | Out-Null
+        Zaloz ((Get-WertisNpm -Katalog $k) -eq "npm") "bez npm.cmd w paczce — npm z PATH"
+        Set-Content -LiteralPath (Join-Path $k "node\node.exe") -Value "x"
+        Set-Content -LiteralPath (Join-Path $k "node\npm.cmd") -Value "x"
+        Zaloz ((Get-WertisNodeAplikacji -Katalog $k) -eq (Join-Path $k "node\node.exe"))
+        Zaloz ((Get-WertisNpm -Katalog $k) -eq (Join-Path $k "node\npm.cmd"))
+    } finally { Remove-Item -LiteralPath $k -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+if ($IsWindows -or $env:OS -eq "Windows_NT") {
+    Sprawdz "reinstalacja podpina istniejące <katalog>-dane zamiast pustej bazy" {
+        $k = Join-Path $env:TEMP ("wertis-reinst-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+        try {
+            New-Item -ItemType Directory -Force -Path "$k-dane", (Join-Path $k "server") | Out-Null
+            Set-Content -LiteralPath "$k-dane\wertis.db" -Value "baza firmy"
+            Move-WertisDaneNaZewnatrz -Katalog $k
+            Zaloz (Test-WertisDowiazanie -Sciezka (Join-Path $k "server\data")) "server\data ma być dowiązaniem"
+            Zaloz ((Get-Content -LiteralPath (Join-Path $k "server\data\wertis.db") -Raw).Trim() -eq "baza firmy")
+        } finally {
+            Remove-WertisKatalogAplikacji -Sciezka $k
+            Remove-Item -LiteralPath "$k-dane" -Recurse -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+Sprawdz "kreator nie nadpisuje obiektu instancji WERTIS napisem" {
+    # Do 0.496.0 `$instancja = Read-Tekst "Instancja..."` zabierało usługom
+    # restart, a dev — swoje SRODOWISKO. Przypisanie ma zostać jedno.
+    $tekst = Get-Content -LiteralPath (Join-Path $zrodlo "wertis-instalator.ps1") -Raw -Encoding UTF8
+    $przypisania = [regex]::Matches($tekst, '(?m)^\s*\$instancja\s*=')
+    Zaloz ($przypisania.Count -eq 1) "przypisań `$instancja: $($przypisania.Count)"
 }
 
 Sprawdz "zlecenie.ps1 czyta numer wersji przez ten sam wąski wzorzec" {

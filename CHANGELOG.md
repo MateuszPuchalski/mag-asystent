@@ -10,6 +10,143 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.497.0 — 25 września 2026
+
+**Raport tygodnia robi się sam.** Serwer liczy go w pierwszym takcie po
+poniedziałkowej północy, od poniedziałku do niedzieli czasu magazynu, i zapisuje
+na stałe. Analiza dostała zakres „Tydzień": ten tydzień obok poprzedniego
+i różnica w sztukach. Wiersze obejmują pracę hali, obsługę klienta, Copilota
+i zdrowie systemu. Pod tabelą są regały do przedruku etykiet i szukania bez
+wyniku.
+
+- **Migawka stanu raz na dobę.** DO DECYZJI z pilnymi i wiekiem najstarszej
+  sprawy, klient czekający teraz, kubełki zwrotów i reklamacji, otwarte wyjątki
+  i zapisy w błędzie. Do tej pory te liczby żyły tylko w chwili otwarcia ekranu.
+  Teraz widać, czy zaległość rośnie.
+- **Bez ludzi.** Raport nie zawiera rozbicia na osoby. Raport per osoba zostaje
+  w Analizie, na żywo, tylko dla administratora.
+- **Pierwszy raport** powstaje po pierwszym pełnym tygodniu, który obejmuje
+  dziennik. Po przerwie automat nadrabia do czterech tygodni wstecz.
+
+## 0.496.0 — 25 września 2026
+
+**Serwer aktualizuje się tego samego dnia, nie w nocy.** Domyślny tryb
+produkcji to `zaraz`: nowe wydanie wchodzi, gdy ma co najmniej godzinę i przez
+dziesięć minut nikt nic nie zapisał. Decyzja właściciela z wywiadu
+o wdrażaniu: jedna zmiana, dwie minuty postoju o każdej porze są do przyjęcia,
+zmiana ma dojść w ciągu dnia. Tryb `noc` zostaje w konfiguracji.
+
+**Paczka wydania powstaje dopiero po zielonym „Serwer" na commicie wydania**
+(`paczka.yml` przez `workflow_run`). Kodu przed scaleniem nikt nie czyta, więc
+testy tego commita są jedynym dowodem, że działa. Wersja z czerwonymi testami
+nie dostaje paczki i serwer jej nie wgra.
+
+**Nowa instalacja z paczki wydania.** Instalator pobiera najnowszy
+`wertis-<wersja>.zip` i rozpakowuje go, zamiast instalować Gita, klonować
+repozytorium i budować 372 MB zależności na serwerze. Paczka niesie własny
+Node 22 (`tools/node-windows.txt`, suma przypięta w repo), więc instalator nie
+instaluje żadnych programów. Git zostaje dla `-Galaz` i instalacji z `.git`.
+
+- **Reinstalacja po awarii zachowuje dane.** Dane od pierwszego dnia leżą
+  w `<katalog>-dane`; instalator, który je zastanie, podpina je zamiast
+  zaczynać od pustej bazy.
+- **Mniej pytań.** Serwer SQL to `localhost` (`-SerwerSql`), instancję czyta
+  z rejestru (`-InstancjaSql`), jedyną bazę bierze sam, magazyny MGP i Zwroty
+  podsuwa po symbolu. Pole lokalizacji zostaje pytaniem — aplikacja nadpisuje
+  je bezwarunkowo.
+- **Pierwsze konto w panelu.** Pusta instalacja pokazuje formularz konta
+  administratora zamiast logowania; instalator o hasło już nie pyta.
+- **Poprawka:** kreator nadpisywał obiekt instancji WERTIS nazwą instancji
+  SQL. Po podłączeniu do Subiekta usługi nie dostawały restartu z nową
+  konfiguracją, a dev — swojego `SRODOWISKO`.
+
+Paczka urosła z 22 do 58 MB przez Node.
+
+**Poprawka CI: scalenia z auto-scalania nie uruchamiały niczego na `main`.**
+Auto-scalanie włączał token workflowu, więc GitHub scalał jako bot Actions,
+a taki push nie wyzwala workflowów. Przepadły wydania 0.482.1–0.482.11,
+0.484.3, 0.484.6, 0.485.0, 0.486.1, 0.486.4 i 0.492.0, a `wydanie.yml` po
+pierwszym scaleniu nie ruszył. Auto-scalanie włącza teraz `ODSWIEZANIE_TOKEN`.
+
+**DEPLOY.md zaczyna się od jednej strony dla osoby, która stawia albo
+odtwarza serwer:** instalator, pięć kroków, co dzieje się samo i czego nie
+trzeba robić na co dzień. Reszta dokumentu zostaje odniesieniem.
+
+Przegląd 55 ustawień zaawansowanych nie dał żadnego do usunięcia. Każde jest
+albo hamulcem bezpieczeństwa (takt z „0 wyłącza", pusty wzorzec linku
+Allegro), albo zależy od firmy (okna importu, format półki, limity SQL),
+albo pilnuje kosztu Copilota. Bezpieczne zamieniło w stałe już 0.489.0.
+
+**Karta „Nowy kolektor" w ustawieniach.** Pierwsza instalacja aplikacji
+na kolektorze nie potrzebuje już kabla ani MDM. Kod QR prowadzi do APK na
+serwerze (`/api/aktualizacja/apk`, bez logowania, jak dotąd), więc wystarczy
+zeskanować go aparatem kolektora. Obok stoi adres serwera dużymi literami —
+na wypadek przeprowadzki, bo adres produkcyjny aplikacja ma wbudowany.
+
+- Adres podaje serwer (`GET /api/biuro/kolektor`, biuro i admin), nie pasek
+  przeglądarki: panel otwarty na samym serwerze to `localhost`.
+- Skaner na ekranie startowym kolektora zostaje wyłączony — pilnuje, żeby
+  wpisywane hasło nie pojechało jako skan.
+
+## 0.495.0 — 25 września 2026
+
+**Analiza mierzy skutek odpowiedzi, nie tylko jej szybkość.** Zgłoszenie
+właściciela po rozmowie o metodzie Feynmana: „build it”. Czas odpowiedzi
+nagradza szybką złą odpowiedź tak samo jak szybką dobrą. Nowa liczba mówi,
+czy klient po naszej odpowiedzi musiał pisać jeszcze raz.
+
+- **„Bez ponownego pytania”** w Analizie → Obsługa klienta. Po naszej
+  prawdziwej odpowiedzi klient nie pisał w tej rozmowie przez 7 dni.
+  Podziękowanie się nie liczy; rozpoznaje je ta sama reguła, która zdejmuje
+  je z kolejki.
+- **Niepewność stoi obok wyniku, nie w nim.** Powrót bez rozpoznania liczy
+  się jako powrót i ma własną liczbę, bo mógł być podziękowaniem. Odpowiedź
+  młodsza niż 7 dni bez powrotu nie ma jeszcze wyniku.
+- **Według kategorii**, a administrator widzi też rozbicie na osoby.
+- Powrót przez dyskusję albo reklamację liczy dalej miara eskalacji.
+
+Pierwsze wyniki są od razu, z historii.
+
+**Odpowiedź na końcu rozmowy, szkic Copilota w polu.** Środkowa kolumna
+skrzynki nie dzieli się już na rozmowę i edytor. Edytor jest ostatnią
+wypowiedzią wątku, a całość przewija się jednym paskiem. Świeży szkic Copilota
+stoi w pustym polu jako podpowiedź: Tab albo „Przyjmij szkic" go bierze,
+pierwsza litera agenta go zasłania. Do wysłania jest tylko tekst przyjęty.
+Uwagi modelu zostają pod przyjętym tekstem. Pole rośnie z treścią, a przyciski
+wysyłki pływają w jednym rzędzie przy dolnej krawędzi.
+
+**Test na żywym Allegro raz dziennie.** Drugi krok po „build it”. Nasze
+bramki sprawdzają kod wobec kodu, nie wobec Allegro. Tak przez 150 wydań
+„działały” zdjęcia Copilota: testy podstawiały pobieracz i przechodziły.
+
+- **Pięć kroków, te same drogi co produkcja, bez atrap:** lista wątków
+  skrzynki, najnowsza sprawa posprzedażowa, zdjęcie z rozmowy i zdjęcie ze
+  sprawy pobrane dokładnie tak, jak pobiera je Copilot. Piąty krok, bez
+  sieci, liczy zdjęcia, które w szkicach z ostatniej doby nie doszły do modelu.
+- **Tylko czyta z Allegro.** U siebie zapisuje wynik kroku, zdanie bez
+  adresów i czas. Zdjęcia nie idą do modelu; test sprawdza bramkę, nie płaci.
+- **Stan systemu → „Test na żywym Allegro”** z przyciskiem „Przetestuj
+  teraz”, co najwyżej raz na pięć minut.
+- **Krok, który nie przeszedł, staje w DO DECYZJI** i gaśnie po udanym
+  przebiegu. Limit 429 i brak danych to „pominięty”, nie błąd.
+
+Po wdrożeniu warto kliknąć „Przetestuj teraz” — pierwszy przebieg z taktu
+przyjdzie w ciągu doby. Tabela `sonda_rzeczywistosci` powstaje sama przy starcie.
+
+## 0.494.1 — 25 września 2026
+
+**Okna raportów bez dodatkowej doby.** Analiza, metryki, ergonomia, cykl
+zwrotów i analiza dostaw porównywały znaczniki z bazy z `datetime('now', …)`.
+Znaczniki mają `T`, a `datetime()` daje spację, więc porównanie tekstowe
+wpuszczało całą dobę graniczną. Okno „7 dni" liczyło do ośmiu, także
+w raporcie wydajności per osoba. Rekoncyliacja miała ten sam błąd w drugą
+stronę: zadanie w błędzie od 25 godzin czekało na raport kolejną dobę.
+
+- Granica okna ma jedną definicję, `GRANICA_OKNA` w `raporty.ts`. Ten sam
+  zapis stał już w `skutecznosc-doboru.ts` od 0.267.0.
+- Liczby w Analizie mogą spaść o zdarzenia z doby granicznej. To poprawka,
+  nie utrata danych.
+
 ## 0.494.0 — 25 września 2026
 
 **Serwer aktualizuje się sam.** Przycisk z 0.492.0 zrobił jedną

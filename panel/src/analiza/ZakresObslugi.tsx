@@ -1,5 +1,5 @@
 import React from "react";
-import type { CzasOdpowiedzi, WierszCzasu } from "../api/wglad";
+import type { CzasOdpowiedzi, Powroty, WierszCzasu, WierszPowrotu } from "../api/wglad";
 import { Liczba, PasekUdzialu } from "../ui/wykres";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 import { NAZWA_KATEGORII } from "../skrzynka/statusy";
@@ -47,6 +47,58 @@ function TabelaCzasu({ wiersze, naglowek, nazwa }: {
   </Tabela>;
 }
 
+/* ── BEZ PONOWNEGO PYTANIA (24 września 2026) ────────────────────────────────
+   Druga liczba obok czasu, i ważniejsza od niego: czas nagradza szybką złą
+   odpowiedź, a ta liczba nie. Reguła stoi w `services/czas-odpowiedzi.ts`.
+
+   UDZIAŁ LICZY SIĘ Z ODPOWIEDZI, KTÓRE MAJĄ WYNIK. Odpowiedź młodsza niż
+   tydzień bez powrotu klienta jeszcze go nie ma, więc stoi osobno, zamiast
+   poprawiać wynik ostatnich dni. Powrót bez rozpoznania też stoi osobno:
+   mógł być podziękowaniem, a wynik ma mówić, ile w nim niepewności. */
+
+const procent = (bez: number, n: number) => (n === 0 ? "—" : `${Math.round((100 * bez) / n)}%`);
+
+function TabelaPowrotow({ wiersze, naglowek, nazwa }: {
+  wiersze: WierszPowrotu[]; naglowek: string; nazwa: (k: string) => string;
+}) {
+  return <Tabela naglowki={[naglowek, "odpowiedzi z wynikiem", "bez ponownego pytania"]}
+    pusto="Żadna odpowiedź w tym oknie nie ma jeszcze wyniku.">
+    {wiersze.map((w) => <tr key={w.klucz}>
+      <Td>{nazwa(w.klucz)}</Td>
+      <Td className="tabular-nums">{w.n}</Td>
+      <Td><div className="flex items-center gap-3">
+        <span className="w-12 shrink-0 tabular-nums">{procent(w.bezPowrotu, w.n)}</span>
+        <PasekUdzialu ile={w.bezPowrotu} max={w.n}
+          etykieta={`${w.bezPowrotu} z ${w.n} bez ponownego pytania`} />
+      </div></Td>
+    </tr>)}
+  </Tabela>;
+}
+
+function KartyPowrotow({ p, dni }: { p: Powroty; dni: number }) {
+  return <>
+    <KartaWgladu tytul="Bez ponownego pytania"
+      opis={`Po naszej odpowiedzi klient nie pisał już w tej rozmowie przez ${p.oknoDni} dni. `
+        + "Podziękowanie się nie liczy. Mierzy skutek, nie szybkość."}>
+      <div className="flex flex-wrap gap-8">
+        <Liczba ile={procent(p.bezPowrotu, p.n)} etykieta={`z ${p.n} odpowiedzi z wynikiem, okno ${dni} dni`} />
+        <Liczba ile={p.wrocilo} etykieta={p.wrociloBezRozpoznania
+          ? `klient wrócił · ${p.wrociloBezRozpoznania} bez rozpoznania, mogło być podziękowanie`
+          : "klient wrócił"} />
+        <Liczba ile={p.czeka} etykieta={`młodsze niż ${p.oknoDni} dni, jeszcze bez wyniku`} />
+      </div>
+    </KartaWgladu>
+    <KartaWgladu tytul="Bez ponownego pytania według kategorii"
+      opis="Gdzie odpowiedź najczęściej nie kończy sprawy.">
+      <TabelaPowrotow wiersze={p.wgKategorii} naglowek="kategoria" nazwa={nazwaKategorii} />
+    </KartaWgladu>
+    {p.wgOsoby && <KartaWgladu tytul="Bez ponownego pytania według osoby"
+      opis="Autor wysyłki z WERTIS; odpowiedź z panelu Allegro stoi jako „z Allegro”.">
+      <TabelaPowrotow wiersze={p.wgOsoby} naglowek="kto" nazwa={(k) => k} />
+    </KartaWgladu>}
+  </>;
+}
+
 export function ZakresObslugi({ a }: { a: CzasOdpowiedzi }) {
   return <>
     <KartaWgladu tytul="Czas odpowiedzi klientowi"
@@ -61,6 +113,7 @@ export function ZakresObslugi({ a }: { a: CzasOdpowiedzi }) {
           ton={a.czekaTeraz.n > 0 ? "text-ranga-uwaga" : ""} />
       </div>
     </KartaWgladu>
+    <KartyPowrotow p={a.powroty} dni={a.dni} />
     <KartaWgladu tytul="Według kategorii"
       opis="Kategoria z rozpoznania wiadomości, na którą odpowiadaliśmy.">
       <TabelaCzasu wiersze={a.wgKategorii} naglowek="kategoria" nazwa={nazwaKategorii} />

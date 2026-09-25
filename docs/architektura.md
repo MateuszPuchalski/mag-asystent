@@ -686,6 +686,30 @@ Raport ma trzy reguły wbudowane w kod, każda z testem:
 3. **Tempo poniżej 20 pozycji to `null`.** Czas aktywny liczony z odstępów
    ≤ 15 min, więc z natury zaniżony: zawyżone tempo krzywdziłoby ludzi.
 
+### Raport tygodnia i migawka doby (0.497.0)
+
+Ślad `events` pamięta czynności, ale nie stan. Ile spraw czekało DO DECYZJI,
+ile zwrotów stało w kubełku, jak długo czekał klient — te liczby istniały
+tylko w chwili otwarcia ekranu. Pytanie „czy zaległość rośnie" nie miało
+odpowiedzi, bo nikt ich nie zapisywał.
+
+Takt `raporty` w `main()` robi dwie rzeczy, co godzinę:
+
+1. **Migawka doby** (`migawka_dnia`) — raz na dobę lokalną, pierwsza wygrywa.
+   Liczą ją te same funkcje co ekrany: `doDecyzji`, `listaZwrotow`,
+   `listaReklamacji`, `czasOdpowiedzi`. Sekcja, która padnie, jest `null`.
+2. **Raport tygodnia** (`raport_tygodnia`) — od poniedziałku 00:00 do
+   poniedziałku 00:00 czasu magazynu. Automat nadrabia do czterech tygodni
+   wstecz. Tygodnia sprzed pierwszego wpisu dziennika nie liczy.
+
+Raport jest **zamrożony**. Rozmowy sprzed `ALLEGRO_INBOX_OD` znikają przy
+starcie, więc tydzień liczony od nowa po pół roku kłamałby. Zmiana reguły
+podbija `WERSJA_RAPORTU` i nie przepisuje starych tygodni.
+
+Raport **nie niesie ludzi**. Zapisany co tydzień i czytany przez biuro byłby
+trwałą kopią monitoringu pracowniczego, który od 0.431.0 widzi tylko admin,
+na żywo. Ekran: Analiza → Tydzień, tylko odczyt.
+
 ---
 
 ## 10. Testy i bramki

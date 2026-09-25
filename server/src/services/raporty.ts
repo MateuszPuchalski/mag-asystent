@@ -27,7 +27,7 @@ export const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(d
  * Granica okna w formacie znaczników w bazie — ISO z `T` i `Z`. Parametrem
  * jest modyfikator z `OKNO` albo stały, np. `'-1 day'`.
  *
- * NIE `${GRANICA_OKNA}`. `datetime()` zwraca `'2026-08-11 19:59:47'` ze
+ * NIE `datetime('now', ?)`. `datetime()` zwraca `'2026-08-11 19:59:47'` ze
  * SPACJĄ, a znaczniki mają `'T'` (0x54 > 0x20). Porównanie tekstowe
  * `'2026-08-11T00:05:00.000Z' >= datetime('now','-30 days')` daje PRAWDĘ,
  * choć 00:05 jest wcześniej niż 19:59. Okno z `>=` było więc do doby
@@ -36,12 +36,13 @@ export const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(d
  * Mieszkała w `skutecznosc-doboru.ts` od 0.267.0, a `problems.ts` miał
  * własną kopię. Reszta raportów dalej porównywała z `datetime()`, więc
  * „7 dni" w Analizie liczyło do ośmiu, także w raporcie per osoba
- * (@wydanie). Jedna definicja tutaj, bo trzecia kopia by się rozjechała.
+ * (0.494.1). Jedna definicja tutaj, bo trzecia kopia by się rozjechała.
  */
 export const GRANICA_OKNA = "strftime('%Y-%m-%dT%H:%M:%fZ','now',?)";
 
-/** Zdarzenia liczone jako wykonana pozycja — wspólne dla obu raportów. */
-const PRACA = ["putaway_line_done", "putaway_confirm", "location_set", "location_removed"];
+/** Zdarzenia liczone jako wykonana pozycja — wspólne dla obu raportów
+    i dla raportu tygodnia (`raport-tygodnia.ts`), stąd eksport. */
+export const PRACA = ["putaway_line_done", "putaway_confirm", "location_set", "location_removed"];
 
 /**
  * Warunek odsiewający PODWÓJNE LICZENIE tej samej czynności.
@@ -77,7 +78,7 @@ const zrodloZdarzenia = (alias: string) =>
   `CASE WHEN json_valid(${alias}payload)
         THEN json_extract(${alias}payload,'$.zrodlo') END`;
 
-const bezDubli = (alias: string) => `(${alias}type NOT IN ('location_set','location_removed')
+export const bezDubli = (alias: string) => `(${alias}type NOT IN ('location_set','location_removed')
        OR ${zrodloZdarzenia(alias)} IS NULL
        OR ${zrodloZdarzenia(alias)} = 'karta')`;
 
@@ -103,8 +104,9 @@ export interface Metrics {
   zdarzen: number;
 }
 
-/** Percentyl z posortowanej tablicy; null gdy brak danych. */
-function p95(values: number[]): number | null {
+/** Percentyl z posortowanej tablicy; null gdy brak danych. Czyta go też
+    raport tygodnia — jedna definicja percentyla na oba ekrany. */
+export function p95(values: number[]): number | null {
   if (!values.length) return null;
   const s = [...values].sort((a, b) => a - b);
   return s[Math.min(s.length - 1, Math.ceil(0.95 * s.length) - 1)];

@@ -146,6 +146,22 @@ export interface CzasOdpowiedzi {
   /** `null` dla roli biuro — rozbicie na ludzi liczy serwer wyłącznie adminowi. */
   wgOsoby: WierszCzasu[] | null;
   czekaTeraz: { n: number; najdluzejMin: number | null };
+  powroty: Powroty;
+}
+
+/** Wiersz „bez ponownego pytania” — `n` liczy odpowiedzi z wynikiem. */
+export interface WierszPowrotu { klucz: string; n: number; bezPowrotu: number }
+
+export interface Powroty {
+  oknoDni: number;
+  n: number;
+  bezPowrotu: number;
+  wrocilo: number;
+  wrociloBezRozpoznania: number;
+  czeka: number;
+  wgKategorii: WierszPowrotu[];
+  /** `null` dla roli biuro, jak przy czasie odpowiedzi. */
+  wgOsoby: WierszPowrotu[] | null;
 }
 
 export function useCzasOdpowiedzi(dni: number, wlaczona: boolean) {
@@ -172,6 +188,64 @@ export function useUzycie(dni: number, wlaczona: boolean) {
     queryKey: ["analiza", "uzycie", dni],
     queryFn: () => api<RaportUzycia>(`/api/analiza/uzycie?days=${dni}`),
     enabled: wlaczona,
+    placeholderData: (poprzednie) => poprzednie,
+  });
+}
+
+/* ── Raport tygodnia (`services/raport-tygodnia.ts`, 0.497.0) ───────────
+   Zamrożony przy zapisie przez takt serwera. Ekran tylko czyta: tygodnia
+   niepoliczonego nie ma na liście, więc nie ma też o co zapytać 404. */
+
+export interface NaglowekRaportu { tydzien: string; od: string; do: string; wersja: number; utworzono: string }
+
+export interface Migawka {
+  doDecyzji: { wszystko: number; magazyn: number; obsluga: number; pilne: number; najstarszaGodz: number | null } | null;
+  problemyOtwarte: number | null;
+  kolejka: { bledy: number; wDrodze: number } | null;
+  klientCzeka: { n: number; najdluzejMin: number | null } | null;
+  zwroty: Record<string, number> | null;
+  reklamacje: Record<string, number> | null;
+}
+
+export interface RaportTygodnia {
+  wersja: number;
+  tydzien: string;
+  od: string;
+  do: string;
+  dni: string[];
+  magazyn: {
+    pozycje: number; pozycjeWgDnia: number[]; dostawZamknietych: number; medianaMinutDostawy: number | null;
+    problemyZgloszone: number; problemyRozwiazane: number; dotknieciaNaPozycje: number | null;
+    p95SkanuMs: number | null; etykietyDoPrzedruku: Array<{ kod: string; reczne: number }>;
+    szukaniaBezWynikow: Array<{ q: string; ile: number }>; upadkiKolektorow: number; odrzuconeOperacje: number;
+  };
+  obsluga: {
+    wiadomosciOdKlientow: number; odpowiedzi: number; medianaMin: number | null; p90Min: number | null;
+    klientCzekaNaKoniec: { n: number; najdluzejMin: number | null };
+    zwrotyNowe: number; zwrotyZamkniete: number; reklamacjeNowe: number; reklamacjeRozstrzygniete: number;
+  };
+  copilot: { wywolan: number; bledow: number; kosztUsd: number };
+  system: { kopieNocne: number; rozjazdyRekoncyliacji: number | null; zapisyNieudane: number; odrzuconeZadaniaHttp: number };
+  migawki: Array<{ data: string; at: string; stan: Migawka }>;
+}
+
+export function useTygodnie(wlaczona: boolean) {
+  return useQuery({
+    queryKey: ["analiza", "tygodnie"],
+    queryFn: () => api<{ tygodnie: NaglowekRaportu[] }>("/api/analiza/tygodnie"),
+    enabled: wlaczona,
+  });
+}
+
+export function useRaportTygodnia(tydzien: string | null) {
+  return useQuery({
+    queryKey: ["analiza", "tygodnie", tydzien],
+    queryFn: () => api<{ raport: RaportTygodnia; poprzedni: RaportTygodnia | null }>(
+      `/api/analiza/tygodnie/${tydzien}`),
+    enabled: tydzien != null,
+    /* Raport jest zamrożony — ten sam tydzień nie zmieni się do końca
+       sesji, więc ponowne pobranie przy powrocie na kartę nic nie wnosi. */
+    staleTime: Infinity,
     placeholderData: (poprzednie) => poprzednie,
   });
 }
