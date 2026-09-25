@@ -39,6 +39,13 @@
     w wertis.env, konfiguracji Subiekta ani kont użytkowników — nie zadaje
     też ani jednego pytania.
 
+.PARAMETER SerwerSql
+    Komputer z SQL Serverem Subiekta; domyślnie localhost, bez pytania.
+
+.PARAMETER InstancjaSql
+    Instancja SQL Servera. Bez parametru instalator bierze INSERTGT albo
+    jedyną instancję z rejestru, a pyta tylko przy kilku.
+
 .PARAMETER Paczka
     Tylko z -Aktualizuj (0.492.0): aktualizacja z PACZKI WYDANIA zamiast
     budowania na tej maszynie. Wartość to numer wersji (0.492.0), słowo
@@ -100,7 +107,9 @@ param(
     [switch]$UsunDane,
     [switch]$Aktualizuj,
     [string]$Paczka,
-    [switch]$ZdjeciaZapis
+    [switch]$ZdjeciaZapis,
+    [string]$SerwerSql = "localhost",
+    [string]$InstancjaSql
 )
 
 $ErrorActionPreference = "Stop"
@@ -394,21 +403,51 @@ if ($Aktualizuj) {
 # ═══ ETAP 1: instalacja ══════════════════════════════════════════════════════
 
 if (-not $TylkoKonfiguracja) {
-    Write-Krok "Zależności: Node.js i Git"
-    $okNode = Install-WertisNarzedzie -Polecenie "node" -IdWinget "OpenJS.NodeJS.LTS" `
-        -Opis "Node.js LTS" -UrlAwaryjny "https://nodejs.org/dist/v22.11.0/node-v22.11.0-x64.msi"
-    $okGit = Install-WertisNarzedzie -Polecenie "git" -IdWinget "Git.Git" -Opis "Git"
-    if (-not ($okNode -and $okGit)) { exit 1 }
-    if (-not (Test-WertisNode)) { exit 1 }
-
     # Instalacja z paczki wydania (0.492.0) nie ma repozytorium ani źródeł.
     # Ponowny przebieg instalatora na niej — po zmianę Subiekta albo konta —
     # nie pobiera i nie buduje niczego; nową wersję wgrywa -Aktualizuj -Paczka.
     $zPaczki = Test-Path (Join-Path $Katalog "paczka.json")
+    # Od @wydanie NOWA instalacja idzie z paczki wydania: bez Gita, bez
+    # `npm ci` na 372 MB i bez kompilacji na serwerze, z Nodem w paczce.
+    # Git zostaje dla instalacji, która już go ma, i dla jawnego -Galaz
+    # (dev z gałęzi) — paczki powstają wyłącznie z `main`.
+    $zGita = -not $zPaczki -and ((Test-Path (Join-Path $Katalog ".git")) -or $PSBoundParameters.ContainsKey("Galaz"))
+
+    Write-Krok "Zależności"
+    if ($zGita) {
+        $okNode = Install-WertisNarzedzie -Polecenie "node" -IdWinget "OpenJS.NodeJS.LTS" `
+            -Opis "Node.js LTS" -UrlAwaryjny "https://nodejs.org/dist/v22.11.0/node-v22.11.0-x64.msi"
+        $okGit = Install-WertisNarzedzie -Polecenie "git" -IdWinget "Git.Git" -Opis "Git"
+        if (-not ($okNode -and $okGit)) { exit 1 }
+        if (-not (Test-WertisNode)) { exit 1 }
+    } else {
+        Write-Ok "Paczka wydania niesie własny Node — nie instaluję żadnych programów."
+    }
 
     Write-Krok "Aplikacja w $Katalog"
     if ($zPaczki) {
         Write-Ok "Instalacja z paczki wydania $(Get-WertisWersja -Katalog $Katalog) — kodu nie pobieram."
+    } elseif (-not $zGita) {
+        if ((Test-Path $Katalog) -and (Get-ChildItem $Katalog -Force | Select-Object -First 1)) {
+            Write-Blad "$Katalog istnieje i nie jest pusty, a nie ma w nim instalacji WERTIS."
+            Write-Info "Usuń katalog albo wskaż inny przez -Katalog."
+            if (-not $DryRun) { exit 1 }
+        }
+        if (-not (Test-DryRun "Pobrałbym najnowszą paczkę wydania i rozpakował ją do $Katalog.")) {
+            $repoGh = Get-WertisRepoGitHub -Repo $Repo
+            $wersjaPaczki = Get-WertisNajnowszaWersja -Repo $repoGh
+            if (-not $wersjaPaczki) { Write-Blad "Nie udało się ustalić najnowszego wydania $repoGh."; exit 1 }
+            $zip = Get-WertisPaczka -Repo $repoGh -Wersja $wersjaPaczki -Cel (Join-Path ([IO.Path]::GetTempPath()) "wertis-paczki")
+            if (-not $zip) { exit 1 }
+            Zapewnij-Katalog (Split-Path $Katalog)
+            Expand-WertisPaczka -Zip $zip -Cel $Katalog -Wersja $wersjaPaczki
+            # Dane od pierwszego dnia poza katalogiem aplikacji: aktualizacja
+            # podmienia katalog, a ponowna instalacja po awarii znajdzie je
+            # w <katalog>-dane i podepnie, zamiast zaczynać od pustej bazy.
+            Move-WertisDaneNaZewnatrz -Katalog $Katalog
+            Write-Ok "Wersja $wersjaPaczki rozpakowana w $Katalog."
+        }
+        $zPaczki = $true
     } elseif (Test-Path (Join-Path $Katalog ".git")) {
         # Ponowne uruchomienie instalatora JEST aktualizacją (DEPLOY.md §7).
         if (-not (Test-DryRun "Zaktualizowałbym repozytorium (git pull).")) {
@@ -472,7 +511,9 @@ if (-not $TylkoKonfiguracja) {
 
     Write-Krok "Usługi Windows"
     $nssm = Get-WertisNssm -Katalog $Katalog
-    $node = if (Test-DryRun) { "node.exe" } else { (Get-Command node).Source }
+    # Node z paczki, gdy jest: podmienia się razem z wydaniem, więc usługa
+    # chodzi na wersji, na której paczka przeszła próbę w CI.
+    $node = Get-WertisNodeAplikacji -Katalog $Katalog
     Register-WertisUsluga -Nssm $nssm -Nazwa "wertis-api$($instancja.Sufiks)" -Aplikacja $node -Katalog $Katalog `
         -Skrypt (Join-Path $Katalog "server\dist\index.js")
     Register-WertisUsluga -Nssm $nssm -Nazwa "wertis-worker$($instancja.Sufiks)" -Aplikacja $node -Katalog $Katalog `
@@ -501,14 +542,31 @@ if ($podlaczacDoSubiekta -and -not $DryRun) {
 if ($podlaczacDoSubiekta) {
     Write-Naglowek "Kreator konfiguracji"
 
-    $serwer    = Read-Tekst "Serwer SQL" -Domyslnie "localhost"
-    $instancja = Read-Tekst "Instancja (Enter = INSERTGT)" -Domyslnie "INSERTGT"
+    # Serwer SQL z parametru, bez pytania: WERTIS stawia się na maszynie
+    # z Subiektem, więc odpowiedź to prawie zawsze „localhost" (@wydanie).
+    $serwer = $SerwerSql
+    Write-Info "Serwer SQL: $serwer (inny: -SerwerSql)."
+    # `$instancjaSql`, nie `$instancja`: ta druga to obiekt instancji WERTIS
+    # (usługi, zapora, SRODOWISKO). Do @wydanie kreator nadpisywał ją napisem,
+    # więc po podłączeniu do Subiekta usługi nie dostawały restartu, a dev —
+    # swojego SRODOWISKO.
+    $instancjaSql = if ($InstancjaSql) { $InstancjaSql } else { Select-WertisInstancjaSql -Dostepne (Get-WertisInstancjeSql) }
+    if ($instancjaSql) {
+        Write-Info "Instancja SQL: $instancjaSql (inna: -InstancjaSql)."
+    } else {
+        $dostepne = @(Get-WertisInstancjeSql)
+        $instancjaSql = if ($dostepne.Count -gt 1) {
+            Read-Wybor -Pozycje $dostepne -Pytanie "Instancja SQL Servera"
+        } else {
+            Read-Tekst "Instancja SQL (Enter = INSERTGT)" -Domyslnie "INSERTGT"
+        }
+    }
 
     # ── Wymogi wstępne (docs/subiekt-gt-edu-setup.md §1) ────────────────────
-    Write-Krok "Sprawdzam instancję $instancja"
-    $stan = Test-WertisWymogiSql -Instancja $instancja
+    Write-Krok "Sprawdzam instancję $instancjaSql"
+    $stan = Test-WertisWymogiSql -Instancja $instancjaSql
     if (-not $stan.Znaleziona) {
-        Write-Uwaga "Nie widzę instancji '$instancja' w rejestrze tej maszyny."
+        Write-Uwaga "Nie widzę instancji '$instancjaSql' w rejestrze tej maszyny."
         Write-Info "Jeśli SQL Server stoi na innym komputerze, to normalne - jadę dalej."
     } elseif ($stan.TcpIp -and $stan.Mieszane) {
         Write-Ok "TCP/IP i uwierzytelnianie mieszane są już włączone - restart niepotrzebny."
@@ -519,7 +577,7 @@ if ($podlaczacDoSubiekta) {
         Write-Info "a konto aplikacji to login SQL, nie konto Windows."
         Write-Uwaga "Włączenie wymaga RESTARTU usługi SQL - wszyscy wylecą z Subiekta na kilkanaście sekund."
         if (Read-Tak "Włączyć teraz i zrestartować usługę SQL?" -Domyslnie $false) {
-            Enable-WertisWymogiSql -Instancja $instancja -Stan $stan | Out-Null
+            Enable-WertisWymogiSql -Instancja $instancjaSql -Stan $stan | Out-Null
         } else {
             Write-Uwaga "Pominięte. Bez tego połączenie z bazą się nie uda - dokończ wg DEPLOY.md."
         }
@@ -532,7 +590,7 @@ if ($podlaczacDoSubiekta) {
     if (-not (Test-DryRun "Połączyłbym się jako administrator (Windows Auth, w razie czego sa).")) {
         try {
             $polaczenie = Open-WertisPolaczenie -ConnectionString (
-                Get-WertisConnectionString -Serwer $serwer -Instancja $instancja -Windows)
+                Get-WertisConnectionString -Serwer $serwer -Instancja $instancjaSql -Windows)
             Write-Ok "Połączono jako $env:USERNAME (uwierzytelnianie Windows)."
         } catch {
             $bledy += $_.Exception.Message
@@ -543,7 +601,7 @@ if ($podlaczacDoSubiekta) {
             if ($jawne) {
                 try {
                     $polaczenie = Open-WertisPolaczenie -ConnectionString (
-                        Get-WertisConnectionString -Serwer $serwer -Instancja $instancja `
+                        Get-WertisConnectionString -Serwer $serwer -Instancja $instancjaSql `
                             -Uzytkownik "sa" -Haslo $jawne)
                     Write-Ok "Połączono jako sa."
                 } catch { $bledy += $_.Exception.Message }
@@ -576,9 +634,15 @@ if ($podlaczacDoSubiekta) {
             Write-Blad "Na tej instancji nie ma ani jednej bazy użytkownika."
             exit 1
         }
-        $wybor = Read-Wybor -Pozycje $bazy -Pytanie "Numer bazy podmiotu" `
-            -Etykieta { param($b) Format-WertisEtykietaBazy -Baza $b } `
-            -Domyslny (Get-WertisSugerowanaBaza -Bazy $bazy)
+        # Jedyna baza nie jest wyborem (@wydanie); ostrzeżenia niżej i tak padną.
+        $wybor = if ($bazy.Count -eq 1) {
+            Write-Info "Jedyna baza na instancji: $(Format-WertisEtykietaBazy -Baza $bazy[0])"
+            $bazy[0]
+        } else {
+            Read-Wybor -Pozycje $bazy -Pytanie "Numer bazy podmiotu" `
+                -Etykieta { param($b) Format-WertisEtykietaBazy -Baza $b } `
+                -Domyslny (Get-WertisSugerowanaBaza -Bazy $bazy)
+        }
         $baza = $wybor.Nazwa
         $polaczenie.ChangeDatabase($baza)
 
@@ -614,8 +678,12 @@ if ($podlaczacDoSubiekta) {
             if ($magazyny[$i].mag_Glowny -eq $true -or $magazyny[$i].mag_Glowny -eq 1) { $glowny = $i }
         }
         $mag = Read-Wybor -Pozycje $magazyny -Pytanie "Magazyn główny (MAG)" -Etykieta $etykieta -Domyslny $glowny
-        $mgp = Read-Wybor -Pozycje $magazyny -Pytanie "Strefa przyjęć (MGP)" -Etykieta $etykieta
-        $zwr = Read-Wybor -Pozycje $magazyny -Pytanie "Magazyn Zwroty" -Etykieta $etykieta
+        # Podpowiedź pod Enterem z symbolu albo nazwy (@wydanie) — lista zostaje,
+        # bo magazyn skutku rozstrzyga, dokąd idzie dokument.
+        $mgp = Read-Wybor -Pozycje $magazyny -Pytanie "Strefa przyjęć (MGP)" -Etykieta $etykieta `
+            -Domyslny (Get-WertisSugerowanyMagazyn -Magazyny $magazyny -Wzorzec "MGP|PRZYJ")
+        $zwr = Read-Wybor -Pozycje $magazyny -Pytanie "Magazyn Zwroty" -Etykieta $etykieta `
+            -Domyslny (Get-WertisSugerowanyMagazyn -Magazyny $magazyny -Wzorzec "ZWR|ZWROT")
         $ustawienia.MAG_ID_MAG    = "$($mag.mag_Id)"
         $ustawienia.MAG_ID_MGP    = "$($mgp.mag_Id)"
         $ustawienia.MAG_ID_ZWROTY = "$($zwr.mag_Id)"
@@ -769,7 +837,7 @@ if ($podlaczacDoSubiekta) {
                     # co konto może, a nie czy da się na nie zalogować. Hasło
                     # potrafi się rozjechać (login przeżywa nieudany przebieg),
                     # a objawem jest dopiero „Login failed" w logu usługi.
-                    $proba = Test-WertisLogowanie -Serwer $serwer -Instancja $instancja `
+                    $proba = Test-WertisLogowanie -Serwer $serwer -Instancja $instancjaSql `
                         -Baza $baza -Login $login -Haslo $haslo
                     if ($proba.Udalo) {
                         Write-Ok "Konto gotowe: $($ocena.TabeleOdczytu) tabel do odczytu, zapis tylko $($ocena.KolumnyZapisu) kolumn kartoteki."
@@ -816,7 +884,7 @@ if ($podlaczacDoSubiekta) {
 
     $ustawienia.SGT_MODE       = "mssql"
     $ustawienia.MSSQL_SERVER   = $serwer
-    $ustawienia.MSSQL_INSTANCE = $instancja
+    $ustawienia.MSSQL_INSTANCE = $instancjaSql
     $ustawienia.MSSQL_DATABASE = $baza
     $ustawienia.MSSQL_USER     = $login
     $ustawienia.MSSQL_PASSWORD = $haslo
@@ -848,7 +916,7 @@ if ($podlaczacDoSubiekta) {
     Write-Krok "Dane demonstracyjne"
     if (-not (Test-DryRun "Uruchomiłbym npm run seed.")) {
         Push-Location $Katalog
-        & npm run seed
+        & (Get-WertisNpm -Katalog $Katalog) run seed
         Pop-Location
         Write-Ok "Baza demo zasilona."
     }
@@ -857,7 +925,7 @@ if ($podlaczacDoSubiekta) {
         # dev: każdy przypadek brzegowy gotowy do obejrzenia, bez wyklikiwania.
         if (-not (Test-DryRun "Uruchomiłbym npm run seed:scenariusze.")) {
             Push-Location $Katalog
-            & npm run seed:scenariusze
+            & (Get-WertisNpm -Katalog $Katalog) run seed:scenariusze
             Pop-Location
             Write-Ok "Scenariusze testowe zasilone."
         }
@@ -878,46 +946,14 @@ $health = Test-WertisHealth -Port $Port
 
 # ═══ Konto administratora ═══════════════════════════════════════════════════
 #
-# PO starcie usług, bo konto zakłada API. Krok jest pomijany, gdy API nie
-# odpowiedziało (nie ma z czym rozmawiać) albo gdy baza ma już konta — wtedy
-# `POST /api/users` i tak by odmówił, a pytanie o hasło byłoby tylko stratą
-# czasu człowieka stojącego przy serwerze.
+# Od @wydanie instalator o nie NIE pyta. Pierwsze konto zakłada się w panelu:
+# pusta instalacja pokazuje zamiast logowania formularz konta administratora
+# (`panel/src/ekrany/Logowanie.tsx`). Hasło nie przechodzi przez okno
+# PowerShella na serwerze, a instalacja nie czeka na człowieka przy klawiaturze.
 
 $setup = $null
 if ($health) {
     try { $setup = Invoke-RestMethod -Uri "http://localhost:$Port/api/setup" -TimeoutSec 5 } catch { }
-}
-
-if ($DryRun -or ($setup -and $setup.potrzebne)) {
-    Write-Krok "Konto administratora"
-    Write-Info "To konto zakłada wszystkie pozostałe - także konta biura."
-    Write-Info "Hasła nigdzie nie zapisuję: nie trafia ani do wertis.env, ani do logów."
-
-    $loginAdmina = Read-Tekst "Login administratora" "admin"
-    $hasloAdmina = ""
-    if (-not $DryRun) {
-        while ($true) {
-            $pierwsze = Read-Host "   Hasło (min. 8 znakow)" -AsSecureString
-            $drugie   = Read-Host "   Powtorz haslo" -AsSecureString
-            # SecureString wraca do zwykłego łańcucha dopiero tutaj: hasło musi
-            # pójść w ciele żądania HTTP, więc gdzieś zamienić je trzeba.
-            $a = [Runtime.InteropServices.Marshal]::PtrToStringBSTR(
-                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($pierwsze))
-            $b = [Runtime.InteropServices.Marshal]::PtrToStringBSTR(
-                [Runtime.InteropServices.Marshal]::SecureStringToBSTR($drugie))
-            if ($a -ne $b)                          { Write-Uwaga "Hasła się różnią."; continue }
-            if (-not (Test-WertisHasloAdmina $a))   { Write-Uwaga "Hasło musi mieć co najmniej 8 znaków."; continue }
-            $hasloAdmina = $a
-            break
-        }
-    }
-
-    if (-not (New-WertisKontoAdmina -Login $loginAdmina -Haslo $hasloAdmina -Port $Port)) {
-        Write-Info "Konto założysz kreatorem na kolektorze - patrz instalator\README.md."
-    }
-    $hasloAdmina = $null
-} elseif ($setup) {
-    Write-Info "Baza ma już konta - nie zakładam żadnego."
 }
 
 Write-Naglowek "Gotowe"
@@ -978,8 +1014,12 @@ $nazwaHosta = if ($env:COMPUTERNAME) { $env:COMPUTERNAME } else { "<IP-serwera>"
 Write-Host ""
 Write-Host "  Co dalej:" -ForegroundColor Cyan
 Write-Info "1. Adres dla kolektorów: http://$nazwaHosta`:$Port  (albo http://<IP>:$Port)"
-Write-Info "2. Konta pracowników zakłada się Z KOLEKTORA - przycisk ZAŁÓŻ KONTA"
-Write-Info "   na ekranie startowym pustej instalacji. Instrukcja: DEPLOY.md §5a."
+if ($DryRun -or ($setup -and $setup.potrzebne)) {
+    Write-Info "2. Otwórz panel: http://$nazwaHosta`:$Port/obsluga/ - pusta instalacja"
+    Write-Info "   pokaże formularz PIERWSZEGO KONTA (administrator). Resztę kont zakłada on."
+} else {
+    Write-Info "2. Panel: http://$nazwaHosta`:$Port/obsluga/ (konta już są)."
+}
 # Do 0.487.0 stała tu prośba o dwa wpisy w Harmonogramie zadań, a bramka
 # etapu 4 wdrożenia stała na obu. Serwer robi je dziś sam; zostaje jedyna
 # rzecz, której za człowieka nie zrobi — próba odtworzenia z kopii.

@@ -111,21 +111,24 @@ powershell -ExecutionPolicy Bypass -File instalator\wertis-instalator.ps1
 
 ## Co instalator robi
 
-1. **Zależności** — Node.js LTS i Git przez `winget` (bez wingeta: instalator
-   MSI z nodejs.org). Sprawdza też **wersję Node**: aplikacja wymaga co
-   najmniej 22.5. Git jest w komplecie celowo. Bieżąca obsługa
-   z `DEPLOY.md` §7 stoi na `git pull` i Git Bashu.
-
-   > **Dlaczego wersja, a nie sama obecność.** Serwer używa wbudowanego
-   > sterownika SQLite, którego starsze wersje nie mają. Starszy Node przechodzi
-   > zwykłe „czy jest node?". Wywala się dopiero przy starcie usługi.
-2. **Aplikacja** — `git clone` do `C:\wertis`, `npm ci`, `npm run build`.
-   Ponowne uruchomienie instalatora jest zarazem **aktualizacją** (`git pull`).
+1. **Aplikacja** — od @wydanie z **paczki wydania**: pobiera najnowszy
+   `wertis-<wersja>.zip`, sprawdza sumę i rozpakowuje do `C:\wertis`. Paczka
+   niesie własny Node, więc instalator **nie instaluje żadnych programów**,
+   a na serwerze nic się nie kompiluje. Dane od razu lądują w
+   `C:\wertis-dane`. Gdy ten katalog już istnieje — ponowna instalacja po
+   awarii — instalator go podpina i baza wraca.
+2. **Git tylko na życzenie** — dla `-Galaz <gałąź>` i instalacji z `.git`.
+   Te idą po staremu: Node i Git przez `winget`, `git clone`, `npm ci`,
+   `npm run build`. Sprawdzana jest wtedy **wersja Node**
+   (co najmniej 22.5, bo serwer używa wbudowanego sterownika SQLite).
 3. **Usługi** — `wertis-api` i `wertis-worker` przez NSSM, z logami, rotacją,
    autostartem i restartem po awarii.
 4. **Sieć** — reguła zapory na porcie API, wpuszczająca **tylko sieć lokalną**.
-5. **Kreator** — odpytuje bazę i podsuwa listy do wyboru zamiast kazać
-   przepisywać identyfikatory z SSMS: magazyny i pole lokalizacji.
+5. **Kreator** — pyta tylko o to, czego nie da się ustalić. Serwer SQL to
+   `localhost` (inny: `-SerwerSql`), instancję czyta z rejestru (INSERTGT albo
+   jedyna; pyta przy kilku). Jedyną bazę bierze bez pytania, magazyny podsuwa
+   po symbolu. **Pole lokalizacji zostaje decyzją człowieka**, bo aplikacja
+   nadpisuje wybrane pole bezwarunkowo.
 6. **Konto SQL** — zakłada login `wertis` z losowym hasłem i uprawnieniami
    **kolumnowymi**, po czym sprawdza, co faktycznie zostało nadane.
 
@@ -213,27 +216,20 @@ nie trzeba podmieniać — po wykonaniu skryptu wystarczy restart obu usług.
 
 ## Konto administratora
 
-**Od 0.24.0 instalator zakłada jedno konto** — o roli `admin`, zaraz po starcie
-usług. Pyta o login (domyślnie `admin`) i o hasło, dwa razy, z tą samą regułą
-długości co serwer. Bez tego konta świeża instalacja nie wpuszcza nikogo: ani
-na kolektor, ani do podglądu biura.
+**Od @wydanie instalator o nie nie pyta.** Pusta instalacja pokazuje w panelu
+(`http://<serwer>:3001/obsluga/`) formularz pierwszego konta zamiast
+logowania. To konto dostaje rolę `admin` i zakłada wszystkie następne.
 
-Wcześniej stało w tym miejscu zdanie, że instalator kont **nie zakłada**, bo
-„wypisywanie loginów i haseł na monitorze w biurze byłoby krokiem w złą stronę".
-To zdanie zostało odwrócone świadomie i różnica jest dokładnie w tym, co je
-uzasadniało: instalator **nie wypisuje** hasła, tylko o nie **pyta**. Nie zapisuje
-go też nigdzie — ani do `wertis.env` (biała lista go nie przepuszcza), ani do
-logów. Hasło idzie przez `POST /api/users` prosto do bazy, gdzie hashuje je
-serwer.
-
-Krok jest pomijany, gdy baza ma już konta — dokładanie kont do działającej firmy
-nie jest zadaniem instalatora. Pozostałe konta zakłada się potem z kolektora
-albo `curl`-em (`DEPLOY.md` §5a).
+Dotąd (od 0.24.0) instalator pytał o login i hasło w oknie PowerShella na
+serwerze. Instalacja czekała więc na człowieka przy klawiaturze serwera,
+a hasło przechodziło przez skrypt. Serwer umiał przyjąć pierwsze konto bez
+sesji od początku (`POST /api/users` przy pustej bazie), więc panel tylko z tego
+korzysta. Kreator na kolektorze (`DEPLOY.md` §5a) działa dalej.
 
 ## Czego instalator NIE robi
 
-- **Nie zakłada kont pracowników.** Powstaje jedno konto administratora (wyżej);
-  magazynierów i biuro zakłada się z kolektora (`DEPLOY.md` §5a).
+- **Nie zakłada żadnych kont.** Pierwsze, administratora, zakłada się w panelu
+  (wyżej); resztę z panelu albo z kolektora (`DEPLOY.md` §5a).
 - **Nie buduje workera Sfery** (dokumenty MM, Etap 2 z `DEPLOY.md` §6) — exe
   buduje się osobno wg `sfera-worker/README.md`. Gdy `wertis-sfera-worker.exe`
   leży już w `<katalog>\sfera-worker\`, instalator pyta o włączenie i rejestruje

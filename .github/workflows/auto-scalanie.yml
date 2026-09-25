@@ -5,7 +5,14 @@
 #
 # 1. Scalenie wykonane tokenem `GITHUB_TOKEN` NIE WYZWALA kolejnych workflow'ów.
 #    Przepadłby build wydania APK na `main` — ten, z którego kolektory biorą
-#    aktualizację (DEPLOY.md §5). Natywne auto-scalanie wyzwala go normalnie.
+#    aktualizację (DEPLOY.md §5).
+#
+#    DO @wydanie STAŁO TU, ŻE NATYWNE AUTO-SCALANIE TEGO NIE MA — i to była
+#    nieprawda. GitHub scala w imieniu tego, kto auto-scalanie WŁĄCZYŁ, a
+#    włączał je `github.token`. Push scalenia szedł więc jako bot Actions
+#    i nie uruchamiał niczego: brakuje wydań 0.482.1–0.482.11, 0.484.3,
+#    0.484.6, 0.485.0, 0.486.1, 0.486.4 i 0.492.0, a `wydanie.yml` po #591
+#    nie ruszył wcale. Stąd token osobisty `ODSWIEZANIE_TOKEN` (DEPLOY §0a).
 # 2. Natywne przelicza wymagane checki na nowej głowie po każdym odświeżeniu
 #    gałęzi. Własny automat musiałby to śledzić sam i prędzej czy później
 #    scaliłby na podstawie wyniku sprzed odświeżenia.
@@ -37,9 +44,13 @@ jobs:
         # na awarię tam, gdzie zadziałała reguła.
         if: github.event.pull_request.draft == false
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.ODSWIEZANIE_TOKEN || github.token }}
+          MA_TOKEN: ${{ secrets.ODSWIEZANIE_TOKEN != '' }}
           PR: ${{ github.event.pull_request.number }}
         run: |
+          if [ "$MA_TOKEN" != "true" ]; then
+            echo "::warning::Brak ODSWIEZANIE_TOKEN — scalenie pójdzie jako bot Actions i NIE uruchomi wydania na main (DEPLOY §0a)."
+          fi
           # `|| true`: gdy PR jest już scalalny i nie ma na co czekać, GitHub
           # odmawia włączenia auto-scalania. To nie jest błąd bramki.
           gh pr merge "$PR" --auto --merge --repo "$GITHUB_REPOSITORY" || {

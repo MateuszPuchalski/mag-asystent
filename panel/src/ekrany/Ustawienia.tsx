@@ -11,6 +11,7 @@ import { SlownikTagow } from "../ustawienia/SlownikTagow";
 import { LogoDostawcow } from "../ustawienia/LogoDostawcow";
 import { Konfiguracja } from "../ustawienia/Konfiguracja";
 import { Aktualizacja } from "../ustawienia/Aktualizacja";
+import { NowyKolektor } from "../ustawienia/NowyKolektor";
 
 /* ── USTAWIENIA (0.168.0, ustawienia biura od 0.444.0) ────────────────────
    Za zębatką, bo zmienia się tu rzadko — cel biura z §7: praca na górnym
@@ -48,6 +49,8 @@ export function Ustawienia() {
     <DaneFirmy />
     <RegulyStrefy />
     <Konta admin={admin} biuro={ja.data?.user.role === "biuro"} />
+    {/* Obok kont: nowa osoba i nowe urządzenie to ta sama chwila w firmie. */}
+    <NowyKolektor biuro={admin || ja.data?.user.role === "biuro"} />
     <SlownikTagow tagi={tagi.data?.tagi ?? []} trwa={zmienTag.isPending} blad={bladTagu}
       onNazwa={(tagId, nazwa) => {
         setBladTagu("");

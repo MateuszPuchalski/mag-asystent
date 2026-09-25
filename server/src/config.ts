@@ -95,16 +95,18 @@ export const config = {
   /**
    * Aktualizacja automatyczna (0.494.0), `services/aktualizacja-auto.ts`.
    *
-   * Dev dostaje każde wydanie od razu i jest kanarkiem; produkcja czeka na
-   * okno nocne i na wydanie starsze niż `dojrzaloscGodz`. Stąd różne
-   * wartości domyślne — ta sama instalacja z tym samym plikiem nie istnieje.
+   * DOMYŚLNIE „zaraz", TAKŻE NA PRODUKCJI — decyzja właściciela z wywiadu
+   * o wdrażaniu (@wydanie). Magazyn pracuje na jedną zmianę, dwie minuty
+   * postoju są do przyjęcia o każdej porze, a zmiana ma dojść tego samego
+   * dnia. Dziesięć minut bez zapisu (`CISZA_MIN`) i godzina od wydania
+   * wystarczą; okno nocne zostaje jako tryb `noc` dla tego, kto go zechce.
+   * Dev bez dojrzałości: tam nie ma na co czekać.
    */
   aktualizacja: {
-    tryb: (process.env.AKTUALIZACJA_AUTO
-      || (process.env.SRODOWISKO === "dev" ? "zaraz" : "noc")) as string,
+    tryb: (process.env.AKTUALIZACJA_AUTO || "zaraz") as string,
     okno: process.env.AKTUALIZACJA_OKNO || "3-5",
     dojrzaloscGodz: Number(process.env.AKTUALIZACJA_DOJRZALOSC_H
-      ?? (process.env.SRODOWISKO === "dev" ? 0 : 6)),
+      ?? (process.env.SRODOWISKO === "dev" ? 0 : 1)),
     kanarek: (process.env.AKTUALIZACJA_KANAREK ?? "").trim(),
   },
 

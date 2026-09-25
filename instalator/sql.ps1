@@ -123,6 +123,59 @@ function Get-WertisInstancjaKlucz {
     } catch { return $null }
 }
 
+function Get-WertisInstancjeSql {
+    <#
+        .SYNOPSIS
+        Nazwy instancji SQL Servera zainstalowanych na tej maszynie (@wydanie).
+        Pusta lista, gdy rejestru nie ma — SQL na innym komputerze albo nie Windows.
+    #>
+    try {
+        $mapa = "HKLM:\SOFTWARE\Microsoft\Microsoft SQL Server\Instance Names\SQL"
+        if (-not (Test-Path $mapa)) { return @() }
+        $wpis = Get-ItemProperty -Path $mapa -ErrorAction SilentlyContinue
+        if (-not $wpis) { return @() }
+        return @($wpis.PSObject.Properties | Where-Object { $_.Name -notlike "PS*" } | ForEach-Object { $_.Name })
+    } catch { return @() }
+}
+
+function Select-WertisInstancjaSql {
+    <#
+        .SYNOPSIS
+        Którą instancję wziąć bez pytania; $null = trzeba zapytać (@wydanie).
+        .DESCRIPTION
+        Pytanie o instancję padało przy każdej instalacji, choć odpowiedź
+        prawie zawsze jest jedna. INSERTGT wygrywa, bo tak nazywa instancję
+        instalator Subiekta; jedyna instancja wygrywa, bo nie ma innej. Przy
+        kilku bez INSERTGT, i przy żadnej (SQL na innym komputerze), pytamy.
+    #>
+    param([AllowNull()][AllowEmptyCollection()][string[]]$Dostepne = @())
+    # Pusta tablica zwrócona z funkcji dociera tu jako $null, a @($null).Count
+    # to 1 — bez filtra „jedyna instancja" zapalała się przy braku instancji.
+    $lista = @($Dostepne | Where-Object { $_ })
+    if ($lista -contains "INSERTGT") { return "INSERTGT" }
+    if ($lista.Count -eq 1) { return $lista[0] }
+    return $null
+}
+
+function Get-WertisSugerowanyMagazyn {
+    <#
+        .SYNOPSIS
+        Indeks magazynu, którego symbol albo nazwa pasuje do wzorca; -1, gdy
+        nie pasuje żaden albo pasuje więcej niż jeden (@wydanie).
+        .DESCRIPTION
+        Tylko PODPOWIEDŹ pod Enterem, nie wybór: magazyn skutku rozstrzyga,
+        dokąd idzie dokument, więc człowiek i tak widzi listę. Dwa trafienia
+        to brak podpowiedzi — zgadywanie tu kosztuje dokument w złym magazynie.
+    #>
+    param([Parameter(Mandatory)][AllowEmptyCollection()][object[]]$Magazyny, [Parameter(Mandatory)][string]$Wzorzec)
+    $trafione = @()
+    for ($i = 0; $i -lt $Magazyny.Count; $i++) {
+        if ("$($Magazyny[$i].mag_Symbol) $($Magazyny[$i].mag_Nazwa)" -match $Wzorzec) { $trafione += $i }
+    }
+    if ($trafione.Count -eq 1) { return $trafione[0] }
+    return -1
+}
+
 function Test-WertisWymogiSql {
     <#
         .SYNOPSIS

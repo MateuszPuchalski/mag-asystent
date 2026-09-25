@@ -48,13 +48,13 @@ function Ostatnia({ s }: { s: StanAktualizacji }) {
    kieruje taktem na serwerze, więc panel nie zgaduje. Zmiana trybu idzie
    przez kartę konfiguracji obok — nie ma tu drugiego miejsca na tę decyzję. */
 const TRYB: Record<string, string> = {
-  noc: "w nocy", zaraz: "od razu (dev)", wylaczona: "wyłączona",
+  noc: "w nocy", zaraz: "gdy nikt nie pracuje", wylaczona: "wyłączona",
 };
 
 function Automat({ a }: { a: NonNullable<StanAktualizacji["auto"]> }) {
-  const szczegoly = a.tryb === "noc"
-    ? ` ${a.okno.od}:00–${a.okno.do}:00, wydanie starsze niż ${a.dojrzaloscGodz} h${a.kanarek ? ", po kanarku" : ""}`
-    : "";
+  const wiek = a.dojrzaloscGodz > 0 ? `, wydanie starsze niż ${a.dojrzaloscGodz} h` : "";
+  const szczegoly = a.tryb === "wylaczona" ? ""
+    : `${a.tryb === "noc" ? ` ${a.okno.od}:00–${a.okno.do}:00` : ""}${wiek}${a.kanarek ? ", po kanarku" : ""}`;
   return <p className="mb-3 text-sm">
     <b>Automatycznie:</b> {TRYB[a.tryb] ?? a.tryb}{szczegoly}. {a.powod}
     {" "}<span className="text-slate-600">Tryb zmienisz w konfiguracji (AKTUALIZACJA_AUTO).</span>

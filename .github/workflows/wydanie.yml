@@ -11,7 +11,7 @@
 #    powstaje po nich; klucz jest jedynym wyjątkiem w `.github/rulesets/main.json`;
 # 2. push tokenem Actions nie uruchamia innych workflowów, a commit wydania
 #    MUSI uruchomić `android.yml` i `paczka.yml` — to one publikują wydanie.
-# Konfiguracja klucza: DEPLOY §0a.
+# Konfiguracja klucza: DEPLOY §0c.
 name: Wydanie
 
 on:
@@ -48,7 +48,7 @@ jobs:
           # Fragmenty są, a klucza nie ma: czerwono, bo scalona zmiana nie
           # dostanie numeru i nie trafi do magazynu. Cisza byłaby gorsza.
           if [ "$MA_KLUCZ" != "true" ]; then
-            echo "::error::Brak sekretu WYDANIE_KLUCZ — wydanie nie powstało. Konfiguracja: DEPLOY §0a."
+            echo "::error::Brak sekretu WYDANIE_KLUCZ — wydanie nie powstało. Konfiguracja: DEPLOY §0c."
             exit 1
           fi
           git config user.name "wertis-wydanie"

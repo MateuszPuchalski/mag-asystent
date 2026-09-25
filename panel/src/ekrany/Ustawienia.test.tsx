@@ -65,6 +65,7 @@ const AKTUALIZACJA_WZOR = {
   auto: { tryb: "noc", okno: { od: 3, do: 5 }, dojrzaloscGodz: 6, kanarek: null,
     kandydat: "0.493.0", teraz: false, powod: "Wydanie 0.494.0 wymaga działania — zaktualizuj przyciskiem po przeczytaniu." },
 };
+let KOLEKTOR: { adresy: string[]; port: number; apk: { wersja: string } | null };
 let rola = "admin";
 let firmaNaSerwerze: { dane: Record<string, string>; zmieniono: { at: string; przez: string } | null };
 
@@ -73,6 +74,7 @@ const PUSTA_FIRMA = { nazwa: "", nip: "", adres: "", miejscowosc: "", osoba: "",
 beforeEach(() => {
   wyslane = []; odczyty = []; rola = "admin";
   AKTUALIZACJA = { ...AKTUALIZACJA_WZOR };
+  KOLEKTOR = { adresy: ["192.168.1.49", "10.8.0.2"], port: 3001, apk: { wersja: "0.493.0" } };
   firmaNaSerwerze = { dane: { ...PUSTA_FIRMA }, zmieniono: null };
   localStorage.clear();
   /* Pamięć obrazów jest modułowa i żyje między testami. */
@@ -105,6 +107,7 @@ beforeEach(() => {
     if (url === "/api/auth/me") return odp({ user: { userId: 1, name: "Anna", role: rola } });
     if (url === "/api/biuro/konfiguracja") return odp(KONFIGURACJA);
     if (url === "/api/biuro/aktualizacja") return odp(AKTUALIZACJA);
+    if (url === "/api/biuro/kolektor") return odp(KOLEKTOR);
     if (url === "/api/biuro/firma") return odp(firmaNaSerwerze);
     if (url === "/api/biuro/strefa") return odp({ reguly: [{ alejka: "A", od: "", do: "", poziomy: "2,3" }] });
     if (url === "/api/users") return odp({ users: [
@@ -147,7 +150,8 @@ describe("Ustawienia w panelu", () => {
     expect(wyslane).toEqual([]);
     /* Karty w kolejności makiety. */
     const tytuly = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(tytuly).toEqual(["Dane firmy do protokołów", "Reguły strefy złotej", "Konta i sesje", "Logo dostawców",
+    expect(tytuly).toEqual(["Dane firmy do protokołów", "Reguły strefy złotej", "Konta i sesje", "Nowy kolektor",
+      "Logo dostawców",
       "Konfiguracja serwera", "Aktualizacja serwera"]);
   });
 
@@ -276,6 +280,27 @@ describe("Ustawienia w panelu", () => {
     expect(within(k).getByRole("button", { name: "Zaktualizuj do 0.493.0" })).toBeEnabled();
   });
 
+  it("nowy kolektor: kod do APK z adresu serwera, nie z paska przeglądarki", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Nowy kolektor"));
+    expect(await within(k).findByRole("img", { name: "Kod QR: http://192.168.1.49:3001/api/aktualizacja/apk" }))
+      .toBeInTheDocument();
+    expect(within(k).getByText("http://192.168.1.49:3001")).toBeInTheDocument();
+    /* Kilka adresów — wybór przestawia i kod, i napis. */
+    await userEvent.selectOptions(within(k).getByLabelText("Adres serwera"), "10.8.0.2");
+    expect(within(k).getByRole("img", { name: "Kod QR: http://10.8.0.2:3001/api/aktualizacja/apk" })).toBeInTheDocument();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("nowy kolektor bez APK na serwerze: zdanie zamiast kodu", async () => {
+    KOLEKTOR = { adresy: ["192.168.1.49"], port: 3001, apk: null };
+    pokaz();
+    const k = await waitFor(() => karta("Nowy kolektor"));
+    expect(await within(k).findByText(/nie ma jeszcze APK/)).toBeInTheDocument();
+    expect(within(k).queryByRole("img")).toBeNull();
+    expect(within(k).queryByLabelText("Adres serwera")).toBeNull();
+  });
+
   it("automat: tryb, okno i zdanie serwera, bez żadnego zapisu", async () => {
     pokaz();
     const k = await waitFor(() => karta("Aktualizacja serwera"));
@@ -283,6 +308,15 @@ describe("Ustawienia w panelu", () => {
     expect(linia.textContent).toMatch(/w nocy 3:00–5:00, wydanie starsze niż 6 h\./);
     expect(linia.textContent).toMatch(/0\.494\.0 wymaga działania/);
     expect(wyslane).toEqual([]);
+  });
+
+  it("automat w trybie domyślnym: bez okna nocnego, z wiekiem wydania", async () => {
+    AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, auto: { ...AKTUALIZACJA_WZOR.auto, tryb: "zaraz", dojrzaloscGodz: 1 } };
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    const linia = (await within(k).findByText(/Automatycznie:/)).closest("p") as HTMLElement;
+    expect(linia.textContent).toMatch(/gdy nikt nie pracuje, wydanie starsze niż 1 h\./);
+    expect(linia.textContent).not.toMatch(/3:00/);
   });
 
   it("sprawdź teraz: POST bez ciała i bez typu treści", async () => {
