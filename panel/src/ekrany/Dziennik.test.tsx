@@ -13,7 +13,9 @@ import type { WpisAudytu } from "../api/wglad";
    2. FILTR DZIAŁA BEZ „SZUKAJ" — zmiana pola sama zmienia zapytanie.
    3. OSOBA z listy kont; jej brak (403) nie wywraca dziennika.
    4. CSV idzie tym samym filtrem co tabela, z sesją w nagłówku.
-   5. Doba filtra jest LOKALNA — szczegół w `dziennik/rodziny.test.ts`. */
+   5. Doba filtra jest LOKALNA — szczegół w `dziennik/rodziny.test.ts`.
+   6. Rzadkie filtry i surowy szczegół są zwinięte (@wydanie), ale ustawiony
+      filtr nigdy się nie chowa. */
 
 const wpis = (id: number, o: Partial<WpisAudytu> = {}): WpisAudytu => ({
   id, typ: "putaway_line_done", czas: "2026-09-22T12:31:05.000Z", uzytkownik: "j.wrona", userRef: 3,
@@ -77,6 +79,7 @@ describe("Dziennik w panelu", () => {
     pokaz();
     await screen.findByText("queue_failed", { selector: "td span" });
     expect(screen.queryByRole("button", { name: /szukaj/i })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Więcej filtrów" }));
     await userEvent.type(screen.getByLabelText("Urządzenie"), "KOL-03");
     await waitFor(() => expect(zapytaniaDziennika().some((a) => a.includes("device=KOL-03"))).toBe(true));
     /* Ćwierć sekundy przerwy: jedno zapytanie na wpisany numer, nie sześć. */
@@ -101,10 +104,36 @@ describe("Dziennik w panelu", () => {
   it("CSV idzie tym samym filtrem co tabela", async () => {
     pokaz();
     await screen.findByText("queue_failed", { selector: "td span" });
+    await userEvent.click(screen.getByRole("button", { name: "Więcej filtrów" }));
     await userEvent.selectOptions(screen.getByLabelText("Wierszy"), "500");
     await waitFor(() => expect(zapytaniaDziennika().some((a) => a.includes("limit=500"))).toBe(true));
     await userEvent.click(screen.getByRole("button", { name: /CSV/ }));
     await waitFor(() => expect(adresy.some((a) => a === "/api/events/csv?limit=500")).toBe(true));
     expect(zapisy).toEqual([]);
+  });
+
+  it("towar, urządzenie i liczba wierszy czekają pod „Więcej filtrów” — ustawione się nie chowają", async () => {
+    pokaz();
+    await screen.findByText("queue_failed", { selector: "td span" });
+    expect(screen.queryByLabelText("Urządzenie")).toBeNull();
+    expect(screen.queryByLabelText(/tw_id/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Więcej filtrów" }));
+    await userEvent.type(screen.getByLabelText("Towar"), "88");
+    /* Ustawiony filtr trzyma pola na widoku, więc przełącznik znika —
+       schowany filtr to tabela, która kłamie o tym, co pokazuje. */
+    expect(screen.queryByRole("button", { name: /filtrów/ })).toBeNull();
+    await userEvent.clear(screen.getByLabelText("Towar"));
+    await userEvent.click(screen.getByRole("button", { name: "Mniej filtrów" }));
+    expect(screen.queryByLabelText("Towar")).toBeNull();
+    expect(zapisy).toEqual([]);
+  });
+
+  it("surowy szczegół wpisu stoi zwinięty pod „szczegóły”", async () => {
+    pokaz();
+    const wiersz = (await screen.findByText("putaway_line_done", { selector: "td span" })).closest("tr")!;
+    const kod = within(wiersz).getByText('{"qty":6}');
+    expect(kod).not.toBeVisible();
+    await userEvent.click(within(wiersz).getByText("szczegóły"));
+    expect(kod).toBeVisible();
   });
 });

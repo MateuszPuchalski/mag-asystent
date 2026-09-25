@@ -19,9 +19,19 @@ import { PrzyciskTowaru } from "../towar/Szuflada";
    dostaw, a listy i daty działają od razu.
 
    FILTRY W JEDNYM RZĘDZIE NAD TABELĄ, nie w karcie: rządzą całym ekranem,
-   a stojąc w środku karty wyglądały jak jeszcze jeden wiersz treści. */
+   a stojąc w środku karty wyglądały jak jeszcze jeden wiersz treści.
+
+   TRZY FILTRY POD „WIĘCEJ FILTRÓW" (@wydanie). Siedem pól naraz przytłaczało,
+   a towar, urządzenie i liczbę wierszy ustawia się rzadko — zwykle szuka się
+   po dniu, typie i osobie. Ustawiony filtr nigdy się nie chowa: pola stoją
+   na widoku, dopóki któreś odbiega od domyślnego, bo schowany filtr to
+   tabela, która kłamie o tym, co pokazuje. */
 
 const LIMITY = [100, 500, 1000];
+
+/** Czy któryś z rzadkich filtrów odbiega od domyślnego — wtedy zostają na widoku. */
+const dodatkoweUstawione = (f: FiltrDziennika) =>
+  f.twId !== FILTR_PUSTY.twId || f.device !== FILTR_PUSTY.device || f.limit !== FILTR_PUSTY.limit;
 
 export function Dziennik() {
   const [szkic, setSzkic] = useState<FiltrDziennika>(FILTR_PUSTY);
@@ -32,6 +42,9 @@ export function Dziennik() {
      filtr osoby pusty, a dziennik działa dalej — tak samo jak w biurze. */
   const agenci = useAgenci();
   const [bladCsv, setBladCsv] = useState("");
+  const [wiecej, setWiecej] = useState(false);
+  const ustawione = dodatkoweUstawione(szkic);
+  const widacWiecej = wiecej || ustawione;
 
   const zmien = <K extends keyof FiltrDziennika>(k: K, v: FiltrDziennika[K]) => setSzkic((f) => ({ ...f, [k]: v }));
   const pobierz = () => {
@@ -65,14 +78,22 @@ export function Dziennik() {
           <option value="">wszystkie</option>
           {(agenci.data?.users ?? []).map((u) => <option key={u.userId} value={String(u.userId)}>{u.name}</option>)}
         </select></Etykieta>
-      <Etykieta napis="Towar (tw_id)">
-        <Pole className="w-28" inputMode="numeric" value={szkic.twId} onChange={(e) => zmien("twId", e.target.value)} /></Etykieta>
-      <Etykieta napis="Urządzenie">
-        <Pole className="w-36" value={szkic.device} onChange={(e) => zmien("device", e.target.value)} /></Etykieta>
-      <Etykieta napis="Wierszy">
-        <select className="field" value={szkic.limit} onChange={(e) => zmien("limit", Number(e.target.value))}>
-          {LIMITY.map((l) => <option key={l} value={l}>{l}</option>)}
-        </select></Etykieta>
+      {/* „Towar", nie „Towar (tw_id)" (@wydanie): agent nie zna nazwy kolumny
+          w bazie, a numer kartoteki widzi w kolumnie „Towar" tej samej tabeli. */}
+      {widacWiecej && <>
+        <Etykieta napis="Towar">
+          <Pole className="w-28" inputMode="numeric" value={szkic.twId} onChange={(e) => zmien("twId", e.target.value)} /></Etykieta>
+        <Etykieta napis="Urządzenie">
+          <Pole className="w-36" value={szkic.device} onChange={(e) => zmien("device", e.target.value)} /></Etykieta>
+        <Etykieta napis="Wierszy">
+          <select className="field" value={szkic.limit} onChange={(e) => zmien("limit", Number(e.target.value))}>
+            {LIMITY.map((l) => <option key={l} value={l}>{l}</option>)}
+          </select></Etykieta>
+      </>}
+      {/* Przełącznik znika, gdy rzadki filtr jest ustawiony: zwinąć się go
+          i tak nie da, a przycisk, który nic nie robi, to jeszcze jedna decyzja. */}
+      {!ustawione && <Przycisk type="button" aria-expanded={widacWiecej} onClick={() => setWiecej(!widacWiecej)}>
+        {widacWiecej ? "Mniej filtrów" : "Więcej filtrów"}</Przycisk>}
     </div>
 
     {/* 403 znaczy „ta rola nie ogląda śladu" i jest poprawną odpowiedzią, nie
@@ -105,9 +126,13 @@ export function Dziennik() {
                 <td className="py-1.5 pr-3 tabular-nums text-slate-600">
                   {w.twId != null ? <PrzyciskTowaru twId={w.twId}>{w.twId}</PrzyciskTowaru> : "—"}</td>
                 {/* 160 znaków jak w biurze: szczegół ma podpowiedzieć, co się
-                    stało, a całość i tak jest w CSV. */}
-                <td className="py-1.5 pr-4"><code className="break-all text-xs text-slate-700">
-                  {(w.payload ?? "").slice(0, 160)}</code></td>
+                    stało, a całość i tak jest w CSV. Zwinięte (@wydanie), bo
+                    surowy JSON w każdym wierszu zagłuszał czas, typ i osobę —
+                    po nich się czyta dziennik, szczegół otwiera się raz na sto. */}
+                <td className="py-1.5 pr-4">{w.payload
+                  ? <details><summary className="cursor-pointer text-xs text-slate-600 hover:text-slate-900">szczegóły</summary>
+                    <code className="break-all text-xs text-slate-700">{w.payload.slice(0, 160)}</code></details>
+                  : <span className="text-slate-600">—</span>}</td>
               </tr>)}
             </tbody>
           </table>
