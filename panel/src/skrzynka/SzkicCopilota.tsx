@@ -229,11 +229,11 @@ export function KartaSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
           data-testid="luki-kartoteki">
           <b className="text-sky-950">Przy okazji.</b>{" "}
           {p.nowePolaDoboru.length > 0 && <>
-            Do doboru wpisano: <b>{p.nowePolaDoboru.join(", ")}</b> (popraw w zakładce Dobór,
+            Do doboru wpisano: <b>{p.nowePolaDoboru.join(", ")}</b> (popraw w Doborze po prawej,
             jeśli się myli).{" "}
           </>}
           {p.paraPasowania && <>
-            Rozpoznane pasowanie <b>{p.paraPasowania}</b> — zaproponuj je w zakładce Dobór.{" "}
+            Rozpoznane pasowanie <b>{p.paraPasowania}</b> — zaproponuj je w Doborze po prawej.{" "}
           </>}
           {s.lukiKartoteki.numery.length > 0 && <>
             Z oferty do kartoteki {s.lukiKartoteki.symbol}:{" "}
