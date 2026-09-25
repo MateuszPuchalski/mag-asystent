@@ -155,7 +155,7 @@ test("nieudana aktualizacja w zdrowiu przez dobę", () => {
   assert.equal(problemAktualizacji({ ...stan, etap: "gotowe" }, Date.parse("2026-09-25T12:00:00Z")), null);
 });
 
-/* Pasek postępu (@wydanie): krok z pliku instalatora trafia do stanu tylko
+/* Pasek postępu (0.504.0): krok z pliku instalatora trafia do stanu tylko
    w trakcie, tylko w poprawnym kształcie i tylko z TEJ aktualizacji. */
 test("postęp: poprawny kształt przechodzi, reszta odpada", () => {
   const at = "2026-09-25T16:48:10.000Z";

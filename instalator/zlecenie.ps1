@@ -28,7 +28,7 @@ $katalog = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $dir = Join-Path $katalog "server\data\aktualizacja"
 $plikZlecenia = Join-Path $dir "zlecenie.json"
 $plikStanu = Join-Path $dir "stan.json"
-# Bieżący krok dla paska w panelu (@wydanie) — pisze go instalator.
+# Bieżący krok dla paska w panelu (0.504.0) — pisze go instalator.
 $plikPostepu = Join-Path $dir "postep.json"
 $robocze = Join-Path $env:TEMP "wertis-aktualizacja"
 $dziennikRoboczy = Join-Path $env:TEMP "wertis-aktualizacja.log"

@@ -61,7 +61,7 @@ function Automat({ a }: { a: NonNullable<StanAktualizacji["auto"]> }) {
   </p>;
 }
 
-/* ── Pasek postępu (@wydanie) ──────────────────────────────────────────
+/* ── Pasek postępu (0.504.0) ──────────────────────────────────────────
    Kroki są PRAWDZIWE: zapisuje je instalator (`Set-WertisPostep`), a serwer
    podaje dalej. Żadnych procentów liczonych z zegara — pobieranie zależy od
    łącza, więc pasek z czasu kłamałby dokładnie wtedy, gdy ktoś na niego

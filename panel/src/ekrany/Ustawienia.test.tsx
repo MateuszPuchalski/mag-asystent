@@ -338,7 +338,7 @@ describe("Ustawienia w panelu", () => {
     expect(within(k).getByRole("button", { name: "Zaktualizuj do 0.494.0" })).toBeDisabled();
   });
 
-  /* Pasek postępu (@wydanie): kroki z instalatora, bez procentów z zegara;
+  /* Pasek postępu (0.504.0): kroki z instalatora, bez procentów z zegara;
      w trakcie nie ma formularza, a samo patrzenie nadal niczego nie zapisuje. */
   it("aktualizacja w toku: pasek z krokiem instalatora zamiast formularza", async () => {
     AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, ostatnia: {

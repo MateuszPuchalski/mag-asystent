@@ -419,7 +419,7 @@ function Wait-WertisKatalogWolny {
 function Set-WertisPostep {
     <#
         .SYNOPSIS
-        Zapisuje bieżący krok aktualizacji do pliku z -PlikPostepu (@wydanie).
+        Zapisuje bieżący krok aktualizacji do pliku z -PlikPostepu (0.504.0).
         .DESCRIPTION
         Karta w panelu rysuje z niego pasek postępu. Do tej pory wiedziała
         tylko „trwa", a dziennik instalatora trafia do katalogu danych dopiero
