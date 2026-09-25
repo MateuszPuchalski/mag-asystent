@@ -50,7 +50,12 @@ describe("soczewka w kolumnie kontekstu", () => {
 
   it("mówi, skąd kategoria: od Copilota albo od zespołu", () => {
     const { unmount } = rysuj(dane({ kategoria: "INVOICE" }));
-    expect(screen.getByText(/kategoria wg Copilota/)).toBeInTheDocument();
+    /* Źródło stoi słowem; „gdzie poprawić" czeka w dymku (@wydanie), bo nad
+       każdą soczewką czytało się jak instrukcja obsługi ekranu. */
+    const zrodlo = screen.getByText(/kategoria wg Copilota/);
+    expect(zrodlo).toBeInTheDocument();
+    expect(zrodlo).not.toHaveTextContent(/poprawisz/);
+    expect(zrodlo).toHaveAttribute("title", expect.stringMatching(/pod „⋯” nad rozmową/));
     unmount();
     rysuj(dane({ kategoriaCzlowieka: "INVOICE" }));
     expect(screen.getByText(/kategoria wskazana przez zespół/)).toBeInTheDocument();
