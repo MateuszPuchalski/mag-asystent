@@ -28,7 +28,7 @@ const pokaz = (wpisy: WpisOsi[]) => render(
   <Os rozmowaId={1} wpisy={wpisy} zrodloPomiaru={null} mozeZlecac={false}
     onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
-/* Od @wydanie pasek mówi jedno zdanie, a czipy otwiera „przebieg (n)". */
+/* Od 0.506.0 pasek mówi jedno zdanie, a czipy otwiera „przebieg (n)". */
 const rozwin = () => fireEvent.click(screen.getByRole("button", { name: /przebieg \(/ }));
 
 describe("Zdarzenia sprawy stoją w pasku, nie na osi", () => {
@@ -110,7 +110,7 @@ describe("zwrot na osi rozmowy", () => {
   });
 });
 
-/* ── Spokojniejsza oś (@wydanie) ────────────────────────────────────────────
+/* ── Spokojniejsza oś (0.506.0) ────────────────────────────────────────────
    Pasek zdarzeń mówi jedno zdanie o ostatniej zmianie; nasza długa
    wypowiedź zwija się do początku, a puste wiersze ściskają się tylko na
    ekranie; pytanie klienta bez odpowiedzi ma ramkę. */

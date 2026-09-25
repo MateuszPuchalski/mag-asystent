@@ -109,7 +109,7 @@ export function coSwieci(dane: OsRozmowy): Swiatlo[] {
    po to, żeby porównać z kartoteką. */
 export function towarOtwartyNaStart(swiatla: Swiatlo[], kategoria: Kategoria | null = null): boolean {
   if (swiatla.includes("zwrot") || swiatla.includes("sprawa")) return false;
-  /* ── TYLKO PRZY PYTANIU O TOWAR (@wydanie) ────────────────────────────────
+  /* ── TYLKO PRZY PYTANIU O TOWAR (0.506.0) ────────────────────────────────
      Zgłoszenie agenta: „przytłacza". Na zrzucie klient pisał o odesłaniu
      części, a karta oferty z cenami, EAN i opisem stała otwarta nad
      wszystkim — pasmo nad kolumną mówiło już nazwę, SKU i stan. Powód

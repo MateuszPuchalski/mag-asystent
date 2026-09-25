@@ -112,7 +112,7 @@ describe("soczewka w kolumnie kontekstu", () => {
     dokumenty.data = undefined;
   });
 
-  /* Zwrot (@wydanie): soczewka mówi, że zwrotu w Allegro jeszcze nie ma;
+  /* Zwrot (0.506.0): soczewka mówi, że zwrotu w Allegro jeszcze nie ma;
      gdy zwrot jest, jego karta stoi w „Wymaga Ciebie" i soczewka milczy. */
   it("zwrot: bez zgłoszenia w Allegro mówi to wprost, ze zgłoszeniem milczy", () => {
     const { unmount } = rysuj(dane({ kategoria: "RETURN" }));

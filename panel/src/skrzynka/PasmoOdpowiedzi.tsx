@@ -107,7 +107,7 @@ export function PasmoOdpowiedzi({ dane }: { dane: OsRozmowy }) {
       </Wiersz>}
       {toJest && <Wiersz etykieta="To jest">
         <span className="font-semibold">{toJest}</span>
-        {/* Symbol tylko wtedy, gdy RÓŻNI SIĘ od sygnatury z „Zamówił" (@wydanie).
+        {/* Symbol tylko wtedy, gdy RÓŻNI SIĘ od sygnatury z „Zamówił" (0.506.0).
             Równy powtarzał to samo słowo wiersz niżej; różny to sygnał, że
             oferta wskazuje inną kartotekę, i ten zostaje. */}
         {karta.data?.sym && karta.data.sym !== pozycja?.sku

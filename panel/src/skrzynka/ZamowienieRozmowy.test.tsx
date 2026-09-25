@@ -118,7 +118,7 @@ describe("brak powiązania z towarem", () => {
     expect(brakPowiazania([w({}), w({ id: "msg-2", odKlienta: false, zamowienieId: "zam-1" })])).toBe(false);
   });
 
-  it("zamówienie znane spoza osi też ucisza blok (@wydanie)", () => {
+  it("zamówienie znane spoza osi też ucisza blok (0.506.0)", () => {
     /* Runda krytyki: baner „brak powiązania" stał nad prawą kolumną, która
        mówiła „Zamówił 1 × …". Zamówienie wskazane z kandydatów nie ma
        `zamowienieId` na osi, ale ekran je zna — i to rozstrzyga. */

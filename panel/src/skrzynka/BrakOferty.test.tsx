@@ -7,7 +7,7 @@ describe("BrakOferty", () => {
   it("mówi o braku wprost, zamiast go ukrywać", () => {
     render(<BrakOferty zapisuje={false} blad="" onWskaz={() => {}} onDopytaj={() => {}} />);
     expect(screen.getByText(/Brak powiązania z ofertą/)).toBeInTheDocument();
-    /* Zdanie mówi o KLIENCIE, nie o ekranie (@wydanie) — agent ma wiedzieć,
+    /* Zdanie mówi o KLIENCIE, nie o ekranie (0.506.0) — agent ma wiedzieć,
        czego brakuje, a nie jak ekran został zaprojektowany. */
     expect(screen.getByText(/Nie wiadomo, o który towar pyta klient/)).toBeInTheDocument();
     expect(screen.queryByText(/Ekran mówi/)).toBeNull();

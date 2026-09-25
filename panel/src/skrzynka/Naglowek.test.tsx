@@ -66,7 +66,7 @@ describe("Nagłówek rozmowy", () => {
 
   it("mówi, że rozmowę przypisze PIERWSZA ODPOWIEDŹ", async () => {
     /* To zdanie jest ceną zdjęcia przycisku: bez niego znika czynność i nie
-       przychodzi nic, co by ją wytłumaczyło. Od @wydanie „nikt" i „Ty" stoją
+       przychodzi nic, co by ją wytłumaczyło. Od 0.506.0 „nikt" i „Ty" stoją
        w menu „⋯" — na wierzchu zostaje wyjątek, czyli cudza rozmowa. */
     render(<EkranRozmowy {...props()} />);
     expect(screen.queryByTitle("Prowadzi nikt — przypisze pierwsza odpowiedź")).toBeNull();

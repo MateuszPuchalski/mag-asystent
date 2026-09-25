@@ -40,7 +40,7 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
   onZakoncz?: (mimoPytania: boolean) => void;
   onOtworz?: () => void;
   zmieniaStatus?: boolean;
-  /* Wiersze menu „⋯" od ekranu rozmowy (@wydanie): prowadzący i kategoria.
+  /* Wiersze menu „⋯" od ekranu rozmowy (0.506.0): prowadzący i kategoria.
      Przełączniki w spoczynku dokłada tu sam `Status` — powód w `MenuRozmowy.tsx`. */
   menu?: React.ReactNode;
 }) {
@@ -80,7 +80,7 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
         tekstu"). Opuszczony przełącznik jest propozycją ruchu i wystarczy mu
         ikona z dymkiem. Podniesiony jest stanem sprawy — ten czyta się
         słowem, bo ma być zauważony, a nie rozszyfrowany. */}
-    {/* PODNIESIONA FLAGA ZOSTAJE NA WIERZCHU (@wydanie). To stan sprawy
+    {/* PODNIESIONA FLAGA ZOSTAJE NA WIERZCHU (0.506.0). To stan sprawy
         i ma krzyczeć; kliknięcie opuszcza ją tym samym przyciskiem.
         Przełącznik w spoczynku zszedł do menu „⋯" — `MenuRozmowy.tsx`. */}
     {rozmowa.priorytet === "pilny" && <button type="button" disabled={zapisujePriorytet}

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
 
-/* ── „⋯" — NARZĘDZIA ROZMOWY W JEDNYM MIEJSCU (@wydanie) ───────────────────
+/* ── „⋯" — NARZĘDZIA ROZMOWY W JEDNYM MIEJSCU (0.506.0) ───────────────────
    Zgłoszenie agenta: „aplikacja przytłacza". Nagłówek rozmowy niósł siedem
    rzeczy w jednej wadze: prowadzącego, kategorię z trzema narzędziami,
    pilne, reklamacyjną, status i Zakończ. Większość z nich to NARZĘDZIA,

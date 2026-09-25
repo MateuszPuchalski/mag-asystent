@@ -347,7 +347,7 @@ export function Os({
          strony. Zamiast rozjaśniać pytanie (nie ma dokąd: jest już białe),
          cofamy odpowiedź: nasza traci obwódkę i cień, a jej tekst schodzi
          na szarość. Pytanie zostaje jedyną kartą z cieniem na ekranie. */
-      /* PYTANIE BEZ ODPOWIEDZI MA RAMKĘ (@wydanie): to ono jest powodem
+      /* PYTANIE BEZ ODPOWIEDZI MA RAMKĘ (0.506.0): to ono jest powodem
          ekranu, a na długiej osi ginęło między naszymi wypowiedziami. Ramka
          tylko wtedy, gdy nic nie padło po nim — odpowiedziane wraca do tła. */
       : <article key={w.id} className={`group max-w-[75ch] rounded-lg p-3 ${w.odKlienta
@@ -397,7 +397,7 @@ export function Os({
             : <NaszaTresc tresc={w.tresc} />}
           {w.stopka && <Stopka tresc={w.stopka} />}
           {w.zalaczniki?.length ? <Zalaczniki lista={w.zalaczniki} /> : null}
-          {/* „Zleć" NA WIERZCHU TYLKO PRZY PYTANIU BEZ ODPOWIEDZI (@wydanie).
+          {/* „Zleć" NA WIERZCHU TYLKO PRZY PYTANIU BEZ ODPOWIEDZI (0.506.0).
               Stał pod każdą wiadomością klienta, więc na długiej osi ten sam
               napis powtarzał się co kilka akapitów. Przy starszych wychodzi
               pod myszą albo fokusem — zostaje w miejscu i w kolejności Tab. */}
@@ -514,7 +514,7 @@ function PasekZdarzen({ zdarzenia, onSkocz }: {
   zdarzenia: Zdarzenie[];
   onSkocz: (celId: string) => void;
 }) {
-  /* ── JEDNO ZDANIE, CAŁOŚĆ NA ŻĄDANIE (@wydanie) ─────────────────────────
+  /* ── JEDNO ZDANIE, CAŁOŚĆ NA ŻĄDANIE (0.506.0) ─────────────────────────
      Zgłoszenie agenta: „przytłacza". Rząd siedmiu czipów stał pod każdą
      rozmową, a przy sprawie otwieranej i kończonej kilka razy mówił pięć
      razy „Otwarta → Zakończona". Przy pisaniu liczy się ostatnia zmiana;
@@ -641,7 +641,7 @@ function Zlecenie({ wpis }: { wpis: WpisOsi }) {
   </article>;
 }
 
-/* ── NASZA WYPOWIEDŹ ZWINIĘTA DO CZTERECH LINII (@wydanie) ───────────────────
+/* ── NASZA WYPOWIEDŹ ZWINIĘTA DO CZTERECH LINII (0.506.0) ───────────────────
    Zrzut z „przytłacza": nasza odpowiedź ze stopką i pustymi wierszami zajęła
    całą oś, a pytanie klienta stało wciśnięte nad polem odpowiedzi. Własną
    treść agent już zna — wystarczy mu jej początek, całość na kliknięcie.

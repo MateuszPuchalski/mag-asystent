@@ -81,7 +81,7 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
   });
 
   it("symbol kartoteki staje tylko wtedy, gdy różni się od sygnatury zamówienia", () => {
-    /* Runda krytyki (@wydanie): ten sam symbol stał w „Zamówił" i w „To jest".
+    /* Runda krytyki (0.506.0): ten sam symbol stał w „Zamówił" i w „To jest".
        Równy to powtórzenie; różny mówi, że oferta wskazuje inną kartotekę. */
     const { unmount } = render(<PasmoOdpowiedzi dane={dane()} />);
     expect(screen.getAllByText(/MFG163856/)).toHaveLength(1);

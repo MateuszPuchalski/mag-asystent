@@ -6116,7 +6116,7 @@ Każda zmiana niżej ma powód w komentarzu obok kodu.
 się najwyżej raz w tygodniu, została odrzucona. Wydania idą jak dotąd,
 a o zmianach mówi pasek z punktu 7.
 
-## 26d. Skrzynka spokojniejsza: mniej naraz, to samo pod ręką (@wydanie)
+## 26d. Skrzynka spokojniejsza: mniej naraz, to samo pod ręką (0.506.0)
 
 Zgłoszenie jednego z agentów brzmiało: „aplikacja przytłacza". Propozycja
 powstała na tablicy projektowej i właściciel ją przyjął. Zasada była jedna:

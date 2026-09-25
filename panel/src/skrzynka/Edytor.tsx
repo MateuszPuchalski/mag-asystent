@@ -280,7 +280,7 @@ export function Edytor({
           </Przycisk>
         </>
       : <>
-          {/* LICZNIK TYLKO PRZY LIMICIE (@wydanie). „0 znaków" stało przy każdej
+          {/* LICZNIK TYLKO PRZY LIMICIE (0.506.0). „0 znaków" stało przy każdej
               odpowiedzi, a liczy się wyłącznie blisko progu Allegro — tam, gdzie
               zmienia decyzję. Wtedy staje, a za progiem czerwienieje. */}
           {szkic.length >= LIMIT_ALLEGRO - 400 && <span className={`whitespace-nowrap text-podpis font-semibold ${
@@ -318,7 +318,7 @@ export function Edytor({
 /** Limit treści `NewMessageInThread` w Allegro — ten sam, którego pilnuje serwer (`LIMIT_ZNAKOW`). */
 const LIMIT_ALLEGRO = 2000;
 
-/* ── „▾" OBOK WYSYŁKI (@wydanie) ─────────────────────────────────────────────
+/* ── „▾" OBOK WYSYŁKI (0.506.0) ─────────────────────────────────────────────
    Pasek niósł pięć rzeczy: licznik, spinacz, „Zapisz szkic", „Wyślij
    i zakończ" z napisem skrótu i „Wyślij do klienta" z drugim. Najgłośniejsze
    ma zostać jedno — wysyłka (0.247.0). Dwie rzadsze drogi stoją pod

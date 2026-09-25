@@ -33,7 +33,7 @@ export function Soczewka({ dane, onWstawDoSzkicu }: {
 
 /* SKĄD KATEGORIA — zawsze, bo soczewka stoi na domyśle klasyfikatora.
    Agent, który widzi „wg Copilota", wie, że może się mylić, i wie, gdzie
-   to poprawić: od @wydanie etykieta kategorii stoi pod „⋯” nad rozmową. */
+   to poprawić: od 0.506.0 etykieta kategorii stoi pod „⋯” nad rozmową. */
 function Naglowek({ s }: { s: DaneSoczewki }) {
   return <div className="mb-2">
     <h3 className="text-podpis font-bold uppercase tracking-wide text-slate-700">
@@ -172,7 +172,7 @@ function Faktura({ dane }: { dane: OsRozmowy }) {
   </div>;
 }
 
-/* ── ZWROT, KTÓREGO W ALLEGRO JESZCZE NIE MA (@wydanie) ──────────────────────
+/* ── ZWROT, KTÓREGO W ALLEGRO JESZCZE NIE MA (0.506.0) ──────────────────────
    Soczewka staje tylko wtedy (`soczewki-reguly.ts`): gdy zwrot jest, jego
    karta stoi w „Wymaga Ciebie". Terminu ustawowego nie liczymy — zasady
    zwrotu oferty bywają dłuższe, a zły termin jest gorszy niż żaden. */

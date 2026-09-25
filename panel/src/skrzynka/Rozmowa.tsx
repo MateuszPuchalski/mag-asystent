@@ -26,7 +26,7 @@ import { Obecni } from "./Obecni";
 export function brakPowiazania(os: WpisOsi[],
   znane?: Pick<OsRozmowy, "zamowienie" | "oferta">): boolean {
   /* Baner mówi „nie wiemy, o co pyta", więc milknie, gdy wiemy to inną drogą
-     (@wydanie). Zamówienie wskazane z kandydatów albo z numeru w treści nie
+     (0.506.0). Zamówienie wskazane z kandydatów albo z numeru w treści nie
      trafia na oś jako `zamowienieId`, a prawa kolumna już je pokazuje. Runda
      krytyki złapała obie kolumny naraz: „brak powiązania" nad „Zamówił 1 ×". */
   if (znane?.zamowienie || znane?.oferta) return false;
@@ -161,7 +161,7 @@ export function Rozmowa(p: {
               „Prowadzi nikt — przypisze pierwsza odpowiedź" zajmowało linię
               pod loginem. Zostaje kółko: puste przerywane, gdy nikt, z inicjałem,
               gdy ktoś — a całe zdanie w dymku i dla czytnika ekranu. */}
-          {/* ZNAK TYLKO PRZY WYJĄTKU (@wydanie): cudza rozmowa zmienia decyzję
+          {/* ZNAK TYLKO PRZY WYJĄTKU (0.506.0): cudza rozmowa zmienia decyzję
               o pisaniu, więc zostaje na wierzchu. „Nikt" i „Ty" to norma — stoją
               w menu „⋯", żeby nagłówek nie powtarzał jej przy każdej rozmowie. */}
           {rozmowa.wlasciciel && !moja && <ProwadziZnak prowadzi={rozmowa.wlasciciel} ja={false} />}
@@ -172,7 +172,7 @@ export function Rozmowa(p: {
       {/* Etykieta o propozycji Copilota stoi PRZY NIEJ, nie za zębatką: ocenia
           się to, na co się właśnie patrzy. Za zębatką mieszka SUMA etykiet,
           czyli pomiar — ekran pracy niesie to, co woła o reakcję (0.168.0). */}
-      {/* KATEGORIA POD „⋯" (@wydanie). Pierwsze wdrożenie zostawiło na
+      {/* KATEGORIA POD „⋯" (0.506.0). Pierwsze wdrożenie zostawiło na
           wierzchu samą plakietkę; runda krytyki na ekranie 1366 px pokazała, że
           łamie ona nagłówek na dwa rzędy i spycha pytanie klienta. Kategorię
           niesie już kafel wiersza w kolejce i nagłówek soczewki po prawej,

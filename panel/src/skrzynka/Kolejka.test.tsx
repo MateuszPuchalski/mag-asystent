@@ -114,7 +114,7 @@ describe("Kolejka", () => {
        w „Oczekujących", nie w „Moje". */
     expect(screen.queryByText("Czeka")).not.toBeInTheDocument();
     expect(screen.queryByText("Nieprzypisana")).not.toBeInTheDocument();
-    /* Od @wydanie „Oczekujące" i „Zakończone" stoją pod „Więcej". */
+    /* Od 0.506.0 „Oczekujące" i „Zakończone" stoją pod „Więcej". */
     await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"), "oczekujace");
     expect(screen.getByText("Czeka")).toBeInTheDocument();
   });

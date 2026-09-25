@@ -106,7 +106,7 @@ describe("bramka doboru", () => {
   });
 });
 
-/* ── Karta towaru otwarta tylko przy pytaniu o towar (@wydanie) ─────────────
+/* ── Karta towaru otwarta tylko przy pytaniu o towar (0.506.0) ─────────────
    Zgłoszenie agenta: „przytłacza". Przy zwrocie, dostawie czy fakturze karta
    oferty z cenami i EAN stała otwarta, choć pasmo mówiło już nazwę i stan. */
 describe("karta towaru na starcie według rodzaju pytania", () => {

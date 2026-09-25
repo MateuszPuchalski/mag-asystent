@@ -224,7 +224,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
                   ? " Wskaż pozycję zamówienia wyżej, a towar pojawi się tutaj."
                   : " Wskaż ofertę przy rozmowie, a towar pojawi się tutaj."}</span>
             </p>}
-        {/* „Szukaj innego towaru mimo to" przy znanym towarze (@wydanie) —
+        {/* „Szukaj innego towaru mimo to" przy znanym towarze (0.506.0) —
             tutaj, a nie we własnym wierszu „Dobór: zbędny". Wiersz mówił przy
             każdej takiej rozmowie, że czegoś NIE trzeba robić. */}
         {/* Kliknięcie OTWIERA dobór: bez tego wiersz wracał zwinięty i przycisk
@@ -356,7 +356,7 @@ export function streszczenieZamowienia(dane: OsRozmowy): string {
      (NN/g, wzorzec F, potwierdzony w 2017). O zamówieniu pytają najczęściej
      „gdzie paczka", więc to słowo ma stać tam, gdzie oko na pewno trafi. */
   if (!p) return `${paczka} · treść jeszcze nie pobrana`;
-  /* „kupione" przy dacie (@wydanie): obok „doręczona 15 września" goła druga
+  /* „kupione" przy dacie (0.506.0): obok „doręczona 15 września" goła druga
      data czytała się jak druga data dostawy. */
   return [paczka, p.kupionoAt ? `kupione ${dzien(p.kupionoAt)}` : null,
     p.sumaGrosze !== null ? zlote(p.sumaGrosze, p.waluta) : null].filter(Boolean).join(" · ");

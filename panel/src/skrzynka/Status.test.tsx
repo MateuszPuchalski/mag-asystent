@@ -86,7 +86,7 @@ describe("ręczna flaga „pilne”", () => {
     const onPriorytet = vi.fn();
     render(<Status rozmowa={rozmowa()} blad=""
       onPriorytet={onPriorytet} zapisujePriorytet={false} />);
-    /* Przełącznik w spoczynku stoi w menu „⋯" od @wydanie — `MenuRozmowy.tsx`. */
+    /* Przełącznik w spoczynku stoi w menu „⋯" od 0.506.0 — `MenuRozmowy.tsx`. */
     await userEvent.click(screen.getByRole("button", { name: "Więcej czynności rozmowy" }));
     const p = screen.getByRole("button", { name: /Oznacz jako pilne/ });
     expect(p).toHaveAttribute("aria-pressed", "false");

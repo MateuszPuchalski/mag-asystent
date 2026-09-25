@@ -49,7 +49,7 @@ export function odNajnowszych(rozmowy: Rozmowa[]): Rozmowa[] {
     || b.id - a.id);
 }
 
-/** Kubełki przeglądania, nie pracy — pod „Więcej" (@wydanie). */
+/** Kubełki przeglądania, nie pracy — pod „Więcej" (0.506.0). */
 const POD_WIECEJ: ReadonlySet<Kubelek> = new Set(["oczekujace", "zakonczone"]);
 
 const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
@@ -291,7 +291,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         `py-1.5` → `py-1`. Kubełki zawijają się na dwa rzędy przy kolumnie
         400 px, więc pigułki kosztują +8 px, a pasmo oddaje 4 px. Netto +4 px
         chromu — cena, której próg dostępności jest wart. */}
-    {/* ── TRZY KUBEŁKI NA WIERZCHU, DWA POD „WIĘCEJ" (@wydanie) ─────────────
+    {/* ── TRZY KUBEŁKI NA WIERZCHU, DWA POD „WIĘCEJ" (0.506.0) ─────────────
         Zgłoszenie agenta: „przytłacza". Pięć pigułek zawijało się na dwa rzędy
         nad pierwszym pytaniem. Robota dzieje się w trzech; „Oczekujące"
         i „Zakończone" to przeglądanie — stoją pod „Więcej" z liczbą, a cyfry
@@ -303,7 +303,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           ile: rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length }))} />
       <select aria-label="Więcej kubełków" value={POD_WIECEJ.has(kubelek) ? kubelek : ""}
         onChange={(e) => { if (e.target.value) setKubelek(e.target.value as Kubelek); }}
-        /* Reszta rzędu, nie własna szerokość (@wydanie): stała szerokość
+        /* Reszta rzędu, nie własna szerokość (0.506.0): stała szerokość
            125 px spadała w kolumnie 360 px pod kubełki i dokładała rząd. */
         className={`field w-auto min-w-0 flex-1 basis-[5.5rem] py-1 text-xs font-semibold ${POD_WIECEJ.has(kubelek) ? "border-wertis-ink" : ""}`}>
         <option value="">Więcej…</option>
@@ -333,7 +333,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         <option value="najnowsze">od najnowszych</option>
       </select>
       {/* Pomoc wchodzi do TEGO rzędu (0.402.0) zamiast stać pasmem niżej —
-          ten sam ruch, co na trzech pozostałych ekranach obsługi. Do @wydanie
+          ten sam ruch, co na trzech pozostałych ekranach obsługi. Do 0.506.0
           komentarz to obiecywał, a przycisk stał osobnym rzędem w liście. */}
       <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length}
         sita={false} zWszystkimi={false} />

@@ -28,7 +28,7 @@ const SOCZEWKA_KATEGORII: Partial<Record<Kategoria, RodzajSoczewki>> = {
      Jedna soczewka na oba, bo odpowiedź zaczyna się od tej samej listy. */
   MISSING_PRODUCT: "inny_towar",
   INVOICE: "faktura",
-  /* Zwrot (@wydanie): zrzut z „przytłacza" — klient pisał o odesłaniu części,
+  /* Zwrot (0.506.0): zrzut z „przytłacza" — klient pisał o odesłaniu części,
      a kolumna mówiła o cenach i EAN. Soczewka mówi to, czego agent szuka:
      czy zwrot jest już w Allegro. Gdy jest, jego karta stoi w „Wymaga
      Ciebie" — wtedy soczewka milczy, żeby nie mówić tego samego dwa razy. */

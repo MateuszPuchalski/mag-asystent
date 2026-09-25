@@ -213,7 +213,7 @@ describe("kolumna kontekstu", () => {
   it("towar znany z zamówienia chowa dobór automatu za bramką", async () => {
     rysuj(znany());
     expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
-    /* Od @wydanie wiersza „Dobór: zbędny" nie ma — bramka stoi w „Oferta
+    /* Od 0.506.0 wiersza „Dobór: zbędny" nie ma — bramka stoi w „Oferta
        i towar", otwartym, bo rozmowa nie ma rozpoznania. */
     expect(screen.queryByRole("button", { name: /^Dobór/ })).toBeNull();
     expect(screen.getByText(/Towar znany z zamówienia\./)).toBeInTheDocument();
@@ -240,7 +240,7 @@ describe("streszczenie zamówienia", () => {
       pobrane: { kupionoAt: "2026-09-22T10:00:00Z", sumaGrosze: 5549, waluta: "PLN" } as never } }));
     expect(s.startsWith("w drodze do klienta")).toBe(true);
     expect(s).toMatch(/55,49/);
-    /* Data zakupu z nazwą (@wydanie): obok „doręczona" goła data czytała się
+    /* Data zakupu z nazwą (0.506.0): obok „doręczona" goła data czytała się
        jak druga data dostawy. */
     expect(s).toMatch(/kupione 22 września 2026/);
   });

@@ -6,7 +6,7 @@ import { Przycisk } from "../ui";
  * Pytanie bez numeru oferty (§4.3, otwarcie `docs/obsluga-klienta.md`).
  *
  * Ekran mówi o braku wprost, zamiast podstawiać ofertę zgadniętą z treści.
- * To zdanie stało do @wydanie także NA ekranie — agentowi mówiło o ekranie,
+ * To zdanie stało do 0.506.0 także NA ekranie — agentowi mówiło o ekranie,
  * nie o kliencie. Na ekranie zostaje skutek: nie wiadomo, o jaki towar chodzi.
  * Tak wygrywały kiedyś „zdemontowanym" i „Pozdrawiam", bo dobór fraz brał
  * słowa po DŁUGOŚCI, a „szarpaku" wypadało przez limit trzech fraz.
