@@ -58,6 +58,7 @@ export const ZDARZENIA: readonly string[] = [
   "reklamacja_zalacznik_pobrany", "reklamacja_zalacznik_zdjety", "reklamacja_zwrot_towaru",
   "reklamacje_synchronizacja_reczna", "rozmowa_kartoteka_wskazana", "rozmowa_kartoteka_zdjeta",
   "rozmowa_komentarz", "rozmowa_oferta_wskazana", "rozmowa_priorytet",
+  "sonda_rzeczywistosci",
   "rozmowa_przeczytana_blad", "rozmowa_przejeta", "rozmowa_przekazana_wymuszenie",
   "rozmowa_przesylka_reczna", "rozmowa_przypisana_odpowiedzia", "rozmowa_reklamacyjna",
   "rozmowa_status", "rozmowa_szkic_zapisany", "rozmowa_wyslana", "rozmowa_wysylka_blad",

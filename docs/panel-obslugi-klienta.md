@@ -1040,6 +1040,13 @@ nasza następna prawdziwa odpowiedź. Autoodpowiedź czekania nie kończy.
 Rozbicie na osoby widzi wyłącznie administrator, jak każdy raport o ludziach
 od 0.431.0.
 
+**Bez ponownego pytania (0.495.0) mierzy skutek, nie szybkość.** Po naszej
+prawdziwej odpowiedzi patrzymy siedem dni naprzód w tej samej rozmowie.
+Wiadomość klienta inna niż podziękowanie znaczy powrót. Podziękowanie
+rozpoznaje `klientPodziekowal`, ta sama reguła co w kolejce. Powrót bez
+rozpoznania liczy się jako powrót i ma własną liczbę. Odpowiedź młodsza niż
+tydzień bez powrotu nie ma wyniku i nie wchodzi do udziału.
+
 **Cofnięcie mieszka w przeglądarce, nie na serwerze.** Zamknięcie karty
 w tych dziesięciu sekundach zatrzymuje wysyłkę, a ekran o to pyta. Wyjście
 ze skrzynki wysyła od razu. Serwer sprawdza świeżość przy właściwym
@@ -1423,6 +1430,31 @@ pod polem, a do szkicu agenta trafia jednym przyciskiem. Od 22 września 2026
 przycisk jest jeden: „Popraw w edytorze" przy pustym polu i „Zastąp mój szkic"
 przy pełnym. Napis mówi, co się stanie, zanim ktoś kliknie. „Odrzuć" chowa
 kartę. W trybie komentarza ani przycisku, ani karty nie ma w drzewie.
+
+**Szkic stoi w polu, odpowiedź na końcu rozmowy (0.495.0).** Zgłoszenie
+właściciela ze zrzutem: „za dużo odstępów w środkowej kolumnie, miejsce pracy
+jest ściśnięte". Zmierzone na zrzucie: rozmowa zajmowała 19% kolumny, puste
+pole 25%, a karta szkicu z tą samą odpowiedzią stała pod krawędzią, w drugim
+pasku przewijania. Przyczyną był kształt: oś i edytor dzieliły kolumnę
+sztywno, a szkic stał w edytorze dwa razy. Właściciel wybrał z kanwy dwie
+zmiany naraz („A + B"):
+
+- **Szkic w polu.** Świeży, nieoceniony szkic stoi w PUSTYM polu jako
+  podpowiedź. Wartość pola zostaje pusta, więc wysyłka nie ma czego wysłać,
+  dopóki agent nie przyjmie szkicu Tabem albo przyciskiem „Przyjmij szkic".
+  Pierwsza litera agenta zasłania podpowiedź. Karta zostaje wtedy z treścią
+  zwiniętą i przyciskiem „Zastąp mój szkic". Nieświeży szkic nie wchodzi do
+  pola nigdy, bo odpowiada na pytanie, którego już nie ma.
+- **Uwagi modelu przeżywają przyjęcie.** Lista „czego model nie znalazł
+  w faktach" stoi pod przyjętym tekstem, dopóki tekst jest w polu.
+- **Odpowiedź jako ostatnia wypowiedź.** Edytor stoi na końcu osi, w tym
+  samym przewijaniu co wątek, po naszej stronie. Pole rośnie z treścią od
+  120 px, zamiast stać na 200 px od pierwszego otwarcia. Siatka `max-h-[60vh]`
+  odeszła, bo edytor nie odejmuje już rozmowie ani piksela.
+- **Pasek działań pływa.** Wysyłka, „Wyślij i zakończ", zapis szkicu i spinacz
+  stoją w jednym rzędzie przy dolnej krawędzi osi. Przy przewiniętym wątku
+  zostają pod ręką. W trybie notatki pasek niesie „Dodaj notatkę", a przycisku
+  wysyłki dalej nie ma w drzewie.
 
 **„Ułóż odpowiedź" stoi tylko wtedy, gdy szkicu brak albo jest stary.** Takt
 układa szkic sam, więc przy świeżej karcie przycisk kazałby zapłacić drugi raz.
@@ -2410,7 +2442,8 @@ wynikają trzy zmiany i jedna jawna cena.
 rozmowy i chował przyciski pod krawędzią. Powód zniknął w tym samym wydaniu —
 przyciski przeniesiono NAD treść — a ograniczenie zostało. Oś chroni
 `max-h-[60vh]` na edytorze, czyli siatka założona po to, żeby wewnętrzne nie
-były potrzebne.
+były potrzebne. Od 0.495.0 tej siatki nie ma: edytor stoi na końcu osi,
+w jednym przewijaniu z rozmową.
 
 **Bloki drugoplanowe są zwinięte.** Odczyt ze zdjęć i dopytanie zwijają się do
 jednej linii, która niesie tyle, żeby dało się rozstrzygnąć bez rozwijania:
@@ -6141,6 +6174,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Spoiwo czterech kolejek — sprawy i droga zakupu | **działa** od 0.387.0 | `services/droga-klienta.ts`, `panel/src/sprawy/Spoiwo.tsx`; mostek po `order_id`, blok wspólny dla skrzynki, zwrotów, reklamacji i dyskusji |
 | Historia klienta ze zwrotami i sprawami | **działa** od 0.387.0 | `services/klient-historia.ts`; pięć rodzajów wpisu, wiązanie po `kupujacy_login` — wolno, bo zwrot i sprawa niosą go z Allegro |
 | Profil klienta: liczby, sygnały, otwarte sprawy, zamówienia, notatka | **działa** od 0.484.0 | `services/profil-klienta.ts`, `GET /api/obsluga/klient/:login`, `panel/src/ekrany/ProfilKlienta.tsx`; login przez konta, bez wielkości liter; sygnały wyliczane; jedyny zapis to `klient_notatka` z cofnięciem |
+| Test na żywym Allegro | **działa** od 0.495.0 | `services/sonda-rzeczywistosci.ts`, takt dzienny w `main()`, karta `stan/Sonda.tsx`, wiersz w DO DECYZJI; drogi produkcji bez atrap, tylko odczyt z Allegro |
 | Droga zakupu przez kolejki | **działa** od 0.387.0 | `drogaZakupu`; ODCZYT z momentów otwarcia, bez zdarzenia i bez tabeli (otwarcie ekranu nic nie mutuje) |
 | Jedno „Moje" ponad kolejkami | **działa** od 0.387.0 | `mojeSprawy`, `GET /api/obsluga/moje`, `panel/src/ekrany/Moje.tsx`; TRZY kolejki — zwrot nie ma prowadzącego od 0.370.0; tożsamość z sesji, nie z zapytania |
 | Miara eskalacji po rozmowie | **działa** od 0.387.0 | `eskalacje`, `GET /api/obsluga/eskalacja`, `panel/src/ustawienia/Eskalacja.tsx`; liczy ZAKUPY, bez osi osobowej |

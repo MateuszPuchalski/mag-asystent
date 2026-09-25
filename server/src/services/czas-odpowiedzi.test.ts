@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate } from "../db/db.js";
-import { czasOdpowiedzi, p90, probkiRozmowy } from "./czas-odpowiedzi.js";
+import { czasOdpowiedzi, losOdpowiedzi, p90, probkiRozmowy } from "./czas-odpowiedzi.js";
 
 /* ── Czas odpowiedzi (23 września 2026) ──────────────────────────────────────
    Pilnujemy reguły próbki, bo od niej zależy, czy liczba mówi prawdę:
@@ -96,4 +96,82 @@ test("odczyt niczego nie zapisuje", () => {
   const przed = (d.prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
   czasOdpowiedzi(30, true, d, TERAZ);
   assert.equal((d.prepare("SELECT count(*) n FROM events").get() as { n: number }).n, przed);
+});
+
+/* ── Bez ponownego pytania (24 września 2026) ────────────────────────────────
+   Pilnujemy trzech rzeczy, bo każda przekłamałaby wynik w inną stronę.
+   Podziękowanie nie jest powrotem, ale „dziękuję” i zaraz nowe pytanie jest.
+   Powrót bez rozpoznania liczy się jako powrót i jest wymieniony osobno.
+   Odpowiedź młodsza niż tydzień bez powrotu nie ma jeszcze wyniku. */
+const w = (id: number, direction: string, sent_at: string) =>
+  ({ id, conversation_id: 1, direction, auto_odpowiedz: 0, sent_at, external_message_id: `m${id}` });
+const DZIEKI = { kategoria: "OTHER", akcja: "NO_ACTION", status: "SUCCESS",
+  pewnosc: "wysoka", wymagaCzlowieka: false };
+const PYTANIE = { ...DZIEKI, kategoria: "SHIPPING_STATUS", akcja: "CHECK_SHIPMENT" };
+
+test("los odpowiedzi: podziękowanie to nie powrót, a pytanie po podziękowaniu tak", () => {
+  const odp = { doId: 2, at: "2026-09-01T10:00:00Z" };
+  const lista = [w(1, "incoming", "2026-09-01T09:00:00Z"), w(2, "outgoing", "2026-09-01T10:00:00Z"),
+    w(3, "incoming", "2026-09-01T11:00:00Z"), w(4, "incoming", "2026-09-02T11:00:00Z")];
+  const teraz = Date.parse("2026-09-20T00:00:00Z");
+  assert.deepEqual(losOdpowiedzi(lista.slice(0, 3), odp, () => DZIEKI, teraz),
+    { los: "bez_powrotu", bezRozpoznania: false });
+  assert.deepEqual(losOdpowiedzi(lista, odp, (id) => (id === 3 ? DZIEKI : PYTANIE), teraz),
+    { los: "wrocil", bezRozpoznania: false });
+  assert.deepEqual(losOdpowiedzi(lista.slice(0, 3), odp, () => null, teraz),
+    { los: "wrocil", bezRozpoznania: true }, "bez rozpoznania nie wiemy, że to podziękowanie");
+});
+
+test("los odpowiedzi: powrót po tygodniu się nie liczy, a świeża odpowiedź jeszcze czeka", () => {
+  const odp = { doId: 2, at: "2026-09-01T10:00:00Z" };
+  const lista = [w(1, "incoming", "2026-09-01T09:00:00Z"), w(2, "outgoing", "2026-09-01T10:00:00Z"),
+    w(3, "incoming", "2026-09-09T10:00:00Z")];
+  assert.equal(losOdpowiedzi(lista, odp, () => PYTANIE, Date.parse("2026-09-20T00:00:00Z")).los,
+    "bez_powrotu", "osiem dni później to nowa sprawa, nie powrót");
+  assert.equal(losOdpowiedzi(lista.slice(0, 2), odp, () => null, Date.parse("2026-09-03T00:00:00Z")).los,
+    "czeka");
+});
+
+test("udział bez ponownego pytania w odczycie Analizy, z rozbiciem tylko dla administratora", () => {
+  const { d, ala, rozmowa, wiad } = baza();
+  const decyzja = (r: number, m: number, kat: string, akcja: string, pewnosc: string) =>
+    d.prepare(`INSERT INTO decyzja_klasyfikacji(conversation_id,message_id,wersja,aktywna,zrodlo,status,
+      kategoria,akcja,pewnosc,wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,
+      taksonomia_wersja,polityka_wersja,at,przez) VALUES (?,?,1,1,'MODEL','SUCCESS',?,?,?,0,0,0,'v2','p1',
+      '2026-09-10T08:01:00Z','automat')`).run(r, m, kat, akcja, pewnosc);
+
+  /* R1: odpowiedź Ali, klient podziękował — bez powrotu. */
+  const r1 = rozmowa();
+  const q1 = wiad(r1, "incoming", "2026-09-10T08:00:00Z");
+  decyzja(r1, q1.id, "SHIPPING_STATUS", "CHECK_SHIPMENT", "wysoka");
+  const o1 = wiad(r1, "outgoing", "2026-09-10T09:00:00Z");
+  d.prepare(`INSERT INTO outbox(conversation_id,idempotency_key,body,expected_version,status,
+    external_message_id,created_by) VALUES (?,?,?,?,?,?,?)`).run(r1, "k1", "x", 1, "sent", o1.ext, ala);
+  const t1 = wiad(r1, "incoming", "2026-09-10T10:00:00Z");
+  decyzja(r1, t1.id, "OTHER", "NO_ACTION", "wysoka");
+
+  /* R2: klient dopytał następnego dnia — powrót. */
+  const r2 = rozmowa();
+  wiad(r2, "incoming", "2026-09-11T08:00:00Z");
+  wiad(r2, "outgoing", "2026-09-11T09:00:00Z");
+  wiad(r2, "incoming", "2026-09-12T09:00:00Z");
+
+  /* R3: odpowiedź sprzed godziny — jeszcze bez wyniku. */
+  const r3 = rozmowa();
+  wiad(r3, "incoming", "2026-09-23T10:00:00Z");
+  wiad(r3, "outgoing", "2026-09-23T11:00:00Z");
+
+  const b = czasOdpowiedzi(30, false, d, TERAZ);
+  assert.equal(b.powroty.n, 2);
+  assert.equal(b.powroty.bezPowrotu, 1);
+  assert.equal(b.powroty.wrocilo, 1);
+  assert.equal(b.powroty.wrociloBezRozpoznania, 1, "R2 dopytał wiadomością bez rozpoznania");
+  assert.equal(b.powroty.czeka, 1);
+  assert.equal(b.powroty.wgOsoby, null);
+  assert.deepEqual(b.powroty.wgKategorii.map((x) => [x.klucz, x.n, x.bezPowrotu]).sort(),
+    [["SHIPPING_STATUS", 1, 1], ["bez rozpoznania", 1, 0]]);
+
+  const a = czasOdpowiedzi(30, true, d, TERAZ);
+  assert.deepEqual(a.powroty.wgOsoby!.map((x) => [x.klucz, x.n, x.bezPowrotu]).sort(),
+    [["A. Lewandowska", 1, 1], ["z Allegro", 1, 0]]);
 });

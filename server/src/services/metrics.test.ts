@@ -92,7 +92,7 @@ test("okno jest ograniczone — brak wstrzyknięcia przez parametr", () => {
   assert.doesNotThrow(() => metrics(-5));
 });
 
-/* Granica okna w formacie bazy (@wydanie). Zdarzenie sekundę sprzed
+/* Granica okna w formacie bazy (0.494.1). Zdarzenie sekundę sprzed
    granicy siedmiu dni leży tej samej doby co granica. Porównane z
    `datetime('now','-7 days')` (spacja) wchodziło, bo `'T'` > `' '`
    — „7 dni" liczyło do ośmiu. Znacznik jak z produkcji: ISO z `T` i `Z`. */

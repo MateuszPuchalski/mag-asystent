@@ -9,7 +9,7 @@ export type Obszar = "magazyn" | "obsluga";
 
 export type ZrodloDecyzji =
   | "dostawy" | "odpowiedzi" | "kosze" | "zapisy" | "kody" | "allegro"
-  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje";
+  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda";
 
 /** Adres w panelu — od 0.441.0 każdy wiersz prowadzi do ekranu panelu. */
 export type CelDecyzji = { panel: string };

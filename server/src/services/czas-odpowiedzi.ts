@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { db as defaultDb } from "../db/db.js";
 import { mediana } from "./raporty.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
+import { klientPodziekowal } from "./conversations.js";
 
 /* ── Czas odpowiedzi klientowi (23 września 2026) ────────────────────────────
    Zgłoszenie właściciela: „how we can improve the ui/ux even further". Dwa
@@ -36,6 +37,50 @@ export interface WierszCzasu {
   medianaMin: number | null;
 }
 
+/* ── BEZ PONOWNEGO PYTANIA (24 września 2026) ────────────────────────────────
+   Zgłoszenie właściciela po rozmowie o metodzie Feynmana: „build it”. Czas
+   odpowiedzi mierzy SZYBKOŚĆ i nagradza szybką złą odpowiedź tak samo jak
+   szybką dobrą. Ta liczba mierzy SKUTEK: czy klient po naszej odpowiedzi
+   musiał pisać jeszcze raz.
+
+   REGUŁA, jedna i sprawdzalna. Po każdej naszej prawdziwej odpowiedzi
+   patrzymy siedem dni naprzód w TEJ rozmowie. Wiadomość klienta inna niż
+   podziękowanie znaczy „wrócił”. Podziękowanie rozpoznaje ta sama reguła,
+   która zdejmuje je z kolejki (`klientPodziekowal`), a nie nowy filtr.
+
+   CZEGO NIE UDAJEMY. Wiadomość bez rozpoznania liczy się jako powrót, bo
+   nie wiemy, że to podziękowanie. Ile takich było, mówi osobna liczba, żeby
+   nikt nie czytał wyniku jako czystszego, niż jest. Odpowiedź młodsza niż
+   siedem dni bez powrotu klienta jeszcze nie ma wyniku i do udziału nie
+   wchodzi. Powrót przez dyskusję albo reklamację liczy osobno miara
+   eskalacji (S5), nie ta. */
+
+/** Ile dni po odpowiedzi czekamy na powrót klienta. */
+export const OKNO_POWROTU_DNI = 7;
+
+export type LosOdpowiedzi = "bez_powrotu" | "wrocil" | "czeka";
+
+export interface WierszPowrotu {
+  klucz: string;
+  /** Odpowiedzi z wynikiem (bez tych, które jeszcze czekają). */
+  n: number;
+  bezPowrotu: number;
+}
+
+export interface Powroty {
+  oknoDni: number;
+  /** Odpowiedzi z wynikiem. */
+  n: number;
+  bezPowrotu: number;
+  wrocilo: number;
+  /** Z tego: powrót, którego nikt nie rozpoznał — mógł być podziękowaniem. */
+  wrociloBezRozpoznania: number;
+  /** Odpowiedzi młodsze niż okno, po których klient jeszcze nie wrócił. */
+  czeka: number;
+  wgKategorii: WierszPowrotu[];
+  wgOsoby: WierszPowrotu[] | null;
+}
+
 export interface CzasOdpowiedzi {
   dni: number;
   /** Najświeższa odpowiedź w oknie — „dane do", nie zegar serwera. */
@@ -46,6 +91,7 @@ export interface CzasOdpowiedzi {
   wgOsoby: WierszCzasu[] | null;
   /** Rozmowy, w których klient czeka TERAZ, i najdłuższe z tych czekań. */
   czekaTeraz: { n: number; najdluzejMin: number | null };
+  powroty: Powroty;
 }
 
 interface Wiadomosc {
@@ -86,6 +132,43 @@ export function probkiRozmowy(wiadomosci: Wiadomosc[]): { probki: Probka[]; czek
     }
   }
   return { probki, czekaOd: od?.at ?? null };
+}
+
+/** Decyzja klasyfikatora o JEDNEJ wiadomości, w polach reguły podziękowania. */
+export interface DecyzjaWiadomosci {
+  kategoria: string; akcja: string; status: string;
+  pewnosc: string | null; wymagaCzlowieka: boolean;
+}
+
+/**
+ * Los jednej odpowiedzi: czy klient wrócił w ciągu okna.
+ *
+ * Czysta funkcja, jak `probkiRozmowy`. Przechodzi WSZYSTKIE wiadomości
+ * klienta w oknie, nie tylko pierwszą: „dziękuję”, a godzinę później
+ * „a jeszcze jedno” to powrót.
+ */
+export function losOdpowiedzi(
+  wiadomosci: Wiadomosc[], odpowiedz: { doId: number; at: string },
+  decyzja: (messageId: number) => DecyzjaWiadomosci | null, teraz: number,
+  oknoDni = OKNO_POWROTU_DNI,
+): { los: LosOdpowiedzi; bezRozpoznania: boolean } {
+  const koniec = Date.parse(odpowiedz.at) + oknoDni * 86_400_000;
+  let po = false;
+  for (const w of wiadomosci) {
+    if (w.id === odpowiedz.doId) { po = true; continue; }
+    if (!po || w.direction !== "incoming") continue;
+    if (Date.parse(w.sent_at) > koniec) break;
+    const d = decyzja(w.id);
+    if (d && klientPodziekowal({ ...d, nieaktualna: false }, true)) continue;
+    return { los: "wrocil", bezRozpoznania: d === null };
+  }
+  return { los: teraz >= koniec ? "bez_powrotu" : "czeka", bezRozpoznania: false };
+}
+
+function wierszePowrotu(grupy: Map<string, { n: number; bez: number }>): WierszPowrotu[] {
+  return [...grupy.entries()]
+    .map(([klucz, g]) => ({ klucz, n: g.n, bezPowrotu: g.bez }))
+    .sort((a, b) => b.n - a.n || a.klucz.localeCompare(b.klucz));
 }
 
 function wiersze(grupy: Map<string, number[]>): WierszCzasu[] {
@@ -129,14 +212,20 @@ export function czasOdpowiedzi(
   }
 
   /* Decyzje aktywne w bieżącym słowniku, po rozmowie, rosnąco po wiadomości. */
-  const decyzje = new Map<number, Array<{ message_id: number; kategoria: string; status: string }>>();
-  for (const d of database.prepare(`SELECT conversation_id, message_id, kategoria, status
+  type Decyzja = { message_id: number; kategoria: string; status: string; akcja: string;
+    pewnosc: string | null; wymaga: number };
+  const decyzje = new Map<number, Decyzja[]>();
+  const poWiadomosci = new Map<number, DecyzjaWiadomosci>();
+  for (const d of database.prepare(`SELECT conversation_id, message_id, kategoria, status,
+      akcja, pewnosc, wymaga_czlowieka AS wymaga
       FROM decyzja_klasyfikacji WHERE aktywna=1 AND taksonomia_wersja=?
       ORDER BY conversation_id, message_id`).all(TAKSONOMIA_WERSJA) as
-      Array<{ conversation_id: number; message_id: number; kategoria: string; status: string }>) {
+      Array<Decyzja & { conversation_id: number }>) {
     const lista = decyzje.get(d.conversation_id) ?? [];
     lista.push(d);
     decyzje.set(d.conversation_id, lista);
+    poWiadomosci.set(d.message_id, { kategoria: d.kategoria, akcja: d.akcja, status: d.status,
+      pewnosc: d.pewnosc ?? null, wymagaCzlowieka: Boolean(Number(d.wymaga)) });
   }
 
   const autorzy = new Map<string, string>();
@@ -151,16 +240,39 @@ export function czasOdpowiedzi(
 
   const wgKategorii = new Map<string, number[]>();
   const wgOsoby = new Map<string, number[]>();
+  const powroty: Powroty = { oknoDni: OKNO_POWROTU_DNI, n: 0, bezPowrotu: 0, wrocilo: 0,
+    wrociloBezRozpoznania: 0, czeka: 0, wgKategorii: [], wgOsoby: null };
+  const powrotyKat = new Map<string, { n: number; bez: number }>();
+  const powrotyOsoby = new Map<string, { n: number; bez: number }>();
+  const dolicz = (m: Map<string, { n: number; bez: number }>, k: string, bez: boolean) => {
+    const g = m.get(k) ?? { n: 0, bez: 0 };
+    g.n += 1;
+    if (bez) g.bez += 1;
+    m.set(k, g);
+  };
   for (const p of probki) {
     const d = (decyzje.get(p.rozmowa) ?? [])
       .filter((x) => x.message_id >= p.odId && x.message_id < p.doId).at(-1);
     const kat = !d ? "bez rozpoznania" : d.status === "FAILED" ? "nierozpoznane" : d.kategoria;
     wgKategorii.set(kat, [...(wgKategorii.get(kat) ?? []), p.minuty]);
-    if (zLudzmi) {
-      const kto = autorzy.get(`${p.rozmowa}|${p.zewnetrzny}`) ?? "z Allegro";
-      wgOsoby.set(kto, [...(wgOsoby.get(kto) ?? []), p.minuty]);
+    const kto = zLudzmi ? autorzy.get(`${p.rozmowa}|${p.zewnetrzny}`) ?? "z Allegro" : null;
+    if (kto !== null) wgOsoby.set(kto, [...(wgOsoby.get(kto) ?? []), p.minuty]);
+
+    const l = losOdpowiedzi(wgRozmowy.get(p.rozmowa) ?? [], p,
+      (id) => poWiadomosci.get(id) ?? null, teraz);
+    if (l.los === "czeka") { powroty.czeka += 1; continue; }
+    const bez = l.los === "bez_powrotu";
+    powroty.n += 1;
+    if (bez) powroty.bezPowrotu += 1;
+    else {
+      powroty.wrocilo += 1;
+      if (l.bezRozpoznania) powroty.wrociloBezRozpoznania += 1;
     }
+    dolicz(powrotyKat, kat, bez);
+    if (kto !== null) dolicz(powrotyOsoby, kto, bez);
   }
+  powroty.wgKategorii = wierszePowrotu(powrotyKat);
+  powroty.wgOsoby = zLudzmi ? wierszePowrotu(powrotyOsoby) : null;
 
   const wszystkie = probki.map((p) => p.minuty);
   return {
@@ -173,5 +285,6 @@ export function czasOdpowiedzi(
       n: czekajace.length,
       najdluzejMin: czekajace.length ? Math.round(Math.max(...czekajace)) : null,
     },
+    powroty,
   };
 }
