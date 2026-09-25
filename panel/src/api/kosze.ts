@@ -36,6 +36,13 @@ export interface WierszKosza {
   brakujeKorekt: number;
   mmStan: StanMm;
   wirtualny: boolean;
+  /**
+   * Kłopot z MM tego kosza (@wydanie): odmowa Sfery, nawet przepuszczona potem
+   * PONÓW-em. `null` = każda MM weszła za pierwszym razem. Opcjonalne, bo
+   * starszy serwer pola nie przysyła.
+   */
+  problemMm?: { prob: number; ostatniBlad: string | null; ostatnioAt: string;
+    nierozwiazany: boolean } | null;
 }
 
 export interface PozycjaWKoszu {

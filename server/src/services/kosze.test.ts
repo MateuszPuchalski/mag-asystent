@@ -1025,3 +1025,68 @@ test("ZWIĄZANY koszyk wraca trasą z konfiguracji, choćby dokument nie znał n
   assert.equal(p.magFrom, 3);
   assert.equal(p.magTo, 1, "na magazyn główny — tak, jak koszyk stamtąd wyjechał");
 });
+
+/* ── Kosze z kłopotem MM (@wydanie) ─────────────────────────────────────────
+   Zgłoszenie właściciela: „zaznacz koszyki, w których był problem z MM —
+   muszę sprawdzić stany z Subiektem". Wiersz kolejki pamięta tylko ostatnie
+   podejście, więc MM odrzucona i przepuszczona PONÓW-em wyglądała jak czysta. */
+
+function koszZMm(kod: string, pola: { status?: string; rozlozono?: string; queueStatus: string;
+  blad?: string | null; wPozycji?: boolean }) {
+  const d = db();
+  const teraz = new Date().toISOString();
+  const q = Number(d.prepare(`INSERT INTO sfera_queue(type,payload,status,error_msg,created_by)
+    VALUES ('mm','{}',?,?,'Test')`).run(pola.queueStatus, pola.blad ?? null).lastInsertRowid);
+  const k = Number(d.prepare(`INSERT INTO kosz(kod,status,utworzono_at,utworzono_przez,rozlozono_at,mm_queue_id)
+    VALUES (?,?,?,'Test',?,?)`).run(kod, pola.status ?? "zamkniety", teraz, pola.rozlozono ?? null,
+    pola.wPozycji ? null : q).lastInsertRowid);
+  if (pola.wPozycji) {
+    d.prepare(`INSERT INTO kosz_pozycja(kosz_id,tw_id,symbol,nazwa,ilosc,mm_queue_id)
+      VALUES (?,900036,'S','N',1,?)`).run(k, q);
+  }
+  return { koszId: k, queueId: q };
+}
+
+function zdarzenie(typ: string, dane: Record<string, unknown>, kiedy = new Date().toISOString()) {
+  db().prepare("INSERT INTO events(type,payload,user_id,created_at) VALUES (?,?,'Test',?)")
+    .run(typ, JSON.stringify(dane), kiedy);
+}
+
+test("MM przepuszczona po odmowie zostaje zaznaczona — z treścią odmowy", () => {
+  db().prepare("DELETE FROM events").run();
+  const { koszId, queueId } = koszZMm("Z-40", { queueStatus: "done" });
+  zdarzenie("queue_retry", { queueId, typ: "mm", proba: 1, max: 3, blad: "Brak towaru w magazynie" });
+  zdarzenie("queue_ponowione_recznie", { queueId });
+  const w = K.listaKoszy().find((k) => k.id === koszId)!;
+  assert.equal(w.problemMm?.prob, 1, "ręczne PONÓW nie jest nieudaną próbą");
+  assert.equal(w.problemMm?.ostatniBlad, "Brak towaru w magazynie");
+  assert.equal(w.problemMm?.nierozwiazany, false, "MM weszła — trzeba tylko sprawdzić stany");
+});
+
+test("MM pozycji stojąca w błędzie jest kłopotem nierozwiązanym, także bez zdarzeń", () => {
+  db().prepare("DELETE FROM events").run();
+  const { koszId } = koszZMm("Z-41", { queueStatus: "error", blad: "Kartoteka w edycji", wPozycji: true });
+  const w = K.listaKoszy().find((k) => k.id === koszId)!;
+  assert.equal(w.problemMm?.nierozwiazany, true);
+  assert.equal(w.problemMm?.ostatniBlad, "Kartoteka w edycji");
+});
+
+test("czekanie na otwarty dokument i cudze zadania kłopotem nie są", () => {
+  db().prepare("DELETE FROM events").run();
+  const { koszId, queueId } = koszZMm("Z-42", { queueStatus: "done" });
+  zdarzenie("queue_retry", { queueId, typ: "mm", blad: "Dokument otwarty", blokada: true });
+  zdarzenie("queue_failed", { queueId: queueId + 999, typ: "mm", blad: "Cudze" });
+  assert.equal(K.listaKoszy().find((k) => k.id === koszId)!.problemMm, null);
+});
+
+test("kosz z kłopotem MM zostaje na liście po oknie dwóch tygodni", () => {
+  db().prepare("DELETE FROM events").run();
+  const dawno = new Date(Date.now() - 40 * 86_400_000).toISOString();
+  const zKlopotem = koszZMm("Z-43", { status: "rozlozony", rozlozono: dawno, queueStatus: "done" });
+  zdarzenie("queue_failed", { queueId: zKlopotem.queueId, typ: "mm", blad: "Brak towaru" },
+    new Date(Date.now() - 39 * 86_400_000).toISOString());
+  const bez = koszZMm("Z-44", { status: "rozlozony", rozlozono: dawno, queueStatus: "done" });
+  const lista = K.listaKoszy();
+  assert.ok(lista.some((k) => k.id === zKlopotem.koszId), "biuro sprawdza stany także po starszych");
+  assert.ok(!lista.some((k) => k.id === bez.koszId), "reszta historii zostaje w audycie");
+});

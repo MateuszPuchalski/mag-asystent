@@ -54,7 +54,12 @@ let szukane: string[] = [];
 function odpowiedz(url: string, init?: RequestInit): unknown {
   const metoda = init?.method ?? "GET";
   if (metoda !== "GET") { wyslane.push(`${metoda} ${url} ${init?.body ?? ""}`); return { pominiete: [] }; }
-  if (url === "/api/biuro/kosze") return { kosze: [kosz(14, { pominietych: 1 }), kosz(15, { status: "rozlozony" }), kosz(16, { status: "otwarty" })] };
+  if (url === "/api/biuro/kosze") return { kosze: [kosz(14, { pominietych: 1 }),
+    /* Kłopoty z MM (@wydanie): rozłożony po odmowie i otwarty z błędem teraz. */
+    kosz(15, { status: "rozlozony", problemMm: { prob: 1, ostatniBlad: "Brak towaru w magazynie",
+      ostatnioAt: "2026-09-21T09:00:00.000Z", nierozwiazany: false } }),
+    kosz(16, { status: "otwarty", problemMm: { prob: 3, ostatniBlad: "Kartoteka w edycji",
+      ostatnioAt: "2026-09-22T09:00:00.000Z", nierozwiazany: true } })] };
   if (url === "/api/biuro/kosze/pominiete") return { pominiete: POMINIETE };
   if (url === "/api/biuro/kosze/14") return { kosz: SZCZEGOL };
   if (url.startsWith("/api/biuro/kosze/szukaj?q=")) {
@@ -106,6 +111,21 @@ describe("Kosze w zakładce Zwroty", () => {
     expect(await screen.findByRole("button", { name: /Z-14/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Z-16/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Z-15/ })).toBeNull();
+  });
+
+  it("kosze z kłopotem MM mają znacznik i własny kubełek z treścią odmowy (@wydanie)", async () => {
+    /* Zgłoszenie właściciela: „muszę sprawdzić stany z Subiektem". */
+    pokaz();
+    const w16 = await screen.findByRole("button", { name: /Z-16/ });
+    expect(within(w16).getByText("MM w błędzie")).toBeInTheDocument();
+    expect(within(screen.getByRole("button", { name: /Z-14/ })).queryByText(/MM (w|po) błędzie/)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Problem z MM/ }));
+    const wiersze = screen.getAllByRole("button", { name: /Z-1[56]/ });
+    /* Najświeższy kłopot na górze — przekrój przez kubełki, także rozłożone. */
+    expect(wiersze.map((w) => within(w).getByText(/^Z-/).textContent)).toEqual(["Z-16", "Z-15"]);
+    expect(within(wiersze[1]).getByText(/Brak towaru w magazynie/)).toBeInTheDocument();
+    expect(within(wiersze[1]).getByText("MM po błędzie")).toBeInTheDocument();
+    expect(wyslane).toEqual([]);
   });
 
   it("kosz prowadzi do swoich zwrotów — połowa wiązania od strony kosza", async () => {

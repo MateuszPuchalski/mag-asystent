@@ -203,6 +203,97 @@ export interface SzczegolKosza {
   zwroty: Array<{ id: number; numer: string; korektaNumer: string | null }>;
 }
 
+/**
+ * Kłopot z dokumentem MM kosza (@wydanie).
+ *
+ * Zgłoszenie właściciela: „w koszykach zwrotów zaznacz koszyki, w których był
+ * problem z MM — muszę sprawdzić stany z Subiektem". Wiersz kolejki mówi
+ * wyłącznie, jak skończyło się OSTATNIE podejście. MM odrzucona i przepuszczona
+ * PONÓW-em wygląda w nim jak każda inna udana, a właśnie po takiej stany
+ * bywają rozjechane: Sfera potrafi odmówić w pół zapisu albo worker padnie po
+ * `Zapisz()`. Pamięć o tym trzyma dziennik zdarzeń (`queue_retry`,
+ * `queue_failed`, `queue_ponowione_recznie`), więc stamtąd czytamy.
+ */
+export interface ProblemMm {
+  /** Ile nieudanych podejść zapisał dziennik (bez czekania na otwarty dokument). */
+  prob: number;
+  /** Treść ostatniej odmowy — pierwsze, czego szuka się w Subiekcie. */
+  ostatniBlad: string | null;
+  ostatnioAt: string;
+  /** Zadanie MM kosza stoi TERAZ w błędzie — nic jeszcze nie weszło. */
+  nierozwiazany: boolean;
+}
+
+/** Jak daleko wstecz szukamy kłopotów z MM. Starsze sprawdził już remanent. */
+const PROBLEM_MM_DNI = 90;
+
+/**
+ * Kosze, których zadania MM miały kłopot (@wydanie) — mapa po id kosza.
+ *
+ * Zadanie należy do kosza przez trzy kolumny: MM koszyka wirtualnego
+ * (`kosz.mm_queue_id`), MM powrotne z bufora (`kosz.powrot_queue_id`) i MM
+ * pojedynczych pozycji na regał (`kosz_pozycja.mm_queue_id`). Każda z nich to
+ * ruch stanu w Subiekcie, więc każda się liczy.
+ *
+ * CZEKANIE NA OTWARTY DOKUMENT (`blokada`) NIE JEST KŁOPOTEM. Worker ponawia
+ * wtedy bez zużycia próby i nic w Subiekcie się nie zmienia — liczone
+ * zalewałoby listę koszami, przy których nie ma czego sprawdzać.
+ */
+export function problemyMm(database: Db = db(), teraz = new Date()): Map<number, ProblemMm> {
+  const kosz = new Map<number, number>();
+  for (const k of database.prepare(
+    "SELECT id, mm_queue_id, powrot_queue_id FROM kosz").all() as Array<Record<string, unknown>>) {
+    if (k.mm_queue_id != null) kosz.set(Number(k.mm_queue_id), Number(k.id));
+    if (k.powrot_queue_id != null) kosz.set(Number(k.powrot_queue_id), Number(k.id));
+  }
+  for (const p of database.prepare(
+    "SELECT kosz_id, mm_queue_id FROM kosz_pozycja WHERE mm_queue_id IS NOT NULL")
+    .all() as Array<Record<string, unknown>>) {
+    kosz.set(Number(p.mm_queue_id), Number(p.kosz_id));
+  }
+  const wynik = new Map<number, ProblemMm>();
+  if (!kosz.size) return wynik;
+
+  const od = new Date(teraz.getTime() - PROBLEM_MM_DNI * 86_400_000).toISOString();
+  const zdarzenia = database.prepare(
+    `SELECT type, payload, created_at FROM events
+      WHERE type IN ('queue_retry','queue_failed','queue_ponowione_recznie') AND created_at >= ?
+      ORDER BY created_at ASC, id ASC`).all(od) as Array<{ type: string; payload: string | null; created_at: string }>;
+  for (const e of zdarzenia) {
+    let d: Record<string, unknown>;
+    try { d = JSON.parse(e.payload ?? "{}") as Record<string, unknown>; } catch { continue; }
+    const koszId = kosz.get(Number(d.queueId));
+    if (koszId === undefined || d.blokada === true) continue;
+    /* Ręczne PONÓW nie niesie typu zadania — należy do kosza przez numer. */
+    if (e.type !== "queue_ponowione_recznie" && d.typ !== "mm") continue;
+    const byl = wynik.get(koszId);
+    wynik.set(koszId, {
+      prob: (byl?.prob ?? 0) + (e.type === "queue_ponowione_recznie" ? 0 : 1),
+      ostatniBlad: typeof d.blad === "string" ? d.blad : byl?.ostatniBlad ?? null,
+      ostatnioAt: e.created_at,
+      nierozwiazany: false,
+    });
+  }
+  /* STAN TERAZ z wiersza kolejki, nie z dziennika: błąd sprzed zapisu
+     zdarzeń (sierpień 2026) też jest kłopotem, a ostatnie zdarzenie nie mówi,
+     czy ktoś potem kliknął PONÓW. */
+  const idy = [...kosz.keys()];
+  for (const q of database.prepare(
+    `SELECT id, error_msg, processed_at FROM sfera_queue
+      WHERE type='mm' AND status='error' AND id IN (SELECT value FROM json_each(?))`)
+    .all(JSON.stringify(idy)) as Array<{ id: number; error_msg: string | null; processed_at: string | null }>) {
+    const koszId = kosz.get(Number(q.id))!;
+    const byl = wynik.get(koszId);
+    wynik.set(koszId, {
+      prob: Math.max(byl?.prob ?? 0, 1),
+      ostatniBlad: byl?.ostatniBlad ?? q.error_msg,
+      ostatnioAt: byl?.ostatnioAt ?? q.processed_at ?? teraz.toISOString(),
+      nierozwiazany: true,
+    });
+  }
+  return wynik;
+}
+
 export interface WierszListyKoszy {
   id: number;
   kod: string;
@@ -257,6 +348,8 @@ export interface WierszListyKoszy {
    * halę rozkłada kosz z TAMTEGO dokumentu. Kolektor go nie dostaje.
    */
   wirtualny: boolean;
+  /** Kłopot z MM tego kosza; `null` = wszystkie MM weszły za pierwszym razem (@wydanie). */
+  problemMm: ProblemMm | null;
 }
 
 /** Kosz, do którego trafił towar jednego zwrotu — lekki wiersz do wiązania. */
@@ -367,7 +460,11 @@ export function odmowaKoszaWirtualnego(raw: string): string {
    się teraz w Subiekcie, a aplikacja rozkłada to, co przyjechało.          */
 
 export function listaKoszy(): WierszListyKoszy[] {
-  /* Rozłożone tylko świeże: lista służy pracy, historię trzyma audyt. */
+  const problemy = problemyMm();
+  /* Rozłożone tylko świeże: lista służy pracy, historię trzyma audyt.
+     WYJĄTEK: kosz z kłopotem MM (@wydanie) stoi na liście, dopóki kłopot
+     mieści się w oknie `PROBLEM_MM_DNI` — biuro sprawdza stany także po
+     koszach rozłożonych dawno. */
   const wiersze = db()
     .prepare(
       `SELECT k.id, k.kod, k.status, k.utworzono_at,
@@ -394,9 +491,10 @@ export function listaKoszy(): WierszListyKoszy[] {
        WHERE k.status NOT IN ('rozlozony', 'anulowany')
           -- granica ISO, nie datetime(): powód przy GRANICA_OKNA w raporty.ts
           OR COALESCE(k.rozlozono_at, k.anulowano_at) >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-14 days')
+          OR k.id IN (SELECT value FROM json_each(?))
        ORDER BY CASE k.status WHEN 'otwarty' THEN 0 WHEN 'zamkniety' THEN 1 ELSE 2 END, k.id DESC`
     )
-    .all() as Array<Record<string, unknown>>;
+    .all(JSON.stringify([...problemy.keys()])) as Array<Record<string, unknown>>;
   return wiersze.map((w) => ({
     id: w.id as number,
     kod: w.kod as string,
@@ -417,6 +515,7 @@ export function listaKoszy(): WierszListyKoszy[] {
     brakujeKorekt: Number(w.brakuje_korekt ?? 0),
     mmStan: stanMm(w),
     wirtualny: jestKoszemWirtualnym({ kod: String(w.kod), mm_dok_id: (w.mm_dok_id as number) ?? null }),
+    problemMm: problemy.get(Number(w.id)) ?? null,
   }));
 }
 
