@@ -4700,6 +4700,17 @@ zdaniem, co sprawdzić, a przycisk „Sprawdziłem w Subiekcie" dopiero wtedy
 ponawia. MM, które weszło po błędzie, przycisku nie ma — tam zostaje
 sprawdzenie stanów.
 
+**Kosz bez MM powrotnego stoi w tym samym kubełku (@wydanie).** Zgłoszenie
+właściciela: „jak mogę sprawdzić, do których koszyków po rozłożeniu nie
+została zrobiona MM powrotna?". Lista żyła dotąd tylko w rekoncyliacji.
+Teraz ten sam warunek (`koszeBezPowrotu`) czyta też ekran koszy: znacznik
+„bez MM powrotnej" i miejsce w kubełku „Problem z MM".
+
+Karta kosza mówi, co zrobić, zależnie od przyczyny. Przy zapisie adresu
+w kolejce albo w błędzie powrót wyjdzie sam po nim. Przy dokumencie bez
+znanego magazynu źródłowego aplikacja powrotu nie wystawi nigdy, więc robi
+go biuro w Subiekcie. Rekoncyliacja podaje ten sam ruch w swoim zdaniu.
+
 ### 25a.18. Przebieg sprawy, notatka i rozjazdy (0.313.0)
 
 Trzy odpowiedzi na jedno pytanie biura: co się z tym zwrotem działo.
@@ -5124,6 +5135,27 @@ którym kroku stanął. Wypłata nie może wyprzedzić zapisu u nas.
 
 Zwrot zostaje potem w DO ZWROTU z paskiem pieniędzy (0.476.0). Schodzi sam,
 gdy synchronizacja zobaczy wypłatę z Allegro.
+
+
+**Szybka ścieżka czeka na paczkę (@wydanie).** Zgłoszenie właściciela przy
+zwrocie 5ZRQ/2026: przycisk proponował „na półkę i oddaj" za filtr, który
+nigdy nie przyjechał. Przy sygnale `brak_dowodu` przycisk stoi, ale mówi, że
+paczka nie wróciła. Gdy karton leży przy biurku, a tracking się spóźnia,
+zostaje droga ręczna.
+
+**Klient nie odesłał — odmowa jednym ruchem (@wydanie).** Zwrot bez numeru
+listu i bez doręczenia po czternastu dniach od zgłoszenia dostaje sygnał
+`nie_odeslany`. Stoi w DO DECYZJI z czerwonym paskiem w miejscu szybkiej
+ścieżki. `N` albo przycisk wysyła odmowę `REFUND_REJECTED` z gotowym
+powodem, a potem zapisuje werdykt „odrzucony" z tym samym zdaniem.
+Kolejność jest celowa: odmowa, która nie przejdzie, nie zmienia niczego.
+
+`O` otwiera pole powodu, bo odmowa jest nieodwracalna, a powód bywa inny.
+Tu fakt jest jeden i sprawdzalny, więc pole dodawałoby klawisz bez decyzji.
+
+Reguła wieku z 0.452.0 nie zamyka takiego zwrotu po 45 dniach. Allegro za
+nienadaną paczkę nic nie oddaje, więc zamknięcie mówiłoby nieprawdę. Sufit
+wynosi dziewięćdziesiąt dni, żeby stara historia nie wróciła setkami.
 
 ### 25a.8. Czego panel nie wie
 

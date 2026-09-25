@@ -47,8 +47,11 @@ export function koszeKubelka(kosze: WierszKosza[], kubelek: KubelekKoszy): Wiers
      nierozwiązany błąd i wczorajsza odmowa są pilniejsze od tej sprzed
      miesiąca, którą remanent mógł już wyrównać. */
   if (kubelek === "mm") {
-    return kosze.filter((k) => k.problemMm)
-      .sort((a, b) => b.problemMm!.ostatnioAt.localeCompare(a.problemMm!.ostatnioAt));
+    /* Kosz BEZ MM POWROTNEGO też tu stoi (@wydanie): jego stan wisi na
+       regale zwrotów, więc sprawdza się go z Subiektem tak samo. Dla niego
+       chwilą kłopotu jest rozłożenie — od niej powrót powinien był wyjść. */
+    const kiedy = (k: WierszKosza) => k.problemMm?.ostatnioAt ?? k.rozlozonoAt ?? "";
+    return kosze.filter(maKlopotMm).sort((a, b) => kiedy(b).localeCompare(kiedy(a)));
   }
   const wybrane = kosze.filter((k) => kubelekKosza(k) === kubelek);
   if (kubelek !== "rozlozone") return wybrane;
@@ -56,6 +59,11 @@ export function koszeKubelka(kosze: WierszKosza[], kubelek: KubelekKoszy): Wiers
     if (!a.rozlozonoAt || !b.rozlozonoAt) return a.rozlozonoAt ? -1 : b.rozlozonoAt ? 1 : 0;
     return b.rozlozonoAt.localeCompare(a.rozlozonoAt);
   });
+}
+
+/** Czy kosz należy do kubełka PROBLEM Z MM — liczniki i lista pytają tu jednym zdaniem. */
+export function maKlopotMm(k: WierszKosza): boolean {
+  return Boolean(k.problemMm) || Boolean(k.bezPowrotu);
 }
 
 export function kubelekKosza(k: WierszKosza): KubelekKoszy {
@@ -102,7 +110,10 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
           ? <span className="w-full truncate text-sm text-ranga-zle"
               title={k.problemMm.ostatniBlad ?? undefined}>
               {k.problemMm.ostatniBlad ?? "Sfera odmówiła bez treści"} · {czas(k.problemMm.ostatnioAt)}</span>
-          : <span className="w-full truncate text-sm text-slate-600">{postep(k)}</span>}
+          : pokazBladMm && k.bezPowrotu
+            ? <span className="w-full truncate text-sm text-ranga-zle">
+                MM powrotne nie powstało{k.rozlozonoAt ? ` · rozłożono ${czas(k.rozlozonoAt)}` : ""}</span>
+            : <span className="w-full truncate text-sm text-slate-600">{postep(k)}</span>}
         <span className="mt-1 flex w-full flex-wrap items-center gap-1.5">
           {karton && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-700">karton</span>}
           <CyklKosza status={k.status} mmBlad={k.mmStan === "blad" && !k.mmNumer && !karton} />
@@ -116,6 +127,12 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
               className={`rounded px-1.5 py-0.5 text-xs font-bold ${k.problemMm.nierozwiazany
                 ? "bg-red-100 text-ranga-zle" : "bg-amber-100 text-ranga-uwaga"}`}>
               {k.problemMm.nierozwiazany ? "MM w błędzie" : "MM po błędzie"}</span>}
+          {/* BEZ MM POWROTNEGO (@wydanie). Czerwony, bo towar leży na półce,
+              a stan na regale zwrotów — sprzedać się go nie da. */}
+          {k.bezPowrotu &&
+            <span title="Rozłożony ponad dobę temu, a MM powrotne nie powstało — stan wisi na regale zwrotów"
+              className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">
+              bez MM powrotnej</span>}
           {k.pominietych > 0 &&
             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-ranga-uwaga">
               {ile(k.pominietych, "pominięta", "pominięte", "pominiętych")}</span>}

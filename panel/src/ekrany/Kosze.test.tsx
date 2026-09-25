@@ -63,13 +63,16 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
     }
     return { pominiete: [] };
   }
+  if (url === "/api/biuro/kosze/17") return { kosz: { ...SZCZEGOL, id: 17, kod: "Z-17", status: "rozlozony" } };
   if (url === "/api/biuro/kosze/16") return { kosz: { ...SZCZEGOL, id: 16, kod: "Z-16", status: "otwarty" } };
   if (url === "/api/biuro/kosze") return { kosze: [kosz(14, { pominietych: 1 }),
     /* Kłopoty z MM (0.501.0): rozłożony po odmowie i otwarty z błędem teraz. */
     kosz(15, { status: "rozlozony", problemMm: { prob: 1, ostatniBlad: "Brak towaru w magazynie",
       ostatnioAt: "2026-09-21T09:00:00.000Z", nierozwiazany: false } }),
     kosz(16, { status: "otwarty", problemMm: { prob: 3, ostatniBlad: "Kartoteka w edycji",
-      ostatnioAt: "2026-09-22T09:00:00.000Z", nierozwiazany: true } })] };
+      ostatnioAt: "2026-09-22T09:00:00.000Z", nierozwiazany: true } }),
+    /* Bez MM powrotnego (@wydanie): rozłożony, dokument bez znanego kierunku. */
+    kosz(17, { status: "rozlozony", rozlozonoAt: "2026-09-20T09:00:00.000Z", bezPowrotu: "kierunek" })] };
   if (url === "/api/biuro/kosze/pominiete") return { pominiete: POMINIETE };
   if (url === "/api/biuro/kosze/14") return { kosz: SZCZEGOL };
   if (url.startsWith("/api/biuro/kosze/szukaj?q=")) {
@@ -131,9 +134,12 @@ describe("Kosze w zakładce Zwroty", () => {
     expect(within(w16).getByText("MM w błędzie")).toBeInTheDocument();
     expect(within(screen.getByRole("button", { name: /Z-14/ })).queryByText(/MM (w|po) błędzie/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /Problem z MM/ }));
-    const wiersze = screen.getAllByRole("button", { name: /Z-1[56]/ });
-    /* Najświeższy kłopot na górze — przekrój przez kubełki, także rozłożone. */
-    expect(wiersze.map((w) => within(w).getByText(/^Z-/).textContent)).toEqual(["Z-16", "Z-15"]);
+    const wiersze = screen.getAllByRole("button", { name: /Z-1[567]/ });
+    /* Najświeższy kłopot na górze — przekrój przez kubełki, także rozłożone.
+       Kosz bez MM powrotnego stoi po chwili rozłożenia. */
+    expect(wiersze.map((w) => within(w).getByText(/^Z-/).textContent)).toEqual(["Z-16", "Z-15", "Z-17"]);
+    expect(within(wiersze[2]).getByText(/MM powrotne nie powstało/)).toBeInTheDocument();
+    expect(within(wiersze[2]).getByText("bez MM powrotnej")).toBeInTheDocument();
     expect(within(wiersze[1]).getByText(/Brak towaru w magazynie/)).toBeInTheDocument();
     expect(within(wiersze[1]).getByText("MM po błędzie")).toBeInTheDocument();
     expect(wyslane).toEqual([]);
@@ -163,6 +169,13 @@ describe("Kosze w zakładce Zwroty", () => {
     pokaz("/obsluga/zwroty/kosze/14");
     expect(await screen.findByRole("heading", { name: "Z-14" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Ponów MM/ })).toBeNull();
+  });
+
+  it("karta kosza bez MM powrotnego mówi, co zrobić — zależnie od przyczyny (@wydanie)", async () => {
+    pokaz("/obsluga/zwroty/kosze/17");
+    expect(await screen.findByText(/MM powrotne wystaw w Subiekcie/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Ponów MM/ })).toBeNull();
+    expect(wyslane).toEqual([]);
   });
 
   it("kosz prowadzi do swoich zwrotów — połowa wiązania od strony kosza", async () => {

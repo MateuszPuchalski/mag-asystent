@@ -1,6 +1,6 @@
 import React from "react";
 import { RefreshCw } from "lucide-react";
-import type { PozycjaWKoszu, SzczegolKosza, WierszKosza } from "../api/kosze";
+import type { PowodBezPowrotu, PozycjaWKoszu, SzczegolKosza, WierszKosza } from "../api/kosze";
 import { Zdjecie } from "../towar/Zdjecie";
 import { Blad, NaglowekSekcji, Przycisk, czas, ile } from "../ui";
 import { CyklKosza } from "./Cykl";
@@ -54,10 +54,21 @@ export interface PonowienieMm {
   onPonow: (sprawdzono: boolean) => void;
 }
 
-export function Kosz({ k, przelicz, ponowMm = null }: {
+/* Co zrobić, gdy MM powrotne nie powstało — zależnie od przyczyny (@wydanie).
+   Kosz bez znanego kierunku NIE czeka na adresy: tam jedynym ruchem jest
+   dokument w Subiekcie, bo aplikacja powrotu nie wystawi nigdy. */
+const RUCH_BEZ_POWROTU: Record<PowodBezPowrotu, string> = {
+  adresy: "Czeka na zapis adresu, który stoi w kolejce Sfery albo w błędzie — powrót wyjdzie sam po nim.",
+  kierunek: "Aplikacja nie zna magazynu, z którego przyszedł dokument — MM powrotne wystaw w Subiekcie.",
+  nieznany: "Powrót powinien był już wyjść — sprawdź kolejkę Sfery.",
+};
+
+export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
   k: SzczegolKosza;
   przelicz: { trwa: boolean; blad: string; wynik: string; onPrzelicz: () => void };
   ponowMm?: PonowienieMm | null;
+  /** Rozłożony ponad dobę, a MM powrotne nie powstało (@wydanie) — i dlaczego. */
+  bezPowrotu?: PowodBezPowrotu | null;
 }) {
   const bezKorekty = k.zwroty.filter((z) => !z.korektaNumer);
   const pominiete = k.pozycje.filter((p) => p.status === "skipped");
@@ -111,6 +122,13 @@ export function Kosz({ k, przelicz, ponowMm = null }: {
         {ponowMm.wynik && <p className="mt-1 text-ranga-ok">{ponowMm.wynik}</p>}
         <Blad>{ponowMm.blad}</Blad>
       </div>}
+      {/* ── BEZ MM POWROTNEGO (@wydanie) ──────────────────────────────────
+          Zdanie kończy się RUCHEM, jak w rekoncyliacji, i zależy od przyczyny
+          (`RUCH_BEZ_POWROTU`). Przycisku tu nie ma: powrót zamawia automat,
+          gdy adresy wejdą, a ręczne zamówienie ominęłoby właśnie tę bramkę. */}
+      {bezPowrotu && <div className="mt-2 rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-ranga-zle">
+        <b>MM powrotne nie powstało</b> · towar leży na półce, a stan wisi na regale zwrotów,
+        więc nie da się go sprzedać. {RUCH_BEZ_POWROTU[bezPowrotu]}</div>}
       {bezKorekty.length > 0 && <p className="mt-1 text-sm">
         <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-ranga-uwaga">czeka na korektę</span>
         {" "}MM wyjdzie, gdy dojdą numery korekt do {ile(bezKorekty.length, "zwrotu", "zwrotów", "zwrotów")}.</p>}
