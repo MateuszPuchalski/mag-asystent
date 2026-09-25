@@ -204,7 +204,7 @@ export interface SzczegolKosza {
 }
 
 /**
- * Kłopot z dokumentem MM kosza (@wydanie).
+ * Kłopot z dokumentem MM kosza (0.501.0).
  *
  * Zgłoszenie właściciela: „w koszykach zwrotów zaznacz koszyki, w których był
  * problem z MM — muszę sprawdzić stany z Subiektem". Wiersz kolejki mówi
@@ -228,7 +228,7 @@ export interface ProblemMm {
 const PROBLEM_MM_DNI = 90;
 
 /**
- * Kosze, których zadania MM miały kłopot (@wydanie) — mapa po id kosza.
+ * Kosze, których zadania MM miały kłopot (0.501.0) — mapa po id kosza.
  *
  * Zadanie należy do kosza przez trzy kolumny: MM koszyka wirtualnego
  * (`kosz.mm_queue_id`), MM powrotne z bufora (`kosz.powrot_queue_id`) i MM
@@ -348,7 +348,7 @@ export interface WierszListyKoszy {
    * halę rozkłada kosz z TAMTEGO dokumentu. Kolektor go nie dostaje.
    */
   wirtualny: boolean;
-  /** Kłopot z MM tego kosza; `null` = wszystkie MM weszły za pierwszym razem (@wydanie). */
+  /** Kłopot z MM tego kosza; `null` = wszystkie MM weszły za pierwszym razem (0.501.0). */
   problemMm: ProblemMm | null;
 }
 
@@ -462,7 +462,7 @@ export function odmowaKoszaWirtualnego(raw: string): string {
 export function listaKoszy(): WierszListyKoszy[] {
   const problemy = problemyMm();
   /* Rozłożone tylko świeże: lista służy pracy, historię trzyma audyt.
-     WYJĄTEK: kosz z kłopotem MM (@wydanie) stoi na liście, dopóki kłopot
+     WYJĄTEK: kosz z kłopotem MM (0.501.0) stoi na liście, dopóki kłopot
      mieści się w oknie `PROBLEM_MM_DNI` — biuro sprawdza stany także po
      koszach rozłożonych dawno. */
   const wiersze = db()

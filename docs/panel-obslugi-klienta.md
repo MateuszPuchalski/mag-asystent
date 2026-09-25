@@ -4670,7 +4670,7 @@ Reguła „tylko lokalizacja" z 0.16.0 nie jest złamana. Dotyczy ona SUROWYCH
 zapisów do bazy Subiekta, a dokumenty idą osobnym, przyjętym kanałem — przez
 Sferę, tak samo jak korekta zwrotu.
 
-**Kosze z kłopotem MM są zaznaczone (@wydanie).** Zgłoszenie właściciela:
+**Kosze z kłopotem MM są zaznaczone (0.501.0).** Zgłoszenie właściciela:
 „w koszykach zwrotów zaznacz koszyki, w których był problem z MM — muszę
 sprawdzić stany z Subiektem". Wiersz kolejki pamięta tylko ostatnie podejście.
 MM odrzucona i przepuszczona PONÓW-em wyglądała więc jak czysta, a właśnie po

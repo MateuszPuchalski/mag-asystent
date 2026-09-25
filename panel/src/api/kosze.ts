@@ -37,7 +37,7 @@ export interface WierszKosza {
   mmStan: StanMm;
   wirtualny: boolean;
   /**
-   * Kłopot z MM tego kosza (@wydanie): odmowa Sfery, nawet przepuszczona potem
+   * Kłopot z MM tego kosza (0.501.0): odmowa Sfery, nawet przepuszczona potem
    * PONÓW-em. `null` = każda MM weszła za pierwszym razem. Opcjonalne, bo
    * starszy serwer pola nie przysyła.
    */

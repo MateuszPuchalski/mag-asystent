@@ -55,7 +55,7 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
   const metoda = init?.method ?? "GET";
   if (metoda !== "GET") { wyslane.push(`${metoda} ${url} ${init?.body ?? ""}`); return { pominiete: [] }; }
   if (url === "/api/biuro/kosze") return { kosze: [kosz(14, { pominietych: 1 }),
-    /* Kłopoty z MM (@wydanie): rozłożony po odmowie i otwarty z błędem teraz. */
+    /* Kłopoty z MM (0.501.0): rozłożony po odmowie i otwarty z błędem teraz. */
     kosz(15, { status: "rozlozony", problemMm: { prob: 1, ostatniBlad: "Brak towaru w magazynie",
       ostatnioAt: "2026-09-21T09:00:00.000Z", nierozwiazany: false } }),
     kosz(16, { status: "otwarty", problemMm: { prob: 3, ostatniBlad: "Kartoteka w edycji",
@@ -113,7 +113,7 @@ describe("Kosze w zakładce Zwroty", () => {
     expect(screen.queryByRole("button", { name: /Z-15/ })).toBeNull();
   });
 
-  it("kosze z kłopotem MM mają znacznik i własny kubełek z treścią odmowy (@wydanie)", async () => {
+  it("kosze z kłopotem MM mają znacznik i własny kubełek z treścią odmowy (0.501.0)", async () => {
     /* Zgłoszenie właściciela: „muszę sprawdzić stany z Subiektem". */
     pokaz();
     const w16 = await screen.findByRole("button", { name: /Z-16/ });
