@@ -339,9 +339,12 @@ export function streszczenieZamowienia(dane: OsRozmowy): string {
     ? `doręczona ${dzien(z.przesylka.dostarczonoAt)}`
     : z.przesylka?.status ? STATUS_PACZKI[z.przesylka.status] ?? z.przesylka.status
       : "paczki nie sprawdzano";
-  if (!p) return `treść jeszcze nie pobrana · ${paczka}`;
-  return [p.kupionoAt ? dzien(p.kupionoAt) : null,
-    p.sumaGrosze !== null ? zlote(p.sumaGrosze, p.waluta) : null, paczka].filter(Boolean).join(" · ");
+  /* PACZKA PIERWSZA (@wydanie): wzrok czyta początek wiersza i pomija resztę
+     (NN/g, wzorzec F, potwierdzony w 2017). O zamówieniu pytają najczęściej
+     „gdzie paczka", więc to słowo ma stać tam, gdzie oko na pewno trafi. */
+  if (!p) return `${paczka} · treść jeszcze nie pobrana`;
+  return [paczka, p.kupionoAt ? dzien(p.kupionoAt) : null,
+    p.sumaGrosze !== null ? zlote(p.sumaGrosze, p.waluta) : null].filter(Boolean).join(" · ");
 }
 
 export function streszczenieZamknietych(zwrotow: number, spraw: number): string {

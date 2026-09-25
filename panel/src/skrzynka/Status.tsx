@@ -3,6 +3,7 @@ import { CheckCircle2, Flame, RotateCcw, Scale } from "lucide-react";
 import type { Rozmowa } from "../api/typy";
 import { KLASA_STATUSU } from "../ui";
 import { NAZWA, ZRODLO_ZAKONCZENIA } from "./statusy";
+import { polePisania, useSkrotyDzialaja } from "../nawigacja/fokus";
 
 /* Status rozmowy (§7, 0.158.0). Nagłówek rozmowy pokazuje go ZAWSZE, także
    gdy nikt go nie ruszył — „Nowa" znaczy, że sprawy nie tknięto, a to jest
@@ -40,6 +41,8 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
   zmieniaStatus?: boolean;
 }) {
   const [pytam, setPytam] = useState(false);
+  /* Znaczek „Z" tylko wtedy, gdy klawisz działa — powód w `nawigacja/fokus.ts`. */
+  const skrotyDzialaja = useSkrotyDzialaja();
   const zakonczona = rozmowa.status === "resolved" || rozmowa.status === "closed";
   const zrodlo = zakonczona && rozmowa.zakonczenie ? ZRODLO_ZAKONCZENIA[rozmowa.zakonczenie] : null;
 
@@ -54,9 +57,7 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
   };
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT"
-        || el.isContentEditable)) return;
+      if (polePisania(e.target)) return;
       if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
       if (e.key === "z" || e.key === "Z") { e.preventDefault(); klawisz.current(); }
     };
@@ -132,7 +133,8 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
           onClick={() => (KLIENT_CZEKA.has(rozmowa.status) ? setPytam(true) : onZakoncz(false))}
           className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
           <CheckCircle2 size={13} />Zakończ
-          <kbd aria-hidden="true" className="rounded bg-black/15 px-1 font-sans text-podpis">Z</kbd></button>}
+          {skrotyDzialaja && <kbd aria-hidden="true" className="rounded bg-black/15 px-1 font-sans text-podpis">Z</kbd>}
+        </button>}
     {/* PYTANIE RAZ, W MIEJSCU PRZYCISKU, nie oknem na środku ekranu — ten sam
         wzorzec co groźne ruchy w stanie systemu. To jedyna pomyłka tego
         przycisku, która kosztuje klienta bez odpowiedzi. */}

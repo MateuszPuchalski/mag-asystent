@@ -66,12 +66,14 @@ function Anulowanie({ dane }: { dane: OsRozmowy }) {
       : `Bez powtórzonego zakupu tych samych pozycji w ${OKNO_PODWOJNEGO_GODZ} godzinach.`}</p>
     <ul className="divide-y rounded-lg border" aria-label="Zakupy tego klienta">
       {zakupy.map((z) => <li key={z.externalId} className="px-3 py-2">
+        {/* STATUS PIERWSZY (@wydanie): to on rozstrzyga, który zakup anulować,
+            a początek wiersza jest jedynym miejscem, które oko czyta na pewno. */}
         <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
-          <b className="text-slate-900">{czas(z.kupionoAt)}</b>
-          <span className="tabular-nums">{zlote(z.sumaGrosze, z.waluta)}</span>
           <span className={z.status === "READY_FOR_PROCESSING" ? "font-semibold text-emerald-800"
             : z.status === "CANCELLED" ? "text-slate-600" : "font-semibold text-amber-900"}>
             {STATUS_ZAKUPU[z.status ?? ""] ?? z.status ?? "status nieznany"}</span>
+          <b className="text-slate-900">{czas(z.kupionoAt)}</b>
+          <span className="tabular-nums">{zlote(z.sumaGrosze, z.waluta)}</span>
           {pary.has(z.externalId) && <span className="rounded bg-amber-100 px-1.5 font-semibold text-amber-900">
             te same pozycje</span>}
           {z.externalId === dane.zamowienie?.externalId && <span className="rounded bg-slate-100 px-1.5 text-slate-700">

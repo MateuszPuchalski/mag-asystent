@@ -425,8 +425,12 @@ export function useZakoncz() {
 export function useOtworz() {
   const qc = useQueryClient();
   return useMutation({
-    /* Bez ciała — i dlatego bez `body`: pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`. */
-    mutationFn: (v: { id: number }) => api(`/api/conversations/${v.id}/otworz`, { method: "POST" }),
+    /* Bez ciała — i dlatego bez `body`: pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`.
+       Ciało idzie WYŁĄCZNIE z paska „Cofnij" (@wydanie): serwer liczy to
+       otwarcie jako cofnięte zakończenie w pomiarze tarcia. */
+    mutationFn: (v: { id: number; zCofniecia?: boolean }) => api(`/api/conversations/${v.id}/otworz`, {
+      method: "POST", ...(v.zCofniecia ? { body: JSON.stringify({ zCofniecia: true }) } : {}),
+    }),
     onSettled: (_d, _e, v) => {
       qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
       qc.invalidateQueries({ queryKey: klucze.rozmowy });
@@ -443,6 +447,8 @@ export function useWyslij() {
       mimoNowejWiadomosci?: boolean; mimoObecnosci?: boolean;
       /** „Wyślij i zakończ" (23 września 2026) — werdykt w tej samej transakcji co wiadomość. */
       zakoncz?: boolean;
+      /** Ms od otwarcia rozmowy do kliknięcia „Wyślij" — pomiar tarcia (@wydanie). */
+      msOdOtwarcia?: number;
     }) => api<WynikWysylki>(`/api/conversations/${v.id}/send`, {
       method: "POST",
       body: JSON.stringify({
@@ -451,6 +457,7 @@ export function useWyslij() {
         mimoNowejWiadomosci: Boolean(v.mimoNowejWiadomosci),
         mimoObecnosci: Boolean(v.mimoObecnosci),
         zakoncz: Boolean(v.zakoncz),
+        msOdOtwarcia: v.msOdOtwarcia,
       }),
     }),
     onSettled: (_d, _e, v) => {
@@ -461,6 +468,17 @@ export function useWyslij() {
       qc.invalidateQueries({ queryKey: klucze.zalaczniki(v.id) });
     },
   });
+}
+
+/**
+ * Cofnięta wysyłka (@wydanie) — sam wpis do pomiaru tarcia. Czekanie
+ * dziesięciu sekund mieszka w przeglądarce, więc bez tego serwer nie wie,
+ * że agent zawrócił odpowiedź. Porażka wpisu nie ma prawa zatrzymać
+ * cofnięcia — agent już zdecydował, a pomiar to nie jego sprawa.
+ */
+export function zglosCofnietaWysylke(id: number): void {
+  /* Bez ciała — i dlatego bez `body`: pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`. */
+  void api(`/api/conversations/${id}/wysylka-cofnieta`, { method: "POST" }).catch(() => {});
 }
 
 /**

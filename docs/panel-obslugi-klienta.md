@@ -6008,6 +6008,52 @@ Jedyna poprawna kopia reguły mieszkała jako prywatna funkcja w
 znak w znak. „Dni" brzmi tak samo w obu formach mnogich, więc tamte kopie były
 poprawne — ale trzy zapisy jednej odmiany to trzy miejsca na rozjazd.
 
+## 26c. Intuicyjność: siedem zmian z badań (@wydanie)
+
+Pytanie właściciela brzmiało: „co zrobić, żeby aplikacja była bardziej
+intuicyjna". Odpowiedź oparła się na badaniach sprawdzonych pod kątem daty.
+Każda zmiana niżej ma powód w komentarzu obok kodu.
+
+1. **Jeden czasownik na czynność, decydujące słowo pierwsze.** „Popraw
+   w edytorze" niczego nie poprawiało, tylko przenosiło szkic do pola. Teraz
+   przycisk mówi skutek: „Wstaw do odpowiedzi" albo „Zastąp mój szkic".
+   „Odrzuć" stało przy szkicu, zwrocie i wiedzy, więc przy szkicu brzmi
+   „Odrzuć szkic". W wierszu anulowania status zakupu stoi przed datą i kwotą.
+   Streszczenie zamówienia zaczyna się od stanu paczki.
+2. **Pole nie zmienia się pod okiem.** Szkic, który przyszedł po otwarciu
+   rozmowy, nie wskakuje już do pola sam. Czeka w karcie na „Wstaw".
+   Zasada najmniejszego zaskoczenia (Raskin): tekst zmieniony w trakcie
+   czytania to tekst, któremu przestaje się ufać.
+3. **Tarcie tylko tam, gdzie ryzyko.** Nietknięty szkic Copilota
+   z twierdzeniami spoza faktów zmienia przycisk na „Wyślij bez zmian".
+   Nad nim stoją do trzech twierdzeń do sprawdzenia. Poprawka jednej litery
+   zdejmuje tarcie. Podstawa: badania nad nadmiernym zaufaniem do automatu
+   (Buçinca i in., CSCW 2021).
+4. **Cofnij zamiast „czy na pewno".** Zakończenie rozmowy zostawia pasek
+   „Cofnij" na osiem sekund. Cofnięcie woła „Otwórz ponownie" i wraca do
+   rozmowy. Ostrzeżenie widziane drugi raz mózg niemal pomija (Anderson i in.,
+   CHI 2015). Cofnięcia NIE dostały trzy czynności, każda z innego powodu:
+   - **kategoria** — cofnięcie zapisałoby fałszywą etykietę człowieka
+     i skaziło pomiar klasyfikatora;
+   - **wskazanie zamówienia** — serwer nie ma trasy odwiązania, a dopisanie
+     jej to osobna decyzja;
+   - **wybór w doborze** — ma już widoczne „Zdejmij wybór".
+5. **Znaczek klawisza tylko wtedy, gdy klawisz działa.** E, R i Z milczą
+   w polu tekstowym, więc ich znaczki znikają, gdy fokus wchodzi w pole.
+   Wspólny strażnik stoi w `nawigacja/fokus.ts`.
+6. **Pomiar tarcia w Analizie.** Karta „Tarcie w skrzynce" liczy cofnięte
+   wysyłki i zakończenia oraz medianę od otwarcia rozmowy do wysyłki. Liczy
+   też udział szkiców wysłanych bez zmian. Rozbicie na osoby czyta wyłącznie
+   administrator. Wysoki udział „bez zmian" nie ma koloru oceny: bywa dobry
+   i bywa zły.
+7. **Pasek „Nowe w panelu".** Pierwsze wejście po wydaniu pokazuje nagłówki
+   zmian pod górnym paskiem. „Rozumiem" zamyka go do następnego wydania.
+   Wchodzą wyłącznie wydania `minor`, bo `patch` agent zwykle nie zauważy.
+
+**Czego nie robimy — decyzja właściciela.** Propozycja, by układ zmieniał
+się najwyżej raz w tygodniu, została odrzucona. Wydania idą jak dotąd,
+a o zmianach mówi pasek z punktu 7.
+
 ## 27. Zasady nadrzędne
 
 Te punkty mówią o JEDNEJ rozmowie i jednej sprawie. Reguły obowiązujące

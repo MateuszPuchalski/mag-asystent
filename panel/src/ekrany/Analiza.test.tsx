@@ -102,6 +102,9 @@ beforeEach(() => {
       powroty: { oknoDni: 7, n: 40, bezPowrotu: 30, wrocilo: 10, wrociloBezRozpoznania: 4, czeka: 2,
         wgKategorii: [{ klucz: "PRODUCT_COMPATIBILITY", n: 20, bezPowrotu: 11 }], wgOsoby: null },
     }));
+    if (url.startsWith("/api/analiza/tarcie?days=")) return new Response(JSON.stringify({
+      dni: 30, osoby: null, razem: { wyslanych: 40, zeSzkicem: 20, bezZmian: 9, udzialBezZmian: 0.45,
+        cofnietychWysylek: 3, cofnietychZakonczen: 1, medianaSekDoWysylki: 95, probekCzasu: 38 } }));
     /* Miary obsługi (0.444.0, przyszły z ustawień). Kształty minimalne —
        treść każdej karty ma własny test obok niej; tu liczy się skład. */
     if (url === "/api/obsluga/sygnatury") return new Response(JSON.stringify(
@@ -239,6 +242,21 @@ describe("zakres Obsługa klienta", () => {
     expect(screen.getAllByText("Dobór").length).toBe(2);
     expect(screen.getByText("nierozpoznane")).toBeInTheDocument();
     expect(screen.queryByText("Według osoby")).toBeNull();
+    expect(zapisy).toEqual([]);
+  });
+
+  /* Tarcie w skrzynce (@wydanie): trzy liczby pod czasem odpowiedzi, bez
+     karty osób dla biura i bez zapisu przy otwarciu. */
+  it("pokazuje tarcie: cofnięcia, czas do wysyłki i szkice bez zmian", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    await userEvent.click(screen.getByRole("button", { name: "Obsługa klienta" }));
+    await screen.findByText("Tarcie w skrzynce");
+    expect(adresy).toContain("/api/analiza/tarcie?days=30");
+    expect(screen.getByText("95 s")).toBeInTheDocument();
+    expect(screen.getByText("45%")).toBeInTheDocument();
+    expect(screen.getByText(/cofniętych wysyłek z 40/)).toBeInTheDocument();
+    expect(screen.queryByText("Tarcie według osoby")).toBeNull();
     expect(zapisy).toEqual([]);
   });
 

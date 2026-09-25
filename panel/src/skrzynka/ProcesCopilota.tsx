@@ -41,7 +41,7 @@ const PEWNOSC: Record<PoziomPewnosci, string> = {
 };
 
 /** Twierdzenie, którego agent nie może wziąć na wiarę — te decydują o otwarciu okna. */
-const doSprawdzenia = (t: TwierdzenieCopilota) => t.zrodlo !== "fakty";
+export const doSprawdzenia = (t: TwierdzenieCopilota) => t.zrodlo !== "fakty";
 
 export function ProcesCopilota({ twierdzenia }: { twierdzenia: TwierdzenieCopilota[] }) {
   const ile = twierdzenia.filter(doSprawdzenia).length;

@@ -113,6 +113,8 @@ const TRASY = () => [
   /* Zakończ / Otwórz ponownie (23 września 2026) — ta sama bramka. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/zakoncz`, payload: {} },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/otworz` },
+  /* Cofnięta wysyłka (@wydanie) — sam wpis do pomiaru tarcia, ta sama bramka. */
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/wysylka-cofnieta` },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/priorytet`,
     payload: { priorytet: "pilny" } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/reklamacyjna`,

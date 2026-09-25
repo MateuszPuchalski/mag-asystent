@@ -14,7 +14,7 @@ vi.mock("./ZamowienieRozmowy", () => ({
   ZamowienieRozmowy: () => <div data-testid="zamowienie">blok zamówienia</div>,
   /* Słownik paczki jedzie z modułu zamówienia, bo streszczenie wiersza mówi
      tymi samymi słowami co karta. */
-  STATUS: { NOTICE_LEFT: "awizo — nieudana próba doręczenia" },
+  STATUS: { NOTICE_LEFT: "awizo — nieudana próba doręczenia", IN_TRANSIT: "w drodze do klienta" },
 }));
 vi.mock("./ZwrotRozmowy", () => ({
   ZwrotRozmowy: ({ zwrot }: { zwrot: { id: number } }) => <div data-testid="zwrot">zwrot {zwrot.id}</div>,
@@ -225,5 +225,19 @@ describe("kolumna kontekstu", () => {
     rysuj(znany({ updatedBy: "A. Lewandowska" }));
     const swieci = screen.getByRole("region", { name: "Wymaga Ciebie" });
     expect(within(swieci).getByRole("button", { name: /^Dobór/ })).toHaveTextContent("Szukamy");
+  });
+});
+
+/* ── Rozstrzygające słowo na początku (@wydanie) ─────────────────────────────
+   Oko czyta początek wiersza i pomija resztę (NN/g, wzorzec F, 2006 i 2017).
+   O zamówieniu pyta się „gdzie paczka", więc paczka stoi pierwsza. */
+describe("streszczenie zamówienia", () => {
+  it("zaczyna od paczki, dopiero potem data i kwota", async () => {
+    const { streszczenieZamowienia } = await import("./Kontekst");
+    const s = streszczenieZamowienia(dane({ zamowienie: { externalId: "z", link: null,
+      przesylka: { waybill: null, przewoznik: "DPD", status: "IN_TRANSIT", dostarczonoAt: null, sprawdzonoAt: null },
+      pobrane: { kupionoAt: "2026-09-22T10:00:00Z", sumaGrosze: 5549, waluta: "PLN" } as never } }));
+    expect(s.startsWith("w drodze do klienta")).toBe(true);
+    expect(s).toMatch(/55,49/);
   });
 });

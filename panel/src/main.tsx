@@ -30,6 +30,7 @@ import { Analiza } from "./ekrany/Analiza";
 import { Stan } from "./ekrany/Stan";
 import { Protokol } from "./druk/Protokol";
 import "./index.css";
+import { CoNowego } from "./coNowego/CoNowego";
 
 /* Jeden cache zapytań na cały panel zastępuje ręczne odświeżanie co
    piętnaście sekund. To jest ta część wyceny z `docs/obsluga-klienta.md` §7,
@@ -314,6 +315,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
      i `dvh` po kolei, czego jedna klasa Tailwinda zapisać nie umie. */
   return <div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
     <Naglowek wyloguj={wyloguj} />
+    {/* „Nowe w panelu" (@wydanie) — pod nagłówkiem, nad pracą, tylko przy
+        pierwszym wejściu po wydaniu. Powód w `coNowego/CoNowego.tsx`. */}
+    <CoNowego />
     {/* BEZ `max-w` i bez `mx-auto` (0.198.0). Ogranicznik 1500 px przyszedł
         z makiety i nikt go nigdy nie uzasadnił w kodzie. Na monitorze 1920
         oddawał 210 pikseli na margines z każdej strony, na 2560 — po 530,

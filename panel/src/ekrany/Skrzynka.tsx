@@ -4,7 +4,7 @@ import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
 import { naBase64 } from "../api/plik";
 import {
-  useAgenci, useDodajKomentarz, useJa,
+  zglosCofnietaWysylke, useAgenci, useDodajKomentarz, useJa,
   usePrzekaz, useRozmowa, useUstawReklamacyjna, useZakoncz, useOtworz,
   usePisze, useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useWskazOferte, useWyslij,
   useZapiszSzkic, useZdrowie, useZlecPomiar,
@@ -25,6 +25,8 @@ import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { OKNO_COFNIECIA_MS, Odlozone, nastepnaRozmowa, type Odlozona } from "../skrzynka/Odlozone";
+import { Cofniecie, type DoCofniecia } from "../skrzynka/Cofniecie";
+import { polePisania } from "../nawigacja/fokus";
 import { useSygnaly } from "../skrzynka/Sygnaly";
 
 type Paczka = Parameters<ReturnType<typeof useWyslij>["mutateAsync"]>[0];
@@ -99,6 +101,8 @@ export function Skrzynka() {
   /* Czy pole trzyma szkic Copilota (0.499.0) — nad polem stoi wtedy zdanie
      „Szkic Copilota w polu", a pod nim to, na czym szkic stoi. */
   const [zCopilota, setZCopilota] = useState(false);
+  /* Pasek „Cofnij" po czynności jednym kliknięciem — powód w `Cofniecie.tsx`. */
+  const [doCofniecia, setDoCofniecia] = useState<DoCofniecia | null>(null);
   /* Szkice, które już raz weszły do pola: `rozmowa:czas szkicu`. Ref, nie
      stan — to pamięć ekranu, nie coś, od czego zależy rysowanie. */
   const wstawione = useRef(new Set<string>());
@@ -181,22 +185,35 @@ export function Skrzynka() {
     }
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
 
-  /* Szkic, który PRZYSZEDŁ, gdy rozmowa była już otwarta (takt układa go
-     w tle): wchodzi tylko do wciąż pustego pola. Tekst agenta wygrywa zawsze. */
-  const czasSzkicu = rozmowa.data?.szkicCopilota?.at;
+  /* ── NIC NIE WCHODZI DO POLA, GDY AGENT JUŻ PATRZY (@wydanie) ──────────────
+     Do @wydanie szkic, który takt ułożył w tle przy otwartej rozmowie, sam
+     wypełniał puste pole — tekst pojawiał się agentowi pod ręką w trakcie
+     czytania wątku. Zasada najmniejszego zaskoczenia (Raskin, „The Humane
+     Interface"): stan ekranu zmienia się na ruch człowieka, nie obok niego.
+     Szkic spóźniony staje więc w karcie pod polem z „Wstaw do odpowiedzi".
+
+     Zostaje JEDEN przypadek dociągnięcia: konto zalogowanego doczytało się
+     po rozmowie. Wtedy przy otwarciu własna rozmowa wyglądała na cudzą
+     i szkic nie wszedł, choć agent nie zdążył jeszcze niczego zobaczyć. */
   const szkicTeraz = useRef(szkic);
   szkicTeraz.current = szkic;
   useEffect(() => {
     if (!rozmowa.data || szkicTeraz.current !== "") return;
     const startowy = szkicNaStartRozmowy(rozmowa.data, ja.data?.user.userId ?? null);
-    const klucz = `${rozmowa.data.rozmowa.id}:${czasSzkicu}`;
+    const klucz = `${rozmowa.data.rozmowa.id}:${rozmowa.data.szkicCopilota?.at}`;
     if (startowy === null || wstawione.current.has(klucz)) return;
     wstawione.current.add(klucz);
     setSzkic(startowy);
     setZCopilota(true);
-    /* `ja` w zależnościach, bo bez niego rozmowa własna wygląda na cudzą:
-       szkic nie wszedłby, gdy konto dociąga się po rozmowie. */
-  }, [czasSzkicu, ja.data?.user.userId]);
+    /* WYŁĄCZNIE `ja` w zależnościach — celowo bez czasu szkicu. Szkic
+       spóźniony ma NIE uruchamiać tego efektu; powód wyżej. */
+  }, [ja.data?.user.userId]);
+
+  /* CHWILA OTWARCIA ROZMOWY — pomiar tarcia (@wydanie). Liczy się od
+     wejścia w rozmowę do kliknięcia „Wyślij", nie do wyjścia odpowiedzi po
+     dziesięciu sekundach: okno cofnięcia to nie szukanie po ekranie. */
+  const otwartaOd = useRef(Date.now());
+  useEffect(() => { otwartaOd.current = Date.now(); }, [wybranaId]);
 
   const zglos = (e: unknown) =>
     setBlad(e instanceof Konflikt ? `${e.message} — odśwież rozmowę` : (e as Error).message);
@@ -278,7 +295,7 @@ export function Skrzynka() {
         stan: { rodzaj: "czeka", doKiedy: Date.now() + OKNO_COFNIECIA_MS },
         paczka: { id: rozmowa.data.rozmowa.id, body: szkic,
           expectedVersion: rozmowa.data.rozmowa.wersja, expectedLastMessageId: ostatniaKlienta,
-          zakoncz: zakonczPo },
+          zakoncz: zakonczPo, msOdOtwarcia: Date.now() - otwartaOd.current },
       };
       setOdlozone((l) => [...l, w]);
       timery.current.set(w.klucz, setTimeout(() => wyslijOdlozona(w), OKNO_COFNIECIA_MS));
@@ -348,7 +365,7 @@ export function Skrzynka() {
   }
 
   /* ── E I R PRZY KARCIE SZKICU (23 września 2026) ────────────────────────
-     „Popraw w edytorze" i „Odrzuć" z klawiatury, ten sam strażnik co
+     „Wstaw do odpowiedzi" i „Odrzuć" z klawiatury, ten sam strażnik co
      w kolejce: pole tekstowe wygrywa zawsze, bo „e" w słowie „jest" nie może
      wstawiać szkicu. Klawisze działają tylko przy karcie na ekranie —
      z cudzą rozmową albo bez propozycji nie robią nic. */
@@ -359,9 +376,7 @@ export function Skrzynka() {
   skrot.current = { popraw: poprawSzkicem, odrzuc: odrzucSzkic, widoczna: kartaWidoczna };
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
-      const el = e.target as HTMLElement | null;
-      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT"
-        || el.isContentEditable)) return;
+      if (polePisania(e.target)) return;
       if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing || !skrot.current.widoczna) return;
       if (e.key === "e" || e.key === "E") { e.preventDefault(); skrot.current.popraw(); }
       if (e.key === "r" || e.key === "R") { e.preventDefault(); skrot.current.odrzuc(); }
@@ -586,10 +601,19 @@ export function Skrzynka() {
         if (!rozmowa.data) return;
         setBladStatusu("");
         const id = rozmowa.data.rozmowa.id;
+        const klient = rozmowa.data.rozmowa.klient;
         zakoncz.mutate({ id, mimoPytania }, {
           onSuccess: () => {
             const nast = nastepnaRozmowa(widoczne.current, id);
             if (nast !== null) nawiguj(`/obsluga/skrzynka/${nast}`);
+            /* COFNIJ PO ZAKOŃCZENIU (@wydanie): rozmowa właśnie zniknęła
+               z listy i z ekranu, więc pomyłki nie widać. Cofnięcie to ta sama
+               „Otwórz ponownie", która stoi w nagłówku — plus powrót do niej. */
+            setDoCofniecia({ klucz: Date.now(), opis: <>Zakończono rozmowę z <b>{klient}</b></>,
+              cofnij: () => {
+                otworz.mutate({ id, zCofniecia: true }, { onError: (e) => setBladStatusu((e as Error).message) });
+                nawiguj(`/obsluga/skrzynka/${id}`);
+              } });
           },
           onError: (e) => setBladStatusu((e as Error).message),
         });
@@ -635,8 +659,14 @@ export function Skrzynka() {
       <Blad>{blad || (lista.error as Error | null)?.message}</Blad>
     </div>
 
+    <Cofniecie wpis={doCofniecia} onZamknij={() => setDoCofniecia(null)} />
     <Odlozone lista={odlozone}
-      onCofnij={(k) => { const w = odlozone.find((o) => o.klucz === k); if (w) wrocDo(w); }}
+      onCofnij={(k) => {
+        const w = odlozone.find((o) => o.klucz === k);
+        /* Wpis do pomiaru tarcia (@wydanie) — tylko przy „Cofnij". „Wróć"
+           po błędzie wysyłki to nie pomyłka agenta, tylko Allegro. */
+        if (w) { zglosCofnietaWysylke(w.rozmowaId); wrocDo(w); }
+      }}
       onWroc={(k) => { const w = odlozone.find((o) => o.klucz === k); if (w) wrocDo(w, w.blad); }}
       onZamknij={usunOdlozona} />
   </div>;

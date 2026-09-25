@@ -10,6 +10,7 @@ import { Strefa } from "../analiza/Strefa";
 import { ZakresObslugi } from "../analiza/ZakresObslugi";
 import { ZakresUzycia } from "../analiza/ZakresUzycia";
 import { MiaryObslugi } from "../analiza/MiaryObslugi";
+import { TarcieSkrzynki } from "../analiza/TarcieSkrzynki";
 import { ZakresTygodnia } from "../analiza/ZakresTygodnia";
 
 /* ── ANALIZA (0.440.0) ───────────────────────────────────────────────────
@@ -105,6 +106,9 @@ export function Analiza() {
       {zakres === "tydzien" && <ZakresTygodnia />}
       {zakres === "obsluga" && <>
         {obsluga.data && <ZakresObslugi a={obsluga.data} />}
+        {/* Tarcie zaraz pod czasem odpowiedzi: tamto mówi, jak szybko,
+            to — ile kosztował sam ekran (@wydanie). */}
+        <TarcieSkrzynki dni={okna.obsluga} />
         <MiaryObslugi dni={okna.obsluga} />
       </>}
       {zakres === "uzycie" && uzycie.data && <ZakresUzycia r={uzycie.data} />}
