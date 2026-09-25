@@ -712,7 +712,7 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
       COALESCE(SUM(wyszukiwania),0) AS wyszukiwania
     FROM copilot_wywolanie WHERE model <> '' GROUP BY model`)
     .all() as Array<Record<string, string | number>>;
-  /* Wyszukiwania w sieci (@wydanie) płaci się od sztuki — bez nich pomiar
+  /* Wyszukiwania w sieci (0.507.0) płaci się od sztuki — bez nich pomiar
      zaniżałby koszt pasowania z sieci o większą część rachunku. */
   const usd = perModel.reduce((suma, m) => suma + kosztUsd(String(m.model), {
     wej: Number(m.wej), wyj: Number(m.wyj),

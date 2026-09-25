@@ -38,7 +38,7 @@ test("jedna klasyfikacja kosztuje ułamek centa, a nie zero", () => {
   assert.ok(jedno < 0.05, `jedno wywołanie ma kosztować grosze, a kosztuje ${jedno}`);
 });
 
-test("wyszukiwanie w sieci kosztuje cent od sztuki, niezależnie od modelu (@wydanie)", () => {
+test("wyszukiwanie w sieci kosztuje cent od sztuki, niezależnie od modelu (0.507.0)", () => {
   const bez = kosztUsd("claude-opus-5", { wej: 1000, wyj: 100, cacheZapis: 0, cacheOdczyt: 0 });
   const z = kosztUsd("claude-opus-5", { wej: 1000, wyj: 100, cacheZapis: 0, cacheOdczyt: 0, wyszukiwania: 3 });
   assert.equal(Number((z - bez).toFixed(6)), 0.03);

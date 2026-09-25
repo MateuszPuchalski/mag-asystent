@@ -597,7 +597,7 @@ export type WymianaCopilota = {
   model: string;
   at: string;
   przez: string;
-  /** Po co model sięgnął do bazy (@wydanie). Brak = starszy serwer albo nie sięgał. */
+  /** Po co model sięgnął do bazy (0.507.0). Brak = starszy serwer albo nie sięgał. */
   narzedzia?: UzycieNarzedziaCopilota[];
 };
 

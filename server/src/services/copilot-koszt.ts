@@ -25,7 +25,7 @@ const NAJDROZSZY = { wej: 5, wyj: 25 };
 const MNOZNIK_CACHE_ODCZYT = 0.1;
 const MNOZNIK_CACHE_ZAPIS = 1.25;
 
-/* Wyszukiwanie w sieci (@wydanie): 10 dolarów za tysiąc zapytań, NIEZALEŻNIE
+/* Wyszukiwanie w sieci (0.507.0): 10 dolarów za tysiąc zapytań, NIEZALEŻNIE
    od modelu — stąd stała obok cennika, a nie pole w nim. Pobranie strony
    (`web_fetch`) osobnej opłaty nie ma; płaci się za jej tokeny. */
 const USD_ZA_WYSZUKIWANIE = 0.01;

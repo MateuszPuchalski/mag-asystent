@@ -9,7 +9,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-si
 process.env.SGT_MODE = "seeded";
 process.env.LOG_LEVEL = "silent";
 
-/* ── Pasowanie z sieci (@wydanie) ────────────────────────────────────────────
+/* ── Pasowanie z sieci (0.507.0) ────────────────────────────────────────────
    Właściciel: „bądź ostrożny, nie chcę dostać bana na Allegro. Z innych stron
    możesz ściągnąć". Testy pilnują czterech granic:
 

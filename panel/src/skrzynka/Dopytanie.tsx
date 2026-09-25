@@ -17,7 +17,7 @@ const NAZWY: Record<string, string> = {
 };
 
 /**
- * CO COPILOT SPRAWDZIŁ W BAZIE (@wydanie). Jedna linijka pod odpowiedzią.
+ * CO COPILOT SPRAWDZIŁ W BAZIE (0.507.0). Jedna linijka pod odpowiedzią.
  * Odpowiedź „nie pasuje” po sprawdzeniu pasowania waży co innego niż ta sama
  * odpowiedź z pamięci modelu — i agent ma to widzieć, zanim uwierzy.
  * Brak linijki znaczy „nie sięgał”, więc pusta lista nie rysuje nic.
