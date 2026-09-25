@@ -16,5 +16,8 @@ nie adres sklepu. Propozycja przechodzi tylko wtedy, gdy model przeczytał
 stronę, cytat stoi na niej dosłownie, a strona zawiera nasz numer.
 
 Domyślnie wyłączone: `PASOWANIE_Z_SIECI=1` w `wertis.env`, sufit
-`PASOWANIE_Z_SIECI_NA_NOC` (domyślnie 10 kartotek). Pomiar Copilota i raport
+`PASOWANIE_Z_SIECI_NA_NOC` (domyślnie 10 kartotek). Automat można też
+uruchomić od razu: Wiedza → „Z opisów i ofert” → karta „Pasowanie z sieci”
+→ „Sprawdź teraz” (trzy kartoteki, po jednej, z przyciskiem „Zatrzymaj”).
+Ręczny przebieg liczy się do tego samego sufitu co noc. Pomiar Copilota i raport
 tygodnia doliczają teraz wyszukiwania, płatne po jednym cencie od sztuki.

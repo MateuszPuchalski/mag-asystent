@@ -2140,3 +2140,27 @@ export type NowePasowanie = {
   /** Obecność mówi serwerowi, że propozycja idzie z pracy (`dobor`), nie z ekranu Wiedza (`reczne`). */
   conversationId?: number | null;
 };
+
+/* ── Pasowanie z sieci (@wydanie) ─────────────────────────────────────────────
+   Kształt z `services/pasowanie-z-sieci.ts`. Automat szuka pasowania części na
+   stronach SPOZA Allegro i składa wyłącznie propozycje do kolejki Wiedzy. */
+export type PowodOdrzuceniaSieci =
+  | "zly_adres" | "allegro" | "strona_nieprzeczytana" | "cytat_spoza_strony"
+  | "model_spoza_cytatu" | "marka_spoza_strony" | "numer_spoza_strony" | "za_krotki_model";
+export type OstatniPrzebiegSieci = {
+  symbol: string; at: string; wynik: "ok" | "blad"; znalezisk: number; zaproponowano: number;
+  odrzucone: Partial<Record<PowodOdrzuceniaSieci, number>>; blad: string | null;
+};
+export type StanPasowaniaZSieci = {
+  /** `null` = można uruchomić; inaczej zdanie, czego brakuje. */
+  niegotowy: string | null;
+  naNoc: number;
+  sprawdzono: number;
+  doSprawdzenia: number;
+  ostatnie: OstatniPrzebiegSieci[];
+};
+export type WynikPrzebieguSieci = {
+  sprawdzono: number; zaproponowano: number; bledow: number;
+  odrzucono: Partial<Record<PowodOdrzuceniaSieci, number>>;
+  przerwane: string | null;
+};

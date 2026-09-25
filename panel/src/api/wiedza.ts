@@ -5,7 +5,7 @@ import type {
   AliasSilnika, Identyfikator, ImportOdsylaczy, ImportWykazu, MapowanieWykazu, PrzegladWykazu, RaportWykazu,
   SprawdzenieOfert, StanPasujeDo, WynikListyOfert, WynikPartiiPasujeDo, KandydatZamiennosci, LukaSilnika, MapowanieOdsylaczy, ModelUrzadzenia, ModelZOpisu, NowaPropozycja, NowePasowanie,
   NowaZabudowa, Pasowanie, PasowaniaTowaru, PowodNegatywny, RaportImportuOdsylaczy, RodzajDowodu,
-  RodzajIdentyfikatora, SiecWiedzy, TrescImportu,
+  RodzajIdentyfikatora, SiecWiedzy, StanPasowaniaZSieci, TrescImportu, WynikPrzebieguSieci,
   TokenSilnika, Zabudowa, Zamiennosc, Zastosowanie,
 } from "./typy";
 
@@ -27,6 +27,7 @@ export const kluczeWiedzy = {
   odsylacze: ["wiedza", "odsylacze"] as const,
   wykazy: ["wiedza", "wykazy"] as const,
   pasujeDo: ["wiedza", "pasuje-do"] as const,
+  pasowanieZSieci: ["wiedza", "pasowanie-z-sieci"] as const,
 };
 
 /**
@@ -385,6 +386,23 @@ export function useSpiszOferty() {
 export function useZbierzPasujeDo() {
   return useMutation({
     mutationFn: () => api<WynikPartiiPasujeDo>(`/api/obsluga/wiedza/pasuje-do/zbierz`, { method: "POST" }),
+  });
+}
+
+/* ── Pasowanie z sieci (@wydanie): stan (odczyt) i jedna kartoteka na żądanie ─ */
+export function usePasowanieZSieci() {
+  return useQuery({
+    queryKey: kluczeWiedzy.pasowanieZSieci,
+    queryFn: () => api<StanPasowaniaZSieci>(`/api/obsluga/wiedza/pasowanie-z-sieci`),
+  });
+}
+
+/* Bez odświeżania po każdym kroku, jak przy zbiórce: ekran woła w pętli
+   i odświeża wiedzę sam, gdy przebieg się skończy. */
+export function useSprawdzZSieci() {
+  return useMutation({
+    mutationFn: () => api<{ wynik: WynikPrzebieguSieci; stan: StanPasowaniaZSieci }>(
+      `/api/obsluga/wiedza/pasowanie-z-sieci/sprawdz`, { method: "POST" }),
   });
 }
 

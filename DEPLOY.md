@@ -2916,6 +2916,12 @@ Rachunek stoi na karcie „Copilot” w ustawieniach, pod zadaniem
 `pasowanie_siec`. Nie podnoś sufitu, zanim nie przejrzysz pierwszych
 propozycji w Wiedzy.
 
+Żeby nie czekać na noc: Wiedza → „Z opisów i ofert” → karta „Pasowanie
+z sieci” → „Sprawdź teraz”. Przycisk sprawdza trzy kartoteki, po jednej,
+i da się go zatrzymać. Ręczny przebieg liczy się do tego samego sufitu,
+więc klikanie nie wyda więcej niż jedna noc. Karta pokazuje też, czego
+brakuje, gdy automat jest wyłączony, i ostatnie sprawdzone kartoteki.
+
 ### Aktualizacja do 0.495.0 — bez ponownego pytania i test na żywym Allegro
 
 **Panel trzeba przebudować, a serwer zrestartować.** Tabela
