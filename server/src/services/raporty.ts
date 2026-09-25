@@ -23,6 +23,23 @@ import { czasLokalny, dataLokalna } from "../czas.js";
  */
 export const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(days)))} days`;
 
+/**
+ * Granica okna w formacie znaczników w bazie — ISO z `T` i `Z`. Parametrem
+ * jest modyfikator z `OKNO` albo stały, np. `'-1 day'`.
+ *
+ * NIE `datetime('now', ?)`. `datetime()` zwraca `'2026-08-11 19:59:47'` ze
+ * SPACJĄ, a znaczniki mają `'T'` (0x54 > 0x20). Porównanie tekstowe
+ * `'2026-08-11T00:05:00.000Z' >= datetime('now','-30 days')` daje PRAWDĘ,
+ * choć 00:05 jest wcześniej niż 19:59. Okno z `>=` było więc do doby
+ * SZERSZE, niż deklaruje, a z `<` — do doby WĘŻSZE.
+ *
+ * Mieszkała w `skutecznosc-doboru.ts` od 0.267.0, a `problems.ts` miał
+ * własną kopię. Reszta raportów dalej porównywała z `datetime()`, więc
+ * „7 dni" w Analizie liczyło do ośmiu, także w raporcie per osoba
+ * (@wydanie). Jedna definicja tutaj, bo trzecia kopia by się rozjechała.
+ */
+export const GRANICA_OKNA = "strftime('%Y-%m-%dT%H:%M:%fZ','now',?)";
+
 /** Zdarzenia liczone jako wykonana pozycja — wspólne dla obu raportów
     i dla raportu tygodnia (`raport-tygodnia.ts`), stąd eksport. */
 export const PRACA = ["putaway_line_done", "putaway_confirm", "location_set", "location_removed"];
@@ -100,7 +117,7 @@ export function metrics(days = 7): Metrics {
   const d = db();
 
   const zdarzen = (
-    d.prepare("SELECT COUNT(*) n FROM events WHERE created_at >= datetime('now', ?)").get(od) as {
+    d.prepare(`SELECT COUNT(*) n FROM events WHERE created_at >= ${GRANICA_OKNA}`).get(od) as {
       n: number;
     }
   ).n;
@@ -111,7 +128,7 @@ export function metrics(days = 7): Metrics {
       d
         .prepare(
           `SELECT COUNT(*) n FROM events
-           WHERE created_at >= datetime('now', ?) AND type IN (${types.map(() => "?").join(",")})`
+           WHERE created_at >= ${GRANICA_OKNA} AND type IN (${types.map(() => "?").join(",")})`
         )
         .get(od, ...types) as { n: number }
     ).n;
@@ -124,7 +141,7 @@ export function metrics(days = 7): Metrics {
     d
       .prepare(
         `SELECT COUNT(*) AS n FROM events
-         WHERE created_at >= datetime('now', ?)
+         WHERE created_at >= ${GRANICA_OKNA}
            AND type IN (${PRACA.map(() => "?").join(",")})
            AND ${bezDubli("")}`
       )
@@ -136,7 +153,7 @@ export function metrics(days = 7): Metrics {
     d
       .prepare(
         `SELECT json_extract(payload,'$.ms') AS ms FROM events
-         WHERE type = 'scan_timing' AND created_at >= datetime('now', ?)`
+         WHERE type = 'scan_timing' AND created_at >= ${GRANICA_OKNA}`
       )
       .all(od) as Array<{ ms: number | null }>
   )
@@ -153,7 +170,7 @@ export function metrics(days = 7): Metrics {
               SUM(CASE WHEN type='manual_entry' THEN 1 ELSE 0 END) AS reczne,
               COUNT(*) AS razem
        FROM events
-       WHERE type IN ('scan','manual_entry') AND created_at >= datetime('now', ?)
+       WHERE type IN ('scan','manual_entry') AND created_at >= ${GRANICA_OKNA}
        GROUP BY code, kind
        HAVING reczne > 0
        ORDER BY reczne DESC
@@ -285,7 +302,7 @@ export function raportWydajnosci(days = 7): RaportWydajnosci {
               SUM(CASE WHEN e.type = 'manual_entry'   THEN 1 ELSE 0 END)  AS reczne
          FROM events e
          JOIN app_user u ON u.user_id = e.user_ref
-        WHERE e.created_at >= datetime('now', ?)
+        WHERE e.created_at >= ${GRANICA_OKNA}
         GROUP BY e.user_ref, u.name
         ORDER BY pozycje DESC, u.name`
     )
@@ -305,7 +322,7 @@ export function raportWydajnosci(days = 7): RaportWydajnosci {
   for (const r of d
     .prepare(
       `SELECT user_ref AS ref, created_at FROM events
-        WHERE user_ref IS NOT NULL AND created_at >= datetime('now', ?)
+        WHERE user_ref IS NOT NULL AND created_at >= ${GRANICA_OKNA}
           AND type IN (${PRACA.map(() => "?").join(",")})
           AND ${bezDubli("")}`
     )
@@ -320,7 +337,7 @@ export function raportWydajnosci(days = 7): RaportWydajnosci {
   const nieprzypisanych = (
     d
       .prepare(
-        "SELECT COUNT(*) n FROM events WHERE user_ref IS NULL AND created_at >= datetime('now', ?)"
+        `SELECT COUNT(*) n FROM events WHERE user_ref IS NULL AND created_at >= ${GRANICA_OKNA}`
       )
       .get(od) as { n: number }
   ).n;
@@ -439,7 +456,7 @@ export function analiza(days = 7, zWydajnoscia = true): AnalizaAudytu {
   const zdarzenia = d
     .prepare(
       `SELECT created_at, type IN (${PRACA.map(() => "?").join(",")}) AND ${bezDubli("")} AS praca
-         FROM events WHERE created_at >= datetime('now', ?)`
+         FROM events WHERE created_at >= ${GRANICA_OKNA}`
     )
     .all(...PRACA, od) as Array<{ created_at: string; praca: number }>;
 
@@ -468,7 +485,7 @@ export function analiza(days = 7, zWydajnoscia = true): AnalizaAudytu {
       `SELECT opened_at, closed_at,
               (SELECT COUNT(*) FROM delivery_line l WHERE l.delivery_id = delivery.id) AS pozycji
          FROM delivery
-        WHERE status = 'done' AND closed_at >= datetime('now', ?)`
+        WHERE status = 'done' AND closed_at >= ${GRANICA_OKNA}`
     )
     .all(od) as Array<{ opened_at: string; closed_at: string; pozycji: number }>;
   const czasy = zamkniete
@@ -479,8 +496,8 @@ export function analiza(days = 7, zWydajnoscia = true): AnalizaAudytu {
   const problemy = d
     .prepare(
       `SELECT
-         SUM(CASE WHEN created_at >= datetime('now', ?) THEN 1 ELSE 0 END) AS zgloszone,
-         SUM(CASE WHEN resolved_at >= datetime('now', ?) THEN 1 ELSE 0 END) AS rozwiazane,
+         SUM(CASE WHEN created_at >= ${GRANICA_OKNA} THEN 1 ELSE 0 END) AS zgloszone,
+         SUM(CASE WHEN resolved_at >= ${GRANICA_OKNA} THEN 1 ELSE 0 END) AS rozwiazane,
          SUM(CASE WHEN resolved_at IS NULL THEN 1 ELSE 0 END) AS otwarte
        FROM problem`
     )
@@ -491,7 +508,7 @@ export function analiza(days = 7, zWydajnoscia = true): AnalizaAudytu {
     .prepare(
       `SELECT lower(json_extract(payload,'$.q')) AS q, COUNT(*) AS ile
          FROM events
-        WHERE type = 'search' AND created_at >= datetime('now', ?)
+        WHERE type = 'search' AND created_at >= ${GRANICA_OKNA}
           AND json_extract(payload,'$.q') IS NOT NULL
         GROUP BY lower(json_extract(payload,'$.q'))
         ORDER BY ile DESC, q LIMIT 15`
@@ -503,7 +520,7 @@ export function analiza(days = 7, zWydajnoscia = true): AnalizaAudytu {
     .prepare(
       `SELECT lower(json_extract(payload,'$.q')) AS q, COUNT(*) AS ile
          FROM events
-        WHERE type = 'search' AND created_at >= datetime('now', ?)
+        WHERE type = 'search' AND created_at >= ${GRANICA_OKNA}
           AND json_extract(payload,'$.wynikow') = 0
         GROUP BY lower(json_extract(payload,'$.q'))
         ORDER BY ile DESC, q LIMIT 15`
@@ -519,7 +536,7 @@ export function analiza(days = 7, zWydajnoscia = true): AnalizaAudytu {
               SUM(CASE WHEN type = 'klient_odrzucona' THEN 1 ELSE 0 END) AS odrzucone,
               COUNT(*) AS zdarzen
          FROM events
-        WHERE device_id IS NOT NULL AND created_at >= datetime('now', ?)
+        WHERE device_id IS NOT NULL AND created_at >= ${GRANICA_OKNA}
         GROUP BY device_id
         ORDER BY upadki DESC, odrzucone DESC, zdarzen DESC LIMIT 20`
     )

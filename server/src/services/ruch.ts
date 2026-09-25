@@ -1,4 +1,4 @@
-/* ── Ostatni ruch człowieka (@wydanie) ───────────────────────────────────────
+/* ── Ostatni ruch człowieka (0.494.0) ───────────────────────────────────────
    Aktualizacja automatyczna zatrzymuje serwer na minutę lub dwie, więc czeka,
    aż nikt nie pracuje. „Ruch" to ZAPIS z sesją, nie dowolne żądanie: panel
    zostawiony otwarty na biurku odpytuje kolejki całą noc i przy liczeniu

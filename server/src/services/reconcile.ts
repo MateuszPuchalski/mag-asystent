@@ -36,13 +36,17 @@ export interface Rekoncyliacja {
   rozjazdy: Rozjazd[];
 }
 
+/* Granice w tym pliku piszemy `strftime(…'Z'…)`, nie `datetime()`: znaczniki
+   kolejki mają `T`, a `datetime()` spację, więc `<` gubiło dobę graniczną.
+   Powód przy `GRANICA_OKNA` w `raporty.ts` (@wydanie). */
+
 /** 1. Adres w Subiekcie vs ostatni udany zapis aplikacji (24 h). */
 function lokalizacje(): { rozjazdy: Rozjazd[]; sprawdzono: number } {
   const zadania = db()
     .prepare(
       `SELECT tw_id, payload, MAX(processed_at) AS at FROM sfera_queue
        WHERE type='set_location' AND status='done' AND tw_id IS NOT NULL
-         AND processed_at >= datetime('now','-1 day')
+         AND processed_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')
        GROUP BY tw_id`
     )
     .all() as Array<{ tw_id: number; payload: string; at: string }>;
@@ -82,7 +86,7 @@ function zadaniaWBledzie(): Rozjazd[] {
   const rows = db()
     .prepare(
       `SELECT id, type, label, error_msg, processed_at FROM sfera_queue
-       WHERE status='error' AND processed_at < datetime('now','-1 day')
+       WHERE status='error' AND processed_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 day')
        ORDER BY id`
     )
     .all() as Array<{
@@ -105,7 +109,7 @@ function utknieteWBuforze(): Rozjazd[] {
   const rows = db()
     .prepare(
       `SELECT id, label, source_doc_id, created_at FROM sfera_queue
-       WHERE status='waiting_for_doc' AND created_at < datetime('now','-3 days')
+       WHERE status='waiting_for_doc' AND created_at < strftime('%Y-%m-%dT%H:%M:%fZ','now','-3 days')
        ORDER BY id`
     )
     .all() as Array<{ id: number; label: string; source_doc_id: number | null; created_at: string }>;

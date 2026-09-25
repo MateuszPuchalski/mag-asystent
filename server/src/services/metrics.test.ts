@@ -91,3 +91,13 @@ test("okno jest ograniczone — brak wstrzyknięcia przez parametr", () => {
   assert.doesNotThrow(() => metrics(99999));
   assert.doesNotThrow(() => metrics(-5));
 });
+
+/* Granica okna w formacie bazy (@wydanie). Zdarzenie sekundę sprzed
+   granicy siedmiu dni leży tej samej doby co granica. Porównane z
+   `datetime('now','-7 days')` (spacja) wchodziło, bo `'T'` > `' '`
+   — „7 dni" liczyło do ośmiu. Znacznik jak z produkcji: ISO z `T` i `Z`. */
+test("zdarzenie tuż sprzed okna nie wchodzi do okna", () => {
+  db().prepare(`INSERT INTO events(type, user_id, created_at)
+      VALUES ('scan', 'test', strftime('%Y-%m-%dT%H:%M:%fZ','now','-7 days','-1 seconds'))`).run();
+  assert.equal(metrics(7).zdarzen, 0);
+});

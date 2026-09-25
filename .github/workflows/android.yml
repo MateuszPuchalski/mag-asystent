@@ -152,7 +152,7 @@ jobs:
         run: |
           wersja=$(node -p "require('./package.json').version")
           tag="v$wersja"
-          # Od @wydanie numer nadaje `wydanie.yml`, a scalenie PR-a wchodzi na
+          # Od 0.494.0 numer nadaje `wydanie.yml`, a scalenie PR-a wchodzi na
           # main ZE STARYM numerem. Publikujemy tylko wtedy, gdy tag tej wersji
           # wskazuje ten commit albo jeszcze go nie ma — inaczej `--clobber`
           # podmieniłby pliki poprzedniego wydania kodem, którego ono nie ma.

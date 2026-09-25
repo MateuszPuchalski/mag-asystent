@@ -93,7 +93,7 @@ export const config = {
   },
 
   /**
-   * Aktualizacja automatyczna (@wydanie), `services/aktualizacja-auto.ts`.
+   * Aktualizacja automatyczna (0.494.0), `services/aktualizacja-auto.ts`.
    *
    * Dev dostaje każde wydanie od razu i jest kanarkiem; produkcja czeka na
    * okno nocne i na wydanie starsze niż `dojrzaloscGodz`. Stąd różne
