@@ -155,7 +155,7 @@ export function Dostawy() {
 
   /* Stopka mówi, GDZIE KOŃCZY SIĘ TO, NA CO PATRZYSZ. Obcięte archiwum
      wygląda z ekranu jak pełne — a to jest dokładnie ta pomyłka, po której
-     ktoś orzeka, że faktury nie ma. */
+     ktoś orzeka, że faktury nie ma. Stoi w paśmie nad listą, obok pytania. */
   const stopka = kubelek === "archiwum"
     ? archiwum.data && (archiwum.data.ile > archiwum.data.documents.length
         ? `pokazano ${archiwum.data.documents.length} z ${archiwum.data.ile} — zawęź wyszukiwaniem`
@@ -168,9 +168,8 @@ export function Dostawy() {
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
-        <div className="flex shrink-0 items-center gap-2 px-4 pt-3">
-          <Truck size={18} /><b className="text-naglowek">Dostawy</b>
-        </div>
+        {/* Tytuł „Dostawy" zszedł (@wydanie), bo powtarzał zakładkę nawigacji,
+            która stoi podświetlona nad ekranem — wiersz wraca do kolejki. */}
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">
           <FiltrSegmentowy<KubelekDostaw> wybrany={kubelek} onWybierz={setKubelek}
             pozycje={KUBELKI_DOSTAW.map((k) => ({ klucz: k.id, etykieta: k.etykieta, ile: liczniki[k.id],
@@ -181,11 +180,15 @@ export function Dostawy() {
             placeholder={kubelek === "archiwum" ? "Szukaj w archiwum: numer albo dostawca" : "Numer albo dostawca"}
             aria-label="Szukaj dostawy" />
         </div>
-        <div className="shrink-0 border-y border-slate-200 bg-slate-50 px-2 py-1">
-          <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
+        {/* PYTANIE KUBEŁKA I STOPKA W JEDNYM PAŚMIE (@wydanie). Stały dwoma
+            cienkimi paskami, nad listą i pod nią, a mówiły o tej samej liście:
+            „co z nią zrobić" i „gdzie się kończy". Granica okna stoi teraz NAD
+            listą, więc ucięte archiwum widać, zanim zacznie się ją czytać. */}
+        <div className="flex shrink-0 flex-wrap items-baseline gap-x-3 border-y border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
+          <span className="font-semibold">{opis?.pytanie}</span>
+          <span className="ml-auto">{stopka}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
-        <p className="shrink-0 border-t border-slate-200 px-3 py-1.5 text-xs text-slate-600">{stopka}</p>
         <Blad>{lista.error ? (lista.error as Error).message : ""}</Blad>
       </Karta>
 
