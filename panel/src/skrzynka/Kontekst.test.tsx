@@ -85,7 +85,7 @@ describe("kolumna kontekstu", () => {
     onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
   const wiersz = (nazwa: RegExp) => screen.getByRole("button", { name: nazwa });
 
-  /* ── Ciemny kokpit (@wydanie) ──────────────────────────────────────────────
+  /* ── Ciemny kokpit (0.498.0) ──────────────────────────────────────────────
      W normie temat to jedna linia ze streszczeniem, a treść czeka pod
      kliknięciem. Świeci tylko to, co ma zegar albo czeka na ruch agenta. */
   it("zamówienie w normie to jedna linia; treść po kliknięciu", async () => {
@@ -146,7 +146,7 @@ describe("kolumna kontekstu", () => {
     expect(screen.queryByText(/nie jest powiązana z ofertą/)).toBeNull();
   });
 
-  /* Zakładek nie ma od @wydanie. „Oferta" i „Towar" zostają JEDNYM tematem
+  /* Zakładek nie ma od 0.498.0. „Oferta" i „Towar" zostają JEDNYM tematem
      (0.198.0), a dobór, klient i wiedza mają własne wiersze. */
   it("każdy temat ma wiersz, a dobór działa nawet bez oferty", async () => {
     rysuj(dane({ oferta: null }));
@@ -183,7 +183,7 @@ describe("kolumna kontekstu", () => {
     historia.data = undefined; wiedza.data = undefined;
   });
 
-  /* ── Bramka doboru (@wydanie, E z kanwy) ───────────────────────────────────
+  /* ── Bramka doboru (0.498.0, E z kanwy) ───────────────────────────────────
      Nagranie: klient zwracał kupiony nóż 14-25001, a dobór szukał po wymiarach
      i pokazał świecę, sprężynę i przewody paliwa — bez kupionego towaru. */
   const znany = (n: Partial<OsRozmowy["dobor"]> = {}) => dane({

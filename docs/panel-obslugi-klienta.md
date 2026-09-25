@@ -676,7 +676,7 @@ przewijają nawzajem. Trzyma się on, dopóki obie karty są wysokie. „Dobór"
 zostaje osobno, bo to nie karta faktów, tylko robota z własnymi krokami
 i przyciskami.
 
-**Od @wydanie zakładek nie ma: kolumna jest ciemnym kokpitem.** Nagranie
+**Od 0.498.0 zakładek nie ma: kolumna jest ciemnym kokpitem.** Nagranie
 właściciela pokazało cztery zakładki i trzy kłopoty. Nazwa towaru stała cztery
 razy, a SKU sześć. Zwrot do decyzji, jedyna rzecz z terminem, leżał w połowie
 przewijania. „Klient 2" i „Wiedza 0" niosły po zdaniu na całą kolumnę.
@@ -4081,7 +4081,7 @@ Wszystkie rozmowy kupującego pokazuje historia klienta.
 **W drugą stronę: zwrot przy rozmowie (0.221.0).** Klient często pyta pod
 zamówieniem o zwrot, którego dokonał — „czy paczka doszła", „kiedy pieniądze".
 Do 0.220.0 agent szedł na ekran Zwroty i szukał zwrotu ręcznie. Teraz zwroty
-tego zamówienia stoją w kolumnie kontekstu — od @wydanie w toku na górze, w „Wymaga Ciebie" — tym samym
+tego zamówienia stoją w kolumnie kontekstu — od 0.498.0 w toku na górze, w „Wymaga Ciebie" — tym samym
 mostkiem i tym samym składem wiersza, co w kolejce zwrotów: kubełek, sygnały,
 termin, paczka, pozycje, decyzja i kwota. Praca nad zwrotem zostaje na ekranie
 Zwroty; odnośnik prowadzi prosto do tego zwrotu. Po loginie nie dobieramy —
@@ -6111,7 +6111,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Kolejność listy rozmów — przełącznik „od najnowszych" | **działa** od 0.215.0 | `skrzynka/Kolejka.tsx`, `odNajnowszych`; domyślnie PILNE i najdłużej czekające |
 | Nazwa towaru przy ofercie w rozmowie | **z oferty** od 0.178.0 | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
 | Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie; od 0.219.0 jedno trafienie po SKU bez „Zatwierdź" |
-| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`; od @wydanie bez zakładek: „Wymaga Ciebie" i wiersze „W normie" (`skrzynka/kokpit.ts`) |
+| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`; od 0.498.0 bez zakładek: „Wymaga Ciebie" i wiersze „W normie" (`skrzynka/kokpit.ts`) |
 | Opis kartoteki przy rozmowie | **działa** od 0.198.0 | `skrzynka/TowarRozmowy.tsx`, pole `desc` z `/api/products/:twId` |
 | Wiersz kolejki wg §10.2 | **częściowo** od 0.181.0 | priorytet, czas oczekiwania, dopiski, zadanie, od E1 status doboru; bez terminu |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |

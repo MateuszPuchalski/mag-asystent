@@ -1,6 +1,6 @@
 import type { Kubelek, OsRozmowy, StatusDoboru, Zwrot } from "../api/typy";
 
-/* ── CIEMNY KOKPIT: CO W KOLUMNIE KONTEKSTU ŚWIECI (@wydanie) ────────────────
+/* ── CIEMNY KOKPIT: CO W KOLUMNIE KONTEKSTU ŚWIECI (0.498.0) ────────────────
    Zgłoszenie właściciela z nagraniem prawej kolumny: „uporządkuj ten panel".
    Na nagraniu nazwa towaru stała cztery razy, SKU sześć, a jedyna rzecz,
    która czekała na człowieka — zwrot do decyzji — leżała w połowie przewijania,

@@ -341,7 +341,7 @@ function brakBrutto(c: CenaPoziomu): boolean {
   return c.bruttoGrosze === null || c.bruttoGrosze === 0;
 }
 
-/* ── CENY NA JEDNEJ OSI (@wydanie, D z kanwy „prawa kolumna") ────────────────
+/* ── CENY NA JEDNEJ OSI (0.498.0, D z kanwy „prawa kolumna") ────────────────
    Nagranie właściciela: oferta sprzedawała nóż za 45,00 zł, a detaliczna
    w kartotece to 29,06 zł — o 55% mniej. Tabela sześciu cen tego nie mówiła,
    bo cena oferty stała trzy sekcje wyżej, a porównanie trzeba było zrobić
@@ -399,7 +399,7 @@ export function CenyKartoteki({ ceny, ramka = true, oferta = null }: {
      GT", więc ramka i drugi podpis źródła byłyby pudełkiem w pudełku.
      Reklamacje stawiają blok samodzielnie i ramkę zostawiają. */
   ramka?: boolean;
-  /** Cena oferty rozmowy — wtedy pod listą staje oś (@wydanie). Reklamacje jej nie podają. */
+  /** Cena oferty rozmowy — wtedy pod listą staje oś (0.498.0). Reklamacje jej nie podają. */
   oferta?: { grosze: number; waluta: string } | null;
 }) {
   if (ceny.length === 0) return null;

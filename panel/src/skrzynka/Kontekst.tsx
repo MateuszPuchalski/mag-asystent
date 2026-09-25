@@ -28,7 +28,7 @@ import { bramkaDoboru, coSwieci, doborWToku, paczkaOdchylenie, pozycjiDoWskazani
  * nad osią: cztery bloki jeden pod drugim spychały pytanie klienta poniżej
  * krawędzi okna, a to ono jest powodem, dla którego agent tu przyszedł.
  *
- * ZAKŁADEK JUŻ NIE MA (@wydanie) — patrz „Ciemny kokpit" niżej. Do tego
+ * ZAKŁADEK JUŻ NIE MA (0.498.0) — patrz „Ciemny kokpit" niżej. Do tego
  * wydania były cztery: „Oferta" i „Towar" zeszły się w jedną, a „Klient"
  * i „Wiedza" wróciły decyzją właściciela. Uzasadnienia tamtych decyzji
  * zostają poniżej, bo te same tematy żyją dziś jako wiersze.
@@ -70,7 +70,7 @@ import { bramkaDoboru, coSwieci, doborWToku, paczkaOdchylenie, pozycjiDoWskazani
  * pomiaru: dobór wstawia zdanie do szkicu i podstawia kartotekę do zlecenia
  * — obu rzeczy nie ma prawa robić po cichu.
  *
- * ── CIEMNY KOKPIT ZAMIAST ZAKŁADEK (@wydanie) ───────────────────────────────
+ * ── CIEMNY KOKPIT ZAMIAST ZAKŁADEK (0.498.0) ───────────────────────────────
  * Nagranie właściciela pokazało cztery zakładki i trzy kłopoty naraz. W „Ofercie
  * i towarze" nazwa towaru stała cztery razy, a zwrot do decyzji — jedyna
  * rzecz z terminem — w połowie przewijania. „Klient 2" i „Wiedza 0" niosły po
@@ -151,7 +151,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
   return <section className="card flex min-h-0 flex-col overflow-hidden" aria-label="Kontekst">
     {/* ── PASMO ODPOWIEDZI NAD KOLUMNĄ (0.404.0) ──────────────────────────────
         Trzy fakty, które rozstrzygają odpowiedź, stoją nad wszystkim innym.
-        Od @wydanie to także JEDYNE miejsce nazwy, SKU i stanu towaru —
+        Od 0.498.0 to także JEDYNE miejsce nazwy, SKU i stanu towaru —
         wiersze niżej ich nie powtarzają. Granice w `PasmoOdpowiedzi.tsx`. */}
     <PasmoOdpowiedzi dane={dane} />
 

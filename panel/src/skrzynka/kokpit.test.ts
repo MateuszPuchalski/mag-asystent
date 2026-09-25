@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { OsRozmowy } from "../api/typy";
 import { bramkaDoboru, coSwieci, towarOtwartyNaStart, towarZnany } from "./kokpit";
 
-/* ── Reguły ciemnego kokpitu (@wydanie) ──────────────────────────────────────
+/* ── Reguły ciemnego kokpitu (0.498.0) ──────────────────────────────────────
    Szara linia jest bezpieczna tylko wtedy, gdy reguła „w normie" nie kłamie.
    Dlatego każda reguła ma tu parę: stan, w którym gaśnie, i stan, w którym
    MUSI się zapalić. Test tylko z pierwszej połowy przepuściłby regułę, która

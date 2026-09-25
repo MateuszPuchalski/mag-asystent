@@ -330,7 +330,7 @@ describe("grupowanie cen", () => {
   });
 });
 
-/* ── Cena oferty na osi poziomów kartoteki (@wydanie) ────────────────────────
+/* ── Cena oferty na osi poziomów kartoteki (0.498.0) ────────────────────────
    Nagranie właściciela: oferta 45,00 zł przy detalicznej 29,06 zł, a tabela
    tego nie mówiła. Zdanie ma nazwać kierunek i skalę rozjazdu, a poziom bez
    ceny brutto (zakupowy) nie może udawać najniższej ceny. */

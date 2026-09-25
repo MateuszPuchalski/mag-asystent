@@ -132,7 +132,7 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
 
 /* Kody przewoźnika słowem, z perspektywy KLIENTA — paczka jedzie do niego.
    Słownik zwrotów mówi „w drodze do nas" i tu dałby zdanie odwrotne. Nieznany
-   kod stoi surowy, jak u przewoźnika. Eksport od @wydanie: wiersz zamówienia
+   kod stoi surowy, jak u przewoźnika. Eksport od 0.498.0: wiersz zamówienia
    w kolumnie kontekstu streszcza paczkę tymi samymi słowami. */
 export const STATUS: Record<string, string> = {
   PENDING: "czeka na nadanie",
