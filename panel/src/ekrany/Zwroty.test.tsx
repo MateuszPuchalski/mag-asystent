@@ -111,6 +111,7 @@ vi.mock("../api/zwroty", async () => {
     usePotwierdzKartoteke: () => atrapa("kartoteka"),
     useZwrot: () => ({ data: scena.szczegol, isLoading: false, error: null }),
     useZwrocPieniadze: () => atrapa("zwrocPieniadze"),
+    useOdmowPlatnosci: () => atrapa("odmowaPlatnosci"),
     /* Skan i dołożenie towaru jako atrapy: test sprawdza, KTÓRĄ drogą poszedł
        kod, a prawdziwe mutacje strzelałyby `fetch`-em w nieistniejący serwer. */
     useSkanZwrotu: () => {
@@ -1067,6 +1068,21 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
       .toEqual({ orderId: "ord-9", waybill: null });
     scena.wynikSkanu = null;
     scena.paczki = null;
+  });
+
+  it("nie odesłał: N odmawia w Allegro, potem odrzuca u nas — z gotowym powodem (0.505.0)", async () => {
+    /* Zgłoszenie właściciela przy 5ZRQ/2026, decyzja „zrób obie". */
+    scena.wolano.length = 0;
+    scena.zwroty = [{ ...zwrot(1, "decyzja", "5ZRQ/2026"), sygnaly: ["nie_odeslany"] }];
+    pokaz("/obsluga/zwroty/1");
+    expect(await screen.findByText(/przez 14 dni nie nadał paczki/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Wszystko OK/ })).toBeNull();
+    fireEvent.keyDown(window, { key: "n" });
+    await waitFor(() => expect(scena.wolano.map((w) => w.co)).toEqual(["odmowaPlatnosci", "werdykt"]));
+    expect(scena.wolano[0].dane).toMatchObject({ kod: "REFUND_REJECTED", wersja: 1 });
+    expect(scena.wolano[1].dane).toMatchObject({ decyzja: "odrzucony", wersja: 2 });
+    expect(scena.wolano[1].dane.powod).toBe(scena.wolano[0].dane.powod);
+    scena.zwroty = null;
   });
 
   it("etykieta zwrotu idzie do szukania, nie do koszyka", async () => {

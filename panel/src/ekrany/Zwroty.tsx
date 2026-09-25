@@ -26,6 +26,7 @@ import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
 import { polecanyKandydat } from "../zwroty/Dokument";
 import { SzybkiZwrot } from "../zwroty/SzybkiZwrot";
+import { NieOdeslany, POWOD_NIE_ODESLAL } from "../zwroty/NieOdeslany";
 import { pewnaPropozycja, szybkaSciezka } from "../zwroty/regulaSzybkiej";
 import { Szukanie } from "../zwroty/Szukanie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
@@ -746,6 +747,30 @@ export function Zwroty() {
     });
   };
 
+  /* ── KLIENT NIE ODESŁAŁ: ODMOWA JEDNYM RUCHEM (0.505.0) ──────────────
+     Najpierw odmowa w Allegro, potem werdykt u nas. Odwrotnie zwrot stałby
+     u nas jako odrzucony, a w Allegro dalej czekałby na wypłatę — i nic by
+     o tym nie przypominało. Odmowa, która nie przejdzie, nie zmienia niczego. */
+  const [nieOdeslany, setNieOdeslany] = useState<{ trwa: boolean; blad: string }>({ trwa: false, blad: "" });
+  const odmowNieOdeslanemu = () => {
+    if (!zwrot || !zwrot.sygnaly.includes("nie_odeslany") || nieOdeslany.trwa) return;
+    const z = zwrot;
+    setNieOdeslany({ trwa: true, blad: "" });
+    let odmowionoWAllegro = false;
+    void (async () => {
+      const o = await odmowaPlatnosci.mutateAsync(
+        { id: z.id, kod: "REFUND_REJECTED", powod: POWOD_NIE_ODESLAL, wersja: z.wersja });
+      odmowionoWAllegro = true;
+      await werdykt.mutateAsync(
+        { id: z.id, decyzja: "odrzucony", powod: POWOD_NIE_ODESLAL, wersja: o.wersja });
+    })().then(() => setNieOdeslany({ trwa: false, blad: "" }), (e: Error) => setNieOdeslany({
+      trwa: false,
+      blad: odmowionoWAllegro
+        ? `Odmowa poszła do Allegro, ale werdykt się nie zapisał: ${e.message} Odrzuć ręcznie (O).`
+        : `Allegro nie przyjęło odmowy: ${e.message}`,
+    }));
+  };
+
   /**
    * Klawisze KUBEŁKA — tabela §25a.2 wreszcie z nasłuchem (0.284.0).
    *
@@ -791,6 +816,12 @@ export function Zwroty() {
       return;
     }
     if (zwrot.kubelek === "decyzja") {
+      /* `N` — gotowa odmowa, tylko przy sygnale „nie odesłał" (0.505.0). */
+      if ((e.key === "n" || e.key === "N") && zwrot.sygnaly.includes("nie_odeslany")) {
+        e.preventDefault();
+        odmowNieOdeslanemu();
+        return;
+      }
       if (e.key === "p" || e.key === "P") {
         e.preventDefault();
         werdykt.mutate({ id: zwrot.id, decyzja: "przyjety", powod: null, wersja });
@@ -912,7 +943,10 @@ export function Zwroty() {
       if (zwrot.kubelek === "zwrot" && zwrot.kwotaGrosze !== null) return false;
       if (k === "-") return zwrot.pozycje.some((p) => p.ilosc > 1 && p.iloscZwrocona == null);
       return true;
-    });
+    })
+    /* `N` doklejany przy sygnale „nie odesłał" (0.505.0) — tak jak `R`. */
+    .concat(zwrot?.kubelek === "decyzja" && zwrot.sygnaly.includes("nie_odeslany")
+      ? [["N", "nie odesłał — odmów"] as const] : []);
   const pieniadzeCzekaja =
     Boolean(stanPieniedzy?.moznaZwrocic || stanPieniedzy?.moznaZapisacPrzelew);
 
@@ -1130,6 +1164,8 @@ export function Zwroty() {
                 operator zjechał na dziewiątą pozycję. */}
             <SzybkiZwrot zwrot={zwrot} stan={stanSzybkiej} trwa={szybka.trwa || trwa}
               blad={szybka.blad} onStart={szybkiZwrot} />
+            <NieOdeslany zwrot={zwrot} trwa={nieOdeslany.trwa || trwa}
+              blad={nieOdeslany.blad} onOdmow={odmowNieOdeslanemu} />
             <Decyzje zwrot={zwrot} trwa={trwa} blad={bladDecyzji} akcje={akcje}
               moznaZwrocic={Boolean(stanPieniedzy?.moznaZwrocic)}
               /* KURSOR SCHODZI PO TYCH DWÓCH DECYZJACH, i tylko po nich

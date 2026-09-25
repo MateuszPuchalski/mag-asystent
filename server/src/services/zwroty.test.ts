@@ -2319,3 +2319,38 @@ test("drugi zwrot gaśnie na zwrocie zamkniętym, ale odnośnik zostaje", () => 
   assert.equal(z.drugiZwrot?.id, nieodebrana);
   assert.ok(!z.sygnaly.includes("drugi_zwrot"));
 });
+
+/* ── Klient nie odesłał paczki (0.505.0) ────────────────────────────────────
+   Zgłoszenie właściciela przy zwrocie 5ZRQ/2026: odstąpienie zgłoszone
+   20 sierpnia, paczka nigdy nienadana. Pieniądze się nie należą. */
+
+test("po czternastu dniach bez nadanej paczki sygnał mówi „nie odesłał”, nie „nie nadana”", () => {
+  const baza = {
+    kubelek: "decyzja" as const, dni: null, paczkaAt: null, dostarczonoAt: null,
+    przesylkaStatus: null, rejectionCode: null, pieniadzeAt: null, statusAllegro: null,
+  };
+  const teraz = Date.parse("2026-09-25T12:00:00Z");
+  const stary = sygnalyZwrotu({ ...baza, utworzono: "2026-08-20T08:13:00Z" }, teraz);
+  assert.ok(stary.includes("nie_odeslany"));
+  assert.ok(!stary.includes("brak_dowodu"), "jeden sygnał na jedną sprawę");
+  const swiezy = sygnalyZwrotu({ ...baza, utworzono: "2026-09-20T08:00:00Z" }, teraz);
+  assert.ok(!swiezy.includes("nie_odeslany") && swiezy.includes("brak_dowodu"),
+    "w terminie klient jeszcze może nadać — to czekanie, nie decyzja");
+  assert.ok(!sygnalyZwrotu({ ...baza, utworzono: "2026-08-20T08:13:00Z",
+    paczkaAt: "2026-09-01T08:00:00Z" }, teraz).includes("nie_odeslany"),
+    "nadana paczka w drodze nie jest „nie odesłał”");
+  assert.ok(!sygnalyZwrotu({ ...baza, kubelek: "ocena", utworzono: "2026-08-20T08:13:00Z" }, teraz)
+    .includes("nie_odeslany"), "po werdykcie decyzję ktoś już podjął");
+});
+
+test("nienadana nie wygasa po 45 dniach jak rozliczona — dopiero po 90", () => {
+  const z = { rejectionCode: null, werdykt: null, zamknietyAt: null, kwotaGrosze: null,
+    korektaNumer: null, pozycje: [{ ocena: null }], utworzono: "2026-08-01T08:00:00Z" };
+  const po50 = Date.parse("2026-09-20T08:00:00Z");
+  assert.equal(kubelekZwrotu({ ...z, nadana: false }, po50, 45), "decyzja",
+    "Allegro za nienadaną nie oddało nic — zamknięcie mówiłoby nieprawdę");
+  assert.equal(kubelekZwrotu({ ...z, nadana: true }, po50, 45), "zamkniety");
+  assert.equal(kubelekZwrotu(z, po50, 45), "zamkniety", "bez pola — dawne zachowanie");
+  assert.equal(kubelekZwrotu({ ...z, nadana: false }, Date.parse("2026-11-05T08:00:00Z"), 45),
+    "zamkniety", "sufit, żeby stara historia nie wróciła setkami");
+});

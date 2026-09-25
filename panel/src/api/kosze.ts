@@ -14,6 +14,8 @@ import { api } from "./klient";
 /** Na czym stoi dokument MM kosza — liczy serwer (`WierszListyKoszy.mmStan`). */
 export type StanMm = "gotowa" | "zamowiona" | "blad" | "czeka_na_korekte" | "brak";
 
+export type PowodBezPowrotu = "adresy" | "kierunek" | "nieznany";
+
 export interface WierszKosza {
   id: number;
   kod: string;
@@ -43,6 +45,12 @@ export interface WierszKosza {
    */
   problemMm?: { prob: number; ostatniBlad: string | null; ostatnioAt: string;
     nierozwiazany: boolean } | null;
+  /**
+   * Rozłożony ponad dobę, a MM powrotne nie powstało (0.505.0) — i dlaczego.
+   * `adresy`: czeka na zapis adresu; `kierunek`: powrót robi biuro w Subiekcie.
+   * Starszy serwer pola nie przysyła.
+   */
+  bezPowrotu?: PowodBezPowrotu | null;
 }
 
 export interface PozycjaWKoszu {

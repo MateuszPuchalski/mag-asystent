@@ -27,6 +27,8 @@ describe("czekanie", () => {
     render(<Czekanie ms={14 * G} />);
     const znak = screen.getByTitle("czeka 14 g");
     expect(znak).toHaveTextContent("czeka 14 g");
-    expect(znak.querySelectorAll("[aria-hidden='true']")).toHaveLength(4);
+    /* Kresek nie ma od 0.506.0 — barwa liczby niesie ten sam próg. */
+    expect(znak.querySelectorAll("[aria-hidden='true']")).toHaveLength(0);
+    expect(znak.className).toMatch(/text-ranga-zle/);
   });
 });

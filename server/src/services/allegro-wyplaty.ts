@@ -109,30 +109,58 @@ export const WYPLATY_NA_PRZEBIEG = 100;
  * Które zwroty warto odpytać o wypłatę.
  *
  * TYLKO TE W PRACY I BEZ ZATRZASKU — odpowiedź dla zwrotu zamkniętego albo już
- * rozliczonego nic by nie zmieniła, a każde żądanie to koszt u Allegro. Zwrot
+ * rozliczonego nic by nie zmieniła, a każde żądanie to koszt u Allegro.
+ * Zamknięty, który czeka na pieniądze, jest w pracy — powód niżej. Zwrot
  * odrzucony odpada razem z nimi: tam pieniądze nie miały wyjść.
  *
- * NAJSTARSZE PIERWSZE, odwrotnie niż przy trackingu paczek. Tamta lista goni
- * zdarzenie, które dopiero nastąpi, więc świeże ma pierwszeństwo. Ta odkopuje
- * zaległość — a zwrot po terminie boli dziś, nie jutro.
+ * NAJDAWNIEJ SPRAWDZANE PIERWSZE, NIE NAJSTARSZE (0.506.1). Do tego wydania
+ * lista szła po dacie zgłoszenia, sto na przebieg, bez pamięci, kogo już
+ * pytała. Gdy zwrotów bez rozliczenia jest ponad setka, czoło listy zajmują
+ * te, które rozliczenia nie dostaną nigdy — nienadane paczki, sprawy
+ * zamknięte regułą wieku — a nowszy zwrot nie doczeka się pytania ani razu.
+ * Wyszło to przy zwrocie 6016/2026 (wypłata 23 września, panel dalej „do
+ * zwrotu"). Teraz nigdy niepytane idą pierwsze, po dacie zgłoszenia, a potem
+ * te, o które pytaliśmy najdawniej.
  */
+/**
+ * Jak długo pytamy o wypłatę zwrotu ZAMKNIĘTEGO korektą (0.505.0). Dłużej niż
+ * termin i dzień automatu Allegro, bo pobranie i paczka nieodebrana czekają
+ * na pieniądze dłużej (`pieniadzeCzekaja`). Dalej to już historia.
+ */
+const ZAMKNIETY_PYTAMY_DNI = 60;
+
 export function zwrotyDoSprawdzeniaWyplaty(
-  database: Db, konto: number, limit = WYPLATY_NA_PRZEBIEG,
+  database: Db, konto: number, limit = WYPLATY_NA_PRZEBIEG, teraz = new Date(),
 ): DoSprawdzeniaWyplaty[] {
+  /* ZAMKNIĘTY, A NIEZAPŁACONY TEŻ JEST W PRACY (0.505.0). Od 0.476.0 zwrot
+     zamknięty korektą wraca do DO ZWROTU, dopóki pieniądze nie wyjdą — ZW
+     automatem zamyka go minutę po kwocie. Ta lista brała jednak tylko
+     zwroty BEZ zamknięcia, więc o wypłatę zrobioną ręką w Allegro nie pytała
+     nikogo. Zgłoszenie właściciela, zwrot X5XY/2026: „dlaczego pokazuje do
+     zwrotu, mimo że pieniądze zostały zwrócone?".
+
+     Warunek to lustro `pieniadzeCzekaja`: przyjęty, z kwotą, bez naszego
+     zlecenia, bez zapisanego przelewu i bez odmowy. Reszta zamkniętych to
+     historia i nie kosztuje żądania. */
   const wiersze = database.prepare(`
     SELECT z.id AS zwrot_id, m.platnosc_id AS platnosc_id
       FROM zwrot_klienta z
       JOIN zamowienie_klienta m
         ON m.channel_account_id = z.channel_account_id AND m.external_id = z.order_id
      WHERE z.channel_account_id = ?
-       AND z.zamkniety_at IS NULL
+       AND (z.zamkniety_at IS NULL
+            OR (z.werdykt = 'przyjety' AND z.kwota_grosze > 0
+                AND z.zwrot_pieniedzy_id IS NULL AND z.zwrot_pieniedzy_command_id IS NULL
+                AND z.przelew_at IS NULL AND z.odmowa_kod IS NULL
+                AND z.zamkniety_at >= ?))
        AND z.rozliczony_allegro_at IS NULL
        AND (z.werdykt IS NULL OR z.werdykt <> 'odrzucony')
        AND m.platnosc_id IS NOT NULL
-     ORDER BY z.created_at ASC, z.id ASC
+     ORDER BY z.wyplata_sprawdzono_at IS NOT NULL, z.wyplata_sprawdzono_at ASC,
+              z.created_at ASC, z.id ASC
      LIMIT ?`)
-    .all(konto, Math.max(0, Math.trunc(limit))) as Array<
-      { zwrot_id: number; platnosc_id: string }>;
+    .all(konto, new Date(teraz.getTime() - ZAMKNIETY_PYTAMY_DNI * 86_400_000).toISOString(),
+      Math.max(0, Math.trunc(limit))) as Array<{ zwrot_id: number; platnosc_id: string }>;
   return wiersze.map((w) => ({ zwrotId: Number(w.zwrot_id), platnoscId: String(w.platnosc_id) }));
 }
 
@@ -161,13 +189,16 @@ export async function uzupelnijWyplaty(
   const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
 
   let zatrzasnietych = 0;
+  const odnotuj = database.prepare("UPDATE zwrot_klienta SET wyplata_sprawdzono_at=? WHERE id=?");
   for (const z of zwroty) {
     let wyplata: string | null = null;
+    let odpowiedziano = false;
     for (const portmonetka of PORTMONETKI) {
       let odp: Odpowiedz | null = null;
       try {
         odp = (await query(urlOperacjiPlatnosci(apiUrl, z.platnoscId, portmonetka))) as
           Odpowiedz | null;
+        odpowiedziano = true;
       } catch (e) {
         console.warn(`[wyplaty] płatność ${z.platnoscId} (${portmonetka}):`,
           e instanceof Error ? e.message : e);
@@ -179,6 +210,10 @@ export async function uzupelnijWyplaty(
          żądań — a przy zwrocie bez wypłaty i tak pytamy obie. */
       if (wyplata) break;
     }
+    /* Stempel TYLKO po odpowiedzi Allegro. Nieudane pytanie nie przesuwa
+       zwrotu na koniec kolejki — inaczej przerwa po stronie Allegro
+       odsuwałaby właśnie te zwroty, o które nie zdążyliśmy zapytać. */
+    if (odpowiedziano) odnotuj.run(new Date().toISOString(), z.zwrotId);
     if (!wyplata) continue;
 
     const r = database.prepare(

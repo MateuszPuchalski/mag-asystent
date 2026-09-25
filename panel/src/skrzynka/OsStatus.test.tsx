@@ -28,12 +28,16 @@ const pokaz = (wpisy: WpisOsi[]) => render(
   <Os rozmowaId={1} wpisy={wpisy} zrodloPomiaru={null} mozeZlecac={false}
     onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
 
+/* Od 0.506.0 pasek mówi jedno zdanie, a czipy otwiera „przebieg (n)". */
+const rozwin = () => fireEvent.click(screen.getByRole("button", { name: /przebieg \(/ }));
+
 describe("Zdarzenia sprawy stoją w pasku, nie na osi", () => {
   it("przebieg sprawy dalej widać — z podpisem i godziną pod ręką", () => {
     /* Przeniesienie nie ma prawa skasować informacji. Przejście zostaje na
        wierzchu, a KTO je wywołał i KIEDY — w podpowiedzi, bo w rzędzie liczy
        się jedno spojrzenie, nie komplet danych naraz. */
     pokaz([wiadomosc(), status({ autor: "klient" })]);
+    rozwin();
     const pasek = screen.getByRole("navigation", { name: /przebieg sprawy/i });
     const chip = within(pasek).getByRole("button", { name: /resolved → open/ });
     expect(chip).toBeInTheDocument();
@@ -59,6 +63,7 @@ describe("Zdarzenia sprawy stoją w pasku, nie na osi", () => {
       skoki.push([(this as HTMLElement).dataset.wpis, o]);
     });
     pokaz([wiadomosc(), status(), wiadomosc({ id: "msg-2", tresc: "Dziękuję" })]);
+    rozwin();
     fireEvent.click(screen.getByRole("button", { name: /resolved → open/ }));
     expect(skoki).toHaveLength(1);
     expect((skoki[0] as unknown[])[0]).toBe("msg-2");
@@ -98,8 +103,53 @@ describe("zwrot na osi rozmowy", () => {
     expect(wypowiedzi.map((w) => w.id)).toEqual(["msg-1"]);
     expect(zdarzenia.map((z) => z.id)).toEqual(["zwrot-1"]);
     pokaz([wiadomosc(), zwrot("pieniadze"), zwrot("przelew_cofniety", "zwrot-2")]);
+    rozwin();
     const pasek = screen.getByRole("navigation", { name: /przebieg sprawy/i });
     expect(within(pasek).getByRole("button", { name: "zwrot: pieniądze" })).toBeInTheDocument();
     expect(within(pasek).getByRole("button", { name: "zwrot: przelew cofnięty" })).toBeInTheDocument();
+  });
+});
+
+/* ── Spokojniejsza oś (0.506.0) ────────────────────────────────────────────
+   Pasek zdarzeń mówi jedno zdanie o ostatniej zmianie; nasza długa
+   wypowiedź zwija się do początku, a puste wiersze ściskają się tylko na
+   ekranie; pytanie klienta bez odpowiedzi ma ramkę. */
+describe("spokojniejsza oś", () => {
+  it("pasek mówi ostatnią zmianę i liczbę, całość po kliknięciu", () => {
+    pokaz([wiadomosc(), status({ id: "status-1", tresc: "open → resolved" }), status({ id: "status-2" })]);
+    const pasek = screen.getByRole("navigation", { name: /przebieg sprawy/i });
+    expect(pasek).toHaveTextContent(/Ostatnio:/);
+    expect(within(pasek).getByRole("button", { name: "przebieg (2)" })).toBeInTheDocument();
+    expect(within(pasek).queryByRole("button", { name: /open → resolved/ })).toBeNull();
+  });
+
+  it("nasza długa wypowiedź zwinięta, puste wiersze ściśnięte, całość na żądanie", () => {
+    const dluga = "Po otrzymaniu potwierdzenia nadamy nową przesyłkę.\n\n\n\n\n\nZ poważaniem,\nNatalia\n" + "x".repeat(400);
+    pokaz([wiadomosc({ id: "msg-9", odKlienta: false, autor: "Natalia", tresc: dluga })]);
+    const tekst = screen.getByText(/Po otrzymaniu potwierdzenia/);
+    expect(tekst.className).toMatch(/line-clamp-4/);
+    expect(tekst.textContent).not.toMatch(/\n\n\n/);
+    fireEvent.click(screen.getByRole("button", { name: "Pokaż całą wiadomość" }));
+    expect(screen.getByText(/Po otrzymaniu potwierdzenia/).className).not.toMatch(/line-clamp-4/);
+  });
+
+  it("pytanie klienta bez odpowiedzi ma ramkę, odpowiedziane — nie", () => {
+    const { container, unmount } = pokaz([wiadomosc()]);
+    expect(container.querySelector("[data-wpis='msg-1'] article")?.className).toMatch(/border-amber-400/);
+    unmount();
+    const r = pokaz([wiadomosc(), wiadomosc({ id: "msg-2", odKlienta: false, autor: "Ala", tresc: "Już sprawdzam" })]);
+    expect(r.container.querySelector("[data-wpis='msg-1'] article")?.className).not.toMatch(/border-amber-400/);
+  });
+
+  it("„Zleć” na wierzchu tylko przy pytaniu bez odpowiedzi, przy starszych czeka pod myszą", () => {
+    /* Runda krytyki: ten sam napis stał pod każdą wiadomością klienta.
+       Przy starszych zostaje w drzewie — Tab i czytnik ekranu go znajdą. */
+    render(<Os rozmowaId={1} zrodloPomiaru={null} mozeZlecac onZrodlo={() => {}} onWstawDoSzkicu={() => {}}
+      wpisy={[wiadomosc(), wiadomosc({ id: "msg-2", odKlienta: false, autor: "Ala", tresc: "Sprawdzam" }),
+        wiadomosc({ id: "msg-3", messageId: 3, tresc: "A jednak inna?" })]} />);
+    const [stare, nowe] = screen.getAllByRole("button", { name: "Zleć z tej wiadomości" });
+    expect(stare.className).toMatch(/opacity-0/);
+    expect(stare.className).toMatch(/group-hover:opacity-100/);
+    expect(nowe.className).not.toMatch(/opacity-0/);
   });
 });

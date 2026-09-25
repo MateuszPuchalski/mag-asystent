@@ -114,12 +114,15 @@ describe("Kolejka", () => {
        w „Oczekujących", nie w „Moje". */
     expect(screen.queryByText("Czeka")).not.toBeInTheDocument();
     expect(screen.queryByText("Nieprzypisana")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /^Oczekujące/ }));
+    /* Od 0.506.0 „Oczekujące" i „Zakończone" stoją pod „Więcej". */
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"), "oczekujace");
     expect(screen.getByText("Czeka")).toBeInTheDocument();
   });
 
   it("zakończona schodzi z roboczych do „Zakończonych” — także zamknięta sprzed tej wersji", async () => {
-    await kubelek(/^Zakończone/);
+    render(<Kolejka rozmowy={KOMPLET} stan={STAN} wybranaId={null} mojeId={7} laduje={false}
+      onWybierz={() => {}} onOdswiez={() => {}} />);
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"), "zakonczone");
     expect(screen.getByText("Sprawa z archiwum")).toBeInTheDocument();
     expect(screen.queryByText("Moja")).not.toBeInTheDocument();
   });

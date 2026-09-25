@@ -224,6 +224,59 @@ export interface ProblemMm {
   nierozwiazany: boolean;
 }
 
+/**
+ * Kosze rozłożone ponad dobę temu, którym nie powstało MM powrotne (0.505.0).
+ *
+ * JEDNA DEFINICJA DLA DWÓCH MIEJSC. Warunek żył dotąd tylko w rekoncyliacji
+ * (`koszeBezPowrotu` w `reconcile.ts`, z uzasadnieniem każdego członu).
+ * Zgłoszenie właściciela: „jak mogę sprawdzić, do których koszyków po
+ * rozłożeniu nie została zrobiona MM powrotna?", a potem „zrób to" —
+ * znacznik na liście koszy i miejsce w kubełku „Problem z MM". Druga kopia
+ * warunku rozjechałaby raport z ekranem przy pierwszej zmianie.
+ *
+ * Doba zapasu, bo powrót czeka świadomie na zapis adresów. Poza listą: kosz
+ * rozliczony ręką przed 0.277.0, karton, odpad i kosz z aplikacji, którego
+ * MM na regał jeszcze nie weszło — tam przyczynę mówi inny sygnał.
+ */
+/**
+ * Dlaczego MM powrotne nie powstało — dwie przyczyny prowadzą w dwa miejsca.
+ * `adresy`: zapis adresu czeka albo stoi w błędzie, a powrót wyjdzie sam po
+ * nim. `kierunek`: aplikacja nie zna magazynu źródłowego dokumentu i powrotu
+ * NIE wystawi nigdy — robi go biuro w Subiekcie (`trasaPowrotu`). `nieznany`:
+ * żadne z dwóch; powrót powinien był wyjść przy ostatnim takcie.
+ */
+export type PowodBezPowrotu = "adresy" | "kierunek" | "nieznany";
+
+export function koszeBezPowrotu(
+  database: Db = db(), teraz = new Date(),
+): Array<{ id: number; kod: string; rozlozonoAt: string; powod: PowodBezPowrotu }> {
+  const wiersze = (database.prepare(
+    `SELECT id, kod, rozlozono_at, mm_dok_id, mm_mag_z, mm_queue_id FROM kosz
+      WHERE status='rozlozony' AND powrot_queue_id IS NULL
+        AND powrot_poza_aplikacja = 0
+        AND rodzaj NOT IN ('karton','odpad')
+        AND (mm_dok_id IS NOT NULL
+             OR mm_queue_id IN (SELECT id FROM sfera_queue WHERE status='done'))
+        AND rozlozono_at < ?
+        AND EXISTS (SELECT 1 FROM kosz_pozycja p
+                     WHERE p.kosz_id = kosz.id AND p.status='done')
+      ORDER BY rozlozono_at`)
+    .all(new Date(teraz.getTime() - 86_400_000).toISOString()) as Array<{ id: number; kod: string;
+      rozlozono_at: string; mm_dok_id: number | null; mm_mag_z: number | null; mm_queue_id: number | null }>);
+  const wDrodze = database.prepare(
+    `SELECT COUNT(*) AS n FROM kosz_pozycja p JOIN sfera_queue q ON q.id = p.loc_queue_id
+      WHERE p.kosz_id = ? AND q.status IN ('pending','processing','error')`);
+  return wiersze.map((k) => {
+    /* Ten sam warunek co w `trasaPowrotu` — tam kosz z dokumentu bez
+       znanego magazynu źródłowego dostaje `null` i zostaje biuru. */
+    const bezKierunku = k.mm_queue_id == null && k.mm_dok_id != null
+      && (!Number(k.mm_mag_z ?? 0) || Number(k.mm_mag_z) === config.magId.ZWROTY);
+    const powod: PowodBezPowrotu = bezKierunku ? "kierunek"
+      : Number((wDrodze.get(k.id) as { n: number }).n) > 0 ? "adresy" : "nieznany";
+    return { id: Number(k.id), kod: String(k.kod), rozlozonoAt: String(k.rozlozono_at), powod };
+  });
+}
+
 /** Jak daleko wstecz szukamy kłopotów z MM. Starsze sprawdził już remanent. */
 const PROBLEM_MM_DNI = 90;
 
@@ -406,7 +459,12 @@ export interface WierszListyKoszy {
    */
   wirtualny: boolean;
   /** Kłopot z MM tego kosza; `null` = wszystkie MM weszły za pierwszym razem (0.501.0). */
-  problemMm: ProblemMm | null;
+  problemMm: ProblemMm | null;  /**
+   * Rozłożony ponad dobę temu, a MM powrotne nie powstało (0.505.0) — stan
+   * wisi na regale zwrotów. Warunek przy `koszeBezPowrotu`, przyczyna przy
+   * `PowodBezPowrotu`; `null` = powrót jest albo jeszcze się nie należy.
+   */
+  bezPowrotu: PowodBezPowrotu | null;
 }
 
 /** Kosz, do którego trafił towar jednego zwrotu — lekki wiersz do wiązania. */
@@ -518,6 +576,7 @@ export function odmowaKoszaWirtualnego(raw: string): string {
 
 export function listaKoszy(): WierszListyKoszy[] {
   const problemy = problemyMm();
+  const bezPowrotu = new Map(koszeBezPowrotu().map((k) => [k.id, k.powod]));
   /* Rozłożone tylko świeże: lista służy pracy, historię trzyma audyt.
      WYJĄTEK: kosz z kłopotem MM (0.501.0) stoi na liście, dopóki kłopot
      mieści się w oknie `PROBLEM_MM_DNI` — biuro sprawdza stany także po
@@ -551,7 +610,9 @@ export function listaKoszy(): WierszListyKoszy[] {
           OR k.id IN (SELECT value FROM json_each(?))
        ORDER BY CASE k.status WHEN 'otwarty' THEN 0 WHEN 'zamkniety' THEN 1 ELSE 2 END, k.id DESC`
     )
-    .all(JSON.stringify([...problemy.keys()])) as Array<Record<string, unknown>>;
+    /* Kosz bez MM powrotnego też zostaje po oknie dwóch tygodni: jego stan
+       wisi na regale zwrotów, dopóki ktoś tego nie naprawi (0.505.0). */
+    .all(JSON.stringify([...problemy.keys(), ...bezPowrotu.keys()])) as Array<Record<string, unknown>>;
   return wiersze.map((w) => ({
     id: w.id as number,
     kod: w.kod as string,
@@ -573,6 +634,7 @@ export function listaKoszy(): WierszListyKoszy[] {
     mmStan: stanMm(w),
     wirtualny: jestKoszemWirtualnym({ kod: String(w.kod), mm_dok_id: (w.mm_dok_id as number) ?? null }),
     problemMm: problemy.get(Number(w.id)) ?? null,
+    bezPowrotu: bezPowrotu.get(Number(w.id)) ?? null,
   }));
 }
 

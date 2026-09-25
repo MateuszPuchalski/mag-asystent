@@ -27,19 +27,20 @@ export function Soczewka({ dane, onWstawDoSzkicu }: {
     {s.rodzaj === "anulowanie" && <Anulowanie dane={dane} />}
     {s.rodzaj === "inny_towar" && <InnyTowar dane={dane} s={s} onWstawDoSzkicu={onWstawDoSzkicu} />}
     {s.rodzaj === "faktura" && <Faktura dane={dane} />}
+    {s.rodzaj === "zwrot" && <ZwrotBezZgloszenia dane={dane} />}
   </section>;
 }
 
 /* SKĄD KATEGORIA — zawsze, bo soczewka stoi na domyśle klasyfikatora.
    Agent, który widzi „wg Copilota", wie, że może się mylić, i wie, gdzie
-   to poprawić: etykieta kategorii stoi w nagłówku rozmowy. */
+   to poprawić: od 0.506.0 etykieta kategorii stoi pod „⋯” nad rozmową. */
 function Naglowek({ s }: { s: DaneSoczewki }) {
   return <div className="mb-2">
     <h3 className="text-podpis font-bold uppercase tracking-wide text-slate-700">
       Pytanie klienta · {NAZWA_KATEGORII[s.kategoria]}</h3>
     <p className="text-podpis text-slate-600">
       {s.zCzlowieka ? "kategoria wskazana przez zespół"
-        : "kategoria wg Copilota — poprawisz ją w nagłówku rozmowy"}
+        : "kategoria wg Copilota — poprawisz ją pod „⋯” nad rozmową"}
       {s.nieaktualna && " · sprzed ostatniej wiadomości klienta"}</p>
   </div>;
 }
@@ -168,5 +169,23 @@ function Faktura({ dane }: { dane: OsRozmowy }) {
         <span className="text-slate-600">{d.typ === "FS" ? "faktura" : "paragon"} z {dzien(d.data)}</span>
       </li>)}
     </ul>}
+  </div>;
+}
+
+/* ── ZWROT, KTÓREGO W ALLEGRO JESZCZE NIE MA (0.506.0) ──────────────────────
+   Soczewka staje tylko wtedy (`soczewki-reguly.ts`): gdy zwrot jest, jego
+   karta stoi w „Wymaga Ciebie". Terminu ustawowego nie liczymy — zasady
+   zwrotu oferty bywają dłuższe, a zły termin jest gorszy niż żaden. */
+function ZwrotBezZgloszenia({ dane }: { dane: OsRozmowy }) {
+  if (!dane.zamowienie) {
+    return <p className="text-slate-600">Rozmowa nie ma zamówienia — wskaż je w wierszu „Zamówienie"
+      niżej. Bez niego nie znajdziemy zwrotu.</p>;
+  }
+  const paczka = dane.zamowienie.przesylka;
+  return <div className="space-y-1">
+    <p className="font-semibold text-slate-900">Zwrotu tego zamówienia w Allegro jeszcze nie ma.</p>
+    <p className="text-slate-700">Klient zgłasza zwrot w Allegro; tu pojawi się po synchronizacji zwrotów.</p>
+    {paczka?.dostarczonoAt && <p className="text-xs text-slate-600">
+      Paczka z zamówieniem doręczona {dzien(paczka.dostarczonoAt)}.</p>}
   </div>;
 }

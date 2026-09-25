@@ -33,15 +33,16 @@ export function stopienCzekania(ms: number): { kreski: number; pismo: string; kr
   return { kreski: 4, pismo: "text-ranga-zle", kreska: "bg-ranga-zle" };
 }
 
-const WYSOKOSC = ["h-1.5", "h-2.5", "h-3", "h-4"];
-
+/* ── LICZBA BEZ KRESEK (0.506.0) ────────────────────────────────────────────
+   Zgłoszenie agenta: „przytłacza". Cztery kreski przy KAŻDYM wierszu mówiły
+   to samo co barwa liczby obok — dwa znaki jednego faktu w liście, która
+   i tak niesie kafel kategorii, kropkę i podgląd. Zostaje liczba w barwie
+   progu: ta sama drabina (szarość, bursztyn, pomarańcz, czerwień), ten sam
+   próg „za co się wziąć", o jeden rysunek mniej na wiersz. */
 export function Czekanie({ ms }: { ms: number }) {
   const s = stopienCzekania(ms);
   const tekst = czekaKrotko(ms);
-  return <span title={`czeka ${tekst}`} className="inline-flex shrink-0 items-end gap-0.5">
-    {WYSOKOSC.map((h, i) => <span key={i} aria-hidden="true"
-      className={`w-1 rounded-sm ${h} ${i < s.kreski ? s.kreska : "bg-slate-200"}`} />)}
-    <span className={`ml-1 text-xs font-bold leading-none tabular-nums ${s.pismo}`}>
-      <span className="sr-only">czeka </span>{tekst}</span>
-  </span>;
+  return <span title={`czeka ${tekst}`}
+    className={`inline-flex shrink-0 text-sm font-bold leading-none tabular-nums ${s.pismo}`}>
+    <span className="sr-only">czeka </span>{tekst}</span>;
 }

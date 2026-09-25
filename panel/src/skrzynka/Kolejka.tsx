@@ -49,6 +49,9 @@ export function odNajnowszych(rozmowy: Rozmowa[]): Rozmowa[] {
     || b.id - a.id);
 }
 
+/** Kubełki przeglądania, nie pracy — pod „Więcej" (0.506.0). */
+const POD_WIECEJ: ReadonlySet<Kubelek> = new Set(["oczekujace", "zakonczone"]);
+
 const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
   { klucz: "wszystkie", etykieta: "Wszystkie" },
   { klucz: "nieprzypisane", etykieta: "Nieprzypisane" },
@@ -288,10 +291,25 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         `py-1.5` → `py-1`. Kubełki zawijają się na dwa rzędy przy kolumnie
         400 px, więc pigułki kosztują +8 px, a pasmo oddaje 4 px. Netto +4 px
         chromu — cena, której próg dostępności jest wart. */}
-    <div className="flex shrink-0 flex-wrap gap-1 border-b px-2 py-1">
+    {/* ── TRZY KUBEŁKI NA WIERZCHU, DWA POD „WIĘCEJ" (0.506.0) ─────────────
+        Zgłoszenie agenta: „przytłacza". Pięć pigułek zawijało się na dwa rzędy
+        nad pierwszym pytaniem. Robota dzieje się w trzech; „Oczekujące"
+        i „Zakończone" to przeglądanie — stoją pod „Więcej" z liczbą, a cyfry
+        4 i 5 dalej je wybierają. Wybrany ukryty kubełek pokazuje swoją nazwę
+        na przycisku, więc nie ma stanu, którego nie widać. */}
+    <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1">
       <FiltrSegmentowy<Kubelek> wybrany={kubelek} onWybierz={setKubelek}
-        pozycje={KUBELKI.map((k) => ({ klucz: k.klucz, etykieta: k.etykieta,
+        pozycje={KUBELKI.filter((k) => !POD_WIECEJ.has(k.klucz)).map((k) => ({ klucz: k.klucz, etykieta: k.etykieta,
           ile: rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length }))} />
+      <select aria-label="Więcej kubełków" value={POD_WIECEJ.has(kubelek) ? kubelek : ""}
+        onChange={(e) => { if (e.target.value) setKubelek(e.target.value as Kubelek); }}
+        /* Reszta rzędu, nie własna szerokość (0.506.0): stała szerokość
+           125 px spadała w kolumnie 360 px pod kubełki i dokładała rząd. */
+        className={`field w-auto min-w-0 flex-1 basis-[5.5rem] py-1 text-xs font-semibold ${POD_WIECEJ.has(kubelek) ? "border-wertis-ink" : ""}`}>
+        <option value="">Więcej…</option>
+        {KUBELKI.filter((k) => POD_WIECEJ.has(k.klucz)).map((k) => <option key={k.klucz} value={k.klucz}>
+          {k.etykieta} · {rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length}</option>)}
+      </select>
     </div>
     {/* Pole stoi POD kubełkami, nie nad nimi: kubełek wybiera się raz na
         wejście, a szuka się w środku tego, co się wybrało. Kolejność obok
@@ -315,7 +333,10 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         <option value="najnowsze">od najnowszych</option>
       </select>
       {/* Pomoc wchodzi do TEGO rzędu (0.402.0) zamiast stać pasmem niżej —
-          ten sam ruch, co na trzech pozostałych ekranach obsługi. */}
+          ten sam ruch, co na trzech pozostałych ekranach obsługi. Do 0.506.0
+          komentarz to obiecywał, a przycisk stał osobnym rzędem w liście. */}
+      <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length}
+        sita={false} zWszystkimi={false} />
     </div>
     <PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)}
       trwa={klasyfikacja?.trwa} wynik={klasyfikacja?.wynik} blad={klasyfikacja?.blad}
@@ -332,8 +353,6 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           nie skraca niczyjej pracy. Sit „moje"/„niczyje" skrzynka nie ma —
           „Moje" jest tu KUBEŁKIEM, więc siedzi już pod cyfrą i drugi raz nie
           ma po co stać. */}
-      <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length}
-        sita={false} zWszystkimi={false} />
       {laduje && <Pusto waga="lista">Wczytuję…</Pusto>}
       {!laduje && !rozmowy.length &&
         <Pusto waga="lista">Brak rozmów w zsynchronizowanej skrzynce.</Pusto>}
@@ -509,7 +528,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
                 <Eye size={12} />{r.oglada.name}</span>}
           </span>
           </span>
-          {/* Czas oczekiwania NA PRAWEJ KRAWĘDZI, kreskami — `Czekanie`. Stoi
+          {/* Czas oczekiwania NA PRAWEJ KRAWĘDZI, barwną liczbą — `Czekanie`. Stoi
               osobno, żeby w przewijanej liście układał się w jedną kolumnę. */}
           {zegar !== null && <span className="self-center"><Czekanie ms={zegar} /></span>}
         </button>;

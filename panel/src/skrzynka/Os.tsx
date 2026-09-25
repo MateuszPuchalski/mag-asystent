@@ -238,6 +238,9 @@ export function Os({
     return null;
   }, [wypowiedzi]);
 
+  /** Pytanie klienta, po którym nie padła już żadna wypowiedź — to, co czeka. */
+  const bezOdpowiedzi = pytanie && wypowiedzi[wypowiedzi.length - 1]?.id === pytanie.id ? pytanie.id : null;
+
   /* `true` na starcie, żeby pasek nie mrugnął przed pierwszym pomiarem:
      `IntersectionObserver` oddaje wynik dopiero po renderze. */
   const [pytanieWKadrze, setPytanieWKadrze] = React.useState(true);
@@ -344,8 +347,12 @@ export function Os({
          strony. Zamiast rozjaśniać pytanie (nie ma dokąd: jest już białe),
          cofamy odpowiedź: nasza traci obwódkę i cień, a jej tekst schodzi
          na szarość. Pytanie zostaje jedyną kartą z cieniem na ekranie. */
-      : <article key={w.id} className={`max-w-[75ch] rounded-lg p-3 ${w.odKlienta
-          ? "mr-auto border border-slate-300 bg-os-klient shadow-sm"
+      /* PYTANIE BEZ ODPOWIEDZI MA RAMKĘ (0.506.0): to ono jest powodem
+         ekranu, a na długiej osi ginęło między naszymi wypowiedziami. Ramka
+         tylko wtedy, gdy nic nie padło po nim — odpowiedziane wraca do tła. */
+      : <article key={w.id} className={`group max-w-[75ch] rounded-lg p-3 ${w.odKlienta
+          ? `mr-auto border bg-os-klient shadow-sm ${w.id === bezOdpowiedzi
+            ? "border-2 border-amber-400" : "border-slate-300"}`
           : "ml-auto bg-os-firma"}`}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-500">
             {/* ── LOGIN STOI W MIEJSCU SŁOWA „KLIENT" (0.219.2) ────────────
@@ -385,13 +392,20 @@ export function Os({
               treść jest treścią po obu stronach wątku, a drabina ma na tę rolę
               jeden szczebel. Dwa rozmiary dla jednej roli to był ten sam błąd,
               który to wydanie naprawia w siedemnastu innych miejscach. */}
-          <p className={`mt-1 whitespace-pre-wrap text-tresc ${
-            w.odKlienta ? "" : "text-slate-600"}`}>{w.tresc}</p>
+          {w.odKlienta
+            ? <p className="mt-1 whitespace-pre-wrap text-tresc">{w.tresc}</p>
+            : <NaszaTresc tresc={w.tresc} />}
           {w.stopka && <Stopka tresc={w.stopka} />}
           {w.zalaczniki?.length ? <Zalaczniki lista={w.zalaczniki} /> : null}
-          {w.odKlienta && mozeZlecac && <button
+          {/* „Zleć" NA WIERZCHU TYLKO PRZY PYTANIU BEZ ODPOWIEDZI (0.506.0).
+              Stał pod każdą wiadomością klienta, więc na długiej osi ten sam
+              napis powtarzał się co kilka akapitów. Przy starszych wychodzi
+              pod myszą albo fokusem — zostaje w miejscu i w kolejności Tab. */}
+          {w.odKlienta && mozeZlecac && <button type="button"
             className={`mt-2 text-xs font-bold ${
-              zrodloPomiaru === w.messageId ? "text-amber-700" : "text-slate-500"}`}
+              zrodloPomiaru === w.messageId ? "text-amber-700"
+                : w.id === bezOdpowiedzi ? "text-slate-500"
+                  : "text-slate-500 opacity-0 focus:opacity-100 group-hover:opacity-100"}`}
             onClick={() => onZrodlo(zrodloPomiaru === w.messageId ? null : w.messageId!)}>
             {zrodloPomiaru === w.messageId ? "✓ źródło pomiaru" : "Zleć z tej wiadomości"}</button>}
         </article>}
@@ -500,9 +514,25 @@ function PasekZdarzen({ zdarzenia, onSkocz }: {
   zdarzenia: Zdarzenie[];
   onSkocz: (celId: string) => void;
 }) {
+  /* ── JEDNO ZDANIE, CAŁOŚĆ NA ŻĄDANIE (0.506.0) ─────────────────────────
+     Zgłoszenie agenta: „przytłacza". Rząd siedmiu czipów stał pod każdą
+     rozmową, a przy sprawie otwieranej i kończonej kilka razy mówił pięć
+     razy „Otwarta → Zakończona". Przy pisaniu liczy się ostatnia zmiana;
+     reszta jest historią i otwiera się jednym kliknięciem. */
+  const [cala, setCala] = React.useState(false);
   /* Pusty pasek NIE ZOSTAJE jako pusta ramka. Rozmowa bez ani jednej zmiany
      stanu jest częsta i pas szarości pod nią mówiłby, że czegoś brakuje. */
   if (!zdarzenia.length) return null;
+  const ostatnie = zdarzenia[zdarzenia.length - 1];
+  if (!cala) {
+    return <nav aria-label="Przebieg sprawy"
+      className="flex shrink-0 items-center gap-2 bg-[#fbfcfd] px-3 py-1.5 text-podpis text-slate-600">
+      <span>Ostatnio: <b className="font-semibold text-slate-800">{etykieta(ostatnie)}</b> · {czas(ostatnie.at)}</span>
+      <button type="button" aria-expanded={false} onClick={() => setCala(true)}
+        className="font-semibold text-sky-800 underline underline-offset-2">
+        przebieg ({zdarzenia.length})</button>
+    </nav>;
+  }
 
   /* Pasek CICHNIE (0.247.0): niesie kontekst, nie treść, a stał w tej samej
      wadze co wypowiedzi — obwódki chipów rysowały dziewięć ramek pod rozmową.
@@ -512,6 +542,8 @@ function PasekZdarzen({ zdarzenia, onSkocz }: {
     {/* Przewijanie w POZIOMIE, nie zawijanie do drugiego rzędu: pasek ma mieć
         stałą wysokość, bo rośnie kosztem osi, czyli kosztem rozmowy. */}
     <ol className="flex items-center gap-1.5 overflow-x-auto">
+      <li className="shrink-0"><button type="button" aria-expanded onClick={() => setCala(false)}
+        className="text-podpis font-semibold text-sky-800 underline underline-offset-2">zwiń</button></li>
       {zdarzenia.map((z, i) => <li key={z.id} className="flex shrink-0 items-center gap-1.5">
         {i > 0 && <ArrowRight size={10} className="shrink-0 text-slate-300" />}
         <button type="button" disabled={z.cel === null}
@@ -607,4 +639,25 @@ function Zlecenie({ wpis }: { wpis: WpisOsi }) {
     {z.przypisanoPrzez && !zamkniete && <p className="mt-1 text-xs text-slate-500">
       realizuje: {z.przypisanoPrzez}</p>}
   </article>;
+}
+
+/* ── NASZA WYPOWIEDŹ ZWINIĘTA DO CZTERECH LINII (0.506.0) ───────────────────
+   Zrzut z „przytłacza": nasza odpowiedź ze stopką i pustymi wierszami zajęła
+   całą oś, a pytanie klienta stało wciśnięte nad polem odpowiedzi. Własną
+   treść agent już zna — wystarczy mu jej początek, całość na kliknięcie.
+   Puste wiersze ponad jeden ściskamy WYŁĄCZNIE na ekranie: treść w bazie
+   i w Allegro zostaje taka, jaka poszła. */
+const PROG_ZWINIECIA = 320;
+
+function NaszaTresc({ tresc }: { tresc: string }) {
+  const [cala, setCala] = React.useState(false);
+  const zwarta = tresc.replace(/\n[ \t]*(\n[ \t]*){2,}/g, "\n\n").trim();
+  const dluga = zwarta.length > PROG_ZWINIECIA || zwarta.split("\n").length > 5;
+  return <>
+    <p className={`mt-1 whitespace-pre-wrap text-tresc text-slate-600 ${dluga && !cala ? "line-clamp-4" : ""}`}>
+      {zwarta}</p>
+    {dluga && <button type="button" onClick={() => setCala((c) => !c)} aria-expanded={cala}
+      className="mt-1 text-xs font-semibold text-sky-800 underline underline-offset-2">
+      {cala ? "Zwiń" : "Pokaż całą wiadomość"}</button>}
+  </>;
 }

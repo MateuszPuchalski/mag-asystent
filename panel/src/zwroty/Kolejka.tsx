@@ -75,6 +75,12 @@ export const SYGNALY: Record<Sygnal,
     ikona: <BanknoteArrowDown size={13} /> },
   /* Drugi zwrot tego zamówienia z innego źródła (0.493.0). Czerwień, bo to
      pieniądze, które mogą wyjść dwa razy — nie praca na kiedyś. */
+  /* Klient nie odesłał paczki w 14 dni (0.505.0). Czerwień, bo w DO DECYZJI
+     czeka odmowa, a zwrot bez niej wygląda jak zwrot w drodze. */
+  nie_odeslany: {
+    tytul: "Klient zgłosił zwrot, ale przez 14 dni nie nadał paczki — pieniądze się nie należą. Odmów (N)",
+    krotko: "nie odesłał", klasa: "bg-red-100 text-ranga-zle",
+    ikona: <PackageX size={13} /> },
   drugi_zwrot: {
     tytul: "To zamówienie ma też drugi zwrot — paczkę nieodebraną albo zwrot z Allegro. Pieniądze oddaje się raz",
     krotko: "2 zwroty", klasa: "bg-red-100 text-ranga-zle",

@@ -105,3 +105,17 @@ describe("bramka doboru", () => {
     expect(coSwieci(d)).toEqual(["dobor"]);
   });
 });
+
+/* ── Karta towaru otwarta tylko przy pytaniu o towar (0.506.0) ─────────────
+   Zgłoszenie agenta: „przytłacza". Przy zwrocie, dostawie czy fakturze karta
+   oferty z cenami i EAN stała otwarta, choć pasmo mówiło już nazwę i stan. */
+describe("karta towaru na starcie według rodzaju pytania", () => {
+  it("otwarta przy pytaniu o towar i bez rozpoznania; zwinięta przy zwrocie, dostawie, fakturze", () => {
+    expect(towarOtwartyNaStart([], "PRODUCT_COMPATIBILITY")).toBe(true);
+    expect(towarOtwartyNaStart([], null)).toBe(true);
+    expect(towarOtwartyNaStart([], "RETURN")).toBe(false);
+    expect(towarOtwartyNaStart([], "DELIVERY_DELAY")).toBe(false);
+    expect(towarOtwartyNaStart([], "INVOICE")).toBe(false);
+    expect(towarOtwartyNaStart(["zwrot"], "PRODUCT_QUESTION")).toBe(false);
+  });
+});

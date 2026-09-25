@@ -100,6 +100,53 @@ test("pytamy tylko o zwroty W PRACY, po zamówieniu z identyfikatorem płatnośc
   assert.equal(zwrotyDoSprawdzeniaWyplaty(d, 1, 1).length, 1, "próg tnie budżet taktu");
 });
 
+test("zamknięty korektą, a niezapłacony też pytamy o wypłatę (0.505.0)", async () => {
+  /* Zgłoszenie właściciela, zwrot X5XY/2026: korekta ZW zamknęła zwrot, biuro
+     oddało pieniądze w Allegro, a panel dalej mówił „do zwrotu". */
+  const d = stanowisko();
+  const teraz = new Date("2026-09-25T12:00:00Z");
+  const czeka = zwrotZPlatnoscia(d, "x", "pay-x", { zamkniety: "2026-09-20T08:00:00Z", werdykt: "przyjety" });
+  d.prepare("UPDATE zwrot_klienta SET kwota_grosze=2720, korekta_numer='ZW 831/MAG/09/2026' WHERE id=?").run(czeka);
+  const zlecony = zwrotZPlatnoscia(d, "y", "pay-y", { zamkniety: "2026-09-20T08:00:00Z", werdykt: "przyjety" });
+  d.prepare("UPDATE zwrot_klienta SET kwota_grosze=2720, zwrot_pieniedzy_id='r-1' WHERE id=?").run(zlecony);
+  const stary = zwrotZPlatnoscia(d, "z", "pay-z", { zamkniety: "2026-06-01T08:00:00Z", werdykt: "przyjety" });
+  d.prepare("UPDATE zwrot_klienta SET kwota_grosze=2720 WHERE id=?").run(stary);
+
+  const lista = zwrotyDoSprawdzeniaWyplaty(d, 1, 100, teraz);
+  assert.deepEqual(lista.map((z) => z.zwrotId), [czeka],
+    "nasze zlecenie ma własne potwierdzenie, a zamknięty sprzed dwóch miesięcy to historia");
+
+  await uzupelnijWyplaty(d, lista, {
+    apiUrl: "https://api.test",
+    query: async () => ({ paymentOperations: [operacja("REFUND_CHARGE", "2026-09-24T10:00:00Z")] }),
+  });
+  const w = d.prepare("SELECT rozliczony_allegro_at FROM zwrot_klienta WHERE id=?").get(czeka) as
+    { rozliczony_allegro_at: string | null };
+  assert.equal(w.rozliczony_allegro_at, "2026-09-24T10:00:00Z", "zatrzask zdejmuje czekanie na pieniądze");
+});
+
+test("kolejka pytań się kręci — stare nierozliczalne nie zasłaniają nowych (0.506.1)", async () => {
+  /* Zgłoszenie właściciela, zwrot 6016/2026: wypłata 23 września, a panel
+     dalej „do zwrotu". Setka najstarszych, które rozliczenia nie dostaną
+     nigdy, stała na czele listy na zawsze. */
+  const d = stanowisko();
+  const stare = [0, 1, 2].map((i) =>
+    zwrotZPlatnoscia(d, `s${i}`, `pay-s${i}`, { utworzono: `2026-07-0${i + 1}T08:00:00Z` }));
+  const nowy = zwrotZPlatnoscia(d, "n", "pay-n", { utworzono: "2026-09-10T08:00:00Z" });
+
+  const pierwsza = zwrotyDoSprawdzeniaWyplaty(d, 1, 2);
+  assert.deepEqual(pierwsza.map((z) => z.zwrotId), [stare[0], stare[1]], "niepytane po dacie zgłoszenia");
+  await uzupelnijWyplaty(d, pierwsza, { apiUrl: "https://api.test", query: async () => ({ paymentOperations: [] }) });
+
+  const druga = zwrotyDoSprawdzeniaWyplaty(d, 1, 2);
+  assert.deepEqual(druga.map((z) => z.zwrotId), [stare[2], nowy],
+    "po jednym przebiegu nowszy zwrot dochodzi do pytania mimo starych bez wypłaty");
+
+  /* Nieudane pytanie nie odsuwa zwrotu na koniec kolejki. */
+  await uzupelnijWyplaty(d, druga, { apiUrl: "https://api.test", query: async () => { throw new Error("503"); } });
+  assert.deepEqual(zwrotyDoSprawdzeniaWyplaty(d, 1, 2).map((z) => z.zwrotId), [stare[2], nowy]);
+});
+
 test("potwierdzona wypłata ZDEJMUJE zwrot z kolejki decyzji", () => {
   /* To jest cała wartość tej zmiany: sierpniowy zwrot bez werdyktu stał
      w DO DECYZJI, bo `status_allegro` mówił już o prowizji. Zatrzask z faktu

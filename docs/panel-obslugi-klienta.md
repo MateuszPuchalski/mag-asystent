@@ -4700,6 +4700,17 @@ zdaniem, co sprawdzić, a przycisk „Sprawdziłem w Subiekcie" dopiero wtedy
 ponawia. MM, które weszło po błędzie, przycisku nie ma — tam zostaje
 sprawdzenie stanów.
 
+**Kosz bez MM powrotnego stoi w tym samym kubełku (0.505.0).** Zgłoszenie
+właściciela: „jak mogę sprawdzić, do których koszyków po rozłożeniu nie
+została zrobiona MM powrotna?". Lista żyła dotąd tylko w rekoncyliacji.
+Teraz ten sam warunek (`koszeBezPowrotu`) czyta też ekran koszy: znacznik
+„bez MM powrotnej" i miejsce w kubełku „Problem z MM".
+
+Karta kosza mówi, co zrobić, zależnie od przyczyny. Przy zapisie adresu
+w kolejce albo w błędzie powrót wyjdzie sam po nim. Przy dokumencie bez
+znanego magazynu źródłowego aplikacja powrotu nie wystawi nigdy, więc robi
+go biuro w Subiekcie. Rekoncyliacja podaje ten sam ruch w swoim zdaniu.
+
 ### 25a.18. Przebieg sprawy, notatka i rozjazdy (0.313.0)
 
 Trzy odpowiedzi na jedno pytanie biura: co się z tym zwrotem działo.
@@ -5124,6 +5135,27 @@ którym kroku stanął. Wypłata nie może wyprzedzić zapisu u nas.
 
 Zwrot zostaje potem w DO ZWROTU z paskiem pieniędzy (0.476.0). Schodzi sam,
 gdy synchronizacja zobaczy wypłatę z Allegro.
+
+
+**Szybka ścieżka czeka na paczkę (0.505.0).** Zgłoszenie właściciela przy
+zwrocie 5ZRQ/2026: przycisk proponował „na półkę i oddaj" za filtr, który
+nigdy nie przyjechał. Przy sygnale `brak_dowodu` przycisk stoi, ale mówi, że
+paczka nie wróciła. Gdy karton leży przy biurku, a tracking się spóźnia,
+zostaje droga ręczna.
+
+**Klient nie odesłał — odmowa jednym ruchem (0.505.0).** Zwrot bez numeru
+listu i bez doręczenia po czternastu dniach od zgłoszenia dostaje sygnał
+`nie_odeslany`. Stoi w DO DECYZJI z czerwonym paskiem w miejscu szybkiej
+ścieżki. `N` albo przycisk wysyła odmowę `REFUND_REJECTED` z gotowym
+powodem, a potem zapisuje werdykt „odrzucony" z tym samym zdaniem.
+Kolejność jest celowa: odmowa, która nie przejdzie, nie zmienia niczego.
+
+`O` otwiera pole powodu, bo odmowa jest nieodwracalna, a powód bywa inny.
+Tu fakt jest jeden i sprawdzalny, więc pole dodawałoby klawisz bez decyzji.
+
+Reguła wieku z 0.452.0 nie zamyka takiego zwrotu po 45 dniach. Allegro za
+nienadaną paczkę nic nie oddaje, więc zamknięcie mówiłoby nieprawdę. Sufit
+wynosi dziewięćdziesiąt dni, żeby stara historia nie wróciła setkami.
 
 ### 25a.8. Czego panel nie wie
 
@@ -6083,6 +6115,56 @@ Każda zmiana niżej ma powód w komentarzu obok kodu.
 **Czego nie robimy — decyzja właściciela.** Propozycja, by układ zmieniał
 się najwyżej raz w tygodniu, została odrzucona. Wydania idą jak dotąd,
 a o zmianach mówi pasek z punktu 7.
+
+## 26d. Skrzynka spokojniejsza: mniej naraz, to samo pod ręką (0.506.0)
+
+Zgłoszenie jednego z agentów brzmiało: „aplikacja przytłacza". Propozycja
+powstała na tablicy projektowej i właściciel ją przyjął. Zasada była jedna:
+żadnej nowej funkcji, tylko zdjąć, scalić albo zwinąć. Nic nie zniknęło na
+dobre — każda rzecz jest najwyżej jedno kliknięcie dalej.
+
+1. **Nagłówek rozmowy: login, status, „⋯" i Zakończ.** Prowadzący, kategoria
+   z poprawką oraz przełączniki „pilne" i „reklamacyjna" zeszły do menu
+   „⋯". Podniesiona flaga dalej stoi na wierzchu i jednym kliknięciem się
+   zdejmuje. Cudzy prowadzący też zostaje na wierzchu, bo zmienia decyzję
+   o pisaniu.
+2. **Jeden przycisk wysyłki.** „Wyślij do klienta" zostaje z podpowiedzią
+   Ctrl+Enter. „Wyślij i zakończ" oraz „Zapisz szkic" stoją pod strzałką
+   obok. Licznik znaków pojawia się dopiero 400 znaków przed limitem Allegro.
+3. **Oś: nasze długie wiadomości zwinięte.** Wiadomość firmy powyżej 320
+   znaków albo pięciu linii pokazuje cztery linie i „Pokaż całą wiadomość".
+   Serie pustych linii ściskają się do jednej, wyłącznie na ekranie.
+4. **Pytanie bez odpowiedzi ma ramkę.** Ostatnia wiadomość klienta, po której
+   nic nie padło, dostaje bursztynową obwódkę. „Zleć z tej wiadomości" stoi
+   na wierzchu tylko przy niej; przy starszych wychodzi pod myszą i fokusem.
+5. **Pasek zdarzeń jednym zdaniem.** „Ostatnio: Otwarta · czas" i przycisk
+   „przebieg (n)". Całą sekwencję zmian pokazuje dopiero kliknięcie.
+6. **Kolejka: trzy kubełki i „Więcej".** „Oczekujące" i „Zakończone" to
+   przeglądanie, więc stoją w liście „Więcej" z liczbą. Klawisze 1–5 działają
+   jak dotąd. Czas czekania to sama barwna liczba, bez słupków.
+7. **Prawa kolumna bez dubli.** Przy zwrocie i sprawie „Oferta i towar" startuje
+   zwinięta. Wiersz „Dobór" nie staje, gdy dobór jest zbędny. Bramka doboru
+   mieszka w wierszu towaru. Soczewka zwrotu mówi, że zgłoszenia w Allegro
+   jeszcze nie ma i kiedy doręczono paczkę.
+
+**Druga runda krytyki na wdrożonym ekranie.** Zrzuty w 1900 i 1366 px
+złapały pięć rzeczy, poprawionych w tym samym wydaniu:
+
+- baner „Brak powiązania z ofertą" stał nad kolumną, która mówiła „Zamówił
+  1 ×". Milknie teraz, gdy ekran zna zamówienie albo ofertę inną drogą;
+- ten baner mówił o ekranie („Ekran mówi to wprost…"). Mówi teraz o kliencie:
+  „Nie wiadomo, o który towar pyta klient";
+- symbol kartoteki stał dwa razy w pasmie. Staje w „To jest" tylko wtedy,
+  gdy różni się od sygnatury zamówienia — wtedy to sygnał, nie powtórzenie;
+- plakietka kategorii łamała nagłówek na dwa rzędy przy 1366 px. Zeszła do
+  „⋯", bo kategorię niesie już kafel wiersza i nagłówek soczewki;
+- lista „Więcej" spadała pod kubełki i dokładała rząd. Wypełnia teraz resztę
+  rzędu kubełków.
+
+**Odwrócona decyzja.** Słupki czasu czekania weszły 23 września 2026.
+Zdjęła je przyjęta propozycja: barwa i liczba mówią to samo w jednym znaku.
+Kafel kategorii na początku wiersza zostaje, bo tylko on niesie częste
+kategorie.
 
 ## 27. Zasady nadrzędne
 
