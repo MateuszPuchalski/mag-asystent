@@ -245,7 +245,7 @@ describe("zakres Obsługa klienta", () => {
     expect(zapisy).toEqual([]);
   });
 
-  /* Tarcie w skrzynce (@wydanie): trzy liczby pod czasem odpowiedzi, bez
+  /* Tarcie w skrzynce (0.500.0): trzy liczby pod czasem odpowiedzi, bez
      karty osób dla biura i bez zapisu przy otwarciu. */
   it("pokazuje tarcie: cofnięcia, czas do wysyłki i szkice bez zmian", async () => {
     pokaz();

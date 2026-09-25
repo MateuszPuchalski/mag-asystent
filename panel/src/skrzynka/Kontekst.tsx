@@ -339,7 +339,7 @@ export function streszczenieZamowienia(dane: OsRozmowy): string {
     ? `doręczona ${dzien(z.przesylka.dostarczonoAt)}`
     : z.przesylka?.status ? STATUS_PACZKI[z.przesylka.status] ?? z.przesylka.status
       : "paczki nie sprawdzano";
-  /* PACZKA PIERWSZA (@wydanie): wzrok czyta początek wiersza i pomija resztę
+  /* PACZKA PIERWSZA (0.500.0): wzrok czyta początek wiersza i pomija resztę
      (NN/g, wzorzec F, potwierdzony w 2017). O zamówieniu pytają najczęściej
      „gdzie paczka", więc to słowo ma stać tam, gdzie oko na pewno trafi. */
   if (!p) return `${paczka} · treść jeszcze nie pobrana`;

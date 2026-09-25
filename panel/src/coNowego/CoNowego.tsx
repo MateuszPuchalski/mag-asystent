@@ -3,7 +3,7 @@ import { Sparkles, X } from "lucide-react";
 import dane from "virtual:wertis-zmiany";
 import { doPokazania, type WydanieZmian } from "./zmiany";
 
-/* ── Pasek „Nowe w panelu" (@wydanie) ────────────────────────────────────────
+/* ── Pasek „Nowe w panelu" (0.500.0) ────────────────────────────────────────
    Jeden wiersz pod nagłówkiem przy pierwszym wejściu po wydaniu: nagłówki
    zmian, które agent jeszcze nie widział, i „Rozumiem". Powód i dobór wydań
    w `zmiany.ts`.

@@ -100,7 +100,7 @@ export async function analizaRoutes(app: FastifyInstance) {
     return czasOdpowiedzi(dniZQuery(req.query.days), mozeWidziecLudzi());
   });
 
-  /* Pomiar tarcia w skrzynce (@wydanie) — cofnięcia, czas do wysyłki
+  /* Pomiar tarcia w skrzynce (0.500.0) — cofnięcia, czas do wysyłki
      i szkice wysłane bez zmian. Ta sama bramka i okno co czas odpowiedzi;
      rozbicie na osoby wyłącznie dla administratora. Odczyt niczego nie
      zapisuje. Powód każdej liczby przy `services/tarcie.ts`. */

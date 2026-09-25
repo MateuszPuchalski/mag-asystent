@@ -3,7 +3,7 @@ import React from "react";
 import { act, render, screen } from "@testing-library/react";
 import { useSkrotyDzialaja } from "./fokus";
 
-/* ── Podpowiedź klawisza tylko wtedy, gdy klawisz działa (@wydanie) ────────
+/* ── Podpowiedź klawisza tylko wtedy, gdy klawisz działa (0.500.0) ────────
    Znaczek jednoliterowego skrótu znika, gdy fokus wchodzi w pole pisania,
    i wraca, gdy z niego wychodzi — dokładnie tam, gdzie skrót milknie.     */
 

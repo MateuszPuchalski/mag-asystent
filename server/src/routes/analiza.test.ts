@@ -185,7 +185,7 @@ test("czas odpowiedzi: biuro bez rozbicia na osoby, administrator z nim", async 
 });
 
 test("pomiar tarcia: biuro bez rozbicia na osoby, administrator z nim", async () => {
-  /* @wydanie. Udział szkiców wysłanych bez zmian na osobę to ocena pracy
+  /* 0.500.0. Udział szkiców wysłanych bez zmian na osobę to ocena pracy
      człowieka — ta sama reguła co czas odpowiedzi. */
   const czytaj = async (t: string) => (await app.inject({
     method: "GET", url: "/api/analiza/tarcie?days=30", headers: { "x-session": t } })).json();

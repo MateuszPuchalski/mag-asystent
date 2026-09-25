@@ -589,7 +589,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     } catch (e) { return konflikt(reply, e); }
   });
 
-  /* Cofnięta wysyłka (@wydanie) — sam wpis do pomiaru tarcia. Czekanie
+  /* Cofnięta wysyłka (0.500.0) — sam wpis do pomiaru tarcia. Czekanie
      dziesięciu sekund mieszka w przeglądarce, więc serwer inaczej by o tym
      nie wiedział. Powód i granice przy `services/tarcie.ts`. */
   app.post<{ Params: { id: string } }>(

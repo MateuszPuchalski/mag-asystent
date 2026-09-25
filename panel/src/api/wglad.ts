@@ -173,7 +173,7 @@ export function useCzasOdpowiedzi(dni: number, wlaczona: boolean) {
   });
 }
 
-/* ── Tarcie w skrzynce (`services/tarcie.ts`, @wydanie) ────────────────── */
+/* ── Tarcie w skrzynce (`services/tarcie.ts`, 0.500.0) ────────────────── */
 
 export interface LiczbyTarcia {
   wyslanych: number;

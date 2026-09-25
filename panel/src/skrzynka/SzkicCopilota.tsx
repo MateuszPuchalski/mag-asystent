@@ -11,7 +11,7 @@ import { useSkrotyDzialaja } from "../nawigacja/fokus";
  * Szkic odpowiedzi z Copilota (§14.6, 0.231.0) — przycisk i karta pod edytorem.
  *
  * Propozycja modelu NIE wchodzi do pola sama. Stoi obok jako karta, a do
- * szkicu agenta trafia jednym kliknięciem „Wstaw do odpowiedzi" (do @wydanie
+ * szkicu agenta trafia jednym kliknięciem „Wstaw do odpowiedzi" (do 0.500.0
  * „Popraw w edytorze").
  *
  * ── JEDEN PRZYCISK ZAMIAST „WSTAW" I „ZASTĄP" (22 września 2026) ──────────
@@ -194,7 +194,7 @@ export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
       <span className="ml-auto flex flex-wrap items-center gap-2">
         {!wPolu && <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onPopraw}
           aria-keyshortcuts="E">
-          {/* „WSTAW DO ODPOWIEDZI", NIE „POPRAW W EDYTORZE" (@wydanie). Przycisk
+          {/* „WSTAW DO ODPOWIEDZI", NIE „POPRAW W EDYTORZE" (0.500.0). Przycisk
               niczego nie poprawia — przenosi szkic do pola. Napis ma nazywać
               SKUTEK, bo po skutek się klika (Nielsen: zgodność z rzeczywistością). */}
           {p.maSzkicAgenta ? "Zastąp mój szkic" : "Wstaw do odpowiedzi"}

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { doPokazania, najnowszeZmiany, starsza } from "./zmiany";
 
-/* ── Wyciąg „co się zmieniło" (@wydanie) ────────────────────────────────────
+/* ── Wyciąg „co się zmieniło" (0.500.0) ────────────────────────────────────
    Pilnujemy trzech granic: bierzemy tylko wydania `minor`, tylko pogrubione
    otwarcia akapitów (nie punkty list), a porównanie wersji jest liczbowe.  */
 

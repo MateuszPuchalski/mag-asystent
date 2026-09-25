@@ -1,4 +1,4 @@
-/* ── „CO SIĘ ZMIENIŁO" — WYCIĄG Z HISTORII ZMIAN (@wydanie) ──────────────────
+/* ── „CO SIĘ ZMIENIŁO" — WYCIĄG Z HISTORII ZMIAN (0.500.0) ──────────────────
    Panel zmienia się kilka razy w tygodniu, a agent dowiadywał się o tym,
    trafiając na przycisk w innym miejscu. Zaskoczenie kosztuje uwagę przy
    KAŻDEJ zmianie; jedno zdanie przy pierwszym wejściu po wydaniu — raz.

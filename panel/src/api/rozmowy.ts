@@ -426,7 +426,7 @@ export function useOtworz() {
   const qc = useQueryClient();
   return useMutation({
     /* Bez ciała — i dlatego bez `body`: pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`.
-       Ciało idzie WYŁĄCZNIE z paska „Cofnij" (@wydanie): serwer liczy to
+       Ciało idzie WYŁĄCZNIE z paska „Cofnij" (0.500.0): serwer liczy to
        otwarcie jako cofnięte zakończenie w pomiarze tarcia. */
     mutationFn: (v: { id: number; zCofniecia?: boolean }) => api(`/api/conversations/${v.id}/otworz`, {
       method: "POST", ...(v.zCofniecia ? { body: JSON.stringify({ zCofniecia: true }) } : {}),
@@ -447,7 +447,7 @@ export function useWyslij() {
       mimoNowejWiadomosci?: boolean; mimoObecnosci?: boolean;
       /** „Wyślij i zakończ" (23 września 2026) — werdykt w tej samej transakcji co wiadomość. */
       zakoncz?: boolean;
-      /** Ms od otwarcia rozmowy do kliknięcia „Wyślij" — pomiar tarcia (@wydanie). */
+      /** Ms od otwarcia rozmowy do kliknięcia „Wyślij" — pomiar tarcia (0.500.0). */
       msOdOtwarcia?: number;
     }) => api<WynikWysylki>(`/api/conversations/${v.id}/send`, {
       method: "POST",
@@ -471,7 +471,7 @@ export function useWyslij() {
 }
 
 /**
- * Cofnięta wysyłka (@wydanie) — sam wpis do pomiaru tarcia. Czekanie
+ * Cofnięta wysyłka (0.500.0) — sam wpis do pomiaru tarcia. Czekanie
  * dziesięciu sekund mieszka w przeglądarce, więc bez tego serwer nie wie,
  * że agent zawrócił odpowiedź. Porażka wpisu nie ma prawa zatrzymać
  * cofnięcia — agent już zdecydował, a pomiar to nie jego sprawa.

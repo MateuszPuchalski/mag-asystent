@@ -107,7 +107,7 @@ export function Analiza() {
       {zakres === "obsluga" && <>
         {obsluga.data && <ZakresObslugi a={obsluga.data} />}
         {/* Tarcie zaraz pod czasem odpowiedzi: tamto mówi, jak szybko,
-            to — ile kosztował sam ekran (@wydanie). */}
+            to — ile kosztował sam ekran (0.500.0). */}
         <TarcieSkrzynki dni={okna.obsluga} />
         <MiaryObslugi dni={okna.obsluga} />
       </>}

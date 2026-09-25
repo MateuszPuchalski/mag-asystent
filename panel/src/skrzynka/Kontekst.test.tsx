@@ -228,7 +228,7 @@ describe("kolumna kontekstu", () => {
   });
 });
 
-/* ── Rozstrzygające słowo na początku (@wydanie) ─────────────────────────────
+/* ── Rozstrzygające słowo na początku (0.500.0) ─────────────────────────────
    Oko czyta początek wiersza i pomija resztę (NN/g, wzorzec F, 2006 i 2017).
    O zamówieniu pyta się „gdzie paczka", więc paczka stoi pierwsza. */
 describe("streszczenie zamówienia", () => {

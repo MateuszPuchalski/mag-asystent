@@ -786,7 +786,7 @@ export function zakonczRozmowe(
  */
 export function otworzRozmowe(
   database: DatabaseSync, conversationId: number, userId: number, teraz = new Date(),
-  /* Otwarcie z paska „Cofnij" tuż po zakończeniu (@wydanie). Osobny wpis
+  /* Otwarcie z paska „Cofnij" tuż po zakończeniu (0.500.0). Osobny wpis
      w dzienniku, bo to pomyłka złapana w porę, a nie decyzja po dniach —
      pomiar tarcia (`services/tarcie.ts`) liczy wyłącznie te pierwsze. */
   zCofniecia = false,

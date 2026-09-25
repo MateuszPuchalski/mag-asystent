@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 
-/* ── PODPOWIEDŹ KLAWISZA TYLKO WTEDY, GDY KLAWISZ DZIAŁA (@wydanie) ─────────
+/* ── PODPOWIEDŹ KLAWISZA TYLKO WTEDY, GDY KLAWISZ DZIAŁA (0.500.0) ─────────
    Jednoliterowe skróty skrzynki (E, R, Z) milczą w polu tekstowym — tam
    człowiek pisze, nie steruje. Znaczek „E" przy przycisku świecił jednak dalej,
    więc agent w trakcie pisania widział obietnicę, której klawisz nie spełniał.

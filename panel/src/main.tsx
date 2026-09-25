@@ -315,7 +315,7 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
      i `dvh` po kolei, czego jedna klasa Tailwinda zapisać nie umie. */
   return <div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
     <Naglowek wyloguj={wyloguj} />
-    {/* „Nowe w panelu" (@wydanie) — pod nagłówkiem, nad pracą, tylko przy
+    {/* „Nowe w panelu" (0.500.0) — pod nagłówkiem, nad pracą, tylko przy
         pierwszym wejściu po wydaniu. Powód w `coNowego/CoNowego.tsx`. */}
     <CoNowego />
     {/* BEZ `max-w` i bez `mx-auto` (0.198.0). Ogranicznik 1500 px przyszedł

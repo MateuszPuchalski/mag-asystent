@@ -1,7 +1,7 @@
 import React from "react";
 import { Undo2, X } from "lucide-react";
 
-/* ── „COFNIJ" ZAMIAST PYTANIA „CZY NA PEWNO" (@wydanie) ──────────────────────
+/* ── „COFNIJ" ZAMIAST PYTANIA „CZY NA PEWNO" (0.500.0) ──────────────────────
    Czynność jednym kliknięciem, której skutek znika z oczu — rozmowa
    zakończona schodzi z listy, a ekran przeskakuje do następnej — dostaje
    pasek z „Cofnij" na kilka sekund. Nie okno potwierdzenia: badanie

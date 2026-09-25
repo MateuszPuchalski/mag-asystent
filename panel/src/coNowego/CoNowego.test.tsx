@@ -3,7 +3,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
-/* ── Pasek „Nowe w panelu" (@wydanie) ───────────────────────────────────────
+/* ── Pasek „Nowe w panelu" (0.500.0) ───────────────────────────────────────
    Pilnujemy: pasek pokazuje nowsze niż zamknięte, „Rozumiem" zapamiętuje
    najnowsze i chowa pasek, a samo otwarcie niczego nie zapisuje — ani na
    serwerze, ani w przeglądarce.                                            */

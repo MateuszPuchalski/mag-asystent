@@ -94,7 +94,7 @@ export function Edytor({
      pomylenia. Czyszczenie niczego nie zapisuje, więc do pomyłki potrzebne
      jest cofnięcie — trzymane, dopóki agent nie zacznie pisać od nowa. */
   const [wyczyszczone, setWyczyszczone] = useState<string | null>(null);
-  /* ── TARCIE PRZY WYSYŁCE NIETKNIĘTEGO SZKICU (@wydanie) ─────────────────
+  /* ── TARCIE PRZY WYSYŁCE NIETKNIĘTEGO SZKICU (0.500.0) ─────────────────
      Szkic stoi w polu gotowy do wysłania, więc przyjęcie go bez czytania
      kosztuje jedno kliknięcie. Randomizowane badanie z 2025 (NEJM AI):
      lekarze po dwudziestu godzinach szkolenia z AI wypadali o 18 punktów

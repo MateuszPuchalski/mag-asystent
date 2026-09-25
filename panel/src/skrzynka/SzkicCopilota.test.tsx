@@ -81,7 +81,7 @@ describe("Szkic Copilota w edytorze", () => {
     expect(c.onOdrzuc).toHaveBeenCalledTimes(1);
   });
 
-  /* ── Tarcie przy nietkniętym szkicu (@wydanie) ────────────────────────────
+  /* ── Tarcie przy nietkniętym szkicu (0.500.0) ────────────────────────────
      Wąskie z rozmysłem: tylko szkic bez zmian i tylko z twierdzeniami spoza
      naszej bazy. Bez okna dialogowego — przycisk mówi, co się stanie. */
   it("nietknięty szkic z twierdzeniami spoza bazy: „Wyślij bez zmian” i lista obok", async () => {

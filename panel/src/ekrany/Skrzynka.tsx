@@ -185,8 +185,8 @@ export function Skrzynka() {
     }
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
 
-  /* ── NIC NIE WCHODZI DO POLA, GDY AGENT JUŻ PATRZY (@wydanie) ──────────────
-     Do @wydanie szkic, który takt ułożył w tle przy otwartej rozmowie, sam
+  /* ── NIC NIE WCHODZI DO POLA, GDY AGENT JUŻ PATRZY (0.500.0) ──────────────
+     Do 0.500.0 szkic, który takt ułożył w tle przy otwartej rozmowie, sam
      wypełniał puste pole — tekst pojawiał się agentowi pod ręką w trakcie
      czytania wątku. Zasada najmniejszego zaskoczenia (Raskin, „The Humane
      Interface"): stan ekranu zmienia się na ruch człowieka, nie obok niego.
@@ -209,7 +209,7 @@ export function Skrzynka() {
        spóźniony ma NIE uruchamiać tego efektu; powód wyżej. */
   }, [ja.data?.user.userId]);
 
-  /* CHWILA OTWARCIA ROZMOWY — pomiar tarcia (@wydanie). Liczy się od
+  /* CHWILA OTWARCIA ROZMOWY — pomiar tarcia (0.500.0). Liczy się od
      wejścia w rozmowę do kliknięcia „Wyślij", nie do wyjścia odpowiedzi po
      dziesięciu sekundach: okno cofnięcia to nie szukanie po ekranie. */
   const otwartaOd = useRef(Date.now());
@@ -606,7 +606,7 @@ export function Skrzynka() {
           onSuccess: () => {
             const nast = nastepnaRozmowa(widoczne.current, id);
             if (nast !== null) nawiguj(`/obsluga/skrzynka/${nast}`);
-            /* COFNIJ PO ZAKOŃCZENIU (@wydanie): rozmowa właśnie zniknęła
+            /* COFNIJ PO ZAKOŃCZENIU (0.500.0): rozmowa właśnie zniknęła
                z listy i z ekranu, więc pomyłki nie widać. Cofnięcie to ta sama
                „Otwórz ponownie", która stoi w nagłówku — plus powrót do niej. */
             setDoCofniecia({ klucz: Date.now(), opis: <>Zakończono rozmowę z <b>{klient}</b></>,
@@ -663,7 +663,7 @@ export function Skrzynka() {
     <Odlozone lista={odlozone}
       onCofnij={(k) => {
         const w = odlozone.find((o) => o.klucz === k);
-        /* Wpis do pomiaru tarcia (@wydanie) — tylko przy „Cofnij". „Wróć"
+        /* Wpis do pomiaru tarcia (0.500.0) — tylko przy „Cofnij". „Wróć"
            po błędzie wysyłki to nie pomyłka agenta, tylko Allegro. */
         if (w) { zglosCofnietaWysylke(w.rozmowaId); wrocDo(w); }
       }}

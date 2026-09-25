@@ -66,7 +66,7 @@ function Anulowanie({ dane }: { dane: OsRozmowy }) {
       : `Bez powtórzonego zakupu tych samych pozycji w ${OKNO_PODWOJNEGO_GODZ} godzinach.`}</p>
     <ul className="divide-y rounded-lg border" aria-label="Zakupy tego klienta">
       {zakupy.map((z) => <li key={z.externalId} className="px-3 py-2">
-        {/* STATUS PIERWSZY (@wydanie): to on rozstrzyga, który zakup anulować,
+        {/* STATUS PIERWSZY (0.500.0): to on rozstrzyga, który zakup anulować,
             a początek wiersza jest jedynym miejscem, które oko czyta na pewno. */}
         <div className="flex flex-wrap items-baseline gap-x-2 text-xs">
           <span className={z.status === "READY_FOR_PROCESSING" ? "font-semibold text-emerald-800"

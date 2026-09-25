@@ -3,7 +3,7 @@ import path from "node:path";
 import type { Plugin } from "vite";
 import { najnowszeZmiany } from "./src/coNowego/zmiany";
 
-/* ── Moduł `virtual:wertis-zmiany` (@wydanie) ────────────────────────────────
+/* ── Moduł `virtual:wertis-zmiany` (0.500.0) ────────────────────────────────
    Nagłówki trzech ostatnich wydań `minor` i numer wersji panelu, wyliczone
    przy budowaniu z `CHANGELOG.md` i `package.json` w korzeniu repo. Powód,
    dla którego wyciąg, a nie cały plik: `src/coNowego/zmiany.ts`.

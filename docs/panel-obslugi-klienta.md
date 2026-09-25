@@ -6008,7 +6008,7 @@ Jedyna poprawna kopia reguły mieszkała jako prywatna funkcja w
 znak w znak. „Dni" brzmi tak samo w obu formach mnogich, więc tamte kopie były
 poprawne — ale trzy zapisy jednej odmiany to trzy miejsca na rozjazd.
 
-## 26c. Intuicyjność: siedem zmian z badań (@wydanie)
+## 26c. Intuicyjność: siedem zmian z badań (0.500.0)
 
 Pytanie właściciela brzmiało: „co zrobić, żeby aplikacja była bardziej
 intuicyjna". Odpowiedź oparła się na badaniach sprawdzonych pod kątem daty.

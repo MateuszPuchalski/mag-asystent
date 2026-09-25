@@ -6,7 +6,7 @@ import { migrate } from "../db/db.js";
 import { czasDoWysylki, pomiarTarcia, zapiszCofniecieWysylki } from "./tarcie.js";
 import { otworzRozmowe, zakonczRozmowe } from "./conversations.js";
 
-/* ── Pomiar tarcia w skrzynce (@wydanie) ─────────────────────────────────────
+/* ── Pomiar tarcia w skrzynce (0.500.0) ─────────────────────────────────────
    Pilnujemy czterech rzeczy: udział szkiców bez zmian liczy się tylko ze
    szkiców na tę samą wiadomość; cofnięte zakończenie to wyłącznie otwarcie
    z paska „Cofnij"; liczba czasu z przeglądarki jest przycinana; a rozbicia

@@ -3,7 +3,7 @@ import { useTarcie, type LiczbyTarcia } from "../api/wglad";
 import { Liczba } from "../ui/wykres";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
-/* ── Tarcie w skrzynce (@wydanie) ────────────────────────────────────────────
+/* ── Tarcie w skrzynce (0.500.0) ────────────────────────────────────────────
    Trzy liczby, po których widać, czy zmiana układu skrzynki pomogła: ile
    pomyłek agent zawrócił, ile sekund mija od otwarcia rozmowy do wysyłki
    i jak często szkic Copilota idzie do klienta nietknięty. Powód każdej

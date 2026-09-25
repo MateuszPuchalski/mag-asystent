@@ -3,7 +3,7 @@ import { db as defaultDb } from "../db/db.js";
 import { mediana } from "./raporty.js";
 import { logEvent } from "./events.js";
 
-/* ── Pomiar tarcia w skrzynce (@wydanie) ─────────────────────────────────────
+/* ── Pomiar tarcia w skrzynce (0.500.0) ─────────────────────────────────────
    Zgłoszenie właściciela: „jak zrobić aplikację bardziej intuicyjną”. Zmiany
    w etykietach, cofnięcia i podpowiedzi klawiszy da się ocenić tylko liczbą,
    inaczej każde wydanie wygrywa spór o wygląd samym tym, że jest nowsze.
@@ -125,7 +125,7 @@ export function czasDoWysylki(v: unknown): number | null {
 }
 
 /**
- * Agent zawrócił odpowiedź w oknie „Cofnij" (@wydanie). Czekanie mieszka
+ * Agent zawrócił odpowiedź w oknie „Cofnij" (0.500.0). Czekanie mieszka
  * w przeglądarce (`skrzynka/Odlozone.tsx`), więc bez tego wpisu serwer
  * nigdy by się o cofnięciu nie dowiedział. To jedyny zapis tej ścieżki.
  */
