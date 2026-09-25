@@ -113,8 +113,13 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
   const oferta = dane.oferta;
   const kilkaPozycji = pozycjiDoWskazania(dane);
   const swiatla = coSwieci(dane);
+  /* Kategoria dla domyślnego rozwinięcia: człowieka, a bez niej modelu —
+     ale nie awaryjna ani nieudana, bo te nie mówią, o co pyta klient. */
+  const kop = dane.rozmowa.kopilot;
+  const kategoria = kop?.kategoriaCzlowieka
+    ?? (kop && kop.zrodlo !== "FALLBACK" && kop.status !== "FAILED" ? kop.kategoria : null);
   const [otwarte, setOtwarte] = useState<ReadonlySet<Temat>>(
-    () => new Set<Temat>(towarOtwartyNaStart(swiatla) ? ["towar"] : []));
+    () => new Set<Temat>(towarOtwartyNaStart(swiatla, kategoria) ? ["towar"] : []));
   const przelacz = (t: Temat) => setOtwarte((o) => {
     const n = new Set(o);
     if (n.has(t)) n.delete(t); else n.add(t);
@@ -219,6 +224,15 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
                   ? " Wskaż pozycję zamówienia wyżej, a towar pojawi się tutaj."
                   : " Wskaż ofertę przy rozmowie, a towar pojawi się tutaj."}</span>
             </p>}
+        {/* „Szukaj innego towaru mimo to" przy znanym towarze (@wydanie) —
+            tutaj, a nie we własnym wierszu „Dobór: zbędny". Wiersz mówił przy
+            każdej takiej rozmowie, że czegoś NIE trzeba robić. */}
+        {/* Kliknięcie OTWIERA dobór: bez tego wiersz wracał zwinięty i przycisk
+            wyglądał, jakby nie zrobił nic. */}
+        {bramka && <BramkaDoboru dane={dane} onSzukaj={() => {
+          setSzukamMimoTo(true);
+          setOtwarte((o) => new Set(o).add("dobor"));
+        }} />}
       </Wiersz>
 
       {/* ── ZAKUPY TEGO KLIENTA (0.397.0) ──────────────────────────────────
@@ -241,10 +255,9 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
           {sprawyZamkniete.length > 0 && <SprawyZakupu sprawy={sprawyZamkniete} />}
         </Wiersz>}
 
-      {!doborSwieci && <Wiersz tytul="Dobór"
-        streszczenie={bramka ? "zbędny — towar znany z zamówienia" : streszczenieDoboru(dane)}
+      {!doborSwieci && !bramka && <Wiersz tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
         otwarty={otwarte.has("dobor")} onPrzelacz={() => przelacz("dobor")}>
-        {bramka ? <BramkaDoboru dane={dane} onSzukaj={() => setSzukamMimoTo(true)} /> : dobor}
+        {dobor}
       </Wiersz>}
 
       <Wiersz tytul="Klient" streszczenie={streszczenieKlienta(historia.data)}
@@ -343,7 +356,9 @@ export function streszczenieZamowienia(dane: OsRozmowy): string {
      (NN/g, wzorzec F, potwierdzony w 2017). O zamówieniu pytają najczęściej
      „gdzie paczka", więc to słowo ma stać tam, gdzie oko na pewno trafi. */
   if (!p) return `${paczka} · treść jeszcze nie pobrana`;
-  return [paczka, p.kupionoAt ? dzien(p.kupionoAt) : null,
+  /* „kupione" przy dacie (@wydanie): obok „doręczona 15 września" goła druga
+     data czytała się jak druga data dostawy. */
+  return [paczka, p.kupionoAt ? `kupione ${dzien(p.kupionoAt)}` : null,
     p.sumaGrosze !== null ? zlote(p.sumaGrosze, p.waluta) : null].filter(Boolean).join(" · ");
 }
 

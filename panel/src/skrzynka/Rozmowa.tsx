@@ -10,6 +10,7 @@ import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
 import { BrakOferty } from "./BrakOferty";
 import { Status } from "./Status";
 import { EtykietaKategorii } from "./Copilot";
+import { WierszMenu } from "./MenuRozmowy";
 import { ProwadziZnak } from "./ProwadziZnak";
 import { Obecni } from "./Obecni";
 
@@ -22,7 +23,13 @@ import { Obecni } from "./Obecni";
  * Ekran dalej nie podstawia oferty zgadniętej z treści — tak wygrywały
  * kiedyś „zdemontowanym" i „Pozdrawiam".
  */
-export function brakPowiazania(os: WpisOsi[]): boolean {
+export function brakPowiazania(os: WpisOsi[],
+  znane?: Pick<OsRozmowy, "zamowienie" | "oferta">): boolean {
+  /* Baner mówi „nie wiemy, o co pyta", więc milknie, gdy wiemy to inną drogą
+     (@wydanie). Zamówienie wskazane z kandydatów albo z numeru w treści nie
+     trafia na oś jako `zamowienieId`, a prawa kolumna już je pokazuje. Runda
+     krytyki złapała obie kolumny naraz: „brak powiązania" nad „Zamówił 1 ×". */
+  if (znane?.zamowienie || znane?.oferta) return false;
   return os.some((w) => w.rodzaj === "wiadomosc" && w.odKlienta && !w.ofertaId && !w.zamowienieId)
     && !os.some((w) => w.ofertaId || w.zamowienieId);
 }
@@ -108,7 +115,7 @@ export function Rozmowa(p: {
   const { rozmowa, os } = p.dane;
   const moja = rozmowa.wlascicielId !== null && rozmowa.wlascicielId === p.mojeId;
   const cudza = rozmowa.wlascicielId != null && rozmowa.wlascicielId !== p.mojeId;
-  const bezOferty = brakPowiazania(os);
+  const bezOferty = brakPowiazania(os, p.dane);
   const wskazanaRecznie = Boolean(p.dane.ofertaWskazana);
 
   return <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -154,7 +161,10 @@ export function Rozmowa(p: {
               „Prowadzi nikt — przypisze pierwsza odpowiedź" zajmowało linię
               pod loginem. Zostaje kółko: puste przerywane, gdy nikt, z inicjałem,
               gdy ktoś — a całe zdanie w dymku i dla czytnika ekranu. */}
-          <ProwadziZnak prowadzi={rozmowa.wlasciciel} ja={moja} />
+          {/* ZNAK TYLKO PRZY WYJĄTKU (@wydanie): cudza rozmowa zmienia decyzję
+              o pisaniu, więc zostaje na wierzchu. „Nikt" i „Ty" to norma — stoją
+              w menu „⋯", żeby nagłówek nie powtarzał jej przy każdej rozmowie. */}
+          {rozmowa.wlasciciel && !moja && <ProwadziZnak prowadzi={rozmowa.wlasciciel} ja={false} />}
       {/* Status stoi w nagłówku, nie przy edytorze: odpowiada na pytanie „co
           z tą sprawą", a nie „co napisać". Zmienić go może każdy z biura,
           także bez prowadzenia rozmowy — zamknięcie cudzej sprawy załatwionej
@@ -162,12 +172,25 @@ export function Rozmowa(p: {
       {/* Etykieta o propozycji Copilota stoi PRZY NIEJ, nie za zębatką: ocenia
           się to, na co się właśnie patrzy. Za zębatką mieszka SUMA etykiet,
           czyli pomiar — ekran pracy niesie to, co woła o reakcję (0.168.0). */}
-      {rozmowa.kopilot && <EtykietaKategorii kopilot={rozmowa.kopilot}
-        zapisuje={p.poprawia} onPopraw={p.onPoprawKategorie ?? (() => {})} />}
+      {/* KATEGORIA POD „⋯" (@wydanie). Pierwsze wdrożenie zostawiło na
+          wierzchu samą plakietkę; runda krytyki na ekranie 1366 px pokazała, że
+          łamie ona nagłówek na dwa rzędy i spycha pytanie klienta. Kategorię
+          niesie już kafel wiersza w kolejce i nagłówek soczewki po prawej,
+          więc tu byłaby trzecim zapisem. Poprawka została w menu. */}
         <Status rozmowa={rozmowa} blad={p.bladStatusu}
           onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet}
           onReklamacyjna={p.onReklamacyjna} zapisujeReklamacyjna={p.zapisujeReklamacyjna}
-          onZakoncz={p.onZakoncz} onOtworz={p.onOtworz} zmieniaStatus={p.zmieniaStatus} />
+          onZakoncz={p.onZakoncz} onOtworz={p.onOtworz} zmieniaStatus={p.zmieniaStatus}
+          menu={<>
+            <WierszMenu etykieta="Prowadzi">
+              <span className="text-slate-700">{rozmowa.wlasciciel
+                ? (moja ? "Ty" : rozmowa.wlasciciel) : "nikt — przypisze pierwsza odpowiedź"}</span>
+            </WierszMenu>
+            {rozmowa.kopilot && <WierszMenu etykieta="Kategoria">
+              <EtykietaKategorii kopilot={rozmowa.kopilot}
+                zapisuje={p.poprawia} onPopraw={p.onPoprawKategorie ?? (() => {})} />
+            </WierszMenu>}
+          </>} />
       </div>
 
     </header>

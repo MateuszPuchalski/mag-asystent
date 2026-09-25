@@ -86,6 +86,8 @@ describe("ręczna flaga „pilne”", () => {
     const onPriorytet = vi.fn();
     render(<Status rozmowa={rozmowa()} blad=""
       onPriorytet={onPriorytet} zapisujePriorytet={false} />);
+    /* Przełącznik w spoczynku stoi w menu „⋯" od @wydanie — `MenuRozmowy.tsx`. */
+    await userEvent.click(screen.getByRole("button", { name: "Więcej czynności rozmowy" }));
     const p = screen.getByRole("button", { name: /Oznacz jako pilne/ });
     expect(p).toHaveAttribute("aria-pressed", "false");
     await userEvent.click(p);
@@ -133,6 +135,7 @@ describe("Stan rozmowy stoi w nagłówku raz", () => {
     const { rerender } = render(<Status rozmowa={rozmowa()} blad="" onPriorytet={vi.fn()} zapisujePriorytet={false}
       onReklamacyjna={onZnacznik} />);
 
+    await userEvent.click(screen.getByRole("button", { name: "Więcej czynności rozmowy" }));
     await userEvent.click(screen.getByRole("button", { name: /Sprawa reklamacyjna/ }));
     expect(onZnacznik).toHaveBeenCalledWith(true);
 
@@ -142,16 +145,18 @@ describe("Stan rozmowy stoi w nagłówku raz", () => {
     expect(onZnacznik).toHaveBeenLastCalledWith(false);
   });
 
-  it("mówi wprost, że sprawy w Allegro to NIE zakłada", () => {
+  it("mówi wprost, że sprawy w Allegro to NIE zakłada", async () => {
     render(<Status rozmowa={rozmowa()} blad="" onPriorytet={vi.fn()} zapisujePriorytet={false}
       onReklamacyjna={vi.fn()} />);
+    await userEvent.click(screen.getByRole("button", { name: "Więcej czynności rozmowy" }));
 
     expect(screen.getByRole("button", { name: /Sprawa reklamacyjna/ }))
       .toHaveAttribute("title", expect.stringContaining("Allegro"));
   });
 
-  it("bez obsługi znacznika przycisku NIE MA — obietnica bez pokrycia", () => {
+  it("bez obsługi znacznika przycisku NIE MA — obietnica bez pokrycia", async () => {
     render(<Status rozmowa={rozmowa()} blad="" onPriorytet={vi.fn()} zapisujePriorytet={false} />);
+    await userEvent.click(screen.getByRole("button", { name: "Więcej czynności rozmowy" }));
 
     expect(screen.queryByRole("button", { name: /reklamacyjn/i })).not.toBeInTheDocument();
   });

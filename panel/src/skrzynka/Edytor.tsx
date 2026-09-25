@@ -1,11 +1,12 @@
 import React, { useState } from "react";
-import { Eraser, Lock, MessageSquare, Send, Undo2 } from "lucide-react";
+import { ChevronDown, Eraser, Lock, MessageSquare, Send, Undo2 } from "lucide-react";
 import { Przycisk } from "../ui";
 import { PrzyciskZalacznika, ZalacznikiWysylki } from "./ZalacznikiWysylki";
 import { KartaSzkicu, PasekSzkicu, PrzyciskSzkicu, UwagiSzkicu,
   type PropsSzkicuCopilota } from "./SzkicCopilota";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 import { doSprawdzenia } from "./ProcesCopilota";
+import { useOkienko } from "./MenuRozmowy";
 
 /**
  * Edytor odpowiedzi (§10.4).
@@ -279,22 +280,14 @@ export function Edytor({
           </Przycisk>
         </>
       : <>
-          <span className="hidden whitespace-nowrap text-podpis text-slate-500 2xl:inline">{szkic.length} znaków</span>
+          {/* LICZNIK TYLKO PRZY LIMICIE (@wydanie). „0 znaków" stało przy każdej
+              odpowiedzi, a liczy się wyłącznie blisko progu Allegro — tam, gdzie
+              zmienia decyzję. Wtedy staje, a za progiem czerwienieje. */}
+          {szkic.length >= LIMIT_ALLEGRO - 400 && <span className={`whitespace-nowrap text-podpis font-semibold ${
+            szkic.length > LIMIT_ALLEGRO ? "text-ranga-zle" : "text-ranga-uwaga"}`}>
+            {szkic.length} / {LIMIT_ALLEGRO}</span>}
           <PrzyciskZalacznika dodaje={dodajeZalacznik}
             onDodaj={onDodajZalacznik} wylaczone={cudza} />
-          <button type="button" onClick={onZapisz} disabled={cudza || zapisuje}
-            className="whitespace-nowrap text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:text-slate-300">
-            {zapisuje ? "Zapisuję…" : "Zapisz szkic"}</button>
-          {/* DRUGI, CICHSZY (23 września 2026): wysyłka zostaje jedynym
-              najgłośniejszym działaniem, a zakończenie jedzie z nią w tej
-              samej transakcji — nieudana wysyłka niczego nie kończy. */}
-          {onWyslijIZakoncz && <button type="button" onClick={onWyslijIZakoncz}
-            disabled={cudza || wysyla || !szkic.trim()} aria-keyshortcuts="Control+Shift+Enter"
-            title="Wyślij i zakończ — Ctrl+Shift+Enter"
-            className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg border border-emerald-600 px-3 py-2 text-sm font-bold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
-            Wyślij i zakończ
-            <kbd aria-hidden="true" className="hidden rounded bg-black/10 px-1 font-sans text-podpis 2xl:inline">Ctrl+Shift+Enter</kbd>
-          </button>}
           {/* ── JEDNO DZIAŁANIE MA BYĆ NAJGŁOŚNIEJSZE (0.247.0) ───────────────
               Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na
               zewnątrz, i idzie WYŁĄCZNIE na kliknięcie człowieka — innej drogi
@@ -315,7 +308,45 @@ export function Edytor({
                   {niesprawdzone.length} do sprawdzenia</span>
               : <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans text-podpis">Ctrl+Enter</kbd>}
           </Przycisk>
+          <InneWysylki onZapisz={onZapisz} zapisuje={zapisuje} cudza={cudza}
+            onWyslijIZakoncz={onWyslijIZakoncz} mozeWyslac={!cudza && !wysyla && !!szkic.trim()} />
         </>}
   </div>
   </>;
+}
+
+/** Limit treści `NewMessageInThread` w Allegro — ten sam, którego pilnuje serwer (`LIMIT_ZNAKOW`). */
+const LIMIT_ALLEGRO = 2000;
+
+/* ── „▾" OBOK WYSYŁKI (@wydanie) ─────────────────────────────────────────────
+   Pasek niósł pięć rzeczy: licznik, spinacz, „Zapisz szkic", „Wyślij
+   i zakończ" z napisem skrótu i „Wyślij do klienta" z drugim. Najgłośniejsze
+   ma zostać jedno — wysyłka (0.247.0). Dwie rzadsze drogi stoją pod
+   strzałką, a „Wyślij i zakończ" dalej chodzi z klawiatury Ctrl+Shift+Enter.
+   Okienko otwiera się W GÓRĘ, bo pasek pływa przy dolnej krawędzi osi. */
+function InneWysylki({ onZapisz, zapisuje, cudza, onWyslijIZakoncz, mozeWyslac }: {
+  onZapisz: () => void; zapisuje: boolean; cudza: boolean;
+  onWyslijIZakoncz?: () => void; mozeWyslac: boolean;
+}) {
+  const { otwarte, setOtwarte, ramka } = useOkienko<HTMLDivElement>();
+  return <div ref={ramka} className="relative">
+    <button type="button" aria-label="Inne sposoby wysłania" aria-expanded={otwarte}
+      title="Wyślij i zakończ · Zapisz szkic" onClick={() => setOtwarte((o) => !o)}
+      className="inline-flex h-10 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">
+      <ChevronDown size={17} /></button>
+    {otwarte && <div role="group" aria-label="Inne sposoby wysłania"
+      className="absolute bottom-full right-0 z-30 mb-2 flex w-64 flex-col gap-1 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+      {/* Zakończenie jedzie z wysyłką w tej samej transakcji (23 września 2026):
+          nieudana wysyłka niczego nie kończy. */}
+      {onWyslijIZakoncz && <button type="button" disabled={!mozeWyslac}
+        aria-keyshortcuts="Control+Shift+Enter" title="Ctrl+Shift+Enter"
+        onClick={() => { setOtwarte(false); onWyslijIZakoncz(); }}
+        className="flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-bold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
+        Wyślij i zakończ<span className="text-podpis font-normal text-slate-600">Ctrl+Shift+Enter</span></button>}
+      <button type="button" disabled={cudza || zapisuje}
+        onClick={() => { setOtwarte(false); onZapisz(); }}
+        className="rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
+        {zapisuje ? "Zapisuję…" : "Zapisz szkic"}</button>
+    </div>}
+  </div>;
 }
