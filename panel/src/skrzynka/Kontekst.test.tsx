@@ -183,6 +183,24 @@ describe("kolumna kontekstu", () => {
     historia.data = undefined; wiedza.data = undefined;
   });
 
+  /* ── Soczewka nad kolumną (@wydanie) ──────────────────────────────────────
+     Odpowiedź na pytanie klienta stoi PRZED tym, co ma termin — i niczego
+     nie chowa: „Wymaga Ciebie" i każdy wiersz stoją pod nią jak bez niej. */
+  it("soczewka stoi nad „Wymaga Ciebie” i niczego nie chowa", () => {
+    rysuj(dane({
+      rozmowa: { ...dane().rozmowa, kopilot: { kategoria: "CANCEL_ORDER", dodatkowe: [], zrodlo: "MODEL",
+        status: "SUCCESS", nieaktualna: false, kategoriaCzlowieka: null } as never },
+      zamowienie: pusteZamowienie,
+      zwroty: [{ id: 5, kubelek: "decyzja" } as never],
+    }));
+    const soczewka = screen.getByRole("region", { name: "Pytanie klienta" });
+    const swieci = screen.getByRole("region", { name: "Wymaga Ciebie" });
+    expect(soczewka.compareDocumentPosition(swieci) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    for (const nazwa of [/^Oferta i towar/, /^Zamówienie/, /^Dobór/, /^Klient/, /^Wiedza/]) {
+      expect(wiersz(nazwa)).toBeInTheDocument();
+    }
+  });
+
   /* ── Bramka doboru (0.498.0, E z kanwy) ───────────────────────────────────
      Nagranie: klient zwracał kupiony nóż 14-25001, a dobór szukał po wymiarach
      i pokazał świecę, sprężynę i przewody paliwa — bez kupionego towaru. */

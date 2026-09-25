@@ -385,3 +385,25 @@ test("zwrot detaliczny (ZW) wiąże się tak samo jak korekta faktury", () => {
   assert.equal(zwiazKorekte(id, d), true);
   assert.equal(stanKorekty(d, id).korekta_numer, "ZW 4/2026");
 });
+/* ── Dokumenty sprzedaży zamówienia — soczewka „Faktura" (@wydanie) ───────────
+   Agent powie klientowi „wysyłamy fakturę FS …", więc lista zna WYŁĄCZNIE
+   dokumenty z numerem zamówienia. Nakładka pozycji, która przy zwrocie jest
+   poszlaką, tutaj nie wchodzi wcale. */
+test("dokumenty zamówienia: tylko z jego numerem, bez korekt, w oknie od zakupu", async () => {
+  const { dokumentySprzedazyZamowienia } = await import("./faktury.js");
+  const d = stanowisko();
+  dokument(d, 1, { typ: "FS", numer: "FS 1240/2026", nrOryg: ZAMOWIENIE.slice(0, 30), data: "2026-09-02" });
+  dokument(d, 2, { typ: "PA", numer: "PA 88/2026", zUwag: ZAMOWIENIE, data: "2026-09-01" });
+  /* Cudzy dokument z tego samego dnia — ta sama data, inny numer. */
+  dokument(d, 3, { typ: "FS", numer: "FS 1241/2026", nrOryg: "inne-zamowienie", data: "2026-09-02" });
+  /* Korekta z numerem zamówienia — nie jest dokumentem sprzedaży. */
+  dokument(d, 4, { typ: "KFS", numer: "KFS 7/2026", nrOryg: ZAMOWIENIE.slice(0, 30), data: "2026-09-05" });
+  /* Dokument sprzed zakupu nie może go dokumentować. */
+  dokument(d, 5, { typ: "FS", numer: "FS 900/2026", nrOryg: ZAMOWIENIE.slice(0, 30), data: "2026-08-20" });
+
+  assert.deepEqual(dokumentySprzedazyZamowienia(ZAMOWIENIE, "2026-09-01T10:00:00Z", d), [
+    { numer: "PA 88/2026", typ: "PA", data: "2026-09-01" },
+    { numer: "FS 1240/2026", typ: "FS", data: "2026-09-02" },
+  ]);
+  assert.deepEqual(dokumentySprzedazyZamowienia("", "2026-09-01T10:00:00Z", d), []);
+});

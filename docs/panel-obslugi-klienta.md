@@ -705,6 +705,27 @@ Właściciel wybrał z kanwy trzy zmiany naraz („E + A + D"):
   wyłącznie start automatu, z kreską na osi i wpisem w dzienniku. Decyzji
   człowieka i doboru z wybranym kandydatem nie dotyka.
 
+**Soczewki według rodzaju pytania (@wydanie).** Właściciel przysłał listę
+prawdziwych pytań klientów i pomysł: prawa kolumna ma pokazywać to, czego
+wymaga KATEGORIA pytania. Soczewka to blok na samej górze kolumny, nad
+„Wymaga Ciebie". Trzy pierwsze (`skrzynka/Soczewki.tsx`):
+
+- **Anulowanie** — zakupy tego klienta obok siebie, statusy słowem ze schematu
+  `CheckoutFormStatus`. Podwójny zakup tych samych pozycji w 72 godzinach jest
+  nazwany wprost, a paczka zamówienia rozmowy stoi jako fakt, nie wyrok.
+- **Inny towar i brak w paczce** — co było w zamówieniu, z półką każdej pozycji.
+  Zdanie „prosimy o zdjęcie" trafia do szkicu wyłącznie kliknięciem.
+- **Faktura** — czy kupujący zaznaczył fakturę przy zakupie i jakie dokumenty
+  stoją w Subiekcie POD NUMEREM ZAMÓWIENIA: faktura, sam paragon albo nic.
+  Trasa `GET /api/obsluga/rozmowy/:id/dokumenty-sprzedazy` zna tylko pewne
+  dopasowanie, bo agent powie klientowi numer dokumentu.
+
+Ryzykiem jest pomyłka klasyfikatora, więc reguły są trzy, każda z testem
+w `soczewki-reguly.ts`. Soczewka dokłada blok i niczego nie chowa. Mówi, czy
+kategoria jest od Copilota, czy od zespołu. Przy kategorii awaryjnej albo
+nieudanym rozpoznaniu nie staje wcale. Kategoria człowieka wygrywa i nie
+wpuszcza dodatkowych kategorii modelu.
+
 Decyzja z 0.198.0 zostaje: oferta i kartoteka to jeden wiersz, otwarty bez
 klikania. Zwija się wyłącznie przy zwrocie albo sprawie w toku, bo wtedy
 tematem jest decyzja z terminem, a karta towaru jest tłem.

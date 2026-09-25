@@ -439,3 +439,53 @@ export function zwiazKorektyPewne(database: Db = defaultDb(), teraz = new Date()
   }
   return powiazane;
 }
+
+/* ── DOKUMENTY SPRZEDAŻY ZAMÓWIENIA ROZMOWY (@wydanie) ───────────────────────
+   Soczewka „Faktura" w skrzynce. Klient pisze „paczkę otrzymaliśmy, faktury
+   nie", a agent szedł do Subiekta szukać dokumentu po dacie i nazwisku.
+   Read-model `sgt_faktura` zna numer zamówienia na dokumencie, więc panel
+   może powiedzieć od razu: jest faktura, jest tylko paragon albo nie ma nic.
+
+   TYLKO PEWNE DOPASOWANIE, tą samą regułą co zwrot (`numerWskazuje`). Przy
+   zwrocie poszlaki mają sens, bo człowiek z nich wybiera. Tu agent
+   powiedziałby klientowi „wysyłamy fakturę FS …" — a zgadnięty dokument
+   to cudza faktura w cudzej skrzynce.                                     */
+
+export interface DokumentZamowienia {
+  numer: string;
+  /** `FS` faktura, `PA` paragon. Korekty nie wchodzą — nie są dokumentem sprzedaży. */
+  typ: string;
+  data: string;
+}
+
+/** Ile dni po zakupie szukać dokumentu — tyle, ile przy zwrocie. */
+const OKNO_DOKUMENTU_DNI = OKNO_DNI;
+
+/**
+ * Dokumenty sprzedaży z numerem tego zamówienia, od najstarszego.
+ * Czysty odczyt: niczego nie wiąże i nie zapisuje.
+ */
+export function dokumentySprzedazyZamowienia(
+  orderId: string, kupiono: string | null, database: Db = defaultDb(),
+): DokumentZamowienia[] {
+  const szukane = [orderId.trim().toLowerCase()].filter((s) => s !== "");
+  if (szukane.length === 0) return [];
+  /* Okno od dnia przed zakupem (UTC kontra czas lokalny Subiekta — powód
+     przy `dolnaGranicaOkna`). Bez daty zakupu szukamy od dziś wstecz. */
+  const odDnia = kupiono
+    ? new Date(Date.parse(kupiono.slice(0, 10)) - 86_400_000).toISOString().slice(0, 10)
+    : new Date(Date.now() - OKNO_DOKUMENTU_DNI * 86_400_000).toISOString().slice(0, 10);
+  const doDnia = kupiono
+    ? new Date(Date.parse(kupiono.slice(0, 10)) + OKNO_DOKUMENTU_DNI * 86_400_000).toISOString().slice(0, 10)
+    : new Date().toISOString().slice(0, 10);
+  const dokumenty = database.prepare(
+    `SELECT typ, nr_pelny, nr_oryg, zamowienie_z_uwag, data_wyst FROM sgt_faktura
+     WHERE typ IN ('FS','PA') AND data_wyst >= ? AND data_wyst <= ?
+     ORDER BY data_wyst, dok_id`)
+    .all(odDnia, doDnia) as Array<{
+      typ: string; nr_pelny: string; nr_oryg: string | null; zamowienie_z_uwag: string | null; data_wyst: string;
+    }>;
+  return dokumenty
+    .filter((d) => numerWskazuje(d.nr_oryg, szukane) || numerWskazuje(d.zamowienie_z_uwag, szukane))
+    .map((d) => ({ numer: String(d.nr_pelny), typ: String(d.typ), data: String(d.data_wyst) }));
+}

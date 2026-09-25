@@ -1024,6 +1024,13 @@ export type WpisHistorii = {
   sprawaId: number | null;
 };
 
+/** Dokumenty sprzedaży zamówienia rozmowy (@wydanie) — tylko z jego numerem. */
+export type DokumentySprzedazy = {
+  /** Numer zamówienia rozmowy; `null`, gdy rozmowa go nie ma. */
+  zamowienie: string | null;
+  dokumenty: Array<{ numer: string; typ: string; data: string }>;
+};
+
 export type HistoriaKlienta = {
   login: string | null; maszyny: MaszynaKlienta[]; wpisy: WpisHistorii[];
 };
