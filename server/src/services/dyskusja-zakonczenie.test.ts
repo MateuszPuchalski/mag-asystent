@@ -201,3 +201,14 @@ test("sprawa po prośbie nadal stoi w kolejce, dopóki Allegro jej nie zamknie",
   assert.equal(w.kubelek, "klient", "po naszej wiadomości ruch przechodzi do klienta");
   assert.equal(w.zakonczenieStatus, "sent");
 });
+
+test("prośba stempluje czas w ISO, nie w formacie `datetime()`", async () => {
+  /* Do @wydanie ten stempel szedł przez `datetime('now')`. Ekran pokazuje go
+     przez `czas()`, a `new Date()` czyta tekst ze spacją jako czas LOKALNY,
+     więc godzina przesuwała się o strefę. */
+  const { d, id, pytanie } = stanowisko();
+  await poprosOZakonczenie(zadanie(d, id, pytanie, {
+    wyslij: async () => ({ id: "w-2", createdAt: "2026-09-09T12:00:00Z" }),
+  }));
+  assert.match(String(wiersz(d, id).zakonczenie_at), /^\d{4}-\d{2}-\d{2}T.*Z$/);
+});

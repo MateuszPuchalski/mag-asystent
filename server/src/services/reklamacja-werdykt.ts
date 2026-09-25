@@ -317,7 +317,7 @@ export async function zdecydujZwrotTowaru(z: ZadanieZwrotuTowaru): Promise<Wynik
     /* bez typu: stanowisko o towarze zapisujemy dopiero po udanej wysyłce,
        a ta poszła przez bramkę uznanej reklamacji. */
     database.prepare(`UPDATE reklamacja_klienta
-        SET zwrot_towaru=?, zwrot_towaru_at=datetime('now'), wersja=wersja+1
+        SET zwrot_towaru=?, zwrot_towaru_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'), wersja=wersja+1
       WHERE id=? AND zwrot_towaru IS NULL`).run(decyzja, z.reklamacjaId);
     logEvent("reklamacja_zwrot_towaru", z.autor.name, null,
       { id: z.reklamacjaId, decyzja, znakow: (z.tresc ?? "").trim().length, status: wynik.status },

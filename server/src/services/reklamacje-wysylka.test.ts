@@ -322,3 +322,36 @@ test("ten sam tekst z załącznikiem i bez to DWIE różne wiadomości", async (
   assert.notEqual(zPlikiem.kluczIdempotencji, bez.kluczIdempotencji,
     "załącznik zmienia klucz, więc druga wysyłka naprawdę wychodzi");
 });
+
+/* ── Stemple czasu w ISO ─────────────────────────────────────────────────────
+   Do @wydanie te zapisy szły przez `datetime('now')`, czyli ze spacją i bez
+   strefy. Reszta bazy trzyma `T…Z`, więc porównanie tekstu stawiało je przed
+   każdą wartością ISO z tego samego dnia. Panel czytał je jako czas lokalny.
+   Każda droga zapisu dostaje własną asercję, bo każda miała własne `datetime`. */
+const ISO = /^\d{4}-\d{2}-\d{2}T.*Z$/;
+const koniecWysylki = (d: DatabaseSync) => String((d.prepare(
+  "SELECT finished_at AS t FROM reklamacja_outbox").get() as { t: string }).t);
+
+test("udana wysyłka stempluje koniec i prowadzącego w ISO", async () => {
+  const { d, id, pytanie } = stanowisko();
+  await odpowiedzWSprawie(zadanie(d, id, pytanie));
+  assert.match(koniecWysylki(d), ISO);
+  assert.match(String((d.prepare("SELECT prowadzi_at AS t FROM reklamacja_klienta WHERE id=?")
+    .get(id) as { t: string }).t), ISO);
+});
+
+test("porażka wysyłki stempluje koniec w ISO", async () => {
+  const { d, id, pytanie } = stanowisko();
+  await assert.rejects(() => odpowiedzWSprawie(zadanie(d, id, pytanie, {
+    wyslij: async () => { throw new Error("Allegro odpowiedziało 422"); },
+  })));
+  assert.match(koniecWysylki(d), ISO);
+});
+
+test("sukces bez identyfikatora stempluje koniec w ISO", async () => {
+  const { d, id, pytanie } = stanowisko();
+  await odpowiedzWSprawie(zadanie(d, id, pytanie, {
+    wyslij: async () => ({ createdAt: "2026-09-07T12:00:00.000Z" }),
+  }));
+  assert.match(koniecWysylki(d), ISO);
+});

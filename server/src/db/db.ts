@@ -924,6 +924,7 @@ export function migrate(database: DatabaseSync) {
   bezNakladkiSpraw(database);
   przeniesKlasyfikacjeRozmow(database);
   bezSzablonowOdpowiedzi(database);
+  czasISOWZastanych(database);
   tabelaFts(database);
 }
 
@@ -2767,4 +2768,44 @@ function odkodujEncjeWZastanych(database: DatabaseSync) {
   napraw("reklamacja_zalacznik", "nazwa");
   /* Zwroty: komentarz klienta do pozycji. */
   napraw("zwrot_klienta_pozycja", "powod_komentarz");
+}
+
+/**
+ * Stemple zapisane przez `datetime('now')` wracają do ISO z `T…Z`.
+ *
+ * Cała baza trzyma czas jako `2026-09-25T08:00:00.000Z`. Sześć zapisów
+ * w reklamacjach i dyskusjach wołało jednak `datetime('now')`. Ono daje
+ * `2026-09-25 08:00:00`, ze spacją i bez strefy. Kolumna trzymała więc dwa
+ * formaty naraz i oba psuły się po cichu:
+ *
+ * - porównanie tekstu i `ORDER BY` stawiają spację (0x20) przed `T` (0x54),
+ *   więc wartość ze spacją wypadała przed każdą ISO z tego samego dnia;
+ * - `new Date('2026-09-25 08:00:00')` w panelu czyta czas LOKALNY, nie UTC,
+ *   więc godzina na ekranie przesuwała się o strefę.
+ *
+ * Poprawka zapisu naprawia tylko to, co przyjdzie od teraz. Ta funkcja bierze
+ * to, co już leży. `datetime('now')` liczy w UTC, więc dopisane `Z` niczego
+ * nie przesuwa. Nazywa tylko strefę, która była tam od początku.
+ *
+ * Chodzi PRZY KAŻDYM STARCIE i nie ma znacznika wersji. Warunek GLOB jest
+ * warunkiem POPRAWNOŚCI, nie optymalizacją. Dotyka wyłącznie wartości dokładnie
+ * w kształcie `datetime()`, więc ISO, NULL i każdy inny tekst zostają nietknięte.
+ * Drugi przebieg nie ma już czego zmienić. `IS NOT NULL` przy `strftime` pilnuje
+ * daty niemożliwej w kalendarzu: lepiej zostawić ją jak jest, niż zgubić do NULL.
+ */
+function czasISOWZastanych(database: DatabaseSync) {
+  const KSZTALT_DATETIME =
+    "[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]";
+  const kolumny: Array<[string, string]> = [
+    ["reklamacja_klienta", "zakonczenie_at"],
+    ["reklamacja_klienta", "zwrot_towaru_at"],
+    ["reklamacja_klienta", "prowadzi_at"],
+    ["reklamacja_outbox", "finished_at"],
+  ];
+  for (const [tabela, kolumna] of kolumny) {
+    database.prepare(
+      `UPDATE ${tabela} SET ${kolumna} = strftime('%Y-%m-%dT%H:%M:%fZ', ${kolumna})
+        WHERE ${kolumna} GLOB ? AND strftime('%Y-%m-%dT%H:%M:%fZ', ${kolumna}) IS NOT NULL`,
+    ).run(KSZTALT_DATETIME);
+  }
 }

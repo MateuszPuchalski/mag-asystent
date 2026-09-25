@@ -309,3 +309,18 @@ test("towar: odmowa Allegro kodem zostawia decyzję pustą — wolno spróbować
   assert.equal(wiersz(d, id).zwrot_towaru, "niewymagany");
   assert.equal((d.prepare("SELECT typ FROM reklamacja_outbox").get() as { typ: string }).typ, "RETURN_NOT_REQUIRED");
 });
+
+test("decyzja o towarze stempluje czas w ISO, nie w formacie `datetime()`", async () => {
+  /* Do @wydanie ten stempel szedł przez `datetime('now')`, ze spacją i bez
+     strefy. Panel czytał go jako czas lokalny, a porównanie tekstu stawiało
+     go przed każdą wartością ISO z tego samego dnia. */
+  const { d, id, pytanie } = stanowisko();
+  await wydajWerdykt(d, id, { werdykt: "ACCEPTED_REFUND", wiadomosc: "Zwracamy." }, KTO, allegro().wyslij);
+  await zdecydujZwrotTowaru({
+    reklamacjaId: id, decyzja: "niewymagany", tresc: "Towaru nie trzeba odsyłać.",
+    expectedWersja: 2, expectedLastMessageId: pytanie, autor: KTO, database: d,
+    wyslij: async () => ({ id: "m-1", createdAt: "2026-09-07T12:00:00.000Z" }),
+  });
+  assert.match(String((d.prepare("SELECT zwrot_towaru_at AS t FROM reklamacja_klienta WHERE id=?")
+    .get(id) as { t: string }).t), /^\d{4}-\d{2}-\d{2}T.*Z$/);
+});

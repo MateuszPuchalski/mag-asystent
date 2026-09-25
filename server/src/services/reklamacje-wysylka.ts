@@ -255,7 +255,7 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
   } catch (e) {
     const status: StatusWysylki = niejednoznaczny(e) ? "send_uncertain" : "send_failed";
     database.prepare(
-      `UPDATE reklamacja_outbox SET status=?, blad=?, finished_at=datetime('now') WHERE id=?`,
+      `UPDATE reklamacja_outbox SET status=?, blad=?, finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?`,
     ).run(status, (e as Error).message.slice(0, 500), outboxId);
     throw e;
   }
@@ -267,7 +267,7 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
        więc wpis bez identyfikatora nie miałby jak być idempotentny i wróciłby
        w duplikacie przy najbliższej synchronizacji. */
     database.prepare(
-      `UPDATE reklamacja_outbox SET status='send_uncertain', finished_at=datetime('now')
+      `UPDATE reklamacja_outbox SET status='send_uncertain', finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now')
         WHERE id=?`).run(outboxId);
     return { status: "send_uncertain", externalMessageId: null, kluczIdempotencji: klucz };
   }
@@ -283,7 +283,7 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
 
     database.prepare(
       `UPDATE reklamacja_outbox SET status='sent', external_message_id=?,
-         finished_at=datetime('now') WHERE id=?`).run(externalMessageId, outboxId);
+         finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?`).run(externalMessageId, outboxId);
 
     /* LICZNIK ROŚNIE O JEDEN. `wiadomosci_ile` jest snapshotem sprzed naszej
        wysyłki, więc bez tego ekran natychmiast skłamałby „ta rozmowa jest
@@ -304,7 +304,7 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
     if (k.prowadzi === null) {
       /* bez typu: ten sam wiersz co wyżej, za tą samą bramką. */
       database.prepare(
-        "UPDATE reklamacja_klienta SET prowadzi=?, prowadzi_at=datetime('now') WHERE id=?",
+        "UPDATE reklamacja_klienta SET prowadzi=?, prowadzi_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?",
       ).run(z.autor.name, z.reklamacjaId);
     }
 
