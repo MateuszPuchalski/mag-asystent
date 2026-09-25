@@ -10,6 +10,20 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.494.1 — 25 września 2026
+
+**Okna raportów bez dodatkowej doby.** Analiza, metryki, ergonomia, cykl
+zwrotów i analiza dostaw porównywały znaczniki z bazy z `datetime('now', …)`.
+Znaczniki mają `T`, a `datetime()` daje spację, więc porównanie tekstowe
+wpuszczało całą dobę graniczną. Okno „7 dni" liczyło do ośmiu, także
+w raporcie wydajności per osoba. Rekoncyliacja miała ten sam błąd w drugą
+stronę: zadanie w błędzie od 25 godzin czekało na raport kolejną dobę.
+
+- Granica okna ma jedną definicję, `GRANICA_OKNA` w `raporty.ts`. Ten sam
+  zapis stał już w `skutecznosc-doboru.ts` od 0.267.0.
+- Liczby w Analizie mogą spaść o zdarzenia z doby granicznej. To poprawka,
+  nie utrata danych.
+
 ## 0.494.0 — 25 września 2026
 
 **Serwer aktualizuje się sam.** Przycisk z 0.492.0 zrobił jedną

@@ -38,7 +38,7 @@ export interface Rekoncyliacja {
 
 /* Granice w tym pliku piszemy `strftime(…'Z'…)`, nie `datetime()`: znaczniki
    kolejki mają `T`, a `datetime()` spację, więc `<` gubiło dobę graniczną.
-   Powód przy `GRANICA_OKNA` w `raporty.ts` (@wydanie). */
+   Powód przy `GRANICA_OKNA` w `raporty.ts` (0.494.1). */
 
 /** 1. Adres w Subiekcie vs ostatni udany zapis aplikacji (24 h). */
 function lokalizacje(): { rozjazdy: Rozjazd[]; sprawdzono: number } {

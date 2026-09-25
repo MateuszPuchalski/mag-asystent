@@ -36,7 +36,7 @@ export const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(d
  * Mieszkała w `skutecznosc-doboru.ts` od 0.267.0, a `problems.ts` miał
  * własną kopię. Reszta raportów dalej porównywała z `datetime()`, więc
  * „7 dni" w Analizie liczyło do ośmiu, także w raporcie per osoba
- * (@wydanie). Jedna definicja tutaj, bo trzecia kopia by się rozjechała.
+ * (0.494.1). Jedna definicja tutaj, bo trzecia kopia by się rozjechała.
  */
 export const GRANICA_OKNA = "strftime('%Y-%m-%dT%H:%M:%fZ','now',?)";
 
