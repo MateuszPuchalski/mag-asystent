@@ -10,6 +10,21 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.498.1 — 25 września 2026
+
+**Aktualizacja z paczki nie pada już na „Odmowa dostępu do ścieżki C:\wertis".**
+Pierwsza taka aktualizacja na magazynie wróciła na starą wersję w kroku
+zamiany katalogów. Instalator zatrzymywał tylko trzy usługi ze stałej listy.
+Usługa `wertis-tlo` zakłada się ręcznie, a jej program leży w
+`C:\wertis\tlo-worker`, więc trzymała katalog.
+
+- Przed zamianą instalator zatrzymuje każdą DZIAŁAJĄCĄ usługę, której program
+  leży w katalogu aplikacji. Sprawdza ścieżkę usługi i plik aplikacji NSSM.
+  Po zamianie, porażce albo wycofaniu uruchamia ten sam zestaw.
+- Potem czeka do 15 sekund, aż procesy z katalogu się zamkną. Pozostałe
+  zatrzymuje z nazwą w dzienniku.
+- Dotyczy przycisku w panelu, automatu i `-Aktualizuj -Paczka`.
+
 ## 0.498.0 — 25 września 2026
 
 **Prawa kolumna skrzynki bez zakładek.** Na górze stoi „Wymaga Ciebie": zwrot

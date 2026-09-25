@@ -349,7 +349,7 @@ function Get-WertisUslugiDoZamiany {
         Usługi do zatrzymania przed zamianą katalogu: nasze plus każda
         DZIAŁAJĄCA, której program leży w $Katalog.
         .DESCRIPTION
-        Blizna @wydanie: pierwsza aktualizacja z paczki na magazynie padła na
+        Blizna 0.498.1: pierwsza aktualizacja z paczki na magazynie padła na
         „Odmowa dostępu do ścieżki C:\wertis". Lista stała znała trzy usługi,
         a `wertis-tlo` zakłada się ręcznie (tlo-worker/README.md) i jej exe
         leży w C:\wertis\tlo-worker. Działający proces trzyma katalog, więc
