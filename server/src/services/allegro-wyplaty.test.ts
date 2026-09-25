@@ -100,7 +100,7 @@ test("pytamy tylko o zwroty W PRACY, po zamówieniu z identyfikatorem płatnośc
   assert.equal(zwrotyDoSprawdzeniaWyplaty(d, 1, 1).length, 1, "próg tnie budżet taktu");
 });
 
-test("zamknięty korektą, a niezapłacony też pytamy o wypłatę (@wydanie)", async () => {
+test("zamknięty korektą, a niezapłacony też pytamy o wypłatę (0.505.0)", async () => {
   /* Zgłoszenie właściciela, zwrot X5XY/2026: korekta ZW zamknęła zwrot, biuro
      oddało pieniądze w Allegro, a panel dalej mówił „do zwrotu". */
   const d = stanowisko();

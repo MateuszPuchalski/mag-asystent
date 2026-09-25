@@ -4700,7 +4700,7 @@ zdaniem, co sprawdzić, a przycisk „Sprawdziłem w Subiekcie" dopiero wtedy
 ponawia. MM, które weszło po błędzie, przycisku nie ma — tam zostaje
 sprawdzenie stanów.
 
-**Kosz bez MM powrotnego stoi w tym samym kubełku (@wydanie).** Zgłoszenie
+**Kosz bez MM powrotnego stoi w tym samym kubełku (0.505.0).** Zgłoszenie
 właściciela: „jak mogę sprawdzić, do których koszyków po rozłożeniu nie
 została zrobiona MM powrotna?". Lista żyła dotąd tylko w rekoncyliacji.
 Teraz ten sam warunek (`koszeBezPowrotu`) czyta też ekran koszy: znacznik
@@ -5137,13 +5137,13 @@ Zwrot zostaje potem w DO ZWROTU z paskiem pieniędzy (0.476.0). Schodzi sam,
 gdy synchronizacja zobaczy wypłatę z Allegro.
 
 
-**Szybka ścieżka czeka na paczkę (@wydanie).** Zgłoszenie właściciela przy
+**Szybka ścieżka czeka na paczkę (0.505.0).** Zgłoszenie właściciela przy
 zwrocie 5ZRQ/2026: przycisk proponował „na półkę i oddaj" za filtr, który
 nigdy nie przyjechał. Przy sygnale `brak_dowodu` przycisk stoi, ale mówi, że
 paczka nie wróciła. Gdy karton leży przy biurku, a tracking się spóźnia,
 zostaje droga ręczna.
 
-**Klient nie odesłał — odmowa jednym ruchem (@wydanie).** Zwrot bez numeru
+**Klient nie odesłał — odmowa jednym ruchem (0.505.0).** Zwrot bez numeru
 listu i bez doręczenia po czternastu dniach od zgłoszenia dostaje sygnał
 `nie_odeslany`. Stoi w DO DECYZJI z czerwonym paskiem w miejscu szybkiej
 ścieżki. `N` albo przycisk wysyła odmowę `REFUND_REJECTED` z gotowym

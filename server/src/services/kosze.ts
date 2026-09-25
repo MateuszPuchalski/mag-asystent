@@ -225,7 +225,7 @@ export interface ProblemMm {
 }
 
 /**
- * Kosze rozłożone ponad dobę temu, którym nie powstało MM powrotne (@wydanie).
+ * Kosze rozłożone ponad dobę temu, którym nie powstało MM powrotne (0.505.0).
  *
  * JEDNA DEFINICJA DLA DWÓCH MIEJSC. Warunek żył dotąd tylko w rekoncyliacji
  * (`koszeBezPowrotu` w `reconcile.ts`, z uzasadnieniem każdego członu).
@@ -460,7 +460,7 @@ export interface WierszListyKoszy {
   wirtualny: boolean;
   /** Kłopot z MM tego kosza; `null` = wszystkie MM weszły za pierwszym razem (0.501.0). */
   problemMm: ProblemMm | null;  /**
-   * Rozłożony ponad dobę temu, a MM powrotne nie powstało (@wydanie) — stan
+   * Rozłożony ponad dobę temu, a MM powrotne nie powstało (0.505.0) — stan
    * wisi na regale zwrotów. Warunek przy `koszeBezPowrotu`, przyczyna przy
    * `PowodBezPowrotu`; `null` = powrót jest albo jeszcze się nie należy.
    */
@@ -611,7 +611,7 @@ export function listaKoszy(): WierszListyKoszy[] {
        ORDER BY CASE k.status WHEN 'otwarty' THEN 0 WHEN 'zamkniety' THEN 1 ELSE 2 END, k.id DESC`
     )
     /* Kosz bez MM powrotnego też zostaje po oknie dwóch tygodni: jego stan
-       wisi na regale zwrotów, dopóki ktoś tego nie naprawi (@wydanie). */
+       wisi na regale zwrotów, dopóki ktoś tego nie naprawi (0.505.0). */
     .all(JSON.stringify([...problemy.keys(), ...bezPowrotu.keys()])) as Array<Record<string, unknown>>;
   return wiersze.map((w) => ({
     id: w.id as number,

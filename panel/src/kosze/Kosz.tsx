@@ -54,7 +54,7 @@ export interface PonowienieMm {
   onPonow: (sprawdzono: boolean) => void;
 }
 
-/* Co zrobić, gdy MM powrotne nie powstało — zależnie od przyczyny (@wydanie).
+/* Co zrobić, gdy MM powrotne nie powstało — zależnie od przyczyny (0.505.0).
    Kosz bez znanego kierunku NIE czeka na adresy: tam jedynym ruchem jest
    dokument w Subiekcie, bo aplikacja powrotu nie wystawi nigdy. */
 const RUCH_BEZ_POWROTU: Record<PowodBezPowrotu, string> = {
@@ -67,7 +67,7 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
   k: SzczegolKosza;
   przelicz: { trwa: boolean; blad: string; wynik: string; onPrzelicz: () => void };
   ponowMm?: PonowienieMm | null;
-  /** Rozłożony ponad dobę, a MM powrotne nie powstało (@wydanie) — i dlaczego. */
+  /** Rozłożony ponad dobę, a MM powrotne nie powstało (0.505.0) — i dlaczego. */
   bezPowrotu?: PowodBezPowrotu | null;
 }) {
   const bezKorekty = k.zwroty.filter((z) => !z.korektaNumer);
@@ -122,7 +122,7 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
         {ponowMm.wynik && <p className="mt-1 text-ranga-ok">{ponowMm.wynik}</p>}
         <Blad>{ponowMm.blad}</Blad>
       </div>}
-      {/* ── BEZ MM POWROTNEGO (@wydanie) ──────────────────────────────────
+      {/* ── BEZ MM POWROTNEGO (0.505.0) ──────────────────────────────────
           Zdanie kończy się RUCHEM, jak w rekoncyliacji, i zależy od przyczyny
           (`RUCH_BEZ_POWROTU`). Przycisku tu nie ma: powrót zamawia automat,
           gdy adresy wejdą, a ręczne zamówienie ominęłoby właśnie tę bramkę. */}

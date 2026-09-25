@@ -1070,7 +1070,7 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
     scena.paczki = null;
   });
 
-  it("nie odesłał: N odmawia w Allegro, potem odrzuca u nas — z gotowym powodem (@wydanie)", async () => {
+  it("nie odesłał: N odmawia w Allegro, potem odrzuca u nas — z gotowym powodem (0.505.0)", async () => {
     /* Zgłoszenie właściciela przy 5ZRQ/2026, decyzja „zrób obie". */
     scena.wolano.length = 0;
     scena.zwroty = [{ ...zwrot(1, "decyzja", "5ZRQ/2026"), sygnaly: ["nie_odeslany"] }];

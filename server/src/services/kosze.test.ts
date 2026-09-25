@@ -1136,7 +1136,7 @@ test("kosz bez MM w błędzie odmawia zamiast udawać ponowienie", () => {
   assert.throws(() => K.ponowMmKosza(db(), koszId, "Ala"), (e: Error & { kod?: number }) => e.kod === 409);
 });
 
-/* ── Kosz bez MM powrotnego na liście koszy (@wydanie) ───────────────────────
+/* ── Kosz bez MM powrotnego na liście koszy (0.505.0) ───────────────────────
    Zgłoszenie właściciela: „jak mogę sprawdzić, do których koszyków po
    rozłożeniu nie została zrobiona MM powrotna?" — a potem „zrób to". */
 

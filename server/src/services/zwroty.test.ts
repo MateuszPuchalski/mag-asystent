@@ -2320,7 +2320,7 @@ test("drugi zwrot gaśnie na zwrocie zamkniętym, ale odnośnik zostaje", () => 
   assert.ok(!z.sygnaly.includes("drugi_zwrot"));
 });
 
-/* ── Klient nie odesłał paczki (@wydanie) ────────────────────────────────────
+/* ── Klient nie odesłał paczki (0.505.0) ────────────────────────────────────
    Zgłoszenie właściciela przy zwrocie 5ZRQ/2026: odstąpienie zgłoszone
    20 sierpnia, paczka nigdy nienadana. Pieniądze się nie należą. */
 

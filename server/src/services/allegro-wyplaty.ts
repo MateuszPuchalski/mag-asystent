@@ -118,7 +118,7 @@ export const WYPLATY_NA_PRZEBIEG = 100;
  * zaległość — a zwrot po terminie boli dziś, nie jutro.
  */
 /**
- * Jak długo pytamy o wypłatę zwrotu ZAMKNIĘTEGO korektą (@wydanie). Dłużej niż
+ * Jak długo pytamy o wypłatę zwrotu ZAMKNIĘTEGO korektą (0.505.0). Dłużej niż
  * termin i dzień automatu Allegro, bo pobranie i paczka nieodebrana czekają
  * na pieniądze dłużej (`pieniadzeCzekaja`). Dalej to już historia.
  */
@@ -127,7 +127,7 @@ const ZAMKNIETY_PYTAMY_DNI = 60;
 export function zwrotyDoSprawdzeniaWyplaty(
   database: Db, konto: number, limit = WYPLATY_NA_PRZEBIEG, teraz = new Date(),
 ): DoSprawdzeniaWyplaty[] {
-  /* ZAMKNIĘTY, A NIEZAPŁACONY TEŻ JEST W PRACY (@wydanie). Od 0.476.0 zwrot
+  /* ZAMKNIĘTY, A NIEZAPŁACONY TEŻ JEST W PRACY (0.505.0). Od 0.476.0 zwrot
      zamknięty korektą wraca do DO ZWROTU, dopóki pieniądze nie wyjdą — ZW
      automatem zamyka go minutę po kwocie. Ta lista brała jednak tylko
      zwroty BEZ zamknięcia, więc o wypłatę zrobioną ręką w Allegro nie pytała

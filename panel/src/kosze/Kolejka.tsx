@@ -47,7 +47,7 @@ export function koszeKubelka(kosze: WierszKosza[], kubelek: KubelekKoszy): Wiers
      nierozwiązany błąd i wczorajsza odmowa są pilniejsze od tej sprzed
      miesiąca, którą remanent mógł już wyrównać. */
   if (kubelek === "mm") {
-    /* Kosz BEZ MM POWROTNEGO też tu stoi (@wydanie): jego stan wisi na
+    /* Kosz BEZ MM POWROTNEGO też tu stoi (0.505.0): jego stan wisi na
        regale zwrotów, więc sprawdza się go z Subiektem tak samo. Dla niego
        chwilą kłopotu jest rozłożenie — od niej powrót powinien był wyjść. */
     const kiedy = (k: WierszKosza) => k.problemMm?.ostatnioAt ?? k.rozlozonoAt ?? "";
@@ -127,7 +127,7 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
               className={`rounded px-1.5 py-0.5 text-xs font-bold ${k.problemMm.nierozwiazany
                 ? "bg-red-100 text-ranga-zle" : "bg-amber-100 text-ranga-uwaga"}`}>
               {k.problemMm.nierozwiazany ? "MM w błędzie" : "MM po błędzie"}</span>}
-          {/* BEZ MM POWROTNEGO (@wydanie). Czerwony, bo towar leży na półce,
+          {/* BEZ MM POWROTNEGO (0.505.0). Czerwony, bo towar leży na półce,
               a stan na regale zwrotów — sprzedać się go nie da. */}
           {k.bezPowrotu &&
             <span title="Rozłożony ponad dobę temu, a MM powrotne nie powstało — stan wisi na regale zwrotów"

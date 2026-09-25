@@ -37,7 +37,7 @@ export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
   | "rozjazd_ilosci" | "przelew_czeka" | "drugi_zwrot" | "nie_odeslany";
 
 /**
- * Ile dni klient ma na ODESŁANIE towaru po zgłoszeniu odstąpienia (@wydanie).
+ * Ile dni klient ma na ODESŁANIE towaru po zgłoszeniu odstąpienia (0.505.0).
  * Czternaście, jak termin ustawowy na odesłanie rzeczy. Po nim zwrot bez
  * nadanej paczki dostaje sygnał `nie_odeslany` i gotową odmowę.
  */
@@ -45,7 +45,7 @@ export const TERMIN_ODESLANIA_DNI = 14;
 
 /**
  * Jak długo zwrot bez nadanej paczki stoi w DO DECYZJI mimo reguły wieku
- * (@wydanie). Reguła z 0.452.0 zamyka po `ZWROT_WYGASA_DNI` zwrot bez decyzji,
+ * (0.505.0). Reguła z 0.452.0 zamyka po `ZWROT_WYGASA_DNI` zwrot bez decyzji,
  * bo „ósmego dnia Allegro oddaje samo" — ale oddaje za paczkę, która wróciła.
  * Za nienadaną nie oddaje nic, więc zamknięcie mówiłoby nieprawdę i zdejmowało
  * odmowę z pracy. Sufit jest, żeby stara historia nie wróciła do kolejki
@@ -393,7 +393,7 @@ export function kubelekZwrotu(z: {
   /** Wynik `pieniadzeCzekaja` — liczony raz, przez wołającego (0.476.0). */
   pieniadzeCzekaja?: boolean;
   /**
-   * Czy klient w ogóle nadał paczkę (@wydanie) — numer listu albo doręczenie.
+   * Czy klient w ogóle nadał paczkę (0.505.0) — numer listu albo doręczenie.
    * Brak pola znaczy „nadana": wołający, którzy go nie znają, dostają
    * dawne zachowanie reguły wieku.
    */
@@ -468,7 +468,7 @@ export function kubelekZwrotu(z: {
      LICZONE, NIE ZAPISANE. Kubełek wynika z faktów przy każdym odczycie,
      więc zmiana progu w `ZWROT_WYGASA_DNI` działa od razu i w obie strony.
      Zapis w bazie byłby decyzją bez człowieka, której nie dałoby się cofnąć. */
-  /* NIENADANA CZEKA DŁUŻEJ (@wydanie) — powód przy `NIEODESLANY_WYGASA_DNI`. */
+  /* NIENADANA CZEKA DŁUŻEJ (0.505.0) — powód przy `NIEODESLANY_WYGASA_DNI`. */
   const prog = z.nadana === false ? Math.max(wygasaDni, NIEODESLANY_WYGASA_DNI) : wygasaDni;
   if (!z.werdykt && z.utworzono && (z.zrodlo ?? "allegro") !== "nieodebrana"
       && teraz - Date.parse(z.utworzono) > prog * 86_400_000) {
@@ -528,7 +528,7 @@ export function sygnalyZwrotu(z: {
   przyjety?: boolean;
   /** Czy to zamówienie ma zwrot z drugiego źródła (0.493.0). */
   drugiZwrot?: boolean;
-  /** Data zgłoszenia — od niej liczy się termin odesłania (@wydanie). */
+  /** Data zgłoszenia — od niej liczy się termin odesłania (0.505.0). */
   utworzono?: string | null;
 }, teraz = Date.now()): Sygnal[] {
   const s: Sygnal[] = [];
@@ -547,7 +547,7 @@ export function sygnalyZwrotu(z: {
      dawne kryterium: lepszy sygnał z daty nadania niż jego brak. */
   const wrocila = z.dostarczonoAt != null
     || (z.przesylkaStatus == null && Boolean(z.paczkaAt));
-  /* KLIENT NIE ODESŁAŁ (@wydanie). Zgłosił odstąpienie, a przez czternaście
+  /* KLIENT NIE ODESŁAŁ (0.505.0). Zgłosił odstąpienie, a przez czternaście
      dni nie nadał paczki — nie ma ani numeru listu, ani doręczenia. Pieniądze
      się nie należą, więc sygnał zastępuje „nie nadana": to już nie czekanie,
      tylko decyzja do podjęcia. Tylko w DO DECYZJI — po werdykcie ktoś ją

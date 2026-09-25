@@ -206,7 +206,7 @@ function koszeBezKorekty(): Rozjazd[] {
  * adresy" kazałoby szukać nie tam.
  */
 function koszeBezPowrotuRozjazdy(): Rozjazd[] {
-  /* Warunek mieszka w `kosze.ts` od @wydanie — ten sam czyta ekran koszy.
+  /* Warunek mieszka w `kosze.ts` od 0.505.0 — ten sam czyta ekran koszy.
      Ruch w zdaniu zależy od przyczyny: kosz bez znanego kierunku NIE czeka
      na adresy, więc „sprawdź adresy" kazałoby szukać nie tam. */
   const RUCH = {

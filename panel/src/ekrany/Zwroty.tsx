@@ -747,7 +747,7 @@ export function Zwroty() {
     });
   };
 
-  /* ── KLIENT NIE ODESŁAŁ: ODMOWA JEDNYM RUCHEM (@wydanie) ──────────────
+  /* ── KLIENT NIE ODESŁAŁ: ODMOWA JEDNYM RUCHEM (0.505.0) ──────────────
      Najpierw odmowa w Allegro, potem werdykt u nas. Odwrotnie zwrot stałby
      u nas jako odrzucony, a w Allegro dalej czekałby na wypłatę — i nic by
      o tym nie przypominało. Odmowa, która nie przejdzie, nie zmienia niczego. */
@@ -816,7 +816,7 @@ export function Zwroty() {
       return;
     }
     if (zwrot.kubelek === "decyzja") {
-      /* `N` — gotowa odmowa, tylko przy sygnale „nie odesłał" (@wydanie). */
+      /* `N` — gotowa odmowa, tylko przy sygnale „nie odesłał" (0.505.0). */
       if ((e.key === "n" || e.key === "N") && zwrot.sygnaly.includes("nie_odeslany")) {
         e.preventDefault();
         odmowNieOdeslanemu();
@@ -944,7 +944,7 @@ export function Zwroty() {
       if (k === "-") return zwrot.pozycje.some((p) => p.ilosc > 1 && p.iloscZwrocona == null);
       return true;
     })
-    /* `N` doklejany przy sygnale „nie odesłał" (@wydanie) — tak jak `R`. */
+    /* `N` doklejany przy sygnale „nie odesłał" (0.505.0) — tak jak `R`. */
     .concat(zwrot?.kubelek === "decyzja" && zwrot.sygnaly.includes("nie_odeslany")
       ? [["N", "nie odesłał — odmów"] as const] : []);
   const pieniadzeCzekaja =

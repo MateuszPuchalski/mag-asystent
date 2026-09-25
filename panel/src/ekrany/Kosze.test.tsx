@@ -71,7 +71,7 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
       ostatnioAt: "2026-09-21T09:00:00.000Z", nierozwiazany: false } }),
     kosz(16, { status: "otwarty", problemMm: { prob: 3, ostatniBlad: "Kartoteka w edycji",
       ostatnioAt: "2026-09-22T09:00:00.000Z", nierozwiazany: true } }),
-    /* Bez MM powrotnego (@wydanie): rozłożony, dokument bez znanego kierunku. */
+    /* Bez MM powrotnego (0.505.0): rozłożony, dokument bez znanego kierunku. */
     kosz(17, { status: "rozlozony", rozlozonoAt: "2026-09-20T09:00:00.000Z", bezPowrotu: "kierunek" })] };
   if (url === "/api/biuro/kosze/pominiete") return { pominiete: POMINIETE };
   if (url === "/api/biuro/kosze/14") return { kosz: SZCZEGOL };
@@ -171,7 +171,7 @@ describe("Kosze w zakładce Zwroty", () => {
     expect(screen.queryByRole("button", { name: /Ponów MM/ })).toBeNull();
   });
 
-  it("karta kosza bez MM powrotnego mówi, co zrobić — zależnie od przyczyny (@wydanie)", async () => {
+  it("karta kosza bez MM powrotnego mówi, co zrobić — zależnie od przyczyny (0.505.0)", async () => {
     pokaz("/obsluga/zwroty/kosze/17");
     expect(await screen.findByText(/MM powrotne wystaw w Subiekcie/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Ponów MM/ })).toBeNull();

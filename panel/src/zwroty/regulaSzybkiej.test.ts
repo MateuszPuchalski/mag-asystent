@@ -46,7 +46,7 @@ describe("szybka ścieżka zwrotu", () => {
     expect(przeszkoda(ZW({ zrodlo: "nieodebrana" }))).toBe("UKRYTA");
   });
 
-  it("paczka, która nie wróciła, zatrzymuje — a nieodesłana chowa przycisk (@wydanie)", () => {
+  it("paczka, która nie wróciła, zatrzymuje — a nieodesłana chowa przycisk (0.505.0)", () => {
     /* Zgłoszenie właściciela przy 5ZRQ/2026: „na półkę i oddaj" za filtr,
        który nigdy nie przyjechał. */
     expect(przeszkoda(ZW({ sygnaly: ["brak_dowodu"] }))).toMatch(/nie wróciła/);

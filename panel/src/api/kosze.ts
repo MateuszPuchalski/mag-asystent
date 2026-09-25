@@ -46,7 +46,7 @@ export interface WierszKosza {
   problemMm?: { prob: number; ostatniBlad: string | null; ostatnioAt: string;
     nierozwiazany: boolean } | null;
   /**
-   * Rozłożony ponad dobę, a MM powrotne nie powstało (@wydanie) — i dlaczego.
+   * Rozłożony ponad dobę, a MM powrotne nie powstało (0.505.0) — i dlaczego.
    * `adresy`: czeka na zapis adresu; `kierunek`: powrót robi biuro w Subiekcie.
    * Starszy serwer pola nie przysyła.
    */
