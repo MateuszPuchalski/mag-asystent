@@ -90,6 +90,11 @@ describe("Nagłówek zwrotu", () => {
       notatka: "kurier zwrócił po 14 dniach" })} />);
     expect(screen.getByText("ABC-1")).toBeInTheDocument();
     expect(screen.getByText("nieodebrana paczka")).toBeInTheDocument();
+    /* Zdanie o nieodebraniu stoi w podpowiedzi plakietki, nie drugim wierszem
+       pod nią (@wydanie) — ten sam fakt padał na ekranie trzy razy. */
+    expect(screen.getByText("nieodebrana paczka"))
+      .toHaveAttribute("title", "Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana.");
+    expect(screen.queryByText(/przesyłka wróciła nieodebrana/)).toBeNull();
     expect(screen.queryByRole("link")).not.toBeInTheDocument();
     /* NOTATKI TU JUŻ NIE MA (0.313.0): ma własną sekcję w kolumnie dowodów,
        z autorem, godziną i cofnięciem. Cytat w nagłówku byłby tym samym
@@ -136,6 +141,14 @@ describe("Nagłówek zwrotu", () => {
     expect(wpis).toHaveTextContent("czeka na odpowiedź");
     expect(wpis).toHaveTextContent(/Wysłałem obie sztuki/);
     expect(wpis).toHaveTextContent("i 1 inna rozmowa o tym zakupie");
+  });
+
+  it("rozmowa bez tematu dostaje nazwę, a nie pusty odnośnik", () => {
+    /* Test przeszedł tu z dowodów (@wydanie): lista wiadomości zeszła do drogi
+       zakupu, a nazwę rozmowy pisze już tylko nagłówek. */
+    render(<Naglowek zwrot={zwrot({ rozmowy: [
+      { id: 8, temat: "  ", status: "new", ostatniaAt: null }] })} />);
+    expect(screen.getByRole("link", { name: /Rozmowa bez tematu/ })).toBeInTheDocument();
   });
 
   it("bez rozmów nagłówek nie rysuje pustego pola", () => {
