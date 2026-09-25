@@ -72,7 +72,7 @@ export function stempelLokalny(iso: string): string {
   ).format(d)}`;
 }
 
-/* ── Tydzień na zegarze magazynu (@wydanie, raport tygodnia) ────────────────
+/* ── Tydzień na zegarze magazynu (0.497.0, raport tygodnia) ────────────────
    Raport tygodnia ma granice STAŁE: od poniedziałku 00:00 do następnego
    poniedziałku 00:00 czasu lokalnego. Okna analizy liczą „ostatnie N dni od
    teraz", więc ten sam raport otwarty we wtorek i w piątek dawał różne liczby.

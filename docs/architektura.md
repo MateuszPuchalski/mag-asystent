@@ -686,7 +686,7 @@ Raport ma trzy reguły wbudowane w kod, każda z testem:
 3. **Tempo poniżej 20 pozycji to `null`.** Czas aktywny liczony z odstępów
    ≤ 15 min, więc z natury zaniżony: zawyżone tempo krzywdziłoby ludzi.
 
-### Raport tygodnia i migawka doby (@wydanie)
+### Raport tygodnia i migawka doby (0.497.0)
 
 Ślad `events` pamięta czynności, ale nie stan. Ile spraw czekało DO DECYZJI,
 ile zwrotów stało w kubełku, jak długo czekał klient — te liczby istniały

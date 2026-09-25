@@ -33,7 +33,7 @@ import { ZakresTygodnia } from "../analiza/ZakresTygodnia";
    patrz `analiza/ZakresObslugi.tsx`. Pod nim od 0.444.0 stoi sześć miar
    obsługi, które mieszkały za zębatką (`analiza/MiaryObslugi.tsx`).
 
-   ZAKRES „TYDZIEŃ" (@wydanie) nie ma okna: raport tygodnia ma granice
+   ZAKRES „TYDZIEŃ" (0.497.0) nie ma okna: raport tygodnia ma granice
    stałe, od poniedziałku do poniedziałku, i liczy go serwer sam. Czipy okna
    znikają, bo czip, który niczego nie zmienia, jest decyzją za dużo.
 

@@ -184,7 +184,7 @@ test("czas odpowiedzi: biuro bez rozbicia na osoby, administrator z nim", async 
   assert.ok(Array.isArray(admin.wgOsoby));
 });
 
-/* Raporty tygodni (@wydanie). Trasy tylko czytają: raport zapisuje takt
+/* Raporty tygodni (0.497.0). Trasy tylko czytają: raport zapisuje takt
    w `main()`, a tydzień niepoliczony to 404, nie liczenie w locie. */
 test("raporty tygodni: lista, raport z poprzednim, 404 i zero zapisu", async () => {
   const token = zalogowany("biuro");

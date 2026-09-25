@@ -8,7 +8,7 @@ import {
   licznikiKubelkow as kubelkiReklamacji, listaReklamacji, type Kubelek as KubelekReklamacji,
 } from "./reklamacje.js";
 
-/* ── Migawka stanu raz na dobę (@wydanie, raport tygodnia) ───────────────────
+/* ── Migawka stanu raz na dobę (0.497.0, raport tygodnia) ───────────────────
    Pytanie właściciela: „co śledzić automatycznie". Czynności śledzi dziennik
    `events` od pierwszego dnia — ponad dwieście typów. Nie śledzi go nic, co
    jest STANEM: ile spraw czeka DO DECYZJI, od kiedy najstarsza, ile zwrotów

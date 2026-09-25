@@ -192,7 +192,7 @@ export function useUzycie(dni: number, wlaczona: boolean) {
   });
 }
 
-/* ── Raport tygodnia (`services/raport-tygodnia.ts`, @wydanie) ───────────
+/* ── Raport tygodnia (`services/raport-tygodnia.ts`, 0.497.0) ───────────
    Zamrożony przy zapisie przez takt serwera. Ekran tylko czyta: tygodnia
    niepoliczonego nie ma na liście, więc nie ma też o co zapytać 404. */
 

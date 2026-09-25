@@ -1,6 +1,6 @@
 import { dzienSkrot, liczbaPl } from "./liczby";
 
-/* ── Porównanie tygodnia z poprzednim (@wydanie) ──────────────────────────
+/* ── Porównanie tygodnia z poprzednim (0.497.0) ──────────────────────────
    Różnica w SZTUKACH, nie w procentach. Przy liczbach tej hali — trzy
    reklamacje, dwie zamknięte dostawy — „+50%" znaczy „o jedną więcej",
    a brzmi jak alarm. Sztuka mówi dokładnie tyle, ile się stało.

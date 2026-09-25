@@ -636,7 +636,7 @@ async function main() {
      instalator nie zakładał. Powód i okno nocne: `services/przebieg-nocny.ts`. */
   uruchomTakt("noc", TAKT_NOCNY_MS, async () => { przebiegNocny(); });
 
-  /* MIGAWKA DOBY I RAPORT TYGODNIA (@wydanie) — bez warunku, jak noc: każda
+  /* MIGAWKA DOBY I RAPORT TYGODNIA (0.497.0) — bez warunku, jak noc: każda
      instalacja ma stan, który jutro zniknie, i tydzień do porównania. Poza
      oknem nocnym, bo to odczyt bez `VACUUM` — serwer włączany rano też
      dostaje migawkę. Powód i reguły: `services/raport-tygodnia.ts`. */

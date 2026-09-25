@@ -7,7 +7,7 @@ import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 import { dzienSkrot, liczbaPl } from "./liczby";
 import { podpisTygodnia, zmiana } from "./porownanie";
 
-/* ── Zakres TYDZIEŃ (@wydanie) ────────────────────────────────────────────
+/* ── Zakres TYDZIEŃ (0.497.0) ────────────────────────────────────────────
    Raport tygodnia liczy serwer sam, w pierwszym takcie po poniedziałkowej
    północy, i zapisuje go na stałe (`services/raport-tygodnia.ts`). Ten ekran
    tylko czyta — zero zapisu przy patrzeniu, jak każdy zakres Analizy.

@@ -293,7 +293,7 @@ describe("zakres Użycie", () => {
   });
 });
 
-/* ── Zakres TYDZIEŃ (@wydanie) ───────────────────────────────────────────────
+/* ── Zakres TYDZIEŃ (0.497.0) ───────────────────────────────────────────────
    Raport tygodnia zapisuje takt serwera, a ekran tylko czyta. Pilnujemy:
    zero zapisu przy patrzeniu i przy zmianie tygodnia, porównanie z poprzednim
    w sztukach, brak czipów okna i zdanie zamiast pustej karty. */

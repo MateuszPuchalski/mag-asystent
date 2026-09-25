@@ -10,6 +10,24 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.497.0 — 25 września 2026
+
+**Raport tygodnia robi się sam.** Serwer liczy go w pierwszym takcie po
+poniedziałkowej północy, od poniedziałku do niedzieli czasu magazynu, i zapisuje
+na stałe. Analiza dostała zakres „Tydzień": ten tydzień obok poprzedniego
+i różnica w sztukach. Wiersze obejmują pracę hali, obsługę klienta, Copilota
+i zdrowie systemu. Pod tabelą są regały do przedruku etykiet i szukania bez
+wyniku.
+
+- **Migawka stanu raz na dobę.** DO DECYZJI z pilnymi i wiekiem najstarszej
+  sprawy, klient czekający teraz, kubełki zwrotów i reklamacji, otwarte wyjątki
+  i zapisy w błędzie. Do tej pory te liczby żyły tylko w chwili otwarcia ekranu.
+  Teraz widać, czy zaległość rośnie.
+- **Bez ludzi.** Raport nie zawiera rozbicia na osoby. Raport per osoba zostaje
+  w Analizie, na żywo, tylko dla administratora.
+- **Pierwszy raport** powstaje po pierwszym pełnym tygodniu, który obejmuje
+  dziennik. Po przerwie automat nadrabia do czterech tygodni wstecz.
+
 ## 0.496.0 — 25 września 2026
 
 **Serwer aktualizuje się tego samego dnia, nie w nocy.** Domyślny tryb

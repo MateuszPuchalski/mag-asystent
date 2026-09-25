@@ -123,7 +123,7 @@ export async function analizaRoutes(app: FastifyInstance) {
     return ergonomia(dniZQuery(req.query.days));
   });
 
-  /* Raporty tygodni (@wydanie). Ta sama bramka biura, bo raport nie niesie
+  /* Raporty tygodni (0.497.0). Ta sama bramka biura, bo raport nie niesie
      ludzi — patrz nagłówek `services/raport-tygodnia.ts`. Trasy tylko
      CZYTAJĄ: raport zapisuje takt w `main()`, a tydzień niepoliczony
      odpowiada 404, nie liczy się w locie. Inaczej pierwsze otwarcie ekranu

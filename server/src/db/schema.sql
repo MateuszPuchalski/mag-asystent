@@ -3203,7 +3203,7 @@ CREATE TABLE IF NOT EXISTS sonda_rzeczywistosci (
 );
 CREATE INDEX IF NOT EXISTS ix_sonda_rzeczywistosci_przebieg ON sonda_rzeczywistosci(przebieg);
 
--- Migawka stanu raz na dobę lokalną (@wydanie, raport tygodnia). Dziennik
+-- Migawka stanu raz na dobę lokalną (0.497.0, raport tygodnia). Dziennik
 -- `events` pamięta CZYNNOŚCI, ale nie STAN: ile czekało DO DECYZJI, ile
 -- zwrotów stało w kubełku, jak długo czekał klient. Te liczby istnieją tylko
 -- w chwili odczytu i jutro nie da się ich odtworzyć — bez migawki pytanie
@@ -3215,7 +3215,7 @@ CREATE TABLE IF NOT EXISTS migawka_dnia (
   stan  TEXT NOT NULL                -- JSON `Migawka`, patrz services/migawka-dnia.ts
 );
 
--- Raport tygodnia (@wydanie). ZAMROŻONY przy zapisie: liczby z tygodnia 38
+-- Raport tygodnia (0.497.0). ZAMROŻONY przy zapisie: liczby z tygodnia 38
 -- mają za miesiąc brzmieć tak samo jak w dniu, w którym ktoś je omawiał.
 -- Poprawka reguły liczenia zmienia raporty NASTĘPNE, a starych nie przepisuje
 -- po cichu — `wersja` mówi, którą regułą policzono dany tydzień.

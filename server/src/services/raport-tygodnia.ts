@@ -6,7 +6,7 @@ import { czasOdpowiedzi } from "./czas-odpowiedzi.js";
 import { kosztUsd } from "./copilot-koszt.js";
 import { migawki, zrobMigawke, type WpisMigawki } from "./migawka-dnia.js";
 
-/* ── Raport tygodnia (@wydanie) ──────────────────────────────────────────────
+/* ── Raport tygodnia (0.497.0) ──────────────────────────────────────────────
    Zgłoszenie właściciela: „co śledzić automatycznie i dodać automatyczne
    raporty tygodniowe". Analiza liczyła wszystko, ale zawsze „ostatnie N dni
    od teraz" i tylko wtedy, gdy ktoś ją otworzył. Tydzień do tygodnia nie dało

@@ -185,7 +185,7 @@ export function czasOdpowiedzi(
      jest próbką TEGO okna. Bez zapasu takie czekanie byłoby liczone od
      pierwszej wiadomości w oknie, czyli krócej, niż trwało naprawdę. */
   const zapas = new Date(teraz - (dni + 7) * 86_400_000).toISOString();
-  /* Górna granica okna (@wydanie). Na żywo `teraz` to zegar i nic za nim
+  /* Górna granica okna (0.497.0). Na żywo `teraz` to zegar i nic za nim
      nie leży. Raport tygodnia liczy jednak tydzień, który już minął, a bez
      granicy odpowiedź z poniedziałku rana weszłaby do niedzieli, a „klient
      czeka" mówiłby o dziś zamiast o końcu tygodnia. */
