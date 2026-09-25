@@ -21,7 +21,7 @@ const POZ = (n: Partial<PozycjaZwrotu> = {}): PozycjaZwrotu => ({
 const ZW = (n: Partial<Zwrot> = {}): Zwrot => ({
   id: 5, kubelek: "decyzja", werdykt: null, kwotaGrosze: null, zrodlo: "allegro",
   linkZwrotu: "https://salescenter.allegro.com/returns?q=Z", zamowienie: null,
-  pozycje: [POZ()], ...n,
+  pozycje: [POZ()], sygnaly: [], ...n,
 } as unknown as Zwrot);
 
 const przeszkoda = (z: Zwrot, pudla: Parameters<typeof szybkaSciezka>[1] = []) => {
@@ -44,6 +44,13 @@ describe("szybka ścieżka zwrotu", () => {
     expect(przeszkoda(ZW({ kubelek: "korekta" }))).toBe("UKRYTA");
     expect(przeszkoda(ZW({ kubelek: "odrzucony", werdykt: "odrzucony" }))).toBe("UKRYTA");
     expect(przeszkoda(ZW({ zrodlo: "nieodebrana" }))).toBe("UKRYTA");
+  });
+
+  it("paczka, która nie wróciła, zatrzymuje — a nieodesłana chowa przycisk (0.505.0)", () => {
+    /* Zgłoszenie właściciela przy 5ZRQ/2026: „na półkę i oddaj" za filtr,
+       który nigdy nie przyjechał. */
+    expect(przeszkoda(ZW({ sygnaly: ["brak_dowodu"] }))).toMatch(/nie wróciła/);
+    expect(przeszkoda(ZW({ sygnaly: ["nie_odeslany"] }))).toBe("UKRYTA");
   });
 
   it("nie puszcza zwrotu, który odbiega od zamówienia", () => {

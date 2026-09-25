@@ -7,7 +7,7 @@ import {
 } from "../api/kosze";
 import { Blad, FiltrSegmentowy, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { KUBELKI_KOSZY, KolejkaKoszy, KolejkaPominietych, WynikiSzukania, koszeKubelka, kubelekKosza,
-  type KubelekKoszy } from "../kosze/Kolejka";
+  maKlopotMm, type KubelekKoszy } from "../kosze/Kolejka";
 import { Kosz } from "../kosze/Kosz";
 import { KontekstKosza } from "../kosze/Kontekst";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
@@ -66,10 +66,11 @@ export function Kosze() {
   /* Kłopot z MM niesie wiersz LISTY, nie szczegół — liczy go ta sama funkcja
      co kubełek, więc karta i kubełek nie mogą się rozjechać (0.503.0). */
   const problemMm = lista.find((k) => k.id === wybrany)?.problemMm ?? null;
+  const bezPowrotu = lista.find((k) => k.id === wybrany)?.bezPowrotu ?? null;
   const liczniki: Record<KubelekKoszy, number> = {
     praca: lista.filter((k) => kubelekKosza(k) === "praca").length,
     pominiete: pominiete.data?.pominiete.length ?? 0,
-    mm: lista.filter((k) => k.problemMm).length,
+    mm: lista.filter(maKlopotMm).length,
     rozlozone: lista.filter((k) => kubelekKosza(k) === "rozlozone").length,
     anulowane: lista.filter((k) => kubelekKosza(k) === "anulowane").length,
   };
@@ -120,7 +121,7 @@ export function Kosze() {
           ? <Pusto ikona={Package}>Wybierz kosz z kolejki.</Pusto>
           : szczegol.isLoading ? <Pusto waga="lista">Wczytuję zawartość kosza…</Pusto>
             : szczegol.data
-              ? <Kosz k={szczegol.data.kosz} ponowMm={problemMm && wybrany !== null ? {
+              ? <Kosz k={szczegol.data.kosz} bezPowrotu={bezPowrotu} ponowMm={problemMm && wybrany !== null ? {
                   problem: problemMm, trwa: ponow.isPending, blad: bladPonow, wynik: wynikPonow,
                   czekaNaSprawdzenie,
                   onPonow: (sprawdzono) => {

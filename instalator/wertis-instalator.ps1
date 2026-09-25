@@ -54,7 +54,7 @@
     na starą razem z bazą. Tak aktualizuje przycisk w panelu.
 
 .PARAMETER PlikPostepu
-    Tylko z -Paczka (@wydanie): plik JSON, do którego instalator zapisuje
+    Tylko z -Paczka (0.504.0): plik JSON, do którego instalator zapisuje
     bieżący krok aktualizacji. Podaje go `zlecenie.ps1`, a karta w panelu
     rysuje z niego pasek postępu. Bez parametru nic się nie zapisuje.
 

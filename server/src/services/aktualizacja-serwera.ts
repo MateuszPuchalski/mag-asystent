@@ -209,7 +209,7 @@ function czytajJson<T>(plik: string): T | null {
 }
 
 /**
- * Plik postępu przechodzi przez kształt, zanim dotknie panelu (@wydanie).
+ * Plik postępu przechodzi przez kształt, zanim dotknie panelu (0.504.0).
  * Pisze go skrypt na tej samej maszynie, ale nazwa trafia na ekran, a plik
  * z połową zapisu albo z poprzedniej aktualizacji nie może rysować bzdury.
  */
