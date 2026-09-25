@@ -1,6 +1,10 @@
 import fs from "node:fs";
 import type { FastifyInstance } from "fastify";
 import { apkNaSerwerze } from "../services/aktualizacja.js";
+import { adresySieci } from "../services/adresy-sieci.js";
+import { config } from "../config.js";
+import { sesjaZadania } from "../context.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Aktualizacja kolektora z serwera (0.52.0) ───────────────────────────────
    OBIE TRASY SĄ POZA BRAMKĄ SESJI (`BEZ_SESJI` w `context.ts`) i to jest
@@ -60,5 +64,20 @@ export async function aktualizacjaRoutes(app: FastifyInstance) {
       .header("cache-control", "no-store")
       .header("content-length", String(fs.statSync(apk.plik).size))
       .send(fs.createReadStream(apk.plik));
+  });
+
+  /**
+   * Dane dla karty „Nowy kolektor" w panelu (0.496.0): adresy serwera w sieci
+   * i czy jest APK do pobrania. Za bramką biura, inaczej niż dwie trasy wyżej:
+   * lista adresów nie jest potrzebna kolektorowi, tylko człowiekowi przy biurku.
+   */
+  app.get("/api/biuro/kolektor", async (_req, reply) => {
+    const s = sesjaZadania();
+    if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+    if (!ROLE_BIUROWE.includes(s.user.role)) {
+      return reply.code(403).send({ error: "Karta nowego kolektora jest dla biura i admina" });
+    }
+    const apk = apkNaSerwerze();
+    return { adresy: adresySieci(), port: config.port, apk: apk ? { wersja: apk.wersja } : null };
   });
 }

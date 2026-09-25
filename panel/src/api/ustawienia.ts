@@ -250,6 +250,18 @@ export function useZlecAktualizacje() {
   });
 }
 
+/* ── Nowy kolektor (0.496.0) ──────────────────────────────────────────── */
+
+export interface DaneKolektora { adresy: string[]; port: number; apk: { wersja: string | null } | null }
+
+/** Trasa biura — hala jej nie dostaje, więc pytamy tylko jako biuro albo admin. */
+export const useKolektor = (biuro: boolean) => useQuery({
+  queryKey: ["kolektor"],
+  queryFn: () => api<DaneKolektora>("/api/biuro/kolektor"),
+  enabled: biuro,
+  retry: false,
+});
+
 /* ── Logo dostawców ───────────────────────────────────────────────────── */
 
 export interface DostawcaZLogo { khId: number; nazwa: string; dokumentow: number; maLogo: boolean }

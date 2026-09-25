@@ -10,6 +10,66 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.496.0 — 25 września 2026
+
+**Serwer aktualizuje się tego samego dnia, nie w nocy.** Domyślny tryb
+produkcji to `zaraz`: nowe wydanie wchodzi, gdy ma co najmniej godzinę i przez
+dziesięć minut nikt nic nie zapisał. Decyzja właściciela z wywiadu
+o wdrażaniu: jedna zmiana, dwie minuty postoju o każdej porze są do przyjęcia,
+zmiana ma dojść w ciągu dnia. Tryb `noc` zostaje w konfiguracji.
+
+**Paczka wydania powstaje dopiero po zielonym „Serwer" na commicie wydania**
+(`paczka.yml` przez `workflow_run`). Kodu przed scaleniem nikt nie czyta, więc
+testy tego commita są jedynym dowodem, że działa. Wersja z czerwonymi testami
+nie dostaje paczki i serwer jej nie wgra.
+
+**Nowa instalacja z paczki wydania.** Instalator pobiera najnowszy
+`wertis-<wersja>.zip` i rozpakowuje go, zamiast instalować Gita, klonować
+repozytorium i budować 372 MB zależności na serwerze. Paczka niesie własny
+Node 22 (`tools/node-windows.txt`, suma przypięta w repo), więc instalator nie
+instaluje żadnych programów. Git zostaje dla `-Galaz` i instalacji z `.git`.
+
+- **Reinstalacja po awarii zachowuje dane.** Dane od pierwszego dnia leżą
+  w `<katalog>-dane`; instalator, który je zastanie, podpina je zamiast
+  zaczynać od pustej bazy.
+- **Mniej pytań.** Serwer SQL to `localhost` (`-SerwerSql`), instancję czyta
+  z rejestru (`-InstancjaSql`), jedyną bazę bierze sam, magazyny MGP i Zwroty
+  podsuwa po symbolu. Pole lokalizacji zostaje pytaniem — aplikacja nadpisuje
+  je bezwarunkowo.
+- **Pierwsze konto w panelu.** Pusta instalacja pokazuje formularz konta
+  administratora zamiast logowania; instalator o hasło już nie pyta.
+- **Poprawka:** kreator nadpisywał obiekt instancji WERTIS nazwą instancji
+  SQL. Po podłączeniu do Subiekta usługi nie dostawały restartu z nową
+  konfiguracją, a dev — swojego `SRODOWISKO`.
+
+Paczka urosła z 22 do 58 MB przez Node.
+
+**Poprawka CI: scalenia z auto-scalania nie uruchamiały niczego na `main`.**
+Auto-scalanie włączał token workflowu, więc GitHub scalał jako bot Actions,
+a taki push nie wyzwala workflowów. Przepadły wydania 0.482.1–0.482.11,
+0.484.3, 0.484.6, 0.485.0, 0.486.1, 0.486.4 i 0.492.0, a `wydanie.yml` po
+pierwszym scaleniu nie ruszył. Auto-scalanie włącza teraz `ODSWIEZANIE_TOKEN`.
+
+**DEPLOY.md zaczyna się od jednej strony dla osoby, która stawia albo
+odtwarza serwer:** instalator, pięć kroków, co dzieje się samo i czego nie
+trzeba robić na co dzień. Reszta dokumentu zostaje odniesieniem.
+
+Przegląd 55 ustawień zaawansowanych nie dał żadnego do usunięcia. Każde jest
+albo hamulcem bezpieczeństwa (takt z „0 wyłącza", pusty wzorzec linku
+Allegro), albo zależy od firmy (okna importu, format półki, limity SQL),
+albo pilnuje kosztu Copilota. Bezpieczne zamieniło w stałe już 0.489.0.
+
+**Karta „Nowy kolektor" w ustawieniach.** Pierwsza instalacja aplikacji
+na kolektorze nie potrzebuje już kabla ani MDM. Kod QR prowadzi do APK na
+serwerze (`/api/aktualizacja/apk`, bez logowania, jak dotąd), więc wystarczy
+zeskanować go aparatem kolektora. Obok stoi adres serwera dużymi literami —
+na wypadek przeprowadzki, bo adres produkcyjny aplikacja ma wbudowany.
+
+- Adres podaje serwer (`GET /api/biuro/kolektor`, biuro i admin), nie pasek
+  przeglądarki: panel otwarty na samym serwerze to `localhost`.
+- Skaner na ekranie startowym kolektora zostaje wyłączony — pilnuje, żeby
+  wpisywane hasło nie pojechało jako skan.
+
 ## 0.495.0 — 25 września 2026
 
 **Analiza mierzy skutek odpowiedzi, nie tylko jej szybkość.** Zgłoszenie

@@ -25,13 +25,47 @@ Maszyna z Subiektem GT (Windows)
 > **Jak to jest zbudowane i dlaczego tak** — [`docs/architektura.md`](docs/architektura.md).
 > Ten dokument mówi tylko, jak to uruchomić.
 
+## Na jednej stronie (0.496.0)
+
+To jest cała droga dla osoby, która stawia albo odtwarza serwer. Reszta
+dokumentu jest odniesieniem — sięga się do niej, gdy coś tu nie zadziała.
+
+**Nowy serwer albo odtworzenie po awarii** — na maszynie z Subiektem:
+
+1. Pobierz `WERTIS-Instalator.exe` z [wydań](https://github.com/MateuszPuchalski/mag-asystent/releases)
+   i uruchom go jako administrator. Nie instaluje żadnych programów.
+2. Odpowiedz na pytania: zgoda na podłączenie do Subiekta, trzy magazyny
+   (Enter przyjmuje podpowiedź) i pole lokalizacji. O bazę pyta tylko przy kilku.
+3. Otwórz `http://<serwer>:3001/obsluga/` i załóż konto administratora.
+   Formularz pokazuje się sam, dopóki baza nie ma żadnego konta.
+4. Kolektory: w panelu **Ustawienia → Nowy kolektor**. Zeskanuj kod aparatem
+   kolektora i zainstaluj aplikację.
+5. Raz, przed pracą na prawdziwych danych: **odtwórz jedną kopię bazy** (§7).
+
+Po awarii ten sam plik podpina dane z `C:\wertis-dane`, więc baza, zdjęcia
+i kopie wracają. Nowa baza powstaje tylko wtedy, gdy tego katalogu nie ma.
+
+**Na co dzień nie ma nic do zrobienia.**
+
+- **Aktualizacje** wchodzą same tego samego dnia, gdy przez dziesięć minut
+  nikt nic nie zapisze (§0b). Karta „Aktualizacja serwera" mówi, co i kiedy.
+  Wydanie z „[wymaga działania]" czeka na przycisk.
+- **Ustawienia** zmienia się w panelu: Ustawienia → Konfiguracja.
+- **Kopia bazy** powstaje co noc i przed każdą migracją (§7).
+- **Awaria wersji** wraca sama do poprzedniej. Panel i `/api/health` mówią
+  o tym przez dobę.
+
+**Raz, w ustawieniach repozytorium** (właściciel): klucz wydań i token
+odświeżania (§0a, §0c). Bez nich scalony kod nie staje się wydaniem.
+
 ## 0. Instalator — właściwa droga
 
 Rozdziały 1–4 i checklistę z §6 wykonuje za Ciebie
 [**instalator dla Windows**](instalator/README.md): pobierz
 `WERTIS-Instalator.exe` z [wydań](https://github.com/MateuszPuchalski/mag-asystent/releases)
-i uruchom jako administrator. Stawia Node i Gita, buduje aplikację, rejestruje
-obie usługi, otwiera port, wypełnia `wertis.env` **odpytując bazę Subiekta**
+i uruchom jako administrator. Pobiera paczkę wydania z Nodem w środku. Od
+0.496.0 nie instaluje Gita i niczego nie buduje na serwerze. Rejestruje obie
+usługi, otwiera port, wypełnia `wertis.env` **odpytując bazę Subiekta**
 i zakłada konto SQL o minimalnych uprawnieniach.
 
 Trzy rzeczy robi lepiej niż ręczna droga, i to jest jego właściwy powód:
@@ -107,6 +141,12 @@ organizacji.
    write** oraz **Pull requests: Read and write**.
 3. Repozytorium → Settings → Secrets and variables → Actions → **New repository
    secret**, nazwa `ODSWIEZANIE_TOKEN`, wartość: token z punktu 1.
+
+**Ten sam token włącza auto-scalanie** (od 0.496.0, `auto-scalanie.yml`).
+GitHub scala w imieniu tego, kto auto-scalanie włączył. Włączone tokenem
+workflowu dawało scalenie jako bot Actions, a taki push nie uruchamia na
+`main` niczego — ani wydania, ani APK. Bez sekretu scalenie działa, ale
+wydanie trzeba uruchomić ręcznie (Actions → Wydanie → Run workflow).
 
 Zwykłym tokenem workflowu (`github.token`) tego się nie zrobi. Push zrobiony
 nim nie uruchamia CI, więc odświeżona gałąź nie dostałaby wymaganych checków. Bez
@@ -238,18 +278,28 @@ Tryb ustawia klucz `AKTUALIZACJA_AUTO` w karcie konfiguracji:
 
 | tryb | kiedy wgrywa | domyślny dla |
 |---|---|---|
-| `noc` | w oknie `AKTUALIZACJA_OKNO` (domyślnie 3–5), po dziesięciu minutach bez zapisu | produkcji |
-| `zaraz` | przy najbliższym takcie, co pięć minut | instancji dev |
+| `zaraz` | przy najbliższym takcie po dziesięciu minutach bez zapisu, także w dzień | produkcji i dev |
+| `noc` | tylko w oknie `AKTUALIZACJA_OKNO` (domyślnie 3–5), po tej samej ciszy | — |
 | `wylaczona` | nigdy — zostaje przycisk | — |
 
 Automat NIE wgrywa wydania, gdy zachodzi którykolwiek z tych warunków:
 
 - **wpis ma „[wymaga działania]"**, także pośredni — staje na wydaniu przed nim;
-- **wydanie ma mniej niż `AKTUALIZACJA_DOJRZALOSC_H` godzin** (produkcja 6, dev 0);
+- **wydanie ma mniej niż `AKTUALIZACJA_DOJRZALOSC_H` godzin** (produkcja 1, dev 0);
+- **wydanie nie ma paczki** — a paczka powstaje dopiero po zielonym „Serwer"
+  na commicie wydania (`paczka.yml`), więc wersja z czerwonymi testami nie
+  wejdzie wcale;
 - **ta wersja już raz się nie udała** i została wycofana;
 - **CHANGELOG się nie wczytał**, więc nie wiadomo, czy coś wymaga działania;
 - **kanarek nie pracuje jeszcze na tej wersji**, gdy ustawiono
   `AKTUALIZACJA_KANAREK` (adres instancji dev, np. `http://localhost:3002`).
+
+**Dlaczego w dzień, a nie w nocy** (0.496.0, decyzja właściciela z wywiadu
+o wdrażaniu). Magazyn pracuje na jedną zmianę, dwie minuty postoju nie są
+problemem o żadnej porze, a zmiana ma dojść tego samego dnia. Kodu przed
+scaleniem nikt nie czyta, więc ręczny przycisk dawałby tylko zwłokę. Bramką
+są testy commita wydania, wycofanie przy porażce i godzina na wycofanie
+wydania z obiegu.
 
 **Kanarek.** Dev w trybie `zaraz` dostaje każde wydanie od razu. Produkcja
 z ustawionym kanarkiem wgra najwyżej wersję, na której dev pracuje i odpowiada.
@@ -880,9 +930,9 @@ także wtedy, gdy sesji nie ma.
 > urządzenie w sieci hali mogło zmienić lokalizację w Subiekcie albo pobrać
 > raport wydajności per pracownik. Podpisywało operację dowolnym nazwiskiem.
 
-**1. Zwykle konto admina zakłada już INSTALATOR.** Pyta o login i hasło zaraz
-po starcie usług. Ten punkt dotyczy więc instalacji stawianej ręcznie albo
-serwera, na którym instalator tego kroku nie wykonał.
+**1. Konto admina zakłada się w PANELU** (od 0.496.0). Pusta instalacja
+pokazuje pod `/obsluga/` formularz pierwszego konta zamiast logowania. Poniższa
+droga przez kolektor działa dalej.
 
 **Załóż konta z KOLEKTORA — bez terminala.** Po instalacji APK i ustawieniu
 adresu serwera aplikacja sama sprawdza, czy instalacja jest pusta. Jeśli tak,
@@ -955,7 +1005,7 @@ ją wykonać bez zastanawiania się — nie po to, żeby zostało w firmie.
 
 **Żadnych domyślnych haseł i żadnych domyślnych kont.** Ta reguła nie była
 dotąd nigdzie zapisana, choć kod trzymał się jej od początku. Instalator losuje
-hasło konta SQL i **pyta o hasło admina zamiast je wymyślać**. Kreator nie
+hasło konta SQL, a hasło admina **wpisuje człowiek w panelu**. Kreator nie
 pokazuje haseł ani razu, a konto bez hasła nie zaloguje się nigdy. Nawet
 `npm run seed` losuje hasło admina i pokazuje je raz, zamiast wpisywać stałe
 demo — wyjątek „tylko na dev" jest dokładnie tym, który jedzie potem na
