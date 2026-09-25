@@ -16,6 +16,7 @@ import { db } from "../db/db.js";
 import { stanSynchronizacji } from "../services/allegro-inbox-sync-state.js";
 import { synchronizujAllegroInbox } from "../services/allegro-inbox-sync.js";
 import { wyslijOdpowiedz } from "../services/wysylka.js";
+import { czasDoWysylki, zapiszCofniecieWysylki } from "../services/tarcie.js";
 import {
   dodajZalacznik, usunZalacznik, zalacznikiRozmowy,
 } from "../services/zalaczniki-wysylki.js";
@@ -569,7 +570,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
      przycisku. */
   app.post<{ Params: { id: string }; Body: {
     body?: string; expectedVersion?: number; expectedLastMessageId?: number | null;
-    mimoNowejWiadomosci?: boolean; mimoObecnosci?: boolean; zakoncz?: boolean;
+    mimoNowejWiadomosci?: boolean; mimoObecnosci?: boolean; zakoncz?: boolean; msOdOtwarcia?: number;
   } }>("/api/conversations/:id/send", async (req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
     const s = sesjaZadania()!;
@@ -583,9 +584,23 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
         mimoNowejWiadomosci: Boolean(req.body?.mimoNowejWiadomosci),
         mimoObecnosci: Boolean(req.body?.mimoObecnosci),
         zakoncz: Boolean(req.body?.zakoncz),
+        msOdOtwarcia: czasDoWysylki(req.body?.msOdOtwarcia),
       });
     } catch (e) { return konflikt(reply, e); }
   });
+
+  /* Cofnięta wysyłka (@wydanie) — sam wpis do pomiaru tarcia. Czekanie
+     dziesięciu sekund mieszka w przeglądarce, więc serwer inaczej by o tym
+     nie wiedział. Powód i granice przy `services/tarcie.ts`. */
+  app.post<{ Params: { id: string } }>(
+    "/api/conversations/:id/wysylka-cofnieta", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const s = sesjaZadania()!;
+      if (!zapiszCofniecieWysylki(db(), Number(req.params.id), { id: s.user.userId, name: s.user.name })) {
+        return reply.code(404).send({ error: "Nie ma takiej rozmowy" });
+      }
+      return { ok: true };
+    });
 
   /* ── ZAKOŃCZ / OTWÓRZ PONOWNIE (23 września 2026) ──────────────────────────
      Jeden werdykt zamiast menu statusów — powód w `conversations.ts` przy
@@ -600,11 +615,12 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  app.post<{ Params: { id: string } }>(
+  app.post<{ Params: { id: string }; Body: { zCofniecia?: boolean } }>(
     "/api/conversations/:id/otworz", async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
       try {
-        return otworzRozmowe(db(), Number(req.params.id), sesjaZadania()!.user.userId);
+        return otworzRozmowe(db(), Number(req.params.id), sesjaZadania()!.user.userId, new Date(),
+          Boolean(req.body?.zCofniecia));
       } catch (e) { return konflikt(reply, e); }
     });
 

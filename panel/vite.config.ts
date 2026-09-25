@@ -3,6 +3,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
+import { wtyczkaZmian } from "./wtyczka-zmian";
 
 const tutaj = path.dirname(fileURLToPath(import.meta.url));
 
@@ -28,7 +29,7 @@ function pieczatkaWersji(): Plugin {
 }
 
 export default defineConfig({
-  plugins: [react(), pieczatkaWersji()],
+  plugins: [react(), pieczatkaWersji(), wtyczkaZmian(path.join(tutaj, ".."))],
   base: "/obsluga/",
   server: {
     port: 5174,

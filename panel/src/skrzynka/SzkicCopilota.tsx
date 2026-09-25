@@ -5,12 +5,14 @@ import { OdczytZdjec } from "./OdczytZdjec";
 import { ProcesCopilota } from "./ProcesCopilota";
 import type { OsRozmowy, StanCopilota, SzkicCopilota, WymianaCopilota } from "../api/typy";
 import { Dopytanie } from "./Dopytanie";
+import { useSkrotyDzialaja } from "../nawigacja/fokus";
 
 /**
  * Szkic odpowiedzi z Copilota (§14.6, 0.231.0) — przycisk i karta pod edytorem.
  *
  * Propozycja modelu NIE wchodzi do pola sama. Stoi obok jako karta, a do
- * szkicu agenta trafia jednym kliknięciem „Popraw w edytorze".
+ * szkicu agenta trafia jednym kliknięciem „Wstaw do odpowiedzi" (do @wydanie
+ * „Popraw w edytorze").
  *
  * ── JEDEN PRZYCISK ZAMIAST „WSTAW" I „ZASTĄP" (22 września 2026) ──────────
  * Decyzja właściciela. Od kiedy szkic czeka na agenta przy każdej wiadomości,
@@ -173,6 +175,8 @@ export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
  * odeszło razem z podpowiedzią.
  */
 export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPolu?: boolean }) {
+  /* Znaczki E i R tylko wtedy, gdy klawisze działają — powód w `nawigacja/fokus.ts`. */
+  const skrotyDzialaja = useSkrotyDzialaja();
   const s = p.szkic;
   if (!s) return null;
   return <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
@@ -190,10 +194,17 @@ export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
       <span className="ml-auto flex flex-wrap items-center gap-2">
         {!wPolu && <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onPopraw}
           aria-keyshortcuts="E">
-          {p.maSzkicAgenta ? "Zastąp mój szkic" : "Popraw w edytorze"}
-          <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans">E</kbd></Przycisk>}
-        <Przycisk className="text-xs" onClick={p.onOdrzuc} aria-keyshortcuts="R">Odrzuć
-          <kbd aria-hidden="true" className="ml-1 rounded bg-slate-100 px-1 font-sans">R</kbd></Przycisk>
+          {/* „WSTAW DO ODPOWIEDZI", NIE „POPRAW W EDYTORZE" (@wydanie). Przycisk
+              niczego nie poprawia — przenosi szkic do pola. Napis ma nazywać
+              SKUTEK, bo po skutek się klika (Nielsen: zgodność z rzeczywistością). */}
+          {p.maSzkicAgenta ? "Zastąp mój szkic" : "Wstaw do odpowiedzi"}
+          {skrotyDzialaja && <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans">E</kbd>}
+        </Przycisk>}
+        {/* „Odrzuć SZKIC": samo „Odrzuć" stało w panelu także przy zwrotach
+            i propozycjach wiedzy — jedno słowo, trzy różne czynności. */}
+        <Przycisk className="text-xs" onClick={p.onOdrzuc} aria-keyshortcuts="R">Odrzuć szkic
+          {skrotyDzialaja && <kbd aria-hidden="true" className="ml-1 rounded bg-slate-100 px-1 font-sans">R</kbd>}
+        </Przycisk>
       </span>
     </div>;
 }
@@ -228,7 +239,7 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
   /* Oceniony szkic zniknął z ekranu: odrzucony nie ma po co wisieć. Wiersz
      w bazie zostaje dla pomiaru. WYJĄTEK od 0.499.0: szkic stojący w polu
      zostaje z tym, na czym stoi — uwagami, odczytem zdjęć i dopytaniem —
-     także po „Popraw w edytorze", bo agent właśnie go poprawia. */
+     także po „Wstaw do odpowiedzi", bo agent właśnie go poprawia. */
   if (!s || (s.ocena !== null && !(wPolu && s.ocena !== "odrzucony"))) return null;
   /* PRZYCISKI NA GÓRZE (0.232.1) — patrz `PasekSzkicu`. */
   return <section className={wPolu ? "mt-2" : "mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3"}

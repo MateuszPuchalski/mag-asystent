@@ -48,7 +48,7 @@ function zalogowany(rola: Rola): string {
    Powód jest inny i wypisany przy trasie: karta odpowiada na „u którego
    dostawcy jest problem", a to ocena kontrahenta, nie stan magazynu. */
 const CHRONIONE = ["/api/analiza", "/api/analiza/csv", "/api/biuro/dostawy/analiza", "/api/analiza/obsluga",
-  "/api/analiza/tygodnie", "/api/analiza/tygodnie/2026-W38"];
+  "/api/analiza/tarcie", "/api/analiza/tygodnie", "/api/analiza/tygodnie/2026-W38"];
 
 test("bez sesji 401 — dane o ludziach nie mają prawa być otwarte", async () => {
   for (const url of CHRONIONE) {
@@ -182,6 +182,19 @@ test("czas odpowiedzi: biuro bez rozbicia na osoby, administrator z nim", async 
   assert.ok(Array.isArray(biuro.wgKategorii));
   const admin = await czytaj(zalogowany("admin"));
   assert.ok(Array.isArray(admin.wgOsoby));
+});
+
+test("pomiar tarcia: biuro bez rozbicia na osoby, administrator z nim", async () => {
+  /* @wydanie. Udział szkiców wysłanych bez zmian na osobę to ocena pracy
+     człowieka — ta sama reguła co czas odpowiedzi. */
+  const czytaj = async (t: string) => (await app.inject({
+    method: "GET", url: "/api/analiza/tarcie?days=30", headers: { "x-session": t } })).json();
+  const biuro = await czytaj(zalogowany("biuro"));
+  assert.equal(biuro.dni, 30);
+  assert.equal(biuro.osoby, null);
+  assert.equal(typeof biuro.razem.wyslanych, "number");
+  const admin = await czytaj(zalogowany("admin"));
+  assert.ok(Array.isArray(admin.osoby));
 });
 
 /* Raporty tygodni (0.497.0). Trasy tylko czytają: raport zapisuje takt

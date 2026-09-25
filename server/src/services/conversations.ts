@@ -786,6 +786,10 @@ export function zakonczRozmowe(
  */
 export function otworzRozmowe(
   database: DatabaseSync, conversationId: number, userId: number, teraz = new Date(),
+  /* Otwarcie z paska „Cofnij" tuż po zakończeniu (@wydanie). Osobny wpis
+     w dzienniku, bo to pomyłka złapana w porę, a nie decyzja po dniach —
+     pomiar tarcia (`services/tarcie.ts`) liczy wyłącznie te pierwsze. */
+  zCofniecia = false,
 ): { status: StatusRozmowy } {
   const wynik = transaction(database, () => {
     const przed = statusZapisany(database, conversationId, teraz.getTime());
@@ -799,6 +803,10 @@ export function otworzRozmowe(
     }
     database.prepare("UPDATE conversation SET otwarta_recznie_at=? WHERE id=?")
       .run(teraz.toISOString(), conversationId);
+    if (zCofniecia) {
+      logEvent("rozmowa_zakonczenie_cofniete", imieAutora(database, userId), null,
+        { conversationId }, userId, database);
+    }
     return { status: statusIZakonczenie(database, conversationId, teraz.getTime()).status };
   })();
   publishConversationEvent("assignment.changed", conversationId, { status: wynik.status });

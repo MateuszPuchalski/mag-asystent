@@ -5,6 +5,7 @@ import { PrzyciskZalacznika, ZalacznikiWysylki } from "./ZalacznikiWysylki";
 import { KartaSzkicu, PasekSzkicu, PrzyciskSzkicu, UwagiSzkicu,
   type PropsSzkicuCopilota } from "./SzkicCopilota";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
+import { doSprawdzenia } from "./ProcesCopilota";
 
 /**
  * Edytor odpowiedzi (§10.4).
@@ -93,6 +94,23 @@ export function Edytor({
      pomylenia. Czyszczenie niczego nie zapisuje, więc do pomyłki potrzebne
      jest cofnięcie — trzymane, dopóki agent nie zacznie pisać od nowa. */
   const [wyczyszczone, setWyczyszczone] = useState<string | null>(null);
+  /* ── TARCIE PRZY WYSYŁCE NIETKNIĘTEGO SZKICU (@wydanie) ─────────────────
+     Szkic stoi w polu gotowy do wysłania, więc przyjęcie go bez czytania
+     kosztuje jedno kliknięcie. Randomizowane badanie z 2025 (NEJM AI):
+     lekarze po dwudziestu godzinach szkolenia z AI wypadali o 18 punktów
+     procentowych gorzej, gdy model podsuwał błąd — szkolenie nie chroni.
+
+     Stąd tarcie w interfejsie, ale WĄSKIE: tylko szkic nietknięty i tylko
+     z twierdzeniami spoza naszej bazy. Buçinca i in. (CSCW 2021) pokazali,
+     że wymuszanie namysłu zmniejsza nadmierne zaufanie, ale ludzie oceniają
+     je najgorzej — więc bez okna dialogowego (klikane z przyzwyczajenia,
+     Anderson i in., CHI 2015). Przycisk mówi, co się stanie, a twierdzenia
+     stoją obok. Porównanie po zwinięciu białych znaków, tak jak `losSzkicu`
+     na serwerze liczy „bez zmian". */
+  const zwin = (t: string) => t.replace(/\s+/g, " ").trim();
+  const niezmieniony = !wKomentarzu && copilot?.szkic != null && szkic.trim() !== ""
+    && zwin(szkic) === zwin(copilot.szkic.tresc);
+  const niesprawdzone = niezmieniony ? (copilot?.szkic?.twierdzenia ?? []).filter(doSprawdzenia) : [];
   const wyczysc = () => { setWyczyszczone(szkic); onZmiana(""); };
   /* Uwagi modelu PRZEŻYWAJĄ przyjęcie — patrz `UwagiSzkicu`. Znikają razem
      z tekstem agenta i przy nieświeżym szkicu, bo wtedy mówią o innym tekście. */
@@ -214,13 +232,21 @@ export function Edytor({
             placeholder="Szkic odpowiedzi — współdzielony z zespołem" />
           {uwagiPoPrzyjeciu.length > 0 && <div className="mt-2"><UwagiSzkicu uwagi={uwagiPoPrzyjeciu} /></div>}
           {/* Po „Wyczyść wszystko" karta stoi zwinięta: pusty znaczy pusty,
-              a szkic wraca jednym kliknięciem „Popraw w edytorze". */}
+              a szkic wraca jednym kliknięciem „Wstaw do odpowiedzi". */}
           {copilot && <KartaSzkicu p={copilot} wPolu={wPolu} zwinieta={wyczyszczone !== null} />}
           {/* Lista dołożonych plików stoi POD treścią (0.247.0): należy do
               komponowanej wiadomości, nie do przycisków. Sam spinacz jedzie
               w pasku działań — nie zasługuje na własny rząd. */}
           <ZalacznikiWysylki lista={zalaczniki} blad={bladZalacznika}
             onUsun={onUsunZalacznik} wylaczone={cudza} />
+          {niesprawdzone.length > 0 && <section aria-label="Do sprawdzenia przed wysłaniem"
+            className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+            <b>Szkic bez zmian — te twierdzenia nie pochodzą z naszej bazy:</b>
+            <ul className="mt-1 list-disc pl-4">
+              {niesprawdzone.slice(0, 3).map((t, i) => <li key={i}>{t.teza}</li>)}
+            </ul>
+            {niesprawdzone.length > 3 && <p className="mt-1">i {niesprawdzone.length - 3} więcej w „Skąd to wiem".</p>}
+          </section>}
         </>}
   </article>
 
@@ -278,10 +304,16 @@ export function Edytor({
               przesuwanej od dymka — tam, gdzie kończy się czytanie odpowiedzi. */}
           <Przycisk wariant="glowny" onClick={onWyslij} disabled={cudza || wysyla || !szkic.trim()}
             className="whitespace-nowrap px-5 py-2.5 text-tresc shadow-sm">
-            <Send size={17} />{wysyla ? "Wysyłam…" : "Wyślij do klienta"}
+            <Send size={17} />{wysyla ? "Wysyłam…" : niesprawdzone.length ? "Wyślij bez zmian" : "Wyślij do klienta"}
             {/* Skrót NA PRZYCISKU (dekalog, punkt 2): o skrócie, o którym nikt
                 nie wie, nikt nie skorzysta. Poza nazwą dostępną przycisku. */}
-            <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans text-podpis">Ctrl+Enter</kbd>
+            {/* Przy tarciu w miejscu podpisu skrótu staje liczba twierdzeń:
+                pasek ma zostać w jednym rzędzie, a skrót działa dalej
+                i zostaje w `aria-keyshortcuts`. */}
+            {niesprawdzone.length
+              ? <span className="ml-1 rounded bg-white/70 px-1 text-podpis text-amber-950">
+                  {niesprawdzone.length} do sprawdzenia</span>
+              : <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans text-podpis">Ctrl+Enter</kbd>}
           </Przycisk>
         </>}
   </div>

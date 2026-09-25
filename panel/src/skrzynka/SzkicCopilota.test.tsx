@@ -70,15 +70,46 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.getByLabelText("Szkic odpowiedzi")).toHaveValue(szkic().tresc);
     expect(screen.getByText(/Szkic Copilota w polu/)).toBeInTheDocument();
     expect(screen.getByText(/poprawiaj wprost w polu/)).toBeInTheDocument();
-    for (const n of [/Przyjmij/, /Popraw w edytorze/, /Zastąp mój szkic/]) {
+    for (const n of [/Przyjmij/, /Wstaw do odpowiedzi/, /Zastąp mój szkic/]) {
       expect(screen.queryByRole("button", { name: n })).toBeNull();
     }
     /* Treść stoi raz: w polu, nie drugi raz w karcie pod nim. */
     expect(screen.queryByTestId("szkic-copilota-tresc")).toBeNull();
     /* Wysyłka zostaje decyzją człowieka — ale do wysłania jest już tekst. */
     expect(screen.getByRole("button", { name: /Wyślij do klienta/ })).toBeEnabled();
-    await userEvent.click(screen.getByRole("button", { name: "Odrzuć" }));
+    await userEvent.click(screen.getByRole("button", { name: "Odrzuć szkic" }));
     expect(c.onOdrzuc).toHaveBeenCalledTimes(1);
+  });
+
+  /* ── Tarcie przy nietkniętym szkicu (@wydanie) ────────────────────────────
+     Wąskie z rozmysłem: tylko szkic bez zmian i tylko z twierdzeniami spoza
+     naszej bazy. Bez okna dialogowego — przycisk mówi, co się stanie. */
+  it("nietknięty szkic z twierdzeniami spoza bazy: „Wyślij bez zmian” i lista obok", async () => {
+    const tw = [
+      { teza: "Nóż pasuje do WYZ18H", zrodlo: "model" as const, odwolanie: null, pewnosc: "prawdopodobne" as const, obnizona: false },
+      { teza: "Mamy 3 sztuki", zrodlo: "fakty" as const, odwolanie: "F2", pewnosc: "pewne" as const, obnizona: false },
+    ];
+    const z = szkic({ twierdzenia: tw });
+    const { rerender } = edytor(copilot({ szkic: z, wPolu: true, maSzkicAgenta: true }), { szkic: z.tresc });
+    const wyslij = screen.getByRole("button", { name: /Wyślij bez zmian/ });
+    expect(wyslij).toHaveTextContent("1 do sprawdzenia");
+    expect(wyslij).toBeEnabled();
+    const lista = screen.getByRole("region", { name: "Do sprawdzenia przed wysłaniem" });
+    expect(lista).toHaveTextContent("Nóż pasuje do WYZ18H");
+    expect(lista).not.toHaveTextContent("Mamy 3 sztuki");
+
+    /* Poprawiony tekst to już praca agenta — tarcie znika. */
+    rerender(<Edytor {...props} szkic={`${z.tresc} Pozdrawiamy.`}
+      copilot={copilot({ szkic: z, wPolu: true, maSzkicAgenta: true })} />);
+    expect(screen.getByRole("button", { name: /Wyślij do klienta/ })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Do sprawdzenia przed wysłaniem" })).toBeNull();
+  });
+
+  it("szkic oparty wyłącznie na naszej bazie idzie bez tarcia", () => {
+    const z = szkic({ twierdzenia: [
+      { teza: "Mamy 3 sztuki", zrodlo: "fakty", odwolanie: "F2", pewnosc: "pewne", obnizona: false }] });
+    edytor(copilot({ szkic: z, wPolu: true, maSzkicAgenta: true }), { szkic: z.tresc });
+    expect(screen.getByRole("button", { name: /Wyślij do klienta/ })).toBeInTheDocument();
   });
 
   it("Tab w polu przenosi fokus — nie przyjmuje niczego", async () => {
@@ -117,7 +148,7 @@ describe("Szkic Copilota w edytorze", () => {
     render(<Pole />);
     await userEvent.click(screen.getByRole("button", { name: /Wyczyść wszystko/ }));
     expect(screen.getByTestId("szkic-copilota-tresc").closest("details")).not.toHaveAttribute("open");
-    expect(screen.getByRole("button", { name: "Popraw w edytorze" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Wstaw do odpowiedzi" })).toBeInTheDocument();
   });
 
   it("w cudzej rozmowie nie ma czego czyścić", () => {
@@ -138,7 +169,7 @@ describe("Szkic Copilota w edytorze", () => {
     expect(szkicNaStart(copilot(), "")).toBeNull();
   });
 
-  it("karta w polu zostaje po „Popraw w edytorze”, znika po odrzuceniu", () => {
+  it("karta w polu zostaje po „Wstaw do odpowiedzi”, znika po odrzuceniu", () => {
     const { unmount } = edytor(copilot({ szkic: szkic({ ocena: "wstawiony" }), wPolu: true, maSzkicAgenta: true }),
       { szkic: szkic().tresc });
     expect(screen.getByRole("region", { name: "Na czym stoi szkic Copilota" })).toBeInTheDocument();
@@ -184,7 +215,7 @@ describe("Szkic Copilota w edytorze", () => {
   /* Od 0.495.0 karta z treścią zostaje tylko POZA polem — tu nieświeża. */
   it("przyciski stoją PRZED treścią, a treść PŁYNIE bez własnego przewijania", () => {
     edytor(copilot({ szkic: szkic({ tresc: "linia\n".repeat(60) }), nieswiezy: true }));
-    const wstaw = screen.getByRole("button", { name: "Popraw w edytorze" });
+    const wstaw = screen.getByRole("button", { name: "Wstaw do odpowiedzi" });
     const tresc = screen.getByTestId("szkic-copilota-tresc");
     expect(wstaw.compareDocumentPosition(tresc) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(tresc.className).not.toMatch(/max-h-\d+/);
@@ -196,10 +227,10 @@ describe("Szkic Copilota w edytorze", () => {
        ZANIM ktoś kliknie. */
     const c = copilot({ szkic: szkic(), maSzkicAgenta: true });
     edytor(c, { szkic: "Dzień dobry," });
-    expect(screen.queryByRole("button", { name: "Popraw w edytorze" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Wstaw do odpowiedzi" })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Zastąp mój szkic" }));
     expect(c.onPopraw).toHaveBeenCalledTimes(1);
-    await userEvent.click(screen.getByRole("button", { name: "Odrzuć" }));
+    await userEvent.click(screen.getByRole("button", { name: "Odrzuć szkic" }));
     expect(c.onOdrzuc).toHaveBeenCalledTimes(1);
   });
 
@@ -250,7 +281,7 @@ describe("Szkic Copilota w edytorze", () => {
     edytor(copilot({ szkic: szkic(), nieswiezy: true, wylaczony: true }),
       { cudza: true, wlasciciel: "M. Wójcik" });
     expect(screen.getByRole("button", { name: "Ułóż ponownie" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Popraw w edytorze" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Wstaw do odpowiedzi" })).toBeDisabled();
   });
 
   it("błąd układania stoi obok przycisku zdaniem", () => {

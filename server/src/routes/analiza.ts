@@ -7,6 +7,7 @@ import { logEvent } from "../services/events.js";
 import { sesjaZadania } from "../context.js";
 import { czasOdpowiedzi } from "../services/czas-odpowiedzi.js";
 import { raportUzycia } from "../services/uzycie.js";
+import { pomiarTarcia } from "../services/tarcie.js";
 import { ergonomia } from "../services/ergonomia.js";
 import { listaRaportow, raportTygodnia } from "../services/raport-tygodnia.js";
 
@@ -97,6 +98,16 @@ export async function analizaRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return czasOdpowiedzi(dniZQuery(req.query.days), mozeWidziecLudzi());
+  });
+
+  /* Pomiar tarcia w skrzynce (@wydanie) — cofnięcia, czas do wysyłki
+     i szkice wysłane bez zmian. Ta sama bramka i okno co czas odpowiedzi;
+     rozbicie na osoby wyłącznie dla administratora. Odczyt niczego nie
+     zapisuje. Powód każdej liczby przy `services/tarcie.ts`. */
+  app.get<{ Querystring: { days?: string } }>("/api/analiza/tarcie", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return pomiarTarcia(dniZQuery(req.query.days), mozeWidziecLudzi());
   });
 
   /* Czego nikt nie używa (23 września 2026) — raport z dziennika zdarzeń,

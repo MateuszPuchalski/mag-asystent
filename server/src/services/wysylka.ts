@@ -23,6 +23,8 @@ export interface ZadanieWysylki {
   mimoObecnosci?: boolean;
   /** „Wyślij i zakończ" (23 września 2026): po udanej wysyłce rozmowa jest zakończona. */
   zakoncz?: boolean;
+  /** Ile ms minęło od otwarcia rozmowy w panelu — pomiar tarcia (`services/tarcie.ts`), przycięty w trasie. */
+  msOdOtwarcia?: number | null;
   database?: DatabaseSync;
   wyslij?: WyslijDoAllegro;
   /** Znacznik „przeczytane" w Allegro. Wstrzykiwany, żeby test nie szedł w sieć. */
@@ -330,7 +332,8 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
     logEvent("rozmowa_wyslana", z.autor.name, null,
       { conversationId: z.conversationId, outboxId, kluczIdempotencji: klucz,
         externalMessageId: wynik.externalMessageId, znakow: tresc.length,
-        zalacznikow: idZalacznikow.length }, undefined, database);
+        zalacznikow: idZalacznikow.length,
+        ...(z.msOdOtwarcia != null ? { msOdOtwarcia: z.msOdOtwarcia } : {}) }, undefined, database);
 
     publishConversationEvent("message.created", z.conversationId, { outboxId });
     return { outboxId, status: "sent" as StatusWysylki, kluczIdempotencji: klucz,

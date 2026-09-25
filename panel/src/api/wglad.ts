@@ -173,6 +173,35 @@ export function useCzasOdpowiedzi(dni: number, wlaczona: boolean) {
   });
 }
 
+/* ── Tarcie w skrzynce (`services/tarcie.ts`, @wydanie) ────────────────── */
+
+export interface LiczbyTarcia {
+  wyslanych: number;
+  zeSzkicem: number;
+  bezZmian: number;
+  udzialBezZmian: number | null;
+  cofnietychWysylek: number;
+  cofnietychZakonczen: number;
+  medianaSekDoWysylki: number | null;
+  probekCzasu: number;
+}
+
+export interface PomiarTarcia {
+  dni: number;
+  razem: LiczbyTarcia;
+  /** `null` dla roli biuro — rozbicie na osoby czyta tylko administrator. */
+  osoby: Array<LiczbyTarcia & { osoba: string }> | null;
+}
+
+export function useTarcie(dni: number, wlaczona: boolean) {
+  return useQuery({
+    queryKey: ["analiza", "tarcie", dni],
+    queryFn: () => api<PomiarTarcia>(`/api/analiza/tarcie?days=${dni}`),
+    enabled: wlaczona,
+    placeholderData: (poprzednie) => poprzednie,
+  });
+}
+
 /* ── Użycie (`services/uzycie.ts`, 23 września 2026) ────────────────────── */
 
 export interface WpisUzycia { typ: string; ile: number; ostatnio: string | null }
