@@ -1025,3 +1025,34 @@ test("ZWIĄZANY koszyk wraca trasą z konfiguracji, choćby dokument nie znał n
   assert.equal(p.magFrom, 3);
   assert.equal(p.magTo, 1, "na magazyn główny — tak, jak koszyk stamtąd wyjechał");
 });
+
+/* Granica okna w formacie bazy (@wydanie). Lista koszy trzyma rozłożone
+   przez 14 dni, pominięte pozycje — przez 30. Znaczniki mają `T`, a granica
+   z `datetime()` miała spację, więc kosz rozłożony minutę przed granicą tej
+   samej doby wciąż stał na liście pracy biura. Oba okna w jednym teście, bo
+   obie listy mówią „to jest jeszcze do zrobienia" i muszą liczyć tak samo. */
+test("kosz rozłożony tuż przed oknem schodzi z obu list, tuż w oknie zostaje", () => {
+  const d = db();
+  const temu = (dni: number, minut: number) =>
+    new Date(Date.now() - dni * 86_400_000 - minut * 60_000).toISOString();
+  const kosz = d.prepare(
+    `INSERT INTO kosz(kod, status, utworzono_at, utworzono_przez, rozlozono_at, rozlozono_przez)
+     VALUES (?, 'rozlozony', ?, 'Test', ?, 'Hala')`);
+  const pominieta = d.prepare(
+    `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, status, powod, pominieto_at)
+     VALUES (?, 900036, 'TEST-LINIA-TODO', 'Pozycja', 1, 'skipped', 'brak', ?)`);
+
+  const lista = (at: string) => Number(kosz.run("GRANICA", at, at).lastInsertRowid);
+  lista(temu(14, 1));
+  const listaWOknie = lista(temu(14, -1));
+  assert.deepEqual(K.listaKoszy().map((k) => k.id), [listaWOknie]);
+
+  const zPominieta = (at: string) => {
+    const id = Number(kosz.run("POMINIETA", at, at).lastInsertRowid);
+    pominieta.run(id, at);
+    return id;
+  };
+  zPominieta(temu(30, 1));
+  const pominietaWOknie = zPominieta(temu(30, -1));
+  assert.deepEqual(K.pominietePozycje().map((p) => p.koszId), [pominietaWOknie]);
+});

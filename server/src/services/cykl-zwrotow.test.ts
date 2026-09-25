@@ -215,3 +215,19 @@ test("zdarzenia nie po kolei nie produkują ujemnego czasu", () => {
   assert.equal(odcinek(r, "domknięcie").probka, 0, "powrót przed odłożeniem nie jest odcinkiem");
   assert.equal(odcinek(r, "cały cykl").medianaMin, 10);
 });
+
+/* Granica okna w formacie bazy (@wydanie). Koszyk z minuty sprzed granicy
+   siedmiu dni leży zwykle tej samej doby co granica. Porównany
+   z `datetime('now','-7 days')` (spacja) wchodził, bo `'T'` > `' '`, więc
+   raport „7 dni" brał kartony z ośmiu. Granica zdarzeń hali tylko wstępnie
+   przesiewa: zdarzenie liczy się wyłącznie przy kartonie z okna, więc
+   o wyniku rozstrzyga granica koszy i to ją pilnujemy. */
+test("koszyk tuż sprzed okna nie jest kartonem raportu, tuż z okna — jest", () => {
+  const TYDZIEN_MIN = 7 * 1440;
+  koszyk("Z-1", T(TYDZIEN_MIN + 1), null, null);
+  const wOknie = koszyk("Z-2", T(TYDZIEN_MIN - 1), null, null);
+
+  const r = C.cyklZwrotow(7);
+  assert.equal(r.kartonow, 1);
+  assert.equal(r.sprawy[0].koszId, wOknie);
+});

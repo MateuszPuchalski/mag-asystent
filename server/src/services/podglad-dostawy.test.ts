@@ -272,3 +272,38 @@ test("podgląd niesie płatnika i flagę logo — panel wie, czy pytać o obraz"
   assert.equal(P.podgladDokumentu(DOK)?.maLogo, false);
   d.prepare("DELETE FROM dostawca_logo").run();
 });
+
+/* Granica okna w formacie bazy (@wydanie). Dostawa zamknięta minutę przed
+   granicą siedmiu dni leży zwykle tej samej doby co granica. Porównana
+   z `datetime('now','-7 days')` (spacja) wchodziła, bo `'T'` > `' '`, więc
+   analiza „7 dni" liczyła dostawy, pozycje, dostawców i wyjątki z ośmiu.
+   Każde z pięciu zapytań miało własne `datetime`, więc graniczna dostawa
+   niesie wszystko, co któreś z nich mogłoby wpuścić. */
+test("analiza dostaw: dostawa i wyjątek tuż sprzed okna nie wchodzą, tuż z okna — wchodzą", () => {
+  const d = db();
+  const temu = (minut: number) => new Date(Date.now() - minut * 60_000).toISOString();
+  const TYDZIEN_MIN = 7 * 1440;
+  const dostawa = (dok: number, dostawca: string, zamknieta: string, linia: string) => {
+    const id = Number(d.prepare(
+      `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, dostawca, status, opened_at, closed_at)
+       VALUES (?, ?, ?, 'done', ?, ?)`)
+      .run(dok, `FZ ${dok}/2026`, dostawca, temu(TYDZIEN_MIN + 120), zamknieta).lastInsertRowid);
+    d.prepare(
+      `INSERT INTO delivery_line(delivery_id, tw_id, tw_symbol, tw_nazwa, ilosc_dok, status)
+       VALUES (?, ?, 'TEST-GAZNIK', 'Gaźnik', 1, ?)`).run(id, GAZNIK, linia);
+    return id;
+  };
+
+  const poza = dostawa(801, "Graniczny", temu(TYDZIEN_MIN + 1), "problem");
+  d.prepare("INSERT INTO problem(delivery_id, typ, created_at) VALUES (?, 'damaged', ?)")
+    .run(poza, temu(TYDZIEN_MIN + 1));
+  dostawa(802, "W oknie", temu(TYDZIEN_MIN - 1), "done");
+
+  const a = P.analizaDostaw(7);
+  assert.equal(a.zamknietych, 1);
+  assert.equal(a.pozycjiRozlozonych, 1);
+  assert.equal(a.udzialWyjatkow, 0, "pozycja z problemem była w dostawie spoza okna");
+  assert.deepEqual(a.dostawcy.map((w) => w.dostawca), ["W oknie"]);
+  assert.equal(a.wyjatki.length, 0);
+  assert.equal(a.tygodnie.reduce((s, t) => s + t.ile, 0), 1);
+});

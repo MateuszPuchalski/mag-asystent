@@ -175,3 +175,33 @@ test("każde zdarzenie czynności nadal pada gdzieś w serwisach", () => {
     }
   }
 });
+
+/* Granica okna w formacie bazy (@wydanie). Zdarzenie minutę sprzed granicy
+   siedmiu dni leży zwykle tej samej doby co granica. Porównane z
+   `datetime('now','-7 days')` (spacja) wchodziło, bo `'T'` > `' '` — raport
+   „7 dni" liczył do ośmiu w każdej tabeli naraz. Po jednym zdarzeniu na każde
+   zapytanie z oknem, bo każde miało własne `datetime`. Zdarzenie tuż
+   w oknie pilnuje drugiej strony: granica nie może też uciąć za dużo. */
+test("zdarzenia tuż sprzed okna nie wchodzą do żadnej tabeli, tuż z okna — wchodzą", () => {
+  // TERAZ stoi minutę przed zegarem, więc równe siedem dni wstecz to minuta za granicą.
+  const poza = 7 * 86_400_000;
+  zdarzenie("czasy_zadan", { czasy: [{ ekran: "HOME", trasa: "/api/x", kubelki: [1, 0, 0, 0, 0, 0] }] },
+    "kol-a", poza);
+  zdarzenie("scan_timing", { ms: 120 }, "kol-a", poza);
+  zdarzenie("scan", { code: "590111", kind: "EAN" }, "kol-a", poza);
+  zdarzenie("http_rejected", { sciezka: "/api/x", status: 400, powod: "zły kod" }, "kol-a", poza);
+  zdarzenie("siec_przerwa", { trwanieMs: 60_000 }, "kol-a", poza);
+  zdarzenie("putaway_line_done", {}, "kol-a", poza);
+
+  const r = E.ergonomia(7);
+  assert.equal(r.daneDo, null);
+  assert.equal(r.czasy.n, 0);
+  assert.equal(r.skanGlowny.n, 0);
+  assert.equal(r.powtorzoneSkany.length, 0);
+  assert.equal(r.odrzucenia.length, 0);
+  assert.equal(r.przerwy.length, 0);
+  assert.equal(r.poprawki.reduce((s, c) => s + c.wykonane, 0), 0);
+
+  zdarzenie("siec_przerwa", { trwanieMs: 60_000 }, "kol-a", poza - 120_000);
+  assert.equal(E.ergonomia(7).przerwy.length, 1, "minuta w oknie to wciąż okno");
+});

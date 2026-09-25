@@ -27,7 +27,7 @@ export const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(d
  * Granica okna w formacie znaczników w bazie — ISO z `T` i `Z`. Parametrem
  * jest modyfikator z `OKNO` albo stały, np. `'-1 day'`.
  *
- * NIE `${GRANICA_OKNA}`. `datetime()` zwraca `'2026-08-11 19:59:47'` ze
+ * NIE `datetime('now', ?)`. `datetime()` zwraca `'2026-08-11 19:59:47'` ze
  * SPACJĄ, a znaczniki mają `'T'` (0x54 > 0x20). Porównanie tekstowe
  * `'2026-08-11T00:05:00.000Z' >= datetime('now','-30 days')` daje PRAWDĘ,
  * choć 00:05 jest wcześniej niż 19:59. Okno z `>=` było więc do doby
