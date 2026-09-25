@@ -34,14 +34,22 @@ import { KartaKolektorow } from "../stan/Kolektory";
 
    ADRES NIESIE KARTĘ (`?karta=kolejka|kody|allegro|wymiana|…`): wiersz
    DO DECYZJI prowadzi wprost do karty, a nie na górę ekranu. Biuro robiło to
-   samo `data-cel`, a jego brak zgubił kiedyś licznik odpowiedzi na notatki. */
+   samo `data-cel`, a jego brak zgubił kiedyś licznik odpowiedzi na notatki.
+
+   MNIEJ NARAZ (@wydanie), ta sama zasada co w skrzynce z 0.506.0. Arkusz,
+   rekoncyliacja i test na żywym Allegro są zwinięte do nagłówka, bo sięga
+   się po nie rzadko. Adres z `?karta=` otwiera zwiniętą kartę, bo inaczej
+   wiersz DO DECYZJI prowadziłby do samego tytułu. Konto Allegro stoi teraz
+   PRZED stanem integracji: niesie przycisk, a wiersz o połączeniu zszedł
+   z tabeli integracji właśnie do tej karty. */
 
 export function Stan() {
   const zdrowie = useZdrowie();
   const ja = useJa();
   const admin = ja.data?.user.role === "admin";
-  /* Skok do karty z adresu — logika i jej uzasadnienie w `ui/useSkokDoKarty.ts`. */
-  useSkokDoKarty();
+  /* Skok do karty z adresu — logika i jej uzasadnienie w `ui/useSkokDoKarty.ts`.
+     Ta sama nazwa karty otwiera kartę zwiniętą, zanim skok w nią wyceluje. */
+  const karta = useSkokDoKarty();
 
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
     <Karta className="flex flex-wrap items-center gap-3 p-4">
@@ -49,16 +57,14 @@ export function Stan() {
       <span className="text-sm text-slate-500">Tło pracy biura. To, co czeka na decyzję, stoi też w DO DECYZJI.</span>
     </Karta>
     <KartaKolejki />
-    {admin && <KartaArkusza />}
+    {admin && <KartaArkusza otworz={karta === "arkusz"} />}
     <KartaKolizji />
-    <KartaRekoncyliacji />
+    <KartaRekoncyliacji otworz={karta === "rekoncyliacja"} />
     <KartaKolektorow />
     <KartaWymiany />
-    <div id="karta-integracje" className="scroll-mt-4">
-      <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
-    </div>
     <KartaAllegro admin={admin} />
-    <KartaSondy />
+    <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
+    <KartaSondy otworz={karta === "sonda"} />
     <KartaSerwera zdrowie={zdrowie.data} />
   </div>;
 }

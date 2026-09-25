@@ -6,6 +6,7 @@ import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stan } from "./Stan";
 import { NAZWA_ROZJAZDU, csvRozjazdow } from "../stan/Rekoncyliacja";
+import { zdanieResyncu } from "../stan/Serwer";
 import reconcileZrodlo from "../../../server/src/services/reconcile.ts?raw";
 
 /* ── STAN SYSTEMU w panelu (0.441.0) ────────────────────────────────────
@@ -19,12 +20,15 @@ import reconcileZrodlo from "../../../server/src/services/reconcile.ts?raw";
       nie wysyła nic (953, 999).
    5. Arkusz lokalizacji stoi wyłącznie u administratora.
    6. NOWE: nazwy WSZYSTKICH rodzajów rozjazdu z unii serwera.
-   7. NOWE: `?karta=` przewija do karty. */
+   7. NOWE: `?karta=` przewija do karty.
+   8. (@wydanie) Rzadkie karty zwinięte do nagłówka; `?karta=` i błąd testu
+      na żywo otwierają je same. Każdy fakt stoi w jednym miejscu. */
 
 let wyslane: string[] = [];
 let odczyty: string[] = [];
 let rola = "admin";
 let parowanie: Array<{ stan: string; nastepnyPollMs?: number }> = [];
+let sondaBlad = true;
 
 const KOLEJKA = { summary: { pending: 1, error: 1, done: 3 }, items: [
   { id: 7, time: "12:00", status: "pending", label: "Lokalizacja RP-4120", detail: "P-01-3 → P-02-1", errMsg: null },
@@ -32,7 +36,7 @@ const KOLEJKA = { summary: { pending: 1, error: 1, done: 3 }, items: [
 ] };
 
 beforeEach(() => {
-  wyslane = []; odczyty = []; rola = "admin"; parowanie = [];
+  wyslane = []; odczyty = []; rola = "admin"; parowanie = []; sondaBlad = true;
   Element.prototype.scrollIntoView = vi.fn();
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metoda = init?.method ?? "GET";
@@ -62,7 +66,7 @@ beforeEach(() => {
     if (url === "/api/kolektory") return odp({ kolektory: [] });
     if (url === "/api/biuro/sonda-rzeczywistosci") return odp({ przebieg: "2026-09-24T06:00:00.000Z", kroki: [
       { krok: "watki", wynik: "ok", szczegol: "20 wątków na pierwszej stronie", ms: 310 },
-      { krok: "zdjecie_rozmowy", wynik: "blad", szczegol: "1 z 1 zdjęć nie pobrało się: 403", ms: 820 },
+      { krok: "zdjecie_rozmowy", wynik: sondaBlad ? "blad" : "ok", szczegol: "1 z 1 zdjęć nie pobrało się: 403", ms: 820 },
       { krok: "zdjecia_copilota", wynik: "pominiety", szczegol: null, ms: 1 }] });
     if (url === "/api/auth/me") return odp({ user: { userId: 1, name: "Anna", role: rola } });
     throw new Error(`nieoczekiwany adres w teście: ${url}`);
@@ -74,6 +78,9 @@ function pokaz(adres = "/obsluga/stan") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}><MemoryRouter initialEntries={[adres]}><Stan /></MemoryRouter></QueryClientProvider>);
 }
+
+/* Zwinięta karta: nagłówek z przyciskiem, który niesie `aria-expanded`. */
+const rozwin = (tytul: string) => screen.getByRole("button", { name: tytul });
 
 const kartaKolejki = () => screen.getByRole("heading", { name: "Zapisy do Subiekta" }).closest(".card") as HTMLElement;
 
@@ -113,7 +120,10 @@ describe("Stan systemu w panelu", () => {
   it("test na żywo: wynik ostatniego przebiegu, a nowy tylko na kliknięcie", async () => {
     pokaz();
     await screen.findByText("Test na żywym Allegro");
+    /* Karta jest zwinięta, ale krok „nie działa" otwiera ją sama —
+       awaria ma być widać bez szukania. */
     expect(await screen.findByText("nie działa")).toBeInTheDocument();
+    expect(rozwin("Test na żywym Allegro")).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("zdjęcie z rozmowy")).toBeInTheDocument();
     expect(screen.getByText("pominięty")).toBeInTheDocument();
     expect(wyslane.filter((w) => w.includes("sonda"))).toEqual([]);
@@ -121,8 +131,39 @@ describe("Stan systemu w panelu", () => {
     await waitFor(() => expect(wyslane).toContain("POST /api/biuro/sonda-rzeczywistosci"));
   });
 
-  it("rekoncyliacja biegnie na żądanie i nazywa rodzaj słowem, nie kluczem", async () => {
+  it("rzadkie karty stoją zwinięte, a otwarcie jednej nadal niczego nie zapisuje", async () => {
+    sondaBlad = false;
     pokaz();
+    await screen.findByText("MM kosza K-010");
+    for (const tytul of ["Masowa zmiana lokalizacji", "Rekoncyliacja", "Test na żywym Allegro"]) {
+      expect(screen.getByRole("heading", { name: tytul })).toBeInTheDocument();
+      expect(rozwin(tytul)).toHaveAttribute("aria-expanded", "false");
+    }
+    expect(screen.queryByRole("button", { name: /Sprawdź teraz/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Przetestuj teraz/ })).toBeNull();
+    await userEvent.click(rozwin("Rekoncyliacja"));
+    expect(rozwin("Rekoncyliacja")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Sprawdź teraz/ })).toBeInTheDocument();
+    /* Rozwinięcie to też patrzenie: bez zapisu i bez przebiegu rekoncyliacji. */
+    expect(wyslane).toEqual([]);
+    expect(odczyty).not.toContain("/api/reconcile");
+  });
+
+  it("?karta= otwiera zwiniętą kartę — DO DECYZJI nie prowadzi do samego tytułu", async () => {
+    /* Sonda bez błędu stoi zwinięta; wiersz DO DECYZJI o teście na żywo
+       (`?karta=sonda`) ma ją zastać otwartą. */
+    sondaBlad = false;
+    pokaz("/obsluga/stan?karta=sonda");
+    expect(await screen.findByRole("button", { name: /Przetestuj teraz/ })).toBeInTheDocument();
+    expect(rozwin("Test na żywym Allegro")).toHaveAttribute("aria-expanded", "true");
+    expect(rozwin("Rekoncyliacja")).toHaveAttribute("aria-expanded", "false");
+    const skok = Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>;
+    await waitFor(() => expect(skok).toHaveBeenCalled());
+    expect(new Set(skok.mock.contexts.map((c) => (c as HTMLElement).id))).toEqual(new Set(["karta-sonda"]));
+  });
+
+  it("rekoncyliacja biegnie na żądanie i nazywa rodzaj słowem, nie kluczem", async () => {
+    pokaz("/obsluga/stan?karta=rekoncyliacja");
     await userEvent.click(await screen.findByRole("button", { name: /Sprawdź teraz/ }));
     expect(await screen.findByText("zwrot rozliczony bez korekty")).toBeInTheDocument();
     expect(screen.queryByText("zwrot_rozliczony_bez_korekty")).toBeNull();
@@ -150,6 +191,28 @@ describe("Stan systemu w panelu", () => {
        gdzie widać, że je robi. Data lokalna: 00:30Z to 2:30 w Warszawie. */
     pokaz();
     expect(await screen.findByText("nocna 2026-09-24 · przed aktualizacją —")).toBeInTheDocument();
+  });
+
+  it("każdy fakt stanu raz: bez pliku konfiguracji, bez połączenia i workera w tabeli integracji", async () => {
+    /* Plik konfiguracji mówi karta konfiguracji za zębatką; połączenie —
+       karta konta Allegro; worker — karta serwera. Wersja zostaje, bo karta
+       aktualizacji jest wyłącznie adminowa (@wydanie). */
+    pokaz();
+    await screen.findByText("Stan integracji");
+    expect(await screen.findByText("wersja serwera")).toBeInTheDocument();
+    expect(screen.queryByText("plik konfiguracji")).toBeNull();
+    expect(screen.queryByText("Połączenie Allegro")).toBeNull();
+    expect(screen.queryByText("Subiekt GT")).toBeNull();
+    expect(screen.getAllByText("worker Sfery")).toHaveLength(1);
+    expect(screen.queryByText(/api\/health/)).toBeNull();
+    expect(screen.queryByText(/ta sama trasa/)).toBeNull();
+  });
+
+  it("wynik resyncu mówi zdaniem, ile wczytano — nie zrzutem JSON-a", () => {
+    expect(zdanieResyncu({ towary: 1203, stany: 9, dokumenty: 22, pozycje: 90 }))
+      .toBe("Resync zakończony: wczytano 1203 kartoteki i 22 dokumenty.");
+    expect(zdanieResyncu({ towary: 1, dokumenty: 5 })).toBe("Resync zakończony: wczytano 1 kartotekę i 5 dokumentów.");
+    expect(zdanieResyncu(undefined)).toBe("Resync zakończony.");
   });
 
   it("arkusz lokalizacji stoi wyłącznie u administratora", async () => {

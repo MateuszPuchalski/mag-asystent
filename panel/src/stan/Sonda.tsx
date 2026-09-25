@@ -2,7 +2,8 @@ import React from "react";
 import { FlaskConical } from "lucide-react";
 import { useSonda, useSondujTeraz, type KrokSondy, type WynikSondy } from "../api/stan";
 import { Blad, Przycisk, czas } from "../ui";
-import { KartaWgladu, Tabela, Td } from "../ui/wglad";
+import { Tabela, Td } from "../ui/wglad";
+import { KartaZwinieta } from "./KartaZwinieta";
 
 /* ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────
    Zgłoszenie właściciela po rozmowie o metodzie Feynmana: „build it”. Nasze
@@ -11,7 +12,11 @@ import { KartaWgladu, Tabela, Td } from "../ui/wglad";
    atrap. Błąd kroku stoi też w DO DECYZJI i prowadzi tutaj.
 
    Trzy stany, nie dwa. „Pominięty” to brak danych albo limit Allegro, czyli
-   nie wada drogi — czerwień zapalana przy nim uczyłaby ją ignorować. */
+   nie wada drogi — czerwień zapalana przy nim uczyłaby ją ignorować.
+
+   ZWINIĘTA (@wydanie), bo przy zdrowych drogach nikt tu nie zagląda. Krok
+   „nie działa" otwiera ją sam: awaria ma być widać, nie tylko dać się
+   znaleźć. Biuro tak samo otwierało kiedyś zwiniętą kartę konta Allegro. */
 
 export const NAZWA_KROKU: Record<KrokSondy, string> = {
   watki: "wątki skrzynki", sprawa: "sprawa posprzedażowa", zdjecie_rozmowy: "zdjęcie z rozmowy",
@@ -25,11 +30,12 @@ function Wynik({ w }: { w: WynikSondy["wynik"] }) {
   return <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-xs font-bold ${klasa}`}>{tekst}</span>;
 }
 
-export function KartaSondy() {
+export function KartaSondy({ otworz = false }: { otworz?: boolean }) {
   const s = useSonda();
   const teraz = useSondujTeraz();
   const d = s.data;
-  return <KartaWgladu id="karta-sonda" tytul="Test na żywym Allegro"
+  const blad = !!d?.kroki.some((k) => k.wynik === "blad");
+  return <KartaZwinieta id="karta-sonda" tytul="Test na żywym Allegro" otworz={otworz || blad}
     opis="Raz dziennie serwer przechodzi drogi produkcji wobec prawdziwego Allegro, bez atrap: wątki, sprawę i zdjęcia tak, jak pobiera je Copilot. Tylko czyta."
     akcje={<Przycisk disabled={teraz.isPending} onClick={() => teraz.mutate()}>
       <FlaskConical size={16} />{teraz.isPending ? "Testuję…" : "Przetestuj teraz"}</Przycisk>}>
@@ -47,5 +53,5 @@ export function KartaSondy() {
           </tr>)}
         </Tabela>
       </>)}
-  </KartaWgladu>;
+  </KartaZwinieta>;
 }

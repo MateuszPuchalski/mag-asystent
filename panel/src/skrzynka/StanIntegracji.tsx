@@ -1,6 +1,7 @@
 import React from "react";
 import type { Zdrowie } from "../api/typy";
-import { Karta, czas } from "../ui";
+import { czas } from "../ui";
+import { KartaWgladu } from "../ui/wglad";
 import { wiek } from "./AlarmSynchronizacji";
 
 type Ranga = "zle" | "uwaga" | "ok" | "nic";
@@ -15,27 +16,22 @@ const RANGA_STATUSU: Record<string, Ranga> = {
   authentication_error: "zle", failed: "zle",
 };
 
-/* Stan POŁĄCZENIA to nie stan synchronizacji, choć oba bywają czerwone naraz.
-   `niepolaczone` woła admina do parowania, `failed` — do dziennika. */
-const RANGA_POLACZENIA: Record<string, Ranga> = {
-  polaczone: "ok", dev: "nic", wylaczone: "uwaga",
-  niepolaczone: "zle", zle_srodowisko: "zle",
-};
-
-/** Panel „Stan integracji" z §21 — trzynaście rzeczy, które ma raportować health. */
+/** Panel „Stan integracji" z §21 — to, co raportuje health, bez faktów,
+ *  które na tym samym ekranie niesie już inna karta (niżej). */
 export function StanIntegracji({ zdrowie, odczyt }: { zdrowie: Zdrowie | undefined; odczyt: number | null }) {
   if (!zdrowie) return null;
   const i = zdrowie.allegroInbox;
   const o = zdrowie.obsluga;
 
   const wiersze: Array<[string, string, Ranga]> = [
-    /* DWA OSOBNE WIERSZE, i to jest poprawka z 0.152.0. Do niej etykieta
+    /* POŁĄCZENIE TO NIE SYNCHRONIZACJA — poprawka z 0.152.0. Do niej etykieta
        „Połączenie Allegro" niosła `allegroInbox.status`, czyli stan
-       SYNCHRONIZACJI — ekran nazywał rzecz, której nie pokazywał. Niesparowane
-       konto wyglądało wtedy jak awaria synchronizacji i właściciel szukał
-       przyczyny w dzienniku usługi zamiast na ekranie. */
-    ["Połączenie Allegro", zdrowie.allegro?.stan ?? "nieznany",
-      RANGA_POLACZENIA[zdrowie.allegro?.stan ?? ""] ?? "nic"],
+       SYNCHRONIZACJI. Niesparowane konto wyglądało jak awaria synchronizacji
+       i właściciel szukał przyczyny w dzienniku usługi zamiast na ekranie.
+
+       Wiersz o połączeniu zszedł stąd (@wydanie), bo ten sam fakt, ze słowem
+       zamiast kodu i z przyciskiem „Połącz", niesie karta „Konto Allegro" tuż
+       nad tą. Rozdział z 0.152.0 zostaje: ta tabela mówi o synchronizacji. */
     ["Synchronizacja", i.status, RANGA_STATUSU[i.status] ?? "nic"],
     ["Ostatnia próba", i.ostatniaProba
       ? `${czas(i.ostatniaProba)}${i.kodOstatniegoBledu ? ` · ${i.kodOstatniegoBledu}` : ""}`
@@ -57,21 +53,22 @@ export function StanIntegracji({ zdrowie, odczyt }: { zdrowie: Zdrowie | undefin
        że nie wiadomo, czy poszła. Zasada 10 projektu każe to pokazać, więc
        wiersz zmienia rangę, zamiast stać zawsze na szaro. */
     ["Kolejka wysyłek", o.kolejkaWysylek, o.wysylkiDoSprawdzenia ? "uwaga" : "nic"],
-    ["Subiekt GT", zdrowie.worker?.zyje ? `tryb ${zdrowie.worker.mode}` : "worker milczy",
-      zdrowie.worker?.zyje ? "ok" : "uwaga"],
+    /* Wiersz „Subiekt GT" zszedł (@wydanie): to, czy worker żyje, mówi karta
+       „Serwer" na tym samym ekranie, i mówi więcej — kiedy go widziano i że
+       bez niego zapisy do Subiekta nie wchodzą. */
   ];
 
-  return <Karta className="overflow-hidden">
-    <header className="flex items-baseline gap-2 border-b p-4">
-      <b className="text-naglowek mr-auto">Stan integracji</b>
-      <span className="text-xs text-slate-500">/api/health · odczyt {czas(
-        odczyt ? new Date(odczyt).toISOString() : null)}</span>
-    </header>
-    <dl className="divide-y text-sm">
-      {wiersze.map(([nazwa, wartosc, ranga]) => <div key={nazwa} className="flex gap-3 px-4 py-2">
-        <dt className="mr-auto text-slate-500">{nazwa}</dt>
+  /* Rama kart wglądu (@wydanie), jak każda karta obok. Własny nagłówek miał
+     inny krój i nazwę trasy „/api/health" — głos programisty, nie biura.
+     Zostaje godzina odczytu, bo mówi, jak świeże są te wiersze. */
+  return <KartaWgladu id="karta-integracje" tytul="Stan integracji"
+    akcje={<span className="text-xs text-slate-600">odczyt {czas(
+      odczyt ? new Date(odczyt).toISOString() : null)}</span>}>
+    <dl className="-my-2 divide-y text-sm">
+      {wiersze.map(([nazwa, wartosc, ranga]) => <div key={nazwa} className="flex gap-3 py-2">
+        <dt className="mr-auto text-slate-600">{nazwa}</dt>
         <dd className={`font-bold ${BARWA[ranga]}`}>{wartosc}</dd>
       </div>)}
     </dl>
-  </Karta>;
+  </KartaWgladu>;
 }

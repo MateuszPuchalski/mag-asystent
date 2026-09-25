@@ -27,6 +27,13 @@ const NAZWA_KANALU: Record<KanalWymiany, string> = {
 
 const minuty = (m: number | null) => (m == null ? "—" : wiek(m * 60_000));
 
+/** Skąd wziął się próg — zdaniem, do podpowiedzi przy liczbie. */
+export function skadProg(podstawa: string, n: number): string {
+  return podstawa === "podloga"
+    ? "Najniższy próg, godzina: sprawy w tym kanale kończą się zwykle szybciej."
+    : `9 na 10 z ${n} domkniętych spraw w tym kanale trwało krócej.`;
+}
+
 export function KartaWymiany() {
   const [dni, setDni] = useState(7);
   const wymiana = useWymiana(dni);
@@ -57,23 +64,28 @@ export function KartaWymiany() {
     </Tabela>
 
     {a && <div className="mt-5 border-t pt-4">
-      <h3 className={`text-sm font-bold ${spoznione.length ? "" : "text-slate-600"}`}>
-        Co stoi dłużej, niż stoi zwykle — {spoznione.length ? a.spoznionychRazem : "nic"}</h3>
+      {/* Okno alarmu stoi W NAGŁÓWKU, krótko (@wydanie). Całe zdanie o tym,
+          skąd próg, zeszło do podpowiedzi: to przypis dla dociekliwych,
+          a dwie liczby z różnych okresów dalej mają podpis przy sobie. */}
+      <h3 className={`text-sm font-bold ${spoznione.length ? "" : "text-slate-600"}`}
+        title={`Próg liczony osobno dla każdego kanału z ostatnich ${a.dni} dni; nie zależy od okna wybranego przy tabeli.`}>
+        Co stoi dłużej, niż stoi zwykle (ostatnie {a.dni} dni) — {spoznione.length ? a.spoznionychRazem : "nic"}</h3>
       {spoznione.length > 0 && <ul className="mt-2 space-y-1 text-sm">
         {spoznione.map((k) => <li key={k.kanal} className="flex flex-wrap gap-x-3">
           <b>{NAZWA_KANALU[k.kanal] ?? k.kanal}</b>
           <span className="tabular-nums">{k.spoznionych}</span>
           {/* Próg nie jest niczyim werdyktem: to p90 spraw domkniętych w tym
-              samym kanale. Liczba bez pochodzenia byłaby wyrocznią. */}
-          <span className="text-slate-600">próg {minuty(k.progMin)} {k.podstawa === "podloga" ? "(podłoga)" : `(p90 z ${k.n})`}</span>
+              samym kanale. Liczba bez pochodzenia byłaby wyrocznią, więc
+              pochodzenie zostaje — w podpowiedzi, nie w nawiasie ze słowem
+              „p90" albo „podłoga", którego biuro nie używa (@wydanie). */}
+          <span className="cursor-help text-slate-600 underline decoration-dotted" title={skadProg(k.podstawa, k.n)}>
+            próg {minuty(k.progMin)}</span>
           <span>najdłuższa: {minuty(k.najstarszaSpoznionaMin)}</span>
         </li>)}
       </ul>}
       {bezProgu.length > 0 && <p className="mt-2 text-sm text-slate-600">
         Bez progu — za mało domkniętych spraw (potrzeba {a.minSpraw}):{" "}
         {bezProgu.map((k) => `${NAZWA_KANALU[k.kanal] ?? k.kanal} (${k.n})`).join(", ")}.</p>}
-      <p className="mt-2 text-sm text-slate-600">
-        Próg liczony osobno dla każdego kanału z ostatnich {a.dni} dni; nie zależy od okna wybranego przy tabeli.</p>
     </div>}
   </KartaWgladu>;
 }
