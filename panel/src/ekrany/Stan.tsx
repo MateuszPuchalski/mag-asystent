@@ -10,6 +10,7 @@ import { KartaKolizji } from "../stan/Kolizje";
 import { KartaRekoncyliacji } from "../stan/Rekoncyliacja";
 import { KartaWymiany } from "../stan/Wymiana";
 import { KartaAllegro } from "../stan/Allegro";
+import { KartaSondy } from "../stan/Sonda";
 import { KartaSerwera } from "../stan/Serwer";
 import { KartaKolektorow } from "../stan/Kolektory";
 
@@ -57,6 +58,7 @@ export function Stan() {
       <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
     </div>
     <KartaAllegro admin={admin} />
+    <KartaSondy />
     <KartaSerwera zdrowie={zdrowie.data} />
   </div>;
 }

@@ -2886,6 +2886,19 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do 0.495.0 — bez ponownego pytania i test na żywym Allegro
+
+**Panel trzeba przebudować, a serwer zrestartować.** Tabela
+`sonda_rzeczywistosci` powstaje sama przy starcie.
+
+Sprawdzenie, dwa kroki:
+- Analiza → Obsługa klienta, okno 30 dni. Pod czasem odpowiedzi ma stać
+  karta „Bez ponownego pytania” z udziałem i liczbą powrotów.
+- Stan systemu → „Test na żywym Allegro” → „Przetestuj teraz”. Kroki
+  z danymi mają stać na „działa”. Czerwony krok znaczy, że droga produkcji
+  nie działa wobec prawdziwego Allegro; zdanie obok mówi dlaczego, a ten sam
+  wiersz stoi w DO DECYZJI.
+
 ### Aktualizacja do 0.491.0 — ustawienia zmienia się z panelu
 
 Niczego nie trzeba robić. Pierwsza zmiana z panelu dopisze do `wertis.env`

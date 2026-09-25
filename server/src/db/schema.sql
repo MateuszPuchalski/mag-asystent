@@ -3187,3 +3187,18 @@ CREATE TABLE IF NOT EXISTS klient_notatka (
   przez          TEXT NOT NULL,
   przez_user_id  INTEGER REFERENCES app_user(user_id)
 );
+
+-- ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────────
+-- Raz dziennie serwer przechodzi te same drogi co produkcja, bez atrap, i zapisuje
+-- tu WYNIK każdego kroku. Powód: przez 150 wydań Copilot „widział zdjęcia” tylko
+-- w testach z podstawionym pobieraczem. Treści tu nie ma — krok, wynik, zdanie
+-- bez adresów i czas. Stare przebiegi odchodzą po 90 dniach.
+CREATE TABLE IF NOT EXISTS sonda_rzeczywistosci (
+  id        INTEGER PRIMARY KEY AUTOINCREMENT,
+  przebieg  TEXT NOT NULL,
+  krok      TEXT NOT NULL,
+  wynik     TEXT NOT NULL CHECK (wynik IN ('ok','blad','pominiety')),
+  szczegol  TEXT,
+  ms        INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS ix_sonda_rzeczywistosci_przebieg ON sonda_rzeczywistosci(przebieg);

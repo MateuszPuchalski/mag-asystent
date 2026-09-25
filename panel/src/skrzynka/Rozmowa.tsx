@@ -207,51 +207,55 @@ export function Rozmowa(p: {
       zapisuje={p.zapisujeOferte} blad={p.bladOferty}
       onWskaz={p.onWskazOferte} onDopytaj={p.onDopytajOOferte} />}
 
+    {/* ── EDYTOR NA KOŃCU OSI (0.495.0) — powód w `Edytor.tsx`. ─────────────
+        Formularz pomiaru jedzie tą samą drogą i stoi PRZED edytorem: zlecenie
+        dla hali to zwykle krok przed odpowiedzią klientowi, nie po niej. */}
     <Os wpisy={os} rozmowaId={rozmowa.id} skokNaDol={zjazdy}
       zrodloPomiaru={p.zrodloPomiaru} mozeZlecac={!cudza}
       onZrodlo={p.onZrodlo}
-      onWstawDoSzkicu={(t) => p.onSzkic(p.szkic ? `${p.szkic}\n${t}` : t)} />
+      onWstawDoSzkicu={(t) => p.onSzkic(p.szkic ? `${p.szkic}\n${t}` : t)}
+      koniec={<>
+        {p.zrodloPomiaru && <div className="ml-auto w-full max-w-[75ch] rounded-lg border border-amber-300 bg-amber-50 p-4">
+          {/* Kartoteki nie wywiedziemy dziś z oferty, więc agent może ją wskazać.
+              Zadanie zapisze, że to jego wybór, a nie fakt z Allegro. */}
+          <div className="mb-3">
+            <div className="mb-1 text-sm font-semibold">Kartoteka dla hali
+              <span className="font-normal text-slate-500"> (opcjonalnie)</span></div>
+            <Wyszukiwarka wybrany={p.towar} onWybierz={p.onTowar} etykieta="Wskazana przez Ciebie" />
+          </div>
+          {/* ── POLECENIE JEST OBOWIĄZKOWE (0.408.0) ─────────────────────────────
+              Zgłoszenie właściciela: „zadania zlecane dla magazynu mają za dużo
+              informacji; powinno być tylko, jakiego produktu dotyczy zadanie — lub
+              bez produktu — i co ma zrobić".
 
-    {p.zrodloPomiaru && <div className="shrink-0 border-t bg-amber-50 p-4">
-      {/* Kartoteki nie wywiedziemy dziś z oferty, więc agent może ją wskazać.
-          Zadanie zapisze, że to jego wybór, a nie fakt z Allegro. */}
-      <div className="mb-3">
-        <div className="mb-1 text-sm font-semibold">Kartoteka dla hali
-          <span className="font-normal text-slate-500"> (opcjonalnie)</span></div>
-        <Wyszukiwarka wybrany={p.towar} onWybierz={p.onTowar} etykieta="Wskazana przez Ciebie" />
-      </div>
-      {/* ── POLECENIE JEST OBOWIĄZKOWE (0.408.0) ─────────────────────────────
-          Zgłoszenie właściciela: „zadania zlecane dla magazynu mają za dużo
-          informacji; powinno być tylko, jakiego produktu dotyczy zadanie — lub
-          bez produktu — i co ma zrobić".
+              To pole było opcjonalne, bo hala dostawała w zastępstwie CAŁY kontekst
+              rozmowy: pytanie kupującego, numer oferty, zdanie o kartotece. Skoro
+              kontekst zszedł z kolektora do karty zadania w biurze, pustej
+              wskazówki nie ma już czym zastąpić — a zadanie bez zdania „co zrobić"
+              jest nie do wykonania. Przetłumaczenie pytania klienta na polecenie
+              dla hali to praca agenta, nie magazyniera w rękawicy. */}
+          <label className="block text-sm font-semibold">Co ma zrobić hala
+            <input className="field mt-1" value={p.wskazowka}
+              onChange={(e) => p.onWskazowka(e.target.value)}
+              placeholder="Np. zmierz rozstaw otworów, podaj w milimetrach" /></label>
+          {/* Przycisk MARTWY przy pustym poleceniu, a nie błąd po kliknięciu:
+              serwer i tak odmówi, tylko o jeden strzał i jedno zdanie później. */}
+          <Przycisk wariant="glowny" className="mt-3" onClick={p.onZlec}
+            disabled={!p.wskazowka.trim()}>
+            <Ruler size={16} />ZLEĆ POMIAR</Przycisk>
+        </div>}
 
-          To pole było opcjonalne, bo hala dostawała w zastępstwie CAŁY kontekst
-          rozmowy: pytanie kupującego, numer oferty, zdanie o kartotece. Skoro
-          kontekst zszedł z kolektora do karty zadania w biurze, pustej
-          wskazówki nie ma już czym zastąpić — a zadanie bez zdania „co zrobić"
-          jest nie do wykonania. Przetłumaczenie pytania klienta na polecenie
-          dla hali to praca agenta, nie magazyniera w rękawicy. */}
-      <label className="block text-sm font-semibold">Co ma zrobić hala
-        <input className="field mt-1" value={p.wskazowka}
-          onChange={(e) => p.onWskazowka(e.target.value)}
-          placeholder="Np. zmierz rozstaw otworów, podaj w milimetrach" /></label>
-      {/* Przycisk MARTWY przy pustym poleceniu, a nie błąd po kliknięciu:
-          serwer i tak odmówi, tylko o jeden strzał i jedno zdanie później. */}
-      <Przycisk wariant="glowny" className="mt-3" onClick={p.onZlec}
-        disabled={!p.wskazowka.trim()}>
-        <Ruler size={16} />ZLEĆ POMIAR</Przycisk>
-    </div>}
-
-    <Edytor szkic={p.szkic} cudza={cudza} wlasciciel={rozmowa.wlasciciel}
-      zapisuje={p.zapisuje} wysyla={p.wysyla}
-      onZmiana={p.onSzkic} onZapisz={p.onZapiszSzkic} onWyslij={p.onWyslij}
-      onWyslijIZakoncz={p.onWyslijIZakoncz}
-      komentarz={p.komentarz} onKomentarz={p.onKomentarz}
-      onDodajKomentarz={p.onDodajKomentarz} komentuje={p.komentuje}
-      agenci={p.agenci} wzmianki={p.wzmianki} onWzmianki={p.onWzmianki}
-      zalaczniki={p.zalaczniki} dodajeZalacznik={p.dodajeZalacznik}
-      bladZalacznika={p.bladZalacznika}
-      onDodajZalacznik={p.onDodajZalacznik} onUsunZalacznik={p.onUsunZalacznik}
-      copilot={p.copilot} />
+        <Edytor szkic={p.szkic} cudza={cudza} wlasciciel={rozmowa.wlasciciel}
+          zapisuje={p.zapisuje} wysyla={p.wysyla}
+          onZmiana={p.onSzkic} onZapisz={p.onZapiszSzkic} onWyslij={p.onWyslij}
+          onWyslijIZakoncz={p.onWyslijIZakoncz}
+          komentarz={p.komentarz} onKomentarz={p.onKomentarz}
+          onDodajKomentarz={p.onDodajKomentarz} komentuje={p.komentuje}
+          agenci={p.agenci} wzmianki={p.wzmianki} onWzmianki={p.onWzmianki}
+          zalaczniki={p.zalaczniki} dodajeZalacznik={p.dodajeZalacznik}
+          bladZalacznika={p.bladZalacznika}
+          onDodajZalacznik={p.onDodajZalacznik} onUsunZalacznik={p.onUsunZalacznik}
+          copilot={p.copilot} />
+      </>} />
   </section>;
 }

@@ -60,6 +60,10 @@ beforeEach(() => {
         nastepnaProba: null, interwalMs: 60000 },
       obsluga: { rozmowyOczekujace: 0, zadaniaTerenowe: 0, najstarszeZadanieMs: null, kolejkaWysylek: "pusta", wysylkiDoSprawdzenia: 0 } });
     if (url === "/api/kolektory") return odp({ kolektory: [] });
+    if (url === "/api/biuro/sonda-rzeczywistosci") return odp({ przebieg: "2026-09-24T06:00:00.000Z", kroki: [
+      { krok: "watki", wynik: "ok", szczegol: "20 wątków na pierwszej stronie", ms: 310 },
+      { krok: "zdjecie_rozmowy", wynik: "blad", szczegol: "1 z 1 zdjęć nie pobrało się: 403", ms: 820 },
+      { krok: "zdjecia_copilota", wynik: "pominiety", szczegol: null, ms: 1 }] });
     if (url === "/api/auth/me") return odp({ user: { userId: 1, name: "Anna", role: rola } });
     throw new Error(`nieoczekiwany adres w teście: ${url}`);
   }));
@@ -102,6 +106,19 @@ describe("Stan systemu w panelu", () => {
     await userEvent.click(screen.getByRole("button", { name: "Zapisz dopuszczone" }));
     await waitFor(() => expect(wyslane).toEqual([
       `POST /api/ean-conflicts/5901234567890/rozstrzygnij ${JSON.stringify({ rodzaj: "dopuszczone", notatka: "dwa rozmiary" })}`]));
+  });
+
+  /* Test na żywym Allegro (0.495.0): otwarcie karty CZYTA ostatni przebieg,
+     nowy biegnie wyłącznie na kliknięcie — POST bez ciała. */
+  it("test na żywo: wynik ostatniego przebiegu, a nowy tylko na kliknięcie", async () => {
+    pokaz();
+    await screen.findByText("Test na żywym Allegro");
+    expect(await screen.findByText("nie działa")).toBeInTheDocument();
+    expect(screen.getByText("zdjęcie z rozmowy")).toBeInTheDocument();
+    expect(screen.getByText("pominięty")).toBeInTheDocument();
+    expect(wyslane.filter((w) => w.includes("sonda"))).toEqual([]);
+    await userEvent.click(screen.getByRole("button", { name: /Przetestuj teraz/ }));
+    await waitFor(() => expect(wyslane).toContain("POST /api/biuro/sonda-rzeczywistosci"));
   });
 
   it("rekoncyliacja biegnie na żądanie i nazywa rodzaj słowem, nie kluczem", async () => {
