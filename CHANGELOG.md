@@ -10,6 +10,21 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.497.1 — 25 września 2026
+
+**Znaczniki czasu w reklamacjach i dyskusjach w jednym formacie.** Sześć
+zapisów wstawiało `datetime('now')`, czyli datę ze spacją zamiast `T`.
+Przeglądarka czyta taki zapis jako czas lokalny, więc godzina zakończenia
+dyskusji stała w panelu dwie godziny za wcześnie (zimą godzinę). Dotyczyło
+to też znacznika „prowadzę", zwrotu towaru i zakończenia wysyłki odpowiedzi
+w reklamacji.
+
+- Zapisy idą teraz w ISO, tak jak w reszcie bazy.
+- Przy starcie serwer zamienia stare wiersze na ISO. Godzina się nie zmienia,
+  tylko jej zapis.
+- Strażnik w testach odrzuca `datetime('now'` w kodzie serwera, w zapisie
+  i w granicy okna.
+
 ## 0.497.0 — 25 września 2026
 
 **Raport tygodnia robi się sam.** Serwer liczy go w pierwszym takcie po

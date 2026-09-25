@@ -2557,7 +2557,7 @@ function dosypZamowienieWiadomosci(database: DatabaseSync) {
 }
 
 /**
- * Znaczniki ze spacją → ISO z `T` i `Z` (@wydanie).
+ * Znaczniki ze spacją → ISO z `T` i `Z` (0.497.1).
  *
  * Sześć zapisów w reklamacjach i dyskusjach wstawiało `datetime('now')`,
  * czyli `'2026-09-25 08:00:00'`, do kolumn, w których reszta kodu trzyma

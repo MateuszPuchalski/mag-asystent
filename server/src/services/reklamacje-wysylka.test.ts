@@ -108,7 +108,7 @@ test("udana wysyłka dopisuje oś, podnosi licznik i stempluje prowadzącego", a
   assert.equal(r.wiadomosci_ile, 2);
   assert.equal(r.ostatnia_wiadomosc_status, "SELLER_REPLIED");
   assert.equal(r.prowadzi, "A. Lewandowska", "odpowiedź JEST prowadzeniem sprawy");
-  /* Znaczniki ISO z `T` i `Z` (@wydanie) — napis ze spacją przeglądarka
+  /* Znaczniki ISO z `T` i `Z` (0.497.1) — napis ze spacją przeglądarka
      czyta jako czas lokalny, więc panel pokazywał godzinę o dwie za wcześnie. */
   const znaczniki = d.prepare(`SELECT r.prowadzi_at, o.finished_at FROM reklamacja_klienta r
     JOIN reklamacja_outbox o ON o.reklamacja_id = r.id WHERE r.id=?`).get(id) as
