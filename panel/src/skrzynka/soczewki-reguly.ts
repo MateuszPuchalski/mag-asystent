@@ -1,6 +1,6 @@
 import type { Kategoria, KandydatZamowienia, OsRozmowy } from "../api/typy";
 
-/* ── SOCZEWKI: PRAWA KOLUMNA WEDŁUG RODZAJU PYTANIA (@wydanie) ───────────────
+/* ── SOCZEWKI: PRAWA KOLUMNA WEDŁUG RODZAJU PYTANIA (0.499.0) ───────────────
    Zgłoszenie właściciela z listą prawdziwych pytań klientów: „faktury nie
    dostaliśmy", „podwójne zamówienie, prosimy anulować jedno", „w paczce są
    inne rzeczy". Każde z nich ma JEDNĄ odpowiedź, której agent szukał po

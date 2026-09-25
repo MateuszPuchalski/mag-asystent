@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { DokumentySprzedazy, KandydatZamowienia, Kopilot, OsRozmowy, PozycjaZamowienia } from "../api/typy";
 
-/* ── Soczewki na górze kolumny kontekstu (@wydanie) ──────────────────────────
+/* ── Soczewki na górze kolumny kontekstu (0.499.0) ──────────────────────────
    Pilnujemy odpowiedzi, nie wyglądu: podwójny zakup jest nazwany ze statusem
    słowem, „inny towar" pokazuje, co miało przyjść, a zdanie do szkicu idzie
    tylko kliknięciem, faktura mówi, co jest w Subiekcie pod numerem

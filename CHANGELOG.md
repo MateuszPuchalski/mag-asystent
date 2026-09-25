@@ -10,6 +10,39 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.499.0 — 25 września 2026
+
+**Bez „Szukamy" przy zwrocie znanego towaru.** Automat szkicu Copilota
+wpisywał dane doboru i przy okazji podnosił status do „Szukamy". Nagłówek
+rozmowy i plakietka kolejki mówiły to także przy zwrocie towaru kupionego
+w tym zamówieniu. Teraz, gdy oferta rozmowy jest pozycją jej zamówienia,
+automat wpisuje dane, ale doboru nie zaczyna. Rozmowy oznaczone tak wcześniej
+porządkuje sam start serwera: cofa wyłącznie start automatu, z wpisem
+w dzienniku, a decyzji człowieka nie dotyka.
+
+**Soczewki według rodzaju pytania.** Na górze prawej kolumny staje blok
+dobrany do kategorii rozmowy:
+
+- **Anulowanie**: zakupy klienta obok siebie, ze statusem opłacenia i nazwanym
+  podwójnym zakupem tych samych pozycji.
+- **Inny towar i brak w paczce**: co było w zamówieniu, z półką każdej pozycji,
+  i przycisk wstawiający do szkicu prośbę o zdjęcie.
+- **Faktura**: czy kupujący zaznaczył fakturę i jakie dokumenty z numerem
+  zamówienia stoją w Subiekcie.
+
+Soczewka niczego nie chowa i mówi, czy kategoria jest od Copilota, czy od
+zespołu. Przy nieudanym rozpoznaniu nie staje wcale.
+
+**Szkic Copilota poprawia się wprost w polu.** Świeży szkic wchodzi do pustego
+pola odpowiedzi jako zwykły tekst, a nie szara podpowiedź przyjmowana Tabem.
+Pierwsza litera już go nie zasłania i nie otwiera karty pod polem. Do klienta
+nic nie wychodzi bez „Wyślij". Wstawienie jest stanem ekranu, więc otwarcie
+rozmowy dalej niczego nie zapisuje, a zapisany szkic zespołu wygrywa.
+
+**„Wyczyść wszystko" z cofnięciem.** Przycisk nad polem opróżnia je jednym
+kliknięciem. „Cofnij wyczyszczenie" oddaje tekst, dopóki agent nie zacznie
+pisać od nowa. „Odrzuć" zdejmuje z pola tylko szkic nietknięty.
+
 ## 0.498.1 — 25 września 2026
 
 **Aktualizacja z paczki nie pada już na „Odmowa dostępu do ścieżki C:\wertis".**

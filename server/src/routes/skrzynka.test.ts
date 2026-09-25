@@ -133,7 +133,7 @@ const TRASY = () => [
   /* Historia klienta niesie CUDZE ZAKUPY — bramka roli jest tu ostrzejszym
      wymogiem niż przy reszcie skrzynki, nie luźniejszym. */
   { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/klient` },
-  /* Dokumenty sprzedaży zamówienia (@wydanie) — numery faktur i paragonów
+  /* Dokumenty sprzedaży zamówienia (0.499.0) — numery faktur i paragonów
      kupującego, więc ta sama bramka co historia klienta. */
   { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dokumenty-sprzedazy` },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/pomiar-do-wiedzy`,

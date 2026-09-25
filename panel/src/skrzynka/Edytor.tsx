@@ -79,15 +79,15 @@ export function Edytor({
   const [tryb, setTryb] = useState<"odpowiedz" | "komentarz">("odpowiedz");
   const wKomentarzu = tryb === "komentarz";
 
-  /* ── SZKIC W POLU: ZWYKŁY TEKST DO POPRAWIANIA (@wydanie) ─────────────────
-     Do @wydanie szkic stał w pustym polu jako szara podpowiedź przyjmowana
+  /* ── SZKIC W POLU: ZWYKŁY TEKST DO POPRAWIANIA (0.499.0) ─────────────────
+     Do 0.499.0 szkic stał w pustym polu jako szara podpowiedź przyjmowana
      Tabem (0.495.0). Nagranie właściciela pokazało, że nikt się tego kroku
      nie domyśla: pierwsza litera zasłaniała szkic, a pod polem wyskakiwała
      karta. Szkic wstawia teraz do pola ekran, jako zwykły tekst — powód
      i granice przy `szkicNaStart` w `SzkicCopilota.tsx`. Edytor wie tylko,
      że pole trzyma szkic, i mówi to nad nim. */
   const wPolu = !wKomentarzu && Boolean(copilot?.wPolu) && szkic !== "";
-  /* ── „WYCZYŚĆ WSZYSTKO" Z COFNIĘCIEM (@wydanie) ─────────────────────────
+  /* ── „WYCZYŚĆ WSZYSTKO" Z COFNIĘCIEM (0.499.0) ─────────────────────────
      Druga połowa zgłoszenia: „z opcją wyczyszczenia wszystkiego". Kasowanie
      pięciuset znaków zaznaczaniem to ruch na kilka sekund i łatwy do
      pomylenia. Czyszczenie niczego nie zapisuje, więc do pomyłki potrzebne

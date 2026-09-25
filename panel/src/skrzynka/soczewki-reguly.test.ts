@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { KandydatZamowienia, Kopilot, OsRozmowy } from "../api/typy";
 import { podwojneZakupy, soczewka } from "./soczewki-reguly";
 
-/* ── Która soczewka staje (@wydanie) ─────────────────────────────────────────
+/* ── Która soczewka staje (0.499.0) ─────────────────────────────────────────
    Soczewka stoi na domyśle klasyfikatora, więc testy pilnują przede wszystkim
    tego, kiedy NIE ma prawa stanąć: kategoria awaryjna, nieudane rozpoznanie,
    człowiek poprawił na kategorię bez soczewki.                             */

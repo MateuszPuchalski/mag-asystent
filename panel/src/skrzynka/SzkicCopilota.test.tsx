@@ -60,7 +60,7 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.getByRole("button", { name: /Układam szkic z faktów/ })).toBeDisabled();
   });
 
-  /* ── SZKIC W POLU JAKO ZWYKŁY TEKST (@wydanie) ────────────────────────────
+  /* ── SZKIC W POLU JAKO ZWYKŁY TEKST (0.499.0) ────────────────────────────
      Zgłoszenie właściciela z nagraniem: „edycja powinna być w tym samym oknie,
      z opcją wyczyszczenia wszystkiego". Szkic stoi w polu jako tekst agenta —
      bez podpowiedzi, bez Taba, bez karty „Zastąp mój szkic" pod spodem. */
@@ -318,7 +318,7 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
   it("licznik znaków siedzi w nagłówku, a nie w osobnym wierszu pod kartą", () => {
     edytor(copilot({ szkic: szkic({ tresc: "abcde" }) }));
     expect(screen.queryByText(/każde twierdzenie ma podpisane źródło/)).toBeNull();
-    /* Drugi raz liczba stoi w podpisie zwiniętej treści (@wydanie) — pierwszy
+    /* Drugi raz liczba stoi w podpisie zwiniętej treści (0.499.0) — pierwszy
        jest nagłówkiem, o który ten test pyta. */
     expect(screen.getAllByText(/5 znaków/)[0]).toBeVisible();
   });

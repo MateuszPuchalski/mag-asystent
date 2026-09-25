@@ -1024,7 +1024,7 @@ export type WpisHistorii = {
   sprawaId: number | null;
 };
 
-/** Dokumenty sprzedaży zamówienia rozmowy (@wydanie) — tylko z jego numerem. */
+/** Dokumenty sprzedaży zamówienia rozmowy (0.499.0) — tylko z jego numerem. */
 export type DokumentySprzedazy = {
   /** Numer zamówienia rozmowy; `null`, gdy rozmowa go nie ma. */
   zamowienie: string | null;

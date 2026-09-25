@@ -697,7 +697,7 @@ Właściciel wybrał z kanwy trzy zmiany naraz („E + A + D"):
   i przewody paliwa — bez kupionego towaru. „Szukaj innego towaru mimo to"
   odsłania go jednym kliknięciem. Dobór uruchomiony przez człowieka bramka
   zostawia na wierzchu.
-- **Bez „Szukamy" przy znanym towarze (@wydanie).** Tę samą regułę stosuje
+- **Bez „Szukamy" przy znanym towarze (0.499.0).** Tę samą regułę stosuje
   serwer (`services/towar-znany.ts`). Automat szkicu dalej wpisuje dane
   doboru, ale przy znanym towarze nie podnosi statusu do `searching`. Nagłówek
   i plakietka kolejki nie mówią więc „Szukamy" przy zwrocie kupionego noża.
@@ -705,7 +705,7 @@ Właściciel wybrał z kanwy trzy zmiany naraz („E + A + D"):
   wyłącznie start automatu, z kreską na osi i wpisem w dzienniku. Decyzji
   człowieka i doboru z wybranym kandydatem nie dotyka.
 
-**Soczewki według rodzaju pytania (@wydanie).** Właściciel przysłał listę
+**Soczewki według rodzaju pytania (0.499.0).** Właściciel przysłał listę
 prawdziwych pytań klientów i pomysł: prawa kolumna ma pokazywać to, czego
 wymaga KATEGORIA pytania. Soczewka to blok na samej górze kolumny, nad
 „Wymaga Ciebie". Trzy pierwsze (`skrzynka/Soczewki.tsx`):
@@ -1499,7 +1499,7 @@ zmiany naraz („A + B"):
   Pierwsza litera agenta zasłania podpowiedź. Karta zostaje wtedy z treścią
   zwiniętą i przyciskiem „Zastąp mój szkic". Nieświeży szkic nie wchodzi do
   pola nigdy, bo odpowiada na pytanie, którego już nie ma.
-- **Od @wydanie szkic stoi w polu jako tekst, nie podpowiedź.** Nagranie
+- **Od 0.499.0 szkic stoi w polu jako tekst, nie podpowiedź.** Nagranie
   właściciela: „edycja powinna być w tym samym oknie, z opcją wyczyszczenia
   wszystkiego". Pierwsza litera zasłaniała podpowiedź i otwierała kartę pod
   polem, a przyjęcia Tabem nikt się nie domyślał. Ekran wstawia teraz świeży
@@ -2567,7 +2567,7 @@ a co czeka bez rozpoznanej marki.
 
 **Wpis maszyny jest odróżnialny** wszędzie tam, gdzie powstaje:
 `dobor_rozmowy.updated_by='automat (szkic)'` i `zastosowanie.rozstrzygnal=
-'automat (oferta)'`, oba przy pustym koncie. Od @wydanie automat przy towarze znanym
+'automat (oferta)'`, oba przy pustym koncie. Od 0.499.0 automat przy towarze znanym
 z zamówienia wpisuje dane, ale statusu doboru nie podnosi. Agent poprawia takie pole tam,
 gdzie ono stoi — w zakładce Dobór albo w Wiedzy.
 

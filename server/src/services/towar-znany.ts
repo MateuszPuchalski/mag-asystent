@@ -5,14 +5,14 @@ import { numerZamowieniaRozmowy } from "./zamowienia-kandydaci.js";
 import { zamowienieRozmowy } from "./zamowienia.js";
 import { cofnijStartAutomatu } from "./dobor.js";
 
-/* ── TOWAR ZNANY Z ZAMÓWIENIA (@wydanie) ─────────────────────────────────────
+/* ── TOWAR ZNANY Z ZAMÓWIENIA (0.499.0) ─────────────────────────────────────
    Zgłoszenie właściciela: nagłówek rozmowy o ZWROT mówił „Szukamy". Klient
    oddawał nóż 14-25001 kupiony w tym zamówieniu, a automat szkicu Copilota
    (0.341.0) wpisał „nóż, 16 mm" do danych doboru i przy pierwszym zapisie
    podniósł status do `searching`. Nagłówek i plakietka kolejki mówiły potem
    „Szukamy" o towarze, którego nikt nie szukał.
 
-   Kolumna kontekstu chowa ten dobór za bramką od @wydanie (`skrzynka/kokpit.ts`).
+   Kolumna kontekstu chowa ten dobór za bramką od 0.499.0 (`skrzynka/kokpit.ts`).
    To jest ta sama reguła po stronie serwera: towar jest znany, gdy oferta
    rozmowy jest pozycją jej zamówienia. Dwie kopie jednej reguły to ryzyko
    rozjazdu, ale panel nie ma serwera w testach, a serwer nie ma panelu —
@@ -45,7 +45,7 @@ export function towarZnanyZZamowienia(conversationId: number, database: Database
 export const PORZADEK_DOBORU = { automat: "porządek znanych towarów" } as const;
 
 /**
- * Jednorazowy porządek po wydaniach 0.341.0 – przed @wydanie: zdejmuje
+ * Jednorazowy porządek po wydaniach 0.341.0 – przed 0.499.0: zdejmuje
  * „Szukamy", które automat nadał rozmowom o towar znany z zamówienia.
  *
  * Biegnie przy każdym starcie i jest bezpieczny do powtórzeń. Po cofnięciu

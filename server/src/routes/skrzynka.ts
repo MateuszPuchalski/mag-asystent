@@ -365,7 +365,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       catch (e) { return blad(reply, e); }
     });
 
-  /* DOKUMENTY SPRZEDAŻY ZAMÓWIENIA (@wydanie) — soczewka „Faktura". Osobna
+  /* DOKUMENTY SPRZEDAŻY ZAMÓWIENIA (0.499.0) — soczewka „Faktura". Osobna
      trasa z tego samego powodu co historia klienta niżej: panel woła ją
      tylko przy pytaniu o fakturę, a oś przeładowuje się przy każdym
      zdarzeniu. Czysty odczyt; tylko dokumenty z numerem zamówienia. */

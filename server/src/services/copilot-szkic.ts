@@ -1312,7 +1312,7 @@ export async function ulozSzkic(
     const { czesc, pol } = tylkoWPuste(propozycja.dane, doborRozmowy(conversationId).dane);
     if (pol > 0) {
       try {
-        /* BEZ STARTU PRZY ZNANYM TOWARZE (@wydanie): dane wchodzą, ale status
+        /* BEZ STARTU PRZY ZNANYM TOWARZE (0.499.0): dane wchodzą, ale status
            zostaje. Zwrot kupionego noża nie jest szukaniem innego — powód
            przy `towarZnanyZZamowienia`. */
         wersjaDoboru = zapiszDane(conversationId, czesc, wersjaDoboru, AUTOMAT_DANYCH, db(),

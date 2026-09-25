@@ -734,7 +734,7 @@ export function useHistoriaKlienta(id: number | null) {
 }
 
 /**
- * Faktura i paragon zamówienia rozmowy (@wydanie) — tylko dokumenty z jego
+ * Faktura i paragon zamówienia rozmowy (0.499.0) — tylko dokumenty z jego
  * numerem. `wlaczone`, bo woła to wyłącznie soczewka „Faktura": pytanie
  * o dokumenty przy każdej rozmowie byłoby pracą, której nikt nie ogląda.
  */

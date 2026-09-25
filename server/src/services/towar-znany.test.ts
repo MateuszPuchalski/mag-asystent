@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-towar-znany-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── „Szukamy" przy zwrocie znanego towaru (@wydanie) ────────────────────────
+/* ── „Szukamy" przy zwrocie znanego towaru (0.499.0) ────────────────────────
    Zgłoszenie właściciela: nagłówek rozmowy o zwrot noża 14-25001 mówił
    „Szukamy". Automat szkicu wpisał dane doboru i przy okazji podniósł status.
    Testy pilnują czterech granic:

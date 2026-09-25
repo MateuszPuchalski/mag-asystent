@@ -159,7 +159,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
     {/* JEDEN scroller na kolumnę, jak przy zwrotach: dwa zagnieżdżone dają
         pasek w pasku, a treść bez `min-h-0` rozpycha kartę poza okno. */}
     <div className="min-h-0 flex-1 overflow-y-auto">
-      {/* SOCZEWKA NAD WSZYSTKIM (@wydanie): odpowiedź na pytanie klienta stoi
+      {/* SOCZEWKA NAD WSZYSTKIM (0.499.0): odpowiedź na pytanie klienta stoi
           przed tym, co ma termin, bo po nią agent otwiera rozmowę. Niczego nie
           chowa — „Wymaga Ciebie" i wiersze stoją pod nią jak bez niej. */}
       <Soczewka dane={dane} onWstawDoSzkicu={onWstawDoSzkicu} />

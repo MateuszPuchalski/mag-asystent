@@ -183,7 +183,7 @@ describe("kolumna kontekstu", () => {
     historia.data = undefined; wiedza.data = undefined;
   });
 
-  /* ── Soczewka nad kolumną (@wydanie) ──────────────────────────────────────
+  /* ── Soczewka nad kolumną (0.499.0) ──────────────────────────────────────
      Odpowiedź na pytanie klienta stoi PRZED tym, co ma termin — i niczego
      nie chowa: „Wymaga Ciebie" i każdy wiersz stoją pod nią jak bez niej. */
   it("soczewka stoi nad „Wymaga Ciebie” i niczego nie chowa", () => {

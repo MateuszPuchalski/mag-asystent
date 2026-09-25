@@ -440,7 +440,7 @@ export function zwiazKorektyPewne(database: Db = defaultDb(), teraz = new Date()
   return powiazane;
 }
 
-/* ── DOKUMENTY SPRZEDAŻY ZAMÓWIENIA ROZMOWY (@wydanie) ───────────────────────
+/* ── DOKUMENTY SPRZEDAŻY ZAMÓWIENIA ROZMOWY (0.499.0) ───────────────────────
    Soczewka „Faktura" w skrzynce. Klient pisze „paczkę otrzymaliśmy, faktury
    nie", a agent szedł do Subiekta szukać dokumentu po dacie i nazwisku.
    Read-model `sgt_faktura` zna numer zamówienia na dokumencie, więc panel

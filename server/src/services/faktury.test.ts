@@ -385,7 +385,7 @@ test("zwrot detaliczny (ZW) wiąże się tak samo jak korekta faktury", () => {
   assert.equal(zwiazKorekte(id, d), true);
   assert.equal(stanKorekty(d, id).korekta_numer, "ZW 4/2026");
 });
-/* ── Dokumenty sprzedaży zamówienia — soczewka „Faktura" (@wydanie) ───────────
+/* ── Dokumenty sprzedaży zamówienia — soczewka „Faktura" (0.499.0) ───────────
    Agent powie klientowi „wysyłamy fakturę FS …", więc lista zna WYŁĄCZNIE
    dokumenty z numerem zamówienia. Nakładka pozycji, która przy zwrocie jest
    poszlaką, tutaj nie wchodzi wcale. */

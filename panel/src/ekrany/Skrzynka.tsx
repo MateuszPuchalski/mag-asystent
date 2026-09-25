@@ -96,7 +96,7 @@ export function Skrzynka() {
   const dodajKomentarz = useDodajKomentarz();
 
   const [szkic, setSzkic] = useState("");
-  /* Czy pole trzyma szkic Copilota (@wydanie) — nad polem stoi wtedy zdanie
+  /* Czy pole trzyma szkic Copilota (0.499.0) — nad polem stoi wtedy zdanie
      „Szkic Copilota w polu", a pod nim to, na czym szkic stoi. */
   const [zCopilota, setZCopilota] = useState(false);
   /* Szkice, które już raz weszły do pola: `rozmowa:czas szkicu`. Ref, nie
@@ -145,7 +145,7 @@ export function Skrzynka() {
   /* Szkic wchodzi do pola przy zmianie ROZMOWY, nie przy każdym odczycie:
      nadpisywanie go w trakcie pisania kasowałoby pracę agenta. */
   useEffect(() => {
-    /* SZKIC COPILOTA DO PUSTEGO POLA (@wydanie) — reguła i jej granice przy
+    /* SZKIC COPILOTA DO PUSTEGO POLA (0.499.0) — reguła i jej granice przy
        `szkicNaStart`. To stan ekranu, nie zapis: otwarcie niczego nie mutuje.
        Klucz z czasu szkicu pamięta, że ten szkic już raz wszedł — agent, który
        wyczyścił pole, nie ma go dostać z powrotem przy następnym odczycie. */

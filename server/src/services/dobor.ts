@@ -392,7 +392,7 @@ const oczysc = (v: unknown): string | null => {
  * wpisał, o jaką maszynę chodzi, dobór SIĘ ZACZĄŁ, a wiersz z danymi
  * w `not_started` znikałby z plakietki kolejki.
  *
- * `bezStartu` (@wydanie) zapisuje dane, ale statusu nie rusza. Woła tak
+ * `bezStartu` (0.499.0) zapisuje dane, ale statusu nie rusza. Woła tak
  * automat, gdy towar jest znany z zamówienia — powód przy
  * `towarZnanyZZamowienia` w `towar-znany.ts`.
  */
@@ -441,7 +441,7 @@ export function zapiszDane(
 }
 
 /**
- * Cofnięcie startu, który nadał AUTOMAT, a nie człowiek (@wydanie).
+ * Cofnięcie startu, który nadał AUTOMAT, a nie człowiek (0.499.0).
  *
  * Zdejmuje `searching` tylko wtedy, gdy wszystkie trzy warunki stoją naraz:
  * ostatnia zmiana statusu to `not_started → searching` z podpisem

@@ -12,7 +12,7 @@ import {
 } from "./soczewki-reguly";
 
 /**
- * Soczewka na górze kolumny kontekstu (@wydanie) — reguły i ryzyko
+ * Soczewka na górze kolumny kontekstu (0.499.0) — reguły i ryzyko
  * w `soczewki-reguly.ts`. Tutaj tylko rysowanie, każda soczewka to jedno pytanie
  * klienta i jedna odpowiedź, której agent dotąd szukał po całej kolumnie.
  */

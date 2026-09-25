@@ -39,7 +39,7 @@ export interface PropsSzkicuCopilota {
   /** Szkic agenta jest niepusty — przycisk mówi wtedy „Zastąp mój szkic". */
   maSzkicAgenta: boolean;
   /**
-   * Pole agenta trzyma TEN szkic, do edycji wprost (@wydanie). Ustawia go
+   * Pole agenta trzyma TEN szkic, do edycji wprost (0.499.0). Ustawia go
    * ekran, gdy sam wstawił szkic do pustego pola albo agent kliknął „Popraw
    * w edytorze"; gaśnie przy wyczyszczeniu pola i przy zmianie rozmowy.
    */
@@ -82,7 +82,7 @@ export function szkicDoPola(p: PropsSzkicuCopilota): boolean {
   return p.szkic !== null && p.szkic.ocena === null && !p.nieswiezy && !doborZmienil(p) && !p.wylaczony;
 }
 
-/* ── SZKIC WCHODZI DO POLA JAKO TEKST, NIE JAKO PODPOWIEDŹ (@wydanie) ────────
+/* ── SZKIC WCHODZI DO POLA JAKO TEKST, NIE JAKO PODPOWIEDŹ (0.499.0) ────────
    Zgłoszenie właściciela z nagraniem: „wydaje mi się, że edycja powinna być
    w tym samym oknie, z opcją wyczyszczenia wszystkiego". Od 0.495.0 szkic
    stał w pustym polu jako szara podpowiedź. Pierwsza litera agenta ją
@@ -167,7 +167,7 @@ export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
 /**
  * Pasek szkicu: skąd, jak świeży, co z nim zrobić.
  *
- * `wPolu` (@wydanie): treść STOI W POLU jako tekst agenta, więc nie ma czego
+ * `wPolu` (0.499.0): treść STOI W POLU jako tekst agenta, więc nie ma czego
  * przyjmować ani wstawiać. Zostaje „Odrzuć", które mierzy los szkicu,
  * i zdanie mówiące, skąd tekst w polu. Przyjmowanie Tabem z 0.495.0
  * odeszło razem z podpowiedzią.
@@ -215,18 +215,18 @@ export function UwagiSzkicu({ uwagi }: { uwagi: string[] }) {
 
 /**
  * Karta szkicu. `wPolu` znaczy, że treść stoi już w polu agenta (0.495.0,
- * od @wydanie jako zwykły tekst) — wtedy karta nie powtarza ani treści, ani
+ * od 0.499.0 jako zwykły tekst) — wtedy karta nie powtarza ani treści, ani
  * paska z przyciskami, bo oba stoją nad polem. Zostaje to, na czym szkic stoi.
  */
 export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
   p: PropsSzkicuCopilota;
   wPolu?: boolean;
-  /** Agent właśnie wyczyścił pole (@wydanie) — treść nie wraca rozwinięta pod pustym polem. */
+  /** Agent właśnie wyczyścił pole (0.499.0) — treść nie wraca rozwinięta pod pustym polem. */
   zwinieta?: boolean;
 }) {
   const s = p.szkic;
   /* Oceniony szkic zniknął z ekranu: odrzucony nie ma po co wisieć. Wiersz
-     w bazie zostaje dla pomiaru. WYJĄTEK od @wydanie: szkic stojący w polu
+     w bazie zostaje dla pomiaru. WYJĄTEK od 0.499.0: szkic stojący w polu
      zostaje z tym, na czym stoi — uwagami, odczytem zdjęć i dopytaniem —
      także po „Popraw w edytorze", bo agent właśnie go poprawia. */
   if (!s || (s.ocena !== null && !(wPolu && s.ocena !== "odrzucony"))) return null;

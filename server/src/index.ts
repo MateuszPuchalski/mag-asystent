@@ -468,7 +468,7 @@ export async function buildApp() {
 
 async function main() {
   db(); // migracja schematu przy starcie
-  /* Porządek po automacie doboru (@wydanie): zdejmuje „Szukamy" z rozmów
+  /* Porządek po automacie doboru (0.499.0): zdejmuje „Szukamy" z rozmów
      o towar znany z zamówienia. Jednorazowy w skutkach, bezpieczny do
      powtórzeń — powód i granice w `services/towar-znany.ts`. Błąd nie
      zatrzymuje startu: nagłówek z „Szukamy" to kłopot, serwer bez skrzynki

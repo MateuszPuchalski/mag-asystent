@@ -552,7 +552,7 @@ po słowie OEM, nr, numer, symbol albo kod NIE jest maskowane jako telefon —
 decyzja właściciela, żeby numer OEM dało się rozpoznać. Cena: telefon podany
 jako „nr 601…" bez słowa „tel" wyjdzie do dostawcy. Szkic nie staje się
 odpowiedzią sam — wraca jako propozycja i do szkicu trafia na jawny ruch
-agenta. Od @wydanie stoi w pustym polu jako zwykły tekst do poprawiania,
+agenta. Od 0.499.0 stoi w pustym polu jako zwykły tekst do poprawiania,
 wstawiony przez ekran, nie zapisany. Do klienta idzie dopiero po „Wyślij".
 
 Z tego samego wywołania wracają DANE DOBORU rozpoznane w rozmowie: marka,
