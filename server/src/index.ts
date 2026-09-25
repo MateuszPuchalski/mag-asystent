@@ -83,6 +83,7 @@ import { sondujRzeczywistosc } from "./services/sonda-rzeczywistosci.js";
 import { uruchomTakt } from "./services/takt.js";
 import { czytajStan, problemyKopii } from "./services/kopie-bazy.js";
 import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
+import { przebiegRaportow, TAKT_RAPORTOW_MS } from "./services/raport-tygodnia.js";
 import { podNssm, ustawRestart } from "./services/restart.js";
 import {
   problemAktualizacji, sprawdzWydania, stanZadania, uruchomSchtasks, ustawUruchamiacz, wynikDoDziennika,
@@ -634,6 +635,15 @@ async function main() {
      każdej instalacji. Dotąd były wpisami w Harmonogramie zadań, których
      instalator nie zakładał. Powód i okno nocne: `services/przebieg-nocny.ts`. */
   uruchomTakt("noc", TAKT_NOCNY_MS, async () => { przebiegNocny(); });
+
+  /* MIGAWKA DOBY I RAPORT TYGODNIA (@wydanie) — bez warunku, jak noc: każda
+     instalacja ma stan, który jutro zniknie, i tydzień do porównania. Poza
+     oknem nocnym, bo to odczyt bez `VACUUM` — serwer włączany rano też
+     dostaje migawkę. Powód i reguły: `services/raport-tygodnia.ts`. */
+  uruchomTakt("raporty", TAKT_RAPORTOW_MS, async () => {
+    const w = przebiegRaportow();
+    if (w.raporty.length) console.log(`[raporty] tygodnie: ${w.raporty.join(", ")}`);
+  });
 
   /* Restart po zmianie ustawienia z panelu (0.491.0). Tu, nie w buildApp():
      test trasy zapisu nie ma prawa zakończyć procesu testów. Poza usługą NSSM
