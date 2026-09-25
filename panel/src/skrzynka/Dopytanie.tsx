@@ -73,12 +73,15 @@ export function Dopytanie(p: {
   const zaDlugie = tekst.length > p.limitZnakow;
   const gotowe = tekst.trim().length > 0 && !zaDlugie && !p.pracuje && !p.wylaczony;
 
+  /* PODPIS KRÓTSZY (@wydanie). „Odpowiedź czytasz Ty, nie klient" stało
+     w podpisie przy każdym szkicu, pięć słów na myśl, którą niesie brak
+     przycisku „wstaw". Zostają trzy słowa, bo sam sens — kto czyta — ma zostać. */
   return <Zwijka
     tytul="Dopytaj Copilota"
     Ikona={MessageCircleQuestion}
     podpis={p.wymiany.length > 0
-      ? `${ile(p.wymiany.length, "wymiana", "wymiany", "wymian")} · odpowiedź czytasz Ty, nie klient`
-      : "odpowiedź czytasz Ty, nie klient"}
+      ? `${ile(p.wymiany.length, "wymiana", "wymiany", "wymian")} · tylko dla Ciebie`
+      : "tylko dla Ciebie"}
     domyslnieOtwarte={p.wymiany.length > 0}
   >
     {p.wymiany.length > 0 && <ul className="divide-y divide-slate-100" aria-label="Wymiany z Copilotem">

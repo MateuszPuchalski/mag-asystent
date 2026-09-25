@@ -60,7 +60,8 @@ describe("dopytanie Copilota", () => {
 
   test("ekran mówi wprost, kto czyta odpowiedź", () => {
     render(<Dopytanie {...props()} />);
-    expect(screen.getByText(/odpowiedź czytasz Ty, nie klient/i)).toBeTruthy();
+    /* Krótko od @wydanie: „tylko dla Ciebie" zamiast pięciu słów o tym samym. */
+    expect(screen.getByText(/tylko dla Ciebie/i)).toBeTruthy();
   });
 
   test("puste pytanie nie da się wysłać", () => {
