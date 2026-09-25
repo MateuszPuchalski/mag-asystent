@@ -236,6 +236,8 @@ export function Rozmowa(p: {
     <Os wpisy={os} rozmowaId={rozmowa.id} skokNaDol={zjazdy}
       zrodloPomiaru={p.zrodloPomiaru} mozeZlecac={!cudza}
       onZrodlo={p.onZrodlo}
+      powiazanie={{ ofertaId: p.dane.oferta?.externalId ?? null,
+        zamowienieId: p.dane.zamowienie?.externalId ?? null }}
       onWstawDoSzkicu={(t) => p.onSzkic(p.szkic ? `${p.szkic}\n${t}` : t)}
       koniec={<>
         {p.zrodloPomiaru && <div className="ml-auto w-full max-w-[75ch] rounded-lg border border-amber-300 bg-amber-50 p-4">
@@ -263,9 +265,11 @@ export function Rozmowa(p: {
               placeholder="Np. zmierz rozstaw otworów, podaj w milimetrach" /></label>
           {/* Przycisk MARTWY przy pustym poleceniu, a nie błąd po kliknięciu:
               serwer i tak odmówi, tylko o jeden strzał i jedno zdanie później. */}
+          {/* Zwykłą wielkością liter (@wydanie): wersaliki krzyczały głośniej
+              niż „Wyślij do klienta" tuż pod spodem, a to wysyłka jest główna. */}
           <Przycisk wariant="glowny" className="mt-3" onClick={p.onZlec}
             disabled={!p.wskazowka.trim()}>
-            <Ruler size={16} />ZLEĆ POMIAR</Przycisk>
+            <Ruler size={16} />Zleć pomiar</Przycisk>
         </div>}
 
         <Edytor szkic={p.szkic} cudza={cudza} wlasciciel={rozmowa.wlasciciel}

@@ -8,6 +8,7 @@ import { useWiedzaTowaru } from "../api/wiedza";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
 import { PrzyciskTowaru } from "../towar/Szuflada";
+import { PROG_ZNAKOW } from "./DlugiTekst";
 
 /**
  * Towar z Subiekta przy rozmowie (0.179.0).
@@ -202,8 +203,10 @@ function OpisKartoteki({ desc }: { desc?: string }) {
     {/* Przycisk tylko wtedy, gdy jest co rozwijać. Linii nie liczymy w kodzie
         — `line-clamp` robi to w przeglądarce. Sześć, a nie osiem, bo domyślna
         skala Tailwinda kończy się na sześciu, a `line-clamp-8` nie powstałoby
-        w arkuszu i opis jechałby CAŁY. */}
-    {tresc.length > 320 && <button type="button" onClick={() => setCalosc((c) => !c)}
+        w arkuszu i opis jechałby CAŁY. Próg znaków jest wspólny z osią
+        rozmowy (@wydanie): dwa zapisy tej samej liczby rozjechałyby się
+        przy pierwszej poprawce. Wierszy nie liczymy, bo sześć się mieści. */}
+    {tresc.length > PROG_ZNAKOW && <button type="button" onClick={() => setCalosc((c) => !c)}
       className="mt-1 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
       {calosc ? "zwiń opis" : "pokaż cały opis"}</button>}
   </div>;

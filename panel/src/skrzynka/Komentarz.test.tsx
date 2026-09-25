@@ -68,6 +68,19 @@ describe("Edytor — tryb komentarza wewnętrznego", () => {
     expect(onWzmianki).toHaveBeenCalledWith([7]);
   });
 
+  it("notatka nie liczy znaków i nie powtarza, że jest wewnętrzna", async () => {
+    /* @wydanie: licznik nie miał limitu, przy którym by coś znaczył, a zdanie
+       „Widoczna tylko dla zespołu" mówiły już zakładka i pole. Zostaje
+       w podpowiedzi przycisku — tuż przed kliknięciem. */
+    edytor({ komentarz: "Zerknij proszę" });
+    await userEvent.click(screen.getByRole("button", { name: /Notatka wewnętrzna/ }));
+    expect(screen.queryByText(/znaków/)).toBeNull();
+    expect(screen.queryByText(/Widoczna tylko dla zespołu/)).toBeNull();
+    expect(screen.getByRole("button", { name: /Dodaj notatkę/ }))
+      .toHaveAttribute("title", expect.stringMatching(/tylko dla zespołu/));
+    expect(screen.getByPlaceholderText(/klient tego nie zobaczy/)).toBeInTheDocument();
+  });
+
   it("pusty komentarz nie wychodzi", async () => {
     edytor({ komentarz: "   " });
     await userEvent.click(screen.getByRole("button", { name: /Notatka wewnętrzna/ }));
