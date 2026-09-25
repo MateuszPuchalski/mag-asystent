@@ -3188,7 +3188,7 @@ CREATE TABLE IF NOT EXISTS klient_notatka (
   przez_user_id  INTEGER REFERENCES app_user(user_id)
 );
 
--- ── Test na żywym Allegro (@wydanie) ─────────────────────────────────────────
+-- ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────────
 -- Raz dziennie serwer przechodzi te same drogi co produkcja, bez atrap, i zapisuje
 -- tu WYNIK każdego kroku. Powód: przez 150 wydań Copilot „widział zdjęcia” tylko
 -- w testach z podstawionym pobieraczem. Treści tu nie ma — krok, wynik, zdanie

@@ -246,7 +246,7 @@ function kontoAllegro(): PozycjaDecyzji[] {
 }
 
 /**
- * Test na żywym Allegro (@wydanie): ostatni przebieg ma krok z błędem.
+ * Test na żywym Allegro (0.495.0): ostatni przebieg ma krok z błędem.
  *
  * Droga produkcji nie działa, a nikt by tego nie zauważył — tak przez 150
  * wydań nie działały zdjęcia Copilota. Nie „pilne”: to nie termin wobec

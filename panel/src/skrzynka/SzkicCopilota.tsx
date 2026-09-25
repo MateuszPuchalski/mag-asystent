@@ -67,7 +67,7 @@ function doborZmienil(p: PropsSzkicuCopilota): boolean {
 }
 
 /**
- * Czy szkic może stanąć W POLU agenta (@wydanie). Tylko świeży i jeszcze
+ * Czy szkic może stanąć W POLU agenta (0.495.0). Tylko świeży i jeszcze
  * nieoceniony: stary odpowiada na pytanie, którego już nie ma, a wpisany
  * w pole wyglądałby jak gotowa odpowiedź na bieżące. Taki zostaje w karcie,
  * z nazwaną nieświeżością i przyciskiem „Ułóż ponownie".
@@ -118,7 +118,7 @@ export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
 /**
  * Pasek szkicu: skąd, jak świeży, co z nim zrobić.
  *
- * `wPolu` (@wydanie): treść stoi w polu agenta jako podpowiedź, więc
+ * `wPolu` (0.495.0): treść stoi w polu agenta jako podpowiedź, więc
  * przycisk nie „poprawia w edytorze", tylko PRZYJMUJE to, co agent już
  * czyta. Klawisz Tab, a nie E — bo kursor stoi w polu, a tam „e" jest
  * literą. Tab przyjmuje podpowiedź w każdym edytorze kodu, więc nie
@@ -151,7 +151,7 @@ export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
 }
 
 /**
- * Uwagi modelu — czego nie znalazł w faktach (@wydanie: „uwagi na marginesie").
+ * Uwagi modelu — czego nie znalazł w faktach (0.495.0: „uwagi na marginesie").
  *
  * Osobny komponent, bo żyją dłużej niż karta. Karta znika z oceną szkicu,
  * a przyjęty tekst dalej stoi w polu i dalej opiera się na tym samym braku
@@ -167,7 +167,7 @@ export function UwagiSzkicu({ uwagi }: { uwagi: string[] }) {
 
 /**
  * Karta szkicu. `wPolu` znaczy, że treść stoi już w polu agenta jako
- * podpowiedź (@wydanie) — wtedy karta nie powtarza ani treści, ani paska
+ * podpowiedź (0.495.0) — wtedy karta nie powtarza ani treści, ani paska
  * z przyciskami, bo oba stoją nad polem. Zostaje to, na czym szkic stoi.
  */
 export function KartaSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPolu?: boolean }) {
@@ -195,7 +195,7 @@ export function KartaSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
         spór wprost: czytelność szkicu wygrywa. Cena jest jawna — przy długim
         szkicu bloki pod nim schodzą poniżej krawędzi i trzeba do nich
         przewinąć. */}
-    {/* ── TREŚĆ ZWINIĘTA, GDY AGENT MA WŁASNĄ (@wydanie) ─────────────────
+    {/* ── TREŚĆ ZWINIĘTA, GDY AGENT MA WŁASNĄ (0.495.0) ─────────────────
         Przy pustym polu treść stoi W POLU, więc tu jej nie ma wcale. Karta
         z treścią zostaje w dwóch przypadkach: agent pisze swoje albo szkic
         jest nieświeży. Przy pierwszym treść jest zwinięta: agent zaczął

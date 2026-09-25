@@ -23,7 +23,7 @@ import type { ZalacznikSzkicu } from "../api/rozmowy";
  * bywa trudny" zostawałaby w szkicu po przełączeniu z powrotem i czekała na
  * kliknięcie WYŚLIJ.
  *
- * ── OSTATNIA WYPOWIEDŹ W WĄTKU, NIE PAS POD NIM (@wydanie) ─────────────────
+ * ── OSTATNIA WYPOWIEDŹ W WĄTKU, NIE PAS POD NIM (0.495.0) ─────────────────
  * Zgłoszenie właściciela ze zrzutem: „za dużo odstępów w środkowej kolumnie,
  * miejsce pracy jest ściśnięte". Zmierzone na tamtym zrzucie: rozmowa 166 px,
  * czyli 19% kolumny; puste pole 212 px; pod nim karta szkicu z tą samą
@@ -79,7 +79,7 @@ export function Edytor({
   const [tryb, setTryb] = useState<"odpowiedz" | "komentarz">("odpowiedz");
   const wKomentarzu = tryb === "komentarz";
 
-  /* ── SZKIC W POLU JAKO PODPOWIEDŹ (@wydanie) ────────────────────────────
+  /* ── SZKIC W POLU JAKO PODPOWIEDŹ (0.495.0) ────────────────────────────
      Treść modelu NIE wchodzi do wartości pola — reguła z 0.231.0 zostaje.
      Stoi POD pustym polem jako warstwa, którą agent czyta tam, gdzie będzie
      pisał, i przyjmuje Tabem. Pierwsza litera agenta ją zasłania. Wartość
@@ -99,7 +99,7 @@ export function Edytor({
   const przelacz = (id: number) => onWzmianki(
     wzmianki.includes(id) ? wzmianki.filter((x) => x !== id) : [...wzmianki, id]);
 
-  /* SIATKI 60vh JUŻ NIE MA (@wydanie). Stała od 0.232.1, bo edytor był
+  /* SIATKI 60vh JUŻ NIE MA (0.495.0). Stała od 0.232.1, bo edytor był
      `shrink-0` pod osią i rozepchnięty zjadał rozmowę. Na końcu osi nie ma
      czego zjadać: dymek i wątek przewijają się razem, a wysoki szkic
      wydłuża przewijanie, zamiast ściskać rozmowę do jednej linii.
@@ -174,7 +174,7 @@ export function Edytor({
           {/* POLE MA WYGLĄDAĆ NA MIEJSCE DO PISANIA (0.247.0). Miało 80 px
               wysokości i tekst 14 px — tyle samo, co każdy inny wiersz ekranu,
               choć agent spędza w nim najwięcej czasu z całego panelu. */}
-          {/* ── POLE ROŚNIE Z TREŚCIĄ, NIE STOI NA 200 PX (@wydanie) ─────────
+          {/* ── POLE ROŚNIE Z TREŚCIĄ, NIE STOI NA 200 PX (0.495.0) ─────────
               0.404.0 dało polu stałe 200 px i powiedziało wprost, czemu nie
               elastyczne: przy DŁUGIM wątku rozciągnięty edytor zwijał oś do
               `min-h-40`. Ten powód odszedł razem z osobnym pasem — pole stoi
@@ -204,7 +204,7 @@ export function Edytor({
                  niżej — skrót nie ma prawa ominąć blokady cudzej rozmowy. Sam
                  Enter zostaje nową linią, bo odpowiedź ma akapity. */
               onKeyDown={(e) => {
-                /* TAB PRZYJMUJE PODPOWIEDŹ (@wydanie) — i tylko wtedy, gdy
+                /* TAB PRZYJMUJE PODPOWIEDŹ (0.495.0) — i tylko wtedy, gdy
                    jakaś stoi w polu. Bez niej Tab przenosi fokus jak zawsze,
                    a Shift+Tab nie jest przechwytywany nigdy: wyjście z pola
                    klawiaturą zostaje otwarte także nad podpowiedzią. */
@@ -234,7 +234,7 @@ export function Edytor({
         </>}
   </article>
 
-  {/* ── PASEK DZIAŁAŃ PŁYWA (@wydanie) ───────────────────────────────────────
+  {/* ── PASEK DZIAŁAŃ PŁYWA (0.495.0) ───────────────────────────────────────
       `sticky bottom-2` na końcu listy wypowiedzi: gdy agent stoi na dole,
       pasek leży zwyczajnie pod dymkiem; gdy przewinie w górę, żeby doczytać
       wątek, pasek zostaje przy krawędzi. Wysłać można więc z każdego miejsca
@@ -284,7 +284,7 @@ export function Edytor({
               zewnątrz, i idzie WYŁĄCZNIE na kliknięcie człowieka — innej drogi
               wysyłki w kodzie nie ma. Dostaje większy stopień pisma, wyższy
               padding i cień; zapis szkicu schodzi do zwykłego tekstu.
-              Od @wydanie stoi NA PRAWYM KOŃCU paska, pod kciukiem myszy
+              Od 0.495.0 stoi NA PRAWYM KOŃCU paska, pod kciukiem myszy
               przesuwanej od dymka — tam, gdzie kończy się czytanie odpowiedzi. */}
           <Przycisk wariant="glowny" onClick={onWyslij} disabled={cudza || wysyla || !szkic.trim()}
             className="whitespace-nowrap px-5 py-2.5 text-tresc shadow-sm">

@@ -188,7 +188,7 @@ export function Os({
   onZrodlo: (messageId: number | null) => void;
   onWstawDoSzkicu: (tresc: string) => void;
   /**
-   * Co stoi PO ostatniej wypowiedzi, w tym samym przewijaniu (@wydanie):
+   * Co stoi PO ostatniej wypowiedzi, w tym samym przewijaniu (0.495.0):
    * edytor odpowiedzi i formularz pomiaru. Poza listą wpisów, bo nie ma
    * `data-wpis` — skok po identyfikatorze i obserwator pytania go nie widzą.
    */
@@ -280,7 +280,7 @@ export function Os({
   /* `min-h-40`, nie `min-h-0` (0.232.1): karta szkicu Copilota zwinęła oś do
      jednej linii, bo edytor pod nią jest `shrink-0`. Rozmowa ma zostać
      czytelna przy każdej wysokości edytora — to ona jest powodem ekranu.
-     Od @wydanie edytor stoi W tej liście (`koniec`), więc go nie ściska;
+     Od 0.495.0 edytor stoi W tej liście (`koniec`), więc go nie ściska;
      próg zostaje dla bloków nad osią, które dalej są `shrink-0`. */
   return <div className="flex min-h-0 flex-1 flex-col">
   <div ref={listaRef}
@@ -399,7 +399,7 @@ export function Os({
   </div>
 
     {/* Pasek stoi POD oknem wiadomości — czyli tam, gdzie kończy się
-        czytanie. Od @wydanie edytor jest w oknie, więc pasek stoi pod nim. */}
+        czytanie. Od 0.495.0 edytor jest w oknie, więc pasek stoi pod nim. */}
     <PasekZdarzen zdarzenia={zdarzenia} onSkocz={skocz} />
 
     {/* Przypięte pytanie stoi PONIŻEJ paska zdarzeń, czyli najbliżej edytora:

@@ -2836,7 +2836,7 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
-### Aktualizacja do @wydanie — bez ponownego pytania i test na żywym Allegro
+### Aktualizacja do 0.495.0 — bez ponownego pytania i test na żywym Allegro
 
 **Panel trzeba przebudować, a serwer zrestartować.** Tabela
 `sonda_rzeczywistosci` powstaje sama przy starcie.

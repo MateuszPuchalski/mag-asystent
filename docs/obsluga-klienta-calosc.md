@@ -214,7 +214,7 @@ osobowej, celowo.
 rosnącej eskalacji jest miarą, która kłamie. Pilnują tego testy eskalacji
 w `droga-klienta.test.ts`.
 
-### S5a. Bez ponownego pytania (@wydanie)
+### S5a. Bez ponownego pytania (0.495.0)
 
 Druga miara skutku obok eskalacji, w Analizie przy czasie odpowiedzi. Mówi,
 czy klient po naszej odpowiedzi musiał pisać jeszcze raz w tej samej rozmowie.
@@ -224,7 +224,7 @@ czy odpowiedź zamknęła sprawę. Reguła stoi w `services/czas-odpowiedzi.ts`.
 **Zabrania.** Liczenia podziękowania jako powrotu i chowania niepewności
 w wyniku. Pilnują tego testy `losOdpowiedzi` w `czas-odpowiedzi.test.ts`.
 
-### S5b. Test na żywym Allegro (@wydanie)
+### S5b. Test na żywym Allegro (0.495.0)
 
 Raz dziennie serwer przechodzi drogi produkcji wobec prawdziwego Allegro, bez
 atrap: wątki, sprawę i zdjęcia tak, jak pobiera je Copilot. Wynik stoi na

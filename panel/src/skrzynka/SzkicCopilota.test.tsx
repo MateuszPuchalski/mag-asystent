@@ -60,7 +60,7 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.getByRole("button", { name: /Układam szkic z faktów/ })).toBeDisabled();
   });
 
-  /* ── SZKIC W POLU, NIE W KARCIE POD NIM (@wydanie) ───────────────────────
+  /* ── SZKIC W POLU, NIE W KARCIE POD NIM (0.495.0) ───────────────────────
      Decyzja właściciela z kanwy („A + B"). Treść modelu stoi w pustym polu
      jako podpowiedź, ale WARTOŚĆ pola zostaje pusta: wysyłka nie ma czego
      wysłać, dopóki agent nie przyjmie. To jest ta sama granica, co od 0.231.0,
@@ -163,7 +163,7 @@ describe("Szkic Copilota w edytorze", () => {
      kazało czytać pięćset znaków przez szparę, w trzecim zagnieżdżonym pasku
      przewijania, a oś chroni `max-h-[60vh]` na edytorze — siatka założona
      dokładnie po to, żeby wewnętrzne nie były potrzebne. */
-  /* Od @wydanie karta z treścią zostaje tylko POZA polem — tu nieświeża. */
+  /* Od 0.495.0 karta z treścią zostaje tylko POZA polem — tu nieświeża. */
   it("przyciski stoją PRZED treścią, a treść PŁYNIE bez własnego przewijania", () => {
     edytor(copilot({ szkic: szkic({ tresc: "linia\n".repeat(60) }), nieswiezy: true }));
     const wstaw = screen.getByRole("button", { name: "Popraw w edytorze" });

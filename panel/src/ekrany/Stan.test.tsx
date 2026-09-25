@@ -108,7 +108,7 @@ describe("Stan systemu w panelu", () => {
       `POST /api/ean-conflicts/5901234567890/rozstrzygnij ${JSON.stringify({ rodzaj: "dopuszczone", notatka: "dwa rozmiary" })}`]));
   });
 
-  /* Test na żywym Allegro (@wydanie): otwarcie karty CZYTA ostatni przebieg,
+  /* Test na żywym Allegro (0.495.0): otwarcie karty CZYTA ostatni przebieg,
      nowy biegnie wyłącznie na kliknięcie — POST bez ciała. */
   it("test na żywo: wynik ostatniego przebiegu, a nowy tylko na kliknięcie", async () => {
     pokaz();

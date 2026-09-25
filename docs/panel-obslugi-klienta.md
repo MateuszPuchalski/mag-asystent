@@ -1040,7 +1040,7 @@ nasza następna prawdziwa odpowiedź. Autoodpowiedź czekania nie kończy.
 Rozbicie na osoby widzi wyłącznie administrator, jak każdy raport o ludziach
 od 0.431.0.
 
-**Bez ponownego pytania (@wydanie) mierzy skutek, nie szybkość.** Po naszej
+**Bez ponownego pytania (0.495.0) mierzy skutek, nie szybkość.** Po naszej
 prawdziwej odpowiedzi patrzymy siedem dni naprzód w tej samej rozmowie.
 Wiadomość klienta inna niż podziękowanie znaczy powrót. Podziękowanie
 rozpoznaje `klientPodziekowal`, ta sama reguła co w kolejce. Powrót bez
@@ -1431,7 +1431,7 @@ przycisk jest jeden: „Popraw w edytorze" przy pustym polu i „Zastąp mój sz
 przy pełnym. Napis mówi, co się stanie, zanim ktoś kliknie. „Odrzuć" chowa
 kartę. W trybie komentarza ani przycisku, ani karty nie ma w drzewie.
 
-**Szkic stoi w polu, odpowiedź na końcu rozmowy (@wydanie).** Zgłoszenie
+**Szkic stoi w polu, odpowiedź na końcu rozmowy (0.495.0).** Zgłoszenie
 właściciela ze zrzutem: „za dużo odstępów w środkowej kolumnie, miejsce pracy
 jest ściśnięte". Zmierzone na zrzucie: rozmowa zajmowała 19% kolumny, puste
 pole 25%, a karta szkicu z tą samą odpowiedzią stała pod krawędzią, w drugim
@@ -2442,7 +2442,7 @@ wynikają trzy zmiany i jedna jawna cena.
 rozmowy i chował przyciski pod krawędzią. Powód zniknął w tym samym wydaniu —
 przyciski przeniesiono NAD treść — a ograniczenie zostało. Oś chroni
 `max-h-[60vh]` na edytorze, czyli siatka założona po to, żeby wewnętrzne nie
-były potrzebne. Od @wydanie tej siatki nie ma: edytor stoi na końcu osi,
+były potrzebne. Od 0.495.0 tej siatki nie ma: edytor stoi na końcu osi,
 w jednym przewijaniu z rozmową.
 
 **Bloki drugoplanowe są zwinięte.** Odczyt ze zdjęć i dopytanie zwijają się do
@@ -6174,7 +6174,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Spoiwo czterech kolejek — sprawy i droga zakupu | **działa** od 0.387.0 | `services/droga-klienta.ts`, `panel/src/sprawy/Spoiwo.tsx`; mostek po `order_id`, blok wspólny dla skrzynki, zwrotów, reklamacji i dyskusji |
 | Historia klienta ze zwrotami i sprawami | **działa** od 0.387.0 | `services/klient-historia.ts`; pięć rodzajów wpisu, wiązanie po `kupujacy_login` — wolno, bo zwrot i sprawa niosą go z Allegro |
 | Profil klienta: liczby, sygnały, otwarte sprawy, zamówienia, notatka | **działa** od 0.484.0 | `services/profil-klienta.ts`, `GET /api/obsluga/klient/:login`, `panel/src/ekrany/ProfilKlienta.tsx`; login przez konta, bez wielkości liter; sygnały wyliczane; jedyny zapis to `klient_notatka` z cofnięciem |
-| Test na żywym Allegro | **działa** od @wydanie | `services/sonda-rzeczywistosci.ts`, takt dzienny w `main()`, karta `stan/Sonda.tsx`, wiersz w DO DECYZJI; drogi produkcji bez atrap, tylko odczyt z Allegro |
+| Test na żywym Allegro | **działa** od 0.495.0 | `services/sonda-rzeczywistosci.ts`, takt dzienny w `main()`, karta `stan/Sonda.tsx`, wiersz w DO DECYZJI; drogi produkcji bez atrap, tylko odczyt z Allegro |
 | Droga zakupu przez kolejki | **działa** od 0.387.0 | `drogaZakupu`; ODCZYT z momentów otwarcia, bez zdarzenia i bez tabeli (otwarcie ekranu nic nie mutuje) |
 | Jedno „Moje" ponad kolejkami | **działa** od 0.387.0 | `mojeSprawy`, `GET /api/obsluga/moje`, `panel/src/ekrany/Moje.tsx`; TRZY kolejki — zwrot nie ma prowadzącego od 0.370.0; tożsamość z sesji, nie z zapytania |
 | Miara eskalacji po rozmowie | **działa** od 0.387.0 | `eskalacje`, `GET /api/obsluga/eskalacja`, `panel/src/ustawienia/Eskalacja.tsx`; liczy ZAKUPY, bez osi osobowej |

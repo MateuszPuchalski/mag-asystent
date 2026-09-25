@@ -561,7 +561,7 @@ async function main() {
        będzie, a agent i tak potrzebuje wiedzieć, o czym rozmawia. Partia
        mieści się w jednym żądaniu, więc ten takt to jedno wywołanie na cykl. */
     uruchomTakt("allegro-oferty", config.allegro.ofertySyncMs, async () => { await uzupelnijOferty(); });
-    /* TEST NA ŻYWYM ALLEGRO RAZ DZIENNIE (@wydanie). Te same drogi co
+    /* TEST NA ŻYWYM ALLEGRO RAZ DZIENNIE (0.495.0). Te same drogi co
        produkcja, bez atrap; wynik na ekranie Stan i w DO DECYZJI przy
        błędzie. Powód: `services/sonda-rzeczywistosci.ts`. */
     uruchomTakt("sonda-rzeczywistosci", 24 * 60 * 60_000, async () => {

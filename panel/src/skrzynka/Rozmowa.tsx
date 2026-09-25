@@ -207,7 +207,7 @@ export function Rozmowa(p: {
       zapisuje={p.zapisujeOferte} blad={p.bladOferty}
       onWskaz={p.onWskazOferte} onDopytaj={p.onDopytajOOferte} />}
 
-    {/* ── EDYTOR NA KOŃCU OSI (@wydanie) — powód w `Edytor.tsx`. ─────────────
+    {/* ── EDYTOR NA KOŃCU OSI (0.495.0) — powód w `Edytor.tsx`. ─────────────
         Formularz pomiaru jedzie tą samą drogą i stoi PRZED edytorem: zlecenie
         dla hali to zwykle krok przed odpowiedzią klientowi, nie po niej. */}
     <Os wpisy={os} rozmowaId={rozmowa.id} skokNaDol={zjazdy}

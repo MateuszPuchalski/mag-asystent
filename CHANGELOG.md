@@ -10,6 +10,51 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.495.0 — 25 września 2026
+
+**Analiza mierzy skutek odpowiedzi, nie tylko jej szybkość.** Zgłoszenie
+właściciela po rozmowie o metodzie Feynmana: „build it”. Czas odpowiedzi
+nagradza szybką złą odpowiedź tak samo jak szybką dobrą. Nowa liczba mówi,
+czy klient po naszej odpowiedzi musiał pisać jeszcze raz.
+
+- **„Bez ponownego pytania”** w Analizie → Obsługa klienta. Po naszej
+  prawdziwej odpowiedzi klient nie pisał w tej rozmowie przez 7 dni.
+  Podziękowanie się nie liczy; rozpoznaje je ta sama reguła, która zdejmuje
+  je z kolejki.
+- **Niepewność stoi obok wyniku, nie w nim.** Powrót bez rozpoznania liczy
+  się jako powrót i ma własną liczbę, bo mógł być podziękowaniem. Odpowiedź
+  młodsza niż 7 dni bez powrotu nie ma jeszcze wyniku.
+- **Według kategorii**, a administrator widzi też rozbicie na osoby.
+- Powrót przez dyskusję albo reklamację liczy dalej miara eskalacji.
+
+Pierwsze wyniki są od razu, z historii.
+
+**Odpowiedź na końcu rozmowy, szkic Copilota w polu.** Środkowa kolumna
+skrzynki nie dzieli się już na rozmowę i edytor. Edytor jest ostatnią
+wypowiedzią wątku, a całość przewija się jednym paskiem. Świeży szkic Copilota
+stoi w pustym polu jako podpowiedź: Tab albo „Przyjmij szkic" go bierze,
+pierwsza litera agenta go zasłania. Do wysłania jest tylko tekst przyjęty.
+Uwagi modelu zostają pod przyjętym tekstem. Pole rośnie z treścią, a przyciski
+wysyłki pływają w jednym rzędzie przy dolnej krawędzi.
+
+**Test na żywym Allegro raz dziennie.** Drugi krok po „build it”. Nasze
+bramki sprawdzają kod wobec kodu, nie wobec Allegro. Tak przez 150 wydań
+„działały” zdjęcia Copilota: testy podstawiały pobieracz i przechodziły.
+
+- **Pięć kroków, te same drogi co produkcja, bez atrap:** lista wątków
+  skrzynki, najnowsza sprawa posprzedażowa, zdjęcie z rozmowy i zdjęcie ze
+  sprawy pobrane dokładnie tak, jak pobiera je Copilot. Piąty krok, bez
+  sieci, liczy zdjęcia, które w szkicach z ostatniej doby nie doszły do modelu.
+- **Tylko czyta z Allegro.** U siebie zapisuje wynik kroku, zdanie bez
+  adresów i czas. Zdjęcia nie idą do modelu; test sprawdza bramkę, nie płaci.
+- **Stan systemu → „Test na żywym Allegro”** z przyciskiem „Przetestuj
+  teraz”, co najwyżej raz na pięć minut.
+- **Krok, który nie przeszedł, staje w DO DECYZJI** i gaśnie po udanym
+  przebiegu. Limit 429 i brak danych to „pominięty”, nie błąd.
+
+Po wdrożeniu warto kliknąć „Przetestuj teraz” — pierwszy przebieg z taktu
+przyjdzie w ciągu doby. Tabela `sonda_rzeczywistosci` powstaje sama przy starcie.
+
 ## 0.494.1 — 25 września 2026
 
 **Okna raportów bez dodatkowej doby.** Analiza, metryki, ergonomia, cykl

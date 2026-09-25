@@ -4,7 +4,7 @@ import { useSonda, useSondujTeraz, type KrokSondy, type WynikSondy } from "../ap
 import { Blad, Przycisk, czas } from "../ui";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
-/* ── Test na żywym Allegro (@wydanie) ─────────────────────────────────────
+/* ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────
    Zgłoszenie właściciela po rozmowie o metodzie Feynmana: „build it”. Nasze
    bramki sprawdzają kod wobec kodu; ta karta pokazuje, czy drogi produkcji
    działają wobec prawdziwego Allegro. Serwer przechodzi je raz dziennie, bez

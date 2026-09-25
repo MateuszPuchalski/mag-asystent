@@ -215,7 +215,7 @@ export function useArkuszLokalizacji() {
   });
 }
 
-/* ── Test na żywym Allegro (@wydanie) ─────────────────────────────────────
+/* ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────
    Wzór typu obok serwisu: `services/sonda-rzeczywistosci.ts`. Otwarcie
    karty CZYTA ostatni przebieg; nowy biegnie wyłącznie na kliknięcie albo
    raz dziennie w takcie serwera. */

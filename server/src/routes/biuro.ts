@@ -239,7 +239,7 @@ export async function biuroRoutes(app: FastifyInstance) {
     return doDecyzji();
   });
 
-  /* ── Test na żywym Allegro (@wydanie) ────────────────────────────────────
+  /* ── Test na żywym Allegro (0.495.0) ────────────────────────────────────
      Odczyt ostatniego przebiegu i przycisk „Przetestuj teraz”. Przebieg sam
      chodzi raz dziennie w `main()`; przycisk jest po to, żeby po wdrożeniu
      nie czekać doby na pierwszy wynik. Powód i kroki: serwis.
