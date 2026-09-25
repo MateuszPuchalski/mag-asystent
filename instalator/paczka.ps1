@@ -323,6 +323,99 @@ function Stop-WertisUslugi {
     }
 }
 
+function Get-WertisPlikUslugi {
+    <#
+        .SYNOPSIS
+        Plik wykonywalny z `PathName` usługi — w cudzysłowie albo bez, z argumentami.
+        .DESCRIPTION
+        `PathName` to cała linia poleceń: `"C:\wertis\tools\nssm.exe"` albo
+        `C:\Program Files\x\a.exe -k`. Porównanie całej linii z katalogiem
+        myliłoby argumenty ze ścieżką, więc bierzemy sam plik.
+    #>
+    param([string]$PathName)
+    if (-not $PathName -or -not $PathName.Trim()) { return $null }
+    $t = $PathName.Trim()
+    if ($t.StartsWith('"')) {
+        $koniec = $t.IndexOf('"', 1)
+        return $(if ($koniec -gt 1) { $t.Substring(1, $koniec - 1) } else { $t.Trim('"') })
+    }
+    $exe = $t.IndexOf(".exe", [System.StringComparison]::OrdinalIgnoreCase)
+    return $(if ($exe -ge 0) { $t.Substring(0, $exe + 4) } else { $t })
+}
+
+function Get-WertisUslugiDoZamiany {
+    <#
+        .SYNOPSIS
+        Usługi do zatrzymania przed zamianą katalogu: nasze plus każda
+        DZIAŁAJĄCA, której program leży w $Katalog.
+        .DESCRIPTION
+        Blizna @wydanie: pierwsza aktualizacja z paczki na magazynie padła na
+        „Odmowa dostępu do ścieżki C:\wertis". Lista stała znała trzy usługi,
+        a `wertis-tlo` zakłada się ręcznie (tlo-worker/README.md) i jej exe
+        leży w C:\wertis\tlo-worker. Działający proces trzyma katalog, więc
+        zmiana nazwy nie przejdzie. Lista z systemu zamiast dopisania czwartej
+        nazwy: następna ręcznie dołożona usługa trafiłaby na ten sam mur.
+
+        Program usługi NSSM to nssm.exe, a właściwy plik stoi w rejestrze
+        (`Parameters\Application`). Sprawdzamy oba, bo nssm.exe bywa spoza
+        katalogu (ten z PATH), a aplikacja z niego.
+
+        Dołączamy tylko DZIAŁAJĄCE: usługę zatrzymaną celowo restart po
+        zamianie by uruchomił wbrew komuś, kto ją wyłączył.
+        Czysta funkcja — listę usług dostaje gotową, jak Get-WertisProcesyDoUbicia.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Katalog,
+        [string[]]$Nasze = @(),
+        [object[]]$System = @()
+    )
+    $wynik = [System.Collections.Generic.List[string]]::new()
+    foreach ($n in @($Nasze)) { if ($n -and -not $wynik.Contains($n)) { $wynik.Add($n) } }
+    foreach ($u in @($System)) {
+        if ($null -eq $u -or -not $u.Name -or $u.State -ne "Running") { continue }
+        if ($wynik.Contains([string]$u.Name)) { continue }
+        foreach ($s in @((Get-WertisPlikUslugi -PathName $u.PathName), $u.Aplikacja)) {
+            if (Test-SciezkaWewnatrz -Sciezka $s -Katalog $Katalog) { $wynik.Add([string]$u.Name); break }
+        }
+    }
+    return @($wynik)
+}
+
+function Get-WertisUslugiSystemu {
+    <# .SYNOPSIS Usługi systemu z plikiem aplikacji NSSM — wejście dla Get-WertisUslugiDoZamiany. #>
+    foreach ($s in @(Get-CimInstance -ClassName Win32_Service -ErrorAction SilentlyContinue)) {
+        $aplikacja = $null
+        try {
+            $aplikacja = (Get-ItemProperty -LiteralPath "HKLM:\SYSTEM\CurrentControlSet\Services\$($s.Name)\Parameters" `
+                -Name Application -ErrorAction Stop).Application
+        } catch { $aplikacja = $null }
+        [pscustomobject]@{ Name = $s.Name; PathName = $s.PathName; Aplikacja = $aplikacja; State = $s.State }
+    }
+}
+
+function Wait-WertisKatalogWolny {
+    <#
+        .SYNOPSIS
+        Czeka, aż z $Katalog zejdą procesy zatrzymanych usług; resztę zatrzymuje.
+        .DESCRIPTION
+        `Stop-Service` wraca, gdy usługa zgłosi zatrzymanie, a proces potomny
+        potrafi zamykać pliki jeszcze chwilę. Po limicie zostają sieroty
+        z plikiem wykonywalnym w katalogu aplikacji — z definicji nasze,
+        bo nic innego stamtąd nie startuje. Zatrzymanie ich z nazwą w dzienniku
+        jest lepsze niż aktualizacja, która w nocy pada bez świadka.
+        Okno Eksploratora albo konsola stojąca w katalogu nie mają tam pliku
+        wykonywalnego — tych nie widać i o nich mówi komunikat po porażce.
+    #>
+    param([Parameter(Mandatory)][string]$Katalog, [int]$Sekundy = 15)
+    for ($i = 0; $i -lt $Sekundy; $i++) {
+        $trzymaja = @(Get-WertisProcesyDoUbicia -Katalog $Katalog -Procesy @(Get-Process -ErrorAction SilentlyContinue))
+        if ($trzymaja.Count -eq 0) { return }
+        Start-Sleep -Seconds 1
+    }
+    [void](Stop-WertisProcesyWKatalogu -Katalog $Katalog)
+    Start-Sleep -Seconds 1
+}
+
 function Update-WertisZPaczki {
     <#
         .SYNOPSIS
@@ -388,7 +481,13 @@ function Update-WertisZPaczki {
 
     # ── 3. Zamiana: jedyne sekundy bez usług ───────────────────────────────
     Write-Krok "Zamiana wersji"
+    # Od tej chwili „usługi" to nasze plus każda działająca z programem
+    # w katalogu (Get-WertisUslugiDoZamiany) — ten sam zestaw wraca po
+    # zamianie, po porażce i po wycofaniu.
+    $Uslugi = @(Get-WertisUslugiDoZamiany -Katalog $Katalog -Nasze $Uslugi -System @(Get-WertisUslugiSystemu))
+    Write-Info "Zatrzymuję: $($Uslugi -join ', ')."
     Stop-WertisUslugi -Uslugi $Uslugi
+    Wait-WertisKatalogWolny -Katalog $Katalog
     try {
         Move-WertisDaneNaZewnatrz -Katalog $Katalog
         foreach ($p in (Get-WertisDoPrzeniesienia -Katalog $Katalog)) {
@@ -406,7 +505,7 @@ function Update-WertisZPaczki {
             Rename-Item -LiteralPath $poprzedni -NewName (Split-Path -Leaf $Katalog)
         }
         Restart-WertisUslugi -Uslugi $Uslugi
-        Write-Info "Usługi wróciły na $obecna. Zamknij okna stojące w $Katalog i spróbuj ponownie."
+        Write-Info "Usługi wróciły na $obecna. Zamknij okna Eksploratora i konsole stojące w $Katalog i spróbuj ponownie."
         return 1
     }
     Restart-WertisUslugi -Uslugi $Uslugi
@@ -422,6 +521,8 @@ function Update-WertisZPaczki {
 
     Write-Blad "Wersja $wersja nie odpowiedziała poprawnie — wycofuję na $obecna."
     Stop-WertisUslugi -Uslugi $Uslugi
+    # Wycofanie zmienia nazwę tego samego katalogu — ta sama pułapka co wyżej.
+    Wait-WertisKatalogWolny -Katalog $Katalog
     $nieudana = "$Katalog.nieudana-$wersja"
     Remove-WertisKatalogAplikacji -Sciezka $nieudana
     Rename-Item -LiteralPath $Katalog -NewName (Split-Path -Leaf $nieudana)

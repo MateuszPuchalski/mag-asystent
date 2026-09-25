@@ -1409,6 +1409,37 @@ Sprawdz "przenoszone jest tylko to, co istnieje, i nic z kodu" {
     } finally { Remove-Item $k -Recurse -Force }
 }
 
+# Namiastka tego, co zwraca Get-WertisUslugiSystemu.
+function Usl { param($Nazwa, $PathName, $Aplikacja = $null, $Stan = "Running")
+    [pscustomobject]@{ Name = $Nazwa; PathName = $PathName; Aplikacja = $Aplikacja; State = $Stan }
+}
+
+Sprawdz "plik usługi z PathName: cudzysłów, argumenty, pusto" {
+    Zaloz ((Get-WertisPlikUslugi '"C:\wertis\tools\nssm.exe"') -eq "C:\wertis\tools\nssm.exe") "cudzysłów"
+    Zaloz ((Get-WertisPlikUslugi '"C:\Program Files\x\a.exe" -k siec') -eq "C:\Program Files\x\a.exe") "cudzysłów z argumentami"
+    Zaloz ((Get-WertisPlikUslugi 'C:\Windows\system32\svchost.exe -k netsvcs') -eq "C:\Windows\system32\svchost.exe") "bez cudzysłowu z argumentami"
+    Zaloz ($null -eq (Get-WertisPlikUslugi "")) "pusta linia"
+}
+
+Sprawdz "zamiana zatrzymuje też ręczną usługę z programem w katalogu (wertis-tlo)" {
+    # Blizna z magazynu: „Odmowa dostępu do ścieżki C:\wertis", bo wertis-tlo
+    # nie było na stałej liście i trzymało swój exe w katalogu aplikacji.
+    $u = Get-WertisUslugiDoZamiany -Katalog "C:\wertis" -Nasze @("wertis-api", "wertis-worker", "wertis-sfera") -System @(
+        (Usl "wertis-api" '"C:\wertis\tools\nssm.exe"'),
+        (Usl "wertis-tlo" '"C:\narzedzia\nssm.exe"' "C:\wertis\tlo-worker\wertis-tlo-worker.exe"),
+        (Usl "wertis-inna" '"C:\wertis\tools\nssm.exe"'),
+        (Usl "wertis2-api" '"C:\wertis2\tools\nssm.exe"'),
+        (Usl "Spooler" 'C:\Windows\System32\spoolsv.exe'),
+        (Usl "wertis-stoi" '"C:\wertis\tools\nssm.exe"' $null "Stopped")
+    )
+    Zaloz (($u -join ",") -eq "wertis-api,wertis-worker,wertis-sfera,wertis-tlo,wertis-inna") "dostałem: $($u -join ',')"
+}
+
+Sprawdz "zamiana bez listy z systemu to same nasze usługi, bez powtórzeń" {
+    $u = Get-WertisUslugiDoZamiany -Katalog "C:\wertis" -Nasze @("wertis-api", "wertis-api", "wertis-worker") -System @($null)
+    Zaloz (($u -join ",") -eq "wertis-api,wertis-worker") "dostałem: $($u -join ',')"
+}
+
 Sprawdz "kopia bazy sprzed migracji: najnowsza dla tej wersji, obca nie" {
     $k = Nowy-Katalog
     try {
