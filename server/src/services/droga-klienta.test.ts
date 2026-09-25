@@ -37,7 +37,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["reklamacja_klienta", "zwrot_klienta", "message", "conversation",
+  for (const t of ["reklamacja_klienta", "zwrot_klienta", "message", "conversation_event", "conversation",
     "channel_account", "events", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
 
   agent = Number(d.prepare(
@@ -280,4 +280,67 @@ test("moja lista niczego nie zapisuje", () => {
   mojeSprawy(d, agent);
 
   assert.equal(Number(d.prepare("SELECT COUNT(*) AS n FROM events").get()!.n), przed);
+});
+
+/* ── Wiązanie obustronne przy ręcznie wskazanym zamówieniu (@wydanie) ───────
+   Rozmowa bez numeru w wiadomościach, której zamówienie wskazał agent.
+   Skrzynka widziała jej zwrot od 0.397.0; zwrot, droga zakupu i szukanie
+   rozmowy nie widziały. Test chodzi mostkiem w OBIE strony, bo wiązanie
+   jednostronne to wiązanie, którego nie ma.                               */
+const wskaz = (numer: string, rozm = rozmowa) => db().prepare(`INSERT INTO conversation_event(
+    conversation_id, event_type, payload) VALUES (?, 'order_linked_manually',
+    json_object('externalId', ?, 'autor', 'A. Lewandowska'))`).run(rozm, numer);
+
+test("zamówienie wskazane ręcznie wiąże rozmowę w obie strony: droga, zwrot, eskalacja", async () => {
+  const { listaZwrotow } = await import("./zwroty.js");
+  const { numerZamowieniaRozmowy } = await import("./zamowienia-kandydaci.js");
+  wiadomosc("2026-09-10T08:00:00Z", null);
+  wskaz("inny");
+  wskaz(ZAM);
+  const idZwrotu = zwrot("2026-09-12T08:00:00Z");
+
+  assert.equal(numerZamowieniaRozmowy(rozmowa, db())?.externalId, ZAM, "strona skrzynki");
+  const droga = drogaZakupu(db(), konto, ZAM);
+  assert.deepEqual(droga.map((p) => p.rodzaj), ["rozmowa", "zwrot"], "strona drogi zakupu");
+  assert.equal(droga[0].at, "2026-09-10T08:00:00Z", "rozmowa staje pierwszą wiadomością, nie chwilą wskazania");
+  const z = listaZwrotow(db(), Date.parse("2026-09-20T00:00:00Z"), { channelAccountId: konto, orderId: ZAM });
+  assert.equal(z.find((w) => w.id === idZwrotu)?.rozmowy.map((r) => r.id)[0], rozmowa, "strona zwrotu");
+  assert.equal(drogaZakupu(db(), konto, "inny").length, 0, "liczy się ostatnie wskazanie");
+  sprawa("CLAIM", "2026-09-15T08:00:00Z");
+  assert.deepEqual(eskalacje(db(), konto).map((m) => m.eskalowane), [1]);
+});
+
+test("numer z wiadomości bije wskazanie — jak w `numerZamowieniaRozmowy`", () => {
+  wiadomosc("2026-09-10T08:00:00Z", "z-wiadomosci");
+  wskaz(ZAM);
+  zwrot("2026-09-12T08:00:00Z");
+  assert.deepEqual(drogaZakupu(db(), konto, ZAM).map((p) => p.rodzaj), ["zwrot"]);
+  assert.deepEqual(drogaZakupu(db(), konto, "z-wiadomosci").map((p) => p.rodzaj), ["rozmowa"]);
+});
+
+test("rozmowa z cudzego konta nie wchodzi do zwrotu, choć niesie ten sam numer", async () => {
+  const { listaZwrotow } = await import("./zwroty.js");
+  const obca = Number(db().prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject) VALUES (?,'w-obca','Obca')`).run(obce).lastInsertRowid);
+  wiadomosc("2026-09-10T08:00:00Z", ZAM, obca, obce);
+  const idZwrotu = zwrot("2026-09-12T08:00:00Z");
+  const z = listaZwrotow(db(), Date.parse("2026-09-20T00:00:00Z"), { channelAccountId: konto, orderId: ZAM });
+  assert.deepEqual(z.find((w) => w.id === idZwrotu)?.rozmowy, []);
+});
+
+/* STRAŻNIK ŹRÓDŁA: rozmowy zamówienia czyta się wyłącznie przez
+   `ROZMOWA_ZAMOWIENIA`. Surowe `related_order_id =` albo `IN (` w serwisie
+   wróciłoby do wiązania jednostronnego bez jednego czerwonego testu.
+   Zwolnione: sama relacja, reguła jednej rozmowy (`numerZamowieniaRozmowy`),
+   klasyfikator czytający własne wiadomości i wiersz osi pojedynczej wiadomości. */
+test("rozmowy zamówienia tylko przez ROZMOWA_ZAMOWIENIA", () => {
+  const katalog = new URL(".", import.meta.url);
+  const zwolnione = new Set(["droga-klienta.ts", "zamowienia-kandydaci.ts", "copilot-klasyfikacja.ts"]);
+  const zle: string[] = [];
+  for (const plik of fs.readdirSync(katalog)) {
+    if (!plik.endsWith(".ts") || plik.endsWith(".test.ts") || zwolnione.has(plik)) continue;
+    const tresc = fs.readFileSync(new URL(plik, katalog), "utf8");
+    if (/related_order_id\s*(=|IN\s*\()/.test(tresc)) zle.push(plik);
+  }
+  assert.deepEqual(zle, []);
 });

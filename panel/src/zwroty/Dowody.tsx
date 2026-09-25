@@ -451,13 +451,13 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
     <Sekcja ikona={<MessageSquare size={14} />} tytul="Wiadomości o tym zakupie">
       {<ul className="space-y-1">
             {zwrot.rozmowy.map((r) => <li key={r.id}>
-              <a href={`/obsluga/skrzynka/${r.id}`}
+              <RouterLink to={`/obsluga/skrzynka/${r.id}`}
                 className="block rounded-lg bg-slate-50 px-2 py-1 hover:bg-slate-100">
                 <span className="font-semibold text-sky-700 underline underline-offset-2">
                   {r.temat?.trim() || "Rozmowa bez tematu"}</span>
                 <span className="ml-2 text-xs text-slate-500">{czas(r.ostatniaAt)}</span>
                 <Plakietka status={r.status} className="ml-2">{r.status}</Plakietka>
-              </a>
+              </RouterLink>
             </li>)}
           </ul>}
     </Sekcja>}

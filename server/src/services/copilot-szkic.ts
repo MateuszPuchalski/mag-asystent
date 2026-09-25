@@ -847,6 +847,35 @@ const dostepnosc = (ile: number | null, jednostka: string | null) =>
   ile != null && ile > 0 ? `dostępne dziś: ${ile} ${jednostka ?? "szt."}` : "dziś brak na stanie";
 
 /**
+ * „Kiedy będzie" przy braku na stanie (@wydanie) — z zamówień u dostawcy.
+ *
+ * Serwer liczył to od dawna (`zamowioneUDostawcy`), ale widział to tylko
+ * kolektor. Szkic przy braku towaru nie miał więc czego powiedzieć poza
+ * „brak", a agent szedł po termin do Subiekta. Fakt stoi WYŁĄCZNIE przy braku:
+ * przy towarze na półce pytanie o termin nie pada.
+ *
+ * Nazwy dostawcy i numeru dokumentu NIE ma — to nasza kuchnia, nie odpowiedź
+ * dla klienta (ta sama zasada co półka w §10.4). Termin jest terminem
+ * DOSTAWCY i fakt mówi to wprost, żeby szkic nie zamienił go w obietnicę.
+ */
+export function kiedyBedzie(
+  karta: { mag: { avail: number }; unit: string | null; zamowione?: Array<{ termin: string | null; ilosc: number; szacunek: boolean }> },
+): string | null {
+  if (karta.mag.avail > 0) return null;
+  const z = karta.zamowione ?? [];
+  if (!z.length) return "brak otwartych zamówień u dostawcy — terminu nie znamy";
+  const jedn = karta.unit ?? "szt.";
+  /* Lista przychodzi posortowana po terminie, bez terminu na końcu. */
+  const najblizsze = z[0];
+  const ile = z.reduce((a, b) => a + b.ilosc, 0);
+  const szac = z.some((w) => w.szacunek) ? "do " : "";
+  return `zamówione u dostawcy: ${szac}${ile} ${jedn}`
+    + (najblizsze.termin ? `, najbliższy termin dostawcy ${najblizsze.termin.slice(0, 10)}`
+      : ", dostawca nie podał terminu")
+    + " (termin dostawcy, nie obietnica dla klienta)";
+}
+
+/**
  * Fakty dla modelu — czysty ODCZYT, niczego nie zapisuje.
  *
  * Co świadomie NIE wchodzi: półka, rezerwacje, rozbicie na magazyny (§10.4 —
@@ -905,7 +934,8 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
         zapamietaj({ twId: k.twId, symbol: karta.sym, nazwa: karta.name });
         const numery = karta.identyfikatory.map((i) => i.wartosc).join(", ");
         dodaj("kartoteka", `Kartoteka oferty: ${karta.sym} — ${karta.name}; EAN ${karta.ean || "brak"};`
-          + ` numery: ${numery || "brak"}; ${dostepnosc(karta.mag.avail, karta.unit)} (${k.zrodlo})`);
+          + ` numery: ${numery || "brak"}; ${dostepnosc(karta.mag.avail, karta.unit)}`
+          + `${kiedyBedzie(karta) ? `; ${kiedyBedzie(karta)}` : ""} (${k.zrodlo})`);
       }
     } else {
       dodaj("oferta", `Oferta bez kartoteki w Subiekcie: ${k.zrodlo}`);

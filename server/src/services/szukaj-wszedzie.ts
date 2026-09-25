@@ -1,5 +1,6 @@
 import { db as defaultDb, type Db } from "../db/db.js";
 import { linkZamowienia } from "./allegro-linki.js";
+import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
 
 /* ── Jedno szukanie ponad kolejkami, Ctrl+K (23 września 2026) ────────────────
    Każdy ekran panelu miał własne pole szukania i trzeba było wiedzieć, które
@@ -148,9 +149,9 @@ export function szukajWszedzie(
   if (numery.length > 0) {
     const miejsca = numery.map(() => "?").join(",");
     for (const w of database.prepare(`
-      SELECT c.id, c.subject, m.related_order_id AS zam, MAX(m.sent_at) AS ostatnia
-        FROM message m JOIN conversation c ON c.id = m.conversation_id
-       WHERE m.related_order_id IN (${miejsca})
+      SELECT c.id, c.subject, rz.numer AS zam, MAX(rz.at) AS ostatnia
+        FROM ${ROZMOWA_ZAMOWIENIA} rz JOIN conversation c ON c.id = rz.conversation_id
+       WHERE rz.numer IN (${miejsca})
        GROUP BY c.id ORDER BY ostatnia DESC LIMIT ?`).all(...numery, NA_RODZAJ) as Wiersz[]) {
       dodaj({
         rodzaj: "rozmowa", id: String(w.id), tytul: tekst(w.subject) ?? "Rozmowa bez tematu",

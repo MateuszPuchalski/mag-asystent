@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Package } from "lucide-react";
 import {
   useKosze, usePominiete, usePrzeliczKosz, useSzczegolKosza, useSzukajWKoszach, useZalatwPominiecie,
@@ -24,13 +24,20 @@ import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
    zamyka go ten pasek.
 
    ADRES NIESIE KOSZ (`/obsluga/zwroty/kosze/:id`): odświeżenie nie gubi
-   sprawy, a karta zwrotu i ANALIZA w biurze prowadzą wprost do niego. */
+   sprawy, a karta zwrotu i Do zrobienia prowadzą wprost do niego. */
 
 export function Kosze() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const wybrany = id ? Number(id) : null;
-  const [kubelek, setKubelek] = useState<KubelekKoszy>("praca");
+  /* Kubełek z adresu (@wydanie): wiersz „Pominięta pozycja" w Do zrobienia
+     prowadzi tu z `?kubelek=pominiete`. Adres czyta się RAZ, przy wejściu —
+     dalej kubełek jest stanem ekranu, jak na każdej kolejce. */
+  const [parametry] = useSearchParams();
+  const [kubelek, setKubelek] = useState<KubelekKoszy>(() => {
+    const z = parametry.get("kubelek");
+    return KUBELKI_KOSZY.some((k) => k.id === z) ? (z as KubelekKoszy) : "praca";
+  });
   const [fraza, setFraza] = useState("");
   /* Szukanie liczy SERWER — ćwierć sekundy przerwy, jak przy archiwum dostaw. */
   const [q, setQ] = useState("");

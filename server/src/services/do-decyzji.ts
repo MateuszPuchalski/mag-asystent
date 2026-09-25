@@ -168,8 +168,11 @@ function kosze(): PozycjaDecyzji[] {
     co: `${p.symbol} · ${p.kod}${p.powod ? ` · ${p.powod}` : ""}`,
     od: p.at,
     pilne: false,
-    /* Kosze mieszkają od 0.438.0 w zakładce Zwroty, bo tam powstają. */
-    cel: { panel: "/obsluga/zwroty/kosze" },
+    /* Kosze mieszkają od 0.438.0 w zakładce Zwroty, bo tam powstają.
+       Adres niesie kosz i kubełek (@wydanie): do tego wydania wiersz lądował
+       w kubełku „praca", a pominięcia stoją w „pominiete" — agent klikał
+       „załatwione?" i nie widział tego, o co pytano. */
+    cel: { panel: `/obsluga/zwroty/kosze/${p.koszId}?kubelek=pominiete` },
   }));
   const otwarte: PozycjaDecyzji[] = listaKoszy()
     .filter((k) => k.status === "otwarty" && (k.rodzaj ?? "zwroty") === "zwroty" && k.pozycji > 0)

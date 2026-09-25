@@ -10,7 +10,7 @@ import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { linkOferty, linkReklamacji, linkZamowienia } from "./allegro-linki.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import { przesylkaZamowienia, type StanPrzesylkiZamowienia } from "./przesylka-zamowienia.js";
-import { drogaZakupu, sprawyZakupu, type PrzystanekDrogi, type SprawaZakupu }
+import { ROZMOWA_ZAMOWIENIA, drogaZakupu, sprawyZakupu, type PrzystanekDrogi, type SprawaZakupu }
   from "./droga-klienta.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { STATUSY_KONCOWE } from "./statusy-spraw.js";
@@ -960,11 +960,12 @@ export function kontekstZamowienia(
     droga: drogaZakupu(database, konto, orderId),
     zwroty: listaZwrotow(database, teraz, { channelAccountId: konto, orderId }),
     rozmowy: (database.prepare(`
-      SELECT c.id, c.subject, c.status, MAX(m.sent_at) AS ostatnia
-        FROM message m JOIN conversation c ON c.id = m.conversation_id
-       WHERE m.related_order_id = ?
+      SELECT c.id, c.subject, c.status,
+             (SELECT MAX(x.sent_at) FROM message x WHERE x.conversation_id = c.id) AS ostatnia
+        FROM ${ROZMOWA_ZAMOWIENIA} rz JOIN conversation c ON c.id = rz.conversation_id
+       WHERE rz.numer = ? AND c.channel_account_id = ?
        GROUP BY c.id
-       ORDER BY ostatnia DESC`).all(orderId) as Wiersz[]).map((r) => ({
+       ORDER BY ostatnia DESC`).all(orderId, konto) as Wiersz[]).map((r) => ({
       id: Number(r.id),
       temat: tekst(r.subject),
       status: String(r.status),

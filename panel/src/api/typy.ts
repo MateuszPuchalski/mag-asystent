@@ -335,6 +335,14 @@ export type KartaTowaru = {
   ceny?: CenaPoziomu[];
   mag: { stan: number; rez: number; avail: number };
   magazyny: Array<{ magId: number; kod: string; nazwa: string; stan: number; rez: number }>;
+  /**
+   * Przyjechało, jeszcze nie na półce, i zamówione u dostawcy (@wydanie).
+   * Serwer zwracał je od dawna, czytał tylko kolektor. Opcjonalne, bo starszy
+   * serwer ich nie niesie, a brak pola ma znaczyć „nie wiemy", nie „nic".
+   */
+  wDostawie?: Array<{ dokId: number; nrPelny: string; dataWyst: string; ilosc: number; dostawca: string }>;
+  zamowione?: Array<{ dokId: number; nrPelny: string; dataWyst: string; termin: string | null;
+    dostawca: string; ilosc: number; szacunek: boolean }>;
 };
 
 /** Lista zgodności oferty — to samo dopasowanie, co fakt szkicu (`zgodnosc-oferty.ts`). */

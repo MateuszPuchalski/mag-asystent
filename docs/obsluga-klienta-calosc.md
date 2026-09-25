@@ -64,9 +64,17 @@ z czterech kolejek widzi trzy pozostałe, czyli dwanaście przejść z dwunastu.
 Wszystkie idą przez `services/droga-klienta.ts` i jeden blok na ekranie,
 `panel/src/sprawy/Spoiwo.tsx`.
 
+**Od @wydanie rozmowa należy do zamówienia także przez ręczne wskazanie.**
+Skrzynka czytała wskazanie od 0.397.0, a zwrot, reklamacja, droga zakupu
+i szukanie — tylko numer z wiadomości. Rozmowa ze wskazanym zamówieniem
+widziała więc zwrot, a zwrot jej nie. Teraz każda strona czyta jedną relację
+`ROZMOWA_ZAMOWIENIA`. Pilnuje jej test „rozmowy zamówienia tylko przez
+ROZMOWA_ZAMOWIENIA" w `droga-klienta.test.ts`.
+
 Drugim mostkiem jest login kupującego. Chodzą po nim zakładka KLIENT (S2)
-i kandydaci zamówień rozmowy bez numeru (S1). Czy ten mostek jest pewny, nie
-wiadomo — mówi o tym rozdział „Sprzeczność: login kupującego" niżej.
+i kandydaci zamówień rozmowy bez numeru (S1). Właściciel potwierdził go na
+żywym koncie 24 września 2026 — rozdział „Sprzeczność: login kupującego"
+niżej. Nowe wiązania po loginie są więc dozwolone, bez wielkości liter.
 
 Nakładka spraw (`sprawa_klienta`) odeszła w 0.388.0. Droga zakupu robi to
 samo sama i przez cztery kolejki. Cena jest zapisana jawnie: dwóch rozmów
@@ -275,7 +283,7 @@ od drugiej: nazywa dziurę, a nie funkcję.
 |---|---|---|
 | pytanie przed zakupem | skrzynka, rozmowa bez zamówienia | terminu odpowiedzi (§26) |
 | pytanie o dobór części | skrzynka, zakładka Dobór | — |
-| pytanie o dostawę i termin | skrzynka | — |
+| pytanie o dostawę i termin | skrzynka; od @wydanie „zamówione u dostawcy” w paśmie i w faktach szkicu | — |
 | prośba o fakturę albo korektę | skrzynka, ręcznie | drogi do Subiekta bez przepisywania |
 | paczka nieodebrana | zwroty, `zrodlo` osobne (0.172.0) | — |
 | zwrot ustawowy w 14 dni | zwroty, kubełki bramek | — |

@@ -1,3 +1,4 @@
+import { MemoryRouter } from "react-router-dom";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -54,7 +55,8 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
    klienta zapytań — inaczej hook wywala się, zanim cokolwiek się narysuje. */
 const zKlientem = (ui: React.ReactNode) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return <QueryClientProvider client={qc}>{ui}</QueryClientProvider>;
+  /* Router, bo odnośniki do rozmów idą przez niego (@wydanie), jak na ekranie. */
+  return <QueryClientProvider client={qc}><MemoryRouter>{ui}</MemoryRouter></QueryClientProvider>;
 };
 
 describe("Kolejka zwrotów", () => {

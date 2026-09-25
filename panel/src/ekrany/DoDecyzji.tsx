@@ -18,10 +18,7 @@ import { Wzmianki } from "./Wzmianki";
    decyzji: wyjątek dostawy rozstrzyga się przy fakturze i jej zdjęciach,
    reklamację przy czacie z kupującym. Przycisk „uznaj" na tej liście
    kazałby decydować bez dowodów — a to jest dokładnie to, czego biuro
-   robić nie powinno. Ta sama zasada co w „Moje".
-
-   Ekran, który jeszcze mieszka w `biuro.html`, otwiera się mostem — jak
-   drugi rząd nagłówka. Strzałka „na zewnątrz" mówi to przed kliknięciem. */
+   robić nie powinno. Ta sama zasada co w „Moje". */
 
 const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; className?: string }>> = {
   dostawy: Truck, odpowiedzi: MessageSquareReply, kosze: Package, zapisy: AlertTriangle,
