@@ -172,7 +172,7 @@ export function dogonicDol(el: { scrollHeight: number; scrollTop: number; client
 }
 
 export function Os({
-  wpisy, rozmowaId, skokNaDol = 0, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu,
+  wpisy, rozmowaId, skokNaDol = 0, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu, koniec,
 }: {
   wpisy: WpisOsi[];
   /** Która rozmowa. Zmiana tej wartości zjeżdża oś na dół bez pytania. */
@@ -187,6 +187,12 @@ export function Os({
   mozeZlecac: boolean;
   onZrodlo: (messageId: number | null) => void;
   onWstawDoSzkicu: (tresc: string) => void;
+  /**
+   * Co stoi PO ostatniej wypowiedzi, w tym samym przewijaniu (@wydanie):
+   * edytor odpowiedzi i formularz pomiaru. Poza listą wpisów, bo nie ma
+   * `data-wpis` — skok po identyfikatorze i obserwator pytania go nie widzą.
+   */
+  koniec?: React.ReactNode;
 }) {
   const listaRef = React.useRef<HTMLDivElement>(null);
   const [podswietlony, setPodswietlony] = React.useState<string | null>(null);
@@ -273,7 +279,9 @@ export function Os({
 
   /* `min-h-40`, nie `min-h-0` (0.232.1): karta szkicu Copilota zwinęła oś do
      jednej linii, bo edytor pod nią jest `shrink-0`. Rozmowa ma zostać
-     czytelna przy każdej wysokości edytora — to ona jest powodem ekranu. */
+     czytelna przy każdej wysokości edytora — to ona jest powodem ekranu.
+     Od @wydanie edytor stoi W tej liście (`koniec`), więc go nie ściska;
+     próg zostaje dla bloków nad osią, które dalej są `shrink-0`. */
   return <div className="flex min-h-0 flex-1 flex-col">
   <div ref={listaRef}
     onScroll={() => { const el = listaRef.current; if (el) naDole.current = dogonicDol(el); }}
@@ -387,10 +395,11 @@ export function Os({
             {zrodloPomiaru === w.messageId ? "✓ źródło pomiaru" : "Zleć z tej wiadomości"}</button>}
         </article>}
     </div>)}
+    {koniec}
   </div>
 
-    {/* Pasek stoi POD oknem wiadomości, nad edytorem — czyli tam, gdzie kończy
-        się czytanie, a zaczyna pisanie odpowiedzi. */}
+    {/* Pasek stoi POD oknem wiadomości — czyli tam, gdzie kończy się
+        czytanie. Od @wydanie edytor jest w oknie, więc pasek stoi pod nim. */}
     <PasekZdarzen zdarzenia={zdarzenia} onSkocz={skocz} />
 
     {/* Przypięte pytanie stoi PONIŻEJ paska zdarzeń, czyli najbliżej edytora:

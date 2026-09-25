@@ -1431,6 +1431,31 @@ przycisk jest jeden: „Popraw w edytorze" przy pustym polu i „Zastąp mój sz
 przy pełnym. Napis mówi, co się stanie, zanim ktoś kliknie. „Odrzuć" chowa
 kartę. W trybie komentarza ani przycisku, ani karty nie ma w drzewie.
 
+**Szkic stoi w polu, odpowiedź na końcu rozmowy (@wydanie).** Zgłoszenie
+właściciela ze zrzutem: „za dużo odstępów w środkowej kolumnie, miejsce pracy
+jest ściśnięte". Zmierzone na zrzucie: rozmowa zajmowała 19% kolumny, puste
+pole 25%, a karta szkicu z tą samą odpowiedzią stała pod krawędzią, w drugim
+pasku przewijania. Przyczyną był kształt: oś i edytor dzieliły kolumnę
+sztywno, a szkic stał w edytorze dwa razy. Właściciel wybrał z kanwy dwie
+zmiany naraz („A + B"):
+
+- **Szkic w polu.** Świeży, nieoceniony szkic stoi w PUSTYM polu jako
+  podpowiedź. Wartość pola zostaje pusta, więc wysyłka nie ma czego wysłać,
+  dopóki agent nie przyjmie szkicu Tabem albo przyciskiem „Przyjmij szkic".
+  Pierwsza litera agenta zasłania podpowiedź. Karta zostaje wtedy z treścią
+  zwiniętą i przyciskiem „Zastąp mój szkic". Nieświeży szkic nie wchodzi do
+  pola nigdy, bo odpowiada na pytanie, którego już nie ma.
+- **Uwagi modelu przeżywają przyjęcie.** Lista „czego model nie znalazł
+  w faktach" stoi pod przyjętym tekstem, dopóki tekst jest w polu.
+- **Odpowiedź jako ostatnia wypowiedź.** Edytor stoi na końcu osi, w tym
+  samym przewijaniu co wątek, po naszej stronie. Pole rośnie z treścią od
+  120 px, zamiast stać na 200 px od pierwszego otwarcia. Siatka `max-h-[60vh]`
+  odeszła, bo edytor nie odejmuje już rozmowie ani piksela.
+- **Pasek działań pływa.** Wysyłka, „Wyślij i zakończ", zapis szkicu i spinacz
+  stoją w jednym rzędzie przy dolnej krawędzi osi. Przy przewiniętym wątku
+  zostają pod ręką. W trybie notatki pasek niesie „Dodaj notatkę", a przycisku
+  wysyłki dalej nie ma w drzewie.
+
 **„Ułóż odpowiedź" stoi tylko wtedy, gdy szkicu brak albo jest stary.** Takt
 układa szkic sam, więc przy świeżej karcie przycisk kazałby zapłacić drugi raz.
 Wraca po odrzuceniu, przy dopisku klienta i po zmianie doboru, jako „Ułóż
@@ -2417,7 +2442,8 @@ wynikają trzy zmiany i jedna jawna cena.
 rozmowy i chował przyciski pod krawędzią. Powód zniknął w tym samym wydaniu —
 przyciski przeniesiono NAD treść — a ograniczenie zostało. Oś chroni
 `max-h-[60vh]` na edytorze, czyli siatka założona po to, żeby wewnętrzne nie
-były potrzebne.
+były potrzebne. Od @wydanie tej siatki nie ma: edytor stoi na końcu osi,
+w jednym przewijaniu z rozmową.
 
 **Bloki drugoplanowe są zwinięte.** Odczyt ze zdjęć i dopytanie zwijają się do
 jednej linii, która niesie tyle, żeby dało się rozstrzygnąć bez rozwijania:

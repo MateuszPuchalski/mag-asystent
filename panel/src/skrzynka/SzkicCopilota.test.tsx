@@ -60,17 +60,81 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.getByRole("button", { name: /Układam szkic z faktów/ })).toBeDisabled();
   });
 
-  it("propozycja NIE wchodzi do pola sama — stoi w karcie, jeden przycisk ją bierze", async () => {
+  /* ── SZKIC W POLU, NIE W KARCIE POD NIM (@wydanie) ───────────────────────
+     Decyzja właściciela z kanwy („A + B"). Treść modelu stoi w pustym polu
+     jako podpowiedź, ale WARTOŚĆ pola zostaje pusta: wysyłka nie ma czego
+     wysłać, dopóki agent nie przyjmie. To jest ta sama granica, co od 0.231.0,
+     tylko narysowana w innym miejscu. */
+  it("propozycja NIE wchodzi do pola sama — stoi w nim jako podpowiedź, Tab ją przyjmuje", async () => {
     const c = copilot({ szkic: szkic() });
     edytor(c);
-    expect(screen.getByLabelText("Szkic odpowiedzi")).toHaveValue("");
-    const karta = screen.getByRole("region", { name: "Szkic Copilota" });
-    expect(karta).toHaveTextContent("LC170430140-0001");
-    await userEvent.click(screen.getByRole("button", { name: "Popraw w edytorze" }));
+    const pole = screen.getByLabelText("Szkic odpowiedzi");
+    expect(pole).toHaveValue("");
+    expect(screen.getByTestId("szkic-w-polu")).toHaveTextContent("LC170430140-0001");
+    /* Podpowiedź opisuje pole dla czytnika ekranu, a placeholder nie nachodzi na nią. */
+    expect(pole).toHaveAccessibleDescription(/LC170430140-0001/);
+    expect(pole).not.toHaveAttribute("placeholder");
+    /* Wysyłka martwa: wartość jest pusta, choć tekst widać. */
+    expect(screen.getByRole("button", { name: /Wyślij do klienta/ })).toBeDisabled();
+
+    pole.focus();
+    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
+    expect(c.onPopraw).not.toHaveBeenCalled();
+    pole.focus();
+    await userEvent.keyboard("{Tab}");
     expect(c.onPopraw).toHaveBeenCalledTimes(1);
+    await userEvent.click(screen.getByRole("button", { name: /Przyjmij szkic/ }));
+    expect(c.onPopraw).toHaveBeenCalledTimes(2);
     /* Dwóch dróg do jednego pola już nie ma (22 września 2026). */
     expect(screen.queryByRole("button", { name: /Wstaw do szkicu/ })).toBeNull();
     expect(screen.queryByRole("button", { name: /Zastąp/ })).toBeNull();
+    /* Treść stoi raz: w polu, nie drugi raz w karcie pod nim. */
+    expect(screen.queryByTestId("szkic-copilota-tresc")).toBeNull();
+  });
+
+  it("Tab bez podpowiedzi przenosi fokus, a nie przyjmuje czegokolwiek", async () => {
+    const c = copilot({ szkic: szkic(), maSzkicAgenta: true });
+    edytor(c, { szkic: "Dzień dobry," });
+    screen.getByLabelText("Szkic odpowiedzi").focus();
+    await userEvent.keyboard("{Tab}");
+    expect(c.onPopraw).not.toHaveBeenCalled();
+    expect(screen.getByLabelText("Szkic odpowiedzi")).not.toHaveFocus();
+  });
+
+  it("nieświeży szkic, cudza rozmowa i tryb notatki nie stawiają podpowiedzi w polu", async () => {
+    const stary = edytor(copilot({ szkic: szkic(), nieswiezy: true }));
+    expect(screen.queryByTestId("szkic-w-polu")).toBeNull();
+    /* Stary zostaje w karcie, z treścią i nazwaną nieświeżością. */
+    expect(screen.getByTestId("szkic-copilota-tresc")).toHaveTextContent("LC170430140-0001");
+    stary.unmount();
+
+    const cudzy = edytor(copilot({ szkic: szkic(), wylaczony: true }), { cudza: true, wlasciciel: "M. Wójcik" });
+    expect(screen.queryByTestId("szkic-w-polu")).toBeNull();
+    cudzy.unmount();
+
+    edytor(copilot({ szkic: szkic() }));
+    await userEvent.click(screen.getByRole("button", { name: /Notatka wewnętrzna/ }));
+    expect(screen.queryByTestId("szkic-w-polu")).toBeNull();
+  });
+
+  it("pierwsza litera agenta zasłania podpowiedź, a karta zwija treść", () => {
+    const c = copilot({ szkic: szkic() });
+    const { rerender } = edytor(c);
+    const pole = screen.getByLabelText("Szkic odpowiedzi");
+    rerender(<Edytor {...props} szkic="D" copilot={{ ...c, maSzkicAgenta: true }} />);
+    expect(screen.queryByTestId("szkic-w-polu")).toBeNull();
+    /* TO SAMO pole — gdyby podpowiedź zmieniała mu rodzica, kursor by przepadł. */
+    expect(screen.getByLabelText("Szkic odpowiedzi")).toBe(pole);
+    expect(screen.getByRole("button", { name: "Zastąp mój szkic" })).toBeInTheDocument();
+    expect(screen.getByTestId("szkic-copilota-tresc").closest("details")).not.toHaveAttribute("open");
+  });
+
+  it("uwagi modelu zostają przy przyjętym tekście i znikają z nim", () => {
+    const z = szkic({ ocena: "wstawiony", zastrzezenia: ["brak dowodu na dopasowanie do LS 46-450"] });
+    const { rerender } = edytor(copilot({ szkic: z }), { szkic: "Dzień dobry, pasuje." });
+    expect(screen.getByLabelText("Czego model nie znalazł w faktach")).toHaveTextContent("LS 46-450");
+    rerender(<Edytor {...props} szkic="" copilot={copilot({ szkic: z })} />);
+    expect(screen.queryByLabelText("Czego model nie znalazł w faktach")).toBeNull();
   });
 
   /* ── „Ułóż" tylko przy braku albo starości szkicu (22 września 2026) ─────
@@ -99,8 +163,9 @@ describe("Szkic Copilota w edytorze", () => {
      kazało czytać pięćset znaków przez szparę, w trzecim zagnieżdżonym pasku
      przewijania, a oś chroni `max-h-[60vh]` na edytorze — siatka założona
      dokładnie po to, żeby wewnętrzne nie były potrzebne. */
+  /* Od @wydanie karta z treścią zostaje tylko POZA polem — tu nieświeża. */
   it("przyciski stoją PRZED treścią, a treść PŁYNIE bez własnego przewijania", () => {
-    edytor(copilot({ szkic: szkic({ tresc: "linia\n".repeat(60) }) }));
+    edytor(copilot({ szkic: szkic({ tresc: "linia\n".repeat(60) }), nieswiezy: true }));
     const wstaw = screen.getByRole("button", { name: "Popraw w edytorze" });
     const tresc = screen.getByTestId("szkic-copilota-tresc");
     expect(wstaw.compareDocumentPosition(tresc) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
