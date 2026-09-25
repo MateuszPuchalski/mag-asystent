@@ -108,7 +108,9 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
             </div>
           </div>
           {karta.data && <>
-            <CenyKartoteki ceny={karta.data.ceny ?? []} ramka={false} />
+            <CenyKartoteki ceny={karta.data.ceny ?? []} ramka={false}
+              oferta={oferta.pobrana?.cenaGrosze != null
+                ? { grosze: oferta.pobrana.cenaGrosze, waluta: oferta.pobrana.waluta ?? "PLN" } : null} />
             {/* WYŁĄCZNIE ODCZYT — sekcja jest „Źródło: Subiekt GT" (§4.3 nie
                 miesza źródeł), a wiedza stoi tu jako osobna plakietka.
                 Dopisuje się w Doborze albo w Wiedza → Sprawdź kartotekę. */}
@@ -339,12 +341,66 @@ function brakBrutto(c: CenaPoziomu): boolean {
   return c.bruttoGrosze === null || c.bruttoGrosze === 0;
 }
 
-export function CenyKartoteki({ ceny, ramka = true }: {
+/* ── CENY NA JEDNEJ OSI (@wydanie, D z kanwy „prawa kolumna") ────────────────
+   Nagranie właściciela: oferta sprzedawała nóż za 45,00 zł, a detaliczna
+   w kartotece to 29,06 zł — o 55% mniej. Tabela sześciu cen tego nie mówiła,
+   bo cena oferty stała trzy sekcje wyżej, a porównanie trzeba było zrobić
+   w głowie. Położenie na wspólnej skali to zadanie, które oko rozwiązuje
+   najdokładniej (Cleveland i McGill, 1984), więc oferta staje na tej samej
+   osi co poziomy kartoteki.
+
+   Która cena jest nieaktualna, oś NIE rozstrzyga — mówi tylko, że się
+   rozjechały. Rozstrzyga człowiek w Allegro albo w Subiekcie. */
+
+/** Gdzie cena oferty stoi wobec poziomów brutto kartoteki; `null`, gdy nie ma czego porównać. */
+export function polozenieOferty(ceny: CenaPoziomu[], oferta: { grosze: number; waluta: string }):
+  { min: number; max: number; zdanie: string } | null {
+  const brutto = ceny.filter((c) => !brakBrutto(c) && c.waluta === oferta.waluta)
+    .map((c) => ({ grosze: c.bruttoGrosze as number, nazwa: c.nazwa || `poziom ${c.poziom}` }));
+  if (brutto.length === 0) return null;
+  const najnizszy = brutto.reduce((a, b) => (b.grosze < a.grosze ? b : a));
+  const najwyzszy = brutto.reduce((a, b) => (b.grosze > a.grosze ? b : a));
+  const o = zlote(oferta.grosze, oferta.waluta);
+  const zdanie = oferta.grosze > najwyzszy.grosze
+    ? `Oferta ${o} stoi ${Math.round((oferta.grosze / najwyzszy.grosze - 1) * 100)}% nad najwyższym poziomem (${najwyzszy.nazwa} ${zlote(najwyzszy.grosze, oferta.waluta)}).`
+    : oferta.grosze < najnizszy.grosze
+      ? `Oferta ${o} stoi ${Math.round((1 - oferta.grosze / najnizszy.grosze) * 100)}% pod najniższym poziomem (${najnizszy.nazwa} ${zlote(najnizszy.grosze, oferta.waluta)}).`
+      : `Oferta ${o} mieści się między poziomami kartoteki.`;
+  return { min: Math.min(najnizszy.grosze, oferta.grosze), max: Math.max(najwyzszy.grosze, oferta.grosze), zdanie };
+}
+
+function OsCen({ ceny, oferta }: { ceny: CenaPoziomu[]; oferta: { grosze: number; waluta: string } }) {
+  const p = polozenieOferty(ceny, oferta);
+  if (!p) return null;
+  const rozpietosc = Math.max(1, p.max - p.min);
+  /* Margines 4% z obu stron, żeby skrajna kropka nie wisiała na krawędzi. */
+  const x = (g: number) => `${4 + ((g - p.min) / rozpietosc) * 92}%`;
+  const poziomy = grupujCeny(ceny).filter(({ cena: c }) => !brakBrutto(c) && c.waluta === oferta.waluta);
+  return <figure className="mt-2" aria-label="Cena oferty na tle poziomów kartoteki">
+    <div className="relative h-6" aria-hidden>
+      <div className="absolute inset-x-0 top-1/2 h-px bg-slate-300" />
+      {poziomy.map(({ cena: c, nazwy }) => <span key={c.poziom} title={`${nazwy.join(", ")} · ${zlote(c.bruttoGrosze, c.waluta)}`}
+        className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-500"
+        style={{ left: x(c.bruttoGrosze as number) }} />)}
+      <span title={`oferta · ${zlote(oferta.grosze, oferta.waluta)}`}
+        className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-amber-500"
+        style={{ left: x(oferta.grosze) }} />
+    </div>
+    <div className="flex justify-between text-podpis tabular-nums text-slate-600" aria-hidden>
+      <span>{zlote(p.min, oferta.waluta)}</span><span>{zlote(p.max, oferta.waluta)}</span>
+    </div>
+    <figcaption className="mt-1 text-xs text-slate-700">{p.zdanie}</figcaption>
+  </figure>;
+}
+
+export function CenyKartoteki({ ceny, ramka = true, oferta = null }: {
   ceny: CenaPoziomu[];
   /* `false` w skrzynce (23 września 2026): tam ceny stoją W sekcji „Subiekt
      GT", więc ramka i drugi podpis źródła byłyby pudełkiem w pudełku.
      Reklamacje stawiają blok samodzielnie i ramkę zostawiają. */
   ramka?: boolean;
+  /** Cena oferty rozmowy — wtedy pod listą staje oś (@wydanie). Reklamacje jej nie podają. */
+  oferta?: { grosze: number; waluta: string } | null;
 }) {
   if (ceny.length === 0) return null;
   return <div className={ramka ? "rounded-lg border border-slate-200 p-3" : "border-t border-slate-200 pt-3"}>
@@ -386,6 +442,7 @@ export function CenyKartoteki({ ceny, ramka = true }: {
             </>}
       </li>)}
     </ul>
+    {oferta && <OsCen ceny={ceny} oferta={oferta} />}
   </div>;
 }
 

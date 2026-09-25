@@ -203,7 +203,7 @@ describe("Szkic Copilota w edytorze", () => {
        nie porządek. Tekst rozbity na wiele elementów, stąd `textContent`. */
     expect(screen.getByTestId("luki-kartoteki").textContent)
       .toMatch(/Do doboru wpisano:\s*Marka, Model, Silnik/);
-    expect(screen.getByTestId("luki-kartoteki").textContent).toMatch(/popraw w zakładce Dobór/i);
+    expect(screen.getByTestId("luki-kartoteki").textContent).toMatch(/popraw w Doborze po prawej/i);
     expect(screen.queryByRole("button", { name: /Wpisz do danych/ })).toBeNull();
     expect(screen.getByText(/dane doboru zmieniły się od szkicu/)).toBeInTheDocument();
   });

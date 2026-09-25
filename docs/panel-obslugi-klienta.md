@@ -676,6 +676,32 @@ przewijają nawzajem. Trzyma się on, dopóki obie karty są wysokie. „Dobór"
 zostaje osobno, bo to nie karta faktów, tylko robota z własnymi krokami
 i przyciskami.
 
+**Od @wydanie zakładek nie ma: kolumna jest ciemnym kokpitem.** Nagranie
+właściciela pokazało cztery zakładki i trzy kłopoty. Nazwa towaru stała cztery
+razy, a SKU sześć. Zwrot do decyzji, jedyna rzecz z terminem, leżał w połowie
+przewijania. „Klient 2" i „Wiedza 0" niosły po zdaniu na całą kolumnę.
+Właściciel wybrał z kanwy trzy zmiany naraz („E + A + D"):
+
+- **A — ciemny kokpit** (zasada Airbusa: w normie lampki gasną). Na górze
+  „Wymaga Ciebie": zwrot w toku, otwarta reklamacja albo dyskusja, paczka
+  z awizo, problemem lub w drodze powrotnej, pozycja zamówienia do wskazania
+  i dobór w toku. Niżej „W normie": jedna linia na temat ze streszczeniem,
+  rozwijana kliknięciem. Reguły stoją w `skrzynka/kokpit.ts`, każda z testem,
+  który sprawdza, że zapala się, gdy warunek pęka.
+- **D — towar raz.** Nazwę, SKU i stan mówi pasmo nad kolumną. Streszczenie
+  wiersza dokłada tylko to, co jego źródło ma inne. Cena oferty staje na
+  jednej osi z poziomami cen kartoteki i zdaniem, o ile od nich odbiega.
+- **E — bramka doboru.** Gdy oferta rozmowy jest pozycją jej zamówienia,
+  towar jest znany i dobór automatu chowa się za zdaniem „dobór zbędny".
+  Na nagraniu klient zwracał nóż 14-25001, a dobór pokazał świecę, sprężynę
+  i przewody paliwa — bez kupionego towaru. „Szukaj innego towaru mimo to"
+  odsłania go jednym kliknięciem. Dobór uruchomiony przez człowieka bramka
+  zostawia na wierzchu.
+
+Decyzja z 0.198.0 zostaje: oferta i kartoteka to jeden wiersz, otwarty bez
+klikania. Zwija się wyłącznie przy zwrocie albo sprawie w toku, bo wtedy
+tematem jest decyzja z terminem, a karta towaru jest tłem.
+
 **„Klient" i „Wiedza" WRACAJĄ z makiety (0.216.0)** — decyzja właściciela,
 która unieważnia oba powody odmowy z 0.198.0, a nie idzie wbrew nim.
 
@@ -4055,7 +4081,7 @@ Wszystkie rozmowy kupującego pokazuje historia klienta.
 **W drugą stronę: zwrot przy rozmowie (0.221.0).** Klient często pyta pod
 zamówieniem o zwrot, którego dokonał — „czy paczka doszła", „kiedy pieniądze".
 Do 0.220.0 agent szedł na ekran Zwroty i szukał zwrotu ręcznie. Teraz zwroty
-tego zamówienia stoją w kolumnie „Oferta i towar", pod zamówieniem, tym samym
+tego zamówienia stoją w kolumnie kontekstu — od @wydanie w toku na górze, w „Wymaga Ciebie" — tym samym
 mostkiem i tym samym składem wiersza, co w kolejce zwrotów: kubełek, sygnały,
 termin, paczka, pozycje, decyzja i kwota. Praca nad zwrotem zostaje na ekranie
 Zwroty; odnośnik prowadzi prosto do tego zwrotu. Po loginie nie dobieramy —
@@ -6085,7 +6111,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Kolejność listy rozmów — przełącznik „od najnowszych" | **działa** od 0.215.0 | `skrzynka/Kolejka.tsx`, `odNajnowszych`; domyślnie PILNE i najdłużej czekające |
 | Nazwa towaru przy ofercie w rozmowie | **z oferty** od 0.178.0 | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
 | Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie; od 0.219.0 jedno trafienie po SKU bez „Zatwierdź" |
-| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`; od 0.198.0 zakładki „Oferta i towar" oraz „Dobór" |
+| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`; od @wydanie bez zakładek: „Wymaga Ciebie" i wiersze „W normie" (`skrzynka/kokpit.ts`) |
 | Opis kartoteki przy rozmowie | **działa** od 0.198.0 | `skrzynka/TowarRozmowy.tsx`, pole `desc` z `/api/products/:twId` |
 | Wiersz kolejki wg §10.2 | **częściowo** od 0.181.0 | priorytet, czas oczekiwania, dopiski, zadanie, od E1 status doboru; bez terminu |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
