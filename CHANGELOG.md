@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.508.1 — 25 września 2026
+
+**„Nie wiem” automatu wiedzy zostaje w księdze.** Gdy model językowy nie był
+pewny marki, zapis do `copilot_wywolanie` łamał warunek kolumny `wynik`.
+Przebieg liczył wtedy wiersz jako błąd, a zapłacone wywołanie znikało z księgi.
+Teraz taka odpowiedź staje jako `wynik='ok'`. Wiersz niesie też prawdziwą nazwę
+modelu zamiast pustej, więc koszt składania kluczy wchodzi do pomiaru Copilota.
+
 ## 0.508.0 — 25 września 2026
 
 **Pasowanie z sieci na żądanie.** Automatu z 0.507.0 nie trzeba już czekać
