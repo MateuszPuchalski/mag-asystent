@@ -338,6 +338,33 @@ describe("Ustawienia w panelu", () => {
     expect(within(k).getByRole("button", { name: "Zaktualizuj do 0.494.0" })).toBeDisabled();
   });
 
+  /* Pasek postępu (@wydanie): kroki z instalatora, bez procentów z zegara;
+     w trakcie nie ma formularza, a samo patrzenie nadal niczego nie zapisuje. */
+  it("aktualizacja w toku: pasek z krokiem instalatora zamiast formularza", async () => {
+    AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, ostatnia: {
+      etap: "trwa", wersja: "0.503.0", kto: "Administrator", od: new Date(Date.now() - 75_000).toISOString(),
+      postep: { krok: 3, z: 4, nazwa: "Zamiana wersji, serwer na chwilę wyłączony", at: new Date().toISOString() } } };
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    const pasek = await within(k).findByRole("progressbar", { name: "Postęp aktualizacji" });
+    expect(pasek).toHaveAttribute("aria-valuenow", "3");
+    expect(pasek).toHaveAttribute("aria-valuemax", "4");
+    expect(within(k).getByText(/Krok 3 z 4: Zamiana wersji, serwer na chwilę wyłączony/)).toBeInTheDocument();
+    expect(within(k).getByText(/· 1:1\d/)).toBeInTheDocument();
+    expect(within(k).queryByLabelText("Twoje hasło")).toBeNull();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("aktualizacja w toku bez kroku od instalatora: przygotowanie, pasek pusty", async () => {
+    AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, ostatnia: {
+      etap: "trwa", wersja: "0.503.0", od: new Date().toISOString() } };
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    const pasek = await within(k).findByRole("progressbar", { name: "Postęp aktualizacji" });
+    expect(pasek).toHaveAttribute("aria-valuenow", "0");
+    expect(within(k).getByText(/Przygotowanie aktualizacji/)).toBeInTheDocument();
+  });
+
   it("najnowsza wersja: bez formularza", async () => {
     AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, wydania: [], zmiany: [] };
     pokaz();

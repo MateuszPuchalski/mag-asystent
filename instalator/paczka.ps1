@@ -416,6 +416,32 @@ function Wait-WertisKatalogWolny {
     Start-Sleep -Seconds 1
 }
 
+function Set-WertisPostep {
+    <#
+        .SYNOPSIS
+        Zapisuje bieżący krok aktualizacji do pliku z -PlikPostepu (@wydanie).
+        .DESCRIPTION
+        Karta w panelu rysuje z niego pasek postępu. Do tej pory wiedziała
+        tylko „trwa", a dziennik instalatora trafia do katalogu danych dopiero
+        na końcu. Kroków jest tyle, ile ich naprawdę jest, bez udawanych
+        procentów: pobieranie zależy od łącza, a nie od czegokolwiek, co tu
+        da się zmierzyć.
+
+        Zapis przez plik tymczasowy, bo serwer czyta ten plik w trakcie. Błąd
+        zapisu jest cichy: pasek to wygoda, a aktualizacja nie może paść przez
+        to, że katalog danych zmienia właśnie miejsce (pierwsza zamiana).
+    #>
+    param([Parameter(Mandatory)][int]$Krok, [Parameter(Mandatory)][string]$Nazwa, [int]$Z = 4)
+    $plik = $script:WertisPlikPostepu
+    if (-not $plik -or $script:WertisDryRun) { return }
+    try {
+        $json = [ordered]@{ krok = $Krok; z = $Z; nazwa = $Nazwa
+                            at = (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") } | ConvertTo-Json -Compress
+        Set-Content -LiteralPath "$plik.tmp" -Value $json -Encoding UTF8
+        Move-Item -LiteralPath "$plik.tmp" -Destination $plik -Force
+    } catch { }
+}
+
 function Update-WertisZPaczki {
     <#
         .SYNOPSIS
@@ -463,6 +489,7 @@ function Update-WertisZPaczki {
         Test-DryRun "Zatrzymałbym usługi, zamienił $Katalog z $nowy (stara wersja -> $poprzedni) i uruchomił je z powrotem." | Out-Null
         return 0
     }
+    Set-WertisPostep -Krok 1 -Nazwa "Pobieranie paczki $wersja"
     if (-not $zip) {
         $zip = Get-WertisPaczka -Repo $repoGh -Wersja $wersja -Cel $pobrane
         if (-not $zip) { return 1 }
@@ -470,6 +497,7 @@ function Update-WertisZPaczki {
 
     # ── 2. Rozpakowanie OBOK — stara wersja dalej pracuje ──────────────────
     Write-Krok "Rozpakowanie obok działającej wersji"
+    Set-WertisPostep -Krok 2 -Nazwa "Rozpakowanie obok działającej wersji"
     try {
         Expand-WertisPaczka -Zip $zip -Cel $nowy -Wersja $wersja
     } catch {
@@ -481,6 +509,7 @@ function Update-WertisZPaczki {
 
     # ── 3. Zamiana: jedyne sekundy bez usług ───────────────────────────────
     Write-Krok "Zamiana wersji"
+    Set-WertisPostep -Krok 3 -Nazwa "Zamiana wersji, serwer na chwilę wyłączony"
     # Od tej chwili „usługi" to nasze plus każda działająca z programem
     # w katalogu (Get-WertisUslugiDoZamiany) — ten sam zestaw wraca po
     # zamianie, po porażce i po wycofaniu.
@@ -512,6 +541,7 @@ function Update-WertisZPaczki {
 
     # ── 4. Zdrowie albo wycofanie ──────────────────────────────────────────
     Write-Krok "Sprawdzenie nowej wersji"
+    Set-WertisPostep -Krok 4 -Nazwa "Uruchomienie i sprawdzenie wersji $wersja"
     $health = Test-WertisHealth -Port $Port
     if ($health -and [string]$health.wersja -eq $wersja) {
         Write-Ok "Wersja $wersja pracuje."
@@ -520,6 +550,7 @@ function Update-WertisZPaczki {
     }
 
     Write-Blad "Wersja $wersja nie odpowiedziała poprawnie — wycofuję na $obecna."
+    Set-WertisPostep -Krok 4 -Nazwa "Wycofanie na wersję $obecna"
     Stop-WertisUslugi -Uslugi $Uslugi
     # Wycofanie zmienia nazwę tego samego katalogu — ta sama pułapka co wyżej.
     Wait-WertisKatalogWolny -Katalog $Katalog
