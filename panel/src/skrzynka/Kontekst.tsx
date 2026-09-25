@@ -13,6 +13,7 @@ import { Dobor } from "./Dobor";
 import { Klient } from "./Klient";
 import { Wiedza } from "./Wiedza";
 import { PasmoOdpowiedzi } from "./PasmoOdpowiedzi";
+import { Soczewka } from "./Soczewki";
 import { useHistoriaKlienta, useWiedzaDoboru } from "../api/rozmowy";
 import type { Towar } from "../wyszukiwarka";
 import { NAZWA_DOBORU } from "./statusy";
@@ -158,6 +159,10 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
     {/* JEDEN scroller na kolumnę, jak przy zwrotach: dwa zagnieżdżone dają
         pasek w pasku, a treść bez `min-h-0` rozpycha kartę poza okno. */}
     <div className="min-h-0 flex-1 overflow-y-auto">
+      {/* SOCZEWKA NAD WSZYSTKIM (@wydanie): odpowiedź na pytanie klienta stoi
+          przed tym, co ma termin, bo po nią agent otwiera rozmowę. Niczego nie
+          chowa — „Wymaga Ciebie" i wiersze stoją pod nią jak bez niej. */}
+      <Soczewka dane={dane} onWstawDoSzkicu={onWstawDoSzkicu} />
       {ileSwieci > 0 && <section aria-label="Wymaga Ciebie" className="space-y-2 pb-3">
         <h3 className="px-4 pt-3 text-podpis font-bold uppercase tracking-wide text-amber-900">
           Wymaga Ciebie · {ileSwieci}</h3>

@@ -697,6 +697,34 @@ Właściciel wybrał z kanwy trzy zmiany naraz („E + A + D"):
   i przewody paliwa — bez kupionego towaru. „Szukaj innego towaru mimo to"
   odsłania go jednym kliknięciem. Dobór uruchomiony przez człowieka bramka
   zostawia na wierzchu.
+- **Bez „Szukamy" przy znanym towarze (@wydanie).** Tę samą regułę stosuje
+  serwer (`services/towar-znany.ts`). Automat szkicu dalej wpisuje dane
+  doboru, ale przy znanym towarze nie podnosi statusu do `searching`. Nagłówek
+  i plakietka kolejki nie mówią więc „Szukamy" przy zwrocie kupionego noża.
+  Rozmowy oznaczone tak przed tym wydaniem porządkuje start serwera. Cofa
+  wyłącznie start automatu, z kreską na osi i wpisem w dzienniku. Decyzji
+  człowieka i doboru z wybranym kandydatem nie dotyka.
+
+**Soczewki według rodzaju pytania (@wydanie).** Właściciel przysłał listę
+prawdziwych pytań klientów i pomysł: prawa kolumna ma pokazywać to, czego
+wymaga KATEGORIA pytania. Soczewka to blok na samej górze kolumny, nad
+„Wymaga Ciebie". Trzy pierwsze (`skrzynka/Soczewki.tsx`):
+
+- **Anulowanie** — zakupy tego klienta obok siebie, statusy słowem ze schematu
+  `CheckoutFormStatus`. Podwójny zakup tych samych pozycji w 72 godzinach jest
+  nazwany wprost, a paczka zamówienia rozmowy stoi jako fakt, nie wyrok.
+- **Inny towar i brak w paczce** — co było w zamówieniu, z półką każdej pozycji.
+  Zdanie „prosimy o zdjęcie" trafia do szkicu wyłącznie kliknięciem.
+- **Faktura** — czy kupujący zaznaczył fakturę przy zakupie i jakie dokumenty
+  stoją w Subiekcie POD NUMEREM ZAMÓWIENIA: faktura, sam paragon albo nic.
+  Trasa `GET /api/obsluga/rozmowy/:id/dokumenty-sprzedazy` zna tylko pewne
+  dopasowanie, bo agent powie klientowi numer dokumentu.
+
+Ryzykiem jest pomyłka klasyfikatora, więc reguły są trzy, każda z testem
+w `soczewki-reguly.ts`. Soczewka dokłada blok i niczego nie chowa. Mówi, czy
+kategoria jest od Copilota, czy od zespołu. Przy kategorii awaryjnej albo
+nieudanym rozpoznaniu nie staje wcale. Kategoria człowieka wygrywa i nie
+wpuszcza dodatkowych kategorii modelu.
 
 Decyzja z 0.198.0 zostaje: oferta i kartoteka to jeden wiersz, otwarty bez
 klikania. Zwija się wyłącznie przy zwrocie albo sprawie w toku, bo wtedy
@@ -1471,6 +1499,17 @@ zmiany naraz („A + B"):
   Pierwsza litera agenta zasłania podpowiedź. Karta zostaje wtedy z treścią
   zwiniętą i przyciskiem „Zastąp mój szkic". Nieświeży szkic nie wchodzi do
   pola nigdy, bo odpowiada na pytanie, którego już nie ma.
+- **Od @wydanie szkic stoi w polu jako tekst, nie podpowiedź.** Nagranie
+  właściciela: „edycja powinna być w tym samym oknie, z opcją wyczyszczenia
+  wszystkiego". Pierwsza litera zasłaniała podpowiedź i otwierała kartę pod
+  polem, a przyjęcia Tabem nikt się nie domyślał. Ekran wstawia teraz świeży
+  szkic do PUSTEGO pola własnej rozmowy jako zwykły tekst do poprawiania.
+  Reguła z 0.231.0 („propozycja nie wchodzi do pola sama") odchodzi decyzją
+  właściciela, a jej sens zostaje w dwóch miejscach. Do klienta nic nie
+  wychodzi bez „Wyślij". Wstawienie jest stanem ekranu, nie zapisem, więc
+  otwarcie rozmowy dalej niczego nie mutuje. Zapisany szkic zespołu wygrywa
+  zawsze. „Wyczyść wszystko" opróżnia pole z możliwością cofnięcia, a karta
+  szkicu stoi wtedy zwinięta. „Odrzuć" zdejmuje z pola tylko tekst nietknięty.
 - **Uwagi modelu przeżywają przyjęcie.** Lista „czego model nie znalazł
   w faktach" stoi pod przyjętym tekstem, dopóki tekst jest w polu.
 - **Odpowiedź jako ostatnia wypowiedź.** Edytor stoi na końcu osi, w tym
@@ -2528,7 +2567,8 @@ a co czeka bez rozpoznanej marki.
 
 **Wpis maszyny jest odróżnialny** wszędzie tam, gdzie powstaje:
 `dobor_rozmowy.updated_by='automat (szkic)'` i `zastosowanie.rozstrzygnal=
-'automat (oferta)'`, oba przy pustym koncie. Agent poprawia takie pole tam,
+'automat (oferta)'`, oba przy pustym koncie. Od @wydanie automat przy towarze znanym
+z zamówienia wpisuje dane, ale statusu doboru nie podnosi. Agent poprawia takie pole tam,
 gdzie ono stoi — w zakładce Dobór albo w Wiedzy.
 
 **Dopytanie Copilota (0.332.0).** Właściciel: „dodaj możliwość kontynuowania

@@ -5,7 +5,7 @@ import type {
   DaneDoboru, Dobor, DrogaDoboru, KandydaciDoboru, KartaTowaru, OsRozmowy, PokrycieSygnatur, PokrycieWiedzy,
   SkutecznoscDoboru,
   PowodNegatywny,
-  HistoriaKlienta, MiesiacEskalacji, MojaSprawa,
+  DokumentySprzedazy, HistoriaKlienta, MiesiacEskalacji, MojaSprawa,
   Rozmowa, StanPrzesylki, StanSkrzynki, StatusDoboru, StatusRozmowy, WiedzaDoboru, WpisWzmianki,
   WpisAutomatu,
   WynikWysylki, Zadanie, Zastosowanie, Zdrowie,
@@ -32,6 +32,7 @@ export const klucze = {
   kandydaci: (id: number) => ["kandydaci", id] as const,
   wiedzaDoboru: (id: number) => ["wiedzaDoboru", id] as const,
   historiaKlienta: (id: number) => ["historiaKlienta", id] as const,
+  dokumentySprzedazy: (id: number) => ["dokumentySprzedazy", id] as const,
 };
 
 export function useJa() {
@@ -729,6 +730,19 @@ export function useHistoriaKlienta(id: number | null) {
     queryKey: klucze.historiaKlienta(id ?? 0),
     queryFn: () => api<HistoriaKlienta>(`/api/obsluga/rozmowy/${id}/klient`),
     enabled: id !== null,
+  });
+}
+
+/**
+ * Faktura i paragon zamówienia rozmowy (@wydanie) — tylko dokumenty z jego
+ * numerem. `wlaczone`, bo woła to wyłącznie soczewka „Faktura": pytanie
+ * o dokumenty przy każdej rozmowie byłoby pracą, której nikt nie ogląda.
+ */
+export function useDokumentySprzedazy(id: number | null, wlaczone: boolean) {
+  return useQuery({
+    queryKey: klucze.dokumentySprzedazy(id ?? 0),
+    queryFn: () => api<DokumentySprzedazy>(`/api/obsluga/rozmowy/${id}/dokumenty-sprzedazy`),
+    enabled: id !== null && wlaczone,
   });
 }
 

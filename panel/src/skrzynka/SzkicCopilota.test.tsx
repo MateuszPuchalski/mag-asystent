@@ -60,73 +60,91 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.getByRole("button", { name: /Układam szkic z faktów/ })).toBeDisabled();
   });
 
-  /* ── SZKIC W POLU, NIE W KARCIE POD NIM (0.495.0) ───────────────────────
-     Decyzja właściciela z kanwy („A + B"). Treść modelu stoi w pustym polu
-     jako podpowiedź, ale WARTOŚĆ pola zostaje pusta: wysyłka nie ma czego
-     wysłać, dopóki agent nie przyjmie. To jest ta sama granica, co od 0.231.0,
-     tylko narysowana w innym miejscu. */
-  it("propozycja NIE wchodzi do pola sama — stoi w nim jako podpowiedź, Tab ją przyjmuje", async () => {
-    const c = copilot({ szkic: szkic() });
-    edytor(c);
-    const pole = screen.getByLabelText("Szkic odpowiedzi");
-    expect(pole).toHaveValue("");
-    expect(screen.getByTestId("szkic-w-polu")).toHaveTextContent("LC170430140-0001");
-    /* Podpowiedź opisuje pole dla czytnika ekranu, a placeholder nie nachodzi na nią. */
-    expect(pole).toHaveAccessibleDescription(/LC170430140-0001/);
-    expect(pole).not.toHaveAttribute("placeholder");
-    /* Wysyłka martwa: wartość jest pusta, choć tekst widać. */
-    expect(screen.getByRole("button", { name: /Wyślij do klienta/ })).toBeDisabled();
-
-    pole.focus();
-    await userEvent.keyboard("{Shift>}{Tab}{/Shift}");
-    expect(c.onPopraw).not.toHaveBeenCalled();
-    pole.focus();
-    await userEvent.keyboard("{Tab}");
-    expect(c.onPopraw).toHaveBeenCalledTimes(1);
-    await userEvent.click(screen.getByRole("button", { name: /Przyjmij szkic/ }));
-    expect(c.onPopraw).toHaveBeenCalledTimes(2);
-    /* Dwóch dróg do jednego pola już nie ma (22 września 2026). */
-    expect(screen.queryByRole("button", { name: /Wstaw do szkicu/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Zastąp/ })).toBeNull();
+  /* ── SZKIC W POLU JAKO ZWYKŁY TEKST (@wydanie) ────────────────────────────
+     Zgłoszenie właściciela z nagraniem: „edycja powinna być w tym samym oknie,
+     z opcją wyczyszczenia wszystkiego". Szkic stoi w polu jako tekst agenta —
+     bez podpowiedzi, bez Taba, bez karty „Zastąp mój szkic" pod spodem. */
+  it("szkic w polu to tekst do poprawiania — bez przycisku przyjęcia, z odrzuceniem", async () => {
+    const c = copilot({ szkic: szkic(), wPolu: true, maSzkicAgenta: true });
+    edytor(c, { szkic: szkic().tresc });
+    expect(screen.getByLabelText("Szkic odpowiedzi")).toHaveValue(szkic().tresc);
+    expect(screen.getByText(/Szkic Copilota w polu/)).toBeInTheDocument();
+    expect(screen.getByText(/poprawiaj wprost w polu/)).toBeInTheDocument();
+    for (const n of [/Przyjmij/, /Popraw w edytorze/, /Zastąp mój szkic/]) {
+      expect(screen.queryByRole("button", { name: n })).toBeNull();
+    }
     /* Treść stoi raz: w polu, nie drugi raz w karcie pod nim. */
     expect(screen.queryByTestId("szkic-copilota-tresc")).toBeNull();
+    /* Wysyłka zostaje decyzją człowieka — ale do wysłania jest już tekst. */
+    expect(screen.getByRole("button", { name: /Wyślij do klienta/ })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Odrzuć" }));
+    expect(c.onOdrzuc).toHaveBeenCalledTimes(1);
   });
 
-  it("Tab bez podpowiedzi przenosi fokus, a nie przyjmuje czegokolwiek", async () => {
-    const c = copilot({ szkic: szkic(), maSzkicAgenta: true });
-    edytor(c, { szkic: "Dzień dobry," });
+  it("Tab w polu przenosi fokus — nie przyjmuje niczego", async () => {
+    const c = copilot({ szkic: szkic(), wPolu: true, maSzkicAgenta: true });
+    edytor(c, { szkic: szkic().tresc });
     screen.getByLabelText("Szkic odpowiedzi").focus();
     await userEvent.keyboard("{Tab}");
     expect(c.onPopraw).not.toHaveBeenCalled();
     expect(screen.getByLabelText("Szkic odpowiedzi")).not.toHaveFocus();
   });
 
-  it("nieświeży szkic, cudza rozmowa i tryb notatki nie stawiają podpowiedzi w polu", async () => {
-    const stary = edytor(copilot({ szkic: szkic(), nieswiezy: true }));
-    expect(screen.queryByTestId("szkic-w-polu")).toBeNull();
-    /* Stary zostaje w karcie, z treścią i nazwaną nieświeżością. */
-    expect(screen.getByTestId("szkic-copilota-tresc")).toHaveTextContent("LC170430140-0001");
-    stary.unmount();
-
-    const cudzy = edytor(copilot({ szkic: szkic(), wylaczony: true }), { cudza: true, wlasciciel: "M. Wójcik" });
-    expect(screen.queryByTestId("szkic-w-polu")).toBeNull();
-    cudzy.unmount();
-
-    edytor(copilot({ szkic: szkic() }));
-    await userEvent.click(screen.getByRole("button", { name: /Notatka wewnętrzna/ }));
-    expect(screen.queryByTestId("szkic-w-polu")).toBeNull();
+  it("„Wyczyść wszystko” opróżnia pole, a „Cofnij wyczyszczenie” oddaje tekst", async () => {
+    function Pole() {
+      const [t, setT] = React.useState("Dzień dobry, sprawdzimy wymiar korka.");
+      return <Edytor {...props} szkic={t} onZmiana={setT} copilot={copilot()} />;
+    }
+    render(<Pole />);
+    await userEvent.click(screen.getByRole("button", { name: /Wyczyść wszystko/ }));
+    expect(screen.getByLabelText("Szkic odpowiedzi")).toHaveValue("");
+    expect(screen.queryByRole("button", { name: /Wyczyść wszystko/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: /Cofnij wyczyszczenie/ }));
+    expect(screen.getByLabelText("Szkic odpowiedzi")).toHaveValue("Dzień dobry, sprawdzimy wymiar korka.");
+    /* Nowe pisanie po wyczyszczeniu zamyka drogę powrotu — cofnięcie
+       nadpisałoby to, co agent właśnie napisał. */
+    await userEvent.click(screen.getByRole("button", { name: /Wyczyść wszystko/ }));
+    await userEvent.type(screen.getByLabelText("Szkic odpowiedzi"), "N");
+    expect(screen.queryByRole("button", { name: /Cofnij wyczyszczenie/ })).toBeNull();
   });
 
-  it("pierwsza litera agenta zasłania podpowiedź, a karta zwija treść", () => {
-    const c = copilot({ szkic: szkic() });
-    const { rerender } = edytor(c);
-    const pole = screen.getByLabelText("Szkic odpowiedzi");
-    rerender(<Edytor {...props} szkic="D" copilot={{ ...c, maSzkicAgenta: true }} />);
-    expect(screen.queryByTestId("szkic-w-polu")).toBeNull();
-    /* TO SAMO pole — gdyby podpowiedź zmieniała mu rodzica, kursor by przepadł. */
-    expect(screen.getByLabelText("Szkic odpowiedzi")).toBe(pole);
-    expect(screen.getByRole("button", { name: "Zastąp mój szkic" })).toBeInTheDocument();
+  it("po wyczyszczeniu szkicu Copilota jego karta stoi zwinięta, nie rozwinięta pod pustym polem", async () => {
+    function Pole() {
+      const [t, setT] = React.useState(szkic().tresc);
+      return <Edytor {...props} szkic={t} onZmiana={setT}
+        copilot={copilot({ szkic: szkic(), wPolu: t !== "", maSzkicAgenta: t !== "" })} />;
+    }
+    render(<Pole />);
+    await userEvent.click(screen.getByRole("button", { name: /Wyczyść wszystko/ }));
     expect(screen.getByTestId("szkic-copilota-tresc").closest("details")).not.toHaveAttribute("open");
+    expect(screen.getByRole("button", { name: "Popraw w edytorze" })).toBeInTheDocument();
+  });
+
+  it("w cudzej rozmowie nie ma czego czyścić", () => {
+    edytor(copilot(), { szkic: "cudzy tekst", cudza: true, wlasciciel: "M. Wójcik" });
+    expect(screen.queryByRole("button", { name: /Wyczyść wszystko/ })).toBeNull();
+  });
+
+  /* Kiedy szkic wchodzi do pola sam: tylko świeży, tylko do pustego pola,
+     tylko we własnej rozmowie. Zapisany szkic zespołu wygrywa zawsze. */
+  it("szkic wchodzi na start tylko świeży, do pustego pola i we własnej rozmowie", async () => {
+    const { szkicNaStart } = await import("./SzkicCopilota");
+    expect(szkicNaStart(copilot({ szkic: szkic() }), "")).toBe(szkic().tresc);
+    expect(szkicNaStart(copilot({ szkic: szkic() }), "Zapisany szkic kolegi")).toBeNull();
+    expect(szkicNaStart(copilot({ szkic: szkic(), nieswiezy: true }), "")).toBeNull();
+    expect(szkicNaStart(copilot({ szkic: szkic(), wylaczony: true }), "")).toBeNull();
+    expect(szkicNaStart(copilot({ szkic: szkic({ ocena: "odrzucony" }) }), "")).toBeNull();
+    expect(szkicNaStart(copilot({ szkic: szkic({ doborWersja: 1 }), doborWersja: 2 }), "")).toBeNull();
+    expect(szkicNaStart(copilot(), "")).toBeNull();
+  });
+
+  it("karta w polu zostaje po „Popraw w edytorze”, znika po odrzuceniu", () => {
+    const { unmount } = edytor(copilot({ szkic: szkic({ ocena: "wstawiony" }), wPolu: true, maSzkicAgenta: true }),
+      { szkic: szkic().tresc });
+    expect(screen.getByRole("region", { name: "Na czym stoi szkic Copilota" })).toBeInTheDocument();
+    unmount();
+    edytor(copilot({ szkic: szkic({ ocena: "odrzucony" }), wPolu: true, maSzkicAgenta: true }), { szkic: "x" });
+    expect(screen.queryByRole("region", { name: "Na czym stoi szkic Copilota" })).toBeNull();
   });
 
   it("uwagi modelu zostają przy przyjętym tekście i znikają z nim", () => {
@@ -300,6 +318,8 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
   it("licznik znaków siedzi w nagłówku, a nie w osobnym wierszu pod kartą", () => {
     edytor(copilot({ szkic: szkic({ tresc: "abcde" }) }));
     expect(screen.queryByText(/każde twierdzenie ma podpisane źródło/)).toBeNull();
-    expect(screen.getByText(/5 znaków/)).toBeVisible();
+    /* Drugi raz liczba stoi w podpisie zwiniętej treści (@wydanie) — pierwszy
+       jest nagłówkiem, o który ten test pyta. */
+    expect(screen.getAllByText(/5 znaków/)[0]).toBeVisible();
   });
 });

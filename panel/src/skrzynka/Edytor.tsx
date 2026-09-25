@@ -1,8 +1,8 @@
-import React, { useId, useState } from "react";
-import { Lock, MessageSquare, Send } from "lucide-react";
+import React, { useState } from "react";
+import { Eraser, Lock, MessageSquare, Send, Undo2 } from "lucide-react";
 import { Przycisk } from "../ui";
 import { PrzyciskZalacznika, ZalacznikiWysylki } from "./ZalacznikiWysylki";
-import { KartaSzkicu, PasekSzkicu, PrzyciskSzkicu, UwagiSzkicu, szkicDoPola,
+import { KartaSzkicu, PasekSzkicu, PrzyciskSzkicu, UwagiSzkicu,
   type PropsSzkicuCopilota } from "./SzkicCopilota";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 
@@ -79,20 +79,24 @@ export function Edytor({
   const [tryb, setTryb] = useState<"odpowiedz" | "komentarz">("odpowiedz");
   const wKomentarzu = tryb === "komentarz";
 
-  /* ── SZKIC W POLU JAKO PODPOWIEDŹ (0.495.0) ────────────────────────────
-     Treść modelu NIE wchodzi do wartości pola — reguła z 0.231.0 zostaje.
-     Stoi POD pustym polem jako warstwa, którą agent czyta tam, gdzie będzie
-     pisał, i przyjmuje Tabem. Pierwsza litera agenta ją zasłania. Wartość
-     pola zmienia się dopiero na jawny ruch, więc wysyłka nigdy nie wyśle
-     tekstu, którego agent nie przyjął.
-
-     Tylko przy pustym polu i swojej rozmowie. Przy tekście agenta podpowiedź
-     przykryłaby jego pracę; w cudzej rozmowie nie ma prawa przyjąć. */
-  const duch = !wKomentarzu && !cudza && szkic === "" && copilot !== undefined && szkicDoPola(copilot);
-  const idDucha = useId();
+  /* ── SZKIC W POLU: ZWYKŁY TEKST DO POPRAWIANIA (@wydanie) ─────────────────
+     Do @wydanie szkic stał w pustym polu jako szara podpowiedź przyjmowana
+     Tabem (0.495.0). Nagranie właściciela pokazało, że nikt się tego kroku
+     nie domyśla: pierwsza litera zasłaniała szkic, a pod polem wyskakiwała
+     karta. Szkic wstawia teraz do pola ekran, jako zwykły tekst — powód
+     i granice przy `szkicNaStart` w `SzkicCopilota.tsx`. Edytor wie tylko,
+     że pole trzyma szkic, i mówi to nad nim. */
+  const wPolu = !wKomentarzu && Boolean(copilot?.wPolu) && szkic !== "";
+  /* ── „WYCZYŚĆ WSZYSTKO" Z COFNIĘCIEM (@wydanie) ─────────────────────────
+     Druga połowa zgłoszenia: „z opcją wyczyszczenia wszystkiego". Kasowanie
+     pięciuset znaków zaznaczaniem to ruch na kilka sekund i łatwy do
+     pomylenia. Czyszczenie niczego nie zapisuje, więc do pomyłki potrzebne
+     jest cofnięcie — trzymane, dopóki agent nie zacznie pisać od nowa. */
+  const [wyczyszczone, setWyczyszczone] = useState<string | null>(null);
+  const wyczysc = () => { setWyczyszczone(szkic); onZmiana(""); };
   /* Uwagi modelu PRZEŻYWAJĄ przyjęcie — patrz `UwagiSzkicu`. Znikają razem
      z tekstem agenta i przy nieświeżym szkicu, bo wtedy mówią o innym tekście. */
-  const uwagiPoPrzyjeciu = !wKomentarzu && copilot?.szkic && szkic.trim() !== "" && !copilot.nieswiezy
+  const uwagiPoPrzyjeciu = !wKomentarzu && !wPolu && copilot?.szkic && szkic.trim() !== "" && !copilot.nieswiezy
     && (copilot.szkic.ocena === "wstawiony" || copilot.szkic.ocena === "zastapiony")
     ? copilot.szkic.zastrzezenia : [];
 
@@ -110,7 +114,7 @@ export function Edytor({
   return <>
   <article aria-label={wKomentarzu ? "Twoja notatka" : "Twoja odpowiedź"}
     className={`ml-auto w-full max-w-[75ch] rounded-lg border-2 border-dashed p-3 ${wKomentarzu
-      ? "border-amber-300 bg-amber-50" : duch ? "border-violet-300 bg-white" : "border-slate-300 bg-white"}`}>
+      ? "border-amber-300 bg-amber-50" : wPolu ? "border-violet-300 bg-white" : "border-slate-300 bg-white"}`}>
     {/* ── PRZEŁĄCZNIK JEST JEDNYM ELEMENTEM, NIE DWOMA (0.247.0) ──────────────
         Dwa luźne przyciski o tej samej wadze nie mówiły, że wybiera się JEDEN
         z dwóch — mówiły, że są dwie rzeczy do kliknięcia. Bieżnia z tłem
@@ -145,8 +149,15 @@ export function Edytor({
           zostało wycofane, bo z Copilotem WYŁĄCZONYM komponent renderował
           akapit, nie przycisk, i łamał rząd. Naprawiona jest przyczyna:
           `PrzyciskSzkicu` nie zajmuje już nigdy więcej niż jednej linii. */}
-      {!wKomentarzu && <div className="ml-auto flex min-w-0 items-center justify-end gap-1">
+      {!wKomentarzu && <div className="ml-auto flex min-w-0 items-center justify-end gap-2">
         {copilot && <PrzyciskSzkicu p={copilot} />}
+        {szkic !== "" && !cudza && <button type="button" onClick={wyczysc}
+          className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+          <Eraser size={13} />Wyczyść wszystko</button>}
+        {szkic === "" && wyczyszczone !== null && <button type="button"
+          onClick={() => { onZmiana(wyczyszczone); setWyczyszczone(null); }}
+          className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-sky-800 hover:bg-sky-50">
+          <Undo2 size={13} />Cofnij wyczyszczenie</button>}
       </div>}
     </div>
 
@@ -170,7 +181,7 @@ export function Edytor({
       : <>
           {cudza && <p className="mb-2 flex items-center gap-2 text-xs text-slate-500">
             <Lock size={13} />Rozmowę prowadzi {wlasciciel} — szkic zapisze tylko właściciel.</p>}
-          {duch && copilot && <PasekSzkicu p={copilot} wPolu />}
+          {wPolu && copilot && <PasekSzkicu p={copilot} wPolu />}
           {/* POLE MA WYGLĄDAĆ NA MIEJSCE DO PISANIA (0.247.0). Miało 80 px
               wysokości i tekst 14 px — tyle samo, co każdy inny wiersz ekranu,
               choć agent spędza w nim najwięcej czasu z całego panelu. */}
@@ -184,48 +195,27 @@ export function Edytor({
 
               `field-sizing: content` rośnie z tekstem od progu 120 px, bez
               skryptu mierzącego wysokość. Przeglądarka bez tej własności
-              dostaje próg i `resize-y`, czyli to, co było, tylko niższe.
-
-              POLE I PODPOWIEDŹ W JEDNEJ KOMÓRCE SIATKI. Wyższa z nich ustala
-              wysokość, więc długi szkic nie chowa się pod dolną krawędzią
-              pustego pola. Pole jest ZAWSZE w tym samym miejscu drzewa: gdyby
-              podpowiedź zmieniała mu rodzica, pierwsza litera agenta
-              przemontowałaby pole i zgubiła kursor. */}
-          <div className="grid">
-            {duch && copilot?.szkic && <div id={idDucha} data-testid="szkic-w-polu"
-              className="pointer-events-none col-start-1 row-start-1 whitespace-pre-wrap break-words rounded-lg border border-transparent bg-violet-50 px-3 py-2 text-tresc text-violet-950">
-              {copilot.szkic.tresc}</div>}
-            <textarea className={`field col-start-1 row-start-1 min-h-[7.5rem] resize-y text-tresc [field-sizing:content] ${
-              duch ? "bg-transparent" : ""}`} value={szkic}
-              aria-label="Szkic odpowiedzi" aria-keyshortcuts="Control+Enter"
-              aria-describedby={duch ? idDucha : undefined}
-              onChange={(e) => onZmiana(e.target.value)}
-              /* CTRL+ENTER WYSYŁA (23 września 2026). Ten sam warunek co przycisk
-                 niżej — skrót nie ma prawa ominąć blokady cudzej rozmowy. Sam
-                 Enter zostaje nową linią, bo odpowiedź ma akapity. */
-              onKeyDown={(e) => {
-                /* TAB PRZYJMUJE PODPOWIEDŹ (0.495.0) — i tylko wtedy, gdy
-                   jakaś stoi w polu. Bez niej Tab przenosi fokus jak zawsze,
-                   a Shift+Tab nie jest przechwytywany nigdy: wyjście z pola
-                   klawiaturą zostaje otwarte także nad podpowiedzią. */
-                if (e.key === "Tab" && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey
-                  && duch && copilot) {
-                  e.preventDefault();
-                  copilot.onPopraw();
-                  return;
-                }
-                if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
-                e.preventDefault();
-                /* Ctrl+Shift+Enter — „Wyślij i zakończ" (23 września 2026). */
-                if (!cudza && !wysyla && szkic.trim()) {
-                  if (e.shiftKey && onWyslijIZakoncz) onWyslijIZakoncz(); else onWyslij();
-                }
-              }}
-              /* Nad podpowiedzią placeholder nachodziłby na jej pierwszy wiersz. */
-              placeholder={duch ? undefined : "Szkic odpowiedzi — współdzielony z zespołem"} />
-          </div>
+              dostaje próg i `resize-y`, czyli to, co było, tylko niższe. */}
+          <textarea className={`field min-h-[7.5rem] resize-y text-tresc [field-sizing:content] ${
+            wPolu ? "bg-violet-50" : ""}`} value={szkic}
+            aria-label="Szkic odpowiedzi" aria-keyshortcuts="Control+Enter"
+            onChange={(e) => { if (e.target.value !== "") setWyczyszczone(null); onZmiana(e.target.value); }}
+            /* CTRL+ENTER WYSYŁA (23 września 2026). Ten sam warunek co przycisk
+               niżej — skrót nie ma prawa ominąć blokady cudzej rozmowy. Sam
+               Enter zostaje nową linią, bo odpowiedź ma akapity. */
+            onKeyDown={(e) => {
+              if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
+              e.preventDefault();
+              /* Ctrl+Shift+Enter — „Wyślij i zakończ" (23 września 2026). */
+              if (!cudza && !wysyla && szkic.trim()) {
+                if (e.shiftKey && onWyslijIZakoncz) onWyslijIZakoncz(); else onWyslij();
+              }
+            }}
+            placeholder="Szkic odpowiedzi — współdzielony z zespołem" />
           {uwagiPoPrzyjeciu.length > 0 && <div className="mt-2"><UwagiSzkicu uwagi={uwagiPoPrzyjeciu} /></div>}
-          {copilot && <KartaSzkicu p={copilot} wPolu={duch} />}
+          {/* Po „Wyczyść wszystko" karta stoi zwinięta: pusty znaczy pusty,
+              a szkic wraca jednym kliknięciem „Popraw w edytorze". */}
+          {copilot && <KartaSzkicu p={copilot} wPolu={wPolu} zwinieta={wyczyszczone !== null} />}
           {/* Lista dołożonych plików stoi POD treścią (0.247.0): należy do
               komponowanej wiadomości, nie do przycisków. Sam spinacz jedzie
               w pasku działań — nie zasługuje na własny rząd. */}

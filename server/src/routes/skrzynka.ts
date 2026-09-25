@@ -29,6 +29,7 @@ import { pomiarDoWiedzy, ustawStatusDoboru, wiedzaDoboru, wybierzKandydata, zapi
 import { kandydaciDoboru } from "../services/kandydaci.js";
 import { historiaKlienta } from "../services/klient-historia.js";
 import { mojeSprawy } from "../services/droga-klienta.js";
+import { dokumentySprzedazyZamowienia } from "../services/faktury.js";
 
 const BIURO = ["biuro", "admin"];
 const blad = (reply: FastifyReply, e: unknown) =>
@@ -362,6 +363,26 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       const nie = odmowa(reply); if (nie) return nie;
       try { return wiedzaDoboru(Number(req.params.id)); }
       catch (e) { return blad(reply, e); }
+    });
+
+  /* DOKUMENTY SPRZEDAŻY ZAMÓWIENIA (@wydanie) — soczewka „Faktura". Osobna
+     trasa z tego samego powodu co historia klienta niżej: panel woła ją
+     tylko przy pytaniu o fakturę, a oś przeładowuje się przy każdym
+     zdarzeniu. Czysty odczyt; tylko dokumenty z numerem zamówienia. */
+  app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/dokumenty-sprzedazy",
+    async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try {
+        const numer = numerZamowieniaRozmowy(Number(req.params.id));
+        if (!numer) return { zamowienie: null, dokumenty: [] };
+        const zam = db().prepare(`SELECT kupiono_at FROM zamowienie_klienta
+            WHERE channel_account_id=? AND external_id=?`).get(numer.konto, numer.externalId) as
+          { kupiono_at: string | null } | undefined;
+        return {
+          zamowienie: numer.externalId,
+          dokumenty: dokumentySprzedazyZamowienia(numer.externalId, zam?.kupiono_at ?? null),
+        };
+      } catch (e) { return blad(reply, e); }
     });
 
   /* HISTORIA KLIENTA (§10.1, zakładka KLIENT). Osobna trasa, nie pole

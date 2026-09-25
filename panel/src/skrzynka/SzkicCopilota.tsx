@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import { Przycisk, czas } from "../ui";
 import { OdczytZdjec } from "./OdczytZdjec";
 import { ProcesCopilota } from "./ProcesCopilota";
-import type { StanCopilota, SzkicCopilota, WymianaCopilota } from "../api/typy";
+import type { OsRozmowy, StanCopilota, SzkicCopilota, WymianaCopilota } from "../api/typy";
 import { Dopytanie } from "./Dopytanie";
 
 /**
@@ -38,6 +38,12 @@ export interface PropsSzkicuCopilota {
   blad: string;
   /** Szkic agenta jest niepusty — przycisk mówi wtedy „Zastąp mój szkic". */
   maSzkicAgenta: boolean;
+  /**
+   * Pole agenta trzyma TEN szkic, do edycji wprost (@wydanie). Ustawia go
+   * ekran, gdy sam wstawił szkic do pustego pola albo agent kliknął „Popraw
+   * w edytorze"; gaśnie przy wyczyszczeniu pola i przy zmianie rozmowy.
+   */
+  wPolu?: boolean;
   wylaczony: boolean;
   /**
    * DOPYTANIE (0.332.0). `undefined` = rozmowa jeszcze się nie wczytała.
@@ -74,6 +80,49 @@ function doborZmienil(p: PropsSzkicuCopilota): boolean {
  */
 export function szkicDoPola(p: PropsSzkicuCopilota): boolean {
   return p.szkic !== null && p.szkic.ocena === null && !p.nieswiezy && !doborZmienil(p) && !p.wylaczony;
+}
+
+/* ── SZKIC WCHODZI DO POLA JAKO TEKST, NIE JAKO PODPOWIEDŹ (@wydanie) ────────
+   Zgłoszenie właściciela z nagraniem: „wydaje mi się, że edycja powinna być
+   w tym samym oknie, z opcją wyczyszczenia wszystkiego". Od 0.495.0 szkic
+   stał w pustym polu jako szara podpowiedź. Pierwsza litera agenta ją
+   zasłaniała, a pod polem wyskakiwała karta z „Zastąp mój szkic". Poprawka
+   jednego słowa w szkicu wymagała więc najpierw przyjęcia go Tabem — kroku,
+   o którym nagranie pokazuje, że się go nie domyśla nikt.
+
+   Szkic wchodzi teraz do pola jako zwykły tekst, gotowy do poprawiania.
+   Reguła z 0.231.0 — „propozycja nie wchodzi do pola sama" — ODCHODZI
+   decyzją właściciela, a jej sens zostaje w dwóch miejscach:
+   - do klienta nic nie wychodzi bez kliknięcia „Wyślij" — to się nie zmienia;
+   - wstawienie jest STANEM EKRANU, nie zapisem. Pole nie jest zapisywane
+     na serwer, więc otwarcie rozmowy dalej niczego nie mutuje.
+
+   Wstawiamy tylko do PUSTEGO pola i tylko świeży szkic swojej rozmowy.
+   Zapisany szkic zespołu wygrywa zawsze — to czyjaś praca. */
+
+/** Tekst do wstawienia w pole przy otwarciu rozmowy albo `null`, gdy nie wolno. */
+export function szkicNaStart(p: PropsSzkicuCopilota, zapisanySzkic: string): string | null {
+  if (zapisanySzkic.trim() !== "" || !szkicDoPola(p)) return null;
+  return p.szkic?.tresc ?? null;
+}
+
+/**
+ * To samo, liczone wprost z rozmowy — tak woła to ekran skrzynki. Świeżość
+ * i cudzość tą samą regułą, co karta: szkic świeży, gdy odpowiada na
+ * OSTATNIĄ wiadomość klienta; cudza rozmowa to cudzy szkic.
+ */
+export function szkicNaStartRozmowy(dane: OsRozmowy, mojeId: number | null): string | null {
+  const ostatniaKlienta = [...dane.os].reverse()
+    .find((w) => w.rodzaj === "wiadomosc" && w.odKlienta)?.messageId ?? null;
+  const wl = dane.rozmowa.wlascicielId;
+  return szkicNaStart({
+    stan: undefined, szkic: dane.szkicCopilota,
+    nieswiezy: (dane.szkicCopilota?.messageId ?? null) !== ostatniaKlienta,
+    doborWersja: dane.dobor.wersja, nowePolaDoboru: [], paraPasowania: null,
+    uklada: false, blad: "", maSzkicAgenta: false,
+    wylaczony: wl != null && wl !== mojeId,
+    onUloz: () => {}, onPopraw: () => {}, onOdrzuc: () => {},
+  }, dane.szkic?.body ?? "");
 }
 
 /**
@@ -118,11 +167,10 @@ export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
 /**
  * Pasek szkicu: skąd, jak świeży, co z nim zrobić.
  *
- * `wPolu` (0.495.0): treść stoi w polu agenta jako podpowiedź, więc
- * przycisk nie „poprawia w edytorze", tylko PRZYJMUJE to, co agent już
- * czyta. Klawisz Tab, a nie E — bo kursor stoi w polu, a tam „e" jest
- * literą. Tab przyjmuje podpowiedź w każdym edytorze kodu, więc nie
- * trzeba go uczyć. E zostaje poza polem, jak było.
+ * `wPolu` (@wydanie): treść STOI W POLU jako tekst agenta, więc nie ma czego
+ * przyjmować ani wstawiać. Zostaje „Odrzuć", które mierzy los szkicu,
+ * i zdanie mówiące, skąd tekst w polu. Przyjmowanie Tabem z 0.495.0
+ * odeszło razem z podpowiedzią.
  */
 export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPolu?: boolean }) {
   const s = p.szkic;
@@ -130,7 +178,7 @@ export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
   return <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
       <b className="text-violet-900"><Sparkles size={12} className="inline" /> Szkic Copilota{wPolu && " w polu"}</b>
       <span className="text-slate-500">{s.model} · {czas(s.at)} · {s.przez} · {s.tresc.length} znaków</span>
-      {wPolu && <span className="text-slate-600">— pisanie zaczyna od zera</span>}
+      {wPolu && <span className="text-slate-600">— poprawiaj wprost w polu</span>}
       {p.nieswiezy && <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
         powstał przed nową wiadomością klienta</span>}
       {/* Drugi rodzaj nieświeżości (przyrost trzeci): dane doboru zmieniły się
@@ -140,10 +188,10 @@ export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
         <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
           dane doboru zmieniły się od szkicu — ułóż ponownie</span>}
       <span className="ml-auto flex flex-wrap items-center gap-2">
-        <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onPopraw}
-          aria-keyshortcuts={wPolu ? "Tab" : "E"}>
-          {wPolu ? "Przyjmij szkic" : p.maSzkicAgenta ? "Zastąp mój szkic" : "Popraw w edytorze"}
-          <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans">{wPolu ? "Tab" : "E"}</kbd></Przycisk>
+        {!wPolu && <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onPopraw}
+          aria-keyshortcuts="E">
+          {p.maSzkicAgenta ? "Zastąp mój szkic" : "Popraw w edytorze"}
+          <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans">E</kbd></Przycisk>}
         <Przycisk className="text-xs" onClick={p.onOdrzuc} aria-keyshortcuts="R">Odrzuć
           <kbd aria-hidden="true" className="ml-1 rounded bg-slate-100 px-1 font-sans">R</kbd></Przycisk>
       </span>
@@ -166,15 +214,22 @@ export function UwagiSzkicu({ uwagi }: { uwagi: string[] }) {
 }
 
 /**
- * Karta szkicu. `wPolu` znaczy, że treść stoi już w polu agenta jako
- * podpowiedź (0.495.0) — wtedy karta nie powtarza ani treści, ani paska
- * z przyciskami, bo oba stoją nad polem. Zostaje to, na czym szkic stoi.
+ * Karta szkicu. `wPolu` znaczy, że treść stoi już w polu agenta (0.495.0,
+ * od @wydanie jako zwykły tekst) — wtedy karta nie powtarza ani treści, ani
+ * paska z przyciskami, bo oba stoją nad polem. Zostaje to, na czym szkic stoi.
  */
-export function KartaSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPolu?: boolean }) {
+export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
+  p: PropsSzkicuCopilota;
+  wPolu?: boolean;
+  /** Agent właśnie wyczyścił pole (@wydanie) — treść nie wraca rozwinięta pod pustym polem. */
+  zwinieta?: boolean;
+}) {
   const s = p.szkic;
-  /* Oceniony szkic zniknął z ekranu: wstawiony już jest w polu, odrzucony
-     nie ma po co wisieć. Wiersz w bazie zostaje dla pomiaru. */
-  if (!s || s.ocena !== null) return null;
+  /* Oceniony szkic zniknął z ekranu: odrzucony nie ma po co wisieć. Wiersz
+     w bazie zostaje dla pomiaru. WYJĄTEK od @wydanie: szkic stojący w polu
+     zostaje z tym, na czym stoi — uwagami, odczytem zdjęć i dopytaniem —
+     także po „Popraw w edytorze", bo agent właśnie go poprawia. */
+  if (!s || (s.ocena !== null && !(wPolu && s.ocena !== "odrzucony"))) return null;
   /* PRZYCISKI NA GÓRZE (0.232.1) — patrz `PasekSzkicu`. */
   return <section className={wPolu ? "mt-2" : "mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3"}
     aria-label={wPolu ? "Na czym stoi szkic Copilota" : "Szkic Copilota"}>
@@ -203,7 +258,7 @@ export function KartaSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
         pod krawędź. Rozwija się jednym kliknięciem, bez nowego żądania.
         Siatki `max-h-[60vh]`, o której mówi komentarz wyżej, już nie ma:
         edytor stoi na końcu osi, w jednym przewijaniu z rozmową. */}
-    {!wPolu && <details open={!p.maSzkicAgenta} className="mb-2">
+    {!wPolu && <details open={!p.maSzkicAgenta && !zwinieta} className="mb-2">
       <summary className="cursor-pointer text-xs font-semibold text-violet-900">
         Treść szkicu · {s.tresc.length} znaków</summary>
       <pre className="mt-1 whitespace-pre-wrap font-sans text-tresc text-slate-800"
