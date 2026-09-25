@@ -644,7 +644,7 @@ async function main() {
     });
   }
 
-  /* PASOWANIE Z SIECI (@wydanie). Takt co godzinę, praca tylko w oknie
+  /* PASOWANIE Z SIECI (0.507.0). Takt co godzinę, praca tylko w oknie
      nocnym: wyszukiwanie trwa sekundy na kartotekę, a w dzień tokeny i łącze
      należą do biura. Ten sam warunek co każde wywołanie modelu bez kliknięcia
      — wyłącznik w `wertis.env` i klucz dostawcy. Do Allegro nie idzie stąd

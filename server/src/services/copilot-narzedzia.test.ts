@@ -8,7 +8,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-na
 process.env.SGT_MODE = "seeded";
 process.env.LOG_LEVEL = "silent";
 
-/* ── Narzędzia Copilota (@wydanie) ───────────────────────────────────────────
+/* ── Narzędzia Copilota (0.507.0) ───────────────────────────────────────────
    Model wybiera wywołania sam, więc granice pilnuje KOD, nie instrukcja:
 
    1. Zero zapisu. Żadne narzędzie nie zmienia ani jednego wiersza.

@@ -10,6 +10,38 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.507.0 — 25 września 2026
+
+**Copilot sam sprawdza bazę przy dopytaniu.** Do tej pory model odpowiadał
+agentowi wyłącznie z faktów, które mu podaliśmy, albo z własnej pamięci.
+Teraz ma pięć narzędzi tylko do odczytu naszej bazy: szukanie w kartotece
+(także po numerze OEM), kartę towaru, pasowanie, części do maszyny i treść
+naszych ofert z kopii w bazie. Sam decyduje, po co sięgnąć, najwyżej w pięciu
+rundach. Pod odpowiedzią stoi linijka „Sprawdził w bazie: …”, więc agent
+widzi, na czym odpowiedź stoi.
+
+Narzędzia nie zapisują niczego i nie wołają sieci — ani Allegro, ani
+Subiekta na żywo. Półka, opis kartoteki i dane klienta do modelu nie idą.
+Twierdzenie oparte na niezatwierdzonej propozycji z bazy wiedzy serwer
+obniża do „niepewne”. Koszt wszystkich rund liczy się w pomiarze Copilota,
+także gdy dopytanie skończy się błędem.
+
+**Nocne pasowanie części z sieci, poza Allegro.** Nowy automat nocny (1–5)
+bierze kartoteki z numerem OEM albo oryginalnym, które nie mają ani jednego
+zastosowania, i szuka w sieci, do jakich maszyn i silników pasują. Znalezisko
+staje w kolejce Wiedzy jako propozycja z cytatem i linkiem do strony. Nic nie
+zatwierdza się samo.
+
+Allegro jest wyłączone na trzy sposoby: automat nie wysyła do niego ani
+jednego żądania, domeny Allegro są zablokowane w wyszukiwarce, a znalezisko
+z takiej domeny serwer i tak odrzuca. Wyszukiwanie robią serwery Anthropic,
+nie adres sklepu. Propozycja przechodzi tylko wtedy, gdy model przeczytał
+stronę, cytat stoi na niej dosłownie, a strona zawiera nasz numer.
+
+Domyślnie wyłączone: `PASOWANIE_Z_SIECI=1` w `wertis.env`, sufit
+`PASOWANIE_Z_SIECI_NA_NOC` (domyślnie 10 kartotek). Pomiar Copilota i raport
+tygodnia doliczają teraz wyszukiwania, płatne po jednym cencie od sztuki.
+
 ## 0.506.1 — 25 września 2026
 
 **Sprawdzanie wypłat dochodzi do każdego zwrotu.** Wyszło przy zwrocie

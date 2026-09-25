@@ -85,7 +85,7 @@ export interface KontekstPytania {
   /** Poprzednie wymiany, od najstarszej. */
   historia: Array<{ pytanie: string; odpowiedz: string }>;
   pytanie: string;
-  /** Odczyt naszej bazy na żądanie modelu (@wydanie). `null` = bez narzędzi. */
+  /** Odczyt naszej bazy na żądanie modelu (0.507.0). `null` = bez narzędzi. */
   narzedzia: ZestawNarzedzi | null;
 }
 
@@ -205,7 +205,7 @@ export async function zadajPytanie(
 function zapiszWywolanie(
   conversationId: number, odp: OdpowiedzNaPytanie | null, wynik: "ok" | "blad",
   blad: string | null, kto: { id: number | null }, teraz: Date,
-  /* Rundy narzędzi zapłacone przed błędem (@wydanie). Bez nich porażka po
+  /* Rundy narzędzi zapłacone przed błędem (0.507.0). Bez nich porażka po
      czterech rundach ważyłaby w pomiarze zero, a kosztowała cztery żądania. */
   zuzyciePrzedBledem?: Tokeny,
 ): void {

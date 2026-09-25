@@ -750,7 +750,7 @@ const INSTRUKCJA_PYTANIA = [
 export const SUFIT_RUND_NARZEDZI = 5;
 
 /**
- * Dopytanie z narzędziami (@wydanie). Pętla stoi TUTAJ, bo tylko ten plik
+ * Dopytanie z narzędziami (0.507.0). Pętla stoi TUTAJ, bo tylko ten plik
  * rozmawia z dostawcą; serwis podaje zestaw i dostaje ślad wywołań.
  *
  * `create`, NIE `parse`. Parser SDK czyta JSON z KAŻDEGO bloku tekstu,
@@ -959,7 +959,7 @@ export async function nadawcaKluczaAnthropic(
   }
 }
 
-/* ── Pasowanie z sieci (@wydanie) ────────────────────────────────────────────
+/* ── Pasowanie z sieci (0.507.0) ────────────────────────────────────────────
    Jedyne wywołanie, w którym model czyta CUDZE strony. Wyszukiwanie i pobranie
    robią serwery Anthropic (narzędzia serwerowe), więc do żadnej strony nie
    idzie ani jedno żądanie z adresu sklepu — a domeny Allegro są zablokowane

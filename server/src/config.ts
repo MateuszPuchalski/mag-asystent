@@ -1107,7 +1107,7 @@ export const config = {
   },
 
   /**
-   * PASOWANIE Z SIECI (@wydanie). Automat nocny szuka na stronach spoza
+   * PASOWANIE Z SIECI (0.507.0). Automat nocny szuka na stronach spoza
    * Allegro, do czego pasują nasze części z numerem OEM, i składa propozycje
    * do kolejki Wiedzy. Nic nie zatwierdza sam.
    *

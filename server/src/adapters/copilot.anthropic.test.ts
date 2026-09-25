@@ -201,7 +201,7 @@ test("szkic i klucz modelu też nie wysyłają wysiłku do Haiku 4.5", async () 
   }
 });
 
-/* ── Pętla narzędzi dopytania (@wydanie) ─────────────────────────────────────
+/* ── Pętla narzędzi dopytania (0.507.0) ─────────────────────────────────────
    Atrapa klienta oddaje CIĄG odpowiedzi, jak dostawca w kolejnych rundach.
    Sprawdzamy to, czego nie sprawdzi test serwisu z atrapą nadawcy: że wyniki
    narzędzi wracają do modelu w jednej wiadomości, że zdanie wstępu przed
@@ -309,7 +309,7 @@ test("dopytanie bez zestawu nie wysyła narzędzi, a ucięta odpowiedź niesie k
   }
 });
 
-/* ── Pasowanie z sieci (@wydanie) ────────────────────────────────────────────
+/* ── Pasowanie z sieci (0.507.0) ────────────────────────────────────────────
    Tu sprawdzamy to, czego nie widzi test serwisu: że Allegro jest zablokowane
    w OBU narzędziach serwerowych, że tekst przeczytanych stron wraca do sita,
    że `pause_turn` wznawia się bez nowej wiadomości i że wyszukiwania liczą się

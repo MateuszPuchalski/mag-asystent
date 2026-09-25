@@ -361,7 +361,7 @@ CREATE TABLE IF NOT EXISTS copilot_pytanie (
   at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   przez           TEXT NOT NULL,
   przez_user_id   INTEGER REFERENCES app_user(user_id),
-  -- Narzędzia, po które model sięgnął (@wydanie): [{nazwa, argument, znakow}].
+  -- Narzędzia, po które model sięgnął (0.507.0): [{nazwa, argument, znakow}].
   narzedzia       TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_rozmowa
@@ -387,7 +387,7 @@ CREATE TABLE IF NOT EXISTS copilot_wywolanie (
   blad            TEXT,
   przez_user_id   INTEGER REFERENCES app_user(user_id),
   at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  -- Zapytania do wyszukiwarki (@wydanie). Płatne od sztuki, nie od tokenu,
+  -- Zapytania do wyszukiwarki (0.507.0). Płatne od sztuki, nie od tokenu,
   -- więc osobna kolumna; pomiar dolicza je do kosztu.
   wyszukiwania    INTEGER NOT NULL DEFAULT 0
 );
@@ -3233,7 +3233,7 @@ CREATE TABLE IF NOT EXISTS raport_tygodnia (
   dane       TEXT NOT NULL           -- JSON `RaportTygodnia`
 );
 
--- Pasowanie z sieci (@wydanie). Jeden wiersz na kartotekę sprawdzoną przez
+-- Pasowanie z sieci (0.507.0). Jeden wiersz na kartotekę sprawdzoną przez
 -- automat nocny, także bez wyniku — bez tego ta sama kartoteka wracałaby co
 -- noc i płaciła za to samo wyszukiwanie. `odrzucone` to JSON {powód: liczba}
 -- z sita w services/pasowanie-z-sieci.ts; treści stron tu nie ma.

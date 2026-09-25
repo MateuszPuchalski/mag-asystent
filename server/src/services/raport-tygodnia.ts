@@ -38,7 +38,7 @@ import { migawki, zrobMigawke, type WpisMigawki } from "./migawka-dnia.js";
    brak, a nie liczy go w locie.                                            */
 
 /** Podbij przy każdej zmianie reguły liczenia albo kształtu `RaportTygodnia`.
- *  2 (@wydanie): koszt Copilota dolicza wyszukiwania w sieci, płatne od sztuki. */
+ *  2 (0.507.0): koszt Copilota dolicza wyszukiwania w sieci, płatne od sztuki. */
 export const WERSJA_RAPORTU = 2;
 
 /* Tyle tygodni wstecz automat nadrabia po przerwie. Cztery, bo miesiąc to

@@ -7,7 +7,7 @@ import type { Tokeny } from "./copilot-koszt.js";
 import { zaproponujZastosowanie, type RodzajDowodu } from "./wiedza.js";
 import { BladKluczaCopilota, BladLimituCopilota, BladPrzeciazeniaCopilota } from "../adapters/copilot.js";
 
-/* ── Pasowanie z sieci: nocny automat uzupełnia luki wiedzy (@wydanie) ───────
+/* ── Pasowanie z sieci: nocny automat uzupełnia luki wiedzy (0.507.0) ───────
 
    Właściciel: „z innych stron możesz ściągnąć, aby uzupełnić fitment", z
    zastrzeżeniem: „bądź ostrożny, nie chcę dostać bana na Allegro".

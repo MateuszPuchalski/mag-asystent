@@ -9,7 +9,7 @@ import { pasowaniaTowaru } from "./pasowania.js";
 import { zamiennicyOem } from "./zamiennosc-oem.js";
 import { zwin } from "../tekst.js";
 
-/* ── Narzędzia Copilota: model sam sięga do bazy (@wydanie) ──────────────────
+/* ── Narzędzia Copilota: model sam sięga do bazy (0.507.0) ──────────────────
 
    Do tego wydania model dostawał fakty, które mu wybraliśmy, i nic więcej.
    Agent pytał „czy ten gaźnik pasuje do MS 250", a model mógł odpowiedzieć
