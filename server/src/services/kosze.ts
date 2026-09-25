@@ -392,7 +392,8 @@ export function listaKoszy(): WierszListyKoszy[] {
               k.mm_numer, k.mm_queue_id, k.rodzaj, k.anulowano_at, k.anulowano_przez, k.mm_dok_id
        FROM kosz k
        WHERE k.status NOT IN ('rozlozony', 'anulowany')
-          OR COALESCE(k.rozlozono_at, k.anulowano_at) >= datetime('now', '-14 days')
+          -- granica ISO, nie datetime(): powód przy GRANICA_OKNA w raporty.ts
+          OR COALESCE(k.rozlozono_at, k.anulowano_at) >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-14 days')
        ORDER BY CASE k.status WHEN 'otwarty' THEN 0 WHEN 'zamkniety' THEN 1 ELSE 2 END, k.id DESC`
     )
     .all() as Array<Record<string, unknown>>;
@@ -1423,7 +1424,8 @@ export function pominietePozycje(): PominietaPozycja[] {
        JOIN kosz k ON k.id = p.kosz_id
        WHERE p.status = 'skipped'
          AND p.zalatwione_at IS NULL
-         AND (k.status <> 'rozlozony' OR k.rozlozono_at >= datetime('now', '-30 days'))
+         -- granica ISO, nie datetime(): powód przy GRANICA_OKNA w raporty.ts
+         AND (k.status <> 'rozlozony' OR k.rozlozono_at >= strftime('%Y-%m-%dT%H:%M:%fZ','now','-30 days'))
        ORDER BY COALESCE(p.pominieto_at, k.zamknieto_at, k.utworzono_at)`
     )
     .all() as Array<Record<string, unknown>>;
