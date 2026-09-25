@@ -117,6 +117,17 @@ describe("brak powiązania z towarem", () => {
     expect(brakPowiazania([w({ ofertaId: "1" })])).toBe(false);
     expect(brakPowiazania([w({}), w({ id: "msg-2", odKlienta: false, zamowienieId: "zam-1" })])).toBe(false);
   });
+
+  it("zamówienie znane spoza osi też ucisza blok (@wydanie)", () => {
+    /* Runda krytyki: baner „brak powiązania" stał nad prawą kolumną, która
+       mówiła „Zamówił 1 × …". Zamówienie wskazane z kandydatów nie ma
+       `zamowienieId` na osi, ale ekran je zna — i to rozstrzyga. */
+    const zam = { zamowienie: { externalId: "zam-1" }, oferta: null } as never;
+    const of = { zamowienie: null, oferta: { externalId: "7" } } as never;
+    expect(brakPowiazania([w({})], zam)).toBe(false);
+    expect(brakPowiazania([w({})], of)).toBe(false);
+    expect(brakPowiazania([w({})], { zamowienie: null, oferta: null })).toBe(true);
+  });
 });
 
 /* ── Paczka przy zamówieniu (23 września 2026) ───────────────────────────────

@@ -1,3 +1,4 @@
+import userEvent from "@testing-library/user-event";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
@@ -63,13 +64,14 @@ describe("Nagłówek rozmowy", () => {
     expect(screen.queryByRole("button", { name: /PRZEJMIJ ROZMOWĘ/i })).not.toBeInTheDocument();
   });
 
-  it("mówi, że rozmowę przypisze PIERWSZA ODPOWIEDŹ", () => {
+  it("mówi, że rozmowę przypisze PIERWSZA ODPOWIEDŹ", async () => {
     /* To zdanie jest ceną zdjęcia przycisku: bez niego znika czynność i nie
-       przychodzi nic, co by ją wytłumaczyło. */
+       przychodzi nic, co by ją wytłumaczyło. Od @wydanie „nikt" i „Ty" stoją
+       w menu „⋯" — na wierzchu zostaje wyjątek, czyli cudza rozmowa. */
     render(<EkranRozmowy {...props()} />);
-    /* Od 23 września 2026 zdanie stoi w dymku kółka i dla czytnika ekranu —
-       linia pod loginem odeszła z „za dużo tekstu". */
-    expect(screen.getByTitle("Prowadzi nikt — przypisze pierwsza odpowiedź")).toBeInTheDocument();
+    expect(screen.queryByTitle("Prowadzi nikt — przypisze pierwsza odpowiedź")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Więcej czynności rozmowy" }));
+    expect(screen.getByText("nikt — przypisze pierwsza odpowiedź")).toBeInTheDocument();
   });
 
   it("przy cudzej rozmowie pokazuje IMIĘ prowadzącego", () => {
@@ -78,8 +80,9 @@ describe("Nagłówek rozmowy", () => {
     expect(screen.queryByText(/przypisze pierwsza odpowiedź/)).not.toBeInTheDocument();
   });
 
-  it("własną rozmowę podpisuje „Ty”, nie własnym imieniem", () => {
+  it("własną rozmowę podpisuje „Ty”, nie własnym imieniem", async () => {
     render(<EkranRozmowy {...props({ wlascicielId: 7, wlasciciel: "Ja Sam" })} />);
+    await userEvent.click(screen.getByRole("button", { name: "Więcej czynności rozmowy" }));
     expect(screen.getByText("Ty")).toBeInTheDocument();
   });
 });

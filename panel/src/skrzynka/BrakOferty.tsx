@@ -6,6 +6,8 @@ import { Przycisk } from "../ui";
  * Pytanie bez numeru oferty (§4.3, otwarcie `docs/obsluga-klienta.md`).
  *
  * Ekran mówi o braku wprost, zamiast podstawiać ofertę zgadniętą z treści.
+ * To zdanie stało do @wydanie także NA ekranie — agentowi mówiło o ekranie,
+ * nie o kliencie. Na ekranie zostaje skutek: nie wiadomo, o jaki towar chodzi.
  * Tak wygrywały kiedyś „zdemontowanym" i „Pozdrawiam", bo dobór fraz brał
  * słowa po DŁUGOŚCI, a „szarpaku" wypadało przez limit trzech fraz.
  */
@@ -22,7 +24,7 @@ export function BrakOferty({ zapisuje, blad, onWskaz, onDopytaj }: {
     <p className="flex items-center gap-2 text-sm text-amber-800">
       <AlertTriangle size={16} />
       <b>Brak powiązania z ofertą.</b>
-      Ekran mówi to wprost, zamiast podstawiać ofertę zgadniętą z treści.
+      Nie wiadomo, o który towar pyta klient.
     </p>
 
     <div className="mt-2 flex flex-wrap gap-2">

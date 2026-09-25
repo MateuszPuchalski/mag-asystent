@@ -37,7 +37,7 @@ const dane = (k: Partial<Kopilot>, n: Partial<OsRozmowy> = {}): OsRozmowy => ({
     externalId: "z1", status: "READY_FOR_PROCESSING", kupujacyLogin: "k", dostawaGrosze: 1049, dostawaMetoda: null,
     platnoscTyp: null, platnoscAt: null, fakturaZadana: true, sumaGrosze: 5549, waluta: "PLN",
     kupionoAt: "2026-09-22T13:17:00Z", link: null, pozycje: [pozycja()] } },
-  kandydaciZamowien: [], ...n,
+  kandydaciZamowien: [], zwroty: [], ...n,
 } as unknown as OsRozmowy);
 
 const rysuj = (d: OsRozmowy, onWstaw = vi.fn()) => render(<Soczewka dane={d} onWstawDoSzkicu={onWstaw} />);
@@ -111,4 +111,15 @@ describe("soczewka w kolumnie kontekstu", () => {
     expect(screen.getByText(/nie ma dokumentu z numerem tego zamówienia/)).toBeInTheDocument();
     dokumenty.data = undefined;
   });
+
+  /* Zwrot (@wydanie): soczewka mówi, że zwrotu w Allegro jeszcze nie ma;
+     gdy zwrot jest, jego karta stoi w „Wymaga Ciebie" i soczewka milczy. */
+  it("zwrot: bez zgłoszenia w Allegro mówi to wprost, ze zgłoszeniem milczy", () => {
+    const { unmount } = rysuj(dane({ kategoria: "RETURN" }));
+    expect(screen.getByText(/Zwrotu tego zamówienia w Allegro jeszcze nie ma/)).toBeInTheDocument();
+    unmount();
+    const { container } = rysuj(dane({ kategoria: "RETURN" }, { zwroty: [{ id: 3 }] } as unknown as Partial<OsRozmowy>));
+    expect(container).toBeEmptyDOMElement();
+  });
 });
+

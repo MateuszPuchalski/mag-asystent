@@ -149,6 +149,8 @@ describe("Wyślij i zakończ", () => {
     await userEvent.keyboard("{Control>}{Shift>}{Enter}{/Shift}{/Control}");
     expect(onWyslijIZakoncz).toHaveBeenCalledTimes(1);
     expect(onWyslij).not.toHaveBeenCalled();
+    /* Od @wydanie „Wyślij i zakończ" stoi pod „▾" obok wysyłki. */
+    await userEvent.click(screen.getByRole("button", { name: "Inne sposoby wysłania" }));
     await userEvent.click(screen.getByRole("button", { name: /Wyślij i zakończ/ }));
     expect(onWyslijIZakoncz).toHaveBeenCalledTimes(2);
   });

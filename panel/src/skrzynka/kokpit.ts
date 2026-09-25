@@ -1,4 +1,4 @@
-import type { Kubelek, OsRozmowy, StatusDoboru, Zwrot } from "../api/typy";
+import type { Kategoria, Kubelek, OsRozmowy, StatusDoboru, Zwrot } from "../api/typy";
 
 /* ── CIEMNY KOKPIT: CO W KOLUMNIE KONTEKSTU ŚWIECI (0.498.0) ────────────────
    Zgłoszenie właściciela z nagraniem prawej kolumny: „uporządkuj ten panel".
@@ -107,6 +107,20 @@ export function coSwieci(dane: OsRozmowy): Swiatlo[] {
    to decyzja z terminem, a karta towaru jest tłem, które spychało decyzję
    w połowę przewijania. Dobór w toku niczego nie zwija: szuka się właśnie
    po to, żeby porównać z kartoteką. */
-export function towarOtwartyNaStart(swiatla: Swiatlo[]): boolean {
-  return !swiatla.includes("zwrot") && !swiatla.includes("sprawa");
+export function towarOtwartyNaStart(swiatla: Swiatlo[], kategoria: Kategoria | null = null): boolean {
+  if (swiatla.includes("zwrot") || swiatla.includes("sprawa")) return false;
+  /* ── TYLKO PRZY PYTANIU O TOWAR (@wydanie) ────────────────────────────────
+     Zgłoszenie agenta: „przytłacza". Na zrzucie klient pisał o odesłaniu
+     części, a karta oferty z cenami, EAN i opisem stała otwarta nad
+     wszystkim — pasmo nad kolumną mówiło już nazwę, SKU i stan. Powód
+     z 0.198.0 (gwint w niewidocznej zakładce) dotyczy pytań O TOWAR, więc
+     przy nich karta zostaje otwarta. Bez rozpoznania też: nie wiemy, o co
+     pyta klient, a ukrycie byłoby zgadywaniem. */
+  return kategoria === null || KATEGORIE_O_TOWAR.has(kategoria);
 }
+
+/** Kategorie, przy których odpowiedź leży w karcie towaru (parametry, zgodność, stan). */
+const KATEGORIE_O_TOWAR: ReadonlySet<Kategoria> = new Set<Kategoria>([
+  "PRODUCT_COMPATIBILITY", "PRODUCT_QUESTION", "PRODUCT_AVAILABILITY", "WRONG_PRODUCT",
+  "MISSING_PRODUCT", "DAMAGED_PRODUCT", "OTHER",
+]);

@@ -80,6 +80,17 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
     expect(screen.getByText(/E06-02-01/)).toBeInTheDocument();
   });
 
+  it("symbol kartoteki staje tylko wtedy, gdy różni się od sygnatury zamówienia", () => {
+    /* Runda krytyki (@wydanie): ten sam symbol stał w „Zamówił" i w „To jest".
+       Równy to powtórzenie; różny mówi, że oferta wskazuje inną kartotekę. */
+    const { unmount } = render(<PasmoOdpowiedzi dane={dane()} />);
+    expect(screen.getAllByText(/MFG163856/)).toHaveLength(1);
+    unmount();
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, sym: "MFG-INNY" } });
+    render(<PasmoOdpowiedzi dane={dane()} />);
+    expect(screen.getByText(/MFG-INNY/)).toBeInTheDocument();
+  });
+
   it("BRAK NA STANIE mówi o sobie wprost — to zmienia treść odpowiedzi", () => {
     karta.mockReturnValue({ isLoading: false, error: null,
       data: { ...PELNA, mag: { stan: 0, rez: 0, avail: 0 } } });

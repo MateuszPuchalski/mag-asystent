@@ -4,6 +4,7 @@ import type { Rozmowa } from "../api/typy";
 import { KLASA_STATUSU } from "../ui";
 import { NAZWA, ZRODLO_ZAKONCZENIA } from "./statusy";
 import { polePisania, useSkrotyDzialaja } from "../nawigacja/fokus";
+import { MenuRozmowy, WierszMenu } from "./MenuRozmowy";
 
 /* Status rozmowy (§7, 0.158.0). Nagłówek rozmowy pokazuje go ZAWSZE, także
    gdy nikt go nie ruszył — „Nowa" znaczy, że sprawy nie tknięto, a to jest
@@ -23,7 +24,7 @@ import { polePisania, useSkrotyDzialaja } from "../nawigacja/fokus";
 const KLIENT_CZEKA = new Set(["new", "open", "waiting_for_us"]);
 
 export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
-  onReklamacyjna, zapisujeReklamacyjna = false, onZakoncz, onOtworz, zmieniaStatus = false }: {
+  onReklamacyjna, zapisujeReklamacyjna = false, onZakoncz, onOtworz, zmieniaStatus = false, menu }: {
   rozmowa: Rozmowa;
   blad: string;
   onPriorytet: (priorytet: "normalny" | "pilny") => void;
@@ -39,6 +40,9 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
   onZakoncz?: (mimoPytania: boolean) => void;
   onOtworz?: () => void;
   zmieniaStatus?: boolean;
+  /* Wiersze menu „⋯" od ekranu rozmowy (@wydanie): prowadzący i kategoria.
+     Przełączniki w spoczynku dokłada tu sam `Status` — powód w `MenuRozmowy.tsx`. */
+  menu?: React.ReactNode;
 }) {
   const [pytam, setPytam] = useState(false);
   /* Znaczek „Z" tylko wtedy, gdy klawisz działa — powód w `nawigacja/fokus.ts`. */
@@ -76,44 +80,19 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
         tekstu"). Opuszczony przełącznik jest propozycją ruchu i wystarczy mu
         ikona z dymkiem. Podniesiony jest stanem sprawy — ten czyta się
         słowem, bo ma być zauważony, a nie rozszyfrowany. */}
-    <button type="button" disabled={zapisujePriorytet}
-      aria-pressed={rozmowa.priorytet === "pilny"}
-      aria-label={rozmowa.priorytet === "pilny" ? undefined : "Oznacz jako pilne"}
-      title={rozmowa.priorytet === "pilny" ? "Zdejmij flagę pilne" : "Oznacz jako pilne"}
-      onClick={() => onPriorytet(rozmowa.priorytet === "pilny" ? "normalny" : "pilny")}
-      className={`ml-auto inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-bold disabled:opacity-50 ${
-        rozmowa.priorytet === "pilny"
-          ? "bg-red-100 text-ranga-zle hover:bg-red-200"
-          : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-      <Flame size={13} />{rozmowa.priorytet === "pilny" && "PILNE"}
-    </button>
-
-    {/* ── ZNACZNIK REKLAMACYJNY (0.390.0) ───────────────────────────────────
-        Właściciel: „chcę zaznaczyć, że to jest pytanie reklamacyjne i będzie
-        traktowane jako reklamacja, ale nie będzie w allegrowych reklamacjach".
-
-        SPRAWY W ALLEGRO ZAŁOŻYĆ SIĘ NIE DA i to nie jest nasz wybór:
-        `/sale/issues` w `docs/allegro/swagger.yaml` ma wyłącznie GET, sprawę
-        otwiera kupujący. Ten znacznik jest NASZ i mówi wyłącznie, jak biuro
-        prowadzi tę rozmowę.
-
-        Przełącznik, nie droga w jedną stronę: agent bierze pytanie za
-        reklamacyjne po pierwszym zdaniu klienta, a po wyniku z hali bywa, że
-        to pytanie o dobór. Ten sam kształt co przy „pilne" obok — dwa
-        przełączniki, dwa różne pytania, jedna gramatyka. */}
-    {onReklamacyjna && <button type="button" disabled={zapisujeReklamacyjna}
-      aria-pressed={rozmowa.reklamacyjna}
-      aria-label={rozmowa.reklamacyjna ? undefined : "Sprawa reklamacyjna"}
-      title={rozmowa.reklamacyjna
-        ? "Prowadzimy tę rozmowę jak reklamację. W Allegro sprawy nie ma — założyć ją może tylko kupujący."
-        : "Oznacz, że prowadzimy tę rozmowę jak reklamację. Sprawy w Allegro to nie zakłada."}
-      onClick={() => onReklamacyjna(!rozmowa.reklamacyjna)}
-      className={`inline-flex items-center gap-1 rounded px-2 py-1 text-xs font-bold disabled:opacity-50 ${
-        rozmowa.reklamacyjna
-          ? "bg-violet-100 text-violet-900 hover:bg-violet-200"
-          : "bg-slate-100 text-slate-600 hover:bg-slate-200"}`}>
-      <Scale size={13} />{rozmowa.reklamacyjna && "REKLAMACYJNA"}
-    </button>}
+    {/* PODNIESIONA FLAGA ZOSTAJE NA WIERZCHU (@wydanie). To stan sprawy
+        i ma krzyczeć; kliknięcie opuszcza ją tym samym przyciskiem.
+        Przełącznik w spoczynku zszedł do menu „⋯" — `MenuRozmowy.tsx`. */}
+    {rozmowa.priorytet === "pilny" && <button type="button" disabled={zapisujePriorytet}
+      aria-pressed title="Zdejmij flagę pilne" onClick={() => onPriorytet("normalny")}
+      className="inline-flex items-center gap-1 rounded bg-red-100 px-2 py-1 text-xs font-bold text-ranga-zle hover:bg-red-200 disabled:opacity-50">
+      <Flame size={13} />PILNE</button>}
+    {onReklamacyjna && rozmowa.reklamacyjna && <button type="button" disabled={zapisujeReklamacyjna}
+      aria-pressed
+      title="Prowadzimy tę rozmowę jak reklamację. W Allegro sprawy nie ma — założyć ją może tylko kupujący."
+      onClick={() => onReklamacyjna(false)}
+      className="inline-flex items-center gap-1 rounded bg-violet-100 px-2 py-1 text-xs font-bold text-violet-900 hover:bg-violet-200 disabled:opacity-50">
+      <Scale size={13} />REKLAMACYJNA</button>}
 
     {/* STATUS RAZ, NIE DWA (0.193.0): jedna plakietka z barwą stanu, bez
         podpisu „Status" — nazwa stanu mówi to samo jednym wyrazem mniej. */}
@@ -123,6 +102,27 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
     {/* Źródło zakończenia SAMEGO stoi słowem: „zakończona" bez „dlaczego"
         przy regule, której nikt nie kliknął, wyglądałaby na pomyłkę. */}
     {zrodlo && rozmowa.zakonczenie !== "agent" && <span className="text-xs text-slate-600">{zrodlo}</span>}
+
+    <MenuRozmowy>
+      {menu}
+      {/* Przełączniki W SPOCZYNKU — ta sama gramatyka co dotąd: „pilne" mówi
+          o rozmowie, którą się czyta, a „reklamacyjna" o tym, jak ją prowadzimy.
+          Sprawy w Allegro to NIE zakłada (0.390.0) i podpis mówi to wprost. */}
+      {(rozmowa.priorytet !== "pilny" || (onReklamacyjna && !rozmowa.reklamacyjna)) &&
+        <WierszMenu etykieta="Oznacz">
+          {rozmowa.priorytet !== "pilny" && <button type="button" disabled={zapisujePriorytet}
+            aria-pressed={false} aria-label="Oznacz jako pilne" title="Oznacz jako pilne"
+            onClick={() => onPriorytet("pilny")}
+            className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-50">
+            <Flame size={13} />pilne</button>}
+          {onReklamacyjna && !rozmowa.reklamacyjna && <button type="button" disabled={zapisujeReklamacyjna}
+            aria-pressed={false} aria-label="Sprawa reklamacyjna"
+            title="Oznacz, że prowadzimy tę rozmowę jak reklamację. Sprawy w Allegro to nie zakłada."
+            onClick={() => onReklamacyjna(true)}
+            className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-1 text-xs font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-50">
+            <Scale size={13} />reklamacyjna</button>}
+        </WierszMenu>}
+    </MenuRozmowy>
 
     {zakonczona
       ? onOtworz && <button type="button" disabled={zmieniaStatus} onClick={onOtworz}
