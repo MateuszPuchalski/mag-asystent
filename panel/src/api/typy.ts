@@ -1196,7 +1196,7 @@ export interface PozycjaNaOutlet {
 }
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
   | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna"
-  | "rozjazd_ilosci" | "przelew_czeka" | "drugi_zwrot";
+  | "rozjazd_ilosci" | "przelew_czeka" | "drugi_zwrot" | "nie_odeslany";
 
 /** Wynik dopasowania — §11.3 żąda widocznego źródła i pewności. */
 export interface Dopasowanie {

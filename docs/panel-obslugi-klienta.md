@@ -5136,6 +5136,27 @@ którym kroku stanął. Wypłata nie może wyprzedzić zapisu u nas.
 Zwrot zostaje potem w DO ZWROTU z paskiem pieniędzy (0.476.0). Schodzi sam,
 gdy synchronizacja zobaczy wypłatę z Allegro.
 
+
+**Szybka ścieżka czeka na paczkę (@wydanie).** Zgłoszenie właściciela przy
+zwrocie 5ZRQ/2026: przycisk proponował „na półkę i oddaj" za filtr, który
+nigdy nie przyjechał. Przy sygnale `brak_dowodu` przycisk stoi, ale mówi, że
+paczka nie wróciła. Gdy karton leży przy biurku, a tracking się spóźnia,
+zostaje droga ręczna.
+
+**Klient nie odesłał — odmowa jednym ruchem (@wydanie).** Zwrot bez numeru
+listu i bez doręczenia po czternastu dniach od zgłoszenia dostaje sygnał
+`nie_odeslany`. Stoi w DO DECYZJI z czerwonym paskiem w miejscu szybkiej
+ścieżki. `N` albo przycisk wysyła odmowę `REFUND_REJECTED` z gotowym
+powodem, a potem zapisuje werdykt „odrzucony" z tym samym zdaniem.
+Kolejność jest celowa: odmowa, która nie przejdzie, nie zmienia niczego.
+
+`O` otwiera pole powodu, bo odmowa jest nieodwracalna, a powód bywa inny.
+Tu fakt jest jeden i sprawdzalny, więc pole dodawałoby klawisz bez decyzji.
+
+Reguła wieku z 0.452.0 nie zamyka takiego zwrotu po 45 dniach. Allegro za
+nienadaną paczkę nic nie oddaje, więc zamknięcie mówiłoby nieprawdę. Sufit
+wynosi dziewięćdziesiąt dni, żeby stara historia nie wróciła setkami.
+
 ### 25a.8. Czego panel nie wie
 
 Kwoty pełnej nie znamy, dopóki zamówienie nie zostanie pobrane — i ekran mówi

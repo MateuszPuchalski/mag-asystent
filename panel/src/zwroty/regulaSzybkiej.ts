@@ -47,9 +47,21 @@ export function szybkaSciezka(zwrot: Zwrot, pudla: PudloSzybkie[]): SzybkaSciezk
     && zwrot.werdykt !== "odrzucony";
   /* Paczka nieodebrana nie ma zwrotu w Allegro — nie ma czego oddawać ani
      gdzie. Pieniądze przy niej to inna rozmowa z klientem. */
-  if (!wZasiegu || zwrot.zrodlo === "nieodebrana") return { pokaz: false };
+  /* KLIENT NIE ODESŁAŁ (@wydanie) — miejsce przycisku zajmuje gotowa odmowa
+     (`NieOdeslany`). Dwa przyciski na jedną decyzję, z czego jeden oddaje
+     pieniądze za towar, którego nie ma, to pomyłka czekająca na klawisz. */
+  if (!wZasiegu || zwrot.zrodlo === "nieodebrana" || zwrot.sygnaly.includes("nie_odeslany")) {
+    return { pokaz: false };
+  }
 
   const stop = (przeszkoda: string): SzybkaSciezka => ({ pokaz: true, przeszkoda });
+  /* PACZKA MUSI WRÓCIĆ (@wydanie). Zgłoszenie właściciela przy 5ZRQ/2026:
+     przycisk proponował „na półkę i oddaj" za filtr, który nigdy nie
+     przyjechał. `brak_dowodu` liczy serwer z trackingu. Gdy karton leży
+     przy biurku, a tracking się spóźnia, droga ręczna zostaje otwarta. */
+  if (zwrot.sygnaly.includes("brak_dowodu")) {
+    return stop("Paczka jeszcze nie wróciła — jeśli karton jest przy biurku, przyjmij ręcznie (P).");
+  }
   if (!zwrot.linkZwrotu) return stop("Brak odnośnika do zwrotu w Allegro — oddaj pieniądze ręcznie.");
   if (!zwrot.pozycje.length) return stop("Zwrot bez pozycji — dopisz, co przyszło w kartonie.");
 

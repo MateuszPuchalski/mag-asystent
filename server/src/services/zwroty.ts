@@ -34,7 +34,24 @@ export type Kubelek = "decyzja" | "ocena" | "zwrot" | "korekta" | "zamkniety" | 
 
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
   | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna"
-  | "rozjazd_ilosci" | "przelew_czeka" | "drugi_zwrot";
+  | "rozjazd_ilosci" | "przelew_czeka" | "drugi_zwrot" | "nie_odeslany";
+
+/**
+ * Ile dni klient ma na ODESŁANIE towaru po zgłoszeniu odstąpienia (@wydanie).
+ * Czternaście, jak termin ustawowy na odesłanie rzeczy. Po nim zwrot bez
+ * nadanej paczki dostaje sygnał `nie_odeslany` i gotową odmowę.
+ */
+export const TERMIN_ODESLANIA_DNI = 14;
+
+/**
+ * Jak długo zwrot bez nadanej paczki stoi w DO DECYZJI mimo reguły wieku
+ * (@wydanie). Reguła z 0.452.0 zamyka po `ZWROT_WYGASA_DNI` zwrot bez decyzji,
+ * bo „ósmego dnia Allegro oddaje samo" — ale oddaje za paczkę, która wróciła.
+ * Za nienadaną nie oddaje nic, więc zamknięcie mówiłoby nieprawdę i zdejmowało
+ * odmowę z pracy. Sufit jest, żeby stara historia nie wróciła do kolejki
+ * setkami — to ta sama blizna, po której reguła wieku powstała.
+ */
+export const NIEODESLANY_WYGASA_DNI = 90;
 
 /**
  * Zwrot tego samego zamówienia z DRUGIEGO źródła (0.493.0).
@@ -375,6 +392,12 @@ export function kubelekZwrotu(z: {
   zrodlo?: string | null;
   /** Wynik `pieniadzeCzekaja` — liczony raz, przez wołającego (0.476.0). */
   pieniadzeCzekaja?: boolean;
+  /**
+   * Czy klient w ogóle nadał paczkę (@wydanie) — numer listu albo doręczenie.
+   * Brak pola znaczy „nadana": wołający, którzy go nie znają, dostają
+   * dawne zachowanie reguły wieku.
+   */
+  nadana?: boolean;
 }, teraz = Date.now(), wygasaDni = config.allegro.zwrotWygasaDni): Kubelek {
   /* ZAMKNIĘCIE NIE ZDEJMUJE NIEZAPŁACONEGO ZWROTU (0.476.0). Korekta
      zamyka zwrot w bazie — ręką albo automatem ZW minutę po kwocie — ale
@@ -445,8 +468,10 @@ export function kubelekZwrotu(z: {
      LICZONE, NIE ZAPISANE. Kubełek wynika z faktów przy każdym odczycie,
      więc zmiana progu w `ZWROT_WYGASA_DNI` działa od razu i w obie strony.
      Zapis w bazie byłby decyzją bez człowieka, której nie dałoby się cofnąć. */
+  /* NIENADANA CZEKA DŁUŻEJ (@wydanie) — powód przy `NIEODESLANY_WYGASA_DNI`. */
+  const prog = z.nadana === false ? Math.max(wygasaDni, NIEODESLANY_WYGASA_DNI) : wygasaDni;
   if (!z.werdykt && z.utworzono && (z.zrodlo ?? "allegro") !== "nieodebrana"
-      && teraz - Date.parse(z.utworzono) > wygasaDni * 86_400_000) {
+      && teraz - Date.parse(z.utworzono) > prog * 86_400_000) {
     return "zamkniety";
   }
   if (z.werdykt !== "przyjety") return "decyzja";
@@ -503,6 +528,8 @@ export function sygnalyZwrotu(z: {
   przyjety?: boolean;
   /** Czy to zamówienie ma zwrot z drugiego źródła (0.493.0). */
   drugiZwrot?: boolean;
+  /** Data zgłoszenia — od niej liczy się termin odesłania (@wydanie). */
+  utworzono?: string | null;
 }, teraz = Date.now()): Sygnal[] {
   const s: Sygnal[] = [];
   /* Stany końcowe nie mają terminu do pilnowania — czerwień na nich uczyłaby
@@ -520,7 +547,16 @@ export function sygnalyZwrotu(z: {
      dawne kryterium: lepszy sygnał z daty nadania niż jego brak. */
   const wrocila = z.dostarczonoAt != null
     || (z.przesylkaStatus == null && Boolean(z.paczkaAt));
-  if (wPracy && !wrocila) s.push("brak_dowodu");
+  /* KLIENT NIE ODESŁAŁ (@wydanie). Zgłosił odstąpienie, a przez czternaście
+     dni nie nadał paczki — nie ma ani numeru listu, ani doręczenia. Pieniądze
+     się nie należą, więc sygnał zastępuje „nie nadana": to już nie czekanie,
+     tylko decyzja do podjęcia. Tylko w DO DECYZJI — po werdykcie ktoś ją
+     już podjął. Zgłoszenie właściciela przy zwrocie 5ZRQ/2026. */
+  const nieOdeslany = z.kubelek === "decyzja" && !z.paczkaAt && !z.dostarczonoAt
+    && !z.rejectionCode && Boolean(z.utworzono)
+    && teraz - Date.parse(String(z.utworzono)) > TERMIN_ODESLANIA_DNI * 86_400_000;
+  if (nieOdeslany) s.push("nie_odeslany");
+  else if (wPracy && !wrocila) s.push("brak_dowodu");
   /* Odrzucone w panelu Allegro, nie u nas. Bez tego biuro drugi raz
      rozstrzygałoby sprawę, którą ktoś już zamknął gdzie indziej. */
   if (z.rejectionCode) s.push("odrzucony_w_allegro");
@@ -673,6 +709,7 @@ function zloz(
     utworzono,
     zrodlo: String(z.zrodlo ?? "allegro"),
     pieniadzeCzekaja: czeka,
+    nadana: z.paczka_at != null || z.dostarczono_at != null,
   }, teraz);
   const suma = sumaPozycji(pozycje);
   return {
@@ -701,6 +738,7 @@ function zloz(
       kwotaUstalona: z.kwota_grosze != null,
       przyjety: z.werdykt === "przyjety",
       drugiZwrot: drugiZwrot !== null,
+      utworzono,
     }, teraz),
     terminAt,
     dniDoTerminu: dni,
