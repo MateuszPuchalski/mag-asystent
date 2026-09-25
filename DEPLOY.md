@@ -2886,6 +2886,36 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do @wydanie — Copilot sprawdza bazę i szuka pasowania w sieci
+
+**Panel trzeba przebudować, a serwer zrestartować.** Kolumny
+`copilot_pytanie.narzedzia` i `copilot_wywolanie.wyszukiwania` oraz tabela
+`pasowanie_siec` powstają same przy starcie.
+
+Dopytanie Copilota działa od razu i bez nowych ustawień. Model sam sięga do
+kartoteki, pasowania i treści ofert z kopii w bazie. Pod odpowiedzią stoi
+linijka „Sprawdził w bazie: …”. Żadne z tych narzędzi nie pisze do bazy ani
+nie woła Allegro.
+
+Pasowanie z sieci stoi na zerze i włącza się jedną linią:
+
+```
+export PASOWANIE_Z_SIECI=1
+```
+
+Nocą (1–5) automat bierze kartoteki z numerem OEM albo oryginalnym, które
+nie mają ani jednego zastosowania. Szuka ich w sieci poza Allegro. Domeny
+Allegro są zablokowane w wyszukiwarce, a automat nie wysyła do Allegro ani
+jednego żądania. Wyszukiwanie robią serwery Anthropic, nie adres sklepu.
+Znalezisko staje w kolejce Wiedzy jako propozycja z linkiem do strony.
+Nic nie zatwierdza się samo.
+
+`PASOWANIE_Z_SIECI_NA_NOC` (domyślnie 10) mówi, ile kartotek na noc. Jedna
+to zwykle kilka wyszukiwań po jednym cencie i kilka przeczytanych stron.
+Rachunek stoi na karcie „Copilot” w ustawieniach, pod zadaniem
+`pasowanie_siec`. Nie podnoś sufitu, zanim nie przejrzysz pierwszych
+propozycji w Wiedzy.
+
 ### Aktualizacja do 0.495.0 — bez ponownego pytania i test na żywym Allegro
 
 **Panel trzeba przebudować, a serwer zrestartować.** Tabela

@@ -308,3 +308,44 @@ test("dopytanie bez zestawu nie wysyła narzędzi, a ucięta odpowiedź niesie k
     _ustawKlienta(null);
   }
 });
+
+/* ── Pasowanie z sieci (@wydanie) ────────────────────────────────────────────
+   Tu sprawdzamy to, czego nie widzi test serwisu: że Allegro jest zablokowane
+   w OBU narzędziach serwerowych, że tekst przeczytanych stron wraca do sita,
+   że `pause_turn` wznawia się bez nowej wiadomości i że wyszukiwania liczą się
+   do kosztu. */
+
+test("pasowanie z sieci: Allegro zablokowane w wyszukiwarce i w pobieraniu, strony wracają do sita", async () => {
+  const { nadawcaPasowaniaSieciAnthropic } = await import("./copilot.anthropic.js");
+  const wynik = JSON.stringify({ znaleziska: [{
+    rodzaj: "maszyna", marka: "Stihl", model: "MS 250", wariant: null,
+    url: "https://czesci.example.com/a", cytat: "Stihl MS 250", zrodloStrony: "sklep",
+  }] });
+  const uzycie = (wysz: number) => ({ ...zuzycieRundy, server_tool_use: { web_search_requests: wysz, web_fetch_requests: 1 } });
+  const zadania = klientSekwencja([
+    () => ({ stop_reason: "pause_turn", model: "m", usage: uzycie(2), content: [
+      { type: "server_tool_use", id: "s1", name: "web_fetch", input: { url: "https://czesci.example.com/a" } },
+      { type: "web_fetch_tool_result", tool_use_id: "s1", content: { type: "web_fetch_result",
+        url: "https://czesci.example.com/a", retrieved_at: null,
+        content: { type: "document", title: null, citations: null,
+          source: { type: "text", media_type: "text/plain", data: "Nr 1123 120 0650. Stihl MS 250" } } } },
+    ] }),
+    () => ({ stop_reason: "end_turn", model: "m", usage: uzycie(1), content: [{ type: "text", text: wynik }] }),
+  ]);
+  try {
+    const o = await nadawcaPasowaniaSieciAnthropic({ symbol: "GAZ-1", nazwa: "Gaźnik", numery: ["1123 120 0650"] });
+    for (const t of zadania[0]!.tools as Array<{ name: string; blocked_domains?: string[] }>) {
+      assert.ok(t.blocked_domains?.includes("allegro.pl"), `${t.name} bez blokady Allegro`);
+    }
+    assert.deepEqual(o.strony, [{ url: "https://czesci.example.com/a", tekst: "Nr 1123 120 0650. Stihl MS 250" }]);
+    assert.equal(o.znaleziska.length, 1);
+    assert.equal(o.wyszukiwan, 3, "wyszukiwania z obu tur — płatne od sztuki");
+    assert.equal(zadania.length, 2);
+    const druga = zadania[1]!.messages as Array<{ role: string }>;
+    assert.deepEqual(druga.map((m) => m.role), ["user", "assistant"], "wznowienie bez nowej wiadomości");
+    const tresc = String((zadania[0]!.messages as Array<{ content: string }>)[0]!.content);
+    assert.ok(tresc.includes("1123 120 0650") && tresc.includes("GAZ-1"));
+  } finally {
+    _ustawKlienta(null);
+  }
+});

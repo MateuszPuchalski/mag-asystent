@@ -235,6 +235,9 @@ export function migrate(database: DatabaseSync) {
      widzieć, CO sprawdzono, zanim uwierzy odpowiedzi. Stare wymiany mają
      pustą listę i to jest o nich prawda: modele wtedy narzędzi nie miały. */
   addColumn("copilot_pytanie", "narzedzia", "TEXT NOT NULL DEFAULT '[]'");
+  /* Zapytania do wyszukiwarki w księdze Copilota (@wydanie) — pasowanie
+     z sieci. Stare wiersze mają zero i to jest o nich prawda. */
+  addColumn("copilot_wywolanie", "wyszukiwania", "INTEGER NOT NULL DEFAULT 0");
   /* Skąd wziął się tekst w kolejce Wiedzy (0.264.0) — patrz `model_z_opisu`
      w `schema.sql`. Zastane wiersze dostają `'opis'` i to jest o nich PRAWDA:
      powstały wyłącznie z sekcji „Modele:" w opisach kartotek. Tu wystarcza

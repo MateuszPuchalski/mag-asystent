@@ -78,10 +78,11 @@ import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
 import { sklasyfikujNowe } from "./services/klasyfikacja-auto.js";
 import { szkicujPoRozpoznaniu } from "./services/copilot-szkic-po-rozpoznaniu.js";
 import { oproznijKolejke } from "./services/wiedza-automat.js";
-import { nadawcaKluczaAnthropic } from "./adapters/copilot.anthropic.js";
+import { nadawcaKluczaAnthropic, nadawcaPasowaniaSieciAnthropic } from "./adapters/copilot.anthropic.js";
+import { szukajPasowaniaWSieci } from "./services/pasowanie-z-sieci.js";
 import { sondujRzeczywistosc } from "./services/sonda-rzeczywistosci.js";
 import { uruchomTakt } from "./services/takt.js";
-import { czytajStan, problemyKopii } from "./services/kopie-bazy.js";
+import { czytajStan, problemyKopii, wOknieNocnym } from "./services/kopie-bazy.js";
 import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
 import { przebiegRaportow, TAKT_RAPORTOW_MS } from "./services/raport-tygodnia.js";
 import { podNssm, ustawRestart } from "./services/restart.js";
@@ -640,6 +641,21 @@ async function main() {
       if (w.bezMarki || w.bledow) {
         console.warn(`[wiedza-automat] bez marki: ${w.bezMarki}, błędów: ${w.bledow}`);
       }
+    });
+  }
+
+  /* PASOWANIE Z SIECI (@wydanie). Takt co godzinę, praca tylko w oknie
+     nocnym: wyszukiwanie trwa sekundy na kartotekę, a w dzień tokeny i łącze
+     należą do biura. Ten sam warunek co każde wywołanie modelu bez kliknięcia
+     — wyłącznik w `wertis.env` i klucz dostawcy. Do Allegro nie idzie stąd
+     ani jedno żądanie; powód i trzy bariery w `services/pasowanie-z-sieci.ts`. */
+  if (config.pasowanieZSieci.wlaczony && config.copilot.mode === "anthropic" && config.copilot.klucz) {
+    uruchomTakt("pasowanie-z-sieci", config.pasowanieZSieci.ms, async () => {
+      if (!wOknieNocnym(new Date().toISOString())) return;
+      const w = await szukajPasowaniaWSieci({
+        nadaj: nadawcaPasowaniaSieciAnthropic, naNoc: config.pasowanieZSieci.naNoc,
+      });
+      if (w.przerwane) console.warn(`[pasowanie-z-sieci] przebieg przerwany: ${w.przerwane}`);
     });
   }
 

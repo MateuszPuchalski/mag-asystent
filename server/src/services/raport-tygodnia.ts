@@ -37,8 +37,9 @@ import { migawki, zrobMigawke, type WpisMigawki } from "./migawka-dnia.js";
    trasa tylko czyta. Otwarcie tygodnia, którego nie policzono, pokazuje
    brak, a nie liczy go w locie.                                            */
 
-/** Podbij przy każdej zmianie reguły liczenia albo kształtu `RaportTygodnia`. */
-export const WERSJA_RAPORTU = 1;
+/** Podbij przy każdej zmianie reguły liczenia albo kształtu `RaportTygodnia`.
+ *  2 (@wydanie): koszt Copilota dolicza wyszukiwania w sieci, płatne od sztuki. */
+export const WERSJA_RAPORTU = 2;
 
 /* Tyle tygodni wstecz automat nadrabia po przerwie. Cztery, bo miesiąc to
    najdłuższa przerwa, po której porównanie z poprzednim tygodniem jeszcze
@@ -181,11 +182,12 @@ export function zbudujRaport(poniedzialek: string, database: Db = defaultDb()): 
 
   // ── Copilot: koszt z tych samych stawek co pomiar ───────────────────────
   const wywolania = database.prepare(`SELECT model, wynik, tokeny_wej, tokeny_wyj,
-      tokeny_cache_zapis, tokeny_cache_odczyt FROM copilot_wywolanie WHERE ${wOknie("at")}`)
+      tokeny_cache_zapis, tokeny_cache_odczyt, wyszukiwania FROM copilot_wywolanie WHERE ${wOknie("at")}`)
     .all(od, doChwili) as Array<{ model: string; wynik: string; tokeny_wej: number;
-      tokeny_wyj: number; tokeny_cache_zapis: number; tokeny_cache_odczyt: number }>;
+      tokeny_wyj: number; tokeny_cache_zapis: number; tokeny_cache_odczyt: number; wyszukiwania: number }>;
   const koszt = wywolania.reduce((s, w) => s + kosztUsd(w.model, {
     wej: w.tokeny_wej, wyj: w.tokeny_wyj, cacheZapis: w.tokeny_cache_zapis, cacheOdczyt: w.tokeny_cache_odczyt,
+    wyszukiwania: w.wyszukiwania,
   }), 0);
 
   // ── system ──────────────────────────────────────────────────────────────
