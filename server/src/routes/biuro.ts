@@ -16,6 +16,8 @@ import {
 import { podgladDokumentu } from "../services/podglad-dostawy.js";
 import { archiwumDostaw } from "../services/archiwum-dostaw.js";
 import { doDecyzji } from "../services/do-decyzji.js";
+import { sondujRzeczywistosc, stanSondy } from "../services/sonda-rzeczywistosci.js";
+import { config } from "../config.js";
 import { BladFirmy, daneFirmy, zapiszDaneFirmy, type PoleFirmy } from "../services/firma.js";
 
 /* ── Trasy biura (strona `/biuro` zniknęła w 0.446.0) ─────────────────────
@@ -235,6 +237,39 @@ export async function biuroRoutes(app: FastifyInstance) {
       return reply.code(403).send({ error: "Decyzje biura podejmuje biuro" });
     }
     return doDecyzji();
+  });
+
+  /* ── Test na żywym Allegro (@wydanie) ────────────────────────────────────
+     Odczyt ostatniego przebiegu i przycisk „Przetestuj teraz”. Przebieg sam
+     chodzi raz dziennie w `main()`; przycisk jest po to, żeby po wdrożeniu
+     nie czekać doby na pierwszy wynik. Powód i kroki: serwis.
+
+     POST, bo przebieg ZAPISUJE wynik u nas (i `logEvent`). U Allegro tylko
+     czyta. Pięć minut odstępu między ręcznymi przebiegami, żeby przycisk
+     nie stał się drogą w limit 429. */
+  app.get("/api/biuro/sonda-rzeczywistosci", async (_req, reply) => {
+    const s = sesjaZadania();
+    if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+    if (!ORZEKAJACY.includes(s.user.role)) {
+      return reply.code(403).send({ error: "Stan systemu czyta biuro" });
+    }
+    return stanSondy();
+  });
+
+  app.post("/api/biuro/sonda-rzeczywistosci", async (_req, reply) => {
+    const s = sesjaZadania();
+    if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
+    if (!ORZEKAJACY.includes(s.user.role)) {
+      return reply.code(403).send({ error: "Stan systemu czyta biuro" });
+    }
+    if (!config.allegro.clientId) {
+      return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+    }
+    const ost = stanSondy().przebieg;
+    if (ost && Date.now() - Date.parse(ost) < 5 * 60_000) {
+      return reply.code(429).send({ error: "Ostatni przebieg był przed chwilą — wynik stoi niżej." });
+    }
+    return sondujRzeczywistosc();
   });
 
   /* ── Dane firmy na wydrukach (0.444.0) ─────────────────────────────────

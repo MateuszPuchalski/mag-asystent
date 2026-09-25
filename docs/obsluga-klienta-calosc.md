@@ -214,6 +214,30 @@ osobowej, celowo.
 rosnącej eskalacji jest miarą, która kłamie. Pilnują tego testy eskalacji
 w `droga-klienta.test.ts`.
 
+### S5a. Bez ponownego pytania (@wydanie)
+
+Druga miara skutku obok eskalacji, w Analizie przy czasie odpowiedzi. Mówi,
+czy klient po naszej odpowiedzi musiał pisać jeszcze raz w tej samej rozmowie.
+Eskalacja liczy powrót INNĄ drogą: dyskusją albo reklamacją. Razem mówią,
+czy odpowiedź zamknęła sprawę. Reguła stoi w `services/czas-odpowiedzi.ts`.
+
+**Zabrania.** Liczenia podziękowania jako powrotu i chowania niepewności
+w wyniku. Pilnują tego testy `losOdpowiedzi` w `czas-odpowiedzi.test.ts`.
+
+### S5b. Test na żywym Allegro (@wydanie)
+
+Raz dziennie serwer przechodzi drogi produkcji wobec prawdziwego Allegro, bez
+atrap: wątki, sprawę i zdjęcia tak, jak pobiera je Copilot. Wynik stoi na
+ekranie Stan, a krok z błędem — w DO DECYZJI. Kod: `services/sonda-rzeczywistosci.ts`.
+
+Powód jest jeden i drogi. Nasze bramki sprawdzają kod wobec kodu. Copilot
+„widział zdjęcia” od 0.330.0 do 0.484.6 tylko w testach z podstawionym
+pobieraczem, a ani jedno zdjęcie nie doszło do modelu.
+
+**Zabrania.** Atrap w samej sondzie poza jej testem, zapisu czegokolwiek
+u Allegro i trzymania treści, nazw plików albo adresów w wyniku. Limit 429
+i brak danych to „pominięty”, bo czerwień ma znaczyć jedno: droga nie działa.
+
 ### S6. Zamknięcie sprawy klienta — czeka na decyzję właściciela
 
 Kiedy sprawa klienta jest skończona, skoro składa się z bytów o czterech

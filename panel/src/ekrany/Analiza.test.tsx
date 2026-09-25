@@ -78,6 +78,8 @@ beforeEach(() => {
       wgKategorii: [{ klucz: "PRODUCT_COMPATIBILITY", n: 20, medianaMin: 95 },
         { klucz: "nierozpoznane", n: 3, medianaMin: 12 }],
       wgOsoby: null, czekaTeraz: { n: 2, najdluzejMin: 130 },
+      powroty: { oknoDni: 7, n: 40, bezPowrotu: 30, wrocilo: 10, wrociloBezRozpoznania: 4, czeka: 2,
+        wgKategorii: [{ klucz: "PRODUCT_COMPATIBILITY", n: 20, bezPowrotu: 11 }], wgOsoby: null },
     }));
     /* Miary obsługi (0.444.0, przyszły z ustawień). Kształty minimalne —
        treść każdej karty ma własny test obok niej; tu liczy się skład. */
@@ -207,10 +209,25 @@ describe("zakres Obsługa klienta", () => {
     await screen.findByText("Czas odpowiedzi klientowi");
     expect(adresy).toContain("/api/analiza/obsluga?days=30");
     expect(screen.getByText("38 min")).toBeInTheDocument();
-    expect(screen.getByText("Dobór")).toBeInTheDocument();
+    /* Kategoria stoi w dwóch tabelach od 24 września 2026: czasu
+       i „bez ponownego pytania”. */
+    expect(screen.getAllByText("Dobór").length).toBe(2);
     expect(screen.getByText("nierozpoznane")).toBeInTheDocument();
     expect(screen.queryByText("Według osoby")).toBeNull();
     expect(zapisy).toEqual([]);
+  });
+
+  /* Bez ponownego pytania (24 września 2026): udział liczony z odpowiedzi
+     z wynikiem, a niepewność i odpowiedzi bez wyniku stoją obok, nie w nim. */
+  it("pokazuje udział bez ponownego pytania i mówi, ile w nim niepewności", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    await userEvent.click(screen.getByRole("button", { name: "Obsługa klienta" }));
+    await screen.findByText("Bez ponownego pytania");
+    expect(screen.getByText("75%")).toBeInTheDocument();
+    expect(screen.getByText(/4 bez rozpoznania, mogło być podziękowanie/)).toBeInTheDocument();
+    expect(screen.getByText("55%")).toBeInTheDocument();
+    expect(screen.queryByText("Bez ponownego pytania według osoby")).toBeNull();
   });
 
   /* Miary obsługi przeszły tu z ustawień w 0.444.0. Pilnujemy trzech

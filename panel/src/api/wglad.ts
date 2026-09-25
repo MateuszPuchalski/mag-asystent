@@ -146,6 +146,22 @@ export interface CzasOdpowiedzi {
   /** `null` dla roli biuro — rozbicie na ludzi liczy serwer wyłącznie adminowi. */
   wgOsoby: WierszCzasu[] | null;
   czekaTeraz: { n: number; najdluzejMin: number | null };
+  powroty: Powroty;
+}
+
+/** Wiersz „bez ponownego pytania” — `n` liczy odpowiedzi z wynikiem. */
+export interface WierszPowrotu { klucz: string; n: number; bezPowrotu: number }
+
+export interface Powroty {
+  oknoDni: number;
+  n: number;
+  bezPowrotu: number;
+  wrocilo: number;
+  wrociloBezRozpoznania: number;
+  czeka: number;
+  wgKategorii: WierszPowrotu[];
+  /** `null` dla roli biuro, jak przy czasie odpowiedzi. */
+  wgOsoby: WierszPowrotu[] | null;
 }
 
 export function useCzasOdpowiedzi(dni: number, wlaczona: boolean) {
