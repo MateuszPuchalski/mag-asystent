@@ -196,6 +196,8 @@ export interface StanZadaniaAktualizacji {
   do?: string;
   kod?: number;
   komunikat?: string;
+  /** Bieżący krok instalatora (@wydanie) — tylko w trakcie, gdy go zapisał. */
+  postep?: { krok: number; z: number; nazwa: string; at: string };
 }
 export interface StanAktualizacji {
   obecna: string;

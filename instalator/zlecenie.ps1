@@ -28,6 +28,8 @@ $katalog = Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)
 $dir = Join-Path $katalog "server\data\aktualizacja"
 $plikZlecenia = Join-Path $dir "zlecenie.json"
 $plikStanu = Join-Path $dir "stan.json"
+# Bieżący krok dla paska w panelu (@wydanie) — pisze go instalator.
+$plikPostepu = Join-Path $dir "postep.json"
 $robocze = Join-Path $env:TEMP "wertis-aktualizacja"
 $dziennikRoboczy = Join-Path $env:TEMP "wertis-aktualizacja.log"
 $teraz = { (Get-Date).ToUniversalTime().ToString("yyyy-MM-ddTHH:mm:ss.fffZ") }
@@ -53,6 +55,9 @@ if ($wersja -notmatch '^\d{1,4}\.\d{1,5}\.\d{1,6}\z') {
                    komunikat = "Zlecenie bez poprawnego numeru wersji." }
     exit 1
 }
+# Krok z poprzedniej aktualizacji pokazałby się na pasku nowej, zanim
+# instalator zapisze pierwszy własny.
+Remove-Item -LiteralPath $plikPostepu -Force -ErrorAction SilentlyContinue
 Zapisz-Stan @{ etap = "trwa"; wersja = $wersja; kto = $kto; od = $od }
 
 # Port i instancja z wertis.env tej instalacji — zadanie nie ma argumentów.
@@ -73,7 +78,8 @@ Copy-Item -Path (Join-Path $katalog "instalator\*.ps1") -Destination $robocze
 Set-Location $env:TEMP
 
 $argumenty = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", (Join-Path $robocze "wertis-instalator.ps1"),
-               "-Aktualizuj", "-Paczka", $wersja, "-Katalog", $katalog, "-Port", "$port")
+               "-Aktualizuj", "-Paczka", $wersja, "-Katalog", $katalog, "-Port", "$port",
+               "-PlikPostepu", $plikPostepu)
 if ($dev) { $argumenty += "-Dev" }
 & powershell.exe @argumenty *> $dziennikRoboczy
 $kod = $LASTEXITCODE

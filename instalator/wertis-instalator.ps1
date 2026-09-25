@@ -53,6 +53,11 @@
     rozpakowuje się obok działającej wersji, a nieudany start nowej wraca
     na starą razem z bazą. Tak aktualizuje przycisk w panelu.
 
+.PARAMETER PlikPostepu
+    Tylko z -Paczka (@wydanie): plik JSON, do którego instalator zapisuje
+    bieżący krok aktualizacji. Podaje go `zlecenie.ps1`, a karta w panelu
+    rysuje z niego pasek postępu. Bez parametru nic się nie zapisuje.
+
 .PARAMETER Dev
     Druga, ROZWOJOWA instancja obok produkcji: usługi z sufiksem -dev, dane
     demo, pusty kanał APK (dev niczego kolektorom nie proponuje) i etykieta
@@ -107,6 +112,7 @@ param(
     [switch]$UsunDane,
     [switch]$Aktualizuj,
     [string]$Paczka,
+    [string]$PlikPostepu,
     [switch]$ZdjeciaZapis,
     [string]$SerwerSql = "localhost",
     [string]$InstancjaSql
@@ -127,6 +133,7 @@ $katalogSkryptu = Split-Path -Parent $MyInvocation.MyCommand.Path
 # MODULY-KONIEC
 
 $script:WertisDryRun = [bool]$DryRun
+$script:WertisPlikPostepu = $PlikPostepu
 
 # ── Instancja: produkcja albo dev (0.69.0) ──────────────────────────────────
 # Nazwy usług i reguły zapory idą z jednego miejsca. Bramka odmawia od razu,

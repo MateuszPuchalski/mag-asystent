@@ -84,11 +84,19 @@ try {
     Write-Host "`n1. Udana aktualizacja 9.0.0 -> 9.1.0" -ForegroundColor Cyan
     $zip = Nowa-Paczka "9.1.0"
     $atrapa = Atrapa-Zdrowia "9.1.0"
+    # Plik postępu tą samą ścieżką co w `zlecenie.ps1`: przez server\data, które
+    # w trakcie zamiany staje się dowiązaniem. Krok 4 musi przejść już przez nie.
+    $script:WertisPlikPostepu = Join-Path $k "server\data\postep.json"
     try {
         $kod = Update-WertisZPaczki -Katalog $k -Repo "https://github.com/a/b.git" -Paczka $zip `
             -Uslugi @("wertis-proba-brak") -Port $PORT
-    } finally { Stop-Process -Id $atrapa.Id -Force -ErrorAction SilentlyContinue }
+    } finally {
+        Stop-Process -Id $atrapa.Id -Force -ErrorAction SilentlyContinue
+        $script:WertisPlikPostepu = $null
+    }
     Zaloz ($kod -eq 0) "kod wyjścia 0 (dostałem $kod)"
+    $postep = Get-Content -LiteralPath (Join-Path $dane "postep.json") -Raw -Encoding UTF8 | ConvertFrom-Json
+    Zaloz ($postep.krok -eq 4 -and $postep.z -eq 4) "ostatni krok postępu to 4 z 4 (jest $($postep.krok) z $($postep.z))"
     Zaloz ((Tresc (Join-Path $k "paczka.json")) -match '9\.1\.0') "w katalogu aplikacji stoi nowa wersja"
     Zaloz (-not (Test-Path (Join-Path $k "znak-starej.txt"))) "stare pliki nie przeciekły do nowej wersji"
     Zaloz (Test-Path (Join-Path "$k.poprzednia" "znak-starej.txt")) "poprzednia wersja leży obok"
