@@ -10,7 +10,7 @@ import { Zakonczenie } from "./Zakonczenie";
 
    1. PRZYCISK NIE OBIECUJE ZAKOŃCZENIA. Allegro nazywa tę wartość
       `END_REQUEST` i nigdzie nie mówi, że dyskusja się od niej zamknie.
-      Napis „ZAKOŃCZ" byłby zgadywaniem skutku — tym samym rodzajem, który
+      Napis „Zakończ" byłby zgadywaniem skutku — tym samym rodzajem, który
       do 0.155.0 trzymał w kodzie adres, jakiego Allegro nie ma.
    2. ZGODA JEST WARUNKIEM, nie ozdobą: prośby nie da się cofnąć.
    3. PUSTA TREŚĆ NIE WYCHODZI. Prośba o zamknięcie sprawy bez ani jednego
@@ -39,14 +39,14 @@ const props = (n: Partial<React.ComponentProps<typeof Zakonczenie>> = {}) => ({
 describe("Prośba o zakończenie dyskusji", () => {
   it("przycisk PROSI o zakończenie, a nie kończy", () => {
     render(<Zakonczenie {...props()} />);
-    expect(screen.getByRole("button", { name: /POPROŚ O ZAKOŃCZENIE/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^ZAKOŃCZ$/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Poproś o zakończenie/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^zakończ$/i })).not.toBeInTheDocument();
   });
 
   it("bez zgody wysyłka jest martwa, ze zgodą ożywa", async () => {
     render(<Zakonczenie {...props()} />);
-    await userEvent.click(screen.getByRole("button", { name: /POPROŚ/ }));
-    const wyslij = screen.getByRole("button", { name: /WYŚLIJ PROŚBĘ/ });
+    await userEvent.click(screen.getByRole("button", { name: /Poproś/ }));
+    const wyslij = screen.getByRole("button", { name: /Wyślij prośbę/ });
     expect(wyslij).toBeDisabled();
     await userEvent.click(screen.getByRole("checkbox"));
     expect(wyslij).toBeEnabled();
@@ -54,39 +54,44 @@ describe("Prośba o zakończenie dyskusji", () => {
 
   it("zdanie zgody mówi, że to Allegro zamyka dyskusję", async () => {
     render(<Zakonczenie {...props()} />);
-    await userEvent.click(screen.getByRole("button", { name: /POPROŚ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Poproś/ }));
     expect(screen.getByText(/nie da się jej cofnąć/)).toBeInTheDocument();
     expect(screen.getByText(/Dyskusję zamyka Allegro, nie to kliknięcie/)).toBeInTheDocument();
   });
 
   it("pusta treść blokuje wysyłkę mimo zgody", async () => {
     render(<Zakonczenie {...props()} />);
-    await userEvent.click(screen.getByRole("button", { name: /POPROŚ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Poproś/ }));
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.clear(screen.getByRole("textbox"));
-    expect(screen.getByRole("button", { name: /WYŚLIJ PROŚBĘ/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Wyślij prośbę/ })).toBeDisabled();
   });
 
   it("wysyła treść z pola, raz", async () => {
     const onZakoncz = vi.fn();
     render(<Zakonczenie {...props({ onZakoncz })} />);
-    await userEvent.click(screen.getByRole("button", { name: /POPROŚ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Poproś/ }));
     await userEvent.click(screen.getByRole("checkbox"));
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ PROŚBĘ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij prośbę/ }));
     expect(onZakoncz).toHaveBeenCalledTimes(1);
     expect(String(onZakoncz.mock.calls[0][0])).toMatch(/proszę o zakończenie/i);
   });
 
-  it("po wysłanej prośbie przycisku NIE MA, a pasek mówi, że zamyka Allegro", () => {
+  it("po wysłanej prośbie przycisku NIE MA, a podpowiedź mówi, że zamyka Allegro", () => {
+    /* Zdanie „zamyka Allegro" zeszło do podpowiedzi (@wydanie) — test pilnuje,
+       że nie zniknęło, tylko przestało zajmować linijkę. */
     render(<Zakonczenie {...props({
       dyskusja: d({ zakonczenieStatus: "sent", zakonczeniePrzez: "Ala" }) })} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
     expect(screen.getByText(/Poproszono o zakończenie/)).toBeInTheDocument();
-    expect(screen.getByText(/Dyskusję zamyka Allegro, nie my/)).toBeInTheDocument();
+    expect(screen.getByTitle(/Dyskusję zamyka Allegro, nie my/)).toBeInTheDocument();
+    expect(screen.queryByText(/Dyskusję zamyka Allegro, nie my/)).not.toBeInTheDocument();
   });
 
   it("niepewny los mówi, czego NIE robić", () => {
     render(<Zakonczenie {...props({ dyskusja: d({ zakonczenieStatus: "send_uncertain" }) })} />);
+    /* Ostrzeżenie stoi NA WIERZCHU, nie w podpowiedzi: pod myszą nie
+       zatrzymałoby drugiej prośby. */
     expect(screen.getByText(/Nie wysyłaj drugiej prośby/)).toBeInTheDocument();
   });
 
@@ -98,7 +103,7 @@ describe("Prośba o zakończenie dyskusji", () => {
 
   it("błąd z serwera stoi PRZY formularzu, a nie w rogu ekranu", async () => {
     render(<Zakonczenie {...props({ blad: "Allegro zamknęło rozmowę w tej sprawie" })} />);
-    await userEvent.click(screen.getByRole("button", { name: /POPROŚ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Poproś/ }));
     expect(screen.getByText(/Allegro zamknęło rozmowę/)).toBeInTheDocument();
   });
 });
