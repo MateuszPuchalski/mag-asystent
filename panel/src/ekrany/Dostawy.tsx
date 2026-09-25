@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Truck } from "lucide-react";
 import {
   useArchiwumDostaw, useDokument, useDostawy, useNotatkaDoHali, useOdpowiedziHali, usePozaWertis,
@@ -38,8 +38,16 @@ export function Dostawy() {
   const wybrany: number | "bez" | null = id === "bez" ? "bez" : id ? Number(id) : null;
   const dokId = typeof wybrany === "number" ? wybrany : null;
 
-  const [kubelek, setKubelek] = useState<KubelekDostaw>("decyzja");
-  const [fraza, setFraza] = useState("");
+  /* Kubełek i fraza z adresu (@wydanie): wiersz dostawcy w Analizie prowadzi
+     tu z `?kubelek=archiwum&q=<dostawca>`. Adres czyta się RAZ, przy wejściu,
+     jak w koszach — dalej to stan ekranu. */
+  const [parametry] = useSearchParams();
+  const [kubelek, setKubelek] = useState<KubelekDostaw>(() => {
+    const z = parametry.get("kubelek");
+    return (["decyzja", "toku", "nietkniete", "zamkniete", "poza", "archiwum"] as const)
+      .find((k) => k === z) ?? "decyzja";
+  });
+  const [fraza, setFraza] = useState(() => parametry.get("q") ?? "");
   /* Archiwum szuka SERWER, więc każde naciśnięcie klawisza byłoby żądaniem.
      Ćwierć sekundy to próg, poniżej którego pisanie i tak trwa — wzięty
      z biura, gdzie działa od 0.121.0. */

@@ -95,6 +95,12 @@ Oferty towaru to pamięć człowieka i sygnatura równa symbolowi, więc liczba
 sprzedaży mówi wprost, z ilu ofert powiązanych jest liczona
 (`services/przekroj-towaru.ts`).
 
+**Wgląd prowadzi do pracy (@wydanie).** Liczba w Analizie, która opisuje
+stan BIEŻĄCY, otwiera listę, którą liczy: klient czeka teraz → skrzynka,
+problemy dostaw → dostawy. Dostawca w tabeli dostaw otwiera archiwum jego
+dokumentów. Liczby z minionego okna — tydzień, eskalacje, tarcie — odnośnika
+nie mają. Otworzyłyby listę, która dziś znaczy co innego.
+
 Nakładka spraw (`sprawa_klienta`) odeszła w 0.388.0. Droga zakupu robi to
 samo sama i przez cztery kolejki. Cena jest zapisana jawnie: dwóch rozmów
 o jednym problemie BEZ wspólnego zamówienia nikt już nie sklei.

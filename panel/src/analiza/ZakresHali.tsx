@@ -24,7 +24,7 @@ export function ZakresHali({ a, m }: { a: AnalizaAudytu; m: Metryki | undefined 
         <Liczba ile={a.dni.reduce((s, d) => s + d.pozycje, 0)} etykieta={`pozycji w oknie ${a.days} dni`} />
         <Liczba ile={r.dostawZamknietych} etykieta="dostaw rozłożonych" />
         <Liczba ile={r.medianaMinutDostawy != null ? `${r.medianaMinutDostawy} min` : "—"} etykieta="mediana czasu dostawy" />
-        <Liczba ile={r.problemyOtwarte} etykieta="problemów czeka na biuro"
+        <Liczba doPracy="/obsluga/dostawy" ile={r.problemyOtwarte} etykieta="problemów czeka na biuro"
           ton={r.problemyOtwarte > 0 ? "text-ranga-zle" : ""} />
       </div>
       <div className="mt-5 grid gap-6 xl:grid-cols-2">

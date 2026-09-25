@@ -1,6 +1,6 @@
 ---
 rodzaj: minor
-tytul: panele pomagają sobie — wiązanie obustronne, „kiedy będzie”, odświeżanie
+tytul: panele pomagają sobie — wiązania, zwrot na osi, zadania ze spraw, szuflada towaru
 ---
 
 **Zwrot widzi rozmowę, której zamówienie wskazał agent.** Do tej wersji
@@ -25,6 +25,11 @@ staje na osi zwrotu. Zadanie odesłane przez halę pojawia się w Do zrobienia.
 reklamacjach, zadaniach, dzienniku i szukaniu otwiera przekrój. Pokazuje stan,
 dostawy, wiedzę, otwarte zwroty, reklamacje i rozmowy o tym towarze. Dochodzą
 sprzedaż, zwroty i reklamacje z 90 dni. Każdy wiersz prowadzi do sprawy.
+
+**Analiza prowadzi do pracy.** „Ostatnie słowo klienta teraz" otwiera
+skrzynkę, „problemów czeka na biuro" — dostawy. Dostawca w tabeli dostaw
+otwiera archiwum jego dokumentów. Liczby z minionych okien zostają bez
+odnośnika, bo lista dziś znaczy co innego.
 
 **Drobne:**
 

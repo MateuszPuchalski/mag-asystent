@@ -161,6 +161,12 @@ describe("Analiza w panelu", () => {
     expect(screen.queryByRole("button", { name: /CSV/ })).toBeNull();
   });
 
+  it("dostawca w tabeli prowadzi do archiwum jego dokumentów (@wydanie)", async () => {
+    pokaz();
+    const link = await screen.findByRole("link", { name: "Rosa-Pol" });
+    expect(link).toHaveAttribute("href", "/obsluga/dostawy?kubelek=archiwum&q=Rosa-Pol");
+  });
+
   it("zero zapisu przy patrzeniu — oba zakresy i zmiana okna", async () => {
     pokaz();
     await naPraceHali();
@@ -242,6 +248,8 @@ describe("zakres Obsługa klienta", () => {
     expect(screen.getAllByText("Dobór").length).toBe(2);
     expect(screen.getByText("nierozpoznane")).toBeInTheDocument();
     expect(screen.queryByText("Według osoby")).toBeNull();
+    /* Wgląd prowadzi do pracy (@wydanie): liczba bieżąca otwiera kolejkę. */
+    expect(screen.getByRole("link", { name: /ostatnie słowo klienta teraz/ })).toHaveAttribute("href", "/obsluga/skrzynka");
     expect(zapisy).toEqual([]);
   });
 
