@@ -79,7 +79,7 @@ test("patrzenie niczego nie zapisuje", async () => {
   const s = r.json() as { wydania: Array<{ wersja: string }>; zmiany: unknown[]; blokada: string | null;
     auto: { tryb: string; okno: { od: number; do: number }; kandydat: string | null; teraz: boolean; powod: string } };
   assert.deepEqual(s.wydania.map((w) => w.wersja), ["9.0.0"]);
-  /* Decyzja automatu (@wydanie) w odpowiedzi — to samo zdanie, którym kieruje
+  /* Decyzja automatu (0.494.0) w odpowiedzi — to samo zdanie, którym kieruje
      się takt. Wydanie z testu ma dwa dni, więc jest dojrzałe. */
   assert.deepEqual([s.auto.tryb, s.auto.okno, s.auto.kandydat], ["noc", { od: 3, do: 5 }, "9.0.0"]);
   assert.ok(s.auto.powod.length > 0);

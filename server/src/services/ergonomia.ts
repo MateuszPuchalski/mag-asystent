@@ -1,5 +1,5 @@
 import { db } from "../db/db.js";
-import { OKNO } from "./raporty.js";
+import { GRANICA_OKNA, OKNO } from "./raporty.js";
 import { etykietaUrzadzenia } from "./szukanie-kolektora.js";
 
 /* ── Ergonomia w liczbach ────────────────────────────────────────────────────
@@ -187,13 +187,13 @@ export function ergonomia(days = 7): Ergonomia {
   const od = OKNO(days);
   const d = db();
 
-  const daneDo = (d.prepare("SELECT MAX(created_at) AS t FROM events WHERE created_at >= datetime('now', ?)")
+  const daneDo = (d.prepare(`SELECT MAX(created_at) AS t FROM events WHERE created_at >= ${GRANICA_OKNA}`)
     .get(od) as { t: string | null }).t;
 
   /* ── Czas odpowiedzi każdego żądania ── */
   const paczki = d.prepare(
     `SELECT device_id AS device, ${pole("$.czasy")} AS czasy FROM events
-      WHERE type = 'czasy_zadan' AND created_at >= datetime('now', ?)`
+      WHERE type = 'czasy_zadan' AND created_at >= ${GRANICA_OKNA}`
   ).all(od) as Array<{ device: string | null; czasy: unknown }>;
   const trasy = new Map<string, { ekran: string; trasa: string; k: number[] }>();
   const kolektory = new Map<string | null, number[]>();
@@ -231,7 +231,7 @@ export function ergonomia(days = 7): Ergonomia {
   /* ── Skan na ekranie głównym (stary pomiar) ── */
   const pomiary = (d.prepare(
     `SELECT device_id AS device, ${pole("$.ms")} AS ms FROM events
-      WHERE type = 'scan_timing' AND created_at >= datetime('now', ?)`
+      WHERE type = 'scan_timing' AND created_at >= ${GRANICA_OKNA}`
   ).all(od) as Array<{ device: string | null; ms: unknown }>)
     .filter((r): r is { device: string | null; ms: number } => typeof r.ms === "number");
   const skanWgKolektora = [...grupuj(pomiary, (r) => r.device).entries()]
@@ -243,7 +243,7 @@ export function ergonomia(days = 7): Ergonomia {
      się świadomie, skan w dwie sekundy — bo pierwszy „nie zadziałał". */
   const skany = d.prepare(
     `SELECT device_id AS device, ${pole("$.code")} AS kod, created_at AS t FROM events
-      WHERE type = 'scan' AND created_at >= datetime('now', ?)
+      WHERE type = 'scan' AND created_at >= ${GRANICA_OKNA}
       ORDER BY device_id, created_at`
   ).all(od) as Array<{ device: string | null; kod: unknown; t: string }>;
   const powtorzoneSkany = [...grupuj(skany, (r) => r.device).entries()]
@@ -262,7 +262,7 @@ export function ergonomia(days = 7): Ergonomia {
   const odrzucone = d.prepare(
     `SELECT device_id AS device, ${pole("$.sciezka")} AS sciezka, ${pole("$.status")} AS status,
             ${pole("$.powod")} AS powod FROM events
-      WHERE type = 'http_rejected' AND created_at >= datetime('now', ?)`
+      WHERE type = 'http_rejected' AND created_at >= ${GRANICA_OKNA}`
   ).all(od) as Array<{ device: string | null; sciezka: unknown; status: unknown; powod: unknown }>;
   const odrzucenia = [...grupuj(odrzucone, (r) => {
     const trasa = wzorTrasy(typeof r.sciezka === "string" ? r.sciezka : "?");
@@ -280,7 +280,7 @@ export function ergonomia(days = 7): Ergonomia {
   /* ── Przerwy w łączności ── */
   const przerwyWiersze = d.prepare(
     `SELECT device_id AS device, ${pole("$.trwanieMs")} AS ms FROM events
-      WHERE type = 'siec_przerwa' AND created_at >= datetime('now', ?)`
+      WHERE type = 'siec_przerwa' AND created_at >= ${GRANICA_OKNA}`
   ).all(od) as Array<{ device: string | null; ms: unknown }>;
   const przerwy = [...grupuj(przerwyWiersze, (r) => r.device).entries()]
     .map(([device, rs]) => {
@@ -296,7 +296,7 @@ export function ergonomia(days = 7): Ergonomia {
   const liczby = new Map(
     (d.prepare(
       `SELECT type, COUNT(*) AS n FROM events
-        WHERE created_at >= datetime('now', ?) AND type IN (${typy.map(() => "?").join(",")})
+        WHERE created_at >= ${GRANICA_OKNA} AND type IN (${typy.map(() => "?").join(",")})
         GROUP BY type`
     ).all(od, ...typy) as Array<{ type: string; n: number }>).map((r) => [r.type, r.n])
   );

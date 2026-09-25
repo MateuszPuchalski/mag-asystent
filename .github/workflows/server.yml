@@ -50,7 +50,7 @@ jobs:
             echo "dotyczy=false" >> "$GITHUB_OUTPUT"
             echo "Zmiany nie dotyczą serwera ani dokumentacji — bramka zielona bez pracy."
           fi
-      # Bramka wydania (@wydanie): PR opisuje zmianę w `zmiany/<nazwa>.md`,
+      # Bramka wydania (0.494.0): PR opisuje zmianę w `zmiany/<nazwa>.md`,
       # a numer nadaje `wydanie.yml` po scaleniu. Stoi POZA zakresem, bo PR
       # z samym fragmentem też ma przejść przez nią — i trwa sekundę.
       - name: Fragmenty zmian
