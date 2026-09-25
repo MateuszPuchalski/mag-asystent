@@ -1478,6 +1478,17 @@ zmiany naraz („A + B"):
   Pierwsza litera agenta zasłania podpowiedź. Karta zostaje wtedy z treścią
   zwiniętą i przyciskiem „Zastąp mój szkic". Nieświeży szkic nie wchodzi do
   pola nigdy, bo odpowiada na pytanie, którego już nie ma.
+- **Od @wydanie szkic stoi w polu jako tekst, nie podpowiedź.** Nagranie
+  właściciela: „edycja powinna być w tym samym oknie, z opcją wyczyszczenia
+  wszystkiego". Pierwsza litera zasłaniała podpowiedź i otwierała kartę pod
+  polem, a przyjęcia Tabem nikt się nie domyślał. Ekran wstawia teraz świeży
+  szkic do PUSTEGO pola własnej rozmowy jako zwykły tekst do poprawiania.
+  Reguła z 0.231.0 („propozycja nie wchodzi do pola sama") odchodzi decyzją
+  właściciela, a jej sens zostaje w dwóch miejscach. Do klienta nic nie
+  wychodzi bez „Wyślij". Wstawienie jest stanem ekranu, nie zapisem, więc
+  otwarcie rozmowy dalej niczego nie mutuje. Zapisany szkic zespołu wygrywa
+  zawsze. „Wyczyść wszystko" opróżnia pole z możliwością cofnięcia, a karta
+  szkicu stoi wtedy zwinięta. „Odrzuć" zdejmuje z pola tylko tekst nietknięty.
 - **Uwagi modelu przeżywają przyjęcie.** Lista „czego model nie znalazł
   w faktach" stoi pod przyjętym tekstem, dopóki tekst jest w polu.
 - **Odpowiedź jako ostatnia wypowiedź.** Edytor stoi na końcu osi, w tym

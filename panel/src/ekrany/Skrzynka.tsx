@@ -20,6 +20,7 @@ import {
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
 import { paraPasowania, propozycjaDoboru } from "../skrzynka/propozycjaDoboru";
+import { szkicNaStartRozmowy } from "../skrzynka/SzkicCopilota";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
@@ -95,6 +96,12 @@ export function Skrzynka() {
   const dodajKomentarz = useDodajKomentarz();
 
   const [szkic, setSzkic] = useState("");
+  /* Czy pole trzyma szkic Copilota (@wydanie) — nad polem stoi wtedy zdanie
+     „Szkic Copilota w polu", a pod nim to, na czym szkic stoi. */
+  const [zCopilota, setZCopilota] = useState(false);
+  /* Szkice, które już raz weszły do pola: `rozmowa:czas szkicu`. Ref, nie
+     stan — to pamięć ekranu, nie coś, od czego zależy rysowanie. */
+  const wstawione = useRef(new Set<string>());
   /* Komentarz ma WŁASNY stan, osobny od szkicu. Gdyby dzieliły jeden, notatka
      „klient bywa trudny" zostawałaby w szkicu po przełączeniu trybu i czekała
      na kliknięcie WYŚLIJ (§6.4). */
@@ -138,7 +145,21 @@ export function Skrzynka() {
   /* Szkic wchodzi do pola przy zmianie ROZMOWY, nie przy każdym odczycie:
      nadpisywanie go w trakcie pisania kasowałoby pracę agenta. */
   useEffect(() => {
-    setSzkic(rozmowa.data?.szkic?.body ?? "");
+    /* SZKIC COPILOTA DO PUSTEGO POLA (@wydanie) — reguła i jej granice przy
+       `szkicNaStart`. To stan ekranu, nie zapis: otwarcie niczego nie mutuje.
+       Klucz z czasu szkicu pamięta, że ten szkic już raz wszedł — agent, który
+       wyczyścił pole, nie ma go dostać z powrotem przy następnym odczycie. */
+    const startowy = rozmowa.data ? szkicNaStartRozmowy(rozmowa.data, ja.data?.user.userId ?? null) : null;
+    const klucz = startowy !== null && rozmowa.data
+      ? `${rozmowa.data.rozmowa.id}:${rozmowa.data.szkicCopilota?.at}` : null;
+    if (klucz && !wstawione.current.has(klucz)) {
+      wstawione.current.add(klucz);
+      setSzkic(startowy ?? "");
+      setZCopilota(true);
+    } else {
+      setSzkic(rozmowa.data?.szkic?.body ?? "");
+      setZCopilota(false);
+    }
     setZrodlo(null); setWskazowka(""); setTowar(null); setNowa(false); setBlad("");
     setKonflikt(null); setBladKonfliktu(""); setBladOferty("");
     setKonfliktWysylki(null); setBladWysylki(""); setBladStatusu(""); setPrzyRozmowie(null);
@@ -150,6 +171,7 @@ export function Skrzynka() {
     if (p && rozmowa.data?.rozmowa.id === p.rozmowaId) {
       przywroc.current = null;
       setSzkic(p.body);
+      setZCopilota(false);
       if (p.blad instanceof Konflikt) {
         const sz = p.blad.szczegoly as SzczegolyWysylki & SzczegolyKonfliktu;
         if (sz?.nowaWiadomosc !== undefined) setKonfliktWysylki(sz);
@@ -158,6 +180,23 @@ export function Skrzynka() {
       }
     }
   }, [wybranaId, rozmowa.data?.rozmowa.id]);
+
+  /* Szkic, który PRZYSZEDŁ, gdy rozmowa była już otwarta (takt układa go
+     w tle): wchodzi tylko do wciąż pustego pola. Tekst agenta wygrywa zawsze. */
+  const czasSzkicu = rozmowa.data?.szkicCopilota?.at;
+  const szkicTeraz = useRef(szkic);
+  szkicTeraz.current = szkic;
+  useEffect(() => {
+    if (!rozmowa.data || szkicTeraz.current !== "") return;
+    const startowy = szkicNaStartRozmowy(rozmowa.data, ja.data?.user.userId ?? null);
+    const klucz = `${rozmowa.data.rozmowa.id}:${czasSzkicu}`;
+    if (startowy === null || wstawione.current.has(klucz)) return;
+    wstawione.current.add(klucz);
+    setSzkic(startowy);
+    setZCopilota(true);
+    /* `ja` w zależnościach, bo bez niego rozmowa własna wygląda na cudzą:
+       szkic nie wszedłby, gdy konto dociąga się po rozmowie. */
+  }, [czasSzkicu, ja.data?.user.userId]);
 
   const zglos = (e: unknown) =>
     setBlad(e instanceof Konflikt ? `${e.message} — odśwież rozmowę` : (e as Error).message);
@@ -294,11 +333,18 @@ export function Skrzynka() {
     if (!rozmowa.data || !t) return;
     const zastepuje = szkic.trim() !== "";
     setSzkic(t);
+    setZCopilota(true);
     ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id,
       ocena: zastepuje ? "zastapiony" : "wstawiony" });
   }
   function odrzucSzkic() {
-    if (rozmowa.data) ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "odrzucony" });
+    if (!rozmowa.data) return;
+    ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id, ocena: "odrzucony" });
+    /* Odrzucony szkic schodzi też z pola — ale tylko NIETKNIĘTY. Tekst, który
+       agent zaczął poprawiać, jest już jego pracą i odrzucenie propozycji
+       nie ma prawa go skasować. */
+    if (zCopilota && szkic === rozmowa.data.szkicCopilota?.tresc) setSzkic("");
+    setZCopilota(false);
   }
 
   /* ── E I R PRZY KARCIE SZKICU (23 września 2026) ────────────────────────
@@ -424,6 +470,7 @@ export function Skrzynka() {
         uklada: ulozSzkic.isPending,
         blad: bladSzkicu,
         maSzkicAgenta: szkic.trim() !== "",
+        wPolu: zCopilota,
         /* Cudza rozmowa = cudzy szkic: ten sam warunek, którym edytor blokuje pole. */
         wylaczony: rozmowa.data?.rozmowa.wlascicielId != null
           && rozmowa.data.rozmowa.wlascicielId !== (ja.data?.user.userId ?? null),
@@ -465,7 +512,7 @@ export function Skrzynka() {
       onUsunZalacznik={(id) => wybranaId && usunZalacznik.mutate(
         { id: wybranaId, zalacznikId: id },
         { onError: (e) => setBladZalacznika(e instanceof Error ? e.message : String(e)) })}
-      onSzkic={(v) => { setSzkic(v); zglosPisanie(); }}
+      onSzkic={(v) => { setSzkic(v); if (v === "") setZCopilota(false); zglosPisanie(); }}
       onZapiszSzkic={() => {
         if (!rozmowa.data) return;
         const ostatnia = [...rozmowa.data.os].reverse().find((w) => w.messageId)?.messageId ?? null;
