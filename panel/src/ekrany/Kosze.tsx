@@ -64,7 +64,7 @@ export function Kosze() {
 
   const lista = kosze.data?.kosze ?? [];
   /* Kłopot z MM niesie wiersz LISTY, nie szczegół — liczy go ta sama funkcja
-     co kubełek, więc karta i kubełek nie mogą się rozjechać (@wydanie). */
+     co kubełek, więc karta i kubełek nie mogą się rozjechać (0.503.0). */
   const problemMm = lista.find((k) => k.id === wybrany)?.problemMm ?? null;
   const liczniki: Record<KubelekKoszy, number> = {
     praca: lista.filter((k) => kubelekKosza(k) === "praca").length,

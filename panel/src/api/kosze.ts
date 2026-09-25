@@ -188,7 +188,7 @@ export function useZalatwPominiecie() {
  * Nieodwracalny jest dopiero dokument, a tego tu jeszcze nie ma.
  */
 /**
- * Ponowienie MM kosza stojących w błędzie (@wydanie). `sprawdzono` wysyła się
+ * Ponowienie MM kosza stojących w błędzie (0.503.0). `sprawdzono` wysyła się
  * dopiero po odmowie „przerwano w trakcie zapisu" — powód przy `ponowMmKosza`.
  */
 export function usePonowMmKosza() {

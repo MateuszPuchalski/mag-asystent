@@ -301,7 +301,7 @@ export function problemyMm(database: Db = db(), teraz = new Date()): Map<number,
 const PRZERWANE_W_ZAPISIE = /przerwany w trakcie zapisu/i;
 
 /**
- * Ponowienie wszystkich MM kosza, które stoją w błędzie (@wydanie).
+ * Ponowienie wszystkich MM kosza, które stoją w błędzie (0.503.0).
  *
  * Zgłoszenie właściciela, przy kubełku „Problem z MM": „dodaj, abym mógł
  * wywołać ponownie". Kosz z dokumentu miewa MM na każdą pozycję osobno, więc

@@ -43,7 +43,7 @@ function StanPozycji({ p }: { p: PozycjaWKoszu }) {
   return <span className="text-xs text-slate-600">czeka na hali</span>;
 }
 
-/** Stan ponowienia MM kosza z kłopotem (@wydanie). */
+/** Stan ponowienia MM kosza z kłopotem (0.503.0). */
 export interface PonowienieMm {
   problem: NonNullable<WierszKosza["problemMm"]>;
   trwa: boolean;
@@ -92,7 +92,7 @@ export function Kosz({ k, przelicz, ponowMm = null }: {
         z ocen „na stan" — zestaw sprzedany jedną ofertą wchodzi rozbity, tak jak leży na magazynie.</p>}
       {przelicz.wynik && <p className="mt-1 text-sm text-ranga-ok">{przelicz.wynik}</p>}
       <Blad>{przelicz.blad}</Blad>
-      {/* ── KŁOPOT Z MM I PONOWIENIE (@wydanie) ──────────────────────────────
+      {/* ── KŁOPOT Z MM I PONOWIENIE (0.503.0) ──────────────────────────────
           Zgłoszenie właściciela: „dodaj, abym mógł wywołać ponownie". Przycisk
           stoi tylko przy MM w błędzie TERAZ — MM, która weszła po odmowie, nie
           ma czego ponawiać, tam zostaje samo sprawdzenie stanów. */}

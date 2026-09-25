@@ -50,7 +50,7 @@ const POMINIETE: Pominieta[] = [{ pozycjaId: 2, koszId: 14, kod: "Z-14", mmNumer
 
 let wyslane: string[] = [];
 let szukane: string[] = [];
-/* Pierwsza odmowa ponowienia MM (@wydanie): `null` = serwer ponawia od razu. */
+/* Pierwsza odmowa ponowienia MM (0.503.0): `null` = serwer ponawia od razu. */
 let odmowaPonowienia: string | null = null;
 
 function odpowiedz(url: string, init?: RequestInit): unknown {
@@ -139,7 +139,7 @@ describe("Kosze w zakładce Zwroty", () => {
     expect(wyslane).toEqual([]);
   });
 
-  it("MM w błędzie ponawia się z karty kosza jednym przyciskiem (@wydanie)", async () => {
+  it("MM w błędzie ponawia się z karty kosza jednym przyciskiem (0.503.0)", async () => {
     /* Zgłoszenie właściciela: „dodaj, abym mógł wywołać ponownie". */
     pokaz("/obsluga/zwroty/kosze/16");
     await userEvent.click(await screen.findByRole("button", { name: "Ponów MM" }));
@@ -147,7 +147,7 @@ describe("Kosze w zakładce Zwroty", () => {
     expect(await screen.findByText(/Ponowiono 3 MM/)).toBeInTheDocument();
   });
 
-  it("MM przerwane w zapisie wymaga drugiego ruchu po sprawdzeniu w Subiekcie (@wydanie)", async () => {
+  it("MM przerwane w zapisie wymaga drugiego ruchu po sprawdzeniu w Subiekcie (0.503.0)", async () => {
     odmowaPonowienia = "Jedno MM przerwano w trakcie zapisu. Sprawdź w Subiekcie, czy dokument nie powstał.";
     pokaz("/obsluga/zwroty/kosze/16");
     await userEvent.click(await screen.findByRole("button", { name: "Ponów MM" }));

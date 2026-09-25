@@ -1091,7 +1091,7 @@ test("kosz z kłopotem MM zostaje na liście po oknie dwóch tygodni", () => {
   assert.ok(!lista.some((k) => k.id === bez.koszId), "reszta historii zostaje w audycie");
 });
 
-/* ── Ponowienie MM kosza (@wydanie) ────────────────────────────────────────
+/* ── Ponowienie MM kosza (0.503.0) ────────────────────────────────────────
    Zgłoszenie właściciela przy kubełku „Problem z MM": „dodaj, abym mógł
    wywołać ponownie". Jeden ruch na kosz, a nie PONÓW na każde zadanie. */
 

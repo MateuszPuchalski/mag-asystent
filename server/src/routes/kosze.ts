@@ -93,7 +93,7 @@ export async function koszeRoutes(app: FastifyInstance) {
       }
     });
 
-  /* Ponowienie MM kosza stojących w błędzie (@wydanie). Bramka BIURA, bo to
+  /* Ponowienie MM kosza stojących w błędzie (0.503.0). Bramka BIURA, bo to
      drugi zapis do bazy firmy — uzasadnienie i wyjątek przerwanych przy
      `ponowMmKosza`. */
   app.post<{ Params: { id: string }; Body: { sprawdzono?: boolean } }>(

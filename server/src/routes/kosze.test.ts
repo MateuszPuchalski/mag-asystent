@@ -453,7 +453,7 @@ test("przeliczenie kosza: bramka biura, a kosz Z DOKUMENTEM dostaje 400 ze zdani
   assert.match(r.json().error, /dokument MM/);
 });
 
-test("ponowienie MM kosza: bramka biura, a odmowa dochodzi zdaniem (@wydanie)", async () => {
+test("ponowienie MM kosza: bramka biura, a odmowa dochodzi zdaniem (0.503.0)", async () => {
   /* Reguły ponowienia stoją w serwisie (`services/kosze.test.ts`). Tu dwie
      rzeczy, których serwis nie widzi: hala tego nie kliknie, a odmowa
      dochodzi do ekranu zdaniem z właściwym kodem. */

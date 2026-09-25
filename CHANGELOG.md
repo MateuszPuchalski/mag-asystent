@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.503.0 — 25 września 2026
+
+**MM kosza w błędzie ponawia się z karty kosza.** Zgłoszenie właściciela przy
+kubełku „Problem z MM": „dodaj, abym mógł wywołać ponownie".
+
+- Przy „MM w błędzie" karta kosza ma przycisk „Ponów MM". Wraca do kolejki
+  każde MM tego kosza, które stoi w błędzie — kosz z dokumentu miewa ich kilka.
+- MM przerwane w trakcie zapisu ponawia się dopiero po sprawdzeniu
+  w Subiekcie, czy dokument nie powstał. Ślepe ponowienie przesunęłoby stany
+  drugi raz.
+- MM, które weszło po błędzie, przycisku nie ma — tam zostaje sprawdzenie stanów.
+
 ## 0.502.0 — 25 września 2026
 
 **Zwrot widzi rozmowę, której zamówienie wskazał agent.** Do tej wersji
