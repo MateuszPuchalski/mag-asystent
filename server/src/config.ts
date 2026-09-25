@@ -1106,6 +1106,27 @@ export const config = {
     model: process.env.WIEDZA_AUTOMAT_MODEL === "1",
   },
 
+  /**
+   * PASOWANIE Z SIECI (@wydanie). Automat nocny szuka na stronach spoza
+   * Allegro, do czego pasują nasze części z numerem OEM, i składa propozycje
+   * do kolejki Wiedzy. Nic nie zatwierdza sam.
+   *
+   * Domyślnie WYŁĄCZONE z tego samego powodu co automat wiedzy i szkic
+   * z taktu: wydaje pieniądze bez kliknięcia (wyszukiwanie i tokeny stron),
+   * więc włącza się decyzją w `wertis.env`, nie aktualizacją.
+   */
+  pasowanieZSieci: {
+    wlaczony: process.env.PASOWANIE_Z_SIECI === "1",
+    /** Takt co godzinę; pracuje tylko w oknie nocnym, reszta taktów wychodzi od razu. */
+    ms: 3_600_000,
+    /**
+     * Ile kartotek na jedną noc. Jedna to zwykle kilka wyszukiwań i kilka
+     * przeczytanych stron — kilka do kilkunastu centów. Dziesięć na start,
+     * żeby pierwszy tydzień dał się przejrzeć w kolejce, zanim urośnie.
+     */
+    naNoc: Math.max(1, Number(process.env.PASOWANIE_Z_SIECI_NA_NOC ?? 10) || 10),
+  },
+
 };
 
 /**

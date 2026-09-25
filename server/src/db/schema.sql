@@ -360,7 +360,9 @@ CREATE TABLE IF NOT EXISTS copilot_pytanie (
   model           TEXT NOT NULL,
   at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   przez           TEXT NOT NULL,
-  przez_user_id   INTEGER REFERENCES app_user(user_id)
+  przez_user_id   INTEGER REFERENCES app_user(user_id),
+  -- Narzędzia, po które model sięgnął (@wydanie): [{nazwa, argument, znakow}].
+  narzedzia       TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_rozmowa
   ON copilot_pytanie(conversation_id, id);
@@ -384,7 +386,10 @@ CREATE TABLE IF NOT EXISTS copilot_wywolanie (
   -- Klasa błędu i status. NIGDY treść wiadomości — §19 i polityka danych.
   blad            TEXT,
   przez_user_id   INTEGER REFERENCES app_user(user_id),
-  at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+  at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  -- Zapytania do wyszukiwarki (@wydanie). Płatne od sztuki, nie od tokenu,
+  -- więc osobna kolumna; pomiar dolicza je do kosztu.
+  wyszukiwania    INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS ix_copilot_wywolanie_at ON copilot_wywolanie(at);
 
@@ -3227,3 +3232,20 @@ CREATE TABLE IF NOT EXISTS raport_tygodnia (
   utworzono  TEXT NOT NULL,
   dane       TEXT NOT NULL           -- JSON `RaportTygodnia`
 );
+
+-- Pasowanie z sieci (@wydanie). Jeden wiersz na kartotekę sprawdzoną przez
+-- automat nocny, także bez wyniku — bez tego ta sama kartoteka wracałaby co
+-- noc i płaciła za to samo wyszukiwanie. `odrzucone` to JSON {powód: liczba}
+-- z sita w services/pasowanie-z-sieci.ts; treści stron tu nie ma.
+CREATE TABLE IF NOT EXISTS pasowanie_siec (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  tw_id          INTEGER NOT NULL,
+  at             TEXT NOT NULL,       -- ISO UTC
+  wynik          TEXT NOT NULL CHECK (wynik IN ('ok','blad')),
+  znalezisk      INTEGER NOT NULL DEFAULT 0,
+  zaproponowano  INTEGER NOT NULL DEFAULT 0,
+  odrzucone      TEXT NOT NULL DEFAULT '{}',
+  wyszukiwan     INTEGER NOT NULL DEFAULT 0,
+  blad           TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_pasowanie_siec_tw ON pasowanie_siec(tw_id, at);
