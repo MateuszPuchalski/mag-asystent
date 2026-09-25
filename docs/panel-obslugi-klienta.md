@@ -697,6 +697,13 @@ Właściciel wybrał z kanwy trzy zmiany naraz („E + A + D"):
   i przewody paliwa — bez kupionego towaru. „Szukaj innego towaru mimo to"
   odsłania go jednym kliknięciem. Dobór uruchomiony przez człowieka bramka
   zostawia na wierzchu.
+- **Bez „Szukamy" przy znanym towarze (@wydanie).** Tę samą regułę stosuje
+  serwer (`services/towar-znany.ts`). Automat szkicu dalej wpisuje dane
+  doboru, ale przy znanym towarze nie podnosi statusu do `searching`. Nagłówek
+  i plakietka kolejki nie mówią więc „Szukamy" przy zwrocie kupionego noża.
+  Rozmowy oznaczone tak przed tym wydaniem porządkuje start serwera. Cofa
+  wyłącznie start automatu, z kreską na osi i wpisem w dzienniku. Decyzji
+  człowieka i doboru z wybranym kandydatem nie dotyka.
 
 Decyzja z 0.198.0 zostaje: oferta i kartoteka to jeden wiersz, otwarty bez
 klikania. Zwija się wyłącznie przy zwrocie albo sprawie w toku, bo wtedy
@@ -2528,7 +2535,8 @@ a co czeka bez rozpoznanej marki.
 
 **Wpis maszyny jest odróżnialny** wszędzie tam, gdzie powstaje:
 `dobor_rozmowy.updated_by='automat (szkic)'` i `zastosowanie.rozstrzygnal=
-'automat (oferta)'`, oba przy pustym koncie. Agent poprawia takie pole tam,
+'automat (oferta)'`, oba przy pustym koncie. Od @wydanie automat przy towarze znanym
+z zamówienia wpisuje dane, ale statusu doboru nie podnosi. Agent poprawia takie pole tam,
 gdzie ono stoi — w zakładce Dobór albo w Wiedzy.
 
 **Dopytanie Copilota (0.332.0).** Właściciel: „dodaj możliwość kontynuowania

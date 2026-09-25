@@ -93,6 +93,7 @@ import { logEvent } from "./services/events.js";
 import { powiazPoImporcieSubiekta, powiazZaleglosci } from "./services/wiazania.js";
 import { allegroTryb } from "./adapters/allegro.js";
 import { poImporcie, pochodnePuste } from "./services/po-imporcie.js";
+import { uporzadkujStartyAutomatu } from "./services/towar-znany.js";
 
 /**
  * Złożenie aplikacji BEZ nasłuchiwania.
@@ -467,6 +468,17 @@ export async function buildApp() {
 
 async function main() {
   db(); // migracja schematu przy starcie
+  /* Porządek po automacie doboru (@wydanie): zdejmuje „Szukamy" z rozmów
+     o towar znany z zamówienia. Jednorazowy w skutkach, bezpieczny do
+     powtórzeń — powód i granice w `services/towar-znany.ts`. Błąd nie
+     zatrzymuje startu: nagłówek z „Szukamy" to kłopot, serwer bez skrzynki
+     byłby awarią. */
+  try {
+    const cofniete = uporzadkujStartyAutomatu();
+    if (cofniete > 0) console.log(`[dobor] zdjęto „Szukamy" z ${cofniete} rozmów o znany towar`);
+  } catch (e) {
+    console.error("[dobor] porządek startów automatu nie przeszedł:", e);
+  }
   /* Konto demo admin/admin — tylko seeded, tylko pusta baza. Tu, nie
      w buildApp(): testy tras sprawdzają bootstrap „pierwsze konto bez
      sesji", który by przy gotowym koncie zniknął. */

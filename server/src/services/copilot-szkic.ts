@@ -29,6 +29,7 @@ import { zapiszWiedzeZOferty } from "./wiedza-z-oferty.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 import { wzorzecOdpowiedzi } from "./wzorce-odpowiedzi.js";
 import { numerZamowieniaRozmowy } from "./zamowienia-kandydaci.js";
+import { towarZnanyZZamowienia } from "./towar-znany.js";
 import { naLiscieZgodnosci, zdanieZgodnosci } from "./zgodnosc-oferty.js";
 import {
   idZamowienia, przesylkaDoOdswiezenia, przesylkaZamowienia, sprawdzPrzesylke, zdaniePrzesylki,
@@ -1311,7 +1312,11 @@ export async function ulozSzkic(
     const { czesc, pol } = tylkoWPuste(propozycja.dane, doborRozmowy(conversationId).dane);
     if (pol > 0) {
       try {
-        wersjaDoboru = zapiszDane(conversationId, czesc, wersjaDoboru, AUTOMAT_DANYCH).wersja;
+        /* BEZ STARTU PRZY ZNANYM TOWARZE (@wydanie): dane wchodzą, ale status
+           zostaje. Zwrot kupionego noża nie jest szukaniem innego — powód
+           przy `towarZnanyZZamowienia`. */
+        wersjaDoboru = zapiszDane(conversationId, czesc, wersjaDoboru, AUTOMAT_DANYCH, db(),
+          { bezStartu: towarZnanyZZamowienia(conversationId) }).wersja;
         wpisanePol = pol;
       } catch {
         /* Wyścig z agentem piszącym ręcznie w tej samej chwili kończy się

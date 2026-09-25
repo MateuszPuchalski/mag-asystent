@@ -391,10 +391,14 @@ const oczysc = (v: unknown): string | null => {
  * Pierwszy zapis danych podnosi `not_started` do `searching`: skoro agent
  * wpisał, o jaką maszynę chodzi, dobór SIĘ ZACZĄŁ, a wiersz z danymi
  * w `not_started` znikałby z plakietki kolejki.
+ *
+ * `bezStartu` (@wydanie) zapisuje dane, ale statusu nie rusza. Woła tak
+ * automat, gdy towar jest znany z zamówienia — powód przy
+ * `towarZnanyZZamowienia` w `towar-znany.ts`.
  */
 export function zapiszDane(
   conversationId: number, dane: Partial<DaneDoboru>, expectedVersion: number, kto: AutorDanych,
-  database: DatabaseSync = db(),
+  database: DatabaseSync = db(), opcje: { bezStartu?: boolean } = {},
 ): Dobor {
   istniejeRozmowa(database, conversationId);
   const { autor, userId } = ktoPisze(database, kto);
@@ -427,13 +431,47 @@ export function zapiszDane(
         conversationId);
     podpisz(database, conversationId, autor, userId);
     logEvent("dobor_dane", autor, null, { conversationId, zmiany }, userId, database);
-    if (przed.status === "not_started") {
+    if (przed.status === "not_started" && !opcje.bezStartu) {
       zmienStatus(database, conversationId, "not_started", "searching", null, autor, userId);
     }
     return naDobor(wiersz(database, conversationId), database);
   })();
   publishConversationEvent("assignment.changed", conversationId, { dobor: true });
   return wynik;
+}
+
+/**
+ * Cofnięcie startu, który nadał AUTOMAT, a nie człowiek (@wydanie).
+ *
+ * Zdejmuje `searching` tylko wtedy, gdy wszystkie trzy warunki stoją naraz:
+ * ostatnia zmiana statusu to `not_started → searching` z podpisem
+ * `automat (…)`, nikt nie wybrał kandydata i status wciąż jest `searching`.
+ * Każda późniejsza zmiana człowieka jest nowszym zdarzeniem, więc wygrywa.
+ * Znany towar sprawdza wołający, bo tu nie ma zamówień.
+ *
+ * Zwraca, czy cofnął. Zmiana idzie przez `zmienStatus`, więc zostawia kreskę
+ * na osi i wpis w dzienniku, jak każda inna.
+ */
+export function cofnijStartAutomatu(
+  conversationId: number, kto: { automat: string }, database: DatabaseSync = db(),
+): boolean {
+  const { autor, userId } = ktoPisze(database, kto);
+  const cofnal = transaction(database, () => {
+    const w = wiersz(database, conversationId);
+    if (!w || w.status !== "searching" || w.wybrany_tw_id != null) return false;
+    const ostatni = database.prepare(`SELECT payload FROM conversation_event
+        WHERE conversation_id=? AND event_type='dobor_status_changed' ORDER BY id DESC LIMIT 1`)
+      .get(conversationId) as { payload: string | null } | undefined;
+    let p: { przed?: string; po?: string; autor?: string } = {};
+    try { p = JSON.parse(ostatni?.payload ?? "{}"); } catch { return false; }
+    if (p.przed !== "not_started" || p.po !== "searching" || !String(p.autor ?? "").startsWith("automat")) {
+      return false;
+    }
+    zmienStatus(database, conversationId, "searching", "not_started", null, autor, userId);
+    return true;
+  })();
+  if (cofnal) publishConversationEvent("assignment.changed", conversationId, { dobor: true });
+  return cofnal;
 }
 
 /**
