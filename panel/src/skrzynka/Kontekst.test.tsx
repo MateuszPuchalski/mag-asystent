@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { OsRozmowy } from "../api/typy";
 
@@ -12,6 +12,9 @@ vi.mock("./OfertaRozmowy", () => ({
 }));
 vi.mock("./ZamowienieRozmowy", () => ({
   ZamowienieRozmowy: () => <div data-testid="zamowienie">blok zamówienia</div>,
+  /* Słownik paczki jedzie z modułu zamówienia, bo streszczenie wiersza mówi
+     tymi samymi słowami co karta. */
+  STATUS: { NOTICE_LEFT: "awizo — nieudana próba doręczenia" },
 }));
 vi.mock("./ZwrotRozmowy", () => ({
   ZwrotRozmowy: ({ zwrot }: { zwrot: { id: number } }) => <div data-testid="zwrot">zwrot {zwrot.id}</div>,
@@ -77,26 +80,50 @@ describe("kolumna kontekstu", () => {
     expect(screen.getByTestId("towar")).toBeInTheDocument();
   });
 
-  /* Zamówienie stoi POD ofertą w tej samej zakładce: oba mówią „czego dotyczy
-     rozmowa", tylko jedno przed zakupem, a drugie po. */
-  it("zamówienie jedzie razem z ofertą, nie osobną zakładką", () => {
-    render(<Kontekst dane={dane({
-      zamowienie: { externalId: "zam-77", link: null, pobrane: null, przesylka: null },
-    })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
+  const pusteZamowienie = { externalId: "zam-77", link: null, pobrane: null, przesylka: null };
+  const rysuj = (d: OsRozmowy) => render(<Kontekst dane={d} onWstawDoSzkicu={() => {}}
+    onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
+  const wiersz = (nazwa: RegExp) => screen.getByRole("button", { name: nazwa });
+
+  /* ── Ciemny kokpit (@wydanie) ──────────────────────────────────────────────
+     W normie temat to jedna linia ze streszczeniem, a treść czeka pod
+     kliknięciem. Świeci tylko to, co ma zegar albo czeka na ruch agenta. */
+  it("zamówienie w normie to jedna linia; treść po kliknięciu", async () => {
+    rysuj(dane({ zamowienie: pusteZamowienie }));
+    expect(wiersz(/^Zamówienie/)).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByTestId("zamowienie")).not.toBeInTheDocument();
+    await userEvent.click(wiersz(/^Zamówienie/));
     expect(screen.getByTestId("zamowienie")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Zamówienie" })).not.toBeInTheDocument();
+    /* Nic nie świeci, więc nie ma ani nagłówka „Wymaga Ciebie", ani „W normie". */
+    expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
   });
 
-  it("zwroty tego zamówienia stoją pod zamówieniem, każdy osobno", () => {
-    render(<Kontekst dane={dane({
-      zamowienie: { externalId: "zam-77", link: null, pobrane: null, przesylka: null },
-      zwroty: [{ id: 5 } as never, { id: 9 } as never],
-    })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
-    expect(screen.getAllByTestId("zwrot").map((e) => e.textContent)).toEqual(["zwrot 5", "zwrot 9"]);
+  it("zwrot w toku świeci nad resztą, zamknięty czeka w swoim wierszu, a oferta się zwija", async () => {
+    rysuj(dane({
+      zamowienie: pusteZamowienie,
+      zwroty: [{ id: 5, kubelek: "decyzja" } as never, { id: 9, kubelek: "zamkniety" } as never],
+    }));
+    const swieci = screen.getByRole("region", { name: "Wymaga Ciebie" });
+    expect(within(swieci).getAllByTestId("zwrot").map((e) => e.textContent)).toEqual(["zwrot 5"]);
+    expect(within(swieci).getByText(/Wymaga Ciebie · 1/)).toBeInTheDocument();
+    expect(screen.queryByText("zwrot 9")).toBeNull();
+    /* Decyzja z terminem jest tematem — karta towaru schodzi pod kliknięcie. */
+    expect(screen.queryByTestId("oferta")).toBeNull();
+    await userEvent.click(wiersz(/^Zamknięte sprawy/));
+    expect(screen.getByText("zwrot 9")).toBeInTheDocument();
+  });
+
+  it("paczka z awizo świeci, a zamówienie nie stoi drugi raz w swoim wierszu", async () => {
+    rysuj(dane({ zamowienie: { ...pusteZamowienie, przesylka: {
+      waybill: null, przewoznik: "DPD", status: "NOTICE_LEFT", dostarczonoAt: null, sprawdzonoAt: null } } }));
+    const swieci = screen.getByRole("region", { name: "Wymaga Ciebie" });
+    expect(within(swieci).getByTestId("zamowienie")).toBeInTheDocument();
+    await userEvent.click(wiersz(/^Zamówienie/));
+    expect(screen.getAllByTestId("zamowienie")).toHaveLength(1);
   });
 
   it("bez oferty kolumna mówi, czego brakuje, zamiast milczeć", () => {
-    render(<Kontekst dane={dane({ oferta: null })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
+    rysuj(dane({ oferta: null }));
     expect(screen.getByText(/nie jest powiązana z ofertą/)).toBeInTheDocument();
     /* Drugie zdanie mówi osobno o kartotece, bo to osobny brak: numer oferty
        bywa, a przypisania do Subiekta nie ma. */
@@ -104,57 +131,81 @@ describe("kolumna kontekstu", () => {
     expect(screen.queryByTestId("towar")).not.toBeInTheDocument();
   });
 
-  it("zamówienie z kilku pozycji bez oferty każe wskazać pozycję, nie wpisywać numer", () => {
+  it("zamówienie z kilku pozycji bez oferty świeci i każe wskazać pozycję", () => {
     const pozycja = { offerId: "1", nazwa: "A", sku: null, ilosc: 1, cenaGrosze: 100, waluta: "PLN",
       zwracana: false, wracaIlosc: 0, twId: null, twSymbol: null, twZrodlo: null, ofertaZdjecie: "nieznane" as const };
-    render(<Kontekst dane={dane({ oferta: null, zamowienie: { externalId: "zam-77", link: null, przesylka: null, pobrane: {
+    rysuj(dane({ oferta: null, zamowienie: { externalId: "zam-77", link: null, przesylka: null, pobrane: {
       externalId: "zam-77", status: null, kupujacyLogin: null, dostawaGrosze: null, dostawaMetoda: null,
       platnoscTyp: null, platnoscAt: null, fakturaZadana: null, sumaGrosze: 200, waluta: "PLN", kupionoAt: null,
       link: null, pozycje: [pozycja, { ...pozycja, offerId: "2", nazwa: "B" }],
-    } } })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
-    expect(screen.getByText(/Zamówienie ma 2 pozycje — wskaż niżej/)).toBeInTheDocument();
+    } } }));
+    const swieci = screen.getByRole("region", { name: "Wymaga Ciebie" });
+    expect(within(swieci).getByText(/Zamówienie ma 2 pozycje — wskaż tę/)).toBeInTheDocument();
+    expect(within(swieci).getByTestId("zamowienie")).toBeInTheDocument();
     expect(screen.getByText(/Wskaż pozycję zamówienia wyżej/)).toBeInTheDocument();
     expect(screen.queryByText(/nie jest powiązana z ofertą/)).toBeNull();
   });
 
-  /* Zakładek jest CZTERY, nie pięć z makiety: „Oferta" i „Towar" zeszły się
-     w jedną w 0.198.0 i to zostaje — jeden temat oglądany z dwóch stron.
-     „Klient" i „Wiedza" wróciły, bo dostały treść: pierwsza czyta historię
-     po loginie kupującego, druga trzyma dowody, które WYSZŁY z „Doboru". */
-  it("ma cztery zakładki, a dobór działa nawet bez oferty", async () => {
-    render(<Kontekst dane={dane({ oferta: null })} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
+  /* Zakładek nie ma od @wydanie. „Oferta" i „Towar" zostają JEDNYM tematem
+     (0.198.0), a dobór, klient i wiedza mają własne wiersze. */
+  it("każdy temat ma wiersz, a dobór działa nawet bez oferty", async () => {
+    rysuj(dane({ oferta: null }));
     for (const nazwa of ["Oferta", "Towar"]) {
       expect(screen.queryByRole("button", { name: nazwa })).not.toBeInTheDocument();
     }
-    for (const nazwa of ["Oferta i towar", "Dobór", /^Klient/, /^Wiedza/]) {
-      expect(screen.getByRole("button", { name: nazwa })).toBeInTheDocument();
+    for (const nazwa of [/^Oferta i towar/, /^Zamówienie/, /^Dobór/, /^Klient/, /^Wiedza/]) {
+      expect(wiersz(nazwa)).toBeInTheDocument();
     }
     /* Bez oferty dobór ISTNIEJE: klient bywa bez numeru oferty, a maszynę
        i część wpisuje agent. */
-    await userEvent.click(screen.getByRole("button", { name: "Dobór" }));
+    await userEvent.click(wiersz(/^Dobór/));
     expect(screen.getByTestId("dobor")).toBeInTheDocument();
   });
 
-  /* „Dobór" zostaje OSOBNO i to jest decyzja, nie przeoczenie: to nie karta
-     faktów, tylko robota z własnymi krokami i przyciskami zmieniającymi stan
-     rozmowy. Doklejona pod kartotekę zepchnęłaby stan magazynowy z ekranu. */
-  it("dobór zostaje osobną zakładką — nie doklejamy go pod towar", () => {
-    render(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
+  /* „Dobór" to robota z krokami i przyciskami, nie karta faktów. Doklejony
+     pod kartotekę zepchnąłby stan magazynowy z ekranu. */
+  it("dobór nie stoi rozwinięty pod towarem", () => {
+    rysuj(dane());
     expect(screen.queryByTestId("dobor")).not.toBeInTheDocument();
   });
 
-  /* Zakładka z zerem mówi „tu nic nie ma" bez kliknięcia — zrzut właściciela
-     pokazał dwie zakładki po jednym zdaniu, a każda kosztowała klik. */
-  it("Klient i Wiedza niosą licznik, a przed odczytem — żadnego", () => {
-    const { rerender } = render(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}}
-      onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
-    expect(screen.getByRole("button", { name: "Klient" })).toBeInTheDocument();
-    historia.data = { login: "pasikonik5", maszyny: [], wpisy: [] };
+  /* Zakładka z zerem kosztowała klik, żeby usłyszeć „tu nic nie ma".
+     Streszczenie mówi to od razu, i mówi więcej niż liczba. */
+  it("Klient i Wiedza mówią streszczeniem, a przed odczytem — że czekają", () => {
+    const { rerender } = rysuj(dane());
+    expect(wiersz(/^Klient/)).toHaveTextContent("wczytuję…");
+    historia.data = { login: "pasikonik5", maszyny: [], wpisy: [{ rodzaj: "zakup" }, { rodzaj: "zwrot" }] };
     wiedza.data = { zastosowanie: null, pomiary: [{ zadanieId: 1 }], silniki: [] };
     rerender(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}}
       onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
-    expect(screen.getByRole("button", { name: "Klient 0" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Wiedza 1" })).toBeInTheDocument();
+    expect(wiersz(/^Klient/)).toHaveTextContent("1 zakup · 1 zwrot");
+    expect(wiersz(/^Wiedza/)).toHaveTextContent("1 dowód");
     historia.data = undefined; wiedza.data = undefined;
+  });
+
+  /* ── Bramka doboru (@wydanie, E z kanwy) ───────────────────────────────────
+     Nagranie: klient zwracał kupiony nóż 14-25001, a dobór szukał po wymiarach
+     i pokazał świecę, sprężynę i przewody paliwa — bez kupionego towaru. */
+  const znany = (n: Partial<OsRozmowy["dobor"]> = {}) => dane({
+    zamowienie: pusteZamowienie,
+    oferta: { ...dane().oferta!, zrodlo: "zamowienie" },
+    dobor: { ...dane().dobor, status: "searching", updatedBy: "automat (szkic)", ...n },
+  });
+
+  it("towar znany z zamówienia chowa dobór automatu za bramką", async () => {
+    rysuj(znany());
+    expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
+    expect(wiersz(/^Dobór/)).toHaveTextContent("zbędny — towar znany z zamówienia");
+    await userEvent.click(wiersz(/^Dobór/));
+    expect(screen.getByText(/Towar znany z zamówienia\./)).toBeInTheDocument();
+    expect(screen.queryByTestId("dobor")).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Szukaj innego towaru mimo to" }));
+    expect(screen.getByTestId("dobor")).toBeInTheDocument();
+  });
+
+  it("bramka ustępuje, gdy szukać zaczął człowiek, a nie automat", () => {
+    rysuj(znany({ updatedBy: "A. Lewandowska" }));
+    const swieci = screen.getByRole("region", { name: "Wymaga Ciebie" });
+    expect(within(swieci).getByRole("button", { name: /^Dobór/ })).toHaveTextContent("Szukamy");
   });
 });

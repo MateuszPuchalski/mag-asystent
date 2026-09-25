@@ -64,7 +64,7 @@ export function Silniki() {
     <section aria-label="Luki">
       <h3 className="mb-1 text-naglowek font-bold">Maszyny z doborów, od najczęstszych ({luki.length})</h3>
       <p className="mb-2 text-podpis text-slate-500">
-        Kolejność liczy się z pól wpisanych przez agentów w zakładce Dobór — nie z treści wiadomości klientów.
+        Kolejność liczy się z pól wpisanych przez agentów w Doborze — nie z treści wiadomości klientów.
       </p>
       {!dane.isLoading && luki.length === 0 &&
         <Pusto ikona={Cog}>Żaden dobór nie wskazał jeszcze maszyny.</Pusto>}

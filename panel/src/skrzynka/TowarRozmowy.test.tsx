@@ -329,3 +329,37 @@ describe("grupowanie cen", () => {
     expect(g.map((x) => x.nazwy)).toEqual([["poziom 0"], ["Detaliczna", "Hurtowa", "Specjalna"]]);
   });
 });
+
+/* ── Cena oferty na osi poziomów kartoteki (@wydanie) ────────────────────────
+   Nagranie właściciela: oferta 45,00 zł przy detalicznej 29,06 zł, a tabela
+   tego nie mówiła. Zdanie ma nazwać kierunek i skalę rozjazdu, a poziom bez
+   ceny brutto (zakupowy) nie może udawać najniższej ceny. */
+describe("położenie ceny oferty", () => {
+  const c = (poziom: number, nazwa: string, brutto: number | null, netto: number) =>
+    ({ poziom, nazwa, bruttoGrosze: brutto, nettoGrosze: netto, waluta: "PLN" });
+  const kartoteka = [c(0, "", 0, 1969), c(1, "Detaliczna", 2906, 2363), c(6, "Serwisanci", 3149, 2560),
+    c(5, "Bazowa", 2422, 1969)];
+
+  it("nad najwyższym poziomem — z procentem i nazwą poziomu", async () => {
+    const { polozenieOferty } = await import("./TowarRozmowy");
+    const p = polozenieOferty(kartoteka, { grosze: 4500, waluta: "PLN" });
+    expect(p?.zdanie).toMatch(/43% nad najwyższym poziomem \(Serwisanci 31,49/);
+    /* Poziom zakupowy (brutto 0) nie wchodzi na oś: zero to brak, nie cena. */
+    expect(p?.min).toBe(2422);
+    expect(p?.max).toBe(4500);
+  });
+
+  it("pod najniższym i pomiędzy poziomami", async () => {
+    const { polozenieOferty } = await import("./TowarRozmowy");
+    expect(polozenieOferty(kartoteka, { grosze: 2000, waluta: "PLN" })?.zdanie)
+      .toMatch(/17% pod najniższym poziomem \(Bazowa 24,22/);
+    expect(polozenieOferty(kartoteka, { grosze: 3000, waluta: "PLN" })?.zdanie)
+      .toMatch(/mieści się między poziomami/);
+  });
+
+  it("bez poziomu brutto w tej walucie nie ma osi", async () => {
+    const { polozenieOferty } = await import("./TowarRozmowy");
+    expect(polozenieOferty([c(0, "", 0, 1969)], { grosze: 4500, waluta: "PLN" })).toBeNull();
+    expect(polozenieOferty(kartoteka, { grosze: 4500, waluta: "EUR" })).toBeNull();
+  });
+});
