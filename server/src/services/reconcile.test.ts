@@ -356,3 +356,16 @@ test("CSV otwiera się w Excelu PL bez kreatora", () => {
   // cytowanie jest warunkowe (wspólny csv.ts): zwykłe pole idzie bez cudzysłowów
   assert.match(csv, /^lokalizacja;/m);
 });
+
+/* Granica okna w formacie bazy (@wydanie). `processed_at` zapisuje worker
+   jako ISO z `T`. Porównanie z `datetime('now','-1 day')` (ze spacją) dawało
+   `'…T…' < '… …'` = FAŁSZ dla całej doby granicznej, więc zadanie w błędzie
+   od 25 godzin nie trafiało do raportu przez kolejną dobę. */
+test("zadanie w błędzie od 25 godzin jest w raporcie — granica ISO, nie ze spacją", () => {
+  db().prepare(`INSERT INTO sfera_queue(type, payload, status, label, detail, tw_id,
+      created_by, created_at, processed_at, error_msg)
+    VALUES ('set_location', '{}', 'error', 'Lokalizacja · W32-0203', '', ?, 'test',
+      strftime('%Y-%m-%dT%H:%M:%fZ','now','-25 hours'),
+      strftime('%Y-%m-%dT%H:%M:%fZ','now','-25 hours'), 'Zapis Sfery nieudany')`).run(TW);
+  assert.equal(reconcile().rozjazdy.filter((x) => x.rodzaj === "zadanie_w_bledzie").length, 1);
+});

@@ -10,6 +10,7 @@ import {
   TERMINAL_LINE,
 } from "./delivery.js";
 import { ktorzyMajaLogo } from "./logo-dostawcy.js";
+import { GRANICA_OKNA } from "./raporty.js";
 import { listByDelivery, PROBLEM_TYPES_LABELS } from "./problems.js";
 import type { ProblemType, ProblemView } from "../types.js";
 import type { RawDocument } from "../adapters/subiekt.js";
@@ -357,7 +358,7 @@ export function analizaDostaw(dni: number): AnalizaDostaw {
     .prepare(
       `SELECT status, (julianday(closed_at) - julianday(opened_at)) AS dni
          FROM delivery
-        WHERE status IN ('done','external') AND closed_at >= datetime('now', ?)`
+        WHERE status IN ('done','external') AND closed_at >= ${GRANICA_OKNA}`
     )
     .all(odKiedy) as Array<{ status: string; dni: number }>;
 
@@ -372,7 +373,7 @@ export function analizaDostaw(dni: number): AnalizaDostaw {
               SUM(CASE WHEN l.status = 'problem' THEN 1 ELSE 0 END) AS zWyjatkiem,
               SUM(CASE WHEN l.status IN ('done','partial') THEN 1 ELSE 0 END) AS rozlozone
          FROM delivery_line l JOIN delivery dd ON dd.id = l.delivery_id
-        WHERE dd.closed_at >= datetime('now', ?)`
+        WHERE dd.closed_at >= ${GRANICA_OKNA}`
     )
     .get(odKiedy) as {
     wszystkie: number;
@@ -392,7 +393,7 @@ export function analizaDostaw(dni: number): AnalizaDostaw {
               COUNT(l.id) AS pozycji,
               SUM(CASE WHEN l.status = 'problem' THEN 1 ELSE 0 END) AS zWyjatkiem
          FROM delivery dd LEFT JOIN delivery_line l ON l.delivery_id = dd.id
-        WHERE dd.dostawca IS NOT NULL AND dd.closed_at >= datetime('now', ?)
+        WHERE dd.dostawca IS NOT NULL AND dd.closed_at >= ${GRANICA_OKNA}
         GROUP BY dd.dostawca`
     )
     .all(odKiedy) as Array<{
@@ -408,7 +409,7 @@ export function analizaDostaw(dni: number): AnalizaDostaw {
       `SELECT dostawca, (julianday(closed_at) - julianday(opened_at)) AS dni
          FROM delivery
         WHERE dostawca IS NOT NULL AND status = 'done'
-          AND closed_at >= datetime('now', ?)`
+          AND closed_at >= ${GRANICA_OKNA}`
     )
     .all(odKiedy) as Array<{ dostawca: string; dni: number }>) {
     if (!Number.isFinite(w.dni) || w.dni < 0) continue;
@@ -440,7 +441,7 @@ export function analizaDostaw(dni: number): AnalizaDostaw {
         `SELECT typ,
                 SUM(CASE WHEN resolved_at IS NULL THEN 1 ELSE 0 END) AS otwartych,
                 SUM(CASE WHEN resolved_at IS NOT NULL THEN 1 ELSE 0 END) AS rozwiazanych
-           FROM problem WHERE created_at >= datetime('now', ?)
+           FROM problem WHERE created_at >= ${GRANICA_OKNA}
           GROUP BY typ ORDER BY COUNT(*) DESC`
       )
       .all(odKiedy) as Array<{ typ: string; otwartych: number | null; rozwiazanych: number | null }>
@@ -460,7 +461,7 @@ export function analizaDostaw(dni: number): AnalizaDostaw {
         .prepare(
           `SELECT strftime('%Y-%W', closed_at) AS tydzien, COUNT(*) AS ile
              FROM delivery
-            WHERE status IN ('done','external') AND closed_at >= datetime('now', ?)
+            WHERE status IN ('done','external') AND closed_at >= ${GRANICA_OKNA}
             GROUP BY tydzien`
         )
         .all(odKiedy) as Array<{ tydzien: string; ile: number }>
