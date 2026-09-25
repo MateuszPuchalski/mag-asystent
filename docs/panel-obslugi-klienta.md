@@ -4700,6 +4700,17 @@ zdaniem, co sprawdzić, a przycisk „Sprawdziłem w Subiekcie" dopiero wtedy
 ponawia. MM, które weszło po błędzie, przycisku nie ma — tam zostaje
 sprawdzenie stanów.
 
+**Kosz bez MM powrotnego stoi w tym samym kubełku (@wydanie).** Zgłoszenie
+właściciela: „jak mogę sprawdzić, do których koszyków po rozłożeniu nie
+została zrobiona MM powrotna?". Lista żyła dotąd tylko w rekoncyliacji.
+Teraz ten sam warunek (`koszeBezPowrotu`) czyta też ekran koszy: znacznik
+„bez MM powrotnej" i miejsce w kubełku „Problem z MM".
+
+Karta kosza mówi, co zrobić, zależnie od przyczyny. Przy zapisie adresu
+w kolejce albo w błędzie powrót wyjdzie sam po nim. Przy dokumencie bez
+znanego magazynu źródłowego aplikacja powrotu nie wystawi nigdy, więc robi
+go biuro w Subiekcie. Rekoncyliacja podaje ten sam ruch w swoim zdaniu.
+
 ### 25a.18. Przebieg sprawy, notatka i rozjazdy (0.313.0)
 
 Trzy odpowiedzi na jedno pytanie biura: co się z tym zwrotem działo.

@@ -1135,3 +1135,47 @@ test("kosz bez MM w błędzie odmawia zamiast udawać ponowienie", () => {
   const { koszId } = koszZMm("Z-52", { queueStatus: "done" });
   assert.throws(() => K.ponowMmKosza(db(), koszId, "Ala"), (e: Error & { kod?: number }) => e.kod === 409);
 });
+
+/* ── Kosz bez MM powrotnego na liście koszy (@wydanie) ───────────────────────
+   Zgłoszenie właściciela: „jak mogę sprawdzić, do których koszyków po
+   rozłożeniu nie została zrobiona MM powrotna?" — a potem „zrób to". */
+
+function rozlozonyZDokumentu(kod: string, rozlozono: string, powrotQueue: number | null = null) {
+  const d = db();
+  const k = Number(d.prepare(`INSERT INTO kosz(kod,status,mm_dok_id,mm_numer,utworzono_at,utworzono_przez,
+      rozlozono_at,powrot_queue_id) VALUES (?,'rozlozony',1209,?,?,'Test',?,?)`)
+    .run(kod, kod, rozlozono, rozlozono, powrotQueue).lastInsertRowid);
+  d.prepare(`INSERT INTO kosz_pozycja(kosz_id,tw_id,symbol,nazwa,ilosc,status)
+    VALUES (?,900036,'S','N',1,'done')`).run(k);
+  return k;
+}
+
+test("kosz rozłożony ponad dobę bez MM powrotnego ma znacznik — też po dwóch tygodniach", () => {
+  db().prepare("DELETE FROM events").run();
+  const dawno = rozlozonyZDokumentu("1284", new Date(Date.now() - 20 * 86_400_000).toISOString());
+  const swiezy = rozlozonyZDokumentu("1285", new Date(Date.now() - 2 * 3_600_000).toISOString());
+  const q = Number(db().prepare(`INSERT INTO sfera_queue(type,payload,status,created_by)
+    VALUES ('mm','{}','done','Test')`).run().lastInsertRowid);
+  const zPowrotem = rozlozonyZDokumentu("1286", new Date(Date.now() - 3 * 86_400_000).toISOString(), q);
+  const lista = K.listaKoszy();
+  assert.equal(lista.find((k) => k.id === dawno)?.bezPowrotu, "kierunek",
+    "dokument bez znanego magazynu źródłowego — powrót robi biuro, a kosz nie wypada po oknie");
+  assert.equal(lista.find((k) => k.id === swiezy)?.bezPowrotu, null, "doba zapasu na zapis adresów");
+  assert.equal(lista.find((k) => k.id === zPowrotem)?.bezPowrotu, null);
+  assert.deepEqual(K.koszeBezPowrotu().map((k) => k.kod), ["1284"],
+    "ta sama definicja, którą czyta rekoncyliacja");
+});
+
+test("przyczyna braku powrotu: adres w błędzie odróżnia się od nieznanego kierunku", () => {
+  db().prepare("DELETE FROM kosz_pozycja").run();
+  db().prepare("DELETE FROM kosz").run();
+  const k = rozlozonyZDokumentu("1290", new Date(Date.now() - 2 * 86_400_000).toISOString());
+  db().prepare("UPDATE kosz SET mm_mag_z=1 WHERE id=?").run(k);
+  const adres = Number(db().prepare(`INSERT INTO sfera_queue(type,payload,status,error_msg,created_by)
+    VALUES ('set_location','{}','error','Kartoteka w edycji','Test')`).run().lastInsertRowid);
+  db().prepare("UPDATE kosz_pozycja SET loc_queue_id=? WHERE kosz_id=?").run(adres, k);
+  assert.equal(K.listaKoszy().find((x) => x.id === k)?.bezPowrotu, "adresy",
+    "powrót wyjdzie sam po zapisie adresu — do sprawdzenia jest kolejka, nie Subiekt");
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(adres);
+  assert.equal(K.listaKoszy().find((x) => x.id === k)?.bezPowrotu, "nieznany");
+});

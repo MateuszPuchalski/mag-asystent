@@ -3,6 +3,7 @@ import path from "node:path";
 import { db } from "../db/db.js";
 import { config } from "../config.js";
 import { koszykiCzekajaceNaKorekty } from "./kosze-zwrotow.js";
+import { koszeBezPowrotu } from "./kosze.js";
 import { listaZwrotow } from "./zwroty.js";
 import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 import { subiekt } from "../context.js";
@@ -204,29 +205,22 @@ function koszeBezKorekty(): Rozjazd[] {
  * inny wiersz: brak korekty albo MM w kolejce lub w błędzie. Zdanie „sprawdź
  * adresy" kazałoby szukać nie tam.
  */
-function koszeBezPowrotu(): Rozjazd[] {
-  const rows = db()
-    .prepare(
-      `SELECT kod, rozlozono_at FROM kosz
-        WHERE status='rozlozony' AND powrot_queue_id IS NULL
-          AND powrot_poza_aplikacja = 0
-          AND rodzaj NOT IN ('karton','odpad')
-          AND (mm_dok_id IS NOT NULL
-               OR mm_queue_id IN (SELECT id FROM sfera_queue WHERE status='done'))
-          AND rozlozono_at < ?
-          AND EXISTS (SELECT 1 FROM kosz_pozycja p
-                       WHERE p.kosz_id = kosz.id AND p.status='done')
-        ORDER BY rozlozono_at`
-    )
-    .all(new Date(Date.now() - 86400_000).toISOString()) as
-    Array<{ kod: string; rozlozono_at: string }>;
-  return rows.map((k) => ({
+function koszeBezPowrotuRozjazdy(): Rozjazd[] {
+  /* Warunek mieszka w `kosze.ts` od @wydanie — ten sam czyta ekran koszy.
+     Ruch w zdaniu zależy od przyczyny: kosz bez znanego kierunku NIE czeka
+     na adresy, więc „sprawdź adresy" kazałoby szukać nie tam. */
+  const RUCH = {
+    adresy: "Sprawdź zadania adresów w błędzie — powrót wyjdzie sam po ich zapisie.",
+    kierunek: "Aplikacja nie zna magazynu źródłowego dokumentu — MM powrotne wystaw w Subiekcie.",
+    nieznany: "Sprawdź zadania adresów w błędzie.",
+  } as const;
+  return koszeBezPowrotu().map((k) => ({
     rodzaj: "kosz_bez_powrotu" as const,
     klucz: k.kod,
     opis:
       `Kosz ${k.kod} rozłożono ponad dobę temu, a stan wisi na regale zwrotów — ` +
-      "towar leży na półce i nie jest sprzedawalny. Sprawdź zadania adresów w błędzie.",
-    odKiedy: k.rozlozono_at,
+      `towar leży na półce i nie jest sprzedawalny. ${RUCH[k.powod]}`,
+    odKiedy: k.rozlozonoAt,
   }));
 }
 
@@ -372,7 +366,7 @@ export function reconcile(): Rekoncyliacja {
   const bufor = utknieteWBuforze();
   const mm = mmCzekajace();
   const kosze = koszeBezKorekty();
-  const powroty = koszeBezPowrotu();
+  const powroty = koszeBezPowrotuRozjazdy();
   const przelewy = zwrotyBezPrzelewu();
   const terminy = zwrotyPoTerminie();
   const rozliczone = zwrotyRozliczoneBezKorekty();
