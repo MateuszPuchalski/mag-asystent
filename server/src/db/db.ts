@@ -900,6 +900,7 @@ export function migrate(database: DatabaseSync) {
   doborZnaDrogi(database);
   identyfikatorZamiennika(database);
   typZakonczeniaWSkrzynce(database);
+  znacznikiIso(database);
   identyfikatorZOferty(database);
   identyfikatorOdDostawcy(database);
   zrodloPropozycjiZOferty(database);
@@ -2552,6 +2553,41 @@ function dosypZamowienieWiadomosci(database: DatabaseSync) {
     );
   } catch {
     /* Pusto — rozmowa bez numeru zamówienia dalej pokazuje samą ofertę. */
+  }
+}
+
+/**
+ * Znaczniki ze spacją → ISO z `T` i `Z` (@wydanie).
+ *
+ * Sześć zapisów w reklamacjach i dyskusjach wstawiało `datetime('now')`,
+ * czyli `'2026-09-25 08:00:00'`, do kolumn, w których reszta kodu trzyma
+ * ISO. Skutek widoczny: przeglądarka czyta napis ze spacją jako czas
+ * LOKALNY, więc zakończenie dyskusji z 10:00 stało w panelu jako 8:00.
+ * Skutek cichy: w jednej kolumnie dwa formaty, a porównanie tekstowe
+ * ustawia je w złej kolejności tej samej doby (`'T'` > `' '`).
+ *
+ * `datetime('now')` w SQLite to UTC, więc `strftime(…, kolumna)` tylko
+ * zmienia zapis, nie godzinę. Warunek GLOB łapie WYŁĄCZNIE dokładny kształt
+ * ze spacją — ISO i NULL go omijają, więc drugi start niczego nie rusza.
+ * Wzorzec `dosypIdKupujacego`: start serwera ważniejszy niż poprawka.
+ */
+export const KOLUMNY_ZNACZNIKOW_ZE_SPACJA: ReadonlyArray<[string, string]> = [
+  ["reklamacja_klienta", "zakonczenie_at"],
+  ["reklamacja_klienta", "zwrot_towaru_at"],
+  ["reklamacja_klienta", "prowadzi_at"],
+  ["reklamacja_outbox", "finished_at"],
+];
+
+function znacznikiIso(database: DatabaseSync) {
+  for (const [tabela, kolumna] of KOLUMNY_ZNACZNIKOW_ZE_SPACJA) {
+    try {
+      database.exec(
+        `UPDATE ${tabela} SET ${kolumna} = strftime('%Y-%m-%dT%H:%M:%fZ', ${kolumna})
+          WHERE ${kolumna} GLOB '[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]:[0-9][0-9]'`
+      );
+    } catch {
+      /* Pusto — baza testowa bez tej tabeli; zapis ze spacją dalej się czyta. */
+    }
   }
 }
 
