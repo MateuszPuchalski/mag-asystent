@@ -51,6 +51,7 @@ export function Kosze() {
   const liczniki: Record<KubelekKoszy, number> = {
     praca: lista.filter((k) => kubelekKosza(k) === "praca").length,
     pominiete: pominiete.data?.pominiete.length ?? 0,
+    mm: lista.filter((k) => k.problemMm).length,
     rozlozone: lista.filter((k) => kubelekKosza(k) === "rozlozone").length,
     anulowane: lista.filter((k) => kubelekKosza(k) === "anulowane").length,
   };
@@ -63,7 +64,8 @@ export function Kosze() {
         : <WynikiSzukania lista={szukaj.data?.znalezione ?? []} onWybierz={idz} />)
       : kubelek === "pominiete"
         ? <KolejkaPominietych lista={pominiete.data?.pominiete ?? []} wybranyKosz={wybrany} onWybierz={idz} />
-        : <KolejkaKoszy kosze={koszeKubelka(lista, kubelek)} wybrany={wybrany} onWybierz={idz} />;
+        : <KolejkaKoszy kosze={koszeKubelka(lista, kubelek)} wybrany={wybrany} onWybierz={idz}
+            pokazBladMm={kubelek === "mm"} />;
 
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     {/* Jeden rząd nagłówka, jak na liście zwrotów (0.484.3). */}

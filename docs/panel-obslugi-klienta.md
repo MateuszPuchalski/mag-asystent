@@ -4670,6 +4670,24 @@ Reguła „tylko lokalizacja" z 0.16.0 nie jest złamana. Dotyczy ona SUROWYCH
 zapisów do bazy Subiekta, a dokumenty idą osobnym, przyjętym kanałem — przez
 Sferę, tak samo jak korekta zwrotu.
 
+**Kosze z kłopotem MM są zaznaczone (0.501.0).** Zgłoszenie właściciela:
+„w koszykach zwrotów zaznacz koszyki, w których był problem z MM — muszę
+sprawdzić stany z Subiektem". Wiersz kolejki pamięta tylko ostatnie podejście.
+MM odrzucona i przepuszczona PONÓW-em wyglądała więc jak czysta, a właśnie po
+takiej stany bywają rozjechane.
+
+Pamięć trzyma dziennik zdarzeń kolejki: `queue_retry`, `queue_failed`
+i `queue_ponowione_recznie`. Liczą się trzy rodzaje MM kosza: koszyka
+wirtualnego, powrotne z bufora i pozycji na regał. Czekanie na otwarty
+dokument kłopotem nie jest, bo Subiekt nic wtedy nie zmienia. Okno sięga
+dziewięćdziesięciu dni, a kosz z kłopotem zostaje na liście także po dwóch
+tygodniach od rozłożenia.
+
+Znacznik stoi w każdym kubełku. „MM w błędzie" jest czerwony: zadanie stoi
+w błędzie i nic jeszcze nie weszło. „MM po błędzie" jest bursztynowy: dokument
+jest, ale stany trzeba sprawdzić. Kubełek „Problem z MM" zbiera wszystkie
+takie kosze, najświeższy kłopot na górze, z treścią ostatniej odmowy.
+
 ### 25a.18. Przebieg sprawy, notatka i rozjazdy (0.313.0)
 
 Trzy odpowiedzi na jedno pytanie biura: co się z tym zwrotem działo.
