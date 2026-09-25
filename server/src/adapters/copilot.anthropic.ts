@@ -832,6 +832,9 @@ const INSTRUKCJA_KLUCZA = [
 
 export type WynikKlucza = {
   model: { rodzaj: "maszyna" | "silnik"; marka: string; nazwa: string; wariant: string | null } | null;
+  /** Model językowy, który odpowiedział. Pomiar kosztu bierze stawkę po nim,
+   *  a wiersz księgi z pustym modelem wypada z pomiaru w całości. */
+  modelJezykowy: string;
   zuzycie: Tokeny;
   ms: number;
 };
@@ -869,12 +872,13 @@ export async function nadawcaKluczaAnthropic(
       cacheZapis: u?.cache_creation_input_tokens ?? 0, cacheOdczyt: u?.cache_read_input_tokens ?? 0,
     };
     const w = odp.parsed_output;
+    const modelJezykowy = odp.model ?? config.copilot.model;
     /* Brak odpowiedzi i „nie jestem pewny" znaczą tu to samo i to jest
        zamierzone: wiersz zostaje w kolejce dla człowieka. */
-    if (!w || !w.pewny) return { model: null, zuzycie, ms: Date.now() - start };
+    if (!w || !w.pewny) return { model: null, modelJezykowy, zuzycie, ms: Date.now() - start };
     return {
       model: { rodzaj: w.rodzaj, marka: w.marka, nazwa: w.nazwa, wariant: w.wariant },
-      zuzycie, ms: Date.now() - start,
+      modelJezykowy, zuzycie, ms: Date.now() - start,
     };
   } catch (e) {
     /* Odmowa dostawcy NIE wywraca przebiegu automatu: wiersz zostaje w

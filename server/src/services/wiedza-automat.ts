@@ -171,6 +171,8 @@ export function markaZKontekstu(
  */
 export interface OdpowiedzKlucza {
   model: DaneModelu | null;
+  /** Nazwa modelu językowego do księgi. `model` wyżej to maszyna z odpowiedzi. */
+  modelJezykowy: string;
   zuzycie: { wej: number; wyj: number; cacheZapis: number; cacheOdczyt: number };
   ms: number;
 }
@@ -230,13 +232,19 @@ export async function zlozKlucz(
  * Nieudane kosztuje tyle samo co udane i musi stać w rachunku; ta sama
  * reguła, którą sufit godzinowy automatycznych szkiców liczy od 0.317.0.
  * `conversation_id` zostaje puste: kolejka wiedzy nie wisi na rozmowie.
+ *
+ * „Nie wiem" to `wynik='ok'`: wywołanie się udało, a odpowiedzią było „nie
+ * wiem". Kolumna zna tylko `ok` i `blad`. Dawne `'niepewny'` łamało `CHECK`,
+ * więc INSERT rzucał, przebieg liczył wiersz jako błąd, a zapłacone
+ * wywołanie znikało z księgi. Model idzie z odpowiedzi, nie jako `''`,
+ * bo pomiar kosztu pomija wiersze z pustym modelem — nie zna dla nich stawki.
  */
 function zapiszWywolanieKlucza(database: DatabaseSync, odp: OdpowiedzKlucza): void {
   database.prepare(`INSERT INTO copilot_wywolanie
     (zadanie,model,tokeny_wej,tokeny_wyj,tokeny_cache_zapis,tokeny_cache_odczyt,ms,wynik,przez_user_id,at)
-    VALUES ('klucz_modelu','',?,?,?,?,?,?,NULL,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`)
-    .run(odp.zuzycie.wej, odp.zuzycie.wyj, odp.zuzycie.cacheZapis,
-      odp.zuzycie.cacheOdczyt, odp.ms, odp.model ? "ok" : "niepewny");
+    VALUES ('klucz_modelu',?,?,?,?,?,?,'ok',NULL,strftime('%Y-%m-%dT%H:%M:%fZ','now'))`)
+    .run(odp.modelJezykowy, odp.zuzycie.wej, odp.zuzycie.wyj, odp.zuzycie.cacheZapis,
+      odp.zuzycie.cacheOdczyt, odp.ms);
 }
 
 /* ── Przebieg ─────────────────────────────────────────────────────────────── */
