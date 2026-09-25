@@ -115,7 +115,7 @@ export async function poprosOZakonczenie(
   const wersja = transaction(database, () => {
     database.prepare(
       `UPDATE reklamacja_klienta
-          SET zakonczenie_status=?, zakonczenie_at=datetime('now'),
+          SET zakonczenie_status=?, zakonczenie_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'),
               zakonczenie_przez=?, zakonczenie_user_id=?, wersja=wersja+1
         WHERE id=? AND typ='DISPUTE'`,
     ).run(status, z.autor.name, z.autor.id, z.dyskusjaId);

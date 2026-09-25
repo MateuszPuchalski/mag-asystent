@@ -79,6 +79,9 @@ test("prośba wychodzi jako END_REQUEST i zostawia ślad na sprawie", async () =
   assert.equal(w.zakonczenie_status, "sent");
   assert.equal(w.zakonczenie_przez, "A. Lewandowska");
   assert.equal(w.zakonczenie_user_id, 1);
+  /* ISO, nie `datetime('now')` ze spacją — panel pokazuje tę godzinę przez
+     `czas()`, a napis ze spacją czytał jako lokalny, dwie godziny za wcześnie. */
+  assert.match(String(w.zakonczenie_at), /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/);
   assert.equal(w.status_allegro, "DISPUTE_ONGOING",
     "stan dyskusji należy do Allegro — rozstrzyga go synchronizacja, nie nasz strzał");
   assert.deepEqual(skrzynka(d).map((s) => s.typ), ["END_REQUEST"]);
