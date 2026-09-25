@@ -130,3 +130,19 @@ describe("Notatka i jej droga powrotna", () => {
     expect(screen.queryByText("Zamówienie złożone")).not.toBeInTheDocument();
   });
 });
+
+describe("Kolumna faktów bez pustych czynności (@wydanie)", () => {
+  it("„Zapisz notatkę” pojawia się dopiero przy zmianie", async () => {
+    const onNotatka = vi.fn();
+    render(<Dowody {...props(rek(), { onNotatka })} />);
+    expect(screen.queryByRole("button", { name: "Zapisz notatkę" })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Notatka biura"), " i zwrot");
+    await userEvent.click(screen.getByRole("button", { name: "Zapisz notatkę" }));
+    expect(onNotatka).toHaveBeenCalledWith("ustalono wymianę i zwrot");
+  });
+
+  it("nad „Zleć hali” nie stoi już nagłówek „Hala”", () => {
+    render(<Dowody {...props(rek())} />);
+    expect(screen.queryByRole("heading", { name: "Hala" })).not.toBeInTheDocument();
+  });
+});

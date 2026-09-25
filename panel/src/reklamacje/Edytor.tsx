@@ -21,7 +21,7 @@ import { PrzyciskZalacznika, ZalacznikiWysylki } from "../skrzynka/ZalacznikiWys
     niż w Centrum Wiadomości, bo to inny zasób. */
 export const LIMIT_ZNAKOW = 20_000;
 
-/** Od ilu znaków przed sufitem licznik przestaje być szary. */
+/** Od ilu znaków przed sufitem licznik w ogóle się pokazuje. */
 const PROG_OSTRZEZENIA = 500;
 
 export function Edytor({
@@ -97,15 +97,17 @@ export function Edytor({
     <div className="flex items-center gap-2">
       {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
         onDodaj={onDodajZalacznik} wylaczone={wysyla} />}
-      {/* Licznik mówi, dopiero gdy ma co powiedzieć. Kolor przy progu, a nie
-          zawsze — czerwony napis stojący cały czas przestaje być czytany. */}
-      <span className={`text-xs tabular-nums ${
-        zaDlugo ? "font-bold text-ranga-zle" : blisko ? "text-ranga-uwaga" : "text-slate-500"}`}>
-        {znakow} znaków{zaDlugo ? ` — o ${znakow - LIMIT_ZNAKOW} za dużo` : ""}
-      </span>
+      {/* LICZNIK TYLKO PRZY LIMICIE (@wydanie), jak w skrzynce od 0.506.0.
+          Szary „0 znaków" stał przy każdej odpowiedzi, a liczba zmienia decyzję
+          dopiero przy suficie. Wtedy staje, a za sufitem czerwienieje. */}
+      {(blisko || zaDlugo) && <span className={`text-xs font-semibold tabular-nums ${
+        zaDlugo ? "text-ranga-zle" : "text-ranga-uwaga"}`}>
+        {znakow} / {LIMIT_ZNAKOW}{zaDlugo ? ` — o ${znakow - LIMIT_ZNAKOW} za dużo` : ""}
+      </span>}
+      {/* Zdaniem, nie wersalikami (@wydanie): tak piszą przyciski skrzynki. */}
       <Przycisk className="ml-auto" wariant="glowny" onClick={onWyslij}
         disabled={wysyla || zaDlugo || !tresc.trim()}>
-        <Send size={16} />{wysyla ? "WYSYŁAM…" : "WYŚLIJ ODPOWIEDŹ"}
+        <Send size={16} />{wysyla ? "Wysyłam…" : "Wyślij odpowiedź"}
       </Przycisk>
     </div>
     {/* Do przyrostu trzeciego stało tu zdanie „formalny werdykt wydaje się

@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { Gavel, Check, Ban, PackageSearch } from "lucide-react";
-import type { Reklamacja, Werdykt as KodWerdyktu } from "../api/typy";
+import type { Reklamacja, WiadomoscReklamacji, Werdykt as KodWerdyktu } from "../api/typy";
 import { Przycisk, Skopiuj, czas } from "../ui";
 import { zlote } from "../api/zwroty";
 import { NAZWA_STANU_WERDYKTU, NAZWA_WERDYKTU, ODMOWY, UZNANIA } from "./statusy";
 import { LIMIT_ZNAKOW } from "./Edytor";
+import { DlugaTresc, scisle, zawieraOpis } from "./tresc";
 
 /* ── Werdykt reklamacji (przyrost trzeci; miejsce z 0.412.0) ─────────────────
    Pasek decyzji CAŁEJ sprawy — §25a.4: „pasek decyzji zostaje przy tym, co
@@ -64,6 +65,9 @@ const ZDANIE_O_TOWARZE = {
   niewymagany: "Towaru nie trzeba odsyłać. Uznaną reklamację zrealizujemy bez zwrotu przesyłki.",
 } as const;
 
+/** Od ilu znaków przed sufitem licznik w ogóle się pokazuje — jak w edytorze. */
+const PROG_LICZNIKA = 500;
+
 /** „12,50" albo „12.50" → grosze; śmieci dają `null`, a nie zero. */
 export function naGrosze(tekst: string): number | null {
   const t = tekst.trim().replace(",", ".");
@@ -79,8 +83,11 @@ export interface ZadanieWerdyktu {
 
 export type DecyzjaOTowarze = "wymagany" | "niewymagany";
 
-export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWerdykt, onTowar }: {
+export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladTowaru, onWerdykt, onTowar }: {
   reklamacja: Reklamacja;
+  /** Rozmowa sprawy — tylko po to, żeby nie powtarzać wiadomości werdyktu,
+      którą Allegro oddało w rozmowie. Bez niej blok pokazuje ją jak dotąd. */
+  czat?: WiadomoscReklamacji[];
   trwa: boolean;
   /** Zdanie z serwera pod formularzem: konflikt, sufit kwoty, odmowa Allegro. */
   blad: string;
@@ -108,6 +115,11 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
   const wydany = status === "sent" || status === "send_uncertain" || status === "sending";
   const uAllegro = r.statusAllegro ? ROZSTRZYGNIETE[r.statusAllegro] : undefined;
   const uznana = (r.werdykt ?? "").startsWith("ACCEPTED");
+  /* Równość po ściśnięciu łapie krótkie zdania, zawarcie — nasze zdanie
+     wklejone przez Allegro w dłuższą wiadomość (próg dubla z `tresc.tsx`). */
+  const wiadomoscWerdyktu = r.werdyktWiadomosc ?? "";
+  const wRozmowie = wiadomoscWerdyktu !== "" && czat.some((w) => w.autorRola === "SELLER"
+    && (scisle(w.tresc) === scisle(wiadomoscWerdyktu) || zawieraOpis(w.tresc, wiadomoscWerdyktu)));
 
   const otworz = (g: "uznaje" | "odrzucam", start?: { kod: KodWerdyktu; wiadomosc: string; kwota: number | null }) => {
     setGalaz(g);
@@ -141,8 +153,17 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
         <p className="mt-1 text-xs text-slate-500">
           {r.werdyktPrzez ?? "?"}{r.werdyktAt ? `, ${czas(r.werdyktAt)}` : ""}
         </p>
-        {r.werdyktWiadomosc && <div className="mt-2 flex items-start gap-2 rounded bg-slate-50 p-2">
-          <p className="flex-1 whitespace-pre-wrap text-tresc text-slate-800">{r.werdyktWiadomosc}</p>
+        {/* ── WIADOMOŚĆ WERDYKTU RAZ I KRÓTKO (@wydanie) ──────────────────────
+            Stała w całości w stopce, która się nie przewija, więc długa
+            zjadała okno rozmowy nad nią. Zwija się do czterech linii jak
+            nasza wypowiedź na osi. Gdy Allegro oddało ją w rozmowie jako
+            naszą wiadomość, tu już jej nie ma — to samo zdanie dwa razy
+            to dwa miejsca do przeczytania. */}
+        {r.werdyktWiadomosc && !wRozmowie && <div className="mt-2 flex items-start gap-2 rounded bg-slate-50 p-2">
+          <div className="min-w-0 flex-1">
+            <DlugaTresc key={r.id} tekst={r.werdyktWiadomosc} className="text-tresc text-slate-800"
+              etykieta="Pokaż całą" />
+          </div>
           <Skopiuj tekst={r.werdyktWiadomosc} tytul="Kopiuj wiadomość werdyktu" />
         </div>}
       </>}
@@ -167,10 +188,10 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
               : towar === null && <>
                 <Przycisk className="text-xs" disabled={trwaTowar}
                   onClick={() => { setTowar("wymagany"); setTrescTowaru(ZDANIE_O_TOWARZE.wymagany); }}>
-                  TOWAR DO ODESŁANIA</Przycisk>
+                  Towar do odesłania</Przycisk>
                 <Przycisk className="text-xs" disabled={trwaTowar}
                   onClick={() => { setTowar("niewymagany"); setTrescTowaru(ZDANIE_O_TOWARZE.niewymagany); }}>
-                  BEZ ODSYŁANIA</Przycisk>
+                  Bez odsyłania</Przycisk>
               </>}
         </div>
         {towar !== null && !r.zwrotTowaru && <div className="mt-2 space-y-2">
@@ -182,7 +203,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
           <div className="flex items-center gap-2">
             <Przycisk wariant="glowny" className="text-xs" disabled={trwaTowar || !trescTowaru.trim()}
               onClick={() => onTowar(towar, trescTowaru.trim())}>
-              {trwaTowar ? "WYSYŁAM…" : "WYŚLIJ STANOWISKO"}</Przycisk>
+              {trwaTowar ? "Wysyłam…" : "Wyślij stanowisko"}</Przycisk>
             <Przycisk className="text-xs" onClick={() => setTowar(null)}>Anuluj</Przycisk>
           </div>
         </div>}
@@ -211,12 +232,13 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
               onClick={() => otworz(uznana ? "uznaje" : "odrzucam", {
                 kod: r.werdykt as KodWerdyktu, wiadomosc: r.werdyktWiadomosc ?? "",
                 kwota: r.werdyktKwotaGrosze,
-              })}>SPRÓBUJ JESZCZE RAZ</Przycisk>
+              })}>Spróbuj jeszcze raz</Przycisk>
           : <>
+            {/* Zdaniem, nie wersalikami (@wydanie) — tak piszą przyciski skrzynki. */}
             <Przycisk className="text-xs text-ranga-ok" disabled={trwa}
-              onClick={() => otworz("uznaje")}><Check size={14} />UZNAJĘ</Przycisk>
+              onClick={() => otworz("uznaje")}><Check size={14} />Uznaję</Przycisk>
             <Przycisk className="text-xs text-ranga-zle" disabled={trwa}
-              onClick={() => otworz("odrzucam")}><Ban size={14} />ODRZUCAM</Przycisk>
+              onClick={() => otworz("odrzucam")}><Ban size={14} />Odrzucam</Przycisk>
           </>}
       </>}
     </div>
@@ -254,8 +276,11 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
         Wiadomość do kupującego — wymagana przez Allegro, klient ją przeczyta
         <textarea className="field mt-1 min-h-20 w-full text-sm" value={wiadomosc}
           aria-label="Wiadomość do kupującego" onChange={(e) => setWiadomosc(e.target.value)} />
-        <span className={`mt-1 block font-normal tabular-nums ${zaDlugo ? "text-ranga-zle" : "text-slate-500"}`}>
-          {znakow} znaków{zaDlugo ? ` — o ${znakow - LIMIT_ZNAKOW} za dużo` : ""}</span>
+        {/* LICZNIK TYLKO PRZY LIMICIE (@wydanie) — ta sama reguła co w polu
+            odpowiedzi: „0 znaków" pod każdym werdyktem niczego nie rozstrzygał. */}
+        {znakow > LIMIT_ZNAKOW - PROG_LICZNIKA && <span className={`mt-1 block font-semibold tabular-nums ${
+          zaDlugo ? "text-ranga-zle" : "text-ranga-uwaga"}`}>
+          {znakow} / {LIMIT_ZNAKOW}{zaDlugo ? ` — o ${znakow - LIMIT_ZNAKOW} za dużo` : ""}</span>}
       </label>
 
       {/* ── ZGODA NAZYWA WERDYKT PO IMIENIU (0.424.0) ────────────────────────
@@ -281,7 +306,7 @@ export function Werdykt({ reklamacja: r, trwa, blad, trwaTowar, bladTowaru, onWe
       <div className="flex items-center gap-2">
         <Przycisk wariant="glowny" className="text-xs" disabled={trwa || !gotowe}
           onClick={() => onWerdykt({ werdykt: kod, wiadomosc: wiadomosc.trim(), kwotaGrosze: czesciowy ? grosze : null })}>
-          {trwa ? "WYSYŁAM…" : "WYŚLIJ WERDYKT"}</Przycisk>
+          {trwa ? "Wysyłam…" : "Wyślij werdykt"}</Przycisk>
         <Przycisk className="text-xs" onClick={() => setGalaz(null)}>Anuluj</Przycisk>
       </div>
     </div>}
