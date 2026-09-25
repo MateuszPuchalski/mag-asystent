@@ -77,7 +77,7 @@ function nadawca(tresc = "Fakty tego nie rozstrzygają.", twierdzenia: import(".
     widziane.ostatni = k;
     return {
       tresc, twierdzenia, model: "atrapa",
-      zuzycie: { wej: 100, wyj: 20, cacheZapis: 0, cacheOdczyt: 0 }, ms: 5,
+      zuzycie: { wej: 100, wyj: 20, cacheZapis: 0, cacheOdczyt: 0 }, ms: 5, narzedzia: [],
     };
   };
   return { widziane, nadaj };
@@ -155,7 +155,7 @@ test("puste pytanie i pytanie dłuższe od limitu odpadają PRZED siecią", asyn
   let wywolan = 0;
   const licz: import("./copilot-pytania.js").NadawcaPytania = async () => {
     wywolan += 1;
-    return { tresc: "x", twierdzenia: [], model: "a", zuzycie: { wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0 }, ms: 1 };
+    return { tresc: "x", twierdzenia: [], model: "a", zuzycie: { wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0 }, ms: 1, narzedzia: [] };
   };
 
   await assert.rejects(Q.zadajPytanie(rozmowa, "   ", KTO(), licz, subiekt), /Puste pytanie/);
@@ -182,6 +182,57 @@ test("odczyt wymian niczego nie mutuje", async () => {
   Q.wymianyRozmowy(rozmowa);
   Q.wymianyRozmowy(rozmowa);
   assert.deepEqual([liczba("copilot_pytanie"), liczba("copilot_wywolanie"), liczba("events")], przed);
+});
+
+/* ── Narzędzia (0.507.0) ─────────────────────────────────────────────────
+   Model dostaje zestaw narzędzi i sam sięga do bazy. Pilnujemy trzech
+   rzeczy: zestaw dochodzi do nadawcy, ślad wywołań zostaje przy wymianie,
+   a twierdzenie oparte na PROPOZYCJI nie wychodzi jako pewne.            */
+
+test("model dostaje narzędzia, a wymiana pamięta, po co sięgnął", async () => {
+  let wynik = "";
+  const nadaj: import("./copilot-pytania.js").NadawcaPytania = async (k) => {
+    assert.ok(k.narzedzia, "dopytanie idzie z zestawem narzędzi");
+    assert.deepEqual(k.narzedzia!.definicje.map((d) => d.name),
+      ["szukaj_towaru", "karta_towaru", "pasowanie_towaru", "czesci_do_maszyny", "tresc_oferty"]);
+    wynik = String(k.narzedzia!.wykonaj("szukaj_towaru", { zapytanie: "gaźnik" }).wynik);
+    return {
+      tresc: "Sprawdziłem kartotekę.", twierdzenia: [], model: "atrapa",
+      zuzycie: { wej: 300, wyj: 40, cacheZapis: 0, cacheOdczyt: 200 }, ms: 9,
+      narzedzia: [{ nazwa: "szukaj_towaru", argument: "gaźnik", znakow: wynik.length }],
+    };
+  };
+  const w = await Q.zadajPytanie(rozmowa, "Mamy gaźnik?", KTO(), nadaj, subiekt);
+
+  assert.ok(wynik.length > 0, "narzędzie odpowiedziało z bazy");
+  assert.deepEqual(w.narzedzia.map((n) => n.nazwa), ["szukaj_towaru"]);
+  assert.deepEqual(Q.wymianyRozmowy(rozmowa)[0]!.narzedzia, w.narzedzia, "ślad przeżywa odczyt z bazy");
+  const zd = db().prepare("SELECT payload FROM events WHERE type='copilot_pytanie'").get() as { payload: string };
+  assert.ok(zd.payload.includes("szukaj_towaru"));
+  assert.ok(!zd.payload.includes("gaźnik"), "argument narzędzia nie staje w dzienniku");
+});
+
+test("twierdzenie oparte na propozycji WP schodzi do „niepewne”, choć źródłem są fakty", async () => {
+  const n = nadawca("Propozycja mówi, że pasuje do MS 250.", [
+    { teza: "pasuje do Stihl MS 250", zrodlo: "fakty", odwolanie: "WP17", pewnosc: "pewne" },
+    { teza: "pasuje do Stihl MS 230", zrodlo: "fakty", odwolanie: "WZ4", pewnosc: "pewne" },
+  ]);
+  const w = await Q.zadajPytanie(rozmowa, "Pasuje do MS 250?", KTO(), n.nadaj, subiekt);
+
+  assert.equal(w.twierdzenia[0]!.pewnosc, "niepewne", "niezatwierdzona propozycja to nie baza");
+  assert.equal(w.twierdzenia[0]!.obnizona, true);
+  assert.equal(w.twierdzenia[1]!.pewnosc, "pewne", "zatwierdzone zastosowanie zostaje pewne");
+});
+
+test("błąd po zapłaconych rundach narzędzi zostawia ich koszt w księdze", async () => {
+  const pad: import("./copilot-pytania.js").NadawcaPytania = async () => {
+    throw Object.assign(new Error("ucięte"), { zuzycie: { wej: 900, wyj: 80, cacheZapis: 0, cacheOdczyt: 0 } });
+  };
+  await assert.rejects(Q.zadajPytanie(rozmowa, "Pytanie", KTO(), pad, subiekt), /ucięte/);
+  const k = db().prepare("SELECT model, tokeny_wej, wynik FROM copilot_wywolanie").get() as Record<string, unknown>;
+  assert.equal(k.wynik, "blad");
+  assert.equal(k.tokeny_wej, 900, "rundy przed błędem kosztowały i pomiar ma to widzieć");
+  assert.equal(k.model, config.copilot.model, "bez modelu pomiar pominąłby ten wiersz");
 });
 
 test("dziennik niesie DŁUGOŚCI, nigdy treści pytania", async () => {

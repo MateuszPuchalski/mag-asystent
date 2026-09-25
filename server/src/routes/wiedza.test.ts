@@ -133,6 +133,8 @@ const TRASY = () => [
   { method: "GET" as const, url: "/api/obsluga/wiedza/pasuje-do" },
   { method: "POST" as const, url: "/api/obsluga/wiedza/pasuje-do/lista", payload: { offset: 0 } },
   { method: "POST" as const, url: "/api/obsluga/wiedza/pasuje-do/zbierz" },
+  { method: "GET" as const, url: "/api/obsluga/wiedza/pasowanie-z-sieci" },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/pasowanie-z-sieci/sprawdz" },
 ];
 
 test("bez sesji żadna trasa wiedzy nie odpowiada danymi", async () => {
@@ -197,8 +199,12 @@ test("tras zapisu jest dwadzieścia osiem — licznik jest umową", () => {
 
      DWUDZIESTA SIÓDMA I DWUDZIESTA ÓSMA: zbiórka „Pasuje do" z ofert — strona
      listy ofert konta i partia treści. Czytają Allegro, piszą tylko u nas.
-     Publikacji do Allegro nie ma, decyzją właściciela, więc nie ma trasy. */
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 28);
+     Publikacji do Allegro nie ma, decyzją właściciela, więc nie ma trasy.
+
+     DWUDZIESTA DZIEWIĄTA (0.508.0): ręczne pasowanie z sieci, jedna kartoteka
+     na żądanie. Pisze wyłącznie propozycje do kolejki, nigdy zatwierdzenie,
+     a wydatek ogranicza sufit nocy liczony z tej samej księgi. */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 29);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {
@@ -525,4 +531,25 @@ test("tokeny przez trasę: dodanie z listą dopasowań, dubel 409, rozstrzygnię
   assert.equal(r.statusCode, 200, r.body);
   assert.equal(liczba("token_silnika"), 0);
   assert.equal(W.zastosowaniaTowaru(503).potwierdzone.length, 1, "usunięcie tokenu nie cofa faktu");
+});
+
+/* Pasowanie z sieci uruchomione ręcznie (0.508.0). Wyłączone — a tak jest
+   domyślnie — mówi, czego brakuje, i niczego nie rusza: ani księgi, ani
+   kolejki. Do sieci nie ma wtedy jak dojść, bo trasa odmawia przed wywołaniem. */
+test("ręczne pasowanie z sieci: wyłączone mówi dlaczego i niczego nie zapisuje", async () => {
+  const b = login("biuro", "Anna");
+  const g = await app.inject({ method: "GET", url: "/api/obsluga/wiedza/pasowanie-z-sieci", headers: b.naglowki });
+  assert.equal(g.statusCode, 200, g.body);
+  const stan = g.json<{ niegotowy: string | null; naNoc: number; ostatnie: unknown[] }>();
+  assert.match(stan.niegotowy ?? "", /PASOWANIE_Z_SIECI=1/);
+  assert.ok(stan.naNoc >= 1);
+
+  /* `events` liczone BEZ `http_rejected`: każda odmowa 4xx zostawia ten ślad
+     w kontekście żądania, a to jest dziennik odmów, nie zapis tej trasy. */
+  const zdarzen = () => (db().prepare("SELECT count(*) n FROM events WHERE type <> 'http_rejected'").get() as { n: number }).n;
+  const przed = [...["copilot_wywolanie", "pasowanie_siec", "zastosowanie"].map(liczba), zdarzen()];
+  const p = await app.inject({ method: "POST", url: "/api/obsluga/wiedza/pasowanie-z-sieci/sprawdz", headers: b.naglowki });
+  assert.equal(p.statusCode, 409, p.body);
+  assert.match(p.json<{ error: string }>().error, /wyłączone/);
+  assert.deepEqual([...["copilot_wywolanie", "pasowanie_siec", "zastosowanie"].map(liczba), zdarzen()], przed);
 });

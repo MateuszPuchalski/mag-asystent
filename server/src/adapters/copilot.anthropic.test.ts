@@ -2,9 +2,11 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import Anthropic from "@anthropic-ai/sdk";
 import {
-  _ustawKlienta, nadawcaAnthropic, nadawcaKluczaAnthropic, nadawcaSzkicuAnthropic,
-  wspieraWysilek,
+  _ustawKlienta, nadawcaAnthropic, nadawcaKluczaAnthropic, nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
+  SUFIT_RUND_NARZEDZI, wspieraWysilek,
 } from "./copilot.anthropic.js";
+import type { KontekstPytania } from "../services/copilot-pytania.js";
+import type { WynikNarzedzia, ZestawNarzedzi } from "../services/copilot-narzedzia.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
   BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
@@ -195,6 +197,155 @@ test("szkic i klucz modelu też nie wysyłają wysiłku do Haiku 4.5", async () 
     }
   } finally {
     (config.copilot as { model: string }).model = bylo;
+    _ustawKlienta(null);
+  }
+});
+
+/* ── Pętla narzędzi dopytania (0.507.0) ─────────────────────────────────────
+   Atrapa klienta oddaje CIĄG odpowiedzi, jak dostawca w kolejnych rundach.
+   Sprawdzamy to, czego nie sprawdzi test serwisu z atrapą nadawcy: że wyniki
+   narzędzi wracają do modelu w jednej wiadomości, że zdanie wstępu przed
+   wywołaniem nie wywraca parsowania, że tokeny sumują się po rundach i że
+   sufit rund kończy pętlę wymuszoną odpowiedzią.                          */
+
+const ODPOWIEDZ = JSON.stringify({ tresc: "Pasuje do MS 230 (WZ4).", twierdzenia: [] });
+const zuzycieRundy = { input_tokens: 100, output_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 50 };
+
+function kontekstPytania(narzedzia: ZestawNarzedzi | null): KontekstPytania {
+  return {
+    watek: TRESC, fakty: FAKTY, zdjecia: [], szkic: null, historia: [],
+    pytanie: "Pasuje do MS 230?", narzedzia,
+  };
+}
+
+function atrapaNarzedzi() {
+  const wywolania: Array<{ nazwa: string; wejscie: unknown }> = [];
+  const zestaw: ZestawNarzedzi = {
+    definicje: [{
+      name: "karta_towaru", description: "karta", strict: true,
+      input_schema: { type: "object", properties: { zapytanie: { type: "string", description: "s" } },
+        required: ["zapytanie"], additionalProperties: false },
+    }],
+    wykonaj(nazwa, wejscie) {
+      wywolania.push({ nazwa, wejscie });
+      return { wynik: "Kartoteka GAZ-1: gaźnik" as WynikNarzedzia, blad: false };
+    },
+  };
+  return { zestaw, wywolania };
+}
+
+/** Klient oddający kolejne odpowiedzi; zapamiętuje KOPIE żądań. */
+function klientSekwencja(odpowiedzi: Array<(p: Record<string, unknown>) => Record<string, unknown>>) {
+  const zadania: Array<Record<string, unknown>> = [];
+  _ustawKlienta({ messages: { create: async (p: Record<string, unknown>) => {
+    zadania.push(structuredClone({ ...p, output_config: { ...(p.output_config as object), format: "zod" } }));
+    const nast = odpowiedzi[Math.min(zadania.length - 1, odpowiedzi.length - 1)]!;
+    return nast(p);
+  } } } as unknown as Anthropic);
+  return zadania;
+}
+
+test("dopytanie: wynik narzędzia wraca do modelu, a wstęp przed wywołaniem nie wywraca parsowania", async () => {
+  const { zestaw, wywolania } = atrapaNarzedzi();
+  const zadania = klientSekwencja([
+    () => ({
+      stop_reason: "tool_use", model: "claude-opus-5", usage: zuzycieRundy,
+      content: [
+        { type: "text", text: "Sprawdzę kartotekę." },
+        { type: "tool_use", id: "tu_1", name: "karta_towaru", input: { zapytanie: "GAZ-1" } },
+      ],
+    }),
+    () => ({ stop_reason: "end_turn", model: "claude-opus-5", usage: zuzycieRundy,
+      content: [{ type: "text", text: ODPOWIEDZ }] }),
+  ]);
+  try {
+    const o = await nadawcaPytaniaAnthropic(kontekstPytania(zestaw));
+    assert.equal(o.tresc, "Pasuje do MS 230 (WZ4).");
+    assert.deepEqual(wywolania, [{ nazwa: "karta_towaru", wejscie: { zapytanie: "GAZ-1" } }]);
+    assert.deepEqual(o.narzedzia, [{ nazwa: "karta_towaru", argument: "GAZ-1", znakow: 23 }]);
+    assert.deepEqual([o.zuzycie.wej, o.zuzycie.wyj, o.zuzycie.cacheOdczyt], [200, 20, 100], "suma z obu rund");
+
+    assert.equal(zadania.length, 2);
+    const druga = zadania[1]!.messages as Array<{ role: string; content: unknown }>;
+    assert.equal(druga.length, 3, "pytanie, tura modelu, wyniki narzędzi");
+    assert.equal(druga[1]!.role, "assistant");
+    const wyniki = druga[2]!.content as Array<Record<string, unknown>>;
+    assert.deepEqual(wyniki.map((w) => [w.type, w.tool_use_id, w.is_error]), [["tool_result", "tu_1", false]]);
+    assert.ok(Array.isArray(zadania[0]!.tools), "pierwsza runda niesie narzędzia");
+    assert.equal(zadania[0]!.tool_choice, undefined, "model sam decyduje, czy sięgnąć");
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+test("dopytanie: sufit rund kończy pętlę rundą bez narzędzi", async () => {
+  const { zestaw, wywolania } = atrapaNarzedzi();
+  const zadania = klientSekwencja([(p) => (p.tool_choice
+    ? { stop_reason: "end_turn", model: "m", usage: zuzycieRundy, content: [{ type: "text", text: ODPOWIEDZ }] }
+    : { stop_reason: "tool_use", model: "m", usage: zuzycieRundy,
+      content: [{ type: "tool_use", id: `tu_${Math.random()}`, name: "karta_towaru", input: { zapytanie: "X" } }] })]);
+  try {
+    const o = await nadawcaPytaniaAnthropic(kontekstPytania(zestaw));
+    assert.equal(o.tresc, "Pasuje do MS 230 (WZ4).");
+    assert.equal(wywolania.length, SUFIT_RUND_NARZEDZI, "tyle rund z narzędziami, ani jednej więcej");
+    assert.equal(zadania.length, SUFIT_RUND_NARZEDZI + 1);
+    assert.deepEqual(zadania.at(-1)!.tool_choice, { type: "none" });
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+test("dopytanie bez zestawu nie wysyła narzędzi, a ucięta odpowiedź niesie koszt rund", async () => {
+  const zadania = klientSekwencja([() => ({
+    stop_reason: "max_tokens", model: "m", usage: zuzycieRundy, content: [{ type: "text", text: "{\"tre" }],
+  })]);
+  try {
+    const e = await nadawcaPytaniaAnthropic(kontekstPytania(null)).then(() => null, (x: unknown) => x);
+    assert.ok(e instanceof BladOdpowiedziCopilota);
+    assert.equal((e as { zuzycie?: { wej: number } }).zuzycie?.wej, 100, "koszt uciętej rundy idzie do księgi");
+    assert.equal("tools" in zadania[0]!, false);
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+/* ── Pasowanie z sieci (0.507.0) ────────────────────────────────────────────
+   Tu sprawdzamy to, czego nie widzi test serwisu: że Allegro jest zablokowane
+   w OBU narzędziach serwerowych, że tekst przeczytanych stron wraca do sita,
+   że `pause_turn` wznawia się bez nowej wiadomości i że wyszukiwania liczą się
+   do kosztu. */
+
+test("pasowanie z sieci: Allegro zablokowane w wyszukiwarce i w pobieraniu, strony wracają do sita", async () => {
+  const { nadawcaPasowaniaSieciAnthropic } = await import("./copilot.anthropic.js");
+  const wynik = JSON.stringify({ znaleziska: [{
+    rodzaj: "maszyna", marka: "Stihl", model: "MS 250", wariant: null,
+    url: "https://czesci.example.com/a", cytat: "Stihl MS 250", zrodloStrony: "sklep",
+  }] });
+  const uzycie = (wysz: number) => ({ ...zuzycieRundy, server_tool_use: { web_search_requests: wysz, web_fetch_requests: 1 } });
+  const zadania = klientSekwencja([
+    () => ({ stop_reason: "pause_turn", model: "m", usage: uzycie(2), content: [
+      { type: "server_tool_use", id: "s1", name: "web_fetch", input: { url: "https://czesci.example.com/a" } },
+      { type: "web_fetch_tool_result", tool_use_id: "s1", content: { type: "web_fetch_result",
+        url: "https://czesci.example.com/a", retrieved_at: null,
+        content: { type: "document", title: null, citations: null,
+          source: { type: "text", media_type: "text/plain", data: "Nr 1123 120 0650. Stihl MS 250" } } } },
+    ] }),
+    () => ({ stop_reason: "end_turn", model: "m", usage: uzycie(1), content: [{ type: "text", text: wynik }] }),
+  ]);
+  try {
+    const o = await nadawcaPasowaniaSieciAnthropic({ symbol: "GAZ-1", nazwa: "Gaźnik", numery: ["1123 120 0650"] });
+    for (const t of zadania[0]!.tools as Array<{ name: string; blocked_domains?: string[] }>) {
+      assert.ok(t.blocked_domains?.includes("allegro.pl"), `${t.name} bez blokady Allegro`);
+    }
+    assert.deepEqual(o.strony, [{ url: "https://czesci.example.com/a", tekst: "Nr 1123 120 0650. Stihl MS 250" }]);
+    assert.equal(o.znaleziska.length, 1);
+    assert.equal(o.wyszukiwan, 3, "wyszukiwania z obu tur — płatne od sztuki");
+    assert.equal(zadania.length, 2);
+    const druga = zadania[1]!.messages as Array<{ role: string }>;
+    assert.deepEqual(druga.map((m) => m.role), ["user", "assistant"], "wznowienie bez nowej wiadomości");
+    const tresc = String((zadania[0]!.messages as Array<{ content: string }>)[0]!.content);
+    assert.ok(tresc.includes("1123 120 0650") && tresc.includes("GAZ-1"));
+  } finally {
     _ustawKlienta(null);
   }
 });

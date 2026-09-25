@@ -32,6 +32,7 @@ const Z_OFERTY: ModelZOpisu = {
 vi.mock("./Odsylacze", () => ({ Odsylacze: () => <p>odsyłacze</p> }));
 vi.mock("./WykazCzesci", () => ({ WykazCzesci: () => <p>wykaz części</p> }));
 vi.mock("./PasujeDoOfert", () => ({ PasujeDoOfert: () => <p>pasuje do z ofert</p> }));
+vi.mock("./PasowanieZSieci", () => ({ PasowanieZSieci: () => <p>pasowanie z sieci</p> }));
 
 vi.mock("../api/wiedza", () => ({
   useModeleZOpisow: () => ({ data: { wiersze: WIERSZE, liczba: 1 }, isLoading: false, error: null }),

@@ -244,6 +244,10 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "1 = automat wiedzy może pytać model językowy." },
   { klucz: "WIEDZA_AUTOMAT_NA_PRZEBIEG", grupa: "copilot", kto: "zaawansowane",
     opis: "Ile wierszy wiedzy na jeden przebieg." },
+  { klucz: "PASOWANIE_Z_SIECI", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
+    opis: "1 = nocą automat szuka pasowania części na stronach spoza Allegro." },
+  { klucz: "PASOWANIE_Z_SIECI_NA_NOC", grupa: "copilot", kto: "zaawansowane",
+    opis: "Ile kartotek automat pasowania z sieci sprawdza na jedną noc." },
 
   // ── Zdjęcia ───────────────────────────────────────────────────────────────
   { klucz: "ZDJECIA_ZRODLO", grupa: "zdjecia", kto: "instalator",

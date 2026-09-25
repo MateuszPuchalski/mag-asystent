@@ -708,19 +708,24 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
   const perModel = database.prepare(`SELECT model,
       COALESCE(SUM(tokeny_wej),0) AS wej, COALESCE(SUM(tokeny_wyj),0) AS wyj,
       COALESCE(SUM(tokeny_cache_zapis),0) AS cacheZapis,
-      COALESCE(SUM(tokeny_cache_odczyt),0) AS cacheOdczyt
+      COALESCE(SUM(tokeny_cache_odczyt),0) AS cacheOdczyt,
+      COALESCE(SUM(wyszukiwania),0) AS wyszukiwania
     FROM copilot_wywolanie WHERE model <> '' GROUP BY model`)
     .all() as Array<Record<string, string | number>>;
+  /* Wyszukiwania w sieci (0.507.0) płaci się od sztuki — bez nich pomiar
+     zaniżałby koszt pasowania z sieci o większą część rachunku. */
   const usd = perModel.reduce((suma, m) => suma + kosztUsd(String(m.model), {
     wej: Number(m.wej), wyj: Number(m.wyj),
     cacheZapis: Number(m.cacheZapis), cacheOdczyt: Number(m.cacheOdczyt),
+    wyszukiwania: Number(m.wyszukiwania),
   }), 0);
 
   const wgZadania = (database.prepare(`SELECT zadanie, model,
       COUNT(*) AS wywolan, SUM(CASE WHEN wynik='blad' THEN 1 ELSE 0 END) AS bledow,
       COALESCE(SUM(tokeny_wej),0) AS wej, COALESCE(SUM(tokeny_wyj),0) AS wyj,
       COALESCE(SUM(tokeny_cache_zapis),0) AS cacheZapis,
-      COALESCE(SUM(tokeny_cache_odczyt),0) AS cacheOdczyt
+      COALESCE(SUM(tokeny_cache_odczyt),0) AS cacheOdczyt,
+      COALESCE(SUM(wyszukiwania),0) AS wyszukiwania
     FROM copilot_wywolanie GROUP BY zadanie, model ORDER BY zadanie`)
     .all() as Array<Record<string, string | number>>)
     .reduce((acc, w) => {
@@ -731,6 +736,7 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
         z.kosztUsd = Number((z.kosztUsd + kosztUsd(String(w.model), {
           wej: Number(w.wej), wyj: Number(w.wyj),
           cacheZapis: Number(w.cacheZapis), cacheOdczyt: Number(w.cacheOdczyt),
+          wyszukiwania: Number(w.wyszukiwania),
         })).toFixed(6));
       }
       return acc;

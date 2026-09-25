@@ -25,11 +25,18 @@ const NAJDROZSZY = { wej: 5, wyj: 25 };
 const MNOZNIK_CACHE_ODCZYT = 0.1;
 const MNOZNIK_CACHE_ZAPIS = 1.25;
 
+/* Wyszukiwanie w sieci (0.507.0): 10 dolarów za tysiąc zapytań, NIEZALEŻNIE
+   od modelu — stąd stała obok cennika, a nie pole w nim. Pobranie strony
+   (`web_fetch`) osobnej opłaty nie ma; płaci się za jej tokeny. */
+const USD_ZA_WYSZUKIWANIE = 0.01;
+
 export interface Tokeny {
   wej: number;
   wyj: number;
   cacheZapis: number;
   cacheOdczyt: number;
+  /** Zapytania do wyszukiwarki. Brak = zero; płatne od sztuki, nie od tokenu. */
+  wyszukiwania?: number;
 }
 
 /** Koszt jednego wywołania w dolarach. */
@@ -40,7 +47,8 @@ export function kosztUsd(model: string, t: Tokeny): number {
       t.cacheZapis * c.wej * MNOZNIK_CACHE_ZAPIS +
       t.cacheOdczyt * c.wej * MNOZNIK_CACHE_ODCZYT +
       t.wyj * c.wyj) /
-    1_000_000;
+    1_000_000
+    + (t.wyszukiwania ?? 0) * USD_ZA_WYSZUKIWANIE;
   /* Zaokrąglenie do centa byłoby tu zerem przy każdym pojedynczym wywołaniu
      (jedna klasyfikacja to ułamek centa), więc trzymamy sześć miejsc. */
   return Number(usd.toFixed(6));
