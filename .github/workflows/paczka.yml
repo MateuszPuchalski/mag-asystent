@@ -13,7 +13,7 @@
 # starą drogę (`git pull`), czerwona paczka nie blokuje wydania, tylko mówi,
 # że tej wersji nie da się zainstalować z paczki.
 #
-# OD @wydanie PACZKA JEDZIE DO WYDANIA DOPIERO PO ZIELONYM „Serwer" NA TYM
+# OD 0.496.0 PACZKA JEDZIE DO WYDANIA DOPIERO PO ZIELONYM „Serwer" NA TYM
 # SAMYM COMMICIE (`workflow_run`), a nie równolegle z testami. Serwer w magazynie
 # aktualizuje się sam, w ciągu dnia, a kodu nikt nie czyta przed scaleniem —
 # więc testy commita wydania są jedynym dowodem, że działa. Bez paczki serwer

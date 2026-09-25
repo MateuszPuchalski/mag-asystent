@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import type { FastifyInstance } from "fastify";
 
-/* `GET /api/biuro/kolektor` (@wydanie): adresy serwera dla karty „Nowy
+/* `GET /api/biuro/kolektor` (0.496.0): adresy serwera dla karty „Nowy
    kolektor". Biuro i admin tak, hala nie, bez sesji nie — w odróżnieniu od
    samego APK, który pobiera się bez logowania. */
 

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { adresySieci } from "./adresy-sieci.js";
 
-/* Karta „Nowy kolektor" (@wydanie): do kodu trafia pierwszy adres z listy,
+/* Karta „Nowy kolektor" (0.496.0): do kodu trafia pierwszy adres z listy,
    więc kolejność jest gwarancją, a nie ozdobą. */
 
 const ifc = (address: string, internal = false, family: "IPv4" | "IPv6" = "IPv4") =>

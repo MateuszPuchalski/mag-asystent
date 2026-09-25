@@ -809,7 +809,7 @@ function Test-WertisHealth {
     return $null
 }
 
-# Konto administratora zakładał tu instalator od 0.23.0. Od @wydanie
+# Konto administratora zakładał tu instalator od 0.23.0. Od 0.496.0
 # zakłada się je w panelu, formularzem pustej instalacji — patrz nagłówek
 # kroku „Konto administratora" w wertis-instalator.ps1.
 

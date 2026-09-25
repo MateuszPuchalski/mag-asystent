@@ -1,4 +1,4 @@
-# Node dla Windowsa, który jedzie w paczce wydania (tools/paczka.sh, @wydanie).
+# Node dla Windowsa, który jedzie w paczce wydania (tools/paczka.sh, 0.496.0).
 #
 # Przypięty numer i suma, a nie „najnowsza 22": serwer w magazynie ma chodzić
 # na tym samym Nodzie, na którym przeszła paczka, a suma wpisana TUTAJ, nie

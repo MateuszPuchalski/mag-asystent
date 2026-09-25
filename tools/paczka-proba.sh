@@ -20,7 +20,7 @@ trap '[ -n "$PID" ] && kill "$PID" 2>/dev/null; rm -rf "$ROB"' EXIT
 unzip -q "$ZIP" -d "$ROB"
 P="$ROB/wertis-$WERSJA"
 [ "$(node -p "require('$P/paczka.json').wersja")" = "$WERSJA" ] || { echo "paczka.json nie zgadza się z nazwą" >&2; exit 1; }
-# Node dla Windowsa (@wydanie): tu go nie uruchomimy, ale jego brak albo
+# Node dla Windowsa (0.496.0): tu go nie uruchomimy, ale jego brak albo
 # ucięty plik zatrzymałby instalację w magazynie na pierwszej usłudze.
 . "$(dirname "$0")/node-windows.txt"
 [ -f "$P/node/node.exe" ] && [ "$(stat -c %s "$P/node/node.exe")" -gt 10000000 ] \

@@ -126,7 +126,7 @@ function Get-WertisInstancjaKlucz {
 function Get-WertisInstancjeSql {
     <#
         .SYNOPSIS
-        Nazwy instancji SQL Servera zainstalowanych na tej maszynie (@wydanie).
+        Nazwy instancji SQL Servera zainstalowanych na tej maszynie (0.496.0).
         Pusta lista, gdy rejestru nie ma — SQL na innym komputerze albo nie Windows.
     #>
     try {
@@ -141,7 +141,7 @@ function Get-WertisInstancjeSql {
 function Select-WertisInstancjaSql {
     <#
         .SYNOPSIS
-        Którą instancję wziąć bez pytania; $null = trzeba zapytać (@wydanie).
+        Którą instancję wziąć bez pytania; $null = trzeba zapytać (0.496.0).
         .DESCRIPTION
         Pytanie o instancję padało przy każdej instalacji, choć odpowiedź
         prawie zawsze jest jedna. INSERTGT wygrywa, bo tak nazywa instancję
@@ -161,7 +161,7 @@ function Get-WertisSugerowanyMagazyn {
     <#
         .SYNOPSIS
         Indeks magazynu, którego symbol albo nazwa pasuje do wzorca; -1, gdy
-        nie pasuje żaden albo pasuje więcej niż jeden (@wydanie).
+        nie pasuje żaden albo pasuje więcej niż jeden (0.496.0).
         .DESCRIPTION
         Tylko PODPOWIEDŹ pod Enterem, nie wybór: magazyn skutku rozstrzyga,
         dokąd idzie dokument, więc człowiek i tak widzi listę. Dwa trafienia

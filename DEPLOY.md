@@ -25,7 +25,7 @@ Maszyna z Subiektem GT (Windows)
 > **Jak to jest zbudowane i dlaczego tak** — [`docs/architektura.md`](docs/architektura.md).
 > Ten dokument mówi tylko, jak to uruchomić.
 
-## Na jednej stronie (@wydanie)
+## Na jednej stronie (0.496.0)
 
 To jest cała droga dla osoby, która stawia albo odtwarza serwer. Reszta
 dokumentu jest odniesieniem — sięga się do niej, gdy coś tu nie zadziała.
@@ -64,7 +64,7 @@ Rozdziały 1–4 i checklistę z §6 wykonuje za Ciebie
 [**instalator dla Windows**](instalator/README.md): pobierz
 `WERTIS-Instalator.exe` z [wydań](https://github.com/MateuszPuchalski/mag-asystent/releases)
 i uruchom jako administrator. Pobiera paczkę wydania z Nodem w środku. Od
-@wydanie nie instaluje Gita i niczego nie buduje na serwerze. Rejestruje obie
+0.496.0 nie instaluje Gita i niczego nie buduje na serwerze. Rejestruje obie
 usługi, otwiera port, wypełnia `wertis.env` **odpytując bazę Subiekta**
 i zakłada konto SQL o minimalnych uprawnieniach.
 
@@ -142,7 +142,7 @@ organizacji.
 3. Repozytorium → Settings → Secrets and variables → Actions → **New repository
    secret**, nazwa `ODSWIEZANIE_TOKEN`, wartość: token z punktu 1.
 
-**Ten sam token włącza auto-scalanie** (od @wydanie, `auto-scalanie.yml`).
+**Ten sam token włącza auto-scalanie** (od 0.496.0, `auto-scalanie.yml`).
 GitHub scala w imieniu tego, kto auto-scalanie włączył. Włączone tokenem
 workflowu dawało scalenie jako bot Actions, a taki push nie uruchamia na
 `main` niczego — ani wydania, ani APK. Bez sekretu scalenie działa, ale
@@ -294,7 +294,7 @@ Automat NIE wgrywa wydania, gdy zachodzi którykolwiek z tych warunków:
 - **kanarek nie pracuje jeszcze na tej wersji**, gdy ustawiono
   `AKTUALIZACJA_KANAREK` (adres instancji dev, np. `http://localhost:3002`).
 
-**Dlaczego w dzień, a nie w nocy** (@wydanie, decyzja właściciela z wywiadu
+**Dlaczego w dzień, a nie w nocy** (0.496.0, decyzja właściciela z wywiadu
 o wdrażaniu). Magazyn pracuje na jedną zmianę, dwie minuty postoju nie są
 problemem o żadnej porze, a zmiana ma dojść tego samego dnia. Kodu przed
 scaleniem nikt nie czyta, więc ręczny przycisk dawałby tylko zwłokę. Bramką
@@ -930,7 +930,7 @@ także wtedy, gdy sesji nie ma.
 > urządzenie w sieci hali mogło zmienić lokalizację w Subiekcie albo pobrać
 > raport wydajności per pracownik. Podpisywało operację dowolnym nazwiskiem.
 
-**1. Konto admina zakłada się w PANELU** (od @wydanie). Pusta instalacja
+**1. Konto admina zakłada się w PANELU** (od 0.496.0). Pusta instalacja
 pokazuje pod `/obsluga/` formularz pierwszego konta zamiast logowania. Poniższa
 droga przez kolektor działa dalej.
 

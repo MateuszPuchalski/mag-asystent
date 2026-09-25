@@ -15,7 +15,7 @@ const Schemat = z.object({
 });
 type Dane = z.infer<typeof Schemat>;
 
-/* Pierwsze konto (@wydanie). Do tej pory zakładał je instalator, pytając
+/* Pierwsze konto (0.496.0). Do tej pory zakładał je instalator, pytając
    o hasło w oknie PowerShella na serwerze — a panel pustej instalacji
    pokazywał logowanie, na które nie było czym się zalogować. Serwer umie to
    od dawna: w pustej bazie `POST /api/users` przyjmuje pierwsze konto bez

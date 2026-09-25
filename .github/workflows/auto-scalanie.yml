@@ -7,7 +7,7 @@
 #    Przepadłby build wydania APK na `main` — ten, z którego kolektory biorą
 #    aktualizację (DEPLOY.md §5).
 #
-#    DO @wydanie STAŁO TU, ŻE NATYWNE AUTO-SCALANIE TEGO NIE MA — i to była
+#    DO 0.496.0 STAŁO TU, ŻE NATYWNE AUTO-SCALANIE TEGO NIE MA — i to była
 #    nieprawda. GitHub scala w imieniu tego, kto auto-scalanie WŁĄCZYŁ, a
 #    włączał je `github.token`. Push scalenia szedł więc jako bot Actions
 #    i nie uruchamiał niczego: brakuje wydań 0.482.1–0.482.11, 0.484.3,

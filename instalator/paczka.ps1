@@ -270,7 +270,7 @@ function Move-WertisDaneNaZewnatrz {
     $dane = Join-Path $Katalog "server\data"
     $cel = Get-WertisKatalogDanych -Katalog $Katalog
     if (Test-WertisDowiazanie -Sciezka $dane) { return }
-    # Ponowna instalacja po awarii (@wydanie): aplikacji nie ma, dane zostały.
+    # Ponowna instalacja po awarii (0.496.0): aplikacji nie ma, dane zostały.
     # Podpinamy je, zamiast zaczynać od pustej bazy.
     if (-not (Test-Path -LiteralPath $dane) -and (Test-Path -LiteralPath $cel)) {
         if (Test-DryRun "Podpiąłbym istniejące dane z $cel.") { return }
@@ -297,7 +297,7 @@ function Get-WertisNodeAplikacji {
         .SYNOPSIS
         node.exe dla usług: z paczki (`<katalog>\node`), gdy jest, inaczej z PATH.
         .DESCRIPTION
-        Paczka od @wydanie niesie Node. Instalacja z Gita go nie ma i chodzi na
+        Paczka od 0.496.0 niesie Node. Instalacja z Gita go nie ma i chodzi na
         Nodzie systemowym, jak dotąd. W przebiegu próbnym zwraca samą nazwę.
     #>
     param([Parameter(Mandatory)][string]$Katalog)

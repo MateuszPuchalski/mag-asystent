@@ -407,7 +407,7 @@ if (-not $TylkoKonfiguracja) {
     # Ponowny przebieg instalatora na niej — po zmianę Subiekta albo konta —
     # nie pobiera i nie buduje niczego; nową wersję wgrywa -Aktualizuj -Paczka.
     $zPaczki = Test-Path (Join-Path $Katalog "paczka.json")
-    # Od @wydanie NOWA instalacja idzie z paczki wydania: bez Gita, bez
+    # Od 0.496.0 NOWA instalacja idzie z paczki wydania: bez Gita, bez
     # `npm ci` na 372 MB i bez kompilacji na serwerze, z Nodem w paczce.
     # Git zostaje dla instalacji, która już go ma, i dla jawnego -Galaz
     # (dev z gałęzi) — paczki powstają wyłącznie z `main`.
@@ -543,11 +543,11 @@ if ($podlaczacDoSubiekta) {
     Write-Naglowek "Kreator konfiguracji"
 
     # Serwer SQL z parametru, bez pytania: WERTIS stawia się na maszynie
-    # z Subiektem, więc odpowiedź to prawie zawsze „localhost" (@wydanie).
+    # z Subiektem, więc odpowiedź to prawie zawsze „localhost" (0.496.0).
     $serwer = $SerwerSql
     Write-Info "Serwer SQL: $serwer (inny: -SerwerSql)."
     # `$instancjaSql`, nie `$instancja`: ta druga to obiekt instancji WERTIS
-    # (usługi, zapora, SRODOWISKO). Do @wydanie kreator nadpisywał ją napisem,
+    # (usługi, zapora, SRODOWISKO). Do 0.496.0 kreator nadpisywał ją napisem,
     # więc po podłączeniu do Subiekta usługi nie dostawały restartu, a dev —
     # swojego SRODOWISKO.
     $instancjaSql = if ($InstancjaSql) { $InstancjaSql } else { Select-WertisInstancjaSql -Dostepne (Get-WertisInstancjeSql) }
@@ -634,7 +634,7 @@ if ($podlaczacDoSubiekta) {
             Write-Blad "Na tej instancji nie ma ani jednej bazy użytkownika."
             exit 1
         }
-        # Jedyna baza nie jest wyborem (@wydanie); ostrzeżenia niżej i tak padną.
+        # Jedyna baza nie jest wyborem (0.496.0); ostrzeżenia niżej i tak padną.
         $wybor = if ($bazy.Count -eq 1) {
             Write-Info "Jedyna baza na instancji: $(Format-WertisEtykietaBazy -Baza $bazy[0])"
             $bazy[0]
@@ -678,7 +678,7 @@ if ($podlaczacDoSubiekta) {
             if ($magazyny[$i].mag_Glowny -eq $true -or $magazyny[$i].mag_Glowny -eq 1) { $glowny = $i }
         }
         $mag = Read-Wybor -Pozycje $magazyny -Pytanie "Magazyn główny (MAG)" -Etykieta $etykieta -Domyslny $glowny
-        # Podpowiedź pod Enterem z symbolu albo nazwy (@wydanie) — lista zostaje,
+        # Podpowiedź pod Enterem z symbolu albo nazwy (0.496.0) — lista zostaje,
         # bo magazyn skutku rozstrzyga, dokąd idzie dokument.
         $mgp = Read-Wybor -Pozycje $magazyny -Pytanie "Strefa przyjęć (MGP)" -Etykieta $etykieta `
             -Domyslny (Get-WertisSugerowanyMagazyn -Magazyny $magazyny -Wzorzec "MGP|PRZYJ")
@@ -946,7 +946,7 @@ $health = Test-WertisHealth -Port $Port
 
 # ═══ Konto administratora ═══════════════════════════════════════════════════
 #
-# Od @wydanie instalator o nie NIE pyta. Pierwsze konto zakłada się w panelu:
+# Od 0.496.0 instalator o nie NIE pyta. Pierwsze konto zakłada się w panelu:
 # pusta instalacja pokazuje zamiast logowania formularz konta administratora
 # (`panel/src/ekrany/Logowanie.tsx`). Hasło nie przechodzi przez okno
 # PowerShella na serwerze, a instalacja nie czeka na człowieka przy klawiaturze.

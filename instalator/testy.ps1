@@ -1561,7 +1561,7 @@ if ($IsWindows -or $env:OS -eq "Windows_NT") {
 }
 
 Sprawdz "kreator nie nadpisuje obiektu instancji WERTIS napisem" {
-    # Do @wydanie `$instancja = Read-Tekst "Instancja..."` zabierało usługom
+    # Do 0.496.0 `$instancja = Read-Tekst "Instancja..."` zabierało usługom
     # restart, a dev — swoje SRODOWISKO. Przypisanie ma zostać jedno.
     $tekst = Get-Content -LiteralPath (Join-Path $zrodlo "wertis-instalator.ps1") -Raw -Encoding UTF8
     $przypisania = [regex]::Matches($tekst, '(?m)^\s*\$instancja\s*=')

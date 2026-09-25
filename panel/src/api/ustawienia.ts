@@ -250,7 +250,7 @@ export function useZlecAktualizacje() {
   });
 }
 
-/* ── Nowy kolektor (@wydanie) ──────────────────────────────────────────── */
+/* ── Nowy kolektor (0.496.0) ──────────────────────────────────────────── */
 
 export interface DaneKolektora { adresy: string[]; port: number; apk: { wersja: string | null } | null }
 

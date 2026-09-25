@@ -111,7 +111,7 @@ powershell -ExecutionPolicy Bypass -File instalator\wertis-instalator.ps1
 
 ## Co instalator robi
 
-1. **Aplikacja** — od @wydanie z **paczki wydania**: pobiera najnowszy
+1. **Aplikacja** — od 0.496.0 z **paczki wydania**: pobiera najnowszy
    `wertis-<wersja>.zip`, sprawdza sumę i rozpakowuje do `C:\wertis`. Paczka
    niesie własny Node, więc instalator **nie instaluje żadnych programów**,
    a na serwerze nic się nie kompiluje. Dane od razu lądują w
@@ -216,7 +216,7 @@ nie trzeba podmieniać — po wykonaniu skryptu wystarczy restart obu usług.
 
 ## Konto administratora
 
-**Od @wydanie instalator o nie nie pyta.** Pusta instalacja pokazuje w panelu
+**Od 0.496.0 instalator o nie nie pyta.** Pusta instalacja pokazuje w panelu
 (`http://<serwer>:3001/obsluga/`) formularz pierwszego konta zamiast
 logowania. To konto dostaje rolę `admin` i zakłada wszystkie następne.
 

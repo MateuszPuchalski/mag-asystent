@@ -67,7 +67,7 @@ export async function aktualizacjaRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Dane dla karty „Nowy kolektor" w panelu (@wydanie): adresy serwera w sieci
+   * Dane dla karty „Nowy kolektor" w panelu (0.496.0): adresy serwera w sieci
    * i czy jest APK do pobrania. Za bramką biura, inaczej niż dwie trasy wyżej:
    * lista adresów nie jest potrzebna kolektorowi, tylko człowiekowi przy biurku.
    */

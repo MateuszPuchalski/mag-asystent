@@ -4,7 +4,7 @@ import { useKolektor } from "../api/ustawienia";
 import { Blad } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
 
-/* ── Nowy kolektor (@wydanie) ───────────────────────────────────────────
+/* ── Nowy kolektor (0.496.0) ───────────────────────────────────────────
    Pierwsza instalacja aplikacji na kolektorze szła przez MDM albo kabel.
    Serwer rozdaje APK bez logowania (`/api/aktualizacja/apk`), więc wystarczy
    zeskanować ten kod aparatem kolektora: przeglądarka pobierze plik,

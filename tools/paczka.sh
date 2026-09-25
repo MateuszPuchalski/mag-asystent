@@ -100,7 +100,7 @@ if find "$DEPS/node_modules" -name '*.node' | grep -q .; then
 fi
 mv "$DEPS/node_modules" "$P/node_modules"
 
-# ── Node dla Windowsa (@wydanie) ─────────────────────────────────────────
+# ── Node dla Windowsa (0.496.0) ─────────────────────────────────────────
 # Paczka niesie własny Node, więc instalator nie instaluje żadnych programów
 # wstępnych, a serwer chodzi na wersji, na której przeszła paczka. Usługi
 # wskazują `<katalog>\node\node.exe`, który podmienia się razem z wydaniem.

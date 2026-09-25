@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { Logowanie } from "./Logowanie";
 
-/* ── Logowanie i pierwsze konto (@wydanie) ─────────────────────────────
+/* ── Logowanie i pierwsze konto (0.496.0) ─────────────────────────────
    1. Otwarcie to same odczyty — także na pustej instalacji.
    2. Pusta baza: formularz pierwszego konta zamiast logowania; jeden zapis
       (konto) i od razu logowanie tym samym hasłem.

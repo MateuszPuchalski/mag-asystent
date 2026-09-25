@@ -96,7 +96,7 @@ export const config = {
    * Aktualizacja automatyczna (0.494.0), `services/aktualizacja-auto.ts`.
    *
    * DOMYŚLNIE „zaraz", TAKŻE NA PRODUKCJI — decyzja właściciela z wywiadu
-   * o wdrażaniu (@wydanie). Magazyn pracuje na jedną zmianę, dwie minuty
+   * o wdrażaniu (0.496.0). Magazyn pracuje na jedną zmianę, dwie minuty
    * postoju są do przyjęcia o każdej porze, a zmiana ma dojść tego samego
    * dnia. Dziesięć minut bez zapisu (`CISZA_MIN`) i godzina od wydania
    * wystarczą; okno nocne zostaje jako tryb `noc` dla tego, kto go zechce.
