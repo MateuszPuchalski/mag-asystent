@@ -113,7 +113,7 @@ export const WYPLATY_NA_PRZEBIEG = 100;
  * Zamknięty, który czeka na pieniądze, jest w pracy — powód niżej. Zwrot
  * odrzucony odpada razem z nimi: tam pieniądze nie miały wyjść.
  *
- * NAJDAWNIEJ SPRAWDZANE PIERWSZE, NIE NAJSTARSZE (@wydanie). Do tego wydania
+ * NAJDAWNIEJ SPRAWDZANE PIERWSZE, NIE NAJSTARSZE (0.506.1). Do tego wydania
  * lista szła po dacie zgłoszenia, sto na przebieg, bez pamięci, kogo już
  * pytała. Gdy zwrotów bez rozliczenia jest ponad setka, czoło listy zajmują
  * te, które rozliczenia nie dostaną nigdy — nienadane paczki, sprawy

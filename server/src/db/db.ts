@@ -355,7 +355,7 @@ export function migrate(database: DatabaseSync) {
      przejść, nie wywrócić synchronizację. */
   addColumn("zwrot_klienta", "status_allegro", "TEXT");
   addColumn("zwrot_klienta", "rozliczony_allegro_at", "TEXT");
-  /* Kiedy ostatnio pytaliśmy Allegro o wypłatę tego zwrotu (@wydanie). Kolejka
+  /* Kiedy ostatnio pytaliśmy Allegro o wypłatę tego zwrotu (0.506.1). Kolejka
      sprawdzania kręci się po tej kolumnie — powód przy `zwrotyDoSprawdzeniaWyplaty`. */
   addColumn("zwrot_klienta", "wyplata_sprawdzono_at", "TEXT");
   /* Ile zwrotów Allegro miało jeszcze do oddania, gdy przebieg się skończył

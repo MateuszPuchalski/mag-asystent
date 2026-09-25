@@ -125,7 +125,7 @@ test("zamknięty korektą, a niezapłacony też pytamy o wypłatę (0.505.0)", a
   assert.equal(w.rozliczony_allegro_at, "2026-09-24T10:00:00Z", "zatrzask zdejmuje czekanie na pieniądze");
 });
 
-test("kolejka pytań się kręci — stare nierozliczalne nie zasłaniają nowych (@wydanie)", async () => {
+test("kolejka pytań się kręci — stare nierozliczalne nie zasłaniają nowych (0.506.1)", async () => {
   /* Zgłoszenie właściciela, zwrot 6016/2026: wypłata 23 września, a panel
      dalej „do zwrotu". Setka najstarszych, które rozliczenia nie dostaną
      nigdy, stała na czele listy na zawsze. */

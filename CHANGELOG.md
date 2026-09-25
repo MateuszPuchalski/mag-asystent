@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.506.1 — 25 września 2026
+
+**Sprawdzanie wypłat dochodzi do każdego zwrotu.** Wyszło przy zwrocie
+6016/2026: pieniądze oddane w Allegro 23 września, a panel dalej pokazywał
+„do zwrotu".
+
+Aplikacja pyta Allegro o wypłaty setkę zwrotów na przebieg, dotąd zawsze
+najstarszych i bez pamięci, kogo już pytała. Gdy zwrotów bez rozliczenia jest
+więcej, czoło listy zajmują te, które rozliczenia nie dostaną nigdy, a nowsze
+nie doczekają się pytania. Teraz kolejka się kręci: najpierw zwroty jeszcze
+niepytane, potem te, o które pytaliśmy najdawniej.
+
 ## 0.506.0 — 25 września 2026
 
 **Skrzynka przytłacza mniej.** Nagłówek rozmowy niesie login, status, menu
