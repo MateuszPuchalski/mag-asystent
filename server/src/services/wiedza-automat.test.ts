@@ -61,7 +61,7 @@ beforeEach(() => {
 const ALA = () => ({ userId: biuro, name: "A. Lewandowska" });
 /** Atrapa odpowiedzi modelu; zużycie zerowe, bo nikt tu do dostawcy nie idzie. */
 const odpowiedzModelu = (model: import("./wiedza.js").DaneModelu | null) => ({
-  model, zuzycie: { wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0 }, ms: 1,
+  model, modelJezykowy: "claude-opus-5", zuzycie: { wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0 }, ms: 1,
 });
 const marki = () => ["NAC", "NAC PRO", "STIHL"];
 
@@ -247,6 +247,25 @@ test("marka ZNANA, wskazana przez model, przechodzi", async () => {
   });
   assert.equal(w.zlozonych, 1);
   assert.equal(w.zastosowan, 1);
+});
+
+test("„nie wiem” modelu zostaje w księdze z modelem i nie liczy się jako błąd", async () => {
+  /* Blizna: zapis pisał `wynik='niepewny'`, którego `CHECK` nie zna, i model
+     `''`. INSERT rzucał, przebieg liczył wiersz jako błąd, a zapłacone
+     wywołanie nie zostawiało śladu. Pusty model wypadał też z pomiaru kosztu. */
+  db().prepare("DELETE FROM copilot_wywolanie").run();
+  wiersz("236; 240", KOSA);
+
+  const w = await A.oproznijKolejke({ database: db(), nadajKlucz: async () => odpowiedzModelu(null) });
+
+  assert.equal(w.bledow, 0, "„nie wiem” to odpowiedź, nie awaria");
+  assert.equal(w.bezMarki, 1);
+  const wiersze = db().prepare(
+    "SELECT zadanie, model, wynik FROM copilot_wywolanie").all() as Array<Record<string, string>>;
+  assert.equal(wiersze.length, 1, "płatne wywołanie musi stać w księdze");
+  assert.equal(wiersze[0]!.zadanie, "klucz_modelu");
+  assert.equal(wiersze[0]!.wynik, "ok");
+  assert.equal(wiersze[0]!.model, "claude-opus-5");
 });
 
 /* ── Czego automat NIE zniósł ─────────────────────────────────────────────── */
