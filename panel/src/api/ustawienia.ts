@@ -207,7 +207,7 @@ export interface StanAktualizacji {
   czekaZlecenie: boolean;
   /** `null` = wolno zlecić; inaczej zdanie, dlaczego nie. */
   blokada: string | null;
-  /** Decyzja automatu (@wydanie) — `services/aktualizacja-auto.ts`. */
+  /** Decyzja automatu (0.494.0) — `services/aktualizacja-auto.ts`. */
   auto?: {
     tryb: "noc" | "zaraz" | "wylaczona";
     okno: { od: number; do: number };

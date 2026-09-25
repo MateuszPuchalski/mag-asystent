@@ -164,7 +164,7 @@ niejednoznaczna i dawała bramkę słabszą, niż wygląda. Zmieniając nazwę z
 w workflow, zmień ją też w `main.json` — inaczej reguła będzie czekać na check,
 którego nikt nie zgłasza, i zablokuje scalanie na zawsze.
 
-**`bypass_actors` ma jedną pozycję: klucz wdrożeniowy** (od @wydanie). Tym
+**`bypass_actors` ma jedną pozycję: klucz wdrożeniowy** (od 0.494.0). Tym
 kluczem `wydanie.yml` wypycha commit wydania — patrz §0c. Reguła obowiązuje
 wszystkich ludzi łącznie z właścicielem, więc bezpośredni push na `main` nie
 przechodzi. Nie dopisuj tu siebie „na wszelki wypadek". Scalenie z czerwonym
@@ -185,7 +185,7 @@ bez żadnego konfliktu. Konflikt nie jest miarą ryzyka.
 **Jak zatrzymać pojedynczy PR.** Wyłącz na nim auto-scalanie przyciskiem
 w interfejsie GitHuba. Draft nie jest scalany w ogóle.
 
-## 0c. Numer wydania nadaje automat (@wydanie)
+## 0c. Numer wydania nadaje automat (0.494.0)
 
 **PR nie zmienia numeru wersji ani nie dopisuje wpisu w `CHANGELOG.md`.**
 Opisuje zmianę w pliku `zmiany/<nazwa>.md` — wzór stoi w `zmiany/README.md`.
@@ -270,7 +270,7 @@ Zdrowie pokazuje porażkę przez dobę. Dziennik przebiegu:
 > jedną operacją i cofa się jedną operacją. Dane w środku trzeba by przenosić
 > przy każdej aktualizacji, a przerwane przenoszenie bazy to najgorszy stan.
 
-### Aktualizacja automatyczna (@wydanie)
+### Aktualizacja automatyczna (0.494.0)
 
 Serwer sam klika przycisk z tej karty, przez to samo zadanie Harmonogramu.
 Karta pokazuje w jednym zdaniu, co automat zrobi i dlaczego jeszcze nie.

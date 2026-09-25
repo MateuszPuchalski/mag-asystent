@@ -9,7 +9,7 @@ import {
 import { logEvent } from "./events.js";
 import { ostatniRuch } from "./ruch.js";
 
-/* ── Aktualizacja automatyczna (@wydanie) ────────────────────────────────────
+/* ── Aktualizacja automatyczna (0.494.0) ────────────────────────────────────
    Przycisk z 0.492.0 zrobił jedną aktualizację tanią, ale ktoś wciąż musiał
    kliknąć — przy trzydziestu wydaniach dziennie serwer stał na wersji, którą
    ktoś ostatnio pamiętał wgrać. Automat klika sam, przez to samo zadanie

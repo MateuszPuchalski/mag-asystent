@@ -93,7 +93,7 @@ export const config = {
   },
 
   /**
-   * Aktualizacja automatyczna (@wydanie), `services/aktualizacja-auto.ts`.
+   * Aktualizacja automatyczna (0.494.0), `services/aktualizacja-auto.ts`.
    *
    * DOMYŚLNIE „zaraz", TAKŻE NA PRODUKCJI — decyzja właściciela z wywiadu
    * o wdrażaniu (@wydanie). Magazyn pracuje na jedną zmianę, dwie minuty

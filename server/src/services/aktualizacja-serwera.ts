@@ -72,7 +72,7 @@ export function wydaniaNowsze(
   obecna: string,
 ): Wydanie[] {
   return surowe
-    /* Wydanie oznaczone na GitHubie jako „pre-release" jest WYCOFANE (@wydanie):
+    /* Wydanie oznaczone na GitHubie jako „pre-release" jest WYCOFANE (0.494.0):
        jedno kliknięcie zdejmuje zepsutą wersję z przycisku i z automatu. */
     .filter((r) => !r.prerelease && !r.draft)
     .map((r) => {
