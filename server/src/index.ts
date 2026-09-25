@@ -635,7 +635,7 @@ async function main() {
      aktualizacji trafia do dziennika raz, przy pierwszym starcie po niej. */
   if (podNssm()) ustawUruchamiacz(uruchomSchtasks);
   uruchomTakt("wydania", 60 * 60_000, () => sprawdzWydania());
-  /* Automat (@wydanie) co pięć minut: okno nocne ma dwie godziny, a czekanie
+  /* Automat (0.494.0) co pięć minut: okno nocne ma dwie godziny, a czekanie
      na dziesięć minut ciszy przy takcie godzinnym zjadłoby je całe. */
   uruchomTakt("autoaktualizacja", 5 * 60_000, async () => { await taktAuto(); });
   try {

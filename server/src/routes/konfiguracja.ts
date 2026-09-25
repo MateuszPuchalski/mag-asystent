@@ -22,7 +22,7 @@ import { zaplanujRestart } from "../services/restart.js";
    `privileged` do dziennika, a to jest zapis przy samym patrzeniu — reguła
    zero zapisu przy otwarciu ekranu obowiązuje także karty ustawień. */
 
-/* Stan z decyzją automatu (@wydanie): panel pokazuje to samo zdanie, którym
+/* Stan z decyzją automatu (0.494.0): panel pokazuje to samo zdanie, którym
    kieruje się takt. `decyzjaTeraz` nie pobiera niczego i niczego nie zleca. */
 function zAutomatem() {
   const u = ustawieniaAuto();

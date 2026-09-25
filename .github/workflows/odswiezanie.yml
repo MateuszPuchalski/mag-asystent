@@ -63,7 +63,7 @@ jobs:
             exit 0
           fi
 
-          # Od @wydanie za każdym scaleniem idzie, minutę później, commit
+          # Od 0.494.0 za każdym scaleniem idzie, minutę później, commit
           # wydania (`wydanie.yml`). Odświeżenie PO scaleniu, a PRZED wydaniem
           # kosztowałoby każdy PR drugi pełny przebieg CI. Czekamy więc, aż
           # fragmenty zmian na `main` znikną — push wydania uruchomi nas znowu.
