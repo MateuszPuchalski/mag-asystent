@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { StanPasowaniaZSieci } from "../api/typy";
 import { NA_KLIKNIECIE, PasowanieZSieci } from "./PasowanieZSieci";
 
-/* ── Pasowanie z sieci uruchomione ręcznie (@wydanie) ────────────────────────
+/* ── Pasowanie z sieci uruchomione ręcznie (0.508.0) ────────────────────────
    Po prawdziwym `fetch`. Otwarcie to wyłącznie odczyt stanu. Wyłączony
    automat mówi, czego brakuje, i nie daje kliknąć. Włączony idzie kartoteka
    po kartotece, najwyżej NA_KLIKNIECIE razy, i staje, gdy nie ma co robić. */

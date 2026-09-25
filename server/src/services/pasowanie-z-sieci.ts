@@ -310,7 +310,7 @@ function zapiszKsiege(
       teraz.toISOString());
 }
 
-/* ── Stan dla ekranu Wiedzy (@wydanie) ───────────────────────────────────────
+/* ── Stan dla ekranu Wiedzy (0.508.0) ───────────────────────────────────────
    Właściciel chciał uruchomić automat ręcznie, poza oknem nocnym, żeby
    zobaczyć go w pracy. Ekran potrzebuje wiedzieć trzy rzeczy: czy wolno
    (wyłącznik i klucz), ile zostało z sufitu i co wyszło ostatnio. */

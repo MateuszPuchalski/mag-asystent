@@ -61,7 +61,7 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    Dwudziesty siódmy i dwudziesty ósmy to zbiórka „Pasuje do" z ofert:
    strona listy ofert konta i partia treści. Obie CZYTAJĄ Allegro, a piszą
    wyłącznie u nas — publikacji do Allegro nie ma, decyzją właściciela.
-   Dwudziesty dziewiąty (@wydanie) to ręczne pasowanie z sieci, po jednej
+   Dwudziesty dziewiąty (0.508.0) to ręczne pasowanie z sieci, po jednej
    kartotece: składa wyłącznie propozycje i nie woła Allegro.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
@@ -427,7 +427,7 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     catch (e) { return limit(reply, e); }
   });
 
-  /* Pasowanie z sieci uruchomione ręcznie (@wydanie). Właściciel chciał zobaczyć
+  /* Pasowanie z sieci uruchomione ręcznie (0.508.0). Właściciel chciał zobaczyć
      automat w pracy bez czekania na noc. JEDNA kartoteka na żądanie, a ekran
      woła w pętli, jak przy zbiórce wyżej: serwer nie trzyma przebiegów w tle,
      a człowiek ma móc przerwać. Wydatek pilnuje sufit nocy, bo ręczny przebieg

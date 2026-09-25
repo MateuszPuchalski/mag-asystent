@@ -389,7 +389,7 @@ export function useZbierzPasujeDo() {
   });
 }
 
-/* ── Pasowanie z sieci (@wydanie): stan (odczyt) i jedna kartoteka na żądanie ─ */
+/* ── Pasowanie z sieci (0.508.0): stan (odczyt) i jedna kartoteka na żądanie ─ */
 export function usePasowanieZSieci() {
   return useQuery({
     queryKey: kluczeWiedzy.pasowanieZSieci,

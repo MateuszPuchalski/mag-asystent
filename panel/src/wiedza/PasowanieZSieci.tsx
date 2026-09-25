@@ -5,7 +5,7 @@ import type { PowodOdrzuceniaSieci, WynikPrzebieguSieci } from "../api/typy";
 import { kluczeWiedzy, usePasowanieZSieci, useSprawdzZSieci } from "../api/wiedza";
 import { Blad, NaglowekSekcji, Przycisk, czas, ile } from "../ui";
 
-/* ── Pasowanie z sieci uruchomione ręcznie (@wydanie) ────────────────────────
+/* ── Pasowanie z sieci uruchomione ręcznie (0.508.0) ────────────────────────
    Właściciel chciał zobaczyć automat nocny w pracy bez czekania na 1:00.
 
    EKRAN PROWADZI PRZEBIEG, kartoteka po kartotece, jak zbiórka „Pasuje do"

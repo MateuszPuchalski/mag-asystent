@@ -2141,7 +2141,7 @@ export type NowePasowanie = {
   conversationId?: number | null;
 };
 
-/* ── Pasowanie z sieci (@wydanie) ─────────────────────────────────────────────
+/* ── Pasowanie z sieci (0.508.0) ─────────────────────────────────────────────
    Kształt z `services/pasowanie-z-sieci.ts`. Automat szuka pasowania części na
    stronach SPOZA Allegro i składa wyłącznie propozycje do kolejki Wiedzy. */
 export type PowodOdrzuceniaSieci =

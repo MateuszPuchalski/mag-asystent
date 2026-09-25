@@ -201,7 +201,7 @@ test("tras zapisu jest dwadzieścia osiem — licznik jest umową", () => {
      listy ofert konta i partia treści. Czytają Allegro, piszą tylko u nas.
      Publikacji do Allegro nie ma, decyzją właściciela, więc nie ma trasy.
 
-     DWUDZIESTA DZIEWIĄTA (@wydanie): ręczne pasowanie z sieci, jedna kartoteka
+     DWUDZIESTA DZIEWIĄTA (0.508.0): ręczne pasowanie z sieci, jedna kartoteka
      na żądanie. Pisze wyłącznie propozycje do kolejki, nigdy zatwierdzenie,
      a wydatek ogranicza sufit nocy liczony z tej samej księgi. */
   assert.equal(TRASY().filter((t) => t.method !== "GET").length, 29);
@@ -533,7 +533,7 @@ test("tokeny przez trasę: dodanie z listą dopasowań, dubel 409, rozstrzygnię
   assert.equal(W.zastosowaniaTowaru(503).potwierdzone.length, 1, "usunięcie tokenu nie cofa faktu");
 });
 
-/* Pasowanie z sieci uruchomione ręcznie (@wydanie). Wyłączone — a tak jest
+/* Pasowanie z sieci uruchomione ręcznie (0.508.0). Wyłączone — a tak jest
    domyślnie — mówi, czego brakuje, i niczego nie rusza: ani księgi, ani
    kolejki. Do sieci nie ma wtedy jak dojść, bo trasa odmawia przed wywołaniem. */
 test("ręczne pasowanie z sieci: wyłączone mówi dlaczego i niczego nie zapisuje", async () => {
