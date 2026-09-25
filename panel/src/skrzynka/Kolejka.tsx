@@ -5,9 +5,10 @@ import {
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
 } from "../api/typy";
-import { czas, FiltrSegmentowy, godzina, Plakietka, Pusto } from "../ui";
+import { czas, Plakietka, Pusto } from "../ui";
+import { FiltrZWiecej } from "../ui/FiltrZWiecej";
+import { polePisania } from "../nawigacja/fokus";
 import { NAZWA, NAZWA_DOBORU } from "./statusy";
-import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { CZESTE, KafelKategorii, PasekCopilota, ZnakCopilota, doRozpoznania, nazwaNaPlakietce } from "./Copilot";
 import { Czekanie } from "./Czekanie";
 import { SlownikZnakow } from "./SlownikZnakow";
@@ -50,7 +51,7 @@ export function odNajnowszych(rozmowy: Rozmowa[]): Rozmowa[] {
 }
 
 /** Kubełki przeglądania, nie pracy — pod „Więcej" (0.506.0). */
-const POD_WIECEJ: ReadonlySet<Kubelek> = new Set(["oczekujace", "zakonczone"]);
+const POD_WIECEJ: ReadonlyArray<Kubelek> = ["oczekujace", "zakonczone"];
 
 const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
   { klucz: "wszystkie", etykieta: "Wszystkie" },
@@ -205,12 +206,14 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
      ekran byłoby większą zmianą niż cały ten skrót.
 
      POLE TEKSTOWE WYGRYWA ZAWSZE. Na tym ekranie agent PISZE — bez tej bramki
-     `j` w słowie „już" przerzucałoby rozmowę spod kursora. Stąd ten sam
-     strażnik co w reklamacjach: INPUT, TEXTAREA i pole edytowalne milczą. */
+     `j` w słowie „już" przerzucałoby rozmowę spod kursora.
+
+     Strażnik jest WSPÓLNY, z `nawigacja/fokus.ts` (@wydanie). Własny nie znał
+     SELECT-a, a kolejka ma dwa: „Więcej" i kolejność. Strzałka w otwartej
+     liście zmieniała wtedy naraz jej wartość i rozmowę pod kursorem. */
   const naKlawisz = useRef<(e: KeyboardEvent) => void>(() => {});
   naKlawisz.current = (e: KeyboardEvent) => {
-    const el = e.target as HTMLElement | null;
-    if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+    if (polePisania(e.target)) return;
     if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
     if (e.key === "ArrowDown" || e.key === "j" || e.key === "ArrowUp" || e.key === "k") {
       if (!widoczne.length) return;
@@ -262,7 +265,11 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         synchronizacja {czas(stan.ostatniaSynchronizacja)}
         {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
       </p>
-      <SlownikZnakow />
+      {/* JEDEN „?" ZAMIAST DWÓCH (@wydanie). Słownik znaków stał w nagłówku,
+          skróty klawiszy w paśmie szukania — dwa znaki zapytania o dwóch
+          regułach otwierania. Pomoc tej kolejki jest jedna, więc otwiera się
+          jednym przyciskiem i zamyka jak każde okienko panelu. */}
+      <SlownikZnakow kubelkow={KUBELKI.length} />
       {powiadomienia && powiadomienia.stan !== "brak" && <button type="button"
         aria-pressed={powiadomienia.stan === "wlaczone"}
         disabled={powiadomienia.stan === "zablokowane"}
@@ -277,8 +284,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           powiadomienia.stan === "wlaczone" ? "text-wertis-ink" : "text-slate-500"}`}>
         {powiadomienia.stan === "wlaczone" ? <Bell size={16} /> : <BellOff size={16} />}</button>}
       <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)} />
-      {nieswieza && <span className="rounded bg-red-100 px-1.5 py-0.5 text-podpis font-bold text-ranga-zle">
-        STAN Z {godzina(stan.ostatniaSynchronizacja)}</span>}
+      {/* Plakietka „STAN Z …" zeszła (@wydanie). Zapalała się wyłącznie przy
+          alarmie synchronizacji, a baner alarmu nad kolumnami mówi już „dane
+          sprzed…" pełnym zdaniem. Godzinę niesie zdanie obok tytułu. */}
       <button type="button" className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
         title="Odśwież" aria-label="Odśwież"><RefreshCw size={16} /></button>
     </header>
@@ -295,21 +303,12 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         Zgłoszenie agenta: „przytłacza". Pięć pigułek zawijało się na dwa rzędy
         nad pierwszym pytaniem. Robota dzieje się w trzech; „Oczekujące"
         i „Zakończone" to przeglądanie — stoją pod „Więcej" z liczbą, a cyfry
-        4 i 5 dalej je wybierają. Wybrany ukryty kubełek pokazuje swoją nazwę
-        na przycisku, więc nie ma stanu, którego nie widać. */}
+        4 i 5 dalej je wybierają. Od @wydanie ten układ mieszka
+        w `ui/FiltrZWiecej.tsx`, bo te same „Więcej" dostały inne kolejki. */}
     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1">
-      <FiltrSegmentowy<Kubelek> wybrany={kubelek} onWybierz={setKubelek}
-        pozycje={KUBELKI.filter((k) => !POD_WIECEJ.has(k.klucz)).map((k) => ({ klucz: k.klucz, etykieta: k.etykieta,
+      <FiltrZWiecej<Kubelek> wybrany={kubelek} onWybierz={setKubelek} wiecej={POD_WIECEJ}
+        pozycje={KUBELKI.map((k) => ({ klucz: k.klucz, etykieta: k.etykieta,
           ile: rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length }))} />
-      <select aria-label="Więcej kubełków" value={POD_WIECEJ.has(kubelek) ? kubelek : ""}
-        onChange={(e) => { if (e.target.value) setKubelek(e.target.value as Kubelek); }}
-        /* Reszta rzędu, nie własna szerokość (0.506.0): stała szerokość
-           125 px spadała w kolumnie 360 px pod kubełki i dokładała rząd. */
-        className={`field w-auto min-w-0 flex-1 basis-[5.5rem] py-1 text-xs font-semibold ${POD_WIECEJ.has(kubelek) ? "border-wertis-ink" : ""}`}>
-        <option value="">Więcej…</option>
-        {KUBELKI.filter((k) => POD_WIECEJ.has(k.klucz)).map((k) => <option key={k.klucz} value={k.klucz}>
-          {k.etykieta} · {rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length}</option>)}
-      </select>
     </div>
     {/* Pole stoi POD kubełkami, nie nad nimi: kubełek wybiera się raz na
         wejście, a szuka się w środku tego, co się wybrało. Kolejność obok
@@ -332,11 +331,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         <option value="czekanie">najdłużej czekające</option>
         <option value="najnowsze">od najnowszych</option>
       </select>
-      {/* Pomoc wchodzi do TEGO rzędu (0.402.0) zamiast stać pasmem niżej —
-          ten sam ruch, co na trzech pozostałych ekranach obsługi. Do 0.506.0
-          komentarz to obiecywał, a przycisk stał osobnym rzędem w liście. */}
-      <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length}
-        sita={false} zWszystkimi={false} />
+      {/* Skróty klawiszy zeszły stąd do „?" w nagłówku (@wydanie) — obok
+          słownika znaków, jedną pomocą zamiast dwóch. */}
     </div>
     <PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)}
       trwa={klasyfikacja?.trwa} wynik={klasyfikacja?.wynik} blad={klasyfikacja?.blad}
@@ -533,8 +529,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           {zegar !== null && <span className="self-center"><Czekanie ms={zegar} /></span>}
         </button>;
       })}
-      {nieswieza && <p className="border-t bg-red-50 px-4 py-2 text-xs text-red-800">
-        Dalsze wiersze mogą istnieć w Allegro i nie zostały jeszcze pobrane.</p>}
+      {/* Stopka „Dalsze wiersze mogą istnieć w Allegro…" zeszła (@wydanie):
+          stała tylko przy alarmie, a baner alarmu mówi to samo — „nowe pytania
+          mogą już czekać, a ich tu nie widać". Przygaszona lista zostaje. */}
     </div>
   </section>;
 }
