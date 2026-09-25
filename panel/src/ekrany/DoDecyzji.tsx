@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import {
   AlertTriangle, Barcode, ChevronRight, CircleCheck, Inbox, ListChecks, MessageSquareReply,
   FlaskConical, MessagesSquare, Package, PlugZap, ShieldQuestion, Truck, Undo2,
+  ClipboardList,
 } from "lucide-react";
 import { useDoDecyzji, type Obszar, type PozycjaDecyzji, type ZrodloDecyzji } from "../api/decyzje";
 import { Blad, FiltrSegmentowy, Karta, Pusto, wiek } from "../ui";
@@ -18,21 +19,20 @@ import { Wzmianki } from "./Wzmianki";
    decyzji: wyjątek dostawy rozstrzyga się przy fakturze i jej zdjęciach,
    reklamację przy czacie z kupującym. Przycisk „uznaj" na tej liście
    kazałby decydować bez dowodów — a to jest dokładnie to, czego biuro
-   robić nie powinno. Ta sama zasada co w „Moje".
-
-   Ekran, który jeszcze mieszka w `biuro.html`, otwiera się mostem — jak
-   drugi rząd nagłówka. Strzałka „na zewnątrz" mówi to przed kliknięciem. */
+   robić nie powinno. Ta sama zasada co w „Moje". */
 
 const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; className?: string }>> = {
   dostawy: Truck, odpowiedzi: MessageSquareReply, kosze: Package, zapisy: AlertTriangle,
   kody: Barcode, allegro: PlugZap, reklamacje: ShieldQuestion, zwroty: Undo2,
   skrzynka: Inbox, dyskusje: MessagesSquare, sonda: FlaskConical,
+  /* Zadanie odesłane przez halę (@wydanie) — `odeslaneZadania` w `do-decyzji.ts`. */
+  zadania: ClipboardList,
 };
 
 const NAZWY: Record<ZrodloDecyzji, string> = {
   dostawy: "Dostawy", odpowiedzi: "Odpowiedź z hali", kosze: "Kosze", zapisy: "Zapis do Subiekta",
   kody: "Kody kreskowe", allegro: "Konto Allegro", reklamacje: "Reklamacje", zwroty: "Zwroty",
-  skrzynka: "Skrzynka", dyskusje: "Dyskusje", sonda: "Test na żywo",
+  skrzynka: "Skrzynka", dyskusje: "Dyskusje", sonda: "Test na żywo", zadania: "Zadanie hali",
 };
 
 type Filtr = "wszystko" | Obszar;

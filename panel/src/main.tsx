@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { MutationCache, QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { nowyKlientZapytan } from "./api/klient-zapytan";
 import { Activity, BarChart3, BookMarked, ClipboardList, FileText, Inbox, ListChecks, LogOut, MessagesSquare, Settings, ShieldQuestion, Truck, Undo2 } from "lucide-react";
 import logo from "./assets/wertis-logo.png";
-import { BrakSesji, SESJA_WYGASLA, token, wyczyscToken, zglosBrakSesji } from "./api/klient";
+import { SESJA_WYGASLA, token, wyczyscToken } from "./api/klient";
 import { useJa, useWzmianki, useZdrowie } from "./api/rozmowy";
 import { BrakDostepu } from "./ekrany/BrakDostepu";
 import { EtykietaInstancji } from "./stan/Instancja";
@@ -31,25 +32,10 @@ import { Stan } from "./ekrany/Stan";
 import { Protokol } from "./druk/Protokol";
 import "./index.css";
 import { CoNowego } from "./coNowego/CoNowego";
+import { SzufladaTowaru } from "./towar/Szuflada";
 
-/* Jeden cache zapytań na cały panel zastępuje ręczne odświeżanie co
-   piętnaście sekund. To jest ta część wyceny z `docs/obsluga-klienta.md` §7,
-   za którą płacimy TanStackiem: ekrany dzielą stan zamiast każdy swój. */
-const klient = new QueryClient({
-  /* Wygasła sesja w dowolnym zapytaniu albo mutacji wraca do logowania
-     (0.431.0) — szczegół przy `zglosBrakSesji` w `api/klient.ts`. */
-  queryCache: new QueryCache({ onError: zglosBrakSesji }),
-  mutationCache: new MutationCache({ onError: zglosBrakSesji }),
-  defaultOptions: {
-    queries: {
-      /* Sesja wygasła nie jest błędem do ponowienia — ekran ma wrócić do
-         logowania. Bez tego panel próbowałby trzy razy i pokazał błąd. */
-      retry: (proba, blad) => !(blad instanceof BrakSesji) && proba < 2,
-      staleTime: 10_000,
-      refetchOnWindowFocus: true,
-    },
-  },
-});
+/* Jeden cache zapytań na cały panel — budowa i powody w `api/klient-zapytan.ts`. */
+const klient = nowyKlientZapytan();
 
 /* `korzen` znaczy „to jest strona domowa panelu" i tylko ona dopasowuje się
    po równości. Do 0.149.0 aktywną zakładkę wybierało wyrażenie
@@ -313,7 +299,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
      deklarację, a `lg:min-h-0` skasowało już `min-h-screen` — ramie nie
      zostawał żaden limit i przewijał się cały dokument. Klasa niesie `vh`
      i `dvh` po kolei, czego jedna klasa Tailwinda zapisać nie umie. */
-  return <div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
+  /* Szuflada towaru (@wydanie) obejmuje całą ramę: przycisk towaru stoi na
+     dziewięciu ekranach, a szuflada ma otwierać się nad każdym z nich. */
+  return <SzufladaTowaru><div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
     <Naglowek wyloguj={wyloguj} />
     {/* „Nowe w panelu" (0.500.0) — pod nagłówkiem, nad pracą, tylko przy
         pierwszym wejściu po wydaniu. Powód w `coNowego/CoNowego.tsx`. */}
@@ -369,7 +357,7 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         <Route path="*" element={<Navigate to="/obsluga/" replace />} />
       </Routes>
     </main>
-  </div>;
+  </div></SzufladaTowaru>;
 }
 
 createRoot(document.getElementById("root")!).render(

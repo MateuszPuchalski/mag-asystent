@@ -7,6 +7,7 @@ import { Zdjecie } from "../towar/Zdjecie";
 import { useZdrowie } from "../api/rozmowy";
 import { Blad, NaglowekSekcji, Plakietka, Przycisk, czas, dzien } from "../ui";
 import { Wyjatek } from "./Wyjatek";
+import { PrzyciskTowaru } from "../towar/Szuflada";
 
 /* ── Dokument dostawy — środkowa kolumna (0.435.0) ─────────────────────────
    Przeniesiony z `biuro.html` z trzema decyzjami, które tam kosztowały:
@@ -164,7 +165,7 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
                 {/* Symbol w jednej linii: przy 1180 px kolumna zdjęć zabiera Towarowi
                     miejsce, a symbol łamany na łącznikach („TEST- / JEDNA- / POZ")
                     przestaje być tym, co hala ma na etykiecie. Łamie się nazwa. */}
-                <td className="py-2 pr-2"><b className="whitespace-nowrap">{l.sym}</b><div className="text-xs text-slate-600">{l.name}</div></td>
+                <td className="py-2 pr-2"><b className="whitespace-nowrap"><PrzyciskTowaru twId={l.twId}>{l.sym}</PrzyciskTowaru></b><div className="text-xs text-slate-600">{l.name}</div></td>
                 <td className="py-2 pr-2 tabular-nums"><b>{ilosc(l.qtyDone)}/{ilosc(l.qtyDoc)}</b>{" "}
                   <StanPozycji s={l.status} /></td>
                 <td className="py-2"><Gdzie l={l} /></td>

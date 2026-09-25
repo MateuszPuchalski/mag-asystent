@@ -269,3 +269,14 @@ describe("Ekran dostaw", () => {
     expect(screen.queryByRole("button", { name: "Zamknij powiększenie" })).toBeNull();
   });
 });
+
+/* ── Wejście z Analizy (@wydanie) ──────────────────────────────────────────
+   Wiersz dostawcy w Analizie prowadzi tu z kubełkiem archiwum i nazwą
+   dostawcy. Adres czyta się raz, przy wejściu, i od razu pyta archiwum. */
+describe("adres z kubełkiem i frazą", () => {
+  it("otwiera archiwum z frazą dostawcy", async () => {
+    pokaz("/obsluga/dostawy?kubelek=archiwum&q=Rosa-Pol");
+    await waitFor(() => expect(archiwumPytania).toContain("Rosa-Pol"));
+    expect(screen.getByDisplayValue("Rosa-Pol")).toBeInTheDocument();
+  });
+});

@@ -81,3 +81,25 @@ describe("Zdarzenia sprawy stoją w pasku, nie na osi", () => {
     expect(screen.queryByText(/NOTATKA WEWNĘTRZNA/)).toBeNull();
   });
 });
+
+/* ── Zwrot na osi rozmowy (@wydanie) ────────────────────────────────────────
+   Decyzja i pieniądze zwrotu stoją w pasku jako zdarzenie. Najgorszy wynik
+   tej zmiany to wpis zwrotu narysowany jak wypowiedź — test pilnuje, że
+   rodzaj „zwrot" nie trafia do rozmowy. */
+describe("zwrot na osi rozmowy", () => {
+  const zwrot = (co: string, id = "zwrot-1"): WpisOsi => ({
+    id, rodzaj: "zwrot", autor: "Ala", odKlienta: false, tresc: `zwrot Z-7: ${co}`,
+    at: "2026-09-02T09:00:00Z", ofertaId: null,
+    zdarzenie: { rodzaj: "zwrot", co, zwrotId: 7, numer: "Z-7" },
+  });
+
+  it("jest zdarzeniem w pasku z nazwą z osi zwrotu, nie wypowiedzią", () => {
+    const { wypowiedzi, zdarzenia } = rozdziel([wiadomosc(), zwrot("pieniadze")]);
+    expect(wypowiedzi.map((w) => w.id)).toEqual(["msg-1"]);
+    expect(zdarzenia.map((z) => z.id)).toEqual(["zwrot-1"]);
+    pokaz([wiadomosc(), zwrot("pieniadze"), zwrot("przelew_cofniety", "zwrot-2")]);
+    const pasek = screen.getByRole("navigation", { name: /przebieg sprawy/i });
+    expect(within(pasek).getByRole("button", { name: "zwrot: pieniądze" })).toBeInTheDocument();
+    expect(within(pasek).getByRole("button", { name: "zwrot: przelew cofnięty" })).toBeInTheDocument();
+  });
+});

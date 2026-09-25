@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { db } from "../db/db.js";
 import { linkZamowienia } from "./allegro-linki.js";
+import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
 
 /* ── Historia klienta u nas (§10.1, zakładka KLIENT) ─────────────────────────
    Zakładka wróciła z makiety decyzją właściciela. §10.1 skreślił ją w 0.198.0
@@ -167,8 +168,8 @@ export function historiaSprawy(
       LEFT JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
      WHERE c.channel_account_id = ?
        AND (t.interlocutor_login = ? COLLATE NOCASE
-            OR EXISTS (SELECT 1 FROM message m WHERE m.conversation_id = c.id
-                        AND m.related_order_id IN (${numeryWarunek.map(() => "?").join(",")})))
+            OR EXISTS (SELECT 1 FROM ${ROZMOWA_ZAMOWIENIA} rz WHERE rz.conversation_id = c.id
+                        AND rz.numer IN (${numeryWarunek.map(() => "?").join(",")})))
      ORDER BY c.updated_at DESC`).all(konto, login, ...numeryWarunek) as Array<Record<string, unknown>>;
 
   const pomin = rodzaj === "zwrot"
@@ -196,8 +197,8 @@ export function historiaPoLoginie(
       LEFT JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
      WHERE c.channel_account_id = ?
        AND (t.interlocutor_login = ? COLLATE NOCASE
-            OR EXISTS (SELECT 1 FROM message m WHERE m.conversation_id = c.id
-                        AND m.related_order_id IN (${warunek.map(() => "?").join(",")})))
+            OR EXISTS (SELECT 1 FROM ${ROZMOWA_ZAMOWIENIA} rz WHERE rz.conversation_id = c.id
+                        AND rz.numer IN (${warunek.map(() => "?").join(",")})))
      ORDER BY c.updated_at DESC`).all(konto, login, ...warunek) as Array<Record<string, unknown>>;
   return zbierz(database, konto, login, rozmowy, { rodzaj: "zakup", id: -1 });
 }

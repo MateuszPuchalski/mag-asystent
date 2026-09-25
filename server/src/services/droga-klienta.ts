@@ -26,6 +26,40 @@ import { statusRozmowy } from "./conversations.js";
 
 type Wiersz = Record<string, unknown>;
 
+/**
+ * Które rozmowy są o którym zamówieniu — JEDNA relacja SQL dla każdej strony
+ * mostka (@wydanie). Kolumny: `conversation_id`, `numer`, `at`.
+ *
+ * Do tego wydania skrzynka czytała numer rozmowy razem z ręcznym wskazaniem
+ * (`numerZamowieniaRozmowy`), a zwrot, reklamacja, droga zakupu i szukanie —
+ * tylko z `message.related_order_id`. Rozmowa z zamówieniem wskazanym przez
+ * agenta widziała więc zwrot, a zwrot jej nie widział. Wiązanie jednostronne
+ * to wiązanie, którego nie ma (CLAUDE.md), i nic go nie pilnowało.
+ *
+ * Reguła jest ta sama co w `numerZamowieniaRozmowy`: numer z wiadomości bije
+ * wskazanie, bo numer z Allegro jest faktem, a wskazanie wnioskiem. Wskazanie
+ * liczy się więc tylko przy rozmowie bez żadnego numeru w wiadomościach,
+ * i tylko OSTATNIE — pomyłkę poprawia się wskazaniem innego zamówienia.
+ * `at` wskazania to pierwsza wiadomość rozmowy: klient pisał, zanim agent
+ * wskazał, a droga zakupu układa przystanki po czasie pisania.
+ *
+ * Konta relacja nie filtruje — robi to zapytanie po `conversation`.
+ * Pilnuje jej strażnik źródła w `droga-klienta.test.ts`.
+ */
+export const ROZMOWA_ZAMOWIENIA = `(
+  SELECT m.conversation_id AS conversation_id, m.related_order_id AS numer, m.sent_at AS at
+    FROM message m WHERE m.related_order_id IS NOT NULL
+  UNION ALL
+  SELECT e.conversation_id, json_extract(e.payload, '$.externalId'),
+         COALESCE((SELECT MIN(x.sent_at) FROM message x WHERE x.conversation_id = e.conversation_id),
+                  e.created_at)
+    FROM conversation_event e
+   WHERE e.event_type = 'order_linked_manually'
+     AND e.id = (SELECT MAX(w.id) FROM conversation_event w
+                  WHERE w.conversation_id = e.conversation_id AND w.event_type = 'order_linked_manually')
+     AND NOT EXISTS (SELECT 1 FROM message y
+                      WHERE y.conversation_id = e.conversation_id AND y.related_order_id IS NOT NULL))`;
+
 const tekst = (v: unknown): string | null => {
   const s = v == null ? "" : String(v).trim();
   return s === "" ? null : s;
@@ -130,9 +164,9 @@ export function drogaZakupu(
   /* Rozmowa wchodzi na drogę PIERWSZĄ wiadomością o tym zamówieniu, nie datą
      założenia wątku: wątek bywa starszy od zakupu, gdy klient pytał przed nim. */
   for (const w of database.prepare(`
-    SELECT c.id, c.subject, MIN(m.sent_at) AS pierwsza
-      FROM message m JOIN conversation c ON c.id = m.conversation_id
-     WHERE m.related_order_id = ? AND c.channel_account_id = ?
+    SELECT c.id, c.subject, MIN(rz.at) AS pierwsza
+      FROM ${ROZMOWA_ZAMOWIENIA} rz JOIN conversation c ON c.id = rz.conversation_id
+     WHERE rz.numer = ? AND c.channel_account_id = ?
      GROUP BY c.id`).all(orderId, konto) as Wiersz[]) {
     const at = tekst(w.pierwsza);
     if (at) przystanki.push({ rodzaj: "rozmowa", id: Number(w.id), at, opis: tekst(w.subject) });
@@ -194,10 +228,10 @@ export function eskalacje(
 ): MiesiacEskalacji[] {
   const poKoncie = konto === null ? "" : "AND c.channel_account_id = ?";
   const rozmowy = database.prepare(`
-    SELECT m.related_order_id AS zam, MIN(m.sent_at) AS pierwsza
-      FROM message m JOIN conversation c ON c.id = m.conversation_id
-     WHERE m.related_order_id IS NOT NULL ${poKoncie}
-     GROUP BY m.related_order_id`).all(...(konto === null ? [] : [konto])) as Wiersz[];
+    SELECT rz.numer AS zam, MIN(rz.at) AS pierwsza
+      FROM ${ROZMOWA_ZAMOWIENIA} rz JOIN conversation c ON c.id = rz.conversation_id
+     WHERE 1=1 ${poKoncie}
+     GROUP BY rz.numer`).all(...(konto === null ? [] : [konto])) as Wiersz[];
 
   const sprawy = new Map<string, string>();
   /* bez typu: eskalacją jest KAŻDE wyjście klienta poza skrzynkę — dyskusja

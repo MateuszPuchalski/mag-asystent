@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import {
-  CalendarClock, CalendarDays, CreditCard, History, MessageSquare, NotebookPen, Package, Receipt,
+  CalendarClock, CalendarDays, ClipboardList, CreditCard, History, MessageSquare, NotebookPen, Package, Receipt,
   RefreshCw, Scale, ShoppingCart, Truck, Undo2, UserCheck, Wallet,
 } from "lucide-react";
 import type { Tag } from "../api/typy";
@@ -14,6 +14,7 @@ import { Link } from "./Link";
 import { ZnakAllegro } from "../ui/ZnakAllegro";
 import { KafelOferty } from "../towar/Kafel";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
+import { ZlecHali, jedynaKartoteka } from "../sprawy/ZlecHali";
 import { Link as RouterLink } from "react-router-dom";
 
 /* Kolumna dowodów: wszystko, co trzeba przeczytać, ZANIM padnie decyzja.
@@ -447,17 +448,25 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
       <DrogaZakupu droga={droga} tutaj={{ rodzaj: "zwrot", id: zwrot.id }} />
     </Sekcja>}
 
+    {/* ZLECENIE HALI ZE ZWROTU (@wydanie) — powód w `sprawy/ZlecHali.tsx`.
+        Towar jedzie z zadaniem tylko wtedy, gdy zwrot ma JEDNĄ znaną
+        kartotekę: przy kilku zgadywanie wysłałoby magazyniera pod złą półkę. */}
+    <Sekcja ikona={<ClipboardList size={14} />} tytul="Hala">
+      <ZlecHali zrodlo="zwrot" zrodloRef={zwrot.id} tytul={`Zwrot ${zwrot.numer ?? zwrot.id}`}
+        twId={jedynaKartoteka(zwrot.pozycje.map((p) => p.twId))} />
+    </Sekcja>
+
     {zwrot.rozmowy.length > 0 &&
     <Sekcja ikona={<MessageSquare size={14} />} tytul="Wiadomości o tym zakupie">
       {<ul className="space-y-1">
             {zwrot.rozmowy.map((r) => <li key={r.id}>
-              <a href={`/obsluga/skrzynka/${r.id}`}
+              <RouterLink to={`/obsluga/skrzynka/${r.id}`}
                 className="block rounded-lg bg-slate-50 px-2 py-1 hover:bg-slate-100">
                 <span className="font-semibold text-sky-700 underline underline-offset-2">
                   {r.temat?.trim() || "Rozmowa bez tematu"}</span>
                 <span className="ml-2 text-xs text-slate-500">{czas(r.ostatniaAt)}</span>
                 <Plakietka status={r.status} className="ml-2">{r.status}</Plakietka>
-              </a>
+              </RouterLink>
             </li>)}
           </ul>}
     </Sekcja>}

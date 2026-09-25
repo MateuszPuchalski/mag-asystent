@@ -25,7 +25,7 @@ vi.mock("../api/rozmowy", () => ({
   useKartaTowaru: (twId: number | null) => karta(twId),
 }));
 
-const { PasmoOdpowiedzi } = await import("./PasmoOdpowiedzi");
+const { PasmoOdpowiedzi, dopisekDostaw } = await import("./PasmoOdpowiedzi");
 
 const PELNA: KartaTowaru = {
   id: 7701, sym: "MFG163856", name: "Zestaw prowadnica 16\" 3/8\" 1,3mm +2 łań.",
@@ -85,6 +85,26 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
       data: { ...PELNA, mag: { stan: 0, rez: 0, avail: 0 } } });
     render(<PasmoOdpowiedzi dane={dane()} />);
     expect(screen.getByText("brak na stanie")).toBeInTheDocument();
+  });
+
+  /* „Kiedy będzie" (@wydanie): przy braku — co zamówione i na kiedy, przy
+     stanie — ile stoi w przyjęciach. W wierszu „Mamy", nie w czwartym. */
+  it("przy braku mówi, co zamówione u dostawcy i na kiedy — w wierszu „Mamy”", () => {
+    const zam = (termin: string | null, ilosc: number) => ({ dokId: 1, nrPelny: "ZD 1", dataWyst: "2026-09-20",
+      termin, dostawca: "Rosa-Pol", ilosc, szacunek: false });
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA,
+      mag: { stan: 0, rez: 0, avail: 0 }, zamowione: [zam("2026-10-01", 20), zam(null, 5)] } });
+    render(<PasmoOdpowiedzi dane={dane()} />);
+    expect(screen.getByText(/zamówione 25 szt\. u Rosa-Pol, termin/)).toHaveTextContent("(2 zamówienia)");
+    expect(dopisekDostaw({ ...PELNA, mag: { stan: 0, rez: 0, avail: 0 }, zamowione: [] }))
+      .toBe("nic nie zamówione u dostawcy");
+    expect(dopisekDostaw({ ...PELNA, mag: { stan: 0, rez: 0, avail: 0 } })).toBeNull();
+  });
+
+  it("przy stanie mówi, ile z niego stoi jeszcze w przyjęciach", () => {
+    expect(dopisekDostaw({ ...PELNA, wDostawie: [{ dokId: 2, nrPelny: "FZ 9", dataWyst: "2026-09-24",
+      ilosc: 4, dostawca: "X" }] })).toBe("w tym 4 szt. w przyjęciach, jeszcze nie na półce");
+    expect(dopisekDostaw(PELNA)).toBeNull();
   });
 
   it("bez pobranej kartoteki NIE pisze pustego wiersza — brak wiedzy to nie zero", () => {

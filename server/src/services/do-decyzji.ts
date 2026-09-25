@@ -16,6 +16,7 @@ import { listaZwrotow } from "./zwroty.js";
 import { listaReklamacji, progKolejki } from "./reklamacje.js";
 import { listaDyskusji } from "./dyskusje.js";
 import { listaRozmow } from "./skrzynka.js";
+import { listaZadan } from "./zadania-terenowe.js";
 
 /* ── DO DECYZJI — jedna lista tego, co czeka na biuro (`docs/obsluga-klienta.md` §7) ──
    Cel biura zapisany przy decyzji o jednym froncie: biuro rozstrzyga to,
@@ -48,7 +49,7 @@ export type Obszar = "magazyn" | "obsluga";
 
 export type ZrodloDecyzji =
   | "dostawy" | "odpowiedzi" | "kosze" | "zapisy" | "kody" | "allegro"
-  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda";
+  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania";
 
 /**
  * Dokąd prowadzi wiersz — adres w panelu. Do 0.441.0 był tu też wariant
@@ -156,6 +157,27 @@ function odpowiedziHali(): PozycjaDecyzji[] {
 }
 
 /**
+ * Zadanie, które hala ODESŁAŁA (@wydanie) — nie da się albo brak towaru.
+ *
+ * Status `odeslane` istniał od 0.352.0, ale do „Do zrobienia" nie wchodził.
+ * Rozmowa dostawała wpis na oś, a zadanie ze zwrotu czy ręczne wisiało
+ * w Zadaniach, dopóki ktoś tam nie zajrzał. To jest decyzja biura, której
+ * hala nie podejmie: ponowić inaczej, anulować albo iść do Subiekta.
+ * Wiersz prowadzi do Zadań, bo tam stoją „ponów" i „anuluj".
+ */
+function odeslaneZadania(): PozycjaDecyzji[] {
+  return listaZadan({ status: "odeslane" }).map((z) => ({
+    klucz: `zadanie:${z.id}`, obszar: "magazyn" as const, zrodlo: "zadania" as const,
+    pytanie: "Hala odesłała zadanie — co dalej?",
+    co: [z.tytul, z.powodKod === "brak_towaru" ? "brak towaru" : "nie da się", z.powod]
+      .filter(Boolean).join(" · "),
+    od: z.odeslanoAt,
+    pilne: z.priorytet === "pilny",
+    cel: { panel: "/obsluga/zadania" },
+  }));
+}
+
+/**
  * Kosze: pominięta pozycja i koszyk zwrotów, który czeka na zamknięcie.
  *
  * Koszyk bez pozycji NIE wchodzi. Pusty otwarty koszyk to stan spoczynku,
@@ -168,8 +190,11 @@ function kosze(): PozycjaDecyzji[] {
     co: `${p.symbol} · ${p.kod}${p.powod ? ` · ${p.powod}` : ""}`,
     od: p.at,
     pilne: false,
-    /* Kosze mieszkają od 0.438.0 w zakładce Zwroty, bo tam powstają. */
-    cel: { panel: "/obsluga/zwroty/kosze" },
+    /* Kosze mieszkają od 0.438.0 w zakładce Zwroty, bo tam powstają.
+       Adres niesie kosz i kubełek (@wydanie): do tego wydania wiersz lądował
+       w kubełku „praca", a pominięcia stoją w „pominiete" — agent klikał
+       „załatwione?" i nie widział tego, o co pytano. */
+    cel: { panel: `/obsluga/zwroty/kosze/${p.koszId}?kubelek=pominiete` },
   }));
   const otwarte: PozycjaDecyzji[] = listaKoszy()
     .filter((k) => k.status === "otwarty" && (k.rodzaj ?? "zwroty") === "zwroty" && k.pozycji > 0)
@@ -339,7 +364,7 @@ function kolejkiKlienta(teraz: number): PozycjaDecyzji[] {
 export function doDecyzji(teraz = Date.now()): DoDecyzji {
   const pozycje = [
     ...kontoAllegro(), ...zapisyWBledzie(), ...dostawyZWyjatkiem(), ...odpowiedziHali(),
-    ...kosze(), ...kodyKreskowe(), ...kolejkiKlienta(teraz), ...sonda(),
+    ...kosze(), ...odeslaneZadania(), ...kodyKreskowe(), ...kolejkiKlienta(teraz), ...sonda(),
   ].sort((a, b) =>
     Number(b.pilne) - Number(a.pilne)
     || Number(a.od == null) - Number(b.od == null)

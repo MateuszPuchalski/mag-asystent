@@ -4,6 +4,7 @@ import type { PozycjaWKoszu, SzczegolKosza } from "../api/kosze";
 import { Zdjecie } from "../towar/Zdjecie";
 import { Blad, NaglowekSekcji, Przycisk, czas, ile } from "../ui";
 import { CyklKosza } from "./Cykl";
+import { PrzyciskTowaru } from "../towar/Szuflada";
 
 /* ── Zawartość kosza — środkowa kolumna (0.438.0) ─────────────────────────
    Biuro widziało kiedyś sam licznik „3/6 poz." i nie miało jak sprawdzić,
@@ -99,7 +100,7 @@ export function Kosz({ k, przelicz }: {
             <td className="py-2 pr-2">
               <div className="flex gap-2">
                 <Zdjecie twId={p.twId} rozmiar={36} nazwa={p.nazwa} />
-                <div className="min-w-0">{p.symbol && <b className="block">{p.symbol}</b>}
+                <div className="min-w-0">{p.symbol && <b className="block"><PrzyciskTowaru twId={p.twId}>{p.symbol}</PrzyciskTowaru></b>}
                   <span className="text-xs text-slate-600">{p.nazwa}</span></div>
               </div></td>
             <td className="py-2 pr-2 font-bold tabular-nums">{p.ilosc}{p.unit ? ` ${p.unit}` : ""}</td>

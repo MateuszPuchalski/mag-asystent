@@ -3,6 +3,7 @@ import { MessageSquare, UserRound } from "lucide-react";
 import type { RozmowaZwrotu, Zwrot } from "../api/typy";
 import { LoginKlienta, Skopiuj, czas, ile } from "../ui";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
+import { Link as RouterLink } from "react-router-dom";
 import { Link } from "./Link";
 
 /* ── Nagłówek sprawy (0.207.0) ───────────────────────────────────────────────
@@ -68,10 +69,10 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
       {zwrot.odbiorcaNazwa && zwrot.odbiorcaNazwa !== zwrot.kupujacyLogin &&
         <span className="text-slate-600">{zwrot.odbiorcaNazwa}</span>}
       {zwrot.kupujacyLogin &&
-        <a href={`/obsluga/klient/${encodeURIComponent(zwrot.kupujacyLogin)}`}
+        <RouterLink to={`/obsluga/klient/${encodeURIComponent(zwrot.kupujacyLogin)}`}
           title="Profil klienta — zakupy, zwroty, reklamacje i rozmowy"
           className="inline-flex items-center gap-1 text-xs text-sky-700 underline underline-offset-2">
-          <UserRound size={12} aria-hidden="true" />profil</a>}
+          <UserRound size={12} aria-hidden="true" />profil</RouterLink>}
       {/* Historia kupującego jednym kliknięciem — powód w `sprawy/HistoriaKlienta.tsx`. */}
       {zwrot.kupujacyLogin && <PrzyciskHistorii rodzaj="zwrot" id={zwrot.id} tutaj="tym zwrotem" />}
     </p>
@@ -85,8 +86,8 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
       <p role="alert" className="mt-1 text-xs font-semibold text-ranga-zle">
         To zamówienie ma też {zwrot.drugiZwrot.zrodlo === "nieodebrana"
           ? "paczkę nieodebraną" : "zwrot zgłoszony w Allegro"}{" "}
-        <a href={`/obsluga/zwroty/${zwrot.drugiZwrot.id}`}
-          className="font-mono underline underline-offset-2">{zwrot.drugiZwrot.numer}</a>
+        <RouterLink to={`/obsluga/zwroty/${zwrot.drugiZwrot.id}`}
+          className="font-mono underline underline-offset-2">{zwrot.drugiZwrot.numer}</RouterLink>
         {" "}— pieniądze oddaje się raz.</p>}
 
     {zwrot.rozmowy.length > 0 && <RozmowaWNaglowku rozmowy={zwrot.rozmowy} />}
@@ -115,7 +116,7 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
  */
 function RozmowaWNaglowku({ rozmowy }: { rozmowy: RozmowaZwrotu[] }) {
   const r = rozmowy[0]!;
-  return <a href={`/obsluga/skrzynka/${r.id}`}
+  return <RouterLink to={`/obsluga/skrzynka/${r.id}`}
     className={`mt-2 block rounded-lg border px-3 py-2 text-sm hover:bg-white ${r.odKlienta
       ? "border-sky-300 bg-sky-50" : "border-slate-200 bg-slate-50"}`}>
     <span className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
@@ -132,5 +133,5 @@ function RozmowaWNaglowku({ rozmowy }: { rozmowy: RozmowaZwrotu[] }) {
       „{r.ostatniaTresc}”</p>}
     {rozmowy.length > 1 && <span className="mt-1 block text-xs text-slate-600">
       i {ile(rozmowy.length - 1, "inna rozmowa", "inne rozmowy", "innych rozmów")} o tym zakupie — w dowodach</span>}
-  </a>;
+  </RouterLink>;
 }

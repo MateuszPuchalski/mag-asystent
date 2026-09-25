@@ -1185,3 +1185,19 @@ test("maszyna z danych doboru dostaje zdanie JEST albo NIE MA na liście oferty"
   D.zapiszDane(rozmowa, { marka: "Honda", model: "GX390" }, D.doborRozmowy(rozmowa).wersja, biuro);
   assert.ok(zgodnosc().some((z) => z.includes("Honda GX390 NIE MA na liście") && z.includes("NIE znaczy")));
 });
+
+/* ── „Kiedy będzie" przy braku na stanie (@wydanie) ─────────────────────────
+   Fakt stoi tylko przy braku, nie niesie dostawcy ani numeru dokumentu
+   i mówi wprost, że termin jest terminem dostawcy. */
+test("kiedy będzie: tylko przy braku, bez dostawcy, termin nazwany terminem dostawcy", () => {
+  const zam = (termin: string | null, ilosc: number, szacunek = false) => ({ termin, ilosc, szacunek });
+  assert.equal(S.kiedyBedzie({ mag: { avail: 3 }, unit: "szt.", zamowione: [zam("2026-10-01", 5)] }), null);
+  const zdanie = S.kiedyBedzie({ mag: { avail: 0 }, unit: "szt.",
+    zamowione: [zam("2026-10-01T00:00:00", 5), zam(null, 2)] })!;
+  assert.match(zdanie, /zamówione u dostawcy: 7 szt\., najbliższy termin dostawcy 2026-10-01/);
+  assert.match(zdanie, /nie obietnica dla klienta/);
+  assert.match(S.kiedyBedzie({ mag: { avail: 0 }, unit: null, zamowione: [zam(null, 4, true)] })!,
+    /do 4 szt\., dostawca nie podał terminu/);
+  assert.equal(S.kiedyBedzie({ mag: { avail: -1 }, unit: null, zamowione: [] }),
+    "brak otwartych zamówień u dostawcy — terminu nie znamy");
+});

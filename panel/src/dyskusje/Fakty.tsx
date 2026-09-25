@@ -3,7 +3,9 @@ import { ExternalLink, Undo2 } from "lucide-react";
 import type { Dyskusja, SzczegolDyskusji, Tag } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { TagiSprawy } from "../sprawy/Tagi";
+import { Link as RouterLink } from "react-router-dom";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
+import { ZlecHali } from "../sprawy/ZlecHali";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
 import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
 
@@ -213,9 +215,9 @@ export function Fakty({
     {szczegol.zwroty.length > 0 && <Sekcja tytul="Zwroty tego zamówienia">
       <ul className="flex flex-col gap-1">
         {szczegol.zwroty.map((z) => <li key={z.id} className="text-sm">
-          <a href={`/obsluga/zwroty/${z.id}`}
+          <RouterLink to={`/obsluga/zwroty/${z.id}`}
             className="inline-flex items-center gap-1 underline underline-offset-2">
-            <Undo2 size={12} />{z.numer ?? z.externalId}</a>
+            <Undo2 size={12} />{z.numer ?? z.externalId}</RouterLink>
           <span className="ml-2 text-slate-500">{czas(z.utworzono)}</span>
         </li>)}
       </ul>
@@ -233,11 +235,17 @@ export function Fakty({
       <DrogaZakupu droga={szczegol.droga} tutaj={{ rodzaj: "dyskusja", id: d.id }} />
     </Sekcja>}
 
+    {/* Zlecenie hali z dyskusji (@wydanie) — powód w `sprawy/ZlecHali.tsx`.
+        Dyskusja nie ma numeru od Allegro (§25c.1), więc tytuł niesie temat. */}
+    <Sekcja tytul="Hala">
+      <ZlecHali zrodlo="dyskusja" zrodloRef={d.id} tytul={`Dyskusja — ${d.temat ?? `#${d.id}`}`} />
+    </Sekcja>
+
     {szczegol.rozmowy.length > 0 && <Sekcja tytul="Rozmowy o tym zakupie">
       <ul className="flex flex-col gap-1">
         {szczegol.rozmowy.map((c) => <li key={c.id} className="text-sm">
-          <a href={`/obsluga/skrzynka/${c.id}`} className="underline underline-offset-2">
-            {c.temat ?? `Rozmowa ${c.id}`}</a>
+          <RouterLink to={`/obsluga/skrzynka/${c.id}`} className="underline underline-offset-2">
+            {c.temat ?? `Rozmowa ${c.id}`}</RouterLink>
           <span className="ml-2 text-slate-500">{czas(c.ostatniaAt)}</span>
         </li>)}
       </ul>

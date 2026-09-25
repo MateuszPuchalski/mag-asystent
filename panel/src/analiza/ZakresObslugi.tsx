@@ -107,7 +107,9 @@ export function ZakresObslugi({ a }: { a: CzasOdpowiedzi }) {
         <Liczba ile={a.ogolem.n} etykieta={`odpowiedzi w oknie ${a.dni} dni`} />
         <Liczba ile={czasPo(a.ogolem.medianaMin)} etykieta="mediana" />
         <Liczba ile={czasPo(a.ogolem.p90Min)} etykieta="9 na 10 odpowiedzi szybciej niż" />
-        <Liczba ile={a.czekaTeraz.n} etykieta={a.czekaTeraz.najdluzejMin !== null
+        {/* Skrzynka układa się domyślnie od najdłużej czekającego klienta,
+            więc to jest dokładnie lista, którą ta liczba liczy. */}
+        <Liczba doPracy="/obsluga/skrzynka" ile={a.czekaTeraz.n} etykieta={a.czekaTeraz.najdluzejMin !== null
           ? `ostatnie słowo klienta teraz · najdłużej ${czasPo(a.czekaTeraz.najdluzejMin)}`
           : "ostatnie słowo klienta teraz"}
           ton={a.czekaTeraz.n > 0 ? "text-ranga-uwaga" : ""} />

@@ -1,8 +1,12 @@
 import React from "react";
 import { describe, expect, it } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render as renderRTL, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { Naglowek } from "./Naglowek";
 import type { Zwrot } from "../api/typy";
+
+/* Odnośniki wewnątrz panelu idą przez router (@wydanie), jak na ekranie. */
+const render = (ui: React.ReactElement) => renderRTL(ui, { wrapper: MemoryRouter });
 
 /* ── Tożsamość zwrotu w nagłówku (0.207.0) ───────────────────────────────────
    Numer i login przeprowadziły się tu z prawej kolumny, więc razem z nimi

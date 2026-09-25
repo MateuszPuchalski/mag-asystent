@@ -1,5 +1,5 @@
 import React from "react";
-import type { OsRozmowy } from "../api/typy";
+import type { KartaTowaru, OsRozmowy } from "../api/typy";
 import { useKartaTowaru } from "../api/rozmowy";
 import { dzien } from "../ui";
 
@@ -38,6 +38,32 @@ function Wiersz({ etykieta, children }: { etykieta: string; children: React.Reac
       {etykieta}</span>
     <span className="min-w-0 flex-1 text-slate-900">{children}</span>
   </div>;
+}
+
+/**
+ * Dopisek do „Mamy" o dostawach (@wydanie) — w TYM wierszu, nie w czwartym,
+ * bo pasmo ma trzy wiersze (nagłówek pliku). Serwer liczył to dla kolektora,
+ * a agent pytany „kiedy będzie" szedł po termin do Subiekta.
+ *
+ * Przy braku mówi, co jest zamówione i na kiedy; przy stanie — ile z niego
+ * stoi jeszcze w przyjęciach, bo „mamy 12" z pustą półką to paczka, która
+ * dziś nie wyjdzie. Dostawca i numer dokumentu są tu wolno: pasmo czyta
+ * agent, nie klient (szkic Copilota ich nie dostaje).
+ */
+export function dopisekDostaw(karta: KartaTowaru): string | null {
+  const jedn = karta.unit ?? "szt.";
+  if (karta.mag.avail <= 0) {
+    if (!karta.zamowione) return null;
+    const z = karta.zamowione[0];
+    if (!z) return "nic nie zamówione u dostawcy";
+    const ile = karta.zamowione.reduce((a, b) => a + b.ilosc, 0);
+    return `zamówione ${z.szacunek ? "do " : ""}${ile} ${jedn}`
+      + (z.dostawca ? ` u ${z.dostawca}` : "")
+      + (z.termin ? `, termin ${dzien(z.termin)}` : ", bez terminu")
+      + (karta.zamowione.length > 1 ? ` (${karta.zamowione.length} zamówienia)` : "");
+  }
+  const wPrzyjeciach = (karta.wDostawie ?? []).reduce((a, b) => a + b.ilosc, 0);
+  return wPrzyjeciach > 0 ? `w tym ${wPrzyjeciach} ${jedn} w przyjęciach, jeszcze nie na półce` : null;
 }
 
 export function PasmoOdpowiedzi({ dane }: { dane: OsRozmowy }) {
@@ -90,6 +116,8 @@ export function PasmoOdpowiedzi({ dane }: { dane: OsRozmowy }) {
           {mamy}</b>
         {karta.data?.locs?.length ? <span className="font-mono text-slate-600">
           {" · "}{karta.data.locs.join(", ")}</span> : null}
+        {karta.data && dopisekDostaw(karta.data) && <span className="text-slate-700">
+          {" · "}{dopisekDostaw(karta.data)}</span>}
       </Wiersz>}
     </div>
   </aside>;

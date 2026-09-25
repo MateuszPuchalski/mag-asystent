@@ -458,6 +458,9 @@ export function useZamknijKosz() {
     onSettled: () => {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+      /* Zamknięty koszyk staje się koszem na liście koszy (@wydanie) — bez tego
+         przełącznik na kosze pokazywał listę sprzed zamknięcia. */
+      qc.invalidateQueries({ queryKey: ["kosze"] });
     },
   });
 }

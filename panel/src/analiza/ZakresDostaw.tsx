@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 import type { AnalizaDostaw } from "../api/wglad";
 import { odmien } from "../ui";
 import { Liczba, PasekUdzialu, Slupki } from "../ui/wykres";
@@ -49,7 +50,10 @@ export function ZakresDostaw({ a }: { a: AnalizaDostaw }) {
       <Tabela naglowki={["Dostawca", "Dostaw", "Pozycji", "Z wyjątkiem", "Mediana"]}
         pusto="Żadna dostawa nie domknęła się w tym oknie.">
         {a.dostawcy.map((x) => <tr key={x.dostawca}>
-          <Td className="font-semibold">{x.dostawca}</Td>
+          {/* Dostawca prowadzi do ARCHIWUM jego dokumentów (@wydanie): wiersz
+              liczy dostawy z okna, a archiwum szuka po nazwie dostawcy. */}
+          <Td className="font-semibold"><Link className="underline decoration-dotted underline-offset-2 hover:decoration-solid"
+            to={`/obsluga/dostawy?kubelek=archiwum&q=${encodeURIComponent(x.dostawca)}`}>{x.dostawca}</Link></Td>
           <Td className="tabular-nums">{x.dostaw}</Td>
           <Td className="tabular-nums text-slate-600">{x.pozycji}</Td>
           <Td>{x.udzialWyjatkow == null ? "—"

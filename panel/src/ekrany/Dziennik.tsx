@@ -5,6 +5,7 @@ import { FILTR_PUSTY, paramyDziennika, useDziennik, type FiltrDziennika } from "
 import { useAgenci } from "../api/rozmowy";
 import { Blad, Karta, Pole, Przycisk, Pusto, stempel } from "../ui";
 import { KLASA_RODZINY, rodzinaZdarzenia } from "../dziennik/rodziny";
+import { PrzyciskTowaru } from "../towar/Szuflada";
 
 /* ── DZIENNIK (0.440.0) ─────────────────────────────────────────────────
    Przeniesiony z DZIENNIKA w `biuro.html`. Ślad audytowy: każdy skan, każda
@@ -101,7 +102,8 @@ export function Dziennik() {
                 <td className="py-1.5 pr-3">{w.uzytkownik}
                   {w.userRef == null && <span className="ml-1.5 rounded bg-slate-100 px-1.5 py-0.5 text-xs text-slate-600">bez konta</span>}</td>
                 <td className="whitespace-nowrap py-1.5 pr-3 text-slate-600">{w.device || "—"}</td>
-                <td className="py-1.5 pr-3 tabular-nums text-slate-600">{w.twId ?? "—"}</td>
+                <td className="py-1.5 pr-3 tabular-nums text-slate-600">
+                  {w.twId != null ? <PrzyciskTowaru twId={w.twId}>{w.twId}</PrzyciskTowaru> : "—"}</td>
                 {/* 160 znaków jak w biurze: szczegół ma podpowiedzieć, co się
                     stało, a całość i tak jest w CSV. */}
                 <td className="py-1.5 pr-4"><code className="break-all text-xs text-slate-700">

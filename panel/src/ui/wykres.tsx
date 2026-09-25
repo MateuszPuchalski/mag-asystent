@@ -1,4 +1,5 @@
 import React from "react";
+import { Link } from "react-router-dom";
 
 /* ── Liczby i słupki wglądu (0.440.0) ───────────────────────────────────
    Przyszły z ANALIZY w `biuro.html`, gdzie składał je ręcznie `slupkiSvg`
@@ -22,13 +23,25 @@ import React from "react";
  * `number`. Analiza podaje też „12 min" i „4,2%", więc wartość jest węzłem,
  * a komponent przeszedł tutaj, bo odbiorców ma już dwa ekrany, nie jeden.
  */
-export const Liczba = ({ etykieta, ile, ton = "" }: {
+export const Liczba = ({ etykieta, ile, ton = "", doPracy }: {
   etykieta: string; ile: React.ReactNode; ton?: string;
-}) =>
-  <div className="flex flex-col">
+  /**
+   * Adres listy, którą ta liczba liczy (@wydanie). Tylko przy liczbie o stanie
+   * BIEŻĄCYM: liczba z minionego tygodnia otworzyłaby listę, która dziś
+   * znaczy co innego, a to gorsze niż brak odnośnika.
+   */
+  doPracy?: string;
+}) => {
+  const tresc = <>
     <span className={`text-2xl font-bold ${ton}`}>{ile}</span>
     <span className="text-xs text-slate-500">{etykieta}</span>
-  </div>;
+  </>;
+  /* WGLĄD PROWADZI DO PRACY (@wydanie): liczba, której nie da się kliknąć,
+     zostaje ciekawostką — agent szukał potem tych samych spraw w kolejce. */
+  return doPracy
+    ? <Link to={doPracy} className="flex flex-col rounded hover:bg-slate-50" title="Otwórz listę">{tresc}</Link>
+    : <div className="flex flex-col">{tresc}</div>;
+};
 
 /**
  * Pasek proporcji w komórce tabeli. `max` to największa wartość W TEJ

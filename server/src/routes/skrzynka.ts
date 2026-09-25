@@ -17,6 +17,7 @@ import { stanSynchronizacji } from "../services/allegro-inbox-sync-state.js";
 import { synchronizujAllegroInbox } from "../services/allegro-inbox-sync.js";
 import { wyslijOdpowiedz } from "../services/wysylka.js";
 import { czasDoWysylki, zapiszCofniecieWysylki } from "../services/tarcie.js";
+import { przekrojTowaru } from "../services/przekroj-towaru.js";
 import {
   dodajZalacznik, usunZalacznik, zalacznikiRozmowy,
 } from "../services/zalaczniki-wysylki.js";
@@ -396,6 +397,18 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       const nie = odmowa(reply); if (nie) return nie;
       try { return historiaKlienta(Number(req.params.id)); }
       catch (e) { return blad(reply, e); }
+    });
+
+  /* Przekrój towaru (@wydanie) — trzeci mostek: zwroty, sprawy i rozmowy
+     o tej kartotece obok siebie. Ta sama bramka co historia klienta, bo
+     niesie cudze zakupy. Odczyt niczego nie zapisuje; powód i granice
+     w `services/przekroj-towaru.ts`. */
+  app.get<{ Params: { twId: string } }>("/api/obsluga/towar/:twId/przekroj",
+    async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const twId = Number(req.params.twId);
+      if (!Number.isInteger(twId) || twId <= 0) return reply.code(400).send({ error: "Zły numer kartoteki" });
+      return przekrojTowaru(twId);
     });
 
   app.post<{ Params: { id: string }; Body: { zadanieId?: number; twId?: number | null; polaryzacja?: string; powodNegatywny?: string | null } }>(

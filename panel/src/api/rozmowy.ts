@@ -233,8 +233,11 @@ export function useAnulujZadanie() {
 export function useNoweZadanie() {
   const qc = useQueryClient();
   return useMutation({
+    /* Źródło domyślnie „panel" (ręczne z ekranu Zadań). Zlecenie ze sprawy
+       podaje własne `zrodlo` i `zrodloRef` (@wydanie) — `sprawy/ZlecHali.tsx`. */
     mutationFn: (v: Record<string, unknown>) =>
-      api("/api/zadania-terenowe", { method: "POST", body: JSON.stringify({ ...v, zrodlo: "panel" }) }),
+      api<{ zadanie: Zadanie }>("/api/zadania-terenowe",
+        { method: "POST", body: JSON.stringify({ zrodlo: "panel", ...v }) }),
     onSettled: () => qc.invalidateQueries({ queryKey: klucze.zadania }),
   });
 }

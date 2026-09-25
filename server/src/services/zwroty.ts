@@ -13,6 +13,7 @@ import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 import { zapiszSkladRecznie, type SkladPozycji } from "./komplety.js";
 import { odsunZwPrzedRecznym, zakolejkujZw } from "./zw-automat.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
+import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
    Panel zwrotów jest KOLEJKĄ BRAMEK, nie rejestrem. Rejestr każe najpierw
@@ -930,8 +931,8 @@ export function listaZwrotow(
   const rozmowyWgZam = new Map<string, RozmowaZwrotu[]>();
   const numery = [...new Set(zwroty.filter((z) => z.order_id).map((z) => String(z.order_id)))];
   const rozmowy = filtr !== null && !numery.length ? [] : database.prepare(`
-    SELECT m.related_order_id AS zam, c.id, c.subject, c.status,
-           MAX(m.sent_at) AS ostatnia,
+    SELECT rz.numer AS zam, c.id, c.subject, c.status,
+           (SELECT MAX(x.sent_at) FROM message x WHERE x.conversation_id = c.id) AS ostatnia,
            /* OSTATNIE SŁOWO W WĄTKU (0.486.1) — do nagłówka zwrotu. Zgłoszenie
               właściciela: „potrzebuję więcej informacji o kliencie w nagłówku,
               szczególnie jeśli jest konwersacja o tym zwrocie". Temat i data
@@ -944,10 +945,14 @@ export function listaZwrotow(
            (SELECT x.direction FROM message x
              WHERE x.conversation_id = c.id AND x.auto_odpowiedz = 0
              ORDER BY x.sent_at DESC LIMIT 1) AS kierunek
-      FROM message m JOIN conversation c ON c.id = m.conversation_id
-     WHERE m.related_order_id IS NOT NULL
-       ${filtr === null ? "" : `AND m.related_order_id IN (${znaki(numery.length)})`}
-     GROUP BY m.related_order_id, c.id
+      FROM ${ROZMOWA_ZAMOWIENIA} rz JOIN conversation c ON c.id = rz.conversation_id
+      /* Konto rozmowy musi być kontem zwrotu (@wydanie) — do tego wydania
+         zapytanie go nie sprawdzało. Numery Allegro to UUID, więc zderzenie
+         kont jest czysto teoretyczne; reszta mostka filtruje i ta część też. */
+      JOIN zwrot_klienta zk ON zk.order_id = rz.numer AND zk.channel_account_id = c.channel_account_id
+     WHERE 1=1
+       ${filtr === null ? "" : `AND rz.numer IN (${znaki(numery.length)})`}
+     GROUP BY rz.numer, c.id
      ORDER BY ostatnia DESC`).all(...(filtr === null ? [] : numery));
   for (const r of rozmowy as Wiersz[]) {
     const klucz = String(r.zam);

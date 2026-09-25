@@ -6,6 +6,7 @@ import type {
 } from "../api/typy";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
+import { ZlecHali } from "../sprawy/ZlecHali";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
 import { zlote } from "../api/zwroty";
 import {
@@ -18,6 +19,7 @@ import { useKartaTowaru } from "../api/rozmowy";
 import { OCZEKIWANIA, POWODY } from "./Kolejka";
 import { NAZWA_WERDYKTU } from "./statusy";
 import { Zwijka } from "../skrzynka/Zwijka";
+import { PrzyciskTowaru } from "../towar/Szuflada";
 
 /* ── Kolumna dowodów o reklamacji ────────────────────────────────────────────
    Jedna lista faktów o jednej sprawie, więc SEKCJE jedna pod drugą, a nie
@@ -501,6 +503,12 @@ export function Dowody({
         </div>}
       </Sekcja>}
 
+    {/* ZLECENIE HALI Z REKLAMACJI (@wydanie) — „zdjęcie towaru z półki",
+        „sprawdź, czy partia ma tę wadę". Powód w `sprawy/ZlecHali.tsx`. */}
+    <Sekcja tytul="Hala">
+      <ZlecHali zrodlo="reklamacja" zrodloRef={r.id} tytul={`Reklamacja ${r.numer ?? r.id}`} twId={r.twId} />
+    </Sekcja>
+
     {/* ── COPILOT NA DOLE (0.403.0) ───────────────────────────────────────────
         Do tego wydania karta maszyny stała PIERWSZA, nad faktami sprawy.
         Kolejność czytania powinna iść za kolejnością zaufania: najpierw to,
@@ -616,7 +624,7 @@ function Towar({ szczegol }: { szczegol: SzczegolReklamacji }) {
         {r.ofertaNazwa ?? "Oferty nie pobrano"}</p>
       <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-slate-600">
         {symbol
-          ? <span className="font-mono font-semibold text-slate-800">{symbol}</span>
+          ? <PrzyciskTowaru twId={r.twId}><span className="font-mono font-semibold text-slate-800">{symbol}</span></PrzyciskTowaru>
           : <span>{szczegol.kartoteka?.powod ?? "bez kartoteki"}</span>}
         {symbol && <span>{r.twZParagonu ? "z paragonu" : "z mapowania oferty"}</span>}
         {/* ── CENY TU NIE MA (0.414.0) ──────────────────────────────────────
