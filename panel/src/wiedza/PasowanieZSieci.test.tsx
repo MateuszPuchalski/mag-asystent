@@ -18,7 +18,7 @@ const STAN: StanPasowaniaZSieci = { niegotowy: null, naNoc: 10, sprawdzono: 2, d
 
 let stan: StanPasowaniaZSieci = STAN;
 let wyslane: string[] = [];
-let wyniki: Array<{ sprawdzono: number; zaproponowano: number }> = [];
+let wyniki: Array<{ sprawdzono: number; zaproponowano: number; odrzucono?: Record<string, number> }> = [];
 
 const json = (x: unknown, status = 200) => new Response(JSON.stringify(x), { status });
 
@@ -31,7 +31,7 @@ beforeEach(() => {
     }
     wyslane.push(url);
     const w = wyniki.shift() ?? { sprawdzono: 0, zaproponowano: 0 };
-    return json({ wynik: { ...w, bledow: 0, odrzucono: {}, przerwane: null }, stan });
+    return json({ wynik: { bledow: 0, odrzucono: {}, przerwane: null, ...w }, stan });
   }));
 });
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -42,9 +42,12 @@ const pokaz = () => render(
   </QueryClientProvider>);
 
 describe("pasowanie z sieci na żądanie", () => {
-  it("otwarcie tylko czyta: stan, sufit i ostatnie przebiegi", async () => {
+  it("otwarcie tylko czyta: stan, limit i ostatnie przebiegi", async () => {
     pokaz();
-    expect(await screen.findByLabelText("Stan pasowania z sieci")).toHaveTextContent("zostało 8");
+    /* Głos agenta, nie księgi (@wydanie): ile jeszcze można, bez „sufitu". */
+    const stanKarty = await screen.findByLabelText("Stan pasowania z sieci");
+    expect(stanKarty).toHaveTextContent("w limicie zostało 8 z 10");
+    expect(stanKarty).not.toHaveTextContent(/sufit|wykorzystane/);
     expect(screen.getByLabelText("Ostatnio sprawdzone")).toHaveTextContent("naszego numeru nie ma na stronie: 1");
     expect(wyslane).toEqual([]);
   });
@@ -63,6 +66,15 @@ describe("pasowanie z sieci na żądanie", () => {
     await waitFor(() => expect(wyslane).toHaveLength(NA_KLIKNIECIE));
     expect(new Set(wyslane)).toEqual(new Set(["/api/obsluga/wiedza/pasowanie-z-sieci/sprawdz"]));
     expect(await screen.findByLabelText("Wynik pasowania z sieci")).toHaveTextContent(`propozycji w kolejce: ${2 * NA_KLIKNIECIE}`);
+  });
+
+  it("wynik mówi o pominiętych znaleziskach słowami agenta, nie „sitem”", async () => {
+    wyniki = [{ sprawdzono: 1, zaproponowano: 0, odrzucono: { cytat_spoza_strony: 2 } }, { sprawdzono: 0, zaproponowano: 0 }];
+    pokaz();
+    await userEvent.click(await screen.findByRole("button", { name: /Sprawdź teraz/ }));
+    const wynik = await screen.findByLabelText("Wynik pasowania z sieci");
+    await waitFor(() => expect(wynik).toHaveTextContent("pominięte jako niepewne: cytatu nie ma na stronie: 2"));
+    expect(wynik).not.toHaveTextContent(/sito/);
   });
 
   it("gdy nie ma czego sprawdzać, pętla staje po pierwszym pustym kroku", async () => {
