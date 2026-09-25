@@ -597,7 +597,12 @@ export type WymianaCopilota = {
   model: string;
   at: string;
   przez: string;
+  /** Po co model sięgnął do bazy (@wydanie). Brak = starszy serwer albo nie sięgał. */
+  narzedzia?: UzycieNarzedziaCopilota[];
 };
+
+/** Jedno wywołanie narzędzia: nazwa, zapytanie modelu i długość wyniku. */
+export type UzycieNarzedziaCopilota = { nazwa: string; argument: string; znakow: number };
 
 /** Skąd wziął się wiersz identyfikatora. `oferta` doszło w 0.264.0, `dostawca`
  *  z importem odsyłaczy od dostawców. */

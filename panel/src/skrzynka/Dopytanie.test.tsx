@@ -45,6 +45,19 @@ describe("dopytanie Copilota", () => {
     }
   });
 
+  test("pod odpowiedzią stoi, co Copilot sprawdził w bazie — i nic, gdy nie sięgał", () => {
+    render(<Dopytanie {...props({ wymiany: [
+      w({ id: 1, narzedzia: [
+        { nazwa: "szukaj_towaru", argument: "1123 120 0650", znakow: 120 },
+        { nazwa: "pasowanie_towaru", argument: "GAZ-MS250", znakow: 300 },
+      ] }),
+      w({ id: 2, narzedzia: [] }),
+    ] })} />);
+    expect(screen.getByText(/Sprawdził w bazie: szukanie w kartotece „1123 120 0650”, pasowanie „GAZ-MS250”/))
+      .toBeTruthy();
+    expect(screen.getAllByText(/Sprawdził w bazie/)).toHaveLength(1);
+  });
+
   test("ekran mówi wprost, kto czyta odpowiedź", () => {
     render(<Dopytanie {...props()} />);
     expect(screen.getByText(/odpowiedź czytasz Ty, nie klient/i)).toBeTruthy();

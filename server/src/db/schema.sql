@@ -360,7 +360,9 @@ CREATE TABLE IF NOT EXISTS copilot_pytanie (
   model           TEXT NOT NULL,
   at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   przez           TEXT NOT NULL,
-  przez_user_id   INTEGER REFERENCES app_user(user_id)
+  przez_user_id   INTEGER REFERENCES app_user(user_id),
+  -- Narzędzia, po które model sięgnął (@wydanie): [{nazwa, argument, znakow}].
+  narzedzia       TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_rozmowa
   ON copilot_pytanie(conversation_id, id);

@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { db } from "../db/db.js";
+import { config } from "../config.js";
 import type { SubiektAdapter } from "../adapters/subiekt.js";
 import { logEvent } from "./events.js";
 import { zostalyDaneOsobowe, type TrescBezpieczna } from "./copilot-maskowanie.js";
@@ -10,6 +11,9 @@ import {
 } from "./copilot-szkic.js";
 import { ofertyPoSygnaturze } from "./allegro-oferty-po-sygnaturze.js";
 import { przygotujZdjeciaRozmowy, spisZdjec, type Pobieracz, type ZdjecieZBramki } from "./copilot-zdjecia.js";
+import {
+  naPropozycjiNiepewne, zestawNarzedzi, type UzycieNarzedzia, type ZestawNarzedzi,
+} from "./copilot-narzedzia.js";
 
 /* ── Dopytanie Copilota (§14.6, 0.332.0) ─────────────────────────────────────
    Właściciel: „dodaj możliwość kontynuowania rozmowy z modelem, możliwość
@@ -57,14 +61,18 @@ export interface WymianaCopilota {
   model: string;
   at: string;
   przez: string;
+  /** Po co model sięgnął do bazy, w kolejności wywołań. Pusta = nie sięgał. */
+  narzedzia: UzycieNarzedzia[];
 }
 
 export interface OdpowiedzNaPytanie {
   tresc: string;
   twierdzenia: TwierdzenieSurowe[];
   model: string;
+  /** Suma ze WSZYSTKICH rund narzędzi — tyle kosztowało jedno dopytanie. */
   zuzycie: Tokeny;
   ms: number;
+  narzedzia: UzycieNarzedzia[];
 }
 
 /** Materiał, na którym model odpowiada. Wszystko przeszło przez maskowanie. */
@@ -77,6 +85,8 @@ export interface KontekstPytania {
   /** Poprzednie wymiany, od najstarszej. */
   historia: Array<{ pytanie: string; odpowiedz: string }>;
   pytanie: string;
+  /** Odczyt naszej bazy na żądanie modelu (@wydanie). `null` = bez narzędzi. */
+  narzedzia: ZestawNarzedzi | null;
 }
 
 export type NadawcaPytania = (k: KontekstPytania) => Promise<OdpowiedzNaPytanie>;
@@ -86,7 +96,7 @@ export function wymianyRozmowy(
   conversationId: number, database: DatabaseSync = db(),
 ): WymianaCopilota[] {
   return (database.prepare(
-    `SELECT id, pytanie, odpowiedz, twierdzenia, model, at, przez
+    `SELECT id, pytanie, odpowiedz, twierdzenia, model, at, przez, narzedzia
        FROM copilot_pytanie WHERE conversation_id=? ORDER BY id`)
     .all(conversationId) as Array<Record<string, unknown>>)
     .map((w) => ({
@@ -97,6 +107,7 @@ export function wymianyRozmowy(
       model: String(w.model),
       at: String(w.at),
       przez: String(w.przez),
+      narzedzia: JSON.parse(String(w.narzedzia ?? "[]")) as UzycieNarzedzia[],
     }));
 }
 
@@ -157,19 +168,24 @@ export async function zadajPytanie(
       historia: dotad.slice(-HISTORII_W_KONTEKSCIE)
         .map((w) => ({ pytanie: w.pytanie, odpowiedz: w.odpowiedz })),
       pytanie: tresc,
+      /* Narzędzia czytają tę samą bazę co fakty, ale na żądanie modelu.
+         Tylko odczyt i tylko nasz towar — granica stoi w `copilot-narzedzia`. */
+      narzedzia: zestawNarzedzi(subiekt),
     });
   } catch (e) {
     zapiszWywolanie(conversationId, null, "blad",
-      (e as { slad?: string }).slad || (e as Error).message, kto, teraz);
+      (e as { slad?: string }).slad || (e as Error).message, kto, teraz,
+      (e as { zuzycie?: Tokeny }).zuzycie);
     throw e;
   }
 
-  const twierdzenia = ocenTwierdzenia(odp.twierdzenia);
+  /* Dwa sufity po kolei: źródło twierdzenia, potem propozycja z bazy wiedzy. */
+  const twierdzenia = naPropozycjiNiepewne(ocenTwierdzenia(odp.twierdzenia));
   const id = Number(db().prepare(`INSERT INTO copilot_pytanie
-    (conversation_id,pytanie,odpowiedz,twierdzenia,model,at,przez,przez_user_id)
-    VALUES (?,?,?,?,?,?,?,?)`)
+    (conversation_id,pytanie,odpowiedz,twierdzenia,model,at,przez,przez_user_id,narzedzia)
+    VALUES (?,?,?,?,?,?,?,?,?)`)
     .run(conversationId, tresc, odp.tresc, JSON.stringify(twierdzenia), odp.model,
-      teraz.toISOString(), kto.name, kto.id).lastInsertRowid);
+      teraz.toISOString(), kto.name, kto.id, JSON.stringify(odp.narzedzia ?? [])).lastInsertRowid);
   zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
 
   /* Ładunek niesie DŁUGOŚCI, nigdy treści (§19): pytanie agenta bywa
@@ -179,6 +195,8 @@ export async function zadajPytanie(
     wymiana: dotad.length + 1, model: odp.model, tokeny: odp.zuzycie,
     /* Zdjęcia liczbami, jak przy szkicu — patrz blizna 0.484.6 w `copilot-zdjecia`. */
     zdjec: zdjecia.zdjecia.length, zdjecBledow: zdjecia.bledow,
+    /* Nazwy narzędzi, bez argumentów: argument bywa numerem z rozmowy. */
+    narzedzia: (odp.narzedzia ?? []).map((n) => n.nazwa),
   }, kto.id);
 
   return wymianyRozmowy(conversationId).find((w) => w.id === id)!;
@@ -187,12 +205,19 @@ export async function zadajPytanie(
 function zapiszWywolanie(
   conversationId: number, odp: OdpowiedzNaPytanie | null, wynik: "ok" | "blad",
   blad: string | null, kto: { id: number | null }, teraz: Date,
+  /* Rundy narzędzi zapłacone przed błędem (@wydanie). Bez nich porażka po
+     czterech rundach ważyłaby w pomiarze zero, a kosztowała cztery żądania. */
+  zuzyciePrzedBledem?: Tokeny,
 ): void {
+  const t = odp?.zuzycie ?? zuzyciePrzedBledem;
+  /* Model pusty przy błędzie bez rund, jak dotąd — pomiar go pomija. Z rundami
+     wpisujemy model z konfiguracji, bo inaczej pomiar zgubiłby ich koszt. */
+  const model = odp?.model ?? (t && (t.wej || t.wyj) ? config.copilot.model : "");
   db().prepare(`INSERT INTO copilot_wywolanie
     (zadanie,conversation_id,model,tokeny_wej,tokeny_wyj,tokeny_cache_zapis,
      tokeny_cache_odczyt,ms,wynik,blad,przez_user_id,at)
     VALUES ('pytanie',?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(conversationId, odp?.model ?? "", odp?.zuzycie.wej ?? 0, odp?.zuzycie.wyj ?? 0,
-      odp?.zuzycie.cacheZapis ?? 0, odp?.zuzycie.cacheOdczyt ?? 0, odp?.ms ?? 0, wynik,
+    .run(conversationId, model, t?.wej ?? 0, t?.wyj ?? 0,
+      t?.cacheZapis ?? 0, t?.cacheOdczyt ?? 0, odp?.ms ?? 0, wynik,
       blad ? blad.slice(0, 300) : null, kto.id, teraz.toISOString());
 }

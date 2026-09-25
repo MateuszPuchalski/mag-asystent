@@ -3,7 +3,31 @@ import { MessageCircleQuestion } from "lucide-react";
 import { Przycisk, ile } from "../ui";
 import { ProcesCopilota } from "./ProcesCopilota";
 import { Zwijka } from "./Zwijka";
-import type { WymianaCopilota } from "../api/typy";
+import type { UzycieNarzedziaCopilota, WymianaCopilota } from "../api/typy";
+
+/* Nazwy narzędzi po ludzku. Serwer mówi `pasowanie_towaru`, agent czyta
+   „pasowanie”; nieznana nazwa (nowsze narzędzie, starszy panel) zostaje
+   jak przyszła, bo lepsza surowa nazwa niż zniknięte sprawdzenie. */
+const NAZWY: Record<string, string> = {
+  szukaj_towaru: "szukanie w kartotece",
+  karta_towaru: "karta towaru",
+  pasowanie_towaru: "pasowanie",
+  czesci_do_maszyny: "części do maszyny",
+  tresc_oferty: "treść oferty",
+};
+
+/**
+ * CO COPILOT SPRAWDZIŁ W BAZIE (@wydanie). Jedna linijka pod odpowiedzią.
+ * Odpowiedź „nie pasuje” po sprawdzeniu pasowania waży co innego niż ta sama
+ * odpowiedź z pamięci modelu — i agent ma to widzieć, zanim uwierzy.
+ * Brak linijki znaczy „nie sięgał”, więc pusta lista nie rysuje nic.
+ */
+function Sprawdzono({ narzedzia }: { narzedzia: UzycieNarzedziaCopilota[] }) {
+  if (!narzedzia.length) return null;
+  return <p className="mt-1 text-xs text-slate-600">
+    Sprawdził w bazie: {narzedzia.map((n) => `${NAZWY[n.nazwa] ?? n.nazwa} „${n.argument}”`).join(", ")}
+  </p>;
+}
 
 /**
  * DOPYTANIE COPILOTA (0.332.0) — rozmowa agenta z modelem o szkicu.
@@ -61,6 +85,7 @@ export function Dopytanie(p: {
       {p.wymiany.map((w) => <li key={w.id} className="p-2">
         <p className="text-xs font-semibold text-slate-700">{w.przez}: {w.pytanie}</p>
         <pre className="mt-1 whitespace-pre-wrap font-sans text-sm text-slate-800">{w.odpowiedz}</pre>
+        <Sprawdzono narzedzia={w.narzedzia ?? []} />
         <ProcesCopilota key={`${w.id}-${w.at}`} twierdzenia={w.twierdzenia} />
       </li>)}
     </ul>}
