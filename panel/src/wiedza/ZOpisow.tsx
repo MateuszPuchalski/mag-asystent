@@ -9,6 +9,7 @@ import { Tokeny } from "./Tokeny";
 import { Odsylacze } from "./Odsylacze";
 import { WykazCzesci } from "./WykazCzesci";
 import { PasujeDoOfert } from "./PasujeDoOfert";
+import { PasowanieZSieci } from "./PasowanieZSieci";
 
 /**
  * „Z opisów i ofert" (E3, rozszerzone w 0.264.0): teksty, z których człowiek
@@ -37,6 +38,7 @@ export function ZOpisow() {
 
   return <div className="space-y-3">
     <PasujeDoOfert />
+    <PasowanieZSieci />
     <Odsylacze />
     <WykazCzesci />
     <p className="text-xs text-slate-500">

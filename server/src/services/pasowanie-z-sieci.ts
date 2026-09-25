@@ -146,6 +146,15 @@ const OPIS_ZRODLA: Record<ZrodloStrony, string> = {
   producent: "strona producenta", katalog_dostawcy: "katalog dostawcy", sklep: "sklep internetowy",
 };
 
+/* Jeden warunek dla listy kandydatów i dla ich liczby na ekranie — dwie kopie
+   rozjechałyby się przy pierwszej poprawce i ekran obiecywałby co innego, niż
+   automat zrobi. Parametry: próg dni po wyniku, potem próg po błędzie. */
+const WARUNEK_KANDYDATA = `
+      EXISTS (SELECT 1 FROM towar_identyfikator i WHERE i.tw_id=t.tw_id AND i.rodzaj IN ('oem','nr_oryg'))
+  AND NOT EXISTS (SELECT 1 FROM zastosowanie z WHERE z.tw_id=t.tw_id AND z.stan IN ('propozycja','zatwierdzone'))
+  AND NOT EXISTS (SELECT 1 FROM pasowanie_siec p WHERE p.tw_id=t.tw_id
+        AND ((p.wynik='ok' AND p.at >= ?) OR (p.wynik='blad' AND p.at >= ?)))`;
+
 export interface Kandydat {
   twId: number;
   symbol: string;
@@ -173,11 +182,7 @@ export function kandydaciDoSieci(
   const wiersze = database.prepare(`SELECT t.tw_id, t.symbol, t.nazwa,
         (SELECT group_concat(i.wartosc, char(31)) FROM towar_identyfikator i
           WHERE i.tw_id=t.tw_id AND i.rodzaj IN ('oem','nr_oryg')) AS numery
-      FROM sgt_towar t
-     WHERE EXISTS (SELECT 1 FROM towar_identyfikator i WHERE i.tw_id=t.tw_id AND i.rodzaj IN ('oem','nr_oryg'))
-       AND NOT EXISTS (SELECT 1 FROM zastosowanie z WHERE z.tw_id=t.tw_id AND z.stan IN ('propozycja','zatwierdzone'))
-       AND NOT EXISTS (SELECT 1 FROM pasowanie_siec p WHERE p.tw_id=t.tw_id
-             AND ((p.wynik='ok' AND p.at >= ?) OR (p.wynik='blad' AND p.at >= ?)))
+      FROM sgt_towar t WHERE ${WARUNEK_KANDYDATA}
      ORDER BY EXISTS (SELECT 1 FROM oferta_kartoteka k WHERE k.tw_id=t.tw_id) DESC, t.tw_id
      LIMIT ?`).all(odKiedy, poBledzie, limit) as Array<{ tw_id: number; symbol: string; nazwa: string; numery: string | null }>;
   return wiersze.map((w) => ({
@@ -209,13 +214,15 @@ export interface WynikPrzebiegu {
 export async function szukajPasowaniaWSieci(deps: {
   nadaj: NadawcaPasowaniaSieci;
   naNoc: number;
+  /** Sufit JEDNEGO przebiegu — ekran woła po jednej kartotece. Brak = do sufitu nocy. */
+  naPrzebieg?: number;
   teraz?: () => Date;
   database?: DatabaseSync;
 }): Promise<WynikPrzebiegu> {
   const database = deps.database ?? db();
   const teraz = deps.teraz ?? (() => new Date());
   const wynik: WynikPrzebiegu = { sprawdzono: 0, zaproponowano: 0, odrzucono: {}, bledow: 0, przerwane: null };
-  const zostalo = deps.naNoc - sprawdzonychTejNocy(teraz(), database);
+  const zostalo = Math.min(deps.naNoc - sprawdzonychTejNocy(teraz(), database), deps.naPrzebieg ?? Infinity);
 
   for (const k of kandydaciDoSieci(zostalo, teraz(), database)) {
     let odp: WynikSieci;
@@ -301,4 +308,60 @@ function zapiszKsiege(
     .run(model, t?.wej ?? 0, t?.wyj ?? 0, t?.cacheZapis ?? 0, t?.cacheOdczyt ?? 0,
       odp?.wyszukiwan ?? t?.wyszukiwania ?? 0, odp?.ms ?? 0, stan, blad ? blad.slice(0, 300) : null,
       teraz.toISOString());
+}
+
+/* ── Stan dla ekranu Wiedzy (@wydanie) ───────────────────────────────────────
+   Właściciel chciał uruchomić automat ręcznie, poza oknem nocnym, żeby
+   zobaczyć go w pracy. Ekran potrzebuje wiedzieć trzy rzeczy: czy wolno
+   (wyłącznik i klucz), ile zostało z sufitu i co wyszło ostatnio. */
+
+export interface OstatniPrzebieg {
+  symbol: string;
+  at: string;
+  wynik: "ok" | "blad";
+  znalezisk: number;
+  zaproponowano: number;
+  odrzucone: Partial<Record<PowodOdrzucenia, number>>;
+  blad: string | null;
+}
+
+export interface StanPasowaniaZSieci {
+  /** `null` = można uruchomić; inaczej zdanie, czego brakuje. */
+  niegotowy: string | null;
+  naNoc: number;
+  /** Ile kartotek sprawdzono w oknie sufitu — także ręcznie, w dzień. */
+  sprawdzono: number;
+  /** Ile kartotek czeka na sprawdzenie. */
+  doSprawdzenia: number;
+  ostatnie: OstatniPrzebieg[];
+}
+
+/** Czego brakuje, żeby automat mógł ruszyć. Jedno zdanie, bo ekran je pokazuje. */
+export function czemuNiegotowy(): string | null {
+  if (!config.pasowanieZSieci.wlaczony) return "Pasowanie z sieci jest wyłączone — włącza je PASOWANIE_Z_SIECI=1 w ustawieniach.";
+  if (config.copilot.mode !== "anthropic" || !config.copilot.klucz) {
+    return "Copilot nie ma połączenia z Anthropic — ustaw COPILOT_MODE=anthropic i klucz.";
+  }
+  return null;
+}
+
+/** Czysty ODCZYT — otwarcie ekranu niczego nie zapisuje. */
+export function stanPasowaniaZSieci(teraz = new Date(), database: DatabaseSync = db()): StanPasowaniaZSieci {
+  const odKiedy = new Date(teraz.getTime() - PONOWNIE_PO_DNIACH * 86_400_000).toISOString();
+  const poBledzie = new Date(teraz.getTime() - PONOWNIE_PO_BLEDZIE_DNI * 86_400_000).toISOString();
+  const doSprawdzenia = (database.prepare(`SELECT count(*) n FROM sgt_towar t WHERE ${WARUNEK_KANDYDATA}`)
+    .get(odKiedy, poBledzie) as { n: number }).n;
+  const ostatnie = (database.prepare(`SELECT COALESCE(t.symbol, '#' || p.tw_id) AS symbol, p.at, p.wynik,
+      p.znalezisk, p.zaproponowano, p.odrzucone, p.blad
+      FROM pasowanie_siec p LEFT JOIN sgt_towar t ON t.tw_id=p.tw_id ORDER BY p.id DESC LIMIT 5`)
+    .all() as Array<Record<string, unknown>>).map((w) => ({
+    symbol: String(w.symbol), at: String(w.at), wynik: w.wynik as "ok" | "blad",
+    znalezisk: Number(w.znalezisk), zaproponowano: Number(w.zaproponowano),
+    odrzucone: JSON.parse(String(w.odrzucone ?? "{}")) as Partial<Record<PowodOdrzucenia, number>>,
+    blad: w.blad == null ? null : String(w.blad),
+  }));
+  return {
+    niegotowy: czemuNiegotowy(), naNoc: config.pasowanieZSieci.naNoc,
+    sprawdzono: sprawdzonychTejNocy(teraz, database), doSprawdzenia, ostatnie,
+  };
 }

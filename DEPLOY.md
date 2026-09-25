@@ -2886,6 +2886,17 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do @wydanie — pasowanie z sieci na żądanie
+
+**Panel trzeba przebudować.** Migracji nie ma.
+
+Żeby nie czekać na noc: Wiedza → „Z opisów i ofert” → karta „Pasowanie
+z sieci” → „Sprawdź teraz”. Przycisk sprawdza trzy kartoteki, po jednej,
+i da się go zatrzymać. Ręczny przebieg liczy się do tego samego sufitu,
+więc klikanie nie wyda więcej niż jedna noc. Karta pokazuje też, czego
+brakuje, gdy automat jest wyłączony, i ostatnie sprawdzone kartoteki.
+Przycisk działa tylko przy `PASOWANIE_Z_SIECI=1` i kluczu Copilota.
+
 ### Aktualizacja do 0.507.0 — Copilot sprawdza bazę i szuka pasowania w sieci
 
 **Panel trzeba przebudować, a serwer zrestartować.** Kolumny

@@ -27,11 +27,14 @@ import {
   historiaWykazow, importujWykaz, przegladWykazow, wycofajWykaz, zatwierdzZWykazu, type ZadanieWykazu,
 } from "../services/wykaz-czesci.js";
 import { spiszOferty, sprawdzOferty, stanPasujeDo, zbierzPartie } from "../services/pasuje-do-ofert.js";
+import { czemuNiegotowy, stanPasowaniaZSieci, szukajPasowaniaWSieci } from "../services/pasowanie-z-sieci.js";
+import { nadawcaPasowaniaSieciAnthropic } from "../adapters/copilot.anthropic.js";
+import { config } from "../config.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
 import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   DWADZIEŚCIA OSIEM ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   DWADZIEŚCIA DZIEWIĘĆ ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
    przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
    (E3), trzy przy zabudowie silnika (0.229.0), trzy przy pasowaniu części:
    propozycja, rozstrzygnięcie i wycofanie, dwa przy słowniku silników
@@ -58,6 +61,8 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    Dwudziesty siódmy i dwudziesty ósmy to zbiórka „Pasuje do" z ofert:
    strona listy ofert konta i partia treści. Obie CZYTAJĄ Allegro, a piszą
    wyłącznie u nas — publikacji do Allegro nie ma, decyzją właściciela.
+   Dwudziesty dziewiąty (@wydanie) to ręczne pasowanie z sieci, po jednej
+   kartotece: składa wyłącznie propozycje i nie woła Allegro.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
 
@@ -420,6 +425,26 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     const nie = odmowa(reply); if (nie) return nie;
     try { return await zbierzPartie(ja().userId); }
     catch (e) { return limit(reply, e); }
+  });
+
+  /* Pasowanie z sieci uruchomione ręcznie (@wydanie). Właściciel chciał zobaczyć
+     automat w pracy bez czekania na noc. JEDNA kartoteka na żądanie, a ekran
+     woła w pętli, jak przy zbiórce wyżej: serwer nie trzyma przebiegów w tle,
+     a człowiek ma móc przerwać. Wydatek pilnuje sufit nocy, bo ręczny przebieg
+     liczy się do tej samej księgi — klikanie nie wyda więcej niż jedna noc.
+     Bramka biura, nie admina: to ta sama klasa pracy co zbiórka „Pasuje do". */
+  app.get("/api/obsluga/wiedza/pasowanie-z-sieci", async (_req, reply) => odmowa(reply) ?? stanPasowaniaZSieci());
+
+  app.post("/api/obsluga/wiedza/pasowanie-z-sieci/sprawdz", async (_req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    const powod = czemuNiegotowy();
+    if (powod) return reply.code(409).send({ error: powod });
+    try {
+      const wynik = await szukajPasowaniaWSieci({
+        nadaj: nadawcaPasowaniaSieciAnthropic, naNoc: config.pasowanieZSieci.naNoc, naPrzebieg: 1,
+      });
+      return { wynik, stan: stanPasowaniaZSieci() };
+    } catch (e) { return blad(reply, e); }
   });
 
   /* Ręczny identyfikator z katalogu, którego nie ma w opisie. Duplikat → 409. */
