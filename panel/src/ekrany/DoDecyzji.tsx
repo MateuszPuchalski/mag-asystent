@@ -25,7 +25,7 @@ const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; classNam
   dostawy: Truck, odpowiedzi: MessageSquareReply, kosze: Package, zapisy: AlertTriangle,
   kody: Barcode, allegro: PlugZap, reklamacje: ShieldQuestion, zwroty: Undo2,
   skrzynka: Inbox, dyskusje: MessagesSquare, sonda: FlaskConical,
-  /* Zadanie odesłane przez halę (@wydanie) — `odeslaneZadania` w `do-decyzji.ts`. */
+  /* Zadanie odesłane przez halę (0.502.0) — `odeslaneZadania` w `do-decyzji.ts`. */
   zadania: ClipboardList,
 };
 

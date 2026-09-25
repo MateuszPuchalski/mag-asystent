@@ -84,7 +84,7 @@ export type RodzajFaktu =
      niesie datę sprawdzenia: to stan z chwili pytania Allegro, nie z chwili
      czytania szkicu, i model ma go podać jako taki. */
   | "przesylka"
-  /* Kamienie milowe zwrotu tego zamówienia (@wydanie) — `zwrot-na-osi.ts`.
+  /* Kamienie milowe zwrotu tego zamówienia (0.502.0) — `zwrot-na-osi.ts`.
      Osobny rodzaj z tego samego powodu co przesyłka: to stan z naszego
      systemu z datą, a nie obietnica, i model ma go podać jako taki. */
   | "zwrot";
@@ -852,7 +852,7 @@ const dostepnosc = (ile: number | null, jednostka: string | null) =>
   ile != null && ile > 0 ? `dostępne dziś: ${ile} ${jednostka ?? "szt."}` : "dziś brak na stanie";
 
 /**
- * „Kiedy będzie" przy braku na stanie (@wydanie) — z zamówień u dostawcy.
+ * „Kiedy będzie" przy braku na stanie (0.502.0) — z zamówień u dostawcy.
  *
  * Serwer liczył to od dawna (`zamowioneUDostawcy`), ale widział to tylko
  * kolektor. Szkic przy braku towaru nie miał więc czego powiedzieć poza

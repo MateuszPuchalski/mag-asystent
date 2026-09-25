@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./klient";
 
-/* ── Przekrój towaru (@wydanie) — `server/src/services/przekroj-towaru.ts` ── */
+/* ── Przekrój towaru (0.502.0) — `server/src/services/przekroj-towaru.ts` ── */
 
 export interface PrzekrojTowaru {
   twId: number;

@@ -157,7 +157,7 @@ function odpowiedziHali(): PozycjaDecyzji[] {
 }
 
 /**
- * Zadanie, które hala ODESŁAŁA (@wydanie) — nie da się albo brak towaru.
+ * Zadanie, które hala ODESŁAŁA (0.502.0) — nie da się albo brak towaru.
  *
  * Status `odeslane` istniał od 0.352.0, ale do „Do zrobienia" nie wchodził.
  * Rozmowa dostawała wpis na oś, a zadanie ze zwrotu czy ręczne wisiało
@@ -191,7 +191,7 @@ function kosze(): PozycjaDecyzji[] {
     od: p.at,
     pilne: false,
     /* Kosze mieszkają od 0.438.0 w zakładce Zwroty, bo tam powstają.
-       Adres niesie kosz i kubełek (@wydanie): do tego wydania wiersz lądował
+       Adres niesie kosz i kubełek (0.502.0): do tego wydania wiersz lądował
        w kubełku „praca", a pominięcia stoją w „pominiete" — agent klikał
        „załatwione?" i nie widział tego, o co pytano. */
     cel: { panel: `/obsluga/zwroty/kosze/${p.koszId}?kubelek=pominiete` },

@@ -207,7 +207,7 @@ export type WpisOsi = {
      zdanie wysłane kupującemu to najgorszy możliwy wynik tej zmiany. */
   rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania"
     | "komentarz" | "status" | "dobor"
-    /* Kamień milowy zwrotu (@wydanie) — zdarzenie, nie wypowiedź; `Os.tsx` ZDARZENIE. */
+    /* Kamień milowy zwrotu (0.502.0) — zdarzenie, nie wypowiedź; `Os.tsx` ZDARZENIE. */
     | "zwrot";
   autor: string;
   odKlienta: boolean;
@@ -240,7 +240,7 @@ export type WpisOsi = {
   zdarzenie?:
     | { rodzaj: "status" | "dobor"; po: string | null }
     | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null }
-    /* Kamień milowy zwrotu tego zamówienia (@wydanie) — `server/src/services/zwrot-na-osi.ts`. */
+    /* Kamień milowy zwrotu tego zamówienia (0.502.0) — `server/src/services/zwrot-na-osi.ts`. */
     | { rodzaj: "zwrot"; co: string; zwrotId: number; numer: string | null };
   messageId?: number;
   zalaczniki?: ZalacznikOsi[];
@@ -340,7 +340,7 @@ export type KartaTowaru = {
   mag: { stan: number; rez: number; avail: number };
   magazyny: Array<{ magId: number; kod: string; nazwa: string; stan: number; rez: number }>;
   /**
-   * Przyjechało, jeszcze nie na półce, i zamówione u dostawcy (@wydanie).
+   * Przyjechało, jeszcze nie na półce, i zamówione u dostawcy (0.502.0).
    * Serwer zwracał je od dawna, czytał tylko kolektor. Opcjonalne, bo starszy
    * serwer ich nie niesie, a brak pola ma znaczyć „nie wiemy", nie „nic".
    */
@@ -1068,7 +1068,7 @@ export type Zadanie = {
   zleconeOdMs: number | null;
   /* Zdjęcia od hali (§13.3) — sama lista, treść ciągnie `useZdjecieZadania`. */
   zalaczniki: ZalacznikZadania[];
-  /* Adres sprawy, z której zlecono zadanie (@wydanie); `null` przy ręcznym.
+  /* Adres sprawy, z której zlecono zadanie (0.502.0); `null` przy ręcznym.
      Opcjonalne, bo starszy serwer go nie niesie. */
   cel?: string | null;
 }

@@ -138,7 +138,7 @@ const TRASY = () => [
   /* Dokumenty sprzedaży zamówienia (0.499.0) — numery faktur i paragonów
      kupującego, więc ta sama bramka co historia klienta. */
   { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dokumenty-sprzedazy` },
-  /* Przekrój towaru (@wydanie) — zwroty i sprawy cudzych zakupów, ta sama bramka. */
+  /* Przekrój towaru (0.502.0) — zwroty i sprawy cudzych zakupów, ta sama bramka. */
   { method: "GET" as const, url: "/api/obsluga/towar/1/przekroj" },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/pomiar-do-wiedzy`,
     payload: { zadanieId: 1, polaryzacja: "pasuje" } },

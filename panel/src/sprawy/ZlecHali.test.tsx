@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { ZlecHali, jedynaKartoteka } from "./ZlecHali";
 
-/* ── „Zleć hali" ze sprawy (@wydanie) ───────────────────────────────────────
+/* ── „Zleć hali" ze sprawy (0.502.0) ───────────────────────────────────────
    Pilnujemy: samo otwarcie niczego nie wysyła, zlecenie niesie źródło
    i numer sprawy, „Anuluj" nie zleca (przycisk bez typu w formularzu
    wysłałby go), a towar jedzie tylko przy jednej znanej kartotece.        */

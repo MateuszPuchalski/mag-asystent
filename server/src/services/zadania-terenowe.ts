@@ -47,11 +47,11 @@ export interface ZadanieTerenowe {
  zleconeOdMs: number | null;
  /** Zdjęcia od hali — bez treści plików, sama lista (§13.3). */
  zalaczniki: ZalacznikZadania[];
- /** Adres sprawy, z której zlecono zadanie (@wydanie); `null` przy ręcznym. */
+ /** Adres sprawy, z której zlecono zadanie (0.502.0); `null` przy ręcznym. */
  cel: string | null;
 }
 
-/* ── SKĄD ZADANIE I DOKĄD WRACA (@wydanie) ───────────────────────────────────
+/* ── SKĄD ZADANIE I DOKĄD WRACA (0.502.0) ───────────────────────────────────
    Do tego wydania zlecić hali dało się tylko z rozmowy, a karta zadania nie
    miała odnośnika z powrotem — źródło stało zdaniem w `kontekst`. Zwrot
    („sprawdź stan towaru z kosza") i reklamacja („zdjęcie towaru z półki")

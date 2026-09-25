@@ -38,7 +38,7 @@ const BARWA: Record<string, string> = {
   rabat: "bg-amber-100 text-amber-900",
   rozlozenie: "bg-violet-100 text-violet-800",
   kosz_pominiety: "bg-violet-100 text-violet-800",
-  /* Zadanie zlecone hali ze zwrotu wraca tu wynikiem albo odesłaniem (@wydanie). */
+  /* Zadanie zlecone hali ze zwrotu wraca tu wynikiem albo odesłaniem (0.502.0). */
   zadanie_wynik: "bg-violet-100 text-violet-800",
   zadanie_odeslane: "bg-amber-100 text-amber-900",
   notatka: "bg-slate-100 text-slate-700",
@@ -47,7 +47,7 @@ const BARWA: Record<string, string> = {
 const SZARY = "bg-slate-100 text-slate-600";
 
 /** Krótkie nazwy rodzajów — czip ma się zmieścić obok godziny. Czyta je też
-    pasek zdarzeń rozmowy (@wydanie), żeby zwrot nazywał się tak samo w obu. */
+    pasek zdarzeń rozmowy (0.502.0), żeby zwrot nazywał się tak samo w obu. */
 export const NAZWA_ZDARZENIA_ZWROTU: Record<string, string> = {
   werdykt: "decyzja",
   ocena: "ocena",

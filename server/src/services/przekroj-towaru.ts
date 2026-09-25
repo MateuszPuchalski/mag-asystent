@@ -3,7 +3,7 @@ import { db as defaultDb } from "../db/db.js";
 import { sprawaOtwarta } from "./statusy-spraw.js";
 import { statusRozmowy } from "./conversations.js";
 
-/* ── Towar jako trzeci mostek (@wydanie) ─────────────────────────────────────
+/* ── Towar jako trzeci mostek (0.502.0) ─────────────────────────────────────
    Numer zamówienia wiąże kolejki JEDNEGO zakupu, login — jednego klienta.
    Towar (`tw_id`) stał na dziewięciu ekranach i nie wiązał niczego: nie miał
    własnej karty ani odnośnika. A to w nim spotyka się magazyn z obsługą —

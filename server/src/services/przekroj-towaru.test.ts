@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import { przekrojTowaru } from "./przekroj-towaru.js";
 
-/* ── Przekrój towaru (@wydanie) ─────────────────────────────────────────────
+/* ── Przekrój towaru (0.502.0) ─────────────────────────────────────────────
    Pilnujemy: oferty towaru to pamięć człowieka i sygnatura równa symbolowi;
    otwarte sprawy i zwroty są otwarte naprawdę; udział zwrotów liczy się
    z ofert powiązanych i milczy bez sprzedaży; odczyt niczego nie zapisuje. */

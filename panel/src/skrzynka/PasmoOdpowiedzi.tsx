@@ -41,7 +41,7 @@ function Wiersz({ etykieta, children }: { etykieta: string; children: React.Reac
 }
 
 /**
- * Dopisek do „Mamy" o dostawach (@wydanie) — w TYM wierszu, nie w czwartym,
+ * Dopisek do „Mamy" o dostawach (0.502.0) — w TYM wierszu, nie w czwartym,
  * bo pasmo ma trzy wiersze (nagłówek pliku). Serwer liczył to dla kolektora,
  * a agent pytany „kiedy będzie" szedł po termin do Subiekta.
  *

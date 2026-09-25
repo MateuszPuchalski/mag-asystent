@@ -282,7 +282,7 @@ test("moja lista niczego nie zapisuje", () => {
   assert.equal(Number(d.prepare("SELECT COUNT(*) AS n FROM events").get()!.n), przed);
 });
 
-/* ── Wiązanie obustronne przy ręcznie wskazanym zamówieniu (@wydanie) ───────
+/* ── Wiązanie obustronne przy ręcznie wskazanym zamówieniu (0.502.0) ───────
    Rozmowa bez numeru w wiadomościach, której zamówienie wskazał agent.
    Skrzynka widziała jej zwrot od 0.397.0; zwrot, droga zakupu i szukanie
    rozmowy nie widziały. Test chodzi mostkiem w OBIE strony, bo wiązanie

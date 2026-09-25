@@ -8,7 +8,7 @@ import { dopisekDostaw } from "../skrzynka/PasmoOdpowiedzi";
 import { Kafel } from "./Kafel";
 import { dzien } from "../ui";
 
-/* ── SZUFLADA TOWARU — TRZECI MOSTEK (@wydanie) ──────────────────────────────
+/* ── SZUFLADA TOWARU — TRZECI MOSTEK (0.502.0) ──────────────────────────────
    Towar stał na dziewięciu ekranach — w skrzynce, zwrotach, koszach,
    dostawach, zadaniach, wiedzy, stanie, dzienniku i w szukaniu — i nigdzie
    nie był odnośnikiem. „Ten nóż wraca trzeci raz w tym miesiącu" składało

@@ -433,7 +433,7 @@ export function Os({
    Gdy zdarzenie jest ostatnie i nic po nim nie padło, celem zostaje ostatnia
    wypowiedź przed nim, bo skok donikąd byłby przyciskiem bez skutku.        */
 
-/* „zwrot" (@wydanie) MUSI tu stać: rodzaj spoza tego zbioru rysuje się jak
+/* „zwrot" (0.502.0) MUSI tu stać: rodzaj spoza tego zbioru rysuje się jak
    wypowiedź, a decyzja zwrotu udająca zdanie do klienta to najgorszy możliwy
    wynik (ta sama blizna co `odeslanie_zadania`, `api/typy.ts`). */
 const ZDARZENIE: ReadonlySet<string> = new Set(["status", "dobor", "zwrot"]);

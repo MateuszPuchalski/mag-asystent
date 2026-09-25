@@ -503,7 +503,7 @@ export function Dowody({
         </div>}
       </Sekcja>}
 
-    {/* ZLECENIE HALI Z REKLAMACJI (@wydanie) — „zdjęcie towaru z półki",
+    {/* ZLECENIE HALI Z REKLAMACJI (0.502.0) — „zdjęcie towaru z półki",
         „sprawdź, czy partia ma tę wadę". Powód w `sprawy/ZlecHali.tsx`. */}
     <Sekcja tytul="Hala">
       <ZlecHali zrodlo="reklamacja" zrodloRef={r.id} tytul={`Reklamacja ${r.numer ?? r.id}`} twId={r.twId} />

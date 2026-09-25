@@ -448,7 +448,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
       <DrogaZakupu droga={droga} tutaj={{ rodzaj: "zwrot", id: zwrot.id }} />
     </Sekcja>}
 
-    {/* ZLECENIE HALI ZE ZWROTU (@wydanie) — powód w `sprawy/ZlecHali.tsx`.
+    {/* ZLECENIE HALI ZE ZWROTU (0.502.0) — powód w `sprawy/ZlecHali.tsx`.
         Towar jedzie z zadaniem tylko wtedy, gdy zwrot ma JEDNĄ znaną
         kartotekę: przy kilku zgadywanie wysłałoby magazyniera pod złą półkę. */}
     <Sekcja ikona={<ClipboardList size={14} />} tytul="Hala">

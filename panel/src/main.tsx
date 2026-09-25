@@ -299,7 +299,7 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
      deklarację, a `lg:min-h-0` skasowało już `min-h-screen` — ramie nie
      zostawał żaden limit i przewijał się cały dokument. Klasa niesie `vh`
      i `dvh` po kolei, czego jedna klasa Tailwinda zapisać nie umie. */
-  /* Szuflada towaru (@wydanie) obejmuje całą ramę: przycisk towaru stoi na
+  /* Szuflada towaru (0.502.0) obejmuje całą ramę: przycisk towaru stoi na
      dziewięciu ekranach, a szuflada ma otwierać się nad każdym z nich. */
   return <SzufladaTowaru><div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
     <Naglowek wyloguj={wyloguj} />

@@ -30,7 +30,7 @@ export function Kosze() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const wybrany = id ? Number(id) : null;
-  /* Kubełek z adresu (@wydanie): wiersz „Pominięta pozycja" w Do zrobienia
+  /* Kubełek z adresu (0.502.0): wiersz „Pominięta pozycja" w Do zrobienia
      prowadzi tu z `?kubelek=pominiete`. Adres czyta się RAZ, przy wejściu —
      dalej kubełek jest stanem ekranu, jak na każdej kolejce. */
   const [parametry] = useSearchParams();

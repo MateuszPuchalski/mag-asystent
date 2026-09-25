@@ -82,7 +82,7 @@ describe("Zdarzenia sprawy stoją w pasku, nie na osi", () => {
   });
 });
 
-/* ── Zwrot na osi rozmowy (@wydanie) ────────────────────────────────────────
+/* ── Zwrot na osi rozmowy (0.502.0) ────────────────────────────────────────
    Decyzja i pieniądze zwrotu stoją w pasku jako zdarzenie. Najgorszy wynik
    tej zmiany to wpis zwrotu narysowany jak wypowiedź — test pilnuje, że
    rodzaj „zwrot" nie trafia do rozmowy. */

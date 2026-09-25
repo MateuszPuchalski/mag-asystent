@@ -1,7 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
 
-/* ── Zwrot na osi rozmowy (@wydanie) ─────────────────────────────────────────
+/* ── Zwrot na osi rozmowy (0.502.0) ─────────────────────────────────────────
    Klient, który pisze „gdzie moje pieniądze", pyta o ZDARZENIE zwrotu:
    decyzję, korektę, przelew. Rozmowa pokazywała tylko BIEŻĄCY stan zwrotu
    w bloku obok, więc agent szedł do Zwrotów czytać oś tamtej sprawy.

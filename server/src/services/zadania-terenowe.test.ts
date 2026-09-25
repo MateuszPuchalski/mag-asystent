@@ -79,7 +79,7 @@ test("skasowanie zadania zabiera jego zdjęcia — załącznik bez zadania nic n
     "CASCADE ze `schema.sql` działa — inaczej retencja zostawiałaby sieroty");
 });
 
-/* ── Zadanie ze sprawy: skąd i dokąd wraca (@wydanie) ───────────────────────
+/* ── Zadanie ze sprawy: skąd i dokąd wraca (0.502.0) ───────────────────────
    Zwrot, reklamacja, dyskusja i dostawa zlecają hali z numerem sprawy.
    Karta zadania prowadzi z powrotem, wynik i odesłanie wracają na oś zwrotu,
    a odesłane zadanie staje w Do zrobienia.                                */

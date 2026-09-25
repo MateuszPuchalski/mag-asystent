@@ -4,7 +4,7 @@ import { ClipboardList } from "lucide-react";
 import { useNoweZadanie } from "../api/rozmowy";
 import { Przycisk } from "../ui";
 
-/* ── „ZLEĆ HALI" ZE SPRAWY (@wydanie) ────────────────────────────────────────
+/* ── „ZLEĆ HALI" ZE SPRAWY (0.502.0) ────────────────────────────────────────
    Do tego wydania zlecić hali dało się tylko z rozmowy (pomiar). Zwrot,
    reklamacja i dyskusja kazały przejść do Zadań, przepisać sprawę
    w tytuł i wrócić — a zadanie nie wiedziało, skąd przyszło. Tu zlecenie

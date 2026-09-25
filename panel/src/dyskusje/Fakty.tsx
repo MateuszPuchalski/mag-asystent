@@ -235,7 +235,7 @@ export function Fakty({
       <DrogaZakupu droga={szczegol.droga} tutaj={{ rodzaj: "dyskusja", id: d.id }} />
     </Sekcja>}
 
-    {/* Zlecenie hali z dyskusji (@wydanie) — powód w `sprawy/ZlecHali.tsx`.
+    {/* Zlecenie hali z dyskusji (0.502.0) — powód w `sprawy/ZlecHali.tsx`.
         Dyskusja nie ma numeru od Allegro (§25c.1), więc tytuł niesie temat. */}
     <Sekcja tytul="Hala">
       <ZlecHali zrodlo="dyskusja" zrodloRef={d.id} tytul={`Dyskusja — ${d.temat ?? `#${d.id}`}`} />

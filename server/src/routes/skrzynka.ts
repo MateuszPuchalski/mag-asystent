@@ -399,7 +399,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       catch (e) { return blad(reply, e); }
     });
 
-  /* Przekrój towaru (@wydanie) — trzeci mostek: zwroty, sprawy i rozmowy
+  /* Przekrój towaru (0.502.0) — trzeci mostek: zwroty, sprawy i rozmowy
      o tej kartotece obok siebie. Ta sama bramka co historia klienta, bo
      niesie cudze zakupy. Odczyt niczego nie zapisuje; powód i granice
      w `services/przekroj-towaru.ts`. */

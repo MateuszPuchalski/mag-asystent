@@ -5,10 +5,10 @@ import { BrakSesji, zglosBrakSesji } from "./klient";
    piętnaście sekund. To jest ta część wyceny z `docs/obsluga-klienta.md` §7,
    za którą płacimy TanStackiem: ekrany dzielą stan zamiast każdy swój.
 
-   Budowa mieszka tu, a nie w `main.tsx` (@wydanie), żeby test mógł złożyć
+   Budowa mieszka tu, a nie w `main.tsx` (0.502.0), żeby test mógł złożyć
    ten sam klient i sprawdzić odświeżenie wspólnych kluczy niżej. */
 
-/* ── ODŚWIEŻENIE PO KAŻDEJ ZMIANIE, NA KAŻDYM EKRANIE (@wydanie) ────────────
+/* ── ODŚWIEŻENIE PO KAŻDEJ ZMIANIE, NA KAŻDYM EKRANIE (0.502.0) ────────────
    Mutacja w zwrotach, reklamacjach albo dyskusjach odświeżała tylko swoją
    kolejkę. „Do zrobienia" i otwarta rozmowa dowiadywały się o niej dopiero
    po 10–30 sekundach, więc wiersz „do decyzji" wisiał nad sprawą już

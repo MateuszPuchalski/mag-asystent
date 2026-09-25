@@ -55,7 +55,7 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
    klienta zapytań — inaczej hook wywala się, zanim cokolwiek się narysuje. */
 const zKlientem = (ui: React.ReactNode) => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  /* Router, bo odnośniki do rozmów idą przez niego (@wydanie), jak na ekranie. */
+  /* Router, bo odnośniki do rozmów idą przez niego (0.502.0), jak na ekranie. */
   return <QueryClientProvider client={qc}><MemoryRouter>{ui}</MemoryRouter></QueryClientProvider>;
 };
 

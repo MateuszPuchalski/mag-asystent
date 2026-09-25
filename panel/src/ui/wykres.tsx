@@ -26,7 +26,7 @@ import { Link } from "react-router-dom";
 export const Liczba = ({ etykieta, ile, ton = "", doPracy }: {
   etykieta: string; ile: React.ReactNode; ton?: string;
   /**
-   * Adres listy, którą ta liczba liczy (@wydanie). Tylko przy liczbie o stanie
+   * Adres listy, którą ta liczba liczy (0.502.0). Tylko przy liczbie o stanie
    * BIEŻĄCYM: liczba z minionego tygodnia otworzyłaby listę, która dziś
    * znaczy co innego, a to gorsze niż brak odnośnika.
    */
@@ -36,7 +36,7 @@ export const Liczba = ({ etykieta, ile, ton = "", doPracy }: {
     <span className={`text-2xl font-bold ${ton}`}>{ile}</span>
     <span className="text-xs text-slate-500">{etykieta}</span>
   </>;
-  /* WGLĄD PROWADZI DO PRACY (@wydanie): liczba, której nie da się kliknąć,
+  /* WGLĄD PROWADZI DO PRACY (0.502.0): liczba, której nie da się kliknąć,
      zostaje ciekawostką — agent szukał potem tych samych spraw w kolejce. */
   return doPracy
     ? <Link to={doPracy} className="flex flex-col rounded hover:bg-slate-50" title="Otwórz listę">{tresc}</Link>

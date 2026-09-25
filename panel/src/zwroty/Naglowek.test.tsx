@@ -5,7 +5,7 @@ import { MemoryRouter } from "react-router-dom";
 import { Naglowek } from "./Naglowek";
 import type { Zwrot } from "../api/typy";
 
-/* Odnośniki wewnątrz panelu idą przez router (@wydanie), jak na ekranie. */
+/* Odnośniki wewnątrz panelu idą przez router (0.502.0), jak na ekranie. */
 const render = (ui: React.ReactElement) => renderRTL(ui, { wrapper: MemoryRouter });
 
 /* ── Tożsamość zwrotu w nagłówku (0.207.0) ───────────────────────────────────

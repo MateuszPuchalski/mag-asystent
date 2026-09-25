@@ -28,7 +28,7 @@ type Wiersz = Record<string, unknown>;
 
 /**
  * Które rozmowy są o którym zamówieniu — JEDNA relacja SQL dla każdej strony
- * mostka (@wydanie). Kolumny: `conversation_id`, `numer`, `at`.
+ * mostka (0.502.0). Kolumny: `conversation_id`, `numer`, `at`.
  *
  * Do tego wydania skrzynka czytała numer rozmowy razem z ręcznym wskazaniem
  * (`numerZamowieniaRozmowy`), a zwrot, reklamacja, droga zakupu i szukanie —

@@ -64,14 +64,14 @@ z czterech kolejek widzi trzy pozostałe, czyli dwanaście przejść z dwunastu.
 Wszystkie idą przez `services/droga-klienta.ts` i jeden blok na ekranie,
 `panel/src/sprawy/Spoiwo.tsx`.
 
-**Od @wydanie rozmowa należy do zamówienia także przez ręczne wskazanie.**
+**Od 0.502.0 rozmowa należy do zamówienia także przez ręczne wskazanie.**
 Skrzynka czytała wskazanie od 0.397.0, a zwrot, reklamacja, droga zakupu
 i szukanie — tylko numer z wiadomości. Rozmowa ze wskazanym zamówieniem
 widziała więc zwrot, a zwrot jej nie. Teraz każda strona czyta jedną relację
 `ROZMOWA_ZAMOWIENIA`. Pilnuje jej test „rozmowy zamówienia tylko przez
 ROZMOWA_ZAMOWIENIA" w `droga-klienta.test.ts`.
 
-**Od @wydanie zwrot staje na osi rozmowy, a hala odpowiada sprawie, która ją
+**Od 0.502.0 zwrot staje na osi rozmowy, a hala odpowiada sprawie, która ją
 wezwała.** Decyzja, korekta i pieniądze zwrotu tego zamówienia są zdarzeniami
 w pasku rozmowy i faktem w szkicu Copilota (`services/zwrot-na-osi.ts`).
 Ocena, kwota robocza i notatka biura zostają w zwrocie — to nasza kuchnia.
@@ -86,7 +86,7 @@ i kandydaci zamówień rozmowy bez numeru (S1). Właściciel potwierdził go na
 żywym koncie 24 września 2026 — rozdział „Sprzeczność: login kupującego"
 niżej. Nowe wiązania po loginie są więc dozwolone, bez wielkości liter.
 
-Trzecim mostkiem jest od @wydanie towar (`tw_id`). Stał na dziewięciu
+Trzecim mostkiem jest od 0.502.0 towar (`tw_id`). Stał na dziewięciu
 ekranach i nigdzie nie był odnośnikiem. Teraz jego symbol otwiera szufladę
 (`panel/src/towar/Szuflada.tsx`): stan, dostawy, wiedzę, otwarte zwroty,
 reklamacje i rozmowy o nim oraz liczby z 90 dni. Szuflada to wgląd, nie
@@ -95,7 +95,7 @@ Oferty towaru to pamięć człowieka i sygnatura równa symbolowi, więc liczba
 sprzedaży mówi wprost, z ilu ofert powiązanych jest liczona
 (`services/przekroj-towaru.ts`).
 
-**Wgląd prowadzi do pracy (@wydanie).** Liczba w Analizie, która opisuje
+**Wgląd prowadzi do pracy (0.502.0).** Liczba w Analizie, która opisuje
 stan BIEŻĄCY, otwiera listę, którą liczy: klient czeka teraz → skrzynka,
 problemy dostaw → dostawy. Dostawca w tabeli dostaw otwiera archiwum jego
 dokumentów. Liczby z minionego okna — tydzień, eskalacje, tarcie — odnośnika
@@ -308,7 +308,7 @@ od drugiej: nazywa dziurę, a nie funkcję.
 |---|---|---|
 | pytanie przed zakupem | skrzynka, rozmowa bez zamówienia | terminu odpowiedzi (§26) |
 | pytanie o dobór części | skrzynka, zakładka Dobór | — |
-| pytanie o dostawę i termin | skrzynka; od @wydanie „zamówione u dostawcy” w paśmie i w faktach szkicu | — |
+| pytanie o dostawę i termin | skrzynka; od 0.502.0 „zamówione u dostawcy” w paśmie i w faktach szkicu | — |
 | prośba o fakturę albo korektę | skrzynka, ręcznie | drogi do Subiekta bez przepisywania |
 | paczka nieodebrana | zwroty, `zrodlo` osobne (0.172.0) | — |
 | zwrot ustawowy w 14 dni | zwroty, kubełki bramek | — |

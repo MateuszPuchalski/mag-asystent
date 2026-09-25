@@ -1186,7 +1186,7 @@ test("maszyna z danych doboru dostaje zdanie JEST albo NIE MA na liście oferty"
   assert.ok(zgodnosc().some((z) => z.includes("Honda GX390 NIE MA na liście") && z.includes("NIE znaczy")));
 });
 
-/* ── „Kiedy będzie" przy braku na stanie (@wydanie) ─────────────────────────
+/* ── „Kiedy będzie" przy braku na stanie (0.502.0) ─────────────────────────
    Fakt stoi tylko przy braku, nie niesie dostawcy ani numeru dokumentu
    i mówi wprost, że termin jest terminem dostawcy. */
 test("kiedy będzie: tylko przy braku, bez dostawcy, termin nazwany terminem dostawcy", () => {

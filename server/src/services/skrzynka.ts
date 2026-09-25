@@ -178,7 +178,7 @@ export interface WpisOsi {
      nie `wynik_zadania` z treścią „nie da się": agent czytający oś ma widzieć,
      że pomiaru NIE MA, a nie że pomiar brzmi jak wymówka. */
   rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania" | "komentarz" | "status" | "dobor"
-    /* Kamień milowy zwrotu tego zamówienia (@wydanie) — `zwrot-na-osi.ts`. */
+    /* Kamień milowy zwrotu tego zamówienia (0.502.0) — `zwrot-na-osi.ts`. */
     | "zwrot";
   autor: string; odKlienta: boolean; tresc: string; at: string;
   ofertaId: string | null; zadanieId?: number; messageId?: number;
@@ -985,7 +985,7 @@ export function osRozmowy(id: number): {
     });
   }
 
-  /* ZWROT NA OSI (@wydanie) — decyzja, korekta i pieniądze zwrotu tego
+  /* ZWROT NA OSI (0.502.0) — decyzja, korekta i pieniądze zwrotu tego
      zamówienia jako zdarzenia, jak status i dobór. Powód i zakres
      w `services/zwrot-na-osi.ts`. */
   for (const z of zdarzeniaZwrotowRozmowy(db(), id)) {

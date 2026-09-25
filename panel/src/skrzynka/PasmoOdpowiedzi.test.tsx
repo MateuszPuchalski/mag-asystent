@@ -87,7 +87,7 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
     expect(screen.getByText("brak na stanie")).toBeInTheDocument();
   });
 
-  /* „Kiedy będzie" (@wydanie): przy braku — co zamówione i na kiedy, przy
+  /* „Kiedy będzie" (0.502.0): przy braku — co zamówione i na kiedy, przy
      stanie — ile stoi w przyjęciach. W wierszu „Mamy", nie w czwartym. */
   it("przy braku mówi, co zamówione u dostawcy i na kiedy — w wierszu „Mamy”", () => {
     const zam = (termin: string | null, ilosc: number) => ({ dokId: 1, nrPelny: "ZD 1", dataWyst: "2026-09-20",

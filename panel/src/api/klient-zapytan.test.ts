@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { nowyKlientZapytan } from "./klient-zapytan";
 
-/* ── Odświeżenie wspólnych kluczy po każdej mutacji (@wydanie) ──────────────
+/* ── Odświeżenie wspólnych kluczy po każdej mutacji (0.502.0) ──────────────
    Rozstrzygnięty zwrot nie ma prawa wisieć w „Do zrobienia" przez pół minuty.
    Test składa TEN SAM klient, co panel, i sprawdza skutek, nie listę kluczy. */
 describe("klient zapytań panelu", () => {

@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { PrzyciskTowaru, SzufladaTowaru } from "./Szuflada";
 
-/* ── Szuflada towaru — trzeci mostek (@wydanie) ─────────────────────────────
+/* ── Szuflada towaru — trzeci mostek (0.502.0) ─────────────────────────────
    Pilnujemy: bez dostawcy przycisk jest tekstem (testy komponentów i ekrany
    poza ramą), otwarcie czyta i niczego nie zapisuje, wiersze prowadzą do
    spraw i zamykają szufladę, a Escape ją zamyka.                          */

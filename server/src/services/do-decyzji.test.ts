@@ -105,7 +105,7 @@ test("pominięta pozycja kosza prowadzi do koszy w zakładce Zwroty (0.438.0)", 
   const w = D.doDecyzji().pozycje.find((p) => p.zrodlo === "kosze");
   assert.ok(w, "pominięcie czeka na biuro");
   assert.deepEqual(w.cel, { panel: `/obsluga/zwroty/kosze/${k}?kubelek=pominiete` },
-    "kosz i kubełek pominiętych — @wydanie; wcześniej wiersz lądował w kubełku „praca”");
+    "kosz i kubełek pominiętych — 0.502.0; wcześniej wiersz lądował w kubełku „praca”");
   assert.match(w.co, /HM-0520 · Z-14 · brak w pudle/);
 });
 

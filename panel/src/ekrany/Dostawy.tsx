@@ -38,7 +38,7 @@ export function Dostawy() {
   const wybrany: number | "bez" | null = id === "bez" ? "bez" : id ? Number(id) : null;
   const dokId = typeof wybrany === "number" ? wybrany : null;
 
-  /* Kubełek i fraza z adresu (@wydanie): wiersz dostawcy w Analizie prowadzi
+  /* Kubełek i fraza z adresu (0.502.0): wiersz dostawcy w Analizie prowadzi
      tu z `?kubelek=archiwum&q=<dostawca>`. Adres czyta się RAZ, przy wejściu,
      jak w koszach — dalej to stan ekranu. */
   const [parametry] = useSearchParams();

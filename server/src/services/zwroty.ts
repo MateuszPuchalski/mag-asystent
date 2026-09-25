@@ -946,7 +946,7 @@ export function listaZwrotow(
              WHERE x.conversation_id = c.id AND x.auto_odpowiedz = 0
              ORDER BY x.sent_at DESC LIMIT 1) AS kierunek
       FROM ${ROZMOWA_ZAMOWIENIA} rz JOIN conversation c ON c.id = rz.conversation_id
-      /* Konto rozmowy musi być kontem zwrotu (@wydanie) — do tego wydania
+      /* Konto rozmowy musi być kontem zwrotu (0.502.0) — do tego wydania
          zapytanie go nie sprawdzało. Numery Allegro to UUID, więc zderzenie
          kont jest czysto teoretyczne; reszta mostka filtruje i ta część też. */
       JOIN zwrot_klienta zk ON zk.order_id = rz.numer AND zk.channel_account_id = c.channel_account_id

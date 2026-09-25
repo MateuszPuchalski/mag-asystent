@@ -50,7 +50,7 @@ export function ZakresDostaw({ a }: { a: AnalizaDostaw }) {
       <Tabela naglowki={["Dostawca", "Dostaw", "Pozycji", "Z wyjątkiem", "Mediana"]}
         pusto="Żadna dostawa nie domknęła się w tym oknie.">
         {a.dostawcy.map((x) => <tr key={x.dostawca}>
-          {/* Dostawca prowadzi do ARCHIWUM jego dokumentów (@wydanie): wiersz
+          {/* Dostawca prowadzi do ARCHIWUM jego dokumentów (0.502.0): wiersz
               liczy dostawy z okna, a archiwum szuka po nazwie dostawcy. */}
           <Td className="font-semibold"><Link className="underline decoration-dotted underline-offset-2 hover:decoration-solid"
             to={`/obsluga/dostawy?kubelek=archiwum&q=${encodeURIComponent(x.dostawca)}`}>{x.dostawca}</Link></Td>

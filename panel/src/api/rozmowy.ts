@@ -234,7 +234,7 @@ export function useNoweZadanie() {
   const qc = useQueryClient();
   return useMutation({
     /* Źródło domyślnie „panel" (ręczne z ekranu Zadań). Zlecenie ze sprawy
-       podaje własne `zrodlo` i `zrodloRef` (@wydanie) — `sprawy/ZlecHali.tsx`. */
+       podaje własne `zrodlo` i `zrodloRef` (0.502.0) — `sprawy/ZlecHali.tsx`. */
     mutationFn: (v: Record<string, unknown>) =>
       api<{ zadanie: Zadanie }>("/api/zadania-terenowe",
         { method: "POST", body: JSON.stringify({ zrodlo: "panel", ...v }) }),

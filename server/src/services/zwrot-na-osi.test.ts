@@ -5,7 +5,7 @@ import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import { faktZwrotu, zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
 
-/* ── Zwrot na osi rozmowy (@wydanie) ────────────────────────────────────────
+/* ── Zwrot na osi rozmowy (0.502.0) ────────────────────────────────────────
    Pilnujemy trzech granic: na oś wchodzi tylko to, co dotyczy klienta;
    wiązanie idzie po numerze zamówienia (także wskazanym ręcznie) i po koncie;
    fakt dla szkicu nie niesie nazwisk biura.                                 */

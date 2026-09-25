@@ -250,7 +250,7 @@ export function Zadania() {
                 kliknięcie przy każdym powrocie po wynik. */}
             {t.kontekst && <p className="mt-2 whitespace-pre-wrap border-l-2 border-slate-200
               pl-2 text-podpis text-slate-500">{t.kontekst}</p>}
-            {/* ODNOŚNIK DO SPRAWY (@wydanie): kontekst mówił, skąd zadanie,
+            {/* ODNOŚNIK DO SPRAWY (0.502.0): kontekst mówił, skąd zadanie,
                 ale nie prowadził tam. Decyzja po wyniku zapada w sprawie. */}
             {t.cel && <Link to={t.cel}
               className="mt-1 inline-flex items-center gap-1 text-podpis font-semibold text-sky-800 underline underline-offset-2">

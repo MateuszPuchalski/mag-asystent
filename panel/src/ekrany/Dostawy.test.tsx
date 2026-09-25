@@ -270,7 +270,7 @@ describe("Ekran dostaw", () => {
   });
 });
 
-/* ── Wejście z Analizy (@wydanie) ──────────────────────────────────────────
+/* ── Wejście z Analizy (0.502.0) ──────────────────────────────────────────
    Wiersz dostawcy w Analizie prowadzi tu z kubełkiem archiwum i nazwą
    dostawcy. Adres czyta się raz, przy wejściu, i od razu pyta archiwum. */
 describe("adres z kubełkiem i frazą", () => {
