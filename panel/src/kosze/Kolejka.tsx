@@ -16,11 +16,15 @@ import { CyklKosza, StanMmKosza } from "./Cykl";
    pytanie — ale z pastylką, inaczej karton bez zwrotów i bez MM wyglądałby
    jak kosz zepsuty. Biuro go wyłącznie ogląda: zawartość zbiera hala. */
 
-export type KubelekKoszy = "praca" | "pominiete" | "rozlozone" | "anulowane";
+export type KubelekKoszy = "praca" | "pominiete" | "mm" | "rozlozone" | "anulowane";
 
 export const KUBELKI_KOSZY: Array<{ id: KubelekKoszy; etykieta: string; pytanie: string }> = [
   { id: "praca", etykieta: "W pracy", pytanie: "Co jest w drodze na regał?" },
   { id: "pominiete", etykieta: "Pominięte", pytanie: "Szukać dalej, reklamować czy poprawić dokument?" },
+  /* Problem z MM (0.501.0), zgłoszenie właściciela: „muszę sprawdzić stany
+     z Subiektem". Kubełek PRZEKROJOWY — kosz stoi tu obok swojego kubełka
+     statusu, bo kłopot z dokumentem nie zmienia tego, gdzie kosz jest. */
+  { id: "mm", etykieta: "Problem z MM", pytanie: "Czy stany w Subiekcie zgadzają się z koszem?" },
   { id: "rozlozone", etykieta: "Rozłożone", pytanie: "Tylko wgląd." },
   { id: "anulowane", etykieta: "Anulowane", pytanie: "Tylko wgląd." },
 ];
@@ -39,6 +43,13 @@ export const KUBELKI_KOSZY: Array<{ id: KubelekKoszy; etykieta: string; pytanie:
  * zostają w porządku serwera — tam pytanie jest inne.
  */
 export function koszeKubelka(kosze: WierszKosza[], kubelek: KubelekKoszy): WierszKosza[] {
+  /* PROBLEM Z MM po chwili ostatniego kłopotu, najświeższy na górze:
+     nierozwiązany błąd i wczorajsza odmowa są pilniejsze od tej sprzed
+     miesiąca, którą remanent mógł już wyrównać. */
+  if (kubelek === "mm") {
+    return kosze.filter((k) => k.problemMm)
+      .sort((a, b) => b.problemMm!.ostatnioAt.localeCompare(a.problemMm!.ostatnioAt));
+  }
   const wybrane = kosze.filter((k) => kubelekKosza(k) === kubelek);
   if (kubelek !== "rozlozone") return wybrane;
   return [...wybrane].sort((a, b) => {
@@ -71,8 +82,10 @@ function postep(k: WierszKosza): string {
     k.rozlozonoPrzez ? ` · ${k.rozlozonoPrzez}` : ""}`;
 }
 
-export function KolejkaKoszy({ kosze, wybrany, onWybierz }: {
+export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }: {
   kosze: WierszKosza[]; wybrany: number | null; onWybierz: (id: number) => void;
+  /** W kubełku PROBLEM Z MM treść odmowy zastępuje zdanie o postępie. */
+  pokazBladMm?: boolean;
 }) {
   if (!kosze.length) return <Pusto waga="lista">Ten kubełek jest pusty.</Pusto>;
   return <ul className="divide-y divide-slate-200">
@@ -85,11 +98,24 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz }: {
             {karton ? ile(k.pozycji, "pozycja", "pozycje", "pozycji")
               : k.mmNumer ? `MM ${k.mmNumer}` : ile(k.zwrotow, "zwrot", "zwroty", "zwrotów")}</span>
         </span>
-        <span className="w-full truncate text-sm text-slate-600">{postep(k)}</span>
+        {pokazBladMm && k.problemMm
+          ? <span className="w-full truncate text-sm text-ranga-zle"
+              title={k.problemMm.ostatniBlad ?? undefined}>
+              {k.problemMm.ostatniBlad ?? "Sfera odmówiła bez treści"} · {czas(k.problemMm.ostatnioAt)}</span>
+          : <span className="w-full truncate text-sm text-slate-600">{postep(k)}</span>}
         <span className="mt-1 flex w-full flex-wrap items-center gap-1.5">
           {karton && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-700">karton</span>}
           <CyklKosza status={k.status} mmBlad={k.mmStan === "blad" && !k.mmNumer && !karton} />
           <StanMmKosza mmStan={k.mmStan} mmNumer={k.mmNumer} brakujeKorekt={k.brakujeKorekt} karton={karton} />
+          {/* ZNACZNIK KŁOPOTU Z MM (0.501.0) w każdym kubełku. Czerwony, gdy
+              zadanie stoi w błędzie teraz; bursztynowy, gdy przeszło po
+              odmowie — wtedy dokument jest, ale stany trzeba sprawdzić. */}
+          {k.problemMm &&
+            <span title={`${ile(k.problemMm.prob, "nieudana próba", "nieudane próby", "nieudanych prób")} MM${
+              k.problemMm.ostatniBlad ? `: ${k.problemMm.ostatniBlad}` : ""} — sprawdź stany z Subiektem`}
+              className={`rounded px-1.5 py-0.5 text-xs font-bold ${k.problemMm.nierozwiazany
+                ? "bg-red-100 text-ranga-zle" : "bg-amber-100 text-ranga-uwaga"}`}>
+              {k.problemMm.nierozwiazany ? "MM w błędzie" : "MM po błędzie"}</span>}
           {k.pominietych > 0 &&
             <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-ranga-uwaga">
               {ile(k.pominietych, "pominięta", "pominięte", "pominiętych")}</span>}
