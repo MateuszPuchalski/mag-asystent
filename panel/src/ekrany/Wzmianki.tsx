@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { AtSign, Check, Lock } from "lucide-react";
 import { useOdhaczWzmianke, useWzmianki } from "../api/rozmowy";
-import { Blad, Karta, Przycisk, czas } from "../ui";
+import { Blad, Karta, NaglowekSekcji, Przycisk, czas } from "../ui";
 
 /* Skrzynka wzmianek — „wspomniano o mnie" (§6.4, 0.160.0).
    
@@ -24,6 +24,7 @@ export function Wzmianki() {
 
   const wszystkie = dane.data?.wzmianki ?? [];
   const widoczne = zHistoria ? wszystkie : wszystkie.filter((w) => !w.odhaczona);
+  const odhaczonych = wszystkie.filter((w) => w.odhaczona).length;
 
   /* ── SEKCJA „DO ZROBIENIA" (23 września 2026) ─────────────────────────────
      Powód przy `Moje` — trzy zakładki z jednym pytaniem stały się jednym
@@ -31,20 +32,24 @@ export function Wzmianki() {
      na każdą prośbę spychała decyzje biura pod krawędź. */
   return <Karta className="overflow-hidden p-0" aria-label="Wspomniano o mnie" role="region">
     <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2">
-      <AtSign size={16} /><b className="mr-auto">Wspomniano o mnie</b>
-      <span className="text-sm text-slate-600">
-        {dane.data ? `${dane.data.nowe} do zajęcia się` : "Wczytuję…"}</span>
-      {/* Cel klikalny to CAŁA etykieta (0.255.0). Sam kwadracik miał 13×13 px
-          przy progu 24×24 z WCAG 2.2 AA — ta sama usterka co w pasku zwrotów
-          i ta sama naprawa, żeby nie było dwóch wzorców na jedno. */}
-      <label className="flex min-h-6 cursor-pointer items-center gap-2 text-sm text-slate-600">
-        <input type="checkbox" checked={zHistoria} className="h-4 w-4 shrink-0"
-          onChange={(e) => setZHistoria(e.target.checked)} />
-        Pokaż odhaczone</label>
+      {/* Nagłówek jak w dwóch sąsiednich sekcjach (@wydanie): `NaglowekSekcji`
+          i licznik po kropce. Powód przy `DoDecyzji`. Licznik mówi o
+          nieodhaczonych, bo tylko one są robotą. */}
+      <NaglowekSekcji jako="h3" ikona={<AtSign size={14} />} className="mr-auto">
+        Wspomniano o mnie{dane.data ? ` · ${dane.data.nowe}` : ""}</NaglowekSekcji>
+      {/* PRZEŁĄCZNIK ZWINIĘTY DO ODNOŚNIKA (@wydanie). Pole wyboru stało
+          zawsze, także przy liście bez ani jednej odhaczonej, gdzie niczego nie
+          przełączało. Historię otwiera się rzadko, po dowód „pisałam ci
+          o tym w środę", więc wystarczy cichy odnośnik, gdy jest co pokazać.
+          Cel dotyku 24 px (`min-h-6`) zostaje z 0.255.0 — próg WCAG 2.2 AA. */}
+      {odhaczonych > 0 && <button type="button" onClick={() => setZHistoria((z) => !z)}
+        className="min-h-6 text-sm text-slate-600 underline underline-offset-2 hover:text-slate-900">
+        {zHistoria ? "Ukryj odhaczone" : `Pokaż odhaczone (${odhaczonych})`}</button>}
     </div>
 
     <Blad>{blad || (dane.error as Error | null)?.message}</Blad>
 
+    {dane.isLoading && <p className="px-4 py-2 text-sm text-slate-500">Wczytuję…</p>}
     {!dane.isLoading && !widoczne.length && <p className="px-4 py-2 text-sm text-slate-500">
       {wszystkie.length ? "Wszystko odhaczone." : "Nikt Cię jeszcze nie wzmiankował."}</p>}
 
@@ -60,16 +65,18 @@ export function Wzmianki() {
             odhaczone {czas(w.odhaczonaAt)}</span>}
         </span>
         <span className="min-w-0 flex-1 truncate text-sm" title={w.fragment}>{w.fragment}</span>
+        {/* Napisy zwykłą pisownią, nie wersalikami (@wydanie): dwa krzykliwe
+            przyciski na każdym wierszu głuszyły treść prośby, którą się czyta. */}
         <span className="flex shrink-0 gap-2">
           <Przycisk className="px-2 py-1 text-xs"
             onClick={() => nawiguj(`/obsluga/skrzynka/${w.conversationId}`)}>
-            OTWÓRZ ROZMOWĘ</Przycisk>
+            Otwórz rozmowę</Przycisk>
           {/* Przejście do rozmowy NIE odhacza. Agent bywa w niej po to, żeby
               dopiero zobaczyć, czy sprawa jest jego. */}
           {!w.odhaczona && <Przycisk className="px-2 py-1 text-xs" disabled={odhacz.isPending}
             onClick={() => { setBlad(""); odhacz.mutate({ commentId: w.commentId },
               { onError: (e) => setBlad((e as Error).message) }); }}>
-            <Check size={14} />ODHACZ</Przycisk>}
+            <Check size={14} />Odhacz</Przycisk>}
         </span>
       </li>)}
     </ul>}

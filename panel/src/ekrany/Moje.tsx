@@ -2,7 +2,7 @@ import React from "react";
 import { MessageSquare, MessagesSquare, Scale, Briefcase } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useMojeSprawy } from "../api/rozmowy";
-import { Blad, Karta, czas } from "../ui";
+import { Blad, Karta, NaglowekSekcji, czas } from "../ui";
 
 /* ── Jedno „Moje" ponad kolejkami (S4 spoiwa, `docs/obsluga-klienta-calosc.md`)
    Sita „Moje" były trzy — w skrzynce, w reklamacjach i w dyskusjach — i każde
@@ -35,18 +35,22 @@ export function Moje() {
   const zTerminem = sprawy.filter((s) => s.terminDo !== null).length;
 
   return <Karta className="overflow-hidden p-0" aria-label="Moje sprawy" role="region">
+    {/* Nagłówek jak w dwóch sąsiednich sekcjach (@wydanie): `NaglowekSekcji`
+        i licznik po kropce. Powód przy `DoDecyzji`. „Wczytuję…" zeszło
+        z nagłówka do treści, tam gdzie stoi w sekcji decyzji. */}
     <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2">
-      <Briefcase size={16} /><b className="mr-auto">Moje sprawy</b>
-      <span className="text-sm text-slate-600">
-        {dane.isLoading ? "Wczytuję…" : `${sprawy.length} w pracy`}
-        {zTerminem > 0 && `, ${zTerminem} z terminem`}</span>
+      <NaglowekSekcji jako="h3" ikona={<Briefcase size={14} />}>
+        Moje sprawy{dane.data ? ` · ${sprawy.length}` : ""}
+        {zTerminem > 0 && ` · ${zTerminem} z terminem`}</NaglowekSekcji>
     </div>
 
     {dane.error && <Blad>{(dane.error as Error).message}</Blad>}
 
     {/* Pusta sekcja to JEDNA linijka, nie ilustracja na pół ekranu — na
         wspólnym ekranie stoi nad listą decyzji i nie ma jej zasłaniać. */}
-    {!dane.isLoading && sprawy.length === 0
+    {dane.isLoading
+      ? <p className="px-4 py-2 text-sm text-slate-500">Wczytuję…</p>
+      : sprawy.length === 0
       ? <p className="px-4 py-2 text-sm text-slate-500">Nic nie prowadzisz. Weź sprawę z kolejki.</p>
       : <ul>
           {sprawy.map((s) => {
