@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { OsRozmowy } from "../api/typy";
-import { bramkaDoboru, coSwieci, towarOtwartyNaStart, towarZnany } from "./kokpit";
+import type { HistoriaKlienta, OsRozmowy, WiedzaDoboru } from "../api/typy";
+import { bramkaDoboru, coSwieci, klientMaHistorie, nowyKlient, towarOtwartyNaStart, towarZnany, wiedzaMaTresc }
+  from "./kokpit";
 
 /* ── Reguły ciemnego kokpitu (0.498.0) ──────────────────────────────────────
    Szara linia jest bezpieczna tylko wtedy, gdy reguła „w normie" nie kłamie.
@@ -9,7 +10,7 @@ import { bramkaDoboru, coSwieci, towarOtwartyNaStart, towarZnany } from "./kokpi
    gasi wszystko.                                                            */
 
 const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
-  zwroty: [], sprawy: [], zamowienie: null, kandydaciZamowien: [],
+  rozmowa: { kopilot: null }, zwroty: [], sprawy: [], zamowienie: null, kandydaciZamowien: [],
   oferta: { externalId: "111", link: null, zrodlo: "wiadomosc", zgodnosc: null, pobrana: null,
     kartoteka: { pewnosc: "brak", twId: null, symbol: null, zrodlo: "—", powod: null } },
   dobor: { status: "not_started", wersja: 1, brakuje: null, wybrany: null, updatedBy: null, updatedAt: null,
@@ -54,6 +55,18 @@ describe("co świeci w kolumnie kontekstu", () => {
     for (const s of ["NOTICE_LEFT", "ISSUE", "RETURNED"]) expect(coSwieci(z(s))).toEqual(["paczka"]);
     expect(coSwieci(z("IN_TRANSIT"))).toEqual([]);
     expect(coSwieci(z("ISSUE", "2026-09-25T10:00:00Z"))).toEqual([]);
+  });
+
+  /* Soczewka paczki (@wydanie) stoi nad „Wymaga Ciebie" i mówi o awizo sama.
+     Para jak wszędzie tutaj: przy pytaniu o towar awizo dalej musi świecić. */
+  it("awizo nie świeci drugi raz, gdy paczkę pokazuje soczewka", () => {
+    const z = (kategoria: string) => dane({
+      rozmowa: { kopilot: { kategoria, dodatkowe: [], zrodlo: "MODEL", status: "SUCCESS",
+        nieaktualna: false, kategoriaCzlowieka: null } } as never,
+      zamowienie: zamowienie({ przesylka: { waybill: "X1", przewoznik: "DPD", status: "NOTICE_LEFT",
+        dostarczonoAt: null, sprawdzonoAt: "2026-09-25T10:00:00Z" } }) });
+    expect(coSwieci(z("DELIVERY_DELAY"))).toEqual([]);
+    expect(coSwieci(z("PRODUCT_QUESTION"))).toEqual(["paczka"]);
   });
 
   it("zamówienie z kilku pozycji bez wskazanej oferty świeci; z jedną — nie", () => {
@@ -117,5 +130,35 @@ describe("karta towaru na starcie według rodzaju pytania", () => {
     expect(towarOtwartyNaStart([], "DELIVERY_DELAY")).toBe(false);
     expect(towarOtwartyNaStart([], "INVOICE")).toBe(false);
     expect(towarOtwartyNaStart(["zwrot"], "PRODUCT_QUESTION")).toBe(false);
+  });
+});
+
+/* ── Puste wiersze znikają (@wydanie, decyzja właściciela z 26 września) ──
+   Para przy każdej regule: stan, w którym wiersz gaśnie, i stan, w którym
+   MUSI stanąć. Reguła gasząca wszystko schowałaby klienta z historią. */
+describe("puste wiersze Klient i Wiedza", () => {
+  const h = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta => ({ login: "pasikonik5", wpisy: [], maszyny: [], ...n });
+
+  it("Klient staje z historią albo maszyną; bez nich i przed odczytem — nie", () => {
+    expect(klientMaHistorie(undefined)).toBe(false);
+    expect(klientMaHistorie(h())).toBe(false);
+    expect(klientMaHistorie(h({ wpisy: [{ rodzaj: "zakup" } as never] }))).toBe(true);
+    expect(klientMaHistorie(h({ maszyny: [{ marka: "NAC" } as never] }))).toBe(true);
+  });
+
+  it("„nowy klient” tylko przy znanym loginie bez historii — bez loginu nie wiemy, kto pisze", () => {
+    expect(nowyKlient(h())).toBe(true);
+    expect(nowyKlient(h({ login: null }))).toBe(false);
+    expect(nowyKlient(h({ wpisy: [{ rodzaj: "rozmowa" } as never] }))).toBe(false);
+    expect(nowyKlient(undefined)).toBe(false);
+  });
+
+  it("Wiedza staje z zastosowaniem albo pomiarem; pusta i przed odczytem — nie", () => {
+    const w = (n: Partial<WiedzaDoboru> = {}) => ({ zastosowanie: null, zabudowa: null, pasowanie: null,
+      silniki: [], silnikZPola: null, pomiary: [], ...n }) as WiedzaDoboru;
+    expect(wiedzaMaTresc(undefined)).toBe(false);
+    expect(wiedzaMaTresc(w())).toBe(false);
+    expect(wiedzaMaTresc(w({ pomiary: [{ zadanieId: 1 } as never] }))).toBe(true);
+    expect(wiedzaMaTresc(w({ zastosowanie: { dowody: [] } as never }))).toBe(true);
   });
 });

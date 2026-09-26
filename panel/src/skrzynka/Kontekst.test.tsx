@@ -11,7 +11,8 @@ vi.mock("./OfertaRozmowy", () => ({
   OfertaRozmowy: () => <div data-testid="oferta">blok oferty</div>,
 }));
 vi.mock("./ZamowienieRozmowy", () => ({
-  ZamowienieRozmowy: () => <div data-testid="zamowienie">blok zamówienia</div>,
+  ZamowienieRozmowy: ({ bezPaczki }: { bezPaczki?: boolean }) =>
+    <div data-testid="zamowienie" data-bez-paczki={String(Boolean(bezPaczki))}>blok zamówienia</div>,
   /* Słownik paczki jedzie z modułu zamówienia, bo streszczenie wiersza mówi
      tymi samymi słowami co karta. */
   STATUS: { NOTICE_LEFT: "awizo — nieudana próba doręczenia", IN_TRANSIT: "w drodze do klienta" },
@@ -40,10 +41,17 @@ vi.mock("./PasmoOdpowiedzi", () => ({
    Ten plik pilnuje UKŁADU, więc hak oddaje stałe dane. */
 const historia = { data: undefined as unknown };
 const wiedza = { data: undefined as unknown };
+/* Soczewka paczki (@wydanie) woła hak sprawdzenia; tu tylko liczymy, że
+   samo rysowanie kolumny go nie odpala. */
+const sprawdz = { mutate: vi.fn(), isPending: false, error: null };
 vi.mock("../api/rozmowy", () => ({
   useHistoriaKlienta: () => historia,
   useWiedzaDoboru: () => wiedza,
+  useSprawdzPrzesylkeRozmowy: () => sprawdz,
 }));
+/* Wiersze Klient i Wiedza stają tylko z treścią (@wydanie). */
+const zHistoria = { login: "pasikonik5", maszyny: [], wpisy: [{ rodzaj: "zakup" }, { rodzaj: "zwrot" }] };
+const zWiedza = { zastosowanie: null, pomiary: [{ zadanieId: 1 }], silniki: [] };
 
 const { Kontekst } = await import("./Kontekst");
 
@@ -152,6 +160,7 @@ describe("kolumna kontekstu", () => {
   /* Zakładek nie ma od 0.498.0. „Oferta" i „Towar" zostają JEDNYM tematem
      (0.198.0), a dobór, klient i wiedza mają własne wiersze. */
   it("każdy temat ma wiersz, a dobór działa nawet bez oferty", async () => {
+    historia.data = zHistoria; wiedza.data = zWiedza;
     rysuj(dane({ oferta: null }));
     for (const nazwa of ["Oferta", "Towar"]) {
       expect(screen.queryByRole("button", { name: nazwa })).not.toBeInTheDocument();
@@ -163,6 +172,7 @@ describe("kolumna kontekstu", () => {
        i część wpisuje agent. */
     await userEvent.click(wiersz(/^Dobór/));
     expect(screen.getByTestId("dobor")).toBeInTheDocument();
+    historia.data = undefined; wiedza.data = undefined;
   });
 
   /* „Dobór" to robota z krokami i przyciskami, nie karta faktów. Doklejony
@@ -173,16 +183,35 @@ describe("kolumna kontekstu", () => {
   });
 
   /* Zakładka z zerem kosztowała klik, żeby usłyszeć „tu nic nie ma".
-     Streszczenie mówi to od razu, i mówi więcej niż liczba. */
-  it("Klient i Wiedza mówią streszczeniem, a przed odczytem — że czekają", () => {
+     Od @wydanie (decyzja właściciela z 26 września) pusty wiersz nie staje
+     wcale — ani przed odczytem, ani po pustym wyniku. Z treścią mówi
+     streszczeniem, jak dotąd. */
+  it("Klient i Wiedza stają tylko z treścią i mówią streszczeniem", () => {
     const { rerender } = rysuj(dane());
-    expect(wiersz(/^Klient/)).toHaveTextContent("wczytuję…");
-    historia.data = { login: "pasikonik5", maszyny: [], wpisy: [{ rodzaj: "zakup" }, { rodzaj: "zwrot" }] };
-    wiedza.data = { zastosowanie: null, pomiary: [{ zadanieId: 1 }], silniki: [] };
+    expect(screen.queryByRole("button", { name: /^Klient/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Wiedza/ })).toBeNull();
+    historia.data = zHistoria; wiedza.data = zWiedza;
     rerender(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}}
       onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
     expect(wiersz(/^Klient/)).toHaveTextContent("1 zakup · 1 zwrot");
+    expect(wiersz(/^Klient/)).toHaveAttribute("aria-expanded", "false");
     expect(wiersz(/^Wiedza/)).toHaveTextContent("1 dowód");
+    expect(screen.queryByText(/Nowy klient/)).toBeNull();
+    historia.data = undefined; wiedza.data = undefined;
+  });
+
+  it("pusta historia przy znanym loginie to jedna linijka „Nowy klient”, bez wiersza", () => {
+    historia.data = { login: "pasikonik5", maszyny: [], wpisy: [] };
+    wiedza.data = { zastosowanie: null, pomiary: [], silniki: [] };
+    const { rerender } = rysuj(dane());
+    expect(screen.getByText(/Nowy klient — pierwszy kontakt u nas/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Klient/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Wiedza/ })).toBeNull();
+    /* Bez loginu nie wiemy, kto pisze — „nowy" byłoby zgadywaniem. */
+    historia.data = { login: null, maszyny: [], wpisy: [] };
+    rerender(<Kontekst dane={dane()} onWstawDoSzkicu={() => {}}
+      onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} />);
+    expect(screen.queryByText(/Nowy klient/)).toBeNull();
     historia.data = undefined; wiedza.data = undefined;
   });
 
@@ -199,9 +228,31 @@ describe("kolumna kontekstu", () => {
     const soczewka = screen.getByRole("region", { name: "Pytanie klienta" });
     const swieci = screen.getByRole("region", { name: "Wymaga Ciebie" });
     expect(soczewka.compareDocumentPosition(swieci) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    for (const nazwa of [/^Oferta i towar/, /^Zamówienie/, /^Dobór/, /^Klient/, /^Wiedza/]) {
+    /* Klient i Wiedza bez treści nie stają wcale (@wydanie) — z soczewką czy bez. */
+    for (const nazwa of [/^Oferta i towar/, /^Zamówienie/, /^Dobór/]) {
       expect(wiersz(nazwa)).toBeInTheDocument();
     }
+  });
+
+  /* ── Soczewka paczki (@wydanie) ──────────────────────────────────────────
+     Paczka stoi RAZ: w soczewce. Awizo nie zapala drugiej karty w „Wymaga
+     Ciebie", streszczenie wiersza jej nie powtarza, a karta zamówienia pod
+     wierszem dostaje `bezPaczki`. Samo rysowanie niczego nie sprawdza. */
+  it("paczka stoi raz — w soczewce; wiersz zamówienia jej nie powtarza", async () => {
+    sprawdz.mutate.mockClear();
+    rysuj(dane({
+      rozmowa: { ...dane().rozmowa, kopilot: { kategoria: "DELIVERY_DELAY", dodatkowe: [], zrodlo: "MODEL",
+        status: "SUCCESS", nieaktualna: false, kategoriaCzlowieka: null } as never },
+      zamowienie: { ...pusteZamowienie, przesylka: { waybill: "6800123", przewoznik: "DPD",
+        status: "NOTICE_LEFT", dostarczonoAt: null, sprawdzonoAt: null } },
+    }));
+    const soczewka = screen.getByRole("region", { name: "Pytanie klienta" });
+    expect(within(soczewka).getByText(/Nie pytaliśmy jeszcze Allegro/)).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
+    expect(wiersz(/^Zamówienie/)).not.toHaveTextContent(/awizo/);
+    await userEvent.click(wiersz(/^Zamówienie/));
+    expect(screen.getByTestId("zamowienie")).toHaveAttribute("data-bez-paczki", "true");
+    expect(sprawdz.mutate).not.toHaveBeenCalled();
   });
 
   /* ── Bramka doboru (0.498.0, E z kanwy) ───────────────────────────────────
@@ -246,5 +297,17 @@ describe("streszczenie zamówienia", () => {
     /* Data zakupu z nazwą (0.506.0): obok „doręczona" goła data czytała się
        jak druga data dostawy. */
     expect(s).toMatch(/kupione 22 września 2026/);
+  });
+
+  it("przy soczewce paczki zaczyna od daty zakupu — paczka stoi wyżej", async () => {
+    const { streszczenieZamowienia } = await import("./Kontekst");
+    const s = streszczenieZamowienia(dane({
+      rozmowa: { ...dane().rozmowa, kopilot: { kategoria: "ORDER_STATUS", dodatkowe: [], zrodlo: "MODEL",
+        status: "SUCCESS", nieaktualna: false, kategoriaCzlowieka: null } as never },
+      zamowienie: { externalId: "z", link: null,
+        przesylka: { waybill: null, przewoznik: "DPD", status: "IN_TRANSIT", dostarczonoAt: null, sprawdzonoAt: null },
+        pobrane: { kupionoAt: "2026-09-22T10:00:00Z", sumaGrosze: 5549, waluta: "PLN" } as never } }));
+    expect(s.startsWith("kupione 22 września 2026")).toBe(true);
+    expect(s).not.toMatch(/w drodze/);
   });
 });
