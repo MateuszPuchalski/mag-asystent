@@ -6,7 +6,7 @@ import {
   ClipboardList,
 } from "lucide-react";
 import { useDoDecyzji, type Obszar, type PozycjaDecyzji, type ZrodloDecyzji } from "../api/decyzje";
-import { Blad, FiltrSegmentowy, Karta, Pusto, wiek } from "../ui";
+import { Blad, FiltrSegmentowy, Karta, NaglowekSekcji, Pusto, wiek } from "../ui";
 import { Moje } from "./Moje";
 import { Wzmianki } from "./Wzmianki";
 
@@ -83,17 +83,27 @@ export function DoDecyzji() {
   const pozycje = (dane.data?.pozycje ?? []).filter((p) => filtr === "wszystko" || p.obszar === filtr);
   const l = dane.data?.liczniki;
 
-  /* Własny scroller — jak w Zadaniach; rama panelu nie przewija za ekrany. */
+  /* Własny scroller — jak w Zadaniach; rama panelu nie przewija za ekrany.
+
+     TYTUŁ „Do zrobienia" ZESZEDŁ (0.524.0), bo powtarzał podświetloną
+     zakładkę tuż nad nim. Zeszedł też podpis „najpilniejsze pierwsze": opisywał
+     kolejkę, którą widać po plakietkach wieku, a nie mówił, co zrobić.
+
+     TRZY SEKCJE, JEDEN NAGŁÓWEK (0.524.0). Każda miała inny kształt licznika:
+     „1 do zajęcia się", „3 w pracy" i liczba w pigułce sita. Teraz wszystkie
+     trzy biorą `NaglowekSekcji` i licznik po kropce, jak „Zawartość · 4"
+     w koszu. Oko czyta jeden wzór zamiast trzech. */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
-    <h1 className="text-tytul font-bold">Do zrobienia</h1>
     <Wzmianki />
     <Moje />
     <Karta className="overflow-hidden p-0" role="region" aria-label="Do decyzji biura">
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2">
-        <ListChecks size={16} /><b>Do decyzji biura</b>
-        <span className="mr-auto text-xs text-slate-600">najpilniejsze pierwsze</span>
+        <NaglowekSekcji jako="h3" ikona={<ListChecks size={14} />} className="mr-auto">
+          Do decyzji biura{l ? ` · ${l.wszystko}` : ""}</NaglowekSekcji>
+        {/* „Wszystko" bez licznika (0.524.0): tę samą liczbę niesie już
+            nagłówek, a dwie kopie jednego faktu to jedna za dużo. */}
         <FiltrSegmentowy<Filtr> wybrany={filtr} onWybierz={setFiltr} pozycje={[
-          { klucz: "wszystko", etykieta: "Wszystko", ile: l?.wszystko },
+          { klucz: "wszystko", etykieta: "Wszystko" },
           { klucz: "magazyn", etykieta: "Magazyn", ile: l?.magazyn },
           { klucz: "obsluga", etykieta: "Obsługa klienta", ile: l?.obsluga },
         ]} />
