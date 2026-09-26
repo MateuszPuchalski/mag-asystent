@@ -87,7 +87,7 @@ describe("Decyzje zwrotu", () => {
     expect(screen.getByRole("button", { name: /Przyjmij/ }).className).toContain("btn-primary");
   });
 
-  it("przy gotowym „Wszystko OK” „Przyjmij” schodzi do drugiego rzędu (@wydanie)", () => {
+  it("przy gotowym „Wszystko OK” „Przyjmij” schodzi do drugiego rzędu (0.516.0)", () => {
     /* Jeden główny przycisk na widok (§26d). Klawisz P i kliknięcie działają
        tak samo — zmienia się tylko waga. */
     const onWerdykt = vi.fn();
@@ -155,7 +155,7 @@ describe("Odmowa zwrotu (0.210.0)", () => {
     expect(screen.queryByText(/nie ma tu decyzji do podjęcia/)).toBeNull();
   });
 
-  it("stan końcowy BEZ powodu i korekty nie stawia pustej ramki (@wydanie)", () => {
+  it("stan końcowy BEZ powodu i korekty nie stawia pustej ramki (0.516.0)", () => {
     /* Oś etapów mówi już „Zamknięty". Zdanie „nie ma tu decyzji" było
        drugim sposobem powiedzenia tego samego. */
     const { container } = pasek(zwrot({ kubelek: "zamkniety", werdykt: "przyjety" }));
@@ -237,7 +237,7 @@ describe("Korekta zwrotu (0.162.0)", () => {
        z kubełkiem DO ZWROTU, więc pomyłka w zaznaczeniu zostawała na zawsze. */
     const onCofnijKwote = vi.fn();
     pasek(doKorekty(), { onCofnijKwote });
-    /* Samą kwotę pokazują „Pieniądze" (@wydanie) — tu zostaje droga wyjścia. */
+    /* Samą kwotę pokazują „Pieniądze" (0.516.0) — tu zostaje droga wyjścia. */
     expect(screen.queryByText("99,98 PLN")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: /popraw kwotę/i }));
@@ -272,7 +272,7 @@ describe("Korekta zwrotu (0.162.0)", () => {
   });
 
   it("zwrot odrzucony nie ma czego cofać — to stan końcowy bez korekty", () => {
-    /* Od @wydanie bez zdania „Stan końcowy" — oś etapów mówi „Odrzucony". */
+    /* Od 0.516.0 bez zdania „Stan końcowy" — oś etapów mówi „Odrzucony". */
     const { container } = pasek(zwrot({ kubelek: "odrzucony", werdykt: "odrzucony" }));
     expect(container).toBeEmptyDOMElement();
     expect(screen.queryByRole("button", { name: /Cofnij korektę/ })).toBeNull();
@@ -283,7 +283,7 @@ describe("Korekta zwrotu (0.162.0)", () => {
        ma udawać czyjejś decyzji, a decyzja nie ma udawać faktu. */
     pasek(zwrot({ kubelek: "zamkniety", korektaNumer: "KFS 12/2026",
       korektaZrodlo: "subiekt" }), { onCofnijKorekte: vi.fn() });
-    /* Od @wydanie w podpowiedzi przy numerze — czyta się ją raz. */
+    /* Od 0.516.0 w podpowiedzi przy numerze — czyta się ją raz. */
     expect(screen.getByText("KFS 12/2026"))
       .toHaveAttribute("title", expect.stringMatching(/Znaleziona w Subiekcie/));
   });
@@ -348,7 +348,7 @@ describe("DO ZWROTU z kwotą — droga do poprawki (0.484.7)", () => {
     expect(onCofnijKwote).toHaveBeenCalled();
   });
 
-  it("kwoty nie powtarza — stoi raz, w „Pieniądzach” (@wydanie)", () => {
+  it("kwoty nie powtarza — stoi raz, w „Pieniądzach” (0.516.0)", () => {
     /* Ta sama liczba stała w pasku, w sekcji pieniędzy i w stopce pozycji.
        Zdanie o klawiszu Z też zeszło: przycisk z klawiszem stoi niżej. */
     pasek(czeka(), { moznaZwrocic: true });

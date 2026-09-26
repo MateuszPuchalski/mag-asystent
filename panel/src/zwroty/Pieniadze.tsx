@@ -97,7 +97,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
     <div className="flex flex-wrap items-center gap-2">
       <Banknote size={15} className="shrink-0 text-slate-400" />
       <b className="text-naglowek">Pieniądze</b>
-      {/* JEDYNE MIEJSCE KWOTY NA EKRANIE (@wydanie, §26d). Stała też w pasku
+      {/* JEDYNE MIEJSCE KWOTY NA EKRANIE (0.516.0, §26d). Stała też w pasku
           decyzji i w stopce pozycji; zeszła stamtąd, więc tu zostaje także po
           oddaniu — inaczej zamknięty zwrot nie mówiłby, ile wyszło. */}
       {stan.kwotaGrosze !== null &&
@@ -131,7 +131,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
       {/* Klawisz STOI PRZY PRZYCISKU, tak jak przy werdykcie i korekcie:
           rozpoznanie jest tańsze od pamiętania, a pasek skrótów na dole ekranu
           czyta się dopiero wtedy, gdy się wie, że jest czego szukać. */}
-      {/* Etykiety zwykłą pisownią (@wydanie, §26d): wersaliki krzyczały przy
+      {/* Etykiety zwykłą pisownią (0.516.0, §26d): wersaliki krzyczały przy
           każdym przycisku naraz, więc żaden nie był głośniejszy od innych. */}
       {stan.moznaZwrocic && <Przycisk wariant="glowny" className="ml-auto text-xs" disabled={trwa}
         onClick={onZwroc}>{trwa ? "Oddaję…"

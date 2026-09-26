@@ -238,7 +238,7 @@ describe("Produkty ze zwrotu", () => {
     expect(screen.getByText(/Kwoty pełnej nie znamy bez zamówienia/)).toBeInTheDocument();
   });
 
-  it("z ustaloną kwotą stopki sum nie ma — kwotę pokazują „Pieniądze” (@wydanie)", () => {
+  it("z ustaloną kwotą stopki sum nie ma — kwotę pokazują „Pieniądze” (0.516.0)", () => {
     /* Ta sama liczba stała trzy razy: w pasku decyzji, w sekcji pieniędzy
        i tutaj. Dwie sumy obok ustalonej kwoty czytało się jak trzecią wersję. */
     lista(zwrot({ kubelek: "zwrot", werdykt: "przyjety", kwotaGrosze: 9998, kwotaWariant: "pelna" }));

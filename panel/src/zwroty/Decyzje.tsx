@@ -44,7 +44,7 @@ type Props = {
   /** Rejestr akcji dla klawiszy kubełka (`zwroty/klawisze.ts`). */
   akcje?: MutableRefObject<AkcjeKlawiszy>;
   /**
-   * Czy klawisz `Z` odda pieniądze (0.484.7). NIEUŻYWANE od @wydanie: zdanie
+   * Czy klawisz `Z` odda pieniądze (0.484.7). NIEUŻYWANE od 0.516.0: zdanie
    * „albo klawiszem Z" zeszło, bo klawisz stoi na przycisku w „Pieniądzach"
    * tuż niżej. Ekran dalej je podaje; prop zejdzie przy jego następnej zmianie.
    */
@@ -76,7 +76,7 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
   const ramka = "border-b border-slate-200 bg-slate-50 p-4";
 
   if (zwrot.kubelek === "decyzja") {
-    /* JEDEN GŁÓWNY PRZYCISK NA WIDOK (@wydanie, §26d). Nad paskiem stoi
+    /* JEDEN GŁÓWNY PRZYCISK NA WIDOK (0.516.0, §26d). Nad paskiem stoi
        „Wszystko OK" (`SzybkiZwrot`), też główny — dwa zielone przyciski
        jeden pod drugim każą wybierać, który jest „ten". Gdy szybka ścieżka
        jest gotowa, „Przyjmij" schodzi do drugiego rzędu; klawisz P zostaje.
@@ -158,7 +158,7 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
     const pobranie = zwrot.zamowienie?.platnoscTyp === "CASH_ON_DELIVERY";
     const automat = zwrot.terminAt
       ? new Date(Date.parse(zwrot.terminAt) + 86_400_000).toISOString() : null;
-    /* KWOTA STOI RAZ, W „PIENIĄDZACH" (@wydanie, §26d). Ta sama liczba
+    /* KWOTA STOI RAZ, W „PIENIĄDZACH" (0.516.0, §26d). Ta sama liczba
        stała tu, w sekcji pieniędzy i w stopce pozycji — trzy razy na jednym
        ekranie. Zeszło też „oddaj je w Allegro albo klawiszem Z": przycisk
        z klawiszem stoi linijkę niżej, a przy pobraniu drogę mówi serwer. */
@@ -205,7 +205,7 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
           więc tu, i tylko tu, da się ją poprawić. Pomyłka w zaznaczeniu
           pozycji zostawała dotąd na zawsze: pasek wyceny znika razem
           z kubełkiem DO ZWROTU. */}
-      {/* Sama kwota zeszła stąd (@wydanie) — stoi w „Pieniądzach" niżej.
+      {/* Sama kwota zeszła stąd (0.516.0) — stoi w „Pieniądzach" niżej.
           Zostaje droga wyjścia, bo to ona jest powodem tego bloku. */}
       {zwrot.kwotaGrosze !== null && <button type="button" disabled={trwa} onClick={onCofnijKwote}
         className="mb-2 block text-xs text-slate-500 underline underline-offset-2 disabled:opacity-50">
@@ -259,7 +259,7 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
     </div>;
   }
 
-  /* STAN KOŃCOWY BEZ KOREKTY I POWODU NIE MA RAMKI (@wydanie, §26d).
+  /* STAN KOŃCOWY BEZ KOREKTY I POWODU NIE MA RAMKI (0.516.0, §26d).
      Stało tu „nie ma tu decyzji do podjęcia" — oś etapów wyżej mówi już
      „Zamknięty" albo „Odrzucony", a pusta ramka tylko zabierała wzrok. */
   if (!zwrot.korektaNumer && !(zwrot.kubelek === "odrzucony" && zwrot.werdyktPowod)) {
@@ -268,7 +268,7 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
 
   /* Skąd wziął się numer, jest częścią informacji — ta sama zasada co
      przy dokumencie sprzedaży (§4.3). Fakt z danych nie ma udawać
-     czyjejś decyzji, a decyzja nie ma udawać faktu. Od @wydanie mówi to
+     czyjejś decyzji, a decyzja nie ma udawać faktu. Od 0.516.0 mówi to
      podpowiedź przy numerze, nie osobna linijka: czyta się ją raz. */
   const skadKorekta = zwrot.korektaZrodlo === "subiekt"
     ? "Znaleziona w Subiekcie — dokument koryguje tę sprzedaż."
@@ -299,7 +299,7 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-slate-500">Odmówiono</span>
               {/* Wskazówka „napisz mu w skrzynce" zeszła do podpowiedzi
-                  (@wydanie): operator zna ją po pierwszym razie. */}
+                  (0.516.0): operator zna ją po pierwszym razie. */}
               <b className="mr-auto"
                 title="Powód został u nas. Jeśli klient go jeszcze nie zna, napisz mu w skrzynce.">
                 {zwrot.werdyktPowod}</b>

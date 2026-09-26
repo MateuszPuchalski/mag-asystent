@@ -64,7 +64,7 @@ describe("Pieniądze przy zwrocie", () => {
       oddane: { id: "ref-9", status: "SUCCEEDED", kiedy: null, potwierdzone: true } }) });
     expect(screen.getByText("ref-9")).toBeInTheDocument();
     expect(screen.getByText(/Oddano/)).toBeInTheDocument();
-    /* Kwota stoi tylko tutaj (@wydanie) — po oddaniu nie może zniknąć,
+    /* Kwota stoi tylko tutaj (0.516.0) — po oddaniu nie może zniknąć,
        bo zamknięty zwrot nie mówiłby wtedy nigdzie, ile wyszło. */
     expect(screen.getByText("64,98 PLN")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Oddaj pieniądze/ })).toBeNull();
