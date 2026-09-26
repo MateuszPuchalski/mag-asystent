@@ -38,7 +38,7 @@ function udzial(u: Udzial | null): string {
 /** Dolary na złotówki dla oka. Kurs orientacyjny — rachunek wystawia dostawca. */
 const zl = (usd: number) => `${(usd * 4).toFixed(2)} zł`;
 
-/* ── Czas czekania na Copilota (26 września 2026, @wydanie) ──────────────
+/* ── Czas czekania na Copilota (26 września 2026, 0.532.0) ──────────────
    Księga zapisywała czas każdego wywołania od początku, a nikt go nie
    czytał. Agent czeka na szkic przy otwartej rozmowie, więc to koszt
    w sekundach obok kosztu w złotych. Mediana mówi o zwykłym czekaniu,

@@ -115,7 +115,7 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/otworz` },
   /* Cofnięta wysyłka (0.500.0) — sam wpis do pomiaru tarcia, ta sama bramka. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/wysylka-cofnieta` },
-  /* Pominięcie (@wydanie) — licznik bez człowieka, ale pisze go tylko biuro:
+  /* Pominięcie (0.532.0) — licznik bez człowieka, ale pisze go tylko biuro:
      hala rozmów nie widzi, więc nie ma czego pomijać. */
   { method: "POST" as const, url: "/api/obsluga/pominiecie", payload: { kategoria: "RETURN" } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/priorytet`,
@@ -836,7 +836,7 @@ test("ciało bez `reklamacyjna` odpada 400, zamiast po cichu zdejmować znacznik
   assert.equal(r.statusCode, 400, r.body);
 });
 
-/* ── Pomiary pod decyzje (26 września 2026, @wydanie) ─────────────────────── */
+/* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ─────────────────────── */
 
 test("cofnięta wysyłka niesie czas od odłożenia; liczba spoza 0–60 s odpada, wpis zostaje", async () => {
   const b = login("biuro", "Anna");

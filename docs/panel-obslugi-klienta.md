@@ -6146,7 +6146,7 @@ Każda zmiana niżej ma powód w komentarzu obok kodu.
 się najwyżej raz w tygodniu, została odrzucona. Wydania idą jak dotąd,
 a o zmianach mówi pasek z punktu 7.
 
-### 26c.1. Pomiary pod decyzje (@wydanie)
+### 26c.1. Pomiary pod decyzje (0.532.0)
 
 Decyzja właściciela z 26 września 2026: cztery zasady skrzynki rozstrzygają
 dane, nie przekonanie. Karta „Pomiary pod decyzje” stoi w Analizie, pod

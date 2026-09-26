@@ -198,7 +198,7 @@ test("pomiar tarcia: biuro bez rozbicia na osoby, administrator z nim", async ()
 });
 
 test("pomiary pod decyzje: cztery sekcje dla biura, bez ludzi i bez zapisu przy odczycie", async () => {
-  /* 26 września 2026, @wydanie. Okno cofnięcia, tarcie przy szkicu,
+  /* 26 września 2026, 0.532.0. Okno cofnięcia, tarcie przy szkicu,
      gotowość per klasa i pominięcia to liczby o SKRZYNCE, nie o osobach —
      więc biuro dostaje je w całości, a odczyt niczego nie dopisuje. */
   const t = zalogowany("biuro");

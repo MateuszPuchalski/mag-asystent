@@ -46,7 +46,7 @@ describe("PomiarCopilota", () => {
     expect(screen.getByText("6 z 8 · 75 % (41–93 %)")).toBeInTheDocument();
   });
 
-  /* Czas czekania na Copilota (@wydanie): jedno zdanie o szkicu na wierzchu,
+  /* Czas czekania na Copilota (0.532.0): jedno zdanie o szkicu na wierzchu,
      tabela po zadaniu w szczegółach, nazwy zadań po ludzku. */
   it("podaje czas czekania: zdanie o szkicu na wierzchu, mediana i p90 zadań w szczegółach", () => {
     render(<PomiarCopilota dane={dane({ wgZadania: [

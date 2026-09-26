@@ -481,7 +481,7 @@ export function useWyslij() {
  */
 export function zglosCofnietaWysylke(id: number, msOdKolejki?: number): void {
   /* Bez czasu — bez ciała, bo pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`.
-     Z czasem (@wydanie) — ms od odłożenia wysyłki do „Cofnij", do pytania
+     Z czasem (0.532.0) — ms od odłożenia wysyłki do „Cofnij", do pytania
      właściciela, czy dziesięć sekund to za długo. Serwer przycina liczbę. */
   /* `method` jako pierwsze pole literału, nie w gałęzi warunku: strażnik
      tras w `routes/skrzynka.test.ts` czyta metodę ze źródła tego pliku. */

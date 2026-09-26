@@ -29,7 +29,7 @@ import { KATEGORIE, TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
    niczego nie zapisuje. Rozbicie na osoby to monitoring pracowniczy, więc
    czyta je wyłącznie administrator (0.431.0) — pilnuje tego trasa.
 
-   ── Pomiary pod decyzje (26 września 2026, @wydanie) ─────────────────────
+   ── Pomiary pod decyzje (26 września 2026, 0.532.0) ─────────────────────
    Właściciel chce rozstrzygać politykę skrzynki danymi, nie przekonaniem.
    Cztery pytania, każde z własną sekcją odpowiedzi:
 
@@ -394,7 +394,7 @@ export function pomiarTarcia(
  *
  * Porównanie mierzy CAŁE wydanie 0.500.0, nie samo tarcie: to samo wydanie
  * zmieniło napisy przycisków, a 0.499.0 dzień wcześniej wstawiło szkic do
- * pola. Karta mówi to przy liczbie. Twierdzeń sprzed @wydanie nie znamy,
+ * pola. Karta mówi to przy liczbie. Twierdzeń sprzed 0.532.0 nie znamy,
  * więc rozbicia „z twierdzeniami" przed granicą nie ma i być nie może.
  */
 function przedIPo(database: DatabaseSync): TarcieSzkicu["przedPo"] {
@@ -448,7 +448,7 @@ export function czasCofniecia(v: unknown): number | null {
  * Agent zawrócił odpowiedź w oknie „Cofnij" (0.500.0). Czekanie mieszka
  * w przeglądarce (`skrzynka/Odlozone.tsx`), więc bez tego wpisu serwer
  * nigdy by się o cofnięciu nie dowiedział. To jedyny zapis tej ścieżki.
- * Od @wydanie wpis niesie też czas cofnięcia — pytanie (a) w nagłówku.
+ * Od 0.532.0 wpis niesie też czas cofnięcia — pytanie (a) w nagłówku.
  */
 export function zapiszCofniecieWysylki(
   database: DatabaseSync, conversationId: number, autor: { id: number; name: string },
