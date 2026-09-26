@@ -2899,6 +2899,13 @@ czyta teraz katalogi producentów w PDF i szuka wyłącznie po numerach OEM.
 Najpierw bierze kartoteki, o które pytają klienci i które wracają jako
 „nie pasuje”.
 
+Noc i przyciski zaczynają od listy 37 popularnych silników. Dla każdego
+automat czyta wykaz części i sam szuka w nim naszych numerów OEM. Jeden
+wykaz daje propozycje dla wielu kartotek naraz; w Kolejce stoją one kartą
+silnika. Silnik wraca po 90 dniach. Wykaz części czyta się dłużej niż
+stronę produktu, więc jeden silnik kosztuje więcej niż jedna kartoteka.
+Za to zwykle zastępuje dziesiątki osobnych wyszukiwań.
+
 ### Aktualizacja do 0.508.0 — pasowanie z sieci na żądanie
 
 **Panel trzeba przebudować.** Migracji nie ma.

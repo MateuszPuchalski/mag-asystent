@@ -45,6 +45,8 @@ let ZAMIENNOSCI: KandydatZamiennosci[] = [];
 let WIEDZA: unknown = undefined;
 let WYKAZY: import("../api/typy").PrzegladWykazu[] = [];
 let Z_SIECI: import("../api/typy").PrzegladZSieci[] = [];
+let Z_SILNIKOW: import("../api/typy").PrzegladWykazu[] = [];
+const zatwierdzOdSilnika = vi.fn();
 const zatwierdzZWykazu = vi.fn();
 const zatwierdzZSieci = vi.fn();
 const rozstrzygnijZamiennosc = vi.fn();
@@ -59,10 +61,11 @@ vi.mock("../api/wiedza", async () => {
     ...rzeczywisty,
     useKolejkaWiedzy: () => ({ data: { propozycje: LISTA, liczba: LISTA.length,
       pasowania: PASOWANIA, pasowanDoRozstrzygniecia: PASOWANIA.length,
-      zamiennosciOem: ZAMIENNOSCI, zamiennosciOemDoRozstrzygniecia: ZAMIENNOSCI.length, wykazy: WYKAZY, zSieci: Z_SIECI },
+      zamiennosciOem: ZAMIENNOSCI, zamiennosciOemDoRozstrzygniecia: ZAMIENNOSCI.length, wykazy: WYKAZY, zSieci: Z_SIECI, zSilnikow: Z_SILNIKOW },
     isLoading: false, error: null }),
     useZatwierdzZWykazu: () => ({ mutate: zatwierdzZWykazu, isPending: false }),
     useZatwierdzZSieci: () => ({ mutate: zatwierdzZSieci, isPending: false }),
+    useZatwierdzOdSilnika: () => ({ mutate: zatwierdzOdSilnika, isPending: false }),
     useRozstrzygnijZamiennosc: () => ({ mutate: rozstrzygnijZamiennosc, isPending: false }),
     useWycofajZamiennosc: () => ({ mutate: wycofajZamiennosc, isPending: false, error: null }),
     useRozstrzygnijZastosowanie: () => ({ mutate: rozstrzygnij, isPending: false }),
@@ -113,7 +116,7 @@ beforeEach(() => {
   rozstrzygnij.mockReset(); rozstrzygnijPasowanie.mockReset(); zaproponuj.mockReset();
   rozstrzygnijZamiennosc.mockReset(); wycofajZamiennosc.mockReset(); zatwierdzZWykazu.mockReset();
   zatwierdzZSieci.mockReset();
-  LISTA = []; PASOWANIA = []; ZAMIENNOSCI = []; WIEDZA = undefined; WYKAZY = []; Z_SIECI = [];
+  LISTA = []; PASOWANIA = []; ZAMIENNOSCI = []; WIEDZA = undefined; WYKAZY = []; Z_SIECI = []; Z_SILNIKOW = []; zatwierdzOdSilnika.mockReset();
 });
 
 describe("Ekran wiedzy", () => {
@@ -301,6 +304,20 @@ describe("Ekran wiedzy", () => {
     await userEvent.click(within(lista).getByRole("checkbox", { name: "Zatwierdź: 09-05001 → Stihl MS 230" }));
     await userEvent.click(within(lista).getByRole("button", { name: /Zatwierdź zaznaczone \(1\)/ }));
     expect(zatwierdzZSieci).toHaveBeenCalledWith({ twId: 91, ids: [31] }, expect.anything());
+  });
+
+  /* Tryb „od silnika” (@wydanie): karta na silnik, przegląd jak wykaz, link na wierszu. */
+  it("propozycje od silnika stoją kartą silnika z listą naszych części i linkiem źródła", async () => {
+    LISTA = [propozycja({ id: 41, symbol: "W12-001" }), propozycja({ id: 3 })];
+    Z_SILNIKOW = [{ id: 7, zrodlo: "silnik Honda GCV160 — wykazy części z sieci", link: null, rodzaj: "silnik", pozycje: [
+      { id: 41, twId: 901, symbol: "W12-001", nazwa: "Filtr powietrza", maszyna: "silnik Honda GCV160", warunki: null,
+        dowod: "„…17211-ZL8-023 ELEMENT, AIR CLEANER…” — numer 17211-ZL8-023", link: "https://producent.example.com/ipl.pdf" }] }];
+    pokaz();
+    const lista = screen.getByRole("region", { name: "Wykaz: silnik Honda GCV160 — wykazy części z sieci" });
+    expect(within(lista).getByRole("link", { name: "źródło" })).toHaveAttribute("href", "https://producent.example.com/ipl.pdf");
+    expect(screen.queryByRole("article", { name: /Propozycja: W12-001/ })).toBeNull();
+    await userEvent.click(within(lista).getByRole("button", { name: /Zatwierdź zaznaczone \(1\)/ }));
+    expect(zatwierdzOdSilnika).toHaveBeenCalledWith({ modelId: 7, ids: [41] }, expect.anything());
   });
 
   it("odrzucenie wiersza z wykazu wymaga powodu i idzie zwykłą decyzją o propozycji", async () => {

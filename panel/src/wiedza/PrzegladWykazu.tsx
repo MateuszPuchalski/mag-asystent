@@ -57,7 +57,8 @@ export function PrzegladWykazu({ w, trwa, onZatwierdz, onOdrzuc }: {
         <Kafel twId={p.twId} rozmiar={40} nazwa={p.nazwa ?? p.symbol} symbol={p.symbol} />
         <div className="min-w-0 flex-1 text-sm">
           <p><b className="font-mono">{p.symbol}</b>{p.nazwa && <span> {p.nazwa}</span>}</p>
-          <p className="text-slate-600">{p.dowod}</p>
+          <p className="text-slate-600">{p.dowod}
+            {p.link && <a className="ml-2 text-xs underline" href={p.link} target="_blank" rel="noreferrer">źródło</a>}</p>
           {p.warunki && <p className="text-amber-900"><b>Tylko:</b> {p.warunki}</p>}
           {odrzucam === p.id && <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg bg-red-50 p-2">
             <label className="block flex-1 text-xs font-bold text-slate-600">

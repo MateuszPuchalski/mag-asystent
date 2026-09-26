@@ -135,6 +135,11 @@ export function PasowanieZSieci() {
       Czeka na sprawdzenie: <b>{ile(s.doSprawdzenia, "kartoteka", "kartoteki", "kartotek")}</b>
       {" "}· <span title="Wspólny z przebiegiem nocnym: ręczne sprawdzenia zużywają ten sam limit.">
         w limicie zostało <b>{zostalo}</b> z {s.naNoc}</span></p>}
+    {/* Postęp listy popularnych silników (@wydanie). Silniki idą PIERWSZE, bo
+        jeden wykaz silnika dopasowuje dziesiątki kartotek naraz. */}
+    {s?.silniki && s.silniki.doSprawdzenia > 0 && <p className="text-sm text-slate-600" aria-label="Popularne silniki">
+      Najpierw popularne silniki: czeka {s.silniki.doSprawdzenia} z {s.silniki.razem}. Jeden wykaz części silnika
+      dopasowuje wiele naszych kartotek naraz.</p>}
     {s?.niegotowy && <p className="rounded-lg bg-slate-50 p-2 text-sm text-slate-700" role="note">{s.niegotowy}</p>}
     <div className="flex flex-wrap items-center gap-2">
       {!trwa

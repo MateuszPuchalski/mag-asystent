@@ -46,6 +46,8 @@ export function useKolejkaWiedzy() {
       wykazy?: PrzegladWykazu[];
       /** Propozycje automatu z sieci po kartotece (@wydanie). Brak = starszy serwer. */
       zSieci?: PrzegladZSieci[];
+      /** Propozycje trybu „od silnika”, jedna karta na silnik (@wydanie). */
+      zSilnikow?: PrzegladWykazu[];
     }>(`/api/obsluga/wiedza/kolejka`),
     refetchInterval: 30_000,
   });
@@ -409,6 +411,17 @@ export function useSprawdzZSieci() {
 }
 
 /** Zatwierdzenie listą — identyfikatory, które człowiek zostawił zaznaczone. */
+/** Zatwierdzenie listą propozycji trybu „od silnika” dla jednego silnika (@wydanie). */
+export function useZatwierdzOdSilnika() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { modelId: number; ids: number[] }) =>
+      api<{ zatwierdzono: number; pominieto: number }>(`/api/obsluga/wiedza/pasowanie-z-sieci/silnik/${v.modelId}/zatwierdz`,
+        { method: "POST", body: JSON.stringify({ ids: v.ids }) }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
 /** Zatwierdzenie listą propozycji z sieci dla jednej kartoteki (@wydanie). */
 export function useZatwierdzZSieci() {
   const qc = useQueryClient();

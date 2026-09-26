@@ -10,6 +10,7 @@ import {
 } from "./wiedza.js";
 import { BladKluczaCopilota, BladLimituCopilota, BladPrzeciazeniaCopilota } from "../adapters/copilot.js";
 import { tekstyPdf, type CzytnikPdf } from "./pdf-tekst.js";
+import { sprawdzWarunki } from "./warunki-zastosowania.js";
 
 /* ── Pasowanie z sieci: nocny automat uzupełnia luki wiedzy (0.507.0) ───────
 
@@ -85,6 +86,13 @@ export interface ZnaleziskoSurowe {
   /** Dosłowny fragment strony, na którym znalezisko stoi. */
   cytat: string;
   zrodloStrony: ZrodloStrony;
+  /* Warunki (@wydanie): roczniki i zakres numerów seryjnych, gdy strona je
+     podaje. Bez nich „pasuje do MS 250" jest za szerokie dla części, która
+     zmieniła się w trakcie produkcji. Każdy musi stać w cytacie — patrz sito. */
+  rokOd: number | null;
+  rokDo: number | null;
+  seryjnyOd: string | null;
+  seryjnyDo: string | null;
 }
 
 export interface WynikSieci {
@@ -103,9 +111,10 @@ export type NadawcaPasowaniaSieci = (z: ZapytanieOPasowanie) => Promise<WynikSie
 
 export type PowodOdrzucenia =
   | "zly_adres" | "allegro" | "strona_nieprzeczytana" | "cytat_spoza_strony"
-  | "model_spoza_cytatu" | "marka_spoza_strony" | "numer_spoza_strony" | "za_krotki_model";
+  | "model_spoza_cytatu" | "marka_spoza_strony" | "numer_spoza_strony" | "za_krotki_model"
+  | "warunek_spoza_cytatu" | "zle_warunki";
 
-const host = (url: string): string | null => {
+export const host = (url: string): string | null => {
   try {
     const u = new URL(url);
     return u.protocol === "https:" || u.protocol === "http:" ? u.hostname : null;
@@ -116,7 +125,7 @@ const host = (url: string): string | null => {
 
 /* Adres porównujemy bez kotwicy i końcowego ukośnika: model cytuje adres
    tak, jak go podał w `web_fetch`, a serwer oddaje go czasem znormalizowany. */
-const bezOgona = (url: string) => url.replace(/#.*$/, "").replace(/\/+$/, "").toLowerCase();
+export const bezOgona = (url: string) => url.replace(/#.*$/, "").replace(/\/+$/, "").toLowerCase();
 
 /**
  * Sito jednego znaleziska. Czyste — żadnego zapisu, żadnej sieci. Zwraca
@@ -134,12 +143,25 @@ export function sprawdzZnalezisko(
   const cytat = zwin(z.cytat);
   if (!cytat || !tekst.includes(cytat)) return "cytat_spoza_strony";
   const model = zwin(z.model);
-  /* Oznaczenie krótsze niż trzy znaki („25") trafia w każdą liczbę na stronie. */
-  if (model.length < 3) return "za_krotki_model";
-  if (!cytat.includes(model)) return "model_spoza_cytatu";
   const marka = zwin(z.marka);
+  /* Oznaczenie krótsze niż trzy znaki („25") samo trafia w każdą liczbę na
+     stronie. Od @wydanie przechodzi, gdy w cytacie stoi TUŻ ZA MARKĄ
+     („Stihl 025” → „stihl025”): wtedy to oznaczenie, nie przypadkowa liczba.
+     Pierwszy dzień na żywo odrzucił tak pięć znalezisk na piętnaście. */
+  if (model.length < 3) {
+    if (!model || !marka || !cytat.includes(marka + model)) return "za_krotki_model";
+  } else if (!cytat.includes(model)) return "model_spoza_cytatu";
   if (!marka || !(cytat.includes(marka) || tekst.includes(marka))) return "marka_spoza_strony";
   if (!numery.some((n) => zwin(n).length >= 4 && tekst.includes(zwin(n)))) return "numer_spoza_strony";
+  /* Warunek, którego nie ma w cytacie, jest zgadnięty — a zgadnięty rocznik
+     zawęża pasowanie tam, gdzie strona go nie zawęża, albo odwrotnie. */
+  const wCytacie = [z.rokOd, z.rokDo, z.seryjnyOd, z.seryjnyDo].filter((w) => w !== null && w !== undefined);
+  if (wCytacie.some((w) => !cytat.includes(zwin(String(w))))) return "warunek_spoza_cytatu";
+  try {
+    sprawdzWarunki({ rokOd: z.rokOd, rokDo: z.rokDo, seryjnyOd: z.seryjnyOd, seryjnyDo: z.seryjnyDo });
+  } catch {
+    return "zle_warunki";
+  }
   return null;
 }
 
@@ -165,10 +187,17 @@ export interface Kandydat {
   twId: number;
   symbol: string;
   nazwa: string;
+  /** Numery do WYSZUKIWARKI: własne OEM i oryginalne, najwyżej pięć. */
   numery: string[];
+  /** Numery do SITA: szerzej — patrz `numery_sita` w zapytaniu (@wydanie). */
+  numerySita: string[];
   /** Waga popytu z `POPYT` — do kolejności i do testu, nie na ekran. */
   popyt: number;
 }
+
+/** Lista z `group_concat(..., char(31))` — bez pustych i bez powtórzeń. */
+const lista = (s: string | null) =>
+  [...new Set(String(s ?? "").split("\u001f").map((n) => n.trim()).filter(Boolean))];
 
 /* ── Kolejność: najpierw to, o co pytają klienci (@wydanie) ──────────────────
    Do tego wydania kolejność brzmiała „ma ofertę, potem numer kartoteki”.
@@ -245,6 +274,15 @@ export function kandydaciDoSieci(
     SELECT t.tw_id, t.symbol, t.nazwa,
         (SELECT group_concat(i.wartosc, char(31)) FROM towar_identyfikator i
           WHERE i.tw_id=t.tw_id AND i.rodzaj IN ('oem','nr_oryg')) AS numery,
+        /* Numery, którymi strona może POTWIERDZIĆ tę część (@wydanie): własne,
+           z obcych katalogów i zatwierdzonych zamienników OEM. Strona często
+           podaje nowszy numer zamiennika, a nie ten z naszej kartoteki —
+           a zamienność zatwierdził już człowiek. */
+        (SELECT group_concat(i.wartosc, char(31)) FROM towar_identyfikator i
+          WHERE i.rodzaj IN ('oem','nr_oryg','katalog_obcy')
+            AND (i.tw_id=t.tw_id OR i.tw_id IN (
+              SELECT CASE WHEN zo.tw_a=t.tw_id THEN zo.tw_b ELSE zo.tw_a END FROM zamiennosc_oem zo
+               WHERE (zo.tw_a=t.tw_id OR zo.tw_b=t.tw_id) AND zo.stan='zatwierdzone'))) AS numery_sita,
         5 * COALESCE(zw.n, 0) + 3 * COALESCE(d.n, 0) + 2 * COALESCE(r.n, 0) + MIN(COALESCE(s.n, 0), 20) AS popyt
       FROM sgt_towar t
       LEFT JOIN zwroty zw ON zw.tw_id = t.tw_id
@@ -254,17 +292,20 @@ export function kandydaciDoSieci(
      WHERE ${WARUNEK_KANDYDATA}
      ORDER BY popyt DESC, EXISTS (SELECT 1 FROM oferta_kartoteka k WHERE k.tw_id=t.tw_id) DESC, t.tw_id
      LIMIT ?`).all(odSprzedazy, odKiedy, poBledzie, limit) as
-    Array<{ tw_id: number; symbol: string; nazwa: string; numery: string | null; popyt: number }>;
+    Array<{ tw_id: number; symbol: string; nazwa: string; numery: string | null; numery_sita: string | null; popyt: number }>;
   return wiersze.map((w) => ({
     twId: Number(w.tw_id), symbol: w.symbol, nazwa: w.nazwa, popyt: Number(w.popyt),
-    numery: [...new Set(String(w.numery ?? "").split("\u001f").map((n) => n.trim()).filter(Boolean))].slice(0, 5),
+    numery: lista(w.numery).slice(0, 5),
+    numerySita: lista(w.numery_sita),
   }));
 }
 
 /** Ile kartotek sprawdzono w ostatniej nocy — z księgi, więc restart nie zeruje. */
 export function sprawdzonychTejNocy(teraz = new Date(), database: DatabaseSync = db()): number {
   const od = new Date(teraz.getTime() - OKNO_NOCY_MS).toISOString();
-  return (database.prepare(`SELECT count(*) n FROM copilot_wywolanie WHERE zadanie='pasowanie_siec' AND at >= ?`)
+  /* Oba tryby (@wydanie) — część i silnik — ciągną z jednego limitu. */
+  return (database.prepare(`SELECT count(*) n FROM copilot_wywolanie
+      WHERE zadanie IN ('pasowanie_siec','pasowanie_siec_silnik') AND at >= ?`)
     .get(od) as { n: number }).n;
 }
 
@@ -322,7 +363,7 @@ export async function szukajPasowaniaWSieci(deps: {
     const odrzucone: Partial<Record<PowodOdrzucenia, number>> = {};
     let zaproponowano = 0;
     for (const z of odp.znaleziska.slice(0, SUFIT_ZNALEZISK)) {
-      const powod = sprawdzZnalezisko(z, strony, k.numery);
+      const powod = sprawdzZnalezisko(z, strony, k.numerySita);
       if (powod) {
         odrzucone[powod] = (odrzucone[powod] ?? 0) + 1;
         continue;
@@ -331,6 +372,7 @@ export async function szukajPasowaniaWSieci(deps: {
         const p = zaproponujZastosowanie({
           twId: k.twId,
           model: { rodzaj: z.rodzaj, marka: z.marka.trim(), nazwa: z.model.trim(), wariant: z.wariant?.trim() || null },
+          warunki: { rokOd: z.rokOd ?? null, rokDo: z.rokDo ?? null, seryjnyOd: z.seryjnyOd ?? null, seryjnyDo: z.seryjnyDo ?? null },
           polaryzacja: "pasuje",
           zrodlo: "copilot",
           komentarz: `Automat nocny znalazł to w sieci (${OPIS_ZRODLA[z.zrodloStrony]}). Sprawdź stronę przed zatwierdzeniem.`,

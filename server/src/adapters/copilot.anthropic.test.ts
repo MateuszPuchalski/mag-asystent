@@ -320,6 +320,7 @@ test("pasowanie z sieci: Allegro zablokowane w wyszukiwarce i w pobieraniu, stro
   const wynik = JSON.stringify({ znaleziska: [{
     rodzaj: "maszyna", marka: "Stihl", model: "MS 250", wariant: null,
     url: "https://czesci.example.com/a", cytat: "Stihl MS 250", zrodloStrony: "sklep",
+    rokOd: null, rokDo: null, seryjnyOd: null, seryjnyDo: null,
   }] });
   const uzycie = (wysz: number) => ({ ...zuzycieRundy, server_tool_use: { web_search_requests: wysz, web_fetch_requests: 1 } });
   const zadania = klientSekwencja([

@@ -4,7 +4,7 @@ import {
   useKolejkaWiedzy, useModeleZOpisow, useRozstrzygnijPasowanie, useRozstrzygnijZamiennosc,
   useRozstrzygnijZastosowanie, useSilniki,
   useTokenySilnikow,
-  useZaproponujZastosowanie, useZatwierdzZSieci, useZatwierdzZWykazu,
+  useZaproponujZastosowanie, useZatwierdzOdSilnika, useZatwierdzZSieci, useZatwierdzZWykazu,
 } from "../api/wiedza";
 import { PrzegladWykazu } from "../wiedza/PrzegladWykazu";
 import { PrzegladZSieci } from "../wiedza/PrzegladZSieci";
@@ -49,6 +49,7 @@ export function Wiedza() {
   const zaproponuj = useZaproponujZastosowanie();
   const zatwierdzZWykazu = useZatwierdzZWykazu();
   const zatwierdzZSieci = useZatwierdzZSieci();
+  const zatwierdzOdSilnika = useZatwierdzOdSilnika();
   const [widok, setWidok] = useState<Widok>("kolejka");
   const [blad, setBlad] = useState("");
   const [wyslano, setWyslano] = useState("");
@@ -62,8 +63,11 @@ export function Wiedza() {
   /* Propozycje automatu z sieci (@wydanie) — ta sama zasada: przegląd listą
      po kartotece, a pojedyncza karta tylko dla reszty. */
   const przegladySieci = kolejka.data?.zSieci ?? [];
+  /* Tryb „od silnika” (@wydanie): karta na silnik, tym samym przeglądem co wykaz. */
+  const przegladySilnikow = kolejka.data?.zSilnikow ?? [];
   const wPrzegladzie = new Set([...wykazy.flatMap((w) => w.pozycje.map((p) => p.id)),
-    ...przegladySieci.flatMap((g) => g.pozycje.map((p) => p.id))]);
+    ...przegladySieci.flatMap((g) => g.pozycje.map((p) => p.id)),
+    ...przegladySilnikow.flatMap((g) => g.pozycje.map((p) => p.id))]);
   const propozycje = (kolejka.data?.propozycje ?? []).filter((z) => !wPrzegladzie.has(z.id));
   const pasowania = kolejka.data?.pasowania ?? [];
   const zamiennosci = kolejka.data?.zamiennosciOem ?? [];
@@ -114,6 +118,7 @@ export function Wiedza() {
 
         {widok === "kolejka" && <>
           {!kolejka.isLoading && propozycje.length === 0 && wykazy.length === 0 && przegladySieci.length === 0
+            && przegladySilnikow.length === 0
             && pasowania.length === 0 && zamiennosci.length === 0 &&
             <Pusto ikona={BookMarked}>
               Nic nie czeka. Propozycje biorą się z zatwierdzonych doborów, z pomiarów hali i z ręcznych wpisów.
@@ -125,6 +130,19 @@ export function Wiedza() {
                 zatwierdzZWykazu.mutate({ importId: w.id, ids }, {
                   onSuccess: (r) => setWyslano(`Zatwierdzono ${ile(r.zatwierdzono, "propozycję", "propozycje", "propozycji")}`
                     + ` z wykazu „${w.zrodlo}”.`
+                    + (r.pominieto > 0 ? ` ${r.pominieto} rozstrzygnął w międzyczasie ktoś inny — tych lista nie ruszyła.` : "")),
+                  onError: (e) => setBlad((e as Error).message),
+                }); }}
+              onOdrzuc={(id, powod) => { setBlad("");
+                rozstrzygnij.mutate({ id, decyzja: "odrzuc", powod }, { onError: (e) => setBlad((e as Error).message) }); }} />)}
+          </div>}
+          {przegladySilnikow.length > 0 && <div className="mb-3 space-y-3">
+            {przegladySilnikow.map((w) => <PrzegladWykazu key={`silnik-${w.id}`} w={w}
+              trwa={zatwierdzOdSilnika.isPending || rozstrzygnij.isPending}
+              onZatwierdz={(ids) => { setBlad(""); setWyslano("");
+                zatwierdzOdSilnika.mutate({ modelId: w.id, ids }, {
+                  onSuccess: (r) => setWyslano(`Zatwierdzono ${ile(r.zatwierdzono, "część", "części", "części")}`
+                    + ` dla ${w.zrodlo.split(" — ")[0]}.`
                     + (r.pominieto > 0 ? ` ${r.pominieto} rozstrzygnął w międzyczasie ktoś inny — tych lista nie ruszyła.` : "")),
                   onError: (e) => setBlad((e as Error).message),
                 }); }}

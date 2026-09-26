@@ -62,7 +62,8 @@ beforeEach(() => {
 
 const znalezisko = (n: Partial<import("./pasowanie-z-sieci.js").ZnaleziskoSurowe> = {}) => ({
   rodzaj: "maszyna" as const, marka: "Stihl", model: "MS 250", wariant: null,
-  url: STRONA, cytat: "Pasuje do: Stihl MS 250, MS 230", zrodloStrony: "katalog_dostawcy" as const, ...n,
+  url: STRONA, cytat: "Pasuje do: Stihl MS 250, MS 230", zrodloStrony: "katalog_dostawcy" as const,
+  rokOd: null, rokDo: null, seryjnyOd: null, seryjnyDo: null, ...n,
 });
 const STRONY = [{ url: STRONA, tekst: TEKST }];
 const NUMERY = ["1123 120 0650"];
@@ -250,4 +251,52 @@ test("przegląd listą: propozycje automatu po kartotece; zatwierdzenie bierze t
   const stan = (id: number) => (d.prepare("SELECT stan FROM zastosowanie WHERE id=?").get(id) as { stan: string }).stan;
   assert.equal(stan(pierwsza!.id), "zatwierdzone");
   assert.equal(stan(druga!.id), "propozycja", "niezaznaczone czeka dalej — to nie jest odrzucenie");
+});
+
+/* ── Łagodniejsze sito i warunki (@wydanie) ──────────────────────────────────
+   Pierwszy dzień na żywo odrzucił pięć znalezisk na piętnaście jako „za
+   krótkie oznaczenie”, a jedną kartotekę w całości jako „naszego numeru nie
+   ma na stronie”. Sito przepuszcza teraz krótkie oznaczenie tuż za marką
+   i numer zatwierdzonego zamiennika — i pilnuje, żeby rocznik stał w cytacie. */
+
+const STRONA2 = "https://katalog.example.com/stihl-025";
+const TEKST2 = "Gaźnik 1123 120 0650 do Stihl 025 od 2004 do 2010, seria od 170000000.";
+
+test("krótkie oznaczenie przechodzi, gdy w cytacie stoi tuż za marką", () => {
+  const s = [{ url: STRONA2, tekst: TEKST2 }];
+  assert.equal(S.sprawdzZnalezisko(znalezisko({ url: STRONA2, model: "025", cytat: "do Stihl 025" }), s, NUMERY), null);
+  assert.equal(S.sprawdzZnalezisko(znalezisko({ url: STRONA2, model: "25", cytat: "do Stihl 025" }), s, NUMERY),
+    "za_krotki_model", "„25” nie stoi tuż za marką — to cyfry z „025”, nie oznaczenie");
+});
+
+test("warunki muszą stać w cytacie, a zły zakres odpada", () => {
+  const s = [{ url: STRONA2, tekst: TEKST2 }];
+  const baza = { url: STRONA2, model: "025", cytat: "do Stihl 025 od 2004 do 2010, seria od 170000000" };
+  assert.equal(S.sprawdzZnalezisko(znalezisko({ ...baza, rokOd: 2004, rokDo: 2010, seryjnyOd: "170000000" }), s, NUMERY), null);
+  assert.equal(S.sprawdzZnalezisko(znalezisko({ ...baza, rokOd: 2012 }), s, NUMERY), "warunek_spoza_cytatu",
+    "zgadnięty rocznik zawężałby pasowanie tam, gdzie strona go nie zawęża");
+  assert.equal(S.sprawdzZnalezisko(znalezisko({ ...baza, rokOd: 2010, rokDo: 2004 }), s, NUMERY), "zle_warunki");
+});
+
+test("warunki z cytatu trafiają do propozycji, a numer zamiennika OEM potwierdza stronę", async () => {
+  const d = db();
+  /* Zamiennik z zatwierdzoną zamiennością: strona podaje JEGO numer, nie nasz. */
+  d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (805,'GAZ-ZAM','Gaźnik zamiennik')").run();
+  d.prepare(`INSERT OR IGNORE INTO towar_identyfikator(tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,at)
+    VALUES (805,'GAZ-ZAM','oem','4134 120 0600','41341200600','opis','import','2026-09-01T00:00:00Z')`).run();
+  d.prepare("DELETE FROM zamiennosc_oem").run();
+  d.prepare(`INSERT INTO zamiennosc_oem(tw_a,tw_a_symbol,tw_b,tw_b_symbol,stan,numery,rozstrzygnal,rozstrzygnieto_at)
+    VALUES (?,'GAZ-MS250',?,'GAZ-ZAM','zatwierdzone','[]','test','2026-09-01T00:00:00Z')`).run(GAZNIK, 805);
+  const TEKST3 = "Carburetor 4134 120 0600 fits Stihl MS 250 (2004-2010).";
+  const STRONA3 = "https://katalog.example.com/4134";
+  const nadaj: import("./pasowanie-z-sieci.js").NadawcaPasowaniaSieci = async () => ({
+    znaleziska: [znalezisko({ url: STRONA3, cytat: "fits Stihl MS 250 (2004-2010)", rokOd: 2004, rokDo: 2010 })],
+    strony: [{ url: STRONA3, tekst: TEKST3 }], pdfy: [],
+    wyszukiwan: 1, model: "claude-opus-5", zuzycie: { wej: 10, wyj: 1, cacheZapis: 0, cacheOdczyt: 0 }, ms: 1,
+  });
+  const w = await S.szukajPasowaniaWSieci({ nadaj, naNoc: 10, naPrzebieg: 1, teraz: () => TERAZ });
+  assert.equal(w.zaproponowano, 1, "numer zatwierdzonego zamiennika wystarcza za nasz");
+  const z = d.prepare("SELECT rok_od, rok_do FROM zastosowanie WHERE tw_id=? AND stan='propozycja'").get(GAZNIK) as
+    { rok_od: number; rok_do: number };
+  assert.deepEqual({ ...z }, { rok_od: 2004, rok_do: 2010 });
 });
