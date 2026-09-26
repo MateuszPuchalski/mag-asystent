@@ -153,7 +153,7 @@ describe("Ustawienia w panelu", () => {
     expect(tytuly).toEqual(["Dane firmy do protokołów", "Reguły strefy złotej", "Konta i sesje", "Nowy kolektor",
       "Tagi spraw", "Logo dostawców",
       "Konfiguracja serwera", "Aktualizacja serwera"]);
-    /* Zdania o innych ekranach i o dawnym wydaniu zeszły (@wydanie). */
+    /* Zdania o innych ekranach i o dawnym wydaniu zeszły (0.521.0). */
     expect(screen.queryByText(/Pomiary obsługi są w Analizie/)).toBeNull();
     expect(screen.queryByText(/0\.87\.0/)).toBeNull();
   });
@@ -189,7 +189,7 @@ describe("Ustawienia w panelu", () => {
   it("zapis danych firmy wysyła komplet sześciu pól", async () => {
     pokaz();
     const k = await waitFor(() => karta("Dane firmy do protokołów"));
-    /* Formularz stoi za „Zmień" (@wydanie) — na wierzchu jest odczyt. */
+    /* Formularz stoi za „Zmień" (0.521.0) — na wierzchu jest odczyt. */
     await userEvent.click(await within(k).findByRole("button", { name: "Zmień" }));
     await userEvent.type(within(k).getByRole("textbox", { name: "Miejscowość" }), "Kraków");
     await userEvent.click(within(k).getByRole("button", { name: "Zapisz" }));
@@ -310,7 +310,7 @@ describe("Ustawienia w panelu", () => {
   it("nowy kolektor: kod do APK z adresu serwera, nie z paska przeglądarki", async () => {
     pokaz();
     const k = await waitFor(() => karta("Nowy kolektor"));
-    /* Kod stoi za „Pokaż kod" (@wydanie); adres jest na wierzchu od razu. */
+    /* Kod stoi za „Pokaż kod" (0.521.0); adres jest na wierzchu od razu. */
     await userEvent.click(await within(k).findByRole("button", { name: /Pokaż kod/ }));
     expect(await within(k).findByRole("img", { name: "Kod QR: http://192.168.1.49:3001/api/aktualizacja/apk" }))
       .toBeInTheDocument();
@@ -347,7 +347,7 @@ describe("Ustawienia w panelu", () => {
     const linia = (await within(k).findByText(/Automatycznie:/)).closest("p") as HTMLElement;
     expect(linia.textContent).toMatch(/w nocy 3:00–5:00, wydanie starsze niż 6 h\./);
     expect(linia.textContent).toMatch(/0\.494\.0 wymaga działania/);
-    /* Nazwa zmiennej nie stoi w zdaniu (@wydanie) — tylko w dymku. */
+    /* Nazwa zmiennej nie stoi w zdaniu (0.521.0) — tylko w dymku. */
     expect(linia.textContent).not.toMatch(/AKTUALIZACJA_AUTO/);
     expect(within(linia).getByTitle("Klucz AKTUALIZACJA_AUTO")).toHaveTextContent("konfiguracji serwera");
     expect(wyslane).toEqual([]);
@@ -490,7 +490,7 @@ describe("Ustawienia w panelu", () => {
     pokaz();
     await screen.findByText("Jan Wrona");
     const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
-    /* Wiersz na wierzchu niesie jeden przycisk, nie trzy (@wydanie). */
+    /* Wiersz na wierzchu niesie jeden przycisk, nie trzy (0.521.0). */
     expect(within(wiersz).getAllByRole("button").map((b) => b.getAttribute("aria-label")))
       .toEqual(["Czynności konta Jan Wrona"]);
     const menu = within(wiersz).getByRole("button", { name: "Czynności konta Jan Wrona" });
@@ -569,7 +569,7 @@ describe("Ustawienia w panelu", () => {
        dwudziestym pierwszym tagu byłaby ścianą w połowie czynności. */
     pokaz();
     await screen.findByText("stary tag");
-    /* Karta tej samej rangi co sąsiednie (@wydanie): nagłówek i przyciski. */
+    /* Karta tej samej rangi co sąsiednie (0.521.0): nagłówek i przyciski. */
     expect(karta("Tagi spraw")).toBeInTheDocument();
     expect(within(karta("Tagi spraw")).getAllByRole("button", { name: "Zmień nazwę" })).toHaveLength(2);
     expect(screen.getByText("wyłączony")).toBeInTheDocument();

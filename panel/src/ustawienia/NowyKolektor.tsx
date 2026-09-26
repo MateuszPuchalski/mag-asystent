@@ -19,7 +19,7 @@ import { KartaWgladu } from "../ui/wglad";
    `SplashScreen.kt`). Aplikacja ma adres produkcyjny wbudowany; wpisuje się
    go tylko po przeprowadzce serwera, i do tego jest duży napis niżej.
 
-   KOD ZA PRZYCISKIEM (@wydanie). Kwadrat 192 px był największą rzeczą na
+   KOD ZA PRZYCISKIEM (0.521.0). Kwadrat 192 px był największą rzeczą na
    ekranie ustawień, a potrzebny jest raz na nowe urządzenie. Stoi jedno
    kliknięcie dalej; adres serwera zostaje na wierzchu, bo po niego sięga się
    częściej — przy każdej przeprowadzce i każdym „Nie widzę serwera". */

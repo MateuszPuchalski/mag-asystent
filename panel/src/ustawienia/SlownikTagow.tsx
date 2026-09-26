@@ -19,7 +19,7 @@ import { KartaWgladu } from "../ui/wglad";
    sprawie, byłaby ścianą w połowie czynności; licznik w tym miejscu mówi
    o niej wcześniej. Dekalog p. 6: ograniczenie jest tańsze od komunikatu.
 
-   KARTA JAK SĄSIEDNIE (@wydanie). Jako jedyna na ekranie miała gołą kartę,
+   KARTA JAK SĄSIEDNIE (0.521.0). Jako jedyna na ekranie miała gołą kartę,
    własny nagłówek i podkreślone napisy zamiast przycisków — inny kształt
    tej samej rangi kazał czytać, czy to coś innego. Teraz `KartaWgladu`
    i `Przycisk`, jak konta i logo obok. */

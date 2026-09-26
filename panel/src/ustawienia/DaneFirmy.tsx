@@ -20,7 +20,7 @@ import { KartaWgladu } from "../ui/wglad";
    klikać drugi raz, a różnicy między „przenieś" a „przenieś i zapisz" nikt
    nie szuka (dekalog pkt 1).
 
-   PODGLĄD, NIE FORMULARZ (@wydanie). Sześć otwartych pól na ekranie
+   PODGLĄD, NIE FORMULARZ (0.521.0). Sześć otwartych pól na ekranie
    „rzadko zmieniane" zapraszało do pisania przy każdym wejściu, a dane firmy
    zmieniają się raz na lata. Na wierzchu stoi odczyt; ten sam formularz
    otwiera „Zmień", jedno kliknięcie dalej. */

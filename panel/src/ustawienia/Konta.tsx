@@ -29,7 +29,7 @@ import { useOkienko } from "../skrzynka/MenuRozmowy";
    HASŁO W POLU `password`, nie w okienku przeglądarki. Biuro pytało przez
    `prompt()`, który pokazuje wpisywany tekst każdemu za plecami.
 
-   CZYNNOŚCI ZA „⋯" (@wydanie). Trzy przyciski w każdym wierszu dawały
+   CZYNNOŚCI ZA „⋯" (0.521.0). Trzy przyciski w każdym wierszu dawały
    tabelę, w której więcej było przycisków niż osób — a sięga się po nie
    przy zgubionym kolektorze albo zapomnianym haśle. Ta sama zasada co „⋯"
    rozmowy (0.506.0) i ten sam `useOkienko`: Escape i klik obok zamykają.
@@ -185,7 +185,7 @@ export function Konta({ admin, biuro = false }: { admin: boolean; biuro?: boolea
   const role: RolaKonta[] = admin ? ["magazynier", "biuro", "admin"] : biuro ? ["magazynier"] : [];
 
   return <KartaWgladu id="karta-konta" tytul="Konta i sesje"
-    /* Zdanie admina zeszło (@wydanie): opisywało przyciski, które schowały
+    /* Zdanie admina zeszło (0.521.0): opisywało przyciski, które schowały
        się za „⋯", a pytania przy Wyłącz i Wyloguj wszędzie mówią to samo
        w chwili decyzji. Biuro dalej słyszy, czego tu nie zrobi i dlaczego. */
     opis={admin
