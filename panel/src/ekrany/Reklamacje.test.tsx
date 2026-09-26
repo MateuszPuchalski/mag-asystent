@@ -486,6 +486,22 @@ describe("Ekran reklamacji", () => {
     expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
   });
 
+  it("cyfry idą za kubełkami: 4 to „Bez ruchu”, 5 to „Wszystkie”", async () => {
+    /* @wydanie: 1–3 i „4 = Wszystkie" stały na sztywno, choć kubełki są
+       cztery — „Bez ruchu" nie miał klawisza, a podpowiedzi obiecywały 4 i 5. */
+    pokaz();
+    await userEvent.keyboard("4");
+    expect(screen.getByText("Nic tu nie zrobimy.")).toBeInTheDocument();
+    expect(screen.queryByText("111/2026")).not.toBeInTheDocument();
+    await userEvent.keyboard("5");
+    /* Numer stoi też w kolumnie dowodów wybranej sprawy — liczy się, że
+       oba wiersze są na liście, więc `getAll`. */
+    expect(screen.getAllByRole("button", { name: /111\/2026/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /222\/2026/ }).length).toBeGreaterThan(0);
+    await userEvent.keyboard("1");
+    expect(screen.getByText("Uznać czy odrzucić?")).toBeInTheDocument();
+  });
+
   it("klawisz `m` przełącza sito, ale MILCZY w polu tekstowym", async () => {
     pokaz();
     await userEvent.keyboard("m");
