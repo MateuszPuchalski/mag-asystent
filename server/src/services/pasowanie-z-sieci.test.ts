@@ -184,7 +184,7 @@ test("limit dostawcy zatrzymuje przebieg i zostawia ślad kosztu", async () => {
   assert.equal((db().prepare("SELECT count(*) n FROM zastosowanie WHERE tw_id=?").get(GAZNIK) as { n: number }).n, 0);
 });
 
-/* ── Kolejność, PDF i przegląd listą (@wydanie) ──────────────────────────────
+/* ── Kolejność, PDF i przegląd listą (0.527.0) ──────────────────────────────
    Właściciel po pierwszym dniu: „zrób 1, 2 i 3 — głównym łącznikiem powinien
    być numer OEM”. Pilnujemy: najpierw część, przy której klienci się mylą;
    cytat z PDF-u przechodzi sito jak ze strony; propozycje automatu stoją jedną
@@ -253,7 +253,7 @@ test("przegląd listą: propozycje automatu po kartotece; zatwierdzenie bierze t
   assert.equal(stan(druga!.id), "propozycja", "niezaznaczone czeka dalej — to nie jest odrzucenie");
 });
 
-/* ── Łagodniejsze sito i warunki (@wydanie) ──────────────────────────────────
+/* ── Łagodniejsze sito i warunki (0.527.0) ──────────────────────────────────
    Pierwszy dzień na żywo odrzucił pięć znalezisk na piętnaście jako „za
    krótkie oznaczenie”, a jedną kartotekę w całości jako „naszego numeru nie
    ma na stronie”. Sito przepuszcza teraz krótkie oznaczenie tuż za marką

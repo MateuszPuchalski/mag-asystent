@@ -984,7 +984,7 @@ const ZnaleziskoZ = z.object({
   url: z.string(),
   cytat: z.string(),
   zrodloStrony: z.enum(ZRODLA_STRONY),
-  /* Warunki (@wydanie): tylko gdy stoją w cytacie — sito w serwisie to sprawdza. */
+  /* Warunki (0.527.0): tylko gdy stoją w cytacie — sito w serwisie to sprawdza. */
   rokOd: z.number().int().nullable(),
   rokDo: z.number().int().nullable(),
   seryjnyOd: z.string().nullable(),
@@ -1032,7 +1032,7 @@ const INSTRUKCJA_SIECI = [
    dziesięciu krokach; trzy wznowienia to z zapasem sufit `max_uses` niżej. */
 const WZNOWIEN_SIECI = 3;
 
-/* Jedna rozmowa z siecią (@wydanie): wspólna dla trybu części i trybu
+/* Jedna rozmowa z siecią (0.527.0): wspólna dla trybu części i trybu
    silnika. Pytanie, wznowienia po `pause_turn`, zbieranie przeczytanych stron
    i PDF-ów, suma kosztu. Tryby różnią się instrukcją, schematem odpowiedzi
    i tym, ile tekstu strony wolno przeczytać — reszta byłaby drugą kopią tej
@@ -1129,7 +1129,7 @@ export const nadawcaPasowaniaSieciAnthropic: NadawcaPasowaniaSieci =
       model: r.model, zuzycie: r.zuzycie, ms: r.ms };
   };
 
-/* ── Tryb „od silnika” (@wydanie) ─────────────────────────────────────────────
+/* ── Tryb „od silnika” (0.527.0) ─────────────────────────────────────────────
    Model tylko znajduje i czyta wykazy części silnika i mówi, które strony
    nimi są. Numery dopasowuje serwer (`pasowanie-od-silnika.ts`). */
 const WynikWykazuZ = z.object({

@@ -60,10 +60,10 @@ export function Wiedza() {
   /* Propozycje z wykazów części idą przeglądem listą; pojedyncze karty
      dostaje wyłącznie reszta. Każda propozycja stoi na ekranie RAZ. */
   const wykazy = kolejka.data?.wykazy ?? [];
-  /* Propozycje automatu z sieci (@wydanie) — ta sama zasada: przegląd listą
+  /* Propozycje automatu z sieci (0.527.0) — ta sama zasada: przegląd listą
      po kartotece, a pojedyncza karta tylko dla reszty. */
   const przegladySieci = kolejka.data?.zSieci ?? [];
-  /* Tryb „od silnika” (@wydanie): karta na silnik, tym samym przeglądem co wykaz. */
+  /* Tryb „od silnika” (0.527.0): karta na silnik, tym samym przeglądem co wykaz. */
   const przegladySilnikow = kolejka.data?.zSilnikow ?? [];
   const wPrzegladzie = new Set([...wykazy.flatMap((w) => w.pozycje.map((p) => p.id)),
     ...przegladySieci.flatMap((g) => g.pozycje.map((p) => p.id)),

@@ -44,9 +44,9 @@ export function useKolejkaWiedzy() {
       zamiennosciOem: KandydatZamiennosci[]; zamiennosciOemDoRozstrzygniecia: number;
       /** Propozycje z wykazów części pogrupowane do przeglądu listą; brak = starszy serwer. */
       wykazy?: PrzegladWykazu[];
-      /** Propozycje automatu z sieci po kartotece (@wydanie). Brak = starszy serwer. */
+      /** Propozycje automatu z sieci po kartotece (0.527.0). Brak = starszy serwer. */
       zSieci?: PrzegladZSieci[];
-      /** Propozycje trybu „od silnika”, jedna karta na silnik (@wydanie). */
+      /** Propozycje trybu „od silnika”, jedna karta na silnik (0.527.0). */
       zSilnikow?: PrzegladWykazu[];
     }>(`/api/obsluga/wiedza/kolejka`),
     refetchInterval: 30_000,
@@ -411,7 +411,7 @@ export function useSprawdzZSieci() {
 }
 
 /** Zatwierdzenie listą — identyfikatory, które człowiek zostawił zaznaczone. */
-/** Zatwierdzenie listą propozycji trybu „od silnika” dla jednego silnika (@wydanie). */
+/** Zatwierdzenie listą propozycji trybu „od silnika” dla jednego silnika (0.527.0). */
 export function useZatwierdzOdSilnika() {
   const qc = useQueryClient();
   return useMutation({
@@ -422,7 +422,7 @@ export function useZatwierdzOdSilnika() {
   });
 }
 
-/** Zatwierdzenie listą propozycji z sieci dla jednej kartoteki (@wydanie). */
+/** Zatwierdzenie listą propozycji z sieci dla jednej kartoteki (0.527.0). */
 export function useZatwierdzZSieci() {
   const qc = useQueryClient();
   return useMutation({

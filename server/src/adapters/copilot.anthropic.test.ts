@@ -352,7 +352,7 @@ test("pasowanie z sieci: Allegro zablokowane w wyszukiwarce i w pobieraniu, stro
     assert.deepEqual(druga.map((m) => m.role), ["user", "assistant"], "wznowienie bez nowej wiadomości");
     const tresc = String((zadania[0]!.messages as Array<{ content: string }>)[0]!.content);
     assert.ok(tresc.includes("1123 120 0650"), "numer OEM to klucz wyszukiwania");
-    /* Właściciel (@wydanie): nasz symbol trafia najwyżej w naszą aukcję, więc
+    /* Właściciel (0.527.0): nasz symbol trafia najwyżej w naszą aukcję, więc
        nie idzie do dostawcy wcale — inaczej model wydaje na nim wyszukiwania. */
     assert.ok(!tresc.includes("GAZ-1"), "nasz symbol nie idzie do dostawcy");
   } finally {

@@ -5,7 +5,7 @@ import { Pole, Przycisk, ile } from "../ui";
 import { Kafel } from "../towar/Kafel";
 
 /**
- * Przegląd propozycji automatu z sieci dla JEDNEJ kartoteki (@wydanie).
+ * Przegląd propozycji automatu z sieci dla JEDNEJ kartoteki (0.527.0).
  *
  * DLACZEGO LISTA. Pierwszy dzień na żywo: trzy kartoteki dały szesnaście
  * propozycji, a w kolejce czeka ponad tysiąc kartotek. Karta na każdą maszynę

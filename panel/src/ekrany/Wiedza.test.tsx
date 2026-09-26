@@ -286,7 +286,7 @@ describe("Ekran wiedzy", () => {
     expect(zatwierdzZWykazu).toHaveBeenCalledWith({ importId: 4, ids: [21] }, expect.anything());
   });
 
-  /* Przegląd z sieci (@wydanie): ta sama umowa co wykaz, grupa to kartoteka. */
+  /* Przegląd z sieci (0.527.0): ta sama umowa co wykaz, grupa to kartoteka. */
   it("propozycje z sieci stoją jedną listą na kartotekę, z linkiem do źródła; zatwierdzenie bierze zaznaczone", async () => {
     LISTA = [propozycja({ id: 31, symbol: "09-05001" }), propozycja({ id: 32, symbol: "09-05001" }), propozycja({ id: 3 })];
     Z_SIECI = [{ twId: 91, symbol: "09-05001", nazwa: "Gaźnik", pozycje: [
@@ -306,7 +306,7 @@ describe("Ekran wiedzy", () => {
     expect(zatwierdzZSieci).toHaveBeenCalledWith({ twId: 91, ids: [31] }, expect.anything());
   });
 
-  /* Tryb „od silnika” (@wydanie): karta na silnik, przegląd jak wykaz, link na wierszu. */
+  /* Tryb „od silnika” (0.527.0): karta na silnik, przegląd jak wykaz, link na wierszu. */
   it("propozycje od silnika stoją kartą silnika z listą naszych części i linkiem źródła", async () => {
     LISTA = [propozycja({ id: 41, symbol: "W12-001" }), propozycja({ id: 3 })];
     Z_SILNIKOW = [{ id: 7, zrodlo: "silnik Honda GCV160 — wykazy części z sieci", link: null, rodzaj: "silnik", pozycje: [

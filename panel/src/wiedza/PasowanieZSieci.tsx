@@ -20,7 +20,7 @@ import { Blad, NaglowekSekcji, Przycisk, czas, ile } from "../ui";
 /** Tyle kartotek na jedno kliknięcie. Dość, żeby zobaczyć wynik; mało, żeby przejrzeć. */
 export const NA_KLIKNIECIE = 3;
 
-/* ── Tryb „przez godzinę" (@wydanie) ─────────────────────────────────────────
+/* ── Tryb „przez godzinę" (0.527.0) ─────────────────────────────────────────
    Właściciel po pierwszym dniu: „dodaj przycisk sprawdzaj przez godzinę".
    Klikanie co trzy kartoteki przez godzinę to kilkadziesiąt kliknięć.
 
@@ -119,7 +119,7 @@ export function PasowanieZSieci() {
       <p className="text-sm text-slate-600">
         Szuka na stronach spoza Allegro, do czego pasują nasze części z numerem OEM, które nie mają jeszcze
         żadnego zastosowania. Nocą robi to sam; tu możesz uruchomić go od razu.</p>
-      {/* GDZIE SZUKAĆ WYNIKU (@wydanie). Właściciel po pierwszym przebiegu
+      {/* GDZIE SZUKAĆ WYNIKU (0.527.0). Właściciel po pierwszym przebiegu
           zapytał, gdzie trafiają propozycje — licznik „w kolejce: 16" nie
           mówił, która to kolejka. Podpis „automat (siec)" jest tym, co stoi
           przy każdej propozycji w Kolejce, więc po nim się ją rozpoznaje. */}
@@ -135,7 +135,7 @@ export function PasowanieZSieci() {
       Czeka na sprawdzenie: <b>{ile(s.doSprawdzenia, "kartoteka", "kartoteki", "kartotek")}</b>
       {" "}· <span title="Wspólny z przebiegiem nocnym: ręczne sprawdzenia zużywają ten sam limit.">
         w limicie zostało <b>{zostalo}</b> z {s.naNoc}</span></p>}
-    {/* Postęp listy popularnych silników (@wydanie). Silniki idą PIERWSZE, bo
+    {/* Postęp listy popularnych silników (0.527.0). Silniki idą PIERWSZE, bo
         jeden wykaz silnika dopasowuje dziesiątki kartotek naraz. */}
     {s?.silniki && s.silniki.doSprawdzenia > 0 && <p className="text-sm text-slate-600" aria-label="Popularne silniki">
       Najpierw popularne silniki: czeka {s.silniki.doSprawdzenia} z {s.silniki.razem}. Jeden wykaz części silnika

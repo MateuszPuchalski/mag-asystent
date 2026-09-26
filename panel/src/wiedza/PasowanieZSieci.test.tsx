@@ -77,7 +77,7 @@ describe("pasowanie z sieci na żądanie", () => {
     expect(wynik).not.toHaveTextContent(/sito/);
   });
 
-  /* Tryb godzinny (@wydanie): ta sama pętla, koniec po czasie albo limicie. */
+  /* Tryb godzinny (0.527.0): ta sama pętla, koniec po czasie albo limicie. */
   it("„przez godzinę” idzie dalej niż trzy kartoteki i mówi, gdy zatrzymał go limit", async () => {
     wyniki = [...Array.from({ length: NA_KLIKNIECIE + 2 }, () => ({ sprawdzono: 1, zaproponowano: 1 })),
       { sprawdzono: 0, zaproponowano: 0 }];

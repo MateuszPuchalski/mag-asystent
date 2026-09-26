@@ -66,9 +66,9 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    wyłącznie u nas — publikacji do Allegro nie ma, decyzją właściciela.
    Dwudziesty dziewiąty (0.508.0) to ręczne pasowanie z sieci, po jednej
    kartotece: składa wyłącznie propozycje i nie woła Allegro.
-   Trzydziesty (@wydanie) to zatwierdzenie listą propozycji z sieci dla jednej
+   Trzydziesty (0.527.0) to zatwierdzenie listą propozycji z sieci dla jednej
    kartoteki — ten sam kształt co zatwierdzenie wykazu. Trzydziesty pierwszy
-   (@wydanie) to to samo dla jednego silnika z trybu „od silnika”.
+   (0.527.0) to to samo dla jednego silnika z trybu „od silnika”.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
 
@@ -107,7 +107,7 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     /* Propozycje z wykazów części jadą DWA razy: w `propozycje` (licznik mówi
        prawdę o całej pracy) i pogrupowane w `wykazy` do przeglądu listą.
        Ekran pokazuje każdą raz — pojedyncze karty bez tych z przeglądu. */
-    /* Propozycje automatu z sieci (@wydanie) jadą tak samo DWA razy: w
+    /* Propozycje automatu z sieci (0.527.0) jadą tak samo DWA razy: w
        `propozycje` i pogrupowane po kartotece w `zSieci` do przeglądu listą. */
     return { ...kolejka, wykazy: przegladWykazow(kolejka.propozycje), zSieci: przegladZSieci(kolejka.propozycje),
       zSilnikow: przegladOdSilnika(kolejka.propozycje),
@@ -458,7 +458,7 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     } catch (e) { return blad(reply, e); }
   });
 
-  /* Zatwierdzenie listą propozycji automatu dla jednej kartoteki (@wydanie).
+  /* Zatwierdzenie listą propozycji automatu dla jednej kartoteki (0.527.0).
      Ten sam kształt co `wykazy/:id/zatwierdz`: ciało to identyfikatory, które
      człowiek zostawił zaznaczone; reszta czeka dalej. */
   app.post<{ Params: { twId: string }; Body: { ids?: unknown } }>(
@@ -468,7 +468,7 @@ export async function wiedzaRoutes(app: FastifyInstance) {
       catch (e) { return blad(reply, e); }
     });
 
-  /* Zatwierdzenie listą propozycji trybu „od silnika” (@wydanie): jedna karta
+  /* Zatwierdzenie listą propozycji trybu „od silnika” (0.527.0): jedna karta
      na silnik, ciało to identyfikatory zostawione zaznaczone. */
   app.post<{ Params: { modelId: string }; Body: { ids?: unknown } }>(
     "/api/obsluga/wiedza/pasowanie-z-sieci/silnik/:modelId/zatwierdz", async (req, reply) => {

@@ -10,6 +10,53 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.527.0 — 26 września 2026
+
+**Pasowanie od popularnych silników.** Automat zaczyna teraz od listy 37
+najczęstszych silników kosiarek (B&S, Honda GCV/GXV, Loncin, Rato, STIGA,
+Emak, Kawasaki). Dla każdego szuka wykazu części — zwykle PDF producenta —
+a serwer sam wyszukuje w nim nasze numery OEM. Jeden wykaz dopasowuje
+dziesiątki kartotek naraz, zamiast płacić za wyszukiwanie każdej osobno.
+Model nie przepisuje numerów: numer albo stoi na stronie, albo nie ma
+propozycji. W Kolejce każdy silnik ma jedną kartę z listą naszych części
+i linkiem „źródło”; zatwierdza się ją jednym kliknięciem. Noc i przyciski
+najpierw przerabiają silniki, potem pojedyncze kartoteki, z jednego limitu.
+
+**Łagodniejsze sito.** Krótkie oznaczenie („025”) przechodzi, gdy w cytacie
+stoi tuż za marką. Stronę potwierdza też numer zatwierdzonego zamiennika OEM
+albo numer z obcego katalogu tej części.
+
+**Roczniki i numery seryjne.** Gdy strona zawęża pasowanie do lat albo
+zakresu numerów seryjnych, propozycja niesie ten warunek — pod warunkiem, że
+liczby stoją w cytacie. Warunek spoza cytatu unieważnia znalezisko.
+
+**Pasowanie z sieci przez godzinę.** Karta „Pasowanie z sieci” w Wiedzy ma
+drugi przycisk, „Sprawdzaj przez godzinę”. Sprawdza kartotekę po kartotece,
+aż minie godzina, skończy się limit albo ktoś kliknie „Zatrzymaj”. Gdy
+skończy przed czasem, mówi dlaczego — przy wyczerpanym limicie podpowiada,
+że godzinę wydłuża podniesienie `PASOWANIE_Z_SIECI_NA_NOC`. Przebieg idzie
+z karty, więc przejście na inną zakładkę albo ekran go kończy.
+
+Karta mówi też, gdzie szukać wyniku: propozycje czekają w zakładce Kolejka,
+podpisane „automat (siec)”, z cytatem i linkiem „źródło”.
+
+**Pasowanie z sieci: mniej klikania, lepsze źródła, właściwa kolejność.**
+
+- **Zatwierdzanie listą.** Propozycje automatu stoją w Kolejce jedną kartą na
+  kartotekę: maszyny w kolumnie, każda z cytatem i odnośnikiem „źródło”,
+  zaznaczone domyślnie. „Zatwierdź zaznaczone” zatwierdza całą listę jednym
+  kliknięciem; odznaczone czekają dalej, odrzuca się pojedynczo, z powodem.
+- **Katalogi w PDF.** Rysunki i wykazy części producentów to najczęściej
+  PDF-y, a automat dotąd je pomijał. Teraz czyta ich tekst i sprawdza cytat
+  tak samo jak na zwykłej stronie.
+- **Numer OEM jako klucz.** Do wyszukiwarki idą wyłącznie numery OEM
+  i oryginalne. Nasz symbol (np. W47-123) trafiał najwyżej w naszą aukcję
+  i marnował płatne wyszukiwanie.
+- **Najpierw to, o co pytają klienci.** Kolejność kartotek do sprawdzenia
+  bierze się z popytu: zwroty z powodem pasowania, dobór w rozmowach,
+  rozmowy pod ofertą i sprzedaż z 90 dni. Kartoteka bez sygnałów czeka na
+  końcu.
+
 ## 0.526.0 — 26 września 2026
 
 **Kosze i dostawy mają ten sam wybór kubełków co pozostałe kolejki.** W koszach „Rozłożone” i „Anulowane” stoją pod „Więcej”. W dostawach pod „Więcej” stoją „Zamknięte”, „Poza WERTIS” i „Archiwum”. Każdy z nich zostaje o jedno kliknięcie, z licznikiem przy nazwie.

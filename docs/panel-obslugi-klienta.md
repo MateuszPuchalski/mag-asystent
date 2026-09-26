@@ -6166,7 +6166,7 @@ Zdjęła je przyjęta propozycja: barwa i liczba mówią to samo w jednym znaku.
 Kafel kategorii na początku wiersza zostaje, bo tylko on niesie częste
 kategorie.
 
-## 26e. Uproszczenie całego panelu (@wydanie)
+## 26e. Uproszczenie całego panelu (0.527.0)
 
 Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko: „uprość UI”. Zasada się nie zmieniła: nic nowego, tylko zdjąć, scalić, zwinąć albo użyć wspólnego elementu. Każda rzecz została najwyżej jedno kliknięcie dalej. Zmiany weszły siedemnastoma osobnymi PR-ami (#610–#626) i dwoma poprawkami po nich (#627, #628).
 

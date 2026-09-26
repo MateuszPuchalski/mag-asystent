@@ -86,7 +86,7 @@ export interface ZnaleziskoSurowe {
   /** Dosłowny fragment strony, na którym znalezisko stoi. */
   cytat: string;
   zrodloStrony: ZrodloStrony;
-  /* Warunki (@wydanie): roczniki i zakres numerów seryjnych, gdy strona je
+  /* Warunki (0.527.0): roczniki i zakres numerów seryjnych, gdy strona je
      podaje. Bez nich „pasuje do MS 250" jest za szerokie dla części, która
      zmieniła się w trakcie produkcji. Każdy musi stać w cytacie — patrz sito. */
   rokOd: number | null;
@@ -99,7 +99,7 @@ export interface WynikSieci {
   znaleziska: ZnaleziskoSurowe[];
   /** Strony PRZECZYTANE przez `web_fetch` — tekst do sprawdzenia cytatu. */
   strony: Array<{ url: string; tekst: string }>;
-  /** PDF-y przeczytane przez `web_fetch`, surowe — tekst wyciąga `pdf-tekst.ts` (@wydanie). */
+  /** PDF-y przeczytane przez `web_fetch`, surowe — tekst wyciąga `pdf-tekst.ts` (0.527.0). */
   pdfy: Array<{ url: string; base64: string }>;
   wyszukiwan: number;
   model: string;
@@ -145,7 +145,7 @@ export function sprawdzZnalezisko(
   const model = zwin(z.model);
   const marka = zwin(z.marka);
   /* Oznaczenie krótsze niż trzy znaki („25") samo trafia w każdą liczbę na
-     stronie. Od @wydanie przechodzi, gdy w cytacie stoi TUŻ ZA MARKĄ
+     stronie. Od 0.527.0 przechodzi, gdy w cytacie stoi TUŻ ZA MARKĄ
      („Stihl 025” → „stihl025”): wtedy to oznaczenie, nie przypadkowa liczba.
      Pierwszy dzień na żywo odrzucił tak pięć znalezisk na piętnaście. */
   if (model.length < 3) {
@@ -189,7 +189,7 @@ export interface Kandydat {
   nazwa: string;
   /** Numery do WYSZUKIWARKI: własne OEM i oryginalne, najwyżej pięć. */
   numery: string[];
-  /** Numery do SITA: szerzej — patrz `numery_sita` w zapytaniu (@wydanie). */
+  /** Numery do SITA: szerzej — patrz `numery_sita` w zapytaniu (0.527.0). */
   numerySita: string[];
   /** Waga popytu z `POPYT` — do kolejności i do testu, nie na ekran. */
   popyt: number;
@@ -199,7 +199,7 @@ export interface Kandydat {
 const lista = (s: string | null) =>
   [...new Set(String(s ?? "").split("\u001f").map((n) => n.trim()).filter(Boolean))];
 
-/* ── Kolejność: najpierw to, o co pytają klienci (@wydanie) ──────────────────
+/* ── Kolejność: najpierw to, o co pytają klienci (0.527.0) ──────────────────
    Do tego wydania kolejność brzmiała „ma ofertę, potem numer kartoteki”.
    Przy ponad tysiącu kartotek w kolejce i dziesięciu na noc pierwszy miesiąc
    szedłby na części, o które nikt nie pyta. Teraz waga popytu, WYŁĄCZNIE
@@ -274,7 +274,7 @@ export function kandydaciDoSieci(
     SELECT t.tw_id, t.symbol, t.nazwa,
         (SELECT group_concat(i.wartosc, char(31)) FROM towar_identyfikator i
           WHERE i.tw_id=t.tw_id AND i.rodzaj IN ('oem','nr_oryg')) AS numery,
-        /* Numery, którymi strona może POTWIERDZIĆ tę część (@wydanie): własne,
+        /* Numery, którymi strona może POTWIERDZIĆ tę część (0.527.0): własne,
            z obcych katalogów i zatwierdzonych zamienników OEM. Strona często
            podaje nowszy numer zamiennika, a nie ten z naszej kartoteki —
            a zamienność zatwierdził już człowiek. */
@@ -303,7 +303,7 @@ export function kandydaciDoSieci(
 /** Ile kartotek sprawdzono w ostatniej nocy — z księgi, więc restart nie zeruje. */
 export function sprawdzonychTejNocy(teraz = new Date(), database: DatabaseSync = db()): number {
   const od = new Date(teraz.getTime() - OKNO_NOCY_MS).toISOString();
-  /* Oba tryby (@wydanie) — część i silnik — ciągną z jednego limitu. */
+  /* Oba tryby (0.527.0) — część i silnik — ciągną z jednego limitu. */
   return (database.prepare(`SELECT count(*) n FROM copilot_wywolanie
       WHERE zadanie IN ('pasowanie_siec','pasowanie_siec_silnik') AND at >= ?`)
     .get(od) as { n: number }).n;
@@ -357,7 +357,7 @@ export async function szukajPasowaniaWSieci(deps: {
 
     wynik.sprawdzono += 1;
     zapiszKsiege(database, odp, "ok", null, teraz());
-    /* PDF-y dochodzą do sita jako zwykłe strony z tekstem (@wydanie). Tekst
+    /* PDF-y dochodzą do sita jako zwykłe strony z tekstem (0.527.0). Tekst
        wyciąga `pdf-tekst.ts`; PDF bez tekstu odpada razem ze znaleziskami. */
     const strony = [...odp.strony, ...await tekstyPdf(odp.pdfy ?? [], deps.czytajPdf)];
     const odrzucone: Partial<Record<PowodOdrzucenia, number>> = {};
@@ -483,7 +483,7 @@ export function stanPasowaniaZSieci(teraz = new Date(), database: DatabaseSync =
   };
 }
 
-/* ── Przegląd listą (@wydanie) ───────────────────────────────────────────────
+/* ── Przegląd listą (0.527.0) ───────────────────────────────────────────────
    Pierwszy dzień na żywo: trzy kartoteki dały szesnaście propozycji, a w
    kolejce czeka ponad tysiąc kartotek. Zatwierdzane pojedynczo, z kartą na
    każdą maszynę, to kilka tysięcy kliknięć.

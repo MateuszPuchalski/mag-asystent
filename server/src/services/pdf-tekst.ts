@@ -1,4 +1,4 @@
-/* ── Tekst z PDF-u dla sita pasowania z sieci (@wydanie) ─────────────────────
+/* ── Tekst z PDF-u dla sita pasowania z sieci (0.527.0) ─────────────────────
 
    Najlepsze źródła pasowania — rysunki i wykazy części producentów — to
    najczęściej PDF-y. Do tego wydania automat je pomijał: `web_fetch` oddaje

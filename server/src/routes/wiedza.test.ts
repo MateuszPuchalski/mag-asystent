@@ -207,11 +207,11 @@ test("tras zapisu jest trzydzieści jeden — licznik jest umową", () => {
      na żądanie. Pisze wyłącznie propozycje do kolejki, nigdy zatwierdzenie,
      a wydatek ogranicza sufit nocy liczony z tej samej księgi.
 
-     TRZYDZIESTA (@wydanie): zatwierdzenie listą propozycji z sieci dla jednej
+     TRZYDZIESTA (0.527.0): zatwierdzenie listą propozycji z sieci dla jednej
      kartoteki. Kształt i powód jak przy wykazie: trzy kartoteki dały na żywo
      szesnaście propozycji, a pojedyncze karty to kilka tysięcy kliknięć.
 
-     TRZYDZIESTA PIERWSZA (@wydanie): to samo dla jednego silnika z trybu „od
+     TRZYDZIESTA PIERWSZA (0.527.0): to samo dla jednego silnika z trybu „od
      silnika” — wykaz części silnika daje dziesiątki kartotek naraz. */
   assert.equal(TRASY().filter((t) => t.method !== "GET").length, 31);
 });

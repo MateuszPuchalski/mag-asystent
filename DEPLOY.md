@@ -2886,7 +2886,7 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
-### Aktualizacja do @wydanie — pasowanie z sieci: lista, PDF, popyt
+### Aktualizacja do 0.527.0 — pasowanie z sieci: lista, PDF, popyt
 
 **Panel trzeba przebudować, a serwer zrestartować.** Migracji nie ma.
 Doszła jedna zależność serwera, `unpdf` (czytanie tekstu z PDF-ów). Paczka

@@ -16,7 +16,7 @@ import {
 import { tekstyPdf, type CzytnikPdf } from "./pdf-tekst.js";
 import { BladKluczaCopilota, BladLimituCopilota, BladPrzeciazeniaCopilota } from "../adapters/copilot.js";
 
-/* ── Pasowanie od silnika (@wydanie) ──────────────────────────────────────────
+/* ── Pasowanie od silnika (0.527.0) ──────────────────────────────────────────
 
    Właściciel: „szukanie pasowań od najpopularniejszych silników powinno
    znacznie przyspieszyć dopasowania”. I tak jest, z jednego powodu: wykaz
@@ -341,7 +341,7 @@ export function zatwierdzOdSilnika(
   });
 }
 
-/* ── Koordynator nocy i przycisku (@wydanie) ─────────────────────────────────
+/* ── Koordynator nocy i przycisku (0.527.0) ─────────────────────────────────
    Najpierw silniki z listy, potem kartoteki — z JEDNEGO limitu. Silnik idzie
    pierwszy, bo jeden jego wykaz dopasowuje dziesiątki kartotek naraz; tryb
    części dostaje to, co z limitu zostało. Ekran woła to samo po jednej

@@ -3250,7 +3250,7 @@ CREATE TABLE IF NOT EXISTS pasowanie_siec (
 );
 CREATE INDEX IF NOT EXISTS ix_pasowanie_siec_tw ON pasowanie_siec(tw_id, at);
 
--- Pasowanie od silnika (@wydanie). Jeden wiersz na silnik z listy popularnych,
+-- Pasowanie od silnika (0.527.0). Jeden wiersz na silnik z listy popularnych,
 -- sprawdzony przez automat — bez tego ten sam wykaz czytalibyśmy co noc.
 -- `klucz` jak w `model_urzadzenia.klucz`. Treści stron tu nie ma.
 CREATE TABLE IF NOT EXISTS pasowanie_siec_silnik (

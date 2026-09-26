@@ -8,7 +8,7 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-si
 process.env.SGT_MODE = "seeded";
 process.env.LOG_LEVEL = "silent";
 
-/* ── Pasowanie od silnika (@wydanie) ─────────────────────────────────────────
+/* ── Pasowanie od silnika (0.527.0) ─────────────────────────────────────────
    Właściciel: „szukanie od najpopularniejszych silników powinno znacznie
    przyspieszyć dopasowania”. Jeden wykaz części silnika dopasowuje wiele
    naszych kartotek naraz. Pilnujemy: numer dopasowuje SERWER, dokładnie, po
