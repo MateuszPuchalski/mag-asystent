@@ -41,9 +41,15 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["1–9", "kubełek"],
   ] },
   { tytul: "Skrzynka", sciezka: "/obsluga/skrzynka", klawisze: [
+    /* Enter i Ctrl+Enter działają też spoza pola (@wydanie) — powód
+       w `skrzynka/Edytor.tsx`. */
+    ["Enter", "pisz odpowiedź (kursor w polu)"],
     ["Ctrl Enter", "wyślij odpowiedź"],
     ["Ctrl Shift Enter", "wyślij i zakończ"],
-    ["Z", "zakończ / otwórz rozmowę"],
+    /* Do @wydanie stało tu „zakończ / otwórz", a na zakończonej „Z" nie robi
+       nic — ponowne otwarcie jest wyłącznie przyciskiem. */
+    ["Z", "zakończ rozmowę; drugie Z — mimo pytania"],
+    ["O", "odłóż do następnego dnia roboczego, 8:00"],
     /* Opis idzie za napisem przycisku, który od 0.500.0 mówi „Wstaw do
        odpowiedzi" (0.515.0): stary opis obiecywał poprawianie. */
     ["E", "wstaw szkic do odpowiedzi"],

@@ -425,6 +425,47 @@ export function useZakoncz() {
   });
 }
 
+/**
+ * Odłóż do terminu (@wydanie) — powód przy `odlozRozmowe` na serwerze.
+ * `doKiedy: null` zdejmuje odłożenie („Cofnij", „Wróć teraz"). Pole idzie
+ * zawsze, także jako `null`: serwer odbija ciało bez niego, żeby literówka
+ * nie budziła rozmowy po cichu.
+ */
+export function useOdloz() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; doKiedy: string | null }) =>
+      api<{ status: StatusRozmowy; snoozedUntil: string | null }>(`/api/conversations/${v.id}/odloz`, {
+        method: "POST", body: JSON.stringify({ doKiedy: v.doKiedy }),
+      }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
+      qc.invalidateQueries({ queryKey: klucze.rozmowy });
+    },
+  });
+}
+
+/**
+ * Następna rozmowa czeka w pamięci, zanim agent do niej przejdzie (@wydanie).
+ *
+ * Po wysyłce ekran sam przechodzi dalej (0.443.0), ale do tej pory dopiero
+ * wtedy pytał serwer o treść — środek kolumny mówił przez tę chwilę „Wybierz
+ * rozmowę z listy", a prawa kolumna znikała. Czekanie na każdą rozmowę to
+ * czekanie pomnożone przez całą kolejkę.
+ *
+ * To jest ODCZYT (GET), więc reguła „zero zapisu przy patrzeniu" stoi.
+ * `staleTime` jak domyślny w kliencie zapytań: świeższej treści szuka i tak
+ * szyna zdarzeń, a wczytana za wcześnie rozmowa odświeży się przy wejściu.
+ */
+export function usePrzygotujRozmowe() {
+  const qc = useQueryClient();
+  return (id: number) => void qc.prefetchQuery({
+    queryKey: klucze.rozmowa(id),
+    queryFn: () => api<OsRozmowy>(`/api/obsluga/rozmowy/${id}`),
+    staleTime: 10_000,
+  });
+}
+
 export function useOtworz() {
   const qc = useQueryClient();
   return useMutation({

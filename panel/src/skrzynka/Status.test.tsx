@@ -24,7 +24,9 @@ describe("Status rozmowy", () => {
 
   /* ── Ręcznego statusu nie ma (22 września 2026) ──────────────────────────
      Decyzja właściciela: stan wynika wyłącznie z faktów. Nagłówek nie ma
-     pola wyboru ani kroku odłożenia — test pilnuje, żeby nie wróciły. */
+     pola wyboru — test pilnuje, żeby nie wróciło. Odłożenie wróciło
+     26 września 2026 (@wydanie), ale jako werdykt Z DATĄ w menu „⋯", nie
+     jako pozycja listy statusów; bez `onOdloz` go nie ma — testy niżej. */
   it("status jest odczytem: bez pola wyboru i bez odłożenia", () => {
     render(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} blad=""
       onPriorytet={() => {}} zapisujePriorytet={false} />);
@@ -159,5 +161,55 @@ describe("Stan rozmowy stoi w nagłówku raz", () => {
     await userEvent.click(screen.getByRole("button", { name: "Więcej czynności rozmowy" }));
 
     expect(screen.queryByRole("button", { name: /reklamacyjn/i })).not.toBeInTheDocument();
+  });
+});
+
+/* ── Klawiatura i odłożenie (@wydanie) ───────────────────────────────────────
+   Drugie „Z" zatwierdza zakończenie bez odpowiedzi — pytanie zostaje jedno
+   i w miejscu przycisku, tylko odpowiedź nie wymaga już myszy. „O" odkłada
+   do następnego dnia roboczego, 8:00. Menu „⋯" ma trzy terminy i kalendarz. */
+describe("Status: klawiatura i odłożenie", () => {
+  it("drugie Z zatwierdza zakończenie mimo pytania, Esc je anuluje", async () => {
+    const onZakoncz = vi.fn();
+    render(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} blad="" onPriorytet={() => {}}
+      zapisujePriorytet={false} onZakoncz={onZakoncz} onOtworz={() => {}} />);
+    await userEvent.keyboard("z");
+    expect(screen.getByRole("alert")).toHaveTextContent("zakończyć bez odpowiedzi?");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("alert")).toBeNull();
+    expect(onZakoncz).not.toHaveBeenCalled();
+    await userEvent.keyboard("zz");
+    expect(onZakoncz).toHaveBeenCalledWith(true);
+  });
+
+  it("O odkłada do następnego dnia roboczego na 8:00", async () => {
+    const onOdloz = vi.fn();
+    render(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} blad="" onPriorytet={() => {}}
+      zapisujePriorytet={false} onZakoncz={() => {}} onOdloz={onOdloz} />);
+    await userEvent.keyboard("o");
+    expect(onOdloz).toHaveBeenCalledTimes(1);
+    const kiedy = new Date(onOdloz.mock.calls[0][0] as string);
+    expect(kiedy.getTime()).toBeGreaterThan(Date.now());
+    expect([kiedy.getHours(), kiedy.getMinutes()]).toEqual([8, 0]);
+    expect([0, 6]).not.toContain(kiedy.getDay());
+  });
+
+  it("menu „⋯” ma trzy terminy i kalendarz; odłożona mówi do kiedy i ma „Wróć teraz”", async () => {
+    const onOdloz = vi.fn();
+    const onWroc = vi.fn();
+    const { rerender } = render(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} blad=""
+      onPriorytet={() => {}} zapisujePriorytet={false} onOdloz={onOdloz} onWrocZOdlozenia={onWroc} />);
+    await userEvent.click(screen.getByRole("button", { name: "Więcej czynności rozmowy" }));
+    expect(screen.getByText("· za tydzień")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Odłóż do dnia"), "2026-10-02");
+    await userEvent.click(screen.getByRole("button", { name: "Odłóż" }));
+    const kiedy = new Date(onOdloz.mock.calls[0][0] as string);
+    expect([kiedy.getFullYear(), kiedy.getMonth() + 1, kiedy.getDate(), kiedy.getHours()]).toEqual([2026, 10, 2, 8]);
+
+    rerender(<Status rozmowa={rozmowa({ status: "snoozed", odlozoneDo: "2026-10-02T06:00:00.000Z" })} blad=""
+      onPriorytet={() => {}} zapisujePriorytet={false} onOdloz={onOdloz} onWrocZOdlozenia={onWroc} />);
+    expect(screen.getByLabelText("Status rozmowy")).toHaveTextContent(/Odłożona do/);
+    await userEvent.click(screen.getByRole("button", { name: /Wróć teraz/ }));
+    expect(onWroc).toHaveBeenCalled();
   });
 });

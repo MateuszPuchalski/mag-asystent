@@ -32,8 +32,12 @@ export function Cofniecie({ wpis, onZamknij }: { wpis: DoCofniecia | null; onZam
        przerysowaniu rodzica, a zegar ma ruszyć raz na wpis. */
   }, [wpis?.klucz]);
   if (!wpis) return null;
+  /* BEZ WŁASNEGO `fixed` (@wydanie). Pasek stał w lewym dolnym rogu, a pasek
+     odłożonej wysyłki na środku dołu — przy 1440 px nachodziły na siebie
+     o 16 px, przy 1366 px o ponad 50. Odłożenie rozmowy zaraz po wysyłce
+     stawia oba naraz, więc stoją teraz w jednym stosie, który układa ekran. */
   return <div role="status" aria-live="polite"
-    className="fixed bottom-4 left-4 z-40 flex w-[min(28rem,calc(100vw-2rem))] items-center gap-3 rounded-xl bg-wertis-ink px-4 py-3 text-sm text-white shadow-lg">
+    className="flex w-full items-center gap-3 rounded-xl bg-wertis-ink px-4 py-3 text-sm text-white shadow-lg">
     <span className="min-w-0 flex-1">{wpis.opis}</span>
     <button type="button" onClick={() => { wpis.cofnij(); onZamknij(); }}
       className="inline-flex items-center gap-1 rounded-lg bg-wertis-amber px-3 py-1.5 font-bold text-wertis-ink">
