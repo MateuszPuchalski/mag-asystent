@@ -51,7 +51,9 @@ describe("Skrzynka wzmianek", () => {
     expect(screen.getByText("A. Lewandowska")).toBeInTheDocument();
     expect(screen.getByText(/zielony_ogrod/)).toBeInTheDocument();
     expect(screen.getByText(/zerkniesz na ten szarpak/)).toBeInTheDocument();
-    expect(screen.getByText(/1 do zajęcia się/)).toBeInTheDocument();
+    /* Licznik nieodhaczonych stoi w nagłówku po kropce (0.524.0), jak
+       w pozostałych sekcjach „Do zrobienia". */
+    expect(screen.getByRole("heading", { name: "Wspomniano o mnie · 1" })).toBeInTheDocument();
   });
 
   it("odhacza wyłącznie na kliknięcie, a przejście do rozmowy niczego nie kasuje", async () => {
@@ -62,16 +64,16 @@ describe("Skrzynka wzmianek", () => {
     odhacz.mockClear();
     pokaz();
 
-    await userEvent.click(screen.getByRole("button", { name: /OTWÓRZ ROZMOWĘ/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Otwórz rozmowę" }));
     expect(screen.getByText("Rozmowa otwarta")).toBeInTheDocument();
     expect(odhacz).not.toHaveBeenCalled();
   });
 
-  it("kliknięcie ODHACZ oddaje numer komentarza", async () => {
+  it("kliknięcie „Odhacz” oddaje numer komentarza", async () => {
     LISTA = [wpis()];
     odhacz.mockClear();
     pokaz();
-    await userEvent.click(screen.getByRole("button", { name: /ODHACZ/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Odhacz" }));
     expect(odhacz).toHaveBeenCalledWith({ commentId: 7 }, expect.anything());
   });
 
@@ -80,11 +82,23 @@ describe("Skrzynka wzmianek", () => {
     pokaz();
     expect(screen.getByText(/Wszystko odhaczone/)).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("checkbox", { name: /Pokaż odhaczone/ }));
+    /* Przełącznik jest cichym odnośnikiem w nagłówku (0.524.0), nie polem
+       wyboru — dalej jedno kliknięcie od historii. */
+    await userEvent.click(screen.getByRole("button", { name: "Pokaż odhaczone (1)" }));
     expect(screen.getByText(/zerkniesz na ten szarpak/)).toBeInTheDocument();
     expect(screen.getByText(/^odhaczone /)).toBeInTheDocument();
     /* Odhaczonej nie da się odhaczyć drugi raz — przycisku po prostu nie ma. */
-    expect(screen.queryByRole("button", { name: /ODHACZ/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Odhacz" })).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Ukryj odhaczone" }));
+    expect(screen.getByText(/Wszystko odhaczone/)).toBeInTheDocument();
+  });
+
+  it("bez odhaczonych przełącznika historii nie ma — nie miałby czego pokazać", () => {
+    LISTA = [wpis()];
+    pokaz();
+    expect(screen.queryByRole("button", { name: /odhaczone/ })).toBeNull();
+    expect(screen.queryByRole("checkbox")).toBeNull();
   });
 
   it("pusta skrzynka mówi wprost, że nikt nie prosił o pomoc", () => {

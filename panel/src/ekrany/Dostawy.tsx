@@ -5,13 +5,17 @@ import {
   useArchiwumDostaw, useDokument, useDostawy, useNotatkaDoHali, useOdpowiedziHali, usePozaWertis,
   usePrzeczytane, usePrzywrocDostawe, useRozwiazWyjatek, useWyjatkiOtwarte, useZamknijPozaWertis,
 } from "../api/dostawy";
-import { Blad, FiltrSegmentowy, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN, ile } from "../ui";
+import { Blad, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN, ile } from "../ui";
+import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import {
   KUBELKI_DOSTAW, KolejkaDostaw, KolejkaPozaWertis, WierszeSpozaOkna, kubelekDokumentu,
   type KubelekDostaw,
 } from "../dostawy/Kolejka";
 import { Dokument, WyjatkiLuzem } from "../dostawy/Dokument";
 import { Kontekst } from "../dostawy/Kontekst";
+
+/** Kubełki do przeglądania — stoją pod „Więcej”, nie na wierzchu (0.526.0). */
+const WIECEJ_DOSTAW: ReadonlyArray<KubelekDostaw> = ["zamkniete", "poza", "archiwum"];
 
 /* ── DOSTAWY W PANELU (0.435.0) ────────────────────────────────────────────
    Pierwszy widok biura po przeprowadzce (`docs/obsluga-klienta.md` §7).
@@ -155,7 +159,7 @@ export function Dostawy() {
 
   /* Stopka mówi, GDZIE KOŃCZY SIĘ TO, NA CO PATRZYSZ. Obcięte archiwum
      wygląda z ekranu jak pełne — a to jest dokładnie ta pomyłka, po której
-     ktoś orzeka, że faktury nie ma. */
+     ktoś orzeka, że faktury nie ma. Stoi w paśmie nad listą, obok pytania. */
   const stopka = kubelek === "archiwum"
     ? archiwum.data && (archiwum.data.ile > archiwum.data.documents.length
         ? `pokazano ${archiwum.data.documents.length} z ${archiwum.data.ile} — zawęź wyszukiwaniem`
@@ -168,11 +172,15 @@ export function Dostawy() {
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
-        <div className="flex shrink-0 items-center gap-2 px-4 pt-3">
-          <Truck size={18} /><b className="text-naglowek">Dostawy</b>
-        </div>
+        {/* Tytuł „Dostawy" zszedł (0.525.0), bo powtarzał zakładkę nawigacji,
+            która stoi podświetlona nad ekranem — wiersz wraca do kolejki. */}
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          <FiltrSegmentowy<KubelekDostaw> wybrany={kubelek} onWybierz={setKubelek}
+          {/* „Zamknięte", „Poza WERTIS" i „Archiwum" pod „Więcej" (0.526.0):
+              to przeglądanie, nie praca. „Poza WERTIS" zostaje o jedno
+              kliknięcie z licznikiem w opcji, bo ma wyłapać pomyłkowe
+              zdjęcie dostawy. Ten sam komponent co na pozostałych kolejkach. */}
+          <FiltrZWiecej<KubelekDostaw> wybrany={kubelek} onWybierz={setKubelek}
+            wiecej={WIECEJ_DOSTAW}
             pozycje={KUBELKI_DOSTAW.map((k) => ({ klucz: k.id, etykieta: k.etykieta, ile: liczniki[k.id],
               podpowiedz: k.pytanie }))} />
         </nav>
@@ -181,11 +189,15 @@ export function Dostawy() {
             placeholder={kubelek === "archiwum" ? "Szukaj w archiwum: numer albo dostawca" : "Numer albo dostawca"}
             aria-label="Szukaj dostawy" />
         </div>
-        <div className="shrink-0 border-y border-slate-200 bg-slate-50 px-2 py-1">
-          <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
+        {/* PYTANIE KUBEŁKA I STOPKA W JEDNYM PAŚMIE (0.525.0). Stały dwoma
+            cienkimi paskami, nad listą i pod nią, a mówiły o tej samej liście:
+            „co z nią zrobić" i „gdzie się kończy". Granica okna stoi teraz NAD
+            listą, więc ucięte archiwum widać, zanim zacznie się ją czytać. */}
+        <div className="flex shrink-0 flex-wrap items-baseline gap-x-3 border-y border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-600">
+          <span className="font-semibold">{opis?.pytanie}</span>
+          <span className="ml-auto">{stopka}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
-        <p className="shrink-0 border-t border-slate-200 px-3 py-1.5 text-xs text-slate-600">{stopka}</p>
         <Blad>{lista.error ? (lista.error as Error).message : ""}</Blad>
       </Karta>
 

@@ -96,7 +96,7 @@ describe("Karta faktów Copilota", () => {
     await userEvent.click(screen.getByRole("button", { name: /Co wyczytał Copilot/ }));
 
     expect(screen.getByText(/Werdykt zostaje przy Tobie/)).toBeVisible();
-    expect(screen.getByRole("button", { name: "PRZECZYTAJ SPRAWĘ" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Przeczytaj sprawę" })).toBeVisible();
   });
 
   it("rozpoznanie jest JAWNYM kliknięciem, nie skutkiem otwarcia ekranu", async () => {
@@ -106,7 +106,7 @@ describe("Karta faktów Copilota", () => {
     render(<Dowody {...props(null, { onRozpoznaj })} />);
     await userEvent.click(screen.getByRole("button", { name: /Co wyczytał Copilot/ }));
     expect(onRozpoznaj).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "PRZECZYTAJ SPRAWĘ" }));
+    await userEvent.click(screen.getByRole("button", { name: "Przeczytaj sprawę" }));
     expect(onRozpoznaj).toHaveBeenCalledTimes(1);
   });
 
@@ -135,7 +135,7 @@ describe("Karta faktów Copilota", () => {
        dowodów nie ma prawa zaznaczyć niczego w pasku werdyktu. */
     render(<Dowody {...props(Z_RADA)} />);
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /UZNAJĘ|ODRZUCAM|WYŚLIJ WERDYKT/ }))
+    expect(screen.queryByRole("button", { name: /Uznaję|Odrzucam|Wyślij werdykt/ }))
       .not.toBeInTheDocument();
   });
 

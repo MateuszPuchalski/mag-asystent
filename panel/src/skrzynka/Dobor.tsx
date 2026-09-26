@@ -128,7 +128,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
   /* „Pasuje do…": jedyne miejsce, gdzie pasowanie rodzi się Z PRACY. Kotwica
      to kartoteka, którą agent wskazał symbolem/numerem albo kartoteka oferty —
      inna niż wybrany kandydat. Kierunek narzucony (wybrany pasuje DO kotwicy),
-     bo taki jest sens pytania klienta. Bez automatu przy ZATWIERDŹ DOBÓR: rola
+     bo taki jest sens pytania klienta. Bez automatu przy „Zatwierdź dobór”: rola
      nieznana, a kotwica bywa samą częścią (klient pyta o dostępność gaźnika). */
   const zaproponujPasowanie = useZaproponujPasowanie();
   const [pasujeDo, setPasujeDo] = useState<number | null>(null);
@@ -225,17 +225,18 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
               : <span className={`shrink-0 text-podpis font-bold ${k.stan <= 0
                   ? "text-ranga-zle" : "text-emerald-700"}`}>dostępne {k.stan}</span>}
           </div>
+          {/* ── DROGA I ŹRÓDŁO W DYMKU PEWNOŚCI (0.517.0) ──────────────────
+              Do tego wydania stały pod symbolem osobną linią: czip drogi
+              i ucięte zdanie źródła, przy każdym kandydacie. To trzeci
+              plan z komentarza wyżej, a trzeci plan czytany przy każdym
+              wierszu przestaje być trzecim. Pewność JEST werdyktem z tego
+              źródła, więc dymek nad nią odpowiada na „skąd ta ocena". */}
           <div className="mt-1 flex flex-wrap items-center gap-1.5">
             <span className="font-mono text-xs text-slate-600">{k.symbol}</span>
-            <span className={`rounded px-1.5 py-0.5 text-podpis font-bold ${PEWNOSC[k.pewnosc].klasa}`}>
+            <span className={`cursor-help rounded px-1.5 py-0.5 text-podpis font-bold ${PEWNOSC[k.pewnosc].klasa}`}
+              title={`droga: ${NAZWA_DROGI[k.droga]} — ${k.zrodlo}`}>
               {PEWNOSC[k.pewnosc].etykieta}</span>
           </div>
-          {/* Źródło w JEDNEJ linii z pełnym zdaniem w dymku: zdanie
-              „trafienie po treści kartoteki dla…" łamało się na dwie
-              linie przy każdym kandydacie. */}
-          <p className="mt-1 truncate text-podpis text-slate-500" title={k.zrodlo}>
-            <span className="rounded bg-slate-100 px-1 py-0.5 font-semibold text-slate-600">droga: {NAZWA_DROGI[k.droga]}</span>
-            {" "}{k.zrodlo}</p>
         </div>
       </div>
       {k.ostrzezenia.map((o) => <p key={o} className="mt-1 flex items-center gap-1 rounded border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-podpis text-amber-900">
@@ -257,7 +258,10 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
           Plakietka „SZUKAMY" stała obok pola wyboru, które też mówiło
           „Szukamy". Zostaje pole, bo to w nim zmienia się stan, a barwę
           stanu niesie kropka przed nim. */}
-      <label className="flex items-center gap-1.5 text-xs text-slate-500">
+      {/* „Ustawił: X" zeszło do dymku pola (0.517.0): kto zmienił stan,
+          pyta się przy sporze, nie przy każdym spojrzeniu na zakładkę. */}
+      <label className="flex items-center gap-1.5 text-xs text-slate-500"
+        title={dobor.updatedBy ? `ustawił: ${dobor.updatedBy}` : undefined}>
         <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${
           KROPKA_STATUSU[dobor.status] ?? "bg-slate-300"}`} />
         <select className="field w-auto py-1 text-xs" aria-label="Status doboru" value={dobor.status}
@@ -274,7 +278,6 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
           {DO_WYBORU_DOBORU.map((s) => <option key={s} value={s}>{NAZWA_DOBORU[s]}</option>)}
         </select>
       </label>
-      {dobor.updatedBy && <span className="text-xs text-slate-500">ustawił: {dobor.updatedBy}</span>}
       {(pytamOBrak || dobor.status === "missing_information") &&
         <div className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-900">
           <AlertTriangle size={14} className="shrink-0" />
@@ -293,8 +296,11 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
     {/* ── Dane wejściowe (§11.1) ─────────────────────────────────────────── */}
     <section className="border-b p-3" aria-label="Dane wejściowe">
       <div className="mb-2 flex items-center gap-2">
-        <NaglowekSekcji>Dane wejściowe</NaglowekSekcji>
-        <span className="text-podpis text-slate-500">wersja {dobor.wersja}</span>
+        {/* Numer wersji w dymku (0.517.0): pilnuje zapisu przed
+            nadpisaniem, a agentowi nic nie mówi, dopóki nie ma konfliktu —
+            a konflikt nazywa się wtedy sam, zdaniem z nazwiskiem. */}
+        <span className="cursor-help" title={`wersja ${dobor.wersja}`}>
+          <NaglowekSekcji>Dane wejściowe</NaglowekSekcji></span>
         {!edycja && <button type="button" className="ml-auto inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"
           onClick={() => { setFormularz(naFormularz(dobor.dane)); setKonflikt(""); setEdycja(true); }}>
           <Pencil size={12} />{wypelnione.length ? "Popraw" : "Wpisz dane"}</button>}
@@ -414,7 +420,8 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
         {konflikt && <p className="col-span-2 flex items-center gap-1 text-xs font-semibold text-ranga-zle">
           <AlertTriangle size={13} />{konflikt}</p>}
         <div className="col-span-2 flex gap-2">
-          <Przycisk wariant="glowny" type="submit" disabled={zapisz.isPending}>ZAPISZ</Przycisk>
+          {/* Zdaniem, nie WERSALIKAMI (0.517.0) — jak reszta przycisków zakładki. */}
+          <Przycisk wariant="glowny" type="submit" disabled={zapisz.isPending}>Zapisz</Przycisk>
           <Przycisk type="button" onClick={() => { setEdycja(false); setKonflikt(""); }}>Anuluj</Przycisk>
         </div>
       </form>}
@@ -514,7 +521,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
                 <FileText size={14} />Wstaw do szkicu ze źródłem</Przycisk>
               {dobor.status !== "confirmed" && <Przycisk wariant="glowny" className="text-xs"
                 disabled={status.isPending} onClick={() => ustawStatus("confirmed", null, doSilnika)}>
-                <Check size={14} />ZATWIERDŹ DOBÓR</Przycisk>}
+                <Check size={14} />Zatwierdź dobór</Przycisk>}
             </div>
             {/* DO MASZYNY CZY DO SILNIKA — bez tego wyboru baza silnikowa nie
                 urosłaby nigdy, bo zatwierdzenie zawsze zapisywało maszynę.

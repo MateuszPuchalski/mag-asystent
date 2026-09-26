@@ -18,7 +18,8 @@ import { Edytor } from "../reklamacje/Edytor";
 import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamacje/Werdykt";
 import { Prowadzi } from "../sprawy/Prowadzi";
 import { useSzkicSprawy } from "../sprawy/useSzkicSprawy";
-import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { Blad, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
@@ -422,8 +423,15 @@ export function Reklamacje() {
       if (e.ctrlKey || e.altKey || e.metaKey || wPolu(e.target)) return;
       if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idz(1); }
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
-      else if (/^[1-3]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
-      else if (e.key === "4") przelacz(null);
+      /* Cyfry liczą się z długości `KUBELKI` (0.525.1), jak podpowiedzi przy
+         kubełkach. Stało tu na sztywno 1–3 i „4 = Wszystkie", a kubełki są
+         cztery: „Bez ruchu" nie miał klawisza, choć podpowiedź obiecywała 4,
+         a „Wszystkie" 5. Dopisanie kubełka nie może znów rozjechać klawiszy. */
+      else if (/^[1-9]$/.test(e.key)) {
+        const n = Number(e.key);
+        if (n <= KUBELKI.length) przelacz(KUBELKI[n - 1].id);
+        else if (n === KUBELKI.length + 1) przelacz(null);
+      }
       /* `m` jak „moje" — sito ma być jednym ruchem, bo o to właściciel
          prosił. Litera, nie cyfra: cyfry należą do kubełków i piąta z nich
          obiecywałaby piąty kubełek. */
@@ -506,7 +514,11 @@ export function Reklamacje() {
               pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
               zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
               kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
-          <FiltrSegmentowy<KubelekReklamacji | null> wybrany={kubelek} onWybierz={przelacz}
+          {/* Rozstrzygnięte i Bez ruchu pod „Więcej" (0.522.0): oba mówią
+              „tylko wgląd", więc nie stoją w wadze kubełka pracy. Cyfry dalej
+              je wybierają — powód przy `ui/FiltrZWiecej.tsx`. */}
+          <FiltrZWiecej<KubelekReklamacji | null> wybrany={kubelek} onWybierz={przelacz}
+            wiecej={["zamknieta", "bez_ruchu"]}
             pozycje={[
               ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
                 ile: data?.liczniki?.[k.id] ?? 0,
@@ -653,7 +665,7 @@ export function Reklamacje() {
             Zgoda przed wysłaniem zostaje przy OBU gałęziach — uznanie kosztuje
             pieniądze i jest równie nieodwracalne co odmowa. */}
         {szczegol.data && <div className="shrink-0"><Werdykt reklamacja={szczegol.data.reklamacja}
-          trwa={werdykt.isPending} blad={bladWerdyktu}
+          czat={szczegol.data.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
           trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
           onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)} /></div>}
       </Karta>

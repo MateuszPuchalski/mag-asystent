@@ -20,8 +20,10 @@ export function ZakresDostaw({ a }: { a: AnalizaDostaw }) {
   return <>
     <KartaWgladu tytul="Dostawy w oknie">
       <div className="flex flex-wrap gap-8">
+        {/* Bez „w N dniach" (0.512.0): okno stoi w nagłówku Analizy
+            i na wybranym czipie, a trzecie powtórzenie tylko wydłużało etykietę. */}
         <Liczba ile={a.zamknietych}
-          etykieta={`${odmien(a.zamknietych, "dostawa domknięta", "dostawy domknięte", "dostaw domkniętych")} w ${a.dni} dniach`} />
+          etykieta={odmien(a.zamknietych, "dostawa domknięta", "dostawy domknięte", "dostaw domkniętych")} />
         <Liczba ile={a.pozycjiRozlozonych}
           etykieta={odmien(a.pozycjiRozlozonych, "pozycja rozłożona", "pozycje rozłożone", "pozycji rozłożonych")} />
         <Liczba ile={dniPl(a.medianaDni)} etykieta="mediana czasu rozłożenia" />

@@ -1,8 +1,10 @@
-import React, { useState, type MutableRefObject } from "react";
-import type { Zwrot } from "../api/typy";
+import React, { useContext, useState, type MutableRefObject } from "react";
+import { QueryClientContext } from "@tanstack/react-query";
+import type { KoszZwrotow, Zwrot } from "../api/typy";
 import { Przycisk, Pole, Blad, Skopiuj, dzien } from "../ui";
-import { zlote } from "../api/zwroty";
 import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
+import { kluczeZwrotow } from "../api/zwroty";
+import { szybkaSciezka } from "./regulaSzybkiej";
 
 /* ── Pasek decyzji zwrotu (0.156.0) ──────────────────────────────────────────
    Do tego wydania klawisze z §25a.2 stały tu jako PODPISY: `kubelekZwrotu`
@@ -41,12 +43,16 @@ type Props = {
   blad: string;
   /** Rejestr akcji dla klawiszy kubełka (`zwroty/klawisze.ts`). */
   akcje?: MutableRefObject<AkcjeKlawiszy>;
-  /** Czy klawisz `Z` odda pieniądze (0.484.7) — bez tego zdanie o nim milczy. */
+  /**
+   * Czy klawisz `Z` odda pieniądze (0.484.7). NIEUŻYWANE od 0.516.0: zdanie
+   * „albo klawiszem Z" zeszło, bo klawisz stoi na przycisku w „Pieniądzach"
+   * tuż niżej. Ekran dalej je podaje; prop zejdzie przy jego następnej zmianie.
+   */
   moznaZwrocic?: boolean;
 };
 
 export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnijKwote,
-  onCofnijWerdykt, trwa, blad, akcje, moznaZwrocic = false }: Props) {
+  onCofnijWerdykt, trwa, blad, akcje }: Props) {
   const [odmowa, setOdmowa] = useState(false);
   const [powod, setPowod] = useState("");
   /* PRZED gałęziami kubełków, bo to hak — a gałęzie kończą się `return`.
@@ -58,16 +64,33 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
   /* Numer korekty PRZEPISUJE człowiek z Subiekta — panel go nie wywiedzie
      z niczego, bo read-model zna tylko dokumenty zakupu (FZ, PZ). */
   const [numer, setNumer] = useState("");
+  /* Pudła do reguły szybkiej ścieżki — Z PAMIĘCI zapytań, nie z nowego
+     zapytania. Ekran subskrybuje je sam (`useKosz`), więc tu wystarczy
+     odczyt: reguła ma widzieć te same pudła co przycisk „Wszystko OK",
+     inaczej przeoczy przeszkodę „kilka otwartych pudeł" i zdejmie wagę
+     z „Przyjmij" dokładnie wtedy, gdy to jedyna droga. Kontekst, nie
+     `useQueryClient`, bo pasek renderuje się też bez dostawcy (testy). */
+  const klient = useContext(QueryClientContext);
+  const pudla = klient?.getQueryData<{ kosze: KoszZwrotow[] }>(kluczeZwrotow.kosz)?.kosze ?? [];
 
   const ramka = "border-b border-slate-200 bg-slate-50 p-4";
 
   if (zwrot.kubelek === "decyzja") {
+    /* JEDEN GŁÓWNY PRZYCISK NA WIDOK (0.516.0, §26d). Nad paskiem stoi
+       „Wszystko OK" (`SzybkiZwrot`), też główny — dwa zielone przyciski
+       jeden pod drugim każą wybierać, który jest „ten". Gdy szybka ścieżka
+       jest gotowa, „Przyjmij" schodzi do drugiego rzędu; klawisz P zostaje.
+       Gdy szybka ścieżka stoi z przeszkodą, „Przyjmij" zostaje główny:
+       wyłączony przycisk nie jest drogą. */
+    const szybka = szybkaSciezka(zwrot, pudla);
+    const przyjmijGlowny = !(szybka.pokaz && szybka.przeszkoda === null);
     return <div className={ramka}>
       {!odmowa
         ? <div className="flex flex-wrap gap-2">
-            <Przycisk wariant="glowny" disabled={trwa}
+            <Przycisk wariant={przyjmijGlowny ? "glowny" : "drugi"} disabled={trwa}
               onClick={() => onWerdykt("przyjety", null)}>
-              <kbd className="rounded border border-black/20 px-1 text-xs">P</kbd> Przyjmij
+              <kbd className={`rounded border px-1 text-xs ${przyjmijGlowny
+                ? "border-black/20" : "border-slate-300"}`}>P</kbd> Przyjmij
             </Przycisk>
             <Przycisk disabled={trwa} onClick={() => setOdmowa(true)}>
               <kbd className="rounded border border-slate-300 px-1 text-xs">O</kbd> Odrzuć
@@ -135,20 +158,15 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
     const pobranie = zwrot.zamowienie?.platnoscTyp === "CASH_ON_DELIVERY";
     const automat = zwrot.terminAt
       ? new Date(Date.parse(zwrot.terminAt) + 86_400_000).toISOString() : null;
+    /* KWOTA STOI RAZ, W „PIENIĄDZACH" (0.516.0, §26d). Ta sama liczba
+       stała tu, w sekcji pieniędzy i w stopce pozycji — trzy razy na jednym
+       ekranie. Zeszło też „oddaj je w Allegro albo klawiszem Z": przycisk
+       z klawiszem stoi linijkę niżej, a przy pobraniu drogę mówi serwer. */
     return <div className={ramka}>
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-slate-500">Do oddania</span>
-        <b className="tabular-nums">{zlote(zwrot.kwotaGrosze, zwrot.waluta)}</b>
-        {zwrot.korektaNumer && <span className="text-xs text-slate-500">
-          korekta {zwrot.korektaNumer}</span>}
-      </div>
-      <p className="mt-1 text-xs text-slate-600">
-        {pobranie
-          ? "Pieniądze jeszcze nie wyszły. Oddaj je przelewem i zapisz przelew niżej."
-          /* „Albo klawiszem Z" tylko wtedy, gdy Z coś zrobi (0.484.7). */
-          : <>Pieniądze jeszcze nie wyszły — oddaj je w Allegro
-            {moznaZwrocic && <> albo klawiszem <kbd>Z</kbd></>}.
-            {automat && <> Allegro odda całość samo {dzien(automat)}, bez potrącenia.</>}</>}
+      <p className="text-xs text-slate-600">
+        Pieniądze jeszcze nie wyszły.
+        {zwrot.korektaNumer && <> Korekta {zwrot.korektaNumer}.</>}
+        {!pobranie && automat && <> Allegro odda całość samo {dzien(automat)}, bez potrącenia.</>}
       </p>
       {/* DROGA DO POPRAWKI STOI TUTAJ (0.484.7). Sygnał „kwota?" i odmowa
           wypłaty mówiły „popraw kwotę", a w tym stanie nie było ani
@@ -187,13 +205,11 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
           więc tu, i tylko tu, da się ją poprawić. Pomyłka w zaznaczeniu
           pozycji zostawała dotąd na zawsze: pasek wyceny znika razem
           z kubełkiem DO ZWROTU. */}
-      {zwrot.kwotaGrosze !== null && <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-        <span className="text-slate-500">Do oddania</span>
-        <b className="tabular-nums">{zlote(zwrot.kwotaGrosze, zwrot.waluta)}</b>
-        <button type="button" disabled={trwa} onClick={onCofnijKwote}
-          className="text-xs text-slate-500 underline underline-offset-2 disabled:opacity-50">
-          popraw kwotę</button>
-      </div>}
+      {/* Sama kwota zeszła stąd (0.516.0) — stoi w „Pieniądzach" niżej.
+          Zostaje droga wyjścia, bo to ona jest powodem tego bloku. */}
+      {zwrot.kwotaGrosze !== null && <button type="button" disabled={trwa} onClick={onCofnijKwote}
+        className="mb-2 block text-xs text-slate-500 underline underline-offset-2 disabled:opacity-50">
+        popraw kwotę</button>}
       {/* KTO WYSTAWIA ZW (0.349.0). „Wystawiasz w Subiekcie" było prawdą, dopóki
           robiło to wyłącznie biuro. Przy zleconym automacie zdanie mówi, że numer
           przyjdzie sam — inaczej biuro wystawiłoby drugi dokument obok. Pole
@@ -243,12 +259,29 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
     </div>;
   }
 
+  /* STAN KOŃCOWY BEZ KOREKTY I POWODU NIE MA RAMKI (0.516.0, §26d).
+     Stało tu „nie ma tu decyzji do podjęcia" — oś etapów wyżej mówi już
+     „Zamknięty" albo „Odrzucony", a pusta ramka tylko zabierała wzrok. */
+  if (!zwrot.korektaNumer && !(zwrot.kubelek === "odrzucony" && zwrot.werdyktPowod)) {
+    return blad ? <div className={ramka}><Blad>{blad}</Blad></div> : null;
+  }
+
+  /* Skąd wziął się numer, jest częścią informacji — ta sama zasada co
+     przy dokumencie sprzedaży (§4.3). Fakt z danych nie ma udawać
+     czyjejś decyzji, a decyzja nie ma udawać faktu. Od 0.516.0 mówi to
+     podpowiedź przy numerze, nie osobna linijka: czyta się ją raz. */
+  const skadKorekta = zwrot.korektaZrodlo === "subiekt"
+    ? "Znaleziona w Subiekcie — dokument koryguje tę sprzedaż."
+    : zwrot.korektaZrodlo === "sfera"
+      ? "Wystawiona automatycznie po zapisaniu kwoty."
+      : "Numer przepisany w panelu.";
+
   return <div className={ramka}>
     {zwrot.korektaNumer
       ? <>
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="text-slate-500">Korekta</span>
-            <b className="mr-auto">{zwrot.korektaNumer}</b>
+            <b className="mr-auto" title={skadKorekta}>{zwrot.korektaNumer}</b>
             {/* Cofnięcie zamiast potwierdzenia (§25a.5) — i tak samo dostępne
                 dla numeru znalezionego przez automat: cofnięcie cudzej pomyłki
                 nie ma być trudniejsze niż cofnięcie własnej. */}
@@ -256,16 +289,6 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
               <kbd className="rounded border border-slate-300 px-1 text-xs">R</kbd> Cofnij korektę
             </Przycisk>
           </div>
-          {/* Skąd wziął się numer, jest częścią informacji — ta sama zasada co
-              przy dokumencie sprzedaży (§4.3). Fakt z danych nie ma udawać
-              czyjejś decyzji, a decyzja nie ma udawać faktu. */}
-          <p className="mt-0.5 text-xs text-slate-500">
-            {zwrot.korektaZrodlo === "subiekt"
-              ? "Znaleziona w Subiekcie — dokument koryguje tę sprzedaż."
-              : zwrot.korektaZrodlo === "sfera"
-                ? "Wystawiona automatycznie po zapisaniu kwoty."
-                : "Numer przepisany w panelu."}
-          </p>
         </>
       : zwrot.kubelek === "odrzucony" && zwrot.werdyktPowod
         /* POWÓD ODMOWY WIDOCZNY (0.210.0). Zapisywał się do bazy i nikt go nie
@@ -275,15 +298,15 @@ export function Decyzje({ zwrot, onWerdykt, onKorekta, onCofnijKorekte, onCofnij
         ? <div className="text-sm">
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-slate-500">Odmówiono</span>
-              <b className="mr-auto">{zwrot.werdyktPowod}</b>
+              {/* Wskazówka „napisz mu w skrzynce" zeszła do podpowiedzi
+                  (0.516.0): operator zna ją po pierwszym razie. */}
+              <b className="mr-auto"
+                title="Powód został u nas. Jeśli klient go jeszcze nie zna, napisz mu w skrzynce.">
+                {zwrot.werdyktPowod}</b>
               <Skopiuj tekst={zwrot.werdyktPowod} tytul="Kopiuj powód odmowy" />
             </div>
-            <p className="mt-0.5 text-xs text-slate-500">
-              Powód został u nas. Jeśli klient go jeszcze nie zna, napisz mu
-              w skrzynce.
-            </p>
           </div>
-        : <p className="text-xs text-slate-500">Stan końcowy — nie ma tu decyzji do podjęcia.</p>}
+        : null}
     {blad && <Blad>{blad}</Blad>}
   </div>;
 }

@@ -24,9 +24,18 @@ import { PasowanieZSieci } from "./PasowanieZSieci";
  *
  * Nowego widoku dla ofert NIE MA i to jest decyzja, nie skrót: robota jest ta
  * sama co do joty, a rozdzielenie jej na dwa ekrany kazałoby człowiekowi
- * pamiętać o dwóch kolejkach zamiast o jednej. *
- * Odsyłacze od dostawców stoją tu jako pierwsza karta z tego samego powodu:
- * to trzecie źródło wiedzy z dokumentu, a siódma zakładka połamałaby rząd.
+ * pamiętać o dwóch kolejkach zamiast o jednej.
+ *
+ * Odsyłacze od dostawców stoją tu z tego samego powodu: to trzecie źródło
+ * wiedzy z dokumentu, a siódma zakładka połamałaby rząd.
+ *
+ * NARZĘDZIA POD LISTĄ, ZWINIĘTE (0.510.0). Cztery karty — „Pasuje do"
+ * z ofert, pasowanie z sieci, odsyłacze i wykaz części — stały NAD listą,
+ * dwie z głównym przyciskiem. Agent otwierał zakładkę, żeby przerobić wiersze,
+ * a zaczynał od przewijania narzędzi uruchamianych raz na tydzień. Teraz
+ * praca stoi na wierzchu, a narzędzia jedno kliknięcie niżej. Przebieg
+ * z sieci na żądanie (decyzja właściciela z 0.508.0) zostaje w zasięgu
+ * tego jednego kliknięcia.
  */
 export function ZOpisow() {
   const lista = useModeleZOpisow();
@@ -35,12 +44,12 @@ export function ZOpisow() {
   const [blad, setBlad] = useState("");
   const [ostatnie, setOstatnie] = useState("");
   const wiersze = lista.data?.wiersze ?? [];
+  /* Karty narzędzi montują się przy PIERWSZYM rozwinięciu i zostają. Zwinięte
+     nie pytają serwera o cztery stany, których nikt nie ogląda. Zwinięcie
+     w trakcie zbiórki jej nie przerywa — przerwałoby odmontowanie. */
+  const [narzedzia, setNarzedzia] = useState(false);
 
   return <div className="space-y-3">
-    <PasujeDoOfert />
-    <PasowanieZSieci />
-    <Odsylacze />
-    <WykazCzesci />
     <p className="text-xs text-slate-500">
       Teksty z opisów kartotek i z list zgodności naszych ofert. Wskaż markę i model —
       powstanie propozycja do kolejki. Odrzuć, gdy to nie jest lista modeli;
@@ -66,6 +75,17 @@ export function ZOpisow() {
         `Zakladki` w ekranie Wiedza). Obie sekcje to ta sama robota: wiedza
         wyjęta z kartotek, którą człowiek zamienia na zastosowania. */}
     <Tokeny />
+    <details className="rounded-lg border border-slate-200 px-3 py-2"
+      onToggle={(e) => { if (e.currentTarget.open) setNarzedzia(true); }}>
+      <summary className="cursor-pointer text-sm font-semibold">
+        Importy i zbiórki — „Pasuje do” z ofert, pasowanie z sieci, odsyłacze, wykazy części</summary>
+      {narzedzia && <div className="mt-3 space-y-3">
+        <PasujeDoOfert />
+        <PasowanieZSieci />
+        <Odsylacze />
+        <WykazCzesci />
+      </div>}
+    </details>
   </div>;
 }
 

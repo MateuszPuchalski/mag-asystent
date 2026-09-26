@@ -227,6 +227,16 @@ describe("Ekran reklamacji", () => {
     expect(screen.getByText("Uznać czy odrzucić?")).toBeInTheDocument();
   });
 
+  it("kubełki „tylko wgląd” stoją pod „Więcej” z licznikiem, a cyfra dalej je wybiera", async () => {
+    pokaz();
+    expect(screen.queryByRole("button", { name: /Rozstrzygnięte/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /^Rozstrzygnięte · \d+$/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /^Bez ruchu · \d+$/ })).toBeInTheDocument();
+    await userEvent.keyboard("3");
+    const lista = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
+    expect(lista.selectedOptions[0].textContent).toMatch(/^Rozstrzygnięte/);
+  });
+
   it("kubełek DO DECYZJI pokazuje tylko sprawy przed werdyktem", () => {
     pokaz();
     expect(screen.getByText("111/2026")).toBeInTheDocument();
@@ -235,7 +245,10 @@ describe("Ekran reklamacji", () => {
 
   it("przełączenie kubełka przestawia KURSOR na jego pierwszą sprawę", async () => {
     pokaz("/obsluga/reklamacje/1");
-    await userEvent.click(screen.getByTitle(/Tylko wgląd\. \(klawisz 3\)/));
+    /* Rozstrzygnięte stoją od 0.522.0 pod „Więcej" — wybór z listy jest tym
+       samym przełączeniem kubełka co klik w pigułkę. */
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"),
+      screen.getByRole("option", { name: /^Rozstrzygnięte/ }));
     /* Bez przestawienia kursora środkowa kolumna pokazywałaby rozmowę ze
        sprawy z poprzedniego kubełka. Wiersz kolejki JEST wybrany — a numer
        stoi też w kolumnie dowodów, i od 0.403.0 w PRZYCISKU: nagłówek zwijki
@@ -270,8 +283,8 @@ describe("Ekran reklamacji", () => {
     /* `DOCUMENT_POSITION_FOLLOWING` liczone OD rozmowy: pasek ma stać za nią. */
     expect(rozmowa.compareDocumentPosition(pasek)
       & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole("button", { name: /UZNAJĘ/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /ODRZUCAM/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Uznaję/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Odrzucam/ })).toBeInTheDocument();
     expect(screen.queryByText(/Centrum Sprzedaży/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Odpowiedź .* wysyła się/)).not.toBeInTheDocument();
   });
@@ -280,10 +293,10 @@ describe("Ekran reklamacji", () => {
     /* Wersja z ekranu jest obowiązkowa po stronie serwera: werdykt bez
        wiedzy, na co agent patrzył, to werdykt w ciemno. Ekran ją dokłada sam. */
     pokaz("/obsluga/reklamacje/1");
-    await userEvent.click(screen.getByRole("button", { name: /ODRZUCAM/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Odrzucam/ }));
     await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Towar sprawny.");
     await userEvent.click(screen.getByRole("checkbox"));
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ WERDYKT/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij werdykt/ }));
     expect(bezOdswiezenia()).toEqual([
       `werdykt:${JSON.stringify({
         id: 1, werdykt: "REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED",
@@ -331,7 +344,7 @@ describe("Ekran reklamacji", () => {
       wiad({ id: 2, externalId: "w-2", autorRola: "SELLER", tresc: "Proszę o zdjęcie" }),
     ]);
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(bezOdswiezenia()).toEqual([`odpowiedz:${JSON.stringify({
       id: 1, tresc: "Wysyłam nowy nóż", expectedWersja: 1,
       expectedLastMessageId: 1, mimoNowejWiadomosci: false,
@@ -348,7 +361,7 @@ describe("Ekran reklamacji", () => {
       nowaWiadomosc: { id: 7, tresc: "Proszę o zdjęcie noża", at: null, rola: "ADMIN" },
     });
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(screen.getByRole("dialog", { name: "Wysyłka zatrzymana" })).toBeInTheDocument();
     expect(screen.getByText(/doradca Allegro dopisał wiadomość/)).toBeInTheDocument();
     /* Szkic zostaje NIETKNIĘTY: serwer odrzucił wysyłkę przed strzałem. */
@@ -365,7 +378,7 @@ describe("Ekran reklamacji", () => {
       nowaWiadomosc: { id: 7, tresc: "Dopisuję", at: null, rola: "BUYER" },
     });
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(screen.getByText(/klient dopisał wiadomość/)).toBeInTheDocument();
     const mimoTo = screen.getByRole("button", { name: "WYŚLIJ MIMO TO" });
     expect(mimoTo).toBeDisabled();
@@ -385,12 +398,12 @@ describe("Ekran reklamacji", () => {
     scena.wynikWysylki = { status: "sent" };
     const pole = screen.getByLabelText("Odpowiedź w sprawie");
     await userEvent.type(pole, "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(pole).toHaveValue("");
 
     scena.wynikWysylki = { status: "send_uncertain" };
     await userEvent.type(pole, "Druga próba");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(pole).toHaveValue("Druga próba");
     expect(screen.getByText(/nie dała jednoznacznej odpowiedzi/)).toBeInTheDocument();
   });
@@ -402,7 +415,7 @@ describe("Ekran reklamacji", () => {
     scena.wynikWysylki = new Konflikt(
       "Allegro zamknęło rozmowę w tej sprawie i nie przyjmie nowej wiadomości.", {});
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText(/Allegro zamknęło rozmowę/)).toBeInTheDocument();
   });
@@ -428,7 +441,7 @@ describe("Ekran reklamacji", () => {
     pokaz("/obsluga/reklamacje/1");
     scena.wynikWysylki = { status: "sent" };
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(scena.mutacje).toContain(`odswiez:${JSON.stringify({ id: 1 })}`);
   });
 
@@ -439,7 +452,7 @@ describe("Ekran reklamacji", () => {
     const przed = scena.mutacje.filter((m) => m.startsWith("odswiez:")).length;
     scena.wynikWysylki = new Konflikt("Allegro zamknęło rozmowę w tej sprawie", {});
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(scena.mutacje.filter((m) => m.startsWith("odswiez:")).length).toBe(przed);
   });
 
@@ -471,6 +484,22 @@ describe("Ekran reklamacji", () => {
 
     await userEvent.click(screen.getByRole("button", { name: "pokaż wszystkie" }));
     expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+  });
+
+  it("cyfry idą za kubełkami: 4 to „Bez ruchu”, 5 to „Wszystkie”", async () => {
+    /* 0.525.1: 1–3 i „4 = Wszystkie" stały na sztywno, choć kubełki są
+       cztery — „Bez ruchu" nie miał klawisza, a podpowiedzi obiecywały 4 i 5. */
+    pokaz();
+    await userEvent.keyboard("4");
+    expect(screen.getByText("Nic tu nie zrobimy.")).toBeInTheDocument();
+    expect(screen.queryByText("111/2026")).not.toBeInTheDocument();
+    await userEvent.keyboard("5");
+    /* Numer stoi też w kolumnie dowodów wybranej sprawy — liczy się, że
+       oba wiersze są na liście, więc `getAll`. */
+    expect(screen.getAllByRole("button", { name: /111\/2026/ }).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole("button", { name: /222\/2026/ }).length).toBeGreaterThan(0);
+    await userEvent.keyboard("1");
+    expect(screen.getByText("Uznać czy odrzucić?")).toBeInTheDocument();
   });
 
   it("klawisz `m` przełącza sito, ale MILCZY w polu tekstowym", async () => {
