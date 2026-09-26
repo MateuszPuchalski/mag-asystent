@@ -9,6 +9,7 @@ import { Kafel } from "../towar/Kafel";
 import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
 import { PrzypietePytanie } from "./PrzypietePytanie";
 import { NAZWA_ZDARZENIA_ZWROTU } from "../zwroty/Os";
+import { DlugiTekst, KLASA_PRZELACZNIKA, useRozwiniecie } from "./DlugiTekst";
 
 /* Załączniki wiadomości (0.155.0). Sonda pokazała je w 7 z 39 wiadomości —
    do tej pory rozmowa milczała o tym, że klient coś przysłał.
@@ -63,30 +64,12 @@ function Zalacznik({ z }: { z: ZalacznikOsi }) {
     powodBrakuPobrania={POWOD[z.status] ?? `stan ${z.status}`} />;
 }
 
-/**
- * Blok firmowy pod odpowiedzią, ZWINIĘTY (0.219.1).
- *
- * Nazwa spółki, adres, NIP, KRS, REGON, telefon — siedem wierszy, w każdej
- * naszej wiadomości te same, i ani jeden o sprawie klienta. Przy trzech
- * odpowiedziach w wątku stopka zajmowała na osi więcej miejsca niż wszystko,
- * co naprawdę napisaliśmy.
- *
- * Zwinięta, nie skasowana — z tego samego powodu, co autoodpowiedź: to jest
- * treść, którą klient DOSTAŁ, i przy sporze musi dać się przeczytać w panelu.
- * Podpis człowieka („Z poważaniem, Mateusz") zostaje wyżej, w treści: mówi,
- * z kim klient rozmawiał, więc nie jest stopką.
- */
-function Stopka({ tresc }: { tresc: string }) {
-  const [otwarte, setOtwarte] = React.useState(false);
-  return <div className="mt-1">
-    <button type="button" className="text-podpis text-slate-500 underline hover:text-slate-600"
-      aria-expanded={otwarte} onClick={() => setOtwarte(!otwarte)}>
-      {otwarte ? "ukryj stopkę firmową" : "stopka firmowa"}
-    </button>
-    {otwarte && <p className="mt-1 whitespace-pre-wrap border-t pt-1 text-xs text-slate-500">
-      {tresc}</p>}
-  </div>;
-}
+/* Blok firmowy pod odpowiedzią, ZWINIĘTY (0.219.1): nazwa spółki, adres,
+   NIP, KRS, REGON, telefon — siedem wierszy w każdej naszej wiadomości i ani
+   jeden o sprawie klienta. Zwinięty, nie skasowany: to treść, którą klient
+   DOSTAŁ. Podpis człowieka („Z poważaniem, Mateusz") zostaje w treści, bo
+   mówi, z kim klient rozmawiał. Od 0.523.0 stopkę odsłania ten sam
+   przełącznik co długą wypowiedź — `DlugiTekst`, powód tam. */
 
 /**
  * Nasze automatyczne potwierdzenie, ZWINIĘTE do jednej linijki (0.218.0).
@@ -102,15 +85,17 @@ function Stopka({ tresc }: { tresc: string }) {
  * dalej i pokazuje całość.
  */
 function Autoodpowiedz({ wpis }: { wpis: WpisOsi }) {
-  const [otwarte, setOtwarte] = React.useState(false);
+  /* Stan ze wspólnego haka (0.523.0); cały wiersz zostaje przyciskiem,
+     bo zwinięta autoodpowiedź ma być jedną linijką, nie dwiema. */
+  const { otwarte, przelacznik } = useRozwiniecie();
   return <article className="ml-auto max-w-[75ch] rounded-lg border border-dashed
       border-slate-200 bg-slate-50/70 px-3 py-1.5">
     <button type="button" className="flex w-full items-center gap-2 text-left text-xs text-slate-400"
-      aria-expanded={otwarte} onClick={() => setOtwarte(!otwarte)}>
+      {...przelacznik}>
       <Bot size={12} className="shrink-0" />
       <span className="font-bold uppercase tracking-wide">Autoodpowiedź biura</span>
       <span>{czas(wpis.at)}</span>
-      <span className="ml-auto underline">{otwarte ? "zwiń" : "pokaż treść"}</span>
+      <span className={`ml-auto ${KLASA_PRZELACZNIKA}`}>{otwarte ? "zwiń" : "pokaż treść"}</span>
     </button>
     {otwarte && <p className="mt-1 whitespace-pre-wrap border-t pt-1 text-tresc text-slate-500">
       {wpis.tresc}</p>}
@@ -173,7 +158,7 @@ export function dogonicDol(el: { scrollHeight: number; scrollTop: number; client
 }
 
 export function Os({
-  wpisy, rozmowaId, skokNaDol = 0, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu, koniec,
+  wpisy, rozmowaId, skokNaDol = 0, zrodloPomiaru, mozeZlecac, onZrodlo, onWstawDoSzkicu, koniec, powiazanie,
 }: {
   wpisy: WpisOsi[];
   /** Która rozmowa. Zmiana tej wartości zjeżdża oś na dół bez pytania. */
@@ -194,6 +179,12 @@ export function Os({
    * `data-wpis` — skok po identyfikatorze i obserwator pytania go nie widzą.
    */
   koniec?: React.ReactNode;
+  /**
+   * Oferta i zamówienie CAŁEJ rozmowy (0.523.0) — te, które pokazuje pasmo
+   * odpowiedzi i kolumna kontekstu. Wiadomość powtarza je w nagłówku tylko
+   * wtedy, gdy wskazuje coś INNEGO. Bez tej wartości oś pokazuje każde.
+   */
+  powiazanie?: { ofertaId: string | null; zamowienieId: string | null };
 }) {
   const listaRef = React.useRef<HTMLDivElement>(null);
   const [podswietlony, setPodswietlony] = React.useState<string | null>(null);
@@ -382,9 +373,17 @@ export function Os({
             {/* Nazwa przy ofercie jest Z ZAMÓWIENIA (§4.3) — mail Allegro
                 „Wiadomość dotyczy" pokazuje tytuł, goły numer kazał agentowi
                 szukać towaru drugi raz. Zamówienie skracamy: UUID w całości
-                nikomu nic nie mówi, a całość niesie blok nad osią. */}
-            {w.ofertaId && <span>· oferta {w.ofertaId}{w.nazwaOferty && ` — ${w.nazwaOferty}`}</span>}
-            {w.zamowienieId && <span title={w.zamowienieId}>· zamówienie {w.zamowienieId.slice(0, 8)}…</span>}
+                nikomu nic nie mówi, a całość niesie blok nad osią.
+
+                TYLKO GDY INNE NIŻ ROZMOWY (0.523.0). Ta sama oferta i to samo
+                zamówienie stały w nagłówku każdej wiadomości klienta, choć
+                pasmo odpowiedzi i kolumna kontekstu mówią je raz na rozmowę.
+                Nie zdejmujemy ich w ogóle, bo wiadomość spod INNEJ oferty to
+                sygnał: klient pyta o dwa towary w jednym wątku. */}
+            {w.ofertaId && w.ofertaId !== powiazanie?.ofertaId
+              && <span>· oferta {w.ofertaId}{w.nazwaOferty && ` — ${w.nazwaOferty}`}</span>}
+            {w.zamowienieId && w.zamowienieId !== powiazanie?.zamowienieId
+              && <span title={w.zamowienieId}>· zamówienie {w.zamowienieId.slice(0, 8)}…</span>}
           </div>
           {/* JEDEN SZCZEBEL PO OBU STRONACH (0.258.0). Do 0.257.0 pytanie klienta
               miało 15 px, a nasza odpowiedź 14 — różnica rozmiaru wyciszała to,
@@ -394,8 +393,7 @@ export function Os({
               który to wydanie naprawia w siedemnastu innych miejscach. */}
           {w.odKlienta
             ? <p className="mt-1 whitespace-pre-wrap text-tresc">{w.tresc}</p>
-            : <NaszaTresc tresc={w.tresc} />}
-          {w.stopka && <Stopka tresc={w.stopka} />}
+            : <NaszaTresc tresc={w.tresc} stopka={w.stopka} />}
           {w.zalaczniki?.length ? <Zalaczniki lista={w.zalaczniki} /> : null}
           {/* „Zleć" NA WIERZCHU TYLKO PRZY PYTANIU BEZ ODPOWIEDZI (0.506.0).
               Stał pod każdą wiadomością klienta, więc na długiej osi ten sam
@@ -646,18 +644,9 @@ function Zlecenie({ wpis }: { wpis: WpisOsi }) {
    całą oś, a pytanie klienta stało wciśnięte nad polem odpowiedzi. Własną
    treść agent już zna — wystarczy mu jej początek, całość na kliknięcie.
    Puste wiersze ponad jeden ściskamy WYŁĄCZNIE na ekranie: treść w bazie
-   i w Allegro zostaje taka, jaka poszła. */
-const PROG_ZWINIECIA = 320;
-
-function NaszaTresc({ tresc }: { tresc: string }) {
-  const [cala, setCala] = React.useState(false);
+   i w Allegro zostaje taka, jaka poszła. Próg i przełącznik mieszkają od
+   0.523.0 w `DlugiTekst.tsx`, razem ze stopką. */
+function NaszaTresc({ tresc, stopka }: { tresc: string; stopka?: string | null }) {
   const zwarta = tresc.replace(/\n[ \t]*(\n[ \t]*){2,}/g, "\n\n").trim();
-  const dluga = zwarta.length > PROG_ZWINIECIA || zwarta.split("\n").length > 5;
-  return <>
-    <p className={`mt-1 whitespace-pre-wrap text-tresc text-slate-600 ${dluga && !cala ? "line-clamp-4" : ""}`}>
-      {zwarta}</p>
-    {dluga && <button type="button" onClick={() => setCala((c) => !c)} aria-expanded={cala}
-      className="mt-1 text-xs font-semibold text-sky-800 underline underline-offset-2">
-      {cala ? "Zwiń" : "Pokaż całą wiadomość"}</button>}
-  </>;
+  return <DlugiTekst tresc={zwarta} stopka={stopka} className="text-tresc text-slate-600" />;
 }
