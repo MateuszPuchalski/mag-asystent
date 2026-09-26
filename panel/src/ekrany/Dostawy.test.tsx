@@ -5,7 +5,8 @@ import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dostawy } from "./Dostawy";
-import { kubelekDokumentu } from "../dostawy/Kolejka";
+import { kubelekDokumentu, wiekDokumentu } from "../dostawy/Kolejka";
+import { Wyjatek as WyjatekWiersz } from "../dostawy/Wyjatek";
 import type { Dokument, DokumentDostawy, Wyjatek } from "../api/dostawy";
 import { _wyczyscPamiecZdjec } from "../towar/useZdjecie";
 
@@ -100,12 +101,19 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
     return { problems: [wyj(1), wyj(2, { deliveryId: 60, dokId: 700, docNumber: "FZ 700/MAG/07/2026" }),
       wyj(3, { deliveryId: null, dokId: null, docNumber: null, sym: null, symObcy: "OBCY-1" })] };
   }
-  if (url === "/api/biuro/zamkniete-poza") return { documents: [] };
+  if (url === "/api/biuro/zamkniete-poza") return { documents: [{ dokId: 901, nrPelny: "FZ 901/MAG/08/2026",
+    dostawca: "Rosa-Pol", dataWyst: "2026-08-16", zamknietaAt: "2026-08-17T09:00:00.000Z",
+    zamknietaBy: "Anna", powod: "Rozłożone bezpośrednio z palety przed wdrożeniem kolektorów w hali", linie: 3 }] };
   if (url === "/api/health") return zdjeciaWHealth ? { zdjecia: { plikow: 3 } } : {};
   if (url === "/api/biuro/notatki/odpowiedzi") return { odpowiedzi: [] };
   if (url === "/api/biuro/dokument/802") return DOKUMENT;
   if (url === "/api/biuro/dokument/806") return { ...DOKUMENT_ZE_ZDJECIEM(), dokId: 806 };
   if (url === "/api/biuro/dokument/803") return DOKUMENT_803;
+  /* Nietknięta: pozycje „do zrobienia" i wyjątek sprzed 0.21.0 bez towaru. */
+  if (url === "/api/biuro/dokument/805") return { ...DOKUMENT, dokId: 805, nrPelny: "FZ 805/MAG/09/2026",
+    status: null, lines: DOKUMENT.lines.map((l) => ({ ...l, status: "todo", qtyDone: 0, problemy: [] })),
+    problemyBezLinii: [wyj(31, { lineId: null, typ: "no_space", typLabel: "Brak miejsca", sym: null,
+      symObcy: null, qtyDok: null })] };
   if (url === "/api/biuro/dokument/804") return { ...DOKUMENT, dokId: 804, nrPelny: "FZ 804/MAG/09/2026",
     lines: DOKUMENT.lines.map((l) => ({ ...l, status: "done", problemy: [] })) };
   /* Zgłoszenie ze zdjęciem, którego pliku serwer nie ma — `/api/problems/9/photo` daje 404. */
@@ -184,8 +192,10 @@ describe("Obrazy na ekranie dostaw", () => {
     await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
     await screen.findByText("RP-2201");
     expect(screen.queryByRole("columnheader", { name: "Zdjęcie" })).toBeNull();
-    /* Pozycja z wyjątkiem ma swoje zdjęcie od 0.435.0 — ono zostaje. */
-    expect(pytaniaOObrazy.filter((u) => u.endsWith("/zdjecie"))).toEqual(["/api/products/7/zdjecie"]);
+    /* Od audytu 26.09.2026 pozycja z wyjątkiem słucha tej samej reguły co
+       tabela. Do tej pory pytała o zdjęcie zawsze — i w instalacji bez zdjęć
+       rysowała kafel „bez zdjęcia" przy każdym wyjątku, z 404 za każdy. */
+    expect(pytaniaOObrazy.filter((u) => u.endsWith("/zdjecie"))).toEqual([]);
   });
 });
 
@@ -392,5 +402,64 @@ describe("audyt ekranu dostaw", () => {
     pokaz("/obsluga/dostawy/808");
     expect(await screen.findByText("zdjęcie zgłoszone, pliku brak")).toBeInTheDocument();
     expect(screen.queryByText("bez zdjęcia")).toBeNull();
+  });
+});
+
+/* ── Audyt 26 września 2026, grupy trzecia i czwarta ──────────────────────
+   Drobniejsze rozjazdy między tym, co ekran mówi, a tym, co wie. */
+describe("audyt ekranu dostaw — drobne", () => {
+  it("wiek dostawy w dniach kalendarza, nie w godzinach od północy UTC", () => {
+    const teraz = new Date(2026, 8, 26, 13, 51);
+    expect(wiekDokumentu("2026-09-26", teraz)).toBe("dziś");
+    expect(wiekDokumentu("2026-09-25", teraz)).toBe("wczoraj");
+    expect(wiekDokumentu("2026-09-20", teraz)).toBe("6 dni");
+    expect(wiekDokumentu("", teraz)).toBe("—");
+  });
+
+  it("błędny artykuł czyta się jako zamiana, nie jako komplet", () => {
+    render(<WyjatekWiersz trwa={false} blad="" onRozwiaz={() => {}}
+      p={wyj(40, { typ: "wrong_item", typLabel: "Błędny artykuł", qty: 6, qtyDok: 6, zamiastIlosc: 6,
+        symObcy: "OEM-77-521", sym: "TEST-LINIA", opis: null })} />);
+    expect(screen.getByText(/przyszło 6 szt\./).textContent)
+      .toBe("przyszło 6 szt. OEM-77-521 zamiast 6 szt. TEST-LINIA");
+    expect(screen.queryByText(/policzone/)).toBeNull();
+  });
+
+  it("nietknięta: bez „do zrobienia” przy każdym wierszu, wyjątek bez towaru nazwany wprost", async () => {
+    pokaz("/obsluga/dostawy/805");
+    await screen.findByRole("heading", { name: "FZ 805/MAG/09/2026" });
+    expect(screen.queryByText("do zrobienia")).toBeNull();
+    expect(screen.getByRole("row", { name: /RP-2201/ })).toHaveTextContent("0/12");
+    expect(screen.getByText("bez wskazania towaru")).toBeInTheDocument();
+  });
+
+  it("miejsce na logo tylko wtedy, gdy ktoś na liście je ma", async () => {
+    pokaz();
+    await screen.findByRole("button", { name: /FZ 802\/MAG/ });
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"),
+      screen.getByRole("option", { name: /Archiwum/ }));
+    /* Archiwum w teście ma jedną fakturę bez logo — kolumny logo nie ma. */
+    const wiersz = await screen.findByRole("button", { name: /FZ 501\/MAG/ });
+    expect(wiersz.querySelector("span.w-14")).toBeNull();
+  });
+
+  it("Poza WERTIS: wiek słowami, pełny powód i stopka bez okna importu", async () => {
+    pokaz();
+    await screen.findByRole("button", { name: /FZ 802\/MAG/ });
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"),
+      screen.getByRole("option", { name: /Poza WERTIS/ }));
+    const wiersz = await screen.findByRole("button", { name: /FZ 901\/MAG/ });
+    expect(wiersz).not.toHaveTextContent("2026-08-16");
+    expect(within(wiersz).getByText("Rozłożone bezpośrednio z palety przed wdrożeniem kolektorów w hali"))
+      .not.toHaveClass("truncate");
+    expect(screen.getByText("1 zdjęta z listy — bez granicy okna importu")).toBeInTheDocument();
+    expect(screen.queryByText(/okno importu: ostatnie/)).toBeNull();
+  });
+
+  it("reguła notatki stoi pod polem, nie w uciętej podpowiedzi", async () => {
+    pokaz("/obsluga/dostawy/802");
+    await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
+    expect(screen.getByLabelText("Notatka do hali")).toHaveAttribute("placeholder", "Pytanie do hali");
+    expect(screen.getByText("Hala musi odpowiedzieć, zanim dostawa się domknie.")).toBeInTheDocument();
   });
 });

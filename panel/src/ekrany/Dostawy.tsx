@@ -196,7 +196,12 @@ export function Dostawy() {
   /* Stopka mówi, GDZIE KOŃCZY SIĘ TO, NA CO PATRZYSZ. Obcięte archiwum
      wygląda z ekranu jak pełne — a to jest dokładnie ta pomyłka, po której
      ktoś orzeka, że faktury nie ma. Stoi w paśmie nad listą, obok pytania. */
-  const stopka = kubelek === "archiwum"
+  /* „Poza WERTIS" nie ma okna importu: serwer oddaje każdą zdjętą dostawę,
+     także sprzed miesięcy. Zdanie o czternastu dniach nad taką listą mówiło
+     nieprawdę o jej granicy (audyt 26.09.2026). */
+  const stopka = kubelek === "poza"
+    ? `${ile(poza.data?.documents.length ?? 0, "zdjęta", "zdjęte", "zdjętych")} z listy — bez granicy okna importu`
+    : kubelek === "archiwum"
     ? archiwum.data && (archiwum.data.ile > archiwum.data.documents.length
         ? `pokazano ${archiwum.data.documents.length} z ${archiwum.data.ile} — zawęź wyszukiwaniem`
         : `${ile(archiwum.data.ile, "dostawa", "dostawy", "dostaw")} starszych niż ${lista.data?.dniWstecz ?? 14} dni`)

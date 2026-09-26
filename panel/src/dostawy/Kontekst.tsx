@@ -31,7 +31,11 @@ function Dowod({ p, onPowieksz }: { p: Wyjatek; onPowieksz: (url: string) => voi
                   : <span title="Hala dołączyła zdjęcie, ale serwer nie ma jego pliku — dowód do reklamacji przepadł">
                       zdjęcie zgłoszone, pliku brak</span>}</span>}
         </div>}
-    <figcaption className="mt-1 truncate text-xs text-slate-600">
+    {/* Dwie linijki zamiast wielokropka (audyt 26.09.2026): przy dwóch
+        dowodach w rzędzie ucinało się akurat to, co je odróżnia — typ
+        i godzina. Pełny podpis zostaje też w `title`. */}
+    <figcaption className="mt-1 line-clamp-2 text-xs text-slate-600"
+      title={`${p.sym ?? p.symObcy ?? "towar"} · ${p.typLabel} · ${czas(p.createdAt)}`}>
       {p.sym ?? p.symObcy ?? "towar"} · {p.typLabel} · {czas(p.createdAt)}</figcaption>
   </figure>;
 }
@@ -100,10 +104,13 @@ function Notatki({ d, notatka, przeczytane }: {
       void notatka.onWyslij(tresc.trim()).then((ok) => { if (ok) setTresc(""); });
     }}>
       <Pole className="min-w-0 flex-1" value={tresc} onChange={(e) => setTresc(e.target.value)}
-        placeholder="Napisz do hali — trzeba będzie odpowiedzieć przed zamknięciem"
-        aria-label="Notatka do hali" />
+        placeholder="Pytanie do hali" aria-label="Notatka do hali" />
       <Przycisk type="submit" disabled={notatka.trwa || !tresc.trim()}>Wyślij</Przycisk>
     </form>
+    {/* Reguła zeszła z podpowiedzi pola (audyt 26.09.2026): w kolumnie
+        kontekstu ucinała się w połowie („trzeba będzie odpo…") i znikała
+        przy pierwszej literze — akurat wtedy, gdy jest ważna. */}
+    <p className="mt-1 text-xs text-slate-600">Hala musi odpowiedzieć, zanim dostawa się domknie.</p>
     <Blad>{notatka.blad}</Blad>
   </section>;
 }
