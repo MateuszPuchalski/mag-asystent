@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import React from "react";
 import { KartaErgonomii, NAZWA_EKRANU, NAZWA_POPRAWKI } from "./Ergonomia";
 import type { Ergonomia } from "../api/wglad";
@@ -12,7 +13,9 @@ import ergonomiaZrodlo from "../../../server/src/services/ergonomia.ts?raw";
       wywróci test, zamiast pokazać „DELIVERY_LINES" biuru.
    2. To samo dla zdarzeń poprawek — czytane z `CZYNNOSCI` serwisu.
    3. Pusty pomiar czasu mówi zdaniem, skąd się weźmie, zamiast stać zerem.
-   4. Wolne odpowiedzi powyżej jednej na dziesięć dostają czerwień. */
+   4. Wolne odpowiedzi powyżej jednej na dziesięć dostają czerwień.
+   5. Otwarta stoi tylko pierwsza sekcja; reszta zwinięta z widocznym
+      tytułem, a pusta mówi „brak" bez rozwijania (0.512.0). */
 
 const E: Ergonomia = {
   days: 7, daneDo: "2026-09-23T12:00:00.000Z", progMs: 300,
@@ -49,8 +52,10 @@ describe("Ergonomia w liczbach", () => {
     for (const p of poprawki) expect(NAZWA_POPRAWKI[p], p).toBeTruthy();
   });
 
-  it("rysuje pięć pytań słowami, a nieznany ekran zostaje taki, jaki przyszedł", () => {
+  it("rysuje pięć pytań słowami, a nieznany ekran zostaje taki, jaki przyszedł", async () => {
     render(<KartaErgonomii e={E} />);
+    /* Sekcje poza pierwszą są zwinięte — otwieramy je jak człowiek. */
+    for (const b of screen.getAllByRole("button", { expanded: false })) await userEvent.click(b);
     expect(within(wiersz("Dostawa")).getByText("12 (60%)")).toHaveClass("text-ranga-zle");
     expect(screen.getByText("EKRAN_Z_JUTRA")).toBeInTheDocument();
     expect(screen.getByText("Kod # nie jest etykietą regału")).toBeInTheDocument();
@@ -59,9 +64,30 @@ describe("Ergonomia w liczbach", () => {
     expect(screen.queryByText(/Brak pomiarów czasu z pracy/)).toBeNull();
   });
 
+  it("otwarta jest tylko pierwsza sekcja; reszta zwinięta z tytułem na wierzchu", async () => {
+    render(<KartaErgonomii e={{ ...E, przerwy: [] }} />);
+    expect(screen.getByText("Gdzie jest wolno")).toBeVisible();
+    expect(screen.getByText("EKRAN_Z_JUTRA")).toBeVisible();
+    const zwiniete = screen.getAllByRole("button", { expanded: false });
+    expect(zwiniete.map((b) => b.textContent)).toEqual([
+      expect.stringContaining("Kolektory z wolnymi odpowiedziami"),
+      expect.stringContaining("Najczęstsze odrzucenia"),
+      expect.stringContaining("Poprawki na czynność"),
+      expect.stringContaining("Przerwy w łączności"),
+      expect.stringContaining("Skan na ekranie głównym"),
+    ]);
+    expect(screen.getByText("Kod # nie jest etykietą regału")).not.toBeVisible();
+    /* Pusta sekcja mówi to w podpisie — nie trzeba jej rozwijać, żeby zobaczyć brak. */
+    expect(within(zwiniete[3]).getByText("Żadnej przerwy dłuższej niż 5 s.")).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: /Najczęstsze odrzucenia/ }));
+    expect(screen.getByText("Kod # nie jest etykietą regału")).toBeVisible();
+  });
+
   it("bez pomiarów czasu mówi, skąd się wezmą", () => {
     render(<KartaErgonomii e={{ ...E, czasy: { ...E.czasy, n: 0, powyzejProgu: 0, udzialPowyzejProgu: 0, p95: null,
       wgTrasy: [], wgKolektora: [] } }} />);
     expect(screen.getByText(/po aktualizacji aplikacji/)).toBeInTheDocument();
+    /* Zdanie kieruje do skanu z ekranu głównego, więc ta sekcja stoi otwarta. */
+    expect(screen.getByRole("button", { name: /Skan na ekranie głównym/ })).toHaveAttribute("aria-expanded", "true");
   });
 });

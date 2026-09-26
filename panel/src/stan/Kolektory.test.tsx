@@ -84,4 +84,14 @@ describe("Zgubiony kolektor", () => {
     await screen.findByText("#BB01");
     expect(within(wiersz("#BB01")).getByRole("button", { name: /Zadzwoń/ })).toBeDisabled();
   });
+
+  it("Zadzwoń nie jest głównym przyciskiem w każdym wierszu", async () => {
+    /* Główny przycisk w każdym wierszu to kilka głównych akcji naraz, a po
+       ten sięga się rzadko — dlatego drugorzędny (0.509.0). */
+    pokaz();
+    await screen.findByText("#A3F9");
+    const zadzwon = within(wiersz("#A3F9")).getByRole("button", { name: "Zadzwoń na kolektor #A3F9" });
+    expect(zadzwon).toHaveClass("btn-secondary");
+    expect(zadzwon).not.toHaveClass("btn-primary");
+  });
 });
