@@ -129,6 +129,17 @@ describe("Kosze w zakładce Zwroty", () => {
     expect(screen.queryByRole("button", { name: /Z-15/ })).toBeNull();
   });
 
+  it("„Rozłożone” i „Anulowane” stoją pod „Więcej” i dalej się wybierają", async () => {
+    /* @wydanie: oba to „Tylko wgląd", więc schodzą z pigułek do listy. */
+    pokaz();
+    await screen.findByRole("button", { name: /Z-14/ });
+    expect(screen.queryByRole("button", { name: /^Rozłożone/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Anulowane/ })).toBeNull();
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"),
+      screen.getByRole("option", { name: /^Rozłożone/ }));
+    expect(await screen.findByRole("button", { name: /Z-15/ })).toBeInTheDocument();
+  });
+
   it("kosze z kłopotem MM mają znacznik i własny kubełek z treścią odmowy (0.501.0)", async () => {
     /* Zgłoszenie właściciela: „muszę sprawdzić stany z Subiektem". */
     pokaz();

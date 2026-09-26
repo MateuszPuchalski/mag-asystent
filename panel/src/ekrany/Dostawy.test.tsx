@@ -254,11 +254,23 @@ describe("Ekran dostaw", () => {
     expect(within(wiersz).getByText("R-07-1")).toBeInTheDocument();
   });
 
+  it("kubełki do przeglądania stoją pod „Więcej”, praca na wierzchu", async () => {
+    pokaz();
+    await screen.findByRole("button", { name: /FZ 802\/MAG/ });
+    for (const n of [/^Zamknięte/, /^Poza WERTIS/, /^Archiwum/]) {
+      expect(screen.queryByRole("button", { name: n })).toBeNull();
+      expect(screen.getByRole("option", { name: n })).toBeInTheDocument();
+    }
+    expect(screen.getByRole("button", { name: /^Do decyzji/ })).toBeInTheDocument();
+  });
+
   it("archiwum szuka SERWER, pobiera się dopiero na życzenie i mówi, że jest obcięte", async () => {
     pokaz();
     await screen.findByRole("button", { name: /FZ 802\/MAG/ });
     expect(archiwumPytania).toEqual([]);
-    await userEvent.click(screen.getByRole("button", { name: /Archiwum/ }));
+    /* Od @wydanie „Archiwum" stoi pod „Więcej" — wybór z listy, nie pigułka. */
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"),
+      screen.getByRole("option", { name: /Archiwum/ }));
     const granica = await screen.findByText(/pokazano 1 z 350 — zawęź wyszukiwaniem/);
     /* Granica okna stoi w paśmie pytania, NAD listą (@wydanie) — ucięte
        archiwum widać, zanim zacznie się czytać wiersze. */

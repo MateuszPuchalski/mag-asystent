@@ -5,13 +5,17 @@ import {
   useArchiwumDostaw, useDokument, useDostawy, useNotatkaDoHali, useOdpowiedziHali, usePozaWertis,
   usePrzeczytane, usePrzywrocDostawe, useRozwiazWyjatek, useWyjatkiOtwarte, useZamknijPozaWertis,
 } from "../api/dostawy";
-import { Blad, FiltrSegmentowy, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN, ile } from "../ui";
+import { Blad, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN, ile } from "../ui";
+import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import {
   KUBELKI_DOSTAW, KolejkaDostaw, KolejkaPozaWertis, WierszeSpozaOkna, kubelekDokumentu,
   type KubelekDostaw,
 } from "../dostawy/Kolejka";
 import { Dokument, WyjatkiLuzem } from "../dostawy/Dokument";
 import { Kontekst } from "../dostawy/Kontekst";
+
+/** Kubełki do przeglądania — stoją pod „Więcej”, nie na wierzchu (@wydanie). */
+const WIECEJ_DOSTAW: ReadonlyArray<KubelekDostaw> = ["zamkniete", "poza", "archiwum"];
 
 /* ── DOSTAWY W PANELU (0.435.0) ────────────────────────────────────────────
    Pierwszy widok biura po przeprowadzce (`docs/obsluga-klienta.md` §7).
@@ -171,7 +175,12 @@ export function Dostawy() {
         {/* Tytuł „Dostawy" zszedł (@wydanie), bo powtarzał zakładkę nawigacji,
             która stoi podświetlona nad ekranem — wiersz wraca do kolejki. */}
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          <FiltrSegmentowy<KubelekDostaw> wybrany={kubelek} onWybierz={setKubelek}
+          {/* „Zamknięte", „Poza WERTIS" i „Archiwum" pod „Więcej" (@wydanie):
+              to przeglądanie, nie praca. „Poza WERTIS" zostaje o jedno
+              kliknięcie z licznikiem w opcji, bo ma wyłapać pomyłkowe
+              zdjęcie dostawy. Ten sam komponent co na pozostałych kolejkach. */}
+          <FiltrZWiecej<KubelekDostaw> wybrany={kubelek} onWybierz={setKubelek}
+            wiecej={WIECEJ_DOSTAW}
             pozycje={KUBELKI_DOSTAW.map((k) => ({ klucz: k.id, etykieta: k.etykieta, ile: liczniki[k.id],
               podpowiedz: k.pytanie }))} />
         </nav>
