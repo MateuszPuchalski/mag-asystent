@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.524.0 — 26 września 2026
+
+**„Do zrobienia" i Zadania mówią mniej naraz.** Oba ekrany straciły tytuł, bo powtarzał podświetloną zakładkę. Zeszły też podpisy „najpilniejsze pierwsze" i zdanie o kolektorach pod Zadaniami. Trzy sekcje „Do zrobienia" mają jeden nagłówek z licznikiem po kropce, a „Wszystko" nie powtarza sumy. „Pokaż odhaczone" to cichy odnośnik w nagłówku wzmianek, widoczny tylko wtedy, gdy jest co pokazać. Przyciski obu ekranów piszą się zwykłą pisownią zamiast wersalikami.
+
 ## 0.523.0 — 26 września 2026
 
 **Oś rozmowy powtarza mniej, a nasza wypowiedź ma jeden przełącznik.** Długa

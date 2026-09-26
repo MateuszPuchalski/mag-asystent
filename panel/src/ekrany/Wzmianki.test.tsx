@@ -51,7 +51,7 @@ describe("Skrzynka wzmianek", () => {
     expect(screen.getByText("A. Lewandowska")).toBeInTheDocument();
     expect(screen.getByText(/zielony_ogrod/)).toBeInTheDocument();
     expect(screen.getByText(/zerkniesz na ten szarpak/)).toBeInTheDocument();
-    /* Licznik nieodhaczonych stoi w nagłówku po kropce (@wydanie), jak
+    /* Licznik nieodhaczonych stoi w nagłówku po kropce (0.524.0), jak
        w pozostałych sekcjach „Do zrobienia". */
     expect(screen.getByRole("heading", { name: "Wspomniano o mnie · 1" })).toBeInTheDocument();
   });
@@ -82,7 +82,7 @@ describe("Skrzynka wzmianek", () => {
     pokaz();
     expect(screen.getByText(/Wszystko odhaczone/)).toBeInTheDocument();
 
-    /* Przełącznik jest cichym odnośnikiem w nagłówku (@wydanie), nie polem
+    /* Przełącznik jest cichym odnośnikiem w nagłówku (0.524.0), nie polem
        wyboru — dalej jedno kliknięcie od historii. */
     await userEvent.click(screen.getByRole("button", { name: "Pokaż odhaczone (1)" }));
     expect(screen.getByText(/zerkniesz na ten szarpak/)).toBeInTheDocument();

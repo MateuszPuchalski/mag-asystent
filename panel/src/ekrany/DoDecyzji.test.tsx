@@ -93,7 +93,7 @@ describe("DO DECYZJI", () => {
     expect(screen.queryByText("Reklamować u dostawcy czy zamknąć wyjątki?")).toBeNull();
     expect(screen.getByText("Uznać czy odrzucić?")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Magazyn 2/ })).toBeInTheDocument();
-    /* Suma stoi w nagłówku sekcji (@wydanie), więc „Wszystko" nie powtarza jej
+    /* Suma stoi w nagłówku sekcji (0.524.0), więc „Wszystko" nie powtarza jej
        w pigułce — jeden fakt, jedno miejsce. */
     expect(screen.getByRole("heading", { name: "Do decyzji biura · 3" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Wszystko" })).toBeInTheDocument();
@@ -114,7 +114,7 @@ describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
     expect(wyslane).toEqual([]);
   });
 
-  it("bez tytułu nad sekcjami; trzy nagłówki mają jeden kształt licznika (@wydanie)", async () => {
+  it("bez tytułu nad sekcjami; trzy nagłówki mają jeden kształt licznika (0.524.0)", async () => {
     /* Tytuł „Do zrobienia" powtarzał podświetloną zakładkę. Liczniki miały
        trzy zapisy; teraz każdy stoi po kropce w nagłówku sekcji. */
     pokaz();

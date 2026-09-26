@@ -191,7 +191,7 @@ export function Zadania() {
      i celowo nie przewija za ekrany. Poniżej `lg` klasa jest bezczynna:
      bez związanej wysokości nie ma czego przewijać. */
   return <div className="lg:h-full lg:overflow-y-auto">
-    {/* ── JEDEN RZĄD NAGŁÓWKA, BEZ TYTUŁU (@wydanie) ─────────────────────────
+    {/* ── JEDEN RZĄD NAGŁÓWKA, BEZ TYTUŁU (0.524.0) ─────────────────────────
         Tytuł „Zadania terenowe" powtarzał podświetloną zakładkę, a podpis pod
         nim mówił, skąd wracają wyniki — rzecz wiadoma po pierwszym dniu.
         Zostaje to, czym się tu pracuje: sito i akcja główna, w jednym rzędzie
@@ -213,7 +213,7 @@ export function Zadania() {
             etykieta: v === "odeslane" && odeslanych ? `${l} (${odeslanych})` : l,
           }))} />
       </div>
-      {/* Napisy przycisków zwykłą pisownią (@wydanie), jak w reszcie panelu:
+      {/* Napisy przycisków zwykłą pisownią (0.524.0), jak w reszcie panelu:
           wersaliki krzyczały głośniej niż karty zadań, które się tu czyta. */}
       <Przycisk wariant="glowny" onClick={() => setModal(true)}>
         <Plus size={18} />Zadanie dla magazynu</Przycisk>

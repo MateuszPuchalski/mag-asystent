@@ -47,7 +47,7 @@ describe("Ekran Moje", () => {
     render(<MemoryRouter><Moje /></MemoryRouter>);
     expect(screen.getAllByText(/^termin /).length).toBe(1);
     expect(screen.getAllByText(/^ostatni ruch /).length).toBe(1);
-    /* Liczniki stoją w nagłówku po kropce (@wydanie), jednym wzorem
+    /* Liczniki stoją w nagłówku po kropce (0.524.0), jednym wzorem
        z pozostałymi sekcjami „Do zrobienia". */
     expect(screen.getByRole("heading", { name: "Moje sprawy · 2 · 1 z terminem" })).toBeInTheDocument();
   });

@@ -32,12 +32,12 @@ export function Wzmianki() {
      na każdą prośbę spychała decyzje biura pod krawędź. */
   return <Karta className="overflow-hidden p-0" aria-label="Wspomniano o mnie" role="region">
     <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2">
-      {/* Nagłówek jak w dwóch sąsiednich sekcjach (@wydanie): `NaglowekSekcji`
+      {/* Nagłówek jak w dwóch sąsiednich sekcjach (0.524.0): `NaglowekSekcji`
           i licznik po kropce. Powód przy `DoDecyzji`. Licznik mówi o
           nieodhaczonych, bo tylko one są robotą. */}
       <NaglowekSekcji jako="h3" ikona={<AtSign size={14} />} className="mr-auto">
         Wspomniano o mnie{dane.data ? ` · ${dane.data.nowe}` : ""}</NaglowekSekcji>
-      {/* PRZEŁĄCZNIK ZWINIĘTY DO ODNOŚNIKA (@wydanie). Pole wyboru stało
+      {/* PRZEŁĄCZNIK ZWINIĘTY DO ODNOŚNIKA (0.524.0). Pole wyboru stało
           zawsze, także przy liście bez ani jednej odhaczonej, gdzie niczego nie
           przełączało. Historię otwiera się rzadko, po dowód „pisałam ci
           o tym w środę", więc wystarczy cichy odnośnik, gdy jest co pokazać.
@@ -65,7 +65,7 @@ export function Wzmianki() {
             odhaczone {czas(w.odhaczonaAt)}</span>}
         </span>
         <span className="min-w-0 flex-1 truncate text-sm" title={w.fragment}>{w.fragment}</span>
-        {/* Napisy zwykłą pisownią, nie wersalikami (@wydanie): dwa krzykliwe
+        {/* Napisy zwykłą pisownią, nie wersalikami (0.524.0): dwa krzykliwe
             przyciski na każdym wierszu głuszyły treść prośby, którą się czyta. */}
         <span className="flex shrink-0 gap-2">
           <Przycisk className="px-2 py-1 text-xs"

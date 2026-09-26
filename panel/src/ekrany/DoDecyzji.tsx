@@ -85,11 +85,11 @@ export function DoDecyzji() {
 
   /* Własny scroller — jak w Zadaniach; rama panelu nie przewija za ekrany.
 
-     TYTUŁ „Do zrobienia" ZESZEDŁ (@wydanie), bo powtarzał podświetloną
+     TYTUŁ „Do zrobienia" ZESZEDŁ (0.524.0), bo powtarzał podświetloną
      zakładkę tuż nad nim. Zeszedł też podpis „najpilniejsze pierwsze": opisywał
      kolejkę, którą widać po plakietkach wieku, a nie mówił, co zrobić.
 
-     TRZY SEKCJE, JEDEN NAGŁÓWEK (@wydanie). Każda miała inny kształt licznika:
+     TRZY SEKCJE, JEDEN NAGŁÓWEK (0.524.0). Każda miała inny kształt licznika:
      „1 do zajęcia się", „3 w pracy" i liczba w pigułce sita. Teraz wszystkie
      trzy biorą `NaglowekSekcji` i licznik po kropce, jak „Zawartość · 4"
      w koszu. Oko czyta jeden wzór zamiast trzech. */
@@ -100,7 +100,7 @@ export function DoDecyzji() {
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2">
         <NaglowekSekcji jako="h3" ikona={<ListChecks size={14} />} className="mr-auto">
           Do decyzji biura{l ? ` · ${l.wszystko}` : ""}</NaglowekSekcji>
-        {/* „Wszystko" bez licznika (@wydanie): tę samą liczbę niesie już
+        {/* „Wszystko" bez licznika (0.524.0): tę samą liczbę niesie już
             nagłówek, a dwie kopie jednego faktu to jedna za dużo. */}
         <FiltrSegmentowy<Filtr> wybrany={filtr} onWybierz={setFiltr} pozycje={[
           { klucz: "wszystko", etykieta: "Wszystko" },

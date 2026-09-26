@@ -35,7 +35,7 @@ export function Moje() {
   const zTerminem = sprawy.filter((s) => s.terminDo !== null).length;
 
   return <Karta className="overflow-hidden p-0" aria-label="Moje sprawy" role="region">
-    {/* Nagłówek jak w dwóch sąsiednich sekcjach (@wydanie): `NaglowekSekcji`
+    {/* Nagłówek jak w dwóch sąsiednich sekcjach (0.524.0): `NaglowekSekcji`
         i licznik po kropce. Powód przy `DoDecyzji`. „Wczytuję…" zeszło
         z nagłówka do treści, tam gdzie stoi w sekcji decyzji. */}
     <div className="flex flex-wrap items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-2">

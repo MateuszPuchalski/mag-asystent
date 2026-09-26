@@ -64,7 +64,7 @@ const pokaz = () => render(
 
 describe("Zadania terenowe — nagłówek ekranu", () => {
   it("bez tytułu powtarzającego zakładkę; w rzędzie zostają sito i akcja główna", () => {
-    /* Tytuł i podpis zeszły (@wydanie): nazwę ekranu niesie podświetlona
+    /* Tytuł i podpis zeszły (0.524.0): nazwę ekranu niesie podświetlona
        zakładka, jak na każdym innym ekranie panelu. */
     LISTA = [];
     pokaz();
