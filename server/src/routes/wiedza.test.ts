@@ -137,6 +137,7 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/wiedza/pasowanie-z-sieci/sprawdz" },
   { method: "POST" as const, url: `/api/obsluga/wiedza/pasowanie-z-sieci/${SZR}/zatwierdz`, payload: { ids: [1] } },
   { method: "POST" as const, url: "/api/obsluga/wiedza/pasowanie-z-sieci/silnik/1/zatwierdz", payload: { ids: [1] } },
+  { method: "POST" as const, url: "/api/obsluga/wiedza/pasowanie-z-sieci/zatwierdz-potwierdzone", payload: { ids: [1] } },
 ];
 
 test("bez sesji żadna trasa wiedzy nie odpowiada danymi", async () => {
@@ -154,7 +155,7 @@ test("hala nie widzi wiedzy — także na odczycie", async () => {
   }
 });
 
-test("tras zapisu jest trzydzieści jeden — licznik jest umową", () => {
+test("tras zapisu jest trzydzieści dwa — licznik jest umową", () => {
   /* Trzy przy zabudowie silnika (0.229.0) i trzy przy pasowaniu części:
      propozycja, rozstrzygnięcie i wycofanie. Każda z tych relacji ma ten sam
      cykl życia co zastosowanie, a bez własnego wycofania zatwierdzona pomyłka
@@ -212,8 +213,11 @@ test("tras zapisu jest trzydzieści jeden — licznik jest umową", () => {
      szesnaście propozycji, a pojedyncze karty to kilka tysięcy kliknięć.
 
      TRZYDZIESTA PIERWSZA (0.527.0): to samo dla jednego silnika z trybu „od
-     silnika” — wykaz części silnika daje dziesiątki kartotek naraz. */
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 31);
+     silnika” — wykaz części silnika daje dziesiątki kartotek naraz.
+
+     TRZYDZIESTA DRUGA (@wydanie): wszystkie POTWIERDZONE z sieci naraz, czyli
+     dwa niezależne źródła, w tym katalog. Serwer liczy pewność od nowa. */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 32);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {
@@ -359,7 +363,8 @@ test("żądanie bez ciała nie wywala się na pustym JSON-ie", async () => {
     "/api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij", "/api/obsluga/wiedza/zamiennosci-oem/1/wycofaj",
     "/api/obsluga/wiedza/odsylacze", "/api/obsluga/wiedza/odsylacze/1/wycofaj",
     "/api/obsluga/wiedza/wykazy", "/api/obsluga/wiedza/wykazy/1/wycofaj", "/api/obsluga/wiedza/wykazy/1/zatwierdz",
-    `/api/obsluga/wiedza/pasowanie-z-sieci/${SZR}/zatwierdz`, "/api/obsluga/wiedza/pasowanie-z-sieci/silnik/1/zatwierdz"]) {
+    `/api/obsluga/wiedza/pasowanie-z-sieci/${SZR}/zatwierdz`, "/api/obsluga/wiedza/pasowanie-z-sieci/silnik/1/zatwierdz",
+    "/api/obsluga/wiedza/pasowanie-z-sieci/zatwierdz-potwierdzone"]) {
     const r = await app.inject({ method: "POST", url, headers: b.naglowki });
     assert.equal(r.statusCode, 400, url);
     assert.doesNotMatch(r.body, /FST_ERR_CTP_EMPTY_JSON_BODY/, url);

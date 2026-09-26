@@ -73,6 +73,7 @@ const TRASY = () => [
     payload: { ocena: "odrzucone" } },
   { method: "POST" as const, url: `/api/obsluga/copilot/szkic/${rozmowa}/pasowanie`,
     payload: { ocena: "odrzucone" } },
+  { method: "POST" as const, url: "/api/obsluga/copilot/pytania/1/pasowania/0" },
 ];
 
 test("bez sesji żadna trasa Copilota nie odpowiada danymi", async () => {
@@ -127,11 +128,14 @@ test("hala nie widzi Copilota — bramka stoi też na odczycie", async () => {
 /* SIÓDMA (0.332.0) to dopytanie. Licznik podniósł się o jeden świadomie:
    trasa produkuje tekst DLA AGENTA i celowo nie ma sit szkicu, więc wspólna
    trasa z tamtą musiałaby wybrać jedno zachowanie dla dwóch różnych rzeczy. */
-test("Copilot ma SIEDEM tras zapisu", async () => {
+/* ÓSMA (@wydanie) to „Zapisz jako propozycję” przy pasowaniu z sieci
+   znalezionym w dopytaniu. Para leży przy wymianie i przeszła sito strony;
+   trasa bierze ją z wiersza, nie z ciała żądania — jak szósta ze szkicu. */
+test("Copilot ma OSIEM tras zapisu", async () => {
   const zrodlo = fs.readFileSync(new URL("./copilot.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 7, `tras POST jest ${posty.length}, a umowa mówi o siedmiu`);
-  for (const slowo of ["klasyfikacja", "korekta", "ocena", "szkic", "dane", "pasowanie", "pytanie"]) {
+  assert.equal(posty.length, 8, `tras POST jest ${posty.length}, a umowa mówi o ośmiu`);
+  for (const slowo of ["klasyfikacja", "korekta", "ocena", "szkic", "dane", "pasowanie", "pytanie", "pasowania/:nr"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
 });

@@ -8,7 +8,7 @@ import {
 import {
   nadawcaAnthropic, nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
 } from "../adapters/copilot.anthropic.js";
-import { wymianyRozmowy, zadajPytanie } from "../services/copilot-pytania.js";
+import { wymianyRozmowy, zadajPytanie, zapiszPasowanieZDopytania } from "../services/copilot-pytania.js";
 import { czekajaNaSzkic, zlecSzkicPoRozpoznaniu } from "../services/copilot-szkic-po-rozpoznaniu.js";
 import {
   ocenSzkic, odrzucDaneDoboru, odrzucPasowanie, przyjmijDaneDoboru, przyjmijPasowanie, ulozSzkic,
@@ -20,7 +20,7 @@ import {
 } from "../adapters/copilot.js";
 
 /* ── Trasy Copilota (§14, etap F) ────────────────────────────────────────────
-   SIEDEM TRAS ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
+   OSIEM TRAS ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
    etykieta człowieka o jej kategorii (do 22 września 2026 werdykt
    „trafna/nietrafna"), szkic odpowiedzi (0.231.0), werdykt
    o szkicu, los danych doboru z rozmowy (przyrost trzeci) i los pasowania
@@ -49,6 +49,11 @@ import {
    DLA AGENTA i celowo tych sit nie ma. Wspólna trasa musiałaby wybrać jedno
    zachowanie dla obu — a wtedy albo szkic przestałby być sprawdzany, albo
    dopytanie przestałoby umieć powiedzieć „tego numeru u nas nie ma".
+
+   ÓSMA (@wydanie) to „Zapisz jako propozycję” przy pasowaniu, które dopytanie
+   znalazło w sieci. Osobna od `szkic/:id/pasowanie`, bo para leży przy
+   WYMIANIE, nie przy szkicu, i przeszła inne sito: stronę, nie fakty. Para
+   idzie z wiersza sprawdzonego przez serwer, nie z ciała żądania.
 
    Szkic dostał WŁASNĄ trasę, choć 0.191.0 obiecywało przycisk w rozmowie bez
    nowej trasy: tamta obietnica dotyczyła klasyfikacji jednej rozmowy (lista
@@ -253,6 +258,18 @@ export async function copilotRoutes(app: FastifyInstance) {
           || e instanceof BladPrzeciazeniaCopilota || e instanceof BladLacznosciCopilota
           || e instanceof BladOdpowiedziCopilota;
         return reply.code(dostawcy ? 502 : 400).send({ error: (e as Error).message });
+      }
+    });
+
+  /** Pasowanie z sieci z dopytania → propozycja w Kolejce Wiedzy (@wydanie). */
+  app.post<{ Params: { id: string; nr: string } }>(
+    "/api/obsluga/copilot/pytania/:id/pasowania/:nr", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return { wymiana: zapiszPasowanieZDopytania(Number(req.params.id), Number(req.params.nr), kto()) };
+      } catch (e) {
+        return reply.code(400).send({ error: (e as Error).message });
       }
     });
 

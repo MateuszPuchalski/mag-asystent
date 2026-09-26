@@ -1,9 +1,9 @@
 import React from "react";
-import { MessageCircleQuestion } from "lucide-react";
+import { BookPlus, ExternalLink, MessageCircleQuestion } from "lucide-react";
 import { Przycisk, ile } from "../ui";
 import { ProcesCopilota } from "./ProcesCopilota";
 import { Zwijka } from "./Zwijka";
-import type { UzycieNarzedziaCopilota, WymianaCopilota } from "../api/typy";
+import type { PasowanieZDopytania, UzycieNarzedziaCopilota, WymianaCopilota } from "../api/typy";
 
 /* Nazwy narzędzi po ludzku. Serwer mówi `pasowanie_towaru`, agent czyta
    „pasowanie”; nieznana nazwa (nowsze narzędzie, starszy panel) zostaje
@@ -27,6 +27,39 @@ function Sprawdzono({ narzedzia }: { narzedzia: UzycieNarzedziaCopilota[] }) {
   return <p className="mt-1 text-xs text-slate-600">
     Sprawdził w bazie: {narzedzia.map((n) => `${NAZWY[n.nazwa] ?? n.nazwa} „${n.argument}”`).join(", ")}
   </p>;
+}
+
+/**
+ * ZNALEZIONE W SIECI (@wydanie). Pasowania ze stron, które model przeczytał
+ * przy tym pytaniu i które przeszły sito serwera: cytat na stronie, NASZ
+ * numer na stronie. Wcześniej biuro robiło to w czacie SZPERACZA obok panelu,
+ * a wynik zostawał w czacie. Tu jedno kliknięcie kładzie parę w Kolejce Wiedzy.
+ *
+ * To NIE jest „wstaw”: nic stąd nie idzie do klienta. Propozycja czeka na
+ * zatwierdzenie w Wiedzy jak każda inna — granica z nagłówka niżej stoi.
+ */
+function ZnalezioneWSieci({ pasowania, onZapisz, zapisuje }: {
+  pasowania: PasowanieZDopytania[];
+  onZapisz?: (nr: number) => void;
+  zapisuje?: boolean;
+}) {
+  if (!pasowania.length) return null;
+  return <div className="mt-2 rounded border border-slate-200 p-2" aria-label="Znalezione w sieci">
+    <p className="text-xs font-semibold text-slate-700">Znalezione w sieci — strona potwierdza nasz numer</p>
+    <ul className="mt-1 space-y-1.5">
+      {pasowania.map((x, nr) => <li key={nr} className="text-sm">
+        <p><span className="font-mono">{x.symbol}</span> → <b>{x.marka} {x.model}</b>
+          <a className="ml-2 text-xs underline" href={x.url} target="_blank" rel="noreferrer">
+            źródło<ExternalLink size={12} className="ml-0.5 inline" aria-hidden="true" /></a></p>
+        <p className="text-xs text-slate-600">„{x.cytat}”</p>
+        {x.warunek && <p className="text-xs text-amber-900"><b>Uwaga:</b> {x.warunek}</p>}
+        {x.zapis === "nowa" && <p className="text-xs text-emerald-800">W Kolejce Wiedzy — czeka na zatwierdzenie.</p>}
+        {x.zapis === "juz_byla" && <p className="text-xs text-slate-600">Ta para już jest w Wiedzy.</p>}
+        {!x.zapis && onZapisz && <Przycisk className="mt-1 text-xs" disabled={zapisuje} onClick={() => onZapisz(nr)}>
+          <BookPlus size={14} />Zapisz jako propozycję</Przycisk>}
+      </li>)}
+    </ul>
+  </div>;
 }
 
 /**
@@ -68,6 +101,8 @@ export function Dopytanie(p: {
   pracuje: boolean;
   onPytaj: (pytanie: string) => void;
   limitZnakow: number;
+  onZapiszPasowanie?: (wymianaId: number, nr: number) => void;
+  zapisuje?: boolean;
 }) {
   const [tekst, setTekst] = React.useState("");
   const zaDlugie = tekst.length > p.limitZnakow;
@@ -89,6 +124,8 @@ export function Dopytanie(p: {
         <p className="text-xs font-semibold text-slate-700">{w.przez}: {w.pytanie}</p>
         <pre className="mt-1 whitespace-pre-wrap font-sans text-sm text-slate-800">{w.odpowiedz}</pre>
         <Sprawdzono narzedzia={w.narzedzia ?? []} />
+        <ZnalezioneWSieci pasowania={w.pasowania ?? []} zapisuje={p.zapisuje}
+          onZapisz={p.onZapiszPasowanie && ((nr) => p.onZapiszPasowanie!(w.id, nr))} />
         <ProcesCopilota key={`${w.id}-${w.at}`} twierdzenia={w.twierdzenia} />
       </li>)}
     </ul>}

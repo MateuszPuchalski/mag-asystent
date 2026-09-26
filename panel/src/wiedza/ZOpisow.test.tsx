@@ -32,7 +32,6 @@ const Z_OFERTY: ModelZOpisu = {
 vi.mock("./Odsylacze", () => ({ Odsylacze: () => <p>odsyłacze</p> }));
 vi.mock("./WykazCzesci", () => ({ WykazCzesci: () => <p>wykaz części</p> }));
 vi.mock("./PasujeDoOfert", () => ({ PasujeDoOfert: () => <p>pasuje do z ofert</p> }));
-vi.mock("./PasowanieZSieci", () => ({ PasowanieZSieci: () => <p>pasowanie z sieci</p> }));
 
 vi.mock("../api/wiedza", () => ({
   useModeleZOpisow: () => ({ data: { wiersze: WIERSZE, liczba: 1 }, isLoading: false, error: null }),
@@ -79,14 +78,14 @@ describe("sekcje Modele: z opisów", () => {
     const podsumowanie = screen.getByText(/^Importy i zbiórki/);
     const zwiniete = podsumowanie.closest("details")!;
     expect(zwiniete).not.toHaveAttribute("open");
-    expect(screen.queryByText("pasowanie z sieci")).toBeNull();
+    expect(screen.queryByText("pasuje do z ofert")).toBeNull();
     /* Karta narzędzi PRZED pierwszym wierszem w kolejności dokumentu. */
     const wiersz = screen.getByRole("listitem", { name: "Z opisu: FTC272" });
     expect(zwiniete.compareDocumentPosition(wiersz) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     await userEvent.click(podsumowanie);
-    await waitFor(() => expect(screen.getByText("pasowanie z sieci")).toBeInTheDocument());
-    for (const karta of ["pasuje do z ofert", "odsyłacze", "wykaz części"]) {
+    await waitFor(() => expect(screen.getByText("pasuje do z ofert")).toBeInTheDocument());
+    for (const karta of ["odsyłacze", "wykaz części"]) {
       expect(screen.getByText(karta)).toBeInTheDocument();
     }
   });

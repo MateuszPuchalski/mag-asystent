@@ -2886,6 +2886,22 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do @wydanie — szukanie w sieci prościej, metodą SZPERACZA
+
+**Panel trzeba przebudować, a serwer zrestartować.** Kolumna
+`copilot_pytanie.pasowania` powstaje sama przy starcie.
+
+Szukanie w sieci stoi teraz na górze Wiedzy → Kolejka i ma jeden przycisk
+„Szukaj w sieci”. Szuka przez godzinę i da się go zatrzymać. Ręczne
+szukanie ma własny limit, 60 kartotek na godzinę, osobny od nocy. Ustawień
+nocy nie trzeba ruszać. Nad listą propozycji stoi „Zatwierdź wszystkie
+potwierdzone”. Potwierdzone to dwa niezależne źródła, w tym katalog.
+
+Dopytanie Copilota szuka w sieci tylko przy `PASOWANIE_Z_SIECI=1`. Do tego
+samego wyłącznika należy przebieg nocny. Wyszukiwania dopytania stoją
+w księdze kosztu tak samo jak nocne. OLX i Ceneo są zablokowane obok
+Allegro — tam też sprzedajemy.
+
 ### Aktualizacja do 0.527.0 — pasowanie z sieci: lista, PDF, popyt
 
 **Panel trzeba przebudować, a serwer zrestartować.** Migracji nie ma.

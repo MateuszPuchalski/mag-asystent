@@ -4,17 +4,18 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { StanPasowaniaZSieci } from "../api/typy";
-import { GODZINA_MS, NA_KLIKNIECIE, PasowanieZSieci } from "./PasowanieZSieci";
+import { GODZINA_MS, PasowanieZSieci } from "./PasowanieZSieci";
 
-/* ── Pasowanie z sieci uruchomione ręcznie (0.508.0) ────────────────────────
+/* ── Szukanie w sieci na żądanie ────────────────────────────────────────────
    Po prawdziwym `fetch`. Otwarcie to wyłącznie odczyt stanu. Wyłączony
-   automat mówi, czego brakuje, i nie daje kliknąć. Włączony idzie kartoteka
-   po kartotece, najwyżej NA_KLIKNIECIE razy, i staje, gdy nie ma co robić. */
+   automat mówi, czego brakuje, i nie daje kliknąć. Od @wydanie jest JEDEN
+   przycisk: godzina z „Zatrzymaj”, liczona w limicie ręcznym, nie nocnym. */
 
-const STAN: StanPasowaniaZSieci = { niegotowy: null, naNoc: 10, sprawdzono: 2, doSprawdzenia: 40, ostatnie: [
-  { symbol: "GAZ-MS250", at: "2026-09-25T02:10:00.000Z", wynik: "ok", znalezisk: 3, zaproponowano: 2,
-    odrzucone: { numer_spoza_strony: 1 }, blad: null },
-] };
+const STAN: StanPasowaniaZSieci = { niegotowy: null, naNoc: 10, sprawdzono: 10, doSprawdzenia: 40,
+  reczne: { naGodzine: 60, wGodzinie: 5 }, ostatnie: [
+    { symbol: "GAZ-MS250", at: "2026-09-25T02:10:00.000Z", wynik: "ok", znalezisk: 3, zaproponowano: 2,
+      odrzucone: { numer_spoza_strony: 1 }, blad: null },
+  ] };
 
 let stan: StanPasowaniaZSieci = STAN;
 let wyslane: string[] = [];
@@ -41,56 +42,54 @@ const pokaz = () => render(
     <PasowanieZSieci />
   </QueryClientProvider>);
 
-describe("pasowanie z sieci na żądanie", () => {
-  it("otwarcie tylko czyta: stan, limit i ostatnie przebiegi", async () => {
+describe("szukanie w sieci na żądanie", () => {
+  it("otwarcie tylko czyta; limit to limit ręczny na godzinę, nie limit nocy", async () => {
     pokaz();
-    /* Głos agenta, nie księgi (0.510.0): ile jeszcze można, bez „sufitu". */
+    /* Noc wyczerpana (10 z 10), a ręczne dalej może — to był cały powód zmiany. */
     const stanKarty = await screen.findByLabelText("Stan pasowania z sieci");
-    expect(stanKarty).toHaveTextContent("w limicie zostało 8 z 10");
+    expect(stanKarty).toHaveTextContent("w tej godzinie zostało 55 z 60");
     expect(stanKarty).not.toHaveTextContent(/sufit|wykorzystane/);
+    expect(screen.getByRole("button", { name: /Szukaj w sieci/ })).toBeEnabled();
     expect(screen.getByLabelText("Ostatnio sprawdzone")).toHaveTextContent("naszego numeru nie ma na stronie: 1");
     expect(wyslane).toEqual([]);
+  });
+
+  it("jest jeden przycisk startu — nie trzeba wybierać trybu", async () => {
+    pokaz();
+    await screen.findByLabelText("Stan pasowania z sieci");
+    expect(screen.getAllByRole("button")).toHaveLength(1);
   });
 
   it("wyłączony automat mówi, czego brakuje, i nie daje kliknąć", async () => {
     stan = { ...STAN, niegotowy: "Pasowanie z sieci jest wyłączone — włącza je PASOWANIE_Z_SIECI=1 w ustawieniach." };
     pokaz();
     expect(await screen.findByRole("note")).toHaveTextContent("PASOWANIE_Z_SIECI=1");
-    expect(screen.getByRole("button", { name: /Sprawdź teraz/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Szukaj w sieci/ })).toBeDisabled();
   });
 
-  it("kliknięcie idzie kartoteka po kartotece i sumuje wynik", async () => {
-    wyniki = Array.from({ length: NA_KLIKNIECIE }, () => ({ sprawdzono: 1, zaproponowano: 2 }));
+  it("idzie kartoteka po kartotece, sumuje wynik i mówi, gdy zatrzymał go limit", async () => {
+    wyniki = [...Array.from({ length: 5 }, () => ({ sprawdzono: 1, zaproponowano: 1 })), { sprawdzono: 0, zaproponowano: 0 }];
     pokaz();
-    await userEvent.click(await screen.findByRole("button", { name: /Sprawdź teraz/ }));
-    await waitFor(() => expect(wyslane).toHaveLength(NA_KLIKNIECIE));
+    await userEvent.click(await screen.findByRole("button", { name: /Szukaj w sieci/ }));
+    const koniec = await screen.findByLabelText("Koniec przebiegu");
+    expect(koniec).toHaveTextContent("wyczerpał się limit (60 kartotek na godzinę)");
+    /* Rada „podnieś ustawienie” odeszła razem z limitem nocy przy ręcznym szukaniu. */
+    expect(koniec).not.toHaveTextContent("PASOWANIE_Z_SIECI_NA_NOC");
+    expect(wyslane).toHaveLength(6);
     expect(new Set(wyslane)).toEqual(new Set(["/api/obsluga/wiedza/pasowanie-z-sieci/sprawdz"]));
-    expect(await screen.findByLabelText("Wynik pasowania z sieci")).toHaveTextContent(`propozycji w kolejce: ${2 * NA_KLIKNIECIE}`);
+    expect(screen.getByLabelText("Wynik pasowania z sieci")).toHaveTextContent("nowych propozycji: 5");
   });
 
   it("wynik mówi o pominiętych znaleziskach słowami agenta, nie „sitem”", async () => {
     wyniki = [{ sprawdzono: 1, zaproponowano: 0, odrzucono: { cytat_spoza_strony: 2 } }, { sprawdzono: 0, zaproponowano: 0 }];
     pokaz();
-    await userEvent.click(await screen.findByRole("button", { name: /Sprawdź teraz/ }));
+    await userEvent.click(await screen.findByRole("button", { name: /Szukaj w sieci/ }));
     const wynik = await screen.findByLabelText("Wynik pasowania z sieci");
     await waitFor(() => expect(wynik).toHaveTextContent("pominięte jako niepewne: cytatu nie ma na stronie: 2"));
     expect(wynik).not.toHaveTextContent(/sito/);
   });
 
-  /* Tryb godzinny (0.527.0): ta sama pętla, koniec po czasie albo limicie. */
-  it("„przez godzinę” idzie dalej niż trzy kartoteki i mówi, gdy zatrzymał go limit", async () => {
-    wyniki = [...Array.from({ length: NA_KLIKNIECIE + 2 }, () => ({ sprawdzono: 1, zaproponowano: 1 })),
-      { sprawdzono: 0, zaproponowano: 0 }];
-    pokaz();
-    await userEvent.click(await screen.findByRole("button", { name: /Sprawdzaj przez godzinę/ }));
-    const koniec = await screen.findByLabelText("Koniec przebiegu");
-    expect(koniec).toHaveTextContent("wyczerpał się limit");
-    expect(koniec).toHaveTextContent("PASOWANIE_Z_SIECI_NA_NOC");
-    expect(wyslane).toHaveLength(NA_KLIKNIECIE + 3);
-    expect(screen.getByLabelText("Wynik pasowania z sieci")).toHaveTextContent(`propozycji w kolejce: ${NA_KLIKNIECIE + 2}`);
-  });
-
-  it("„przez godzinę” kończy się po godzinie, nawet gdy jest co sprawdzać", async () => {
+  it("kończy się po godzinie, nawet gdy jest co sprawdzać", async () => {
     const start = 1_800_000_000_000;
     /* Zegar skacze za koniec godziny po drugim żądaniu — pętla pyta o czas
        przed każdą kartoteką, więc trzeciego żądania być nie może. */
@@ -98,8 +97,8 @@ describe("pasowanie z sieci na żądanie", () => {
     try {
       wyniki = Array.from({ length: 10 }, () => ({ sprawdzono: 1, zaproponowano: 1 }));
       pokaz();
-      await userEvent.click(await screen.findByRole("button", { name: /Sprawdzaj przez godzinę/ }));
-      await waitFor(() => expect(screen.getByRole("button", { name: /Sprawdzaj przez godzinę/ })).toBeEnabled());
+      await userEvent.click(await screen.findByRole("button", { name: /Szukaj w sieci/ }));
+      await waitFor(() => expect(screen.getByRole("button", { name: /Szukaj w sieci/ })).toBeEnabled());
       expect(wyslane).toHaveLength(2);
       expect(screen.queryByLabelText("Koniec przebiegu")).toBeNull();
     } finally {
@@ -109,9 +108,10 @@ describe("pasowanie z sieci na żądanie", () => {
 
   it("gdy nie ma czego sprawdzać, pętla staje po pierwszym pustym kroku", async () => {
     wyniki = [{ sprawdzono: 0, zaproponowano: 0 }];
+    stan = { ...STAN, doSprawdzenia: 1 };
     pokaz();
-    await userEvent.click(await screen.findByRole("button", { name: /Sprawdź teraz/ }));
-    await waitFor(() => expect(screen.getByRole("button", { name: /Sprawdź teraz/ })).toBeEnabled());
+    await userEvent.click(await screen.findByRole("button", { name: /Szukaj w sieci/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Szukaj w sieci/ })).toBeEnabled());
     expect(wyslane).toHaveLength(1);
   });
 });

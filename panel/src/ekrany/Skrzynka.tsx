@@ -15,7 +15,7 @@ import { Blad, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
 import {
   LIMIT_PYTANIA, useCopilot, useKlasyfikuj, usePoprawKlasyfikacje, useOcenSzkic, useUlozSzkic,
-  useWymianyCopilota, useZadajPytanie,
+  useWymianyCopilota, useZadajPytanie, useZapiszPasowanieZDopytania,
 } from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
@@ -76,6 +76,7 @@ export function Skrzynka() {
      żeby żądanie odpadło przed siecią. Dwie granice, jedna liczba. */
   const wymiany = useWymianyCopilota(wybranaId ?? 0);
   const zadajPytanie = useZadajPytanie();
+  const zapiszPasowanie = useZapiszPasowanieZDopytania();
   const [bladPytania, setBladPytania] = useState<string | null>(null);
   const klasyfikuj = useKlasyfikuj();
   const poprawKategorie = usePoprawKlasyfikacje();
@@ -506,6 +507,11 @@ export function Skrzynka() {
           limitZnakow: LIMIT_PYTANIA,
           onPytaj: (pytanie: string) => rozmowa.data && zadajPytanie.mutate(
             { rozmowaId: rozmowa.data.rozmowa.id, pytanie },
+            { onError: (e) => setBladPytania((e as Error).message),
+              onSuccess: () => setBladPytania(null) }),
+          zapisuje: zapiszPasowanie.isPending,
+          onZapiszPasowanie: (wymianaId: number, nr: number) => rozmowa.data && zapiszPasowanie.mutate(
+            { rozmowaId: rozmowa.data.rozmowa.id, wymianaId, nr },
             { onError: (e) => setBladPytania((e as Error).message),
               onSuccess: () => setBladPytania(null) }),
         },

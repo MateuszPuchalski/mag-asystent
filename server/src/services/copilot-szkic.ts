@@ -194,7 +194,11 @@ export interface PasowanieZRozmowy { czesc: string; doCzego: string; rola: strin
    sprawdzić, kosztuje dokładnie tyle, co szkic zmyślony.                    */
 
 /** Skąd wzięło się twierdzenie. Kolejność ma znaczenie: od najmocniejszego. */
-export const ZRODLA_TWIERDZENIA = ["fakty", "oferta", "zdjecie", "model"] as const;
+export const ZRODLA_TWIERDZENIA = ["fakty", "oferta", "zdjecie", "siec", "model"] as const;
+/* Szkic nie czyta sieci, więc jego schemat nie zna źródła `siec` (@wydanie).
+   Model, który nazwałby tak własną wiedzę, dostałby sufit o stopień wyżej
+   za samo słowo — a sufit stoi w kodzie, nie w dyscyplinie modelu. */
+export const ZRODLA_TWIERDZENIA_SZKICU = ["fakty", "oferta", "zdjecie", "model"] as const;
 export type ZrodloTwierdzenia = (typeof ZRODLA_TWIERDZENIA)[number];
 
 /** Ile temu twierdzeniu wolno ufać. Też od najmocniejszej. */
@@ -218,6 +222,10 @@ export type PoziomPewnosci = (typeof POZIOMY_PEWNOSCI)[number];
  *   zdjęciu widać tabliczkę, NIE wynika, że to tabliczka maszyny, o którą
  *   klient pyta. Zdjęcie bywa z internetu, z maszyny sąsiada albo z drugiej
  *   kosiarki w garażu. „Pewne" zostaje dla naszej bazy.
+ * `siec` (@wydanie) — strona przeczytana w dopytaniu przez `web_fetch`;
+ *   najwyżej „prawdopodobne”. Cudza strona bywa błędna, a tego, że mówi
+ *   o NASZEJ części, nikt u nas jeszcze nie sprawdził. Wyżej wchodzi dopiero
+ *   po zatwierdzeniu w Wiedzy — wtedy jest już faktem z naszej bazy.
  * `model` — wiedza własna modelu, bez pokrycia w naszych danych; „niepewne"
  *   i ani stopnia wyżej. To nie jest opinia o modelu, tylko o tym, że nikt
  *   tego u nas nie sprawdził.
@@ -226,7 +234,7 @@ export type PoziomPewnosci = (typeof POZIOMY_PEWNOSCI)[number];
  * której nie mamy powodu poprawiać.
  */
 const SUFIT_PEWNOSCI: Record<ZrodloTwierdzenia, PoziomPewnosci> = {
-  fakty: "pewne", oferta: "prawdopodobne", zdjecie: "prawdopodobne", model: "niepewne",
+  fakty: "pewne", oferta: "prawdopodobne", zdjecie: "prawdopodobne", siec: "prawdopodobne", model: "niepewne",
 };
 
 /** Twierdzenie tak, jak oddał je model — przed obcięciem pewności do sufitu. */

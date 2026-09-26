@@ -238,6 +238,11 @@ export function migrate(database: DatabaseSync) {
   /* Zapytania do wyszukiwarki w księdze Copilota (0.507.0) — pasowanie
      z sieci. Stare wiersze mają zero i to jest o nich prawda. */
   addColumn("copilot_wywolanie", "wyszukiwania", "INTEGER NOT NULL DEFAULT 0");
+  /* Pasowania znalezione w sieci przy dopytaniu (@wydanie), już po sicie.
+     Leżą przy wymianie, bo „Zapisz jako propozycję” bierze parę z wiersza
+     SPRAWDZONEGO przez serwer, nie z ciała żądania — ta sama zasada co przy
+     pasowaniu ze szkicu. Stare wymiany mają pustą listę i to jest o nich prawda. */
+  addColumn("copilot_pytanie", "pasowania", "TEXT NOT NULL DEFAULT '[]'");
   /* Skąd wziął się tekst w kolejce Wiedzy (0.264.0) — patrz `model_z_opisu`
      w `schema.sql`. Zastane wiersze dostają `'opis'` i to jest o nich PRAWDA:
      powstały wyłącznie z sekcji „Modele:" w opisach kartotek. Tu wystarcza

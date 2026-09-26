@@ -9,7 +9,6 @@ import { Tokeny } from "./Tokeny";
 import { Odsylacze } from "./Odsylacze";
 import { WykazCzesci } from "./WykazCzesci";
 import { PasujeDoOfert } from "./PasujeDoOfert";
-import { PasowanieZSieci } from "./PasowanieZSieci";
 
 /**
  * „Z opisów i ofert" (E3, rozszerzone w 0.264.0): teksty, z których człowiek
@@ -36,6 +35,10 @@ import { PasowanieZSieci } from "./PasowanieZSieci";
  * praca stoi na wierzchu, a narzędzia jedno kliknięcie niżej. Przebieg
  * z sieci na żądanie (decyzja właściciela z 0.508.0) zostaje w zasięgu
  * tego jednego kliknięcia.
+ *
+ * Szukanie w sieci wyprowadziło się stąd na górę Kolejki (@wydanie): jego
+ * wynik to propozycje w Kolejce, a start i wynik w dwóch zakładkach kazały
+ * właścicielowi pytać, gdzie one trafiają.
  */
 export function ZOpisow() {
   const lista = useModeleZOpisow();
@@ -63,10 +66,9 @@ export function ZOpisow() {
     <details className="rounded-lg border border-slate-200 px-3 py-2"
       onToggle={(e) => { if (e.currentTarget.open) setNarzedzia(true); }}>
       <summary className="cursor-pointer text-sm font-semibold">
-        Importy i zbiórki — „Pasuje do” z ofert, pasowanie z sieci, odsyłacze, wykazy części</summary>
+        Importy i zbiórki — „Pasuje do” z ofert, odsyłacze, wykazy części</summary>
       {narzedzia && <div className="mt-3 space-y-3">
         <PasujeDoOfert />
-        <PasowanieZSieci />
         <Odsylacze />
         <WykazCzesci />
       </div>}

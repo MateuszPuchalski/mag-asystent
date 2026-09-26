@@ -194,6 +194,21 @@ export function useWymianyCopilota(rozmowaId: number) {
   });
 }
 
+/** „Zapisz jako propozycję” przy pasowaniu z sieci (@wydanie). Parę bierze serwer z wiersza wymiany. */
+export function useZapiszPasowanieZDopytania() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { rozmowaId: number; wymianaId: number; nr: number }) =>
+      api<{ wymiana: WymianaCopilota }>(`/api/obsluga/copilot/pytania/${v.wymianaId}/pasowania/${v.nr}`,
+        { method: "POST" }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeCopilota.pytania(v.rozmowaId) });
+      /* Propozycja stanęła w Kolejce Wiedzy — jej licznik ma to widzieć. */
+      qc.invalidateQueries({ queryKey: ["wiedza"] });
+    },
+  });
+}
+
 export function useZadajPytanie() {
   const qc = useQueryClient();
   return useMutation({

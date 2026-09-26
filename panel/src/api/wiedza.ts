@@ -422,6 +422,18 @@ export function useZatwierdzOdSilnika() {
   });
 }
 
+/** Wszystkie POTWIERDZONE propozycje z sieci jednym kliknięciem (@wydanie).
+    Serwer liczy pewność od nowa — lista z ekranu niczego słabszego nie przemyci. */
+export function useZatwierdzPotwierdzone() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: number[]) =>
+      api<{ zatwierdzono: number; pominieto: number }>("/api/obsluga/wiedza/pasowanie-z-sieci/zatwierdz-potwierdzone",
+        { method: "POST", body: JSON.stringify({ ids }) }),
+    onSettled: () => poWiedzy(qc),
+  });
+}
+
 /** Zatwierdzenie listą propozycji z sieci dla jednej kartoteki (0.527.0). */
 export function useZatwierdzZSieci() {
   const qc = useQueryClient();

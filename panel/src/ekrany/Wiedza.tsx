@@ -1,16 +1,17 @@
 import React, { useState } from "react";
-import { BookMarked } from "lucide-react";
+import { BookMarked, CheckCheck } from "lucide-react";
 import {
   useKolejkaWiedzy, useModeleZOpisow, useRozstrzygnijPasowanie, useRozstrzygnijZamiennosc,
   useRozstrzygnijZastosowanie, useSilniki,
   useTokenySilnikow,
-  useZaproponujZastosowanie, useZatwierdzOdSilnika, useZatwierdzZSieci, useZatwierdzZWykazu,
+  useZaproponujZastosowanie, useZatwierdzOdSilnika, useZatwierdzPotwierdzone, useZatwierdzZSieci, useZatwierdzZWykazu,
 } from "../api/wiedza";
+import { PasowanieZSieci } from "../wiedza/PasowanieZSieci";
 import { PrzegladWykazu } from "../wiedza/PrzegladWykazu";
 import { PrzegladZSieci } from "../wiedza/PrzegladZSieci";
 import { PropozycjaPasowania } from "../wiedza/PropozycjaPasowania";
 import { KandydatZamiennosci } from "../wiedza/KandydatZamiennosci";
-import { Blad, Karta, Pusto, Zakladki, ile } from "../ui";
+import { Blad, Karta, Przycisk, Pusto, Zakladki, ile } from "../ui";
 import { Propozycja } from "../wiedza/Propozycja";
 import { NowaPropozycja } from "../wiedza/NowaPropozycja";
 import { WiedzaTowaru } from "../wiedza/WiedzaTowaru";
@@ -50,6 +51,7 @@ export function Wiedza() {
   const zatwierdzZWykazu = useZatwierdzZWykazu();
   const zatwierdzZSieci = useZatwierdzZSieci();
   const zatwierdzOdSilnika = useZatwierdzOdSilnika();
+  const zatwierdzPotwierdzone = useZatwierdzPotwierdzone();
   const [widok, setWidok] = useState<Widok>("kolejka");
   const [blad, setBlad] = useState("");
   const [wyslano, setWyslano] = useState("");
@@ -69,6 +71,13 @@ export function Wiedza() {
     ...przegladySieci.flatMap((g) => g.pozycje.map((p) => p.id)),
     ...przegladySilnikow.flatMap((g) => g.pozycje.map((p) => p.id))]);
   const propozycje = (kolejka.data?.propozycje ?? []).filter((z) => !wPrzegladzie.has(z.id));
+  /* JEDNO KLIKNIĘCIE DLA PEWNYCH (@wydanie), decyzją właściciela: „uprość
+     w użytkowaniu”. Reguła SZPERACZA: dwa niezależne źródła, w tym katalog
+     producenta albo baza części, to „potwierdzone”. Takie wiersze i tak
+     przechodziły przegląd bez odznaczania, więc karta po karcie to same
+     kliknięcia bez decyzji. Zatwierdza dalej CZŁOWIEK, tylko raz. */
+  const potwierdzone = [...przegladySieci.flatMap((g) => g.pozycje), ...przegladySilnikow.flatMap((g) => g.pozycje)]
+    .filter((p) => p.pewnosc === "potwierdzone").map((p) => p.id);
   const pasowania = kolejka.data?.pasowania ?? [];
   const zamiennosci = kolejka.data?.zamiennosciOem ?? [];
   /* Liczniki z serwera, nie długości list: lista par bywa przycięta, licznik
@@ -117,6 +126,23 @@ export function Wiedza() {
         <Blad>{blad || (kolejka.error as Error | null)?.message}</Blad>
 
         {widok === "kolejka" && <>
+          {/* Szukanie w sieci NA GÓRZE KOLEJKI (@wydanie): jego wynikiem są
+              propozycje tej kolejki, więc start i wynik stoją w jednym widoku. */}
+          <div className="mb-3"><PasowanieZSieci /></div>
+          {potwierdzone.length > 0 && <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-green-50 p-3"
+            aria-label="Potwierdzone z sieci">
+            <p className="flex-1 text-sm text-green-900">
+              <b>{ile(potwierdzone.length, "propozycja potwierdzona", "propozycje potwierdzone", "propozycji potwierdzonych")}</b>
+              {" "}przez dwa niezależne źródła, w tym katalog. Resztę przejrzyj niżej.</p>
+            <Przycisk wariant="glowny" disabled={zatwierdzPotwierdzone.isPending}
+              onClick={() => { setBlad(""); setWyslano("");
+                zatwierdzPotwierdzone.mutate(potwierdzone, {
+                  onSuccess: (r) => setWyslano(`Zatwierdzono ${ile(r.zatwierdzono, "potwierdzoną propozycję", "potwierdzone propozycje", "potwierdzonych propozycji")}.`
+                    + (r.pominieto > 0 ? ` ${r.pominieto} pominięto — rozstrzygnięte w międzyczasie albo już niepotwierdzone.` : "")),
+                  onError: (e) => setBlad((e as Error).message),
+                }); }}>
+              <CheckCheck size={16} />Zatwierdź wszystkie potwierdzone ({potwierdzone.length})</Przycisk>
+          </div>}
           {!kolejka.isLoading && propozycje.length === 0 && wykazy.length === 0 && przegladySieci.length === 0
             && przegladySilnikow.length === 0
             && pasowania.length === 0 && zamiennosci.length === 0 &&

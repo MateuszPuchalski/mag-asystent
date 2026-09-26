@@ -3,6 +3,7 @@ import { Check, ExternalLink, X as Krzyzyk } from "lucide-react";
 import type { PrzegladZSieci as Przeglad } from "../api/typy";
 import { Pole, Przycisk, ile } from "../ui";
 import { Kafel } from "../towar/Kafel";
+import { ZnakPewnosci } from "./ZnakPewnosci";
 
 /**
  * Przegląd propozycji automatu z sieci dla JEDNEJ kartoteki (0.527.0).
@@ -48,7 +49,8 @@ export function PrzegladZSieci({ p, trwa, onZatwierdz, onOdrzuc }: {
       </span>
     </div>
     <p className="px-3 pt-2 text-sm text-slate-600">
-      Automat znalazł tę część na stronach spoza Allegro po numerze OEM. Otwórz źródło, gdy cytat budzi wątpliwość.
+      Automat znalazł tę część na stronach spoza Allegro po numerze OEM. Potwierdzone stoją na górze;
+      przy słabych otwórz źródło, zanim zatwierdzisz.
       Odznaczone zostają w kolejce.</p>
     <ul className="divide-y divide-slate-100">
       {p.pozycje.map((x) => <li key={x.id} className="flex items-start gap-3 px-3 py-2">
@@ -57,7 +59,8 @@ export function PrzegladZSieci({ p, trwa, onZatwierdz, onOdrzuc }: {
         <div className="min-w-0 flex-1 text-sm">
           <p><b>{x.maszyna}</b>
             {x.link && <a className="ml-2 text-xs underline" href={x.link} target="_blank" rel="noreferrer">
-              źródło<ExternalLink size={12} className="ml-0.5 inline" aria-hidden="true" /></a>}</p>
+              źródło<ExternalLink size={12} className="ml-0.5 inline" aria-hidden="true" /></a>}
+            <ZnakPewnosci pewnosc={x.pewnosc} zrodel={x.zrodel} /></p>
           <p className="text-slate-600">{x.cytat}</p>
           {x.warunki && <p className="text-amber-900"><b>Tylko:</b> {x.warunki}</p>}
           {odrzucam === x.id && <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg bg-red-50 p-2">
