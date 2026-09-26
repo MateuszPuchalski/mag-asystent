@@ -62,6 +62,20 @@ describe("Autoodpowiedź na osi rozmowy", () => {
     expect(screen.getByText(/NIP: 5423444020/)).toBeTruthy();
   });
 
+  /* Od 0.523.0 długa wypowiedź ze stopką ma JEDEN przełącznik, nie dwa:
+     oba odsłaniały resztę tego, co klient dostał. */
+  it("długa odpowiedź ze stopką odsłania treść i stopkę jednym kliknięciem", async () => {
+    os(wpis({ automatyczna: false, tresc: "Prosimy o zgłoszenie reklamacji. " + "x".repeat(400),
+      stopka: "WERTIS Sp. z o.o.\nNIP: 5423444020" }));
+    expect(screen.queryByRole("button", { name: /stopka/ })).toBeNull();
+    expect(screen.queryByText(/NIP: 5423444020/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Pokaż całą wiadomość" }));
+    expect(screen.getByText(/NIP: 5423444020/)).toBeTruthy();
+    expect(screen.getByText(/Prosimy o zgłoszenie/).className).not.toMatch(/line-clamp/);
+    expect(screen.getAllByRole("button", { name: /Zwiń|stopk/ })).toHaveLength(1);
+  });
+
   it("wiadomość bez stopki nie dostaje przycisku do pustki", () => {
     os(wpis({ automatyczna: false, tresc: "Szarpak pasuje." }));
     expect(screen.queryByRole("button", { name: /stopka/ })).toBeNull();
