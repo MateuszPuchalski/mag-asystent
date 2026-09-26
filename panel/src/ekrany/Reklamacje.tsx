@@ -507,7 +507,7 @@ export function Reklamacje() {
               pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
               zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
               kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
-          {/* Rozstrzygnięte i Bez ruchu pod „Więcej" (@wydanie): oba mówią
+          {/* Rozstrzygnięte i Bez ruchu pod „Więcej" (0.522.0): oba mówią
               „tylko wgląd", więc nie stoją w wadze kubełka pracy. Cyfry dalej
               je wybierają — powód przy `ui/FiltrZWiecej.tsx`. */}
           <FiltrZWiecej<KubelekReklamacji | null> wybrany={kubelek} onWybierz={przelacz}

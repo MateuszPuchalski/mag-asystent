@@ -245,7 +245,7 @@ describe("Ekran reklamacji", () => {
 
   it("przełączenie kubełka przestawia KURSOR na jego pierwszą sprawę", async () => {
     pokaz("/obsluga/reklamacje/1");
-    /* Rozstrzygnięte stoją od @wydanie pod „Więcej" — wybór z listy jest tym
+    /* Rozstrzygnięte stoją od 0.522.0 pod „Więcej" — wybór z listy jest tym
        samym przełączeniem kubełka co klik w pigułkę. */
     await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"),
       screen.getByRole("option", { name: /^Rozstrzygnięte/ }));

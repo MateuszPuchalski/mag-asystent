@@ -10,6 +10,20 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.522.0 — 26 września 2026
+
+**Kubełki do przeglądania schodzą pod „Więcej”.** W reklamacjach Rozstrzygnięte
+i Bez ruchu, w dyskusjach Zamknięte stoją teraz w liście „Więcej” z licznikiem.
+Na wierzchu zostają kubełki pracy, a klawisze cyfr dalej wybierają każdy kubełek.
+Układ ze skrzynki mieszka we wspólnym `ui/FiltrZWiecej.tsx`, więc wszędzie
+działa tak samo.
+
+**Jeden „?” w kolejce rozmów.** Słownik znaków i skróty klawiszy otwierają się
+jednym przyciskiem i zamykają Escape'em albo kliknięciem obok. Plakietka
+„STAN Z” i stopka o niepobranych wierszach zeszły, bo mówił to już baner alarmu
+synchronizacji. Strzałka w liście „Więcej” albo w kolejności nie przesuwa już
+rozmowy pod kursorem.
+
 ## 0.521.0 — 26 września 2026
 
 **Ustawienia pokazują mniej naraz.** Dane firmy stoją jako odczyt, a formularz otwiera „Zmień”.

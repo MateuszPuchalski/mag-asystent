@@ -70,7 +70,7 @@ describe("Kolejka", () => {
 
   it("nieświeża kolejka nie powtarza alarmu, ale mówi, z kiedy jest stan", () => {
     /* Pusta kolejka przy stojącym synchronizatorze to nie „brak pytań",
-       tylko „nie wiem". Od @wydanie mówi to baner alarmu nad kolumnami
+       tylko „nie wiem". Od 0.522.0 mówi to baner alarmu nad kolumnami
        (`nieswieza` to dokładnie jego warunek), więc plakietka „STAN Z"
        i stopka zeszły. Godzina synchronizacji przy tytule zostaje (0.193.0). */
     render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={null} laduje={false}
@@ -557,7 +557,7 @@ describe("Kolejka: klawiatura", () => {
   });
 
   it("fokus w liście „Więcej” nie przesuwa rozmowy — strzałka należy do listy", async () => {
-    /* Strażnik z `nawigacja/fokus.ts` zna SELECT; własny, sprzed @wydanie,
+    /* Strażnik z `nawigacja/fokus.ts` zna SELECT; własny, sprzed 0.522.0,
        go nie znał i strzałka w liście przerzucała też rozmowę. */
     const onWybierz = vi.fn();
     zKlawiszami(null, onWybierz);
@@ -570,7 +570,7 @@ describe("Kolejka: klawiatura", () => {
     /* Ta sama lekcja co 0.281.0 na reklamacjach. Pasek NIE obiecuje sit
        „moje"/„niczyje": w skrzynce „Moje" jest kubełkiem pod cyfrą. */
     zKlawiszami(null, vi.fn());
-    /* Skróty siedzą pod „?" od 0.402.0, od @wydanie pod tym samym „?" co
+    /* Skróty siedzą pod „?" od 0.402.0, od 0.522.0 pod tym samym „?" co
        słownik znaków. Reguła ta sama: pokazane klawisze mają DZIAŁAĆ. */
     await userEvent.click(screen.getByRole("button", { name: "Znaki i skróty" }));
     const pomoc = screen.getByRole("region", { name: "Znaki i skróty" });

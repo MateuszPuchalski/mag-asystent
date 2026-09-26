@@ -394,7 +394,7 @@ export function Dyskusje() {
               pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
               zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
               kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
-          {/* Zamknięte pod „Więcej" (@wydanie): „tylko wgląd" nie stoi w wadze
+          {/* Zamknięte pod „Więcej" (0.522.0): „tylko wgląd" nie stoi w wadze
               kubełka pracy. Powód przy `ui/FiltrZWiecej.tsx`. */}
           <FiltrZWiecej<KubelekDyskusji | null> wybrany={kubelek} onWybierz={przelacz}
             wiecej={["zamknieta"]}
