@@ -10,6 +10,47 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.512.0 — 26 września 2026
+
+**Analiza mówi mniej naraz.** W „Ergonomii w liczbach" otwarta stoi tylko sekcja „Gdzie jest wolno". Pięć pozostałych tabel jest zwiniętych, z tytułem na wierzchu. Pusta sekcja mówi „brak" bez rozwijania. Bez pomiarów z pracy sama otwiera się sekcja skanu na ekranie głównym. Etykiety liczb w dostawach, pracy hali i obsłudze nie powtarzają już okna z nagłówka. Zostaje „młodsze niż 7 dni", bo to inne okno. Kolumna „DO DECYZJI" w raporcie tygodnia pisze się teraz „Do decyzji".
+
+## 0.511.0 — 26 września 2026
+
+**Ekran reklamacji mówi mniej naraz.** Licznik znaków w odpowiedzi i przy
+werdykcie pokazuje się dopiero 500 znaków przed limitem Allegro. Za limitem
+czerwienieje, a wysyłka zostaje zablokowana jak dotąd. Nasze długie wiadomości
+w rozmowie zwijają się do czterech linii z „Pokaż całą wiadomość”, jak
+w skrzynce. Wiadomość wydanego werdyktu też się zwija. Gdy Allegro oddało ją
+w rozmowie, pod werdyktem już jej nie powtarzamy. Nagłówek „Hala” nad jednym
+przyciskiem zszedł. „Zapisz notatkę” pojawia się dopiero po zmianie notatki.
+Przyciski reklamacji piszą zdaniem, nie wersalikami. Ten sam edytor dostały
+dyskusje.
+
+## 0.510.0 — 26 września 2026
+
+**Ekran wiedzy pokazuje najpierw pracę, a narzędzia jedno kliknięcie niżej.**
+W zakładce „Z opisów i ofert” cztery karty narzędzi stały nad listą do przerobienia.
+Chodzi o „Pasuje do” z ofert, pasowanie z sieci, odsyłacze i wykaz części.
+Zeszły pod listę, do zwiniętego „Importy i zbiórki”, a ich przyciski przestały być główne.
+Pasowanie z sieci na żądanie dalej uruchamia się po jednym rozwinięciu.
+
+Nagłówek ekranu niesie jedną sumę decyzji zamiast czterech liczników.
+Liczby zakładek stoją w zwykłym liczniku zakładki, nie w nawiasie przy nazwie.
+Karty decyzji mają jedną parę przycisków: główne „Zatwierdź” i drugie „Odrzuć”, w jednym rozmiarze.
+Karta pasowania z sieci mówi o limicie i pominiętych znaleziskach, bez „sufitu” i „sita”.
+
+## 0.509.0 — 26 września 2026
+
+**Stan systemu: mniej naraz, każdy fakt raz.** Arkusz lokalizacji, rekoncyliacja
+i test na żywym Allegro stoją zwinięte do nagłówka. Otwiera je jedno kliknięcie
+albo link `?karta=` z DO DECYZJI. Krok testu, który nie działa, otwiera kartę sam.
+Tabela integracji nie powtarza już połączenia Allegro ani workera Subiekta. Te
+fakty niosą karty konta Allegro i serwera obok. Karta serwera nie pokazuje pliku
+konfiguracji, bo stoi on w konfiguracji za zębatką. Wynik resyncu mówi zdaniem,
+ile kartotek i dokumentów wczytano. Zniknęły słowa programisty: nazwa trasy,
+„read-model” i „ta sama trasa”. Pochodzenie progu spóźnień przeszło do
+podpowiedzi przy liczbie. „Zadzwoń” przy kolektorze jest przyciskiem drugorzędnym.
+
 ## 0.508.1 — 25 września 2026
 
 **„Nie wiem” automatu wiedzy zostaje w księdze.** Gdy model językowy nie był
