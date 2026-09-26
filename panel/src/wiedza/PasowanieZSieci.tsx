@@ -61,7 +61,7 @@ export function PasowanieZSieci() {
   const limit = s ? (s.reczne ? s.reczne.naGodzine : s.naNoc) : 0;
   const zostalo = s ? Math.max(0, limit - (s.reczne ? s.reczne.wGodzinie : s.sprawdzono)) : 0;
   const nieMoze = !s || !!s.niegotowy || zostalo === 0 || s.doSprawdzenia === 0;
-  /* Treść ostatniego błędu (@wydanie). Samo „błędów: 3” nie mówi, czy to
+  /* Treść ostatniego błędu (0.528.1). Samo „błędów: 3” nie mówi, czy to
      klucz, limit dostawcy, czy strona za duża — a od tego zależy, co zrobić. */
   const ostatniBlad = s?.ostatnie.find((o) => o.wynik === "blad") ?? null;
 

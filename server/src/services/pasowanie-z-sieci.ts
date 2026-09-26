@@ -464,7 +464,7 @@ function zapiszKsiege(
    (wyłącznik i klucz), ile zostało z sufitu i co wyszło ostatnio. */
 
 export interface OstatniPrzebieg {
-  /** Kartoteka albo silnik z listy (@wydanie) — przy silniku `znalezisk` to liczba wykazów. */
+  /** Kartoteka albo silnik z listy (0.528.1) — przy silniku `znalezisk` to liczba wykazów. */
   rodzaj: "kartoteka" | "silnik";
   symbol: string;
   at: string;
@@ -501,7 +501,7 @@ export function stanPasowaniaZSieci(teraz = new Date(), database: DatabaseSync =
   const poBledzie = new Date(teraz.getTime() - PONOWNIE_PO_BLEDZIE_DNI * 86_400_000).toISOString();
   const doSprawdzenia = (database.prepare(`SELECT count(*) n FROM sgt_towar t WHERE ${WARUNEK_KANDYDATA}`)
     .get(odKiedy, poBledzie) as { n: number }).n;
-  /* Silniki na tej samej liście (@wydanie). Przycisk zaczyna od silników,
+  /* Silniki na tej samej liście (0.528.1). Przycisk zaczyna od silników,
      a ich błędy stały tylko w bazie — na ekranie było „błędów: 3” bez
      jednego słowa, co się stało. */
   const ostatnie = (database.prepare(`SELECT * FROM (

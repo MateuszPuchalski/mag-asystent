@@ -116,7 +116,7 @@ describe("szukanie w sieci na żądanie", () => {
   });
 });
 
-/* Błędy silników na karcie (@wydanie): „błędów: 3” bez słowa, co się stało,
+/* Błędy silników na karcie (0.528.1): „błędów: 3” bez słowa, co się stało,
    zostawiało właściciela ze zrzutem ekranu i bez przyczyny. */
 describe("błąd przebiegu jest widoczny", () => {
   it("silnik z błędem stoi w „Ostatnio sprawdzone”, a wynik mówi, jaki to błąd", async () => {

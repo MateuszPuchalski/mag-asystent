@@ -1327,7 +1327,7 @@ function naNasz(e: unknown): Error {
     /* Ślad do KSIĘGI, nie na ekran. `requestID` (tak, wielbłądem — SDK nazywa
        je inaczej niż nagłówek `request-id`) to jedyna rzecz, po której dostawca
        odszuka konkretne żądanie. Na ekranie byłby trzydziestoznakowym szumem. */
-    /* Zdanie dostawcy też idzie do śladu (@wydanie). Bez niego odrzucenie
+    /* Zdanie dostawcy też idzie do śladu (0.528.1). Bez niego odrzucenie
        400 przy wykazie silnika zostawiało w księdze „invalid_request_error
        400” i nic więcej — a przyczyną bywa za długi kontekst albo za duży
        PDF, czyli rzecz do naprawienia u nas, nie „spróbuj ponownie”. */

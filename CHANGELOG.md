@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.528.1 — 26 września 2026
+
+**Błąd szukania mówi, co się stało.** „Ostatnio sprawdzone” pokazuje też
+silniki z listy, a przy błędzie rozwija się samo. Pod wynikiem stoi treść
+ostatniego błędu. Ślad odrzucenia w księdze niesie zdanie dostawcy, nie
+tylko kod 400.
+
 ## 0.528.0 — 26 września 2026
 
 **Szukanie w sieci na górze Kolejki, jednym przyciskiem.** Wiedza → Kolejka

@@ -2163,7 +2163,7 @@ export type PowodOdrzuceniaSieci =
   | "zly_adres" | "allegro" | "strona_nieprzeczytana" | "cytat_spoza_strony"
   | "model_spoza_cytatu" | "marka_spoza_strony" | "numer_spoza_strony" | "za_krotki_model";
 export type OstatniPrzebiegSieci = {
-  /** Kartoteka albo silnik z listy (@wydanie). Brak = starszy serwer, same kartoteki. */
+  /** Kartoteka albo silnik z listy (0.528.1). Brak = starszy serwer, same kartoteki. */
   rodzaj?: "kartoteka" | "silnik";
   symbol: string; at: string; wynik: "ok" | "blad"; znalezisk: number; zaproponowano: number;
   odrzucone: Partial<Record<PowodOdrzuceniaSieci, number>>; blad: string | null;
