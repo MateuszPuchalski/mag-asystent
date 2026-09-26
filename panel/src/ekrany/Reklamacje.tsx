@@ -653,7 +653,7 @@ export function Reklamacje() {
             Zgoda przed wysłaniem zostaje przy OBU gałęziach — uznanie kosztuje
             pieniądze i jest równie nieodwracalne co odmowa. */}
         {szczegol.data && <div className="shrink-0"><Werdykt reklamacja={szczegol.data.reklamacja}
-          trwa={werdykt.isPending} blad={bladWerdyktu}
+          czat={szczegol.data.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
           trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
           onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)} /></div>}
       </Karta>

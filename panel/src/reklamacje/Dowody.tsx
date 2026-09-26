@@ -86,10 +86,14 @@ function Notatka({ reklamacja, trwa, blad, onZapisz, onCofnij }: {
       placeholder="Ustalenia, których Allegro nie zna"
       className="field resize-y text-sm" />
     {blad && <p className="text-xs text-red-700">{blad}</p>}
-    <Przycisk wariant="glowny" disabled={!zmienione || trwa}
+    {/* ZAPIS DOPIERO PRZY ZMIANIE (@wydanie). Martwy bursztynowy przycisk
+        stał pod każdą notatką i był najgłośniejszą rzeczą w kolumnie faktów,
+        choć przy czytaniu nie ma czego zapisać. Pojawia się z pierwszą
+        zmienioną literą i znika po zapisie, gdy pole równa się notatce. */}
+    {zmienione && <Przycisk wariant="glowny" disabled={trwa}
       onClick={() => onZapisz(tekst)}>
       {trwa ? "Zapisuję…" : "Zapisz notatkę"}
-    </Przycisk>
+    </Przycisk>}
     {/* ── CO SIĘ Z NIĄ STAŁO I JAK TO COFNĄĆ (0.280.0) ─────────────────────
         §25a.5: cofnięcie zamiast potwierdzenia, i to jest ZDANIE, nie ramka
         z decyzją. Notatka jest polem swobodnym, które nadpisuje ten, kto pisze
@@ -191,8 +195,9 @@ function KartaFaktow({ karta, trwa, blad, onRozpoznaj }: {
         {karta.zdjecia.length > 0 && ` · przeczytał ${zdjecSlowo(karta.zdjecia.length)}`}
       </p>
     </> : <p className="pt-1 text-xs text-slate-500">Werdykt zostaje przy Tobie.</p>}
+    {/* Zdaniem, nie wersalikami (@wydanie) — tak piszą przyciski skrzynki. */}
     <Przycisk className="mt-2 !px-2 !py-1 !text-xs" disabled={trwa} onClick={onRozpoznaj}>
-      {trwa ? "CZYTAM…" : karta ? "PRZECZYTAJ JESZCZE RAZ" : "PRZECZYTAJ SPRAWĘ"}
+      {trwa ? "Czytam…" : karta ? "Przeczytaj jeszcze raz" : "Przeczytaj sprawę"}
     </Przycisk>
     </div>
     </Zwijka>
@@ -504,10 +509,12 @@ export function Dowody({
       </Sekcja>}
 
     {/* ZLECENIE HALI Z REKLAMACJI (0.502.0) — „zdjęcie towaru z półki",
-        „sprawdź, czy partia ma tę wadę". Powód w `sprawy/ZlecHali.tsx`. */}
-    <Sekcja tytul="Hala">
+        „sprawdź, czy partia ma tę wadę". Powód w `sprawy/ZlecHali.tsx`.
+        Nagłówek „Hala" zszedł (@wydanie): stał nad jednym przyciskiem
+        „Zleć hali", który mówi to samo i sam jest nagłówkiem swojej czynności. */}
+    <section className="border-t border-slate-200 px-4 py-2 first:border-t-0">
       <ZlecHali zrodlo="reklamacja" zrodloRef={r.id} tytul={`Reklamacja ${r.numer ?? r.id}`} twId={r.twId} />
-    </Sekcja>
+    </section>
 
     {/* ── COPILOT NA DOLE (0.403.0) ───────────────────────────────────────────
         Do tego wydania karta maszyny stała PIERWSZA, nad faktami sprawy.

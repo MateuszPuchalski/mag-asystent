@@ -24,7 +24,7 @@ const props = (n: Partial<React.ComponentProps<typeof Edytor>> = {}) => ({
   onZmiana: vi.fn(), onWyslij: vi.fn(), ...n,
 });
 
-const przycisk = () => screen.getByRole("button", { name: /WYŚLIJ|WYSYŁAM/ });
+const przycisk = () => screen.getByRole("button", { name: /Wyślij|Wysyłam/ });
 
 describe("Edytor odpowiedzi w reklamacji", () => {
   it("przycisk jest martwy przy pustym polu i przy samych spacjach", () => {
@@ -42,17 +42,16 @@ describe("Edytor odpowiedzi w reklamacji", () => {
     expect(screen.getByText(/o 7 za dużo/)).toBeInTheDocument();
   });
 
-  it("licznik jest szary daleko od sufitu, a kolorowy dopiero przy progu", () => {
-    /* Próg to 500 znaków przed limitem. Poniżej licznik ma być tłem, nie
-       ostrzeżeniem — inaczej ostrzeżenie przestaje cokolwiek znaczyć. */
+  it("licznika NIE MA daleko od sufitu, staje dopiero przy progu", () => {
+    /* Od @wydanie licznik milczy zupełnie, jak w skrzynce od 0.506.0. Szary
+       „100 znaków" przy każdej odpowiedzi był tłem, którego nikt nie czytał —
+       liczba zmienia decyzję dopiero 500 znaków przed sufitem Allegro. */
     const { rerender } = render(<Edytor {...props({ tresc: "x".repeat(100) })} />);
-    /* slate-500 od 0.255.0, nie slate-400: intencja („licznik ma być tłem”)
-       zostaje, zmienia się barwa. slate-400 dawało 2.56:1 na bieli przy progu
-       4.5 — wyciszenie zeszło poniżej czytelności, a to już nie jest tło,
-       tylko brak informacji. */
-    expect(screen.getByText(/^100 znaków$/)).toHaveClass("text-slate-500");
+    expect(screen.queryByText(/\/ 20000/)).not.toBeInTheDocument();
     rerender(<Edytor {...props({ tresc: "x".repeat(LIMIT_ZNAKOW - 10) })} />);
-    expect(screen.getByText(/znaków$/)).toHaveClass("text-ranga-uwaga");
+    expect(screen.getByText(`${LIMIT_ZNAKOW - 10} / ${LIMIT_ZNAKOW}`)).toHaveClass("text-ranga-uwaga");
+    rerender(<Edytor {...props({ tresc: "x".repeat(LIMIT_ZNAKOW + 3) })} />);
+    expect(screen.getByText(/o 3 za dużo/)).toHaveClass("text-ranga-zle");
   });
 
   it("kliknięcie woła wysyłkę RAZ, a w trakcie przycisk jest martwy", async () => {
@@ -61,7 +60,7 @@ describe("Edytor odpowiedzi w reklamacji", () => {
     await userEvent.click(przycisk());
     expect(onWyslij).toHaveBeenCalledTimes(1);
     rerender(<Edytor {...props({ tresc: "Wysyłam nowy nóż", onWyslij, wysyla: true })} />);
-    expect(screen.getByRole("button", { name: /WYSYŁAM/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Wysyłam/ })).toBeDisabled();
   });
 
   it("przy zamkniętej rozmowie edytora NIE MA — nie jest wyłączony, nie ma go", () => {
