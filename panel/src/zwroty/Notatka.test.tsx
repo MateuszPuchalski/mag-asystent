@@ -18,8 +18,9 @@ import type { Zwrot } from "../api/typy";
 
    1. ZAPIS JAWNYM PRZYCISKIEM, nie przy każdym znaku: zapis po literze
       podnosiłby wersję zwrotu i wywracał kontrolę świeżości u kolegi.
-   2. NIE MA ZMIANY → PRZYCISK NIEAKTYWNY. Zapis tego samego zdania kosztuje
-      wersję i nie mówi nic nowego.
+   2. NIE MA ZMIANY → NIE MA PRZYCISKU (od 0.518.0; wcześniej nieaktywny).
+      Zapis tego samego zdania kosztuje wersję i nie mówi nic nowego, a główny
+      przycisk bez działania ściągał wzrok przy każdym zwrocie.
    3. NIE MA CZEGO COFAĆ → NIE MA PRZYCISKU. Pierwsza notatka nie ma dokąd
       wracać, a przycisk bez działania kłamie.
    4. AUTOR I GODZINA STOJĄ PRZY NOTATCE, nie w osobnej sekcji.             */
@@ -57,12 +58,11 @@ describe("Notatka biura przy zwrocie", () => {
   it("zapisuje dopiero po kliknięciu, i tylko gdy treść się zmieniła", async () => {
     const onNotatka = vi.fn();
     pokaz(zwrot(), { onNotatka });
-    const zapisz = screen.getByRole("button", { name: /Zapisz notatkę/ });
-    expect(zapisz).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Zapisz notatkę/ })).toBeNull();
 
     await userEvent.type(screen.getByLabelText("Notatka biura"), "klient prosi o telefon");
     expect(onNotatka).not.toHaveBeenCalled();
-    await userEvent.click(zapisz);
+    await userEvent.click(screen.getByRole("button", { name: /Zapisz notatkę/ }));
     expect(onNotatka).toHaveBeenCalledWith("klient prosi o telefon");
   });
 
@@ -76,6 +76,21 @@ describe("Notatka biura przy zwrocie", () => {
     expect(screen.getByText(/Ala z biura/)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "cofnij zmianę" }));
     expect(onCofnijNotatke).toHaveBeenCalled();
+  });
+
+  it("zapisana notatka nie niesie przycisku, dopóki nikt jej nie zmieni", async () => {
+    /* Sama spacja na końcu to nie zmiana — porównanie idzie po `trim`, jak
+       przy zapisie. Powrót do zapisanej treści chowa przycisk z powrotem. */
+    pokaz(zwrot({ notatka: "awizo dwa razy" }), { onNotatka: vi.fn() });
+    expect(screen.queryByRole("button", { name: /Zapisz notatkę/ })).toBeNull();
+    const pole = screen.getByLabelText("Notatka biura");
+    await userEvent.type(pole, " ");
+    expect(screen.queryByRole("button", { name: /Zapisz notatkę/ })).toBeNull();
+    await userEvent.type(pole, "i telefon");
+    expect(screen.getByRole("button", { name: /Zapisz notatkę/ })).toBeInTheDocument();
+    await userEvent.clear(pole);
+    await userEvent.type(pole, "awizo dwa razy");
+    expect(screen.queryByRole("button", { name: /Zapisz notatkę/ })).toBeNull();
   });
 
   it("pierwsza notatka nie dostaje cofnięcia — nie ma dokąd wracać", () => {

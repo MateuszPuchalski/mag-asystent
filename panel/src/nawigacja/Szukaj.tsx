@@ -77,8 +77,11 @@ export function OknoSzukania({ onZamknij }: { onZamknij: () => void }) {
 
   return <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[12vh]"
     onClick={onZamknij}>
+    {/* `text-slate-900` jawnie (0.515.0): okno rysuje się wewnątrz nagłówka
+        z `text-white`, więc wpisana fraza dziedziczyła biel na białym polu
+        i agent nie widział, co pisze. Zmierzone w przeglądarce. */}
     <div role="dialog" aria-label="Szukaj wszędzie" onClick={(e) => e.stopPropagation()} onKeyDown={naKlawisz}
-      className="flex max-h-[70vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white shadow-2xl">
+      className="flex max-h-[70vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white text-slate-900 shadow-2xl">
       <label className="flex shrink-0 items-center gap-3 border-b px-4 py-3">
         <Search size={18} className="shrink-0 text-slate-500" />
         <input autoFocus value={fraza} onChange={(e) => { setFraza(e.target.value); setTowar(null); }}

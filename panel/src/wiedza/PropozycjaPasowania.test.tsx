@@ -54,6 +54,9 @@ describe("PropozycjaPasowania", () => {
 
   it("zatwierdzenie idzie bez powodu, odrzucenie — dopiero z powodem", async () => {
     const onDecyzja = pokaz();
+    /* Ten sam kształt pary co w karcie zastosowania (0.510.0): bez `text-xs`. */
+    expect(screen.getByRole("button", { name: "Zatwierdź" })).toHaveClass("btn-primary");
+    expect(screen.getByRole("button", { name: "Zatwierdź" })).not.toHaveClass("text-xs");
     await userEvent.click(screen.getByRole("button", { name: "Zatwierdź" }));
     expect(onDecyzja).toHaveBeenCalledWith("zatwierdz", null);
 
