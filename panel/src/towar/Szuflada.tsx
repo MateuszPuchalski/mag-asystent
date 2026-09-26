@@ -90,17 +90,24 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
             : "Żadna oferta nie jest powiązana z tą kartoteką — sprzedaży nie znamy."}</p>
       </section>}
 
-      {p && <Lista tytul="Otwarte zwroty" ikona={<Undo2 size={14} />} pusto="brak"
-        wiersze={p.otwarteZwroty.map((z) => ({ klucz: `z${z.id}`, do: `/obsluga/zwroty/${z.id}`,
-          napis: `${z.numer ?? `#${z.id}`} · ${z.ilosc} szt.`, at: z.at }))} onIdz={onZamknij} />}
-      {p && <Lista tytul="Otwarte reklamacje i dyskusje" ikona={<Scale size={14} />} pusto="brak"
-        wiersze={p.otwarteSprawy.map((s) => ({ klucz: `s${s.id}`,
-          do: `/obsluga/${s.typ === "DISPUTE" ? "dyskusje" : "reklamacje"}/${s.id}`,
-          napis: `${s.typ === "DISPUTE" ? "dyskusja" : "reklamacja"} ${s.numer ?? `#${s.id}`}`, at: s.at }))}
-        onIdz={onZamknij} />}
-      {p && <Lista tytul="Otwarte rozmowy o tym towarze" ikona={<MessageSquare size={14} />} pusto="brak"
-        wiersze={p.otwarteRozmowy.map((r) => ({ klucz: `r${r.id}`, do: `/obsluga/skrzynka/${r.id}`,
-          napis: r.temat ?? "Rozmowa bez tematu", at: r.at }))} onIdz={onZamknij} />}
+      {/* PUSTA LISTA NIE STOI (0.514.0). Trzy nagłówki z „brak" pod każdym
+          to sześć linijek, które mówią jedno. Zostaje jedno zdanie, gdy nic
+          nie jest otwarte, a lista pojawia się dopiero, gdy ma wiersz. */}
+      {p && (p.otwarteZwroty.length + p.otwarteSprawy.length + p.otwarteRozmowy.length === 0
+        ? <p className="text-slate-600">Brak otwartych spraw.</p>
+        : <>
+          <Lista tytul="Otwarte zwroty" ikona={<Undo2 size={14} />}
+            wiersze={p.otwarteZwroty.map((z) => ({ klucz: `z${z.id}`, do: `/obsluga/zwroty/${z.id}`,
+              napis: `${z.numer ?? `#${z.id}`} · ${z.ilosc} szt.`, at: z.at }))} onIdz={onZamknij} />
+          <Lista tytul="Otwarte reklamacje i dyskusje" ikona={<Scale size={14} />}
+            wiersze={p.otwarteSprawy.map((s) => ({ klucz: `s${s.id}`,
+              do: `/obsluga/${s.typ === "DISPUTE" ? "dyskusje" : "reklamacje"}/${s.id}`,
+              napis: `${s.typ === "DISPUTE" ? "dyskusja" : "reklamacja"} ${s.numer ?? `#${s.id}`}`, at: s.at }))}
+            onIdz={onZamknij} />
+          <Lista tytul="Otwarte rozmowy o tym towarze" ikona={<MessageSquare size={14} />}
+            wiersze={p.otwarteRozmowy.map((r) => ({ klucz: `r${r.id}`, do: `/obsluga/skrzynka/${r.id}`,
+              napis: r.temat ?? "Rozmowa bez tematu", at: r.at }))} onIdz={onZamknij} />
+        </>)}
 
       {wiedza.data && <section aria-label="Wiedza">
         <h3 className="mb-1 flex items-center gap-1 text-podpis font-bold uppercase tracking-wide text-slate-700">
@@ -112,18 +119,19 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
   </aside>;
 }
 
-function Lista({ tytul, ikona, wiersze, pusto, onIdz }: {
-  tytul: string; ikona: React.ReactNode; pusto: string; onIdz: () => void;
+/** Lista otwartych spraw jednego rodzaju; pusta się nie rysuje (0.514.0). */
+function Lista({ tytul, ikona, wiersze, onIdz }: {
+  tytul: string; ikona: React.ReactNode; onIdz: () => void;
   wiersze: Array<{ klucz: string; do: string; napis: string; at: string }>;
 }) {
+  if (wiersze.length === 0) return null;
   return <section aria-label={tytul}>
     <h3 className="mb-1 flex items-center gap-1 text-podpis font-bold uppercase tracking-wide text-slate-700">
       {ikona}{tytul}</h3>
-    {wiersze.length === 0 ? <p className="text-slate-600">{pusto}</p>
-      : <ul className="space-y-0.5">{wiersze.map((w) => <li key={w.klucz}>
-        {/* Przejście ZAMYKA szufladę: decyzja zapada na ekranie sprawy. */}
-        <Link to={w.do} onClick={onIdz} className="text-sky-800 underline underline-offset-2">{w.napis}</Link>
-        <span className="ml-2 text-podpis text-slate-600">{dzien(w.at)}</span>
-      </li>)}</ul>}
+    <ul className="space-y-0.5">{wiersze.map((w) => <li key={w.klucz}>
+      {/* Przejście ZAMYKA szufladę: decyzja zapada na ekranie sprawy. */}
+      <Link to={w.do} onClick={onIdz} className="text-sky-800 underline underline-offset-2">{w.napis}</Link>
+      <span className="ml-2 text-podpis text-slate-600">{dzien(w.at)}</span>
+    </li>)}</ul>
   </section>;
 }

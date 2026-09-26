@@ -382,3 +382,33 @@ describe("Rozmowa przewija się, czynności stoją (0.418.0)", () => {
     expect(przewijany.contains(screen.getByTestId("edytor"))).toBe(false);
   });
 });
+
+describe("Nasza długa wypowiedź zwija się do czterech linii (0.511.0)", () => {
+  /* Wzorzec skrzynki z 0.506.0: własną odpowiedź agent zna, a długa zajmowała
+     całą oś. Cudzej nie zwijamy — po nią agent przyszedł. */
+  const dluga = "Dzień dobry, " + "sprawdziliśmy zgłoszenie dokładnie. ".repeat(12);
+
+  it("nasza długa: cztery linie i „Pokaż całą wiadomość”", async () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
+      czat={[wiad({ autorRola: "SELLER", autorLogin: "sklep", tresc: dluga })]} />);
+    const tekst = screen.getByText(/Dzień dobry/);
+    expect(tekst.className).toContain("line-clamp-4");
+    await userEvent.click(screen.getByRole("button", { name: "Pokaż całą wiadomość" }));
+    expect(tekst.className).not.toContain("line-clamp-4");
+    expect(screen.getByRole("button", { name: "Zwiń" })).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("puste wiersze ponad jeden ściska na ekranie; krótkiej nie zwija", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
+      czat={[wiad({ autorRola: "SELLER", tresc: "Wysłane.\n\n\n\nPozdrawiamy" })]} />);
+    expect(screen.getByText(/Wysłane\./).textContent).toBe("Wysłane.\n\nPozdrawiamy");
+    expect(screen.queryByRole("button", { name: "Pokaż całą wiadomość" })).not.toBeInTheDocument();
+  });
+
+  it("długiej wiadomości klienta NIE zwija", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
+      czat={[wiad({ autorRola: "BUYER", tresc: dluga })]} />);
+    expect(screen.getByText(/Dzień dobry/).className).not.toContain("line-clamp-4");
+    expect(screen.queryByRole("button", { name: "Pokaż całą wiadomość" })).not.toBeInTheDocument();
+  });
+});
