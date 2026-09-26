@@ -107,7 +107,7 @@ describe("kolumna kontekstu", () => {
     expect(within(swieci).getAllByTestId("zwrot").map((e) => e.textContent)).toEqual(["zwrot 5"]);
     expect(within(swieci).getByText(/Wymaga Ciebie · 1/)).toBeInTheDocument();
     expect(screen.queryByText("zwrot 9")).toBeNull();
-    /* Nagłówek „W normie” zszedł (@wydanie): rama oddziela świecące,
+    /* Nagłówek „W normie” zszedł (0.513.0): rama oddziela świecące,
        a wiersze mówią o sobie streszczeniem. */
     expect(screen.queryByText("W normie")).toBeNull();
     /* Decyzja z terminem jest tematem — karta towaru schodzi pod kliknięcie. */

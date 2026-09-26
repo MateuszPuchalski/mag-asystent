@@ -50,7 +50,7 @@ describe("soczewka w kolumnie kontekstu", () => {
 
   it("mówi, skąd kategoria: od Copilota albo od zespołu", () => {
     const { unmount } = rysuj(dane({ kategoria: "INVOICE" }));
-    /* Źródło stoi słowem; „gdzie poprawić" czeka w dymku (@wydanie), bo nad
+    /* Źródło stoi słowem; „gdzie poprawić" czeka w dymku (0.513.0), bo nad
        każdą soczewką czytało się jak instrukcja obsługi ekranu. */
     const zrodlo = screen.getByText(/kategoria wg Copilota/);
     expect(zrodlo).toBeInTheDocument();

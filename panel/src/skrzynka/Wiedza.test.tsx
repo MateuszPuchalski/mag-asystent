@@ -46,7 +46,7 @@ beforeEach(() => {
 describe("zakładka wiedzy", () => {
   it("klauzula o źródle stoi na ekranie, nie w dokumencie", () => {
     pokaz();
-    /* Reguła zostaje zdaniem na ekranie; opis listy zszedł do dymka (@wydanie). */
+    /* Reguła zostaje zdaniem na ekranie; opis listy zszedł do dymka (0.513.0). */
     const klauzula = screen.getByText(/Bez źródła treść jest przypuszczeniem \(§14\.3\)/);
     expect(klauzula).toHaveAttribute("title", expect.stringMatching(/Każde twierdzenie techniczne w szkicu/));
     expect(screen.queryByText(/Każde twierdzenie techniczne/)).toBeNull();

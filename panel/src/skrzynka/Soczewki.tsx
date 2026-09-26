@@ -34,7 +34,7 @@ export function Soczewka({ dane, onWstawDoSzkicu }: {
 /* SKĄD KATEGORIA — zawsze, bo soczewka stoi na domyśle klasyfikatora.
    Agent, który widzi „wg Copilota", wie, że może się mylić, i wie, gdzie
    to poprawić: od 0.506.0 etykieta kategorii stoi pod „⋯” nad rozmową.
-   Zwinięte (@wydanie): źródło zostaje słowem w linii nagłówka, a „gdzie
+   Zwinięte (0.513.0): źródło zostaje słowem w linii nagłówka, a „gdzie
    poprawić" zeszło do dymka. Zdanie o „⋯” stało nad KAŻDĄ soczewką, choć
    potrzebne jest tylko temu, kto chce poprawić kategorię. */
 function Naglowek({ s }: { s: DaneSoczewki }) {

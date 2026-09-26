@@ -39,7 +39,7 @@ export function Wiedza({ rozmowaId, twId, maMaszyne }: {
   return <div className="p-3" aria-label="Wiedza">
     {/* Zdanie, nie ramka (23 września 2026): obramowana klauzula była
         najcięższym elementem zakładki, która poza nią zwykle nie ma nic.
-        Jedno zdanie, nie dwa (@wydanie): na ekranie zostaje sama reguła,
+        Jedno zdanie, nie dwa (0.513.0): na ekranie zostaje sama reguła,
         bo dokument każe jej stać tam, gdzie agent pisze. Pierwsze zdanie
         opisywało tylko, do czego służy lista niżej — zeszło do dymka. */}
     <p className="text-podpis text-slate-600"
@@ -113,7 +113,7 @@ function Pomiar({ pomiar, maMaszyne, trwa, onZaproponuj }: {
     {pomiar.zaproponowano
       ? <p className="mt-1 text-podpis font-semibold text-emerald-700">w kolejce wiedzy jako dowód</p>
       : <>
-          {/* Opis drogi pomiaru zszedł spod nagłówka do dymka (@wydanie):
+          {/* Opis drogi pomiaru zszedł spod nagłówka do dymka (0.513.0):
               etykieta mówi stan słowem, a „jak to działa” czyta się raz. */}
           <p className="mt-1 text-podpis font-semibold text-amber-800" title={DROGA_POMIARU}>
             niezatwierdzone jako wiedza</p>

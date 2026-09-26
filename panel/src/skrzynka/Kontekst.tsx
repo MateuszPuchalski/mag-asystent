@@ -194,7 +194,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
 
       <DrogaZakupu droga={dane.droga} tutaj={{ rodzaj: "rozmowa", id: dane.rozmowa.id }} />
 
-      {/* Nagłówek „W normie” zszedł (@wydanie): wiersze niżej mówią o sobie
+      {/* Nagłówek „W normie” zszedł (0.513.0): wiersze niżej mówią o sobie
           streszczeniem i szewronem, a bursztynowa rama nad nimi już oddziela
           to, co świeci. Trzeci poziom tytułów w wąskiej kolumnie był szumem. */}
 

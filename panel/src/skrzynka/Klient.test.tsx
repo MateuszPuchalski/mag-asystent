@@ -71,7 +71,7 @@ describe("zakładka klienta", () => {
   });
 
   it("login nie stoi trzeci raz — profil klienta zostaje o klik", () => {
-    /* Zeszło (@wydanie): w skrzynce login stoi w nagłówku rozmowy i przy
+    /* Zeszło (0.513.0): w skrzynce login stoi w nagłówku rozmowy i przy
        wiadomościach, a kopiuje się go stamtąd. Odnośnik do profilu zostaje. */
     pokaz(dane());
     expect(screen.queryByText("zielony_ogrod")).toBeNull();

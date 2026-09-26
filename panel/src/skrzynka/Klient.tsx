@@ -72,7 +72,7 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
     {/* Profil klienta (24 września 2026): cały klient na jednym ekranie —
         liczby, sygnały, otwarte sprawy, zamówienia z pozycjami, notatka.
         Na samym profilu login stoi w nagłówku, więc tu drugi raz go nie ma. */}
-    {/* Login zszedł ze skrzynki (@wydanie): stał tam trzeci raz, po nagłówku
+    {/* Login zszedł ze skrzynki (0.513.0): stał tam trzeci raz, po nagłówku
         rozmowy i wątku, a kopiuje się go z nagłówka. Szuflada przy sprawach
         go zachowuje — tam zasłania kartę, na której login stoi. */}
     {!bezProfilu && <>
