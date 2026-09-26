@@ -6166,6 +6166,42 @@ Zdjęła je przyjęta propozycja: barwa i liczba mówią to samo w jednym znaku.
 Kafel kategorii na początku wiersza zostaje, bo tylko on niesie częste
 kategorie.
 
+## 26e. Uproszczenie całego panelu (@wydanie)
+
+Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko: „uprość UI”. Zasada się nie zmieniła: nic nowego, tylko zdjąć, scalić, zwinąć albo użyć wspólnego elementu. Każda rzecz została najwyżej jedno kliknięcie dalej. Zmiany weszły siedemnastoma osobnymi PR-ami (#610–#626) i dwoma poprawkami po nich (#627, #628).
+
+**Wspólne wzorce, które powstały albo się rozeszły:**
+
+- `ui/FiltrZWiecej.tsx`: kubełki pracy na wierzchu, kubełki „Tylko wgląd” pod „Więcej” z licznikiem. Używają go Skrzynka, reklamacje, dyskusje, kosze i dostawy.
+- „Ten zakup u nas”: jedna sekcja zamiast czterech list o zakupie. Kształt z reklamacji (0.416.0) przeszedł do zwrotów i dyskusji.
+- „Ostatnio: … · przebieg (n)”: przebieg sprawy jednym zdaniem, całość po kliknięciu. Stoi w Skrzynce i przy zwrocie.
+- Długie teksty zwinięte do czterech linii przy progu 320 znaków lub 5 linii. Stoi w Skrzynce i w reklamacjach.
+- Licznik znaków pojawia się dopiero przy limicie.
+- „Zapisz notatkę” pojawia się dopiero po zmianie treści.
+- Przyciski piszą zdaniem, nie wersalikami.
+
+**Co zeszło z ekranu, ekran po ekranie:**
+
+- **Skrzynka.** Jeden „?” w kolejce zamiast dwóch; zamyka się Escape'em i kliknięciem obok. Kategoria i jej źródło w soczewce, poprawka w podpowiedzi. Metadane szkicu Copilota i doboru w podpowiedziach. Linia oferty przy wiadomości tylko wtedy, gdy różni się od rozmowy.
+- **Zwroty.** Kwota raz, w „Pieniądzach”. „Przyjmij” drugorzędny, gdy działa „Wszystko OK”. Lista outletu zwinięta do jednej linii z licznikiem.
+- **Reklamacje i dyskusje.** Dyskusje dostały jeden wiersz nagłówka: prowadzący, „Odśwież z Allegro” i zakończenie. „Sprawa” i „Stan” zwinięte, domyślny status Allegro znika. Cyfry kubełków reklamacji liczą się z listy, więc 4 otwiera „Bez ruchu”.
+- **Do zrobienia i Zadania.** Bez tytułu powtarzającego zakładkę; trzy sekcje w jednym kształcie nagłówka. „Pokaż odhaczone” to mały przycisk w nagłówku sekcji.
+- **Analiza.** Karty obsługi w `KartaWgladu`, szczegóły pod „Szczegóły”, okno podane raz w nagłówku. Ergonomia pokazuje otwartą tylko pierwszą sekcję.
+- **Wiedza.** Lista pracy na wierzchu, narzędzia importu pod „Importy i zbiórki”. W nagłówku jedna suma. Jeden styl przycisków „Zatwierdź” i „Odrzuć”.
+- **Stan, Ustawienia, Dziennik, szuflada towaru.** Rzadkie karty zwinięte; `?karta=` dalej je otwiera. Każdy fakt w jednym miejscu. Konta mają menu „⋯” w wierszu, a kod QR stoi za „Pokaż kod”. Rzadkie filtry dziennika stoją pod „Więcej filtrów”. Puste listy szuflady nie stoją wcale.
+- **Powłoka.** Bez napisu „Biuro” przy logo. Jeden licznik w nawigacji. Pasek „Nowe w panelu” w jednej linii z „+N”.
+
+**Czego nie ruszono, bo to decyzje właściciela:**
+
+- zdanie o czasie synchronizacji w kolejce (0.193.0);
+- kafle i pasek pytania kubełka w zwrotach (0.214.0, 0.454.0);
+- zdanie „Klientowi trzeba powiedzieć osobno” (0.210.0) i zdanie o prywatności w zwrocie;
+- rozwinięta lista automatu wiedzy (0.331.0);
+- tarcie „Wyślij bez zmian” (§26c.3);
+- wiersze Klient i Wiedza w Skrzynce, tylko skrócone (0.216.0).
+
+**Jedna zmiana do potwierdzenia.** Ściąga skrótów w kolejce Skrzynki otwiera się teraz kliknięciem, nie najechaniem. Najechanie przyszło w 0.402.0 po uwadze właściciela. Pełna lista skrótów dalej stoi pod klawiszem `?`.
+
 ## 27. Zasady nadrzędne
 
 Te punkty mówią o JEDNEJ rozmowie i jednej sprawie. Reguły obowiązujące
