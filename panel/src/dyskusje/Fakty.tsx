@@ -1,13 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { ExternalLink, Undo2 } from "lucide-react";
+import { Activity, ExternalLink, MessagesSquare } from "lucide-react";
 import type { Dyskusja, SzczegolDyskusji, Tag } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { TagiSprawy } from "../sprawy/Tagi";
-import { Link as RouterLink } from "react-router-dom";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { ZlecHali } from "../sprawy/ZlecHali";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
-import { EtykietaWartosci, NaglowekSekcji, czas, LoginKlienta, Przycisk, Skopiuj } from "../ui";
+import { EtykietaWartosci, NaglowekSekcji, czas, dzien, dniSlowo, ile, LoginKlienta, Przycisk, Skopiuj } from "../ui";
+import { Zwijka } from "../skrzynka/Zwijka";
 
 /* ── Kolumna faktów o dyskusji ───────────────────────────────────────────────
    Jedna lista faktów o jednej sprawie, więc SEKCJE jedna pod drugą, a nie
@@ -74,10 +74,14 @@ function Notatka({ dyskusja, trwa, blad, onZapisz, onCofnij }: {
       placeholder="Ustalenia, których Allegro nie zna"
       className="field resize-y text-sm" />
     {blad && <p className="text-xs text-red-700">{blad}</p>}
-    <Przycisk wariant="glowny" disabled={!zmienione || trwa}
+    {/* Przycisk staje dopiero przy ZMIANIE (0.520.0). Główny, bursztynowy
+        guzik stał pod pustym polem przy każdej dyskusji i był najgłośniejszą
+        rzeczą w kolumnie faktów, choć nie było czego zapisać. Wyszarzony
+        zaprasza do kliknięcia i odmawia; zapis i tak zaczyna się od pisania. */}
+    {zmienione && <Przycisk wariant="glowny" disabled={trwa}
       onClick={() => onZapisz(tekst)}>
       {trwa ? "Zapisuję…" : "Zapisz notatkę"}
-    </Przycisk>
+    </Przycisk>}
     {/* ── CO SIĘ Z NIĄ STAŁO I JAK TO COFNĄĆ (0.280.0) ─────────────────────
         §25a.5: cofnięcie zamiast potwierdzenia, i to jest ZDANIE, nie ramka
         z decyzją. Notatka jest polem swobodnym, które nadpisuje ten, kto pisze
@@ -127,30 +131,49 @@ export function Fakty({
 }) {
   const d = szczegol.dyskusja;
   return <div className="flex min-h-0 flex-col">
-    <Sekcja tytul="Sprawa">
-      <Wiersz etykieta="Temat">{d.temat ?? "bez tematu"}</Wiersz>
-      <Wiersz etykieta="Kupujący">{d.kupujacyLogin
-        ? <span className="inline-flex flex-wrap items-center gap-2"><LoginKlienta login={d.kupujacyLogin} />
-            <PrzyciskHistorii rodzaj="sprawa" id={d.id} tutaj="tą dyskusją" /></span>
-        : "—"}</Wiersz>
-      <Wiersz etykieta="Otwarto">{czas(d.otwartoAt)}</Wiersz>
-    </Sekcja>
+    {/* ── SPRAWA I STAN ZWINIĘTE (0.520.0) ───────────────────────────────────
+        Zgłoszenie agentów: „aplikacja przytłacza". Obie sekcje stały otwarte
+        przy każdej dyskusji, a ich treść — temat, login, liczba wiadomości —
+        powtarza wiersz kolejki i nagłówek rozmowy obok. Ten sam ruch co
+        w kolumnie reklamacji od 0.403.0: podpis zwijki mówi najważniejsze,
+        reszta jest jedno kliknięcie dalej, a wybór pamięta stanowisko. */}
+    <div className="px-2 pb-2">
+      <Zwijka tytul="Sprawa" Ikona={MessagesSquare} podpis={podpisSprawy(d)}
+        pamietajJako="wertis.dyskusje.sprawa">
+        <div className="px-2 py-2">
+          <Wiersz etykieta="Temat">{d.temat ?? "bez tematu"}</Wiersz>
+          <Wiersz etykieta="Kupujący">{d.kupujacyLogin
+            ? <span className="inline-flex flex-wrap items-center gap-2"><LoginKlienta login={d.kupujacyLogin} />
+                <PrzyciskHistorii rodzaj="sprawa" id={d.id} tutaj="tą dyskusją" /></span>
+            : "—"}</Wiersz>
+          <Wiersz etykieta="Otwarto">{czas(d.otwartoAt)}</Wiersz>
+        </div>
+      </Zwijka>
 
-    <Sekcja tytul="Stan">
-      {/* TERMINU TU NIE MA i to nie jest brak danych. Allegro nie oddaje przy
-          dyskusji ani `decisionDueDate`, ani `statusDueDate`; jedyną miarą
-          pilności jest to, jak długo piłka leży po naszej stronie. */}
-      <Wiersz etykieta="Czeka na nas">
-        {d.czekaOdDni === null
-          ? "ruch należy do klienta"
-          : `${d.czekaOdDni === 0 ? "od dziś" : `${d.czekaOdDni} dni`} — Allegro terminu tu nie stawia`}
-      </Wiersz>
-      <Wiersz etykieta="Status Allegro">{d.statusAllegro ?? "—"}</Wiersz>
-      <Wiersz etykieta="Rozmowa">
-        {d.czatAktywny ? "otwarta" : "zamknięta przez Allegro"}
-        {` · ${d.wiadomosciIle} wiadomości`}
-      </Wiersz>
-    </Sekcja>
+      <Zwijka tytul="Stan" Ikona={Activity} podpis={podpisStanu(d)}
+        pamietajJako="wertis.dyskusje.stan">
+        <div className="px-2 py-2">
+          {/* TERMINU TU NIE MA i to nie jest brak danych. Allegro nie oddaje przy
+              dyskusji ani `decisionDueDate`, ani `statusDueDate`; jedyną miarą
+              pilności jest to, jak długo piłka leży po naszej stronie.
+
+              Dopisek „Allegro terminu tu nie stawia" zszedł (0.520.0): to było
+              zdanie programisty do agenta, a agent nie szukał tu terminu. */}
+          <Wiersz etykieta="Czeka na nas">{czekaSlowem(d)}</Wiersz>
+          {/* ── STATUS DOMYŚLNY NIE JEST INFORMACJĄ (0.520.0) ────────────────
+              Ta sama reguła co w głowicy reklamacji od 0.414.0.
+              `DISPUTE_ONGOING` ma każda trwająca dyskusja, więc wiersz mówił
+              „to zwykła dyskusja". Staje tylko, gdy stan ODBIEGA od
+              domyślnego — zamknięta albo nierozstrzygnięta. */}
+          {d.statusAllegro && d.statusAllegro !== STATUS_DOMYSLNY &&
+            <Wiersz etykieta="Status Allegro">{d.statusAllegro}</Wiersz>}
+          <Wiersz etykieta="Rozmowa">
+            {d.czatAktywny ? "otwarta" : "zamknięta przez Allegro"}
+            {` · ${d.wiadomosciIle} wiadomości`}
+          </Wiersz>
+        </div>
+      </Zwijka>
+    </div>
 
     <Sekcja tytul="Kontekst zakupu">
       <Wiersz etykieta="Zamówienie">
@@ -210,46 +233,40 @@ export function Fakty({
       </Wiersz>}
     </Sekcja>
 
-    {/* Zwroty tego zamówienia — mostkiem jest numer zamówienia, ten sam
-        mechanizm co przy rozmowie od 0.221.0 i przy reklamacji. */}
-    {szczegol.zwroty.length > 0 && <Sekcja tytul="Zwroty tego zamówienia">
-      <ul className="flex flex-col gap-1">
-        {szczegol.zwroty.map((z) => <li key={z.id} className="text-sm">
-          <RouterLink to={`/obsluga/zwroty/${z.id}`}
-            className="inline-flex items-center gap-1 underline underline-offset-2">
-            <Undo2 size={12} />{z.numer ?? z.externalId}</RouterLink>
-          <span className="ml-2 text-slate-500">{czas(z.utworzono)}</span>
-        </li>)}
-      </ul>
-    </Sekcja>}
+    {/* ── JEDNA SEKCJA ZAMIAST CZTERECH (0.520.0) ────────────────────────────
+        Ten sam ruch, który kolumna reklamacji zrobiła w 0.416.0; pełny powód
+        stoi tam, w `reklamacje/Dowody.tsx`. Pod kolumną dyskusji zostały
+        CZTERY sekcje o jednym zakupie: zwroty, inne sprawy, droga i rozmowy.
+        Dwie ostatnie miały przy tym podwójny nagłówek — sekcja nad blokiem,
+        który rysował własny, bo nie dostał `wSekcji`.
 
-    {/* Rodzeństwo posprzedażowe i droga zakupu (S1 i S3 spoiwa). Przy dyskusji
-        to przypadek najważniejszy: ona zwykle poprzedza reklamację, więc agent
-        ma widzieć, czy sprawa poszła już dalej — i nie obiecywać w tym kanale
+        DROGA JEST NADZBIOREM: `services/droga-klienta.ts` składa przystanki
+        z tych samych tabel, z których serwis dyskusji bierze zwroty i rozmowy
+        (wspólne `kontekstZamowienia`). Każdy przystanek prowadzi do swojej
+        kolejki, więc z drogi da się wejść wszędzie tam, gdzie prowadziły
+        tamte listy.
+
+        ZOSTAJE RODZEŃSTWO SPRAW, i przy dyskusji jest ważniejsze niż gdzie
+        indziej. Dyskusja zwykle poprzedza reklamację, więc agent ma widzieć,
+        czy sprawa poszła już dalej, i nie obiecywać w tym kanale
         rozstrzygnięcia, nad którym kanał stracił władzę. */}
-    {szczegol.sprawy.length > 0 && <Sekcja tytul="Inne sprawy tego zakupu">
-      <SprawyZakupu sprawy={szczegol.sprawy} />
-    </Sekcja>}
-
-    {szczegol.droga.length > 1 && <Sekcja tytul="Droga tego zakupu">
-      <DrogaZakupu droga={szczegol.droga} tutaj={{ rodzaj: "dyskusja", id: d.id }} />
-    </Sekcja>}
+    {(szczegol.droga.length > 1 || szczegol.sprawy.length > 0) &&
+      <Sekcja tytul="Ten zakup u nas">
+        {szczegol.droga.length > 1 && <DrogaZakupu droga={szczegol.droga}
+          tutaj={{ rodzaj: "dyskusja", id: d.id }} wSekcji />}
+        {szczegol.sprawy.length > 0 && <div className={szczegol.droga.length > 1 ? "mt-1.5" : ""}>
+          <SprawyZakupu sprawy={szczegol.sprawy} wSekcji />
+        </div>}
+      </Sekcja>}
 
     {/* Zlecenie hali z dyskusji (0.502.0) — powód w `sprawy/ZlecHali.tsx`.
-        Dyskusja nie ma numeru od Allegro (§25c.1), więc tytuł niesie temat. */}
-    <Sekcja tytul="Hala">
-      <ZlecHali zrodlo="dyskusja" zrodloRef={d.id} tytul={`Dyskusja — ${d.temat ?? `#${d.id}`}`} />
-    </Sekcja>
+        Dyskusja nie ma numeru od Allegro (§25c.1), więc tytuł niesie temat.
 
-    {szczegol.rozmowy.length > 0 && <Sekcja tytul="Rozmowy o tym zakupie">
-      <ul className="flex flex-col gap-1">
-        {szczegol.rozmowy.map((c) => <li key={c.id} className="text-sm">
-          <RouterLink to={`/obsluga/skrzynka/${c.id}`} className="underline underline-offset-2">
-            {c.temat ?? `Rozmowa ${c.id}`}</RouterLink>
-          <span className="ml-2 text-slate-500">{czas(c.ostatniaAt)}</span>
-        </li>)}
-      </ul>
-    </Sekcja>}
+        Nagłówek „Hala" zszedł (0.520.0): stał nad jednym przyciskiem, który
+        sam mówi „Zleć hali", więc powtarzał jego napis. */}
+    <div className="border-t border-slate-200 px-4 py-2">
+      <ZlecHali zrodlo="dyskusja" zrodloRef={d.id} tytul={`Dyskusja — ${d.temat ?? `#${d.id}`}`} />
+    </div>
 
     {/* „Prowadzi" zeszło do ŚRODKOWEJ kolumny (0.392.0) — ten sam ruch i ten
         sam powód co przy reklamacji: wzięcie sprawy jest czynnością, a ta
@@ -267,4 +284,39 @@ export function Fakty({
       </div>
     </Sekcja>
   </div>;
+}
+
+/** Status, który ma każda trwająca dyskusja — nie wołamy go wierszem. */
+const STATUS_DOMYSLNY = "DISPUTE_ONGOING";
+
+/** Jak długo piłka leży u nas — słowem, bo terminu dyskusja nie ma. */
+function czekaSlowem(d: Dyskusja): string {
+  if (d.czekaOdDni === null) return "ruch należy do klienta";
+  return d.czekaOdDni === 0 ? "od dziś" : dniSlowo(d.czekaOdDni);
+}
+
+/** Co stoi w sprawie — kto i od kiedy, żeby zamknięta zwijka nie kazała zgadywać. */
+function podpisSprawy(d: Dyskusja): string {
+  return [d.kupujacyLogin, d.otwartoAt ? `otwarto ${dzien(d.otwartoAt)}` : null]
+    .filter(Boolean).join(" · ");
+}
+
+/**
+ * Co stoi w stanie — czyj ruch, status spoza domyślnego i ile wiadomości.
+ *
+ * Czekanie idzie PIERWSZE, bo przy dyskusji to jedyna miara pilności.
+ * Zwinięta zwijka nie może jej chować — dlatego stoi w podpisie. Z tego
+ * samego powodu staje tu status ODBIEGAJĄCY od domyślnego: wiersz, który ma
+ * wołać o uwagę, nie może czekać za kliknięciem.
+ *
+ * Przy zamkniętej rozmowie „ruch klienta" byłoby nieprawdą — nikt już nie
+ * odpisze. Serwer oddaje wtedy puste czekanie, więc rozstrzygamy to tutaj.
+ */
+function podpisStanu(d: Dyskusja): string {
+  const ruch = !d.czatAktywny ? "rozmowa zamknięta"
+    : d.czekaOdDni !== null ? `czeka na nas ${czekaSlowem(d)}`
+      : d.ruchNasz ? "czeka na nas" : "ruch klienta";
+  const status = d.statusAllegro && d.statusAllegro !== STATUS_DOMYSLNY ? d.statusAllegro : null;
+  return [ruch, status, ile(d.wiadomosciIle, "wiadomość", "wiadomości", "wiadomości")]
+    .filter(Boolean).join(" · ");
 }

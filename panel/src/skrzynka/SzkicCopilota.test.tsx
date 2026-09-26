@@ -69,7 +69,9 @@ describe("Szkic Copilota w edytorze", () => {
     edytor(c, { szkic: szkic().tresc });
     expect(screen.getByLabelText("Szkic odpowiedzi")).toHaveValue(szkic().tresc);
     expect(screen.getByText(/Szkic Copilota w polu/)).toBeInTheDocument();
-    expect(screen.getByText(/poprawiaj wprost w polu/)).toBeInTheDocument();
+    /* „— poprawiaj wprost w polu" zeszło (0.517.0): tekst stoi w polu
+       z kursorem, zdanie powtarzało to, co widać. */
+    expect(screen.queryByText(/poprawiaj wprost w polu/)).toBeNull();
     for (const n of [/Przyjmij/, /Wstaw do odpowiedzi/, /Zastąp mój szkic/]) {
       expect(screen.queryByRole("button", { name: n })).toBeNull();
     }
@@ -349,8 +351,23 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
   it("licznik znaków siedzi w nagłówku, a nie w osobnym wierszu pod kartą", () => {
     edytor(copilot({ szkic: szkic({ tresc: "abcde" }) }));
     expect(screen.queryByText(/każde twierdzenie ma podpisane źródło/)).toBeNull();
-    /* Drugi raz liczba stoi w podpisie zwiniętej treści (0.499.0) — pierwszy
-       jest nagłówkiem, o który ten test pyta. */
-    expect(screen.getAllByText(/5 znaków/)[0]).toBeVisible();
+    /* Od 0.517.0 liczba stoi widoczna w podpisie zwiniętej treści, a cała
+       metryka — model, czas, kto — w dymku nazwy szkicu. */
+    expect(screen.getByText(/Treść szkicu · 5 znaków/)).toBeVisible();
+    expect(screen.getByText(/Szkic Copilota/).closest("[title]"))
+      .toHaveAttribute("title", expect.stringMatching(/5 znaków/));
+  });
+
+  it("pasek „Przy okazji” jest zwinięty do jednej linii z tematami", async () => {
+    /* 0.517.0: sześć zdań pod każdym szkicem, z których żadne nie prosi
+       o ruch. Podpis mówi, czego dotyczą; treść o jedno kliknięcie. */
+    edytor(copilot({ nowePolaDoboru: ["Marka"], szkic: szkic({ lukiKartoteki:
+      { symbol: "W09-0211", numery: [], modele: [], wpisane: [], czeka: 2 } }) }));
+    const pasek = screen.getByTestId("luki-kartoteki");
+    expect(pasek).not.toHaveAttribute("open");
+    expect(pasek.querySelector("summary")!.textContent).toBe("Przy okazji: dane doboru, wiedza");
+    expect(screen.getByText(/Do doboru wpisano/)).not.toBeVisible();
+    await userEvent.click(pasek.querySelector("summary")!);
+    expect(screen.getByText(/Do doboru wpisano/)).toBeVisible();
   });
 });

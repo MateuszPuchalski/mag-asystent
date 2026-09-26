@@ -40,10 +40,11 @@ export function Ustawienia() {
 
   /* Własny scroller — rama panelu nie przewija za ekrany (patrz `main.tsx`). */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
+    {/* Zdanie o tym, gdzie mieszkają pomiary i stan integracji, zeszło
+        (0.521.0), bo mówiło o innych ekranach, nie o tym. Agent czytał je
+        przy każdym wejściu, a pomagało raz — przy pierwszym szukaniu. */}
     <Karta className="flex flex-wrap items-center gap-3 p-4">
       <Settings size={18} /><b className="text-naglowek">Ustawienia</b>
-      <span className="text-sm text-slate-500">Rzadko zmieniane, wspólne dla wszystkich biurek.
-        Pomiary obsługi są w Analizie, stan integracji w Stanie systemu.</span>
     </Karta>
 
     <DaneFirmy />

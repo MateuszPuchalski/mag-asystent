@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ModelZOpisu } from "../api/typy";
 
@@ -68,6 +68,26 @@ describe("sekcje Modele: z opisów", () => {
     render(<ZOpisow />);
     await userEvent.click(screen.getByRole("button", { name: "Odrzuć" }));
     expect(odrzuc).toHaveBeenCalledWith({ id: 7 }, expect.anything());
+  });
+
+  /* Narzędzia pod listą, zwinięte (0.510.0). Praca stoi na wierzchu, cztery
+     karty importów i zbiórek jedno kliknięcie niżej. Zwinięte nie montują się,
+     więc nie pytają serwera o stany, których nikt nie ogląda. */
+  it("praca stoi przed narzędziami, a narzędzia czekają zwinięte o jedno kliknięcie", async () => {
+    render(<ZOpisow />);
+    const podsumowanie = screen.getByText(/^Importy i zbiórki/);
+    const zwiniete = podsumowanie.closest("details")!;
+    expect(zwiniete).not.toHaveAttribute("open");
+    expect(screen.queryByText("pasowanie z sieci")).toBeNull();
+    /* Wiersz pracy PRZED kartą narzędzi w kolejności dokumentu. */
+    const wiersz = screen.getByRole("listitem", { name: "Z opisu: FTC272" });
+    expect(wiersz.compareDocumentPosition(zwiniete) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    await userEvent.click(podsumowanie);
+    await waitFor(() => expect(screen.getByText("pasowanie z sieci")).toBeInTheDocument());
+    for (const karta of ["pasuje do z ofert", "odsyłacze", "wykaz części"]) {
+      expect(screen.getByText(karta)).toBeInTheDocument();
+    }
   });
 
   it("wiersz z oferty mówi, SKĄD jest — inna waga świadectwa, inna decyzja", () => {

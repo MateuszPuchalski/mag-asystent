@@ -20,9 +20,11 @@ const procent = (u: number | null) => (u === null ? "—" : `${Math.round(u * 10
 const sekundy = (s: number | null) =>
   (s === null ? "—" : s < 120 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`);
 
-function Liczby({ l, dni }: { l: LiczbyTarcia; dni: number }) {
+/* Bez „w oknie N dni" (0.512.0): karta słucha okna zakresu, które stoi
+   w nagłówku Analizy. Powtórka przy liczbie była drugim źródłem tego faktu. */
+function Liczby({ l }: { l: LiczbyTarcia }) {
   return <div className="flex flex-wrap gap-8">
-    <Liczba ile={l.cofnietychWysylek} etykieta={`cofniętych wysyłek z ${l.wyslanych} w oknie ${dni} dni`} />
+    <Liczba ile={l.cofnietychWysylek} etykieta={`cofniętych wysyłek z ${l.wyslanych}`} />
     <Liczba ile={l.cofnietychZakonczen} etykieta="cofniętych zakończeń" />
     <Liczba ile={sekundy(l.medianaSekDoWysylki)}
       etykieta={`mediana od otwarcia rozmowy do wysyłki · ${l.probekCzasu} pomiarów`} />
@@ -39,7 +41,7 @@ export function TarcieSkrzynki({ dni }: { dni: number }) {
       opis={"Cofnięcia to pomyłki złapane w porę — rosną, gdy przycisk stoi w złym miejscu. "
         + "Czas mierzy szukanie po ekranie. Wysoki udział szkiców bez zmian bywa dobry albo zły: "
         + "rozstrzyga rozmowa, nie ta liczba."}>
-      <Liczby l={t.data.razem} dni={t.data.dni} />
+      <Liczby l={t.data.razem} />
     </KartaWgladu>
     {/* Rozbicie na ludzi przychodzi WYŁĄCZNIE administratorowi (0.431.0). */}
     {t.data.osoby && <KartaWgladu tytul="Tarcie według osoby"

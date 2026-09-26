@@ -18,7 +18,8 @@ import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { Edytor } from "../reklamacje/Edytor";
 import { Czat } from "../reklamacje/Czat";
 import { useSzkicSprawy } from "../sprawy/useSzkicSprawy";
-import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { Blad, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
@@ -393,7 +394,10 @@ export function Dyskusje() {
               pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
               zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
               kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
-          <FiltrSegmentowy<KubelekDyskusji | null> wybrany={kubelek} onWybierz={przelacz}
+          {/* Zamknięte pod „Więcej" (0.522.0): „tylko wgląd" nie stoi w wadze
+              kubełka pracy. Powód przy `ui/FiltrZWiecej.tsx`. */}
+          <FiltrZWiecej<KubelekDyskusji | null> wybrany={kubelek} onWybierz={przelacz}
+            wiecej={["zamknieta"]}
             pozycje={[
               ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
                 ile: data?.liczniki?.[k.id] ?? 0,
@@ -444,19 +448,34 @@ export function Dyskusje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto p-4">
         {szczegol.data
           ? <>
-              {/* Kto prowadzi — czynność przy czynnościach (0.392.0). */}
-              <Prowadzi prowadzi={szczegol.data.dyskusja.prowadzi} trwa={prowadze.isPending}
-                onProwadze={() => {
-                  setBladZapisu("");
-                  prowadze.mutate(
-                    { id: szczegol.data!.dyskusja.id, wersja: szczegol.data!.dyskusja.wersja },
-                    { onError: (e) => setBladZapisu((e as Error).message) });
-                }} />
-              {/* Przycisk ZOSTAJE obok odświeżenia przy wejściu, decyzją
-                  właściciela. Agent, który czeka w sprawie na odpowiedź
-                  kupującego albo doradcy, nie musi z niej wychodzić, żeby
-                  zobaczyć nową wiadomość. */}
-              <div className="mb-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
+              {/* ── JEDEN WIERSZ NAGŁÓWKA (0.520.0) ─────────────────────────
+                  Zgłoszenie agentów: „aplikacja przytłacza". Nad rozmową stały
+                  TRZY osobne rzędy — „Prowadzi", odświeżenie i prośba
+                  o zakończenie — każdy z jednym przyciskiem. Teraz to jeden
+                  wiersz, jak nagłówek rozmowy w skrzynce od 0.506.0: kto
+                  prowadzi po lewej, czynności po prawej. Rozmowa, po którą
+                  agent tu przyszedł, zaczyna się dwa rzędy wyżej.
+
+                  Kto prowadzi — czynność przy czynnościach (0.392.0). */}
+              <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+                {/* `mr-auto`, nie `flex-1`: rozciągnięty blok łamał „Prowadzę tę
+                    sprawę" pod własne imię przy 1366 px. Tak wiersz łamie się
+                    całymi przyciskami, a `justify-end` trzyma złamane czynności
+                    po prawej, pod swoimi sąsiadami. */}
+                <div className="mr-auto">
+                  <Prowadzi wWierszu prowadzi={szczegol.data.dyskusja.prowadzi} trwa={prowadze.isPending}
+                    onProwadze={() => {
+                      setBladZapisu("");
+                      prowadze.mutate(
+                        { id: szczegol.data!.dyskusja.id, wersja: szczegol.data!.dyskusja.wersja },
+                        { onError: (e) => setBladZapisu((e as Error).message) });
+                    }} />
+                </div>
+                {/* Przycisk ZOSTAJE obok odświeżenia przy wejściu, decyzją
+                    właściciela. Agent, który czeka w sprawie na odpowiedź
+                    kupującego albo doradcy, nie musi z niej wychodzić, żeby
+                    zobaczyć nową wiadomość. Przeniesiony do wiersza nagłówka,
+                    nie zdjęty. */}
                 <Przycisk className="!px-2 !py-1 !text-xs" disabled={odswiez.isPending}
                   onClick={() => {
                     setBladOdswiezenia("");
@@ -466,11 +485,12 @@ export function Dyskusje() {
                   <RefreshCw size={12} className={odswiez.isPending ? "animate-spin" : ""} />
                   {odswiez.isPending ? "Odświeżam…" : "Odśwież z Allegro"}
                 </Przycisk>
-                {bladOdswiezenia && <span className="text-red-800">{bladOdswiezenia}</span>}
-              </div>
-              <div className="mb-3">
+                {/* Prośba o zakończenie OSTATNIA, jak główna czynność
+                    w nagłówku skrzynki. Rozwinięty formularz łamie się pod
+                    wiersz sam — powód w `dyskusje/Zakonczenie.tsx`. */}
                 <Zakonczenie dyskusja={szczegol.data.dyskusja} wysyla={zakoncz.isPending}
                   blad={bladZakonczenia} onZakoncz={wyslijZakonczenie} />
+                {bladOdswiezenia && <p className="basis-full text-xs text-red-800">{bladOdswiezenia}</p>}
               </div>
               <Czat
                 sprawa={{

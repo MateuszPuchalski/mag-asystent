@@ -126,7 +126,9 @@ export function PasujeDoOfert() {
       {s.listaAt && <span className="text-slate-600"> · lista ofert pobrana {czas(s.listaAt)}</span>}</p>}
     <div className="flex flex-wrap items-center gap-2">
       {!trwa
-        ? <Przycisk wariant="glowny" onClick={() => void uruchom()}><Download size={16} />Zbierz z wszystkich ofert</Przycisk>
+        /* Drugorzędny (0.510.0) z powodu opisanego przy „Sprawdź teraz"
+           w `PasowanieZSieci`: jeden główny przycisk na zakładkę. */
+        ? <Przycisk onClick={() => void uruchom()}><Download size={16} />Zbierz z wszystkich ofert</Przycisk>
         : <Przycisk onClick={() => { stop.current = true; }}><Square size={14} />Zatrzymaj</Przycisk>}
       {postep && <span className="text-sm text-slate-600" role="status">{postep}</span>}
     </div>
