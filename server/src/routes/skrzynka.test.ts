@@ -113,6 +113,9 @@ const TRASY = () => [
   /* Zakończ / Otwórz ponownie (23 września 2026) — ta sama bramka. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/zakoncz`, payload: {} },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/otworz` },
+  /* Odłóż do terminu (@wydanie) — ta sama bramka co Zakończ. */
+  { method: "POST" as const, url: `/api/conversations/${rozmowa}/odloz`,
+    payload: { doKiedy: new Date(Date.now() + 86_400_000).toISOString() } },
   /* Cofnięta wysyłka (0.500.0) — sam wpis do pomiaru tarcia, ta sama bramka. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/wysylka-cofnieta` },
   /* Pominięcie (0.532.0) — licznik bez człowieka, ale pisze go tylko biuro:
@@ -834,6 +837,32 @@ test("ciało bez `reklamacyjna` odpada 400, zamiast po cichu zdejmować znacznik
   const r = await app.inject({ method: "POST", url: `/api/obsluga/rozmowy/${rozmowa}/reklamacyjna`,
     headers: b.naglowki, payload: {} });
   assert.equal(r.statusCode, 400, r.body);
+});
+
+test("odłóż: ciało bez `doKiedy` odpada 400; z terminem kolejka widzi odłożenie, null je zdejmuje", async () => {
+  /* Ta sama blizna 0.224.1 co wyżej: puste ciało nie może znaczyć „zdejmij",
+     bo budziłoby rozmowę przez literówkę. */
+  const b = login("biuro", "Anna");
+  let r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/odloz`,
+    headers: b.naglowki, payload: {} });
+  assert.equal(r.statusCode, 400, r.body);
+
+  const doKiedy = new Date(Date.now() + 2 * 86_400_000).toISOString();
+  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/odloz`,
+    headers: b.naglowki, payload: { doKiedy } });
+  assert.equal(r.statusCode, 200, r.body);
+  const wiersz = () => app.inject({ method: "GET", url: "/api/obsluga/rozmowy", headers: b.naglowki })
+    .then((x) => x.json<{ rozmowy: Array<{ id: number; status: string; odlozoneDo: string | null }> }>()
+      .rozmowy.find((w) => w.id === rozmowa)!);
+  let w = await wiersz();
+  assert.equal(w.status, "snoozed");
+  assert.equal(w.odlozoneDo, doKiedy);
+
+  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/odloz`,
+    headers: b.naglowki, payload: { doKiedy: null } });
+  assert.equal(r.statusCode, 200, r.body);
+  w = await wiersz();
+  assert.equal(w.status, "waiting_for_us");
 });
 
 /* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ─────────────────────── */

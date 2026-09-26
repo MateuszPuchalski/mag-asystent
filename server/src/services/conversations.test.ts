@@ -6,7 +6,7 @@ import { migrate } from "../db/db.js";
 import {
   ConversationConflict, dodajKomentarz, obudzPrzychodzaca, przejmijRozmowe,
   klientPodziekowal, statusRozmowy, ustawStatus, zapiszSzkic, type DecyzjaDoStatusu,
-  CISZA_ZAKONCZENIA_MS, otworzRozmowe, statusIZakonczenie, wyliczStatus, zakonczRozmowe,
+  CISZA_ZAKONCZENIA_MS, odlozRozmowe, otworzRozmowe, statusIZakonczenie, wyliczStatus, zakonczRozmowe,
 } from "./conversations.js";
 
 /* Serwis rozmów nie miał testu obok do 0.145.1, choć trzyma trzy mutacje
@@ -473,3 +473,63 @@ test("Otwórz ponownie cofa werdykt agenta; nowa wiadomość klienta budzi zako�
   assert.equal(statusRozmowy(d, rozmowa), "waiting_for_us");
 });
 
+
+/* ── ODŁÓŻ DO TERMINU (@wydanie) ─────────────────────────────────────────────
+   Decyzja właściciela z 26 września 2026 — powód przy `odlozRozmowe`. Test
+   pilnuje trzech obietnic: termin jest zawsze, rozmowa wraca SAMA, a klient
+   budzi ją wcześniej. */
+test("odłożona rozmowa schodzi z ruchu do terminu i wraca sama, z wpisem w dzienniku", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  const teraz = new Date("2026-09-26T10:00:00.000Z");
+  const wynik = odlozRozmowe(d, rozmowa, ala, "2026-09-27T06:00:00.000Z", teraz);
+  assert.deepEqual(wynik, { status: "snoozed", snoozedUntil: "2026-09-27T06:00:00.000Z" });
+  assert.equal(statusRozmowy(d, rozmowa, teraz.getTime()), "snoozed");
+  /* Po terminie liczy się znów z kierunku wiadomości — bez żadnego taktu. */
+  assert.equal(statusRozmowy(d, rozmowa, Date.parse("2026-09-27T06:00:01.000Z")), "waiting_for_us");
+  const wpisy = zdarzenia(d, "rozmowa_odlozona");
+  assert.equal(wpisy.length, 1);
+  assert.match(String(wpisy[0].payload), /"doKiedy":"2026-09-27T06:00:00.000Z"/);
+});
+
+test("odłożenie wymaga terminu w przyszłości i najwyżej 30 dni", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  const teraz = new Date("2026-09-26T10:00:00.000Z");
+  assert.throws(() => odlozRozmowe(d, rozmowa, ala, "jutro", teraz), /nie jest datą/);
+  assert.throws(() => odlozRozmowe(d, rozmowa, ala, "2026-09-26T09:00:00.000Z", teraz), /w przyszłości/);
+  assert.throws(() => odlozRozmowe(d, rozmowa, ala, "2026-11-30T09:00:00.000Z", teraz), /30 dni/);
+  assert.equal(statusRozmowy(d, rozmowa, teraz.getTime()), "waiting_for_us", "odmowa niczego nie zmienia");
+});
+
+test("zakończonej nie da się odłożyć — nie stoi w żadnym kubełku roboczym", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  zakonczRozmowe(d, rozmowa, ala, true);
+  const jutro = new Date(Date.now() + 86_400_000).toISOString();
+  assert.throws(() => odlozRozmowe(d, rozmowa, ala, jutro),
+    (e: unknown) => e instanceof ConversationConflict);
+});
+
+test("zdjęcie odłożenia (null) budzi rozmowę od razu; bez odłożenia nic nie pisze", () => {
+  const { d, ala, rozmowa } = stanowisko();
+  const teraz = new Date("2026-09-26T10:00:00.000Z");
+  odlozRozmowe(d, rozmowa, ala, null, teraz);
+  assert.equal(zdarzenia(d, "rozmowa_odlozona").length, 0, "nie było czego zdejmować");
+  odlozRozmowe(d, rozmowa, ala, "2026-09-28T06:00:00.000Z", teraz);
+  const wynik = odlozRozmowe(d, rozmowa, ala, null, teraz);
+  assert.deepEqual(wynik, { status: "waiting_for_us", snoozedUntil: null });
+  assert.equal(zdarzenia(d, "rozmowa_odlozona").length, 2);
+});
+
+test("nowa wiadomość klienta budzi odłożoną przed terminem, prowadzący zostaje", () => {
+  const { d, ala, rozmowa, wiadomosc } = stanowisko();
+  d.prepare("UPDATE conversation SET assigned_user_id=? WHERE id=?").run(ala, rozmowa);
+  /* Zegar stoi przed terminem przez cały test — budzi KLIENT, nie kalendarz. */
+  odlozRozmowe(d, rozmowa, ala, "2026-09-05T06:00:00.000Z", new Date("2026-09-01T08:00:00.000Z"));
+  wiadomosc("Przesyłam zdjęcie tabliczki", "m-7");
+  d.prepare("UPDATE message SET sent_at='2026-09-02T07:00:00.000Z' WHERE external_message_id='m-7'").run();
+  const przedTerminem = new Date("2026-09-02T07:01:00.000Z");
+  assert.equal(statusRozmowy(d, rozmowa, przedTerminem.getTime()), "snoozed");
+  obudzPrzychodzaca(d, rozmowa, przedTerminem);
+  assert.equal(statusRozmowy(d, rozmowa, przedTerminem.getTime()), "waiting_for_us");
+  const w = d.prepare("SELECT assigned_user_id AS a FROM conversation WHERE id=?").get(rozmowa) as { a: number };
+  assert.equal(w.a, ala, "odłożenie to nie oddanie sprawy");
+});

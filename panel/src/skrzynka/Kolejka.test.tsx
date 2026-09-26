@@ -135,7 +135,8 @@ describe("Kolejka", () => {
        cofnąć — nikt nie szuka sprawy, której nie widać na żadnej liście. */
     await kubelek(/^Nieprzypisane/);
     expect(screen.queryByText("Sprawa z archiwum")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /^Wszystkie/ }));
+    /* „Wszystkie" stoi od @wydanie pod „Więcej" — cyfra 6 dalej go wybiera. */
+    await userEvent.keyboard("6");
     expect(screen.getByText("Sprawa z archiwum")).toBeInTheDocument();
   });
 
@@ -176,6 +177,15 @@ const pokaz = (rozmowy: Rozmowa[]) =>
   render(<Kolejka rozmowy={rozmowy} stan={STAN} wybranaId={null} laduje={false}
     onWybierz={() => {}} onOdswiez={() => {}} />);
 
+/* Wiersze w stanach spoza pracy (czeka na klienta, odłożona, zakończona) stoją
+   od @wydanie poza domyślnym „Do odpowiedzi" — test wiersza patrzy więc
+   w „Wszystkie", jedyny kubełek, który pokazuje każdy stan. */
+const pokazWszystkie = async (rozmowy: Rozmowa[]) => {
+  const r = pokaz(rozmowy);
+  await userEvent.keyboard("6");
+  return r;
+};
+
 /* ── RANGA STATUSU W WIERSZU (0.251.0) ───────────────────────────────────────
    Najgłośniejszym elementem wiersza była plakietka statusu — a w kubełkach
    roboczych status jest praktycznie stały, więc emfaza szła na słowo, które
@@ -192,37 +202,39 @@ describe("plakietka należy się WYJĄTKOWI, nie normie", () => {
     expect(screen.getByTitle("czeka 3 g")).toBeInTheDocument();
   });
 
-  it("„czeka na klienta” NIE dostaje zegara, bo nikt nie czeka", () => {
+  it("„czeka na klienta” NIE dostaje zegara, bo nikt nie czeka", async () => {
     /* `czekaOdMs` liczy się od wiadomości KLIENTA, więc po naszej odpowiedzi
        dalej rośnie. Wiersz pisał wtedy „czeka 15 g” o rozmowie, w której
        piłka jest po drugiej stronie. Słowo „czeka” musi być prawdziwe. */
-    pokaz([rozmowa({ status: "waiting_for_customer", czekaOdMs: 15 * 3600_000 })]);
+    await pokazWszystkie([rozmowa({ status: "waiting_for_customer", czekaOdMs: 15 * 3600_000 })]);
     expect(screen.queryByText(/czeka 15 g/)).not.toBeInTheDocument();
     /* Ale sam status ZOSTAJE — zszedł do podpisu, nie zniknął. */
     expect(screen.getByText("Czeka na klienta")).toBeInTheDocument();
   });
 
-  it("werdykt człowieka i ruch hali dalej krzyczą plakietką", () => {
+  it("werdykt człowieka i ruch hali dalej krzyczą plakietką", async () => {
     /* Tych dwóch nie da się odczytać z niczego innego w wierszu: „Odłożona”
        to decyzja agenta, „Czeka na halę” — wystawione zlecenie pomiaru. */
-    pokaz([rozmowa({ id: 1, status: "snoozed" }), rozmowa({ id: 2, status: "waiting_for_internal" })]);
+    await pokazWszystkie([rozmowa({ id: 1, status: "snoozed" }), rozmowa({ id: 2, status: "waiting_for_internal" })]);
     expect(screen.getByText("Odłożona")).toBeInTheDocument();
     expect(screen.getByText("Czeka na halę")).toBeInTheDocument();
   });
 
-  it("data ustępuje zegarowi, bo mierzą TĘ SAMĄ wiadomość", () => {
+  it("data ustępuje zegarowi, bo mierzą TĘ SAMĄ wiadomość", async () => {
     /* Przy „czeka na nas” znacznik czasu i zegar opisują jedno zdarzenie.
        Zostaje ten, który odpowiada na pytanie „za co się wziąć” — a data
        wraca wtedy, gdy zegara nie ma i jest jedynym czasem w wierszu. */
     /* Pytamy WIERSZ, nie ekran: data synchronizacji stoi w nagłówku kolejki
        i ma tam zostać — to inny fakt niż wiek ostatniej wiadomości. */
-    const wiersz = (r: Rozmowa) => {
-      const w = pokaz([r]).container.querySelector("button[aria-current]");
-      return w?.textContent ?? "";
+    const wiersz = async (r: Rozmowa) => {
+      const { container, unmount } = await pokazWszystkie([r]);
+      const tekst = container.querySelector("button[aria-current]")?.textContent ?? "";
+      unmount();
+      return tekst;
     };
-    expect(wiersz(rozmowa({ status: "waiting_for_us", czekaOdMs: 3 * 3600_000 })))
+    expect(await wiersz(rozmowa({ status: "waiting_for_us", czekaOdMs: 3 * 3600_000 })))
       .not.toMatch(/2026/);
-    expect(wiersz(rozmowa({ status: "closed", czekaOdMs: 3 * 3600_000 })))
+    expect(await wiersz(rozmowa({ status: "closed", czekaOdMs: 3 * 3600_000 })))
       .toMatch(/2026/);
   });
 });
@@ -336,26 +348,31 @@ describe("Szukanie w kolejce", () => {
     rozmowa({ id: 2, klient: "Kosecka_Ola", ostatniaWiadomosc: "Kiedy wyjdzie przesyłka?",
       wlasciciel: "M. Wójcik", wlascicielId: 9 }),
   ];
-  const pokaz = () => render(<Kolejka rozmowy={lista} stan={STAN} wybranaId={null}
-    laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+  /* Druga rozmowa jest KOLEGI — w „Do odpowiedzi" jej nie ma, więc szukanie
+     sprawdzamy w „Wszystkie" (cyfra 6), tam gdzie szuka się cudzych spraw. */
+  const pokaz = async () => {
+    render(<Kolejka rozmowy={lista} stan={STAN} wybranaId={null}
+      laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    await userEvent.keyboard("6");
+  };
   const pole = () => screen.getByRole("textbox", { name: /Szukaj w rozmowach/ });
 
   it("zawęża po loginie klienta", async () => {
-    pokaz();
+    await pokaz();
     await userEvent.type(pole(), "mirek");
     expect(screen.getByText("mirek352810")).toBeInTheDocument();
     expect(screen.queryByText("Kosecka_Ola")).toBeNull();
   });
 
   it("zawęża po TREŚCI, bo loginu nikt nie pamięta", async () => {
-    pokaz();
+    await pokaz();
     await userEvent.type(pole(), "przesyłka");
     expect(screen.getByText("Kosecka_Ola")).toBeInTheDocument();
     expect(screen.queryByText("mirek352810")).toBeNull();
   });
 
   it("zawęża po prowadzącym, bo o to pyta się na głos", async () => {
-    pokaz();
+    await pokaz();
     await userEvent.type(pole(), "wójcik");
     expect(screen.getByText("Kosecka_Ola")).toBeInTheDocument();
     expect(screen.queryByText("mirek352810")).toBeNull();
@@ -381,24 +398,24 @@ describe("Szukanie w kolejce", () => {
   });
 
   it("MILCZY przy trafieniu po loginie — znak zapalany zawsze przestaje być znakiem", async () => {
-    pokaz();
+    await pokaz();
     await userEvent.type(pole(), "mirek");
     expect(screen.queryByText(/trafienie w treści/)).toBeNull();
   });
 
   it("nazywa też trafienie po PROWADZĄCYM, bo to znowu nie jest login klienta", async () => {
-    pokaz();
+    await pokaz();
     await userEvent.type(pole(), "wójcik");
     expect(screen.getByText("trafienie po prowadzącym")).toBeInTheDocument();
   });
 
-  it("bez szukania nie ma żadnego znacznika trafienia", () => {
-    pokaz();
+  it("bez szukania nie ma żadnego znacznika trafienia", async () => {
+    await pokaz();
     expect(screen.queryByText(/trafienie/)).toBeNull();
   });
 
   it("brak trafień CYTUJE frazę — literówkę widać dopiero wtedy", async () => {
-    pokaz();
+    await pokaz();
     await userEvent.type(pole(), "kosiarka elektryczna");
     expect(screen.getByText(/Nic nie pasuje do „kosiarka elektryczna"/)).toBeInTheDocument();
     /* Zdanie o pustym kubełku byłoby tu nieprawdą: rozmowy są, tylko sito je
@@ -407,7 +424,7 @@ describe("Szukanie w kolejce", () => {
   });
 
   it("wyczyszczenie przywraca całą listę", async () => {
-    pokaz();
+    await pokaz();
     await userEvent.type(pole(), "mirek");
     await userEvent.click(screen.getByRole("button", { name: /Wyczyść szukanie/ }));
     expect(screen.getByText("Kosecka_Ola")).toBeInTheDocument();
@@ -536,16 +553,19 @@ describe("Kolejka: klawiatura", () => {
     expect(pole.value).toBe("już kk jj 2");
   });
 
-  it('cyfra przełącza kubełek, a „Wszystkie” jest PIERWSZE, nie doklejone', async () => {
-    /* Zwroty, reklamacje i dyskusje trzymają „Wszystkie" poza tablicą kubełków,
-       więc tam ostatnia cyfra to `kubelkow + 1`. Skrzynka ma je jako kubełek
-       pierwszy (§10.1) i cyfra mapuje się wprost na indeks. */
+  it("cyfra przełącza kubełek, a pierwszy i domyślny jest „Do odpowiedzi”", async () => {
+    /* Od @wydanie pierwszy kubełek to praca, nie przeglądanie — „Wszystkie"
+       zeszło pod „Więcej" jako ostatnie, jak w zwrotach, reklamacjach
+       i dyskusjach. Cyfra dalej mapuje się wprost na indeks listy. */
     zKlawiszami(null, vi.fn());
-    expect(screen.getByRole("button", { name: /Wszystkie/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.keyboard("2");
     expect(screen.getByRole("button", { name: /Nieprzypisane/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.keyboard("1");
-    expect(screen.getByRole("button", { name: /Wszystkie/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.keyboard("6");
+    const lista = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
+    expect(lista.selectedOptions[0].textContent).toMatch(/^Wszystkie/);
   });
 
   it("cyfra wybiera też kubełek spod „Więcej” i lista pokazuje jego nazwę", async () => {
@@ -553,7 +573,7 @@ describe("Kolejka: klawiatura", () => {
     await userEvent.keyboard("5");
     const lista = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
     expect(lista.selectedOptions[0].textContent).toMatch(/^Zakończone/);
-    expect(screen.getByRole("button", { name: /Wszystkie/ })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("fokus w liście „Więcej” nie przesuwa rozmowy — strzałka należy do listy", async () => {
@@ -575,7 +595,7 @@ describe("Kolejka: klawiatura", () => {
     await userEvent.click(screen.getByRole("button", { name: "Znaki i skróty" }));
     const pomoc = screen.getByRole("region", { name: "Znaki i skróty" });
     expect(pomoc).toHaveTextContent("ruch po liście");
-    expect(pomoc).toHaveTextContent(/1–5\s*kubełek/);
+    expect(pomoc).toHaveTextContent(/1–6\s*kubełek/);
     expect(pomoc).not.toHaveTextContent(/niczyje/);
   });
 
@@ -597,10 +617,9 @@ describe("Kolejka: klawiatura", () => {
    wiadomość za podziękowanie. Wiersz ma powiedzieć DLACZEGO, bo podgląd to
    słowa klienta. */
 describe("podziękowanie w kolejce", () => {
-  it("wiersz mówi, że to podziękowanie, i nie liczy zegara", () => {
-    render(<Kolejka rozmowy={[rozmowa({ status: "waiting_for_customer", podziekowal: true,
-      czekaOdMs: 3 * 3600_000, ostatniaWiadomosc: "Dziękuję!" })]}
-      stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+  it("wiersz mówi, że to podziękowanie, i nie liczy zegara", async () => {
+    await pokazWszystkie([rozmowa({ status: "waiting_for_customer", podziekowal: true,
+      czekaOdMs: 3 * 3600_000, ostatniaWiadomosc: "Dziękuję!" })]);
     expect(screen.getByText("podziękowanie, bez odpowiedzi")).toBeInTheDocument();
     expect(screen.queryByText(/czeka 3 g/)).not.toBeInTheDocument();
   });
@@ -654,8 +673,42 @@ describe("kolejka podaje widoczne wiersze", () => {
       rozmowa({ id: 2, klient: "B", wlascicielId: 9, wlasciciel: "Kolega" }),
     ]} stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}}
       onWidoczne={onWidoczne} />);
-    expect(onWidoczne).toHaveBeenLastCalledWith([1, 2]);
-    await userEvent.click(screen.getByRole("button", { name: /^Nieprzypisane/ }));
+    /* Domyślny „Do odpowiedzi" nie niesie rozmowy kolegi. */
     expect(onWidoczne).toHaveBeenLastCalledWith([1]);
+    await userEvent.keyboard("6");
+    expect(onWidoczne).toHaveBeenLastCalledWith([1, 2]);
+  });
+});
+
+/* ── „DO ODPOWIEDZI" (@wydanie) ──────────────────────────────────────────────
+   Decyzja właściciela z 26 września 2026: wejście staje na pracy, nie na
+   archiwum. Nasz ruch, niczyje i moje razem; kolegi i czekające — nie. */
+describe("kubełek „Do odpowiedzi”", () => {
+  const LISTA = [
+    rozmowa({ id: 1, klient: "Niczyja", status: "waiting_for_us" }),
+    rozmowa({ id: 2, klient: "Moja", status: "waiting_for_us", wlascicielId: 7, wlasciciel: "Ja" }),
+    rozmowa({ id: 3, klient: "Kolegi", status: "waiting_for_us", wlascicielId: 9, wlasciciel: "M. Wójcik" }),
+    rozmowa({ id: 4, klient: "Czeka", status: "waiting_for_customer", wlascicielId: 7, wlasciciel: "Ja" }),
+    rozmowa({ id: 5, klient: "Odlozona", status: "snoozed", odlozoneDo: "2026-09-28T06:00:00.000Z" }),
+    rozmowa({ id: 6, klient: "Archiwum", status: "closed" }),
+  ];
+
+  it("jest domyślny i niesie niczyje i moje, bez kolegi, czekających i odłożonych", () => {
+    render(<Kolejka rozmowy={LISTA} stan={STAN} wybranaId={null} mojeId={7} laduje={false}
+      onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Niczyja")).toBeInTheDocument();
+    expect(screen.getByText("Moja")).toBeInTheDocument();
+    for (const k of ["Kolegi", "Czeka", "Odlozona", "Archiwum"]) {
+      expect(screen.queryByText(k)).not.toBeInTheDocument();
+    }
+  });
+
+  it("odłożona stoi w „Oczekujących” i mówi, do kiedy", async () => {
+    render(<Kolejka rozmowy={LISTA} stan={STAN} wybranaId={null} mojeId={7} laduje={false}
+      onWybierz={() => {}} onOdswiez={() => {}} />);
+    await userEvent.keyboard("4");
+    const wiersz = screen.getByText("Odlozona").closest("button")!;
+    expect(wiersz).toHaveTextContent(/do 28\.09\.2026/);
   });
 });

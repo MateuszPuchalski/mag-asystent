@@ -63,8 +63,9 @@ export function Odlozone({ lista, onCofnij, onWroc, onZamknij }: {
   onZamknij: (klucz: number) => void;
 }) {
   if (lista.length === 0) return null;
-  return <div aria-live="polite"
-    className="fixed bottom-4 left-1/2 z-40 flex w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 flex-col gap-2">
+  /* Stos na dole ekranu układa `ekrany/Skrzynka.tsx` — razem z paskiem
+     „Cofnij" po zakończeniu i odłożeniu (powód w `Cofniecie.tsx`). */
+  return <div aria-live="polite" className="flex flex-col gap-2">
     {lista.map((o) => {
       const blad = o.stan.rodzaj === "blad";
       return <div key={o.klucz} role={blad ? "alert" : "status"}

@@ -46,6 +46,24 @@ function pisz(k: string, v: string): void {
   }
 }
 
+/* ── TO SAMO DLA SKRZYNKI, TYLKO BEZ HOOKA (@wydanie) ─────────────────────────
+   Akapit wyżej mówi, że skrzynka ma własny mechanizm — szkic na serwerze
+   z wersją. Ma, ale zapisuje go wyłącznie „Zapisz szkic" schowane pod „▾",
+   więc niezapisana odpowiedź ginęła przy j/k dokładnie tak, jak tu przed
+   0.423.0. Skrzynka bierze ten sam magazyn i te same klucze, ale bez hooka:
+   jej pole ma więcej źródeł (szkic zespołu, szkic Copilota, powrót po
+   „Cofnij") i o tym, co wygrywa, decyduje ekran. */
+
+/** Treść zapamiętana dla sprawy albo `null`, gdy nic nie zapamiętano. */
+export function pamietanySzkic(kolejka: string, id: number): string | null {
+  return czytaj(klucz(kolejka, id));
+}
+
+/** Zapisuje treść dla sprawy; pusty napis kasuje wpis. */
+export function zapamietajSzkic(kolejka: string, id: number, v: string): void {
+  pisz(klucz(kolejka, id), v);
+}
+
 export interface SzkicSprawy {
   /** Treść dla AKTUALNIE wybranej sprawy; pusty napis, gdy nic nie wybrano. */
   tresc: string;

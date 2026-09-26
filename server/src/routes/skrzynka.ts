@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania, subiekt } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, typPodgladu, zlecPomiar } from "../services/skrzynka.js";
-import { ConversationConflict, dodajKomentarz, otworzRozmowe, zakonczRozmowe, przejmijRozmowe, przekazRozmowe, ustawPriorytet,
+import { ConversationConflict, dodajKomentarz, odlozRozmowe, otworzRozmowe, zakonczRozmowe, przejmijRozmowe, przekazRozmowe, ustawPriorytet,
   ustawReklamacyjna, wskazKartoteke, wskazOferte, zapiszSzkic } from "../services/conversations.js";
 import {
   onConversationEvent, przyRozmowie, setTyping, trzymajacy, wejdzDoRozmowy, wyjdzZRozmowy,
@@ -653,6 +653,22 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       try {
         return otworzRozmowe(db(), Number(req.params.id), sesjaZadania()!.user.userId, new Date(),
           Boolean(req.body?.zCofniecia));
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  /* ── ODŁÓŻ DO TERMINU (@wydanie) ──────────────────────────────────────────
+     Powód i granice przy `odlozRozmowe`. `doKiedy: null` zdejmuje odłożenie —
+     tą drogą chodzą „Cofnij" i „Wróć teraz". Brak pola to błąd, nie zdjęcie:
+     puste ciało nie może po cichu budzić rozmowy. */
+  app.post<{ Params: { id: string }; Body: { doKiedy?: string | null } }>(
+    "/api/conversations/:id/odloz", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      if (!req.body || !("doKiedy" in req.body)) {
+        return reply.code(400).send({ error: "Brak terminu odłożenia (doKiedy)" });
+      }
+      try {
+        return odlozRozmowe(db(), Number(req.params.id), sesjaZadania()!.user.userId,
+          req.body.doKiedy ?? null);
       } catch (e) { return konflikt(reply, e); }
     });
 

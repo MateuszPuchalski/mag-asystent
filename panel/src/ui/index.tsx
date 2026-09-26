@@ -359,6 +359,17 @@ export const czas = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleString("pl", { dateStyle: "short", timeStyle: "short" }) : "—";
 
 /**
+ * Termin z dniem tygodnia — „pt., 02.10, 08:00" (@wydanie).
+ *
+ * Dla odłożenia rozmowy: o terminie powrotu myśli się dniem tygodnia („wróci
+ * w poniedziałek"), a rok nic nie rozstrzyga, bo odłożenie ma najwyżej
+ * trzydzieści dni. Stoi tutaj, bo `Czas.test.ts` trzyma formaty w jednym pliku.
+ */
+export const termin = (v: Date | string) =>
+  new Date(v).toLocaleString("pl", { weekday: "short", day: "2-digit", month: "2-digit",
+    hour: "2-digit", minute: "2-digit" });
+
+/**
  * Data i godzina Z SEKUNDAMI — „10.09.2026, 14:23:05" (0.440.0).
  *
  * Jedyny wyjątek od `czas()` i ma jednego odbiorcę: DZIENNIK. Ślad audytowy
