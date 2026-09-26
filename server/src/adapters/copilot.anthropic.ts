@@ -1327,8 +1327,14 @@ function naNasz(e: unknown): Error {
     /* Ślad do KSIĘGI, nie na ekran. `requestID` (tak, wielbłądem — SDK nazywa
        je inaczej niż nagłówek `request-id`) to jedyna rzecz, po której dostawca
        odszuka konkretne żądanie. Na ekranie byłby trzydziestoznakowym szumem. */
+    /* Zdanie dostawcy też idzie do śladu (@wydanie). Bez niego odrzucenie
+       400 przy wykazie silnika zostawiało w księdze „invalid_request_error
+       400” i nic więcej — a przyczyną bywa za długi kontekst albo za duży
+       PDF, czyli rzecz do naprawienia u nas, nie „spróbuj ponownie”. */
+    const zdanie = (e.error as { error?: { message?: unknown } } | undefined)?.error?.message;
     const slad = `${e.type ?? "?"} ${e.status ?? "?"}`
-      + (e.requestID ? ` ${e.requestID}` : "");
+      + (e.requestID ? ` ${e.requestID}` : "")
+      + (typeof zdanie === "string" && zdanie ? `: ${zdanie.slice(0, 180)}` : "");
 
     /* PRZECIĄŻENIE TO STAN DOSTAWCY, NIE TEJ ROZMOWY — i dlatego zatrzyma
        partię. Rozpoznajemy je po `type`, bo ono mówi wprost; `status >= 500`

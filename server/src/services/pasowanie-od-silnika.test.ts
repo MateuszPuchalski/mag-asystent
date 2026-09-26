@@ -176,3 +176,15 @@ test("numer MTD 754 trafia stronę z numerem serwisowym 954 — to ta sama czę�
   const t = M.trafieniaWTekscie("MTD deck belt 954-0430, 1 pc.", M.naszeNumery(d));
   assert.deepEqual(t.map((x) => x.symbol), ["W30-754"]);
 });
+
+test("stan karty pokazuje błąd silnika z treścią dostawcy, obok kartotek", async () => {
+  const { stanPasowaniaZSieci } = await import("./pasowanie-z-sieci.js");
+  const blad = Object.assign(new Error("Anthropic odrzuciło żądanie (400)."),
+    { slad: "invalid_request_error 400: prompt is too long" });
+  await M.szukajOdSilnikow({ nadaj: async () => { throw blad; }, ile: 1, teraz: () => TERAZ });
+  const o = stanPasowaniaZSieci(TERAZ).ostatnie[0]!;
+  assert.equal(o.rodzaj, "silnik");
+  assert.equal(o.symbol, "Briggs & Stratton Classic");
+  assert.equal(o.wynik, "blad");
+  assert.match(o.blad ?? "", /prompt is too long/);
+});
