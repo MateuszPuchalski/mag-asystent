@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.516.0 — 26 września 2026
+
+**Kwota zwrotu stoi raz, w sekcji „Pieniądze”.** Dotąd ta sama liczba stała
+w pasku decyzji, w sekcji pieniędzy i w stopce pozycji. Pasek mówi teraz tylko,
+że pieniądze nie wyszły, i podaje datę automatu Allegro. Stopka sum znika,
+gdy kwota jest ustalona. „Pieniądze” pokazują kwotę także po oddaniu.
+Przy gotowym „Wszystko OK” przycisk „Przyjmij” schodzi do drugiego rzędu,
+a klawisz P działa jak dotąd. Zamknięty zwrot bez korekty nie stawia pustej
+ramki. Zdania o źródle korekty, o powodzie odmowy i o przeliczaniu kwoty
+przeszły do podpowiedzi. Przyciski pieniędzy piszą się zwykłą pisownią
+zamiast wersalików.
+
 ## 0.515.0 — 26 września 2026
 
 **Spokojniejszy nagłówek i pasek „Nowe w panelu”.** Obok logo nie stoi już

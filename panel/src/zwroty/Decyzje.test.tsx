@@ -1,7 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Decyzje } from "./Decyzje";
+import { kluczeZwrotow } from "../api/zwroty";
 import type { Zwrot } from "../api/typy";
 
 /* ── Pasek decyzji (0.156.0) ─────────────────────────────────────────────────
@@ -78,6 +80,42 @@ describe("Decyzje zwrotu", () => {
     expect(onWerdykt).toHaveBeenCalledWith("odrzucony", "Towar użyty");
   });
 
+  it("„Przyjmij” jest główny, gdy szybkiej ścieżki nie ma", () => {
+    /* Fabryka nie ma odnośnika do Allegro, a `SzybkiZwrot` bez niego stoi
+       z przeszkodą — więc zostaje jedyną główną drogą. */
+    pasek(zwrot());
+    expect(screen.getByRole("button", { name: /Przyjmij/ }).className).toContain("btn-primary");
+  });
+
+  it("przy gotowym „Wszystko OK” „Przyjmij” schodzi do drugiego rzędu (0.516.0)", () => {
+    /* Jeden główny przycisk na widok (§26d). Klawisz P i kliknięcie działają
+       tak samo — zmienia się tylko waga. */
+    const onWerdykt = vi.fn();
+    const z = zwrot({ linkZwrotu: "https://allegro.pl/zwrot/1" });
+    z.pozycje = z.pozycje.map((p) => ({ ...p, ocena: null, twId: 7 }));
+    pasek(z, { onWerdykt });
+    const przyjmij = screen.getByRole("button", { name: /Przyjmij/ });
+    expect(przyjmij.className).not.toContain("btn-primary");
+    przyjmij.click();
+    expect(onWerdykt).toHaveBeenCalledWith("przyjety", null);
+  });
+
+  it("przy kilku otwartych pudłach „Przyjmij” zostaje główny — to jedyna droga", () => {
+    /* Reguła widzi te same pudła co „Wszystko OK". Przy dwóch pudłach
+       szybka ścieżka stoi z przeszkodą „przyjmij zwrot (P)" — bez głównego
+       „Przyjmij" ekran nie miałby żadnej drogi naprzód. */
+    const klient = new QueryClient();
+    klient.setQueryData(kluczeZwrotow.kosz, { kosze: [
+      { rodzaj: "zwroty", pozycje: [] }, { rodzaj: "zwroty", pozycje: [] }] });
+    const z = zwrot({ linkZwrotu: "https://allegro.pl/zwrot/1" });
+    z.pozycje = z.pozycje.map((p) => ({ ...p, ocena: null, twId: 7 }));
+    render(<QueryClientProvider client={klient}>
+      <Decyzje zwrot={z} onWerdykt={vi.fn()} onKorekta={vi.fn()} onCofnijKorekte={vi.fn()}
+        onCofnijKwote={vi.fn()} onCofnijWerdykt={vi.fn()} trwa={false} blad="" />
+    </QueryClientProvider>);
+    expect(screen.getByRole("button", { name: /Przyjmij/ }).className).toContain("btn-primary");
+  });
+
   it("stan końcowy nie proponuje decyzji", () => {
     pasek(zwrot({ kubelek: "zamkniety" }));
     expect(screen.queryByRole("button", { name: /Przyjmij|Zapisz kwotę/ })).toBeNull();
@@ -117,9 +155,19 @@ describe("Odmowa zwrotu (0.210.0)", () => {
     expect(screen.queryByText(/nie ma tu decyzji do podjęcia/)).toBeNull();
   });
 
-  it("stan końcowy BEZ powodu mówi po staremu — nie ma czego pokazać", () => {
-    pasek(zwrot({ kubelek: "zamkniety", werdykt: "przyjety" }));
-    expect(screen.getByText(/nie ma tu decyzji do podjęcia/)).toBeInTheDocument();
+  it("stan końcowy BEZ powodu i korekty nie stawia pustej ramki (0.516.0)", () => {
+    /* Oś etapów mówi już „Zamknięty". Zdanie „nie ma tu decyzji" było
+       drugim sposobem powiedzenia tego samego. */
+    const { container } = pasek(zwrot({ kubelek: "zamkniety", werdykt: "przyjety" }));
+    expect(container).toBeEmptyDOMElement();
+  });
+
+  it("powód odmowy niesie wskazówkę o kliencie w podpowiedzi, nie w linijce", () => {
+    pasek(zwrot({ kubelek: "odrzucony", werdykt: "odrzucony",
+      werdyktPowod: "towar nosi ślady użycia" }));
+    expect(screen.getByText("towar nosi ślady użycia"))
+      .toHaveAttribute("title", expect.stringMatching(/napisz mu w skrzynce/));
+    expect(screen.queryByText(/Powód został u nas/)).toBeNull();
   });
 });
 
@@ -189,7 +237,8 @@ describe("Korekta zwrotu (0.162.0)", () => {
        z kubełkiem DO ZWROTU, więc pomyłka w zaznaczeniu zostawała na zawsze. */
     const onCofnijKwote = vi.fn();
     pasek(doKorekty(), { onCofnijKwote });
-    expect(screen.getByText("99,98 PLN")).toBeInTheDocument();
+    /* Samą kwotę pokazują „Pieniądze" (0.516.0) — tu zostaje droga wyjścia. */
+    expect(screen.queryByText("99,98 PLN")).toBeNull();
 
     await userEvent.click(screen.getByRole("button", { name: /popraw kwotę/i }));
     expect(onCofnijKwote).toHaveBeenCalled();
@@ -223,8 +272,9 @@ describe("Korekta zwrotu (0.162.0)", () => {
   });
 
   it("zwrot odrzucony nie ma czego cofać — to stan końcowy bez korekty", () => {
-    pasek(zwrot({ kubelek: "odrzucony", werdykt: "odrzucony" }));
-    expect(screen.getByText(/Stan końcowy/)).toBeInTheDocument();
+    /* Od 0.516.0 bez zdania „Stan końcowy" — oś etapów mówi „Odrzucony". */
+    const { container } = pasek(zwrot({ kubelek: "odrzucony", werdykt: "odrzucony" }));
+    expect(container).toBeEmptyDOMElement();
     expect(screen.queryByRole("button", { name: /Cofnij korektę/ })).toBeNull();
   });
 
@@ -233,7 +283,9 @@ describe("Korekta zwrotu (0.162.0)", () => {
        ma udawać czyjejś decyzji, a decyzja nie ma udawać faktu. */
     pasek(zwrot({ kubelek: "zamkniety", korektaNumer: "KFS 12/2026",
       korektaZrodlo: "subiekt" }), { onCofnijKorekte: vi.fn() });
-    expect(screen.getByText(/Znaleziona w Subiekcie/)).toBeInTheDocument();
+    /* Od 0.516.0 w podpowiedzi przy numerze — czyta się ją raz. */
+    expect(screen.getByText("KFS 12/2026"))
+      .toHaveAttribute("title", expect.stringMatching(/Znaleziona w Subiekcie/));
   });
 
   it("cofnięcie korekty znalezionej przez automat jest tak samo dostępne", () => {
@@ -271,7 +323,8 @@ describe("Korekta zwrotu (0.162.0)", () => {
   it("numer z automatu podpisuje się jako wystawiony automatycznie", () => {
     pasek(zwrot({ kubelek: "zamkniety", korektaNumer: "ZW 9/MAG/09/2026",
       korektaZrodlo: "sfera" }), { onCofnijKorekte: vi.fn() });
-    expect(screen.getByText(/Wystawiona automatycznie/)).toBeInTheDocument();
+    expect(screen.getByText("ZW 9/MAG/09/2026"))
+      .toHaveAttribute("title", expect.stringMatching(/Wystawiona automatycznie/));
   });
 });
 
@@ -295,11 +348,23 @@ describe("DO ZWROTU z kwotą — droga do poprawki (0.484.7)", () => {
     expect(onCofnijKwote).toHaveBeenCalled();
   });
 
-  it("„albo klawiszem Z” tylko wtedy, gdy Z coś zrobi", () => {
-    const { unmount } = pasek(czeka());
-    expect(screen.queryByText(/klawiszem/)).toBeNull();
-    unmount();
+  it("kwoty nie powtarza — stoi raz, w „Pieniądzach” (0.516.0)", () => {
+    /* Ta sama liczba stała w pasku, w sekcji pieniędzy i w stopce pozycji.
+       Zdanie o klawiszu Z też zeszło: przycisk z klawiszem stoi niżej. */
     pasek(czeka(), { moznaZwrocic: true });
-    expect(screen.getByText(/klawiszem/)).toBeInTheDocument();
+    expect(screen.queryByText(/99,98/)).toBeNull();
+    expect(screen.queryByText(/Do oddania/)).toBeNull();
+    expect(screen.queryByText(/klawiszem/)).toBeNull();
+    expect(screen.getByText(/Pieniądze jeszcze nie wyszły/)).toBeInTheDocument();
+  });
+
+  it("zostaje data, w której Allegro odda całość samo", () => {
+    pasek(czeka());
+    expect(screen.getByText(/Allegro odda całość samo/)).toBeInTheDocument();
+  });
+
+  it("przy pobraniu nie ma daty automatu — Allegro tych pieniędzy nie trzyma", () => {
+    pasek(czeka({ zamowienie: { ...zwrot().zamowienie!, platnoscTyp: "CASH_ON_DELIVERY" } }));
+    expect(screen.queryByText(/Allegro odda całość samo/)).toBeNull();
   });
 });
