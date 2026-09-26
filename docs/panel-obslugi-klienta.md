@@ -449,6 +449,9 @@ Cena jest znana z góry i przyjęta świadomie. Rozmowa zakończona podziękowan
 klienta zostaje „Czeka na nas", dopóki ktoś nie odpisze. Spamu nie da się już
 uciszyć, a rozmowy nie da się odłożyć na termin.
 
+**Odłożenie wróciło 26 września 2026 (0.533.0), jako werdykt z datą.** Nie
+jako pozycja statusów. Powód i kształt stoją w §26f.
+
 **Podziękowanie klienta nie czeka na nas (22 września 2026).** Pierwszą
 część tej ceny zdejmuje klasyfikator. Rozmowa, w której ostatnia wiadomość
 klienta dostała `OTHER` z `NO_ACTION`, wysoką pewnością i bez żądania
@@ -6296,6 +6299,39 @@ Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko
 **Odwrócone 26 września 2026 decyzją właściciela (0.531.0).** Puste wiersze Klient i Wiedza znikają, bo przy większości rozmów mówiły tylko „nic tu nie ma”. Wiersz z treścią zostaje zwinięty jak dotąd. Pierwszy kontakt ze znanym loginem mówi jedna linijka „Nowy klient” pod pasmem.
 
 **Jedna zmiana do potwierdzenia.** Ściąga skrótów w kolejce Skrzynki otwiera się teraz kliknięciem, nie najechaniem. Najechanie przyszło w 0.402.0 po uwadze właściciela. Pełna lista skrótów dalej stoi pod klawiszem `?`.
+
+## 26f. Pętla pracy w skrzynce (0.533.0)
+
+Właściciel poprosił o poprawę przepływu pracy agenta w Skrzynce. §26d i §26e zdejmowały z ekranu nadmiar. Tu chodziło o co innego: o kroki, czekanie i przeskoki między rozmowami przy pracy seryjnej. Przegląd kodu i przejście na żywym serwerze znalazły błędy na styku klocków i dziury w pętli.
+
+**Błędy, które psuły pracę seryjną:**
+
+- Wysyłka poprzedniej rozmowy gasiła przycisk bieżącej. Obie drogi niosła jedna mutacja, więc po dziesięciu sekundach przycisk pisał „Wysyłam…”, a Ctrl+Enter ginął.
+- Klawisz E nadpisywał poprawiony szkic, który już stał w polu. Karta nie pokazywała wtedy „Wstaw”, a klawisz działał dalej.
+- Niezapisana odpowiedź ginęła przy j/k. Notatka nie była czyszczona i zapisywała się przy następnej rozmowie. Tekst trzyma teraz pamięć karty przy rozmowie, jak w reklamacjach od 0.423.0.
+- „Poproś o przekazanie” pisało do pola odpowiedzi do klienta. Pisze do notatki, a edytor przełącza się na nią.
+- Ściąga obiecywała, że Z otwiera zakończoną rozmowę. Nie otwiera; otwiera przycisk.
+
+**Pętla od listy do wysyłki:**
+
+- Enter z tła strony albo z wiersza kolejki stawia kursor w polu odpowiedzi. Autofokusu dalej nie ma, bo zabiłby j/k.
+- Ctrl+Enter wysyła także spoza pola. Przez pierwszą sekundę po otwarciu rozmowy milczy, żeby podwójne naciśnięcie nie wysłało następnej.
+- Po przejściu dalej fokus schodzi na tło. Następna rozmowa wczytuje się, zanim agent do niej przejdzie.
+- Szkic zamówiony przyciskiem „Ułóż odpowiedź” wchodzi do pustego pola. Reguła 0.500.0 dotyczy szkiców z tła i zostaje.
+- Dopisek klienta i kolega przy rozmowie zatrzymują wysyłkę przy kliknięciu, nie dziesięć sekund później.
+- Drugie Z zatwierdza zakończenie bez odpowiedzi, a Escape je anuluje.
+- Paski „Cofnij” i odliczanie wysyłki stoją w jednym stosie nad dołem kolejki. Stały na środku dołu i zasłaniały przycisk wysyłki następnej rozmowy.
+
+**Dwie decyzje właściciela z 26 września 2026:**
+
+- **Domyślny kubełek „Do odpowiedzi”.** To nasz ruch bez cudzych rozmów: niczyje i moje razem. „Wszystkie” zeszło pod „Więcej”, bo pokazywało zakończone rozmowy na górze.
+- **Odłóż do terminu wraca.** Trasa `POST /api/conversations/:id/odloz` przyjmuje `doKiedy`, a `null` zdejmuje odłożenie. Termin jest zawsze, najwyżej trzydzieści dni. Rozmowa wraca sama o 8:00 w dzień roboczy, a nowa wiadomość klienta budzi ją wcześniej. Menu „⋯” ma trzy gotowe terminy i kalendarz. Klawisz O odkłada do następnego dnia roboczego. Po odłożeniu stoi pasek „Cofnij”, jak po Zakończ.
+
+Odłożenie nie jest powrotem ręcznych statusów z 22 września. Tamto było pozycją menu bez daty. Powód zmiany jest mierzalny: rozmowa bez możliwego ruchu stała najwyżej w kolejce, bo była najstarsza. Agent przeskakiwał ją przy każdym wejściu.
+
+**Pomiary pod decyzje.** Ekran zgłasza pominięcie przy wyjściu z rozmowy bez ruchu, nigdy przy otwarciu. „Cofnij” niesie czas od odłożenia wysyłki. Oba liczby czyta karta „Pomiary pod decyzje” w Analizie.
+
+**Strażnik.** `ekrany/Skrzynka.test.tsx` jest pierwszym testem całego ekranu Skrzynki. Pilnuje zera zapisu przy otwarciu i każdego błędu z listy wyżej.
 
 ## 27. Zasady nadrzędne
 

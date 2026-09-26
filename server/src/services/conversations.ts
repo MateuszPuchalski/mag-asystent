@@ -813,6 +813,66 @@ export function otworzRozmowe(
   return wynik;
 }
 
+/** Najdłuższe odłożenie. Dalej to już nie „wrócę do tego", tylko zapomnienie. */
+export const NAJDLUZSZE_ODLOZENIE_MS = 30 * 86_400_000;
+
+/**
+ * „Odłóż do terminu" (0.533.0, decyzja właściciela z 26 września 2026).
+ *
+ * WRACA TO, CO ODESZŁO 22 WRZEŚNIA — ale w innym kształcie i z innego powodu.
+ * Tamto było ręcznym statusem z menu i zniknęło razem z nim. Po jego zdjęciu
+ * rozmowa, w której ruchu teraz nie ma (dostawca milczy, klient przyśle
+ * zdjęcie jutro), stała w kubełku roboczym jako NAJSTARSZA — czyli na samej
+ * górze, bo kolejność niesie czas oczekiwania (0.181.0). Agent przeskakiwał ją
+ * przy każdym wejściu, a jedyne obejścia były gorsze: pusta wiadomość do
+ * klienta albo zakończenie z pytaniem bez odpowiedzi.
+ *
+ * ZAWSZE Z TERMINEM. Odłożenie bez daty jest cmentarzem i tego się właściciel
+ * obawiał. Wygasa samo przy odczycie (`statusZapisany`, jak od 0.158.0), a nowa
+ * wiadomość klienta budzi rozmowę wcześniej (`obudzPrzychodzaca`) — prowadzący
+ * zostaje, bo odłożenie to nie oddanie sprawy.
+ *
+ * `doKiedy === null` zdejmuje odłożenie. To droga „Cofnij" i „Wróć teraz":
+ * jeden przycisk w jedną stronę, drugi w drugą, bez osobnej trasy.
+ */
+export function odlozRozmowe(
+  database: DatabaseSync, conversationId: number, userId: number,
+  doKiedy: string | null, teraz = new Date(),
+): { status: StatusRozmowy; snoozedUntil: string | null } {
+  const wynik = transaction(database, () => {
+    const przed = statusZapisany(database, conversationId, teraz.getTime());
+    if (doKiedy === null) {
+      if (przed === "snoozed") {
+        zmienStatus(database, conversationId, "open", userId, null, teraz);
+        logEvent("rozmowa_odlozona", imieAutora(database, userId), null,
+          { conversationId, doKiedy: null }, userId, database);
+      }
+      return { status: statusIZakonczenie(database, conversationId, teraz.getTime()).status, snoozedUntil: null };
+    }
+    const t = Date.parse(doKiedy);
+    if (!Number.isFinite(t)) throw new Error("Termin odłożenia nie jest datą");
+    if (t <= teraz.getTime()) throw new Error("Termin odłożenia musi być w przyszłości");
+    if (t - teraz.getTime() > NAJDLUZSZE_ODLOZENIE_MS) {
+      throw new Error("Najdłużej na 30 dni — dalej to już nie odłożenie, tylko zapomnienie");
+    }
+    /* Zakończonej nie ma czego odkładać: nie stoi w żadnym kubełku roboczym.
+       Spam tym bardziej — odłożony obudziłby się z powrotem w pracy. */
+    const teraz_ = statusIZakonczenie(database, conversationId, teraz.getTime()).status;
+    if (teraz_ === "resolved" || teraz_ === "closed" || teraz_ === "spam") {
+      throw new ConversationConflict("Rozmowa jest zakończona — nie ma czego odkładać", { status: teraz_ });
+    }
+    const iso = new Date(t).toISOString();
+    const zmiana = zmienStatus(database, conversationId, "snoozed", userId, iso, teraz);
+    /* Własny wpis obok `rozmowa_status`: przełożenie terminu nie zmienia
+       statusu (`snoozed` → `snoozed`), więc tamten by milczał. */
+    logEvent("rozmowa_odlozona", imieAutora(database, userId), null,
+      { conversationId, doKiedy: iso }, userId, database);
+    return zmiana;
+  })();
+  publishConversationEvent("assignment.changed", conversationId, { status: wynik.status });
+  return wynik;
+}
+
 export type PriorytetRozmowy = "normalny" | "pilny";
 
 /**

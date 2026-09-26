@@ -22,7 +22,7 @@ import type { StanPowiadomien } from "./Sygnaly";
    Znacznik „po terminie" na wierszu liczy dalej SERWER (`poTerminie`), bo
    odłożenia zapisane przed 22 września 2026 wciąż wygasają. Nowych nikt nie
    nadaje, więc kubełek na nie odszedł, a znacznik zgaśnie sam. */
-type Kubelek = "wszystkie" | "nieprzypisane" | "moje" | "oczekujace" | "zakonczone";
+type Kubelek = "doOdpowiedzi" | "nieprzypisane" | "moje" | "oczekujace" | "zakonczone" | "wszystkie";
 
 /* ── Kolejność listy (0.215.0) ───────────────────────────────────────────────
    Domyślna zostaje po serwerze: PILNE, potem najdłużej czekające pytanie —
@@ -51,10 +51,21 @@ export function odNajnowszych(rozmowy: Rozmowa[]): Rozmowa[] {
 }
 
 /** Kubełki przeglądania, nie pracy — pod „Więcej" (0.506.0). */
-const POD_WIECEJ: ReadonlyArray<Kubelek> = ["oczekujace", "zakonczone"];
+const POD_WIECEJ: ReadonlyArray<Kubelek> = ["oczekujace", "zakonczone", "wszystkie"];
 
+/* ── „DO ODPOWIEDZI" JEST PIERWSZY I DOMYŚLNY (0.533.0) ─────────────────────
+   Decyzja właściciela z 26 września 2026. Wejście stawało na „Wszystkie",
+   a tam stoją też zakończone — i to NA GÓRZE, bo serwer układa po najstarszym
+   pytaniu klienta (0.181.0), a pytanie sprzed miesięcy jest najstarsze.
+   „Następna" po wysyłce potrafiła więc trafić w archiwum. Praca dzieliła się
+   za to na dwa kubełki: dopisek klienta, któremu już odpisałem, stał
+   w „Moje", nowe pytanie — w „Nieprzypisane".
+
+   „Do odpowiedzi" to nasz ruch bez cudzych: niczyje i moje razem. Kolega
+   ma swoje u siebie, a jego rozmowę dalej widać w „Wszystkie". „Wszystkie"
+   schodzi pod „Więcej" — to przeglądanie, nie praca. */
 const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
-  { klucz: "wszystkie", etykieta: "Wszystkie" },
+  { klucz: "doOdpowiedzi", etykieta: "Do odpowiedzi" },
   { klucz: "nieprzypisane", etykieta: "Nieprzypisane" },
   { klucz: "moje", etykieta: "Moje" },
   { klucz: "oczekujace", etykieta: "Oczekujące" },
@@ -62,8 +73,10 @@ const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
      dwa dni ciszy, wątek zamknięty w Allegro. Osobno, żeby pomyłkowe
      zakończenie dało się znaleźć i otworzyć, a nie tylko w „Wszystkie". */
   { klucz: "zakonczone", etykieta: "Zakończone" },
-  /* „Po terminie" odeszło 22 września 2026 razem z ręcznym odłożeniem:
-     kubełek liczył wyłącznie odłożenia, a tych nikt już nie nadaje. */
+  { klucz: "wszystkie", etykieta: "Wszystkie" },
+  /* Odłożone stoją w „Oczekujących" (0.533.0) — czekają na termin, jak
+     tamte na klienta albo halę. Osobny kubełek byłby czwartym miejscem do
+     sprawdzania, a po terminie rozmowa i tak wraca sama do „Do odpowiedzi". */
 ];
 
 /* Spam znika z kolejki roboczej, ale NIE z panelu: widać go w „Wszystkie".
@@ -113,6 +126,7 @@ function wKubelku(r: Rozmowa, kubelek: Kubelek, mojeId: number | null): boolean 
   if (kubelek === "oczekujace") return CZEKA_NA_KOGOS.includes(r.status);
   if (CZEKA_NA_KOGOS.includes(r.status)) return false;
   if (kubelek === "nieprzypisane") return r.wlascicielId === null;
+  if (kubelek === "doOdpowiedzi") return r.wlascicielId === null || (mojeId !== null && r.wlascicielId === mojeId);
   return mojeId !== null && r.wlascicielId === mojeId;
 }
 
@@ -145,7 +159,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
      stojącym synchronizatorze to nie „brak pytań", tylko „nie wiem". */
   nieswieza?: boolean;
 }) {
-  const [kubelek, setKubelek] = useState<Kubelek>("wszystkie");
+  const [kubelek, setKubelek] = useState<Kubelek>("doOdpowiedzi");
   /* ── Szukanie w kolejce (0.195.0) ──────────────────────────────────────────
      Zwroty mają wyszukiwarkę od 0.165.0, skrzynka nie miała żadnej: kubełek
      mówi „czyje to", a pytania „czy TA rozmowa gdzieś
@@ -227,8 +241,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
       if (nast && nast.id !== wybranaId) onWybierz(nast.id);
       return;
     }
-    /* „Wszystkie" jest tu kubełkiem PIERWSZYM (§10.1), nie doklejonym na końcu
-       jak w tamtych trzech ekranach — więc cyfra mapuje się wprost na indeks. */
+    /* Cyfra mapuje się wprost na indeks listy: „Do odpowiedzi" to 1,
+       a „Wszystkie" od 0.533.0 ostatnia — jak w tamtych trzech ekranach. */
     if (/^[1-9]$/.test(e.key) && Number(e.key) <= KUBELKI.length) {
       e.preventDefault();
       setKubelek(KUBELKI[Number(e.key) - 1].klucz);
@@ -380,6 +394,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         const glosne = r.priorytet === "pilny" || r.reklamacyjna || wyjatkowy;
         return <button key={r.id} onClick={() => onWybierz(r.id)}
           aria-current={wybranaId === r.id}
+          /* Znacznik dla Entera „do pola odpowiedzi" (`Edytor.tsx`): z wiersza
+             kolejki Enter prowadzi do pisania, a nie klika wiersza drugi raz. */
+          data-wiersz-kolejki=""
           /* ── ZAZNACZENIE PRZESTAJE BYĆ BURSZTYNOWE (0.265.0) ───────────────
              `bg-amber-50` znaczyło w panelu naraz „wybrany wiersz" i „coś tu
              jest nie tak": tym samym `#FFFBEB` malowały się pasmo braku oferty,
@@ -507,6 +524,11 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
               <span className="font-semibold text-violet-800">{nazwaNaPlakietce(r.kopilot)}</span>}
             {r.wlasciciel && <span className="flex items-center gap-1 font-semibold text-slate-600">
               <UserCheck size={12} />{r.wlasciciel}</span>}
+            {/* Odłożona mówi DO KIEDY (0.533.0): „Odłożona" bez daty każe
+                otworzyć rozmowę, żeby się dowiedzieć, czy to jutro, czy za tydzień. */}
+            {r.status === "snoozed" && r.odlozoneDo && !r.poTerminie &&
+              <span className="flex items-center gap-1 text-slate-600">
+                <AlarmClock size={12} aria-hidden="true" />do {czas(r.odlozoneDo)}</span>}
             {r.poTerminie && <span title="termin odłożenia minął" className="flex items-center text-ranga-uwaga">
               <AlarmClock size={13} aria-hidden="true" /><span className="sr-only">po terminie</span></span>}
             {/* PODZIĘKOWANIE BEZ ODPOWIEDZI (22 września 2026). Podgląd wiersza

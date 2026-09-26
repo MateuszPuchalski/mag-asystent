@@ -4,7 +4,7 @@ import type { Towar } from "../wyszukiwarka";
 import { Konflikt } from "../api/klient";
 import { naBase64 } from "../api/plik";
 import {
-  zglosCofnietaWysylke, useAgenci, useDodajKomentarz, useJa,
+  zglosCofnietaWysylke, useAgenci, useDodajKomentarz, useJa, useOdloz, usePrzygotujRozmowe,
   usePrzekaz, useRozmowa, useUstawReklamacyjna, useZakoncz, useOtworz,
   usePisze, useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useWskazOferte, useWyslij,
   useZapiszSzkic, useZdrowie, useZlecPomiar,
@@ -28,6 +28,13 @@ import { OKNO_COFNIECIA_MS, Odlozone, nastepnaRozmowa, type Odlozona } from "../
 import { Cofniecie, type DoCofniecia } from "../skrzynka/Cofniecie";
 import { polePisania } from "../nawigacja/fokus";
 import { useSygnaly } from "../skrzynka/Sygnaly";
+import { useZglosPominiecie } from "../api/wglad";
+import { pamietanySzkic, zapamietajSzkic } from "../sprawy/useSzkicSprawy";
+
+/* Człony klucza magazynu karty — ten sam magazyn co reklamacje i dyskusje
+   (`sprawy/useSzkicSprawy.ts`), osobno odpowiedź i notatka, bo to dwa pola. */
+const PAMIEC_ODPOWIEDZI = "rozmowa";
+const PAMIEC_NOTATKI = "rozmowa-notatka";
 
 type Paczka = Parameters<ReturnType<typeof useWyslij>["mutateAsync"]>[0];
 
@@ -85,6 +92,14 @@ export function Skrzynka() {
   const zdrowie = useZdrowie();
   const synchronizuj = useSynchronizuj();
   const wyslij = useWyslij();
+  /* ── DRUGA INSTANCJA DLA WYSYŁEK ODŁOŻONYCH (0.533.0) ──────────────────
+     Jedna mutacja niosła obie drogi, a `wysyla={wyslij.isPending}` gasił
+     przycisk BIEŻĄCEJ rozmowy, gdy po dziesięciu sekundach wychodziła
+     odpowiedź do POPRZEDNIEJ. Przy pracy w rytmie rozmowa na dziesięć sekund
+     trafiało to regularnie: „Wysyłam…" na przycisku, którego agent nie
+     kliknął, i Ctrl+Enter połknięty bez słowa. Stan odłożonych niesie
+     `odlozone` — tu liczy się tylko wysyłka tej rozmowy, „mimo to". */
+  const wyslijWTle = useWyslij();
   const zapisz = useZapiszSzkic();
   const zlec = useZlecPomiar();
   const zalaczniki = useZalaczniki(wybranaId);
@@ -95,6 +110,8 @@ export function Skrzynka() {
   const reklamacyjna = useUstawReklamacyjna();
   const zakoncz = useZakoncz();
   const otworz = useOtworz();
+  const odloz = useOdloz();
+  const przygotuj = usePrzygotujRozmowe();
   const agenci = useAgenci();
   const dodajKomentarz = useDodajKomentarz();
 
@@ -112,6 +129,9 @@ export function Skrzynka() {
      na kliknięcie WYŚLIJ (§6.4). */
   const [komentarz, setKomentarz] = useState("");
   const [wzmianki, setWzmianki] = useState<number[]>([]);
+  /* Licznik, nie flaga: każde „Poproś o przekazanie" ma przełączyć edytor
+     na notatkę, także drugie z rzędu. */
+  const [doNotatki, setDoNotatki] = useState(0);
   const [zrodlo, setZrodlo] = useState<number | null>(null);
   const [wskazowka, setWskazowka] = useState("");
   const [towar, setTowar] = useState<Towar | null>(null);
@@ -149,7 +169,20 @@ export function Skrzynka() {
 
   /* Szkic wchodzi do pola przy zmianie ROZMOWY, nie przy każdym odczycie:
      nadpisywanie go w trakcie pisania kasowałoby pracę agenta. */
+  const komentarzTeraz = useRef(komentarz);
+  komentarzTeraz.current = komentarz;
   useEffect(() => {
+    /* ── NIEZAPISANY TEKST ZOSTAJE PRZY SWOJEJ ROZMOWIE (0.533.0) ──────────
+       Do tego wydania j/k, klik w wiersz albo powiadomienie nadpisywały pole
+       szkicem z serwera — niezapisana odpowiedź przepadała bez słowa. Gorzej
+       z notatką: nie czyścił jej nikt, więc zaczęta przy jednej rozmowie
+       zapisywała się przy NASTĘPNEJ. Pamięć karty trzyma tekst przy
+       rozmowie, do której był pisany; powrót go oddaje, a obca rozmowa
+       dostaje czyste pole. Zapis do pamięci to nie zapis stanu sprawy —
+       reguła „zero zapisu przy patrzeniu" dotyczy serwera. */
+    const zapamietany = wybranaId === null ? null : pamietanySzkic(PAMIEC_ODPOWIEDZI, wybranaId);
+    setKomentarz(wybranaId === null ? "" : pamietanySzkic(PAMIEC_NOTATKI, wybranaId) ?? "");
+    setWzmianki([]);
     /* SZKIC COPILOTA DO PUSTEGO POLA (0.499.0) — reguła i jej granice przy
        `szkicNaStart`. To stan ekranu, nie zapis: otwarcie niczego nie mutuje.
        Klucz z czasu szkicu pamięta, że ten szkic już raz wszedł — agent, który
@@ -157,7 +190,13 @@ export function Skrzynka() {
     const startowy = rozmowa.data ? szkicNaStartRozmowy(rozmowa.data, ja.data?.user.userId ?? null) : null;
     const klucz = startowy !== null && rozmowa.data
       ? `${rozmowa.data.rozmowa.id}:${rozmowa.data.szkicCopilota?.at}` : null;
-    if (klucz && !wstawione.current.has(klucz)) {
+    if (zapamietany !== null) {
+      /* Własny tekst agenta wygrywa ze szkicem zespołu i z Copilotem: to jego
+         praca, a tamte stoją dalej — szkic Copilota w karcie pod polem. */
+      if (klucz) wstawione.current.add(klucz);
+      setSzkic(zapamietany);
+      setZCopilota(false);
+    } else if (klucz && !wstawione.current.has(klucz)) {
       wstawione.current.add(klucz);
       setSzkic(startowy ?? "");
       setZCopilota(true);
@@ -198,6 +237,8 @@ export function Skrzynka() {
      i szkic nie wszedł, choć agent nie zdążył jeszcze niczego zobaczyć. */
   const szkicTeraz = useRef(szkic);
   szkicTeraz.current = szkic;
+  const wybranaIdTeraz = useRef(wybranaId);
+  wybranaIdTeraz.current = wybranaId;
   useEffect(() => {
     if (!rozmowa.data || szkicTeraz.current !== "") return;
     const startowy = szkicNaStartRozmowy(rozmowa.data, ja.data?.user.userId ?? null);
@@ -210,11 +251,81 @@ export function Skrzynka() {
        spóźniony ma NIE uruchamiać tego efektu; powód wyżej. */
   }, [ja.data?.user.userId]);
 
+  /* ── POMINIĘCIE ROZMOWY (0.533.0) ────────────────────────────────────────
+     Pomiar pod decyzję właściciela z 26 września 2026: jak często agent
+     otwiera rozmowę i odchodzi bez ruchu — bez wysyłki, zakończenia,
+     odłożenia i notatki. Tego kosztu nie widział żaden licznik, a to on
+     mówi, ile rozmów bez możliwego ruchu stoi w kolejce.
+
+     NIGDY PRZY OTWARCIU. Raport idzie przy WYJŚCIU: przejście do innej
+     rozmowy, wyjście z ekranu, zamknięcie karty. Zapis jest zbiorczy, bez
+     osoby i bez rozmowy (`POST /api/obsluga/pominiecie`, wyjątek od
+     `logEvent` przyjęty przez właściciela — powód przy trasie).
+
+     RAPORT ODROCZONY O JEDEN OBRÓT PĘTLI. `StrictMode` montuje efekty dwa
+     razy; natychmiastowy raport przy sprzątaniu liczyłby pominięcie przy
+     każdym otwarciu. Ta sama rozmowa zamontowana z powrotem odwołuje raport. */
+  const zglosPominiecie = useZglosPominiecie();
+  type Pobyt = { id: number; dzialal: boolean; kategoria: string | null };
+  const pobyt = useRef<Pobyt | null>(null);
+  const raportPominiecia = useRef<{ p: Pobyt; t: ReturnType<typeof setTimeout> } | null>(null);
+  const oznaczDzialanie = () => { if (pobyt.current) pobyt.current.dzialal = true; };
+  useEffect(() => {
+    if (wybranaId === null) return;
+    const o = raportPominiecia.current;
+    if (o && o.p.id === wybranaId) {
+      clearTimeout(o.t);
+      raportPominiecia.current = null;
+      pobyt.current = o.p;
+    } else {
+      pobyt.current = { id: wybranaId, dzialal: false, kategoria: null };
+    }
+    return () => {
+      const p = pobyt.current;
+      pobyt.current = null;
+      if (!p || p.dzialal) return;
+      const t = setTimeout(() => {
+        if (raportPominiecia.current?.p === p) raportPominiecia.current = null;
+        zglosPominiecie(p.kategoria);
+      }, 0);
+      raportPominiecia.current = { p, t };
+    };
+  }, [wybranaId]);
+  /* Kategoria przychodzi z danymi rozmowy, a raport idzie dopiero przy
+     wyjściu — dopisujemy ją, gdy się wczyta. */
+  useEffect(() => {
+    const p = pobyt.current;
+    const k = rozmowa.data?.rozmowa.kopilot;
+    if (!p || rozmowa.data?.rozmowa.id !== p.id) return;
+    p.kategoria = k ? (k.status === "FAILED" ? "nierozpoznane" : k.kategoria) : null;
+  }, [rozmowa.data]);
+  /* Zamknięcie karty: odroczony raport by nie zdążył, więc idzie od razu
+     (`keepalive` w haku), a pobyt dostaje znacznik, żeby nie poszedł drugi raz. */
+  useEffect(() => {
+    const f = () => {
+      const p = pobyt.current;
+      if (p && !p.dzialal) { p.dzialal = true; zglosPominiecie(p.kategoria); }
+    };
+    window.addEventListener("pagehide", f);
+    return () => window.removeEventListener("pagehide", f);
+  }, []);
+
   /* CHWILA OTWARCIA ROZMOWY — pomiar tarcia (0.500.0). Liczy się od
      wejścia w rozmowę do kliknięcia „Wyślij", nie do wyjścia odpowiedzi po
      dziesięciu sekundach: okno cofnięcia to nie szukanie po ekranie. */
   const otwartaOd = useRef(Date.now());
   useEffect(() => { otwartaOd.current = Date.now(); }, [wybranaId]);
+
+  /* Każda zmiana pola ląduje w pamięci karty pod TĄ rozmową — patrz efekt
+     zmiany rozmowy wyżej. Pusty tekst kasuje wpis. */
+  function ustawSzkic(v: string) {
+    setSzkic(v);
+    if (wybranaId !== null) zapamietajSzkic(PAMIEC_ODPOWIEDZI, wybranaId, v);
+  }
+  function ustawKomentarz(v: string) {
+    setKomentarz(v);
+    if (wybranaId !== null) zapamietajSzkic(PAMIEC_NOTATKI, wybranaId, v);
+  }
 
   const zglos = (e: unknown) =>
     setBlad(e instanceof Konflikt ? `${e.message} — odśwież rozmowę` : (e as Error).message);
@@ -238,7 +349,7 @@ export function Skrzynka() {
   function wyslijOdlozona(w: Wpis) {
     timery.current.delete(w.klucz);
     zmienOdlozona(w.klucz, { stan: { rodzaj: "wysyla" } });
-    wyslij.mutateAsync(w.paczka).then((r) => {
+    wyslijWTle.mutateAsync(w.paczka).then((r) => {
       if (r.status === "sent") {
         zmienOdlozona(w.klucz, { stan: { rodzaj: "wyslana" } });
         setTimeout(() => setOdlozone((l) => l.filter((o) => o.klucz !== w.klucz)), 4000);
@@ -256,9 +367,11 @@ export function Skrzynka() {
       /* Agent nie odszedł — efekt zmiany rozmowy się nie odpali. */
       przywroc.current = null;
       setSzkic(w.body);
+      zapamietajSzkic(PAMIEC_ODPOWIEDZI, w.rozmowaId, w.body);
       if (blad) zglos(blad);
       return;
     }
+    zapamietajSzkic(PAMIEC_ODPOWIEDZI, w.rozmowaId, w.body);
     przywroc.current = { rozmowaId: w.rozmowaId, body: w.body, blad };
     nawiguj(`/obsluga/skrzynka/${w.rozmowaId}`);
   }
@@ -272,7 +385,7 @@ export function Skrzynka() {
     for (const w of odlozoneRef.current) {
       if (w.stan.rodzaj !== "czeka") continue;
       clearTimeout(timery.current.get(w.klucz));
-      void wyslij.mutateAsync(w.paczka).catch(() => {});
+      void wyslijWTle.mutateAsync(w.paczka).catch(() => {});
     }
   }, []);
   const czekajace = odlozone.some((o) => o.stan.rodzaj === "czeka" || o.stan.rodzaj === "wysyla");
@@ -283,8 +396,35 @@ export function Skrzynka() {
     return () => window.removeEventListener("beforeunload", f);
   }, [czekajace]);
 
+  /* Po każdym przejściu dalej fokus schodzi na tło strony (0.533.0). Gdy
+     następna rozmowa była już w pamięci, fokus zostawał w polu albo na
+     przycisku wysyłki: j/k milkły, a drugie Ctrl+Enter trafiało w nietknięty
+     szkic NASTĘPNEJ rozmowy. */
+  function dalej(nast: number | null) {
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+    if (nast !== null) nawiguj(`/obsluga/skrzynka/${nast}`);
+  }
+
   function wyslijOdpowiedz(mimoNowejWiadomosci = false, mimoObecnosci = false, zakonczPo = false) {
     if (!rozmowa.data) return;
+    /* ── KONFLIKT PRZY KLIKNIĘCIU, NIE DZIESIĘĆ SEKUND PÓŹNIEJ (0.533.0) ───
+       Dwie rzeczy, które zatrzymają wysyłkę na serwerze, ekran zna już teraz:
+       klient dopisał (szyna zdarzeń, `nowa`) i kolega trzyma rozmowę
+       (`oglada` w wierszu kolejki). Do tego wydania wysyłka i tak szła do
+       kolejki cofnięć, a czerwony dymek przychodził, gdy agent był dwie
+       rozmowy dalej — powrót kosztował wątek myślowy. Tu pytamy od razu,
+       tym samym paskiem i tym samym dialogiem co dotąd. */
+    if (!mimoNowejWiadomosci && nowa) {
+      setNowa(false);
+      void rozmowa.refetch();
+      setBlad("Klient dopisał wiadomość — przeczytaj ją; odpowiedź czeka w polu.");
+      return;
+    }
+    const trzyma = lista.data?.rozmowy.find((r) => r.id === rozmowa.data?.rozmowa.id)?.oglada ?? null;
+    if (!mimoObecnosci && trzyma && trzyma.userId !== (ja.data?.user.userId ?? null)) {
+      setPrzyRozmowie(trzyma.name);
+      return;
+    }
     /* Zwykłe „Wyślij" idzie przez dziesięć sekund na cofnięcie i od razu
        prowadzi do następnej rozmowy. Wysyłka PO JAWNEJ ZGODZIE z dialogu
        konfliktu („odpowiedz mimo to") idzie wprost: agent właśnie tę decyzję
@@ -300,13 +440,14 @@ export function Skrzynka() {
       };
       setOdlozone((l) => [...l, w]);
       timery.current.set(w.klucz, setTimeout(() => wyslijOdlozona(w), OKNO_COFNIECIA_MS));
-      setSzkic("");
+      oznaczDzialanie();
+      ustawSzkic("");
       /* NASTĘPNA W TYM, CO WIDAĆ — patrz `nastepnaRozmowa`. */
-      const nast = nastepnaRozmowa(widoczne.current, w.rozmowaId);
-      if (nast !== null) nawiguj(`/obsluga/skrzynka/${nast}`);
+      dalej(nastepnaRozmowa(widoczne.current, w.rozmowaId));
       return;
     }
     setBladWysylki("");
+    oznaczDzialanie();
     wyslij.mutate({
       id: rozmowa.data.rozmowa.id, body: szkic,
       expectedVersion: rozmowa.data.rozmowa.wersja,
@@ -315,7 +456,7 @@ export function Skrzynka() {
       onSuccess: (w) => {
         setKonfliktWysylki(null);
         setPrzyRozmowie(null);
-        if (w.status === "sent") setSzkic("");
+        if (w.status === "sent") ustawSzkic("");
         else setBlad("Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj wątek.");
       },
       onError: (e) => {
@@ -350,7 +491,7 @@ export function Skrzynka() {
     const t = rozmowa.data?.szkicCopilota?.tresc;
     if (!rozmowa.data || !t) return;
     const zastepuje = szkic.trim() !== "";
-    setSzkic(t);
+    ustawSzkic(t);
     setZCopilota(true);
     ocenSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id,
       ocena: zastepuje ? "zastapiony" : "wstawiony" });
@@ -361,7 +502,7 @@ export function Skrzynka() {
     /* Odrzucony szkic schodzi też z pola — ale tylko NIETKNIĘTY. Tekst, który
        agent zaczął poprawiać, jest już jego pracą i odrzucenie propozycji
        nie ma prawa go skasować. */
-    if (zCopilota && szkic === rozmowa.data.szkicCopilota?.tresc) setSzkic("");
+    if (zCopilota && szkic === rozmowa.data.szkicCopilota?.tresc) ustawSzkic("");
     setZCopilota(false);
   }
 
@@ -370,7 +511,12 @@ export function Skrzynka() {
      w kolejce: pole tekstowe wygrywa zawsze, bo „e" w słowie „jest" nie może
      wstawiać szkicu. Klawisze działają tylko przy karcie na ekranie —
      z cudzą rozmową albo bez propozycji nie robią nic. */
+  /* SZKIC JUŻ W POLU = KARTA BEZ „WSTAW" (0.533.0). Karta chowa wtedy
+     swój przycisk (`!wPolu` w `SzkicCopilota.tsx`), ale klawisz działał dalej:
+     poprawiony szkic, klik obok pola, „e" — i poprawki znikały bez cofnięcia,
+     a pomiar zapisywał „zastąpiony". Klawisz ma robić to, co widać. */
   const kartaWidoczna = Boolean(rozmowa.data?.szkicCopilota && rozmowa.data.szkicCopilota.ocena === null)
+    && !(zCopilota && szkic !== "")
     && !(rozmowa.data?.rozmowa.wlascicielId != null
       && rozmowa.data.rozmowa.wlascicielId !== (ja.data?.user.userId ?? null));
   const skrot = useRef({ popraw: poprawSzkicem, odrzuc: odrzucSzkic, widoczna: kartaWidoczna });
@@ -385,6 +531,39 @@ export function Skrzynka() {
     window.addEventListener("keydown", f);
     return () => window.removeEventListener("keydown", f);
   }, []);
+
+  /* Następna rozmowa wczytuje się, gdy agent czyta bieżącą — powód przy
+     `usePrzygotujRozmowe`. Zależność od listy widocznych, bo po wysyłce
+     „następna" przesuwa się razem z nią. */
+  const otwarta = rozmowa.data?.rozmowa.id ?? null;
+  useEffect(() => {
+    if (otwarta === null) return;
+    const nast = nastepnaRozmowa(widoczne.current, otwarta);
+    if (nast !== null) przygotuj(nast);
+  }, [otwarta, lista.dataUpdatedAt]);
+
+  /* ── ODŁÓŻ DO TERMINU (0.533.0) ─────────────────────────────────────────
+     Ten sam kształt co Zakończ: przejście dalej i pasek „Cofnij", bo
+     odłożona schodzi z kubełka roboczego i pomyłki na liście nie widać.
+     Cofnięcie zdejmuje odłożenie i wraca do rozmowy. */
+  function odlozDo(doKiedy: string, opis: string) {
+    if (!rozmowa.data) return;
+    setBladStatusu("");
+    const id = rozmowa.data.rozmowa.id;
+    const klient = rozmowa.data.rozmowa.klient;
+    odloz.mutate({ id, doKiedy }, {
+      onSuccess: () => {
+        oznaczDzialanie();
+        dalej(nastepnaRozmowa(widoczne.current, id));
+        setDoCofniecia({ klucz: Date.now(), opis: <>Odłożono rozmowę z <b>{klient}</b> {opis}</>,
+          cofnij: () => {
+            odloz.mutate({ id, doKiedy: null }, { onError: (e) => setBladStatusu((e as Error).message) });
+            nawiguj(`/obsluga/skrzynka/${id}`);
+          } });
+      },
+      onError: (e) => setBladStatusu((e as Error).message),
+    });
+  }
 
   const jestemAdminem = ja.data?.user.role === "admin";
   const alarm = Boolean(zdrowie.data?.allegroInbox.alarm);
@@ -448,6 +627,7 @@ export function Skrzynka() {
 
     <Rozmowa
       dane={rozmowa.data}
+      laduje={wybranaId !== null && rozmowa.isLoading}
       mojeId={ja.data?.user.userId ?? null}
       obecni={obecnosc}
       nowaWiadomosc={nowa}
@@ -461,13 +641,14 @@ export function Skrzynka() {
       onPoprawKategorie={(kategoria) => rozmowa.data && poprawKategorie.mutate(
         { rozmowaId: rozmowa.data.rozmowa.id, kategoria })}
       komentarz={komentarz}
-      onKomentarz={(v) => { setKomentarz(v); zglosPisanie(); }}
+      onKomentarz={(v) => { ustawKomentarz(v); zglosPisanie(); }}
+      doNotatki={doNotatki}
       komentuje={dodajKomentarz.isPending}
       /* Komentowanie NIE wymaga prowadzenia rozmowy: notatka zespołu to nie
          odpowiedź do klienta. */
       onDodajKomentarz={() => rozmowa.data && dodajKomentarz.mutate(
         { rozmowaId: rozmowa.data.rozmowa.id, body: komentarz, mentionedUserIds: wzmianki },
-        { onSuccess: () => { setKomentarz(""); setWzmianki([]); } })}
+        { onSuccess: () => { oznaczDzialanie(); ustawKomentarz(""); setWzmianki([]); } })}
       agenci={(agenci.data?.users ?? [])
         .filter((u) => u.userId !== ja.data?.user.userId)
         .map((u) => ({ userId: u.userId, name: u.name }))}
@@ -490,8 +671,25 @@ export function Skrzynka() {
         /* Cudza rozmowa = cudzy szkic: ten sam warunek, którym edytor blokuje pole. */
         wylaczony: rozmowa.data?.rozmowa.wlascicielId != null
           && rozmowa.data.rozmowa.wlascicielId !== (ja.data?.user.userId ?? null),
-        onUloz: () => rozmowa.data && ulozSzkic.mutate({ rozmowaId: rozmowa.data.rozmowa.id },
-          { onError: (e) => setBladSzkicu((e as Error).message), onSuccess: () => setBladSzkicu("") }),
+        /* ZAMÓWIONY SZKIC WCHODZI DO PUSTEGO POLA (0.533.0). Reguła 0.500.0
+           („nic nie wchodzi do pola, gdy agent patrzy") chroni przed szkicem
+           z TŁA. Ten agent właśnie kliknął „Ułóż odpowiedź" i czekał —
+           kazać mu jeszcze wcisnąć E to krok bez decyzji. Pole z tekstem
+           zostaje nietknięte, a szkic czeka w karcie jak dotąd. */
+        onUloz: () => {
+          if (!rozmowa.data) return;
+          const id = rozmowa.data.rozmowa.id;
+          ulozSzkic.mutate({ rozmowaId: id }, {
+            onError: (e) => setBladSzkicu((e as Error).message),
+            onSuccess: (r) => {
+              setBladSzkicu("");
+              if (wybranaIdTeraz.current !== id || szkicTeraz.current !== "" || !r.szkic?.tresc) return;
+              wstawione.current.add(`${id}:${r.szkic.at}`);
+              ustawSzkic(r.szkic.tresc);
+              setZCopilota(true);
+            },
+          });
+        },
         /* JEDEN PRZYCISK (22 września 2026): pusty szkic dostaje treść, pełny
            jest zastępowany — napis przycisku mówi to agentowi PRZED kliknięciem.
            Ocena zostaje zapisana, bo to ona chowa kartę po użyciu; los szkicu
@@ -533,7 +731,7 @@ export function Skrzynka() {
       onUsunZalacznik={(id) => wybranaId && usunZalacznik.mutate(
         { id: wybranaId, zalacznikId: id },
         { onError: (e) => setBladZalacznika(e instanceof Error ? e.message : String(e)) })}
-      onSzkic={(v) => { setSzkic(v); if (v === "") setZCopilota(false); zglosPisanie(); }}
+      onSzkic={(v) => { ustawSzkic(v); if (v === "") setZCopilota(false); zglosPisanie(); }}
       onZapiszSzkic={() => {
         if (!rozmowa.data) return;
         const ostatnia = [...rozmowa.data.os].reverse().find((w) => w.messageId)?.messageId ?? null;
@@ -564,8 +762,13 @@ export function Skrzynka() {
       onPoprosOPrzekazanie={() => {
         /* Prośba o przekazanie to komentarz wewnętrzny, nie osobny mechanizm:
            właściciel czyta go w rozmowie, przy której siedzi. */
+        /* Do 0.533.0 prośba lądowała w polu ODPOWIEDZI DO KLIENTA, wbrew
+           zdaniu wyżej — nadpisywała tekst agenta i w cudzej rozmowie nie
+           dała się nawet wysłać. Idzie do notatki, a edytor przełącza się
+           na nią, żeby agent widział, gdzie pisze. */
         if (!rozmowa.data) return;
-        setSzkic(`@${konflikt?.assignedUserName ?? ""} — przejmiesz tę rozmowę? `.trimEnd());
+        ustawKomentarz(`@${konflikt?.assignedUserName ?? ""} — przejmiesz tę rozmowę?`);
+        setDoNotatki((n) => n + 1);
         setKonflikt(null);
       }}
       onWymus={(powod) => {
@@ -602,7 +805,7 @@ export function Skrzynka() {
          Po zakończeniu ekran idzie do następnej rozmowy, jak po wysyłce:
          zakończona i tak schodzi z kubełka roboczego, więc zostanie przy
          niej znaczyłoby patrzenie na coś, czego na liście już nie ma. */
-      zmieniaStatus={zakoncz.isPending || otworz.isPending}
+      zmieniaStatus={zakoncz.isPending || otworz.isPending || odloz.isPending}
       onZakoncz={(mimoPytania) => {
         if (!rozmowa.data) return;
         setBladStatusu("");
@@ -610,8 +813,8 @@ export function Skrzynka() {
         const klient = rozmowa.data.rozmowa.klient;
         zakoncz.mutate({ id, mimoPytania }, {
           onSuccess: () => {
-            const nast = nastepnaRozmowa(widoczne.current, id);
-            if (nast !== null) nawiguj(`/obsluga/skrzynka/${nast}`);
+            oznaczDzialanie();
+            dalej(nastepnaRozmowa(widoczne.current, id));
             /* COFNIJ PO ZAKOŃCZENIU (0.500.0): rozmowa właśnie zniknęła
                z listy i z ekranu, więc pomyłki nie widać. Cofnięcie to ta sama
                „Otwórz ponownie", która stoi w nagłówku — plus powrót do niej. */
@@ -631,16 +834,19 @@ export function Skrzynka() {
           { onError: (e) => setBladStatusu((e as Error).message) });
       }}
       onWyslijIZakoncz={() => wyslijOdpowiedz(false, false, true)}
+      onOdloz={odlozDo}
+      onWrocZOdlozenia={() => rozmowa.data && odloz.mutate({ id: rozmowa.data.rozmowa.id, doKiedy: null },
+        { onError: (e) => setBladStatusu((e as Error).message) })}
       bladStatusu={bladStatusu}
-      onDopytajOOferte={() => setSzkic((s) => s
-        || "Dzień dobry, proszę o numer oferty, której dotyczy pytanie — dobiorę wtedy właściwą część.")}
+      onDopytajOOferte={() => { if (szkic === "") ustawSzkic(
+        "Dzień dobry, proszę o numer oferty, której dotyczy pytanie — dobiorę wtedy właściwą część."); }}
     />
     </div>
 
     {/* Trzecia kolumna. Bez rozmowy nie ma czego pokazać — kolumna znika,
         zamiast stać pusta i zabierać środkowi 340 px. */}
     {rozmowa.data && <Kontekst dane={rozmowa.data}
-      onWstawDoSzkicu={(t) => setSzkic((s) => s ? `${s}\n${t}` : t)}
+      onWstawDoSzkicu={(t) => ustawSzkic(szkic ? `${szkic}\n${t}` : t)}
       /* Ta sama droga, co z osi rozmowy: historia klienta prowadzi do rozmowy,
          w której maszynę ustalono. */
       onOtworzRozmowe={(x) => nawiguj(`/obsluga/skrzynka/${x}`)}
@@ -665,15 +871,29 @@ export function Skrzynka() {
       <Blad>{blad || (lista.error as Error | null)?.message}</Blad>
     </div>
 
+    {/* JEDEN STOS PASKÓW, NAD KOLEJKĄ (0.533.0) — powód stosu w `Cofniecie.tsx`.
+        Stał na środku dołu, czyli NA pływającym pasku wysyłki środkowej
+        kolumny: przez dziesięć sekund po wysyłce przycisk „Wyślij" następnej
+        rozmowy był zasłonięty. Nad dołem kolejki zasłania najwyżej jej
+        ostatnie wiersze, a te agent i tak ma pod j/k. Szerokość kolumny
+        kolejki przy 1366 px, żeby nie wjeżdżać na środek. */}
+    <div className="fixed bottom-4 left-4 z-40 flex w-[min(23rem,calc(100vw-2rem))] flex-col gap-2">
     <Cofniecie wpis={doCofniecia} onZamknij={() => setDoCofniecia(null)} />
     <Odlozone lista={odlozone}
       onCofnij={(k) => {
         const w = odlozone.find((o) => o.klucz === k);
         /* Wpis do pomiaru tarcia (0.500.0) — tylko przy „Cofnij". „Wróć"
            po błędzie wysyłki to nie pomyłka agenta, tylko Allegro. */
-        if (w) { zglosCofnietaWysylke(w.rozmowaId); wrocDo(w); }
+        /* Czas od odłożenia do „Cofnij" (0.533.0) — do pytania właściciela,
+           czy dziesięć sekund to za długo. Liczony z odliczania na pasku. */
+        if (w) {
+          const ms = w.stan.rodzaj === "czeka" ? OKNO_COFNIECIA_MS - (w.stan.doKiedy - Date.now()) : undefined;
+          zglosCofnietaWysylke(w.rozmowaId, ms);
+          wrocDo(w);
+        }
       }}
       onWroc={(k) => { const w = odlozone.find((o) => o.klucz === k); if (w) wrocDo(w, w.blad); }}
       onZamknij={usunOdlozona} />
+    </div>
   </div>;
 }

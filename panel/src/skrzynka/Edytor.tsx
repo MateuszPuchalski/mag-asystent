@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ChevronDown, Eraser, Lock, MessageSquare, Send, Undo2 } from "lucide-react";
 import { Przycisk } from "../ui";
 import { PrzyciskZalacznika, ZalacznikiWysylki } from "./ZalacznikiWysylki";
@@ -7,6 +7,15 @@ import { KartaSzkicu, PasekSzkicu, PrzyciskSzkicu, UwagiSzkicu,
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 import { doSprawdzenia } from "./ProcesCopilota";
 import { useOkienko } from "./MenuRozmowy";
+import { polePisania, useSkrotyDzialaja } from "../nawigacja/fokus";
+
+/**
+ * Ms od otwarcia rozmowy, przed którymi Ctrl+Enter SPOZA POLA milczy.
+ * Po wysyłce ekran przechodzi dalej, a następna rozmowa ma zwykle szkic
+ * Copilota w polu — podwójne Ctrl+Enter wysłałoby go bez jednego spojrzenia.
+ * Sekunda to mniej, niż trwa przeczytanie pytania, i więcej niż odbicie palca.
+ */
+export const ZWLOKA_KLAWISZA_MS = 1000;
 
 /**
  * Edytor odpowiedzi (§10.4).
@@ -45,7 +54,7 @@ import { useOkienko } from "./MenuRozmowy";
  */
 export function Edytor({
   szkic, cudza, wlasciciel, zapisuje, wysyla, onZmiana, onZapisz, onWyslij, onWyslijIZakoncz,
-  komentarz, onKomentarz, onDodajKomentarz, komentuje, agenci, wzmianki, onWzmianki,
+  komentarz, onKomentarz, onDodajKomentarz, komentuje, agenci, wzmianki, onWzmianki, doNotatki,
   zalaczniki, dodajeZalacznik, bladZalacznika, onDodajZalacznik, onUsunZalacznik, copilot,
 }: {
   szkic: string;
@@ -60,6 +69,8 @@ export function Edytor({
   onWyslijIZakoncz?: () => void;
   komentarz: string;
   onKomentarz: (v: string) => void;
+  /** Licznik zmian z ekranu: każda przełącza tryb na notatkę (prośba o przekazanie). */
+  doNotatki?: number;
   onDodajKomentarz: () => void;
   komentuje: boolean;
   agenci: Array<{ userId: number; name: string }>;
@@ -80,6 +91,54 @@ export function Edytor({
 }) {
   const [tryb, setTryb] = useState<"odpowiedz" | "komentarz">("odpowiedz");
   const wKomentarzu = tryb === "komentarz";
+  /* Prośba o przekazanie pisze do notatki (0.533.0) — edytor ma wtedy
+     stać na notatce, żeby agent widział, gdzie leży tekst. Porównanie
+     z wartością z montowania, bo ekran montuje edytor od nowa przy każdej
+     rozmowie, a stary licznik nie jest nową prośbą. */
+  const doNotatkiNaStart = useRef(doNotatki);
+  useEffect(() => {
+    if (doNotatki !== undefined && doNotatki !== doNotatkiNaStart.current) setTryb("komentarz");
+  }, [doNotatki]);
+
+  /* ── KLAWIATURA OD LISTY DO WYSYŁKI (0.533.0) ──────────────────────────
+     Ctrl+Enter wysyłał tylko z pola, a po przejściu do następnej rozmowy
+     fokus stoi na tle strony (i tak ma być — pole z autofokusem zabiłoby
+     j/k, `zwroty/klawisze.ts`). Każda rozmowa kosztowała więc ruch ręki do
+     myszy, nawet gdy szkic w polu był gotowy. Dwa klawisze to zamykają:
+
+     ENTER — do pola, kursor na końcu. Tylko z tła strony albo z wiersza
+     kolejki; na przycisku Enter dalej go naciska.
+     CTRL+ENTER (i Ctrl+Shift+Enter) — wysyłka także spoza pola, tym samym
+     warunkiem co przycisk. Nie w trybie notatki: tam przycisku wysyłki nie
+     ma w drzewie (§10.4) i skrót nie może go udawać. */
+  const pole = useRef<HTMLTextAreaElement>(null);
+  const zamontowany = useRef(Date.now());
+  const skrotyDzialaja = useSkrotyDzialaja();
+  const klawisz = useRef<(e: KeyboardEvent) => void>(() => {});
+  klawisz.current = (e: KeyboardEvent) => {
+    if (e.key !== "Enter" || wKomentarzu || e.altKey || e.isComposing || polePisania(e.target)) return;
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      if (Date.now() - zamontowany.current < ZWLOKA_KLAWISZA_MS) return;
+      if (!cudza && !wysyla && szkic.trim()) {
+        if (e.shiftKey && onWyslijIZakoncz) onWyslijIZakoncz(); else onWyslij();
+      }
+      return;
+    }
+    if (e.shiftKey || cudza) return;
+    const cel = e.target as HTMLElement | null;
+    if (cel && cel !== document.body && !cel.closest("[data-wiersz-kolejki]")) return;
+    e.preventDefault();
+    const el = pole.current;
+    if (!el) return;
+    el.focus();
+    el.setSelectionRange(el.value.length, el.value.length);
+  };
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => klawisz.current(e);
+    window.addEventListener("keydown", f);
+    return () => window.removeEventListener("keydown", f);
+  }, []);
 
   /* ── SZKIC W POLU: ZWYKŁY TEKST DO POPRAWIANIA (0.499.0) ─────────────────
      Do 0.499.0 szkic stał w pustym polu jako szara podpowiedź przyjmowana
@@ -215,7 +274,7 @@ export function Edytor({
               `field-sizing: content` rośnie z tekstem od progu 120 px, bez
               skryptu mierzącego wysokość. Przeglądarka bez tej własności
               dostaje próg i `resize-y`, czyli to, co było, tylko niższe. */}
-          <textarea className={`field min-h-[7.5rem] resize-y text-tresc [field-sizing:content] ${
+          <textarea ref={pole} className={`field min-h-[7.5rem] resize-y text-tresc [field-sizing:content] ${
             wPolu ? "bg-violet-50" : ""}`} value={szkic}
             aria-label="Szkic odpowiedzi" aria-keyshortcuts="Control+Enter"
             onChange={(e) => { if (e.target.value !== "") setWyczyszczone(null); onZmiana(e.target.value); }}
@@ -230,7 +289,11 @@ export function Edytor({
                 if (e.shiftKey && onWyslijIZakoncz) onWyslijIZakoncz(); else onWyslij();
               }
             }}
-            placeholder="Szkic odpowiedzi — współdzielony z zespołem" />
+            /* Podpowiedź Entera tylko wtedy, gdy Enter prowadzi do pola —
+               w samym polu robi nową linię (dekalog p. 2, `nawigacja/fokus.ts`). */
+            placeholder={skrotyDzialaja && !cudza
+              ? "Szkic odpowiedzi — współdzielony z zespołem · Enter, żeby pisać"
+              : "Szkic odpowiedzi — współdzielony z zespołem"} />
           {uwagiPoPrzyjeciu.length > 0 && <div className="mt-2"><UwagiSzkicu uwagi={uwagiPoPrzyjeciu} /></div>}
           {/* Po „Wyczyść wszystko" karta stoi zwinięta: pusty znaczy pusty,
               a szkic wraca jednym kliknięciem „Wstaw do odpowiedzi". */}

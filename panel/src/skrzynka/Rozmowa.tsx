@@ -1,5 +1,5 @@
 import React from "react";
-import { Bell, Inbox, Ruler } from "lucide-react";
+import { Bell, Inbox, LoaderCircle, Ruler } from "lucide-react";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import type { Kategoria, OsRozmowy, SzczegolyKonfliktu, WpisOsi } from "../api/typy";
 import type { Obecnosc } from "../api/zdarzenia";
@@ -36,6 +36,8 @@ export function brakPowiazania(os: WpisOsi[],
 
 export function Rozmowa(p: {
   dane: OsRozmowy | undefined;
+  /** Rozmowa wybrana, a treść jeszcze w drodze — patrz pusty stan niżej. */
+  laduje?: boolean;
   mojeId: number | null;
   /** Kto jeszcze siedzi przy tej rozmowie — stan chwilowy z szyny zdarzeń. */
   obecni: Obecnosc[];
@@ -56,6 +58,8 @@ export function Rozmowa(p: {
   onWyslij: () => void;
   komentarz: string;
   onKomentarz: (v: string) => void;
+  /** Licznik: każda zmiana przełącza edytor na notatkę — patrz `Edytor`. */
+  doNotatki?: number;
   onDodajKomentarz: () => void;
   komentuje: boolean;
   agenci: Array<{ userId: number; name: string }>;
@@ -92,6 +96,9 @@ export function Rozmowa(p: {
   onWyslijIZakoncz?: () => void;
   onZakoncz?: (mimoPytania: boolean) => void;
   onOtworz?: () => void;
+  /* Odłóż do terminu (0.533.0) — opcjonalne tym samym wzorcem. */
+  onOdloz?: (doKiedy: string, opis: string) => void;
+  onWrocZOdlozenia?: () => void;
   zmieniaStatus?: boolean;
   /* Etykieta człowieka o kategorii (22 września 2026, wcześniej kciuki).
      Opcjonalna, bo rozmowa bez rozpoznania nie ma czego potwierdzać — a każdy
@@ -107,9 +114,15 @@ export function Rozmowa(p: {
      wychodzi z tej funkcji wcześniej, a hak warunkowy to złamana zasada haków. */
   const [zjazdy, setZjazdy] = React.useState(0);
 
+  /* „WYBIERZ ROZMOWĘ", GDY JEST WYBRANA, TO KŁAMSTWO (0.533.0). Po wysyłce
+     ekran sam przechodzi dalej, a przez czas wczytywania środek mówił
+     „Wybierz rozmowę z listy" — choć wybór już padł. Zdanie odpowiada teraz
+     stanowi: wybrana i w drodze albo niewybrana. */
   if (!p.dane) {
     return <section className="card flex min-h-0 flex-1 flex-col overflow-hidden">
-      <Pusto ikona={Inbox}>Wybierz rozmowę z listy</Pusto>
+      {p.laduje
+        ? <Pusto ikona={LoaderCircle}>Wczytuję rozmowę…</Pusto>
+        : <Pusto ikona={Inbox}>Wybierz rozmowę z listy</Pusto>}
     </section>;
   }
   const { rozmowa, os } = p.dane;
@@ -177,10 +190,13 @@ export function Rozmowa(p: {
           łamie ona nagłówek na dwa rzędy i spycha pytanie klienta. Kategorię
           niesie już kafel wiersza w kolejce i nagłówek soczewki po prawej,
           więc tu byłaby trzecim zapisem. Poprawka została w menu. */}
-        <Status rozmowa={rozmowa} blad={p.bladStatusu}
+        {/* `key` po rozmowie (0.533.0): pytanie „zakończyć bez odpowiedzi?"
+            zostawało otwarte i przechodziło na następną rozmowę. */}
+        <Status key={rozmowa.id} rozmowa={rozmowa} blad={p.bladStatusu}
           onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet}
           onReklamacyjna={p.onReklamacyjna} zapisujeReklamacyjna={p.zapisujeReklamacyjna}
           onZakoncz={p.onZakoncz} onOtworz={p.onOtworz} zmieniaStatus={p.zmieniaStatus}
+          onOdloz={p.onOdloz} onWrocZOdlozenia={p.onWrocZOdlozenia}
           menu={<>
             <WierszMenu etykieta="Prowadzi">
               <span className="text-slate-700">{rozmowa.wlasciciel
@@ -272,11 +288,14 @@ export function Rozmowa(p: {
             <Ruler size={16} />Zleć pomiar</Przycisk>
         </div>}
 
-        <Edytor szkic={p.szkic} cudza={cudza} wlasciciel={rozmowa.wlasciciel}
+        {/* `key` po rozmowie (0.533.0): tryb notatki, „Cofnij wyczyszczenie"
+            z tekstem poprzedniej rozmowy i treść Dopytania przechodziły dalej
+            razem z komponentem, bo ekran go nie przemontowywał. */}
+        <Edytor key={rozmowa.id} szkic={p.szkic} cudza={cudza} wlasciciel={rozmowa.wlasciciel}
           zapisuje={p.zapisuje} wysyla={p.wysyla}
           onZmiana={p.onSzkic} onZapisz={p.onZapiszSzkic} onWyslij={p.onWyslij}
           onWyslijIZakoncz={p.onWyslijIZakoncz}
-          komentarz={p.komentarz} onKomentarz={p.onKomentarz}
+          komentarz={p.komentarz} onKomentarz={p.onKomentarz} doNotatki={p.doNotatki}
           onDodajKomentarz={p.onDodajKomentarz} komentuje={p.komentuje}
           agenci={p.agenci} wzmianki={p.wzmianki} onWzmianki={p.onWzmianki}
           zalaczniki={p.zalaczniki} dodajeZalacznik={p.dodajeZalacznik}
