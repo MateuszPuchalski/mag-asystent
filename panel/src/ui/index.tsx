@@ -359,7 +359,7 @@ export const czas = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleString("pl", { dateStyle: "short", timeStyle: "short" }) : "—";
 
 /**
- * Termin z dniem tygodnia — „pt., 02.10, 08:00" (@wydanie).
+ * Termin z dniem tygodnia — „pt., 02.10, 08:00" (0.533.0).
  *
  * Dla odłożenia rozmowy: o terminie powrotu myśli się dniem tygodnia („wróci
  * w poniedziałek"), a rok nic nie rozstrzyga, bo odłożenie ma najwyżej

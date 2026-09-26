@@ -817,7 +817,7 @@ export function otworzRozmowe(
 export const NAJDLUZSZE_ODLOZENIE_MS = 30 * 86_400_000;
 
 /**
- * „Odłóż do terminu" (@wydanie, decyzja właściciela z 26 września 2026).
+ * „Odłóż do terminu" (0.533.0, decyzja właściciela z 26 września 2026).
  *
  * WRACA TO, CO ODESZŁO 22 WRZEŚNIA — ale w innym kształcie i z innego powodu.
  * Tamto było ręcznym statusem z menu i zniknęło razem z nim. Po jego zdjęciu

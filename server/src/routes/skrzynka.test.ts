@@ -113,7 +113,7 @@ const TRASY = () => [
   /* Zakończ / Otwórz ponownie (23 września 2026) — ta sama bramka. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/zakoncz`, payload: {} },
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/otworz` },
-  /* Odłóż do terminu (@wydanie) — ta sama bramka co Zakończ. */
+  /* Odłóż do terminu (0.533.0) — ta sama bramka co Zakończ. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/odloz`,
     payload: { doKiedy: new Date(Date.now() + 86_400_000).toISOString() } },
   /* Cofnięta wysyłka (0.500.0) — sam wpis do pomiaru tarcia, ta sama bramka. */

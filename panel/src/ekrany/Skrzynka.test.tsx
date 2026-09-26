@@ -6,7 +6,7 @@ import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Skrzynka } from "./Skrzynka";
 
-/* ── EKRAN SKRZYNKI (@wydanie) ───────────────────────────────────────────────
+/* ── EKRAN SKRZYNKI (0.533.0) ───────────────────────────────────────────────
    Skrzynka nie miała testu EKRANU — tylko testy swoich klocków. Reguła
    „zero zapisu przy patrzeniu" nie miała więc tu strażnika, a pętla pracy
    (wysyłka → następna rozmowa → pisanie) nie była sprawdzana jako całość.
@@ -264,7 +264,7 @@ describe("EKRAN SKRZYNKI: pętla pracy", () => {
     expect(nieGet().some((z) => z.url.endsWith("/send"))).toBe(false);
   });
 
-  /* ── Pomiary pod decyzje (@wydanie) ────────────────────────────────────── */
+  /* ── Pomiary pod decyzje (0.533.0) ────────────────────────────────────── */
   it("wyjście z rozmowy bez ruchu zgłasza jedno pominięcie — z kategorią, nigdy przy otwarciu", async () => {
     const u = userEvent.setup();
     /* Pełny kształt rozpoznania — ten sam, co w `skrzynka/Copilot.test.tsx`. */

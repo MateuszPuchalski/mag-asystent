@@ -92,7 +92,7 @@ export function Skrzynka() {
   const zdrowie = useZdrowie();
   const synchronizuj = useSynchronizuj();
   const wyslij = useWyslij();
-  /* ── DRUGA INSTANCJA DLA WYSYŁEK ODŁOŻONYCH (@wydanie) ──────────────────
+  /* ── DRUGA INSTANCJA DLA WYSYŁEK ODŁOŻONYCH (0.533.0) ──────────────────
      Jedna mutacja niosła obie drogi, a `wysyla={wyslij.isPending}` gasił
      przycisk BIEŻĄCEJ rozmowy, gdy po dziesięciu sekundach wychodziła
      odpowiedź do POPRZEDNIEJ. Przy pracy w rytmie rozmowa na dziesięć sekund
@@ -172,7 +172,7 @@ export function Skrzynka() {
   const komentarzTeraz = useRef(komentarz);
   komentarzTeraz.current = komentarz;
   useEffect(() => {
-    /* ── NIEZAPISANY TEKST ZOSTAJE PRZY SWOJEJ ROZMOWIE (@wydanie) ──────────
+    /* ── NIEZAPISANY TEKST ZOSTAJE PRZY SWOJEJ ROZMOWIE (0.533.0) ──────────
        Do tego wydania j/k, klik w wiersz albo powiadomienie nadpisywały pole
        szkicem z serwera — niezapisana odpowiedź przepadała bez słowa. Gorzej
        z notatką: nie czyścił jej nikt, więc zaczęta przy jednej rozmowie
@@ -251,7 +251,7 @@ export function Skrzynka() {
        spóźniony ma NIE uruchamiać tego efektu; powód wyżej. */
   }, [ja.data?.user.userId]);
 
-  /* ── POMINIĘCIE ROZMOWY (@wydanie) ────────────────────────────────────────
+  /* ── POMINIĘCIE ROZMOWY (0.533.0) ────────────────────────────────────────
      Pomiar pod decyzję właściciela z 26 września 2026: jak często agent
      otwiera rozmowę i odchodzi bez ruchu — bez wysyłki, zakończenia,
      odłożenia i notatki. Tego kosztu nie widział żaden licznik, a to on
@@ -396,7 +396,7 @@ export function Skrzynka() {
     return () => window.removeEventListener("beforeunload", f);
   }, [czekajace]);
 
-  /* Po każdym przejściu dalej fokus schodzi na tło strony (@wydanie). Gdy
+  /* Po każdym przejściu dalej fokus schodzi na tło strony (0.533.0). Gdy
      następna rozmowa była już w pamięci, fokus zostawał w polu albo na
      przycisku wysyłki: j/k milkły, a drugie Ctrl+Enter trafiało w nietknięty
      szkic NASTĘPNEJ rozmowy. */
@@ -407,7 +407,7 @@ export function Skrzynka() {
 
   function wyslijOdpowiedz(mimoNowejWiadomosci = false, mimoObecnosci = false, zakonczPo = false) {
     if (!rozmowa.data) return;
-    /* ── KONFLIKT PRZY KLIKNIĘCIU, NIE DZIESIĘĆ SEKUND PÓŹNIEJ (@wydanie) ───
+    /* ── KONFLIKT PRZY KLIKNIĘCIU, NIE DZIESIĘĆ SEKUND PÓŹNIEJ (0.533.0) ───
        Dwie rzeczy, które zatrzymają wysyłkę na serwerze, ekran zna już teraz:
        klient dopisał (szyna zdarzeń, `nowa`) i kolega trzyma rozmowę
        (`oglada` w wierszu kolejki). Do tego wydania wysyłka i tak szła do
@@ -511,7 +511,7 @@ export function Skrzynka() {
      w kolejce: pole tekstowe wygrywa zawsze, bo „e" w słowie „jest" nie może
      wstawiać szkicu. Klawisze działają tylko przy karcie na ekranie —
      z cudzą rozmową albo bez propozycji nie robią nic. */
-  /* SZKIC JUŻ W POLU = KARTA BEZ „WSTAW" (@wydanie). Karta chowa wtedy
+  /* SZKIC JUŻ W POLU = KARTA BEZ „WSTAW" (0.533.0). Karta chowa wtedy
      swój przycisk (`!wPolu` w `SzkicCopilota.tsx`), ale klawisz działał dalej:
      poprawiony szkic, klik obok pola, „e" — i poprawki znikały bez cofnięcia,
      a pomiar zapisywał „zastąpiony". Klawisz ma robić to, co widać. */
@@ -542,7 +542,7 @@ export function Skrzynka() {
     if (nast !== null) przygotuj(nast);
   }, [otwarta, lista.dataUpdatedAt]);
 
-  /* ── ODŁÓŻ DO TERMINU (@wydanie) ─────────────────────────────────────────
+  /* ── ODŁÓŻ DO TERMINU (0.533.0) ─────────────────────────────────────────
      Ten sam kształt co Zakończ: przejście dalej i pasek „Cofnij", bo
      odłożona schodzi z kubełka roboczego i pomyłki na liście nie widać.
      Cofnięcie zdejmuje odłożenie i wraca do rozmowy. */
@@ -671,7 +671,7 @@ export function Skrzynka() {
         /* Cudza rozmowa = cudzy szkic: ten sam warunek, którym edytor blokuje pole. */
         wylaczony: rozmowa.data?.rozmowa.wlascicielId != null
           && rozmowa.data.rozmowa.wlascicielId !== (ja.data?.user.userId ?? null),
-        /* ZAMÓWIONY SZKIC WCHODZI DO PUSTEGO POLA (@wydanie). Reguła 0.500.0
+        /* ZAMÓWIONY SZKIC WCHODZI DO PUSTEGO POLA (0.533.0). Reguła 0.500.0
            („nic nie wchodzi do pola, gdy agent patrzy") chroni przed szkicem
            z TŁA. Ten agent właśnie kliknął „Ułóż odpowiedź" i czekał —
            kazać mu jeszcze wcisnąć E to krok bez decyzji. Pole z tekstem
@@ -762,7 +762,7 @@ export function Skrzynka() {
       onPoprosOPrzekazanie={() => {
         /* Prośba o przekazanie to komentarz wewnętrzny, nie osobny mechanizm:
            właściciel czyta go w rozmowie, przy której siedzi. */
-        /* Do @wydanie prośba lądowała w polu ODPOWIEDZI DO KLIENTA, wbrew
+        /* Do 0.533.0 prośba lądowała w polu ODPOWIEDZI DO KLIENTA, wbrew
            zdaniu wyżej — nadpisywała tekst agenta i w cudzej rozmowie nie
            dała się nawet wysłać. Idzie do notatki, a edytor przełącza się
            na nią, żeby agent widział, gdzie pisze. */
@@ -871,7 +871,7 @@ export function Skrzynka() {
       <Blad>{blad || (lista.error as Error | null)?.message}</Blad>
     </div>
 
-    {/* JEDEN STOS PASKÓW, NAD KOLEJKĄ (@wydanie) — powód stosu w `Cofniecie.tsx`.
+    {/* JEDEN STOS PASKÓW, NAD KOLEJKĄ (0.533.0) — powód stosu w `Cofniecie.tsx`.
         Stał na środku dołu, czyli NA pływającym pasku wysyłki środkowej
         kolumny: przez dziesięć sekund po wysyłce przycisk „Wyślij" następnej
         rozmowy był zasłonięty. Nad dołem kolejki zasłania najwyżej jej
@@ -884,7 +884,7 @@ export function Skrzynka() {
         const w = odlozone.find((o) => o.klucz === k);
         /* Wpis do pomiaru tarcia (0.500.0) — tylko przy „Cofnij". „Wróć"
            po błędzie wysyłki to nie pomyłka agenta, tylko Allegro. */
-        /* Czas od odłożenia do „Cofnij" (@wydanie) — do pytania właściciela,
+        /* Czas od odłożenia do „Cofnij" (0.533.0) — do pytania właściciela,
            czy dziesięć sekund to za długo. Liczony z odliczania na pasku. */
         if (w) {
           const ms = w.stan.rodzaj === "czeka" ? OKNO_COFNIECIA_MS - (w.stan.doKiedy - Date.now()) : undefined;

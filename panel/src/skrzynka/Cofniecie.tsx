@@ -32,7 +32,7 @@ export function Cofniecie({ wpis, onZamknij }: { wpis: DoCofniecia | null; onZam
        przerysowaniu rodzica, a zegar ma ruszyć raz na wpis. */
   }, [wpis?.klucz]);
   if (!wpis) return null;
-  /* BEZ WŁASNEGO `fixed` (@wydanie). Pasek stał w lewym dolnym rogu, a pasek
+  /* BEZ WŁASNEGO `fixed` (0.533.0). Pasek stał w lewym dolnym rogu, a pasek
      odłożonej wysyłki na środku dołu — przy 1440 px nachodziły na siebie
      o 16 px, przy 1366 px o ponad 50. Odłożenie rozmowy zaraz po wysyłce
      stawia oba naraz, więc stoją teraz w jednym stosie, który układa ekran. */

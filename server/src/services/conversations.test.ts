@@ -474,7 +474,7 @@ test("Otwórz ponownie cofa werdykt agenta; nowa wiadomość klienta budzi zako�
 });
 
 
-/* ── ODŁÓŻ DO TERMINU (@wydanie) ─────────────────────────────────────────────
+/* ── ODŁÓŻ DO TERMINU (0.533.0) ─────────────────────────────────────────────
    Decyzja właściciela z 26 września 2026 — powód przy `odlozRozmowe`. Test
    pilnuje trzech obietnic: termin jest zawsze, rozmowa wraca SAMA, a klient
    budzi ją wcześniej. */

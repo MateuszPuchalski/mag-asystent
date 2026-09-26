@@ -25,7 +25,7 @@ describe("Status rozmowy", () => {
   /* ── Ręcznego statusu nie ma (22 września 2026) ──────────────────────────
      Decyzja właściciela: stan wynika wyłącznie z faktów. Nagłówek nie ma
      pola wyboru — test pilnuje, żeby nie wróciło. Odłożenie wróciło
-     26 września 2026 (@wydanie), ale jako werdykt Z DATĄ w menu „⋯", nie
+     26 września 2026 (0.533.0), ale jako werdykt Z DATĄ w menu „⋯", nie
      jako pozycja listy statusów; bez `onOdloz` go nie ma — testy niżej. */
   it("status jest odczytem: bez pola wyboru i bez odłożenia", () => {
     render(<Status rozmowa={rozmowa({ status: "waiting_for_us" })} blad=""
@@ -164,7 +164,7 @@ describe("Stan rozmowy stoi w nagłówku raz", () => {
   });
 });
 
-/* ── Klawiatura i odłożenie (@wydanie) ───────────────────────────────────────
+/* ── Klawiatura i odłożenie (0.533.0) ───────────────────────────────────────
    Drugie „Z" zatwierdza zakończenie bez odpowiedzi — pytanie zostaje jedno
    i w miejscu przycisku, tylko odpowiedź nie wymaga już myszy. „O" odkłada
    do następnego dnia roboczego, 8:00. Menu „⋯" ma trzy terminy i kalendarz. */

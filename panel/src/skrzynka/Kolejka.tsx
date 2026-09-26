@@ -53,7 +53,7 @@ export function odNajnowszych(rozmowy: Rozmowa[]): Rozmowa[] {
 /** Kubełki przeglądania, nie pracy — pod „Więcej" (0.506.0). */
 const POD_WIECEJ: ReadonlyArray<Kubelek> = ["oczekujace", "zakonczone", "wszystkie"];
 
-/* ── „DO ODPOWIEDZI" JEST PIERWSZY I DOMYŚLNY (@wydanie) ─────────────────────
+/* ── „DO ODPOWIEDZI" JEST PIERWSZY I DOMYŚLNY (0.533.0) ─────────────────────
    Decyzja właściciela z 26 września 2026. Wejście stawało na „Wszystkie",
    a tam stoją też zakończone — i to NA GÓRZE, bo serwer układa po najstarszym
    pytaniu klienta (0.181.0), a pytanie sprzed miesięcy jest najstarsze.
@@ -74,7 +74,7 @@ const KUBELKI: Array<{ klucz: Kubelek; etykieta: string }> = [
      zakończenie dało się znaleźć i otworzyć, a nie tylko w „Wszystkie". */
   { klucz: "zakonczone", etykieta: "Zakończone" },
   { klucz: "wszystkie", etykieta: "Wszystkie" },
-  /* Odłożone stoją w „Oczekujących" (@wydanie) — czekają na termin, jak
+  /* Odłożone stoją w „Oczekujących" (0.533.0) — czekają na termin, jak
      tamte na klienta albo halę. Osobny kubełek byłby czwartym miejscem do
      sprawdzania, a po terminie rozmowa i tak wraca sama do „Do odpowiedzi". */
 ];
@@ -242,7 +242,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
       return;
     }
     /* Cyfra mapuje się wprost na indeks listy: „Do odpowiedzi" to 1,
-       a „Wszystkie" od @wydanie ostatnia — jak w tamtych trzech ekranach. */
+       a „Wszystkie" od 0.533.0 ostatnia — jak w tamtych trzech ekranach. */
     if (/^[1-9]$/.test(e.key) && Number(e.key) <= KUBELKI.length) {
       e.preventDefault();
       setKubelek(KUBELKI[Number(e.key) - 1].klucz);
@@ -524,7 +524,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
               <span className="font-semibold text-violet-800">{nazwaNaPlakietce(r.kopilot)}</span>}
             {r.wlasciciel && <span className="flex items-center gap-1 font-semibold text-slate-600">
               <UserCheck size={12} />{r.wlasciciel}</span>}
-            {/* Odłożona mówi DO KIEDY (@wydanie): „Odłożona" bez daty każe
+            {/* Odłożona mówi DO KIEDY (0.533.0): „Odłożona" bez daty każe
                 otworzyć rozmowę, żeby się dowiedzieć, czy to jutro, czy za tydzień. */}
             {r.status === "snoozed" && r.odlozoneDo && !r.poTerminie &&
               <span className="flex items-center gap-1 text-slate-600">

@@ -46,7 +46,7 @@ function pisz(k: string, v: string): void {
   }
 }
 
-/* ── TO SAMO DLA SKRZYNKI, TYLKO BEZ HOOKA (@wydanie) ─────────────────────────
+/* ── TO SAMO DLA SKRZYNKI, TYLKO BEZ HOOKA (0.533.0) ─────────────────────────
    Akapit wyżej mówi, że skrzynka ma własny mechanizm — szkic na serwerze
    z wersją. Ma, ale zapisuje go wyłącznie „Zapisz szkic" schowane pod „▾",
    więc niezapisana odpowiedź ginęła przy j/k dokładnie tak, jak tu przed

@@ -91,7 +91,7 @@ export function Edytor({
 }) {
   const [tryb, setTryb] = useState<"odpowiedz" | "komentarz">("odpowiedz");
   const wKomentarzu = tryb === "komentarz";
-  /* Prośba o przekazanie pisze do notatki (@wydanie) — edytor ma wtedy
+  /* Prośba o przekazanie pisze do notatki (0.533.0) — edytor ma wtedy
      stać na notatce, żeby agent widział, gdzie leży tekst. Porównanie
      z wartością z montowania, bo ekran montuje edytor od nowa przy każdej
      rozmowie, a stary licznik nie jest nową prośbą. */
@@ -100,7 +100,7 @@ export function Edytor({
     if (doNotatki !== undefined && doNotatki !== doNotatkiNaStart.current) setTryb("komentarz");
   }, [doNotatki]);
 
-  /* ── KLAWIATURA OD LISTY DO WYSYŁKI (@wydanie) ──────────────────────────
+  /* ── KLAWIATURA OD LISTY DO WYSYŁKI (0.533.0) ──────────────────────────
      Ctrl+Enter wysyłał tylko z pola, a po przejściu do następnej rozmowy
      fokus stoi na tle strony (i tak ma być — pole z autofokusem zabiłoby
      j/k, `zwroty/klawisze.ts`). Każda rozmowa kosztowała więc ruch ręki do

@@ -41,7 +41,7 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
      go nie używał dobrze. Stan „kto ma ruch" dalej liczy się sam. */
   onZakoncz?: (mimoPytania: boolean) => void;
   onOtworz?: () => void;
-  /* ── ODŁÓŻ DO TERMINU (@wydanie) — decyzja właściciela z 26 września 2026,
+  /* ── ODŁÓŻ DO TERMINU (0.533.0) — decyzja właściciela z 26 września 2026,
      powód przy `odlozRozmowe` na serwerze. Werdykt z datą, nie status z menu:
      tamten odszedł 22 września i nie wraca. Drugi przycisk zdejmuje odłożenie. */
   onOdloz?: (doKiedy: string, opis: string) => void;
@@ -64,7 +64,7 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
      czeka. Nasłuch mieszka TU, a nie w ekranie, bo to tu stoi pytanie; ten
      sam strażnik co przy E i R: pole tekstowe wygrywa zawsze, bo „z" w słowie
      „zamówienie" nie może kończyć rozmowy. */
-  /* DRUGIE „Z" ZATWIERDZA (@wydanie). Pytanie zostaje jedno i w miejscu
+  /* DRUGIE „Z" ZATWIERDZA (0.533.0). Pytanie zostaje jedno i w miejscu
      przycisku, ale odpowiedź na nie wymagała myszy — agent kończący
      z klawiatury musiał zmienić narzędzie w połowie ruchu. Esc anuluje. */
   const klawisz = useRef((_k: "z" | "o" | "esc") => {});

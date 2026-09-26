@@ -449,7 +449,7 @@ Cena jest znana z góry i przyjęta świadomie. Rozmowa zakończona podziękowan
 klienta zostaje „Czeka na nas", dopóki ktoś nie odpisze. Spamu nie da się już
 uciszyć, a rozmowy nie da się odłożyć na termin.
 
-**Odłożenie wróciło 26 września 2026 (@wydanie), jako werdykt z datą.** Nie
+**Odłożenie wróciło 26 września 2026 (0.533.0), jako werdykt z datą.** Nie
 jako pozycja statusów. Powód i kształt stoją w §26f.
 
 **Podziękowanie klienta nie czeka na nas (22 września 2026).** Pierwszą
@@ -6277,7 +6277,7 @@ Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko
 
 **Jedna zmiana do potwierdzenia.** Ściąga skrótów w kolejce Skrzynki otwiera się teraz kliknięciem, nie najechaniem. Najechanie przyszło w 0.402.0 po uwadze właściciela. Pełna lista skrótów dalej stoi pod klawiszem `?`.
 
-## 26f. Pętla pracy w skrzynce (@wydanie)
+## 26f. Pętla pracy w skrzynce (0.533.0)
 
 Właściciel poprosił o poprawę przepływu pracy agenta w Skrzynce. §26d i §26e zdejmowały z ekranu nadmiar. Tu chodziło o co innego: o kroki, czekanie i przeskoki między rozmowami przy pracy seryjnej. Przegląd kodu i przejście na żywym serwerze znalazły błędy na styku klocków i dziury w pętli.
 

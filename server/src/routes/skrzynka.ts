@@ -656,7 +656,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  /* ── ODŁÓŻ DO TERMINU (@wydanie) ──────────────────────────────────────────
+  /* ── ODŁÓŻ DO TERMINU (0.533.0) ──────────────────────────────────────────
      Powód i granice przy `odlozRozmowe`. `doKiedy: null` zdejmuje odłożenie —
      tą drogą chodzą „Cofnij" i „Wróć teraz". Brak pola to błąd, nie zdjęcie:
      puste ciało nie może po cichu budzić rozmowy. */

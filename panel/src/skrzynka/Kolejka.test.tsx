@@ -135,7 +135,7 @@ describe("Kolejka", () => {
        cofnąć — nikt nie szuka sprawy, której nie widać na żadnej liście. */
     await kubelek(/^Nieprzypisane/);
     expect(screen.queryByText("Sprawa z archiwum")).not.toBeInTheDocument();
-    /* „Wszystkie" stoi od @wydanie pod „Więcej" — cyfra 6 dalej go wybiera. */
+    /* „Wszystkie" stoi od 0.533.0 pod „Więcej" — cyfra 6 dalej go wybiera. */
     await userEvent.keyboard("6");
     expect(screen.getByText("Sprawa z archiwum")).toBeInTheDocument();
   });
@@ -178,7 +178,7 @@ const pokaz = (rozmowy: Rozmowa[]) =>
     onWybierz={() => {}} onOdswiez={() => {}} />);
 
 /* Wiersze w stanach spoza pracy (czeka na klienta, odłożona, zakończona) stoją
-   od @wydanie poza domyślnym „Do odpowiedzi" — test wiersza patrzy więc
+   od 0.533.0 poza domyślnym „Do odpowiedzi" — test wiersza patrzy więc
    w „Wszystkie", jedyny kubełek, który pokazuje każdy stan. */
 const pokazWszystkie = async (rozmowy: Rozmowa[]) => {
   const r = pokaz(rozmowy);
@@ -554,7 +554,7 @@ describe("Kolejka: klawiatura", () => {
   });
 
   it("cyfra przełącza kubełek, a pierwszy i domyślny jest „Do odpowiedzi”", async () => {
-    /* Od @wydanie pierwszy kubełek to praca, nie przeglądanie — „Wszystkie"
+    /* Od 0.533.0 pierwszy kubełek to praca, nie przeglądanie — „Wszystkie"
        zeszło pod „Więcej" jako ostatnie, jak w zwrotach, reklamacjach
        i dyskusjach. Cyfra dalej mapuje się wprost na indeks listy. */
     zKlawiszami(null, vi.fn());
@@ -680,7 +680,7 @@ describe("kolejka podaje widoczne wiersze", () => {
   });
 });
 
-/* ── „DO ODPOWIEDZI" (@wydanie) ──────────────────────────────────────────────
+/* ── „DO ODPOWIEDZI" (0.533.0) ──────────────────────────────────────────────
    Decyzja właściciela z 26 września 2026: wejście staje na pracy, nie na
    archiwum. Nasz ruch, niczyje i moje razem; kolegi i czekające — nie. */
 describe("kubełek „Do odpowiedzi”", () => {

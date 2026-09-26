@@ -426,7 +426,7 @@ export function useZakoncz() {
 }
 
 /**
- * Odłóż do terminu (@wydanie) — powód przy `odlozRozmowe` na serwerze.
+ * Odłóż do terminu (0.533.0) — powód przy `odlozRozmowe` na serwerze.
  * `doKiedy: null` zdejmuje odłożenie („Cofnij", „Wróć teraz"). Pole idzie
  * zawsze, także jako `null`: serwer odbija ciało bez niego, żeby literówka
  * nie budziła rozmowy po cichu.
@@ -446,7 +446,7 @@ export function useOdloz() {
 }
 
 /**
- * Następna rozmowa czeka w pamięci, zanim agent do niej przejdzie (@wydanie).
+ * Następna rozmowa czeka w pamięci, zanim agent do niej przejdzie (0.533.0).
  *
  * Po wysyłce ekran sam przechodzi dalej (0.443.0), ale do tej pory dopiero
  * wtedy pytał serwer o treść — środek kolumny mówił przez tę chwilę „Wybierz

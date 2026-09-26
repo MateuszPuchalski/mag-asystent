@@ -96,7 +96,7 @@ export function Rozmowa(p: {
   onWyslijIZakoncz?: () => void;
   onZakoncz?: (mimoPytania: boolean) => void;
   onOtworz?: () => void;
-  /* Odłóż do terminu (@wydanie) — opcjonalne tym samym wzorcem. */
+  /* Odłóż do terminu (0.533.0) — opcjonalne tym samym wzorcem. */
   onOdloz?: (doKiedy: string, opis: string) => void;
   onWrocZOdlozenia?: () => void;
   zmieniaStatus?: boolean;
@@ -114,7 +114,7 @@ export function Rozmowa(p: {
      wychodzi z tej funkcji wcześniej, a hak warunkowy to złamana zasada haków. */
   const [zjazdy, setZjazdy] = React.useState(0);
 
-  /* „WYBIERZ ROZMOWĘ", GDY JEST WYBRANA, TO KŁAMSTWO (@wydanie). Po wysyłce
+  /* „WYBIERZ ROZMOWĘ", GDY JEST WYBRANA, TO KŁAMSTWO (0.533.0). Po wysyłce
      ekran sam przechodzi dalej, a przez czas wczytywania środek mówił
      „Wybierz rozmowę z listy" — choć wybór już padł. Zdanie odpowiada teraz
      stanowi: wybrana i w drodze albo niewybrana. */
@@ -190,7 +190,7 @@ export function Rozmowa(p: {
           łamie ona nagłówek na dwa rzędy i spycha pytanie klienta. Kategorię
           niesie już kafel wiersza w kolejce i nagłówek soczewki po prawej,
           więc tu byłaby trzecim zapisem. Poprawka została w menu. */}
-        {/* `key` po rozmowie (@wydanie): pytanie „zakończyć bez odpowiedzi?"
+        {/* `key` po rozmowie (0.533.0): pytanie „zakończyć bez odpowiedzi?"
             zostawało otwarte i przechodziło na następną rozmowę. */}
         <Status key={rozmowa.id} rozmowa={rozmowa} blad={p.bladStatusu}
           onPriorytet={p.onPriorytet} zapisujePriorytet={p.zapisujePriorytet}
@@ -288,7 +288,7 @@ export function Rozmowa(p: {
             <Ruler size={16} />Zleć pomiar</Przycisk>
         </div>}
 
-        {/* `key` po rozmowie (@wydanie): tryb notatki, „Cofnij wyczyszczenie"
+        {/* `key` po rozmowie (0.533.0): tryb notatki, „Cofnij wyczyszczenie"
             z tekstem poprzedniej rozmowy i treść Dopytania przechodziły dalej
             razem z komponentem, bo ekran go nie przemontowywał. */}
         <Edytor key={rozmowa.id} szkic={p.szkic} cudza={cudza} wlasciciel={rozmowa.wlasciciel}

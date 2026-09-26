@@ -1,4 +1,4 @@
-/* ── TERMINY ODŁOŻENIA (@wydanie) ────────────────────────────────────────────
+/* ── TERMINY ODŁOŻENIA (0.533.0) ────────────────────────────────────────────
    Trzy gotowe terminy zamiast kalendarza, bo prawie każde odłożenie to jedno
    z trzech: „jutro rano", „za dwa dni" (dostawca odpowiada), „za tydzień"
    (towar w drodze). Kalendarz zostaje na resztę — jako czwarta droga, nie
