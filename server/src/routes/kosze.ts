@@ -20,6 +20,7 @@ import {
   pominietePozycje,
   pominPozycjeKosza,
   ponowMmKosza,
+  usunZMmKosza,
   przesunNaKoniec,
   skanTowaruKosza,
   szczegolKosza,
@@ -102,6 +103,19 @@ export async function koszeRoutes(app: FastifyInstance) {
       if (nie) return reply.code(nie.kod).send({ error: nie.error });
       return zBledem(reply, () =>
         ponowMmKosza(db(), Number(req.params.id), autor(), req.body?.sprawdzono === true));
+    });
+
+  /* Zdjęcie kartoteki z MM kosza, które nie weszło (0.530.0). Bramka BIURA:
+     to zmiana treści dokumentu w bazie firmy. Uzasadnienie przy `usunZMmKosza`. */
+  app.post<{ Params: { id: string }; Body: { twId?: number } }>(
+    "/api/biuro/kosze/:id/mm-usun", async (req, reply) => {
+      const nie = odmowaBiuro();
+      if (nie) return reply.code(nie.kod).send({ error: nie.error });
+      const twId = Number(req.body?.twId);
+      if (!Number.isInteger(twId) || twId <= 0) {
+        return reply.code(400).send({ error: "Wskaż kartotekę do zdjęcia z MM." });
+      }
+      return zBledem(reply, () => usunZMmKosza(db(), Number(req.params.id), twId, autor()));
     });
 
   /* Pominięte pozycje ze wszystkich koszy — lista pracy biura, nie historia.

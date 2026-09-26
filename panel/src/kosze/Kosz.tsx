@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { RefreshCw } from "lucide-react";
 import type { PowodBezPowrotu, PozycjaWKoszu, SzczegolKosza, WierszKosza } from "../api/kosze";
 import { Zdjecie } from "../towar/Zdjecie";
@@ -52,6 +52,8 @@ export interface PonowienieMm {
   /** Odmowa „przerwano w trakcie zapisu" czeka na potwierdzenie człowieka. */
   czekaNaSprawdzenie: boolean;
   onPonow: (sprawdzono: boolean) => void;
+  /** Zdjęcie kartoteki z MM, które nie weszło (0.530.0). */
+  usun?: { trwa: boolean; blad: string; wynik: string; onUsun: (twId: number) => void };
 }
 
 /* Co zrobić, gdy MM powrotne nie powstało — zależnie od przyczyny (0.505.0).
@@ -75,6 +77,9 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
   /** Rozłożony ponad dobę, a MM powrotne nie powstało (0.505.0) — i dlaczego. */
   bezPowrotu?: PowodBezPowrotu | null;
 }) {
+  /* Potwierdzenie przy zdjęciu z MM (0.530.0): towar zostaje na magazynie
+     źródłowym, a przesunięcie ręką to druga czynność — jeden klik za mało. */
+  const [potwierdzUsun, setPotwierdzUsun] = useState<number | null>(null);
   const bezKorekty = k.zwroty.filter((z) => !z.korektaNumer);
   const pominiete = k.pozycje.filter((p) => p.status === "skipped");
   const powrot = !k.powrot ? null
@@ -116,8 +121,41 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
       {ponowMm && <div className={`mt-2 rounded-lg border p-2 text-sm ${ponowMm.problem.nierozwiazany
         ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
         <p className={ponowMm.problem.nierozwiazany ? "text-ranga-zle" : "text-ranga-uwaga"}>
-          <b>{ponowMm.problem.nierozwiazany ? "MM w błędzie" : "MM weszło po błędzie — sprawdź stany z Subiektem"}</b>
+          <b>{ponowMm.problem.nierozwiazany ? "MM w błędzie"
+            /* PONAWIANE (0.530.0) — kosz 1205: karta mówiła „weszło", a powrót
+               czekał na kolejną próbę. Weszło to dopiero dokument z numerem. */
+            : ponowMm.problem.ponawiane ? "MM ponawiane po odmowie — jeszcze nie weszło"
+              : "MM weszło po błędzie — sprawdź stany z Subiektem"}</b>
           {ponowMm.problem.ostatniBlad ? ` · ${ponowMm.problem.ostatniBlad}` : ""}</p>
+        {/* KTÓRY TOWAR (0.530.0). Sfera mówi „brak towaru" o całym dokumencie;
+            read-model stanów wskazuje linię. Pusta lista to też informacja:
+            nasza kopia braku nie widzi, więc przyczyna leży poza nią. */}
+        {(k.brakiMm?.length ?? 0) > 0 && <ul className="mt-1 space-y-0.5 text-ranga-zle">
+          {k.brakiMm!.map((b) => <li key={`${b.twId}-${b.magazyn}`}>
+            <b>{b.symbol ?? `kartoteka ${b.twId}`}</b>{b.nazwa ? ` · ${b.nazwa}` : ""}
+            {` — MM chce ${b.potrzeba} szt. z ${b.magazyn}, a tam jest ${b.stan}`}
+            {b.rezerwacja > 0 ? `, z czego ${b.rezerwacja} zarezerwowane` : ""}.
+            {/* ZDJĘCIE Z MM (0.530.0) — zgłoszenie właściciela przy 1205. */}
+            {ponowMm.usun && (potwierdzUsun === b.twId
+              ? <span className="ml-2 inline-flex flex-wrap items-center gap-1 text-slate-700">
+                  Zostanie na {b.magazyn} — przesuniesz go ręką w Subiekcie.
+                  <button type="button" disabled={ponowMm.usun.trwa}
+                    onClick={() => { ponowMm.usun!.onUsun(b.twId); setPotwierdzUsun(null); }}
+                    className="rounded border border-red-300 bg-white px-1.5 font-semibold text-ranga-zle hover:bg-red-100">
+                    Zdejmij z MM</button>
+                  <button type="button" onClick={() => setPotwierdzUsun(null)}
+                    className="underline underline-offset-2">anuluj</button>
+                </span>
+              : <button type="button" onClick={() => setPotwierdzUsun(b.twId)}
+                  className="ml-2 text-xs font-semibold underline underline-offset-2">usuń z MM</button>)}
+          </li>)}
+        </ul>}
+        {ponowMm.usun?.wynik && <p className="mt-1 text-ranga-ok">{ponowMm.usun.wynik}</p>}
+        {ponowMm.usun && <Blad>{ponowMm.usun.blad}</Blad>}
+        {k.brakiMm?.length === 0 && /brak towaru/i.test(ponowMm.problem.ostatniBlad ?? "")
+          && (ponowMm.problem.nierozwiazany || ponowMm.problem.ponawiane)
+          && <p className="mt-1 text-xs text-slate-600">Nasza kopia stanów nie widzi braku —
+            sprawdź stan na magazynie źródłowym w Subiekcie; import mógł jeszcze nie dojść.</p>}
         {ponowMm.problem.nierozwiazany && <div className="mt-2 flex flex-wrap items-center gap-2">
           {ponowMm.czekaNaSprawdzenie
             ? <Przycisk wariant="glowny" disabled={ponowMm.trwa} onClick={() => ponowMm.onPonow(true)}>
@@ -162,7 +200,12 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
             <td className="py-2 pr-2">{p.lokFaktyczna
               ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-ranga-ok">{p.lokFaktyczna}</span>
               : <span className="text-xs text-slate-600">{p.lokOczekiwana ?? "—"}</span>}</td>
-            <td className="py-2"><StanPozycji p={p} /></td>
+            <td className="py-2"><StanPozycji p={p} />
+              {/* Wiersz, który blokuje MM, oznaczony przy sobie (0.530.0) —
+                  żeby nie szukać symbolu z ramki wśród dwudziestu pięciu. */}
+              {k.brakiMm?.some((b) => b.twId === p.twId) &&
+                <span className="mt-1 block text-xs font-bold text-ranga-zle">blokuje MM — brak wolnego stanu</span>}
+            </td>
           </tr>)}
         </tbody>
       </table>
