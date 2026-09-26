@@ -48,7 +48,10 @@ export function KartaKolektorow() {
           {k.wezwanie
             ? <Przycisk disabled={szukanie.isPending}
                 onClick={() => szukanie.mutate({ deviceId: k.deviceId, ruch: "odwolaj" })}>Przestań</Przycisk>
-            : <Przycisk wariant="glowny" disabled={szukanie.isPending || !k.zalogowany}
+            /* Zadzwoń jest DRUGORZĘDNY (@wydanie): główny przycisk w każdym
+               wierszu to dziesięć głównych akcji naraz, a po ten sięga się
+               raz na tydzień, gdy kolektor zginie. */
+            : <Przycisk disabled={szukanie.isPending || !k.zalogowany}
                 aria-label={`Zadzwoń na kolektor ${k.etykieta}`}
                 onClick={() => szukanie.mutate({ deviceId: k.deviceId, ruch: "wezwij" })}>Zadzwoń</Przycisk>}
         </Td>
