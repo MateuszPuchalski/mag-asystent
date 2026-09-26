@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.519.0 — 26 września 2026
+
+**Karty miar obsługi mówią mniej naraz.** Sześć kart w Analizie → Obsługa klienta stoi teraz we wspólnej ramie wglądu. Pokrycie wiedzy pokazuje jeden rząd liczb, a resztę pod „Szczegóły”. Tam też zwinęły się decyzje i szkice Copilota oraz tabela doboru według osoby. Liczba czekająca na decyzję człowieka stoi przy przełączniku. Z ekranu zeszły tokeny, prefiks instrukcji, nazwa indeksu i odsyłacz „§11.2”. Karta doboru nie powtarza już okna z nagłówka analizy. Lista wpisów automatu wiedzy zostaje rozwinięta.
+
 ## 0.518.0 — 26 września 2026
 
 **Prawa kolumna zwrotu mówi każdą rzecz raz.** Sprawy, droga i wiadomości o zakupie stoją w jednej sekcji „Ten zakup u nas”, bez podwójnych nagłówków. Przebieg sprawy zwija się do zdania „Ostatnio: … · przebieg (n)”, a całość otwiera jedno kliknięcie. „Zapisz notatkę” pojawia się dopiero przy zmienionej treści. Nieodebraną paczkę nazywa sama plakietka, a wyjaśnienie stoi w jej podpowiedzi. Zlecenie hali to sam przycisk, bez nagłówka nad nim.
