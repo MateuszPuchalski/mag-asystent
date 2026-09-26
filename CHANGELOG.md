@@ -10,6 +10,16 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.514.0 — 26 września 2026
+
+**Dziennik i szuflada towaru pokazują mniej naraz.** W dzienniku towar,
+urządzenie i liczba wierszy czekają pod „Więcej filtrów”. Ustawiony filtr
+zostaje na widoku, więc tabela nie ukrywa, co pokazuje. Pole „Towar (tw_id)”
+nazywa się teraz po prostu „Towar”. Surowy szczegół wpisu otwiera się pod
+„szczegóły” w wierszu, zamiast stać w każdym. Szuflada towaru nie rysuje pustych
+list otwartych spraw. Gdy żadna sprawa nie jest otwarta, stoi jedno zdanie
+„Brak otwartych spraw”.
+
 ## 0.513.0 — 26 września 2026
 
 **Kolumna kontekstu w skrzynce mówi mniej o sobie, a tyle samo o kliencie.**

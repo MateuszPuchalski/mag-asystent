@@ -21,7 +21,7 @@ import { PrzyciskTowaru } from "../towar/Szuflada";
    FILTRY W JEDNYM RZĘDZIE NAD TABELĄ, nie w karcie: rządzą całym ekranem,
    a stojąc w środku karty wyglądały jak jeszcze jeden wiersz treści.
 
-   TRZY FILTRY POD „WIĘCEJ FILTRÓW" (@wydanie). Siedem pól naraz przytłaczało,
+   TRZY FILTRY POD „WIĘCEJ FILTRÓW" (0.514.0). Siedem pól naraz przytłaczało,
    a towar, urządzenie i liczbę wierszy ustawia się rzadko — zwykle szuka się
    po dniu, typie i osobie. Ustawiony filtr nigdy się nie chowa: pola stoją
    na widoku, dopóki któreś odbiega od domyślnego, bo schowany filtr to
@@ -78,7 +78,7 @@ export function Dziennik() {
           <option value="">wszystkie</option>
           {(agenci.data?.users ?? []).map((u) => <option key={u.userId} value={String(u.userId)}>{u.name}</option>)}
         </select></Etykieta>
-      {/* „Towar", nie „Towar (tw_id)" (@wydanie): agent nie zna nazwy kolumny
+      {/* „Towar", nie „Towar (tw_id)" (0.514.0): agent nie zna nazwy kolumny
           w bazie, a numer kartoteki widzi w kolumnie „Towar" tej samej tabeli. */}
       {widacWiecej && <>
         <Etykieta napis="Towar">
@@ -126,7 +126,7 @@ export function Dziennik() {
                 <td className="py-1.5 pr-3 tabular-nums text-slate-600">
                   {w.twId != null ? <PrzyciskTowaru twId={w.twId}>{w.twId}</PrzyciskTowaru> : "—"}</td>
                 {/* 160 znaków jak w biurze: szczegół ma podpowiedzieć, co się
-                    stało, a całość i tak jest w CSV. Zwinięte (@wydanie), bo
+                    stało, a całość i tak jest w CSV. Zwinięte (0.514.0), bo
                     surowy JSON w każdym wierszu zagłuszał czas, typ i osobę —
                     po nich się czyta dziennik, szczegół otwiera się raz na sto. */}
                 <td className="py-1.5 pr-4">{w.payload

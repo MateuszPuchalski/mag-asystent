@@ -90,7 +90,7 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
             : "Żadna oferta nie jest powiązana z tą kartoteką — sprzedaży nie znamy."}</p>
       </section>}
 
-      {/* PUSTA LISTA NIE STOI (@wydanie). Trzy nagłówki z „brak" pod każdym
+      {/* PUSTA LISTA NIE STOI (0.514.0). Trzy nagłówki z „brak" pod każdym
           to sześć linijek, które mówią jedno. Zostaje jedno zdanie, gdy nic
           nie jest otwarte, a lista pojawia się dopiero, gdy ma wiersz. */}
       {p && (p.otwarteZwroty.length + p.otwarteSprawy.length + p.otwarteRozmowy.length === 0
@@ -119,7 +119,7 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
   </aside>;
 }
 
-/** Lista otwartych spraw jednego rodzaju; pusta się nie rysuje (@wydanie). */
+/** Lista otwartych spraw jednego rodzaju; pusta się nie rysuje (0.514.0). */
 function Lista({ tytul, ikona, wiersze, onIdz }: {
   tytul: string; ikona: React.ReactNode; onIdz: () => void;
   wiersze: Array<{ klucz: string; do: string; napis: string; at: string }>;

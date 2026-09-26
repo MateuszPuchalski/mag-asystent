@@ -55,7 +55,7 @@ describe("szuflada towaru", () => {
     expect(within(s).getByRole("link", { name: /Z-7/ })).toHaveAttribute("href", "/obsluga/zwroty/7");
     expect(within(s).getByRole("link", { name: /reklamacja 12\/2026/ })).toHaveAttribute("href", "/obsluga/reklamacje/9");
     expect(await within(s).findByText(/2 potwierdzonych zastosowań/)).toBeInTheDocument();
-    /* Pusta lista się nie rysuje (@wydanie): rozmów o tym towarze nie ma,
+    /* Pusta lista się nie rysuje (0.514.0): rozmów o tym towarze nie ma,
        więc nie ma też ich nagłówka ani „brak" pod nim. */
     expect(within(s).queryByRole("region", { name: /Otwarte rozmowy/ })).toBeNull();
     expect(within(s).queryByText("brak")).toBeNull();

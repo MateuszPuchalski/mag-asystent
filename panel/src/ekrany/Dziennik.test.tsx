@@ -14,7 +14,7 @@ import type { WpisAudytu } from "../api/wglad";
    3. OSOBA z listy kont; jej brak (403) nie wywraca dziennika.
    4. CSV idzie tym samym filtrem co tabela, z sesją w nagłówku.
    5. Doba filtra jest LOKALNA — szczegół w `dziennik/rodziny.test.ts`.
-   6. Rzadkie filtry i surowy szczegół są zwinięte (@wydanie), ale ustawiony
+   6. Rzadkie filtry i surowy szczegół są zwinięte (0.514.0), ale ustawiony
       filtr nigdy się nie chowa. */
 
 const wpis = (id: number, o: Partial<WpisAudytu> = {}): WpisAudytu => ({
