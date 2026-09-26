@@ -274,7 +274,8 @@ Zdrowie pokazuje porażkę przez dobę. Dziennik przebiegu:
 
 Serwer sam klika przycisk z tej karty, przez to samo zadanie Harmonogramu.
 Karta pokazuje w jednym zdaniu, co automat zrobi i dlaczego jeszcze nie.
-Tryb ustawia klucz `AKTUALIZACJA_AUTO` w karcie konfiguracji:
+Tryb ustawia klucz `AKTUALIZACJA_AUTO` w karcie „Serwer i kopie” (Ustawienia →
+Serwer, pod kartą aktualizacji):
 
 | tryb | kiedy wgrywa | domyślny dla |
 |---|---|---|
@@ -397,15 +398,18 @@ nie jest już potrzebne (dalej działa: zmienne środowiskowe mają pierwszeńst
 nad plikiem). Inną ścieżkę wskazuje `WERTIS_ENV_FILE` i wtedy szukanie kończy
 się na niej.
 
-**Co faktycznie jest ustawione — w panelu (0.488.0).** Ustawienia → karta
-**Konfiguracja serwera**, widoczna tylko dla administratora. Pokazuje ścieżkę
+**Co faktycznie jest ustawione — w panelu (0.488.0).** Ustawienia → Serwer →
+karta **Konfiguracja serwera**, widoczna tylko dla administratora. Pokazuje ścieżkę
 wczytanego pliku i każdy klucz ze źródłem: z pliku, przykryty przez zmienną
 usługi albo domyślny. Hasła i klucze API widać wyłącznie jako „ustawione".
 
-**Zmiana z panelu (0.491.0).** Przy 25 decyzjach właściciela karta ma przycisk
+**Zmiana z panelu (0.491.0).** Przy decyzjach właściciela stoi przycisk
 **Zmień**: progi dat Allegro, terminy zwrotów, Copilot i jego limity, klucze
-Allegro i API, kopie na innym dysku. Serwer robi wtedy cztery rzeczy
-w tej kolejności:
+Allegro i API, kopie na innym dysku. Od @wydanie stoją one w grupie ustawień,
+na którą wpływają: zwroty i Copilot w „Obsłudze klienta”, magazyny
+w „Magazynie”, kopie i automat w „Serwerze”. Karta konfiguracji trzyma
+resztę: klucze instalatora i zaawansowane. Po kliknięciu „Zapisz” serwer robi
+cztery rzeczy w tej kolejności:
 
 1. sprawdza wartość według rodzaju (liczba, data ISO, wybór, tekst);
 2. próbuje wstać z nowym plikiem w osobnym procesie — konfiguracja, przy

@@ -50,7 +50,8 @@ function Ostatnia({ s }: { s: StanAktualizacji }) {
 
 /* Jedno zdanie o automacie: w jakim trybie jest i co zrobi. To samo zdanie
    kieruje taktem na serwerze, więc panel nie zgaduje. Zmiana trybu idzie
-   przez kartę konfiguracji obok — nie ma tu drugiego miejsca na tę decyzję. */
+   przez kartę „Serwer i kopie" tuż pod tą (od @wydanie klucze właściciela
+   stoją w grupie, na którą wpływają) — nie ma tu drugiego miejsca na tę decyzję. */
 const TRYB: Record<string, string> = {
   noc: "w nocy", zaraz: "gdy nikt nie pracuje", wylaczona: "wyłączona",
 };
@@ -63,8 +64,8 @@ function Automat({ a }: { a: NonNullable<StanAktualizacji["auto"]> }) {
     <b>Automatycznie:</b> {TRYB[a.tryb] ?? a.tryb}{szczegoly}. {a.powod}
     {/* Nazwa zmiennej zeszła do dymka (0.521.0) — na wierzchu mówimy, gdzie
         to zmienić, a klucz dostaje ten, kto najedzie i go szuka. */}
-    {" "}<span className="text-slate-600">Tryb zmienisz w <span title="Klucz AKTUALIZACJA_AUTO"
-      className="underline decoration-dotted">konfiguracji serwera</span> wyżej.</span>
+    {" "}<span className="text-slate-600">Tryb zmienisz niżej, w karcie <span title="Klucz AKTUALIZACJA_AUTO"
+      className="underline decoration-dotted">„Serwer i kopie”</span>.</span>
   </p>;
 }
 

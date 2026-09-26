@@ -145,17 +145,46 @@ describe("Ustawienia w panelu", () => {
     localStorage.setItem("wertis.firma", JSON.stringify({ Nazwa: "WERTIS", Nip: "123" }));
     pokaz();
     await screen.findByText("Rosa-Pol");
-    await screen.findByText("Jan Wrona");
-    await screen.findByDisplayValue("2,3");
     expect(wyslane).toEqual([]);
-    /* Karty w kolejności makiety. */
-    const tytuly = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
-    expect(tytuly).toEqual(["Dane firmy do protokołów", "Reguły strefy złotej", "Konta i sesje", "Nowy kolektor",
-      "Tagi spraw", "Logo dostawców",
-      "Konfiguracja serwera", "Aktualizacja serwera"]);
+    /* Na wejściu grupa Firma: to, co wychodzi na papier do dostawcy. */
+    expect(screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent))
+      .toEqual(["Dane firmy do protokołów", "Logo dostawców"]);
+    const grupy = within(screen.getByRole("navigation", { name: "Grupy ustawień" })).getAllByRole("button");
+    expect(grupy.map((b) => b.querySelector("span")!.textContent))
+      .toEqual(["Firma", "Magazyn", "Ludzie i urządzenia", "Obsługa klienta", "Serwer"]);
+    expect(grupy[0]).toHaveAttribute("aria-current", "page");
     /* Zdania o innych ekranach i o dawnym wydaniu zeszły (0.521.0). */
     expect(screen.queryByText(/Pomiary obsługi są w Analizie/)).toBeNull();
     expect(screen.queryByText(/0\.87\.0/)).toBeNull();
+  });
+
+  /* Pięć grup (@wydanie): przejście przez wszystkie to same odczyty, a każda
+     karta stoi w grupie, na którą wpływa — decyzje właściciela też. */
+  it("przejście przez wszystkie grupy: karty na swoich miejscach, zero zapisu", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    const nav = screen.getByRole("navigation", { name: "Grupy ustawień" });
+    const tytuly = () => screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
+    await userEvent.click(within(nav).getByRole("button", { name: /^Magazyn/ }));
+    await screen.findByDisplayValue("2,3");
+    expect(tytuly()).toEqual(["Reguły strefy złotej"]);
+    await userEvent.click(within(nav).getByRole("button", { name: /^Ludzie i urządzenia/ }));
+    await screen.findByText("Jan Wrona");
+    expect(tytuly()).toEqual(["Konta i sesje", "Nowy kolektor"]);
+    await userEvent.click(within(nav).getByRole("button", { name: /^Obsługa klienta/ }));
+    await screen.findByText("ZWROT_TERMIN_DNI");
+    expect(tytuly()).toEqual(["Tagi spraw", "Zwroty i reklamacje"]);
+    await userEvent.click(within(nav).getByRole("button", { name: /^Serwer/ }));
+    await screen.findByText("serwer-subiekta");
+    expect(tytuly()).toEqual(["Aktualizacja serwera", "Konfiguracja serwera"]);
+    expect(wyslane).toEqual([]);
+  });
+
+  it("głęboki link do strefy złotej otwiera grupę Magazyn", async () => {
+    pokaz("/obsluga/ustawienia?karta=strefa");
+    expect(await screen.findByRole("heading", { name: "Reguły strefy złotej" })).toBeInTheDocument();
+    expect(within(screen.getByRole("navigation", { name: "Grupy ustawień" }))
+      .getByRole("button", { name: /^Magazyn/ })).toHaveAttribute("aria-current", "page");
   });
 
   it("przeniesienie z przeglądarki: tylko przy pustym serwerze, jednym kliknięciem", async () => {
@@ -220,7 +249,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("reguły strefy: pusty komplet nie wyjeżdża, pełny idzie w całości", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=magazyn");
     await screen.findByDisplayValue("2,3");
     const k = karta("Reguły strefy złotej");
     await userEvent.click(within(k).getByRole("button", { name: "Usuń regułę 1" }));
@@ -235,27 +264,38 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("konfiguracja: ustawione na wierzchu, sekret bez wartości, literówka na czerwono", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Konfiguracja serwera"));
     expect(await within(k).findByText("serwer-subiekta")).toBeInTheDocument();
-    /* Dwa sekrety w atrapie — hasło SQL i klucz API — oba bez wartości. */
-    expect(within(k).getAllByText("ustawione")).toHaveLength(2);
+    expect(within(k).getAllByText("ustawione")).toHaveLength(1);
     expect(within(k).getByText(/ALEGRO_CLIENT_ID/)).toBeInTheDocument();
-    /* Decyzja właściciela widać zawsze, domyślne pokrętło dopiero po przełączniku. */
-    expect(within(k).getByText("ZWROT_TERMIN_DNI")).toBeInTheDocument();
+    /* Klucz instalatora bez przycisku — serwer by odmówił. */
+    const wiersz = within(k).getByText("MSSQL_SERVER").closest("tr") as HTMLElement;
+    expect(within(wiersz).queryByRole("button", { name: "Zmień" })).toBeNull();
+    /* Decyzje właściciela mieszkają w swoich grupach, nie tutaj. */
+    expect(within(k).queryByText("ZWROT_TERMIN_DNI")).toBeNull();
+    /* Domyślne pokrętło dopiero po przełączniku. */
     expect(within(k).queryByText("MSSQL_SYNC_MS")).toBeNull();
-    await userEvent.click(within(k).getByRole("button", { name: /Wszystkie \(5\)/ }));
+    await userEvent.click(within(k).getByRole("button", { name: /Wszystkie \(3\)/ }));
     expect(within(k).getByText("MSSQL_SYNC_MS")).toBeInTheDocument();
     expect(wyslane).toEqual([]);
   });
 
-  it("zmiana ustawienia: jeden klucz w jednym żądaniu, tylko tam, gdzie wolno", async () => {
-    pokaz();
-    const k = await waitFor(() => karta("Konfiguracja serwera"));
-    await within(k).findByText("serwer-subiekta");
-    /* Klucz instalatora nie ma przycisku — serwer by odmówił. */
+  it("decyzje właściciela stoją w grupie, na którą wpływają — zwroty przy obsłudze", async () => {
+    pokaz("/obsluga/ustawienia?grupa=obsluga");
+    const k = await waitFor(() => karta("Zwroty i reklamacje"));
+    expect(await within(k).findByText("ZWROT_TERMIN_DNI")).toBeInTheDocument();
+    /* Klucz właściciela z wartością domyślną widać zawsze, sekret bez wartości. */
+    expect(within(k).getAllByText("ustawione")).toHaveLength(1);
+    expect(within(k).queryByText("MSSQL_SERVER")).toBeNull();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("zmiana ustawienia: jeden klucz w jednym żądaniu", async () => {
+    pokaz("/obsluga/ustawienia?grupa=obsluga");
+    const k = await waitFor(() => karta("Zwroty i reklamacje"));
+    await within(k).findByText("ZWROT_TERMIN_DNI");
     const wiersz = (klucz: string) => within(k).getByText(klucz).closest("tr") as HTMLElement;
-    expect(within(wiersz("MSSQL_SERVER")).queryByRole("button", { name: "Zmień" })).toBeNull();
     await userEvent.click(within(wiersz("ZWROT_TERMIN_DNI")).getByRole("button", { name: "Zmień" }));
     expect(wyslane).toEqual([]);
     await userEvent.type(within(k).getByLabelText("ZWROT_TERMIN_DNI"), "10");
@@ -268,9 +308,9 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("sekret: pole puste na start, pustego nie zapisze", async () => {
-    pokaz();
-    const k = await waitFor(() => karta("Konfiguracja serwera"));
-    await within(k).findByText("serwer-subiekta");
+    pokaz("/obsluga/ustawienia?grupa=obsluga");
+    const k = await waitFor(() => karta("Zwroty i reklamacje"));
+    await within(k).findByText("ANTHROPIC_API_KEY");
     const wiersz = within(k).getByText("ANTHROPIC_API_KEY").closest("tr") as HTMLElement;
     await userEvent.click(within(wiersz).getByRole("button", { name: "Zmień" }));
     const pole = within(wiersz).getByLabelText("ANTHROPIC_API_KEY") as HTMLInputElement;
@@ -280,7 +320,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("aktualizacja: zmiany przed decyzją, bez hasła i odhaczenia nie ruszy", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Aktualizacja serwera"));
     expect(await within(k).findByText("Nowy port kolektora.")).toBeInTheDocument();
     expect(within(k).getByText("Poprawka zwrotów.")).toBeInTheDocument();
@@ -298,7 +338,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("aktualizacja do starszego wydania: zmiany ucięte, odhaczenie niepotrzebne", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Aktualizacja serwera"));
     await userEvent.selectOptions(await within(k).findByLabelText("Wersja docelowa"), "0.493.0");
     expect(within(k).queryByText("Nowy port kolektora.")).toBeNull();
@@ -308,7 +348,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("nowy kolektor: kod do APK z adresu serwera, nie z paska przeglądarki", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=ludzie");
     const k = await waitFor(() => karta("Nowy kolektor"));
     /* Kod stoi za „Pokaż kod" (0.521.0); adres jest na wierzchu od razu. */
     await userEvent.click(await within(k).findByRole("button", { name: /Pokaż kod/ }));
@@ -322,7 +362,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("nowy kolektor: kod schowany przy otwarciu, adres widać bez klikania", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=ludzie");
     const k = await waitFor(() => karta("Nowy kolektor"));
     expect(await within(k).findByText("http://192.168.1.49:3001")).toBeInTheDocument();
     expect(within(k).queryByRole("img")).toBeNull();
@@ -333,7 +373,7 @@ describe("Ustawienia w panelu", () => {
 
   it("nowy kolektor bez APK na serwerze: zdanie zamiast kodu", async () => {
     KOLEKTOR = { adresy: ["192.168.1.49"], port: 3001, apk: null };
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=ludzie");
     const k = await waitFor(() => karta("Nowy kolektor"));
     expect(await within(k).findByText(/nie ma jeszcze APK/)).toBeInTheDocument();
     expect(within(k).queryByRole("img")).toBeNull();
@@ -342,20 +382,20 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("automat: tryb, okno i zdanie serwera, bez żadnego zapisu", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Aktualizacja serwera"));
     const linia = (await within(k).findByText(/Automatycznie:/)).closest("p") as HTMLElement;
     expect(linia.textContent).toMatch(/w nocy 3:00–5:00, wydanie starsze niż 6 h\./);
     expect(linia.textContent).toMatch(/0\.494\.0 wymaga działania/);
     /* Nazwa zmiennej nie stoi w zdaniu (0.521.0) — tylko w dymku. */
     expect(linia.textContent).not.toMatch(/AKTUALIZACJA_AUTO/);
-    expect(within(linia).getByTitle("Klucz AKTUALIZACJA_AUTO")).toHaveTextContent("konfiguracji serwera");
+    expect(within(linia).getByTitle("Klucz AKTUALIZACJA_AUTO")).toHaveTextContent("„Serwer i kopie”");
     expect(wyslane).toEqual([]);
   });
 
   it("nieudana aktualizacja: dziennik po ludzku, ścieżka pliku w dymku", async () => {
     AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, ostatnia: { ...AKTUALIZACJA_WZOR.ostatnia, etap: "blad" } };
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Aktualizacja serwera"));
     const linia = (await within(k).findByText(/Ostatnia aktualizacja/)).closest("p") as HTMLElement;
     expect(linia.textContent).toMatch(/serwer wrócił do poprzedniej wersji/);
@@ -365,7 +405,7 @@ describe("Ustawienia w panelu", () => {
 
   it("automat w trybie domyślnym: bez okna nocnego, z wiekiem wydania", async () => {
     AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, auto: { ...AKTUALIZACJA_WZOR.auto, tryb: "zaraz", dojrzaloscGodz: 1 } };
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Aktualizacja serwera"));
     const linia = (await within(k).findByText(/Automatycznie:/)).closest("p") as HTMLElement;
     expect(linia.textContent).toMatch(/gdy nikt nie pracuje, wydanie starsze niż 1 h\./);
@@ -373,7 +413,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("sprawdź teraz: POST bez ciała i bez typu treści", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Aktualizacja serwera"));
     await within(k).findByText("Poprawka zwrotów.");
     await userEvent.click(within(k).getByRole("button", { name: /Sprawdź teraz/ }));
@@ -383,7 +423,7 @@ describe("Ustawienia w panelu", () => {
 
   it("blokada serwera: zdanie zamiast działającego przycisku", async () => {
     AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, blokada: "Aktualizacja z panelu działa na serwerze uruchomionym jako usługa Windows." };
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Aktualizacja serwera"));
     expect(await within(k).findByText(/jako usługa Windows/)).toBeInTheDocument();
     await userEvent.type(within(k).getByLabelText("Twoje hasło"), "tajne");
@@ -397,7 +437,7 @@ describe("Ustawienia w panelu", () => {
     AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, ostatnia: {
       etap: "trwa", wersja: "0.503.0", kto: "Administrator", od: new Date(Date.now() - 75_000).toISOString(),
       postep: { krok: 3, z: 4, nazwa: "Zamiana wersji, serwer na chwilę wyłączony", at: new Date().toISOString() } } };
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Aktualizacja serwera"));
     const pasek = await within(k).findByRole("progressbar", { name: "Postęp aktualizacji" });
     expect(pasek).toHaveAttribute("aria-valuenow", "3");
@@ -411,7 +451,7 @@ describe("Ustawienia w panelu", () => {
   it("aktualizacja w toku bez kroku od instalatora: przygotowanie, pasek pusty", async () => {
     AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, ostatnia: {
       etap: "trwa", wersja: "0.503.0", od: new Date().toISOString() } };
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Aktualizacja serwera"));
     const pasek = await within(k).findByRole("progressbar", { name: "Postęp aktualizacji" });
     expect(pasek).toHaveAttribute("aria-valuenow", "0");
@@ -420,7 +460,7 @@ describe("Ustawienia w panelu", () => {
 
   it("najnowsza wersja: bez formularza", async () => {
     AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, wydania: [], zmiany: [] };
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Aktualizacja serwera"));
     expect(await within(k).findByText("To najnowsza wersja.")).toBeInTheDocument();
     expect(within(k).queryByLabelText("Twoje hasło")).toBeNull();
@@ -428,7 +468,7 @@ describe("Ustawienia w panelu", () => {
 
   it("przed pierwszym sprawdzeniem nie twierdzi, że to najnowsza wersja", async () => {
     AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, sprawdzono: null, wydania: [], zmiany: [] };
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=serwer");
     const k = await waitFor(() => karta("Aktualizacja serwera"));
     expect(await within(k).findByText(/jeszcze nie sprawdzał wydań/)).toBeInTheDocument();
     expect(within(k).queryByText("To najnowsza wersja.")).toBeNull();
@@ -436,9 +476,17 @@ describe("Ustawienia w panelu", () => {
 
   it("biuro nie widzi konfiguracji i nawet o nią nie pyta", async () => {
     rola = "biuro";
-    pokaz();
+    /* Adres z grupą Serwer, której biuro nie ma — ekran wraca na Firmę. */
+    pokaz("/obsluga/ustawienia?grupa=serwer");
+    await screen.findByText("Rosa-Pol");
+    const nav = screen.getByRole("navigation", { name: "Grupy ustawień" });
+    expect(within(nav).queryByRole("button", { name: /^Serwer/ })).toBeNull();
+    await userEvent.click(within(nav).getByRole("button", { name: /^Obsługa klienta/ }));
+    await screen.findByText("u producenta / u dostawcy");
+    await userEvent.click(within(nav).getByRole("button", { name: /^Ludzie i urządzenia/ }));
     await screen.findByText("Jan Wrona");
     expect(screen.queryByRole("heading", { name: "Konfiguracja serwera" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Zwroty i reklamacje" })).toBeNull();
     expect(odczyty).not.toContain("/api/biuro/konfiguracja");
     expect(screen.queryByRole("heading", { name: "Aktualizacja serwera" })).toBeNull();
     expect(odczyty).not.toContain("/api/biuro/aktualizacja");
@@ -446,7 +494,7 @@ describe("Ustawienia w panelu", () => {
 
   it("biuro widzi konta bez przycisków, które serwer by odrzucił — zostaje tylko dodanie osoby", async () => {
     rola = "biuro";
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=ludzie");
     await screen.findByText("Jan Wrona");
     const k = karta("Konta i sesje");
     /* Biuro zakłada magazynierów (0.490.0); reset, wyłączenie i sesje są
@@ -457,7 +505,7 @@ describe("Ustawienia w panelu", () => {
 
   it("biuro zakłada wyłącznie magazyniera — innej roli formularz nie proponuje", async () => {
     rola = "biuro";
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=ludzie");
     await screen.findByText("Jan Wrona");
     await userEvent.click(within(karta("Konta i sesje")).getByRole("button", { name: "Dodaj osobę" }));
     const f = screen.getByRole("form", { name: "Nowa osoba" });
@@ -465,7 +513,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("admin zakłada konto: pełne dane w jednym żądaniu, hasła nie pokazuje", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=ludzie");
     await screen.findByText("Jan Wrona");
     await userEvent.click(within(karta("Konta i sesje")).getByRole("button", { name: "Dodaj osobę" }));
     const f = screen.getByRole("form", { name: "Nowa osoba" });
@@ -487,7 +535,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("admin: czynności konta za „⋯”, Escape zamyka bez zapisu", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=ludzie");
     await screen.findByText("Jan Wrona");
     const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
     /* Wiersz na wierzchu niesie jeden przycisk, nie trzy (0.521.0). */
@@ -504,7 +552,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("admin: reset hasła w polu hasła, minimum 8 znaków", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=ludzie");
     await screen.findByText("Jan Wrona");
     const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
     await userEvent.click(within(wiersz).getByRole("button", { name: "Czynności konta Jan Wrona" }));
@@ -520,7 +568,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("admin: wyloguj wszędzie pyta, a potem idzie BEZ ciała i bez typu treści", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=ludzie");
     await screen.findByText("Jan Wrona");
     const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
     await userEvent.click(within(wiersz).getByRole("button", { name: "Czynności konta Jan Wrona" }));
@@ -536,7 +584,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("admin: wyłączenie konta za potwierdzeniem", async () => {
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=ludzie");
     await screen.findByText("Jan Wrona");
     const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
     await userEvent.click(within(wiersz).getByRole("button", { name: "Czynności konta Jan Wrona" }));
@@ -567,7 +615,7 @@ describe("Ustawienia w panelu", () => {
   it("słownik tagów pokazuje WYŁĄCZONE, mówi, że kasowania nie ma, i pokazuje sufit", async () => {
     /* Skasowany tag zniknąłby po cichu ze spraw historycznych, a odmowa przy
        dwudziestym pierwszym tagu byłaby ścianą w połowie czynności. */
-    pokaz();
+    pokaz("/obsluga/ustawienia?grupa=obsluga");
     await screen.findByText("stary tag");
     /* Karta tej samej rangi co sąsiednie (0.521.0): nagłówek i przyciski. */
     expect(karta("Tagi spraw")).toBeInTheDocument();
