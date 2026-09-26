@@ -77,7 +77,7 @@ export function OknoSzukania({ onZamknij }: { onZamknij: () => void }) {
 
   return <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[12vh]"
     onClick={onZamknij}>
-    {/* `text-slate-900` jawnie (@wydanie): okno rysuje się wewnątrz nagłówka
+    {/* `text-slate-900` jawnie (0.515.0): okno rysuje się wewnątrz nagłówka
         z `text-white`, więc wpisana fraza dziedziczyła biel na białym polu
         i agent nie widział, co pisze. Zmierzone w przeglądarce. */}
     <div role="dialog" aria-label="Szukaj wszędzie" onClick={(e) => e.stopPropagation()} onKeyDown={naKlawisz}

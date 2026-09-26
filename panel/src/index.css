@@ -15,7 +15,7 @@
   button, input, textarea, select { @apply font-sans; }
 }
 @layer components {
-  /* Gołe `.btn` zeszło (@wydanie): żaden ekran go nie używał, a martwa klasa
+  /* Gołe `.btn` zeszło (0.515.0): żaden ekran go nie używał, a martwa klasa
      obok dwóch żywych podsuwa trzecią drogę do przycisku zamiast `Przycisk`. */
   .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-lg bg-wertis-amber px-4 py-2 text-sm font-bold text-wertis-ink transition hover:bg-amber-500 disabled:opacity-50; }
   .btn-secondary { @apply inline-flex items-center justify-center gap-2 rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-bold transition hover:bg-slate-50; }

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Keyboard, Search, X } from "lucide-react";
 import { OknoSzukania } from "./Szukaj";
-/* „Czy klawisz padł w polu" pyta jeden strażnik (@wydanie): własna kopia
+/* „Czy klawisz padł w polu" pyta jeden strażnik (0.515.0): własna kopia
    w tym pliku była tą samą funkcją pod inną nazwą. */
 import { polePisania } from "./fokus";
 import { Klawisz } from "./Klawisz";
@@ -45,7 +45,7 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["Ctrl Shift Enter", "wyślij i zakończ"],
     ["Z", "zakończ / otwórz rozmowę"],
     /* Opis idzie za napisem przycisku, który od 0.500.0 mówi „Wstaw do
-       odpowiedzi" (@wydanie): stary opis obiecywał poprawianie. */
+       odpowiedzi" (0.515.0): stary opis obiecywał poprawianie. */
     ["E", "wstaw szkic do odpowiedzi"],
     ["R", "odrzuć szkic Copilota"],
   ] },
@@ -84,7 +84,7 @@ export function ListaSkrotow({ onZamknij }: { onZamknij: () => void }) {
   }, [onZamknij]);
   return <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[10vh]"
     onClick={onZamknij}>
-    {/* `text-slate-900` jawnie (@wydanie): okno rysuje się wewnątrz nagłówka,
+    {/* `text-slate-900` jawnie (0.515.0): okno rysuje się wewnątrz nagłówka,
         który ma `text-white`. Tytuł i ikona dziedziczyły biel na białym tle
         i nie było ich widać — zmierzone w przeglądarce przy uproszczeniu. */}
     <div role="dialog" aria-label="Skróty klawiszowe" onClick={(e) => e.stopPropagation()}

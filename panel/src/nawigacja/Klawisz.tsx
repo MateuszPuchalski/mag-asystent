@@ -1,6 +1,6 @@
 import React from "react";
 
-/* ── JEDEN ZNACZEK KLAWISZA W PANELU (@wydanie) ───────────────────────────────
+/* ── JEDEN ZNACZEK KLAWISZA W PANELU (0.515.0) ───────────────────────────────
    Ta sama kopia stała w `nawigacja/Klawisze.tsx` i w `sprawy/Skroty.tsx`.
    Lista pod `?` i pomoc kolejki pokazują te same klawisze, więc mają wyglądać
    identycznie, a dwie kopie rozjeżdżają się przy pierwszej poprawce jednej.

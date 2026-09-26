@@ -25,7 +25,7 @@ function czytaj(): string | null {
 }
 
 export function PasekZmian({ zmiany, onZamknij }: { zmiany: WydanieZmian[]; onZamknij: () => void }) {
-  /* JEDNO WYDANIE NARAZ, reszta za „+N" (@wydanie). Po tygodniu nieobecności
+  /* JEDNO WYDANIE NARAZ, reszta za „+N" (0.515.0). Po tygodniu nieobecności
      pasek wyrastał na trzy wiersze nagłówków nad pracą, a agent czyta
      najnowsze albo nic. Starsze zostają o jedno kliknięcie. */
   const [wszystkie, setWszystkie] = useState(false);

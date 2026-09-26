@@ -23,7 +23,7 @@ describe("pasek „Nowe w panelu”", () => {
     const zapis = vi.spyOn(Storage.prototype, "setItem");
     render(<CoNowego />);
     expect(screen.getByText(/Cofnij po zakończeniu · Znaczki klawiszy/)).toBeInTheDocument();
-    /* Jeden wiersz naraz (@wydanie): starsze wydanie czeka za „+1". */
+    /* Jeden wiersz naraz (0.515.0): starsze wydanie czeka za „+1". */
     expect(screen.queryByText(/Soczewki pytań/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /^\+1/ }));
     expect(screen.getByText(/Soczewki pytań/)).toBeInTheDocument();

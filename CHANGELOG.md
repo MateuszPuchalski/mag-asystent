@@ -10,6 +10,16 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.515.0 — 26 września 2026
+
+**Spokojniejszy nagłówek i pasek „Nowe w panelu”.** Obok logo nie stoi już
+podpis „Biuro”, który niczego nie mówił. Pasek „Nowe w panelu” pokazuje
+najnowsze wydanie w jednym wierszu. Starsze czekają za „+N”, jedno kliknięcie
+dalej. Lista skrótów pod `?` opisuje klawisz E jak przycisk: „wstaw szkic do
+odpowiedzi”. Okno szukania pokazuje wreszcie wpisywaną frazę, a lista skrótów
+swój tytuł. Oba dziedziczyły biały tekst nagłówka. Plakietki liczników
+i znaczek klawisza mają jedną kopię w kodzie, a nieużywana klasa `.btn` zeszła.
+
 ## 0.514.0 — 26 września 2026
 
 **Dziennik i szuflada towaru pokazują mniej naraz.** W dzienniku towar,

@@ -94,7 +94,7 @@ describe("lista skrótów pod ?", () => {
 });
 
 describe("opis skrótu idzie za napisem przycisku", () => {
-  it("E w skrzynce opisuje „Wstaw do odpowiedzi”, nie dawne „popraw” (@wydanie)", () => {
+  it("E w skrzynce opisuje „Wstaw do odpowiedzi”, nie dawne „popraw” (0.515.0)", () => {
     /* Przycisk pod E od 0.500.0 nazywa skutek, a lista pod `?` dalej
        obiecywała poprawianie. Czytamy napis ze źródła karty, żeby kolejna
        zmiana napisu bez zmiany opisu wywróciła ten test. */

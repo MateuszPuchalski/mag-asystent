@@ -6,7 +6,7 @@ import zrodloSkrotow from "../sprawy/Skroty.tsx?raw";
 import zrodloKlawiszy from "./Klawisze.tsx?raw";
 import zrodloSzukania from "./Szukaj.tsx?raw";
 
-/* ── Powłoka bez powtórzeń (@wydanie) ────────────────────────────────────────
+/* ── Powłoka bez powtórzeń (0.515.0) ────────────────────────────────────────
    Pilnujemy uproszczeń nagłówka i klawiszy: podpis „Biuro" nie wraca,
    plakietka licznika ma jedną kopię, a znaczek klawisza i strażnik pola
    pisania mieszkają w jednym miejscu. */

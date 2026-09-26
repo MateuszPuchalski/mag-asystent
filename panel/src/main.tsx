@@ -108,7 +108,7 @@ function DrugiRzad() {
    wie tylko własny ekran, dociera wtedy, gdy ktoś na niego wejdzie — czyli
    dokładnie wtedy, gdy nie jest już potrzebna.
 
-   JEDNA PLAKIETKA NA DWA LICZNIKI (@wydanie). Wiedza i „Do zrobienia" miały
+   JEDNA PLAKIETKA NA DWA LICZNIKI (0.515.0). Wiedza i „Do zrobienia" miały
    dwie kopie tego samego znacznika; druga kopia rozjeżdża się z pierwszą
    przy pierwszej poprawce koloru. Liczniki różnią się tylko źródłem liczby. */
 function Licznik({ liczba, opis }: { liczba: number; opis: string }) {
@@ -169,7 +169,7 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
      rząd zabiera kilkadziesiąt pikseli wysokości, brak wylogowania zabiera
      całą funkcję.
 
-     PODPIS „BIURO" ZESZEDŁ (@wydanie). Stał obok logo i nie mówił nic, czego
+     PODPIS „BIURO" ZESZEDŁ (0.515.0). Stał obok logo i nie mówił nic, czego
      agent by nie wiedział — panel jest wyłącznie biurowy. Jego rolę odstępu
      przejęło `mr-auto` na tabliczce logo: szukanie i zakładki dalej stoją
      z prawej. */
