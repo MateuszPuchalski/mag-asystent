@@ -9,7 +9,7 @@ import { Liczba } from "./PokrycieSygnatur";
    człowieka, czy indeks pełnotekstowy w ogóle stoi. Wzorzec karty sygnatur:
    liczby, nie procent, i lista roboty zamiast ozdoby.
 
-   SIEDEMNAŚCIE KAFELKÓW TO ZA DUŻO NA JEDNO SPOJRZENIE (@wydanie). Na
+   SIEDEMNAŚCIE KAFELKÓW TO ZA DUŻO NA JEDNO SPOJRZENIE (0.519.0). Na
    wierzchu został pierwszy rząd — ile wiedzy mamy. Kolejka, tokeny silników,
    wymiary i stan indeksu zwinęły się pod „Szczegóły", bo czyta się je
    rzadko, a lista roboty mieszka w Wiedzy. Liczba czekająca na człowieka
@@ -44,7 +44,7 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
 
     {/* Brak pełnego tekstu to awaria, nie szczegół — zostaje na wierzchu.
         Przyczyna techniczna (SQLite zbudowany bez FTS5) zeszła z ekranu
-        (@wydanie): agent nic z nią nie zrobi, a administrator zna ją
+        (0.519.0): agent nic z nią nie zrobi, a administrator zna ją
         z dziennika serwera. */}
     {!dane.fts.dostepne && <p className="mt-4 border-t pt-4 text-sm font-bold text-ranga-zle">
       Wyszukiwanie pełnym tekstem nie działa — dobór go teraz pomija.</p>}
@@ -80,7 +80,7 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
         <Liczba etykieta="wymiarów" ile={dane.wymiary.wymiarow} />
       </Rzad>
 
-      {/* Nazwa indeksu (FTS5) zeszła z ekranu (@wydanie) — agentowi mówi
+      {/* Nazwa indeksu (FTS5) zeszła z ekranu (0.519.0) — agentowi mówi
           tyle, ile „działa" i liczba kartotek. */}
       {dane.fts.dostepne && <p className="mt-4 border-t pt-4 text-slate-600">
         Wyszukiwanie pełnym tekstem obejmuje <b>{dane.fts.wpisow}</b> kartotek.</p>}

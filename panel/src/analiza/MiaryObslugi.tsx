@@ -32,7 +32,7 @@ export function MiaryObslugi({ dni }: { dni: number }) {
   /* Dobór liczy się z OKNA ZAKRESU — tego samego, które rządzi czasem
      odpowiedzi nad nim. Dwa selektory okna na jednym ekranie to dwie
      decyzje o tym samym (dekalog pkt 5). Samej karcie okna już nie
-     podajemy (@wydanie): powtarzała je w nagłówku, dwa wiersze pod
+     podajemy (0.519.0): powtarzała je w nagłówku, dwa wiersze pod
      selektorem zakresu. */
   const skutecznosc = useSkutecznoscDoboru(dni);
   const eskalacja = useEskalacja();

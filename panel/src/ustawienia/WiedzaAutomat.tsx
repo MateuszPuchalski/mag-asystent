@@ -25,14 +25,14 @@ import type { WpisAutomatu } from "../api/typy";
 export function WiedzaAutomat({ wpisy }: { wpisy: WpisAutomatu[] | undefined }) {
   if (!wpisy) return null;
 
-  /* Rama wspólna z resztą analizy (@wydanie); ikona robota zeszła razem
+  /* Rama wspólna z resztą analizy (0.519.0); ikona robota zeszła razem
      z własnym nagłówkiem, bo żadna inna karta wglądu ikony nie ma. Karta
      zostaje ROZWINIĘTA — patrz decyzja właściciela wyżej: automat
      zatwierdza tylko dlatego, że ta lista jest widoczna. */
   return <KartaWgladu tytul="Co automat dopisał do wiedzy"
     opis="Wpisy zatwierdzone bez człowieka. Sprawdź je i cofnij błędne — cofa się przy wpisie w Wiedzy.">
     {wpisy.length === 0
-      /* Zdanie skrócone (@wydanie) do samych przyczyn pustki — dalej nie
+      /* Zdanie skrócone (0.519.0) do samych przyczyn pustki — dalej nie
          udaje sukcesu, tylko mówi krócej. */
       ? <p className="text-sm text-slate-700">
           Automat nic nie dopisał. Kolejka mogła być pusta albo automat jest wyłączony.

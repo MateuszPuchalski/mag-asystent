@@ -20,7 +20,7 @@ import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 const udzial = (m: MiesiacEskalacji) =>
   m.zRozmowa === 0 ? null : Math.round((m.eskalowane / m.zRozmowa) * 100);
 
-/* Rama i tabela wspólne z resztą analizy (@wydanie): karta budowała własny
+/* Rama i tabela wspólne z resztą analizy (0.519.0): karta budowała własny
    nagłówek z ikoną i własną tabelę, a obok stoi pięć kart w innym kształcie.
    Pusta lista mówi zdaniem przez `Tabela`, jak wszędzie w analizie. */
 export function Eskalacja({ miesiace }: { miesiace: MiesiacEskalacji[] | undefined }) {

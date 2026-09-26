@@ -48,7 +48,7 @@ export function PokrycieSygnatur({ dane }: { dane: Pokrycie | undefined }) {
   if (!dane) return null;
   const zSygnatura = dane.pozycji - dane.bezSygnatury;
 
-  /* Rama wspólna z resztą analizy (@wydanie): sześć kart „Obsługa klienta"
+  /* Rama wspólna z resztą analizy (0.519.0): sześć kart „Obsługa klienta"
      budowało własną, każda trochę inną, i ekran czytał się jak sześć
      aplikacji. Podpis „pozycje pobranych zamówień" przeszedł do opisu. */
   return <KartaWgladu tytul="Sygnatura → kartoteka Subiekta"

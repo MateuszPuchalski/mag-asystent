@@ -32,12 +32,12 @@ import { NAZWA_DROGI } from "../skrzynka/statusy";
    najlepszego do najgorszego: „najczęstsza droga" mówi, JAK ktoś pracuje,
    czyli komu warto pokazać bazę wiedzy.                                     */
 
-/* SELEKTOR OKNA ZESZEDŁ (@wydanie). Od 0.444.0 był opcjonalny, a jedyny
+/* SELEKTOR OKNA ZESZEDŁ (0.519.0). Od 0.444.0 był opcjonalny, a jedyny
    odbiorca — analiza — go nie podawał: karta stoi pod nagłówkiem z oknem
    7/30/90 dla całego zakresu. Z tego samego powodu zeszło „okno N dni"
    w nagłówku karty — ten sam fakt drugi raz, dwa wiersze niżej.
 
-   RAMA I TABELE WSPÓLNE z resztą analizy (@wydanie), a tabela osób zwinięta
+   RAMA I TABELE WSPÓLNE z resztą analizy (0.519.0), a tabela osób zwinięta
    pod „Szczegóły": czyta się ją rzadko, a otwarta była połową karty.
    Podstawa prawna jedzie z nią — stoi POD tabelą, tam gdzie monitoring. */
 export function SkutecznoscDoboru({ dane }: { dane: Raport | undefined }) {
@@ -60,7 +60,7 @@ export function SkutecznoscDoboru({ dane }: { dane: Raport | undefined }) {
 
     <div className="mt-4 border-t pt-4">
       {/* Nagłówek „szczebel §11.2" był odsyłaczem do dokumentu, nie do
-          pracy agenta (@wydanie) — kolumna mówi „droga", jak nazwy w niej. */}
+          pracy agenta (0.519.0) — kolumna mówi „droga", jak nazwy w niej. */}
       <Tabela naglowki={["droga", "wybrany", "z tego zatwierdzony"]} pusto="">
         {dane.drogi.map((d) => <tr key={d.droga}>
           <Td>{NAZWA_DROGI[d.droga]}</Td>
@@ -73,7 +73,7 @@ export function SkutecznoscDoboru({ dane }: { dane: Raport | undefined }) {
         </tr>)}
       </Tabela>
       {/* Zero jako ZDANIE, nie jako brak wiersza — patrz nagłówek pliku.
-          Dopisek „to szczeble, które utrzymujemy w kodzie" zszedł (@wydanie):
+          Dopisek „to szczeble, które utrzymujemy w kodzie" zszedł (0.519.0):
           to wniosek dla programisty, agentowi wystarczy sama lista. */}
       {zeroDrog.length > 0 && <p className="mt-2 text-xs text-slate-500">
         Bez ani jednego wyboru w tym oknie: <b>{zeroDrog.map((d) => NAZWA_DROGI[d.droga]).join(", ")}</b>.

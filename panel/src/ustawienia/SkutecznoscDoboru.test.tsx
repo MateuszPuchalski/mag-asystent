@@ -76,7 +76,7 @@ describe("skuteczność doboru", () => {
           najczestszaDroga: "wyszukiwarka", medianaMin: null },
       ],
     })} />);
-    /* Tabela osób jest zwinięta (@wydanie), a podstawa prawna jedzie razem
+    /* Tabela osób jest zwinięta (0.519.0), a podstawa prawna jedzie razem
        z nią — POD tabelą, nie osobno nad zwiniętym blokiem. */
     const szczegoly = screen.getByText("Szczegóły").closest("details")!;
     expect(szczegoly.open).toBe(false);
@@ -91,7 +91,7 @@ describe("skuteczność doboru", () => {
   });
 
   it("nie ma własnego okna — okno podaje nagłówek analizy, raz", () => {
-    /* Selektor i „okno N dni" zeszły (@wydanie): ten sam fakt stał dwa
+    /* Selektor i „okno N dni" zeszły (0.519.0): ten sam fakt stał dwa
        wiersze wyżej, w nagłówku zakresu. */
     render(<SkutecznoscDoboru dane={dane()} />);
     expect(screen.queryByRole("group", { name: "Okno raportu" })).toBeNull();

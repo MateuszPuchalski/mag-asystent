@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { PomiarCopilota } from "./PomiarCopilota";
 import type { PomiarCopilota as Pomiar } from "../api/typy";
 
-/* ── Pomiar Copilota (uproszczony @wydanie) ──────────────────────────────────
+/* ── Pomiar Copilota (uproszczony 0.519.0) ──────────────────────────────────
    Na wierzchu zostaje to, na czym zapada decyzja o modelu: wywołania,
    nieudane i rachunek. Tokeny i prefiks instrukcji to głos programisty —
    nie wracają na ekran. Objaw ciszy cache zostaje, tylko w szczegółach.    */

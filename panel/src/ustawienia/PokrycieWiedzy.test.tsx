@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { PokrycieWiedzy } from "./PokrycieWiedzy";
 import type { PokrycieWiedzy as Pokrycie } from "../api/typy";
 
-/* ── Pokrycie wiedzy (zwinięte @wydanie) ─────────────────────────────────────
+/* ── Pokrycie wiedzy (zwinięte 0.519.0) ─────────────────────────────────────
    Siedemnaście kafelków zeszło do jednego rzędu na wierzchu. Testy pilnują,
    że zwinięcie niczego nie chowa w ciszy: kolejka dla człowieka woła przy
    przełączniku, a awaria pełnego tekstu stoi na wierzchu.                   */

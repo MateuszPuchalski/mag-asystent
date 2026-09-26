@@ -44,9 +44,9 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
      spoczynku: cache nie włączył się, bo prefiks instrukcji jest krótszy niż
      minimum modelu albo coś go rozbija. */
   const cacheMilczy = dane.wywolan > 0 && dane.tokeny.cacheOdczyt === 0;
-  /* Rama wspólna z resztą analizy (@wydanie). Na wierzchu zostały trzy
+  /* Rama wspólna z resztą analizy (0.519.0). Na wierzchu zostały trzy
      rzeczy, na których zapada decyzja o modelu: wywołania, nieudane
-     i rachunek. Zeszły z ekranu (@wydanie): podpis „tokeny liczone od
+     i rachunek. Zeszły z ekranu (0.519.0): podpis „tokeny liczone od
      pierwszego wywołania", trzy kafelki tokenów i zdanie o prefiksie
      instrukcji — to głos programisty, nie agenta, a rachunek w złotych mówi
      o tokenach wszystko, co biuru potrzebne. Jedyny objaw tamtej diagnozy,
@@ -62,7 +62,7 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
       Rachunek: <b>{dane.kosztUsd.toFixed(2)} USD</b> ({zl(dane.kosztUsd)}).
     </p>
 
-    {/* Decyzje, szkice i tabela precyzji zwinięte (@wydanie): to raport
+    {/* Decyzje, szkice i tabela precyzji zwinięte (0.519.0): to raport
         czytany raz na tydzień, a otwarty zajmował pół ekranu analizy. */}
     <details className="mt-4 border-t pt-4 text-sm">
       <summary className="cursor-pointer text-slate-600">Szczegóły</summary>
@@ -119,7 +119,7 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         </p>;
       })()}
 
-      {/* Tabela wspólna z resztą analizy (@wydanie) zamiast własnej, pisanej
+      {/* Tabela wspólna z resztą analizy (0.519.0) zamiast własnej, pisanej
           wersalikami. */}
       {dane.klasyfikacja.wgKategorii.length > 0 && <div className="mt-3 border-t pt-3">
         <Tabela naglowki={["kategoria", "przewidzianych", "precyzja", "czułość"]} pusto="">
