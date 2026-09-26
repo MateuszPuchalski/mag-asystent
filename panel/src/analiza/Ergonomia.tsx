@@ -63,7 +63,7 @@ function Sekcja({ tytul, co, children }: { tytul: string; co: string; children: 
   </section>;
 }
 
-/* Zwinięte (@wydanie), bo sześć otwartych tabel naraz przytłaczało: trasy,
+/* Zwinięte (0.512.0), bo sześć otwartych tabel naraz przytłaczało: trasy,
    kody HTTP i p95 stały ścianą, zanim ktokolwiek zadał im pytanie. Otwarta
    zostaje pierwsza — „gdzie jest wolno" odpowiada na pytanie tej karty.
    Tytuł widać zawsze, a pusta sekcja mówi to w podpisie, więc nikt nie

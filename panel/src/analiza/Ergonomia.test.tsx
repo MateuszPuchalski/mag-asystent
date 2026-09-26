@@ -15,7 +15,7 @@ import ergonomiaZrodlo from "../../../server/src/services/ergonomia.ts?raw";
    3. Pusty pomiar czasu mówi zdaniem, skąd się weźmie, zamiast stać zerem.
    4. Wolne odpowiedzi powyżej jednej na dziesięć dostają czerwień.
    5. Otwarta stoi tylko pierwsza sekcja; reszta zwinięta z widocznym
-      tytułem, a pusta mówi „brak" bez rozwijania (@wydanie). */
+      tytułem, a pusta mówi „brak" bez rozwijania (0.512.0). */
 
 const E: Ergonomia = {
   days: 7, daneDo: "2026-09-23T12:00:00.000Z", progMs: 300,

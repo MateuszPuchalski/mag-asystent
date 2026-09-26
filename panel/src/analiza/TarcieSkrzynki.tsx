@@ -20,7 +20,7 @@ const procent = (u: number | null) => (u === null ? "—" : `${Math.round(u * 10
 const sekundy = (s: number | null) =>
   (s === null ? "—" : s < 120 ? `${s} s` : `${Math.floor(s / 60)} min ${s % 60} s`);
 
-/* Bez „w oknie N dni" (@wydanie): karta słucha okna zakresu, które stoi
+/* Bez „w oknie N dni" (0.512.0): karta słucha okna zakresu, które stoi
    w nagłówku Analizy. Powtórka przy liczbie była drugim źródłem tego faktu. */
 function Liczby({ l }: { l: LiczbyTarcia }) {
   return <div className="flex flex-wrap gap-8">

@@ -358,7 +358,7 @@ describe("Analiza: zakres Tydzień", () => {
   });
 });
 
-/* ── Okno podane raz (@wydanie) ──────────────────────────────────────────────
+/* ── Okno podane raz (0.512.0) ──────────────────────────────────────────────
    Nagłówek Analizy mówi „Okno N dni", a etykiety liczb powtarzały to samo
    przy każdej karcie. Pilnujemy, że powtórka nie wraca, a etykieta z INNYM
    oknem (czas na powrót klienta) zostaje. */

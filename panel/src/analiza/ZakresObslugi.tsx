@@ -81,7 +81,7 @@ function KartyPowrotow({ p }: { p: Powroty }) {
       opis={`Po naszej odpowiedzi klient nie pisał już w tej rozmowie przez ${p.oknoDni} dni. `
         + "Podziękowanie się nie liczy. Mierzy skutek, nie szybkość."}>
       <div className="flex flex-wrap gap-8">
-        {/* Bez „okno N dni" (@wydanie) — okno zakresu stoi w nagłówku Analizy.
+        {/* Bez „okno N dni" (0.512.0) — okno zakresu stoi w nagłówku Analizy.
             „Młodsze niż N dni" niżej zostaje: to INNE okno, czas na powrót klienta. */}
         <Liczba ile={procent(p.bezPowrotu, p.n)} etykieta={`z ${p.n} odpowiedzi z wynikiem`} />
         <Liczba ile={p.wrocilo} etykieta={p.wrociloBezRozpoznania
@@ -106,7 +106,7 @@ export function ZakresObslugi({ a }: { a: CzasOdpowiedzi }) {
     <KartaWgladu tytul="Czas odpowiedzi klientowi"
       opis="Od pierwszej wiadomości klienta do naszej odpowiedzi. Autoodpowiedź się nie liczy.">
       <div className="flex flex-wrap gap-8">
-        {/* Okno podaje nagłówek Analizy — tu bez powtórki (@wydanie). */}
+        {/* Okno podaje nagłówek Analizy — tu bez powtórki (0.512.0). */}
         <Liczba ile={a.ogolem.n} etykieta="odpowiedzi" />
         <Liczba ile={czasPo(a.ogolem.medianaMin)} etykieta="mediana" />
         <Liczba ile={czasPo(a.ogolem.p90Min)} etykieta="9 na 10 odpowiedzi szybciej niż" />

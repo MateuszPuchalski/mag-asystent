@@ -21,7 +21,7 @@ export function ZakresHali({ a, m }: { a: AnalizaAudytu; m: Metryki | undefined 
   return <>
     <KartaWgladu tytul="Praca hali w oknie">
       <div className="flex flex-wrap gap-8">
-        {/* Bez „w oknie N dni" (@wydanie) — okno podaje nagłówek Analizy. */}
+        {/* Bez „w oknie N dni" (0.512.0) — okno podaje nagłówek Analizy. */}
         <Liczba ile={a.dni.reduce((s, d) => s + d.pozycje, 0)} etykieta="pozycji" />
         <Liczba ile={r.dostawZamknietych} etykieta="dostaw rozłożonych" />
         <Liczba ile={r.medianaMinutDostawy != null ? `${r.medianaMinutDostawy} min` : "—"} etykieta="mediana czasu dostawy" />
@@ -55,7 +55,7 @@ export function ZakresHali({ a, m }: { a: AnalizaAudytu; m: Metryki | undefined 
           ton={m.dotknieciaNaPozycje != null && m.dotknieciaNaPozycje >= 0.3 ? "text-ranga-zle" : ""} />
         <Liczba ile={m.p95OdpowiedziMs != null ? `${m.p95OdpowiedziMs} ms` : "—"} etykieta="p95 skanu na ekranie głównym · cel < 150 ms"
           ton={m.p95OdpowiedziMs != null && m.p95OdpowiedziMs > 300 ? "text-ranga-zle" : ""} />
-        {/* Metryki słuchają tego samego okna co nagłówek, więc bez jego powtórki (@wydanie). */}
+        {/* Metryki słuchają tego samego okna co nagłówek, więc bez jego powtórki (0.512.0). */}
         <Liczba ile={m.zdarzen} etykieta="zdarzeń" />
       </div>
       <div className="mt-5 grid gap-6 xl:grid-cols-2">
@@ -115,7 +115,7 @@ export function ZakresHali({ a, m }: { a: AnalizaAudytu; m: Metryki | undefined 
         <Szukania lista={a.szukania.bezWynikow} pusto="Wszystko, czego szukano, znajdowało się." /></KartaWgladu>
     </div>
 
-    {/* Zostaje obok ergonomii (@wydanie), bo to INNE fakty, nie dubel.
+    {/* Zostaje obok ergonomii (0.512.0), bo to INNE fakty, nie dubel.
         „Odrzucone" tu to `klient_odrzucona`, a odrzucenia w ergonomii to
         `http_rejected` per trasa. Upadków i baterii ergonomia nie liczy wcale. */}
     <KartaWgladu tytul="Urządzenia" opis="Upadki, baterie i odrzucone operacje — per kolektor, nie per osoba.">
