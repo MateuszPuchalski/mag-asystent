@@ -14,7 +14,7 @@ import {
 import { Dokument, WyjatkiLuzem } from "../dostawy/Dokument";
 import { Kontekst } from "../dostawy/Kontekst";
 
-/** Kubełki do przeglądania — stoją pod „Więcej”, nie na wierzchu (@wydanie). */
+/** Kubełki do przeglądania — stoją pod „Więcej”, nie na wierzchu (0.526.0). */
 const WIECEJ_DOSTAW: ReadonlyArray<KubelekDostaw> = ["zamkniete", "poza", "archiwum"];
 
 /* ── DOSTAWY W PANELU (0.435.0) ────────────────────────────────────────────
@@ -175,7 +175,7 @@ export function Dostawy() {
         {/* Tytuł „Dostawy" zszedł (0.525.0), bo powtarzał zakładkę nawigacji,
             która stoi podświetlona nad ekranem — wiersz wraca do kolejki. */}
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          {/* „Zamknięte", „Poza WERTIS" i „Archiwum" pod „Więcej" (@wydanie):
+          {/* „Zamknięte", „Poza WERTIS" i „Archiwum" pod „Więcej" (0.526.0):
               to przeglądanie, nie praca. „Poza WERTIS" zostaje o jedno
               kliknięcie z licznikiem w opcji, bo ma wyłapać pomyłkowe
               zdjęcie dostawy. Ten sam komponent co na pozostałych kolejkach. */}

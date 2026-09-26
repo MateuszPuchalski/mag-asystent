@@ -268,7 +268,7 @@ describe("Ekran dostaw", () => {
     pokaz();
     await screen.findByRole("button", { name: /FZ 802\/MAG/ });
     expect(archiwumPytania).toEqual([]);
-    /* Od @wydanie „Archiwum" stoi pod „Więcej" — wybór z listy, nie pigułka. */
+    /* Od 0.526.0 „Archiwum" stoi pod „Więcej" — wybór z listy, nie pigułka. */
     await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"),
       screen.getByRole("option", { name: /Archiwum/ }));
     const granica = await screen.findByText(/pokazano 1 z 350 — zawęź wyszukiwaniem/);

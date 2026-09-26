@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.526.0 — 26 września 2026
+
+**Kosze i dostawy mają ten sam wybór kubełków co pozostałe kolejki.** W koszach „Rozłożone” i „Anulowane” stoją pod „Więcej”. W dostawach pod „Więcej” stoją „Zamknięte”, „Poza WERTIS” i „Archiwum”. Każdy z nich zostaje o jedno kliknięcie, z licznikiem przy nazwie.
+
 ## 0.525.1 — 26 września 2026
 
 **Klawisze kubełków w reklamacjach zgadzają się z podpowiedziami.** Cyfra 4 otwiera „Bez ruchu”, a 5 pokazuje wszystkie sprawy. Dotąd 4 przełączało na „Wszystkie”, a „Bez ruchu” nie miał klawisza.

@@ -14,7 +14,7 @@ import { KontekstKosza } from "../kosze/Kontekst";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 
-/** Kubełki „Tylko wgląd” — stoją pod „Więcej”, nie na wierzchu (@wydanie). */
+/** Kubełki „Tylko wgląd” — stoją pod „Więcej”, nie na wierzchu (0.526.0). */
 const WIECEJ_KOSZY: ReadonlyArray<KubelekKoszy> = ["rozlozone", "anulowane"];
 
 /* ── KOSZE W ZAKŁADCE ZWROTY (0.438.0) ─────────────────────────────────────
@@ -103,7 +103,7 @@ export function Kosze() {
             przełącznika tuż nad nim — dwa razy ta sama nazwa to wiersz
             zabrany kolejce i nic nowego dla oka. */}
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          {/* „Rozłożone" i „Anulowane" pod „Więcej" (@wydanie): oba to
+          {/* „Rozłożone" i „Anulowane" pod „Więcej" (0.526.0): oba to
               „Tylko wgląd", a stały pigułką równą koszom w pracy. Ten sam
               komponent co w Skrzynce, reklamacjach i dyskusjach. */}
           <FiltrZWiecej<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}

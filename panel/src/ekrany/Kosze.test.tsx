@@ -130,7 +130,7 @@ describe("Kosze w zakładce Zwroty", () => {
   });
 
   it("„Rozłożone” i „Anulowane” stoją pod „Więcej” i dalej się wybierają", async () => {
-    /* @wydanie: oba to „Tylko wgląd", więc schodzą z pigułek do listy. */
+    /* 0.526.0: oba to „Tylko wgląd", więc schodzą z pigułek do listy. */
     pokaz();
     await screen.findByRole("button", { name: /Z-14/ });
     expect(screen.queryByRole("button", { name: /^Rozłożone/ })).toBeNull();
