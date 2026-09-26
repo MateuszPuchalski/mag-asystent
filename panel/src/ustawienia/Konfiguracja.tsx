@@ -79,24 +79,84 @@ function Edytor({ w, onGotowe, onZamknij }: {
   </form>;
 }
 
+/* ── Gdzie mieszkają klucze właściciela (@wydanie) ──────────────────────
+   Ustawienia są pogrupowane według tego, na co wpływają, a nie gdzie je
+   zapisuje serwer. Termin zwrotu stoi przy zwrotach, a nie w konfiguracji
+   serwera pod nazwą `ZWROT_TERMIN_DNI` — szukało się go tam, gdzie się
+   o nim myśli, i nie znajdowało.
+
+   Grupa rejestru bez miejsca tutaj ląduje w karcie zaawansowanej, razem
+   z kluczami instalatora. Nowy klucz właściciela nie zniknie więc po cichu:
+   najwyżej trafi na dno, dopóki ktoś nie dopisze go tutaj. */
+export const MIEJSCE_KLUCZY: Record<string, "magazyn" | "obsluga" | "serwer"> = {
+  magazyn: "magazyn", zdjecia: "magazyn",
+  zwroty: "obsluga", allegro: "obsluga", copilot: "obsluga", sfera: "obsluga",
+  serwer: "serwer",
+};
+
+const wlasciciela = (w: WierszKonfiguracji) => w.kto === "wlasciciel" && w.grupa in MIEJSCE_KLUCZY;
+
+/** Tabela kluczy z „Zmień" przy każdym, który wolno zmienić z panelu. */
+function TabelaKluczy({ wiersze, onWynik }: { wiersze: WierszKonfiguracji[]; onWynik: (z: string) => void }) {
+  const [edytowany, setEdytowany] = useState<string | null>(null);
+  return <Tabela naglowki={["Klucz", "Wartość", "Skąd", "Co ustawia"]} pusto="">
+    {wiersze.map((w) => <tr key={w.klucz}>
+      <Td className="font-mono text-xs">{w.klucz}</Td>
+      <Td>{edytowany === w.klucz
+        ? <Edytor w={w} onZamknij={() => setEdytowany(null)}
+            onGotowe={(z) => { onWynik(z); setEdytowany(null); }} />
+        : <div className="flex flex-wrap items-center gap-2">{wartosc(w)}
+            {w.edycja && <Przycisk className={maly}
+              onClick={() => { setEdytowany(w.klucz); onWynik(""); }}>Zmień</Przycisk>}</div>}</Td>
+      <Td><span className={`rounded px-1.5 py-0.5 text-xs ${ZRODLO[w.zrodlo].klasa}`}>
+        {ZRODLO[w.zrodlo].etykieta}</span></Td>
+      <Td className="text-slate-600">{w.opis}</Td>
+    </tr>)}
+  </Tabela>;
+}
+
+/** Klucze właściciela z podanych grup rejestru, jedna karta na grupę —
+ *  osadzane w grupie ekranu ustawień, której dotyczą. Tylko admin, jak
+ *  cała konfiguracja (nagłówek pliku). */
+export function KluczeWlasciciela({ admin, grupy }: { admin: boolean; grupy: string[] }) {
+  const konf = useKonfiguracja(admin);
+  const [wynik, setWynik] = useState("");
+  if (!admin) return null;
+  const dane = konf.data;
+  const wiersze = (dane?.wiersze ?? []).filter(wlasciciela);
+  return <>
+    {grupy.map((g) => {
+      const wGrupie = wiersze.filter((w) => w.grupa === g);
+      if (!wGrupie.length) return null;
+      return <KartaWgladu key={g} id={`karta-klucze-${g}`} tytul={dane!.grupy[g] ?? g}
+        opis="Zmiana to jeden klucz naraz. Serwer sprawdza, czy wstanie z nowym plikiem, i restartuje się sam.">
+        {wynik && <p className="mb-3 text-sm text-ranga-ok">{wynik}</p>}
+        <TabelaKluczy wiersze={wGrupie} onWynik={setWynik} />
+      </KartaWgladu>;
+    })}
+    {konf.error && <Blad>{konf.error.message}</Blad>}
+  </>;
+}
+
+/** Zaawansowane: klucze instalatora, pokrętła i klucze właściciela z grup,
+ *  które nie mają jeszcze miejsca w ekranie. Domyślnie tylko ustawione. */
 export function Konfiguracja({ admin }: { admin: boolean }) {
   const konf = useKonfiguracja(admin);
   const [wszystkie, setWszystkie] = useState(false);
-  const [edytowany, setEdytowany] = useState<string | null>(null);
   const [wynik, setWynik] = useState("");
   if (!admin) return null;
 
   const dane = konf.data;
-  const wiersze = dane?.wiersze ?? [];
+  const zaawansowane = (dane?.wiersze ?? []).filter((w) => !wlasciciela(w));
   const grupy = Object.keys(dane?.grupy ?? {});
 
   return <KartaWgladu id="karta-konfiguracja" tytul="Konfiguracja serwera"
-    opis={<>Plik: <code>{dane?.plik ?? "nie znaleziono — działają wartości domyślne"}</code>. Decyzje
-      właściciela zmienisz przyciskiem „Zmień"; resztę ustawia instalator. Hasła i klucze są tu tylko
-      jako „ustawione".</>}
+    opis={<>Plik: <code>{dane?.plik ?? "nie znaleziono — działają wartości domyślne"}</code>. Klucze
+      instalatora i zaawansowane — decyzje właściciela stoją w swoich grupach. Hasła i klucze są tu
+      tylko jako „ustawione".</>}
     akcje={<>
       <Przycisk onClick={() => setWszystkie((x) => !x)}>
-        <SlidersHorizontal size={16} />{wszystkie ? "Tylko ustawione" : `Wszystkie (${wiersze.length})`}
+        <SlidersHorizontal size={16} />{wszystkie ? "Tylko ustawione" : `Wszystkie (${zaawansowane.length})`}
       </Przycisk>
     </>}>
     {wynik && <p className="mb-3 text-sm text-ranga-ok">{wynik}</p>}
@@ -105,24 +165,11 @@ export function Konfiguracja({ admin }: { admin: boolean }) {
       to zwykle literówka, a wtedy działa wartość domyślna.
     </p>}
     {grupy.map((g) => {
-      const wGrupie = wiersze.filter((w) => w.grupa === g && widoczny(w, wszystkie));
+      const wGrupie = zaawansowane.filter((w) => w.grupa === g && widoczny(w, wszystkie));
       if (!wGrupie.length) return null;
       return <section key={g} className="mb-4 last:mb-0">
         <h3 className="mb-1 text-sm font-bold text-slate-700">{dane!.grupy[g]}</h3>
-        <Tabela naglowki={["Klucz", "Wartość", "Skąd", "Co ustawia"]} pusto="">
-          {wGrupie.map((w) => <tr key={w.klucz}>
-            <Td className="font-mono text-xs">{w.klucz}</Td>
-            <Td>{edytowany === w.klucz
-              ? <Edytor w={w} onZamknij={() => setEdytowany(null)}
-                  onGotowe={(z) => { setWynik(z); setEdytowany(null); }} />
-              : <div className="flex flex-wrap items-center gap-2">{wartosc(w)}
-                  {w.edycja && <Przycisk className={maly}
-                    onClick={() => { setEdytowany(w.klucz); setWynik(""); }}>Zmień</Przycisk>}</div>}</Td>
-            <Td><span className={`rounded px-1.5 py-0.5 text-xs ${ZRODLO[w.zrodlo].klasa}`}>
-              {ZRODLO[w.zrodlo].etykieta}</span></Td>
-            <Td className="text-slate-600">{w.opis}</Td>
-          </tr>)}
-        </Tabela>
+        <TabelaKluczy wiersze={wGrupie} onWynik={setWynik} />
       </section>;
     })}
     <Blad>{konf.error?.message}</Blad>
