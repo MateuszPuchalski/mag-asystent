@@ -115,3 +115,27 @@ describe("szukanie w sieci na żądanie", () => {
     expect(wyslane).toHaveLength(1);
   });
 });
+
+/* Błędy silników na karcie (@wydanie): „błędów: 3” bez słowa, co się stało,
+   zostawiało właściciela ze zrzutem ekranu i bez przyczyny. */
+describe("błąd przebiegu jest widoczny", () => {
+  it("silnik z błędem stoi w „Ostatnio sprawdzone”, a wynik mówi, jaki to błąd", async () => {
+    stan = { ...STAN, ostatnie: [
+      { rodzaj: "silnik", symbol: "Briggs & Stratton Sprint", at: "2026-09-26T12:10:00.000Z", wynik: "blad",
+        znalezisk: 0, zaproponowano: 0, odrzucone: {}, blad: "invalid_request_error 400: prompt is too long" },
+      ...STAN.ostatnie] };
+    /* Atrapa oddaje błąd w pierwszym kroku, pusty w drugim. */
+    let krok = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") === "GET") return json(stan);
+      krok += 1;
+      return json({ wynik: { sprawdzono: 0, zaproponowano: 0, bledow: krok === 1 ? 1 : 0, odrzucono: {}, przerwane: null }, stan });
+    }));
+    pokaz();
+    const lista = await screen.findByLabelText("Ostatnio sprawdzone");
+    expect(lista).toHaveAttribute("open");
+    expect(lista).toHaveTextContent("silnik Briggs & Stratton Sprint");
+    await userEvent.click(screen.getByRole("button", { name: /Szukaj w sieci/ }));
+    expect(await screen.findByLabelText("Ostatni błąd")).toHaveTextContent("prompt is too long");
+  });
+});

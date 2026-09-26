@@ -31,3 +31,8 @@ z przyciskiem „Zapisz jako propozycję”. Działa przy `PASOWANIE_Z_SIECI=1`.
 
 **Importy nad listą.** W zakładce „Z opisów i ofert” zwinięta sekcja
 importów stoi na górze, nad listą tekstów.
+
+**Błąd szukania mówi, co się stało.** „Ostatnio sprawdzone” pokazuje też
+silniki z listy, a przy błędzie rozwija się samo. Pod wynikiem stoi treść
+ostatniego błędu. Ślad odrzucenia w księdze niesie zdanie dostawcy, nie
+tylko kod 400.

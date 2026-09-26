@@ -61,6 +61,9 @@ export function PasowanieZSieci() {
   const limit = s ? (s.reczne ? s.reczne.naGodzine : s.naNoc) : 0;
   const zostalo = s ? Math.max(0, limit - (s.reczne ? s.reczne.wGodzinie : s.sprawdzono)) : 0;
   const nieMoze = !s || !!s.niegotowy || zostalo === 0 || s.doSprawdzenia === 0;
+  /* Treść ostatniego błędu (@wydanie). Samo „błędów: 3” nie mówi, czy to
+     klucz, limit dostawcy, czy strona za duża — a od tego zależy, co zrobić. */
+  const ostatniBlad = s?.ostatnie.find((o) => o.wynik === "blad") ?? null;
 
   const uruchom = async () => {
     const koniec = Date.now() + GODZINA_MS;
@@ -137,17 +140,21 @@ export function PasowanieZSieci() {
       {Object.keys(sumy.odrzucono).length > 0 && <span
         title="Znaleziska, których strona nie potwierdziła, nie trafiają do kolejki."> · pominięte jako niepewne: {odrzuty(sumy.odrzucono)}</span>}
       {sumy.bledow > 0 && <span className="text-red-800"> · błędów: {sumy.bledow}</span>}
+      {sumy.bledow > 0 && ostatniBlad && <span className="block text-red-800" aria-label="Ostatni błąd">
+        Ostatni błąd ({ostatniBlad.rodzaj === "silnik" ? "silnik " : ""}{ostatniBlad.symbol}): {ostatniBlad.blad}</span>}
       {sumy.przerwane && <span className="text-red-800"> · przerwano: {sumy.przerwane}</span>}</p>}
     <Blad>{blad || (dane.error as Error | null)?.message}</Blad>
     {/* Zwinięte (@wydanie): to wiedza na wypadek pytania „czemu nic nie
         znalazł”, nie do czytania co dzień nad kolejką. */}
-    {s && s.ostatnie.length > 0 && <details aria-label="Ostatnio sprawdzone">
+    {/* Otwarte, gdy wśród ostatnich jest błąd — wtedy to jest to, czego się szuka. */}
+    {s && s.ostatnie.length > 0 && <details aria-label="Ostatnio sprawdzone" open={!!ostatniBlad}>
       <summary className="cursor-pointer text-sm text-slate-600">Ostatnio sprawdzone</summary>
       <ul className="mt-1 space-y-0.5 text-sm text-slate-700">
         {s.ostatnie.map((o, i) => <li key={i}>
-          <span className="font-mono">{o.symbol}</span> · {czas(o.at)} · {o.wynik === "blad"
+          {o.rodzaj === "silnik" ? <>silnik <b>{o.symbol}</b></> : <span className="font-mono">{o.symbol}</span>}
+          {" "}· {czas(o.at)} · {o.wynik === "blad"
             ? <span className="text-red-800">błąd: {o.blad}</span>
-            : <>znalezisk {o.znalezisk}, propozycji {o.zaproponowano}
+            : <>{o.rodzaj === "silnik" ? "wykazów" : "znalezisk"} {o.znalezisk}, propozycji {o.zaproponowano}
               {Object.keys(o.odrzucone).length > 0 && <span className="text-slate-600"> (odrzucone: {odrzuty(o.odrzucone)})</span>}</>}
         </li>)}
       </ul>
