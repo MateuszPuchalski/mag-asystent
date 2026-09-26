@@ -338,3 +338,27 @@ test("bez COPILOT_MODEL_KLASYFIKACJA klasyfikacja idzie modelem z COPILOT_MODEL"
   if (process.env.COPILOT_MODEL_KLASYFIKACJA) return;
   assert.equal(config.copilot.modelKlasyfikacji, config.copilot.model);
 });
+
+/* ── Szkice przed pracą (26 września 2026) ───────────────────────────────────
+   Okno przechodzi przez tę samą bramkę co zmiana z panelu: zły zapis ma
+   zatrzymać zapis pliku, a nie zamienić się po cichu w „nigdy". Okno przez
+   północ odpada, bo limit poranka liczy się po dacie lokalnej. */
+test("COPILOT_PRZED_PRACA: domyślnie wyłączone, okno 6-8, limit sto", () => {
+  if (process.env.COPILOT_PRZED_PRACA || process.env.COPILOT_PRZED_PRACA_OKNO
+    || process.env.COPILOT_PRZED_PRACA_LIMIT) return;
+  assert.equal(config.copilot.przedPraca, false);
+  assert.equal(config.copilot.przedPracaOkno, "6-8");
+  assert.equal(config.copilot.przedPracaLimit, 100);
+  assert.equal(bledyKonfiguracji(config).some((b) => b.startsWith("COPILOT_PRZED_PRACA_OKNO=")), false);
+});
+
+test("COPILOT_PRZED_PRACA_OKNO: zły zapis i okno przez północ to błąd, klucz nie trafia do zdania", () => {
+  for (const [okno, ok] of [["6-8", true], ["5-7", true], ["22-2", false], ["8-8", false], ["rano", false],
+    ["sk-ant-api03-TAJNE", false]] as const) {
+    const c = structuredClone(config) as typeof config;
+    (c.copilot as { przedPracaOkno: string }).przedPracaOkno = okno;
+    const b = bledyKonfiguracji(c).find((x) => x.startsWith("COPILOT_PRZED_PRACA_OKNO="));
+    assert.equal(b === undefined, ok, okno);
+    if (b) assert.ok(!b.includes("TAJNE"));
+  }
+});

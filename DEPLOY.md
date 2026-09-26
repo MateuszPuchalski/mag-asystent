@@ -2890,6 +2890,20 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do @wydanie — szkice przed pracą
+
+**Panel trzeba przebudować, a serwer zrestartować.** Migracji nie ma.
+
+Nowe klucze stoją w Ustawieniach → Obsługa klienta → Copilot. Domyślnie
+nic się nie zmienia: `COPILOT_PRZED_PRACA` jest wyłączony. Włączony
+rozpoznaje i szkicuje zaległość skrzynki w oknie przed biurem.
+`COPILOT_PRZED_PRACA_OKNO` to godziny, domyślnie `6-8` czasu magazynu.
+`COPILOT_PRZED_PRACA_LIMIT` to rozmowy na poranek, domyślnie sto.
+
+Poranek ma własny limit i nie zjada sufitów godzinowych dnia. W oknie zwykłe
+takty rozpoznania i szkicu czekają, żeby nie płacić dwa razy. Koszt poranka
+stoi na karcie pomiaru Copilota w osobnym wierszu.
+
 ### Aktualizacja do 0.528.0 — szukanie w sieci prościej, metodą SZPERACZA
 
 **Panel trzeba przebudować, a serwer zrestartować.** Kolumna

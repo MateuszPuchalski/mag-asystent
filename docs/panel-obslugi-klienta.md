@@ -2818,6 +2818,29 @@ w kodzie nie ma.
 „Nic do zrobienia" i rozpoznanie zastępcze szkicu nie dają. Włączone
 domyślnie decyzją właściciela; wyłącza je `COPILOT_SZKIC_PO_ROZPOZNANIU=0`.
 
+### 14.6d. Szkice przed pracą (@wydanie)
+
+Decyzja właściciela z 26 września 2026. Po weekendzie zaległość trafiała na
+sufit godzinowy dokładnie wtedy, gdy przychodzili agenci. Pierwsza godzina
+dostawała około trzydziestu szkiców, a resztę kolejki pisało się od zera.
+
+**Okno przed biurem** (`services/copilot-przed-praca.ts`). W godzinach
+`COPILOT_PRZED_PRACA_OKNO`, domyślnie 6–8 czasu magazynu, ta sama droga
+rozpoznaje i szkicuje zaległość. Najpierw rozmowy PILNE, potem najdłużej
+czekające, jak w kolejce. Rozmowa, w której już odpisaliśmy, nie kosztuje nic.
+
+**Własny limit, nie sufit dnia.** `COPILOT_PRZED_PRACA_LIMIT` to rozmowy na
+poranek, domyślnie sto: dwie doby weekendu. Księga zapisuje poranek pod
+zadaniami `klasyfikacja_przed_praca` i `szkic_przed_praca`. Sufity godzinowe
+ich nie liczą, więc pierwsza godzina biura dostaje swoje trzydzieści szkiców
+w całości. Karta pomiaru Copilota pokazuje koszt poranka osobnym wierszem.
+
+**Okno należy do poranka.** Zwykłe takty rozpoznania i szkicu wtedy czekają,
+żeby dwie drogi nie płaciły za to samo pytanie. Świeży szkic zostaje.
+Szkic nieudany z winy rozmowy nie wraca na tę samą wiadomość tego ranka.
+Przeciążenie dostawcy rozmowy nie skreśla. Przełącznik `COPILOT_PRZED_PRACA`
+jest domyślnie wyłączony, bo wydaje pieniądze bez kliknięcia.
+
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
 Pytanie właściciela z 8 września 2026, nad szkicem o śrubę noża do kosiarki

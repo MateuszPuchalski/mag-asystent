@@ -67,12 +67,14 @@ const AKTUALIZACJA_WZOR = {
 };
 let KOLEKTOR: { adresy: string[]; port: number; apk: { wersja: string } | null };
 let rola = "admin";
+/* Konfiguracja podmienialna w teście — reszta testów stoi na wzorze wyżej. */
+let konfiguracja: typeof KONFIGURACJA = KONFIGURACJA;
 let firmaNaSerwerze: { dane: Record<string, string>; zmieniono: { at: string; przez: string } | null };
 
 const PUSTA_FIRMA = { nazwa: "", nip: "", adres: "", miejscowosc: "", osoba: "", telefon: "" };
 
 beforeEach(() => {
-  wyslane = []; odczyty = []; rola = "admin";
+  wyslane = []; odczyty = []; rola = "admin"; konfiguracja = KONFIGURACJA;
   AKTUALIZACJA = { ...AKTUALIZACJA_WZOR };
   KOLEKTOR = { adresy: ["192.168.1.49", "10.8.0.2"], port: 3001, apk: { wersja: "0.493.0" } };
   firmaNaSerwerze = { dane: { ...PUSTA_FIRMA }, zmieniono: null };
@@ -105,7 +107,7 @@ beforeEach(() => {
     }
     odczyty.push(url);
     if (url === "/api/auth/me") return odp({ user: { userId: 1, name: "Anna", role: rola } });
-    if (url === "/api/biuro/konfiguracja") return odp(KONFIGURACJA);
+    if (url === "/api/biuro/konfiguracja") return odp(konfiguracja);
     if (url === "/api/biuro/aktualizacja") return odp(AKTUALIZACJA);
     if (url === "/api/biuro/kolektor") return odp(KOLEKTOR);
     if (url === "/api/biuro/firma") return odp(firmaNaSerwerze);
@@ -289,6 +291,47 @@ describe("Ustawienia w panelu", () => {
     expect(within(k).getAllByText("ustawione")).toHaveLength(1);
     expect(within(k).queryByText("MSSQL_SERVER")).toBeNull();
     expect(wyslane).toEqual([]);
+  });
+
+  /* Szkice przed pracą (26 września 2026): trzy decyzje właściciela stoją
+     przy Copilocie, obok sufitów, na które wpływają — z opisem skutku. */
+  it("szkice przed pracą: przełącznik, okno i limit w grupie Copilota, zero zapisu", async () => {
+    const wiersz = (klucz: string, opis: string, edycja: Record<string, unknown>) => ({
+      klucz, grupa: "copilot", kto: "wlasciciel", opis, czyta: ["serwer"],
+      tajny: false, zrodlo: "domyslna", wartosc: null, edycja });
+    konfiguracja = {
+      ...KONFIGURACJA,
+      grupy: { ...KONFIGURACJA.grupy, copilot: "Copilot" } as typeof KONFIGURACJA.grupy,
+      wiersze: [...KONFIGURACJA.wiersze,
+        wiersz("COPILOT_AUTO_NA_GODZINE", "Sufit automatycznych szkiców na godzinę; hamulec kosztów.", { rodzaj: "liczba" }),
+        wiersz("COPILOT_PRZED_PRACA", "1 = przed biurem Copilot rozpoznaje i szkicuje zaległość z własnym limitem, nie z sufitu godzinowego.",
+          { rodzaj: "wybor", opcje: ["0", "1"] }),
+        wiersz("COPILOT_PRZED_PRACA_OKNO", "Godziny szkiców przed pracą, czas magazynu, np. 6-8; zwykłe takty Copilota wtedy czekają.",
+          { rodzaj: "tekst" }),
+        wiersz("COPILOT_PRZED_PRACA_LIMIT", "Ile rozmów na jeden poranek: tyle rozpoznań i tyle szkiców; hamulec kosztów poranka.",
+          { rodzaj: "liczba" }),
+      ] as typeof KONFIGURACJA.wiersze,
+    };
+    pokaz("/obsluga/ustawienia?grupa=obsluga");
+    const k = await waitFor(() => karta("Copilot"));
+    for (const klucz of ["COPILOT_PRZED_PRACA", "COPILOT_PRZED_PRACA_OKNO", "COPILOT_PRZED_PRACA_LIMIT"]) {
+      const w = (await within(k).findByText(klucz)).closest("tr") as HTMLElement;
+      expect(within(w).getByRole("button", { name: "Zmień" })).toBeInTheDocument();
+    }
+    expect(within(k).getByText(/własnym limitem, nie z sufitu godzinowego/)).toBeInTheDocument();
+    expect(within(k).getByText("COPILOT_AUTO_NA_GODZINE")).toBeInTheDocument();
+    /* Nic z tej grupy nie ląduje w karcie zaawansowanej. */
+    expect(screen.queryByRole("heading", { name: "Konfiguracja serwera" })).toBeNull();
+    expect(wyslane).toEqual([]);
+
+    /* Włączenie to jeden klucz w jednym żądaniu, dopiero po „Zapisz". */
+    const przelacznik = within(k).getByText("COPILOT_PRZED_PRACA").closest("tr") as HTMLElement;
+    await userEvent.click(within(przelacznik).getByRole("button", { name: "Zmień" }));
+    await userEvent.selectOptions(within(k).getByLabelText("COPILOT_PRZED_PRACA"), "1");
+    expect(wyslane).toEqual([]);
+    await userEvent.click(within(k).getByRole("button", { name: "Zapisz" }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(JSON.parse(wyslane[0].body!)).toEqual({ klucz: "COPILOT_PRZED_PRACA", wartosc: "1" });
   });
 
   it("zmiana ustawienia: jeden klucz w jednym żądaniu", async () => {

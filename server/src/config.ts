@@ -1068,6 +1068,33 @@ export const config = {
      */
     klasyfikacjaOknoDni: Math.max(1,
       Number(process.env.COPILOT_KLASYFIKACJA_OKNO_DNI ?? 7) || 7),
+    /**
+     * SZKICE PRZED PRACĄ (26 września 2026, decyzja właściciela).
+     *
+     * Po weekendzie zaległość skrzynki trafiała na sufit godzinowy dokładnie
+     * wtedy, gdy przychodzili agenci: pierwsza godzina dostawała około
+     * trzydziestu szkiców, a reszta kolejki szła od zera w szczycie. Okno
+     * przed biurem rozpoznaje i szkicuje zaległość z WŁASNYM limitem.
+     *
+     * Domyślnie WYŁĄCZONE z tej samej reguły co każdy takt z modelem: rzecz,
+     * która wydaje pieniądze bez kliknięcia, włącza właściciel, nie
+     * aktualizacja. Powód i rachunek: `services/copilot-przed-praca.ts`.
+     */
+    przedPraca: process.env.COPILOT_PRZED_PRACA === "1",
+    /**
+     * Pełne godziny czasu magazynu, „od-do", w tym samym zapisie co okno
+     * aktualizacji. Szósta do ósmej, bo biuro zaczyna około ósmej, a dwie
+     * godziny mieszczą setkę rozmów po kilka sekund z dużym zapasem.
+     */
+    przedPracaOkno: process.env.COPILOT_PRZED_PRACA_OKNO ?? "6-8",
+    /**
+     * Ile rozmów na jeden poranek: tyle rozpoznań i tyle szkiców, osobno,
+     * z księgi razem z błędami. Sto to dwie doby weekendu po około
+     * pięćdziesiąt pytań. Rozmowa kosztuje najwyżej jedno i jedno, więc
+     * liczba czyta się jak „ile rozmów rano".
+     */
+    przedPracaLimit: Math.max(1,
+      Number(process.env.COPILOT_PRZED_PRACA_LIMIT ?? 100) || 100),
   },
 
   /**
@@ -1201,6 +1228,13 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   }
   if (!Number.isFinite(a.dojrzaloscGodz) || a.dojrzaloscGodz < 0) {
     bledy.push(`AKTUALIZACJA_DOJRZALOSC_H=${a.dojrzaloscGodz} — oczekuję liczby godzin, 0 lub więcej.`);
+  }
+  /* Okno przed pracą sprawdzamy także przy wyłączonym przełączniku: panel
+     zmienia jeden klucz naraz, więc zła godzina wpisana dziś odezwałaby się
+     dopiero przy włączeniu, bez śladu, skąd się wzięła. */
+  if (!oknoPrzedPraca(c.copilot.przedPracaOkno)) {
+    bledy.push(`COPILOT_PRZED_PRACA_OKNO=${bezpiecznaWartosc(c.copilot.przedPracaOkno)} — oczekuję godzin „od-do" `
+      + "w jednej dobie, np. 6-8.");
   }
   if (a.kanarek && !/^https?:\/\/[^\s/]+/.test(a.kanarek)) {
     bledy.push(`AKTUALIZACJA_KANAREK=${a.kanarek} — oczekuję adresu, np. http://localhost:3002.`);
@@ -1454,4 +1488,14 @@ export function oknoAktualizacji(tekst: string): { od: number; do: number } | nu
   const od = Number(m[1]), doG = Number(m[2]);
   if (od > 23 || doG > 24 || od === doG % 24) return null;
   return { od, do: doG };
+}
+
+/**
+ * Okno szkiców przed pracą: ten sam zapis co okno aktualizacji, ale BEZ
+ * przejścia przez północ. Limit poranka liczy się po dacie lokalnej, więc
+ * okno rozcięte północą miałoby dwa limity na jeden poranek.
+ */
+export function oknoPrzedPraca(tekst: string): { od: number; do: number } | null {
+  const o = oknoAktualizacji(tekst);
+  return o && o.od < o.do ? o : null;
 }
