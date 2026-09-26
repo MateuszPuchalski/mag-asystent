@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Klawisz } from "../nawigacja/Klawisz";
 
 /* ── Skróty klawiszowe NA EKRANIE (0.281.0) ──────────────────────────────────
    Kolejka reklamacji i dyskusji chodzi z klawiatury od 0.245.0: strzałki albo
@@ -35,10 +36,6 @@ import React, { useState } from "react";
 
    Nazwa komponentu zostaje, bo to dalej ten sam byt: „gdzie agent widzi, czym
    chodzi się po tej kolejce".                                              */
-
-const Klawisz = ({ children }: { children: React.ReactNode }) =>
-  <kbd className="rounded border border-slate-300 bg-slate-50 px-1 font-mono text-podpis text-slate-700">
-    {children}</kbd>;
 
 export function SkrotyKlawiszy({ zMoje, kubelkow, sita = true, zWszystkimi = true,
   dodatkowe = [] }: {
