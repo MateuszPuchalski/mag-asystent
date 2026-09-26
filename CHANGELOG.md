@@ -10,6 +10,63 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.522.0 — 26 września 2026
+
+**Kubełki do przeglądania schodzą pod „Więcej”.** W reklamacjach Rozstrzygnięte
+i Bez ruchu, w dyskusjach Zamknięte stoją teraz w liście „Więcej” z licznikiem.
+Na wierzchu zostają kubełki pracy, a klawisze cyfr dalej wybierają każdy kubełek.
+Układ ze skrzynki mieszka we wspólnym `ui/FiltrZWiecej.tsx`, więc wszędzie
+działa tak samo.
+
+**Jeden „?” w kolejce rozmów.** Słownik znaków i skróty klawiszy otwierają się
+jednym przyciskiem i zamykają Escape'em albo kliknięciem obok. Plakietka
+„STAN Z” i stopka o niepobranych wierszach zeszły, bo mówił to już baner alarmu
+synchronizacji. Strzałka w liście „Więcej” albo w kolejności nie przesuwa już
+rozmowy pod kursorem.
+
+## 0.521.0 — 26 września 2026
+
+**Ustawienia pokazują mniej naraz.** Dane firmy stoją jako odczyt, a formularz otwiera „Zmień”.
+Kod QR nowego kolektora czeka za „Pokaż kod”, adres serwera zostaje na wierzchu.
+Reset hasła, wyłączenie konta i sesje schowały się za „⋯” w wierszu osoby.
+Słownik tagów wygląda jak karty obok. Zeszły zdania o innych ekranach i stara rada o logo.
+Karta aktualizacji mówi po ludzku: ścieżka dziennika i nazwa klucza są w dymku.
+
+## 0.520.0 — 26 września 2026
+
+**Ekran dyskusji pokazuje mniej naraz, a nic nie zniknęło.** Prowadzący, „Odśwież z Allegro" i „Poproś o zakończenie" stoją w jednym wierszu nad rozmową. Wcześniej zajmowały trzy osobne rzędy. W prawej kolumnie cztery sekcje o zakupie zeszły się w jedną „Ten zakup u nas", jak przy reklamacji. Droga zakupu prowadzi do każdego zwrotu i każdej rozmowy tego zamówienia. „Sprawa" i „Stan" są zwinięte, a podpis mówi, ile dyskusja czeka na nas. Wiersz „Status Allegro" staje tylko przy stanie innym niż trwająca dyskusja. „Zapisz notatkę" pojawia się dopiero przy zmianie treści. Nagłówek „Hala" nad jednym przyciskiem zszedł. Objaśnienie „zamyka Allegro" przy wysłanej prośbie stoi w podpowiedzi. Przyciski prośby o zakończenie są pisane zdaniem, nie wersalikami.
+
+## 0.519.0 — 26 września 2026
+
+**Karty miar obsługi mówią mniej naraz.** Sześć kart w Analizie → Obsługa klienta stoi teraz we wspólnej ramie wglądu. Pokrycie wiedzy pokazuje jeden rząd liczb, a resztę pod „Szczegóły”. Tam też zwinęły się decyzje i szkice Copilota oraz tabela doboru według osoby. Liczba czekająca na decyzję człowieka stoi przy przełączniku. Z ekranu zeszły tokeny, prefiks instrukcji, nazwa indeksu i odsyłacz „§11.2”. Karta doboru nie powtarza już okna z nagłówka analizy. Lista wpisów automatu wiedzy zostaje rozwinięta.
+
+## 0.518.0 — 26 września 2026
+
+**Prawa kolumna zwrotu mówi każdą rzecz raz.** Sprawy, droga i wiadomości o zakupie stoją w jednej sekcji „Ten zakup u nas”, bez podwójnych nagłówków. Przebieg sprawy zwija się do zdania „Ostatnio: … · przebieg (n)”, a całość otwiera jedno kliknięcie. „Zapisz notatkę” pojawia się dopiero przy zmienionej treści. Nieodebraną paczkę nazywa sama plakietka, a wyjaśnienie stoi w jej podpowiedzi. Zlecenie hali to sam przycisk, bez nagłówka nad nim.
+
+## 0.517.0 — 26 września 2026
+
+**Szkic Copilota, Dobór i alarm synchronizacji mówią mniej naraz.** Metryka szkicu
+(model, godzina, kto, liczba znaków) stoi w dymku nazwy „Szkic Copilota”. Pasek
+„Przy okazji” zwija się do jednej linii z tematami, a treść rozwija jednym
+kliknięciem. Ostrzeżenia modelu i tarcie przy twierdzeniach spoza bazy zostają
+na wierzchu. W Doborze numer wersji, „ustawił” oraz droga ze źródłem kandydata
+przeszły do dymków; droga i źródło stoją nad plakietką pewności. Zdanie
+o Retry-After stoi w dymku przycisku „Synchronizuj teraz”. Przyciski „Zapisz”,
+„Zatwierdź dobór” i „Synchronizuj teraz” piszą zdaniem, nie wersalikami.
+
+## 0.516.0 — 26 września 2026
+
+**Kwota zwrotu stoi raz, w sekcji „Pieniądze”.** Dotąd ta sama liczba stała
+w pasku decyzji, w sekcji pieniędzy i w stopce pozycji. Pasek mówi teraz tylko,
+że pieniądze nie wyszły, i podaje datę automatu Allegro. Stopka sum znika,
+gdy kwota jest ustalona. „Pieniądze” pokazują kwotę także po oddaniu.
+Przy gotowym „Wszystko OK” przycisk „Przyjmij” schodzi do drugiego rzędu,
+a klawisz P działa jak dotąd. Zamknięty zwrot bez korekty nie stawia pustej
+ramki. Zdania o źródle korekty, o powodzie odmowy i o przeliczaniu kwoty
+przeszły do podpowiedzi. Przyciski pieniędzy piszą się zwykłą pisownią
+zamiast wersalików.
+
 ## 0.515.0 — 26 września 2026
 
 **Spokojniejszy nagłówek i pasek „Nowe w panelu”.** Obok logo nie stoi już

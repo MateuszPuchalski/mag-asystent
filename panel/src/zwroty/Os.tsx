@@ -82,6 +82,43 @@ function zrodlo(w: WpisOsiZwrotu): string | null {
   return w.dane && w.dane.zrodlo === "subiekt" ? "znaleziona w Subiekcie" : null;
 }
 
+/**
+ * Przebieg zwrotu jednym zdaniem, całość na żądanie (0.518.0).
+ *
+ * Zgłoszenie agentów: „aplikacja przytłacza". Pełna lista stała otwarta pod
+ * każdym zwrotem, a przy decyzji liczy się ostatni ruch — reszta jest
+ * historią, po którą sięga się przy sprawie wracającej pytaniem. Ten sam
+ * kształt co pasek zdarzeń rozmowy (`skrzynka/Os.tsx`, 0.506.0), żeby dwa
+ * ekrany obsługi miały jeden nawyk. Kopia wzorca, nie import: tamten pasek
+ * nie jest eksportowany i czyta zdarzenia rozmowy, nie wpisy zwrotu.
+ *
+ * Rozwinięcie pokazuje DOTYCHCZASOWĄ listę pionową — powód pionu stoi wyżej.
+ */
+export function PrzebiegZwrotu({ wpisy }: { wpisy: WpisOsiZwrotu[] }) {
+  const [cala, setCala] = React.useState(false);
+  /* Pusty przebieg milczy — powód przy `Os` niżej. */
+  if (!wpisy.length) return null;
+  /* Ostatni wpis to ostatni ruch, bo serwer oddaje oś od najstarszego. */
+  const ostatni = wpisy[wpisy.length - 1]!;
+  return <nav aria-label="Przebieg sprawy">
+    {!cala
+      ? <p className="text-podpis text-slate-600">
+          {/* Treść wpisu w podpowiedzi: nazwa rodzaju mieści się w jednym
+              wierszu, a pełne zdanie jest jednym najazdem myszy dalej. */}
+          Ostatnio: <b title={ostatni.tresc ?? undefined} className="font-semibold text-slate-800">
+            {NAZWA_ZDARZENIA_ZWROTU[ostatni.rodzaj] ?? ostatni.rodzaj}</b> · {czas(ostatni.kiedy)}{" · "}
+          <button type="button" aria-expanded={false} onClick={() => setCala(true)}
+            className="font-semibold text-sky-800 underline underline-offset-2">
+            przebieg ({wpisy.length})</button>
+        </p>
+      : <>
+          <button type="button" aria-expanded onClick={() => setCala(false)}
+            className="mb-2 text-podpis font-semibold text-sky-800 underline underline-offset-2">zwiń</button>
+          <Os wpisy={wpisy} />
+        </>}
+  </nav>;
+}
+
 export function Os({ wpisy }: { wpisy: WpisOsiZwrotu[] }) {
   /* Pusta oś NIE ZOSTAJE jako pusta ramka. Zwrot świeżo zaciągnięty z Allegro
      nie ma jeszcze żadnej decyzji, a pas szarości pod nagłówkiem mówiłby, że

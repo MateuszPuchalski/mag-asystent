@@ -227,6 +227,16 @@ describe("Ekran reklamacji", () => {
     expect(screen.getByText("Uznać czy odrzucić?")).toBeInTheDocument();
   });
 
+  it("kubełki „tylko wgląd” stoją pod „Więcej” z licznikiem, a cyfra dalej je wybiera", async () => {
+    pokaz();
+    expect(screen.queryByRole("button", { name: /Rozstrzygnięte/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /^Rozstrzygnięte · \d+$/ })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: /^Bez ruchu · \d+$/ })).toBeInTheDocument();
+    await userEvent.keyboard("3");
+    const lista = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
+    expect(lista.selectedOptions[0].textContent).toMatch(/^Rozstrzygnięte/);
+  });
+
   it("kubełek DO DECYZJI pokazuje tylko sprawy przed werdyktem", () => {
     pokaz();
     expect(screen.getByText("111/2026")).toBeInTheDocument();
@@ -235,7 +245,10 @@ describe("Ekran reklamacji", () => {
 
   it("przełączenie kubełka przestawia KURSOR na jego pierwszą sprawę", async () => {
     pokaz("/obsluga/reklamacje/1");
-    await userEvent.click(screen.getByTitle(/Tylko wgląd\. \(klawisz 3\)/));
+    /* Rozstrzygnięte stoją od 0.522.0 pod „Więcej" — wybór z listy jest tym
+       samym przełączeniem kubełka co klik w pigułkę. */
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"),
+      screen.getByRole("option", { name: /^Rozstrzygnięte/ }));
     /* Bez przestawienia kursora środkowa kolumna pokazywałaby rozmowę ze
        sprawy z poprzedniego kubełka. Wiersz kolejki JEST wybrany — a numer
        stoi też w kolumnie dowodów, i od 0.403.0 w PRZYCISKU: nagłówek zwijki

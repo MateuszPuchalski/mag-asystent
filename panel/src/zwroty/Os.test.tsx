@@ -1,8 +1,9 @@
 import React from "react";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { WpisOsiZwrotu } from "../api/typy";
-import { Os } from "./Os";
+import { Os, PrzebiegZwrotu } from "./Os";
 
 /* ── Oś zwrotu (0.313.0) ─────────────────────────────────────────────────────
    Serwer oddawał ją przy szczególe sprawy od 0.156.0, panel miał na nią nawet
@@ -60,6 +61,40 @@ describe("Oś zwrotu", () => {
 
   it("pusta oś nie rysuje niczego", () => {
     const { container } = render(<Os wpisy={[]} />);
+    expect(container).toBeEmptyDOMElement();
+  });
+});
+
+/* ── Przebieg zwinięty do zdania (0.518.0) ──────────────────────────────────
+   Zgłoszenie agentów: „przytłacza". Pełna lista stała otwarta pod każdym
+   zwrotem; przy decyzji liczy się ostatni ruch, reszta jest jednym
+   kliknięciem dalej — ten sam kształt co pasek zdarzeń rozmowy.            */
+describe("Przebieg zwrotu", () => {
+  const wpisy = [
+    wpis({ id: 1, tresc: "Zwrot przyjęty" }),
+    wpis({ id: 2, rodzaj: "kwota", tresc: "Do oddania 49.99 (pełna)", kiedy: "2026-09-02T10:00:00.000Z" }),
+  ];
+
+  it("na wierzchu stoi ostatni ruch i liczba wpisów, lista jest zwinięta", () => {
+    render(<PrzebiegZwrotu wpisy={wpisy} />);
+    const pasek = screen.getByRole("navigation", { name: "Przebieg sprawy" });
+    expect(pasek).toHaveTextContent(/Ostatnio: kwota/);
+    expect(screen.queryByRole("listitem")).toBeNull();
+    expect(screen.getByRole("button", { name: "przebieg (2)" }))
+      .toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("całość otwiera się jednym kliknięciem i tak samo się zwija", async () => {
+    render(<PrzebiegZwrotu wpisy={wpisy} />);
+    await userEvent.click(screen.getByRole("button", { name: "przebieg (2)" }));
+    expect(screen.getAllByRole("listitem")).toHaveLength(2);
+    expect(screen.getByText("Zwrot przyjęty")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "zwiń" }));
+    expect(screen.queryByRole("listitem")).toBeNull();
+  });
+
+  it("pusty przebieg nie rysuje niczego", () => {
+    const { container } = render(<PrzebiegZwrotu wpisy={[]} />);
     expect(container).toBeEmptyDOMElement();
   });
 });

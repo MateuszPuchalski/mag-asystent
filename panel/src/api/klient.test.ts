@@ -62,7 +62,7 @@ describe("api()", () => {
   it("żądanie BEZ ciała nie deklaruje typu treści", async () => {
     const f = odp(200, { ok: true });
     vi.stubGlobal("fetch", f);
-    /* Dokładnie to wywołanie padało na produkcji: przycisk SYNCHRONIZUJ TERAZ
+    /* Dokładnie to wywołanie padało na produkcji: przycisk „Synchronizuj teraz”
        z banera awarii, czyli ten, który ma pomóc, gdy synchronizacja stoi. */
     await api("/api/obsluga/synchronizuj", { method: "POST" });
     expect(naglowki(f)["content-type"]).toBeUndefined();
