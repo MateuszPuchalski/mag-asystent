@@ -55,6 +55,22 @@ export function ZOpisow() {
       powstanie propozycja do kolejki. Odrzuć, gdy to nie jest lista modeli;
       odrzucone nie wracają po imporcie.
     </p>
+    {/* IMPORTY NAD LISTĄ (@wydanie). Do tego wydania sekcja stała pod listą
+        dwustu wierszy i właściciel zgłosił: „to przesłania” — do pasowania
+        z sieci trzeba było przewinąć wszystkie teksty. Zwinięta nad listą nie
+        zabiera miejsca, a jest pod ręką; główną robotą zakładki dalej jest
+        „Zaproponuj” przy wierszu. */}
+    <details className="rounded-lg border border-slate-200 px-3 py-2"
+      onToggle={(e) => { if (e.currentTarget.open) setNarzedzia(true); }}>
+      <summary className="cursor-pointer text-sm font-semibold">
+        Importy i zbiórki — „Pasuje do” z ofert, pasowanie z sieci, odsyłacze, wykazy części</summary>
+      {narzedzia && <div className="mt-3 space-y-3">
+        <PasujeDoOfert />
+        <PasowanieZSieci />
+        <Odsylacze />
+        <WykazCzesci />
+      </div>}
+    </details>
     <Blad>{blad || (lista.error as Error | null)?.message}</Blad>
     {ostatnie && <p className="rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">{ostatnie}</p>}
     {!lista.isLoading && wiersze.length === 0 &&
@@ -75,17 +91,6 @@ export function ZOpisow() {
         `Zakladki` w ekranie Wiedza). Obie sekcje to ta sama robota: wiedza
         wyjęta z kartotek, którą człowiek zamienia na zastosowania. */}
     <Tokeny />
-    <details className="rounded-lg border border-slate-200 px-3 py-2"
-      onToggle={(e) => { if (e.currentTarget.open) setNarzedzia(true); }}>
-      <summary className="cursor-pointer text-sm font-semibold">
-        Importy i zbiórki — „Pasuje do” z ofert, pasowanie z sieci, odsyłacze, wykazy części</summary>
-      {narzedzia && <div className="mt-3 space-y-3">
-        <PasujeDoOfert />
-        <PasowanieZSieci />
-        <Odsylacze />
-        <WykazCzesci />
-      </div>}
-    </details>
   </div>;
 }
 
