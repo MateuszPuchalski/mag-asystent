@@ -1,5 +1,4 @@
-import { Bot } from "lucide-react";
-import { Karta } from "../ui";
+import { KartaWgladu } from "../ui/wglad";
 import type { WpisAutomatu } from "../api/typy";
 
 /**
@@ -26,22 +25,19 @@ import type { WpisAutomatu } from "../api/typy";
 export function WiedzaAutomat({ wpisy }: { wpisy: WpisAutomatu[] | undefined }) {
   if (!wpisy) return null;
 
-  return <Karta className="overflow-hidden">
-    <header className="flex items-center gap-2">
-      <Bot size={16} aria-hidden="true" className="text-slate-600" />
-      <h3 className="font-semibold text-slate-900">Co automat dopisał do wiedzy</h3>
-    </header>
-    <p className="mt-1 text-xs text-slate-600">
-      Wpisy zatwierdzone bez człowieka. Sprawdź je i cofnij te, które nie
-      trzymają się kupy — cofanie jest przy wpisie w Wiedzy.
-    </p>
-
+  /* Rama wspólna z resztą analizy (@wydanie); ikona robota zeszła razem
+     z własnym nagłówkiem, bo żadna inna karta wglądu ikony nie ma. Karta
+     zostaje ROZWINIĘTA — patrz decyzja właściciela wyżej: automat
+     zatwierdza tylko dlatego, że ta lista jest widoczna. */
+  return <KartaWgladu tytul="Co automat dopisał do wiedzy"
+    opis="Wpisy zatwierdzone bez człowieka. Sprawdź je i cofnij błędne — cofa się przy wpisie w Wiedzy.">
     {wpisy.length === 0
-      ? <p className="mt-3 text-sm text-slate-700">
-          Automat nic nie dopisał. To znaczy tyle, że nic nie dopisał: kolejka
-          mogła być pusta, a automat mógł być wyłączony.
+      /* Zdanie skrócone (@wydanie) do samych przyczyn pustki — dalej nie
+         udaje sukcesu, tylko mówi krócej. */
+      ? <p className="text-sm text-slate-700">
+          Automat nic nie dopisał. Kolejka mogła być pusta albo automat jest wyłączony.
         </p>
-      : <ul className="mt-3 divide-y divide-slate-100 text-sm" aria-label="Wpisy automatu wiedzy">
+      : <ul className="divide-y divide-slate-100 text-sm" aria-label="Wpisy automatu wiedzy">
           {wpisy.map((w) => <li key={`${w.rodzaj}-${w.id}`} className="flex items-baseline gap-2 py-1.5">
             <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-700">
               {w.rodzaj === "zastosowanie" ? "zastosowanie" : "pasowanie"}
@@ -51,5 +47,5 @@ export function WiedzaAutomat({ wpisy }: { wpisy: WpisAutomatu[] | undefined }) 
             <span className="ml-auto shrink-0 text-xs text-slate-500">{w.at.slice(0, 10)}</span>
           </li>)}
         </ul>}
-  </Karta>;
+  </KartaWgladu>;
 }

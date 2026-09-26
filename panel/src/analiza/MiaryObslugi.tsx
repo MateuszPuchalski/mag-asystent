@@ -31,7 +31,9 @@ export function MiaryObslugi({ dni }: { dni: number }) {
   const pomiar = usePomiarCopilota(copilot.data?.wlaczony === true);
   /* Dobór liczy się z OKNA ZAKRESU — tego samego, które rządzi czasem
      odpowiedzi nad nim. Dwa selektory okna na jednym ekranie to dwie
-     decyzje o tym samym (dekalog pkt 5). */
+     decyzje o tym samym (dekalog pkt 5). Samej karcie okna już nie
+     podajemy (@wydanie): powtarzała je w nagłówku, dwa wiersze pod
+     selektorem zakresu. */
   const skutecznosc = useSkutecznoscDoboru(dni);
   const eskalacja = useEskalacja();
   const automat = useWiedzaAutomat();
@@ -43,7 +45,7 @@ export function MiaryObslugi({ dni }: { dni: number }) {
         ta — co z kolejki wyszło bez człowieka. Jedno czytanie, dwa stany. */}
     <WiedzaAutomat wpisy={automat.data} />
     <PomiarCopilota dane={pomiar.data} />
-    <SkutecznoscDoboru dane={skutecznosc.data} dni={dni} />
+    <SkutecznoscDoboru dane={skutecznosc.data} />
     {/* Eskalacja POD skutecznością doboru: tamta mierzy naszą pracę, ta jej
         skutek u klienta. Razem odpowiadają na pytanie „czy to działa". */}
     <Eskalacja miesiace={eskalacja.data?.miesiace} />

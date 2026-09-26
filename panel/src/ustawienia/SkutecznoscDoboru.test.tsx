@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { SkutecznoscDoboru as Raport } from "../api/typy";
@@ -37,7 +37,7 @@ describe("skuteczność doboru", () => {
     /* Szczebel bez ani jednego wyboru jest najcenniejszym ustaleniem tego
        raportu: droga utrzymywana w kodzie, która nikomu nie odpowiedziała.
        Wypadnięcie jej razem z zerem zamieniłoby ustalenie w ciszę. */
-    render(<SkutecznoscDoboru dane={dane()} dni={30} onDni={vi.fn()} />);
+    render(<SkutecznoscDoboru dane={dane()} />);
     for (const etykieta of ["OEM", "zgodne wymiary", "pełny tekst", "przez silnik"]) {
       expect(screen.getByText(etykieta)).toBeInTheDocument();
     }
@@ -48,15 +48,14 @@ describe("skuteczność doboru", () => {
   it("mediana bez próbki to kreska, nie zero, i zawsze niesie swoje `n`", () => {
     /* „Mediana 0 min" czyta się jako wynik. Kreska czyta się jako brak
        danych — i tylko to drugie jest prawdą przy pustym oknie. */
-    render(<SkutecznoscDoboru dane={dane({ medianaDoWyboruMin: null, wyborowZCzasem: 0 })}
-      dni={30} onDni={vi.fn()} />);
+    render(<SkutecznoscDoboru dane={dane({ medianaDoWyboruMin: null, wyborowZCzasem: 0 })} />);
     const zdanie = screen.getByText(/Mediana od pytania klienta/).textContent ?? "";
     expect(zdanie).toContain("—");
     expect(zdanie).toContain("0 wyborów");
   });
 
   it("mówi, dokąd sięga historia — inaczej selektor obiecuje kwartał, którego nie ma", () => {
-    render(<SkutecznoscDoboru dane={dane()} dni={90} onDni={vi.fn()} />);
+    render(<SkutecznoscDoboru dane={dane()} />);
     expect(screen.getByText(/2026-08-31/)).toBeInTheDocument();
   });
 
@@ -64,12 +63,12 @@ describe("skuteczność doboru", () => {
     /* Zdanie o monitoringu ma stać tam, gdzie monitoring. Wypisane nad pustą
        tabelą byłoby ostrzeżeniem przed czymś, czego nie ma — a ostrzeżenie
        bez pokrycia uczy ignorowania ostrzeżeń. */
-    render(<SkutecznoscDoboru dane={dane({ osoby: [] })} dni={30} onDni={vi.fn()} />);
+    render(<SkutecznoscDoboru dane={dane({ osoby: [] })} />);
     expect(screen.queryByText(/Kodeks pracy/)).toBeNull();
   });
 
-  it("z osią osobową wypisuje podstawę prawną i tłumaczy kreskę przy medianie", () => {
-    render(<SkutecznoscDoboru dni={30} onDni={vi.fn()} dane={dane({
+  it("z osią osobową wypisuje podstawę prawną i tłumaczy kreskę przy medianie", async () => {
+    render(<SkutecznoscDoboru dane={dane({
       osoby: [
         { userId: 1, osoba: "A. Lewandowska", wybranych: 30, zatwierdzonych: 20,
           najczestszaDroga: "zastosowanie", medianaMin: 9 },
@@ -77,6 +76,13 @@ describe("skuteczność doboru", () => {
           najczestszaDroga: "wyszukiwarka", medianaMin: null },
       ],
     })} />);
+    /* Tabela osób jest zwinięta (@wydanie), a podstawa prawna jedzie razem
+       z nią — POD tabelą, nie osobno nad zwiniętym blokiem. */
+    const szczegoly = screen.getByText("Szczegóły").closest("details")!;
+    expect(szczegoly.open).toBe(false);
+    expect(szczegoly).toContainElement(screen.getByText(/Kodeks pracy/));
+    await userEvent.click(screen.getByText("Szczegóły"));
+    expect(szczegoly.open).toBe(true);
     expect(screen.getByText(/Kodeks pracy/)).toBeInTheDocument();
     expect(screen.getByText("A. Lewandowska")).toBeInTheDocument();
     expect(screen.getByText("9 min")).toBeInTheDocument();
@@ -84,15 +90,22 @@ describe("skuteczność doboru", () => {
     expect(screen.getByTitle(/poniżej 20 wyborów/)).toBeInTheDocument();
   });
 
-  it("selektor okna oddaje wybór ekranowi, bo okno wchodzi do klucza cache", async () => {
-    const onDni = vi.fn();
-    render(<SkutecznoscDoboru dane={dane()} dni={30} onDni={onDni} />);
-    await userEvent.click(screen.getByRole("button", { name: "90 dni" }));
-    expect(onDni).toHaveBeenCalledWith(90);
+  it("nie ma własnego okna — okno podaje nagłówek analizy, raz", () => {
+    /* Selektor i „okno N dni" zeszły (@wydanie): ten sam fakt stał dwa
+       wiersze wyżej, w nagłówku zakresu. */
+    render(<SkutecznoscDoboru dane={dane()} />);
+    expect(screen.queryByRole("group", { name: "Okno raportu" })).toBeNull();
+    expect(screen.queryByText(/okno \d+ dni/)).toBeNull();
+    expect(screen.queryByText(/§11\.2/)).toBeNull();
+  });
+
+  it("bez osi osobowej nie ma przełącznika szczegółów", () => {
+    render(<SkutecznoscDoboru dane={dane({ osoby: [] })} />);
+    expect(screen.queryByText("Szczegóły")).toBeNull();
   });
 
   it("bez danych nie renderuje nic — karta nie miga pustym szkieletem", () => {
-    const { container } = render(<SkutecznoscDoboru dane={undefined} dni={30} onDni={vi.fn()} />);
+    const { container } = render(<SkutecznoscDoboru dane={undefined} />);
     expect(container.firstChild).toBeNull();
   });
 });

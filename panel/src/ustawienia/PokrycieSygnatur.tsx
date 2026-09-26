@@ -1,5 +1,5 @@
 import React from "react";
-import { Karta } from "../ui";
+import { KartaWgladu } from "../ui/wglad";
 import type { PokrycieSygnatur as Pokrycie } from "../api/typy";
 
 /* ── Pokrycie sygnatur (0.169.0) ─────────────────────────────────────────────
@@ -31,7 +31,7 @@ const Lista = ({ tytul, opis, wiersze }: {
   tytul: string; opis: string; wiersze: Pokrycie["pudla"];
 }) => {
   if (!wiersze.length) return null;
-  return <div className="border-t p-4">
+  return <div className="mt-4 border-t pt-4">
     <b className="text-naglowek">{tytul}</b>
     <p className="mb-2 text-xs text-slate-500">{opis}</p>
     <ul className="space-y-1 text-sm">
@@ -48,13 +48,12 @@ export function PokrycieSygnatur({ dane }: { dane: Pokrycie | undefined }) {
   if (!dane) return null;
   const zSygnatura = dane.pozycji - dane.bezSygnatury;
 
-  return <Karta className="overflow-hidden">
-    <header className="flex items-baseline gap-2 border-b p-4">
-      <b className="text-naglowek mr-auto">Sygnatura → kartoteka Subiekta</b>
-      <span className="text-xs text-slate-500">pozycje pobranych zamówień</span>
-    </header>
-
-    <div className="flex flex-wrap gap-8 p-4">
+  /* Rama wspólna z resztą analizy (@wydanie): sześć kart „Obsługa klienta"
+     budowało własną, każda trochę inną, i ekran czytał się jak sześć
+     aplikacji. Podpis „pozycje pobranych zamówień" przeszedł do opisu. */
+  return <KartaWgladu tytul="Sygnatura → kartoteka Subiekta"
+    opis="Pozycje pobranych zamówień.">
+    <div className="flex flex-wrap gap-8">
       <Liczba etykieta="pozycji zamówień" ile={dane.pozycji} />
       <Liczba etykieta="z sygnaturą" ile={zSygnatura} />
       {/* Trafienie liczy się TYLKO przy jednej kartotece — dokładnie tak, jak
@@ -64,13 +63,14 @@ export function PokrycieSygnatur({ dane }: { dane: Pokrycie | undefined }) {
       <Liczba etykieta="różnych sygnatur" ile={dane.sygnatur} />
     </div>
 
-    {dane.pozycji === 0 && <p className="border-t p-4 text-sm text-slate-500">
+    {dane.pozycji === 0 && <p className="mt-4 border-t pt-4 text-sm text-slate-500">
       Nie ma jeszcze pobranych zamówień — pokrycie policzy się po pierwszej
       synchronizacji.</p>}
 
+    {/* Obie listy zostają na wierzchu: to lista roboty, nie szczegół. */}
     <Lista tytul="Sygnatury bez kartoteki" wiersze={dane.pudla}
       opis="Takiego symbolu nie ma w Subiekcie — literówka w Allegro albo brak kartoteki." />
     <Lista tytul="Symbol zdublowany w Subiekcie" wiersze={dane.zdublowane}
       opis="Dwie kartoteki o tym samym symbolu. Automat nie wybiera — rozstrzyga człowiek." />
-  </Karta>;
+  </KartaWgladu>;
 }

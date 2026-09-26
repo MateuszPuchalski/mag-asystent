@@ -1,5 +1,5 @@
 import React from "react";
-import { Karta } from "../ui";
+import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 import type { PomiarCopilota as Pomiar, Udzial } from "../api/typy";
 import { Liczba } from "./PokrycieSygnatur";
 import { NAZWA_KATEGORII } from "../skrzynka/statusy";
@@ -40,89 +40,95 @@ const zl = (usd: number) => `${(usd * 4).toFixed(2)} zł`;
 
 export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
   if (!dane) return null;
-  return <Karta className="overflow-hidden">
-    <header className="flex items-baseline gap-2 border-b p-4">
-      <b className="text-naglowek mr-auto">Copilot — rozpoznawanie kategorii</b>
-      <span className="text-xs text-slate-500">tokeny liczone od pierwszego wywołania</span>
-    </header>
-
-    <div className="flex flex-wrap gap-8 p-4">
+  /* Zero udziału cache przy niezerowej liczbie wywołań to objaw, nie stan
+     spoczynku: cache nie włączył się, bo prefiks instrukcji jest krótszy niż
+     minimum modelu albo coś go rozbija. */
+  const cacheMilczy = dane.wywolan > 0 && dane.tokeny.cacheOdczyt === 0;
+  /* Rama wspólna z resztą analizy (@wydanie). Na wierzchu zostały trzy
+     rzeczy, na których zapada decyzja o modelu: wywołania, nieudane
+     i rachunek. Zeszły z ekranu (@wydanie): podpis „tokeny liczone od
+     pierwszego wywołania", trzy kafelki tokenów i zdanie o prefiksie
+     instrukcji — to głos programisty, nie agenta, a rachunek w złotych mówi
+     o tokenach wszystko, co biuru potrzebne. Jedyny objaw tamtej diagnozy,
+     udział cache, stoi w szczegółach i dostaje ton „uwaga". */
+  return <KartaWgladu tytul="Copilot — rozpoznawanie kategorii">
+    <div className="flex flex-wrap gap-8">
       <Liczba etykieta="wywołań" ile={dane.wywolan} />
       <Liczba etykieta="nieudanych" ile={dane.bledow}
         ton={dane.bledow > 0 ? "text-ranga-uwaga" : ""} />
-      <Liczba etykieta="tokenów wejścia" ile={dane.tokeny.wej} />
-      <Liczba etykieta="tokenów wyjścia" ile={dane.tokeny.wyj} />
-      <Liczba etykieta="z cache" ile={dane.tokeny.cacheOdczyt} />
     </div>
 
-    <p className="border-t p-4 text-sm text-slate-600">
+    <p className="mt-4 border-t pt-4 text-sm text-slate-600">
       Rachunek: <b>{dane.kosztUsd.toFixed(2)} USD</b> ({zl(dane.kosztUsd)}).
-      {" "}Udział cache: <b>{dane.udzialCache === null
-        ? "—" : `${Math.round(dane.udzialCache * 100)} %`}</b>.
-      {/* Zero przy niezerowej liczbie wywołań to objaw, nie stan spoczynku. */}
-      {dane.wywolan > 0 && dane.tokeny.cacheOdczyt === 0 &&
-        <span className="font-semibold text-ranga-uwaga"> Cache się nie włączył —
-          prefiks instrukcji jest krótszy niż minimum modelu albo coś go rozbija.</span>}
     </p>
 
-    {(() => {
-      const k = dane.klasyfikacja;
-      return <p className="border-t p-4 text-sm text-slate-600" aria-label="Decyzje klasyfikatora">
-        Decyzje (słownik {k.taksonomia}): <b>{k.decyzji}</b> — z modelu {k.wgZrodla.MODEL},
-        {" "}ze struktury Allegro {k.wgZrodla.ALLEGRO_MAPPING}, zastępczych {k.wgZrodla.FALLBACK}.
-        {" "}Nieudanych <b>{k.wgStatusu.FAILED ?? 0}</b>, do przejrzenia {k.wgStatusu.NEEDS_REVIEW ?? 0},
-        {" "}wymaga człowieka {k.wymagaCzlowieka}.
-        {" "}Etykiet człowieka: <b>{k.oznaczonych}</b> (w tym poprawek {k.poprawionych}),
-        {" "}bez etykiety: <b>{k.nieoznaczonych}</b>.
-        {/* Próg podany JAWNIE, bo „wygląda dobrze" to nie jest decyzja o modelu. */}
-        {k.oznaczonych < 50 && <span className="text-slate-500"> Poniżej pięćdziesięciu etykiet
-          liczby niżej jeszcze nic nie rozstrzygają.</span>}
-        {/* Zgodność mapowania OSOBNO: specyfikacja każe ją mierzyć oddzielnie,
-            bo wąskie mapowanie omija model i nie ma go w tabeli niżej. */}
-        {" "}Zgodność struktury Allegro z etykietą: <b>{udzial(k.mapowanie)}</b>.
-      </p>;
-    })()}
+    {/* Decyzje, szkice i tabela precyzji zwinięte (@wydanie): to raport
+        czytany raz na tydzień, a otwarty zajmował pół ekranu analizy. */}
+    <details className="mt-4 border-t pt-4 text-sm">
+      <summary className="cursor-pointer text-slate-600">Szczegóły</summary>
 
-    {/* SZKICE OSOBNO (0.231.0). Jeden szkic kosztuje kilkadziesiąt razy więcej
-        niż etykieta, więc zlany rachunek mówiłby „klasyfikacja zdrożała".
+      <p className="mt-3 text-slate-600">
+        Udział cache: <b className={cacheMilczy ? "text-ranga-uwaga" : ""}>{dane.udzialCache === null
+          ? "—" : `${Math.round(dane.udzialCache * 100)} %`}</b>.
+      </p>
 
-        MIARĄ JEST LOS PRZY WYSYŁCE (22 września 2026, decyzja właściciela).
-        Do tej wersji karta liczyła „użytych" z kliknięć „Wstaw" i „Zastąp",
-        a wstawiony szkic bywał potem przepisany — liczba mówiła o kliknięciu,
-        nie o tym, co dostał klient. Zostają: bez zmian, z poprawką i odrzucone,
-        czyli jedyny ślad, że agent napisał sam. */}
-    {(() => {
-      const sz = dane.wgZadania.find((z) => z.zadanie === "szkic");
-      if (!sz && dane.szkice.ile === 0) return null;
-      return <p className="border-t p-4 text-sm text-slate-600" aria-label="Szkice odpowiedzi">
-        Szkice odpowiedzi: <b>{sz?.wywolan ?? 0}</b> wywołań
-        {sz && sz.bledow > 0 && <>, <b className="text-ranga-uwaga">{sz.bledow}</b> nieudanych</>},
-        {" "}rachunek <b>{(sz?.kosztUsd ?? 0).toFixed(2)} USD</b> ({zl(sz?.kosztUsd ?? 0)}).
-        {" "}Wysłanych ze szkicu: bez zmian <b>{dane.szkice.wyslanychBezZmian}</b>,
-        {" "}z poprawką <b>{dane.szkice.wyslanychPoprawionych}</b>;
-        {" "}odrzuconych <b>{dane.szkice.odrzuconych}</b>.
-        {/* Los DANYCH osobno: dobry szkic bywa ze złym modelem i odwrotnie. */}
-        {dane.szkice.daneZaproponowane > 0 && <> Dane doboru z rozmowy w <b>{dane.szkice.daneZaproponowane}</b> szkicach:
-          {" "}wpisanych {dane.szkice.daneWpisane}, odrzuconych {dane.szkice.daneOdrzucone}.</>}
-        {/* Pasowania z rozmowy (przyrost czwarty): właściwa miara to ostatnia liczba —
-            czy biuro zatwierdza to, co model widzi. */}
-        {dane.szkice.pasowaniaRozpoznane > 0 && <> Pasowania z rozmowy w <b>{dane.szkice.pasowaniaRozpoznane}</b> szkicach:
-          {" "}zaproponowanych {dane.szkice.pasowaniaZaproponowane}, odrzuconych {dane.szkice.pasowaniaOdrzucone};
-          {" "}biuro zatwierdziło <b>{dane.szkice.pasowaniaZatwierdzonePrzezBiuro}</b>.</>}
-      </p>;
-    })()}
+      {(() => {
+        const k = dane.klasyfikacja;
+        return <p className="mt-3 border-t pt-3 text-slate-600" aria-label="Decyzje klasyfikatora">
+          Decyzje (słownik {k.taksonomia}): <b>{k.decyzji}</b> — z modelu {k.wgZrodla.MODEL},
+          {" "}ze struktury Allegro {k.wgZrodla.ALLEGRO_MAPPING}, zastępczych {k.wgZrodla.FALLBACK}.
+          {" "}Nieudanych <b>{k.wgStatusu.FAILED ?? 0}</b>, do przejrzenia {k.wgStatusu.NEEDS_REVIEW ?? 0},
+          {" "}wymaga człowieka {k.wymagaCzlowieka}.
+          {" "}Etykiet człowieka: <b>{k.oznaczonych}</b> (w tym poprawek {k.poprawionych}),
+          {" "}bez etykiety: <b>{k.nieoznaczonych}</b>.
+          {/* Próg podany JAWNIE, bo „wygląda dobrze" to nie jest decyzja o modelu. */}
+          {k.oznaczonych < 50 && <span className="text-slate-500"> Poniżej pięćdziesięciu etykiet
+            liczby niżej jeszcze nic nie rozstrzygają.</span>}
+          {/* Zgodność mapowania OSOBNO: specyfikacja każe ją mierzyć oddzielnie,
+              bo wąskie mapowanie omija model i nie ma go w tabeli niżej. */}
+          {" "}Zgodność struktury Allegro z etykietą: <b>{udzial(k.mapowanie)}</b>.
+        </p>;
+      })()}
 
-    {dane.klasyfikacja.wgKategorii.length > 0 && <div className="border-t p-4">
-      <table className="w-full text-sm">
-        <thead><tr className="text-left text-xs uppercase text-slate-500">
-          <th className="pb-1">kategoria</th><th className="pb-1">przewidzianych</th>
-          <th className="pb-1">precyzja</th><th className="pb-1">czułość</th>
-        </tr></thead>
-        <tbody>{dane.klasyfikacja.wgKategorii.map((k) => <tr key={k.kategoria} className="border-t">
-          <td className="py-1">{NAZWA_KATEGORII[k.kategoria] ?? k.kategoria}</td>
-          <td>{k.przewidzianych}</td><td>{udzial(k.precyzja)}</td><td>{udzial(k.czulosc)}</td>
-        </tr>)}</tbody>
-      </table>
-    </div>}
-  </Karta>;
+      {/* SZKICE OSOBNO (0.231.0). Jeden szkic kosztuje kilkadziesiąt razy więcej
+          niż etykieta, więc zlany rachunek mówiłby „klasyfikacja zdrożała".
+
+          MIARĄ JEST LOS PRZY WYSYŁCE (22 września 2026, decyzja właściciela).
+          Do tej wersji karta liczyła „użytych" z kliknięć „Wstaw" i „Zastąp",
+          a wstawiony szkic bywał potem przepisany — liczba mówiła o kliknięciu,
+          nie o tym, co dostał klient. Zostają: bez zmian, z poprawką i odrzucone,
+          czyli jedyny ślad, że agent napisał sam. */}
+      {(() => {
+        const sz = dane.wgZadania.find((z) => z.zadanie === "szkic");
+        if (!sz && dane.szkice.ile === 0) return null;
+        return <p className="mt-3 border-t pt-3 text-slate-600" aria-label="Szkice odpowiedzi">
+          Szkice odpowiedzi: <b>{sz?.wywolan ?? 0}</b> wywołań
+          {sz && sz.bledow > 0 && <>, <b className="text-ranga-uwaga">{sz.bledow}</b> nieudanych</>},
+          {" "}rachunek <b>{(sz?.kosztUsd ?? 0).toFixed(2)} USD</b> ({zl(sz?.kosztUsd ?? 0)}).
+          {" "}Wysłanych ze szkicu: bez zmian <b>{dane.szkice.wyslanychBezZmian}</b>,
+          {" "}z poprawką <b>{dane.szkice.wyslanychPoprawionych}</b>;
+          {" "}odrzuconych <b>{dane.szkice.odrzuconych}</b>.
+          {/* Los DANYCH osobno: dobry szkic bywa ze złym modelem i odwrotnie. */}
+          {dane.szkice.daneZaproponowane > 0 && <> Dane doboru z rozmowy w <b>{dane.szkice.daneZaproponowane}</b> szkicach:
+            {" "}wpisanych {dane.szkice.daneWpisane}, odrzuconych {dane.szkice.daneOdrzucone}.</>}
+          {/* Pasowania z rozmowy (przyrost czwarty): właściwa miara to ostatnia liczba —
+              czy biuro zatwierdza to, co model widzi. */}
+          {dane.szkice.pasowaniaRozpoznane > 0 && <> Pasowania z rozmowy w <b>{dane.szkice.pasowaniaRozpoznane}</b> szkicach:
+            {" "}zaproponowanych {dane.szkice.pasowaniaZaproponowane}, odrzuconych {dane.szkice.pasowaniaOdrzucone};
+            {" "}biuro zatwierdziło <b>{dane.szkice.pasowaniaZatwierdzonePrzezBiuro}</b>.</>}
+        </p>;
+      })()}
+
+      {/* Tabela wspólna z resztą analizy (@wydanie) zamiast własnej, pisanej
+          wersalikami. */}
+      {dane.klasyfikacja.wgKategorii.length > 0 && <div className="mt-3 border-t pt-3">
+        <Tabela naglowki={["kategoria", "przewidzianych", "precyzja", "czułość"]} pusto="">
+          {dane.klasyfikacja.wgKategorii.map((k) => <tr key={k.kategoria}>
+            <Td>{NAZWA_KATEGORII[k.kategoria] ?? k.kategoria}</Td>
+            <Td>{k.przewidzianych}</Td><Td>{udzial(k.precyzja)}</Td><Td>{udzial(k.czulosc)}</Td>
+          </tr>)}
+        </Tabela>
+      </div>}
+    </details>
+  </KartaWgladu>;
 }
