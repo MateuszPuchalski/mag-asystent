@@ -253,7 +253,7 @@ describe("Dowody", () => {
        Operator czekał na coś, co miał pod ręką. */
     render(zKlientem(<Dowody zwrot={zwrot()} />));
     expect(screen.getByText("ord-1")).toBeInTheDocument();
-    expect(screen.getByText(/Dociągnij je przyciskiem niżej/)).toBeInTheDocument();
+    expect(screen.getByText(/dociągnij je, żeby pozycje dostały kartotekę/)).toBeInTheDocument();
   });
 
   it("odnośnik zamówienia wychodzi w nowej karcie i nie wynosi naszego adresu", () => {
@@ -342,11 +342,12 @@ describe("Dowody", () => {
   it("paczka nieodebrana nie była NADANA PRZEZ KLIENTA — wróciła sama", () => {
     /* Klient jej właśnie nie odebrał, więc niczego nie nadawał (0.172.0),
        a `paczkaAt` jest przy niej chwilą, w której biuro wpisało karton do
-       kolejki. Ta paczka jest u nas na pewno — i tak ma się pokazywać. */
+       kolejki. Ta paczka jest u nas na pewno — i tak ma się pokazywać.
+       Słowo „nieodebrana" stoi od @wydanie raz, w plakietce nagłówka. */
     render(zKlientem(<Dowody zwrot={zwrot({
       zrodlo: "nieodebrana", paczkaAt: "2026-08-28T09:00:00.000Z",
       dostarczonoAt: "2026-08-28T09:00:00.000Z" })} />));
-    expect(screen.getByText(/Wróciła nieodebrana/)).toBeInTheDocument();
+    expect(screen.getByText(/Wpisana do kolejki/)).toBeInTheDocument();
     expect(screen.queryByText(/Nadana przez klienta/)).toBeNull();
     expect(screen.getByText(/Doręczona do nas/)).toBeInTheDocument();
   });
@@ -354,21 +355,20 @@ describe("Dowody", () => {
   it("wiadomości o zakupie prowadzą do skrzynki, a ich BRAK MILCZY", () => {
     /* Do 0.368.0 pusta sekcja pisała „Allegro nic nie powiązało" — zdanie
        o Allegro, nie o tej sprawie, powtarzane przy prawie każdym zwrocie.
-       Od 0.370.0 sekcji wtedy po prostu nie ma (dekalog p. 2). */
+       Od 0.370.0 sekcji wtedy po prostu nie ma (dekalog p. 2).
+
+       Od @wydanie rozmowa stoi przystankiem drogi w „Ten zakup u nas" —
+       osobna lista wiadomości powtarzała to, co droga już niesie. */
     const { rerender } = render(zKlientem(<Dowody zwrot={zwrot()} />));
-    expect(screen.queryByText(/Wiadomości o tym zakupie/)).toBeNull();
+    expect(screen.queryByText(/Ten zakup u nas/)).toBeNull();
 
     rerender(zKlientem(<Dowody zwrot={zwrot({ rozmowy: [
       { id: 7, temat: "Kiedy zwrot pieniędzy?", status: "open",
-        ostatniaAt: "2026-09-01T10:00:00.000Z" }] })} />));
-    const link = screen.getByRole("link", { name: /Kiedy zwrot pieniędzy/ });
+        ostatniaAt: "2026-09-01T10:00:00.000Z" }] })} droga={[
+      { rodzaj: "rozmowa", id: 7, at: "2026-08-24T10:00:00.000Z", opis: "Kiedy zwrot pieniędzy?" },
+      { rodzaj: "zwrot", id: 1, at: "2026-08-25T09:00:00.000Z", opis: "REF-1" }]} />));
+    const link = screen.getByRole("link", { name: /pytanie/ });
     expect(link).toHaveAttribute("href", "/obsluga/skrzynka/7");
-  });
-
-  it("rozmowa bez tematu dostaje nazwę, a nie pusty odnośnik", () => {
-    render(zKlientem(<Dowody zwrot={zwrot({ rozmowy: [
-      { id: 8, temat: "  ", status: "new", ostatniaAt: null }] })} />));
-    expect(screen.getByRole("link", { name: /Rozmowa bez tematu/ })).toBeInTheDocument();
   });
 
   it("bez pobranego zamówienia ekran daje drogę wyjścia, nie samo czekanie", () => {

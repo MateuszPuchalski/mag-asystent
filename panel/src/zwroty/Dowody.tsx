@@ -1,15 +1,15 @@
 import React, { useEffect, useState } from "react";
 import {
-  CalendarClock, CalendarDays, ClipboardList, CreditCard, History, MessageSquare, NotebookPen, Package, Receipt,
-  RefreshCw, Scale, ShoppingCart, Truck, Undo2, UserCheck, Wallet,
+  CalendarClock, CalendarDays, CreditCard, NotebookPen, Package, Receipt,
+  RefreshCw, Route, ShoppingCart, Truck, Undo2, Wallet,
 } from "lucide-react";
 import type { Tag } from "../api/typy";
 import type { KandydatFaktury, PozycjaZwrotu, PrzystanekDrogi, SprawaZakupu, WpisOsiZwrotu, Zwrot }
   from "../api/typy";
-import { Os } from "./Os";
+import { PrzebiegZwrotu } from "./Os";
 import { Dokument, ikonaDokumentu } from "./Dokument";
 import { useDociagnijZamowienia, zlote } from "../api/zwroty";
-import { czas, NaglowekSekcji, Plakietka, Przycisk, Skopiuj } from "../ui";
+import { czas, NaglowekSekcji, Przycisk, Skopiuj } from "../ui";
 import { Link } from "./Link";
 import { ZnakAllegro } from "../ui/ZnakAllegro";
 import { KafelOferty } from "../towar/Kafel";
@@ -63,10 +63,13 @@ const STAN_KOSZA: Record<string, string> = {
   otwarty: "otwarty — zbiera towar", zamkniety: "na hali", rozlozony: "rozłożony", anulowany: "anulowany",
 };
 
+/* Tytuł jest OPCJONALNY (@wydanie): sekcja z jednym przyciskiem albo jednym
+   zdaniem nie potrzebuje nagłówka, który mówi to samo co jej treść. Ramka
+   i odstęp zostają, żeby kolumna dalej czytała się blokami. */
 const Sekcja = ({ ikona, tytul, children }: {
-  ikona: React.ReactNode; tytul: string; children: React.ReactNode;
+  ikona?: React.ReactNode; tytul?: string; children: React.ReactNode;
 }) => <section className="border-b border-slate-200 p-4 last:border-0">
-  <NaglowekSekcji jako="h3" ikona={ikona} className="mb-2">{tytul}</NaglowekSekcji>
+  {tytul && <NaglowekSekcji jako="h3" ikona={ikona} className="mb-2">{tytul}</NaglowekSekcji>}
   {children}
 </section>;
 
@@ -132,10 +135,14 @@ function Notatka({ zwrot, trwa, blad, onZapisz, onCofnij }: {
       placeholder="Ustalenia, których Allegro nie zna"
       className="field resize-y text-sm" />
     {blad && <p className="text-xs text-red-700">{blad}</p>}
-    <Przycisk wariant="glowny" disabled={!zmienione || trwa}
+    {/* PRZYCISK TYLKO PRZY ZMIANIE (@wydanie). Nieaktywny „Zapisz notatkę"
+        stał pod każdym zwrotem jako główny przycisk kolumny — najmocniejszy
+        kolor ekranu przy czynności, której właśnie nikt nie wykonuje. Pojawia
+        się z pierwszą zmienioną literą, czyli tam, gdzie patrzy piszący. */}
+    {zmienione && <Przycisk wariant="glowny" disabled={trwa}
       onClick={() => onZapisz(tekst)}>
       {trwa ? "Zapisuję…" : "Zapisz notatkę"}
-    </Przycisk>
+    </Przycisk>}
     {/* Autor i godzina stoją TU, a nie w osobnej sekcji: pytanie „kto to
         napisał" zadaje się patrząc na notatkę. Cofnięcie jest ZDANIEM, nie
         ramką z decyzją — §25a.5. */}
@@ -223,15 +230,15 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                 odsyłało do CZEKANIA na synchronizację, choć przycisk „Dociągnij
                 teraz" stoi dwa wiersze niżej — operator czekał na coś, co miał pod
                 ręką. Drugie kończyło się ścianą: bez numeru zamówienia panel nie ma
-                czego dociągnąć, ale zwrot da się doprowadzić do końca i tak. */}
+                czego dociągnąć, ale zwrot da się doprowadzić do końca i tak.
+
+                PO JEDNYM ZDANIU NA GAŁĄŹ (@wydanie). Stały tu po dwa, a drugie
+                tłumaczyło system — skąd kartoteka, kiedy synchronizacja. Agent
+                potrzebuje tylko ruchu, który ma zrobić; powód stoi w tym komentarzu. */}
             <p className="mt-2 text-xs text-slate-500">
               {zwrot.orderId
-                ? `Treści zamówienia jeszcze nie pobrano — bez nich pozycje zwrotu nie
-                   mają skąd wziąć kartoteki. Dociągnij je przyciskiem niżej albo
-                   poczekaj na najbliższą synchronizację.`
-                : `Allegro nie podało przy tym zwrocie numeru zamówienia. Bez niego
-                   nie ma czego dociągnąć ani z czego wziąć kartoteki — wycenę robisz
-                   z pozycji, a zwrot zamyka numer korekty z Subiekta.`}</p>
+                ? "Zamówienia jeszcze nie pobrano — dociągnij je, żeby pozycje dostały kartotekę."
+                : "Allegro nie podało przy tym zwrocie numeru zamówienia — wyceniasz z pozycji, zamykasz numerem korekty."}</p>
           </>
         : <>
             <div className="flex items-center gap-1">
@@ -370,8 +377,11 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                 sama od przewoźnika, a `paczka_at` jest przy niej datą, w której
                 biuro wpisało ją do kolejki. Do 0.188.0 stało tu zdanie
                 o kliencie, który tej paczki właśnie nigdy nie nadał. */}
+            {/* „NIEODEBRANA" STOI RAZ, w plakietce nagłówka (@wydanie). Tu
+                padała po raz trzeci — zostaje sama data, bo tylko ją ta
+                sekcja wie, a nagłówek nie. */}
             <p>{zwrot.zrodlo === "nieodebrana"
-              ? <>Wróciła nieodebrana, zapisana {czas(zwrot.paczkaAt)}.</>
+              ? <>Wpisana do kolejki {czas(zwrot.paczkaAt)}.</>
               : <>Nadana przez klienta {czas(zwrot.paczkaAt)}.</>}</p>
             {zwrot.dostarczonoAt
               ? <p className="mt-1 font-semibold text-ranga-ok">
@@ -406,26 +416,31 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         Danych nadawcy i konta bankowego nie pobieramy.</p>
     </Sekcja>
 
-    {/* ── Wiadomości o tym zakupie (0.169.0) ─────────────────────────────────
-        Mostkiem jest numer zamówienia przy wiadomości (`related_order_id`,
-        mapowany od 0.166.0) — ani jednego nowego żądania do Allegro.
+    {/* ── JEDNA SEKCJA ZAMIAST TRZECH (@wydanie) ─────────────────────────────
+        Zgłoszenie agentów: „aplikacja przytłacza". Pod kolumną stały trzy
+        sekcje o jednym zakupie: „Sprawy tego zakupu", „Droga tego zakupu"
+        i „Wiadomości o tym zakupie". Dwie pierwsze rysowały przy tym DRUGI
+        nagłówek nad własną listą — `wSekcji` brakowało, choć reklamacje
+        naprawiły to samo w 0.387.0.
 
-        Pusty wynik mówi „Allegro nic nie powiązało", a nie „klient nie
-        pisał". To dwa różne zdania i tylko pierwsze jest prawdziwe: Allegro
-        oznacza zamówieniem tylko część wiadomości, a klient piszący z poziomu
-        oferty tym mostkiem się nie znajdzie. */}
-    {/* SEKCJA MILCZY, GDY NIE MA CZEGO POWIEDZIEĆ (0.370.0). Przy typowym
-        zwrocie mostek nie trafia w nic, więc ikona, nagłówek i ramka stały tu
-        po to, żeby napisać „nie powiązało" — czyli zdanie o Allegro, nie
-        o sprawie. Dekalog p. 2: na wierzchu to, co rozstrzyga bieżącą
-        czynność. Że wiadomości bywają, mówi dokumentacja i ta sekcja wtedy,
-        gdy naprawdę są. */}
-    {/* Reklamacje i dyskusje tego zakupu (S1 spoiwa). Zwrot widział rozmowy
-        od 0.169.0, a spraw posprzedażowych nie widział wcale — biuro oddawało
-        pieniądze, nie wiedząc o otwartej reklamacji o ten sam towar. */}
-    {sprawy.length > 0 &&
-    <Sekcja ikona={<Scale size={14} />} tytul="Sprawy tego zakupu">
-      <SprawyZakupu sprawy={sprawy} />
+        Kształt i powód są te same co w reklamacji 0.416.0
+        (`reklamacje/Dowody.tsx`): droga jest nadzbiorem. Rozmowy wchodzą na
+        nią po tej samej relacji `ROZMOWA_ZAMOWIENIA`, z której serwer bierze
+        `zwrot.rozmowy`, a każdy przystanek prowadzi do skrzynki. Najnowszą
+        rozmowę z treścią i stanem niesie nagłówek. Rodzeństwo spraw zostaje,
+        bo mówi to, czego droga nie ma: termin, prowadzącego i czy otwarta.
+
+        Historia miejsca: wiadomości weszły tu w 0.169.0 (mostek
+        `related_order_id`), sprawy w S1 spoiwa — biuro oddawało pieniądze,
+        nie wiedząc o otwartej reklamacji o ten sam towar. Pusta sekcja
+        MILCZY (0.370.0): „nic nie powiązano" jest zdaniem o Allegro,
+        nie o sprawie. */}
+    {(droga.length > 1 || sprawy.length > 0) &&
+    <Sekcja ikona={<Route size={14} />} tytul="Ten zakup u nas">
+      {droga.length > 1 && <DrogaZakupu droga={droga} tutaj={{ rodzaj: "zwrot", id: zwrot.id }} wSekcji />}
+      {sprawy.length > 0 && <div className={droga.length > 1 ? "mt-1.5" : ""}>
+        <SprawyZakupu sprawy={sprawy} wSekcji />
+      </div>}
     </Sekcja>}
 
     {/* KOSZE Z TOWAREM TEGO ZWROTU (0.438.0). Pozycja pisała „w koszyku
@@ -443,33 +458,15 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
       </ul>
     </Sekcja>}
 
-    {droga.length > 1 &&
-    <Sekcja ikona={<MessageSquare size={14} />} tytul="Droga tego zakupu">
-      <DrogaZakupu droga={droga} tutaj={{ rodzaj: "zwrot", id: zwrot.id }} />
-    </Sekcja>}
-
     {/* ZLECENIE HALI ZE ZWROTU (0.502.0) — powód w `sprawy/ZlecHali.tsx`.
         Towar jedzie z zadaniem tylko wtedy, gdy zwrot ma JEDNĄ znaną
-        kartotekę: przy kilku zgadywanie wysłałoby magazyniera pod złą półkę. */}
-    <Sekcja ikona={<ClipboardList size={14} />} tytul="Hala">
+        kartotekę: przy kilku zgadywanie wysłałoby magazyniera pod złą półkę.
+        Nagłówek „Hala" zszedł (@wydanie): stał nad jednym przyciskiem
+        „Zleć hali", który mówi to samo. */}
+    <Sekcja>
       <ZlecHali zrodlo="zwrot" zrodloRef={zwrot.id} tytul={`Zwrot ${zwrot.numer ?? zwrot.id}`}
         twId={jedynaKartoteka(zwrot.pozycje.map((p) => p.twId))} />
     </Sekcja>
-
-    {zwrot.rozmowy.length > 0 &&
-    <Sekcja ikona={<MessageSquare size={14} />} tytul="Wiadomości o tym zakupie">
-      {<ul className="space-y-1">
-            {zwrot.rozmowy.map((r) => <li key={r.id}>
-              <RouterLink to={`/obsluga/skrzynka/${r.id}`}
-                className="block rounded-lg bg-slate-50 px-2 py-1 hover:bg-slate-100">
-                <span className="font-semibold text-sky-700 underline underline-offset-2">
-                  {r.temat?.trim() || "Rozmowa bez tematu"}</span>
-                <span className="ml-2 text-xs text-slate-500">{czas(r.ostatniaAt)}</span>
-                <Plakietka status={r.status} className="ml-2">{r.status}</Plakietka>
-              </RouterLink>
-            </li>)}
-          </ul>}
-    </Sekcja>}
 
     {zwrot.rejectionCode && <Sekcja ikona={<Receipt size={14} />} tytul="Rozstrzygnięte w Allegro">
       <p className="font-semibold">{ODRZUCENIA[zwrot.rejectionCode] ?? zwrot.rejectionCode}</p>
@@ -489,9 +486,13 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
     {/* OŚ STOI NA KOŃCU KOLUMNY i to jest jej miejsce: reszta dowodów odpowiada
         na „co zdecydować", a oś na „co się już stało". Pierwsze czyta się przed
         decyzją, drugie po fakcie — najczęściej przy zwrocie zamkniętym, gdy
-        sprawa wraca pytaniem. */}
-    {os.length > 0 && <Sekcja ikona={<History size={14} />} tytul="Przebieg sprawy">
-      <Os wpisy={os} />
+        sprawa wraca pytaniem.
+
+        ZWINIĘTA DO ZDANIA I BEZ NAGŁÓWKA (@wydanie) — powód przy
+        `PrzebiegZwrotu`. Zdanie zaczyna się od „Ostatnio:", więc nagłówek
+        „Przebieg sprawy" nad nim byłby drugim tytułem jednego wiersza. */}
+    {os.length > 0 && <Sekcja>
+      <PrzebiegZwrotu wpisy={os} />
     </Sekcja>}
 
   </div>;
