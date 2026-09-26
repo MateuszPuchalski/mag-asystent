@@ -5,11 +5,11 @@ import { Przycisk, czas } from "../ui";
 import { LIMIT_ZNAKOW } from "../reklamacje/Edytor";
 
 /* ── Prośba o zakończenie dyskusji (0.245.0) ─────────────────────────────────
-   PRZYCISK NAZYWA SIĘ „POPROŚ O ZAKOŃCZENIE", NIE „ZAKOŃCZ", i to jest
+   PRZYCISK NAZYWA SIĘ „Poproś o zakończenie", NIE „Zakończ", i to jest
    najważniejsza decyzja tego pliku. Allegro nazywa tę wartość `END_REQUEST` —
    żądaniem zakończenia — i nigdzie, ani w schemacie, ani w opisie, nie
    obiecuje, że dyskusja zamknie się od naszego kliknięcia. Przycisk mówiący
-   „ZAKOŃCZ" obiecywałby skutek, którego nie znamy; to ten sam rodzaj
+   „Zakończ" obiecywałby skutek, którego nie znamy; to ten sam rodzaj
    zgadywania, który do 0.155.0 trzymał w kodzie adres, jakiego Allegro nie ma.
 
    ZAMKNIĘCIE POTWIERDZA SYNCHRONIZACJA, nie nasz strzał. Do czasu, aż wróci
@@ -24,7 +24,14 @@ import { LIMIT_ZNAKOW } from "../reklamacje/Edytor";
    ale powód jest głębszy niż schemat: prośba o zamknięcie sprawy bez ani
    jednego zdania to dla człowieka po drugiej stronie zamknięcie drzwi bez
    słowa. Limit znaków jest TEN SAM co w czacie — agent nie ma uczyć się
-   dwóch liczb dla dwóch pól tego samego ekranu.                             */
+   dwóch liczb dla dwóch pól tego samego ekranu.
+
+   ── ZDANIEM, NIE WERSALIKAMI, I W WIERSZU NAGŁÓWKA (@wydanie) ──────────────
+   Zgłoszenie agentów: „aplikacja przytłacza". Napisy wersalikami krzyczały
+   głośniej niż treść sprawy, więc piszemy je zdaniem, jak skrzynka od 0.506.0.
+   Przycisk stoi w jednym wierszu z „Prowadzi" i odświeżeniem. Formularz
+   i ostrzeżenie o niepewnym losie biorą `basis-full`, więc łamią się pod
+   tamten wiersz, zamiast ściskać się obok przycisków.                      */
 
 const ZDANIE_STARTOWE =
   "Uznaję sprawę za wyjaśnioną i proszę o zakończenie dyskusji. "
@@ -45,8 +52,14 @@ export function Zakonczenie({ dyskusja, wysyla, blad, onZakoncz }: {
      NIE robić: drugiej prośby nie wysyłamy, bo pierwsza mogła dojść. */
   if (dyskusja.zakonczenieStatus) {
     const niepewny = dyskusja.zakonczenieStatus === "send_uncertain";
-    return <div className={`rounded-lg border px-3 py-2 text-xs ${
-      niepewny ? "border-amber-300 bg-amber-50 text-ranga-uwaga"
+    /* Objaśnienie spokojnego stanu zeszło do podpowiedzi (@wydanie): „zamyka
+       Allegro" agent czyta raz, a linijka stała przy każdej takiej sprawie.
+       Ostrzeżenie przy NIEPEWNYM losie zostaje na wierzchu, bo mówi, czego
+       nie robić — schowane pod myszą nie zatrzymałoby drugiej prośby. */
+    return <div title={niepewny ? undefined
+      : "Dyskusję zamyka Allegro, nie my. Stan zmieni się po synchronizacji."}
+      className={`rounded-lg border px-3 py-2 text-xs ${
+      niepewny ? "basis-full border-amber-300 bg-amber-50 text-ranga-uwaga"
         : "border-slate-200 bg-slate-50 text-slate-600"}`}>
       <span className="inline-flex items-center gap-1 font-bold">
         <Scale size={13} />
@@ -58,11 +71,9 @@ export function Zakonczenie({ dyskusja, wysyla, blad, onZakoncz }: {
         {dyskusja.zakonczeniePrzez ? `· ${dyskusja.zakonczeniePrzez} ` : ""}
         {dyskusja.zakonczenieAt ? `· ${czas(dyskusja.zakonczenieAt)}` : ""}
       </span>
-      <p className="mt-1">
-        {niepewny
-          ? "Nie wysyłaj drugiej prośby — sprawdź stan w Centrum Sprzedaży."
-          : "Dyskusję zamyka Allegro, nie my. Stan zmieni się po synchronizacji."}
-      </p>
+      {niepewny && <p className="mt-1">
+        Nie wysyłaj drugiej prośby — sprawdź stan w Centrum Sprzedaży.
+      </p>}
     </div>;
   }
 
@@ -71,17 +82,16 @@ export function Zakonczenie({ dyskusja, wysyla, blad, onZakoncz }: {
   if (!dyskusja.czatAktywny) return null;
 
   if (!otwarte) {
-    return <div>
-      <Przycisk onClick={() => setOtwarte(true)}>
-        <Scale size={16} />POPROŚ O ZAKOŃCZENIE
-      </Przycisk>
-    </div>;
+    /* Rozmiar ten sam co sąsiedzi w wierszu nagłówka — powód w nagłówku pliku. */
+    return <Przycisk className="!px-2 !py-1 !text-xs" onClick={() => setOtwarte(true)}>
+      <Scale size={12} />Poproś o zakończenie
+    </Przycisk>;
   }
 
   const zaDlugo = tresc.length > LIMIT_ZNAKOW;
   const gotowe = Boolean(tresc.trim()) && !zaDlugo && zgoda && !wysyla;
 
-  return <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+  return <div className="basis-full rounded-lg border border-slate-200 bg-slate-50 p-3">
     <p className="mb-2 text-xs font-bold text-slate-700">
       Prośba o zakończenie dyskusji
     </p>
@@ -110,9 +120,9 @@ export function Zakonczenie({ dyskusja, wysyla, blad, onZakoncz }: {
     {blad && <p className="mt-2 text-xs font-bold text-ranga-zle">{blad}</p>}
     <div className="mt-2 flex gap-2">
       <Przycisk wariant="glowny" disabled={!gotowe} onClick={() => onZakoncz(tresc)}>
-        <Send size={16} />{wysyla ? "WYSYŁAM…" : "WYŚLIJ PROŚBĘ"}
+        <Send size={16} />{wysyla ? "Wysyłam…" : "Wyślij prośbę"}
       </Przycisk>
-      <Przycisk onClick={() => { setOtwarte(false); setZgoda(false); }}>ANULUJ</Przycisk>
+      <Przycisk onClick={() => { setOtwarte(false); setZgoda(false); }}>Anuluj</Przycisk>
     </div>
   </div>;
 }
