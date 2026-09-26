@@ -18,7 +18,8 @@ import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { Edytor } from "../reklamacje/Edytor";
 import { Czat } from "../reklamacje/Czat";
 import { useSzkicSprawy } from "../sprawy/useSzkicSprawy";
-import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { Blad, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
@@ -393,7 +394,10 @@ export function Dyskusje() {
               pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
               zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
               kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
-          <FiltrSegmentowy<KubelekDyskusji | null> wybrany={kubelek} onWybierz={przelacz}
+          {/* Zamknięte pod „Więcej" (0.522.0): „tylko wgląd" nie stoi w wadze
+              kubełka pracy. Powód przy `ui/FiltrZWiecej.tsx`. */}
+          <FiltrZWiecej<KubelekDyskusji | null> wybrany={kubelek} onWybierz={przelacz}
+            wiecej={["zamknieta"]}
             pozycje={[
               ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
                 ile: data?.liczniki?.[k.id] ?? 0,
