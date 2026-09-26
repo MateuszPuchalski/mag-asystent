@@ -2890,7 +2890,7 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
-### Aktualizacja do @wydanie — szkice przed pracą
+### Aktualizacja do 0.534.0 — szkice przed pracą
 
 **Panel trzeba przebudować, a serwer zrestartować.** Migracji nie ma.
 

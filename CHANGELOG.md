@@ -10,6 +10,23 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.534.0 — 26 września 2026
+
+**Szkice przed pracą.** Po weekendzie zaległość skrzynki trafiała na sufit
+godzinowy Copilota dokładnie wtedy, gdy przychodzili agenci. Teraz w oknie
+przed biurem Copilot rozpoznaje i szkicuje zaległość z własnym limitem na
+poranek. Najpierw rozmowy PILNE, potem najdłużej czekające, jak w kolejce.
+
+- Trzy nowe ustawienia w grupie Obsługa klienta → Copilot:
+  `COPILOT_PRZED_PRACA` (domyślnie wyłączony), `COPILOT_PRZED_PRACA_OKNO`
+  (domyślnie `6-8` czasu magazynu) i `COPILOT_PRZED_PRACA_LIMIT`
+  (domyślnie sto rozmów na poranek).
+- Poranek nie zjada sufitów godzinowych dnia: pierwsza godzina biura
+  dostaje swoje szkice w całości. W oknie zwykłe takty Copilota czekają.
+- Świeży szkic zostaje. Szkic nieudany z winy rozmowy nie wraca na tę samą
+  wiadomość tego ranka. Nic nie idzie do klienta — szkic czeka na agenta.
+- Karta pomiaru Copilota pokazuje koszt poranka osobnym wierszem.
+
 ## 0.533.0 — 26 września 2026
 
 **Skrzynka: pętla pracy bez przeszkód.** Enter z listy stawia kursor w polu odpowiedzi, a Ctrl+Enter wysyła także spoza pola. Podwójne naciśnięcie nie wyśle następnej rozmowy. Następna rozmowa wczytuje się, zanim agent do niej przejdzie. Zamówiony szkic Copilota wchodzi do pustego pola. Dopisek klienta i kolega przy rozmowie zatrzymują wysyłkę przy kliknięciu, nie dziesięć sekund później. Drugie Z zatwierdza zakończenie bez odpowiedzi.

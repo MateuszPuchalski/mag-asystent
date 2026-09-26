@@ -2818,7 +2818,7 @@ w kodzie nie ma.
 „Nic do zrobienia" i rozpoznanie zastępcze szkicu nie dają. Włączone
 domyślnie decyzją właściciela; wyłącza je `COPILOT_SZKIC_PO_ROZPOZNANIU=0`.
 
-### 14.6d. Szkice przed pracą (@wydanie)
+### 14.6d. Szkice przed pracą (0.534.0)
 
 Decyzja właściciela z 26 września 2026. Po weekendzie zaległość trafiała na
 sufit godzinowy dokładnie wtedy, gdy przychodzili agenci. Pierwsza godzina
