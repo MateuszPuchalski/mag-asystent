@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import qrcode from "qrcode-generator";
+import { QrCode } from "lucide-react";
 import { useKolektor } from "../api/ustawienia";
-import { Blad } from "../ui";
+import { Blad, Przycisk } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
 
 /* ── Nowy kolektor (0.496.0) ───────────────────────────────────────────
@@ -16,7 +17,12 @@ import { KartaWgladu } from "../ui/wglad";
    Skanera na ekranie startowym kolektora celowo tu nie wołamy — jest tam
    wyłączony, żeby wpisywane hasło nie pojechało jako skan (nagłówek
    `SplashScreen.kt`). Aplikacja ma adres produkcyjny wbudowany; wpisuje się
-   go tylko po przeprowadzce serwera, i do tego jest duży napis niżej. */
+   go tylko po przeprowadzce serwera, i do tego jest duży napis niżej.
+
+   KOD ZA PRZYCISKIEM (0.521.0). Kwadrat 192 px był największą rzeczą na
+   ekranie ustawień, a potrzebny jest raz na nowe urządzenie. Stoi jedno
+   kliknięcie dalej; adres serwera zostaje na wierzchu, bo po niego sięga się
+   częściej — przy każdej przeprowadzce i każdym „Nie widzę serwera". */
 
 function KodQr({ tekst }: { tekst: string }) {
   const qr = qrcode(0, "M");
@@ -38,6 +44,7 @@ function KodQr({ tekst }: { tekst: string }) {
 export function NowyKolektor({ biuro }: { biuro: boolean }) {
   const k = useKolektor(biuro);
   const [wybrany, setWybrany] = useState<string | null>(null);
+  const [kod, setKod] = useState(false);
   if (!biuro) return null;
 
   const d = k.data;
@@ -51,7 +58,12 @@ export function NowyKolektor({ biuro }: { biuro: boolean }) {
       kolektor go nie znajdzie. Sprawdź kartę sieciową serwera (DEPLOY.md §4).</p>}
     {baza && <div className="flex flex-wrap items-start gap-6">
       {d!.apk
-        ? <KodQr tekst={`${baza}/api/aktualizacja/apk`} />
+        ? kod
+          ? <div className="flex flex-col items-start gap-2">
+            <KodQr tekst={`${baza}/api/aktualizacja/apk`} />
+            <Przycisk className="!px-2.5 !py-1 !text-xs" aria-expanded onClick={() => setKod(false)}>Schowaj kod</Przycisk>
+          </div>
+          : <Przycisk aria-expanded={false} onClick={() => setKod(true)}><QrCode size={16} />Pokaż kod</Przycisk>
         : <p className="max-w-xs text-sm text-slate-600">Serwer nie ma jeszcze APK kolektora — dokłada je
           aktualizacja serwera. Do tego czasu zostaje instalacja z pliku.</p>}
       <div className="text-sm">
