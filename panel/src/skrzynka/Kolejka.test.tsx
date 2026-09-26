@@ -68,19 +68,16 @@ describe("Kolejka", () => {
     expect(wybierz).toHaveBeenCalledWith(4821);
   });
 
-  it("nieświeża kolejka mówi, z kiedy jest stan i czego może brakować", () => {
+  it("nieświeża kolejka nie powtarza alarmu, ale mówi, z kiedy jest stan", () => {
     /* Pusta kolejka przy stojącym synchronizatorze to nie „brak pytań",
-       tylko „nie wiem" — i ekran ma to powiedzieć. */
+       tylko „nie wiem". Od @wydanie mówi to baner alarmu nad kolumnami
+       (`nieswieza` to dokładnie jego warunek), więc plakietka „STAN Z"
+       i stopka zeszły. Godzina synchronizacji przy tytule zostaje (0.193.0). */
     render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={null} laduje={false}
       nieswieza onWybierz={() => {}} onOdswiez={() => {}} />);
-    expect(screen.getByText(/STAN Z/)).toBeInTheDocument();
-    expect(screen.getByText(/nie zostały jeszcze pobrane/)).toBeInTheDocument();
-  });
-
-  it("świeża kolejka nie straszy plakietką", () => {
-    render(<Kolejka rozmowy={[rozmowa()]} stan={STAN} wybranaId={null} laduje={false}
-      onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.queryByText(/STAN Z/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/nie zostały jeszcze pobrane/)).not.toBeInTheDocument();
+    expect(screen.getByText(/synchronizacja/)).toBeInTheDocument();
   });
 
   it("wybrany wiersz jest oznaczony dla czytnika ekranu, nie tylko kolorem", () => {
@@ -115,14 +112,14 @@ describe("Kolejka", () => {
     expect(screen.queryByText("Czeka")).not.toBeInTheDocument();
     expect(screen.queryByText("Nieprzypisana")).not.toBeInTheDocument();
     /* Od 0.506.0 „Oczekujące" i „Zakończone" stoją pod „Więcej". */
-    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"), "oczekujace");
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"), "Oczekujące · 1");
     expect(screen.getByText("Czeka")).toBeInTheDocument();
   });
 
   it("zakończona schodzi z roboczych do „Zakończonych” — także zamknięta sprzed tej wersji", async () => {
     render(<Kolejka rozmowy={KOMPLET} stan={STAN} wybranaId={null} mojeId={7} laduje={false}
       onWybierz={() => {}} onOdswiez={() => {}} />);
-    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"), "zakonczone");
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"), "Zakończone · 1");
     expect(screen.getByText("Sprawa z archiwum")).toBeInTheDocument();
     expect(screen.queryByText("Moja")).not.toBeInTheDocument();
   });
@@ -551,16 +548,35 @@ describe("Kolejka: klawiatura", () => {
     expect(screen.getByRole("button", { name: /Wszystkie/ })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("cyfra wybiera też kubełek spod „Więcej” i lista pokazuje jego nazwę", async () => {
+    zKlawiszami(null, vi.fn());
+    await userEvent.keyboard("5");
+    const lista = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
+    expect(lista.selectedOptions[0].textContent).toMatch(/^Zakończone/);
+    expect(screen.getByRole("button", { name: /Wszystkie/ })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("fokus w liście „Więcej” nie przesuwa rozmowy — strzałka należy do listy", async () => {
+    /* Strażnik z `nawigacja/fokus.ts` zna SELECT; własny, sprzed @wydanie,
+       go nie znał i strzałka w liście przerzucała też rozmowę. */
+    const onWybierz = vi.fn();
+    zKlawiszami(null, onWybierz);
+    screen.getByLabelText("Więcej kubełków").focus();
+    await userEvent.keyboard("{ArrowDown}j");
+    expect(onWybierz).not.toHaveBeenCalled();
+  });
+
   it("pasek pokazuje klawisze, bo skrót, o którym nikt nie wie, nie skraca pracy", async () => {
     /* Ta sama lekcja co 0.281.0 na reklamacjach. Pasek NIE obiecuje sit
        „moje"/„niczyje": w skrzynce „Moje" jest kubełkiem pod cyfrą. */
     zKlawiszami(null, vi.fn());
-    /* Skróty siedzą pod „?" od 0.402.0 — reguła została ta sama: pokazane
-       klawisze mają być TYMI, które naprawdę działają. */
-    await userEvent.click(screen.getByRole("button", { name: /Skróty klawiszowe/ }));
-    expect(screen.getByText(/ruch po liście/)).toBeInTheDocument();
-    expect(screen.getByText(/kubełek/)).toBeInTheDocument();
-    expect(screen.queryByText(/niczyje/)).toBeNull();
+    /* Skróty siedzą pod „?" od 0.402.0, od @wydanie pod tym samym „?" co
+       słownik znaków. Reguła ta sama: pokazane klawisze mają DZIAŁAĆ. */
+    await userEvent.click(screen.getByRole("button", { name: "Znaki i skróty" }));
+    const pomoc = screen.getByRole("region", { name: "Znaki i skróty" });
+    expect(pomoc).toHaveTextContent("ruch po liście");
+    expect(pomoc).toHaveTextContent(/1–5\s*kubełek/);
+    expect(pomoc).not.toHaveTextContent(/niczyje/);
   });
 
   it("wiersz woła plakietką REKLAMACYJNA — inaczej znacznik nie zmieniałby wyboru pracy", () => {
@@ -602,12 +618,28 @@ describe("podziękowanie w kolejce", () => {
 describe("słownik znaków pod „?”", () => {
   it("otwiera się z kolejki i nazywa każdą kategorię", async () => {
     pokaz([rozmowa()]);
-    await userEvent.click(screen.getByRole("button", { name: "Co znaczą znaki" }));
-    const slownik = screen.getByRole("region", { name: "Co znaczą znaki" });
+    await userEvent.click(screen.getByRole("button", { name: "Znaki i skróty" }));
+    const slownik = screen.getByRole("region", { name: "Znaki i skróty" });
     expect(slownik).toHaveTextContent("Dobór");
     expect(slownik).toHaveTextContent("wymaga człowieka");
     await userEvent.click(screen.getByRole("button", { name: "Zamknij słownik" }));
-    expect(screen.queryByRole("region", { name: "Co znaczą znaki" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Znaki i skróty" })).not.toBeInTheDocument();
+  });
+
+  it("jeden „?” w kolejce — skróty nie mają już osobnego przycisku", () => {
+    pokaz([rozmowa()]);
+    expect(screen.queryByRole("button", { name: /Skróty klawiszowe/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Znaki i skróty" })).toHaveLength(1);
+  });
+
+  it("zamyka się Escape'em i kliknięciem obok, jak każde okienko panelu", async () => {
+    pokaz([rozmowa()]);
+    await userEvent.click(screen.getByRole("button", { name: "Znaki i skróty" }));
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("region", { name: "Znaki i skróty" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Znaki i skróty" }));
+    await userEvent.click(screen.getByLabelText("Szukaj w rozmowach"));
+    expect(screen.queryByRole("region", { name: "Znaki i skróty" })).not.toBeInTheDocument();
   });
 });
 

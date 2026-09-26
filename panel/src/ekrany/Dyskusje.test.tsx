@@ -228,7 +228,9 @@ describe("Ekran dyskusji", () => {
 
   it("przełączenie kubełka przestawia kursor na jego pierwszą sprawę", async () => {
     pokaz("/obsluga/dyskusje/1");
-    await userEvent.click(screen.getByRole("button", { name: /Zamknięte\s*1/ }));
+    /* Zamknięte stoją od @wydanie pod „Więcej", z tym samym licznikiem. */
+    await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"),
+      screen.getByRole("option", { name: "Zamknięte · 1" }));
     expect(screen.getByRole("button", { name: /Sprawa wyjaśniona/ }))
       .toHaveAttribute("aria-current", "true");
   });

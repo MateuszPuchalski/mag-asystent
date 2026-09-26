@@ -18,7 +18,8 @@ import { Edytor } from "../reklamacje/Edytor";
 import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamacje/Werdykt";
 import { Prowadzi } from "../sprawy/Prowadzi";
 import { useSzkicSprawy } from "../sprawy/useSzkicSprawy";
-import { Blad, FiltrSegmentowy, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { Blad, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { KUBELKI, Kolejka } from "../reklamacje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
@@ -506,7 +507,11 @@ export function Reklamacje() {
               pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
               zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
               kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
-          <FiltrSegmentowy<KubelekReklamacji | null> wybrany={kubelek} onWybierz={przelacz}
+          {/* Rozstrzygnięte i Bez ruchu pod „Więcej" (@wydanie): oba mówią
+              „tylko wgląd", więc nie stoją w wadze kubełka pracy. Cyfry dalej
+              je wybierają — powód przy `ui/FiltrZWiecej.tsx`. */}
+          <FiltrZWiecej<KubelekReklamacji | null> wybrany={kubelek} onWybierz={przelacz}
+            wiecej={["zamknieta", "bez_ruchu"]}
             pozycje={[
               ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
                 ile: data?.liczniki?.[k.id] ?? 0,
