@@ -2,6 +2,7 @@ import React from "react";
 import { useTarcie, type LiczbyTarcia } from "../api/wglad";
 import { Liczba } from "../ui/wykres";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
+import { PomiaryDecyzji } from "./PomiaryDecyzji";
 
 /* ── Tarcie w skrzynce (0.500.0) ────────────────────────────────────────────
    Trzy liczby, po których widać, czy zmiana układu skrzynki pomogła: ile
@@ -59,5 +60,10 @@ export function TarcieSkrzynki({ dni }: { dni: number }) {
         </tr>)}
       </Tabela>
     </KartaWgladu>}
+    {/* Pod tarciem i jego rozbiciem na osoby, bo liczy z tego samego odczytu
+        (@wydanie): tam „ile", tu „co z tego wynika dla decyzji właściciela".
+        Rozbicie zostaje przy liczbach, które rozbija. Drugi fetch po te same
+        wiersze byłby kosztem za nic. */}
+    <PomiaryDecyzji t={t.data} />
   </>;
 }

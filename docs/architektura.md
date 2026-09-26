@@ -710,6 +710,14 @@ Raport **nie niesie ludzi**. Zapisany co tydzień i czytany przez biuro byłby
 trwałą kopią monitoringu pracowniczego, który od 0.431.0 widzi tylko admin,
 na żywo. Ekran: Analiza → Tydzień, tylko odczyt.
 
+### Pominięcia w skrzynce (@wydanie)
+
+`pominiecia_dzien` to nowa miara zapisana w bazie: ile rozmów otwarto
+i zostawiono bez ruchu, na dobę i kategorię. Nie ma w niej autora, rozmowy
+ani godziny, bo każda z tych kolumn wskazałaby człowieka. Z tego samego
+powodu zapis nie woła `logEvent` — to jedyny taki wyjątek w biurze. Powód
+stoi przy `zapiszPominiecie` w `services/tarcie.ts` i w §26c.1 panelu obsługi.
+
 ---
 
 ## 10. Testy i bramki

@@ -178,7 +178,9 @@ export type PomiarCopilota = {
   /** Klasyfikacja w kształcie specyfikacji — precyzja i czułość per klasa. */
   klasyfikacja: PomiarKlasyfikacji;
   /** Rozbicie księgi po zadaniu (0.231.0) — koszt szkiców osobno od klasyfikacji. */
-  wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number }>;
+  wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number;
+    /** Czas czekania na model w ms (@wydanie); `null` bez zmierzonego wywołania. */
+    medianaMs: number | null; p90Ms: number | null }>;
   szkice: {
     ile: number; odrzuconych: number;
     /** Los danych doboru z rozmowy — osobno od losu szkicu. */

@@ -38,12 +38,27 @@ function udzial(u: Udzial | null): string {
 /** Dolary na złotówki dla oka. Kurs orientacyjny — rachunek wystawia dostawca. */
 const zl = (usd: number) => `${(usd * 4).toFixed(2)} zł`;
 
+/* ── Czas czekania na Copilota (26 września 2026, @wydanie) ──────────────
+   Księga zapisywała czas każdego wywołania od początku, a nikt go nie
+   czytał. Agent czeka na szkic przy otwartej rozmowie, więc to koszt
+   w sekundach obok kosztu w złotych. Mediana mówi o zwykłym czekaniu,
+   p90 o tym, które agent zapamięta. Nazwy zadań po ludzku, bo klucz
+   z księgi to głos programisty. */
+const NAZWA_ZADANIA: Record<string, string> = {
+  szkic: "szkic odpowiedzi", klasyfikacja: "rozpoznanie kategorii", pytanie: "pytanie do Copilota",
+  rozpoznanie_reklamacji: "rozpoznanie reklamacji", pasowanie_siec: "pasowanie z sieci",
+  pasowanie_siec_silnik: "pasowanie od silnika", klucz_modelu: "klucz modelu z opisu",
+};
+const sek = (ms: number | null) => (ms === null ? "—" : `${(ms / 1000).toFixed(1).replace(".", ",")} s`);
+
 export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
   if (!dane) return null;
   /* Zero udziału cache przy niezerowej liczbie wywołań to objaw, nie stan
      spoczynku: cache nie włączył się, bo prefiks instrukcji jest krótszy niż
      minimum modelu albo coś go rozbija. */
   const cacheMilczy = dane.wywolan > 0 && dane.tokeny.cacheOdczyt === 0;
+  const czekanie = dane.wgZadania.find((z) => z.zadanie === "szkic" && z.medianaMs !== null);
+  const zCzasem = dane.wgZadania.filter((z) => z.medianaMs !== null);
   /* Rama wspólna z resztą analizy (0.519.0). Na wierzchu zostały trzy
      rzeczy, na których zapada decyzja o modelu: wywołania, nieudane
      i rachunek. Zeszły z ekranu (0.519.0): podpis „tokeny liczone od
@@ -60,6 +75,10 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
 
     <p className="mt-4 border-t pt-4 text-sm text-slate-600">
       Rachunek: <b>{dane.kosztUsd.toFixed(2)} USD</b> ({zl(dane.kosztUsd)}).
+      {/* Jedno zdanie o czekaniu na wierzchu — o szkicu, bo na niego agent
+          czeka przy otwartej rozmowie. Reszta zadań w szczegółach. */}
+      {czekanie && <> Na szkic czeka się zwykle <b>{sek(czekanie.medianaMs)}</b>,
+        {" "}co dziesiąty dłużej niż <b>{sek(czekanie.p90Ms)}</b>.</>}
     </p>
 
     {/* Decyzje, szkice i tabela precyzji zwinięte (0.519.0): to raport
@@ -118,6 +137,17 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
             {" "}biuro zatwierdziło <b>{dane.szkice.pasowaniaZatwierdzonePrzezBiuro}</b>.</>}
         </p>;
       })()}
+
+      {zCzasem.length > 0 && <div className="mt-3 border-t pt-3" aria-label="Czas czekania na Copilota">
+        <Tabela naglowki={["zadanie", "wywołań", "zwykle", "co dziesiąte dłużej niż"]} pusto="">
+          {zCzasem.map((z) => <tr key={z.zadanie}>
+            <Td>{NAZWA_ZADANIA[z.zadanie] ?? z.zadanie}</Td>
+            <Td className="tabular-nums">{z.wywolan}</Td>
+            <Td className="tabular-nums">{sek(z.medianaMs)}</Td>
+            <Td className="tabular-nums">{sek(z.p90Ms)}</Td>
+          </tr>)}
+        </Tabela>
+      </div>}
 
       {/* Tabela wspólna z resztą analizy (0.519.0) zamiast własnej, pisanej
           wersalikami. */}
