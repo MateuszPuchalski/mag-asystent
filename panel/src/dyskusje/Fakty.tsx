@@ -74,7 +74,7 @@ function Notatka({ dyskusja, trwa, blad, onZapisz, onCofnij }: {
       placeholder="Ustalenia, których Allegro nie zna"
       className="field resize-y text-sm" />
     {blad && <p className="text-xs text-red-700">{blad}</p>}
-    {/* Przycisk staje dopiero przy ZMIANIE (@wydanie). Główny, bursztynowy
+    {/* Przycisk staje dopiero przy ZMIANIE (0.520.0). Główny, bursztynowy
         guzik stał pod pustym polem przy każdej dyskusji i był najgłośniejszą
         rzeczą w kolumnie faktów, choć nie było czego zapisać. Wyszarzony
         zaprasza do kliknięcia i odmawia; zapis i tak zaczyna się od pisania. */}
@@ -131,7 +131,7 @@ export function Fakty({
 }) {
   const d = szczegol.dyskusja;
   return <div className="flex min-h-0 flex-col">
-    {/* ── SPRAWA I STAN ZWINIĘTE (@wydanie) ───────────────────────────────────
+    {/* ── SPRAWA I STAN ZWINIĘTE (0.520.0) ───────────────────────────────────
         Zgłoszenie agentów: „aplikacja przytłacza". Obie sekcje stały otwarte
         przy każdej dyskusji, a ich treść — temat, login, liczba wiadomości —
         powtarza wiersz kolejki i nagłówek rozmowy obok. Ten sam ruch co
@@ -157,10 +157,10 @@ export function Fakty({
               dyskusji ani `decisionDueDate`, ani `statusDueDate`; jedyną miarą
               pilności jest to, jak długo piłka leży po naszej stronie.
 
-              Dopisek „Allegro terminu tu nie stawia" zszedł (@wydanie): to było
+              Dopisek „Allegro terminu tu nie stawia" zszedł (0.520.0): to było
               zdanie programisty do agenta, a agent nie szukał tu terminu. */}
           <Wiersz etykieta="Czeka na nas">{czekaSlowem(d)}</Wiersz>
-          {/* ── STATUS DOMYŚLNY NIE JEST INFORMACJĄ (@wydanie) ────────────────
+          {/* ── STATUS DOMYŚLNY NIE JEST INFORMACJĄ (0.520.0) ────────────────
               Ta sama reguła co w głowicy reklamacji od 0.414.0.
               `DISPUTE_ONGOING` ma każda trwająca dyskusja, więc wiersz mówił
               „to zwykła dyskusja". Staje tylko, gdy stan ODBIEGA od
@@ -233,7 +233,7 @@ export function Fakty({
       </Wiersz>}
     </Sekcja>
 
-    {/* ── JEDNA SEKCJA ZAMIAST CZTERECH (@wydanie) ────────────────────────────
+    {/* ── JEDNA SEKCJA ZAMIAST CZTERECH (0.520.0) ────────────────────────────
         Ten sam ruch, który kolumna reklamacji zrobiła w 0.416.0; pełny powód
         stoi tam, w `reklamacje/Dowody.tsx`. Pod kolumną dyskusji zostały
         CZTERY sekcje o jednym zakupie: zwroty, inne sprawy, droga i rozmowy.
@@ -262,7 +262,7 @@ export function Fakty({
     {/* Zlecenie hali z dyskusji (0.502.0) — powód w `sprawy/ZlecHali.tsx`.
         Dyskusja nie ma numeru od Allegro (§25c.1), więc tytuł niesie temat.
 
-        Nagłówek „Hala" zszedł (@wydanie): stał nad jednym przyciskiem, który
+        Nagłówek „Hala" zszedł (0.520.0): stał nad jednym przyciskiem, który
         sam mówi „Zleć hali", więc powtarzał jego napis. */}
     <div className="border-t border-slate-200 px-4 py-2">
       <ZlecHali zrodlo="dyskusja" zrodloRef={d.id} tytul={`Dyskusja — ${d.temat ?? `#${d.id}`}`} />

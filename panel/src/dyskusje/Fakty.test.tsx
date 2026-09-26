@@ -12,7 +12,7 @@ vi.mock("../api/rozmowy", () => ({
   useNoweZadanie: () => ({ mutate: () => {}, isPending: false }),
 }));
 
-/* ── Kolumna faktów o dyskusji uproszczona (@wydanie) ────────────────────────
+/* ── Kolumna faktów o dyskusji uproszczona (0.520.0) ────────────────────────
    Zgłoszenie agentów: „aplikacja przytłacza". Każdy test pilnuje jednej rzeczy,
    która zeszła z wierzchu, i tego, że dalej jest najwyżej jedno kliknięcie
    dalej. Nic z tej kolumny nie zniknęło na dobre.                          */

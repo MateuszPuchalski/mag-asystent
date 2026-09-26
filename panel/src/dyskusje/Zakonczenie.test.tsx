@@ -78,7 +78,7 @@ describe("Prośba o zakończenie dyskusji", () => {
   });
 
   it("po wysłanej prośbie przycisku NIE MA, a podpowiedź mówi, że zamyka Allegro", () => {
-    /* Zdanie „zamyka Allegro" zeszło do podpowiedzi (@wydanie) — test pilnuje,
+    /* Zdanie „zamyka Allegro" zeszło do podpowiedzi (0.520.0) — test pilnuje,
        że nie zniknęło, tylko przestało zajmować linijkę. */
     render(<Zakonczenie {...props({
       dyskusja: d({ zakonczenieStatus: "sent", zakonczeniePrzez: "Ala" }) })} />);

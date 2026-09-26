@@ -444,7 +444,7 @@ export function Dyskusje() {
       <Karta className="flex min-h-0 flex-col overflow-y-auto p-4">
         {szczegol.data
           ? <>
-              {/* ── JEDEN WIERSZ NAGŁÓWKA (@wydanie) ─────────────────────────
+              {/* ── JEDEN WIERSZ NAGŁÓWKA (0.520.0) ─────────────────────────
                   Zgłoszenie agentów: „aplikacja przytłacza". Nad rozmową stały
                   TRZY osobne rzędy — „Prowadzi", odświeżenie i prośba
                   o zakończenie — każdy z jednym przyciskiem. Teraz to jeden

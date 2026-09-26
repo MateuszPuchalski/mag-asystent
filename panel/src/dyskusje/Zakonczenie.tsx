@@ -26,7 +26,7 @@ import { LIMIT_ZNAKOW } from "../reklamacje/Edytor";
    słowa. Limit znaków jest TEN SAM co w czacie — agent nie ma uczyć się
    dwóch liczb dla dwóch pól tego samego ekranu.
 
-   ── ZDANIEM, NIE WERSALIKAMI, I W WIERSZU NAGŁÓWKA (@wydanie) ──────────────
+   ── ZDANIEM, NIE WERSALIKAMI, I W WIERSZU NAGŁÓWKA (0.520.0) ──────────────
    Zgłoszenie agentów: „aplikacja przytłacza". Napisy wersalikami krzyczały
    głośniej niż treść sprawy, więc piszemy je zdaniem, jak skrzynka od 0.506.0.
    Przycisk stoi w jednym wierszu z „Prowadzi" i odświeżeniem. Formularz
@@ -52,7 +52,7 @@ export function Zakonczenie({ dyskusja, wysyla, blad, onZakoncz }: {
      NIE robić: drugiej prośby nie wysyłamy, bo pierwsza mogła dojść. */
   if (dyskusja.zakonczenieStatus) {
     const niepewny = dyskusja.zakonczenieStatus === "send_uncertain";
-    /* Objaśnienie spokojnego stanu zeszło do podpowiedzi (@wydanie): „zamyka
+    /* Objaśnienie spokojnego stanu zeszło do podpowiedzi (0.520.0): „zamyka
        Allegro" agent czyta raz, a linijka stała przy każdej takiej sprawie.
        Ostrzeżenie przy NIEPEWNYM losie zostaje na wierzchu, bo mówi, czego
        nie robić — schowane pod myszą nie zatrzymałoby drugiej prośby. */

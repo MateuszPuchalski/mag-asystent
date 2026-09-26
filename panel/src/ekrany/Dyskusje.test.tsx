@@ -200,7 +200,7 @@ describe("Ekran dyskusji", () => {
   });
 
   it("prowadzący, odświeżenie i prośba o zakończenie stoją w JEDNYM wierszu", () => {
-    /* Do @wydanie trzy osobne rzędy nad rozmową, każdy z jednym przyciskiem.
+    /* Do 0.520.0 trzy osobne rzędy nad rozmową, każdy z jednym przyciskiem.
        „Odśwież z Allegro" zostaje decyzją właściciela — przeniesiony, nie
        zdjęty — więc test pilnuje obu rzeczy naraz. */
     pokaz("/obsluga/dyskusje/1", [wiad()]);
