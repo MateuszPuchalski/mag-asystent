@@ -191,7 +191,7 @@ describe("Ekran dyskusji", () => {
     await userEvent.click(screen.getByRole("button", { name: /Odśwież z Allegro/ }));
     expect(ile()).toBe(2);
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Odpisuję");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /wyślij odpowiedź/i }));
     expect(ile()).toBe(3);
     await userEvent.click(screen.getByRole("button", { name: /POPROŚ O ZAKOŃCZENIE/ }));
     await userEvent.click(screen.getByRole("checkbox"));
@@ -242,7 +242,7 @@ describe("Ekran dyskusji", () => {
       wiad({ id: 3, autorRola: "SELLER", tresc: "Nasza odpowiedź" }),
     ]);
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Odpisuję");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /wyślij odpowiedź/i }));
     const wyslane = scena.mutacje.find((m) => m.startsWith("odpowiedz:"));
     expect(wyslane).toBeTruthy();
     expect(JSON.parse(wyslane!.slice("odpowiedz:".length)).expectedLastMessageId).toBe(2);
