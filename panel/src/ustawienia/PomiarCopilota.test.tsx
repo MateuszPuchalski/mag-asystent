@@ -53,9 +53,9 @@ describe("PomiarCopilota", () => {
     expect(screen.queryByLabelText("Szkice przed pracą")).toBeNull();
     unmount();
     render(<PomiarCopilota dane={dane({ wgZadania: [
-      { zadanie: "szkic", wywolan: 30, bledow: 0, kosztUsd: 3 },
-      { zadanie: "szkic_przed_praca", wywolan: 12, bledow: 1, kosztUsd: 1.2 },
-      { zadanie: "klasyfikacja_przed_praca", wywolan: 14, bledow: 0, kosztUsd: 0.05 },
+      { zadanie: "szkic", wywolan: 30, bledow: 0, kosztUsd: 3, medianaMs: null, p90Ms: null },
+      { zadanie: "szkic_przed_praca", wywolan: 12, bledow: 1, kosztUsd: 1.2, medianaMs: null, p90Ms: null },
+      { zadanie: "klasyfikacja_przed_praca", wywolan: 14, bledow: 0, kosztUsd: 0.05, medianaMs: null, p90Ms: null },
     ] })} />);
     const w = screen.getByLabelText("Szkice przed pracą");
     expect(w.textContent).toContain("12 szkiców i 14 rozpoznań");
@@ -63,6 +63,28 @@ describe("PomiarCopilota", () => {
     expect(within(w).getByText("1")).toHaveClass("text-ranga-uwaga");
     /* Wiersz dnia liczy tylko swoje zadanie — poranek nie wlicza się dwa razy. */
     expect(screen.getByLabelText("Szkice odpowiedzi").textContent).toContain("30 wywołań");
+  });
+
+  /* Czas czekania na Copilota (@wydanie): jedno zdanie o szkicu na wierzchu,
+     tabela po zadaniu w szczegółach, nazwy zadań po ludzku. */
+  it("podaje czas czekania: zdanie o szkicu na wierzchu, mediana i p90 zadań w szczegółach", () => {
+    render(<PomiarCopilota dane={dane({ wgZadania: [
+      { zadanie: "szkic", wywolan: 12, bledow: 0, kosztUsd: 0.3, medianaMs: 6_400, p90Ms: 14_000 },
+      { zadanie: "klasyfikacja", wywolan: 8, bledow: 1, kosztUsd: 0.2, medianaMs: 900, p90Ms: 1_500 },
+      { zadanie: "stare", wywolan: 2, bledow: 0, kosztUsd: 0, medianaMs: null, p90Ms: null },
+    ] })} />);
+    expect(screen.getByText(/Rachunek/).textContent).toContain("Na szkic czeka się zwykle 6,4 s, co dziesiąty dłużej niż 14,0 s.");
+    const tabela = screen.getByLabelText("Czas czekania na Copilota");
+    expect(screen.getByText("Szczegóły").closest("details")).toContainElement(tabela);
+    expect(tabela.textContent).toContain("rozpoznanie kategorii");
+    expect(tabela.textContent).toContain("0,9 s");
+    expect(tabela.textContent).not.toContain("stare");
+  });
+
+  it("bez zmierzonego szkicu zdania o czekaniu nie ma", () => {
+    render(<PomiarCopilota dane={dane()} />);
+    expect(screen.getByText(/Rachunek/).textContent).not.toContain("czeka");
+    expect(screen.queryByLabelText("Czas czekania na Copilota")).toBeNull();
   });
 
   it("cisza cache przy wywołaniach zostaje objawem — tonem, bez wykładu", () => {
