@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.512.0 — 26 września 2026
+
+**Analiza mówi mniej naraz.** W „Ergonomii w liczbach" otwarta stoi tylko sekcja „Gdzie jest wolno". Pięć pozostałych tabel jest zwiniętych, z tytułem na wierzchu. Pusta sekcja mówi „brak" bez rozwijania. Bez pomiarów z pracy sama otwiera się sekcja skanu na ekranie głównym. Etykiety liczb w dostawach, pracy hali i obsłudze nie powtarzają już okna z nagłówka. Zostaje „młodsze niż 7 dni", bo to inne okno. Kolumna „DO DECYZJI" w raporcie tygodnia pisze się teraz „Do decyzji".
+
 ## 0.511.0 — 26 września 2026
 
 **Ekran reklamacji mówi mniej naraz.** Licznik znaków w odpowiedzi i przy

@@ -75,13 +75,15 @@ function TabelaPowrotow({ wiersze, naglowek, nazwa }: {
   </Tabela>;
 }
 
-function KartyPowrotow({ p, dni }: { p: Powroty; dni: number }) {
+function KartyPowrotow({ p }: { p: Powroty }) {
   return <>
     <KartaWgladu tytul="Bez ponownego pytania"
       opis={`Po naszej odpowiedzi klient nie pisał już w tej rozmowie przez ${p.oknoDni} dni. `
         + "Podziękowanie się nie liczy. Mierzy skutek, nie szybkość."}>
       <div className="flex flex-wrap gap-8">
-        <Liczba ile={procent(p.bezPowrotu, p.n)} etykieta={`z ${p.n} odpowiedzi z wynikiem, okno ${dni} dni`} />
+        {/* Bez „okno N dni" (0.512.0) — okno zakresu stoi w nagłówku Analizy.
+            „Młodsze niż N dni" niżej zostaje: to INNE okno, czas na powrót klienta. */}
+        <Liczba ile={procent(p.bezPowrotu, p.n)} etykieta={`z ${p.n} odpowiedzi z wynikiem`} />
         <Liczba ile={p.wrocilo} etykieta={p.wrociloBezRozpoznania
           ? `klient wrócił · ${p.wrociloBezRozpoznania} bez rozpoznania, mogło być podziękowanie`
           : "klient wrócił"} />
@@ -104,7 +106,8 @@ export function ZakresObslugi({ a }: { a: CzasOdpowiedzi }) {
     <KartaWgladu tytul="Czas odpowiedzi klientowi"
       opis="Od pierwszej wiadomości klienta do naszej odpowiedzi. Autoodpowiedź się nie liczy.">
       <div className="flex flex-wrap gap-8">
-        <Liczba ile={a.ogolem.n} etykieta={`odpowiedzi w oknie ${a.dni} dni`} />
+        {/* Okno podaje nagłówek Analizy — tu bez powtórki (0.512.0). */}
+        <Liczba ile={a.ogolem.n} etykieta="odpowiedzi" />
         <Liczba ile={czasPo(a.ogolem.medianaMin)} etykieta="mediana" />
         <Liczba ile={czasPo(a.ogolem.p90Min)} etykieta="9 na 10 odpowiedzi szybciej niż" />
         {/* Skrzynka układa się domyślnie od najdłużej czekającego klienta,
@@ -115,7 +118,7 @@ export function ZakresObslugi({ a }: { a: CzasOdpowiedzi }) {
           ton={a.czekaTeraz.n > 0 ? "text-ranga-uwaga" : ""} />
       </div>
     </KartaWgladu>
-    <KartyPowrotow p={a.powroty} dni={a.dni} />
+    <KartyPowrotow p={a.powroty} />
     <KartaWgladu tytul="Według kategorii"
       opis="Kategoria z rozpoznania wiadomości, na którą odpowiadaliśmy.">
       <TabelaCzasu wiersze={a.wgKategorii} naglowek="kategoria" nazwa={nazwaKategorii} />
