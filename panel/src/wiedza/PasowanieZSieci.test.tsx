@@ -4,7 +4,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { StanPasowaniaZSieci } from "../api/typy";
-import { NA_KLIKNIECIE, PasowanieZSieci } from "./PasowanieZSieci";
+import { GODZINA_MS, NA_KLIKNIECIE, PasowanieZSieci } from "./PasowanieZSieci";
 
 /* ── Pasowanie z sieci uruchomione ręcznie (0.508.0) ────────────────────────
    Po prawdziwym `fetch`. Otwarcie to wyłącznie odczyt stanu. Wyłączony
@@ -75,6 +75,36 @@ describe("pasowanie z sieci na żądanie", () => {
     const wynik = await screen.findByLabelText("Wynik pasowania z sieci");
     await waitFor(() => expect(wynik).toHaveTextContent("pominięte jako niepewne: cytatu nie ma na stronie: 2"));
     expect(wynik).not.toHaveTextContent(/sito/);
+  });
+
+  /* Tryb godzinny (@wydanie): ta sama pętla, koniec po czasie albo limicie. */
+  it("„przez godzinę” idzie dalej niż trzy kartoteki i mówi, gdy zatrzymał go limit", async () => {
+    wyniki = [...Array.from({ length: NA_KLIKNIECIE + 2 }, () => ({ sprawdzono: 1, zaproponowano: 1 })),
+      { sprawdzono: 0, zaproponowano: 0 }];
+    pokaz();
+    await userEvent.click(await screen.findByRole("button", { name: /Sprawdzaj przez godzinę/ }));
+    const koniec = await screen.findByLabelText("Koniec przebiegu");
+    expect(koniec).toHaveTextContent("wyczerpał się limit");
+    expect(koniec).toHaveTextContent("PASOWANIE_Z_SIECI_NA_NOC");
+    expect(wyslane).toHaveLength(NA_KLIKNIECIE + 3);
+    expect(screen.getByLabelText("Wynik pasowania z sieci")).toHaveTextContent(`propozycji w kolejce: ${NA_KLIKNIECIE + 2}`);
+  });
+
+  it("„przez godzinę” kończy się po godzinie, nawet gdy jest co sprawdzać", async () => {
+    const start = 1_800_000_000_000;
+    /* Zegar skacze za koniec godziny po drugim żądaniu — pętla pyta o czas
+       przed każdą kartoteką, więc trzeciego żądania być nie może. */
+    const zegar = vi.spyOn(Date, "now").mockImplementation(() => start + (wyslane.length >= 2 ? GODZINA_MS + 1 : 0));
+    try {
+      wyniki = Array.from({ length: 10 }, () => ({ sprawdzono: 1, zaproponowano: 1 }));
+      pokaz();
+      await userEvent.click(await screen.findByRole("button", { name: /Sprawdzaj przez godzinę/ }));
+      await waitFor(() => expect(screen.getByRole("button", { name: /Sprawdzaj przez godzinę/ })).toBeEnabled());
+      expect(wyslane).toHaveLength(2);
+      expect(screen.queryByLabelText("Koniec przebiegu")).toBeNull();
+    } finally {
+      zegar.mockRestore();
+    }
   });
 
   it("gdy nie ma czego sprawdzać, pętla staje po pierwszym pustym kroku", async () => {
