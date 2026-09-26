@@ -136,7 +136,7 @@ describe("zwijanie dopytania (0.342.0)", () => {
   });
 });
 
-/* ── Znalezione w sieci (@wydanie) ───────────────────────────────────────────
+/* ── Znalezione w sieci (0.528.0) ───────────────────────────────────────────
    Pasowanie z przeczytanej strony idzie jednym kliknięciem do Kolejki Wiedzy,
    nie do klienta. Zapisane nie ma już przycisku — mówi, gdzie czeka. */
 describe("znalezione w sieci", () => {

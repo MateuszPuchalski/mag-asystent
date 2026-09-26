@@ -71,7 +71,7 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    Trzydziesty (0.527.0) to zatwierdzenie listą propozycji z sieci dla jednej
    kartoteki — ten sam kształt co zatwierdzenie wykazu. Trzydziesty pierwszy
    (0.527.0) to to samo dla jednego silnika z trybu „od silnika”. Trzydziesty
-   drugi (@wydanie) zatwierdza naraz wszystkie potwierdzone z sieci.
+   drugi (0.528.0) zatwierdza naraz wszystkie potwierdzone z sieci.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
 
@@ -455,7 +455,7 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     try {
       const wynik = await przebiegSieci({
         nadaj: nadawcaPasowaniaSieciAnthropic, nadajSilnik: nadawcaWykazuSilnikaAnthropic,
-        /* Ręcznie: własny sufit na godzinę, nie limit nocy (@wydanie) — patrz
+        /* Ręcznie: własny sufit na godzinę, nie limit nocy (0.528.0) — patrz
            `RECZNIE_NA_GODZINE`. Wyłącznik `PASOWANIE_Z_SIECI` obowiązuje dalej. */
         naNoc: RECZNIE_NA_GODZINE, oknoMs: GODZINA_MS, naPrzebieg: 1,
       });
@@ -473,7 +473,7 @@ export async function wiedzaRoutes(app: FastifyInstance) {
       catch (e) { return blad(reply, e); }
     });
 
-  /* Jedno kliknięcie dla wszystkich POTWIERDZONYCH propozycji z sieci (@wydanie):
+  /* Jedno kliknięcie dla wszystkich POTWIERDZONYCH propozycji z sieci (0.528.0):
      dwa niezależne źródła, w tym katalog — reguła SZPERACZA. Serwer liczy
      pewność od nowa, więc lista z ekranu nie przemyci słabszej propozycji. */
   app.post<{ Body: { ids?: unknown } }>("/api/obsluga/wiedza/pasowanie-z-sieci/zatwierdz-potwierdzone", async (req, reply) => {

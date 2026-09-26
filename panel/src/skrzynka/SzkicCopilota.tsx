@@ -58,7 +58,7 @@ export interface PropsSzkicuCopilota {
     pracuje: boolean;
     onPytaj: (pytanie: string) => void;
     limitZnakow: number;
-    /** „Zapisz jako propozycję” przy pasowaniu z sieci (@wydanie). */
+    /** „Zapisz jako propozycję” przy pasowaniu z sieci (0.528.0). */
     onZapiszPasowanie?: (wymianaId: number, nr: number) => void;
     zapisuje?: boolean;
   };

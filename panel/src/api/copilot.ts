@@ -194,7 +194,7 @@ export function useWymianyCopilota(rozmowaId: number) {
   });
 }
 
-/** „Zapisz jako propozycję” przy pasowaniu z sieci (@wydanie). Parę bierze serwer z wiersza wymiany. */
+/** „Zapisz jako propozycję” przy pasowaniu z sieci (0.528.0). Parę bierze serwer z wiersza wymiany. */
 export function useZapiszPasowanieZDopytania() {
   const qc = useQueryClient();
   return useMutation({

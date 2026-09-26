@@ -310,7 +310,7 @@ describe("Ekran wiedzy", () => {
     expect(zatwierdzZSieci).toHaveBeenCalledWith({ twId: 91, ids: [31] }, expect.anything());
   });
 
-  /* Uproszczenie (@wydanie): szukanie na górze Kolejki, a potwierdzone
+  /* Uproszczenie (0.528.0): szukanie na górze Kolejki, a potwierdzone
      z dwóch miejsc — kartoteki i silnika — jednym kliknięciem. Słabsze
      zostają do przeglądu i nie wchodzą do listy zatwierdzenia. */
   it("kolejka zaczyna się od szukania w sieci i zatwierdza wszystkie potwierdzone jednym kliknięciem", async () => {

@@ -50,7 +50,7 @@ import {
    zachowanie dla obu — a wtedy albo szkic przestałby być sprawdzany, albo
    dopytanie przestałoby umieć powiedzieć „tego numeru u nas nie ma".
 
-   ÓSMA (@wydanie) to „Zapisz jako propozycję” przy pasowaniu, które dopytanie
+   ÓSMA (0.528.0) to „Zapisz jako propozycję” przy pasowaniu, które dopytanie
    znalazło w sieci. Osobna od `szkic/:id/pasowanie`, bo para leży przy
    WYMIANIE, nie przy szkicu, i przeszła inne sito: stronę, nie fakty. Para
    idzie z wiersza sprawdzonego przez serwer, nie z ciała żądania.
@@ -261,7 +261,7 @@ export async function copilotRoutes(app: FastifyInstance) {
       }
     });
 
-  /** Pasowanie z sieci z dopytania → propozycja w Kolejce Wiedzy (@wydanie). */
+  /** Pasowanie z sieci z dopytania → propozycja w Kolejce Wiedzy (0.528.0). */
   app.post<{ Params: { id: string; nr: string } }>(
     "/api/obsluga/copilot/pytania/:id/pasowania/:nr", async (req, reply) => {
       const nie = odmowa(reply);

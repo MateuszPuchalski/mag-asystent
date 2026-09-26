@@ -599,7 +599,7 @@ export type WymianaCopilota = {
   przez: string;
   /** Po co model sięgnął do bazy (0.507.0). Brak = starszy serwer albo nie sięgał. */
   narzedzia?: UzycieNarzedziaCopilota[];
-  /** Pasowania z sieci po sicie serwera (@wydanie). Brak = starszy serwer albo bez sieci. */
+  /** Pasowania z sieci po sicie serwera (0.528.0). Brak = starszy serwer albo bez sieci. */
   pasowania?: PasowanieZDopytania[];
 };
 
@@ -624,7 +624,7 @@ export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta" | "dostawca";
  * ostrożność na wyrost: z tego, że na fotografii widać tabliczkę, nie wynika,
  * że to tabliczka maszyny, o którą klient pyta.
  */
-/* `siec` (@wydanie): strona przeczytana w dopytaniu; sufit „prawdopodobne”. */
+/* `siec` (0.528.0): strona przeczytana w dopytaniu; sufit „prawdopodobne”. */
 export type ZrodloTwierdzenia = "fakty" | "oferta" | "zdjecie" | "siec" | "model";
 export type PoziomPewnosci = "pewne" | "prawdopodobne" | "niepewne";
 export type TwierdzenieCopilota = {
@@ -869,7 +869,7 @@ export type PozycjaPrzegladu = {
   id: number; twId: number; symbol: string; nazwa: string | null; maszyna: string; warunki: string | null; dowod: string;
   /** Adres strony dowodu (0.527.0) — przy wykazach z sieci każdy wiersz ma własny. */
   link?: string | null;
-  /** Pewność z sieci (@wydanie), tylko przy wykazach silników z sieci. */
+  /** Pewność z sieci (0.528.0), tylko przy wykazach silników z sieci. */
   pewnosc?: PewnoscZSieci; zrodel?: number;
 };
 export type PrzegladWykazu = {
@@ -2175,7 +2175,7 @@ export type StanPasowaniaZSieci = {
   ostatnie: OstatniPrzebiegSieci[];
   /** Lista popularnych silników (0.527.0): ile ich razem i ile czeka. Brak = starszy serwer. */
   silniki?: { razem: number; doSprawdzenia: number };
-  /** Ręczne szukanie (@wydanie): własny limit na godzinę, osobny od nocy. Brak = starszy serwer. */
+  /** Ręczne szukanie (0.528.0): własny limit na godzinę, osobny od nocy. Brak = starszy serwer. */
   reczne?: { naGodzine: number; wGodzinie: number };
 };
 export type WynikPrzebieguSieci = {
@@ -2187,7 +2187,7 @@ export type WynikPrzebieguSieci = {
 /* ── Przegląd listą propozycji z sieci (0.527.0) ─────────────────────────────
    Kształt z `services/pasowanie-z-sieci.ts` (`przegladZSieci`). Grupa to
    KARTOTEKA: automat pyta o jedną część naraz. */
-/** Reguła SZPERACZA (@wydanie): „potwierdzone” to dwa niezależne źródła, w tym katalog. */
+/** Reguła SZPERACZA (0.528.0): „potwierdzone” to dwa niezależne źródła, w tym katalog. */
 export type PewnoscZSieci = "potwierdzone" | "prawdopodobne" | "slabe";
 export type PozycjaZSieci = {
   id: number; maszyna: string; warunki: string | null; cytat: string; link: string | null;

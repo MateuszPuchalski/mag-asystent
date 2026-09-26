@@ -9,13 +9,13 @@ import { Blad, NaglowekSekcji, Przycisk, czas, ile } from "../ui";
    0.508.0: właściciel chciał zobaczyć automat nocny w pracy bez czekania
    na 1:00. 0.527.0: „dodaj przycisk sprawdzaj przez godzinę”.
 
-   JEDEN PRZYCISK (@wydanie), decyzją właściciela: „uprość w użytkowaniu”.
+   JEDEN PRZYCISK (0.528.0), decyzją właściciela: „uprość w użytkowaniu”.
    Były dwa — „Sprawdź teraz (3)” i „Sprawdzaj przez godzinę” — i pytanie,
    który kliknąć, było jedyną decyzją, jaką karta stawiała. Zostaje godzina
    z przyciskiem „Zatrzymaj”, bo trzy kartoteki to też godzina przerwana
    po trzech. Mniej decyzji wygrywa spór o kształt ekranu.
 
-   WŁASNY LIMIT NA GODZINĘ (@wydanie). Ręczne szukanie zużywało limit nocy
+   WŁASNY LIMIT NA GODZINĘ (0.528.0). Ręczne szukanie zużywało limit nocy
    i godzina kończyła się po kilku kartotekach z radą „podnieś
    PASOWANIE_Z_SIECI_NA_NOC”. Żeby kliknąć, trzeba było zmienić ustawienie.
    Serwer liczy teraz ręczne szukanie w oknie godziny (`RECZNIE_NA_GODZINE`),
@@ -106,7 +106,7 @@ export function PasowanieZSieci() {
     <div>
       <NaglowekSekcji>Szukanie w sieci</NaglowekSekcji>
       {/* GDZIE SZUKAĆ WYNIKU. Właściciel po pierwszym przebiegu zapytał, gdzie
-          trafiają propozycje. Karta stoi teraz na górze Kolejki (@wydanie),
+          trafiają propozycje. Karta stoi teraz na górze Kolejki (0.528.0),
           więc odpowiedź to „niżej, tutaj” — bez przechodzenia między zakładkami. */}
       <p className="text-sm text-slate-600">
         Szuka po numerach OEM, do czego pasują nasze części — w katalogach producentów i sklepach, nigdy na
@@ -139,7 +139,7 @@ export function PasowanieZSieci() {
       {sumy.bledow > 0 && <span className="text-red-800"> · błędów: {sumy.bledow}</span>}
       {sumy.przerwane && <span className="text-red-800"> · przerwano: {sumy.przerwane}</span>}</p>}
     <Blad>{blad || (dane.error as Error | null)?.message}</Blad>
-    {/* Zwinięte (@wydanie): to wiedza na wypadek pytania „czemu nic nie
+    {/* Zwinięte (0.528.0): to wiedza na wypadek pytania „czemu nic nie
         znalazł”, nie do czytania co dzień nad kolejką. */}
     {s && s.ostatnie.length > 0 && <details aria-label="Ostatnio sprawdzone">
       <summary className="cursor-pointer text-sm text-slate-600">Ostatnio sprawdzone</summary>

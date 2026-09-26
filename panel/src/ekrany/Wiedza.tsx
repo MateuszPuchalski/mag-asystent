@@ -71,7 +71,7 @@ export function Wiedza() {
     ...przegladySieci.flatMap((g) => g.pozycje.map((p) => p.id)),
     ...przegladySilnikow.flatMap((g) => g.pozycje.map((p) => p.id))]);
   const propozycje = (kolejka.data?.propozycje ?? []).filter((z) => !wPrzegladzie.has(z.id));
-  /* JEDNO KLIKNIĘCIE DLA PEWNYCH (@wydanie), decyzją właściciela: „uprość
+  /* JEDNO KLIKNIĘCIE DLA PEWNYCH (0.528.0), decyzją właściciela: „uprość
      w użytkowaniu”. Reguła SZPERACZA: dwa niezależne źródła, w tym katalog
      producenta albo baza części, to „potwierdzone”. Takie wiersze i tak
      przechodziły przegląd bez odznaczania, więc karta po karcie to same
@@ -126,7 +126,7 @@ export function Wiedza() {
         <Blad>{blad || (kolejka.error as Error | null)?.message}</Blad>
 
         {widok === "kolejka" && <>
-          {/* Szukanie w sieci NA GÓRZE KOLEJKI (@wydanie): jego wynikiem są
+          {/* Szukanie w sieci NA GÓRZE KOLEJKI (0.528.0): jego wynikiem są
               propozycje tej kolejki, więc start i wynik stoją w jednym widoku. */}
           <div className="mb-3"><PasowanieZSieci /></div>
           {potwierdzone.length > 0 && <div className="mb-3 flex flex-wrap items-center gap-3 rounded-lg bg-green-50 p-3"

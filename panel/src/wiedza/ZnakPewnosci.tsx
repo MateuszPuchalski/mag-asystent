@@ -2,7 +2,7 @@ import React from "react";
 import type { PewnoscZSieci } from "../api/typy";
 import { ile } from "../ui";
 
-/* ── Pewność propozycji z sieci (@wydanie) ──────────────────────────────────
+/* ── Pewność propozycji z sieci (0.528.0) ──────────────────────────────────
    Reguła z SZPERACZA, paczki, której biuro używa do ręcznego researchu:
    „potwierdzone” to dwa NIEZALEŻNE źródła, w tym katalog producenta albo
    baza części z rysunkami. Liczy ją serwer (`services/zrodla-sieci.ts`),

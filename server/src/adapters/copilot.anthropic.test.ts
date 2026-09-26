@@ -208,7 +208,7 @@ test("szkic i klucz modelu też nie wysyłają wysiłku do Haiku 4.5", async () 
    wywołaniem nie wywraca parsowania, że tokeny sumują się po rundach i że
    sufit rund kończy pętlę wymuszoną odpowiedzią.                          */
 
-/* `pasowania` od @wydanie: schemat wymaga pola, więc prawdziwe API zawsze je oddaje. */
+/* `pasowania` od 0.528.0: schemat wymaga pola, więc prawdziwe API zawsze je oddaje. */
 const ODPOWIEDZ = JSON.stringify({ tresc: "Pasuje do MS 230 (WZ4).", twierdzenia: [], pasowania: [] });
 const zuzycieRundy = { input_tokens: 100, output_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 50 };
 
@@ -296,7 +296,7 @@ test("dopytanie: sufit rund kończy pętlę rundą bez narzędzi", async () => {
   }
 });
 
-/* Sieć w dopytaniu (@wydanie): narzędzia serwerowe tylko przy `siec`,
+/* Sieć w dopytaniu (0.528.0): narzędzia serwerowe tylko przy `siec`,
    z zablokowanym Allegro, OLX i Ceneo; `pause_turn` wznawia turę, a tekst
    przeczytanych stron wraca do serwisu jako materiał sita. */
 test("dopytanie z siecią: wyszukiwarka bez Allegro, wznowienie po pause_turn i strony dla sita", async () => {

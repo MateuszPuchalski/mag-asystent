@@ -238,7 +238,7 @@ export function migrate(database: DatabaseSync) {
   /* Zapytania do wyszukiwarki w księdze Copilota (0.507.0) — pasowanie
      z sieci. Stare wiersze mają zero i to jest o nich prawda. */
   addColumn("copilot_wywolanie", "wyszukiwania", "INTEGER NOT NULL DEFAULT 0");
-  /* Pasowania znalezione w sieci przy dopytaniu (@wydanie), już po sicie.
+  /* Pasowania znalezione w sieci przy dopytaniu (0.528.0), już po sicie.
      Leżą przy wymianie, bo „Zapisz jako propozycję” bierze parę z wiersza
      SPRAWDZONEGO przez serwer, nie z ciała żądania — ta sama zasada co przy
      pasowaniu ze szkicu. Stare wymiany mają pustą listę i to jest o nich prawda. */

@@ -215,7 +215,7 @@ test("tras zapisu jest trzydzieści dwa — licznik jest umową", () => {
      TRZYDZIESTA PIERWSZA (0.527.0): to samo dla jednego silnika z trybu „od
      silnika” — wykaz części silnika daje dziesiątki kartotek naraz.
 
-     TRZYDZIESTA DRUGA (@wydanie): wszystkie POTWIERDZONE z sieci naraz, czyli
+     TRZYDZIESTA DRUGA (0.528.0): wszystkie POTWIERDZONE z sieci naraz, czyli
      dwa niezależne źródła, w tym katalog. Serwer liczy pewność od nowa. */
   assert.equal(TRASY().filter((t) => t.method !== "GET").length, 32);
 });

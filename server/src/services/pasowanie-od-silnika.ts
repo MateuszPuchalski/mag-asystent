@@ -69,7 +69,7 @@ export interface ZapytanieOSilnik { marka: string; nazwa: string }
 
 export interface WynikWykazu {
   /** Strony, które model uznał za wykaz części TEGO silnika. */
-  /** `oznaczenie` (@wydanie): dokładny model silnika z tej strony, np. B&S „09P702-0010”. */
+  /** `oznaczenie` (0.528.0): dokładny model silnika z tej strony, np. B&S „09P702-0010”. */
   wykazy: Array<{ url: string; zrodloStrony: ZrodloStrony; oznaczenie?: string | null }>;
   strony: Array<{ url: string; tekst: string }>;
   pdfy: Array<{ url: string; base64: string }>;
@@ -107,7 +107,7 @@ export function naszeNumery(database: DatabaseSync = db()): Map<string, Array<{ 
   for (const w of wiersze) {
     const n = String(w.wartosc_norm);
     if (!znakiNumeru(n)) continue;
-    /* Każda postać równoważna (@wydanie: MTD 7xx/9xx, przyrostek „S”) wskazuje
+    /* Każda postać równoważna (0.528.0: MTD 7xx/9xx, przyrostek „S”) wskazuje
        tę samą kartotekę — wykaz bywa w postaci serwisowej, kartoteka w fabrycznej. */
     for (const wariant of wariantyNumeru(n)) {
       const lista = mapa.get(wariant) ?? [];
@@ -153,7 +153,7 @@ export function trafieniaWTekscie(
 /** Czy strona mówi o TYM silniku: marka i oznaczenie stoją w jej tekście. */
 export function stronaOSilniku(tekst: string, s: ZapytanieOSilnik, oznaczenie?: string | null): boolean {
   const t = zwin(tekst);
-  /* Wykaz B&S mówi „09P702-0010”, nie „450E” (@wydanie) — wystarczy
+  /* Wykaz B&S mówi „09P702-0010”, nie „450E” (0.528.0) — wystarczy
      oznaczenie, które model podał dla tej strony, byle stało w jej tekście
      obok marki. SZPERACZ: części B&S są w katalogu MODELU i TYPU. */
   const ozn = zwin(oznaczenie ?? "");
@@ -268,7 +268,7 @@ function zaproponujDlaSilnika(
         + "Sprawdź wiersz wykazu przed zatwierdzeniem.",
       dowod,
     }, { automat: "siec-silnik" }, database) !== null;
-    /* Ten sam silnik z innego wykazu to drugie źródło — dokłada dowód (@wydanie). */
+    /* Ten sam silnik z innego wykazu to drugie źródło — dokłada dowód (0.528.0). */
     if (!nowa) dowodDoPropozycjiAutomatu(t.twId, model, dowod, "siec-silnik", database);
     return nowa;
   } catch {
@@ -379,7 +379,7 @@ export async function przebiegSieci(deps: {
   nadajSilnik: NadawcaWykazuSilnika;
   naNoc: number;
   naPrzebieg?: number;
-  /** Okno liczenia limitu — 12 h nocą, godzina przy ręcznym szukaniu (@wydanie). */
+  /** Okno liczenia limitu — 12 h nocą, godzina przy ręcznym szukaniu (0.528.0). */
   oknoMs?: number;
   teraz?: () => Date;
   database?: DatabaseSync;
@@ -412,7 +412,7 @@ export function stanSilnikow(teraz = new Date(), database: DatabaseSync = db()):
   return { razem: SILNIKI_POPULARNE.length, doSprawdzenia: silnikiDoSieci(SILNIKI_POPULARNE.length, teraz, database).length };
 }
 
-/* ── Uproszczenie: „Zatwierdź wszystkie potwierdzone” (@wydanie) ─────────────
+/* ── Uproszczenie: „Zatwierdź wszystkie potwierdzone” (0.528.0) ─────────────
    Właściciel: „uprość w użytkowaniu”. Propozycja z dwóch niezależnych stron,
    w tym katalogu producenta albo bazy części, to w metodzie SZPERACZA
    „potwierdzone” — można na tym oprzeć zamówienie. Przeglądanie takich po
@@ -454,7 +454,7 @@ export function zatwierdzPotwierdzone(
   });
 }
 
-/* Ręczne szukanie ma własny sufit na GODZINĘ (@wydanie), a nie limit nocy:
+/* Ręczne szukanie ma własny sufit na GODZINĘ (0.528.0), a nie limit nocy:
    człowiek kliknął świadomie, a przestawianie ustawienia przed każdym
    szukaniem było krokiem, o którym trzeba pamiętać. Sześćdziesiąt jednostek
    to z zapasem tyle, ile ekran zdąży przerobić w godzinę. */

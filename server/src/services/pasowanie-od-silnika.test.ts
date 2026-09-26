@@ -123,7 +123,7 @@ test("zatwierdzone „nie pasuje” do silnika wygrywa z wykazem z sieci", async
   assert.equal(w.zaproponowano, 1, "tylko gaźnik; filtr zmierzony jako niepasujący zostaje niepasujący");
 });
 
-/* ── Metoda SZPERACZA (@wydanie) ─────────────────────────────────────────────
+/* ── Metoda SZPERACZA (0.528.0) ─────────────────────────────────────────────
    Ta sama para z drugiej, niezależnej strony to drugie źródło, nie duplikat.
    Dwie domeny, w tym baza części (T2), dają „potwierdzone” — i tylko takie
    bierze jedno kliknięcie „Zatwierdź wszystkie potwierdzone”. */

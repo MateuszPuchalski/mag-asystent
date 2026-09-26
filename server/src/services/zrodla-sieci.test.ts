@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { numeryZWariantami, pewnoscZSieci, poziomZrodla, warunekZeStrony, wariantyNumeru } from "./zrodla-sieci.js";
 
-/* ── Metoda SZPERACZA w kodzie (@wydanie) ────────────────────────────────────
+/* ── Metoda SZPERACZA w kodzie (0.528.0) ────────────────────────────────────
    Czyste funkcje, bez bazy i bez sieci. Pilnujemy czterech reguł przepisanych
    z paczki: poziomów źródeł, „potwierdzone” = dwa niezależne źródła z katalogiem,
    równoważnych numerów i ukrytych warunków. */

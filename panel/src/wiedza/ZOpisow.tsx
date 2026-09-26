@@ -36,7 +36,7 @@ import { PasujeDoOfert } from "./PasujeDoOfert";
  * z sieci na żądanie (decyzja właściciela z 0.508.0) zostaje w zasięgu
  * tego jednego kliknięcia.
  *
- * Szukanie w sieci wyprowadziło się stąd na górę Kolejki (@wydanie): jego
+ * Szukanie w sieci wyprowadziło się stąd na górę Kolejki (0.528.0): jego
  * wynik to propozycje w Kolejce, a start i wynik w dwóch zakładkach kazały
  * właścicielowi pytać, gdzie one trafiają.
  */
@@ -58,7 +58,7 @@ export function ZOpisow() {
       powstanie propozycja do kolejki. Odrzuć, gdy to nie jest lista modeli;
       odrzucone nie wracają po imporcie.
     </p>
-    {/* IMPORTY NAD LISTĄ (@wydanie). Do tego wydania sekcja stała pod listą
+    {/* IMPORTY NAD LISTĄ (0.528.0). Do tego wydania sekcja stała pod listą
         dwustu wierszy i właściciel zgłosił: „to przesłania” — do pasowania
         z sieci trzeba było przewinąć wszystkie teksty. Zwinięta nad listą nie
         zabiera miejsca, a jest pod ręką; główną robotą zakładki dalej jest

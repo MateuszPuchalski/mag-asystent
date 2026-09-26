@@ -363,7 +363,7 @@ CREATE TABLE IF NOT EXISTS copilot_pytanie (
   przez_user_id   INTEGER REFERENCES app_user(user_id),
   -- Narzędzia, po które model sięgnął (0.507.0): [{nazwa, argument, znakow}].
   narzedzia       TEXT NOT NULL DEFAULT '[]',
-  -- Pasowania z sieci po sicie (@wydanie): [{twId, symbol, marka, model, url, cytat, …, propozycjaId}].
+  -- Pasowania z sieci po sicie (0.528.0): [{twId, symbol, marka, model, url, cytat, …, propozycjaId}].
   pasowania       TEXT NOT NULL DEFAULT '[]'
 );
 CREATE INDEX IF NOT EXISTS ix_copilot_pytanie_rozmowa

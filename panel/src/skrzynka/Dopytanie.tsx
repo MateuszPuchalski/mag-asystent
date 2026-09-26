@@ -30,7 +30,7 @@ function Sprawdzono({ narzedzia }: { narzedzia: UzycieNarzedziaCopilota[] }) {
 }
 
 /**
- * ZNALEZIONE W SIECI (@wydanie). Pasowania ze stron, które model przeczytał
+ * ZNALEZIONE W SIECI (0.528.0). Pasowania ze stron, które model przeczytał
  * przy tym pytaniu i które przeszły sito serwera: cytat na stronie, NASZ
  * numer na stronie. Wcześniej biuro robiło to w czacie SZPERACZA obok panelu,
  * a wynik zostawał w czacie. Tu jedno kliknięcie kładzie parę w Kolejce Wiedzy.

@@ -254,7 +254,7 @@ const Twierdzenie = z.object({
   odwolanie: z.string().nullable(),
   pewnosc: z.enum(POZIOMY_PEWNOSCI),
 });
-/* Dopytanie czyta sieć (@wydanie), więc zna źródło `siec`; szkic nie. */
+/* Dopytanie czyta sieć (0.528.0), więc zna źródło `siec`; szkic nie. */
 const TwierdzeniePytania = Twierdzenie.extend({ zrodlo: z.enum(ZRODLA_TWIERDZENIA) });
 
 /** Co model odczytał z jednego zdjęcia; `zdjecie` sprawdza serwis. */
@@ -689,7 +689,7 @@ export const nadawcaSzkicuAnthropic: NadawcaSzkicu =
   }
 };
 
-/* Źródła z metody SZPERACZA (@wydanie) — `search-patterns.md`: gdzie producenci
+/* Źródła z metody SZPERACZA (0.528.0) — `search-patterns.md`: gdzie producenci
    i bazy części trzymają wykazy. Model wybiera po opisie; lista oszczędza
    płatne wyszukiwania, które szły w sklepy z „pasuje do wszystkiego”. */
 const ZRODLA_MAREK = [
@@ -714,7 +714,7 @@ const ZRODLA_MAREK = [
    nagłówek `services/copilot-pytania.ts`). Model wolno tu nazwać numer,
    którego nie mamy w kartotece — właśnie po to agent pyta.
 
-   SIEĆ W DOPYTANIU (@wydanie), z metody SZPERACZA, której biuro używało
+   SIEĆ W DOPYTANIU (0.528.0), z metody SZPERACZA, której biuro używało
    w czacie obok panelu. Tam wynik zostawał w czacie; tu pasowanie z
    przeczytanej strony przechodzi przez to samo sito co przebieg nocny
    i jednym kliknięciem staje w Kolejce. Zasada „numer tylko ze źródła”
@@ -722,7 +722,7 @@ const ZRODLA_MAREK = [
    pół minuty. Sieć dostaje model tylko przy włączonym PASOWANIE_Z_SIECI —
    jeden wyłącznik na czytanie cudzych stron.                             */
 
-/* Pasowanie z przeczytanej strony (@wydanie). Bez roczników i numerów
+/* Pasowanie z przeczytanej strony (0.528.0). Bez roczników i numerów
    seryjnych, które ma przebieg nocny: dopytanie to jedno pytanie agenta,
    a warunek słowny ze strony wyciąga serwer (`warunekZeStrony`). */
 const PasowanieDopytaniaZ = z.object({
@@ -846,7 +846,7 @@ export const nadawcaPytaniaAnthropic: NadawcaPytania = async (k): Promise<Odpowi
       ],
     }];
     const narzedzia: Anthropic.ToolUnion[] = (k.narzedzia?.definicje ?? []).map((d) => ({ ...d }));
-    /* Narzędzia serwerowe (@wydanie): wyszukanie i pobranie robią serwery
+    /* Narzędzia serwerowe (0.528.0): wyszukanie i pobranie robią serwery
        Anthropic, więc żadne żądanie nie idzie z adresu sklepu. Sufity niższe
        niż w nocy — to jedno pytanie agenta, nie przegląd kartoteki. */
     if (k.siec) {
@@ -1116,7 +1116,7 @@ const INSTRUKCJA_SIECI = [
 /* Tekst przeczytanych stron zbieramy ze WSZYSTKICH tur — sito ma się czym
    posłużyć także po wznowieniu. PDF wraca surowy: tekst wyciąga serwis
    (`pdf-tekst.ts`), bo to lokalna robota, nie rozmowa z dostawcą. Jedna
-   kopia dla nocy i dopytania (@wydanie). */
+   kopia dla nocy i dopytania (0.528.0). */
 function zbierzStrony(tresc: Anthropic.ContentBlock[], strony: WynikSieci["strony"], pdfy: WynikSieci["pdfy"]): void {
   for (const b of tresc) {
     if (b.type !== "web_fetch_tool_result" || b.content.type !== "web_fetch_result") continue;
@@ -1223,7 +1223,7 @@ export const nadawcaPasowaniaSieciAnthropic: NadawcaPasowaniaSieci =
    Model tylko znajduje i czyta wykazy części silnika i mówi, które strony
    nimi są. Numery dopasowuje serwer (`pasowanie-od-silnika.ts`). */
 const WynikWykazuZ = z.object({
-  /* `oznaczenie` (@wydanie): dokładny model silnika z tej strony (B&S MODEL-TYPE). */
+  /* `oznaczenie` (0.528.0): dokładny model silnika z tej strony (B&S MODEL-TYPE). */
   wykazy: z.array(z.object({ url: z.string(), zrodloStrony: z.enum(ZRODLA_STRONY), oznaczenie: z.string().nullable() })),
 });
 

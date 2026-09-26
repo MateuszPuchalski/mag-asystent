@@ -8,7 +8,7 @@ import { GODZINA_MS, PasowanieZSieci } from "./PasowanieZSieci";
 
 /* ── Szukanie w sieci na żądanie ────────────────────────────────────────────
    Po prawdziwym `fetch`. Otwarcie to wyłącznie odczyt stanu. Wyłączony
-   automat mówi, czego brakuje, i nie daje kliknąć. Od @wydanie jest JEDEN
+   automat mówi, czego brakuje, i nie daje kliknąć. Od 0.528.0 jest JEDEN
    przycisk: godzina z „Zatrzymaj”, liczona w limicie ręcznym, nie nocnym. */
 
 const STAN: StanPasowaniaZSieci = { niegotowy: null, naNoc: 10, sprawdzono: 10, doSprawdzenia: 40,

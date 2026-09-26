@@ -69,7 +69,7 @@ describe("sekcje Modele: z opisów", () => {
     expect(odrzuc).toHaveBeenCalledWith({ id: 7 }, expect.anything());
   });
 
-  /* Narzędzia zwinięte (0.510.0) i NAD listą (@wydanie). Pod listą dwustu
+  /* Narzędzia zwinięte (0.510.0) i NAD listą (0.528.0). Pod listą dwustu
      wierszy właściciel ich nie znalazł — „to przesłania”. Zwinięte zajmują
      jedną linię i nie montują się, więc nie pytają serwera o stany, których
      nikt nie ogląda. */

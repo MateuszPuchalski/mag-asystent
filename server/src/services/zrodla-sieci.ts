@@ -1,6 +1,6 @@
 import { zwin } from "../tekst.js";
 
-/* ── Metoda SZPERACZA w kodzie (@wydanie) ─────────────────────────────────────
+/* ── Metoda SZPERACZA w kodzie (0.528.0) ─────────────────────────────────────
 
    SZPERACZ to paczka skilli do claude.ai, której biuro używa do ręcznego
    researchu części. Ma dobrą metodę, ale jej wyniki zostawały w czacie.

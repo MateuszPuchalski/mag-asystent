@@ -70,11 +70,11 @@ export interface WymianaCopilota {
   przez: string;
   /** Po co model sięgnął do bazy, w kolejności wywołań. Pusta = nie sięgał. */
   narzedzia: UzycieNarzedzia[];
-  /** Pasowania z sieci, które przeszły sito (@wydanie). Pusta = sieci nie było albo nic nie przeszło. */
+  /** Pasowania z sieci, które przeszły sito (0.528.0). Pusta = sieci nie było albo nic nie przeszło. */
   pasowania: PasowanieZDopytania[];
 }
 
-/* ── Pasowanie z sieci w dopytaniu (@wydanie) ───────────────────────────────
+/* ── Pasowanie z sieci w dopytaniu (0.528.0) ───────────────────────────────
    Metoda SZPERACZA — paczki, której biuro używało w czacie obok panelu —
    przeniesiona tutaj. Tam wynik zostawał w czacie; tu staje przy wymianie
    i jednym kliknięciem („Zapisz jako propozycję”) idzie do Kolejki Wiedzy.
@@ -166,7 +166,7 @@ export function zapiszPasowanieZDopytania(
 export interface OdpowiedzNaPytanie {
   tresc: string;
   twierdzenia: TwierdzenieSurowe[];
-  /** Pasowania z przeczytanych stron (@wydanie), PRZED sitem. Brak = bez sieci. */
+  /** Pasowania z przeczytanych stron (0.528.0), PRZED sitem. Brak = bez sieci. */
   pasowania?: PasowanieModelu[];
   /** Strony i PDF-y przeczytane przez `web_fetch` — materiał sita. */
   strony?: WynikSieci["strony"];
@@ -190,7 +190,7 @@ export interface KontekstPytania {
   pytanie: string;
   /** Odczyt naszej bazy na żądanie modelu (0.507.0). `null` = bez narzędzi. */
   narzedzia: ZestawNarzedzi | null;
-  /** Czy model dostaje wyszukiwarkę i czytnik stron (@wydanie). */
+  /** Czy model dostaje wyszukiwarkę i czytnik stron (0.528.0). */
   siec?: boolean;
 }
 
@@ -287,7 +287,7 @@ export async function zadajPytanie(
     throw e;
   }
 
-  /* Strony przeczytane w sieci (@wydanie): PDF-y zamieniamy na tekst tu, jak
+  /* Strony przeczytane w sieci (0.528.0): PDF-y zamieniamy na tekst tu, jak
      w nocy. Twierdzenie ze źródłem `siec` bez ANI JEDNEJ przeczytanej strony
      to wiedza modelu przebrana za stronę — schodzi do `model`, bo sufit
      pewności stoi w kodzie, nie w dyscyplinie modelu. */
@@ -315,7 +315,7 @@ export async function zadajPytanie(
     zdjec: zdjecia.zdjecia.length, zdjecBledow: zdjecia.bledow,
     /* Nazwy narzędzi, bez argumentów: argument bywa numerem z rozmowy. */
     narzedzia: (odp.narzedzia ?? []).map((n) => n.nazwa),
-    /* Sieć liczbami (@wydanie): ile wyszukań i ile pasowań przeszło sito. */
+    /* Sieć liczbami (0.528.0): ile wyszukań i ile pasowań przeszło sito. */
     wyszukiwan: odp.zuzycie.wyszukiwania ?? 0, stron: przeczytane.length,
     pasowanZSieci: (odp.pasowania ?? []).length, poSicie: pasowania.length,
   }, kto.id);
@@ -341,6 +341,6 @@ function zapiszWywolanie(
     .run(conversationId, model, t?.wej ?? 0, t?.wyj ?? 0,
       t?.cacheZapis ?? 0, t?.cacheOdczyt ?? 0, odp?.ms ?? 0, wynik,
       blad ? blad.slice(0, 300) : null, kto.id, teraz.toISOString(),
-      /* Wyszukiwania dopytania (@wydanie) — płatne osobno, pomiar ma je widzieć. */
+      /* Wyszukiwania dopytania (0.528.0) — płatne osobno, pomiar ma je widzieć. */
       t?.wyszukiwania ?? 0);
 }

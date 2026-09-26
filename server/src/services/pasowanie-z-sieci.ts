@@ -60,7 +60,7 @@ const OKNO_NOCY_MS = 12 * 3_600_000;
 export const DOMENY_ZAKAZANE = [
   "allegro.pl", "allegro.cz", "allegro.sk", "allegro.hu", "allegro.eu",
   "allegrolokalnie.pl", "allegroimg.com", "allegrostatic.com",
-  /* OLX i Ceneo (@wydanie) — reguła SZPERACZA: tam też sprzedajemy, a ruch
+  /* OLX i Ceneo (0.528.0) — reguła SZPERACZA: tam też sprzedajemy, a ruch
      automatu, który da się z nami powiązać, to ryzyko dla konta. */
   "olx.pl", "ceneo.pl",
 ] as const;
@@ -156,7 +156,7 @@ export function sprawdzZnalezisko(
     if (!model || !marka || !cytat.includes(marka + model)) return "za_krotki_model";
   } else if (!cytat.includes(model)) return "model_spoza_cytatu";
   if (!marka || !(cytat.includes(marka) || tekst.includes(marka))) return "marka_spoza_strony";
-  /* Numer w postaciach równoważnych (@wydanie): MTD 7xx/9xx, przyrostek „S”. */
+  /* Numer w postaciach równoważnych (0.528.0): MTD 7xx/9xx, przyrostek „S”. */
   if (!numeryZWariantami(numery).some((n) => n.length >= 4 && tekst.includes(n))) return "numer_spoza_strony";
   /* Warunek, którego nie ma w cytacie, jest zgadnięty — a zgadnięty rocznik
      zawęża pasowanie tam, gdzie strona go nie zawęża, albo odwrotnie. */
@@ -179,7 +179,7 @@ const OPIS_ZRODLA: Record<ZrodloStrony, string> = {
   producent: "strona producenta", katalog_dostawcy: "katalog dostawcy", sklep: "sklep internetowy",
 };
 
-/** Dowód do bazy wiedzy ze znaleziska — jedna postać dla nocy i dopytania (@wydanie). */
+/** Dowód do bazy wiedzy ze znaleziska — jedna postać dla nocy i dopytania (0.528.0). */
 export function dowodZeZnaleziska(z: Pick<ZnaleziskoSurowe, "cytat" | "url" | "zrodloStrony">) {
   return {
     rodzaj: RODZAJ_DOWODU[z.zrodloStrony],
@@ -191,7 +191,7 @@ export function dowodZeZnaleziska(z: Pick<ZnaleziskoSurowe, "cytat" | "url" | "z
 /* Numery, którymi strona może POTWIERDZIĆ kartotekę `t` (0.527.0): własne,
    z obcych katalogów i zatwierdzonych zamienników OEM. Strona często podaje
    nowszy numer zamiennika, a nie ten z naszej kartoteki — a zamienność
-   zatwierdził już człowiek. Jedna kopia dla nocy i dopytania (@wydanie). */
+   zatwierdził już człowiek. Jedna kopia dla nocy i dopytania (0.528.0). */
 const NUMERY_SITA = `(SELECT group_concat(i.wartosc, char(31)) FROM towar_identyfikator i
           WHERE i.rodzaj IN ('oem','nr_oryg','katalog_obcy')
             AND (i.tw_id=t.tw_id OR i.tw_id IN (
@@ -351,7 +351,7 @@ export async function szukajPasowaniaWSieci(deps: {
   naNoc: number;
   /** Sufit JEDNEGO przebiegu — ekran woła po jednej kartotece. Brak = do sufitu nocy. */
   naPrzebieg?: number;
-  /** Okno liczenia limitu; domyślnie noc (@wydanie). */
+  /** Okno liczenia limitu; domyślnie noc (0.528.0). */
   oknoMs?: number;
   teraz?: () => Date;
   /** Wstrzykiwany, jak nadawca: test nie parsuje prawdziwych PDF-ów. */
@@ -397,7 +397,7 @@ export async function szukajPasowaniaWSieci(deps: {
       try {
         const model = { rodzaj: z.rodzaj, marka: z.marka.trim(), nazwa: z.model.trim(), wariant: z.wariant?.trim() || null };
         const dowod = dowodZeZnaleziska(z);
-        /* Ukryty warunek ze strony (@wydanie) — „will not fit manual” nad listą
+        /* Ukryty warunek ze strony (0.528.0) — „will not fit manual” nad listą
            modeli. Idzie w warunek słowny, więc Kolejka pokaże go jako „Tylko:”. */
         const strona = strony.find((s) => bezOgona(s.url) === bezOgona(z.url));
         const warunek = strona ? warunekZeStrony(strona.tekst, z.cytat) : null;
@@ -411,7 +411,7 @@ export async function szukajPasowaniaWSieci(deps: {
           dowod,
         }, { automat: "siec" }, database);
         if (p) zaproponowano += 1;
-        /* Ta sama para z innej strony to DRUGIE ŹRÓDŁO, nie duplikat (@wydanie):
+        /* Ta sama para z innej strony to DRUGIE ŹRÓDŁO, nie duplikat (0.528.0):
            dopisuje dowód, a dwa niezależne dają „potwierdzone”. */
         else dowodDoPropozycjiAutomatu(k.twId, model, dowod, "siec", database);
       } catch {
@@ -538,7 +538,7 @@ export interface PozycjaZSieci {
   /** Cytat ze strony razem z nazwą źródła — tak, jak stoi w dowodzie. */
   cytat: string;
   link: string | null;
-  /** Pewność ze źródeł (@wydanie) — reguła SZPERACZA, patrz `zrodla-sieci.ts`. */
+  /** Pewność ze źródeł (0.528.0) — reguła SZPERACZA, patrz `zrodla-sieci.ts`. */
   pewnosc: PewnoscZSieci;
   /** Ile stron potwierdza tę parę. */
   zrodel: number;
@@ -568,7 +568,7 @@ export function przegladZSieci(propozycje: Zastosowanie[], database: DatabaseSyn
   }
   /* Najpierw kartoteki z największą liczbą maszyn: jedno kliknięcie tam
      zdejmuje z kolejki najwięcej pracy. */
-  /* Potwierdzone na górze (@wydanie): pierwsze do odhaczenia, najmniej do czytania. */
+  /* Potwierdzone na górze (0.528.0): pierwsze do odhaczenia, najmniej do czytania. */
   const ranga = { potwierdzone: 0, prawdopodobne: 1, slabe: 2 } as const;
   for (const g of grupy.values()) g.pozycje.sort((a, b) => ranga[a.pewnosc] - ranga[b.pewnosc]);
   return [...grupy.values()].sort((a, b) => b.pozycje.length - a.pozycje.length || a.twId - b.twId);

@@ -422,7 +422,7 @@ export function useZatwierdzOdSilnika() {
   });
 }
 
-/** Wszystkie POTWIERDZONE propozycje z sieci jednym kliknięciem (@wydanie).
+/** Wszystkie POTWIERDZONE propozycje z sieci jednym kliknięciem (0.528.0).
     Serwer liczy pewność od nowa — lista z ekranu niczego słabszego nie przemyci. */
 export function useZatwierdzPotwierdzone() {
   const qc = useQueryClient();

@@ -195,7 +195,7 @@ export interface PasowanieZRozmowy { czesc: string; doCzego: string; rola: strin
 
 /** Skąd wzięło się twierdzenie. Kolejność ma znaczenie: od najmocniejszego. */
 export const ZRODLA_TWIERDZENIA = ["fakty", "oferta", "zdjecie", "siec", "model"] as const;
-/* Szkic nie czyta sieci, więc jego schemat nie zna źródła `siec` (@wydanie).
+/* Szkic nie czyta sieci, więc jego schemat nie zna źródła `siec` (0.528.0).
    Model, który nazwałby tak własną wiedzę, dostałby sufit o stopień wyżej
    za samo słowo — a sufit stoi w kodzie, nie w dyscyplinie modelu. */
 export const ZRODLA_TWIERDZENIA_SZKICU = ["fakty", "oferta", "zdjecie", "model"] as const;
@@ -222,7 +222,7 @@ export type PoziomPewnosci = (typeof POZIOMY_PEWNOSCI)[number];
  *   zdjęciu widać tabliczkę, NIE wynika, że to tabliczka maszyny, o którą
  *   klient pyta. Zdjęcie bywa z internetu, z maszyny sąsiada albo z drugiej
  *   kosiarki w garażu. „Pewne" zostaje dla naszej bazy.
- * `siec` (@wydanie) — strona przeczytana w dopytaniu przez `web_fetch`;
+ * `siec` (0.528.0) — strona przeczytana w dopytaniu przez `web_fetch`;
  *   najwyżej „prawdopodobne”. Cudza strona bywa błędna, a tego, że mówi
  *   o NASZEJ części, nikt u nas jeszcze nie sprawdził. Wyżej wchodzi dopiero
  *   po zatwierdzeniu w Wiedzy — wtedy jest już faktem z naszej bazy.

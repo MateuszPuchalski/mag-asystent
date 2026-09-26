@@ -376,7 +376,7 @@ function sprawdzDowod(d: NowyDowod): { rodzaj: RodzajDowodu; tresc: string; link
 }
 
 /**
- * Kolejny dowód automatu do CZEKAJĄCEJ propozycji tej samej pary (@wydanie).
+ * Kolejny dowód automatu do CZEKAJĄCEJ propozycji tej samej pary (0.528.0).
  *
  * Automat z sieci znajduje tę samą parę część → maszyna na kilku stronach.
  * Do tego wydania druga strona przepadała jako duplikat, a to ona rozstrzyga

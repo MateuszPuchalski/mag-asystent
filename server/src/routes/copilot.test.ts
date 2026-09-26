@@ -128,7 +128,7 @@ test("hala nie widzi Copilota — bramka stoi też na odczycie", async () => {
 /* SIÓDMA (0.332.0) to dopytanie. Licznik podniósł się o jeden świadomie:
    trasa produkuje tekst DLA AGENTA i celowo nie ma sit szkicu, więc wspólna
    trasa z tamtą musiałaby wybrać jedno zachowanie dla dwóch różnych rzeczy. */
-/* ÓSMA (@wydanie) to „Zapisz jako propozycję” przy pasowaniu z sieci
+/* ÓSMA (0.528.0) to „Zapisz jako propozycję” przy pasowaniu z sieci
    znalezionym w dopytaniu. Para leży przy wymianie i przeszła sito strony;
    trasa bierze ją z wiersza, nie z ciała żądania — jak szósta ze szkicu. */
 test("Copilot ma OSIEM tras zapisu", async () => {

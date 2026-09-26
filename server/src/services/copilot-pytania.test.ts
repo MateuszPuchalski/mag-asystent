@@ -48,7 +48,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  /* Propozycje z „Zapisz jako propozycję” (@wydanie) wskazują konto biura,
+  /* Propozycje z „Zapisz jako propozycję” (0.528.0) wskazują konto biura,
      więc schodzą przed nim — inaczej klucz obcy wywraca następny test. */
   for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia", "copilot_pytanie", "szkic_copilota", "copilot_wywolanie", "message",
     "conversation", "offer_snapshot", "allegro_inbox_thread", "channel_account", "events", "app_user"]) {
@@ -247,7 +247,7 @@ test("dziennik niesie DŁUGOŚCI, nigdy treści pytania", async () => {
   assert.ok(zd!.payload.includes("znakowPytania"));
 });
 
-/* ── Sieć w dopytaniu (@wydanie) ─────────────────────────────────────────────
+/* ── Sieć w dopytaniu (0.528.0) ─────────────────────────────────────────────
    Metoda SZPERACZA: numer i pasowanie tylko ze strony przeczytanej w tej
    rozmowie. Pasowanie przechodzi to samo sito co przebieg nocny, a „Zapisz
    jako propozycję” bierze parę z wiersza wymiany, nie z żądania. */

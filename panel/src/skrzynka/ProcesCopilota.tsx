@@ -31,7 +31,7 @@ const ZRODLA: Record<ZrodloTwierdzenia, { etykieta: string; klasa: string; Ikona
      je rozpoznać nie czytając etykiety. Bursztyn zostaje przy wiedzy modelu:
      to on woła o sprawdzenie najgłośniej. */
   zdjecie: { etykieta: "ze zdjęcia klienta", klasa: "border-violet-200 bg-violet-50 text-violet-900", Ikona: Camera },
-  /* Strona przeczytana w dopytaniu (@wydanie). Szarość, nie zieleń bazy: cudza
+  /* Strona przeczytana w dopytaniu (0.528.0). Szarość, nie zieleń bazy: cudza
      strona to jeszcze nie nasza wiedza — tą staje się po zatwierdzeniu w Wiedzy. */
   siec: { etykieta: "ze strony w sieci", klasa: "border-slate-200 bg-slate-50 text-slate-800", Ikona: Globe },
   model: { etykieta: "z wiedzy modelu", klasa: "border-amber-200 bg-amber-50 text-amber-900", Ikona: Brain },
