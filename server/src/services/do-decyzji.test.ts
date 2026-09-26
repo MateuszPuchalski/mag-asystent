@@ -125,8 +125,8 @@ test("odczyt nie zmienia bazy — ani jednego wiersza", () => {
 });
 
 test("serwis nie zakłada tabeli ani nie pisze — sprawdzone po źródle", () => {
-  /* Zakaz z `CLAUDE.md`: piątej tabeli ze wspólnym statusem nad kolejkami nie
-     było i nie będzie. Test po źródle, bo taka tabela zaczyna się od jednej
+  /* Zakaz z `CLAUDE.md`: wspólnego statusu przepisanego z kolejek nie było
+     i nie będzie. Test po źródle, bo taka tabela zaczyna się od jednej
      linijki „na razie tylko pamięć odczytu". */
   const zrodlo = fs.readFileSync(path.join(import.meta.dirname, "do-decyzji.ts"), "utf8")
     .replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
