@@ -78,8 +78,10 @@ import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
 import { sklasyfikujNowe } from "./services/klasyfikacja-auto.js";
 import { szkicujPoRozpoznaniu } from "./services/copilot-szkic-po-rozpoznaniu.js";
 import { oproznijKolejke } from "./services/wiedza-automat.js";
-import { nadawcaKluczaAnthropic, nadawcaPasowaniaSieciAnthropic } from "./adapters/copilot.anthropic.js";
-import { szukajPasowaniaWSieci } from "./services/pasowanie-z-sieci.js";
+import {
+  nadawcaKluczaAnthropic, nadawcaPasowaniaSieciAnthropic, nadawcaWykazuSilnikaAnthropic,
+} from "./adapters/copilot.anthropic.js";
+import { przebiegSieci } from "./services/pasowanie-od-silnika.js";
 import { sondujRzeczywistosc } from "./services/sonda-rzeczywistosci.js";
 import { uruchomTakt } from "./services/takt.js";
 import { czytajStan, problemyKopii, wOknieNocnym } from "./services/kopie-bazy.js";
@@ -652,8 +654,9 @@ async function main() {
   if (config.pasowanieZSieci.wlaczony && config.copilot.mode === "anthropic" && config.copilot.klucz) {
     uruchomTakt("pasowanie-z-sieci", config.pasowanieZSieci.ms, async () => {
       if (!wOknieNocnym(new Date().toISOString())) return;
-      const w = await szukajPasowaniaWSieci({
-        nadaj: nadawcaPasowaniaSieciAnthropic, naNoc: config.pasowanieZSieci.naNoc,
+      /* Najpierw popularne silniki, potem kartoteki — patrz `przebiegSieci`. */
+      const w = await przebiegSieci({
+        nadaj: nadawcaPasowaniaSieciAnthropic, nadajSilnik: nadawcaWykazuSilnikaAnthropic, naNoc: config.pasowanieZSieci.naNoc,
       });
       if (w.przerwane) console.warn(`[pasowanie-z-sieci] przebieg przerwany: ${w.przerwane}`);
     });

@@ -3249,3 +3249,20 @@ CREATE TABLE IF NOT EXISTS pasowanie_siec (
   blad           TEXT
 );
 CREATE INDEX IF NOT EXISTS ix_pasowanie_siec_tw ON pasowanie_siec(tw_id, at);
+
+-- Pasowanie od silnika (@wydanie). Jeden wiersz na silnik z listy popularnych,
+-- sprawdzony przez automat — bez tego ten sam wykaz czytalibyśmy co noc.
+-- `klucz` jak w `model_urzadzenia.klucz`. Treści stron tu nie ma.
+CREATE TABLE IF NOT EXISTS pasowanie_siec_silnik (
+  id             INTEGER PRIMARY KEY AUTOINCREMENT,
+  klucz          TEXT NOT NULL,
+  marka          TEXT NOT NULL,
+  nazwa          TEXT NOT NULL,
+  at             TEXT NOT NULL,       -- ISO UTC
+  wynik          TEXT NOT NULL CHECK (wynik IN ('ok','blad')),
+  stron          INTEGER NOT NULL DEFAULT 0,
+  trafien        INTEGER NOT NULL DEFAULT 0,
+  zaproponowano  INTEGER NOT NULL DEFAULT 0,
+  blad           TEXT
+);
+CREATE INDEX IF NOT EXISTS ix_pasowanie_siec_silnik ON pasowanie_siec_silnik(klucz, at);

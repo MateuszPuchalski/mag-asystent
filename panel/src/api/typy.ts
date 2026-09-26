@@ -856,6 +856,8 @@ export type WynikPartiiPasujeDo = {
 /** Czekające propozycje jednego wykazu — przegląd listą w kolejce. */
 export type PozycjaPrzegladu = {
   id: number; twId: number; symbol: string; nazwa: string | null; maszyna: string; warunki: string | null; dowod: string;
+  /** Adres strony dowodu (@wydanie) — przy wykazach z sieci każdy wiersz ma własny. */
+  link?: string | null;
 };
 export type PrzegladWykazu = {
   id: number; zrodlo: string; link: string | null; rodzaj: "maszyna" | "silnik"; pozycje: PozycjaPrzegladu[];
@@ -2158,9 +2160,17 @@ export type StanPasowaniaZSieci = {
   sprawdzono: number;
   doSprawdzenia: number;
   ostatnie: OstatniPrzebiegSieci[];
+  /** Lista popularnych silników (@wydanie): ile ich razem i ile czeka. Brak = starszy serwer. */
+  silniki?: { razem: number; doSprawdzenia: number };
 };
 export type WynikPrzebieguSieci = {
   sprawdzono: number; zaproponowano: number; bledow: number;
   odrzucono: Partial<Record<PowodOdrzuceniaSieci, number>>;
   przerwane: string | null;
 };
+
+/* ── Przegląd listą propozycji z sieci (@wydanie) ─────────────────────────────
+   Kształt z `services/pasowanie-z-sieci.ts` (`przegladZSieci`). Grupa to
+   KARTOTEKA: automat pyta o jedną część naraz. */
+export type PozycjaZSieci = { id: number; maszyna: string; warunki: string | null; cytat: string; link: string | null };
+export type PrzegladZSieci = { twId: number; symbol: string; nazwa: string | null; pozycje: PozycjaZSieci[] };
