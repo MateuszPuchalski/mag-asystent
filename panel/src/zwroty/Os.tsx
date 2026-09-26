@@ -83,7 +83,7 @@ function zrodlo(w: WpisOsiZwrotu): string | null {
 }
 
 /**
- * Przebieg zwrotu jednym zdaniem, całość na żądanie (@wydanie).
+ * Przebieg zwrotu jednym zdaniem, całość na żądanie (0.518.0).
  *
  * Zgłoszenie agentów: „aplikacja przytłacza". Pełna lista stała otwarta pod
  * każdym zwrotem, a przy decyzji liczy się ostatni ruch — reszta jest

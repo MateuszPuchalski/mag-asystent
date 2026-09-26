@@ -33,7 +33,7 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
       {/* Oznaczenie stoi PRZY NUMERZE, nie w dowodach: operator ma wiedzieć,
           z czym pracuje, zanim cokolwiek kliknie.
 
-          ZDANIE O NIEODEBRANIU MIESZKA W PODPOWIEDZI (@wydanie). Stało też
+          ZDANIE O NIEODEBRANIU MIESZKA W PODPOWIEDZI (0.518.0). Stało też
           fioletowym wierszem pod nagłówkiem, więc ten sam fakt padał na
           ekranie trzy razy: plakietka, wiersz i sekcja paczki. Plakietka mówi
           go jednym słowem, a wyjaśnienie jest jednym najazdem myszy dalej. */}
@@ -102,7 +102,7 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
         tutaj, bo nie miała innego miejsca — od tego wydania ma własną sekcję
         w kolumnie dowodów, razem z autorem, godziną i cofnięciem. Zdanie
         powtórzone dwa razy na jednym ekranie każe je czytać dwa razy.
-        Z tego samego powodu zeszło stąd zdanie o nieodebraniu (@wydanie) —
+        Z tego samego powodu zeszło stąd zdanie o nieodebraniu (0.518.0) —
         stoi w podpowiedzi plakietki przy numerze. */}
   </header>;
 }
@@ -116,7 +116,7 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
  * A to jest pierwsze, co trzeba wiedzieć, zanim podejmie się decyzję
  * o zwrocie: klient bywa w tej samej sprawie w pół zdania.
  *
- * JEDNA ROZMOWA, NAJNOWSZA. Reszta zostaje w dowodach — od @wydanie jako
+ * JEDNA ROZMOWA, NAJNOWSZA. Reszta zostaje w dowodach — od 0.518.0 jako
  * przystanki drogi w sekcji „Ten zakup u nas"; nagłówek mówi tylko, ile ich jest. „Czeka na odpowiedź" niesie niebieski, nie bursztyn —
  * to wezwanie do ruchu, a nie ostrzeżenie o błędzie.
  */

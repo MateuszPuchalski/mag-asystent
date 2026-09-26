@@ -91,7 +91,7 @@ describe("Nagłówek zwrotu", () => {
     expect(screen.getByText("ABC-1")).toBeInTheDocument();
     expect(screen.getByText("nieodebrana paczka")).toBeInTheDocument();
     /* Zdanie o nieodebraniu stoi w podpowiedzi plakietki, nie drugim wierszem
-       pod nią (@wydanie) — ten sam fakt padał na ekranie trzy razy. */
+       pod nią (0.518.0) — ten sam fakt padał na ekranie trzy razy. */
     expect(screen.getByText("nieodebrana paczka"))
       .toHaveAttribute("title", "Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana.");
     expect(screen.queryByText(/przesyłka wróciła nieodebrana/)).toBeNull();
@@ -144,7 +144,7 @@ describe("Nagłówek zwrotu", () => {
   });
 
   it("rozmowa bez tematu dostaje nazwę, a nie pusty odnośnik", () => {
-    /* Test przeszedł tu z dowodów (@wydanie): lista wiadomości zeszła do drogi
+    /* Test przeszedł tu z dowodów (0.518.0): lista wiadomości zeszła do drogi
        zakupu, a nazwę rozmowy pisze już tylko nagłówek. */
     render(<Naglowek zwrot={zwrot({ rozmowy: [
       { id: 8, temat: "  ", status: "new", ostatniaAt: null }] })} />);

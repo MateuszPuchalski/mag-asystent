@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dowody } from "./Dowody";
 import type { PrzystanekDrogi, SprawaZakupu, WpisOsiZwrotu, Zwrot } from "../api/typy";
 
-/* ── Kolumna dowodów po uproszczeniu (@wydanie) ──────────────────────────────
+/* ── Kolumna dowodów po uproszczeniu (0.518.0) ──────────────────────────────
    Zgłoszenie agentów: „aplikacja przytłacza". Te testy pilnują, żeby to,
    co zeszło, nie wróciło przy następnej zmianie:
 

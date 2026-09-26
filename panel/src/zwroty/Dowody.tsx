@@ -63,7 +63,7 @@ const STAN_KOSZA: Record<string, string> = {
   otwarty: "otwarty — zbiera towar", zamkniety: "na hali", rozlozony: "rozłożony", anulowany: "anulowany",
 };
 
-/* Tytuł jest OPCJONALNY (@wydanie): sekcja z jednym przyciskiem albo jednym
+/* Tytuł jest OPCJONALNY (0.518.0): sekcja z jednym przyciskiem albo jednym
    zdaniem nie potrzebuje nagłówka, który mówi to samo co jej treść. Ramka
    i odstęp zostają, żeby kolumna dalej czytała się blokami. */
 const Sekcja = ({ ikona, tytul, children }: {
@@ -135,7 +135,7 @@ function Notatka({ zwrot, trwa, blad, onZapisz, onCofnij }: {
       placeholder="Ustalenia, których Allegro nie zna"
       className="field resize-y text-sm" />
     {blad && <p className="text-xs text-red-700">{blad}</p>}
-    {/* PRZYCISK TYLKO PRZY ZMIANIE (@wydanie). Nieaktywny „Zapisz notatkę"
+    {/* PRZYCISK TYLKO PRZY ZMIANIE (0.518.0). Nieaktywny „Zapisz notatkę"
         stał pod każdym zwrotem jako główny przycisk kolumny — najmocniejszy
         kolor ekranu przy czynności, której właśnie nikt nie wykonuje. Pojawia
         się z pierwszą zmienioną literą, czyli tam, gdzie patrzy piszący. */}
@@ -232,7 +232,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                 ręką. Drugie kończyło się ścianą: bez numeru zamówienia panel nie ma
                 czego dociągnąć, ale zwrot da się doprowadzić do końca i tak.
 
-                PO JEDNYM ZDANIU NA GAŁĄŹ (@wydanie). Stały tu po dwa, a drugie
+                PO JEDNYM ZDANIU NA GAŁĄŹ (0.518.0). Stały tu po dwa, a drugie
                 tłumaczyło system — skąd kartoteka, kiedy synchronizacja. Agent
                 potrzebuje tylko ruchu, który ma zrobić; powód stoi w tym komentarzu. */}
             <p className="mt-2 text-xs text-slate-500">
@@ -377,7 +377,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
                 sama od przewoźnika, a `paczka_at` jest przy niej datą, w której
                 biuro wpisało ją do kolejki. Do 0.188.0 stało tu zdanie
                 o kliencie, który tej paczki właśnie nigdy nie nadał. */}
-            {/* „NIEODEBRANA" STOI RAZ, w plakietce nagłówka (@wydanie). Tu
+            {/* „NIEODEBRANA" STOI RAZ, w plakietce nagłówka (0.518.0). Tu
                 padała po raz trzeci — zostaje sama data, bo tylko ją ta
                 sekcja wie, a nagłówek nie. */}
             <p>{zwrot.zrodlo === "nieodebrana"
@@ -416,7 +416,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         Danych nadawcy i konta bankowego nie pobieramy.</p>
     </Sekcja>
 
-    {/* ── JEDNA SEKCJA ZAMIAST TRZECH (@wydanie) ─────────────────────────────
+    {/* ── JEDNA SEKCJA ZAMIAST TRZECH (0.518.0) ─────────────────────────────
         Zgłoszenie agentów: „aplikacja przytłacza". Pod kolumną stały trzy
         sekcje o jednym zakupie: „Sprawy tego zakupu", „Droga tego zakupu"
         i „Wiadomości o tym zakupie". Dwie pierwsze rysowały przy tym DRUGI
@@ -461,7 +461,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
     {/* ZLECENIE HALI ZE ZWROTU (0.502.0) — powód w `sprawy/ZlecHali.tsx`.
         Towar jedzie z zadaniem tylko wtedy, gdy zwrot ma JEDNĄ znaną
         kartotekę: przy kilku zgadywanie wysłałoby magazyniera pod złą półkę.
-        Nagłówek „Hala" zszedł (@wydanie): stał nad jednym przyciskiem
+        Nagłówek „Hala" zszedł (0.518.0): stał nad jednym przyciskiem
         „Zleć hali", który mówi to samo. */}
     <Sekcja>
       <ZlecHali zrodlo="zwrot" zrodloRef={zwrot.id} tytul={`Zwrot ${zwrot.numer ?? zwrot.id}`}
@@ -488,7 +488,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         decyzją, drugie po fakcie — najczęściej przy zwrocie zamkniętym, gdy
         sprawa wraca pytaniem.
 
-        ZWINIĘTA DO ZDANIA I BEZ NAGŁÓWKA (@wydanie) — powód przy
+        ZWINIĘTA DO ZDANIA I BEZ NAGŁÓWKA (0.518.0) — powód przy
         `PrzebiegZwrotu`. Zdanie zaczyna się od „Ostatnio:", więc nagłówek
         „Przebieg sprawy" nad nim byłby drugim tytułem jednego wiersza. */}
     {os.length > 0 && <Sekcja>

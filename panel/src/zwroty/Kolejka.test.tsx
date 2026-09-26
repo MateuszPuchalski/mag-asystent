@@ -343,7 +343,7 @@ describe("Dowody", () => {
     /* Klient jej właśnie nie odebrał, więc niczego nie nadawał (0.172.0),
        a `paczkaAt` jest przy niej chwilą, w której biuro wpisało karton do
        kolejki. Ta paczka jest u nas na pewno — i tak ma się pokazywać.
-       Słowo „nieodebrana" stoi od @wydanie raz, w plakietce nagłówka. */
+       Słowo „nieodebrana" stoi od 0.518.0 raz, w plakietce nagłówka. */
     render(zKlientem(<Dowody zwrot={zwrot({
       zrodlo: "nieodebrana", paczkaAt: "2026-08-28T09:00:00.000Z",
       dostarczonoAt: "2026-08-28T09:00:00.000Z" })} />));
@@ -357,7 +357,7 @@ describe("Dowody", () => {
        o Allegro, nie o tej sprawie, powtarzane przy prawie każdym zwrocie.
        Od 0.370.0 sekcji wtedy po prostu nie ma (dekalog p. 2).
 
-       Od @wydanie rozmowa stoi przystankiem drogi w „Ten zakup u nas" —
+       Od 0.518.0 rozmowa stoi przystankiem drogi w „Ten zakup u nas" —
        osobna lista wiadomości powtarzała to, co droga już niesie. */
     const { rerender } = render(zKlientem(<Dowody zwrot={zwrot()} />));
     expect(screen.queryByText(/Ten zakup u nas/)).toBeNull();

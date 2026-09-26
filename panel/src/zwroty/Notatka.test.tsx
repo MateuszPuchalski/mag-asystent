@@ -18,7 +18,7 @@ import type { Zwrot } from "../api/typy";
 
    1. ZAPIS JAWNYM PRZYCISKIEM, nie przy każdym znaku: zapis po literze
       podnosiłby wersję zwrotu i wywracał kontrolę świeżości u kolegi.
-   2. NIE MA ZMIANY → NIE MA PRZYCISKU (od @wydanie; wcześniej nieaktywny).
+   2. NIE MA ZMIANY → NIE MA PRZYCISKU (od 0.518.0; wcześniej nieaktywny).
       Zapis tego samego zdania kosztuje wersję i nie mówi nic nowego, a główny
       przycisk bez działania ściągał wzrok przy każdym zwrocie.
    3. NIE MA CZEGO COFAĆ → NIE MA PRZYCISKU. Pierwsza notatka nie ma dokąd

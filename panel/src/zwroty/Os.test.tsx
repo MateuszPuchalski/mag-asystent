@@ -65,7 +65,7 @@ describe("Oś zwrotu", () => {
   });
 });
 
-/* ── Przebieg zwinięty do zdania (@wydanie) ──────────────────────────────────
+/* ── Przebieg zwinięty do zdania (0.518.0) ──────────────────────────────────
    Zgłoszenie agentów: „przytłacza". Pełna lista stała otwarta pod każdym
    zwrotem; przy decyzji liczy się ostatni ruch, reszta jest jednym
    kliknięciem dalej — ten sam kształt co pasek zdarzeń rozmowy.            */
