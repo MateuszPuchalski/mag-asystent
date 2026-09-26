@@ -357,3 +357,28 @@ describe("Analiza: zakres Tydzień", () => {
     expect(adresy.filter((a) => a.startsWith("/api/analiza/tygodnie/"))).toEqual([]);
   });
 });
+
+/* ── Okno podane raz (0.512.0) ──────────────────────────────────────────────
+   Nagłówek Analizy mówi „Okno N dni", a etykiety liczb powtarzały to samo
+   przy każdej karcie. Pilnujemy, że powtórka nie wraca, a etykieta z INNYM
+   oknem (czas na powrót klienta) zostaje. */
+describe("Analiza: okno podane raz", () => {
+  it("nagłówek podaje okno, a liczby go nie powtarzają", async () => {
+    pokaz();
+    await screen.findByText("Rosa-Pol");
+    expect(screen.getByText(/Okno 90 dni/)).toBeInTheDocument();
+    expect(screen.getByText("dostaw domkniętych")).toBeInTheDocument();
+    expect(screen.queryByText(/w 90 dniach/)).toBeNull();
+
+    await naPraceHali();
+    expect(screen.getByText("pozycji")).toBeInTheDocument();
+    expect(await screen.findByText("zdarzeń")).toBeInTheDocument();
+    expect(screen.queryByText(/w oknie 7 dni/)).toBeNull();
+
+    await userEvent.click(screen.getByRole("button", { name: "Obsługa klienta" }));
+    await screen.findByText("Tarcie w skrzynce");
+    expect(screen.getAllByText("odpowiedzi").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/w oknie 30 dni|wynikiem, okno/)).toBeNull();
+    expect(screen.getByText("młodsze niż 7 dni, jeszcze bez wyniku")).toBeInTheDocument();
+  });
+});

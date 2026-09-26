@@ -45,7 +45,7 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
   }
 
   return <WidokHistorii historia={{ ...h.data, login: h.data.login }} tutaj="tą rozmową"
-    onOtworzRozmowe={onOtworzRozmowe} />;
+    bezLoginu onOtworzRozmowe={onOtworzRozmowe} />;
 }
 
 /**
@@ -53,13 +53,15 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
  * historii przy zwrocie, reklamacji i dyskusji (23 września 2026). Jeden widok
  * na cztery wejścia: agent czyta klienta tak samo, skądkolwiek przyszedł.
  */
-export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = false }: {
+export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = false, bezLoginu = false }: {
   historia: HistoriaKlienta & { login: string };
   /** „tą rozmową", „tym zwrotem" — o czym mówi pusta oś. */
   tutaj: string;
   onOtworzRozmowe: (id: number) => void;
   /** Na samym profilu odnośnik do profilu prowadziłby w miejsce. */
   bezProfilu?: boolean;
+  /** W skrzynce login stoi już w nagłówku rozmowy i przy każdej wiadomości. */
+  bezLoginu?: boolean;
 }) {
   const { login, maszyny, wpisy } = historia;
 
@@ -70,10 +72,14 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
     {/* Profil klienta (24 września 2026): cały klient na jednym ekranie —
         liczby, sygnały, otwarte sprawy, zamówienia z pozycjami, notatka.
         Na samym profilu login stoi w nagłówku, więc tu drugi raz go nie ma. */}
+    {/* Login zszedł ze skrzynki (0.513.0): stał tam trzeci raz, po nagłówku
+        rozmowy i wątku, a kopiuje się go z nagłówka. Szuflada przy sprawach
+        go zachowuje — tam zasłania kartę, na której login stoi. */}
     {!bezProfilu && <>
-      <LoginKlienta login={login} className="font-mono text-sm font-semibold text-slate-900" />
+      {!bezLoginu && <LoginKlienta login={login}
+        className="mr-2 font-mono text-sm font-semibold text-slate-900" />}
       <Link to={`/obsluga/klient/${encodeURIComponent(login)}`}
-        className="ml-2 text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
+        className="text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
         Profil klienta</Link>
     </>}
 

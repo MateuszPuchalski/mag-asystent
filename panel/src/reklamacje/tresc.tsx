@@ -127,3 +127,30 @@ export function Tresc({ tekst, className = "" }: { tekst: string; className?: st
     })}
   </p>;
 }
+
+/* ── DŁUGA TREŚĆ ZWINIĘTA DO CZTERECH LINII (0.511.0) ──────────────────────
+   Wzorzec `NaszaTresc` ze skrzynki (0.506.0), skopiowany, bo tamten nie jest
+   eksportowany. Powód ten sam: własną odpowiedź agent już zna, a długa
+   zajmowała całą oś i spychała pytanie klienta pod krawędź okna.
+
+   Progi te same co w skrzynce, 320 znaków albo pięć linii, żeby zwijało się
+   jednakowo na każdej kolejce. Puste wiersze ponad jeden ściskamy WYŁĄCZNIE
+   na ekranie: treść w bazie i w Allegro zostaje taka, jaka poszła.
+
+   Stan zwinięcia jest LOKALNY, nie w bazie: rozwinięcie to patrzenie,
+   a patrzenie niczego nie zapisuje. */
+export const PROG_ZWINIECIA = 320;
+
+export function DlugaTresc({ tekst, className = "", etykieta = "Pokaż całą wiadomość" }: {
+  tekst: string; className?: string; etykieta?: string;
+}) {
+  const [cala, setCala] = React.useState(false);
+  const zwarta = tekst.replace(/\n[ \t]*(\n[ \t]*){2,}/g, "\n\n").trim();
+  const dluga = zwarta.length > PROG_ZWINIECIA || zwarta.split("\n").length > 5;
+  return <>
+    <Tresc tekst={zwarta} className={`${className} ${dluga && !cala ? "line-clamp-4" : ""}`} />
+    {dluga && <button type="button" onClick={() => setCala((c) => !c)} aria-expanded={cala}
+      className="mt-1 text-xs font-semibold text-sky-800 underline underline-offset-2">
+      {cala ? "Zwiń" : etykieta}</button>}
+  </>;
+}

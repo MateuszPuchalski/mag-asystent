@@ -35,17 +35,20 @@ describe("AlarmSynchronizacji", () => {
 
   it("nie obiecuje, że ręczna synchronizacja ominie przerwę", () => {
     render(<AlarmSynchronizacji zdrowie={zdrowie()} synchronizuj={() => {}} trwa={false} blad="" />);
-    expect(screen.getByText(/nie omija tej przerwy/)).toBeInTheDocument();
+    /* Od 0.517.0 zdanie stoi w dymku przycisku, nie w stałym akapicie —
+       obietnica dotyczy przycisku, więc tam ją prostujemy. */
+    expect(screen.getByRole("button", { name: /Synchronizuj teraz/ }))
+      .toHaveAttribute("title", expect.stringMatching(/Retry-After.*nie omija tej przerwy/));
   });
 
   it("przycisk woła synchronizację i wyłącza się na czas próby", async () => {
     const klik = vi.fn();
     const { rerender } = render(<AlarmSynchronizacji zdrowie={zdrowie()}
       synchronizuj={klik} trwa={false} blad="" />);
-    await userEvent.click(screen.getByRole("button", { name: /SYNCHRONIZUJ TERAZ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Synchronizuj teraz/ }));
     expect(klik).toHaveBeenCalledOnce();
     rerender(<AlarmSynchronizacji zdrowie={zdrowie()} synchronizuj={klik} trwa blad="" />);
-    expect(screen.getByRole("button", { name: /PRÓBA W TOKU/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Próba w toku/ })).toBeDisabled();
   });
 
   it("błąd konta mówi o koncie, nie o limicie", () => {
@@ -65,7 +68,7 @@ describe("wiek()", () => {
 });
 
 describe("AlarmSynchronizacji — konto niepołączone (0.152.0)", () => {
-  /* Przy niesparowanym koncie SYNCHRONIZUJ TERAZ wywołuje dokładnie ten sam
+  /* Przy niesparowanym koncie „Synchronizuj teraz” wywołuje dokładnie ten sam
      błąd, na którym stoi skrzynka. Przycisk, który na pewno nie zadziała,
      jest gorszy niż jego brak: obiecuje naprawę i zabiera uwagę od tej
      jedynej rzeczy, która pomaga. */
@@ -80,13 +83,13 @@ describe("AlarmSynchronizacji — konto niepołączone (0.152.0)", () => {
     render(<AlarmSynchronizacji zdrowie={nieSparowane()} synchronizuj={() => {}}
       trwa={false} blad="" />);
 
-    expect(screen.queryByRole("button", { name: /SYNCHRONIZUJ/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Synchronizuj/ })).toBeNull();
     expect(screen.getByText(/KONTO ALLEGRO/)).toBeTruthy();
   });
 
   it("przy sparowanym koncie przycisk zostaje", () => {
     render(<AlarmSynchronizacji zdrowie={zdrowie()} synchronizuj={() => {}}
       trwa={false} blad="" />);
-    expect(screen.getByRole("button", { name: /SYNCHRONIZUJ/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Synchronizuj/ })).toBeTruthy();
   });
 });

@@ -97,7 +97,10 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
     <div className="flex flex-wrap items-center gap-2">
       <Banknote size={15} className="shrink-0 text-slate-400" />
       <b className="text-naglowek">Pieniądze</b>
-      {stan.kwotaGrosze !== null && !stan.oddane &&
+      {/* JEDYNE MIEJSCE KWOTY NA EKRANIE (0.516.0, §26d). Stała też w pasku
+          decyzji i w stopce pozycji; zeszła stamtąd, więc tu zostaje także po
+          oddaniu — inaczej zamknięty zwrot nie mówiłby, ile wyszło. */}
+      {stan.kwotaGrosze !== null &&
         <span className="text-sm tabular-nums">{zlote(stan.kwotaGrosze, stan.waluta)}</span>}
 
       {/* Oddane: numer zwrotu płatności z Allegro, nie samo „zrobione".
@@ -128,14 +131,16 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
       {/* Klawisz STOI PRZY PRZYCISKU, tak jak przy werdykcie i korekcie:
           rozpoznanie jest tańsze od pamiętania, a pasek skrótów na dole ekranu
           czyta się dopiero wtedy, gdy się wie, że jest czego szukać. */}
+      {/* Etykiety zwykłą pisownią (0.516.0, §26d): wersaliki krzyczały przy
+          każdym przycisku naraz, więc żaden nie był głośniejszy od innych. */}
       {stan.moznaZwrocic && <Przycisk wariant="glowny" className="ml-auto text-xs" disabled={trwa}
-        onClick={onZwroc}>{trwa ? "ODDAJĘ…"
+        onClick={onZwroc}>{trwa ? "Oddaję…"
           : <><kbd className="rounded border border-black/20 px-1 text-xs">Z</kbd>{" "}
-            ODDAJ PIENIĄDZE</>}</Przycisk>}
+            Oddaj pieniądze</>}</Przycisk>}
 
       {stan.moznaOdmowic && !odmawiam && !stan.odmowa && !stan.oddane &&
         <Przycisk className={`text-xs ${stan.moznaZwrocic ? "" : "ml-auto"}`}
-          onClick={() => setOdmawiam(true)}>ODMÓW WYPŁATY</Przycisk>}
+          onClick={() => setOdmawiam(true)}>Odmów wypłaty</Przycisk>}
     </div>
 
     {/* Przeszkoda mówi, CO zrobić — i stoi także wtedy, gdy odmowa jest
@@ -177,7 +182,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
         </label>
         <Przycisk className="text-xs" disabled={trwa}
           onClick={() => onPrzelew(referencja.trim() === "" ? null : referencja.trim())}>
-          {trwa ? "ZAPISUJĘ…" : "ZAPISZ PRZELEW"}</Przycisk>
+          {trwa ? "Zapisuję…" : "Zapisz przelew"}</Przycisk>
       </div>}
 
     {odmawiam && <div className="mt-2 space-y-2 border-t pt-2">
@@ -197,7 +202,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
       <div className="flex items-center gap-2">
         <Przycisk wariant="glowny" className="text-xs" disabled={trwa || niegotowe}
           onClick={() => onOdmow(kod, powod.trim() === "" ? null : powod.trim())}>
-          {trwa ? "WYSYŁAM…" : "WYŚLIJ ODMOWĘ"}</Przycisk>
+          {trwa ? "Wysyłam…" : "Wyślij odmowę"}</Przycisk>
         <Przycisk className="text-xs" onClick={() => setOdmawiam(false)}>Anuluj</Przycisk>
         <span className="ml-auto text-xs text-slate-500">{powod.length}/{LIMIT_POWODU}</span>
       </div>

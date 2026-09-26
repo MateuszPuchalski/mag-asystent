@@ -685,20 +685,23 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
           </label>}
           <div className="flex items-center gap-3 border-t border-slate-200 pt-2">
             <span className="text-xs font-bold uppercase text-slate-500">Do oddania</span>
-            <b data-testid="suma" className="mr-auto tabular-nums text-lg">
+            {/* Podgląd jest PODGLĄDEM. Do serwera idzie zaznaczenie, a sumę
+                składa on sam (§25a.3) — inaczej dałoby się zapisać dowolną
+                kwotę żądaniem z pominięciem tego ekranu. Od 0.516.0 mówi to
+                podpowiedź przy sumie: zdanie pod nią było głosem programisty. */}
+            <b data-testid="suma" className="mr-auto tabular-nums text-lg"
+              title="Kwotę przelicza serwer z zaznaczenia; to podgląd.">
               {zlote(suma, zwrot.waluta)}</b>
             <Przycisk wariant="glowny" disabled={trwa}
               onClick={() => onKwota(wybrane, dostawa)}>
               <kbd className="rounded border border-black/20 px-1 text-xs">Enter</kbd> Zapisz kwotę
             </Przycisk>
           </div>
-          {/* Podgląd jest PODGLĄDEM. Do serwera idzie zaznaczenie, a sumę składa
-              on sam (§25a.3) — inaczej dałoby się zapisać dowolną kwotę żądaniem
-              z pominięciem tego ekranu. */}
-          <p className="mt-1 text-xs text-slate-500">
-            Kwotę przelicza serwer z zaznaczenia; to podgląd.
-          </p>
         </div>
+      /* STOPKA ZNIKA, GDY KWOTA JEST USTALONA (0.516.0, §26d). Wtedy liczba,
+         która idzie do klienta, stoi w „Pieniądzach" — dwie sumy obok niej
+         czytało się jak trzecią wersję tej samej kwoty. */
+      : zwrot.kwotaGrosze !== null ? null
       : <div className="mt-3 space-y-1 border-t border-slate-200 pt-2 text-sm">
           <div className="flex items-baseline justify-between">
             <span className="text-slate-500">Suma pozycji</span>
