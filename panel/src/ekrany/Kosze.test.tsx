@@ -57,6 +57,7 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
   const metoda = init?.method ?? "GET";
   if (metoda !== "GET") {
     wyslane.push(`${metoda} ${url} ${init?.body ?? ""}`);
+    if (url.endsWith("/mm-usun")) return { zadan: 1, anulowanych: 0, ilosc: 2, magazyn: 3 };
     if (url.endsWith("/ponow-mm")) {
       const blad = odmowaPonowienia; odmowaPonowienia = null;
       return blad ? { __status: 409, error: blad } : { ponowione: 3 };
@@ -66,7 +67,10 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
   if (url === "/api/biuro/kosze/17") return { kosz: { ...SZCZEGOL, id: 17, kod: "Z-17", status: "rozlozony" } };
   /* Kosz jeszcze bez dokumentu — przeliczenie jest dozwolone (0.525.0). */
   if (url === "/api/biuro/kosze/18") return { kosz: { ...SZCZEGOL, id: 18, kod: "Z-18", status: "otwarty", doEdycji: true } };
-  if (url === "/api/biuro/kosze/16") return { kosz: { ...SZCZEGOL, id: 16, kod: "Z-16", status: "otwarty" } };
+  if (url === "/api/biuro/kosze/16") return { kosz: { ...SZCZEGOL, id: 16, kod: "Z-16", status: "otwarty",
+    /* Kartoteka, która blokuje MM (@wydanie) — zgłoszenie przy koszu 1205. */
+    brakiMm: [{ twId: 8, symbol: "HM-0520", nazwa: "Gaźnik", magazyn: "ZWR",
+      potrzeba: 2, stan: 2, rezerwacja: 1 }] } };
   if (url === "/api/biuro/kosze") return { kosze: [kosz(14, { pominietych: 1 }),
     /* Kłopoty z MM (0.501.0): rozłożony po odmowie i otwarty z błędem teraz. */
     kosz(15, { status: "rozlozony", problemMm: { prob: 1, ostatniBlad: "Brak towaru w magazynie",
@@ -156,6 +160,20 @@ describe("Kosze w zakładce Zwroty", () => {
     expect(within(wiersze[1]).getByText(/Brak towaru w magazynie/)).toBeInTheDocument();
     expect(within(wiersze[1]).getByText("MM po błędzie")).toBeInTheDocument();
     expect(wyslane).toEqual([]);
+  });
+
+  it("karta nazywa kartotekę, która blokuje MM, i pozwala ją zdjąć po potwierdzeniu (@wydanie)", async () => {
+    /* Zgłoszenie właściciela przy koszu 1205: „nie pokazuje, o jaki towar
+       chodzi" i „daj możliwość usunięcia tego towaru z tej MM". */
+    pokaz("/obsluga/zwroty/kosze/16");
+    expect(await screen.findByText(/MM chce 2 szt\. z ZWR, a tam jest 2, z czego 1 zarezerwowane/)).toBeInTheDocument();
+    expect(screen.getByText("blokuje MM — brak wolnego stanu")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "usuń z MM" }));
+    expect(wyslane).toEqual([]);
+    expect(screen.getByText(/Zostanie na ZWR/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Zdejmij z MM" }));
+    expect(wyslane).toEqual(['POST /api/biuro/kosze/16/mm-usun {"twId":8}']);
+    expect(await screen.findByText(/Zdjęte z MM \(2 szt\.\)/)).toBeInTheDocument();
   });
 
   it("MM w błędzie ponawia się z karty kosza jednym przyciskiem (0.503.0)", async () => {
