@@ -238,6 +238,21 @@ describe("Produkty ze zwrotu", () => {
     expect(screen.getByText(/Kwoty pełnej nie znamy bez zamówienia/)).toBeInTheDocument();
   });
 
+  it("z ustaloną kwotą stopki sum nie ma — kwotę pokazują „Pieniądze” (@wydanie)", () => {
+    /* Ta sama liczba stała trzy razy: w pasku decyzji, w sekcji pieniędzy
+       i tutaj. Dwie sumy obok ustalonej kwoty czytało się jak trzecią wersję. */
+    lista(zwrot({ kubelek: "zwrot", werdykt: "przyjety", kwotaGrosze: 9998, kwotaWariant: "pelna" }));
+    expect(screen.queryByText("Suma pozycji")).toBeNull();
+    expect(screen.queryByText("Z dostawą")).toBeNull();
+    expect(screen.queryByTestId("suma")).toBeNull();
+  });
+
+  it("zdanie o przeliczaniu kwoty stoi w podpowiedzi przy sumie", () => {
+    lista(zwrot({ kubelek: "zwrot" }));
+    expect(screen.getByTestId("suma")).toHaveAttribute("title", expect.stringMatching(/przelicza serwer/));
+    expect(screen.queryByText(/przelicza serwer/)).toBeNull();
+  });
+
   it("przy wycenie nie ma dwóch liczb o pieniądzach naraz", () => {
     /* „Suma pozycji" nad „Do oddania" czyta się jak jedna liczba, a myli się
        tę, która idzie do klienta. */
