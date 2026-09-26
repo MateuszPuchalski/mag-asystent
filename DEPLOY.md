@@ -2895,8 +2895,8 @@ wydania instaluje ją sama; przy aktualizacji z repo wystarczy zwykłe
 
 W Kolejce Wiedzy propozycje automatu z sieci stoją jedną kartą na
 kartotekę, z listą maszyn do zatwierdzenia jednym kliknięciem. Automat
-czyta teraz katalogi producentów w PDF, szuka wyłącznie po numerach OEM
-i bierze najpierw kartoteki, o które pytają klienci i które wracają jako
+czyta teraz katalogi producentów w PDF i szuka wyłącznie po numerach OEM.
+Najpierw bierze kartoteki, o które pytają klienci i które wracają jako
 „nie pasuje”.
 
 ### Aktualizacja do 0.508.0 — pasowanie z sieci na żądanie
