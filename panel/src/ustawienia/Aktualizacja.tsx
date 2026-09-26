@@ -50,7 +50,7 @@ function Ostatnia({ s }: { s: StanAktualizacji }) {
 
 /* Jedno zdanie o automacie: w jakim trybie jest i co zrobi. To samo zdanie
    kieruje taktem na serwerze, więc panel nie zgaduje. Zmiana trybu idzie
-   przez kartę „Serwer i kopie" tuż pod tą (od @wydanie klucze właściciela
+   przez kartę „Serwer i kopie" tuż pod tą (od 0.529.0 klucze właściciela
    stoją w grupie, na którą wpływają) — nie ma tu drugiego miejsca na tę decyzję. */
 const TRYB: Record<string, string> = {
   noc: "w nocy", zaraz: "gdy nikt nie pracuje", wylaczona: "wyłączona",

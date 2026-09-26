@@ -79,7 +79,7 @@ function Edytor({ w, onGotowe, onZamknij }: {
   </form>;
 }
 
-/* ── Gdzie mieszkają klucze właściciela (@wydanie) ──────────────────────
+/* ── Gdzie mieszkają klucze właściciela (0.529.0) ──────────────────────
    Ustawienia są pogrupowane według tego, na co wpływają, a nie gdzie je
    zapisuje serwer. Termin zwrotu stoi przy zwrotach, a nie w konfiguracji
    serwera pod nazwą `ZWROT_TERMIN_DNI` — szukało się go tam, gdzie się

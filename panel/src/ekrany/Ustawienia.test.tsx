@@ -158,7 +158,7 @@ describe("Ustawienia w panelu", () => {
     expect(screen.queryByText(/0\.87\.0/)).toBeNull();
   });
 
-  /* Pięć grup (@wydanie): przejście przez wszystkie to same odczyty, a każda
+  /* Pięć grup (0.529.0): przejście przez wszystkie to same odczyty, a każda
      karta stoi w grupie, na którą wpływa — decyzje właściciela też. */
   it("przejście przez wszystkie grupy: karty na swoich miejscach, zero zapisu", async () => {
     pokaz();

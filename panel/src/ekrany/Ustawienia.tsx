@@ -18,7 +18,7 @@ import { NowyKolektor } from "../ustawienia/NowyKolektor";
    Za zębatką, bo zmienia się tu rzadko — cel biura z §7: praca na górnym
    rzędzie, wgląd na dolnym, ustawienia za zębatką.
 
-   PIĘĆ GRUP ZAMIAST JEDNEGO ZWOJU (@wydanie). Osiem kart stało jedna pod
+   PIĘĆ GRUP ZAMIAST JEDNEGO ZWOJU (0.529.0). Osiem kart stało jedna pod
    drugą, a trzydzieści pięć decyzji właściciela — termin zwrotu, sufit
    szkiców Copilota, magazyn odpadu — mieszkało na dnie, w karcie
    „Konfiguracja serwera", pod nazwą klucza w pliku. Szukało się ich tam,

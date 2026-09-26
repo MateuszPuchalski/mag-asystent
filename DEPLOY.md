@@ -405,7 +405,7 @@ usługi albo domyślny. Hasła i klucze API widać wyłącznie jako „ustawione
 
 **Zmiana z panelu (0.491.0).** Przy decyzjach właściciela stoi przycisk
 **Zmień**: progi dat Allegro, terminy zwrotów, Copilot i jego limity, klucze
-Allegro i API, kopie na innym dysku. Od @wydanie stoją one w grupie ustawień,
+Allegro i API, kopie na innym dysku. Od 0.529.0 stoją one w grupie ustawień,
 na którą wpływają: zwroty i Copilot w „Obsłudze klienta”, magazyny
 w „Magazynie”, kopie i automat w „Serwerze”. Karta konfiguracji trzyma
 resztę: klucze instalatora i zaawansowane. Po kliknięciu „Zapisz” serwer robi
