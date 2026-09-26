@@ -38,10 +38,13 @@ export function Wiedza({ rozmowaId, twId, maMaszyne }: {
 
   return <div className="p-3" aria-label="Wiedza">
     {/* Zdanie, nie ramka (23 września 2026): obramowana klauzula była
-        najcięższym elementem zakładki, która poza nią zwykle nie ma nic. */}
-    <p className="text-podpis text-slate-600">
-      Każde twierdzenie techniczne w szkicu wskazuje jeden z tych dowodów (§14.3).
-      Bez źródła treść jest przypuszczeniem.
+        najcięższym elementem zakładki, która poza nią zwykle nie ma nic.
+        Jedno zdanie, nie dwa (0.513.0): na ekranie zostaje sama reguła,
+        bo dokument każe jej stać tam, gdzie agent pisze. Pierwsze zdanie
+        opisywało tylko, do czego służy lista niżej — zeszło do dymka. */}
+    <p className="text-podpis text-slate-600"
+      title="Każde twierdzenie techniczne w szkicu wskazuje jeden z tych dowodów.">
+      Bez źródła treść jest przypuszczeniem (§14.3).
     </p>
 
     <Dowody zastosowanie={wiedza.data?.zastosowanie ?? null} wczytuje={wiedza.isLoading} />
@@ -54,8 +57,6 @@ export function Wiedza({ rozmowaId, twId, maMaszyne }: {
     {pomiary.length > 0 &&
       <section className="mt-3" aria-label="Pomiary z tej rozmowy">
         <NaglowekSekcji>Pomiary z tej rozmowy</NaglowekSekcji>
-        <p className="mt-1 text-podpis text-slate-500">Wynik z hali nie staje się wiedzą sam. Zaproponowany
-          trafia do kolejki jako dowód „pomiar własny” i czeka na zatwierdzenie.</p>
         <ul className="mt-2 space-y-2">
           {pomiary.map((p) => <Pomiar key={p.zadanieId} pomiar={p} maMaszyne={maMaszyne}
             trwa={pomiarDoWiedzy.isPending}
@@ -96,6 +97,9 @@ function Dowody({ zastosowanie, wczytuje }: { zastosowanie: Zastosowanie | null;
   </div>;
 }
 
+const DROGA_POMIARU = "Wynik z hali nie staje się wiedzą sam. Zaproponowany trafia do kolejki "
+  + "jako dowód „pomiar własny” i czeka na zatwierdzenie.";
+
 function Pomiar({ pomiar, maMaszyne, trwa, onZaproponuj }: {
   pomiar: PomiarRozmowy; maMaszyne: boolean; trwa: boolean;
   onZaproponuj: (polaryzacja: "pasuje" | "nie_pasuje", powodNegatywny: PowodNegatywny | null) => void;
@@ -109,7 +113,10 @@ function Pomiar({ pomiar, maMaszyne, trwa, onZaproponuj }: {
     {pomiar.zaproponowano
       ? <p className="mt-1 text-podpis font-semibold text-emerald-700">w kolejce wiedzy jako dowód</p>
       : <>
-          <p className="mt-1 text-podpis font-semibold text-amber-800">niezatwierdzone jako wiedza</p>
+          {/* Opis drogi pomiaru zszedł spod nagłówka do dymka (0.513.0):
+              etykieta mówi stan słowem, a „jak to działa” czyta się raz. */}
+          <p className="mt-1 text-podpis font-semibold text-amber-800" title={DROGA_POMIARU}>
+            niezatwierdzone jako wiedza</p>
           <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
             <select className="field w-auto py-0.5 text-podpis" aria-label={`Wynik pomiaru: ${pomiar.tytul}`}
               value={polaryzacja} onChange={(e) => setPolaryzacja(e.target.value as "pasuje" | "nie_pasuje")}>

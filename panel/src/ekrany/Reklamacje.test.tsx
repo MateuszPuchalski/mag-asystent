@@ -270,8 +270,8 @@ describe("Ekran reklamacji", () => {
     /* `DOCUMENT_POSITION_FOLLOWING` liczone OD rozmowy: pasek ma stać za nią. */
     expect(rozmowa.compareDocumentPosition(pasek)
       & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(screen.getByRole("button", { name: /UZNAJĘ/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /ODRZUCAM/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Uznaję/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Odrzucam/ })).toBeInTheDocument();
     expect(screen.queryByText(/Centrum Sprzedaży/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Odpowiedź .* wysyła się/)).not.toBeInTheDocument();
   });
@@ -280,10 +280,10 @@ describe("Ekran reklamacji", () => {
     /* Wersja z ekranu jest obowiązkowa po stronie serwera: werdykt bez
        wiedzy, na co agent patrzył, to werdykt w ciemno. Ekran ją dokłada sam. */
     pokaz("/obsluga/reklamacje/1");
-    await userEvent.click(screen.getByRole("button", { name: /ODRZUCAM/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Odrzucam/ }));
     await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Towar sprawny.");
     await userEvent.click(screen.getByRole("checkbox"));
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ WERDYKT/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij werdykt/ }));
     expect(bezOdswiezenia()).toEqual([
       `werdykt:${JSON.stringify({
         id: 1, werdykt: "REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED",
@@ -331,7 +331,7 @@ describe("Ekran reklamacji", () => {
       wiad({ id: 2, externalId: "w-2", autorRola: "SELLER", tresc: "Proszę o zdjęcie" }),
     ]);
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(bezOdswiezenia()).toEqual([`odpowiedz:${JSON.stringify({
       id: 1, tresc: "Wysyłam nowy nóż", expectedWersja: 1,
       expectedLastMessageId: 1, mimoNowejWiadomosci: false,
@@ -348,7 +348,7 @@ describe("Ekran reklamacji", () => {
       nowaWiadomosc: { id: 7, tresc: "Proszę o zdjęcie noża", at: null, rola: "ADMIN" },
     });
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(screen.getByRole("dialog", { name: "Wysyłka zatrzymana" })).toBeInTheDocument();
     expect(screen.getByText(/doradca Allegro dopisał wiadomość/)).toBeInTheDocument();
     /* Szkic zostaje NIETKNIĘTY: serwer odrzucił wysyłkę przed strzałem. */
@@ -365,7 +365,7 @@ describe("Ekran reklamacji", () => {
       nowaWiadomosc: { id: 7, tresc: "Dopisuję", at: null, rola: "BUYER" },
     });
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(screen.getByText(/klient dopisał wiadomość/)).toBeInTheDocument();
     const mimoTo = screen.getByRole("button", { name: "WYŚLIJ MIMO TO" });
     expect(mimoTo).toBeDisabled();
@@ -385,12 +385,12 @@ describe("Ekran reklamacji", () => {
     scena.wynikWysylki = { status: "sent" };
     const pole = screen.getByLabelText("Odpowiedź w sprawie");
     await userEvent.type(pole, "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(pole).toHaveValue("");
 
     scena.wynikWysylki = { status: "send_uncertain" };
     await userEvent.type(pole, "Druga próba");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(pole).toHaveValue("Druga próba");
     expect(screen.getByText(/nie dała jednoznacznej odpowiedzi/)).toBeInTheDocument();
   });
@@ -402,7 +402,7 @@ describe("Ekran reklamacji", () => {
     scena.wynikWysylki = new Konflikt(
       "Allegro zamknęło rozmowę w tej sprawie i nie przyjmie nowej wiadomości.", {});
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByText(/Allegro zamknęło rozmowę/)).toBeInTheDocument();
   });
@@ -428,7 +428,7 @@ describe("Ekran reklamacji", () => {
     pokaz("/obsluga/reklamacje/1");
     scena.wynikWysylki = { status: "sent" };
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(scena.mutacje).toContain(`odswiez:${JSON.stringify({ id: 1 })}`);
   });
 
@@ -439,7 +439,7 @@ describe("Ekran reklamacji", () => {
     const przed = scena.mutacje.filter((m) => m.startsWith("odswiez:")).length;
     scena.wynikWysylki = new Konflikt("Allegro zamknęło rozmowę w tej sprawie", {});
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Wysyłam nowy nóż");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODPOWIEDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odpowiedź/ }));
     expect(scena.mutacje.filter((m) => m.startsWith("odswiez:")).length).toBe(przed);
   });
 

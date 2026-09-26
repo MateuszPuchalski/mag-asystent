@@ -4,7 +4,8 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { SzukajIKlawisze } from "./Klawisze";
+import { SKROTY, SzukajIKlawisze } from "./Klawisze";
+import zrodloSzkicu from "../skrzynka/SzkicCopilota.tsx?raw";
 
 /* ── Ctrl+K i lista skrótów pod `?` (23 września 2026) ───────────────────────
    Pilnujemy: Ctrl+K otwiera szukanie z każdego miejsca, także z pola; Enter
@@ -89,5 +90,18 @@ describe("lista skrótów pod ?", () => {
     pokaz();
     await userEvent.type(screen.getByLabelText("notatka"), "czy?");
     expect(screen.queryByRole("dialog")).toBeNull();
+  });
+});
+
+describe("opis skrótu idzie za napisem przycisku", () => {
+  it("E w skrzynce opisuje „Wstaw do odpowiedzi”, nie dawne „popraw” (0.515.0)", () => {
+    /* Przycisk pod E od 0.500.0 nazywa skutek, a lista pod `?` dalej
+       obiecywała poprawianie. Czytamy napis ze źródła karty, żeby kolejna
+       zmiana napisu bez zmiany opisu wywróciła ten test. */
+    expect(zrodloSzkicu).toContain('"Wstaw do odpowiedzi"');
+    const skrzynka = SKROTY.find((s) => s.tytul === "Skrzynka")!;
+    const opis = skrzynka.klawisze.find(([k]) => k === "E")?.[1];
+    expect(opis).toMatch(/^wstaw .*do odpowiedzi$/);
+    expect(opis).not.toMatch(/popraw/);
   });
 });

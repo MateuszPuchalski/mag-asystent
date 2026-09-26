@@ -33,14 +33,17 @@ export function Soczewka({ dane, onWstawDoSzkicu }: {
 
 /* SKĄD KATEGORIA — zawsze, bo soczewka stoi na domyśle klasyfikatora.
    Agent, który widzi „wg Copilota", wie, że może się mylić, i wie, gdzie
-   to poprawić: od 0.506.0 etykieta kategorii stoi pod „⋯” nad rozmową. */
+   to poprawić: od 0.506.0 etykieta kategorii stoi pod „⋯” nad rozmową.
+   Zwinięte (0.513.0): źródło zostaje słowem w linii nagłówka, a „gdzie
+   poprawić" zeszło do dymka. Zdanie o „⋯” stało nad KAŻDĄ soczewką, choć
+   potrzebne jest tylko temu, kto chce poprawić kategorię. */
 function Naglowek({ s }: { s: DaneSoczewki }) {
-  return <div className="mb-2">
+  return <div className="mb-2 flex flex-wrap items-baseline gap-x-2">
     <h3 className="text-podpis font-bold uppercase tracking-wide text-slate-700">
       Pytanie klienta · {NAZWA_KATEGORII[s.kategoria]}</h3>
-    <p className="text-podpis text-slate-600">
-      {s.zCzlowieka ? "kategoria wskazana przez zespół"
-        : "kategoria wg Copilota — poprawisz ją pod „⋯” nad rozmową"}
+    <p className="text-podpis text-slate-600"
+      title={s.zCzlowieka ? undefined : "Kategorię poprawisz pod „⋯” nad rozmową"}>
+      {s.zCzlowieka ? "kategoria wskazana przez zespół" : "kategoria wg Copilota"}
       {s.nieaktualna && " · sprzed ostatniej wiadomości klienta"}</p>
   </div>;
 }
