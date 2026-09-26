@@ -35,7 +35,7 @@ describe("AlarmSynchronizacji", () => {
 
   it("nie obiecuje, że ręczna synchronizacja ominie przerwę", () => {
     render(<AlarmSynchronizacji zdrowie={zdrowie()} synchronizuj={() => {}} trwa={false} blad="" />);
-    /* Od @wydanie zdanie stoi w dymku przycisku, nie w stałym akapicie —
+    /* Od 0.517.0 zdanie stoi w dymku przycisku, nie w stałym akapicie —
        obietnica dotyczy przycisku, więc tam ją prostujemy. */
     expect(screen.getByRole("button", { name: /Synchronizuj teraz/ }))
       .toHaveAttribute("title", expect.stringMatching(/Retry-After.*nie omija tej przerwy/));

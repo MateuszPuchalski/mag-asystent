@@ -69,7 +69,7 @@ describe("Szkic Copilota w edytorze", () => {
     edytor(c, { szkic: szkic().tresc });
     expect(screen.getByLabelText("Szkic odpowiedzi")).toHaveValue(szkic().tresc);
     expect(screen.getByText(/Szkic Copilota w polu/)).toBeInTheDocument();
-    /* „— poprawiaj wprost w polu" zeszło (@wydanie): tekst stoi w polu
+    /* „— poprawiaj wprost w polu" zeszło (0.517.0): tekst stoi w polu
        z kursorem, zdanie powtarzało to, co widać. */
     expect(screen.queryByText(/poprawiaj wprost w polu/)).toBeNull();
     for (const n of [/Przyjmij/, /Wstaw do odpowiedzi/, /Zastąp mój szkic/]) {
@@ -351,7 +351,7 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
   it("licznik znaków siedzi w nagłówku, a nie w osobnym wierszu pod kartą", () => {
     edytor(copilot({ szkic: szkic({ tresc: "abcde" }) }));
     expect(screen.queryByText(/każde twierdzenie ma podpisane źródło/)).toBeNull();
-    /* Od @wydanie liczba stoi widoczna w podpisie zwiniętej treści, a cała
+    /* Od 0.517.0 liczba stoi widoczna w podpisie zwiniętej treści, a cała
        metryka — model, czas, kto — w dymku nazwy szkicu. */
     expect(screen.getByText(/Treść szkicu · 5 znaków/)).toBeVisible();
     expect(screen.getByText(/Szkic Copilota/).closest("[title]"))
@@ -359,7 +359,7 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
   });
 
   it("pasek „Przy okazji” jest zwinięty do jednej linii z tematami", async () => {
-    /* @wydanie: sześć zdań pod każdym szkicem, z których żadne nie prosi
+    /* 0.517.0: sześć zdań pod każdym szkicem, z których żadne nie prosi
        o ruch. Podpis mówi, czego dotyczą; treść o jedno kliknięcie. */
     edytor(copilot({ nowePolaDoboru: ["Marka"], szkic: szkic({ lukiKartoteki:
       { symbol: "W09-0211", numery: [], modele: [], wpisane: [], czeka: 2 } }) }));

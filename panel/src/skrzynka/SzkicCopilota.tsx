@@ -179,7 +179,7 @@ export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
   const skrotyDzialaja = useSkrotyDzialaja();
   const s = p.szkic;
   if (!s) return null;
-  /* ── METRYKA W DYMKU, NIE W WIERSZU (@wydanie) ────────────────────────
+  /* ── METRYKA W DYMKU, NIE W WIERSZU (0.517.0) ────────────────────────
      Model, godzina, kto i liczba znaków stały zawsze widoczne obok nazwy.
      Agent sięga po nie wyjątkowo — przy reklamacji szkicu, nie przy
      czytaniu — więc zeszły do podpowiedzi nad napisem. Liczba znaków
@@ -232,7 +232,7 @@ export function UwagiSzkicu({ uwagi }: { uwagi: string[] }) {
 }
 
 /**
- * Tematy paska „Przy okazji" — podpis zwiniętego paska (@wydanie). Nazwy
+ * Tematy paska „Przy okazji" — podpis zwiniętego paska (0.517.0). Nazwy
  * mówią, GDZIE rzecz trafiła, bo po to agent rozwija: żeby sprawdzić swoje
  * miejsce, nie żeby przeczytać wszystko. Pusta lista = paska nie ma.
  */
@@ -312,7 +312,7 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
           `data-testid` zostaje HISTORYCZNY (`luki-kartoteki`), bo po nim
           sięgają testy, a zmiana nazwy kupiłaby wyłącznie ładniejsze słowo.
 
-          ── ZWINIĘTY DO JEDNEJ LINII (@wydanie) ────────────────────────────
+          ── ZWINIĘTY DO JEDNEJ LINII (0.517.0) ────────────────────────────
           Pasek bywał sześcioma zdaniami pod każdym szkicem, a żadne nie
           prosi o ruch: dane weszły same, pasowanie czeka w Doborze, wiedza
           w swojej kolejce. Zwinięty mówi, CZEGO dotyczy, a treść stoi

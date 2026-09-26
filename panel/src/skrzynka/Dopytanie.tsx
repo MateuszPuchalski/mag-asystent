@@ -73,7 +73,7 @@ export function Dopytanie(p: {
   const zaDlugie = tekst.length > p.limitZnakow;
   const gotowe = tekst.trim().length > 0 && !zaDlugie && !p.pracuje && !p.wylaczony;
 
-  /* PODPIS KRÓTSZY (@wydanie). „Odpowiedź czytasz Ty, nie klient" stało
+  /* PODPIS KRÓTSZY (0.517.0). „Odpowiedź czytasz Ty, nie klient" stało
      w podpisie przy każdym szkicu, pięć słów na myśl, którą niesie brak
      przycisku „wstaw". Zostają trzy słowa, bo sam sens — kto czyta — ma zostać. */
   return <Zwijka

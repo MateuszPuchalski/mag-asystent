@@ -67,14 +67,14 @@ export function AlarmSynchronizacji({ zdrowie, synchronizuj, trwa, blad }: {
       {/* Ręczna synchronizacja NIE omija przerwy — skraca tylko czekanie po jej
           końcu. Bez tego zdania przycisk obiecuje coś, czego nie robi.
 
-          ZDANIE W DYMKU PRZYCISKU, NIE W STAŁYM AKAPICIE (@wydanie). Akapit
+          ZDANIE W DYMKU PRZYCISKU, NIE W STAŁYM AKAPICIE (0.517.0). Akapit
           stał pod banerem zawsze, także przy niesparowanym koncie, gdzie
           przycisku nie ma i zdanie nie miało czego prostować. Dymek stoi
           tam, gdzie pada pytanie „czy to pomoże", czyli nad samym przyciskiem. */}
       {!bezPolaczenia && <Przycisk onClick={synchronizuj} disabled={trwa}
         title={`Respektujemy Retry-After. Następna próba: ${czas(i.nastepnaProba)}. `
           + "Ręczna synchronizacja nie omija tej przerwy."}>
-        {/* Zdaniem, nie WERSALIKAMI (@wydanie): krzyk w banerze awarii
+        {/* Zdaniem, nie WERSALIKAMI (0.517.0): krzyk w banerze awarii
             dokładał paniki, a nie czytelności. */}
         <RefreshCw size={16} />{trwa ? "Próba w toku…" : "Synchronizuj teraz"}
       </Przycisk>}

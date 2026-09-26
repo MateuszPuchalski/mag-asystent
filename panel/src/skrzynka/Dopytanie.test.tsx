@@ -60,7 +60,7 @@ describe("dopytanie Copilota", () => {
 
   test("ekran mówi wprost, kto czyta odpowiedź", () => {
     render(<Dopytanie {...props()} />);
-    /* Krótko od @wydanie: „tylko dla Ciebie" zamiast pięciu słów o tym samym. */
+    /* Krótko od 0.517.0: „tylko dla Ciebie" zamiast pięciu słów o tym samym. */
     expect(screen.getByText(/tylko dla Ciebie/i)).toBeTruthy();
   });
 

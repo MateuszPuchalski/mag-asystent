@@ -225,7 +225,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
               : <span className={`shrink-0 text-podpis font-bold ${k.stan <= 0
                   ? "text-ranga-zle" : "text-emerald-700"}`}>dostępne {k.stan}</span>}
           </div>
-          {/* ── DROGA I ŹRÓDŁO W DYMKU PEWNOŚCI (@wydanie) ──────────────────
+          {/* ── DROGA I ŹRÓDŁO W DYMKU PEWNOŚCI (0.517.0) ──────────────────
               Do tego wydania stały pod symbolem osobną linią: czip drogi
               i ucięte zdanie źródła, przy każdym kandydacie. To trzeci
               plan z komentarza wyżej, a trzeci plan czytany przy każdym
@@ -258,7 +258,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
           Plakietka „SZUKAMY" stała obok pola wyboru, które też mówiło
           „Szukamy". Zostaje pole, bo to w nim zmienia się stan, a barwę
           stanu niesie kropka przed nim. */}
-      {/* „Ustawił: X" zeszło do dymku pola (@wydanie): kto zmienił stan,
+      {/* „Ustawił: X" zeszło do dymku pola (0.517.0): kto zmienił stan,
           pyta się przy sporze, nie przy każdym spojrzeniu na zakładkę. */}
       <label className="flex items-center gap-1.5 text-xs text-slate-500"
         title={dobor.updatedBy ? `ustawił: ${dobor.updatedBy}` : undefined}>
@@ -296,7 +296,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
     {/* ── Dane wejściowe (§11.1) ─────────────────────────────────────────── */}
     <section className="border-b p-3" aria-label="Dane wejściowe">
       <div className="mb-2 flex items-center gap-2">
-        {/* Numer wersji w dymku (@wydanie): pilnuje zapisu przed
+        {/* Numer wersji w dymku (0.517.0): pilnuje zapisu przed
             nadpisaniem, a agentowi nic nie mówi, dopóki nie ma konfliktu —
             a konflikt nazywa się wtedy sam, zdaniem z nazwiskiem. */}
         <span className="cursor-help" title={`wersja ${dobor.wersja}`}>
@@ -420,7 +420,7 @@ export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, on
         {konflikt && <p className="col-span-2 flex items-center gap-1 text-xs font-semibold text-ranga-zle">
           <AlertTriangle size={13} />{konflikt}</p>}
         <div className="col-span-2 flex gap-2">
-          {/* Zdaniem, nie WERSALIKAMI (@wydanie) — jak reszta przycisków zakładki. */}
+          {/* Zdaniem, nie WERSALIKAMI (0.517.0) — jak reszta przycisków zakładki. */}
           <Przycisk wariant="glowny" type="submit" disabled={zapisz.isPending}>Zapisz</Przycisk>
           <Przycisk type="button" onClick={() => { setEdycja(false); setKonflikt(""); }}>Anuluj</Przycisk>
         </div>

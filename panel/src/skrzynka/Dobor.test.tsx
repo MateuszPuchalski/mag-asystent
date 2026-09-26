@@ -173,7 +173,7 @@ describe("zakładka doboru", () => {
     ] }, isLoading: false, error: null });
     pokaz(dobor({ status: "searching", dane: { ...dobor().dane, parametry: { "długość": "148 cm" } } }));
     expect(screen.getByTitle(/pominięty: agent nie wpisał wymiarów w parametrach doboru/)).toHaveTextContent("zgodne wymiary");
-    /* Droga i źródło stoją w dymku pewności od @wydanie — nie znikają,
+    /* Droga i źródło stoją w dymku pewności od 0.517.0 — nie znikają,
        schodzą z trzeciego planu do podpowiedzi nad werdyktem. */
     expect(screen.getByTitle(/droga: zgodne wymiary — zgodny wymiar 1480 mm/)).toHaveTextContent("wymaga danych");
   });
@@ -240,7 +240,7 @@ describe("zakładka doboru", () => {
   });
 
   it("wersja i „ustawił” stoją w dymkach, nie w wierszu", () => {
-    /* @wydanie: metryka zapisu przydaje się przy sporze, nie przy każdym
+    /* 0.517.0: metryka zapisu przydaje się przy sporze, nie przy każdym
        spojrzeniu — więc jest o najechanie, nie na wierzchu. */
     pokaz(dobor({ wersja: 7, updatedBy: "M. Wójcik" }));
     expect(screen.queryByText(/wersja 7/)).toBeNull();
