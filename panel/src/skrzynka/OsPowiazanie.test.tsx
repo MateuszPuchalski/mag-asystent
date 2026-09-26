@@ -30,7 +30,7 @@ describe("Powiązanie wiadomości na osi", () => {
     expect(z).toHaveAttribute("title", "2f8c1a3e-9b7d-4c1e-8a2b-000000000001");
   });
 
-  /* Od @wydanie oferta i zamówienie rozmowy stoją raz, w paśmie i kolumnie
+  /* Od 0.523.0 oferta i zamówienie rozmowy stoją raz, w paśmie i kolumnie
      kontekstu. Wiadomość powtarza je tylko wtedy, gdy wskazuje coś innego. */
   const osRozmowy = (w: WpisOsi, powiazanie: { ofertaId: string | null; zamowienieId: string | null }) =>
     render(<Os rozmowaId={1} wpisy={[w]} zrodloPomiaru={null} mozeZlecac={false}

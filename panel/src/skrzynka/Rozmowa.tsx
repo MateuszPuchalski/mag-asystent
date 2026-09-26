@@ -265,7 +265,7 @@ export function Rozmowa(p: {
               placeholder="Np. zmierz rozstaw otworów, podaj w milimetrach" /></label>
           {/* Przycisk MARTWY przy pustym poleceniu, a nie błąd po kliknięciu:
               serwer i tak odmówi, tylko o jeden strzał i jedno zdanie później. */}
-          {/* Zwykłą wielkością liter (@wydanie): wersaliki krzyczały głośniej
+          {/* Zwykłą wielkością liter (0.523.0): wersaliki krzyczały głośniej
               niż „Wyślij do klienta" tuż pod spodem, a to wysyłka jest główna. */}
           <Przycisk wariant="glowny" className="mt-3" onClick={p.onZlec}
             disabled={!p.wskazowka.trim()}>

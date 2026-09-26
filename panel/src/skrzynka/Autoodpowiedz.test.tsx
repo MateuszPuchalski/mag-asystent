@@ -62,7 +62,7 @@ describe("Autoodpowiedź na osi rozmowy", () => {
     expect(screen.getByText(/NIP: 5423444020/)).toBeTruthy();
   });
 
-  /* Od @wydanie długa wypowiedź ze stopką ma JEDEN przełącznik, nie dwa:
+  /* Od 0.523.0 długa wypowiedź ze stopką ma JEDEN przełącznik, nie dwa:
      oba odsłaniały resztę tego, co klient dostał. */
   it("długa odpowiedź ze stopką odsłania treść i stopkę jednym kliknięciem", async () => {
     os(wpis({ automatyczna: false, tresc: "Prosimy o zgłoszenie reklamacji. " + "x".repeat(400),

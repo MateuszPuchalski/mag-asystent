@@ -269,7 +269,7 @@ export function Edytor({
     role="group" aria-label={wKomentarzu ? "Działania notatki" : "Działania odpowiedzi"}>
     {wKomentarzu
       ? <>
-          {/* LICZNIK I ZDANIE ZESZŁY (@wydanie), tą samą regułą co licznik
+          {/* LICZNIK I ZDANIE ZESZŁY (0.523.0), tą samą regułą co licznik
               odpowiedzi w 0.506.0: stoi tylko to, co zmienia decyzję. Notatka
               nie ma limitu znaków — serwer żadnego nie trzyma — więc licznik
               nie miał progu, przy którym by coś znaczył. „Widoczna tylko dla

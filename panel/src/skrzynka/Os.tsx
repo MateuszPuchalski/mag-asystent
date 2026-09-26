@@ -68,7 +68,7 @@ function Zalacznik({ z }: { z: ZalacznikOsi }) {
    NIP, KRS, REGON, telefon — siedem wierszy w każdej naszej wiadomości i ani
    jeden o sprawie klienta. Zwinięty, nie skasowany: to treść, którą klient
    DOSTAŁ. Podpis człowieka („Z poważaniem, Mateusz") zostaje w treści, bo
-   mówi, z kim klient rozmawiał. Od @wydanie stopkę odsłania ten sam
+   mówi, z kim klient rozmawiał. Od 0.523.0 stopkę odsłania ten sam
    przełącznik co długą wypowiedź — `DlugiTekst`, powód tam. */
 
 /**
@@ -85,7 +85,7 @@ function Zalacznik({ z }: { z: ZalacznikOsi }) {
  * dalej i pokazuje całość.
  */
 function Autoodpowiedz({ wpis }: { wpis: WpisOsi }) {
-  /* Stan ze wspólnego haka (@wydanie); cały wiersz zostaje przyciskiem,
+  /* Stan ze wspólnego haka (0.523.0); cały wiersz zostaje przyciskiem,
      bo zwinięta autoodpowiedź ma być jedną linijką, nie dwiema. */
   const { otwarte, przelacznik } = useRozwiniecie();
   return <article className="ml-auto max-w-[75ch] rounded-lg border border-dashed
@@ -180,7 +180,7 @@ export function Os({
    */
   koniec?: React.ReactNode;
   /**
-   * Oferta i zamówienie CAŁEJ rozmowy (@wydanie) — te, które pokazuje pasmo
+   * Oferta i zamówienie CAŁEJ rozmowy (0.523.0) — te, które pokazuje pasmo
    * odpowiedzi i kolumna kontekstu. Wiadomość powtarza je w nagłówku tylko
    * wtedy, gdy wskazuje coś INNEGO. Bez tej wartości oś pokazuje każde.
    */
@@ -375,7 +375,7 @@ export function Os({
                 szukać towaru drugi raz. Zamówienie skracamy: UUID w całości
                 nikomu nic nie mówi, a całość niesie blok nad osią.
 
-                TYLKO GDY INNE NIŻ ROZMOWY (@wydanie). Ta sama oferta i to samo
+                TYLKO GDY INNE NIŻ ROZMOWY (0.523.0). Ta sama oferta i to samo
                 zamówienie stały w nagłówku każdej wiadomości klienta, choć
                 pasmo odpowiedzi i kolumna kontekstu mówią je raz na rozmowę.
                 Nie zdejmujemy ich w ogóle, bo wiadomość spod INNEJ oferty to
@@ -645,7 +645,7 @@ function Zlecenie({ wpis }: { wpis: WpisOsi }) {
    treść agent już zna — wystarczy mu jej początek, całość na kliknięcie.
    Puste wiersze ponad jeden ściskamy WYŁĄCZNIE na ekranie: treść w bazie
    i w Allegro zostaje taka, jaka poszła. Próg i przełącznik mieszkają od
-   @wydanie w `DlugiTekst.tsx`, razem ze stopką. */
+   0.523.0 w `DlugiTekst.tsx`, razem ze stopką. */
 function NaszaTresc({ tresc, stopka }: { tresc: string; stopka?: string | null }) {
   const zwarta = tresc.replace(/\n[ \t]*(\n[ \t]*){2,}/g, "\n\n").trim();
   return <DlugiTekst tresc={zwarta} stopka={stopka} className="text-tresc text-slate-600" />;

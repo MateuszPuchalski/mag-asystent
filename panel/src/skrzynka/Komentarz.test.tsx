@@ -69,7 +69,7 @@ describe("Edytor — tryb komentarza wewnętrznego", () => {
   });
 
   it("notatka nie liczy znaków i nie powtarza, że jest wewnętrzna", async () => {
-    /* @wydanie: licznik nie miał limitu, przy którym by coś znaczył, a zdanie
+    /* 0.523.0: licznik nie miał limitu, przy którym by coś znaczył, a zdanie
        „Widoczna tylko dla zespołu" mówiły już zakładka i pole. Zostaje
        w podpowiedzi przycisku — tuż przed kliknięciem. */
     edytor({ komentarz: "Zerknij proszę" });

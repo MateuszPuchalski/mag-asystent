@@ -204,7 +204,7 @@ function OpisKartoteki({ desc }: { desc?: string }) {
         — `line-clamp` robi to w przeglądarce. Sześć, a nie osiem, bo domyślna
         skala Tailwinda kończy się na sześciu, a `line-clamp-8` nie powstałoby
         w arkuszu i opis jechałby CAŁY. Próg znaków jest wspólny z osią
-        rozmowy (@wydanie): dwa zapisy tej samej liczby rozjechałyby się
+        rozmowy (0.523.0): dwa zapisy tej samej liczby rozjechałyby się
         przy pierwszej poprawce. Wierszy nie liczymy, bo sześć się mieści. */}
     {tresc.length > PROG_ZNAKOW && <button type="button" onClick={() => setCalosc((c) => !c)}
       className="mt-1 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
