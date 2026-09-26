@@ -25,13 +25,26 @@ function czytaj(): string | null {
 }
 
 export function PasekZmian({ zmiany, onZamknij }: { zmiany: WydanieZmian[]; onZamknij: () => void }) {
+  /* JEDNO WYDANIE NARAZ, reszta za „+N" (@wydanie). Po tygodniu nieobecności
+     pasek wyrastał na trzy wiersze nagłówków nad pracą, a agent czyta
+     najnowsze albo nic. Starsze zostają o jedno kliknięcie. */
+  const [wszystkie, setWszystkie] = useState(false);
   if (!zmiany.length) return null;
+  const [najnowsze, ...starsze] = zmiany;
+  const widoczne = wszystkie ? zmiany : [najnowsze];
   return <section aria-label="Nowe w panelu"
     className="flex items-start gap-3 border-b border-sky-200 bg-sky-50 px-5 py-2 text-sm text-sky-950">
     <Sparkles size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
     <div className="min-w-0 flex-1">
-      {zmiany.map((z) => <p key={z.wersja}>
-        <b>Nowe w {z.wersja}:</b> {z.naglowki.join(" · ")}</p>)}
+      {widoczne.map((z) => <p key={z.wersja}>
+        <b>Nowe w {z.wersja}:</b> {z.naglowki.join(" · ")}
+        {z === najnowsze && !wszystkie && starsze.length > 0 &&
+          <button type="button" onClick={() => setWszystkie(true)}
+            title="Pokaż wcześniejsze wydania"
+            aria-label={`+${starsze.length}: pokaż wcześniejsze wydania`}
+            className="ml-2 rounded px-1.5 font-semibold underline hover:bg-sky-100">
+            +{starsze.length}</button>}
+      </p>)}
     </div>
     <button type="button" onClick={onZamknij}
       className="inline-flex shrink-0 items-center gap-1 rounded-lg px-2 py-1 font-semibold hover:bg-sky-100">
