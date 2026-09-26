@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { KeyRound, LogOut, Power, UserPlus, Users } from "lucide-react";
+import { KeyRound, LogOut, MoreHorizontal, Power, UserPlus, Users } from "lucide-react";
 import {
   useAktywnosc, useKonta, useResetHasla, useSesje, useWylogujWszedzie, useZalozKonto,
   type Konto, type RolaKonta,
@@ -7,6 +7,7 @@ import {
 import { Blad, Pole, Przycisk, stempel } from "../ui";
 import { Potwierdz } from "../ui/Potwierdz";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
+import { useOkienko } from "../skrzynka/MenuRozmowy";
 
 /* ── Konta i sesje (z `biuro.html` 0.111.0, 0.444.0) ────────────────────
    Do 0.111.0 reset hasła, wyłączenie konta i ucięcie sesji zgubionego
@@ -26,7 +27,16 @@ import { KartaWgladu, Tabela, Td } from "../ui/wglad";
    biura albo admina serwer założy tylko adminowi (`zarzadzanie_biurem`).
 
    HASŁO W POLU `password`, nie w okienku przeglądarki. Biuro pytało przez
-   `prompt()`, który pokazuje wpisywany tekst każdemu za plecami. */
+   `prompt()`, który pokazuje wpisywany tekst każdemu za plecami.
+
+   CZYNNOŚCI ZA „⋯" (@wydanie). Trzy przyciski w każdym wierszu dawały
+   tabelę, w której więcej było przycisków niż osób — a sięga się po nie
+   przy zgubionym kolektorze albo zapomnianym haśle. Ta sama zasada co „⋯"
+   rozmowy (0.506.0) i ten sam `useOkienko`: Escape i klik obok zamykają.
+
+   Czynności rozwijają się W WIERSZU, nie w pływającym okienku. `Tabela`
+   przewija się w poziomie, a karta ucina, co wystaje: okienko nad ostatnim
+   wierszem zniknęłoby pod krawędzią karty. */
 
 const HASLO_MIN = 8;
 
@@ -37,6 +47,7 @@ function WierszKonta({ k, admin, sesjeOtwarte, onSesje }: {
   const reset = useResetHasla();
   const [haslo, setHaslo] = useState<string | null>(null);
   const [wynik, setWynik] = useState("");
+  const { otwarte, setOtwarte, ramka } = useOkienko<HTMLDivElement>();
   const maly = "!px-2.5 !py-1 !text-xs";
 
   return <tr className={k.active ? "" : "text-slate-500"}>
@@ -47,11 +58,9 @@ function WierszKonta({ k, admin, sesjeOtwarte, onSesje }: {
       ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-ranga-ok">aktywne</span>
       : <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">wyłączone</span>}</Td>
     {admin && <Td>
-      <div className="flex flex-wrap items-center gap-2">
-        <Przycisk className={maly} aria-pressed={sesjeOtwarte} onClick={onSesje}>Sesje</Przycisk>
-        {haslo === null
-          ? <Przycisk className={maly} onClick={() => { setHaslo(""); setWynik(""); }}><KeyRound size={14} />Reset hasła</Przycisk>
-          : <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => {
+      <div ref={ramka} className="flex flex-wrap items-center justify-end gap-2">
+        {haslo !== null
+          ? <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => {
               e.preventDefault();
               reset.mutate({ userId: k.userId, haslo }, {
                 onSuccess: () => { setHaslo(null); setWynik("Hasło ustawione — przekaż je osobie bezpośrednio."); },
@@ -63,13 +72,27 @@ function WierszKonta({ k, admin, sesjeOtwarte, onSesje }: {
               <Przycisk wariant="glowny" type="submit" className={maly}
                 disabled={haslo.length < HASLO_MIN || reset.isPending}>Ustaw</Przycisk>
               <Przycisk type="button" className={maly} onClick={() => setHaslo(null)}>Anuluj</Przycisk>
-            </form>}
-        {k.active
-          ? <Potwierdz maly etykieta={<><Power size={14} />Wyłącz</>}
-              pytanie="Konto straci dostęp od zaraz." tak="Wyłącz konto" trwa={aktywnosc.isPending}
-              onTak={() => aktywnosc.mutate({ userId: k.userId, active: false })} />
-          : <Przycisk className={maly} disabled={aktywnosc.isPending}
-              onClick={() => aktywnosc.mutate({ userId: k.userId, active: true })}><Power size={14} />Włącz</Przycisk>}
+            </form>
+          : <>
+            {otwarte && <div role="group" aria-label={`Czynności: ${k.name}`} className="flex flex-wrap items-center gap-2">
+              <Przycisk className={maly} aria-pressed={sesjeOtwarte}
+                onClick={() => { setOtwarte(false); onSesje(); }}>Sesje</Przycisk>
+              <Przycisk className={maly} onClick={() => { setOtwarte(false); setHaslo(""); setWynik(""); }}>
+                <KeyRound size={14} />Reset hasła</Przycisk>
+              {k.active
+                ? <Potwierdz maly etykieta={<><Power size={14} />Wyłącz</>}
+                    pytanie="Konto straci dostęp od zaraz." tak="Wyłącz konto" trwa={aktywnosc.isPending}
+                    onTak={() => { setOtwarte(false); aktywnosc.mutate({ userId: k.userId, active: false }); }} />
+                : <Przycisk className={maly} disabled={aktywnosc.isPending}
+                    onClick={() => { setOtwarte(false); aktywnosc.mutate({ userId: k.userId, active: true }); }}>
+                    <Power size={14} />Włącz</Przycisk>}
+            </div>}
+            <button type="button" aria-label={`Czynności konta ${k.name}`} aria-expanded={otwarte}
+              title="Sesje, reset hasła, wyłączenie"
+              onClick={() => setOtwarte((o) => !o)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">
+              <MoreHorizontal size={16} /></button>
+          </>}
       </div>
       {wynik && <p className="mt-1 text-xs text-ranga-ok">{wynik}</p>}
       <Blad>{reset.error?.message || aktywnosc.error?.message}</Blad>
@@ -162,8 +185,11 @@ export function Konta({ admin, biuro = false }: { admin: boolean; biuro?: boolea
   const role: RolaKonta[] = admin ? ["magazynier", "biuro", "admin"] : biuro ? ["magazynier"] : [];
 
   return <KartaWgladu id="karta-konta" tytul="Konta i sesje"
+    /* Zdanie admina zeszło (@wydanie): opisywało przyciski, które schowały
+       się za „⋯", a pytania przy Wyłącz i Wyloguj wszędzie mówią to samo
+       w chwili decyzji. Biuro dalej słyszy, czego tu nie zrobi i dlaczego. */
     opis={admin
-      ? "Reset nadaje nowe hasło, Wyłącz odbiera dostęp od zaraz. Sesje pokazują, co jest zalogowane; Wyloguj wszędzie to przycisk na zgubiony kolektor."
+      ? undefined
       : biuro
         ? "Konta magazynierów zakładasz tutaj. Reset hasła, wyłączenie konta i sesje są po stronie administratora."
         : "Konta zmienia administrator — reset hasła, wyłączenie konta i sesje są po jego stronie."}

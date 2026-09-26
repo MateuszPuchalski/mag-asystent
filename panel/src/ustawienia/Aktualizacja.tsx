@@ -40,7 +40,11 @@ function Ostatnia({ s }: { s: StanAktualizacji }) {
   return <p className="mb-3 text-sm">
     Ostatnia aktualizacja do <b>{o.wersja}</b>: <span className={e.klasa}>{e.zdanie}</span>
     {o.kto && <> · zlecił(a) {o.kto}</>} · {czas(o.do ?? o.od)}.
-    {o.etap === "blad" && <> Dziennik: <code>server\data\aktualizacja\ostatnia.log</code>.</>}
+    {/* Ścieżka pliku zeszła do dymka (@wydanie): czytającemu kartę mówi
+        tyle, że szczegóły są na serwerze, a adminowi przy pulpicie zdalnym
+        wystarczy najechać, żeby wiedzieć, który plik otworzyć. */}
+    {o.etap === "blad" && <> Szczegóły są w <span title="server\data\aktualizacja\ostatnia.log"
+      className="underline decoration-dotted">dzienniku aktualizacji na serwerze</span>.</>}
   </p>;
 }
 
@@ -57,7 +61,10 @@ function Automat({ a }: { a: NonNullable<StanAktualizacji["auto"]> }) {
     : `${a.tryb === "noc" ? ` ${a.okno.od}:00–${a.okno.do}:00` : ""}${wiek}${a.kanarek ? ", po kanarku" : ""}`;
   return <p className="mb-3 text-sm">
     <b>Automatycznie:</b> {TRYB[a.tryb] ?? a.tryb}{szczegoly}. {a.powod}
-    {" "}<span className="text-slate-600">Tryb zmienisz w konfiguracji (AKTUALIZACJA_AUTO).</span>
+    {/* Nazwa zmiennej zeszła do dymka (@wydanie) — na wierzchu mówimy, gdzie
+        to zmienić, a klucz dostaje ten, kto najedzie i go szuka. */}
+    {" "}<span className="text-slate-600">Tryb zmienisz w <span title="Klucz AKTUALIZACJA_AUTO"
+      className="underline decoration-dotted">konfiguracji serwera</span> wyżej.</span>
   </p>;
 }
 
@@ -159,8 +166,9 @@ export function Aktualizacja({ admin }: { admin: boolean }) {
           : "Serwer jeszcze nie sprawdzał wydań od startu — kliknij „Sprawdź teraz”."}</p>
       : <>
         <Zmiany zmiany={zmiany} />
-        {!zPaczka.length && <p className="mb-3 text-sm text-slate-600">Nowsze wydanie nie ma jeszcze paczki —
-          CI dokłada ją kilka minut po scaleniu.</p>}
+        {/* „CI" i „scalenie" to słowa z repozytorium, nie z biura (@wydanie). */}
+        {!zPaczka.length && <p className="mb-3 text-sm text-slate-600">Nowsze wydanie nie ma jeszcze paczki
+          do pobrania — zwykle pojawia się kilka minut później.</p>}
         {zPaczka.length > 0 && <form aria-label="Zlecenie aktualizacji" className="flex flex-wrap items-center gap-2"
           onSubmit={(e) => {
             e.preventDefault();
