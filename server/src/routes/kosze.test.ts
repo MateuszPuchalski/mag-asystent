@@ -468,3 +468,19 @@ test("ponowienie MM kosza: bramka biura, a odmowa dochodzi zdaniem (0.503.0)", a
   assert.equal(r.statusCode, 409);
   assert.match(r.json().error, /nie stoi w błędzie/);
 });
+
+test("zdjęcie kartoteki z MM: bramka biura i odmowa zdaniem (@wydanie)", async () => {
+  const magazynier = zalogowany("magazynier");
+  const biuro = zalogowany("biuro");
+  const koszId = koszDoRozkladania("KZ-35");
+  let r = await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/mm-usun`,
+    headers: magazynier, payload: { twId: 1 } });
+  assert.equal(r.statusCode, 403, "treść dokumentu w bazie firmy zmienia biuro");
+  r = await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/mm-usun`,
+    headers: biuro, payload: {} });
+  assert.equal(r.statusCode, 400);
+  r = await app.inject({ method: "POST", url: `/api/biuro/kosze/${koszId}/mm-usun`,
+    headers: biuro, payload: { twId: 1 } });
+  assert.equal(r.statusCode, 409);
+  assert.match(r.json().error, /nie ma w żadnym MM/);
+});

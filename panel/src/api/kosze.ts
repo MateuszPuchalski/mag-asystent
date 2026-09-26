@@ -44,7 +44,9 @@ export interface WierszKosza {
    * starszy serwer pola nie przysyła.
    */
   problemMm?: { prob: number; ostatniBlad: string | null; ostatnioAt: string;
-    nierozwiazany: boolean } | null;
+    nierozwiazany: boolean;
+    /** Po odmowie czeka na kolejną próbę (@wydanie) — jeszcze NIE weszło. */
+    ponawiane?: boolean } | null;
   /**
    * Rozłożony ponad dobę, a MM powrotne nie powstało (0.505.0) — i dlaczego.
    * `adresy`: czeka na zapis adresu; `kierunek`: powrót robi biuro w Subiekcie.
@@ -86,6 +88,12 @@ export interface SzczegolKosza {
   odlozonych: number;
   mmNumer: string | null;
   powrot: { status: string; numer: string | null } | null;
+  /**
+   * Kartoteki, których brakuje na magazynie źródłowym MM jeszcze niewykonanego
+   * (@wydanie) — stan i rezerwacja z read-modelu. Starszy serwer go nie przysyła.
+   */
+  brakiMm?: Array<{ twId: number; symbol: string | null; nazwa: string | null; magazyn: string;
+    potrzeba: number; stan: number; rezerwacja: number }>;
   rodzaj: string;
   anulowanoAt: string | null;
   anulowanoPrzez: string | null;
@@ -205,6 +213,20 @@ export function usePonowMmKosza() {
     mutationFn: (v: { id: number; sprawdzono: boolean }) =>
       api<{ ponowione: number }>(`/api/biuro/kosze/${v.id}/ponow-mm`,
         { method: "POST", body: JSON.stringify({ sprawdzono: v.sprawdzono }) }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: kluczeKoszy.wszystko }),
+  });
+}
+
+/**
+ * Zdjęcie kartoteki z MM kosza, które jeszcze nie weszło (@wydanie). Towar
+ * zostaje na magazynie źródłowym — powód przy `usunZMmKosza` na serwerze.
+ */
+export function useUsunZMm() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; twId: number }) =>
+      api<{ zadan: number; anulowanych: number; ilosc: number; magazyn: number | null }>(
+        `/api/biuro/kosze/${v.id}/mm-usun`, { method: "POST", body: JSON.stringify({ twId: v.twId }) }),
     onSuccess: () => qc.invalidateQueries({ queryKey: kluczeKoszy.wszystko }),
   });
 }
