@@ -83,7 +83,11 @@ export interface WynikPartii {
 }
 
 /** Autor decyzji. `id: null` to automat — tak samo jak przy szkicu z taktu. */
-export type Autor = { id: number | null; name: string };
+export type Autor = {
+  id: number | null; name: string;
+  /** Zadanie w księdze; brak = `klasyfikacja`. Powód przy `AutorSzkicu`. */
+  zadanie?: string;
+};
 
 /**
  * Wiadomość, którą się klasyfikuje: OSTATNIA przychodząca. Fragment SQL stoi
@@ -455,8 +459,8 @@ function zapiszWywolanie(
   database.prepare(`INSERT INTO copilot_wywolanie
     (zadanie,conversation_id,model,tokeny_wej,tokeny_wyj,tokeny_cache_zapis,
      tokeny_cache_odczyt,ms,wynik,blad,przez_user_id,at)
-    VALUES ('klasyfikacja',?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(rozmowaId, odp.model, odp.zuzycie.wej, odp.zuzycie.wyj,
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(kto.zadanie ?? "klasyfikacja", rozmowaId, odp.model, odp.zuzycie.wej, odp.zuzycie.wyj,
       odp.zuzycie.cacheZapis, odp.zuzycie.cacheOdczyt, odp.ms, wynik,
       blad ? blad.slice(0, 300) : null, kto.id, teraz.toISOString());
 }
@@ -469,8 +473,8 @@ function zapiszBlad(
 ): void {
   database.prepare(`INSERT INTO copilot_wywolanie
     (zadanie,conversation_id,model,wynik,blad,przez_user_id,at)
-    VALUES ('klasyfikacja',?,'',?,?,?,?)`)
-    .run(rozmowaId, "blad", powod.slice(0, 300), kto.id, teraz.toISOString());
+    VALUES (?,?,'',?,?,?,?)`)
+    .run(kto.zadanie ?? "klasyfikacja", rozmowaId, "blad", powod.slice(0, 300), kto.id, teraz.toISOString());
 }
 
 /**

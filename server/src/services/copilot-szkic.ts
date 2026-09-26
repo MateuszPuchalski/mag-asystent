@@ -1175,7 +1175,16 @@ export async function odswiezPrzesylke(
  * Ten sam wzorzec, co przy wiedzy z ofert w 0.264.0: `dodal='oferta'`,
  * `dodal_user_id` NULL, a kto kliknął, mówi dziennik.
  */
-export type AutorSzkicu = { id: number | null; name: string };
+export type AutorSzkicu = {
+  id: number | null; name: string;
+  /**
+   * Pod jakim zadaniem wywołanie staje w księdze; brak = `szkic`. Szkice przed
+   * pracą (26 września 2026) mają własną etykietę, bo liczą własny limit, a sufit
+   * godzinowy dnia liczy wyłącznie `szkic` — inaczej poranek zjadałby pierwszą
+   * godzinę biura. Karta pomiaru pokazuje je dzięki temu osobno.
+   */
+  zadanie?: string;
+};
 
 export async function ulozSzkic(
   conversationId: number, kto: AutorSzkicu,
@@ -1590,20 +1599,22 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
 
 function zapiszWywolanie(
   conversationId: number, odp: OdpowiedzSzkicu, wynik: "ok" | "blad", blad: string | null,
-  kto: { id: number | null }, teraz: Date,
+  kto: { id: number | null; zadanie?: string }, teraz: Date,
 ): void {
   db().prepare(`INSERT INTO copilot_wywolanie
     (zadanie,conversation_id,model,tokeny_wej,tokeny_wyj,tokeny_cache_zapis,
      tokeny_cache_odczyt,ms,wynik,blad,przez_user_id,at)
-    VALUES ('szkic',?,?,?,?,?,?,?,?,?,?,?)`)
-    .run(conversationId, odp.model, odp.zuzycie.wej, odp.zuzycie.wyj,
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`)
+    .run(kto.zadanie ?? "szkic", conversationId, odp.model, odp.zuzycie.wej, odp.zuzycie.wyj,
       odp.zuzycie.cacheZapis, odp.zuzycie.cacheOdczyt, odp.ms, wynik,
       blad ? blad.slice(0, 300) : null, kto.id, teraz.toISOString());
 }
 
-function zapiszBlad(conversationId: number, powod: string, kto: { id: number | null }, teraz: Date): void {
+function zapiszBlad(
+  conversationId: number, powod: string, kto: { id: number | null; zadanie?: string }, teraz: Date,
+): void {
   db().prepare(`INSERT INTO copilot_wywolanie
     (zadanie,conversation_id,model,wynik,blad,przez_user_id,at)
-    VALUES ('szkic',?,'',?,?,?,?)`)
-    .run(conversationId, "blad", powod.slice(0, 300), kto.id, teraz.toISOString());
+    VALUES (?,?,'',?,?,?,?)`)
+    .run(kto.zadanie ?? "szkic", conversationId, "blad", powod.slice(0, 300), kto.id, teraz.toISOString());
 }

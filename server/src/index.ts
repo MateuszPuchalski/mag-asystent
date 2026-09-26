@@ -77,6 +77,7 @@ import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
 import { sklasyfikujNowe } from "./services/klasyfikacja-auto.js";
 import { szkicujPoRozpoznaniu } from "./services/copilot-szkic-po-rozpoznaniu.js";
+import { przedPracaTrwa, szkicePrzedPraca, TAKT_PRZED_PRACA_MS } from "./services/copilot-przed-praca.js";
 import { oproznijKolejke } from "./services/wiedza-automat.js";
 import {
   nadawcaKluczaAnthropic, nadawcaPasowaniaSieciAnthropic, nadawcaWykazuSilnikaAnthropic,
@@ -598,6 +599,9 @@ async function main() {
      o długość partii szkiców. */
   if (config.copilot.autoSzkic && config.copilot.mode === "anthropic" && config.copilot.klucz) {
     uruchomTakt("copilot-auto-szkic", config.copilot.autoMs, async () => {
+      /* Okno przed pracą należy do przebiegu poranka (26 września 2026) —
+         powód w `services/copilot-przed-praca.ts`. */
+      if (przedPracaTrwa()) return;
       const w = await ulozZalegleSzkice();
       /* Głośno TYLKO wtedy, gdy takt stanął. Przebieg, który nic nie zastał,
          jest normą i nie ma o czym mówić. */
@@ -611,6 +615,9 @@ async function main() {
      kliknięcia. Rytm własny, żeby nie opóźniać pobierania wiadomości. */
   if (config.copilot.autoKlasyfikacja && config.copilot.mode === "anthropic" && config.copilot.klucz) {
     uruchomTakt("copilot-auto-klasyfikacja", config.copilot.autoKlasyfikacjaMs, async () => {
+      /* Jak wyżej: w oknie przed pracą rozpoznaje i szkicuje przebieg poranka,
+         inaczej dwie drogi płaciłyby za te same rozmowy naraz. */
+      if (przedPracaTrwa()) return;
       const w = await sklasyfikujNowe();
       if (w.przerwane) console.warn(`[copilot-auto-klasyfikacja] przebieg przerwany: ${w.przerwane}`);
       /* Szkic zaraz po rozpoznaniu (23 września 2026) — w TYM SAMYM takcie,
@@ -619,6 +626,19 @@ async function main() {
       if (config.copilot.szkicPoRozpoznaniu && w.rozmowy.length > 0) {
         const s = await szkicujPoRozpoznaniu(w.rozmowy);
         if (s.przerwane) console.warn(`[szkic-po-rozpoznaniu] przebieg przerwany: ${s.przerwane}`);
+      }
+    });
+  }
+
+  /* SZKICE PRZED PRACĄ (26 września 2026, decyzja właściciela). Ten sam
+     warunek co każde wywołanie modelu bez kliknięcia: przełącznik w
+     `wertis.env` i klucz dostawcy. Poza oknem takt wychodzi od razu; limit
+     poranka liczy się z księgi. Powód i rachunek w serwisie. */
+  if (config.copilot.przedPraca && config.copilot.mode === "anthropic" && config.copilot.klucz) {
+    uruchomTakt("copilot-przed-praca", TAKT_PRZED_PRACA_MS, async () => {
+      const w = await szkicePrzedPraca();
+      if (w.przerwane && w.przerwane !== "koniec okna przed pracą") {
+        console.warn(`[copilot-przed-praca] przebieg przerwany: ${w.przerwane}`);
       }
     });
   }

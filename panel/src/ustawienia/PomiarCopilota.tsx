@@ -119,6 +119,23 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         </p>;
       })()}
 
+      {/* SZKICE PRZED PRACĄ OSOBNO (26 września 2026). Poranek ma własny limit
+          i własne zadania w księdze. Zlany z wierszem wyżej nie powiedziałby,
+          ile kosztuje gotowa kolejka w poniedziałek, a o to pyta właściciel
+          przy decyzji o limicie. Wiersz znika, dopóki poranek nie płacił. */}
+      {(() => {
+        const s = dane.wgZadania.find((z) => z.zadanie === "szkic_przed_praca");
+        const k = dane.wgZadania.find((z) => z.zadanie === "klasyfikacja_przed_praca");
+        if (!s && !k) return null;
+        const usd = (s?.kosztUsd ?? 0) + (k?.kosztUsd ?? 0);
+        const bledow = (s?.bledow ?? 0) + (k?.bledow ?? 0);
+        return <p className="mt-3 border-t pt-3 text-slate-600" aria-label="Szkice przed pracą">
+          Przed pracą: <b>{s?.wywolan ?? 0}</b> szkiców i <b>{k?.wywolan ?? 0}</b> rozpoznań
+          {bledow > 0 && <>, <b className="text-ranga-uwaga">{bledow}</b> nieudanych</>},
+          {" "}rachunek <b>{usd.toFixed(2)} USD</b> ({zl(usd)}).
+        </p>;
+      })()}
+
       {/* Tabela wspólna z resztą analizy (0.519.0) zamiast własnej, pisanej
           wersalikami. */}
       {dane.klasyfikacja.wgKategorii.length > 0 && <div className="mt-3 border-t pt-3">

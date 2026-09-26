@@ -20,7 +20,7 @@ export const ZDARZENIA: readonly string[] = [
   "brak_na_serwis", "brak_na_serwis_pominiety", "copilot_auto_klasyfikacja",
   "copilot_auto_klasyfikacja_sufit", "copilot_auto_szkic", "copilot_auto_szkic_sufit",
   "copilot_dane_doboru", "copilot_klasyfikacja", "copilot_klasyfikacja_niepoprawna",
-  "copilot_korekta", "copilot_pasowanie", "copilot_pytanie", "copilot_szkic",
+  "copilot_korekta", "copilot_pasowanie", "copilot_przed_praca", "copilot_pytanie", "copilot_szkic",
   "copilot_szkic_ocena", "copilot_szkic_po_rozpoznaniu", "czasy_zadan", "delivery_done", "delivery_external",
   "delivery_external_undo",
   "delivery_finished", "delivery_note_added", "delivery_note_answered", "delivery_open",

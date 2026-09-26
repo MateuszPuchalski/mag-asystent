@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import { PomiarCopilota } from "./PomiarCopilota";
 import type { PomiarCopilota as Pomiar } from "../api/typy";
 
@@ -44,6 +44,25 @@ describe("PomiarCopilota", () => {
     expect(szczegoly).toContainElement(screen.getByLabelText("Decyzje klasyfikatora"));
     expect(szczegoly).toContainElement(screen.getByText("Dobór"));
     expect(screen.getByText("6 z 8 · 75 % (41–93 %)")).toBeInTheDocument();
+  });
+
+  /* Szkice przed pracą (26 września 2026): własny wiersz, bo poranek ma
+     własny limit, a zlany z dniem nie powiedziałby, ile kosztuje. */
+  it("szkice przed pracą mają własny wiersz z rachunkiem; bez wywołań wiersza nie ma", () => {
+    const { unmount } = render(<PomiarCopilota dane={dane()} />);
+    expect(screen.queryByLabelText("Szkice przed pracą")).toBeNull();
+    unmount();
+    render(<PomiarCopilota dane={dane({ wgZadania: [
+      { zadanie: "szkic", wywolan: 30, bledow: 0, kosztUsd: 3 },
+      { zadanie: "szkic_przed_praca", wywolan: 12, bledow: 1, kosztUsd: 1.2 },
+      { zadanie: "klasyfikacja_przed_praca", wywolan: 14, bledow: 0, kosztUsd: 0.05 },
+    ] })} />);
+    const w = screen.getByLabelText("Szkice przed pracą");
+    expect(w.textContent).toContain("12 szkiców i 14 rozpoznań");
+    expect(w.textContent).toContain("1.25 USD (5.00 zł)");
+    expect(within(w).getByText("1")).toHaveClass("text-ranga-uwaga");
+    /* Wiersz dnia liczy tylko swoje zadanie — poranek nie wlicza się dwa razy. */
+    expect(screen.getByLabelText("Szkice odpowiedzi").textContent).toContain("30 wywołań");
   });
 
   it("cisza cache przy wywołaniach zostaje objawem — tonem, bez wykładu", () => {
