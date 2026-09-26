@@ -86,7 +86,7 @@ function Notatka({ reklamacja, trwa, blad, onZapisz, onCofnij }: {
       placeholder="Ustalenia, których Allegro nie zna"
       className="field resize-y text-sm" />
     {blad && <p className="text-xs text-red-700">{blad}</p>}
-    {/* ZAPIS DOPIERO PRZY ZMIANIE (@wydanie). Martwy bursztynowy przycisk
+    {/* ZAPIS DOPIERO PRZY ZMIANIE (0.511.0). Martwy bursztynowy przycisk
         stał pod każdą notatką i był najgłośniejszą rzeczą w kolumnie faktów,
         choć przy czytaniu nie ma czego zapisać. Pojawia się z pierwszą
         zmienioną literą i znika po zapisie, gdy pole równa się notatce. */}
@@ -195,7 +195,7 @@ function KartaFaktow({ karta, trwa, blad, onRozpoznaj }: {
         {karta.zdjecia.length > 0 && ` · przeczytał ${zdjecSlowo(karta.zdjecia.length)}`}
       </p>
     </> : <p className="pt-1 text-xs text-slate-500">Werdykt zostaje przy Tobie.</p>}
-    {/* Zdaniem, nie wersalikami (@wydanie) — tak piszą przyciski skrzynki. */}
+    {/* Zdaniem, nie wersalikami (0.511.0) — tak piszą przyciski skrzynki. */}
     <Przycisk className="mt-2 !px-2 !py-1 !text-xs" disabled={trwa} onClick={onRozpoznaj}>
       {trwa ? "Czytam…" : karta ? "Przeczytaj jeszcze raz" : "Przeczytaj sprawę"}
     </Przycisk>
@@ -510,7 +510,7 @@ export function Dowody({
 
     {/* ZLECENIE HALI Z REKLAMACJI (0.502.0) — „zdjęcie towaru z półki",
         „sprawdź, czy partia ma tę wadę". Powód w `sprawy/ZlecHali.tsx`.
-        Nagłówek „Hala" zszedł (@wydanie): stał nad jednym przyciskiem
+        Nagłówek „Hala" zszedł (0.511.0): stał nad jednym przyciskiem
         „Zleć hali", który mówi to samo i sam jest nagłówkiem swojej czynności. */}
     <section className="border-t border-slate-200 px-4 py-2 first:border-t-0">
       <ZlecHali zrodlo="reklamacja" zrodloRef={r.id} tytul={`Reklamacja ${r.numer ?? r.id}`} twId={r.twId} />

@@ -43,7 +43,7 @@ describe("Edytor odpowiedzi w reklamacji", () => {
   });
 
   it("licznika NIE MA daleko od sufitu, staje dopiero przy progu", () => {
-    /* Od @wydanie licznik milczy zupełnie, jak w skrzynce od 0.506.0. Szary
+    /* Od 0.511.0 licznik milczy zupełnie, jak w skrzynce od 0.506.0. Szary
        „100 znaków" przy każdej odpowiedzi był tłem, którego nikt nie czytał —
        liczba zmienia decyzję dopiero 500 znaków przed sufitem Allegro. */
     const { rerender } = render(<Edytor {...props({ tresc: "x".repeat(100) })} />);

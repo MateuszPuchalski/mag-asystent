@@ -383,7 +383,7 @@ describe("Rozmowa przewija się, czynności stoją (0.418.0)", () => {
   });
 });
 
-describe("Nasza długa wypowiedź zwija się do czterech linii (@wydanie)", () => {
+describe("Nasza długa wypowiedź zwija się do czterech linii (0.511.0)", () => {
   /* Wzorzec skrzynki z 0.506.0: własną odpowiedź agent zna, a długa zajmowała
      całą oś. Cudzej nie zwijamy — po nią agent przyszedł. */
   const dluga = "Dzień dobry, " + "sprawdziliśmy zgłoszenie dokładnie. ".repeat(12);

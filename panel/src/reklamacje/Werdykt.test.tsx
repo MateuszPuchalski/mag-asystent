@@ -295,7 +295,7 @@ describe("Gałąź werdyktu nie jest przestrzeleniem przycisku wysyłki", () => 
   });
 });
 
-describe("Werdykt bez nadmiaru (@wydanie)", () => {
+describe("Werdykt bez nadmiaru (0.511.0)", () => {
   const wyslany = (werdyktWiadomosc: string): Partial<Reklamacja> => ({
     werdykt: "REJECTED_OTHER", werdyktNazwa: "Odrzucona — inny powód",
     werdyktStatus: "sent", werdyktWiadomosc, kubelek: "zamknieta",

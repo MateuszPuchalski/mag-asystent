@@ -131,7 +131,7 @@ describe("Notatka i jej droga powrotna", () => {
   });
 });
 
-describe("Kolumna faktów bez pustych czynności (@wydanie)", () => {
+describe("Kolumna faktów bez pustych czynności (0.511.0)", () => {
   it("„Zapisz notatkę” pojawia się dopiero przy zmianie", async () => {
     const onNotatka = vi.fn();
     render(<Dowody {...props(rek(), { onNotatka })} />);

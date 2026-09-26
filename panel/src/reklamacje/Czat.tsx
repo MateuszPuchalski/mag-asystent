@@ -147,7 +147,7 @@ export interface SprawaCzatu {
 function TrescKarty({ tekst, nasza }: { tekst: string; nasza: boolean }) {
   const [calosc, setCalosc] = useState(false);
   const formularz = rozbierzFormularz(tekst);
-  /* NASZA DŁUGA ZWIJA SIĘ DO CZTERECH LINII (@wydanie). Do tej pory zwijał się
+  /* NASZA DŁUGA ZWIJA SIĘ DO CZTERECH LINII (0.511.0). Do tej pory zwijał się
      tylko formularz Allegro, a nasza odpowiedź ze stopką stała w całości —
      ta sama ściana, którą skrzynka zdjęła w 0.506.0. Cudzych nie zwijamy:
      zdanie klienta albo doradcy jest tym, co agent przyszedł przeczytać. */

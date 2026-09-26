@@ -97,14 +97,14 @@ export function Edytor({
     <div className="flex items-center gap-2">
       {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
         onDodaj={onDodajZalacznik} wylaczone={wysyla} />}
-      {/* LICZNIK TYLKO PRZY LIMICIE (@wydanie), jak w skrzynce od 0.506.0.
+      {/* LICZNIK TYLKO PRZY LIMICIE (0.511.0), jak w skrzynce od 0.506.0.
           Szary „0 znaków" stał przy każdej odpowiedzi, a liczba zmienia decyzję
           dopiero przy suficie. Wtedy staje, a za sufitem czerwienieje. */}
       {(blisko || zaDlugo) && <span className={`text-xs font-semibold tabular-nums ${
         zaDlugo ? "text-ranga-zle" : "text-ranga-uwaga"}`}>
         {znakow} / {LIMIT_ZNAKOW}{zaDlugo ? ` — o ${znakow - LIMIT_ZNAKOW} za dużo` : ""}
       </span>}
-      {/* Zdaniem, nie wersalikami (@wydanie): tak piszą przyciski skrzynki. */}
+      {/* Zdaniem, nie wersalikami (0.511.0): tak piszą przyciski skrzynki. */}
       <Przycisk className="ml-auto" wariant="glowny" onClick={onWyslij}
         disabled={wysyla || zaDlugo || !tresc.trim()}>
         <Send size={16} />{wysyla ? "Wysyłam…" : "Wyślij odpowiedź"}

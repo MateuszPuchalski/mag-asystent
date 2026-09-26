@@ -153,7 +153,7 @@ export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladT
         <p className="mt-1 text-xs text-slate-500">
           {r.werdyktPrzez ?? "?"}{r.werdyktAt ? `, ${czas(r.werdyktAt)}` : ""}
         </p>
-        {/* ── WIADOMOŚĆ WERDYKTU RAZ I KRÓTKO (@wydanie) ──────────────────────
+        {/* ── WIADOMOŚĆ WERDYKTU RAZ I KRÓTKO (0.511.0) ──────────────────────
             Stała w całości w stopce, która się nie przewija, więc długa
             zjadała okno rozmowy nad nią. Zwija się do czterech linii jak
             nasza wypowiedź na osi. Gdy Allegro oddało ją w rozmowie jako
@@ -234,7 +234,7 @@ export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladT
                 kwota: r.werdyktKwotaGrosze,
               })}>Spróbuj jeszcze raz</Przycisk>
           : <>
-            {/* Zdaniem, nie wersalikami (@wydanie) — tak piszą przyciski skrzynki. */}
+            {/* Zdaniem, nie wersalikami (0.511.0) — tak piszą przyciski skrzynki. */}
             <Przycisk className="text-xs text-ranga-ok" disabled={trwa}
               onClick={() => otworz("uznaje")}><Check size={14} />Uznaję</Przycisk>
             <Przycisk className="text-xs text-ranga-zle" disabled={trwa}
@@ -276,7 +276,7 @@ export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladT
         Wiadomość do kupującego — wymagana przez Allegro, klient ją przeczyta
         <textarea className="field mt-1 min-h-20 w-full text-sm" value={wiadomosc}
           aria-label="Wiadomość do kupującego" onChange={(e) => setWiadomosc(e.target.value)} />
-        {/* LICZNIK TYLKO PRZY LIMICIE (@wydanie) — ta sama reguła co w polu
+        {/* LICZNIK TYLKO PRZY LIMICIE (0.511.0) — ta sama reguła co w polu
             odpowiedzi: „0 znaków" pod każdym werdyktem niczego nie rozstrzygał. */}
         {znakow > LIMIT_ZNAKOW - PROG_LICZNIKA && <span className={`mt-1 block font-semibold tabular-nums ${
           zaDlugo ? "text-ranga-zle" : "text-ranga-uwaga"}`}>

@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.511.0 — 26 września 2026
+
+**Ekran reklamacji mówi mniej naraz.** Licznik znaków w odpowiedzi i przy
+werdykcie pokazuje się dopiero 500 znaków przed limitem Allegro. Za limitem
+czerwienieje, a wysyłka zostaje zablokowana jak dotąd. Nasze długie wiadomości
+w rozmowie zwijają się do czterech linii z „Pokaż całą wiadomość”, jak
+w skrzynce. Wiadomość wydanego werdyktu też się zwija. Gdy Allegro oddało ją
+w rozmowie, pod werdyktem już jej nie powtarzamy. Nagłówek „Hala” nad jednym
+przyciskiem zszedł. „Zapisz notatkę” pojawia się dopiero po zmianie notatki.
+Przyciski reklamacji piszą zdaniem, nie wersalikami. Ten sam edytor dostały
+dyskusje.
+
 ## 0.510.0 — 26 września 2026
 
 **Ekran wiedzy pokazuje najpierw pracę, a narzędzia jedno kliknięcie niżej.**

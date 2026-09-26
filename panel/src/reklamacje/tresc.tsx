@@ -128,7 +128,7 @@ export function Tresc({ tekst, className = "" }: { tekst: string; className?: st
   </p>;
 }
 
-/* ── DŁUGA TREŚĆ ZWINIĘTA DO CZTERECH LINII (@wydanie) ──────────────────────
+/* ── DŁUGA TREŚĆ ZWINIĘTA DO CZTERECH LINII (0.511.0) ──────────────────────
    Wzorzec `NaszaTresc` ze skrzynki (0.506.0), skopiowany, bo tamten nie jest
    eksportowany. Powód ten sam: własną odpowiedź agent już zna, a długa
    zajmowała całą oś i spychała pytanie klienta pod krawędź okna.
