@@ -46,8 +46,10 @@ beforeEach(() => {
 describe("zakładka wiedzy", () => {
   it("klauzula o źródle stoi na ekranie, nie w dokumencie", () => {
     pokaz();
-    expect(screen.getByText(/Każde twierdzenie techniczne w szkicu wskazuje/)).toBeInTheDocument();
-    expect(screen.getByText(/Bez źródła treść jest przypuszczeniem/)).toBeInTheDocument();
+    /* Reguła zostaje zdaniem na ekranie; opis listy zszedł do dymka (@wydanie). */
+    const klauzula = screen.getByText(/Bez źródła treść jest przypuszczeniem \(§14\.3\)/);
+    expect(klauzula).toHaveAttribute("title", expect.stringMatching(/Każde twierdzenie techniczne w szkicu/));
+    expect(screen.queryByText(/Każde twierdzenie techniczne/)).toBeNull();
   });
 
   it("bez wpisu w bazie wiedzy mówi, że dobór to przypuszczenie; z wpisem pokazuje dowody", () => {
@@ -72,6 +74,10 @@ describe("zakładka wiedzy", () => {
     /* Makieta nazywa ten stan wprost — bez tego zdania pomiar wygląda jak
        dowód, którym nie jest. */
     expect(screen.getByText("niezatwierdzone jako wiedza")).toBeInTheDocument();
+    /* Droga pomiaru do wiedzy czeka w dymku etykiety, nie w akapicie nad listą. */
+    expect(screen.getByText("niezatwierdzone jako wiedza"))
+      .toHaveAttribute("title", expect.stringMatching(/czeka na zatwierdzenie/));
+    expect(screen.queryByText(/nie staje się wiedzą sam/)).toBeNull();
     expect(screen.getByRole("button", { name: /Zaproponuj jako dowód/ })).toBeDisabled();
     expect(screen.getByText(/najpierw marka i model/)).toBeInTheDocument();
     expect(pomiar.mutate).not.toHaveBeenCalled();
