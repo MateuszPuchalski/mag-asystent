@@ -119,7 +119,8 @@ describe("Ekran wiedzy", () => {
   it("pasowania części stoją jako druga sekcja kolejki z własnym licznikiem", async () => {
     PASOWANIA = [pasowanie()];
     pokaz();
-    expect(screen.getByText(/1 pasowanie do rozstrzygnięcia/)).toBeInTheDocument();
+    /* Nagłówek niesie JEDNĄ sumę (@wydanie); licznik rodzaju stoi przy sekcji. */
+    expect(screen.getByText("1 do rozstrzygnięcia")).toBeInTheDocument();
     /* Pusta lista zastosowań NIE pokazuje „nic nie czeka", bo czeka pasowanie. */
     expect(screen.queryByText(/Nic nie czeka/)).toBeNull();
     const sekcja = screen.getByRole("region", { name: "Pasowania części" });
@@ -144,10 +145,10 @@ describe("Ekran wiedzy", () => {
   it("zatwierdzenie oddaje identyfikator; odrzucenie bez powodu nie wychodzi z ekranu", async () => {
     LISTA = [propozycja()];
     pokaz();
-    await userEvent.click(screen.getByRole("button", { name: /ZATWIERDŹ/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Zatwierdź" }));
     expect(rozstrzygnij).toHaveBeenCalledWith({ id: 3, decyzja: "zatwierdz", powod: null }, expect.anything());
 
-    await userEvent.click(screen.getByRole("button", { name: /ODRZUĆ/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Odrzuć" }));
     const potwierdz = screen.getByRole("button", { name: /Potwierdź odrzucenie/ });
     expect(potwierdz).toBeDisabled();
     await userEvent.type(screen.getByLabelText(/Powód odrzucenia/), "to LS 51");
@@ -159,7 +160,22 @@ describe("Ekran wiedzy", () => {
     /* Jedna liczba pracy: 2 sekcje + 3 kartoteki z tokenem = 5. Oba czekają
        na tego samego człowieka w tym samym widoku. */
     pokaz();
-    expect(screen.getByRole("button", { name: "Z opisów i ofert (5)" })).toBeInTheDocument();
+    /* Liczba przez `ile` zakładki (@wydanie), nie doklejona w nawiasie. */
+    expect(screen.getByRole("button", { name: "Z opisów i ofert 5" })).toBeInTheDocument();
+  });
+
+  /* Jedna suma w nagłówku (@wydanie): stały tam cztery liczby, z których trzy
+     powtarzały sekcje i zakładki. Suma bierze każdą decyzję, bo licznik
+     samych zastosowań kłamałby przez pominięcie. */
+  it("nagłówek niesie jedną sumę decyzji zamiast czterech liczników", () => {
+    LISTA = [propozycja()];
+    PASOWANIA = [pasowanie()];
+    ZAMIENNOSCI = [{ a: { twId: 11, symbol: "W09-1307", nazwa: "Gaźnik" }, b: { twId: 12, symbol: "76-080", nazwa: "Gaźnik" },
+      numery: ["281707"] }];
+    pokaz();
+    expect(screen.getByText("3 do rozstrzygnięcia")).toBeInTheDocument();
+    expect(screen.queryByText(/pasowanie do rozstrzygnięcia/)).toBeNull();
+    expect(screen.queryByText(/ze wspólnym numerem/)).toBeNull();
   });
 
   it("pusta kolejka mówi, skąd biorą się propozycje", () => {
@@ -295,7 +311,7 @@ describe("Ekran wiedzy", () => {
     ZAMIENNOSCI = [{ a: { twId: 11, symbol: "W09-1307", nazwa: "Gaźnik do traktorka B&S" },
       b: { twId: 12, symbol: "76-080", nazwa: "Gaźnik do traktorka B&S" }, numery: ["281707", "390811"] }];
     pokaz();
-    expect(screen.getByText(/1 para ze wspólnym numerem/)).toBeInTheDocument();
+    expect(screen.getByText("1 do rozstrzygnięcia")).toBeInTheDocument();
     expect(screen.queryByText(/Nic nie czeka/)).toBeNull();
     const sekcja = screen.getByRole("region", { name: "Wspólny numer oryginału" });
     expect(sekcja).toHaveTextContent("Wspólny numer oryginału (1)");

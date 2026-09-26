@@ -92,6 +92,16 @@ describe("Silniki", () => {
     }), expect.anything());
   });
 
+  /* Jedna para decyzji na ekranie wiedzy (@wydanie): „Zatwierdź" główny,
+     „Odrzuć" drugi — jak w każdej innej karcie kolejki. */
+  it("para decyzji ma ten sam kształt co w kolejce: główne Zatwierdź, drugie Odrzuć", () => {
+    dane.mockReturnValue({ data: { propozycje: [para(7, "450E")], doRozstrzygniecia: 1, luki: [], lukiRazem: 0, zatwierdzone: [] },
+      isLoading: false, error: null });
+    render(<Silniki />);
+    expect(screen.getByRole("button", { name: "Zatwierdź" })).toHaveClass("btn-primary");
+    expect(screen.getByRole("button", { name: "Odrzuć" })).toHaveClass("btn-secondary");
+  });
+
   it("odrzucenie propozycji wymaga powodu", async () => {
     dane.mockReturnValue({ data: { propozycje: [para(7, "450E")], doRozstrzygniecia: 1, luki: [], lukiRazem: 0, zatwierdzone: [] },
       isLoading: false, error: null });

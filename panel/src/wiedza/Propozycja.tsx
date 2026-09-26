@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Link } from "react-router-dom";
-import { Check, X as Krzyzyk } from "lucide-react";
 import type { Zastosowanie } from "../api/typy";
 import { Pole, Przycisk, czas } from "../ui";
 import { NAZWA_ZRODLA } from "../skrzynka/statusy";
@@ -69,11 +68,15 @@ export function Propozycja({ z, trwa, onRozstrzygnij }: {
       {z.pewnosc === "prawdopodobne" && " — sam ślad rozmowy to nie dowód techniczny; dopisz katalog albo pomiar"}
     </p>
 
+    {/* Jedna para decyzji w całym ekranie wiedzy (@wydanie): „Zatwierdź"
+        główny, „Odrzuć" drugi, zdaniem i w domyślnym rozmiarze. Tu stały
+        wersaliki z ikonami, obok drobne przyciski — cztery karty tej samej
+        decyzji wyglądały jak cztery różne czynności. */}
     {!odmowa
       ? <div className="mt-3 flex flex-wrap gap-2">
           <Przycisk wariant="glowny" disabled={trwa} onClick={() => onRozstrzygnij(z.id, "zatwierdz", null)}>
-            <Check size={16} />ZATWIERDŹ</Przycisk>
-          <Przycisk disabled={trwa} onClick={() => setOdmowa(true)}><Krzyzyk size={16} />ODRZUĆ</Przycisk>
+            Zatwierdź</Przycisk>
+          <Przycisk disabled={trwa} onClick={() => setOdmowa(true)}>Odrzuć</Przycisk>
         </div>
       : <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg bg-red-50 p-2">
           <label className="block flex-1 text-xs font-bold text-slate-600" htmlFor={`powod-${z.id}`}>

@@ -119,8 +119,11 @@ function PropozycjaPary({ z, trwa, onDecyzja }: {
       <span className="ml-auto text-xs text-slate-500">{z.zaproponowal}</span>
     </div>
     <p className="mt-1 text-xs text-slate-600">{NAZWA_DOWODU[z.rodzajDowodu]}: {z.dowodTresc}</p>
+    {/* „Zatwierdź" główny (@wydanie), jak w każdej karcie decyzji ekranu
+        wiedzy. Stał drugorzędny obok drugorzędnego „Odrzuć" i para nie
+        mówiła, która droga jest zwykła. */}
     <div className="mt-2 flex flex-wrap items-center gap-2">
-      <Przycisk disabled={trwa} onClick={() => onDecyzja("zatwierdz", null)}>Zatwierdź</Przycisk>
+      <Przycisk wariant="glowny" disabled={trwa} onClick={() => onDecyzja("zatwierdz", null)}>Zatwierdź</Przycisk>
       {!odrzuca && <Przycisk wariant="drugi" disabled={trwa} onClick={() => setOdrzuca(true)}>Odrzuć</Przycisk>}
       {odrzuca && <>
         {/* Odrzucenie bez powodu nie mówi autorowi, co poprawić — serwer je odbija. */}

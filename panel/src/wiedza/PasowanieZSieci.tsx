@@ -89,13 +89,21 @@ export function PasowanieZSieci() {
         żadnego zastosowania. Znaleziska trafiają do kolejki jako propozycje z linkiem — zatwierdzasz Ty.
         Nocą robi to sam; tu możesz uruchomić go od razu.</p>
     </div>
+    {/* „Limit", nie „sufit … wykorzystane" (@wydanie): agent pyta, ile może
+        jeszcze kliknąć, a nie ile zużyła księga. Skąd limit — w podpowiedzi,
+        bo to wiedza na wypadek pytania, nie do czytania co dzień. */}
     {s && <p className="text-sm" aria-label="Stan pasowania z sieci">
       Czeka na sprawdzenie: <b>{ile(s.doSprawdzenia, "kartoteka", "kartoteki", "kartotek")}</b>
-      {" "}· sufit: {s.sprawdzono} z {s.naNoc} wykorzystane (zostało <b>{zostalo}</b>)</p>}
+      {" "}· <span title="Wspólny z przebiegiem nocnym: ręczne sprawdzenia zużywają ten sam limit.">
+        w limicie zostało <b>{zostalo}</b> z {s.naNoc}</span></p>}
     {s?.niegotowy && <p className="rounded-lg bg-slate-50 p-2 text-sm text-slate-700" role="note">{s.niegotowy}</p>}
     <div className="flex flex-wrap items-center gap-2">
       {!trwa
-        ? <Przycisk wariant="glowny" disabled={!s || !!s.niegotowy || zostalo === 0 || s.doSprawdzenia === 0}
+        /* Drugorzędny (@wydanie): karta stoi pod listą, w zwiniętych
+           „Importach i zbiórkach", a główny przycisk tej zakładki to
+           „Zaproponuj" przy wierszu. Dwa główne obok siebie nie mówią, od
+           czego zacząć. */
+        ? <Przycisk disabled={!s || !!s.niegotowy || zostalo === 0 || s.doSprawdzenia === 0}
           onClick={() => void uruchom()}>
           <Globe size={16} />Sprawdź teraz ({ile(Math.min(NA_KLIKNIECIE, zostalo), "kartoteka", "kartoteki", "kartotek")})</Przycisk>
         : <Przycisk onClick={() => { stop.current = true; }}><Square size={14} />Zatrzymaj po tej kartotece</Przycisk>}
@@ -103,7 +111,10 @@ export function PasowanieZSieci() {
     </div>
     {(trwa || sumy.sprawdzono > 0 || sumy.bledow > 0) && <p className="text-sm text-slate-700" aria-label="Wynik pasowania z sieci">
       Sprawdzono {ile(sumy.sprawdzono, "kartotekę", "kartoteki", "kartotek")} · propozycji w kolejce: <b>{sumy.zaproponowano}</b>
-      {Object.keys(sumy.odrzucono).length > 0 && <> · odrzuciło sito: {odrzuty(sumy.odrzucono)}</>}
+      {/* „Pominięte", nie „odrzuciło sito" (@wydanie) — agent nie zna sita.
+          Zna tylko to, że znalezisko bez pokrycia na stronie nie weszło. */}
+      {Object.keys(sumy.odrzucono).length > 0 && <span
+        title="Znaleziska, których strona nie potwierdziła, nie trafiają do kolejki."> · pominięte jako niepewne: {odrzuty(sumy.odrzucono)}</span>}
       {sumy.bledow > 0 && <span className="text-red-800"> · błędów: {sumy.bledow}</span>}
       {sumy.przerwane && <span className="text-red-800"> · przerwano: {sumy.przerwane}</span>}</p>}
     <Blad>{blad || (dane.error as Error | null)?.message}</Blad>
