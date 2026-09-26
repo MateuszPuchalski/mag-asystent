@@ -26,17 +26,30 @@ const zdrowie = (n: Partial<Zdrowie> = {}): Zdrowie => ({
 const wiersz = (nazwa: string) => screen.getByText(nazwa).parentElement?.textContent ?? "";
 
 describe("StanIntegracji", () => {
-  it("wiersz o połączeniu pokazuje POŁĄCZENIE, nie status synchronizacji", () => {
+  it("tabela mówi o SYNCHRONIZACJI, a połączenie zostawia karcie konta", () => {
     /* Do 0.152.0 etykieta „Połączenie Allegro" była podpięta pod
        `allegroInbox.status`. Ekran nazywał rzecz, której nie pokazywał —
-       i dlatego niesparowane konto wyglądało jak awaria synchronizacji. */
+       i dlatego niesparowane konto wyglądało jak awaria synchronizacji.
+       Od 0.509.0 wiersza o połączeniu tu nie ma: ten sam fakt niesie karta
+       „Konto Allegro" tuż obok, a jeden fakt stoi w jednym miejscu. */
     render(<StanIntegracji zdrowie={zdrowie({
       allegro: { stan: "niepolaczone" },
       allegroInbox: { ...zdrowie().allegroInbox, status: "failed" },
     })} odczyt={null} />);
 
-    expect(wiersz("Połączenie Allegro")).toContain("niepolaczone");
+    expect(screen.queryByText("Połączenie Allegro")).toBeNull();
+    expect(screen.queryByText("niepolaczone")).toBeNull();
     expect(wiersz("Synchronizacja")).toContain("failed");
+  });
+
+  it("bez duplikatów karty serwera i bez nazwy trasy w nagłówku", () => {
+    /* Worker Subiekta mówi karta „Serwer" na tym samym ekranie, więcej niż
+       jednym słowem. „/api/health" to głos programisty, nie biura. */
+    render(<StanIntegracji zdrowie={zdrowie({ worker: { zyje: false, mode: "mssql", widziany: null } })}
+      odczyt={null} />);
+    expect(screen.getByRole("heading", { name: "Stan integracji" })).toBeInTheDocument();
+    expect(screen.queryByText("Subiekt GT")).toBeNull();
+    expect(screen.queryByText(/api\/health/)).toBeNull();
   });
 
   it("pokazuje ZDANIE o błędzie, gdy porażka nie ma kodu HTTP", () => {
