@@ -31,13 +31,15 @@ import {
   czemuNiegotowy, przegladZSieci, stanPasowaniaZSieci, zatwierdzZSieci,
 } from "../services/pasowanie-z-sieci.js";
 import { nadawcaPasowaniaSieciAnthropic, nadawcaWykazuSilnikaAnthropic } from "../adapters/copilot.anthropic.js";
-import { przebiegSieci, przegladOdSilnika, stanSilnikow, zatwierdzOdSilnika } from "../services/pasowanie-od-silnika.js";
-import { config } from "../config.js";
+import {
+  GODZINA_MS, przebiegSieci, przegladOdSilnika, RECZNIE_NA_GODZINE, stanRecznego, stanSilnikow, zatwierdzOdSilnika,
+  zatwierdzPotwierdzone,
+} from "../services/pasowanie-od-silnika.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
 import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   TRZYDZIEŚCI JEDEN ZAPIS: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   TRZYDZIEŚCI DWA ZAPISY: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
    przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
    (E3), trzy przy zabudowie silnika (0.229.0), trzy przy pasowaniu części:
    propozycja, rozstrzygnięcie i wycofanie, dwa przy słowniku silników
@@ -68,7 +70,8 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    kartotece: składa wyłącznie propozycje i nie woła Allegro.
    Trzydziesty (0.527.0) to zatwierdzenie listą propozycji z sieci dla jednej
    kartoteki — ten sam kształt co zatwierdzenie wykazu. Trzydziesty pierwszy
-   (0.527.0) to to samo dla jednego silnika z trybu „od silnika”.
+   (0.527.0) to to samo dla jednego silnika z trybu „od silnika”. Trzydziesty
+   drugi (@wydanie) zatwierdza naraz wszystkie potwierdzone z sieci.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
 
@@ -443,7 +446,7 @@ export async function wiedzaRoutes(app: FastifyInstance) {
      liczy się do tej samej księgi — klikanie nie wyda więcej niż jedna noc.
      Bramka biura, nie admina: to ta sama klasa pracy co zbiórka „Pasuje do". */
   app.get("/api/obsluga/wiedza/pasowanie-z-sieci", async (_req, reply) =>
-    odmowa(reply) ?? { ...stanPasowaniaZSieci(), silniki: stanSilnikow() });
+    odmowa(reply) ?? { ...stanPasowaniaZSieci(), silniki: stanSilnikow(), reczne: stanRecznego() });
 
   app.post("/api/obsluga/wiedza/pasowanie-z-sieci/sprawdz", async (_req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
@@ -452,9 +455,11 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     try {
       const wynik = await przebiegSieci({
         nadaj: nadawcaPasowaniaSieciAnthropic, nadajSilnik: nadawcaWykazuSilnikaAnthropic,
-        naNoc: config.pasowanieZSieci.naNoc, naPrzebieg: 1,
+        /* Ręcznie: własny sufit na godzinę, nie limit nocy (@wydanie) — patrz
+           `RECZNIE_NA_GODZINE`. Wyłącznik `PASOWANIE_Z_SIECI` obowiązuje dalej. */
+        naNoc: RECZNIE_NA_GODZINE, oknoMs: GODZINA_MS, naPrzebieg: 1,
       });
-      return { wynik, stan: { ...stanPasowaniaZSieci(), silniki: stanSilnikow() } };
+      return { wynik, stan: { ...stanPasowaniaZSieci(), silniki: stanSilnikow(), reczne: stanRecznego() } };
     } catch (e) { return blad(reply, e); }
   });
 
@@ -467,6 +472,15 @@ export async function wiedzaRoutes(app: FastifyInstance) {
       try { return zatwierdzZSieci(Number(req.params.twId), req.body?.ids, ja().userId); }
       catch (e) { return blad(reply, e); }
     });
+
+  /* Jedno kliknięcie dla wszystkich POTWIERDZONYCH propozycji z sieci (@wydanie):
+     dwa niezależne źródła, w tym katalog — reguła SZPERACZA. Serwer liczy
+     pewność od nowa, więc lista z ekranu nie przemyci słabszej propozycji. */
+  app.post<{ Body: { ids?: unknown } }>("/api/obsluga/wiedza/pasowanie-z-sieci/zatwierdz-potwierdzone", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    try { return zatwierdzPotwierdzone(req.body?.ids, ja().userId); }
+    catch (e) { return blad(reply, e); }
+  });
 
   /* Zatwierdzenie listą propozycji trybu „od silnika” (0.527.0): jedna karta
      na silnik, ciało to identyfikatory zostawione zaznaczone. */

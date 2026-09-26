@@ -5,7 +5,7 @@ import { logEvent } from "./events.js";
 import { zwin } from "../tekst.js";
 import type { Tokeny } from "./copilot-koszt.js";
 import {
-  czlowiekZBiura, kluczModelu, rozstrzygnijZastosowanie, WiedzaConflict, wTransakcji, zaproponujZastosowanie,
+  czlowiekZBiura, dowodDoPropozycjiAutomatu, kluczModelu, rozstrzygnijZastosowanie, WiedzaConflict, wTransakcji, zaproponujZastosowanie,
   type RodzajDowodu, type Zastosowanie,
 } from "./wiedza.js";
 import { MAX_GRUPA, MIN_CYFR, MIN_ZNAKOW } from "./zamiennosc-oem.js";
@@ -14,6 +14,7 @@ import {
   type NadawcaPasowaniaSieci, type WynikPrzebiegu, type ZrodloStrony,
 } from "./pasowanie-z-sieci.js";
 import { tekstyPdf, type CzytnikPdf } from "./pdf-tekst.js";
+import { pewnoscZSieci, wariantyNumeru, type PewnoscZSieci } from "./zrodla-sieci.js";
 import { BladKluczaCopilota, BladLimituCopilota, BladPrzeciazeniaCopilota } from "../adapters/copilot.js";
 
 /* ── Pasowanie od silnika (0.527.0) ──────────────────────────────────────────
@@ -68,7 +69,8 @@ export interface ZapytanieOSilnik { marka: string; nazwa: string }
 
 export interface WynikWykazu {
   /** Strony, które model uznał za wykaz części TEGO silnika. */
-  wykazy: Array<{ url: string; zrodloStrony: ZrodloStrony }>;
+  /** `oznaczenie` (@wydanie): dokładny model silnika z tej strony, np. B&S „09P702-0010”. */
+  wykazy: Array<{ url: string; zrodloStrony: ZrodloStrony; oznaczenie?: string | null }>;
   strony: Array<{ url: string; tekst: string }>;
   pdfy: Array<{ url: string; base64: string }>;
   wyszukiwan: number;
@@ -105,9 +107,13 @@ export function naszeNumery(database: DatabaseSync = db()): Map<string, Array<{ 
   for (const w of wiersze) {
     const n = String(w.wartosc_norm);
     if (!znakiNumeru(n)) continue;
-    const lista = mapa.get(n) ?? [];
-    if (!lista.some((x) => x.twId === Number(w.tw_id))) lista.push({ twId: Number(w.tw_id), symbol: w.tw_symbol, numer: w.wartosc });
-    mapa.set(n, lista);
+    /* Każda postać równoważna (@wydanie: MTD 7xx/9xx, przyrostek „S”) wskazuje
+       tę samą kartotekę — wykaz bywa w postaci serwisowej, kartoteka w fabrycznej. */
+    for (const wariant of wariantyNumeru(n)) {
+      const lista = mapa.get(wariant) ?? [];
+      if (!lista.some((x) => x.twId === Number(w.tw_id))) lista.push({ twId: Number(w.tw_id), symbol: w.tw_symbol, numer: w.wartosc });
+      mapa.set(wariant, lista);
+    }
   }
   /* Ten sam powód co w zamienności OEM: numer na cztery kartoteki to rodzina
      (noże lewe, prawe i mielące), a nie ta jedna część. */
@@ -145,8 +151,16 @@ export function trafieniaWTekscie(
 }
 
 /** Czy strona mówi o TYM silniku: marka i oznaczenie stoją w jej tekście. */
-export function stronaOSilniku(tekst: string, s: ZapytanieOSilnik): boolean {
+export function stronaOSilniku(tekst: string, s: ZapytanieOSilnik, oznaczenie?: string | null): boolean {
   const t = zwin(tekst);
+  /* Wykaz B&S mówi „09P702-0010”, nie „450E” (@wydanie) — wystarczy
+     oznaczenie, które model podał dla tej strony, byle stało w jej tekście
+     obok marki. SZPERACZ: części B&S są w katalogu MODELU i TYPU. */
+  const ozn = zwin(oznaczenie ?? "");
+  if (ozn.length >= 5 && t.includes(ozn)) {
+    const m = zwin(s.marka.split(" ")[0] ?? s.marka);
+    if (t.includes(m) || t.includes(zwin(s.marka))) return true;
+  }
   /* „Briggs & Stratton” bywa „B&S” albo „Briggs”; wystarczy pierwszy człon marki. */
   const marka = zwin(s.marka.split(/[\s&]+/)[0] ?? s.marka);
   return t.includes(zwin(s.nazwa)) && (t.includes(marka) || t.includes(zwin(s.marka)));
@@ -207,16 +221,17 @@ export async function szukajOdSilnikow(deps: {
     /* Tylko strony, które model NAZWAŁ wykazem tego silnika, spoza Allegro
        i z oznaczeniem silnika w tekście. Reszta przeczytanych stron to
        zwykle wyniki pośrednie, na których numery znaczą co innego. */
-    const wykazy = new Map(odp.wykazy.map((w) => [bezOgona(w.url), w.zrodloStrony]));
+    const wykazy = new Map(odp.wykazy.map((w) => [bezOgona(w.url), w]));
     let stron = 0; let trafien = 0; let zaproponowano = 0;
     for (const strona of wszystkie) {
-      const zrodlo = wykazy.get(bezOgona(strona.url));
+      const w = wykazy.get(bezOgona(strona.url));
       const h = host(strona.url);
-      if (!zrodlo || !h || czyAllegro(h) || !stronaOSilniku(strona.tekst, s)) continue;
+      if (!w || !h || czyAllegro(h) || !stronaOSilniku(strona.tekst, s, w.oznaczenie)) continue;
+      const zrodlo = w.zrodloStrony;
       stron += 1;
       for (const t of trafieniaWTekscie(strona.tekst, numery)) {
         trafien += 1;
-        if (zaproponujDlaSilnika(database, s, t, strona.url, zrodlo)) zaproponowano += 1;
+        if (zaproponujDlaSilnika(database, s, t, strona.url, zrodlo, w.oznaczenie ?? null)) zaproponowano += 1;
       }
     }
     wynik.trafien += trafien;
@@ -234,20 +249,28 @@ export async function szukajOdSilnikow(deps: {
    człowiek już zmierzył i powiedział nie; wykaz z sieci tego nie odwraca. */
 function zaproponujDlaSilnika(
   database: DatabaseSync, s: ZapytanieOSilnik, t: TrafienieNumeru, url: string, zrodlo: ZrodloStrony,
+  oznaczenie: string | null,
 ): boolean {
   const negatyw = database.prepare(`SELECT 1 FROM zastosowanie z JOIN model_urzadzenia m ON m.id=z.model_id
       WHERE z.tw_id=? AND m.klucz=? AND z.polaryzacja='nie_pasuje' AND z.stan='zatwierdzone'`).get(t.twId, klucz(s));
   if (negatyw) return false;
   try {
-    return zaproponujZastosowanie({
+    const model = { rodzaj: "silnik" as const, marka: s.marka, nazwa: s.nazwa };
+    const dowod = { rodzaj: RODZAJ_DOWODU[zrodlo],
+      tresc: `„…${t.cytat.slice(0, 340)}…” — numer ${t.numer}${oznaczenie ? `, wykaz dla ${oznaczenie}` : ""}, ${host(url)}`,
+      link: url };
+    const nowa = zaproponujZastosowanie({
       twId: t.twId,
-      model: { rodzaj: "silnik", marka: s.marka, nazwa: s.nazwa },
+      model,
       polaryzacja: "pasuje",
       zrodlo: "copilot",
       komentarz: `Automat znalazł numer ${t.numer} w wykazie części silnika ${s.marka} ${s.nazwa}. `
         + "Sprawdź wiersz wykazu przed zatwierdzeniem.",
-      dowod: { rodzaj: RODZAJ_DOWODU[zrodlo], tresc: `„…${t.cytat.slice(0, 380)}…” — numer ${t.numer}, ${host(url)}`, link: url },
+      dowod,
     }, { automat: "siec-silnik" }, database) !== null;
+    /* Ten sam silnik z innego wykazu to drugie źródło — dokłada dowód (@wydanie). */
+    if (!nowa) dowodDoPropozycjiAutomatu(t.twId, model, dowod, "siec-silnik", database);
+    return nowa;
   } catch {
     return false;
   }
@@ -287,7 +310,7 @@ export const AUTOR_SILNIKA = "automat (siec-silnik)";
 export function przegladOdSilnika(propozycje: Zastosowanie[], database: DatabaseSync = db()): Array<{
   id: number; zrodlo: string; link: string | null; rodzaj: "maszyna" | "silnik";
   pozycje: Array<{ id: number; twId: number; symbol: string; nazwa: string | null; maszyna: string;
-    warunki: string | null; dowod: string; link: string | null }>;
+    warunki: string | null; dowod: string; link: string | null; pewnosc: PewnoscZSieci; zrodel: number }>;
 }> {
   const grupy = new Map<number, ReturnType<typeof przegladOdSilnika>[number]>();
   for (const z of propozycje) {
@@ -300,8 +323,10 @@ export function przegladOdSilnika(propozycje: Zastosowanie[], database: Database
     const t = database.prepare("SELECT nazwa FROM sgt_towar WHERE tw_id=?").get(z.twId) as { nazwa: string } | undefined;
     const d = z.dowody[0];
     g.pozycje.push({ id: z.id, twId: z.twId, symbol: z.symbol, nazwa: t?.nazwa ?? null, maszyna: z.model.etykieta,
-      warunki: z.zdanieWarunkow, dowod: d?.tresc ?? "", link: d?.link ?? null });
+      warunki: z.zdanieWarunkow, dowod: d?.tresc ?? "", link: d?.link ?? null,
+      pewnosc: pewnoscZSieci(z.dowody.map((x) => x.link)), zrodel: z.dowody.length });
   }
+  for (const g of grupy.values()) g.pozycje.sort(wedlugPewnosci);
   return [...grupy.values()].sort((a, b) => b.pozycje.length - a.pozycje.length || a.id - b.id);
 }
 
@@ -354,13 +379,15 @@ export async function przebiegSieci(deps: {
   nadajSilnik: NadawcaWykazuSilnika;
   naNoc: number;
   naPrzebieg?: number;
+  /** Okno liczenia limitu — 12 h nocą, godzina przy ręcznym szukaniu (@wydanie). */
+  oknoMs?: number;
   teraz?: () => Date;
   database?: DatabaseSync;
   czytajPdf?: CzytnikPdf;
 }): Promise<WynikNocySieci> {
   const database = deps.database ?? db();
   const teraz = deps.teraz ?? (() => new Date());
-  const zostalo = Math.min(deps.naNoc - sprawdzonychTejNocy(teraz(), database), deps.naPrzebieg ?? Infinity);
+  const zostalo = Math.min(deps.naNoc - sprawdzonychTejNocy(teraz(), database, deps.oknoMs), deps.naPrzebieg ?? Infinity);
   const silniki = await szukajOdSilnikow({
     nadaj: deps.nadajSilnik, ile: Math.max(0, zostalo), teraz, database, czytajPdf: deps.czytajPdf,
   });
@@ -368,7 +395,7 @@ export async function przebiegSieci(deps: {
   const czesci: WynikPrzebiegu = silniki.przerwane || reszta <= 0
     ? { sprawdzono: 0, zaproponowano: 0, odrzucono: {}, bledow: 0, przerwane: null }
     : await szukajPasowaniaWSieci({
-      nadaj: deps.nadaj, naNoc: deps.naNoc, naPrzebieg: reszta, teraz, database, czytajPdf: deps.czytajPdf,
+      nadaj: deps.nadaj, naNoc: deps.naNoc, naPrzebieg: reszta, oknoMs: deps.oknoMs, teraz, database, czytajPdf: deps.czytajPdf,
     });
   return {
     sprawdzono: czesci.sprawdzono + silniki.sprawdzono,
@@ -383,4 +410,57 @@ export async function przebiegSieci(deps: {
 /** Postęp listy silników dla ekranu. Czysty ODCZYT. */
 export function stanSilnikow(teraz = new Date(), database: DatabaseSync = db()): { razem: number; doSprawdzenia: number } {
   return { razem: SILNIKI_POPULARNE.length, doSprawdzenia: silnikiDoSieci(SILNIKI_POPULARNE.length, teraz, database).length };
+}
+
+/* ── Uproszczenie: „Zatwierdź wszystkie potwierdzone” (@wydanie) ─────────────
+   Właściciel: „uprość w użytkowaniu”. Propozycja z dwóch niezależnych stron,
+   w tym katalogu producenta albo bazy części, to w metodzie SZPERACZA
+   „potwierdzone” — można na tym oprzeć zamówienie. Przeglądanie takich po
+   jednej to klikanie bez decyzji. Jedno kliknięcie zatwierdza wszystkie,
+   ale NIE samo: człowiek je klika, a serwer liczy pewność od nowa, więc
+   lista z ekranu nie przemyci słabszej propozycji. */
+
+const RANGA: Record<PewnoscZSieci, number> = { potwierdzone: 0, prawdopodobne: 1, slabe: 2 };
+export const wedlugPewnosci = <T extends { pewnosc: PewnoscZSieci }>(a: T, b: T) => RANGA[a.pewnosc] - RANGA[b.pewnosc];
+
+export function zatwierdzPotwierdzone(
+  ids: unknown, userId: number, database: DatabaseSync = db(),
+): { zatwierdzono: number; pominieto: number } {
+  const autor = czlowiekZBiura(database, userId);
+  if (!Array.isArray(ids) || ids.length === 0 || !ids.every((i) => Number.isInteger(i))) {
+    throw new Error("Nie ma czego zatwierdzić");
+  }
+  const lista = [...new Set(ids as number[])];
+  return wTransakcji(database, () => {
+    let zatwierdzono = 0;
+    let pominieto = 0;
+    for (const id of lista) {
+      const z = database.prepare(`SELECT stan, zaproponowal FROM zastosowanie WHERE id=?`).get(id) as
+        { stan: string; zaproponowal: string } | undefined;
+      const linki = (database.prepare("SELECT link FROM dowod_zastosowania WHERE zastosowanie_id=?").all(id) as
+        Array<{ link: string | null }>).map((x) => x.link);
+      if (!z || z.stan !== "propozycja" || ![AUTOR_SILNIKA, "automat (siec)"].includes(z.zaproponowal)
+        || pewnoscZSieci(linki) !== "potwierdzone") { pominieto += 1; continue; }
+      try {
+        rozstrzygnijZastosowanie(id, "zatwierdz", null, userId, database);
+        zatwierdzono += 1;
+      } catch (e) {
+        if (e instanceof WiedzaConflict) { pominieto += 1; continue; }
+        throw e;
+      }
+    }
+    logEvent("pasowanie_siec_potwierdzone", autor, null, { zatwierdzono, pominieto, ids: lista }, userId, database);
+    return { zatwierdzono, pominieto };
+  });
+}
+
+/* Ręczne szukanie ma własny sufit na GODZINĘ (@wydanie), a nie limit nocy:
+   człowiek kliknął świadomie, a przestawianie ustawienia przed każdym
+   szukaniem było krokiem, o którym trzeba pamiętać. Sześćdziesiąt jednostek
+   to z zapasem tyle, ile ekran zdąży przerobić w godzinę. */
+export const RECZNIE_NA_GODZINE = 60;
+export const GODZINA_MS = 3_600_000;
+
+export function stanRecznego(teraz = new Date(), database: DatabaseSync = db()): { naGodzine: number; wGodzinie: number } {
+  return { naGodzine: RECZNIE_NA_GODZINE, wGodzinie: sprawdzonychTejNocy(teraz, database, GODZINA_MS) };
 }

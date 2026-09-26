@@ -375,6 +375,30 @@ function sprawdzDowod(d: NowyDowod): { rodzaj: RodzajDowodu; tresc: string; link
   return { rodzaj: d.rodzaj, tresc, link: oczysc(d.link), zadanieId: d.zadanieId ?? null };
 }
 
+/**
+ * Kolejny dowód automatu do CZEKAJĄCEJ propozycji tej samej pary (@wydanie).
+ *
+ * Automat z sieci znajduje tę samą parę część → maszyna na kilku stronach.
+ * Do tego wydania druga strona przepadała jako duplikat, a to ona rozstrzyga
+ * pewność: dwa niezależne źródła, w tym katalog, to reguła „potwierdzone”
+ * z metody SZPERACZA. Dowód o tej samej treści albo z tej samej strony nie
+ * wchodzi drugi raz — kopia nie jest drugim źródłem. Tylko do propozycji:
+ * zatwierdzonego nie ruszamy, bo tam decyzja już zapadła.
+ */
+export function dowodDoPropozycjiAutomatu(
+  twId: number, model: DaneModelu, d: NowyDowod, automat: string, database: DatabaseSync = db(),
+): boolean {
+  const z = database.prepare(`SELECT z.id FROM zastosowanie z JOIN model_urzadzenia m ON m.id=z.model_id
+      WHERE z.tw_id=? AND m.klucz=? AND z.polaryzacja='pasuje' AND z.stan='propozycja'`)
+    .get(twId, kluczModelu(model.rodzaj, model.marka, model.nazwa, model.wariant)) as { id: number } | undefined;
+  if (!z) return false;
+  const juz = database.prepare("SELECT tresc, link FROM dowod_zastosowania WHERE zastosowanie_id=?")
+    .all(z.id) as Array<{ tresc: string; link: string | null }>;
+  if (juz.some((x) => (d.link && x.link === d.link) || zwin(x.tresc) === zwin(d.tresc))) return false;
+  wstawDowod(database, Number(z.id), d, null, podpis({ automat }));
+  return true;
+}
+
 function wstawDowod(
   database: DatabaseSync, zastosowanieId: number, d: NowyDowod, conversationId: number | null, kto: { name: string; userId: number | null },
 ): void {

@@ -122,3 +122,57 @@ test("zatwierdzone „nie pasuje” do silnika wygrywa z wykazem z sieci", async
   const w = await M.szukajOdSilnikow({ nadaj: nadajSilnik().nadaj, ile: M.SILNIKI_POPULARNE.length, teraz: () => TERAZ });
   assert.equal(w.zaproponowano, 1, "tylko gaźnik; filtr zmierzony jako niepasujący zostaje niepasujący");
 });
+
+/* ── Metoda SZPERACZA (@wydanie) ─────────────────────────────────────────────
+   Ta sama para z drugiej, niezależnej strony to drugie źródło, nie duplikat.
+   Dwie domeny, w tym baza części (T2), dają „potwierdzone” — i tylko takie
+   bierze jedno kliknięcie „Zatwierdź wszystkie potwierdzone”. */
+test("druga niezależna strona dopisuje dowód, a potwierdzone zatwierdza jedno kliknięcie", async () => {
+  const d = db();
+  d.prepare("DELETE FROM app_user WHERE login='ala'").run();
+  const ala = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')")
+    .run().lastInsertRowid);
+  const DRUGI = "https://www.partstree.com/honda-gcv160";
+  const n = nadajSilnik([{ url: WYKAZ, zrodloStrony: "producent" }, { url: DRUGI, zrodloStrony: "katalog_dostawcy" }],
+    [{ url: WYKAZ, tekst: TEKST }, { url: DRUGI, tekst: TEKST }]);
+  await M.szukajOdSilnikow({ nadaj: n.nadaj, ile: M.SILNIKI_POPULARNE.length, teraz: () => TERAZ });
+  const dowodow = d.prepare("SELECT count(*) n FROM dowod_zastosowania").get() as { n: number };
+  assert.equal(dowodow.n, 4, "dwie kartoteki × dwa źródła, bez kopii tej samej strony");
+
+  const { kolejkaPropozycji } = await import("./wiedza.js");
+  const pozycje = M.przegladOdSilnika(kolejkaPropozycji(d).propozycje, d).flatMap((g) => g.pozycje);
+  assert.equal(pozycje.length, 2);
+  assert.ok(pozycje.every((p) => p.pewnosc === "potwierdzone" && p.zrodel === 2), "partstree.com to baza części (T2)");
+
+  const ids = (d.prepare("SELECT id FROM zastosowanie ORDER BY id").all() as Array<{ id: number }>).map((x) => x.id);
+  const w = M.zatwierdzPotwierdzone([...ids, 999_999], ala, d);
+  assert.deepEqual(w, { zatwierdzono: 2, pominieto: 1 }, "nieistniejąca propozycja nie przechodzi");
+  assert.equal((d.prepare("SELECT count(*) n FROM zastosowanie WHERE stan='zatwierdzone'").get() as { n: number }).n, 2);
+});
+
+test("jedno źródło spoza katalogów nie wchodzi do „zatwierdź potwierdzone”", async () => {
+  const d = db();
+  d.prepare("DELETE FROM app_user WHERE login='ala'").run();
+  const ala = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')")
+    .run().lastInsertRowid);
+  await M.szukajOdSilnikow({ nadaj: nadajSilnik().nadaj, ile: M.SILNIKI_POPULARNE.length, teraz: () => TERAZ });
+  const ids = (d.prepare("SELECT id FROM zastosowanie").all() as Array<{ id: number }>).map((x) => x.id);
+  assert.deepEqual(M.zatwierdzPotwierdzone(ids, ala, d), { zatwierdzono: 0, pominieto: 2 });
+});
+
+test("B&S po MODEL-TYPE: strona z oznaczeniem i marką liczy się jako strona o silniku", () => {
+  const s = { marka: "Briggs & Stratton", nazwa: "Classic" };
+  const tekst = "Briggs & Stratton 09P702-0001-F1 parts list. 491588S Air Filter.";
+  assert.equal(M.stronaOSilniku(tekst, s), false, "bez oznaczenia strona nie mówi „Classic”");
+  assert.equal(M.stronaOSilniku(tekst, s, "09P702-0001-F1"), true);
+  assert.equal(M.stronaOSilniku("Kohler 09P702-0001-F1", s, "09P702-0001-F1"), false, "marka musi stać na stronie");
+});
+
+test("numer MTD 754 trafia stronę z numerem serwisowym 954 — to ta sama część", () => {
+  const d = db();
+  d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (903,'W30-754','Pasek napędowy')").run();
+  d.prepare(`INSERT OR IGNORE INTO towar_identyfikator(tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,at)
+    VALUES (903,'W30-754','oem','754-0430','7540430','opis','import','2026-09-01T00:00:00Z')`).run();
+  const t = M.trafieniaWTekscie("MTD deck belt 954-0430, 1 pc.", M.naszeNumery(d));
+  assert.deepEqual(t.map((x) => x.symbol), ["W30-754"]);
+});

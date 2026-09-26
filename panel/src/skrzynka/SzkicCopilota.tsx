@@ -58,6 +58,9 @@ export interface PropsSzkicuCopilota {
     pracuje: boolean;
     onPytaj: (pytanie: string) => void;
     limitZnakow: number;
+    /** „Zapisz jako propozycję” przy pasowaniu z sieci (@wydanie). */
+    onZapiszPasowanie?: (wymianaId: number, nr: number) => void;
+    zapisuje?: boolean;
   };
   onUloz: () => void;
   /** Treść szkicu do pola agenta — wstawia przy pustym, zastępuje przy pełnym. */
@@ -364,6 +367,8 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
       blad={p.dopytanie.blad}
       pracuje={p.dopytanie.pracuje}
       onPytaj={p.dopytanie.onPytaj}
+      onZapiszPasowanie={p.dopytanie.onZapiszPasowanie}
+      zapisuje={p.dopytanie.zapisuje}
       limitZnakow={p.dopytanie.limitZnakow} />}
   </section>;
 }

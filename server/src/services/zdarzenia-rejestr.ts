@@ -74,6 +74,8 @@ export const ZDARZENIA: readonly string[] = [
   "wiedza_model_utworzony", "wiedza_model_z_opisu_odrzucony",
   "wiedza_model_z_opisu_przerobiony", "wiedza_propozycja", "wiedza_rozstrzygniecie",
   "pasowanie_siec", "pasowanie_siec_zatwierdzenie", "pasowanie_siec_silnik", "pasowanie_siec_silnik_zatwierdzenie",
+  "pasowanie_siec_potwierdzone",
+  "copilot_pasowanie_z_sieci",
   "wiedza_wycofanie", "wiedza_z_oferty_zapisana", "wykaz_import", "wykaz_wycofanie", "wykaz_zatwierdzenie", "wzmianka_odhaczona", "zabudowa_propozycja",
   "zabudowa_rozstrzygniecie", "zabudowa_wycofanie", "zadanie_terenowe_anulowane",
   "zadanie_terenowe_oddane", "zadanie_terenowe_odeslane", "zadanie_terenowe_ponowione",

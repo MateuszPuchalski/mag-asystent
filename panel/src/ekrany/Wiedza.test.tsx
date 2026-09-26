@@ -49,6 +49,7 @@ let Z_SILNIKOW: import("../api/typy").PrzegladWykazu[] = [];
 const zatwierdzOdSilnika = vi.fn();
 const zatwierdzZWykazu = vi.fn();
 const zatwierdzZSieci = vi.fn();
+const zatwierdzPotwierdzone = vi.fn();
 const rozstrzygnijZamiennosc = vi.fn();
 const wycofajZamiennosc = vi.fn();
 const rozstrzygnij = vi.fn();
@@ -65,6 +66,7 @@ vi.mock("../api/wiedza", async () => {
     isLoading: false, error: null }),
     useZatwierdzZWykazu: () => ({ mutate: zatwierdzZWykazu, isPending: false }),
     useZatwierdzZSieci: () => ({ mutate: zatwierdzZSieci, isPending: false }),
+    useZatwierdzPotwierdzone: () => ({ mutate: zatwierdzPotwierdzone, isPending: false }),
     useZatwierdzOdSilnika: () => ({ mutate: zatwierdzOdSilnika, isPending: false }),
     useRozstrzygnijZamiennosc: () => ({ mutate: rozstrzygnijZamiennosc, isPending: false }),
     useWycofajZamiennosc: () => ({ mutate: wycofajZamiennosc, isPending: false, error: null }),
@@ -93,6 +95,8 @@ vi.mock("../api/wiedza", async () => {
     useDodajIdentyfikator: () => ({ mutate: vi.fn(), isPending: false, error: null }),
   };
 });
+/* Karta szukania w sieci ma własny test (`PasowanieZSieci.test.tsx`). */
+vi.mock("../wiedza/PasowanieZSieci", () => ({ PasowanieZSieci: () => <p>szukanie w sieci</p> }));
 vi.mock("../wyszukiwarka", () => ({
   Wyszukiwarka: ({ wybrany, onWybierz }: { wybrany: { sym: string } | null; onWybierz: (t: unknown) => void }) => <>
     {wybrany && <span>wybrano {wybrany.sym}</span>}
@@ -115,7 +119,7 @@ const pokaz = () => render(
 beforeEach(() => {
   rozstrzygnij.mockReset(); rozstrzygnijPasowanie.mockReset(); zaproponuj.mockReset();
   rozstrzygnijZamiennosc.mockReset(); wycofajZamiennosc.mockReset(); zatwierdzZWykazu.mockReset();
-  zatwierdzZSieci.mockReset();
+  zatwierdzZSieci.mockReset(); zatwierdzPotwierdzone.mockReset();
   LISTA = []; PASOWANIA = []; ZAMIENNOSCI = []; WIEDZA = undefined; WYKAZY = []; Z_SIECI = []; Z_SILNIKOW = []; zatwierdzOdSilnika.mockReset();
 });
 
@@ -291,9 +295,9 @@ describe("Ekran wiedzy", () => {
     LISTA = [propozycja({ id: 31, symbol: "09-05001" }), propozycja({ id: 32, symbol: "09-05001" }), propozycja({ id: 3 })];
     Z_SIECI = [{ twId: 91, symbol: "09-05001", nazwa: "Gaźnik", pozycje: [
       { id: 31, maszyna: "Stihl MS 250", warunki: null, cytat: "„Pasuje do: Stihl MS 250” — katalog dostawcy czesci.example.com",
-        link: "https://czesci.example.com/a" },
+        link: "https://czesci.example.com/a", pewnosc: "prawdopodobne", zrodel: 1 },
       { id: 32, maszyna: "Stihl MS 230", warunki: "roczniki 2004–2010", cytat: "„MS 230” — katalog dostawcy czesci.example.com",
-        link: "https://czesci.example.com/a" }] }];
+        link: "https://czesci.example.com/a", pewnosc: "prawdopodobne", zrodel: 1 }] }];
     pokaz();
     const lista = screen.getByRole("region", { name: "Z sieci: 09-05001" });
     expect(lista).toHaveTextContent("2 maszyny czekają");
@@ -304,6 +308,28 @@ describe("Ekran wiedzy", () => {
     await userEvent.click(within(lista).getByRole("checkbox", { name: "Zatwierdź: 09-05001 → Stihl MS 230" }));
     await userEvent.click(within(lista).getByRole("button", { name: /Zatwierdź zaznaczone \(1\)/ }));
     expect(zatwierdzZSieci).toHaveBeenCalledWith({ twId: 91, ids: [31] }, expect.anything());
+  });
+
+  /* Uproszczenie (@wydanie): szukanie na górze Kolejki, a potwierdzone
+     z dwóch miejsc — kartoteki i silnika — jednym kliknięciem. Słabsze
+     zostają do przeglądu i nie wchodzą do listy zatwierdzenia. */
+  it("kolejka zaczyna się od szukania w sieci i zatwierdza wszystkie potwierdzone jednym kliknięciem", async () => {
+    LISTA = [propozycja({ id: 51, symbol: "09-05001" }), propozycja({ id: 52, symbol: "09-05001" }),
+      propozycja({ id: 53, symbol: "W12-001" })];
+    Z_SIECI = [{ twId: 91, symbol: "09-05001", nazwa: "Gaźnik", pozycje: [
+      { id: 51, maszyna: "Stihl MS 250", warunki: null, cytat: "MS 250", link: "https://www.stihl.com/a", pewnosc: "potwierdzone", zrodel: 2 },
+      { id: 52, maszyna: "Stihl MS 230", warunki: null, cytat: "MS 230", link: "https://sklep.example.com/b", pewnosc: "slabe", zrodel: 1 }] }];
+    Z_SILNIKOW = [{ id: 7, zrodlo: "silnik Honda GCV160 — wykazy części z sieci", link: null, rodzaj: "silnik", pozycje: [
+      { id: 53, twId: 901, symbol: "W12-001", nazwa: "Filtr", maszyna: "silnik Honda GCV160", warunki: null, dowod: "numer",
+        link: "https://partstree.com/x", pewnosc: "potwierdzone", zrodel: 2 }] }];
+    pokaz();
+    const szukanie = screen.getByText("szukanie w sieci");
+    const baner = screen.getByLabelText("Potwierdzone z sieci");
+    expect(szukanie.compareDocumentPosition(baner) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(baner).toHaveTextContent("2 propozycje potwierdzone");
+    expect(screen.getByRole("region", { name: "Z sieci: 09-05001" })).toHaveTextContent("słabe");
+    await userEvent.click(within(baner).getByRole("button", { name: /Zatwierdź wszystkie potwierdzone \(2\)/ }));
+    expect(zatwierdzPotwierdzone).toHaveBeenCalledWith([51, 53], expect.anything());
   });
 
   /* Tryb „od silnika” (0.527.0): karta na silnik, przegląd jak wykaz, link na wierszu. */

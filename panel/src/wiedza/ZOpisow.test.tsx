@@ -32,7 +32,6 @@ const Z_OFERTY: ModelZOpisu = {
 vi.mock("./Odsylacze", () => ({ Odsylacze: () => <p>odsyłacze</p> }));
 vi.mock("./WykazCzesci", () => ({ WykazCzesci: () => <p>wykaz części</p> }));
 vi.mock("./PasujeDoOfert", () => ({ PasujeDoOfert: () => <p>pasuje do z ofert</p> }));
-vi.mock("./PasowanieZSieci", () => ({ PasowanieZSieci: () => <p>pasowanie z sieci</p> }));
 
 vi.mock("../api/wiedza", () => ({
   useModeleZOpisow: () => ({ data: { wiersze: WIERSZE, liczba: 1 }, isLoading: false, error: null }),
@@ -70,22 +69,23 @@ describe("sekcje Modele: z opisów", () => {
     expect(odrzuc).toHaveBeenCalledWith({ id: 7 }, expect.anything());
   });
 
-  /* Narzędzia pod listą, zwinięte (0.510.0). Praca stoi na wierzchu, cztery
-     karty importów i zbiórek jedno kliknięcie niżej. Zwinięte nie montują się,
-     więc nie pytają serwera o stany, których nikt nie ogląda. */
-  it("praca stoi przed narzędziami, a narzędzia czekają zwinięte o jedno kliknięcie", async () => {
+  /* Narzędzia zwinięte (0.510.0) i NAD listą (@wydanie). Pod listą dwustu
+     wierszy właściciel ich nie znalazł — „to przesłania”. Zwinięte zajmują
+     jedną linię i nie montują się, więc nie pytają serwera o stany, których
+     nikt nie ogląda. */
+  it("narzędzia czekają zwinięte nad listą, o jedno kliknięcie", async () => {
     render(<ZOpisow />);
     const podsumowanie = screen.getByText(/^Importy i zbiórki/);
     const zwiniete = podsumowanie.closest("details")!;
     expect(zwiniete).not.toHaveAttribute("open");
-    expect(screen.queryByText("pasowanie z sieci")).toBeNull();
-    /* Wiersz pracy PRZED kartą narzędzi w kolejności dokumentu. */
+    expect(screen.queryByText("pasuje do z ofert")).toBeNull();
+    /* Karta narzędzi PRZED pierwszym wierszem w kolejności dokumentu. */
     const wiersz = screen.getByRole("listitem", { name: "Z opisu: FTC272" });
-    expect(wiersz.compareDocumentPosition(zwiniete) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(zwiniete.compareDocumentPosition(wiersz) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     await userEvent.click(podsumowanie);
-    await waitFor(() => expect(screen.getByText("pasowanie z sieci")).toBeInTheDocument());
-    for (const karta of ["pasuje do z ofert", "odsyłacze", "wykaz części"]) {
+    await waitFor(() => expect(screen.getByText("pasuje do z ofert")).toBeInTheDocument());
+    for (const karta of ["odsyłacze", "wykaz części"]) {
       expect(screen.getByText(karta)).toBeInTheDocument();
     }
   });

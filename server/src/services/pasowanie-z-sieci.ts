@@ -5,12 +5,13 @@ import { logEvent } from "./events.js";
 import { zwin } from "../tekst.js";
 import type { Tokeny } from "./copilot-koszt.js";
 import {
-  czlowiekZBiura, rozstrzygnijZastosowanie, WiedzaConflict, wTransakcji, zaproponujZastosowanie,
+  czlowiekZBiura, dowodDoPropozycjiAutomatu, rozstrzygnijZastosowanie, WiedzaConflict, wTransakcji, zaproponujZastosowanie,
   type RodzajDowodu, type Zastosowanie,
 } from "./wiedza.js";
 import { BladKluczaCopilota, BladLimituCopilota, BladPrzeciazeniaCopilota } from "../adapters/copilot.js";
 import { tekstyPdf, type CzytnikPdf } from "./pdf-tekst.js";
 import { sprawdzWarunki } from "./warunki-zastosowania.js";
+import { numeryZWariantami, pewnoscZSieci, warunekZeStrony, type PewnoscZSieci } from "./zrodla-sieci.js";
 
 /* ── Pasowanie z sieci: nocny automat uzupełnia luki wiedzy (0.507.0) ───────
 
@@ -59,6 +60,9 @@ const OKNO_NOCY_MS = 12 * 3_600_000;
 export const DOMENY_ZAKAZANE = [
   "allegro.pl", "allegro.cz", "allegro.sk", "allegro.hu", "allegro.eu",
   "allegrolokalnie.pl", "allegroimg.com", "allegrostatic.com",
+  /* OLX i Ceneo (@wydanie) — reguła SZPERACZA: tam też sprzedajemy, a ruch
+     automatu, który da się z nami powiązać, to ryzyko dla konta. */
+  "olx.pl", "ceneo.pl",
 ] as const;
 
 export function czyAllegro(host: string): boolean {
@@ -152,7 +156,8 @@ export function sprawdzZnalezisko(
     if (!model || !marka || !cytat.includes(marka + model)) return "za_krotki_model";
   } else if (!cytat.includes(model)) return "model_spoza_cytatu";
   if (!marka || !(cytat.includes(marka) || tekst.includes(marka))) return "marka_spoza_strony";
-  if (!numery.some((n) => zwin(n).length >= 4 && tekst.includes(zwin(n)))) return "numer_spoza_strony";
+  /* Numer w postaciach równoważnych (@wydanie): MTD 7xx/9xx, przyrostek „S”. */
+  if (!numeryZWariantami(numery).some((n) => n.length >= 4 && tekst.includes(n))) return "numer_spoza_strony";
   /* Warunek, którego nie ma w cytacie, jest zgadnięty — a zgadnięty rocznik
      zawęża pasowanie tam, gdzie strona go nie zawęża, albo odwrotnie. */
   const wCytacie = [z.rokOd, z.rokDo, z.seryjnyOd, z.seryjnyDo].filter((w) => w !== null && w !== undefined);
@@ -173,6 +178,32 @@ const RODZAJ_DOWODU: Record<ZrodloStrony, RodzajDowodu> = {
 const OPIS_ZRODLA: Record<ZrodloStrony, string> = {
   producent: "strona producenta", katalog_dostawcy: "katalog dostawcy", sklep: "sklep internetowy",
 };
+
+/** Dowód do bazy wiedzy ze znaleziska — jedna postać dla nocy i dopytania (@wydanie). */
+export function dowodZeZnaleziska(z: Pick<ZnaleziskoSurowe, "cytat" | "url" | "zrodloStrony">) {
+  return {
+    rodzaj: RODZAJ_DOWODU[z.zrodloStrony],
+    tresc: `„${z.cytat.trim().slice(0, 400)}” — ${OPIS_ZRODLA[z.zrodloStrony]} ${host(z.url)}`,
+    link: z.url,
+  };
+}
+
+/* Numery, którymi strona może POTWIERDZIĆ kartotekę `t` (0.527.0): własne,
+   z obcych katalogów i zatwierdzonych zamienników OEM. Strona często podaje
+   nowszy numer zamiennika, a nie ten z naszej kartoteki — a zamienność
+   zatwierdził już człowiek. Jedna kopia dla nocy i dopytania (@wydanie). */
+const NUMERY_SITA = `(SELECT group_concat(i.wartosc, char(31)) FROM towar_identyfikator i
+          WHERE i.rodzaj IN ('oem','nr_oryg','katalog_obcy')
+            AND (i.tw_id=t.tw_id OR i.tw_id IN (
+              SELECT CASE WHEN zo.tw_a=t.tw_id THEN zo.tw_b ELSE zo.tw_a END FROM zamiennosc_oem zo
+               WHERE (zo.tw_a=t.tw_id OR zo.tw_b=t.tw_id) AND zo.stan='zatwierdzone')))`;
+
+/** Numery sita jednej kartoteki. Warianty (MTD 7xx/9xx, przyrostek S) dokłada samo sito. */
+export function numerySitaKartoteki(twId: number, database: DatabaseSync = db()): string[] {
+  const w = database.prepare(`SELECT ${NUMERY_SITA} AS n FROM sgt_towar t WHERE t.tw_id=?`).get(twId) as
+    { n: string | null } | undefined;
+  return lista(w?.n ?? null);
+}
 
 /* Jeden warunek dla listy kandydatów i dla ich liczby na ekranie — dwie kopie
    rozjechałyby się przy pierwszej poprawce i ekran obiecywałby co innego, niż
@@ -274,15 +305,8 @@ export function kandydaciDoSieci(
     SELECT t.tw_id, t.symbol, t.nazwa,
         (SELECT group_concat(i.wartosc, char(31)) FROM towar_identyfikator i
           WHERE i.tw_id=t.tw_id AND i.rodzaj IN ('oem','nr_oryg')) AS numery,
-        /* Numery, którymi strona może POTWIERDZIĆ tę część (0.527.0): własne,
-           z obcych katalogów i zatwierdzonych zamienników OEM. Strona często
-           podaje nowszy numer zamiennika, a nie ten z naszej kartoteki —
-           a zamienność zatwierdził już człowiek. */
-        (SELECT group_concat(i.wartosc, char(31)) FROM towar_identyfikator i
-          WHERE i.rodzaj IN ('oem','nr_oryg','katalog_obcy')
-            AND (i.tw_id=t.tw_id OR i.tw_id IN (
-              SELECT CASE WHEN zo.tw_a=t.tw_id THEN zo.tw_b ELSE zo.tw_a END FROM zamiennosc_oem zo
-               WHERE (zo.tw_a=t.tw_id OR zo.tw_b=t.tw_id) AND zo.stan='zatwierdzone'))) AS numery_sita,
+        /* Numery sita — patrz stała NUMERY_SITA. */
+        ${NUMERY_SITA} AS numery_sita,
         5 * COALESCE(zw.n, 0) + 3 * COALESCE(d.n, 0) + 2 * COALESCE(r.n, 0) + MIN(COALESCE(s.n, 0), 20) AS popyt
       FROM sgt_towar t
       LEFT JOIN zwroty zw ON zw.tw_id = t.tw_id
@@ -301,8 +325,8 @@ export function kandydaciDoSieci(
 }
 
 /** Ile kartotek sprawdzono w ostatniej nocy — z księgi, więc restart nie zeruje. */
-export function sprawdzonychTejNocy(teraz = new Date(), database: DatabaseSync = db()): number {
-  const od = new Date(teraz.getTime() - OKNO_NOCY_MS).toISOString();
+export function sprawdzonychTejNocy(teraz = new Date(), database: DatabaseSync = db(), oknoMs = OKNO_NOCY_MS): number {
+  const od = new Date(teraz.getTime() - oknoMs).toISOString();
   /* Oba tryby (0.527.0) — część i silnik — ciągną z jednego limitu. */
   return (database.prepare(`SELECT count(*) n FROM copilot_wywolanie
       WHERE zadanie IN ('pasowanie_siec','pasowanie_siec_silnik') AND at >= ?`)
@@ -327,6 +351,8 @@ export async function szukajPasowaniaWSieci(deps: {
   naNoc: number;
   /** Sufit JEDNEGO przebiegu — ekran woła po jednej kartotece. Brak = do sufitu nocy. */
   naPrzebieg?: number;
+  /** Okno liczenia limitu; domyślnie noc (@wydanie). */
+  oknoMs?: number;
   teraz?: () => Date;
   /** Wstrzykiwany, jak nadawca: test nie parsuje prawdziwych PDF-ów. */
   czytajPdf?: CzytnikPdf;
@@ -335,7 +361,7 @@ export async function szukajPasowaniaWSieci(deps: {
   const database = deps.database ?? db();
   const teraz = deps.teraz ?? (() => new Date());
   const wynik: WynikPrzebiegu = { sprawdzono: 0, zaproponowano: 0, odrzucono: {}, bledow: 0, przerwane: null };
-  const zostalo = Math.min(deps.naNoc - sprawdzonychTejNocy(teraz(), database), deps.naPrzebieg ?? Infinity);
+  const zostalo = Math.min(deps.naNoc - sprawdzonychTejNocy(teraz(), database, deps.oknoMs), deps.naPrzebieg ?? Infinity);
 
   for (const k of kandydaciDoSieci(zostalo, teraz(), database)) {
     let odp: WynikSieci;
@@ -369,20 +395,25 @@ export async function szukajPasowaniaWSieci(deps: {
         continue;
       }
       try {
+        const model = { rodzaj: z.rodzaj, marka: z.marka.trim(), nazwa: z.model.trim(), wariant: z.wariant?.trim() || null };
+        const dowod = dowodZeZnaleziska(z);
+        /* Ukryty warunek ze strony (@wydanie) — „will not fit manual” nad listą
+           modeli. Idzie w warunek słowny, więc Kolejka pokaże go jako „Tylko:”. */
+        const strona = strony.find((s) => bezOgona(s.url) === bezOgona(z.url));
+        const warunek = strona ? warunekZeStrony(strona.tekst, z.cytat) : null;
         const p = zaproponujZastosowanie({
-          twId: k.twId,
-          model: { rodzaj: z.rodzaj, marka: z.marka.trim(), nazwa: z.model.trim(), wariant: z.wariant?.trim() || null },
-          warunki: { rokOd: z.rokOd ?? null, rokDo: z.rokDo ?? null, seryjnyOd: z.seryjnyOd ?? null, seryjnyDo: z.seryjnyDo ?? null },
+          twId: k.twId, model,
+          warunki: { rokOd: z.rokOd ?? null, rokDo: z.rokDo ?? null, seryjnyOd: z.seryjnyOd ?? null, seryjnyDo: z.seryjnyDo ?? null,
+            warunek },
           polaryzacja: "pasuje",
           zrodlo: "copilot",
           komentarz: `Automat nocny znalazł to w sieci (${OPIS_ZRODLA[z.zrodloStrony]}). Sprawdź stronę przed zatwierdzeniem.`,
-          dowod: {
-            rodzaj: RODZAJ_DOWODU[z.zrodloStrony],
-            tresc: `„${z.cytat.trim().slice(0, 400)}” — ${OPIS_ZRODLA[z.zrodloStrony]} ${host(z.url)}`,
-            link: z.url,
-          },
+          dowod,
         }, { automat: "siec" }, database);
         if (p) zaproponowano += 1;
+        /* Ta sama para z innej strony to DRUGIE ŹRÓDŁO, nie duplikat (@wydanie):
+           dopisuje dowód, a dwa niezależne dają „potwierdzone”. */
+        else dowodDoPropozycjiAutomatu(k.twId, model, dowod, "siec", database);
       } catch {
         /* Zły wpis (np. kartoteka zniknęła po imporcie) nie wywraca reszty. */
         wynik.bledow += 1;
@@ -507,6 +538,10 @@ export interface PozycjaZSieci {
   /** Cytat ze strony razem z nazwą źródła — tak, jak stoi w dowodzie. */
   cytat: string;
   link: string | null;
+  /** Pewność ze źródeł (@wydanie) — reguła SZPERACZA, patrz `zrodla-sieci.ts`. */
+  pewnosc: PewnoscZSieci;
+  /** Ile stron potwierdza tę parę. */
+  zrodel: number;
 }
 
 export interface PrzegladZSieci {
@@ -528,10 +563,14 @@ export function przegladZSieci(propozycje: Zastosowanie[], database: DatabaseSyn
       grupy.set(z.twId, g);
     }
     const d = z.dowody[0];
-    g.pozycje.push({ id: z.id, maszyna: z.model.etykieta, warunki: z.zdanieWarunkow, cytat: d?.tresc ?? "", link: d?.link ?? null });
+    g.pozycje.push({ id: z.id, maszyna: z.model.etykieta, warunki: z.zdanieWarunkow, cytat: d?.tresc ?? "", link: d?.link ?? null,
+      pewnosc: pewnoscZSieci(z.dowody.map((x) => x.link)), zrodel: z.dowody.length });
   }
   /* Najpierw kartoteki z największą liczbą maszyn: jedno kliknięcie tam
      zdejmuje z kolejki najwięcej pracy. */
+  /* Potwierdzone na górze (@wydanie): pierwsze do odhaczenia, najmniej do czytania. */
+  const ranga = { potwierdzone: 0, prawdopodobne: 1, slabe: 2 } as const;
+  for (const g of grupy.values()) g.pozycje.sort((a, b) => ranga[a.pewnosc] - ranga[b.pewnosc]);
   return [...grupy.values()].sort((a, b) => b.pozycje.length - a.pozycje.length || a.twId - b.twId);
 }
 

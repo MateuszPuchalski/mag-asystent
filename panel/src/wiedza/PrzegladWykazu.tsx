@@ -3,6 +3,7 @@ import { Check, X as Krzyzyk } from "lucide-react";
 import type { PrzegladWykazu as Przeglad } from "../api/typy";
 import { Pole, Przycisk, ile } from "../ui";
 import { Kafel } from "../towar/Kafel";
+import { ZnakPewnosci } from "./ZnakPewnosci";
 
 /**
  * Przegląd jednego wykazu części w kolejce: wszystkie jego czekające
@@ -58,7 +59,8 @@ export function PrzegladWykazu({ w, trwa, onZatwierdz, onOdrzuc }: {
         <div className="min-w-0 flex-1 text-sm">
           <p><b className="font-mono">{p.symbol}</b>{p.nazwa && <span> {p.nazwa}</span>}</p>
           <p className="text-slate-600">{p.dowod}
-            {p.link && <a className="ml-2 text-xs underline" href={p.link} target="_blank" rel="noreferrer">źródło</a>}</p>
+            {p.link && <a className="ml-2 text-xs underline" href={p.link} target="_blank" rel="noreferrer">źródło</a>}
+            <ZnakPewnosci pewnosc={p.pewnosc} zrodel={p.zrodel} /></p>
           {p.warunki && <p className="text-amber-900"><b>Tylko:</b> {p.warunki}</p>}
           {odrzucam === p.id && <div className="mt-2 flex flex-wrap items-end gap-2 rounded-lg bg-red-50 p-2">
             <label className="block flex-1 text-xs font-bold text-slate-600">

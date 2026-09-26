@@ -208,7 +208,8 @@ test("szkic i klucz modelu też nie wysyłają wysiłku do Haiku 4.5", async () 
    wywołaniem nie wywraca parsowania, że tokeny sumują się po rundach i że
    sufit rund kończy pętlę wymuszoną odpowiedzią.                          */
 
-const ODPOWIEDZ = JSON.stringify({ tresc: "Pasuje do MS 230 (WZ4).", twierdzenia: [] });
+/* `pasowania` od @wydanie: schemat wymaga pola, więc prawdziwe API zawsze je oddaje. */
+const ODPOWIEDZ = JSON.stringify({ tresc: "Pasuje do MS 230 (WZ4).", twierdzenia: [], pasowania: [] });
 const zuzycieRundy = { input_tokens: 100, output_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 50 };
 
 function kontekstPytania(narzedzia: ZestawNarzedzi | null): KontekstPytania {
@@ -290,6 +291,44 @@ test("dopytanie: sufit rund kończy pętlę rundą bez narzędzi", async () => {
     assert.equal(wywolania.length, SUFIT_RUND_NARZEDZI, "tyle rund z narzędziami, ani jednej więcej");
     assert.equal(zadania.length, SUFIT_RUND_NARZEDZI + 1);
     assert.deepEqual(zadania.at(-1)!.tool_choice, { type: "none" });
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+/* Sieć w dopytaniu (@wydanie): narzędzia serwerowe tylko przy `siec`,
+   z zablokowanym Allegro, OLX i Ceneo; `pause_turn` wznawia turę, a tekst
+   przeczytanych stron wraca do serwisu jako materiał sita. */
+test("dopytanie z siecią: wyszukiwarka bez Allegro, wznowienie po pause_turn i strony dla sita", async () => {
+  const zadania = klientSekwencja([
+    () => ({ stop_reason: "pause_turn", model: "m", usage: { ...zuzycieRundy, server_tool_use: { web_search_requests: 1 } },
+      content: [{ type: "web_fetch_tool_result", tool_use_id: "srv_1", content: { type: "web_fetch_result",
+        url: "https://www.partstree.com/x", content: { type: "document", source: { type: "text", media_type: "text/plain",
+          data: "Fits LT1050" } } } }] }),
+    () => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy, content: [{ type: "text", text: ODPOWIEDZ }] }),
+  ]);
+  try {
+    const o = await nadawcaPytaniaAnthropic({ ...kontekstPytania(null), siec: true });
+    const narzedzia = zadania[0]!.tools as Array<{ name: string; blocked_domains?: string[] }>;
+    assert.deepEqual(narzedzia.map((t) => t.name), ["web_search", "web_fetch"]);
+    for (const t of narzedzia) {
+      for (const d of ["allegro.pl", "olx.pl", "ceneo.pl"]) assert.ok(t.blocked_domains!.includes(d), `${t.name} bez blokady ${d}`);
+    }
+    assert.equal(zadania.length, 2, "pause_turn wznawia turę");
+    assert.deepEqual(o.strony, [{ url: "https://www.partstree.com/x", tekst: "Fits LT1050" }]);
+    assert.equal(o.zuzycie.wyszukiwania, 1);
+    assert.deepEqual(o.pasowania, []);
+  } finally {
+    _ustawKlienta(null);
+  }
+});
+
+test("dopytanie bez sieci nie dostaje wyszukiwarki", async () => {
+  const zadania = klientSekwencja([() => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy,
+    content: [{ type: "text", text: ODPOWIEDZ }] })]);
+  try {
+    await nadawcaPytaniaAnthropic(kontekstPytania(null));
+    assert.equal(zadania[0]!.tools, undefined);
   } finally {
     _ustawKlienta(null);
   }
