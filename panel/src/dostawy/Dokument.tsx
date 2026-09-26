@@ -72,7 +72,12 @@ function licznikWyjatkow(lista: WyjatekHali[]): string {
 }
 
 function StanPozycji({ s }: { s: string }) {
-  const st = STAN_POZYCJI[s] ?? { slowo: "do zrobienia", klasa: "bg-slate-200 text-slate-700" };
+  /* „DO ZROBIENIA" ZESZŁO Z WIERSZA (audyt 26.09.2026). Nietknięta faktura
+     na czterdzieści pozycji miała czterdzieści identycznych szarych
+     plakietek, a „0/7" obok mówi to samo. Pastylka zostaje tam, gdzie
+     odróżnia wiersz od sąsiadów: rozłożona, częściowo, wyjątek, pominięta. */
+  const st = STAN_POZYCJI[s];
+  if (!st) return null;
   /* `nowrap`: pastylka to JEDNO słowo znaczeniowe. Na zrzucie właściciela
      „DO / ZROBIENIA" łamało się pod „0/100" i przestawało wyglądać na stan. */
   return <span className={`whitespace-nowrap rounded px-1.5 py-0.5 text-podpis font-bold uppercase tracking-wide ${st.klasa}`}>
@@ -92,9 +97,13 @@ function Gdzie({ l }: { l: PozycjaDostawy }) {
   </>;
 }
 
-function PozycjaZWyjatkiem({ l, rozwiaz }: { l: PozycjaDostawy; rozwiaz: RozwiazProps }) {
+/* Zdjęcie przy pozycji z wyjątkiem słucha TEJ SAMEJ reguły co kolumna zdjęć
+   w tabeli (audyt 26.09.2026): stoi, gdy instalacja ma zdjęcia. Bez źródła
+   był to kafel „bez zdjęcia" przy każdym wyjątku i 404 w konsoli za każdy —
+   dokładnie to, czego kolumna w tabeli unika od 0.449.0. */
+function PozycjaZWyjatkiem({ l, rozwiaz, zdjecia }: { l: PozycjaDostawy; rozwiaz: RozwiazProps; zdjecia: boolean }) {
   return <div className="flex gap-3 border-b border-slate-200 py-3 last:border-b-0">
-    <Zdjecie twId={l.twId} rozmiar={44} nazwa={l.name} />
+    {zdjecia && <Zdjecie twId={l.twId} rozmiar={44} nazwa={l.name} />}
     <div className="min-w-0 flex-1">
       <div className="flex flex-wrap items-center gap-2">
         <b>{l.sym}</b>
@@ -169,7 +178,7 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
     <div className="min-h-0 flex-1 overflow-y-auto px-5 py-3">
       {wyjatkowe.length > 0 && <section className="mb-4">
         <NaglowekSekcji jako="h3">Pozycje z wyjątkiem · {wyjatkowe.length}</NaglowekSekcji>
-        {wyjatkowe.map((l) => <PozycjaZWyjatkiem key={l.lineId ?? l.twId} l={l} rozwiaz={rozwiaz} />)}
+        {wyjatkowe.map((l) => <PozycjaZWyjatkiem key={l.lineId ?? l.twId} l={l} rozwiaz={rozwiaz} zdjecia={zdjecia} />)}
       </section>}
 
       {/* Wyjątki bez linii to towar SPOZA dokumentu — schowanie ich byłoby
