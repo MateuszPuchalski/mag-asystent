@@ -105,7 +105,7 @@ export async function koszeRoutes(app: FastifyInstance) {
         ponowMmKosza(db(), Number(req.params.id), autor(), req.body?.sprawdzono === true));
     });
 
-  /* Zdjęcie kartoteki z MM kosza, które nie weszło (@wydanie). Bramka BIURA:
+  /* Zdjęcie kartoteki z MM kosza, które nie weszło (0.530.0). Bramka BIURA:
      to zmiana treści dokumentu w bazie firmy. Uzasadnienie przy `usunZMmKosza`. */
   app.post<{ Params: { id: string }; Body: { twId?: number } }>(
     "/api/biuro/kosze/:id/mm-usun", async (req, reply) => {

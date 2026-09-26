@@ -1180,7 +1180,7 @@ test("przyczyna braku powrotu: adres w błędzie odróżnia się od nieznanego k
   assert.equal(K.listaKoszy().find((x) => x.id === k)?.bezPowrotu, "nieznany");
 });
 
-/* ── Który towar blokuje MM (@wydanie) ───────────────────────────────────────
+/* ── Który towar blokuje MM (0.530.0) ───────────────────────────────────────
    Zgłoszenie właściciela przy koszu 1205: „brak towaru w MM, gdy chcę
    przerzucić z powrotem na główny — i nie pokazuje, o jaki towar chodzi". */
 
@@ -1213,7 +1213,7 @@ test("karta kosza nazywa kartotekę, której brakuje na magazynie źródłowym M
   assert.equal(K.listaKoszy().find((x) => x.id === k.id)!.problemMm?.ponawiane, false);
 });
 
-test("kartotekę, która blokuje MM, zdejmuje się z dokumentu — reszta idzie dalej (@wydanie)", () => {
+test("kartotekę, która blokuje MM, zdejmuje się z dokumentu — reszta idzie dalej (0.530.0)", () => {
   /* Zgłoszenie właściciela przy koszu 1205: „daj możliwość usunięcia tego
      towaru z tej MM". */
   db().prepare("DELETE FROM events").run();

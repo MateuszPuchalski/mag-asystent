@@ -469,7 +469,7 @@ test("ponowienie MM kosza: bramka biura, a odmowa dochodzi zdaniem (0.503.0)", a
   assert.match(r.json().error, /nie stoi w błędzie/);
 });
 
-test("zdjęcie kartoteki z MM: bramka biura i odmowa zdaniem (@wydanie)", async () => {
+test("zdjęcie kartoteki z MM: bramka biura i odmowa zdaniem (0.530.0)", async () => {
   const magazynier = zalogowany("magazynier");
   const biuro = zalogowany("biuro");
   const koszId = koszDoRozkladania("KZ-35");

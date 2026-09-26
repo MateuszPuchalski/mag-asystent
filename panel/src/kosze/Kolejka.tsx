@@ -127,7 +127,7 @@ export function KolejkaKoszy({ kosze, wybrany, onWybierz, pokazBladMm = false }:
               className={`rounded px-1.5 py-0.5 text-xs font-bold ${k.problemMm.nierozwiazany
                 ? "bg-red-100 text-ranga-zle" : "bg-amber-100 text-ranga-uwaga"}`}>
               {k.problemMm.nierozwiazany ? "MM w błędzie"
-                /* Ponawiane (@wydanie): po odmowie czeka na próbę — jeszcze nie weszło. */
+                /* Ponawiane (0.530.0): po odmowie czeka na próbę — jeszcze nie weszło. */
                 : k.problemMm.ponawiane ? "MM ponawiane" : "MM po błędzie"}</span>}
           {/* BEZ MM POWROTNEGO (0.505.0). Czerwony, bo towar leży na półce,
               a stan na regale zwrotów — sprzedać się go nie da. */}

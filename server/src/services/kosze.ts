@@ -181,7 +181,7 @@ export interface SzczegolKosza {
    * „czy stan wrócił na halę" wymagałoby zajrzenia do Subiekta.
    */
   powrot: { status: string; numer: string | null } | null;
-  /** Kartoteki, których brakuje na magazynie źródłowym MM jeszcze niewykonanego (@wydanie). */
+  /** Kartoteki, których brakuje na magazynie źródłowym MM jeszcze niewykonanego (0.530.0). */
   brakiMm: BrakMm[];
   /** `zwroty` albo `karton` — kolektor po tym wie, którą fazę pokazać. */
   rodzaj: string;
@@ -225,7 +225,7 @@ export interface ProblemMm {
   /** Zadanie MM kosza stoi TERAZ w błędzie — nic jeszcze nie weszło. */
   nierozwiazany: boolean;
   /**
-   * Zadanie po odmowie czeka w kolejce na kolejną próbę (@wydanie). Kosz 1205:
+   * Zadanie po odmowie czeka w kolejce na kolejną próbę (0.530.0). Kosz 1205:
    * karta mówiła „MM weszło po błędzie", a powrót dopiero czekał na ponowienie.
    * Weszło to dopiero `done` — i tylko wtedy zostaje samo sprawdzenie stanów.
    */
@@ -233,7 +233,7 @@ export interface ProblemMm {
 }
 
 /**
- * Kartoteka, której na magazynie źródłowym MM brakuje wolnego stanu (@wydanie).
+ * Kartoteka, której na magazynie źródłowym MM brakuje wolnego stanu (0.530.0).
  *
  * Zgłoszenie właściciela przy koszu 1205: „brak towaru w MM, gdy chcę przerzucić
  * z powrotem na główny — i nie pokazuje, o jaki towar chodzi". Sfera odmawia
@@ -253,7 +253,7 @@ export interface BrakMm {
 }
 
 /**
- * Braki wolnego stanu dla zadań MM, które jeszcze nie weszły (@wydanie).
+ * Braki wolnego stanu dla zadań MM, które jeszcze nie weszły (0.530.0).
  * Pusta lista znaczy „read-model nie widzi braku" — wtedy przyczyna leży poza
  * nim: import stanów nie doszedł albo Sfera odmawia z innego powodu.
  */
@@ -417,7 +417,7 @@ export function problemyMm(database: Db = db(), teraz = new Date()): Map<number,
       ponawiane: false,
     });
   }
-  /* PONAWIANE: zadanie po odmowie czeka na następną próbę (@wydanie). Tylko
+  /* PONAWIANE: zadanie po odmowie czeka na następną próbę (0.530.0). Tylko
      tam, gdzie kłopot już jest — świeże zadanie w kolejce kłopotem nie jest. */
   for (const q of database.prepare(
     `SELECT id FROM sfera_queue
@@ -438,7 +438,7 @@ export function problemyMm(database: Db = db(), teraz = new Date()): Map<number,
 const PRZERWANE_W_ZAPISIE = /przerwany w trakcie zapisu/i;
 
 /**
- * Zdjęcie jednej kartoteki z MM kosza, które jeszcze nie weszło (@wydanie).
+ * Zdjęcie jednej kartoteki z MM kosza, które jeszcze nie weszło (0.530.0).
  *
  * Zgłoszenie właściciela przy koszu 1205: „daj możliwość usunięcia tego
  * towaru z tej MM". Sfera odmawia CAŁEGO dokumentu za jedną linię bez

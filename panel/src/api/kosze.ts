@@ -45,7 +45,7 @@ export interface WierszKosza {
    */
   problemMm?: { prob: number; ostatniBlad: string | null; ostatnioAt: string;
     nierozwiazany: boolean;
-    /** Po odmowie czeka na kolejną próbę (@wydanie) — jeszcze NIE weszło. */
+    /** Po odmowie czeka na kolejną próbę (0.530.0) — jeszcze NIE weszło. */
     ponawiane?: boolean } | null;
   /**
    * Rozłożony ponad dobę, a MM powrotne nie powstało (0.505.0) — i dlaczego.
@@ -90,7 +90,7 @@ export interface SzczegolKosza {
   powrot: { status: string; numer: string | null } | null;
   /**
    * Kartoteki, których brakuje na magazynie źródłowym MM jeszcze niewykonanego
-   * (@wydanie) — stan i rezerwacja z read-modelu. Starszy serwer go nie przysyła.
+   * (0.530.0) — stan i rezerwacja z read-modelu. Starszy serwer go nie przysyła.
    */
   brakiMm?: Array<{ twId: number; symbol: string | null; nazwa: string | null; magazyn: string;
     potrzeba: number; stan: number; rezerwacja: number }>;
@@ -218,7 +218,7 @@ export function usePonowMmKosza() {
 }
 
 /**
- * Zdjęcie kartoteki z MM kosza, które jeszcze nie weszło (@wydanie). Towar
+ * Zdjęcie kartoteki z MM kosza, które jeszcze nie weszło (0.530.0). Towar
  * zostaje na magazynie źródłowym — powód przy `usunZMmKosza` na serwerze.
  */
 export function useUsunZMm() {

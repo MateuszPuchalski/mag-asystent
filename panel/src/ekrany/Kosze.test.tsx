@@ -68,7 +68,7 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
   /* Kosz jeszcze bez dokumentu — przeliczenie jest dozwolone (0.525.0). */
   if (url === "/api/biuro/kosze/18") return { kosz: { ...SZCZEGOL, id: 18, kod: "Z-18", status: "otwarty", doEdycji: true } };
   if (url === "/api/biuro/kosze/16") return { kosz: { ...SZCZEGOL, id: 16, kod: "Z-16", status: "otwarty",
-    /* Kartoteka, która blokuje MM (@wydanie) — zgłoszenie przy koszu 1205. */
+    /* Kartoteka, która blokuje MM (0.530.0) — zgłoszenie przy koszu 1205. */
     brakiMm: [{ twId: 8, symbol: "HM-0520", nazwa: "Gaźnik", magazyn: "ZWR",
       potrzeba: 2, stan: 2, rezerwacja: 1 }] } };
   if (url === "/api/biuro/kosze") return { kosze: [kosz(14, { pominietych: 1 }),
@@ -162,7 +162,7 @@ describe("Kosze w zakładce Zwroty", () => {
     expect(wyslane).toEqual([]);
   });
 
-  it("karta nazywa kartotekę, która blokuje MM, i pozwala ją zdjąć po potwierdzeniu (@wydanie)", async () => {
+  it("karta nazywa kartotekę, która blokuje MM, i pozwala ją zdjąć po potwierdzeniu (0.530.0)", async () => {
     /* Zgłoszenie właściciela przy koszu 1205: „nie pokazuje, o jaki towar
        chodzi" i „daj możliwość usunięcia tego towaru z tej MM". */
     pokaz("/obsluga/zwroty/kosze/16");

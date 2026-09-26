@@ -4700,7 +4700,7 @@ zdaniem, co sprawdzić, a przycisk „Sprawdziłem w Subiekcie" dopiero wtedy
 ponawia. MM, które weszło po błędzie, przycisku nie ma — tam zostaje
 sprawdzenie stanów.
 
-**Karta kosza nazywa kartotekę, która blokuje MM (@wydanie).** Zgłoszenie
+**Karta kosza nazywa kartotekę, która blokuje MM (0.530.0).** Zgłoszenie
 właściciela przy koszu 1205: „brak towaru w MM, gdy chcę przerzucić z powrotem
 na główny — i nie pokazuje, o jaki towar chodzi". Sfera odmawia jednym zdaniem
 za cały dokument. `brakiMm` porównuje treść zadania z read-modelem stanów na
@@ -4711,7 +4711,7 @@ Najczęstsza przyczyna to rezerwacja. Zamówienie zarezerwowało towar na
 magazynie zwrotów, a zarezerwowanego Subiekt nie przesunie. Druga: ktoś
 przesunął albo sprzedał go stamtąd ręką, zanim wyszedł powrót.
 
-**Kartotekę zdejmuje się z MM, które nie weszło (@wydanie).** Właściciel:
+**Kartotekę zdejmuje się z MM, które nie weszło (0.530.0).** Właściciel:
 „daj możliwość usunięcia tego towaru z tej MM". Jedna linia bez stanu trzymała
 dwadzieścia cztery odłożone. Po potwierdzeniu linia wychodzi z treści zadania,
 a reszta idzie dalej. Zadanie bez linii jest anulowane, a zadania w zapisie

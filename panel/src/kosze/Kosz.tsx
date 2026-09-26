@@ -52,7 +52,7 @@ export interface PonowienieMm {
   /** Odmowa „przerwano w trakcie zapisu" czeka na potwierdzenie człowieka. */
   czekaNaSprawdzenie: boolean;
   onPonow: (sprawdzono: boolean) => void;
-  /** Zdjęcie kartoteki z MM, które nie weszło (@wydanie). */
+  /** Zdjęcie kartoteki z MM, które nie weszło (0.530.0). */
   usun?: { trwa: boolean; blad: string; wynik: string; onUsun: (twId: number) => void };
 }
 
@@ -77,7 +77,7 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
   /** Rozłożony ponad dobę, a MM powrotne nie powstało (0.505.0) — i dlaczego. */
   bezPowrotu?: PowodBezPowrotu | null;
 }) {
-  /* Potwierdzenie przy zdjęciu z MM (@wydanie): towar zostaje na magazynie
+  /* Potwierdzenie przy zdjęciu z MM (0.530.0): towar zostaje na magazynie
      źródłowym, a przesunięcie ręką to druga czynność — jeden klik za mało. */
   const [potwierdzUsun, setPotwierdzUsun] = useState<number | null>(null);
   const bezKorekty = k.zwroty.filter((z) => !z.korektaNumer);
@@ -122,12 +122,12 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
         ? "border-red-200 bg-red-50" : "border-amber-200 bg-amber-50"}`}>
         <p className={ponowMm.problem.nierozwiazany ? "text-ranga-zle" : "text-ranga-uwaga"}>
           <b>{ponowMm.problem.nierozwiazany ? "MM w błędzie"
-            /* PONAWIANE (@wydanie) — kosz 1205: karta mówiła „weszło", a powrót
+            /* PONAWIANE (0.530.0) — kosz 1205: karta mówiła „weszło", a powrót
                czekał na kolejną próbę. Weszło to dopiero dokument z numerem. */
             : ponowMm.problem.ponawiane ? "MM ponawiane po odmowie — jeszcze nie weszło"
               : "MM weszło po błędzie — sprawdź stany z Subiektem"}</b>
           {ponowMm.problem.ostatniBlad ? ` · ${ponowMm.problem.ostatniBlad}` : ""}</p>
-        {/* KTÓRY TOWAR (@wydanie). Sfera mówi „brak towaru" o całym dokumencie;
+        {/* KTÓRY TOWAR (0.530.0). Sfera mówi „brak towaru" o całym dokumencie;
             read-model stanów wskazuje linię. Pusta lista to też informacja:
             nasza kopia braku nie widzi, więc przyczyna leży poza nią. */}
         {(k.brakiMm?.length ?? 0) > 0 && <ul className="mt-1 space-y-0.5 text-ranga-zle">
@@ -135,7 +135,7 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
             <b>{b.symbol ?? `kartoteka ${b.twId}`}</b>{b.nazwa ? ` · ${b.nazwa}` : ""}
             {` — MM chce ${b.potrzeba} szt. z ${b.magazyn}, a tam jest ${b.stan}`}
             {b.rezerwacja > 0 ? `, z czego ${b.rezerwacja} zarezerwowane` : ""}.
-            {/* ZDJĘCIE Z MM (@wydanie) — zgłoszenie właściciela przy 1205. */}
+            {/* ZDJĘCIE Z MM (0.530.0) — zgłoszenie właściciela przy 1205. */}
             {ponowMm.usun && (potwierdzUsun === b.twId
               ? <span className="ml-2 inline-flex flex-wrap items-center gap-1 text-slate-700">
                   Zostanie na {b.magazyn} — przesuniesz go ręką w Subiekcie.
@@ -201,7 +201,7 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
               ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-ranga-ok">{p.lokFaktyczna}</span>
               : <span className="text-xs text-slate-600">{p.lokOczekiwana ?? "—"}</span>}</td>
             <td className="py-2"><StanPozycji p={p} />
-              {/* Wiersz, który blokuje MM, oznaczony przy sobie (@wydanie) —
+              {/* Wiersz, który blokuje MM, oznaczony przy sobie (0.530.0) —
                   żeby nie szukać symbolu z ramki wśród dwudziestu pięciu. */}
               {k.brakiMm?.some((b) => b.twId === p.twId) &&
                 <span className="mt-1 block text-xs font-bold text-ranga-zle">blokuje MM — brak wolnego stanu</span>}
