@@ -16,6 +16,8 @@ describe("karta eskalacji", () => {
     expect(screen.getByText("40")).toBeInTheDocument();
     expect(screen.getByText("10")).toBeInTheDocument();
     expect(screen.getByText("25%")).toBeInTheDocument();
+    /* Rama wspólna z resztą analizy (0.519.0): tytuł jest nagłówkiem karty wglądu. */
+    expect(screen.getByRole("heading", { name: "Eskalacja po rozmowie" })).toBeInTheDocument();
   });
 
   it("miesiąc bez rozmów nie udaje zera procent", () => {

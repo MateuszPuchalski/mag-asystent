@@ -1,7 +1,7 @@
 import React from "react";
 import { FiltrSegmentowy, type PozycjaFiltra } from "./index";
 
-/* ── KUBEŁKI PRACY NA WIERZCHU, PRZEGLĄDANIE POD „WIĘCEJ" (@wydanie) ─────────
+/* ── KUBEŁKI PRACY NA WIERZCHU, PRZEGLĄDANIE POD „WIĘCEJ" (0.522.0) ─────────
    Zgłoszenie agentów: „aplikacja przytłacza". 0.506.0 zwinęło w Skrzynce
    „Oczekujące" i „Zakończone" do listy „Więcej", bo robotę robi się w trzech
    kubełkach, a te dwa się przegląda. Ta sama diagnoza stoi na każdej kolejce

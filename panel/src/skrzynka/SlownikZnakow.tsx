@@ -17,7 +17,7 @@ import { useOkienko } from "./MenuRozmowy";
    jednocześnie, a okno zasłoniłoby wiersz, o który pyta. Otwarcie niczego nie
    zapisuje — to stan tego jednego komponentu.
 
-   ── ZNAKI I SKRÓTY POD JEDNYM „?" (@wydanie) ───────────────────────────────
+   ── ZNAKI I SKRÓTY POD JEDNYM „?" (0.522.0) ───────────────────────────────
    Nad kolejką stały DWA znaki zapytania: ten, otwierany kliknięciem, i pomoc
    klawiszy w paśmie szukania, otwierana najechaniem. Dwie reguły otwierania
    dla jednego pytania „jak czytać tę kolejkę" to dwa nawyki do nauczenia.
@@ -42,7 +42,7 @@ export function SlownikZnakow({ kubelkow }: {
   kubelkow: number;
 }) {
   const { otwarte: otwarty, setOtwarte: setOtwarty, ramka } = useOkienko<HTMLSpanElement>();
-  /* PANEL W OKNIE, NIE W KARCIE (@wydanie). Karta kolejki ma `overflow-hidden`,
+  /* PANEL W OKNIE, NIE W KARCIE (0.522.0). Karta kolejki ma `overflow-hidden`,
      a słownik jest szerszy od niej — przy `absolute` ucinała go krawędź
      kolumny, razem z połową każdej nazwy. `fixed` liczony od przycisku
      w chwili otwarcia wychodzi nad sąsiednią kolumnę i mieści się w oknie. */

@@ -62,6 +62,19 @@ const pokaz = () => render(
     <Zadania />
   </QueryClientProvider>);
 
+describe("Zadania terenowe — nagłówek ekranu", () => {
+  it("bez tytułu powtarzającego zakładkę; w rzędzie zostają sito i akcja główna", () => {
+    /* Tytuł i podpis zeszły (0.524.0): nazwę ekranu niesie podświetlona
+       zakładka, jak na każdym innym ekranie panelu. */
+    LISTA = [];
+    pokaz();
+    expect(screen.queryByRole("heading", { level: 1 })).toBeNull();
+    expect(screen.queryByText(/wracają bezpośrednio z kolektorów/)).toBeNull();
+    expect(screen.getByRole("button", { name: "Zadanie dla magazynu" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Otwarte" })).toBeInTheDocument();
+  });
+});
+
 describe("Zadania terenowe — droga powrotna z hali", () => {
   it("odesłane stoi w widoku DOMYŚLNYM, nie tylko w swojej zakładce", () => {
     /* Zakładka jest skrótem dla kogoś, kto przyszedł po nie. Gdyby odesłane
@@ -93,14 +106,14 @@ describe("Zadania terenowe — droga powrotna z hali", () => {
     const u = userEvent.setup();
 
     /* Anulowanie jest dostępne od razu — to jedna z dwóch odpowiedzi. */
-    expect(screen.getByRole("button", { name: /ANULUJ ZADANIE/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Anuluj zadanie/ })).toBeInTheDocument();
 
-    await u.click(screen.getByRole("button", { name: /ZLEĆ PONOWNIE/ }));
+    await u.click(screen.getByRole("button", { name: /Zleć ponownie/ }));
     const pole = screen.getByRole("textbox");
     expect(pole).toHaveValue("Od środka do środka, w mm.");
     await u.clear(pole);
     await u.type(pole, "Wałek leży w kartonie przy rampie.");
-    await u.click(screen.getByRole("button", { name: /ZLEĆ PONOWNIE/ }));
+    await u.click(screen.getByRole("button", { name: /Zleć ponownie/ }));
 
     expect(ponow).toHaveBeenCalledWith(
       { id: 12, instrukcja: "Wałek leży w kartonie przy rampie." },
@@ -156,7 +169,7 @@ describe("Zadania terenowe — droga powrotna z hali", () => {
        prawa proponować czynności, która skończy się błędem. */
     LISTA = [zadanie({ status: "w_toku", przypisanoPrzez: "M. Kowal" })];
     pokaz();
-    expect(screen.queryByRole("button", { name: /ZLEĆ PONOWNIE/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Zleć ponownie/ })).not.toBeInTheDocument();
     expect(screen.queryByText(/Hala odesłała/)).not.toBeInTheDocument();
   });
 });

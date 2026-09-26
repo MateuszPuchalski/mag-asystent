@@ -194,8 +194,9 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
 
       <DrogaZakupu droga={dane.droga} tutaj={{ rodzaj: "rozmowa", id: dane.rozmowa.id }} />
 
-      {ileSwieci > 0 && <h3 className="px-4 pb-1 pt-3 text-podpis font-bold uppercase tracking-wide text-slate-600">
-        W normie</h3>}
+      {/* Nagłówek „W normie” zszedł (0.513.0): wiersze niżej mówią o sobie
+          streszczeniem i szewronem, a bursztynowa rama nad nimi już oddziela
+          to, co świeci. Trzeci poziom tytułów w wąskiej kolumnie był szumem. */}
 
       {/* KOLEJNOŚĆ: oferta i towar, zamówienie, sprawy zamknięte, dobór,
           klient, wiedza. Od tego, co klient kupował, do tego, co wiemy. */}

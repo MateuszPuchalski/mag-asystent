@@ -151,8 +151,11 @@ describe("Ustawienia w panelu", () => {
     /* Karty w kolejności makiety. */
     const tytuly = screen.getAllByRole("heading", { level: 2 }).map((h) => h.textContent);
     expect(tytuly).toEqual(["Dane firmy do protokołów", "Reguły strefy złotej", "Konta i sesje", "Nowy kolektor",
-      "Logo dostawców",
+      "Tagi spraw", "Logo dostawców",
       "Konfiguracja serwera", "Aktualizacja serwera"]);
+    /* Zdania o innych ekranach i o dawnym wydaniu zeszły (0.521.0). */
+    expect(screen.queryByText(/Pomiary obsługi są w Analizie/)).toBeNull();
+    expect(screen.queryByText(/0\.87\.0/)).toBeNull();
   });
 
   it("przeniesienie z przeglądarki: tylko przy pustym serwerze, jednym kliknięciem", async () => {
@@ -165,14 +168,14 @@ describe("Ustawienia w panelu", () => {
     expect(JSON.parse(wyslane[0].body!)).toEqual({ ...PUSTA_FIRMA, nazwa: "WERTIS", nip: "123", telefon: "600" });
     /* Po zapisie serwer nie jest pusty — propozycja znika. */
     await waitFor(() => expect(screen.queryByRole("button", { name: /Przenieś na serwer/ })).toBeNull());
-    expect(await screen.findByDisplayValue("WERTIS")).toBeInTheDocument();
+    expect(await within(karta("Dane firmy do protokołów")).findByText("WERTIS")).toBeInTheDocument();
   });
 
   it("serwer z danymi wygrywa — przeglądarka nie proponuje nadpisania", async () => {
     localStorage.setItem("wertis.firma", JSON.stringify({ Nazwa: "Stara nazwa" }));
     firmaNaSerwerze = { dane: { ...PUSTA_FIRMA, nazwa: "WERTIS Sp. z o.o." }, zmieniono: { at: "2026-09-20T10:00:00.000Z", przez: "Ola" } };
     pokaz();
-    expect(await screen.findByDisplayValue("WERTIS Sp. z o.o.")).toBeInTheDocument();
+    expect(await screen.findByText("WERTIS Sp. z o.o.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Przenieś na serwer/ })).toBeNull();
     expect(screen.getByText(/Ostatnio zmienił\(a\) Ola/)).toBeInTheDocument();
   });
@@ -186,10 +189,34 @@ describe("Ustawienia w panelu", () => {
   it("zapis danych firmy wysyła komplet sześciu pól", async () => {
     pokaz();
     const k = await waitFor(() => karta("Dane firmy do protokołów"));
+    /* Formularz stoi za „Zmień" (0.521.0) — na wierzchu jest odczyt. */
+    await userEvent.click(await within(k).findByRole("button", { name: "Zmień" }));
     await userEvent.type(within(k).getByRole("textbox", { name: "Miejscowość" }), "Kraków");
     await userEvent.click(within(k).getByRole("button", { name: "Zapisz" }));
     await waitFor(() => expect(wyslane).toHaveLength(1));
     expect(JSON.parse(wyslane[0].body!)).toEqual({ ...PUSTA_FIRMA, miejscowosc: "Kraków" });
+    /* Po zapisie formularz się zamyka, a odczyt pokazuje nową wartość. */
+    expect(await within(k).findByText("Kraków")).toBeInTheDocument();
+    expect(within(k).queryByRole("textbox")).toBeNull();
+  });
+
+  it("dane firmy: na wierzchu odczyt, formularz jedno kliknięcie dalej, Anuluj nic nie wysyła", async () => {
+    firmaNaSerwerze = { dane: { ...PUSTA_FIRMA, nazwa: "WERTIS", nip: "123" }, zmieniono: { at: "2026-09-20T10:00:00.000Z", przez: "Ola" } };
+    pokaz();
+    const k = await waitFor(() => karta("Dane firmy do protokołów"));
+    expect(await within(k).findByText("WERTIS")).toBeInTheDocument();
+    expect(within(k).queryByRole("textbox")).toBeNull();
+    await userEvent.click(within(k).getByRole("button", { name: "Zmień" }));
+    const nazwa = within(k).getByRole("textbox", { name: "Nazwa firmy" });
+    expect(nazwa).toHaveValue("WERTIS");
+    await userEvent.type(nazwa, " XYZ");
+    await userEvent.click(within(k).getByRole("button", { name: "Anuluj" }));
+    expect(within(k).queryByRole("textbox")).toBeNull();
+    expect(within(k).queryByText("WERTIS XYZ")).toBeNull();
+    /* Ponowne otwarcie zaczyna od stanu serwera, nie od porzuconej edycji. */
+    await userEvent.click(within(k).getByRole("button", { name: "Zmień" }));
+    expect(within(k).getByRole("textbox", { name: "Nazwa firmy" })).toHaveValue("WERTIS");
+    expect(wyslane).toEqual([]);
   });
 
   it("reguły strefy: pusty komplet nie wyjeżdża, pełny idzie w całości", async () => {
@@ -283,6 +310,8 @@ describe("Ustawienia w panelu", () => {
   it("nowy kolektor: kod do APK z adresu serwera, nie z paska przeglądarki", async () => {
     pokaz();
     const k = await waitFor(() => karta("Nowy kolektor"));
+    /* Kod stoi za „Pokaż kod" (0.521.0); adres jest na wierzchu od razu. */
+    await userEvent.click(await within(k).findByRole("button", { name: /Pokaż kod/ }));
     expect(await within(k).findByRole("img", { name: "Kod QR: http://192.168.1.49:3001/api/aktualizacja/apk" }))
       .toBeInTheDocument();
     expect(within(k).getByText("http://192.168.1.49:3001")).toBeInTheDocument();
@@ -292,12 +321,23 @@ describe("Ustawienia w panelu", () => {
     expect(wyslane).toEqual([]);
   });
 
+  it("nowy kolektor: kod schowany przy otwarciu, adres widać bez klikania", async () => {
+    pokaz();
+    const k = await waitFor(() => karta("Nowy kolektor"));
+    expect(await within(k).findByText("http://192.168.1.49:3001")).toBeInTheDocument();
+    expect(within(k).queryByRole("img")).toBeNull();
+    await userEvent.click(within(k).getByRole("button", { name: /Pokaż kod/ }));
+    await userEvent.click(within(k).getByRole("button", { name: "Schowaj kod" }));
+    expect(within(k).queryByRole("img")).toBeNull();
+  });
+
   it("nowy kolektor bez APK na serwerze: zdanie zamiast kodu", async () => {
     KOLEKTOR = { adresy: ["192.168.1.49"], port: 3001, apk: null };
     pokaz();
     const k = await waitFor(() => karta("Nowy kolektor"));
     expect(await within(k).findByText(/nie ma jeszcze APK/)).toBeInTheDocument();
     expect(within(k).queryByRole("img")).toBeNull();
+    expect(within(k).queryByRole("button", { name: /Pokaż kod/ })).toBeNull();
     expect(within(k).queryByLabelText("Adres serwera")).toBeNull();
   });
 
@@ -307,7 +347,20 @@ describe("Ustawienia w panelu", () => {
     const linia = (await within(k).findByText(/Automatycznie:/)).closest("p") as HTMLElement;
     expect(linia.textContent).toMatch(/w nocy 3:00–5:00, wydanie starsze niż 6 h\./);
     expect(linia.textContent).toMatch(/0\.494\.0 wymaga działania/);
+    /* Nazwa zmiennej nie stoi w zdaniu (0.521.0) — tylko w dymku. */
+    expect(linia.textContent).not.toMatch(/AKTUALIZACJA_AUTO/);
+    expect(within(linia).getByTitle("Klucz AKTUALIZACJA_AUTO")).toHaveTextContent("konfiguracji serwera");
     expect(wyslane).toEqual([]);
+  });
+
+  it("nieudana aktualizacja: dziennik po ludzku, ścieżka pliku w dymku", async () => {
+    AKTUALIZACJA = { ...AKTUALIZACJA_WZOR, ostatnia: { ...AKTUALIZACJA_WZOR.ostatnia, etap: "blad" } };
+    pokaz();
+    const k = await waitFor(() => karta("Aktualizacja serwera"));
+    const linia = (await within(k).findByText(/Ostatnia aktualizacja/)).closest("p") as HTMLElement;
+    expect(linia.textContent).toMatch(/serwer wrócił do poprzedniej wersji/);
+    expect(linia.textContent).not.toMatch(/ostatnia\.log/);
+    expect(within(linia).getByTitle(/ostatnia\.log$/)).toHaveTextContent("dzienniku aktualizacji na serwerze");
   });
 
   it("automat w trybie domyślnym: bez okna nocnego, z wiekiem wydania", async () => {
@@ -433,10 +486,28 @@ describe("Ustawienia w panelu", () => {
     expect(within(f).queryByText(/krotko12/)).toBeNull();
   });
 
+  it("admin: czynności konta za „⋯”, Escape zamyka bez zapisu", async () => {
+    pokaz();
+    await screen.findByText("Jan Wrona");
+    const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
+    /* Wiersz na wierzchu niesie jeden przycisk, nie trzy (0.521.0). */
+    expect(within(wiersz).getAllByRole("button").map((b) => b.getAttribute("aria-label")))
+      .toEqual(["Czynności konta Jan Wrona"]);
+    const menu = within(wiersz).getByRole("button", { name: "Czynności konta Jan Wrona" });
+    await userEvent.click(menu);
+    expect(menu).toHaveAttribute("aria-expanded", "true");
+    const grupa = within(wiersz).getByRole("group", { name: "Czynności: Jan Wrona" });
+    expect(within(grupa).getAllByRole("button").map((b) => b.textContent)).toEqual(["Sesje", "Reset hasła", "Wyłącz"]);
+    await userEvent.keyboard("{Escape}");
+    expect(within(wiersz).queryByRole("group", { name: "Czynności: Jan Wrona" })).toBeNull();
+    expect(wyslane).toEqual([]);
+  });
+
   it("admin: reset hasła w polu hasła, minimum 8 znaków", async () => {
     pokaz();
     await screen.findByText("Jan Wrona");
     const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
+    await userEvent.click(within(wiersz).getByRole("button", { name: "Czynności konta Jan Wrona" }));
     await userEvent.click(within(wiersz).getByRole("button", { name: /Reset hasła/ }));
     const pole = within(wiersz).getByLabelText("Nowe hasło dla Jan Wrona");
     expect(pole.getAttribute("type")).toBe("password");
@@ -452,6 +523,7 @@ describe("Ustawienia w panelu", () => {
     pokaz();
     await screen.findByText("Jan Wrona");
     const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
+    await userEvent.click(within(wiersz).getByRole("button", { name: "Czynności konta Jan Wrona" }));
     await userEvent.click(within(wiersz).getByRole("button", { name: "Sesje" }));
     const sesje = await screen.findByRole("region", { name: "Sesje: Jan Wrona" });
     await within(sesje).findByText("KOL-03");
@@ -467,6 +539,7 @@ describe("Ustawienia w panelu", () => {
     pokaz();
     await screen.findByText("Jan Wrona");
     const wiersz = screen.getByText("Jan Wrona").closest("tr") as HTMLElement;
+    await userEvent.click(within(wiersz).getByRole("button", { name: "Czynności konta Jan Wrona" }));
     await userEvent.click(within(wiersz).getByRole("button", { name: /Wyłącz/ }));
     expect(wyslane).toEqual([]);
     await userEvent.click(within(wiersz).getByRole("button", { name: "Wyłącz konto" }));
@@ -496,6 +569,9 @@ describe("Ustawienia w panelu", () => {
        dwudziestym pierwszym tagu byłaby ścianą w połowie czynności. */
     pokaz();
     await screen.findByText("stary tag");
+    /* Karta tej samej rangi co sąsiednie (0.521.0): nagłówek i przyciski. */
+    expect(karta("Tagi spraw")).toBeInTheDocument();
+    expect(within(karta("Tagi spraw")).getAllByRole("button", { name: "Zmień nazwę" })).toHaveLength(2);
     expect(screen.getByText("wyłączony")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Włącz z powrotem" })).toBeInTheDocument();
     expect(screen.getByText(/nie ma kasowania/)).toBeInTheDocument();

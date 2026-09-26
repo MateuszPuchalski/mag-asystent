@@ -30,6 +30,28 @@ describe("Powiązanie wiadomości na osi", () => {
     expect(z).toHaveAttribute("title", "2f8c1a3e-9b7d-4c1e-8a2b-000000000001");
   });
 
+  /* Od 0.523.0 oferta i zamówienie rozmowy stoją raz, w paśmie i kolumnie
+     kontekstu. Wiadomość powtarza je tylko wtedy, gdy wskazuje coś innego. */
+  const osRozmowy = (w: WpisOsi, powiazanie: { ofertaId: string | null; zamowienieId: string | null }) =>
+    render(<Os rozmowaId={1} wpisy={[w]} zrodloPomiaru={null} mozeZlecac={false}
+      onZrodlo={() => {}} onWstawDoSzkicu={() => {}} powiazanie={powiazanie} />);
+
+  it("oferta i zamówienie rozmowy nie powtarzają się w nagłówku wiadomości", () => {
+    osRozmowy(wpis({ ofertaId: "17235726715", nazwaOferty: "Szarpak",
+      zamowienieId: "2f8c1a3e-9b7d-4c1e-8a2b-000000000001" }),
+    { ofertaId: "17235726715", zamowienieId: "2f8c1a3e-9b7d-4c1e-8a2b-000000000001" });
+    expect(screen.queryByText(/oferta 17235726715/)).toBeNull();
+    expect(screen.queryByText(/zamówienie 2f8c1a3e/)).toBeNull();
+  });
+
+  it("wiadomość spod INNEJ oferty albo zamówienia mówi to w nagłówku", () => {
+    osRozmowy(wpis({ ofertaId: "999", nazwaOferty: "Inny towar",
+      zamowienieId: "aaaaaaaa-0000-0000-0000-000000000000" }),
+    { ofertaId: "17235726715", zamowienieId: "2f8c1a3e-9b7d-4c1e-8a2b-000000000001" });
+    expect(screen.getByText(/oferta 999 — Inny towar/)).toBeInTheDocument();
+    expect(screen.getByText(/zamówienie aaaaaaaa…/)).toBeInTheDocument();
+  });
+
   it("wiadomość bez powiązań nie udaje, że jakieś ma", () => {
     os(wpis());
     expect(screen.queryByText(/oferta/)).toBeNull();

@@ -25,14 +25,14 @@ describe("Pieniądze przy zwrocie", () => {
   it("pokazuje kwotę i przycisk, gdy da się oddać", () => {
     ekran();
     expect(screen.getByText("64,98 PLN")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /ODDAJ PIENIĄDZE/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Oddaj pieniądze/ })).toBeInTheDocument();
   });
 
   /* Wyłączony przycisk bez powodu każe zgadywać, czego brakuje. */
   it("przeszkoda jest zdaniem, a przycisku oddania nie ma wcale", () => {
     ekran({ stan: stan({ moznaZwrocic: false, powod: "Najpierw zaznacz, co oddajemy." }) });
     expect(screen.getByText(/Najpierw zaznacz/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /ODDAJ PIENIĄDZE/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Oddaj pieniądze/ })).toBeNull();
   });
 
   /* Przed werdyktem przeszkoda jest JEDNA i znana (0.453.0): oś etapów nad
@@ -55,8 +55,8 @@ describe("Pieniądze przy zwrocie", () => {
      różne drogi, nie dwa warianty jednej. */
   it("przy pobraniu zostaje sama odmowa", () => {
     ekran({ stan: stan({ moznaZwrocic: false, powod: "Zamówienie za pobraniem — oddaj przelewem." }) });
-    expect(screen.queryByRole("button", { name: /ODDAJ PIENIĄDZE/ })).toBeNull();
-    expect(screen.getByRole("button", { name: /ODMÓW WYPŁATY/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Oddaj pieniądze/ })).toBeNull();
+    expect(screen.getByRole("button", { name: /Odmów wypłaty/ })).toBeInTheDocument();
   });
 
   it("po oddaniu pokazuje numer z Allegro i nie oferuje drugiego kliknięcia", () => {
@@ -64,8 +64,11 @@ describe("Pieniądze przy zwrocie", () => {
       oddane: { id: "ref-9", status: "SUCCEEDED", kiedy: null, potwierdzone: true } }) });
     expect(screen.getByText("ref-9")).toBeInTheDocument();
     expect(screen.getByText(/Oddano/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /ODDAJ PIENIĄDZE/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /ODMÓW WYPŁATY/ })).toBeNull();
+    /* Kwota stoi tylko tutaj (0.516.0) — po oddaniu nie może zniknąć,
+       bo zamknięty zwrot nie mówiłby wtedy nigdzie, ile wyszło. */
+    expect(screen.getByText("64,98 PLN")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Oddaj pieniądze/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Odmów wypłaty/ })).toBeNull();
   });
 
   it("przyjęte polecenie NIE UDAJE oddanych pieniędzy", () => {
@@ -85,45 +88,45 @@ describe("Pieniądze przy zwrocie", () => {
   it("odmowa nie ma kodu wybranego z góry i bez wskazania nie wychodzi", async () => {
     const onOdmow = vi.fn();
     ekran({ onOdmow });
-    await userEvent.click(screen.getByRole("button", { name: /ODMÓW WYPŁATY/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Odmów wypłaty/ }));
     expect(screen.getByLabelText("Kod odmowy")).toHaveValue("");
-    expect(screen.getByRole("button", { name: /WYŚLIJ ODMOWĘ/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Wyślij odmowę/ })).toBeDisabled();
     /* Sam powód nie odblokowuje: brakuje tego, czego klient nie zgadnie. */
     await userEvent.type(screen.getByLabelText(/Uzasadnienie/), "Towar wrócił uszkodzony");
-    expect(screen.getByRole("button", { name: /WYŚLIJ ODMOWĘ/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Wyślij odmowę/ })).toBeDisabled();
     expect(onOdmow).not.toHaveBeenCalled();
   });
 
   it("odmowa z kodem wymagającym powodu nie wychodzi pusta", async () => {
     const onOdmow = vi.fn();
     ekran({ onOdmow });
-    await userEvent.click(screen.getByRole("button", { name: /ODMÓW WYPŁATY/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Odmów wypłaty/ }));
     await userEvent.selectOptions(screen.getByLabelText("Kod odmowy"), "REFUND_REJECTED");
-    expect(screen.getByRole("button", { name: /WYŚLIJ ODMOWĘ/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Wyślij odmowę/ })).toBeDisabled();
     await userEvent.type(screen.getByLabelText(/Uzasadnienie/), "Towar wrócił uszkodzony");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODMOWĘ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odmowę/ }));
     expect(onOdmow).toHaveBeenCalledWith("REFUND_REJECTED", "Towar wrócił uszkodzony");
   });
 
   it("kod bez wymogu powodu wychodzi bez uzasadnienia", async () => {
     const onOdmow = vi.fn();
     ekran({ onOdmow });
-    await userEvent.click(screen.getByRole("button", { name: /ODMÓW WYPŁATY/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Odmów wypłaty/ }));
     await userEvent.selectOptions(screen.getByLabelText("Kod odmowy"), "NO_RETURN_RIGHT");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ ODMOWĘ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odmowę/ }));
     expect(onOdmow).toHaveBeenCalledWith("NO_RETURN_RIGHT", null);
   });
 
   /* Powód czyta KLIENT w Allegro, nie zespół — ekran musi to mówić. */
   it("mówi wprost, że powód trafia do klienta", async () => {
     ekran();
-    await userEvent.click(screen.getByRole("button", { name: /ODMÓW WYPŁATY/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Odmów wypłaty/ }));
     expect(screen.getByText(/trafia do klienta w Allegro/)).toBeInTheDocument();
   });
 
   it("w trakcie żądania przycisk jest zablokowany", () => {
     ekran({ trwa: true });
-    expect(screen.getByRole("button", { name: /ODDAJĘ…/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Oddaję…/ })).toBeDisabled();
   });
 
   /* ── Klawisz `Z` (audyt, 15 września 2026) ───────────────────────────
@@ -161,7 +164,7 @@ describe("Pieniądze przy zwrocie", () => {
 
   it("przycisk pokazuje swój klawisz, bo rozpoznanie jest tańsze od pamiętania", () => {
     ekran();
-    expect(screen.getByRole("button", { name: /Z ODDAJ PIENIĄDZE/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Z Oddaj pieniądze/ })).toBeInTheDocument();
   });
 
   /* ── Przelew oddany poza Allegro (0.269.0) ─────────────────────────────────
@@ -176,7 +179,7 @@ describe("Pieniądze przy zwrocie", () => {
       onPrzelew,
     });
     await userEvent.type(screen.getByLabelText("Numer przelewu"), "PRZ/2026/09/14");
-    await userEvent.click(screen.getByRole("button", { name: /ZAPISZ PRZELEW/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Zapisz przelew/ }));
     expect(onPrzelew).toHaveBeenCalledWith("PRZ/2026/09/14");
   });
 
@@ -184,7 +187,7 @@ describe("Pieniądze przy zwrocie", () => {
   it("pusty numer nie blokuje zapisu, a idzie jako brak", async () => {
     const onPrzelew = vi.fn();
     ekran({ stan: stan({ moznaZwrocic: false, moznaZapisacPrzelew: true }), onPrzelew });
-    await userEvent.click(screen.getByRole("button", { name: /ZAPISZ PRZELEW/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Zapisz przelew/ }));
     expect(onPrzelew).toHaveBeenCalledWith(null);
   });
 
@@ -199,7 +202,7 @@ describe("Pieniądze przy zwrocie", () => {
     });
     expect(screen.getByText(/Oddano przelewem/)).toBeInTheDocument();
     expect(screen.getByText("PRZ/1")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /ZAPISZ PRZELEW/ })).toBeNull();
+    expect(screen.queryByRole("button", { name: /Zapisz przelew/ })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: /cofnij/i }));
     expect(onCofnijPrzelew).toHaveBeenCalled();
   });

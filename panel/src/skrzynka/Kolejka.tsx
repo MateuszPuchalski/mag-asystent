@@ -208,7 +208,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
      POLE TEKSTOWE WYGRYWA ZAWSZE. Na tym ekranie agent PISZE — bez tej bramki
      `j` w słowie „już" przerzucałoby rozmowę spod kursora.
 
-     Strażnik jest WSPÓLNY, z `nawigacja/fokus.ts` (@wydanie). Własny nie znał
+     Strażnik jest WSPÓLNY, z `nawigacja/fokus.ts` (0.522.0). Własny nie znał
      SELECT-a, a kolejka ma dwa: „Więcej" i kolejność. Strzałka w otwartej
      liście zmieniała wtedy naraz jej wartość i rozmowę pod kursorem. */
   const naKlawisz = useRef<(e: KeyboardEvent) => void>(() => {});
@@ -265,7 +265,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         synchronizacja {czas(stan.ostatniaSynchronizacja)}
         {stan.bledy > 0 && <span className="ml-1 font-bold text-amber-700">· błędów: {stan.bledy}</span>}
       </p>
-      {/* JEDEN „?" ZAMIAST DWÓCH (@wydanie). Słownik znaków stał w nagłówku,
+      {/* JEDEN „?" ZAMIAST DWÓCH (0.522.0). Słownik znaków stał w nagłówku,
           skróty klawiszy w paśmie szukania — dwa znaki zapytania o dwóch
           regułach otwierania. Pomoc tej kolejki jest jedna, więc otwiera się
           jednym przyciskiem i zamyka jak każde okienko panelu. */}
@@ -284,7 +284,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           powiadomienia.stan === "wlaczone" ? "text-wertis-ink" : "text-slate-500"}`}>
         {powiadomienia.stan === "wlaczone" ? <Bell size={16} /> : <BellOff size={16} />}</button>}
       <ZnakCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)} />
-      {/* Plakietka „STAN Z …" zeszła (@wydanie). Zapalała się wyłącznie przy
+      {/* Plakietka „STAN Z …" zeszła (0.522.0). Zapalała się wyłącznie przy
           alarmie synchronizacji, a baner alarmu nad kolumnami mówi już „dane
           sprzed…" pełnym zdaniem. Godzinę niesie zdanie obok tytułu. */}
       <button type="button" className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
@@ -303,7 +303,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         Zgłoszenie agenta: „przytłacza". Pięć pigułek zawijało się na dwa rzędy
         nad pierwszym pytaniem. Robota dzieje się w trzech; „Oczekujące"
         i „Zakończone" to przeglądanie — stoją pod „Więcej" z liczbą, a cyfry
-        4 i 5 dalej je wybierają. Od @wydanie ten układ mieszka
+        4 i 5 dalej je wybierają. Od 0.522.0 ten układ mieszka
         w `ui/FiltrZWiecej.tsx`, bo te same „Więcej" dostały inne kolejki. */}
     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1">
       <FiltrZWiecej<Kubelek> wybrany={kubelek} onWybierz={setKubelek} wiecej={POD_WIECEJ}
@@ -331,7 +331,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         <option value="czekanie">najdłużej czekające</option>
         <option value="najnowsze">od najnowszych</option>
       </select>
-      {/* Skróty klawiszy zeszły stąd do „?" w nagłówku (@wydanie) — obok
+      {/* Skróty klawiszy zeszły stąd do „?" w nagłówku (0.522.0) — obok
           słownika znaków, jedną pomocą zamiast dwóch. */}
     </div>
     <PasekCopilota stan={copilot} kandydaci={doRozpoznania(wKubelkuTeraz, copilot)}
@@ -529,7 +529,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           {zegar !== null && <span className="self-center"><Czekanie ms={zegar} /></span>}
         </button>;
       })}
-      {/* Stopka „Dalsze wiersze mogą istnieć w Allegro…" zeszła (@wydanie):
+      {/* Stopka „Dalsze wiersze mogą istnieć w Allegro…" zeszła (0.522.0):
           stała tylko przy alarmie, a baner alarmu mówi to samo — „nowe pytania
           mogą już czekać, a ich tu nie widać". Przygaszona lista zostaje. */}
     </div>

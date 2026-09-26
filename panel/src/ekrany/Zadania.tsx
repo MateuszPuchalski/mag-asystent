@@ -157,15 +157,15 @@ function Odeslane({ zadanie }: { zadanie: Zadanie }) {
         ? <>
           <Przycisk wariant="glowny" disabled={zajete} onClick={() => ponow.mutate(
             { id: zadanie.id, instrukcja }, { onError: (e) => setBlad((e as Error).message) })}>
-            <RotateCcw size={16} />ZLEĆ PONOWNIE</Przycisk>
+            <RotateCcw size={16} />Zleć ponownie</Przycisk>
           <Przycisk onClick={() => { setPonawiam(false); setBlad(""); }}>Nie teraz</Przycisk>
         </>
         : <>
           <Przycisk wariant="glowny" disabled={zajete} onClick={() => setPonawiam(true)}>
-            <RotateCcw size={16} />ZLEĆ PONOWNIE</Przycisk>
+            <RotateCcw size={16} />Zleć ponownie</Przycisk>
           <Przycisk disabled={zajete} onClick={() => anuluj.mutate(
             { id: zadanie.id }, { onError: (e) => setBlad((e as Error).message) })}>
-            <X size={16} />ANULUJ ZADANIE</Przycisk>
+            <X size={16} />Anuluj zadanie</Przycisk>
         </>}
     </div>
   </div>;
@@ -191,34 +191,32 @@ export function Zadania() {
      i celowo nie przewija za ekrany. Poniżej `lg` klasa jest bezczynna:
      bez związanej wysokości nie ma czego przewijać. */
   return <div className="lg:h-full lg:overflow-y-auto">
-    <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="text-tytul font-bold">Zadania terenowe</h1>
-        {/* slate-600, nie slate-500 (0.255.0): ten akapit stoi na TLE STRONY
-            (`body` ma `bg-slate-100`), a tam slate-500 daje 4.34:1 przy progu
-            4.5. W kartach, czyli na bieli, slate-500 wystarcza. */}
-        <p className="text-sm text-slate-600">Pomiary i weryfikacje wracają bezpośrednio z kolektorów.</p>
+    {/* ── JEDEN RZĄD NAGŁÓWKA, BEZ TYTUŁU (0.524.0) ─────────────────────────
+        Tytuł „Zadania terenowe" powtarzał podświetloną zakładkę, a podpis pod
+        nim mówił, skąd wracają wyniki — rzecz wiadoma po pierwszym dniu.
+        Zostaje to, czym się tu pracuje: sito i akcja główna, w jednym rzędzie
+        jak na liście koszy i zwrotów. */}
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+      {/* Filtr miał WŁASNĄ bieżnię — białą, w obwódce, z pigułką 14 px na
+          `px-4 py-2` — i jako jedyny z sześciu nie miał `aria-pressed`.
+          Kształt idzie pod wspólny, czyli schodzi na szczebel kontrolki.
+          Bieżnia zostaje szara jak wszędzie: niewybrana pigułka Z TŁEM mówi
+          „wybiera się jedną z tych", a bez tła mówiła „oto trzy rzeczy do
+          kliknięcia" — a to jest jeden wybór, nie trzy. */}
+      <div className="flex gap-1">
+        {/* Licznik TYLKO przy odesłanych i tylko wtedy, gdy są. Liczba przy
+            każdej zakładce byłaby tłem; tutaj mówi o pracy, która stoi po
+            stronie biura i nikt jej nie zabierze. */}
+        <FiltrSegmentowy<string> wybrany={filtr} onWybierz={setFiltr}
+          pozycje={FILTRY.map(([v, l]) => ({
+            klucz: v,
+            etykieta: v === "odeslane" && odeslanych ? `${l} (${odeslanych})` : l,
+          }))} />
       </div>
-      <div className="flex items-center gap-3">
-        {/* Filtr miał WŁASNĄ bieżnię — białą, w obwódce, z pigułką 14 px na
-            `px-4 py-2` — i jako jedyny z sześciu nie miał `aria-pressed`.
-            Kształt idzie pod wspólny, czyli schodzi na szczebel kontrolki.
-            Bieżnia zostaje szara jak wszędzie: niewybrana pigułka Z TŁEM mówi
-            „wybiera się jedną z tych", a bez tła mówiła „oto trzy rzeczy do
-            kliknięcia" — a to jest jeden wybór, nie trzy. */}
-        <div className="flex gap-1">
-          {/* Licznik TYLKO przy odesłanych i tylko wtedy, gdy są. Liczba przy
-              każdej zakładce byłaby tłem; tutaj mówi o pracy, która stoi po
-              stronie biura i nikt jej nie zabierze. */}
-          <FiltrSegmentowy<string> wybrany={filtr} onWybierz={setFiltr}
-            pozycje={FILTRY.map(([v, l]) => ({
-              klucz: v,
-              etykieta: v === "odeslane" && odeslanych ? `${l} (${odeslanych})` : l,
-            }))} />
-        </div>
-        <Przycisk wariant="glowny" onClick={() => setModal(true)}>
-          <Plus size={18} />ZADANIE DLA MAGAZYNU</Przycisk>
-      </div>
+      {/* Napisy przycisków zwykłą pisownią (0.524.0), jak w reszcie panelu:
+          wersaliki krzyczały głośniej niż karty zadań, które się tu czyta. */}
+      <Przycisk wariant="glowny" onClick={() => setModal(true)}>
+        <Plus size={18} />Zadanie dla magazynu</Przycisk>
     </div>
     <div className="mb-4"><Blad>{(zadania.error as Error | null)?.message}</Blad></div>
 

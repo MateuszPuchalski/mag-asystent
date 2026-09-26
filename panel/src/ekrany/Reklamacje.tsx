@@ -507,7 +507,7 @@ export function Reklamacje() {
               pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
               zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
               kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
-          {/* Rozstrzygnięte i Bez ruchu pod „Więcej" (@wydanie): oba mówią
+          {/* Rozstrzygnięte i Bez ruchu pod „Więcej" (0.522.0): oba mówią
               „tylko wgląd", więc nie stoją w wadze kubełka pracy. Cyfry dalej
               je wybierają — powód przy `ui/FiltrZWiecej.tsx`. */}
           <FiltrZWiecej<KubelekReklamacji | null> wybrany={kubelek} onWybierz={przelacz}
@@ -658,7 +658,7 @@ export function Reklamacje() {
             Zgoda przed wysłaniem zostaje przy OBU gałęziach — uznanie kosztuje
             pieniądze i jest równie nieodwracalne co odmowa. */}
         {szczegol.data && <div className="shrink-0"><Werdykt reklamacja={szczegol.data.reklamacja}
-          trwa={werdykt.isPending} blad={bladWerdyktu}
+          czat={szczegol.data.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
           trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
           onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)} /></div>}
       </Karta>

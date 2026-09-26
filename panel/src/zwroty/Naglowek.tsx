@@ -31,9 +31,15 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
            donikąd, bo taki kosztuje kliknięcie i zaufanie do ekranu. */
         : <Link href={zwrot.linkZwrotu}>{zwrot.numer ?? zwrot.externalId}</Link>}
       {/* Oznaczenie stoi PRZY NUMERZE, nie w dowodach: operator ma wiedzieć,
-          z czym pracuje, zanim cokolwiek kliknie. */}
+          z czym pracuje, zanim cokolwiek kliknie.
+
+          ZDANIE O NIEODEBRANIU MIESZKA W PODPOWIEDZI (0.518.0). Stało też
+          fioletowym wierszem pod nagłówkiem, więc ten sam fakt padał na
+          ekranie trzy razy: plakietka, wiersz i sekcja paczki. Plakietka mówi
+          go jednym słowem, a wyjaśnienie jest jednym najazdem myszy dalej. */}
       {nieodebrana &&
-        <span className="rounded bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-800">
+        <span title="Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana."
+          className="rounded bg-violet-100 px-2 py-0.5 text-xs font-bold text-violet-800">
           nieodebrana paczka</span>}
     </h2>
 
@@ -95,9 +101,9 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
     {/* NOTATKA ZESZŁA STĄD W 0.313.0. Przy paczce nieodebranej cytowaliśmy ją
         tutaj, bo nie miała innego miejsca — od tego wydania ma własną sekcję
         w kolumnie dowodów, razem z autorem, godziną i cofnięciem. Zdanie
-        powtórzone dwa razy na jednym ekranie każe je czytać dwa razy. */}
-    {nieodebrana && <p className="mt-1 text-xs text-violet-800">
-      Klient nie zgłosił zwrotu — przesyłka wróciła nieodebrana.</p>}
+        powtórzone dwa razy na jednym ekranie każe je czytać dwa razy.
+        Z tego samego powodu zeszło stąd zdanie o nieodebraniu (0.518.0) —
+        stoi w podpowiedzi plakietki przy numerze. */}
   </header>;
 }
 
@@ -110,8 +116,8 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
  * A to jest pierwsze, co trzeba wiedzieć, zanim podejmie się decyzję
  * o zwrocie: klient bywa w tej samej sprawie w pół zdania.
  *
- * JEDNA ROZMOWA, NAJNOWSZA. Reszta zostaje w dowodach; nagłówek mówi tylko,
- * ile ich jest. „Czeka na odpowiedź" niesie niebieski, nie bursztyn —
+ * JEDNA ROZMOWA, NAJNOWSZA. Reszta zostaje w dowodach — od 0.518.0 jako
+ * przystanki drogi w sekcji „Ten zakup u nas"; nagłówek mówi tylko, ile ich jest. „Czeka na odpowiedź" niesie niebieski, nie bursztyn —
  * to wezwanie do ruchu, a nie ostrzeżenie o błędzie.
  */
 function RozmowaWNaglowku({ rozmowy }: { rozmowy: RozmowaZwrotu[] }) {
@@ -132,6 +138,6 @@ function RozmowaWNaglowku({ rozmowy }: { rozmowy: RozmowaZwrotu[] }) {
       <span className="font-semibold text-slate-600">{r.odKlienta ? "Klient: " : "My: "}</span>
       „{r.ostatniaTresc}”</p>}
     {rozmowy.length > 1 && <span className="mt-1 block text-xs text-slate-600">
-      i {ile(rozmowy.length - 1, "inna rozmowa", "inne rozmowy", "innych rozmów")} o tym zakupie — w dowodach</span>}
+      i {ile(rozmowy.length - 1, "inna rozmowa", "inne rozmowy", "innych rozmów")} o tym zakupie — w „Ten zakup u nas”</span>}
   </RouterLink>;
 }

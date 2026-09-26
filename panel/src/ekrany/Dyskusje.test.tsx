@@ -191,12 +191,23 @@ describe("Ekran dyskusji", () => {
     await userEvent.click(screen.getByRole("button", { name: /Odśwież z Allegro/ }));
     expect(ile()).toBe(2);
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Odpisuję");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /wyślij odpowiedź/i }));
     expect(ile()).toBe(3);
-    await userEvent.click(screen.getByRole("button", { name: /POPROŚ O ZAKOŃCZENIE/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Poproś o zakończenie/ }));
     await userEvent.click(screen.getByRole("checkbox"));
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ PROŚBĘ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij prośbę/ }));
     expect(ile()).toBe(4);
+  });
+
+  it("prowadzący, odświeżenie i prośba o zakończenie stoją w JEDNYM wierszu", () => {
+    /* Do 0.520.0 trzy osobne rzędy nad rozmową, każdy z jednym przyciskiem.
+       „Odśwież z Allegro" zostaje decyzją właściciela — przeniesiony, nie
+       zdjęty — więc test pilnuje obu rzeczy naraz. */
+    pokaz("/obsluga/dyskusje/1", [wiad()]);
+    const odswiez = screen.getByRole("button", { name: /Odśwież z Allegro/ });
+    const wiersz = odswiez.parentElement!;
+    expect(wiersz).toContainElement(screen.getByRole("button", { name: /Prowadzę tę sprawę/ }));
+    expect(wiersz).toContainElement(screen.getByRole("button", { name: /Poproś o zakończenie/ }));
   });
 
   it("odpowiedź w dyskusji niesie załączniki: spinacz i zdjęcie pliku z tej sprawy", async () => {
@@ -217,7 +228,7 @@ describe("Ekran dyskusji", () => {
 
   it("przełączenie kubełka przestawia kursor na jego pierwszą sprawę", async () => {
     pokaz("/obsluga/dyskusje/1");
-    /* Zamknięte stoją od @wydanie pod „Więcej", z tym samym licznikiem. */
+    /* Zamknięte stoją od 0.522.0 pod „Więcej", z tym samym licznikiem. */
     await userEvent.selectOptions(screen.getByLabelText("Więcej kubełków"),
       screen.getByRole("option", { name: "Zamknięte · 1" }));
     expect(screen.getByRole("button", { name: /Sprawa wyjaśniona/ }))
@@ -242,7 +253,7 @@ describe("Ekran dyskusji", () => {
       wiad({ id: 3, autorRola: "SELLER", tresc: "Nasza odpowiedź" }),
     ]);
     await userEvent.type(screen.getByLabelText("Odpowiedź w sprawie"), "Odpisuję");
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /wyślij odpowiedź/i }));
     const wyslane = scena.mutacje.find((m) => m.startsWith("odpowiedz:"));
     expect(wyslane).toBeTruthy();
     expect(JSON.parse(wyslane!.slice("odpowiedz:".length)).expectedLastMessageId).toBe(2);
@@ -250,9 +261,9 @@ describe("Ekran dyskusji", () => {
 
   it("prośba o zakończenie idzie z wersją sprawy z ekranu", async () => {
     pokaz("/obsluga/dyskusje/1", [wiad()]);
-    await userEvent.click(screen.getByRole("button", { name: /POPROŚ O ZAKOŃCZENIE/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Poproś o zakończenie/ }));
     await userEvent.click(screen.getByRole("checkbox"));
-    await userEvent.click(screen.getByRole("button", { name: /WYŚLIJ PROŚBĘ/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij prośbę/ }));
     const wyslane = scena.mutacje.find((m) => m.startsWith("zakoncz:"));
     expect(wyslane).toBeTruthy();
     const ladunek = JSON.parse(wyslane!.slice("zakoncz:".length));
@@ -265,7 +276,7 @@ describe("Ekran dyskusji", () => {
     /* Pola odpowiedzi NIE MA — nie jest wyłączone. Notatka biura i wyszukiwarka
        zostają, bo dotyczą naszej pracy, nie rozmowy z kupującym. */
     expect(screen.queryByLabelText("Odpowiedź w sprawie")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /POPROŚ O ZAKOŃCZENIE/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Poproś o zakończenie/ })).not.toBeInTheDocument();
     expect(screen.getByText(/nowej wiadomości nie przyjmie/)).toBeInTheDocument();
   });
 
