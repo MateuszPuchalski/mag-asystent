@@ -34,11 +34,14 @@ Magazynowo-biurowy asystent firmy ogrodniczej: serwer Fastify + `node:sqlite`
   Kolejki — skrzynka, zwroty, reklamacje, dyskusje — są NASZE, nie jego.
   Dokładając kolejkę albo ekran, dopisujesz ją do `services/droga-klienta.ts`:
   wiązania po numerze zamówienia w obie strony. Wiązanie jednostronne to
-  wiązanie, którego nie ma. Po loginie rozmówcy nie wiąż niczego NOWEGO, dopóki
-  stoi przy nim `[WERYFIKUJ]` w `docs/allegro-ksztalt.md` — blizna 0.56.6 mówi,
-  że bywa zamaskowany, a dwie funkcje już po nim chodzą. Piątej tabeli ze
-  wspólnym statusem nad kolejkami nie było i nie będzie — ten kształt kosztował
-  już cztery tabele nakładki spraw.
+  wiązanie, którego nie ma. Klientem jest login Allegro porównywany bez
+  wielkości liter. Wolno po nim wiązać: login rozmówcy sprawdzono na żywym
+  koncie 24 września 2026, a `client:<liczba>` okazał się loginem, nie maską.
+  Wspólnego statusu przepisanego z kolejek nie było i nie będzie — ten kształt
+  kosztował już cztery tabele nakładki spraw. Sprawa klienta (decyzja
+  właściciela z 26 września 2026) trzyma wyłącznie to, czego kolejki nie
+  wiedzą: kto prowadzi, następny krok z terminem i zamknięcie, które każde
+  nowe zdarzenie otwiera na nowo. Kształt i powód: S6 w tym samym dokumencie.
 
 - **Reguła klienta HTTP obowiązuje KAŻDY front z osobna.** Żądanie bez ciała
   nie deklaruje typu treści — pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`

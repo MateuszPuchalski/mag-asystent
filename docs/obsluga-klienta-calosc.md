@@ -103,7 +103,8 @@ nie mają. Otworzyłyby listę, która dziś znaczy co innego.
 
 Nakładka spraw (`sprawa_klienta`) odeszła w 0.388.0. Droga zakupu robi to
 samo sama i przez cztery kolejki. Cena jest zapisana jawnie: dwóch rozmów
-o jednym problemie BEZ wspólnego zamówienia nikt już nie sklei.
+o jednym problemie BEZ wspólnego zamówienia nikt już nie sklei. Tę cenę
+zdejmie sprawa klienta z S6, bo jej kluczem jest login, nie zamówienie.
 
 ## Dekalog obsługi klienta
 
@@ -171,14 +172,19 @@ Klamra nad sprawami niczego nie przechwytuje. Historia zostaje przy rozmowie,
 przy zwrocie i przy reklamacji, a wspólny widok ją tylko CZYTA. Cztery byty
 mają czterech właścicieli danych i to jest cecha, nie usterka.
 
-**Zabrania.** Piątej tabeli ze wspólnym statusem nad czterema kolejkami.
-Pierwsza odpowiedź o tym kształcie kosztowała cztery tabele nakładki
-(0.140.0). Druga, nakładka spraw, odeszła w 0.388.0 (blizna 0.130.0).
+**Zabrania.** Wspólnego statusu przepisanego z czterech kolejek i ręcznego
+scalania spraw. Pierwsza odpowiedź o tym kształcie kosztowała cztery tabele
+nakładki (0.140.0). Druga, nakładka spraw, odeszła w 0.388.0 (blizna 0.130.0).
+
+**Nie zabrania sprawy klienta z S6.** Do 26 września 2026 stał tu zakaz
+każdej piątej tabeli nad kolejkami. Obie blizny dotyczyły jednak statusu
+przepisanego ze źródeł i scalania bez klucza. Sprawa klienta nie ma żadnego
+z nich, a historia dalej wisi przy źródle.
 
 **Pilnuje.** `droga-klienta.test.ts`: droga zakupu i lista „Moje" niczego
 nie zapisują.
 
-## Spoiwo — pięć kroków stoi, szósty czeka
+## Spoiwo — pięć kroków stoi, szósty ma kształt
 
 Historia budowy stoi w `CHANGELOG.md` (0.386.0–0.397.0) i w komentarzach kodu.
 Tu zostaje to, czego przy zmianie nie wolno zgubić.
@@ -271,11 +277,50 @@ pobieraczem, a ani jedno zdjęcie nie doszło do modelu.
 u Allegro i trzymania treści, nazw plików albo adresów w wyniku. Limit 429
 i brak danych to „pominięty”, bo czerwień ma znaczyć jedno: droga nie działa.
 
-### S6. Zamknięcie sprawy klienta — czeka na decyzję właściciela
+### S6. Sprawa klienta i jej zamknięcie (decyzja z 26 września 2026)
 
-Kiedy sprawa klienta jest skończona, skoro składa się z bytów o czterech
-właścicielach danych? „Zamknięte" znaczy co innego dla Allegro, dla ustawy
-i dla biura. Droga zakupu (S3) jest materiałem do tej decyzji, nie decyzją.
+Pytanie stało tu otwarte: kiedy sprawa klienta jest skończona, skoro składa
+się z bytów o czterech właścicielach danych? Rozstrzygnął je wywiad
+z właścicielem z 26 września 2026. Kształt stoi niżej, kodu jeszcze nie ma.
+
+**Powód.** Biuro nazywa swój główny problem wprost: intuicyjne śledzenie
+i prowadzenie sprawy danego klienta. Jedna osoba prowadzi braki towaru,
+kontakt z klientem i reklamacje. Jej listą zadań są dziś powiadomienia Allegro
+w Gmailu. Droga zakupu, „Moje" i profil klienta tego nie zastąpiły.
+
+**Jednostką jest klient, nie zamówienie.** Typowy łańcuch to pytanie o dobór,
+potem zły towar w paczce, zwrot, dosyłka, reklamacja i dyskusja. Pytanie
+o dobór przychodzi przed zamówieniem, a dosyłka bywa osobną przesyłką. Numer
+zamówienia takiego łańcucha nie sklei. Kluczem jest login Allegro, jak w S2a.
+
+**Sprawa trzyma cztery rzeczy i nic więcej:**
+
+- kto ją prowadzi;
+- następny krok z terminem, na przykład „czekamy na zwrot" albo „dosłać";
+- zamknięcie, które stawia człowiek;
+- ponowne otwarcie przy każdym nowym zdarzeniu dowolnego źródła.
+
+**Czego sprawa nie trzyma.** Stanu kolejek, bo ten liczy się przy odczycie,
+jak droga zakupu (S3). Historii, bo wisi przy źródle (punkt 5). Ręcznego
+scalania, bo login jest kluczem naturalnym i nie ma czego sklejać.
+
+**Zamknięcie zależy od tego, co klient dostał:**
+
+| rozwiązanie | sprawa kończy się, gdy | skąd to wiemy |
+|---|---|---|
+| sam zwrot | pieniądze wróciły do klienta | oś zwrotu, `zwrot-pieniedzy.ts` |
+| wymiana | poprawny towar doszedł na ten sam adres | dziś znikąd — dosyłka idzie poza aplikacją |
+| odpowiedź | klient dostał odpowiedź i nie dopisał | skrzynka, S5a |
+
+Wymiana to zwrot przez Allegro i dosyłka poprawnego towaru. Nie dostaje
+osobnej kolejki, tylko staje jako następny krok sprawy z numerem przesyłki.
+System podpowiada zamknięcie, gdy przyjdzie ostatni fakt, na który sprawa
+czeka. Zamyka zawsze człowiek.
+
+**Zabrania.** Statusu przepisanego ze źródeł, zamykania przez automat
+i otwarcia ekranu, które cokolwiek zapisuje. Test zera zapisów przy otwarciu
+dostaje ekran sprawy tak jak każdy inny. Najbliższy punkt zaczepienia to
+`klient_notatka`: jedyna tabela, której kluczem już jest login.
 
 ## Sprzeczność: login kupującego
 
@@ -295,9 +340,10 @@ nie maska. Rozbieżność brała się z wielkości liter, więc login porównuje
 wszędzie bez niej. Opis stoi w `docs/allegro-ksztalt.md`, rozdział
 `GET /messaging/threads`.
 
-**Do tego czasu obowiązuje jedno.** Żadna NOWA funkcja nie wiąże po loginie
-rozmówcy. Dwie istniejące zostają, bo pomyłka daje w nich najpewniej pustą
-historię, a nie cudze dane. Wiązanie w S1 zatwierdza zresztą człowiek.
+**Od 26 września 2026 nowe wiązania po loginie są dozwolone.** Zakaz stał
+tu tylko do weryfikacji, a ta zapadła 24 września. Login porównuje się
+zawsze bez wielkości liter. Rozmowę BEZ numeru z konkretnym zamówieniem
+dalej wiąże kliknięcie agenta (S1): ten sam login nie znaczy „ta paczka".
 
 ## Mapa możliwości
 
@@ -318,8 +364,9 @@ od drugiej: nazywa dziurę, a nie funkcję.
 | dyskusja przed reklamacją | dyskusje (0.245.0), wiązanie od 0.386.0 | zegara |
 | prośba o rabat zamiast zwrotu | rabat transakcyjny (0.164.0) | — |
 | pytanie reklamacyjne bez sprawy w Allegro | skrzynka, znacznik „reklamacyjna" (0.390.0) | zegara — rozmowa nie ma terminu (§26) |
-| wymiana na inny towar | NIGDZIE | decyzji: zwrot z nowym zamówieniem czy osobny byt |
+| wymiana na inny towar | zwrot przez Allegro, dosyłka poza aplikacją | kroku „dosłać" w sprawie klienta (S6) |
 | brak towaru na stanie | rozmowa plus zadanie terenowe | — |
+| brak towaru do sprzedanego zamówienia | Sellasist: magazynier zgłasza brak przy zbieraniu | drogi braku z Sellasist do sprawy klienta |
 | klient wraca po miesiącu | rozmowa plus pełna historia (0.386.0) | — |
 | klient pisze z drugiego konta | dwie historie, bez wiązania | świadomej odpowiedzi „nie wiążemy" |
 | klient milczy po naszym pytaniu | kubełek BEZ RUCHU w reklamacjach | tego samego w skrzynce i zwrotach |
@@ -331,18 +378,20 @@ od drugiej: nazywa dziurę, a nie funkcję.
 Znacznik „reklamacyjna" (0.390.0) jest NASZ i zostaje przy rozmowie. Sprawy
 w Allegro sprzedawca nie założy — `/sale/issues` ma wyłącznie GET.
 
-**Dwie pozycje „NIGDZIE" są największe.** Wymiana towaru jest codzienna
-w handlu częściami i nie ma dziś żadnego miejsca w aplikacji. Drugi kanał
-przesądza o tym, czy panel jest obsługą klienta, czy obsługą Allegro.
+**Największe dziury to wymiana i brak towaru.** Obie są codzienne w handlu
+częściami i obie żyją dziś poza aplikacją. Wymiana dostaje miejsce w sprawie
+klienta (S6). Brak towaru czeka na drogę z Sellasist.
+
+**Drugi kanał przestał być pilny.** Wywiad z 26 września 2026 dał dwa
+fakty. Z Allegro jest 99% zamówień, a pytania klientów przychodzą przez
+Allegro z odnośnikiem do zamówienia. Gmail niesie głównie powiadomienia
+Allegro i służy biuru za listę zadań. Tę rolę ma przejąć sprawa klienta.
 
 ## Otwarte decyzje właściciela
 
-Czy wchodzi drugi kanał poza Allegro. Czy wymiana towaru dostaje własny byt.
-Kiedy sprawa klienta jest zamknięta. Czy rozmowa dostaje termin odpowiedzi.
-Czy dwa konta jednego człowieka wiążemy ręką.
-
-Pierwsze dwa pytania są większe od reszty razem wziętej. Każde z nich zmienia
-kształt aplikacji, nie kształt ekranu.
+Czy wchodzi drugi kanał poza Allegro. Czy rozmowa dostaje termin odpowiedzi.
+Czy dwa konta jednego człowieka wiążemy ręką. Kiedy sprawa klienta jest
+zamknięta i czy wymiana dostaje własny byt — rozstrzygnięte w S6.
 
 ## Blizny, których to spoiwo nie ma kupić drugi raz
 
@@ -350,7 +399,7 @@ Blizny 0.130.0 i 0.140.0 stoją w punkcie 5 dekalogu i tu ich nie powtarzamy.
 
 | blizna | czego pilnować przy łączeniu kolejek |
 |---|---|
-| 0.56.6 | login rozmówcy bywa zamaskowany; nowe wiązanie po nim czeka na `[WERYFIKUJ]` |
+| 0.56.6 | `client:<liczba>` to login kupującego bez konta, nie maska (sprawdzone 24 września 2026); login porównuje się bez wielkości liter |
 | 0.121.0 | dyskusja nie jest reklamacją; zegar jednej nie nazywa się zegarem drugiej |
 | 0.152.0 | powód odmowy zapisuje się słowem, nie samym kodem odpowiedzi |
 | 0.157.0 | ta sama rzecz zbudowana dwa razy w dwóch gałęziach; sprawdź, co już stoi |

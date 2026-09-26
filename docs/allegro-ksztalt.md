@@ -980,8 +980,9 @@ rozmówcy (blizna 0.56.6); w zamówieniu jest zwykłym loginem.
 
 Schemat nie mówi, czy filtr `buyer.login` rozróżnia wielkość liter. Dla tego
 kształtu pytamy więc najpierw „client:”, a przy pustej odpowiedzi „Client:”.
-Znacznik weryfikacji przy rozmówcy w wiadomościach zostaje: zrzut dotyczy
-zamówienia, a nie wątku.
+Znacznik weryfikacji przy rozmówcy w wiadomościach został wtedy, bo zrzut
+dotyczył zamówienia, a nie wątku. Zdjęto go 24 września 2026 — rozdział
+`GET /messaging/threads`.
 
 ### `external.id` — mostek do kartoteki
 
