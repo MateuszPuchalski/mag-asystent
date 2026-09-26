@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Truck } from "lucide-react";
 import {
@@ -105,6 +105,42 @@ export function Dostawy() {
   const opis = KUBELKI_DOSTAW.find((k) => k.id === kubelek);
   const idz = (x: number | "bez") => nawiguj(`/obsluga/dostawy/${x}`);
 
+  /* Do którego kubełka należy wybrana sprawa — `null`, gdy nie wiadomo.
+     Archiwum przychodzi z serwera dopiero po otwarciu kubełka, więc
+     dokumentu stamtąd nie da się rozpoznać z góry. */
+  const kubelekWybranego = (): KubelekDostaw | null => {
+    if (wybrany === null) return null;
+    if (wybrany === "bez") return "decyzja";
+    const d = dokumenty.find((x) => x.dokId === wybrany);
+    if (d) return kubelekDokumentu(d, zOdpowiedzia);
+    if (spozaOkna.some((g) => g.dokId === wybrany)) return "decyzja";
+    if (poza.data?.documents.some((x) => x.dokId === wybrany)) return "poza";
+    return null;
+  };
+
+  /* ZMIANA KUBEŁKA ZAMYKA SPRAWĘ SPOZA NIEGO (audyt 26.09.2026). Do tej pory
+     środek i prawa kolumna trzymały dokument, którego nowa lista nie
+     zawierała — bez podświetlenia, czasem z rozpoczętym formularzem
+     „Zamknij dostawę". Działało się wtedy na fakturze, o której człowiek
+     już nie myślał. Sprawa z tego samego kubełka zostaje otwarta. */
+  const wybierzKubelek = (k: KubelekDostaw) => {
+    setKubelek(k);
+    if (wybrany !== null && kubelekWybranego() !== k) nawiguj("/obsluga/dostawy");
+  };
+
+  /* LINK DO DOKUMENTU OTWIERA JEGO KUBEŁEK. Adres `/dostawy/9003` bez
+     `?kubelek=` stawał zawsze na „Do decyzji", więc zamknięta albo nietknięta
+     faktura otwierała się obok listy, na której jej nie ma. Rozstrzygamy RAZ,
+     gdy lista jest znana — dalej kubełek należy do człowieka. */
+  const kubelekZLinku = useRef(false);
+  useEffect(() => {
+    if (kubelekZLinku.current || parametry.get("kubelek") || !lista.data || !poza.data) return;
+    kubelekZLinku.current = true;
+    const k = kubelekWybranego();
+    if (k) setKubelek(k);
+    // zależności celowo tylko dwie: efekt ma zadziałać raz, gdy obie listy są znane
+  }, [lista.data, poza.data]);
+
   const rozwiaz = useRozwiazWyjatek();
   const notatka = useNotatkaDoHali();
   const przeczytane = usePrzeczytane();
@@ -160,7 +196,12 @@ export function Dostawy() {
   /* Stopka mówi, GDZIE KOŃCZY SIĘ TO, NA CO PATRZYSZ. Obcięte archiwum
      wygląda z ekranu jak pełne — a to jest dokładnie ta pomyłka, po której
      ktoś orzeka, że faktury nie ma. Stoi w paśmie nad listą, obok pytania. */
-  const stopka = kubelek === "archiwum"
+  /* „Poza WERTIS" nie ma okna importu: serwer oddaje każdą zdjętą dostawę,
+     także sprzed miesięcy. Zdanie o czternastu dniach nad taką listą mówiło
+     nieprawdę o jej granicy (audyt 26.09.2026). */
+  const stopka = kubelek === "poza"
+    ? `${ile(poza.data?.documents.length ?? 0, "zdjęta", "zdjęte", "zdjętych")} z listy — bez granicy okna importu`
+    : kubelek === "archiwum"
     ? archiwum.data && (archiwum.data.ile > archiwum.data.documents.length
         ? `pokazano ${archiwum.data.documents.length} z ${archiwum.data.ile} — zawęź wyszukiwaniem`
         : `${ile(archiwum.data.ile, "dostawa", "dostawy", "dostaw")} starszych niż ${lista.data?.dniWstecz ?? 14} dni`)
@@ -179,7 +220,7 @@ export function Dostawy() {
               to przeglądanie, nie praca. „Poza WERTIS" zostaje o jedno
               kliknięcie z licznikiem w opcji, bo ma wyłapać pomyłkowe
               zdjęcie dostawy. Ten sam komponent co na pozostałych kolejkach. */}
-          <FiltrZWiecej<KubelekDostaw> wybrany={kubelek} onWybierz={setKubelek}
+          <FiltrZWiecej<KubelekDostaw> wybrany={kubelek} onWybierz={wybierzKubelek}
             wiecej={WIECEJ_DOSTAW}
             pozycje={KUBELKI_DOSTAW.map((k) => ({ klucz: k.id, etykieta: k.etykieta, ile: liczniki[k.id],
               podpowiedz: k.pytanie }))} />
@@ -211,7 +252,7 @@ export function Dostawy() {
             : dokument.isLoading
               ? <Pusto waga="lista">Wczytuję dokument…</Pusto>
               : dokument.data
-                ? <Dokument d={dokument.data} rozwiaz={propsRozwiaz} />
+                ? <Dokument key={dokument.data.dokId} d={dokument.data} rozwiaz={propsRozwiaz} />
                 : <Pusto waga="lista">{dokument.error
                     ? (dokument.error as Error).message : "Nie znaleziono dokumentu."}</Pusto>}
       </Karta>
@@ -219,7 +260,14 @@ export function Dostawy() {
       <Karta className="flex min-h-0 flex-col overflow-hidden">
         <div className="min-h-0 flex-1 overflow-y-auto">
           {dokument.data && typeof wybrany === "number"
-            ? <Kontekst d={dokument.data} onPowieksz={setLupa}
+            /* `key` NA DOKUMENCIE (audyt 26.09.2026). Bez niego pole notatki
+               i otwarty formularz „Zamknij dostawę" przechodziły na następnie
+               wybraną fakturę, gdy ta była już w pamięci podręcznej i kolumna
+               się nie przemontowała. Zmierzone: notatka wpisana przy FZ 9006
+               poszła do hali przy FZ 9005, a formularz zamknięcia z powodem
+               „dotyczy 9006" pytał już o 9005. Stan formularzy należy do
+               jednej faktury i ma umrzeć razem z jej wyborem. */
+            ? <Kontekst key={dokument.data.dokId} d={dokument.data} onPowieksz={setLupa}
                 notatka={{ trwa: notatka.isPending, blad: bladNotatki,
                   onWyslij: (tresc) => notatka.mutateAsync({ dokId: dokument.data!.dokId, tresc })
                     .then(() => { setBladNotatki(""); return true; })

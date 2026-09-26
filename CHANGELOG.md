@@ -10,6 +10,80 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.530.0 — 26 września 2026
+
+**Karta kosza wskazuje towar, który blokuje MM, i pozwala go zdjąć.**
+Zgłoszenie właściciela przy koszu 1205: „brak towaru w MM, gdy chcę przerzucić
+z powrotem na główny — i nie pokazuje, o jaki towar chodzi".
+
+- Przy odmowie „Brak towaru w magazynie" karta kosza wypisuje kartotekę,
+  ilość z MM, stan i rezerwację na magazynie, z którego MM zdejmuje. Wiersz
+  w tabeli dostaje dopisek „blokuje MM". Najczęściej winna jest rezerwacja —
+  zarezerwowanego towaru Subiekt nie przesunie.
+- „usuń z MM" przy takiej kartotece zdejmuje ją z dokumentu, który jeszcze nie
+  wszedł, po potwierdzeniu. Reszta MM idzie dalej. Towar zostaje na magazynie
+  źródłowym i przesuwa się go ręką w Subiekcie.
+- MM ponawiane po odmowie ma własny znacznik „MM ponawiane". Karta nie mówi
+  już „weszło po błędzie", gdy dokument dopiero czeka na kolejną próbę.
+
+## 0.529.2 — 26 września 2026
+
+**Dostawy w panelu: drobne poprawki z audytu ekranu.** Druga część audytu:
+miejsca, w których ekran mówił mniej albo inaczej, niż wiedział.
+
+- **Przy 1024 px kolumna pracy jest najszersza.** Dotąd miała ok. 280 px,
+  mniej niż kolumna kontekstu, a opis wyjątku łamał się po dwa słowa.
+  Kontekst oddaje jej miejsce na tym progu. Dotyczy wszystkich ekranów
+  z trzema kolumnami: dostaw, skrzynki, zwrotów, reklamacji, dyskusji
+  i koszy. Kolejka zostaje szeroka, bo kafelki zwrotów potrzebują miejsca.
+- **Błędny artykuł czyta się jako zamiana.** Zamiast „policzone: 6 z 6 szt.
+  · zamiast 6” stoi „przyszło 6 szt. OEM-77-521 zamiast 6 szt.” zamówionego
+  towaru.
+- **Wiek dostawy w dniach.** „dziś”, „wczoraj”, „3 dni” zamiast „11 g 51 min”
+  liczonych od północy UTC z daty bez godziny.
+- **Zdjęcie przy wyjątku tylko w instalacji ze zdjęciami.** Ta sama reguła
+  co w tabeli pozycji. Bez niej każdy wyjątek miał kafel „bez zdjęcia”.
+- **Poza WERTIS:**
+  - wiek słowami zamiast surowej daty;
+  - pełny powód zdjęcia z listy;
+  - pasek „bez granicy okna importu”, bo ta lista okna nie ma.
+- **Mniej szumu:**
+  - miejsce na logo tylko wtedy, gdy ktoś na liście je ma;
+  - bez plakietki „do zrobienia” przy każdej pozycji;
+  - status wyjątku w stałej kolumnie z prawej;
+  - zgłoszenie bez towaru opisane wprost jako „bez wskazania towaru”.
+- **Czytelniej w kontekście:** reguła notatki pod polem zamiast w uciętej
+  podpowiedzi, a podpisy dowodów w dwóch liniach.
+
+## 0.529.1 — 26 września 2026
+
+**Dostawy w panelu: poprawki z audytu ekranu.** Jeden błąd wysyłał dane do
+niewłaściwej faktury. Cztery miejsca mówiły co innego niż fakty.
+
+- **Notatka i zamknięcie zostają przy swojej fakturze.** Przy powrocie do
+  faktury już raz otwartej pole notatki i formularz „Rozłożone poza WERTIS”
+  przechodziły na nią z poprzedniej. Zmierzone: notatka wpisana przy FZ 9006
+  poszła do hali przy FZ 9005. Formularz zamknięcia z powodem „dotyczy 9006”
+  pytał już o 9005. Prawa i środkowa kolumna zaczynają teraz od zera przy
+  każdej fakturze.
+- **Jedna liczba wyjątków.** Kolejka i nagłówek faktury liczą te same
+  otwarte wyjątki i mówią „otwarte” wprost. Dotąd nagłówek liczył pozycje
+  z wyjątkiem, a sekcja doliczała rozwiązane. Sekcja wyjątków poza pozycjami
+  podaje „4 otwarte · 1 rozwiązany”, a rozwiązane stoją na końcu.
+- **Rozłożona z otwartym wyjątkiem nie świeci na zielono.** Nagłówek mówi
+  „rozłożona · czeka na biuro” na bursztynowo, a pasek w kolejce nie
+  zmienia się w zielony, dopóki wyjątek czeka.
+- **Zmiana kubełka zamyka fakturę spoza niego.** Dotąd środek pokazywał
+  fakturę, której nowa lista nie zawierała, czasem z rozpoczętym
+  formularzem zamknięcia. Link do faktury otwiera od razu jej kubełek.
+- **Zgubiony plik dowodu jest widoczny.** Zgłoszenie ze zdjęciem, którego
+  pliku serwer nie ma, mówi „zdjęcie zgłoszone, pliku brak” na czerwono.
+  Dotąd mówiło „bez zdjęcia”, jak zgłoszenie, do którego nikt zdjęcia nie
+  robił.
+
+Sześć nowych testów w `ekrany/Dostawy.test.tsx`. Test przechodzenia notatki
+pada bez poprawki i przechodzi z nią.
+
 ## 0.529.0 — 26 września 2026
 
 **Ustawienia mają pięć grup zamiast jednego zwoju ośmiu kart.** Lewa

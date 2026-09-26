@@ -1,7 +1,7 @@
 import React from "react";
 import type { DokumentDostawy, ZamknietaPoza } from "../api/dostawy";
 import { useLogoDostawcy } from "../towar/useZdjecie";
-import { Pusto, WierszKolejki, czas, ile, wiek } from "../ui";
+import { Pusto, WierszKolejki, czas, dataLokalna, dzien, ile } from "../ui";
 
 /* ── Kolejka dostaw (0.435.0) ──────────────────────────────────────────────
    Przeniesiona z `biuro.html` razem z decyzjami, które tam kosztowały:
@@ -26,7 +26,12 @@ import { Pusto, WierszKolejki, czas, ile, wiek } from "../ui";
    Pytamy wyłącznie o logo, które jest — `maLogo` przychodzi z listy, więc
    dostawca bez logo nie dobija serwera o 404. Obraz WYPEŁNIA miejsce
    (`object-contain`), a nie tylko się w nim mieści: `max-w-full` nie
-   powiększa, więc małe logo stało kropką w rogu pustego pola. */
+   powiększa, więc małe logo stało kropką w rogu pustego pola.
+
+   MIEJSCE STOI TYLKO WTEDY, GDY KTOKOLWIEK NA LIŚCIE MA LOGO (audyt
+   26.09.2026). Równa kolumna nazw ma sens przy logo obok logo; przy liście,
+   na której żaden dostawca go nie ma, było to 56 px pustki przed każdym
+   numerem — wcięcie bez powodu, powtórzone w każdym wierszu. */
 function LogoWiersza({ d }: { d: DokumentDostawy }) {
   const url = useLogoDostawcy(d.khId, d.maLogo);
   return <span className="flex h-8 w-14 shrink-0 items-center" aria-hidden="true">
@@ -62,17 +67,45 @@ export function kubelekDokumentu(d: DokumentDostawy, zOdpowiedzia: Set<number>):
   return "nietkniete";
 }
 
-/** Wiek dokumentu słowami — od daty wystawienia, bo tylko ją lista zna. */
-const wiekDokumentu = (data: string) => {
-  const ms = Date.now() - Date.parse(data);
-  return Number.isFinite(ms) ? wiek(Math.max(0, ms)) : "—";
-};
+/**
+ * Liczba wyjątków słowami — JEDNO brzmienie na liście i w dokumencie (audyt
+ * 26.09.2026). Jedna faktura miała trzy różne liczby „wyjątków": otwarte
+ * zgłoszenia w kolejce, pozycje ze statusem wyjątku w nagłówku i wszystkie
+ * zgłoszenia z rozwiązanymi nad sekcją. Każda liczyła co innego, a słowo
+ * było to samo. Tu liczy się zawsze OTWARTE i mówi się to wprost.
+ */
+export const otwarteWyjatki = (n: number) => ile(n, "otwarty wyjątek", "otwarte wyjątki", "otwartych wyjątków");
 
-function Pasek({ zrobione, wszystkie }: { zrobione: number; wszystkie: number }) {
+/**
+ * Wiek dokumentu słowami — od daty wystawienia, bo tylko ją lista zna.
+ *
+ * W DNIACH KALENDARZA, NIE W GODZINACH (audyt 26.09.2026). Data wystawienia
+ * nie ma godziny, a liczenie od niej milisekund dawało „11 g 51 min" przy
+ * fakturze z dzisiaj — dokładność, której dane nie mają, liczoną w dodatku
+ * od północy UTC, czyli o dwie godziny obok zegara magazynu.
+ */
+export function wiekDokumentu(data: string, teraz = new Date()): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(data ?? "");
+  if (!m) return "—";
+  const [r, mies, dz] = dataLokalna(teraz.toISOString()).split("-").map(Number);
+  const dni = Math.round((Date.UTC(r, mies - 1, dz) - Date.UTC(+m[1], +m[2] - 1, +m[3])) / 86_400_000);
+  if (dni <= 0) return "dziś";
+  if (dni === 1) return "wczoraj";
+  return `${dni} dni`;
+}
+
+/**
+ * Pasek rozłożenia. ZIELEŃ TYLKO DLA SKOŃCZONEGO BEZ ZASTRZEŻEŃ (audyt
+ * 26.09.2026): wyjątek liczy się jako pozycja domknięta (D8), więc faktura
+ * z czterema otwartymi wyjątkami miała zielony pasek 2/2 — kolor mówił
+ * „gotowe", a plakietka obok „czeka na ciebie". Wygrywał kolor, bo zajmuje
+ * więcej miejsca. Przy otwartym wyjątku pasek zostaje bursztynowy.
+ */
+function Pasek({ zrobione, wszystkie, czeka }: { zrobione: number; wszystkie: number; czeka: boolean }) {
   const proc = wszystkie ? Math.min(100, Math.round((zrobione / wszystkie) * 100)) : 0;
   return <div className="mt-1 flex items-center gap-2">
     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
-      <div className={`h-1.5 ${proc >= 100 ? "bg-emerald-600" : "bg-wertis-amber"}`} style={{ width: `${proc}%` }} />
+      <div className={`h-1.5 ${proc >= 100 && !czeka ? "bg-emerald-600" : "bg-wertis-amber"}`} style={{ width: `${proc}%` }} />
     </div>
     <span className="text-xs tabular-nums text-slate-600">{zrobione}/{wszystkie}</span>
   </div>;
@@ -91,20 +124,23 @@ export function KolejkaDostaw({ dokumenty, zOdpowiedzia, wybrany, onWybierz, pus
   /* Pusty napis = nic nie mówić: w DO DECYZJI nad listą stoją wtedy wiersze
      spoza okna importu, a „nic nie czeka" pod nimi przeczyłoby im. */
   if (!dokumenty.length) return pusto ? <Pusto waga="lista">{pusto}</Pusto> : null;
+  const zLogo = dokumenty.some((d) => d.maLogo);
   return <ul className="divide-y divide-slate-200">
     {dokumenty.map((d) => {
       const wszystkie = d.linesTotal || d.positions;
       return <Wiersz key={d.dokId} aktywny={d.dokId === wybrany} onKlik={() => onWybierz(d.dokId)}>
         <span className="flex w-full items-start gap-3">
-          <LogoWiersza d={d} />
+          {zLogo && <LogoWiersza d={d} />}
           <span className="flex min-w-0 flex-1 flex-col">
             <span className="flex w-full items-baseline gap-2">
               <span className="truncate font-bold">{d.nrPelny}</span>
-              <span className="ml-auto shrink-0 text-xs text-slate-600">{wiekDokumentu(d.dataWyst)}</span>
+              <span className="ml-auto shrink-0 text-xs text-slate-600" title={`wystawiona ${dzien(d.dataWyst)}`}>
+                {wiekDokumentu(d.dataWyst)}</span>
             </span>
             <span className="w-full truncate text-sm text-slate-600">
               {d.dostawca} · {ile(wszystkie, "pozycja", "pozycje", "pozycji")}</span>
-            <span className="w-full"><Pasek zrobione={d.linesDone} wszystkie={wszystkie} /></span>
+            <span className="w-full"><Pasek zrobione={d.linesDone} wszystkie={wszystkie}
+              czeka={d.wyjatkiOtwarte > 0} /></span>
             {(zOdpowiedzia.has(d.dokId) || d.wyjatkiOtwarte > 0) &&
               <span className="mt-1 flex flex-wrap gap-1.5">
                 {zOdpowiedzia.has(d.dokId) &&
@@ -112,7 +148,7 @@ export function KolejkaDostaw({ dokumenty, zOdpowiedzia, wybrany, onWybierz, pus
                     odpowiedź z hali</span>}
                 {d.wyjatkiOtwarte > 0 &&
                   <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">
-                    {ile(d.wyjatkiOtwarte, "wyjątek", "wyjątki", "wyjątków")}</span>}
+                    {otwarteWyjatki(d.wyjatkiOtwarte)}</span>}
               </span>}
           </span>
         </span>
@@ -141,28 +177,37 @@ export function WierszeSpozaOkna({ grupy, wybrany, onWybierz }: {
         <span className="text-sm text-slate-600">
           {g.dokId == null ? "Towar spoza dokumentu" : "Dokument spoza okna importu"}</span>
         <span className="mt-1 rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">
-          {ile(g.ile, "wyjątek", "wyjątki", "wyjątków")}</span>
+          {otwarteWyjatki(g.ile)}</span>
       </Wiersz>;
     })}
   </ul>;
 }
 
-/** Dostawy zdjęte z listy poza WERTIS — kto i dlaczego, bo to odróżnia decyzję od pomyłki. */
+/**
+ * Dostawy zdjęte z listy poza WERTIS — kto i dlaczego, bo to odróżnia decyzję od pomyłki.
+ *
+ * POWÓD SIĘ NIE UCINA (audyt 26.09.2026): to jedyna odpowiedź na pytanie
+ * „dlaczego tej faktury nikt nie rozkładał", a wielokropek zjadał ją
+ * w połowie. Wiek stoi słowami, jak w pozostałych kubełkach — surowa data
+ * „2026-08-16" była jedynym takim zapisem na ekranie.
+ */
 export function KolejkaPozaWertis({ lista, wybrany, onWybierz }: {
   lista: ZamknietaPoza[];
   wybrany: number | null;
   onWybierz: (dokId: number) => void;
 }) {
-  if (!lista.length) return <Pusto waga="lista">Nic nie zdjęto z listy w tym oknie.</Pusto>;
+  /* „w tym oknie" zeszło: ta lista nie ma okna, serwer oddaje każde zdjęcie. */
+  if (!lista.length) return <Pusto waga="lista">Nic nie zdjęto z listy.</Pusto>;
   return <ul className="divide-y divide-slate-200">
     {lista.map((d) => <Wiersz key={d.dokId} aktywny={d.dokId === wybrany} onKlik={() => onWybierz(d.dokId)}>
       <span className="flex w-full items-baseline gap-2">
         <span className="truncate font-bold">{d.nrPelny}</span>
-        <span className="ml-auto shrink-0 text-xs text-slate-600">{d.dataWyst}</span>
+        <span className="ml-auto shrink-0 text-xs text-slate-600" title={`wystawiona ${dzien(d.dataWyst)}`}>
+          {wiekDokumentu(d.dataWyst)}</span>
       </span>
       <span className="w-full truncate text-sm text-slate-600">{d.dostawca}</span>
-      <span className="w-full truncate text-xs text-slate-600">
-        {d.zamknietaBy} · {czas(d.zamknietaAt)} · {d.powod}</span>
+      <span className="w-full text-xs text-slate-600">
+        {d.zamknietaBy} · {czas(d.zamknietaAt)} · <span className="text-slate-700">{d.powod}</span></span>
     </Wiersz>)}
   </ul>;
 }
