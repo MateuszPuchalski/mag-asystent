@@ -36,7 +36,7 @@ import { KartaKolektorow } from "../stan/Kolektory";
    DO DECYZJI prowadzi wprost do karty, a nie na górę ekranu. Biuro robiło to
    samo `data-cel`, a jego brak zgubił kiedyś licznik odpowiedzi na notatki.
 
-   MNIEJ NARAZ (@wydanie), ta sama zasada co w skrzynce z 0.506.0. Arkusz,
+   MNIEJ NARAZ (0.509.0), ta sama zasada co w skrzynce z 0.506.0. Arkusz,
    rekoncyliacja i test na żywym Allegro są zwinięte do nagłówka, bo sięga
    się po nie rzadko. Adres z `?karta=` otwiera zwiniętą kartę, bo inaczej
    wiersz DO DECYZJI prowadziłby do samego tytułu. Konto Allegro stoi teraz

@@ -16,7 +16,7 @@ import { Potwierdz } from "../ui/Potwierdz";
    kolektorze — ta strona tylko czyta", choć od 0.111.0 to nie była prawda;
    to zdanie nie przeszło.
 
-   „Ta sama trasa" zeszło z opisu karty (@wydanie): to wiedza o serwerze,
+   „Ta sama trasa" zeszło z opisu karty (0.509.0): to wiedza o serwerze,
    a biuro potrzebuje tylko tego, GDZIE da się ponowić. */
 
 const STATUS: Record<string, [string, string]> = {

@@ -64,7 +64,7 @@ export function KartaWymiany() {
     </Tabela>
 
     {a && <div className="mt-5 border-t pt-4">
-      {/* Okno alarmu stoi W NAGŁÓWKU, krótko (@wydanie). Całe zdanie o tym,
+      {/* Okno alarmu stoi W NAGŁÓWKU, krótko (0.509.0). Całe zdanie o tym,
           skąd próg, zeszło do podpowiedzi: to przypis dla dociekliwych,
           a dwie liczby z różnych okresów dalej mają podpis przy sobie. */}
       <h3 className={`text-sm font-bold ${spoznione.length ? "" : "text-slate-600"}`}
@@ -77,7 +77,7 @@ export function KartaWymiany() {
           {/* Próg nie jest niczyim werdyktem: to p90 spraw domkniętych w tym
               samym kanale. Liczba bez pochodzenia byłaby wyrocznią, więc
               pochodzenie zostaje — w podpowiedzi, nie w nawiasie ze słowem
-              „p90" albo „podłoga", którego biuro nie używa (@wydanie). */}
+              „p90" albo „podłoga", którego biuro nie używa (0.509.0). */}
           <span className="cursor-help text-slate-600 underline decoration-dotted" title={skadProg(k.podstawa, k.n)}>
             próg {minuty(k.progMin)}</span>
           <span>najdłuższa: {minuty(k.najstarszaSpoznionaMin)}</span>

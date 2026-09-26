@@ -29,7 +29,7 @@ export function StanIntegracji({ zdrowie, odczyt }: { zdrowie: Zdrowie | undefin
        SYNCHRONIZACJI. Niesparowane konto wyglądało jak awaria synchronizacji
        i właściciel szukał przyczyny w dzienniku usługi zamiast na ekranie.
 
-       Wiersz o połączeniu zszedł stąd (@wydanie), bo ten sam fakt, ze słowem
+       Wiersz o połączeniu zszedł stąd (0.509.0), bo ten sam fakt, ze słowem
        zamiast kodu i z przyciskiem „Połącz", niesie karta „Konto Allegro" tuż
        nad tą. Rozdział z 0.152.0 zostaje: ta tabela mówi o synchronizacji. */
     ["Synchronizacja", i.status, RANGA_STATUSU[i.status] ?? "nic"],
@@ -53,12 +53,12 @@ export function StanIntegracji({ zdrowie, odczyt }: { zdrowie: Zdrowie | undefin
        że nie wiadomo, czy poszła. Zasada 10 projektu każe to pokazać, więc
        wiersz zmienia rangę, zamiast stać zawsze na szaro. */
     ["Kolejka wysyłek", o.kolejkaWysylek, o.wysylkiDoSprawdzenia ? "uwaga" : "nic"],
-    /* Wiersz „Subiekt GT" zszedł (@wydanie): to, czy worker żyje, mówi karta
+    /* Wiersz „Subiekt GT" zszedł (0.509.0): to, czy worker żyje, mówi karta
        „Serwer" na tym samym ekranie, i mówi więcej — kiedy go widziano i że
        bez niego zapisy do Subiekta nie wchodzą. */
   ];
 
-  /* Rama kart wglądu (@wydanie), jak każda karta obok. Własny nagłówek miał
+  /* Rama kart wglądu (0.509.0), jak każda karta obok. Własny nagłówek miał
      inny krój i nazwę trasy „/api/health" — głos programisty, nie biura.
      Zostaje godzina odczytu, bo mówi, jak świeże są te wiersze. */
   return <KartaWgladu id="karta-integracje" tytul="Stan integracji"

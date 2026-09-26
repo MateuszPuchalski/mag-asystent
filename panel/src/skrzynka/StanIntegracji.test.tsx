@@ -30,7 +30,7 @@ describe("StanIntegracji", () => {
     /* Do 0.152.0 etykieta „Połączenie Allegro" była podpięta pod
        `allegroInbox.status`. Ekran nazywał rzecz, której nie pokazywał —
        i dlatego niesparowane konto wyglądało jak awaria synchronizacji.
-       Od @wydanie wiersza o połączeniu tu nie ma: ten sam fakt niesie karta
+       Od 0.509.0 wiersza o połączeniu tu nie ma: ten sam fakt niesie karta
        „Konto Allegro" tuż obok, a jeden fakt stoi w jednym miejscu. */
     render(<StanIntegracji zdrowie={zdrowie({
       allegro: { stan: "niepolaczone" },

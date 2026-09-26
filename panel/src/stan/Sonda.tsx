@@ -14,7 +14,7 @@ import { KartaZwinieta } from "./KartaZwinieta";
    Trzy stany, nie dwa. „Pominięty” to brak danych albo limit Allegro, czyli
    nie wada drogi — czerwień zapalana przy nim uczyłaby ją ignorować.
 
-   ZWINIĘTA (@wydanie), bo przy zdrowych drogach nikt tu nie zagląda. Krok
+   ZWINIĘTA (0.509.0), bo przy zdrowych drogach nikt tu nie zagląda. Krok
    „nie działa" otwiera ją sam: awaria ma być widać, nie tylko dać się
    znaleźć. Biuro tak samo otwierało kiedyś zwiniętą kartę konta Allegro. */
 

@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.509.0 — 26 września 2026
+
+**Stan systemu: mniej naraz, każdy fakt raz.** Arkusz lokalizacji, rekoncyliacja
+i test na żywym Allegro stoją zwinięte do nagłówka. Otwiera je jedno kliknięcie
+albo link `?karta=` z DO DECYZJI. Krok testu, który nie działa, otwiera kartę sam.
+Tabela integracji nie powtarza już połączenia Allegro ani workera Subiekta. Te
+fakty niosą karty konta Allegro i serwera obok. Karta serwera nie pokazuje pliku
+konfiguracji, bo stoi on w konfiguracji za zębatką. Wynik resyncu mówi zdaniem,
+ile kartotek i dokumentów wczytano. Zniknęły słowa programisty: nazwa trasy,
+„read-model” i „ta sama trasa”. Pochodzenie progu spóźnień przeszło do
+podpowiedzi przy liczbie. „Zadzwoń” przy kolektorze jest przyciskiem drugorzędnym.
+
 ## 0.508.1 — 25 września 2026
 
 **„Nie wiem” automatu wiedzy zostaje w księdze.** Gdy model językowy nie był

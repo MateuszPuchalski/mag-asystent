@@ -21,7 +21,7 @@ import reconcileZrodlo from "../../../server/src/services/reconcile.ts?raw";
    5. Arkusz lokalizacji stoi wyłącznie u administratora.
    6. NOWE: nazwy WSZYSTKICH rodzajów rozjazdu z unii serwera.
    7. NOWE: `?karta=` przewija do karty.
-   8. (@wydanie) Rzadkie karty zwinięte do nagłówka; `?karta=` i błąd testu
+   8. (0.509.0) Rzadkie karty zwinięte do nagłówka; `?karta=` i błąd testu
       na żywo otwierają je same. Każdy fakt stoi w jednym miejscu. */
 
 let wyslane: string[] = [];
@@ -196,7 +196,7 @@ describe("Stan systemu w panelu", () => {
   it("każdy fakt stanu raz: bez pliku konfiguracji, bez połączenia i workera w tabeli integracji", async () => {
     /* Plik konfiguracji mówi karta konfiguracji za zębatką; połączenie —
        karta konta Allegro; worker — karta serwera. Wersja zostaje, bo karta
-       aktualizacji jest wyłącznie adminowa (@wydanie). */
+       aktualizacji jest wyłącznie adminowa (0.509.0). */
     pokaz();
     await screen.findByText("Stan integracji");
     expect(await screen.findByText("wersja serwera")).toBeInTheDocument();

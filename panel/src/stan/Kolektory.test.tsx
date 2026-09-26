@@ -87,7 +87,7 @@ describe("Zgubiony kolektor", () => {
 
   it("Zadzwoń nie jest głównym przyciskiem w każdym wierszu", async () => {
     /* Główny przycisk w każdym wierszu to kilka głównych akcji naraz, a po
-       ten sięga się rzadko — dlatego drugorzędny (@wydanie). */
+       ten sięga się rzadko — dlatego drugorzędny (0.509.0). */
     pokaz();
     await screen.findByText("#A3F9");
     const zadzwon = within(wiersz("#A3F9")).getByRole("button", { name: "Zadzwoń na kolektor #A3F9" });

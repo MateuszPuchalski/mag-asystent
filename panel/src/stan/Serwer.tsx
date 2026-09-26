@@ -13,7 +13,7 @@ import { Potwierdz } from "../ui/Potwierdz";
    produkcji to pełny import z Subiekta; odświeżenie zdjęć nie pyta, bo
    kasuje wyłącznie znaczniki „nie ma zdjęcia" i kolektory zapytają ponownie.
 
-   KAŻDY FAKT RAZ (@wydanie). Plik konfiguracji zszedł stąd, bo stoi
+   KAŻDY FAKT RAZ (0.509.0). Plik konfiguracji zszedł stąd, bo stoi
    w opisie karty „Konfiguracja serwera" za zębatką, a zmienić go może
    tylko admin, który tam właśnie patrzy. Wersja ZOSTAJE, choć mówi ją też
    karta aktualizacji: tamta jest wyłącznie adminowa, a biuro zgłaszające

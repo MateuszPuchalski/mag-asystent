@@ -15,7 +15,7 @@ import { KartaZwinieta } from "./KartaZwinieta";
    `Record<RodzajRozjazdu, …>` każe kompilatorowi upomnieć się o każdy nowy
    rodzaj z unii serwera, a test sprawdza, że unia jest ta sama.
 
-   ZWINIĘTA (@wydanie): sprawdzenie na żądanie, którego wynik zwykle brzmi
+   ZWINIĘTA (0.509.0): sprawdzenie na żądanie, którego wynik zwykle brzmi
    „bez rozjazdów", a nocny przebieg liczy to samo codziennie. */
 
 export const NAZWA_ROZJAZDU: Record<RodzajRozjazdu, string> = {

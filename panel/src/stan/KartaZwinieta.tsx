@@ -2,7 +2,7 @@ import React, { useEffect, useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { Karta } from "../ui";
 
-/* ── Karta stanu zwinięta do nagłówka (@wydanie) ─────────────────────────
+/* ── Karta stanu zwinięta do nagłówka (0.509.0) ─────────────────────────
    Agenci mówili, że aplikacja przytłacza. Na stanie systemu stało dziesięć
    kart naraz, a trzy z nich — test na żywym Allegro, rekoncyliacja i arkusz
    lokalizacji — otwiera się rzadko, na żądanie. Zwinięte zostawiają sam

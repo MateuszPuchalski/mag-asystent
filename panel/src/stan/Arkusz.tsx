@@ -22,7 +22,7 @@ import { Potwierdz } from "../ui/Potwierdz";
    pierwszym kliknięciu. Zaznaczone znaczy „zdejmij", bo arkusz PODMIENIA
    pole; „zostaw" jest wyjątkiem od tej reguły, nie nową regułą.
 
-   ZWINIĘTA (@wydanie): arkusz wgrywa się raz na jakiś czas, a otwarta karta
+   ZWINIĘTA (0.509.0): arkusz wgrywa się raz na jakiś czas, a otwarta karta
    stała z długą instrukcją na drugim miejscu ekranu. Miejsce pod kolejką
    zostaje. Stan wgranego pliku żyje w tym komponencie, nie w ramie, więc
    zwinięcie w połowie przeglądu niczego nie gubi. */

@@ -48,7 +48,7 @@ export function KartaKolektorow() {
           {k.wezwanie
             ? <Przycisk disabled={szukanie.isPending}
                 onClick={() => szukanie.mutate({ deviceId: k.deviceId, ruch: "odwolaj" })}>Przestań</Przycisk>
-            /* Zadzwoń jest DRUGORZĘDNY (@wydanie): główny przycisk w każdym
+            /* Zadzwoń jest DRUGORZĘDNY (0.509.0): główny przycisk w każdym
                wierszu to dziesięć głównych akcji naraz, a po ten sięga się
                raz na tydzień, gdy kolektor zginie. */
             : <Przycisk disabled={szukanie.isPending || !k.zalogowany}
