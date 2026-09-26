@@ -68,7 +68,7 @@ export function Propozycja({ z, trwa, onRozstrzygnij }: {
       {z.pewnosc === "prawdopodobne" && " — sam ślad rozmowy to nie dowód techniczny; dopisz katalog albo pomiar"}
     </p>
 
-    {/* Jedna para decyzji w całym ekranie wiedzy (@wydanie): „Zatwierdź"
+    {/* Jedna para decyzji w całym ekranie wiedzy (0.510.0): „Zatwierdź"
         główny, „Odrzuć" drugi, zdaniem i w domyślnym rozmiarze. Tu stały
         wersaliki z ikonami, obok drobne przyciski — cztery karty tej samej
         decyzji wyglądały jak cztery różne czynności. */}

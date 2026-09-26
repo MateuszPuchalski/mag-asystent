@@ -29,7 +29,7 @@ import { PasowanieZSieci } from "./PasowanieZSieci";
  * Odsyłacze od dostawców stoją tu z tego samego powodu: to trzecie źródło
  * wiedzy z dokumentu, a siódma zakładka połamałaby rząd.
  *
- * NARZĘDZIA POD LISTĄ, ZWINIĘTE (@wydanie). Cztery karty — „Pasuje do"
+ * NARZĘDZIA POD LISTĄ, ZWINIĘTE (0.510.0). Cztery karty — „Pasuje do"
  * z ofert, pasowanie z sieci, odsyłacze i wykaz części — stały NAD listą,
  * dwie z głównym przyciskiem. Agent otwierał zakładkę, żeby przerobić wiersze,
  * a zaczynał od przewijania narzędzi uruchamianych raz na tydzień. Teraz

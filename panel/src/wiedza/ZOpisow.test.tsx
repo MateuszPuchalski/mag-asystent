@@ -70,7 +70,7 @@ describe("sekcje Modele: z opisów", () => {
     expect(odrzuc).toHaveBeenCalledWith({ id: 7 }, expect.anything());
   });
 
-  /* Narzędzia pod listą, zwinięte (@wydanie). Praca stoi na wierzchu, cztery
+  /* Narzędzia pod listą, zwinięte (0.510.0). Praca stoi na wierzchu, cztery
      karty importów i zbiórek jedno kliknięcie niżej. Zwinięte nie montują się,
      więc nie pytają serwera o stany, których nikt nie ogląda. */
   it("praca stoi przed narzędziami, a narzędzia czekają zwinięte o jedno kliknięcie", async () => {

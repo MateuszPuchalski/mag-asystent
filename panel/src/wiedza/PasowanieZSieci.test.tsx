@@ -44,7 +44,7 @@ const pokaz = () => render(
 describe("pasowanie z sieci na żądanie", () => {
   it("otwarcie tylko czyta: stan, limit i ostatnie przebiegi", async () => {
     pokaz();
-    /* Głos agenta, nie księgi (@wydanie): ile jeszcze można, bez „sufitu". */
+    /* Głos agenta, nie księgi (0.510.0): ile jeszcze można, bez „sufitu". */
     const stanKarty = await screen.findByLabelText("Stan pasowania z sieci");
     expect(stanKarty).toHaveTextContent("w limicie zostało 8 z 10");
     expect(stanKarty).not.toHaveTextContent(/sufit|wykorzystane/);

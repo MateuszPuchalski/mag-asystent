@@ -119,7 +119,7 @@ describe("Ekran wiedzy", () => {
   it("pasowania części stoją jako druga sekcja kolejki z własnym licznikiem", async () => {
     PASOWANIA = [pasowanie()];
     pokaz();
-    /* Nagłówek niesie JEDNĄ sumę (@wydanie); licznik rodzaju stoi przy sekcji. */
+    /* Nagłówek niesie JEDNĄ sumę (0.510.0); licznik rodzaju stoi przy sekcji. */
     expect(screen.getByText("1 do rozstrzygnięcia")).toBeInTheDocument();
     /* Pusta lista zastosowań NIE pokazuje „nic nie czeka", bo czeka pasowanie. */
     expect(screen.queryByText(/Nic nie czeka/)).toBeNull();
@@ -160,11 +160,11 @@ describe("Ekran wiedzy", () => {
     /* Jedna liczba pracy: 2 sekcje + 3 kartoteki z tokenem = 5. Oba czekają
        na tego samego człowieka w tym samym widoku. */
     pokaz();
-    /* Liczba przez `ile` zakładki (@wydanie), nie doklejona w nawiasie. */
+    /* Liczba przez `ile` zakładki (0.510.0), nie doklejona w nawiasie. */
     expect(screen.getByRole("button", { name: "Z opisów i ofert 5" })).toBeInTheDocument();
   });
 
-  /* Jedna suma w nagłówku (@wydanie): stały tam cztery liczby, z których trzy
+  /* Jedna suma w nagłówku (0.510.0): stały tam cztery liczby, z których trzy
      powtarzały sekcje i zakładki. Suma bierze każdą decyzję, bo licznik
      samych zastosowań kłamałby przez pominięcie. */
   it("nagłówek niesie jedną sumę decyzji zamiast czterech liczników", () => {

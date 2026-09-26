@@ -89,7 +89,7 @@ export function PasowanieZSieci() {
         żadnego zastosowania. Znaleziska trafiają do kolejki jako propozycje z linkiem — zatwierdzasz Ty.
         Nocą robi to sam; tu możesz uruchomić go od razu.</p>
     </div>
-    {/* „Limit", nie „sufit … wykorzystane" (@wydanie): agent pyta, ile może
+    {/* „Limit", nie „sufit … wykorzystane" (0.510.0): agent pyta, ile może
         jeszcze kliknąć, a nie ile zużyła księga. Skąd limit — w podpowiedzi,
         bo to wiedza na wypadek pytania, nie do czytania co dzień. */}
     {s && <p className="text-sm" aria-label="Stan pasowania z sieci">
@@ -99,7 +99,7 @@ export function PasowanieZSieci() {
     {s?.niegotowy && <p className="rounded-lg bg-slate-50 p-2 text-sm text-slate-700" role="note">{s.niegotowy}</p>}
     <div className="flex flex-wrap items-center gap-2">
       {!trwa
-        /* Drugorzędny (@wydanie): karta stoi pod listą, w zwiniętych
+        /* Drugorzędny (0.510.0): karta stoi pod listą, w zwiniętych
            „Importach i zbiórkach", a główny przycisk tej zakładki to
            „Zaproponuj" przy wierszu. Dwa główne obok siebie nie mówią, od
            czego zacząć. */
@@ -111,7 +111,7 @@ export function PasowanieZSieci() {
     </div>
     {(trwa || sumy.sprawdzono > 0 || sumy.bledow > 0) && <p className="text-sm text-slate-700" aria-label="Wynik pasowania z sieci">
       Sprawdzono {ile(sumy.sprawdzono, "kartotekę", "kartoteki", "kartotek")} · propozycji w kolejce: <b>{sumy.zaproponowano}</b>
-      {/* „Pominięte", nie „odrzuciło sito" (@wydanie) — agent nie zna sita.
+      {/* „Pominięte", nie „odrzuciło sito" (0.510.0) — agent nie zna sita.
           Zna tylko to, że znalezisko bez pokrycia na stronie nie weszło. */}
       {Object.keys(sumy.odrzucono).length > 0 && <span
         title="Znaleziska, których strona nie potwierdziła, nie trafiają do kolejki."> · pominięte jako niepewne: {odrzuty(sumy.odrzucono)}</span>}

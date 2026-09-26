@@ -43,7 +43,7 @@ export function KandydatZamiennosci({ k, trwa, onDecyzja }: {
       </div>
       <Kafel twId={k.b.twId} rozmiar={44} nazwa={k.b.nazwa} symbol={k.b.symbol} />
     </div>
-    {/* Rozmiar domyślny, nie `text-xs` (@wydanie): ta sama para decyzji co
+    {/* Rozmiar domyślny, nie `text-xs` (0.510.0): ta sama para decyzji co
         w karcie `Propozycja`. Słowa zostają własne — „Zamienne" odpowiada
         na pytanie karty wprost, a „Zatwierdź" kazałoby je sobie dopowiedzieć. */}
     <div className="mt-2 flex flex-wrap items-center gap-2">

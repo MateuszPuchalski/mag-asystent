@@ -92,7 +92,7 @@ describe("Silniki", () => {
     }), expect.anything());
   });
 
-  /* Jedna para decyzji na ekranie wiedzy (@wydanie): „Zatwierdź" główny,
+  /* Jedna para decyzji na ekranie wiedzy (0.510.0): „Zatwierdź" główny,
      „Odrzuć" drugi — jak w każdej innej karcie kolejki. */
   it("para decyzji ma ten sam kształt co w kolejce: główne Zatwierdź, drugie Odrzuć", () => {
     dane.mockReturnValue({ data: { propozycje: [para(7, "450E")], doRozstrzygniecia: 1, luki: [], lukiRazem: 0, zatwierdzone: [] },

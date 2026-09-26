@@ -119,7 +119,7 @@ function PropozycjaPary({ z, trwa, onDecyzja }: {
       <span className="ml-auto text-xs text-slate-500">{z.zaproponowal}</span>
     </div>
     <p className="mt-1 text-xs text-slate-600">{NAZWA_DOWODU[z.rodzajDowodu]}: {z.dowodTresc}</p>
-    {/* „Zatwierdź" główny (@wydanie), jak w każdej karcie decyzji ekranu
+    {/* „Zatwierdź" główny (0.510.0), jak w każdej karcie decyzji ekranu
         wiedzy. Stał drugorzędny obok drugorzędnego „Odrzuć" i para nie
         mówiła, która droga jest zwykła. */}
     <div className="mt-2 flex flex-wrap items-center gap-2">

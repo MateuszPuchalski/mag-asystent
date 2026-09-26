@@ -41,7 +41,7 @@ export function PropozycjaPasowania({ p, trwa, onDecyzja }: {
       </div>
       <Kafel twId={p.doCzego.twId} rozmiar={44} nazwa={p.doCzego.nazwa} symbol={p.doCzego.symbol} />
     </div>
-    {/* Rozmiar domyślny, nie `text-xs` (@wydanie): ta sama para decyzji co
+    {/* Rozmiar domyślny, nie `text-xs` (0.510.0): ta sama para decyzji co
         w karcie `Propozycja`, więc ten sam wygląd — patrz komentarz tam. */}
     <div className="mt-2 flex flex-wrap items-center gap-2">
       <Przycisk wariant="glowny" disabled={trwa} onClick={() => onDecyzja("zatwierdz", null)}>Zatwierdź</Przycisk>

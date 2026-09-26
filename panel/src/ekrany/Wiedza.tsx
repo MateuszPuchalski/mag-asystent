@@ -73,7 +73,7 @@ export function Wiedza() {
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
     <Karta className="flex flex-wrap items-center gap-3 p-4">
       <BookMarked size={18} /><b className="text-naglowek mr-auto">Baza wiedzy zastosowań</b>
-      {/* JEDNA suma, nie cztery liczniki (@wydanie). Nagłówek niósł cztery
+      {/* JEDNA suma, nie cztery liczniki (0.510.0). Nagłówek niósł cztery
           liczby, a trzy z nich powtarzały nagłówki sekcji i zakładki niżej.
           Suma bierze wszystkie decyzje, bo licznik samych zastosowań kłamałby
           przez pominięcie: para maszyna–silnik czeka na tego samego człowieka. */}
@@ -89,7 +89,7 @@ export function Wiedza() {
         /* „i ofert" od 0.264.0: ta sama kolejka niesie odtąd pozycje list
            zgodności z naszych ofert Allegro, a etykieta mówiąca tylko o opisach
            kazałaby szukać ich gdzie indziej. */
-        /* Liczba w `ile`, nie doklejona do etykiety (@wydanie): ten sam
+        /* Liczba w `ile`, nie doklejona do etykiety (0.510.0): ten sam
            kształt licznika co w kubełkach zwrotów, a zero mówi „nic tu nie ma"
            bez klikania. Przed odczytem licznika nie ma — zero byłoby kłamstwem. */
         { klucz: "z-opisow", etykieta: "Z opisów i ofert", ile: zOpisow.data ? zOpisowRazem : undefined },
