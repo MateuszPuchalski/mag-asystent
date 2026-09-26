@@ -2164,3 +2164,9 @@ export type WynikPrzebieguSieci = {
   odrzucono: Partial<Record<PowodOdrzuceniaSieci, number>>;
   przerwane: string | null;
 };
+
+/* ── Przegląd listą propozycji z sieci (@wydanie) ─────────────────────────────
+   Kształt z `services/pasowanie-z-sieci.ts` (`przegladZSieci`). Grupa to
+   KARTOTEKA: automat pyta o jedną część naraz. */
+export type PozycjaZSieci = { id: number; maszyna: string; warunki: string | null; cytat: string; link: string | null };
+export type PrzegladZSieci = { twId: number; symbol: string; nazwa: string | null; pozycje: PozycjaZSieci[] };

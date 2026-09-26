@@ -48,7 +48,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia", "pasowanie_siec",
+  for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia", "pasowanie_siec", "zwrot_klienta_pozycja", "zwrot_klienta",
     "copilot_wywolanie", "events"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -126,7 +126,7 @@ function nadawca(znaleziska = [znalezisko(), znalezisko({ model: "MS 260", cytat
   const nadaj: import("./pasowanie-z-sieci.js").NadawcaPasowaniaSieci = async (z) => {
     pytania.push(z);
     return {
-      znaleziska, strony: STRONY, wyszukiwan: 2, model: "claude-opus-5",
+      znaleziska, strony: STRONY, pdfy: [], wyszukiwan: 2, model: "claude-opus-5",
       zuzycie: { wej: 5000, wyj: 400, cacheZapis: 0, cacheOdczyt: 1000, wyszukiwania: 2 }, ms: 30,
     };
   };
@@ -181,4 +181,73 @@ test("limit dostawcy zatrzymuje przebieg i zostawia ślad kosztu", async () => {
   const k = db().prepare("SELECT wynik, tokeny_wej, wyszukiwania FROM copilot_wywolanie").get() as Record<string, unknown>;
   assert.deepEqual({ ...k }, { wynik: "blad", tokeny_wej: 700, wyszukiwania: 1 });
   assert.equal((db().prepare("SELECT count(*) n FROM zastosowanie WHERE tw_id=?").get(GAZNIK) as { n: number }).n, 0);
+});
+
+/* ── Kolejność, PDF i przegląd listą (@wydanie) ──────────────────────────────
+   Właściciel po pierwszym dniu: „zrób 1, 2 i 3 — głównym łącznikiem powinien
+   być numer OEM”. Pilnujemy: najpierw część, przy której klienci się mylą;
+   cytat z PDF-u przechodzi sito jak ze strony; propozycje automatu stoją jedną
+   listą na kartotekę, a zatwierdzenie bierze tylko zaznaczone. */
+
+const ZWRACANY = 804;
+
+function zwrotNiePasuje() {
+  const d = db();
+  d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,?)").run(ZWRACANY, "W47-123", "Pasek napędowy");
+  d.prepare(`INSERT OR IGNORE INTO towar_identyfikator(tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,at)
+    VALUES (?,?,'oem','754-0467','7540467','opis','import','2026-09-01T00:00:00Z')`).run(ZWRACANY, "W47-123");
+  const konto = Number(d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro',?)")
+    .run(`s-${Math.random()}`).lastInsertRowid);
+  const zwrot = Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,created_at,synced_at)
+    VALUES (?,?,?,?)`).run(konto, `z-${Math.random()}`, "2026-09-20T10:00:00Z", "2026-09-20T10:00:00Z").lastInsertRowid);
+  d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id,nazwa,ilosc,cena_grosze,waluta,klucz,powod,powod_komentarz,tw_id)
+    VALUES (?,?,1,4900,'PLN',?,'MISTAKE','nie pasuje do mojej kosiarki',?)`).run(zwrot, "Pasek", `k-${zwrot}`, ZWRACANY);
+}
+
+test("kolejność: najpierw część wracająca jako „nie pasuje”, choć ma wyższy numer kartoteki", () => {
+  zwrotNiePasuje();
+  const k = S.kandydaciDoSieci(10, TERAZ);
+  assert.deepEqual(k.map((x) => x.symbol), ["W47-123", "GAZ-MS250"]);
+  assert.ok(k[0]!.popyt > k[1]!.popyt, "zwrot z powodem pasowania waży więcej niż brak sygnału");
+});
+
+test("cytat z PDF-u przechodzi sito jak ze strony, a nieczytelny PDF odpada bez wywrotki", async () => {
+  const PDF = "https://producent.example.com/ipl-ms250.pdf";
+  const nadaj: import("./pasowanie-z-sieci.js").NadawcaPasowaniaSieci = async () => ({
+    znaleziska: [znalezisko({ url: PDF })], strony: [],
+    pdfy: [{ url: PDF, base64: Buffer.from("PDF-1").toString("base64") },
+      { url: "https://x.example.com/zly.pdf", base64: Buffer.from("zly").toString("base64") }],
+    wyszukiwan: 1, model: "claude-opus-5", zuzycie: { wej: 10, wyj: 1, cacheZapis: 0, cacheOdczyt: 0 }, ms: 1,
+  });
+  const czytajPdf = async (b: Uint8Array) => {
+    if (Buffer.from(b).toString() === "zly") throw new Error("uszkodzony");
+    return TEKST;
+  };
+  /* Jedna kartoteka: druga (z testu kolejności) słusznie odpadłaby na numerze. */
+  const w = await S.szukajPasowaniaWSieci({ nadaj, naNoc: 10, naPrzebieg: 1, teraz: () => TERAZ, czytajPdf });
+  assert.equal(w.zaproponowano, 1, "strona producenta w PDF-ie to nasze najlepsze źródło");
+  assert.deepEqual(w.odrzucono, {});
+});
+
+test("przegląd listą: propozycje automatu po kartotece; zatwierdzenie bierze tylko zaznaczone", async () => {
+  const d = db();
+  const biuro = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES (?,?,'biuro')")
+    .run(`ala-${Math.random()}`, "A. L.").lastInsertRowid);
+  const n = nadawca([znalezisko(), znalezisko({ model: "MS 230", cytat: "Stihl MS 250, MS 230" })]);
+  await S.szukajPasowaniaWSieci({ nadaj: n.nadaj, naNoc: 10, teraz: () => TERAZ });
+  const W = await import("./wiedza.js");
+  const przeglad = S.przegladZSieci(W.kolejkaPropozycji().propozycje);
+  assert.equal(przeglad.length, 1);
+  assert.equal(przeglad[0]!.symbol, "GAZ-MS250");
+  assert.deepEqual(przeglad[0]!.pozycje.map((p) => p.maszyna).sort(), ["Stihl MS 230", "Stihl MS 250"]);
+  assert.ok(przeglad[0]!.pozycje.every((p) => p.link === STRONA && p.cytat.includes("Stihl")));
+
+  const [pierwsza, druga] = przeglad[0]!.pozycje;
+  assert.throws(() => S.zatwierdzZSieci(ZNANY, [pierwsza!.id], biuro), /spoza tej kartoteki/,
+    "id z cudzej kartoteki wywraca całe żądanie");
+  const r = S.zatwierdzZSieci(GAZNIK, [pierwsza!.id], biuro);
+  assert.deepEqual(r, { zatwierdzono: 1, pominieto: 0 });
+  const stan = (id: number) => (d.prepare("SELECT stan FROM zastosowanie WHERE id=?").get(id) as { stan: string }).stan;
+  assert.equal(stan(pierwsza!.id), "zatwierdzone");
+  assert.equal(stan(druga!.id), "propozycja", "niezaznaczone czeka dalej — to nie jest odrzucenie");
 });

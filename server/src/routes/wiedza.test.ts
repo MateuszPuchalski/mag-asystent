@@ -135,6 +135,7 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/wiedza/pasuje-do/zbierz" },
   { method: "GET" as const, url: "/api/obsluga/wiedza/pasowanie-z-sieci" },
   { method: "POST" as const, url: "/api/obsluga/wiedza/pasowanie-z-sieci/sprawdz" },
+  { method: "POST" as const, url: `/api/obsluga/wiedza/pasowanie-z-sieci/${SZR}/zatwierdz`, payload: { ids: [1] } },
 ];
 
 test("bez sesji żadna trasa wiedzy nie odpowiada danymi", async () => {
@@ -152,7 +153,7 @@ test("hala nie widzi wiedzy — także na odczycie", async () => {
   }
 });
 
-test("tras zapisu jest dwadzieścia osiem — licznik jest umową", () => {
+test("tras zapisu jest trzydzieści — licznik jest umową", () => {
   /* Trzy przy zabudowie silnika (0.229.0) i trzy przy pasowaniu części:
      propozycja, rozstrzygnięcie i wycofanie. Każda z tych relacji ma ten sam
      cykl życia co zastosowanie, a bez własnego wycofania zatwierdzona pomyłka
@@ -203,8 +204,12 @@ test("tras zapisu jest dwadzieścia osiem — licznik jest umową", () => {
 
      DWUDZIESTA DZIEWIĄTA (0.508.0): ręczne pasowanie z sieci, jedna kartoteka
      na żądanie. Pisze wyłącznie propozycje do kolejki, nigdy zatwierdzenie,
-     a wydatek ogranicza sufit nocy liczony z tej samej księgi. */
-  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 29);
+     a wydatek ogranicza sufit nocy liczony z tej samej księgi.
+
+     TRZYDZIESTA (@wydanie): zatwierdzenie listą propozycji z sieci dla jednej
+     kartoteki. Kształt i powód jak przy wykazie: trzy kartoteki dały na żywo
+     szesnaście propozycji, a pojedyncze karty to kilka tysięcy kliknięć. */
+  assert.equal(TRASY().filter((t) => t.method !== "GET").length, 30);
 });
 
 test("otwarcie wiedzy niczego nie zapisuje", async () => {
@@ -349,7 +354,8 @@ test("żądanie bez ciała nie wywala się na pustym JSON-ie", async () => {
     `/api/obsluga/wiedza/pasowania/${pasowanie}/wycofaj`, "/api/obsluga/wiedza/pasowania",
     "/api/obsluga/wiedza/zamiennosci-oem/rozstrzygnij", "/api/obsluga/wiedza/zamiennosci-oem/1/wycofaj",
     "/api/obsluga/wiedza/odsylacze", "/api/obsluga/wiedza/odsylacze/1/wycofaj",
-    "/api/obsluga/wiedza/wykazy", "/api/obsluga/wiedza/wykazy/1/wycofaj", "/api/obsluga/wiedza/wykazy/1/zatwierdz"]) {
+    "/api/obsluga/wiedza/wykazy", "/api/obsluga/wiedza/wykazy/1/wycofaj", "/api/obsluga/wiedza/wykazy/1/zatwierdz",
+    `/api/obsluga/wiedza/pasowanie-z-sieci/${SZR}/zatwierdz`]) {
     const r = await app.inject({ method: "POST", url, headers: b.naglowki });
     assert.equal(r.statusCode, 400, url);
     assert.doesNotMatch(r.body, /FST_ERR_CTP_EMPTY_JSON_BODY/, url);

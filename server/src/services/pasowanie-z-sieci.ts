@@ -4,8 +4,12 @@ import { config } from "../config.js";
 import { logEvent } from "./events.js";
 import { zwin } from "../tekst.js";
 import type { Tokeny } from "./copilot-koszt.js";
-import { zaproponujZastosowanie, type RodzajDowodu } from "./wiedza.js";
+import {
+  czlowiekZBiura, rozstrzygnijZastosowanie, WiedzaConflict, wTransakcji, zaproponujZastosowanie,
+  type RodzajDowodu, type Zastosowanie,
+} from "./wiedza.js";
 import { BladKluczaCopilota, BladLimituCopilota, BladPrzeciazeniaCopilota } from "../adapters/copilot.js";
+import { tekstyPdf, type CzytnikPdf } from "./pdf-tekst.js";
 
 /* ── Pasowanie z sieci: nocny automat uzupełnia luki wiedzy (0.507.0) ───────
 
@@ -87,6 +91,8 @@ export interface WynikSieci {
   znaleziska: ZnaleziskoSurowe[];
   /** Strony PRZECZYTANE przez `web_fetch` — tekst do sprawdzenia cytatu. */
   strony: Array<{ url: string; tekst: string }>;
+  /** PDF-y przeczytane przez `web_fetch`, surowe — tekst wyciąga `pdf-tekst.ts` (@wydanie). */
+  pdfy: Array<{ url: string; base64: string }>;
   wyszukiwan: number;
   model: string;
   zuzycie: Tokeny;
@@ -160,7 +166,62 @@ export interface Kandydat {
   symbol: string;
   nazwa: string;
   numery: string[];
+  /** Waga popytu z `POPYT` — do kolejności i do testu, nie na ekran. */
+  popyt: number;
 }
+
+/* ── Kolejność: najpierw to, o co pytają klienci (@wydanie) ──────────────────
+   Do tego wydania kolejność brzmiała „ma ofertę, potem numer kartoteki”.
+   Przy ponad tysiącu kartotek w kolejce i dziesięciu na noc pierwszy miesiąc
+   szedłby na części, o które nikt nie pyta. Teraz waga popytu, WYŁĄCZNIE
+   z naszej bazy:
+   - ×5 zwrot z powodem pasowania. Allegro nie ma kodu „nie pasuje”, więc
+     bierzemy kody, pod którymi taki zwrot przychodzi (MISTAKE — klient
+     zamówił złą część, DIFFERENT, NOT_AS_DESCRIBED, NOT_AS_EXPECTED,
+     TOO_LARGE, TOO_SMALL), albo słowa klienta o pasowaniu i wymiarze.
+     Najdroższy sygnał: towar już pojechał w obie strony.
+   - ×3 dobór w rozmowie wskazał tę kartotekę — ktoś o nią pytał wprost.
+   - ×2 rozmowa pod ofertą tej kartoteki.
+   - ×1 sztuka sprzedana w 90 dni, najwyżej 20 — żeby hit sprzedaży nie
+     przykrył części, przy której klienci się mylą.
+   Kartoteka bez żadnego sygnału dalej wchodzi, tylko na końcu. */
+const OKNO_POPYTU_DNI = 90;
+const POPYT = `WITH oferta_tw AS (
+    SELECT channel_account_id AS konto, offer_id AS oferta, tw_id FROM oferta_kartoteka
+    UNION
+    SELECT s.channel_account_id, s.external_id, t.tw_id
+      FROM offer_snapshot s JOIN sgt_towar t ON t.symbol = s.sku
+     WHERE s.sku IS NOT NULL AND s.sku <> ''
+  ),
+  zwroty AS (
+    SELECT p.tw_id, COUNT(DISTINCT p.zwrot_id) AS n FROM zwrot_klienta_pozycja p
+     WHERE p.tw_id IS NOT NULL
+       AND (p.powod IN ('MISTAKE','DIFFERENT','NOT_AS_DESCRIBED','NOT_AS_EXPECTED','TOO_LARGE','TOO_SMALL')
+            OR lower(COALESCE(p.powod_komentarz, '')) LIKE '%pasuj%'
+            OR lower(COALESCE(p.powod_komentarz, '')) LIKE '%pasow%'
+            OR lower(COALESCE(p.powod_komentarz, '')) LIKE '%wymiar%'
+            OR lower(COALESCE(p.powod_komentarz, '')) LIKE '%rozmiar%')
+     GROUP BY p.tw_id
+  ),
+  dobory AS (
+    SELECT wybrany_tw_id AS tw_id, COUNT(*) AS n FROM dobor_rozmowy
+     WHERE wybrany_tw_id IS NOT NULL GROUP BY wybrany_tw_id
+  ),
+  rozmowy AS (
+    SELECT ot.tw_id, COUNT(DISTINCT m.conversation_id) AS n
+      FROM message m JOIN conversation c ON c.id = m.conversation_id
+      JOIN oferta_tw ot ON ot.konto = c.channel_account_id AND ot.oferta = m.related_object_id
+     WHERE m.related_object_type = 'OFFER'
+     GROUP BY ot.tw_id
+  ),
+  sprzedaz AS (
+    SELECT ot.tw_id, SUM(p.ilosc) AS n
+      FROM zamowienie_klienta_pozycja p
+      JOIN zamowienie_klienta z ON z.id = p.zamowienie_id
+      JOIN oferta_tw ot ON ot.konto = z.channel_account_id AND ot.oferta = p.offer_id
+     WHERE z.kupiono_at >= ? AND COALESCE(z.status, '') <> 'CANCELLED'
+     GROUP BY ot.tw_id
+  )`;
 
 /**
  * Kartoteki do sprawdzenia w sieci. Czysty ODCZYT.
@@ -179,14 +240,23 @@ export function kandydaciDoSieci(
      tygodniu, nie po kwartale. Inaczej jedna zła noc wyłączałaby dziesięć
      kartotek na trzy miesiące. */
   const poBledzie = new Date(teraz.getTime() - PONOWNIE_PO_BLEDZIE_DNI * 86_400_000).toISOString();
-  const wiersze = database.prepare(`SELECT t.tw_id, t.symbol, t.nazwa,
+  const odSprzedazy = new Date(teraz.getTime() - OKNO_POPYTU_DNI * 86_400_000).toISOString();
+  const wiersze = database.prepare(`${POPYT}
+    SELECT t.tw_id, t.symbol, t.nazwa,
         (SELECT group_concat(i.wartosc, char(31)) FROM towar_identyfikator i
-          WHERE i.tw_id=t.tw_id AND i.rodzaj IN ('oem','nr_oryg')) AS numery
-      FROM sgt_towar t WHERE ${WARUNEK_KANDYDATA}
-     ORDER BY EXISTS (SELECT 1 FROM oferta_kartoteka k WHERE k.tw_id=t.tw_id) DESC, t.tw_id
-     LIMIT ?`).all(odKiedy, poBledzie, limit) as Array<{ tw_id: number; symbol: string; nazwa: string; numery: string | null }>;
+          WHERE i.tw_id=t.tw_id AND i.rodzaj IN ('oem','nr_oryg')) AS numery,
+        5 * COALESCE(zw.n, 0) + 3 * COALESCE(d.n, 0) + 2 * COALESCE(r.n, 0) + MIN(COALESCE(s.n, 0), 20) AS popyt
+      FROM sgt_towar t
+      LEFT JOIN zwroty zw ON zw.tw_id = t.tw_id
+      LEFT JOIN dobory d ON d.tw_id = t.tw_id
+      LEFT JOIN rozmowy r ON r.tw_id = t.tw_id
+      LEFT JOIN sprzedaz s ON s.tw_id = t.tw_id
+     WHERE ${WARUNEK_KANDYDATA}
+     ORDER BY popyt DESC, EXISTS (SELECT 1 FROM oferta_kartoteka k WHERE k.tw_id=t.tw_id) DESC, t.tw_id
+     LIMIT ?`).all(odSprzedazy, odKiedy, poBledzie, limit) as
+    Array<{ tw_id: number; symbol: string; nazwa: string; numery: string | null; popyt: number }>;
   return wiersze.map((w) => ({
-    twId: Number(w.tw_id), symbol: w.symbol, nazwa: w.nazwa,
+    twId: Number(w.tw_id), symbol: w.symbol, nazwa: w.nazwa, popyt: Number(w.popyt),
     numery: [...new Set(String(w.numery ?? "").split("\u001f").map((n) => n.trim()).filter(Boolean))].slice(0, 5),
   }));
 }
@@ -217,6 +287,8 @@ export async function szukajPasowaniaWSieci(deps: {
   /** Sufit JEDNEGO przebiegu — ekran woła po jednej kartotece. Brak = do sufitu nocy. */
   naPrzebieg?: number;
   teraz?: () => Date;
+  /** Wstrzykiwany, jak nadawca: test nie parsuje prawdziwych PDF-ów. */
+  czytajPdf?: CzytnikPdf;
   database?: DatabaseSync;
 }): Promise<WynikPrzebiegu> {
   const database = deps.database ?? db();
@@ -244,10 +316,13 @@ export async function szukajPasowaniaWSieci(deps: {
 
     wynik.sprawdzono += 1;
     zapiszKsiege(database, odp, "ok", null, teraz());
+    /* PDF-y dochodzą do sita jako zwykłe strony z tekstem (@wydanie). Tekst
+       wyciąga `pdf-tekst.ts`; PDF bez tekstu odpada razem ze znaleziskami. */
+    const strony = [...odp.strony, ...await tekstyPdf(odp.pdfy ?? [], deps.czytajPdf)];
     const odrzucone: Partial<Record<PowodOdrzucenia, number>> = {};
     let zaproponowano = 0;
     for (const z of odp.znaleziska.slice(0, SUFIT_ZNALEZISK)) {
-      const powod = sprawdzZnalezisko(z, odp.strony, k.numery);
+      const powod = sprawdzZnalezisko(z, strony, k.numery);
       if (powod) {
         odrzucone[powod] = (odrzucone[powod] ?? 0) + 1;
         continue;
@@ -364,4 +439,99 @@ export function stanPasowaniaZSieci(teraz = new Date(), database: DatabaseSync =
     niegotowy: czemuNiegotowy(), naNoc: config.pasowanieZSieci.naNoc,
     sprawdzono: sprawdzonychTejNocy(teraz, database), doSprawdzenia, ostatnie,
   };
+}
+
+/* ── Przegląd listą (@wydanie) ───────────────────────────────────────────────
+   Pierwszy dzień na żywo: trzy kartoteki dały szesnaście propozycji, a w
+   kolejce czeka ponad tysiąc kartotek. Zatwierdzane pojedynczo, z kartą na
+   każdą maszynę, to kilka tysięcy kliknięć.
+
+   Kształt przepisany z wykazów części (`wykaz-czesci.ts`), bo to ta sama
+   robota: jedno źródło, wiele par część → maszyna, człowiek odznacza, co mu
+   nie pasuje, i zatwierdza resztę jednym kliknięciem. Różnica jest jedna:
+   grupa to KARTOTEKA, nie wykaz — bo automat pyta o jedną część naraz,
+   a pytanie przy przeglądzie brzmi „czy ta część pasuje do tych maszyn”.
+
+   Tak samo jak przy wykazach: NIEODZNACZONE NIE JEST ODRZUCONE. Zostaje
+   w kolejce; odrzuca się pojedynczo, z powodem, bo powód uczy automat. */
+
+/** Podpis, pod którym automat składa propozycje (`podpis({ automat: "siec" })`). */
+export const AUTOR_SIECI = "automat (siec)";
+
+export interface PozycjaZSieci {
+  id: number;
+  maszyna: string;
+  warunki: string | null;
+  /** Cytat ze strony razem z nazwą źródła — tak, jak stoi w dowodzie. */
+  cytat: string;
+  link: string | null;
+}
+
+export interface PrzegladZSieci {
+  twId: number;
+  symbol: string;
+  nazwa: string | null;
+  pozycje: PozycjaZSieci[];
+}
+
+/** Propozycje automatu pogrupowane po kartotece. Czysty ODCZYT. */
+export function przegladZSieci(propozycje: Zastosowanie[], database: DatabaseSync = db()): PrzegladZSieci[] {
+  const grupy = new Map<number, PrzegladZSieci>();
+  for (const z of propozycje) {
+    if (z.stan !== "propozycja" || z.zaproponowal !== AUTOR_SIECI || z.importId !== null) continue;
+    let g = grupy.get(z.twId);
+    if (!g) {
+      const t = database.prepare("SELECT nazwa FROM sgt_towar WHERE tw_id=?").get(z.twId) as { nazwa: string } | undefined;
+      g = { twId: z.twId, symbol: z.symbol, nazwa: t?.nazwa ?? null, pozycje: [] };
+      grupy.set(z.twId, g);
+    }
+    const d = z.dowody[0];
+    g.pozycje.push({ id: z.id, maszyna: z.model.etykieta, warunki: z.zdanieWarunkow, cytat: d?.tresc ?? "", link: d?.link ?? null });
+  }
+  /* Najpierw kartoteki z największą liczbą maszyn: jedno kliknięcie tam
+     zdejmuje z kolejki najwięcej pracy. */
+  return [...grupy.values()].sort((a, b) => b.pozycje.length - a.pozycje.length || a.twId - b.twId);
+}
+
+export interface WynikZatwierdzeniaZSieci {
+  zatwierdzono: number;
+  /** Rozstrzygnięte w międzyczasie przez kogoś innego — lista ich nie ruszyła. */
+  pominieto: number;
+}
+
+/**
+ * Zatwierdzenie LISTY propozycji automatu dla jednej kartoteki. Każda idzie
+ * przez `rozstrzygnijZastosowanie`, więc zostawia ten sam ślad co pojedyncze
+ * kliknięcie. Id spoza tej kartoteki albo nie od automatu wywraca całe
+ * żądanie — lista to decyzja o TYM, co człowiek widział na ekranie.
+ */
+export function zatwierdzZSieci(
+  twId: number, ids: unknown, userId: number, database: DatabaseSync = db(),
+): WynikZatwierdzeniaZSieci {
+  const autor = czlowiekZBiura(database, userId);
+  if (!Array.isArray(ids) || ids.length === 0 || !ids.every((i) => Number.isInteger(i))) {
+    throw new Error("Zaznacz co najmniej jedną maszynę z listy");
+  }
+  const lista = [...new Set(ids as number[])];
+  return wTransakcji(database, () => {
+    const swoje = new Map((database.prepare(`SELECT id, stan FROM zastosowanie
+        WHERE tw_id=? AND zaproponowal=? AND import_id IS NULL AND id IN (${lista.map(() => "?").join(",")})`)
+      .all(twId, AUTOR_SIECI, ...lista) as Array<{ id: number; stan: string }>).map((w) => [Number(w.id), w.stan]));
+    const obce = lista.filter((i) => !swoje.has(i));
+    if (obce.length > 0) throw new Error(`Propozycje spoza tej kartoteki albo nie od automatu: ${obce.join(", ")}`);
+    let zatwierdzono = 0;
+    let pominieto = 0;
+    for (const id of lista) {
+      if (swoje.get(id) !== "propozycja") { pominieto += 1; continue; }
+      try {
+        rozstrzygnijZastosowanie(id, "zatwierdz", null, userId, database);
+        zatwierdzono += 1;
+      } catch (e) {
+        if (e instanceof WiedzaConflict) { pominieto += 1; continue; }
+        throw e;
+      }
+    }
+    logEvent("pasowanie_siec_zatwierdzenie", autor, twId, { twId, zatwierdzono, pominieto, ids: lista }, userId, database);
+    return { zatwierdzono, pominieto };
+  });
 }

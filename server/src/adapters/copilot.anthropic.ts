@@ -990,14 +990,17 @@ const WynikSieciZ = z.object({ znaleziska: z.array(ZnaleziskoZ) });
    tylko to, co model ma zrobić. */
 const INSTRUKCJA_SIECI = [
   "Szukasz w sieci, do jakich maszyn ogrodniczych albo silników pasuje część zamienna.",
-  "Dostajesz naszą nazwę części, symbol i numery OEM albo oryginalne producenta.",
+  "Dostajesz numery OEM albo oryginalne producenta i naszą nazwę części.",
   "",
   "JAK SZUKAĆ:",
-  "1. Szukaj po numerach, nie po nazwie. Najlepsze źródła to katalogi i rysunki",
-  "   części producentów, a potem katalogi hurtowni i sklepy z częściami.",
-  "2. Znalezisko wolno oprzeć WYŁĄCZNIE na stronie, którą przeczytałeś narzędziem",
-  "   web_fetch. Sam wynik wyszukiwania nie wystarcza.",
-  "3. Strona musi zawierać jeden z podanych numerów. Strona o części o podobnej",
+  "1. Szukaj WYŁĄCZNIE po numerach. Nazwa mówi tylko, jaka to część, i pomaga",
+  "   odróżnić ją od innej części z tym samym numerem w innym katalogu.",
+  "2. Najlepsze źródła to katalogi i rysunki części producentów, często w PDF;",
+  "   web_fetch czyta PDF i wolno z niego cytować. Potem katalogi hurtowni",
+  "   i sklepy z częściami.",
+  "3. Znalezisko wolno oprzeć WYŁĄCZNIE na stronie albo PDF-ie, który przeczytałeś",
+  "   narzędziem web_fetch. Sam wynik wyszukiwania nie wystarcza.",
+  "4. Strona musi zawierać jeden z podanych numerów. Strona o części o podobnej",
   "   nazwie, ale bez naszego numeru, to inna część.",
   "",
   "CO ODDAĆ w `znaleziska`, po jednym wpisie na maszynę albo silnik:",
@@ -1027,12 +1030,18 @@ export const nadawcaPasowaniaSieciAnthropic: NadawcaPasowaniaSieci =
     const format = zodOutputFormat(WynikSieciZ);
     const zuzycie: Tokeny = { wej: 0, wyj: 0, cacheZapis: 0, cacheOdczyt: 0, wyszukiwania: 0 };
     const strony: WynikSieci["strony"] = [];
+    const pdfy: WynikSieci["pdfy"] = [];
+    /* BEZ NASZEGO SYMBOLU (@wydanie). Właściciel: „głównym łącznikiem
+       powinien być numer OEM, nasze SKU w rodzaju W47-123 nie trafi w nic poza
+       naszą aukcją”. Symbol w pytaniu kusił model do wyszukiwania po nim — a
+       jedyny wynik to nasza oferta Allegro, zablokowana i tak. Zmarnowane
+       wyszukiwanie, płatne od sztuki. Symbol zostaje w `ZapytanieOPasowanie`
+       dla księgi i ekranu, do dostawcy nie idzie. */
     const wiadomosci: Anthropic.MessageParam[] = [{
       role: "user",
       content: [
-        `CZĘŚĆ: ${zapytanie.nazwa}`,
-        `NASZ SYMBOL: ${zapytanie.symbol}`,
-        `NUMERY: ${zapytanie.numery.join("; ")}`,
+        `NUMERY OEM / ORYGINALNE: ${zapytanie.numery.join("; ")}`,
+        `CZĘŚĆ (nasza nazwa): ${zapytanie.nazwa}`,
       ].join("\n"),
     }];
     try {
@@ -1068,12 +1077,15 @@ export const nadawcaPasowaniaSieciAnthropic: NadawcaPasowaniaSieci =
         zuzycie.wyszukiwania! += u?.server_tool_use?.web_search_requests ?? 0;
 
         /* Tekst przeczytanych stron zbieramy ze WSZYSTKICH tur — sito cytatu
-           ma się czym posłużyć także po wznowieniu. PDF-u nie czytamy: cytat
-           z niego nie da się sprawdzić bez parsera, więc taka strona odpada. */
+           ma się czym posłużyć także po wznowieniu. PDF (@wydanie) wraca
+           surowy: tekst wyciąga serwis (`pdf-tekst.ts`), bo to lokalna robota,
+           nie rozmowa z dostawcą, a ten plik ma być tylko tą rozmową. */
         for (const b of odp.content) {
-          if (b.type === "web_fetch_tool_result" && b.content.type === "web_fetch_result"
-            && b.content.content.source.type === "text") {
-            strony.push({ url: b.content.url, tekst: b.content.content.source.data });
+          if (b.type !== "web_fetch_tool_result" || b.content.type !== "web_fetch_result") continue;
+          const zrodlo = b.content.content.source;
+          if (zrodlo.type === "text") strony.push({ url: b.content.url, tekst: zrodlo.data });
+          else if (zrodlo.type === "base64" && zrodlo.media_type === "application/pdf") {
+            pdfy.push({ url: b.content.url, base64: zrodlo.data });
           }
         }
 
@@ -1092,7 +1104,7 @@ export const nadawcaPasowaniaSieciAnthropic: NadawcaPasowaniaSieci =
         }
         const w = format.parse(ostatniTekst.text);
         return {
-          znaleziska: w.znaleziska, strony,
+          znaleziska: w.znaleziska, strony, pdfy,
           wyszukiwan: zuzycie.wyszukiwania ?? 0,
           model: odp.model ?? model, zuzycie, ms: Date.now() - start,
         };

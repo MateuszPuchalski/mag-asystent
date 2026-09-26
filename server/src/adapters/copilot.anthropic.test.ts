@@ -329,6 +329,10 @@ test("pasowanie z sieci: Allegro zablokowane w wyszukiwarce i w pobieraniu, stro
         url: "https://czesci.example.com/a", retrieved_at: null,
         content: { type: "document", title: null, citations: null,
           source: { type: "text", media_type: "text/plain", data: "Nr 1123 120 0650. Stihl MS 250" } } } },
+      { type: "web_fetch_tool_result", tool_use_id: "s2", content: { type: "web_fetch_result",
+        url: "https://producent.example.com/ipl.pdf", retrieved_at: null,
+        content: { type: "document", title: null, citations: null,
+          source: { type: "base64", media_type: "application/pdf", data: "JVBERi0=" } } } },
     ] }),
     () => ({ stop_reason: "end_turn", model: "m", usage: uzycie(1), content: [{ type: "text", text: wynik }] }),
   ]);
@@ -338,13 +342,18 @@ test("pasowanie z sieci: Allegro zablokowane w wyszukiwarce i w pobieraniu, stro
       assert.ok(t.blocked_domains?.includes("allegro.pl"), `${t.name} bez blokady Allegro`);
     }
     assert.deepEqual(o.strony, [{ url: "https://czesci.example.com/a", tekst: "Nr 1123 120 0650. Stihl MS 250" }]);
+    assert.deepEqual(o.pdfy, [{ url: "https://producent.example.com/ipl.pdf", base64: "JVBERi0=" }],
+      "PDF wraca surowy — tekst wyciąga serwis, nie adapter");
     assert.equal(o.znaleziska.length, 1);
     assert.equal(o.wyszukiwan, 3, "wyszukiwania z obu tur — płatne od sztuki");
     assert.equal(zadania.length, 2);
     const druga = zadania[1]!.messages as Array<{ role: string }>;
     assert.deepEqual(druga.map((m) => m.role), ["user", "assistant"], "wznowienie bez nowej wiadomości");
     const tresc = String((zadania[0]!.messages as Array<{ content: string }>)[0]!.content);
-    assert.ok(tresc.includes("1123 120 0650") && tresc.includes("GAZ-1"));
+    assert.ok(tresc.includes("1123 120 0650"), "numer OEM to klucz wyszukiwania");
+    /* Właściciel (@wydanie): nasz symbol trafia najwyżej w naszą aukcję, więc
+       nie idzie do dostawcy wcale — inaczej model wydaje na nim wyszukiwania. */
+    assert.ok(!tresc.includes("GAZ-1"), "nasz symbol nie idzie do dostawcy");
   } finally {
     _ustawKlienta(null);
   }

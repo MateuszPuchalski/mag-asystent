@@ -27,14 +27,16 @@ import {
   historiaWykazow, importujWykaz, przegladWykazow, wycofajWykaz, zatwierdzZWykazu, type ZadanieWykazu,
 } from "../services/wykaz-czesci.js";
 import { spiszOferty, sprawdzOferty, stanPasujeDo, zbierzPartie } from "../services/pasuje-do-ofert.js";
-import { czemuNiegotowy, stanPasowaniaZSieci, szukajPasowaniaWSieci } from "../services/pasowanie-z-sieci.js";
+import {
+  czemuNiegotowy, przegladZSieci, stanPasowaniaZSieci, szukajPasowaniaWSieci, zatwierdzZSieci,
+} from "../services/pasowanie-z-sieci.js";
 import { nadawcaPasowaniaSieciAnthropic } from "../adapters/copilot.anthropic.js";
 import { config } from "../config.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
 import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
-   DWADZIEŚCIA DZIEWIĘĆ ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
+   TRZYDZIEŚCI ZAPISÓW: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
    przerobienie i odrzucenie sekcji „Modele:" z opisu, ręczny identyfikator
    (E3), trzy przy zabudowie silnika (0.229.0), trzy przy pasowaniu części:
    propozycja, rozstrzygnięcie i wycofanie, dwa przy słowniku silników
@@ -63,6 +65,8 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    wyłącznie u nas — publikacji do Allegro nie ma, decyzją właściciela.
    Dwudziesty dziewiąty (0.508.0) to ręczne pasowanie z sieci, po jednej
    kartotece: składa wyłącznie propozycje i nie woła Allegro.
+   Trzydziesty (@wydanie) to zatwierdzenie listą propozycji z sieci dla jednej
+   kartoteki — ten sam kształt co zatwierdzenie wykazu.
    Każdy zapis idzie przez serwis, który sprawdza konto biura PRZED zapisem
    — trasa nie ma własnej listy ról poza bramką odczytu.
 
@@ -101,7 +105,9 @@ export async function wiedzaRoutes(app: FastifyInstance) {
     /* Propozycje z wykazów części jadą DWA razy: w `propozycje` (licznik mówi
        prawdę o całej pracy) i pogrupowane w `wykazy` do przeglądu listą.
        Ekran pokazuje każdą raz — pojedyncze karty bez tych z przeglądu. */
-    return { ...kolejka, wykazy: przegladWykazow(kolejka.propozycje),
+    /* Propozycje automatu z sieci (@wydanie) jadą tak samo DWA razy: w
+       `propozycje` i pogrupowane po kartotece w `zSieci` do przeglądu listą. */
+    return { ...kolejka, wykazy: przegladWykazow(kolejka.propozycje), zSieci: przegladZSieci(kolejka.propozycje),
       pasowania: pasowania.propozycje, pasowanDoRozstrzygniecia: pasowania.liczba,
       zamiennosciOem: zamiennosci.kandydaci, zamiennosciOemDoRozstrzygniecia: zamiennosci.liczba };
   });
@@ -446,6 +452,16 @@ export async function wiedzaRoutes(app: FastifyInstance) {
       return { wynik, stan: stanPasowaniaZSieci() };
     } catch (e) { return blad(reply, e); }
   });
+
+  /* Zatwierdzenie listą propozycji automatu dla jednej kartoteki (@wydanie).
+     Ten sam kształt co `wykazy/:id/zatwierdz`: ciało to identyfikatory, które
+     człowiek zostawił zaznaczone; reszta czeka dalej. */
+  app.post<{ Params: { twId: string }; Body: { ids?: unknown } }>(
+    "/api/obsluga/wiedza/pasowanie-z-sieci/:twId/zatwierdz", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      try { return zatwierdzZSieci(Number(req.params.twId), req.body?.ids, ja().userId); }
+      catch (e) { return blad(reply, e); }
+    });
 
   /* Ręczny identyfikator z katalogu, którego nie ma w opisie. Duplikat → 409. */
   app.post<{ Body: { twId?: number; rodzaj?: string; wartosc?: string } }>(

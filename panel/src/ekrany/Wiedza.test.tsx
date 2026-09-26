@@ -44,7 +44,9 @@ let PASOWANIA: Pasowanie[] = [];
 let ZAMIENNOSCI: KandydatZamiennosci[] = [];
 let WIEDZA: unknown = undefined;
 let WYKAZY: import("../api/typy").PrzegladWykazu[] = [];
+let Z_SIECI: import("../api/typy").PrzegladZSieci[] = [];
 const zatwierdzZWykazu = vi.fn();
+const zatwierdzZSieci = vi.fn();
 const rozstrzygnijZamiennosc = vi.fn();
 const wycofajZamiennosc = vi.fn();
 const rozstrzygnij = vi.fn();
@@ -57,9 +59,10 @@ vi.mock("../api/wiedza", async () => {
     ...rzeczywisty,
     useKolejkaWiedzy: () => ({ data: { propozycje: LISTA, liczba: LISTA.length,
       pasowania: PASOWANIA, pasowanDoRozstrzygniecia: PASOWANIA.length,
-      zamiennosciOem: ZAMIENNOSCI, zamiennosciOemDoRozstrzygniecia: ZAMIENNOSCI.length, wykazy: WYKAZY },
+      zamiennosciOem: ZAMIENNOSCI, zamiennosciOemDoRozstrzygniecia: ZAMIENNOSCI.length, wykazy: WYKAZY, zSieci: Z_SIECI },
     isLoading: false, error: null }),
     useZatwierdzZWykazu: () => ({ mutate: zatwierdzZWykazu, isPending: false }),
+    useZatwierdzZSieci: () => ({ mutate: zatwierdzZSieci, isPending: false }),
     useRozstrzygnijZamiennosc: () => ({ mutate: rozstrzygnijZamiennosc, isPending: false }),
     useWycofajZamiennosc: () => ({ mutate: wycofajZamiennosc, isPending: false, error: null }),
     useRozstrzygnijZastosowanie: () => ({ mutate: rozstrzygnij, isPending: false }),
@@ -109,7 +112,8 @@ const pokaz = () => render(
 beforeEach(() => {
   rozstrzygnij.mockReset(); rozstrzygnijPasowanie.mockReset(); zaproponuj.mockReset();
   rozstrzygnijZamiennosc.mockReset(); wycofajZamiennosc.mockReset(); zatwierdzZWykazu.mockReset();
-  LISTA = []; PASOWANIA = []; ZAMIENNOSCI = []; WIEDZA = undefined; WYKAZY = [];
+  zatwierdzZSieci.mockReset();
+  LISTA = []; PASOWANIA = []; ZAMIENNOSCI = []; WIEDZA = undefined; WYKAZY = []; Z_SIECI = [];
 });
 
 describe("Ekran wiedzy", () => {
@@ -277,6 +281,26 @@ describe("Ekran wiedzy", () => {
     expect(lista).toHaveTextContent("1 odznaczona zostanie w kolejce");
     await userEvent.click(within(lista).getByRole("button", { name: /Zatwierdź zaznaczone \(1\)/ }));
     expect(zatwierdzZWykazu).toHaveBeenCalledWith({ importId: 4, ids: [21] }, expect.anything());
+  });
+
+  /* Przegląd z sieci (@wydanie): ta sama umowa co wykaz, grupa to kartoteka. */
+  it("propozycje z sieci stoją jedną listą na kartotekę, z linkiem do źródła; zatwierdzenie bierze zaznaczone", async () => {
+    LISTA = [propozycja({ id: 31, symbol: "09-05001" }), propozycja({ id: 32, symbol: "09-05001" }), propozycja({ id: 3 })];
+    Z_SIECI = [{ twId: 91, symbol: "09-05001", nazwa: "Gaźnik", pozycje: [
+      { id: 31, maszyna: "Stihl MS 250", warunki: null, cytat: "„Pasuje do: Stihl MS 250” — katalog dostawcy czesci.example.com",
+        link: "https://czesci.example.com/a" },
+      { id: 32, maszyna: "Stihl MS 230", warunki: "roczniki 2004–2010", cytat: "„MS 230” — katalog dostawcy czesci.example.com",
+        link: "https://czesci.example.com/a" }] }];
+    pokaz();
+    const lista = screen.getByRole("region", { name: "Z sieci: 09-05001" });
+    expect(lista).toHaveTextContent("2 maszyny czekają");
+    expect(within(lista).getAllByRole("link", { name: /źródło/ })[0]).toHaveAttribute("href", "https://czesci.example.com/a");
+    expect(screen.queryByRole("article", { name: /Propozycja: 09-05001/ })).toBeNull();
+    expect(screen.getByRole("article", { name: /Propozycja: SZR-148\/82/ })).toBeInTheDocument();
+
+    await userEvent.click(within(lista).getByRole("checkbox", { name: "Zatwierdź: 09-05001 → Stihl MS 230" }));
+    await userEvent.click(within(lista).getByRole("button", { name: /Zatwierdź zaznaczone \(1\)/ }));
+    expect(zatwierdzZSieci).toHaveBeenCalledWith({ twId: 91, ids: [31] }, expect.anything());
   });
 
   it("odrzucenie wiersza z wykazu wymaga powodu i idzie zwykłą decyzją o propozycji", async () => {
