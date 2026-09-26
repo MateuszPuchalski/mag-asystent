@@ -606,7 +606,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
      dziesięciu sekund mieszka w przeglądarce, więc serwer inaczej by o tym
      nie wiedział. Powód i granice przy `services/tarcie.ts`.
 
-     `msOdKolejki` (@wydanie) jest opcjonalne i NIEZAUFANE: liczba spoza
+     `msOdKolejki` (0.532.0) jest opcjonalne i NIEZAUFANE: liczba spoza
      0–60 s odpada po cichu, a cofnięcie i tak się liczy. Pomiar nie ma
      prawa odrzucić wpisu, który mówi o decyzji agenta już podjętej. */
   app.post<{ Params: { id: string }; Body: { msOdKolejki?: number } }>(
@@ -620,7 +620,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       return { ok: true };
     });
 
-  /* Pominięcie rozmowy (26 września 2026, @wydanie) — sam licznik doby
+  /* Pominięcie rozmowy (26 września 2026, 0.532.0) — sam licznik doby
      i klasy, bez autora i bez numeru rozmowy. Ta sama bramka co reszta
      skrzynki: licznik pisze tylko ten, kto rozmowy w ogóle widzi.
 

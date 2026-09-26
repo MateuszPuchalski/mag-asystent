@@ -3269,7 +3269,7 @@ CREATE TABLE IF NOT EXISTS pasowanie_siec_silnik (
 );
 CREATE INDEX IF NOT EXISTS ix_pasowanie_siec_silnik ON pasowanie_siec_silnik(klucz, at);
 
--- Pominięcia w skrzynce (26 września 2026, @wydanie). Rozmowa otwarta
+-- Pominięcia w skrzynce (26 września 2026, 0.532.0). Rozmowa otwarta
 -- i zostawiona bez wysyłki, zakończenia, odłożenia i notatki. Tylko
 -- LICZNIK doby lokalnej i klasy: bez autora, bez rozmowy, bez godziny.
 -- Każda z tych trzech kolumn odtworzyłaby, KTO odpuścił, a to monitoring

@@ -581,7 +581,7 @@ test("pomiar rozbija księgę po zadaniu i liczy odrzucenia, nie wstawienia", as
 });
 
 test("pomiar podaje czas czekania na model: mediana i p90 po zadaniu, błąd bez czasu odpada", () => {
-  /* @wydanie. Księga zapisywała `ms` od początku, a nikt go nie czytał. */
+  /* 0.532.0. Księga zapisywała `ms` od początku, a nikt go nie czytał. */
   db().prepare("DELETE FROM copilot_wywolanie").run();
   const wpisz = db().prepare(`INSERT INTO copilot_wywolanie(zadanie,model,ms,wynik) VALUES (?,'m',?,?)`);
   for (const ms of [1_000, 2_000, 3_000, 4_000, 5_000, 6_000, 7_000, 8_000, 9_000, 30_000]) wpisz.run("szkic", ms, "ok");

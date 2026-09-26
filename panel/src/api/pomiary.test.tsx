@@ -1,7 +1,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 
-/* ── Zgłoszenia pomiarów ze skrzynki (26 września 2026, @wydanie) ────────────
+/* ── Zgłoszenia pomiarów ze skrzynki (26 września 2026, 0.532.0) ────────────
    Dwa wywołania, które okablowuje ekran Skrzynki, a które mieszkają tutaj.
    Pilnujemy trzech rzeczy: samo użycie haka niczego nie wysyła (zero zapisu
    przy patrzeniu), pominięcie przeżywa zamknięcie karty (`keepalive`), a

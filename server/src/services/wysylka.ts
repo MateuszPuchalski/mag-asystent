@@ -114,7 +114,7 @@ export const LIMIT_ZNAKOW = 2000;
  *
  * To pomiar, nie bramka: los nie blokuje wysyłki i nie zmienia jej wyniku.
  *
- * TWIERDZENIA DO SPRAWDZENIA ZAMRAŻANE PRZY WYSYŁCE (@wydanie). Pytanie
+ * TWIERDZENIA DO SPRAWDZENIA ZAMRAŻANE PRZY WYSYŁCE (0.532.0). Pytanie
  * właściciela: czy tarcie „Wyślij bez zmian" (0.500.0) działa. Tarcie stoi
  * tylko przy szkicu z twierdzeniami spoza faktów, a `szkic_copilota` ma
  * jeden wiersz na rozmowę i następny szkic go nadpisuje. Po fakcie nie

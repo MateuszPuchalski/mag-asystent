@@ -61,7 +61,7 @@ export function TarcieSkrzynki({ dni }: { dni: number }) {
       </Tabela>
     </KartaWgladu>}
     {/* Pod tarciem i jego rozbiciem na osoby, bo liczy z tego samego odczytu
-        (@wydanie): tam „ile", tu „co z tego wynika dla decyzji właściciela".
+        (0.532.0): tam „ile", tu „co z tego wynika dla decyzji właściciela".
         Rozbicie zostaje przy liczbach, które rozbija. Drugi fetch po te same
         wiersze byłby kosztem za nic. */}
     <PomiaryDecyzji t={t.data} />

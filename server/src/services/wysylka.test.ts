@@ -554,7 +554,7 @@ test("szkic ułożony na STARSZE pytanie nie liczy się do losu", async () => {
   assert.equal(los(d), null);
 });
 
-/* Twierdzenia do sprawdzenia zamrożone przy wysyłce (@wydanie). Szkic ma
+/* Twierdzenia do sprawdzenia zamrożone przy wysyłce (0.532.0). Szkic ma
    jeden wiersz na rozmowę i następny go nadpisze, więc pytanie „czy tarcie
    działa" ma odpowiedź tylko wtedy, gdy liczba jedzie w zdarzeniu. Reguła
    ta sama co w panelu: źródło inne niż „fakty". */

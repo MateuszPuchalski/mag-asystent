@@ -710,7 +710,7 @@ Raport **nie niesie ludzi**. Zapisany co tydzień i czytany przez biuro byłby
 trwałą kopią monitoringu pracowniczego, który od 0.431.0 widzi tylko admin,
 na żywo. Ekran: Analiza → Tydzień, tylko odczyt.
 
-### Pominięcia w skrzynce (@wydanie)
+### Pominięcia w skrzynce (0.532.0)
 
 `pominiecia_dzien` to nowa miara zapisana w bazie: ile rozmów otwarto
 i zostawiono bez ruchu, na dobę i kategorię. Nie ma w niej autora, rozmowy

@@ -668,7 +668,7 @@ export interface PomiarCopilota {
    */
   wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number;
     /**
-     * Czas czekania na model w ms (@wydanie): mediana i 90. percentyl.
+     * Czas czekania na model w ms (0.532.0): mediana i 90. percentyl.
      * `null`, gdy żadne wywołanie nie ma zmierzonego czasu.
      */
     medianaMs: number | null; p90Ms: number | null }>;
@@ -754,7 +754,7 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
       return acc;
     }, [] as PomiarCopilota["wgZadania"]);
 
-  /* ── Czas czekania na Copilota (26 września 2026, @wydanie) ──────────────
+  /* ── Czas czekania na Copilota (26 września 2026, 0.532.0) ──────────────
      Księga zapisywała `ms` od początku, a nikt go nie czytał. Agent czeka
      na szkic przy otwartej rozmowie, więc to jest koszt w sekundach obok
      kosztu w złotych. Mediana mówi o typowym czekaniu, p90 o tym, które

@@ -5,7 +5,7 @@ import { PasekUdzialu } from "../ui/wykres";
 import { czas, ile, odmien } from "../ui";
 import { NAZWA_KATEGORII } from "../skrzynka/statusy";
 
-/* ── Pomiary pod decyzje (26 września 2026, @wydanie) ────────────────────
+/* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ────────────────────
    Właściciel chce rozstrzygać politykę skrzynki danymi, nie przekonaniem.
    Każda sekcja nosi nazwę DECYZJI, której służy, bo liczba bez pytania
    czyta się jak ocena ludzi. Na wierzchu jedno zdanie na decyzję,

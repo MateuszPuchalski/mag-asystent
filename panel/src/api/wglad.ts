@@ -187,7 +187,7 @@ export interface LiczbyTarcia {
   probekCzasu: number;
 }
 
-/* ── Pomiary pod decyzje (26 września 2026, @wydanie) ──────────────────────
+/* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ──────────────────────
    Cztery odpowiedzi na cztery pytania właściciela o politykę skrzynki. Żadna
    nie idzie na osobę, więc czyta je całe biuro. Powód każdej przy
    `services/tarcie.ts` na serwerze. */
@@ -250,7 +250,7 @@ export function useTarcie(dni: number, wlaczona: boolean) {
 }
 
 /**
- * Pominięcie rozmowy (@wydanie) — licznik doby i klasy, bez człowieka.
+ * Pominięcie rozmowy (0.532.0) — licznik doby i klasy, bez człowieka.
  *
  * KIEDY WOŁAĆ: agent WYCHODZI z rozmowy, którą otworzył, a przez cały pobyt
  * nie wysłał odpowiedzi, nie zakończył, nie odłożył i nie dopisał notatki.

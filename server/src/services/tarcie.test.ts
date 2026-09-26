@@ -81,7 +81,7 @@ test("czas z przeglądarki: ujemny, nieliczbowy i dłuższy niż dzień pracy od
   for (const zly of [-1, Infinity, NaN, "100", null, 9 * 3_600_000]) assert.equal(czasDoWysylki(zly), null);
 });
 
-/* ── Pomiary pod decyzje (26 września 2026, @wydanie) ───────────────────────
+/* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ───────────────────────
    Każda z czterech liczb ma tu swój test: rozkład cofnięć z odczytem, tarcie
    wg twierdzeń do sprawdzenia, gotowość per klasa z dniami i przedziałem,
    pominięcia bez człowieka. Ostatni test pilnuje prywatności, nie liczby. */

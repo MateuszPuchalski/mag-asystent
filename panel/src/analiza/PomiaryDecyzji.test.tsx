@@ -4,7 +4,7 @@ import { render, screen, within } from "@testing-library/react";
 import { PomiaryDecyzji } from "./PomiaryDecyzji";
 import type { PomiarTarcia } from "../api/wglad";
 
-/* ── Pomiary pod decyzje (26 września 2026, @wydanie) ───────────────────────
+/* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ───────────────────────
    Cztery sekcje, każda nazwana decyzją, której służy. Na wierzchu jedno
    zdanie, szczegóły zwinięte (§26e). Pusty stan mówi zdaniem, nie zerem,
    które udawałoby pomiar. Zero zapisu przy otwarciu pilnuje test ekranu

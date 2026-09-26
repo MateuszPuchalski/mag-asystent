@@ -105,7 +105,7 @@ beforeEach(() => {
     if (url.startsWith("/api/analiza/tarcie?days=")) return new Response(JSON.stringify({
       dni: 30, osoby: null, razem: { wyslanych: 40, zeSzkicem: 20, bezZmian: 9, udzialBezZmian: 0.45,
         cofnietychWysylek: 3, cofnietychZakonczen: 1, medianaSekDoWysylki: 95, probekCzasu: 38 },
-      /* Pomiary pod decyzje (@wydanie) — kształt minimalny, treść ma własny
+      /* Pomiary pod decyzje (0.532.0) — kształt minimalny, treść ma własny
          test przy `analiza/PomiaryDecyzji.tsx`; tu liczy się skład ekranu. */
       oknoCofniecia: { odlozonych: 43, cofnietych: 3, udzial: 0.07, poOknie: 0, bezCzasu: 0,
         kubelki: [{ odSek: 0, doSek: 2, ile: 3 }, { odSek: 2, doSek: 4, ile: 0 }, { odSek: 4, doSek: 6, ile: 0 },
@@ -273,7 +273,7 @@ describe("zakres Obsługa klienta", () => {
     expect(screen.getByText("45%")).toBeInTheDocument();
     expect(screen.getByText(/cofniętych wysyłek z 40/)).toBeInTheDocument();
     expect(screen.queryByText("Tarcie według osoby")).toBeNull();
-    /* Pomiary pod decyzje (@wydanie) z tego samego odczytu — bez drugiego
+    /* Pomiary pod decyzje (0.532.0) z tego samego odczytu — bez drugiego
        żądania i bez zapisu przy otwarciu. */
     expect(screen.getByText("Pomiary pod decyzje")).toBeInTheDocument();
     expect(screen.getByRole("region", { name: "Okno cofnięcia" })).toBeInTheDocument();
