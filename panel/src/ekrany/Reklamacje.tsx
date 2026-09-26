@@ -422,8 +422,15 @@ export function Reklamacje() {
       if (e.ctrlKey || e.altKey || e.metaKey || wPolu(e.target)) return;
       if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idz(1); }
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
-      else if (/^[1-3]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);
-      else if (e.key === "4") przelacz(null);
+      /* Cyfry liczą się z długości `KUBELKI` (@wydanie), jak podpowiedzi przy
+         kubełkach. Stało tu na sztywno 1–3 i „4 = Wszystkie", a kubełki są
+         cztery: „Bez ruchu" nie miał klawisza, choć podpowiedź obiecywała 4,
+         a „Wszystkie" 5. Dopisanie kubełka nie może znów rozjechać klawiszy. */
+      else if (/^[1-9]$/.test(e.key)) {
+        const n = Number(e.key);
+        if (n <= KUBELKI.length) przelacz(KUBELKI[n - 1].id);
+        else if (n === KUBELKI.length + 1) przelacz(null);
+      }
       /* `m` jak „moje" — sito ma być jednym ruchem, bo o to właściciel
          prosił. Litera, nie cyfra: cyfry należą do kubełków i piąta z nich
          obiecywałaby piąty kubełek. */
