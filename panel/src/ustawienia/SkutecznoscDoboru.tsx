@@ -1,5 +1,5 @@
 import React from "react";
-import { Karta } from "../ui";
+import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 import type { SkutecznoscDoboru as Raport } from "../api/typy";
 import { Liczba } from "./PokrycieSygnatur";
 import { NAZWA_DROGI } from "../skrzynka/statusy";
@@ -22,8 +22,8 @@ import { NAZWA_DROGI } from "../skrzynka/statusy";
 
    TRZECI: granica historii jest WYPISANA. Retencja kasuje rozmowy sprzed
    `ALLEGRO_INBOX_OD`, więc selektor „90 dni" potrafi obiecywać kwartał,
-   którego w bazie nie ma. Zdanie o tym stoi pod selektorem, a nie w niczyjej
-   pamięci.
+   którego w bazie nie ma. Zdanie o tym stoi pod selektorem okna zakresu,
+   a nie w niczyjej pamięci.
 
    OŚ OSOBOWA I KODEKS PRACY. Tabela osób to monitoring pracowniczy
    (art. 22²). Podstawa prawna jedzie z serwera i jest wypisana POD tabelą,
@@ -32,97 +32,76 @@ import { NAZWA_DROGI } from "../skrzynka/statusy";
    najlepszego do najgorszego: „najczęstsza droga" mówi, JAK ktoś pracuje,
    czyli komu warto pokazać bazę wiedzy.                                     */
 
-const OKNA = [7, 30, 90];
+/* SELEKTOR OKNA ZESZEDŁ (@wydanie). Od 0.444.0 był opcjonalny, a jedyny
+   odbiorca — analiza — go nie podawał: karta stoi pod nagłówkiem z oknem
+   7/30/90 dla całego zakresu. Z tego samego powodu zeszło „okno N dni"
+   w nagłówku karty — ten sam fakt drugi raz, dwa wiersze niżej.
 
-/* SELEKTOR OKNA JEST OPCJONALNY od 0.444.0. W analizie karta stoi pod
-   nagłówkiem, który ma już okno 7/30/90 dla całego zakresu „Obsługa
-   klienta" — drugi selektor obok pierwszego to dwie decyzje o tym samym
-   (dekalog pkt 5). Bez `onDni` karta pokazuje okno, które dostała. */
-export function SkutecznoscDoboru({ dane, dni, onDni }: {
-  dane: Raport | undefined; dni: number; onDni?: (d: number) => void;
-}) {
+   RAMA I TABELE WSPÓLNE z resztą analizy (@wydanie), a tabela osób zwinięta
+   pod „Szczegóły": czyta się ją rzadko, a otwarta była połową karty.
+   Podstawa prawna jedzie z nią — stoi POD tabelą, tam gdzie monitoring. */
+export function SkutecznoscDoboru({ dane }: { dane: Raport | undefined }) {
   if (!dane) return null;
   const zeroDrog = dane.drogi.filter((d) => d.wybranych === 0);
-  return <Karta className="overflow-hidden">
-    <header className="flex flex-wrap items-baseline gap-2 border-b p-4">
-      <b className="text-naglowek mr-auto">Skuteczność doboru — którędy przychodzi odpowiedź</b>
-      {onDni ? <div className="flex gap-1" role="group" aria-label="Okno raportu">
-        {OKNA.map((d) => <button key={d} type="button" onClick={() => onDni(d)}
-          aria-pressed={d === dni}
-          className={`rounded px-2 py-0.5 text-xs ${d === dni
-            ? "bg-slate-200 font-semibold text-slate-900" : "text-slate-500 hover:text-slate-800"}`}>
-          {d} dni</button>)}
-      </div> : <span className="text-sm text-slate-600">okno {dni} dni</span>}
-    </header>
-
-    <div className="flex flex-wrap gap-8 p-4">
+  return <KartaWgladu tytul="Skuteczność doboru — którędy przychodzi odpowiedź">
+    <div className="flex flex-wrap gap-8">
       <Liczba etykieta="wyborów kandydata" ile={dane.wyborow} />
       <Liczba etykieta="doborów na stole" ile={dane.naStole.doborow} />
       <Liczba etykieta="bez konta autora" ile={dane.bezKonta}
         ton={dane.bezKonta > 0 ? "text-ranga-uwaga" : ""} />
     </div>
 
-    <p className="border-t p-4 text-sm text-slate-600">
+    <p className="mt-4 border-t pt-4 text-sm text-slate-600">
       Mediana od pytania klienta do wyboru: <b>{dane.medianaDoWyboruMin === null
         ? "—" : `${dane.medianaDoWyboruMin} min`}</b> z {dane.wyborowZCzasem} wyborów.
       {dane.granicaHistorii && <> Rozmów sprzed <b>{dane.granicaHistorii.slice(0, 10)}</b>
         {" "}w bazie nie ma, więc dłuższe okno nie doda historii.</>}
     </p>
 
-    <div className="border-t p-4">
-      <table className="w-full text-sm">
-        <thead><tr className="text-left text-xs text-slate-500">
-          <th className="font-normal">szczebel §11.2</th>
-          <th className="font-normal">wybrany</th>
-          <th className="font-normal">z tego zatwierdzony</th>
-        </tr></thead>
-        <tbody>
-          {dane.drogi.map((d) => <tr key={d.droga} className="border-t border-slate-100">
-            <td className="py-1">{NAZWA_DROGI[d.droga]}</td>
-            {/* Zero NIE jest wyszarzone, i to jest ta sama myśl, co w nagłówku
-                pliku: szczebel bez wyboru to najcenniejsze ustalenie tego
-                raportu. Wyciszenie go poniżej czytelności byłoby ukryciem
-                faktu, nie wyciszeniem (§4.3, strażnik `Kontrast.test.ts`). */}
-            <td className={d.wybranych === 0 ? "" : "font-semibold"}>{d.wybranych}</td>
-            <td>{d.zatwierdzonych}</td>
-          </tr>)}
-        </tbody>
-      </table>
-      {/* Zero jako ZDANIE, nie jako brak wiersza — patrz nagłówek pliku. */}
+    <div className="mt-4 border-t pt-4">
+      {/* Nagłówek „szczebel §11.2" był odsyłaczem do dokumentu, nie do
+          pracy agenta (@wydanie) — kolumna mówi „droga", jak nazwy w niej. */}
+      <Tabela naglowki={["droga", "wybrany", "z tego zatwierdzony"]} pusto="">
+        {dane.drogi.map((d) => <tr key={d.droga}>
+          <Td>{NAZWA_DROGI[d.droga]}</Td>
+          {/* Zero NIE jest wyszarzone, i to jest ta sama myśl, co w nagłówku
+              pliku: szczebel bez wyboru to najcenniejsze ustalenie tego
+              raportu. Wyciszenie go poniżej czytelności byłoby ukryciem
+              faktu, nie wyciszeniem (§4.3, strażnik `Kontrast.test.ts`). */}
+          <Td className={d.wybranych === 0 ? "" : "font-semibold"}>{d.wybranych}</Td>
+          <Td>{d.zatwierdzonych}</Td>
+        </tr>)}
+      </Tabela>
+      {/* Zero jako ZDANIE, nie jako brak wiersza — patrz nagłówek pliku.
+          Dopisek „to szczeble, które utrzymujemy w kodzie" zszedł (@wydanie):
+          to wniosek dla programisty, agentowi wystarczy sama lista. */}
       {zeroDrog.length > 0 && <p className="mt-2 text-xs text-slate-500">
         Bez ani jednego wyboru w tym oknie: <b>{zeroDrog.map((d) => NAZWA_DROGI[d.droga]).join(", ")}</b>.
-        {" "}To są szczeble, które utrzymujemy w kodzie, a które jeszcze nikomu nie odpowiedziały.
       </p>}
     </div>
 
-    {dane.osoby.length > 0 && <div className="border-t p-4">
-      <table className="w-full text-sm">
-        <thead><tr className="text-left text-xs text-slate-500">
-          <th className="font-normal">kto</th>
-          <th className="font-normal">wyborów</th>
-          <th className="font-normal">zatwierdzonych</th>
-          <th className="font-normal">najczęściej kończy na</th>
-          <th className="font-normal">mediana</th>
-        </tr></thead>
-        <tbody>
-          {dane.osoby.map((o) => <tr key={o.userId ?? o.osoba} className="border-t border-slate-100">
-            <td className="py-1">{o.osoba}</td>
-            <td>{o.wybranych}</td>
-            <td>{o.zatwierdzonych}</td>
-            <td>{o.najczestszaDroga ? NAZWA_DROGI[o.najczestszaDroga] : "—"}</td>
+    {dane.osoby.length > 0 && <details className="mt-4 border-t pt-4 text-sm">
+      <summary className="cursor-pointer text-slate-600">Szczegóły</summary>
+      <div className="mt-2">
+        <Tabela naglowki={["kto", "wyborów", "zatwierdzonych", "najczęściej kończy na", "mediana"]} pusto="">
+          {dane.osoby.map((o) => <tr key={o.userId ?? o.osoba}>
+            <Td>{o.osoba}</Td>
+            <Td>{o.wybranych}</Td>
+            <Td>{o.zatwierdzonych}</Td>
+            <Td>{o.najczestszaDroga ? NAZWA_DROGI[o.najczestszaDroga] : "—"}</Td>
             {/* `null` poniżej progu wypisujemy jako kreskę z powodem, nie jako zero. */}
-            <td>{o.medianaMin === null
+            <Td>{o.medianaMin === null
               ? <span className="text-slate-500" title={`poniżej ${dane.progWiarygodnosci} wyborów`}>—</span>
-              : `${o.medianaMin} min`}</td>
+              : `${o.medianaMin} min`}</Td>
           </tr>)}
-        </tbody>
-      </table>
+        </Tabela>
+      </div>
       <p className="mt-2 text-xs text-slate-500">
         Mediana pokazuje się od <b>{dane.progWiarygodnosci}</b> wyborów — niżej byłaby szumem
         postawionym przy nazwisku. Kolumna „najczęściej kończy na" mówi, JAK ktoś pracuje,
         a nie jak dobrze.
       </p>
       <p className="mt-2 text-xs text-ranga-uwaga">{dane.podstawaPrawna}</p>
-    </div>}
-  </Karta>;
+    </details>}
+  </KartaWgladu>;
 }
