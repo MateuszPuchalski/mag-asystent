@@ -1179,3 +1179,76 @@ test("przyczyna braku powrotu: adres w błędzie odróżnia się od nieznanego k
   db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(adres);
   assert.equal(K.listaKoszy().find((x) => x.id === k)?.bezPowrotu, "nieznany");
 });
+
+/* ── Który towar blokuje MM (0.530.0) ───────────────────────────────────────
+   Zgłoszenie właściciela przy koszu 1205: „brak towaru w MM, gdy chcę
+   przerzucić z powrotem na główny — i nie pokazuje, o jaki towar chodzi". */
+
+test("karta kosza nazywa kartotekę, której brakuje na magazynie źródłowym MM", () => {
+  db().prepare("DELETE FROM events").run();
+  const k = koszDoRozkladania("1205");
+  /* Powrót z regału zwrotów (mag 3): 900036 ma tam 3 szt., 900037 — nic. */
+  db().prepare("UPDATE sgt_stan SET stan_rez=2 WHERE tw_id=900036 AND mag_id=3").run();
+  const q = Number(db().prepare(`INSERT INTO sfera_queue(type,payload,status,attempts,error_msg,created_by)
+    VALUES ('mm',?,'pending',1,'Sfera odrzuciła „MM.Zapisz()”: Brak towaru w magazynie.','Test')`)
+    .run(JSON.stringify({ magFrom: 3, magTo: 1, items: [
+      { twId: 900036, qty: 2 }, { twId: 900037, qty: 1 }] })).lastInsertRowid);
+  db().prepare("UPDATE kosz SET powrot_queue_id=? WHERE id=?").run(q, k.id);
+  db().prepare("INSERT INTO events(type,payload,user_id) VALUES ('queue_retry',?,'Test')")
+    .run(JSON.stringify({ queueId: q, typ: "mm", proba: 1, max: 3, blad: "Brak towaru w magazynie." }));
+
+  const braki = K.szczegolKosza(k.id).brakiMm;
+  assert.deepEqual(braki.map((b) => [b.symbol, b.magazyn, b.potrzeba, b.stan, b.rezerwacja]), [
+    ["TEST-LINIA-TODO", "ZWR", 2, 3, 2],
+    ["TEST-LINIA-DONE", "ZWR", 1, 0, 0],
+  ], "rezerwacja blokuje tak samo jak brak stanu — Subiekt jej nie przesunie");
+
+  /* Powrót czeka na kolejną próbę — to nie jest „weszło po błędzie". */
+  const w = K.listaKoszy().find((x) => x.id === k.id)!;
+  assert.equal(w.problemMm?.ponawiane, true);
+  assert.equal(w.problemMm?.nierozwiazany, false);
+
+  db().prepare("UPDATE sfera_queue SET status='done' WHERE id=?").run(q);
+  assert.deepEqual(K.szczegolKosza(k.id).brakiMm, [], "MM, które weszło, niczego już nie blokuje");
+  assert.equal(K.listaKoszy().find((x) => x.id === k.id)!.problemMm?.ponawiane, false);
+});
+
+test("kartotekę, która blokuje MM, zdejmuje się z dokumentu — reszta idzie dalej (0.530.0)", () => {
+  /* Zgłoszenie właściciela przy koszu 1205: „daj możliwość usunięcia tego
+     towaru z tej MM". */
+  db().prepare("DELETE FROM events").run();
+  const k = koszDoRozkladania("1206");
+  const q = Number(db().prepare(`INSERT INTO sfera_queue(type,payload,status,attempts,error_msg,created_by)
+    VALUES ('mm',?,'error',3,'Brak towaru w magazynie.','Test')`)
+    .run(JSON.stringify({ magFrom: 3, magTo: 1, items: [
+      { twId: 900036, qty: 2 }, { twId: 900037, qty: 1 }] })).lastInsertRowid);
+  db().prepare("UPDATE kosz SET powrot_queue_id=? WHERE id=?").run(q, k.id);
+
+  assert.deepEqual(K.usunZMmKosza(db(), k.id, 900037, "Ala"),
+    { zadan: 1, anulowanych: 0, ilosc: 1, magazyn: 3 });
+  const z = db().prepare("SELECT status, payload FROM sfera_queue WHERE id=?").get(q) as
+    { status: string; payload: string };
+  assert.deepEqual(JSON.parse(z.payload).items, [{ twId: 900036, qty: 2 }]);
+  assert.equal(z.status, "error", "błąd zostaje — resztę puszcza „Ponów MM”, nie cicha zmiana");
+  const e = db().prepare("SELECT tw_id, payload FROM events WHERE type='kosz_mm_pozycja_zdjeta'").get() as
+    { tw_id: number; payload: string };
+  assert.equal(e.tw_id, 900037);
+  assert.equal(JSON.parse(e.payload).magazyn, 3, "ślad, skąd towar trzeba jeszcze przesunąć ręką");
+
+  /* Ostatnia linia anuluje zadanie zamiast zostawić MM bez pozycji. */
+  assert.equal(K.usunZMmKosza(db(), k.id, 900036, "Ala").anulowanych, 1);
+  assert.equal((db().prepare("SELECT status FROM sfera_queue WHERE id=?").get(q) as { status: string }).status,
+    "cancelled");
+});
+
+test("MM w trakcie zapisu i kartoteki spoza MM się nie rusza", () => {
+  const k = koszDoRozkladania("1207");
+  const q = Number(db().prepare(`INSERT INTO sfera_queue(type,payload,status,created_by)
+    VALUES ('mm',?,'processing','Test')`)
+    .run(JSON.stringify({ magFrom: 3, magTo: 1, items: [{ twId: 900036, qty: 1 }] })).lastInsertRowid);
+  db().prepare("UPDATE kosz SET powrot_queue_id=? WHERE id=?").run(q, k.id);
+  assert.throws(() => K.usunZMmKosza(db(), k.id, 900036, "Ala"),
+    (e: Error & { kod?: number }) => e.kod === 409 && /zapisuje/.test(e.message));
+  assert.throws(() => K.usunZMmKosza(db(), k.id, 900029, "Ala"),
+    (e: Error & { kod?: number }) => e.kod === 409 && /nie ma w żadnym MM/.test(e.message));
+});

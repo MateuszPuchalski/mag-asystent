@@ -181,6 +181,8 @@ export interface SzczegolKosza {
    * „czy stan wrócił na halę" wymagałoby zajrzenia do Subiekta.
    */
   powrot: { status: string; numer: string | null } | null;
+  /** Kartoteki, których brakuje na magazynie źródłowym MM jeszcze niewykonanego (0.530.0). */
+  brakiMm: BrakMm[];
   /** `zwroty` albo `karton` — kolektor po tym wie, którą fazę pokazać. */
   rodzaj: string;
   /** Kto i kiedy anulował karton (0.123.0); NULL przy każdym innym koszu. */
@@ -222,6 +224,75 @@ export interface ProblemMm {
   ostatnioAt: string;
   /** Zadanie MM kosza stoi TERAZ w błędzie — nic jeszcze nie weszło. */
   nierozwiazany: boolean;
+  /**
+   * Zadanie po odmowie czeka w kolejce na kolejną próbę (0.530.0). Kosz 1205:
+   * karta mówiła „MM weszło po błędzie", a powrót dopiero czekał na ponowienie.
+   * Weszło to dopiero `done` — i tylko wtedy zostaje samo sprawdzenie stanów.
+   */
+  ponawiane: boolean;
+}
+
+/**
+ * Kartoteka, której na magazynie źródłowym MM brakuje wolnego stanu (0.530.0).
+ *
+ * Zgłoszenie właściciela przy koszu 1205: „brak towaru w MM, gdy chcę przerzucić
+ * z powrotem na główny — i nie pokazuje, o jaki towar chodzi". Sfera odmawia
+ * jednym zdaniem na cały dokument. Porównanie zadania z read-modelem stanów
+ * wskazuje linię: potrzeba z MM, stan i rezerwacja na magazynie, z którego MM
+ * zdejmuje. Rezerwacji Subiekt nie przesunie — to ta sama blizna co przy
+ * koszyku Z-29 (0.486.5), tylko po drugiej stronie drogi.
+ */
+export interface BrakMm {
+  twId: number;
+  symbol: string | null;
+  nazwa: string | null;
+  magazyn: string;
+  potrzeba: number;
+  stan: number;
+  rezerwacja: number;
+}
+
+/**
+ * Braki wolnego stanu dla zadań MM, które jeszcze nie weszły (0.530.0).
+ * Pusta lista znaczy „read-model nie widzi braku" — wtedy przyczyna leży poza
+ * nim: import stanów nie doszedł albo Sfera odmawia z innego powodu.
+ */
+export function brakiMm(database: Db, queueIds: number[]): BrakMm[] {
+  if (!queueIds.length) return [];
+  const zadania = database.prepare(
+    `SELECT id, payload FROM sfera_queue
+      WHERE type='mm' AND status IN ('pending','processing','waiting_for_doc','error')
+        AND id IN (SELECT value FROM json_each(?))`)
+    .all(JSON.stringify([...new Set(queueIds)])) as Array<{ id: number; payload: string }>;
+  const stan = database.prepare(
+    `SELECT COALESCE(st.stan, 0) AS stan, COALESCE(st.stan_rez, 0) AS rez,
+            t.symbol, t.nazwa, m.kod AS mag
+       FROM (SELECT ? AS tw_id, ? AS mag_id) x
+       LEFT JOIN sgt_stan st ON st.tw_id = x.tw_id AND st.mag_id = x.mag_id
+       LEFT JOIN sgt_towar t ON t.tw_id = x.tw_id
+       LEFT JOIN sgt_magazyn m ON m.mag_id = x.mag_id`);
+  const braki: BrakMm[] = [];
+  for (const z of zadania) {
+    let p: { magFrom?: number; items?: Array<{ twId?: number; qty?: number }> };
+    try { p = JSON.parse(z.payload); } catch { continue; }
+    const mag = Number(p.magFrom);
+    if (!mag || !Array.isArray(p.items)) continue;
+    /* Po kartotece, nie po linii — ta sama zasada co przy MM na regał. */
+    const wg = new Map<number, number>();
+    for (const i of p.items) {
+      if (i?.twId == null) continue;
+      wg.set(Number(i.twId), (wg.get(Number(i.twId)) ?? 0) + Number(i.qty ?? 0));
+    }
+    for (const [twId, potrzeba] of wg) {
+      const w = stan.get(twId, mag) as
+        { stan: number; rez: number; symbol: string | null; nazwa: string | null; mag: string | null };
+      if (Number(w.stan) - Number(w.rez) >= potrzeba) continue;
+      braki.push({ twId, symbol: w.symbol ?? null, nazwa: w.nazwa ?? null,
+        magazyn: w.mag ?? `magazyn ${mag}`, potrzeba,
+        stan: Number(w.stan), rezerwacja: Number(w.rez) });
+    }
+  }
+  return braki;
 }
 
 /**
@@ -325,6 +396,7 @@ export function problemyMm(database: Db = db(), teraz = new Date()): Map<number,
       ostatniBlad: typeof d.blad === "string" ? d.blad : byl?.ostatniBlad ?? null,
       ostatnioAt: e.created_at,
       nierozwiazany: false,
+      ponawiane: false,
     });
   }
   /* STAN TERAZ z wiersza kolejki, nie z dziennika: błąd sprzed zapisu
@@ -342,7 +414,19 @@ export function problemyMm(database: Db = db(), teraz = new Date()): Map<number,
       ostatniBlad: byl?.ostatniBlad ?? q.error_msg,
       ostatnioAt: byl?.ostatnioAt ?? q.processed_at ?? teraz.toISOString(),
       nierozwiazany: true,
+      ponawiane: false,
     });
+  }
+  /* PONAWIANE: zadanie po odmowie czeka na następną próbę (0.530.0). Tylko
+     tam, gdzie kłopot już jest — świeże zadanie w kolejce kłopotem nie jest. */
+  for (const q of database.prepare(
+    `SELECT id FROM sfera_queue
+      WHERE type='mm' AND status IN ('pending','processing','waiting_for_doc')
+        AND id IN (SELECT value FROM json_each(?))`)
+    .all(JSON.stringify(idy)) as Array<{ id: number }>) {
+    const koszId = kosz.get(Number(q.id))!;
+    const byl = wynik.get(koszId);
+    if (byl && !byl.nierozwiazany) byl.ponawiane = true;
   }
   return wynik;
 }
@@ -352,6 +436,79 @@ export function problemyMm(database: Db = db(), teraz = new Date()): Map<number,
  * Po niej `Zapisz()` mógł zdążyć — ponowienie bez sprawdzenia dubluje MM.
  */
 const PRZERWANE_W_ZAPISIE = /przerwany w trakcie zapisu/i;
+
+/**
+ * Zdjęcie jednej kartoteki z MM kosza, które jeszcze nie weszło (0.530.0).
+ *
+ * Zgłoszenie właściciela przy koszu 1205: „daj możliwość usunięcia tego
+ * towaru z tej MM". Sfera odmawia CAŁEGO dokumentu za jedną linię bez
+ * wolnego stanu, więc dwadzieścia cztery odłożone kartoteki czekały na
+ * jedną zarezerwowaną. Zdjęta linia wychodzi z treści zadania; reszta
+ * dokumentu idzie dalej — przy zadaniu w kolejce sama, przy błędzie po
+ * „Ponów MM". Zadanie, z którego zeszła ostatnia linia, jest anulowane.
+ *
+ * TOWAR ZOSTAJE NA MAGAZYNIE ŹRÓDŁOWYM. Pozycja kosza stoi dalej jako
+ * odłożona, bo fizycznie leży na półce — stan przesuwa się ręką w Subiekcie,
+ * gdy przeszkoda zejdzie. Dlatego zdarzenie niesie ilość i magazyn: to jedyny
+ * ślad, że ten ruch trzeba jeszcze zrobić.
+ *
+ * ZADANIA W ZAPISIE NIE RUSZAMY. Worker mógł już zbudować dokument z dawnej
+ * treści — zmiana pod nim rozjechałaby bazę z Subiektem. Warunek statusu
+ * stoi w samym `UPDATE`, więc wyścig z workerem kończy się odmową, nie zapisem.
+ */
+export function usunZMmKosza(
+  database: Db, koszId: number, twId: number, kto: string,
+): { zadan: number; anulowanych: number; ilosc: number; magazyn: number | null } {
+  const kosz = database.prepare("SELECT id, kod, mm_queue_id, powrot_queue_id FROM kosz WHERE id=?")
+    .get(koszId) as { id: number; kod: string; mm_queue_id: number | null; powrot_queue_id: number | null } | undefined;
+  if (!kosz) throw new BladKosza(404, "Nie ma takiego kosza");
+  const idy = [kosz.mm_queue_id, kosz.powrot_queue_id,
+    ...(database.prepare("SELECT mm_queue_id FROM kosz_pozycja WHERE kosz_id=? AND mm_queue_id IS NOT NULL")
+      .all(koszId) as Array<{ mm_queue_id: number }>).map((p) => p.mm_queue_id)]
+    .filter((x): x is number => x != null);
+  const zadania = (idy.length === 0 ? [] : database.prepare(
+    `SELECT id, status, payload FROM sfera_queue
+      WHERE type='mm' AND status NOT IN ('done','cancelled')
+        AND id IN (SELECT value FROM json_each(?))`)
+    .all(JSON.stringify([...new Set(idy)])) as Array<{ id: number; status: string; payload: string }>)
+    .filter((z) => {
+      try {
+        return (JSON.parse(z.payload).items ?? []).some((i: { twId?: number }) => Number(i?.twId) === twId);
+      } catch { return false; }
+    });
+  if (!zadania.length) {
+    throw new BladKosza(409, "Tej kartoteki nie ma w żadnym MM kosza, które czeka na zapis.");
+  }
+  if (zadania.some((z) => z.status === "processing")) {
+    throw new BladKosza(409, "Worker Sfery właśnie zapisuje to MM — spróbuj za chwilę.");
+  }
+  let ilosc = 0;
+  let magazyn: number | null = null;
+  let anulowanych = 0;
+  transaction(database, () => {
+    for (const z of zadania) {
+      const p = JSON.parse(z.payload) as { magFrom?: number; items: Array<{ twId: number; qty: number }> };
+      ilosc += p.items.filter((i) => Number(i.twId) === twId).reduce((s, i) => s + Number(i.qty), 0);
+      magazyn = p.magFrom ?? magazyn;
+      const reszta = p.items.filter((i) => Number(i.twId) !== twId);
+      const r = reszta.length
+        ? database.prepare(`UPDATE sfera_queue SET payload=? WHERE id=?
+            AND status IN ('pending','error','waiting_for_doc')`)
+          .run(JSON.stringify({ ...p, items: reszta }), z.id)
+        : database.prepare(`UPDATE sfera_queue SET status='cancelled', processed_at=?
+            WHERE id=? AND status IN ('pending','error','waiting_for_doc')`)
+          .run(new Date().toISOString(), z.id);
+      if (Number(r.changes) === 0) {
+        throw new BladKosza(409, "Worker Sfery właśnie wziął to MM — spróbuj za chwilę.");
+      }
+      if (!reszta.length) anulowanych++;
+    }
+    logEvent("kosz_mm_pozycja_zdjeta", kto, twId,
+      { koszId, kod: kosz.kod, zadania: zadania.map((z) => z.id), ilosc, magazyn, anulowanych },
+      undefined, database);
+  })();
+  return { zadan: zadania.length, anulowanych, ilosc, magazyn };
+}
 
 /**
  * Ponowienie wszystkich MM kosza, które stoją w błędzie (0.503.0).
@@ -851,6 +1008,9 @@ export function szczegolKosza(koszId: number): SzczegolKosza {
       && koszDoEdycji(db(), koszId),
     zwroty,
     powrot: powrot ? { status: powrot.status, numer: powrot.numer ?? null } : null,
+    brakiMm: brakiMm(db(), [kosz.mm_queue_id, kosz.powrot_queue_id,
+      ...wiersze.map((w) => w.mm_queue_id as number | null)]
+      .filter((x): x is number => x != null).map(Number)),
     rodzaj: kosz.rodzaj ?? "zwroty",
     anulowanoAt: kosz.anulowano_at ?? null,
     anulowanoPrzez: kosz.anulowano_przez ?? null,
