@@ -168,7 +168,7 @@ export function Dostawy() {
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
-        {/* Tytuł „Dostawy" zszedł (@wydanie), bo powtarzał zakładkę nawigacji,
+        {/* Tytuł „Dostawy" zszedł (0.525.0), bo powtarzał zakładkę nawigacji,
             która stoi podświetlona nad ekranem — wiersz wraca do kolejki. */}
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">
           <FiltrSegmentowy<KubelekDostaw> wybrany={kubelek} onWybierz={setKubelek}
@@ -180,7 +180,7 @@ export function Dostawy() {
             placeholder={kubelek === "archiwum" ? "Szukaj w archiwum: numer albo dostawca" : "Numer albo dostawca"}
             aria-label="Szukaj dostawy" />
         </div>
-        {/* PYTANIE KUBEŁKA I STOPKA W JEDNYM PAŚMIE (@wydanie). Stały dwoma
+        {/* PYTANIE KUBEŁKA I STOPKA W JEDNYM PAŚMIE (0.525.0). Stały dwoma
             cienkimi paskami, nad listą i pod nią, a mówiły o tej samej liście:
             „co z nią zrobić" i „gdzie się kończy". Granica okna stoi teraz NAD
             listą, więc ucięte archiwum widać, zanim zacznie się ją czytać. */}

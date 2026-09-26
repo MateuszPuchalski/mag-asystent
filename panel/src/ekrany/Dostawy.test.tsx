@@ -189,7 +189,7 @@ describe("Ekran dostaw", () => {
     expect(within(kolejka).getByRole("button", { name: /Towar spoza dokumentu/ })).toBeInTheDocument();
   });
 
-  it("kolejka bez tytułu „Dostawy” — nazwę niesie nawigacja nad ekranem (@wydanie)", async () => {
+  it("kolejka bez tytułu „Dostawy” — nazwę niesie nawigacja nad ekranem (0.525.0)", async () => {
     pokaz();
     await screen.findByRole("button", { name: /FZ 802\/MAG/ });
     expect(screen.queryByText("Dostawy", { selector: "b" })).toBeNull();
@@ -260,7 +260,7 @@ describe("Ekran dostaw", () => {
     expect(archiwumPytania).toEqual([]);
     await userEvent.click(screen.getByRole("button", { name: /Archiwum/ }));
     const granica = await screen.findByText(/pokazano 1 z 350 — zawęź wyszukiwaniem/);
-    /* Granica okna stoi w paśmie pytania, NAD listą (@wydanie) — ucięte
+    /* Granica okna stoi w paśmie pytania, NAD listą (0.525.0) — ucięte
        archiwum widać, zanim zacznie się czytać wiersze. */
     expect(granica.parentElement).toHaveTextContent(/Tylko wgląd — dostawy spoza okna importu/);
     await userEvent.type(screen.getByLabelText("Szukaj dostawy"), "FZ 5");

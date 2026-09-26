@@ -64,7 +64,7 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
     return { pominiete: [] };
   }
   if (url === "/api/biuro/kosze/17") return { kosz: { ...SZCZEGOL, id: 17, kod: "Z-17", status: "rozlozony" } };
-  /* Kosz jeszcze bez dokumentu — przeliczenie jest dozwolone (@wydanie). */
+  /* Kosz jeszcze bez dokumentu — przeliczenie jest dozwolone (0.525.0). */
   if (url === "/api/biuro/kosze/18") return { kosz: { ...SZCZEGOL, id: 18, kod: "Z-18", status: "otwarty", doEdycji: true } };
   if (url === "/api/biuro/kosze/16") return { kosz: { ...SZCZEGOL, id: 16, kod: "Z-16", status: "otwarty" } };
   if (url === "/api/biuro/kosze") return { kosze: [kosz(14, { pominietych: 1 }),
@@ -222,14 +222,14 @@ describe("Kosze w zakładce Zwroty", () => {
     expect(screen.getAllByTestId("adres")[0]).toHaveTextContent("/obsluga/zwroty/kosze/15");
   });
 
-  it("kolejka nie powtarza tytułem wybranej zakładki przełącznika (@wydanie)", async () => {
+  it("kolejka nie powtarza tytułem wybranej zakładki przełącznika (0.525.0)", async () => {
     pokaz();
     await screen.findByRole("button", { name: /Z-14/ });
     /* Nazwa „Kosze" stoi raz — w przełączniku, który mówi, gdzie jesteśmy. */
     expect(screen.queryByText("Kosze", { selector: "b" })).toBeNull();
   });
 
-  it("wyjaśnienie przeliczenia siedzi w podpowiedzi przycisku, nie w akapicie (@wydanie)", async () => {
+  it("wyjaśnienie przeliczenia siedzi w podpowiedzi przycisku, nie w akapicie (0.525.0)", async () => {
     pokaz("/obsluga/zwroty/kosze/18");
     const przycisk = await screen.findByRole("button", { name: "Przelicz ze zwrotów" });
     expect(przycisk).toHaveAttribute("title", expect.stringMatching(/Dokumentu jeszcze nie ma/));

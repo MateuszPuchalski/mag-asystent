@@ -96,7 +96,7 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
         <CyklKosza status={k.status} />
         {k.rodzaj === "karton" && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-700">karton</span>}
         <span className="ml-auto" />
-        {/* Wyjaśnienie w podpowiedzi przycisku (@wydanie). Stało dwoma zdaniami
+        {/* Wyjaśnienie w podpowiedzi przycisku (0.525.0). Stało dwoma zdaniami
             pod nagłówkiem przy każdym koszu do edycji, a czyta się je raz —
             przy pierwszym przeliczeniu, czyli z myszą na przycisku. */}
         {k.doEdycji && <Przycisk disabled={przelicz.trwa} onClick={przelicz.onPrzelicz}
