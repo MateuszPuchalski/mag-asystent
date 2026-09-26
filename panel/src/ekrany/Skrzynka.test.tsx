@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
@@ -93,7 +93,15 @@ beforeEach(() => {
     return odpowiedz(url, metoda);
   }));
 });
-afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
+/* Sprzątanie PRZED zdjęciem atrapy `fetch`: odmontowanie ekranu zgłasza
+   pominięcie z odroczeniem o jeden obrót pętli (powód w `Skrzynka.tsx`),
+   a bez tego raport trafiałby do atrapy NASTĘPNEGO testu. */
+afterEach(async () => {
+  vi.useRealTimers();
+  cleanup();
+  await new Promise((r) => setTimeout(r, 0));
+  vi.unstubAllGlobals();
+});
 
 function Adres() {
   return <output aria-label="adres">{useLocation().pathname}</output>;
@@ -254,5 +262,45 @@ describe("EKRAN SKRZYNKI: pętla pracy", () => {
     await waitFor(() => expect(adres()).toBe("/obsluga/skrzynka/1"));
     expect(await pole()).toHaveValue("Moja odpowiedź");
     expect(nieGet().some((z) => z.url.endsWith("/send"))).toBe(false);
+  });
+
+  /* ── Pomiary pod decyzje (@wydanie) ────────────────────────────────────── */
+  it("wyjście z rozmowy bez ruchu zgłasza jedno pominięcie — z kategorią, nigdy przy otwarciu", async () => {
+    const u = userEvent.setup();
+    /* Pełny kształt rozpoznania — ten sam, co w `skrzynka/Copilot.test.tsx`. */
+    const kopilot = { kategoria: "RETURN", dodatkowe: [], akcja: "CHECK_STOCK", akcjaModelu: null,
+      wymagaCzlowieka: false, brakDanychZamowienia: false, brakDanychProduktu: false,
+      pewnosc: "wysoka", zrodlo: "MODEL", status: "SUCCESS", kody: [], uzasadnienie: null,
+      nieaktualna: false, kategoriaCzlowieka: null, kategoriaModelu: "RETURN" };
+    rozmowy = [wiersz(1, { kopilot }), wiersz(2), wiersz(3)];
+    dane[1] = szczegoly(1, { rozmowa: wiersz(1, { kopilot }) });
+    pokaz("/obsluga/skrzynka/1");
+    await pole();
+    expect(zadania.some((z) => z.url === "/api/obsluga/pominiecie")).toBe(false);
+    (document.activeElement as HTMLElement).blur();
+    await u.keyboard("j");
+    await waitFor(() => expect(zadania.filter((z) => z.url === "/api/obsluga/pominiecie")).toHaveLength(1));
+    expect(JSON.parse(zadania.find((z) => z.url === "/api/obsluga/pominiecie")!.body!)).toEqual({ kategoria: "RETURN" });
+  });
+
+  it("wysyłka to ruch — przejście dalej po niej nie jest pominięciem, a „Cofnij” niesie czas", async () => {
+    const u = userEvent.setup();
+    pokaz("/obsluga/skrzynka/1");
+    await u.type(await pole(), "Odpowiedź");
+    await u.click(screen.getByRole("button", { name: /Wyślij do klienta/ }));
+    await waitFor(() => expect(adres()).toBe("/obsluga/skrzynka/2"));
+    await u.click(await screen.findByRole("button", { name: "Cofnij" }));
+    const cofniecie = await waitFor(() => {
+      const z = zadania.find((x) => x.url === "/api/conversations/1/wysylka-cofnieta");
+      expect(z).toBeTruthy();
+      return z!;
+    });
+    const { msOdKolejki } = JSON.parse(cofniecie.body!) as { msOdKolejki: number };
+    expect(msOdKolejki).toBeGreaterThanOrEqual(0);
+    expect(msOdKolejki).toBeLessThan(10_000);
+    /* Z rozmowy 1 odeszło się wysyłką — pominięcia nie ma. Rozmowa 2, z której
+       „Cofnij” zawróciło bez ruchu, jest pominięciem i tak ma być liczona. */
+    await waitFor(() => expect(adres()).toBe("/obsluga/skrzynka/1"));
+    await waitFor(() => expect(zadania.filter((z) => z.url === "/api/obsluga/pominiecie")).toHaveLength(1));
   });
 });

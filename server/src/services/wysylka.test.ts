@@ -554,6 +554,32 @@ test("szkic ułożony na STARSZE pytanie nie liczy się do losu", async () => {
   assert.equal(los(d), null);
 });
 
+/* Twierdzenia do sprawdzenia zamrożone przy wysyłce (0.532.0). Szkic ma
+   jeden wiersz na rozmowę i następny go nadpisze, więc pytanie „czy tarcie
+   działa" ma odpowiedź tylko wtedy, gdy liczba jedzie w zdarzeniu. Reguła
+   ta sama co w panelu: źródło inne niż „fakty". */
+test("wysyłka ze szkicu zapisuje w zdarzeniu liczbę twierdzeń do sprawdzenia", async () => {
+  const a = stanowisko();
+  szkic(a.d, a.rozmowa, "Dzień dobry, pasuje.", a.pytanie);
+  a.d.prepare("UPDATE szkic_copilota SET twierdzenia=? WHERE conversation_id=?").run(JSON.stringify([
+    { teza: "Pasuje do NAC", zrodlo: "fakty" }, { teza: "Wysyłka jutro", zrodlo: "model" },
+    { teza: "Na zdjęciu gwint M8", zrodlo: "zdjecie" }]), a.rozmowa);
+  await wyslijOdpowiedz({ conversationId: a.rozmowa, autor: autorAli(a.ala),
+    body: "Dzień dobry, pasuje.", expectedVersion: 1, expectedLastMessageId: a.pytanie,
+    database: a.d, wyslij: udany(), oznaczPrzeczytany: async () => {} });
+  const zd = (d: DatabaseSync) => JSON.parse((d.prepare(
+    "SELECT payload FROM events WHERE type='rozmowa_wyslana' ORDER BY id DESC LIMIT 1").get() as { payload: string }).payload);
+  assert.equal(zd(a.d).szkicDoSprawdzenia, 2, "„fakty” nie wymagają sprawdzenia, model i zdjęcie — tak");
+
+  /* Bez szkicu na to pytanie pola nie ma wcale: zero znaczyłoby „szkic bez
+     twierdzeń do sprawdzenia", a to inna odpowiedź niż „szkicu nie było". */
+  const b = stanowisko();
+  await wyslijOdpowiedz({ conversationId: b.rozmowa, autor: autorAli(b.ala),
+    body: "Dzień dobry.", expectedVersion: 1, expectedLastMessageId: b.pytanie,
+    database: b.d, wyslij: udany(), oznaczPrzeczytany: async () => {} });
+  assert.equal("szkicDoSprawdzenia" in zd(b.d), false);
+});
+
 /* „Wyślij i zakończ" (23 września 2026): werdykt jedzie w tej samej
    transakcji co wiadomość — nieudana wysyłka nie zostawia rozmowy
    zakończonej bez odpowiedzi. */

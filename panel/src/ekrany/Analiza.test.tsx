@@ -104,7 +104,15 @@ beforeEach(() => {
     }));
     if (url.startsWith("/api/analiza/tarcie?days=")) return new Response(JSON.stringify({
       dni: 30, osoby: null, razem: { wyslanych: 40, zeSzkicem: 20, bezZmian: 9, udzialBezZmian: 0.45,
-        cofnietychWysylek: 3, cofnietychZakonczen: 1, medianaSekDoWysylki: 95, probekCzasu: 38 } }));
+        cofnietychWysylek: 3, cofnietychZakonczen: 1, medianaSekDoWysylki: 95, probekCzasu: 38 },
+      /* Pomiary pod decyzje (0.532.0) — kształt minimalny, treść ma własny
+         test przy `analiza/PomiaryDecyzji.tsx`; tu liczy się skład ekranu. */
+      oknoCofniecia: { odlozonych: 43, cofnietych: 3, udzial: 0.07, poOknie: 0, bezCzasu: 0,
+        kubelki: [{ odSek: 0, doSek: 2, ile: 3 }, { odSek: 2, doSek: 4, ile: 0 }, { odSek: 4, doSek: 6, ile: 0 },
+          { odSek: 6, doSek: 8, ile: 0 }, { odSek: 8, doSek: 10, ile: 0 }], odczyt: { przedSek: 2, udzial: 1 } },
+      tarcieSzkicu: { zTwierdzeniami: { zeSzkicem: 0, bezZmian: 0, udzialBezZmian: null },
+        bezTwierdzen: { zeSzkicem: 0, bezZmian: 0, udzialBezZmian: null }, bezDanych: 20, przedPo: null },
+      gotowosc: [], pominiecia: { odKiedy: null, pominiec: 0, wyslanych: 40, wgDnia: [], wgKategorii: [] } }));
     /* Miary obsługi (0.444.0, przyszły z ustawień). Kształty minimalne —
        treść każdej karty ma własny test obok niej; tu liczy się skład. */
     if (url === "/api/obsluga/sygnatury") return new Response(JSON.stringify(
@@ -265,6 +273,11 @@ describe("zakres Obsługa klienta", () => {
     expect(screen.getByText("45%")).toBeInTheDocument();
     expect(screen.getByText(/cofniętych wysyłek z 40/)).toBeInTheDocument();
     expect(screen.queryByText("Tarcie według osoby")).toBeNull();
+    /* Pomiary pod decyzje (0.532.0) z tego samego odczytu — bez drugiego
+       żądania i bez zapisu przy otwarciu. */
+    expect(screen.getByText("Pomiary pod decyzje")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Okno cofnięcia" })).toBeInTheDocument();
+    expect(adresy.filter((a) => a.startsWith("/api/analiza/tarcie"))).toHaveLength(1);
     expect(zapisy).toEqual([]);
   });
 

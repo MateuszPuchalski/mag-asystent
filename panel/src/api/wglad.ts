@@ -1,3 +1,4 @@
+import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 
@@ -186,11 +187,57 @@ export interface LiczbyTarcia {
   probekCzasu: number;
 }
 
+/* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ──────────────────────
+   Cztery odpowiedzi na cztery pytania właściciela o politykę skrzynki. Żadna
+   nie idzie na osobę, więc czyta je całe biuro. Powód każdej przy
+   `services/tarcie.ts` na serwerze. */
+
+export interface LosSzkicow { zeSzkicem: number; bezZmian: number; udzialBezZmian: number | null }
+
+export interface OknoCofniecia {
+  odlozonych: number;
+  cofnietych: number;
+  udzial: number | null;
+  kubelki: Array<{ odSek: number; doSek: number; ile: number }>;
+  poOknie: number;
+  bezCzasu: number;
+  /** Najkrótsza granica, przed którą padło co najmniej 90% zmierzonych cofnięć. */
+  odczyt: { przedSek: number; udzial: number } | null;
+}
+
+export interface TarcieSzkicu {
+  zTwierdzeniami: LosSzkicow;
+  bezTwierdzen: LosSzkicow;
+  bezDanych: number;
+  przedPo: { granica: string; przed: LosSzkicow; po: LosSzkicow } | null;
+}
+
+export interface GotowoscKlasy {
+  kategoria: string;
+  zeSzkicem: number;
+  bezZmian: number;
+  udzial: { k: number; n: number; p: number; dolna: number; gorna: number } | null;
+  dni: number;
+}
+
+export interface Pominiecia {
+  /** Pierwsza doba z jakimkolwiek zgłoszeniem; `null` — licznik jeszcze nie ruszył. */
+  odKiedy: string | null;
+  pominiec: number;
+  wyslanych: number;
+  wgDnia: Array<{ dzien: string; pominiec: number; wyslanych: number }>;
+  wgKategorii: Array<{ kategoria: string; pominiec: number; wyslanych: number }>;
+}
+
 export interface PomiarTarcia {
   dni: number;
   razem: LiczbyTarcia;
   /** `null` dla roli biuro — rozbicie na osoby czyta tylko administrator. */
   osoby: Array<LiczbyTarcia & { osoba: string }> | null;
+  oknoCofniecia: OknoCofniecia;
+  tarcieSzkicu: TarcieSzkicu;
+  gotowosc: GotowoscKlasy[];
+  pominiecia: Pominiecia;
 }
 
 export function useTarcie(dni: number, wlaczona: boolean) {
@@ -200,6 +247,31 @@ export function useTarcie(dni: number, wlaczona: boolean) {
     enabled: wlaczona,
     placeholderData: (poprzednie) => poprzednie,
   });
+}
+
+/**
+ * Pominięcie rozmowy (0.532.0) — licznik doby i klasy, bez człowieka.
+ *
+ * KIEDY WOŁAĆ: agent WYCHODZI z rozmowy, którą otworzył, a przez cały pobyt
+ * nie wysłał odpowiedzi, nie zakończył, nie odłożył i nie dopisał notatki.
+ * Wyjście to wybór innej rozmowy, zmiana zakładki panelu albo zamknięcie
+ * karty. NIGDY przy otwarciu — zero zapisu przy patrzeniu obowiązuje dalej.
+ * Jeden raz na pobyt; powrót i drugie wyjście to drugi pobyt.
+ *
+ * `kategoria` to klucz klasy rozmowy ze słownika (`ORDER_STATUS`…),
+ * „nierozpoznane" przy nieudanej klasyfikacji albo nic. Serwer zamienia
+ * nieznany klucz na „bez rozpoznania" — tak jak liczy wysyłki obok.
+ *
+ * Porażka zapisu jest cicha, jak przy cofniętej wysyłce: agent już wyszedł,
+ * a pomiar nie ma prawa go zatrzymać komunikatem. `keepalive`, bo przy
+ * zamknięciu karty zwykłe żądanie ginie razem ze stroną.
+ */
+export function useZglosPominiecie(): (kategoria?: string | null) => void {
+  return useCallback((kategoria?: string | null) => {
+    void api("/api/obsluga/pominiecie", {
+      method: "POST", keepalive: true, body: JSON.stringify(kategoria ? { kategoria } : {}),
+    }).catch(() => {});
+  }, []);
 }
 
 /* ── Użycie (`services/uzycie.ts`, 23 września 2026) ────────────────────── */

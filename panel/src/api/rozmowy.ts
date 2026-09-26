@@ -520,9 +520,14 @@ export function useWyslij() {
  * że agent zawrócił odpowiedź. Porażka wpisu nie ma prawa zatrzymać
  * cofnięcia — agent już zdecydował, a pomiar to nie jego sprawa.
  */
-export function zglosCofnietaWysylke(id: number): void {
-  /* Bez ciała — i dlatego bez `body`: pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`. */
-  void api(`/api/conversations/${id}/wysylka-cofnieta`, { method: "POST" }).catch(() => {});
+export function zglosCofnietaWysylke(id: number, msOdKolejki?: number): void {
+  /* Bez czasu — bez ciała, bo pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`.
+     Z czasem (0.532.0) — ms od odłożenia wysyłki do „Cofnij", do pytania
+     właściciela, czy dziesięć sekund to za długo. Serwer przycina liczbę. */
+  /* `method` jako pierwsze pole literału, nie w gałęzi warunku: strażnik
+     tras w `routes/skrzynka.test.ts` czyta metodę ze źródła tego pliku. */
+  void api(`/api/conversations/${id}/wysylka-cofnieta`, { method: "POST",
+    ...(msOdKolejki === undefined ? {} : { body: JSON.stringify({ msOdKolejki }) }) }).catch(() => {});
 }
 
 /**

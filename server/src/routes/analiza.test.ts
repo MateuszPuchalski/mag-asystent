@@ -197,6 +197,25 @@ test("pomiar tarcia: biuro bez rozbicia na osoby, administrator z nim", async ()
   assert.ok(Array.isArray(admin.osoby));
 });
 
+test("pomiary pod decyzje: cztery sekcje dla biura, bez ludzi i bez zapisu przy odczycie", async () => {
+  /* 26 września 2026, 0.532.0. Okno cofnięcia, tarcie przy szkicu,
+     gotowość per klasa i pominięcia to liczby o SKRZYNCE, nie o osobach —
+     więc biuro dostaje je w całości, a odczyt niczego nie dopisuje. */
+  const t = zalogowany("biuro");
+  const zapisow = () => (db().prepare(`SELECT (SELECT COUNT(*) FROM events WHERE type <> 'http_rejected')
+    + (SELECT COUNT(*) FROM pominiecia_dzien) AS n`).get() as { n: number }).n;
+  const przed = zapisow();
+  const r = await app.inject({ method: "GET", url: "/api/analiza/tarcie?days=30", headers: { "x-session": t } });
+  assert.equal(r.statusCode, 200);
+  const p = r.json();
+  assert.equal(p.oknoCofniecia.kubelki.length, 5);
+  assert.ok(p.tarcieSzkicu.zTwierdzeniami);
+  assert.ok(Array.isArray(p.gotowosc));
+  assert.ok(Array.isArray(p.pominiecia.wgDnia));
+  assert.equal(JSON.stringify(p).includes("Ktoś biuro"), false, "nazwisko nie ma prawa wyjść do biura");
+  assert.equal(zapisow(), przed, "odczyt pomiaru dopisał zdarzenie");
+});
+
 /* Raporty tygodni (0.497.0). Trasy tylko czytają: raport zapisuje takt
    w `main()`, a tydzień niepoliczony to 404, nie liczenie w locie. */
 test("raporty tygodni: lista, raport z poprzednim, 404 i zero zapisu", async () => {

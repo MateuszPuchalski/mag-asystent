@@ -28,6 +28,7 @@ import { OKNO_COFNIECIA_MS, Odlozone, nastepnaRozmowa, type Odlozona } from "../
 import { Cofniecie, type DoCofniecia } from "../skrzynka/Cofniecie";
 import { polePisania } from "../nawigacja/fokus";
 import { useSygnaly } from "../skrzynka/Sygnaly";
+import { useZglosPominiecie } from "../api/wglad";
 import { pamietanySzkic, zapamietajSzkic } from "../sprawy/useSzkicSprawy";
 
 /* Człony klucza magazynu karty — ten sam magazyn co reklamacje i dyskusje
@@ -250,6 +251,65 @@ export function Skrzynka() {
        spóźniony ma NIE uruchamiać tego efektu; powód wyżej. */
   }, [ja.data?.user.userId]);
 
+  /* ── POMINIĘCIE ROZMOWY (@wydanie) ────────────────────────────────────────
+     Pomiar pod decyzję właściciela z 26 września 2026: jak często agent
+     otwiera rozmowę i odchodzi bez ruchu — bez wysyłki, zakończenia,
+     odłożenia i notatki. Tego kosztu nie widział żaden licznik, a to on
+     mówi, ile rozmów bez możliwego ruchu stoi w kolejce.
+
+     NIGDY PRZY OTWARCIU. Raport idzie przy WYJŚCIU: przejście do innej
+     rozmowy, wyjście z ekranu, zamknięcie karty. Zapis jest zbiorczy, bez
+     osoby i bez rozmowy (`POST /api/obsluga/pominiecie`, wyjątek od
+     `logEvent` przyjęty przez właściciela — powód przy trasie).
+
+     RAPORT ODROCZONY O JEDEN OBRÓT PĘTLI. `StrictMode` montuje efekty dwa
+     razy; natychmiastowy raport przy sprzątaniu liczyłby pominięcie przy
+     każdym otwarciu. Ta sama rozmowa zamontowana z powrotem odwołuje raport. */
+  const zglosPominiecie = useZglosPominiecie();
+  type Pobyt = { id: number; dzialal: boolean; kategoria: string | null };
+  const pobyt = useRef<Pobyt | null>(null);
+  const raportPominiecia = useRef<{ p: Pobyt; t: ReturnType<typeof setTimeout> } | null>(null);
+  const oznaczDzialanie = () => { if (pobyt.current) pobyt.current.dzialal = true; };
+  useEffect(() => {
+    if (wybranaId === null) return;
+    const o = raportPominiecia.current;
+    if (o && o.p.id === wybranaId) {
+      clearTimeout(o.t);
+      raportPominiecia.current = null;
+      pobyt.current = o.p;
+    } else {
+      pobyt.current = { id: wybranaId, dzialal: false, kategoria: null };
+    }
+    return () => {
+      const p = pobyt.current;
+      pobyt.current = null;
+      if (!p || p.dzialal) return;
+      const t = setTimeout(() => {
+        if (raportPominiecia.current?.p === p) raportPominiecia.current = null;
+        zglosPominiecie(p.kategoria);
+      }, 0);
+      raportPominiecia.current = { p, t };
+    };
+  }, [wybranaId]);
+  /* Kategoria przychodzi z danymi rozmowy, a raport idzie dopiero przy
+     wyjściu — dopisujemy ją, gdy się wczyta. */
+  useEffect(() => {
+    const p = pobyt.current;
+    const k = rozmowa.data?.rozmowa.kopilot;
+    if (!p || rozmowa.data?.rozmowa.id !== p.id) return;
+    p.kategoria = k ? (k.status === "FAILED" ? "nierozpoznane" : k.kategoria) : null;
+  }, [rozmowa.data]);
+  /* Zamknięcie karty: odroczony raport by nie zdążył, więc idzie od razu
+     (`keepalive` w haku), a pobyt dostaje znacznik, żeby nie poszedł drugi raz. */
+  useEffect(() => {
+    const f = () => {
+      const p = pobyt.current;
+      if (p && !p.dzialal) { p.dzialal = true; zglosPominiecie(p.kategoria); }
+    };
+    window.addEventListener("pagehide", f);
+    return () => window.removeEventListener("pagehide", f);
+  }, []);
+
   /* CHWILA OTWARCIA ROZMOWY — pomiar tarcia (0.500.0). Liczy się od
      wejścia w rozmowę do kliknięcia „Wyślij", nie do wyjścia odpowiedzi po
      dziesięciu sekundach: okno cofnięcia to nie szukanie po ekranie. */
@@ -380,12 +440,14 @@ export function Skrzynka() {
       };
       setOdlozone((l) => [...l, w]);
       timery.current.set(w.klucz, setTimeout(() => wyslijOdlozona(w), OKNO_COFNIECIA_MS));
+      oznaczDzialanie();
       ustawSzkic("");
       /* NASTĘPNA W TYM, CO WIDAĆ — patrz `nastepnaRozmowa`. */
       dalej(nastepnaRozmowa(widoczne.current, w.rozmowaId));
       return;
     }
     setBladWysylki("");
+    oznaczDzialanie();
     wyslij.mutate({
       id: rozmowa.data.rozmowa.id, body: szkic,
       expectedVersion: rozmowa.data.rozmowa.wersja,
@@ -491,6 +553,7 @@ export function Skrzynka() {
     const klient = rozmowa.data.rozmowa.klient;
     odloz.mutate({ id, doKiedy }, {
       onSuccess: () => {
+        oznaczDzialanie();
         dalej(nastepnaRozmowa(widoczne.current, id));
         setDoCofniecia({ klucz: Date.now(), opis: <>Odłożono rozmowę z <b>{klient}</b> {opis}</>,
           cofnij: () => {
@@ -585,7 +648,7 @@ export function Skrzynka() {
          odpowiedź do klienta. */
       onDodajKomentarz={() => rozmowa.data && dodajKomentarz.mutate(
         { rozmowaId: rozmowa.data.rozmowa.id, body: komentarz, mentionedUserIds: wzmianki },
-        { onSuccess: () => { ustawKomentarz(""); setWzmianki([]); } })}
+        { onSuccess: () => { oznaczDzialanie(); ustawKomentarz(""); setWzmianki([]); } })}
       agenci={(agenci.data?.users ?? [])
         .filter((u) => u.userId !== ja.data?.user.userId)
         .map((u) => ({ userId: u.userId, name: u.name }))}
@@ -750,6 +813,7 @@ export function Skrzynka() {
         const klient = rozmowa.data.rozmowa.klient;
         zakoncz.mutate({ id, mimoPytania }, {
           onSuccess: () => {
+            oznaczDzialanie();
             dalej(nastepnaRozmowa(widoczne.current, id));
             /* COFNIJ PO ZAKOŃCZENIU (0.500.0): rozmowa właśnie zniknęła
                z listy i z ekranu, więc pomyłki nie widać. Cofnięcie to ta sama
@@ -820,7 +884,13 @@ export function Skrzynka() {
         const w = odlozone.find((o) => o.klucz === k);
         /* Wpis do pomiaru tarcia (0.500.0) — tylko przy „Cofnij". „Wróć"
            po błędzie wysyłki to nie pomyłka agenta, tylko Allegro. */
-        if (w) { zglosCofnietaWysylke(w.rozmowaId); wrocDo(w); }
+        /* Czas od odłożenia do „Cofnij" (@wydanie) — do pytania właściciela,
+           czy dziesięć sekund to za długo. Liczony z odliczania na pasku. */
+        if (w) {
+          const ms = w.stan.rodzaj === "czeka" ? OKNO_COFNIECIA_MS - (w.stan.doKiedy - Date.now()) : undefined;
+          zglosCofnietaWysylke(w.rozmowaId, ms);
+          wrocDo(w);
+        }
       }}
       onWroc={(k) => { const w = odlozone.find((o) => o.klucz === k); if (w) wrocDo(w, w.blad); }}
       onZamknij={usunOdlozona} />

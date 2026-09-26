@@ -729,6 +729,15 @@ kategoria jest od Copilota, czy od zespołu. Przy kategorii awaryjnej albo
 nieudanym rozpoznaniu nie staje wcale. Kategoria człowieka wygrywa i nie
 wpuszcza dodatkowych kategorii modelu.
 
+**Soczewka paczki (0.531.0).** „Gdzie moja paczka" to najczęstsze pytanie
+skrzynki, a odpowiedź leżała w zwiniętym wierszu „Zamówienie". Przy statusie
+zamówienia i kategoriach dostawy soczewka pokazuje bez kliknięcia stan paczki,
+przewoźnika, numer z kopiowaniem i czas sprawdzenia. Sprawdzenie zostaje jawnym
+kliknięciem. Pełny przycisk staje przy stanie nieznanym albo starszym niż pół
+godziny, a przy świeżym zostaje ciche „sprawdź".
+Paczka stoi wtedy raz: wiersz „Zamówienie" i „Wymaga Ciebie" jej nie powtarzają.
+Ogólny status zamówienia ustępuje soczewce z dodatkowej kategorii, np. anulowaniu.
+
 Decyzja z 0.198.0 zostaje: oferta i kartoteka to jeden wiersz, otwarty bez
 klikania. Zwija się wyłącznie przy zwrocie albo sprawie w toku, bo wtedy
 tematem jest decyzja z terminem, a karta towaru jest tłem.
@@ -6140,6 +6149,46 @@ Każda zmiana niżej ma powód w komentarzu obok kodu.
 się najwyżej raz w tygodniu, została odrzucona. Wydania idą jak dotąd,
 a o zmianach mówi pasek z punktu 7.
 
+### 26c.1. Pomiary pod decyzje (0.532.0)
+
+Decyzja właściciela z 26 września 2026: cztery zasady skrzynki rozstrzygają
+dane, nie przekonanie. Karta „Pomiary pod decyzje” stoi w Analizie, pod
+tarciem, i liczy z tego samego odczytu. Każda sekcja nosi nazwę decyzji:
+
+- **Okno cofnięcia.** Czy dziesięć sekund to za długo. Panel podaje czas od
+  odłożenia wysyłki do „Cofnij” (`msOdKolejki`). Karta pokazuje udział
+  cofnięć i rozkład co dwie sekundy. Zdanie na wierzchu brzmi na przykład
+  „95% cofnięć przed 4 s”. Stare cofnięcia bez czasu liczą się w udziale.
+- **Tarcie przy szkicu.** Czy „Wyślij bez zmian” (§26c.3) działa. Przy
+  wysyłce serwer zamraża liczbę twierdzeń spoza faktów w zdarzeniu
+  `rozmowa_wyslana`. Wiersz `szkic_copilota` nadpisuje następny szkic, więc
+  po fakcie tej wiedzy by nie było. Karta porównuje udział „bez zmian” przy
+  szkicach z takimi twierdzeniami i bez nich. Porównanie przed i po 0.500.0
+  bierze granicę z pierwszej wysyłki z pomiarem czasu.
+- **Gotowość do autowysyłki.** Dowody, nie sama autowysyłka — tej dalej nie
+  ma. Dla każdej kategorii karta podaje szkice bez zmian, dolną granicę
+  przedziału Wilsona i liczbę dni z danymi. Specyfikacja z 20 września chce
+  tygodnia dowodów, bramki per klasa i wyłącznika awaryjnego.
+- **Pominięcia.** Rozmowa otwarta i zostawiona bez odpowiedzi, zakończenia,
+  odłożenia i notatki. Panel zgłasza je przy wyjściu z rozmowy, nigdy przy
+  otwarciu (`useZglosPominiecie`, `POST /api/obsluga/pominiecie`).
+
+**Licznik pominięć nie zna ludzi.** Tabela `pominiecia_dzien` ma trzy
+kolumny: dzień, kategorię i liczbę. Nie ma w niej autora, rozmowy ani
+godziny. Każda z nich pozwoliłaby odtworzyć, kto odpuścił. To byłby
+monitoring pracowniczy (art. 22² Kodeksu pracy), którego to pytanie nie
+potrzebuje.
+
+**Wyjątek od reguły `logEvent`.** Zapis pominięcia jest jedyną mutacją biura
+bez wpisu w dzienniku. Wpis w `events` niesie autora i milisekundę. Nawet
+bez autora jego chwila zestawiona z otwarciem rozmowy wskazuje człowieka.
+Prawo pracownika bije tu zasadę audytu. Pozostałe trzy pomiary liczą się
+z zapisów, które już stały w bazie.
+
+**Czas czekania na Copilota.** Karta Copilota podaje medianę i 90. percentyl
+czasu wywołania dla każdego zadania. Księga `copilot_wywolanie` zapisywała
+ten czas od początku, ale nikt go nie czytał.
+
 ## 26d. Skrzynka spokojniejsza: mniej naraz, to samo pod ręką (0.506.0)
 
 Zgłoszenie jednego z agentów brzmiało: „aplikacja przytłacza". Propozycja
@@ -6224,6 +6273,8 @@ Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko
 - tarcie „Wyślij bez zmian” (§26c.3);
 - wiersze Klient i Wiedza w Skrzynce, tylko skrócone (0.216.0).
 
+**Odwrócone 26 września 2026 decyzją właściciela (0.531.0).** Puste wiersze Klient i Wiedza znikają, bo przy większości rozmów mówiły tylko „nic tu nie ma”. Wiersz z treścią zostaje zwinięty jak dotąd. Pierwszy kontakt ze znanym loginem mówi jedna linijka „Nowy klient” pod pasmem.
+
 **Jedna zmiana do potwierdzenia.** Ściąga skrótów w kolejce Skrzynki otwiera się teraz kliknięciem, nie najechaniem. Najechanie przyszło w 0.402.0 po uwadze właściciela. Pełna lista skrótów dalej stoi pod klawiszem `?`.
 
 ## 26f. Pętla pracy w skrzynce (@wydanie)
@@ -6254,6 +6305,8 @@ Właściciel poprosił o poprawę przepływu pracy agenta w Skrzynce. §26d i §
 - **Odłóż do terminu wraca.** Trasa `POST /api/conversations/:id/odloz` przyjmuje `doKiedy`, a `null` zdejmuje odłożenie. Termin jest zawsze, najwyżej trzydzieści dni. Rozmowa wraca sama o 8:00 w dzień roboczy, a nowa wiadomość klienta budzi ją wcześniej. Menu „⋯” ma trzy gotowe terminy i kalendarz. Klawisz O odkłada do następnego dnia roboczego. Po odłożeniu stoi pasek „Cofnij”, jak po Zakończ.
 
 Odłożenie nie jest powrotem ręcznych statusów z 22 września. Tamto było pozycją menu bez daty. Powód zmiany jest mierzalny: rozmowa bez możliwego ruchu stała najwyżej w kolejce, bo była najstarsza. Agent przeskakiwał ją przy każdym wejściu.
+
+**Pomiary pod decyzje.** Ekran zgłasza pominięcie przy wyjściu z rozmowy bez ruchu, nigdy przy otwarciu. „Cofnij” niesie czas od odłożenia wysyłki. Oba liczby czyta karta „Pomiary pod decyzje” w Analizie.
 
 **Strażnik.** `ekrany/Skrzynka.test.tsx` jest pierwszym testem całego ekranu Skrzynki. Pilnuje zera zapisu przy otwarciu i każdego błędu z listy wyżej.
 

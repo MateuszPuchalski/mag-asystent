@@ -118,6 +118,9 @@ const TRASY = () => [
     payload: { doKiedy: new Date(Date.now() + 86_400_000).toISOString() } },
   /* Cofnięta wysyłka (0.500.0) — sam wpis do pomiaru tarcia, ta sama bramka. */
   { method: "POST" as const, url: `/api/conversations/${rozmowa}/wysylka-cofnieta` },
+  /* Pominięcie (0.532.0) — licznik bez człowieka, ale pisze go tylko biuro:
+     hala rozmów nie widzi, więc nie ma czego pomijać. */
+  { method: "POST" as const, url: "/api/obsluga/pominiecie", payload: { kategoria: "RETURN" } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/priorytet`,
     payload: { priorytet: "pilny" } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/reklamacyjna`,
@@ -860,4 +863,40 @@ test("odłóż: ciało bez `doKiedy` odpada 400; z terminem kolejka widzi odło�
   assert.equal(r.statusCode, 200, r.body);
   w = await wiersz();
   assert.equal(w.status, "waiting_for_us");
+});
+
+/* ── Pomiary pod decyzje (26 września 2026, 0.532.0) ─────────────────────── */
+
+test("cofnięta wysyłka niesie czas od odłożenia; liczba spoza 0–60 s odpada, wpis zostaje", async () => {
+  const b = login("biuro", "Anna");
+  const wpisy = () => (db().prepare(`SELECT payload FROM events WHERE type='rozmowa_wysylka_cofnieta'
+    ORDER BY id`).all() as Array<{ payload: string }>).map((w) => JSON.parse(w.payload));
+  let r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/wysylka-cofnieta`,
+    headers: b.naglowki, payload: { msOdKolejki: 2_345.6 } });
+  assert.equal(r.statusCode, 200, r.body);
+  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/wysylka-cofnieta`,
+    headers: b.naglowki, payload: { msOdKolejki: 999_999 } });
+  assert.equal(r.statusCode, 200, "zła liczba nie odrzuca decyzji agenta");
+  /* Stary panel woła bez ciała — tak ma zostać ważne. */
+  r = await app.inject({ method: "POST", url: `/api/conversations/${rozmowa}/wysylka-cofnieta`,
+    headers: b.naglowki });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.deepEqual(wpisy(), [
+    { conversationId: rozmowa, msOdKolejki: 2_346 },
+    { conversationId: rozmowa }, { conversationId: rozmowa }]);
+});
+
+test("pominięcie: sam licznik doby i klasy — bez wpisu w dzienniku, bez człowieka", async () => {
+  db().prepare("DELETE FROM pominiecia_dzien").run();
+  const b = login("biuro", "Anna");
+  const przed = liczbaZdarzen();
+  for (const payload of [{ kategoria: "RETURN" }, { kategoria: "RETURN" }, {}, undefined]) {
+    const r = await app.inject({ method: "POST", url: "/api/obsluga/pominiecie", headers: b.naglowki, payload });
+    assert.equal(r.statusCode, 200, r.body);
+  }
+  assert.equal(liczbaZdarzen(), przed, "wpis w dzienniku niósłby autora z milisekundą");
+  const wiersze = db().prepare("SELECT * FROM pominiecia_dzien ORDER BY kategoria").all() as
+    Array<Record<string, unknown>>;
+  assert.deepEqual(wiersze.map((w) => [w.kategoria, w.ile]), [["RETURN", 2], ["bez rozpoznania", 2]]);
+  assert.deepEqual(Object.keys(wiersze[0]!).sort(), ["dzien", "ile", "kategoria"]);
 });

@@ -16,7 +16,7 @@ import { db } from "../db/db.js";
 import { stanSynchronizacji } from "../services/allegro-inbox-sync-state.js";
 import { synchronizujAllegroInbox } from "../services/allegro-inbox-sync.js";
 import { wyslijOdpowiedz } from "../services/wysylka.js";
-import { czasDoWysylki, zapiszCofniecieWysylki } from "../services/tarcie.js";
+import { czasCofniecia, czasDoWysylki, zapiszCofniecieWysylki, zapiszPominiecie } from "../services/tarcie.js";
 import { przekrojTowaru } from "../services/przekroj-towaru.js";
 import {
   dodajZalacznik, usunZalacznik, zalacznikiRozmowy,
@@ -604,16 +604,35 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
 
   /* Cofnięta wysyłka (0.500.0) — sam wpis do pomiaru tarcia. Czekanie
      dziesięciu sekund mieszka w przeglądarce, więc serwer inaczej by o tym
-     nie wiedział. Powód i granice przy `services/tarcie.ts`. */
-  app.post<{ Params: { id: string } }>(
+     nie wiedział. Powód i granice przy `services/tarcie.ts`.
+
+     `msOdKolejki` (0.532.0) jest opcjonalne i NIEZAUFANE: liczba spoza
+     0–60 s odpada po cichu, a cofnięcie i tak się liczy. Pomiar nie ma
+     prawa odrzucić wpisu, który mówi o decyzji agenta już podjętej. */
+  app.post<{ Params: { id: string }; Body: { msOdKolejki?: number } }>(
     "/api/conversations/:id/wysylka-cofnieta", async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
       const s = sesjaZadania()!;
-      if (!zapiszCofniecieWysylki(db(), Number(req.params.id), { id: s.user.userId, name: s.user.name })) {
+      if (!zapiszCofniecieWysylki(db(), Number(req.params.id), { id: s.user.userId, name: s.user.name },
+        czasCofniecia(req.body?.msOdKolejki))) {
         return reply.code(404).send({ error: "Nie ma takiej rozmowy" });
       }
       return { ok: true };
     });
+
+  /* Pominięcie rozmowy (26 września 2026, 0.532.0) — sam licznik doby
+     i klasy, bez autora i bez numeru rozmowy. Ta sama bramka co reszta
+     skrzynki: licznik pisze tylko ten, kto rozmowy w ogóle widzi.
+
+     JEDYNA MUTACJA BIURA BEZ `logEvent`, i to celowo. Wpis w dzienniku
+     niesie autora i milisekundę, więc zrobiłby z licznika listę „kto
+     odpuścił" — monitoring, którego pytanie nie potrzebuje (art. 22² KP).
+     Całe uzasadnienie przy `zapiszPominiecie` w `services/tarcie.ts`. */
+  app.post<{ Body: { kategoria?: string } }>("/api/obsluga/pominiecie", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    zapiszPominiecie(db(), req.body?.kategoria);
+    return { ok: true };
+  });
 
   /* ── ZAKOŃCZ / OTWÓRZ PONOWNIE (23 września 2026) ──────────────────────────
      Jeden werdykt zamiast menu statusów — powód w `conversations.ts` przy

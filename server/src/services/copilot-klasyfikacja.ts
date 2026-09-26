@@ -6,6 +6,8 @@ import {
   polacz, zamaskujBlok, zamaskujWatekZeSladem, zostalyDaneOsobowe, type TrescBezpieczna,
 } from "./copilot-maskowanie.js";
 import { kosztUsd, type Tokeny } from "./copilot-koszt.js";
+import { mediana } from "./raporty.js";
+import { p90 } from "./wymiana.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
@@ -660,7 +662,12 @@ export interface PomiarCopilota {
    * z miarą klasyfikacji i „zejdź na tańszy model" nie wiedziałoby, o którym
    * zadaniu mówi.
    */
-  wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number }>;
+  wgZadania: Array<{ zadanie: string; wywolan: number; bledow: number; kosztUsd: number;
+    /**
+     * Czas czekania na model w ms (0.532.0): mediana i 90. percentyl.
+     * `null`, gdy żadne wywołanie nie ma zmierzonego czasu.
+     */
+    medianaMs: number | null; p90Ms: number | null }>;
   /**
    * Szkice odpowiedzi: ile powstało i co agent z nimi zrobił. Od przyrostu
    * trzeciego także los DANYCH z rozmowy — osobno, bo dobry szkic bywa ze
@@ -730,7 +737,8 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
     .all() as Array<Record<string, string | number>>)
     .reduce((acc, w) => {
       const z = acc.find((x) => x.zadanie === String(w.zadanie))
-        ?? acc[acc.push({ zadanie: String(w.zadanie), wywolan: 0, bledow: 0, kosztUsd: 0 }) - 1]!;
+        ?? acc[acc.push({ zadanie: String(w.zadanie), wywolan: 0, bledow: 0, kosztUsd: 0,
+          medianaMs: null, p90Ms: null }) - 1]!;
       z.wywolan += Number(w.wywolan); z.bledow += Number(w.bledow ?? 0);
       if (String(w.model)) {
         z.kosztUsd = Number((z.kosztUsd + kosztUsd(String(w.model), {
@@ -741,6 +749,27 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
       }
       return acc;
     }, [] as PomiarCopilota["wgZadania"]);
+
+  /* ── Czas czekania na Copilota (26 września 2026, 0.532.0) ──────────────
+     Księga zapisywała `ms` od początku, a nikt go nie czytał. Agent czeka
+     na szkic przy otwartej rozmowie, więc to jest koszt w sekundach obok
+     kosztu w złotych. Mediana mówi o typowym czekaniu, p90 o tym, które
+     agent zapamięta. Nieudane też, gdy mają czas: przekroczony limit to
+     najdłuższe czekanie ze wszystkich, a pominięcie go upiększałoby liczbę.
+     Błąd bez czasu (`zapiszBlad`) nie ma czego wnieść i odpada sam. */
+  const czasy = new Map<string, number[]>();
+  for (const c of database.prepare("SELECT zadanie, ms FROM copilot_wywolanie WHERE ms IS NOT NULL")
+    .all() as Array<{ zadanie: string; ms: number }>) {
+    const lista = czasy.get(c.zadanie);
+    if (lista) lista.push(Number(c.ms));
+    else czasy.set(c.zadanie, [Number(c.ms)]);
+  }
+  for (const z of wgZadania) {
+    const ms = czasy.get(z.zadanie) ?? [];
+    const m = mediana(ms);
+    z.medianaMs = m === null ? null : Math.round(m);
+    z.p90Ms = p90(ms);
+  }
 
   const sz = database.prepare(`SELECT COUNT(*) AS ile,
       SUM(CASE WHEN ocena='odrzucony' THEN 1 ELSE 0 END) AS odrzuconych,
