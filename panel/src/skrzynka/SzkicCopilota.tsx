@@ -179,10 +179,17 @@ export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
   const skrotyDzialaja = useSkrotyDzialaja();
   const s = p.szkic;
   if (!s) return null;
+  /* ── METRYKA W DYMKU, NIE W WIERSZU (@wydanie) ────────────────────────
+     Model, godzina, kto i liczba znaków stały zawsze widoczne obok nazwy.
+     Agent sięga po nie wyjątkowo — przy reklamacji szkicu, nie przy
+     czytaniu — więc zeszły do podpowiedzi nad napisem. Liczba znaków
+     została widoczna w podpisie zwiniętej treści, gdzie decyduje
+     o rozwinięciu. Zeszło też „— poprawiaj wprost w polu": tekst stoi
+     w polu z kursorem, a zdanie powtarzało to, co widać. */
   return <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
-      <b className="text-violet-900"><Sparkles size={12} className="inline" /> Szkic Copilota{wPolu && " w polu"}</b>
-      <span className="text-slate-500">{s.model} · {czas(s.at)} · {s.przez} · {s.tresc.length} znaków</span>
-      {wPolu && <span className="text-slate-600">— poprawiaj wprost w polu</span>}
+      <b className="cursor-help text-violet-900"
+        title={`${s.model} · ${czas(s.at)} · ${s.przez} · ${s.tresc.length} znaków`}>
+        <Sparkles size={12} className="inline" /> Szkic Copilota{wPolu && " w polu"}</b>
       {p.nieswiezy && <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
         powstał przed nową wiadomością klienta</span>}
       {/* Drugi rodzaj nieświeżości (przyrost trzeci): dane doboru zmieniły się
@@ -225,6 +232,21 @@ export function UwagiSzkicu({ uwagi }: { uwagi: string[] }) {
 }
 
 /**
+ * Tematy paska „Przy okazji" — podpis zwiniętego paska (@wydanie). Nazwy
+ * mówią, GDZIE rzecz trafiła, bo po to agent rozwija: żeby sprawdzić swoje
+ * miejsce, nie żeby przeczytać wszystko. Pusta lista = paska nie ma.
+ */
+function przyOkazji(p: PropsSzkicuCopilota, s: SzkicCopilota): string[] {
+  const l = s.lukiKartoteki;
+  return [
+    p.nowePolaDoboru.length > 0 && "dane doboru",
+    !!p.paraPasowania && "pasowanie",
+    l.numery.length > 0 && "numery w kartotece",
+    (l.wpisane.length > 0 || l.modele.length > 0 || l.czeka > 0) && "wiedza",
+  ].filter((x): x is string => x !== false);
+}
+
+/**
  * Karta szkicu. `wPolu` znaczy, że treść stoi już w polu agenta (0.495.0,
  * od 0.499.0 jako zwykły tekst) — wtedy karta nie powtarza ani treści, ani
  * paska z przyciskami, bo oba stoją nad polem. Zostaje to, na czym szkic stoi.
@@ -241,6 +263,7 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
      zostaje z tym, na czym stoi — uwagami, odczytem zdjęć i dopytaniem —
      także po „Wstaw do odpowiedzi", bo agent właśnie go poprawia. */
   if (!s || (s.ocena !== null && !(wPolu && s.ocena !== "odrzucony"))) return null;
+  const tematy = przyOkazji(p, s);
   /* PRZYCISKI NA GÓRZE (0.232.1) — patrz `PasekSzkicu`. */
   return <section className={wPolu ? "mt-2" : "mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3"}
     aria-label={wPolu ? "Na czym stoi szkic Copilota" : "Szkic Copilota"}>
@@ -287,13 +310,19 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
           ramki na jeden komunikat to ścisk, nie porządek.
 
           `data-testid` zostaje HISTORYCZNY (`luki-kartoteki`), bo po nim
-          sięgają testy, a zmiana nazwy kupiłaby wyłącznie ładniejsze słowo. */}
-      {(p.nowePolaDoboru.length > 0 || p.paraPasowania || s.lukiKartoteki.numery.length > 0
-        || s.lukiKartoteki.wpisane.length > 0 || s.lukiKartoteki.modele.length > 0
-        || s.lukiKartoteki.czeka > 0) &&
-        <p className="mb-2 rounded border border-sky-200 bg-white p-2 text-xs text-sky-900"
+          sięgają testy, a zmiana nazwy kupiłaby wyłącznie ładniejsze słowo.
+
+          ── ZWINIĘTY DO JEDNEJ LINII (@wydanie) ────────────────────────────
+          Pasek bywał sześcioma zdaniami pod każdym szkicem, a żadne nie
+          prosi o ruch: dane weszły same, pasowanie czeka w Doborze, wiedza
+          w swojej kolejce. Zwinięty mówi, CZEGO dotyczy, a treść stoi
+          o jedno kliknięcie. Ostrzeżenia modelu stoją niżej, rozwinięte. */}
+      {tematy.length > 0 &&
+        <details className="mb-2 rounded border border-sky-200 bg-white p-2 text-xs text-sky-900"
           data-testid="luki-kartoteki">
-          <b className="text-sky-950">Przy okazji.</b>{" "}
+          <summary className="cursor-pointer">
+            <b className="text-sky-950">Przy okazji:</b> {tematy.join(", ")}</summary>
+          <p className="mt-1">
           {p.nowePolaDoboru.length > 0 && <>
             Do doboru wpisano: <b>{p.nowePolaDoboru.join(", ")}</b> (popraw w Doborze po prawej,
             jeśli się myli).{" "}
@@ -315,7 +344,8 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
             <b>{s.lukiKartoteki.modele.join(", ")}</b>.{" "}
           </>}
           {s.lukiKartoteki.czeka > 0 && <>Tej kartoteki czeka tam {s.lukiKartoteki.czeka}.</>}
-        </p>}
+          </p>
+        </details>}
       {s.zastrzezenia.length > 0 && <UwagiSzkicu uwagi={s.zastrzezenia} />}
     </div>
     {/* Rachunek POD tekstem, nie w nim (0.253.0): klient ma dostać gładką

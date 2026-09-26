@@ -36,7 +36,7 @@ export function AlarmSynchronizacji({ zdrowie, synchronizuj, trwa, blad }: {
 
   /* Niesparowane konto to NIE jest awaria synchronizacji, choć wygląda tak
      samo: przebiegi padają, licznik rośnie, baner się zapala. Różnica jest
-     w tym, co pomaga — SYNCHRONIZUJ TERAZ wywoła dokładnie ten sam błąd,
+     w tym, co pomaga — „Synchronizuj teraz” wywoła dokładnie ten sam błąd,
      bo próba bez tokena nie ma jak wyjść do Allegro.
 
      Przycisk, który na pewno nie zadziała, jest gorszy niż jego brak:
@@ -64,16 +64,21 @@ export function AlarmSynchronizacji({ zdrowie, synchronizuj, trwa, blad }: {
           czekać, a ich tu nie widać.
         </p>
       </div>
-      {!bezPolaczenia && <Przycisk onClick={synchronizuj} disabled={trwa}>
-        <RefreshCw size={16} />{trwa ? "PRÓBA W TOKU…" : "SYNCHRONIZUJ TERAZ"}
+      {/* Ręczna synchronizacja NIE omija przerwy — skraca tylko czekanie po jej
+          końcu. Bez tego zdania przycisk obiecuje coś, czego nie robi.
+
+          ZDANIE W DYMKU PRZYCISKU, NIE W STAŁYM AKAPICIE (@wydanie). Akapit
+          stał pod banerem zawsze, także przy niesparowanym koncie, gdzie
+          przycisku nie ma i zdanie nie miało czego prostować. Dymek stoi
+          tam, gdzie pada pytanie „czy to pomoże", czyli nad samym przyciskiem. */}
+      {!bezPolaczenia && <Przycisk onClick={synchronizuj} disabled={trwa}
+        title={`Respektujemy Retry-After. Następna próba: ${czas(i.nastepnaProba)}. `
+          + "Ręczna synchronizacja nie omija tej przerwy."}>
+        {/* Zdaniem, nie WERSALIKAMI (@wydanie): krzyk w banerze awarii
+            dokładał paniki, a nie czytelności. */}
+        <RefreshCw size={16} />{trwa ? "Próba w toku…" : "Synchronizuj teraz"}
       </Przycisk>}
     </div>
     {blad && <p className="mt-2 text-sm text-red-800">{blad}</p>}
-    {/* Ręczna synchronizacja NIE omija przerwy — skraca tylko czekanie po jej
-        końcu. Bez tego zdania przycisk obiecuje coś, czego nie robi. */}
-    <p className="mt-2 text-xs text-red-800">
-      Respektujemy Retry-After. Następna próba: {czas(i.nastepnaProba)}.
-      Ręczna synchronizacja nie omija tej przerwy.
-    </p>
   </div>;
 }

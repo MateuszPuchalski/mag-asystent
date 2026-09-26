@@ -132,7 +132,7 @@ describe("zakładka doboru", () => {
     /* Szczebel pominięty NIE wygląda jak „zero wyników" (blizna 0.153.1). */
     expect(screen.getByTitle(/pominięty: rozmowa nie jest powiązana z ofertą/)).toBeInTheDocument();
     /* Bez wyboru nie ma czego zatwierdzać. */
-    expect(screen.queryByRole("button", { name: /ZATWIERDŹ DOBÓR/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Zatwierdź dobór/ })).not.toBeInTheDocument();
     expect(kandydaci).toHaveBeenCalledWith(4821);
   });
 
@@ -173,16 +173,17 @@ describe("zakładka doboru", () => {
     ] }, isLoading: false, error: null });
     pokaz(dobor({ status: "searching", dane: { ...dobor().dane, parametry: { "długość": "148 cm" } } }));
     expect(screen.getByTitle(/pominięty: agent nie wpisał wymiarów w parametrach doboru/)).toHaveTextContent("zgodne wymiary");
-    expect(screen.getByText(/droga: zgodne wymiary/)).toBeInTheDocument();
-    expect(screen.getByText(/zgodny wymiar 1480 mm/)).toBeInTheDocument();
+    /* Droga i źródło stoją w dymku pewności od @wydanie — nie znikają,
+       schodzą z trzeciego planu do podpowiedzi nad werdyktem. */
+    expect(screen.getByTitle(/droga: zgodne wymiary — zgodny wymiar 1480 mm/)).toHaveTextContent("wymaga danych");
   });
 
   it("kandydat niesie drogę, źródło i ostrzeżenie, a wybór jedzie z wersją doboru", async () => {
     kandydaci.mockReturnValue({ data: Z_KANDYDATAMI, isLoading: false, error: null });
     pokaz(dobor({ status: "searching", wersja: 3, dane: { ...dobor().dane, marka: "STIHL", model: "FS250" } }));
     expect(screen.getByText("FTC272")).toBeInTheDocument();
-    expect(screen.getByText(/SKU oferty/)).toBeInTheDocument();
-    expect(screen.getByText(/droga: zamiennik/)).toBeInTheDocument();
+    expect(screen.getByTitle(/SKU oferty/)).toBeInTheDocument();
+    expect(screen.getByTitle(/droga: zamiennik/)).toBeInTheDocument();
     expect(screen.getByText(/inny rozstaw/)).toBeInTheDocument();
     /* Dane wejściowe widać chipami — to one mówią, do czego dobieramy. */
     expect(screen.getByText("STIHL")).toBeInTheDocument();
@@ -207,7 +208,7 @@ describe("zakładka doboru", () => {
     await userEvent.click(screen.getByRole("button", { name: /Zleć pomiar/ }));
     expect(onZlecPomiar).toHaveBeenCalledWith(expect.objectContaining({ id: 14, sym: "FTC272" }));
 
-    await userEvent.click(screen.getByRole("button", { name: /ZATWIERDŹ DOBÓR/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Zatwierdź dobór/ }));
     /* `silnikModelId: null` = wiedza rośnie przy MASZYNIE — zachowanie sprzed
        dołożenia szczebla „przez silnik". */
     expect(status.mutate).toHaveBeenCalledWith(
@@ -238,11 +239,21 @@ describe("zakładka doboru", () => {
     expect(screen.getByAltText("FTC272")).toBeInTheDocument();
   });
 
+  it("wersja i „ustawił” stoją w dymkach, nie w wierszu", () => {
+    /* @wydanie: metryka zapisu przydaje się przy sporze, nie przy każdym
+       spojrzeniu — więc jest o najechanie, nie na wierzchu. */
+    pokaz(dobor({ wersja: 7, updatedBy: "M. Wójcik" }));
+    expect(screen.queryByText(/wersja 7/)).toBeNull();
+    expect(screen.getByTitle("wersja 7")).toHaveTextContent("Dane wejściowe");
+    expect(screen.queryByText(/ustawił:/)).toBeNull();
+    expect(screen.getByTitle("ustawił: M. Wójcik")).toContainElement(screen.getByLabelText("Status doboru"));
+  });
+
   it("zatwierdzony dobór nie ma drugiego przycisku zatwierdzania", () => {
     pokaz(dobor({ status: "confirmed", wybrany: {
       twId: 14, symbol: "FTC272", droga: "oferta", przez: "A. Lewandowska", at: "", zdanieDoSzkicu: "Do X pasuje FTC272 — źródło: kartoteka oferty." } }));
     expect(screen.getByLabelText("Status doboru")).toHaveDisplayValue("Dobór zatwierdzony");
-    expect(screen.queryByRole("button", { name: /ZATWIERDŹ DOBÓR/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Zatwierdź dobór/ })).not.toBeInTheDocument();
   });
 
   it("konflikt wersji przy danych mówi, kto zmienił, i NIE kasuje wpisanego", async () => {
@@ -252,7 +263,7 @@ describe("zakładka doboru", () => {
     await userEvent.click(screen.getByRole("button", { name: /Wpisz dane/ }));
     await userEvent.type(screen.getByLabelText("Marka"), "NAC");
     await userEvent.type(screen.getByLabelText("Model"), "LS 46-450");
-    await userEvent.click(screen.getByRole("button", { name: "ZAPISZ" }));
+    await userEvent.click(screen.getByRole("button", { name: "Zapisz" }));
 
     expect(zapisz.mutate).toHaveBeenCalledWith(expect.objectContaining({
       id: 4821, expectedVersion: 1, dane: expect.objectContaining({ marka: "NAC", model: "LS 46-450" }),
@@ -375,8 +386,7 @@ describe("zakładka doboru", () => {
         zrodlo: "uszczelka (od strony filtra) LC170430140-0001 pasuje do W09-0211 — katalog dostawcy, 7.09.2026, Anna" },
     ] }, isLoading: false, error: null });
     pokaz(dobor({ status: "searching", dane: { ...dobor().dane, oem: "W09-0211" } }));
-    expect(screen.getByText("droga: pasuje do części")).toBeInTheDocument();
-    expect(screen.getByText(/od strony filtra/)).toBeInTheDocument();
+    expect(screen.getByTitle(/^droga: pasuje do części — .*od strony filtra/)).toBeInTheDocument();
   });
 
   it("„Pasuje do…” stoi tylko przy kotwicy INNEJ niż wybrany i wysyła kierunek z rozmową", async () => {
@@ -425,7 +435,7 @@ describe("kandydat bez kartoteki (E3)", () => {
     expect(screen.getByText("OEM 118550127/0")).toBeInTheDocument();
     expect(screen.getByText("brak w kartotece")).toBeInTheDocument();
     expect(screen.getAllByRole("button", { name: /Wybierz/ })).toHaveLength(2);
-    expect(screen.getByText(/nie ma go w żadnym opisie/)).toBeInTheDocument();
+    expect(screen.getByTitle(/nie ma go w żadnym opisie/)).toBeInTheDocument();
   });
 });
 
@@ -507,7 +517,7 @@ describe("Dobór a silnik maszyny", () => {
     render(<Dobor dobor={zDanymi({ wybrany })} rozmowaId={4821}
       onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
     await userEvent.click(screen.getByRole("radio", { name: /Briggs & Stratton 450E/ }));
-    await userEvent.click(screen.getByRole("button", { name: /ZATWIERDŹ DOBÓR/ }));
+    await userEvent.click(screen.getByRole("button", { name: /Zatwierdź dobór/ }));
     expect(status.mutate).toHaveBeenCalledWith(
       { id: 4821, status: "confirmed", brakuje: null, silnikModelId: 7 }, expect.anything());
   });
