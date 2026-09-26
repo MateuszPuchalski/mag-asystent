@@ -113,16 +113,34 @@ export const LIMIT_ZNAKOW = 2000;
  * nie jest poprawka treści.
  *
  * To pomiar, nie bramka: los nie blokuje wysyłki i nie zmienia jej wyniku.
+ *
+ * TWIERDZENIA DO SPRAWDZENIA ZAMRAŻANE PRZY WYSYŁCE (@wydanie). Pytanie
+ * właściciela: czy tarcie „Wyślij bez zmian" (0.500.0) działa. Tarcie stoi
+ * tylko przy szkicu z twierdzeniami spoza faktów, a `szkic_copilota` ma
+ * jeden wiersz na rozmowę i następny szkic go nadpisuje. Po fakcie nie
+ * dałoby się więc powiedzieć, czy wysłany szkic miał co sprawdzać. Liczba
+ * jedzie w zdarzeniu `rozmowa_wyslana`, obok `msOdOtwarcia` — bez nowej
+ * kolumny i bez migracji. Reguła ta sama co `doSprawdzenia` w panelu
+ * (`skrzynka/ProcesCopilota.tsx`): źródło inne niż „fakty".
  */
 function losSzkicu(
   database: DatabaseSync, conversationId: number, lastMessageId: number | null, tresc: string,
-): "bez_zmian" | "poprawiony" | null {
+): { los: "bez_zmian" | "poprawiony"; doSprawdzenia: number } | null {
   if (lastMessageId === null) return null;
-  const sz = database.prepare("SELECT tresc, message_id FROM szkic_copilota WHERE conversation_id=?")
-    .get(conversationId) as { tresc: string; message_id: number | null } | undefined;
+  const sz = database.prepare("SELECT tresc, message_id, twierdzenia FROM szkic_copilota WHERE conversation_id=?")
+    .get(conversationId) as { tresc: string; message_id: number | null; twierdzenia: string | null } | undefined;
   if (!sz || Number(sz.message_id) !== Number(lastMessageId)) return null;
   const zwin = (t: string) => t.replace(/\s+/g, " ").trim();
-  return zwin(sz.tresc) === zwin(tresc) ? "bez_zmian" : "poprawiony";
+  let doSprawdzenia = 0;
+  try {
+    const lista = JSON.parse(sz.twierdzenia ?? "[]") as unknown;
+    if (Array.isArray(lista)) {
+      doSprawdzenia = lista.filter((t) => (t as { zrodlo?: unknown } | null)?.zrodlo !== "fakty").length;
+    }
+  } catch {
+    /* Uszkodzony JSON to brak wiedzy, nie powód, by zatrzymać wysyłkę. */
+  }
+  return { los: zwin(sz.tresc) === zwin(tresc) ? "bez_zmian" : "poprawiony", doSprawdzenia };
 }
 
 export async function wyslijOdpowiedz(z: ZadanieWysylki) {
@@ -289,9 +307,10 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       ON CONFLICT(channel_account_id, external_message_id) DO NOTHING`)
       .run(z.conversationId, k.channelAccountId, wynik.externalMessageId, tresc);
 
+    const szkic = losSzkicu(database, z.conversationId, k.lastMessageId, tresc);
     database.prepare(`UPDATE outbox SET status='sent', external_message_id=?, szkic_los=?,
       finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?`)
-      .run(wynik.externalMessageId, losSzkicu(database, z.conversationId, k.lastMessageId, tresc), outboxId);
+      .run(wynik.externalMessageId, szkic?.los ?? null, outboxId);
 
     /* Szkic znika dopiero po UDANEJ wysyłce. Przy każdym innym końcu zostaje
        nietknięty — odrzucona wysyłka nie ma prawa skasować pracy agenta. */
@@ -333,7 +352,8 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       { conversationId: z.conversationId, outboxId, kluczIdempotencji: klucz,
         externalMessageId: wynik.externalMessageId, znakow: tresc.length,
         zalacznikow: idZalacznikow.length,
-        ...(z.msOdOtwarcia != null ? { msOdOtwarcia: z.msOdOtwarcia } : {}) }, undefined, database);
+        ...(z.msOdOtwarcia != null ? { msOdOtwarcia: z.msOdOtwarcia } : {}),
+        ...(szkic ? { szkicDoSprawdzenia: szkic.doSprawdzenia } : {}) }, undefined, database);
 
     publishConversationEvent("message.created", z.conversationId, { outboxId });
     return { outboxId, status: "sent" as StatusWysylki, kluczIdempotencji: klucz,

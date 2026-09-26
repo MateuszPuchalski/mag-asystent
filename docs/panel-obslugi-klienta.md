@@ -6146,6 +6146,46 @@ Każda zmiana niżej ma powód w komentarzu obok kodu.
 się najwyżej raz w tygodniu, została odrzucona. Wydania idą jak dotąd,
 a o zmianach mówi pasek z punktu 7.
 
+### 26c.1. Pomiary pod decyzje (@wydanie)
+
+Decyzja właściciela z 26 września 2026: cztery zasady skrzynki rozstrzygają
+dane, nie przekonanie. Karta „Pomiary pod decyzje” stoi w Analizie, pod
+tarciem, i liczy z tego samego odczytu. Każda sekcja nosi nazwę decyzji:
+
+- **Okno cofnięcia.** Czy dziesięć sekund to za długo. Panel podaje czas od
+  odłożenia wysyłki do „Cofnij” (`msOdKolejki`). Karta pokazuje udział
+  cofnięć i rozkład co dwie sekundy. Zdanie na wierzchu brzmi na przykład
+  „95% cofnięć przed 4 s”. Stare cofnięcia bez czasu liczą się w udziale.
+- **Tarcie przy szkicu.** Czy „Wyślij bez zmian” (§26c.3) działa. Przy
+  wysyłce serwer zamraża liczbę twierdzeń spoza faktów w zdarzeniu
+  `rozmowa_wyslana`. Wiersz `szkic_copilota` nadpisuje następny szkic, więc
+  po fakcie tej wiedzy by nie było. Karta porównuje udział „bez zmian” przy
+  szkicach z takimi twierdzeniami i bez nich. Porównanie przed i po 0.500.0
+  bierze granicę z pierwszej wysyłki z pomiarem czasu.
+- **Gotowość do autowysyłki.** Dowody, nie sama autowysyłka — tej dalej nie
+  ma. Dla każdej kategorii karta podaje szkice bez zmian, dolną granicę
+  przedziału Wilsona i liczbę dni z danymi. Specyfikacja z 20 września chce
+  tygodnia dowodów, bramki per klasa i wyłącznika awaryjnego.
+- **Pominięcia.** Rozmowa otwarta i zostawiona bez odpowiedzi, zakończenia,
+  odłożenia i notatki. Panel zgłasza je przy wyjściu z rozmowy, nigdy przy
+  otwarciu (`useZglosPominiecie`, `POST /api/obsluga/pominiecie`).
+
+**Licznik pominięć nie zna ludzi.** Tabela `pominiecia_dzien` ma trzy
+kolumny: dzień, kategorię i liczbę. Nie ma w niej autora, rozmowy ani
+godziny. Każda z nich pozwoliłaby odtworzyć, kto odpuścił. To byłby
+monitoring pracowniczy (art. 22² Kodeksu pracy), którego to pytanie nie
+potrzebuje.
+
+**Wyjątek od reguły `logEvent`.** Zapis pominięcia jest jedyną mutacją biura
+bez wpisu w dzienniku. Wpis w `events` niesie autora i milisekundę. Nawet
+bez autora jego chwila zestawiona z otwarciem rozmowy wskazuje człowieka.
+Prawo pracownika bije tu zasadę audytu. Pozostałe trzy pomiary liczą się
+z zapisów, które już stały w bazie.
+
+**Czas czekania na Copilota.** Karta Copilota podaje medianę i 90. percentyl
+czasu wywołania dla każdego zadania. Księga `copilot_wywolanie` zapisywała
+ten czas od początku, ale nikt go nie czytał.
+
 ## 26d. Skrzynka spokojniejsza: mniej naraz, to samo pod ręką (0.506.0)
 
 Zgłoszenie jednego z agentów brzmiało: „aplikacja przytłacza". Propozycja
