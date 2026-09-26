@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Tag } from "lucide-react";
 import { useOutlet, usePrzeniesionoNaOutlet, zlote } from "../api/zwroty";
 import { Przycisk, Blad } from "../ui";
@@ -17,30 +18,39 @@ import { Przycisk, Blad } from "../ui";
 
    POTRĄCENIE STOI PRZY POZYCJI, bo to jest liczba, o którą przedmiot potaniał:
    oddaliśmy klientowi dokładnie tyle mniej. Kto wycenia regał, ma ją pod ręką
-   zamiast szacować z pamięci.                                                */
+   zamiast szacować z pamięci.
+
+   ZWINIĘTA DO JEDNEGO WIERSZA (@wydanie), jak `PasekUwag` na tym samym
+   ekranie. Pełna lista z przyciskiem przy każdej pozycji stała na stałe nad
+   trzema kolumnami i zabierała kolejce kilka wierszy, choć regał obsługuje
+   się raz na jakiś czas, a nie przy każdym zwrocie. Liczba i zdanie
+   o człowieku zostają na wierzchu; pozycje są jedno kliknięcie dalej. */
 
 export function NaOutlet() {
   const { data, error } = useOutlet();
   const przeniesiono = usePrzeniesionoNaOutlet();
+  const [rozwiniete, setRozwiniete] = useState(false);
   const pozycje = data?.pozycje ?? [];
   if (error) return <Blad>Nie wiem, co czeka na outlet: {(error as Error).message}</Blad>;
   if (pozycje.length === 0) return null;
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-3"
-      aria-label="Na regał outletowy">
-      <h2 className="flex items-center gap-2 text-sm font-bold text-slate-700">
-        <Tag size={16} aria-hidden />
-        Na regał outletowy · {pozycje.length}
+    <section className="shrink-0 space-y-1" aria-label="Na regał outletowy">
+      <button type="button" aria-expanded={rozwiniete} onClick={() => setRozwiniete((r) => !r)}
+        className="flex w-full flex-wrap items-center gap-x-2 rounded-lg border border-slate-200
+          bg-white px-3 py-1 text-left text-xs text-slate-700">
+        <Tag size={14} aria-hidden />
+        <span>Na regał outletowy <b className="tabular-nums">{pozycje.length}</b></span>
         {/* Zdanie, nie sama liczba: aplikacja nie wystawia tu dokumentu i ma
             to powiedzieć wprost, zamiast pozwolić czekać na papier, który
-            nie przyjdzie. */}
-        <span className="font-normal text-slate-500">— przenosi i wystawia MM człowiek</span>
-      </h2>
-      <ul className="mt-2 flex flex-col gap-1">
+            nie przyjdzie. Dlatego stoi w zwiniętym wierszu, a nie pod nim. */}
+        <span className="text-slate-500">— przenosi i wystawia MM człowiek</span>
+        <span className="ml-auto underline">{rozwiniete ? "zwiń listę" : "pokaż listę"}</span>
+      </button>
+      {rozwiniete && <ul className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-3">
         {pozycje.map((p) => (
           <li key={p.pozycjaId}
-            className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-1 text-xs">
+            className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-1 text-xs first:border-t-0 first:pt-0">
             <span className="font-bold">{p.symbol ?? p.nazwa}</span>
             {p.symbol && <span className="text-slate-500">{p.nazwa}</span>}
             <span className="text-slate-500">{p.ilosc} szt.</span>
@@ -53,7 +63,7 @@ export function NaOutlet() {
               Stoi na regale
             </Przycisk>
           </li>))}
-      </ul>
+      </ul>}
       {przeniesiono.error &&
         <Blad>{(przeniesiono.error as Error).message}</Blad>}
     </section>

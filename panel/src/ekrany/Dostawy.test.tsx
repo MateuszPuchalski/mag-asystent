@@ -189,6 +189,15 @@ describe("Ekran dostaw", () => {
     expect(within(kolejka).getByRole("button", { name: /Towar spoza dokumentu/ })).toBeInTheDocument();
   });
 
+  it("kolejka bez tytułu „Dostawy” — nazwę niesie nawigacja nad ekranem (@wydanie)", async () => {
+    pokaz();
+    await screen.findByRole("button", { name: /FZ 802\/MAG/ });
+    expect(screen.queryByText("Dostawy", { selector: "b" })).toBeNull();
+    /* Pytanie kubełka i granica okna importu dzielą jedno pasmo. */
+    const pytanie = screen.getByText("Reklamować u dostawcy czy zamknąć wyjątki?");
+    expect(pytanie.parentElement).toHaveTextContent(/okno importu: ostatnie \d+ dni/);
+  });
+
   it("kubełek liczy się z sygnału przed stanem", () => {
     const zOdp = new Set([900]);
     expect(kubelekDokumentu(dok(1, { status: "done", wyjatkiOtwarte: 2 }), new Set())).toBe("decyzja");
@@ -250,7 +259,10 @@ describe("Ekran dostaw", () => {
     await screen.findByRole("button", { name: /FZ 802\/MAG/ });
     expect(archiwumPytania).toEqual([]);
     await userEvent.click(screen.getByRole("button", { name: /Archiwum/ }));
-    expect(await screen.findByText(/pokazano 1 z 350 — zawęź wyszukiwaniem/)).toBeInTheDocument();
+    const granica = await screen.findByText(/pokazano 1 z 350 — zawęź wyszukiwaniem/);
+    /* Granica okna stoi w paśmie pytania, NAD listą (@wydanie) — ucięte
+       archiwum widać, zanim zacznie się czytać wiersze. */
+    expect(granica.parentElement).toHaveTextContent(/Tylko wgląd — dostawy spoza okna importu/);
     await userEvent.type(screen.getByLabelText("Szukaj dostawy"), "FZ 5");
     /* Filtrowanie w przeglądarce zawężałoby stronę wyników, nie zbiór —
        faktura sprzed roku nie znalazłaby się mimo poprawnego numeru. */
