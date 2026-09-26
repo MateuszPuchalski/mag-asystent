@@ -1,13 +1,14 @@
 import React from "react";
-import { ExternalLink, FileText, PackageSearch, ReceiptText } from "lucide-react";
+import { ExternalLink, FileText, PackageSearch, ReceiptText, Truck } from "lucide-react";
 import type { OsRozmowy } from "../api/typy";
 import { zlote } from "../api/zwroty";
-import { useDokumentySprzedazy, useKartaTowaru } from "../api/rozmowy";
+import { useDokumentySprzedazy, useKartaTowaru, useSprawdzPrzesylkeRozmowy } from "../api/rozmowy";
 import { NAZWA_KATEGORII } from "./statusy";
 import { STATUS as STATUS_PACZKI } from "./ZamowienieRozmowy";
-import { Przycisk, czas, dzien } from "../ui";
+import { Przycisk, Skopiuj, czas, dzien } from "../ui";
+import { paczkaOdchylenie } from "./kokpit";
 import {
-  OKNO_PODWOJNEGO_GODZ, PROSBA_O_ZDJECIE, STATUS_ZAKUPU, podwojneZakupy, soczewka,
+  OKNO_PODWOJNEGO_GODZ, PROSBA_O_ZDJECIE, STATUS_ZAKUPU, paczkaDoSprawdzenia, podwojneZakupy, soczewka,
   type Soczewka as DaneSoczewki,
 } from "./soczewki-reguly";
 
@@ -28,6 +29,7 @@ export function Soczewka({ dane, onWstawDoSzkicu }: {
     {s.rodzaj === "inny_towar" && <InnyTowar dane={dane} s={s} onWstawDoSzkicu={onWstawDoSzkicu} />}
     {s.rodzaj === "faktura" && <Faktura dane={dane} />}
     {s.rodzaj === "zwrot" && <ZwrotBezZgloszenia dane={dane} />}
+    {s.rodzaj === "paczka" && <PaczkaZamowienia dane={dane} />}
   </section>;
 }
 
@@ -190,5 +192,59 @@ function ZwrotBezZgloszenia({ dane }: { dane: OsRozmowy }) {
     <p className="text-slate-700">Klient zgłasza zwrot w Allegro; tu pojawi się po synchronizacji zwrotów.</p>
     {paczka?.dostarczonoAt && <p className="text-xs text-slate-600">
       Paczka z zamówieniem doręczona {dzien(paczka.dostarczonoAt)}.</p>}
+  </div>;
+}
+
+/* ── PACZKA: GDZIE JEST I CZY PYTAĆ ALLEGRO (@wydanie) ──────────────────────
+   „Gdzie moja paczka" to najczęstsze pytanie skrzynki. Odpowiedź stała
+   w zwiniętym wierszu „Zamówienie": rozwinąć, znaleźć linijkę, kliknąć
+   „sprawdź". Tu stoi bez kliknięcia, z tego samego zapisanego stanu.
+
+   „Sprawdź" zostaje JAWNYM kliknięciem, tym samym co w karcie zamówienia.
+   To dwa żądania u Allegro, a otwarcie rozmowy nie pisze nic. Pełny
+   przycisk staje tylko, gdy stan jest nieznany albo stary
+   (`paczkaDoSprawdzenia`) — wtedy to następny krok agenta, nie opcja. */
+function PaczkaZamowienia({ dane }: { dane: OsRozmowy }) {
+  const sprawdz = useSprawdzPrzesylkeRozmowy();
+  if (!dane.zamowienie) {
+    return <p className="text-slate-600">Rozmowa nie ma zamówienia — wskaż je w wierszu „Zamówienie" niżej.</p>;
+  }
+  const p = dane.zamowienie.przesylka;
+  /* Serwer odmawia sprawdzenia zamówienia, którego nie ma w bazie, więc
+     przycisk dałby tylko błąd. Zdanie mówi, kiedy to się zmieni. */
+  if (!p) {
+    return <p className="text-slate-600">Zamówienia jeszcze nie pobraliśmy — paczkę sprawdzisz
+      po najbliższej synchronizacji.</p>;
+  }
+  const odchylenie = paczkaOdchylenie(dane);
+  const doSprawdzenia = paczkaDoSprawdzenia(p, Date.now());
+  const pytaj = () => sprawdz.mutate({ id: dane.rozmowa.id });
+  return <div className="space-y-1.5" aria-label="Paczka zamówienia">
+    <p className={`font-semibold ${p.dostarczonoAt ? "text-ranga-ok"
+      : odchylenie ? "text-amber-900" : "text-slate-900"}`}>
+      {p.sprawdzonoAt === null ? "Nie pytaliśmy jeszcze Allegro o tę paczkę."
+        : p.waybill === null ? "Allegro nie ma numeru przesyłki — paczka nienadana albo nadana poza Allegro."
+        : p.dostarczonoAt ? `Paczka doręczona ${czas(p.dostarczonoAt)}.`
+        : p.status ? `Paczka: ${STATUS_PACZKI[p.status] ?? p.status}.`
+        : "Paczka nadana, przewoźnik nie podał jeszcze statusu."}</p>
+    {/* Numer przesyłki kopiuje się tym samym przyciskiem co numer zamówienia:
+        agent wkleja go klientowi albo w okno przewoźnika, nie przepisuje. */}
+    {p.waybill && <p className="flex flex-wrap items-center gap-x-2 text-xs text-slate-700">
+      <Truck size={13} className="shrink-0 text-slate-500" aria-hidden />
+      <span>{p.przewoznik ?? "przewoźnik nieznany"}</span>
+      <span className="font-mono">{p.waybill}</span>
+      <Skopiuj tekst={p.waybill} tytul="Kopiuj numer przesyłki" />
+    </p>}
+    {/* Przy świeżym albo doręczonym stanie pytanie zostaje cichym odnośnikiem,
+        jak w karcie zamówienia. Magazyn bywa szybszy niż pół godziny, a paczka
+        „doręczona" bywa sporna — człowiek musi móc zapytać sam. */}
+    {p.sprawdzonoAt && <p className="text-xs text-slate-600">stan z {czas(p.sprawdzonoAt)}
+      {!doSprawdzenia && <>{" · "}<button type="button" disabled={sprawdz.isPending} onClick={pytaj}
+        className="font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900 disabled:opacity-50">
+        {sprawdz.isPending ? "pytam…" : "sprawdź"}</button></>}</p>}
+    {doSprawdzenia && <Przycisk className="text-xs" disabled={sprawdz.isPending} onClick={pytaj}>
+      <Truck size={14} />{sprawdz.isPending ? "Pytam Allegro…"
+        : p.sprawdzonoAt ? "Sprawdź ponownie" : "Sprawdź paczkę"}</Przycisk>}
+    {sprawdz.error && <p className="text-xs text-red-700">{(sprawdz.error as Error).message}</p>}
   </div>;
 }

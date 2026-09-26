@@ -1,6 +1,6 @@
 import React, { useState } from "react";
-import { ChevronRight, PackageSearch } from "lucide-react";
-import type { OsRozmowy } from "../api/typy";
+import { ChevronRight, PackageSearch, UserRound } from "lucide-react";
+import type { HistoriaKlienta, OsRozmowy, WiedzaDoboru } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Przycisk, Pusto, dzien, odmien } from "../ui";
 import { OfertaRozmowy } from "./OfertaRozmowy";
@@ -14,11 +14,12 @@ import { Klient } from "./Klient";
 import { Wiedza } from "./Wiedza";
 import { PasmoOdpowiedzi } from "./PasmoOdpowiedzi";
 import { Soczewka } from "./Soczewki";
+import { paczkaWSoczewce } from "./soczewki-reguly";
 import { useHistoriaKlienta, useWiedzaDoboru } from "../api/rozmowy";
 import type { Towar } from "../wyszukiwarka";
 import { NAZWA_DOBORU } from "./statusy";
-import { bramkaDoboru, coSwieci, doborWToku, paczkaOdchylenie, pozycjiDoWskazania,
-  towarOtwartyNaStart, zwrotWToku } from "./kokpit";
+import { bramkaDoboru, coSwieci, doborWToku, klientMaHistorie, nowyKlient, pozycjiDoWskazania,
+  towarOtwartyNaStart, wiedzaMaTresc, zwrotWToku } from "./kokpit";
 
 /**
  * Trzecia kolumna ekranu skrzynki (§10.1, 0.180.0).
@@ -146,7 +147,10 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
      poza zwykłą drogą albo pozycja do wskazania. Wtedy nie stoi drugi raz
      w wierszu „Zamówienie" — ta sama karta w dwóch miejscach to dokładnie
      powtórzenie, które to wydanie zdejmuje. */
-  const zamowienieSwieci = Boolean(dane.zamowienie) && (paczkaOdchylenie(dane) || kilkaPozycji > 0);
+  const zamowienieSwieci = Boolean(dane.zamowienie) && (swiatla.includes("paczka") || kilkaPozycji > 0);
+  /* Paczkę pokazuje soczewka nad kolumną (@wydanie), więc karta zamówienia
+     niżej jej nie powtarza — ani w „Wymaga Ciebie", ani w swoim wierszu. */
+  const paczkaWyzej = paczkaWSoczewce(dane);
   const ileSwieci = zwrotyWToku.length + sprawyOtwarte.length + (zamowienieSwieci ? 1 : 0)
     + (doborSwieci ? 1 : 0);
 
@@ -167,6 +171,14 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
       {/* SOCZEWKA NAD WSZYSTKIM (0.499.0): odpowiedź na pytanie klienta stoi
           przed tym, co ma termin, bo po nią agent otwiera rozmowę. Niczego nie
           chowa — „Wymaga Ciebie" i wiersze stoją pod nią jak bez niej. */}
+      {/* NOWY KLIENT JEDNĄ LINIJKĄ (@wydanie). Pusty wiersz „Klient" zniknął
+          decyzją właściciela, a pierwszy kontakt dalej jest informacją. Login
+          stoi tylko w nagłówku rozmowy, więc znak stoi tu, pod pasmem — nad
+          pasmem zepchnąłby trzy fakty, które mają stać nad wszystkim. */}
+      {nowyKlient(historia.data) && <p
+        className="flex items-center gap-1.5 border-b px-4 py-1.5 text-podpis text-slate-600">
+        <UserRound size={12} className="shrink-0" aria-hidden />
+        Nowy klient — pierwszy kontakt u nas</p>}
       <Soczewka dane={dane} onWstawDoSzkicu={onWstawDoSzkicu} />
       {ileSwieci > 0 && <section aria-label="Wymaga Ciebie" className="space-y-2 pb-3">
         <h3 className="px-4 pt-3 text-podpis font-bold uppercase tracking-wide text-amber-900">
@@ -184,7 +196,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
             a oferta i kartoteka pojawią się niżej.
           </Pusto>}
           <ZamowienieRozmowy zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id}
-            ofertaRozmowy={oferta?.externalId ?? null} />
+            ofertaRozmowy={oferta?.externalId ?? null} bezPaczki={paczkaWyzej} />
         </Rama>}
         {doborSwieci && <Rama>
           <Wiersz tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
@@ -243,7 +255,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
       <Wiersz tytul="Zamówienie" streszczenie={streszczenieZamowienia(dane)}
         otwarty={otwarte.has("zamowienie")} onPrzelacz={() => przelacz("zamowienie")}>
         {dane.zamowienie && !zamowienieSwieci && <ZamowienieRozmowy zamowienie={dane.zamowienie}
-          rozmowaId={dane.rozmowa.id} ofertaRozmowy={oferta?.externalId ?? null} />}
+          rozmowaId={dane.rozmowa.id} ofertaRozmowy={oferta?.externalId ?? null} bezPaczki={paczkaWyzej} />}
         <ZamowieniaKlienta kandydaci={dane.kandydaciZamowien} rozmowaId={dane.rozmowa.id}
           maZamowienie={dane.zamowienie !== null} />
       </Wiersz>
@@ -261,19 +273,23 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
         {dobor}
       </Wiersz>}
 
-      <Wiersz tytul="Klient" streszczenie={streszczenieKlienta(historia.data)}
+      {/* Klient i Wiedza stają tylko z treścią (@wydanie) — reguła i powód
+          w `kokpit.ts` przy `klientMaHistorie`. */}
+      {historia.data && klientMaHistorie(historia.data) && <Wiersz tytul="Klient"
+        streszczenie={streszczenieKlienta(historia.data)}
         otwarty={otwarte.has("klient")} onPrzelacz={() => przelacz("klient")}>
         <Klient key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id} onOtworzRozmowe={onOtworzRozmowe} />
-      </Wiersz>
+      </Wiersz>}
 
       {/* Maszyna z DANYCH DOBORU, nie z historii klienta: pomiar ma pasować do
           tego, o co pyta ta rozmowa. */}
-      <Wiersz tytul="Wiedza" streszczenie={streszczenieWiedzy(wiedza.data)}
+      {wiedza.data && wiedzaMaTresc(wiedza.data) && <Wiersz tytul="Wiedza"
+        streszczenie={streszczenieWiedzy(wiedza.data)}
         otwarty={otwarte.has("wiedza")} onPrzelacz={() => przelacz("wiedza")}>
         <Wiedza key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id}
           twId={dane.dobor.wybrany?.twId ?? null}
           maMaszyne={Boolean(dane.dobor.dane.marka && dane.dobor.dane.model)} />
-      </Wiersz>
+      </Wiersz>}
     </div>
   </section>;
 }
@@ -349,18 +365,23 @@ export function streszczenieZamowienia(dane: OsRozmowy): string {
     return n ? `niepowiązane · ${n} ${odmien(n, "zakup", "zakupy", "zakupów")} klienta` : "niepowiązane";
   }
   const p = z.pobrane;
-  const paczka = z.przesylka?.dostarczonoAt
+  /* Gdy paczkę pokazuje soczewka (@wydanie), streszczenie jej nie powtarza:
+     ten sam stan dwa razy w jednej kolumnie każe sprawdzać, czy się zgadza. */
+  const paczka = paczkaWSoczewce(dane) ? null : z.przesylka?.dostarczonoAt
     ? `doręczona ${dzien(z.przesylka.dostarczonoAt)}`
     : z.przesylka?.status ? STATUS_PACZKI[z.przesylka.status] ?? z.przesylka.status
       : "paczki nie sprawdzano";
   /* PACZKA PIERWSZA (0.500.0): wzrok czyta początek wiersza i pomija resztę
      (NN/g, wzorzec F, potwierdzony w 2017). O zamówieniu pytają najczęściej
      „gdzie paczka", więc to słowo ma stać tam, gdzie oko na pewno trafi. */
-  if (!p) return `${paczka} · treść jeszcze nie pobrana`;
+  if (!p) return [paczka, "treść jeszcze nie pobrana"].filter(Boolean).join(" · ");
   /* „kupione" przy dacie (0.506.0): obok „doręczona 15 września" goła druga
      data czytała się jak druga data dostawy. */
+  /* Bez paczki, daty i kwoty streszczenie byłoby puste — a pusty wiersz
+     wygląda jak usterka. Mówi wtedy, co leży pod nim. */
   return [paczka, p.kupionoAt ? `kupione ${dzien(p.kupionoAt)}` : null,
-    p.sumaGrosze !== null ? zlote(p.sumaGrosze, p.waluta) : null].filter(Boolean).join(" · ");
+    p.sumaGrosze !== null ? zlote(p.sumaGrosze, p.waluta) : null].filter(Boolean).join(" · ")
+    || "pozycje zamówienia";
 }
 
 export function streszczenieZamknietych(zwrotow: number, spraw: number): string {
@@ -383,8 +404,7 @@ const RODZAJ_HISTORII: Record<string, [string, string, string]> = {
   dyskusja: ["dyskusja", "dyskusje", "dyskusji"],
 };
 
-export function streszczenieKlienta(h: { wpisy: Array<{ rodzaj: string }>; maszyny: unknown[] } | undefined): string {
-  if (!h) return "wczytuję…";
+export function streszczenieKlienta(h: HistoriaKlienta): string {
   const ile = new Map<string, number>();
   for (const w of h.wpisy) ile.set(w.rodzaj, (ile.get(w.rodzaj) ?? 0) + 1);
   const czesci = [...ile].map(([r, n]) => {
@@ -392,11 +412,11 @@ export function streszczenieKlienta(h: { wpisy: Array<{ rodzaj: string }>; maszy
     return f ? `${n} ${odmien(n, f[0], f[1], f[2])}` : `${n} × ${r}`;
   });
   if (h.maszyny.length) czesci.push(`${h.maszyny.length} ${odmien(h.maszyny.length, "maszyna", "maszyny", "maszyn")}`);
-  return czesci.length ? czesci.join(" · ") : "bez wcześniejszych spraw u nas";
+  return czesci.join(" · ");
 }
 
-export function streszczenieWiedzy(w: { zastosowanie: { dowody: unknown[] } | null; pomiary: unknown[] } | undefined): string {
-  if (!w) return "wczytuję…";
+export function streszczenieWiedzy(w: WiedzaDoboru): string {
   const n = (w.zastosowanie?.dowody.length ?? 0) + w.pomiary.length;
-  return n ? `${n} ${odmien(n, "dowód", "dowody", "dowodów")}` : "brak wpisu dla tej pary";
+  /* Wiersz staje tylko z treścią, więc zero dowodów znaczy tu wpis bez nich. */
+  return n ? `${n} ${odmien(n, "dowód", "dowody", "dowodów")}` : "wpis bez dowodów";
 }

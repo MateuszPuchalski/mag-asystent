@@ -33,11 +33,16 @@ import { ZnakAllegro } from "../ui/ZnakAllegro";
  * agenta. Wskazanie zapisuje się jako wybór człowieka, jak w `BrakOferty`.
  * Hak woła komponent SAM — precedens `TowarRozmowy.tsx`.
  */
-export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null }: {
+export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null, bezPaczki = false }: {
   zamowienie: Dane;
   rozmowaId: number;
   /** Numer oferty, którą rozmowa JUŻ ma — wtedy „Wskaż" nie stoi przy żadnej pozycji. */
   ofertaRozmowy?: string | null;
+  /**
+   * Paczkę pokazuje soczewka nad kolumną (@wydanie). Druga linijka tej samej
+   * paczki z drugim „sprawdź" kazałaby porównywać dwa miejsca.
+   */
+  bezPaczki?: boolean;
 }) {
   const [skopiowano, setSkopiowano] = useState(false);
   const wskaz = useWskazOferte();
@@ -126,14 +131,15 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
       : <p className="mt-1 text-xs text-slate-500">
           Treści zamówienia jeszcze nie pobrano — dociągnie ją najbliższa synchronizacja (do 10 min).
         </p>}
-    {zamowienie.przesylka && <Paczka przesylka={zamowienie.przesylka} rozmowaId={rozmowaId} />}
+    {zamowienie.przesylka && !bezPaczki && <Paczka przesylka={zamowienie.przesylka} rozmowaId={rozmowaId} />}
   </section>;
 }
 
 /* Kody przewoźnika słowem, z perspektywy KLIENTA — paczka jedzie do niego.
    Słownik zwrotów mówi „w drodze do nas" i tu dałby zdanie odwrotne. Nieznany
    kod stoi surowy, jak u przewoźnika. Eksport od 0.498.0: wiersz zamówienia
-   w kolumnie kontekstu streszcza paczkę tymi samymi słowami. */
+   w kolumnie kontekstu streszcza paczkę tymi samymi słowami, a od @wydanie
+   mówi nimi także soczewka paczki. */
 export const STATUS: Record<string, string> = {
   PENDING: "czeka na nadanie",
   IN_TRANSIT: "w drodze do klienta",

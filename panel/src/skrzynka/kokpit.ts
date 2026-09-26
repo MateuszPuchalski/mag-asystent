@@ -1,4 +1,6 @@
-import type { Kategoria, Kubelek, OsRozmowy, StatusDoboru, Zwrot } from "../api/typy";
+import type { HistoriaKlienta, Kategoria, Kubelek, OsRozmowy, StatusDoboru, WiedzaDoboru, Zwrot }
+  from "../api/typy";
+import { paczkaWSoczewce } from "./soczewki-reguly";
 
 /* ── CIEMNY KOKPIT: CO W KOLUMNIE KONTEKSTU ŚWIECI (0.498.0) ────────────────
    Zgłoszenie właściciela z nagraniem prawej kolumny: „uporządkuj ten panel".
@@ -92,7 +94,10 @@ export function coSwieci(dane: OsRozmowy): Swiatlo[] {
   const s: Swiatlo[] = [];
   if (dane.zwroty.some(zwrotWToku)) s.push("zwrot");
   if (dane.sprawy.some((x) => x.otwarta)) s.push("sprawa");
-  if (paczkaOdchylenie(dane)) s.push("paczka");
+  /* Paczkę poza zwykłą drogą pokazuje soczewka paczki, gdy stoi (@wydanie).
+     Stoi NAD „Wymaga Ciebie", więc druga karta tej samej paczki niżej
+     byłaby powtórzeniem, a nie drugim sygnałem. */
+  if (paczkaOdchylenie(dane) && !paczkaWSoczewce(dane)) s.push("paczka");
   if (pozycjiDoWskazania(dane) > 0) s.push("pozycja");
   if (doborWToku(dane.dobor.status) && !bramkaDoboru(dane)) s.push("dobor");
   return s;
@@ -124,3 +129,36 @@ const KATEGORIE_O_TOWAR: ReadonlySet<Kategoria> = new Set<Kategoria>([
   "PRODUCT_COMPATIBILITY", "PRODUCT_QUESTION", "PRODUCT_AVAILABILITY", "WRONG_PRODUCT",
   "MISSING_PRODUCT", "DAMAGED_PRODUCT", "OTHER",
 ]);
+
+/* ── PUSTE WIERSZE „KLIENT" I „WIEDZA" ZNIKAJĄ (@wydanie) ───────────────────
+   Decyzja właściciela z 26 września 2026, wbrew wyłączeniu z §26e. Przy
+   większości rozmów oba wiersze mówiły tylko „nic tu nie ma": dwa cele po
+   44 px, które trzeba przeczytać, żeby się tego dowiedzieć. §26d mówi
+   „flagi tylko aktywne", więc wiersz staje dopiero z treścią.
+
+   PRZED ODCZYTEM TEŻ NIE STAJE. Pusty wynik to najczęstszy przypadek, a
+   wiersz „wczytuję…", który po chwili znika, to ruch na ekranie za nic.
+   Wiersz z treścią pojawia się na dole kolumny, więc niczego nie przesuwa. */
+
+/** Klient ma u nas coś poza tą rozmową — wtedy wiersz „Klient" staje. */
+export function klientMaHistorie(h: HistoriaKlienta | undefined): boolean {
+  return Boolean(h && (h.wpisy.length > 0 || h.maszyny.length > 0));
+}
+
+/**
+ * Pierwszy kontakt: login znany, a historii brak. To dalej informacja, więc
+ * zamiast wiersza staje jedna krótka linijka. Bez loginu nie wiemy, KTO pisze
+ * — „nowy klient" byłby wtedy kłamstwem o kimś, kto kupuje u nas od lat.
+ */
+export function nowyKlient(h: HistoriaKlienta | undefined): boolean {
+  return Boolean(h?.login) && !klientMaHistorie(h);
+}
+
+/**
+ * Wiersz „Wiedza" ma treść: zatwierdzone zastosowanie albo pomiar z tej
+ * rozmowy. Pusty wiersz nie zabiera drogi do dodania wiedzy — jedyny przycisk
+ * w nim, „Zaproponuj jako dowód", stoi przy pomiarze, a pomiar wiersz stawia.
+ */
+export function wiedzaMaTresc(w: WiedzaDoboru | undefined): boolean {
+  return Boolean(w && (w.zastosowanie !== null || w.pomiary.length > 0));
+}

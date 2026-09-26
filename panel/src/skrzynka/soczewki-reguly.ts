@@ -1,4 +1,4 @@
-import type { Kategoria, KandydatZamowienia, OsRozmowy } from "../api/typy";
+import type { Kategoria, KandydatZamowienia, OsRozmowy, StanPrzesylki } from "../api/typy";
 
 /* ── SOCZEWKI: PRAWA KOLUMNA WEDŁUG RODZAJU PYTANIA (0.499.0) ───────────────
    Zgłoszenie właściciela z listą prawdziwych pytań klientów: „faktury nie
@@ -19,7 +19,7 @@ import type { Kategoria, KandydatZamowienia, OsRozmowy } from "../api/typy";
    3. przy kategorii awaryjnej (`FALLBACK`) albo nieudanym rozpoznaniu
       nie staje wcale — kolumna zostaje taka, jak bez niej.                 */
 
-export type RodzajSoczewki = "anulowanie" | "inny_towar" | "faktura" | "zwrot";
+export type RodzajSoczewki = "anulowanie" | "inny_towar" | "faktura" | "zwrot" | "paczka";
 
 const SOCZEWKA_KATEGORII: Partial<Record<Kategoria, RodzajSoczewki>> = {
   CANCEL_ORDER: "anulowanie",
@@ -33,7 +33,23 @@ const SOCZEWKA_KATEGORII: Partial<Record<Kategoria, RodzajSoczewki>> = {
      czy zwrot jest już w Allegro. Gdy jest, jego karta stoi w „Wymaga
      Ciebie" — wtedy soczewka milczy, żeby nie mówić tego samego dwa razy. */
   RETURN: "zwrot",
+  /* ── PACZKA (@wydanie) ────────────────────────────────────────────────────
+     „Gdzie moja paczka" to najczęstsze pytanie skrzynki, a odpowiedź leżała
+     w zwiniętym wierszu „Zamówienie", pod rozwinięciem i kliknięciem.
+     Uszkodzona w transporcie też tu trafia: zgłoszenie szkody u przewoźnika
+     zaczyna się od jego nazwy i numeru przesyłki. */
+  ORDER_STATUS: "paczka",
+  DELIVERY_DELAY: "paczka",
+  DELIVERY_LOST: "paczka",
+  DELIVERY_DAMAGED: "paczka",
 };
+
+/* „Status zamówienia" jest kategorią OGÓLNĄ. Przykład z opisu `soczewka()`
+   — „widzę drugą płatność, anulujcie" — bywa statusem z anulowaniem w tle,
+   i wtedy odpowiedzią jest soczewka anulowania, nie paczka. Dlatego status
+   ustępuje soczewce z dodatkowej kategorii modelu. Kategorie dostawy są
+   konkretne i nie ustępują. */
+const KATEGORIA_OGOLNA: Kategoria = "ORDER_STATUS";
 
 export interface Soczewka {
   rodzaj: RodzajSoczewki;
@@ -66,11 +82,42 @@ function soczewkaKategorii(dane: OsRozmowy): Soczewka | null {
     return rodzaj ? { rodzaj, kategoria: k.kategoriaCzlowieka, zCzlowieka: true, nieaktualna: false } : null;
   }
   if (k.zrodlo === "FALLBACK" || k.status === "FAILED") return null;
-  for (const kategoria of [k.kategoria, ...k.dodatkowe]) {
-    const rodzaj = SOCZEWKA_KATEGORII[kategoria];
-    if (rodzaj) return { rodzaj, kategoria, zCzlowieka: false, nieaktualna: k.nieaktualna };
-  }
-  return null;
+  const trafione = [k.kategoria, ...k.dodatkowe].filter((x) => SOCZEWKA_KATEGORII[x]);
+  const konkretna = trafione.find((x) => x !== KATEGORIA_OGOLNA);
+  /* Soczewka zwrotu milknie, gdy zwrot już jest (`soczewka()`). Wtedy status
+     nie ustępuje soczewce, która i tak nie stanie — inaczej kolumna zostałaby
+     bez żadnej, choć główna kategoria pytała o paczkę. */
+  const milknie = konkretna !== undefined && SOCZEWKA_KATEGORII[konkretna] === "zwrot" && dane.zwroty.length > 0;
+  const kategoria = konkretna && !(milknie && trafione.includes(KATEGORIA_OGOLNA)) ? konkretna : trafione[0];
+  return kategoria
+    ? { rodzaj: SOCZEWKA_KATEGORII[kategoria]!, kategoria, zCzlowieka: false, nieaktualna: k.nieaktualna }
+    : null;
+}
+
+/**
+ * Czy paczkę zamówienia pokazuje soczewka. Wtedy wiersz „Zamówienie" i
+ * „Wymaga Ciebie" jej nie powtarzają — ten sam fakt w dwóch miejscach kazał
+ * sprawdzać, czy oba mówią to samo (§26d). Bez zamówienia soczewka paczki
+ * nie pokazuje, więc nic niżej nie milknie.
+ */
+export function paczkaWSoczewce(dane: OsRozmowy): boolean {
+  return dane.zamowienie !== null && soczewka(dane)?.rodzaj === "paczka";
+}
+
+/* LUSTRO `SWIEZOSC_PRZESYLKI_MS` z `server/src/services/przesylka-zamowienia.ts`.
+   Serwer tym progiem rozstrzyga, czy przed szkicem pytać Allegro jeszcze raz.
+   Soczewka pyta o to samo, więc dwa progi dałyby dwie różne odpowiedzi. */
+export const SWIEZOSC_PACZKI_MS = 30 * 60_000;
+
+/**
+ * Czy podsunąć „Sprawdź" — bliźniak `przesylkaDoOdswiezenia` z serwera.
+ * Doręczona już się nie zmieni, a świeży stan nie wart dwóch żądań u Allegro.
+ * Samo sprawdzenie zostaje JAWNYM kliknięciem: otwarcie rozmowy nie pisze nic.
+ */
+export function paczkaDoSprawdzenia(p: StanPrzesylki, teraz: number): boolean {
+  if (p.sprawdzonoAt === null) return true;
+  if (p.dostarczonoAt) return false;
+  return teraz - Date.parse(p.sprawdzonoAt) >= SWIEZOSC_PACZKI_MS;
 }
 
 /* Status zakupu słowem — ze schematu `CheckoutFormStatus` w

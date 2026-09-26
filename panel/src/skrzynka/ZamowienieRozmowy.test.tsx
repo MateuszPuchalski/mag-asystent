@@ -164,4 +164,13 @@ describe("Paczka przy zamówieniu rozmowy", () => {
       zamowienie={dane({ przesylka: stan({ sprawdzonoAt: "2026-09-23T10:00:00Z" }) })} />);
     expect(screen.getByLabelText("Przesyłka")).toHaveTextContent("Allegro nie ma numeru");
   });
+
+  /* Soczewka paczki (@wydanie) pokazuje paczkę nad kolumną — karta zamówienia
+     jej nie powtarza, ale pozycje i numer zamówienia zostają. */
+  it("gdy paczkę pokazuje soczewka, linijki paczki nie ma, a reszta karty stoi", () => {
+    render(<ZamowienieRozmowy rozmowaId={1} bezPaczki
+      zamowienie={dane({ przesylka: stan({ waybill: "X1", przewoznik: "DPD", status: "IN_TRANSIT" }) })} />);
+    expect(screen.queryByLabelText("Przesyłka")).toBeNull();
+    expect(screen.getByText("2f8c1a3e…")).toBeInTheDocument();
+  });
 });
