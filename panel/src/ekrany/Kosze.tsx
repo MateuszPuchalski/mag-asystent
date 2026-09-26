@@ -5,13 +5,17 @@ import {
   useKosze, usePominiete, usePonowMmKosza, usePrzeliczKosz, useSzczegolKosza, useSzukajWKoszach,
   useZalatwPominiecie,
 } from "../api/kosze";
-import { Blad, FiltrSegmentowy, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { Blad, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
+import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { KUBELKI_KOSZY, KolejkaKoszy, KolejkaPominietych, WynikiSzukania, koszeKubelka, kubelekKosza,
   maKlopotMm, type KubelekKoszy } from "../kosze/Kolejka";
 import { Kosz } from "../kosze/Kosz";
 import { KontekstKosza } from "../kosze/Kontekst";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
+
+/** Kubełki „Tylko wgląd” — stoją pod „Więcej”, nie na wierzchu (@wydanie). */
+const WIECEJ_KOSZY: ReadonlyArray<KubelekKoszy> = ["rozlozone", "anulowane"];
 
 /* ── KOSZE W ZAKŁADCE ZWROTY (0.438.0) ─────────────────────────────────────
    Przeniesione z MAGAZYNU ZWROTÓW w `biuro.html`, decyzją właściciela do
@@ -99,7 +103,11 @@ export function Kosze() {
             przełącznika tuż nad nim — dwa razy ta sama nazwa to wiersz
             zabrany kolejce i nic nowego dla oka. */}
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">
-          <FiltrSegmentowy<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
+          {/* „Rozłożone" i „Anulowane" pod „Więcej" (@wydanie): oba to
+              „Tylko wgląd", a stały pigułką równą koszom w pracy. Ten sam
+              komponent co w Skrzynce, reklamacjach i dyskusjach. */}
+          <FiltrZWiecej<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
+            wiecej={WIECEJ_KOSZY}
             pozycje={KUBELKI_KOSZY.map((k) => ({ klucz: k.id, etykieta: k.etykieta,
               ile: liczniki[k.id], podpowiedz: k.pytanie }))} />
         </nav>
