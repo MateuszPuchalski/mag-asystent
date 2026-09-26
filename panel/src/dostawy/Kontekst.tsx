@@ -18,11 +18,18 @@ function Dowod({ p, onPowieksz }: { p: Wyjatek; onPowieksz: (url: string) => voi
       ? <button type="button" onClick={() => onPowieksz(url)} title="Powiększ"
           className="block w-full overflow-hidden rounded-lg bg-slate-100">
           <img src={url} alt={`Zdjęcie z hali: ${p.sym ?? p.symObcy ?? ""}`} className="h-28 w-full object-cover" /></button>
-      : <div className="grid h-28 place-items-center rounded-lg bg-slate-100 text-slate-600">
+      /* PLIK ZGUBIONY TO NIE „BEZ ZDJĘCIA" (audyt 26.09.2026). Ta kolumna
+         rysuje wyłącznie zgłoszenia z `hasPhoto`, więc 404 znaczy tu jedno:
+         hala zdjęcie zrobiła, a serwer pliku nie ma. Kafel mówił dotąd „bez
+         zdjęcia", jak przy zgłoszeniu, do którego nikt zdjęcia nie robił —
+         i utrata dowodu do reklamacji była niewidoczna. */
+      : <div className={`grid h-28 place-items-center rounded-lg ${url === null && !blad
+          ? "border border-red-200 bg-red-50 text-ranga-zle" : "bg-slate-100 text-slate-600"}`}>
           {url === undefined && !blad ? <span className="text-xs">wczytuję…</span>
-            : <span className="flex flex-col items-center gap-1 text-xs"><ImageOff size={18} />
+            : <span className="flex flex-col items-center gap-1 px-2 text-center text-xs"><ImageOff size={18} />
                 {blad ? <button type="button" className="underline" onClick={ponow} title={blad}>ponów</button>
-                  : "bez zdjęcia"}</span>}
+                  : <span title="Hala dołączyła zdjęcie, ale serwer nie ma jego pliku — dowód do reklamacji przepadł">
+                      zdjęcie zgłoszone, pliku brak</span>}</span>}
         </div>}
     <figcaption className="mt-1 truncate text-xs text-slate-600">
       {p.sym ?? p.symObcy ?? "towar"} · {p.typLabel} · {czas(p.createdAt)}</figcaption>
