@@ -70,6 +70,15 @@ describe("zakładka klienta", () => {
     expect(screen.queryByLabelText("Oś historii klienta")).not.toBeInTheDocument();
   });
 
+  it("login nie stoi trzeci raz — profil klienta zostaje o klik", () => {
+    /* Zeszło (0.513.0): w skrzynce login stoi w nagłówku rozmowy i przy
+       wiadomościach, a kopiuje się go stamtąd. Odnośnik do profilu zostaje. */
+    pokaz(dane());
+    expect(screen.queryByText("zielony_ogrod")).toBeNull();
+    expect(screen.getByRole("link", { name: "Profil klienta" }))
+      .toHaveAttribute("href", "/obsluga/klient/zielony_ogrod");
+  });
+
   it("klient znany, ale bez historii, dostaje zdanie zamiast pustki", () => {
     pokaz(dane());
     expect(screen.getByText(/Pierwszy kontakt/)).toBeInTheDocument();

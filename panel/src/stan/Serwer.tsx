@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { DatabaseZap, ImageOff } from "lucide-react";
 import { useOdswiezZdjecia, useResync } from "../api/stan";
 import type { Zdrowie } from "../api/typy";
-import { Blad, Przycisk, dataLokalna } from "../ui";
+import { Blad, Przycisk, dataLokalna, ile } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
 import { Potwierdz } from "../ui/Potwierdz";
 
@@ -11,7 +11,23 @@ import { Potwierdz } from "../ui/Potwierdz";
    ratunkowe, które do 0.111.0 żyły wyłącznie w DEPLOY.md jako polecenia curl.
    Odmowę roli wypowiada serwer (`ratunek_serwera`). RESYNC pyta, bo na
    produkcji to pełny import z Subiekta; odświeżenie zdjęć nie pyta, bo
-   kasuje wyłącznie znaczniki „nie ma zdjęcia" i kolektory zapytają ponownie. */
+   kasuje wyłącznie znaczniki „nie ma zdjęcia" i kolektory zapytają ponownie.
+
+   KAŻDY FAKT RAZ (0.509.0). Plik konfiguracji zszedł stąd, bo stoi
+   w opisie karty „Konfiguracja serwera" za zębatką, a zmienić go może
+   tylko admin, który tam właśnie patrzy. Wersja ZOSTAJE, choć mówi ją też
+   karta aktualizacji: tamta jest wyłącznie adminowa, a biuro zgłaszające
+   „coś nie działa" patrzy tutaj i nigdzie indziej jej nie zobaczy. */
+
+/** Wynik resyncu zdaniem, nie zrzutem JSON-a: dwie liczby, po których
+ *  człowiek poznaje, że wczytało się tyle, ile się spodziewał. */
+export function zdanieResyncu(stats: Record<string, unknown> | undefined): string {
+  const towary = Number(stats?.towary);
+  const dokumenty = Number(stats?.dokumenty);
+  if (!Number.isFinite(towary) || !Number.isFinite(dokumenty)) return "Resync zakończony.";
+  return `Resync zakończony: wczytano ${ile(towary, "kartotekę", "kartoteki", "kartotek")} i ${
+    ile(dokumenty, "dokument", "dokumenty", "dokumentów")}.`;
+}
 
 function bajty(n: number | undefined): string {
   if (!n) return "—";
@@ -34,11 +50,11 @@ export function KartaSerwera({ zdrowie }: { zdrowie: Zdrowie | undefined }) {
   return <KartaWgladu id="karta-serwer" tytul="Serwer"
     akcje={<>
       <Potwierdz etykieta={<><DatabaseZap size={16} />Pełny resync z Subiekta</>}
-        pytanie="Read-model przeładuje się z bazy Subiekta — na dużej kartotece to trwa." tak="Resync"
+        pytanie="Kartoteki i stany wczytają się od nowa z bazy Subiekta — na dużej kartotece to trwa." tak="Resync"
         trwa={resync.isPending} onTak={() => {
           setWynik(""); setBlad("");
           resync.mutate(undefined, {
-            onSuccess: (d) => setWynik(`Resync zakończony (${JSON.stringify(d.stats ?? {}).slice(0, 80)}).`),
+            onSuccess: (d) => setWynik(zdanieResyncu(d.stats)),
             onError: (e) => setBlad(e.message),
           });
         }} />
@@ -60,7 +76,6 @@ export function KartaSerwera({ zdrowie }: { zdrowie: Zdrowie | undefined }) {
         ? <><span className="rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-ranga-ok">pracuje</span>
             {w.widziany && <span className="ml-2 text-slate-600">{w.widziany}</span>}</>
         : <><span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">nie żyje</span> — zapisy do Subiekta NIE wchodzą</>)}
-      {wiersz("plik konfiguracji", h.configZPliku ?? "—")}
       {wiersz("ślad audytowy", `${a?.zdarzen ?? 0} zdarzeń · od ${a?.najstarsze ? dataLokalna(a.najstarsze) : "—"} · baza ${bajty(a?.bazaBajtow)}`)}
       {/* Kopie robi serwer sam (0.487.0), więc tu biuro widzi, że je robi.
           Zaległość i błąd przychodzą osobno, zdaniem w „do sprawdzenia". */}

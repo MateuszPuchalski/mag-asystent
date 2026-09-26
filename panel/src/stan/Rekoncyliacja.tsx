@@ -2,7 +2,8 @@ import React from "react";
 import { Download, SearchCheck } from "lucide-react";
 import { useRekoncyliacja, type Rekoncyliacja, type RodzajRozjazdu } from "../api/stan";
 import { Blad, Przycisk, czas, dataLokalna } from "../ui";
-import { KartaWgladu, Tabela, Td } from "../ui/wglad";
+import { Tabela, Td } from "../ui/wglad";
+import { KartaZwinieta } from "./KartaZwinieta";
 
 /* ── Rekoncyliacja (z `biuro.html`, 0.441.0) ────────────────────────────
    Czy Subiekt ma to, co zapisaliśmy. Liczona NA ŻĄDANIE — powód przy
@@ -12,7 +13,10 @@ import { KartaWgladu, Tabela, Td } from "../ui/wglad";
    od 0.2xx dokładał kolejne: kosze i zwroty. Rozjazd spoza słownika wychodził
    na ekran surowym kluczem w rodzaju `zwrot_rozliczony_bez_korekty`.
    `Record<RodzajRozjazdu, …>` każe kompilatorowi upomnieć się o każdy nowy
-   rodzaj z unii serwera, a test sprawdza, że unia jest ta sama. */
+   rodzaj z unii serwera, a test sprawdza, że unia jest ta sama.
+
+   ZWINIĘTA (0.509.0): sprawdzenie na żądanie, którego wynik zwykle brzmi
+   „bez rozjazdów", a nocny przebieg liczy to samo codziennie. */
 
 export const NAZWA_ROZJAZDU: Record<RodzajRozjazdu, string> = {
   lokalizacja: "adres w Subiekcie",
@@ -47,10 +51,10 @@ function pobierzCsv(r: Rekoncyliacja) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
-export function KartaRekoncyliacji() {
+export function KartaRekoncyliacji({ otworz = false }: { otworz?: boolean }) {
   const rek = useRekoncyliacja();
   const r = rek.data;
-  return <KartaWgladu id="karta-rekoncyliacja" tytul="Rekoncyliacja"
+  return <KartaZwinieta id="karta-rekoncyliacja" tytul="Rekoncyliacja" otworz={otworz}
     opis="Porównuje adresy w Subiekcie z ostatnim udanym zapisem i wyławia sprawy, o których wszyscy zapomnieli. Pusty wynik to wynik dobry."
     akcje={<>
       <Przycisk disabled={rek.isFetching} onClick={() => void rek.refetch()}><SearchCheck size={16} />
@@ -72,5 +76,5 @@ export function KartaRekoncyliacji() {
           </tr>)}
         </Tabela>
       </>}
-  </KartaWgladu>;
+  </KartaZwinieta>;
 }

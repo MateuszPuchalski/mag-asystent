@@ -14,7 +14,10 @@ import { Potwierdz } from "../ui/Potwierdz";
    naprawić (0.111.0): PONÓW przy błędzie i ANULUJ przy oczekującym wołają te
    same trasy co kolektor. Biuro pisało jeszcze „ponawia się je na
    kolektorze — ta strona tylko czyta", choć od 0.111.0 to nie była prawda;
-   to zdanie nie przeszło. */
+   to zdanie nie przeszło.
+
+   „Ta sama trasa" zeszło z opisu karty (0.509.0): to wiedza o serwerze,
+   a biuro potrzebuje tylko tego, GDZIE da się ponowić. */
 
 const STATUS: Record<string, [string, string]> = {
   error: ["błąd", "bg-red-100 text-ranga-zle"],
@@ -50,7 +53,7 @@ export function KartaKolejki() {
   };
 
   return <KartaWgladu id="karta-kolejka" tytul="Zapisy do Subiekta"
-    opis="Zadanie w błędzie znaczy, że hala zrobiła swoje, a do bazy firmy nic nie weszło. Ponawia się je tutaj albo na kolektorze — ta sama trasa.">
+    opis="Zadanie w błędzie znaczy, że hala zrobiła swoje, a do bazy firmy nic nie weszło. Ponawia się je tutaj albo na kolektorze.">
     <div className="flex flex-wrap gap-8">
       <Liczba ile={s?.error ?? "—"} etykieta="w błędzie · wymaga reakcji" ton={(s?.error ?? 0) > 0 ? "text-ranga-zle" : ""} />
       <Liczba ile={s?.pending ?? "—"} etykieta="czeka na workera" />
