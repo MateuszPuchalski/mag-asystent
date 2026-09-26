@@ -5,7 +5,7 @@ import { pobierzZalacznik } from "../api/reklamacje";
 import { useZdjecieZalacznikaReklamacji } from "../towar/useZdjecie";
 import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
 import { czas, NaglowekSekcji, Pusto } from "../ui";
-import { rozbierzFormularz, Tresc, zawieraOpis } from "./tresc";
+import { DlugaTresc, rozbierzFormularz, Tresc, zawieraOpis } from "./tresc";
 
 /* ── Rozmowa w sprawie reklamacyjnej ─────────────────────────────────────────
    Treść zgłoszenia i czat są tym, po co agent otwiera ten ekran, więc stoją
@@ -144,9 +144,16 @@ export interface SprawaCzatu {
 
    STAN JEST NA WIADOMOŚCI, nie na osi: rozwinięcie jednego formularza nie ma
    prawa rozwijać drugiego, a oś bywa jedenastowiadomościowa. */
-function TrescKarty({ tekst }: { tekst: string }) {
+function TrescKarty({ tekst, nasza }: { tekst: string; nasza: boolean }) {
   const [calosc, setCalosc] = useState(false);
   const formularz = rozbierzFormularz(tekst);
+  /* NASZA DŁUGA ZWIJA SIĘ DO CZTERECH LINII (0.511.0). Do tej pory zwijał się
+     tylko formularz Allegro, a nasza odpowiedź ze stopką stała w całości —
+     ta sama ściana, którą skrzynka zdjęła w 0.506.0. Cudzych nie zwijamy:
+     zdanie klienta albo doradcy jest tym, co agent przyszedł przeczytać. */
+  if (nasza && !formularz) {
+    return <DlugaTresc tekst={tekst} className="mt-1 text-tresc text-slate-800" />;
+  }
   if (!formularz || calosc) {
     return <>
       <Tresc tekst={tekst} className="mt-1 text-tresc text-slate-800" />
@@ -284,7 +291,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
                 {w.autorLogin && <span className="text-slate-600">{w.autorLogin}</span>}
                 <span className="ml-auto text-slate-600">{czas(w.utworzonoAt)}</span>
               </div>
-              <TrescKarty tekst={w.tresc} />
+              <TrescKarty tekst={w.tresc} nasza={rola.nasza} />
               <Zalaczniki reklamacjaId={sprawa.id} lista={w.zalaczniki} />
             </li>;
           })}
