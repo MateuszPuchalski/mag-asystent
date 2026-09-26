@@ -5,9 +5,10 @@ import { ilosc } from "../api/dostawy";
 import { pobierzPlik } from "../api/klient";
 import { Zdjecie } from "../towar/Zdjecie";
 import { useZdrowie } from "../api/rozmowy";
-import { Blad, NaglowekSekcji, Plakietka, Przycisk, czas, dzien } from "../ui";
+import { Blad, NaglowekSekcji, Plakietka, Przycisk, czas, dzien, ile } from "../ui";
 import { Wyjatek } from "./Wyjatek";
 import { PrzyciskTowaru } from "../towar/Szuflada";
+import { otwarteWyjatki } from "./Kolejka";
 
 /* ── Dokument dostawy — środkowa kolumna (0.435.0) ─────────────────────────
    Przeniesiony z `biuro.html` z trzema decyzjami, które tam kosztowały:
@@ -48,6 +49,28 @@ const STAN_POZYCJI: Record<string, { slowo: string; klasa: string }> = {
   skipped: { slowo: "pominięta", klasa: "bg-slate-200 text-slate-700" },
 };
 
+/**
+ * Stan faktury, która fizycznie jest rozłożona, a ma otwarty wyjątek.
+ *
+ * Zielone „rozłożona" przy czterech otwartych wyjątkach mówiło „gotowe",
+ * choć faktura stała w DO DECYZJI i czekała na biuro (audyt 26.09.2026).
+ * Słowo „rozłożona" zostaje, bo hala naprawdę skończyła; kolor i dopisek
+ * mówią, że skończyło się tylko jej zadanie.
+ */
+const CZEKA_NA_BIURO = { slowo: "rozłożona · czeka na biuro", klasa: "bg-amber-100 text-ranga-uwaga" };
+
+/** Otwarte na górze, rozwiązane na dole — biuro wchodzi tu po te pierwsze. */
+const otwarteNajpierw = (lista: WyjatekHali[]) =>
+  [...lista].sort((a, b) => Number(a.resolvedAt != null) - Number(b.resolvedAt != null));
+
+/** Nagłówek sekcji wyjątków: otwarte zawsze, rozwiązane tylko gdy są. */
+function licznikWyjatkow(lista: WyjatekHali[]): string {
+  const rozwiazane = lista.filter((p) => p.resolvedAt != null).length;
+  const otwarte = lista.length - rozwiazane;
+  return ile(otwarte, "otwarty", "otwarte", "otwartych")
+    + (rozwiazane ? ` · ${ile(rozwiazane, "rozwiązany", "rozwiązane", "rozwiązanych")}` : "");
+}
+
 function StanPozycji({ s }: { s: string }) {
   const st = STAN_POZYCJI[s] ?? { slowo: "do zrobienia", klasa: "bg-slate-200 text-slate-700" };
   /* `nowrap`: pastylka to JEDNO słowo znaczeniowe. Na zrzucie właściciela
@@ -79,7 +102,7 @@ function PozycjaZWyjatkiem({ l, rozwiaz }: { l: PozycjaDostawy; rozwiaz: Rozwiaz
         <span className="ml-auto text-right text-sm"><Gdzie l={l} /></span>
       </div>
       <div className="text-sm text-slate-700">{l.name}</div>
-      {l.problemy.map((p) => <Wyjatek key={p.id} p={p} {...rozwiaz} />)}
+      {otwarteNajpierw(l.problemy).map((p) => <Wyjatek key={p.id} p={p} {...rozwiaz} />)}
     </div>
   </div>;
 }
@@ -92,7 +115,10 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
   const zdjecia = zdrowie.data?.zdjecia != null || zdrowie.data?.zdjeciaWlasne != null;
   const wyjatkowe = d.lines.filter((l) => l.status === "problem");
   const reszta = d.lines.filter((l) => l.status !== "problem");
-  const stan = STAN_DOKUMENTU[d.status ?? ""] ?? { slowo: "nietknięta", klasa: "bg-slate-200 text-slate-700" };
+  const otwarte = [...d.lines.flatMap((l) => l.problemy), ...d.problemyBezLinii]
+    .filter((p) => p.resolvedAt == null).length;
+  const stan = d.status === "done" && otwarte > 0 ? CZEKA_NA_BIURO
+    : STAN_DOKUMENTU[d.status ?? ""] ?? { slowo: "nietknięta", klasa: "bg-slate-200 text-slate-700" };
   /* Protokół ma sens, gdy jest co reklamować — otwarte albo zamknięte, bo
      zamknięty wyjątek z notatką to dalej rozbieżność, o której dostawca ma
      wiedzieć. Bez `deliveryId` wyjątków nie ma skąd wziąć. */
@@ -122,8 +148,11 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
         </>}
       </div>
       <p className="mt-1 text-sm text-slate-600">
+        {/* Tu stała liczba POZYCJI ze statusem wyjątku („z wyjątkiem 2"),
+            a w kolejce przy tej samej fakturze liczba otwartych ZGŁOSZEŃ
+            („6 wyjątków"). Teraz obie mówią to samo i tym samym słowem. */}
         {d.dostawca} · wystawiona {dzien(d.dataWyst)} · odłożone {d.progress.done}/{d.progress.total} poz.
-        {d.progress.problems ? ` · z wyjątkiem ${d.progress.problems}` : ""}
+        {otwarte ? ` · ${otwarteWyjatki(otwarte)}` : ""}
       </p>
       {/* Dwa zdania osobno, bo mówią o czym innym: jedno CZY ktoś to
           rozkładał, drugie SKĄD są liczby. */}
@@ -146,8 +175,9 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
       {/* Wyjątki bez linii to towar SPOZA dokumentu — schowanie ich byłoby
           zgubieniem zgłoszenia. */}
       {d.problemyBezLinii.length > 0 && <section className="mb-4">
-        <NaglowekSekcji jako="h3">Wyjątki poza pozycjami dokumentu · {d.problemyBezLinii.length}</NaglowekSekcji>
-        {d.problemyBezLinii.map((p) => <Wyjatek key={p.id} p={p} {...rozwiaz} />)}
+        <NaglowekSekcji jako="h3">
+          Wyjątki poza pozycjami dokumentu · {licznikWyjatkow(d.problemyBezLinii)}</NaglowekSekcji>
+        {otwarteNajpierw(d.problemyBezLinii).map((p) => <Wyjatek key={p.id} p={p} {...rozwiaz} />)}
       </section>}
 
       <NaglowekSekcji jako="h3">

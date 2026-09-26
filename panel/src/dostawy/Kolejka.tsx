@@ -62,17 +62,33 @@ export function kubelekDokumentu(d: DokumentDostawy, zOdpowiedzia: Set<number>):
   return "nietkniete";
 }
 
+/**
+ * Liczba wyjątków słowami — JEDNO brzmienie na liście i w dokumencie (audyt
+ * 26.09.2026). Jedna faktura miała trzy różne liczby „wyjątków": otwarte
+ * zgłoszenia w kolejce, pozycje ze statusem wyjątku w nagłówku i wszystkie
+ * zgłoszenia z rozwiązanymi nad sekcją. Każda liczyła co innego, a słowo
+ * było to samo. Tu liczy się zawsze OTWARTE i mówi się to wprost.
+ */
+export const otwarteWyjatki = (n: number) => ile(n, "otwarty wyjątek", "otwarte wyjątki", "otwartych wyjątków");
+
 /** Wiek dokumentu słowami — od daty wystawienia, bo tylko ją lista zna. */
 const wiekDokumentu = (data: string) => {
   const ms = Date.now() - Date.parse(data);
   return Number.isFinite(ms) ? wiek(Math.max(0, ms)) : "—";
 };
 
-function Pasek({ zrobione, wszystkie }: { zrobione: number; wszystkie: number }) {
+/**
+ * Pasek rozłożenia. ZIELEŃ TYLKO DLA SKOŃCZONEGO BEZ ZASTRZEŻEŃ (audyt
+ * 26.09.2026): wyjątek liczy się jako pozycja domknięta (D8), więc faktura
+ * z czterema otwartymi wyjątkami miała zielony pasek 2/2 — kolor mówił
+ * „gotowe", a plakietka obok „czeka na ciebie". Wygrywał kolor, bo zajmuje
+ * więcej miejsca. Przy otwartym wyjątku pasek zostaje bursztynowy.
+ */
+function Pasek({ zrobione, wszystkie, czeka }: { zrobione: number; wszystkie: number; czeka: boolean }) {
   const proc = wszystkie ? Math.min(100, Math.round((zrobione / wszystkie) * 100)) : 0;
   return <div className="mt-1 flex items-center gap-2">
     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-slate-200" aria-hidden="true">
-      <div className={`h-1.5 ${proc >= 100 ? "bg-emerald-600" : "bg-wertis-amber"}`} style={{ width: `${proc}%` }} />
+      <div className={`h-1.5 ${proc >= 100 && !czeka ? "bg-emerald-600" : "bg-wertis-amber"}`} style={{ width: `${proc}%` }} />
     </div>
     <span className="text-xs tabular-nums text-slate-600">{zrobione}/{wszystkie}</span>
   </div>;
@@ -104,7 +120,8 @@ export function KolejkaDostaw({ dokumenty, zOdpowiedzia, wybrany, onWybierz, pus
             </span>
             <span className="w-full truncate text-sm text-slate-600">
               {d.dostawca} · {ile(wszystkie, "pozycja", "pozycje", "pozycji")}</span>
-            <span className="w-full"><Pasek zrobione={d.linesDone} wszystkie={wszystkie} /></span>
+            <span className="w-full"><Pasek zrobione={d.linesDone} wszystkie={wszystkie}
+              czeka={d.wyjatkiOtwarte > 0} /></span>
             {(zOdpowiedzia.has(d.dokId) || d.wyjatkiOtwarte > 0) &&
               <span className="mt-1 flex flex-wrap gap-1.5">
                 {zOdpowiedzia.has(d.dokId) &&
@@ -112,7 +129,7 @@ export function KolejkaDostaw({ dokumenty, zOdpowiedzia, wybrany, onWybierz, pus
                     odpowiedź z hali</span>}
                 {d.wyjatkiOtwarte > 0 &&
                   <span className="rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">
-                    {ile(d.wyjatkiOtwarte, "wyjątek", "wyjątki", "wyjątków")}</span>}
+                    {otwarteWyjatki(d.wyjatkiOtwarte)}</span>}
               </span>}
           </span>
         </span>
@@ -141,7 +158,7 @@ export function WierszeSpozaOkna({ grupy, wybrany, onWybierz }: {
         <span className="text-sm text-slate-600">
           {g.dokId == null ? "Towar spoza dokumentu" : "Dokument spoza okna importu"}</span>
         <span className="mt-1 rounded bg-red-100 px-1.5 py-0.5 text-xs font-bold text-ranga-zle">
-          {ile(g.ile, "wyjątek", "wyjątki", "wyjątków")}</span>
+          {otwarteWyjatki(g.ile)}</span>
       </Wiersz>;
     })}
   </ul>;
