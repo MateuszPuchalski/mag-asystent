@@ -10,6 +10,147 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.524.0 — 26 września 2026
+
+**„Do zrobienia" i Zadania mówią mniej naraz.** Oba ekrany straciły tytuł, bo powtarzał podświetloną zakładkę. Zeszły też podpisy „najpilniejsze pierwsze" i zdanie o kolektorach pod Zadaniami. Trzy sekcje „Do zrobienia" mają jeden nagłówek z licznikiem po kropce, a „Wszystko" nie powtarza sumy. „Pokaż odhaczone" to cichy odnośnik w nagłówku wzmianek, widoczny tylko wtedy, gdy jest co pokazać. Przyciski obu ekranów piszą się zwykłą pisownią zamiast wersalikami.
+
+## 0.523.0 — 26 września 2026
+
+**Oś rozmowy powtarza mniej, a nasza wypowiedź ma jeden przełącznik.** Długa
+odpowiedź i stopka firmowa rozwijają się teraz jednym kliknięciem, nie dwoma.
+Nagłówek wiadomości klienta pokazuje ofertę i zamówienie tylko wtedy, gdy są
+inne niż rozmowy. Notatka wewnętrzna nie liczy już znaków, bo nie ma limitu.
+Zdanie „widoczna tylko dla zespołu” przeszło do podpowiedzi przycisku.
+Przycisk „Zleć pomiar” pisze się zwykłymi literami.
+
+## 0.522.0 — 26 września 2026
+
+**Kubełki do przeglądania schodzą pod „Więcej”.** W reklamacjach Rozstrzygnięte
+i Bez ruchu, w dyskusjach Zamknięte stoją teraz w liście „Więcej” z licznikiem.
+Na wierzchu zostają kubełki pracy, a klawisze cyfr dalej wybierają każdy kubełek.
+Układ ze skrzynki mieszka we wspólnym `ui/FiltrZWiecej.tsx`, więc wszędzie
+działa tak samo.
+
+**Jeden „?” w kolejce rozmów.** Słownik znaków i skróty klawiszy otwierają się
+jednym przyciskiem i zamykają Escape'em albo kliknięciem obok. Plakietka
+„STAN Z” i stopka o niepobranych wierszach zeszły, bo mówił to już baner alarmu
+synchronizacji. Strzałka w liście „Więcej” albo w kolejności nie przesuwa już
+rozmowy pod kursorem.
+
+## 0.521.0 — 26 września 2026
+
+**Ustawienia pokazują mniej naraz.** Dane firmy stoją jako odczyt, a formularz otwiera „Zmień”.
+Kod QR nowego kolektora czeka za „Pokaż kod”, adres serwera zostaje na wierzchu.
+Reset hasła, wyłączenie konta i sesje schowały się za „⋯” w wierszu osoby.
+Słownik tagów wygląda jak karty obok. Zeszły zdania o innych ekranach i stara rada o logo.
+Karta aktualizacji mówi po ludzku: ścieżka dziennika i nazwa klucza są w dymku.
+
+## 0.520.0 — 26 września 2026
+
+**Ekran dyskusji pokazuje mniej naraz, a nic nie zniknęło.** Prowadzący, „Odśwież z Allegro" i „Poproś o zakończenie" stoją w jednym wierszu nad rozmową. Wcześniej zajmowały trzy osobne rzędy. W prawej kolumnie cztery sekcje o zakupie zeszły się w jedną „Ten zakup u nas", jak przy reklamacji. Droga zakupu prowadzi do każdego zwrotu i każdej rozmowy tego zamówienia. „Sprawa" i „Stan" są zwinięte, a podpis mówi, ile dyskusja czeka na nas. Wiersz „Status Allegro" staje tylko przy stanie innym niż trwająca dyskusja. „Zapisz notatkę" pojawia się dopiero przy zmianie treści. Nagłówek „Hala" nad jednym przyciskiem zszedł. Objaśnienie „zamyka Allegro" przy wysłanej prośbie stoi w podpowiedzi. Przyciski prośby o zakończenie są pisane zdaniem, nie wersalikami.
+
+## 0.519.0 — 26 września 2026
+
+**Karty miar obsługi mówią mniej naraz.** Sześć kart w Analizie → Obsługa klienta stoi teraz we wspólnej ramie wglądu. Pokrycie wiedzy pokazuje jeden rząd liczb, a resztę pod „Szczegóły”. Tam też zwinęły się decyzje i szkice Copilota oraz tabela doboru według osoby. Liczba czekająca na decyzję człowieka stoi przy przełączniku. Z ekranu zeszły tokeny, prefiks instrukcji, nazwa indeksu i odsyłacz „§11.2”. Karta doboru nie powtarza już okna z nagłówka analizy. Lista wpisów automatu wiedzy zostaje rozwinięta.
+
+## 0.518.0 — 26 września 2026
+
+**Prawa kolumna zwrotu mówi każdą rzecz raz.** Sprawy, droga i wiadomości o zakupie stoją w jednej sekcji „Ten zakup u nas”, bez podwójnych nagłówków. Przebieg sprawy zwija się do zdania „Ostatnio: … · przebieg (n)”, a całość otwiera jedno kliknięcie. „Zapisz notatkę” pojawia się dopiero przy zmienionej treści. Nieodebraną paczkę nazywa sama plakietka, a wyjaśnienie stoi w jej podpowiedzi. Zlecenie hali to sam przycisk, bez nagłówka nad nim.
+
+## 0.517.0 — 26 września 2026
+
+**Szkic Copilota, Dobór i alarm synchronizacji mówią mniej naraz.** Metryka szkicu
+(model, godzina, kto, liczba znaków) stoi w dymku nazwy „Szkic Copilota”. Pasek
+„Przy okazji” zwija się do jednej linii z tematami, a treść rozwija jednym
+kliknięciem. Ostrzeżenia modelu i tarcie przy twierdzeniach spoza bazy zostają
+na wierzchu. W Doborze numer wersji, „ustawił” oraz droga ze źródłem kandydata
+przeszły do dymków; droga i źródło stoją nad plakietką pewności. Zdanie
+o Retry-After stoi w dymku przycisku „Synchronizuj teraz”. Przyciski „Zapisz”,
+„Zatwierdź dobór” i „Synchronizuj teraz” piszą zdaniem, nie wersalikami.
+
+## 0.516.0 — 26 września 2026
+
+**Kwota zwrotu stoi raz, w sekcji „Pieniądze”.** Dotąd ta sama liczba stała
+w pasku decyzji, w sekcji pieniędzy i w stopce pozycji. Pasek mówi teraz tylko,
+że pieniądze nie wyszły, i podaje datę automatu Allegro. Stopka sum znika,
+gdy kwota jest ustalona. „Pieniądze” pokazują kwotę także po oddaniu.
+Przy gotowym „Wszystko OK” przycisk „Przyjmij” schodzi do drugiego rzędu,
+a klawisz P działa jak dotąd. Zamknięty zwrot bez korekty nie stawia pustej
+ramki. Zdania o źródle korekty, o powodzie odmowy i o przeliczaniu kwoty
+przeszły do podpowiedzi. Przyciski pieniędzy piszą się zwykłą pisownią
+zamiast wersalików.
+
+## 0.515.0 — 26 września 2026
+
+**Spokojniejszy nagłówek i pasek „Nowe w panelu”.** Obok logo nie stoi już
+podpis „Biuro”, który niczego nie mówił. Pasek „Nowe w panelu” pokazuje
+najnowsze wydanie w jednym wierszu. Starsze czekają za „+N”, jedno kliknięcie
+dalej. Lista skrótów pod `?` opisuje klawisz E jak przycisk: „wstaw szkic do
+odpowiedzi”. Okno szukania pokazuje wreszcie wpisywaną frazę, a lista skrótów
+swój tytuł. Oba dziedziczyły biały tekst nagłówka. Plakietki liczników
+i znaczek klawisza mają jedną kopię w kodzie, a nieużywana klasa `.btn` zeszła.
+
+## 0.514.0 — 26 września 2026
+
+**Dziennik i szuflada towaru pokazują mniej naraz.** W dzienniku towar,
+urządzenie i liczba wierszy czekają pod „Więcej filtrów”. Ustawiony filtr
+zostaje na widoku, więc tabela nie ukrywa, co pokazuje. Pole „Towar (tw_id)”
+nazywa się teraz po prostu „Towar”. Surowy szczegół wpisu otwiera się pod
+„szczegóły” w wierszu, zamiast stać w każdym. Szuflada towaru nie rysuje pustych
+list otwartych spraw. Gdy żadna sprawa nie jest otwarta, stoi jedno zdanie
+„Brak otwartych spraw”.
+
+## 0.513.0 — 26 września 2026
+
+**Kolumna kontekstu w skrzynce mówi mniej o sobie, a tyle samo o kliencie.**
+Soczewka podaje źródło kategorii jednym słowem, a miejsce poprawki czeka
+w dymku. Nad wierszami nie stoi już nagłówek „W normie”, bo rama świecących
+spraw sama je oddziela. Wiersz „Wiedza” zostawia na ekranie jedno zdanie
+reguły §14.3; opis listy i drogi pomiaru przeszedł do dymków. Wiersz „Klient”
+nie powtarza loginu po raz trzeci — stoi w nagłówku rozmowy, a profil klienta
+zostaje o klik.
+
+## 0.512.0 — 26 września 2026
+
+**Analiza mówi mniej naraz.** W „Ergonomii w liczbach" otwarta stoi tylko sekcja „Gdzie jest wolno". Pięć pozostałych tabel jest zwiniętych, z tytułem na wierzchu. Pusta sekcja mówi „brak" bez rozwijania. Bez pomiarów z pracy sama otwiera się sekcja skanu na ekranie głównym. Etykiety liczb w dostawach, pracy hali i obsłudze nie powtarzają już okna z nagłówka. Zostaje „młodsze niż 7 dni", bo to inne okno. Kolumna „DO DECYZJI" w raporcie tygodnia pisze się teraz „Do decyzji".
+
+## 0.511.0 — 26 września 2026
+
+**Ekran reklamacji mówi mniej naraz.** Licznik znaków w odpowiedzi i przy
+werdykcie pokazuje się dopiero 500 znaków przed limitem Allegro. Za limitem
+czerwienieje, a wysyłka zostaje zablokowana jak dotąd. Nasze długie wiadomości
+w rozmowie zwijają się do czterech linii z „Pokaż całą wiadomość”, jak
+w skrzynce. Wiadomość wydanego werdyktu też się zwija. Gdy Allegro oddało ją
+w rozmowie, pod werdyktem już jej nie powtarzamy. Nagłówek „Hala” nad jednym
+przyciskiem zszedł. „Zapisz notatkę” pojawia się dopiero po zmianie notatki.
+Przyciski reklamacji piszą zdaniem, nie wersalikami. Ten sam edytor dostały
+dyskusje.
+
+## 0.510.0 — 26 września 2026
+
+**Ekran wiedzy pokazuje najpierw pracę, a narzędzia jedno kliknięcie niżej.**
+W zakładce „Z opisów i ofert” cztery karty narzędzi stały nad listą do przerobienia.
+Chodzi o „Pasuje do” z ofert, pasowanie z sieci, odsyłacze i wykaz części.
+Zeszły pod listę, do zwiniętego „Importy i zbiórki”, a ich przyciski przestały być główne.
+Pasowanie z sieci na żądanie dalej uruchamia się po jednym rozwinięciu.
+
+Nagłówek ekranu niesie jedną sumę decyzji zamiast czterech liczników.
+Liczby zakładek stoją w zwykłym liczniku zakładki, nie w nawiasie przy nazwie.
+Karty decyzji mają jedną parę przycisków: główne „Zatwierdź” i drugie „Odrzuć”, w jednym rozmiarze.
+Karta pasowania z sieci mówi o limicie i pominiętych znaleziskach, bez „sufitu” i „sita”.
+
+## 0.509.0 — 26 września 2026
+
+**Stan systemu: mniej naraz, każdy fakt raz.** Arkusz lokalizacji, rekoncyliacja
+i test na żywym Allegro stoją zwinięte do nagłówka. Otwiera je jedno kliknięcie
+albo link `?karta=` z DO DECYZJI. Krok testu, który nie działa, otwiera kartę sam.
+Tabela integracji nie powtarza już połączenia Allegro ani workera Subiekta. Te
+fakty niosą karty konta Allegro i serwera obok. Karta serwera nie pokazuje pliku
+konfiguracji, bo stoi on w konfiguracji za zębatką. Wynik resyncu mówi zdaniem,
+ile kartotek i dokumentów wczytano. Zniknęły słowa programisty: nazwa trasy,
+„read-model” i „ta sama trasa”. Pochodzenie progu spóźnień przeszło do
+podpowiedzi przy liczbie. „Zadzwoń” przy kolektorze jest przyciskiem drugorzędnym.
+
 ## 0.508.1 — 25 września 2026
 
 **„Nie wiem” automatu wiedzy zostaje w księdze.** Gdy model językowy nie był

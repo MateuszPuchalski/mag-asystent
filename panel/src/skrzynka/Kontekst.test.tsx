@@ -94,7 +94,7 @@ describe("kolumna kontekstu", () => {
     expect(screen.queryByTestId("zamowienie")).not.toBeInTheDocument();
     await userEvent.click(wiersz(/^Zamówienie/));
     expect(screen.getByTestId("zamowienie")).toBeInTheDocument();
-    /* Nic nie świeci, więc nie ma ani nagłówka „Wymaga Ciebie", ani „W normie". */
+    /* Nic nie świeci, więc nie ma nagłówka „Wymaga Ciebie". */
     expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
   });
 
@@ -107,6 +107,9 @@ describe("kolumna kontekstu", () => {
     expect(within(swieci).getAllByTestId("zwrot").map((e) => e.textContent)).toEqual(["zwrot 5"]);
     expect(within(swieci).getByText(/Wymaga Ciebie · 1/)).toBeInTheDocument();
     expect(screen.queryByText("zwrot 9")).toBeNull();
+    /* Nagłówek „W normie” zszedł (0.513.0): rama oddziela świecące,
+       a wiersze mówią o sobie streszczeniem. */
+    expect(screen.queryByText("W normie")).toBeNull();
     /* Decyzja z terminem jest tematem — karta towaru schodzi pod kliknięcie. */
     expect(screen.queryByTestId("oferta")).toBeNull();
     await userEvent.click(wiersz(/^Zamknięte sprawy/));

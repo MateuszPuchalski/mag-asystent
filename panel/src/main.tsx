@@ -106,18 +106,26 @@ function DrugiRzad() {
 /* Licznik nieodhaczonych wzmianek stoi przy ZAKŁADCE, a nie na jej ekranie:
    prośba kolegi ma być widoczna z każdego widoku panelu. Wzmianka, o której
    wie tylko własny ekran, dociera wtedy, gdy ktoś na niego wejdzie — czyli
-   dokładnie wtedy, gdy nie jest już potrzebna. */
+   dokładnie wtedy, gdy nie jest już potrzebna.
+
+   JEDNA PLAKIETKA NA DWA LICZNIKI (0.515.0). Wiedza i „Do zrobienia" miały
+   dwie kopie tego samego znacznika; druga kopia rozjeżdża się z pierwszą
+   przy pierwszej poprawce koloru. Liczniki różnią się tylko źródłem liczby. */
+function Licznik({ liczba, opis }: { liczba: number; opis: string }) {
+  if (!liczba) return null;
+  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
+    aria-label={opis}>{liczba}</span>;
+}
+
 /* Ten sam powód co przy wzmiankach: propozycja wiedzy przychodzi z CUDZEJ
    rozmowy i cudzego pomiaru, więc licznik stoi przy zakładce, nie na ekranie. */
 function LicznikWiedzy() {
-  const { data } = useKolejkaWiedzy();
-  if (!data?.liczba) return null;
-  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
-    aria-label={`propozycji wiedzy do rozstrzygnięcia: ${data.liczba}`}>{data.liczba}</span>;
+  const liczba = useKolejkaWiedzy().data?.liczba ?? 0;
+  return <Licznik liczba={liczba} opis={`propozycji wiedzy do rozstrzygnięcia: ${liczba}`} />;
 }
 
 /* Ta sama zasada co przy wzmiankach: sprawa czekająca na biuro ma być widoczna
-   z każdego ekranu, a nie dopiero po wejściu na DO ZROBIENIA.
+   z każdego ekranu, a nie dopiero po wejściu na „Do zrobienia".
 
    JEDEN LICZNIK NA DWA ŹRÓDŁA (23 września 2026). Wzmianki straciły własną
    zakładkę, a ich licznik nie mógł zniknąć razem z nią — prośba kolegi ma
@@ -126,10 +134,8 @@ function LicznikWiedzy() {
 function LicznikDoZrobienia() {
   const decyzje = useDoDecyzji().data?.liczniki.wszystko ?? 0;
   const wzmianki = useWzmianki().data?.nowe ?? 0;
-  const razem = decyzje + wzmianki;
-  if (!razem) return null;
-  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
-    aria-label={`do zrobienia: ${decyzje} do decyzji, ${wzmianki} wzmianek`}>{razem}</span>;
+  return <Licznik liczba={decyzje + wzmianki}
+    opis={`do zrobienia: ${decyzje} do decyzji, ${wzmianki} wzmianek`} />;
 }
 
 /* Pigułka stanu synchronizacji jest w NAGŁÓWKU, a nie w skrzynce: agent ma
@@ -161,18 +167,19 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
 
      `flex-wrap` kosztuje drugi rząd na wąskim oknie i to jest cena świadoma:
      rząd zabiera kilkadziesiąt pikseli wysokości, brak wylogowania zabiera
-     całą funkcję. `min-w-0` na tytule, żeby to on oddawał miejsce pierwszy —
-     podpis „Biuro" wolno ucinać, przyciskom nie. */
+     całą funkcję.
+
+     PODPIS „BIURO" ZESZEDŁ (0.515.0). Stał obok logo i nie mówił nic, czego
+     agent by nie wiedział — panel jest wyłącznie biurowy. Jego rolę odstępu
+     przejęło `mr-auto` na tabliczce logo: szukanie i zakładki dalej stoją
+     z prawej. */
   return <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-wertis-ink text-white">
     <div className="flex flex-wrap items-center gap-4 px-5 py-3">
       {/* LOGO ZAMIAST IKONY MAGAZYNU (23 września 2026). Znak ma grafitowe
           litery na przezroczystym tle, więc na grafitowym pasku zniknąłby —
           stoi na białej tabliczce, tak jak na szyldzie sklepu. */}
-      <span className="rounded-md bg-white px-2 py-1"><img src={logo} alt="WERTIS — sklep z częściami"
+      <span className="mr-auto rounded-md bg-white px-2 py-1"><img src={logo} alt="WERTIS — sklep z częściami"
         className="block h-7 w-auto" /></span>
-      <div className="mr-auto min-w-0">
-        {/* kontrast: pasek stoi na #303030, gdzie slate-400 daje 5.14:1 */}
-        <span className="ml-2 text-sm text-slate-400">Biuro</span></div>
       {/* Szukanie PRZED zakładkami (23 września 2026): pytanie „gdzie to jest"
           pada, zanim wiadomo, do której zakładki iść. Miejsce oddały dwie
           zakładki, które weszły w „Do zrobienia". */}

@@ -138,7 +138,7 @@ export function ZakresTygodnia() {
           migawka z północy i migawka z 7:40 mówią o innej chwili. */}
       <KartaWgladu tytul="Ile czekało, dzień po dniu"
         opis="Migawka z pierwszego taktu doby. Wiersz z następnego poniedziałku to stan na zamknięcie tygodnia. Kreska znaczy „nie policzono”, nie zero.">
-        <Tabela naglowki={["Dzień", "DO DECYZJI", "Najstarsza", "Klient czeka", "Zwroty do decyzji",
+        <Tabela naglowki={["Dzień", "Do decyzji", "Najstarsza", "Klient czeka", "Zwroty do decyzji",
           "Reklamacje do decyzji", "Wyjątki otwarte", "Zapisy w błędzie"]}
           pusto="W tym tygodniu serwer nie zrobił ani jednej migawki. Pierwsza powstaje w pierwszym takcie doby po wdrożeniu.">
           {r.migawki.map((m) => <WierszMigawki key={m.data} {...m} />)}

@@ -12,8 +12,9 @@ import { PrzyciskTowaru, SzufladaTowaru } from "./Szuflada";
    spraw i zamykają szufladę, a Escape ją zamyka.                          */
 
 let zapisy: string[] = [];
+let bezSpraw = false;
 beforeEach(() => {
-  zapisy = [];
+  zapisy = []; bezSpraw = false;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if ((init?.method ?? "GET") !== "GET") zapisy.push(url);
     if (url === "/api/products/501") return new Response(JSON.stringify({
@@ -22,8 +23,8 @@ beforeEach(() => {
       zamowione: [{ dokId: 1, nrPelny: "ZD 1", dataWyst: "2026-09-20", termin: "2026-10-01", dostawca: "Rosa-Pol", ilosc: 20, szacunek: false }] }));
     if (url === "/api/obsluga/towar/501/przekroj") return new Response(JSON.stringify({
       twId: 501, oferty: [{ konto: 1, ofertaId: "of-1", nazwa: "Nóż" }],
-      otwarteZwroty: [{ id: 7, numer: "Z-7", at: "2026-09-20T08:00:00Z", ilosc: 1 }],
-      otwarteSprawy: [{ id: 9, typ: "CLAIM", numer: "12/2026", at: "2026-09-21T08:00:00Z" }],
+      otwarteZwroty: bezSpraw ? [] : [{ id: 7, numer: "Z-7", at: "2026-09-20T08:00:00Z", ilosc: 1 }],
+      otwarteSprawy: bezSpraw ? [] : [{ id: 9, typ: "CLAIM", numer: "12/2026", at: "2026-09-21T08:00:00Z" }],
       otwarteRozmowy: [],
       okno: { dni: 90, sprzedanych: 10, zwroconych: 3, reklamacji: 1, udzialZwrotow: 0.3 } }));
     if (url === "/api/obsluga/wiedza/towar/501") return new Response(JSON.stringify({
@@ -54,7 +55,22 @@ describe("szuflada towaru", () => {
     expect(within(s).getByRole("link", { name: /Z-7/ })).toHaveAttribute("href", "/obsluga/zwroty/7");
     expect(within(s).getByRole("link", { name: /reklamacja 12\/2026/ })).toHaveAttribute("href", "/obsluga/reklamacje/9");
     expect(await within(s).findByText(/2 potwierdzonych zastosowań/)).toBeInTheDocument();
+    /* Pusta lista się nie rysuje (0.514.0): rozmów o tym towarze nie ma,
+       więc nie ma też ich nagłówka ani „brak" pod nim. */
+    expect(within(s).queryByRole("region", { name: /Otwarte rozmowy/ })).toBeNull();
+    expect(within(s).queryByText("brak")).toBeNull();
+    expect(within(s).queryByText("Brak otwartych spraw.")).toBeNull();
     expect(zapisy).toEqual([]);
+  });
+
+  it("bez żadnej otwartej sprawy stoi jedno zdanie, nie trzy puste listy", async () => {
+    bezSpraw = true;
+    pokaz();
+    await userEvent.click(screen.getByRole("button", { name: "14-25001" }));
+    const s = await screen.findByRole("dialog", { name: /Towar/ });
+    expect(await within(s).findByText("Brak otwartych spraw.")).toBeInTheDocument();
+    expect(within(s).queryByRole("region", { name: /Otwarte/ })).toBeNull();
+    expect(within(s).queryByText("brak")).toBeNull();
   });
 
   it("przejście do sprawy i Escape zamykają szufladę", async () => {
