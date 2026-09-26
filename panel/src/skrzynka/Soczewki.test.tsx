@@ -130,7 +130,7 @@ describe("soczewka w kolumnie kontekstu", () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  /* ── Paczka (@wydanie) ────────────────────────────────────────────────────
+  /* ── Paczka (0.531.0) ────────────────────────────────────────────────────
      Status słowem, przewoźnik i numer bez kliknięcia; „Sprawdź" tylko przy
      stanie nieznanym albo starym, i tylko kliknięciem. */
   const zPaczka = (kategoria: Kopilot["kategoria"], p: Partial<StanPrzesylki> | null) =>

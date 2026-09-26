@@ -94,7 +94,7 @@ export function coSwieci(dane: OsRozmowy): Swiatlo[] {
   const s: Swiatlo[] = [];
   if (dane.zwroty.some(zwrotWToku)) s.push("zwrot");
   if (dane.sprawy.some((x) => x.otwarta)) s.push("sprawa");
-  /* Paczkę poza zwykłą drogą pokazuje soczewka paczki, gdy stoi (@wydanie).
+  /* Paczkę poza zwykłą drogą pokazuje soczewka paczki, gdy stoi (0.531.0).
      Stoi NAD „Wymaga Ciebie", więc druga karta tej samej paczki niżej
      byłaby powtórzeniem, a nie drugim sygnałem. */
   if (paczkaOdchylenie(dane) && !paczkaWSoczewce(dane)) s.push("paczka");
@@ -130,7 +130,7 @@ const KATEGORIE_O_TOWAR: ReadonlySet<Kategoria> = new Set<Kategoria>([
   "MISSING_PRODUCT", "DAMAGED_PRODUCT", "OTHER",
 ]);
 
-/* ── PUSTE WIERSZE „KLIENT" I „WIEDZA" ZNIKAJĄ (@wydanie) ───────────────────
+/* ── PUSTE WIERSZE „KLIENT" I „WIEDZA" ZNIKAJĄ (0.531.0) ───────────────────
    Decyzja właściciela z 26 września 2026, wbrew wyłączeniu z §26e. Przy
    większości rozmów oba wiersze mówiły tylko „nic tu nie ma": dwa cele po
    44 px, które trzeba przeczytać, żeby się tego dowiedzieć. §26d mówi

@@ -7,7 +7,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Kategoria, OsRozmowy } from "../api/typy";
 import { Kontekst } from "./Kontekst";
 
-/* ── ZERO ZAPISU PRZY PATRZENIU, NA PRAWDZIWYCH HAKACH (@wydanie) ───────────
+/* ── ZERO ZAPISU PRZY PATRZENIU, NA PRAWDZIWYCH HAKACH (0.531.0) ───────────
    Soczewka paczki stoi przy najczęstszym pytaniu skrzynki i trzyma przycisk,
    który pyta Allegro. Testy obok podmieniają hak, więc nie widzą sieci. Ten
    plik stawia całą kolumnę kontekstu na prawdziwym kliencie zapytań i liczy

@@ -33,7 +33,7 @@ const SOCZEWKA_KATEGORII: Partial<Record<Kategoria, RodzajSoczewki>> = {
      czy zwrot jest już w Allegro. Gdy jest, jego karta stoi w „Wymaga
      Ciebie" — wtedy soczewka milczy, żeby nie mówić tego samego dwa razy. */
   RETURN: "zwrot",
-  /* ── PACZKA (@wydanie) ────────────────────────────────────────────────────
+  /* ── PACZKA (0.531.0) ────────────────────────────────────────────────────
      „Gdzie moja paczka" to najczęstsze pytanie skrzynki, a odpowiedź leżała
      w zwiniętym wierszu „Zamówienie", pod rozwinięciem i kliknięciem.
      Uszkodzona w transporcie też tu trafia: zgłoszenie szkody u przewoźnika

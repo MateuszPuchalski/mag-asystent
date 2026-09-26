@@ -148,7 +148,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
      w wierszu „Zamówienie" — ta sama karta w dwóch miejscach to dokładnie
      powtórzenie, które to wydanie zdejmuje. */
   const zamowienieSwieci = Boolean(dane.zamowienie) && (swiatla.includes("paczka") || kilkaPozycji > 0);
-  /* Paczkę pokazuje soczewka nad kolumną (@wydanie), więc karta zamówienia
+  /* Paczkę pokazuje soczewka nad kolumną (0.531.0), więc karta zamówienia
      niżej jej nie powtarza — ani w „Wymaga Ciebie", ani w swoim wierszu. */
   const paczkaWyzej = paczkaWSoczewce(dane);
   const ileSwieci = zwrotyWToku.length + sprawyOtwarte.length + (zamowienieSwieci ? 1 : 0)
@@ -171,7 +171,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
       {/* SOCZEWKA NAD WSZYSTKIM (0.499.0): odpowiedź na pytanie klienta stoi
           przed tym, co ma termin, bo po nią agent otwiera rozmowę. Niczego nie
           chowa — „Wymaga Ciebie" i wiersze stoją pod nią jak bez niej. */}
-      {/* NOWY KLIENT JEDNĄ LINIJKĄ (@wydanie). Pusty wiersz „Klient" zniknął
+      {/* NOWY KLIENT JEDNĄ LINIJKĄ (0.531.0). Pusty wiersz „Klient" zniknął
           decyzją właściciela, a pierwszy kontakt dalej jest informacją. Login
           stoi tylko w nagłówku rozmowy, więc znak stoi tu, pod pasmem — nad
           pasmem zepchnąłby trzy fakty, które mają stać nad wszystkim. */}
@@ -273,7 +273,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
         {dobor}
       </Wiersz>}
 
-      {/* Klient i Wiedza stają tylko z treścią (@wydanie) — reguła i powód
+      {/* Klient i Wiedza stają tylko z treścią (0.531.0) — reguła i powód
           w `kokpit.ts` przy `klientMaHistorie`. */}
       {historia.data && klientMaHistorie(historia.data) && <Wiersz tytul="Klient"
         streszczenie={streszczenieKlienta(historia.data)}
@@ -365,7 +365,7 @@ export function streszczenieZamowienia(dane: OsRozmowy): string {
     return n ? `niepowiązane · ${n} ${odmien(n, "zakup", "zakupy", "zakupów")} klienta` : "niepowiązane";
   }
   const p = z.pobrane;
-  /* Gdy paczkę pokazuje soczewka (@wydanie), streszczenie jej nie powtarza:
+  /* Gdy paczkę pokazuje soczewka (0.531.0), streszczenie jej nie powtarza:
      ten sam stan dwa razy w jednej kolumnie każe sprawdzać, czy się zgadza. */
   const paczka = paczkaWSoczewce(dane) ? null : z.przesylka?.dostarczonoAt
     ? `doręczona ${dzien(z.przesylka.dostarczonoAt)}`

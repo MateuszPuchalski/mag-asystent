@@ -46,7 +46,7 @@ describe("soczewka", () => {
       .toBe("inny_towar");
   });
 
-  /* Paczka (@wydanie): „gdzie moja paczka" to najczęstsze pytanie skrzynki. */
+  /* Paczka (0.531.0): „gdzie moja paczka" to najczęstsze pytanie skrzynki. */
   it("każda kategoria dostawy i status zamówienia stawiają soczewkę paczki; inne — nie", () => {
     for (const kategoria of ["ORDER_STATUS", "DELIVERY_DELAY", "DELIVERY_LOST", "DELIVERY_DAMAGED"] as const) {
       expect(soczewka(dane(kopilot({ kategoria })))?.rodzaj).toBe("paczka");

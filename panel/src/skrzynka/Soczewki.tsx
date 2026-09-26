@@ -195,7 +195,7 @@ function ZwrotBezZgloszenia({ dane }: { dane: OsRozmowy }) {
   </div>;
 }
 
-/* ── PACZKA: GDZIE JEST I CZY PYTAĆ ALLEGRO (@wydanie) ──────────────────────
+/* ── PACZKA: GDZIE JEST I CZY PYTAĆ ALLEGRO (0.531.0) ──────────────────────
    „Gdzie moja paczka" to najczęstsze pytanie skrzynki. Odpowiedź stała
    w zwiniętym wierszu „Zamówienie": rozwinąć, znaleźć linijkę, kliknąć
    „sprawdź". Tu stoi bez kliknięcia, z tego samego zapisanego stanu.

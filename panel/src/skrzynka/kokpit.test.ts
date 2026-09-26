@@ -57,7 +57,7 @@ describe("co świeci w kolumnie kontekstu", () => {
     expect(coSwieci(z("ISSUE", "2026-09-25T10:00:00Z"))).toEqual([]);
   });
 
-  /* Soczewka paczki (@wydanie) stoi nad „Wymaga Ciebie" i mówi o awizo sama.
+  /* Soczewka paczki (0.531.0) stoi nad „Wymaga Ciebie" i mówi o awizo sama.
      Para jak wszędzie tutaj: przy pytaniu o towar awizo dalej musi świecić. */
   it("awizo nie świeci drugi raz, gdy paczkę pokazuje soczewka", () => {
     const z = (kategoria: string) => dane({
@@ -133,7 +133,7 @@ describe("karta towaru na starcie według rodzaju pytania", () => {
   });
 });
 
-/* ── Puste wiersze znikają (@wydanie, decyzja właściciela z 26 września) ──
+/* ── Puste wiersze znikają (0.531.0, decyzja właściciela z 26 września) ──
    Para przy każdej regule: stan, w którym wiersz gaśnie, i stan, w którym
    MUSI stanąć. Reguła gasząca wszystko schowałaby klienta z historią. */
 describe("puste wiersze Klient i Wiedza", () => {

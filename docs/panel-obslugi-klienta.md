@@ -726,7 +726,7 @@ kategoria jest od Copilota, czy od zespołu. Przy kategorii awaryjnej albo
 nieudanym rozpoznaniu nie staje wcale. Kategoria człowieka wygrywa i nie
 wpuszcza dodatkowych kategorii modelu.
 
-**Soczewka paczki (@wydanie).** „Gdzie moja paczka" to najczęstsze pytanie
+**Soczewka paczki (0.531.0).** „Gdzie moja paczka" to najczęstsze pytanie
 skrzynki, a odpowiedź leżała w zwiniętym wierszu „Zamówienie". Przy statusie
 zamówienia i kategoriach dostawy soczewka pokazuje bez kliknięcia stan paczki,
 przewoźnika, numer z kopiowaniem i czas sprawdzenia. Sprawdzenie zostaje jawnym
@@ -6230,7 +6230,7 @@ Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko
 - tarcie „Wyślij bez zmian” (§26c.3);
 - wiersze Klient i Wiedza w Skrzynce, tylko skrócone (0.216.0).
 
-**Odwrócone 26 września 2026 decyzją właściciela (@wydanie).** Puste wiersze Klient i Wiedza znikają, bo przy większości rozmów mówiły tylko „nic tu nie ma”. Wiersz z treścią zostaje zwinięty jak dotąd. Pierwszy kontakt ze znanym loginem mówi jedna linijka „Nowy klient” pod pasmem.
+**Odwrócone 26 września 2026 decyzją właściciela (0.531.0).** Puste wiersze Klient i Wiedza znikają, bo przy większości rozmów mówiły tylko „nic tu nie ma”. Wiersz z treścią zostaje zwinięty jak dotąd. Pierwszy kontakt ze znanym loginem mówi jedna linijka „Nowy klient” pod pasmem.
 
 **Jedna zmiana do potwierdzenia.** Ściąga skrótów w kolejce Skrzynki otwiera się teraz kliknięciem, nie najechaniem. Najechanie przyszło w 0.402.0 po uwadze właściciela. Pełna lista skrótów dalej stoi pod klawiszem `?`.
 

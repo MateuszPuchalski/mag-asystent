@@ -165,7 +165,7 @@ describe("Paczka przy zamówieniu rozmowy", () => {
     expect(screen.getByLabelText("Przesyłka")).toHaveTextContent("Allegro nie ma numeru");
   });
 
-  /* Soczewka paczki (@wydanie) pokazuje paczkę nad kolumną — karta zamówienia
+  /* Soczewka paczki (0.531.0) pokazuje paczkę nad kolumną — karta zamówienia
      jej nie powtarza, ale pozycje i numer zamówienia zostają. */
   it("gdy paczkę pokazuje soczewka, linijki paczki nie ma, a reszta karty stoi", () => {
     render(<ZamowienieRozmowy rozmowaId={1} bezPaczki

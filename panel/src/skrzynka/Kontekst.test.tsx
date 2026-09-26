@@ -41,7 +41,7 @@ vi.mock("./PasmoOdpowiedzi", () => ({
    Ten plik pilnuje UKŁADU, więc hak oddaje stałe dane. */
 const historia = { data: undefined as unknown };
 const wiedza = { data: undefined as unknown };
-/* Soczewka paczki (@wydanie) woła hak sprawdzenia; tu tylko liczymy, że
+/* Soczewka paczki (0.531.0) woła hak sprawdzenia; tu tylko liczymy, że
    samo rysowanie kolumny go nie odpala. */
 const sprawdz = { mutate: vi.fn(), isPending: false, error: null };
 vi.mock("../api/rozmowy", () => ({
@@ -49,7 +49,7 @@ vi.mock("../api/rozmowy", () => ({
   useWiedzaDoboru: () => wiedza,
   useSprawdzPrzesylkeRozmowy: () => sprawdz,
 }));
-/* Wiersze Klient i Wiedza stają tylko z treścią (@wydanie). */
+/* Wiersze Klient i Wiedza stają tylko z treścią (0.531.0). */
 const zHistoria = { login: "pasikonik5", maszyny: [], wpisy: [{ rodzaj: "zakup" }, { rodzaj: "zwrot" }] };
 const zWiedza = { zastosowanie: null, pomiary: [{ zadanieId: 1 }], silniki: [] };
 
@@ -183,7 +183,7 @@ describe("kolumna kontekstu", () => {
   });
 
   /* Zakładka z zerem kosztowała klik, żeby usłyszeć „tu nic nie ma".
-     Od @wydanie (decyzja właściciela z 26 września) pusty wiersz nie staje
+     Od 0.531.0 (decyzja właściciela z 26 września) pusty wiersz nie staje
      wcale — ani przed odczytem, ani po pustym wyniku. Z treścią mówi
      streszczeniem, jak dotąd. */
   it("Klient i Wiedza stają tylko z treścią i mówią streszczeniem", () => {
@@ -228,13 +228,13 @@ describe("kolumna kontekstu", () => {
     const soczewka = screen.getByRole("region", { name: "Pytanie klienta" });
     const swieci = screen.getByRole("region", { name: "Wymaga Ciebie" });
     expect(soczewka.compareDocumentPosition(swieci) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    /* Klient i Wiedza bez treści nie stają wcale (@wydanie) — z soczewką czy bez. */
+    /* Klient i Wiedza bez treści nie stają wcale (0.531.0) — z soczewką czy bez. */
     for (const nazwa of [/^Oferta i towar/, /^Zamówienie/, /^Dobór/]) {
       expect(wiersz(nazwa)).toBeInTheDocument();
     }
   });
 
-  /* ── Soczewka paczki (@wydanie) ──────────────────────────────────────────
+  /* ── Soczewka paczki (0.531.0) ──────────────────────────────────────────
      Paczka stoi RAZ: w soczewce. Awizo nie zapala drugiej karty w „Wymaga
      Ciebie", streszczenie wiersza jej nie powtarza, a karta zamówienia pod
      wierszem dostaje `bezPaczki`. Samo rysowanie niczego nie sprawdza. */
