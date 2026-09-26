@@ -464,6 +464,8 @@ function zapiszKsiege(
    (wyłącznik i klucz), ile zostało z sufitu i co wyszło ostatnio. */
 
 export interface OstatniPrzebieg {
+  /** Kartoteka albo silnik z listy (@wydanie) — przy silniku `znalezisk` to liczba wykazów. */
+  rodzaj: "kartoteka" | "silnik";
   symbol: string;
   at: string;
   wynik: "ok" | "blad";
@@ -499,10 +501,19 @@ export function stanPasowaniaZSieci(teraz = new Date(), database: DatabaseSync =
   const poBledzie = new Date(teraz.getTime() - PONOWNIE_PO_BLEDZIE_DNI * 86_400_000).toISOString();
   const doSprawdzenia = (database.prepare(`SELECT count(*) n FROM sgt_towar t WHERE ${WARUNEK_KANDYDATA}`)
     .get(odKiedy, poBledzie) as { n: number }).n;
-  const ostatnie = (database.prepare(`SELECT COALESCE(t.symbol, '#' || p.tw_id) AS symbol, p.at, p.wynik,
-      p.znalezisk, p.zaproponowano, p.odrzucone, p.blad
-      FROM pasowanie_siec p LEFT JOIN sgt_towar t ON t.tw_id=p.tw_id ORDER BY p.id DESC LIMIT 5`)
+  /* Silniki na tej samej liście (@wydanie). Przycisk zaczyna od silników,
+     a ich błędy stały tylko w bazie — na ekranie było „błędów: 3” bez
+     jednego słowa, co się stało. */
+  const ostatnie = (database.prepare(`SELECT * FROM (
+      SELECT 'kartoteka' AS rodzaj, COALESCE(t.symbol, '#' || p.tw_id) AS symbol, p.at, p.wynik,
+        p.znalezisk, p.zaproponowano, p.odrzucone, p.blad
+        FROM pasowanie_siec p LEFT JOIN sgt_towar t ON t.tw_id=p.tw_id
+      UNION ALL
+      SELECT 'silnik', s.marka || ' ' || s.nazwa, s.at, s.wynik, s.stron, s.zaproponowano, '{}', s.blad
+        FROM pasowanie_siec_silnik s)
+      ORDER BY at DESC LIMIT 5`)
     .all() as Array<Record<string, unknown>>).map((w) => ({
+    rodzaj: w.rodzaj as "kartoteka" | "silnik",
     symbol: String(w.symbol), at: String(w.at), wynik: w.wynik as "ok" | "blad",
     znalezisk: Number(w.znalezisk), zaproponowano: Number(w.zaproponowano),
     odrzucone: JSON.parse(String(w.odrzucone ?? "{}")) as Partial<Record<PowodOdrzucenia, number>>,
