@@ -487,7 +487,7 @@ describe("Ekran reklamacji", () => {
   });
 
   it("cyfry idą za kubełkami: 4 to „Bez ruchu”, 5 to „Wszystkie”", async () => {
-    /* @wydanie: 1–3 i „4 = Wszystkie" stały na sztywno, choć kubełki są
+    /* 0.525.1: 1–3 i „4 = Wszystkie" stały na sztywno, choć kubełki są
        cztery — „Bez ruchu" nie miał klawisza, a podpowiedzi obiecywały 4 i 5. */
     pokaz();
     await userEvent.keyboard("4");

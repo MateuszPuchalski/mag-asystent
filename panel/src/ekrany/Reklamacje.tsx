@@ -423,7 +423,7 @@ export function Reklamacje() {
       if (e.ctrlKey || e.altKey || e.metaKey || wPolu(e.target)) return;
       if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idz(1); }
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
-      /* Cyfry liczą się z długości `KUBELKI` (@wydanie), jak podpowiedzi przy
+      /* Cyfry liczą się z długości `KUBELKI` (0.525.1), jak podpowiedzi przy
          kubełkach. Stało tu na sztywno 1–3 i „4 = Wszystkie", a kubełki są
          cztery: „Bez ruchu" nie miał klawisza, choć podpowiedź obiecywała 4,
          a „Wszystkie" 5. Dopisanie kubełka nie może znów rozjechać klawiszy. */
