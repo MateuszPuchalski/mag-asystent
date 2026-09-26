@@ -269,12 +269,17 @@ export function Edytor({
     role="group" aria-label={wKomentarzu ? "Działania notatki" : "Działania odpowiedzi"}>
     {wKomentarzu
       ? <>
-          <span className="text-podpis text-amber-700/70">{komentarz.length} znaków</span>
-          <span className="text-xs text-amber-800">Widoczna tylko dla zespołu.</span>
+          {/* LICZNIK I ZDANIE ZESZŁY (@wydanie), tą samą regułą co licznik
+              odpowiedzi w 0.506.0: stoi tylko to, co zmienia decyzję. Notatka
+              nie ma limitu znaków — serwer żadnego nie trzyma — więc licznik
+              nie miał progu, przy którym by coś znaczył. „Widoczna tylko dla
+              zespołu" mówią już zakładka, pole i jego podpis; zostaje
+              w podpowiedzi przycisku, tuż przed kliknięciem. */}
           {/* Komentowanie NIE wymaga prowadzenia rozmowy: notatka zespołu to
               nie odpowiedź, a kolega ma prawo dopisać „to ten sam klient co
               wczoraj" bez przejmowania sprawy. */}
           <Przycisk wariant="glowny" disabled={komentuje || !komentarz.trim()}
+            title="Widoczna tylko dla zespołu — klient jej nie zobaczy"
             onClick={onDodajKomentarz} className="px-5 py-2.5 text-tresc shadow-sm">
             <MessageSquare size={17} />{komentuje ? "Zapisuję…" : "Dodaj notatkę"}
           </Przycisk>
