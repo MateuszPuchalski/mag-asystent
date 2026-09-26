@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { Package } from "lucide-react";
 import {
   useKosze, usePominiete, usePonowMmKosza, usePrzeliczKosz, useSzczegolKosza, useSzukajWKoszach,
-  useZalatwPominiecie,
+  useUsunZMm, useZalatwPominiecie,
 } from "../api/kosze";
 import { Blad, Karta, Pole, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
@@ -61,9 +61,13 @@ export function Kosze() {
   const [bladPonow, setBladPonow] = useState("");
   const [wynikPonow, setWynikPonow] = useState("");
   const [czekaNaSprawdzenie, setCzekaNaSprawdzenie] = useState(false);
+  const usunZMm = useUsunZMm();
+  const [bladUsun, setBladUsun] = useState("");
+  const [wynikUsun, setWynikUsun] = useState("");
   useEffect(() => {
     setBladPrzelicz(""); setWynikPrzelicz(""); setBladZalatw("");
     setBladPonow(""); setWynikPonow(""); setCzekaNaSprawdzenie(false);
+    setBladUsun(""); setWynikUsun("");
   }, [id]);
 
   const lista = kosze.data?.kosze ?? [];
@@ -132,6 +136,16 @@ export function Kosze() {
               ? <Kosz k={szczegol.data.kosz} bezPowrotu={bezPowrotu} ponowMm={problemMm && wybrany !== null ? {
                   problem: problemMm, trwa: ponow.isPending, blad: bladPonow, wynik: wynikPonow,
                   czekaNaSprawdzenie,
+                  usun: { trwa: usunZMm.isPending, blad: bladUsun, wynik: wynikUsun,
+                    onUsun: (twId) => {
+                      setBladUsun(""); setWynikUsun("");
+                      usunZMm.mutate({ id: wybrany, twId }, {
+                        onSuccess: (w) => setWynikUsun(w.anulowanych
+                          ? "Zdjęte — MM nie miało innych pozycji, więc zostało anulowane."
+                          : `Zdjęte z MM (${w.ilosc} szt.). Resztę puści „Ponów MM”, a zadanie w kolejce pójdzie samo.`),
+                        onError: (e) => setBladUsun((e as Error).message),
+                      });
+                    } },
                   onPonow: (sprawdzono) => {
                     setBladPonow(""); setWynikPonow("");
                     ponow.mutate({ id: wybrany, sprawdzono }, {

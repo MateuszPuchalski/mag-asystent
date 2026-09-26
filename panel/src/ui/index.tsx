@@ -321,10 +321,19 @@ export const Blad = ({ children }: { children: React.ReactNode }) =>
  * W środku zamieniłaby się w dłuższą linijkę tekstu, a linijka na sto
  * dwadzieścia znaków czyta się GORZEJ, nie lepiej — dlatego wypowiedzi mają
  * własny próg czytelności (`Os.tsx`), a nie ten z okna.
+ *
+ * NA NAJWĘŻSZYM PROGU ŚRODEK NIE MOŻE BYĆ NAJWĘŻSZY (audyt 26.09.2026).
+ * Przy 1024 px boki po 21 rem zostawiały sprawie ok. 280 px — mniej niż
+ * kolumnie kontekstu — i opis wyjątku łamał się po dwa słowa w linijce.
+ * Na `lg` oddaje KONTEKST, nie kolejka: środek ma ok. 360 px przy 1024
+ * i jest najszerszy z trzech. Kolejka zostaje przy 21 rem, bo przy 19 rem
+ * kafelki kubełków w Zwrotach ucinały etykiety („Do decy…", „Zamkni…") —
+ * sprawdzone na zrzucie przed i po. Kontekst pokazuje dowody i liczby,
+ * które przy 16 rem układają się w dwie kolumny bez utraty treści.
  */
 export const SIATKA_TRZECH_KOLUMN =
   "grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)] " +
-  "lg:grid-cols-[21rem_minmax(0,1fr)_21rem] " +
+  "lg:grid-cols-[21rem_minmax(0,1fr)_16rem] " +
   "xl:grid-cols-[23rem_minmax(0,1fr)_24rem] " +
   "2xl:grid-cols-[25rem_minmax(0,1fr)_28rem]";
 

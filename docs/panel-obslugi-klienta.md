@@ -726,6 +726,15 @@ kategoria jest od Copilota, czy od zespołu. Przy kategorii awaryjnej albo
 nieudanym rozpoznaniu nie staje wcale. Kategoria człowieka wygrywa i nie
 wpuszcza dodatkowych kategorii modelu.
 
+**Soczewka paczki (0.531.0).** „Gdzie moja paczka" to najczęstsze pytanie
+skrzynki, a odpowiedź leżała w zwiniętym wierszu „Zamówienie". Przy statusie
+zamówienia i kategoriach dostawy soczewka pokazuje bez kliknięcia stan paczki,
+przewoźnika, numer z kopiowaniem i czas sprawdzenia. Sprawdzenie zostaje jawnym
+kliknięciem. Pełny przycisk staje przy stanie nieznanym albo starszym niż pół
+godziny, a przy świeżym zostaje ciche „sprawdź".
+Paczka stoi wtedy raz: wiersz „Zamówienie" i „Wymaga Ciebie" jej nie powtarzają.
+Ogólny status zamówienia ustępuje soczewce z dodatkowej kategorii, np. anulowaniu.
+
 Decyzja z 0.198.0 zostaje: oferta i kartoteka to jeden wiersz, otwarty bez
 klikania. Zwija się wyłącznie przy zwrocie albo sprawie w toku, bo wtedy
 tematem jest decyzja z terminem, a karta towaru jest tłem.
@@ -4700,6 +4709,27 @@ zdaniem, co sprawdzić, a przycisk „Sprawdziłem w Subiekcie" dopiero wtedy
 ponawia. MM, które weszło po błędzie, przycisku nie ma — tam zostaje
 sprawdzenie stanów.
 
+**Karta kosza nazywa kartotekę, która blokuje MM (0.530.0).** Zgłoszenie
+właściciela przy koszu 1205: „brak towaru w MM, gdy chcę przerzucić z powrotem
+na główny — i nie pokazuje, o jaki towar chodzi". Sfera odmawia jednym zdaniem
+za cały dokument. `brakiMm` porównuje treść zadania z read-modelem stanów na
+magazynie, z którego MM zdejmuje. Linia bez wolnego stanu stoi w ramce kłopotu
+i przy swoim wierszu, z ilością, stanem i rezerwacją.
+
+Najczęstsza przyczyna to rezerwacja. Zamówienie zarezerwowało towar na
+magazynie zwrotów, a zarezerwowanego Subiekt nie przesunie. Druga: ktoś
+przesunął albo sprzedał go stamtąd ręką, zanim wyszedł powrót.
+
+**Kartotekę zdejmuje się z MM, które nie weszło (0.530.0).** Właściciel:
+„daj możliwość usunięcia tego towaru z tej MM". Jedna linia bez stanu trzymała
+dwadzieścia cztery odłożone. Po potwierdzeniu linia wychodzi z treści zadania,
+a reszta idzie dalej. Zadanie bez linii jest anulowane, a zadania w zapisie
+nie ruszamy. Towar zostaje na magazynie źródłowym i przesuwa się go ręką;
+zdarzenie `kosz_mm_pozycja_zdjeta` trzyma ilość i magazyn.
+
+Karta odróżnia też MM ponawiane po odmowie od MM, które weszło. Kosz 1205
+mówił „weszło po błędzie", choć powrót dopiero czekał na kolejną próbę.
+
 **Kosz bez MM powrotnego stoi w tym samym kubełku (0.505.0).** Zgłoszenie
 właściciela: „jak mogę sprawdzić, do których koszyków po rozłożeniu nie
 została zrobiona MM powrotna?". Lista żyła dotąd tylko w rekoncyliacji.
@@ -6239,6 +6269,8 @@ Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko
 - rozwinięta lista automatu wiedzy (0.331.0);
 - tarcie „Wyślij bez zmian” (§26c.3);
 - wiersze Klient i Wiedza w Skrzynce, tylko skrócone (0.216.0).
+
+**Odwrócone 26 września 2026 decyzją właściciela (0.531.0).** Puste wiersze Klient i Wiedza znikają, bo przy większości rozmów mówiły tylko „nic tu nie ma”. Wiersz z treścią zostaje zwinięty jak dotąd. Pierwszy kontakt ze znanym loginem mówi jedna linijka „Nowy klient” pod pasmem.
 
 **Jedna zmiana do potwierdzenia.** Ściąga skrótów w kolejce Skrzynki otwiera się teraz kliknięciem, nie najechaniem. Najechanie przyszło w 0.402.0 po uwadze właściciela. Pełna lista skrótów dalej stoi pod klawiszem `?`.
 
