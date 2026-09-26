@@ -20,7 +20,7 @@ import { Przycisk, Blad } from "../ui";
    oddaliśmy klientowi dokładnie tyle mniej. Kto wycenia regał, ma ją pod ręką
    zamiast szacować z pamięci.
 
-   ZWINIĘTA DO JEDNEGO WIERSZA (@wydanie), jak `PasekUwag` na tym samym
+   ZWINIĘTA DO JEDNEGO WIERSZA (0.525.0), jak `PasekUwag` na tym samym
    ekranie. Pełna lista z przyciskiem przy każdej pozycji stała na stałe nad
    trzema kolumnami i zabierała kolejce kilka wierszy, choć regał obsługuje
    się raz na jakiś czas, a nie przy każdym zwrocie. Liczba i zdanie

@@ -99,7 +99,7 @@ export function Kosze() {
     <Koszyk />
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
-        {/* Tytuł „Kosze" zszedł (@wydanie), bo powtarzał wybraną zakładkę
+        {/* Tytuł „Kosze" zszedł (0.525.0), bo powtarzał wybraną zakładkę
             przełącznika tuż nad nim — dwa razy ta sama nazwa to wiersz
             zabrany kolejce i nic nowego dla oka. */}
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">

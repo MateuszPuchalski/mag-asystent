@@ -51,7 +51,7 @@ describe("Lista robocza regału outletowego", () => {
   });
 
   it("stoi jednym wierszem z liczbą, a pozycje pokazuje dopiero kliknięcie", async () => {
-    /* Zwinięta (@wydanie), jak pasek uwag obok: regał obsługuje się raz na
+    /* Zwinięta (0.525.0), jak pasek uwag obok: regał obsługuje się raz na
        jakiś czas, więc pełna lista nie ma stać nad kolejką na stałe. */
     stan.pozycje = [POZYCJA(), POZYCJA({ pozycjaId: 8, symbol: "SEK-02" })];
     render(<NaOutlet />);
