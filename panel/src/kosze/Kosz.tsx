@@ -63,6 +63,11 @@ const RUCH_BEZ_POWROTU: Record<PowodBezPowrotu, string> = {
   nieznany: "Powrót powinien był już wyjść — sprawdź kolejkę Sfery.",
 };
 
+/* Treść dawnego akapitu pod nagłówkiem kosza — dziś podpowiedź przycisku. */
+const PODPOWIEDZ_PRZELICZENIA = "Dokumentu jeszcze nie ma, więc zawartość da się poprawić. "
+  + "Przeliczenie układa ją od nowa z ocen „na stan” — zestaw sprzedany jedną ofertą "
+  + "wchodzi rozbity, tak jak leży na magazynie.";
+
 export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
   k: SzczegolKosza;
   przelicz: { trwa: boolean; blad: string; wynik: string; onPrzelicz: () => void };
@@ -91,16 +96,17 @@ export function Kosz({ k, przelicz, ponowMm = null, bezPowrotu = null }: {
         <CyklKosza status={k.status} />
         {k.rodzaj === "karton" && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-xs font-bold text-slate-700">karton</span>}
         <span className="ml-auto" />
-        {k.doEdycji && <Przycisk disabled={przelicz.trwa} onClick={przelicz.onPrzelicz}>
+        {/* Wyjaśnienie w podpowiedzi przycisku (0.525.0). Stało dwoma zdaniami
+            pod nagłówkiem przy każdym koszu do edycji, a czyta się je raz —
+            przy pierwszym przeliczeniu, czyli z myszą na przycisku. */}
+        {k.doEdycji && <Przycisk disabled={przelicz.trwa} onClick={przelicz.onPrzelicz}
+          title={PODPOWIEDZ_PRZELICZENIA}>
           <RefreshCw size={16} />Przelicz ze zwrotów</Przycisk>}
       </div>
       <p className="mt-1 text-sm text-slate-600">
         {k.mmNumer ? `z przesunięcia MM ${k.mmNumer}` : `${ile(k.zwroty.length, "zwrot przypięty", "zwroty przypięte", "zwrotów przypiętych")} w panelu`}
         {` · odłożone ${k.odlozonych}/${k.pozycje.length} poz.`}</p>
       {etapy.length > 0 && <p className="mt-1 text-sm text-slate-600">{etapy.join(" → ")}</p>}
-      {k.doEdycji && <p className="mt-1 text-sm text-slate-600">
-        Dokumentu jeszcze nie ma, więc zawartość da się poprawić. Przeliczenie układa ją od nowa
-        z ocen „na stan" — zestaw sprzedany jedną ofertą wchodzi rozbity, tak jak leży na magazynie.</p>}
       {przelicz.wynik && <p className="mt-1 text-sm text-ranga-ok">{przelicz.wynik}</p>}
       <Blad>{przelicz.blad}</Blad>
       {/* ── KŁOPOT Z MM I PONOWIENIE (0.503.0) ──────────────────────────────

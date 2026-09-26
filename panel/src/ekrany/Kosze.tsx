@@ -95,9 +95,9 @@ export function Kosze() {
     <Koszyk />
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
-        <div className="flex shrink-0 items-center gap-2 px-4 pt-3">
-          <Package size={18} /><b className="text-naglowek">Kosze</b>
-        </div>
+        {/* Tytuł „Kosze" zszedł (0.525.0), bo powtarzał wybraną zakładkę
+            przełącznika tuż nad nim — dwa razy ta sama nazwa to wiersz
+            zabrany kolejce i nic nowego dla oka. */}
         <nav className="flex shrink-0 flex-wrap gap-1 p-2">
           <FiltrSegmentowy<KubelekKoszy> wybrany={kubelek} onWybierz={setKubelek}
             pozycje={KUBELKI_KOSZY.map((k) => ({ klucz: k.id, etykieta: k.etykieta,
