@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.525.1 — 26 września 2026
+
+**Klawisze kubełków w reklamacjach zgadzają się z podpowiedziami.** Cyfra 4 otwiera „Bez ruchu”, a 5 pokazuje wszystkie sprawy. Dotąd 4 przełączało na „Wszystkie”, a „Bez ruchu” nie miał klawisza.
+
 ## 0.525.0 — 26 września 2026
 
 **Zwroty, kosze i dostawy pokazują mniej naraz.** Ta sama zasada co w skrzynce:
