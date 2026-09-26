@@ -45,18 +45,18 @@ describe("Werdykt", () => {
   it("najpierw DWA przyciski, lista dopiero po wyborze gałęzi — cztery uznania albo siedem odmów", async () => {
     pokaz();
     expect(screen.queryByRole("combobox")).not.toBeInTheDocument();
-    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.click(przycisk(/Uznaję/));
     expect(screen.getAllByRole("option")).toHaveLength(4);
     expect(screen.getByRole("option", { name: "Uznana — częściowy zwrot pieniędzy" })).toBeInTheDocument();
     await userEvent.click(przycisk(/Anuluj/));
-    await userEvent.click(przycisk(/ODRZUCAM/));
+    await userEvent.click(przycisk(/Odrzucam/));
     expect(screen.getAllByRole("option")).toHaveLength(7);
     expect(screen.getByRole("option", { name: "Odrzucona — towar zgodny z umową" })).toBeInTheDocument();
   });
 
   it("kwota pojawia się WYŁĄCZNIE przy częściowym zwrocie, z podpowiedzią, o co prosił klient", async () => {
     pokaz();
-    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.click(przycisk(/Uznaję/));
     expect(screen.queryByLabelText("Kwota zwrotu")).not.toBeInTheDocument();
     await userEvent.selectOptions(screen.getByLabelText("Wartość werdyktu"), "ACCEPTED_PARTIAL_REFUND");
     expect(screen.getByLabelText("Kwota zwrotu")).toBeInTheDocument();
@@ -65,9 +65,9 @@ describe("Werdykt", () => {
 
   it("przycisk stoi martwy bez wiadomości, bez zgody i bez kwoty przy częściowym; ładunek idzie w groszach", async () => {
     const { onWerdykt } = pokaz();
-    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.click(przycisk(/Uznaję/));
     await userEvent.selectOptions(screen.getByLabelText("Wartość werdyktu"), "ACCEPTED_PARTIAL_REFUND");
-    const wyslij = () => przycisk(/WYŚLIJ WERDYKT/);
+    const wyslij = () => przycisk(/Wyślij werdykt/);
     expect(wyslij()).toBeDisabled();
     await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Zwracamy 40 zł.");
     expect(wyslij()).toBeDisabled();
@@ -105,7 +105,7 @@ describe("Werdykt", () => {
     expect(screen.getByText(/Wysłany — Allegro jeszcze nie potwierdziło/)).toBeInTheDocument();
     expect(screen.getByText(/^Ala/)).toBeInTheDocument();
     expect(screen.getByTitle("Kopiuj wiadomość werdyktu")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /UZNAJĘ|ODRZUCAM|SPRÓBUJ/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Uznaję|Odrzucam|Spróbuj/ })).not.toBeInTheDocument();
   });
 
   it("potwierdzenie z Allegro zieleni stan; niepewny los mówi, czego NIE robić", () => {
@@ -116,18 +116,18 @@ describe("Werdykt", () => {
     pokaz({ werdykt: "REJECTED_OTHER", werdyktNazwa: "Odrzucona — inny powód",
       werdyktStatus: "send_uncertain", kubelek: "zamknieta" });
     expect(screen.getByText(/nie wysyłaj drugi raz/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /SPRÓBUJ/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Spróbuj/ })).not.toBeInTheDocument();
   });
 
   it("ponowienie WYŁĄCZNIE po `send_failed` — z poprzednim werdyktem i wiadomością w formularzu", async () => {
     const { onWerdykt } = pokaz({ werdykt: "REJECTED_MINOR_DEFECT", werdyktNazwa: "Odrzucona — wada nieistotna",
       werdyktStatus: "send_failed", werdyktBlad: "Allegro odpowiedziało 400", werdyktWiadomosc: "Wada nieistotna." });
     expect(screen.getByText(/Nieudany: Allegro odpowiedziało 400/)).toBeInTheDocument();
-    await userEvent.click(przycisk(/SPRÓBUJ JESZCZE RAZ/));
+    await userEvent.click(przycisk(/Spróbuj jeszcze raz/));
     expect(screen.getByLabelText("Wartość werdyktu")).toHaveValue("REJECTED_MINOR_DEFECT");
     expect(screen.getByLabelText("Wiadomość do kupującego")).toHaveValue("Wada nieistotna.");
     await userEvent.click(screen.getByRole("checkbox"));
-    await userEvent.click(przycisk(/WYŚLIJ WERDYKT/));
+    await userEvent.click(przycisk(/Wyślij werdykt/));
     expect(onWerdykt).toHaveBeenCalledWith({ werdykt: "REJECTED_MINOR_DEFECT", wiadomosc: "Wada nieistotna.", kwotaGrosze: null });
   });
 
@@ -140,12 +140,12 @@ describe("Werdykt", () => {
   it("krok „towar do odesłania?” tylko po NASZYM uznaniu; zdanie startowe do edycji; po decyzji potwierdzenie z Allegro", async () => {
     const { onTowar, unmount } = pokaz({ werdykt: "ACCEPTED_REFUND", werdyktNazwa: "Uznana — zwrot pieniędzy",
       werdyktStatus: "sent", kubelek: "zamknieta" });
-    await userEvent.click(przycisk(/TOWAR DO ODESŁANIA/));
+    await userEvent.click(przycisk(/Towar do odesłania/));
     const pole = screen.getByLabelText("Wiadomość o towarze");
     expect((pole as HTMLTextAreaElement).value).toMatch(/odesłanie reklamowanego towaru/);
     await userEvent.clear(pole);
     await userEvent.type(pole, "Odeślij na Ogrodową 1.");
-    await userEvent.click(przycisk(/WYŚLIJ STANOWISKO/));
+    await userEvent.click(przycisk(/Wyślij stanowisko/));
     expect(onTowar).toHaveBeenCalledWith("wymagany", "Odeślij na Ogrodową 1.");
     unmount();
 
@@ -180,11 +180,11 @@ describe("Werdykt", () => {
    miał żywy przycisk pod decyzją, której nigdy nie potwierdził — a zdanie nad
    przyciskiem mówiło już co innego.                                          */
 describe("Zgoda dotyczy KONKRETNEGO werdyktu", () => {
-  const wyslij = () => przycisk(/WYŚLIJ WERDYKT/);
+  const wyslij = () => przycisk(/Wyślij werdykt/);
   const ptaszek = () => screen.getByRole("checkbox");
 
   const doZgody = async () => {
-    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.click(przycisk(/Uznaję/));
     await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Naprawimy.");
     await userEvent.click(ptaszek());
   };
@@ -200,7 +200,7 @@ describe("Zgoda dotyczy KONKRETNEGO werdyktu", () => {
 
   it("zmiana KWOTY też ją zdejmuje — „na 40” i „na 400” to dwie decyzje", async () => {
     pokaz();
-    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.click(przycisk(/Uznaję/));
     await userEvent.selectOptions(screen.getByLabelText("Wartość werdyktu"),
       "ACCEPTED_PARTIAL_REFUND");
     await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Oddajemy część.");
@@ -233,7 +233,7 @@ describe("Zgoda mówi, CO poleci, nie tylko że nie wróci", () => {
 
   it("nazywa wybrany werdykt po imieniu", async () => {
     pokaz();
-    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.click(przycisk(/Uznaję/));
     /* Gałąź „uznaję" otwiera się na PIERWSZEJ pozycji listy uznań, czyli
        naprawie — nie na zwrocie pieniędzy. Test bierze to, co widzi agent. */
     expect(zgoda()).toContain("Uznana — naprawa");
@@ -243,7 +243,7 @@ describe("Zgoda mówi, CO poleci, nie tylko że nie wróci", () => {
   it("przepisuje się NATYCHMIAST po zmianie listy", async () => {
     /* Bez tego zdanie opisywałoby decyzję, której agent już nie wybrał. */
     pokaz();
-    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.click(przycisk(/Uznaję/));
     await userEvent.selectOptions(screen.getByLabelText("Wartość werdyktu"),
       "ACCEPTED_PARTIAL_REFUND");
     expect(zgoda()).toContain("Uznana — częściowy zwrot pieniędzy");
@@ -252,7 +252,7 @@ describe("Zgoda mówi, CO poleci, nie tylko że nie wróci", () => {
 
   it("dokłada KWOTĘ przy częściowym zwrocie, dopiero gdy jest prawidłowa", async () => {
     pokaz();
-    await userEvent.click(przycisk(/UZNAJĘ/));
+    await userEvent.click(przycisk(/Uznaję/));
     await userEvent.selectOptions(screen.getByLabelText("Wartość werdyktu"),
       "ACCEPTED_PARTIAL_REFUND");
     expect(zgoda()).not.toContain("zł");
@@ -262,7 +262,7 @@ describe("Zgoda mówi, CO poleci, nie tylko że nie wróci", () => {
 
   it("przy odmowie nie obiecuje żadnej kwoty", async () => {
     pokaz();
-    await userEvent.click(przycisk(/ODRZUCAM/));
+    await userEvent.click(przycisk(/Odrzucam/));
     expect(zgoda()).toContain("Odrzucona");
     expect(zgoda()).not.toContain("zł");
   });
@@ -271,7 +271,7 @@ describe("Zgoda mówi, CO poleci, nie tylko że nie wróci", () => {
 describe("Gałąź werdyktu nie jest przestrzeleniem przycisku wysyłki", () => {
   it("nie nosi bursztynu — ten w stopce znaczy „to idzie teraz do klienta”", () => {
     pokaz();
-    for (const n of [/UZNAJĘ/, /ODRZUCAM/])
+    for (const n of [/Uznaję/, /Odrzucam/])
       expect(przycisk(n).className).not.toContain("btn-primary");
   });
 
@@ -279,18 +279,57 @@ describe("Gałąź werdyktu nie jest przestrzeleniem przycisku wysyłki", () => 
     /* `ml-auto` dosuwa przycisk do prawej krawędzi pasa. Dopóki obie stopki
        mają wspólną szerokość, to jedna kolumna i jeden cel przestrzelenia. */
     pokaz();
-    for (const n of [/UZNAJĘ/, /ODRZUCAM/])
+    for (const n of [/Uznaję/, /Odrzucam/])
       expect(przycisk(n).className).not.toContain("ml-auto");
   });
 
   it("ponowienie po nieudanej próbie też schodzi z prawej krawędzi", () => {
     pokaz({ werdykt: "REJECTED_OTHER", werdyktStatus: "send_failed", werdyktBlad: "409" });
-    expect(przycisk(/SPRÓBUJ JESZCZE RAZ/).className).not.toContain("ml-auto");
+    expect(przycisk(/Spróbuj jeszcze raz/).className).not.toContain("ml-auto");
   });
 
   it("bursztyn wraca dopiero na WYŚLIJ WERDYKT — za polem zgody", async () => {
     pokaz();
-    await userEvent.click(przycisk(/UZNAJĘ/));
-    expect(przycisk(/WYŚLIJ WERDYKT/).className).toContain("btn-primary");
+    await userEvent.click(przycisk(/Uznaję/));
+    expect(przycisk(/Wyślij werdykt/).className).toContain("btn-primary");
+  });
+});
+
+describe("Werdykt bez nadmiaru (0.511.0)", () => {
+  const wyslany = (werdyktWiadomosc: string): Partial<Reklamacja> => ({
+    werdykt: "REJECTED_OTHER", werdyktNazwa: "Odrzucona — inny powód",
+    werdyktStatus: "sent", werdyktWiadomosc, kubelek: "zamknieta",
+  });
+  const dluga = "Po oględzinach stwierdzamy uszkodzenie mechaniczne. ".repeat(10);
+  const wpis = (autorRola: string) => ({
+    id: 9, externalId: "w-9", autorLogin: "ktos", autorRola,
+    tresc: dluga, utworzonoAt: "2026-09-09T10:00:00.000Z", zalaczniki: [],
+  });
+
+  it("długa wiadomość werdyktu zwija się do czterech linii z „Pokaż całą”", async () => {
+    pokaz(wyslany(dluga));
+    const tekst = screen.getByText(/Po oględzinach/);
+    expect(tekst.className).toContain("line-clamp-4");
+    await userEvent.click(przycisk(/Pokaż całą/));
+    expect(tekst.className).not.toContain("line-clamp-4");
+  });
+
+  it("wiadomości, którą Allegro oddało w rozmowie jako naszą, tu już nie ma", () => {
+    pokaz(wyslany(dluga), { czat: [wpis("SELLER")] });
+    expect(screen.queryByText(/Po oględzinach/)).not.toBeInTheDocument();
+    /* Stan werdyktu zostaje — znika tylko powtórzone zdanie. */
+    expect(screen.getByText("Odrzucona — inny powód")).toBeInTheDocument();
+  });
+
+  it("to samo zdanie od KLIENTA nie jest dublem — blok zostaje", () => {
+    pokaz(wyslany(dluga), { czat: [wpis("BUYER")] });
+    expect(screen.getByText(/Po oględzinach/)).toBeInTheDocument();
+  });
+
+  it("licznik znaków milczy daleko od sufitu", async () => {
+    pokaz();
+    await userEvent.click(przycisk(/Odrzucam/));
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Krótko");
+    expect(screen.queryByText(/znaków|\/ 20000/)).not.toBeInTheDocument();
   });
 });

@@ -3,7 +3,8 @@ import { Upload } from "lucide-react";
 import { useArkuszLokalizacji, type RaportArkusza, type TrescArkusza } from "../api/stan";
 import { paryZArkusza, wierszeZXlsx } from "../lib/xlsx";
 import { Blad, Przycisk } from "../ui";
-import { KartaWgladu, Tabela, Td } from "../ui/wglad";
+import { Tabela, Td } from "../ui/wglad";
+import { KartaZwinieta } from "./KartaZwinieta";
 import { Potwierdz } from "../ui/Potwierdz";
 
 /* ── Masowa zmiana lokalizacji z arkusza (z `biuro.html` 0.138.0, 0.441.0) ─
@@ -19,9 +20,14 @@ import { Potwierdz } from "../ui/Potwierdz";
    WYBÓR „ZOSTAW" ŻYJE W STANIE, nie w polach wyboru (0.139.0): każde
    przeliczenie rysuje tabelę od nowa, a zaznaczenia w DOM-ie znikałyby przy
    pierwszym kliknięciu. Zaznaczone znaczy „zdejmij", bo arkusz PODMIENIA
-   pole; „zostaw" jest wyjątkiem od tej reguły, nie nową regułą. */
+   pole; „zostaw" jest wyjątkiem od tej reguły, nie nową regułą.
 
-export function KartaArkusza() {
+   ZWINIĘTA (0.509.0): arkusz wgrywa się raz na jakiś czas, a otwarta karta
+   stała z długą instrukcją na drugim miejscu ekranu. Miejsce pod kolejką
+   zostaje. Stan wgranego pliku żyje w tym komponencie, nie w ramie, więc
+   zwinięcie w połowie przeglądu niczego nie gubi. */
+
+export function KartaArkusza({ otworz = false }: { otworz?: boolean }) {
   const arkusz = useArkuszLokalizacji();
   const plik = useRef<HTMLInputElement | null>(null);
   const [tresc, setTresc] = useState<TrescArkusza | null>(null);
@@ -89,7 +95,7 @@ export function KartaArkusza() {
   };
 
   const r = raport;
-  return <KartaWgladu id="karta-arkusz" tytul="Masowa zmiana lokalizacji"
+  return <KartaZwinieta id="karta-arkusz" tytul="Masowa zmiana lokalizacji" otworz={otworz}
     opis="Tylko administrator. Wyeksportuj kartoteki z Subiekta, popraw kolumnę Lokalizacja i wgraj plik (.xlsx albo .csv). Arkusz podmienia całe pole adresu; nic nie idzie do Subiekta przed kliknięciem Zastosuj."
     akcje={<>
       <Przycisk disabled={arkusz.isPending} onClick={() => plik.current?.click()}><Upload size={16} />Wgraj arkusz</Przycisk>
@@ -150,5 +156,5 @@ export function KartaArkusza() {
     {(r ?? zapisano) && (r ?? zapisano)!.nieznane.length > 0 && <div className="mt-4">
       <h3 className="text-sm font-bold">Symbole spoza kartoteki</h3>
       <p className="text-sm text-slate-600">{(r ?? zapisano)!.nieznane.join(", ")}</p></div>}
-  </KartaWgladu>;
+  </KartaZwinieta>;
 }

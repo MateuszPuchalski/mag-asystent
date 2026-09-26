@@ -43,14 +43,17 @@ export function KandydatZamiennosci({ k, trwa, onDecyzja }: {
       </div>
       <Kafel twId={k.b.twId} rozmiar={44} nazwa={k.b.nazwa} symbol={k.b.symbol} />
     </div>
+    {/* Rozmiar domyślny, nie `text-xs` (0.510.0): ta sama para decyzji co
+        w karcie `Propozycja`. Słowa zostają własne — „Zamienne" odpowiada
+        na pytanie karty wprost, a „Zatwierdź" kazałoby je sobie dopowiedzieć. */}
     <div className="mt-2 flex flex-wrap items-center gap-2">
-      <Przycisk wariant="glowny" className="text-xs" disabled={trwa} onClick={() => onDecyzja("zatwierdz", null)}>
+      <Przycisk wariant="glowny" disabled={trwa} onClick={() => onDecyzja("zatwierdz", null)}>
         Zamienne</Przycisk>
-      {!odrzuca && <Przycisk className="text-xs" disabled={trwa} onClick={() => setOdrzuca(true)}>Nie są zamienne</Przycisk>}
+      {!odrzuca && <Przycisk disabled={trwa} onClick={() => setOdrzuca(true)}>Nie są zamienne</Przycisk>}
       {odrzuca && <>
         <Pole className="w-64" aria-label="Powód odrzucenia" value={powod} placeholder="np. lewy i prawy"
           onChange={(e) => setPowod(e.target.value)} />
-        <Przycisk className="text-xs" disabled={trwa || !powod.trim()} onClick={() => onDecyzja("odrzuc", powod.trim())}>
+        <Przycisk disabled={trwa || !powod.trim()} onClick={() => onDecyzja("odrzuc", powod.trim())}>
           Odrzuć</Przycisk>
       </>}
     </div>

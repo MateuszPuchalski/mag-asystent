@@ -61,18 +61,24 @@ export function Wiedza() {
   const propozycje = (kolejka.data?.propozycje ?? []).filter((z) => !wPrzegladzie.has(z.id));
   const pasowania = kolejka.data?.pasowania ?? [];
   const zamiennosci = kolejka.data?.zamiennosciOem ?? [];
+  /* Liczniki z serwera, nie długości list: lista par bywa przycięta, licznik
+     mówi o całej pracy. Silniki doliczają się, gdy ich odczyt już wrócił. */
+  const doDecyzji = kolejka.data
+    ? kolejka.data.liczba + kolejka.data.pasowanDoRozstrzygniecia
+      + (kolejka.data.zamiennosciOemDoRozstrzygniecia ?? zamiennosci.length)
+      + (silniki.data?.doRozstrzygniecia ?? 0)
+    : null;
 
   /* Własny scroller — patrz `Wzmianki`; rama panelu nie przewija za ekrany. */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
     <Karta className="flex flex-wrap items-center gap-3 p-4">
       <BookMarked size={18} /><b className="text-naglowek mr-auto">Baza wiedzy zastosowań</b>
-      {/* DWIE kolejki, dwa liczniki. Sam licznik zastosowań kłamałby przez
-          pominięcie: para maszyna–silnik czeka na tę samą decyzję człowieka. */}
+      {/* JEDNA suma, nie cztery liczniki (0.510.0). Nagłówek niósł cztery
+          liczby, a trzy z nich powtarzały nagłówki sekcji i zakładki niżej.
+          Suma bierze wszystkie decyzje, bo licznik samych zastosowań kłamałby
+          przez pominięcie: para maszyna–silnik czeka na tego samego człowieka. */}
       <span className="text-sm text-slate-500">
-        {kolejka.data ? `${kolejka.data.liczba} do rozstrzygnięcia` : "Wczytuję…"}
-        {kolejka.data?.pasowanDoRozstrzygniecia ? ` · ${ile(kolejka.data.pasowanDoRozstrzygniecia, "pasowanie", "pasowania", "pasowań")} do rozstrzygnięcia` : ""}
-        {silniki.data?.doRozstrzygniecia ? ` · ${silniki.data.doRozstrzygniecia} silników do rozstrzygnięcia` : ""}
-        {zamiennosci.length ? ` · ${ile(zamiennosci.length, "para", "pary", "par")} ze wspólnym numerem` : ""}</span>
+        {doDecyzji === null ? "Wczytuję…" : `${doDecyzji} do rozstrzygnięcia`}</span>
     </Karta>
 
     <Karta className="overflow-hidden">
@@ -83,10 +89,13 @@ export function Wiedza() {
         /* „i ofert" od 0.264.0: ta sama kolejka niesie odtąd pozycje list
            zgodności z naszych ofert Allegro, a etykieta mówiąca tylko o opisach
            kazałaby szukać ich gdzie indziej. */
-        { klucz: "z-opisow", etykieta: zOpisowRazem ? `Z opisów i ofert (${zOpisowRazem})` : "Z opisów i ofert" },
-        /* Zakładka liczy LUKI, nagłówek — propozycje. Dwie różne prawdy: luka
+        /* Liczba w `ile`, nie doklejona do etykiety (0.510.0): ten sam
+           kształt licznika co w kubełkach zwrotów, a zero mówi „nic tu nie ma"
+           bez klikania. Przed odczytem licznika nie ma — zero byłoby kłamstwem. */
+        { klucz: "z-opisow", etykieta: "Z opisów i ofert", ile: zOpisow.data ? zOpisowRazem : undefined },
+        /* Zakładka liczy LUKI, nagłówek — decyzje. Dwie różne prawdy: luka
            to praca do zrobienia, propozycja to decyzja do podjęcia. */
-        { klucz: "silniki", etykieta: silniki.data?.lukiRazem ? `Silniki (${silniki.data.lukiRazem})` : "Silniki" },
+        { klucz: "silniki", etykieta: "Silniki", ile: silniki.data?.lukiRazem },
         /* Szósta zakładka, choć pasowania w kolejce szóstej nie dostały.
            Tamte to ta sama decyzja co zastosowania, więc zostały w kolejce.
            Sieć to inny widok, nie inna decyzja. Zrzut przy 1024 px mieści
