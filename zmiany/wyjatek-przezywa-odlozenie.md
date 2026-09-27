@@ -15,5 +15,9 @@ z pozycji wyjątek. Skutki były trzy:
   reklamacje, a na serwis szło dwa razy tyle sztuk, ile brakowało.
 
 Pozycja zostaje teraz wyjątkiem, a ilość i półka zapisują się jak zawsze.
-Pomyłkę przy takim odłożeniu cofa się tak jak dotąd przy odwrotnej
-kolejności: najpierw WYCOFAJ ZGŁOSZENIE, potem COFNIJ.
+Pomyłkę w ilości cofa się tak jak dotąd przy odwrotnej kolejności: najpierw
+WYCOFAJ ZGŁOSZENIE, potem COFNIJ.
+
+**ZMIEŃ PÓŁKĘ działa też przy wyjątku.** Kolektor chował ten przycisk razem
+z COFNIJ, choć półka nie należy do zgłoszenia. Źle zeskanowaną półkę poprawia
+się teraz od razu, bez wycofywania zgłoszenia ze zdjęciem.

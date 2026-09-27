@@ -150,7 +150,7 @@ test("ZAKOŃCZ nie zgłasza drugi raz braku zgłoszonego przy pozycji", () => {
 
 // ── pomyłka przy takim odłożeniu ─────────────────────────────────────────────
 
-test("pomyłkę po odłożeniu na pozycji z wyjątkiem cofa się przez wycofanie zgłoszenia", () => {
+test("pomyłkę w ILOŚCI po odłożeniu na pozycji z wyjątkiem cofa się przez wycofanie zgłoszenia", () => {
   /* Skutek decyzji, nie przypadek. Pozycja `problem` nie daje COFNIJ ani
      POPRAW ILOŚĆ, tak jak przy odwrotnej kolejności — najpierw odłożenie,
      potem zgłoszenie. Droga powrotu jest jedna: wycofać własne zgłoszenie,
@@ -169,4 +169,29 @@ test("pomyłkę po odłożeniu na pozycji z wyjątkiem cofa się przez wycofanie
 
   assert.ok(!("error" in C.cofnijOdlozenie(l, KTO)), "teraz COFNIJ działa");
   assert.equal(odlozone(l), 0);
+});
+
+test("źle zeskanowaną PÓŁKĘ poprawia się przy wyjątku bez wycofania zgłoszenia", () => {
+  /* Półka nie należy do zgłoszenia, więc jej poprawka nie ma prawa kosztować
+     wycofania zgłoszenia ze zdjęciem. Kolektor pokazuje ZMIEŃ PÓŁKĘ przy
+     wyjątku ze stosu `odlozenia` — ten test pilnuje, że stos tam jest,
+     a serwer zmienia półkę i zostawia wyjątek w spokoju. */
+  const l = linia();
+  zglosUszkodzenie(l);
+  D.putawayLine(l, "A01-02-03", KTO);
+
+  const widok = D.getDelivery(dostawaId)?.lines.find((x) => x.id === l);
+  assert.equal(widok?.cofnij, null, "COFNIJ ilości przy wyjątku nie ma");
+  assert.deepEqual(widok?.odlozenia, [{ qty: 10, lok: "A01-02-03" }], "półka do zmiany jest w widoku");
+
+  const r = C.zmienPolke(l, "B02-02-02", KTO);
+  assert.ok(!("error" in r), "zmiana półki przechodzi mimo wyjątku");
+  const po = db().prepare("SELECT lok_faktyczna AS lok, status FROM delivery_line WHERE id=?").get(l) as {
+    lok: string;
+    status: string;
+  };
+  // kopia, bo `node:sqlite` oddaje wiersz bez prototypu, a `deepEqual` porównuje i prototyp
+  assert.deepEqual({ ...po }, { lok: "B02-02-02", status: "problem" }, "półka nowa, wyjątek bez zmian");
+  assert.equal(otwarteZgloszenia().length, 1, "zgłoszenie nietknięte");
+  assert.equal(odlozone(l), 10, "ilość bez zmian");
 });
