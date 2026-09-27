@@ -6419,6 +6419,25 @@ Właściciel poprosił o poprawę następnego ekranu z menu „Więcej”. Z trz
 
 **Strażnik.** `konfiguracja-obowiazuje.test.ts` wymaga wartości przy każdej jawnej decyzji właściciela czytanej przez serwer. Test rejestru wymaga nazwy przy każdej decyzji właściciela i słowa dla każdej opcji wyboru. `ustawienia/Konfiguracja.test.ts` pilnuje wartości słowem.
 
+## 26l. Do zrobienia: pytanie raz (0.545.0)
+
+Właściciel poprosił o poprawę następnego ekranu. Menu „Więcej” było już przerobione, więc przyszła kolej na pierwszą zakładkę. Z trzech makiet wybrał B.
+
+**Problem.** Dwie puste sekcje, „Wspomniano o mnie · 0” i „Moje sprawy · 0”, stały kartami nad decyzjami i zabierały 170 px. Każdy wiersz decyzji powtarzał pytanie i nazwę źródła obok ikony, która mówiła to samo. Na zasianym serwerze sześć wierszy niosło trzy pytania.
+
+**Co się zmieniło:**
+
+- Pusta sekcja schodzi do jednej linijki nad decyzjami. Pełna wraca w swoim kształcie. Sekcja wczytywana albo z błędem zostaje pełna, bo błąd ma być widać.
+- Odhaczone wzmianki dalej są o jedno kliknięcie: linijka ma „pokaż odhaczone (N)”.
+- Decyzje stoją grupami. Nagłówek grupy niesie pytanie, źródło i liczbę spraw, a wiersz tylko sprawę i jej wiek.
+- Nazwa odnośnika w wierszu niesie też pytanie, bo czytnik ekranu nie czyta nagłówka grupy razem z wierszem.
+
+**Kolejność dalej jest serwera.** Panel niczego nie sortuje. Grupa staje tam, gdzie serwer postawił jej pierwszą sprawę, a w grupie zostaje kolejność serwera. Ceną jest to, że młodsza sprawa znanego pytania staje nad starszą sprawą innego. Biuro i tak rozstrzyga pytanie naraz dla całej grupy.
+
+**Pomiar.** Na zasianym serwerze przy 1180 px lista decyzji zaczyna się na 166 px zamiast około 305 px. Kończy się na 553 px zamiast około 760 px.
+
+**Strażnik.** `ekrany/DoDecyzji.test.tsx` pilnuje grup w kolejności serwera, linijki pustych sekcji i historii wzmianek o jedno kliknięcie.
+
 ## 27. Zasady nadrzędne
 
 Te punkty mówią o JEDNEJ rozmowie i jednej sprawie. Reguły obowiązujące

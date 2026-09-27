@@ -13,14 +13,18 @@ import { Blad, Karta, NaglowekSekcji, Przycisk, czas } from "../ui";
    ODHACZENIE JEST JAWNE. Otwarcie tej listy niczego nie kasuje — reguła „zero
    zapisu przy patrzeniu" obowiązuje też tutaj, a wzmianka gasnąca od samego
    spojrzenia ginęłaby dokładnie wtedy, gdy agent przewija listę w biegu. */
-export function Wzmianki() {
+export function Wzmianki({ zHistoriaNaStart = false }: {
+  /** Ekran „Do zrobienia" otwiera sekcję od historii, gdy przyszło się po nią
+   *  z linijki pustych sekcji (0.545.0) — tam jest jedynym powodem kliknięcia. */
+  zHistoriaNaStart?: boolean;
+} = {}) {
   const nawiguj = useNavigate();
   const dane = useWzmianki();
   const odhacz = useOdhaczWzmianke();
   const [blad, setBlad] = useState("");
   /* Odhaczone zostają na liście jako dowód „pisałam ci o tym w środę", ale
      domyślnie schodzą z oczu: robotą do zrobienia są te nieodhaczone. */
-  const [zHistoria, setZHistoria] = useState(false);
+  const [zHistoria, setZHistoria] = useState(zHistoriaNaStart);
 
   const wszystkie = dane.data?.wzmianki ?? [];
   const widoczne = zHistoria ? wszystkie : wszystkie.filter((w) => !w.odhaczona);

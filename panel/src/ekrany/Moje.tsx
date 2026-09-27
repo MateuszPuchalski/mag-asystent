@@ -49,13 +49,19 @@ const zTerminemNaDzis = (s: MojaSprawa) =>
    zrobić — i trzeba było obejść trzy zakładki, żeby je zadać. Sekcja stoi
    dziś na ekranie startowym razem z pozostałymi dwiema. Adres `/obsluga/moje`
    przekierowuje tam, więc zakładka zapamiętana w przeglądarce nie gubi się. */
+/* `lista` niesie też sprawy klientów; starszy serwer daje samo `sprawy`.
+   Wiersz rodzaju, którego ta karta nie zna, SCHODZI z listy, zamiast
+   wywrócić ekran: panel nie ma granicy błędu, a serwer aktualizuje się
+   w nocy pod otwartą kartą. Tak wywróciłaby się karta sprzed 0.535.0.
+   Wyjęte do funkcji (0.545.0), bo ekran „Do zrobienia" pyta o to samo,
+   decydując, czy pusta sekcja zwija się do linijki — dwie kopie filtra
+   powiedziałyby „pusto" i „jedna sprawa" o tych samych danych. */
+export const widoczneSprawy = (d: { sprawy: MojaSprawa[]; lista?: MojaSprawa[] } | undefined): MojaSprawa[] =>
+  (d?.lista ?? d?.sprawy ?? []).filter((s) => Object.hasOwn(KOLEJKI, s.kolejka));
+
 export function Moje() {
   const dane = useMojeSprawy();
-  /* `lista` niesie też sprawy klientów; starszy serwer daje samo `sprawy`.
-     Wiersz rodzaju, którego ta karta nie zna, SCHODZI z listy, zamiast
-     wywrócić ekran: panel nie ma granicy błędu, a serwer aktualizuje się
-     w nocy pod otwartą kartą. Tak wywróciłaby się karta sprzed 0.535.0. */
-  const sprawy = (dane.data?.lista ?? dane.data?.sprawy ?? []).filter((s) => Object.hasOwn(KOLEJKI, s.kolejka));
+  const sprawy = widoczneSprawy(dane.data);
   const zTerminem = sprawy.filter(zTerminemNaDzis).length;
 
   return <Karta className="overflow-hidden p-0" aria-label="Moje sprawy" role="region">
