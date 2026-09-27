@@ -6348,6 +6348,25 @@ Właściciel zgłosił, że górny pasek nie powinien zajmować dwóch rzędów.
 
 **Strażnik.** `nawigacja/Wiecej.test.tsx` pilnuje zawartości menu, zamykania, zera zapisu przy otwarciu i słowa „Stanęła” w alarmie. Pilnuje też, że drugi rząd nie wrócił.
 
+## 26h. Stan systemu jako tablica (@wydanie)
+
+Właściciel pokazał nagraniem przewijanie przez stan systemu i poprosił o poprawę. Dziesięć kart stało jedna pod drugą, a zdrowe zajmowały tyle miejsca co te, które czegoś chcą. Z trzech makiet wybrał A: tablicę z problemami na górze.
+
+**Co gdzie stoi:**
+
+- Na górze rząd kafelków, po jednym na obszar. Kafelek niesie barwę i jedno zdanie, na przykład „2 do decyzji” albo „działa · 11:36”.
+- Czerwień znaczy, że coś nie działa. Bursztyn znaczy, że obszar czeka na biuro. Zieleń to „działa”, szarość to „na żądanie”.
+- Pod kafelkami stoją wyłącznie karty obszarów czerwonych i bursztynowych. Klik w kafelek otwiera albo zamyka kartę każdego obszaru.
+- Karta raz pokazana zostaje, aż człowiek zamknie ją kafelkiem. Sparowanie Allegro nie zabiera karty spod kursora.
+- Adres `?karta=` otwiera kartę obszaru, więc wiersze „Do zrobienia” trafiają tam, gdzie wcześniej.
+- Kolejka zapisów chowa wiersze „zapisane” pod przyciskiem. Kody kreskowe mają przyciski decyzji w wierszu, nie pod kreską.
+
+Kafelek czyta to samo zapytanie co jego karta, więc tablica nie dokłada żadnego żądania. Rekoncyliacja dalej liczy się tylko na żądanie.
+
+**Blizna z przejścia na żywym serwerze.** Pierwsza wersja wkładała karty problemów z efektu, jeden render po ich danych. Skok do `?karta=` zdążał wtedy przed kartą nad celem i lądował za wysoko. Karta problemu wchodzi teraz w tym samym renderze co jej dane.
+
+**Strażnik.** `ekrany/Stan.test.tsx` pilnuje, że na wejściu otwarte są wyłącznie karty do uwagi. Pilnuje też kafelków, przycisku zapisanych i zera zapisu przy otwarciu każdej karty.
+
 ## 27. Zasady nadrzędne
 
 Te punkty mówią o JEDNEJ rozmowie i jednej sprawie. Reguły obowiązujące
