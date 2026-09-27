@@ -316,16 +316,23 @@ describe("zakres Obsługa klienta", () => {
   });
 });
 
-/* ── Zakres Użycie (23 września 2026) ────────────────────────────────────────
-   Nieużyte czynności stoją na wierzchu, użyte — zwinięte; wejście w zakres
+/* ── Zakres Użycie (23 września 2026, obszary jedną linią od @wydanie) ──────
+   Obszar stoi wierszem z liczbami, a jego nieużyte czynności otwiera klik —
+   po polsku, z kluczem w dymku; użyte zostają zwinięte. Wejście w zakres
    pobiera wyłącznie jego raport i niczego nie zapisuje. */
 describe("zakres Użycie", () => {
-  it("pokazuje nieużyte na wierzchu, pobiera tylko swój raport i niczego nie zapisuje", async () => {
+  it("obszar jedną linią, czynności po polsku po kliknięciu, bez zapisu", async () => {
     pokaz();
     await screen.findByText("Rosa-Pol");
     await userEvent.click(screen.getByRole("button", { name: "Użycie" }));
-    expect(await screen.findByText("rozmowa_priorytet")).toBeTruthy();
-    expect(screen.getByText("nigdy")).toBeTruthy();
+    const obszar = await screen.findByRole("button", { name: "▸ Skrzynka" });
+    expect(obszar).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText(/Rozmowa oznaczona jako pilna/)).toBeNull();
+    await userEvent.click(obszar);
+    const czynnosc = screen.getByText(/Rozmowa oznaczona jako pilna/);
+    expect(czynnosc.closest("li")).toHaveAttribute("title", "rozmowa_priorytet");
+    expect(screen.queryByText("rozmowa_priorytet")).toBeNull();
+    expect(screen.getByText(/nigdy/)).toBeTruthy();
     expect(screen.getByText("Użyte (1)")).toBeTruthy();
     expect(adresy.some((a) => a === "/api/analiza/uzycie?days=30")).toBe(true);
     expect(zapisy).toEqual([]);

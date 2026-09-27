@@ -24,6 +24,10 @@ const udzial = (m: MiesiacEskalacji) =>
    nagłówek z ikoną i własną tabelę, a obok stoi pięć kart w innym kształcie.
    Pusta lista mówi zdaniem przez `Tabela`, jak wszędzie w analizie. */
 export function Eskalacja({ miesiace }: { miesiace: MiesiacEskalacji[] | undefined }) {
+  /* Bez rozmów powiązanych z zamówieniem karta jest jednym zdaniem
+     (@wydanie, wariant C Analizy) — pusta tabela z nagłówkami nic nie mówi. */
+  if (miesiace?.length === 0) return <KartaWgladu tytul="Eskalacja po rozmowie"
+    pusta="Brak rozmów powiązanych z zamówieniem — nie ma z czego liczyć." />;
   return <KartaWgladu tytul="Eskalacja po rozmowie"
     opis={"Zakupy, przy których klient najpierw napisał do nas, a potem otworzył dyskusję "
       + "albo reklamację. Liczone po zakupach, nie po wiadomościach — inaczej miara "

@@ -6383,6 +6383,21 @@ Nazwy leżą w `dziennik/nazwy.ts` dla wszystkich 287 typów z rejestru serwera.
 
 **Strażnik.** `dziennik/nazwy.test.ts` czyta rejestr `services/zdarzenia-rejestr.ts`. Typ dopisany do rejestru bez polskiej nazwy to czerwony test.
 
+## 26j. Analiza krótsza (@wydanie)
+
+Właściciel poprosił o poprawę następnego ekranu z menu „Więcej”. Z trzech makiet wybrał C: ten sam układ, mniej miejsca. Analiza była najdłuższym ekranem panelu. Przy 1180 px zakres „Obsługa klienta” miał 3295 px, a „Użycie” 10 709 px.
+
+**Co się zmieniło:**
+
+- Karta bez danych w oknie jest jedną linią: tytuł i zdanie, dlaczego jest pusta. Mechanizm stoi we wspólnej ramie `KartaWgladu` jako `pusta`.
+- Tabele „według kategorii” i „według osoby” weszły do kart liczb, które rozbijają, jako przełącznik `Przekroje`. Rozbicie na osoby dalej przychodzi tylko administratorowi.
+- „Tarcie według osoby” stoi w karcie „Tarcie w skrzynce”.
+- Zakres „Użycie” to jedna tabela obszarów z liczbami i paskiem. Klik otwiera czynności obszaru po polsku, ze słownika dziennika, z kluczem w dymku.
+
+**Pomiar.** Na zasianym serwerze przy 1180 px „Obsługa klienta” ma 1067 px zamiast 3295 px, a „Użycie” 983 px zamiast 10 709 px. „Praca hali” i „Dostawy” mają dane w każdej karcie, więc zostały bez zmian.
+
+**Strażnik.** `ui/wglad.test.tsx` pilnuje karty pustej i przekrojów. Test zakresu „Użycie” w `ekrany/Analiza.test.tsx` pilnuje polskich nazw i zwiniętych obszarów.
+
 ## 27. Zasady nadrzędne
 
 Te punkty mówią o JEDNEJ rozmowie i jednej sprawie. Reguły obowiązujące
