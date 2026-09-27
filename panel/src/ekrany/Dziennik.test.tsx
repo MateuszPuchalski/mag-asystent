@@ -14,8 +14,10 @@ import type { WpisAudytu } from "../api/wglad";
    3. OSOBA z listy kont; jej brak (403) nie wywraca dziennika.
    4. CSV idzie tym samym filtrem co tabela, z sesją w nagłówku.
    5. Doba filtra jest LOKALNA — szczegół w `dziennik/rodziny.test.ts`.
-   6. Rzadkie filtry i surowy szczegół są zwinięte (0.514.0), ale ustawiony
-      filtr nigdy się nie chowa. */
+   6. Rzadkie filtry są zwinięte (0.514.0), ale ustawiony filtr nigdy się
+      nie chowa.
+   7. (0.540.0) Po polsku: nazwa zdarzenia zamiast klucza, opis zamiast
+      schowanego JSON-u, pomiary techniczne schowane, okres jednym polem. */
 
 const wpis = (id: number, o: Partial<WpisAudytu> = {}): WpisAudytu => ({
   id, typ: "putaway_line_done", czas: "2026-09-22T12:31:05.000Z", uzytkownik: "j.wrona", userRef: 3,
@@ -62,22 +64,22 @@ const zapytaniaDziennika = () => adresy.filter((a) => a.startsWith("/api/events?
 describe("Dziennik w panelu", () => {
   it("otwarcie to same odczyty — i tabela z licznikiem „pokazano N z M”", async () => {
     pokaz();
-    await screen.findByText("queue_failed", { selector: "td span" });
+    await screen.findByText("Zapis do Subiekta nie wszedł", { selector: "td span" });
     expect(screen.getByText(/pokazano/).textContent).toBe("pokazano 2 z 214 pasujących wpisów");
     expect(zapisy).toEqual([]);
   });
 
   it("rodzina zdarzenia barwi pastylkę, a konto systemowe dostaje „bez konta”", async () => {
     pokaz();
-    const blad = await screen.findByText("queue_failed", { selector: "td span" });
+    const blad = await screen.findByText("Zapis do Subiekta nie wszedł", { selector: "td span" });
     expect(blad.className).toContain("text-ranga-zle");
-    expect(screen.getByText("putaway_line_done", { selector: "td span" }).className).toContain("text-ranga-uwaga");
+    expect(screen.getByText("Odłożenie pozycji", { selector: "td span" }).className).toContain("text-ranga-uwaga");
     expect(within(blad.closest("tr")!).getByText("bez konta")).toBeTruthy();
   });
 
   it("zmiana filtra sama odpytuje serwer — bez przycisku SZUKAJ", async () => {
     pokaz();
-    await screen.findByText("queue_failed", { selector: "td span" });
+    await screen.findByText("Zapis do Subiekta nie wszedł", { selector: "td span" });
     expect(screen.queryByRole("button", { name: /szukaj/i })).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Więcej filtrów" }));
     await userEvent.type(screen.getByLabelText("Urządzenie"), "KOL-03");
@@ -97,24 +99,31 @@ describe("Dziennik w panelu", () => {
   it("brak dostępu do listy kont nie wywraca dziennika", async () => {
     bezKont = true;
     pokaz();
-    await screen.findByText("queue_failed", { selector: "td span" });
+    await screen.findByText("Zapis do Subiekta nie wszedł", { selector: "td span" });
     expect(within(screen.getByLabelText("Osoba")).getAllByRole("option")).toHaveLength(1);
   });
 
   it("CSV idzie tym samym filtrem co tabela", async () => {
     pokaz();
-    await screen.findByText("queue_failed", { selector: "td span" });
+    await screen.findByText("Zapis do Subiekta nie wszedł", { selector: "td span" });
     await userEvent.click(screen.getByRole("button", { name: "Więcej filtrów" }));
     await userEvent.selectOptions(screen.getByLabelText("Wierszy"), "500");
     await waitFor(() => expect(zapytaniaDziennika().some((a) => a.includes("limit=500"))).toBe(true));
     await userEvent.click(screen.getByRole("button", { name: /CSV/ }));
-    await waitFor(() => expect(adresy.some((a) => a === "/api/events/csv?limit=500")).toBe(true));
+    /* Ten sam filtr to także te same schowane pomiary — `bez` idzie do CSV. */
+    const csv = await waitFor(() => {
+      const a = adresy.find((x) => x.startsWith("/api/events/csv?"));
+      expect(a).toBeDefined();
+      return new URLSearchParams(a!.split("?")[1]);
+    });
+    expect(csv.get("limit")).toBe("500");
+    expect(csv.get("bez")).toContain("scan_timing");
     expect(zapisy).toEqual([]);
   });
 
   it("towar, urządzenie i liczba wierszy czekają pod „Więcej filtrów” — ustawione się nie chowają", async () => {
     pokaz();
-    await screen.findByText("queue_failed", { selector: "td span" });
+    await screen.findByText("Zapis do Subiekta nie wszedł", { selector: "td span" });
     expect(screen.queryByLabelText("Urządzenie")).toBeNull();
     expect(screen.queryByLabelText(/tw_id/)).toBeNull();
     await userEvent.click(screen.getByRole("button", { name: "Więcej filtrów" }));
@@ -128,12 +137,40 @@ describe("Dziennik w panelu", () => {
     expect(zapisy).toEqual([]);
   });
 
-  it("surowy szczegół wpisu stoi zwinięty pod „szczegóły”", async () => {
+  it("zdarzenie ma polską nazwę, a klucz serwera stoi w dymku", async () => {
     pokaz();
-    const wiersz = (await screen.findByText("putaway_line_done", { selector: "td span" })).closest("tr")!;
-    const kod = within(wiersz).getByText('{"qty":6}');
-    expect(kod).not.toBeVisible();
-    await userEvent.click(within(wiersz).getByText("szczegóły"));
-    expect(kod).toBeVisible();
+    const pastylka = await screen.findByText("Odłożenie pozycji", { selector: "td span" });
+    expect(pastylka).toHaveAttribute("title", "putaway_line_done");
+    expect(screen.queryByText("putaway_line_done")).toBeNull();
+  });
+
+  it("„Co się stało” to zdanie z danych, a surowy wpis jest w dymku", async () => {
+    pokaz();
+    const wiersz = (await screen.findByText("Odłożenie pozycji", { selector: "td span" })).closest("tr")!;
+    const opis = within(wiersz).getByText("6 szt.");
+    expect(opis).toHaveAttribute("title", '{"qty":6}');
+    expect(within(wiersz).getByText(/KOL-03/)).toBeTruthy();
+  });
+
+  it("pomiary techniczne są schowane, a jeden klik je pokazuje", async () => {
+    pokaz();
+    await screen.findByText("Zapis do Subiekta nie wszedł", { selector: "td span" });
+    expect(zapytaniaDziennika().every((a) => new URLSearchParams(a.split("?")[1]).get("bez")?.includes("scan_timing"))).toBe(true);
+    await userEvent.click(screen.getByRole("button", { name: "pokaż pomiary techniczne" }));
+    await waitFor(() => expect(zapytaniaDziennika().some((a) => !a.includes("bez="))).toBe(true));
+    expect(zapisy).toEqual([]);
+  });
+
+  it("okres „dziś” ustawia obie granice na dzisiejszą dobę", async () => {
+    pokaz();
+    await screen.findByText("Zapis do Subiekta nie wszedł", { selector: "td span" });
+    expect(screen.queryByLabelText("Od")).toBeNull();
+    await userEvent.selectOptions(screen.getByLabelText("Okres"), "dzis");
+    const dzis = new Date(); dzis.setHours(0, 0, 0, 0);
+    await waitFor(() => expect(zapytaniaDziennika().some((a) =>
+      new URLSearchParams(a.split("?")[1]).get("od") === dzis.toISOString())).toBe(true));
+    /* Własny zakres pokazuje pola dat dopiero na życzenie. */
+    await userEvent.selectOptions(screen.getByLabelText("Okres"), "wlasny");
+    expect(screen.getByLabelText("Od")).toBeTruthy();
   });
 });

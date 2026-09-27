@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
+import { TECHNICZNE } from "../dziennik/nazwy";
 
 /* ── Wgląd biura: dziennik i analiza (0.440.0) ──────────────────────────
    Przeniesione z DZIENNIKA i ANALIZY w `biuro.html`. Trasy są TE SAME, którymi
@@ -39,9 +40,13 @@ export interface FiltrDziennika {
   device: string;
   userRef: string;
   limit: number;
+  /** Pokazać pomiary techniczne (`TECHNICZNE`)? Domyślnie schowane (0.540.0). */
+  techniczne: boolean;
 }
 
-export const FILTR_PUSTY: FiltrDziennika = { od: "", do: "", typ: "", twId: "", device: "", userRef: "", limit: 100 };
+export const FILTR_PUSTY: FiltrDziennika = {
+  od: "", do: "", typ: "", twId: "", device: "", userRef: "", limit: 100, techniczne: false,
+};
 
 /**
  * Doba LOKALNA jako przedział w UTC.
@@ -69,6 +74,9 @@ export function paramyDziennika(f: FiltrDziennika): string {
   dodaj("twId", f.twId.trim());
   dodaj("device", f.device.trim());
   dodaj("userRef", f.userRef);
+  /* Pomiary schowane tylko wtedy, gdy nikt nie prosi o konkretny typ:
+     wybór „Pomiar czasu skanu" w filtrze ma pokazać właśnie te wiersze. */
+  if (!f.techniczne && !f.typ) p.set("bez", TECHNICZNE.join(","));
   p.set("limit", String(f.limit));
   return p.toString();
 }

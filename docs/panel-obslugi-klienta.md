@@ -6367,6 +6367,22 @@ Kafelek czyta to samo zapytanie co jego karta, więc tablica nie dokłada żadne
 
 **Strażnik.** `ekrany/Stan.test.tsx` pilnuje, że na wejściu otwarte są wyłącznie karty do uwagi. Pilnuje też kafelków, przycisku zapisanych i zera zapisu przy otwarciu każdej karty.
 
+## 26i. Dziennik po polsku (0.540.0)
+
+Właściciel poprosił o poprawę kolejnego ekranu z menu „Więcej”. Z trzech makiet wybrał C: tę samą tabelę, tylko po polsku. Tabela została, bo w śladzie audytowym szuka się konkretu po kolumnach: kto, kiedy, który towar.
+
+**Co się zmieniło:**
+
+- Kolumna „Zdarzenie” niesie polską nazwę, na przykład „Zapis do Subiekta nie wszedł”. Klucz serwera stoi w dymku, w CSV i w wartości filtra.
+- Kolumna „Co się stało” zastępuje schowany JSON jednym zdaniem z danych wpisu, na przykład „3 próby · „Kartoteka w edycji””. Surowe dane są w dymku komórki.
+- Osoba i urządzenie stoją w jednej kolumnie „Kto, czym”.
+- Okres wybiera się jednym polem: najnowsze, dziś, wczoraj, ostatnie 7 dni albo własny zakres.
+- Pomiary techniczne, czyli czas skanu i przeliczenia, są domyślnie schowane. Chowa je serwer parametrem `bez`, więc licznik „pokazano N z M” liczy to, co widać.
+
+Nazwy leżą w `dziennik/nazwy.ts` dla wszystkich 287 typów z rejestru serwera. Opisy leżą w `dziennik/opis.ts`: własne zdania dla kolektora, dostaw, zapisów i błędów, a pary z danych dla reszty.
+
+**Strażnik.** `dziennik/nazwy.test.ts` czyta rejestr `services/zdarzenia-rejestr.ts`. Typ dopisany do rejestru bez polskiej nazwy to czerwony test.
+
 ## 27. Zasady nadrzędne
 
 Te punkty mówią o JEDNEJ rozmowie i jednej sprawie. Reguły obowiązujące
