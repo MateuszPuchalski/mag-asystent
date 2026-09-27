@@ -1,4 +1,6 @@
 import type { EnvFileResult } from "../env-file.js";
+import { config, type Config } from "../config.js";
+import { wartoscObowiazujaca } from "../konfiguracja-obowiazuje.js";
 import { KLUCZE, NAZWY_GRUP, type Edycja, type Grupa, type Kto, type Program } from "../konfiguracja-rejestr.js";
 
 /* ── Stan konfiguracji do panelu (0.488.0) ───────────────────────────────────
@@ -39,6 +41,21 @@ export interface WierszKonfiguracji {
    * nie zmienił, więc panel nie ma czego proponować.
    */
   edycja: Edycja | null;
+  /**
+   * Rodzaj wartości NIEZALEŻNIE od edycji (@wydanie). Klucz przykryty zmienną
+   * usługi traci `edycja`, a panel dalej musi wiedzieć, że pokazuje datę.
+   */
+  rodzaj: Edycja["rodzaj"] | null;
+  /** Nazwa po polsku dla decyzji właściciela (@wydanie); `null` gdzie indziej. */
+  nazwa: string | null;
+  jednostka: readonly [string, string, string] | null;
+  wartosci: Readonly<Record<string, string>> | null;
+  /**
+   * Wartość, na której serwer pracuje TERAZ, w kształcie z pliku (@wydanie).
+   * Przy domyślnej to jedyne miejsce, skąd panel wie, ile ona wynosi.
+   * `null` dla sekretu i dla klucza, którego domyślnej serwer nie zna.
+   */
+  obowiazuje: string | null;
 }
 
 export interface StanKonfiguracji {
@@ -52,6 +69,7 @@ export interface StanKonfiguracji {
 export function stanKonfiguracji(
   env: EnvFileResult,
   srodowisko: NodeJS.ProcessEnv = process.env,
+  c: Config = config,
 ): StanKonfiguracji {
   const wPliku = new Set(env.applied);
   const przykryte = new Set(env.overridden);
@@ -71,6 +89,11 @@ export function stanKonfiguracji(
       zrodlo,
       wartosc: k.tajny ? null : surowa,
       edycja: k.edycja && zrodlo !== "przykryte" && env.path ? k.edycja : null,
+      rodzaj: k.edycja?.rodzaj ?? null,
+      nazwa: k.nazwa ?? null,
+      jednostka: k.jednostka ?? null,
+      wartosci: k.wartosci ?? null,
+      obowiazuje: k.tajny ? null : wartoscObowiazujaca(k.klucz, c),
     };
   });
   const znane = new Set(KLUCZE.map((k) => k.klucz));

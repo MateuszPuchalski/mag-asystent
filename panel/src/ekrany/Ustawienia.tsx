@@ -1,9 +1,7 @@
 import React, { useState } from "react";
-import { Settings } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { useJa } from "../api/rozmowy";
 import { useTagi, useZmienTag } from "../api/tagi";
-import { Karta } from "../ui";
 import { useSkokDoKarty } from "../ui/useSkokDoKarty";
 import { DaneFirmy } from "../ustawienia/DaneFirmy";
 import { RegulyStrefy } from "../ustawienia/RegulyStrefy";
@@ -41,7 +39,11 @@ import { NowyKolektor } from "../ustawienia/NowyKolektor";
    karta stoi, i dopiero wtedy do niej skacze.
 
    Otwarcie ekranu i zmiana grupy nic nie zapisują — każda zmiana stoi za
-   przyciskiem. */
+   przyciskiem.
+
+   BEZ KARTY-NAGŁÓWKA (@wydanie). Nad grupami stała cała biała karta z
+   jednym słowem „Ustawienia", które mówi już menu „Więcej". Tytuł ekranu
+   stoi teraz nad listą grup, a treść zaczyna się na wysokości paska. */
 
 type IdGrupy = "firma" | "magazyn" | "ludzie" | "obsluga" | "serwer";
 
@@ -75,13 +77,10 @@ export function Ustawienia() {
   const grupa: IdGrupy = widoczne.find((g) => g.id === zAdresu)?.id ?? "firma";
 
   /* Własny scroller — rama panelu nie przewija za ekrany (patrz `main.tsx`). */
-  return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
-    <Karta className="flex flex-wrap items-center gap-3 p-4">
-      <Settings size={18} /><b className="text-naglowek">Ustawienia</b>
-    </Karta>
-
+  return <div className="lg:h-full lg:overflow-y-auto">
     <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
       <nav aria-label="Grupy ustawień" className="flex flex-wrap gap-1 lg:sticky lg:top-0 lg:w-64 lg:shrink-0 lg:flex-col">
+        <h1 className="text-naglowek w-full px-3 pb-1 font-bold">Ustawienia</h1>
         {widoczne.map((g) => {
           const ta = g.id === grupa;
           return <button key={g.id} type="button" aria-current={ta ? "page" : undefined}

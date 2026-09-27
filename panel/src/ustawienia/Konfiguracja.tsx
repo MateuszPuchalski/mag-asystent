@@ -1,9 +1,9 @@
 import React, { useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
+import { ChevronDown, ChevronRight, SlidersHorizontal } from "lucide-react";
 import {
   useKonfiguracja, useZmienUstawienie, type WierszKonfiguracji, type ZrodloUstawienia,
 } from "../api/ustawienia";
-import { Blad, Pole, Przycisk } from "../ui";
+import { Blad, dataLokalna, odmien, Pole, Przycisk } from "../ui";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
 /* ── Konfiguracja serwera (0.488.0) ─────────────────────────────────────
@@ -38,8 +38,27 @@ function widoczny(w: WierszKonfiguracji, wszystkie: boolean): boolean {
 
 function wartosc(w: WierszKonfiguracji): React.ReactNode {
   if (w.tajny) return w.zrodlo === "domyslna" ? "—" : <i className="text-slate-600">ustawione</i>;
-  if (w.zrodlo === "domyslna") return "—";
+  if (w.zrodlo === "domyslna") return w.obowiazuje ? <code className="break-all">{w.obowiazuje}</code> : "—";
   return w.wartosc === "" ? <i className="text-slate-600">puste</i> : <code className="break-all">{w.wartosc}</code>;
+}
+
+/* ── Wartość słowem (@wydanie) ──────────────────────────────────────────
+   Decyzja właściciela pokazuje to, na czym serwer pracuje, językiem biura:
+   „7 dni", „wyłączony", data. Wcześniej przy domyślnej stała kreska, a
+   liczbę znał tylko `config.ts`. Słowa dla wartości przychodzą z rejestru,
+   bo rodzaj gramatyczny idzie za nazwą: szkic „wyłączony", rozpoznanie
+   „wyłączone". Brak słowa to surowa wartość, nie zgadywanie. */
+export function wartoscSlowem(w: WierszKonfiguracji): string {
+  if (w.tajny) return w.zrodlo === "domyslna" ? "brak" : "ustawiony";
+  const v = w.obowiazuje ?? w.wartosc;
+  if (v === null || v === undefined) return "domyślna";
+  const slowo = w.wartosci?.[v];
+  if (slowo) return slowo;
+  if ((w.rodzaj ?? w.edycja?.rodzaj) === "data") return v === "" ? "bez progu" : dataLokalna(v);
+  if (v === "") return "puste";
+  const n = Number(v);
+  if (w.jednostka && Number.isFinite(n)) return `${v} ${odmien(n, ...w.jednostka)}`;
+  return v;
 }
 
 const maly = "!px-2.5 !py-1 !text-xs";
@@ -51,20 +70,24 @@ function Edytor({ w, onGotowe, onZamknij }: {
   const e = w.edycja!;
   /* Sekret startuje pusty: serwer i tak go nie wysyła, a pusty zapis nie
      jest „wyczyść" — do tego jest „Domyślna". */
-  const [v, setV] = useState(w.tajny ? "" : w.wartosc ?? (e.rodzaj === "wybor" ? e.opcje![0]! : ""));
+  /* Start od wartości, która obowiązuje: zmiana terminu z 7 na 10 dni
+     zaczyna się od „7", nie od pustego pola i szukania, ile było. */
+  const [v, setV] = useState(w.tajny ? ""
+    : w.wartosc ?? w.obowiazuje ?? (e.rodzaj === "wybor" ? e.opcje![0]! : ""));
+  const nazwa = w.nazwa ?? w.klucz;
   const wyslij = (wartosc: string | null) => zmien.mutate({ klucz: w.klucz, wartosc }, {
     onSuccess: (d) => onGotowe(d.restart === "sam"
-      ? `${w.klucz} zapisany. Serwer wstaje ponownie z nowym plikiem — karta odświeży się za chwilę.`
-      : `${w.klucz} zapisany w pliku. Zadziała po restarcie usług wertis-api i wertis-worker.`),
+      ? `${nazwa}: zapisane. Serwer wstaje ponownie z nowym plikiem — karta odświeży się za chwilę.`
+      : `${nazwa}: zapisane w pliku. Zadziała po restarcie usług wertis-api i wertis-worker.`),
   });
 
-  return <form aria-label={`Zmiana ${w.klucz}`} className="flex flex-wrap items-center gap-2"
+  return <form aria-label={`Zmiana ${nazwa}`} className="flex flex-wrap items-center gap-2"
     onSubmit={(ev) => { ev.preventDefault(); wyslij(v); }}>
     {e.rodzaj === "wybor"
-      ? <select aria-label={w.klucz} className="field w-auto !py-1 text-xs" value={v} onChange={(x) => setV(x.target.value)}>
-          {e.opcje!.map((o) => <option key={o} value={o}>{o}</option>)}
+      ? <select aria-label={nazwa} className="field w-auto !py-1 text-xs" value={v} onChange={(x) => setV(x.target.value)}>
+          {e.opcje!.map((o) => <option key={o} value={o}>{w.wartosci?.[o] ?? o}</option>)}
         </select>
-      : <Pole aria-label={w.klucz} autoFocus className="w-64 !py-1 text-xs"
+      : <Pole aria-label={nazwa} autoFocus className="w-64 !py-1 text-xs"
           type={w.tajny ? "password" : "text"} autoComplete={w.tajny ? "new-password" : "off"}
           inputMode={e.rodzaj === "liczba" ? "numeric" : undefined}
           placeholder={e.rodzaj === "data" ? "2026-08-31T22:00:00Z" : w.tajny ? "nowa wartość" : ""}
@@ -115,12 +138,69 @@ function TabelaKluczy({ wiersze, onWynik }: { wiersze: WierszKonfiguracji[]; onW
   </Tabela>;
 }
 
+/* ── Decyzje właściciela wierszami (@wydanie) ──────────────────────────
+   Decyzja właściciela z 27 września 2026, wariant B z makiet: wiersz jak
+   w ustawieniach telefonu. Nazwa i jedno zdanie z lewej, wartość, która
+   obowiązuje, z prawej. Tabela z kluczem z pliku na czele i kreską zamiast
+   liczby odpowiadała na pytanie instalatora, nie biura. Klucz zostaje w
+   dymku nazwy, bo szuka się go przy awarii i w `wertis.env`.
+
+   CAŁY WIERSZ JEST PRZYCISKIEM. Cel kliknięcia to wiersz, nie mały „Zmień"
+   w środku kolumny (dekalog pkt 1 i 6). Wiersz, którego panel nie zmieni,
+   nie udaje przycisku — mówi „w pliku" w miejscu strzałki.
+
+   JEDEN OTWARTY NARAZ. Zmiana to jeden klucz na żądanie (nagłówek pliku),
+   więc drugi formularz obok tylko by kusił. */
+function WierszWlasciciela({ w, otwarty, komunikat, onPrzelacz, onZamknij, onWynik }: {
+  w: WierszKonfiguracji; otwarty: boolean;
+  /** Zdanie po zapisie — pod wierszem, który się zmieniło, nie na górze karty. */
+  komunikat: string | null;
+  onPrzelacz: () => void; onZamknij: () => void; onWynik: (z: string) => void;
+}) {
+  const zmienialny = w.edycja !== null;
+  const tresc = <>
+    <span className="flex min-w-0 flex-1 flex-col">
+      <b title={w.klucz}>{w.nazwa ?? w.klucz}</b>
+      <span className="text-sm text-slate-600">{w.opis}</span>
+    </span>
+    <span className="flex max-w-[45%] flex-col items-end text-right">
+      <b className="break-all">{wartoscSlowem(w)}</b>
+      {/* Źródło tylko wtedy, gdy mówi coś ponad „domyślna" przy wartości,
+          która sama jest słowem „domyślna". */}
+      {!(w.zrodlo === "domyslna" && w.obowiazuje == null && !w.tajny) &&
+        <span className={`rounded px-1.5 text-xs ${ZRODLO[w.zrodlo].klasa}`}>{ZRODLO[w.zrodlo].etykieta}</span>}
+    </span>
+  </>;
+  return <li>
+    {zmienialny
+      ? <button type="button" aria-expanded={otwarty} onClick={onPrzelacz}
+          className="flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left hover:bg-slate-50">
+          {tresc}
+          {otwarty ? <ChevronDown size={18} className="shrink-0 text-slate-600" aria-hidden />
+            : <ChevronRight size={18} className="shrink-0 text-slate-600" aria-hidden />}
+        </button>
+      : <div className="flex min-h-12 items-center gap-3 px-4 py-2"
+          title="Zmienia się w pliku wertis.env albo instalatorem.">
+          {tresc}
+          <span className="w-12 shrink-0 text-right text-xs text-slate-600">w pliku</span>
+        </div>}
+    {otwarty && <div className="border-t border-slate-100 bg-slate-50 px-4 py-3">
+      <Edytor w={w} onZamknij={onZamknij} onGotowe={(z) => { onZamknij(); onWynik(z); }} />
+      <p className="mt-2 text-xs text-slate-600">
+        Serwer najpierw sprawdza, czy wstanie z nową wartością, i dopiero wtedy się restartuje.
+      </p>
+    </div>}
+    {komunikat && <p role="status" className="px-4 pb-2.5 text-sm text-ranga-ok">{komunikat}</p>}
+  </li>;
+}
+
 /** Klucze właściciela z podanych grup rejestru, jedna karta na grupę —
  *  osadzane w grupie ekranu ustawień, której dotyczą. Tylko admin, jak
  *  cała konfiguracja (nagłówek pliku). */
 export function KluczeWlasciciela({ admin, grupy }: { admin: boolean; grupy: string[] }) {
   const konf = useKonfiguracja(admin);
-  const [wynik, setWynik] = useState("");
+  const [wynik, setWynik] = useState<{ klucz: string; zdanie: string } | null>(null);
+  const [otwarty, setOtwarty] = useState<string | null>(null);
   if (!admin) return null;
   const dane = konf.data;
   const wiersze = (dane?.wiersze ?? []).filter(wlasciciela);
@@ -128,10 +208,14 @@ export function KluczeWlasciciela({ admin, grupy }: { admin: boolean; grupy: str
     {grupy.map((g) => {
       const wGrupie = wiersze.filter((w) => w.grupa === g);
       if (!wGrupie.length) return null;
-      return <KartaWgladu key={g} id={`karta-klucze-${g}`} tytul={dane!.grupy[g] ?? g}
-        opis="Zmiana to jeden klucz naraz. Serwer sprawdza, czy wstanie z nowym plikiem, i restartuje się sam.">
-        {wynik && <p className="mb-3 text-sm text-ranga-ok">{wynik}</p>}
-        <TabelaKluczy wiersze={wGrupie} onWynik={setWynik} />
+      return <KartaWgladu key={g} id={`karta-klucze-${g}`} tytul={dane!.grupy[g] ?? g}>
+        <ul className="-m-4 divide-y divide-slate-100">
+          {wGrupie.map((w) => <WierszWlasciciela key={w.klucz} w={w} otwarty={otwarty === w.klucz}
+            komunikat={wynik?.klucz === w.klucz ? wynik.zdanie : null}
+            onPrzelacz={() => { setOtwarty((o) => o === w.klucz ? null : w.klucz); setWynik(null); }}
+            onZamknij={() => setOtwarty(null)}
+            onWynik={(zdanie) => setWynik({ klucz: w.klucz, zdanie })} />)}
+        </ul>
       </KartaWgladu>;
     })}
     {konf.error && <Blad>{konf.error.message}</Blad>}

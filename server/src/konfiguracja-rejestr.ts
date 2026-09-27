@@ -17,7 +17,9 @@
 
    Domyślnych wartości tu NIE MA, celowo. Stoją w `config.ts` i w kodzie C#,
    a druga kopia stu kilkudziesięciu liczb rozjechałaby się przy pierwszej
-   zmianie. Panel mówi „domyślna" i odsyła do opisu.                          */
+   zmianie. Wartość domyślną, która OBOWIĄZUJE, panel dostaje od
+   `konfiguracja-obowiazuje.ts` (@wydanie): ten czyta ją z gotowego `config`,
+   więc nie powstaje druga kopia liczby.                                      */
 
 export type Grupa =
   | "subiekt" | "magazyn" | "allegro" | "zwroty" | "copilot"
@@ -76,6 +78,19 @@ export interface Klucz {
   /** Które programy go czytają. Brak pola = sam serwer. */
   czyta?: readonly Program[];
   edycja?: Edycja;
+  /**
+   * Nazwa po polsku, pod którą panel pokazuje decyzję właściciela (@wydanie).
+   * Klucz z pliku zostaje w dymku: szuka się go przy awarii, nie co dzień.
+   * Wymagana przy `kto: "wlasciciel"` — pilnuje tego test.
+   */
+  nazwa?: string;
+  /** Odmiana jednostki liczby dla 1, 2–4 i 5+, np. dzień / dni / dni. */
+  jednostka?: readonly [string, string, string];
+  /**
+   * Słowa zamiast wartości z pliku, np. `"0"` → „wyłączony". Rodzaj
+   * gramatyczny idzie za nazwą, więc słowa stoją przy kluczu, nie w panelu.
+   */
+  wartosci?: Readonly<Record<string, string>>;
 }
 
 const TEKST: Edycja = { rodzaj: "tekst" };
@@ -84,6 +99,10 @@ const DATA: Edycja = { rodzaj: "data" };
 const PRZELACZNIK: Edycja = { rodzaj: "wybor", opcje: ["0", "1"] };
 
 const S = ["serwer", "sfera"] as const;
+
+const WL_Y = { "0": "wyłączony", "1": "włączony" } as const;
+const WL_E = { "0": "wyłączone", "1": "włączone" } as const;
+const NA_GODZINE = ["na godzinę", "na godzinę", "na godzinę"] as const;
 
 export const KLUCZE: readonly Klucz[] = [
   // ── Połączenie z Subiektem ────────────────────────────────────────────────
@@ -125,17 +144,23 @@ export const KLUCZE: readonly Klucz[] = [
   { klucz: "MAG_ID_MGP", grupa: "magazyn", kto: "instalator", opis: "mag_Id strefy przyjęć." },
   { klucz: "MAG_ID_ZWROTY", grupa: "magazyn", kto: "instalator", opis: "mag_Id magazynu zwrotów." },
   { klucz: "MAG_ID_ODP", grupa: "magazyn", kto: "wlasciciel",
-    opis: "mag_Id magazynu odpadu dla towaru do utylizacji; 0 wyłącza." },
+    nazwa: "Magazyn odpadu", wartosci: { "0": "wyłączony" },
+    opis: "Numer magazynu w Subiekcie dla towaru do utylizacji; 0 wyłącza." },
   { klucz: "MAG_ID_SERWIS", grupa: "magazyn", kto: "wlasciciel",
-    opis: "mag_Id magazynu serwisowego dla braków w dostawie; 0 wyłącza." },
+    nazwa: "Magazyn serwisowy", wartosci: { "0": "wyłączony" },
+    opis: "Numer magazynu w Subiekcie dla braków w dostawie; 0 wyłącza." },
   { klucz: "DOK_TYPY_DOSTAW", grupa: "magazyn", kto: "wlasciciel", edycja: TEKST,
+    nazwa: "Dokumenty dostaw", wartosci: { "1": "sama FZ", "1,10": "FZ i PZ" },
     opis: "Kody dokumentów dostaw do rozkładania: 1 = sama FZ, 1,10 = FZ i PZ." },
   { klucz: "POZYCJE_NIE_TOWAROWE", grupa: "magazyn", kto: "wlasciciel", edycja: TEKST,
+    nazwa: "Pozycje, które nie są towarem", wartosci: { "": "brak" },
     opis: "Symbole pozycji, które nie są towarem, np. PRZESYŁKA; puste wyłącza." },
   { klucz: "TW_ID_PRZESYLKA", grupa: "magazyn", kto: "wlasciciel",
+    nazwa: "Kartoteka PRZESYŁKA", wartosci: { "0": "nieustawiona" },
     opis: "tw_Id kartoteki PRZESYŁKA z paragonów Allegro; wymagane przy SFERA_ZW=1." },
   { klucz: "ALLOW_MANUAL_LOC", grupa: "magazyn", kto: "wlasciciel", edycja: PRZELACZNIK,
-    opis: "0 zabrania wpisywania lokalizacji z klawiatury kolektora." },
+    nazwa: "Lokalizacja z klawiatury", wartosci: { "0": "zabroniona", "1": "dozwolona" },
+    opis: "Czy kolektor pozwala wpisać lokalizację zamiast ją zeskanować." },
   { klucz: "DOK_TYPY_KOREKT", grupa: "magazyn", kto: "zaawansowane",
     opis: "Kody dokumentów oddających towar na stan po zwrocie." },
   { klucz: "DOK_STATUS_ZD_OTWARTE", grupa: "magazyn", kto: "zaawansowane",
@@ -157,13 +182,17 @@ export const KLUCZE: readonly Klucz[] = [
 
   // ── Allegro ───────────────────────────────────────────────────────────────
   { klucz: "ALLEGRO_CLIENT_ID", grupa: "allegro", kto: "wlasciciel", edycja: TEKST,
+    nazwa: "Aplikacja Allegro", wartosci: { "": "brak — integracja wyłączona" },
     opis: "Client ID aplikacji z developer.allegro.pl; puste wyłącza integrację." },
   { klucz: "ALLEGRO_CLIENT_SECRET", grupa: "allegro", kto: "wlasciciel", edycja: TEKST, tajny: true,
+    nazwa: "Sekret aplikacji Allegro",
     opis: "Client secret tej samej aplikacji." },
   { klucz: "ALLEGRO_USER_AGENT", grupa: "allegro", kto: "wlasciciel", edycja: TEKST,
+    nazwa: "Podpis aplikacji (User-Agent)", wartosci: { "": "brak" },
     opis: "Nagłówek User-Agent wygenerowany na developer.allegro.pl." },
   { klucz: "ALLEGRO_INBOX_OD", grupa: "allegro", kto: "wlasciciel", edycja: DATA,
-    opis: "Od kiedy skrzynka widzi rozmowy (data ISO w UTC)." },
+    nazwa: "Skrzynka od",
+    opis: "Od kiedy skrzynka widzi rozmowy." },
   { klucz: "ALLEGRO_SELLER_ID", grupa: "allegro", kto: "zaawansowane",
     opis: "Numer sprzedawcy w linkach do Centrum Sprzedaży." },
   { klucz: "ALLEGRO_SANDBOX", grupa: "allegro", kto: "dev",
@@ -193,14 +222,19 @@ export const KLUCZE: readonly Klucz[] = [
 
   // ── Zwroty i reklamacje ───────────────────────────────────────────────────
   { klucz: "ALLEGRO_ZWROTY_OD", grupa: "zwroty", kto: "wlasciciel", edycja: DATA,
-    opis: "Od kiedy pobierane są zwroty (data ISO w UTC)." },
+    nazwa: "Zwroty od",
+    opis: "Od kiedy pobierane są zwroty." },
   { klucz: "REKLAMACJE_OD", grupa: "zwroty", kto: "wlasciciel", edycja: DATA,
+    nazwa: "Reklamacje od",
     opis: "Od kiedy kolejka reklamacji pokazuje sprawy; puste = bez progu." },
   { klucz: "ZWROT_ROZLICZONE_OD", grupa: "zwroty", kto: "wlasciciel", edycja: DATA,
+    nazwa: "Rekoncyliacja zwrotów od",
     opis: "Od kiedy rekoncyliacja zgłasza zwrot rozliczony poza aplikacją." },
   { klucz: "ZWROT_TERMIN_DNI", grupa: "zwroty", kto: "wlasciciel", edycja: LICZBA,
+    nazwa: "Termin na zwrot", jednostka: ["dzień", "dni", "dni"],
     opis: "Dni na obsłużenie zwrotu od doręczenia paczki (regulamin Allegro)." },
   { klucz: "ZWROT_WYGASA_DNI", grupa: "zwroty", kto: "wlasciciel", edycja: LICZBA,
+    nazwa: "Zwrot bez decyzji wygasa po", jednostka: ["dniu", "dniach", "dniach"],
     opis: "Po ilu dniach zwrot bez decyzji uznaje się za rozliczony." },
   { klucz: "ALLEGRO_ZWROTY_SYNC_MS", grupa: "zwroty", kto: "zaawansowane",
     opis: "Takt synchronizacji zwrotów w milisekundach; 0 wyłącza." },
@@ -215,28 +249,40 @@ export const KLUCZE: readonly Klucz[] = [
 
   // ── Copilot ───────────────────────────────────────────────────────────────
   { klucz: "COPILOT_MODE", grupa: "copilot", kto: "wlasciciel", edycja: { rodzaj: "wybor", opcje: ["off", "anthropic"] },
-    opis: "anthropic włącza Copilota; off wyłącza." },
+    nazwa: "Copilot", wartosci: { off: "wyłączony", anthropic: "włączony" },
+    opis: "Główny wyłącznik Copilota." },
   { klucz: "ANTHROPIC_API_KEY", grupa: "copilot", kto: "wlasciciel", edycja: TEKST, tajny: true,
+    nazwa: "Klucz API modelu",
     opis: "Klucz API dostawcy modelu." },
   { klucz: "COPILOT_MODEL", grupa: "copilot", kto: "wlasciciel", edycja: TEKST,
-    opis: "Model do szkiców odpowiedzi." },
+    nazwa: "Model szkiców",
+    opis: "Model, który układa szkice odpowiedzi." },
   { klucz: "COPILOT_MODEL_KLASYFIKACJA", grupa: "copilot", kto: "wlasciciel", edycja: TEKST,
+    nazwa: "Model rozpoznawania",
     opis: "Model do rozpoznawania wiadomości; puste = ten sam co do szkiców." },
   { klucz: "COPILOT_AUTO_SZKIC", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
-    opis: "1 = szkic sam dla nowego pytania pod ofertą." },
+    nazwa: "Szkic w tle", wartosci: WL_Y,
+    opis: "Szkic sam dla nowego pytania pod ofertą." },
   { klucz: "COPILOT_AUTO_KLASYFIKACJA", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
-    opis: "1 = rozpoznanie każdej nowej wiadomości klienta." },
+    nazwa: "Rozpoznanie w tle", wartosci: WL_E,
+    opis: "Rozpoznanie każdej nowej wiadomości klienta." },
   { klucz: "COPILOT_SZKIC_PO_ROZPOZNANIU", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
-    opis: "0 wyłącza szkic układany zaraz po rozpoznaniu." },
+    nazwa: "Szkic po rozpoznaniu", wartosci: WL_Y,
+    opis: "Szkic układany zaraz po rozpoznaniu wiadomości." },
   { klucz: "COPILOT_AUTO_NA_GODZINE", grupa: "copilot", kto: "wlasciciel", edycja: LICZBA,
+    nazwa: "Sufit szkiców w tle", jednostka: NA_GODZINE,
     opis: "Sufit automatycznych szkiców na godzinę; hamulec kosztów." },
   { klucz: "COPILOT_AUTO_KLASYFIKACJA_NA_GODZINE", grupa: "copilot", kto: "wlasciciel", edycja: LICZBA,
+    nazwa: "Sufit rozpoznań w tle", jednostka: NA_GODZINE,
     opis: "Sufit automatycznych rozpoznań na godzinę; hamulec kosztów." },
   { klucz: "COPILOT_PRZED_PRACA", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
-    opis: "1 = przed biurem Copilot rozpoznaje i szkicuje zaległość z własnym limitem, nie z sufitu godzinowego." },
+    nazwa: "Szkice przed pracą", wartosci: WL_E,
+    opis: "Przed biurem Copilot rozpoznaje i szkicuje zaległość z własnym limitem, nie z sufitu godzinowego." },
   { klucz: "COPILOT_PRZED_PRACA_OKNO", grupa: "copilot", kto: "wlasciciel", edycja: TEKST,
+    nazwa: "Okno szkiców przed pracą",
     opis: "Godziny szkiców przed pracą, czas magazynu, np. 6-8; zwykłe takty Copilota wtedy czekają." },
   { klucz: "COPILOT_PRZED_PRACA_LIMIT", grupa: "copilot", kto: "wlasciciel", edycja: LICZBA,
+    nazwa: "Limit poranka", jednostka: ["rozmowa", "rozmowy", "rozmów"],
     opis: "Ile rozmów na jeden poranek: tyle rozpoznań i tyle szkiców; hamulec kosztów poranka." },
   { klucz: "COPILOT_MAX_PARTIA", grupa: "copilot", kto: "zaawansowane",
     opis: "Ile rozmów bierze jedno kliknięcie." },
@@ -247,13 +293,16 @@ export const KLUCZE: readonly Klucz[] = [
   { klucz: "COPILOT_KLASYFIKACJA_OKNO_DNI", grupa: "copilot", kto: "zaawansowane",
     opis: "Z ilu dni wstecz automat bierze wiadomości do rozpoznania." },
   { klucz: "WIEDZA_AUTOMAT", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
-    opis: "1 = kolejka wiedzy opróżnia się sama." },
+    nazwa: "Automat wiedzy", wartosci: WL_Y,
+    opis: "Kolejka wiedzy opróżnia się sama." },
   { klucz: "WIEDZA_AUTOMAT_MODEL", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
-    opis: "1 = automat wiedzy może pytać model językowy." },
+    nazwa: "Automat wiedzy pyta model", wartosci: { "0": "nie", "1": "tak" },
+    opis: "Czy automat wiedzy może pytać model językowy." },
   { klucz: "WIEDZA_AUTOMAT_NA_PRZEBIEG", grupa: "copilot", kto: "zaawansowane",
     opis: "Ile wierszy wiedzy na jeden przebieg." },
   { klucz: "PASOWANIE_Z_SIECI", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
-    opis: "1 = nocą automat szuka pasowania części na stronach spoza Allegro." },
+    nazwa: "Pasowanie z sieci", wartosci: WL_E,
+    opis: "Nocą automat szuka pasowania części na stronach spoza Allegro." },
   { klucz: "PASOWANIE_Z_SIECI_NA_NOC", grupa: "copilot", kto: "zaawansowane",
     opis: "Ile kartotek automat pasowania z sieci sprawdza na jedną noc." },
 
@@ -272,7 +321,8 @@ export const KLUCZE: readonly Klucz[] = [
   { klucz: "ZDJECIA_WZORZEC_PLIKU", grupa: "zdjecia", kto: "instalator",
     opis: "Wzorzec nazwy pliku zdjęcia, np. {symbol}.jpg." },
   { klucz: "ZDJECIA_DODAWANIE", grupa: "zdjecia", kto: "wlasciciel",
-    opis: "Zdjęcie z kolektora: puste = nie wolno, wertis = u nas, subiekt = także do kartoteki." },
+    nazwa: "Zdjęcie z kolektora", wartosci: { "": "nie wolno", wertis: "zostaje u nas", subiekt: "u nas i w kartotece Subiekta" },
+    opis: "Czy wolno zrobić zdjęcie kartoteki kolektorem i gdzie ono trafia." },
   { klucz: "ZDJECIA_KOLUMNA_CRC", grupa: "zdjecia", kto: "zaawansowane",
     opis: "Kolumna sumy kontrolnej zdjęcia; puste = nie wpisujemy." },
   { klucz: "ZDJECIA_MAX_KB", grupa: "zdjecia", kto: "zaawansowane",
@@ -290,8 +340,10 @@ export const KLUCZE: readonly Klucz[] = [
   { klucz: "SFERA_OPERATOR_HASLO", grupa: "sfera", kto: "instalator", tajny: true, czyta: ["sfera"],
     opis: "Hasło tego operatora." },
   { klucz: "SFERA_ZW", grupa: "sfera", kto: "wlasciciel", edycja: PRZELACZNIK,
-    opis: "1 = automatyczny ZW do paragonu; wymaga SFERA_WORKER=1." },
+    nazwa: "Automatyczny ZW do paragonu", wartosci: WL_Y,
+    opis: "Dokument ZW wystawia worker Sfery; wymaga SFERA_WORKER=1." },
   { klucz: "SFERA_ZW_WYDANIE_KAT_ID", grupa: "sfera", kto: "wlasciciel", czyta: ["sfera"],
+    nazwa: "Kategoria dokumentu ZW", wartosci: { "0": "domyślna Subiekta" },
     opis: "Kategoria dokumentu ZW; 0 = domyślna Subiekta." },
   { klucz: "SFERA_SQL_LOGIN", grupa: "sfera", kto: "zaawansowane", czyta: ["sfera"],
     opis: "Login SQL Sfery, gdy inny niż konto usługi." },
@@ -321,15 +373,20 @@ export const KLUCZE: readonly Klucz[] = [
   { klucz: "SRODOWISKO", grupa: "serwer", kto: "instalator",
     opis: "Etykieta instancji, np. dev; produkcja zostawia puste." },
   { klucz: "KOPIE_KATALOG", grupa: "serwer", kto: "wlasciciel", edycja: TEKST,
+    nazwa: "Katalog kopii",
     opis: "Katalog kopii bazy aplikacji; najlepiej na innym dysku." },
   { klucz: "AKTUALIZACJA_AUTO", grupa: "serwer", kto: "wlasciciel",
     edycja: { rodzaj: "wybor", opcje: ["noc", "zaraz", "wylaczona"] },
-    opis: "Aktualizacja automatyczna: zaraz, gdy nikt nie pracuje (domyślnie), w oknie nocnym albo wyłączona." },
+    nazwa: "Aktualizacja automatyczna", wartosci: { zaraz: "zaraz, gdy nikt nie pracuje", noc: "w oknie nocnym", wylaczona: "wyłączona" },
+    opis: "Kiedy serwer sam wgrywa nowe wydanie." },
   { klucz: "AKTUALIZACJA_OKNO", grupa: "serwer", kto: "wlasciciel", edycja: TEKST,
+    nazwa: "Okno aktualizacji",
     opis: "Godziny okna aktualizacji automatycznej, czas magazynu, np. 3-5." },
   { klucz: "AKTUALIZACJA_DOJRZALOSC_H", grupa: "serwer", kto: "wlasciciel", edycja: LICZBA,
+    nazwa: "Dojrzałość wydania", jednostka: ["godzina", "godziny", "godzin"],
     opis: "Ile godzin wydanie musi mieć, zanim wejdzie samo; produkcja 1, dev 0." },
   { klucz: "AKTUALIZACJA_KANAREK", grupa: "serwer", kto: "wlasciciel", edycja: TEKST,
+    nazwa: "Instancja próbna", wartosci: { "": "brak" },
     opis: "Adres instancji dev; produkcja wgrywa tylko wersję, na której ona już pracuje." },
   { klucz: "STREFA_CZASU", grupa: "serwer", kto: "zaawansowane",
     opis: "Strefa czasu magazynu do wyświetlania godzin i okna nocnej kopii." },

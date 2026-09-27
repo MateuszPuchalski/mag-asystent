@@ -70,6 +70,12 @@ test("wartości ze źródłem, sekret bez wartości", async () => {
     ["plik", null, true]);
   assert.deepEqual([w("PORT").zrodlo, w("PORT").wartosc], ["przykryte", "3001"]);
   assert.deepEqual([w("ZWROT_WYGASA_DNI").zrodlo, w("ZWROT_WYGASA_DNI").wartosc], ["domyslna", null]);
+  /* Domyślna nie jest już kreską (@wydanie): panel dostaje liczbę, na której
+     serwer pracuje, prosto z `config`. Sekret dalej nie wychodzi. */
+  const { config } = await import("../config.js");
+  const obowiazuje = (klucz: string) => (w(klucz) as unknown as { obowiazuje: string | null }).obowiazuje;
+  assert.equal(obowiazuje("ZWROT_WYGASA_DNI"), String(config.allegro.zwrotWygasaDni));
+  assert.equal(obowiazuje("MSSQL_PASSWORD"), null);
   assert.deepEqual(k.nieznane, ["ALEGRO_CLIENT_ID"]);
 });
 
