@@ -40,7 +40,7 @@ export interface FiltrDziennika {
   device: string;
   userRef: string;
   limit: number;
-  /** Pokazać pomiary techniczne (`TECHNICZNE`)? Domyślnie schowane (@wydanie). */
+  /** Pokazać pomiary techniczne (`TECHNICZNE`)? Domyślnie schowane (0.540.0). */
   techniczne: boolean;
 }
 

@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.540.0 — 27 września 2026
+
+**Dziennik po polsku.** Kolumna zdarzenia pokazuje polską nazwę zamiast
+klucza serwera, na przykład „Zapis do Subiekta nie wszedł”. Nowa kolumna
+„Co się stało” opisuje wpis jednym zdaniem zamiast schowanego JSON-u.
+Okres wybiera się jednym polem: dziś, wczoraj albo ostatnie 7 dni.
+Pomiary czasu skanów są domyślnie schowane, a jeden klik je pokazuje.
+
 ## 0.539.0 — 27 września 2026
 
 **Kubełek „Do decyzji” dzieli się na cztery sita z licznikami.** Obok pytania

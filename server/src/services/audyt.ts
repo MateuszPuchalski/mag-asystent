@@ -20,7 +20,7 @@ export interface FiltrAudytu {
   od?: string | null;
   do?: string | null;
   typy?: string[] | null;
-  /** Typy do POMINIĘCIA — panel chowa nimi pomiary techniczne (@wydanie). */
+  /** Typy do POMINIĘCIA — panel chowa nimi pomiary techniczne (0.540.0). */
   bezTypow?: string[] | null;
   userRef?: number | null;
   twId?: number | null;
@@ -70,7 +70,7 @@ function warunki(f: FiltrAudytu): Warunki {
     w.push(`type IN (${f.typy.map(() => "?").join(",")})`);
     p.push(...f.typy);
   }
-  /* WYKLUCZENIE PO STRONIE SERWERA, nie filtr w przeglądarce (@wydanie).
+  /* WYKLUCZENIE PO STRONIE SERWERA, nie filtr w przeglądarce (0.540.0).
      Dziennik chowa pomiary czasu skanów, które potrafią być co trzecim
      wierszem. Odsiane w przeglądarce dawałyby stronę krótszą niż limit
      i licznik „razem" liczący wiersze, których nie widać. */

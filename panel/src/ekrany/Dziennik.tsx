@@ -29,7 +29,7 @@ import { PrzyciskTowaru } from "../towar/Szuflada";
    na widoku, dopóki któreś odbiega od domyślnego, bo schowany filtr to
    tabela, która kłamie o tym, co pokazuje. */
 
-/* ── PO POLSKU, WARIANT C Z MAKIET (@wydanie) ────────────────────────────
+/* ── PO POLSKU, WARIANT C Z MAKIET (0.540.0) ────────────────────────────
    Decyzja właściciela z 27 września 2026. Tabela została tabelą — w śladzie
    audytowym szuka się konkretu po kolumnach: kto, kiedy, który towar. Zmieniło
    się to, czego nie dało się czytać bez ściągawki:

@@ -136,7 +136,7 @@ test("filtr po typie i po urządzeniu", async () => {
   assert.equal((await get("/api/events?typ=scan,queue_failed", token)).json().wpisy.length, 3);
 });
 
-test("`bez` wyklucza typy z listy i z licznika `razem` (@wydanie)", async () => {
+test("`bez` wyklucza typy z listy i z licznika `razem` (0.540.0)", async () => {
   /* Panel chowa nim pomiary techniczne. Licznik musi liczyć to samo co
      lista, inaczej „pokazano 40 z 120" obiecuje wiersze, których nie ma. */
   const { token } = zalogowany("biuro");

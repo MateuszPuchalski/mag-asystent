@@ -3,7 +3,7 @@ import rejestr from "../../../server/src/services/zdarzenia-rejestr.ts?raw";
 import { NAZWA_ZDARZENIA, TECHNICZNE, nazwaZdarzenia } from "./nazwy";
 import { opisZdarzenia } from "./opis";
 
-/* ── Każdy typ z rejestru serwera ma polską nazwę (@wydanie) ─────────────
+/* ── Każdy typ z rejestru serwera ma polską nazwę (0.540.0) ─────────────
    Rejestr `services/zdarzenia-rejestr.ts` pilnuje na serwerze, że każdy
    `logEvent` jest w nim wpisany. Ten test domyka łańcuch po stronie panelu:
    typ dopisany do rejestru bez polskiej nazwy wróciłby na ekran surowym

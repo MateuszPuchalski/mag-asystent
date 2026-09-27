@@ -34,7 +34,7 @@ describe("filtr dziennika liczy dobę LOKALNĄ (0.440.0)", () => {
     expect(p.has("do")).toBe(false);
   });
 
-  /* Pomiary techniczne schowane domyślnie (@wydanie), ale nie wtedy, gdy
+  /* Pomiary techniczne schowane domyślnie (0.540.0), ale nie wtedy, gdy
      ktoś wybrał konkretny typ — wtedy chce zobaczyć właśnie jego. */
   it("pomiary techniczne odpadają domyślnie, a wybrany typ je przywraca", () => {
     const bez = new URLSearchParams(paramyDziennika(FILTR_PUSTY)).get("bez")!;

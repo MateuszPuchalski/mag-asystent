@@ -6367,7 +6367,7 @@ Kafelek czyta to samo zapytanie co jego karta, więc tablica nie dokłada żadne
 
 **Strażnik.** `ekrany/Stan.test.tsx` pilnuje, że na wejściu otwarte są wyłącznie karty do uwagi. Pilnuje też kafelków, przycisku zapisanych i zera zapisu przy otwarciu każdej karty.
 
-## 26i. Dziennik po polsku (@wydanie)
+## 26i. Dziennik po polsku (0.540.0)
 
 Właściciel poprosił o poprawę kolejnego ekranu z menu „Więcej”. Z trzech makiet wybrał C: tę samą tabelę, tylko po polsku. Tabela została, bo w śladzie audytowym szuka się konkretu po kolumnach: kto, kiedy, który towar.
 

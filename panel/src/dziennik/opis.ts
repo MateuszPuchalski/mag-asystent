@@ -1,4 +1,4 @@
-/* ── „Co się stało" jednym zdaniem z danych wpisu (@wydanie) ─────────────
+/* ── „Co się stało" jednym zdaniem z danych wpisu (0.540.0) ─────────────
    Szczegół wpisu był surowym JSON-em pod „szczegóły". Żeby wiedzieć, że
    zapis nie wszedł, bo kartoteka była w edycji, trzeba było kliknąć
    i przeczytać `{"queueId":8,"proby":3,"blad":…}`.

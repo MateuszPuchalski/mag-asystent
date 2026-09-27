@@ -16,7 +16,7 @@ import type { WpisAudytu } from "../api/wglad";
    5. Doba filtra jest LOKALNA — szczegół w `dziennik/rodziny.test.ts`.
    6. Rzadkie filtry są zwinięte (0.514.0), ale ustawiony filtr nigdy się
       nie chowa.
-   7. (@wydanie) Po polsku: nazwa zdarzenia zamiast klucza, opis zamiast
+   7. (0.540.0) Po polsku: nazwa zdarzenia zamiast klucza, opis zamiast
       schowanego JSON-u, pomiary techniczne schowane, okres jednym polem. */
 
 const wpis = (id: number, o: Partial<WpisAudytu> = {}): WpisAudytu => ({

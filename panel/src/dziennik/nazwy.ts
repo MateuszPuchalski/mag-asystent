@@ -1,4 +1,4 @@
-/* ── Polskie nazwy zdarzeń dziennika (@wydanie) ─────────────────────────
+/* ── Polskie nazwy zdarzeń dziennika (0.540.0) ─────────────────────────
    Decyzja właściciela z 27 września 2026, wariant C z makiet. Kolumna
    zdarzenia pokazywała klucz serwera — `putaway_line_done`, `queue_failed` —
    a biuro miało go rozszyfrować samo. Dekalog p. 2: rozpoznanie tańsze od
