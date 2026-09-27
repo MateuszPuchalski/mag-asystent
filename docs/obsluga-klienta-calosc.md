@@ -355,7 +355,7 @@ także „Przejmij” i „Cofnij”, bo wiadomość klienta nie podbija wersji.
 nie potwierdzi więc wiadomości, która przyszła po otwarciu profilu. Brak
 klucza w ciele żądania to 400 bez zapisu (blizna 0.224.1).
 
-Od @wydanie jest jeden wyjątek: odmowa wypłaty z kodem dosyłki i „Śledź
+Od 0.536.0 jest jeden wyjątek: odmowa wypłaty z kodem dosyłki i „Śledź
 dosyłkę” przy zwrocie. Stawiają krok bez wersji i odcisku ekranu, bo agent
 działa na ZWROCIE, a sprawy nie widzi. Obie podnoszą wersję, więc profil
 otwarty w tej chwili dostaje przy zapisie 409. Gdy odcisk różni się tylko
@@ -437,14 +437,15 @@ z opóźnieniem budzi, bo tej wiadomości agent nie widział. Znacznik bez stref
 czyta się jako UTC, tak jak SQLite, żeby próg i zapytanie mówiły o tej samej
 chwili.
 
-**Odcisk dostał w @wydanie dwa klucze: `k` i `q`.** Liczą PRZEJŚCIA dosyłek
+**Odcisk dostał w 0.536.0 dwa klucze: `k` i `q`.** Od @wydanie liczą PRZEJŚCIA dosyłek
 w doręczenie i w kłopot u przewoźnika. Liczniki stoją w wierszu dosyłki
 i nigdy nie maleją. Kłopot, potem „w drodze” i znów kłopot budzi więc dwa
 razy. Zastąpiona dosyłka nie odejmuje niczego i nie udaje obudzenia.
 
-Napis odcisku każdej sprawy przez to się zmienił. Ekran profilu otwarty
-w chwili aktualizacji dostaje więc raz 409 ze świeżą sprawą. Zapamiętany
-odcisk bez nowych kluczy nie budzi. Odmowa z dosyłką dopisuje brakujące
+Napis odcisku każdej sprawy zmienił się w 0.536.0. Ekran profilu otwarty
+w chwili tamtej aktualizacji dostał więc raz 409 ze świeżą sprawą. Zapamiętany
+odcisk bez nowych kluczy nie budzi. Migracja w @wydanie przycina zapisane
+`k` i `q` do nowych sum, żeby następny kłopot obudził sprawę. Odmowa z dosyłką dopisuje brakujące
 klucze bez potwierdzania reszty.
 
 **Zakończenie zależy od tego, co klient dostał:**
@@ -546,14 +547,24 @@ i proponuje „Śledź dosyłkę”.
 
 **Odmowa przejmuje dosyłkę, która należy do zwrotu.** Należy do niego numer
 wpisany ręką w bieżącym epizodzie i dosyłka założona po zgłoszeniu zwrotu.
-Przejęcie zostawia numer, stan i doręczenie. Dosyłkę starszą od zgłoszenia
-zwrotu odmowa zastępuje, bo klient odesłał i ją. Tę samą regułę czytają
+Od @wydanie należy też dosyłka, której numer wpisano po zgłoszeniu. Przejęcie
+zostawia numer, stan i doręczenie. Starszą odmowa zastępuje, bo klient odesłał
+i ją. Tę samą regułę czytają
 ekran zwrotu, „Śledź dosyłkę” i propozycja na profilu.
 
 **Wznowienie zakończonej sprawy zaczyna nowy epizod.** Krok, który ją
-wznawia, odkłada jej dosyłki do historii, każdą drogą. Karta sprawy, „Moje”,
-podpowiedź i ticker widzą tylko dosyłki bieżącego epizodu. Dosyłka sprzed
-miesięcy nie woła więc w nowej sprawie o numer, którego nikt nie wpisze.
+wznawia, odkłada do historii jej skończone dosyłki, każdą drogą. Skończona
+to doręczona, zawrócona albo spoza trzydziestu dni okna. Karta sprawy,
+„Moje”, podpowiedź i ticker widzą tylko dosyłki bieżącego epizodu. Dosyłka
+sprzed miesięcy nie woła więc w nowej sprawie o numer, którego nikt nie wpisze.
+
+Dosyłka w drodze zostaje żywa (@wydanie). Agent kończy sprawę po nadaniu
+etykiety, a wznawia, gdy klient pyta „gdzie paczka?”. Odłożona przestałaby
+być śledzona, a panel nie ma jak jej wskrzesić.
+
+**„Po ruchu człowieka” liczy chwila zapisu doręczenia na serwerze** (@wydanie).
+Data kuriera bywa wcześniejsza od numeru wpisanego ręką. Wtedy podpowiedź
+„Zakończ sprawę?” i zdanie w „Moje” gasły mimo świeżego doręczenia.
 
 **Tabela `klient_dosylka` trzyma numer i wynik śledzenia, nie historię.**
 Jeden wiersz przypada na sprawę i zamówienie. Numer wykrywa ticker `dosylki`

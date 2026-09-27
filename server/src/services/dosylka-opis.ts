@@ -23,7 +23,7 @@ import { chwilaUtc, czasLokalny, dataLokalna, dodajDni, polnocLokalna } from "..
 /**
  * Kody odmowy wypłaty, które znaczą „wysłaliśmy towar jeszcze raz”.
  * `NEW_ITEM_SENT` podał właściciel 27 września 2026 (zły towar).
- * `MISSING_PART_SENT` doszedł w @wydanie, bo brakująca część jedzie tak samo,
+ * `MISSING_PART_SENT` doszedł w 0.536.0, bo brakująca część jedzie tak samo,
  * drugą paczką — to do oceny właściciela, nie jego fakt.
  */
 export const KODY_DOSYLKI = ["NEW_ITEM_SENT", "MISSING_PART_SENT"] as const;
@@ -242,8 +242,10 @@ export const DOSYLKI_SQL = `SELECT d.*, o.przesylka_przewoznik AS przewoznik_zam
  * zamówienia, gdy:
  *   - agent wpisał numer bez odmowy w bieżącym epizodzie sprawy — odmowa
  *     tylko nazywa dosyłkę, którą biuro już wysłało i śledzi;
- *   - wiersz powstał PO zgłoszeniu tego zwrotu według Allegro — dosyłka
- *     wysłana po zwrocie jest odpowiedzią na niego, nie na wcześniejszy.
+ *   - wiersz powstał albo dostał numer PO zgłoszeniu tego zwrotu według
+ *     Allegro — dosyłka wysłana po zwrocie jest odpowiedzią na niego, nie na
+ *     wcześniejszy. Numer liczy się osobno (@wydanie): trzecia paczka wpisana
+ *     do wiersza z pierwszej odmowy ginęła przy odmowie drugiego zwrotu.
  * Wiersz starszy od zwrotu to poprzednia dosyłka: nowa odmowa ją zastępuje.
  * Bez daty zgłoszenia w lądowisku drugi warunek milczy — `julianday(NULL)`.
  */
@@ -251,7 +253,7 @@ export const DOSYLKA_ZWROTU_SQL = `${DOSYLKI_SQL}
   WHERE d.zwrot_id = ?1
      OR (d.konto = ?2 AND d.zamowienie = ?3 AND (
           (d.zwrot_id IS NULL AND d.archiwalna = 0 AND p.zakonczono_at IS NULL)
-          OR julianday(d.zalozono_at) >= julianday((SELECT json_extract(a.surowe_json, '$.createdAt')
+          OR julianday(COALESCE(d.numer_at, d.zalozono_at)) >= julianday((SELECT json_extract(a.surowe_json, '$.createdAt')
                FROM zwrot_klienta z JOIN allegro_zwrot a ON a.id = z.external_id WHERE z.id = ?1))))
   ORDER BY d.zwrot_id IS ?1 DESC, julianday(d.zalozono_at) DESC
   LIMIT 1`;
@@ -277,9 +279,17 @@ export function naDosylkeSprawy(w: Record<string, unknown>, teraz: Date): Dosylk
 /** Kłopot u przewoźnika albo brak numeru za długo — wiersz „Moje” staje na dziś. */
 export const pilnaDosylka = (d: DosylkaSprawy): boolean => d.bezNumeru || d.ton === "zle";
 
-/** Doręczenie po chwili `widzianeDo` — ostatnim ruchu człowieka przy sprawie. */
+/**
+ * Doręczenie po chwili `widzianeDo` — ostatnim ruchu człowieka przy sprawie.
+ *
+ * Liczy się chwila ZAPISU doręczenia na serwerze (`sprawdzonoAt`), nie data
+ * kuriera (@wydanie). Ticker nie pyta o doręczoną, więc jej `sprawdzonoAt` to
+ * moment zapisu. Numer wpisany po czasie do paczki już doręczonej dawał inaczej
+ * doręczenie „sprzed” wpisania i gasił podpowiedź „Zakończ sprawę?”.
+ */
 const doreczonaPo = (d: DosylkaSprawy, widzianeDo: string | null): boolean => {
-  const t = chwilaUtc(d.dostarczonoAt);
+  if (d.dostarczonoAt === null) return false;
+  const t = chwilaUtc(d.sprawdzonoAt ?? d.dostarczonoAt);
   return Number.isFinite(t) && (widzianeDo === null || !(t <= chwilaUtc(widzianeDo)));
 };
 
@@ -313,7 +323,9 @@ export function najwazniejszaDosylka(
 export function doreczonaDoZakonczenia(dosylki: DosylkaSprawy[], zmienionoAt: string): DosylkaSprawy | null {
   const sledzone = dosylki.filter((d) => d.przewoznik !== "OTHER");
   if (sledzone.length === 0 || sledzone.some((d) => d.dostarczonoAt === null)) return null;
-  const ostatnia = sledzone.reduce((a, b) => (chwilaUtc(b.dostarczonoAt) > chwilaUtc(a.dostarczonoAt) ? b : a));
+  /* Ostatnia według chwili ZAPISU, tej samej, którą sprawdza `doreczonaPo`. */
+  const zapis = (d: DosylkaSprawy) => chwilaUtc(d.sprawdzonoAt ?? d.dostarczonoAt);
+  const ostatnia = sledzone.reduce((a, b) => (zapis(b) > zapis(a) ? b : a));
   return doreczonaPo(ostatnia, zmienionoAt) ? ostatnia : null;
 }
 

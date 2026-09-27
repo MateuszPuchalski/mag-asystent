@@ -120,6 +120,8 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
   kodAllegro?: string | null;
 }) {
   const [odmawiam, setOdmawiam] = useState(false);
+  /* Odmowa złożona w panelu Allegro, przy której jest dosyłka do pokazania. */
+  const odmowaZAllegro = !stan.odmowa && !!kodAllegro && (stan.dosylka !== null || stan.sledzicDosylke);
   const [kod, setKod] = useState(BEZ_KODU);
   const [powod, setPowod] = useState("");
   const [referencja, setReferencja] = useState("");
@@ -179,7 +181,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
           ta linijka tłumaczy. Kod z synchronizacji stoi też w kolumnie
           dowodów; tutaj stoi obok dosyłki, której jest powodem. Inne kody
           z synchronizacji zostają tam, gdzie były. */}
-      {!stan.odmowa && kodAllegro && (stan.dosylka || stan.sledzicDosylke) &&
+      {odmowaZAllegro &&
         <span className="flex items-center gap-1 text-sm font-semibold text-slate-600">
           <Ban size={14} aria-hidden="true" />Odmówiono w Allegro: „{etykietaKodu(kodAllegro)}”</span>}
 
@@ -199,8 +201,10 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
     </div>
 
     {/* Przeszkoda mówi, CO zrobić — i stoi także wtedy, gdy odmowa jest
-        możliwa, bo to dwie różne drogi, nie dwa warianty jednej. */}
-    {stan.powod && !stan.oddane && !stan.odmowa && !przedWerdyktem &&
+        możliwa, bo to dwie różne drogi, nie dwa warianty jednej. Przy odmowie
+        z panelu Allegro z dosyłką przeszkodą jest sama odmowa, a jej fakt stoi
+        już wyżej (@wydanie). Trzecie zdanie o tym samym tylko zagłuszało dosyłkę. */}
+    {stan.powod && !stan.oddane && !stan.odmowa && !przedWerdyktem && !odmowaZAllegro &&
       <p className="mt-2 text-xs text-slate-500">{stan.powod}</p>}
 
     {/* ── DOSYŁKA POD ODMOWĄ (0.536.0) ───────────────────────────────────

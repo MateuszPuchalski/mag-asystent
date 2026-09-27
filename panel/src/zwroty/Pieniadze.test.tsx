@@ -290,7 +290,10 @@ describe("Pieniądze przy zwrocie", () => {
      `odmowa`, a dosyłkę serwer liczy i wtedy. Linijka stoi więc niezależnie
      od `odmowa`, z faktem odmowy obok, żeby nie wisiała bez powodu. */
   it("odmowa z panelu Allegro dostaje linijkę dosyłki z faktem odmowy obok", () => {
-    ekran({ stan: zAllegro({ dosylka: W_DRODZE }), kodAllegro: "NEW_ITEM_SENT" });
+    const przeszkoda = "Odmowa zwrotu pieniędzy jest już zgłoszona w Allegro.";
+    ekran({ stan: { ...zAllegro({ dosylka: W_DRODZE }), powod: przeszkoda }, kodAllegro: "NEW_ITEM_SENT" });
+    /* Fakt odmowy stoi raz w tej sekcji — zdanie przeszkody go nie powtarza. */
+    expect(screen.queryByText(przeszkoda)).toBeNull();
     expect(screen.getByText("Odmówiono w Allegro: „Wysłaliśmy nowy towar”")).toBeInTheDocument();
     expect(screen.getByText("Dosyłka w drodze (stan z 14:10)")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /profil klienta/ })).toHaveAttribute("href", "/obsluga/klient/zielony");

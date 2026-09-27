@@ -950,6 +950,22 @@ export function migrate(database: DatabaseSync) {
       database.exec(`UPDATE klient_dosylka
         SET doreczen = CASE WHEN dostarczono_at IS NOT NULL THEN 1 ELSE 0 END,
             problemow = CASE WHEN status IN ('ISSUE','RETURNED') THEN 1 ELSE 0 END`);
+      /* Zapisany odcisk nie może stać WYŻEJ niż nowa suma. 0.536.0 liczył
+         wiersze z kłopotem TERAZ: potwierdzony kłopot, po którym paczka ruszyła,
+         zostawiał `q: 1` przy sumie 0. Następny kłopot dałby 1 — nie więcej
+         niż 1 — i sprawa by nie wstała. To ten sam błąd, który liczniki
+         przejść usuwają, więc przycinamy go razem z nimi. Sprawa ma jeden
+         login (UNIQUE), więc suma po sprawie to suma po loginie. */
+      /* Zapas „Cofnij” też, bo cofnięcie zakończenia przywraca go jako odcisk. */
+      for (const pole of ["znane_json", "przed_zakonczeniem_znane_json"] as const) {
+        for (const [klucz, kolumna] of [["k", "doreczen"], ["q", "problemow"]] as const) {
+          database.exec(`UPDATE klient_prowadzenie
+            SET ${pole} = json_set(${pole}, '$.${klucz}', min(
+              json_extract(${pole}, '$.${klucz}'),
+              (SELECT coalesce(sum(d.${kolumna}), 0) FROM klient_dosylka d WHERE d.sprawa_id = klient_prowadzenie.id)))
+            WHERE json_valid(${pole}) AND json_type(${pole}, '$.${klucz}') IS NOT NULL`);
+        }
+      }
     }
   }
   /* INDEKSY LOGINU BEZ WIELKOŚCI LITER (0.535.0, sprawa klienta). Profil

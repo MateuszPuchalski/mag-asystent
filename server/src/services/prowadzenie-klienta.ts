@@ -6,7 +6,8 @@ import { kontaLoginu, rozmowyPoLoginie } from "./klient-historia.js";
 import { podziekowanieKlienta } from "./conversations.js";
 import { mojeSprawy, ROZMOWA_ZAMOWIENIA, type MojaSprawa } from "./droga-klienta.js";
 import {
-  DOSYLKI_SQL, dzienMiesiac, naDosylkeSprawy, najwazniejszaDosylka, pilnaDosylka, type DosylkaSprawy,
+  DOSYLKI_SQL, dzienMiesiac, naDosylkeSprawy, najwazniejszaDosylka, OKNO_SLEDZENIA_MS, pilnaDosylka,
+  type DosylkaSprawy,
 } from "./dosylka-opis.js";
 
 /* ── Sprawa klienta: kto prowadzi, następny krok, zakończenie (0.535.0) ─────
@@ -362,13 +363,21 @@ function noweZdarzenia(
   const DOSYLKA = `FROM klient_dosylka d JOIN klient_prowadzenie p ON p.id = d.sprawa_id
     WHERE p.login = ? COLLATE NOCASE`;
   if (urosl("k")) {
-    const w = najnowszy(database, `SELECT d.dostarczono_at AS at ${DOSYLKA} AND d.dostarczono_at IS NOT NULL
-      ORDER BY julianday(d.dostarczono_at) DESC LIMIT 1`, login);
+    const w = najnowszy(database, `SELECT d.dostarczono_at AS at, d.sprawdzono_at AS zapisano
+      ${DOSYLKA} AND d.dostarczono_at IS NOT NULL
+      ORDER BY julianday(COALESCE(d.sprawdzono_at, d.dostarczono_at)) DESC LIMIT 1`, login);
     /* Data tylko przy doręczeniu PO ostatnim ruchu człowieka. Licznik rośnie
        też za dosyłkę, którą nowa odmowa zastąpiła — jej daty już nie ma,
-       a data najnowszej ZNANEJ przypisałaby obudzenie dosyłce potwierdzonej. */
+       a data najnowszej ZNANEJ przypisałaby obudzenie dosyłce potwierdzonej.
+
+       „Po ruchu” liczy się chwilą, w której SERWER zapisał doręczenie
+       (`sprawdzono_at`), nie datą kuriera (@wydanie). Numer wpisany w poniedziałek
+       do paczki doręczonej w piątek dawał doręczenie „sprzed” wpisania — więc
+       bez daty i na końcu listy. Oba zegary po stronie serwera, jak przy
+       wiadomościach klienta. */
     const at = tekst(w?.at);
-    const nowa = at !== null && chwilaUtc(at) > chwilaUtc(zmienionoAt);
+    const zapisano = tekst(w?.zapisano) ?? at;
+    const nowa = at !== null && zapisano !== null && chwilaUtc(zapisano) > chwilaUtc(zmienionoAt);
     nowe.push({ rodzaj: "dosylka_doreczona", tekst: nowa ? `Dosyłka doręczona ${dzienMiesiac(at)}` : "Dosyłka doręczona",
       at: nowa ? at : null, cel: null });
   }
@@ -511,7 +520,7 @@ function sprawdzOdcisk(
  * Czy odcisk ekranu różni się od bieżącego WYŁĄCZNIE licznikami dosyłki.
  * Doręczenie albo kłopot zgłasza przewoźnik, nie klient — zdanie „Klient
  * dopisał coś” kazałoby szukać wiadomości, której nie ma. Odcisk ekranu bez
- * `k` i `q` (sprzed @wydanie) nie przechodzi: tam różnica to nowy kształt.
+ * `k` i `q` (sprzed 0.536.0) nie przechodzi: tam różnica to nowy kształt.
  */
 function tylkoDosylka(odcisk: string, biezacy: Odcisk): boolean {
   let ekran: Partial<Odcisk>;
@@ -570,13 +579,21 @@ export function zapiszKrokSprawy(
   let id: number;
   if (w) {
     id = Number(w.id);
-    /* WZNOWIENIE ZAKOŃCZONEJ ZACZYNA NOWY EPIZOD. Jej dosyłki idą do
-       historii, każdą drogą — „Ustaw krok”, odmowa ze zwrotu, propozycja
+    /* WZNOWIENIE ZAKOŃCZONEJ ZACZYNA NOWY EPIZOD. Jej SKOŃCZONE dosyłki idą
+       do historii, każdą drogą — „Ustaw krok”, odmowa ze zwrotu, propozycja
        z profilu. Bez tego dosyłka sprzed miesięcy stanęłaby na karcie
        i w „Moje” nowej sprawy z „brakiem numeru od 60 dni”. Ślad w dzienniku
-       niesie `klient_sprawa_krok` niżej: to jeden ruch, nie dwa. */
+       niesie `klient_sprawa_krok` niżej: to jeden ruch, nie dwa.
+
+       Skończona to doręczona, zawrócona albo spoza okna śledzenia. Dosyłka
+       w drodze zostaje żywa (@wydanie): agent kończy sprawę, gdy nada
+       etykietę, a wznawia, gdy klient pyta „gdzie paczka?”. Odłożona do
+       historii przestałaby być śledzona, a panel nie ma jak jej wskrzesić. */
     if (w.zakonczono_at != null) {
-      database.prepare("UPDATE klient_dosylka SET archiwalna = 1 WHERE sprawa_id = ?").run(id);
+      database.prepare(`UPDATE klient_dosylka SET archiwalna = 1
+         WHERE sprawa_id = ? AND (dostarczono_at IS NOT NULL OR status = 'RETURNED'
+           OR julianday(COALESCE(numer_at, zalozono_at)) < julianday(?))`)
+        .run(id, new Date(p.teraz.getTime() - OKNO_SLEDZENIA_MS).toISOString());
     }
     /* Prowadzący zostaje. Ustawia go tylko sprawa bez prowadzącego —
        tak jak odpowiedź przydziela rozmowę od 0.159.0. Zapas dla „Cofnij”
@@ -650,7 +667,7 @@ export function potwierdzPoZapisie(
  * Odmowa ze zwrotu dopisuje do „znanego” brakujące klucze `k` i `q` — i nic
  * poza tym, bo odmowa niczego nie potwierdza.
  *
- * Sprawa sprzed @wydanie ma odcisk bez `k` i `q`, a klucz nieobecny nie budzi
+ * Sprawa sprzed 0.536.0 ma odcisk bez `k` i `q`, a klucz nieobecny nie budzi
  * (`noweZdarzenia`). Odmowa nie zapisuje odcisku, więc bez tego dopisku
  * dosyłka takiej sprawy nie obudziłaby jej nigdy. Liczniki nie maleją, więc
  * zastąpiony wiersz nie wymaga tu żadnej poprawki.

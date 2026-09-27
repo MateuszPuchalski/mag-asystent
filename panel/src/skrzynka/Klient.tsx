@@ -126,7 +126,7 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
  * i zakończenie; tutaj sprawy się nie zmienia.
  */
 function LiniaSprawy({ login, sprawa: s }: { login: string; sprawa: SprawaKlienta }) {
-  /* Dosyłka (@wydanie) doklejona do TEJ SAMEJ linijki. Bez niej stan drugiej
+  /* Dosyłka (0.536.0) doklejona do TEJ SAMEJ linijki. Bez niej stan drugiej
      paczki stał tylko na profilu, o ekran dalej od rozmowy, zwrotu czy
      reklamacji. Jedno zdanie, najpilniejsze — reszta jest na profilu.
      Zakończona sprawa przychodzi z pustą listą (`prowadzenie-klienta.ts`),

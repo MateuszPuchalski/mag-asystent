@@ -13,9 +13,12 @@ teraz od nowa dla każdego zwrotu, a błąd odmowy stoi przy swoim zwrocie.
 trzech przeglądach:
 
 - Odmowa wypłaty przejmuje dosyłkę, której numer ktoś już wpisał, zamiast ją
-  kasować.
-- Sprawa wznowiona po zakończeniu nie pokazuje dosyłek poprzedniej sprawy.
-  Stara dosyłka bez numeru nie trzyma już sprawy „na dziś” tygodniami.
+  kasować — także numer trzeciej paczki wpisany przed odmową drugiego zwrotu.
+- Sprawa wznowiona po zakończeniu nie pokazuje skończonych dosyłek poprzedniej
+  sprawy. Stara dosyłka bez numeru nie trzyma już sprawy „na dziś” tygodniami.
+  Dosyłka, która jeszcze jedzie, zostaje śledzona.
+- Numer wpisany z Sellasist do paczki już doręczonej budzi sprawę z datą,
+  a profil pyta „Zakończ sprawę?”.
 - Drugi kłopot przewoźnika z tą samą dosyłką budzi sprawę. Doręczenie, które
   prowadzący już widział, nie budzi jej drugi raz.
 - Numer wpisany po czasie ma własne trzydzieści dni śledzenia.
@@ -39,5 +42,5 @@ trzech przeglądach:
 - Dokumenty oddzielają fakty właściciela od założeń. Kod „Wysłaliśmy
   brakującą część” dołożyliśmy sami, a 0.536.0 przypisał go właścicielowi.
 
-Migracja dokłada cztery kolumny do tabeli `klient_dosylka` przy starcie.
-Nie trzeba nic klikać.
+Migracja dokłada cztery kolumny do tabeli `klient_dosylka` przy starcie
+i przycina zapisane odciski spraw do nowych liczników. Nie trzeba nic klikać.

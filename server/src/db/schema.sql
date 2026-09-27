@@ -3229,10 +3229,10 @@ CREATE TABLE IF NOT EXISTS klient_prowadzenie (
   przed_zakonczeniem_zmieniono_at TEXT
 );
 
--- Dosyłka sprawy klienta (@wydanie, drugi przyrost S6). Właściciel podał
+-- Dosyłka sprawy klienta (0.536.0, drugi przyrost S6). Właściciel podał
 -- 27 września 2026, że przy złym towarze biuro odmawia wypłaty kodem
 -- NEW_ITEM_SENT i wysyła poprawny towar nową etykietą z Sellasist.
--- MISSING_PART_SENT doszedł w tym wydaniu, bo brakująca część jedzie tak samo,
+-- MISSING_PART_SENT doszedł w 0.536.0, bo brakująca część jedzie tak samo,
 -- drugą paczką; to do oceny właściciela. Krok „dosłać” był dotąd samym
 -- zdaniem; tu stoi numer drugiej paczki i WYNIK śledzenia, nie historia.
 -- Jeden wiersz na sprawę i zamówienie. Odmowa zwrotu zgłoszonego PO założeniu

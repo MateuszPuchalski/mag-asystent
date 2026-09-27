@@ -56,3 +56,24 @@ test("drugi przebieg migracji nie przelicza liczników, które prowadzi już tic
   assert.equal(wiersz(d, "z-doreczona").doreczen, 2);
   assert.equal(wiersz(d, "z-doreczona").problemow, 3);
 });
+
+test("zapisany odcisk z 0.536.0 schodzi do nowej sumy, żeby następny kłopot obudził sprawę", () => {
+  /* 0.536.0 liczył `q` jako wiersze z kłopotem TERAZ. Agent potwierdził dwa
+     kłopoty, potem jedna paczka ruszyła dalej: zapisane `q: 2`, a nowa suma
+     przejść wynosi 1. Bez przycięcia następny kłopot dałby 2 — nie więcej
+     niż 2 — i sprawa by nie wstała. Pozostałe klucze odcisku zostają. */
+  const d = bazaZ0536();
+  const odcisk = JSON.stringify({ m: "2026-09-27T08:00:00Z", z: 3, k: 1, q: 2 });
+  d.prepare(`INSERT INTO klient_prowadzenie (id, login, krok, krok_do, znane_json, zmieniono_at, zmieniono_przez,
+      przed_zakonczeniem_znane_json)
+    VALUES (1, 'kl', 'Dosłać', '2026-10-01T06:00:00Z', ?, '2026-09-27T09:00:00Z', 'Ala', ?)`).run(odcisk, odcisk);
+  d.prepare("INSERT INTO klient_prowadzenie (id, login, krok, krok_do, znane_json, zmieniono_at, zmieniono_przez) "
+    + "VALUES (2, 'inny', 'x', '2026-10-01T06:00:00Z', '{\"m\":null,\"z\":0}', '2026-09-27T09:00:00Z', 'Ala')").run();
+  migrate(d);
+  const w = d.prepare("SELECT znane_json AS z, przed_zakonczeniem_znane_json AS p FROM klient_prowadzenie WHERE id = ?");
+  const pierwsza = w.get(1) as { z: string; p: string };
+  assert.deepEqual(JSON.parse(pierwsza.z), { m: "2026-09-27T08:00:00Z", z: 3, k: 1, q: 1 });
+  assert.deepEqual(JSON.parse(pierwsza.p), { m: "2026-09-27T08:00:00Z", z: 3, k: 1, q: 1 });
+  assert.deepEqual(JSON.parse((w.get(2) as { z: string }).z), { m: null, z: 0 },
+    "odcisk bez kluczy dosyłki zostaje bez nich — brak klucza nie budzi");
+});
