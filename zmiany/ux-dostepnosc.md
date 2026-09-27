@@ -1,7 +1,25 @@
 ---
 rodzaj: minor
-tytul: pasek braku połączenia, pusta kolumna w jednym miejscu, zero naruszeń WCAG
+tytul: okna trzymają klawiaturę, pasek braku połączenia, zero naruszeń WCAG
 ---
+
+**Klawisz pod otwartym oknem nie działa na sprawie pod spodem.** W zwrotach
+`Z` przy otwartej historii klienta oddawało pieniądze za zwrot zasłonięty
+nakładką. Teraz skróty kolejek milkną, gdy stoi nad nimi okno: historia,
+zdjęcie, lista skrótów, szukanie albo wysyłka zatrzymana. Skan etykiety
+działa dalej, bo zwroty słuchają czytnika cały czas.
+
+**Okno bierze kursor i go oddaje.** Otwarte okno przyjmuje klawiaturę,
+tabulator krąży w nim, a Escape zamyka tylko to górne. Po zamknięciu kursor
+wraca tam, skąd agent przyszedł. Ctrl+K w trakcie pisania wraca więc do
+pisanego pola, a „Historia" do swojego przycisku.
+
+**Wysyłka zatrzymana nie pisze w niewidocznym szkicu.** Po Ctrl+Enter okno
+konfliktu otwierało się z kursorem dalej w polu odpowiedzi, pod nakładką.
+Teraz kursor staje na „Popraw szkic", a Escape wraca do szkicu bez zmian.
+
+**Nowe zadanie dla magazynu zaczyna od tytułu.** Kursor stoi w polu tytułu
+od razu. Escape zamyka pusty formularz, a wpisanej instrukcji nie wyrzuca.
 
 **Brak połączenia z serwerem mówi to wprost.** Gdy serwer nie odpowiada,
 na przykład w minucie aktualizacji, pod nagłówkiem staje czerwony pasek
@@ -30,6 +48,15 @@ z czterech naruszeń do zera. Wiersz stanu synchronizacji spraw ma czytelny
 kontrast, a kolumny tabel bez napisu mają nazwę dla czytnika ekranu. Strażnik
 w testach panelu sprawdza odtąd strukturę każdego ekranu przy każdym
 przebiegu. Pomiar w przeglądarce robi `tools/audyt-dostepnosci.mjs`.
+
+Drugi audyt, na ekranach z otwartą sprawą, znalazł pięć rodzajów naruszeń,
+których pusty seed nie pokazywał. Szary podpis na zaznaczonym wierszu kolejki
+miał 3.86:1, biel na zielonych przyciskach 3.77:1, a nieaktywna połowa
+przełącznika odpowiedzi 4.34:1. Przycisk kopiowania loginu miał 20 px
+wysokości zamiast 24. Dwa okna stały na `aside`, który roli okna nieść nie
+może. Wszystkie zeszły do zera na sześciu widokach z danymi i przy otwartych
+oknach. Pary barw pilnuje `Kontrast.test.ts`, okna — hak `useOkno`
+i strażnik `Okna.test.ts`.
 
 Pasek „Nowe w panelu" pomija `[wymaga działania]` i wpis 0.544.0, który
 opisywał zmiany techniczne, nie widoczne w pracy.

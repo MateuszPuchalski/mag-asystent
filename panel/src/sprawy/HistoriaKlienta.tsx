@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useHistoriaSprawy } from "../api/spoiwo";
 import { WidokHistorii } from "../skrzynka/Klient";
 import { Blad, Pusto } from "../ui";
+import { useOkno } from "../nawigacja/fokus";
 
 /* ── Historia klienta jednym kliknięciem z każdej sprawy (23 września 2026) ──
    Punkt 1 dekalogu obsługi: klient ma JEDNĄ drogę, a kolejki są nasze. Do tego
@@ -43,14 +44,14 @@ function Szuflada({ rodzaj, id, tutaj, onZamknij }: {
 }) {
   const h = useHistoriaSprawy(rodzaj, id, true);
   const nawiguj = useNavigate();
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onZamknij(); };
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, [onZamknij]);
+  /* Modalne, bo tło zasłania ekran sprawy. Skróty pod spodem działałyby
+     na sprawie, której agent w tej chwili nie widzi — w zwrotach `Z`
+     oddawało tak pieniądze (powód w `nawigacja/fokus.ts`). `div`, nie
+     `aside`: `aside` nie może nieść roli okna (axe, `aria-allowed-role`). */
+  const okno = useOkno<HTMLDivElement>({ onZamknij });
 
   return <div className="fixed inset-0 z-40 flex justify-end bg-black/20" onClick={onZamknij}>
-    <aside role="dialog" aria-label="Historia klienta" onClick={(e) => e.stopPropagation()}
+    <div role="dialog" {...okno} aria-label="Historia klienta" onClick={(e) => e.stopPropagation()}
       className="flex h-full w-full max-w-md flex-col bg-white shadow-xl">
       <header className="flex shrink-0 items-center gap-2 border-b px-4 py-3">
         <UserRound size={16} /><b className="mr-auto">Historia klienta</b>
@@ -66,6 +67,6 @@ function Szuflada({ rodzaj, id, tutaj, onZamknij }: {
           : <Pusto waga="lista" ikona={UserRound}>
               Allegro nie podało loginu kupującego, więc nie wiemy, czyja to historia.</Pusto>)}
       </div>
-    </aside>
+    </div>
   </div>;
 }

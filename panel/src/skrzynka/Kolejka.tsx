@@ -7,7 +7,7 @@ import type {
 } from "../api/typy";
 import { Blad, czas, Plakietka, Pusto } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
-import { polePisania } from "../nawigacja/fokus";
+import { klawiszZajety } from "../nawigacja/fokus";
 import { NAZWA, NAZWA_DOBORU } from "./statusy";
 import { CZESTE, KafelKategorii, PasekCopilota, ZnakCopilota, doRozpoznania, nazwaNaPlakietce } from "./Copilot";
 import { Czekanie } from "./Czekanie";
@@ -228,10 +228,11 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
 
      Strażnik jest WSPÓLNY, z `nawigacja/fokus.ts` (0.522.0). Własny nie znał
      SELECT-a, a kolejka ma dwa: „Więcej" i kolejność. Strzałka w otwartej
-     liście zmieniała wtedy naraz jej wartość i rozmowę pod kursorem. */
+     liście zmieniała wtedy naraz jej wartość i rozmowę pod kursorem.
+     Od @wydanie strażnik milczy też pod oknem modalnym (`klawiszZajety`). */
   const naKlawisz = useRef<(e: KeyboardEvent) => void>(() => {});
   naKlawisz.current = (e: KeyboardEvent) => {
-    if (polePisania(e.target)) return;
+    if (klawiszZajety(e.target)) return;
     if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
     if (e.key === "ArrowDown" || e.key === "j" || e.key === "ArrowUp" || e.key === "k") {
       if (!widoczne.length) return;
@@ -430,7 +431,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
              w prawo, więc kliknięcie w wiersz szarpało tekstem. */
           className={`flex w-full items-start gap-3 border-b border-l-[3px] px-3 py-2.5 text-left ${
             wybranaId === r.id
-              ? "border-l-wertis-amber bg-slate-200"
+              ? "wiersz-wybrany border-l-wertis-amber bg-slate-200"
               : "border-l-transparent hover:bg-slate-50"}`}>
           {/* ZNAK NA POCZĄTKU WIERSZA (23 września 2026). Kategoria, prośba
               o człowieka i podziękowanie czytają się, zanim wzrok dojdzie do

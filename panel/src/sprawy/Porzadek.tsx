@@ -133,7 +133,8 @@ export function PasekPorzadku({ porzadek, dozwolone, onZmien }: {
     </button>
     {otwarte && <>
       {/* Kliknięcie POZA menu zamyka je — bez tego menu zostaje otwarte po
-          wyborze innego przycisku i zasłania listę. */}
+          wyborze innego przycisku i zasłania listę.
+          okno: przezroczysta warstwa pod menu, sama oknem nie jest. */}
       <button type="button" aria-label="Zamknij wybór kolejności" tabIndex={-1}
         onClick={() => setOtwarte(false)} className="fixed inset-0 z-10 cursor-default" />
       <div role="menu" aria-label="Kolejność kolejki"

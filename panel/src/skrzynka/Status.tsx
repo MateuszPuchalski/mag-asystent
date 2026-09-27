@@ -3,7 +3,7 @@ import { AlarmClock, CheckCircle2, Flame, RotateCcw, Scale } from "lucide-react"
 import type { Rozmowa } from "../api/typy";
 import { KLASA_STATUSU } from "../ui";
 import { NAZWA, ZRODLO_ZAKONCZENIA } from "./statusy";
-import { polePisania, useSkrotyDzialaja } from "../nawigacja/fokus";
+import { klawiszZajety, useSkrotyDzialaja } from "../nawigacja/fokus";
 import { MenuRozmowy, WierszMenu } from "./MenuRozmowy";
 import { dzienZKalendarza, opisTerminu, poDniachRoboczych, terminyOdlozenia } from "./terminOdlozenia";
 
@@ -82,7 +82,7 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
   };
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
-      if (polePisania(e.target)) return;
+      if (klawiszZajety(e.target)) return;
       if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
       if (e.key === "z" || e.key === "Z") { e.preventDefault(); klawisz.current("z"); }
       if (e.key === "o" || e.key === "O") { e.preventDefault(); klawisz.current("o"); }
@@ -182,7 +182,7 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
       : onZakoncz && !pytam && <button type="button" disabled={zmieniaStatus}
           aria-keyshortcuts="Z" title="Zakończ rozmowę (Z)"
           onClick={() => (KLIENT_CZEKA.has(rozmowa.status) ? setPytam(true) : onZakoncz(false))}
-          className="inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+          className="inline-flex items-center gap-1 rounded bg-emerald-700 px-2 py-1 text-xs font-bold text-white hover:bg-emerald-800 disabled:opacity-50">
           <CheckCircle2 size={13} />Zakończ
           {skrotyDzialaja && <kbd aria-hidden="true" className="rounded bg-black/15 px-1 font-sans text-podpis">Z</kbd>}
         </button>}

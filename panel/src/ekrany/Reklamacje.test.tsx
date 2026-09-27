@@ -368,6 +368,29 @@ describe("Ekran reklamacji", () => {
     expect(screen.getByLabelText("Odpowiedź w sprawie")).toHaveValue("Wysyłam nowy nóż");
   });
 
+  it("okno konfliktu bierze fokus: pisanie nie idzie w szkic pod nakładką (@wydanie)", async () => {
+    /* Ctrl+Enter wysyła z pola, więc okno otwierało się z kursorem dalej
+       w polu. Pisanie szło w szkic, którego pod nakładką nie widać, a drugie
+       Ctrl+Enter próbowało wysłać znowu. Fokus startuje na POPRAW SZKIC,
+       a Escape oddaje go polu z nietkniętym szkicem. */
+    pokaz("/obsluga/reklamacje/1");
+    scena.wynikWysylki = new Konflikt("Ktoś dopisał wiadomość", {
+      lastMessageId: 7, kluczIdempotencji: "rek-1-7-ab12",
+      nowaWiadomosc: { id: 7, tresc: "Dopisuję", at: null, rola: "BUYER" },
+    });
+    const pole = screen.getByLabelText("Odpowiedź w sprawie");
+    await userEvent.type(pole, "Wysyłam nowy nóż");
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    expect(await screen.findByRole("dialog", { name: "Wysyłka zatrzymana" })).toBeInTheDocument();
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "POPRAW SZKIC" }));
+    await userEvent.keyboard("x");
+    expect(pole).toHaveValue("Wysyłam nowy nóż");
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(document.activeElement).toBe(pole);
+    expect(pole).toHaveValue("Wysyłam nowy nóż");
+  });
+
   it("„WYŚLIJ MIMO TO” jest martwy do jawnej zgody, a potem niesie flagę", async () => {
     /* Blizna 0.110.0: do niej odpowiedź szła na starą wersję pytania po cichu.
        Flaga MUSI dojechać — w skrzynce gubi ją trasa i nikt tego nie zauważył

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import kolory from "tailwindcss/colors";
 
 /* Źródła wchodzą przez `?raw`, nie przez `node:fs` — ta sama decyzja co
    w `RamaOkna.test.ts`: `tsconfig.json` zapisuje, że panel jest aplikacją
@@ -13,24 +14,28 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
    nazywało się poprawą czytelności, czyli dokładnie wtedy, gdy uwagi było
    najwięcej. Poprawka bez bramki wraca przy pierwszym pośpiechu.
 
-   CO PILNUJE — trzy pary barw, każda zmierzona, nie oszacowana:
+   CO PILNUJE — cztery pary barw, każda zmierzona, nie oszacowana:
 
      `text-slate-400` na tekście       #94A3B8 na bieli        = 2.56:1
      `text-slate-500` na `bg-slate-100` #64748B na #F1F5F9     = 4.34:1
      `text-wertis-amber` na tekście     #FF9100 na bieli        = 2.26:1
+     `text-slate-500` na zaznaczeniu    #64748B na #E2E8F0     = 3.86:1
 
    Próg dla pisma poniżej 18 px to 4.5:1, dla 24 px/700 — 3:1. Żadna z tych
-   trzech par nie przechodzi nigdzie, więc zakaz jest bezwarunkowy.
+   par nie przechodzi nigdzie, więc zakaz jest bezwarunkowy. Czwarta doszła
+   w @wydanie i pilnuje się jej inaczej — powód przy jej teście.
 
    Bursztyn jest zakazany jako PISMO, nie w ogóle: `bg-wertis-amber` pod
    `text-wertis-ink` daje 5.84:1 i zostaje barwą marki. Usterką było użycie
    barwy tła jako barwy liter.
 
-   CZEGO NIE PILNUJE. Nie liczy kontrastu. Czyta tekst źródła, więc nie wie,
+   CZEGO NIE PILNUJE. Nie liczy kontrastu tam, gdzie tło stoi gdzie indziej.
+   Liczy go tylko dla białego pisma na barwnym tle, bo ta para stoi w jednym
+   łańcuchu klas (@wydanie). Poza tym czyta tekst źródła, więc nie wie,
    na jakim tle element naprawdę wyląduje — tło bierze się z rodzica albo
-   z `@apply` w `index.css`. Zna trzy konkretne złe pary i tyle: nie wykryje
+   z `@apply` w `index.css`. Zna cztery konkretne złe pary i tyle: nie wykryje
    nowej złej barwy ani złego zestawienia, którego nie ma na liście. Zielony
-   wynik NIE znaczy „panel przechodzi WCAG"; znaczy, że te trzy nie wróciły.
+   wynik NIE znaczy „panel przechodzi WCAG"; znaczy, że te cztery nie wróciły.
    Prawdziwy pomiar robi się w przeglądarce, po złożeniu alfy przez cały stos
    tła — audyt pokazał dwa razy pod rząd, że bez tego wyniki są bzdurą.
 
@@ -44,6 +49,17 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
 
 /** Powód zwolnienia — co najmniej trzy wyrazy po dwukropku. */
 const ZWOLNIENIE = /kontrast:\s*\S+(?:\s+\S+){2,}/;
+
+/** Kontrast WCAG dwóch barw `#rrggbb` — wzór luminancji względnej z WCAG 2.2. */
+function kontrast(a: string, b: string): number {
+  const lum = (hex: string) => {
+    const [r, g, bl] = (hex.replace("#", "").match(/../g) ?? []).map((x) => parseInt(x, 16) / 255)
+      .map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+    return 0.2126 * r + 0.7152 * g + 0.0722 * bl;
+  };
+  const [jasna, ciemna] = [lum(a), lum(b)].sort((x, y) => y - x);
+  return (jasna + 0.05) / (ciemna + 0.05);
+}
 
 /**
  * Ikona nie niesie pisma i nie podlega progowi 4.5:1. Rozpoznajemy ją po
@@ -103,7 +119,7 @@ function znajdz(wzorzec: RegExp, { pomijajIkony = false } = {}): string[] {
   return trafienia;
 }
 
-describe("Czytelność: trzy pary barw, które nie przechodzą nigdzie", () => {
+describe("Czytelność: cztery pary barw, które nie przechodzą nigdzie", () => {
   it("`text-slate-400` nie niesie tekstu — 2.56:1 przy progu 4.5", () => {
     /* Na ikonie ta klasa zostaje: ikona nie ma progu dla pisma. Na tekście
        jest zakazana, bo wyciszenie poniżej czytelności to już nie wyciszenie,
@@ -126,6 +142,49 @@ describe("Czytelność: trzy pary barw, które nie przechodzą nigdzie", () => {
     /* 2.26:1 przy 24 px i wadze 700, przy progu 3:1. `bg-wertis-amber` pod
        ciemnym pismem daje 5.84:1 i zostaje — zakaz dotyczy wyłącznie liter. */
     expect(znajdz(/text-wertis-amber/)).toEqual([]);
+  });
+
+  it("białe pismo na barwnym tle ma 4.5:1 — liczone z palety, nie z listy", () => {
+    /* Tu strażnik LICZY (@wydanie), bo para stoi w jednym łańcuchu klas
+       i nic nie trzeba zgadywać o rodzicu. Przycisk „Zakończ” w skrzynce
+       miał biel na `emerald-600`, 3.77:1, razem z dwoma innymi zielonymi.
+       Zmierzone axe w Chromium przy otwartej rozmowie. Lista par przegapiłaby
+       następną barwę; paleta Tailwinda jej nie przegapi. `hover:` pomijamy,
+       bo to stan najechania, a nie tło, na którym pismo spoczywa. */
+    const winne: string[] = [];
+    for (const [plik, zrodlo] of Object.entries(ZRODLA)) {
+      const surowe = zrodlo.split("\n");
+      bezKomentarzy(zrodlo).split("\n").forEach((l, i) => {
+        for (const lancuch of l.match(/["`][^"`]*["`]/g) ?? []) {
+          if (!/\btext-white\b/.test(lancuch)) continue;
+          for (const m of lancuch.matchAll(/(?<![:\w-])bg-([a-z]+)-(\d{2,3})\b/g)) {
+            const hex = (kolory as unknown as Record<string, Record<string, string> | undefined>)[m[1]]?.[m[2]];
+            if (!hex) continue;
+            const k = kontrast("#ffffff", hex);
+            if (k >= 4.5) continue;
+            if (surowe.slice(Math.max(0, i - 6), i + 1).some((x) => ZWOLNIENIE.test(x))) continue;
+            winne.push(`${plik}:${i + 1} → bg-${m[1]}-${m[2]} ${k.toFixed(2)}:1`);
+          }
+        }
+      });
+    }
+    expect(winne).toEqual([]);
+  });
+
+  it("zaznaczenie `bg-slate-200` niesie `wiersz-wybrany` — `slate-500` daje na nim 3.86:1", () => {
+    /* Czwarta para (@wydanie), zmierzona axe w Chromium na zwrocie z danymi.
+       Tło zaznaczenia stoi na rodzicu, podpisy kilkadziesiąt linii niżej,
+       więc strażnik źródła pary nie zobaczy. Pilnuje więc klasy, pod którą
+       `index.css` przyciemnia szarość. Kolejka bez niej wraca do 3.86:1. */
+    const winne: string[] = [];
+    for (const [plik, zrodlo] of Object.entries(ZRODLA)) {
+      bezKomentarzy(zrodlo).split("\n").forEach((l, i) => {
+        if (!/border-l-wertis-amber/.test(l) || !/(?<!hover:)bg-slate-200/.test(l)) return;
+        if (/wiersz-wybrany/.test(l)) return;
+        winne.push(`${plik}:${i + 1} → ${l.trim().slice(0, 72)}`);
+      });
+    }
+    expect(winne).toEqual([]);
   });
 });
 

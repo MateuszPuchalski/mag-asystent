@@ -13,6 +13,7 @@ import {
 } from "../dostawy/Kolejka";
 import { Dokument, WyjatkiLuzem } from "../dostawy/Dokument";
 import { Kontekst } from "../dostawy/Kontekst";
+import { useOkno } from "../nawigacja/fokus";
 
 /** Kubełki do przeglądania — stoją pod „Więcej”, nie na wierzchu (0.526.0). */
 const WIECEJ_DOSTAW: ReadonlyArray<KubelekDostaw> = ["zamkniete", "poza", "archiwum"];
@@ -157,12 +158,6 @@ export function Dostawy() {
   /* Zmiana sprawy czyści zdania o porażkach poprzedniej — błąd przy innej
      fakturze, który stoi dalej na ekranie, mówiłby nieprawdę o tej. */
   useEffect(() => { setBladRozwiaz(""); setBladNotatki(""); setBladPoza(""); }, [id]);
-  useEffect(() => {
-    if (!lupa) return;
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setLupa(null); };
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, [lupa]);
 
   const propsRozwiaz = {
     trwa: rozwiaz.isPending, blad: bladRozwiaz,
@@ -295,9 +290,19 @@ export function Dostawy() {
     {/* Powiększenie dowodu: „czy to TA część" przy kartotekach różniących się
         końcówką nazwy nie rozstrzyga się na miniaturze (0.205.0). Zamyka
         KAŻDE kliknięcie i Escape — tak jak w biurze. */}
-    {lupa && <button type="button" onClick={() => setLupa(null)} aria-label="Zamknij powiększenie"
-      className="fixed inset-0 z-30 grid place-items-center bg-black/70 p-8">
-      <img src={lupa} alt="Zdjęcie z hali — powiększenie" className="max-h-full max-w-full rounded-lg" />
-    </button>}
+    {lupa && <Lupa src={lupa} onZamknij={() => setLupa(null)} />}
+  </div>;
+}
+
+/* Lupa jest oknem od @wydanie, nie gołym przyciskiem na cały ekran. Fokus
+   zostawał na miniaturze pod spodem, więc Tab szedł po niewidocznej stronie.
+   Przycisk zostaje w środku: zamyka KAŻDE kliknięcie, Enter i Escape. */
+function Lupa({ src, onZamknij }: { src: string; onZamknij: () => void }) {
+  const okno = useOkno<HTMLDivElement>({ onZamknij });
+  return <div role="dialog" {...okno} aria-label="Zdjęcie z hali — powiększenie" className="fixed inset-0 z-30">
+    <button type="button" onClick={onZamknij} aria-label="Zamknij powiększenie" data-fokus-startowy
+      className="grid h-full w-full place-items-center bg-black/70 p-8">
+      <img src={src} alt="Zdjęcie z hali — powiększenie" className="max-h-full max-w-full rounded-lg" />
+    </button>
   </div>;
 }

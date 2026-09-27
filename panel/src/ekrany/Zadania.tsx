@@ -11,6 +11,7 @@ import { Kafel } from "../towar/Kafel";
 import type { Zadanie, ZalacznikZadania } from "../api/typy";
 import { useZdjecieZadania } from "../towar/useZdjecie";
 import { PrzyciskTowaru } from "../towar/Szuflada";
+import { useOkno } from "../nawigacja/fokus";
 
 /** Napis odnośnika po drugim członie adresu sprawy (`/obsluga/<to>/<id>`). */
 const NAZWA_ZRODLA: Record<string, string> = {
@@ -35,13 +36,21 @@ function NoweZadanie({ zamknij }: { zamknij: () => void }) {
     defaultValues: { rodzaj: "pomiar", priorytet: "normalny", tytul: "", instrukcja: "" },
   });
   const komunikat = Object.values(formState.errors)[0]?.message;
+  /* OKNO OD @wydanie: bez roli, bez Escape i bez fokusu w środku. Fokus
+     startuje w tytule, bo rodzaj i priorytet mają wartości domyślne.
+     Escape zamyka tylko NIETKNIĘTY formularz. Wpisana instrukcja dla hali
+     to praca, której Escape z rozpędu nie ma prawa wyrzucić; od tego jest
+     „Anuluj". */
+  const okno = useOkno<HTMLDivElement>({
+    onZamknij: formState.isDirty || towar !== null ? undefined : zamknij });
 
-  return <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
+  return <div role="dialog" {...okno} aria-labelledby="nowe-zadanie-tytul"
+    className="fixed inset-0 z-50 grid place-items-center bg-black/40 p-4">
     <form className="card w-full max-w-xl p-6" onSubmit={handleSubmit((d) =>
       zapisz.mutate({ ...d, twId: towar ? towar.id : null },
         { onSuccess: zamknij, onError: (e) => setBlad((e as Error).message) }))}>
       <div className="mb-5 flex items-center justify-between">
-        <h2 className="text-naglowek font-bold">Nowe zadanie dla magazynu</h2>
+        <h2 id="nowe-zadanie-tytul" className="text-naglowek font-bold">Nowe zadanie dla magazynu</h2>
         <button type="button" onClick={zamknij} className="text-slate-500" aria-label="Zamknij">✕</button>
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
@@ -56,7 +65,8 @@ function NoweZadanie({ zamknij }: { zamknij: () => void }) {
           </select></label>
       </div>
       <label className="mt-4 block text-sm font-semibold">Tytuł
-        <input className="field mt-1" placeholder="Np. zmierz rozstaw otworów" {...register("tytul")} /></label>
+        <input className="field mt-1" placeholder="Np. zmierz rozstaw otworów" data-fokus-startowy
+          {...register("tytul")} /></label>
       <label className="mt-4 block text-sm font-semibold">Instrukcja
         <textarea className="field mt-1 min-h-28" placeholder="Co i jak zmierzyć; podaj jednostkę."
           {...register("instrukcja")} /></label>

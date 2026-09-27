@@ -26,7 +26,7 @@ import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { OKNO_COFNIECIA_MS, Odlozone, nastepnaRozmowa, type Odlozona } from "../skrzynka/Odlozone";
 import { Cofniecie, type DoCofniecia } from "../skrzynka/Cofniecie";
-import { polePisania } from "../nawigacja/fokus";
+import { klawiszZajety } from "../nawigacja/fokus";
 import { useSygnaly } from "../skrzynka/Sygnaly";
 import { useZglosPominiecie } from "../api/wglad";
 import { pamietanySzkic, zapamietajSzkic } from "../sprawy/useSzkicSprawy";
@@ -523,7 +523,7 @@ export function Skrzynka() {
   skrot.current = { popraw: poprawSzkicem, odrzuc: odrzucSzkic, widoczna: kartaWidoczna };
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
-      if (polePisania(e.target)) return;
+      if (klawiszZajety(e.target)) return;
       if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing || !skrot.current.widoczna) return;
       if (e.key === "e" || e.key === "E") { e.preventDefault(); skrot.current.popraw(); }
       if (e.key === "r" || e.key === "R") { e.preventDefault(); skrot.current.odrzuc(); }

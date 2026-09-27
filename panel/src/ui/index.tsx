@@ -485,7 +485,7 @@ export function WierszKolejki({ aktywny, onKlik, children }: {
   return <li>
     <button ref={ref} aria-current={aktywny ? "true" : undefined} onClick={onKlik}
       className={`flex w-full flex-col border-l-[3px] px-4 py-2 text-left ${aktywny
-        ? "border-l-wertis-amber bg-slate-200"
+        ? "wiersz-wybrany border-l-wertis-amber bg-slate-200"
         : "border-l-transparent hover:bg-slate-50"}`}>
       {children}
     </button>
@@ -562,12 +562,16 @@ function useKopiowanie(tekst: string) {
  *
  * `title` mówi, co się stanie PRZED kliknięciem; `sr-only` mówi, co się stało
  * PO nim. Bez tego drugiego czytnik ekranu milczy o skutku.
+ *
+ * `min-h-6` (@wydanie): 24 px to próg WCAG 2.2 dla celu (2.5.8). Przycisk
+ * miał 20 px i stał za blisko „profilu" i „Historii" — zmierzone axe
+ * w Chromium na nagłówku zwrotu.
  */
 export function LoginKlienta({ login, className = "" }: { login: string; className?: string }) {
   const { stan, kopiuj } = useKopiowanie(login);
   return <button type="button" onClick={kopiuj}
     title={stan === "blad" ? "Nie udało się skopiować" : `Kopiuj login: ${login}`}
-    className={`group inline-flex max-w-full items-center gap-1 rounded hover:bg-slate-100 ${
+    className={`group inline-flex min-h-6 max-w-full items-center gap-1 rounded hover:bg-slate-100 ${
       stan === "blad" ? "text-ranga-zle" : ""} ${className}`}>
     <span className="truncate">{login}</span>
     {stan === "zrobione"
