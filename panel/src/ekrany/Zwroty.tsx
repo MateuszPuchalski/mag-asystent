@@ -28,6 +28,7 @@ import { polecanyKandydat } from "../zwroty/Dokument";
 import { SzybkiZwrot } from "../zwroty/SzybkiZwrot";
 import { NieOdeslany, POWOD_NIE_ODESLAL } from "../zwroty/NieOdeslany";
 import { pewnaPropozycja, szybkaSciezka } from "../zwroty/regulaSzybkiej";
+import { SITA_DECYZJI, sitoDecyzji, type SitoDecyzji } from "../zwroty/sita";
 import { Szukanie } from "../zwroty/Szukanie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
@@ -376,6 +377,8 @@ export function Zwroty() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const [kubelek, setKubelek] = useState<Kubelek | null>("decyzja");
+  /* Sito DO DECYZJI (@wydanie); `null` = cały kubełek. Powód w `zwroty/sita.ts`. */
+  const [sito, setSito] = useState<SitoDecyzji | null>(null);
   const werdykt = useWerdykt();
   const ocena2 = useOcena();
   const kwota = useKwota();
@@ -451,8 +454,16 @@ export function Zwroty() {
      i `sprawy/Tagi.tsx` stoją nietknięte. Zeszło UŻYCIE, nie komponent. */
   const wKubelku = useMemo(() => kubelek === null
     ? (data?.zwroty ?? [])
-    : (data?.zwroty ?? []).filter((z) => z.kubelek === kubelek),
-  [data, kubelek]);
+    : (data?.zwroty ?? []).filter((z) => z.kubelek === kubelek
+      && (kubelek !== "decyzja" || sito === null || sitoDecyzji(z) === sito)),
+  [data, kubelek, sito]);
+  /* Liczniki sit z CAŁEGO kubełka, nie z listy po sicie — inaczej wybór
+     jednego sita zerowałby liczby pozostałych. */
+  const ileWSicie = useMemo(() => {
+    const ile: Record<SitoDecyzji, number> = { doreczone: 0, w_drodze: 0, bez_skanu: 0, nie_odeslal: 0 };
+    for (const z of data?.zwroty ?? []) if (z.kubelek === "decyzja") ile[sitoDecyzji(z)]++;
+    return ile;
+  }, [data]);
 
   const skan = useSkanZwrotu();
   const dociagnij = useDociagnijPoSkanie();
@@ -633,6 +644,8 @@ export function Zwroty() {
      a nie pustą listę. Adres jest tu źródłem prawdy, kubełek za nim idzie. */
   useEffect(() => {
     if (zwrot && kubelek !== null && zwrot.kubelek !== kubelek) setKubelek(zwrot.kubelek);
+    /* Ta sama zasada dla sita: zwrot z adresu ma stać na liście, którą widać. */
+    if (zwrot?.kubelek === "decyzja" && sito !== null && sitoDecyzji(zwrot) !== sito) setSito(null);
   }, [zwrot?.id]);
 
   /**
@@ -671,6 +684,9 @@ export function Zwroty() {
    */
   const przelacz = (k: Kubelek | null) => {
     setKubelek(k);
+    /* Kubełek zaczyna się bez sita — sito wybrane tydzień temu chowałoby
+       część kubełka bez widocznego powodu. */
+    setSito(null);
     /* Kliknięcie w kubełek jest prośbą o TEN kubełek, więc zdejmuje filtr.
        Inaczej przełącznik wyglądałby na zepsuty: lista zostawałaby ta sama. */
     setFraza("");
@@ -1190,8 +1206,27 @@ export function Zwroty() {
           po ich zdjęciu pasmo niesie jedno zdanie i milczy przy szukaniu
           oraz w zakładce WSZYSTKIE, gdzie pytania nie ma. */}
       {!pasujace && kubelek !== null &&
-        <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-2 py-1">
-          <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
+        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1">
+          <span className="mr-1 text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
+          {/* SITA W PAŚMIE PYTANIA (@wydanie), nie w rzędzie kubełków: dzielą
+              jeden kubełek, więc stoją tam, gdzie widać, który. Kliknięcie
+              przestawia kursor na pierwszy zwrot sita — powód przy `przelacz`. */}
+          {kubelek === "decyzja" &&
+            <FiltrSegmentowy<SitoDecyzji | null> wybrany={sito}
+              onWybierz={(s) => {
+                setSito(s);
+                const pierwszy = (data?.zwroty ?? []).find((z) => z.kubelek === "decyzja"
+                  && (s === null || sitoDecyzji(z) === s));
+                nawiguj(pierwszy ? `/obsluga/zwroty/${pierwszy.id}` : "/obsluga/zwroty");
+              }}
+              pozycje={[
+                /* Suma sit, nie licznik serwera: cztery liczby obok mają się
+                   do niej dodawać co do sztuki. */
+                { klucz: null, etykieta: "wszystkie",
+                  ile: Object.values(ileWSicie).reduce((a, b) => a + b, 0) },
+                ...SITA_DECYZJI.map((s) => ({ klucz: s.id, etykieta: s.etykieta,
+                  ile: ileWSicie[s.id], podpowiedz: s.podpowiedz })),
+              ]} />}
         </div>}
       {/* Aktywna grupa rozjazdów w miejscu pytania kubełka (@wydanie) — lista
           mówi, dlaczego jest krótsza, i ma wyjście jednym kliknięciem. */}
