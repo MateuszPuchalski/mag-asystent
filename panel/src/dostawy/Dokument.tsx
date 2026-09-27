@@ -63,7 +63,7 @@ const CZEKA_NA_BIURO = { slowo: "rozłożona · czeka na biuro", klasa: "bg-ambe
 const otwarteNajpierw = (lista: WyjatekHali[]) =>
   [...lista].sort((a, b) => Number(a.resolvedAt != null) - Number(b.resolvedAt != null));
 
-/* POZYCJĘ Z WYJĄTKIEM ROZPOZNAJE ZGŁOSZENIE, NIE STATUS (@wydanie). Podział
+/* POZYCJĘ Z WYJĄTKIEM ROZPOZNAJE ZGŁOSZENIE, NIE STATUS (0.538.1). Podział
    szedł po `status === "problem"`, a dwie drogi serwera zostawiają otwarty
    wyjątek przy pozycji `done`. Pierwsza to nadmiar zgłaszany przy ZAKOŃCZ
    (`zachowajStatusLinii`). Druga to odłożenie reszty sztuk po zgłoszeniu,
