@@ -44,6 +44,9 @@ z co najmniej trzema wyrazami powodu. Odmowa strażnika zwykle znaczy, że
   test. *Strażnik: `src/test/dostepnosc.ts`.*
 - **Kolumna bez napisu dostaje nazwę dla czytnika:** `{ ukryty: "Działania" }`
   w `Tabela`, nie pusty napis.
+- **Nic nie wychodzi za kadr przy powiększeniu 200%** (WCAG 1.4.4). Element
+  z `shrink-0` szerszy niż 640 px wypycha stronę w bok. Nazwy zakładek
+  chowają się poniżej 900 px (`max-[899px]:sr-only`).
 - **Kontrastu i fokusu jsdom nie widzi.** Zmieniając barwy albo układ,
   zmierz w przeglądarce: `node tools/audyt-dostepnosci.mjs <katalog>` przy
   działającym serwerze i panelu. Cel: zero naruszeń na każdym ekranie.

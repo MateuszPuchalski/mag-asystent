@@ -133,6 +133,18 @@ describe("nagłówek w jednym rzędzie", () => {
     expect(tsx).toContain("<Wiecej wyloguj={wyloguj} />");
   });
 
+  it("przy powiększeniu 200% zakładki nie wychodzą za kadr", () => {
+    /* Bieżnia z `shrink-0` była przy 640 px CSS o 180 px szersza od okna
+       (@wydanie). jsdom nie liczy układu, więc strażnik pilnuje obu przyczyn:
+       bieżnia może się zwęzić i zawinąć, a nazwa zakładki chowa się poniżej
+       900 px, zostając dla czytnika ekranu. */
+    const bieznia = tsx.slice(tsx.indexOf('<nav aria-label="Praca"'), tsx.indexOf("</nav>"));
+    expect(bieznia).toContain('className="flex min-w-0 flex-wrap');
+    expect(bieznia).not.toContain("shrink-0 rounded-lg");
+    expect(bieznia).toContain('<span className="max-[899px]:sr-only">{z.etykieta}</span>');
+    expect(bieznia).toContain("title={z.etykieta}");
+  });
+
   it("Dostawy są ósmą zakładką pracy, za kreską", () => {
     const zakladki = tsx.slice(tsx.indexOf("const ZAKLADKI"), tsx.indexOf("\n];", tsx.indexOf("const ZAKLADKI")));
     expect(zakladki.match(/\{ do: "/g)).toHaveLength(8);

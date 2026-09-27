@@ -1,6 +1,6 @@
 ---
 rodzaj: minor
-tytul: pusta kolumna w jednym miejscu, uczciwa kropka synchronizacji, zero naruszeń WCAG
+tytul: pusta kolumna w jednym miejscu, zakładki przy powiększeniu, zero naruszeń WCAG
 ---
 
 **Pusta kolumna mówi w jednym miejscu.** Ikona i zdanie „Wybierz dostawę
@@ -10,6 +10,11 @@ połowie, a zdanie trzysta pikseli niżej, w skrzynce, dostawach i koszach.
 **Szara kropka przed pierwszą synchronizacją.** Kropka w nagłówku świeciła
 na zielono przy kresce zamiast godziny, choć synchronizacja nie odbyła się
 ani razu. Teraz jest szara, a dymek mówi to zdaniem.
+
+**Powiększenie 200% nie chowa zakładek.** Przy powiększonym ekranie zakładki
+„Zadania" i „Dostawy" wychodziły za prawą krawędź, a strona przewijała się
+w bok. Poniżej 900 px zakładka pokazuje samą ikonę z licznikiem, a nazwę
+w dymku. Przy zwykłej szerokości nic się nie zmienia.
 
 **Podpowiedź w szukaniu skrzynki mieści się w polu.** Pole pokazywało
 „Szukaj: login, treść, prc". Teraz widać całe „Login, treść, prowadzący".
