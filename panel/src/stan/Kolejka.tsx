@@ -39,9 +39,17 @@ export function KartaKolejki() {
   const [wynik, setWynik] = useState("");
   const [blad, setBlad] = useState("");
   const s = kolejka.data?.summary;
+  const [zapisane, setZapisane] = useState(false);
   /* Najpierw błędy, potem reszta, najwyżej dwadzieścia wierszy: to podgląd
-     stanu, a nie pełna kolejka — ta ma sto pozycji i nikt jej nie przewija. */
-  const wiersze = [...(kolejka.data?.items ?? [])]
+     stanu, a nie pełna kolejka — ta ma sto pozycji i nikt jej nie przewija.
+
+     „ZAPISANE" POD PRZYCISKIEM (0.538.0). Karta stała na dwudziestu
+     wierszach „zapisane", a ruchu wymagają tylko błąd i oczekujące. Lista
+     zapisanych zostaje jednym kliknięciem dalej, bo po nią sięga się, gdy
+     hala pyta „czy moja lokalizacja weszła". */
+  const wszystkie = kolejka.data?.items ?? [];
+  const ileZapisanych = wszystkie.filter((z) => z.status === "done").length;
+  const wiersze = [...wszystkie].filter((z) => zapisane || z.status !== "done")
     .sort((a, b) => (a.status === "error" ? 0 : 1) - (b.status === "error" ? 0 : 1)).slice(0, 20);
 
   const rusz = (z: ZadanieKolejki, r: "retry" | "cancel") => {
@@ -62,7 +70,8 @@ export function KartaKolejki() {
     {wynik && <p className="mt-3 text-sm text-ranga-ok">{wynik}</p>}
     <Blad>{blad || kolejka.error?.message}</Blad>
     <div className="mt-4">
-      <Tabela naglowki={["Godz.", "Zadanie", "Szczegół", "Status", ""]} pusto="Kolejka pusta — wszystko zapisane.">
+      <Tabela naglowki={["Godz.", "Zadanie", "Szczegół", "Status", ""]}
+        pusto={ileZapisanych ? "Nic nie czeka i nic nie stoi w błędzie." : "Kolejka pusta — wszystko zapisane."}>
         {wiersze.map((z) => <tr key={z.id}>
           <Td className="tabular-nums text-slate-600">{z.time}</Td>
           <Td className="font-semibold">{z.label}</Td>
@@ -78,6 +87,9 @@ export function KartaKolejki() {
           </Td>
         </tr>)}
       </Tabela>
+      {ileZapisanych > 0 && <button type="button" onClick={() => setZapisane((z) => !z)} aria-expanded={zapisane}
+        className="mt-2 text-sm font-semibold text-slate-700 underline-offset-2 hover:underline">
+        {zapisane ? "Schowaj zapisane" : `Pokaż zapisane (${ileZapisanych})`}</button>}
     </div>
   </KartaWgladu>;
 }

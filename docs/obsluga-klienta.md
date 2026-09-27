@@ -395,6 +395,22 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > spraw. Jedno odstępstwo od planu: zapas danych firmy z przeglądarki
 > ZOSTAJE. Biuro może przeskoczyć 0.444.0 przy aktualizacji, a wtedy nikt
 > nie kliknął „Przenieś na serwer".
+>
+> **Nagłówek w jednym rzędzie (0.538.0, decyzja właściciela z 27 września
+> 2026).** Podział „praca na górnym rzędzie, wgląd na dolnym" zostaje jako
+> podział treści, ale nie jako dwa rzędy. Praca to zakładki, a wgląd,
+> ustawienia i wyjście stoją w menu „Więcej" na końcu rzędu. Dolny rząd
+> kosztował ~50 px wysokości na każdym ekranie pracy za rzeczy otwierane
+> kilka razy w miesiącu. Dostawy są ósmą zakładką, za kreską, bo przyjęcie
+> dostawy to praca dzienna. Szukanie zostało samą lupą, a pigułka
+> synchronizacji kropką z godziną; w alarmie pisze „Stanęła".
+>
+> Zmierzone w Chromium na zasianym serwerze, przy 1180 px. Nagłówek ma
+> 65 px zamiast 117 px. Z godziną synchronizacji i licznikami „6" i „12"
+> rząd ma 55 px luzu. Alarm „Stanęła" mieści się z luzem 23 px, a etykieta
+> „DEV" równo na styk. Drugi rząd daje dopiero „DEV" razem z alarmem albo
+> plakietka spóźnień. To cena świadoma: `flex-wrap` z 0.233.0 zostaje, bo
+> menu niesie wylogowanie. Makiety wariantów leżą w artefakcie projektu.
 
 ### 8. Kiedy nowa obsługa jest gotowa?
 
