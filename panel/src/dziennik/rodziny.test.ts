@@ -26,11 +26,20 @@ describe("filtr dziennika liczy dobę LOKALNĄ (0.440.0)", () => {
   });
 
   it("puste pola nie trafiają do zapytania, limit zawsze", () => {
-    expect(paramyDziennika(FILTR_PUSTY)).toBe("limit=100");
+    expect(paramyDziennika({ ...FILTR_PUSTY, techniczne: true })).toBe("limit=100");
     const p = new URLSearchParams(paramyDziennika({ ...FILTR_PUSTY, od: "2026-09-22", device: " KOL-03 ", userRef: "7" }));
     expect(p.get("od")).toBe(new Date(2026, 8, 22).toISOString());
     expect(p.get("device")).toBe("KOL-03");
     expect(p.get("userRef")).toBe("7");
     expect(p.has("do")).toBe(false);
+  });
+
+  /* Pomiary techniczne schowane domyślnie (@wydanie), ale nie wtedy, gdy
+     ktoś wybrał konkretny typ — wtedy chce zobaczyć właśnie jego. */
+  it("pomiary techniczne odpadają domyślnie, a wybrany typ je przywraca", () => {
+    const bez = new URLSearchParams(paramyDziennika(FILTR_PUSTY)).get("bez")!;
+    expect(bez.split(",")).toContain("scan_timing");
+    expect(new URLSearchParams(paramyDziennika({ ...FILTR_PUSTY, typ: "scan_timing" })).has("bez")).toBe(false);
+    expect(new URLSearchParams(paramyDziennika({ ...FILTR_PUSTY, techniczne: true })).has("bez")).toBe(false);
   });
 });

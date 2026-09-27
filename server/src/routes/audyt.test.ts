@@ -136,6 +136,20 @@ test("filtr po typie i po urządzeniu", async () => {
   assert.equal((await get("/api/events?typ=scan,queue_failed", token)).json().wpisy.length, 3);
 });
 
+test("`bez` wyklucza typy z listy i z licznika `razem` (@wydanie)", async () => {
+  /* Panel chowa nim pomiary techniczne. Licznik musi liczyć to samo co
+     lista, inaczej „pokazano 40 z 120" obiecuje wiersze, których nie ma. */
+  const { token } = zalogowany("biuro");
+  zdarzenie({ typ: "scan" });
+  zdarzenie({ typ: "scan_timing" });
+  zdarzenie({ typ: "czasy_zadan" });
+  const b = (await get("/api/events?bez=scan_timing,czasy_zadan", token)).json();
+  assert.deepEqual(b.wpisy.map((w: { typ: string }) => w.typ), ["scan"]);
+  assert.equal(b.razem, 1);
+  /* Lista typów do wyboru zostaje pełna — wykluczenie to widok, nie wiedza. */
+  assert.ok(b.typy.includes("scan_timing"));
+});
+
 test("`razem` liczy WSZYSTKIE pasujące, nie długość strony", async () => {
   // bez tego czytelnik widzi 2 wiersze i nie wie, czy to komplet
   const { token } = zalogowany("biuro");
