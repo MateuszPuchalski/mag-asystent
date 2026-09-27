@@ -3,8 +3,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
-import { stanZHistorii, uzupelnijDoreczenia } from "./allegro-tracking.js";
+import { odpytajTracking, stanZHistorii, uzupelnijDoreczenia } from "./allegro-tracking.js";
 import { TRACKING_NA_ZADANIE, urlTrackingu } from "../adapters/allegro.http.js";
+import { BladLimituAllegro } from "../adapters/allegro.js";
 
 /* ── Kiedy paczka zwrotna do nas dotarła (0.187.0) ───────────────────────────
    Do 0.186.0 panel twierdził, że „Allegro nie podaje daty doręczenia do nas".
@@ -123,4 +124,42 @@ test("partie idą PO PRZEWOŹNIKU i po dwadzieścia numerów", async () => {
   assert.equal(adresy.length, 3, "21 InPostów to dwie partie, DPD to trzecia");
   assert.equal(adresy.filter((u) => u.includes("/INPOST/")).length, 2);
   assert.equal(adresy.filter((u) => u.includes("/DPD/")).length, 1);
+});
+
+/* ── Wspólne odpytanie dla zwrotów i dosyłki (@wydanie) ──────────────────────
+   Jedna droga do końcówki trackingu, dwie polityki przy 429: zwroty idą
+   dalej jak przed wydzieleniem, dosyłka oddaje limit taktowi. */
+
+test("odpytanie oddaje stan po numerze; partia, która padła, nie ma wpisu", async () => {
+  const stany = await odpytajTracking(async (u) => {
+    if (u.includes("/DPD/")) throw new Error("503");
+    return { waybills: [historia([{ occurredAt: "2026-08-24T10:41:00Z", code: "DELIVERED" }]),
+      { waybill: "AD2", trackingDetails: null }] };
+  }, "https://api", [{ carrierId: "INPOST", waybill: "AD1" }, { carrierId: "INPOST", waybill: "AD2" },
+    { carrierId: "DPD", waybill: "D1" }]);
+  assert.deepEqual(stany.get("AD1"), { dostarczonoAt: "2026-08-24T10:41:00Z", status: "DELIVERED" });
+  assert.deepEqual(stany.get("AD2"), { dostarczonoAt: null, status: null },
+    "„przewoźnik nic nie wie” to wpis — pytanie doszło");
+  assert.equal(stany.has("D1"), false, "„nie udało się zapytać” to brak wpisu");
+});
+
+test("429: zwroty idą dalej, dosyłka oddaje limit wyżej", async () => {
+  const paczki = [{ carrierId: "INPOST", waybill: "AD1" }, { carrierId: "DPD", waybill: "D1" }];
+  const adresy: string[] = [];
+  const query = async (u: string) => {
+    adresy.push(u);
+    if (u.includes("/INPOST/")) throw new BladLimituAllegro("limit", 900_000);
+    return { waybills: [] };
+  };
+  const stany = await odpytajTracking(query, "https://api", paczki);
+  assert.deepEqual([adresy.length, stany.has("D1")], [2, true], "bez flagi — jak przed wydzieleniem");
+  adresy.length = 0;
+  await assert.rejects(odpytajTracking(query, "https://api", paczki, { limitWyzej: true }), BladLimituAllegro);
+  assert.equal(adresy.length, 1, "po limicie dalsze partie tylko przedłużałyby blokadę");
+
+  /* Zwroty z 429 w środku przebiegu: przebieg się nie wywraca. */
+  const d = stanowisko();
+  const id = Number((d.prepare("SELECT id FROM zwrot_klienta").get() as { id: number }).id);
+  assert.equal(await uzupelnijDoreczenia(d, [{ zwrotId: id, carrierId: "INPOST", waybill: "AD1" }],
+    { apiUrl: "https://api", query }), 0);
 });

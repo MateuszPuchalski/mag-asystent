@@ -1,9 +1,9 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
-import type { HistoriaKlienta, MaszynaKlienta, SprawaKlienta, WpisHistorii } from "./typy";
+import type { DosylkaSprawy, HistoriaKlienta, MaszynaKlienta, SprawaKlienta, WpisHistorii } from "./typy";
 
-export type { NoweZdarzenie, SprawaKlienta } from "./typy";
+export type { DosylkaSprawy, NoweZdarzenie, SprawaKlienta } from "./typy";
 
 /* ── Ponad kolejkami (23 września 2026) ─────────────────────────────────────
    Kształty z `server/src/services/szukaj-wszedzie.ts` i `klient-historia.ts`.
@@ -75,6 +75,24 @@ export interface ProfilKlienta {
   sprawa: SprawaKlienta | null;
   /** Nic nie czeka w kolejkach, a dzień kroku nadszedł — liczy serwer. */
   podpowiedzZakonczenia: boolean;
+  /**
+   * DLACZEGO podpowiedź stoi (@wydanie). Doręczona dosyłka to drugi powód
+   * obok terminu kroku, a każdy mówi agentowi co innego. Wartość logiczna
+   * wyżej zostaje, bo starsza karta czyta tylko ją.
+   */
+  podpowiedzPowod: "termin" | "dosylka" | null;
+  /**
+   * Odmowa wypłaty z kodem dosyłki, której nikt nie śledzi (@wydanie). To
+   * droga ZAPASOWA: zwykle śledzenie zakłada sama odmowa na ekranie zwrotu.
+   * Tu trafia odmowa, przy której zapis u nas się nie udał, i kod złożony
+   * poza panelem, który przyszedł synchronizacją.
+   */
+  propozycjaDosylki: {
+    zwrotId: number; zamowienie: string; kod: "NEW_ITEM_SENT" | "MISSING_PART_SENT";
+    odmowaAt: string | null;
+  } | null;
+  /** Identyfikatory przewoźników znane z naszej bazy — lista w formularzu numeru dosyłki. */
+  przewoznicy: string[];
 }
 
 const kluczProfilu = (login: string) => ["profil-klienta", login.toLowerCase()] as const;
@@ -135,8 +153,12 @@ export type OdpowiedzSprawy = { sprawa: SprawaKlienta };
  * Bez tego `isPending` gasło przed odświeżeniem, a karta rysowała starą
  * sprawę z czynnymi przyciskami. Drugie kliknięcie szło ze starą wersją
  * i dostawało 409 po udanym przejęciu — jak przy notatce wyżej, która czeka.
+ *
+ * EKSPORT dla ekranu zwrotów (@wydanie). Odmowa wypłaty z kodem dosyłki
+ * zmienia sprawę klienta, a szuflada historii przy tym samym zwrocie rysuje
+ * jej linijkę. Bez odświeżenia stał tam stary krok zamiast „dosłać”.
  */
-function poZapisieSprawy(qc: QueryClient, login: string) {
+export function poZapisieSprawy(qc: QueryClient, login: string) {
   return Promise.all([
     qc.invalidateQueries({ queryKey: kluczProfilu(login) }),
     qc.invalidateQueries({ queryKey: klucze.moje }),
@@ -200,4 +222,59 @@ export function usePrzejmijSprawe(login: string) {
         { method: "POST", body: JSON.stringify(v) }),
     onSettled: () => poZapisieSprawy(qc, login),
   });
+}
+
+/* ── Dosyłka sprawy klienta (@wydanie) — trasy z `routes/spoiwo.ts` ──────────
+   Dwa zapisy z profilu, oba na kliknięcie i oba Z CIAŁEM, z wersją i odciskiem
+   sprawy narysowanej na ekranie — ta sama kontrola świeżości co przy kroku.
+   Reguły `method` na pierwszym miejscu i pełnego adresu obowiązują tu z tego
+   samego powodu co wyżej: strażnik adresów panelu czyta je wyrażeniem. */
+
+/**
+ * „Śledź dosyłkę” z propozycji na profilu — droga zapasowa za odmową wypłaty.
+ * `wersja: 0` znaczy „sprawy jeszcze nie ma”, dokładnie jak przy kroku:
+ * trasa zakłada wtedy sprawę z krokiem „dosłać”.
+ */
+export function useSledzDosylke(login: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { zwrotId: number; wersja: number; odcisk: string }) =>
+      api<OdpowiedzSprawy>(`/api/obsluga/klient/${encodeURIComponent(login)}/sprawa/dosylka`,
+        { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => poZapisieSprawy(qc, login),
+  });
+}
+
+/**
+ * Numer dosyłki wpisany ręcznie z Sellasist. Automat szuka go w przesyłkach
+ * zamówienia, ale nowej etykiety Allegro bywa nie zna — wtedy wpisuje go
+ * człowiek. Ten sam zapis poprawia numer przekręcony przy przepisywaniu.
+ */
+export function useNumerDosylki(login: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { zamowienie: string; waybill: string; przewoznik: string; wersja: number; odcisk: string }) =>
+      api<OdpowiedzSprawy>(`/api/obsluga/klient/${encodeURIComponent(login)}/sprawa/dosylka/numer`,
+        { method: "POST", body: JSON.stringify(v) }),
+    onSettled: () => poZapisieSprawy(qc, login),
+  });
+}
+
+/**
+ * Dosyłka, o której mówi JEDNA linijka sprawy przy historii kolejek.
+ *
+ * Kolejność jest kolejnością serwera przy `MojaSprawa.dosylka`, żeby „Moje”
+ * i historia mówiły o tej samej paczce: kłopot u przewoźnika, potem brak
+ * numeru, potem paczka w drodze, na końcu doręczona. Pierwsze dwa każą coś
+ * zrobić, trzecie każe czekać, czwarte mówi, że czekanie się skończyło. Przy
+ * remisie wygrywa najnowsza, bo tak serwer układa listę. Linijka pokazuje
+ * jedno zdanie, więc pokazuje najpilniejsze, nie najświeższe.
+ */
+export function najwazniejszaDosylka(dosylki: readonly DosylkaSprawy[] | undefined): DosylkaSprawy | null {
+  const lista = dosylki ?? [];
+  return lista.find((d) => d.ton === "zle")
+    ?? lista.find((d) => d.waybill === null)
+    ?? lista.find((d) => d.dostarczonoAt === null)
+    ?? lista[0]
+    ?? null;
 }

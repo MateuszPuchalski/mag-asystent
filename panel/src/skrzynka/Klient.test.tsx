@@ -3,7 +3,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
-import type { HistoriaKlienta, SprawaKlienta } from "../api/typy";
+import type { DosylkaSprawy, HistoriaKlienta, SprawaKlienta } from "../api/typy";
 
 /* ── Zakładka KLIENT (§10.1) ─────────────────────────────────────────────────
    Zakładka jest ODCZYTEM i te testy pilnują dwóch rzeczy, które o niej
@@ -77,7 +77,7 @@ describe("zakładka klienta", () => {
     pokaz(dane({ login: null, sprawa: {
       id: 7, login: "Kupujacy55", wersja: 1, stan: "w_toku", krok: "czekamy na zwrot",
       krokDo: "2026-09-28T06:00:00Z", dzis: false, poTerminie: false, prowadzi: "Ola", prowadziId: 1,
-      zakonczonoAt: null, zakonczyl: null, odcisk: "{}", nowe: [] } }));
+      zakonczonoAt: null, zakonczyl: null, odcisk: "{}", nowe: [], dosylki: [] } }));
     expect(screen.getByText(/nie niesie loginu kupującego/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Sprawa klienta: czekamy na zwrot/ }))
       .toHaveAttribute("href", "/obsluga/klient/Kupujacy55");
@@ -124,7 +124,7 @@ describe("zakładka klienta", () => {
     const sprawa: SprawaKlienta = {
       id: 5, login: "zielony_ogrod", wersja: 2, stan: "w_toku", krok: "czekamy na zwrot",
       krokDo: "2026-09-25T06:00:00Z", dzis: false, poTerminie: true, prowadzi: "Bartek", prowadziId: 2,
-      zakonczonoAt: null, zakonczyl: null, odcisk: "{}",
+      zakonczonoAt: null, zakonczyl: null, odcisk: "{}", dosylki: [],
       nowe: [{ rodzaj: "rozmowa", tekst: "Klient napisał 26.09 14:10", at: null, cel: "/obsluga/skrzynka/41" }],
     };
     pokaz(dane({ sprawa }));
@@ -144,8 +144,55 @@ describe("zakładka klienta", () => {
       historia={{ login: "zielony_ogrod", maszyny: [], wpisy: [], sprawa: {
         id: 5, login: "zielony_ogrod", wersja: 2, stan: "zakonczona", krok: "dosłać",
         krokDo: "2026-09-25T06:00:00Z", dzis: false, poTerminie: false, prowadzi: "Bartek", prowadziId: 2,
-        zakonczonoAt: "2026-09-24T12:00:00Z", zakonczyl: "Bartek", odcisk: "{}", nowe: [] } }} />
+        zakonczonoAt: "2026-09-24T12:00:00Z", zakonczyl: "Bartek", odcisk: "{}", nowe: [], dosylki: [] } }} />
     </MemoryRouter>);
     expect(screen.queryByText(/Sprawa klienta/)).toBeNull();
+  });
+});
+
+/* ── Dosyłka w linijce sprawy (@wydanie) ─────────────────────────────────────
+   Agent przy rozmowie odpowiada zwykle na „gdzie moja paczka”. Linijka niesie
+   JEDNO zdanie o dosyłce — najpilniejsze, nie najświeższe: kłopot, brak
+   numeru, w drodze, doręczona. Reszta stoi na profilu.                       */
+describe("dosyłka w linijce sprawy", () => {
+  const d = (n: Partial<DosylkaSprawy>): DosylkaSprawy => ({
+    zamowienie: "z-1", waybill: "620111", przewoznik: "DPD", przewoznikZamowienia: "DPD", zrodlo: "allegro",
+    status: "IN_TRANSIT", dostarczonoAt: null, sprawdzonoAt: "2026-09-27T12:10:00Z",
+    zalozonoAt: "2026-09-24T10:00:00Z", bezNumeru: false, opis: "Dosyłka w drodze (stan z 14:10)", ton: null, ...n,
+  });
+  const sprawa = (dosylki: DosylkaSprawy[], n: Partial<SprawaKlienta> = {}): SprawaKlienta => ({
+    id: 5, login: "zielony_ogrod", wersja: 2, stan: "w_toku", krok: "dosłać",
+    krokDo: "2026-09-30T06:00:00Z", dzis: false, poTerminie: false, prowadzi: "Bartek", prowadziId: 2,
+    zakonczonoAt: null, zakonczyl: null, odcisk: "{}", nowe: [], dosylki, ...n,
+  });
+  const DOREC = d({ zamowienie: "z-3", status: "DELIVERED", dostarczonoAt: "2026-09-26T10:00:00Z",
+    opis: "Dosyłka doręczona 26.09", ton: "ok" });
+  const PROBLEM = d({ zamowienie: "z-2", status: "ISSUE", opis: "Przewoźnik zgłosił problem z dosyłką", ton: "zle" });
+  const BEZ = d({ zamowienie: "z-4", waybill: null, przewoznik: null, status: null, sprawdzonoAt: null,
+    opis: "Czekamy na numer dosyłki z Allegro" });
+
+  it("dokleja zdanie dosyłki do tej samej linijki, w barwie tonu", () => {
+    pokaz(dane({ sprawa: sprawa([PROBLEM]) }));
+    const linia = screen.getByRole("link", { name: /Sprawa klienta: dosłać/ });
+    expect(linia).toHaveTextContent("prowadzi Bartek · Przewoźnik zgłosił problem z dosyłką");
+    expect(screen.getByText("Przewoźnik zgłosił problem z dosyłką").className).toContain("text-ranga-zle");
+  });
+
+  it.each([
+    { nazwa: "kłopot przed doręczoną, choć ta jest nowsza", lista: [DOREC, PROBLEM], jest: PROBLEM },
+    { nazwa: "brak numeru przed paczką w drodze", lista: [d({}), BEZ], jest: BEZ },
+    { nazwa: "paczka w drodze przed doręczoną", lista: [DOREC, d({ zamowienie: "z-5" })], jest: d({}) },
+    { nazwa: "sama doręczona", lista: [DOREC], jest: DOREC },
+  ])("wybiera najpilniejszą: $nazwa", ({ lista, jest }) => {
+    pokaz(dane({ sprawa: sprawa(lista) }));
+    const linia = screen.getByRole("link", { name: /Sprawa klienta: dosłać/ });
+    expect(linia).toHaveTextContent(jest.opis);
+    for (const inna of lista.filter((x) => x.opis !== jest.opis)) expect(linia).not.toHaveTextContent(inna.opis);
+  });
+
+  it("zakończona sprawa nie mówi o dosyłce — tej już nikt nie śledzi", () => {
+    pokaz(dane({ sprawa: sprawa([PROBLEM], { stan: "zakonczona", zakonczonoAt: "2026-09-24T12:00:00Z",
+      zakonczyl: "Bartek" }) }));
+    expect(screen.getByRole("link", { name: /Sprawa klienta zakończona/ })).not.toHaveTextContent(/dosyłk/);
   });
 });

@@ -1,4 +1,5 @@
 import { TRACKING_NA_ZADANIE, urlTrackingu, zapytajAllegro } from "../adapters/allegro.http.js";
+import { BladLimituAllegro } from "../adapters/allegro.js";
 import { config } from "../config.js";
 import type { Db } from "../db/db.js";
 
@@ -76,6 +77,64 @@ export interface TrackingDeps {
   apiUrl?: string;
 }
 
+/** Jedna paczka do zapytania przewoźnika. */
+export interface PaczkaDoTrackingu {
+  carrierId: string;
+  waybill: string;
+}
+
+/**
+ * Pyta przewoźników o paczki i oddaje stan każdej po numerze — bez zapisu.
+ *
+ * JEDNA droga do końcówki trackingu dla zwrotów i dla dosyłki (@wydanie).
+ * Partie po PRZEWOŹNIKU, bo `carrierId` siedzi w ścieżce adresu, i po
+ * dwadzieścia numerów, bo tyle dopuszcza `maxItems`.
+ *
+ * DEGRADUJE PO PARTII. Numer z partii, która padła, NIE MA wpisu w wyniku —
+ * wołający odróżnia „przewoźnik nic nie wie” (wpis z pustym stanem) od „nie
+ * udało się zapytać” (brak wpisu). Pierwsze warto zapisać jako sprawdzenie,
+ * drugiego nie.
+ *
+ * `limitWyzej`: 429 przerywa i idzie do wołającego, żeby `uruchomTakt`
+ * odczekał `Retry-After`. Limit jest wspólny dla całego konta, więc dalsze
+ * partie tylko by go przedłużały. Zwroty tej flagi nie podają i zachowują
+ * się jak przed wydzieleniem: partia z 429 przepada, reszta idzie dalej.
+ */
+export async function odpytajTracking(
+  query: (url: string) => Promise<unknown | null>, apiUrl: string, paczki: readonly PaczkaDoTrackingu[],
+  opcje: { limitWyzej?: boolean } = {},
+): Promise<Map<string, StanPrzesylki>> {
+  const wgPrzewoznika = new Map<string, PaczkaDoTrackingu[]>();
+  for (const p of paczki) {
+    const lista = wgPrzewoznika.get(p.carrierId) ?? [];
+    lista.push(p);
+    wgPrzewoznika.set(p.carrierId, lista);
+  }
+
+  const stany = new Map<string, StanPrzesylki>();
+  for (const [carrierId, lista] of wgPrzewoznika) {
+    for (let i = 0; i < lista.length; i += TRACKING_NA_ZADANIE) {
+      const partia = lista.slice(i, i + TRACKING_NA_ZADANIE);
+      let odp: Odpowiedz | null = null;
+      try {
+        const url = urlTrackingu(apiUrl, carrierId, partia.map((p) => p.waybill));
+        odp = (await query(url)) as Odpowiedz | null;
+      } catch (e) {
+        if (opcje.limitWyzej && e instanceof BladLimituAllegro) throw e;
+        console.warn(`[tracking] ${carrierId}: ${e instanceof Error ? e.message : e}`);
+        continue;
+      }
+
+      const wgNumeru = new Map<string, Historia>();
+      for (const h of odp?.waybills ?? []) {
+        if (typeof h?.waybill === "string") wgNumeru.set(h.waybill, h);
+      }
+      for (const p of partia) stany.set(p.waybill, stanZHistorii(wgNumeru.get(p.waybill)));
+    }
+  }
+  return stany;
+}
+
 /**
  * Odpytuje przewoźników i zapisuje przy zwrotach to, co wróciło.
  *
@@ -91,42 +150,16 @@ export async function uzupelnijDoreczenia(
 ): Promise<number> {
   const query = deps.query ?? zapytajAllegro;
   const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
-
-  /* Partie po PRZEWOŹNIKU, bo carrierId siedzi w ścieżce adresu. */
-  const wgPrzewoznika = new Map<string, DoSprawdzenia[]>();
-  for (const p of paczki) {
-    const lista = wgPrzewoznika.get(p.carrierId) ?? [];
-    lista.push(p);
-    wgPrzewoznika.set(p.carrierId, lista);
-  }
+  const stany = await odpytajTracking(query, apiUrl, paczki);
 
   let dopisanych = 0;
-  for (const [carrierId, lista] of wgPrzewoznika) {
-    for (let i = 0; i < lista.length; i += TRACKING_NA_ZADANIE) {
-      const partia = lista.slice(i, i + TRACKING_NA_ZADANIE);
-      let odp: Odpowiedz | null = null;
-      try {
-        const url = urlTrackingu(apiUrl, carrierId, partia.map((p) => p.waybill));
-        odp = (await query(url)) as Odpowiedz | null;
-      } catch (e) {
-        console.warn(`[tracking] ${carrierId}: ${e instanceof Error ? e.message : e}`);
-        continue;
-      }
-
-      const wgNumeru = new Map<string, Historia>();
-      for (const h of odp?.waybills ?? []) {
-        if (typeof h?.waybill === "string") wgNumeru.set(h.waybill, h);
-      }
-
-      for (const p of partia) {
-        const stan = stanZHistorii(wgNumeru.get(p.waybill));
-        if (stan.dostarczonoAt === null && stan.status === null) continue;
-        database.prepare(
-          "UPDATE zwrot_klienta SET dostarczono_at=?, przesylka_status=? WHERE id=?")
-          .run(stan.dostarczonoAt, stan.status, p.zwrotId);
-        if (stan.dostarczonoAt) dopisanych++;
-      }
-    }
+  for (const p of paczki) {
+    const stan = stany.get(p.waybill);
+    if (!stan || (stan.dostarczonoAt === null && stan.status === null)) continue;
+    database.prepare(
+      "UPDATE zwrot_klienta SET dostarczono_at=?, przesylka_status=? WHERE id=?")
+      .run(stan.dostarczonoAt, stan.status, p.zwrotId);
+    if (stan.dostarczonoAt) dopisanych++;
   }
   return dopisanych;
 }

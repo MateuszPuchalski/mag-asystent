@@ -3229,6 +3229,33 @@ CREATE TABLE IF NOT EXISTS klient_prowadzenie (
   przed_zakonczeniem_zmieniono_at TEXT
 );
 
+-- Dosyłka sprawy klienta (@wydanie, drugi przyrost S6). Zły towar wraca zwrotem
+-- przez Allegro, biuro odmawia wypłaty kodem NEW_ITEM_SENT albo MISSING_PART_SENT
+-- i wysyła poprawny towar nową etykietą z Sellasist. Krok „dosłać” był dotąd
+-- samym zdaniem; tu stoi numer tej drugiej paczki i WYNIK śledzenia, nie historia.
+-- Jeden wiersz na sprawę i zamówienie: nowa dosyłka do tego samego zamówienia
+-- zastępuje poprzednią. Autora tu nie ma — stoi w dzienniku, a kolumna z kluczem
+-- do `app_user` blokowałaby kasowanie kont (pułapka z `klient_prowadzenie`).
+-- `waybill` prowadzi do adresu odbiorcy, więc żyje jak `przesylka_waybill`
+-- zamówienia: nie idzie do dziennika, Copilota, CSV, migawki ani raportu
+-- tygodnia (polityka w docs/obsluga-klienta.md). Kaskady jak w repo: sprawa
+-- zabiera swoje dosyłki, a zwrot kasowany przez `migrate()` albo sprzątanie
+-- zostawia dosyłkę bez odnośnika. Bez CHECK z tego samego powodu co wyżej.
+CREATE TABLE IF NOT EXISTS klient_dosylka (
+  sprawa_id      INTEGER NOT NULL REFERENCES klient_prowadzenie(id) ON DELETE CASCADE,
+  konto          INTEGER NOT NULL,        -- konto kanału; numer zamówienia jest unikalny na koncie
+  zamowienie     TEXT NOT NULL,           -- Allegro checkoutForm.id
+  zwrot_id       INTEGER REFERENCES zwrot_klienta(id) ON DELETE SET NULL,
+  waybill        TEXT,                    -- NULL do wykrycia albo wpisania; najwyżej 64 znaki (schemat)
+  przewoznik     TEXT,                    -- carrierId z Allegro; 'OTHER' nie jest pytany
+  zrodlo         TEXT,                    -- 'allegro' (wykryty przy zamówieniu) | 'recznie' (wpisany)
+  status         TEXT,                    -- ostatni kod przewoźnika — wynik, nie historia
+  dostarczono_at TEXT,                    -- pierwsze DELIVERED; COALESCE, nigdy nadpisane
+  sprawdzono_at  TEXT,                    -- ostatnie pytanie do Allegro; NULL = jeszcze nigdy
+  zalozono_at    TEXT NOT NULL,
+  PRIMARY KEY (sprawa_id, zamowienie)
+);
+
 -- ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────────
 -- Raz dziennie serwer przechodzi te same drogi co produkcja, bez atrap, i zapisuje
 -- tu WYNIK każdego kroku. Powód: przez 150 wydań Copilot „widział zdjęcia” tylko

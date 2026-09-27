@@ -2,19 +2,23 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle, BellDot, CalendarClock, ChevronDown, ChevronRight, ClipboardList, ExternalLink,
-  MessageSquare, MessagesSquare, Scale, ShoppingBag, StickyNote, Undo2, UserRound,
+  MessageSquare, MessagesSquare, Scale, ShoppingBag, StickyNote, Truck, Undo2, UserRound,
 } from "lucide-react";
 import { useJa } from "../api/rozmowy";
 import {
-  useCofnijNotatkeKlienta, useKrokSprawy, useNotatkaKlienta, useProfilKlienta, usePrzejmijSprawe,
-  useWznowSprawe, useZakonczSprawe, type NoweZdarzenie, type ProfilKlienta as Profil,
-  type RodzajSprawyKlienta, type SprawaKlienta,
+  useCofnijNotatkeKlienta, useKrokSprawy, useNotatkaKlienta, useNumerDosylki, useProfilKlienta,
+  usePrzejmijSprawe, useSledzDosylke, useWznowSprawe, useZakonczSprawe, type DosylkaSprawy,
+  type NoweZdarzenie, type ProfilKlienta as Profil, type RodzajSprawyKlienta, type SprawaKlienta,
 } from "../api/spoiwo";
 import { zlote } from "../api/zwroty";
 import { Cofniecie, type DoCofniecia } from "../skrzynka/Cofniecie";
 import { WidokHistorii } from "../skrzynka/Klient";
 import { dzienZKalendarza, opisTerminu, terminyOdlozenia } from "../skrzynka/terminOdlozenia";
-import { Blad, Karta, LoginKlienta, Przycisk, Pusto, czas, dataLokalna, dzien, termin } from "../ui";
+import { PRZEWOZNICY } from "../zwroty/Dowody";
+import { etykietaKodu } from "../zwroty/Pieniadze";
+import {
+  Blad, Karta, LoginKlienta, Przycisk, Pusto, Skopiuj, barwaTonu, czas, dataLokalna, dzien, dzienMiesiac, termin,
+} from "../ui";
 
 /* ── PROFIL KLIENTA (24 września 2026) ───────────────────────────────────────
    Zgłoszenie właściciela: „profil klienta ze wszystkim, co z nim związane,
@@ -160,12 +164,15 @@ function KartaSprawy({ d }: { d: Profil }) {
   const zakoncz = useZakonczSprawe(d.login);
   const wznow = useWznowSprawe(d.login);
   const przejmij = usePrzejmijSprawe(d.login);
+  const sledz = useSledzDosylke(d.login);
+  const numer = useNumerDosylki(d.login);
   const [forma, setForma] = useState(false);
   /* Jeden błąd na kartę, nie cztery: pomyłka starej czynności nie może wisieć
      nad udaną nową, a `error` mutacji trwa aż do jej następnego wywołania. */
   const [blad, setBlad] = useState<string | null>(null);
   const [doCofniecia, setDoCofniecia] = useState<DoCofniecia | null>(null);
-  const pracuje = krok.isPending || zakoncz.isPending || wznow.isPending || przejmij.isPending;
+  const pracuje = krok.isPending || zakoncz.isPending || wznow.isPending || przejmij.isPending
+    || sledz.isPending || numer.isPending;
   /* Po zamknięciu formularza fokus wraca na przycisk, który go otworzył.
      Pole z fokusem znika razem z formularzem, a wtedy klawiatura lądowała
      na początku dokumentu, daleko od karty. */
@@ -184,6 +191,13 @@ function KartaSprawy({ d }: { d: Profil }) {
   const moja = s !== null && s.prowadziId !== null && s.prowadziId === jaId;
   const cudza = s?.stan === "w_toku" && s.prowadziId !== null && jaId !== null && s.prowadziId !== jaId;
   const naBlad = (e: Error) => setBlad(e.message);
+  /* Podpowiedź z powodu dosyłki mówi datę doręczenia, więc „nowe” nie
+     powtarza tego samego zdania linijkę wyżej. Inne nowe zostają: podpowiedź
+     nie wie, że klient w międzyczasie napisał. */
+  const poDosylce = s?.stan === "w_toku" && d.podpowiedzZakonczenia && d.podpowiedzPowod === "dosylka";
+  const doreczona = s?.dosylki.find((x) => x.dostarczonoAt !== null)?.dostarczonoAt ?? null;
+  const nowe = s ? (poDosylce ? s.nowe.filter((n) => n.rodzaj !== "dosylka_doreczona") : s.nowe) : [];
+  const propozycja = d.propozycjaDosylki ?? null;
 
   /* Każdy nowy zapis zdejmuje pasek „Cofnij". Jego domknięcie pamięta
      wersję z odpowiedzi zakończenia, a po kroku ta wersja jest już stara:
@@ -197,6 +211,21 @@ function KartaSprawy({ d }: { d: Profil }) {
        sprawa, której nie było, nie potwierdza żadnego „nowego". */
     krok.mutate({ krok: tekst, krokDo: kiedy.toISOString(), wersja: s?.wersja ?? 0, odcisk: s?.odcisk ?? "" },
       { onSuccess: () => setForma(false), onError: naBlad });
+  };
+  /* Oba zapisy dosyłki podnoszą wersję sprawy, więc zdejmują pasek „Cofnij”
+     z tego samego powodu co krok. Wersja i odcisk to sprawa NARYSOWANA:
+     numer wpisany nad nieświeżym stanem wraca 409, jak każdy zapis sprawy. */
+  const sledzDosylke = (zwrotId: number) => {
+    setDoCofniecia(null);
+    setBlad(null);
+    sledz.mutate({ zwrotId, wersja: s?.wersja ?? 0, odcisk: s?.odcisk ?? "" }, { onError: naBlad });
+  };
+  const zapiszNumer = (x: DosylkaSprawy, waybill: string, przewoznik: string, gotowe: () => void) => {
+    if (!s) return;
+    setDoCofniecia(null);
+    setBlad(null);
+    numer.mutate({ zamowienie: x.zamowienie, waybill, przewoznik, wersja: s.wersja, odcisk: s.odcisk },
+      { onSuccess: gotowe, onError: naBlad });
   };
   const zakonczSprawe = (sprawa: SprawaKlienta) => {
     setDoCofniecia(null);
@@ -248,12 +277,33 @@ function KartaSprawy({ d }: { d: Profil }) {
           </>}
     </div>
 
-    {s && <NoweOdKlienta nowe={s.nowe} />}
+    {/* Dosyłka pod krokiem, bo to ona mówi, jak idzie „dosłać”. Wpisanie
+        numeru stoi tylko przy sprawie w toku: zakończonej się nie śledzi. */}
+    {s && s.dosylki.length > 0 && <ul className="mt-2 space-y-1" aria-label="Dosyłki">
+      {s.dosylki.map((x) => <WierszDosylki key={x.zamowienie} dosylka={x} przewoznicy={d.przewoznicy ?? []}
+        wToku={s.stan === "w_toku"} pracuje={pracuje}
+        onZapisz={(waybill, przewoznik, gotowe) => zapiszNumer(x, waybill, przewoznik, gotowe)} />)}
+    </ul>}
+
+    {s && <NoweOdKlienta nowe={nowe} />}
+
+    {/* PROPOZYCJA TO DROGA ZAPASOWA. Śledzenie zakłada zwykle sama odmowa
+        wypłaty na ekranie zwrotu. Tu trafia odmowa, przy której zapis u nas
+        się nie udał, albo kod złożony poza panelem. Pytanie, nie automat: zapis
+        zmienia krok sprawy, a otwarcie profilu niczego nie zapisuje. */}
+    {propozycja && <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-800">
+      <Truck size={14} className="shrink-0 text-slate-500" />
+      <span>Odmówiono wypłaty: „{etykietaKodu(propozycja.kod)}”. Śledzić dosyłkę?</span>
+      <Przycisk disabled={pracuje} onClick={() => sledzDosylke(propozycja.zwrotId)}>Śledź dosyłkę</Przycisk>
+    </div>}
 
     {/* Podpowiedź, nie automat: zakończenie to werdykt człowieka. Serwer liczy
-        warunek (nic w kolejkach i dzień kroku nadszedł), ekran tylko pyta. */}
+        warunek (nic w kolejkach i dzień kroku nadszedł albo dosyłka doszła),
+        ekran tylko pyta. Powód zmienia zdanie, bo każdy każe sprawdzić co innego. */}
     {s?.stan === "w_toku" && d.podpowiedzZakonczenia && <p className="mt-2 text-sm text-slate-700">
-      Nic nie czeka w kolejkach, a termin kroku „{s.krok}” minął. Zakończ sprawę?</p>}
+      {poDosylce
+        ? `Dosyłka doręczona${doreczona ? ` ${dzienMiesiac(doreczona)}` : ""}. Zakończ sprawę?`
+        : <>Nic nie czeka w kolejkach, a termin kroku „{s.krok}” minął. Zakończ sprawę?</>}</p>}
 
     {s && !forma && <div className="mt-3 flex flex-wrap gap-2">
       {s.stan === "w_toku"
@@ -291,6 +341,86 @@ function KartaSprawy({ d }: { d: Profil }) {
       <Cofniecie wpis={doCofniecia} onZamknij={() => setDoCofniecia(null)} />
     </div>}
   </div></Karta>;
+}
+
+/** Lustro limitu numeru przesyłki z serwera — Allegro przyjmuje najwyżej 64 znaki. */
+const LIMIT_NUMERU = 64;
+
+/* JEDNA DOSYŁKA, JEDNA LINIJKA (@wydanie). Zdanie składa serwer, to samo co
+   na liście „Moje” i przy historii kolejek. Numer stoi obok z kopiowaniem, bo
+   klient pyta o niego, a przepisany z ekranu bywa przekręcony (0.228.0).
+
+   „wpisz numer” jest CICHYM odnośnikiem, nie przyciskiem. Numer zwykle
+   znajduje automat w przesyłkach zamówienia, więc to droga zapasowa. Ma być
+   pod ręką, a nie wołać przy każdej dosyłce. */
+function WierszDosylki({ dosylka: x, przewoznicy, wToku, pracuje, onZapisz }: {
+  dosylka: DosylkaSprawy;
+  przewoznicy: string[];
+  wToku: boolean;
+  pracuje: boolean;
+  onZapisz: (waybill: string, przewoznik: string, gotowe: () => void) => void;
+}) {
+  const [forma, setForma] = useState(false);
+  /* Fokus wraca na odnośnik po zamknięciu — powód przy formularzu kroku. */
+  const otwiera = useRef<HTMLButtonElement>(null);
+  const bylaForma = useRef(false);
+  useEffect(() => {
+    if (bylaForma.current && !forma) otwiera.current?.focus();
+    bylaForma.current = forma;
+  }, [forma]);
+
+  return <li>
+    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+      <Truck size={14} className="shrink-0 text-slate-500" />
+      <span className={`font-semibold ${barwaTonu(x.ton)}`}>{x.opis}</span>
+      {x.waybill && <span className="inline-flex items-center gap-0.5 font-mono text-xs text-slate-700">
+        {x.waybill}<Skopiuj tekst={x.waybill} tytul="Kopiuj numer dosyłki" /></span>}
+      {wToku && !forma && <button ref={otwiera} type="button" disabled={pracuje} onClick={() => setForma(true)}
+        className="text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900 disabled:opacity-50">
+        {x.waybill ? "popraw numer" : "wpisz numer"}</button>}
+    </div>
+    {forma && <FormularzNumeru dosylka={x} przewoznicy={przewoznicy} pracuje={pracuje}
+      onAnuluj={() => setForma(false)}
+      onZapisz={(waybill, przewoznik) => onZapisz(waybill, przewoznik, () => setForma(false))} />}
+  </li>;
+}
+
+/* NUMER Z SELLASIST. Przewoźnik ma gotowy wybór: dosyłka jedzie prawie
+   zawsze tym samym przewoźnikiem co pierwsza paczka zamówienia (fakt
+   właściciela z 27 września 2026), więc zwykle zostaje sam numer do wklejenia.
+   Lista to przewoźnicy znani z naszej bazy — pole tekstowe dałoby literówkę
+   w identyfikatorze, której śledzenie nigdy by nie znalazło (dekalog p. 6). */
+function FormularzNumeru({ dosylka: x, przewoznicy, pracuje, onZapisz, onAnuluj }: {
+  dosylka: DosylkaSprawy;
+  przewoznicy: string[];
+  pracuje: boolean;
+  onZapisz: (waybill: string, przewoznik: string) => void;
+  onAnuluj: () => void;
+}) {
+  const domyslny = x.przewoznik ?? x.przewoznikZamowienia ?? przewoznicy[0] ?? "";
+  /* Przewoźnik dosyłki spoza listy dalej ma być wyborem domyślnym — inaczej
+     lista po cichu podmieniłaby go na pierwszego z brzegu. */
+  const opcje = domyslny && !przewoznicy.includes(domyslny) ? [domyslny, ...przewoznicy] : przewoznicy;
+  const [waybill, setWaybill] = useState(x.waybill ?? "");
+  const [przewoznik, setPrzewoznik] = useState(domyslny);
+  const gotowy = waybill.trim() !== "" && przewoznik !== "" && !pracuje;
+
+  return <form className="mt-2 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-2"
+    aria-label="Wpisz numer dosyłki"
+    onSubmit={(e) => { e.preventDefault(); if (gotowy) onZapisz(waybill.trim(), przewoznik); }}>
+    <label className="text-xs font-semibold text-slate-700">Numer dosyłki
+      {/* Kursor od razu w polu: formularz otwiera się po to, żeby wkleić numer. */}
+      <input autoFocus required value={waybill} maxLength={LIMIT_NUMERU} placeholder="z Sellasist"
+        onChange={(e) => setWaybill(e.target.value)} className="field mt-1 w-56 font-mono text-sm" />
+    </label>
+    <label className="text-xs font-semibold text-slate-700">Przewoźnik
+      <select value={przewoznik} onChange={(e) => setPrzewoznik(e.target.value)} className="field mt-1 w-auto text-sm">
+        {opcje.map((p) => <option key={p} value={p}>{PRZEWOZNICY[p] ?? p}</option>)}
+      </select>
+    </label>
+    <Przycisk type="submit" wariant="glowny" disabled={!gotowy}>Zapisz</Przycisk>
+    <Przycisk type="button" onClick={onAnuluj}>Anuluj</Przycisk>
+  </form>;
 }
 
 /* Powód przebudzenia słowami panelu, z odnośnikiem do źródła. Zdanie składa

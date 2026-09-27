@@ -40,6 +40,9 @@ import { dociagnijZwrotPoLiscie, synchronizujAllegroZwroty } from "../services/a
 import { config } from "../config.js";
 import { logEvent } from "../services/events.js";
 import { stanZwrotowHealth } from "../services/allegro-zwroty-sync-state.js";
+import { sledzDosylkeZwrotu, zalozDosylkeZOdmowy, type WynikDosylki } from "../services/dosylka.js";
+import { jestKodemDosylki } from "../services/dosylka-opis.js";
+import { BladSprawy } from "../services/prowadzenie-klienta.js";
 import { reconcile } from "../services/reconcile.js";
 
 /* ── Trasy zwrotów klienckich (0.150.0, decyzje biura od 0.156.0) ────────────
@@ -823,14 +826,25 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
+  /* DOSYŁKA W TYM SAMYM RUCHU (@wydanie). Odmowa z kodem „Wysłaliśmy nowy
+     towar” albo „Wysłaliśmy brakującą część” zakłada śledzenie dosyłki
+     i krok „dosłać” w sprawie klienta. Trasa SKŁADA dwa serwisy, bo
+     `zwrot-pieniedzy.ts` nie ma prawa importować `dosylka.ts` (cykl przez
+     sprawę klienta).
+
+     Porażka drugiego NIGDY nie zamienia odpowiedzi w błąd: odmowa w Allegro
+     już poszła i jest nieodwracalna. Ekran z błędem kazałby odmówić drugi
+     raz, a Allegro odpowiedziałoby odmową. Wynik dosyłki jedzie obok, ze
+     stałym zdaniem, a ponowienie daje „Śledź dosyłkę” niżej. */
   app.post<{ Params: { id: string }; Body: { kod?: string; powod?: string; wersja?: number } }>(
     "/api/obsluga/zwroty/:id/odmowa-platnosci", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
       const w = autoryzuj(sesjaZadania()!.user, "zwrot_pieniedzy");
       if (!w.ok) return reply.code(403).send({ error: w.powod });
+      let wynik: { kod: string; wersja: number };
       try {
-        return await odmowZwrotuPieniedzy(db(), Number(req.params.id), req.body?.kod ?? "",
+        wynik = await odmowZwrotuPieniedzy(db(), Number(req.params.id), req.body?.kod ?? "",
           req.body?.powod ?? null, Number(req.body?.wersja), kto(),
           (zwrotId, kod, powod) => wyslijOdmowe(config.allegro.apiUrl, zwrotId, kod, powod));
       } catch (e) {
@@ -838,6 +852,35 @@ export async function zwrotyRoutes(app: FastifyInstance) {
           return reply.code(409).send({ error: e.message });
         }
         return reply.code(400).send({ error: (e as Error).message });
+      }
+      if (!jestKodemDosylki(wynik.kod)) return wynik;
+      let dosylka: WynikDosylki;
+      try {
+        dosylka = zalozDosylkeZOdmowy(db(), Number(req.params.id), kto());
+      } catch (e) {
+        /* Zdanie STAŁE: nieoczekiwany błąd bywa błędem SQL-a z treścią
+           wiersza, a to zdanie trafia na ekran. */
+        dosylka = { zalozona: false, blad: e instanceof BladSprawy ? e.message
+          : "Zapis się nie udał — kliknij „Śledź dosyłkę” przy zwrocie" };
+        if (!(e instanceof BladSprawy)) console.error("[dosylka] założenie przy odmowie nie doszło:", e);
+      }
+      return { ...wynik, dosylka };
+    });
+
+  /* „Śledź dosyłkę” przy zwrocie — ponowienie, gdy odmowa przeszła, a dosyłka
+     nie; albo odmowa sprzed @wydanie. BEZ CIAŁA: trasa niczego z niego nie
+     czyta, a pusty JSON z typem treści to `FST_ERR_CTP_EMPTY_JSON_BODY`.
+     Samo `odmowa()` bez `autoryzuj()`: pieniądze się tu nie ruszają, więc
+     wpis `privileged` zrównywałby ją z przelewem. */
+  app.post<{ Params: { id: string } }>(
+    "/api/obsluga/zwroty/:id/dosylka", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return sledzDosylkeZwrotu(db(), Number(req.params.id), kto());
+      } catch (e) {
+        if (e instanceof BladSprawy) return reply.code(400).send({ error: e.message });
+        throw e;
       }
     });
 

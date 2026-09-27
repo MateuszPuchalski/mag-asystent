@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
-import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, Ocena, PozycjaNaOutlet, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, Zwrot, SprawaZakupu, PrzystanekDrogi } from "./typy";
+import { poZapisieSprawy } from "./spoiwo";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, Ocena, PozycjaNaOutlet, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, WynikDosylki, Zwrot, SprawaZakupu, PrzystanekDrogi } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -892,15 +893,43 @@ export function useCofnijPrzelew() {
   });
 }
 
+/**
+ * Odmowa wypłaty. Przy kodach dosyłki (@wydanie) ta sama trasa zakłada też
+ * śledzenie dosyłki i krok sprawy klienta — odpowiedź niesie wtedy `dosylka`.
+ * Przy pozostałych kodach tego pola nie ma wcale.
+ */
 export function useOdmowPlatnosci() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { id: number; kod: string; powod: string | null; wersja: number }) =>
-      api<{ kod: string; wersja: number }>(`/api/obsluga/zwroty/${v.id}/odmowa-platnosci`,
+      api<{ kod: string; wersja: number; dosylka?: WynikDosylki }>(`/api/obsluga/zwroty/${v.id}/odmowa-platnosci`,
         { method: "POST", body: JSON.stringify({ kod: v.kod, powod: v.powod, wersja: v.wersja }) }),
-    onSettled: (_d, _e, v) => {
+    onSettled: (d, _e, v) => {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+      if (d?.dosylka?.zalozona) void poZapisieSprawy(qc, d.dosylka.login);
+    },
+  });
+}
+
+/**
+ * „Śledź dosyłkę” przy zwrocie (@wydanie) — ponowienie po odmowie, przy
+ * której zapis u nas się nie udał, albo przy kodzie złożonym poza panelem.
+ *
+ * IDZIE BEZ CIAŁA. Serwer bierze zamówienie i konto ze zwrotu, więc nie ma
+ * czego wysłać — a pusty JSON to „Bad Request” od Fastify (reguła klienta
+ * HTTP z `CLAUDE.md`). Podwójne kliknięcie niczego nie psuje: drugie
+ * żądanie oddaje tę samą dosyłkę bez nowego zapisu.
+ */
+export function useSledzDosylkeZwrotu() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<WynikDosylki>(`/api/obsluga/zwroty/${v.id}/dosylka`, { method: "POST" }),
+    onSettled: (d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+      if (d?.zalozona) void poZapisieSprawy(qc, d.login);
     },
   });
 }

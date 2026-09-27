@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało dwadzieścia dziewięć.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało trzydzieści.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -43,6 +43,11 @@ nie rozstrzyga, a sonda nie pokazuje wartości pól niesłownikowych.
 Przy przeglądzie reguł obsługi klienta doszedł jeden. Nie wiadomo, czy
 `interlocutor.login` z listy wątków jest loginem kupującego. Blizna 0.56.6 mówi,
 że bywa zamaskowany, a dwie funkcje wiążą się po nim od 0.386.0 i 0.397.0.
+
+W @wydanie doszedł jeden, przy dosyłce sprawy klienta. Właściciel podał, że
+numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro. Na tym stoi
+automatyczne wykrycie numeru, a na żywym koncie nikt tego nie sprawdził.
+Pomyłka daje brak numeru i prośbę o wpisanie go ręką, a nie zły numer.
 
 Warto czytać tę liczbę ostrożnie. W tym samym wydaniu wyszło, że mapowanie
 ODCZYTU skrzynki było błędne w każdym polu, choć nie nosiło ani jednego

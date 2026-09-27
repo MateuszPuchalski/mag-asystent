@@ -5,6 +5,9 @@ import { chwilaUtc, czasLokalny, dataLokalna } from "../czas.js";
 import { kontaLoginu, rozmowyPoLoginie } from "./klient-historia.js";
 import { podziekowanieKlienta } from "./conversations.js";
 import { mojeSprawy, ROZMOWA_ZAMOWIENIA, type MojaSprawa } from "./droga-klienta.js";
+import {
+  DOSYLKI_SQL, dzienMiesiac, naDosylkeSprawy, najwazniejszaDosylka, pilnaDosylka, type DosylkaSprawy,
+} from "./dosylka-opis.js";
 
 /* ── Sprawa klienta: kto prowadzi, następny krok, zakończenie (0.535.0) ─────
    S6 `docs/obsluga-klienta-calosc.md`, decyzja właściciela. Kolejki mówią, co
@@ -52,11 +55,16 @@ import { mojeSprawy, ROZMOWA_ZAMOWIENIA, type MojaSprawa } from "./droga-klienta
    Ten plik NIE importuje profilu (`profil-klienta.ts` czyta stąd), a
    `droga-klienta.ts` nie importuje tego pliku. Pętla importów przy stałej
    liczonej w chwili ładowania modułu bywa pustym zbiorem — blizna opisana
-   w `statusy-spraw.ts`. */
+   w `statusy-spraw.ts`.
+
+   DOSYŁKA (@wydanie) mieszka w `dosylka.ts`, który importuje ten plik —
+   więc tu jest wyłącznie SQL na `klient_dosylka` i zdanie z czystego
+   `dosylka-opis.ts`. Doręczenie dosyłki i kłopot u przewoźnika to fakty
+   PO STRONIE ALLEGRO, na które sprawa czeka, więc budzą ją jak zwrot. */
 
 export interface NoweZdarzenie {
   rodzaj: "rozmowa" | "zwrot_nowy" | "zwrot_nadany" | "zwrot_dotarl" | "reklamacja" | "dyskusja"
-    | "wiadomosc_sprawy";
+    | "wiadomosc_sprawy" | "dosylka_doreczona" | "dosylka_problem";
   /** Zdanie panelu, jego słowami: „Klient napisał 26.09 14:10”, „Zwrot dotarł”. */
   tekst: string;
   at: string | null;
@@ -83,6 +91,8 @@ export interface SprawaKlienta {
   nowe: NoweZdarzenie[];
   /** Odcisk, który ekran narysował; zapis, który potwierdza, odsyła go z powrotem (dekalog 4). */
   odcisk: string;
+  /** Dosyłki sprawy w toku, od najnowszej; zakończona nie ma biegnącej dosyłki, więc pusta lista. */
+  dosylki: DosylkaSprawy[];
 }
 
 /** Krok to jedno zdanie na wiersz „Moje”, nie akta sprawy. */
@@ -148,6 +158,11 @@ interface Odcisk {
   s: number;
   /** Wiadomości klienta albo doradcy Allegro w reklamacjach i dyskusjach. */
   w: number;
+  /** Dosyłki doręczone (@wydanie). SZTUKI, nie flaga: druga doręczona dosyłka
+   *  budzi też wtedy, gdy pierwszą ktoś już potwierdził. */
+  k: number;
+  /** Dosyłki z kłopotem u przewoźnika: `ISSUE` albo `RETURNED`. */
+  q: number;
 }
 
 interface WiadomoscKlienta { rozmowa: number; wstawiono: string; napisano: string }
@@ -197,7 +212,7 @@ function ostatniaWiadomoscKlienta(database: DatabaseSync, login: string): Wiadom
 type Licznik = keyof Omit<Odcisk, "m">;
 
 /**
- * Sześć liczników odcisku jako wyrażenia SQL po loginie `l` — parametrze
+ * Osiem liczników odcisku jako wyrażenia SQL po loginie `l` — parametrze
  * albo kolumnie. JEDNA definicja dla odcisku i dla sita „Moje” (`wierszeMoich`):
  * sito z drugiej, ręcznie przepisanej kopii mogłoby odrzucić sprawę, którą
  * odcisk budzi, a takie obudzenie przepadłoby bez śladu.
@@ -207,6 +222,10 @@ type Licznik = keyof Omit<Odcisk, "m">;
  * zjeść jedno obudzenie, a zmyślona data budziłaby przy każdej synchronizacji.
  * Licznik `w` jest bez typu: wiadomość klienta liczy się w reklamacji i w
  * dyskusji jednakowo, bo obie czekają na naszą odpowiedź.
+ *
+ * `k` i `q` (@wydanie) liczą dosyłki sprawy tego loginu. Dosyłkę zakłada
+ * biuro, ale doręczenie i kłopot zgłasza przewoźnik — to jedyne fakty
+ * dosyłki, o których prowadzący może nie wiedzieć.
  */
 const LICZNIKI = (l: string): Record<Licznik, string> => ({
   z: `(SELECT count(*) FROM zwrot_klienta
@@ -221,6 +240,10 @@ const LICZNIKI = (l: string): Record<Licznik, string> => ({
         WHERE kupujacy_login = ${l} COLLATE NOCASE AND typ = 'DISPUTE')`,
   w: `(SELECT count(*) FROM reklamacja_wiadomosc rw JOIN reklamacja_klienta rk ON rk.id = rw.reklamacja_id
         WHERE rk.kupujacy_login = ${l} COLLATE NOCASE AND rw.autor_rola IN ('BUYER','ADMIN'))`,
+  k: `(SELECT count(*) FROM klient_dosylka kd JOIN klient_prowadzenie kp ON kp.id = kd.sprawa_id
+        WHERE kp.login = ${l} COLLATE NOCASE AND kd.dostarczono_at IS NOT NULL)`,
+  q: `(SELECT count(*) FROM klient_dosylka kd JOIN klient_prowadzenie kp ON kp.id = kd.sprawa_id
+        WHERE kp.login = ${l} COLLATE NOCASE AND kd.status IN ('ISSUE','RETURNED'))`,
 });
 
 function policzOdcisk(
@@ -233,12 +256,17 @@ function policzOdcisk(
     odcisk: {
       m: wiadomosc?.wstawiono ?? null,
       z: Number(n.z), p: Number(n.p), d: Number(n.d), r: Number(n.r), s: Number(n.s), w: Number(n.w),
+      k: Number(n.k), q: Number(n.q),
     },
     wiadomosc,
   };
 }
 
-const naNapis = (o: Odcisk): string => JSON.stringify({ m: o.m, z: o.z, p: o.p, d: o.d, r: o.r, s: o.s, w: o.w });
+/* Klucze `k` i `q` doszły w @wydanie, więc odcisk każdej sprawy zmienił
+   napis: ekran otwarty w chwili aktualizacji dostaje raz 409 ze świeżą
+   sprawą. Zapamiętany odcisk bez tych kluczy nie budzi (`noweZdarzenia`). */
+const naNapis = (o: Odcisk): string =>
+  JSON.stringify({ m: o.m, z: o.z, p: o.p, d: o.d, r: o.r, s: o.s, w: o.w, k: o.k, q: o.q });
 
 /** Odcisk faktów po stronie klienta w tej chwili (JSON) — ten sam, który niesie `SprawaKlienta.odcisk`. */
 export function odciskTeraz(login: string, database: DatabaseSync = defaultDb()): string {
@@ -323,6 +351,26 @@ function noweZdarzenia(
     nowe.push({ rodzaj: "wiadomosc_sprawy", tekst: `${kto} w ${dyskusja ? "dyskusji" : "reklamacji"}`,
       at: tekst(w?.at), cel: w ? `/obsluga/${dyskusja ? "dyskusje" : "reklamacje"}/${w.id}` : null });
   }
+  /* Dosyłka (@wydanie). Odnośnika nie ma: dosyłka stoi na karcie sprawy,
+     a sprawa i tak prowadzi na profil — `cel: null` znaczy „tu, na profilu”. */
+  const DOSYLKA = `FROM klient_dosylka d JOIN klient_prowadzenie p ON p.id = d.sprawa_id
+    WHERE p.login = ? COLLATE NOCASE`;
+  if (urosl("k")) {
+    const w = najnowszy(database, `SELECT d.dostarczono_at AS at ${DOSYLKA} AND d.dostarczono_at IS NOT NULL
+      ORDER BY julianday(d.dostarczono_at) DESC LIMIT 1`, login);
+    const at = tekst(w?.at);
+    nowe.push({ rodzaj: "dosylka_doreczona", tekst: at ? `Dosyłka doręczona ${dzienMiesiac(at)}` : "Dosyłka doręczona",
+      at, cel: null });
+  }
+  if (urosl("q")) {
+    /* Chwila kłopotu to chwila, w której się o nim dowiedzieliśmy — przewoźnik
+       podaje `occurredAt`, ale zapisujemy wynik, nie historię. */
+    const w = najnowszy(database, `SELECT d.status, d.sprawdzono_at AS at ${DOSYLKA}
+      AND d.status IN ('ISSUE','RETURNED') ORDER BY julianday(d.sprawdzono_at) DESC LIMIT 1`, login);
+    nowe.push({ rodzaj: "dosylka_problem", at: tekst(w?.at), cel: null,
+      tekst: String(w?.status) === "RETURNED" ? "Dosyłka wraca do nadawcy"
+        : "Problem z dosyłką: przewoźnik zgłosił kłopot" });
+  }
   return nowe.sort((a, b) => chwila(b.at, Number.NEGATIVE_INFINITY) - chwila(a.at, Number.NEGATIVE_INFINITY));
 }
 
@@ -343,9 +391,17 @@ const wOknieObudzenia = (zakonczonoAt: unknown, teraz: Date): boolean =>
 
 /* ── Odczyt ─────────────────────────────────────────────────────────────── */
 
-function wierszSprawy(database: DatabaseSync, login: string): Wiersz | undefined {
+/** Wiersz sprawy po loginie, bez wielkości liter. Eksport dla `dosylka.ts`, który pisze w tej samej transakcji. */
+export function wierszSprawy(database: DatabaseSync, login: string): Wiersz | undefined {
   return database.prepare("SELECT * FROM klient_prowadzenie WHERE login = ? COLLATE NOCASE")
     .get(login) as Wiersz | undefined;
+}
+
+/** Dosyłki sprawy od najnowszej. Kolejność po `julianday`, jak każde porównanie chwil w tym pliku. */
+function dosylkiSprawy(database: DatabaseSync, id: number, teraz: Date): DosylkaSprawy[] {
+  return (database.prepare(`${DOSYLKI_SQL} WHERE d.sprawa_id = ?
+      ORDER BY julianday(d.zalozono_at) DESC, d.zamowienie`).all(id) as Wiersz[])
+    .map((w) => naDosylkeSprawy(w, teraz));
 }
 
 function zbudujSprawe(database: DatabaseSync, w: Wiersz, teraz: Date): SprawaKlienta {
@@ -374,6 +430,9 @@ function zbudujSprawe(database: DatabaseSync, w: Wiersz, teraz: Date): SprawaKli
       ? noweZdarzenia(database, login, znane, odcisk, wiadomosc, String(w.zmieniono_at))
       : [],
     odcisk: naNapis(odcisk),
+    /* Zakończona sprawa nie śledzi dosyłki (ticker jej nie pyta), więc stan
+       na karcie byłby zatrzymanym zegarem udającym bieżący. */
+    dosylki: stan === "w_toku" ? dosylkiSprawy(database, Number(w.id), teraz) : [],
   };
 }
 
@@ -393,7 +452,7 @@ export function sprawaKlienta(
 /* ── Zapis ──────────────────────────────────────────────────────────────── */
 
 /** Login tak, jak zapisało go Allegro; nieznany login to `BrakKlienta`. */
-function loginZAllegro(database: DatabaseSync, login: string): string {
+export function loginZAllegro(database: DatabaseSync, login: string): string {
   const konta = kontaLoginu(database, login.trim());
   if (konta.length === 0) throw new BrakKlienta();
   return konta[0].login;
@@ -432,6 +491,87 @@ function sprawdzOdcisk(
 }
 
 /**
+ * Obaj strażnicy świeżości naraz — wersja i odcisk z ekranu — dla zapisów
+ * dosyłki z profilu (`dosylka.ts`). Ta sama reguła co przy czterech
+ * zapisach sprawy, nie druga kopia: wołający jest w otwartej transakcji.
+ */
+export function sprawdzSwiezosc(
+  database: DatabaseSync, w: Wiersz | undefined, p: { wersja: number; odcisk: string },
+  login: string, teraz: Date,
+): void {
+  sprawdzWersje(database, w, p.wersja, login, teraz);
+  sprawdzOdcisk(database, w, p.odcisk, policzOdcisk(database, login).odcisk, login, teraz);
+}
+
+/** Krok przycięty i termin jako ISO; zły to `BladSprawy` ze stałym zdaniem. */
+function poprawnyKrok(krokWpisany: string, krokDoWpisany: string, teraz: Date): { krok: string; krokDo: string } {
+  const krok = (krokWpisany ?? "").trim();
+  if (krok.length < 1 || krok.length > LIMIT_KROKU) {
+    throw new BladSprawy(`Krok ma od 1 do ${LIMIT_KROKU} znaków`);
+  }
+  const t = Date.parse(krokDoWpisany);
+  if (!Number.isFinite(t)) throw new BladSprawy("Termin kroku nie jest datą");
+  if (t <= teraz.getTime()) throw new BladSprawy("Termin kroku musi być w przyszłości");
+  if (t > teraz.getTime() + NAJDLUZSZY_KROK_DNI * DZIEN) {
+    throw new BladSprawy(`Termin kroku najdalej za ${NAJDLUZSZY_KROK_DNI} dni`);
+  }
+  return { krok, krokDo: new Date(t).toISOString() };
+}
+
+/**
+ * Zapis kroku w OTWARTEJ transakcji wołającego — jedyne miejsce, które
+ * zakłada, wznawia i przestawia sprawę. Woła go `ustawKrok` i odmowa wypłaty
+ * z dosyłką (`dosylka.ts`), więc „krok jest jedyną drogą założenia
+ * i wznowienia” zostaje prawdą także wtedy, gdy krok stawia ekran zwrotu.
+ * Transakcji tu nie ma: `transaction` w `db.ts` to gołe BEGIN IMMEDIATE,
+ * a zagnieżdżone BEGIN wywraca się na SQLite.
+ *
+ * `znane` to odcisk do zapamiętania razem z chwilą ruchu. `null` zostawia
+ * oba bez zmian — odmowa ze zwrotu nie potwierdza „nowego”, którego agent
+ * na tamtym ekranie nie widział. Nowa sprawa musi dostać odcisk.
+ */
+export function zapiszKrokSprawy(
+  database: DatabaseSync,
+  p: { w: Wiersz | undefined; login: string; krok: string; krokDo: string; autor: Autor; teraz: Date;
+    znane: string | null; domyslny?: boolean },
+): { id: number; nowa: boolean; poprzedniKrok: string | null; wToku: boolean } {
+  const { w, krok, krokDo, autor } = p;
+  const at = p.teraz.toISOString();
+  let id: number;
+  if (w) {
+    id = Number(w.id);
+    /* Prowadzący zostaje. Ustawia go tylko sprawa bez prowadzącego —
+       tak jak odpowiedź przydziela rozmowę od 0.159.0. Zapas dla „Cofnij”
+       znika: po nowym kroku nie ma już zakończenia do cofnięcia. */
+    database.prepare(`UPDATE klient_prowadzenie SET krok = ?, krok_do = ?,
+        zakonczono_at = NULL, zakonczyl = NULL, zakonczyl_user_id = NULL,
+        przed_zakonczeniem_znane_json = NULL, przed_zakonczeniem_zmieniono_at = NULL,
+        prowadzi = CASE WHEN prowadzi_user_id IS NULL THEN ? ELSE prowadzi END,
+        prowadzi_user_id = COALESCE(prowadzi_user_id, ?),
+        znane_json = COALESCE(?, znane_json), wersja = wersja + 1,
+        zmieniono_at = CASE WHEN ? IS NULL THEN zmieniono_at ELSE ? END,
+        zmieniono_przez = CASE WHEN ? IS NULL THEN zmieniono_przez ELSE ? END
+      WHERE id = ?`)
+      .run(krok, krokDo, autor.name, autor.id, p.znane, p.znane, at, p.znane, autor.name, id);
+  } else {
+    if (p.znane === null) throw new Error("Nowa sprawa bez odcisku — błąd wołającego");
+    id = Number(database.prepare(`INSERT INTO klient_prowadzenie(login, prowadzi, prowadzi_user_id,
+        krok, krok_do, znane_json, wersja, zmieniono_at, zmieniono_przez)
+      VALUES (?,?,?,?,?,?,1,?,?)`)
+      .run(p.login, autor.name, autor.id, krok, krokDo, p.znane, at, autor.name).lastInsertRowid);
+  }
+  /* `domyslny` tylko wtedy, gdy termin postawił automat — miara z S6 odróżnia
+     po nim terminy wybrane od narzuconych. Klucz bez wartości zmieniałby
+     kształt wpisu każdego kroku, a z niego liczy się już pierwsza miara. */
+  logEvent("klient_sprawa_krok", autor.name, null,
+    p.domyslny ? { sprawa: id, znakow: krok.length, termin: krokDo, nowa: !w, domyslny: true }
+      : { sprawa: id, znakow: krok.length, termin: krokDo, nowa: !w }, autor.id, database);
+  return {
+    id, nowa: !w, poprzedniKrok: w ? String(w.krok) : null, wToku: w ? w.zakonczono_at == null : false,
+  };
+}
+
+/**
  * Ustawia następny krok — JEDYNA droga do założenia i wznowienia sprawy.
  * Sprawa bez kroku nie istnieje: kto nie ma następnego kroku, kończy sprawę.
  */
@@ -439,17 +579,7 @@ export function ustawKrok(
   login: string, p: { krok: string; krokDo: string; wersja: number; odcisk: string }, autor: Autor,
   teraz = new Date(), database: DatabaseSync = defaultDb(),
 ): SprawaKlienta {
-  const krok = (p.krok ?? "").trim();
-  if (krok.length < 1 || krok.length > LIMIT_KROKU) {
-    throw new BladSprawy(`Krok ma od 1 do ${LIMIT_KROKU} znaków`);
-  }
-  const t = Date.parse(p.krokDo);
-  if (!Number.isFinite(t)) throw new BladSprawy("Termin kroku nie jest datą");
-  if (t <= teraz.getTime()) throw new BladSprawy("Termin kroku musi być w przyszłości");
-  if (t > teraz.getTime() + NAJDLUZSZY_KROK_DNI * DZIEN) {
-    throw new BladSprawy(`Termin kroku najdalej za ${NAJDLUZSZY_KROK_DNI} dni`);
-  }
-  const krokDo = new Date(t).toISOString();
+  const { krok, krokDo } = poprawnyKrok(p.krok, p.krokDo, teraz);
   const l = loginZAllegro(database, login);
 
   /* NAWIASY NA KOŃCU: `transaction` zwraca opakowaną funkcję (db.ts). */
@@ -458,31 +588,51 @@ export function ustawKrok(
     sprawdzWersje(database, w, p.wersja, l, teraz);
     const { odcisk } = policzOdcisk(database, l);
     sprawdzOdcisk(database, w, p.odcisk, odcisk, l, teraz);
-    const at = teraz.toISOString();
-    let id: number;
-    if (w) {
-      id = Number(w.id);
-      /* Prowadzący zostaje. Ustawia go tylko sprawa bez prowadzącego —
-         tak jak odpowiedź przydziela rozmowę od 0.159.0. Zapas dla „Cofnij”
-         znika: po nowym kroku nie ma już zakończenia do cofnięcia. */
-      database.prepare(`UPDATE klient_prowadzenie SET krok = ?, krok_do = ?,
-          zakonczono_at = NULL, zakonczyl = NULL, zakonczyl_user_id = NULL,
-          przed_zakonczeniem_znane_json = NULL, przed_zakonczeniem_zmieniono_at = NULL,
-          prowadzi = CASE WHEN prowadzi_user_id IS NULL THEN ? ELSE prowadzi END,
-          prowadzi_user_id = COALESCE(prowadzi_user_id, ?),
-          znane_json = ?, wersja = wersja + 1, zmieniono_at = ?, zmieniono_przez = ?
-        WHERE id = ?`)
-        .run(krok, krokDo, autor.name, autor.id, naNapis(odcisk), at, autor.name, id);
-    } else {
-      id = Number(database.prepare(`INSERT INTO klient_prowadzenie(login, prowadzi, prowadzi_user_id,
-          krok, krok_do, znane_json, wersja, zmieniono_at, zmieniono_przez)
-        VALUES (?,?,?,?,?,?,1,?,?)`)
-        .run(l, autor.name, autor.id, krok, krokDo, naNapis(odcisk), at, autor.name).lastInsertRowid);
-    }
-    logEvent("klient_sprawa_krok", autor.name, null,
-      { sprawa: id, znakow: krok.length, termin: krokDo, nowa: !w }, autor.id, database);
+    zapiszKrokSprawy(database, { w, login: l, krok, krokDo, autor, teraz, znane: naNapis(odcisk) });
   })();
   return sprawaKlienta(l, teraz, database)!;
+}
+
+/**
+ * Ruch człowieka przy dosyłce z PROFILU: odcisk liczony PO zapisie
+ * `klient_dosylka` jako „znane”, chwila ruchu teraz. Odcisk ekranu sprawdził
+ * wołający PRZED zapisem (`sprawdzSwiezosc`). Odcisk sprzed zapisu zostawiłby
+ * różnicę, którą zrobił sam agent — i sprawa obudziłaby się jego ruchem.
+ * `podbij` podnosi wersję, gdy nic innego w tym zapisie jej nie podniosło.
+ */
+export function potwierdzPoZapisie(
+  database: DatabaseSync, id: number, login: string, autor: Autor, teraz: Date, podbij: boolean,
+): void {
+  database.prepare(`UPDATE klient_prowadzenie SET znane_json = ?, zmieniono_at = ?, zmieniono_przez = ?,
+      wersja = wersja + ? WHERE id = ?`)
+    .run(naNapis(policzOdcisk(database, login).odcisk), teraz.toISOString(), autor.name, podbij ? 1 : 0, id);
+}
+
+/**
+ * Odmowa ze zwrotu zastąpiła dosyłkę zamówienia — `znane` bez potwierdzania.
+ *
+ * Liczniki `k` i `q` liczą WIERSZE, a nowa dosyłka do tego samego zamówienia
+ * zastępuje wiersz. Doręczona i potwierdzona pierwsza dosyłka znika więc
+ * z licznika, a druga doręczona wraca do tej samej liczby — i nie budzi.
+ * Stąd odjęcie tego, co zapis zabrał, z podłogą zero. Podłoga chroni przed
+ * fałszywym „Dosyłka doręczona”, gdy zabrana dosyłka nie była potwierdzona.
+ *
+ * Klucz NIEOBECNY dostaje bieżącą liczbę. Sprawa sprzed @wydanie nie ma
+ * `k` ani `q`, a odmowa nie zapisuje odcisku, więc bez tego jej dosyłka nie
+ * obudziłaby jej nigdy. Pozostałe klucze zostają — to nie jest potwierdzenie.
+ */
+export function wyrownajZnane(
+  database: DatabaseSync, id: number, login: string, zabrane: { k: number; q: number },
+): void {
+  const w = database.prepare("SELECT znane_json FROM klient_prowadzenie WHERE id = ?").get(id) as Wiersz | undefined;
+  let znane: Record<string, unknown>;
+  try { znane = JSON.parse(String(w?.znane_json)) as Record<string, unknown>; } catch { return; }
+  if (!znane || typeof znane !== "object") return;
+  const biezacy = policzOdcisk(database, login).odcisk;
+  for (const k of ["k", "q"] as const) {
+    znane[k] = typeof znane[k] === "number" ? Math.max(0, (znane[k] as number) - zabrane[k]) : biezacy[k];
+  }
+  database.prepare("UPDATE klient_prowadzenie SET znane_json = ? WHERE id = ?").run(JSON.stringify(znane), id);
 }
 
 /**
@@ -607,6 +757,13 @@ export function przejmijSprawe(
 
 /* ── „Moje” ─────────────────────────────────────────────────────────────── */
 
+/**
+ * Dosyłka, która woła o ruch dziś: kłopot u przewoźnika albo brak numeru za
+ * długo. Taka sprawa staje na piętrze „na dziś” niezależnie od terminu kroku
+ * — termin trzech dni roboczych jeszcze nie minął, a numer trzeba wpisać już.
+ */
+const pilna = (s: SprawaKlienta): boolean => s.dosylki.some(pilnaDosylka);
+
 const naWierszMoich = (s: SprawaKlienta, at: string, czeka: boolean): MojaSprawa => ({
   kolejka: "klient", id: s.id,
   opis: `${s.login}: ${s.krok}`,
@@ -615,8 +772,11 @@ const naWierszMoich = (s: SprawaKlienta, at: string, czeka: boolean): MojaSprawa
      zapasem dla cofnięcia i na liście udawałby zegar, którego nie ma. */
   terminDo: s.stan === "w_toku" ? s.krokDo : null,
   cel: s.nowe[0]?.cel ?? `/obsluga/klient/${encodeURIComponent(s.login)}`,
-  login: s.login, czeka, dzis: s.dzis, poTerminie: s.poTerminie,
+  login: s.login, czeka, dzis: s.dzis || pilna(s), poTerminie: s.poTerminie,
   nowe: s.nowe[0]?.tekst ?? null,
+  /* Osobne pole, nie dopisek do `opis`: opis ucina się na szerokości wiersza,
+     a stan dosyłki zastępuje w panelu „czeka do …” (`StanKroku`). */
+  dosylka: najwazniejszaDosylka(s.dosylki)?.opis ?? null,
 });
 
 const rosnaco = (a: number, b: number): number => (a === b ? 0 : a < b ? -1 : 1);
@@ -715,7 +875,8 @@ function wiadomoscPoRuchu(database: DatabaseSync, login: string, zmienionoAt: st
  * PIĘTRA, od góry:
  *   1. sprawy z NOWYM zdarzeniem — najdłużej czekające pierwsze, bo klient
  *      ruszył się sam i czeka na nas;
- *   2. terminy: kolejki z terminem i kroki na dziś albo po terminie;
+ *   2. terminy: kolejki z terminem i kroki na dziś albo po terminie, a także
+ *      sprawy z dosyłką bez numeru za długo albo z kłopotem u przewoźnika;
  *   3. reszta kolejek, wedle ostatniego ruchu — jak w `mojeSprawy`;
  *   4. kroki na przyszłość, oznaczone `czeka` — są na liście, żeby prowadzący
  *      widział swoje sprawy w całości, ale nie wołają o ruch dziś.
@@ -741,8 +902,8 @@ export function mojaLista(
   const zNowymi = sprawy.filter((x) => x.s.nowe.length > 0)
     .sort((a, b) => rosnaco(najstarszeNowe(a.s), najstarszeNowe(b.s)));
   const bezNowych = sprawy.filter((x) => x.s.nowe.length === 0);
-  const naDzis = bezNowych.filter((x) => x.s.dzis || x.s.poTerminie).sort(poKroku);
-  const czekaja = bezNowych.filter((x) => !x.s.dzis && !x.s.poTerminie).sort(poKroku);
+  const naDzis = bezNowych.filter((x) => x.s.dzis || x.s.poTerminie || pilna(x.s)).sort(poKroku);
+  const czekaja = bezNowych.filter((x) => !x.s.dzis && !x.s.poTerminie && !pilna(x.s)).sort(poKroku);
 
   return [
     ...zNowymi.map((x) => naWierszMoich(x.s, x.at, false)),

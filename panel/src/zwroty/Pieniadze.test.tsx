@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { Pieniadze } from "./Pieniadze";
 import type { AkcjeKlawiszy } from "./klawisze";
 import type { StanZwrotuPieniedzy } from "../api/typy";
@@ -17,9 +18,18 @@ const stan = (n: Partial<StanZwrotuPieniedzy> = {}): StanZwrotuPieniedzy => ({
   przelew: null, moznaZapisacPrzelew: false, powodPrzelewu: null, ...n,
 });
 
+/* Router, bo zdanie o dosyłce prowadzi odnośnikiem do profilu klienta. */
 const ekran = (n: Partial<Parameters<typeof Pieniadze>[0]> = {}) =>
   render(<Pieniadze stan={stan()} trwa={false} blad=""
-    onZwroc={vi.fn()} onOdmow={vi.fn()} {...n} />);
+    onZwroc={vi.fn()} onOdmow={vi.fn()} {...n} />, { wrapper: MemoryRouter });
+
+type Odmowa = NonNullable<StanZwrotuPieniedzy["odmowa"]>;
+const odmowa = (n: Partial<Odmowa> = {}): Odmowa => ({
+  kod: "NEW_ITEM_SENT", powod: null, kiedy: "2026-09-27T10:00:00Z", dosylka: null, sledzicDosylke: false, ...n,
+});
+/** Stan po odmowie — tak go oddaje serwer po odświeżeniu szczegółu. */
+const poOdmowie = (n: Partial<Odmowa> = {}) =>
+  stan({ moznaZwrocic: false, moznaOdmowic: false, odmowa: odmowa(n) });
 
 describe("Pieniądze przy zwrocie", () => {
   it("pokazuje kwotę i przycisk, gdy da się oddać", () => {
@@ -212,5 +222,97 @@ describe("Pieniądze przy zwrocie", () => {
   it("bez zgody serwera pola przelewu nie ma wcale", () => {
     ekran({ stan: stan({ moznaZapisacPrzelew: false }), onPrzelew: vi.fn() });
     expect(screen.queryByLabelText("Numer przelewu")).toBeNull();
+  });
+
+  /* ── Odmowa z kodem dosyłki (@wydanie) ────────────────────────────────────
+     Zła paczka wraca, biuro odmawia wypłaty kodem „Wysłaliśmy nowy towar”
+     i wysyła właściwy towar. Testy pilnują czterech rzeczy: kod mówi słowami,
+     a nie nazwą pola Allegro; formularz odmowy nie dostaje nowego wyboru, tylko
+     zdanie o skutku; stan dosyłki prowadzi do profilu; a nieudany zapis u nas
+     nie przykrywa odmowy, która już wyszła.                                  */
+  it("odmowa mówi etykietą kodu, nie surowym `NEW_ITEM_SENT`", () => {
+    ekran({ stan: poOdmowie() });
+    expect(screen.getByText("Odmówiono: „Wysłaliśmy nowy towar”")).toBeInTheDocument();
+    expect(screen.queryByText(/NEW_ITEM_SENT/)).toBeNull();
+  });
+
+  it("kod z uwagą dla operatora traci ją po wysłaniu, a nieznany zostaje surowy", () => {
+    const { unmount } = ekran({ stan: poOdmowie({ kod: "REFUND_REJECTED", powod: "Uszkodzony" }) });
+    expect(screen.getByText("Odmówiono: „Odmawiam zwrotu pieniędzy”")).toBeInTheDocument();
+    unmount();
+    /* Kod przychodzi też synchronizacją; nowy kod Allegro nie ma prawa zniknąć. */
+    ekran({ stan: poOdmowie({ kod: "NOWY_KOD_ALLEGRO" }) });
+    expect(screen.getByText("Odmówiono: „NOWY_KOD_ALLEGRO”")).toBeInTheDocument();
+  });
+
+  it("zdanie o skutku stoi przy kodach dosyłki i tylko przy nich — bez nowego wyboru", async () => {
+    ekran();
+    await userEvent.click(screen.getByRole("button", { name: /Odmów wypłaty/ }));
+    const skutek = /Sprawa klienta dostanie krok „dosłać” i śledzenie dosyłki\./;
+    expect(screen.queryByText(skutek)).toBeNull();
+    for (const [kod, jest] of [["NEW_ITEM_SENT", true], ["MISSING_PART_SENT", true],
+      ["REFUND_REJECTED", false], ["ITEM_FIXED", false], ["NO_RETURN_RIGHT", false]] as const) {
+      await userEvent.selectOptions(screen.getByLabelText("Kod odmowy"), kod);
+      if (jest) expect(screen.getByText(skutek)).toBeInTheDocument();
+      else expect(screen.queryByText(skutek)).toBeNull();
+    }
+    /* Dekalog p. 5: jedna lista kodów i jedno pole powodu, jak przed dosyłką. */
+    expect(screen.getAllByRole("combobox")).toHaveLength(1);
+    expect(screen.getAllByRole("textbox")).toHaveLength(1);
+    expect(screen.queryByRole("checkbox")).toBeNull();
+  });
+
+  it("pod odmową stoi stan dosyłki w barwie tonu i odnośnik do profilu", () => {
+    ekran({ stan: poOdmowie({ dosylka: { opis: "Przewoźnik zgłosił problem z dosyłką",
+      login: "Client:105505227", ton: "zle" } }) });
+    expect(screen.getByText("Przewoźnik zgłosił problem z dosyłką").className).toContain("text-ranga-zle");
+    /* Login bywa z dwukropkiem — adres profilu idzie zakodowany. */
+    expect(screen.getByRole("link", { name: /profil klienta/ }))
+      .toHaveAttribute("href", "/obsluga/klient/Client%3A105505227");
+    expect(screen.queryByRole("button", { name: "Śledź dosyłkę" })).toBeNull();
+  });
+
+  it("dosyłki nikt nie śledzi — zdanie i jeden przycisk, który woła ponowienie", async () => {
+    const onSledzDosylke = vi.fn();
+    ekran({ stan: poOdmowie({ sledzicDosylke: true }), onSledzDosylke });
+    expect(screen.getByText("Dosyłki nie śledzimy.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Śledź dosyłkę" }));
+    expect(onSledzDosylke).toHaveBeenCalledTimes(1);
+    /* Wołanie bez argumentów: ciała trasa nie przyjmuje, zwrot zna ekran. */
+    expect(onSledzDosylke).toHaveBeenCalledWith();
+  });
+
+  it("w trakcie zapisu „Śledź dosyłkę” jest zablokowane", () => {
+    ekran({ stan: poOdmowie({ sledzicDosylke: true }), onSledzDosylke: vi.fn(), trwa: true });
+    expect(screen.getByRole("button", { name: "Śledź dosyłkę" })).toBeDisabled();
+  });
+
+  it("nieudane założenie mówi najpierw, że odmowa wyszła", () => {
+    ekran({ stan: poOdmowie({ sledzicDosylke: true }), onSledzDosylke: vi.fn(),
+      wynikDosylki: { zalozona: false, blad: "Zwrot nie ma numeru zamówienia." } });
+    expect(screen.getByText(
+      "Odmowa wysłana; śledzenia dosyłki nie założono — Zwrot nie ma numeru zamówienia.")).toBeInTheDocument();
+    /* Ponowienie stoi obok, z odświeżonego stanu — nie trzeba go szukać. */
+    expect(screen.getByRole("button", { name: "Śledź dosyłkę" })).toBeInTheDocument();
+  });
+
+  it("zastąpiony krok sprawy klienta dostaje jednorazowe zdanie, pusty — żadnego", () => {
+    const { unmount } = ekran({ stan: poOdmowie(),
+      wynikDosylki: { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z", zastapil: "czekamy na zwrot" } });
+    expect(screen.getByText("Krok sprawy klienta: „dosłać” zamiast „czekamy na zwrot”")).toBeInTheDocument();
+    unmount();
+    ekran({ stan: poOdmowie(),
+      wynikDosylki: { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z", zastapil: null } });
+    expect(screen.queryByText(/Krok sprawy klienta/)).toBeNull();
+    expect(screen.queryByText(/nie założono/)).toBeNull();
+  });
+
+  it("formularz odmowy znika, gdy odmowa już stoi — drugiej Allegro nie przyjmie", async () => {
+    const { rerender } = ekran();
+    await userEvent.click(screen.getByRole("button", { name: /Odmów wypłaty/ }));
+    expect(screen.getByLabelText("Kod odmowy")).toBeInTheDocument();
+    rerender(<Pieniadze stan={poOdmowie()} trwa={false} blad="" onZwroc={vi.fn()} onOdmow={vi.fn()} />);
+    expect(screen.queryByLabelText("Kod odmowy")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Wyślij odmowę/ })).toBeNull();
   });
 });

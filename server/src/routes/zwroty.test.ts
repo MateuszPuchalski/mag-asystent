@@ -1,4 +1,4 @@
-import { before, beforeEach, test } from "node:test";
+import { afterEach, before, beforeEach, mock, test } from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
 import os from "node:os";
@@ -35,7 +35,10 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["zwrot_zdarzenie", "zwrot_klienta_pozycja", "zwrot_klienta", "allegro_zwrot",
+  /* `klient_prowadzenie` pierwszy (@wydanie): odmowa z kodem dosyłki zakłada
+     sprawę klienta, a jej prowadzący to klucz obcy do `app_user` bez kaskady.
+     Kaskada zabiera przy okazji `klient_dosylka`. */
+  for (const t of ["klient_prowadzenie", "zwrot_zdarzenie", "zwrot_klienta_pozycja", "zwrot_klienta", "allegro_zwrot",
     "zamowienie_klienta_pozycja", "zamowienie_klienta", "allegro_zamowienie",
     "oferta_kartoteka", "sgt_faktura_pozycja", "sgt_faktura", "sgt_towar",
     "channel_account", "events", "device_session", "app_user"]) {
@@ -105,6 +108,8 @@ const TRASY = () => [
   /* Przyjęcie paczki nieodebranej (0.493.0) zakłada zwrot, czyli przyszłe
      pieniądze do oddania. Decyzja biura, nie hali. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/przyjmij-nieodebrana" },
+  /* „Śledź dosyłkę” (@wydanie) zakłada krok w sprawie klienta — praca biura. */
+  { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/dosylka` },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -179,7 +184,7 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("zwroty mają trzydzieści sześć tras POST, każda z uzasadnieniem", async () => {
+test("zwroty mają trzydzieści siedem tras POST, każda z uzasadnieniem", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -378,15 +383,20 @@ test("zwroty mają trzydzieści sześć tras POST, każda z uzasadnieniem", asyn
      kliknięciem przy zamówieniu z wyniku szukania. Nowa decyzja właściciela,
      po pytaniu „jak procesujemy paczki nieodebrane". Formularz z 0.451.0 nie
      wraca: trasa niczego nie pyta, bierze zamówienie wskazane przez biuro. */
-  assert.equal(posty.length, 36,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu sześciu`);
+  /* Trzydziesta siódma (@wydanie): „Śledź dosyłkę” przy zwrocie. Odmowa
+     z kodem dosyłki zakłada śledzenie sama, w tym samym ruchu; ta trasa jest
+     PONOWIENIEM, gdy odmowa przeszła, a zapis dosyłki nie — odmowy w Allegro
+     nie da się powtórzyć, więc bez niej dosyłka takiego zwrotu przepadałaby.
+     Pieniędzy nie rusza i nie ma ciała. */
+  assert.equal(posty.length, 37,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu siedmiu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
     "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono",
-    "kosz/nowy", "kosz/usun", "paczki-klienta/allegro", "przyjmij-nieodebrana"]) {
+    "kosz/nowy", "kosz/usun", "paczki-klienta/allegro", "przyjmij-nieodebrana", ":id/dosylka"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
   /* Formularza rejestracji nie ma i nie ma wrócić przypadkiem — np. przy
@@ -1008,4 +1018,101 @@ test("nieznane zamówienie albo zamówienie bez pozycji nie zakłada pustego zwr
   }
   assert.equal((db().prepare(
     "SELECT COUNT(*) AS n FROM zwrot_klienta WHERE zrodlo='nieodebrana'").get() as { n: number }).n, 0);
+});
+
+/* ── Odmowa z dosyłką i „Śledź dosyłkę” (@wydanie) ───────────────────────────
+   Trasa odmowy składa dwa serwisy. Pilnujemy trzech rzeczy: dosyłka jedzie
+   w odpowiedzi tylko przy kodach dosyłki; porażka jej zapisu NIE zamienia
+   nieodwracalnej odmowy w błąd; ponowienie jest idempotentne. */
+function tokenAllegro(jest: boolean) {
+  db().prepare("DELETE FROM allegro_token").run();
+  if (jest) {
+    db().prepare(`INSERT INTO allegro_token(id,access_token,refresh_token,wygasa_at,srodowisko,
+      polaczono_at,polaczono_przez) VALUES (1,'tok','ref',?, 'prod','2026-09-01T00:00:00Z','test')`)
+      .run(new Date(Date.now() + 86_400_000).toISOString());
+  }
+}
+/** Allegro przyjmuje odmowę: 200 bez ciała, jak `POST …/rejection`. Liczy strzały. */
+function allegroPrzyjmuje() {
+  const s = { strzalow: 0 };
+  mock.method(globalThis, "fetch", async () => { s.strzalow += 1; return new Response("", { status: 200 }); });
+  return s;
+}
+afterEach(() => { mock.restoreAll(); tokenAllegro(false); });
+
+const zapisyDosylki = () => db().prepare(`SELECT type, payload FROM events
+    WHERE type LIKE 'klient_%' ORDER BY id`).all() as Array<{ type: string; payload: string }>;
+
+test("odmowa „Wysłaliśmy nowy towar” zakłada dosyłkę w tym samym ruchu; inny kod — nie", async () => {
+  const { naglowki } = login("biuro", "Ala odmawia");
+  tokenAllegro(true);
+  const allegro = allegroPrzyjmuje();
+  db().prepare("UPDATE zwrot_klienta SET kupujacy_login='kupiec_77' WHERE id=?").run(zwrot);
+  const r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/odmowa-platnosci`,
+    headers: naglowki, payload: { kod: "NEW_ITEM_SENT", wersja: 1 } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(allegro.strzalow, 1);
+  const j = r.json<{ kod: string; wersja: number; dosylka: { zalozona: boolean; login: string; krokDo: string;
+    zastapil: string | null } }>();
+  assert.deepEqual([j.kod, j.wersja, j.dosylka.zalozona, j.dosylka.login, j.dosylka.zastapil],
+    ["NEW_ITEM_SENT", 2, true, "kupiec_77", null]);
+  assert.ok(Date.parse(j.dosylka.krokDo) > Date.now());
+
+  const szczegol = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
+  const odm = szczegol.json<{ pieniadze: { odmowa: { dosylka: { opis: string; login: string } | null;
+    sledzicDosylke: boolean } } }>().pieniadze.odmowa;
+  assert.deepEqual([odm.dosylka?.opis, odm.dosylka?.login, odm.sledzicDosylke],
+    ["Czekamy na numer dosyłki z Allegro", "kupiec_77", false]);
+
+  /* Ponowienie: sukces bez nowych zapisów i bez nowych wpisów. */
+  const przed = zapisyDosylki().length;
+  const p = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/dosylka`, headers: naglowki });
+  assert.equal(p.statusCode, 200, p.body);
+  assert.equal(p.json<{ zalozona: boolean }>().zalozona, true);
+  assert.equal(zapisyDosylki().length, przed);
+  assert.deepEqual(zapisyDosylki().map((e) => e.type), ["klient_sprawa_krok", "klient_dosylka_zalozona"]);
+  assert.doesNotMatch(JSON.stringify(zapisyDosylki()), /kupiec_77/);
+
+  /* Inny kod: odpowiedź bez pola `dosylka`, sprawy klienta nikt nie zakłada. */
+  const drugi = Number(db().prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,order_id,kupujacy_login,
+      created_at,synced_at) SELECT channel_account_id,'zw-2','ord-2','kupiec_78',created_at,synced_at
+    FROM zwrot_klienta WHERE id=?`).run(zwrot).lastInsertRowid);
+  const inny = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${drugi}/odmowa-platnosci`,
+    headers: naglowki, payload: { kod: "ITEM_FIXED", wersja: 1 } });
+  assert.equal(inny.statusCode, 200, inny.body);
+  assert.equal("dosylka" in inny.json(), false);
+  assert.equal(db().prepare("SELECT count(*) n FROM klient_prowadzenie WHERE login='kupiec_78'").get()!.n, 0);
+});
+
+test("porażka zapisu dosyłki nie zamienia odmowy w błąd: 200, `zalozona: false` i stałe zdanie", async () => {
+  const { naglowki } = login("biuro", "Ala odmawia drugi raz");
+  tokenAllegro(true);
+  allegroPrzyjmuje();
+  /* Zwrot bez loginu kupującego — dosyłki nie ma do czyjej sprawy przypiąć. */
+  const r = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/odmowa-platnosci`,
+    headers: naglowki, payload: { kod: "MISSING_PART_SENT", wersja: 1 } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.deepEqual(r.json().dosylka, { zalozona: false, blad: "Zwrot nie ma loginu kupującego" });
+  assert.equal((db().prepare("SELECT odmowa_kod FROM zwrot_klienta WHERE id=?").get(zwrot) as { odmowa_kod: string })
+    .odmowa_kod, "MISSING_PART_SENT", "nieodwracalna odmowa jest zapisana");
+  assert.equal(db().prepare("SELECT count(*) n FROM klient_dosylka").get()!.n, 0);
+
+  const szczegol = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
+  assert.equal(szczegol.json().pieniadze.odmowa.sledzicDosylke, false, "przycisk, który zawsze odmawia, nie staje");
+
+  /* Po dopisaniu loginu przycisk staje, a ponowienie zakłada dosyłkę — bez ciała żądania. */
+  db().prepare("UPDATE zwrot_klienta SET kupujacy_login='kupiec_79' WHERE id=?").run(zwrot);
+  const teraz = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
+  assert.equal(teraz.json().pieniadze.odmowa.sledzicDosylke, true);
+  const p = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/dosylka`, headers: naglowki });
+  assert.equal(p.statusCode, 200, p.body);
+  assert.deepEqual([p.json().zalozona, p.json().login], [true, "kupiec_79"]);
+  assert.equal(db().prepare("SELECT count(*) n FROM klient_dosylka").get()!.n, 1);
+
+  /* Zwrot bez odmowy z kodem dosyłki: 400 ze zdaniem, nie 500. */
+  db().prepare("UPDATE zwrot_klienta SET odmowa_kod='ITEM_FIXED' WHERE id=?").run(zwrot);
+  db().prepare("DELETE FROM klient_prowadzenie").run();
+  const zle = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/dosylka`, headers: naglowki });
+  assert.equal(zle.statusCode, 400, zle.body);
+  assert.match(zle.json().error, /kodem dosyłki/);
 });

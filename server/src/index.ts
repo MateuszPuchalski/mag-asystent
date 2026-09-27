@@ -85,6 +85,7 @@ import {
 import { przebiegSieci } from "./services/pasowanie-od-silnika.js";
 import { sondujRzeczywistosc } from "./services/sonda-rzeczywistosci.js";
 import { uruchomTakt } from "./services/takt.js";
+import { ODSTEP_DOSYLEK_MS, sledzDosylki } from "./services/dosylka.js";
 import { czytajStan, problemyKopii, wOknieNocnym } from "./services/kopie-bazy.js";
 import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
 import { przebiegRaportow, TAKT_RAPORTOW_MS } from "./services/raport-tygodnia.js";
@@ -578,6 +579,17 @@ async function main() {
        będzie, a agent i tak potrzebuje wiedzieć, o czym rozmawia. Partia
        mieści się w jednym żądaniu, więc ten takt to jedno wywołanie na cykl. */
     uruchomTakt("allegro-oferty", config.allegro.ofertySyncMs, async () => { await uzupelnijOferty(); });
+    /* Dosyłka (@wydanie): wykrycie numeru przy zamówieniu i śledzenie paczki
+       dla spraw klienta w toku. Osobny takt, nie doklejony do zwrotów —
+       jedna końcówka nie ma prawa zabrać drugiej, gdy odpowie błędem (blizna
+       0.149.2). Rytm i powód piętnastu minut przy `ODSTEP_DOSYLEK_MS`. Przebieg
+       bez dosyłek w toku nie wysyła ani jednego żądania. */
+    uruchomTakt("dosylki", ODSTEP_DOSYLEK_MS, async () => {
+      const w = await sledzDosylki();
+      if (w.wykryte || w.doreczone || w.problemy) {
+        console.log(`[dosylki] numerów: ${w.wykryte}, doręczonych: ${w.doreczone}, z kłopotem: ${w.problemy}`);
+      }
+    });
     /* TEST NA ŻYWYM ALLEGRO RAZ DZIENNIE (0.495.0). Te same drogi co
        produkcja, bez atrap; wynik na ekranie Stan i w DO DECYZJI przy
        błędzie. Powód: `services/sonda-rzeczywistosci.ts`. */

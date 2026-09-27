@@ -3,6 +3,7 @@ import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { dopasujPozycjeZamowienia } from "./dopasowanie-sku.js";
 import { logEvent } from "./events.js";
 import { iloscLiczona } from "./ilosc-zwrotu.js";
+import { DOSYLKI_SQL, jestKodemDosylki, naDosylkeSprawy, type TonDosylki } from "./dosylka-opis.js";
 
 /* ── Zwrot pieniędzy i odmowa w Allegro (0.190.0) ────────────────────────────
 
@@ -71,7 +72,7 @@ const POWOD_ZWROTU = "REFUND";
 
 type Wiersz = {
   id: number; external_id: string; order_id: string | null;
-  channel_account_id: number; wersja: number;
+  channel_account_id: number; wersja: number; kupujacy_login: string | null;
   werdykt: string | null; zamkniety_at: string | null;
   kwota_grosze: number | null; kwota_dostawa_grosze: number | null;
   waluta: string | null;
@@ -87,7 +88,7 @@ type Wiersz = {
 };
 
 const wczytaj = (database: Db, zwrotId: number): Wiersz => {
-  const w = database.prepare(`SELECT z.id, z.external_id, z.order_id, z.channel_account_id,
+  const w = database.prepare(`SELECT z.id, z.external_id, z.order_id, z.channel_account_id, z.kupujacy_login,
       z.wersja, z.werdykt, z.zamkniety_at, z.kwota_grosze, z.kwota_dostawa_grosze,
       z.zwrot_pieniedzy_id, z.zwrot_pieniedzy_command_id,
       z.zwrot_pieniedzy_status, z.zwrot_pieniedzy_at,
@@ -198,7 +199,13 @@ export type StanZwrotuPieniedzy = {
      */
     potwierdzone: boolean;
   } | null;
-  odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
+  odmowa: {
+    kod: string; powod: string | null; kiedy: string | null;
+    /** Dosyłka tego zwrotu (@wydanie): po zwrocie, a bez niego po zamówieniu i koncie. */
+    dosylka: { opis: string; login: string; ton: TonDosylki } | null;
+    /** Kod dosyłki, zamówienie znane, a dosyłki nikt nie śledzi — ekran proponuje „Śledź dosyłkę”. */
+    sledzicDosylke: boolean;
+  } | null;
   /**
    * Ślad po przelewie oddanym POZA Allegro (0.269.0) — przy pobraniu jedyny,
    * jaki może istnieć. To notatka biura o ruchu pieniędzy, nie sam ruch:
@@ -238,6 +245,26 @@ function bramkaPrzelewu(w: Wiersz): { moznaZapisacPrzelew: boolean; powodPrzelew
 }
 
 /**
+ * Dosyłka pod odmową wypłaty (@wydanie). Najpierw ta założona z TEGO zwrotu,
+ * potem dosyłka tego samego zamówienia na tym samym koncie — np. wpisana
+ * ręką na profilu, zanim ktoś odmówił wypłaty. Surowy SQL i zdanie
+ * z `dosylka-opis.ts`, nie import `dosylka.ts`: tamten plik importuje sprawę
+ * klienta, a ten czyta synchronizacja zwrotów — cykl czekałby za rogiem.
+ */
+function dosylkaZwrotu(
+  database: Db, w: Wiersz, teraz: Date,
+): { opis: string; login: string; ton: TonDosylki } | null {
+  const d = database.prepare(`SELECT x.*, p.login FROM (${DOSYLKI_SQL}) x
+      JOIN klient_prowadzenie p ON p.id = x.sprawa_id
+     WHERE x.zwrot_id = ? OR (x.zamowienie = ? AND x.konto = ?)
+     ORDER BY x.zwrot_id = ? DESC, julianday(x.zalozono_at) DESC LIMIT 1`)
+    .get(w.id, w.order_id ?? "", w.channel_account_id, w.id) as Record<string, unknown> | undefined;
+  if (!d) return null;
+  const { opis, ton } = naDosylkeSprawy(d, teraz);
+  return { opis, ton, login: String(d.login) };
+}
+
+/**
  * Czy da się oddać pieniądze przez API i czego brakuje.
  *
  * PRZESZKODY SĄ WYMIENIONE PO IMIENIU, nie zwinięte w jedno „nie można".
@@ -246,9 +273,10 @@ function bramkaPrzelewu(w: Wiersz): { moznaZapisacPrzelew: boolean; powodPrzelew
  * znaczy, że operator nie skończył zaznaczania.
  */
 export function stanZwrotuPieniedzy(
-  database: Db = defaultDb(), zwrotId: number,
+  database: Db = defaultDb(), zwrotId: number, teraz = new Date(),
 ): StanZwrotuPieniedzy {
   const w = wczytaj(database, zwrotId);
+  const dosylka = w.odmowa_kod ? dosylkaZwrotu(database, w, teraz) : null;
   const podstawa = {
     kwotaGrosze: w.kwota_grosze == null ? null : Number(w.kwota_grosze),
     waluta: w.waluta ?? "PLN",
@@ -265,7 +293,13 @@ export function stanZwrotuPieniedzy(
       }
       : null,
     odmowa: w.odmowa_kod
-      ? { kod: w.odmowa_kod, powod: w.odmowa_powod, kiedy: w.odmowa_at } : null,
+      ? {
+        kod: w.odmowa_kod, powod: w.odmowa_powod, kiedy: w.odmowa_at, dosylka,
+        /* Bez loginu kupującego dosyłki nie ma do czyjej sprawy przypiąć —
+           przycisk, który zawsze odmawia, uczyłby nie klikać żadnego. */
+        sledzicDosylke: jestKodemDosylki(w.odmowa_kod) && Boolean(w.order_id) && Boolean(w.kupujacy_login)
+          && dosylka === null,
+      } : null,
     przelew: w.przelew_at
       ? { kiedy: w.przelew_at, przez: w.przelew_przez, referencja: w.przelew_referencja }
       : null,

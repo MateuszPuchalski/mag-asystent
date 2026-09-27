@@ -940,7 +940,8 @@ z sygnałem „status?", żeby właściciel potwierdził wartość na żywym kon
 Ta sekcja różni się od poprzednich pochodzeniem po raz drugi, tym razem na
 lepsze. Od 0.151.0 cała specyfikacja Allegro leży w repo
 (`docs/allegro/swagger.yaml`), więc pola niżej odczytano ze SCHEMATU, nie
-z pamięci ani z kopii sprzed dwóch lat. Znaczników tu nie ma.
+z pamięci ani z kopii sprzed dwóch lat. Znacznik stoi tu jeden, przy
+dosyłce, i dotyczy faktu podanego przez właściciela, nie kształtu.
 
 ### `GET /order/checkout-forms/{id}`
 
@@ -983,6 +984,28 @@ kształtu pytamy więc najpierw „client:”, a przy pustej odpowiedzi „Clien
 Znacznik weryfikacji przy rozmówcy w wiadomościach został wtedy, bo zrzut
 dotyczył zamówienia, a nie wątku. Zdjęto go 24 września 2026 — rozdział
 `GET /messaging/threads`.
+
+### `GET /order/checkout-forms/{id}/shipments` — dosyłka (@wydanie)
+
+Schemat `CheckoutFormOrderWaybillResponse`: `shipments[]` z elementem
+`CheckoutFormAddWaybillCreated`. Bierzemy `waybill`, `carrierId` i `createdAt`,
+czyli „Date and time of the parcel tracking number registration in UTC".
+Schemat nie ma listy `required`, więc każde z tych pól może nie przyjść.
+
+Końcówkę pyta od 0.393.0 przycisk przesyłki zamówienia, a od @wydanie ticker
+dosyłki. Lista niesie WSZYSTKIE numery zamówienia: pierwszą paczkę, czasem
+numer zwrotu i wcześniejsze dosyłki. Dosyłkę wybiera `wybierzNumer`
+w `services/dosylka.ts`. Odrzuca numery paczek zwrotów tego zamówienia:
+`waybill` i `transportingWaybill` z `CustomerReturnReturnParcel` w lądowisku.
+Odrzuca też numer zarejestrowany przed zgłoszeniem zwrotu i paczkę doręczoną
+przed nim — to pierwsza paczka.
+
+`[WERYFIKUJ]` **Numer dosyłki stoi przy tym samym zamówieniu w Allegro.** Tak
+podał właściciel 27 września 2026, bez sprawdzenia na żywym koncie. Etykietę
+drukuje Sellasist, a specyfikacja nie mówi, czy Sellasist dopisuje numer do
+zamówienia. Pomyłka nie daje złego numeru, tylko jego brak: po dwóch dniach
+roboczych karta sprawy prosi o numer z Sellasist. Rozstrzygnie miara z S6,
+czyli udział numerów wpisanych ręką.
 
 ### `external.id` — mostek do kartoteki
 

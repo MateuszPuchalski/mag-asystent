@@ -1152,15 +1152,54 @@ roli stoi na każdej trasie, także na odczycie.
 
 **Krok nie niesie adresu ani telefonu.** To reguła dla człowieka, bo pole jest
 wolnym tekstem i kod jej nie wymusi. Wyjątek z 0.422.0 dotyczy mapowania
-zamówień, nie tego pola. Numer przesyłki dosyłki dostanie w następnym
-przyroście własną kolumnę. Stanie przy niej własne uzasadnienie, bo numer
-prowadzi do adresu odbiorcy.
+zamówień, nie tego pola. Numer przesyłki dosyłki ma od @wydanie własną
+kolumnę i własne uzasadnienie — rozdział niżej.
 
 **Retencji nie ma, tak jak przy notatce o kliencie.** Wiersz żyje tak długo
 jak klient w bazie. Zakończona sprawa budzi się tylko przez trzydzieści dni
 (S6), ale profil dalej pokazuje jej ostatni krok i to, kto ją prowadził.
 Kasowanie po czasie zabrałoby agentowi ten ślad przy następnym kontakcie
 klienta. O archiwizacji decyduje właściciel, nie kod, jak przy `events`.
+
+## Polityka danych dosyłki (@wydanie)
+
+Drugi przyrost sprawy klienta (S6) dokłada tabelę `klient_dosylka`. Jej
+granice stoją osobno, bo przy sprawie po raz pierwszy leży numer przesyłki.
+
+**Co zapisujemy.** Numer zamówienia z kontem kanału, numer przesyłki dosyłki
+i identyfikator przewoźnika z Allegro. Obok stoi wynik śledzenia: ostatni kod
+statusu, pierwsze doręczenie i chwila ostatniego pytania. Historii statusów
+nie ma, bo żyje u przewoźnika. Autora też nie ma: stoi w dzienniku, a klucz
+do `app_user` blokowałby kasowanie kont.
+
+**Numer przesyłki leży tak jak numer pierwszej paczki.** Trzymają go już
+`zamowienie_klienta.przesylka_waybill` (0.393.0) i `zwrot_klienta.waybill`
+(0.172.0). Powód jest ten sam: bez numeru nie ma śledzenia, a agent kopiuje go
+do Sellasist albo do rozmowy z przewoźnikiem. W systemie przewoźnika numer
+prowadzi do adresu odbiorcy, więc nie wychodzi dalej niż ta tabela i karta
+sprawy na profilu.
+
+**Czego nie ma i nie będzie.** Adresu, telefonu ani nazwy odbiorcy dosyłki:
+jedzie na adres zamówienia, a ten już znamy. Treści odpowiedzi Allegro nie ma
+w zdaniach błędów ani w logu tickera, bo bywa czymkolwiek.
+
+**Numer przesyłki nie wychodzi dalej.** Nie idzie do dziennika: zdarzenia
+`klient_dosylka_*` niosą numer sprawy, źródło numeru i kod statusu. Nie
+dostaje go Copilot: szkic zna tylko stan drugiej paczki, tak jak pierwszej
+(`zdaniePrzesylki`). Nie ma go w eksporcie CSV, w migawce doby ani w raporcie
+tygodnia. Każdy z nich wybiera tabele i pola z nazwy, więc nowa tabela nie
+wchodzi do nich sama. Kopia bazy niesie ją jak każdą inną tabelę.
+
+**Numer jedzie w ciele żądania, nie w adresie.** Adres ląduje w logu żądań
+serwera i w audycie odrzuceń. Trasy dosyłki stoją pod `/api/obsluga/klient/`,
+więc audyt pisze wzorzec trasy zamiast loginu, jak przy pozostałych zapisach
+sprawy.
+
+**Retencja idzie za sprawą.** Wiersz znika razem ze sprawą klienta (kaskada),
+a zwrot skasowany przy sprzątaniu zostawia dosyłkę bez odnośnika. Ticker
+przestaje pytać po trzydziestu dniach od założenia, ale numeru nie kasuje:
+przy reklamacji dosyłki agent potrzebuje go tak samo jak numeru pierwszej
+paczki.
 
 ## Co się nie zmienia
 

@@ -105,6 +105,34 @@ describe("Ekran Moje", () => {
       .toEqual(["/obsluga/klient/zielony", "/obsluga/skrzynka/11"]);
   });
 
+  /* Dosyłka (@wydanie) stoi po prawej ZAMIAST „dziś” i „czeka do”, a nie
+     doklejona do opisu: opis jest ucięty i dopisek znikałby przy długim
+     kroku. Obudzona i po terminie dalej wygrywają — to one każą działać. */
+  it("wiersz sprawy z dosyłką mówi o paczce, nie o dacie", () => {
+    moje.mockReturnValue({ data: { lista: [
+      sprawa({ kolejka: "klient", id: 5, opis: "zielony: dosłać", login: "zielony",
+        terminDo: "2026-10-05T06:00:00Z", czeka: true, dosylka: "Dosyłka w drodze (stan z 14:10)" }),
+      sprawa({ kolejka: "klient", id: 6, opis: "ogrodnik_7: dosłać", login: "ogrodnik_7", terminDo: null, dzis: true,
+        dosylka: "Allegro nie ma numeru dosyłki od 2 dni roboczych — wpisz go z Sellasist" }),
+      sprawa({ kolejka: "klient", id: 7, opis: "kosiarz: dosłać", login: "kosiarz", nowe: "Klient napisał 27.09 10:00",
+        dosylka: "Dosyłka w drodze (stan z 14:10)" }),
+    ] }, isLoading: false });
+
+    render(<MemoryRouter><Moje /></MemoryRouter>);
+    const [czeka, naDzis, obudzona] = screen.getAllByRole("listitem");
+    expect(czeka).toHaveTextContent("Dosyłka w drodze (stan z 14:10)");
+    expect(czeka).not.toHaveTextContent(/czeka do/);
+    /* Opis zostaje sam: dosyłka nie wchodzi do uciętego pola. */
+    expect(screen.getByText("zielony: dosłać").textContent).toBe("zielony: dosłać");
+    /* Serwer postawił wiersz „na dziś” — pogrubienie, zamiast gołego „dziś”. */
+    const pilna = screen.getByText(/wpisz go z Sellasist/);
+    expect(pilna.className).toContain("font-semibold");
+    expect(naDzis).not.toHaveTextContent(/dziś$/);
+    expect(obudzona).toHaveTextContent("Klient napisał 27.09 10:00");
+    expect(obudzona).not.toHaveTextContent("Dosyłka w drodze");
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
+
   it("nie ma tu ani jednego przycisku pracy — to odczyt, nie piąta kolejka", () => {
     moje.mockReturnValue({ data: { sprawy: [sprawa()] }, isLoading: false });
 

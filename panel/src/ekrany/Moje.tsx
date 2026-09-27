@@ -105,12 +105,22 @@ export function Moje() {
 /* Prawa strona wiersza sprawy klienta — JEDNO zdanie, nie trzy. Obudzona
    mówi, CO klient zrobił, i nic więcej: sprawa zakończona też bywa obudzona,
    a jej stary „po terminie" byłby na czerwono nieprawdą. Czerwień wyłącznie
-   po terminie; „dziś" i „czeka do" to informacja, nie alarm. */
+   po terminie; „dziś" i „czeka do" to informacja, nie alarm.
+
+   DOSYŁKA (@wydanie) ZASTĘPUJE „dziś” i „czeka do”, a nie dokleja się do
+   opisu. Opis jest ucięty, więc dopisek znikałby właśnie przy długim kroku.
+   Sprawa z krokiem „dosłać” czeka na paczkę, a nie na datę. Samo „dziś”
+   przy dosyłce bez numeru nie mówiłoby, co zrobić. Pogrubienie niesie to,
+   co niosło „dziś”: serwer postawił wiersz na dziś. */
 function StanKroku({ s }: { s: MojaSprawa }) {
   if (s.nowe) return <span className="shrink-0 font-semibold text-slate-900">{s.nowe}</span>;
   if (s.poTerminie) {
     return <span className="shrink-0 font-semibold text-ranga-zle">
       po terminie{s.terminDo && ` · ${termin(s.terminDo)}`}</span>;
+  }
+  if (s.dosylka) {
+    return <span className={`shrink-0 ${s.dzis ? "font-semibold text-slate-900" : "text-xs text-slate-600"}`}>
+      {s.dosylka}</span>;
   }
   if (s.dzis) return <span className="shrink-0 font-semibold text-slate-900">dziś</span>;
   if (s.czeka && s.terminDo) {

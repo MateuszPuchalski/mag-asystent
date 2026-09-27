@@ -32,6 +32,7 @@ export const ZDARZENIA: readonly string[] = [
   "http_rejected", "karton_anulowany", "karton_ilosc", "karton_pozycja",
   "karton_pozycja_usunieta", "karton_zalozony", "karton_zatwierdzony",
   "klasyfikacja_mapowanie_do_przegladu", "konfiguracja_zmieniona", "kopia_bazy", "klient_notatka", "klient_notatka_cofnieta", "klient_notatka_zdjeta", "klient_odrzucona",
+  "klient_dosylka_doreczona", "klient_dosylka_numer", "klient_dosylka_problem", "klient_dosylka_zalozona",
   "klient_sprawa_krok", "klient_sprawa_przejeta", "klient_sprawa_wznowiona", "klient_sprawa_zakonczona", "kolektor_odnaleziony",
   "kolektor_wezwanie_odwolane", "kolektor_wezwany", "kosz_mm_ponowione", "kosz_mm_pozycja_zdjeta", "kosz_pominiecie_cofniete",
   "kosz_pominiecie_zalatwione", "kosz_powrot_mm", "kosz_pozycja_na_pozniej",

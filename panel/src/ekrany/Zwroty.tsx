@@ -3,7 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { List, RefreshCw, Undo2 } from "lucide-react";
 import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, type WynikSkanu } from "../api/zwroty";
 import { Konflikt } from "../api/klient";
-import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, Zwrot } from "../api/typy";
+import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, WynikDosylki, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pieniadze } from "../zwroty/Pieniadze";
 import { Pozycje } from "../zwroty/Pozycje";
@@ -12,7 +12,7 @@ import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
   usePaczkiKlienta, useZamowieniaZAllegro, usePrzyjmijNieodebrana, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
-  useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci,
+  useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci, useSledzDosylkeZwrotu,
   useZapiszPrzelew, useCofnijPrzelew,
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
   useDolozTowar, szukajTowaruDoKosza, type TowarDoKosza, useKosz, usePotwierdzKartoteke,
@@ -357,6 +357,7 @@ export function Zwroty() {
   const rabat = useZglosRabat();
   const pieniadze = useZwrocPieniadze();
   const odmowaPlatnosci = useOdmowPlatnosci();
+  const sledzDosylke = useSledzDosylkeZwrotu();
   const potracenie = usePotracenie();
   const faktura = useFaktura();
   const dopisz = useDopiszPozycje();
@@ -364,6 +365,11 @@ export function Zwroty() {
   const [bladDopisania, setBladDopisania] = useState("");
   const [bladRabatu, setBladRabatu] = useState("");
   const [bladPieniedzy, setBladPieniedzy] = useState("");
+  /* Wynik założenia dosyłki (@wydanie) — zdanie jednorazowe z odpowiedzi.
+     Niesie NUMER ZWROTU, bo pieniądze nie są kluczowane zwrotem: przełączenie
+     na inny zwrot z pamięci podręcznej zostawia sekcję zamontowaną, a zdanie
+     o cudzym kroku stałoby pod cudzymi pieniędzmi. */
+  const [wynikDosylki, setWynikDosylki] = useState<{ zwrotId: number; wynik: WynikDosylki } | null>(null);
   const [bladFaktury, setBladFaktury] = useState("");
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
     || korekta.isPending || cofnijKorekte.isPending || cofnijKwote.isPending
@@ -1207,27 +1213,49 @@ export function Zwroty() {
               przedWerdyktem={zwrot.kubelek === "decyzja"}
               akcje={akcje}
               trwa={pieniadze.isPending || odmowaPlatnosci.isPending
-                || przelew.isPending || cofnijPrzelew.isPending}
+                || przelew.isPending || cofnijPrzelew.isPending || sledzDosylke.isPending}
               blad={bladPieniedzy}
+              wynikDosylki={wynikDosylki?.zwrotId === zwrot.id ? wynikDosylki.wynik : null}
               onZwroc={() => {
                 setBladPieniedzy("");
+                setWynikDosylki(null);
                 pieniadze.mutate({ id: zwrot.id, wersja: zwrot.wersja },
                   { onError: (e) => setBladPieniedzy((e as Error).message) });
               }}
               onPrzelew={(referencja) => {
                 setBladPieniedzy("");
+                setWynikDosylki(null);
                 przelew.mutate({ id: zwrot.id, wersja: zwrot.wersja, referencja },
                   { onError: (e) => setBladPieniedzy((e as Error).message) });
               }}
               onCofnijPrzelew={() => {
                 setBladPieniedzy("");
+                setWynikDosylki(null);
                 cofnijPrzelew.mutate({ id: zwrot.id, wersja: zwrot.wersja },
                   { onError: (e) => setBladPieniedzy((e as Error).message) });
               }}
               onOdmow={(kod, powod) => {
                 setBladPieniedzy("");
-                odmowaPlatnosci.mutate({ id: zwrot.id, kod, powod, wersja: zwrot.wersja },
-                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+                setWynikDosylki(null);
+                const zwrotId = zwrot.id;
+                odmowaPlatnosci.mutate({ id: zwrotId, kod, powod, wersja: zwrot.wersja }, {
+                  onSuccess: (w) => { if (w.dosylka) setWynikDosylki({ zwrotId, wynik: w.dosylka }); },
+                  onError: (e) => setBladPieniedzy((e as Error).message),
+                });
+              }}
+              onSledzDosylke={() => {
+                setBladPieniedzy("");
+                setWynikDosylki(null);
+                const zwrotId = zwrot.id;
+                sledzDosylke.mutate({ id: zwrotId }, {
+                  /* Ta trasa nie wysyła odmowy, więc zdanie „Odmowa wysłana; …”
+                     byłoby tu nieprawdą. Porażka idzie zwykłym błędem sekcji. */
+                  onSuccess: (w) => {
+                    if (w.zalozona) setWynikDosylki({ zwrotId, wynik: w });
+                    else setBladPieniedzy(`Śledzenia dosyłki nie założono — ${w.blad}`);
+                  },
+                  onError: (e) => setBladPieniedzy((e as Error).message),
+                });
               }} />}
             <div className="min-h-0 flex-1 overflow-y-auto">
               {/* `key` na ZWROCIE: przełączenie zwrotu w kolejce ma montować
