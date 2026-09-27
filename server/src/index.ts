@@ -166,6 +166,21 @@ export async function buildApp() {
     // zdjęcia dowodowe lecą jako base64 w JSON (~300 KB → ~400 KB po kodowaniu)
     bodyLimit: 6 * 1024 * 1024,
   });
+  /* PUSTY JSON TO BRAK CIAŁA (0.544.0). Domyślny parser Fastify odrzuca
+     żądanie z `content-type: application/json` i pustą treścią błędem
+     FST_ERR_CTP_EMPTY_JSON_BODY, a ekran pokazuje wtedy gołe „Bad Request".
+     Do tego wydania pilnował tego każdy front z osobna i dwa razy któryś
+     zapomniał. Poprawka tu zamyka klasę błędu dla wszystkich klientów naraz,
+     także tych, których jeszcze nie ma. Niepusta treść idzie dalej domyślnym
+     parserem, więc zły JSON i zatruty `__proto__` dalej kończą się 400. */
+  const parserJson = app.getDefaultJsonParser("error", "error");
+  app.removeContentTypeParser("application/json");
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (req, body, done) => {
+    /* `parseAs: "string"` oddaje napis; typ Fastify dopuszcza też Buffer. */
+    const tresc = String(body);
+    if (tresc === "") return done(null, undefined);
+    parserJson(req, tresc, done);
+  });
   // kontekst żądania (device_id do events) + bramka sesji — przed trasami
   withRequestContext(app);
   // ETag/304 dla odpytywanych odczytów — kolektor rewaliduje zamiast pobierać

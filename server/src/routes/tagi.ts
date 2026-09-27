@@ -5,6 +5,7 @@ import {
   BladTagu, odepnijTag, przelaczTag, przypnijTag, slownikTagow, utworzTag, zmienNazweTagu,
   type OsTagow,
 } from "../services/tagi-spraw.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy tagów spraw (0.279.0) ─────────────────────────────────────────────
    SŁOWNIK JEST WSPÓLNY dla reklamacji i dyskusji, więc trasy słownika stoją
@@ -18,7 +19,7 @@ import {
    OTWARCIE EKRANU NIE ZAPISUJE NIC. `GET` oddaje słownik taki, jaki jest —
    ziarno wsiewa `migrate()` przy starcie procesu, a nie pierwszy odczyt.    */
 
-const BIURO = ["biuro", "admin"];
+const BIURO = ROLE_BIUROWE;
 
 function odmowa(reply: FastifyReply) {
   const s = sesjaZadania();

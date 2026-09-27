@@ -17,6 +17,7 @@ import {
   listRozstrzygniete,
 } from "../services/problems.js";
 import { wycofajZgloszenie } from "../services/cofanie-dostawy.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Faza 2: wyjątki widoczne i mierzalne (D8) ──────────────────────────── */
 
@@ -155,7 +156,7 @@ export async function problemRoutes(app: FastifyInstance) {
     async (req, reply) => {
       const s = sesjaZadania();
       if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
-      if (!["biuro", "admin"].includes(s.user.role)) {
+      if (!ROLE_BIUROWE.includes(s.user.role)) {
         return reply.code(403).send({ error: "Kolizje kodów rozstrzyga biuro" });
       }
       const wynik = rozstrzygnijKolizje(

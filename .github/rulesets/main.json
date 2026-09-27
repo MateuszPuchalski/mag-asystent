@@ -22,7 +22,8 @@
           { "context": "Android" },
           { "context": "Instalator" },
           { "context": "Worker Sfery" },
-          { "context": "Usługa tła" }
+          { "context": "Usługa tła" },
+          { "context": "Zgoda właściciela" }
         ]
       }
     }

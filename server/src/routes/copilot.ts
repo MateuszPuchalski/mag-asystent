@@ -18,6 +18,7 @@ import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
   BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
 } from "../adapters/copilot.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy Copilota (§14, etap F) ────────────────────────────────────────────
    OSIEM TRAS ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
@@ -69,7 +70,7 @@ import {
    wydajemy WŁASNE, a ślad kto i ile wydał niesie księga `copilot_wywolanie`
    razem z `przez_user_id`.                                                   */
 
-const BIURO = ["biuro", "admin"];
+const BIURO = ROLE_BIUROWE;
 
 function odmowa(reply: FastifyReply) {
   const s = sesjaZadania();

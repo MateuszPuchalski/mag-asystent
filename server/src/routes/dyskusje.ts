@@ -18,6 +18,7 @@ import { autoryzuj } from "../services/auth.js";
 import { sprawdzPrzesylke } from "../services/przesylka-zamowienia.js";
 import { trasyTagowSprawy } from "./tagi.js";
 import { TAGI_REKLAMACJI } from "../services/tagi-spraw.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy dyskusji klienckich (0.245.0) ─────────────────────────────────────
    Bliźniak `routes/reklamacje.ts`, z trzema różnicami, i każda bierze się
@@ -44,7 +45,7 @@ import { TAGI_REKLAMACJI } from "../services/tagi-spraw.js";
    kupującego, treść jego zgłoszenia i numer zamówienia; to są dane biura,
    nie hali.                                                                  */
 
-const BIURO = ["biuro", "admin"];
+const BIURO = ROLE_BIUROWE;
 
 const autor = () => sesjaZadania()?.user.name ?? "?";
 

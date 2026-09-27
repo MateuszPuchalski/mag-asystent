@@ -120,26 +120,43 @@ test("kasowanie działa, a kasowanie nieistniejącego to 404", async () => {
   assert.equal(znowu.statusCode, 404);
 });
 
-test("pusta treść zadeklarowana jako JSON to 400 — tak działa Fastify", () => {
-  /* NIE jest to bramka na naszą poprawkę, bo ta siedzi po stronie panelu
-     (`api()` w biuro.html). Jest to ZAPIS FAKTU, którego nikt nie zna
-     z pamięci, a który przebrał się za błąd w logo: panel wysyłał
-     `content-type: application/json` przy żądaniu bez ciała, domyślny parser
-     Fastify odrzucał to jako FST_ERR_CTP_EMPTY_JSON_BODY, a biuro widziało
-     gołe „Bad Request".
+/* ── Pusty JSON to brak ciała (0.544.0) ─────────────────────────────────────
+   Ta blizna przebrała się kiedyś za błąd w logo: panel wysyłał
+   `content-type: application/json` przy żądaniu bez ciała, domyślny parser
+   Fastify odrzucał to jako FST_ERR_CTP_EMPTY_JSON_BODY, a biuro widziało gołe
+   „Bad Request". Dziś serwer czyta taką treść jak brak ciała (`buildApp`),
+   więc te testy są STRAŻNIKIEM poprawki dla wszystkich frontów naraz.
 
-     `app.inject` bez tego nagłówka przechodzi — i dlatego komplet testów tras
-     świecił na zielono przy funkcji, której nie dało się użyć. */
-  return app
-    .inject({
+   `app.inject` bez nagłówka przechodzi zawsze — dlatego każdy przypadek niżej
+   ten nagłówek wysyła jawnie. */
+
+test("pusta treść zadeklarowana jako JSON działa jak brak ciała", async () => {
+  L.zapiszLogo(508, "X", PNG, "Ewa z biura");
+  for (const typ of ["application/json", "application/json; charset=utf-8"]) {
+    const r = await app.inject({
       method: "DELETE",
       url: "/api/biuro/dostawcy/508/logo",
-      headers: { ...naglowki("biuro"), "content-type": "application/json" },
-    })
-    .then((r) => {
-      assert.equal(r.statusCode, 400);
-      assert.equal(r.json().error, "Bad Request", "dokładnie ten napis zobaczyło biuro");
+      headers: { ...naglowki("biuro"), "content-type": typ },
     });
+    assert.notEqual(r.statusCode, 400, `${typ}: ${r.body}`);
+    assert.doesNotMatch(r.body, /FST_ERR_CTP_EMPTY_JSON_BODY/);
+  }
+  assert.equal(L.logo(508), null, "pierwsze kasowanie przeszło naprawdę");
+});
+
+test("niepusty zły JSON i zatruty __proto__ dalej kończą się 400", async () => {
+  /* Poprawka przepuszcza WYŁĄCZNIE pustą treść. Reszta idzie domyślnym
+     parserem, razem z ochroną przed zatruciem prototypu. */
+  for (const payload of ["{nie-json", '{"__proto__":{"x":1}}']) {
+    const r = await app.inject({
+      method: "PUT",
+      url: "/api/biuro/dostawcy/509/logo",
+      headers: { ...naglowki("biuro"), "content-type": "application/json" },
+      payload,
+    });
+    assert.equal(r.statusCode, 400, payload);
+  }
+  assert.equal(L.logo(509), null);
 });
 
 // ── Odczyt przez kolektor ───────────────────────────────────────────────────

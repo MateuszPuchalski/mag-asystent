@@ -153,8 +153,11 @@ nim nie uruchamia CI, więc odświeżona gałąź nie dostałaby wymaganych chec
 sekretu workflow zostawia ostrzeżenie i nic nie robi. Token wygasa w dniu
 podanym przy tworzeniu — ustaw przypomnienie.
 
-**Nazwy checków to `Serwer`, `Panel`, `Android`, `Instalator`, `Worker Sfery`
-i `Usługa tła`** — czyli pola `name` zadań w workflow'ach. `Panel` doszedł
+**Nazwy checków to `Serwer`, `Panel`, `Android`, `Instalator`, `Worker Sfery`,
+`Usługa tła` i `Zgoda właściciela`** — czyli pola `name` zadań w workflow'ach.
+Ostatni doszedł w 0.544.0 i przed importem wymaga kroku z §0d.
+
+`Panel` doszedł
 w 0.491.1, gdy testy panelu wyszły z zadania `Serwer` do równoległego. **Po
 scaleniu tego wydania zaimportuj `main.json` ponownie** — do tego czasu `Panel`
 biegnie, ale nie jest wymagany. Do 0.194.1 cztery
@@ -225,6 +228,43 @@ podmienia go na numer. Pomija pliki, które znacznik opisują dosłownie:
 
 **PR z samym CI albo dokumentacją nie potrzebuje fragmentu.** Nie dostaje
 wtedy wydania; jego zmiana wejdzie z najbliższym wydaniem, które je ma.
+
+## 0d. Zgoda właściciela na zapis do Subiekta (0.544.0)
+
+**Zmiana w kodzie, który pisze do Subiekta, czeka na kliknięcie właściciela.**
+Resztę repo scala zielone CI, bez człowieka. Błąd w reszcie cofa następne
+wydanie, a bazę SQLite chroni kopia przy starcie. Zły dokument w Subiekcie
+zostaje w księgach i sprząta się go ręcznie. Listę chronionych ścieżek trzyma
+`.github/workflows/zgoda.yml` i tylko tam się ją zmienia.
+
+**Dlaczego nie CODEOWNERS.** Każdy PR otwiera konto właściciela, także te
+pisane przez agentów. GitHub nie pozwala zatwierdzić własnego PR-a. Wymóg
+przeglądu właściciela kodu zablokowałby więc te PR-y na zawsze. Wpis
+w `bypass_actors` omija też wymagane checki, a tego §0a zabrania.
+
+**Czynność jednorazowa, w tej kolejności:**
+
+1. Settings → Environments → **New environment**, nazwa `zgoda-wlasciciela`.
+   Jeśli środowisko już jest, otwórz je: pierwszy PR z tym plikiem zakłada je
+   sam, ale bez ochrony.
+2. Zaznacz **Required reviewers** i dopisz siebie. **Prevent self-review**
+   zostaw odznaczone, bo autorem PR-ów jest to samo konto.
+3. Dopiero teraz zaimportuj ponownie `.github/rulesets/main.json`.
+
+> **Kolejność nie jest dowolna.** Zadanie, które wskazuje nieistniejące
+> środowisko, zakłada je bez ochrony i przechodzi. Import reguły przed
+> krokiem 2 dałby wymagany check, który niczego nie pilnuje.
+
+**Jak wygląda zgoda.** PR z chronionym plikiem ma check `Zgoda właściciela`
+w stanie „Waiting". Actions → ten przebieg → **Review deployments** →
+zaznacz `zgoda-wlasciciela` → **Approve and deploy**. Każdy nowy push pyta
+od nowa, więc zgoda nie przechodzi na kod, którego nie widziałeś. PR bez
+chronionych plików ma to zadanie pominięte, a GitHub liczy pominięte jako
+zaliczone.
+
+**Czego ta bramka nie robi.** Łapie pomyłkę, nie złą wolę. PR może zmienić
+sam `zgoda.yml`, a GitHub uruchomi wersję z PR-a. Dlatego ten plik stoi na
+własnej liście i jego zmiana też czeka na zgodę.
 
 ## 0b. Aktualizacja z panelu i z paczki (0.492.0)
 

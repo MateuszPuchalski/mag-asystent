@@ -9,6 +9,7 @@ import {
   zresetujKandydatow,
   type RaportKandydatow,
 } from "../services/zbiorki.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Zbiórki i strefa złota — trasy biura ────────────────────────────────────
    Import CSV z systemu sprzedażowego, ranking kandydatów do strefy złotej
@@ -21,7 +22,7 @@ import {
    samym żądaniem, bez zmian po naszej stronie. Multipart dałby formularzowi
    wygodę, a integracji zależność.                                            */
 
-const ORZEKAJACY = ["biuro", "admin"];
+const ORZEKAJACY = ROLE_BIUROWE;
 
 /** Plik właściciela ma 6 MB przy 5 dniach — 32 MB starcza na kwartał. */
 const LIMIT_IMPORTU = 32 * 1024 * 1024;

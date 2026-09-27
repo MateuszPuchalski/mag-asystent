@@ -44,6 +44,7 @@ import { sledzDosylkeZwrotu, zalozDosylkeZOdmowy, type WynikDosylki } from "../s
 import { jestKodemDosylki } from "../services/dosylka-opis.js";
 import { BladSprawy, BrakKlienta } from "../services/prowadzenie-klienta.js";
 import { reconcile } from "../services/reconcile.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy zwrotów klienckich (0.150.0, decyzje biura od 0.156.0) ────────────
    SZEŚĆ ZAPISÓW: kartoteka pozycji, werdykt, ocena towaru, kwota oraz — od
@@ -59,7 +60,7 @@ import { reconcile } from "../services/reconcile.js";
    skrzynce. Zwrot niesie numer zamówienia i nazwisko sprawy klienta; to są
    dane biura, nie hali.                                                     */
 
-const BIURO = ["biuro", "admin"];
+const BIURO = ROLE_BIUROWE;
 
 function odmowa(reply: FastifyReply) {
   const s = sesjaZadania();

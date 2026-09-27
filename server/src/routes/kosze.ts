@@ -30,6 +30,7 @@ import {
 } from "../services/kosze.js";
 import { przeliczKosz } from "../services/kosze-zwrotow.js";
 import { db } from "../db/db.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Kosze zwrotowe — trasy ──────────────────────────────────────────────────
    Dwie publiczności jednej tabeli:
@@ -40,7 +41,7 @@ import { db } from "../db/db.js";
                      zakończenie. KAŻDA zalogowana rola, bo rozkłada magazynier
                      — bramka globalna z context.ts i tak wymaga sesji.       */
 
-const ORZEKAJACY = ["biuro", "admin"];
+const ORZEKAJACY = ROLE_BIUROWE;
 
 export async function koszeRoutes(app: FastifyInstance) {
   function odmowaBiuro(): { kod: number; error: string } | null {
