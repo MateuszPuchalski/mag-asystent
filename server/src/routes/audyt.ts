@@ -40,6 +40,7 @@ function filtr(q: Record<string, string | undefined>): FiltrAudytu {
     od: q.od || null,
     do: q.do || null,
     typy: q.typ ? q.typ.split(",").map((s) => s.trim()).filter(Boolean) : null,
+    bezTypow: q.bez ? q.bez.split(",").map((s) => s.trim()).filter(Boolean) : null,
     userRef: liczba(q.userRef),
     twId: liczba(q.twId),
     device: q.device || null,
