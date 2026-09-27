@@ -30,6 +30,17 @@ dotyka, czeka na kliknięcie właściciela. Listę ścieżek trzyma
 w Subiekcie zostaje w księgach, a następne wydanie go nie cofnie. Nie zmieniaj
 tej bramki przy okazji innej pracy.
 
+## Agenci
+
+W `.claude/agents/` stoi sześciu agentów. Cztery obszary: `serwer`,
+`panel`, `kolektor` i `sfera`. Każdy pracuje tylko w swoim katalogu i nie
+commituje. Funkcję na kilka obszarów dzieli sesja główna: najpierw ustala
+kontrakt API, potem deleguje części i robi jeden commit. Obok nich dwaj
+recenzenci tylko do odczytu. `allegro-ksztalt` odpowiada o kształcie
+Allegro wyłącznie z plików, z cytatami. `straznik-zasad` przegląda diff
+przed wypchnięciem i uruchamia bramki. `tlo-worker/` i `instalator/` nie mają
+własnego agenta, bo zmieniają się rzadko. Agentów wczytuje dopiero nowa sesja.
+
 ## Zasady
 
 Każda zasada: co robić, dlaczego i kto tego pilnuje.
