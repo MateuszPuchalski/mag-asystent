@@ -140,11 +140,14 @@ export function SzukajIKlawisze() {
     return () => window.removeEventListener("keydown", f);
   }, []);
   return <>
+    {/* SAMA IKONA (@wydanie, nagłówek w jednym rzędzie). Napis „Szukaj"
+        z klawiszem zajmował ~130 px, a jeden rząd przy 1180 px nie ma ich
+        skąd wziąć. Lupa jest znakiem, który rozpoznaje się bez czytania;
+        skrót Ctrl K stoi w dymku i w nazwie dla czytnika. */}
     <button type="button" onClick={() => setSzukanie(true)} aria-keyshortcuts="Control+K"
-      className="flex items-center gap-2 rounded-lg bg-white/10 px-3 py-1.5 text-sm text-slate-300 hover:bg-white/15">
-      <Search size={16} />Szukaj
-      {/* kontrast: pasek stoi na #303030, gdzie slate-400 daje 5.14:1 */}
-      <kbd className="rounded border border-white/20 px-1 font-mono text-podpis text-slate-400">Ctrl K</kbd>
+      aria-label="Szukaj (Ctrl K)" title="Szukaj — Ctrl K"
+      className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-slate-300 hover:bg-white/15">
+      <Search size={18} />
     </button>
     {szukanie && <OknoSzukania onZamknij={() => setSzukanie(false)} />}
     {lista && <ListaSkrotow onZamknij={() => setLista(false)} />}

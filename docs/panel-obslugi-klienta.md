@@ -6333,6 +6333,21 @@ Odłożenie nie jest powrotem ręcznych statusów z 22 września. Tamto było po
 
 **Strażnik.** `ekrany/Skrzynka.test.tsx` jest pierwszym testem całego ekranu Skrzynki. Pilnuje zera zapisu przy otwarciu i każdego błędu z listy wyżej.
 
+## 26g. Nagłówek w jednym rzędzie (@wydanie)
+
+Właściciel zgłosił, że górny pasek nie powinien zajmować dwóch rzędów. Z trzech wariantów na makietach wybrał B: jeden rząd i jedno menu „Więcej”. Decyzja z 27 września 2026 zmienia kształt z 0.431.0 opisany w `obsluga-klienta.md` §7.
+
+**Co gdzie stoi:**
+
+- Z lewej logo, dalej lupa szukania (Ctrl K bez zmian) i osiem zakładek pracy. Dostawy stoją ostatnie, za kreską.
+- Z prawej kropka synchronizacji z godziną. Pełne zdanie z liczbą błędów jest w dymku i w menu przy stanie systemu.
+- Menu „Więcej” niesie Stan systemu, Dziennik i Analizę, a pod kreską Ustawienia i Wyloguj. Zamyka je Esc, klik obok i przejście na ekran.
+- Przycisk menu świeci bursztynem, gdy bieżący ekran leży w menu. Bez tego agent w dzienniku nie widziałby żadnej zaznaczonej zakładki.
+
+**Pomiar.** Przy 1180 px nagłówek ma 65 px zamiast 117 px, czyli ekran pracy zyskuje 52 px. Zakładki mają węższe wypełnienie, a rząd z licznikami zostawia 55 px luzu. Alarm mieści się bez kropki, bo czerwone słowo mówi to samo. Poniżej 1180 px `flex-wrap` przenosi menu do drugiego rzędu, zamiast chować je poza kadrem.
+
+**Strażnik.** `nawigacja/Wiecej.test.tsx` pilnuje zawartości menu, zamykania, zera zapisu przy otwarciu i słowa „Stanęła” w alarmie. Pilnuje też, że drugi rząd nie wrócił.
+
 ## 27. Zasady nadrzędne
 
 Te punkty mówią o JEDNEJ rozmowie i jednej sprawie. Reguły obowiązujące

@@ -3,16 +3,15 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { nowyKlientZapytan } from "./api/klient-zapytan";
-import { Activity, BarChart3, BookMarked, ClipboardList, FileText, Inbox, ListChecks, LogOut, MessagesSquare, Settings, ShieldQuestion, Truck, Undo2 } from "lucide-react";
+import { BookMarked, ClipboardList, Inbox, ListChecks, MessagesSquare, ShieldQuestion, Truck, Undo2 } from "lucide-react";
 import logo from "./assets/wertis-logo.png";
 import { SESJA_WYGASLA, token, wyczyscToken } from "./api/klient";
-import { useJa, useWzmianki, useZdrowie } from "./api/rozmowy";
+import { useJa, useWzmianki } from "./api/rozmowy";
 import { BrakDostepu } from "./ekrany/BrakDostepu";
 import { EtykietaInstancji } from "./stan/Instancja";
 import { PlakietkaSpoznien } from "./stan/Spoznione";
 import { useKolejkaWiedzy } from "./api/wiedza";
 import { useDoDecyzji } from "./api/decyzje";
-import { czas, godzina } from "./ui";
 import { Logowanie } from "./ekrany/Logowanie";
 import { Skrzynka } from "./ekrany/Skrzynka";
 import { Zwroty } from "./ekrany/Zwroty";
@@ -20,6 +19,8 @@ import { Reklamacje } from "./ekrany/Reklamacje";
 import { Dyskusje } from "./ekrany/Dyskusje";
 import { Zadania } from "./ekrany/Zadania";
 import { SzukajIKlawisze } from "./nawigacja/Klawisze";
+import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
+import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej";
 import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
 import { DoDecyzji } from "./ekrany/DoDecyzji";
@@ -40,10 +41,10 @@ const klient = nowyKlientZapytan();
 /* `korzen` znaczy „to jest strona domowa panelu" i tylko ona dopasowuje się
    po równości. Do 0.149.0 aktywną zakładkę wybierało wyrażenie
    `endsWith("skrzynka") ? naSkrzynce : !naSkrzynce` — działało dla DWÓCH
-   zakładek i przy trzeciej podświetlałoby Zadania na ekranie zwrotów. */
-/** Adres ustawień w JEDNYM miejscu: czyta go zębatka i trasa niżej. */
-const USTAWIENIA = "/obsluga/ustawienia";
+   zakładek i przy trzeciej podświetlałoby Zadania na ekranie zwrotów.
 
+   `kreska` stawia przed zakładką cienką kreskę: oddziela pracę na sprawach
+   od magazynu, który przyszedł tu z dolnego rzędu (@wydanie). */
 const ZAKLADKI = [
   /* DO DECYZJI JEST DOMEM PANELU (0.435.0) — cel biura z §7 w jednym widoku:
      wszystko, co czeka na rozstrzygnięcie biura, z magazynu i z obsługi naraz.
@@ -52,56 +53,24 @@ const ZAKLADKI = [
   /* „DO ZROBIENIA" OD 23 WRZEŚNIA 2026: „Moje" i „Wzmianki" przestały być
      osobnymi zakładkami i stoją sekcjami na tym ekranie — trzy zakładki
      odpowiadały na jedno pytanie. Powód przy `ekrany/DoDecyzji.tsx`. */
-  { do: "/obsluga/", etykieta: "Do zrobienia", ikona: <ListChecks size={16} />, korzen: true },
-  { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} />, korzen: false },
-  { do: "/obsluga/zwroty", etykieta: "Zwroty", ikona: <Undo2 size={16} />, korzen: false },
-  { do: "/obsluga/reklamacje", etykieta: "Reklamacje", ikona: <ShieldQuestion size={16} />, korzen: false },
+  { do: "/obsluga/", etykieta: "Do zrobienia", ikona: <ListChecks size={16} />, korzen: true, kreska: false },
+  { do: "/obsluga/skrzynka", etykieta: "Skrzynka", ikona: <Inbox size={16} />, korzen: false, kreska: false },
+  { do: "/obsluga/zwroty", etykieta: "Zwroty", ikona: <Undo2 size={16} />, korzen: false, kreska: false },
+  { do: "/obsluga/reklamacje", etykieta: "Reklamacje", ikona: <ShieldQuestion size={16} />, korzen: false, kreska: false },
   /* DYSKUSJE OBOK REKLAMACJI, nie w nich. Allegro trzyma oba rodzaje spraw pod
      jednym zasobem, ale to dwie różne prace: reklamacja ma zegar i werdykt,
      dyskusja nie ma ani jednego. Wspólny ekran kazałby najpierw rozpoznać
      rodzaj sprawy, żeby wiedzieć, co się na nim da zrobić — blizna 0.121.0. */
-  { do: "/obsluga/dyskusje", etykieta: "Dyskusje", ikona: <MessagesSquare size={16} />, korzen: false },
-  { do: "/obsluga/wiedza", etykieta: "Wiedza", ikona: <BookMarked size={16} />, korzen: false },
-  { do: "/obsluga/zadania", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: false },
-];
-
-/* ── DRUGI RZĄD: MAGAZYN I WGLĄD (0.431.0) ─────────────────────────────────
-   Biuro przechodzi do panelu widok po widoku (`docs/obsluga-klienta.md` §7).
-   Górny rząd niesie pracę na sprawach, dolny — magazyn i wgląd. Jeden rząd
-   nie mieści obu: zmierzone przy makietach, dziewięć zakładek z pigułką
-   stanu, zębatką i wyjściem potrzebuje ~1280 px, a laptop obok Subiekta ma
-   1180. Stan, zębatka i wyjście stoją więc na prawym końcu DOLNEGO rzędu.
-
-   MOST DO STAREGO BIURA ZNIKNĄŁ Z TEGO RZĘDU w 0.441.0. Pozycje prowadziły
-   do `/biuro` na zakładkę, która jeszcze nie przeszła; stan systemu był
-   ostatnią. Cały dolny rząd to zakładki panelu. Ostatnia droga mostu —
-   reguły strefy złotej za zębatką biura — przeszła do ustawień panelu
-   w 0.444.0 i `mostBiura.ts` zniknął razem z nią. */
-type PozycjaDrugiegoRzedu = { etykieta: string; ikona: React.ReactNode; do: string };
-const DRUGI_RZAD: Array<PozycjaDrugiegoRzedu | "kreska"> = [
-  { etykieta: "Dostawy", ikona: <Truck size={16} />, do: "/obsluga/dostawy" },
-  /* KOSZY TU NIE MA od 0.438.0 — decyzją właściciela mieszkają w zakładce
+  { do: "/obsluga/dyskusje", etykieta: "Dyskusje", ikona: <MessagesSquare size={16} />, korzen: false, kreska: false },
+  { do: "/obsluga/wiedza", etykieta: "Wiedza", ikona: <BookMarked size={16} />, korzen: false, kreska: false },
+  { do: "/obsluga/zadania", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: false, kreska: false },
+  /* DOSTAWY ÓSMĄ ZAKŁADKĄ (@wydanie), nie w menu „Więcej". Do 27 września
+     2026 stały w dolnym rzędzie obok wglądu. Przyjęcie dostawy to praca
+     dzienna, a menu jest na rzeczy otwierane kilka razy w miesiącu.
+     KOSZY TU NIE MA od 0.438.0 — decyzją właściciela mieszkają w zakładce
      Zwroty, bo są dalszym ciągiem zwrotu. Powód przy `zwroty/Przelacznik.tsx`. */
-  "kreska",
-  /* Dziennik i analiza przeszły w 0.440.0, stan systemu w 0.441.0 —
-     cały wgląd mieszka już w panelu. */
-  { etykieta: "Stan systemu", ikona: <Activity size={16} />, do: "/obsluga/stan" },
-  { etykieta: "Dziennik", ikona: <FileText size={16} />, do: "/obsluga/dziennik" },
-  { etykieta: "Analiza", ikona: <BarChart3 size={16} />, do: "/obsluga/analiza" },
+  { do: "/obsluga/dostawy", etykieta: "Dostawy", ikona: <Truck size={16} />, korzen: false, kreska: true },
 ];
-
-function DrugiRzad() {
-  const { pathname } = useLocation();
-  return <nav aria-label="Magazyn i wgląd" className="flex rounded-lg bg-white/5 p-1">
-    {DRUGI_RZAD.map((z, i) => z === "kreska"
-      ? <span key={i} aria-hidden="true" className="mx-1.5 my-1 w-px bg-white/15" />
-      /* bursztyn: zakładka na ciemnym tle jest marką */
-      : <Link key={z.do} to={z.do}
-          className={`flex items-center gap-2 rounded px-2.5 py-1.5 text-sm font-semibold ${
-            pathname.startsWith(z.do) ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
-          {z.ikona}{z.etykieta}</Link>)}
-  </nav>;
-}
 
 /* Licznik nieodhaczonych wzmianek stoi przy ZAKŁADCE, a nie na jej ekranie:
    prośba kolegi ma być widoczna z każdego widoku panelu. Wzmianka, o której
@@ -113,7 +82,7 @@ function DrugiRzad() {
    przy pierwszej poprawce koloru. Liczniki różnią się tylko źródłem liczby. */
 function Licznik({ liczba, opis }: { liczba: number; opis: string }) {
   if (!liczba) return null;
-  return <span className="ml-1 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
+  return <span className="ml-0.5 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
     aria-label={opis}>{liczba}</span>;
 }
 
@@ -138,56 +107,53 @@ function LicznikDoZrobienia() {
     opis={`do zrobienia: ${decyzje} do decyzji, ${wzmianki} wzmianek`} />;
 }
 
-/* Pigułka stanu synchronizacji jest w NAGŁÓWKU, a nie w skrzynce: agent ma
-   ją widzieć z każdej zakładki. Awaria integracji, o której wie tylko jeden
-   ekran, jest awarią widoczną dopiero wtedy, gdy ktoś na ten ekran wejdzie. */
-function PigulkaSynchronizacji() {
-  const { data } = useZdrowie();
-  if (!data) return null;
-  const i = data.allegroInbox;
-  const zle = i.status !== "current";
-  return <div className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs ${
-    zle ? "bg-red-500/20 text-red-100" : "bg-white/10 text-slate-300"}`}>
-    <span className={`h-2 w-2 rounded-full ${zle ? "bg-red-400" : "bg-emerald-400"}`} />
-    {i.alarm
-      ? `Synchronizacja stanęła ${godzina(i.ostatniaUdanaSynchronizacja)}`
-      : `Synchronizacja ${godzina(i.ostatniaUdanaSynchronizacja)} · ${
-          i.liczbaBledow} błędów`}
-  </div>;
-}
-
 function Naglowek({ wyloguj }: { wyloguj: () => void }) {
   const { pathname } = useLocation();
-  /* ── NAGŁÓWEK ZAWIJA, ZAMIAST ZNIKAĆ POZA KADREM (0.233.0) ────────────────
+  /* ── JEDEN RZĄD (@wydanie, decyzja właściciela z 27 września 2026) ─────────
+     Od 0.431.0 nagłówek miał dwa rzędy: dziewięć zakładek z pigułką stanu,
+     zębatką i wyjściem potrzebowało ~1280 px, a laptop obok Subiekta ma 1180.
+     Drugi rząd kosztował ~50 px wysokości na każdym ekranie pracy, czyli dwa
+     wiersze kolejki przez cały dzień, za rzeczy otwierane kilka razy w miesiącu.
+
+     Miejsce oddały trzy rzeczy. Wgląd, zębatka i wyjście zeszły do menu
+     „Więcej" (`nawigacja/Wiecej.tsx`). Szukanie jest samą ikoną, a pigułka
+     synchronizacji — kropką z godziną (`nawigacja/Synchronizacja.tsx`).
+     Zakładki mają węższe wypełnienie: `px-2` i `gap-1.5` zamiast `px-3`
+     i `gap-2`, a elementy rzędu stoją co `gap-2`. Tyle trzeba było, żeby
+     alarm „Stanęła" nie spychał menu do drugiego rzędu. Pomiar przy 1180 px
+     stoi w `docs/obsluga-klienta.md` §7.
+
+     ── NAGŁÓWEK ZAWIJA, ZAMIAST ZNIKAĆ POZA KADREM (0.233.0) ────────────────
      Rama okna jest `overflow-hidden`, więc to, co nie zmieści się w szerokości,
      nie daje paska przewijania — po prostu PRZESTAJE ISTNIEĆ dla myszy.
-     Zmierzone: pasek potrzebuje 1112 px, a poniżej ~1150 px szerokości okna
-     zębatka ustawień i wylogowanie leżały poza kadrem i nie dało się w nie
-     kliknąć. Nie było o tym żadnego sygnału na ekranie.
+     Zmierzone wtedy: poniżej ~1150 px zębatka ustawień i wylogowanie leżały
+     poza kadrem i nie dało się w nie kliknąć. Nie było o tym żadnego sygnału.
 
-     `flex-wrap` kosztuje drugi rząd na wąskim oknie i to jest cena świadoma:
-     rząd zabiera kilkadziesiąt pikseli wysokości, brak wylogowania zabiera
-     całą funkcję.
+     `flex-wrap` zostaje i przy jednym rzędzie. Kosztuje drugi rząd na oknie
+     węższym niż 1180 px, przy plakietce spóźnień albo przy etykiecie „DEV"
+     razem z alarmem. To cena świadoma: rząd zabiera kilkadziesiąt pikseli wysokości,
+     brak menu z wylogowaniem zabiera całą funkcję.
 
      PODPIS „BIURO" ZESZEDŁ (0.515.0). Stał obok logo i nie mówił nic, czego
      agent by nie wiedział — panel jest wyłącznie biurowy. Jego rolę odstępu
      przejęło `mr-auto` na tabliczce logo: szukanie i zakładki dalej stoją
      z prawej. */
   return <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-wertis-ink text-white">
-    <div className="flex flex-wrap items-center gap-4 px-5 py-3">
+    <div className="flex flex-wrap items-center gap-2 px-5 py-3">
       {/* LOGO ZAMIAST IKONY MAGAZYNU (23 września 2026). Znak ma grafitowe
           litery na przezroczystym tle, więc na grafitowym pasku zniknąłby —
           stoi na białej tabliczce, tak jak na szyldzie sklepu. */}
       <span className="mr-auto rounded-md bg-white px-2 py-1"><img src={logo} alt="WERTIS — sklep z częściami"
         className="block h-7 w-auto" /></span>
       {/* Szukanie PRZED zakładkami (23 września 2026): pytanie „gdzie to jest"
-          pada, zanim wiadomo, do której zakładki iść. Miejsce oddały dwie
-          zakładki, które weszły w „Do zrobienia". */}
+          pada, zanim wiadomo, do której zakładki iść. */}
       <SzukajIKlawisze />
-      <nav className="mr-3 flex rounded-lg bg-white/10 p-1">
+      <nav aria-label="Praca" className="flex shrink-0 rounded-lg bg-white/10 p-1">
         {ZAKLADKI.map((z) => {
           const aktywna = z.korzen ? pathname === z.do : pathname.startsWith(z.do);
-          return <Link key={z.do} to={z.do}
+          return <React.Fragment key={z.do}>
+            {z.kreska && <span aria-hidden="true" className="mx-1 my-1 w-px bg-white/15" />}
+            <Link to={z.do}
             /* ── PROMIEŃ KAFELKA = PROMIEŃ BIEŻNI MINUS JEJ WYPEŁNIENIE (0.272.0) ──
                Bieżnia wyżej ma `rounded-lg p-1`, czyli 8 px zaokrąglenia i 4 px
                odstępu. Kafelek współśrodkowy z nią ma więc 8 − 4 = 4 px, czyli
@@ -205,40 +171,24 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
                Na ciemnym pasku żadnego ostrzeżenia nie ma i nie będzie.
 
                bursztyn: zakładka na ciemnym tle jest marką */
-            className={`flex items-center gap-2 rounded px-3 py-1.5 text-sm font-semibold ${
-              aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300"}`}>
-            {z.ikona}{z.etykieta}
-            {z.do === "/obsluga/" && <LicznikDoZrobienia />}
-            {z.do === "/obsluga/wiedza" && <LicznikWiedzy />}</Link>;
+              aria-current={aktywna ? "page" : undefined}
+              className={`flex items-center gap-1.5 whitespace-nowrap rounded px-2 py-1.5 text-sm font-semibold ${
+                aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
+              {z.ikona}{z.etykieta}
+              {z.do === "/obsluga/" && <LicznikDoZrobienia />}
+              {z.do === "/obsluga/wiedza" && <LicznikWiedzy />}</Link>
+          </React.Fragment>;
         })}
       </nav>
-    </div>
-    {/* DOLNY RZĄD (0.431.0): magazyn i wgląd, a z prawej stan i wyjście —
-        powód przy `DRUGI_RZAD`. `flex-wrap` z tego samego powodu co w górnym:
-        przycisk poza kadrem ramy to przycisk, którego nie ma. */}
-    <div className="flex flex-wrap items-center gap-3 px-5 pb-3">
-      <DrugiRzad />
-      <span className="mr-auto" />
-      {/* Plakietka spóźnień STOI OBOK pigułki, a nie w niej: pigułka mówi,
+      {/* Plakietka spóźnień STOI OBOK wskaźnika, a nie w nim: wskaźnik mówi,
           czy system działa, plakietka — że praca idzie wolniej niż zwykle.
-          Powód w `stan/Spoznione.tsx`. */}
-      {/* Etykieta instancji w DOLNYM rzędzie, obok stanu: górny ma przy
-          1180 px kilkanaście pikseli luzu i nawet „DEV" spychało zakładki
-          do osobnego rzędu. Tu stoi obok pytania „czy system działa". */}
+          Powód w `stan/Spoznione.tsx`. Etykieta instancji stoi przy nich,
+          bo odpowiada na to samo pytanie „na co patrzę". Obie pojawiają się
+          rzadko, więc ich miejsca w rzędzie nie rezerwujemy. */}
       <EtykietaInstancji />
       <PlakietkaSpoznien />
-      <PigulkaSynchronizacji />
-      {/* ZĘBATKA STOI POZA `ZAKLADKI` i to jest wybór, nie niedopatrzenie.
-          Pasek niesie PRACĘ — cztery kolejki, do których agent wraca w kółko.
-          Ustawienia otwiera się razy kilka w miesiącu i piąta pastylka ważyłaby
-          w rzędzie tyle samo co Skrzynka. Biuro ma ten sam podział od 0.76.0. */}
-      <Link to={USTAWIENIA} title="Ustawienia" aria-label="Ustawienia"
-        aria-current={pathname.startsWith(USTAWIENIA) ? "page" : undefined}
-        className={`rounded-lg p-2 hover:bg-white/10 ${
-          pathname.startsWith(USTAWIENIA) ? "bg-white/10 text-white" : "text-slate-400"}`}>
-        <Settings size={20} /></Link>
-      <button className="rounded-lg p-2 text-slate-400 hover:bg-white/10" onClick={wyloguj}
-        title="Wyloguj" aria-label="Wyloguj"><LogOut size={20} /></button>
+      <WskaznikSynchronizacji />
+      <Wiecej wyloguj={wyloguj} />
     </div>
   </header>;
 }
