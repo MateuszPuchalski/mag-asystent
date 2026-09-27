@@ -201,7 +201,7 @@ export type StanZwrotuPieniedzy = {
   } | null;
   odmowa: {
     kod: string; powod: string | null; kiedy: string | null;
-    /** Dosyłka tego zwrotu (@wydanie): po zwrocie, a bez niego po zamówieniu i koncie. */
+    /** Dosyłka tego zwrotu (0.536.0): po zwrocie, a bez niego po zamówieniu i koncie. */
     dosylka: { opis: string; login: string; ton: TonDosylki } | null;
     /** Kod dosyłki, zamówienie znane, a dosyłki nikt nie śledzi — ekran proponuje „Śledź dosyłkę”. */
     sledzicDosylke: boolean;
@@ -245,7 +245,7 @@ function bramkaPrzelewu(w: Wiersz): { moznaZapisacPrzelew: boolean; powodPrzelew
 }
 
 /**
- * Dosyłka pod odmową wypłaty (@wydanie). Najpierw ta założona z TEGO zwrotu,
+ * Dosyłka pod odmową wypłaty (0.536.0). Najpierw ta założona z TEGO zwrotu,
  * potem dosyłka tego samego zamówienia na tym samym koncie — np. wpisana
  * ręką na profilu, zanim ktoś odmówił wypłaty. Surowy SQL i zdanie
  * z `dosylka-opis.ts`, nie import `dosylka.ts`: tamten plik importuje sprawę

@@ -57,7 +57,7 @@ describe("Odświeżenie po decyzji zwrotu", () => {
   });
 });
 
-/* ── Dosyłka przy zwrocie (@wydanie) ─────────────────────────────────────────
+/* ── Dosyłka przy zwrocie (0.536.0) ─────────────────────────────────────────
    „Śledź dosyłkę” idzie BEZ CIAŁA — reguła klienta HTTP z `CLAUDE.md`: pusty
    JSON to „Bad Request” od Fastify. A zapis, który założył dosyłkę, zmienił
    też sprawę klienta, więc jej odczyty czytają się od nowa.                  */

@@ -175,7 +175,7 @@ test("profil ze sprawą dalej jest odczytem", async () => {
   assert.equal((db().prepare("SELECT total_changes() n").get() as { n: number }).n, przed);
 });
 
-/* ── Dosyłka na profilu (@wydanie, S6) ──────────────────────────────────────
+/* ── Dosyłka na profilu (0.536.0, S6) ──────────────────────────────────────
    Trzy rzeczy: podpowiedź „Dosyłka doręczona. Zakończ sprawę?” mimo
    otwartego zwrotu wymiany, propozycja śledzenia odmowy z ostatnich
    trzydziestu dni i lista przewoźników do formularza numeru. */

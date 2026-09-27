@@ -985,14 +985,14 @@ Znacznik weryfikacji przy rozmówcy w wiadomościach został wtedy, bo zrzut
 dotyczył zamówienia, a nie wątku. Zdjęto go 24 września 2026 — rozdział
 `GET /messaging/threads`.
 
-### `GET /order/checkout-forms/{id}/shipments` — dosyłka (@wydanie)
+### `GET /order/checkout-forms/{id}/shipments` — dosyłka (0.536.0)
 
 Schemat `CheckoutFormOrderWaybillResponse`: `shipments[]` z elementem
 `CheckoutFormAddWaybillCreated`. Bierzemy `waybill`, `carrierId` i `createdAt`,
 czyli „Date and time of the parcel tracking number registration in UTC".
 Schemat nie ma listy `required`, więc każde z tych pól może nie przyjść.
 
-Końcówkę pyta od 0.393.0 przycisk przesyłki zamówienia, a od @wydanie ticker
+Końcówkę pyta od 0.393.0 przycisk przesyłki zamówienia, a od 0.536.0 ticker
 dosyłki. Lista niesie WSZYSTKIE numery zamówienia: pierwszą paczkę, czasem
 numer zwrotu i wcześniejsze dosyłki. Dosyłkę wybiera `wybierzNumer`
 w `services/dosylka.ts`. Odrzuca numery paczek zwrotów tego zamówienia:

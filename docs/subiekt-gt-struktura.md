@@ -44,7 +44,7 @@ Przy przeglądzie reguł obsługi klienta doszedł jeden. Nie wiadomo, czy
 `interlocutor.login` z listy wątków jest loginem kupującego. Blizna 0.56.6 mówi,
 że bywa zamaskowany, a dwie funkcje wiążą się po nim od 0.386.0 i 0.397.0.
 
-W @wydanie doszedł jeden, przy dosyłce sprawy klienta. Właściciel podał, że
+W 0.536.0 doszedł jeden, przy dosyłce sprawy klienta. Właściciel podał, że
 numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro. Na tym stoi
 automatyczne wykrycie numeru, a na żywym koncie nikt tego nie sprawdził.
 Pomyłka daje brak numeru i prośbę o wpisanie go ręką, a nie zły numer.

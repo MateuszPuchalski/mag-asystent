@@ -74,7 +74,7 @@ const scena = vi.hoisted(() => ({
   /* Lista paczek klienta i identyfikator zwrotu założonego z nieodebranej. */
   paczki: null as unknown[] | null,
   przyjetyZwrot: 0,
-  /* Wynik założenia dosyłki w odpowiedzi odmowy wypłaty (@wydanie). `null` =
+  /* Wynik założenia dosyłki w odpowiedzi odmowy wypłaty (0.536.0). `null` =
      odmowa kodem bez dosyłki, więc odpowiedź tego pola nie niesie. */
   dosylkaOdmowy: null as Record<string, unknown> | null,
   /* Odpowiedź „Śledź dosyłkę” przy zwrocie. */
@@ -1139,7 +1139,7 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
   });
 });
 
-/* ── Dosyłka pod odmową wypłaty (@wydanie) ──────────────────────────────────
+/* ── Dosyłka pod odmową wypłaty (0.536.0) ──────────────────────────────────
    Zła paczka wraca, biuro odmawia wypłaty kodem „Wysłaliśmy nowy towar”
    i wysyła właściwy towar. Ekran pilnuje trzech rzeczy: otwarcie zwrotu ze
    stanem dosyłki niczego nie zapisuje; ponowienie woła trasę bez ciała;

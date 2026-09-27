@@ -36,7 +36,7 @@ type Przesylka = { waybill?: string; carrierId?: string };
 type OdpowiedzPrzesylek = { shipments?: Przesylka[] };
 
 /**
- * Druga paczka zamówienia — dosyłka (@wydanie) — bez numeru. Numer zostaje
+ * Druga paczka zamówienia — dosyłka (0.536.0) — bez numeru. Numer zostaje
  * w `klient_dosylka` i na karcie sprawy; tu idzie tylko to, co mówi o losie
  * towaru. `zrodlo` rozstrzyga, czy klient widzi numer w Allegro: wykryty
  * stoi przy zamówieniu, wpisany ręką — niekoniecznie.
@@ -206,7 +206,7 @@ function stanDosylki(d: DosylkaZamowienia): string {
 }
 
 /**
- * Druga paczka dla szkicu (@wydanie). Bez numeru, jak pierwsza. Zdanie
+ * Druga paczka dla szkicu (0.536.0). Bez numeru, jak pierwsza. Zdanie
  * o numerze w Allegro stoi tylko przy numerze wykrytym przy zamówieniu:
  * wpisany ręką mógł trafić na inne zamówienie, a szkic nie ma prawa
  * odsyłać klienta tam, gdzie numeru nie ma.
@@ -240,7 +240,7 @@ export function zdaniePrzesylki(s: StanPrzesylkiZamowienia): string | null {
  * Ten sam słownik co zdanie dla szkicu — dwa słowniki rozjechałyby się przy
  * pierwszym nowym statusie przewoźnika. `null`: nie wiemy nic.
  *
- * Dosyłka (@wydanie) staje po kropce: „doręczona … · dosyłka: w drodze
+ * Dosyłka (0.536.0) staje po kropce: „doręczona … · dosyłka: w drodze
  * do klienta”. Bez niej doręczony oryginał mówiłby, że sprawa skończona.
  */
 export function stanPrzesylkiKrotko(s: StanPrzesylkiZamowienia): string | null {

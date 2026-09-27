@@ -454,7 +454,7 @@ describe("granice kalendarza kroku", () => {
   });
 });
 
-/* ── DOSYŁKA na karcie sprawy (@wydanie) ──────────────────────────────────────
+/* ── DOSYŁKA na karcie sprawy (0.536.0) ──────────────────────────────────────
    Pilnujemy: otwarcie z dosyłkami i propozycją dalej wysyła same GET-y;
    dosyłka to linijka z barwą tonu i numerem do skopiowania bez serwera;
    wpisany numer idzie przycięty, z przewoźnikiem domyślnym, wersją i odciskiem

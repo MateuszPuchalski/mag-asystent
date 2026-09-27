@@ -4,7 +4,7 @@ import {
   dniRoboczeOd, najwazniejszaDosylka, opisDosylki, poDniachRoboczych, type DosylkaSprawy, type StanDosylki,
 } from "./dosylka-opis.js";
 
-/* ── Zdanie o dosyłce i dni robocze (@wydanie, S6) ───────────────────────────
+/* ── Zdanie o dosyłce i dni robocze (0.536.0, S6) ───────────────────────────
    Zdanie składa serwer, panel tylko je drukuje — więc brzmienie z umowy
    z panelem pilnujemy tutaj, słowo po słowie. Dni robocze i „dziś” liczą
    się na zegarze magazynu: w UTC piątkowa noc byłaby jeszcze piątkiem. */

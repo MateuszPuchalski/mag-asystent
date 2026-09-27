@@ -86,7 +86,7 @@ export interface PaczkaDoTrackingu {
 /**
  * Pyta przewoźników o paczki i oddaje stan każdej po numerze — bez zapisu.
  *
- * JEDNA droga do końcówki trackingu dla zwrotów i dla dosyłki (@wydanie).
+ * JEDNA droga do końcówki trackingu dla zwrotów i dla dosyłki (0.536.0).
  * Partie po PRZEWOŹNIKU, bo `carrierId` siedzi w ścieżce adresu, i po
  * dwadzieścia numerów, bo tyle dopuszcza `maxItems`.
  *

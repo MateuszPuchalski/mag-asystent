@@ -104,7 +104,7 @@ export interface ProfilKlienta {
    */
   podpowiedzZakonczenia: boolean;
   /**
-   * Czemu podpowiedź stoi (@wydanie). „dosylka”: poprawny towar doszedł, więc
+   * Czemu podpowiedź stoi (0.536.0). „dosylka”: poprawny towar doszedł, więc
    * wymiana się spełniła, choć termin kroku jeszcze nie nadszedł. Boolean
    * obok zostaje, bo czytają go ekran i testy sprzed tego wydania.
    */
@@ -237,7 +237,7 @@ export function profilKlienta(
 
   /* Paczka niedoręczona tydzień po zakupie — tylko gdy PYTALIŚMY przewoźnika.
      Brak daty doręczenia bez pytania znaczy „nie wiemy”, nie „nie doszła”.
-     Zamówienie z dosyłką (@wydanie) odpada: sygnał mówi o PIERWSZEJ paczce,
+     Zamówienie z dosyłką (0.536.0) odpada: sygnał mówi o PIERWSZEJ paczce,
      a los towaru tego zamówienia niesie już dosyłka na karcie sprawy.
      Zdanie „niedoręczone” obok „Dosyłka doręczona” przeczyłoby samo sobie. */
   const od7 = new Date(teraz.getTime() - 7 * DZIEN).toISOString();

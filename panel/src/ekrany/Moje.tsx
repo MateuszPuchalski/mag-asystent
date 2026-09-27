@@ -107,7 +107,7 @@ export function Moje() {
    a jej stary „po terminie" byłby na czerwono nieprawdą. Czerwień wyłącznie
    po terminie; „dziś" i „czeka do" to informacja, nie alarm.
 
-   DOSYŁKA (@wydanie) ZASTĘPUJE „dziś” i „czeka do”, a nie dokleja się do
+   DOSYŁKA (0.536.0) ZASTĘPUJE „dziś” i „czeka do”, a nie dokleja się do
    opisu. Opis jest ucięty, więc dopisek znikałby właśnie przy długim kroku.
    Sprawa z krokiem „dosłać” czeka na paczkę, a nie na datę. Samo „dziś”
    przy dosyłce bez numeru nie mówiłoby, co zrobić. Pogrubienie niesie to,

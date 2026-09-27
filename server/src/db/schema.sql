@@ -3229,7 +3229,7 @@ CREATE TABLE IF NOT EXISTS klient_prowadzenie (
   przed_zakonczeniem_zmieniono_at TEXT
 );
 
--- Dosyłka sprawy klienta (@wydanie, drugi przyrost S6). Zły towar wraca zwrotem
+-- Dosyłka sprawy klienta (0.536.0, drugi przyrost S6). Zły towar wraca zwrotem
 -- przez Allegro, biuro odmawia wypłaty kodem NEW_ITEM_SENT albo MISSING_PART_SENT
 -- i wysyła poprawny towar nową etykietą z Sellasist. Krok „dosłać” był dotąd
 -- samym zdaniem; tu stoi numer tej drugiej paczki i WYNIK śledzenia, nie historia.

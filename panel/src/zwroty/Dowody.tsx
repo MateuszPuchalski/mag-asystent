@@ -28,7 +28,7 @@ import { Link as RouterLink } from "react-router-dom";
 
 /* Przewoźnicy i formy płatności po polsku. Kod nieznany pokazuje się SUROWY,
    bo Allegro nie publikuje zamkniętej listy przewoźników — sonda złapała
-   `UNKNOWN`, którego nie ma w żadnej specyfikacji. Eksport od @wydanie:
+   `UNKNOWN`, którego nie ma w żadnej specyfikacji. Eksport od 0.536.0:
    formularz numeru dosyłki na profilu nazywa przewoźników tymi samymi słowami. */
 export const PRZEWOZNICY: Record<string, string> = {
   INPOST: "InPost", DPD: "DPD", ALLEGRO: "Allegro", POCZTA_POLSKA: "Poczta Polska",

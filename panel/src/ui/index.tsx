@@ -91,7 +91,7 @@ export const KLASA_STATUSU: Record<string, string> = {
   "spam": "bg-stan-spam text-stan-spam-tekst",
 };
 /**
- * Barwa zdania z tonem serwera (@wydanie) — dziś zdania o dosyłce.
+ * Barwa zdania z tonem serwera (0.536.0) — dziś zdania o dosyłce.
  *
  * Stoi tutaj, bo to samo zdanie pada na ekranie zwrotu, na profilu i przy
  * historii kolejek. Trzy mapy jednej rangi rozjechałyby się przy pierwszej
@@ -442,7 +442,7 @@ export const dzien = (v: string | null | undefined) =>
     : "—";
 
 /**
- * Dzień i miesiąc cyframi — „30.09” (@wydanie).
+ * Dzień i miesiąc cyframi — „30.09” (0.536.0).
  *
  * Dla podpowiedzi przy doręczonej dosyłce. Serwer pisze tę samą datę w zdaniu
  * dosyłki jako „DD.MM”, a podpowiedź stoi tuż pod nim — dwa zapisy jednego

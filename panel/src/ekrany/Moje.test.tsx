@@ -105,7 +105,7 @@ describe("Ekran Moje", () => {
       .toEqual(["/obsluga/klient/zielony", "/obsluga/skrzynka/11"]);
   });
 
-  /* Dosyłka (@wydanie) stoi po prawej ZAMIAST „dziś” i „czeka do”, a nie
+  /* Dosyłka (0.536.0) stoi po prawej ZAMIAST „dziś” i „czeka do”, a nie
      doklejona do opisu: opis jest ucięty i dopisek znikałby przy długim
      kroku. Obudzona i po terminie dalej wygrywają — to one każą działać. */
   it("wiersz sprawy z dosyłką mówi o paczce, nie o dacie", () => {

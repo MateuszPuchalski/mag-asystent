@@ -126,7 +126,7 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
  * i zakończenie; tutaj sprawy się nie zmienia.
  */
 function LiniaSprawy({ login, sprawa: s }: { login: string; sprawa: SprawaKlienta }) {
-  /* Dosyłka (@wydanie) doklejona do TEJ SAMEJ linijki: agent przy rozmowie
+  /* Dosyłka (0.536.0) doklejona do TEJ SAMEJ linijki: agent przy rozmowie
      odpowiada zwykle na „gdzie moja paczka”, a odpowiedź stała dotąd
      o ekran dalej. Jedno zdanie, najpilniejsze — reszta jest na profilu. */
   const dosylka = s.stan === "w_toku" ? najwazniejszaDosylka(s.dosylki) : null;

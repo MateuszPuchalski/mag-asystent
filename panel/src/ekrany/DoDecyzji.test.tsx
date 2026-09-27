@@ -117,7 +117,7 @@ describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
     expect(wyslane).toEqual([]);
   });
 
-  it("sprawa klienta z dosyłką stoi w „Moje” i otwarcie dalej niczego nie zapisuje (@wydanie)", async () => {
+  it("sprawa klienta z dosyłką stoi w „Moje” i otwarcie dalej niczego nie zapisuje (0.536.0)", async () => {
     moje = [{ kolejka: "klient", id: 5, opis: "zielony: dosłać", at: "2026-09-26T10:00:00Z",
       terminDo: "2026-09-30T06:00:00Z", login: "zielony", cel: "/obsluga/klient/zielony", dzis: true,
       dosylka: "Allegro nie ma numeru dosyłki od 2 dni roboczych — wpisz go z Sellasist" }];

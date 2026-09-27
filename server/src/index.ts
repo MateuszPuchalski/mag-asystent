@@ -579,7 +579,7 @@ async function main() {
        będzie, a agent i tak potrzebuje wiedzieć, o czym rozmawia. Partia
        mieści się w jednym żądaniu, więc ten takt to jedno wywołanie na cykl. */
     uruchomTakt("allegro-oferty", config.allegro.ofertySyncMs, async () => { await uzupelnijOferty(); });
-    /* Dosyłka (@wydanie): wykrycie numeru przy zamówieniu i śledzenie paczki
+    /* Dosyłka (0.536.0): wykrycie numeru przy zamówieniu i śledzenie paczki
        dla spraw klienta w toku. Osobny takt, nie doklejony do zwrotów —
        jedna końcówka nie ma prawa zabrać drugiej, gdy odpowie błędem (blizna
        0.149.2). Rytm i powód piętnastu minut przy `ODSTEP_DOSYLEK_MS`. Przebieg

@@ -894,7 +894,7 @@ export function useCofnijPrzelew() {
 }
 
 /**
- * Odmowa wypłaty. Przy kodach dosyłki (@wydanie) ta sama trasa zakłada też
+ * Odmowa wypłaty. Przy kodach dosyłki (0.536.0) ta sama trasa zakłada też
  * śledzenie dosyłki i krok sprawy klienta — odpowiedź niesie wtedy `dosylka`.
  * Przy pozostałych kodach tego pola nie ma wcale.
  */
@@ -913,7 +913,7 @@ export function useOdmowPlatnosci() {
 }
 
 /**
- * „Śledź dosyłkę” przy zwrocie (@wydanie) — ponowienie po odmowie, przy
+ * „Śledź dosyłkę” przy zwrocie (0.536.0) — ponowienie po odmowie, przy
  * której zapis u nas się nie udał, albo przy kodzie złożonym poza panelem.
  *
  * IDZIE BEZ CIAŁA. Serwer bierze zamówienie i konto ze zwrotu, więc nie ma

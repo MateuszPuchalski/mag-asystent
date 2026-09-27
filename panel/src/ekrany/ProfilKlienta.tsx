@@ -346,7 +346,7 @@ function KartaSprawy({ d }: { d: Profil }) {
 /** Lustro limitu numeru przesyłki z serwera — Allegro przyjmuje najwyżej 64 znaki. */
 const LIMIT_NUMERU = 64;
 
-/* JEDNA DOSYŁKA, JEDNA LINIJKA (@wydanie). Zdanie składa serwer, to samo co
+/* JEDNA DOSYŁKA, JEDNA LINIJKA (0.536.0). Zdanie składa serwer, to samo co
    na liście „Moje” i przy historii kolejek. Numer stoi obok z kopiowaniem, bo
    klient pyta o niego, a przepisany z ekranu bywa przekręcony (0.228.0).
 

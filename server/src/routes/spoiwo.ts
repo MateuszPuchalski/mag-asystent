@@ -103,7 +103,7 @@ export async function spoiwoRoutes(app: FastifyInstance) {
     });
 
   /* ── SPRAWA KLIENTA (0.535.0, S6) ─────────────────────────────────────────
-     Cztery zapisy, każdy z wymaganą `wersją` (od @wydanie jeszcze dwa przy
+     Cztery zapisy, każdy z wymaganą `wersją` (od 0.536.0 jeszcze dwa przy
      dosyłce, niżej). KAŻDY KLUCZ CIAŁA JEST
      WYMAGANY i sprawdza się go `in`, nie `?? null`: brak klucza to 400 bez
      zapisu. Pole, które nie dojechało z trasy do serwisu, ginęło już po
@@ -177,7 +177,7 @@ export async function spoiwoRoutes(app: FastifyInstance) {
         { wersja: Number(b.wersja), odcisk: String(b.odcisk) }, autor()));
     });
 
-  /* ── DOSYŁKA (@wydanie, drugi przyrost S6) ─────────────────────────────────
+  /* ── DOSYŁKA (0.536.0, drugi przyrost S6) ─────────────────────────────────
      Dwa zapisy z profilu, z tymi samymi strażnikami co cztery wyżej: każdy
      klucz wymagany, wersja i odcisk ekranu, 409 ze świeżą sprawą. Zamówienia
      i konta propozycja NIE niesie — wynikają ze zwrotu po stronie serwera.

@@ -57,7 +57,7 @@ import {
    liczonej w chwili ładowania modułu bywa pustym zbiorem — blizna opisana
    w `statusy-spraw.ts`.
 
-   DOSYŁKA (@wydanie) mieszka w `dosylka.ts`, który importuje ten plik —
+   DOSYŁKA (0.536.0) mieszka w `dosylka.ts`, który importuje ten plik —
    więc tu jest wyłącznie SQL na `klient_dosylka` i zdanie z czystego
    `dosylka-opis.ts`. Doręczenie dosyłki i kłopot u przewoźnika to fakty
    PO STRONIE ALLEGRO, na które sprawa czeka, więc budzą ją jak zwrot. */
@@ -158,7 +158,7 @@ interface Odcisk {
   s: number;
   /** Wiadomości klienta albo doradcy Allegro w reklamacjach i dyskusjach. */
   w: number;
-  /** Dosyłki doręczone (@wydanie). SZTUKI, nie flaga: druga doręczona dosyłka
+  /** Dosyłki doręczone (0.536.0). SZTUKI, nie flaga: druga doręczona dosyłka
    *  budzi też wtedy, gdy pierwszą ktoś już potwierdził. */
   k: number;
   /** Dosyłki z kłopotem u przewoźnika: `ISSUE` albo `RETURNED`. */
@@ -223,7 +223,7 @@ type Licznik = keyof Omit<Odcisk, "m">;
  * Licznik `w` jest bez typu: wiadomość klienta liczy się w reklamacji i w
  * dyskusji jednakowo, bo obie czekają na naszą odpowiedź.
  *
- * `k` i `q` (@wydanie) liczą dosyłki sprawy tego loginu. Dosyłkę zakłada
+ * `k` i `q` (0.536.0) liczą dosyłki sprawy tego loginu. Dosyłkę zakłada
  * biuro, ale doręczenie i kłopot zgłasza przewoźnik — to jedyne fakty
  * dosyłki, o których prowadzący może nie wiedzieć.
  */
@@ -262,7 +262,7 @@ function policzOdcisk(
   };
 }
 
-/* Klucze `k` i `q` doszły w @wydanie, więc odcisk każdej sprawy zmienił
+/* Klucze `k` i `q` doszły w 0.536.0, więc odcisk każdej sprawy zmienił
    napis: ekran otwarty w chwili aktualizacji dostaje raz 409 ze świeżą
    sprawą. Zapamiętany odcisk bez tych kluczy nie budzi (`noweZdarzenia`). */
 const naNapis = (o: Odcisk): string =>
@@ -351,7 +351,7 @@ function noweZdarzenia(
     nowe.push({ rodzaj: "wiadomosc_sprawy", tekst: `${kto} w ${dyskusja ? "dyskusji" : "reklamacji"}`,
       at: tekst(w?.at), cel: w ? `/obsluga/${dyskusja ? "dyskusje" : "reklamacje"}/${w.id}` : null });
   }
-  /* Dosyłka (@wydanie). Odnośnika nie ma: dosyłka stoi na karcie sprawy,
+  /* Dosyłka (0.536.0). Odnośnika nie ma: dosyłka stoi na karcie sprawy,
      a sprawa i tak prowadzi na profil — `cel: null` znaczy „tu, na profilu”. */
   const DOSYLKA = `FROM klient_dosylka d JOIN klient_prowadzenie p ON p.id = d.sprawa_id
     WHERE p.login = ? COLLATE NOCASE`;
@@ -617,7 +617,7 @@ export function potwierdzPoZapisie(
  * Stąd odjęcie tego, co zapis zabrał, z podłogą zero. Podłoga chroni przed
  * fałszywym „Dosyłka doręczona”, gdy zabrana dosyłka nie była potwierdzona.
  *
- * Klucz NIEOBECNY dostaje bieżącą liczbę. Sprawa sprzed @wydanie nie ma
+ * Klucz NIEOBECNY dostaje bieżącą liczbę. Sprawa sprzed 0.536.0 nie ma
  * `k` ani `q`, a odmowa nie zapisuje odcisku, więc bez tego jej dosyłka nie
  * obudziłaby jej nigdy. Pozostałe klucze zostają — to nie jest potwierdzenie.
  */

@@ -35,7 +35,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  /* `klient_prowadzenie` pierwszy (@wydanie): odmowa z kodem dosyłki zakłada
+  /* `klient_prowadzenie` pierwszy (0.536.0): odmowa z kodem dosyłki zakłada
      sprawę klienta, a jej prowadzący to klucz obcy do `app_user` bez kaskady.
      Kaskada zabiera przy okazji `klient_dosylka`. */
   for (const t of ["klient_prowadzenie", "zwrot_zdarzenie", "zwrot_klienta_pozycja", "zwrot_klienta", "allegro_zwrot",
@@ -108,7 +108,7 @@ const TRASY = () => [
   /* Przyjęcie paczki nieodebranej (0.493.0) zakłada zwrot, czyli przyszłe
      pieniądze do oddania. Decyzja biura, nie hali. */
   { method: "POST" as const, url: "/api/obsluga/zwroty/przyjmij-nieodebrana" },
-  /* „Śledź dosyłkę” (@wydanie) zakłada krok w sprawie klienta — praca biura. */
+  /* „Śledź dosyłkę” (0.536.0) zakłada krok w sprawie klienta — praca biura. */
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/dosylka` },
 ];
 
@@ -383,7 +383,7 @@ test("zwroty mają trzydzieści siedem tras POST, każda z uzasadnieniem", async
      kliknięciem przy zamówieniu z wyniku szukania. Nowa decyzja właściciela,
      po pytaniu „jak procesujemy paczki nieodebrane". Formularz z 0.451.0 nie
      wraca: trasa niczego nie pyta, bierze zamówienie wskazane przez biuro. */
-  /* Trzydziesta siódma (@wydanie): „Śledź dosyłkę” przy zwrocie. Odmowa
+  /* Trzydziesta siódma (0.536.0): „Śledź dosyłkę” przy zwrocie. Odmowa
      z kodem dosyłki zakłada śledzenie sama, w tym samym ruchu; ta trasa jest
      PONOWIENIEM, gdy odmowa przeszła, a zapis dosyłki nie — odmowy w Allegro
      nie da się powtórzyć, więc bez niej dosyłka takiego zwrotu przepadałaby.
@@ -1020,7 +1020,7 @@ test("nieznane zamówienie albo zamówienie bez pozycji nie zakłada pustego zwr
     "SELECT COUNT(*) AS n FROM zwrot_klienta WHERE zrodlo='nieodebrana'").get() as { n: number }).n, 0);
 });
 
-/* ── Odmowa z dosyłką i „Śledź dosyłkę” (@wydanie) ───────────────────────────
+/* ── Odmowa z dosyłką i „Śledź dosyłkę” (0.536.0) ───────────────────────────
    Trasa odmowy składa dwa serwisy. Pilnujemy trzech rzeczy: dosyłka jedzie
    w odpowiedzi tylko przy kodach dosyłki; porażka jej zapisu NIE zamienia
    nieodwracalnej odmowy w błąd; ponowienie jest idempotentne. */

@@ -224,7 +224,7 @@ describe("Pieniądze przy zwrocie", () => {
     expect(screen.queryByLabelText("Numer przelewu")).toBeNull();
   });
 
-  /* ── Odmowa z kodem dosyłki (@wydanie) ────────────────────────────────────
+  /* ── Odmowa z kodem dosyłki (0.536.0) ────────────────────────────────────
      Zła paczka wraca, biuro odmawia wypłaty kodem „Wysłaliśmy nowy towar”
      i wysyła właściwy towar. Testy pilnują czterech rzeczy: kod mówi słowami,
      a nie nazwą pola Allegro; formularz odmowy nie dostaje nowego wyboru, tylko

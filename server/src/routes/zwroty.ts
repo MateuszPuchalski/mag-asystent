@@ -826,7 +826,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       }
     });
 
-  /* DOSYŁKA W TYM SAMYM RUCHU (@wydanie). Odmowa z kodem „Wysłaliśmy nowy
+  /* DOSYŁKA W TYM SAMYM RUCHU (0.536.0). Odmowa z kodem „Wysłaliśmy nowy
      towar” albo „Wysłaliśmy brakującą część” zakłada śledzenie dosyłki
      i krok „dosłać” w sprawie klienta. Trasa SKŁADA dwa serwisy, bo
      `zwrot-pieniedzy.ts` nie ma prawa importować `dosylka.ts` (cykl przez
@@ -868,7 +868,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     });
 
   /* „Śledź dosyłkę” przy zwrocie — ponowienie, gdy odmowa przeszła, a dosyłka
-     nie; albo odmowa sprzed @wydanie. BEZ CIAŁA: trasa niczego z niego nie
+     nie; albo odmowa sprzed 0.536.0. BEZ CIAŁA: trasa niczego z niego nie
      czyta, a pusty JSON z typem treści to `FST_ERR_CTP_EMPTY_JSON_BODY`.
      Samo `odmowa()` bez `autoryzuj()`: pieniądze się tu nie ruszają, więc
      wpis `privileged` zrównywałby ją z przelewem. */

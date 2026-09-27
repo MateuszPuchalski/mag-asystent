@@ -41,14 +41,14 @@ const KODY: Array<{ kod: string; etykieta: string;
 ];
 const WYMAGA_POWODU = "REFUND_REJECTED";
 /**
- * Kody, przy których do klienta jedzie druga paczka (@wydanie). Odmowa z nimi
+ * Kody, przy których do klienta jedzie druga paczka (0.536.0). Odmowa z nimi
  * zakłada śledzenie dosyłki i krok „dosłać” w sprawie klienta — w tym samym
  * zapisie, bez nowego wyboru w formularzu (dekalog p. 5).
  */
 const KODY_DOSYLKI = new Set(["NEW_ITEM_SENT", "MISSING_PART_SENT"]);
 
 /**
- * Kod odmowy słowami operatora (@wydanie). Do tego wydania stał tu surowy
+ * Kod odmowy słowami operatora (0.536.0). Do tego wydania stał tu surowy
  * `NEW_ITEM_SENT`, czyli nazwa pola ze specyfikacji Allegro, nie zdanie.
  * Kod spoza listy zostaje surowy: przychodzi też synchronizacją, a Allegro
  * może dołożyć nowy. Profil klienta bierze stąd brzmienie propozycji
@@ -93,12 +93,12 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
   /** Rejestr klawiszy ekranu — stąd bierze się `Z`. */
   akcje?: MutableRefObject<AkcjeKlawiszy>;
   /**
-   * Wynik założenia dosyłki z ODPOWIEDZI ostatniego zapisu (@wydanie). Zdanie
+   * Wynik założenia dosyłki z ODPOWIEDZI ostatniego zapisu (0.536.0). Zdanie
    * jednorazowe: stan trwały przychodzi odświeżonym `stan.odmowa`, a tego,
    * czy odmowa podmieniła krok sprawy, stan już nie mówi.
    */
   wynikDosylki?: WynikDosylki | null;
-  /** „Śledź dosyłkę” — gdy odmowa z kodem dosyłki nie ma śledzenia (@wydanie). */
+  /** „Śledź dosyłkę” — gdy odmowa z kodem dosyłki nie ma śledzenia (0.536.0). */
   onSledzDosylke?: () => void;
 }) {
   const [odmawiam, setOdmawiam] = useState(false);
@@ -178,7 +178,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
     {stan.powod && !stan.oddane && !stan.odmowa && !przedWerdyktem &&
       <p className="mt-2 text-xs text-slate-500">{stan.powod}</p>}
 
-    {/* ── DOSYŁKA POD ODMOWĄ (@wydanie) ───────────────────────────────────
+    {/* ── DOSYŁKA POD ODMOWĄ (0.536.0) ───────────────────────────────────
         Zła paczka wraca, biuro odmawia wypłaty kodem „Wysłaliśmy nowy towar”
         i wysyła właściwy towar. Do tego wydania ekran zwrotu kończył się na
         odmowie, a o drugiej paczce wiedział tylko Gmail prowadzącego. Zdanie

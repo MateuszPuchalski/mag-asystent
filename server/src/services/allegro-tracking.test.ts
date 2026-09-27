@@ -126,7 +126,7 @@ test("partie idą PO PRZEWOŹNIKU i po dwadzieścia numerów", async () => {
   assert.equal(adresy.filter((u) => u.includes("/DPD/")).length, 1);
 });
 
-/* ── Wspólne odpytanie dla zwrotów i dosyłki (@wydanie) ──────────────────────
+/* ── Wspólne odpytanie dla zwrotów i dosyłki (0.536.0) ──────────────────────
    Jedna droga do końcówki trackingu, dwie polityki przy 429: zwroty idą
    dalej jak przed wydzieleniem, dosyłka oddaje limit taktowi. */
 

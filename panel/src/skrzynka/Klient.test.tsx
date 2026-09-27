@@ -150,7 +150,7 @@ describe("zakładka klienta", () => {
   });
 });
 
-/* ── Dosyłka w linijce sprawy (@wydanie) ─────────────────────────────────────
+/* ── Dosyłka w linijce sprawy (0.536.0) ─────────────────────────────────────
    Agent przy rozmowie odpowiada zwykle na „gdzie moja paczka”. Linijka niesie
    JEDNO zdanie o dosyłce — najpilniejsze, nie najświeższe: kłopot, brak
    numeru, w drodze, doręczona. Reszta stoi na profilu.                       */

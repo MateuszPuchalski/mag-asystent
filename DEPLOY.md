@@ -2890,7 +2890,7 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
-### Aktualizacja do @wydanie — dosyłka ze śledzeniem
+### Aktualizacja do 0.536.0 — dosyłka ze śledzeniem
 
 **Panel trzeba przebudować, a serwer zrestartować. Klikać nie trzeba nic.**
 Tabela `klient_dosylka` powstaje sama przy starcie. Ticker `dosylki` rusza sam

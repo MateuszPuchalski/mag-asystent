@@ -23,7 +23,7 @@ const AUTOMATY = new Set([
   "siec_przerwa", "rozmowa_przeczytana_blad", "rozmowa_wysylka_blad", "rozmowa_wysylka_niepewna",
   "rozmowa_wysylka_konflikt", "rozmowa_wysylka_uzgodniona", "reklamacja_wysylka_konflikt",
   "reklamacja_zalacznik_bez_location", "allegro_zamowienie_brak", "ean_conflict", "location_mismatch",
-  /* Dosyłka (@wydanie): doręczenie i kłopot zapisuje wyłącznie ticker. Numer
+  /* Dosyłka (0.536.0): doręczenie i kłopot zapisuje wyłącznie ticker. Numer
      (`klient_dosylka_numer`) zostaje w raporcie, bo wpisuje go też człowiek. */
   "klient_dosylka_doreczona", "klient_dosylka_problem",
 ]);

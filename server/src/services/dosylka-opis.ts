@@ -1,6 +1,6 @@
 import { chwilaUtc, czasLokalny, dataLokalna, dodajDni, polnocLokalna } from "../czas.js";
 
-/* ── Dosyłka: zdanie, ton i dni robocze (@wydanie, S6) ───────────────────────
+/* ── Dosyłka: zdanie, ton i dni robocze (0.536.0, S6) ───────────────────────
    Drugi przyrost sprawy klienta: krok „dosłać” dostaje numer przesyłki,
    przewoźnika i śledzenie. Ten plik to CZYSTA część — zdanie o dosyłce,
    jej ton i rachunek dni roboczych. Bez bazy i bez sieci.

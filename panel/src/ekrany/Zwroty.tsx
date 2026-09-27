@@ -365,7 +365,7 @@ export function Zwroty() {
   const [bladDopisania, setBladDopisania] = useState("");
   const [bladRabatu, setBladRabatu] = useState("");
   const [bladPieniedzy, setBladPieniedzy] = useState("");
-  /* Wynik założenia dosyłki (@wydanie) — zdanie jednorazowe z odpowiedzi.
+  /* Wynik założenia dosyłki (0.536.0) — zdanie jednorazowe z odpowiedzi.
      Niesie NUMER ZWROTU, bo pieniądze nie są kluczowane zwrotem: przełączenie
      na inny zwrot z pamięci podręcznej zostawia sekcję zamontowaną, a zdanie
      o cudzym kroku stałoby pod cudzymi pieniędzmi. */

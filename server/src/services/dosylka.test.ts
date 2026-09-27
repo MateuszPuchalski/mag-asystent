@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-dosylka-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Dosyłka ze śledzeniem (@wydanie, drugi przyrost S6) ─────────────────────
+/* ── Dosyłka ze śledzeniem (0.536.0, drugi przyrost S6) ─────────────────────
    Pilnujemy projektu punkt po punkcie:
    - odmowa z kodem dosyłki zakłada, wznawia albo przestawia sprawę TĄ SAMĄ
      drogą co „Ustaw krok”, nie potwierdza „nowego” i jest idempotentna;

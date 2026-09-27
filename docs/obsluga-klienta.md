@@ -1152,7 +1152,7 @@ roli stoi na każdej trasie, także na odczycie.
 
 **Krok nie niesie adresu ani telefonu.** To reguła dla człowieka, bo pole jest
 wolnym tekstem i kod jej nie wymusi. Wyjątek z 0.422.0 dotyczy mapowania
-zamówień, nie tego pola. Numer przesyłki dosyłki ma od @wydanie własną
+zamówień, nie tego pola. Numer przesyłki dosyłki ma od 0.536.0 własną
 kolumnę i własne uzasadnienie — rozdział niżej.
 
 **Retencji nie ma, tak jak przy notatce o kliencie.** Wiersz żyje tak długo
@@ -1161,7 +1161,7 @@ jak klient w bazie. Zakończona sprawa budzi się tylko przez trzydzieści dni
 Kasowanie po czasie zabrałoby agentowi ten ślad przy następnym kontakcie
 klienta. O archiwizacji decyduje właściciel, nie kod, jak przy `events`.
 
-## Polityka danych dosyłki (@wydanie)
+## Polityka danych dosyłki (0.536.0)
 
 Drugi przyrost sprawy klienta (S6) dokłada tabelę `klient_dosylka`. Jej
 granice stoją osobno, bo przy sprawie po raz pierwszy leży numer przesyłki.

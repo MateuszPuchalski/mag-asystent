@@ -76,13 +76,13 @@ export interface ProfilKlienta {
   /** Nic nie czeka w kolejkach, a dzień kroku nadszedł — liczy serwer. */
   podpowiedzZakonczenia: boolean;
   /**
-   * DLACZEGO podpowiedź stoi (@wydanie). Doręczona dosyłka to drugi powód
+   * DLACZEGO podpowiedź stoi (0.536.0). Doręczona dosyłka to drugi powód
    * obok terminu kroku, a każdy mówi agentowi co innego. Wartość logiczna
    * wyżej zostaje, bo starsza karta czyta tylko ją.
    */
   podpowiedzPowod: "termin" | "dosylka" | null;
   /**
-   * Odmowa wypłaty z kodem dosyłki, której nikt nie śledzi (@wydanie). To
+   * Odmowa wypłaty z kodem dosyłki, której nikt nie śledzi (0.536.0). To
    * droga ZAPASOWA: zwykle śledzenie zakłada sama odmowa na ekranie zwrotu.
    * Tu trafia odmowa, przy której zapis u nas się nie udał, i kod złożony
    * poza panelem, który przyszedł synchronizacją.
@@ -154,7 +154,7 @@ export type OdpowiedzSprawy = { sprawa: SprawaKlienta };
  * sprawę z czynnymi przyciskami. Drugie kliknięcie szło ze starą wersją
  * i dostawało 409 po udanym przejęciu — jak przy notatce wyżej, która czeka.
  *
- * EKSPORT dla ekranu zwrotów (@wydanie). Odmowa wypłaty z kodem dosyłki
+ * EKSPORT dla ekranu zwrotów (0.536.0). Odmowa wypłaty z kodem dosyłki
  * zmienia sprawę klienta, a szuflada historii przy tym samym zwrocie rysuje
  * jej linijkę. Bez odświeżenia stał tam stary krok zamiast „dosłać”.
  */
@@ -224,7 +224,7 @@ export function usePrzejmijSprawe(login: string) {
   });
 }
 
-/* ── Dosyłka sprawy klienta (@wydanie) — trasy z `routes/spoiwo.ts` ──────────
+/* ── Dosyłka sprawy klienta (0.536.0) — trasy z `routes/spoiwo.ts` ──────────
    Dwa zapisy z profilu, oba na kliknięcie i oba Z CIAŁEM, z wersją i odciskiem
    sprawy narysowanej na ekranie — ta sama kontrola świeżości co przy kroku.
    Reguły `method` na pierwszym miejscu i pełnego adresu obowiązują tu z tego

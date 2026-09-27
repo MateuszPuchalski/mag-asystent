@@ -146,7 +146,7 @@ test("odczyt bez pytania Allegro niczego nie mutuje", () => {
   assert.equal(Number(db().prepare("SELECT COUNT(*) AS n FROM events").get()!.n), przed);
 });
 
-/* ── Dosyłka jako nakładka przy odczycie (@wydanie) ──────────────────────────
+/* ── Dosyłka jako nakładka przy odczycie (0.536.0) ──────────────────────────
    Reguła „doręczona przebija” zostaje — pierwsza paczka odpowiada na pytanie
    „czy on to dostał”. Dosyłka staje OBOK, bez numeru, żeby doręczony
    oryginał nie zasłonił niedoręczonej drugiej paczki. */

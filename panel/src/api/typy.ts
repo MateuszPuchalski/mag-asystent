@@ -421,7 +421,7 @@ export interface MojaSprawa {
   dzis?: boolean;
   /** Zdanie pierwszego zdarzenia od klienta po naszym ostatnim ruchu. */
   nowe?: string | null;
-  /** Zdanie najważniejszej dosyłki sprawy (@wydanie): kłopot, brak numeru, w drodze, doręczona. */
+  /** Zdanie najważniejszej dosyłki sprawy (0.536.0): kłopot, brak numeru, w drodze, doręczona. */
   dosylka?: string | null;
 }
 
@@ -1100,7 +1100,7 @@ export type HistoriaKlienta = {
  * na każdym ekranie to samo.
  */
 export interface NoweZdarzenie {
-  /* Dwa rodzaje dosyłki (@wydanie) nie przychodzą od klienta, tylko od
+  /* Dwa rodzaje dosyłki (0.536.0) nie przychodzą od klienta, tylko od
      przewoźnika przez Allegro. Budzą sprawę, bo to na ten fakt czeka krok
      „dosłać” — `cel` mają zawsze `null`, bo dosyłka nie ma własnego ekranu. */
   rodzaj: "rozmowa" | "zwrot_nowy" | "zwrot_nadany" | "zwrot_dotarl" | "reklamacja" | "dyskusja"
@@ -1138,12 +1138,12 @@ export interface SprawaKlienta {
   nowe: NoweZdarzenie[];
   /** Odcisk faktów, które ekran narysował — zapis go odsyła (świeżość, dekalog 4). */
   odcisk: string;
-  /** Dosyłki tej sprawy, najnowsza pierwsza (@wydanie). Zawsze obecne, czasem puste. */
+  /** Dosyłki tej sprawy, najnowsza pierwsza (0.536.0). Zawsze obecne, czasem puste. */
   dosylki: DosylkaSprawy[];
 }
 
 /**
- * Dosyłka sprawy klienta (@wydanie) — lustro `DosylkaSprawy` z serwera.
+ * Dosyłka sprawy klienta (0.536.0) — lustro `DosylkaSprawy` z serwera.
  *
  * `opis` SKŁADA SERWER, jak zdanie `NoweZdarzenie`. Ten sam stan dosyłki stoi
  * na profilu, na liście „Moje” i przy historii każdej kolejki; trzy ekrany
@@ -1173,7 +1173,7 @@ export interface DosylkaSprawy {
 }
 
 /**
- * Wynik założenia śledzenia dosyłki (@wydanie) — przy odmowie wypłaty
+ * Wynik założenia śledzenia dosyłki (0.536.0) — przy odmowie wypłaty
  * i przy „Śledź dosyłkę” na ekranie zwrotu.
  *
  * DWA KSZTAŁTY, NIE JEDEN Z FLAGĄ. Odmowa w Allegro jest nieodwracalna, a
@@ -1750,7 +1750,7 @@ export type StanZwrotuPieniedzy = {
   odmowa: {
     kod: string; powod: string | null; kiedy: string | null;
     /**
-     * Dosyłka związana z tym zwrotem (@wydanie). Zła paczka wraca, biuro
+     * Dosyłka związana z tym zwrotem (0.536.0). Zła paczka wraca, biuro
      * odmawia wypłaty kodem „Wysłaliśmy nowy towar” i wysyła właściwy towar.
      * Bez tej linijki ekran zwrotu nie mówił, czy ta druga paczka doszła.
      */

@@ -224,7 +224,7 @@ test("audyt odrzuceń pod profilem klienta pisze wzorzec trasy, nie login", asyn
   assert.deepEqual(zLoginem, [], "login kupującego nie ma prawa trafić do dziennika");
 });
 
-/* ── Dosyłka z profilu (@wydanie, S6) ───────────────────────────────────────
+/* ── Dosyłka z profilu (0.536.0, S6) ───────────────────────────────────────
    Dwa zapisy obok czterech wyżej, z tymi samymi strażnikami: bramka biura,
    każdy klucz wymagany, 409 ze świeżą sprawą. Numer przesyłki jedzie
    w ciele, więc nie trafia ani do adresu, ani do audytu odrzuceń. */

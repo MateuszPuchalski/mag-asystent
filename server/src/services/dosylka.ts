@@ -14,7 +14,7 @@ import {
   sprawdzSwiezosc, wierszSprawy, wyrownajZnane, zapiszKrokSprawy, type SprawaKlienta,
 } from "./prowadzenie-klienta.js";
 
-/* ── Dosyłka ze śledzeniem (@wydanie, drugi przyrost S6) ─────────────────────
+/* ── Dosyłka ze śledzeniem (0.536.0, drugi przyrost S6) ─────────────────────
    Fakty właściciela z 27 września 2026: zły towar wraca zwrotem przez
    Allegro, biuro na ekranie zwrotu odmawia wypłaty kodem „Wysłaliśmy nowy
    towar” (`NEW_ITEM_SENT`), drukuje etykietę w Sellasist i wysyła poprawny
