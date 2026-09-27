@@ -53,7 +53,7 @@ const zTerminemNaDzis = (s: MojaSprawa) =>
    Wiersz rodzaju, którego ta karta nie zna, SCHODZI z listy, zamiast
    wywrócić ekran: panel nie ma granicy błędu, a serwer aktualizuje się
    w nocy pod otwartą kartą. Tak wywróciłaby się karta sprzed 0.535.0.
-   Wyjęte do funkcji (@wydanie), bo ekran „Do zrobienia" pyta o to samo,
+   Wyjęte do funkcji (0.545.0), bo ekran „Do zrobienia" pyta o to samo,
    decydując, czy pusta sekcja zwija się do linijki — dwie kopie filtra
    powiedziałyby „pusto" i „jedna sprawa" o tych samych danych. */
 export const widoczneSprawy = (d: { sprawy: MojaSprawa[]; lista?: MojaSprawa[] } | undefined): MojaSprawa[] =>

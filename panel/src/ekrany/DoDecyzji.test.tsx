@@ -18,7 +18,7 @@ import type { PozycjaDecyzji } from "../api/decyzje";
       człowiek nie logował się drugi raz.
    3. KOLEJNOŚĆ JEST SERWERA. Panel jej nie przestawia — dwie reguły
       sortowania rozjechałyby się przy pierwszej poprawce jednej z nich.
-      Od @wydanie sprawy tego samego pytania stoją w jednej grupie. Grupa
+      Od 0.545.0 sprawy tego samego pytania stoją w jednej grupie. Grupa
       staje tam, gdzie serwer postawił jej pierwszą sprawę — to podział
       listy, nie drugie sortowanie. */
 
@@ -103,7 +103,7 @@ describe("DO DECYZJI", () => {
     expect(pytania).toEqual(POZYCJE.map((p) => p.pytanie));
   });
 
-  /* Wariant B (@wydanie): pytanie raz, sprawy pod nim. Druga sprawa pytania
+  /* Wariant B (0.545.0): pytanie raz, sprawy pod nim. Druga sprawa pytania
      dołącza do grupy pierwszej, choć serwer postawił ją niżej — kolejność
      grup i spraw w grupie to dalej kolejność serwera. */
   it("sprawy jednego pytania stoją pod nim raz, w kolejności serwera", async () => {
@@ -170,7 +170,7 @@ describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
     expect(wyslane).toEqual([]);
   });
 
-  /* Wariant B (@wydanie): pusta sekcja nie jest kartą z nagłówkiem, tylko
+  /* Wariant B (0.545.0): pusta sekcja nie jest kartą z nagłówkiem, tylko
      linijką nad decyzjami — 170 px na „nic" oddane liście decyzji. */
   it("puste sekcje schodzą do jednej linijki, decyzje zostają sekcją", async () => {
     pokaz();
@@ -249,7 +249,7 @@ describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
   it("bez tytułu nad sekcjami; trzy nagłówki mają jeden kształt licznika (0.524.0)", async () => {
     /* Tytuł „Do zrobienia" powtarzał podświetloną zakładkę. Liczniki miały
        trzy zapisy; teraz każdy stoi po kropce w nagłówku sekcji. Sekcje
-       pełne — puste schodzą do linijki (@wydanie). */
+       pełne — puste schodzą do linijki (0.545.0). */
     moje = [{ kolejka: "reklamacja", id: 9, opis: "Nowak: pompa cieknie", at: "2026-09-26T10:00:00Z", terminDo: null }];
     wzmianki = [{ commentId: 3, conversationId: 12, autor: "Ola", klient: "Nowak", at: "2026-09-27T08:00:00Z",
       fragment: "@Ty zerknij", odhaczona: false, odhaczonaAt: null }];

@@ -62,7 +62,7 @@ function Wiek({ p }: { p: PozycjaDecyzji }) {
     title={p.pilne ? "Termin minął albo mija" : "Od kiedy czeka"}>{wiek(ms)}</span>;
 }
 
-/* ── PYTANIE RAZ, SPRAWY POD NIM (@wydanie) ─────────────────────────────
+/* ── PYTANIE RAZ, SPRAWY POD NIM (0.545.0) ─────────────────────────────
    Decyzja właściciela z 27 września 2026, wariant B z makiet. Każdy wiersz
    powtarzał pytanie i źródło: sześć wierszy niosło trzy pytania, a nazwa
    źródła stała obok ikony, która mówiła to samo. Pytanie stoi teraz raz,
@@ -169,7 +169,7 @@ export function DoDecyzji() {
   const pozycje = (dane.data?.pozycje ?? []).filter((p) => filtr === "wszystko" || p.obszar === filtr);
   const l = dane.data?.liczniki;
 
-  /* ── PUSTE SEKCJE JEDNĄ LINIJKĄ (@wydanie) ─────────────────────────────
+  /* ── PUSTE SEKCJE JEDNĄ LINIJKĄ (0.545.0) ─────────────────────────────
      Wariant B, ta sama decyzja. „Wspomniano o mnie · 0" i „Moje sprawy · 0"
      stały jako dwie karty z nagłówkiem nad listą decyzji i zabierały
      170 px tylko po to, żeby powiedzieć „nic". Pusta sekcja schodzi do

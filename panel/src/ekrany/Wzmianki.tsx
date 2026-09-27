@@ -15,7 +15,7 @@ import { Blad, Karta, NaglowekSekcji, Przycisk, czas } from "../ui";
    spojrzenia ginęłaby dokładnie wtedy, gdy agent przewija listę w biegu. */
 export function Wzmianki({ zHistoriaNaStart = false }: {
   /** Ekran „Do zrobienia" otwiera sekcję od historii, gdy przyszło się po nią
-   *  z linijki pustych sekcji (@wydanie) — tam jest jedynym powodem kliknięcia. */
+   *  z linijki pustych sekcji (0.545.0) — tam jest jedynym powodem kliknięcia. */
   zHistoriaNaStart?: boolean;
 } = {}) {
   const nawiguj = useNavigate();

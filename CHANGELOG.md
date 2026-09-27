@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.545.0 — 27 września 2026
+
+**Do zrobienia: pytanie raz.** Decyzje biura stoją grupami: pytanie w nagłówku, pod nim sprawy z wiekiem. Wiersz nie powtarza już pytania ani nazwy źródła. Puste „Wspomniano o mnie” i „Moje sprawy” schodzą do jednej linijki nad decyzjami, więc lista zaczyna się o 140 px wyżej. Kolejność dalej liczy serwer.
+
 ## 0.544.0 — 27 września 2026
 
 **Serwer czyta pusty JSON jak brak ciała.** Żądanie z typem treści JSON
