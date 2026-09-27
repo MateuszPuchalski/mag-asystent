@@ -27,6 +27,17 @@ zapisu patrzy na `fetch`, a nie na haki.
   unieważnia właściwe zapytania, a ekran o tym nie pamięta.
   *Strażnik: konwencja.*
 
+## Brak danych to nie zero
+
+- **Lista bez danych nie mówi „pusto" ani „0".** Gdy zapytanie padło i nie
+  ma danych, ekran pokazuje błąd zamiast listy, a licznik kubełka dostaje
+  `undefined`, nie zero. Serwer znika w każdej aktualizacji, a „nic nie
+  czeka" przy awarii agent czyta jako koniec pracy.
+  *Strażnik: `src/ekrany/BrakPolaczenia.test.tsx` (Dostawy, Kosze, Skrzynka).*
+- **Brak połączenia ma jeden typ: `BrakPolaczenia`** z `api/klient.ts`.
+  Pasek pod nagłówkiem (`nawigacja/Polaczenie.tsx`) mówi o nim raz.
+  Własny `fetch` poza `api()` zamienia brak sieci na ten sam typ.
+
 ## Strażnicy źródeł
 
 Pliki `*.test.ts` leżące wprost w `src/` czytają źródła panelu przez `?raw`

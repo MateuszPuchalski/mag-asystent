@@ -1,5 +1,5 @@
 import { MutationCache, QueryCache, QueryClient } from "@tanstack/react-query";
-import { BrakSesji, zglosBrakSesji } from "./klient";
+import { BrakSesji, zglosBrakPolaczenia, zglosBrakSesji } from "./klient";
 
 /* Jeden cache zapytań na cały panel zastępuje ręczne odświeżanie co
    piętnaście sekund. To jest ta część wyceny z `docs/obsluga-klienta.md` §7,
@@ -22,9 +22,11 @@ export function nowyKlientZapytan(): QueryClient {
   const klient: QueryClient = new QueryClient({
     /* Wygasła sesja w dowolnym zapytaniu albo mutacji wraca do logowania
        (0.431.0) — szczegół przy `zglosBrakSesji` w `api/klient.ts`. */
-    queryCache: new QueryCache({ onError: zglosBrakSesji }),
+    /* Brak połączenia w dowolnym zapytaniu albo mutacji zapala pasek pod
+       nagłówkiem (@wydanie) — szczegół przy `BrakPolaczenia` w `api/klient.ts`. */
+    queryCache: new QueryCache({ onError: (e) => { zglosBrakSesji(e); zglosBrakPolaczenia(e); } }),
     mutationCache: new MutationCache({
-      onError: zglosBrakSesji,
+      onError: (e) => { zglosBrakSesji(e); zglosBrakPolaczenia(e); },
       onSuccess: () => {
         for (const k of WSPOLNE_KLUCZE) void klient.invalidateQueries({ queryKey: [...k] });
       },

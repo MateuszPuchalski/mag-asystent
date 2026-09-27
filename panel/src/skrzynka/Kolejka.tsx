@@ -5,7 +5,7 @@ import {
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
 } from "../api/typy";
-import { czas, Plakietka, Pusto } from "../ui";
+import { Blad, czas, Plakietka, Pusto } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { polePisania } from "../nawigacja/fokus";
 import { NAZWA, NAZWA_DOBORU } from "./statusy";
@@ -134,7 +134,8 @@ function wKubelku(r: Rozmowa, kubelek: Kubelek, mojeId: number | null): boolean 
    znaczy co innego, gdy synchronizator stanął o 6:00, a co innego, gdy
    przebiegł minutę temu. Bez tej daty ekran kłamałby ciszą. */
 export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = () => {},
-  wybranaId, mojeId = null, onWybierz, onWidoczne, powiadomienia, onOdswiez, laduje, nieswieza }: {
+  wybranaId, mojeId = null, onWybierz, onWidoczne, powiadomienia, onOdswiez, laduje, nieswieza,
+  bladBezDanych = null }: {
   rozmowy: Rozmowa[];
   stan: StanSkrzynki;
   /** Stan Copilota (§14, etap F). `undefined` = jeszcze nie wiadomo, milcz. */
@@ -158,6 +159,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   /* Kolejka nieświeża wygląda inaczej, bo znaczy co innego. Pusta lista przy
      stojącym synchronizatorze to nie „brak pytań", tylko „nie wiem". */
   nieswieza?: boolean;
+  /* Lista nie przyszła wcale (@wydanie). Wtedy kolejka nie wie, ile czeka,
+     więc nie mówi „brak rozmów" ani „0" — mówi, że nie wie, i dlaczego. */
+  bladBezDanych?: string | null;
 }) {
   const [kubelek, setKubelek] = useState<Kubelek>("doOdpowiedzi");
   /* ── Szukanie w kolejce (0.195.0) ──────────────────────────────────────────
@@ -322,7 +326,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1">
       <FiltrZWiecej<Kubelek> wybrany={kubelek} onWybierz={setKubelek} wiecej={POD_WIECEJ}
         pozycje={KUBELKI.map((k) => ({ klucz: k.klucz, etykieta: k.etykieta,
-          ile: rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length }))} />
+          ile: bladBezDanych ? undefined : rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length }))} />
     </div>
     {/* Pole stoi POD kubełkami, nie nad nimi: kubełek wybiera się raz na
         wejście, a szuka się w środku tego, co się wybrało. Kolejność obok
@@ -369,8 +373,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           „Moje" jest tu KUBEŁKIEM, więc siedzi już pod cyfrą i drugi raz nie
           ma po co stać. */}
       {laduje && <Pusto waga="lista">Wczytuję…</Pusto>}
-      {!laduje && !rozmowy.length &&
-        <Pusto waga="lista">Brak rozmów w zsynchronizowanej skrzynce.</Pusto>}
+      {!laduje && !rozmowy.length && (bladBezDanych
+        ? <Blad>{bladBezDanych}</Blad>
+        : <Pusto waga="lista">Brak rozmów w zsynchronizowanej skrzynce.</Pusto>)}
       {/* Pusty KUBEŁEK to co innego niż pusta skrzynka: „nic nie czeka na
           mnie" nie znaczy „nic nie przyszło", a jedno zdanie mniej kazałoby
           agentowi zgadywać, czy synchronizacja stanęła. */}

@@ -75,18 +75,23 @@ export function Kosze() {
      co kubełek, więc karta i kubełek nie mogą się rozjechać (0.503.0). */
   const problemMm = lista.find((k) => k.id === wybrany)?.problemMm ?? null;
   const bezPowrotu = lista.find((k) => k.id === wybrany)?.bezPowrotu ?? null;
-  const liczniki: Record<KubelekKoszy, number> = {
-    praca: lista.filter((k) => kubelekKosza(k) === "praca").length,
-    pominiete: pominiete.data?.pominiete.length ?? 0,
-    mm: lista.filter(maKlopotMm).length,
-    rozlozone: lista.filter((k) => kubelekKosza(k) === "rozlozone").length,
-    anulowane: lista.filter((k) => kubelekKosza(k) === "anulowane").length,
+  /* Bez danych licznik nie zna liczby i jej nie pokazuje (@wydanie) — powód
+     przy tych samych licznikach w `ekrany/Dostawy.tsx`. */
+  const znane = kosze.data !== undefined;
+  const liczniki: Record<KubelekKoszy, number | undefined> = {
+    praca: znane ? lista.filter((k) => kubelekKosza(k) === "praca").length : undefined,
+    pominiete: pominiete.data?.pominiete.length,
+    mm: znane ? lista.filter(maKlopotMm).length : undefined,
+    rozlozone: znane ? lista.filter((k) => kubelekKosza(k) === "rozlozone").length : undefined,
+    anulowane: znane ? lista.filter((k) => kubelekKosza(k) === "anulowane").length : undefined,
   };
   const opis = KUBELKI_KOSZY.find((k) => k.id === kubelek);
   const idz = (x: number) => nawiguj(`/obsluga/zwroty/kosze/${x}`);
   const szuka = q.length >= 2;
 
   const lewa = kosze.isLoading ? <Pusto waga="lista">Wczytuję kosze…</Pusto>
+    /* Błąd bez danych zamiast „ten kubełek jest pusty" (@wydanie). */
+    : kosze.error && !kosze.data ? <Blad>{(kosze.error as Error).message}</Blad>
     : szuka ? (szukaj.isLoading ? <Pusto waga="lista">Szukam w koszach…</Pusto>
         : <WynikiSzukania lista={szukaj.data?.znalezione ?? []} onWybierz={idz} />)
       : kubelek === "pominiete"
@@ -125,7 +130,8 @@ export function Kosze() {
           <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
         </div>}
         <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
-        <Blad>{(kosze.error ?? szukaj.error) ? ((kosze.error ?? szukaj.error) as Error).message : ""}</Blad>
+        <Blad>{kosze.error && kosze.data ? (kosze.error as Error).message
+          : szukaj.error ? (szukaj.error as Error).message : ""}</Blad>
       </Karta>
 
       <Karta className="flex min-h-0 flex-col overflow-hidden">

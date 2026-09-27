@@ -1,7 +1,13 @@
 ---
 rodzaj: minor
-tytul: pusta kolumna w jednym miejscu, zakładki przy powiększeniu, zero naruszeń WCAG
+tytul: pasek braku połączenia, pusta kolumna w jednym miejscu, zero naruszeń WCAG
 ---
+
+**Brak połączenia z serwerem mówi to wprost.** Gdy serwer nie odpowiada,
+na przykład w minucie aktualizacji, pod nagłówkiem staje czerwony pasek
+z godziną ostatniego kontaktu i przyciskiem „Ponów teraz". Panel sam pyta
+co 5 sekund i po powrocie odświeża wszystko. Dostawy, kosze i skrzynka nie
+mówią już wtedy „nic nie czeka" ani „0" — mówią, że nie wiedzą.
 
 **Pusta kolumna mówi w jednym miejscu.** Ikona i zdanie „Wybierz dostawę
 z kolejki" stoją razem na środku kolumny. Dotąd ikona wisiała w górnej

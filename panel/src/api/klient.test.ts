@@ -107,3 +107,43 @@ describe("wygasła sesja wraca do logowania (0.431.0)", () => {
     window.removeEventListener(SESJA_WYGASLA, licz);
   });
 });
+
+describe("brak połączenia z serwerem (@wydanie)", () => {
+  /* Serwer bierze wydanie sam i na chwilę znika. Ekran ma dostać JEDEN typ
+     błędu z polskim zdaniem, a nie „Failed to fetch" albo „Błąd 502". */
+  it("zerwana sieć to BrakPolaczenia, nie angielski TypeError", async () => {
+    const { BrakPolaczenia } = await import("./klient");
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("Failed to fetch")));
+    await expect(api("/api/obsluga/rozmowy")).rejects.toBeInstanceOf(BrakPolaczenia);
+    await expect(api("/api/obsluga/rozmowy")).rejects.toThrow("Brak połączenia z serwerem.");
+  });
+
+  it("502, 503 i 504 bez naszego pola error to brama, czyli brak połączenia", async () => {
+    const { BrakPolaczenia } = await import("./klient");
+    for (const status of [502, 503, 504]) {
+      vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ ok: false, status, json: async () => { throw new Error("html"); } }));
+      await expect(api("/api/obsluga/rozmowy")).rejects.toBeInstanceOf(BrakPolaczenia);
+    }
+  });
+
+  it("502 Z polem error to nasza trasa o awarii Allegro — zdanie dochodzi bez zmian", async () => {
+    const { BrakPolaczenia } = await import("./klient");
+    vi.stubGlobal("fetch", odp(502, { error: "Allegro nie odpowiada — spróbuj za chwilę" }));
+    const blad = await api("/api/obsluga/reklamacje/1/odswiez", { method: "POST" }).catch((e) => e);
+    expect(blad).not.toBeInstanceOf(BrakPolaczenia);
+    expect(blad.message).toBe("Allegro nie odpowiada — spróbuj za chwilę");
+  });
+
+  it("BrakPolaczenia wysyła zdarzenie do ramy, inne błędy — nie", async () => {
+    const { BrakPolaczenia, zglosBrakPolaczenia, POLACZENIE_ZERWANE } = await import("./klient");
+    let ile = 0;
+    const licz = () => { ile++; };
+    window.addEventListener(POLACZENIE_ZERWANE, licz);
+    zglosBrakPolaczenia(new Error("500"));
+    zglosBrakPolaczenia(new BrakSesji("Sesja wygasła"));
+    expect(ile).toBe(0);
+    zglosBrakPolaczenia(new BrakPolaczenia());
+    expect(ile).toBe(1);
+    window.removeEventListener(POLACZENIE_ZERWANE, licz);
+  });
+});

@@ -606,6 +606,7 @@ export function Skrzynka() {
       wybranaId={wybranaId}
       mojeId={ja.data?.user.userId ?? null}
       laduje={lista.isLoading}
+      bladBezDanych={lista.error && !lista.data ? (lista.error as Error).message : null}
       onOdswiez={() => lista.refetch()}
       onWidoczne={(ids) => { widoczne.current = ids; }}
       powiadomienia={sygnaly}
@@ -868,7 +869,9 @@ export function Skrzynka() {
       onPopraw={() => { setKonfliktWysylki(null); rozmowa.refetch(); }} />}
 
     <div className="shrink-0 space-y-4">
-      <Blad>{blad || (lista.error as Error | null)?.message}</Blad>
+      {/* Błąd listy BEZ danych stoi już w kolejce (@wydanie); tu tylko błąd
+          odświeżenia, gdy stare rozmowy zostały na ekranie. */}
+      <Blad>{blad || (lista.data ? (lista.error as Error | null)?.message : undefined)}</Blad>
     </div>
 
     {/* JEDEN STOS PASKÓW, NAD KOLEJKĄ (0.533.0) — powód stosu w `Cofniecie.tsx`.

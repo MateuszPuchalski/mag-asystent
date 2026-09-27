@@ -92,12 +92,16 @@ export function Dostawy() {
   const pasuje = (nr: string, kto: string) =>
     !q || nr.toLowerCase().includes(q) || kto.toLowerCase().includes(q);
   const wKubelku = (k: KubelekDostaw) => dokumenty.filter((d) => kubelekDokumentu(d, zOdpowiedzia) === k);
+  /* Bez danych licznik nie zna liczby, więc jej nie pokazuje (@wydanie).
+     „0" przy zerwanym połączeniu mówiło „nic nie ma", a prawda brzmiała
+     „nie wiem". Przerwa w połączeniu trwa zwykle minutę aktualizacji. */
+  const znane = lista.data !== undefined;
   const liczniki: Record<KubelekDostaw, number | undefined> = {
-    decyzja: wKubelku("decyzja").length + spozaOkna.length,
-    toku: wKubelku("toku").length,
-    nietkniete: wKubelku("nietkniete").length,
-    zamkniete: wKubelku("zamkniete").length,
-    poza: poza.data?.documents.length ?? 0,
+    decyzja: znane ? wKubelku("decyzja").length + spozaOkna.length : undefined,
+    toku: znane ? wKubelku("toku").length : undefined,
+    nietkniete: znane ? wKubelku("nietkniete").length : undefined,
+    zamkniete: znane ? wKubelku("zamkniete").length : undefined,
+    poza: poza.data?.documents.length,
     /* Archiwum bez licznika, dopóki go nie otworzyć — liczba wymagałaby
        pobrania, a pobieramy je dopiero na życzenie. */
     archiwum: kubelek === "archiwum" ? archiwum.data?.ile : undefined,
@@ -170,6 +174,9 @@ export function Dostawy() {
 
   const lewa = (() => {
     if (lista.isLoading) return <Pusto waga="lista">Wczytuję dostawy…</Pusto>;
+    /* Błąd BEZ danych zamiast listy: „nic nie czeka na biuro" przy zerwanym
+       połączeniu brzmiało jak koniec pracy (@wydanie). */
+    if (lista.error && !lista.data) return <Blad>{(lista.error as Error).message}</Blad>;
     if (kubelek === "poza") {
       return <KolejkaPozaWertis wybrany={dokId} onWybierz={idz}
         lista={(poza.data?.documents ?? []).filter((d) => pasuje(d.nrPelny, d.dostawca))} />;
@@ -239,7 +246,9 @@ export function Dostawy() {
           <span className="ml-auto">{stopka}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
-        <Blad>{lista.error ? (lista.error as Error).message : ""}</Blad>
+        {/* Pod listą tylko błąd odświeżenia, gdy dane zostały; bez danych
+            błąd stoi zamiast listy. */}
+        <Blad>{lista.error && lista.data ? (lista.error as Error).message : ""}</Blad>
       </Karta>
 
       <Karta className="flex min-h-0 flex-col overflow-hidden">

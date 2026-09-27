@@ -20,6 +20,7 @@ import { Dyskusje } from "./ekrany/Dyskusje";
 import { Zadania } from "./ekrany/Zadania";
 import { SzukajIKlawisze } from "./nawigacja/Klawisze";
 import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
+import { PasekPolaczenia } from "./nawigacja/Polaczenie";
 import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej";
 import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
@@ -270,7 +271,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
   return <SzufladaTowaru><div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
     <Naglowek wyloguj={wyloguj} />
     {/* „Nowe w panelu" (0.500.0) — pod nagłówkiem, nad pracą, tylko przy
-        pierwszym wejściu po wydaniu. Powód w `coNowego/CoNowego.tsx`. */}
+        pierwszym wejściu po wydaniu. Powód w `coNowego/CoNowego.tsx`.
+        Pasek braku połączenia stoi NAD nim: awaria jest ważniejsza niż nowość. */}
+    <PasekPolaczenia />
     <CoNowego />
     {/* BEZ `max-w` i bez `mx-auto` (0.198.0). Ogranicznik 1500 px przyszedł
         z makiety i nikt go nigdy nie uzasadnił w kodzie. Na monitorze 1920
