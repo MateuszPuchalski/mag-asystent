@@ -43,9 +43,15 @@ const KONFIGURACJA = {
     { klucz: "MSSQL_SYNC_MS", grupa: "subiekt", kto: "zaawansowane", opis: "Takt odświeżania.", czyta: ["serwer"],
       tajny: false, zrodlo: "domyslna", wartosc: null, edycja: null },
     { klucz: "ZWROT_TERMIN_DNI", grupa: "zwroty", kto: "wlasciciel", opis: "Dni na obsłużenie zwrotu.", czyta: ["serwer"],
-      tajny: false, zrodlo: "domyslna", wartosc: null, edycja: { rodzaj: "liczba" } },
+      tajny: false, zrodlo: "domyslna", wartosc: null, edycja: { rodzaj: "liczba" },
+      nazwa: "Termin na zwrot", jednostka: ["dzień", "dni", "dni"], wartosci: null, obowiazuje: "7" },
     { klucz: "ANTHROPIC_API_KEY", grupa: "zwroty", kto: "wlasciciel", opis: "Klucz API.", czyta: ["serwer"],
-      tajny: true, zrodlo: "plik", wartosc: null, edycja: { rodzaj: "tekst" } },
+      tajny: true, zrodlo: "plik", wartosc: null, edycja: { rodzaj: "tekst" },
+      nazwa: "Klucz API modelu", jednostka: null, wartosci: null, obowiazuje: null },
+    /* Decyzja właściciela zmieniana tylko w pliku — panel nie udaje przycisku. */
+    { klucz: "REKLAMACJE_OD", grupa: "zwroty", kto: "wlasciciel", opis: "Od kiedy kolejka reklamacji pokazuje sprawy.",
+      czyta: ["serwer"], tajny: false, zrodlo: "plik", wartosc: "", edycja: null, rodzaj: "data",
+      nazwa: "Reklamacje od", jednostka: null, wartosci: null, obowiazuje: "" },
   ],
 };
 /* Dwa wydania z paczką; nowsze wymaga działania poza przyciskiem. */
@@ -175,7 +181,7 @@ describe("Ustawienia w panelu", () => {
     await screen.findByText("Jan Wrona");
     expect(tytuly()).toEqual(["Konta i sesje", "Nowy kolektor"]);
     await userEvent.click(within(nav).getByRole("button", { name: /^Obsługa klienta/ }));
-    await screen.findByText("ZWROT_TERMIN_DNI");
+    await screen.findByText("Termin na zwrot");
     expect(tytuly()).toEqual(["Tagi spraw", "Zwroty i reklamacje"]);
     await userEvent.click(within(nav).getByRole("button", { name: /^Serwer/ }));
     await screen.findByText("serwer-subiekta");
@@ -287,48 +293,71 @@ describe("Ustawienia w panelu", () => {
   it("decyzje właściciela stoją w grupie, na którą wpływają — zwroty przy obsłudze", async () => {
     pokaz("/obsluga/ustawienia?grupa=obsluga");
     const k = await waitFor(() => karta("Zwroty i reklamacje"));
-    expect(await within(k).findByText("ZWROT_TERMIN_DNI")).toBeInTheDocument();
+    expect(await within(k).findByText("Termin na zwrot")).toBeInTheDocument();
     /* Klucz właściciela z wartością domyślną widać zawsze, sekret bez wartości. */
-    expect(within(k).getAllByText("ustawione")).toHaveLength(1);
+    expect(within(k).getAllByText("ustawiony")).toHaveLength(1);
     expect(within(k).queryByText("MSSQL_SERVER")).toBeNull();
+    expect(wyslane).toEqual([]);
+  });
+
+  /* Wariant B (@wydanie): nazwa po polsku, wartość, która obowiązuje, słowem.
+     Przy domyślnej stała kreska — liczbę znał tylko `config.ts`. */
+  it("decyzja właściciela: nazwa, obowiązująca wartość słowem, klucz w dymku", async () => {
+    pokaz("/obsluga/ustawienia?grupa=obsluga");
+    const k = await waitFor(() => karta("Zwroty i reklamacje"));
+    const termin = await within(k).findByRole("button", { name: /Termin na zwrot/ });
+    expect(termin).toHaveTextContent("7 dni");
+    expect(termin).toHaveTextContent("domyślna");
+    expect(within(termin).getByText("Termin na zwrot")).toHaveAttribute("title", "ZWROT_TERMIN_DNI");
+    expect(within(k).queryByText("—")).toBeNull();
+    /* Pusty próg to „bez progu", nie pusta komórka. Wiersz tylko z pliku nie
+       jest przyciskiem — mówi to zamiast strzałki. */
+    const reklamacje = within(k).getByText("Reklamacje od").closest("li") as HTMLElement;
+    expect(reklamacje).toHaveTextContent("bez progu");
+    expect(reklamacje).toHaveTextContent("w pliku");
+    expect(within(reklamacje).queryByRole("button")).toBeNull();
     expect(wyslane).toEqual([]);
   });
 
   /* Szkice przed pracą (26 września 2026): trzy decyzje właściciela stoją
      przy Copilocie, obok sufitów, na które wpływają — z opisem skutku. */
   it("szkice przed pracą: przełącznik, okno i limit w grupie Copilota, zero zapisu", async () => {
-    const wiersz = (klucz: string, opis: string, edycja: Record<string, unknown>) => ({
+    const wiersz = (klucz: string, opis: string, edycja: Record<string, unknown>, nazwa: string,
+      obowiazuje: string, wartosci: Record<string, string> | null = null) => ({
       klucz, grupa: "copilot", kto: "wlasciciel", opis, czyta: ["serwer"],
-      tajny: false, zrodlo: "domyslna", wartosc: null, edycja });
+      tajny: false, zrodlo: "domyslna", wartosc: null, edycja, nazwa, jednostka: null, wartosci, obowiazuje });
     konfiguracja = {
       ...KONFIGURACJA,
       grupy: { ...KONFIGURACJA.grupy, copilot: "Copilot" } as typeof KONFIGURACJA.grupy,
       wiersze: [...KONFIGURACJA.wiersze,
-        wiersz("COPILOT_AUTO_NA_GODZINE", "Sufit automatycznych szkiców na godzinę; hamulec kosztów.", { rodzaj: "liczba" }),
-        wiersz("COPILOT_PRZED_PRACA", "1 = przed biurem Copilot rozpoznaje i szkicuje zaległość z własnym limitem, nie z sufitu godzinowego.",
-          { rodzaj: "wybor", opcje: ["0", "1"] }),
+        wiersz("COPILOT_AUTO_NA_GODZINE", "Sufit automatycznych szkiców na godzinę; hamulec kosztów.", { rodzaj: "liczba" },
+          "Sufit szkiców w tle", "30"),
+        wiersz("COPILOT_PRZED_PRACA", "Przed biurem Copilot rozpoznaje i szkicuje zaległość z własnym limitem, nie z sufitu godzinowego.",
+          { rodzaj: "wybor", opcje: ["0", "1"] }, "Szkice przed pracą", "0", { "0": "wyłączone", "1": "włączone" }),
         wiersz("COPILOT_PRZED_PRACA_OKNO", "Godziny szkiców przed pracą, czas magazynu, np. 6-8; zwykłe takty Copilota wtedy czekają.",
-          { rodzaj: "tekst" }),
+          { rodzaj: "tekst" }, "Okno szkiców przed pracą", "6-8"),
         wiersz("COPILOT_PRZED_PRACA_LIMIT", "Ile rozmów na jeden poranek: tyle rozpoznań i tyle szkiców; hamulec kosztów poranka.",
-          { rodzaj: "liczba" }),
+          { rodzaj: "liczba" }, "Limit poranka", "100"),
       ] as typeof KONFIGURACJA.wiersze,
     };
     pokaz("/obsluga/ustawienia?grupa=obsluga");
     const k = await waitFor(() => karta("Copilot"));
-    for (const klucz of ["COPILOT_PRZED_PRACA", "COPILOT_PRZED_PRACA_OKNO", "COPILOT_PRZED_PRACA_LIMIT"]) {
-      const w = (await within(k).findByText(klucz)).closest("tr") as HTMLElement;
-      expect(within(w).getByRole("button", { name: "Zmień" })).toBeInTheDocument();
+    for (const nazwa of ["Szkice przed pracą", "Okno szkiców przed pracą", "Limit poranka"]) {
+      expect(await within(k).findByRole("button", { name: new RegExp(nazwa) })).toBeInTheDocument();
     }
     expect(within(k).getByText(/własnym limitem, nie z sufitu godzinowego/)).toBeInTheDocument();
-    expect(within(k).getByText("COPILOT_AUTO_NA_GODZINE")).toBeInTheDocument();
+    expect(within(k).getByRole("button", { name: /Szkice przed pracą/ })).toHaveTextContent("wyłączone");
+    expect(within(k).getByText("Sufit szkiców w tle")).toBeInTheDocument();
     /* Nic z tej grupy nie ląduje w karcie zaawansowanej. */
     expect(screen.queryByRole("heading", { name: "Konfiguracja serwera" })).toBeNull();
     expect(wyslane).toEqual([]);
 
     /* Włączenie to jeden klucz w jednym żądaniu, dopiero po „Zapisz". */
-    const przelacznik = within(k).getByText("COPILOT_PRZED_PRACA").closest("tr") as HTMLElement;
-    await userEvent.click(within(przelacznik).getByRole("button", { name: "Zmień" }));
-    await userEvent.selectOptions(within(k).getByLabelText("COPILOT_PRZED_PRACA"), "1");
+    await userEvent.click(within(k).getByRole("button", { name: /Szkice przed pracą/ }));
+    /* Lista mówi słowami, a wysyła wartość z pliku. */
+    const lista = within(k).getByLabelText("Szkice przed pracą");
+    expect(within(lista).getByRole("option", { name: "włączone" })).toHaveValue("1");
+    await userEvent.selectOptions(lista, "1");
     expect(wyslane).toEqual([]);
     await userEvent.click(within(k).getByRole("button", { name: "Zapisz" }));
     await waitFor(() => expect(wyslane).toHaveLength(1));
@@ -338,11 +367,13 @@ describe("Ustawienia w panelu", () => {
   it("zmiana ustawienia: jeden klucz w jednym żądaniu", async () => {
     pokaz("/obsluga/ustawienia?grupa=obsluga");
     const k = await waitFor(() => karta("Zwroty i reklamacje"));
-    await within(k).findByText("ZWROT_TERMIN_DNI");
-    const wiersz = (klucz: string) => within(k).getByText(klucz).closest("tr") as HTMLElement;
-    await userEvent.click(within(wiersz("ZWROT_TERMIN_DNI")).getByRole("button", { name: "Zmień" }));
+    await userEvent.click(await within(k).findByRole("button", { name: /Termin na zwrot/ }));
     expect(wyslane).toEqual([]);
-    await userEvent.type(within(k).getByLabelText("ZWROT_TERMIN_DNI"), "10");
+    /* Pole startuje od wartości, która obowiązuje, nie od pustego. */
+    const pole = within(k).getByLabelText("Termin na zwrot");
+    expect(pole).toHaveValue("7");
+    await userEvent.clear(pole);
+    await userEvent.type(pole, "10");
     await userEvent.click(within(k).getByRole("button", { name: "Zapisz" }));
     await waitFor(() => expect(wyslane).toHaveLength(1));
     expect(wyslane[0]).toMatchObject({ metoda: "POST", url: "/api/biuro/konfiguracja" });
@@ -354,10 +385,9 @@ describe("Ustawienia w panelu", () => {
   it("sekret: pole puste na start, pustego nie zapisze", async () => {
     pokaz("/obsluga/ustawienia?grupa=obsluga");
     const k = await waitFor(() => karta("Zwroty i reklamacje"));
-    await within(k).findByText("ANTHROPIC_API_KEY");
-    const wiersz = within(k).getByText("ANTHROPIC_API_KEY").closest("tr") as HTMLElement;
-    await userEvent.click(within(wiersz).getByRole("button", { name: "Zmień" }));
-    const pole = within(wiersz).getByLabelText("ANTHROPIC_API_KEY") as HTMLInputElement;
+    await userEvent.click(await within(k).findByRole("button", { name: /Klucz API modelu/ }));
+    const wiersz = within(k).getByText("Klucz API modelu").closest("li") as HTMLElement;
+    const pole = within(wiersz).getByLabelText("Klucz API modelu") as HTMLInputElement;
     expect(pole.type).toBe("password");
     expect(pole.value).toBe("");
     expect(within(wiersz).getByRole("button", { name: "Zapisz" })).toBeDisabled();

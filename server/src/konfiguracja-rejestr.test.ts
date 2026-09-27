@@ -101,3 +101,20 @@ test("z panelu zmienia się wyłącznie decyzje właściciela czytane przez sam 
   const zPliku = KLUCZE.filter((x) => x.kto === "wlasciciel" && !x.edycja).map((x) => x.klucz).sort();
   assert.deepEqual(zPliku, ["MAG_ID_ODP", "MAG_ID_SERWIS", "SFERA_ZW_WYDANIE_KAT_ID", "TW_ID_PRZESYLKA", "ZDJECIA_DODAWANIE"]);
 });
+
+test("decyzja właściciela ma nazwę po polsku, a wybór — słowo dla każdej opcji", () => {
+  /* Panel pokazuje decyzje właściciela nazwą, klucz z pliku tylko w dymku
+     (@wydanie). Bez nazwy wiersz wróciłby do `ZWROT_TERMIN_DNI` na wierzchu.
+     Słowo brakujące przy jednej opcji pokazałoby obok „włączony" gołe „0". */
+  for (const k of KLUCZE) {
+    if (k.kto === "wlasciciel") {
+      assert.ok(k.nazwa, `${k.klucz}: decyzja właściciela bez nazwy`);
+      assert.ok(k.nazwa!.length <= 40, `${k.klucz}: nazwa dłuższa niż lewa kolumna`);
+    } else {
+      assert.equal(k.nazwa, undefined, `${k.klucz}: nazwa tylko przy decyzjach właściciela`);
+    }
+    if (k.wartosci && k.edycja?.rodzaj === "wybor") {
+      for (const o of k.edycja.opcje ?? []) assert.ok(k.wartosci[o], `${k.klucz}: opcja ${o} bez słowa`);
+    }
+  }
+});

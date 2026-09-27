@@ -6398,6 +6398,27 @@ Właściciel poprosił o poprawę następnego ekranu z menu „Więcej”. Z trz
 
 **Strażnik.** `ui/wglad.test.tsx` pilnuje karty pustej i przekrojów. Test zakresu „Użycie” w `ekrany/Analiza.test.tsx` pilnuje polskich nazw i zwiniętych obszarów.
 
+## 26k. Ustawienia wierszami (@wydanie)
+
+Właściciel poprosił o poprawę następnego ekranu z menu „Więcej”. Z trzech makiet wybrał B: wiersze jak w ustawieniach telefonu.
+
+**Problem.** Decyzje właściciela stały w tabeli z kluczem pliku na czele, np. `ZWROT_TERMIN_DNI`. Przy wartości domyślnej komórka miała kreskę. Termin zwrotu, sufit szkiców czy model Copilota znał tylko `config.ts`.
+
+**Co się zmieniło:**
+
+- Wiersz ma nazwę po polsku i jedno zdanie opisu z lewej. Z prawej stoi wartość, która obowiązuje, słowem: „7 dni”, „wyłączony”, data.
+- Pod wartością jest jej źródło: domyślna, z pliku albo przykryta przez usługę. Klucz z pliku został w dymku nazwy.
+- Cały wiersz otwiera edycję, a pole startuje od obowiązującej wartości. Wiersz zmieniany tylko w pliku nie udaje przycisku i mówi „w pliku”.
+- Nad grupami zniknęła karta z jednym słowem „Ustawienia”. Tytuł stoi nad listą grup.
+
+**Wartość obowiązująca bez drugiej kopii domyślnych.** Rejestr kluczy celowo nie ma domyślnych. `konfiguracja-obowiazuje.ts` czyta każdą wartość z gotowego obiektu `config`. To ta sama liczba, na której pracuje serwer, także wyliczona, jak model rozpoznawania po modelu szkiców. Zła ścieżka łapie się przy kompilacji. Sekrety i klucze workerów C# wartości nie dostają.
+
+**Nazwy i słowa są w rejestrze.** Pola `nazwa`, `jednostka` i `wartosci` stoją przy kluczu, bo rodzaj gramatyczny idzie za nazwą. Szkic jest „wyłączony”, a rozpoznanie „wyłączone”.
+
+**Pomiar.** Na zasianym serwerze przy 1180 px grupa „Obsługa klienta” ma 2117 px, a tabela miała 1879 px. Wiersz z opisem pod nazwą jest wyższy od wiersza tabeli. Zapłaciliśmy wysokością za wartość, którą widać bez otwierania pliku.
+
+**Strażnik.** `konfiguracja-obowiazuje.test.ts` wymaga wartości przy każdej jawnej decyzji właściciela czytanej przez serwer. Test rejestru wymaga nazwy przy każdej decyzji właściciela i słowa dla każdej opcji wyboru. `ustawienia/Konfiguracja.test.ts` pilnuje wartości słowem.
+
 ## 27. Zasady nadrzędne
 
 Te punkty mówią o JEDNEJ rozmowie i jednej sprawie. Reguły obowiązujące
