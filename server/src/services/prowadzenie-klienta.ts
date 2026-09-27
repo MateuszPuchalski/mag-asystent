@@ -24,10 +24,9 @@ import { mojeSprawy, ROZMOWA_ZAMOWIENIA, type MojaSprawa } from "./droga-klienta
    z nowym zdarzeniem wraca na „Moje” prowadzącego sama — ticker, który raz
    nie wstanie, zostawiłby ją zakończoną na zawsze.
 
-   OKNO OBUDZENIA: TRZYDZIEŚCI DNI OD ZAKOŃCZENIA (propozycja sesji, która
-   zbudowała ten przyrost — czeka na potwierdzenie właściciela, S6). Decyzja
-   z 26 września mówi o obudzeniu bez granicy; okno ją zawęża z powodu
-   niżej, więc bez zgody nie jest regułą. „Moje” liczy odcisk prowadzonych spraw przy każdym
+   OKNO OBUDZENIA: TRZYDZIEŚCI DNI OD ZAKOŃCZENIA (decyzja właściciela
+   z 27 września 2026, S6). Decyzja z 26 września mówiła o obudzeniu bez
+   granicy; okno ją zawęża z powodu niżej. „Moje” liczy odcisk prowadzonych spraw przy każdym
    odświeżeniu, co 30 sekund, synchronicznie na pętli serwera. Bez granicy
    ten koszt rósłby z każdą sprawą zakończoną kiedykolwiek. Miesiąc mieści
    ustawowe 14 dni na odstąpienie i drogę paczki z powrotem. Później nowa

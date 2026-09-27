@@ -359,10 +359,10 @@ w jednej z nich. Zakończona sprawa z takim zdarzeniem wraca na „Moje”
 prowadzącego, a sprawa w toku staje tam na górze. Powód stoi słowami panelu,
 na przykład „Klient napisał 26.09 14:10”, i prowadzi do źródła.
 
-**Czego nie budzi — odczyt pierwszego przyrostu, do potwierdzenia przez
-właściciela.** Punkt o ponownym otwarciu przy każdym zdarzeniu pierwszy
-przyrost czyta wężej. Zakup nie budzi, a obudzenie stawia zakończoną sprawę
-na „Moje”, zamiast otwierać ją na nowo. Pełna lista i powody:
+**Czego nie budzi (decyzja właściciela z 27 września 2026).** Decyzja
+z 26 września mówiła o ponownym otwarciu przy każdym zdarzeniu. Właściciel
+zatwierdził węższy odczyt, w tym to, że zakup sprawy nie budzi. Pełna lista
+i powody:
 
 - zakupu, bo stały klient budziłby sprawę co tydzień, a obudzenie bez pracy
   uczy je ignorować;
@@ -371,6 +371,14 @@ na „Moje”, zamiast otwierać ją na nowo. Pełna lista i powody:
 - podziękowania, bo to rozstrzygnięcie, nie powrót klienta (S5a);
 - rozmowy dowiązanej wstecz ręcznym wskazaniem zamówienia, bo jej wiadomość
   znaliśmy przed ruchem agenta.
+
+**Otwarte: obudzona zakończona sprawa zostaje zakończona.** Pierwszy
+przyrost stawia ją na „Moje” prowadzącego z powodem, zamiast otwierać na
+nowo. Właściciel 27 września tego nie rozstrzygnął. Samo otwarcie wymagałoby
+kroku z terminem, więc automat musiałby go zmyślić albo pokazać stary, po
+terminie. Rozstrzygnie miara z punktu 10 niżej. Gdy obudzona sprawa zwykle
+dostaje nowy krok, samo otwarcie oszczędzi kliknięcie; gdy zwykle kończy się
+ją znów, obecny kształt wystarcza.
 
 **Obudzenie liczy się przy odczycie, bez tickera.** W wierszu leży odcisk
 faktów z chwili ostatniego ruchu człowieka. „Nowe” to różnica między nim
@@ -384,9 +392,9 @@ mogą załatwić wiadomości, na którą nikt nie odpisał. Obudzoną zakończon
 sprawę kończy się znów jednym kliknięciem „Zakończ sprawę”. Takie zakończenie
 nie ma paska „Cofnij”, bo cofnięcie otworzyłoby sprawę z krokiem po terminie.
 
-**Okno obudzenia: trzydzieści dni od zakończenia — propozycja do
-potwierdzenia przez właściciela.** Zaproponowała je sesja, która zbudowała
-ten przyrost. Decyzja z 26 września nie zna granicy, więc okno ją zawęża.
+**Okno obudzenia: trzydzieści dni od zakończenia (decyzja właściciela
+z 27 września 2026).** Zaproponowała je sesja, która zbudowała ten przyrost,
+bo decyzja z 26 września nie znała granicy. Właściciel okno zatwierdził.
 „Moje” liczy odcisk prowadzonych spraw przy każdym odświeżeniu, co 30 sekund,
 synchronicznie na serwerze. Bez granicy ten koszt rósłby z każdą sprawą
 zakończoną kiedykolwiek.
@@ -462,6 +470,13 @@ Krok podpowiada zwrot z powodem `DIFFERENT` albo odmowa wypłaty
 `NEW_ITEM_SENT`. Liczba spraw do ruchu staje w plakietce `LicznikDoZrobienia`.
 Przy tym trzeba naprawić `services/przesylka-zamowienia.ts`: zna jedną paczkę
 na zamówienie, więc doręczona pierwsza zasłoniłaby niedoręczoną dosyłkę.
+
+Właściciel podał 27 września dwa fakty, jeszcze niesprawdzone na żywym
+koncie. Numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro, obok
+pierwszej paczki. Dosyłka jedzie prawie zawsze tym samym przewoźnikiem.
+Jeśli oba się potwierdzą, dosyłkę widać bez wklejania: to druga pozycja
+w `GET /order/checkout-forms/{id}/shipments`. Wklejony numer zostaje drogą
+zapasową, gdy etykieta trafi na inne zamówienie.
 
 ## Sprzeczność: login kupującego
 
