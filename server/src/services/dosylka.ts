@@ -32,7 +32,7 @@ import {
    ALLEGRO, z nawyku. Obie drogi są obsłużone. Odmowa na naszym ekranie
    zakłada śledzenie tym samym kliknięciem. Kod zsynchronizowany z Allegro
    (`rejection_code`) staje wierszem „Śledzić dosyłkę?” w „Do decyzji” —
-   decyzja właściciela z tego samego dnia, zamiast automatu (@wydanie).
+   decyzja właściciela z tego samego dnia, zamiast automatu (0.541.0).
    Zostają też „Śledź dosyłkę” przy zwrocie i propozycja na profilu.
 
    START W TYM SAMYM RUCHU CO ODMOWA, nie propozycją na profilu. Agent

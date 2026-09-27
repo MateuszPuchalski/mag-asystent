@@ -541,7 +541,7 @@ synchronizacją, a zwrot schodzi do grupy „odrzucony”, poza kolejkę decyzji
 Przycisk przy zwrocie i propozycja na profilu stały więc poza drogą, którą
 biuro chodzi. To wniosek z kodu, nie pomiar.
 
-**Odmowa z panelu Allegro staje w „Do decyzji”** (@wydanie, decyzja
+**Odmowa z panelu Allegro staje w „Do decyzji”** (0.541.0, decyzja
 właściciela z tego samego dnia). Wiersz „Śledzić dosyłkę?” ma przycisk
 „Śledź dosyłkę”, jedyny na tej liście. Przycisk rejestruje odmowę, która już
 zapadła, więc dowodów nie potrzebuje. Wiersz prowadzi też na zwrot i gaśnie,

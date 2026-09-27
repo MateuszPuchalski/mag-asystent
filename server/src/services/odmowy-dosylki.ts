@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { chwilaUtc } from "../czas.js";
 import { DOSYLKA_ZWROTU_SQL, jestKodemDosylki, OKNO_SLEDZENIA_MS, type KodDosylki } from "./dosylka-opis.js";
 
-/* ── Odmowy wypłaty z kodem dosyłki, których nikt nie śledzi (@wydanie) ──────
+/* ── Odmowy wypłaty z kodem dosyłki, których nikt nie śledzi (0.541.0) ──────
    Biuro odmawia wypłaty w PANELU ALLEGRO (fakt właściciela z 27 września
    2026). Kod przychodzi wtedy synchronizacją, a zwrot schodzi do grupy
    „odrzucony”, poza kolejkę decyzji. Przycisk „Śledź dosyłkę” przy zwrocie

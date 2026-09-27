@@ -135,7 +135,7 @@ test("serwis nie zakłada tabeli ani nie pisze — sprawdzone po źródle", () =
   assert.doesNotMatch(zrodlo, /logEvent/, "odczyt nie zostawia śladu w dzienniku");
 });
 
-/* ── Dosyłka bez śledzenia (@wydanie) ────────────────────────────────────────
+/* ── Dosyłka bez śledzenia (0.541.0) ────────────────────────────────────────
    Biuro odmawia w panelu Allegro (fakt właściciela z 27 września 2026). Kod
    przychodzi synchronizacją, a zwrot schodzi z list pracy — więc wiersz
    „Śledzić dosyłkę?” stoi tutaj, z przyciskiem, i gaśnie, gdy dosyłka powstanie. */

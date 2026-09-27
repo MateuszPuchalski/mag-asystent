@@ -76,7 +76,7 @@ export interface PozycjaDecyzji {
   pilne: boolean;
   cel: CelDecyzji;
   /**
-   * Jedyny przycisk na tej liście (@wydanie): „Śledź dosyłkę” przy odmowie
+   * Jedyny przycisk na tej liście (0.541.0): „Śledź dosyłkę” przy odmowie
    * z panelu Allegro. Zasada „rozstrzyga się przy dowodach” go nie dotyczy —
    * odmowę już złożono, przycisk tylko ją rejestruje. Powód przy
    * `dosylkiBezSledzenia`.

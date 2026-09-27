@@ -23,7 +23,7 @@ import { Wzmianki } from "./Wzmianki";
    kazałby decydować bez dowodów — a to jest dokładnie to, czego biuro
    robić nie powinno. Ta sama zasada co w „Moje".
 
-   JEDEN WYJĄTEK (@wydanie, decyzja właściciela z 27 września 2026): „Śledź
+   JEDEN WYJĄTEK (0.541.0, decyzja właściciela z 27 września 2026): „Śledź
    dosyłkę” przy odmowie złożonej w panelu Allegro. Decyzja już zapadła —
    biuro odmówiło kodem „Wysłaliśmy nowy towar” — a przycisk ją rejestruje
    w sprawie klienta. Dowodów do tego nie trzeba, a wiersz prowadzący na
@@ -84,7 +84,7 @@ function Wiersz({ p, onZalozona }: { p: PozycjaDecyzji; onZalozona: (w: DosylkaZ
 }
 
 /**
- * Wiersz odmowy z panelu Allegro z przyciskiem „Śledź dosyłkę” (@wydanie).
+ * Wiersz odmowy z panelu Allegro z przyciskiem „Śledź dosyłkę” (0.541.0).
  *
  * Przycisk stoi OBOK odnośnika, nie w nim: przycisk w `<a>` to niepoprawny
  * HTML, a kliknięcie łapałyby oba. Wiersz dalej prowadzi na zwrot — kto chce
@@ -122,7 +122,7 @@ function WierszDosylki({ p, zwrotId, tresc, onZalozona }: {
 export function DoDecyzji() {
   const dane = useDoDecyzji();
   const [filtr, setFiltr] = useState<Filtr>("wszystko");
-  /* Kroki zastąpione kliknięciem „Śledź dosyłkę” (@wydanie). Sprawa klienta
+  /* Kroki zastąpione kliknięciem „Śledź dosyłkę” (0.541.0). Sprawa klienta
      mogła mieć krok, który ktoś ustawił sam — np. „Oddzwonić w sprawie
      faktury” — a dosyłka go zastępuje. Wiersz znika po kliknięciu, więc bez
      tego zdania stary krok przepadłby po cichu: dziennik niesie tylko jego

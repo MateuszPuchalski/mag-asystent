@@ -144,7 +144,7 @@ describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
     expect(wyslane).toEqual([]);
   });
 
-  /* ── Odmowa z panelu Allegro (@wydanie) ──────────────────────────────────
+  /* ── Odmowa z panelu Allegro (0.541.0) ──────────────────────────────────
      Biuro odmawia w panelu Allegro (fakt właściciela z 27 września 2026).
      Wiersz „Śledzić dosyłkę?” ma jedyny przycisk tej listy — decyzja
      właściciela z tego samego dnia. Otwarcie dalej niczego nie zapisuje. */

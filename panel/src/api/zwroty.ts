@@ -935,7 +935,7 @@ export function useSledzDosylkeZwrotu() {
   return useMutation({
     mutationFn: (v: { id: number }) =>
       api<DosylkaZalozona>(`/api/obsluga/zwroty/${v.id}/dosylka`, { method: "POST" }),
-    /* „Do decyzji” też (@wydanie): przycisk stoi tam w wierszu odmowy z panelu
+    /* „Do decyzji” też (0.541.0): przycisk stoi tam w wierszu odmowy z panelu
        Allegro. Listę odświeża i tak każda udana mutacja (`klient-zapytan.ts`),
        ale `onSettled` na nią CZEKA — przycisk gaśnie dopiero, gdy wiersz już
        zszedł, więc drugiego kliknięcia w ten sam wiersz nie ma. */

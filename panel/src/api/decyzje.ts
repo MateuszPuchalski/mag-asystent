@@ -23,7 +23,7 @@ export interface PozycjaDecyzji {
   od: string | null;
   pilne: boolean;
   cel: CelDecyzji;
-  /** Jedyny przycisk listy: „Śledź dosyłkę” przy odmowie z panelu Allegro (@wydanie). */
+  /** Jedyny przycisk listy: „Śledź dosyłkę” przy odmowie z panelu Allegro (0.541.0). */
   akcja?: { rodzaj: "sledz_dosylke"; zwrotId: number };
 }
 
