@@ -51,6 +51,10 @@ export function PokrycieSygnatur({ dane }: { dane: Pokrycie | undefined }) {
   /* Rama wspólna z resztą analizy (0.519.0): sześć kart „Obsługa klienta"
      budowało własną, każda trochę inną, i ekran czytał się jak sześć
      aplikacji. Podpis „pozycje pobranych zamówień" przeszedł do opisu. */
+  /* Bez zamówień karta jest jednym zdaniem (@wydanie, wariant C Analizy):
+     cztery zera nad zdaniem „jeszcze nie ma" mówiły to samo dwa razy. */
+  if (dane.pozycji === 0) return <KartaWgladu tytul="Sygnatura → kartoteka Subiekta"
+    pusta="Nie ma jeszcze pobranych zamówień — pokrycie policzy się po pierwszej synchronizacji." />;
   return <KartaWgladu tytul="Sygnatura → kartoteka Subiekta"
     opis="Pozycje pobranych zamówień.">
     <div className="flex flex-wrap gap-8">
@@ -62,10 +66,6 @@ export function PokrycieSygnatur({ dane }: { dane: Pokrycie | undefined }) {
       <Liczba etykieta="wiąże się samo" ile={dane.trafia} ton="text-ranga-ok" />
       <Liczba etykieta="różnych sygnatur" ile={dane.sygnatur} />
     </div>
-
-    {dane.pozycji === 0 && <p className="mt-4 border-t pt-4 text-sm text-slate-500">
-      Nie ma jeszcze pobranych zamówień — pokrycie policzy się po pierwszej
-      synchronizacji.</p>}
 
     {/* Obie listy zostają na wierzchu: to lista roboty, nie szczegół. */}
     <Lista tytul="Sygnatury bez kartoteki" wiersze={dane.pudla}

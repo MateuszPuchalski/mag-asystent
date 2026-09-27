@@ -29,6 +29,11 @@ export function WiedzaAutomat({ wpisy }: { wpisy: WpisAutomatu[] | undefined }) 
      z własnym nagłówkiem, bo żadna inna karta wglądu ikony nie ma. Karta
      zostaje ROZWINIĘTA — patrz decyzja właściciela wyżej: automat
      zatwierdza tylko dlatego, że ta lista jest widoczna. */
+  /* Pusta lista jednym zdaniem (@wydanie, wariant C Analizy). Decyzja
+     o widoczności listy wyżej zostaje: wpis automatu, gdy jest, stoi na
+     wierzchu. Zwija się wyłącznie brak wpisów. */
+  if (wpisy.length === 0) return <KartaWgladu tytul="Co automat dopisał do wiedzy"
+    pusta="Automat nic nie dopisał. Kolejka mogła być pusta albo automat jest wyłączony." />;
   return <KartaWgladu tytul="Co automat dopisał do wiedzy"
     opis="Wpisy zatwierdzone bez człowieka. Sprawdź je i cofnij błędne — cofa się przy wpisie w Wiedzy.">
     {wpisy.length === 0

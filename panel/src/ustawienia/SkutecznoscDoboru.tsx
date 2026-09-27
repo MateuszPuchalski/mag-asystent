@@ -43,6 +43,14 @@ import { NAZWA_DROGI } from "../skrzynka/statusy";
 export function SkutecznoscDoboru({ dane }: { dane: Raport | undefined }) {
   if (!dane) return null;
   const zeroDrog = dane.drogi.filter((d) => d.wybranych === 0);
+  /* Bez żadnego wyboru i bez doboru na stole karta jest jednym zdaniem
+     (@wydanie, wariant C Analizy). „Bez wyboru w tym oknie" przy KAŻDEJ
+     drodze nie jest wtedy ustaleniem, tylko pustym oknem. Granica historii
+     zostaje w zdaniu, bo mówi, czy dłuższe okno w ogóle coś da. */
+  if (dane.wyborow === 0 && dane.naStole.doborow === 0) return <KartaWgladu
+    tytul="Skuteczność doboru — którędy przychodzi odpowiedź"
+    pusta={`Brak wyborów kandydata w tym oknie.${dane.granicaHistorii
+      ? ` Rozmów sprzed ${dane.granicaHistorii.slice(0, 10)} w bazie nie ma.` : ""}`} />;
   return <KartaWgladu tytul="Skuteczność doboru — którędy przychodzi odpowiedź">
     <div className="flex flex-wrap gap-8">
       <Liczba etykieta="wyborów kandydata" ile={dane.wyborow} />

@@ -1,7 +1,7 @@
 import React from "react";
 import type { CzasOdpowiedzi, Powroty, WierszCzasu, WierszPowrotu } from "../api/wglad";
 import { Liczba, PasekUdzialu } from "../ui/wykres";
-import { KartaWgladu, Tabela, Td } from "../ui/wglad";
+import { KartaWgladu, Przekroje, Tabela, Td } from "../ui/wglad";
 import { NAZWA_KATEGORII } from "../skrzynka/statusy";
 import type { Kategoria } from "../api/typy";
 
@@ -75,35 +75,48 @@ function TabelaPowrotow({ wiersze, naglowek, nazwa }: {
   </Tabela>;
 }
 
-function KartyPowrotow({ p }: { p: Powroty }) {
-  return <>
-    <KartaWgladu tytul="Bez ponownego pytania"
-      opis={`Po naszej odpowiedzi klient nie pisał już w tej rozmowie przez ${p.oknoDni} dni. `
-        + "Podziękowanie się nie liczy. Mierzy skutek, nie szybkość."}>
-      <div className="flex flex-wrap gap-8">
-        {/* Bez „okno N dni" (0.512.0) — okno zakresu stoi w nagłówku Analizy.
-            „Młodsze niż N dni" niżej zostaje: to INNE okno, czas na powrót klienta. */}
-        <Liczba ile={procent(p.bezPowrotu, p.n)} etykieta={`z ${p.n} odpowiedzi z wynikiem`} />
-        <Liczba ile={p.wrocilo} etykieta={p.wrociloBezRozpoznania
-          ? `klient wrócił · ${p.wrociloBezRozpoznania} bez rozpoznania, mogło być podziękowanie`
-          : "klient wrócił"} />
-        <Liczba ile={p.czeka} etykieta={`młodsze niż ${p.oknoDni} dni, jeszcze bez wyniku`} />
-      </div>
-    </KartaWgladu>
-    <KartaWgladu tytul="Bez ponownego pytania według kategorii"
-      opis="Gdzie odpowiedź najczęściej nie kończy sprawy.">
-      <TabelaPowrotow wiersze={p.wgKategorii} naglowek="kategoria" nazwa={nazwaKategorii} />
-    </KartaWgladu>
-    {p.wgOsoby && <KartaWgladu tytul="Bez ponownego pytania według osoby"
-      opis="Autor wysyłki z WERTIS; odpowiedź z panelu Allegro stoi jako „z Allegro”.">
-      <TabelaPowrotow wiersze={p.wgOsoby} naglowek="kto" nazwa={(k) => k} />
-    </KartaWgladu>}
-  </>;
+/* ── PRZEKROJE W KARCIE LICZBY, PUSTE JEDNĄ LINIĄ (@wydanie) ──────────────
+   Decyzja właściciela z 27 września 2026, wariant C Analizy. Zakres miał
+   czternaście kart jedna pod drugą, w tym cztery tabele „według kategorii"
+   i „według osoby" stojące osobno pod liczbami, które rozbijały. Teraz każdy
+   przekrój stoi przełącznikiem w karcie swojej liczby (`Przekroje`), a karta
+   bez odpowiedzi w oknie zwija się do jednego zdania (`pusta`).
+
+   ROZBICIE NA LUDZI DALEJ PRZYCHODZI TYLKO ADMINOWI (0.431.0): dla biura
+   serwer go nie liczy, więc przełącznik ma jedną pozycję i staje się
+   podpisem. */
+
+function KartaPowrotow({ p }: { p: Powroty }) {
+  const pusto = p.n === 0 && p.wrocilo === 0 && p.czeka === 0;
+  return <KartaWgladu tytul="Bez ponownego pytania"
+    pusta={pusto ? "Żadna odpowiedź w tym oknie nie ma jeszcze wyniku." : null}
+    opis={`Po naszej odpowiedzi klient nie pisał już w tej rozmowie przez ${p.oknoDni} dni. `
+      + "Podziękowanie się nie liczy. Mierzy skutek, nie szybkość."}>
+    <div className="flex flex-wrap gap-8">
+      {/* Bez „okno N dni" (0.512.0) — okno zakresu stoi w nagłówku Analizy.
+          „Młodsze niż N dni" niżej zostaje: to INNE okno, czas na powrót klienta. */}
+      <Liczba ile={procent(p.bezPowrotu, p.n)} etykieta={`z ${p.n} odpowiedzi z wynikiem`} />
+      <Liczba ile={p.wrocilo} etykieta={p.wrociloBezRozpoznania
+        ? `klient wrócił · ${p.wrociloBezRozpoznania} bez rozpoznania, mogło być podziękowanie`
+        : "klient wrócił"} />
+      <Liczba ile={p.czeka} etykieta={`młodsze niż ${p.oknoDni} dni, jeszcze bez wyniku`} />
+    </div>
+    <Przekroje pozycje={[
+      { klucz: "kategoria", etykieta: "według kategorii",
+        tresc: <TabelaPowrotow wiersze={p.wgKategorii} naglowek="kategoria" nazwa={nazwaKategorii} /> },
+      p.wgOsoby && { klucz: "osoba", etykieta: "według osoby",
+        tresc: <TabelaPowrotow wiersze={p.wgOsoby} naglowek="kto" nazwa={(k) => k} /> },
+    ]} />
+  </KartaWgladu>;
 }
 
 export function ZakresObslugi({ a }: { a: CzasOdpowiedzi }) {
+  /* Pusta tylko wtedy, gdy nie ma ANI odpowiedzi, ANI czekającego klienta:
+     „ostatnie słowo klienta teraz" prowadzi do pracy nawet w cichym oknie. */
+  const pusto = a.ogolem.n === 0 && a.czekaTeraz.n === 0;
   return <>
     <KartaWgladu tytul="Czas odpowiedzi klientowi"
+      pusta={pusto ? "Brak odpowiedzi w tym oknie i nikt teraz nie czeka." : null}
       opis="Od pierwszej wiadomości klienta do naszej odpowiedzi. Autoodpowiedź się nie liczy.">
       <div className="flex flex-wrap gap-8">
         {/* Okno podaje nagłówek Analizy — tu bez powtórki (0.512.0). */}
@@ -117,17 +130,13 @@ export function ZakresObslugi({ a }: { a: CzasOdpowiedzi }) {
           : "ostatnie słowo klienta teraz"}
           ton={a.czekaTeraz.n > 0 ? "text-ranga-uwaga" : ""} />
       </div>
+      {a.ogolem.n > 0 && <Przekroje pozycje={[
+        { klucz: "kategoria", etykieta: "według kategorii",
+          tresc: <TabelaCzasu wiersze={a.wgKategorii} naglowek="kategoria" nazwa={nazwaKategorii} /> },
+        a.wgOsoby && { klucz: "osoba", etykieta: "według osoby",
+          tresc: <TabelaCzasu wiersze={a.wgOsoby} naglowek="kto" nazwa={(k) => k} /> },
+      ]} />}
     </KartaWgladu>
-    <KartyPowrotow p={a.powroty} />
-    <KartaWgladu tytul="Według kategorii"
-      opis="Kategoria z rozpoznania wiadomości, na którą odpowiadaliśmy.">
-      <TabelaCzasu wiersze={a.wgKategorii} naglowek="kategoria" nazwa={nazwaKategorii} />
-    </KartaWgladu>
-    {/* Rozbicie na ludzi przychodzi WYŁĄCZNIE administratorowi (0.431.0) —
-        dla biura serwer go nie liczy, więc karty nie ma w drzewie. */}
-    {a.wgOsoby && <KartaWgladu tytul="Według osoby"
-      opis="Autor wysyłki z WERTIS. Odpowiedź z panelu Allegro stoi jako „z Allegro”.">
-      <TabelaCzasu wiersze={a.wgOsoby} naglowek="kto" nazwa={(k) => k} />
-    </KartaWgladu>}
+    <KartaPowrotow p={a.powroty} />
   </>;
 }

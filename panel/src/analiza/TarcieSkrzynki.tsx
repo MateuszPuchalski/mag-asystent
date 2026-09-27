@@ -1,7 +1,7 @@
 import React from "react";
 import { useTarcie, type LiczbyTarcia } from "../api/wglad";
 import { Liczba } from "../ui/wykres";
-import { KartaWgladu, Tabela, Td } from "../ui/wglad";
+import { KartaWgladu, Przekroje, Tabela, Td } from "../ui/wglad";
 import { PomiaryDecyzji } from "./PomiaryDecyzji";
 
 /* ── Tarcie w skrzynce (0.500.0) ────────────────────────────────────────────
@@ -37,29 +37,34 @@ function Liczby({ l }: { l: LiczbyTarcia }) {
 export function TarcieSkrzynki({ dni }: { dni: number }) {
   const t = useTarcie(dni, true);
   if (!t.data) return null;
+  const r = t.data.razem;
+  /* Pusta, gdy w oknie nie było ani wysyłki, ani cofnięcia (@wydanie,
+     wariant C Analizy): cztery zera i kreska to zdanie, nie karta. */
+  const pusto = r.wyslanych === 0 && r.cofnietychWysylek === 0 && r.cofnietychZakonczen === 0;
   return <>
-    <KartaWgladu tytul="Tarcie w skrzynce"
+    <KartaWgladu tytul="Tarcie w skrzynce" pusta={pusto ? "Brak wysyłek w tym oknie." : null}
       opis={"Cofnięcia to pomyłki złapane w porę — rosną, gdy przycisk stoi w złym miejscu. "
         + "Czas mierzy szukanie po ekranie. Wysoki udział szkiców bez zmian bywa dobry albo zły: "
         + "rozstrzyga rozmowa, nie ta liczba."}>
-      <Liczby l={t.data.razem} />
+      <Liczby l={r} />
+      {/* Rozbicie na ludzi przychodzi WYŁĄCZNIE administratorowi (0.431.0).
+          Stoi w karcie liczb, które rozbija (@wydanie), a nie osobną kartą:
+          to ten sam pomiar w innym przekroju. Czas liczy się od wydania,
+          które zaczęło go mierzyć; wcześniejsze wysyłki nie mają pomiaru. */}
+      {t.data.osoby && <Przekroje pozycje={[{ klucz: "osoba", etykieta: "Według osoby", tresc:
+        <Tabela naglowki={["kto", "wysłanych", "cofnięte wysyłki", "cofnięte zakończenia",
+          "mediana do wysyłki", "szkic bez zmian"]} pusto="Brak wysyłek w tym oknie.">
+          {t.data.osoby.map((o) => <tr key={o.osoba}>
+            <Td>{o.osoba}</Td>
+            <Td className="tabular-nums">{o.wyslanych}</Td>
+            <Td className="tabular-nums">{o.cofnietychWysylek}</Td>
+            <Td className="tabular-nums">{o.cofnietychZakonczen}</Td>
+            <Td className="tabular-nums">{sekundy(o.medianaSekDoWysylki)}</Td>
+            <Td className="tabular-nums">{procent(o.udzialBezZmian)}
+              {o.zeSzkicem > 0 && <span className="text-slate-600"> ({o.bezZmian} z {o.zeSzkicem})</span>}</Td>
+          </tr>)}
+        </Tabela> }]} />}
     </KartaWgladu>
-    {/* Rozbicie na ludzi przychodzi WYŁĄCZNIE administratorowi (0.431.0). */}
-    {t.data.osoby && <KartaWgladu tytul="Tarcie według osoby"
-      opis="Czas liczy się od wydania, które zaczęło go mierzyć; wcześniejsze wysyłki nie mają pomiaru.">
-      <Tabela naglowki={["kto", "wysłanych", "cofnięte wysyłki", "cofnięte zakończenia",
-        "mediana do wysyłki", "szkic bez zmian"]} pusto="Brak wysyłek w tym oknie.">
-        {t.data.osoby.map((o) => <tr key={o.osoba}>
-          <Td>{o.osoba}</Td>
-          <Td className="tabular-nums">{o.wyslanych}</Td>
-          <Td className="tabular-nums">{o.cofnietychWysylek}</Td>
-          <Td className="tabular-nums">{o.cofnietychZakonczen}</Td>
-          <Td className="tabular-nums">{sekundy(o.medianaSekDoWysylki)}</Td>
-          <Td className="tabular-nums">{procent(o.udzialBezZmian)}
-            {o.zeSzkicem > 0 && <span className="text-slate-600"> ({o.bezZmian} z {o.zeSzkicem})</span>}</Td>
-        </tr>)}
-      </Tabela>
-    </KartaWgladu>}
     {/* Pod tarciem i jego rozbiciem na osoby, bo liczy z tego samego odczytu
         (0.532.0): tam „ile", tu „co z tego wynika dla decyzji właściciela".
         Rozbicie zostaje przy liczbach, które rozbija. Drugi fetch po te same
