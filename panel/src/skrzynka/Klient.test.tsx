@@ -3,7 +3,7 @@ import React from "react";
 import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
-import type { HistoriaKlienta } from "../api/typy";
+import type { HistoriaKlienta, SprawaKlienta } from "../api/typy";
 
 /* ── Zakładka KLIENT (§10.1) ─────────────────────────────────────────────────
    Zakładka jest ODCZYTEM i te testy pilnują dwóch rzeczy, które o niej
@@ -19,7 +19,7 @@ import type { HistoriaKlienta } from "../api/typy";
 const historia = vi.fn();
 vi.mock("../api/rozmowy", () => ({ useHistoriaKlienta: (id: number | null) => historia(id) }));
 
-const { Klient } = await import("./Klient");
+const { Klient, WidokHistorii } = await import("./Klient");
 
 const dane = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta =>
   ({ login: "zielony_ogrod", maszyny: [], wpisy: [], ...n });
@@ -70,6 +70,20 @@ describe("zakładka klienta", () => {
     expect(screen.queryByLabelText("Oś historii klienta")).not.toBeInTheDocument();
   });
 
+  it("wątek bez loginu i tak pokazuje sprawę kupującego z zamówienia rozmowy", () => {
+    /* S6, @wydanie: sprawa budzi się z rozmowy dowiązanej numerem zamówienia
+       i do niej odsyła — więc ta rozmowa pokazuje sprawę, choć historii nie
+       zna. Login linijki to login SPRAWY, bo historia go nie ma. */
+    pokaz(dane({ login: null, sprawa: {
+      id: 7, login: "Kupujacy55", wersja: 1, stan: "w_toku", krok: "czekamy na zwrot",
+      krokDo: "2026-09-28T06:00:00Z", dzis: false, poTerminie: false, prowadzi: "Ola", prowadziId: 1,
+      zakonczonoAt: null, zakonczyl: null, odcisk: "{}", nowe: [] } }));
+    expect(screen.getByText(/nie niesie loginu kupującego/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /Sprawa klienta: czekamy na zwrot/ }))
+      .toHaveAttribute("href", "/obsluga/klient/Kupujacy55");
+    expect(screen.queryByLabelText("Oś historii klienta")).not.toBeInTheDocument();
+  });
+
   it("login nie stoi trzeci raz — profil klienta zostaje o klik", () => {
     /* Zeszło (0.513.0): w skrzynce login stoi w nagłówku rozmowy i przy
        wiadomościach, a kopiuje się go stamtąd. Odnośnik do profilu zostaje. */
@@ -101,5 +115,37 @@ describe("zakładka klienta", () => {
       .toHaveAttribute("href", "/obsluga/reklamacje/22");
     expect(screen.getByRole("link", { name: /Gdzie paczka/ }))
       .toHaveAttribute("href", "/obsluga/dyskusje/33");
+  });
+
+  it("historia przy źródle niesie sprawę klienta i prowadzi do profilu", () => {
+    /* S6, @wydanie: wiązanie w obie strony. Profil prowadzi do rozmowy, więc
+       rozmowa mówi, że klienta ktoś prowadzi i na co czeka — inaczej drugi
+       agent odpisałby klientowi, nie wiedząc o kroku kolegi. */
+    const sprawa: SprawaKlienta = {
+      id: 5, login: "zielony_ogrod", wersja: 2, stan: "w_toku", krok: "czekamy na zwrot",
+      krokDo: "2026-09-25T06:00:00Z", dzis: false, poTerminie: true, prowadzi: "Bartek", prowadziId: 2,
+      zakonczonoAt: null, zakonczyl: null, odcisk: "{}",
+      nowe: [{ rodzaj: "rozmowa", tekst: "Klient napisał 26.09 14:10", at: null, cel: "/obsluga/skrzynka/41" }],
+    };
+    pokaz(dane({ sprawa }));
+    const linia = screen.getByRole("link", { name: /Sprawa klienta: czekamy na zwrot/ });
+    expect(linia).toHaveAttribute("href", "/obsluga/klient/zielony_ogrod");
+    expect(linia).toHaveTextContent("prowadzi Bartek");
+    expect(linia).toHaveTextContent("Klient napisał 26.09 14:10");
+    expect(screen.getByText("po terminie").className).toContain("text-ranga-zle");
+  });
+
+  it("bez sprawy i na samym profilu linijki sprawy nie ma", () => {
+    pokaz(dane({ sprawa: null }));
+    expect(screen.queryByRole("link", { name: /Sprawa klienta/ })).toBeNull();
+
+    /* Profil ma własną kartę sprawy — druga, w historii, mówiłaby to samo. */
+    render(<MemoryRouter><WidokHistorii tutaj="tym profilem" bezProfilu onOtworzRozmowe={vi.fn()}
+      historia={{ login: "zielony_ogrod", maszyny: [], wpisy: [], sprawa: {
+        id: 5, login: "zielony_ogrod", wersja: 2, stan: "zakonczona", krok: "dosłać",
+        krokDo: "2026-09-25T06:00:00Z", dzis: false, poTerminie: false, prowadzi: "Bartek", prowadziId: 2,
+        zakonczonoAt: "2026-09-24T12:00:00Z", zakonczyl: "Bartek", odcisk: "{}", nowe: [] } }} />
+    </MemoryRouter>);
+    expect(screen.queryByText(/Sprawa klienta/)).toBeNull();
   });
 });

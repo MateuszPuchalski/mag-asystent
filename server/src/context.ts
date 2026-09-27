@@ -285,7 +285,7 @@ export function withRequestContext(app: FastifyInstance): void {
     const { logEvent } = await import("./services/events.js");
     logEvent("http_rejected", currentUserName() ?? "anonim", null, {
       metoda: req.method,
-      sciezka,
+      sciezka: sciezkaDoAudytu(req, sciezka),
       status: reply.statusCode,
       /* WYŁĄCZNIE powód z odpowiedzi. Ciała ŻĄDANIA nie zapisujemy nigdy i to
          jest zasada, nie przeoczenie: przez `POST /api/auth/pin` przechodzi
@@ -294,6 +294,24 @@ export function withRequestContext(app: FastifyInstance): void {
     });
     return payload;
   });
+}
+
+/**
+ * Ścieżka do wpisu odrzucenia — pod profilem klienta WZORZEC TRASY, nie adres.
+ *
+ * Adres `/api/obsluga/klient/<login>/…` niesie login kupującego, a `events`
+ * nie ma retencji. Sprawa klienta (@wydanie) pilnuje, żeby jej zdarzenia
+ * niosły numer sprawy zamiast loginu — i ten wysiłek przepadałby w pierwszym
+ * 409, które dopisywało adres z loginem do tej samej tabeli. Tą samą drogą
+ * login wyciekał już przy 404 profilu i przy odmowie notatki.
+ *
+ * Tylko ten przedrostek: gdzie indziej adres niesie nasze numery, a te są
+ * tropem przy reklamacji odrzuconego skanu. Bez dopasowanej trasy (404
+ * Fastify) wzorca nie ma, więc zostaje stały napis zamiast adresu.
+ */
+function sciezkaDoAudytu(req: FastifyRequest, sciezka: string): string {
+  if (!sciezka.startsWith("/api/obsluga/klient/")) return sciezka;
+  return req.routeOptions.url ?? "/api/obsluga/klient/*";
 }
 
 /** Komunikat błędu z ciała odpowiedzi; `null`, gdy odpowiedź go nie niesie. */

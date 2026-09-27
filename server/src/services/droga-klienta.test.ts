@@ -37,8 +37,10 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["reklamacja_klienta", "zwrot_klienta", "message", "conversation_event", "conversation",
-    "channel_account", "events", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
+  /* `klient_prowadzenie` PRZED `app_user`: sprawa klienta wskazuje
+     prowadzącego kluczem obcym bez kaskady. */
+  for (const t of ["klient_prowadzenie", "reklamacja_klienta", "zwrot_klienta", "message", "conversation_event",
+    "conversation", "channel_account", "events", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
 
   agent = Number(d.prepare(
     "INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')")

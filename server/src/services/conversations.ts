@@ -704,6 +704,25 @@ export function statusIZakonczenie(
 }
 
 /**
+ * Wiadomość-podziękowanie klienta, na której rozmowa stoi, albo `null`.
+ *
+ * To jest DOKŁADNIE wejście `podziekowal` z `wyliczStatus`: ostatnia prawdziwa
+ * wiadomość (ta sama kolejność co w `statusIZakonczenie`) jest klienta,
+ * a klasyfikator uznał ją za podziękowanie. BEZ bramek stanu rozmowy —
+ * werdyktu zapisanego i `otwarta_recznie_at`. Sprawa klienta (@wydanie)
+ * pyta o WIADOMOŚĆ, nie o rozmowę: „Otwórz ponownie” albo „Zakończona” to
+ * nasz ruch i nie ma prawa zmienić, czy klient napisał coś nowego.
+ */
+export function podziekowanieKlienta(database: DatabaseSync, conversationId: number): number | null {
+  const ost = database.prepare(
+    `SELECT id, direction FROM message WHERE conversation_id=? AND auto_odpowiedz=0
+      ORDER BY sent_at DESC, id DESC LIMIT 1`,
+  ).get(conversationId) as { id: number; direction: string } | undefined;
+  if (ost?.direction !== "incoming") return null;
+  return podziekowanieWRozmowie(database, conversationId) ? Number(ost.id) : null;
+}
+
+/**
  * `klientPodziekowal` dla JEDNEJ rozmowy. Ta sama aktywna decyzja i ten sam
  * cel, co w liście skrzynki (`AKTYWNA_DECYZJA`, `CEL_KLASYFIKACJI`), żeby
  * otwarta rozmowa i wiersz kolejki nie mówiły dwóch różnych rzeczy.

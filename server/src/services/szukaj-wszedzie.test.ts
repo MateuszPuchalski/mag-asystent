@@ -116,3 +116,23 @@ test("login daje jeden wiersz klienta na górze, prowadzący do profilu", () => 
   assert.equal(t[0].rodzaj, "klient");
   assert.match(klienci[0].cel ?? "", /^\/obsluga\/klient\/chips20$/i);
 });
+
+/* ── Kupujący zamówienia jako klient (@wydanie) ──────────────────────────────
+   Brak w dostawie przychodzi z numerem zamówienia, a sprawę klienta zakłada
+   się na profilu. Numer zamówienia daje więc wiersz „Klient” jego kupującego,
+   na górze — profil i sprawa są o jeden klik. */
+test("numer zamówienia daje wiersz klienta — kupującego tego zamówienia, na górze", () => {
+  const t = S.szukajWszedzie("29f8e1a0", null, db());
+  const klienci = t.filter((x) => x.rodzaj === "klient");
+  assert.deepEqual(klienci.map((k) => [k.tytul, k.dlaczego, k.cel]),
+    [["chips20", "kupujący zamówienia", "/obsluga/klient/chips20"]]);
+  assert.equal(t[0].rodzaj, "klient");
+  /* List przewozowy zamówienia też prowadzi do kupującego. */
+  assert.ok(S.szukajWszedzie("AD123456789", null, db()).some((x) => x.rodzaj === "klient"
+    && x.dlaczego === "kupujący zamówienia"));
+});
+
+test("trafienie po loginie nie dubluje klienta i zostaje „login”", () => {
+  const klienci = S.szukajWszedzie("chips20", null, db()).filter((x) => x.rodzaj === "klient");
+  assert.deepEqual(klienci.map((k) => k.dlaczego), ["login"]);
+});

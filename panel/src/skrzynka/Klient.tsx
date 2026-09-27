@@ -1,10 +1,10 @@
 import React from "react";
-import { ExternalLink, MessageSquare, MessagesSquare, Scale, Tractor, Undo2, UserRound }
+import { ClipboardList, ExternalLink, MessageSquare, MessagesSquare, Scale, Tractor, Undo2, UserRound }
   from "lucide-react";
 import { Link } from "react-router-dom";
-import type { HistoriaKlienta, MaszynaKlienta, WpisHistorii } from "../api/typy";
+import type { HistoriaKlienta, MaszynaKlienta, SprawaKlienta, WpisHistorii } from "../api/typy";
 import { useHistoriaKlienta } from "../api/rozmowy";
-import { czas, LoginKlienta, NaglowekSekcji, Pusto } from "../ui";
+import { czas, dzien, LoginKlienta, NaglowekSekcji, Pusto, termin } from "../ui";
 
 /**
  * Zakładka KLIENT — historia u nas (makieta „Klient", §10.1).
@@ -37,11 +37,19 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
      Różnica jest cała: drugie zdanie byłoby kłamstwem o kliencie, który kupuje
      u nas od lat, tylko napisał z konta bez loginu w lądowisku wątku. */
   if (!h.data?.login) {
-    return <p className="flex items-start gap-2 p-4 text-sm text-slate-500">
-      <UserRound size={16} className="mt-0.5 shrink-0" />
-      <span>Ten wątek nie niesie loginu kupującego, więc nie wiemy, czyja to
-        historia. Panel nie zgaduje klienta z treści rozmowy.</span>
-    </p>;
+    /* Sprawa klienta i tak bywa tu znana (@wydanie): serwer bierze jej login
+       z zamówienia rozmowy, nie z treści. Sprawa budzi się z takiej rozmowy
+       i do niej odsyła, więc rozmowa pokazuje ją z powrotem — wiązanie
+       jednostronne to wiązanie, którego nie ma. Historii dalej nie ma. */
+    const sprawa = h.data?.sprawa;
+    return <div className="p-4">
+      <p className="flex items-start gap-2 text-sm text-slate-500">
+        <UserRound size={16} className="mt-0.5 shrink-0" />
+        <span>Ten wątek nie niesie loginu kupującego, więc nie wiemy, czyja to
+          historia. Panel nie zgaduje klienta z treści rozmowy.</span>
+      </p>
+      {sprawa && <LiniaSprawy login={sprawa.login} sprawa={sprawa} />}
+    </div>;
   }
 
   return <WidokHistorii historia={{ ...h.data, login: h.data.login }} tutaj="tą rozmową"
@@ -81,6 +89,7 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
       <Link to={`/obsluga/klient/${encodeURIComponent(login)}`}
         className="text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
         Profil klienta</Link>
+      {historia.sprawa && <LiniaSprawy login={login} sprawa={historia.sprawa} />}
     </>}
 
     {maszyny.length > 0 && <section className="mt-3" aria-label="Maszyny klienta">
@@ -104,6 +113,32 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
           </ul>}
     </section>
   </div>;
+}
+
+/**
+ * Sprawa klienta przy źródle (S6, @wydanie) — jedna linijka, cała klikalna.
+ *
+ * WIĄZANIE W OBIE STRONY (`CLAUDE.md`). Profil prowadzi do rozmowy, zwrotu
+ * i reklamacji; bez tej linijki agent przy rozmowie nie wiedziałby, że ktoś
+ * już prowadzi tego klienta i czeka na zwrot — a wiązanie jednostronne to
+ * wiązanie, którego nie ma. Linijka prowadzi do profilu, bo tam stoją krok
+ * i zakończenie; tutaj sprawy się nie zmienia.
+ */
+function LiniaSprawy({ login, sprawa: s }: { login: string; sprawa: SprawaKlienta }) {
+  return <Link to={`/obsluga/klient/${encodeURIComponent(login)}`}
+    className="mt-2 flex items-start gap-1.5 rounded border border-slate-200 px-2 py-1.5 text-xs text-slate-800 hover:bg-slate-50">
+    <ClipboardList size={13} className="mt-0.5 shrink-0 text-slate-400" />
+    <span className="min-w-0">
+      {s.stan === "w_toku"
+        ? <>Sprawa klienta: {s.krok} · {termin(s.krokDo)}
+            {/* Czerwień wyłącznie po terminie — jak na profilu i w „Moje". */}
+            {s.poTerminie && <b className="text-ranga-zle"> po terminie</b>}
+            {s.prowadzi && ` · prowadzi ${s.prowadzi}`}</>
+        : <>Sprawa klienta zakończona {dzien(s.zakonczonoAt)}</>}
+      {/* Pierwsze zdarzenie po naszym ruchu, bo to ono obudziło sprawę. */}
+      {s.nowe[0] && <span className="block font-semibold text-slate-900">{s.nowe[0].tekst}</span>}
+    </span>
+  </Link>;
 }
 
 /**

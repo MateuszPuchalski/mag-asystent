@@ -930,6 +930,37 @@ export function migrate(database: DatabaseSync) {
       addColumn("zastosowanie", kolumna, typ);
     }
   }
+  /* INDEKSY LOGINU BEZ WIELKOŚCI LITER (@wydanie, sprawa klienta). Profil
+     i sprawa klienta pytają o login w czterech tabelach przy każdym otwarciu,
+     a „Moje” — przy każdym odświeżeniu, raz na każdą prowadzoną sprawę.
+     Porównanie idzie `COLLATE NOCASE`, a indeksu z kolatacją BINARY SQLite do
+     niego nie użyje (ta sama para co `ix_towar_symbol_nocase` w schemacie).
+     Złączenie wątku z rozmową idzie po samym `external_conversation_id`, bez
+     konta, więc klucz `UNIQUE(konto, wątek)` mu nie pomaga.
+
+     Indeks częściowy ręcznych wskazań zamówienia niesie drugą połowę
+     `ROZMOWA_ZAMOWIENIA` (`droga-klienta.ts`): bez niego każde pytanie
+     o rozmowy zamówienia przeglądało cały dziennik rozmów. Pomiar na 5000
+     rozmowach: 4 ms na pytanie bez indeksów, 0,06 ms z nimi — a „Moje” pyta
+     raz na każdą prowadzoną sprawę klienta, co 30 sekund.
+
+     TUTAJ, nie w schemacie, i PO przebudowach: `zwrot_klienta.kupujacy_login`
+     dochodzi `addColumn`, a `watekInboxuDopuszczaBrakDaty` stawia wątki od
+     nowa — indeks założony przed nią zginąłby razem ze starą tabelą. */
+  database.exec(`
+    CREATE INDEX IF NOT EXISTS ix_inbox_watek_login_nocase
+      ON allegro_inbox_thread(interlocutor_login COLLATE NOCASE);
+    CREATE INDEX IF NOT EXISTS ix_zwrot_klienta_login_nocase
+      ON zwrot_klienta(kupujacy_login COLLATE NOCASE);
+    CREATE INDEX IF NOT EXISTS ix_reklamacja_klienta_login_nocase
+      ON reklamacja_klienta(kupujacy_login COLLATE NOCASE);
+    CREATE INDEX IF NOT EXISTS ix_zamowienie_klienta_login_nocase
+      ON zamowienie_klienta(kupujacy_login COLLATE NOCASE);
+    CREATE INDEX IF NOT EXISTS ix_conversation_watek
+      ON conversation(external_conversation_id);
+    CREATE INDEX IF NOT EXISTS ix_conversation_event_wskazanie
+      ON conversation_event(conversation_id) WHERE event_type = 'order_linked_manually';
+  `);
   /* NA KOŃCU, po przebudowach: kasowanie ma zastać tabele już w docelowym
      kształcie. */
   sprzatnijSprzedGranicy(database);

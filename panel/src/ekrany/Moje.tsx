@@ -1,8 +1,9 @@
 import React from "react";
-import { MessageSquare, MessagesSquare, Scale, Briefcase } from "lucide-react";
+import { MessageSquare, MessagesSquare, Scale, Briefcase, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useMojeSprawy } from "../api/rozmowy";
-import { Blad, Karta, NaglowekSekcji, czas } from "../ui";
+import type { MojaSprawa } from "../api/typy";
+import { Blad, Karta, NaglowekSekcji, czas, termin } from "../ui";
 
 /* ── Jedno „Moje" ponad kolejkami (S4 spoiwa, `docs/obsluga-klienta-calosc.md`)
    Sita „Moje" były trzy — w skrzynce, w reklamacjach i w dyskusjach — i każde
@@ -16,13 +17,32 @@ import { Blad, Karta, NaglowekSekcji, czas } from "../ui";
 
    ZWROTÓW TU NIE MA i to nie jest brak: właściciel zdjął ze zwrotu znacznik
    prowadzącego w 0.370.0, bo zwrot przechodzi przez biuro jako kolejka
-   decyzji, a nie jako czyjaś sprawa.                                        */
+   decyzji, a nie jako czyjaś sprawa.
+
+   SPRAWA KLIENTA TU JEST (S6, @wydanie) i dalej bez przycisku. Wiersz
+   prowadzi do źródła najnowszego zdarzenia albo do profilu klienta, bo tam
+   stoją krok i zakończenie. Listę scala serwer (`mojaLista`), więc kolejność
+   — obudzone, potem terminy, na końcu kroki czekające na swój dzień — jest
+   jedna dla każdego, kto ją czyta.                                          */
 
 const KOLEJKI = {
   rozmowa: { nazwa: "pytanie", ikona: MessageSquare, sciezka: "/obsluga/skrzynka" },
   dyskusja: { nazwa: "dyskusja", ikona: MessagesSquare, sciezka: "/obsluga/dyskusje" },
   reklamacja: { nazwa: "reklamacja", ikona: Scale, sciezka: "/obsluga/reklamacje" },
+  klient: { nazwa: "klient", ikona: UserRound, sciezka: "/obsluga/klient" },
 } as const;
+
+/* Profil idzie po LOGINIE, nie po numerze sprawy — trasa profilu zna tylko
+   login. Serwer podaje `cel` zawsze; zapas na wypadek starszego serwera. */
+const dokad = (s: MojaSprawa, sciezka: string) => s.kolejka !== "klient"
+  ? `${sciezka}/${s.id}`
+  : s.cel ?? `${sciezka}/${encodeURIComponent(s.login ?? "")}`;
+
+/* Termin z nagłówka liczy sprawę klienta dopiero, gdy jej dzień nadszedł.
+   Krok „czekamy do przyszłego wtorku" ma datę, ale nie jest pracą na dziś —
+   licznik, który go liczy, rośnie z każdą sprawą i przestaje cokolwiek mówić. */
+const zTerminemNaDzis = (s: MojaSprawa) =>
+  s.kolejka === "klient" ? Boolean(s.dzis || s.poTerminie) : s.terminDo !== null;
 
 /* ── SEKCJA „DO ZROBIENIA", NIE OSOBNY EKRAN (23 września 2026) ────────────
    „Do decyzji", „Moje" i „Wzmianki" odpowiadały na jedno pytanie — co teraz
@@ -31,8 +51,12 @@ const KOLEJKI = {
    przekierowuje tam, więc zakładka zapamiętana w przeglądarce nie gubi się. */
 export function Moje() {
   const dane = useMojeSprawy();
-  const sprawy = dane.data?.sprawy ?? [];
-  const zTerminem = sprawy.filter((s) => s.terminDo !== null).length;
+  /* `lista` niesie też sprawy klientów; starszy serwer daje samo `sprawy`.
+     Wiersz rodzaju, którego ta karta nie zna, SCHODZI z listy, zamiast
+     wywrócić ekran: panel nie ma granicy błędu, a serwer aktualizuje się
+     w nocy pod otwartą kartą. Tak wywróciłaby się karta sprzed @wydanie. */
+  const sprawy = (dane.data?.lista ?? dane.data?.sprawy ?? []).filter((s) => Object.hasOwn(KOLEJKI, s.kolejka));
+  const zTerminem = sprawy.filter(zTerminemNaDzis).length;
 
   return <Karta className="overflow-hidden p-0" aria-label="Moje sprawy" role="region">
     {/* Nagłówek jak w dwóch sąsiednich sekcjach (0.524.0): `NaglowekSekcji`
@@ -56,7 +80,7 @@ export function Moje() {
           {sprawy.map((s) => {
             const { nazwa, ikona: Ikona, sciezka } = KOLEJKI[s.kolejka];
             return <li key={`${s.kolejka}-${s.id}`} className="border-t first:border-t-0">
-              <Link to={`${sciezka}/${s.id}`}
+              <Link to={dokad(s, sciezka)}
                 className="flex flex-wrap items-baseline gap-2 px-4 py-2 text-sm hover:bg-slate-50">
                 <Ikona size={14} className="shrink-0 text-slate-400" />
                 <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-podpis font-bold text-slate-700">
@@ -64,7 +88,9 @@ export function Moje() {
                 <span className="min-w-0 flex-1 truncate">{s.opis}</span>
                 {/* Termin, gdy jest, stoi po prawej i jest JEDYNYM sygnałem
                     na wierszu — kolor zapalany zawsze uczy go ignorować. */}
-                {s.terminDo
+                {s.kolejka === "klient"
+                  ? <StanKroku s={s} />
+                  : s.terminDo
                   ? <span className="shrink-0 font-semibold text-ranga-zle">
                       termin {czas(s.terminDo)}</span>
                   : <span className="shrink-0 text-xs text-slate-500">
@@ -74,4 +100,21 @@ export function Moje() {
           })}
         </ul>}
   </Karta>;
+}
+
+/* Prawa strona wiersza sprawy klienta — JEDNO zdanie, nie trzy. Obudzona
+   mówi, CO klient zrobił, i nic więcej: sprawa zakończona też bywa obudzona,
+   a jej stary „po terminie" byłby na czerwono nieprawdą. Czerwień wyłącznie
+   po terminie; „dziś" i „czeka do" to informacja, nie alarm. */
+function StanKroku({ s }: { s: MojaSprawa }) {
+  if (s.nowe) return <span className="shrink-0 font-semibold text-slate-900">{s.nowe}</span>;
+  if (s.poTerminie) {
+    return <span className="shrink-0 font-semibold text-ranga-zle">
+      po terminie{s.terminDo && ` · ${termin(s.terminDo)}`}</span>;
+  }
+  if (s.dzis) return <span className="shrink-0 font-semibold text-slate-900">dziś</span>;
+  if (s.czeka && s.terminDo) {
+    return <span className="shrink-0 text-xs text-slate-500">czeka do {termin(s.terminDo)}</span>;
+  }
+  return <span className="shrink-0 text-xs text-slate-500">ostatni ruch {czas(s.at)}</span>;
 }

@@ -29,8 +29,10 @@ import { kontoKanalu } from "../services/kanal-konto.js";
 import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../services/wzmianki.js";
 import { pomiarDoWiedzy, ustawStatusDoboru, wiedzaDoboru, wybierzKandydata, zapiszDane, type DaneDoboru } from "../services/dobor.js";
 import { kandydaciDoboru } from "../services/kandydaci.js";
-import { historiaKlienta } from "../services/klient-historia.js";
+import { historiaKlienta, loginSprawyRozmowy } from "../services/klient-historia.js";
 import { mojeSprawy } from "../services/droga-klienta.js";
+import { mojaLista } from "../services/prowadzenie-klienta.js";
+import { zeSprawa } from "./spoiwo.js";
 import { dokumentySprzedazyZamowienia } from "../services/faktury.js";
 
 const BIURO = ["biuro", "admin"];
@@ -61,11 +63,25 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
      ODCZYT, bez zapisu — ta sama umowa co przy reszcie skrzynki. Trasa stoi
      tutaj, a nie w ustawieniach, bo to jest praca bieżąca, nie raport.
      Tożsamość bierze z SESJI: `?userId=` pozwalałby czytać cudzą listę pracy,
-     a to monitoring pracowniczy pod inną nazwą. */
+     a to monitoring pracowniczy pod inną nazwą.
+
+     Od @wydanie lista niesie też SPRAWY KLIENTÓW prowadzone przez tę osobę
+     (S6) — scala je `mojaLista`, bo `droga-klienta.ts` nie może znać serwisu
+     sprawy. Ta sama zasada tożsamości: cudzych spraw klienta nie widać tu
+     wcale, a ich listy per osoba nie ma nigdzie (art. 22² KP).
+
+     DWA KLUCZE NA JEDNO WYDANIE. Scalona lista idzie pod `lista`, a `sprawy`
+     zostaje samymi kolejkami. Karta panelu sprzed @wydanie rozkłada
+     `KOLEJKI[s.kolejka]` bez zapasu i wiersz `klient` wywróciłby jej ekran
+     przy najbliższym odświeżeniu, co 30 sekund, po nocnej aktualizacji.
+     Panel nie ma granicy błędu ani sam się nie przeładowuje. `sprawy` może
+     odejść wydanie później, gdy stare karty już się przeładują. */
   app.get("/api/obsluga/moje", async (_req, reply) => {
     const nie = odmowa(reply);
     if (nie) return nie;
-    return { sprawy: mojeSprawy(db(), sesjaZadania()!.user.userId) };
+    const ja = sesjaZadania()!.user.userId;
+    const sprawy = mojeSprawy(db(), ja);
+    return { sprawy, lista: mojaLista(db(), ja, new Date(), sprawy) };
   });
 
   app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id", async (req, reply) => {
@@ -395,7 +411,11 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/klient",
     async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
-      try { return historiaKlienta(Number(req.params.id)); }
+      /* Z doklejoną sprawą klienta (@wydanie) — powód przy `zeSprawa`.
+         Login sprawy osobno od loginu historii: rozmowa bez rozmówcy
+         w wątku należy do sprawy kupującego z jej zamówienia. */
+      const id = Number(req.params.id);
+      try { return zeSprawa(historiaKlienta(id), loginSprawyRozmowy(db(), id)); }
       catch (e) { return blad(reply, e); }
     });
 

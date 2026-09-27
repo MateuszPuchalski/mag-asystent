@@ -5,6 +5,10 @@ import { historiaSprawy } from "../services/klient-historia.js";
 import {
   cofnijNotatkeKlienta, profilKlienta, zapiszNotatkeKlienta,
 } from "../services/profil-klienta.js";
+import {
+  BladSprawy, BrakKlienta, KonfliktSprawy, przejmijSprawe, sprawaKlienta, ustawKrok, wznowSprawe,
+  zakonczSprawe, type SprawaKlienta,
+} from "../services/prowadzenie-klienta.js";
 
 /* ── Trasy PONAD kolejkami (23 września 2026) ────────────────────────────────
    Szukanie Ctrl+K i historia klienta ze zwrotu albo sprawy nie należą do
@@ -12,6 +16,23 @@ import {
    ODCZYTEM: GET, zero zapisu i zero żądań do Allegro. */
 
 const BIURO = ["biuro", "admin"];
+
+/**
+ * Historia klienta RAZEM ze sprawą klienta — wiązanie w drugą stronę
+ * (CLAUDE.md: jednostronne to takie, którego nie ma). Z profilu widać
+ * kolejki; ze zwrotu, reklamacji i rozmowy ma być widać sprawę. Składa to
+ * TRASA, bo `klient-historia.ts` nie ma prawa importować serwisu sprawy —
+ * sprawa sama czyta historię (`kontaLoginu`, `rozmowyPoLoginie`).
+ *
+ * `login` podaje trasa rozmowy osobno: sprawa budzi się też z rozmowy bez
+ * rozmówcy w wątku, dowiązanej numerem zamówienia, a historia takiej
+ * rozmowy loginu nie ma (`loginSprawyRozmowy`).
+ */
+export function zeSprawa<H extends { login: string | null }>(
+  h: H, login: string | null = h.login,
+): H & { sprawa: SprawaKlienta | null } {
+  return { ...h, sprawa: login ? sprawaKlienta(login) : null };
+}
 
 /* Bramka jak w skrzynce: sprawy klientów widzi biuro, nie hala. */
 function odmowa(reply: FastifyReply) {
@@ -35,14 +56,14 @@ export async function spoiwoRoutes(app: FastifyInstance) {
 
   app.get<{ Params: { id: string } }>("/api/obsluga/zwroty/:id/klient", async (req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
-    try { return historiaSprawy("zwrot", Number(req.params.id)); }
+    try { return zeSprawa(historiaSprawy("zwrot", Number(req.params.id))); }
     catch (e) { return reply.code(404).send({ error: (e as Error).message }); }
   });
 
   /* Reklamacja i dyskusja to jedna tabela — jedna trasa, rodzaj zna wiersz. */
   app.get<{ Params: { id: string } }>("/api/obsluga/sprawy/:id/klient", async (req, reply) => {
     const nie = odmowa(reply); if (nie) return nie;
-    try { return historiaSprawy("sprawa", Number(req.params.id)); }
+    try { return zeSprawa(historiaSprawy("sprawa", Number(req.params.id))); }
     catch (e) { return reply.code(404).send({ error: (e as Error).message }); }
   });
 
@@ -55,7 +76,8 @@ export async function spoiwoRoutes(app: FastifyInstance) {
     return p;
   });
 
-  /* Notatka o kliencie — jedyny zapis profilu. `tresc: null` albo pusta zdejmuje. */
+  /* Notatka o kliencie — zapis profilu obok sprawy klienta (trasy `/sprawa/*`
+     niżej). `tresc: null` albo pusta zdejmuje. */
   app.post<{ Params: { login: string }; Body: { tresc?: string | null } }>(
     "/api/obsluga/klient/:login/notatka", async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
@@ -77,5 +99,79 @@ export async function spoiwoRoutes(app: FastifyInstance) {
       const ok = cofnijNotatkeKlienta(req.params.login, { id: s.user.userId, name: s.user.name });
       if (!ok) return reply.code(409).send({ error: "Nie ma poprzedniej notatki do przywrócenia" });
       return { ok };
+    });
+
+  /* ── SPRAWA KLIENTA (@wydanie, S6) ─────────────────────────────────────────
+     Cztery zapisy, każdy z wymaganą `wersją`. KAŻDY KLUCZ CIAŁA JEST
+     WYMAGANY i sprawdza się go `in`, nie `?? null`: brak klucza to 400 bez
+     zapisu. Pole, które nie dojechało z trasy do serwisu, ginęło już po
+     cichu (blizna 0.224.1), a wartość domyślna podstawiona w jego miejsce
+     zamieniłaby taką zgubę w zapis. Notatka wyżej ma `?? null` słusznie:
+     brak treści JEST tam zdjęciem notatki.
+
+     Błędy mają STAŁE zdania: powód odrzucenia idzie do `events`, a login
+     ani krok nie mają prawa tam trafić (`sciezkaDoAudytu` w `context.ts`). */
+  const pola = (body: unknown, klucze: Record<string, "string" | "number">): string | null => {
+    if (!body || typeof body !== "object") return "Brak ciała żądania";
+    for (const [k, typ] of Object.entries(klucze)) {
+      if (!(k in body)) return `Brak pola \`${k}\``;
+      if (typeof (body as Record<string, unknown>)[k] !== typ) return `Pole \`${k}\` ma zły typ`;
+    }
+    const w = (body as Record<string, unknown>).wersja;
+    return Number.isInteger(w) && (w as number) >= 0 ? null : "Pole `wersja` musi być liczbą całkowitą";
+  };
+  const wykonaj = (reply: FastifyReply, zapis: () => SprawaKlienta) => {
+    try { return { sprawa: zapis() }; } catch (e) {
+      if (e instanceof KonfliktSprawy) return reply.code(409).send({ error: e.message, sprawa: e.sprawa });
+      if (e instanceof BrakKlienta) return reply.code(404).send({ error: e.message });
+      if (e instanceof BladSprawy) return reply.code(400).send({ error: e.message });
+      throw e;
+    }
+  };
+  const autor = () => { const s = sesjaZadania()!; return { id: s.user.userId, name: s.user.name }; };
+  type Cialo = Record<string, unknown>;
+
+  app.post<{ Params: { login: string }; Body: Cialo }>(
+    "/api/obsluga/klient/:login/sprawa/krok", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const zle = pola(req.body, { krok: "string", krokDo: "string", wersja: "number", odcisk: "string" });
+      if (zle) return reply.code(400).send({ error: zle });
+      const b = req.body;
+      return wykonaj(reply, () => ustawKrok(req.params.login, {
+        krok: String(b.krok), krokDo: String(b.krokDo), wersja: Number(b.wersja), odcisk: String(b.odcisk),
+      }, autor()));
+    });
+
+  app.post<{ Params: { login: string }; Body: Cialo }>(
+    "/api/obsluga/klient/:login/sprawa/zakoncz", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const zle = pola(req.body, { wersja: "number", odcisk: "string" });
+      if (zle) return reply.code(400).send({ error: zle });
+      const b = req.body;
+      return wykonaj(reply, () => zakonczSprawe(req.params.login,
+        { wersja: Number(b.wersja), odcisk: String(b.odcisk) }, autor()));
+    });
+
+  /* „Cofnij” i „Przejmij” też niosą odcisk: wiadomość klienta nie podbija
+     `wersji`, a oba zapisy ustawiają „znane” — bez odcisku gasiłyby
+     zdarzenie, którego ekran nie narysował (`sprawdzOdcisk`). */
+  app.post<{ Params: { login: string }; Body: Cialo }>(
+    "/api/obsluga/klient/:login/sprawa/wznow", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const zle = pola(req.body, { wersja: "number", odcisk: "string" });
+      if (zle) return reply.code(400).send({ error: zle });
+      const b = req.body;
+      return wykonaj(reply, () => wznowSprawe(req.params.login,
+        { wersja: Number(b.wersja), odcisk: String(b.odcisk) }, autor()));
+    });
+
+  app.post<{ Params: { login: string }; Body: Cialo }>(
+    "/api/obsluga/klient/:login/sprawa/przejmij", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const zle = pola(req.body, { wersja: "number", odcisk: "string" });
+      if (zle) return reply.code(400).send({ error: zle });
+      const b = req.body;
+      return wykonaj(reply, () => przejmijSprawe(req.params.login,
+        { wersja: Number(b.wersja), odcisk: String(b.odcisk) }, autor()));
     });
 }

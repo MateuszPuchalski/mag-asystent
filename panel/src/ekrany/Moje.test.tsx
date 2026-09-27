@@ -11,7 +11,11 @@ import type { MojaSprawa } from "../api/typy";
       wyłącznie część spraw (blizna 0.121.0: jeden zegar nazwany drugim).
    2. WIERSZ PROWADZI DO WŁAŚCIWEJ KOLEJKI, bo tam stoją bramki sprawy.
    3. NIE MA TU ANI JEDNEGO PRZYCISKU PRACY. Ekran roboczy nad kolejkami
-      byłby nakładką ze wspólnym statusem — kształtem z blizny 0.140.0.     */
+      byłby nakładką ze wspólnym statusem — kształtem z blizny 0.140.0.
+
+   Sprawa klienta (S6, @wydanie) dokłada wiersz `klient`: prowadzi do źródła
+   zdarzenia albo do profilu, mówi o kroku jednym zdaniem i dalej nie ma
+   przycisku — krok i zakończenie stoją na profilu.                         */
 
 const moje = vi.fn();
 vi.mock("../api/rozmowy", () => ({ useMojeSprawy: () => moje() }));
@@ -57,6 +61,48 @@ describe("Ekran Moje", () => {
 
     render(<MemoryRouter><Moje /></MemoryRouter>);
     expect(screen.getByText(/Nic nie prowadzisz/)).toBeInTheDocument();
+  });
+
+  it("sprawa klienta prowadzi do źródła zdarzenia albo do profilu, bez przycisku", () => {
+    moje.mockReturnValue({ data: { sprawy: [
+      sprawa({ kolejka: "klient", id: 5, opis: "Chrzanowski1234: czekamy na zwrot", login: "Chrzanowski1234",
+        terminDo: "2026-09-25T06:00:00Z", cel: "/obsluga/zwroty/11", nowe: "Zwrot dotarł" }),
+      sprawa({ kolejka: "klient", id: 6, opis: "ogrodnik_7: dosłać", login: "ogrodnik_7",
+        terminDo: "2026-09-24T06:00:00Z", poTerminie: true, cel: "/obsluga/klient/ogrodnik_7" }),
+      sprawa({ kolejka: "klient", id: 8, opis: "zielony: czekamy na dostawcę", login: "zielony",
+        terminDo: "2026-10-05T06:00:00Z", czeka: true }),
+    ] }, isLoading: false });
+
+    render(<MemoryRouter><Moje /></MemoryRouter>);
+    /* Trzeci wiersz nie ma `cel` (starszy serwer) — idzie do profilu po loginie. */
+    expect(screen.getAllByRole("link").map((a) => a.getAttribute("href")))
+      .toEqual(["/obsluga/zwroty/11", "/obsluga/klient/ogrodnik_7", "/obsluga/klient/zielony"]);
+    expect(screen.getByText("Zwrot dotarł")).toBeInTheDocument();
+    /* Czerwień wyłącznie po terminie; czekający krok jest wyciszony. */
+    expect(screen.getByText(/^po terminie/).className).toContain("text-ranga-zle");
+    expect(screen.getByText(/^czeka do /).className).not.toContain("text-ranga-zle");
+    /* Krok czekający na swój dzień nie jest „z terminem" — licznik mówi
+       o pracy na dziś, a nie o każdej dacie w kalendarzu. */
+    expect(screen.getByRole("heading", { name: "Moje sprawy · 3 · 1 z terminem" })).toBeInTheDocument();
+    expect(screen.queryAllByRole("button")).toHaveLength(0);
+  });
+
+  it("czyta scaloną `lista`, a wiersz nieznanego rodzaju pomija, zamiast wywrócić ekran", () => {
+    /* `sprawy` to od @wydanie same kolejki — dla kart sprzed wydania, które
+       na wierszu `klient` wywracały się bez granicy błędu. Ta karta czyta
+       `lista`, a rodzaj dołożony przez przyszły serwer po prostu pomija. */
+    moje.mockReturnValue({ data: {
+      sprawy: [sprawa({ kolejka: "rozmowa", id: 11 })],
+      lista: [
+        sprawa({ kolejka: "klient", id: 5, login: "zielony", cel: "/obsluga/klient/zielony" }),
+        { ...sprawa({ id: 12 }), kolejka: "przyszla" as MojaSprawa["kolejka"] },
+        sprawa({ kolejka: "rozmowa", id: 11 }),
+      ],
+    }, isLoading: false });
+
+    render(<MemoryRouter><Moje /></MemoryRouter>);
+    expect(screen.getAllByRole("link").map((a) => a.getAttribute("href")))
+      .toEqual(["/obsluga/klient/zielony", "/obsluga/skrzynka/11"]);
   });
 
   it("nie ma tu ani jednego przycisku pracy — to odczyt, nie piąta kolejka", () => {

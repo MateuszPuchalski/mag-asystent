@@ -81,10 +81,10 @@ sprawy, wynik ze zwrotu staje na jego osi, a odesłanie — w Do zrobienia.
 Dostawa zostaje przy „notatce do hali", żeby nie mieć dwóch kanałów o jednym
 dokumencie.
 
-Drugim mostkiem jest login kupującego. Chodzą po nim zakładka KLIENT (S2)
-i kandydaci zamówień rozmowy bez numeru (S1). Właściciel potwierdził go na
-żywym koncie 24 września 2026 — rozdział „Sprzeczność: login kupującego"
-niżej. Nowe wiązania po loginie są więc dozwolone, bez wielkości liter.
+Drugim mostkiem jest login kupującego. Chodzą po nim zakładka KLIENT (S2),
+kandydaci zamówień rozmowy bez numeru (S1) i od @wydanie sprawa klienta
+(S6). Właściciel potwierdził go na żywym koncie 24 września 2026 — rozdział
+„Sprzeczność: login kupującego" niżej. Nowe wiązania po loginie są więc dozwolone, bez wielkości liter.
 
 Trzecim mostkiem jest od 0.502.0 towar (`tw_id`). Stał na dziewięciu
 ekranach i nigdzie nie był odnośnikiem. Teraz jego symbol otwiera szufladę
@@ -103,7 +103,9 @@ nie mają. Otworzyłyby listę, która dziś znaczy co innego.
 
 Nakładka spraw (`sprawa_klienta`) odeszła w 0.388.0. Droga zakupu robi to
 samo sama i przez cztery kolejki. Cena jest zapisana jawnie: dwóch rozmów
-o jednym problemie BEZ wspólnego zamówienia nikt już nie sklei.
+o jednym problemie BEZ wspólnego zamówienia nikt już nie sklei. Tę cenę
+zdejmuje od @wydanie sprawa klienta z S6. Jej kluczem jest login, nie
+zamówienie, więc obie rozmowy budzą tę samą sprawę.
 
 ## Dekalog obsługi klienta
 
@@ -171,14 +173,21 @@ Klamra nad sprawami niczego nie przechwytuje. Historia zostaje przy rozmowie,
 przy zwrocie i przy reklamacji, a wspólny widok ją tylko CZYTA. Cztery byty
 mają czterech właścicieli danych i to jest cecha, nie usterka.
 
-**Zabrania.** Piątej tabeli ze wspólnym statusem nad czterema kolejkami.
-Pierwsza odpowiedź o tym kształcie kosztowała cztery tabele nakładki
-(0.140.0). Druga, nakładka spraw, odeszła w 0.388.0 (blizna 0.130.0).
+**Zabrania.** Wspólnego statusu przepisanego z czterech kolejek i ręcznego
+scalania spraw. Pierwsza odpowiedź o tym kształcie kosztowała cztery tabele
+nakładki (0.140.0). Druga, nakładka spraw, odeszła w 0.388.0 (blizna 0.130.0).
+
+**Nie zabrania sprawy klienta z S6.** Do 26 września 2026 stał tu zakaz
+każdej piątej tabeli nad kolejkami. Obie blizny dotyczyły jednak statusu
+przepisanego ze źródeł i scalania bez klucza. Sprawa klienta nie ma żadnego
+z nich, a historia dalej wisi przy źródle.
 
 **Pilnuje.** `droga-klienta.test.ts`: droga zakupu i lista „Moje" niczego
-nie zapisują.
+nie zapisują. Sprawę klienta pilnuje test „odczyty niczego nie zapisują”
+w `prowadzenie-klienta.test.ts`: sprawa, jej odcisk i „Moje” liczą się
+przy odczycie, bez zapisu.
 
-## Spoiwo — pięć kroków stoi, szósty czeka
+## Spoiwo — sześć kroków, szósty w pierwszym przyroście
 
 Historia budowy stoi w `CHANGELOG.md` (0.386.0–0.397.0) i w komentarzach kodu.
 Tu zostaje to, czego przy zmianie nie wolno zgubić.
@@ -212,10 +221,16 @@ o reklamacji czy zwrocie — tej samej, której zabrania S3. Paczka
 „niedoręczona” wymaga sprawdzenia przewoźnika. Bez niego brak doręczenia
 znaczy tylko, że nie pytaliśmy.
 
-**Notatka to jedyny zapis.** Jedna na login, bez statusu i bez kolejki, więc
-nie jest piątą tabelą nad kolejkami. Trzyma poprzednią treść, bo agent
-nadpisuje cudzą notatkę jednym kliknięciem. Dziennik zdarzeń dostaje długość,
-nie treść: notatka o kliencie to dane osobowe, a dziennik czyta analiza.
+**Notatka była jedynym zapisem do @wydanie.** Jedna na login, bez statusu
+i bez kolejki, więc nie jest piątą tabelą nad kolejkami. Trzyma poprzednią
+treść, bo agent nadpisuje cudzą notatkę jednym kliknięciem. Dziennik zdarzeń
+dostaje długość, nie treść: notatka o kliencie to dane osobowe, a dziennik
+czyta analiza.
+
+**Drugim zapisem jest sprawa klienta (S6).** Notatka mówi, KIM jest klient,
+i nie ma terminu. Sprawa mówi, co z nim robimy i do kiedy. Wpisana w notatkę
+nie wróciłaby na „Moje” ani w dniu kroku, ani po wiadomości klienta. Stąd
+osobna tabela, a nie pole w notatce.
 
 **Zabrania.** Adresu, danych z `buyer` i kwot z anulowanych zamówień.
 Pilnują tego `profil-klienta.test.ts` i test ekranu (zero zapisu przy
@@ -227,14 +242,29 @@ otwarciu).
 Zdarzenie dopisywane przy synchronizacji byłoby drugą prawdą o tym samym
 fakcie. Dwie prawdy rozjeżdżają się przy pierwszej poprawce jednej z nich.
 
-### S4. Jedno „Moje" dla trzech kolejek
+### S4. Jedno „Moje" dla trzech kolejek i spraw klienta
 
 Ekran `/obsluga/moje` składa rozmowy, reklamacje i dyskusje. Zwrotu tam NIE MA:
 w 0.370.0 właściciel zdjął ze zwrotu prowadzącego. Kolumny `prowadzi_*`
 w `zwrot_klienta` zostały, ale nikt ich nie pisze.
 
-Kolejność ma dwa piętra: najpierw sprawy z terminem, wedle terminu, potem
-reszta, wedle ostatniego ruchu.
+**Od @wydanie „Moje" niesie też sprawy klienta tej osoby (S6).** Scala je
+`mojaLista` w `services/prowadzenie-klienta.ts`, bo `droga-klienta.ts` nie
+może znać serwisu sprawy. Pętla importów dała już raz pusty zbiór
+(`statusy-spraw.ts`). Wiersz sprawy prowadzi do źródła najnowszego zdarzenia
+albo na profil klienta i nie ma przycisku.
+
+Kolejność ma cztery piętra:
+
+1. sprawy klienta z nowym zdarzeniem, najdłużej czekające pierwsze;
+2. terminy: kolejki z terminem i kroki na dziś albo po terminie, wedle daty;
+3. reszta kolejek, wedle ostatniego ruchu;
+4. kroki na przyszłość, z dopiskiem „czeka do”.
+
+Przy równym terminie wygrywa kolejka. Jej termin stawia Allegro albo ustawa,
+a krok sprawy stawiamy sobie sami. Pilnuje tego test kolejności „Moje”
+w `prowadzenie-klienta.test.ts`. Tożsamość idzie z sesji, więc cudzej sprawy
+klienta tu nie widać — test „sprawa klienta na „Moje”…” w `skrzynka.test.ts`.
 
 ### S5. Miara eskalacji
 
@@ -271,11 +301,186 @@ pobieraczem, a ani jedno zdjęcie nie doszło do modelu.
 u Allegro i trzymania treści, nazw plików albo adresów w wyniku. Limit 429
 i brak danych to „pominięty”, bo czerwień ma znaczyć jedno: droga nie działa.
 
-### S6. Zamknięcie sprawy klienta — czeka na decyzję właściciela
+### S6. Sprawa klienta i jej zakończenie (decyzja z 26 września 2026)
 
-Kiedy sprawa klienta jest skończona, skoro składa się z bytów o czterech
-właścicielach danych? „Zamknięte" znaczy co innego dla Allegro, dla ustawy
-i dla biura. Droga zakupu (S3) jest materiałem do tej decyzji, nie decyzją.
+Pytanie stało tu otwarte: kiedy sprawa klienta jest skończona, skoro składa
+się z bytów o czterech właścicielach danych? Rozstrzygnął je wywiad
+z właścicielem z 26 września 2026. Pierwszy przyrost stoi w kodzie od
+@wydanie, a następny opisuje koniec tego rozdziału.
+
+**Powód.** Biuro nazywa swój główny problem wprost: intuicyjne śledzenie
+i prowadzenie sprawy danego klienta. Jedna osoba prowadzi braki towaru,
+kontakt z klientem i reklamacje. Jej listą zadań są dziś powiadomienia Allegro
+w Gmailu. Droga zakupu, „Moje" i profil klienta tego nie zastąpiły.
+
+**Jednostką jest klient, nie zamówienie.** Typowy łańcuch to pytanie o dobór,
+potem zły towar w paczce, zwrot, dosyłka, reklamacja i dyskusja. Pytanie
+o dobór przychodzi przed zamówieniem, a dosyłka bywa osobną przesyłką. Numer
+zamówienia takiego łańcucha nie sklei. Kluczem jest login Allegro, jak w S2a.
+
+**Sprawa trzyma cztery rzeczy i nic więcej:**
+
+- kto ją prowadzi;
+- następny krok z terminem, na przykład „czekamy na zwrot" albo „dosłać";
+- zakończenie, które stawia człowiek;
+- ponowne otwarcie przy każdym nowym zdarzeniu dowolnego źródła.
+
+**Czego sprawa nie trzyma.** Stanu kolejek, bo ten liczy się przy odczycie,
+jak droga zakupu (S3). Historii, bo wisi przy źródle (punkt 5). Ręcznego
+scalania, bo login jest kluczem naturalnym i nie ma czego sklejać.
+
+**Co stoi w kodzie.** Tabela `klient_prowadzenie` ma jeden wiersz na login,
+a regułę niesie `services/prowadzenie-klienta.ts`. Nazwa nie brzmi
+`sprawa_klienta`, bo `migrate()` kasuje tamtą tabelę przy każdym starcie
+(0.388.0). Sprawa ma dwa stany: „w toku” z krokiem i terminem albo
+„zakończona”. Karta „Sprawa klienta” stoi na profilu klienta, pod sygnałami.
+W drugą stronę niosą ją „Moje” prowadzącego i historia klienta przy rozmowie,
+zwrocie, reklamacji i dyskusji.
+
+**Krok jest jedyną drogą założenia i wznowienia.** Sprawa bez następnego
+kroku nie istnieje: kto nie ma kroku, kończy sprawę. Termin leży najdalej
+sześćdziesiąt dni naprzód, bo na dostawcę czeka się tygodniami. Pomyłkę przy
+„Zakończ sprawę” cofa przez osiem sekund pasek „Cofnij”. Prowadzącym zostaje
+autor pierwszego ruchu, jak przy odpowiedzi w skrzynce od 0.159.0.
+„Przejmij” widać tylko przy cudzej sprawie w toku.
+
+**Zapis sprawdza świeżość.** Każdy zapis niesie numer wersji, więc cudzy ruch
+po otwarciu ekranu daje 409 ze świeżą sprawą. Każdy zapis poza pierwszym
+krokiem niesie też odcisk faktów, które ekran narysował (punkt 4). Dotyczy to
+także „Przejmij” i „Cofnij”, bo wiadomość klienta nie podbija wersji. Agent
+nie potwierdzi więc wiadomości, która przyszła po otwarciu profilu. Brak
+klucza w ciele żądania to 400 bez zapisu (blizna 0.224.1).
+
+**Co budzi sprawę.** Wyłącznie zdarzenie po stronie klienta albo Allegro, bo
+tylko o nim prowadzący może nie wiedzieć. Budzi wiadomość klienta w dowolnej
+jego rozmowie, nowy zwrot, nadanie zwrotu i jego doręczenie do nas. Budzi
+nowa reklamacja, nowa dyskusja i wiadomość klienta albo doradcy Allegro
+w jednej z nich. Zakończona sprawa z takim zdarzeniem wraca na „Moje”
+prowadzącego, a sprawa w toku staje tam na górze. Powód stoi słowami panelu,
+na przykład „Klient napisał 26.09 14:10”, i prowadzi do źródła.
+
+**Czego nie budzi (decyzja właściciela z 27 września 2026).** Decyzja
+z 26 września mówiła o ponownym otwarciu przy każdym zdarzeniu. Właściciel
+zatwierdził węższy odczyt, w tym to, że zakup sprawy nie budzi. Pełna lista
+i powody:
+
+- zakupu, bo stały klient budziłby sprawę co tydzień, a obudzenie bez pracy
+  uczy je ignorować;
+- naszego ruchu — odpowiedzi, werdyktu, pieniędzy — bo prowadzący o nim wie;
+- paczki nieodebranej, bo zakłada ją biuro, nie klient;
+- podziękowania, bo to rozstrzygnięcie, nie powrót klienta (S5a);
+- rozmowy dowiązanej wstecz ręcznym wskazaniem zamówienia, bo jej wiadomość
+  znaliśmy przed ruchem agenta.
+
+**Otwarte: obudzona zakończona sprawa zostaje zakończona.** Pierwszy
+przyrost stawia ją na „Moje” prowadzącego z powodem, zamiast otwierać na
+nowo. Właściciel 27 września tego nie rozstrzygnął. Samo otwarcie wymagałoby
+kroku z terminem, więc automat musiałby go zmyślić albo pokazać stary, po
+terminie. Rozstrzygnie miara z punktu 10 niżej. Gdy obudzona sprawa zwykle
+dostaje nowy krok, samo otwarcie oszczędzi kliknięcie; gdy zwykle kończy się
+ją znów, obecny kształt wystarcza.
+
+**Obudzenie liczy się przy odczycie, bez tickera.** W wierszu leży odcisk
+faktów z chwili ostatniego ruchu człowieka. „Nowe” to różnica między nim
+a odciskiem teraz. Ticker, który raz nie wstanie, zostawiłby sprawę
+zakończoną na zawsze. Każdy zapis przy sprawie potwierdza to, co widać,
+i gasi obudzenie.
+
+**„Cofnij” przywraca, nie potwierdza.** Zakończenie odkłada odcisk sprzed
+siebie, a „Cofnij” go oddaje. Pomyłkowe zakończenie i jego cofnięcie nie
+mogą załatwić wiadomości, na którą nikt nie odpisał. Obudzoną zakończoną
+sprawę kończy się znów jednym kliknięciem „Zakończ sprawę”. Takie zakończenie
+nie ma paska „Cofnij”, bo cofnięcie otworzyłoby sprawę z krokiem po terminie.
+
+**Okno obudzenia: trzydzieści dni od zakończenia (decyzja właściciela
+z 27 września 2026).** Zaproponowała je sesja, która zbudowała ten przyrost,
+bo decyzja z 26 września nie znała granicy. Właściciel okno zatwierdził.
+„Moje” liczy odcisk prowadzonych spraw przy każdym odświeżeniu, co 30 sekund,
+synchronicznie na serwerze. Bez granicy ten koszt rósłby z każdą sprawą
+zakończoną kiedykolwiek.
+
+Miesiąc mieści ustawowe 14 dni na odstąpienie i drogę paczki z powrotem.
+Później nowa wiadomość to nowa sprawa: pokazuje ją skrzynka, a agent zaczyna
+sprawę krokiem.
+
+Poza oknem zakończona sprawa nie ma „nowego” nigdzie: na profilu, przy
+źródle ani na „Moje”. Wewnątrz okna „Moje” liczy odcisk tylko sprawie, przy
+której klient się ruszył od ostatniego ruchu człowieka. Sito przepuszcza
+więcej, niż budzi, a rozstrzyga pełny odcisk.
+
+**Odcisk liczy sztuki, nie daty Allegro.** Część dat podstawia nasze
+mapowanie, a każda synchronizacja je nadpisuje, więc budziłyby sprawę przy
+każdym przebiegu. Wiadomość idzie po NASZYM czasie wstawienia. Import
+z opóźnieniem budzi, bo tej wiadomości agent nie widział. Znacznik bez strefy
+czyta się jako UTC, tak jak SQLite, żeby próg i zapytanie mówiły o tej samej
+chwili.
+
+**Zakończenie zależy od tego, co klient dostał:**
+
+| rozwiązanie | sprawa kończy się, gdy | skąd to wiemy |
+|---|---|---|
+| sam zwrot | pieniądze wróciły do klienta | oś zwrotu, `zwrot-pieniedzy.ts` |
+| wymiana | poprawny towar doszedł na ten sam adres | dziś znikąd — dosyłka idzie poza aplikacją |
+| odpowiedź | klient dostał odpowiedź i nie dopisał | skrzynka, S5a |
+
+Wymiana to zwrot przez Allegro i dosyłka poprawnego towaru. Nie dostaje
+osobnej kolejki, tylko staje jako następny krok sprawy. Dziś krok „dosłać”
+jest samym zdaniem, a numer przesyłki wchodzi w następnym przyroście.
+Kończy zawsze człowiek.
+
+**Podpowiedź zakończenia stoi na profilu.** Pyta „Zakończ sprawę?”, gdy
+sprawa jest w toku, w kolejkach nic nie czeka, a dzień kroku nadszedł.
+Wcześniej pchałaby do zakończenia sprawy, której krok jeszcze się nie
+spełnił. „Dziś” i „po terminie” liczą się na dobie lokalnej magazynu. Na
+czerwono stoi tylko „po terminie”.
+
+**Pilnują:**
+
+- `prowadzenie-klienta.test.ts`: obudzenia i ich brak, świeżość na czterech
+  zapisach, prowadzący, „Cofnij” z zapasem, okno obudzenia i doba lokalna;
+- ten sam plik: piętra „Moje”, sito bez odcisku dla cichych spraw, UTC
+  znaczników bez strefy i zero zapisu przy odczycie;
+- `spoiwo.test.ts` i `skrzynka.test.ts`: wymagane klucze ciała, 409 ze
+  sprawą, tożsamość z sesji, audyt bez loginu i sprawa przy rozmowie bez
+  rozmówcy;
+- w panelu `ProfilKlienta.test.tsx`, `Moje.test.tsx` i `Klient.test.tsx`:
+  same GET-y przy otwarciu profilu, wiersz „Moje” bez przycisku i linijka
+  sprawy przy źródle.
+
+**Miara (punkt 10 dekalogu z `docs/ergonomia-magazynu.md`).** Dwie liczby
+mówią, czy sprawa pomaga, czy dokłada pracy. Pierwsza to udział obudzeń
+zakończonej sprawy, po których prowadzący kończy ją znów w ciągu dziesięciu
+minut, czyli `klient_sprawa_zakonczona` z `ponownie: true` w dzienniku.
+Wysoki udział znaczy, że budzi szum, a nie klient. Druga to liczba kroków po
+terminie na tydzień: rośnie, gdy terminy są na wyrost albo spraw jest za
+dużo. Obie liczy się bez osi osobowej, a dziś nie liczy ich nic.
+
+**Zabrania.** Statusu przepisanego ze źródeł, kończenia przez automat
+i otwarcia ekranu, które cokolwiek zapisuje. Zabrania też listy, liczby
+i raportu spraw albo kroków po terminie w podziale na osoby. Jedynym
+wyjątkiem jest własne „Moje” oglądającego, z tożsamością z sesji. Zestawienie
+per osoba to monitoring pracowniczy z art. 22² Kodeksu pracy
+(`docs/architektura.md` §9). Do dziennika idzie numer sprawy, nigdy login ani
+treść kroku — polityka stoi w `docs/obsluga-klienta.md`.
+
+**Następny przyrost: dosyłka ze śledzeniem.** Krok „dosłać” dostaje numer
+przesyłki, przewoźnika i śledzenie z Allegro. Śledzenie pyta partiami, jak
+`services/allegro-tracking.ts`, z jednego wpisu `uruchomTakt` w `main()`.
+Krok podpowiada zwrot z powodem `DIFFERENT` albo odmowa wypłaty
+`NEW_ITEM_SENT`. Liczba spraw do ruchu staje w plakietce `LicznikDoZrobienia`.
+Przy tym trzeba naprawić `services/przesylka-zamowienia.ts`: zna jedną paczkę
+na zamówienie, więc doręczona pierwsza zasłoniłaby niedoręczoną dosyłkę.
+
+Przy złym towarze biuro odrzuca wypłatę za zwrot opcją „Wysłaliśmy nowy
+towar”, czyli `NEW_ITEM_SENT` — tak podał właściciel 27 września. Ten kod
+WERTIS już zapisuje przy zwrocie, więc może sam zaproponować krok „dosłać”.
+
+Właściciel podał 27 września jeszcze dwa fakty, niesprawdzone na żywym
+koncie. Numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro, obok
+pierwszej paczki. Dosyłka jedzie prawie zawsze tym samym przewoźnikiem.
+Jeśli oba się potwierdzą, dosyłkę widać bez wklejania: to druga pozycja
+w `GET /order/checkout-forms/{id}/shipments`. Wklejony numer zostaje drogą
+zapasową, gdy etykieta trafi na inne zamówienie.
 
 ## Sprzeczność: login kupującego
 
@@ -295,9 +500,10 @@ nie maska. Rozbieżność brała się z wielkości liter, więc login porównuje
 wszędzie bez niej. Opis stoi w `docs/allegro-ksztalt.md`, rozdział
 `GET /messaging/threads`.
 
-**Do tego czasu obowiązuje jedno.** Żadna NOWA funkcja nie wiąże po loginie
-rozmówcy. Dwie istniejące zostają, bo pomyłka daje w nich najpewniej pustą
-historię, a nie cudze dane. Wiązanie w S1 zatwierdza zresztą człowiek.
+**Od 26 września 2026 nowe wiązania po loginie są dozwolone.** Zakaz stał
+tu tylko do weryfikacji, a ta zapadła 24 września. Login porównuje się
+zawsze bez wielkości liter. Rozmowę BEZ numeru z konkretnym zamówieniem
+dalej wiąże kliknięcie agenta (S1): ten sam login nie znaczy „ta paczka".
 
 ## Mapa możliwości
 
@@ -318,8 +524,9 @@ od drugiej: nazywa dziurę, a nie funkcję.
 | dyskusja przed reklamacją | dyskusje (0.245.0), wiązanie od 0.386.0 | zegara |
 | prośba o rabat zamiast zwrotu | rabat transakcyjny (0.164.0) | — |
 | pytanie reklamacyjne bez sprawy w Allegro | skrzynka, znacznik „reklamacyjna" (0.390.0) | zegara — rozmowa nie ma terminu (§26) |
-| wymiana na inny towar | NIGDZIE | decyzji: zwrot z nowym zamówieniem czy osobny byt |
+| wymiana na inny towar | zwrot przez Allegro, dosyłka poza aplikacją; od @wydanie krok „dosłać" w sprawie klienta (S6) | numeru przesyłki i śledzenia dosyłki — następny przyrost S6 |
 | brak towaru na stanie | rozmowa plus zadanie terenowe | — |
+| brak towaru do sprzedanego zamówienia | Sellasist: magazynier zgłasza brak przy zbieraniu; od @wydanie Ctrl+K po numerze zamówienia daje kupującego | drogi braku z Sellasist do sprawy klienta bez przepisywania numeru |
 | klient wraca po miesiącu | rozmowa plus pełna historia (0.386.0) | — |
 | klient pisze z drugiego konta | dwie historie, bez wiązania | świadomej odpowiedzi „nie wiążemy" |
 | klient milczy po naszym pytaniu | kubełek BEZ RUCHU w reklamacjach | tego samego w skrzynce i zwrotach |
@@ -331,18 +538,22 @@ od drugiej: nazywa dziurę, a nie funkcję.
 Znacznik „reklamacyjna" (0.390.0) jest NASZ i zostaje przy rozmowie. Sprawy
 w Allegro sprzedawca nie założy — `/sale/issues` ma wyłącznie GET.
 
-**Dwie pozycje „NIGDZIE" są największe.** Wymiana towaru jest codzienna
-w handlu częściami i nie ma dziś żadnego miejsca w aplikacji. Drugi kanał
-przesądza o tym, czy panel jest obsługą klienta, czy obsługą Allegro.
+**Największe dziury to wymiana i brak towaru.** Obie są codzienne w handlu
+częściami i obie żyły poza aplikacją. Wymiana ma od @wydanie krok „dosłać"
+w sprawie klienta (S6), a śledzenie dosyłki to następny przyrost. Brak towaru
+czeka na drogę z Sellasist. Do tego czasu numer zamówienia w Ctrl+K daje
+kupującego, a z nim profil i sprawę.
+
+**Drugi kanał przestał być pilny.** Wywiad z 26 września 2026 dał dwa
+fakty. Z Allegro jest 99% zamówień, a pytania klientów przychodzą przez
+Allegro z odnośnikiem do zamówienia. Gmail niesie głównie powiadomienia
+Allegro i służy biuru za listę zadań. Tę rolę ma przejąć sprawa klienta.
 
 ## Otwarte decyzje właściciela
 
-Czy wchodzi drugi kanał poza Allegro. Czy wymiana towaru dostaje własny byt.
-Kiedy sprawa klienta jest zamknięta. Czy rozmowa dostaje termin odpowiedzi.
-Czy dwa konta jednego człowieka wiążemy ręką.
-
-Pierwsze dwa pytania są większe od reszty razem wziętej. Każde z nich zmienia
-kształt aplikacji, nie kształt ekranu.
+Czy wchodzi drugi kanał poza Allegro. Czy rozmowa dostaje termin odpowiedzi.
+Czy dwa konta jednego człowieka wiążemy ręką. Kiedy sprawa klienta jest
+zakończona i czy wymiana dostaje własny byt — rozstrzygnięte w S6.
 
 ## Blizny, których to spoiwo nie ma kupić drugi raz
 
@@ -350,7 +561,7 @@ Blizny 0.130.0 i 0.140.0 stoją w punkcie 5 dekalogu i tu ich nie powtarzamy.
 
 | blizna | czego pilnować przy łączeniu kolejek |
 |---|---|
-| 0.56.6 | login rozmówcy bywa zamaskowany; nowe wiązanie po nim czeka na `[WERYFIKUJ]` |
+| 0.56.6 | `client:<liczba>` to login kupującego bez konta, nie maska (sprawdzone 24 września 2026); login porównuje się bez wielkości liter |
 | 0.121.0 | dyskusja nie jest reklamacją; zegar jednej nie nazywa się zegarem drugiej |
 | 0.152.0 | powód odmowy zapisuje się słowem, nie samym kodem odpowiedzi |
 | 0.157.0 | ta sama rzecz zbudowana dwa razy w dwóch gałęziach; sprawdź, co już stoi |

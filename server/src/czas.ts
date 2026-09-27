@@ -42,6 +42,24 @@ export function czasLokalny(iso: string): string {
   return formater({ hour: "2-digit", minute: "2-digit" }, "hm").format(d);
 }
 
+/**
+ * Chwila (ms) ze znacznika z bazy; napis BEZ STREFY czyta się jako UTC.
+ *
+ * Tak czyta go SQLite (`julianday`, `datetime`), a `Date.parse` — jako czas
+ * LOKALNY maszyny. Kolumna, w której obok ISO z `Z` trafi się
+ * `'2026-09-26 10:30:00'` z `datetime('now')`, porządkowałaby się wtedy
+ * inaczej w SQL-u niż w kodzie: latem w Polsce o dwie godziny. Blizna
+ * 0.497.1 (`znacznikiIso` w `db.ts`) pokazała to na ekranie; ten pomocnik
+ * trzyma porównania po stronie kodu na tym samym zegarze co zapytania.
+ * Niepoprawny albo pusty znacznik daje `NaN`, jak `Date.parse`.
+ */
+export function chwilaUtc(znacznik: string | null | undefined): number {
+  const s = znacznik == null ? "" : String(znacznik).trim();
+  if (!s) return Number.NaN;
+  const bezStrefy = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(s);
+  return Date.parse(bezStrefy ? `${s.replace(" ", "T")}Z` : s);
+}
+
 /** `RRRR-MM-DD` czasu lokalnego — data, nie doba UTC. */
 export function dataLokalna(iso: string): string {
   const d = new Date(iso);

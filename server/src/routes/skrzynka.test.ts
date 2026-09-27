@@ -48,7 +48,9 @@ beforeEach(() => {
   for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia",
     "conversation_mention", "conversation_comment", "conversation_draft",
     "conversation_assignment", "conversation_event", "message", "conversation",
-    "channel_account", "zadanie_terenowe", "events", "device_session", "app_user"]) {
+    "channel_account", "zadanie_terenowe", "events", "device_session",
+    /* Sprawa klienta wskazuje prowadzącego bez kaskady — przed kontami. */
+    "klient_prowadzenie", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   const konto = Number(d.prepare(
@@ -797,6 +799,89 @@ test("moje sprawy: tożsamość z sesji, nie z zapytania — cudzej listy nie ma
   assert.deepEqual(cudza.json<{ sprawy: unknown[] }>().sprawy, [],
     "parametr z cudzym numerem nie ma prawa niczego pokazać");
   assert.equal(liczbaZdarzen(), przed, "odczyt listy pracy niczego nie mutuje");
+});
+
+test("sprawa klienta na „Moje” i w historii rozmowy: tylko prowadzącego, bez zapisu przy patrzeniu", async () => {
+  /* Bliźniak testu wyżej dla sprawy klienta (@wydanie). Scalenie stoi
+     w serwisie, ale tożsamość bierze TRASA — i tu się jej pilnuje. */
+  const ala = login("biuro", "A. Lewandowska");
+  const bob = login("biuro", "B. Nowak");
+  const d = db();
+  /* Wątek rozmowy z beforeEach dostaje rozmówcę — to czyni login znanym. */
+  d.prepare(`INSERT OR REPLACE INTO allegro_inbox_thread(id,read,interlocutor_login,surowe_json,synced_at)
+    VALUES ('w-1',1,'kupujacy44','{}','x')`).run();
+  const zalozona = await app.inject({ method: "POST", url: "/api/obsluga/klient/kupujacy44/sprawa/krok",
+    headers: ala.naglowki, payload: { krok: "dosłać nóż", wersja: 0, odcisk: "",
+      krokDo: new Date(Date.now() + 2 * 86_400_000).toISOString() } });
+  assert.equal(zalozona.statusCode, 200, zalozona.body);
+  const id = zalozona.json<{ sprawa: { id: number } }>().sprawa.id;
+
+  const przed = liczbaZdarzen();
+  const zmiany = (d.prepare("SELECT total_changes() AS n").get() as { n: number }).n;
+  const moja = await app.inject({ method: "GET", url: "/api/obsluga/moje", headers: ala.naglowki });
+  assert.equal(moja.statusCode, 200, moja.body);
+  type Wiersz = { kolejka: string; id: number; czeka?: boolean; cel?: string };
+  const odpowiedz = moja.json<{ sprawy: Wiersz[]; lista: Wiersz[] }>();
+  const wiersz = odpowiedz.lista.find((s) => s.kolejka === "klient");
+  assert.equal(wiersz?.id, id);
+  assert.equal(wiersz?.czeka, true, "krok na pojutrze czeka");
+  assert.equal(wiersz?.cel, "/obsluga/klient/kupujacy44");
+  /* `sprawy` zostaje samymi kolejkami: karta panelu sprzed tego wydania
+     wywraca się na wierszu, którego rodzaju nie zna. */
+  assert.deepEqual(odpowiedz.sprawy.filter((s) => s.kolejka === "klient"), []);
+
+  const cudza = await app.inject({
+    method: "GET", url: `/api/obsluga/moje?userId=${ala.userId}`, headers: bob.naglowki,
+  });
+  assert.equal(cudza.statusCode, 200, cudza.body);
+  assert.deepEqual(cudza.json<{ sprawy: unknown[]; lista: unknown[] }>().lista, [],
+    "cudzej sprawy klienta nie ma jak poprosić");
+
+  const h = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${rozmowa}/klient`, headers: bob.naglowki });
+  assert.equal(h.statusCode, 200, h.body);
+  assert.equal(h.json<{ sprawa: { id: number; krok: string } | null }>().sprawa?.krok, "dosłać nóż",
+    "z rozmowy widać sprawę klienta — wiązanie w drugą stronę");
+  assert.equal(liczbaZdarzen(), przed);
+  assert.equal((d.prepare("SELECT total_changes() AS n").get() as { n: number }).n, zmiany);
+});
+
+test("historia rozmowy bez loginu rozmówcy niesie `sprawa: null`, nie błąd", async () => {
+  const b = login("biuro", "Anna");
+  db().prepare("DELETE FROM allegro_inbox_thread WHERE id='w-1'").run();
+  const h = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${rozmowa}/klient`, headers: b.naglowki });
+  assert.equal(h.statusCode, 200, h.body);
+  assert.equal(h.json<{ sprawa: unknown }>().sprawa, null);
+});
+
+test("rozmowa bez rozmówcy, dowiązana numerem zamówienia, niesie sprawę kupującego", async () => {
+  /* Wiązanie w obie strony (`CLAUDE.md`). Sprawa budzi się z rozmowy, do
+     której klienta prowadzi tylko numer zamówienia, i odsyła do niej — więc
+     ta rozmowa musi pokazać tę sprawę, choć wątek nie niesie loginu. */
+  const ala = login("biuro", "A. Lewandowska");
+  const d = db();
+  const konto = (d.prepare("SELECT channel_account_id AS k FROM conversation WHERE id=?").get(rozmowa) as
+    { k: number }).k;
+  d.prepare("DELETE FROM allegro_inbox_thread WHERE id='w-1'").run();
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,kupujacy_login,kupiono_at,
+      suma_grosze,waluta,synced_at) VALUES (?,'ord-55','READY_FOR_PROCESSING','Kupujacy55',?,5000,'PLN','x')`)
+    .run(konto, "2026-09-01T07:00:00.000Z");
+  try {
+    d.prepare("UPDATE message SET related_order_id='ord-55' WHERE id=?").run(pytanie);
+    const zalozona = await app.inject({ method: "POST", url: "/api/obsluga/klient/kupujacy55/sprawa/krok",
+      headers: ala.naglowki, payload: { krok: "czekamy na zwrot", wersja: 0, odcisk: "",
+        krokDo: new Date(Date.now() + 2 * 86_400_000).toISOString() } });
+    assert.equal(zalozona.statusCode, 200, zalozona.body);
+
+    const h = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${rozmowa}/klient`,
+      headers: ala.naglowki });
+    assert.equal(h.statusCode, 200, h.body);
+    const j = h.json<{ login: string | null; sprawa: { login: string; krok: string } | null }>();
+    assert.equal(j.login, null, "historia dalej nie zgaduje klienta — wątek nie niesie loginu");
+    assert.deepEqual([j.sprawa?.login, j.sprawa?.krok], ["Kupujacy55", "czekamy na zwrot"]);
+  } finally {
+    /* Zamówienie wskazuje konto kluczem obcym, a `beforeEach` kasuje konta. */
+    d.prepare("DELETE FROM zamowienie_klienta WHERE external_id='ord-55'").run();
+  }
 });
 
 test("znacznik reklamacyjny jest PRZEŁĄCZNIKIEM i zostawia ślad w obie strony", async () => {
