@@ -2014,8 +2014,8 @@ private fun PanelOdkladania(
         /* DROGI POWROTU Z POMYŁKI. Przyciski niosą w napisie TO, co cofną —
            liczbę i półkę. „COFNIJ" bez dopełnienia kazałoby pamiętać, co
            było ostatnie, a właśnie tego człowiek po pomyłce nie jest pewien.
-           Pokazuje je serwer (`cofnij`, `zgloszenie`), więc znikają same po
-           korekcie ilości i po cofnięciu. */
+           Pokazuje je serwer (`cofnij`, `odlozenia`, `zgloszenie`), więc
+           znikają same po korekcie ilości i po cofnięciu. */
         /* Pozycja rozłożona na kilka półek pokazuje je wszystkie. Wiersz na
            liście niesie tylko ostatnią (`locActual`), a pytanie po pomyłce
            brzmi właśnie „gdzie poszła reszta". */
@@ -2035,8 +2035,16 @@ private fun PanelOdkladania(
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onCofnij,
             )
+        }
+        /* ZMIEŃ PÓŁKĘ ZOSTAJE PRZY WYJĄTKU (decyzja właściciela z 27 września
+           2026). Półka nie należy do zgłoszenia, a serwer zmienia ją bez
+           względu na status. Od 0.538.2 wyjątek przeżywa odłożenie, więc źle
+           zeskanowana półka czekałaby inaczej na wycofanie zgłoszenia razem
+           ze zdjęciem. Szczyt stosu bierzemy z `odlozenia`, bo `cofnij` przy
+           wyjątku jest puste — ilości cofnąć się wtedy nie da. */
+        line.odlozenia.lastOrNull()?.let { o ->
             OutlineButton(
-                "ZMIEŃ PÓŁKĘ (teraz ${c.lok})",
+                "ZMIEŃ PÓŁKĘ (teraz ${o.lok})",
                 modifier = Modifier.fillMaxWidth(),
                 onClick = onZmienPolke,
             )
@@ -2672,7 +2680,8 @@ private fun ZmianaPolkiSheet(
     onPolka: (kod: String, recznie: Boolean) -> Unit,
     onZlyKod: (String) -> Unit,
 ) {
-    val zapisana = line.cofnij?.lok ?: line.locActual ?: "—"
+    // z `odlozenia`, nie z `cofnij` — przy wyjątku `cofnij` jest puste, a półkę zmienia się i tak
+    val zapisana = line.odlozenia.lastOrNull()?.lok ?: line.locActual ?: "—"
     var wpis by remember(line.id) { mutableStateOf("") }
 
     ScanHandlerEffect { scan ->
