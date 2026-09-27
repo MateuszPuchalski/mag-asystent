@@ -37,6 +37,7 @@ import {
 } from "../services/pasowanie-od-silnika.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
 import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../services/tokeny-silnikow.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy bazy wiedzy (§12, etapy E2 i E3) ─────────────────────────────────
    TRZYDZIEŚCI DWA ZAPISY: propozycja, rozstrzygnięcie, wycofanie, dowód (E2),
@@ -81,7 +82,7 @@ import { dodajToken, listaTokenow, rozstrzygnijToken, usunToken } from "../servi
    Bramka roli stoi także na odczycie: wiedza niesie numery rozmów i imiona
    agentów; hala pracuje na kolektorze i nie ma po co tu zaglądać.          */
 
-const BIURO = ["biuro", "admin"];
+const BIURO = ROLE_BIUROWE;
 
 const blad = (reply: FastifyReply, e: unknown) =>
   reply.code(400).send({ error: e instanceof Error ? e.message : String(e) });

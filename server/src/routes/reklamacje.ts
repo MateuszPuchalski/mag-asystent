@@ -24,6 +24,7 @@ import { autoryzuj } from "../services/auth.js";
 import { trasyTagowSprawy } from "./tagi.js";
 import { TAGI_REKLAMACJI } from "../services/tagi-spraw.js";
 import { bladPobrania } from "./pobranie.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy reklamacji klienckich (0.222.0) ───────────────────────────────────
    PRZYROST PIERWSZY: odczyt, kolejka z zegarem, czat do czytania. Do Allegro
@@ -46,7 +47,7 @@ import { bladPobrania } from "./pobranie.js";
    skrzynce i przy zwrotach. Reklamacja niesie login kupującego, treść jego
    zgłoszenia i numer zamówienia; to są dane biura, nie hali.               */
 
-const BIURO = ["biuro", "admin"];
+const BIURO = ROLE_BIUROWE;
 
 function odmowa(reply: FastifyReply) {
   const s = sesjaZadania();

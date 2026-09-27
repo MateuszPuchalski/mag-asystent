@@ -19,6 +19,7 @@ import { doDecyzji } from "../services/do-decyzji.js";
 import { sondujRzeczywistosc, stanSondy } from "../services/sonda-rzeczywistosci.js";
 import { config } from "../config.js";
 import { BladFirmy, daneFirmy, zapiszDaneFirmy, type PoleFirmy } from "../services/firma.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy biura (strona `/biuro` zniknęła w 0.446.0) ─────────────────────
    Do 0.446.0 ten plik serwował też stronę biura: jeden HTML bez builda,
@@ -182,7 +183,7 @@ export async function biuroRoutes(app: FastifyInstance) {
 
      Licznik jedzie TĄ trasą, a nie przez `/api/health`: health stoi na liście
      `BEZ_SESJI`, więc dane biura wystawiłby każdemu bez logowania. */
-  const ORZEKAJACY = ["biuro", "admin"];
+  const ORZEKAJACY = ROLE_BIUROWE;
 
   function odmowa(): { kod: number; error: string } | null {
     const s = sesjaZadania();

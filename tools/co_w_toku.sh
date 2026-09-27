@@ -35,6 +35,16 @@ wynik=$(git for-each-ref --sort=-committerdate \
     ile=$(git rev-list --count "origin/main..$galaz" 2>/dev/null || echo 0)
     [ "${ile:-0}" -gt 0 ] || continue
     echo "── ${galaz#origin/}  (+$ile, $(git log -1 --format=%cr "$galaz"))"
+    # Zgłoszenie pracy (@wydanie): tytuł fragmentu `zmiany/*.md`, który gałąź
+    # dokłada. Sam git, bez `gh` — tego w sesjach chmurowych nie ma, więc
+    # lista otwartych PR-ów niżej bywa ślepa, a ta nie. Fragment wypchnięty
+    # pierwszym commitem mówi innym sesjom, CO powstaje, zanim powstanie.
+    git diff --name-only --diff-filter=A "origin/main...$galaz" -- zmiany/ 2>/dev/null |
+      grep -v '^zmiany/README.md$' |
+      while read -r plik; do
+        tytul=$(git show "$galaz:$plik" 2>/dev/null | sed -n 's/^tytul: *//p' | head -1)
+        echo "     zgłoszone: ${tytul:-$plik}"
+      done
     git log --oneline --no-merges -3 "origin/main..$galaz" 2>/dev/null | sed 's/^/     /'
   done)
 
@@ -66,7 +76,9 @@ echo
 if ! command -v node >/dev/null 2>&1; then
   echo "Zależności: nie wiem — brak node w PATH."
 elif [ ! -d node_modules ]; then
-  echo "Zależności: BRAK node_modules — uruchom 'npm ci'."
+  # W KORZENIU: `npm ci` w `panel/` albo `server/` kasuje wspólne
+  # `node_modules` workspace'ów i serwer traci połowę pakietów.
+  echo "Zależności: BRAK node_modules — uruchom 'npm ci' w korzeniu repo."
 else
   # Node, a nie `sed` po JSON-ie: lista zależności to struktura, a nie tekst,
   # i w tym repo node jest z definicji. Skrypt milczy przy każdym błędzie —
@@ -92,7 +104,7 @@ else
   ' 2>/dev/null)
   if [ -n "$brak" ]; then
     echo "UWAGA: zależności nieaktualne — brakuje: $brak"
-    echo "       uruchom 'npm ci', inaczej testy pokażą awarie, których nie ma"
+    echo "       uruchom 'npm ci' w korzeniu repo, inaczej testy pokażą awarie, których nie ma"
   fi
 fi
 

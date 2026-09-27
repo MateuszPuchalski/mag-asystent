@@ -6,6 +6,7 @@ import { coAutomatDopisal } from "../services/wiedza-automat.js";
 import { pokrycieWiedzy } from "../services/identyfikatory.js";
 import { skutecznoscDoboru } from "../services/skutecznosc-doboru.js";
 import { eskalacje } from "../services/droga-klienta.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy ekranu ustawień obsługi (0.169.0) ─────────────────────────────────
    ZERO ZAPISÓW i to jest umowa, tak samo jak licznik `method:` w biurze.
@@ -17,7 +18,7 @@ import { eskalacje } from "../services/droga-klienta.js";
    raport z osią osobową, więc bramka przestała być wyłącznie kwestią tego,
    komu te liczby są potrzebne.                                              */
 
-const BIURO = ["biuro", "admin"];
+const BIURO = ROLE_BIUROWE;
 
 function odmowa(reply: FastifyReply) {
   const s = sesjaZadania();

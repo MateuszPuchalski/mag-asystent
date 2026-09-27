@@ -1,0 +1,78 @@
+# Zgoda właściciela na zmiany, których nie da się cofnąć (@wydanie).
+#
+# DLACZEGO. Zielone CI scala PR samo (`auto-scalanie.yml`), a serwer bierze
+# wydanie sam (`AKTUALIZACJA_AUTO=zaraz`). Między agentem a produkcją nie ma
+# więc człowieka. Dla większości kodu to świadoma decyzja właściciela: błąd
+# cofa następne wydanie, a bazę SQLite chroni kopia przy starcie. Zapis do
+# Subiekta takiej drogi powrotu nie ma. Zły dokument, zła korekta albo
+# nadpisana kartoteka zostają w księgach i sprząta się je ręcznie w ERP.
+#
+# DLACZEGO ŚRODOWISKO, A NIE CODEOWNERS. Każdy PR w tym repo otwiera konto
+# właściciela, także te pisane przez agentów. GitHub nie pozwala zatwierdzić
+# własnego PR-a, więc wymóg przeglądu właściciela kodu zablokowałby je na
+# zawsze. Obejście przez `bypass_actors` DEPLOY §0a zabrania, bo omija też
+# wymagane checki. Zatwierdzenie wdrożenia do środowiska właściciel może dać
+# sam sobie jednym kliknięciem, a agent nie ma narzędzia, żeby to zrobić.
+#
+# CO CHRONI. Lista `CHRONIONE` niżej jest JEDYNYM źródłem prawdy o tym, co
+# pisze do Subiekta. CLAUDE.md odsyła tutaj, nie powtarza listy.
+#
+# CZEGO NIE CHRONI. PR może zmienić ten plik, a GitHub uruchomi wersję z PR-a.
+# Bramka łapie więc pomyłkę, nie złą wolę. Dlatego ten plik sam stoi na liście.
+#
+# Działa dopiero po dwóch krokach właściciela: środowisko `zgoda-wlasciciela`
+# z wymaganym recenzentem, potem ponowny import `main.json`. Kolejność i powód
+# stoją w DEPLOY §0d.
+name: Zgoda właściciela
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+
+jobs:
+  zakres:
+    name: Zakres zgody
+    runs-on: ubuntu-latest
+    outputs:
+      chronione: ${{ steps.zakres.outputs.chronione }}
+    steps:
+      # Pełna historia: `git diff` z gałęzią bazową potrzebuje wspólnego
+      # przodka, a domyślny płytki klon go nie ma.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Czy PR dotyka zapisu do Subiekta
+        id: zakres
+        env:
+          # Zapis do Subiekta: worker Sfery (dokumenty przez COM), adapter SQL
+          # Sfery (UPDATE kartoteki `tw__Towar`) i kontrakt kolejki `sfera.ts`.
+          # Do tego sama bramka i reguła gałęzi, bo bez nich lista nic nie waży.
+          CHRONIONE: '^(sfera-worker/|server/src/adapters/sfera(\.sql)?\.ts$|\.github/workflows/zgoda\.yml$|\.github/rulesets/)'
+        run: |
+          zmiany=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
+          trafione=$(printf '%s\n' "$zmiany" | grep -E "$CHRONIONE" || true)
+          if [ -n "$trafione" ]; then
+            echo "chronione=true" >> "$GITHUB_OUTPUT"
+            echo "PR dotyka zapisu do Subiekta albo samej bramki. Czeka na zgodę właściciela:"
+            printf '  %s\n' $trafione
+          else
+            echo "chronione=false" >> "$GITHUB_OUTPUT"
+            echo "PR nie dotyka zapisu do Subiekta. Zgoda niepotrzebna."
+          fi
+
+  # Zadanie pominięte przez `if` GitHub liczy jako zaliczone, więc PR bez
+  # chronionych plików przechodzi bez czekania. Z nimi zadanie wisi, aż
+  # właściciel zatwierdzi wdrożenie do środowiska w zakładce Actions.
+  # Każdy nowy push uruchamia je od nowa, więc zgoda nie przechodzi na kod,
+  # którego właściciel nie widział.
+  zgoda:
+    name: Zgoda właściciela
+    needs: zakres
+    if: needs.zakres.outputs.chronione == 'true'
+    runs-on: ubuntu-latest
+    environment: zgoda-wlasciciela
+    steps:
+      - run: echo "Właściciel zatwierdził zmianę w zapisie do Subiekta."

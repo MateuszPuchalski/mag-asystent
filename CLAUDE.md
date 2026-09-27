@@ -1,162 +1,185 @@
 # WERTIS — zasady pracy w tym repo
 
-Magazynowo-biurowy asystent firmy ogrodniczej: serwer Fastify + `node:sqlite`
-(`server/`), panel biura (`panel/`, React + Vite, pod `/obsluga`; dawny
-`biuro.html` zniknął w 0.446.0), kolektor Android (`android/`). Architektura i decyzje:
-`docs/architektura.md`. Ten plik mówi tylko, CZEGO pilnować przy zmianach.
+Magazynowo-biurowy asystent firmy ogrodniczej. Serwer Fastify z `node:sqlite`
+(`server/`), panel biura w React i Vite pod `/obsluga` (`panel/`), kolektor
+Android (`android/`). Obok nich trzy procesy Windows: worker Sfery, który
+wystawia dokumenty w Subiekcie (`sfera-worker/`, C#), usługa zdjęć bez tła
+(`tlo-worker/`, C#) i instalator (`instalator/`, PowerShell). Architektura
+i decyzje stoją w `docs/architektura.md`.
 
-## Twarde zasady
+Ten plik mówi, CZEGO pilnować przy zmianach. Zasady jednego obszaru stoją
+w jego katalogu: `server/CLAUDE.md`, `panel/CLAUDE.md`, `android/CLAUDE.md`
+i `sfera-worker/CLAUDE.md`. Claude Code wczytuje je, gdy pracujesz w danym
+katalogu.
 
-- **Komentarze po polsku i wyjaśniają DLACZEGO**, nie co robi następna linia.
-  Decyzja bez uzasadnienia w komentarzu to decyzja do wycofania.
-- **Jeden front: `panel/`.** Od 0.431.0, decyzją właściciela z
-  `docs/obsluga-klienta.md` §7, całe biuro mieszka w `panel/` (React + Vite,
-  build do `dist/web/obsluga`). Przeprowadzka skończyła się w 0.446.0:
-  `biuro.html` zniknął, a `/` i `/biuro` przekierowują do `/obsluga/`.
-  Drugiego frontu nie ma i nie będzie — nowy ekran biura, magazynowy czy
-  obsługi, idzie do `panel/`. Kształt ekranu wynika z celu biura (§7): praca
-  na górnym rzędzie, wgląd na dolnym, ustawienia za zębatką. Gwarancje
-  strażników `biuro.html` przejęły testy ekranów panelu, każdy nazwany
-  w wydaniu, które przeniosło jego widok.
-- **Ekran magazynowy projektuje się pod ergonomię, nie pod wygląd.** Reguły
-  stoją w `docs/ergonomia-magazynu.md`. Rozstrzygają spór o kształt ekranu na
-  korzyść tego, który wymaga mniej decyzji, mniej interakcji, mniej uwagi,
-  mniej pamiętania, mniej ruchu i mniej błędów. Uroda liczy się dopiero po
-  tamtym. Mierzalną część — cele dotyku na kolektorze — bramkuje
-  `tools/ergonomia_check.py`: cel mniejszy niż 48 dp wymaga komentarza
-  `ergonomia: <powód>` przy łańcuchu, bo zwolnienie bez uzasadnienia to
-  brak zwolnienia. Dekalog obowiązuje kolektor; biuro i panel obsługi biorą
-  z niego punkty 1, 2, 5, 6 i 10, bo mysz na blacie to nie kciuk w rękawicy.
+## Najpierw to: twojego PR-a nikt nie przeczyta przed produkcją
 
-- **Obsługę klienta projektuje się jako JEDNĄ drogę, nie cztery kolejki.**
-  Reguły stoją w `docs/obsluga-klienta-calosc.md`. Rozstrzygają spór o kształt
-  na korzyść tego, który daje agentowi całą historię klienta w jednym miejscu.
-  Kolejki — skrzynka, zwroty, reklamacje, dyskusje — są NASZE, nie jego.
-  Dokładając kolejkę albo ekran, dopisujesz ją do `services/droga-klienta.ts`:
-  wiązania po numerze zamówienia w obie strony. Wiązanie jednostronne to
-  wiązanie, którego nie ma. Klientem jest login Allegro porównywany bez
-  wielkości liter. Wolno po nim wiązać: login rozmówcy sprawdzono na żywym
-  koncie 24 września 2026, a `client:<liczba>` okazał się loginem, nie maską.
-  Wspólnego statusu przepisanego z kolejek nie było i nie będzie — ten kształt
-  kosztował już cztery tabele nakładki spraw. Sprawa klienta (decyzja
-  właściciela z 26 września 2026) trzyma wyłącznie to, czego kolejki nie
-  wiedzą: kto prowadzi, następny krok z terminem i zakończenie. Nowe
-  zdarzenie po stronie klienta albo Allegro budzi sprawę u prowadzącego,
-  nasze własne ruchy — nie. Kształt, powód i okno budzenia: S6 w tym samym
-  dokumencie.
+Zielone CI scala PR samo, bez zatwierdzenia (`auto-scalanie.yml`). Każde
+scalenie z fragmentem zmian to wydanie (`wydanie.yml`). Serwer w magazynie
+bierze wydanie sam, domyślnie godzinę później (`AKTUALIZACJA_AUTO=zaraz`).
 
-- **Reguła klienta HTTP obowiązuje KAŻDY front z osobna.** Żądanie bez ciała
-  nie deklaruje typu treści — pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`
-  i gołe „Bad Request" na ekranie. Pilnują tego dwie niezależne strażnice:
-  `panel/src/api/klient.test.ts` (po zachowaniu) i `EMPTY_BODY` w kolektorze.
-  Trzecia, po źródle `biuro.html`, odeszła z tą stroną. Panel obsługi kupił
-  tę bliznę drugi raz, bo strażnik istniał tylko dla jednego pliku.
-  Dokładając front, dokładasz też jego strażnika.
+Wniosek: zasada, której nic nie sprawdza, nie chroni nikogo. Dlatego każda
+zasada niżej ma swojego **strażnika** — test albo skrypt, który zatrzyma CI.
+Zasada bez strażnika jest oznaczona jako **konwencja**, żeby było widać,
+na czym stoi. Dokładając zasadę, dokładasz strażnika albo piszesz
+„konwencja".
+
+**Jeden wyjątek od scalania bez człowieka: zapis do Subiekta.** PR, który go
+dotyka, czeka na kliknięcie właściciela. Listę ścieżek trzyma
+`.github/workflows/zgoda.yml`, a instrukcję DEPLOY §0d. Powód: zły dokument
+w Subiekcie zostaje w księgach, a następne wydanie go nie cofnie. Nie zmieniaj
+tej bramki przy okazji innej pracy.
+
+## Zasady
+
+Każda zasada: co robić, dlaczego i kto tego pilnuje.
+
+- **Komentarze po polsku i wyjaśniają DLACZEGO.** Powód, nie historia.
+  „Robimy X, bo Y" zostaje prawdziwe. „Do wersji N było inaczej" przestaje
+  być potrzebne w dniu zmiany, a historia mieszka w `CHANGELOG.md` i gicie.
+  Decyzja bez powodu w komentarzu to decyzja do wycofania.
+  *Strażnik: konwencja.*
+
+- **Jeden front: `panel/`.** Całe biuro mieszka w `panel/`, a `/` i `/biuro`
+  przekierowują do `/obsluga/`. Nowy ekran biura, magazynowy czy obsługi,
+  idzie do `panel/`. Kształt ekranu: praca na górnym rzędzie, wgląd na dolnym,
+  ustawienia za zębatką (`docs/obsluga-klienta.md` §7).
+  *Strażnik: konwencja.*
+
 - **Zero zapisu przy patrzeniu.** Otwarcie ekranu niczego nie mutuje.
-  Pilnują tego testy ekranów (`ekrany/*.test.tsx`): liczą żądania inne niż
-  GET przy samym otwarciu i oczekują zera. Nowy ekran dostaje taki test —
-  bez niego reguła nie ma strażnika. Do 0.446.0 umową były też liczniki
-  zapisów po źródle `biuro.html`; odeszły razem z tą stroną.
-  Od 0.410.0 jest JEDEN wyjątek, decyzją właściciela: wejście w reklamację
-  odświeża ją z Allegro. Powód jest mierzalny — przebieg synchronizacji czyta
-  najwyżej tysiąc spraw, więc ogona archiwum nie odświeżał NIGDY. Wyjątek
-  bramkuje `ekrany/Reklamacje.test.tsx`: dozwolona jest dokładnie jedna
-  mutacja przy wejściu i ani jedna przy samym otwarciu ekranu.
-- **Cienkie trasy, logika w serwisach** z testem obok (`*.test.ts`,
-  `tsx --test`). Każda mutacja woła `logEvent`. Bramka ról: `odmowa()`
-  w trasach biura, `autoryzuj()` przy operacjach uprzywilejowanych.
-- **Tickery wyłącznie w `main()`**, nigdy w `buildApp()` (testy tras nie
-  strzelają do Allegro). Wszystkie idą przez `uruchomTakt` z `services/takt.ts`
-  (rozrzut, respekt dla 429); lista stoi w `main()` w `index.ts`.
-- **Copilot (model językowy) woła się wyłącznie z `adapters/copilot.anthropic.ts`.**
-  Cztery reguły z audytu promptów w 0.482.x, każda po awarii albo o krok od niej:
-  - `output_config.effort` idzie tylko przez `wspieraWysilek`, bo Haiku 4.5
-    i Sonnet 4.5 odrzucają go błędem 400.
-  - `max_tokens` liczy też myślenie, domyślnie włączone na claude-opus-5.
-    Ucięty JSON to wywołanie zapłacone za nic, a sufit nie kosztuje nic.
-  - Kształt odpowiedzi wymusza `zodOutputFormat`. Instrukcja opisuje pola,
-    nie każe „zwrócić JSON”.
-  - Powód reguły i opis incydentu stoją w komentarzu obok instrukcji, nie
-    w jej tekście. Model przejmuje przykłady i rejestr instrukcji, także myślniki.
-- **Prywatność:** adres DOSTAWY przechodzi przez mapowanie od 0.422.0,
-  decyzją właściciela, i to jest wyjątek, nie nowa zasada. Wchodzą cztery pola
-  `delivery.address` — ulica, miasto, kod i telefon — plus nazwa odbiorcy
-  od 0.367.0. Telefon dostaje drugą kolumnę z samymi cyframi, bo szuka się po
-  końcówce numeru. Dalej NIE przechodzą: `invoice.address`, cokolwiek
-  z `buyer`, e-mail, PESEL i konto bankowe. Lądowisko `surowe_json` nie
-  dostaje nic z adresu, a raport sondy kształtu tych pól nie pokazuje — raport
-  wchodzi do repo, baza zostaje w biurze. Zakres i powód stoją w
-  `docs/obsluga-klienta.md` — dokładając cokolwiek z adresu, dopisujesz tam
-  własne uzasadnienie albo tego nie robisz. Pilnują tego testy przy mapowaniu
-  zamówień i lista zakazanych członów w `migracja-zwrotow.test.ts`.
-- **Kształt Allegro czyta się z pliku, nie z pamięci.** Specyfikacja leży
-  w repo: `docs/allegro/swagger.yaml` (cudza, nietykalna — sumę pilnuje
-  `tools/docs_check.py`). Czytaj SCHEMAT, nie przykład: przykłady Allegro bywają
-  niezgodne z własnym schematem, a wymagalność pola mówi wyłącznie lista
-  `required`. `public.v1` i `beta.v1` to bywają RÓŻNE kształty, nie warianty.
-  Mapowanie z pamięci kosztowało już trzy wydania, a raz — skrzynkę, która
-  przez dwa wydania nie zapisała ani jednego wątku.
-- **`[WERYFIKUJ]`** znaczy: niezweryfikowane na żywym Allegro/Subiekcie.
-  Licznik tych znaczników sprawdza `tools/docs_check.py` — dopisując lub
-  zdejmując znacznik, zaktualizuj preambułę w `docs/subiekt-gt-struktura.md`.
+  *Strażnik: `panel/src/ZeroZapisu.test.ts`* — każda trasa z `main.tsx` musi
+  mieć test, który liczy zapisy przy otwarciu. Nowy ekran bez takiego testu
+  zatrzyma CI. Najprościej napisać go atrapą z `panel/src/test/zapisy.ts`.
+  **Wyjątki, decyzją właściciela:** wejście w reklamację i w dyskusję
+  odświeża sprawę z Allegro jednym POST-em. Powód: po wysyłce odpowiedzi
+  albo werdyktu stan u Allegro dochodzi do nas dopiero pełnym przebiegiem,
+  co trzy minuty, a agent patrzy na ekran teraz. *Strażnik wyjątków:
+  `ekrany/Reklamacje.test.tsx` i `ekrany/Dyskusje.test.tsx`* — dokładnie
+  jedna mutacja przy wejściu, zero przy samym otwarciu ekranu.
 
-## Wersje i wydania
+- **Reguła klienta HTTP.** Żądanie bez ciała nie deklaruje typu treści.
+  Serwer i tak czyta pusty JSON jak brak ciała (parser w `buildApp()`), więc
+  pomyłka frontu nie kończy się już gołym „Bad Request". Powód: ten błąd
+  trafił dwa razy, za każdym razem na innym froncie, bo pilnował go każdy
+  front z osobna. *Strażnik: `server/src/routes/logo-dostawcy.test.ts`
+  (serwer) i `panel/src/api/klient.test.ts` (panel).* Kolektor wysyła
+  `EMPTY_BODY` z `ApiService.kt` — to konwencja.
+
+- **Cienkie trasy, logika w serwisach, test obok.** Każda mutacja woła
+  `logEvent`. Role biura bierze się z `ROLE_BIUROWE` (`services/users.ts`),
+  a operacje uprzywilejowane idą przez `autoryzuj()` (`services/auth.ts`).
+  Szczegóły w `server/CLAUDE.md`. *Strażnik ról: `routes/role-biura.test.ts`.
+  Reszta: konwencja.*
+
+- **Tickery odpytujące Allegro startują wyłącznie w `main()`**, przez
+  `uruchomTakt` z `services/takt.ts` (rozrzut, respekt dla 429). Nigdy
+  w `buildApp()`, bo testy tras nie mają prawa strzelać do Allegro.
+  *Strażnik: konwencja.*
+
+- **Copilot woła się wyłącznie z `adapters/copilot.anthropic.ts`.** Przed
+  zmianą wywołania przeczytaj nagłówek tego pliku i `server/CLAUDE.md`.
+  Reguły modelu zależą od wersji modelu i starzeją się z nią.
+  *Strażnik: konwencja — innego importu `@anthropic-ai/sdk` w repo nie ma.*
+
+- **Kształt Allegro czyta się z pliku, nie z pamięci.** Specyfikacja leży
+  w `docs/allegro/swagger.yaml`, cudza i nietykalna. Czytaj SCHEMAT, nie
+  przykład: wymagalność pola mówi wyłącznie lista `required`. `public.v1`
+  i `beta.v1` bywają RÓŻNYMI kształtami. Powód: mapowanie z pamięci
+  kosztowało już trzy wydania i skrzynkę, która nie zapisała ani jednego
+  wątku. *Strażnik: sumę pliku pilnuje `tools/docs_check.py`; samo czytanie
+  to konwencja.*
+
+- **Prywatność.** Przez mapowanie przechodzi adres DOSTAWY: ulica, miasto,
+  kod, telefon i nazwa odbiorcy. Telefon ma drugą kolumnę z samymi cyframi,
+  bo szuka się po końcówce numeru. Z `buyer` przechodzi WYŁĄCZNIE login,
+  bo to klucz klienta. Nie przechodzą: `invoice.address`, reszta `buyer`
+  (e-mail, telefon, własny adres kupującego), PESEL i konto bankowe.
+  Lądowisko `surowe_json` nie dostaje nic z adresu. Zakres i powód stoją
+  w `docs/obsluga-klienta.md`. Dokładając pole, dopisujesz tam uzasadnienie
+  albo pola nie dokładasz. *Strażnik: `server/src/db/prywatnosc-schematu.test.ts`
+  (każda tabela) i testy mapowania zamówień.*
+
+- **Obsługa klienta to JEDNA droga, nie cztery kolejki.** Kolejki —
+  skrzynka, zwroty, reklamacje, dyskusje — są NASZE, nie klienta. Nowa
+  kolejka albo ekran dopisuje się do `services/droga-klienta.ts`, wiązaniem
+  po numerze zamówienia w obie strony. Wiązanie jednostronne to wiązanie,
+  którego nie ma. Klientem jest login Allegro porównywany bez wielkości liter.
+  Wspólnego statusu przepisanego z kolejek nie było i nie będzie. Sprawa
+  klienta trzyma wyłącznie to, czego kolejki nie wiedzą: kto prowadzi,
+  następny krok z terminem i zakończenie. Reguły, S6 i powody:
+  `docs/obsluga-klienta-calosc.md`. *Strażnik: konwencja.*
+
+- **Ekran magazynowy projektuje się pod ergonomię, nie pod wygląd.** Reguły
+  stoją w `docs/ergonomia-magazynu.md`. Spór o kształt wygrywa ekran, który
+  wymaga mniej decyzji, interakcji, uwagi, pamiętania, ruchu i błędów.
+  Dekalog obowiązuje kolektor. Biuro i panel obsługi biorą z niego punkty
+  1, 2, 5, 6 i 10, bo mysz na blacie to nie kciuk w rękawicy.
+  *Strażnik: `tools/ergonomia_check.py`* — cel dotyku kolektora poniżej
+  48 dp wymaga komentarza `ergonomia: <powód>`. Reszta dekalogu: konwencja.
+
+- **`[WERYFIKUJ]`** znaczy: niezweryfikowane na żywym Allegro albo Subiekcie.
+  Dopisując lub zdejmując znacznik, popraw liczbę w preambule
+  `docs/subiekt-gt-struktura.md`. *Strażnik: `tools/docs_check.py`.*
+
+## Wydania
 
 - **Numer nadaje automat po scaleniu, nie PR.** PR nie zmienia wersji
   w `package.json` ani nie dopisuje `## ` do `CHANGELOG.md` — zatrzyma go
-  bramka `Fragmenty zmian`. Opisuje zmianę w `zmiany/<nazwa>.md` (wzór:
-  `zmiany/README.md`): `rodzaj: minor` (widoczna funkcja albo działanie przy
-  wdrożeniu) albo `patch` (reszta), `tytul:` i treść wpisu. Wersję, wpis
-  i tag robi `wydanie.yml` (DEPLOY §0c).
-- **W komentarzach i dokumentach numer swojego wydania pisz jako `@wydanie`.**
-  Automat podmieni znacznik na numer przy scaleniu.
-- `[wymaga działania]` w treści fragmentu wstrzymuje automatyczną aktualizację
-  serwera do czasu, aż ktoś kliknie ją w panelu. Nie pisz go na wyrost.
-- Wersja stoi w DWÓCH `package.json` (korzeń + `server/`) i musi być równa;
-  pilnuje tego `docs_check.py`. Często dochodzi akapit w `DEPLOY.md`.
+  bramka `Fragmenty zmian`. Zmianę opisuje `zmiany/<nazwa>.md` (wzór:
+  `zmiany/README.md`): `rodzaj: minor` dla widocznej funkcji albo działania
+  przy wdrożeniu, `patch` dla reszty, `tytul:` i treść wpisu. PR z samym CI
+  albo dokumentacją fragmentu nie potrzebuje.
+- **Numer swojego wydania pisz jako `@wydanie`.** Automat podmieni znacznik
+  w komentarzach i dokumentach przy scaleniu. Ten plik jest z podmiany
+  wyłączony, bo znacznik opisuje.
+- **`[wymaga działania]` w fragmencie wstrzymuje automatyczną aktualizację
+  serwera**, aż ktoś kliknie ją w panelu. Pisz go zawsze, gdy wdrożenie
+  potrzebuje czegoś poza samą aktualizacją: nowego klucza w `wertis.env`,
+  kroku w Subiekcie, ręcznej migracji. Powód: pominięty znacznik kosztuje
+  awarię w magazynie godzinę po scaleniu, a nadmiarowy — jedno kliknięcie.
 - Commity po polsku. Numer w tytule ma tylko commit wydania.
 
 ## Zanim zaczniesz
 
-Nad tym repo pracuje kilka sesji naraz — zdalnych gałęzi jest ponad trzydzieści.
-Kosztowało to już dwa razy, na dwa różne sposoby. Statusy rozmowy powstały
-DWA RAZY (0.157.0 i 0.158.0) i jedną implementację trzeba było wyrzucić
-w całości przy scalaniu. Numery zderzały się jeszcze częściej: 0.159.0, potem
-0.166.0, 0.168.0, 0.171.0 i 0.173.0 — cztery ostatnie jednego dnia.
-
 ```bash
+npm ci                   # W KORZENIU repo, nigdy w panel/ ani server/
 sh tools/co_w_toku.sh    # hak SessionStart robi to sam; to jest droga ręczna
 ```
 
-Skrypt pokazuje gałęzie z commitami spoza `main`, wersję `main` obok lokalnej
-oraz **otwarte PR-y wraz z numerami, które już zajmują**. Numer nazwany
-w cudzym otwartym PR-ze podnosi głośne ostrzeżenie. Lista PR-ów wymaga `gh`
-w PATH; bez niego skrypt mówi, czego nie wie, i pracuje dalej.
+`panel/` i `server/` to workspace'y npm. `npm ci` w jednym z nich kasuje
+wspólne `node_modules`, a testy serwera pokazują potem setki awarii, których
+nie ma.
 
-**Numerów już nie wybierasz** — nadaje je automat (`wydanie.yml`), więc
-zderzenia numerów i konflikty na `package.json` odeszły. Zostaje drugie
-ryzyko ze zdania wyżej: dwie sesje budujące TO SAMO.
+`co_w_toku.sh` pokazuje gałęzie z commitami spoza `main`, ich **zgłoszenia**
+i otwarte PR-y. Lista PR-ów wymaga `gh`, którego w sesjach chmurowych nie
+ma. Zgłoszenia działają bez niego, bo czyta je sam git.
 
-Gdy ktoś buduje TO SAMO: powiedz właścicielowi i **czekaj na decyzję, zanim
-napiszesz linijkę kodu**. Jedna wymiana zdań kosztuje mniej niż wydanie do
-wyrzucenia.
+**Zgłoś pracę pierwszym pushem.** Zanim napiszesz kod, wypchnij na swojej
+gałęzi fragment `zmiany/<nazwa>.md` z tytułem i otwórz PR jako szkic.
+`co_w_toku.sh` pokaże go innym sesjom jako „zgłoszone", a szkicu automat nie
+scala. Powód: dwie sesje zbudowały już tę samą funkcję równolegle i jedną
+implementację trzeba było wyrzucić w całości.
+
+**Gdy ktoś zgłosił TO SAMO**, powiedz właścicielowi i nie pisz kodu, dopóki
+nie zdecyduje. Jeśli nikt nie odpowiada, zostaw zgłoszenie, opisz kolizję
+w szkicu PR-a i zakończ pracę. Druga wersja tej samej funkcji kosztuje więcej
+niż czekanie.
 
 ## Zanim wypchniesz
 
 ```bash
 cd server && npx tsc --noEmit && npm test
-cd panel  && npx tsc -b --noEmit && npm test   # panel obsługi — patrz niżej
+cd panel  && npx tsc -b --noEmit && npm test
 python3 tools/docs_check.py && python3 tools/styl_check.py   # ≤25 słów/zdanie
 python3 tools/ergonomia_check.py && python3 tools/kt_imports_check.py   # kolektor
 ```
 
-Wszystkie siedem musi być czystych. **Wiersz z `panel` doszedł w 0.255.0 i to
-była dziura, nie przeoczenie w zapisie:** `npm test` w `server/` uruchamia
-wyłącznie testy serwera, więc dało się przejść wszystkie bramki na zielono
-i wypchnąć panel z czerwonymi testami. CI je łapało (`server.yml`, krok „Testy
-panelu obsługi"), ale dopiero po wypchnięciu. Dwie ostatnie dotyczą Kotlina i biegną
-w sekundy — moduł `:app` nie kompiluje się poza CI, więc to jedyne, co łapie
-mały cel dotyku i brakujący import przed wypchnięciem. Testy-strażnicy źródeł
-panelu (`Bursztyn`, `Kontrast`, `Skala`, `Czas`) i zero zapisu przy otwarciu
-ekranu to zasady wyżej zapisane w kodzie — ich odmowa zwykle znaczy, że
-łamiesz jedną z nich, nie że test jest do poprawienia.
+Wszystkie osiem musi być czystych. Testy serwera i panelu trwają po około
+dwie minuty. `npm test` w `server/` nie uruchamia testów panelu, więc wiersz
+z `panel` nie jest opcjonalny. Dwie ostatnie bramki dotyczą Kotlina i biegną
+w sekundy. Moduł `:app` nie kompiluje się poza CI, więc to jedyne, co łapie
+mały cel dotyku i brakujący import przed wypchnięciem.
+
+Testy-strażnicy źródeł w `panel/src/` (m.in. `Bursztyn`, `Kontrast`,
+`Skala`, `Czas`, `ZeroZapisu`) to zasady zapisane w kodzie. Ich odmowa zwykle
+znaczy, że łamiesz jedną z nich, nie że test jest do poprawienia.
