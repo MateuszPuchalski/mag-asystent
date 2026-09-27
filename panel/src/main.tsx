@@ -44,7 +44,7 @@ const klient = nowyKlientZapytan();
    zakładek i przy trzeciej podświetlałoby Zadania na ekranie zwrotów.
 
    `kreska` stawia przed zakładką cienką kreskę: oddziela pracę na sprawach
-   od magazynu, który przyszedł tu z dolnego rzędu (@wydanie). */
+   od magazynu, który przyszedł tu z dolnego rzędu (0.538.0). */
 const ZAKLADKI = [
   /* DO DECYZJI JEST DOMEM PANELU (0.435.0) — cel biura z §7 w jednym widoku:
      wszystko, co czeka na rozstrzygnięcie biura, z magazynu i z obsługi naraz.
@@ -64,7 +64,7 @@ const ZAKLADKI = [
   { do: "/obsluga/dyskusje", etykieta: "Dyskusje", ikona: <MessagesSquare size={16} />, korzen: false, kreska: false },
   { do: "/obsluga/wiedza", etykieta: "Wiedza", ikona: <BookMarked size={16} />, korzen: false, kreska: false },
   { do: "/obsluga/zadania", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: false, kreska: false },
-  /* DOSTAWY ÓSMĄ ZAKŁADKĄ (@wydanie), nie w menu „Więcej". Do 27 września
+  /* DOSTAWY ÓSMĄ ZAKŁADKĄ (0.538.0), nie w menu „Więcej". Do 27 września
      2026 stały w dolnym rzędzie obok wglądu. Przyjęcie dostawy to praca
      dzienna, a menu jest na rzeczy otwierane kilka razy w miesiącu.
      KOSZY TU NIE MA od 0.438.0 — decyzją właściciela mieszkają w zakładce
@@ -109,7 +109,7 @@ function LicznikDoZrobienia() {
 
 function Naglowek({ wyloguj }: { wyloguj: () => void }) {
   const { pathname } = useLocation();
-  /* ── JEDEN RZĄD (@wydanie, decyzja właściciela z 27 września 2026) ─────────
+  /* ── JEDEN RZĄD (0.538.0, decyzja właściciela z 27 września 2026) ─────────
      Od 0.431.0 nagłówek miał dwa rzędy: dziewięć zakładek z pigułką stanu,
      zębatką i wyjściem potrzebowało ~1280 px, a laptop obok Subiekta ma 1180.
      Drugi rząd kosztował ~50 px wysokości na każdym ekranie pracy, czyli dwa

@@ -82,7 +82,7 @@ function pokaz(adres = "/obsluga/stan") {
 
 /* Zwinięta karta: nagłówek z przyciskiem, który niesie `aria-expanded`. */
 const rozwin = (tytul: string) => screen.getByRole("button", { name: tytul });
-/* Kafelek tablicy (@wydanie): nazwa obszaru, spacja i jego stan jednym zdaniem. */
+/* Kafelek tablicy (0.538.0): nazwa obszaru, spacja i jego stan jednym zdaniem. */
 const kafelek = (nazwa: string) => screen.getByRole("button", { name: new RegExp(`^${nazwa} `) });
 
 const kartaKolejki = () => screen.getByRole("heading", { name: "Zapisy do Subiekta" }).closest(".card") as HTMLElement;
@@ -135,7 +135,7 @@ describe("Stan systemu w panelu", () => {
   });
 
   it("zdrowe i rzadkie obszary stoją kafelkiem, a klik otwiera kartę bez zapisu", async () => {
-    /* Tablica z @wydanie: rzadkie karty nie stoją nawet zwinięte — ich
+    /* Tablica z 0.538.0: rzadkie karty nie stoją nawet zwinięte — ich
        nagłówkiem jest kafelek. Otwarcie karty to dalej samo patrzenie. */
     sondaBlad = false;
     pokaz();
@@ -228,7 +228,7 @@ describe("Stan systemu w panelu", () => {
     /* Kopie robi serwer bez udziału człowieka, więc to jedyne miejsce w panelu,
        gdzie widać, że je robi. Data lokalna: 00:30Z to 2:30 w Warszawie. */
     pokaz();
-    /* Zdrowy serwer stoi kafelkiem (@wydanie) — karta jest jedno kliknięcie dalej. */
+    /* Zdrowy serwer stoi kafelkiem (0.538.0) — karta jest jedno kliknięcie dalej. */
     await screen.findByText("MM kosza K-010");
     await userEvent.click(kafelek("Serwer"));
     expect(await screen.findByText("nocna 2026-09-24 · przed aktualizacją —")).toBeInTheDocument();

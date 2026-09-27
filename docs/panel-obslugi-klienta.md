@@ -6333,7 +6333,7 @@ Odłożenie nie jest powrotem ręcznych statusów z 22 września. Tamto było po
 
 **Strażnik.** `ekrany/Skrzynka.test.tsx` jest pierwszym testem całego ekranu Skrzynki. Pilnuje zera zapisu przy otwarciu i każdego błędu z listy wyżej.
 
-## 26g. Nagłówek w jednym rzędzie (@wydanie)
+## 26g. Nagłówek w jednym rzędzie (0.538.0)
 
 Właściciel zgłosił, że górny pasek nie powinien zajmować dwóch rzędów. Z trzech wariantów na makietach wybrał B: jeden rząd i jedno menu „Więcej”. Decyzja z 27 września 2026 zmienia kształt z 0.431.0 opisany w `obsluga-klienta.md` §7.
 
@@ -6348,7 +6348,7 @@ Właściciel zgłosił, że górny pasek nie powinien zajmować dwóch rzędów.
 
 **Strażnik.** `nawigacja/Wiecej.test.tsx` pilnuje zawartości menu, zamykania, zera zapisu przy otwarciu i słowa „Stanęła” w alarmie. Pilnuje też, że drugi rząd nie wrócił.
 
-## 26h. Stan systemu jako tablica (@wydanie)
+## 26h. Stan systemu jako tablica (0.538.0)
 
 Właściciel pokazał nagraniem przewijanie przez stan systemu i poprosił o poprawę. Dziesięć kart stało jedna pod drugą, a zdrowe zajmowały tyle miejsca co te, które czegoś chcą. Z trzech makiet wybrał A: tablicę z problemami na górze.
 

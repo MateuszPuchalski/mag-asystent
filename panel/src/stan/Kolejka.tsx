@@ -43,7 +43,7 @@ export function KartaKolejki() {
   /* Najpierw błędy, potem reszta, najwyżej dwadzieścia wierszy: to podgląd
      stanu, a nie pełna kolejka — ta ma sto pozycji i nikt jej nie przewija.
 
-     „ZAPISANE" POD PRZYCISKIEM (@wydanie). Karta stała na dwudziestu
+     „ZAPISANE" POD PRZYCISKIEM (0.538.0). Karta stała na dwudziestu
      wierszach „zapisane", a ruchu wymagają tylko błąd i oczekujące. Lista
      zapisanych zostaje jednym kliknięciem dalej, bo po nią sięga się, gdy
      hala pyta „czy moja lokalizacja weszła". */

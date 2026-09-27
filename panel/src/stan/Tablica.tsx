@@ -4,7 +4,7 @@ import { useKolektory } from "../api/kolektory";
 import type { Zdrowie } from "../api/typy";
 import { godzina, ile } from "../ui";
 
-/* ── Tablica stanu: jeden kafelek na obszar (@wydanie) ──────────────────
+/* ── Tablica stanu: jeden kafelek na obszar (0.538.0) ──────────────────
    Decyzja właściciela z 27 września 2026, wariant A z makiet. Stan systemu
    był dziesięcioma kartami jedna pod drugą, a zdrowe zajmowały tyle miejsca
    co te, które czegoś od biura chcą. Kolejka niosła dwadzieścia wierszy

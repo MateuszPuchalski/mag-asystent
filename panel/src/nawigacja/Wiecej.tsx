@@ -8,7 +8,7 @@ import { zdanieSynchronizacji } from "./Synchronizacja";
 /** Adres ustawień w JEDNYM miejscu: czyta go menu i trasa w `main.tsx`. */
 export const USTAWIENIA = "/obsluga/ustawienia";
 
-/* ── MENU „WIĘCEJ" ZAMIAST DOLNEGO RZĘDU (@wydanie) ─────────────────────────
+/* ── MENU „WIĘCEJ" ZAMIAST DOLNEGO RZĘDU (0.538.0) ─────────────────────────
    Decyzja właściciela z 27 września 2026: nagłówek ma jeden rząd. Dolny rząd
    z 0.431.0 niósł wgląd, zębatkę i wyjście, czyli rzeczy otwierane kilka razy
    w miesiącu, i płacił za nie ~50 px wysokości na KAŻDYM ekranie pracy.

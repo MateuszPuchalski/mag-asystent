@@ -690,7 +690,7 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("zębatka i trasa istnieją — ekran bez drzwi to ekran, którego nie ma", () => {
-    /* Od @wydanie drzwi stoją w menu „Więcej" i tam mieszka adres; rama
+    /* Od 0.538.0 drzwi stoją w menu „Więcej" i tam mieszka adres; rama
        go importuje, więc trasa i link czytają tę samą stałą. */
     expect(zrodloWiecej).toContain('export const USTAWIENIA = "/obsluga/ustawienia"');
     expect(zrodloRamy).toContain('import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej"');

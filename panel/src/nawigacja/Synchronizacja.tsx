@@ -2,12 +2,12 @@ import { useZdrowie } from "../api/rozmowy";
 import type { Zdrowie } from "../api/typy";
 import { godzina } from "../ui";
 
-/* ── Stan synchronizacji w nagłówku (z pigułki 0.193.0, skrócony @wydanie) ──
+/* ── Stan synchronizacji w nagłówku (z pigułki 0.193.0, skrócony 0.538.0) ──
    Stoi w NAGŁÓWKU, a nie w skrzynce: agent ma go widzieć z każdej zakładki.
    Awaria integracji, o której wie tylko jeden ekran, jest awarią widoczną
    dopiero wtedy, gdy ktoś na ten ekran wejdzie.
 
-   KROPKA I GODZINA ZAMIAST ZDANIA (@wydanie, decyzja właściciela z 27 września
+   KROPKA I GODZINA ZAMIAST ZDANIA (0.538.0, decyzja właściciela z 27 września
    2026 — nagłówek w jednym rzędzie). Pełne zdanie zajmowało ~200 px, a przy
    1180 px jeden rząd nie ma ich skąd wziąć. W spokoju agent pyta tylko „czy
    żyje i jak świeże", a na to odpowiadają kolor i godzina. Liczba błędów

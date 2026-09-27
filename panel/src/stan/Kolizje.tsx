@@ -29,7 +29,7 @@ const OPIS: Record<Rodzaj, string> = {
 function Decyzja({ k }: { k: KolizjaKodu }) {
   const r = k.rozstrzygniecie;
   /* Bez decyzji nie ma czego pokazać: przyciski stoją od razu w wierszu.
-     Do @wydanie stała tu kreska, a przyciski linijkę niżej, więc każdy
+     Do 0.538.0 stała tu kreska, a przyciski linijkę niżej, więc każdy
      wiersz miał dwie wysokości i lista dziewięciu kodów zajmowała ekran. */
   if (!r) return null;
   return <div>

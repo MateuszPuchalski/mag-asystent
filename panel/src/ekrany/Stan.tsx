@@ -43,7 +43,7 @@ import { Kafelki, doUwagi, useObszary } from "../stan/Tablica";
    PRZED stanem integracji: niesie przycisk, a wiersz o połączeniu zszedł
    z tabeli integracji właśnie do tej karty. */
 
-/* ── TABLICA ZAMIAST DZIESIĘCIU KART (@wydanie) ──────────────────────────
+/* ── TABLICA ZAMIAST DZIESIĘCIU KART (0.538.0) ──────────────────────────
    Decyzja właściciela z 27 września 2026, wariant A z makiet: na górze
    kafelek na obszar, pod nim wyłącznie karty z czymś do zrobienia. Zdrowy
    obszar mówi jednym zdaniem na kafelku, a jego karta czeka pod kliknięciem.

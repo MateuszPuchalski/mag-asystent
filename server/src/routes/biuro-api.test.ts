@@ -372,7 +372,7 @@ test("żaden komunikat nie odsyła do zakładki, której nie ma", () => {
      SYSTEMU → …". Pierwszy człon wielkimi literami musi być zakładką, która
      jest — nazwy stoją jako `etykieta` w `panel/src/main.tsx` (zakładki)
      i w `panel/src/nawigacja/Wiecej.tsx` (menu „Więcej", dawny dolny rząd,
-     od @wydanie). Małe litery („/obsluga → zębatka") opisują drogę, nie zakładkę.
+     od 0.538.0). Małe litery („/obsluga → zębatka") opisują drogę, nie zakładkę.
 
      Od 0.446.0 stron biura nie ma, więc komunikat „/biuro → …" nie ma
      prawa się pojawić wcale: prowadziłby do przekierowania na DO DECYZJI,

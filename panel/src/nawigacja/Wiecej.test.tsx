@@ -9,7 +9,7 @@ import { WskaznikSynchronizacji } from "./Synchronizacja";
 import { godzina } from "../ui";
 import tsx from "../main.tsx?raw";
 
-/* ── Nagłówek w jednym rzędzie (@wydanie) ───────────────────────────────────
+/* ── Nagłówek w jednym rzędzie (0.538.0) ───────────────────────────────────
    Pilnujemy: wgląd, ustawienia i wyjście są w menu „Więcej" jeden klik dalej;
    menu zamyka Esc, klik obok i przejście na ekran; przycisk świeci, gdy
    bieżący ekran leży w menu; otwarcie niczego nie zapisuje. Wskaźnik

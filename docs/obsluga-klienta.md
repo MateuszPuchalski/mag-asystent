@@ -396,7 +396,7 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > ZOSTAJE. Biuro może przeskoczyć 0.444.0 przy aktualizacji, a wtedy nikt
 > nie kliknął „Przenieś na serwer".
 >
-> **Nagłówek w jednym rzędzie (@wydanie, decyzja właściciela z 27 września
+> **Nagłówek w jednym rzędzie (0.538.0, decyzja właściciela z 27 września
 > 2026).** Podział „praca na górnym rzędzie, wgląd na dolnym" zostaje jako
 > podział treści, ale nie jako dwa rzędy. Praca to zakładki, a wgląd,
 > ustawienia i wyjście stoją w menu „Więcej" na końcu rzędu. Dolny rząd

@@ -10,6 +10,21 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.538.0 — 27 września 2026
+
+**Nagłówek panelu w jednym rzędzie.** Decyzją właściciela z 27 września 2026
+dolny rząd zniknął, a ekran pracy zyskał 52 px wysokości przy 1180 px.
+Stan systemu, Dziennik, Analiza, Ustawienia i Wyloguj stoją w menu „Więcej”
+na końcu paska. Dostawy są ósmą zakładką, za kreską. Szukanie to sama lupa,
+a Ctrl K działa bez zmian. Synchronizację pokazuje kropka z godziną; gdy
+stanie, pasek pisze „Stanęła” na czerwono.
+
+**Stan systemu jako tablica.** Na górze stoi kafelek na każdy obszar: barwa
+i jedno zdanie, na przykład „2 do decyzji” albo „działa · 11:36”. Pod spodem
+otwarte są wyłącznie karty tego, co nie działa albo czeka na biuro. Kartę
+każdego innego obszaru otwiera klik w kafelek. Kolejka zapisów chowa
+„zapisane” pod przyciskiem, a kody kreskowe mają przyciski decyzji w wierszu.
+
 ## 0.537.0 — 27 września 2026
 
 **Grupa „Do sprawdzenia" zawęża listę zwrotów.** Właściciel zapytał, co

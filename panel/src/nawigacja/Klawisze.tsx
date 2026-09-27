@@ -140,7 +140,7 @@ export function SzukajIKlawisze() {
     return () => window.removeEventListener("keydown", f);
   }, []);
   return <>
-    {/* SAMA IKONA (@wydanie, nagłówek w jednym rzędzie). Napis „Szukaj"
+    {/* SAMA IKONA (0.538.0, nagłówek w jednym rzędzie). Napis „Szukaj"
         z klawiszem zajmował ~130 px, a jeden rząd przy 1180 px nie ma ich
         skąd wziąć. Lupa jest znakiem, który rozpoznaje się bez czytania;
         skrót Ctrl K stoi w dymku i w nazwie dla czytnika. */}
