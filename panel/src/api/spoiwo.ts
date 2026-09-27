@@ -83,9 +83,9 @@ export interface ProfilKlienta {
   podpowiedzPowod: "termin" | "dosylka" | null;
   /**
    * Odmowa wypłaty z kodem dosyłki, której nikt nie śledzi (0.536.0). To
-   * droga ZAPASOWA: zwykle śledzenie zakłada sama odmowa na ekranie zwrotu.
-   * Tu trafia odmowa, przy której zapis u nas się nie udał, i kod złożony
-   * poza panelem, który przyszedł synchronizacją.
+   * droga ZAPASOWA: śledzenie zakłada sama odmowa na ekranie zwrotu. Tu
+   * trafia odmowa, przy której zapis u nas się nie udał, i odmowa z panelu
+   * Allegro, której kod przyszedł synchronizacją.
    */
   propozycjaDosylki: {
     zwrotId: number; zamowienie: string; kod: "NEW_ITEM_SENT" | "MISSING_PART_SENT";
@@ -156,7 +156,7 @@ export type OdpowiedzSprawy = { sprawa: SprawaKlienta };
  *
  * EKSPORT dla ekranu zwrotów (0.536.0). Odmowa wypłaty z kodem dosyłki
  * zmienia sprawę klienta, a szuflada historii przy tym samym zwrocie rysuje
- * jej linijkę. Bez odświeżenia stał tam stary krok zamiast „dosłać”.
+ * jej linijkę. Bez odświeżenia stał tam stary krok zamiast kroku dosyłki.
  */
 export function poZapisieSprawy(qc: QueryClient, login: string) {
   return Promise.all([
@@ -233,7 +233,7 @@ export function usePrzejmijSprawe(login: string) {
 /**
  * „Śledź dosyłkę” z propozycji na profilu — droga zapasowa za odmową wypłaty.
  * `wersja: 0` znaczy „sprawy jeszcze nie ma”, dokładnie jak przy kroku:
- * trasa zakłada wtedy sprawę z krokiem „dosłać”.
+ * trasa zakłada wtedy sprawę z krokiem dosyłki, którego brzmienie ustala serwer.
  */
 export function useSledzDosylke(login: string) {
   const qc = useQueryClient();
@@ -247,8 +247,10 @@ export function useSledzDosylke(login: string) {
 
 /**
  * Numer dosyłki wpisany ręcznie z Sellasist. Automat szuka go w przesyłkach
- * zamówienia, ale nowej etykiety Allegro bywa nie zna — wtedy wpisuje go
- * człowiek. Ten sam zapis poprawia numer przekręcony przy przepisywaniu.
+ * zamówienia; to, że nowa etykieta z Sellasist tam trafia, jest
+ * niezweryfikowane (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`). Gdy automat
+ * numeru nie znajdzie, wpisuje go człowiek. Ten sam zapis poprawia numer
+ * przekręcony przy przepisywaniu.
  */
 export function useNumerDosylki(login: string) {
   const qc = useQueryClient();
@@ -263,17 +265,27 @@ export function useNumerDosylki(login: string) {
 /**
  * Dosyłka, o której mówi JEDNA linijka sprawy przy historii kolejek.
  *
- * Kolejność jest kolejnością serwera przy `MojaSprawa.dosylka`, żeby „Moje”
- * i historia mówiły o tej samej paczce: kłopot u przewoźnika, potem brak
- * numeru, potem paczka w drodze, na końcu doręczona. Pierwsze dwa każą coś
- * zrobić, trzecie każe czekać, czwarte mówi, że czekanie się skończyło. Przy
- * remisie wygrywa najnowsza, bo tak serwer układa listę. Linijka pokazuje
- * jedno zdanie, więc pokazuje najpilniejsze, nie najświeższe.
+ * Kolejność jest kolejnością serwera przy `MojaSprawa.dosylka`
+ * (`najwazniejszaDosylka` w `dosylka-opis.ts`): kłopot u przewoźnika, potem
+ * brak numeru, potem paczka w drodze, na końcu doręczona. Pierwsze dwa każą
+ * coś zrobić, trzecie każe czekać, czwarte mówi, że czekanie się skończyło.
+ * Przy remisie wygrywa najnowsza, bo tak serwer układa listę. Linijka
+ * pokazuje jedno zdanie, więc pokazuje najpilniejsze, nie najświeższe.
+ *
+ * Jedna różnica: „Moje” pomija doręczoną sprzed ostatniego ruchu człowieka,
+ * bo tam zdanie dosyłki ZASTĘPUJE „czeka do”. Tutaj termin kroku stoi
+ * zawsze, a sprawa nie niesie chwili ostatniego ruchu — doręczona zostaje.
+ *
+ * „BEZ NUMERU” CZYTA SIĘ Z `zrodlo`, NIE Z `waybill`. Historie kolejek
+ * dostają `waybill: null` — numer potrzebny jest tylko karcie na profilu —
+ * więc po `waybill` każda dosyłka w historii wyglądałaby na bez numeru,
+ * a doręczona wyprzedzałaby paczkę w drodze. Serwer ustawia `zrodlo` razem
+ * z numerem (wykryty albo wpisany) i zeruje oba naraz.
  */
 export function najwazniejszaDosylka(dosylki: readonly DosylkaSprawy[] | undefined): DosylkaSprawy | null {
   const lista = dosylki ?? [];
   return lista.find((d) => d.ton === "zle")
-    ?? lista.find((d) => d.waybill === null)
+    ?? lista.find((d) => d.zrodlo === null)
     ?? lista.find((d) => d.dostarczonoAt === null)
     ?? lista[0]
     ?? null;

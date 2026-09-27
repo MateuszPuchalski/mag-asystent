@@ -15,7 +15,8 @@ import type { StanZwrotuPieniedzy } from "../api/typy";
 const stan = (n: Partial<StanZwrotuPieniedzy> = {}): StanZwrotuPieniedzy => ({
   moznaZwrocic: true, moznaOdmowic: true, powod: null,
   kwotaGrosze: 6498, waluta: "PLN", oddane: null, odmowa: null,
-  przelew: null, moznaZapisacPrzelew: false, powodPrzelewu: null, ...n,
+  przelew: null, moznaZapisacPrzelew: false, powodPrzelewu: null,
+  dosylka: null, sledzicDosylke: false, ...n,
 });
 
 /* Router, bo zdanie o dosyłce prowadzi odnośnikiem do profilu klienta. */
@@ -24,12 +25,19 @@ const ekran = (n: Partial<Parameters<typeof Pieniadze>[0]> = {}) =>
     onZwroc={vi.fn()} onOdmow={vi.fn()} {...n} />, { wrapper: MemoryRouter });
 
 type Odmowa = NonNullable<StanZwrotuPieniedzy["odmowa"]>;
-const odmowa = (n: Partial<Odmowa> = {}): Odmowa => ({
-  kod: "NEW_ITEM_SENT", powod: null, kiedy: "2026-09-27T10:00:00Z", dosylka: null, sledzicDosylke: false, ...n,
-});
+/** Dosyłka i ponowienie stoją OBOK odmowy, nie w niej — tak je oddaje serwer. */
+type ZDosylka = Partial<Odmowa> & Partial<Pick<StanZwrotuPieniedzy, "dosylka" | "sledzicDosylke">>;
 /** Stan po odmowie — tak go oddaje serwer po odświeżeniu szczegółu. */
-const poOdmowie = (n: Partial<Odmowa> = {}) =>
-  stan({ moznaZwrocic: false, moznaOdmowic: false, odmowa: odmowa(n) });
+const poOdmowie = ({ dosylka = null, sledzicDosylke = false, ...n }: ZDosylka = {}) =>
+  stan({ moznaZwrocic: false, moznaOdmowic: false, dosylka, sledzicDosylke,
+    odmowa: { kod: "NEW_ITEM_SENT", powod: null, kiedy: "2026-09-27T10:00:00Z", ...n } });
+/** Odmowa z panelu Allegro: naszej `odmowa` nie ma, kod przychodzi synchronizacją. */
+const zAllegro = (n: Partial<Pick<StanZwrotuPieniedzy, "dosylka" | "sledzicDosylke">>) =>
+  stan({ moznaZwrocic: false, moznaOdmowic: false, ...n });
+const W_DRODZE = { opis: "Dosyłka w drodze (stan z 14:10)", login: "zielony", ton: null } as const;
+/** Odpowiedź udanego założenia — krok podaje serwer, nie ekran. */
+const zalozona = (zastapil: string | null) => ({ zalozona: true as const, login: "zielony",
+  krokDo: "2026-09-30T06:00:00Z", krok: "Dosłać nowy towar (etykieta w Sellasist)", zastapil });
 
 describe("Pieniądze przy zwrocie", () => {
   it("pokazuje kwotę i przycisk, gdy da się oddać", () => {
@@ -236,19 +244,20 @@ describe("Pieniądze przy zwrocie", () => {
     expect(screen.queryByText(/NEW_ITEM_SENT/)).toBeNull();
   });
 
-  it("kod z uwagą dla operatora traci ją po wysłaniu, a nieznany zostaje surowy", () => {
-    const { unmount } = ekran({ stan: poOdmowie({ kod: "REFUND_REJECTED", powod: "Uszkodzony" }) });
-    expect(screen.getByText("Odmówiono: „Odmawiam zwrotu pieniędzy”")).toBeInTheDocument();
-    unmount();
-    /* Kod przychodzi też synchronizacją; nowy kod Allegro nie ma prawa zniknąć. */
-    ekran({ stan: poOdmowie({ kod: "NOWY_KOD_ALLEGRO" }) });
-    expect(screen.getByText("Odmówiono: „NOWY_KOD_ALLEGRO”")).toBeInTheDocument();
+  /* Kod spoza listy w `stan.odmowa` nie przychodzi: to pole niesie wyłącznie
+     naszą odmowę z listy wyżej. Surowy kod z synchronizacji pilnuje
+     `Dowody.test.tsx`, bo tam stoi `rejectionCode`. */
+  it("kod z uwagą dla operatora traci ją po wysłaniu i mówi faktem, nie pierwszą osobą", () => {
+    ekran({ stan: poOdmowie({ kod: "REFUND_REJECTED", powod: "Uszkodzony" }) });
+    expect(screen.getByText("Odmówiono: „Odmowa zwrotu pieniędzy”")).toBeInTheDocument();
+    expect(screen.queryByText(/Odmawiam/)).toBeNull();
   });
 
   it("zdanie o skutku stoi przy kodach dosyłki i tylko przy nich — bez nowego wyboru", async () => {
     ekran();
     await userEvent.click(screen.getByRole("button", { name: /Odmów wypłaty/ }));
-    const skutek = /Sprawa klienta dostanie krok „dosłać” i śledzenie dosyłki\./;
+    /* Brzmienia kroku tu nie ma: ustawia je serwer, a ekran go nie zgaduje. */
+    const skutek = /^Sprawa klienta dostanie krok dosyłki i jej śledzenie\.$/;
     expect(screen.queryByText(skutek)).toBeNull();
     for (const [kod, jest] of [["NEW_ITEM_SENT", true], ["MISSING_PART_SENT", true],
       ["REFUND_REJECTED", false], ["ITEM_FIXED", false], ["NO_RETURN_RIGHT", false]] as const) {
@@ -265,11 +274,45 @@ describe("Pieniądze przy zwrocie", () => {
   it("pod odmową stoi stan dosyłki w barwie tonu i odnośnik do profilu", () => {
     ekran({ stan: poOdmowie({ dosylka: { opis: "Przewoźnik zgłosił problem z dosyłką",
       login: "Client:105505227", ton: "zle" } }) });
-    expect(screen.getByText("Przewoźnik zgłosił problem z dosyłką").className).toContain("text-ranga-zle");
+    const zdanie = screen.getByText("Przewoźnik zgłosił problem z dosyłką");
+    expect(zdanie.className).toContain("text-ranga-zle");
     /* Login bywa z dwukropkiem — adres profilu idzie zakodowany. */
     expect(screen.getByRole("link", { name: /profil klienta/ }))
       .toHaveAttribute("href", "/obsluga/klient/Client%3A105505227");
     expect(screen.queryByRole("button", { name: "Śledź dosyłkę" })).toBeNull();
+    /* Ciężarówka to ozdoba — czytnik ekranu czyta samo zdanie. */
+    expect(zdanie.parentElement!.querySelector("svg")).toHaveAttribute("aria-hidden", "true");
+  });
+
+  /* ── Odmowa złożona w panelu Allegro ───────────────────────────────────────
+     Gdzie biuro odmawia — na naszym ekranie zwrotu czy w panelu Allegro — nie
+     wiadomo. Kod z panelu Allegro przychodzi synchronizacją, bez naszej
+     `odmowa`, a dosyłkę serwer liczy i wtedy. Linijka stoi więc niezależnie
+     od `odmowa`, z faktem odmowy obok, żeby nie wisiała bez powodu. */
+  it("odmowa z panelu Allegro dostaje linijkę dosyłki z faktem odmowy obok", () => {
+    const przeszkoda = "Odmowa zwrotu pieniędzy jest już zgłoszona w Allegro.";
+    ekran({ stan: { ...zAllegro({ dosylka: W_DRODZE }), powod: przeszkoda }, kodAllegro: "NEW_ITEM_SENT" });
+    /* Fakt odmowy stoi raz w tej sekcji — zdanie przeszkody go nie powtarza. */
+    expect(screen.queryByText(przeszkoda)).toBeNull();
+    expect(screen.getByText("Odmówiono w Allegro: „Wysłaliśmy nowy towar”")).toBeInTheDocument();
+    expect(screen.getByText("Dosyłka w drodze (stan z 14:10)")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /profil klienta/ })).toHaveAttribute("href", "/obsluga/klient/zielony");
+    /* Nasza odmowa ma swoje zdanie — tamto się nie dubluje. */
+    expect(screen.queryByText(/^Odmówiono: /)).toBeNull();
+  });
+
+  it("odmowa z panelu Allegro bez śledzenia daje „Śledź dosyłkę”", async () => {
+    const onSledzDosylke = vi.fn();
+    ekran({ stan: zAllegro({ sledzicDosylke: true }), kodAllegro: "MISSING_PART_SENT", onSledzDosylke });
+    expect(screen.getByText("Odmówiono w Allegro: „Wysłaliśmy brakującą część”")).toBeInTheDocument();
+    expect(screen.getByText("Dosyłki nie śledzimy.")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Śledź dosyłkę" }));
+    expect(onSledzDosylke).toHaveBeenCalledTimes(1);
+  });
+
+  it("kod z synchronizacji bez dosyłki nie dostaje tu zdania — stoi w kolumnie dowodów", () => {
+    ekran({ stan: zAllegro({}), kodAllegro: "ITEM_FIXED" });
+    expect(screen.queryByText(/Odmówiono w Allegro/)).toBeNull();
   });
 
   it("dosyłki nikt nie śledzi — zdanie i jeden przycisk, który woła ponowienie", async () => {
@@ -296,13 +339,13 @@ describe("Pieniądze przy zwrocie", () => {
     expect(screen.getByRole("button", { name: "Śledź dosyłkę" })).toBeInTheDocument();
   });
 
-  it("zastąpiony krok sprawy klienta dostaje jednorazowe zdanie, pusty — żadnego", () => {
-    const { unmount } = ekran({ stan: poOdmowie(),
-      wynikDosylki: { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z", zastapil: "czekamy na zwrot" } });
-    expect(screen.getByText("Krok sprawy klienta: „dosłać” zamiast „czekamy na zwrot”")).toBeInTheDocument();
+  it("zastąpiony krok sprawy klienta dostaje jednorazowe zdanie z krokiem serwera, pusty — żadnego", () => {
+    const { unmount } = ekran({ stan: poOdmowie(), wynikDosylki: zalozona("czekamy na zwrot") });
+    expect(screen.getByText(
+      "Krok sprawy klienta: „Dosłać nowy towar (etykieta w Sellasist)” zamiast „czekamy na zwrot”"))
+      .toBeInTheDocument();
     unmount();
-    ekran({ stan: poOdmowie(),
-      wynikDosylki: { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z", zastapil: null } });
+    ekran({ stan: poOdmowie(), wynikDosylki: zalozona(null) });
     expect(screen.queryByText(/Krok sprawy klienta/)).toBeNull();
     expect(screen.queryByText(/nie założono/)).toBeNull();
   });

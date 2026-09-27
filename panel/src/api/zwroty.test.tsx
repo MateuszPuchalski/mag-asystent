@@ -1,7 +1,7 @@
 import React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderHook } from "@testing-library/react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { act, renderHook, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
 
 /* ── Co odświeża zapis zwrotu (audyt zwrotów, 15 września 2026) ──────────────
    Dwie usterki jednej linijki. `["zwroty"]` jest przedrostkiem koszyka
@@ -34,6 +34,8 @@ function stanowisko() {
    wywrócić, gdy ktoś je zmieni, a odświeżenie przestanie trafiać. */
 const PROFIL = ["profil-klienta", "zielony_ogrod"] as const;
 const MOJE = ["mojeSprawy"] as const;
+/** Krok, który ustawia serwer — ekran go tylko przepisuje z odpowiedzi. */
+const KROK = "Dosłać nowy towar (etykieta w Sellasist)";
 
 afterEach(() => { vi.mocked(api).mockReset(); vi.mocked(api).mockImplementation(async () => ({ wersja: 2 })); vi.unstubAllGlobals(); });
 
@@ -66,7 +68,7 @@ describe("Dosyłka przy zwrocie", () => {
     /* Tu idzie PRAWDZIWY klient HTTP: sprawdzamy to, co wychodzi z panelu,
        a nie tylko to, co hook podał dalej. */
     const f = vi.fn(async () => new Response(JSON.stringify(
-      { zalozona: true, login: "zielony_ogrod", krokDo: "2026-09-30T06:00:00Z", zastapil: null })));
+      { zalozona: true, login: "zielony_ogrod", krokDo: "2026-09-30T06:00:00Z", krok: KROK, zastapil: null })));
     vi.stubGlobal("fetch", f);
     vi.mocked(api).mockImplementation(prawdziwyKlient.api);
     const s = stanowisko();
@@ -82,7 +84,7 @@ describe("Dosyłka przy zwrocie", () => {
 
   it("założona dosyłka odświeża zwrot, profil klienta i „Moje”", async () => {
     vi.mocked(api).mockImplementation(async () =>
-      ({ zalozona: true, login: "Zielony_Ogrod", krokDo: "2026-09-30T06:00:00Z", zastapil: null }));
+      ({ zalozona: true, login: "Zielony_Ogrod", krokDo: "2026-09-30T06:00:00Z", krok: KROK, zastapil: null }));
     const s = stanowisko();
     const { result } = renderHook(() => useSledzDosylkeZwrotu(), { wrapper: s.wrapper });
     await result.current.mutateAsync({ id: 5 });
@@ -102,12 +104,62 @@ describe("Dosyłka przy zwrocie", () => {
     expect(bez.niewazne(PROFIL)).toBe(false);
 
     vi.mocked(api).mockImplementation(async () => ({ kod: "NEW_ITEM_SENT", wersja: 2,
-      dosylka: { zalozona: true, login: "zielony_ogrod", krokDo: "2026-09-30T06:00:00Z", zastapil: "czekamy na zwrot" } }));
+      dosylka: { zalozona: true, login: "zielony_ogrod", krokDo: "2026-09-30T06:00:00Z", krok: KROK,
+        zastapil: "czekamy na zwrot" } }));
     const z = stanowisko();
     const r2 = renderHook(() => useOdmowPlatnosci(), { wrapper: z.wrapper });
     const w = await r2.result.current.mutateAsync({ id: 5, kod: "NEW_ITEM_SENT", powod: null, wersja: 1 });
     expect(w.dosylka).toMatchObject({ zalozona: true, zastapil: "czekamy na zwrot" });
     expect(z.niewazne(PROFIL)).toBe(true);
     expect(z.niewazne(MOJE)).toBe(true);
+  });
+});
+
+/* ── Zapis czeka na świeży szczegół (0.536.1) ──────────────────────────────
+   Lekcja `poZapisieSprawy` ze `spoiwo.ts`: bez obietnicy zwróconej
+   z `onSettled` `isPending` gasło przed odświeżeniem, a sekcja pieniędzy
+   rysowała przez chwilę stan sprzed zapisu z czynnymi przyciskami. Test
+   wstrzymuje drugi odczyt szczegółu i patrzy, czy mutacja na niego czeka. */
+describe("Dosyłka przy zwrocie — zapis czeka na świeży szczegół", () => {
+  function zWstrzymanymSzczegolem<T>(hak: () => T) {
+    let pusc = () => {};
+    const wstrzymanie = new Promise<void>((r) => { pusc = r; });
+    let odczyty = 0;
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const wrapper = ({ children }: { children: React.ReactNode }) =>
+      <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    const r = renderHook(() => {
+      /* Otwarty szczegół zwrotu — aktywne zapytanie, więc unieważnienie go czyta. */
+      useQuery({ queryKey: kluczeZwrotow.zwrot(5), queryFn: async () => {
+        odczyty += 1;
+        if (odczyty > 1) await wstrzymanie;
+        return {};
+      } });
+      return hak();
+    }, { wrapper });
+    return { ...r, pusc, odczyty: () => odczyty };
+  }
+
+  it("odmowa wypłaty trwa, dopóki szczegół zwrotu się nie odświeży", async () => {
+    vi.mocked(api).mockImplementation(async () => ({ kod: "ITEM_FIXED", wersja: 2 }));
+    const h = zWstrzymanymSzczegolem(() => useOdmowPlatnosci());
+    await waitFor(() => expect(h.odczyty()).toBe(1));
+    act(() => { h.result.current.mutate({ id: 5, kod: "ITEM_FIXED", powod: null, wersja: 1 }); });
+    await waitFor(() => expect(h.odczyty()).toBe(2));
+    expect(h.result.current.isPending).toBe(true);
+    h.pusc();
+    await waitFor(() => expect(h.result.current.isPending).toBe(false));
+  });
+
+  it("„Śledź dosyłkę” trwa, dopóki szczegół zwrotu się nie odświeży", async () => {
+    vi.mocked(api).mockImplementation(async () =>
+      ({ zalozona: true, login: "zielony_ogrod", krokDo: "2026-09-30T06:00:00Z", krok: KROK, zastapil: null }));
+    const h = zWstrzymanymSzczegolem(() => useSledzDosylkeZwrotu());
+    await waitFor(() => expect(h.odczyty()).toBe(1));
+    act(() => { h.result.current.mutate({ id: 5 }); });
+    await waitFor(() => expect(h.odczyty()).toBe(2));
+    expect(h.result.current.isPending).toBe(true);
+    h.pusc();
+    await waitFor(() => expect(h.result.current.isPending).toBe(false));
   });
 });

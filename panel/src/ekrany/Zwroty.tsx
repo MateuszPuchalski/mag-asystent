@@ -116,7 +116,10 @@ const STANY_SYNCHRONIZACJI: Record<StanZwrotow["status"], string> = {
  */
 /** Nazwa rodzaju po ludzku — w zdaniu zbiorczym, nie w wierszu. */
 const NAZWA_ROZJAZDU: Record<string, string> = {
-  zwrot_po_terminie: "po terminie ustawowym",
+  /* TERMIN OBSŁUGI, nie ustawowy (0.537.0) — siedem dni od doręczenia,
+     regulamin Allegro. Serwer mówi tak od 0.339.0, a podpis tutaj został
+     przy „ustawowym" i właściciel zapytał, co to właściwie znaczy. */
+  zwrot_po_terminie: "po terminie obsługi (7 dni od doręczenia)",
   zwrot_bez_przelewu: "bez śladu po przelewie",
   kosz_czeka_na_korekte: "koszyk czeka na korektę",
   kosz_bez_powrotu: "kosz bez powrotu z regału",
@@ -125,7 +128,16 @@ const NAZWA_ROZJAZDU: Record<string, string> = {
   zwrot_rozliczony_bez_korekty: "rozliczony w Allegro bez korekty",
 };
 
-function PasekRozjazdow({ rozjazdy }: { rozjazdy: RozjazdZwrotu[] }) {
+/* Rodzaje, które dotyczą ZWROTU — ich klucz to numer zwrotu, więc zawężają
+   listę. Pozostałe mówią o koszach i prowadzą do ekranu koszy (0.537.0). */
+const ROZJAZDY_ZWROTOW = new Set(["zwrot_po_terminie", "zwrot_bez_przelewu", "zwrot_rozliczony_bez_korekty"]);
+
+function PasekRozjazdow({ rozjazdy, filtr, onFiltr }: {
+  rozjazdy: RozjazdZwrotu[];
+  /** Rodzaj, po którym lista jest teraz zawężona (0.537.0). */
+  filtr?: string | null;
+  onFiltr?: (rodzaj: string | null) => void;
+}) {
   /* ZWINIĘTY DOMYŚLNIE — i to jest NAPRAWA, nie upodobanie (0.319.0).
      Pierwsza wersja rysowała każdy wiersz z osobna. Na żywej bazie wyszło ich
      czterysta trzydzieści trzy, więc pasek zjadł cały ekran: kolejki i kolumn
@@ -142,19 +154,34 @@ function PasekRozjazdow({ rozjazdy }: { rozjazdy: RozjazdZwrotu[] }) {
 
   return <section aria-label="Rozjazdy zwrotów"
     className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
-    <button type="button" onClick={() => setRozwiniete((r) => !r)}
-      className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-left">
+    {/* ── GRUPA ZAWĘŻA LISTĘ (0.537.0) ─────────────────────────────────────
+        Zgłoszenie właściciela: „co to właściwie oznacza", a potem „zrób
+        oba". Liczba bez drogi do spraw kazała rozwijać czterysta numerów
+        i szukać ich w kolejce ręką. Kliknięcie zostawia na liście tylko te
+        zwroty, ze wszystkich kubełków; grupy koszy prowadzą do koszy. */}
+    <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1">
       <span className="text-xs font-bold uppercase text-amber-900">
         Do sprawdzenia ({rozjazdy.length})
       </span>
-      {[...wgRodzaju].map(([rodzaj, ile]) => <span key={rodzaj} className="text-sm text-amber-900">
-        <b className="font-semibold tabular-nums">{ile}</b>{" "}
-        {NAZWA_ROZJAZDU[rodzaj] ?? rodzaj}
-      </span>)}
-      <span className="ml-auto text-xs underline text-amber-900">
+      {[...wgRodzaju].map(([rodzaj, ile]) => {
+        const tresc = <><b className="font-semibold tabular-nums">{ile}</b>{" "}
+          {NAZWA_ROZJAZDU[rodzaj] ?? rodzaj}</>;
+        const klasa = "rounded px-1 text-sm text-amber-900 underline-offset-2 hover:underline";
+        if (ROZJAZDY_ZWROTOW.has(rodzaj) && onFiltr) {
+          return <button key={rodzaj} type="button" aria-pressed={filtr === rodzaj}
+            title="Pokaż na liście tylko te zwroty"
+            onClick={() => onFiltr(filtr === rodzaj ? null : rodzaj)}
+            className={`${klasa} ${filtr === rodzaj ? "bg-amber-200 font-semibold" : ""}`}>{tresc}</button>;
+        }
+        return rodzaj.startsWith("kosz_")
+          ? <a key={rodzaj} href="/obsluga/zwroty/kosze" title="Otwórz kosze" className={klasa}>{tresc}</a>
+          : <span key={rodzaj} className="text-sm text-amber-900">{tresc}</span>;
+      })}
+      <button type="button" onClick={() => setRozwiniete((r) => !r)}
+        className="ml-auto text-xs text-amber-900 underline">
         {rozwiniete ? "zwiń" : "pokaż numery"}
-      </span>
-    </button>
+      </button>
+    </div>
     {/* Rozwinięta lista ma WŁASNY scroller i sufit wysokości. Bez niego
         czterysta wierszy znowu wypchnęłoby kolejkę poza okno — tym razem
         na życzenie, ale z tym samym skutkiem. */}
@@ -236,14 +263,17 @@ function PasekOgona({ stan }: { stan: StanZwrotow }) {
  * kiedyś — schowane kazałoby zatwierdzać ręką to, co naprawia jedna rzecz.
  * Czerwony pasek niekompletnej kolejki stoi osobno i nie chowa się nigdy.
  */
-function PasekUwag({ bilans, stan, rozjazdy }: {
+function PasekUwag({ bilans, stan, rozjazdy, filtr = null, onFiltr }: {
   bilans?: BilansKartotek; stan?: StanZwrotow; rozjazdy: RozjazdZwrotu[];
+  filtr?: string | null; onFiltr?: (rodzaj: string | null) => void;
 }) {
   const [rozwiniete, setRozwiniete] = useState(false);
   const bez = bilans?.bez ?? 0;
   if (!bez && !rozjazdy.length) return null;
   const alarm = Boolean(stan && stan.status !== "current" && (bilans?.powody.do_zwiazania ?? 0) > 0);
-  const otwarte = rozwiniete || alarm;
+  /* Otwarty filtr trzyma pasek otwarty: zwinięty chowałby przycisk, którym
+     się go zdejmuje (0.537.0). */
+  const otwarte = rozwiniete || alarm || filtr !== null;
   return <section aria-label="Uwagi do kolejki" className="shrink-0 space-y-1">
     <button type="button" onClick={() => setRozwiniete((r) => !r)}
       className="flex w-full flex-wrap items-center gap-x-3 rounded-lg border border-amber-200
@@ -254,7 +284,7 @@ function PasekUwag({ bilans, stan, rozjazdy }: {
     </button>
     {otwarte && <>
       {bilans && <PasekKartotek bilans={bilans} stan={stan} />}
-      <PasekRozjazdow rozjazdy={rozjazdy} />
+      <PasekRozjazdow rozjazdy={rozjazdy} filtr={filtr} onFiltr={onFiltr} />
     </>}
   </section>;
 }
@@ -364,12 +394,20 @@ export function Zwroty() {
   const zdejmij = useZdejmijPozycje();
   const [bladDopisania, setBladDopisania] = useState("");
   const [bladRabatu, setBladRabatu] = useState("");
-  const [bladPieniedzy, setBladPieniedzy] = useState("");
-  /* Wynik założenia dosyłki (0.536.0) — zdanie jednorazowe z odpowiedzi.
-     Niesie NUMER ZWROTU, bo pieniądze nie są kluczowane zwrotem: przełączenie
-     na inny zwrot z pamięci podręcznej zostawia sekcję zamontowaną, a zdanie
-     o cudzym kroku stałoby pod cudzymi pieniędzmi. */
+  /* ZDANIA SEKCJI PIENIĘDZY NIOSĄ NUMER ZWROTU (0.536.1) — błąd i wynik
+     założenia dosyłki. Odpowiedź przychodzi po chwili, a operator bywa już
+     przy następnym zwrocie. Bez numeru błąd odmowy zwrotu A stanąłby pod
+     pieniędzmi zwrotu B. Klucz sekcji tego nie załatwi: te zdania mieszkają
+     tutaj, poza nią, bo pisze je odpowiedź mutacji.
+
+     Przejście na inny zwrot ich NIE KASUJE. Odpowiedź, która przyszła po
+     odejściu, czeka przy swoim zwrocie: odmowa jest nieodwracalna, więc jej
+     wynik nie może przepaść bez słowa. Następny zapis przy tym zwrocie
+     zaczyna od czystej sekcji. */
+  const [bladPieniedzy, setBladPieniedzy] = useState<{ zwrotId: number; tekst: string } | null>(null);
   const [wynikDosylki, setWynikDosylki] = useState<{ zwrotId: number; wynik: WynikDosylki } | null>(null);
+  const bladPieniedzyDla = (zwrotId: number, przedrostek = "") => (e: unknown) =>
+    setBladPieniedzy({ zwrotId, tekst: `${przedrostek}${(e as Error).message}` });
   const [bladFaktury, setBladFaktury] = useState("");
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
     || korekta.isPending || cofnijKorekte.isPending || cofnijKwote.isPending
@@ -427,6 +465,8 @@ export function Zwroty() {
   const rozjazdy = useRozjazdyZwrotow();
   const [kod, setKod] = useState("");
   const [fraza, setFraza] = useState("");
+  /* Grupa z paska „Do sprawdzenia", po której zawężona jest lista (0.537.0). */
+  const [filtrRozjazdu, setFiltrRozjazdu] = useState<string | null>(null);
   /* Login, o którego PACZKI pytamy (0.365.0) — osobno od tego, co operator
      wpisuje, bo pytanie idzie po Enterze i po wyjściu z pola, a nie po każdym
      znaku. Pusty nie pyta wcale. */
@@ -457,9 +497,17 @@ export function Zwroty() {
     "wertis.zwroty.porzadek", ["termin", "otwarto", "kwota"], "termin");
 
   const pasujace = useMemo(() => {
+    /* Grupa rozjazdów zawęża jak szukanie — przez wszystkie kubełki, bo
+       „rozliczony bez korekty" stoi w ZAMKNIĘTYCH, a „po terminie" w kilku
+       naraz. Klucz rozjazdu to numer zwrotu albo jego identyfikator. */
+    if (filtrRozjazdu) {
+      const klucze = new Set((rozjazdy.data?.rozjazdy ?? [])
+        .filter((r) => r.rodzaj === filtrRozjazdu).map((r) => r.klucz));
+      return (data?.zwroty ?? []).filter((z) => klucze.has(z.numer ?? z.externalId));
+    }
     if (!rozbij(fraza).length) return null;
     return (data?.zwroty ?? []).filter((z) => pasujeDoFrazy(kody(z), fraza));
-  }, [data, fraza]);
+  }, [data, fraza, filtrRozjazdu, rozjazdy.data]);
 
   /* Szukanie PRZEBIJA kubełek. Bez tego operator wpisuje numer, widzi „ten
      kubełek jest pusty" i nie ma jak się dowiedzieć, że zwrot stoi w
@@ -980,7 +1028,11 @@ export function Zwroty() {
       <PrzelacznikZwrotow teraz="zwroty" />
       <NowyKoszyk />
       <div className="min-w-0 flex-1">
-        <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []} />
+        <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []}
+          filtr={filtrRozjazdu}
+          /* Grupa zdejmuje frazę: dwa filtry naraz dawałyby pustą listę
+             bez widocznego powodu. */
+          onFiltr={(r) => { setFiltrRozjazdu(r); if (r) setFraza(""); }} />
       </div>
     </div>
     {data?.stan && <PasekOgona stan={data.stan} />}
@@ -1064,7 +1116,7 @@ export function Zwroty() {
       <Szukanie
         wynik={wynikSkanu} kod={kod} fraza={fraza} ile={pasujace?.length ?? null}
         szuka={skan.isPending} dociaga={dociagnij.isPending} blad={bladSkanu}
-        onFraza={(v) => { setFraza(v); if (!v) setWynikSkanu(null); }}
+        onFraza={(v) => { setFraza(v); if (v) setFiltrRozjazdu(null); if (!v) setWynikSkanu(null); }}
         onSzukaj={(v) => { kodZCzytnika.current = ""; szukaj(v); }}
         onSkan={(v) => { void naSkan(v); }}
         towar={skanTowaru}
@@ -1141,6 +1193,15 @@ export function Zwroty() {
         <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-2 py-1">
           <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
         </div>}
+      {/* Aktywna grupa rozjazdów w miejscu pytania kubełka (0.537.0) — lista
+          mówi, dlaczego jest krótsza, i ma wyjście jednym kliknięciem. */}
+      {filtrRozjazdu &&
+        <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-2 py-1">
+          <span className="text-xs font-semibold text-amber-900">
+            Tylko: {NAZWA_ROZJAZDU[filtrRozjazdu] ?? filtrRozjazdu} ({pasujace?.length ?? 0})</span>
+          <button type="button" onClick={() => setFiltrRozjazdu(null)}
+            className="ml-auto text-xs text-amber-900 underline">wyczyść</button>
+        </div>}
 
       {/* Klawisze NA EKRANIE, wzorem reklamacji (0.281.0). Dekalog p. 2:
           rozpoznanie jest tańsze od pamiętania. Pasek pokazuje klawisze
@@ -1208,53 +1269,56 @@ export function Zwroty() {
             {/* Pieniądze STOJĄ POD DECYZJAMI, nie w kolumnie dowodów: to jest
                 ostatni krok tej pracy i ma być tam, gdzie operator właśnie
                 patrzy, a nie o kolumnę dalej. */}
-            {szczegol.data?.pieniadze && <Pieniadze
+            {/* `key` na ZWROCIE, jak przy `Pozycje` niżej (0.536.1). Bez niego
+                sekcja zostawała zamontowana przy przejściu na zwrot z pamięci
+                podręcznej, a z nią otwarty formularz odmowy z kodem i powodem
+                poprzedniego zwrotu — gotowy do wysłania pod cudzym numerem. */}
+            {szczegol.data?.pieniadze && <Pieniadze key={`pieniadze-${zwrot.id}`}
               stan={szczegol.data.pieniadze}
               przedWerdyktem={zwrot.kubelek === "decyzja"}
+              kodAllegro={zwrot.rejectionCode}
               akcje={akcje}
               trwa={pieniadze.isPending || odmowaPlatnosci.isPending
                 || przelew.isPending || cofnijPrzelew.isPending || sledzDosylke.isPending}
-              blad={bladPieniedzy}
+              blad={bladPieniedzy?.zwrotId === zwrot.id ? bladPieniedzy.tekst : ""}
               wynikDosylki={wynikDosylki?.zwrotId === zwrot.id ? wynikDosylki.wynik : null}
               onZwroc={() => {
-                setBladPieniedzy("");
+                setBladPieniedzy(null);
                 setWynikDosylki(null);
                 pieniadze.mutate({ id: zwrot.id, wersja: zwrot.wersja },
-                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+                  { onError: bladPieniedzyDla(zwrot.id) });
               }}
               onPrzelew={(referencja) => {
-                setBladPieniedzy("");
+                setBladPieniedzy(null);
                 setWynikDosylki(null);
                 przelew.mutate({ id: zwrot.id, wersja: zwrot.wersja, referencja },
-                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+                  { onError: bladPieniedzyDla(zwrot.id) });
               }}
               onCofnijPrzelew={() => {
-                setBladPieniedzy("");
+                setBladPieniedzy(null);
                 setWynikDosylki(null);
                 cofnijPrzelew.mutate({ id: zwrot.id, wersja: zwrot.wersja },
-                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+                  { onError: bladPieniedzyDla(zwrot.id) });
               }}
               onOdmow={(kod, powod) => {
-                setBladPieniedzy("");
+                setBladPieniedzy(null);
                 setWynikDosylki(null);
                 const zwrotId = zwrot.id;
                 odmowaPlatnosci.mutate({ id: zwrotId, kod, powod, wersja: zwrot.wersja }, {
                   onSuccess: (w) => { if (w.dosylka) setWynikDosylki({ zwrotId, wynik: w.dosylka }); },
-                  onError: (e) => setBladPieniedzy((e as Error).message),
+                  onError: bladPieniedzyDla(zwrotId),
                 });
               }}
               onSledzDosylke={() => {
-                setBladPieniedzy("");
+                setBladPieniedzy(null);
                 setWynikDosylki(null);
                 const zwrotId = zwrot.id;
                 sledzDosylke.mutate({ id: zwrotId }, {
-                  /* Ta trasa nie wysyła odmowy, więc zdanie „Odmowa wysłana; …”
-                     byłoby tu nieprawdą. Porażka idzie zwykłym błędem sekcji. */
-                  onSuccess: (w) => {
-                    if (w.zalozona) setWynikDosylki({ zwrotId, wynik: w });
-                    else setBladPieniedzy(`Śledzenia dosyłki nie założono — ${w.blad}`);
-                  },
-                  onError: (e) => setBladPieniedzy((e as Error).message),
+                  onSuccess: (w) => setWynikDosylki({ zwrotId, wynik: w }),
+                  /* Porażkę ta trasa mówi błędem 400 ze stałym zdaniem serwera.
+                     Zdanie „Odmowa wysłana; …” byłoby tu nieprawdą, bo ta trasa
+                     odmowy nie wysyła — więc przedrostek mówi tylko o śledzeniu. */
+                  onError: bladPieniedzyDla(zwrotId, "Śledzenia dosyłki nie założono — "),
                 });
               }} />}
             <div className="min-h-0 flex-1 overflow-y-auto">

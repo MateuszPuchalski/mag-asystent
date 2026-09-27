@@ -438,6 +438,16 @@ export const config = {
        nie minutami — Allegro część z nich rozpatruje samo. Rzadziej niż zwroty. */
     rabatySyncMs: num(process.env.ALLEGRO_RABATY_SYNC_MS, 900_000, "ALLEGRO_RABATY_SYNC_MS"),
     /**
+     * Takt dosyłek (0.536.1): wykrycie numeru przy zamówieniu i śledzenie
+     * paczki w sprawach klienta w toku; 0 wyłącza ticker.
+     *
+     * SIEDEMNAŚCIE MINUT, nie kwadrans. Dosyłka jedzie dniami, więc
+     * „doręczona” kilka minut później nie zmienia niczyjej pracy. Kwadrans
+     * mają już rabaty, a dwa tickery z jednego adresu tym samym rytmem to
+     * równy chór, który anti-bot Allegro rozpoznaje (`services/takt.ts`).
+     */
+    dosylkiSyncMs: num(process.env.ALLEGRO_DOSYLKI_SYNC_MS, 1_020_000, "ALLEGRO_DOSYLKI_SYNC_MS"),
+    /**
      * Takt synchronizacji reklamacji (`/sale/issues`); 0 wyłącza ticker.
      *
      * GĘŚCIEJ NIŻ ZWROTY, i to jest różnica natury sprawy, nie kaprys.

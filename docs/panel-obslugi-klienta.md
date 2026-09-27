@@ -6333,6 +6333,40 @@ Odłożenie nie jest powrotem ręcznych statusów z 22 września. Tamto było po
 
 **Strażnik.** `ekrany/Skrzynka.test.tsx` jest pierwszym testem całego ekranu Skrzynki. Pilnuje zera zapisu przy otwarciu i każdego błędu z listy wyżej.
 
+## 26g. Nagłówek w jednym rzędzie (0.538.0)
+
+Właściciel zgłosił, że górny pasek nie powinien zajmować dwóch rzędów. Z trzech wariantów na makietach wybrał B: jeden rząd i jedno menu „Więcej”. Decyzja z 27 września 2026 zmienia kształt z 0.431.0 opisany w `obsluga-klienta.md` §7.
+
+**Co gdzie stoi:**
+
+- Z lewej logo, dalej lupa szukania (Ctrl K bez zmian) i osiem zakładek pracy. Dostawy stoją ostatnie, za kreską.
+- Z prawej kropka synchronizacji z godziną. Pełne zdanie z liczbą błędów jest w dymku i w menu przy stanie systemu.
+- Menu „Więcej” niesie Stan systemu, Dziennik i Analizę, a pod kreską Ustawienia i Wyloguj. Zamyka je Esc, klik obok i przejście na ekran.
+- Przycisk menu świeci bursztynem, gdy bieżący ekran leży w menu. Bez tego agent w dzienniku nie widziałby żadnej zaznaczonej zakładki.
+
+**Pomiar.** Przy 1180 px nagłówek ma 65 px zamiast 117 px, czyli ekran pracy zyskuje 52 px. Zakładki mają węższe wypełnienie, a rząd z licznikami zostawia 55 px luzu. Alarm mieści się bez kropki, bo czerwone słowo mówi to samo. Poniżej 1180 px `flex-wrap` przenosi menu do drugiego rzędu, zamiast chować je poza kadrem.
+
+**Strażnik.** `nawigacja/Wiecej.test.tsx` pilnuje zawartości menu, zamykania, zera zapisu przy otwarciu i słowa „Stanęła” w alarmie. Pilnuje też, że drugi rząd nie wrócił.
+
+## 26h. Stan systemu jako tablica (0.538.0)
+
+Właściciel pokazał nagraniem przewijanie przez stan systemu i poprosił o poprawę. Dziesięć kart stało jedna pod drugą, a zdrowe zajmowały tyle miejsca co te, które czegoś chcą. Z trzech makiet wybrał A: tablicę z problemami na górze.
+
+**Co gdzie stoi:**
+
+- Na górze rząd kafelków, po jednym na obszar. Kafelek niesie barwę i jedno zdanie, na przykład „2 do decyzji” albo „działa · 11:36”.
+- Czerwień znaczy, że coś nie działa. Bursztyn znaczy, że obszar czeka na biuro. Zieleń to „działa”, szarość to „na żądanie”.
+- Pod kafelkami stoją wyłącznie karty obszarów czerwonych i bursztynowych. Klik w kafelek otwiera albo zamyka kartę każdego obszaru.
+- Karta raz pokazana zostaje, aż człowiek zamknie ją kafelkiem. Sparowanie Allegro nie zabiera karty spod kursora.
+- Adres `?karta=` otwiera kartę obszaru, więc wiersze „Do zrobienia” trafiają tam, gdzie wcześniej.
+- Kolejka zapisów chowa wiersze „zapisane” pod przyciskiem. Kody kreskowe mają przyciski decyzji w wierszu, nie pod kreską.
+
+Kafelek czyta to samo zapytanie co jego karta, więc tablica nie dokłada żadnego żądania. Rekoncyliacja dalej liczy się tylko na żądanie.
+
+**Blizna z przejścia na żywym serwerze.** Pierwsza wersja wkładała karty problemów z efektu, jeden render po ich danych. Skok do `?karta=` zdążał wtedy przed kartą nad celem i lądował za wysoko. Karta problemu wchodzi teraz w tym samym renderze co jej dane.
+
+**Strażnik.** `ekrany/Stan.test.tsx` pilnuje, że na wejściu otwarte są wyłącznie karty do uwagi. Pilnuje też kafelków, przycisku zapisanych i zera zapisu przy otwarciu każdej karty.
+
 ## 27. Zasady nadrzędne
 
 Te punkty mówią o JEDNEJ rozmowie i jednej sprawie. Reguły obowiązujące
@@ -6566,7 +6600,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Historia klienta ze zwrotami i sprawami | **działa** od 0.387.0 | `services/klient-historia.ts`; pięć rodzajów wpisu, wiązanie po `kupujacy_login` — wolno, bo zwrot i sprawa niosą go z Allegro |
 | Profil klienta: liczby, sygnały, otwarte sprawy, zamówienia, notatka | **działa** od 0.484.0 | `services/profil-klienta.ts`, `GET /api/obsluga/klient/:login`, `panel/src/ekrany/ProfilKlienta.tsx`; login przez konta, bez wielkości liter; sygnały wyliczane; zapisy tylko na kliknięcie: `klient_notatka` z cofnięciem i od 0.535.0 sprawa klienta; karta „Otwarte sprawy” nazywa się od 0.535.0 „Otwarte w kolejkach” |
 | Sprawa klienta: kto prowadzi, następny krok z terminem, zakończenie | **działa** od 0.535.0 (pierwszy przyrost S6) | `services/prowadzenie-klienta.ts`, tabela `klient_prowadzenie`, cztery `POST /api/obsluga/klient/:login/sprawa/…` (`krok`, `zakoncz`, `wznow`, `przejmij`), karta na profilu, linijka przy historii klienta, wiersz w „Moje”; dwa stany, krok jako jedyna droga założenia i wznowienia, „nowe” z odcisku przy odczycie, obudzenie zakończonej przez 30 dni od zakończenia, `wersja` i odcisk pilnują świeżości każdego zapisu; w dzienniku numer sprawy, nigdy login ani krok; Ctrl+K po numerze zamówienia daje wiersz kupującego (`szukajWszedzie`), żeby brak w dostawie był o krok od sprawy (`docs/obsluga-klienta-calosc.md` S6, `docs/obsluga-klienta.md`) |
-| Dosyłka ze śledzeniem: numer i stan drugiej paczki przy kroku „dosłać” | **działa** od 0.536.0 (drugi przyrost S6) | `services/dosylka.ts`, czysty `services/dosylka-opis.ts`, tabela `klient_dosylka`; odmowa wypłaty z kodem `NEW_ITEM_SENT` albo `MISSING_PART_SENT` w tym samym ruchu stawia krok „dosłać” (trzy dni robocze, 8:00) tą samą drogą co „Ustaw krok” i zakłada śledzenie, a jej porażka nie psuje odmowy (`POST /api/obsluga/zwroty/:id/dosylka` ponawia); ticker `dosylki` w `main()` co 15 minut wykrywa numer przy zamówieniu i śledzi paczkę tylko w sprawach w toku; numer wpisany ręką (`POST …/sprawa/dosylka/numer`) i propozycja na profilu (`POST …/sprawa/dosylka`) sprawdzają wersję i odcisk; doręczenie i kłopot budzą sprawę (klucze odcisku `k`, `q`); „Moje” stawia na dziś dosyłkę bez numeru i z kłopotem; w dzienniku numer sprawy, nigdy numer przesyłki (`docs/obsluga-klienta-calosc.md` S6, `docs/obsluga-klienta.md`) |
+| Dosyłka ze śledzeniem: numer i stan drugiej paczki przy kroku „dosłać” | **działa** od 0.536.0 (drugi przyrost S6), poprawki w 0.536.1 | `services/dosylka.ts`, czysty `services/dosylka-opis.ts`, tabela `klient_dosylka`; odmowa wypłaty z kodem `NEW_ITEM_SENT` albo `MISSING_PART_SENT` w tym samym ruchu stawia krok „dosłać” (trzy dni robocze, 8:00) tą samą drogą co „Ustaw krok” i zakłada śledzenie, a jej porażka nie psuje odmowy (`POST /api/obsluga/zwroty/:id/dosylka` ponawia); ticker `dosylki` w `main()` co 17 minut (`ALLEGRO_DOSYLKI_SYNC_MS`) wykrywa numer przy zamówieniu i śledzi paczkę tylko w sprawach w toku i w bieżącym epizodzie, a wznowienie sprawy odkłada do historii skończone dosyłki, w drodze zostawia; numer wpisany ręką (`POST …/sprawa/dosylka/numer`) i propozycja na profilu (`POST …/sprawa/dosylka`) sprawdzają wersję i odcisk; doręczenie i kłopot budzą sprawę (klucze odcisku `k`, `q`); „Moje” stawia na dziś dosyłkę bez numeru i z kłopotem; w dzienniku numer sprawy, nigdy numer przesyłki (`docs/obsluga-klienta-calosc.md` S6, `docs/obsluga-klienta.md`) |
 | Test na żywym Allegro | **działa** od 0.495.0 | `services/sonda-rzeczywistosci.ts`, takt dzienny w `main()`, karta `stan/Sonda.tsx`, wiersz w DO DECYZJI; drogi produkcji bez atrap, tylko odczyt z Allegro |
 | Droga zakupu przez kolejki | **działa** od 0.387.0 | `drogaZakupu`; ODCZYT z momentów otwarcia, bez zdarzenia i bez tabeli (otwarcie ekranu nic nie mutuje) |
 | Jedno „Moje" ponad kolejkami | **działa** od 0.387.0 | `mojeSprawy`, `GET /api/obsluga/moje`, `panel/src/ekrany/Moje.tsx`; TRZY kolejki — zwrot nie ma prowadzącego od 0.370.0; tożsamość z sesji, nie z zapytania; od 0.535.0 także sprawy klienta tej osoby, scalone w `mojaLista` w cztery piętra |

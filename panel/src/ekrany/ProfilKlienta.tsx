@@ -277,22 +277,22 @@ function KartaSprawy({ d }: { d: Profil }) {
           </>}
     </div>
 
-    {/* Dosyłka pod krokiem, bo to ona mówi, jak idzie „dosłać”. Wpisanie
-        numeru stoi tylko przy sprawie w toku: zakończonej się nie śledzi. */}
+    {/* Dosyłka pod krokiem, bo to ona mówi, jak idzie krok dosyłki. */}
     {s && s.dosylki.length > 0 && <ul className="mt-2 space-y-1" aria-label="Dosyłki">
       {s.dosylki.map((x) => <WierszDosylki key={x.zamowienie} dosylka={x} przewoznicy={d.przewoznicy ?? []}
-        wToku={s.stan === "w_toku"} pracuje={pracuje}
+        pracuje={pracuje}
         onZapisz={(waybill, przewoznik, gotowe) => zapiszNumer(x, waybill, przewoznik, gotowe)} />)}
     </ul>}
 
     {s && <NoweOdKlienta nowe={nowe} />}
 
-    {/* PROPOZYCJA TO DROGA ZAPASOWA. Śledzenie zakłada zwykle sama odmowa
-        wypłaty na ekranie zwrotu. Tu trafia odmowa, przy której zapis u nas
-        się nie udał, albo kod złożony poza panelem. Pytanie, nie automat: zapis
-        zmienia krok sprawy, a otwarcie profilu niczego nie zapisuje. */}
+    {/* PROPOZYCJA TO DROGA ZAPASOWA. Śledzenie zakłada sama odmowa wypłaty
+        na ekranie zwrotu. Tu trafia odmowa, przy której zapis u nas się nie
+        udał, albo odmowa z panelu Allegro, której kod przyszedł synchronizacją.
+        Pytanie, nie automat: zapis zmienia krok sprawy, a otwarcie profilu
+        niczego nie zapisuje. */}
     {propozycja && <div className="mt-2 flex flex-wrap items-center gap-2 text-sm text-slate-800">
-      <Truck size={14} className="shrink-0 text-slate-500" />
+      <Truck size={14} aria-hidden="true" className="shrink-0 text-slate-500" />
       <span>Odmówiono wypłaty: „{etykietaKodu(propozycja.kod)}”. Śledzić dosyłkę?</span>
       <Przycisk disabled={pracuje} onClick={() => sledzDosylke(propozycja.zwrotId)}>Śledź dosyłkę</Przycisk>
     </div>}
@@ -343,20 +343,33 @@ function KartaSprawy({ d }: { d: Profil }) {
   </div></Karta>;
 }
 
-/** Lustro limitu numeru przesyłki z serwera — Allegro przyjmuje najwyżej 64 znaki. */
+/** Lustro `LIMIT_NUMERU` z `services/dosylka.ts` — dłuższy numer serwer odrzuca. */
 const LIMIT_NUMERU = 64;
+
+/** Zamówienie Allegro skrótem — ten sam zapis co przy rozmowie (`skrzynka/Os.tsx`). */
+const krotkoZamowienie = (id: string) => id.slice(0, 8);
 
 /* JEDNA DOSYŁKA, JEDNA LINIJKA (0.536.0). Zdanie składa serwer, to samo co
    na liście „Moje” i przy historii kolejek. Numer stoi obok z kopiowaniem, bo
-   klient pyta o niego, a przepisany z ekranu bywa przekręcony (0.228.0).
+   przepisany z ekranu bywa przekręcony (0.228.0).
 
-   „wpisz numer” jest CICHYM odnośnikiem, nie przyciskiem. Numer zwykle
-   znajduje automat w przesyłkach zamówienia, więc to droga zapasowa. Ma być
-   pod ręką, a nie wołać przy każdej dosyłce. */
-function WierszDosylki({ dosylka: x, przewoznicy, wToku, pracuje, onZapisz }: {
+   ZAMÓWIENIE I ZWROT W LINIJCE. Dosyłek w sprawie bywa kilka, a zdanie
+   „Dosyłka w drodze” nie mówi, której paczki dotyczy. Ekran zwrotu prowadzi
+   do tego profilu; odnośnik „zwrot” prowadzi z powrotem, bo wiązanie
+   jednostronne to wiązanie, którego nie ma (`CLAUDE.md`). Dosyłka wpisana
+   ręcznie, bez odmowy, zwrotu nie ma i odnośnika też nie.
+
+   „wpisz numer” jest CICHYM odnośnikiem, nie przyciskiem. Numer ma znaleźć
+   automat w przesyłkach zamówienia — ale to, że nowa etykieta z Sellasist
+   pokazuje się na tym samym zamówieniu w Allegro, jest niezweryfikowane
+   (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`). Droga ręczna ma być pod
+   ręką, a nie wołać przy każdej dosyłce.
+
+   Warunku „sprawa w toku” przy numerze tu nie ma: zakończona sprawa
+   przychodzi z pustą listą dosyłek (`prowadzenie-klienta.ts`). */
+function WierszDosylki({ dosylka: x, przewoznicy, pracuje, onZapisz }: {
   dosylka: DosylkaSprawy;
   przewoznicy: string[];
-  wToku: boolean;
   pracuje: boolean;
   onZapisz: (waybill: string, przewoznik: string, gotowe: () => void) => void;
 }) {
@@ -368,16 +381,25 @@ function WierszDosylki({ dosylka: x, przewoznicy, wToku, pracuje, onZapisz }: {
     if (bylaForma.current && !forma) otwiera.current?.focus();
     bylaForma.current = forma;
   }, [forma]);
+  const krotko = krotkoZamowienie(x.zamowienie);
+  /* Nazwa przycisku niesie zamówienie: przy dwóch dosyłkach czytnik ekranu
+     mówił dwa razy samo „wpisz numer”, bez znaku, przy której paczce. */
+  const czynnosc = x.waybill ? "popraw numer" : "wpisz numer";
 
   return <li>
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-      <Truck size={14} className="shrink-0 text-slate-500" />
+      <Truck size={14} aria-hidden="true" className="shrink-0 text-slate-500" />
       <span className={`font-semibold ${barwaTonu(x.ton)}`}>{x.opis}</span>
+      <span className="text-xs text-slate-600" title={x.zamowienie}>zamówienie {krotko}…</span>
+      {x.zwrotId !== null && <Link to={`/obsluga/zwroty/${x.zwrotId}`} aria-label={`zwrot zamówienia ${krotko}`}
+        className="inline-flex items-center gap-1 text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900">
+        <Undo2 size={12} aria-hidden="true" />zwrot</Link>}
       {x.waybill && <span className="inline-flex items-center gap-0.5 font-mono text-xs text-slate-700">
         {x.waybill}<Skopiuj tekst={x.waybill} tytul="Kopiuj numer dosyłki" /></span>}
-      {wToku && !forma && <button ref={otwiera} type="button" disabled={pracuje} onClick={() => setForma(true)}
+      {!forma && <button ref={otwiera} type="button" disabled={pracuje} onClick={() => setForma(true)}
+        aria-label={`${czynnosc} dosyłki zamówienia ${krotko}`}
         className="text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900 disabled:opacity-50">
-        {x.waybill ? "popraw numer" : "wpisz numer"}</button>}
+        {czynnosc}</button>}
     </div>
     {forma && <FormularzNumeru dosylka={x} przewoznicy={przewoznicy} pracuje={pracuje}
       onAnuluj={() => setForma(false)}
@@ -385,11 +407,23 @@ function WierszDosylki({ dosylka: x, przewoznicy, wToku, pracuje, onZapisz }: {
   </li>;
 }
 
+/** `UNKNOWN` z Allegro nie nazywa przewoźnika — śledzenie nie ma pod czym szukać. */
+const NIEZNANY_PRZEWOZNIK = "UNKNOWN";
+/** Identyfikator Allegro dla przewoźnika spoza listy; takiej dosyłki serwer nie śledzi. */
+const INNY_PRZEWOZNIK = "OTHER";
+const znanyPrzewoznik = (p: string | null | undefined): p is string =>
+  Boolean(p) && p !== NIEZNANY_PRZEWOZNIK;
+
 /* NUMER Z SELLASIST. Przewoźnik ma gotowy wybór: dosyłka jedzie prawie
    zawsze tym samym przewoźnikiem co pierwsza paczka zamówienia (fakt
    właściciela z 27 września 2026), więc zwykle zostaje sam numer do wklejenia.
    Lista to przewoźnicy znani z naszej bazy — pole tekstowe dałoby literówkę
-   w identyfikatorze, której śledzenie nigdy by nie znalazło (dekalog p. 6). */
+   w identyfikatorze, której śledzenie nigdy by nie znalazło (dekalog p. 6).
+
+   BEZ ZNANEGO PRZEWOŹNIKA LISTA ZACZYNA OD PUSTEGO WYBORU. Do tego wydania
+   podsuwała pierwszego z alfabetu, a zapis przechodził jednym kliknięciem
+   z przewoźnikiem, którego nikt nie wybrał. „inny” stoi zawsze: przewoźnik
+   spoza Allegro to prawdziwa odpowiedź, nie brak odpowiedzi. */
 function FormularzNumeru({ dosylka: x, przewoznicy, pracuje, onZapisz, onAnuluj }: {
   dosylka: DosylkaSprawy;
   przewoznicy: string[];
@@ -397,16 +431,17 @@ function FormularzNumeru({ dosylka: x, przewoznicy, pracuje, onZapisz, onAnuluj 
   onZapisz: (waybill: string, przewoznik: string) => void;
   onAnuluj: () => void;
 }) {
-  const domyslny = x.przewoznik ?? x.przewoznikZamowienia ?? przewoznicy[0] ?? "";
-  /* Przewoźnik dosyłki spoza listy dalej ma być wyborem domyślnym — inaczej
-     lista po cichu podmieniłaby go na pierwszego z brzegu. */
-  const opcje = domyslny && !przewoznicy.includes(domyslny) ? [domyslny, ...przewoznicy] : przewoznicy;
+  const domyslny = [x.przewoznik, x.przewoznikZamowienia].find(znanyPrzewoznik) ?? "";
+  /* Przewoźnik dosyłki i pierwszej paczki stoją na liście także wtedy, gdy
+     baza ich nie zna — inaczej lista po cichu podmieniłaby domyślny wybór. */
+  const opcje = [...new Set([x.przewoznik, x.przewoznikZamowienia, ...przewoznicy, INNY_PRZEWOZNIK]
+    .filter(znanyPrzewoznik))];
   const [waybill, setWaybill] = useState(x.waybill ?? "");
   const [przewoznik, setPrzewoznik] = useState(domyslny);
   const gotowy = waybill.trim() !== "" && przewoznik !== "" && !pracuje;
 
   return <form className="mt-2 flex flex-wrap items-end gap-2 border-t border-slate-100 pt-2"
-    aria-label="Wpisz numer dosyłki"
+    aria-label={x.waybill ? "Popraw numer dosyłki" : "Wpisz numer dosyłki"}
     onSubmit={(e) => { e.preventDefault(); if (gotowy) onZapisz(waybill.trim(), przewoznik); }}>
     <label className="text-xs font-semibold text-slate-700">Numer dosyłki
       {/* Kursor od razu w polu: formularz otwiera się po to, żeby wkleić numer. */}
@@ -415,7 +450,9 @@ function FormularzNumeru({ dosylka: x, przewoznicy, pracuje, onZapisz, onAnuluj 
     </label>
     <label className="text-xs font-semibold text-slate-700">Przewoźnik
       <select value={przewoznik} onChange={(e) => setPrzewoznik(e.target.value)} className="field mt-1 w-auto text-sm">
-        {opcje.map((p) => <option key={p} value={p}>{PRZEWOZNICY[p] ?? p}</option>)}
+        {domyslny === "" && <option value="">— wybierz przewoźnika —</option>}
+        {opcje.map((p) => <option key={p} value={p}>
+          {p === INNY_PRZEWOZNIK ? "inny (nie śledzimy)" : PRZEWOZNICY[p] ?? p}</option>)}
       </select>
     </label>
     <Przycisk type="submit" wariant="glowny" disabled={!gotowy}>Zapisz</Przycisk>

@@ -8,7 +8,9 @@ import { sprawaOtwarta } from "./statusy-spraw.js";
 import { statusRozmowy } from "./conversations.js";
 import { sprawaKlienta, type SprawaKlienta } from "./prowadzenie-klienta.js";
 import { chwilaUtc } from "../czas.js";
-import { jestKodemDosylki, OKNO_SLEDZENIA_MS, type KodDosylki } from "./dosylka-opis.js";
+import {
+  DOSYLKA_ZWROTU_SQL, doreczonaDoZakonczenia, jestKodemDosylki, OKNO_SLEDZENIA_MS, type KodDosylki,
+} from "./dosylka-opis.js";
 
 /* ── Profil klienta: wszystko, co z nim związane, w jednym widoku ────────────
    (24 września 2026, zgłoszenie właściciela). Historia klienta istniała od S2
@@ -114,7 +116,11 @@ export interface ProfilKlienta {
    * gdy założenie przy odmowie nie doszło, i kodów odmowy z panelu Allegro.
    */
   propozycjaDosylki: { zwrotId: number; zamowienie: string; kod: KodDosylki; odmowaAt: string | null } | null;
-  /** Przewoźnicy znani z naszej bazy, bez powtórzeń i po kolei — opcje formularza numeru dosyłki. */
+  /**
+   * Przewoźnicy znani z naszej bazy, bez powtórzeń i po kolei, z `OTHER`
+   * zawsze, a bez `UNKNOWN` — opcje formularza numeru dosyłki. Pusta lista,
+   * gdy formularza nie ma: sprawa bez dosyłek i bez propozycji.
+   */
   przewoznicy: string[];
 }
 
@@ -176,7 +182,7 @@ export function profilKlienta(
     pozycje: (database.prepare(`SELECT nazwa, ilosc, cena_grosze FROM zamowienie_klienta_pozycja
         WHERE zamowienie_id = ? ORDER BY id`).all(Number(z.id)) as Wiersz[])
       .map((p) => ({ nazwa: String(p.nazwa), ilosc: Number(p.ilosc), cenaGrosze: Number(p.cena_grosze) })),
-    przesylka: stanPrzesylkiKrotko(przesylkaZamowienia(database, Number(z.id))),
+    przesylka: stanPrzesylkiKrotko(przesylkaZamowienia(database, Number(z.id), teraz)),
     link: linkZamowienia(String(z.external_id)),
   }));
 
@@ -258,6 +264,7 @@ export function profilKlienta(
 
   const ile = (r: WpisHistorii["rodzaj"]) => os.filter((w) => w.rodzaj === r).length;
   const sprawa = sprawaKlienta(q, teraz, database);
+  const propozycja = propozycjaDosylki(database, q, teraz);
   return {
     login,
     liczby: {
@@ -274,8 +281,11 @@ export function profilKlienta(
       : null,
     sprawa,
     ...podpowiedz(database, sprawa, otwarte),
-    propozycjaDosylki: propozycjaDosylki(database, q, sprawa, teraz),
-    przewoznicy: przewoznicy(database),
+    propozycjaDosylki: propozycja,
+    /* Lista tylko tam, gdzie stoi formularz numeru — przy dosyłce na karcie
+       albo po kliknięciu propozycji. Przegląd trzech tabel przy każdym
+       otwarciu profilu bez dosyłki kosztowałby za nic. */
+    przewoznicy: (sprawa?.dosylki.length ?? 0) > 0 || propozycja !== null ? przewoznicy(database) : [],
   };
 }
 
@@ -283,7 +293,10 @@ export function profilKlienta(
  * Podpowiedź „Zakończ sprawę?” i jej powód.
  *
  * „dosylka” wygrywa z „termin”, gdy obie zachodzą: doręczenie mówi, CZEMU
- * krok się spełnił, a termin tylko, że minął czas.
+ * krok się spełnił, a termin tylko, że minął czas. Stoi tylko wtedy, gdy
+ * doszła każda śledzona dosyłka, a ostatnia PO ostatnim ruchu człowieka
+ * (`doreczonaDoZakonczenia`). Nowy krok po doręczeniu znaczy, że agent je
+ * widział i ma jeszcze coś do zrobienia.
  *
  * Otwarty zwrot z TEGO SAMEGO zamówienia nie gasi podpowiedzi dosyłki.
  * Zwrot przy wymianie nie dostaje korekty, bo pieniędzy się nie oddaje,
@@ -295,8 +308,11 @@ function podpowiedz(
 ): { podpowiedzZakonczenia: boolean; podpowiedzPowod: "termin" | "dosylka" | null } {
   const nic = { podpowiedzZakonczenia: false, podpowiedzPowod: null };
   if (!sprawa || sprawa.stan !== "w_toku") return nic;
+  const ruch = database.prepare("SELECT zmieniono_at FROM klient_prowadzenie WHERE id = ?").get(sprawa.id) as
+    Wiersz | undefined;
+  const doszla = ruch ? doreczonaDoZakonczenia(sprawa.dosylki, String(ruch.zmieniono_at)) : null;
   const doreczone = new Set(sprawa.dosylki.filter((d) => d.dostarczonoAt).map((d) => d.zamowienie));
-  if (doreczone.size > 0) {
+  if (doszla) {
     const zwrotyWymiany = new Set((database.prepare(`SELECT id, order_id FROM zwrot_klienta
         WHERE kupujacy_login = ? COLLATE NOCASE AND zamkniety_at IS NULL`).all(sprawa.login) as Wiersz[])
       .filter((z) => doreczone.has(String(z.order_id))).map((z) => Number(z.id)));
@@ -319,9 +335,13 @@ function podpowiedz(
  * daty odmowy w lądowisku, w ostateczności od zgłoszenia zwrotu. Nigdy od
  * `zwrot_klienta.created_at`: mapowanie podstawia tam czas synchronizacji,
  * gdy Allegro daty nie poda — i stara odmowa udawałaby świeżą.
+ *
+ * „Nikt nie śledzi” liczy ta sama reguła co ekran zwrotu i „Śledź dosyłkę”
+ * (`DOSYLKA_ZWROTU_SQL`). Dosyłka poprzedniej odmowy tego zamówienia nie
+ * chowa propozycji: to inna paczka.
  */
 function propozycjaDosylki(
-  database: DatabaseSync, login: string, sprawa: SprawaKlienta | null, teraz: Date,
+  database: DatabaseSync, login: string, teraz: Date,
 ): ProfilKlienta["propozycjaDosylki"] {
   const kandydaci = database.prepare(`
     SELECT z.id, z.order_id, z.channel_account_id, z.odmowa_kod, z.rejection_code, z.odmowa_at,
@@ -341,8 +361,8 @@ function propozycjaDosylki(
     /* Bez żadnej daty Allegro odmowy nie da się umieścić w oknie — a stara
        odmowa podana jako świeża namawiałaby do śledzenia paczki sprzed miesięcy. */
     .filter((x) => Number.isFinite(x.t) && x.t >= granica)
-    .filter((x) => !(sprawa && database.prepare(`SELECT 1 FROM klient_dosylka WHERE sprawa_id = ? AND zamowienie = ?`)
-      .get(sprawa.id, String(x.z.order_id))))
+    .filter((x) => !database.prepare(DOSYLKA_ZWROTU_SQL)
+      .get(Number(x.z.id), Number(x.z.channel_account_id), String(x.z.order_id)))
     .sort((a, b) => b.t - a.t);
   const p = propozycje[0];
   return p ? {
@@ -355,13 +375,18 @@ function propozycjaDosylki(
  * Przewoźnicy, których już widzieliśmy — przy zamówieniach, zwrotach
  * i dosyłkach. Lista zamiast pola tekstowego, bo `carrierId` trafia do
  * adresu trackingu i literówka dałaby dosyłkę, o którą nikt nie umie spytać.
+ *
+ * `OTHER` jest zawsze: to przewoźnik spoza Allegro, którego nie śledzimy,
+ * a etykieta z Sellasist bywa u takiego. `UNKNOWN` odpada — to kod „Allegro
+ * nie wie”, a o paczkę u nieznanego przewoźnika nie da się zapytać.
  */
 function przewoznicy(database: DatabaseSync): string[] {
-  return (database.prepare(`
+  return [...(database.prepare(`
     SELECT przesylka_przewoznik AS p FROM zamowienie_klienta WHERE przesylka_przewoznik IS NOT NULL
     UNION SELECT przewoznik FROM zwrot_klienta WHERE przewoznik IS NOT NULL
     UNION SELECT przewoznik FROM klient_dosylka WHERE przewoznik IS NOT NULL`).all() as Wiersz[])
-    .map((w) => String(w.p).trim()).filter((p) => p !== "")
+    .map((w) => String(w.p).trim()), "OTHER"]
+    .filter((p) => p !== "" && p !== "UNKNOWN")
     .filter((p, i, t) => t.indexOf(p) === i)
     .sort((a, b) => a.localeCompare(b));
 }

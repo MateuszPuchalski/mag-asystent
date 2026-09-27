@@ -28,7 +28,10 @@ const OPIS: Record<Rodzaj, string> = {
 
 function Decyzja({ k }: { k: KolizjaKodu }) {
   const r = k.rozstrzygniecie;
-  if (!r) return <span className="text-slate-600">—</span>;
+  /* Bez decyzji nie ma czego pokazać: przyciski stoją od razu w wierszu.
+     Do 0.538.0 stała tu kreska, a przyciski linijkę niżej, więc każdy
+     wiersz miał dwie wysokości i lista dziewięciu kodów zajmowała ekran. */
+  if (!r) return null;
   return <div>
     <b>{r.rodzaj === "poprawione" ? "Poprawione" : "Dopuszczone"}</b>
     <div className="text-xs text-slate-600">{r.przez ?? "biuro"} · {czas(r.at)}</div>
@@ -70,7 +73,7 @@ export function KartaKolizji() {
         <Td>
           <Decyzja k={k} />
           {forma?.ean === k.ean
-            ? <form className="mt-2 space-y-2" onSubmit={(e) => { e.preventDefault(); zapisz(); }}>
+            ? <form className={`space-y-2 ${k.rozstrzygniecie ? "mt-2" : ""}`} onSubmit={(e) => { e.preventDefault(); zapisz(); }}>
                 <p className="text-xs text-slate-700">{OPIS[forma.rodzaj]}</p>
                 <Pole className="w-full" autoFocus value={notatka} onChange={(e) => setNotatka(e.target.value)}
                   placeholder="notatka — opcjonalnie" aria-label="Notatka do decyzji" />
@@ -80,7 +83,7 @@ export function KartaKolizji() {
                   <Przycisk type="button" className="!px-2.5 !py-1 !text-xs" onClick={() => setForma(null)}>Anuluj</Przycisk>
                 </div>
               </form>
-            : <div className="mt-2 flex gap-2">
+            : <div className={`flex gap-2 ${k.rozstrzygniecie ? "mt-2" : ""}`}>
                 {(["poprawione", "dopuszczone"] as const).map((r) =>
                   <Przycisk key={r} className="!px-2.5 !py-1 !text-xs"
                     onClick={() => { setForma({ ean: k.ean, rodzaj: r }); setNotatka(""); setBlad(""); }}>

@@ -395,6 +395,22 @@ ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
 > spraw. Jedno odstępstwo od planu: zapas danych firmy z przeglądarki
 > ZOSTAJE. Biuro może przeskoczyć 0.444.0 przy aktualizacji, a wtedy nikt
 > nie kliknął „Przenieś na serwer".
+>
+> **Nagłówek w jednym rzędzie (0.538.0, decyzja właściciela z 27 września
+> 2026).** Podział „praca na górnym rzędzie, wgląd na dolnym" zostaje jako
+> podział treści, ale nie jako dwa rzędy. Praca to zakładki, a wgląd,
+> ustawienia i wyjście stoją w menu „Więcej" na końcu rzędu. Dolny rząd
+> kosztował ~50 px wysokości na każdym ekranie pracy za rzeczy otwierane
+> kilka razy w miesiącu. Dostawy są ósmą zakładką, za kreską, bo przyjęcie
+> dostawy to praca dzienna. Szukanie zostało samą lupą, a pigułka
+> synchronizacji kropką z godziną; w alarmie pisze „Stanęła".
+>
+> Zmierzone w Chromium na zasianym serwerze, przy 1180 px. Nagłówek ma
+> 65 px zamiast 117 px. Z godziną synchronizacji i licznikami „6" i „12"
+> rząd ma 55 px luzu. Alarm „Stanęła" mieści się z luzem 23 px, a etykieta
+> „DEV" równo na styk. Drugi rząd daje dopiero „DEV" razem z alarmem albo
+> plakietka spóźnień. To cena świadoma: `flex-wrap` z 0.233.0 zostaje, bo
+> menu niesie wylogowanie. Makiety wariantów leżą w artefakcie projektu.
 
 ### 8. Kiedy nowa obsługa jest gotowa?
 
@@ -1168,23 +1184,33 @@ granice stoją osobno, bo przy sprawie po raz pierwszy leży numer przesyłki.
 
 **Co zapisujemy.** Numer zamówienia z kontem kanału, numer przesyłki dosyłki
 i identyfikator przewoźnika z Allegro. Obok stoi wynik śledzenia: ostatni kod
-statusu, pierwsze doręczenie i chwila ostatniego pytania. Historii statusów
-nie ma, bo żyje u przewoźnika. Autora też nie ma: stoi w dzienniku, a klucz
-do `app_user` blokowałby kasowanie kont.
+statusu, pierwsze doręczenie i chwila ostatniego pytania. Są też liczniki
+przejść w doręczenie i w kłopot oraz znacznik poprzedniego epizodu sprawy.
+Historii statusów nie ma, bo żyje u przewoźnika. Autora też nie ma: stoi
+w dzienniku, a klucz do `app_user` blokowałby kasowanie kont.
 
 **Numer przesyłki leży tak jak numer pierwszej paczki.** Trzymają go już
 `zamowienie_klienta.przesylka_waybill` (0.393.0) i `zwrot_klienta.waybill`
 (0.172.0). Powód jest ten sam: bez numeru nie ma śledzenia, a agent kopiuje go
 do Sellasist albo do rozmowy z przewoźnikiem. W systemie przewoźnika numer
-prowadzi do adresu odbiorcy, więc nie wychodzi dalej niż ta tabela i karta
-sprawy na profilu.
+prowadzi do adresu odbiorcy, więc wychodzi z tabeli tylko w dwa miejsca.
+
+**Gdzie numer wychodzi z tabeli.** Pierwsze miejsce to sprawa klienta
+w profilu, `GET /api/obsluga/klient/:login`, bo karta sprawy go kopiuje
+i poprawia. Drugie to odpowiedzi zapisów sprawy pod
+`/api/obsluga/klient/:login/sprawa/`, także ciało 409 ze świeżą sprawą.
+Historia klienta przy zwrocie, sprawie i rozmowie niesie sprawę z numerem
+dosyłki pustym, bo jej linia drukuje samo zdanie. Ekran zwrotu, „Moje”
+i trasy zwrotu dostają zdanie o dosyłce, bez numeru.
 
 **Czego nie ma i nie będzie.** Adresu, telefonu ani nazwy odbiorcy dosyłki:
 jedzie na adres zamówienia, a ten już znamy. Treści odpowiedzi Allegro nie ma
-w zdaniach błędów ani w logu tickera, bo bywa czymkolwiek.
+w zdaniach błędów dosyłki ani w logu jej tickera, bo bywa czymkolwiek. Log
+tickera niesie stałe zdanie, a log trackingu dokłada tylko przewoźnika i kod
+HTTP.
 
 **Numer przesyłki nie wychodzi dalej.** Nie idzie do dziennika: zdarzenia
-`klient_dosylka_*` niosą numer sprawy, źródło numeru i kod statusu. Nie
+`klient_dosylka_*` niosą numer sprawy, źródło założenia i kod statusu. Nie
 dostaje go Copilot: szkic zna tylko stan drugiej paczki, tak jak pierwszej
 (`zdaniePrzesylki`). Nie ma go w eksporcie CSV, w migawce doby ani w raporcie
 tygodnia. Każdy z nich wybiera tabele i pola z nazwy, więc nowa tabela nie
@@ -1197,9 +1223,9 @@ sprawy.
 
 **Retencja idzie za sprawą.** Wiersz znika razem ze sprawą klienta (kaskada),
 a zwrot skasowany przy sprzątaniu zostawia dosyłkę bez odnośnika. Ticker
-przestaje pytać po trzydziestu dniach od założenia, ale numeru nie kasuje:
-przy reklamacji dosyłki agent potrzebuje go tak samo jak numeru pierwszej
-paczki.
+przestaje pytać po trzydziestu dniach od założenia albo od numeru. Numeru
+nie kasuje: przy reklamacji dosyłki agent potrzebuje go tak samo jak numeru
+pierwszej paczki.
 
 ## Co się nie zmienia
 

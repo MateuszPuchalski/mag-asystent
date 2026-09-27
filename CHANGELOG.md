@@ -10,6 +10,79 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.538.0 — 27 września 2026
+
+**Nagłówek panelu w jednym rzędzie.** Decyzją właściciela z 27 września 2026
+dolny rząd zniknął, a ekran pracy zyskał 52 px wysokości przy 1180 px.
+Stan systemu, Dziennik, Analiza, Ustawienia i Wyloguj stoją w menu „Więcej”
+na końcu paska. Dostawy są ósmą zakładką, za kreską. Szukanie to sama lupa,
+a Ctrl K działa bez zmian. Synchronizację pokazuje kropka z godziną; gdy
+stanie, pasek pisze „Stanęła” na czerwono.
+
+**Stan systemu jako tablica.** Na górze stoi kafelek na każdy obszar: barwa
+i jedno zdanie, na przykład „2 do decyzji” albo „działa · 11:36”. Pod spodem
+otwarte są wyłącznie karty tego, co nie działa albo czeka na biuro. Kartę
+każdego innego obszaru otwiera klik w kafelek. Kolejka zapisów chowa
+„zapisane” pod przyciskiem, a kody kreskowe mają przyciski decyzji w wierszu.
+
+## 0.537.0 — 27 września 2026
+
+**Grupa „Do sprawdzenia" zawęża listę zwrotów.** Właściciel zapytał, co
+właściwie znaczy pasek nad kolejką zwrotów, a potem napisał „zrób oba".
+
+- Podpis „po terminie ustawowym" mówi teraz „po terminie obsługi (7 dni od
+  doręczenia)". To termin z regulaminu Allegro, nie ustawowy — serwer mówił
+  tak od dawna, a podpis nie.
+- Kliknięcie grupy zwrotów w pasku („po terminie obsługi", „bez śladu po
+  przelewie", „rozliczony w Allegro bez korekty") zostawia na liście tylko te
+  zwroty, ze wszystkich kubełków. Nad listą stoi „Tylko: …" z przyciskiem
+  „wyczyść". Wpisanie frazy zdejmuje ten filtr.
+- Grupy koszy prowadzą do ekranu koszy.
+
+## 0.536.1 — 27 września 2026
+
+**Formularz odmowy nie przechodzi już na następny zwrot.** Po odmowie na
+jednym zwrocie i przejściu na drugi formularz stał otwarty z kodem i powodem
+poprzedniego. Jedno kliknięcie wysyłało nieodwracalną odmowę do innego
+klienta, a od 0.536.0 zakładało mu też dosyłkę. Sekcja pieniędzy rysuje się
+teraz od nowa dla każdego zwrotu, a błąd odmowy stoi przy swoim zwrocie.
+
+**Dosyłka nie gubi się i nie wraca nie w porę.** Poprawki do 0.536.0 po
+trzech przeglądach:
+
+- Odmowa wypłaty przejmuje dosyłkę, której numer ktoś już wpisał, zamiast ją
+  kasować — także numer trzeciej paczki wpisany przed odmową drugiego zwrotu.
+- Sprawa wznowiona po zakończeniu nie pokazuje skończonych dosyłek poprzedniej
+  sprawy. Stara dosyłka bez numeru nie trzyma już sprawy „na dziś” tygodniami.
+  Dosyłka, która jeszcze jedzie, zostaje śledzona.
+- Numer wpisany z Sellasist do paczki już doręczonej budzi sprawę z datą,
+  a profil pyta „Zakończ sprawę?”.
+- Drugi kłopot przewoźnika z tą samą dosyłką budzi sprawę. Doręczenie, które
+  prowadzący już widział, nie budzi jej drugi raz.
+- Numer wpisany po czasie ma własne trzydzieści dni śledzenia.
+- Serwer nie bierze pierwszej paczki za dosyłkę, gdy Allegro nie podało daty
+  nadania.
+- Jeden źle wpisany numer nie zatrzymuje śledzenia pozostałych dosyłek tego
+  przewoźnika.
+- Podpowiedź „Zakończ sprawę?” czeka, aż dojdą wszystkie dosyłki sprawy,
+  i znika po nowym kroku.
+- Odmowa złożona w panelu Allegro pokazuje na ekranie zwrotu stan dosyłki
+  i zamyka tam drugą odmowę oraz wypłatę, których Allegro i tak nie przyjmie.
+- Numer dosyłki wpisuje się z przewoźnikiem wybranym świadomie. Lista zna
+  „inny”, a nie proponuje już pierwszego z alfabetu.
+- Linijka dosyłki na profilu mówi, którego zamówienia dotyczy, i prowadzi
+  do zwrotu.
+- Śledzenie dosyłek chodzi co siedemnaście minut, innym rytmem niż rabaty.
+  Rytm zmienia `ALLEGRO_DOSYLKI_SYNC_MS`, a 0 wyłącza takt.
+- Dziennik serwera nie przepisuje już treści odpowiedzi Allegro przy błędzie
+  śledzenia. Numer dosyłki zszedł z historii przy kolejkach, zostaje na
+  karcie sprawy.
+- Dokumenty oddzielają fakty właściciela od założeń. Kod „Wysłaliśmy
+  brakującą część” dołożyliśmy sami, a 0.536.0 przypisał go właścicielowi.
+
+Migracja dokłada cztery kolumny do tabeli `klient_dosylka` przy starcie
+i przycina zapisane odciski spraw do nowych liczników. Nie trzeba nic klikać.
+
 ## 0.536.0 — 27 września 2026
 
 **Odmowa „Wysłaliśmy nowy towar” zakłada śledzenie dosyłki.** Drugi przyrost
