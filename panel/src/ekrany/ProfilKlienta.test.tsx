@@ -14,7 +14,7 @@ import { dataLokalna } from "../ui";
    a cofnięcie idzie bez ciała (reguła klienta HTTP); nieznany login to
    zdanie, nie pusty profil.
 
-   SPRAWA KLIENTA (S6, @wydanie) dokłada swoje: otwarcie z prowadzoną sprawą
+   SPRAWA KLIENTA (S6, 0.535.0) dokłada swoje: otwarcie z prowadzoną sprawą
    dalej wysyła same GET-y; karta bez sprawy to jedna linijka; gotowy termin
    zapisuje krok jednym kliknięciem; zakończenie niesie wersję i odcisk,
    a „Cofnij" — wersję i odcisk z ODPOWIEDZI; „Przejmij" widać tylko przy
@@ -130,7 +130,7 @@ describe("PROFIL KLIENTA", () => {
     expect(zadania.every((z) => z.metoda === "GET")).toBe(true);
     expect(zadania[0].url).toBe("/api/obsluga/klient/chrzanowski1234");
     expect(screen.getByRole("link", { name: /Otwarta reklamacja/ })).toHaveAttribute("href", "/obsluga/reklamacje/3");
-    /* „Otwarte w kolejkach", nie „Otwarte sprawy" (@wydanie): słowo „sprawa"
+    /* „Otwarte w kolejkach", nie „Otwarte sprawy" (0.535.0): słowo „sprawa"
        znaczy na tym ekranie już tylko sprawę klienta. */
     expect(within(screen.getByRole("region", { name: "Otwarte w kolejkach" })).getByText("czeka na nas")).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Otwarte sprawy" })).toBeNull();

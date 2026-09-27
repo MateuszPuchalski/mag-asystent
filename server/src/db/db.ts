@@ -930,7 +930,7 @@ export function migrate(database: DatabaseSync) {
       addColumn("zastosowanie", kolumna, typ);
     }
   }
-  /* INDEKSY LOGINU BEZ WIELKOŚCI LITER (@wydanie, sprawa klienta). Profil
+  /* INDEKSY LOGINU BEZ WIELKOŚCI LITER (0.535.0, sprawa klienta). Profil
      i sprawa klienta pytają o login w czterech tabelach przy każdym otwarciu,
      a „Moje” — przy każdym odświeżeniu, raz na każdą prowadzoną sprawę.
      Porównanie idzie `COLLATE NOCASE`, a indeksu z kolatacją BINARY SQLite do

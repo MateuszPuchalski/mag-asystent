@@ -101,7 +101,7 @@ test("profil: odczyt bez zapisu, nieznany login 404, notatka tylko dla biura", a
   assert.equal(c.statusCode, 409, "nie było poprzedniej notatki");
 });
 
-/* ── Sprawa klienta (@wydanie, S6) ───────────────────────────────────────────
+/* ── Sprawa klienta (0.535.0, S6) ───────────────────────────────────────────
    Cztery zapisy: bramka osobno dla każdego (TRASY wyżej wysyłają tylko GET),
    każdy klucz ciała wymagany, konflikt to 409 ze świeżą sprawą, a login
    kupującego nie ląduje w `events` — ani z serwisu, ani z audytu odrzuceń. */

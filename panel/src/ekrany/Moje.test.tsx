@@ -13,7 +13,7 @@ import type { MojaSprawa } from "../api/typy";
    3. NIE MA TU ANI JEDNEGO PRZYCISKU PRACY. Ekran roboczy nad kolejkami
       byłby nakładką ze wspólnym statusem — kształtem z blizny 0.140.0.
 
-   Sprawa klienta (S6, @wydanie) dokłada wiersz `klient`: prowadzi do źródła
+   Sprawa klienta (S6, 0.535.0) dokłada wiersz `klient`: prowadzi do źródła
    zdarzenia albo do profilu, mówi o kroku jednym zdaniem i dalej nie ma
    przycisku — krok i zakończenie stoją na profilu.                         */
 
@@ -88,7 +88,7 @@ describe("Ekran Moje", () => {
   });
 
   it("czyta scaloną `lista`, a wiersz nieznanego rodzaju pomija, zamiast wywrócić ekran", () => {
-    /* `sprawy` to od @wydanie same kolejki — dla kart sprzed wydania, które
+    /* `sprawy` to od 0.535.0 same kolejki — dla kart sprzed wydania, które
        na wierszu `klient` wywracały się bez granicy błędu. Ta karta czyta
        `lista`, a rodzaj dołożony przez przyszły serwer po prostu pomija. */
     moje.mockReturnValue({ data: {

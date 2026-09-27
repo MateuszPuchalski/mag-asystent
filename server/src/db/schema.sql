@@ -3195,7 +3195,7 @@ CREATE TABLE IF NOT EXISTS klient_notatka (
   przez_user_id  INTEGER REFERENCES app_user(user_id)
 );
 
--- Sprawa klienta (26 września 2026, @wydanie, S6 `docs/obsluga-klienta-calosc.md`).
+-- Sprawa klienta (26 września 2026, 0.535.0, S6 `docs/obsluga-klienta-calosc.md`).
 -- Jeden wiersz na login: KTO prowadzi i JAKI jest nasz następny krok z terminem.
 -- To nie jest piąta kolejka ze wspólnym statusem — kolejki mają swoje statusy,
 -- a tu stoi tylko to, czego żadna z nich nie wie. Nazwa nie jest `sprawa_klienta`,

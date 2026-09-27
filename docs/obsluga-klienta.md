@@ -1110,7 +1110,7 @@ odczycie.
 **Do dostawcy modelu nie idzie stąd nic.** Copilot nie ma dostępu do tego
 ekranu, tak samo jak nie ma go do reklamacji.
 
-## Polityka danych sprawy klienta (@wydanie)
+## Polityka danych sprawy klienta (0.535.0)
 
 Ten rozdział powstaje razem ze sprawą klienta (`docs/obsluga-klienta-calosc.md`,
 S6). To druga, po `klient_notatka`, tabela, której kluczem jest sam login
@@ -1139,10 +1139,10 @@ w jednym wierszu tabeli.
 
 **Audyt odrzuceń pisze wzorzec trasy, nie adres.** Pod `/api/obsluga/klient/`
 adres niesie login, a odrzucenie (`http_rejected`) zapisywało go do `events`.
-Od @wydanie idzie tam wzorzec, np. `/api/obsluga/klient/:login/sprawa/krok`.
+Od 0.535.0 idzie tam wzorzec, np. `/api/obsluga/klient/:login/sprawa/krok`.
 To domyka też starszy wyciek przy 404 profilu i przy odmowie notatki. Zdania
 błędów sprawy są stałe, bez loginu i bez kroku. Wpisy `http_rejected` sprzed
-@wydanie zostają z adresem, a w nim z loginem. Czyszczenie ich to decyzja
+0.535.0 zostają z adresem, a w nim z loginem. Czyszczenie ich to decyzja
 właściciela, bo §9 architektury zabrania nadpisywania historii.
 
 **Sprawa nie wychodzi dalej.** Nie czyta jej Copilot i nie ma jej w eksporcie

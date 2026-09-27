@@ -37,7 +37,7 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
      Różnica jest cała: drugie zdanie byłoby kłamstwem o kliencie, który kupuje
      u nas od lat, tylko napisał z konta bez loginu w lądowisku wątku. */
   if (!h.data?.login) {
-    /* Sprawa klienta i tak bywa tu znana (@wydanie): serwer bierze jej login
+    /* Sprawa klienta i tak bywa tu znana (0.535.0): serwer bierze jej login
        z zamówienia rozmowy, nie z treści. Sprawa budzi się z takiej rozmowy
        i do niej odsyła, więc rozmowa pokazuje ją z powrotem — wiązanie
        jednostronne to wiązanie, którego nie ma. Historii dalej nie ma. */
@@ -116,7 +116,7 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
 }
 
 /**
- * Sprawa klienta przy źródle (S6, @wydanie) — jedna linijka, cała klikalna.
+ * Sprawa klienta przy źródle (S6, 0.535.0) — jedna linijka, cała klikalna.
  *
  * WIĄZANIE W OBIE STRONY (`CLAUDE.md`). Profil prowadzi do rozmowy, zwrotu
  * i reklamacji; bez tej linijki agent przy rozmowie nie wiedziałby, że ktoś

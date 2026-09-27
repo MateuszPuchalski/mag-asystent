@@ -123,7 +123,7 @@ test("profil jest odczytem — otwarcie niczego nie zapisuje", () => {
   assert.equal((db().prepare("SELECT total_changes() n").get() as { n: number }).n, przed);
 });
 
-/* ── Sprawa klienta na profilu (@wydanie, S6) ────────────────────────────────
+/* ── Sprawa klienta na profilu (0.535.0, S6) ────────────────────────────────
    Profil niesie sprawę i podpowiedź „Zakończ sprawę?”. Podpowiedź stoi tylko
    wtedy, gdy trzy rzeczy zachodzą naraz: sprawa w toku, w kolejkach nic nie
    czeka, a termin kroku nadszedł. Każda z trzech osobno ją gasi. */

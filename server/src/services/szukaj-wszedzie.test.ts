@@ -117,7 +117,7 @@ test("login daje jeden wiersz klienta na górze, prowadzący do profilu", () => 
   assert.match(klienci[0].cel ?? "", /^\/obsluga\/klient\/chips20$/i);
 });
 
-/* ── Kupujący zamówienia jako klient (@wydanie) ──────────────────────────────
+/* ── Kupujący zamówienia jako klient (0.535.0) ──────────────────────────────
    Brak w dostawie przychodzi z numerem zamówienia, a sprawę klienta zakłada
    się na profilu. Numer zamówienia daje więc wiersz „Klient” jego kupującego,
    na górze — profil i sprawa są o jeden klik. */

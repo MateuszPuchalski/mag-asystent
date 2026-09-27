@@ -82,7 +82,7 @@ Dostawa zostaje przy „notatce do hali", żeby nie mieć dwóch kanałów o jed
 dokumencie.
 
 Drugim mostkiem jest login kupującego. Chodzą po nim zakładka KLIENT (S2),
-kandydaci zamówień rozmowy bez numeru (S1) i od @wydanie sprawa klienta
+kandydaci zamówień rozmowy bez numeru (S1) i od 0.535.0 sprawa klienta
 (S6). Właściciel potwierdził go na żywym koncie 24 września 2026 — rozdział
 „Sprzeczność: login kupującego" niżej. Nowe wiązania po loginie są więc dozwolone, bez wielkości liter.
 
@@ -104,7 +104,7 @@ nie mają. Otworzyłyby listę, która dziś znaczy co innego.
 Nakładka spraw (`sprawa_klienta`) odeszła w 0.388.0. Droga zakupu robi to
 samo sama i przez cztery kolejki. Cena jest zapisana jawnie: dwóch rozmów
 o jednym problemie BEZ wspólnego zamówienia nikt już nie sklei. Tę cenę
-zdejmuje od @wydanie sprawa klienta z S6. Jej kluczem jest login, nie
+zdejmuje od 0.535.0 sprawa klienta z S6. Jej kluczem jest login, nie
 zamówienie, więc obie rozmowy budzą tę samą sprawę.
 
 ## Dekalog obsługi klienta
@@ -221,7 +221,7 @@ o reklamacji czy zwrocie — tej samej, której zabrania S3. Paczka
 „niedoręczona” wymaga sprawdzenia przewoźnika. Bez niego brak doręczenia
 znaczy tylko, że nie pytaliśmy.
 
-**Notatka była jedynym zapisem do @wydanie.** Jedna na login, bez statusu
+**Notatka była jedynym zapisem do 0.535.0.** Jedna na login, bez statusu
 i bez kolejki, więc nie jest piątą tabelą nad kolejkami. Trzyma poprzednią
 treść, bo agent nadpisuje cudzą notatkę jednym kliknięciem. Dziennik zdarzeń
 dostaje długość, nie treść: notatka o kliencie to dane osobowe, a dziennik
@@ -248,7 +248,7 @@ Ekran `/obsluga/moje` składa rozmowy, reklamacje i dyskusje. Zwrotu tam NIE MA:
 w 0.370.0 właściciel zdjął ze zwrotu prowadzącego. Kolumny `prowadzi_*`
 w `zwrot_klienta` zostały, ale nikt ich nie pisze.
 
-**Od @wydanie „Moje" niesie też sprawy klienta tej osoby (S6).** Scala je
+**Od 0.535.0 „Moje" niesie też sprawy klienta tej osoby (S6).** Scala je
 `mojaLista` w `services/prowadzenie-klienta.ts`, bo `droga-klienta.ts` nie
 może znać serwisu sprawy. Pętla importów dała już raz pusty zbiór
 (`statusy-spraw.ts`). Wiersz sprawy prowadzi do źródła najnowszego zdarzenia
@@ -306,7 +306,7 @@ i brak danych to „pominięty”, bo czerwień ma znaczyć jedno: droga nie dzi
 Pytanie stało tu otwarte: kiedy sprawa klienta jest skończona, skoro składa
 się z bytów o czterech właścicielach danych? Rozstrzygnął je wywiad
 z właścicielem z 26 września 2026. Pierwszy przyrost stoi w kodzie od
-@wydanie, a następny opisuje koniec tego rozdziału.
+0.535.0, a następny opisuje koniec tego rozdziału.
 
 **Powód.** Biuro nazywa swój główny problem wprost: intuicyjne śledzenie
 i prowadzenie sprawy danego klienta. Jedna osoba prowadzi braki towaru,
@@ -524,9 +524,9 @@ od drugiej: nazywa dziurę, a nie funkcję.
 | dyskusja przed reklamacją | dyskusje (0.245.0), wiązanie od 0.386.0 | zegara |
 | prośba o rabat zamiast zwrotu | rabat transakcyjny (0.164.0) | — |
 | pytanie reklamacyjne bez sprawy w Allegro | skrzynka, znacznik „reklamacyjna" (0.390.0) | zegara — rozmowa nie ma terminu (§26) |
-| wymiana na inny towar | zwrot przez Allegro, dosyłka poza aplikacją; od @wydanie krok „dosłać" w sprawie klienta (S6) | numeru przesyłki i śledzenia dosyłki — następny przyrost S6 |
+| wymiana na inny towar | zwrot przez Allegro, dosyłka poza aplikacją; od 0.535.0 krok „dosłać" w sprawie klienta (S6) | numeru przesyłki i śledzenia dosyłki — następny przyrost S6 |
 | brak towaru na stanie | rozmowa plus zadanie terenowe | — |
-| brak towaru do sprzedanego zamówienia | Sellasist: magazynier zgłasza brak przy zbieraniu; od @wydanie Ctrl+K po numerze zamówienia daje kupującego | drogi braku z Sellasist do sprawy klienta bez przepisywania numeru |
+| brak towaru do sprzedanego zamówienia | Sellasist: magazynier zgłasza brak przy zbieraniu; od 0.535.0 Ctrl+K po numerze zamówienia daje kupującego | drogi braku z Sellasist do sprawy klienta bez przepisywania numeru |
 | klient wraca po miesiącu | rozmowa plus pełna historia (0.386.0) | — |
 | klient pisze z drugiego konta | dwie historie, bez wiązania | świadomej odpowiedzi „nie wiążemy" |
 | klient milczy po naszym pytaniu | kubełek BEZ RUCHU w reklamacjach | tego samego w skrzynce i zwrotach |
@@ -539,7 +539,7 @@ Znacznik „reklamacyjna" (0.390.0) jest NASZ i zostaje przy rozmowie. Sprawy
 w Allegro sprzedawca nie założy — `/sale/issues` ma wyłącznie GET.
 
 **Największe dziury to wymiana i brak towaru.** Obie są codzienne w handlu
-częściami i obie żyły poza aplikacją. Wymiana ma od @wydanie krok „dosłać"
+częściami i obie żyły poza aplikacją. Wymiana ma od 0.535.0 krok „dosłać"
 w sprawie klienta (S6), a śledzenie dosyłki to następny przyrost. Brak towaru
 czeka na drogę z Sellasist. Do tego czasu numer zamówienia w Ctrl+K daje
 kupującego, a z nim profil i sprawę.

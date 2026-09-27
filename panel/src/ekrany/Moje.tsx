@@ -19,7 +19,7 @@ import { Blad, Karta, NaglowekSekcji, czas, termin } from "../ui";
    prowadzącego w 0.370.0, bo zwrot przechodzi przez biuro jako kolejka
    decyzji, a nie jako czyjaś sprawa.
 
-   SPRAWA KLIENTA TU JEST (S6, @wydanie) i dalej bez przycisku. Wiersz
+   SPRAWA KLIENTA TU JEST (S6, 0.535.0) i dalej bez przycisku. Wiersz
    prowadzi do źródła najnowszego zdarzenia albo do profilu klienta, bo tam
    stoją krok i zakończenie. Listę scala serwer (`mojaLista`), więc kolejność
    — obudzone, potem terminy, na końcu kroki czekające na swój dzień — jest
@@ -54,7 +54,7 @@ export function Moje() {
   /* `lista` niesie też sprawy klientów; starszy serwer daje samo `sprawy`.
      Wiersz rodzaju, którego ta karta nie zna, SCHODZI z listy, zamiast
      wywrócić ekran: panel nie ma granicy błędu, a serwer aktualizuje się
-     w nocy pod otwartą kartą. Tak wywróciłaby się karta sprzed @wydanie. */
+     w nocy pod otwartą kartą. Tak wywróciłaby się karta sprzed 0.535.0. */
   const sprawy = (dane.data?.lista ?? dane.data?.sprawy ?? []).filter((s) => Object.hasOwn(KOLEJKI, s.kolejka));
   const zTerminem = sprawy.filter(zTerminemNaDzis).length;
 

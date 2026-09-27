@@ -23,7 +23,7 @@ import { statusRozmowy } from "./conversations.js";
    potrzebują, leży już w naszej bazie od pierwszej synchronizacji. Piąta
    tabela ze wspólnym statusem nad kolejkami kosztowałaby to, co nakładka
    spraw w 0.140.0 — cztery tabele i ręczne SCAL. `klient_prowadzenie`
-   (@wydanie, S6) taką tabelą nie jest: nie zbiera statusów kolejek, tylko
+   (0.535.0, S6) taką tabelą nie jest: nie zbiera statusów kolejek, tylko
    niesie nasz następny krok — powód w `prowadzenie-klienta.ts`. */
 
 type Wiersz = Record<string, unknown>;
@@ -289,7 +289,7 @@ export interface MojaSprawa {
   /* Trzy kolejki, nie cztery: zwrot nie ma prowadzącego od 0.370.0. Powód
      stoi przy zapytaniach w `mojeSprawy`.
 
-     `klient` to sprawa klienta (S6, @wydanie) — nie kolejka, tylko nasz
+     `klient` to sprawa klienta (S6, 0.535.0) — nie kolejka, tylko nasz
      następny krok przy kliencie. Wiersze dokłada `mojaLista`
      w `prowadzenie-klienta.ts`; ten plik zna wyłącznie TYP, bo import
      w drugą stronę zamknąłby cykl (blizna `statusy-spraw.ts`). */
@@ -318,7 +318,7 @@ export interface MojaSprawa {
 
 /**
  * Wszystko, co prowadzi jedna osoba — trzy kolejki jedną listą (S4 spoiwa).
- * Sprawy klienta (S6, @wydanie) dokłada do niej `mojaLista`
+ * Sprawy klienta (S6, 0.535.0) dokłada do niej `mojaLista`
  * w `prowadzenie-klienta.ts` i to ją woła trasa „Moje”, nie tę funkcję.
  *
  * ODCZYT Z DWÓCH ZAPYTAŃ, nie piąta kolejka i nie nowa tabela. Kliknięcie

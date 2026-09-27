@@ -395,7 +395,7 @@ export interface SprawaZakupu {
  * TRZY KOLEJKI, nie cztery: zwrot nie ma prowadzącego od 0.370.0, bo
  * przechodzi przez biuro jako kolejka decyzji, a nie jako czyjaś sprawa.
  *
- * `klient` TO NIE CZWARTA KOLEJKA (S6, @wydanie), tylko sprawa klienta, którą
+ * `klient` TO NIE CZWARTA KOLEJKA (S6, 0.535.0), tylko sprawa klienta, którą
  * ta osoba prowadzi. Wchodzi do tej samej listy, bo „Moje" odpowiada na „co
  * teraz zrobić", a krok z terminem jest dokładnie taką odpowiedzią. Lustro
  * `MojaSprawa` z `services/droga-klienta.ts`.
@@ -1085,7 +1085,7 @@ export type DokumentySprzedazy = {
 
 export type HistoriaKlienta = {
   login: string | null; maszyny: MaszynaKlienta[]; wpisy: WpisHistorii[];
-  /* Sprawa klienta przy historii źródła (S6, @wydanie). Wiązanie po loginie
+  /* Sprawa klienta przy historii źródła (S6, 0.535.0). Wiązanie po loginie
      musi działać w obie strony (`CLAUDE.md`): profil prowadzi do rozmowy, więc
      rozmowa, zwrot i reklamacja prowadzą do sprawy. Opcjonalne, bo profil
      składa historię sam i sprawę pokazuje własną kartą. */
@@ -1107,7 +1107,7 @@ export interface NoweZdarzenie {
 }
 
 /**
- * Sprawa klienta (S6, @wydanie) — lustro `SprawaKlienta`
+ * Sprawa klienta (S6, 0.535.0) — lustro `SprawaKlienta`
  * z `services/prowadzenie-klienta.ts`.
  *
  * Stoi TUTAJ, a nie w `spoiwo.ts`, choć tam mieszkają jej hooki: niesie ją

@@ -65,13 +65,13 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
      Tożsamość bierze z SESJI: `?userId=` pozwalałby czytać cudzą listę pracy,
      a to monitoring pracowniczy pod inną nazwą.
 
-     Od @wydanie lista niesie też SPRAWY KLIENTÓW prowadzone przez tę osobę
+     Od 0.535.0 lista niesie też SPRAWY KLIENTÓW prowadzone przez tę osobę
      (S6) — scala je `mojaLista`, bo `droga-klienta.ts` nie może znać serwisu
      sprawy. Ta sama zasada tożsamości: cudzych spraw klienta nie widać tu
      wcale, a ich listy per osoba nie ma nigdzie (art. 22² KP).
 
      DWA KLUCZE NA JEDNO WYDANIE. Scalona lista idzie pod `lista`, a `sprawy`
-     zostaje samymi kolejkami. Karta panelu sprzed @wydanie rozkłada
+     zostaje samymi kolejkami. Karta panelu sprzed 0.535.0 rozkłada
      `KOLEJKI[s.kolejka]` bez zapasu i wiersz `klient` wywróciłby jej ekran
      przy najbliższym odświeżeniu, co 30 sekund, po nocnej aktualizacji.
      Panel nie ma granicy błędu ani sam się nie przeładowuje. `sprawy` może
@@ -411,7 +411,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
   app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/klient",
     async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
-      /* Z doklejoną sprawą klienta (@wydanie) — powód przy `zeSprawa`.
+      /* Z doklejoną sprawą klienta (0.535.0) — powód przy `zeSprawa`.
          Login sprawy osobno od loginu historii: rozmowa bez rozmówcy
          w wątku należy do sprawy kupującego z jej zamówienia. */
       const id = Number(req.params.id);

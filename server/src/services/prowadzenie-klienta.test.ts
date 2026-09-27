@@ -7,7 +7,7 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-prowadzenie-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Sprawa klienta (@wydanie, S6) ───────────────────────────────────────────
+/* ── Sprawa klienta (0.535.0, S6) ───────────────────────────────────────────
    Pilnujemy umowy z projektu, punkt po punkcie:
    - dwa stany, krok z terminem jako JEDYNA droga założenia i wznowienia;
    - „nowe” z odcisku: budzi każde źródło po stronie klienta, także import

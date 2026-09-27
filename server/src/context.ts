@@ -300,7 +300,7 @@ export function withRequestContext(app: FastifyInstance): void {
  * Ścieżka do wpisu odrzucenia — pod profilem klienta WZORZEC TRASY, nie adres.
  *
  * Adres `/api/obsluga/klient/<login>/…` niesie login kupującego, a `events`
- * nie ma retencji. Sprawa klienta (@wydanie) pilnuje, żeby jej zdarzenia
+ * nie ma retencji. Sprawa klienta (0.535.0) pilnuje, żeby jej zdarzenia
  * niosły numer sprawy zamiast loginu — i ten wysiłek przepadałby w pierwszym
  * 409, które dopisywało adres z loginem do tej samej tabeli. Tą samą drogą
  * login wyciekał już przy 404 profilu i przy odmowie notatki.

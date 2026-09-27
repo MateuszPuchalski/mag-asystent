@@ -802,7 +802,7 @@ test("moje sprawy: tożsamość z sesji, nie z zapytania — cudzej listy nie ma
 });
 
 test("sprawa klienta na „Moje” i w historii rozmowy: tylko prowadzącego, bez zapisu przy patrzeniu", async () => {
-  /* Bliźniak testu wyżej dla sprawy klienta (@wydanie). Scalenie stoi
+  /* Bliźniak testu wyżej dla sprawy klienta (0.535.0). Scalenie stoi
      w serwisie, ale tożsamość bierze TRASA — i tu się jej pilnuje. */
   const ala = login("biuro", "A. Lewandowska");
   const bob = login("biuro", "B. Nowak");

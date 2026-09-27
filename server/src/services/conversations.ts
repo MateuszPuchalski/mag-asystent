@@ -709,7 +709,7 @@ export function statusIZakonczenie(
  * To jest DOKŁADNIE wejście `podziekowal` z `wyliczStatus`: ostatnia prawdziwa
  * wiadomość (ta sama kolejność co w `statusIZakonczenie`) jest klienta,
  * a klasyfikator uznał ją za podziękowanie. BEZ bramek stanu rozmowy —
- * werdyktu zapisanego i `otwarta_recznie_at`. Sprawa klienta (@wydanie)
+ * werdyktu zapisanego i `otwarta_recznie_at`. Sprawa klienta (0.535.0)
  * pyta o WIADOMOŚĆ, nie o rozmowę: „Otwórz ponownie” albo „Zakończona” to
  * nasz ruch i nie ma prawa zmienić, czy klient napisał coś nowego.
  */

@@ -101,7 +101,7 @@ export async function spoiwoRoutes(app: FastifyInstance) {
       return { ok };
     });
 
-  /* ── SPRAWA KLIENTA (@wydanie, S6) ─────────────────────────────────────────
+  /* ── SPRAWA KLIENTA (0.535.0, S6) ─────────────────────────────────────────
      Cztery zapisy, każdy z wymaganą `wersją`. KAŻDY KLUCZ CIAŁA JEST
      WYMAGANY i sprawdza się go `in`, nie `?? null`: brak klucza to 400 bez
      zapisu. Pole, które nie dojechało z trasy do serwisu, ginęło już po

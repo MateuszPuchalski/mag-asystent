@@ -117,7 +117,7 @@ export function szukajWszedzie(
     q, `${naLike(q)}%`, q, like, like, jakTelefon ? 1 : 0, `%${cyfry}`, q, NA_RODZAJ,
   ) as Wiersz[];
 
-  /* KUPUJĄCY ZAMÓWIENIA jako klient (@wydanie, sprawa klienta). Brak w dostawie
+  /* KUPUJĄCY ZAMÓWIENIA jako klient (0.535.0, sprawa klienta). Brak w dostawie
      przychodzi z numerem zamówienia, a sprawę klienta zakłada się na profilu.
      Bez tego wiersza droga szła przez zamówienie w Allegro i z powrotem po
      login. Trafienie po loginie ma już swój wiersz wyżej (i jego limit), więc

@@ -71,7 +71,7 @@ export interface ProfilKlienta {
   maszyny: MaszynaKlienta[];
   os: WpisHistorii[];
   notatka: { tresc: string; at: string; przez: string; cofalna: boolean } | null;
-  /** Sprawa klienta (S6, @wydanie); `null`, dopóki nikt nie ustawił kroku. */
+  /** Sprawa klienta (S6, 0.535.0); `null`, dopóki nikt nie ustawił kroku. */
   sprawa: SprawaKlienta | null;
   /** Nic nie czeka w kolejkach, a dzień kroku nadszedł — liczy serwer. */
   podpowiedzZakonczenia: boolean;
@@ -107,7 +107,7 @@ export function useCofnijNotatkeKlienta(login: string) {
   });
 }
 
-/* ── Sprawa klienta (S6, @wydanie) — trasy z `routes/spoiwo.ts` ─────────────
+/* ── Sprawa klienta (S6, 0.535.0) — trasy z `routes/spoiwo.ts` ─────────────
    Cztery zapisy, każdy na kliknięcie i każdy Z CIAŁEM: wszystkie niosą
    `wersja`, więc reguła klienta HTTP (pusty JSON to 400) nie ma tu okazji.
 

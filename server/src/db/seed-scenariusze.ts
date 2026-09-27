@@ -546,7 +546,7 @@ function wyczysc(): void {
       `DELETE FROM device_session WHERE user_id IN
          (SELECT user_id FROM app_user WHERE login IN (${luki(LOGINY.length)}))`
     ).run(...LOGINY);
-    /* Sprawa klienta (@wydanie) wskazuje prowadzącego i kończącego kluczem
+    /* Sprawa klienta (0.535.0) wskazuje prowadzącego i kończącego kluczem
        obcym bez kaskady. Sprawa założona na koncie ze scenariuszy (ktoś
        przeklikał profil na bazie pokazowej) wywracałaby kasowanie kont niżej
        i ponowny seed stawałby w pół drogi. Sprawy odchodzą z kontami: bez

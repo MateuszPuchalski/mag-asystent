@@ -17,7 +17,7 @@ import { sprawaKlienta, type SprawaKlienta } from "./prowadzenie-klienta.js";
    ODCZYT Z ISTNIEJĄCYCH TABEL, poza notatką i sprawą klienta. Liczby, sygnały
    i sprawy otwarte liczą się przy otwarciu z zamówień, zwrotów, spraw
    i rozmów. Piątej tabeli ze wspólnym statusem nad kolejkami nie ma i nie
-   będzie. Sprawa klienta (@wydanie, S6) nim nie jest: nie zbiera statusów
+   będzie. Sprawa klienta (0.535.0, S6) nim nie jest: nie zbiera statusów
    kolejek, tylko niesie NASZ następny krok z terminem i prowadzącego — to,
    czego żadna kolejka nie wie, bo „czekamy na zwrot, potem dosyłamy”
    przechodzi przez kilka z nich. Powód i granice w `prowadzenie-klienta.ts`.

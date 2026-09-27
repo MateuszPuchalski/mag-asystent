@@ -185,7 +185,7 @@ export function historiaSprawy(
  * jedno konto, ale login jest unikalny w obrębie konta sprzedawcy, nie
  * globalnie — historia składa się per konto. Pusta lista znaczy „nie znamy”.
  *
- * Stała w profilu klienta; tu jest od @wydanie, bo sprawa klienta pyta
+ * Stała w profilu klienta; tu jest od 0.535.0, bo sprawa klienta pyta
  * o dokładnie to samo. Dwie kopie tego złączenia rozjechałyby się przy
  * pierwszym piątym źródle, a sprawa budziłaby się z innych rozmów, niż
  * profil pokazuje.
@@ -208,7 +208,7 @@ export function kontaLoginu(
  * i numery zamówień tego loginu (także wskazane ręcznie, przez
  * `ROZMOWA_ZAMOWIENIA`). Od najświeższej.
  *
- * JEDNA definicja dla osi profilu i dla sprawy klienta (@wydanie). Sprawa
+ * JEDNA definicja dla osi profilu i dla sprawy klienta (0.535.0). Sprawa
  * budzi się z wiadomości w tych rozmowach, więc ręczna kopia zapytania
  * dawałaby obudzenie z rozmowy, której profil nie pokazuje — albo odwrotnie.
  */
@@ -242,7 +242,7 @@ export function rozmowyPoLoginie(
 }
 
 /**
- * Login, którego SPRAWA KLIENTA dotyczy tej rozmowy (@wydanie), albo `null`.
+ * Login, którego SPRAWA KLIENTA dotyczy tej rozmowy (0.535.0), albo `null`.
  *
  * Najpierw rozmówca z wątku. Gdy wątek go nie niesie (schemat Allegro
  * dopuszcza `interlocutor: null`), login kupującego z zamówienia tej rozmowy,

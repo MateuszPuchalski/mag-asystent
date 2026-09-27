@@ -27,7 +27,7 @@ import { Blad, Karta, LoginKlienta, Przycisk, Pusto, czas, dataLokalna, dzien, t
    (notatka, maszyny, cała oś). Liczby w nagłówku odpowiadają na „jak duży to
    klient" jednym spojrzeniem.
 
-   EKRAN JEST ODCZYTEM, poza notatką i sprawą klienta (S6, @wydanie) — oba
+   EKRAN JEST ODCZYTEM, poza notatką i sprawą klienta (S6, 0.535.0) — oba
    zapisy idą wyłącznie na kliknięcie, otwarcie nie mutuje niczego. Sprawy
    z kolejek załatwia się na ich ekranach; tu każdy wiersz do nich prowadzi.
    Sprawa klienta mieszka TUTAJ, bo jej kluczem jest login, a login ma
@@ -127,7 +127,7 @@ function Sygnaly({ d }: { d: Profil }) {
   </ul>;
 }
 
-/* ── SPRAWA KLIENTA (S6, @wydanie) ──────────────────────────────────────────
+/* ── SPRAWA KLIENTA (S6, 0.535.0) ──────────────────────────────────────────
    Decyzja właściciela z 26 września 2026 (`docs/obsluga-klienta-calosc.md`
    S6). Jedna osoba prowadzi braki, kontakt i reklamacje, a jej listą zadań
    były powiadomienia Allegro w Gmailu. Sprawa trzyma cztery rzeczy: kto
@@ -382,7 +382,7 @@ function FormularzKroku({ poczatek, pracuje, onZapisz, onAnuluj }: {
   </form>;
 }
 
-/* „OTWARTE W KOLEJKACH", nie „Otwarte sprawy" (@wydanie). Od sprawy klienta
+/* „OTWARTE W KOLEJKACH", nie „Otwarte sprawy" (0.535.0). Od sprawy klienta
    słowo „sprawa" na tym ekranie znaczy jedno: to, co ktoś prowadzi dla
    klienta. Wiersze tutaj to byty kolejek, każdy ze swoim właścicielem. */
 function Otwarte({ d }: { d: Profil }) {

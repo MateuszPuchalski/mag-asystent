@@ -71,7 +71,7 @@ describe("zakładka klienta", () => {
   });
 
   it("wątek bez loginu i tak pokazuje sprawę kupującego z zamówienia rozmowy", () => {
-    /* S6, @wydanie: sprawa budzi się z rozmowy dowiązanej numerem zamówienia
+    /* S6, 0.535.0: sprawa budzi się z rozmowy dowiązanej numerem zamówienia
        i do niej odsyła — więc ta rozmowa pokazuje sprawę, choć historii nie
        zna. Login linijki to login SPRAWY, bo historia go nie ma. */
     pokaz(dane({ login: null, sprawa: {
@@ -118,7 +118,7 @@ describe("zakładka klienta", () => {
   });
 
   it("historia przy źródle niesie sprawę klienta i prowadzi do profilu", () => {
-    /* S6, @wydanie: wiązanie w obie strony. Profil prowadzi do rozmowy, więc
+    /* S6, 0.535.0: wiązanie w obie strony. Profil prowadzi do rozmowy, więc
        rozmowa mówi, że klienta ktoś prowadzi i na co czeka — inaczej drugi
        agent odpisałby klientowi, nie wiedząc o kroku kolegi. */
     const sprawa: SprawaKlienta = {

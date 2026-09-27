@@ -6,7 +6,7 @@ import { kontaLoginu, rozmowyPoLoginie } from "./klient-historia.js";
 import { podziekowanieKlienta } from "./conversations.js";
 import { mojeSprawy, ROZMOWA_ZAMOWIENIA, type MojaSprawa } from "./droga-klienta.js";
 
-/* ── Sprawa klienta: kto prowadzi, następny krok, zakończenie (@wydanie) ─────
+/* ── Sprawa klienta: kto prowadzi, następny krok, zakończenie (0.535.0) ─────
    S6 `docs/obsluga-klienta-calosc.md`, decyzja właściciela. Kolejki mówią, co
    czeka w każdej z nich z osobna, ale nie mówią, co z KLIENTEM: „czekamy na
    zwrot, potem dosyłamy” żyło w głowie agenta albo w notatce, której nic nie

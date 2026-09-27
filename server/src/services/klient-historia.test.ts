@@ -238,7 +238,7 @@ test("login z wątku różny wielkością liter od zamówienia dalej znajduje za
   assert.ok(h.wpisy.some((w) => w.rodzaj === "rozmowa" && w.rozmowaId === druga));
 });
 
-/* ── Wspólne złączenia profilu i sprawy klienta (@wydanie) ───────────────────
+/* ── Wspólne złączenia profilu i sprawy klienta (0.535.0) ───────────────────
    `kontaLoginu` i `rozmowyPoLoginie` stały w profilu jako kopie; sprawa
    klienta pyta o to samo. Jedna definicja — i ten sam klient po obu stronach. */
 test("kontaLoginu: cztery źródła, bez wielkości liter, login tak jak w Allegro; nieznany to pusta lista", async () => {

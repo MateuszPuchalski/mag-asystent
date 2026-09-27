@@ -94,7 +94,7 @@ export function useEskalacja() {
 export function useMojeSprawy() {
   return useQuery({
     queryKey: klucze.moje,
-    /* `lista` (@wydanie) to kolejki razem ze sprawami klientów; `sprawy`
+    /* `lista` (0.535.0) to kolejki razem ze sprawami klientów; `sprawy`
        zostaje samymi kolejkami dla kart sprzed tego wydania. */
     queryFn: () => api<{ sprawy: MojaSprawa[]; lista?: MojaSprawa[] }>("/api/obsluga/moje"),
     refetchInterval: 30_000,
