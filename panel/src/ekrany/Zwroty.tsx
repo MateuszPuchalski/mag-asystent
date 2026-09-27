@@ -377,7 +377,7 @@ export function Zwroty() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const [kubelek, setKubelek] = useState<Kubelek | null>("decyzja");
-  /* Sito DO DECYZJI (@wydanie); `null` = cały kubełek. Powód w `zwroty/sita.ts`. */
+  /* Sito DO DECYZJI (0.539.0); `null` = cały kubełek. Powód w `zwroty/sita.ts`. */
   const [sito, setSito] = useState<SitoDecyzji | null>(null);
   const werdykt = useWerdykt();
   const ocena2 = useOcena();
@@ -1208,7 +1208,7 @@ export function Zwroty() {
       {!pasujace && kubelek !== null &&
         <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 bg-slate-50 px-2 py-1">
           <span className="mr-1 text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
-          {/* SITA W PAŚMIE PYTANIA (@wydanie), nie w rzędzie kubełków: dzielą
+          {/* SITA W PAŚMIE PYTANIA (0.539.0), nie w rzędzie kubełków: dzielą
               jeden kubełek, więc stoją tam, gdzie widać, który. Kliknięcie
               przestawia kursor na pierwszy zwrot sita — powód przy `przelacz`. */}
           {kubelek === "decyzja" &&

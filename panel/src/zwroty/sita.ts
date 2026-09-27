@@ -1,6 +1,6 @@
 import type { Zwrot } from "../api/typy";
 
-/* ── Cztery sita DO DECYZJI (@wydanie) ───────────────────────────────────────
+/* ── Cztery sita DO DECYZJI (0.539.0) ───────────────────────────────────────
    Zgłoszenie właściciela: „jak sprawdzić te 645?". Kubełek mieszał zwroty
    z paczką u nas, paczki w drodze i zgłoszenia, za którymi nic nie przyszło.
    Po samym terminie tego nie widać, a każda grupa wymaga innego ruchu:

@@ -10,6 +10,15 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.539.0 — 27 września 2026
+
+**Kubełek „Do decyzji” dzieli się na cztery sita z licznikami.** Obok pytania
+kubełka stoją: doręczone, w drodze, etykieta bez skanu i nie odesłał.
+Kliknięcie zawęża listę do jednego sita, a „wszystkie” wraca do całości.
+Liczniki pokazują, gdzie siedzi masa kubełka, bez otwierania każdego zwrotu.
+„Etykieta bez skanu” to paczka z datą nadania, o której przewoźnik nie ma
+ani jednego wpisu — tak wyglądał zwrot 5ZRQ/2026, którego nikt nie nadał.
+
 ## 0.538.2 — 27 września 2026
 
 **Wyjątek przy pozycji przeżywa odłożenie reszty sztuk.** Po zgłoszeniu

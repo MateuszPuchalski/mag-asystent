@@ -3,7 +3,7 @@ import { sitoDecyzji } from "./sita";
 
 const baza = { dostarczonoAt: null, paczkaAt: null, przesylkaStatus: null, sygnaly: [] };
 
-describe("sitoDecyzji (@wydanie)", () => {
+describe("sitoDecyzji (0.539.0)", () => {
   it("doręczenie wygrywa, choćby przewoźnik dopisał później inny status", () => {
     expect(sitoDecyzji({ ...baza, dostarczonoAt: "2026-09-20T10:00:00Z",
       paczkaAt: "2026-09-18T10:00:00Z", przesylkaStatus: "RETURNED" })).toBe("doreczone");

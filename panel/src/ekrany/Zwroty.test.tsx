@@ -1027,7 +1027,7 @@ describe("Pasek rozjazdów", () => {
     } finally { scena.rozjazdy = []; }
   });
 
-  it("DO DECYZJI dzieli się na cztery sita z licznikami, a sito zawęża listę (@wydanie)", async () => {
+  it("DO DECYZJI dzieli się na cztery sita z licznikami, a sito zawęża listę (0.539.0)", async () => {
     /* Zgłoszenie właściciela: „jak sprawdzić te 645?", potem „rozbij Do
        decyzji na 4 sita". Po jednym zwrocie na sito i drugi w drodze. */
     scena.zwroty = [
