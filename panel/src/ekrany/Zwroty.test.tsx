@@ -1003,7 +1003,7 @@ describe("Pasek rozjazdów", () => {
     } finally { scena.rozjazdy = []; }
   });
 
-  it("grupa rozjazdów zawęża listę przez kubełki, a grupa koszy prowadzi do koszy (@wydanie)", async () => {
+  it("grupa rozjazdów zawęża listę przez kubełki, a grupa koszy prowadzi do koszy (0.537.0)", async () => {
     /* Zgłoszenie właściciela: „co to właściwie oznacza w zakładce zwroty",
        potem „zrób oba". ZW-2 stoi w DO ZWROTU, a otwarty kubełek to DECYZJA. */
     scena.rozjazdy = [
