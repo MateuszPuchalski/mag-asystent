@@ -91,7 +91,7 @@ export const KLASA_STATUSU: Record<string, string> = {
   "spam": "bg-stan-spam text-stan-spam-tekst",
 };
 /**
- * Ranga i jej barwa pisma — JEDNA mapa (@wydanie). Do tego wydania mieszkała
+ * Ranga i jej barwa pisma — JEDNA mapa (0.536.1). Do tego wydania mieszkała
  * wyłącznie w `skrzynka/StanIntegracji.tsx`; zdania o dosyłce potrzebowały
  * tej samej i zamiast drugiej kopii mapa przeszła tutaj.
  */

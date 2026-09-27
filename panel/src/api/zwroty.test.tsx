@@ -115,7 +115,7 @@ describe("Dosyłka przy zwrocie", () => {
   });
 });
 
-/* ── Zapis czeka na świeży szczegół (@wydanie) ──────────────────────────────
+/* ── Zapis czeka na świeży szczegół (0.536.1) ──────────────────────────────
    Lekcja `poZapisieSprawy` ze `spoiwo.ts`: bez obietnicy zwróconej
    z `onSettled` `isPending` gasło przed odświeżeniem, a sekcja pieniędzy
    rysowała przez chwilę stan sprzed zapisu z czynnymi przyciskami. Test

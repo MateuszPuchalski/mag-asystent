@@ -29,7 +29,7 @@ const BIURO = ["biuro", "admin"];
  * rozmówcy w wątku, dowiązanej numerem zamówienia, a historia takiej
  * rozmowy loginu nie ma (`loginSprawyRozmowy`).
  *
- * NUMER DOSYŁKI TU NIE JEDZIE (@wydanie). Linia sprawy przy źródle drukuje
+ * NUMER DOSYŁKI TU NIE JEDZIE (0.536.1). Linia sprawy przy źródle drukuje
  * samo zdanie dosyłki, a numer prowadzi do adresu odbiorcy. Potrzebuje go
  * wyłącznie karta sprawy na profilu, gdzie agent go kopiuje albo poprawia.
  */

@@ -1179,7 +1179,7 @@ export interface DosylkaSprawy {
 }
 
 /**
- * Założone śledzenie dosyłki (@wydanie). Tyle oddaje „Śledź dosyłkę” przy
+ * Założone śledzenie dosyłki (0.536.1). Tyle oddaje „Śledź dosyłkę” przy
  * zwrocie — porażkę ta trasa mówi błędem 400, nie tym kształtem.
  */
 export type DosylkaZalozona = {
@@ -1195,7 +1195,7 @@ export type DosylkaZalozona = {
 };
 
 /**
- * Wynik założenia śledzenia dosyłki przy odmowie wypłaty (@wydanie).
+ * Wynik założenia śledzenia dosyłki przy odmowie wypłaty (0.536.1).
  *
  * DWA KSZTAŁTY, NIE JEDEN Z FLAGĄ. Odmowa w Allegro jest nieodwracalna, a
  * zapis u nas może się nie udać; ekran MUSI wtedy powiedzieć, że odmowa
@@ -1767,7 +1767,7 @@ export type StanZwrotuPieniedzy = {
   /** NASZA odmowa, złożona z tego panelu. Odmowa z panelu Allegro jej nie ma. */
   odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
   /**
-   * Dosyłka związana z tym zwrotem (@wydanie). Zła paczka wraca, biuro
+   * Dosyłka związana z tym zwrotem (0.536.1). Zła paczka wraca, biuro
    * odmawia wypłaty kodem „Wysłaliśmy nowy towar” i wysyła właściwy towar.
    * Bez tej linijki ekran zwrotu nie mówił, czy ta druga paczka doszła.
    *

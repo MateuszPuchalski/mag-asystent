@@ -749,7 +749,7 @@ test("odczyty niczego nie zapisują: sprawa z dosyłkami, „Moje”, stan zwrot
   assert.equal(zmiany(), przed);
 });
 
-/* ── Poprawki po przeglądzie (@wydanie) ─────────────────────────────────── */
+/* ── Poprawki po przeglądzie (0.536.1) ─────────────────────────────────── */
 
 test("wznowienie zakończonej sprawy odkłada jej skończone dosyłki do historii: karta, „Moje” i ticker ich nie widzą", async () => {
   /* Dosyłka dotarła, numeru drugiej nikt nie wpisał, sprawę zakończono.

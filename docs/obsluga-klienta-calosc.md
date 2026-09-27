@@ -437,14 +437,14 @@ z opóźnieniem budzi, bo tej wiadomości agent nie widział. Znacznik bez stref
 czyta się jako UTC, tak jak SQLite, żeby próg i zapytanie mówiły o tej samej
 chwili.
 
-**Odcisk dostał w 0.536.0 dwa klucze: `k` i `q`.** Od @wydanie liczą PRZEJŚCIA dosyłek
+**Odcisk dostał w 0.536.0 dwa klucze: `k` i `q`.** Od 0.536.1 liczą PRZEJŚCIA dosyłek
 w doręczenie i w kłopot u przewoźnika. Liczniki stoją w wierszu dosyłki
 i nigdy nie maleją. Kłopot, potem „w drodze” i znów kłopot budzi więc dwa
 razy. Zastąpiona dosyłka nie odejmuje niczego i nie udaje obudzenia.
 
 Napis odcisku każdej sprawy zmienił się w 0.536.0. Ekran profilu otwarty
 w chwili tamtej aktualizacji dostał więc raz 409 ze świeżą sprawą. Zapamiętany
-odcisk bez nowych kluczy nie budzi. Migracja w @wydanie przycina zapisane
+odcisk bez nowych kluczy nie budzi. Migracja w 0.536.1 przycina zapisane
 `k` i `q` do nowych sum, żeby następny kłopot obudził sprawę. Odmowa z dosyłką dopisuje brakujące
 klucze bez potwierdzania reszty.
 
@@ -485,7 +485,7 @@ pole `podpowiedzPowod`.
 - w panelu `ProfilKlienta.test.tsx`, `Moje.test.tsx` i `Klient.test.tsx`:
   same GET-y przy otwarciu profilu, wiersz „Moje” bez przycisku i linijka
   sprawy przy źródle;
-- od @wydanie `dosylka.test.ts`: odmowa stawia krok tą samą drogą, przejęcie
+- od 0.536.1 `dosylka.test.ts`: odmowa stawia krok tą samą drogą, przejęcie
   i zastąpienie dosyłki, epizody, wykrycie numeru i obudzenie z `k` oraz `q`;
 - ten sam plik: ticker ze strażą sprawy, ponowienie partii numer po numerze
   i zamrożony stan w nakładce zamówienia;
@@ -547,7 +547,7 @@ i proponuje „Śledź dosyłkę”.
 
 **Odmowa przejmuje dosyłkę, która należy do zwrotu.** Należy do niego numer
 wpisany ręką w bieżącym epizodzie i dosyłka założona po zgłoszeniu zwrotu.
-Od @wydanie należy też dosyłka, której numer wpisano po zgłoszeniu. Przejęcie
+Od 0.536.1 należy też dosyłka, której numer wpisano po zgłoszeniu. Przejęcie
 zostawia numer, stan i doręczenie. Starszą odmowa zastępuje, bo klient odesłał
 i ją. Tę samą regułę czytają
 ekran zwrotu, „Śledź dosyłkę” i propozycja na profilu.
@@ -558,11 +558,11 @@ to doręczona, zawrócona albo spoza trzydziestu dni okna. Karta sprawy,
 „Moje”, podpowiedź i ticker widzą tylko dosyłki bieżącego epizodu. Dosyłka
 sprzed miesięcy nie woła więc w nowej sprawie o numer, którego nikt nie wpisze.
 
-Dosyłka w drodze zostaje żywa (@wydanie). Agent kończy sprawę po nadaniu
+Dosyłka w drodze zostaje żywa (0.536.1). Agent kończy sprawę po nadaniu
 etykiety, a wznawia, gdy klient pyta „gdzie paczka?”. Odłożona przestałaby
 być śledzona, a panel nie ma jak jej wskrzesić.
 
-**„Po ruchu człowieka” liczy chwila zapisu doręczenia na serwerze** (@wydanie).
+**„Po ruchu człowieka” liczy chwila zapisu doręczenia na serwerze** (0.536.1).
 Data kuriera bywa wcześniejsza od numeru wpisanego ręką. Wtedy podpowiedź
 „Zakończ sprawę?” i zdanie w „Moje” gasły mimo świeżego doręczenia.
 

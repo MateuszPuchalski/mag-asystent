@@ -91,7 +91,7 @@ describe("Dowody zwrotu — mniej nagłówków", () => {
   });
 });
 
-/* ── Odmowa z Allegro jednym brzmieniem (@wydanie) ──────────────────────────
+/* ── Odmowa z Allegro jednym brzmieniem (0.536.1) ──────────────────────────
    Do tego wydania ta kolumna miała własną mapę kodów i pisała „wysłano nowy
    towar”, a sekcja pieniędzy obok — „Wysłaliśmy nowy towar”. Jeden kod ma
    jedno brzmienie: oba miejsca czytają `etykietaKodu` z `Pieniadze.tsx`. */

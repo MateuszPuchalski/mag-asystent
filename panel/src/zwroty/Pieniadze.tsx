@@ -113,7 +113,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
   /** „Śledź dosyłkę” — gdy odmowa z kodem dosyłki nie ma śledzenia (0.536.0). */
   onSledzDosylke?: () => void;
   /**
-   * Kod odmowy z synchronizacji Allegro (`Zwrot.rejectionCode`, @wydanie).
+   * Kod odmowy z synchronizacji Allegro (`Zwrot.rejectionCode`, 0.536.1).
    * Odmowa złożona w panelu Allegro nie ma `stan.odmowa` — to pole niesie
    * tylko naszą. Bez tego kodu linijka dosyłki wisiałaby bez powodu.
    */
@@ -177,7 +177,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
 
       {stan.odmowa && <span className="flex items-center gap-1 text-sm font-semibold text-slate-600">
         <Ban size={14} />Odmówiono: „{etykietaKodu(stan.odmowa.kod)}”</span>}
-      {/* ODMOWA Z PANELU ALLEGRO (@wydanie) — tylko przy dosyłce, bo to ją
+      {/* ODMOWA Z PANELU ALLEGRO (0.536.1) — tylko przy dosyłce, bo to ją
           ta linijka tłumaczy. Kod z synchronizacji stoi też w kolumnie
           dowodów; tutaj stoi obok dosyłki, której jest powodem. Inne kody
           z synchronizacji zostają tam, gdzie były. */}
@@ -203,7 +203,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
     {/* Przeszkoda mówi, CO zrobić — i stoi także wtedy, gdy odmowa jest
         możliwa, bo to dwie różne drogi, nie dwa warianty jednej. Przy odmowie
         z panelu Allegro z dosyłką przeszkodą jest sama odmowa, a jej fakt stoi
-        już wyżej (@wydanie). Trzecie zdanie o tym samym tylko zagłuszało dosyłkę. */}
+        już wyżej (0.536.1). Trzecie zdanie o tym samym tylko zagłuszało dosyłkę. */}
     {stan.powod && !stan.oddane && !stan.odmowa && !przedWerdyktem && !odmowaZAllegro &&
       <p className="mt-2 text-xs text-slate-500">{stan.powod}</p>}
 

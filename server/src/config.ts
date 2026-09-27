@@ -438,7 +438,7 @@ export const config = {
        nie minutami — Allegro część z nich rozpatruje samo. Rzadziej niż zwroty. */
     rabatySyncMs: num(process.env.ALLEGRO_RABATY_SYNC_MS, 900_000, "ALLEGRO_RABATY_SYNC_MS"),
     /**
-     * Takt dosyłek (@wydanie): wykrycie numeru przy zamówieniu i śledzenie
+     * Takt dosyłek (0.536.1): wykrycie numeru przy zamówieniu i śledzenie
      * paczki w sprawach klienta w toku; 0 wyłącza ticker.
      *
      * SIEDEMNAŚCIE MINUT, nie kwadrans. Dosyłka jedzie dniami, więc

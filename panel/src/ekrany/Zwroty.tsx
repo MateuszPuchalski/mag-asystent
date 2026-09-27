@@ -364,7 +364,7 @@ export function Zwroty() {
   const zdejmij = useZdejmijPozycje();
   const [bladDopisania, setBladDopisania] = useState("");
   const [bladRabatu, setBladRabatu] = useState("");
-  /* ZDANIA SEKCJI PIENIĘDZY NIOSĄ NUMER ZWROTU (@wydanie) — błąd i wynik
+  /* ZDANIA SEKCJI PIENIĘDZY NIOSĄ NUMER ZWROTU (0.536.1) — błąd i wynik
      założenia dosyłki. Odpowiedź przychodzi po chwili, a operator bywa już
      przy następnym zwrocie. Bez numeru błąd odmowy zwrotu A stanąłby pod
      pieniędzmi zwrotu B. Klucz sekcji tego nie załatwi: te zdania mieszkają
@@ -1216,7 +1216,7 @@ export function Zwroty() {
             {/* Pieniądze STOJĄ POD DECYZJAMI, nie w kolumnie dowodów: to jest
                 ostatni krok tej pracy i ma być tam, gdzie operator właśnie
                 patrzy, a nie o kolumnę dalej. */}
-            {/* `key` na ZWROCIE, jak przy `Pozycje` niżej (@wydanie). Bez niego
+            {/* `key` na ZWROCIE, jak przy `Pozycje` niżej (0.536.1). Bez niego
                 sekcja zostawała zamontowana przy przejściu na zwrot z pamięci
                 podręcznej, a z nią otwarty formularz odmowy z kodem i powodem
                 poprzedniego zwrotu — gotowy do wysłania pod cudzym numerem. */}

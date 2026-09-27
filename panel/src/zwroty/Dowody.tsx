@@ -466,7 +466,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
     </Sekcja>
 
     {zwrot.rejectionCode && <Sekcja ikona={<Receipt size={14} />} tytul="Rozstrzygnięte w Allegro">
-      {/* Brzmienie z `etykietaKodu` (@wydanie), to samo co w sekcji pieniędzy.
+      {/* Brzmienie z `etykietaKodu` (0.536.1), to samo co w sekcji pieniędzy.
           Do tego wydania stała tu osobna mapa i ta sama odmowa brzmiała na
           jednym ekranie dwojako: „wysłano nowy towar” i „Wysłaliśmy nowy towar”. */}
       <p className="font-semibold">{etykietaKodu(zwrot.rejectionCode)}</p>

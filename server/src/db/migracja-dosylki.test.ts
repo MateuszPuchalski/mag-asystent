@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "./db.js";
 
-/* ── Dosyłka z 0.536.0 dostaje cztery kolumny (@wydanie) ─────────────────────
+/* ── Dosyłka z 0.536.0 dostaje cztery kolumny (0.536.1) ─────────────────────
    0.536.0 założył `klient_dosylka` bez `numer_at`, `archiwalna`, `doreczen`
    i `problemow`. Baza, która przeszła tamto wydanie, ma tabelę w starym
    kształcie, a `schema.sql` jej nie poprawi. Stanowisko stawia DOKŁADNIE ten

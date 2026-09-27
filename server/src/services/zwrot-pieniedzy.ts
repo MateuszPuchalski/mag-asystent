@@ -206,7 +206,7 @@ export type StanZwrotuPieniedzy = {
   } | null;
   odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
   /**
-   * Dosyłka tego zwrotu (@wydanie), gdy NASZA odmowa albo kod z Allegro to
+   * Dosyłka tego zwrotu (0.536.1), gdy NASZA odmowa albo kod z Allegro to
    * kod dosyłki. Poza `odmowa`, bo odmowa złożona w panelu Allegro przychodzi
    * tylko kodem synchronizacji — a ekran ma pokazać dosyłkę i przy niej.
    */
@@ -252,7 +252,7 @@ function bramkaPrzelewu(w: Wiersz): { moznaZapisacPrzelew: boolean; powodPrzelew
 }
 
 /**
- * Dosyłka pod odmową wypłaty (@wydanie) według JEDNEJ reguły
+ * Dosyłka pod odmową wypłaty (0.536.1) według JEDNEJ reguły
  * (`DOSYLKA_ZWROTU_SQL`) — tej samej, którą „Śledź dosyłkę” sprawdza, czy
  * jest co zakładać. Surowy SQL i zdanie z `dosylka-opis.ts`, nie import
  * `dosylka.ts`: tamten plik importuje sprawę klienta, a ten czyta
@@ -319,7 +319,7 @@ export function stanZwrotuPieniedzy(
     ({ ...podstawa, moznaZwrocic: false, moznaOdmowic: false, powod });
 
   if (w.zwrot_pieniedzy_id) return nie("Pieniądze już oddano przez panel.");
-  /* ODMOWA Z PANELU ALLEGRO TO TEN SAM FAKT CO NASZA (@wydanie). `rejection_code`
+  /* ODMOWA Z PANELU ALLEGRO TO TEN SAM FAKT CO NASZA (0.536.1). `rejection_code`
      to `CustomerReturn.rejection.code` — w schemacie „Refund rejection code”,
      ten sam słownik co nasze `POST …/rejection`. Drugiej odmowy Allegro nie
      przyjmie, a wypłata po odmowie przeczyłaby jej; kolejka zwrotów

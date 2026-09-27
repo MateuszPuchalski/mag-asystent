@@ -244,7 +244,7 @@ export const DOSYLKI_SQL = `SELECT d.*, o.przesylka_przewoznik AS przewoznik_zam
  *     tylko nazywa dosyłkę, którą biuro już wysłało i śledzi;
  *   - wiersz powstał albo dostał numer PO zgłoszeniu tego zwrotu według
  *     Allegro — dosyłka wysłana po zwrocie jest odpowiedzią na niego, nie na
- *     wcześniejszy. Numer liczy się osobno (@wydanie): trzecia paczka wpisana
+ *     wcześniejszy. Numer liczy się osobno (0.536.1): trzecia paczka wpisana
  *     do wiersza z pierwszej odmowy ginęła przy odmowie drugiego zwrotu.
  * Wiersz starszy od zwrotu to poprzednia dosyłka: nowa odmowa ją zastępuje.
  * Bez daty zgłoszenia w lądowisku drugi warunek milczy — `julianday(NULL)`.
@@ -283,7 +283,7 @@ export const pilnaDosylka = (d: DosylkaSprawy): boolean => d.bezNumeru || d.ton 
  * Doręczenie po chwili `widzianeDo` — ostatnim ruchu człowieka przy sprawie.
  *
  * Liczy się chwila ZAPISU doręczenia na serwerze (`sprawdzonoAt`), nie data
- * kuriera (@wydanie). Ticker nie pyta o doręczoną, więc jej `sprawdzonoAt` to
+ * kuriera (0.536.1). Ticker nie pyta o doręczoną, więc jej `sprawdzonoAt` to
  * moment zapisu. Numer wpisany po czasie do paczki już doręczonej dawał inaczej
  * doręczenie „sprzed” wpisania i gasił podpowiedź „Zakończ sprawę?”.
  */

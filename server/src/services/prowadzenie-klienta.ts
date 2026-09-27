@@ -161,7 +161,7 @@ interface Odcisk {
   s: number;
   /** Wiadomości klienta albo doradcy Allegro w reklamacjach i dyskusjach. */
   w: number;
-  /** Doręczenia dosyłek (@wydanie): suma liczników PRZEJŚĆ z wierszy, która
+  /** Doręczenia dosyłek (0.536.1): suma liczników PRZEJŚĆ z wierszy, która
    *  nigdy nie maleje. Druga doręczona budzi, choć pierwszą ktoś potwierdził,
    *  a zastąpienie wiersza nie cofa licznika, więc nie udaje nowego zdarzenia. */
   k: number;
@@ -227,7 +227,7 @@ type Licznik = keyof Omit<Odcisk, "m">;
  * Licznik `w` jest bez typu: wiadomość klienta liczy się w reklamacji i w
  * dyskusji jednakowo, bo obie czekają na naszą odpowiedź.
  *
- * `k` i `q` (@wydanie) sumują liczniki przejść dosyłek tego loginu, także
+ * `k` i `q` (0.536.1) sumują liczniki przejść dosyłek tego loginu, także
  * archiwalnych. Dosyłkę zakłada biuro, ale doręczenie i kłopot zgłasza
  * przewoźnik — to jedyne fakty dosyłki, o których prowadzący może nie
  * wiedzieć. Suma PRZEJŚĆ, nie wierszy w stanie: kłopot, potem „w drodze”,
@@ -371,7 +371,7 @@ function noweZdarzenia(
        a data najnowszej ZNANEJ przypisałaby obudzenie dosyłce potwierdzonej.
 
        „Po ruchu” liczy się chwilą, w której SERWER zapisał doręczenie
-       (`sprawdzono_at`), nie datą kuriera (@wydanie). Numer wpisany w poniedziałek
+       (`sprawdzono_at`), nie datą kuriera (0.536.1). Numer wpisany w poniedziałek
        do paczki doręczonej w piątek dawał doręczenie „sprzed” wpisania — więc
        bez daty i na końcu listy. Oba zegary po stronie serwera, jak przy
        wiadomościach klienta. */
@@ -586,7 +586,7 @@ export function zapiszKrokSprawy(
        niesie `klient_sprawa_krok` niżej: to jeden ruch, nie dwa.
 
        Skończona to doręczona, zawrócona albo spoza okna śledzenia. Dosyłka
-       w drodze zostaje żywa (@wydanie): agent kończy sprawę, gdy nada
+       w drodze zostaje żywa (0.536.1): agent kończy sprawę, gdy nada
        etykietę, a wznawia, gdy klient pyta „gdzie paczka?”. Odłożona do
        historii przestałaby być śledzona, a panel nie ma jak jej wskrzesić. */
     if (w.zakonczono_at != null) {

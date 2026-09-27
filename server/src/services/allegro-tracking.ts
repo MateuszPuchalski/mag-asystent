@@ -41,7 +41,7 @@ export interface StanPrzesylki {
   /** Kod OSTATNIEGO statusu: `IN_TRANSIT`, `NOTICE_LEFT`, `ISSUE`, `RETURNED`… */
   status: string | null;
   /**
-   * `occurredAt` ostatniego statusu (@wydanie). Dosyłka rozpoznaje po nim
+   * `occurredAt` ostatniego statusu (0.536.1). Dosyłka rozpoznaje po nim
    * paczkę bez daty rejestracji: ruch u przewoźnika po zgłoszeniu zwrotu
    * odróżnia nową paczkę od oryginału (`wybierzNumer` w `dosylka.ts`).
    */

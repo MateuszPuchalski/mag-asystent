@@ -930,7 +930,7 @@ export function migrate(database: DatabaseSync) {
       addColumn("zastosowanie", kolumna, typ);
     }
   }
-  /* DOSYŁKA: EPIZODY, OKNO NUMERU I LICZNIKI PRZEJŚĆ (@wydanie). Tabela
+  /* DOSYŁKA: EPIZODY, OKNO NUMERU I LICZNIKI PRZEJŚĆ (0.536.1). Tabela
      `klient_dosylka` stoi na produkcji od 0.536.0 bez tych czterech kolumn,
      a `CREATE TABLE IF NOT EXISTS` ich nie dołoży. Bez tej migracji każdy
      odczyt sprawy kończyłby się „no such column”.
