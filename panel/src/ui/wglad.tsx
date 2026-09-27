@@ -36,15 +36,31 @@ export function KartaWgladu({ tytul, opis, akcje, id, pusta, children }: {
   </Karta>;
 }
 
+/**
+ * Nagłówek kolumny: napis albo nazwa tylko dla czytnika ekranu.
+ *
+ * Kolumna z samymi przyciskami albo z logo nie potrzebuje napisu na ekranie,
+ * ale czytnik ekranu czyta nagłówek przy każdej komórce (@wydanie). Pusty
+ * napis dawał pusty `<th>` — naruszenie WCAG 1.3.1 w audycie axe — i przy
+ * dwóch takich kolumnach ten sam klucz React dwa razy.
+ */
+export type Naglowek = string | { ukryty: string };
+
+export function NaglowekKolumny({ n }: { n: Naglowek }) {
+  return <th className="py-1.5 pr-3 font-bold">
+    {typeof n === "string" ? n : <span className="sr-only">{n.ukryty}</span>}
+  </th>;
+}
+
 /** Tabela wglądu — nagłówki podane raz, pusta tabela mówi zdaniem, nie ciszą. */
 export function Tabela({ naglowki, pusto, children }: {
-  naglowki: string[]; pusto: string; children: React.ReactNode[];
+  naglowki: Naglowek[]; pusto: string; children: React.ReactNode[];
 }) {
   if (!children.length) return <Pusto waga="lista">{pusto}</Pusto>;
   return <div className="overflow-x-auto">
     <table className="w-full text-sm">
       <thead><tr className="border-b text-left text-xs text-slate-600">
-        {naglowki.map((n) => <th key={n} className="py-1.5 pr-3 font-bold">{n}</th>)}</tr></thead>
+        {naglowki.map((n, i) => <NaglowekKolumny key={i} n={n} />)}</tr></thead>
       <tbody className="divide-y divide-slate-100">{children}</tbody>
     </table>
   </div>;

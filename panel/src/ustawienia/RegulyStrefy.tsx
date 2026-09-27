@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { Plus, X } from "lucide-react";
 import { useStrefa, useZapiszStrefe, type RegulaStrefy as Regula } from "../api/ustawienia";
 import { Blad, Pole, Przycisk } from "../ui";
-import { KartaWgladu } from "../ui/wglad";
+import { KartaWgladu, NaglowekKolumny, type Naglowek } from "../ui/wglad";
 
 /* ── Reguły strefy złotej (z `biuro.html`, 0.444.0) ─────────────────────
    Które poziomy regałów są „złote" (75–140 cm — bez schylania i bez
@@ -49,7 +49,8 @@ export function RegulyStrefy() {
     <div className="overflow-x-auto">
       <table className="text-sm">
         <thead><tr className="border-b text-left text-xs text-slate-600">
-          {["Alejka", "Regał od", "Regał do", "Poziomy", ""].map((n) => <th key={n} className="py-1.5 pr-3 font-bold">{n}</th>)}
+          {(["Alejka", "Regał od", "Regał do", "Poziomy", { ukryty: "Działania" }] as Naglowek[])
+            .map((n, i) => <NaglowekKolumny key={i} n={n} />)}
         </tr></thead>
         <tbody>
           {reguly.map((_r, i) => <tr key={i}>

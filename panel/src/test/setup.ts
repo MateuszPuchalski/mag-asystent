@@ -1,7 +1,8 @@
 import "@testing-library/jest-dom/vitest";
-import { afterEach, vi } from "vitest";
+import { afterEach, expect, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 import { zainstalujObserwator, zapomnijObserwatorow } from "./kadr";
+import { sprawdzDostepnosc } from "./dostepnosc";
 
 /* Bez sprzątania po każdym teście kolejny render widzi poprzedni ekran
    i asercje „jest dokładnie jeden wiersz" kłamią. */
@@ -37,3 +38,8 @@ afterEach(() => {
    obserwator z poprzedniego renderu odpowiadałby na sygnał następnego. */
 zainstalujObserwator();
 afterEach(zapomnijObserwatorow);
+
+/* Dostępność ekranu (@wydanie) — powód, zakres i granice w `dostepnosc.ts`.
+   Rejestrowane PO `cleanup`, a Vitest woła `afterEach` od ostatniego
+   zarejestrowanego, więc axe widzi jeszcze wyrenderowany ekran. */
+afterEach(() => sprawdzDostepnosc(expect.getState().testPath));

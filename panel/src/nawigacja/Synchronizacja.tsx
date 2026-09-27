@@ -19,6 +19,7 @@ import { godzina } from "../ui";
 
 /** Pełne zdanie o synchronizacji — dymek wskaźnika i wiersz w menu „Więcej". */
 export function zdanieSynchronizacji(i: Zdrowie["allegroInbox"]): string {
+  if (!i.alarm && !i.ostatniaUdanaSynchronizacja) return "Synchronizacja jeszcze się nie odbyła";
   return i.alarm
     ? `Synchronizacja stanęła ${godzina(i.ostatniaUdanaSynchronizacja)}`
     : `Synchronizacja ${godzina(i.ostatniaUdanaSynchronizacja)} · ${i.liczbaBledow} błędów`;
@@ -29,6 +30,10 @@ export function WskaznikSynchronizacji() {
   if (!data) return null;
   const i = data.allegroInbox;
   const zle = i.status !== "current";
+  /* Zielona kropka przy „—" mówiła „działa" o synchronizacji, która nie
+     odbyła się ani razu (@wydanie). Nieznane to nie to samo co dobre, więc
+     przed pierwszą udaną kropka jest szara, a dymek mówi to zdaniem. */
+  const nigdy = !i.ostatniaUdanaSynchronizacja;
   const zdanie = zdanieSynchronizacji(i);
   return <span role="status" title={zdanie} aria-label={zdanie}
     className={`flex shrink-0 items-center gap-1.5 px-1 text-xs ${
@@ -37,7 +42,8 @@ export function WskaznikSynchronizacji() {
         z odstępem to akurat tyle, ile brakowało, żeby menu nie spadało
         do drugiego rzędu właśnie wtedy, gdy synchronizacja stoi. */}
     {i.alarm ? `Stanęła ${godzina(i.ostatniaUdanaSynchronizacja)}` : <>
-      <span className={`h-2 w-2 rounded-full ${zle ? "bg-red-400" : "bg-emerald-400"}`} />
+      <span className={`h-2 w-2 rounded-full ${
+        zle ? "bg-red-400" : nigdy ? "bg-slate-500" : "bg-emerald-400"}`} />
       {godzina(i.ostatniaUdanaSynchronizacja)}</>}
   </span>;
 }

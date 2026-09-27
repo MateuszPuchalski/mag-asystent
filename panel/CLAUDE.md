@@ -36,6 +36,18 @@ opisuje nagłówek każdego strażnika — zwykle komentarz `<nazwa>: <powód>`
 z co najmniej trzema wyrazami powodu. Odmowa strażnika zwykle znaczy, że
 łamiesz zasadę.
 
+## Dostępność
+
+- **Ekran przechodzi WCAG 2.2 A i AA w strukturze.** Po każdym teście
+  z `src/ekrany/` i `src/druk/` axe-core sprawdza wyrenderowany DOM.
+  Przycisk bez nazwy, pole bez etykiety czy pusty nagłówek tabeli zatrzyma
+  test. *Strażnik: `src/test/dostepnosc.ts`.*
+- **Kolumna bez napisu dostaje nazwę dla czytnika:** `{ ukryty: "Działania" }`
+  w `Tabela`, nie pusty napis.
+- **Kontrastu i fokusu jsdom nie widzi.** Zmieniając barwy albo układ,
+  zmierz w przeglądarce: `node tools/audyt-dostepnosci.mjs <katalog>` przy
+  działającym serwerze i panelu. Cel: zero naruszeń na każdym ekranie.
+
 ## Obsługa klienta
 
 Nowa kolejka albo ekran obsługi dopisuje się do drogi klienta w obie strony:

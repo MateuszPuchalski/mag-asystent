@@ -331,10 +331,15 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     <div className="flex shrink-0 items-center gap-2 border-b px-2 py-1.5">
       <div className="relative min-w-0 flex-1">
         <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+        {/* Podpowiedź MIEŚCI SIĘ w polu (@wydanie). „Szukaj: login, treść,
+            prowadzący" potrzebowało 192 px, a pole ma 136 px przy 1280 i 1440
+            — agent czytał „prc". „Szukaj" mówi lupa i nazwa pola, a miejsce
+            na krzyżyk rezerwujemy dopiero, gdy krzyżyk stoi: to daje 156 px
+            na 150 px podpowiedzi. Pomiar w Chromium, czcionka panelu. */}
         <input value={fraza} onChange={(e) => setFraza(e.target.value)}
           aria-label="Szukaj w rozmowach"
-          placeholder="Szukaj: login, treść, prowadzący"
-          className="field w-full py-1 pl-7 pr-7 text-sm" />
+          placeholder="Login, treść, prowadzący"
+          className={`field w-full py-1 pl-7 text-sm ${fraza !== "" ? "pr-7" : "pr-2"}`} />
         {fraza !== "" && <button type="button" onClick={() => setFraza("")}
           aria-label="Wyczyść szukanie"
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">

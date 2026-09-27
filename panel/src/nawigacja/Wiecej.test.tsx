@@ -18,14 +18,15 @@ import tsx from "../main.tsx?raw";
 const UDANA = "2026-09-27T08:12:00.000Z";
 let wyslane: string[] = [];
 let alarm = false;
+let udana: string | null = UDANA;
 
 beforeEach(() => {
-  wyslane = []; alarm = false;
+  wyslane = []; alarm = false; udana = UDANA;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if ((init?.method ?? "GET") !== "GET") wyslane.push(`${init?.method} ${url}`);
     if (url === "/api/health") return new Response(JSON.stringify({
       allegroInbox: { status: alarm ? "stale" : "current", alarm, ostatniaProba: null,
-        ostatniaUdanaSynchronizacja: UDANA, kodOstatniegoBledu: null, tekstOstatniegoBledu: null,
+        ostatniaUdanaSynchronizacja: udana, kodOstatniegoBledu: null, tekstOstatniegoBledu: null,
         liczbaBledow: 2, watkiZBledem: 0, opoznienieMs: null, nastepnaProba: null, interwalMs: 60000 } }));
     throw new Error(`nieoczekiwany adres w teście: ${url}`);
   }));
@@ -105,6 +106,16 @@ describe("wskaźnik synchronizacji", () => {
     const wskaznik = await screen.findByRole("status");
     expect(wskaznik.textContent).toBe(godzina(UDANA));
     expect(wskaznik.getAttribute("title")).toBe(`Synchronizacja ${godzina(UDANA)} · 2 błędów`);
+  });
+
+  it("przed pierwszą synchronizacją kropka nie jest zielona, a dymek mówi dlaczego", async () => {
+    /* Zielone „—" obiecywało działanie, którego nie było (@wydanie). */
+    udana = null;
+    pokaz();
+    const wskaznik = await screen.findByRole("status");
+    expect(wskaznik.getAttribute("title")).toBe("Synchronizacja jeszcze się nie odbyła");
+    expect(wskaznik.querySelector(".bg-emerald-400")).toBeNull();
+    expect(wskaznik.querySelector(".bg-slate-500")).not.toBeNull();
   });
 
   it("w alarmie mówi słowem „Stanęła”, nie samym kolorem kropki", async () => {

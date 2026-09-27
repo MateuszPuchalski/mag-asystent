@@ -70,7 +70,7 @@ export function KartaKolejki() {
     {wynik && <p className="mt-3 text-sm text-ranga-ok">{wynik}</p>}
     <Blad>{blad || kolejka.error?.message}</Blad>
     <div className="mt-4">
-      <Tabela naglowki={["Godz.", "Zadanie", "Szczegół", "Status", ""]}
+      <Tabela naglowki={["Godz.", "Zadanie", "Szczegół", "Status", { ukryty: "Działania" }]}
         pusto={ileZapisanych ? "Nic nie czeka i nic nie stoi w błędzie." : "Kolejka pusta — wszystko zapisane."}>
         {wiersze.map((z) => <tr key={z.id}>
           <Td className="tabular-nums text-slate-600">{z.time}</Td>

@@ -120,6 +120,18 @@ describe("Pusto: dwie wagi, dwa kształty", () => {
     expect(svg.getAttribute("class")).toContain("text-slate-300");
   });
 
+  it("ikona i zdanie stoją w jednej grupie, więc siatka centruje je razem", () => {
+    /* Siatka z dwojgiem dzieci rozkładała ikonę i zdanie na dwie połowy
+       kolumny, trzysta pikseli od siebie (@wydanie). jsdom nie liczy układu,
+       więc test pilnuje przyczyny: siatka ma dokładnie jedno dziecko. */
+    const { container } = render(<Pusto ikona={Inbox}>Wybierz rozmowę z listy</Pusto>);
+    const siatka = container.firstElementChild!;
+    expect(siatka.className).toContain("place-items-center");
+    expect(siatka.children).toHaveLength(1);
+    expect(siatka.firstElementChild!.querySelector("svg")).not.toBeNull();
+    expect(siatka.firstElementChild!.querySelector("p")).not.toBeNull();
+  });
+
   it("bez ikony nie zostaje po niej odstęp", () => {
     /* `mt-3` odsuwa zdanie OD IKONY. Bez ikony byłby odstępem od niczego. */
     const { container } = render(<Pusto waga="lista">Wczytuję…</Pusto>);

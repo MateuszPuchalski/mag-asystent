@@ -313,9 +313,15 @@ export function Pusto({ waga = "ekran", ikona: Ikona, children }: {
   ikona?: React.ComponentType<{ size?: number; className?: string }>;
   children: React.ReactNode;
 }) {
+  /* Ikona i zdanie w JEDNEJ grupie (@wydanie). Waga „ekran" to siatka, a siatka
+     z dwojgiem dzieci dzieli kolumnę na dwa wiersze: ikona stała na środku
+     górnej połowy, zdanie na środku dolnej, trzysta pikseli od siebie. Oko
+     czytało to jako dwie osobne rzeczy. Jedno dziecko siatka centruje całe. */
   return <div className={`text-slate-500 ${KSZTALT_PUSTKI[waga]}`}>
-    {Ikona && <Ikona size={IKONA_PUSTKI} className="text-slate-300" />}
-    <p className={Ikona ? "mt-3" : ""}>{children}</p>
+    <div>
+      {Ikona && <Ikona size={IKONA_PUSTKI} className="mx-auto text-slate-300" />}
+      <p className={Ikona ? "mt-3" : ""}>{children}</p>
+    </div>
   </div>;
 }
 
