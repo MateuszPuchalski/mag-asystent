@@ -9,7 +9,7 @@ export type Obszar = "magazyn" | "obsluga";
 
 export type ZrodloDecyzji =
   | "dostawy" | "odpowiedzi" | "kosze" | "zapisy" | "kody" | "allegro"
-  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania";
+  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania" | "dosylki";
 
 /** Adres w panelu — od 0.441.0 każdy wiersz prowadzi do ekranu panelu. */
 export type CelDecyzji = { panel: string };
@@ -23,6 +23,8 @@ export interface PozycjaDecyzji {
   od: string | null;
   pilne: boolean;
   cel: CelDecyzji;
+  /** Jedyny przycisk listy: „Śledź dosyłkę” przy odmowie z panelu Allegro (@wydanie). */
+  akcja?: { rodzaj: "sledz_dosylke"; zwrotId: number };
 }
 
 export function useDoDecyzji() {

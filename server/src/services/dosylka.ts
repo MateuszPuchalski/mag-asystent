@@ -23,16 +23,17 @@ import {
    - numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro („Wydaje
      mi się że tak”) — niesprawdzone, `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`;
    - dosyłka jedzie „prawie zawsze tym samym” przewoźnikiem co pierwsza paczka.
-   `MISSING_PART_SENT` („Wysłaliśmy brakującą część”) doszedł w tym wydaniu:
+   `MISSING_PART_SENT` („Wysłaliśmy brakującą część”) doszedł w 0.536.0:
    brakująca część jedzie tak samo, drugą paczką. To do oceny właściciela.
    Krok „dosłać” był dotąd samym zdaniem, a to, czy paczka doszła, sprawdzał
    człowiek w Allegro.
 
-   GDZIE biuro odmawia — na ekranie zwrotu WERTIS czy w panelu Allegro — tego
-   nie wiemy. ZAKŁADAMY obie drogi i obie są obsłużone: odmowa na naszym
-   ekranie zakłada śledzenie tym samym kliknięciem, a kod zsynchronizowany
-   z Allegro (`rejection_code`) daje „Śledź dosyłkę” przy zwrocie
-   i propozycję na profilu.
+   GDZIE biuro odmawia — fakt właściciela z 27 września 2026: w PANELU
+   ALLEGRO, z nawyku. Obie drogi są obsłużone. Odmowa na naszym ekranie
+   zakłada śledzenie tym samym kliknięciem. Kod zsynchronizowany z Allegro
+   (`rejection_code`) staje wierszem „Śledzić dosyłkę?” w „Do decyzji” —
+   decyzja właściciela z tego samego dnia, zamiast automatu (@wydanie).
+   Zostają też „Śledź dosyłkę” przy zwrocie i propozycja na profilu.
 
    START W TYM SAMYM RUCHU CO ODMOWA, nie propozycją na profilu. Agent
    odmawia na ekranie zwrotu i tam kończy; propozycja na profilu byłaby

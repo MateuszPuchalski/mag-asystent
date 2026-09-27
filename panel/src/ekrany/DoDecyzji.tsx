@@ -2,11 +2,13 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle, Barcode, ChevronRight, CircleCheck, Inbox, ListChecks, MessageSquareReply,
-  FlaskConical, MessagesSquare, Package, PlugZap, ShieldQuestion, Truck, Undo2,
+  FlaskConical, MessagesSquare, Package, PackageSearch, PlugZap, ShieldQuestion, Truck, Undo2,
   ClipboardList,
 } from "lucide-react";
 import { useDoDecyzji, type Obszar, type PozycjaDecyzji, type ZrodloDecyzji } from "../api/decyzje";
-import { Blad, FiltrSegmentowy, Karta, NaglowekSekcji, Pusto, wiek } from "../ui";
+import { useSledzDosylkeZwrotu } from "../api/zwroty";
+import type { DosylkaZalozona } from "../api/typy";
+import { Blad, FiltrSegmentowy, Karta, NaglowekSekcji, Przycisk, Pusto, wiek } from "../ui";
 import { Moje } from "./Moje";
 import { Wzmianki } from "./Wzmianki";
 
@@ -19,7 +21,15 @@ import { Wzmianki } from "./Wzmianki";
    decyzji: wyjątek dostawy rozstrzyga się przy fakturze i jej zdjęciach,
    reklamację przy czacie z kupującym. Przycisk „uznaj" na tej liście
    kazałby decydować bez dowodów — a to jest dokładnie to, czego biuro
-   robić nie powinno. Ta sama zasada co w „Moje". */
+   robić nie powinno. Ta sama zasada co w „Moje".
+
+   JEDEN WYJĄTEK (@wydanie, decyzja właściciela z 27 września 2026): „Śledź
+   dosyłkę” przy odmowie złożonej w panelu Allegro. Decyzja już zapadła —
+   biuro odmówiło kodem „Wysłaliśmy nowy towar” — a przycisk ją rejestruje
+   w sprawie klienta. Dowodów do tego nie trzeba, a wiersz prowadzący na
+   zwrot kosztowałby drugie kliknięcie za nic. Jeden skutek nie jest samą
+   rejestracją: krok „dosłać” zastępuje krok ustawiony ręką, więc ekran
+   mówi, co zastąpił. */
 
 const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; className?: string }>> = {
   dostawy: Truck, odpowiedzi: MessageSquareReply, kosze: Package, zapisy: AlertTriangle,
@@ -27,12 +37,14 @@ const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; classNam
   skrzynka: Inbox, dyskusje: MessagesSquare, sonda: FlaskConical,
   /* Zadanie odesłane przez halę (0.502.0) — `odeslaneZadania` w `do-decyzji.ts`. */
   zadania: ClipboardList,
+  dosylki: PackageSearch,
 };
 
 const NAZWY: Record<ZrodloDecyzji, string> = {
   dostawy: "Dostawy", odpowiedzi: "Odpowiedź z hali", kosze: "Kosze", zapisy: "Zapis do Subiekta",
   kody: "Kody kreskowe", allegro: "Konto Allegro", reklamacje: "Reklamacje", zwroty: "Zwroty",
   skrzynka: "Skrzynka", dyskusje: "Dyskusje", sonda: "Test na żywo", zadania: "Zadanie hali",
+  dosylki: "Dosyłka",
 };
 
 type Filtr = "wszystko" | Obszar;
@@ -49,7 +61,7 @@ function Wiek({ p }: { p: PozycjaDecyzji }) {
     title={p.pilne ? "Termin minął albo mija" : "Od kiedy czeka"}>{wiek(ms)}</span>;
 }
 
-function Wiersz({ p }: { p: PozycjaDecyzji }) {
+function Wiersz({ p, onZalozona }: { p: PozycjaDecyzji; onZalozona: (w: DosylkaZalozona) => void }) {
   const Ikona = IKONY[p.zrodlo];
   const tresc = <>
     <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
@@ -62,9 +74,39 @@ function Wiersz({ p }: { p: PozycjaDecyzji }) {
     <Wiek p={p} />
   </>;
   const klasa = "flex items-center gap-3 px-4 py-3 hover:bg-slate-50";
+  if (p.akcja?.rodzaj === "sledz_dosylke") {
+    return <WierszDosylki p={p} zwrotId={p.akcja.zwrotId} tresc={tresc} onZalozona={onZalozona} />;
+  }
   return <li className="border-t border-slate-200 first:border-t-0">
     <Link to={p.cel.panel} className={klasa}>{tresc}
       <ChevronRight size={18} className="shrink-0 text-slate-400" /></Link>
+  </li>;
+}
+
+/**
+ * Wiersz odmowy z panelu Allegro z przyciskiem „Śledź dosyłkę” (@wydanie).
+ *
+ * Przycisk stoi OBOK odnośnika, nie w nim: przycisk w `<a>` to niepoprawny
+ * HTML, a kliknięcie łapałyby oba. Wiersz dalej prowadzi na zwrot — kto chce
+ * spojrzeć na dowody przed kliknięciem, ma je o jedno kliknięcie dalej.
+ * Po sukcesie wiersz schodzi sam, bo serwer liczy listę od nowa. Wynik
+ * oddaje więc wyżej, zanim zniknie — zdanie o zastąpionym kroku musi go
+ * przeżyć.
+ */
+function WierszDosylki({ p, zwrotId, tresc, onZalozona }: {
+  p: PozycjaDecyzji; zwrotId: number; tresc: React.ReactNode; onZalozona: (w: DosylkaZalozona) => void;
+}) {
+  const sledz = useSledzDosylkeZwrotu();
+  return <li className="border-t border-slate-200 first:border-t-0">
+    <div className="flex items-center gap-2 pr-4 hover:bg-slate-50">
+      <Link to={p.cel.panel} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">{tresc}</Link>
+      <Przycisk className="shrink-0 text-xs" disabled={sledz.isPending} aria-busy={sledz.isPending}
+        aria-label={`Śledź dosyłkę — ${p.co}`}
+        onClick={() => sledz.mutate({ id: zwrotId }, { onSuccess: onZalozona })}>
+        {sledz.isPending ? "Zakładam…" : "Śledź dosyłkę"}</Przycisk>
+    </div>
+    {sledz.error && <p role="alert" className="px-4 pb-2 text-xs font-semibold text-ranga-zle">
+      Śledzenia dosyłki nie założono — {(sledz.error as Error).message}</p>}
   </li>;
 }
 
@@ -80,6 +122,15 @@ function Wiersz({ p }: { p: PozycjaDecyzji }) {
 export function DoDecyzji() {
   const dane = useDoDecyzji();
   const [filtr, setFiltr] = useState<Filtr>("wszystko");
+  /* Kroki zastąpione kliknięciem „Śledź dosyłkę” (@wydanie). Sprawa klienta
+     mogła mieć krok, który ktoś ustawił sam — np. „Oddzwonić w sprawie
+     faktury” — a dosyłka go zastępuje. Wiersz znika po kliknięciu, więc bez
+     tego zdania stary krok przepadłby po cichu: dziennik niesie tylko jego
+     długość. To samo zdanie stoi na ekranie zwrotu przy odmowie z WERTIS. */
+  const [zastapione, setZastapione] = useState<DosylkaZalozona[]>([]);
+  const poZalozeniu = (w: DosylkaZalozona) => {
+    if (w.zastapil) setZastapione((z) => [...z, w]);
+  };
   const pozycje = (dane.data?.pozycje ?? []).filter((p) => filtr === "wszystko" || p.obszar === filtr);
   const l = dane.data?.liczniki;
 
@@ -114,7 +165,13 @@ export function DoDecyzji() {
         : pozycje.length === 0
           ? <p className="flex items-center gap-2 px-4 py-2 text-sm text-slate-500">
               <CircleCheck size={16} />Nic nie czeka na biuro.</p>
-          : <ul>{pozycje.map((p) => <Wiersz key={p.klucz} p={p} />)}</ul>}
+          : <ul>{pozycje.map((p) => <Wiersz key={p.klucz} p={p} onZalozona={poZalozeniu} />)}</ul>}
+      {zastapione.map((w, i) => <p key={i} role="status"
+        className="flex flex-wrap items-center gap-x-2 border-t border-slate-200 px-4 py-2 text-xs text-slate-600">
+        <span>Krok sprawy klienta {w.login}: „{w.krok}” zamiast „{w.zastapil}”</span>
+        <Link to={`/obsluga/klient/${encodeURIComponent(w.login)}`}
+          className="text-sky-700 underline underline-offset-2 hover:text-sky-900">profil klienta</Link>
+      </p>)}
     </Karta>
   </div>;
 }

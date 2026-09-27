@@ -285,8 +285,9 @@ export function stanZwrotuPieniedzy(
   database: Db = defaultDb(), zwrotId: number, teraz = new Date(),
 ): StanZwrotuPieniedzy {
   const w = wczytaj(database, zwrotId);
-  /* Nasza odmowa albo kod zsynchronizowany z Allegro — gdzie biuro odmawia,
-     nie wiemy (nagłówek `dosylka.ts`), więc liczą się obie drogi. */
+  /* Nasza odmowa albo kod zsynchronizowany z Allegro. Biuro odmawia w panelu
+     Allegro (fakt właściciela z 27 września 2026, nagłówek `dosylka.ts`),
+     ale nasz ekran też umie odmówić, więc liczą się obie drogi. */
   const kodDosylki = jestKodemDosylki(w.odmowa_kod) || jestKodemDosylki(w.rejection_code);
   const dosylka = kodDosylki ? dosylkaZwrotu(database, w, teraz) : null;
   const podstawa = {

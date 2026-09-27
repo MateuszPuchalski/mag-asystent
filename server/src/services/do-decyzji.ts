@@ -17,6 +17,7 @@ import { listaReklamacji, progKolejki } from "./reklamacje.js";
 import { listaDyskusji } from "./dyskusje.js";
 import { listaRozmow } from "./skrzynka.js";
 import { listaZadan } from "./zadania-terenowe.js";
+import { odmowyBezDosylki } from "./odmowy-dosylki.js";
 
 /* ── DO DECYZJI — jedna lista tego, co czeka na biuro (`docs/obsluga-klienta.md` §7) ──
    Cel biura zapisany przy decyzji o jednym froncie: biuro rozstrzyga to,
@@ -49,7 +50,7 @@ export type Obszar = "magazyn" | "obsluga";
 
 export type ZrodloDecyzji =
   | "dostawy" | "odpowiedzi" | "kosze" | "zapisy" | "kody" | "allegro"
-  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania";
+  | "reklamacje" | "zwroty" | "skrzynka" | "dyskusje" | "sonda" | "zadania" | "dosylki";
 
 /**
  * Dokąd prowadzi wiersz — adres w panelu. Do 0.441.0 był tu też wariant
@@ -74,6 +75,13 @@ export interface PozycjaDecyzji {
   /** Termin minął albo mija — wiersz idzie na górę bez względu na wiek. */
   pilne: boolean;
   cel: CelDecyzji;
+  /**
+   * Jedyny przycisk na tej liście (@wydanie): „Śledź dosyłkę” przy odmowie
+   * z panelu Allegro. Zasada „rozstrzyga się przy dowodach” go nie dotyczy —
+   * odmowę już złożono, przycisk tylko ją rejestruje. Powód przy
+   * `dosylkiBezSledzenia`.
+   */
+  akcja?: { rodzaj: "sledz_dosylke"; zwrotId: number };
 }
 
 export interface DoDecyzji {
@@ -354,6 +362,47 @@ function kolejkiKlienta(teraz: number): PozycjaDecyzji[] {
 }
 
 /**
+ * Nasze polskie nazwy kodów odmowy — kopia `etykietaKodu` z panelu
+ * (`panel/src/zwroty/Pieniadze.tsx`). Kopia, bo serwer nie importuje panelu;
+ * zmieniając brzmienie tam, zmień je i tu.
+ */
+const KOD_ODMOWY: Record<string, string> = {
+  NEW_ITEM_SENT: "Wysłaliśmy nowy towar", MISSING_PART_SENT: "Wysłaliśmy brakującą część",
+};
+
+/**
+ * Odmowy wypłaty z kodem dosyłki, których nikt nie śledzi — wiersz na zwrot.
+ *
+ * BIURO ODMAWIA W PANELU ALLEGRO (fakt właściciela z 27 września 2026),
+ * z nawyku. Kod przychodzi synchronizacją, a zwrot schodzi do grupy
+ * „odrzucony”, poza kolejkę decyzji. Przycisk „Śledź dosyłkę” przy zwrocie
+ * i propozycja na profilu stały więc poza drogą, którą biuro chodzi — to nasz
+ * wniosek z kodu, nie pomiar.
+ *
+ * WIERSZ Z PRZYCISKIEM, NIE AUTOMAT — decyzja właściciela z tego samego dnia.
+ * Krok w sprawie klienta dalej stawia człowiek. Prowadzący sprawy zostaje,
+ * a sprawę bez prowadzącego dostaje ten, kto kliknął — ta sama reguła co
+ * przy każdym kroku. Automat nie miałby kogo wskazać: Allegro nie mówi, kto
+ * odmówił. Kliknięcie może zastąpić krok ustawiony ręką; ekran mówi wtedy,
+ * co zastąpił.
+ *
+ * Wiersz na zwrot, nie liczba, jak przy magazynie: dosyłek jest kilka,
+ * a każda potrzebuje własnego kliknięcia. Gaśnie, gdy dosyłka powstanie
+ * albo odmowa wyjdzie z okna trzydziestu dni.
+ */
+function dosylkiBezSledzenia(teraz: number): PozycjaDecyzji[] {
+  return odmowyBezDosylki(db(), new Date(teraz)).map((o) => ({
+    klucz: `dosylka:${o.zwrotId}`, obszar: "obsluga" as const, zrodlo: "dosylki" as const,
+    pytanie: "Śledzić dosyłkę?",
+    co: `${o.login}: odmowa „${KOD_ODMOWY[o.kod] ?? o.kod}” przy zamówieniu ${o.zamowienie.slice(0, 8)}`,
+    od: o.kiedy,
+    pilne: false,
+    cel: { panel: `/obsluga/zwroty/${o.zwrotId}` },
+    akcja: { rodzaj: "sledz_dosylke" as const, zwrotId: o.zwrotId },
+  }));
+}
+
+/**
  * Wszystko, co czeka na biuro — najpilniejsze pierwsze, potem najstarsze.
  *
  * KOLEJNOŚĆ LICZY SERWER i panel jej nie zmienia — ta sama zasada co przy
@@ -364,7 +413,8 @@ function kolejkiKlienta(teraz: number): PozycjaDecyzji[] {
 export function doDecyzji(teraz = Date.now()): DoDecyzji {
   const pozycje = [
     ...kontoAllegro(), ...zapisyWBledzie(), ...dostawyZWyjatkiem(), ...odpowiedziHali(),
-    ...kosze(), ...odeslaneZadania(), ...kodyKreskowe(), ...kolejkiKlienta(teraz), ...sonda(),
+    ...kosze(), ...odeslaneZadania(), ...kodyKreskowe(), ...kolejkiKlienta(teraz),
+    ...dosylkiBezSledzenia(teraz), ...sonda(),
   ].sort((a, b) =>
     Number(b.pilne) - Number(a.pilne)
     || Number(a.od == null) - Number(b.od == null)
