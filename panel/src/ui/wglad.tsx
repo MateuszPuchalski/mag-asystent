@@ -40,7 +40,7 @@ export function KartaWgladu({ tytul, opis, akcje, id, pusta, children }: {
  * Nagłówek kolumny: napis albo nazwa tylko dla czytnika ekranu.
  *
  * Kolumna z samymi przyciskami albo z logo nie potrzebuje napisu na ekranie,
- * ale czytnik ekranu czyta nagłówek przy każdej komórce (@wydanie). Pusty
+ * ale czytnik ekranu czyta nagłówek przy każdej komórce (0.546.0). Pusty
  * napis dawał pusty `<th>` — naruszenie WCAG 1.3.1 w audycie axe — i przy
  * dwóch takich kolumnach ten sam klucz React dwa razy.
  */

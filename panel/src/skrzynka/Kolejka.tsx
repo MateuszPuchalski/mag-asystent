@@ -159,7 +159,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   /* Kolejka nieświeża wygląda inaczej, bo znaczy co innego. Pusta lista przy
      stojącym synchronizatorze to nie „brak pytań", tylko „nie wiem". */
   nieswieza?: boolean;
-  /* Lista nie przyszła wcale (@wydanie). Wtedy kolejka nie wie, ile czeka,
+  /* Lista nie przyszła wcale (0.546.0). Wtedy kolejka nie wie, ile czeka,
      więc nie mówi „brak rozmów" ani „0" — mówi, że nie wie, i dlaczego. */
   bladBezDanych?: string | null;
 }) {
@@ -229,7 +229,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
      Strażnik jest WSPÓLNY, z `nawigacja/fokus.ts` (0.522.0). Własny nie znał
      SELECT-a, a kolejka ma dwa: „Więcej" i kolejność. Strzałka w otwartej
      liście zmieniała wtedy naraz jej wartość i rozmowę pod kursorem.
-     Od @wydanie strażnik milczy też pod oknem modalnym (`klawiszZajety`). */
+     Od 0.546.0 strażnik milczy też pod oknem modalnym (`klawiszZajety`). */
   const naKlawisz = useRef<(e: KeyboardEvent) => void>(() => {});
   naKlawisz.current = (e: KeyboardEvent) => {
     if (klawiszZajety(e.target)) return;
@@ -336,7 +336,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     <div className="flex shrink-0 items-center gap-2 border-b px-2 py-1.5">
       <div className="relative min-w-0 flex-1">
         <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
-        {/* Podpowiedź MIEŚCI SIĘ w polu (@wydanie). „Szukaj: login, treść,
+        {/* Podpowiedź MIEŚCI SIĘ w polu (0.546.0). „Szukaj: login, treść,
             prowadzący" potrzebowało 192 px, a pole ma 136 px przy 1280 i 1440
             — agent czytał „prc". „Szukaj" mówi lupa i nazwa pola, a miejsce
             na krzyżyk rezerwujemy dopiero, gdy krzyżyk stoi: to daje 156 px

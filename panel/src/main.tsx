@@ -149,7 +149,7 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
       {/* Szukanie PRZED zakładkami (23 września 2026): pytanie „gdzie to jest"
           pada, zanim wiadomo, do której zakładki iść. */}
       <SzukajIKlawisze />
-      {/* ── POWIĘKSZENIE 200% NIE WYPYCHA ZAKŁADEK ZA KADR (@wydanie) ─────────
+      {/* ── POWIĘKSZENIE 200% NIE WYPYCHA ZAKŁADEK ZA KADR (0.546.0) ─────────
           Przy powiększeniu 200% (1280 px okna to 640 px CSS) bieżnia z `shrink-0`
           była o 180 px szersza od okna: „Zadania" i „Dostawy" wychodziły za
           prawą krawędź, a cała strona przewijała się w bok. To ta sama usterka,

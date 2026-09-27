@@ -23,7 +23,7 @@ export function nowyKlientZapytan(): QueryClient {
     /* Wygasła sesja w dowolnym zapytaniu albo mutacji wraca do logowania
        (0.431.0) — szczegół przy `zglosBrakSesji` w `api/klient.ts`. */
     /* Brak połączenia w dowolnym zapytaniu albo mutacji zapala pasek pod
-       nagłówkiem (@wydanie) — szczegół przy `BrakPolaczenia` w `api/klient.ts`. */
+       nagłówkiem (0.546.0) — szczegół przy `BrakPolaczenia` w `api/klient.ts`. */
     queryCache: new QueryCache({ onError: (e) => { zglosBrakSesji(e); zglosBrakPolaczenia(e); } }),
     mutationCache: new MutationCache({
       onError: (e) => { zglosBrakSesji(e); zglosBrakPolaczenia(e); },

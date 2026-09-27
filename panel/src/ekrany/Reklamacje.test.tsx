@@ -368,7 +368,7 @@ describe("Ekran reklamacji", () => {
     expect(screen.getByLabelText("Odpowiedź w sprawie")).toHaveValue("Wysyłam nowy nóż");
   });
 
-  it("okno konfliktu bierze fokus: pisanie nie idzie w szkic pod nakładką (@wydanie)", async () => {
+  it("okno konfliktu bierze fokus: pisanie nie idzie w szkic pod nakładką (0.546.0)", async () => {
     /* Ctrl+Enter wysyła z pola, więc okno otwierało się z kursorem dalej
        w polu. Pisanie szło w szkic, którego pod nakładką nie widać, a drugie
        Ctrl+Enter próbowało wysłać znowu. Fokus startuje na POPRAW SZKIC,

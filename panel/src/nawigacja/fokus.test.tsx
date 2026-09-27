@@ -31,7 +31,7 @@ describe("znaczki skrótów", () => {
   });
 });
 
-/* ── Okna dialogowe: fokus wchodzi, zostaje i wraca (@wydanie) ─────────────
+/* ── Okna dialogowe: fokus wchodzi, zostaje i wraca (0.546.0) ─────────────
    Strona niżej ma nasłuch skrótów na `window`, jak kolejki panelu. Pyta
    o `klawiszZajety`, więc pod oknem modalnym ma milczeć. */
 

@@ -108,7 +108,7 @@ describe("wygasła sesja wraca do logowania (0.431.0)", () => {
   });
 });
 
-describe("brak połączenia z serwerem (@wydanie)", () => {
+describe("brak połączenia z serwerem (0.546.0)", () => {
   /* Serwer bierze wydanie sam i na chwilę znika. Ekran ma dostać JEDEN typ
      błędu z polskim zdaniem, a nie „Failed to fetch" albo „Błąd 502". */
   it("zerwana sieć to BrakPolaczenia, nie angielski TypeError", async () => {

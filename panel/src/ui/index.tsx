@@ -313,7 +313,7 @@ export function Pusto({ waga = "ekran", ikona: Ikona, children }: {
   ikona?: React.ComponentType<{ size?: number; className?: string }>;
   children: React.ReactNode;
 }) {
-  /* Ikona i zdanie w JEDNEJ grupie (@wydanie). Waga „ekran" to siatka, a siatka
+  /* Ikona i zdanie w JEDNEJ grupie (0.546.0). Waga „ekran" to siatka, a siatka
      z dwojgiem dzieci dzieli kolumnę na dwa wiersze: ikona stała na środku
      górnej połowy, zdanie na środku dolnej, trzysta pikseli od siebie. Oko
      czytało to jako dwie osobne rzeczy. Jedno dziecko siatka centruje całe. */
@@ -563,7 +563,7 @@ function useKopiowanie(tekst: string) {
  * `title` mówi, co się stanie PRZED kliknięciem; `sr-only` mówi, co się stało
  * PO nim. Bez tego drugiego czytnik ekranu milczy o skutku.
  *
- * `min-h-6` (@wydanie): 24 px to próg WCAG 2.2 dla celu (2.5.8). Przycisk
+ * `min-h-6` (0.546.0): 24 px to próg WCAG 2.2 dla celu (2.5.8). Przycisk
  * miał 20 px i stał za blisko „profilu" i „Historii" — zmierzone axe
  * w Chromium na nagłówku zwrotu.
  */

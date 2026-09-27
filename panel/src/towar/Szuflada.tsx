@@ -52,7 +52,7 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
   const karta = useKartaTowaru(twId);
   const przekroj = usePrzekrojTowaru(twId);
   const wiedza = useWiedzaTowaru(twId);
-  /* NIEMODALNA (@wydanie): szuflada stoi obok pracy, bez nakładki, więc
+  /* NIEMODALNA (0.546.0): szuflada stoi obok pracy, bez nakładki, więc
      skróty strony działają dalej, a tabulator może z niej wyjść. Fokus
      wchodzi do niej i wraca do przycisku towaru, jak z każdego okna. */
   const okno = useOkno<HTMLDivElement>({ modalne: false, onZamknij });

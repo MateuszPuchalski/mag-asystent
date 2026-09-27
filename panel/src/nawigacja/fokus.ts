@@ -15,7 +15,7 @@ export const polePisania = (t: EventTarget | null): boolean => {
     || el.isContentEditable));
 };
 
-/* ── OKNA DIALOGOWE: FOKUS WCHODZI, ZOSTAJE I WRACA (@wydanie) ──────────────
+/* ── OKNA DIALOGOWE: FOKUS WCHODZI, ZOSTAJE I WRACA (0.546.0) ──────────────
    Pomiar przed zmianą: z sześciu okien panelu fokus wchodził tylko do
    szukania, a nie wracał z żadnego. Tabulator szedł za nakładkę, w ekran,
    którego nie widać. Najdroższy skutek był gdzie indziej. Skróty strony

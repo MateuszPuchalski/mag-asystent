@@ -32,7 +32,7 @@ export function DialogKonfliktu({
 }) {
   const [zgoda, setZgoda] = useState(false);
   const nowa = szczegoly.nowaWiadomosc ?? null;
-  /* FOKUS W OKNIE (@wydanie). Ctrl+Enter wysyła z pola odpowiedzi, więc
+  /* FOKUS W OKNIE (0.546.0). Ctrl+Enter wysyła z pola odpowiedzi, więc
      okno otwierało się z kursorem dalej w tym polu, pod nakładką. Pisanie
      szło w niewidoczny szkic, a drugie Ctrl+Enter próbowało wysłać znowu.
      Fokus startuje na POPRAW SZKIC: to wyjście, które niczego nie wysyła

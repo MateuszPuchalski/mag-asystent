@@ -93,7 +93,7 @@ export function Dostawy() {
   const pasuje = (nr: string, kto: string) =>
     !q || nr.toLowerCase().includes(q) || kto.toLowerCase().includes(q);
   const wKubelku = (k: KubelekDostaw) => dokumenty.filter((d) => kubelekDokumentu(d, zOdpowiedzia) === k);
-  /* Bez danych licznik nie zna liczby, więc jej nie pokazuje (@wydanie).
+  /* Bez danych licznik nie zna liczby, więc jej nie pokazuje (0.546.0).
      „0" przy zerwanym połączeniu mówiło „nic nie ma", a prawda brzmiała
      „nie wiem". Przerwa w połączeniu trwa zwykle minutę aktualizacji. */
   const znane = lista.data !== undefined;
@@ -170,7 +170,7 @@ export function Dostawy() {
   const lewa = (() => {
     if (lista.isLoading) return <Pusto waga="lista">Wczytuję dostawy…</Pusto>;
     /* Błąd BEZ danych zamiast listy: „nic nie czeka na biuro" przy zerwanym
-       połączeniu brzmiało jak koniec pracy (@wydanie). */
+       połączeniu brzmiało jak koniec pracy (0.546.0). */
     if (lista.error && !lista.data) return <Blad>{(lista.error as Error).message}</Blad>;
     if (kubelek === "poza") {
       return <KolejkaPozaWertis wybrany={dokId} onWybierz={idz}
@@ -294,7 +294,7 @@ export function Dostawy() {
   </div>;
 }
 
-/* Lupa jest oknem od @wydanie, nie gołym przyciskiem na cały ekran. Fokus
+/* Lupa jest oknem od 0.546.0, nie gołym przyciskiem na cały ekran. Fokus
    zostawał na miniaturze pod spodem, więc Tab szedł po niewidocznej stronie.
    Przycisk zostaje w środku: zamyka KAŻDE kliknięcie, Enter i Escape. */
 function Lupa({ src, onZamknij }: { src: string; onZamknij: () => void }) {

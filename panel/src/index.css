@@ -19,7 +19,7 @@
   [role="dialog"][tabindex="-1"]:focus { outline: none; }
 }
 @layer components {
-  /* ── ZAZNACZONY WIERSZ KOLEJKI (@wydanie) ──────────────────────────────────
+  /* ── ZAZNACZONY WIERSZ KOLEJKI (0.546.0) ──────────────────────────────────
      Tło zaznaczenia `slate-200` pod szarym `slate-500` daje 3.86:1 przy
      progu 4.5:1. Zmierzone axe w Chromium na zwrocie z danymi; seed bez
      spraw tego stanu nie pokazywał. W skrzynce takich podpisów są cztery,

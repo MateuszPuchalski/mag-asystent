@@ -39,7 +39,7 @@ afterEach(() => {
 zainstalujObserwator();
 afterEach(zapomnijObserwatorow);
 
-/* Dostępność ekranu (@wydanie) — powód, zakres i granice w `dostepnosc.ts`.
+/* Dostępność ekranu (0.546.0) — powód, zakres i granice w `dostepnosc.ts`.
    Rejestrowane PO `cleanup`, a Vitest woła `afterEach` od ostatniego
    zarejestrowanego, więc axe widzi jeszcze wyrenderowany ekran. */
 afterEach(() => sprawdzDostepnosc(expect.getState().testPath));

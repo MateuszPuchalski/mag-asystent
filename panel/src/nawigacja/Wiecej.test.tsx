@@ -109,7 +109,7 @@ describe("wskaźnik synchronizacji", () => {
   });
 
   it("przed pierwszą synchronizacją kropka nie jest zielona, a dymek mówi dlaczego", async () => {
-    /* Zielone „—" obiecywało działanie, którego nie było (@wydanie). */
+    /* Zielone „—" obiecywało działanie, którego nie było (0.546.0). */
     udana = null;
     pokaz();
     const wskaznik = await screen.findByRole("status");
@@ -135,7 +135,7 @@ describe("nagłówek w jednym rzędzie", () => {
 
   it("przy powiększeniu 200% zakładki nie wychodzą za kadr", () => {
     /* Bieżnia z `shrink-0` była przy 640 px CSS o 180 px szersza od okna
-       (@wydanie). jsdom nie liczy układu, więc strażnik pilnuje obu przyczyn:
+       (0.546.0). jsdom nie liczy układu, więc strażnik pilnuje obu przyczyn:
        bieżnia może się zwęzić i zawinąć, a nazwa zakładki chowa się poniżej
        900 px, zostając dla czytnika ekranu. */
     const bieznia = tsx.slice(tsx.indexOf('<nav aria-label="Praca"'), tsx.indexOf("</nav>"));

@@ -23,7 +23,7 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
 
    Próg dla pisma poniżej 18 px to 4.5:1, dla 24 px/700 — 3:1. Żadna z tych
    par nie przechodzi nigdzie, więc zakaz jest bezwarunkowy. Czwarta doszła
-   w @wydanie i pilnuje się jej inaczej — powód przy jej teście.
+   w 0.546.0 i pilnuje się jej inaczej — powód przy jej teście.
 
    Bursztyn jest zakazany jako PISMO, nie w ogóle: `bg-wertis-amber` pod
    `text-wertis-ink` daje 5.84:1 i zostaje barwą marki. Usterką było użycie
@@ -31,7 +31,7 @@ const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
 
    CZEGO NIE PILNUJE. Nie liczy kontrastu tam, gdzie tło stoi gdzie indziej.
    Liczy go tylko dla białego pisma na barwnym tle, bo ta para stoi w jednym
-   łańcuchu klas (@wydanie). Poza tym czyta tekst źródła, więc nie wie,
+   łańcuchu klas (0.546.0). Poza tym czyta tekst źródła, więc nie wie,
    na jakim tle element naprawdę wyląduje — tło bierze się z rodzica albo
    z `@apply` w `index.css`. Zna cztery konkretne złe pary i tyle: nie wykryje
    nowej złej barwy ani złego zestawienia, którego nie ma na liście. Zielony
@@ -145,7 +145,7 @@ describe("Czytelność: cztery pary barw, które nie przechodzą nigdzie", () =>
   });
 
   it("białe pismo na barwnym tle ma 4.5:1 — liczone z palety, nie z listy", () => {
-    /* Tu strażnik LICZY (@wydanie), bo para stoi w jednym łańcuchu klas
+    /* Tu strażnik LICZY (0.546.0), bo para stoi w jednym łańcuchu klas
        i nic nie trzeba zgadywać o rodzicu. Przycisk „Zakończ” w skrzynce
        miał biel na `emerald-600`, 3.77:1, razem z dwoma innymi zielonymi.
        Zmierzone axe w Chromium przy otwartej rozmowie. Lista par przegapiłaby
@@ -172,7 +172,7 @@ describe("Czytelność: cztery pary barw, które nie przechodzą nigdzie", () =>
   });
 
   it("zaznaczenie `bg-slate-200` niesie `wiersz-wybrany` — `slate-500` daje na nim 3.86:1", () => {
-    /* Czwarta para (@wydanie), zmierzona axe w Chromium na zwrocie z danymi.
+    /* Czwarta para (0.546.0), zmierzona axe w Chromium na zwrocie z danymi.
        Tło zaznaczenia stoi na rodzicu, podpisy kilkadziesiąt linii niżej,
        więc strażnik źródła pary nie zobaczy. Pilnuje więc klasy, pod którą
        `index.css` przyciemnia szarość. Kolejka bez niej wraca do 3.86:1. */

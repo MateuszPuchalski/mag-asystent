@@ -1,6 +1,6 @@
 import axe from "axe-core";
 
-/* ── STRAŻNIK DOSTĘPNOŚCI EKRANÓW (@wydanie) ─────────────────────────────────
+/* ── STRAŻNIK DOSTĘPNOŚCI EKRANÓW (0.546.0) ─────────────────────────────────
    Po każdym teście ekranu (`src/ekrany/`, `src/druk/`) axe-core sprawdza
    wyrenderowany DOM regułami WCAG 2.2 A i AA. Test ekranu ma już dane, które
    agent widzi w pracy: sprawy, wiadomości, zwroty. Pomiar na nich łapie to,

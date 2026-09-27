@@ -413,7 +413,7 @@ export function Reklamacje() {
   };
 
   /* Skróty milkną, gdy ognisko stoi w polu tekstowym — inaczej cyfra wpisana
-     w notatkę przełączałaby kubełek. Od @wydanie także pod oknem modalnym,
+     w notatkę przełączałaby kubełek. Od 0.546.0 także pod oknem modalnym,
      wspólnym strażnikiem z `nawigacja/fokus.ts`. Własna kopia nie znała
      SELECT-a, tak jak ta, którą kolejka skrzynki zrzuciła w 0.522.0. */
   useEffect(() => {

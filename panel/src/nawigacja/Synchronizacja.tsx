@@ -31,7 +31,7 @@ export function WskaznikSynchronizacji() {
   const i = data.allegroInbox;
   const zle = i.status !== "current";
   /* Zielona kropka przy „—" mówiła „działa" o synchronizacji, która nie
-     odbyła się ani razu (@wydanie). Nieznane to nie to samo co dobre, więc
+     odbyła się ani razu (0.546.0). Nieznane to nie to samo co dobre, więc
      przed pierwszą udaną kropka jest szara, a dymek mówi to zdaniem. */
   const nigdy = !i.ostatniaUdanaSynchronizacja;
   const zdanie = zdanieSynchronizacji(i);

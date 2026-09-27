@@ -122,7 +122,7 @@ describe("Pusto: dwie wagi, dwa kształty", () => {
 
   it("ikona i zdanie stoją w jednej grupie, więc siatka centruje je razem", () => {
     /* Siatka z dwojgiem dzieci rozkładała ikonę i zdanie na dwie połowy
-       kolumny, trzysta pikseli od siebie (@wydanie). jsdom nie liczy układu,
+       kolumny, trzysta pikseli od siebie (0.546.0). jsdom nie liczy układu,
        więc test pilnuje przyczyny: siatka ma dokładnie jedno dziecko. */
     const { container } = render(<Pusto ikona={Inbox}>Wybierz rozmowę z listy</Pusto>);
     const siatka = container.firstElementChild!;

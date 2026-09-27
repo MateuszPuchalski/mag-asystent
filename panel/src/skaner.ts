@@ -151,7 +151,7 @@ export function useSkaner(
     let bufor = "";
     let ostatni = 0;
     let odlozony: { e: KeyboardEvent; zegar: ReturnType<typeof setTimeout> } | null = null;
-    /* SKRÓT POD OKNEM MODALNYM MILCZY (@wydanie). Pod historią klienta `Z`
+    /* SKRÓT POD OKNEM MODALNYM MILCZY (0.546.0). Pod historią klienta `Z`
        oddawało pieniądze za zwrot zasłonięty nakładką. Skan idzie dalej, bo
        zwroty mają słuchać etykiety cały czas. Pytamy w chwili oddania znaku,
        nie wciśnięcia: odłożony pierwszy znak czeka jeszcze `ZWLOKA_MS`. */

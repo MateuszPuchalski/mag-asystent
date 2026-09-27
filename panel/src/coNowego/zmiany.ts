@@ -41,7 +41,7 @@ export function najnowszeZmiany(md: string, ile = 3): WydanieZmian[] {
        to szczegół wewnątrz zmiany, nie jej tytuł. */
     const n = biezace && /^\*\*(.+?)\*\*/.exec(linia);
     /* `[wymaga działania]` to znak dla wdrożenia, nie wiadomość dla biura
-       (@wydanie). Wzór fragmentu w `zmiany/README.md` go pogrubia, więc bez
+       (0.546.0). Wzór fragmentu w `zmiany/README.md` go pogrubia, więc bez
        tego wyjątku stawałby na pasku obok zmian, które ktoś zauważy. */
     if (biezace && n && !n[1].startsWith("[wymaga działania")) {
       biezace.naglowki.push(n[1].replace(/[.:]\s*$/, ""));

@@ -202,7 +202,7 @@ export function Edytor({
         Przełącznik stoi NAD polem, żeby było widać, gdzie się pisze, zanim
         się zacznie pisać.
 
-        Nieaktywna połowa ma `slate-600` (@wydanie). `slate-500` na bieżni
+        Nieaktywna połowa ma `slate-600` (0.546.0). `slate-500` na bieżni
         `slate-100` dawało 4.34:1, na bursztynowej około 4.3:1, przy progu
         4.5:1 — zmierzone axe w Chromium przy otwartej rozmowie. */}
     <div className="mb-2.5 flex items-center gap-2">

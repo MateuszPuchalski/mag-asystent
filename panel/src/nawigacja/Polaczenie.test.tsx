@@ -7,7 +7,7 @@ import { PasekPolaczenia } from "./Polaczenie";
 import { POLACZENIE_ZERWANE } from "../api/klient";
 import { nowyKlientZapytan } from "../api/klient-zapytan";
 
-/* ── Pasek braku połączenia (@wydanie) ────────────────────────────────────────
+/* ── Pasek braku połączenia (0.546.0) ────────────────────────────────────────
    Pilnujemy czterech rzeczy: pasek staje, gdy serwer nie odpowiada; staje od
    razu po błędzie DOWOLNEGO zapytania; znika po pierwszej udanej odpowiedzi;
    i nigdy niczego nie zapisuje. */

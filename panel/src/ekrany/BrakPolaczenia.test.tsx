@@ -7,7 +7,7 @@ import { Dostawy } from "./Dostawy";
 import { Kosze } from "./Kosze";
 import { Skrzynka } from "./Skrzynka";
 
-/* ── BRAK POŁĄCZENIA TO NIE BRAK PRACY (@wydanie) ────────────────────────────
+/* ── BRAK POŁĄCZENIA TO NIE BRAK PRACY (0.546.0) ────────────────────────────
    Pomiar z zabitym serwerem: Dostawy mówiły „Nic nie czeka na biuro — hala
    rozkłada bez pytań" i liczniki „0" obok „Błąd 502". Agent brał awarię za
    koniec pracy. Tu każdy odczyt pada tak, jak pada przy restarcie serwera,

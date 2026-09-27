@@ -872,7 +872,7 @@ describe("Klawisze kubełka", () => {
     } finally { scena.zwroty = null; scena.szczegol = undefined; }
   });
 
-  it("`Z` pod otwartym oknem nie oddaje pieniędzy; po Escape fokus wraca, a `Z` działa (@wydanie)", async () => {
+  it("`Z` pod otwartym oknem nie oddaje pieniędzy; po Escape fokus wraca, a `Z` działa (0.546.0)", async () => {
     /* Skróty słuchają na `window`, więc pod historią klienta `Z` oddawało
        pieniądze za zwrot zasłonięty nakładką. Okno modalne wycisza skróty
        strony, a po zamknięciu oddaje fokus przyciskowi, który je otworzył. */

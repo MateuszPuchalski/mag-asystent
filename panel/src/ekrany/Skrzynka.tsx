@@ -869,7 +869,7 @@ export function Skrzynka() {
       onPopraw={() => { setKonfliktWysylki(null); rozmowa.refetch(); }} />}
 
     <div className="shrink-0 space-y-4">
-      {/* Błąd listy BEZ danych stoi już w kolejce (@wydanie); tu tylko błąd
+      {/* Błąd listy BEZ danych stoi już w kolejce (0.546.0); tu tylko błąd
           odświeżenia, gdy stare rozmowy zostały na ekranie. */}
       <Blad>{blad || (lista.data ? (lista.error as Error | null)?.message : undefined)}</Blad>
     </div>

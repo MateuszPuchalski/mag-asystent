@@ -20,7 +20,7 @@ export function zglosBrakSesji(blad: unknown): void {
   if (blad instanceof BrakSesji) window.dispatchEvent(new Event(SESJA_WYGASLA));
 }
 
-/* ── SERWER NIE ODPOWIADA (@wydanie) ─────────────────────────────────────────
+/* ── SERWER NIE ODPOWIADA (0.546.0) ─────────────────────────────────────────
    Serwer bierze wydanie sam, kilka razy dziennie, i na chwilę znika. Panel
    pokazywał wtedy angielskie „Failed to fetch" albo gołe „Błąd 502", a listy
    bez danych mówiły „nic nie czeka" — agent brał brak połączenia za brak

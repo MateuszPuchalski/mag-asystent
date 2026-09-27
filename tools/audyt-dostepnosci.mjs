@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* ── Audyt dostępności panelu w prawdziwej przeglądarce (@wydanie) ──────────
+/* ── Audyt dostępności panelu w prawdziwej przeglądarce (0.546.0) ──────────
    axe-core (WCAG 2.2 A i AA oraz dobre praktyki) na każdej trasie `/obsluga`,
    po zalogowaniu, plus zrzut ekranu każdej trasy i przejście klawiaturą
    przez ekran startowy.

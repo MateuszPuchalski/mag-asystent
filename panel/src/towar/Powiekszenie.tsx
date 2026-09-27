@@ -16,7 +16,7 @@ export function Powiekszenie({ url, nazwa, symbol, zamknij }: {
 }) {
 
   /* Escape zamyka, jak każdy dialog w tym panelu. Bez tego operator
-     szukałby myszką krzyżyka w rogu. Modalne od @wydanie także dla
+     szukałby myszką krzyżyka w rogu. Modalne od 0.546.0 także dla
      klawiatury: skróty strony pod nakładką milkną (`nawigacja/fokus.ts`). */
   const okno = useOkno<HTMLDivElement>({ onZamknij: zamknij });
 

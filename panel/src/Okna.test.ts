@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 const ZRODLA = import.meta.glob(["./**/*.tsx", "!./**/*.test.tsx"],
   { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── KAŻDE OKNO IDZIE PRZEZ `useOkno` (@wydanie) ──────────────────────────────
+/* ── KAŻDE OKNO IDZIE PRZEZ `useOkno` (0.546.0) ──────────────────────────────
    Pomiar przed tym wydaniem: sześć okien z `role="dialog"` i dwie nakładki
    bez tej roli. Fokus wchodził tylko do szukania i nie wracał z żadnego.
    Skróty strony działały pod każdym, a w zwrotach `Z` pod historią klienta

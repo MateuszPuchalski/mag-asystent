@@ -36,7 +36,7 @@ function NoweZadanie({ zamknij }: { zamknij: () => void }) {
     defaultValues: { rodzaj: "pomiar", priorytet: "normalny", tytul: "", instrukcja: "" },
   });
   const komunikat = Object.values(formState.errors)[0]?.message;
-  /* OKNO OD @wydanie: bez roli, bez Escape i bez fokusu w środku. Fokus
+  /* OKNO OD 0.546.0: bez roli, bez Escape i bez fokusu w środku. Fokus
      startuje w tytule, bo rodzaj i priorytet mają wartości domyślne.
      Escape zamyka tylko NIETKNIĘTY formularz. Wpisana instrukcja dla hali
      to praca, której Escape z rozpędu nie ma prawa wyrzucić; od tego jest

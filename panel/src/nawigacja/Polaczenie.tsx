@@ -5,7 +5,7 @@ import { BrakPolaczenia, POLACZENIE_ZERWANE } from "../api/klient";
 import { useZdrowie } from "../api/rozmowy";
 import { godzina } from "../ui";
 
-/* ── PASEK BRAKU POŁĄCZENIA (@wydanie) ───────────────────────────────────────
+/* ── PASEK BRAKU POŁĄCZENIA (0.546.0) ───────────────────────────────────────
    Serwer bierze wydanie sam, kilka razy dziennie, i na minutę znika. Pomiar
    z zabitym serwerem pokazał trzy rzeczy naraz, każdą osobno mylącą:
      - listy bez danych mówiły „nic nie czeka na biuro", a liczniki „0";

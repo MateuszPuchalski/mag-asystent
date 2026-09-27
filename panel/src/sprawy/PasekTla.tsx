@@ -52,7 +52,7 @@ export function PasekTla({ prog, onPrzelaczProg, stanTekst, onSynchronizuj, trwa
   const mowiOProgu = Boolean(prog?.od && (prog.zdjety || prog.ukrytych > 0));
   if (!mowiOProgu && !stanTekst) return null;
 
-  /* `slate-600`, nie `slate-500` (@wydanie). Wiersz stoi wprost na tle strony
+  /* `slate-600`, nie `slate-500` (0.546.0). Wiersz stoi wprost na tle strony
      (`#F1F5F9`), a tam `slate-500` przy 11 px daje 4.34:1, poniżej progu
      4.5:1. Strażnik `Kontrast` tego nie widzi, bo tło przychodzi od rodzica;
      złapał to dopiero pomiar axe w przeglądarce. */

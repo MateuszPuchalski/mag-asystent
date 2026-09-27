@@ -75,7 +75,7 @@ export function Kosze() {
      co kubełek, więc karta i kubełek nie mogą się rozjechać (0.503.0). */
   const problemMm = lista.find((k) => k.id === wybrany)?.problemMm ?? null;
   const bezPowrotu = lista.find((k) => k.id === wybrany)?.bezPowrotu ?? null;
-  /* Bez danych licznik nie zna liczby i jej nie pokazuje (@wydanie) — powód
+  /* Bez danych licznik nie zna liczby i jej nie pokazuje (0.546.0) — powód
      przy tych samych licznikach w `ekrany/Dostawy.tsx`. */
   const znane = kosze.data !== undefined;
   const liczniki: Record<KubelekKoszy, number | undefined> = {
@@ -90,7 +90,7 @@ export function Kosze() {
   const szuka = q.length >= 2;
 
   const lewa = kosze.isLoading ? <Pusto waga="lista">Wczytuję kosze…</Pusto>
-    /* Błąd bez danych zamiast „ten kubełek jest pusty" (@wydanie). */
+    /* Błąd bez danych zamiast „ten kubełek jest pusty" (0.546.0). */
     : kosze.error && !kosze.data ? <Blad>{(kosze.error as Error).message}</Blad>
     : szuka ? (szukaj.isLoading ? <Pusto waga="lista">Szukam w koszach…</Pusto>
         : <WynikiSzukania lista={szukaj.data?.znalezione ?? []} onWybierz={idz} />)
