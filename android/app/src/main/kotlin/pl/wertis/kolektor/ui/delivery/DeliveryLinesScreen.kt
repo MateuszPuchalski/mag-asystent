@@ -2038,7 +2038,7 @@ private fun PanelOdkladania(
         }
         /* ZMIEŃ PÓŁKĘ ZOSTAJE PRZY WYJĄTKU (decyzja właściciela z 27 września
            2026). Półka nie należy do zgłoszenia, a serwer zmienia ją bez
-           względu na status. Od @wydanie wyjątek przeżywa odłożenie, więc źle
+           względu na status. Od 0.538.2 wyjątek przeżywa odłożenie, więc źle
            zeskanowana półka czekałaby inaczej na wycofanie zgłoszenia razem
            ze zdjęciem. Szczyt stosu bierzemy z `odlozenia`, bo `cofnij` przy
            wyjątku jest puste — ilości cofnąć się wtedy nie da. */

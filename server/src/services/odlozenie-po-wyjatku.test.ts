@@ -6,7 +6,7 @@ import path from "node:path";
 
 /* ── Odłożenie PO zgłoszeniu wyjątku ─────────────────────────────────────────
    Pozycja z wyjątkiem zostaje `problem`, choćby odłożono na niej resztę sztuk
-   (decyzja właściciela z 27 września 2026). Do @wydanie `putawayLine` liczył
+   (decyzja właściciela z 27 września 2026). Do 0.538.2 `putawayLine` liczył
    status wyłącznie z ilości i nadpisywał wyjątek po cichu. Na statusie
    `problem` stoją trzy reguły, które wtedy milkły:
 

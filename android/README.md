@@ -273,7 +273,7 @@ przed którą ta pozycja broni.
 - [ ] „ZAMIEŃ" dla towaru A nie powtarza się samo dla towaru B.
 - [ ] PROBLEM na ostatniej pozycji NIE zamyka dostawy; nagłówek każe nacisnąć ZAKOŃCZ.
 
-**Odłożenie po zgłoszeniu wyjątku** (@wydanie)
+**Odłożenie po zgłoszeniu wyjątku** (0.538.2)
 
 - [ ] PROBLEM, potem odłożenie reszty: pozycja zostaje wyjątkiem, dostawa czeka na ZAKOŃCZ,
 - [ ] na takiej pozycji jest ZMIEŃ PÓŁKĘ, a nie ma COFNIJ ani POPRAW ILOŚĆ,
