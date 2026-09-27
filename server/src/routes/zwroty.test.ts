@@ -1052,15 +1052,15 @@ test("odmowa „Wysłaliśmy nowy towar” zakłada dosyłkę w tym samym ruchu;
     headers: naglowki, payload: { kod: "NEW_ITEM_SENT", wersja: 1 } });
   assert.equal(r.statusCode, 200, r.body);
   assert.equal(allegro.strzalow, 1);
-  const j = r.json<{ kod: string; wersja: number; dosylka: { zalozona: boolean; login: string; krokDo: string;
-    zastapil: string | null } }>();
-  assert.deepEqual([j.kod, j.wersja, j.dosylka.zalozona, j.dosylka.login, j.dosylka.zastapil],
-    ["NEW_ITEM_SENT", 2, true, "kupiec_77", null]);
+  const j = r.json<{ kod: string; wersja: number; dosylka: { zalozona: boolean; login: string; krok: string;
+    krokDo: string; zastapil: string | null } }>();
+  assert.deepEqual([j.kod, j.wersja, j.dosylka.zalozona, j.dosylka.login, j.dosylka.krok, j.dosylka.zastapil],
+    ["NEW_ITEM_SENT", 2, true, "kupiec_77", "Dosłać nowy towar (etykieta w Sellasist)", null]);
   assert.ok(Date.parse(j.dosylka.krokDo) > Date.now());
 
   const szczegol = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
-  const odm = szczegol.json<{ pieniadze: { odmowa: { dosylka: { opis: string; login: string } | null;
-    sledzicDosylke: boolean } } }>().pieniadze.odmowa;
+  const odm = szczegol.json<{ pieniadze: { dosylka: { opis: string; login: string } | null;
+    sledzicDosylke: boolean } }>().pieniadze;
   assert.deepEqual([odm.dosylka?.opis, odm.dosylka?.login, odm.sledzicDosylke],
     ["Czekamy na numer dosyłki z Allegro", "kupiec_77", false]);
 
@@ -1098,15 +1098,16 @@ test("porażka zapisu dosyłki nie zamienia odmowy w błąd: 200, `zalozona: fal
   assert.equal(db().prepare("SELECT count(*) n FROM klient_dosylka").get()!.n, 0);
 
   const szczegol = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
-  assert.equal(szczegol.json().pieniadze.odmowa.sledzicDosylke, false, "przycisk, który zawsze odmawia, nie staje");
+  assert.equal(szczegol.json().pieniadze.sledzicDosylke, false, "przycisk, który zawsze odmawia, nie staje");
 
   /* Po dopisaniu loginu przycisk staje, a ponowienie zakłada dosyłkę — bez ciała żądania. */
   db().prepare("UPDATE zwrot_klienta SET kupujacy_login='kupiec_79' WHERE id=?").run(zwrot);
   const teraz = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
-  assert.equal(teraz.json().pieniadze.odmowa.sledzicDosylke, true);
+  assert.equal(teraz.json().pieniadze.sledzicDosylke, true);
   const p = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/dosylka`, headers: naglowki });
   assert.equal(p.statusCode, 200, p.body);
-  assert.deepEqual([p.json().zalozona, p.json().login], [true, "kupiec_79"]);
+  assert.deepEqual([p.json().zalozona, p.json().login, p.json().krok],
+    [true, "kupiec_79", "Dosłać brakującą część (etykieta w Sellasist)"]);
   assert.equal(db().prepare("SELECT count(*) n FROM klient_dosylka").get()!.n, 1);
 
   /* Zwrot bez odmowy z kodem dosyłki: 400 ze zdaniem, nie 500. */
@@ -1115,4 +1116,19 @@ test("porażka zapisu dosyłki nie zamienia odmowy w błąd: 200, `zalozona: fal
   const zle = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/dosylka`, headers: naglowki });
   assert.equal(zle.statusCode, 400, zle.body);
   assert.match(zle.json().error, /kodem dosyłki/);
+
+  /* Nieoczekiwany błąd — tu brak tabeli — to też 400 ze STAŁYM zdaniem.
+     Domyślne 500 Fastify pokazałoby na ekranie treść wyjątku SQL-a. */
+  db().prepare("UPDATE zwrot_klienta SET odmowa_kod='NEW_ITEM_SENT' WHERE id=?").run(zwrot);
+  db().exec("ALTER TABLE klient_dosylka RENAME TO klient_dosylka_na_bok");
+  const blad = console.error;
+  console.error = () => {};
+  try {
+    const padl = await app.inject({ method: "POST", url: `/api/obsluga/zwroty/${zwrot}/dosylka`, headers: naglowki });
+    assert.equal(padl.statusCode, 400, padl.body);
+    assert.deepEqual(padl.json(), { error: "Zapis się nie udał — spróbuj jeszcze raz za chwilę" });
+  } finally {
+    console.error = blad;
+    db().exec("ALTER TABLE klient_dosylka_na_bok RENAME TO klient_dosylka");
+  }
 });

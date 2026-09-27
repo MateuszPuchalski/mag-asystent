@@ -6,7 +6,8 @@ import { kontaLoginu, rozmowyPoLoginie } from "./klient-historia.js";
 import { podziekowanieKlienta } from "./conversations.js";
 import { mojeSprawy, ROZMOWA_ZAMOWIENIA, type MojaSprawa } from "./droga-klienta.js";
 import {
-  DOSYLKI_SQL, dzienMiesiac, naDosylkeSprawy, najwazniejszaDosylka, pilnaDosylka, type DosylkaSprawy,
+  DOSYLKI_SQL, dzienMiesiac, naDosylkeSprawy, najwazniejszaDosylka, OKNO_SLEDZENIA_MS, pilnaDosylka,
+  type DosylkaSprawy,
 } from "./dosylka-opis.js";
 
 /* ── Sprawa klienta: kto prowadzi, następny krok, zakończenie (0.535.0) ─────
@@ -59,8 +60,10 @@ import {
 
    DOSYŁKA (0.536.0) mieszka w `dosylka.ts`, który importuje ten plik —
    więc tu jest wyłącznie SQL na `klient_dosylka` i zdanie z czystego
-   `dosylka-opis.ts`. Doręczenie dosyłki i kłopot u przewoźnika to fakty
-   PO STRONIE ALLEGRO, na które sprawa czeka, więc budzą ją jak zwrot. */
+   `dosylka-opis.ts`. Doręczenie dosyłki i kłopot u przewoźnika budzą sprawę.
+   To POSZERZENIE reguły z 26 września, nie jej przypadek: dosyłkę wysyła
+   biuro, więc to nasz ruch, ale jej los zgłasza przewoźnik. Stoi jawnie
+   w S6, do oceny właściciela. */
 
 export interface NoweZdarzenie {
   rodzaj: "rozmowa" | "zwrot_nowy" | "zwrot_nadany" | "zwrot_dotarl" | "reklamacja" | "dyskusja"
@@ -91,7 +94,7 @@ export interface SprawaKlienta {
   nowe: NoweZdarzenie[];
   /** Odcisk, który ekran narysował; zapis, który potwierdza, odsyła go z powrotem (dekalog 4). */
   odcisk: string;
-  /** Dosyłki sprawy w toku, od najnowszej; zakończona nie ma biegnącej dosyłki, więc pusta lista. */
+  /** Dosyłki bieżącego epizodu sprawy w toku, od najnowszej; zakończona nie ma biegnącej dosyłki, więc pusta lista. */
   dosylki: DosylkaSprawy[];
 }
 
@@ -158,10 +161,11 @@ interface Odcisk {
   s: number;
   /** Wiadomości klienta albo doradcy Allegro w reklamacjach i dyskusjach. */
   w: number;
-  /** Dosyłki doręczone (0.536.0). SZTUKI, nie flaga: druga doręczona dosyłka
-   *  budzi też wtedy, gdy pierwszą ktoś już potwierdził. */
+  /** Doręczenia dosyłek (0.536.1): suma liczników PRZEJŚĆ z wierszy, która
+   *  nigdy nie maleje. Druga doręczona budzi, choć pierwszą ktoś potwierdził,
+   *  a zastąpienie wiersza nie cofa licznika, więc nie udaje nowego zdarzenia. */
   k: number;
-  /** Dosyłki z kłopotem u przewoźnika: `ISSUE` albo `RETURNED`. */
+  /** Wejścia dosyłek w kłopot u przewoźnika (`ISSUE` albo `RETURNED`) — też przejścia. */
   q: number;
 }
 
@@ -223,9 +227,12 @@ type Licznik = keyof Omit<Odcisk, "m">;
  * Licznik `w` jest bez typu: wiadomość klienta liczy się w reklamacji i w
  * dyskusji jednakowo, bo obie czekają na naszą odpowiedź.
  *
- * `k` i `q` (0.536.0) liczą dosyłki sprawy tego loginu. Dosyłkę zakłada
- * biuro, ale doręczenie i kłopot zgłasza przewoźnik — to jedyne fakty
- * dosyłki, o których prowadzący może nie wiedzieć.
+ * `k` i `q` (0.536.1) sumują liczniki przejść dosyłek tego loginu, także
+ * archiwalnych. Dosyłkę zakłada biuro, ale doręczenie i kłopot zgłasza
+ * przewoźnik — to jedyne fakty dosyłki, o których prowadzący może nie
+ * wiedzieć. Suma PRZEJŚĆ, nie wierszy w stanie: kłopot, potem „w drodze”,
+ * potem znów kłopot budzi dwa razy, a zastąpiony wiersz nie odejmuje nic.
+ * `coalesce`, bo `sum` po pustym zbiorze to NULL, a NULL w sicie nie budzi.
  */
 const LICZNIKI = (l: string): Record<Licznik, string> => ({
   z: `(SELECT count(*) FROM zwrot_klienta
@@ -240,10 +247,10 @@ const LICZNIKI = (l: string): Record<Licznik, string> => ({
         WHERE kupujacy_login = ${l} COLLATE NOCASE AND typ = 'DISPUTE')`,
   w: `(SELECT count(*) FROM reklamacja_wiadomosc rw JOIN reklamacja_klienta rk ON rk.id = rw.reklamacja_id
         WHERE rk.kupujacy_login = ${l} COLLATE NOCASE AND rw.autor_rola IN ('BUYER','ADMIN'))`,
-  k: `(SELECT count(*) FROM klient_dosylka kd JOIN klient_prowadzenie kp ON kp.id = kd.sprawa_id
-        WHERE kp.login = ${l} COLLATE NOCASE AND kd.dostarczono_at IS NOT NULL)`,
-  q: `(SELECT count(*) FROM klient_dosylka kd JOIN klient_prowadzenie kp ON kp.id = kd.sprawa_id
-        WHERE kp.login = ${l} COLLATE NOCASE AND kd.status IN ('ISSUE','RETURNED'))`,
+  k: `(SELECT coalesce(sum(kd.doreczen), 0) FROM klient_dosylka kd JOIN klient_prowadzenie kp ON kp.id = kd.sprawa_id
+        WHERE kp.login = ${l} COLLATE NOCASE)`,
+  q: `(SELECT coalesce(sum(kd.problemow), 0) FROM klient_dosylka kd JOIN klient_prowadzenie kp ON kp.id = kd.sprawa_id
+        WHERE kp.login = ${l} COLLATE NOCASE)`,
 });
 
 function policzOdcisk(
@@ -356,11 +363,23 @@ function noweZdarzenia(
   const DOSYLKA = `FROM klient_dosylka d JOIN klient_prowadzenie p ON p.id = d.sprawa_id
     WHERE p.login = ? COLLATE NOCASE`;
   if (urosl("k")) {
-    const w = najnowszy(database, `SELECT d.dostarczono_at AS at ${DOSYLKA} AND d.dostarczono_at IS NOT NULL
-      ORDER BY julianday(d.dostarczono_at) DESC LIMIT 1`, login);
+    const w = najnowszy(database, `SELECT d.dostarczono_at AS at, d.sprawdzono_at AS zapisano
+      ${DOSYLKA} AND d.dostarczono_at IS NOT NULL
+      ORDER BY julianday(COALESCE(d.sprawdzono_at, d.dostarczono_at)) DESC LIMIT 1`, login);
+    /* Data tylko przy doręczeniu PO ostatnim ruchu człowieka. Licznik rośnie
+       też za dosyłkę, którą nowa odmowa zastąpiła — jej daty już nie ma,
+       a data najnowszej ZNANEJ przypisałaby obudzenie dosyłce potwierdzonej.
+
+       „Po ruchu” liczy się chwilą, w której SERWER zapisał doręczenie
+       (`sprawdzono_at`), nie datą kuriera (0.536.1). Numer wpisany w poniedziałek
+       do paczki doręczonej w piątek dawał doręczenie „sprzed” wpisania — więc
+       bez daty i na końcu listy. Oba zegary po stronie serwera, jak przy
+       wiadomościach klienta. */
     const at = tekst(w?.at);
-    nowe.push({ rodzaj: "dosylka_doreczona", tekst: at ? `Dosyłka doręczona ${dzienMiesiac(at)}` : "Dosyłka doręczona",
-      at, cel: null });
+    const zapisano = tekst(w?.zapisano) ?? at;
+    const nowa = at !== null && zapisano !== null && chwilaUtc(zapisano) > chwilaUtc(zmienionoAt);
+    nowe.push({ rodzaj: "dosylka_doreczona", tekst: nowa ? `Dosyłka doręczona ${dzienMiesiac(at)}` : "Dosyłka doręczona",
+      at: nowa ? at : null, cel: null });
   }
   if (urosl("q")) {
     /* Chwila kłopotu to chwila, w której się o nim dowiedzieliśmy — przewoźnik
@@ -397,9 +416,14 @@ export function wierszSprawy(database: DatabaseSync, login: string): Wiersz | un
     .get(login) as Wiersz | undefined;
 }
 
-/** Dosyłki sprawy od najnowszej. Kolejność po `julianday`, jak każde porównanie chwil w tym pliku. */
+/**
+ * Dosyłki BIEŻĄCEGO epizodu sprawy, od najnowszej. Archiwalne odchodzą:
+ * dosyłka sprzed wznowienia nie ma kroku, na który czeka, a jej „brak
+ * numeru od 60 dni” wołałby w nowej sprawie o numer, którego nikt nie wpisze.
+ * Kolejność po `julianday`, jak każde porównanie chwil w tym pliku.
+ */
 function dosylkiSprawy(database: DatabaseSync, id: number, teraz: Date): DosylkaSprawy[] {
-  return (database.prepare(`${DOSYLKI_SQL} WHERE d.sprawa_id = ?
+  return (database.prepare(`${DOSYLKI_SQL} WHERE d.sprawa_id = ? AND d.archiwalna = 0
       ORDER BY julianday(d.zalozono_at) DESC, d.zamowienie`).all(id) as Wiersz[])
     .map((w) => naDosylkeSprawy(w, teraz));
 }
@@ -486,8 +510,23 @@ function sprawdzOdcisk(
   login: string, teraz: Date,
 ): void {
   if (w && naNapis(biezacy) !== odcisk) {
-    throw new KonfliktSprawy("Klient dopisał coś po otwarciu ekranu", sprawaKlienta(login, teraz, database));
+    throw new KonfliktSprawy(tylkoDosylka(odcisk, biezacy)
+      ? "Dosyłka zmieniła stan po otwarciu ekranu — sprawdź i zapisz jeszcze raz."
+      : "Klient dopisał coś po otwarciu ekranu", sprawaKlienta(login, teraz, database));
   }
+}
+
+/**
+ * Czy odcisk ekranu różni się od bieżącego WYŁĄCZNIE licznikami dosyłki.
+ * Doręczenie albo kłopot zgłasza przewoźnik, nie klient — zdanie „Klient
+ * dopisał coś” kazałoby szukać wiadomości, której nie ma. Odcisk ekranu bez
+ * `k` i `q` (sprzed 0.536.0) nie przechodzi: tam różnica to nowy kształt.
+ */
+function tylkoDosylka(odcisk: string, biezacy: Odcisk): boolean {
+  let ekran: Partial<Odcisk>;
+  try { ekran = JSON.parse(odcisk) as Partial<Odcisk>; } catch { return false; }
+  if (!ekran || typeof ekran !== "object" || typeof ekran.k !== "number" || typeof ekran.q !== "number") return false;
+  return (["m", "z", "p", "d", "r", "s", "w"] as const).every((k) => ekran[k] === biezacy[k]);
 }
 
 /**
@@ -540,6 +579,22 @@ export function zapiszKrokSprawy(
   let id: number;
   if (w) {
     id = Number(w.id);
+    /* WZNOWIENIE ZAKOŃCZONEJ ZACZYNA NOWY EPIZOD. Jej SKOŃCZONE dosyłki idą
+       do historii, każdą drogą — „Ustaw krok”, odmowa ze zwrotu, propozycja
+       z profilu. Bez tego dosyłka sprzed miesięcy stanęłaby na karcie
+       i w „Moje” nowej sprawy z „brakiem numeru od 60 dni”. Ślad w dzienniku
+       niesie `klient_sprawa_krok` niżej: to jeden ruch, nie dwa.
+
+       Skończona to doręczona, zawrócona albo spoza okna śledzenia. Dosyłka
+       w drodze zostaje żywa (0.536.1): agent kończy sprawę, gdy nada
+       etykietę, a wznawia, gdy klient pyta „gdzie paczka?”. Odłożona do
+       historii przestałaby być śledzona, a panel nie ma jak jej wskrzesić. */
+    if (w.zakonczono_at != null) {
+      database.prepare(`UPDATE klient_dosylka SET archiwalna = 1
+         WHERE sprawa_id = ? AND (dostarczono_at IS NOT NULL OR status = 'RETURNED'
+           OR julianday(COALESCE(numer_at, zalozono_at)) < julianday(?))`)
+        .run(id, new Date(p.teraz.getTime() - OKNO_SLEDZENIA_MS).toISOString());
+    }
     /* Prowadzący zostaje. Ustawia go tylko sprawa bez prowadzącego —
        tak jak odpowiedź przydziela rozmowę od 0.159.0. Zapas dla „Cofnij”
        znika: po nowym kroku nie ma już zakończenia do cofnięcia. */
@@ -609,28 +664,23 @@ export function potwierdzPoZapisie(
 }
 
 /**
- * Odmowa ze zwrotu zastąpiła dosyłkę zamówienia — `znane` bez potwierdzania.
+ * Odmowa ze zwrotu dopisuje do „znanego” brakujące klucze `k` i `q` — i nic
+ * poza tym, bo odmowa niczego nie potwierdza.
  *
- * Liczniki `k` i `q` liczą WIERSZE, a nowa dosyłka do tego samego zamówienia
- * zastępuje wiersz. Doręczona i potwierdzona pierwsza dosyłka znika więc
- * z licznika, a druga doręczona wraca do tej samej liczby — i nie budzi.
- * Stąd odjęcie tego, co zapis zabrał, z podłogą zero. Podłoga chroni przed
- * fałszywym „Dosyłka doręczona”, gdy zabrana dosyłka nie była potwierdzona.
- *
- * Klucz NIEOBECNY dostaje bieżącą liczbę. Sprawa sprzed 0.536.0 nie ma
- * `k` ani `q`, a odmowa nie zapisuje odcisku, więc bez tego jej dosyłka nie
- * obudziłaby jej nigdy. Pozostałe klucze zostają — to nie jest potwierdzenie.
+ * Sprawa sprzed 0.536.0 ma odcisk bez `k` i `q`, a klucz nieobecny nie budzi
+ * (`noweZdarzenia`). Odmowa nie zapisuje odcisku, więc bez tego dopisku
+ * dosyłka takiej sprawy nie obudziłaby jej nigdy. Liczniki nie maleją, więc
+ * zastąpiony wiersz nie wymaga tu żadnej poprawki.
  */
-export function wyrownajZnane(
-  database: DatabaseSync, id: number, login: string, zabrane: { k: number; q: number },
-): void {
+export function wyrownajZnane(database: DatabaseSync, id: number, login: string): void {
   const w = database.prepare("SELECT znane_json FROM klient_prowadzenie WHERE id = ?").get(id) as Wiersz | undefined;
   let znane: Record<string, unknown>;
   try { znane = JSON.parse(String(w?.znane_json)) as Record<string, unknown>; } catch { return; }
   if (!znane || typeof znane !== "object") return;
+  if (typeof znane.k === "number" && typeof znane.q === "number") return;
   const biezacy = policzOdcisk(database, login).odcisk;
   for (const k of ["k", "q"] as const) {
-    znane[k] = typeof znane[k] === "number" ? Math.max(0, (znane[k] as number) - zabrane[k]) : biezacy[k];
+    if (typeof znane[k] !== "number") znane[k] = biezacy[k];
   }
   database.prepare("UPDATE klient_prowadzenie SET znane_json = ? WHERE id = ?").run(JSON.stringify(znane), id);
 }
@@ -775,8 +825,9 @@ const naWierszMoich = (s: SprawaKlienta, at: string, czeka: boolean): MojaSprawa
   login: s.login, czeka, dzis: s.dzis || pilna(s), poTerminie: s.poTerminie,
   nowe: s.nowe[0]?.tekst ?? null,
   /* Osobne pole, nie dopisek do `opis`: opis ucina się na szerokości wiersza,
-     a stan dosyłki zastępuje w panelu „czeka do …” (`StanKroku`). */
-  dosylka: najwazniejszaDosylka(s.dosylki)?.opis ?? null,
+     a stan dosyłki zastępuje w panelu „czeka do …” (`StanKroku`). `at` to
+     ostatni ruch człowieka — doręczenie sprzed niego nie zasłania kroku. */
+  dosylka: najwazniejszaDosylka(s.dosylki, at)?.opis ?? null,
 });
 
 const rosnaco = (a: number, b: number): number => (a === b ? 0 : a < b ? -1 : 1);

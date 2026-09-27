@@ -2894,8 +2894,9 @@ dostaje ostrzeżenie w dzienniku.
 
 **Panel trzeba przebudować, a serwer zrestartować. Klikać nie trzeba nic.**
 Tabela `klient_dosylka` powstaje sama przy starcie. Ticker `dosylki` rusza sam
-w `main()`, gdy konto Allegro jest połączone. Przebieg bez dosyłek w toku nie
-wysyła do Allegro ani jednego żądania.
+w `main()`, gdy konto Allegro jest połączone. Bije co siedemnaście minut,
+a `ALLEGRO_DOSYLKI_SYNC_MS=0` w `wertis.env` go wyłącza. Przebieg bez dosyłek
+w toku nie wysyła do Allegro ani jednego żądania.
 
 Sprawdzenie przy pierwszej prawdziwej odmowie z kodem „Wysłaliśmy nowy
 towar”. Odmowy nie wysyła się na próbę, bo w Allegro jest nieodwracalna. Pod

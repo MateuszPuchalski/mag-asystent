@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -77,9 +77,16 @@ const scena = vi.hoisted(() => ({
   /* Wynik założenia dosyłki w odpowiedzi odmowy wypłaty (0.536.0). `null` =
      odmowa kodem bez dosyłki, więc odpowiedź tego pola nie niesie. */
   dosylkaOdmowy: null as Record<string, unknown> | null,
-  /* Odpowiedź „Śledź dosyłkę” przy zwrocie. */
-  wynikSledzenia: { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z", zastapil: null } as
-    Record<string, unknown>,
+  /* Odpowiedź „Śledź dosyłkę” przy zwrocie. Porażkę ta trasa mówi błędem
+     400, nie kształtem — stąd osobne pole z jego zdaniem. */
+  wynikSledzenia: { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z",
+    krok: "Dosłać nowy towar (etykieta w Sellasist)", zastapil: null } as Record<string, unknown>,
+  bladSledzenia: "",
+  /* Odmowa wypłaty, która wraca błędem — i taka, której odpowiedź przychodzi
+     dopiero, gdy operator stoi już przy następnym zwrocie. */
+  bladOdmowy: "",
+  odlozOdmowe: false,
+  odlozona: null as { onSuccess?: (w: unknown) => void; onError?: (e: Error) => void } | null,
 }));
 
 vi.mock("../api/zwroty", async () => {
@@ -120,14 +127,19 @@ vi.mock("../api/zwroty", async () => {
     /* Odmowa i „Śledź dosyłkę” oddają kształt serwera, bo ekran czyta z odpowiedzi
        zdanie jednorazowe — atrapa z samą wersją by go nigdy nie pokazała. */
     useOdmowPlatnosci: () => ({ ...atrapa("odmowaPlatnosci"),
-      mutate: (dane: Record<string, unknown>, opcje?: { onSuccess?: (w: unknown) => void }) => {
+      mutate: (dane: Record<string, unknown>,
+        opcje?: { onSuccess?: (w: unknown) => void; onError?: (e: Error) => void }) => {
         scena.wolano.push({ co: "odmowaPlatnosci", dane });
+        if (scena.odlozOdmowe) { scena.odlozona = opcje ?? null; return; }
+        if (scena.bladOdmowy) { opcje?.onError?.(new Error(scena.bladOdmowy)); return; }
         opcje?.onSuccess?.({ kod: dane.kod, wersja: Number(dane.wersja) + 1,
           ...(scena.dosylkaOdmowy ? { dosylka: scena.dosylkaOdmowy } : {}) });
       } }),
     useSledzDosylkeZwrotu: () => ({ ...atrapa("sledzDosylke"),
-      mutate: (dane: Record<string, unknown>, opcje?: { onSuccess?: (w: unknown) => void }) => {
+      mutate: (dane: Record<string, unknown>,
+        opcje?: { onSuccess?: (w: unknown) => void; onError?: (e: Error) => void }) => {
         scena.wolano.push({ co: "sledzDosylke", dane });
+        if (scena.bladSledzenia) { opcje?.onError?.(new Error(scena.bladSledzenia)); return; }
         opcje?.onSuccess?.(scena.wynikSledzenia);
       } }),
     /* Skan i dołożenie towaru jako atrapy: test sprawdza, KTÓRĄ drogą poszedł
@@ -1141,61 +1153,116 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
 
 /* ── Dosyłka pod odmową wypłaty (0.536.0) ──────────────────────────────────
    Zła paczka wraca, biuro odmawia wypłaty kodem „Wysłaliśmy nowy towar”
-   i wysyła właściwy towar. Ekran pilnuje trzech rzeczy: otwarcie zwrotu ze
-   stanem dosyłki niczego nie zapisuje; ponowienie woła trasę bez ciała;
-   zdanie z odpowiedzi odmowy stoi przy TYM zwrocie i schodzi przy następnym. */
+   i wysyła właściwy towar. Ekran pilnuje: otwarcie zwrotu ze stanem dosyłki
+   niczego nie zapisuje (liczy żądania inne niż GET, jak `DoDecyzji.test.tsx`);
+   ponowienie woła trasę bez ciała; zdania i formularz sekcji pieniędzy stoją
+   przy SWOIM zwrocie i nie przechodzą na następny. */
 describe("Dosyłka pod odmową wypłaty", () => {
+  /* Żądania inne niż GET, które wyszły prawdziwym `fetch`-em. Mutacje ekranu
+     mają atrapy, więc tu trafiłby tylko zapis spoza nich — np. zapytanie,
+     które przy otwarciu coś zmienia. */
+  let zapisy: string[] = [];
+  beforeEach(() => {
+    zapisy = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if ((init?.method ?? "GET") !== "GET") zapisy.push(`${init?.method} ${url}`);
+      return new Response("{}", { status: 404 });
+    }));
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
   const dwaZwroty = () => [
     { ...zwrot(6, "korekta", "ZK-6"), werdykt: "przyjety" as const, kwotaGrosze: 4999 },
     { ...zwrot(7, "korekta", "ZK-7"), werdykt: "przyjety" as const, kwotaGrosze: 1500 },
   ];
-  const pieniadze = (odmowa: Record<string, unknown> | null) => ({
+  /* Dosyłka i ponowienie stoją OBOK odmowy — tak je oddaje serwer, bo kod
+     dosyłki bywa też w odmowie z panelu Allegro, bez naszej `odmowa`. */
+  const pieniadze = (odmowa: Record<string, unknown> | null, dodatki: Record<string, unknown> = {}) => ({
     pieniadze: {
       moznaZwrocic: false, moznaOdmowic: odmowa === null, powod: null, kwotaGrosze: 4999,
       waluta: "PLN", oddane: null, odmowa, przelew: null, moznaZapisacPrzelew: false, powodPrzelewu: null,
+      dosylka: null, sledzicDosylke: false, ...dodatki,
     },
   });
   const odmowa = (n: Record<string, unknown> = {}) => ({
-    kod: "NEW_ITEM_SENT", powod: null, kiedy: "2026-09-27T10:00:00Z", dosylka: null, sledzicDosylke: false, ...n,
+    kod: "NEW_ITEM_SENT", powod: null, kiedy: "2026-09-27T10:00:00Z", ...n,
   });
   const sprzatnij = () => {
     scena.zwroty = null; scena.szczegol = undefined; scena.dosylkaOdmowy = null;
-    scena.wynikSledzenia = { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z", zastapil: null };
+    scena.wynikSledzenia = { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z",
+      krok: "Dosłać nowy towar (etykieta w Sellasist)", zastapil: null };
+    scena.bladSledzenia = ""; scena.bladOdmowy = ""; scena.odlozOdmowe = false; scena.odlozona = null;
+  };
+  /* Wiersz kolejki, nie nagłówek zwrotu — ten sam numer stoi w obu. */
+  const wiersz = (numer: string) => screen.getAllByText(numer).find((e) => !e.closest("h1,h2,h3,h4"))!;
+  const nastepny = async (numer: string) => {
+    (document.activeElement as HTMLElement | null)?.blur();
+    await userEvent.keyboard("j");
+    expect(await screen.findByRole("heading", { name: numer })).toBeInTheDocument();
+  };
+  const wyslijOdmowe = async (kod: string, powod: string) => {
+    await userEvent.click(await screen.findByRole("button", { name: /Odmów wypłaty/ }));
+    await userEvent.selectOptions(screen.getByLabelText("Kod odmowy"), kod);
+    await userEvent.type(screen.getByLabelText("Uzasadnienie odmowy"), powod);
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij odmowę/ }));
   };
 
   it("otwarcie zwrotu z odmową i stanem dosyłki niczego nie zapisuje", async () => {
     scena.wolano = [];
     scena.zwroty = dwaZwroty();
-    scena.szczegol = pieniadze(odmowa({
-      dosylka: { opis: "Dosyłka w drodze (stan z 14:10)", login: "zielony", ton: null } }));
+    scena.szczegol = pieniadze(odmowa(), {
+      dosylka: { opis: "Dosyłka w drodze (stan z 14:10)", login: "zielony", ton: null } });
     try {
       pokaz("/obsluga/zwroty/6");
       expect(await screen.findByText("Dosyłka w drodze (stan z 14:10)")).toBeInTheDocument();
       expect(screen.getByText("Odmówiono: „Wysłaliśmy nowy towar”")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /profil klienta/ })).toHaveAttribute("href", "/obsluga/klient/zielony");
       expect(scena.wolano).toEqual([]);
+      expect(zapisy).toEqual([]);
     } finally { sprzatnij(); }
   });
 
-  it("„Śledź dosyłkę” woła ponowienie z samym numerem zwrotu", async () => {
+  /* Odmowa złożona w panelu Allegro: `odmowa` pusta, kod w `rejectionCode`
+     z synchronizacji. Sekcja pieniędzy rysuje się przy KAŻDYM wczytanym
+     szczególe, więc to ona niesie linijkę dosyłki — raz, obok faktu odmowy. */
+  it("odmowa z panelu Allegro pokazuje dosyłkę i jej powód, a otwarcie niczego nie zapisuje", async () => {
+    scena.wolano = [];
+    scena.zwroty = [{ ...zwrot(6, "odrzucony", "ZK-6"), rejectionCode: "NEW_ITEM_SENT" }];
+    scena.szczegol = pieniadze(null, { moznaOdmowic: false,
+      dosylka: { opis: "Dosyłka doręczona 30.09", login: "zielony", ton: "ok" } });
+    try {
+      pokaz("/obsluga/zwroty/6");
+      expect(await screen.findByText("Dosyłka doręczona 30.09")).toBeInTheDocument();
+      expect(screen.getByText("Odmówiono w Allegro: „Wysłaliśmy nowy towar”")).toBeInTheDocument();
+      expect(screen.getAllByText("Dosyłka doręczona 30.09")).toHaveLength(1);
+      expect(scena.wolano).toEqual([]);
+      expect(zapisy).toEqual([]);
+    } finally { sprzatnij(); }
+  });
+
+  it("„Śledź dosyłkę” woła ponowienie z samym numerem zwrotu; krok w zdaniu jest z odpowiedzi", async () => {
     scena.wolano = [];
     scena.zwroty = dwaZwroty();
-    scena.szczegol = pieniadze(odmowa({ sledzicDosylke: true }));
+    scena.szczegol = pieniadze(odmowa(), { sledzicDosylke: true });
     scena.wynikSledzenia = { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z",
-      zastapil: "czekamy na zwrot" };
+      krok: "Dosłać brakującą część (etykieta w Sellasist)", zastapil: "czekamy na zwrot" };
     try {
       pokaz("/obsluga/zwroty/6");
       expect(scena.wolano).toEqual([]);
       await userEvent.click(await screen.findByRole("button", { name: "Śledź dosyłkę" }));
       expect(scena.wolano).toEqual([{ co: "sledzDosylke", dane: { id: 6 } }]);
-      expect(screen.getByText("Krok sprawy klienta: „dosłać” zamiast „czekamy na zwrot”")).toBeInTheDocument();
+      expect(screen.getByText(
+        "Krok sprawy klienta: „Dosłać brakującą część (etykieta w Sellasist)” zamiast „czekamy na zwrot”"))
+        .toBeInTheDocument();
     } finally { sprzatnij(); }
   });
 
-  it("nieudane założenie przy ponowieniu nie udaje, że wysłało odmowę", async () => {
+  /* Trasa „Śledź dosyłkę” mówi porażkę błędem 400 ze stałym zdaniem —
+     kształtu `zalozona: false` nie oddaje nigdy, więc atrapa też nie. */
+  it("nieudane założenie przy ponowieniu mówi błąd serwera i nie udaje, że wysłało odmowę", async () => {
     scena.zwroty = dwaZwroty();
-    scena.szczegol = pieniadze(odmowa({ sledzicDosylke: true }));
-    scena.wynikSledzenia = { zalozona: false, blad: "Zwrot nie ma numeru zamówienia." };
+    scena.szczegol = pieniadze(odmowa(), { sledzicDosylke: true });
+    scena.bladSledzenia = "Zwrot nie ma numeru zamówienia.";
     try {
       pokaz("/obsluga/zwroty/6");
       await userEvent.click(await screen.findByRole("button", { name: "Śledź dosyłkę" }));
@@ -1208,25 +1275,76 @@ describe("Dosyłka pod odmową wypłaty", () => {
   it("zdanie z odpowiedzi odmowy stoi przy tym zwrocie i schodzi przy następnym", async () => {
     scena.wolano = [];
     scena.zwroty = dwaZwroty();
-    /* Ten sam stan pieniędzy dla obu zwrotów: sekcja zostaje zamontowana, więc
-       tylko numer zwrotu w stanie ekranu chroni przed zdaniem o cudzym kroku. */
+    /* Ten sam stan pieniędzy dla obu zwrotów — atrapa szczegółu nie zna numeru. */
     scena.szczegol = pieniadze(null);
     scena.dosylkaOdmowy = { zalozona: false, blad: "Zwrot nie ma numeru zamówienia." };
     try {
       pokaz("/obsluga/zwroty/6");
       await userEvent.click(await screen.findByRole("button", { name: /Odmów wypłaty/ }));
       await userEvent.selectOptions(screen.getByLabelText("Kod odmowy"), "NEW_ITEM_SENT");
-      expect(screen.getByText("Sprawa klienta dostanie krok „dosłać” i śledzenie dosyłki.")).toBeInTheDocument();
+      expect(screen.getByText("Sprawa klienta dostanie krok dosyłki i jej śledzenie.")).toBeInTheDocument();
       await userEvent.click(screen.getByRole("button", { name: /Wyślij odmowę/ }));
       expect(scena.wolano).toEqual([{ co: "odmowaPlatnosci",
         dane: { id: 6, kod: "NEW_ITEM_SENT", powod: null, wersja: 1 } }]);
       const zdanie = "Odmowa wysłana; śledzenia dosyłki nie założono — Zwrot nie ma numeru zamówienia.";
       expect(screen.getByText(zdanie)).toBeInTheDocument();
 
-      (document.activeElement as HTMLElement | null)?.blur();
-      await userEvent.keyboard("j");
-      expect(await screen.findByRole("heading", { name: "ZK-7" })).toBeInTheDocument();
+      await nastepny("ZK-7");
       expect(screen.queryByText(zdanie)).toBeNull();
+    } finally { sprzatnij(); }
+  });
+
+  /* SONDA PRZEGLĄDU: sekcja bez klucza zostawała zamontowana przy przejściu
+     na zwrot z pamięci podręcznej. Otwarty formularz odmowy przechodził wtedy
+     na następny zwrot z kodem i powodem poprzedniego — gotowy do wysłania
+     drugiej, nieodwracalnej odmowy pod cudzym numerem. */
+  it("formularz odmowy nie przechodzi na następny zwrot z kodem i powodem poprzedniego", async () => {
+    scena.wolano = [];
+    scena.zwroty = dwaZwroty();
+    scena.szczegol = pieniadze(null);
+    try {
+      pokaz("/obsluga/zwroty/6");
+      await wyslijOdmowe("NEW_ITEM_SENT", "Powód klienta A");
+      expect(scena.wolano).toEqual([{ co: "odmowaPlatnosci",
+        dane: { id: 6, kod: "NEW_ITEM_SENT", powod: "Powód klienta A", wersja: 1 } }]);
+
+      await nastepny("ZK-7");
+      expect(screen.queryByLabelText("Kod odmowy")).toBeNull();
+      expect(screen.queryByLabelText("Uzasadnienie odmowy")).toBeNull();
+      expect(screen.queryByRole("button", { name: /Wyślij odmowę/ })).toBeNull();
+      expect(screen.getByRole("button", { name: /Odmów wypłaty/ })).toBeInTheDocument();
+      expect(scena.wolano).toHaveLength(1);
+    } finally { sprzatnij(); }
+  });
+
+  it("błąd odmowy zwrotu A nie stoi pod pieniędzmi zwrotu B", async () => {
+    scena.zwroty = dwaZwroty();
+    scena.szczegol = pieniadze(null);
+    scena.bladOdmowy = "Allegro nie przyjęło odmowy.";
+    try {
+      pokaz("/obsluga/zwroty/6");
+      await wyslijOdmowe("ITEM_FIXED", "Naprawione");
+      expect(screen.getByText("Allegro nie przyjęło odmowy.")).toBeInTheDocument();
+      await nastepny("ZK-7");
+      expect(screen.queryByText("Allegro nie przyjęło odmowy.")).toBeNull();
+    } finally { sprzatnij(); }
+  });
+
+  /* Odpowiedź, która przyszła po odejściu, czeka przy SWOIM zwrocie: odmowa
+     jest nieodwracalna, więc jej wynik nie może przepaść ani trafić obok. */
+  it("spóźniony błąd odmowy zwrotu A nie ląduje przy B, a czeka przy A", async () => {
+    scena.zwroty = dwaZwroty();
+    scena.szczegol = pieniadze(null);
+    scena.odlozOdmowe = true;
+    try {
+      pokaz("/obsluga/zwroty/6");
+      await wyslijOdmowe("ITEM_FIXED", "Naprawione");
+      await nastepny("ZK-7");
+      act(() => scena.odlozona?.onError?.(new Error("Allegro nie przyjęło odmowy.")));
+      expect(screen.queryByText("Allegro nie przyjęło odmowy.")).toBeNull();
+      await userEvent.click(wiersz("ZK-6"));
+      expect(await screen.findByRole("heading", { name: "ZK-6" })).toBeInTheDocument();
+      expect(screen.getByText("Allegro nie przyjęło odmowy.")).toBeInTheDocument();
     } finally { sprzatnij(); }
   });
 });

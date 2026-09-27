@@ -1,5 +1,5 @@
 import { TRACKING_NA_ZADANIE, urlTrackingu, zapytajAllegro } from "../adapters/allegro.http.js";
-import { BladLimituAllegro } from "../adapters/allegro.js";
+import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { config } from "../config.js";
 import type { Db } from "../db/db.js";
 
@@ -40,6 +40,12 @@ export interface StanPrzesylki {
   dostarczonoAt: string | null;
   /** Kod OSTATNIEGO statusu: `IN_TRANSIT`, `NOTICE_LEFT`, `ISSUE`, `RETURNED`… */
   status: string | null;
+  /**
+   * `occurredAt` ostatniego statusu (0.536.1). Dosyłka rozpoznaje po nim
+   * paczkę bez daty rejestracji: ruch u przewoźnika po zgłoszeniu zwrotu
+   * odróżnia nową paczkę od oryginału (`wybierzNumer` w `dosylka.ts`).
+   */
+  ostatnioAt: string | null;
 }
 
 /**
@@ -52,7 +58,7 @@ export interface StanPrzesylki {
 export function stanZHistorii(historia: Historia | undefined): StanPrzesylki {
   const statusy = (historia?.trackingDetails?.statuses ?? [])
     .filter((s): s is Status & { occurredAt: string } => typeof s?.occurredAt === "string");
-  if (statusy.length === 0) return { dostarczonoAt: null, status: null };
+  if (statusy.length === 0) return { dostarczonoAt: null, status: null, ostatnioAt: null };
 
   const doreczone = statusy.filter((s) => s.code === DORECZONA)
     .sort((a, b) => a.occurredAt.localeCompare(b.occurredAt));
@@ -62,6 +68,7 @@ export function stanZHistorii(historia: Historia | undefined): StanPrzesylki {
        nadawcy ma dwa wpisy, a nas interesuje moment, w którym trafiła do nas. */
     dostarczonoAt: doreczone[0]?.occurredAt ?? null,
     status: ostatni?.code ?? null,
+    ostatnioAt: ostatni?.occurredAt ?? null,
   };
 }
 
@@ -99,10 +106,19 @@ export interface PaczkaDoTrackingu {
  * odczekał `Retry-After`. Limit jest wspólny dla całego konta, więc dalsze
  * partie tylko by go przedłużały. Zwroty tej flagi nie podają i zachowują
  * się jak przed wydzieleniem: partia z 429 przepada, reszta idzie dalej.
+ *
+ * `pojedynczoPoBledzie` (dosyłka): partię, która padła czymś innym niż 429,
+ * pyta jeszcze raz numer po numerze. Jeden źle wpisany numer potrafi
+ * wywrócić całą partię, a z nią dosyłki, które są w porządku. Dosyłek w toku
+ * jest kilka, więc ponowienie kosztuje kilka żądań na takt, w którym coś
+ * padło. Zwroty tej flagi nie podają — ich partie bywają pełne.
+ *
+ * DZIENNIK DOSTAJE STAŁE ZDANIE: przewoźnik i kod HTTP. Treść błędu Allegro
+ * bywa czymkolwiek, także kawałkiem odpowiedzi z adresem odbiorcy.
  */
 export async function odpytajTracking(
   query: (url: string) => Promise<unknown | null>, apiUrl: string, paczki: readonly PaczkaDoTrackingu[],
-  opcje: { limitWyzej?: boolean } = {},
+  opcje: { limitWyzej?: boolean; pojedynczoPoBledzie?: boolean } = {},
 ): Promise<Map<string, StanPrzesylki>> {
   const wgPrzewoznika = new Map<string, PaczkaDoTrackingu[]>();
   for (const p of paczki) {
@@ -112,24 +128,32 @@ export async function odpytajTracking(
   }
 
   const stany = new Map<string, StanPrzesylki>();
+  /* Jedno pytanie o partię; `false`, gdy nie doszło — wtedy numery partii
+     nie dostają wpisu, a dziennik dostaje stałe zdanie. */
+  const zapytaj = async (carrierId: string, partia: readonly PaczkaDoTrackingu[]): Promise<boolean> => {
+    let odp: Odpowiedz | null = null;
+    try {
+      odp = (await query(urlTrackingu(apiUrl, carrierId, partia.map((p) => p.waybill)))) as Odpowiedz | null;
+    } catch (e) {
+      if (opcje.limitWyzej && e instanceof BladLimituAllegro) throw e;
+      const kod = e instanceof BladOdpowiedziAllegro ? `HTTP ${e.status}` : "bez odpowiedzi";
+      console.warn(`[tracking] ${carrierId}: pytanie o ${partia.length} numer(y) nie doszło (${kod})`);
+      return false;
+    }
+    const wgNumeru = new Map<string, Historia>();
+    for (const h of odp?.waybills ?? []) {
+      if (typeof h?.waybill === "string") wgNumeru.set(h.waybill, h);
+    }
+    for (const p of partia) stany.set(p.waybill, stanZHistorii(wgNumeru.get(p.waybill)));
+    return true;
+  };
+
   for (const [carrierId, lista] of wgPrzewoznika) {
     for (let i = 0; i < lista.length; i += TRACKING_NA_ZADANIE) {
       const partia = lista.slice(i, i + TRACKING_NA_ZADANIE);
-      let odp: Odpowiedz | null = null;
-      try {
-        const url = urlTrackingu(apiUrl, carrierId, partia.map((p) => p.waybill));
-        odp = (await query(url)) as Odpowiedz | null;
-      } catch (e) {
-        if (opcje.limitWyzej && e instanceof BladLimituAllegro) throw e;
-        console.warn(`[tracking] ${carrierId}: ${e instanceof Error ? e.message : e}`);
-        continue;
-      }
-
-      const wgNumeru = new Map<string, Historia>();
-      for (const h of odp?.waybills ?? []) {
-        if (typeof h?.waybill === "string") wgNumeru.set(h.waybill, h);
-      }
-      for (const p of partia) stany.set(p.waybill, stanZHistorii(wgNumeru.get(p.waybill)));
+      if (await zapytaj(carrierId, partia)) continue;
+      if (!opcje.pojedynczoPoBledzie || partia.length < 2) continue;
+      for (const p of partia) await zapytaj(carrierId, [p]);
     }
   }
   return stany;

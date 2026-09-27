@@ -375,6 +375,22 @@ test("po odmowie nie da się oddać pieniędzy tym samym zwrotem", async () => {
   assert.match(String(s.powod), /Odmowa/);
 });
 
+test("odmowa złożona w panelu Allegro zamyka odmowę i wypłatę jak nasza — bez wyjścia do sieci", async () => {
+  /* Kod przychodzi synchronizacją (`rejection_code`), naszej odmowy nie ma.
+     Przycisk „Odmów wypłaty” obok „Odmówiono w Allegro” kończyłby się 422. */
+  const d = stanowisko();
+  const id = zwrotGotowy(d);
+  d.prepare("UPDATE zwrot_klienta SET rejection_code = 'NEW_ITEM_SENT' WHERE id = ?").run(id);
+  const s = stanZwrotuPieniedzy(d, id);
+  assert.deepEqual([s.moznaOdmowic, s.moznaZwrocic, s.powod, s.odmowa],
+    [false, false, "Odmowa zwrotu pieniędzy jest już zgłoszona w Allegro.", null]);
+  let strzalow = 0;
+  await assert.rejects(odmowZwrotuPieniedzy(d, id, "REFUND_REJECTED", "powód", 1, KTO,
+    async () => { strzalow++; return {}; }), ZwrotPieniedzyConflict);
+  assert.equal(strzalow, 0);
+  assert.equal(s.moznaZapisacPrzelew, true, "notatka o przelewie poza Allegro zostaje otwarta");
+});
+
 /* ── Ślad po przelewie oddanym poza Allegro (0.269.0) ────────────────────────
    Przy pobraniu Allegro nigdy nie trzymało tych pieniędzy, więc trasa zwrotu
    jest zamknięta z definicji. Do 0.268.0 zwrot zamykał się korektą BEZ ŚLADU

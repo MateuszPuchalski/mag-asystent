@@ -206,6 +206,8 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "Takt synchronizacji zwrotów w milisekundach; 0 wyłącza." },
   { klucz: "ALLEGRO_RABATY_SYNC_MS", grupa: "zwroty", kto: "zaawansowane",
     opis: "Takt wniosków o rabat w milisekundach; 0 wyłącza." },
+  { klucz: "ALLEGRO_DOSYLKI_SYNC_MS", grupa: "zwroty", kto: "zaawansowane",
+    opis: "Takt wykrywania i śledzenia dosyłek w milisekundach; 0 wyłącza." },
   { klucz: "ALLEGRO_REKLAMACJE_SYNC_MS", grupa: "zwroty", kto: "zaawansowane",
     opis: "Takt synchronizacji reklamacji w milisekundach; 0 wyłącza." },
   { klucz: "ALLEGRO_ZWROTY_DNI_WSTECZ", grupa: "zwroty", kto: "zaawansowane",

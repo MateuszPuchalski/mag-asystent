@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { poZapisieSprawy } from "./spoiwo";
-import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, Ocena, PozycjaNaOutlet, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, WynikDosylki, Zwrot, SprawaZakupu, PrzystanekDrogi } from "./typy";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, Ocena, PozycjaNaOutlet, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, WynikDosylki, DosylkaZalozona, Zwrot, SprawaZakupu, PrzystanekDrogi } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -897,6 +897,10 @@ export function useCofnijPrzelew() {
  * Odmowa wypłaty. Przy kodach dosyłki (0.536.0) ta sama trasa zakłada też
  * śledzenie dosyłki i krok sprawy klienta — odpowiedź niesie wtedy `dosylka`.
  * Przy pozostałych kodach tego pola nie ma wcale.
+ *
+ * OBIETNICA WRACA z `onSettled` — lekcja `poZapisieSprawy` w `spoiwo.ts`.
+ * Bez niej `isPending` gasło przed odświeżeniem szczegółu, a sekcja pieniędzy
+ * rysowała przez chwilę stan sprzed odmowy z czynnym formularzem.
  */
 export function useOdmowPlatnosci() {
   const qc = useQueryClient();
@@ -904,33 +908,38 @@ export function useOdmowPlatnosci() {
     mutationFn: (v: { id: number; kod: string; powod: string | null; wersja: number }) =>
       api<{ kod: string; wersja: number; dosylka?: WynikDosylki }>(`/api/obsluga/zwroty/${v.id}/odmowa-platnosci`,
         { method: "POST", body: JSON.stringify({ kod: v.kod, powod: v.powod, wersja: v.wersja }) }),
-    onSettled: (d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
-      if (d?.dosylka?.zalozona) void poZapisieSprawy(qc, d.dosylka.login);
-    },
+    onSettled: (d, _e, v) => Promise.all([
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true }),
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) }),
+      d?.dosylka?.zalozona ? poZapisieSprawy(qc, d.dosylka.login) : null,
+    ]),
   });
 }
 
 /**
  * „Śledź dosyłkę” przy zwrocie (0.536.0) — ponowienie po odmowie, przy
- * której zapis u nas się nie udał, albo przy kodzie złożonym poza panelem.
+ * której zapis u nas się nie udał, albo po odmowie złożonej w panelu
+ * Allegro, której kod przyszedł synchronizacją (`rejection_code`).
  *
  * IDZIE BEZ CIAŁA. Serwer bierze zamówienie i konto ze zwrotu, więc nie ma
  * czego wysłać — a pusty JSON to „Bad Request” od Fastify (reguła klienta
  * HTTP z `CLAUDE.md`). Podwójne kliknięcie niczego nie psuje: drugie
  * żądanie oddaje tę samą dosyłkę bez nowego zapisu.
+ *
+ * Porażka przychodzi błędem 400 ze stałym zdaniem serwera, nie kształtem
+ * `zalozona: false` — stąd typ odpowiedzi bez tej gałęzi. Obietnica wraca
+ * z `onSettled` z tego samego powodu co przy odmowie wyżej.
  */
 export function useSledzDosylkeZwrotu() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { id: number }) =>
-      api<WynikDosylki>(`/api/obsluga/zwroty/${v.id}/dosylka`, { method: "POST" }),
-    onSettled: (d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
-      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
-      if (d?.zalozona) void poZapisieSprawy(qc, d.login);
-    },
+      api<DosylkaZalozona>(`/api/obsluga/zwroty/${v.id}/dosylka`, { method: "POST" }),
+    onSettled: (d, _e, v) => Promise.all([
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true }),
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) }),
+      d ? poZapisieSprawy(qc, d.login) : null,
+    ]),
   });
 }
 
