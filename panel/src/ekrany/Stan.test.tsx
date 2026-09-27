@@ -33,6 +33,7 @@ let sondaBlad = true;
 const KOLEJKA = { summary: { pending: 1, error: 1, done: 3 }, items: [
   { id: 7, time: "12:00", status: "pending", label: "Lokalizacja RP-4120", detail: "P-01-3 → P-02-1", errMsg: null },
   { id: 9, time: "11:40", status: "error", label: "MM kosza K-010", detail: "ZWR", errMsg: "brak stanu" },
+  { id: 11, time: "11:20", status: "done", label: "Lokalizacja RP-9", detail: "A01-01-01", errMsg: null },
 ] };
 
 beforeEach(() => {
@@ -81,6 +82,8 @@ function pokaz(adres = "/obsluga/stan") {
 
 /* Zwinięta karta: nagłówek z przyciskiem, który niesie `aria-expanded`. */
 const rozwin = (tytul: string) => screen.getByRole("button", { name: tytul });
+/* Kafelek tablicy (@wydanie): nazwa obszaru, spacja i jego stan jednym zdaniem. */
+const kafelek = (nazwa: string) => screen.getByRole("button", { name: new RegExp(`^${nazwa} `) });
 
 const kartaKolejki = () => screen.getByRole("heading", { name: "Zapisy do Subiekta" }).closest(".card") as HTMLElement;
 
@@ -131,32 +134,67 @@ describe("Stan systemu w panelu", () => {
     await waitFor(() => expect(wyslane).toContain("POST /api/biuro/sonda-rzeczywistosci"));
   });
 
-  it("rzadkie karty stoją zwinięte, a otwarcie jednej nadal niczego nie zapisuje", async () => {
+  it("zdrowe i rzadkie obszary stoją kafelkiem, a klik otwiera kartę bez zapisu", async () => {
+    /* Tablica z @wydanie: rzadkie karty nie stoją nawet zwinięte — ich
+       nagłówkiem jest kafelek. Otwarcie karty to dalej samo patrzenie. */
     sondaBlad = false;
     pokaz();
     await screen.findByText("MM kosza K-010");
     for (const tytul of ["Masowa zmiana lokalizacji", "Rekoncyliacja", "Test na żywym Allegro"]) {
-      expect(screen.getByRole("heading", { name: tytul })).toBeInTheDocument();
-      expect(rozwin(tytul)).toHaveAttribute("aria-expanded", "false");
+      expect(screen.queryByRole("heading", { name: tytul })).toBeNull();
+      expect(kafelek(tytul)).toHaveAttribute("aria-expanded", "false");
     }
-    expect(screen.queryByRole("button", { name: /Sprawdź teraz/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /Przetestuj teraz/ })).toBeNull();
-    await userEvent.click(rozwin("Rekoncyliacja"));
-    expect(rozwin("Rekoncyliacja")).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(kafelek("Rekoncyliacja"));
+    expect(kafelek("Rekoncyliacja")).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: /Sprawdź teraz/ })).toBeInTheDocument();
     /* Rozwinięcie to też patrzenie: bez zapisu i bez przebiegu rekoncyliacji. */
     expect(wyslane).toEqual([]);
     expect(odczyty).not.toContain("/api/reconcile");
   });
 
-  it("?karta= otwiera zwiniętą kartę — DO DECYZJI nie prowadzi do samego tytułu", async () => {
-    /* Sonda bez błędu stoi zwinięta; wiersz DO DECYZJI o teście na żywo
-       (`?karta=sonda`) ma ją zastać otwartą. */
+  it("na wejściu otwarte są wyłącznie karty obszarów, które czegoś chcą", async () => {
+    /* W danych testu: zadanie w błędzie, nierozstrzygnięta kolizja, konto
+       niepołączone i krok testu na żywo „nie działa". Reszta jest zdrowa. */
+    pokaz();
+    await screen.findByText("MM kosza K-010");
+    await screen.findByText("5901234567890");
+    for (const tytul of ["Zapisy do Subiekta", "Kody kreskowe", "Konto Allegro", "Test na żywym Allegro"]) {
+      expect(await screen.findByRole("heading", { name: tytul })).toBeInTheDocument();
+    }
+    for (const tytul of ["Serwer", "Stan integracji", "Zgubiony kolektor", "Ile trwa wymiana z halą"]) {
+      expect(screen.queryByRole("heading", { name: tytul })).toBeNull();
+    }
+    expect(kafelek("Kody kreskowe")).toHaveTextContent("1 do decyzji");
+    expect(kafelek("Zapisy do Subiekta")).toHaveTextContent("1 w błędzie");
+  });
+
+  it("kafelek zamyka i otwiera kartę także obszaru do uwagi", async () => {
+    pokaz();
+    await screen.findByText("5901234567890");
+    await userEvent.click(kafelek("Kody kreskowe"));
+    expect(screen.queryByRole("heading", { name: "Kody kreskowe" })).toBeNull();
+    await userEvent.click(kafelek("Kody kreskowe"));
+    expect(await screen.findByText("5901234567890")).toBeInTheDocument();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("kolejka chowa „zapisane” pod przyciskiem — ruchu wymagają błąd i oczekujące", async () => {
+    pokaz();
+    await screen.findByText("MM kosza K-010");
+    expect(screen.queryByText("Lokalizacja RP-9")).toBeNull();
+    await userEvent.click(within(kartaKolejki()).getByRole("button", { name: "Pokaż zapisane (1)" }));
+    expect(screen.getByText("Lokalizacja RP-9")).toBeInTheDocument();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("?karta= otwiera kartę obszaru — DO DECYZJI nie prowadzi do samego kafelka", async () => {
+    /* Sonda bez błędu jest zdrowa i stoi samym kafelkiem; wiersz DO DECYZJI
+       o teście na żywo (`?karta=sonda`) ma zastać jej kartę otwartą. */
     sondaBlad = false;
     pokaz("/obsluga/stan?karta=sonda");
     expect(await screen.findByRole("button", { name: /Przetestuj teraz/ })).toBeInTheDocument();
     expect(rozwin("Test na żywym Allegro")).toHaveAttribute("aria-expanded", "true");
-    expect(rozwin("Rekoncyliacja")).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("heading", { name: "Rekoncyliacja" })).toBeNull();
     const skok = Element.prototype.scrollIntoView as ReturnType<typeof vi.fn>;
     await waitFor(() => expect(skok).toHaveBeenCalled());
     expect(new Set(skok.mock.contexts.map((c) => (c as HTMLElement).id))).toEqual(new Set(["karta-sonda"]));
@@ -190,6 +228,9 @@ describe("Stan systemu w panelu", () => {
     /* Kopie robi serwer bez udziału człowieka, więc to jedyne miejsce w panelu,
        gdzie widać, że je robi. Data lokalna: 00:30Z to 2:30 w Warszawie. */
     pokaz();
+    /* Zdrowy serwer stoi kafelkiem (@wydanie) — karta jest jedno kliknięcie dalej. */
+    await screen.findByText("MM kosza K-010");
+    await userEvent.click(kafelek("Serwer"));
     expect(await screen.findByText("nocna 2026-09-24 · przed aktualizacją —")).toBeInTheDocument();
   });
 
@@ -198,7 +239,10 @@ describe("Stan systemu w panelu", () => {
        karta konta Allegro; worker — karta serwera. Wersja zostaje, bo karta
        aktualizacji jest wyłącznie adminowa (0.509.0). */
     pokaz();
-    await screen.findByText("Stan integracji");
+    await screen.findByText("MM kosza K-010");
+    await userEvent.click(kafelek("Stan integracji"));
+    await userEvent.click(kafelek("Serwer"));
+    await screen.findByRole("heading", { name: "Stan integracji" });
     expect(await screen.findByText("wersja serwera")).toBeInTheDocument();
     expect(screen.queryByText("plik konfiguracji")).toBeNull();
     expect(screen.queryByText("Połączenie Allegro")).toBeNull();

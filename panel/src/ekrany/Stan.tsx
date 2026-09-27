@@ -1,7 +1,6 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { Activity } from "lucide-react";
 import { useJa, useZdrowie } from "../api/rozmowy";
-import { Karta } from "../ui";
 import { useSkokDoKarty } from "../ui/useSkokDoKarty";
 import { StanIntegracji } from "../skrzynka/StanIntegracji";
 import { KartaKolejki } from "../stan/Kolejka";
@@ -13,6 +12,7 @@ import { KartaAllegro } from "../stan/Allegro";
 import { KartaSondy } from "../stan/Sonda";
 import { KartaSerwera } from "../stan/Serwer";
 import { KartaKolektorow } from "../stan/Kolektory";
+import { Kafelki, doUwagi, useObszary } from "../stan/Tablica";
 
 /* ── STAN SYSTEMU (0.441.0) ──────────────────────────────────────────────
    Przeniesiony z NADZORU w `biuro.html` — ostatni widok wglądu, który tam
@@ -43,28 +43,76 @@ import { KartaKolektorow } from "../stan/Kolektory";
    PRZED stanem integracji: niesie przycisk, a wiersz o połączeniu zszedł
    z tabeli integracji właśnie do tej karty. */
 
+/* ── TABLICA ZAMIAST DZIESIĘCIU KART (@wydanie) ──────────────────────────
+   Decyzja właściciela z 27 września 2026, wariant A z makiet: na górze
+   kafelek na obszar, pod nim wyłącznie karty z czymś do zrobienia. Zdrowy
+   obszar mówi jednym zdaniem na kafelku, a jego karta czeka pod kliknięciem.
+   Powód i reguły tonu w `stan/Tablica.tsx`.
+
+   KARTA RAZ POKAZANA ZOSTAJE, aż człowiek zamknie ją kafelkiem. Problem
+   znikający w trakcie pracy — Allegro sparowane, kolizja rozstrzygnięta —
+   zabrałby kartę spod kursora razem z wynikiem, który właśnie się pojawił.
+
+   KOLEJNOŚĆ KART W KODZIE JEST TA Z 0.427.0 i pilnuje jej test serwera.
+   Karty rysują się warunkowo, ale w tym samym porządku co kafelki. */
 export function Stan() {
   const zdrowie = useZdrowie();
   const ja = useJa();
   const admin = ja.data?.user.role === "admin";
   /* Skok do karty z adresu — logika i jej uzasadnienie w `ui/useSkokDoKarty.ts`.
-     Ta sama nazwa karty otwiera kartę zwiniętą, zanim skok w nią wyceluje. */
+     Karta z adresu jest otwarta od wejścia, więc skok zastaje ją narysowaną. */
   const karta = useSkokDoKarty();
+  const obszary = useObszary(admin, zdrowie.data);
+  const [recznie, setRecznie] = useState<Record<string, boolean>>({});
+  const [widziane, setWidziane] = useState<ReadonlySet<string>>(new Set());
+  const [cel, setCel] = useState<string | null>(null);
 
+  const problemy = obszary.filter(doUwagi).map((o) => o.id).join(",");
+  useEffect(() => {
+    if (!problemy) return;
+    setWidziane((w) => {
+      const nowe = problemy.split(",").filter((id) => !w.has(id));
+      return nowe.length ? new Set([...w, ...nowe]) : w;
+    });
+  }, [problemy]);
+
+  /* Problem TERAZ liczy się w samym renderze, nie dopiero z efektu. Karta
+     z efektu wchodziła jeden render po swoich danych — już po skoku do
+     `?karta=` — i spychała cel skoku w dół ekranu. `widziane` niesie tylko
+     regułę „raz pokazana zostaje". */
+  const teraz = new Set(problemy ? problemy.split(",") : []);
+  const otwarta = (id: string) => recznie[id] ?? (id === karta || teraz.has(id) || widziane.has(id));
+  const przelacz = (id: string) => {
+    const teraz = !otwarta(id);
+    setRecznie((r) => ({ ...r, [id]: teraz }));
+    if (teraz) setCel(id);
+  };
+  /* Klik w kafelek niżej na ekranie otwiera kartę pod całym rzędem kart.
+     Bez przewinięcia wyglądałoby to jak kafelek, który nic nie robi. */
+  useEffect(() => {
+    if (!cel) return;
+    document.getElementById(`karta-${cel}`)?.scrollIntoView({ block: "start", behavior: "smooth" });
+    setCel(null);
+  }, [cel]);
+
+  const doUwagiIle = obszary.filter(doUwagi).length;
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
-    <Karta className="flex flex-wrap items-center gap-3 p-4">
-      <Activity size={18} /><b className="text-naglowek">Stan systemu</b>
-      <span className="text-sm text-slate-500">Tło pracy biura. To, co czeka na decyzję, stoi też w DO DECYZJI.</span>
-    </Karta>
-    <KartaKolejki />
-    {admin && <KartaArkusza otworz={karta === "arkusz"} />}
-    <KartaKolizji />
-    <KartaRekoncyliacji otworz={karta === "rekoncyliacja"} />
-    <KartaKolektorow />
-    <KartaWymiany />
-    <KartaAllegro admin={admin} />
-    <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />
-    <KartaSondy otworz={karta === "sonda"} />
-    <KartaSerwera zdrowie={zdrowie.data} />
+    <div className="flex flex-wrap items-baseline gap-3">
+      <h1 className="text-tytul flex items-center gap-2 font-bold"><Activity size={20} />Stan systemu</h1>
+      <span className="text-sm text-slate-600">{doUwagiIle
+        ? `Do uwagi: ${doUwagiIle} z ${obszary.length}. Ich karty stoją pod spodem.`
+        : "Wszystko działa. Kartę obszaru otwiera klik w kafelek."}</span>
+    </div>
+    <Kafelki obszary={obszary} otwarte={otwarta} przelacz={przelacz} />
+    {otwarta("kolejka") && <KartaKolejki />}
+    {admin && otwarta("arkusz") && <KartaArkusza otworz />}
+    {otwarta("kody") && <KartaKolizji />}
+    {otwarta("rekoncyliacja") && <KartaRekoncyliacji otworz />}
+    {otwarta("kolektory") && <KartaKolektorow />}
+    {otwarta("wymiana") && <KartaWymiany />}
+    {otwarta("allegro") && <KartaAllegro admin={admin} />}
+    {otwarta("integracje") && <StanIntegracji zdrowie={zdrowie.data} odczyt={zdrowie.dataUpdatedAt} />}
+    {otwarta("sonda") && <KartaSondy otworz />}
+    {otwarta("serwer") && <KartaSerwera zdrowie={zdrowie.data} />}
   </div>;
 }

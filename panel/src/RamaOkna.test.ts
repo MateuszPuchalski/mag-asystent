@@ -46,7 +46,9 @@ describe("Rama okna nie może stać na jednostce okna", () => {
 
   it("nagłówek zawija się, zamiast chować przyciski poza kadrem", () => {
     /* Rama przycina nadmiar szerokości bez paska przewijania, więc poniżej
-       ~1150 px zębatka i wylogowanie były nieklikalne (0.233.0). */
-    expect(tsx).toMatch(/<div className="flex flex-wrap items-center gap-4 px-5 py-3">/);
+       ~1150 px zębatka i wylogowanie były nieklikalne (0.233.0). Od @wydanie
+       nagłówek ma jeden rząd, a menu z wylogowaniem stoi na jego końcu —
+       zawijanie chroni je tak samo, jak chroniło zębatkę. */
+    expect(tsx).toMatch(/<div className="flex flex-wrap items-center gap-2 px-5 py-3">/);
   });
 });
