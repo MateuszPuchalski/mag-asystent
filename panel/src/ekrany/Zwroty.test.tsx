@@ -1026,6 +1026,38 @@ describe("Pasek rozjazdów", () => {
       expect(screen.getByRole("button", { name: /ZW-1/ })).toBeInTheDocument();
     } finally { scena.rozjazdy = []; }
   });
+
+  it("DO DECYZJI dzieli się na cztery sita z licznikami, a sito zawęża listę (0.539.0)", async () => {
+    /* Zgłoszenie właściciela: „jak sprawdzić te 645?", potem „rozbij Do
+       decyzji na 4 sita". Po jednym zwrocie na sito i drugi w drodze. */
+    scena.zwroty = [
+      { ...zwrot(21, "decyzja", "SD-21"), dostarczonoAt: "2026-09-01T09:00:00.000Z" },
+      { ...zwrot(22, "decyzja", "SD-22"), przesylkaStatus: "IN_TRANSIT", dniDoTerminu: null, terminAt: null },
+      { ...zwrot(23, "decyzja", "SD-23"), paczkaAt: null, dniDoTerminu: null, terminAt: null,
+        sygnaly: ["brak_dowodu"] },
+      { ...zwrot(24, "decyzja", "SD-24") },
+      { ...zwrot(25, "decyzja", "SD-25"), paczkaAt: null, dniDoTerminu: null, terminAt: null,
+        sygnaly: ["nie_odeslany"] },
+      zwrot(26, "zwrot", "SD-26"),
+    ];
+    try {
+      pokaz();
+      for (const [nazwa, ile] of [["wszystkie", 5], ["doręczone", 1], ["w drodze", 2],
+        ["etykieta bez skanu", 1], ["nie odesłał", 1]] as const) {
+        expect(screen.getByRole("button", { name: `${nazwa} ${ile}` })).toBeInTheDocument();
+      }
+      await userEvent.click(screen.getByRole("button", { name: "etykieta bez skanu 1" }));
+      expect(screen.getByRole("button", { name: "etykieta bez skanu 1" }))
+        .toHaveAttribute("aria-pressed", "true");
+      expect(screen.getByRole("button", { name: /SD-24/ })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /SD-21/ })).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "wszystkie 5" }));
+      expect(screen.getByRole("button", { name: /SD-21/ })).toBeInTheDocument();
+      /* Sita dzielą wyłącznie DO DECYZJI — w innym kubełku ich nie ma. */
+      await userEvent.click(screen.getByRole("button", { name: /Do zwrotu/ }));
+      expect(screen.queryByRole("button", { name: /^doręczone/ })).toBeNull();
+    } finally { scena.zwroty = null; }
+  });
 });
 
 /* ── Sito i tagi (0.315.0) ───────────────────────────────────────────────────
