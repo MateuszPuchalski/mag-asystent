@@ -179,7 +179,7 @@ export function Kolejka({ zwroty, wybrany, zKubelkiem = false, onWybierz }: {
              mierzy się myszą, nie kciukiem (`docs/ergonomia-magazynu.md`,
              zakres dekalogu). */
           className={`flex w-full gap-3 border-l-[3px] px-4 py-2 text-left ${aktywny
-            ? "border-l-wertis-amber bg-slate-200"
+            ? "wiersz-wybrany border-l-wertis-amber bg-slate-200"
             : "border-l-transparent hover:bg-slate-50"}`}>
           {/* Miniatura PIERWSZEJ pozycji. Zwrot wielopozycyjny i tak
               rozstrzyga się w kolumnie dowodów, a rząd czterech kafli

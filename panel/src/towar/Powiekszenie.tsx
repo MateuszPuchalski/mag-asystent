@@ -1,5 +1,6 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { X } from "lucide-react";
+import { useOkno } from "../nawigacja/fokus";
 
 /* Powiększenie służy JEDNEMU pytaniu: czy to ten sam wariant, który wrócił.
    Dlatego nie ma tu galerii ani zoomu — jest obraz, podpis i wyjście.
@@ -14,15 +15,12 @@ export function Powiekszenie({ url, nazwa, symbol, zamknij }: {
   nazwa: string; symbol: string | null; zamknij: () => void;
 }) {
 
-  useEffect(() => {
-    /* Escape zamyka, jak każdy dialog w tym panelu. Bez tego operator
-       szukałby myszką krzyżyka w rogu. */
-    const naKlawisz = (e: KeyboardEvent) => { if (e.key === "Escape") zamknij(); };
-    window.addEventListener("keydown", naKlawisz);
-    return () => window.removeEventListener("keydown", naKlawisz);
-  }, [zamknij]);
+  /* Escape zamyka, jak każdy dialog w tym panelu. Bez tego operator
+     szukałby myszką krzyżyka w rogu. Modalne od @wydanie także dla
+     klawiatury: skróty strony pod nakładką milkną (`nawigacja/fokus.ts`). */
+  const okno = useOkno<HTMLDivElement>({ onZamknij: zamknij });
 
-  return <div role="dialog" aria-modal="true" aria-label={`Zdjęcie: ${nazwa}`}
+  return <div role="dialog" {...okno} aria-label={`Zdjęcie: ${nazwa}`}
     className="fixed inset-0 z-50 grid place-items-center bg-black/70 p-6" onClick={zamknij}>
     <div className="max-h-full w-full max-w-2xl overflow-auto rounded-xl bg-white p-4"
       onClick={(e) => e.stopPropagation()}>

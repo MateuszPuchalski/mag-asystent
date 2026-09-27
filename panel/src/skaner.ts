@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { oknoModalne } from "./nawigacja/fokus";
 
 /* ── Czytnik kodów jako klawiatura (0.163.0) ─────────────────────────────────
    Czytnik USB wpisuje znaki jak klawiatura i kończy Enterem. Panel musi
@@ -150,13 +151,18 @@ export function useSkaner(
     let bufor = "";
     let ostatni = 0;
     let odlozony: { e: KeyboardEvent; zegar: ReturnType<typeof setTimeout> } | null = null;
+    /* SKRÓT POD OKNEM MODALNYM MILCZY (@wydanie). Pod historią klienta `Z`
+       oddawało pieniądze za zwrot zasłonięty nakładką. Skan idzie dalej, bo
+       zwroty mają słuchać etykiety cały czas. Pytamy w chwili oddania znaku,
+       nie wciśnięcia: odłożony pierwszy znak czeka jeszcze `ZWLOKA_MS`. */
+    const doSkrotu = (e: KeyboardEvent) => { if (!oknoModalne()) naZnak.current?.(e); };
 
     const wypusc = () => {
       if (!odlozony) return;
       clearTimeout(odlozony.zegar);
       const e = odlozony.e;
       odlozony = null;
-      naZnak.current?.(e);
+      doSkrotu(e);
     };
 
     const naKlawisz = (e: KeyboardEvent) => {
@@ -183,16 +189,16 @@ export function useSkaner(
           return;
         }
         wypusc();
-        naZnak.current?.(e);
+        doSkrotu(e);
         return;
       }
 
-      if (e.key.length !== 1) { wypusc(); naZnak.current?.(e); return; }
+      if (e.key.length !== 1) { wypusc(); doSkrotu(e); return; }
 
       bufor += e.key;
       if (bufor.length === 1) {
         /* Pierwszy znak czeka: dopiero drugi w oknie mówi, że to czytnik. */
-        odlozony = { e, zegar: setTimeout(() => { odlozony = null; naZnak.current?.(e); }, ZWLOKA_MS) };
+        odlozony = { e, zegar: setTimeout(() => { odlozony = null; doSkrotu(e); }, ZWLOKA_MS) };
         return;
       }
       /* Druga litera w serii przesądza — pierwszy znak zostaje przy kodzie. */

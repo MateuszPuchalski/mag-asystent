@@ -15,6 +15,8 @@ const MD = `# Historia zmian
 
 **Znaczki klawiszy tylko wtedy, gdy działają:**
 
+**[wymaga działania]** Nowy klucz w wertis.env.
+
 ## 0.500.1 — 26 września 2026
 
 **Instalator czeka na usługi.** Tego agent nie zobaczy.

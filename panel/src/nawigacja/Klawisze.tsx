@@ -4,7 +4,7 @@ import { Keyboard, Search, X } from "lucide-react";
 import { OknoSzukania } from "./Szukaj";
 /* „Czy klawisz padł w polu" pyta jeden strażnik (0.515.0): własna kopia
    w tym pliku była tą samą funkcją pod inną nazwą. */
-import { polePisania } from "./fokus";
+import { polePisania, useOkno } from "./fokus";
 import { Klawisz } from "./Klawisz";
 
 /* ── Jedna lista skrótów i klawisze całego panelu (23 września 2026) ────────
@@ -83,17 +83,13 @@ export function ListaSkrotow({ onZamknij }: { onZamknij: () => void }) {
   const tutaj = SKROTY.filter((s) => s.sciezka && pathname.startsWith(s.sciezka));
   const kolejnosc = [...SKROTY.filter((s) => !s.sciezka), ...tutaj,
     ...SKROTY.filter((s) => s.sciezka && !tutaj.includes(s))];
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") onZamknij(); };
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, [onZamknij]);
+  const okno = useOkno<HTMLDivElement>({ onZamknij });
   return <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/30 px-4 pt-[10vh]"
     onClick={onZamknij}>
     {/* `text-slate-900` jawnie (0.515.0): okno rysuje się wewnątrz nagłówka,
         który ma `text-white`. Tytuł i ikona dziedziczyły biel na białym tle
         i nie było ich widać — zmierzone w przeglądarce przy uproszczeniu. */}
-    <div role="dialog" aria-label="Skróty klawiszowe" onClick={(e) => e.stopPropagation()}
+    <div role="dialog" {...okno} aria-label="Skróty klawiszowe" onClick={(e) => e.stopPropagation()}
       className="max-h-[80vh] w-full max-w-3xl overflow-y-auto rounded-xl bg-white p-5 text-slate-900 shadow-2xl">
       <div className="mb-3 flex items-center gap-2">
         <Keyboard size={18} /><b className="mr-auto text-naglowek">Skróty klawiszowe</b>
@@ -132,6 +128,9 @@ export function SzukajIKlawisze() {
       if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
         e.preventDefault(); setLista(false); setSzukanie(true); return;
       }
+      /* `?` pyta o samo pole, nie o okno (`klawiszZajety`). Pomoc nad
+         otwartym oknem niczego nie zmienia w sprawie, a zamyka się tym samym
+         klawiszem, którym się otworzyła. */
       if (e.key === "?" && !e.ctrlKey && !e.altKey && !e.metaKey && !polePisania(e.target)) {
         e.preventDefault(); setSzukanie(false); setLista((o) => !o);
       }

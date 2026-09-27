@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import type { SzczegolyWysylki } from "../api/typy";
 import { NaglowekSekcji, Przycisk, czas } from "../ui";
+import { useOkno } from "../nawigacja/fokus";
 
 /**
  * Konflikt świeżości przy wysyłce (§8.5, blizna 0.110.0).
@@ -31,9 +32,16 @@ export function DialogKonfliktu({
 }) {
   const [zgoda, setZgoda] = useState(false);
   const nowa = szczegoly.nowaWiadomosc ?? null;
+  /* FOKUS W OKNIE (@wydanie). Ctrl+Enter wysyła z pola odpowiedzi, więc
+     okno otwierało się z kursorem dalej w tym polu, pod nakładką. Pisanie
+     szło w niewidoczny szkic, a drugie Ctrl+Enter próbowało wysłać znowu.
+     Fokus startuje na POPRAW SZKIC: to wyjście, które niczego nie wysyła
+     (WAI-ARIA APG: przy kroku nieodwracalnym fokus na najmniej szkodliwym).
+     Escape robi to samo, jak w każdym oknie panelu, bo szkic zostaje. */
+  const okno = useOkno<HTMLDivElement>({ onZamknij: onPopraw });
 
   return <div className="fixed inset-0 z-50 grid place-items-center bg-slate-900/45 p-4"
-    role="dialog" aria-label="Wysyłka zatrzymana">
+    role="dialog" {...okno} aria-label="Wysyłka zatrzymana">
     <div className="card w-full max-w-3xl overflow-hidden">
       <header className="border-b border-amber-200 bg-amber-50 p-4">
         <div className="flex items-center gap-2">
@@ -83,7 +91,7 @@ export function DialogKonfliktu({
           <Przycisk onClick={onWyslijMimoTo} disabled={!zgoda || wysyla}>
             {wysyla ? "WYSYŁAM…" : "WYŚLIJ MIMO TO"}
           </Przycisk>
-          <Przycisk wariant="glowny" onClick={onPopraw}>POPRAW SZKIC</Przycisk>
+          <Przycisk wariant="glowny" onClick={onPopraw} data-fokus-startowy>POPRAW SZKIC</Przycisk>
         </div>
       </footer>
     </div>

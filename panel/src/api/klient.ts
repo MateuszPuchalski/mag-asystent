@@ -20,6 +20,40 @@ export function zglosBrakSesji(blad: unknown): void {
   if (blad instanceof BrakSesji) window.dispatchEvent(new Event(SESJA_WYGASLA));
 }
 
+/* ── SERWER NIE ODPOWIADA (@wydanie) ─────────────────────────────────────────
+   Serwer bierze wydanie sam, kilka razy dziennie, i na chwilę znika. Panel
+   pokazywał wtedy angielskie „Failed to fetch" albo gołe „Błąd 502", a listy
+   bez danych mówiły „nic nie czeka" — agent brał brak połączenia za brak
+   pracy. Jeden typ błędu pozwala ramie panelu powiedzieć to raz, paskiem
+   pod nagłówkiem (`nawigacja/Polaczenie.tsx`).
+
+   502, 503 i 504 BEZ naszego pola `error` to brama albo pośrednik, nie
+   serwer WERTIS. Z polem `error` to nasza trasa mówi o awarii Allegro
+   i jej zdanie ma dojść do ekranu bez zmian. */
+export class BrakPolaczenia extends Error {
+  constructor() { super("Brak połączenia z serwerem."); }
+}
+
+export const POLACZENIE_ZERWANE = "wertis:polaczenie-zerwane";
+
+/** Każdy błąd zapytania i mutacji przechodzi tędy; reaguje wyłącznie `BrakPolaczenia`. */
+export function zglosBrakPolaczenia(blad: unknown): void {
+  if (blad instanceof BrakPolaczenia) window.dispatchEvent(new Event(POLACZENIE_ZERWANE));
+}
+
+const BRAMA = new Set([502, 503, 504]);
+
+/** `fetch`, który brak sieci zamienia na `BrakPolaczenia` zamiast `TypeError`. */
+async function polacz(sciezka: string, init: RequestInit): Promise<Response> {
+  try {
+    return await fetch(sciezka, init);
+  } catch (e) {
+    /* Przerwane przez `AbortController` to decyzja ekranu, nie awaria sieci. */
+    if (e instanceof DOMException && e.name === "AbortError") throw e;
+    throw new BrakPolaczenia();
+  }
+}
+
 /** Konflikt wersji (409). Szczegóły rysują ekran, więc jadą dalej w całości. */
 /** Serwer przekazał limit Allegro; `poIluMs` = ile czekać, `null` = Allegro nie podało. */
 export class PrzerwaAllegro extends Error {
@@ -58,8 +92,9 @@ export async function api<T = any>(sciezka: string, init: RequestInit = {}): Pro
   if (init.body !== undefined && !naglowki["content-type"]) {
     naglowki["content-type"] = "application/json";
   }
-  const odp = await fetch(sciezka, { ...init, headers: naglowki });
+  const odp = await polacz(sciezka, { ...init, headers: naglowki });
   const dane = await odp.json().catch(() => ({}));
+  if (BRAMA.has(odp.status) && !dane.error) throw new BrakPolaczenia();
   if (odp.status === 401) throw new BrakSesji(dane.error ?? "Sesja wygasła — zaloguj się");
   /* 409 dostaje własny typ, bo panel MUSI umieć go narysować inaczej niż błąd:
      przy konflikcie świeżości szkic zostaje, a agent decyduje, co dalej. */
@@ -92,10 +127,11 @@ export async function api<T = any>(sciezka: string, init: RequestInit = {}): Pro
  * numer z trasy.
  */
 export async function pobierzPlik(sciezka: string, nazwa: string): Promise<void> {
-  const odp = await fetch(sciezka, { headers: { "x-session": token() } });
+  const odp = await polacz(sciezka, { headers: { "x-session": token() } });
   if (odp.status === 401) throw new BrakSesji("Sesja wygasła — zaloguj się");
   if (!odp.ok) {
     const dane = await odp.json().catch(() => ({}));
+    if (BRAMA.has(odp.status) && !dane.error) throw new BrakPolaczenia();
     throw new Error(dane.error ?? `Błąd ${odp.status}`);
   }
   const url = URL.createObjectURL(await odp.blob());

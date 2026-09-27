@@ -31,6 +31,7 @@ import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi"
 import { Czat } from "../reklamacje/Czat";
 import { Dowody } from "../reklamacje/Dowody";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
+import { klawiszZajety } from "../nawigacja/fokus";
 
 /* ── Ekran reklamacji (0.222.0, odpowiedź od 0.224.0, werdykt od przyrostu trzeciego) ──
    Trzy kolumny, jak skrzynka i jak zwroty — trzy ekrany obsługi mają mieć
@@ -412,15 +413,12 @@ export function Reklamacje() {
   };
 
   /* Skróty milkną, gdy ognisko stoi w polu tekstowym — inaczej cyfra wpisana
-     w notatkę przełączałaby kubełek. */
+     w notatkę przełączałaby kubełek. Od @wydanie także pod oknem modalnym,
+     wspólnym strażnikiem z `nawigacja/fokus.ts`. Własna kopia nie znała
+     SELECT-a, tak jak ta, którą kolejka skrzynki zrzuciła w 0.522.0. */
   useEffect(() => {
-    const wPolu = (t: EventTarget | null) => {
-      const el = t as HTMLElement | null;
-      return Boolean(el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA"
-        || el.isContentEditable));
-    };
     const nasluch = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.altKey || e.metaKey || wPolu(e.target)) return;
+      if (e.ctrlKey || e.altKey || e.metaKey || klawiszZajety(e.target)) return;
       if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idz(1); }
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       /* Cyfry liczą się z długości `KUBELKI` (0.525.1), jak podpowiedzi przy

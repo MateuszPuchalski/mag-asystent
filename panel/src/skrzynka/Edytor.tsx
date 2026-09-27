@@ -7,7 +7,7 @@ import { KartaSzkicu, PasekSzkicu, PrzyciskSzkicu, UwagiSzkicu,
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 import { doSprawdzenia } from "./ProcesCopilota";
 import { useOkienko } from "./MenuRozmowy";
-import { polePisania, useSkrotyDzialaja } from "../nawigacja/fokus";
+import { klawiszZajety, useSkrotyDzialaja } from "../nawigacja/fokus";
 
 /**
  * Ms od otwarcia rozmowy, przed którymi Ctrl+Enter SPOZA POLA milczy.
@@ -116,7 +116,7 @@ export function Edytor({
   const skrotyDzialaja = useSkrotyDzialaja();
   const klawisz = useRef<(e: KeyboardEvent) => void>(() => {});
   klawisz.current = (e: KeyboardEvent) => {
-    if (e.key !== "Enter" || wKomentarzu || e.altKey || e.isComposing || polePisania(e.target)) return;
+    if (e.key !== "Enter" || wKomentarzu || e.altKey || e.isComposing || klawiszZajety(e.target)) return;
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       if (Date.now() - zamontowany.current < ZWLOKA_KLAWISZA_MS) return;
@@ -200,14 +200,18 @@ export function Edytor({
         w każdym innym programie, więc nie wymaga czytania.
 
         Przełącznik stoi NAD polem, żeby było widać, gdzie się pisze, zanim
-        się zacznie pisać. */}
+        się zacznie pisać.
+
+        Nieaktywna połowa ma `slate-600` (@wydanie). `slate-500` na bieżni
+        `slate-100` dawało 4.34:1, na bursztynowej około 4.3:1, przy progu
+        4.5:1 — zmierzone axe w Chromium przy otwartej rozmowie. */}
     <div className="mb-2.5 flex items-center gap-2">
       <div className={`flex gap-0.5 rounded-lg p-0.5 ${wKomentarzu ? "bg-amber-100" : "bg-slate-100"}`}>
         <button className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${!wKomentarzu
-          ? "bg-white font-semibold text-slate-900 shadow-sm" : "font-medium text-slate-500"}`}
+          ? "bg-white font-semibold text-slate-900 shadow-sm" : "font-medium text-slate-600"}`}
           onClick={() => setTryb("odpowiedz")}>Odpowiedź do klienta</button>
         <button className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${wKomentarzu
-          ? "bg-white font-semibold text-amber-900 shadow-sm" : "font-medium text-slate-500"}`}
+          ? "bg-white font-semibold text-amber-900 shadow-sm" : "font-medium text-slate-600"}`}
           onClick={() => setTryb("komentarz")}>
           {/* ── JEDNA NAZWA, NIE DWIE (0.260.0) ──────────────────────────────
               Edytor mówił „Komentarz wewnętrzny" i „Dodaj komentarz", a oś

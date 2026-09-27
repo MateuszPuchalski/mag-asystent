@@ -8,6 +8,7 @@ import { useSzukajWszedzie, type RodzajTrafienia, type Trafienie } from "../api/
 import { useKartaTowaru } from "../api/rozmowy";
 import { Blad, Pusto } from "../ui";
 import { PrzyciskTowaru } from "../towar/Szuflada";
+import { useOkno } from "./fokus";
 
 /* ── Szukanie ponad kolejkami, Ctrl+K (23 września 2026) ────────────────────
    Każdy ekran miał własne pole szukania i trzeba było wiedzieć, które wybrać.
@@ -57,6 +58,10 @@ export function OknoSzukania({ onZamknij }: { onZamknij: () => void }) {
   useEffect(() => { setWybrany(0); }, [trafienia]);
   const nawiguj = useNavigate();
   const lista = useRef<HTMLUListElement>(null);
+  /* Bez `onZamknij`: Escape obsługuje `naKlawisz` niżej, bo najpierw cofa
+     z podglądu towaru, a dopiero drugi zamyka okno. Hak oddaje za to fokus
+     polu, z którego przyszło Ctrl+K — agent wraca do pisanej odpowiedzi. */
+  const okno = useOkno<HTMLDivElement>();
 
   const otworz = (t: Trafienie) => {
     if (t.rodzaj === "towar") { setTowar(Number(t.id)); return; }
@@ -80,7 +85,7 @@ export function OknoSzukania({ onZamknij }: { onZamknij: () => void }) {
     {/* `text-slate-900` jawnie (0.515.0): okno rysuje się wewnątrz nagłówka
         z `text-white`, więc wpisana fraza dziedziczyła biel na białym polu
         i agent nie widział, co pisze. Zmierzone w przeglądarce. */}
-    <div role="dialog" aria-label="Szukaj wszędzie" onClick={(e) => e.stopPropagation()} onKeyDown={naKlawisz}
+    <div role="dialog" {...okno} aria-label="Szukaj wszędzie" onClick={(e) => e.stopPropagation()} onKeyDown={naKlawisz}
       className="flex max-h-[70vh] w-full max-w-2xl flex-col overflow-hidden rounded-xl bg-white text-slate-900 shadow-2xl">
       <label className="flex shrink-0 items-center gap-3 border-b px-4 py-3">
         <Search size={18} className="shrink-0 text-slate-500" />

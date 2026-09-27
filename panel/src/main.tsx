@@ -20,6 +20,7 @@ import { Dyskusje } from "./ekrany/Dyskusje";
 import { Zadania } from "./ekrany/Zadania";
 import { SzukajIKlawisze } from "./nawigacja/Klawisze";
 import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
+import { PasekPolaczenia } from "./nawigacja/Polaczenie";
 import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej";
 import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
@@ -148,7 +149,16 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
       {/* Szukanie PRZED zakładkami (23 września 2026): pytanie „gdzie to jest"
           pada, zanim wiadomo, do której zakładki iść. */}
       <SzukajIKlawisze />
-      <nav aria-label="Praca" className="flex shrink-0 rounded-lg bg-white/10 p-1">
+      {/* ── POWIĘKSZENIE 200% NIE WYPYCHA ZAKŁADEK ZA KADR (@wydanie) ─────────
+          Przy powiększeniu 200% (1280 px okna to 640 px CSS) bieżnia z `shrink-0`
+          była o 180 px szersza od okna: „Zadania" i „Dostawy" wychodziły za
+          prawą krawędź, a cała strona przewijała się w bok. To ta sama usterka,
+          co w 0.233.0, tylko przy powiększeniu, którego wtedy nie mierzono.
+
+          Poniżej 900 px zakładka pokazuje samą ikonę i licznik. Nazwa zostaje
+          dla czytnika ekranu i w dymku. `flex-wrap` łapie resztę, np. 400%.
+          Od 900 px w górę nic się nie zmienia, także przy 1180 px z §7. */}
+      <nav aria-label="Praca" className="flex min-w-0 flex-wrap rounded-lg bg-white/10 p-1">
         {ZAKLADKI.map((z) => {
           const aktywna = z.korzen ? pathname === z.do : pathname.startsWith(z.do);
           return <React.Fragment key={z.do}>
@@ -171,10 +181,10 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
                Na ciemnym pasku żadnego ostrzeżenia nie ma i nie będzie.
 
                bursztyn: zakładka na ciemnym tle jest marką */
-              aria-current={aktywna ? "page" : undefined}
+              aria-current={aktywna ? "page" : undefined} title={z.etykieta}
               className={`flex items-center gap-1.5 whitespace-nowrap rounded px-2 py-1.5 text-sm font-semibold ${
                 aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
-              {z.ikona}{z.etykieta}
+              {z.ikona}<span className="max-[899px]:sr-only">{z.etykieta}</span>
               {z.do === "/obsluga/" && <LicznikDoZrobienia />}
               {z.do === "/obsluga/wiedza" && <LicznikWiedzy />}</Link>
           </React.Fragment>;
@@ -261,7 +271,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
   return <SzufladaTowaru><div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
     <Naglowek wyloguj={wyloguj} />
     {/* „Nowe w panelu" (0.500.0) — pod nagłówkiem, nad pracą, tylko przy
-        pierwszym wejściu po wydaniu. Powód w `coNowego/CoNowego.tsx`. */}
+        pierwszym wejściu po wydaniu. Powód w `coNowego/CoNowego.tsx`.
+        Pasek braku połączenia stoi NAD nim: awaria jest ważniejsza niż nowość. */}
+    <PasekPolaczenia />
     <CoNowego />
     {/* BEZ `max-w` i bez `mx-auto` (0.198.0). Ogranicznik 1500 px przyszedł
         z makiety i nikt go nigdy nie uzasadnił w kodzie. Na monitorze 1920

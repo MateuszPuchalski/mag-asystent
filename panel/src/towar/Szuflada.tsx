@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useState } from "react";
 import { Link } from "react-router-dom";
 import { MessageSquare, Package, Scale, Undo2, X } from "lucide-react";
 import { useKartaTowaru } from "../api/rozmowy";
@@ -7,6 +7,7 @@ import { usePrzekrojTowaru } from "../api/towar";
 import { dopisekDostaw } from "../skrzynka/PasmoOdpowiedzi";
 import { Kafel } from "./Kafel";
 import { dzien } from "../ui";
+import { useOkno } from "../nawigacja/fokus";
 
 /* ── SZUFLADA TOWARU — TRZECI MOSTEK (0.502.0) ──────────────────────────────
    Towar stał na dziewięciu ekranach — w skrzynce, zwrotach, koszach,
@@ -51,16 +52,15 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
   const karta = useKartaTowaru(twId);
   const przekroj = usePrzekrojTowaru(twId);
   const wiedza = useWiedzaTowaru(twId);
-  useEffect(() => {
-    const f = (e: KeyboardEvent) => { if (e.key === "Escape") onZamknij(); };
-    window.addEventListener("keydown", f);
-    return () => window.removeEventListener("keydown", f);
-  }, [onZamknij]);
+  /* NIEMODALNA (@wydanie): szuflada stoi obok pracy, bez nakładki, więc
+     skróty strony działają dalej, a tabulator może z niej wyjść. Fokus
+     wchodzi do niej i wraca do przycisku towaru, jak z każdego okna. */
+  const okno = useOkno<HTMLDivElement>({ modalne: false, onZamknij });
   const k = karta.data;
   const p = przekroj.data;
   const dopisek = k ? dopisekDostaw(k) : null;
 
-  return <aside role="dialog" aria-label={`Towar ${k?.sym ?? twId}`}
+  return <div role="dialog" {...okno} aria-label={`Towar ${k?.sym ?? twId}`}
     className="fixed inset-y-0 right-0 z-50 flex w-[min(30rem,100vw)] flex-col border-l border-slate-200 bg-white shadow-2xl">
     <div className="flex items-start gap-3 border-b border-slate-200 p-4">
       <Kafel twId={twId} rozmiar={56} nazwa={k?.name ?? "Kartoteka"} symbol={k?.sym ?? null} />
@@ -116,7 +116,7 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
           {wiedza.data.propozycje.length ? ` · ${wiedza.data.propozycje.length} propozycji` : ""}</p>
       </section>}
     </div>
-  </aside>;
+  </div>;
 }
 
 /** Lista otwartych spraw jednego rodzaju; pusta się nie rysuje (0.514.0). */

@@ -5,9 +5,9 @@ import {
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
 } from "../api/typy";
-import { czas, Plakietka, Pusto } from "../ui";
+import { Blad, czas, Plakietka, Pusto } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
-import { polePisania } from "../nawigacja/fokus";
+import { klawiszZajety } from "../nawigacja/fokus";
 import { NAZWA, NAZWA_DOBORU } from "./statusy";
 import { CZESTE, KafelKategorii, PasekCopilota, ZnakCopilota, doRozpoznania, nazwaNaPlakietce } from "./Copilot";
 import { Czekanie } from "./Czekanie";
@@ -134,7 +134,8 @@ function wKubelku(r: Rozmowa, kubelek: Kubelek, mojeId: number | null): boolean 
    znaczy co innego, gdy synchronizator stanął o 6:00, a co innego, gdy
    przebiegł minutę temu. Bez tej daty ekran kłamałby ciszą. */
 export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = () => {},
-  wybranaId, mojeId = null, onWybierz, onWidoczne, powiadomienia, onOdswiez, laduje, nieswieza }: {
+  wybranaId, mojeId = null, onWybierz, onWidoczne, powiadomienia, onOdswiez, laduje, nieswieza,
+  bladBezDanych = null }: {
   rozmowy: Rozmowa[];
   stan: StanSkrzynki;
   /** Stan Copilota (§14, etap F). `undefined` = jeszcze nie wiadomo, milcz. */
@@ -158,6 +159,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   /* Kolejka nieświeża wygląda inaczej, bo znaczy co innego. Pusta lista przy
      stojącym synchronizatorze to nie „brak pytań", tylko „nie wiem". */
   nieswieza?: boolean;
+  /* Lista nie przyszła wcale (@wydanie). Wtedy kolejka nie wie, ile czeka,
+     więc nie mówi „brak rozmów" ani „0" — mówi, że nie wie, i dlaczego. */
+  bladBezDanych?: string | null;
 }) {
   const [kubelek, setKubelek] = useState<Kubelek>("doOdpowiedzi");
   /* ── Szukanie w kolejce (0.195.0) ──────────────────────────────────────────
@@ -224,10 +228,11 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
 
      Strażnik jest WSPÓLNY, z `nawigacja/fokus.ts` (0.522.0). Własny nie znał
      SELECT-a, a kolejka ma dwa: „Więcej" i kolejność. Strzałka w otwartej
-     liście zmieniała wtedy naraz jej wartość i rozmowę pod kursorem. */
+     liście zmieniała wtedy naraz jej wartość i rozmowę pod kursorem.
+     Od @wydanie strażnik milczy też pod oknem modalnym (`klawiszZajety`). */
   const naKlawisz = useRef<(e: KeyboardEvent) => void>(() => {});
   naKlawisz.current = (e: KeyboardEvent) => {
-    if (polePisania(e.target)) return;
+    if (klawiszZajety(e.target)) return;
     if (e.ctrlKey || e.altKey || e.metaKey || e.isComposing) return;
     if (e.key === "ArrowDown" || e.key === "j" || e.key === "ArrowUp" || e.key === "k") {
       if (!widoczne.length) return;
@@ -322,7 +327,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     <div className="flex shrink-0 flex-wrap items-center gap-1 border-b px-2 py-1">
       <FiltrZWiecej<Kubelek> wybrany={kubelek} onWybierz={setKubelek} wiecej={POD_WIECEJ}
         pozycje={KUBELKI.map((k) => ({ klucz: k.klucz, etykieta: k.etykieta,
-          ile: rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length }))} />
+          ile: bladBezDanych ? undefined : rozmowy.filter((r) => wKubelku(r, k.klucz, mojeId)).length }))} />
     </div>
     {/* Pole stoi POD kubełkami, nie nad nimi: kubełek wybiera się raz na
         wejście, a szuka się w środku tego, co się wybrało. Kolejność obok
@@ -331,10 +336,15 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
     <div className="flex shrink-0 items-center gap-2 border-b px-2 py-1.5">
       <div className="relative min-w-0 flex-1">
         <Search size={14} className="absolute left-2 top-1/2 -translate-y-1/2 text-slate-400" />
+        {/* Podpowiedź MIEŚCI SIĘ w polu (@wydanie). „Szukaj: login, treść,
+            prowadzący" potrzebowało 192 px, a pole ma 136 px przy 1280 i 1440
+            — agent czytał „prc". „Szukaj" mówi lupa i nazwa pola, a miejsce
+            na krzyżyk rezerwujemy dopiero, gdy krzyżyk stoi: to daje 156 px
+            na 150 px podpowiedzi. Pomiar w Chromium, czcionka panelu. */}
         <input value={fraza} onChange={(e) => setFraza(e.target.value)}
           aria-label="Szukaj w rozmowach"
-          placeholder="Szukaj: login, treść, prowadzący"
-          className="field w-full py-1 pl-7 pr-7 text-sm" />
+          placeholder="Login, treść, prowadzący"
+          className={`field w-full py-1 pl-7 text-sm ${fraza !== "" ? "pr-7" : "pr-2"}`} />
         {fraza !== "" && <button type="button" onClick={() => setFraza("")}
           aria-label="Wyczyść szukanie"
           className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700">
@@ -364,8 +374,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           „Moje" jest tu KUBEŁKIEM, więc siedzi już pod cyfrą i drugi raz nie
           ma po co stać. */}
       {laduje && <Pusto waga="lista">Wczytuję…</Pusto>}
-      {!laduje && !rozmowy.length &&
-        <Pusto waga="lista">Brak rozmów w zsynchronizowanej skrzynce.</Pusto>}
+      {!laduje && !rozmowy.length && (bladBezDanych
+        ? <Blad>{bladBezDanych}</Blad>
+        : <Pusto waga="lista">Brak rozmów w zsynchronizowanej skrzynce.</Pusto>)}
       {/* Pusty KUBEŁEK to co innego niż pusta skrzynka: „nic nie czeka na
           mnie" nie znaczy „nic nie przyszło", a jedno zdanie mniej kazałoby
           agentowi zgadywać, czy synchronizacja stanęła. */}
@@ -420,7 +431,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
              w prawo, więc kliknięcie w wiersz szarpało tekstem. */
           className={`flex w-full items-start gap-3 border-b border-l-[3px] px-3 py-2.5 text-left ${
             wybranaId === r.id
-              ? "border-l-wertis-amber bg-slate-200"
+              ? "wiersz-wybrany border-l-wertis-amber bg-slate-200"
               : "border-l-transparent hover:bg-slate-50"}`}>
           {/* ZNAK NA POCZĄTKU WIERSZA (23 września 2026). Kategoria, prośba
               o człowieka i podziękowanie czytają się, zanim wzrok dojdzie do

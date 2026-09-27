@@ -109,7 +109,7 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz, moje
           /* Zaznaczenie szare, marka na belce 3 px — powód przy tej samej
              klauzuli w `skrzynka/Kolejka.tsx`. */
           className={`flex w-full flex-col gap-1 border-l-[3px] px-4 py-3 text-left ${aktywna
-            ? "border-l-wertis-amber bg-slate-200"
+            ? "wiersz-wybrany border-l-wertis-amber bg-slate-200"
             : "border-l-transparent hover:bg-slate-50"}`}>
           <div className="flex items-center gap-2">
             {/* TEMAT jest tożsamością sprawy — wpisał go kupujący i to jego

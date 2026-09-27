@@ -128,7 +128,7 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
             <p className="text-slate-500">{prop.zrodlo}</p>
             <button type="button" disabled={zapisz.isPending}
               onClick={() => ustaw(prop.twId, "sku")}
-              className="mt-1 inline-flex items-center gap-1 rounded bg-emerald-600 px-2 py-0.5 font-bold text-white hover:bg-emerald-700 disabled:opacity-50">
+              className="mt-1 inline-flex items-center gap-1 rounded bg-emerald-700 px-2 py-0.5 font-bold text-white hover:bg-emerald-800 disabled:opacity-50">
               <Check size={12} />Zatwierdź</button>
           </div>
         </div>

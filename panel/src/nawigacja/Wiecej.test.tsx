@@ -18,14 +18,15 @@ import tsx from "../main.tsx?raw";
 const UDANA = "2026-09-27T08:12:00.000Z";
 let wyslane: string[] = [];
 let alarm = false;
+let udana: string | null = UDANA;
 
 beforeEach(() => {
-  wyslane = []; alarm = false;
+  wyslane = []; alarm = false; udana = UDANA;
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     if ((init?.method ?? "GET") !== "GET") wyslane.push(`${init?.method} ${url}`);
     if (url === "/api/health") return new Response(JSON.stringify({
       allegroInbox: { status: alarm ? "stale" : "current", alarm, ostatniaProba: null,
-        ostatniaUdanaSynchronizacja: UDANA, kodOstatniegoBledu: null, tekstOstatniegoBledu: null,
+        ostatniaUdanaSynchronizacja: udana, kodOstatniegoBledu: null, tekstOstatniegoBledu: null,
         liczbaBledow: 2, watkiZBledem: 0, opoznienieMs: null, nastepnaProba: null, interwalMs: 60000 } }));
     throw new Error(`nieoczekiwany adres w teście: ${url}`);
   }));
@@ -107,6 +108,16 @@ describe("wskaźnik synchronizacji", () => {
     expect(wskaznik.getAttribute("title")).toBe(`Synchronizacja ${godzina(UDANA)} · 2 błędów`);
   });
 
+  it("przed pierwszą synchronizacją kropka nie jest zielona, a dymek mówi dlaczego", async () => {
+    /* Zielone „—" obiecywało działanie, którego nie było (@wydanie). */
+    udana = null;
+    pokaz();
+    const wskaznik = await screen.findByRole("status");
+    expect(wskaznik.getAttribute("title")).toBe("Synchronizacja jeszcze się nie odbyła");
+    expect(wskaznik.querySelector(".bg-emerald-400")).toBeNull();
+    expect(wskaznik.querySelector(".bg-slate-500")).not.toBeNull();
+  });
+
   it("w alarmie mówi słowem „Stanęła”, nie samym kolorem kropki", async () => {
     alarm = true;
     pokaz();
@@ -120,6 +131,18 @@ describe("nagłówek w jednym rzędzie", () => {
     expect(tsx).not.toContain('aria-label="Magazyn i wgląd"');
     expect(tsx).not.toContain("px-5 pb-3");
     expect(tsx).toContain("<Wiecej wyloguj={wyloguj} />");
+  });
+
+  it("przy powiększeniu 200% zakładki nie wychodzą za kadr", () => {
+    /* Bieżnia z `shrink-0` była przy 640 px CSS o 180 px szersza od okna
+       (@wydanie). jsdom nie liczy układu, więc strażnik pilnuje obu przyczyn:
+       bieżnia może się zwęzić i zawinąć, a nazwa zakładki chowa się poniżej
+       900 px, zostając dla czytnika ekranu. */
+    const bieznia = tsx.slice(tsx.indexOf('<nav aria-label="Praca"'), tsx.indexOf("</nav>"));
+    expect(bieznia).toContain('className="flex min-w-0 flex-wrap');
+    expect(bieznia).not.toContain("shrink-0 rounded-lg");
+    expect(bieznia).toContain('<span className="max-[899px]:sr-only">{z.etykieta}</span>');
+    expect(bieznia).toContain("title={z.etykieta}");
   });
 
   it("Dostawy są ósmą zakładką pracy, za kreską", () => {

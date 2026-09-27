@@ -13,8 +13,22 @@
 @layer base {
   body { @apply m-0 bg-slate-100 font-sans text-slate-900; }
   button, input, textarea, select { @apply font-sans; }
+  /* Okno dostaje fokus programowo (`useOkno`), a nie tabulatorem: sam
+     kontener nie jest celem, więc obwódka dookoła całego okna nie mówiłaby
+     nic. Tabulator z niego idzie na pierwszy przycisk, który obwódkę ma. */
+  [role="dialog"][tabindex="-1"]:focus { outline: none; }
 }
 @layer components {
+  /* ── ZAZNACZONY WIERSZ KOLEJKI (@wydanie) ──────────────────────────────────
+     Tło zaznaczenia `slate-200` pod szarym `slate-500` daje 3.86:1 przy
+     progu 4.5:1. Zmierzone axe w Chromium na zwrocie z danymi; seed bez
+     spraw tego stanu nie pokazywał. W skrzynce takich podpisów są cztery,
+     a zaznaczona rozmowa to jej zwykły stan pracy.
+     Jedna reguła zamiast pięciu warunków: każdy przyszły podpis na
+     zaznaczonym wierszu przejdzie sam. Na białym wierszu szarość zostaje
+     jaśniejsza i hierarchia się nie spłaszcza. `slate-600` daje tu 6.14:1.
+     Klasę `wiersz-wybrany` przy zaznaczeniu pilnuje `Kontrast.test.ts`. */
+  .wiersz-wybrany .text-slate-500 { @apply text-slate-600; }
   /* Gołe `.btn` zeszło (0.515.0): żaden ekran go nie używał, a martwa klasa
      obok dwóch żywych podsuwa trzecią drogę do przycisku zamiast `Przycisk`. */
   .btn-primary { @apply inline-flex items-center justify-center gap-2 rounded-lg bg-wertis-amber px-4 py-2 text-sm font-bold text-wertis-ink transition hover:bg-amber-500 disabled:opacity-50; }

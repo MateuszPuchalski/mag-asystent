@@ -83,7 +83,7 @@ export function LogoDostawcow() {
       }} />
     {wynik && <p className="mb-2 text-sm text-ranga-ok">{wynik}</p>}
     <Blad>{blad || dostawcy.error?.message || usun.error?.message}</Blad>
-    <Tabela naglowki={["", "Dostawca", "Dokumenty", ""]}
+    <Tabela naglowki={[{ ukryty: "Logo" }, "Dostawca", "Dokumenty", { ukryty: "Działania" }]}
       pusto="Nie ma jeszcze dokumentów dostaw — nie ma komu wgrać logo.">
       {(dostawcy.data?.dostawcy ?? []).map((d) => <tr key={d.khId}>
         <Td className="w-20"><Miniatura d={d} /></Td>

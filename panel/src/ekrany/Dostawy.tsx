@@ -13,6 +13,7 @@ import {
 } from "../dostawy/Kolejka";
 import { Dokument, WyjatkiLuzem } from "../dostawy/Dokument";
 import { Kontekst } from "../dostawy/Kontekst";
+import { useOkno } from "../nawigacja/fokus";
 
 /** Kubełki do przeglądania — stoją pod „Więcej”, nie na wierzchu (0.526.0). */
 const WIECEJ_DOSTAW: ReadonlyArray<KubelekDostaw> = ["zamkniete", "poza", "archiwum"];
@@ -92,12 +93,16 @@ export function Dostawy() {
   const pasuje = (nr: string, kto: string) =>
     !q || nr.toLowerCase().includes(q) || kto.toLowerCase().includes(q);
   const wKubelku = (k: KubelekDostaw) => dokumenty.filter((d) => kubelekDokumentu(d, zOdpowiedzia) === k);
+  /* Bez danych licznik nie zna liczby, więc jej nie pokazuje (@wydanie).
+     „0" przy zerwanym połączeniu mówiło „nic nie ma", a prawda brzmiała
+     „nie wiem". Przerwa w połączeniu trwa zwykle minutę aktualizacji. */
+  const znane = lista.data !== undefined;
   const liczniki: Record<KubelekDostaw, number | undefined> = {
-    decyzja: wKubelku("decyzja").length + spozaOkna.length,
-    toku: wKubelku("toku").length,
-    nietkniete: wKubelku("nietkniete").length,
-    zamkniete: wKubelku("zamkniete").length,
-    poza: poza.data?.documents.length ?? 0,
+    decyzja: znane ? wKubelku("decyzja").length + spozaOkna.length : undefined,
+    toku: znane ? wKubelku("toku").length : undefined,
+    nietkniete: znane ? wKubelku("nietkniete").length : undefined,
+    zamkniete: znane ? wKubelku("zamkniete").length : undefined,
+    poza: poza.data?.documents.length,
     /* Archiwum bez licznika, dopóki go nie otworzyć — liczba wymagałaby
        pobrania, a pobieramy je dopiero na życzenie. */
     archiwum: kubelek === "archiwum" ? archiwum.data?.ile : undefined,
@@ -153,12 +158,6 @@ export function Dostawy() {
   /* Zmiana sprawy czyści zdania o porażkach poprzedniej — błąd przy innej
      fakturze, który stoi dalej na ekranie, mówiłby nieprawdę o tej. */
   useEffect(() => { setBladRozwiaz(""); setBladNotatki(""); setBladPoza(""); }, [id]);
-  useEffect(() => {
-    if (!lupa) return;
-    const esc = (e: KeyboardEvent) => { if (e.key === "Escape") setLupa(null); };
-    window.addEventListener("keydown", esc);
-    return () => window.removeEventListener("keydown", esc);
-  }, [lupa]);
 
   const propsRozwiaz = {
     trwa: rozwiaz.isPending, blad: bladRozwiaz,
@@ -170,6 +169,9 @@ export function Dostawy() {
 
   const lewa = (() => {
     if (lista.isLoading) return <Pusto waga="lista">Wczytuję dostawy…</Pusto>;
+    /* Błąd BEZ danych zamiast listy: „nic nie czeka na biuro" przy zerwanym
+       połączeniu brzmiało jak koniec pracy (@wydanie). */
+    if (lista.error && !lista.data) return <Blad>{(lista.error as Error).message}</Blad>;
     if (kubelek === "poza") {
       return <KolejkaPozaWertis wybrany={dokId} onWybierz={idz}
         lista={(poza.data?.documents ?? []).filter((d) => pasuje(d.nrPelny, d.dostawca))} />;
@@ -239,7 +241,9 @@ export function Dostawy() {
           <span className="ml-auto">{stopka}</span>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto">{lewa}</div>
-        <Blad>{lista.error ? (lista.error as Error).message : ""}</Blad>
+        {/* Pod listą tylko błąd odświeżenia, gdy dane zostały; bez danych
+            błąd stoi zamiast listy. */}
+        <Blad>{lista.error && lista.data ? (lista.error as Error).message : ""}</Blad>
       </Karta>
 
       <Karta className="flex min-h-0 flex-col overflow-hidden">
@@ -286,9 +290,19 @@ export function Dostawy() {
     {/* Powiększenie dowodu: „czy to TA część" przy kartotekach różniących się
         końcówką nazwy nie rozstrzyga się na miniaturze (0.205.0). Zamyka
         KAŻDE kliknięcie i Escape — tak jak w biurze. */}
-    {lupa && <button type="button" onClick={() => setLupa(null)} aria-label="Zamknij powiększenie"
-      className="fixed inset-0 z-30 grid place-items-center bg-black/70 p-8">
-      <img src={lupa} alt="Zdjęcie z hali — powiększenie" className="max-h-full max-w-full rounded-lg" />
-    </button>}
+    {lupa && <Lupa src={lupa} onZamknij={() => setLupa(null)} />}
+  </div>;
+}
+
+/* Lupa jest oknem od @wydanie, nie gołym przyciskiem na cały ekran. Fokus
+   zostawał na miniaturze pod spodem, więc Tab szedł po niewidocznej stronie.
+   Przycisk zostaje w środku: zamyka KAŻDE kliknięcie, Enter i Escape. */
+function Lupa({ src, onZamknij }: { src: string; onZamknij: () => void }) {
+  const okno = useOkno<HTMLDivElement>({ onZamknij });
+  return <div role="dialog" {...okno} aria-label="Zdjęcie z hali — powiększenie" className="fixed inset-0 z-30">
+    <button type="button" onClick={onZamknij} aria-label="Zamknij powiększenie" data-fokus-startowy
+      className="grid h-full w-full place-items-center bg-black/70 p-8">
+      <img src={src} alt="Zdjęcie z hali — powiększenie" className="max-h-full max-w-full rounded-lg" />
+    </button>
   </div>;
 }

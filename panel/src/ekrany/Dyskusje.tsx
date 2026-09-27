@@ -32,6 +32,7 @@ import { Fakty } from "../dyskusje/Fakty";
 import { Zakonczenie } from "../dyskusje/Zakonczenie";
 import { Prowadzi } from "../sprawy/Prowadzi";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
+import { klawiszZajety } from "../nawigacja/fokus";
 
 /* ── Ekran dyskusji (0.245.0) ────────────────────────────────────────────────
    Trzy kolumny, jak skrzynka, zwroty i reklamacje — CZTERY ekrany obsługi mają
@@ -321,13 +322,8 @@ export function Dyskusje() {
   };
 
   useEffect(() => {
-    const wPolu = (t: EventTarget | null) => {
-      const el = t as HTMLElement | null;
-      return Boolean(el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA"
-        || el.isContentEditable));
-    };
     const nasluch = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.altKey || e.metaKey || wPolu(e.target)) return;
+      if (e.ctrlKey || e.altKey || e.metaKey || klawiszZajety(e.target)) return;
       if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idz(1); }
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
       else if (/^[1-3]$/.test(e.key)) przelacz(KUBELKI[Number(e.key) - 1].id);

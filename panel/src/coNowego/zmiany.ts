@@ -40,7 +40,12 @@ export function najnowszeZmiany(md: string, ile = 3): WydanieZmian[] {
     /* Tylko akapit OTWARTY pogrubieniem — punkt listy z pogrubionym słowem
        to szczegół wewnątrz zmiany, nie jej tytuł. */
     const n = biezace && /^\*\*(.+?)\*\*/.exec(linia);
-    if (biezace && n) biezace.naglowki.push(n[1].replace(/[.:]\s*$/, ""));
+    /* `[wymaga działania]` to znak dla wdrożenia, nie wiadomość dla biura
+       (@wydanie). Wzór fragmentu w `zmiany/README.md` go pogrubia, więc bez
+       tego wyjątku stawałby na pasku obok zmian, które ktoś zauważy. */
+    if (biezace && n && !n[1].startsWith("[wymaga działania")) {
+      biezace.naglowki.push(n[1].replace(/[.:]\s*$/, ""));
+    }
   }
   if (biezace && biezace.naglowki.length && wynik.length < ile) wynik.push(biezace);
   return wynik;

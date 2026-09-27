@@ -24,6 +24,12 @@ aktualizacją. Ta pozycja zatrzymuje aktualizację automatyczną serwera.
 - **`rodzaj`**: `minor` dla widocznej funkcji albo działania przy wdrożeniu,
   `patch` dla reszty. Wydanie z kilku fragmentów bierze najwyższy rodzaj.
 - **`tytul`**: staje w tytule commita wydania, po numerze i myślniku.
+- **Pogrubienie idzie do ludzi.** Pogrubione otwarcie akapitu w wydaniu
+  `minor` staje na pasku „Nowe w panelu", który każdy w biurze widzi przy
+  pierwszym wejściu po wydaniu. Pogrubiaj tylko to, co człowiek zauważy przy
+  pracy, i pisz to jego słowami. Zmianę techniczną — serwer, CI, zasady repo —
+  opisz bez pogrubienia. Pasek, który mówi o JSON-ie, uczy zamykać go bez
+  czytania. `[wymaga działania]` pasek pomija sam.
 - **Numer w komentarzach i dokumentach:** zamiast numeru pisz `@wydanie`.
   Automat zamieni znacznik na numer w całym repozytorium.
 

@@ -872,6 +872,36 @@ describe("Klawisze kubełka", () => {
     } finally { scena.zwroty = null; scena.szczegol = undefined; }
   });
 
+  it("`Z` pod otwartym oknem nie oddaje pieniędzy; po Escape fokus wraca, a `Z` działa (@wydanie)", async () => {
+    /* Skróty słuchają na `window`, więc pod historią klienta `Z` oddawało
+       pieniądze za zwrot zasłonięty nakładką. Okno modalne wycisza skróty
+       strony, a po zamknięciu oddaje fokus przyciskowi, który je otworzył. */
+    scena.wolano = [];
+    scena.zwroty = dwieKorekty().map((z) => ({ ...z, kupujacyLogin: "ogrodnik_77" }));
+    scena.szczegol = pieniadze({ moznaZwrocic: true });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 404 })));
+    try {
+      pokaz("/obsluga/zwroty/6");
+      const historia = screen.getByRole("button", { name: /Historia/ });
+      await userEvent.click(historia);
+      const okno = screen.getByRole("dialog", { name: "Historia klienta" });
+      expect(okno).toHaveAttribute("aria-modal", "true");
+      expect(okno.contains(document.activeElement)).toBe(true);
+      await userEvent.keyboard("z");
+      /* Pierwszy znak czeka na drugi, bo może być początkiem skanu. */
+      await new Promise((r) => setTimeout(r, 120));
+      expect(scena.wolano).toEqual([]);
+      await userEvent.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog")).toBeNull();
+      expect(document.activeElement).toBe(historia);
+      /* Dwie litery w 300 ms czytnik bierze za początek skanu (`PRZERWA_MS`),
+         więc drugie `z` przychodzi po przerwie, jak od człowieka. */
+      await new Promise((r) => setTimeout(r, 350));
+      await userEvent.keyboard("z");
+      await waitFor(() => expect(scena.wolano.map((w) => w.co)).toEqual(["zwrocPieniadze"]));
+    } finally { scena.zwroty = null; scena.szczegol = undefined; vi.unstubAllGlobals(); }
+  });
+
   it("Enter w DO KOREKTY najpierw przyjmuje podsunięty dokument sprzedaży (0.479.0)", async () => {
     /* Automat ZW bez dokumentu nie ruszy, więc brak dokumentu jest w tym
        kubełku pierwszą rzeczą do zrobienia. Pasek mówi to wprost. */
