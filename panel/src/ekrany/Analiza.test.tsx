@@ -316,7 +316,7 @@ describe("zakres Obsługa klienta", () => {
   });
 });
 
-/* ── Zakres Użycie (23 września 2026, obszary jedną linią od @wydanie) ──────
+/* ── Zakres Użycie (23 września 2026, obszary jedną linią od 0.542.0) ──────
    Obszar stoi wierszem z liczbami, a jego nieużyte czynności otwiera klik —
    po polsku, z kluczem w dymku; użyte zostają zwinięte. Wejście w zakres
    pobiera wyłącznie jego raport i niczego nie zapisuje. */

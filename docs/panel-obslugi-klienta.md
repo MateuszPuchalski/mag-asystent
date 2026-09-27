@@ -6383,7 +6383,7 @@ Nazwy leżą w `dziennik/nazwy.ts` dla wszystkich 287 typów z rejestru serwera.
 
 **Strażnik.** `dziennik/nazwy.test.ts` czyta rejestr `services/zdarzenia-rejestr.ts`. Typ dopisany do rejestru bez polskiej nazwy to czerwony test.
 
-## 26j. Analiza krótsza (@wydanie)
+## 26j. Analiza krótsza (0.542.0)
 
 Właściciel poprosił o poprawę następnego ekranu z menu „Więcej”. Z trzech makiet wybrał C: ten sam układ, mniej miejsca. Analiza była najdłuższym ekranem panelu. Przy 1180 px zakres „Obsługa klienta” miał 3295 px, a „Użycie” 10 709 px.
 

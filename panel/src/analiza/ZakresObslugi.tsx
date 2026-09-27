@@ -75,7 +75,7 @@ function TabelaPowrotow({ wiersze, naglowek, nazwa }: {
   </Tabela>;
 }
 
-/* ── PRZEKROJE W KARCIE LICZBY, PUSTE JEDNĄ LINIĄ (@wydanie) ──────────────
+/* ── PRZEKROJE W KARCIE LICZBY, PUSTE JEDNĄ LINIĄ (0.542.0) ──────────────
    Decyzja właściciela z 27 września 2026, wariant C Analizy. Zakres miał
    czternaście kart jedna pod drugą, w tym cztery tabele „według kategorii"
    i „według osoby" stojące osobno pod liczbami, które rozbijały. Teraz każdy

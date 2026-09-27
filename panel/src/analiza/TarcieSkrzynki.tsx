@@ -38,7 +38,7 @@ export function TarcieSkrzynki({ dni }: { dni: number }) {
   const t = useTarcie(dni, true);
   if (!t.data) return null;
   const r = t.data.razem;
-  /* Pusta, gdy w oknie nie było ani wysyłki, ani cofnięcia (@wydanie,
+  /* Pusta, gdy w oknie nie było ani wysyłki, ani cofnięcia (0.542.0,
      wariant C Analizy): cztery zera i kreska to zdanie, nie karta. */
   const pusto = r.wyslanych === 0 && r.cofnietychWysylek === 0 && r.cofnietychZakonczen === 0;
   return <>
@@ -48,7 +48,7 @@ export function TarcieSkrzynki({ dni }: { dni: number }) {
         + "rozstrzyga rozmowa, nie ta liczba."}>
       <Liczby l={r} />
       {/* Rozbicie na ludzi przychodzi WYŁĄCZNIE administratorowi (0.431.0).
-          Stoi w karcie liczb, które rozbija (@wydanie), a nie osobną kartą:
+          Stoi w karcie liczb, które rozbija (0.542.0), a nie osobną kartą:
           to ten sam pomiar w innym przekroju. Czas liczy się od wydania,
           które zaczęło go mierzyć; wcześniejsze wysyłki nie mają pomiaru. */}
       {t.data.osoby && <Przekroje pozycje={[{ klucz: "osoba", etykieta: "Według osoby", tresc:

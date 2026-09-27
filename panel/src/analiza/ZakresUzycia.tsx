@@ -15,7 +15,7 @@ import { nazwaZdarzenia } from "../dziennik/nazwy";
    się tylko patrzy, zawsze wyjdzie tu „nieużywany". Opis karty mówi to wprost,
    bo bez tego raport doradziłby zdjęcie Analizy.
 
-   UŻYWANE SĄ ZWINIĘTE. Pytanie brzmi „czego nikt nie nacisnął", a l/* ── OBSZARY JEDNĄ LINIĄ, CZYNNOŚCI PO POLSKU (@wydanie) ─────────────────
+   UŻYWANE SĄ ZWINIĘTE. Pytanie brzmi „czego nikt nie nacisnął", a l/* ── OBSZARY JEDNĄ LINIĄ, CZYNNOŚCI PO POLSKU (0.542.0) ─────────────────
    Decyzja właściciela z 27 września 2026, wariant C Analizy. Zakres był
    najdłuższym ekranem panelu: 10 700 px przy 1180, bo każdy obszar stał
    otwartą kartą z listą kluczy w rodzaju `zwrot_faktura_cofnieta`.

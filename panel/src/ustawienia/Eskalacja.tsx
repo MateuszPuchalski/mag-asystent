@@ -25,7 +25,7 @@ const udzial = (m: MiesiacEskalacji) =>
    Pusta lista mówi zdaniem przez `Tabela`, jak wszędzie w analizie. */
 export function Eskalacja({ miesiace }: { miesiace: MiesiacEskalacji[] | undefined }) {
   /* Bez rozmów powiązanych z zamówieniem karta jest jednym zdaniem
-     (@wydanie, wariant C Analizy) — pusta tabela z nagłówkami nic nie mówi. */
+     (0.542.0, wariant C Analizy) — pusta tabela z nagłówkami nic nie mówi. */
   if (miesiace?.length === 0) return <KartaWgladu tytul="Eskalacja po rozmowie"
     pusta="Brak rozmów powiązanych z zamówieniem — nie ma z czego liczyć." />;
   return <KartaWgladu tytul="Eskalacja po rozmowie"

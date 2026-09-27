@@ -44,7 +44,7 @@ export function SkutecznoscDoboru({ dane }: { dane: Raport | undefined }) {
   if (!dane) return null;
   const zeroDrog = dane.drogi.filter((d) => d.wybranych === 0);
   /* Bez żadnego wyboru i bez doboru na stole karta jest jednym zdaniem
-     (@wydanie, wariant C Analizy). „Bez wyboru w tym oknie" przy KAŻDEJ
+     (0.542.0, wariant C Analizy). „Bez wyboru w tym oknie" przy KAŻDEJ
      drodze nie jest wtedy ustaleniem, tylko pustym oknem. Granica historii
      zostaje w zdaniu, bo mówi, czy dłuższe okno w ogóle coś da. */
   if (dane.wyborow === 0 && dane.naStole.doborow === 0) return <KartaWgladu

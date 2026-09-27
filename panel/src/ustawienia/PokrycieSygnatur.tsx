@@ -51,7 +51,7 @@ export function PokrycieSygnatur({ dane }: { dane: Pokrycie | undefined }) {
   /* Rama wspólna z resztą analizy (0.519.0): sześć kart „Obsługa klienta"
      budowało własną, każda trochę inną, i ekran czytał się jak sześć
      aplikacji. Podpis „pozycje pobranych zamówień" przeszedł do opisu. */
-  /* Bez zamówień karta jest jednym zdaniem (@wydanie, wariant C Analizy):
+  /* Bez zamówień karta jest jednym zdaniem (0.542.0, wariant C Analizy):
      cztery zera nad zdaniem „jeszcze nie ma" mówiły to samo dwa razy. */
   if (dane.pozycji === 0) return <KartaWgladu tytul="Sygnatura → kartoteka Subiekta"
     pusta="Nie ma jeszcze pobranych zamówień — pokrycie policzy się po pierwszej synchronizacji." />;

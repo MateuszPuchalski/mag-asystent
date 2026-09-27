@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.542.0 — 27 września 2026
+
+**Analiza krótsza.** Karta bez danych w wybranym oknie jest jedną linią ze
+zdaniem, dlaczego jest pusta. Tabele „według kategorii” i „według osoby”
+stoją przełącznikiem w karcie liczby, którą rozbijają. Zakres „Użycie” to
+jedna tabela obszarów, a czynności otwiera klik, po polsku. Przy 1180 px
+„Obsługa klienta” skurczyła się z 3295 do 1067 px, a „Użycie” z 10 709 do 983 px.
+
 ## 0.541.0 — 27 września 2026
 
 **Odmowa z panelu Allegro trafia do „Do decyzji”.** Biuro odmawia wypłaty

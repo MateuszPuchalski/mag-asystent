@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { KartaWgladu, Przekroje } from "./wglad";
 
-/* ── Karta wglądu: pusta jedną linią, przekroje w karcie liczby (@wydanie) ──
+/* ── Karta wglądu: pusta jedną linią, przekroje w karcie liczby (0.542.0) ──
    Wariant C Analizy z 27 września 2026. Pilnujemy dwóch rzeczy: karta bez
    danych mówi zdaniem, dlaczego jest pusta, i nie rysuje ciała; przekroje
    jednego pomiaru stoją przełącznikiem, a przekrój, którego nie ma (osoba

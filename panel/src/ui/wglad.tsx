@@ -13,7 +13,7 @@ export function KartaWgladu({ tytul, opis, akcje, id, pusta, children }: {
   /** Kotwica dla głębokiego linku (`?karta=…`) — stan systemu skacze do karty. */
   id?: string;
   /**
-   * Zdanie „czemu nic tu nie ma" — karta staje się JEDNĄ LINIĄ (@wydanie).
+   * Zdanie „czemu nic tu nie ma" — karta staje się JEDNĄ LINIĄ (0.542.0).
    * Decyzja właściciela z 27 września 2026, wariant C Analizy: karta bez
    * danych w oknie zajmowała tyle miejsca co karta z danymi. Zakres „Obsługa
    * klienta" miał ich czternaście i przewijał się przez 3300 px zer i kresek.
@@ -55,7 +55,7 @@ export const Td = ({ className = "", children }: { className?: string; children:
   <td className={`py-1.5 pr-3 align-top ${className}`}>{children}</td>;
 
 /**
- * Jedna karta, kilka przekrojów tych samych liczb (@wydanie, wariant C).
+ * Jedna karta, kilka przekrojów tych samych liczb (0.542.0, wariant C).
  *
  * „Według kategorii" i „według osoby" stały osobnymi kartami pod liczbą,
  * którą rozbijają. Czytało się je jak trzy różne pomiary, a to jeden pomiar
