@@ -935,9 +935,12 @@ export function useSledzDosylkeZwrotu() {
   return useMutation({
     mutationFn: (v: { id: number }) =>
       api<DosylkaZalozona>(`/api/obsluga/zwroty/${v.id}/dosylka`, { method: "POST" }),
+    /* „Do decyzji” też (@wydanie): przycisk stoi tam w wierszu odmowy z panelu
+       Allegro, a wiersz ma zejść od razu, nie po półminutowym odświeżeniu. */
     onSettled: (d, _e, v) => Promise.all([
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true }),
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) }),
+      qc.invalidateQueries({ queryKey: ["do-decyzji"] }),
       d ? poZapisieSprawy(qc, d.login) : null,
     ]),
   });

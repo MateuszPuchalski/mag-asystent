@@ -285,8 +285,8 @@ describe("Pieniądze przy zwrocie", () => {
   });
 
   /* ── Odmowa złożona w panelu Allegro ───────────────────────────────────────
-     Gdzie biuro odmawia — na naszym ekranie zwrotu czy w panelu Allegro — nie
-     wiadomo. Kod z panelu Allegro przychodzi synchronizacją, bez naszej
+     Biuro odmawia w panelu Allegro (fakt właściciela z 27 września 2026),
+     z nawyku. Kod z panelu Allegro przychodzi synchronizacją, bez naszej
      `odmowa`, a dosyłkę serwer liczy i wtedy. Linijka stoi więc niezależnie
      od `odmowa`, z faktem odmowy obok, żeby nie wisiała bez powodu. */
   it("odmowa z panelu Allegro dostaje linijkę dosyłki z faktem odmowy obok", () => {

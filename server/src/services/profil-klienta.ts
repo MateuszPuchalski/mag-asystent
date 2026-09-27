@@ -7,10 +7,8 @@ import { przesylkaZamowienia, stanPrzesylkiKrotko } from "./przesylka-zamowienia
 import { sprawaOtwarta } from "./statusy-spraw.js";
 import { statusRozmowy } from "./conversations.js";
 import { sprawaKlienta, type SprawaKlienta } from "./prowadzenie-klienta.js";
-import { chwilaUtc } from "../czas.js";
-import {
-  DOSYLKA_ZWROTU_SQL, doreczonaDoZakonczenia, jestKodemDosylki, OKNO_SLEDZENIA_MS, type KodDosylki,
-} from "./dosylka-opis.js";
+import { doreczonaDoZakonczenia, type KodDosylki } from "./dosylka-opis.js";
+import { odmowyBezDosylki } from "./odmowy-dosylki.js";
 
 /* ── Profil klienta: wszystko, co z nim związane, w jednym widoku ────────────
    (24 września 2026, zgłoszenie właściciela). Historia klienta istniała od S2
@@ -327,48 +325,16 @@ function podpowiedz(
 }
 
 /**
- * Odmowa wypłaty z kodem dosyłki, której nikt nie śledzi — najnowsza
- * z trzydziestu dni. ODCZYT: przycisk przy propozycji zakłada dosyłkę
- * dopiero kliknięciem (`POST …/sprawa/dosylka`).
- *
- * Wiek odmowy liczy się od NASZEJ odmowy, a przy kodzie z panelu Allegro od
- * daty odmowy w lądowisku, w ostateczności od zgłoszenia zwrotu. Nigdy od
- * `zwrot_klienta.created_at`: mapowanie podstawia tam czas synchronizacji,
- * gdy Allegro daty nie poda — i stara odmowa udawałaby świeżą.
- *
- * „Nikt nie śledzi” liczy ta sama reguła co ekran zwrotu i „Śledź dosyłkę”
- * (`DOSYLKA_ZWROTU_SQL`). Dosyłka poprzedniej odmowy tego zamówienia nie
- * chowa propozycji: to inna paczka.
+ * Najświeższa odmowa wypłaty z kodem dosyłki, której nikt nie śledzi.
+ * ODCZYT: przycisk przy propozycji zakłada dosyłkę dopiero kliknięciem
+ * (`POST …/sprawa/dosylka`). Regułę trzyma `odmowy-dosylki.ts`, bo tę samą
+ * listę czyta „Do decyzji”.
  */
 function propozycjaDosylki(
   database: DatabaseSync, login: string, teraz: Date,
 ): ProfilKlienta["propozycjaDosylki"] {
-  const kandydaci = database.prepare(`
-    SELECT z.id, z.order_id, z.channel_account_id, z.odmowa_kod, z.rejection_code, z.odmowa_at,
-           json_extract(a.surowe_json, '$.rejection.createdAt') AS odrzucono_allegro,
-           json_extract(a.surowe_json, '$.createdAt') AS zgloszono_allegro
-      FROM zwrot_klienta z LEFT JOIN allegro_zwrot a ON a.id = z.external_id
-     WHERE z.kupujacy_login = ? COLLATE NOCASE AND z.order_id IS NOT NULL
-       AND (z.odmowa_kod IN ('NEW_ITEM_SENT','MISSING_PART_SENT')
-            OR z.rejection_code IN ('NEW_ITEM_SENT','MISSING_PART_SENT'))`).all(login) as Wiersz[];
-  const granica = teraz.getTime() - OKNO_SLEDZENIA_MS;
-  const propozycje = kandydaci.map((z) => {
-    const kod = jestKodemDosylki(z.odmowa_kod) ? z.odmowa_kod : z.rejection_code as KodDosylki;
-    const kiedy = [z.odmowa_at, z.odrzucono_allegro, z.zgloszono_allegro]
-      .map((v) => (v == null ? null : String(v))).find((v) => v !== null && Number.isFinite(chwilaUtc(v))) ?? null;
-    return { z, kod, kiedy, t: kiedy === null ? Number.NaN : chwilaUtc(kiedy) };
-  })
-    /* Bez żadnej daty Allegro odmowy nie da się umieścić w oknie — a stara
-       odmowa podana jako świeża namawiałaby do śledzenia paczki sprzed miesięcy. */
-    .filter((x) => Number.isFinite(x.t) && x.t >= granica)
-    .filter((x) => !database.prepare(DOSYLKA_ZWROTU_SQL)
-      .get(Number(x.z.id), Number(x.z.channel_account_id), String(x.z.order_id)))
-    .sort((a, b) => b.t - a.t);
-  const p = propozycje[0];
-  return p ? {
-    zwrotId: Number(p.z.id), zamowienie: String(p.z.order_id), kod: p.kod,
-    odmowaAt: p.z.odmowa_at == null ? tekst(p.z.odrzucono_allegro) : String(p.z.odmowa_at),
-  } : null;
+  const p = odmowyBezDosylki(database, teraz, login)[0];
+  return p ? { zwrotId: p.zwrotId, zamowienie: p.zamowienie, kod: p.kod, odmowaAt: p.odmowaAt } : null;
 }
 
 /**

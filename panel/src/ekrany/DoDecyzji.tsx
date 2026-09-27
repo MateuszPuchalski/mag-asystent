@@ -2,11 +2,12 @@ import React, { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   AlertTriangle, Barcode, ChevronRight, CircleCheck, Inbox, ListChecks, MessageSquareReply,
-  FlaskConical, MessagesSquare, Package, PlugZap, ShieldQuestion, Truck, Undo2,
+  FlaskConical, MessagesSquare, Package, PackageSearch, PlugZap, ShieldQuestion, Truck, Undo2,
   ClipboardList,
 } from "lucide-react";
 import { useDoDecyzji, type Obszar, type PozycjaDecyzji, type ZrodloDecyzji } from "../api/decyzje";
-import { Blad, FiltrSegmentowy, Karta, NaglowekSekcji, Pusto, wiek } from "../ui";
+import { useSledzDosylkeZwrotu } from "../api/zwroty";
+import { Blad, FiltrSegmentowy, Karta, NaglowekSekcji, Przycisk, Pusto, wiek } from "../ui";
 import { Moje } from "./Moje";
 import { Wzmianki } from "./Wzmianki";
 
@@ -19,7 +20,13 @@ import { Wzmianki } from "./Wzmianki";
    decyzji: wyjątek dostawy rozstrzyga się przy fakturze i jej zdjęciach,
    reklamację przy czacie z kupującym. Przycisk „uznaj" na tej liście
    kazałby decydować bez dowodów — a to jest dokładnie to, czego biuro
-   robić nie powinno. Ta sama zasada co w „Moje". */
+   robić nie powinno. Ta sama zasada co w „Moje".
+
+   JEDEN WYJĄTEK (@wydanie, decyzja właściciela z 27 września 2026): „Śledź
+   dosyłkę” przy odmowie złożonej w panelu Allegro. Decyzja już zapadła —
+   biuro odmówiło kodem „Wysłaliśmy nowy towar” — a przycisk ją tylko
+   rejestruje w sprawie klienta. Dowodów do tego nie trzeba, a wiersz
+   prowadzący na zwrot kosztowałby drugie kliknięcie za nic. */
 
 const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; className?: string }>> = {
   dostawy: Truck, odpowiedzi: MessageSquareReply, kosze: Package, zapisy: AlertTriangle,
@@ -27,12 +34,14 @@ const IKONY: Record<ZrodloDecyzji, React.ComponentType<{ size?: number; classNam
   skrzynka: Inbox, dyskusje: MessagesSquare, sonda: FlaskConical,
   /* Zadanie odesłane przez halę (0.502.0) — `odeslaneZadania` w `do-decyzji.ts`. */
   zadania: ClipboardList,
+  dosylki: PackageSearch,
 };
 
 const NAZWY: Record<ZrodloDecyzji, string> = {
   dostawy: "Dostawy", odpowiedzi: "Odpowiedź z hali", kosze: "Kosze", zapisy: "Zapis do Subiekta",
   kody: "Kody kreskowe", allegro: "Konto Allegro", reklamacje: "Reklamacje", zwroty: "Zwroty",
   skrzynka: "Skrzynka", dyskusje: "Dyskusje", sonda: "Test na żywo", zadania: "Zadanie hali",
+  dosylki: "Dosyłka",
 };
 
 type Filtr = "wszystko" | Obszar;
@@ -62,9 +71,32 @@ function Wiersz({ p }: { p: PozycjaDecyzji }) {
     <Wiek p={p} />
   </>;
   const klasa = "flex items-center gap-3 px-4 py-3 hover:bg-slate-50";
+  if (p.akcja?.rodzaj === "sledz_dosylke") return <WierszDosylki p={p} zwrotId={p.akcja.zwrotId} tresc={tresc} />;
   return <li className="border-t border-slate-200 first:border-t-0">
     <Link to={p.cel.panel} className={klasa}>{tresc}
       <ChevronRight size={18} className="shrink-0 text-slate-400" /></Link>
+  </li>;
+}
+
+/**
+ * Wiersz odmowy z panelu Allegro z przyciskiem „Śledź dosyłkę” (@wydanie).
+ *
+ * Przycisk stoi OBOK odnośnika, nie w nim: przycisk w `<a>` to niepoprawny
+ * HTML, a kliknięcie łapałyby oba. Wiersz dalej prowadzi na zwrot — kto chce
+ * spojrzeć na dowody przed kliknięciem, ma je o jedno kliknięcie dalej.
+ * Po sukcesie wiersz schodzi sam, bo serwer liczy listę od nowa.
+ */
+function WierszDosylki({ p, zwrotId, tresc }: { p: PozycjaDecyzji; zwrotId: number; tresc: React.ReactNode }) {
+  const sledz = useSledzDosylkeZwrotu();
+  return <li className="border-t border-slate-200 first:border-t-0">
+    <div className="flex items-center gap-2 pr-4 hover:bg-slate-50">
+      <Link to={p.cel.panel} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">{tresc}</Link>
+      <Przycisk className="shrink-0 text-xs" disabled={sledz.isPending} aria-label={`Śledź dosyłkę — ${p.co}`}
+        onClick={() => sledz.mutate({ id: zwrotId })}>
+        {sledz.isPending ? "Zakładam…" : "Śledź dosyłkę"}</Przycisk>
+    </div>
+    {sledz.error && <p className="px-4 pb-2 text-xs font-semibold text-ranga-zle">
+      Śledzenia dosyłki nie założono — {(sledz.error as Error).message}</p>}
   </li>;
 }
 
