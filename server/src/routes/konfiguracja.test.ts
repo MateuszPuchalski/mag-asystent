@@ -70,7 +70,7 @@ test("wartości ze źródłem, sekret bez wartości", async () => {
     ["plik", null, true]);
   assert.deepEqual([w("PORT").zrodlo, w("PORT").wartosc], ["przykryte", "3001"]);
   assert.deepEqual([w("ZWROT_WYGASA_DNI").zrodlo, w("ZWROT_WYGASA_DNI").wartosc], ["domyslna", null]);
-  /* Domyślna nie jest już kreską (@wydanie): panel dostaje liczbę, na której
+  /* Domyślna nie jest już kreską (0.543.0): panel dostaje liczbę, na której
      serwer pracuje, prosto z `config`. Sekret dalej nie wychodzi. */
   const { config } = await import("../config.js");
   const obowiazuje = (klucz: string) => (w(klucz) as unknown as { obowiazuje: string | null }).obowiazuje;

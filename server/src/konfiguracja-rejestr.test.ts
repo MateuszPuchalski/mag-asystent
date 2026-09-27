@@ -104,7 +104,7 @@ test("z panelu zmienia się wyłącznie decyzje właściciela czytane przez sam 
 
 test("decyzja właściciela ma nazwę po polsku, a wybór — słowo dla każdej opcji", () => {
   /* Panel pokazuje decyzje właściciela nazwą, klucz z pliku tylko w dymku
-     (@wydanie). Bez nazwy wiersz wróciłby do `ZWROT_TERMIN_DNI` na wierzchu.
+     (0.543.0). Bez nazwy wiersz wróciłby do `ZWROT_TERMIN_DNI` na wierzchu.
      Słowo brakujące przy jednej opcji pokazałoby obok „włączony" gołe „0". */
   for (const k of KLUCZE) {
     if (k.kto === "wlasciciel") {

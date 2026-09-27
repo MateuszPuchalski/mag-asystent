@@ -6398,7 +6398,7 @@ Właściciel poprosił o poprawę następnego ekranu z menu „Więcej”. Z trz
 
 **Strażnik.** `ui/wglad.test.tsx` pilnuje karty pustej i przekrojów. Test zakresu „Użycie” w `ekrany/Analiza.test.tsx` pilnuje polskich nazw i zwiniętych obszarów.
 
-## 26k. Ustawienia wierszami (@wydanie)
+## 26k. Ustawienia wierszami (0.543.0)
 
 Właściciel poprosił o poprawę następnego ekranu z menu „Więcej”. Z trzech makiet wybrał B: wiersze jak w ustawieniach telefonu.
 

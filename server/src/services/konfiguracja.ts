@@ -42,16 +42,16 @@ export interface WierszKonfiguracji {
    */
   edycja: Edycja | null;
   /**
-   * Rodzaj wartości NIEZALEŻNIE od edycji (@wydanie). Klucz przykryty zmienną
+   * Rodzaj wartości NIEZALEŻNIE od edycji (0.543.0). Klucz przykryty zmienną
    * usługi traci `edycja`, a panel dalej musi wiedzieć, że pokazuje datę.
    */
   rodzaj: Edycja["rodzaj"] | null;
-  /** Nazwa po polsku dla decyzji właściciela (@wydanie); `null` gdzie indziej. */
+  /** Nazwa po polsku dla decyzji właściciela (0.543.0); `null` gdzie indziej. */
   nazwa: string | null;
   jednostka: readonly [string, string, string] | null;
   wartosci: Readonly<Record<string, string>> | null;
   /**
-   * Wartość, na której serwer pracuje TERAZ, w kształcie z pliku (@wydanie).
+   * Wartość, na której serwer pracuje TERAZ, w kształcie z pliku (0.543.0).
    * Przy domyślnej to jedyne miejsce, skąd panel wie, ile ona wynosi.
    * `null` dla sekretu i dla klucza, którego domyślnej serwer nie zna.
    */

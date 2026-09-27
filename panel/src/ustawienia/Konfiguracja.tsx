@@ -42,7 +42,7 @@ function wartosc(w: WierszKonfiguracji): React.ReactNode {
   return w.wartosc === "" ? <i className="text-slate-600">puste</i> : <code className="break-all">{w.wartosc}</code>;
 }
 
-/* ── Wartość słowem (@wydanie) ──────────────────────────────────────────
+/* ── Wartość słowem (0.543.0) ──────────────────────────────────────────
    Decyzja właściciela pokazuje to, na czym serwer pracuje, językiem biura:
    „7 dni", „wyłączony", data. Wcześniej przy domyślnej stała kreska, a
    liczbę znał tylko `config.ts`. Słowa dla wartości przychodzą z rejestru,
@@ -138,7 +138,7 @@ function TabelaKluczy({ wiersze, onWynik }: { wiersze: WierszKonfiguracji[]; onW
   </Tabela>;
 }
 
-/* ── Decyzje właściciela wierszami (@wydanie) ──────────────────────────
+/* ── Decyzje właściciela wierszami (0.543.0) ──────────────────────────
    Decyzja właściciela z 27 września 2026, wariant B z makiet: wiersz jak
    w ustawieniach telefonu. Nazwa i jedno zdanie z lewej, wartość, która
    obowiązuje, z prawej. Tabela z kluczem z pliku na czele i kreską zamiast

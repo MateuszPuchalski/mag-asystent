@@ -18,7 +18,7 @@
    Domyślnych wartości tu NIE MA, celowo. Stoją w `config.ts` i w kodzie C#,
    a druga kopia stu kilkudziesięciu liczb rozjechałaby się przy pierwszej
    zmianie. Wartość domyślną, która OBOWIĄZUJE, panel dostaje od
-   `konfiguracja-obowiazuje.ts` (@wydanie): ten czyta ją z gotowego `config`,
+   `konfiguracja-obowiazuje.ts` (0.543.0): ten czyta ją z gotowego `config`,
    więc nie powstaje druga kopia liczby.                                      */
 
 export type Grupa =
@@ -79,7 +79,7 @@ export interface Klucz {
   czyta?: readonly Program[];
   edycja?: Edycja;
   /**
-   * Nazwa po polsku, pod którą panel pokazuje decyzję właściciela (@wydanie).
+   * Nazwa po polsku, pod którą panel pokazuje decyzję właściciela (0.543.0).
    * Klucz z pliku zostaje w dymku: szuka się go przy awarii, nie co dzień.
    * Wymagana przy `kto: "wlasciciel"` — pilnuje tego test.
    */

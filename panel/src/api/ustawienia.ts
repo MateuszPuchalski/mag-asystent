@@ -148,14 +148,14 @@ export interface WierszKonfiguracji {
   edycja: { rodzaj: "tekst" | "liczba" | "data" | "wybor"; opcje?: string[] } | null;
   /** Rodzaj wartości także wtedy, gdy `edycja` jest `null` (klucz przykryty). */
   rodzaj?: "tekst" | "liczba" | "data" | "wybor" | null;
-  /** Nazwa po polsku — tylko decyzje właściciela (@wydanie). */
+  /** Nazwa po polsku — tylko decyzje właściciela (0.543.0). */
   nazwa?: string | null;
   /** Odmiana jednostki liczby: 1, 2–4, 5+. */
   jednostka?: [string, string, string] | null;
   /** Słowa zamiast wartości z pliku, np. `"0"` → „wyłączony". */
   wartosci?: Record<string, string> | null;
   /**
-   * Wartość, na której serwer pracuje teraz, w kształcie z pliku (@wydanie).
+   * Wartość, na której serwer pracuje teraz, w kształcie z pliku (0.543.0).
    * Przy domyślnej to jedyne źródło liczby; `null` dla sekretu i kluczy
    * workerów, których domyślnych serwer nie zna.
    */

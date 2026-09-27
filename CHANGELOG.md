@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.543.0 — 27 września 2026
+
+**Ustawienia wierszami.** Decyzje właściciela mają nazwę po polsku i jedno zdanie opisu. Obok stoi wartość, na której serwer pracuje, np. „7 dni” albo „wyłączony”. Dotąd przy wartości domyślnej stała kreska. Cały wiersz otwiera zmianę, a pole startuje od obecnej wartości. Klucz z pliku został w dymku nazwy. Nad grupami zniknęła karta z samym słowem „Ustawienia”.
+
 ## 0.542.0 — 27 września 2026
 
 **Analiza krótsza.** Karta bez danych w wybranym oknie jest jedną linią ze

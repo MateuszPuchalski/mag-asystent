@@ -3,7 +3,7 @@ import { dataLokalna } from "../ui";
 import type { WierszKonfiguracji } from "../api/ustawienia";
 import { wartoscSlowem } from "./Konfiguracja";
 
-/* Wartość słowem (@wydanie) — to, co wiersz decyzji właściciela pokazuje
+/* Wartość słowem (0.543.0) — to, co wiersz decyzji właściciela pokazuje
    po prawej. Każdy przypadek to wiersz, który inaczej wróciłby do kreski
    albo do surowej wartości z pliku. */
 const w = (x: Partial<WierszKonfiguracji>): WierszKonfiguracji => ({

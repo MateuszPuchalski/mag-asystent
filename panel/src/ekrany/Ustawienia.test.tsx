@@ -300,7 +300,7 @@ describe("Ustawienia w panelu", () => {
     expect(wyslane).toEqual([]);
   });
 
-  /* Wariant B (@wydanie): nazwa po polsku, wartość, która obowiązuje, słowem.
+  /* Wariant B (0.543.0): nazwa po polsku, wartość, która obowiązuje, słowem.
      Przy domyślnej stała kreska — liczbę znał tylko `config.ts`. */
   it("decyzja właściciela: nazwa, obowiązująca wartość słowem, klucz w dymku", async () => {
     pokaz("/obsluga/ustawienia?grupa=obsluga");

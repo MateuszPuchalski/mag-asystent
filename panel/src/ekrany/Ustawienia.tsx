@@ -41,7 +41,7 @@ import { NowyKolektor } from "../ustawienia/NowyKolektor";
    Otwarcie ekranu i zmiana grupy nic nie zapisują — każda zmiana stoi za
    przyciskiem.
 
-   BEZ KARTY-NAGŁÓWKA (@wydanie). Nad grupami stała cała biała karta z
+   BEZ KARTY-NAGŁÓWKA (0.543.0). Nad grupami stała cała biała karta z
    jednym słowem „Ustawienia", które mówi już menu „Więcej". Tytuł ekranu
    stoi teraz nad listą grup, a treść zaczyna się na wysokości paska. */
 

@@ -1,6 +1,6 @@
 import type { Config } from "./config.js";
 
-/* ── Wartość, która obowiązuje (@wydanie) ────────────────────────────────────
+/* ── Wartość, która obowiązuje (0.543.0) ────────────────────────────────────
    Panel pokazywał przy kluczu z wartością domyślną kreskę. „Termin na zwrot:
    —" nie odpowiada na pytanie, ile dni ma biuro. Znał to tylko `config.ts`.
 
