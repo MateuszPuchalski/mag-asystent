@@ -370,8 +370,9 @@ test("STAN SYSTEMU zaczyna od tego, co czeka na biuro (0.427.0)", () => {
 test("żaden komunikat nie odsyła do zakładki, której nie ma", () => {
   /* Komunikaty serwera mówią człowiekowi, dokąd iść: „/obsluga → STAN
      SYSTEMU → …". Pierwszy człon wielkimi literami musi być zakładką, która
-     jest — nazwy stoją w `panel/src/main.tsx` jako `etykieta`, w obu rzędach
-     nagłówka. Małe litery („/obsluga → zębatka") opisują drogę, nie zakładkę.
+     jest — nazwy stoją jako `etykieta` w `panel/src/main.tsx` (zakładki)
+     i w `panel/src/nawigacja/Wiecej.tsx` (menu „Więcej", dawny dolny rząd,
+     od @wydanie). Małe litery („/obsluga → zębatka") opisują drogę, nie zakładkę.
 
      Od 0.446.0 stron biura nie ma, więc komunikat „/biuro → …" nie ma
      prawa się pojawić wcale: prowadziłby do przekierowania na DO DECYZJI,
@@ -386,7 +387,8 @@ test("żaden komunikat nie odsyła do zakładki, której nie ma", () => {
     }
   };
   zbierz(path.resolve(import.meta.dirname, ".."));
-  const rama = fs.readFileSync(path.resolve(import.meta.dirname, "../../../panel/src/main.tsx"), "utf8");
+  const rama = ["main.tsx", "nawigacja/Wiecej.tsx"]
+    .map((p) => fs.readFileSync(path.resolve(import.meta.dirname, "../../../panel/src", p), "utf8")).join("\n");
   const wPanelu = new Set([...rama.matchAll(/etykieta: "([^"]+)"/g)].map((m) => m[1].toUpperCase()));
 
   let znalezione = 0;
