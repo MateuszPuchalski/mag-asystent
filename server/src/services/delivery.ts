@@ -793,7 +793,13 @@ export function putawayLine(
   if (!Number.isFinite(putQty) || putQty <= 0) return { error: "Ilość musi być większa od zera" };
 
   const doneQty = line.ilosc_odlozona + putQty;
-  const status = doneQty >= line.ilosc_dok ? "done" : "partial";
+  /* WYJĄTEK PRZEŻYWA ODŁOŻENIE (decyzja właściciela z 27 września 2026).
+     Status liczony z samej ilości nadpisywał `problem`, gdy po zgłoszeniu
+     odkładano resztę sztuk — a uszkodzone też idą na półkę. Na `problem` stoją
+     trzy reguły: wyjątek czeka na ZAKOŃCZ, licznik wyjątków i ZAKOŃCZ, który
+     brał zgłoszony brak za nowy. Wychodziło drugie zgłoszenie i drugie MM na
+     serwis. Tę regułę stosuje już `przeliczStatus` przy wycofaniu zgłoszenia. */
+  const status = line.status === "problem" ? "problem" : doneQty >= line.ilosc_dok ? "done" : "partial";
   /* Rozjazd liczymy względem adresu, KTÓRY MAGAZYNIER MIAŁ NA EKRANIE, czyli
      żywego dla pozycji nietkniętej. Porównanie z zamrożonym snapshotem pytało
      ZAMIEŃ/DODAJ przy odłożeniu pod adresem AKTUALNYM i zaśmiecało raport
