@@ -36,3 +36,5 @@ produkcja.
   *Strażnik: `server/src/worker/sfera-pick.test.ts` na tych samych plikach.*
 - **Nazwy Sfery sprawdzaj sondą, nie z pamięci** (`sonda.ps1` niczego nie
   zapisuje). Niepotwierdzone nazwy znaczy `[WERYFIKUJ]`.
+
+<!-- Próba bramki „Zgoda właściciela" — PR testowy, do zamknięcia bez scalania. -->
