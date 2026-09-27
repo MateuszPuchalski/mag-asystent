@@ -116,7 +116,10 @@ const STANY_SYNCHRONIZACJI: Record<StanZwrotow["status"], string> = {
  */
 /** Nazwa rodzaju po ludzku — w zdaniu zbiorczym, nie w wierszu. */
 const NAZWA_ROZJAZDU: Record<string, string> = {
-  zwrot_po_terminie: "po terminie ustawowym",
+  /* TERMIN OBSŁUGI, nie ustawowy (@wydanie) — siedem dni od doręczenia,
+     regulamin Allegro. Serwer mówi tak od 0.339.0, a podpis tutaj został
+     przy „ustawowym" i właściciel zapytał, co to właściwie znaczy. */
+  zwrot_po_terminie: "po terminie obsługi (7 dni od doręczenia)",
   zwrot_bez_przelewu: "bez śladu po przelewie",
   kosz_czeka_na_korekte: "koszyk czeka na korektę",
   kosz_bez_powrotu: "kosz bez powrotu z regału",
@@ -125,7 +128,16 @@ const NAZWA_ROZJAZDU: Record<string, string> = {
   zwrot_rozliczony_bez_korekty: "rozliczony w Allegro bez korekty",
 };
 
-function PasekRozjazdow({ rozjazdy }: { rozjazdy: RozjazdZwrotu[] }) {
+/* Rodzaje, które dotyczą ZWROTU — ich klucz to numer zwrotu, więc zawężają
+   listę. Pozostałe mówią o koszach i prowadzą do ekranu koszy (@wydanie). */
+const ROZJAZDY_ZWROTOW = new Set(["zwrot_po_terminie", "zwrot_bez_przelewu", "zwrot_rozliczony_bez_korekty"]);
+
+function PasekRozjazdow({ rozjazdy, filtr, onFiltr }: {
+  rozjazdy: RozjazdZwrotu[];
+  /** Rodzaj, po którym lista jest teraz zawężona (@wydanie). */
+  filtr?: string | null;
+  onFiltr?: (rodzaj: string | null) => void;
+}) {
   /* ZWINIĘTY DOMYŚLNIE — i to jest NAPRAWA, nie upodobanie (0.319.0).
      Pierwsza wersja rysowała każdy wiersz z osobna. Na żywej bazie wyszło ich
      czterysta trzydzieści trzy, więc pasek zjadł cały ekran: kolejki i kolumn
@@ -142,19 +154,34 @@ function PasekRozjazdow({ rozjazdy }: { rozjazdy: RozjazdZwrotu[] }) {
 
   return <section aria-label="Rozjazdy zwrotów"
     className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
-    <button type="button" onClick={() => setRozwiniete((r) => !r)}
-      className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 text-left">
+    {/* ── GRUPA ZAWĘŻA LISTĘ (@wydanie) ─────────────────────────────────────
+        Zgłoszenie właściciela: „co to właściwie oznacza", a potem „zrób
+        oba". Liczba bez drogi do spraw kazała rozwijać czterysta numerów
+        i szukać ich w kolejce ręką. Kliknięcie zostawia na liście tylko te
+        zwroty, ze wszystkich kubełków; grupy koszy prowadzą do koszy. */}
+    <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1">
       <span className="text-xs font-bold uppercase text-amber-900">
         Do sprawdzenia ({rozjazdy.length})
       </span>
-      {[...wgRodzaju].map(([rodzaj, ile]) => <span key={rodzaj} className="text-sm text-amber-900">
-        <b className="font-semibold tabular-nums">{ile}</b>{" "}
-        {NAZWA_ROZJAZDU[rodzaj] ?? rodzaj}
-      </span>)}
-      <span className="ml-auto text-xs underline text-amber-900">
+      {[...wgRodzaju].map(([rodzaj, ile]) => {
+        const tresc = <><b className="font-semibold tabular-nums">{ile}</b>{" "}
+          {NAZWA_ROZJAZDU[rodzaj] ?? rodzaj}</>;
+        const klasa = "rounded px-1 text-sm text-amber-900 underline-offset-2 hover:underline";
+        if (ROZJAZDY_ZWROTOW.has(rodzaj) && onFiltr) {
+          return <button key={rodzaj} type="button" aria-pressed={filtr === rodzaj}
+            title="Pokaż na liście tylko te zwroty"
+            onClick={() => onFiltr(filtr === rodzaj ? null : rodzaj)}
+            className={`${klasa} ${filtr === rodzaj ? "bg-amber-200 font-semibold" : ""}`}>{tresc}</button>;
+        }
+        return rodzaj.startsWith("kosz_")
+          ? <a key={rodzaj} href="/obsluga/zwroty/kosze" title="Otwórz kosze" className={klasa}>{tresc}</a>
+          : <span key={rodzaj} className="text-sm text-amber-900">{tresc}</span>;
+      })}
+      <button type="button" onClick={() => setRozwiniete((r) => !r)}
+        className="ml-auto text-xs text-amber-900 underline">
         {rozwiniete ? "zwiń" : "pokaż numery"}
-      </span>
-    </button>
+      </button>
+    </div>
     {/* Rozwinięta lista ma WŁASNY scroller i sufit wysokości. Bez niego
         czterysta wierszy znowu wypchnęłoby kolejkę poza okno — tym razem
         na życzenie, ale z tym samym skutkiem. */}
@@ -236,14 +263,17 @@ function PasekOgona({ stan }: { stan: StanZwrotow }) {
  * kiedyś — schowane kazałoby zatwierdzać ręką to, co naprawia jedna rzecz.
  * Czerwony pasek niekompletnej kolejki stoi osobno i nie chowa się nigdy.
  */
-function PasekUwag({ bilans, stan, rozjazdy }: {
+function PasekUwag({ bilans, stan, rozjazdy, filtr = null, onFiltr }: {
   bilans?: BilansKartotek; stan?: StanZwrotow; rozjazdy: RozjazdZwrotu[];
+  filtr?: string | null; onFiltr?: (rodzaj: string | null) => void;
 }) {
   const [rozwiniete, setRozwiniete] = useState(false);
   const bez = bilans?.bez ?? 0;
   if (!bez && !rozjazdy.length) return null;
   const alarm = Boolean(stan && stan.status !== "current" && (bilans?.powody.do_zwiazania ?? 0) > 0);
-  const otwarte = rozwiniete || alarm;
+  /* Otwarty filtr trzyma pasek otwarty: zwinięty chowałby przycisk, którym
+     się go zdejmuje (@wydanie). */
+  const otwarte = rozwiniete || alarm || filtr !== null;
   return <section aria-label="Uwagi do kolejki" className="shrink-0 space-y-1">
     <button type="button" onClick={() => setRozwiniete((r) => !r)}
       className="flex w-full flex-wrap items-center gap-x-3 rounded-lg border border-amber-200
@@ -254,7 +284,7 @@ function PasekUwag({ bilans, stan, rozjazdy }: {
     </button>
     {otwarte && <>
       {bilans && <PasekKartotek bilans={bilans} stan={stan} />}
-      <PasekRozjazdow rozjazdy={rozjazdy} />
+      <PasekRozjazdow rozjazdy={rozjazdy} filtr={filtr} onFiltr={onFiltr} />
     </>}
   </section>;
 }
@@ -435,6 +465,8 @@ export function Zwroty() {
   const rozjazdy = useRozjazdyZwrotow();
   const [kod, setKod] = useState("");
   const [fraza, setFraza] = useState("");
+  /* Grupa z paska „Do sprawdzenia", po której zawężona jest lista (@wydanie). */
+  const [filtrRozjazdu, setFiltrRozjazdu] = useState<string | null>(null);
   /* Login, o którego PACZKI pytamy (0.365.0) — osobno od tego, co operator
      wpisuje, bo pytanie idzie po Enterze i po wyjściu z pola, a nie po każdym
      znaku. Pusty nie pyta wcale. */
@@ -465,9 +497,17 @@ export function Zwroty() {
     "wertis.zwroty.porzadek", ["termin", "otwarto", "kwota"], "termin");
 
   const pasujace = useMemo(() => {
+    /* Grupa rozjazdów zawęża jak szukanie — przez wszystkie kubełki, bo
+       „rozliczony bez korekty" stoi w ZAMKNIĘTYCH, a „po terminie" w kilku
+       naraz. Klucz rozjazdu to numer zwrotu albo jego identyfikator. */
+    if (filtrRozjazdu) {
+      const klucze = new Set((rozjazdy.data?.rozjazdy ?? [])
+        .filter((r) => r.rodzaj === filtrRozjazdu).map((r) => r.klucz));
+      return (data?.zwroty ?? []).filter((z) => klucze.has(z.numer ?? z.externalId));
+    }
     if (!rozbij(fraza).length) return null;
     return (data?.zwroty ?? []).filter((z) => pasujeDoFrazy(kody(z), fraza));
-  }, [data, fraza]);
+  }, [data, fraza, filtrRozjazdu, rozjazdy.data]);
 
   /* Szukanie PRZEBIJA kubełek. Bez tego operator wpisuje numer, widzi „ten
      kubełek jest pusty" i nie ma jak się dowiedzieć, że zwrot stoi w
@@ -988,7 +1028,11 @@ export function Zwroty() {
       <PrzelacznikZwrotow teraz="zwroty" />
       <NowyKoszyk />
       <div className="min-w-0 flex-1">
-        <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []} />
+        <PasekUwag bilans={data?.kartoteki} stan={data?.stan} rozjazdy={rozjazdy.data?.rozjazdy ?? []}
+          filtr={filtrRozjazdu}
+          /* Grupa zdejmuje frazę: dwa filtry naraz dawałyby pustą listę
+             bez widocznego powodu. */
+          onFiltr={(r) => { setFiltrRozjazdu(r); if (r) setFraza(""); }} />
       </div>
     </div>
     {data?.stan && <PasekOgona stan={data.stan} />}
@@ -1072,7 +1116,7 @@ export function Zwroty() {
       <Szukanie
         wynik={wynikSkanu} kod={kod} fraza={fraza} ile={pasujace?.length ?? null}
         szuka={skan.isPending} dociaga={dociagnij.isPending} blad={bladSkanu}
-        onFraza={(v) => { setFraza(v); if (!v) setWynikSkanu(null); }}
+        onFraza={(v) => { setFraza(v); if (v) setFiltrRozjazdu(null); if (!v) setWynikSkanu(null); }}
         onSzukaj={(v) => { kodZCzytnika.current = ""; szukaj(v); }}
         onSkan={(v) => { void naSkan(v); }}
         towar={skanTowaru}
@@ -1148,6 +1192,15 @@ export function Zwroty() {
       {!pasujace && kubelek !== null &&
         <div className="shrink-0 border-b border-slate-200 bg-slate-50 px-2 py-1">
           <span className="text-xs font-semibold text-slate-600">{opis?.pytanie}</span>
+        </div>}
+      {/* Aktywna grupa rozjazdów w miejscu pytania kubełka (@wydanie) — lista
+          mówi, dlaczego jest krótsza, i ma wyjście jednym kliknięciem. */}
+      {filtrRozjazdu &&
+        <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-2 py-1">
+          <span className="text-xs font-semibold text-amber-900">
+            Tylko: {NAZWA_ROZJAZDU[filtrRozjazdu] ?? filtrRozjazdu} ({pasujace?.length ?? 0})</span>
+          <button type="button" onClick={() => setFiltrRozjazdu(null)}
+            className="ml-auto text-xs text-amber-900 underline">wyczyść</button>
         </div>}
 
       {/* Klawisze NA EKRANIE, wzorem reklamacji (0.281.0). Dekalog p. 2:
