@@ -91,16 +91,23 @@ export const KLASA_STATUSU: Record<string, string> = {
   "spam": "bg-stan-spam text-stan-spam-tekst",
 };
 /**
+ * Ranga i jej barwa pisma — JEDNA mapa (@wydanie). Do tego wydania mieszkała
+ * wyłącznie w `skrzynka/StanIntegracji.tsx`; zdania o dosyłce potrzebowały
+ * tej samej i zamiast drugiej kopii mapa przeszła tutaj.
+ */
+export type Ranga = "zle" | "uwaga" | "ok" | "nic";
+export const BARWA_RANGI: Record<Ranga, string> = {
+  zle: "text-ranga-zle", uwaga: "text-ranga-uwaga", ok: "text-ranga-ok", nic: "text-ranga-nic",
+};
+
+/**
  * Barwa zdania z tonem serwera (0.536.0) — dziś zdania o dosyłce.
  *
- * Stoi tutaj, bo to samo zdanie pada na ekranie zwrotu, na profilu i przy
- * historii kolejek. Trzy mapy jednej rangi rozjechałyby się przy pierwszej
- * poprawce. Bez tonu pismo jest zwykłe, bo kolor zapalany zawsze uczy go
- * ignorować.
+ * To samo zdanie pada na ekranie zwrotu, na profilu i przy historii kolejek,
+ * więc barwę bierze z mapy wyżej, nie z własnej. Bez tonu pismo jest zwykłe,
+ * bo kolor zapalany zawsze uczy go ignorować.
  */
-export const barwaTonu = (ton: "ok" | "uwaga" | "zle" | null | undefined) =>
-  ton === "zle" ? "text-ranga-zle" : ton === "uwaga" ? "text-ranga-uwaga"
-    : ton === "ok" ? "text-ranga-ok" : "text-ranga-nic";
+export const barwaTonu = (ton: "ok" | "uwaga" | "zle" | null | undefined) => BARWA_RANGI[ton ?? "nic"];
 
 export const Plakietka = ({ status, children, className = "" }:
   { status?: string; children: React.ReactNode; className?: string }) =>

@@ -42,7 +42,7 @@ import { logEvent } from "../services/events.js";
 import { stanZwrotowHealth } from "../services/allegro-zwroty-sync-state.js";
 import { sledzDosylkeZwrotu, zalozDosylkeZOdmowy, type WynikDosylki } from "../services/dosylka.js";
 import { jestKodemDosylki } from "../services/dosylka-opis.js";
-import { BladSprawy } from "../services/prowadzenie-klienta.js";
+import { BladSprawy, BrakKlienta } from "../services/prowadzenie-klienta.js";
 import { reconcile } from "../services/reconcile.js";
 
 /* ── Trasy zwrotów klienckich (0.150.0, decyzje biura od 0.156.0) ────────────
@@ -858,20 +858,28 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       try {
         dosylka = zalozDosylkeZOdmowy(db(), Number(req.params.id), kto());
       } catch (e) {
-        /* Zdanie STAŁE: nieoczekiwany błąd bywa błędem SQL-a z treścią
-           wiersza, a to zdanie trafia na ekran. */
-        dosylka = { zalozona: false, blad: e instanceof BladSprawy ? e.message
-          : "Zapis się nie udał — kliknij „Śledź dosyłkę” przy zwrocie" };
-        if (!(e instanceof BladSprawy)) console.error("[dosylka] założenie przy odmowie nie doszło:", e);
+        dosylka = { zalozona: false, blad: zdanieBleduDosylki(e, "kliknij „Śledź dosyłkę” przy zwrocie") };
       }
       return { ...wynik, dosylka };
     });
 
+  /* Zdanie błędu dosyłki dla ekranu — STAŁE. Błąd sprawy i nieznany klient
+     mają własne stałe zdania; każdy inny bywa błędem SQL-a z treścią wiersza,
+     więc na ekran idzie zdanie z rodziny, a szczegół tylko do logu serwera. */
+  const zdanieBleduDosylki = (e: unknown, coDalej: string): string => {
+    if (e instanceof BladSprawy || e instanceof BrakKlienta) return e.message;
+    console.error("[dosylka] zapis dosyłki przy zwrocie nie doszedł:", e);
+    return `Zapis się nie udał — ${coDalej}`;
+  };
+
   /* „Śledź dosyłkę” przy zwrocie — ponowienie, gdy odmowa przeszła, a dosyłka
-     nie; albo odmowa sprzed 0.536.0. BEZ CIAŁA: trasa niczego z niego nie
-     czyta, a pusty JSON z typem treści to `FST_ERR_CTP_EMPTY_JSON_BODY`.
+     nie; albo odmowa złożona w panelu Allegro. BEZ CIAŁA: trasa niczego z niego
+     nie czyta, a pusty JSON z typem treści to `FST_ERR_CTP_EMPTY_JSON_BODY`.
      Samo `odmowa()` bez `autoryzuj()`: pieniądze się tu nie ruszają, więc
-     wpis `privileged` zrównywałby ją z przelewem. */
+     wpis `privileged` zrównywałby ją z przelewem.
+
+     KAŻDA porażka to 400 ze stałym zdaniem, jak przy odmowie wyżej. Domyślne
+     500 Fastify pokazałoby na ekranie treść wyjątku, a ta bywa wierszem bazy. */
   app.post<{ Params: { id: string } }>(
     "/api/obsluga/zwroty/:id/dosylka", async (req, reply) => {
       const nie = odmowa(reply);
@@ -879,8 +887,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       try {
         return sledzDosylkeZwrotu(db(), Number(req.params.id), kto());
       } catch (e) {
-        if (e instanceof BladSprawy) return reply.code(400).send({ error: e.message });
-        throw e;
+        return reply.code(400).send({ error: zdanieBleduDosylki(e, "spróbuj jeszcze raz za chwilę") });
       }
     });
 

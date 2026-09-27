@@ -5,7 +5,7 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import { odpytajTracking, stanZHistorii, uzupelnijDoreczenia } from "./allegro-tracking.js";
 import { TRACKING_NA_ZADANIE, urlTrackingu } from "../adapters/allegro.http.js";
-import { BladLimituAllegro } from "../adapters/allegro.js";
+import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 
 /* ── Kiedy paczka zwrotna do nas dotarła (0.187.0) ───────────────────────────
    Do 0.186.0 panel twierdził, że „Allegro nie podaje daty doręczenia do nas".
@@ -37,6 +37,7 @@ test("moment doręczenia bierze się z wpisu DELIVERED, nie z ostatniego", () =>
   ]));
   assert.equal(s.dostarczonoAt, "2026-08-24T10:41:00Z");
   assert.equal(s.status, "ISSUE", "ostatni status liczy się po czasie, nie po kolejności");
+  assert.equal(s.ostatnioAt, "2026-08-25T08:00:00Z", "chwila ostatniego statusu — też po czasie");
 });
 
 test("paczka w drodze nie ma daty doręczenia", () => {
@@ -59,9 +60,9 @@ test("doręczona i zwrócona nadawcy — bierzemy PIERWSZE doręczenie", () => {
 });
 
 test("brak historii nie udaje żadnej wiedzy", () => {
-  assert.deepEqual(stanZHistorii(undefined), { dostarczonoAt: null, status: null });
+  assert.deepEqual(stanZHistorii(undefined), { dostarczonoAt: null, status: null, ostatnioAt: null });
   assert.deepEqual(stanZHistorii({ waybill: "AD1", trackingDetails: null }),
-    { dostarczonoAt: null, status: null });
+    { dostarczonoAt: null, status: null, ostatnioAt: null });
 });
 
 test("adres niesie przewoźnika w ścieżce i numery w zapytaniu", () => {
@@ -137,10 +138,58 @@ test("odpytanie oddaje stan po numerze; partia, która padła, nie ma wpisu", as
       { waybill: "AD2", trackingDetails: null }] };
   }, "https://api", [{ carrierId: "INPOST", waybill: "AD1" }, { carrierId: "INPOST", waybill: "AD2" },
     { carrierId: "DPD", waybill: "D1" }]);
-  assert.deepEqual(stany.get("AD1"), { dostarczonoAt: "2026-08-24T10:41:00Z", status: "DELIVERED" });
-  assert.deepEqual(stany.get("AD2"), { dostarczonoAt: null, status: null },
+  assert.deepEqual(stany.get("AD1"),
+    { dostarczonoAt: "2026-08-24T10:41:00Z", status: "DELIVERED", ostatnioAt: "2026-08-24T10:41:00Z" });
+  assert.deepEqual(stany.get("AD2"), { dostarczonoAt: null, status: null, ostatnioAt: null },
     "„przewoźnik nic nie wie” to wpis — pytanie doszło");
   assert.equal(stany.has("D1"), false, "„nie udało się zapytać” to brak wpisu");
+});
+
+test("dziennik błędu trackingu: przewoźnik i kod HTTP, nigdy treść odpowiedzi Allegro", async () => {
+  /* `BladOdpowiedziAllegro` niesie w komunikacie do 300 znaków ciała
+     odpowiedzi — a ta bywa czymkolwiek, także adresem odbiorcy. */
+  const ostrzezenia: unknown[] = [];
+  const warn = console.warn;
+  console.warn = (...x: unknown[]) => { ostrzezenia.push(x); };
+  try {
+    await odpytajTracking(async (u) => {
+      if (u.includes("/DPD/")) throw new BladOdpowiedziAllegro("Allegro odpowiedziało 400: {\"adres\":\"ul. Tajna 1\"}", 400);
+      throw new Error("Brak połączenia z Allegro (https://api) — fetch failed: ul. Tajna 2");
+    }, "https://api", [{ carrierId: "DPD", waybill: "D1" }, { carrierId: "INPOST", waybill: "AD1" }]);
+  } finally { console.warn = warn; }
+  const log = JSON.stringify(ostrzezenia);
+  assert.doesNotMatch(log, /Tajna|fetch failed/, "treść błędu nie trafia do logu");
+  assert.match(log, /DPD: pytanie o 1 numer\(y\) nie doszło \(HTTP 400\)/);
+  assert.match(log, /INPOST: pytanie o 1 numer\(y\) nie doszło \(bez odpowiedzi\)/);
+});
+
+test("dosyłka: partia, która padła, idzie jeszcze raz numer po numerze; zwroty — nie", async () => {
+  /* Jeden źle wpisany numer potrafi wywrócić całą partię u przewoźnika. */
+  const adresy: string[] = [];
+  const query = async (u: string) => {
+    adresy.push(u);
+    if (u.includes("ZLY")) throw new BladOdpowiedziAllegro("Allegro odpowiedziało 400: zły numer", 400);
+    return { waybills: new URL(u).searchParams.getAll("waybill").map((waybill) => ({ waybill, trackingDetails: null })) };
+  };
+  const paczki = [{ carrierId: "DPD", waybill: "D1" }, { carrierId: "DPD", waybill: "ZLY" },
+    { carrierId: "DPD", waybill: "D2" }];
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const dosylka = await odpytajTracking(query, "https://api", paczki, { limitWyzej: true, pojedynczoPoBledzie: true });
+    assert.deepEqual([dosylka.has("D1"), dosylka.has("ZLY"), dosylka.has("D2")], [true, false, true]);
+    assert.equal(adresy.length, 4, "partia plus trzy pojedyncze pytania");
+    adresy.length = 0;
+    const zwroty = await odpytajTracking(query, "https://api", paczki);
+    assert.deepEqual([zwroty.size, adresy.length], [0, 1], "zwroty zachowują się jak przed wydaniem");
+  } finally { console.warn = warn; }
+  /* 429 w pojedynczym pytaniu dalej idzie wyżej. */
+  let n = 0;
+  await assert.rejects(odpytajTracking(async () => {
+    n++;
+    if (n === 1) throw new BladOdpowiedziAllegro("Allegro odpowiedziało 400", 400);
+    throw new BladLimituAllegro("limit", 900_000);
+  }, "https://api", paczki, { limitWyzej: true, pojedynczoPoBledzie: true }), BladLimituAllegro);
 });
 
 test("429: zwroty idą dalej, dosyłka oddaje limit wyżej", async () => {

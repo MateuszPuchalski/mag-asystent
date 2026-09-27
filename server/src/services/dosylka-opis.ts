@@ -20,7 +20,12 @@ import { chwilaUtc, czasLokalny, dataLokalna, dodajDni, polnocLokalna } from "..
    założona w piątek o 23:30 to w UTC jeszcze piątek, a w magazynie sobota —
    i „dwa dni robocze” wypadałyby o dzień za wcześnie. */
 
-/** Kody odmowy wypłaty, które znaczą „wysłaliśmy towar jeszcze raz”. */
+/**
+ * Kody odmowy wypłaty, które znaczą „wysłaliśmy towar jeszcze raz”.
+ * `NEW_ITEM_SENT` podał właściciel 27 września 2026 (zły towar).
+ * `MISSING_PART_SENT` doszedł w @wydanie, bo brakująca część jedzie tak samo,
+ * drugą paczką — to do oceny właściciela, nie jego fakt.
+ */
 export const KODY_DOSYLKI = ["NEW_ITEM_SENT", "MISSING_PART_SENT"] as const;
 export type KodDosylki = (typeof KODY_DOSYLKI)[number];
 
@@ -34,12 +39,20 @@ export type TonDosylki = "ok" | "uwaga" | "zle" | null;
 export interface DosylkaSprawy {
   /** Numer zamówienia w Allegro (`checkoutForm.id`). */
   zamowienie: string;
+  /** Zwrot, z którego odmowy wyszła dosyłka; `null` przy numerze wpisanym bez odmowy. */
+  zwrotId: number | null;
   /** `null`, dopóki Allegro go nie pokaże albo agent go nie wpisze. */
   waybill: string | null;
   /** `carrierId` z Allegro, np. „INPOST”, „DPD”, „OTHER”. */
   przewoznik: string | null;
   /** Przewoźnik PIERWSZEJ paczki zamówienia — domyślny wybór w formularzu numeru. */
   przewoznikZamowienia: string | null;
+  /**
+   * Skąd numer. `null` DOKŁADNIE wtedy, gdy numeru nie ma — każdy zapis
+   * serwera stawia i czyści oba pola razem. Historia klienta przy źródle
+   * dostaje `waybill: null` zawsze (`zeSprawa`), więc brak numeru poznaje
+   * po tym polu.
+   */
   zrodlo: "allegro" | "recznie" | null;
   /** Ostatni kod przewoźnika. */
   status: string | null;
@@ -66,18 +79,24 @@ export interface StanDosylki {
 }
 
 /**
- * Po ilu dniach roboczych brak numeru woła o ruch. Etykieta powstaje
- * w Sellasist zwykle w dniu odmowy, a Allegro pokazuje numer przy zamówieniu
- * w ciągu doby. Drugi dzień roboczy bez numeru znaczy więc, że numer trafił
- * na inne zamówienie albo nie trafił wcale — i sam już nie przyjdzie.
+ * Po ilu dniach roboczych brak numeru woła o ruch.
+ *
+ * ZAŁOŻENIE, nie fakt: etykieta powstaje w Sellasist w dniu odmowy, a Allegro
+ * pokazuje numer przy zamówieniu w ciągu doby. Właściciel tego nie podał, a na
+ * żywym koncie nikt nie mierzył. Sprawdzi to miara z S6 — czas od odmowy do
+ * numeru. Przy tym założeniu drugi dzień roboczy bez numeru znaczy, że numer
+ * trafił na inne zamówienie albo nie trafił wcale.
  */
 export const DNI_BEZ_NUMERU = 2;
 
 /**
- * Domyślny termin kroku „dosłać”: trzy dni robocze. Dzień na etykietę
- * i nadanie, jeden do dwóch dni kuriera. Wcześniejszy termin stawiałby krok
- * „po terminie” w dniu, w którym paczka jeszcze jedzie — i uczyłby
- * ignorować czerwień. Późniejszy chowałby dosyłkę, która utknęła.
+ * Domyślny termin kroku „dosłać”: trzy dni robocze.
+ *
+ * ZAŁOŻENIE, nie fakt: dzień na etykietę i nadanie, jeden do dwóch dni
+ * kuriera. Sprawdzi je ta sama miara z S6 co `DNI_BEZ_NUMERU`, a obok niej
+ * `domyslny: true` w `klient_sprawa_krok`. Wcześniejszy termin stawiałby krok
+ * „po terminie” w dniu, w którym paczka jeszcze jedzie — i uczyłby ignorować
+ * czerwień. Późniejszy chowałby dosyłkę, która utknęła.
  */
 export const DNI_KROKU_DOSYLKI = 3;
 
@@ -186,6 +205,13 @@ export function opisDosylki(
      w specyfikacji). Ticker go nie pyta, więc zdanie mówi, czemu stan stoi. */
   if (d.przewoznik === "OTHER") return { bezNumeru: false, ton: null, opis: "Przewoźnik spoza Allegro — nie śledzimy" };
   if (d.sprawdzonoAt === null) return { bezNumeru: false, ton: null, opis: "Dosyłka nadana — czekamy na pierwszy stan" };
+  /* Pytaliśmy, a przewoźnik nie podał ani jednego statusu. To bywa paczka
+     jeszcze nienadana, ale bywa też numer z literówką — „w drodze” ukryłoby
+     ten drugi przypadek, więc zdanie mówi, co wiemy, i dostaje ton uwagi. */
+  if (d.status === null) {
+    return { bezNumeru: false, ton: "uwaga",
+      opis: `Przewoźnik nie zna jeszcze tej paczki (stan z ${stanZ(d.sprawdzonoAt, teraz)})` };
+  }
   return { bezNumeru: false, ton: null, opis: `Dosyłka w drodze (stan z ${stanZ(d.sprawdzonoAt, teraz)})` };
 }
 
@@ -195,14 +221,40 @@ const tekst = (v: unknown): string | null => {
 };
 
 /**
- * Wiersz `klient_dosylka` z przewoźnikiem pierwszej paczki. JEDNO zapytanie
- * dla każdego czytelnika dosyłek, żeby „przewoźnik zamówienia” znaczył
- * wszędzie to samo. Numer zamówienia jest unikalny na koncie sprzedawcy,
- * więc złączenie idzie po obu kolumnach.
+ * Wiersz `klient_dosylka` z przewoźnikiem pierwszej paczki i stanem sprawy.
+ * JEDNO zapytanie dla każdego czytelnika dosyłek, żeby „przewoźnik
+ * zamówienia” i „sprawa w toku” znaczyły wszędzie to samo. Numer zamówienia
+ * jest unikalny na koncie sprzedawcy, więc złączenie idzie po obu kolumnach.
  */
-export const DOSYLKI_SQL = `SELECT d.*, o.przesylka_przewoznik AS przewoznik_zamowienia
+export const DOSYLKI_SQL = `SELECT d.*, o.przesylka_przewoznik AS przewoznik_zamowienia,
+    p.login AS sprawa_login, p.zakonczono_at AS sprawa_zakonczono_at
   FROM klient_dosylka d
+  JOIN klient_prowadzenie p ON p.id = d.sprawa_id
   LEFT JOIN zamowienie_klienta o ON o.channel_account_id = d.konto AND o.external_id = d.zamowienie`;
+
+/**
+ * Dosyłka, która należy do zwrotu (`?1` — id zwrotu, `?2` — konto, `?3` —
+ * numer zamówienia). JEDNA reguła dla ekranu zwrotu, „Śledź dosyłkę”,
+ * propozycji na profilu i przejęcia wiersza przy odmowie: przycisk, trasa
+ * i ekran nie mogą się różnić zdaniem, czy dosyłka tego zwrotu już jest.
+ *
+ * Należy do zwrotu wiersz założony z jego odmowy. Poza nim wiersz tego samego
+ * zamówienia, gdy:
+ *   - agent wpisał numer bez odmowy w bieżącym epizodzie sprawy — odmowa
+ *     tylko nazywa dosyłkę, którą biuro już wysłało i śledzi;
+ *   - wiersz powstał PO zgłoszeniu tego zwrotu według Allegro — dosyłka
+ *     wysłana po zwrocie jest odpowiedzią na niego, nie na wcześniejszy.
+ * Wiersz starszy od zwrotu to poprzednia dosyłka: nowa odmowa ją zastępuje.
+ * Bez daty zgłoszenia w lądowisku drugi warunek milczy — `julianday(NULL)`.
+ */
+export const DOSYLKA_ZWROTU_SQL = `${DOSYLKI_SQL}
+  WHERE d.zwrot_id = ?1
+     OR (d.konto = ?2 AND d.zamowienie = ?3 AND (
+          (d.zwrot_id IS NULL AND d.archiwalna = 0 AND p.zakonczono_at IS NULL)
+          OR julianday(d.zalozono_at) >= julianday((SELECT json_extract(a.surowe_json, '$.createdAt')
+               FROM zwrot_klienta z JOIN allegro_zwrot a ON a.id = z.external_id WHERE z.id = ?1))))
+  ORDER BY d.zwrot_id IS ?1 DESC, julianday(d.zalozono_at) DESC
+  LIMIT 1`;
 
 /** Wiersz z `DOSYLKI_SQL` jako dosyłka ekranu. */
 export function naDosylkeSprawy(w: Record<string, unknown>, teraz: Date): DosylkaSprawy {
@@ -214,6 +266,7 @@ export function naDosylkeSprawy(w: Record<string, unknown>, teraz: Date): Dosylk
   };
   return {
     zamowienie: String(w.zamowienie),
+    zwrotId: w.zwrot_id == null ? null : Number(w.zwrot_id),
     ...stan,
     przewoznikZamowienia: tekst(w.przewoznik_zamowienia),
     zrodlo: zrodlo === "allegro" || zrodlo === "recznie" ? zrodlo : null,
@@ -224,17 +277,90 @@ export function naDosylkeSprawy(w: Record<string, unknown>, teraz: Date): Dosylk
 /** Kłopot u przewoźnika albo brak numeru za długo — wiersz „Moje” staje na dziś. */
 export const pilnaDosylka = (d: DosylkaSprawy): boolean => d.bezNumeru || d.ton === "zle";
 
+/** Doręczenie po chwili `widzianeDo` — ostatnim ruchu człowieka przy sprawie. */
+const doreczonaPo = (d: DosylkaSprawy, widzianeDo: string | null): boolean => {
+  const t = chwilaUtc(d.dostarczonoAt);
+  return Number.isFinite(t) && (widzianeDo === null || !(t <= chwilaUtc(widzianeDo)));
+};
+
 /**
  * Dosyłka, o której mówi wiersz „Moje”: kłopot, potem brak numeru, potem
  * w drodze, na końcu doręczona. Wiersz ma jedno zdanie, więc wygrywa to,
  * co woła o ruch; doręczona tylko wtedy, gdy nic innego nie czeka.
+ *
+ * Doręczona SPRZED ostatniego ruchu człowieka (`widzianeDo`) odpada: agent
+ * postawił krok, widząc ją, więc „czeka do …” jego nowego kroku mówi więcej
+ * niż stare doręczenie. Kłopot i brak numeru liczą się zawsze.
  */
-export function najwazniejszaDosylka(dosylki: DosylkaSprawy[]): DosylkaSprawy | null {
+export function najwazniejszaDosylka(
+  dosylki: DosylkaSprawy[], widzianeDo: string | null = null,
+): DosylkaSprawy | null {
   const waga = (d: DosylkaSprawy): number =>
     d.ton === "zle" ? 0 : d.waybill === null ? 1 : d.dostarczonoAt === null ? 2 : 3;
-  return [...dosylki].sort((a, b) => waga(a) - waga(b))[0] ?? null;
+  return [...dosylki].filter((d) => d.dostarczonoAt === null || doreczonaPo(d, widzianeDo))
+    .sort((a, b) => waga(a) - waga(b))[0] ?? null;
 }
 
-/** Ile dni śledzimy dosyłkę od założenia — i ile dni wstecz patrzy propozycja na profilu. */
+/**
+ * Doręczona dosyłka, po której profil pyta „Zakończ sprawę?” — albo `null`.
+ *
+ * Każda śledzona dosyłka sprawy doszła, co najmniej jedna jest, a ostatnie
+ * doręczenie przyszło PO ostatnim ruchu człowieka. Ruch po doręczeniu, np.
+ * nowy krok, znaczy, że agent je widział i sprawa ma jeszcze coś do zrobienia
+ * — podpowiedź pchałaby wtedy do zamknięcia wbrew jego decyzji. `OTHER`
+ * nie wchodzi do „każdej”: Allegro go nie śledzi, więc nie dojdzie nigdy.
+ */
+export function doreczonaDoZakonczenia(dosylki: DosylkaSprawy[], zmienionoAt: string): DosylkaSprawy | null {
+  const sledzone = dosylki.filter((d) => d.przewoznik !== "OTHER");
+  if (sledzone.length === 0 || sledzone.some((d) => d.dostarczonoAt === null)) return null;
+  const ostatnia = sledzone.reduce((a, b) => (chwilaUtc(b.dostarczonoAt) > chwilaUtc(a.dostarczonoAt) ? b : a));
+  return doreczonaPo(ostatnia, zmienionoAt) ? ostatnia : null;
+}
+
+/**
+ * Ile dni śledzimy dosyłkę od założenia albo od numeru — i ile dni wstecz
+ * patrzy propozycja na profilu. Numer wpisany po czasie dostaje własne okno
+ * (`numer_at`), bo dopiero od niego jest o co pytać przewoźnika.
+ */
 export const DNI_SLEDZENIA = 30;
 export const OKNO_SLEDZENIA_MS = DNI_SLEDZENIA * DZIEN;
+
+/** Pola wiersza, z których wynika, czy jego stan jest „teraz”. */
+export interface ZycieDosylki {
+  wToku: boolean;
+  archiwalna: boolean;
+  dostarczonoAt: string | null;
+  numerAt: string | null;
+  zalozonoAt: string;
+}
+
+/**
+ * Czy ticker dalej pyta o tę dosyłkę — czyli czy jej zdanie mówi o „teraz”.
+ * Sprawa w toku, bieżący epizod i okno śledzenia. Doręczona zostaje „teraz”
+ * na zawsze: doręczenie jest ostateczne, więc jej zdanie się nie starzeje.
+ */
+export function dosylkaSledzona(d: ZycieDosylki, teraz: Date): boolean {
+  if (!d.wToku || d.archiwalna) return false;
+  if (d.dostarczonoAt) return true;
+  return teraz.getTime() - chwilaUtc(d.numerAt ?? d.zalozonoAt) <= OKNO_SLEDZENIA_MS;
+}
+
+/** Pola życia dosyłki z wiersza `DOSYLKI_SQL`. */
+export const zycieWiersza = (w: Record<string, unknown>): ZycieDosylki => ({
+  wToku: w.sprawa_zakonczono_at == null,
+  archiwalna: Number(w.archiwalna) === 1,
+  dostarczonoAt: tekst(w.dostarczono_at),
+  numerAt: tekst(w.numer_at),
+  zalozonoAt: String(w.zalozono_at),
+});
+
+/**
+ * Zdanie dosyłki, której już nie śledzimy: sprawa zakończona, epizod minął
+ * albo skończyło się okno. Stan takiej dosyłki to zatrzymany zegar, więc
+ * mówimy tylko fakt z datą — doręczenie — albo wprost, że nie śledzimy.
+ * Nigdy „wpisz go z Sellasist”: do takiego wiersza numeru się nie wpisze.
+ */
+export function opisZamrozonej(dostarczonoAt: string | null): { opis: string; ton: TonDosylki } {
+  return dostarczonoAt ? { opis: `Dosyłka doręczona ${dzienMiesiac(dostarczonoAt)}`, ton: "ok" }
+    : { opis: "Dosyłki już nie śledzimy.", ton: null };
+}

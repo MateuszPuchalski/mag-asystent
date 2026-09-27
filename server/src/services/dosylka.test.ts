@@ -11,12 +11,17 @@ process.env.SGT_MODE = "seeded";
    Pilnujemy projektu punkt po punkcie:
    - odmowa z kodem dosyłki zakłada, wznawia albo przestawia sprawę TĄ SAMĄ
      drogą co „Ustaw krok”, nie potwierdza „nowego” i jest idempotentna;
+   - odmowa przejmuje dosyłkę, która należy do zwrotu, a zastępuje starszą;
+   - wznowienie zakończonej sprawy odkłada jej dosyłki do historii;
    - zapisy z profilu sprawdzają wersję i odcisk, a potwierdzają odcisk PO zapisie;
-   - numer wpisany ręką: przycięty, do 64 znaków, zamówienie tego klienta;
+   - numer wpisany ręką: przycięty, do 64 znaków, zamówienie tego klienta,
+     ten sam numer drugi raz to nic;
    - wykrycie numeru woli nie zgadnąć niż zgadnąć źle;
-   - ticker: tylko sprawy w toku, trzydzieści dni, compare-and-set, COALESCE,
-     429 wyżej, reszta błędów zabiera jedną dosyłkę, wersji nie podnosi;
-   - doręczenie i kłopot budzą sprawę, a zapamiętany odcisk bez klucza nie;
+   - ticker: tylko sprawy w toku, okno trzydziestu dni, compare-and-set ze
+     strażą sprawy, COALESCE, 429 wyżej, reszta błędów zabiera jedną dosyłkę,
+     wersji nie podnosi;
+   - doręczenie i kłopot budzą sprawę licznikami PRZEJŚĆ, a zapamiętany
+     odcisk bez klucza nie;
    - „Moje” stawia na dziś dosyłkę bez numeru i z kłopotem;
    - dziennik nie niesie numeru przesyłki, loginu ani kroku. */
 
@@ -24,7 +29,10 @@ let db: typeof import("../db/db.js").db;
 let D: typeof import("./dosylka.js");
 let P: typeof import("./prowadzenie-klienta.js");
 let ZP: typeof import("./zwrot-pieniedzy.js");
+let PK: typeof import("./profil-klienta.js");
+let PZ: typeof import("./przesylka-zamowienia.js");
 let BladLimitu: typeof import("../adapters/allegro.js").BladLimituAllegro;
+let BladOdpowiedzi: typeof import("../adapters/allegro.js").BladOdpowiedziAllegro;
 let konto = 0;
 let ala = { id: 0, name: "A. Lewandowska" };
 let bob = { id: 0, name: "B. Nowak" };
@@ -41,7 +49,9 @@ before(async () => {
   D = await import("./dosylka.js");
   P = await import("./prowadzenie-klienta.js");
   ZP = await import("./zwrot-pieniedzy.js");
-  ({ BladLimituAllegro: BladLimitu } = await import("../adapters/allegro.js"));
+  PK = await import("./profil-klienta.js");
+  PZ = await import("./przesylka-zamowienia.js");
+  ({ BladLimituAllegro: BladLimitu, BladOdpowiedziAllegro: BladOdpowiedzi } = await import("../adapters/allegro.js"));
 });
 
 beforeEach(() => {
@@ -61,10 +71,11 @@ beforeEach(() => {
     .run().lastInsertRowid), name: "B. Nowak" };
 });
 
-function zamowienie(id: string, login: string, przewoznik: string | null = "DPD"): void {
-  db().prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,kupujacy_login,kupiono_at,
-      suma_grosze,waluta,przesylka_przewoznik,synced_at) VALUES (?,?,'READY_FOR_PROCESSING',?,?,5000,'PLN',?,'x')`)
-    .run(konto, id, login, iso(-24 * 20), przewoznik);
+function zamowienie(id: string, login: string, przewoznik: string | null = "DPD"): number {
+  return Number(db().prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,kupujacy_login,
+      kupiono_at,suma_grosze,waluta,przesylka_przewoznik,synced_at)
+    VALUES (?,?,'READY_FOR_PROCESSING',?,?,5000,'PLN',?,'x')`)
+    .run(konto, id, login, iso(-24 * 20), przewoznik).lastInsertRowid);
 }
 
 type Paczka = { waybill?: string; transportingWaybill?: string | null; carrierId?: string };
@@ -102,10 +113,20 @@ function potwierdz(login: string, teraz: Date) {
   return P.ustawKrok(login, { krok: s.krok, krokDo: iso(72, teraz), wersja: s.wersja, odcisk: s.odcisk }, ala, teraz, db());
 }
 
-/** Fakt z trackingu wpisany wprost — obudzenie testujemy bez sieci. */
+/**
+ * Fakt z trackingu wpisany wprost — obudzenie testujemy bez sieci. Licznik
+ * przejścia rośnie tak jak w tickerze: raz, przy pierwszym doręczeniu.
+ */
 function doreczona(zamowienieId: string, at: string) {
-  db().prepare(`UPDATE klient_dosylka SET waybill = COALESCE(waybill, 'W-' || zamowienie), przewoznik = 'DPD',
-    status = 'DELIVERED', dostarczono_at = ?, sprawdzono_at = ? WHERE zamowienie = ?`).run(at, at, zamowienieId);
+  db().prepare(`UPDATE klient_dosylka SET waybill = COALESCE(waybill, 'W-' || zamowienie),
+    przewoznik = COALESCE(przewoznik, 'DPD'), status = 'DELIVERED', doreczen = doreczen + (dostarczono_at IS NULL), dostarczono_at = COALESCE(dostarczono_at, ?),
+    sprawdzono_at = ? WHERE zamowienie = ?`).run(at, at, zamowienieId);
+}
+
+/** Status przewoźnika wpisany wprost; wejście w kłopot z innego stanu podbija licznik jak ticker. */
+function status(zamowienieId: string, kod: string, at: string) {
+  db().prepare(`UPDATE klient_dosylka SET problemow = problemow + (?1 IN ('ISSUE','RETURNED') AND status IS NOT ?1),
+    status = ?1, sprawdzono_at = ?2 WHERE zamowienie = ?3`).run(kod, at, zamowienieId);
 }
 
 /** Atrapa Allegro: przesyłki zamówień i historia trackingu po numerze. Liczy każde żądanie. */
@@ -137,7 +158,8 @@ test("odmowa zakłada sprawę: krok „dosłać” na trzy dni robocze, prowadzi
   const zw = zwrot("Kowalski_Jan");
   const w = D.zalozDosylkeZOdmowy(db(), zw, ala, TERAZ);
   /* Poniedziałek 10:00 → czwartek 8:00 w magazynie. */
-  assert.deepEqual(w, { zalozona: true, login: "Kowalski_Jan", krokDo: "2026-10-01T06:00:00.000Z", zastapil: null });
+  assert.deepEqual(w, { zalozona: true, login: "Kowalski_Jan", krok: "Dosłać nowy towar (etykieta w Sellasist)",
+    krokDo: "2026-10-01T06:00:00.000Z", zastapil: null });
 
   const s = sprawa("kowalski_jan");
   assert.deepEqual([s.stan, s.krok, s.krokDo, s.prowadziId, s.wersja],
@@ -145,7 +167,8 @@ test("odmowa zakłada sprawę: krok „dosłać” na trzy dni robocze, prowadzi
   assert.deepEqual(s.nowe, [], "nowa sprawa zapamiętuje odcisk z chwili odmowy");
   assert.equal(s.dosylki.length, 1);
   assert.deepEqual({ ...s.dosylki[0] }, {
-    zamowienie: "z-1", waybill: null, przewoznik: null, przewoznikZamowienia: "DPD", zrodlo: null, status: null,
+    zamowienie: "z-1", zwrotId: zw, waybill: null, przewoznik: null, przewoznikZamowienia: "DPD", zrodlo: null,
+    status: null,
     dostarczonoAt: null, sprawdzonoAt: null, zalozonoAt: TERAZ.toISOString(), bezNumeru: false,
     opis: "Czekamy na numer dosyłki z Allegro", ton: null,
   });
@@ -213,26 +236,64 @@ test("zwrot bez zamówienia, bez loginu albo bez kodu dosyłki: stałe zdanie i 
   assert.equal(zmiany(), przed);
 });
 
-test("ponowienie jest idempotentne; nowa odmowa tego samego zamówienia zastępuje dosyłkę", () => {
+test("ponowienie jest idempotentne; odmowa zwrotu sprzed dosyłki ją przejmuje, a zgłoszonego po niej — zastępuje", () => {
   zamowienie("z-1", "kl");
   const zw = zwrot("kl");
   D.zalozDosylkeZOdmowy(db(), zw, ala, TERAZ);
-  db().prepare("UPDATE klient_dosylka SET waybill = 'W1', przewoznik = 'DPD', zrodlo = 'allegro'").run();
+  db().prepare("UPDATE klient_dosylka SET waybill = 'W1', przewoznik = 'DPD', zrodlo = 'allegro', status = 'IN_TRANSIT'")
+    .run();
   const przed = zmiany();
   const drugi = D.zalozDosylkeZOdmowy(db(), zw, ala, za(1));
-  assert.deepEqual(drugi, { zalozona: true, login: "kl", krokDo: "2026-10-01T06:00:00.000Z", zastapil: null });
+  assert.deepEqual(drugi, { zalozona: true, login: "kl", krok: "Dosłać nowy towar (etykieta w Sellasist)",
+    krokDo: "2026-10-01T06:00:00.000Z", zastapil: null });
   assert.deepEqual(D.sledzDosylkeZwrotu(db(), zw, ala, za(1)), drugi);
   assert.equal(zmiany(), przed, "ponowienie nie zastępuje dosyłki, którą ticker zdążył wykryć");
   assert.equal(wiersz()!.waybill, "W1");
 
-  /* Drugi zwrot tego samego zamówienia: „Śledź dosyłkę” widzi dosyłkę
-     zamówienia i nic nie robi, ale ŚWIEŻA odmowa zastępuje ją nową. */
-  const zw2 = zwrot("kl");
+  /* Drugi zwrot tego zamówienia zgłoszony PRZED dosyłką — np. dwie sztuki
+     dwoma zwrotami. Dosyłka wysłana po obu odpowiada na oba: „Śledź dosyłkę”
+     nic nie robi, a odmowa przejmuje wiersz, nie kasując numeru ani stanu. */
+  const zw2 = zwrot("kl", { zgloszono: iso(-72) });
   const zaMoment = zmiany();
   assert.equal(D.sledzDosylkeZwrotu(db(), zw2, ala, za(2)).zalozona, true);
   assert.equal(zmiany(), zaMoment);
+  assert.equal(ZP.stanZwrotuPieniedzy(db(), zw2, za(2)).sledzicDosylke, false);
   D.zalozDosylkeZOdmowy(db(), zw2, ala, za(2));
-  assert.deepEqual([wiersz()!.zwrot_id, wiersz()!.waybill, wiersz()!.zalozono_at], [zw2, null, iso(2)]);
+  assert.deepEqual([wiersz()!.zwrot_id, wiersz()!.waybill, wiersz()!.status, wiersz()!.zalozono_at],
+    [zw2, "W1", "IN_TRANSIT", TERAZ.toISOString()]);
+  assert.equal(ZP.stanZwrotuPieniedzy(db(), zw, za(2)).dosylka?.opis, "Dosyłka nadana — czekamy na pierwszy stan",
+    "pierwszy zwrot dalej widzi swoją dosyłkę");
+
+  /* Zwrot zgłoszony PO dosyłce: klient odesłał i ją, biuro wysyła kolejną
+     paczkę. Stara nie należy do nowego zwrotu, więc odmowa ją zastępuje. */
+  const zw3 = zwrot("kl", { zgloszono: iso(30) });
+  assert.equal(ZP.stanZwrotuPieniedzy(db(), zw3, za(40)).sledzicDosylke, true);
+  D.zalozDosylkeZOdmowy(db(), zw3, ala, za(40));
+  assert.deepEqual([wiersz()!.zwrot_id, wiersz()!.waybill, wiersz()!.status, wiersz()!.zalozono_at],
+    [zw3, null, null, iso(40)]);
+});
+
+test("numer wpisany przed odmową zostaje: odmowa przejmuje wiersz z numerem, stanem i doręczeniem", () => {
+  /* Agent wysłał dosyłkę i wpisał jej numer, zanim klient zgłosił zwrot złego
+     towaru. Odmowa tylko nazywa paczkę, którą biuro już wysłało — skasowanie
+     numeru i doręczenia kazałoby wpisywać numer drugi raz. */
+  zamowienie("z-1", "kl");
+  P.ustawKrok("kl", { krok: "czekamy na zwrot, dosłane", krokDo: iso(72), wersja: 0, odcisk: "" }, ala, TERAZ, db());
+  const zw = zwrot("kl", { kod: null, zgloszono: iso(10) });
+  const s = sprawa("kl", za(1));
+  D.wpiszNumerDosylki("kl", { zamowienie: "z-1", waybill: "SELLASIST-1", przewoznik: "INPOST", wersja: s.wersja,
+    odcisk: s.odcisk }, ala, za(1), db());
+  doreczona("z-1", iso(20));
+  db().prepare("UPDATE zwrot_klienta SET odmowa_kod = 'NEW_ITEM_SENT', odmowa_at = ? WHERE id = ?").run(iso(22), zw);
+  assert.equal(ZP.stanZwrotuPieniedzy(db(), zw, za(22)).sledzicDosylke, false,
+    "wpisana dosyłka bieżącego epizodu już jest dosyłką tego zwrotu");
+
+  const w = D.zalozDosylkeZOdmowy(db(), zw, ala, za(22));
+  assert.equal(w.zalozona, true);
+  const r = wiersz()!;
+  assert.deepEqual([r.zwrot_id, r.waybill, r.przewoznik, r.zrodlo, r.status, r.dostarczono_at, r.doreczen],
+    [zw, "SELLASIST-1", "INPOST", "recznie", "DELIVERED", iso(20), 1]);
+  assert.equal(sprawa("kl", za(22)).dosylki[0].opis, "Dosyłka doręczona 29.09");
 });
 
 /* ── Obudzenie ──────────────────────────────────────────────────────────── */
@@ -240,8 +301,10 @@ test("ponowienie jest idempotentne; nowa odmowa tego samego zamówienia zastępu
 test("doręczenie i kłopot budzą sprawę swoim zdaniem; druga doręczona po potwierdzeniu pierwszej też", () => {
   zamowienie("z-1", "kl");
   zamowienie("z-2", "kl");
+  zamowienie("z-3", "kl");
   D.zalozDosylkeZOdmowy(db(), zwrot("kl"), ala, TERAZ);
   D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zamowienie: "z-2" }), ala, TERAZ);
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zamowienie: "z-3" }), ala, TERAZ);
   potwierdz("kl", za(1));
   assert.deepEqual(sprawa("kl", za(1)).nowe, []);
 
@@ -256,29 +319,54 @@ test("doręczenie i kłopot budzą sprawę swoim zdaniem; druga doręczona po po
   assert.deepEqual(sprawa("kl", za(80)).nowe.map((n) => n.tekst), ["Dosyłka doręczona 01.10"]);
   potwierdz("kl", za(80));
 
-  db().prepare("UPDATE klient_dosylka SET status = 'ISSUE', dostarczono_at = NULL, sprawdzono_at = ? WHERE zamowienie = 'z-2'")
-    .run(iso(81));
+  status("z-3", "ISSUE", iso(81));
   assert.deepEqual(sprawa("kl", za(82)).nowe.map((n) => [n.rodzaj, n.tekst]),
     [["dosylka_problem", "Problem z dosyłką: przewoźnik zgłosił kłopot"]]);
   potwierdz("kl", za(82));
-  db().prepare("UPDATE klient_dosylka SET status = 'IN_TRANSIT' WHERE zamowienie = 'z-2'").run();
+  status("z-3", "IN_TRANSIT", iso(83));
+  assert.deepEqual(sprawa("kl", za(83)).nowe, [], "„w drodze” po kłopocie to nie kłopot");
   potwierdz("kl", za(83));
-  db().prepare("UPDATE klient_dosylka SET status = 'RETURNED' WHERE zamowienie = 'z-2'").run();
+  status("z-3", "RETURNED", iso(84));
   assert.deepEqual(sprawa("kl", za(84)).nowe.map((n) => n.tekst), ["Dosyłka wraca do nadawcy"]);
 });
 
-test("nowa dosyłka zastępuje doręczoną: następne doręczenie dalej budzi", () => {
-  /* Liczniki liczą wiersze, a nowa dosyłka zamówienia zastępuje wiersz —
-     bez wyrównania „znanego” druga doręczona wróciłaby do tej samej liczby. */
+test("nowa dosyłka zastępuje doręczoną: zastąpienie nie budzi, następne doręczenie — tak", () => {
+  /* Liczniki liczą PRZEJŚCIA i nie maleją, więc zastąpiony wiersz nie
+     odejmuje doręczenia, a następne doręczenie znów podnosi licznik. */
   zamowienie("z-1", "kl");
   D.zalozDosylkeZOdmowy(db(), zwrot("kl"), ala, TERAZ);
   doreczona("z-1", iso(30));
   potwierdz("kl", za(31));
-  D.zalozDosylkeZOdmowy(db(), zwrot("kl"), ala, za(40));
+  /* Klient odsyła i dosyłkę — nowy zwrot, zgłoszony po niej. */
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zgloszono: iso(35) }), ala, za(40));
+  assert.equal(wiersz()!.dostarczono_at, null, "to nowa paczka");
   assert.equal(sprawa("kl", za(41)).nowe.some((n) => n.rodzaj === "dosylka_doreczona"), false,
     "zastąpienie samo nie udaje doręczenia");
   doreczona("z-1", iso(60));
   assert.ok(sprawa("kl", za(61)).nowe.some((n) => n.rodzaj === "dosylka_doreczona"));
+});
+
+test("zastąpiona doręczona dosyłka budzi za siebie, nie za potwierdzoną wcześniej", () => {
+  /* A doszła i agent ją widział. B doszła bez potwierdzenia, a potem klient
+     odesłał i ją, więc odmowa ją zastąpiła. Liczba z odejmowania przypisywała
+     obudzenie A — z datą, którą agent już widział. */
+  zamowienie("z-1", "kl");
+  zamowienie("z-2", "kl");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl"), ala, TERAZ);
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zamowienie: "z-2" }), ala, TERAZ);
+  doreczona("z-1", "2026-09-29T09:00:00.000Z");
+  potwierdz("kl", za(30));
+  doreczona("z-2", "2026-10-01T09:00:00.000Z");
+  assert.deepEqual(sprawa("kl", za(76)).nowe.map((n) => n.tekst), ["Dosyłka doręczona 01.10"]);
+
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zamowienie: "z-2", zgloszono: iso(78) }), ala, za(80));
+  const doreczenia = () => sprawa("kl", za(81)).nowe.filter((n) => n.rodzaj === "dosylka_doreczona").map((n) => n.tekst);
+  assert.deepEqual(doreczenia(), ["Dosyłka doręczona"],
+    "obudzenie należy do B, której daty już nie ma — nie do A z 29.09");
+  potwierdz("kl", za(82));
+  assert.deepEqual(sprawa("kl", za(83)).nowe, []);
+  doreczona("z-2", "2026-10-05T09:00:00.000Z");
+  assert.deepEqual(sprawa("kl", za(24 * 8)).nowe.map((n) => n.tekst), ["Dosyłka doręczona 05.10"]);
 });
 
 test("sprawa sprzed wydania (odcisk bez `k` i `q`): odmowa dopisuje klucze, więc doręczenie budzi", () => {
@@ -305,8 +393,10 @@ test("klucz nieobecny w odcisku nie budzi — ani w sicie „Moje”, ani w „n
   db().prepare(`UPDATE klient_prowadzenie SET znane_json = json_remove(znane_json, '$.k', '$.q')
     WHERE login = 'bezklucza'`).run();
   assert.deepEqual(P.mojaLista(db(), ala.id, za(2)), [], "zakończone i ciche");
-  /* Doręczenie po zakończeniu — np. ticker przeczytał sprawę w toku, zanim
-     ktoś ją zakończył. Obie drogi obudzenia muszą powiedzieć to samo. */
+  /* Licznik zakończonej sprawy rośnie tu WPISEM WPROST. Ticker jej nie pyta,
+     a spóźniony wynik odrzuca straż zapisu (test „wynik spóźniony…” niżej).
+     Sito i „nowe” czytają jednak jedną definicję liczników, więc na tych
+     samych danych muszą powiedzieć to samo. */
   doreczona("z-a", iso(3));
   doreczona("z-b", iso(3));
   assert.deepEqual(sprawa("zkluczem", za(4)).nowe.map((n) => n.rodzaj), ["dosylka_doreczona"]);
@@ -336,6 +426,13 @@ test("„Moje”: bez numeru dwa dni robocze albo z kłopotem — na dziś, ze z
   const w = wiersz1(wtorek);
   assert.deepEqual([w.czeka, w.dzis, w.dosylka, w.nowe], [false, true, "Przewoźnik zgłosił problem z dosyłką", null]);
   assert.equal(w.opis, "kl: Dosłać nowy towar (etykieta w Sellasist)", "opis kroku bez doklejonej dosyłki");
+
+  /* Doręczona po ostatnim ruchu mówi zamiast terminu; po nowym kroku agenta
+     — już nie, bo „czeka do …” jego kroku mówi więcej niż stare doręczenie. */
+  db().prepare("UPDATE klient_dosylka SET status = 'DELIVERED', dostarczono_at = ?").run("2026-09-29T11:00:00.000Z");
+  assert.equal(wiersz1(sroda).dosylka, "Dosyłka doręczona 29.09");
+  potwierdz("kl", sroda);
+  assert.equal(wiersz1(sroda).dosylka, null);
 });
 
 /* ── Zapisy z profilu ───────────────────────────────────────────────────── */
@@ -400,7 +497,7 @@ test("numer wpisany ręką: przycięty, do 64 znaków, zamówienie klienta, spra
     ["AD-TAJNY-64", "INPOST", "recznie", "Dosyłka nadana — czekamy na pierwszy stan"]);
   assert.equal(po.prowadziId, ala.id, "numer nie zmienia prowadzącego");
   const e = wpisy("klient_dosylka_numer");
-  assert.deepEqual(JSON.parse(e[0].payload), { sprawa: s.id, zrodlo: "recznie" });
+  assert.deepEqual(JSON.parse(e[0].payload), { sprawa: s.id });
   assert.doesNotMatch(JSON.stringify(wpisy()), /TAJNY/);
 
   /* Dosyłka bez odmowy: numer do innego zamówienia klienta zakłada wiersz. */
@@ -423,9 +520,13 @@ test("nowy numer zeruje stan śledzenia, ten sam go zostawia; odcisk po zapisie 
   doreczona("z-1", iso(2));
   const b = sprawa("kl", za(3));
   assert.equal(b.nowe.length, 1);
+  const przed = [zmiany(), wpisy().length];
   const tenSam = D.wpiszNumerDosylki("kl", { zamowienie: "z-1", waybill: "A1", przewoznik: "DPD", wersja: b.wersja,
     odcisk: b.odcisk }, ala, za(3), db());
   assert.equal(tenSam.dosylki[0].dostarczonoAt, iso(2), "ten sam numer nie kasuje doręczenia");
+  assert.deepEqual([zmiany(), wpisy().length, tenSam.wersja], [...przed, b.wersja],
+    "ten sam numer drugi raz to nic: bez zapisu, bez wersji i bez wpisu w dzienniku");
+  assert.equal(tenSam.nowe.length, 1, "nic też nie potwierdza");
   const inny = D.wpiszNumerDosylki("kl", { zamowienie: "z-1", waybill: "A2", przewoznik: "DPD",
     wersja: tenSam.wersja, odcisk: tenSam.odcisk }, ala, za(4), db());
   assert.deepEqual([inny.dosylki[0].dostarczonoAt, inny.dosylki[0].status, inny.dosylki[0].sprawdzonoAt], [null, null, null]);
@@ -443,14 +544,28 @@ test("wybór numeru: wykluczone, zarejestrowane przed zwrotem, doręczone przed 
     zwrotAt)?.waybill, "NOWA", "oryginał zarejestrowany przed zwrotem odpada");
   assert.equal(D.wybierzNumer([p("ZWROT", "2026-09-22T10:00:00Z"), p("NOWA", "2026-09-26T10:00:00Z")],
     new Set(["ZWROT"]), nic, zwrotAt)?.waybill, "NOWA", "numer paczki zwrotnej odpada");
-  /* Bez daty rejestracji oryginał łapie doręczenie sprzed zwrotu. */
-  const stany = new Map([["ORYG", { dostarczonoAt: "2026-09-15T10:00:00Z", status: "DELIVERED" }]]);
+  /* Bez daty rejestracji oryginał łapie doręczenie sprzed zwrotu, a nową
+     paczkę — ruch u przewoźnika po zgłoszeniu zwrotu. */
+  const stany = new Map([
+    ["ORYG", { dostarczonoAt: "2026-09-15T10:00:00Z", status: "DELIVERED", ostatnioAt: "2026-09-15T10:00:00Z" }],
+    ["NOWA", { dostarczonoAt: null, status: "IN_TRANSIT", ostatnioAt: "2026-09-26T10:00:00Z" }],
+  ]);
   assert.equal(D.wybierzNumer([p("ORYG", null), p("NOWA", null)], new Set(), stany, zwrotAt)?.waybill, "NOWA");
   assert.equal(D.wybierzNumer([p("ORYG", null)], new Set(), stany, zwrotAt), null, "sam oryginał to brak dosyłki");
+  /* Samotny numer bez daty i bez ruchu po zwrocie NIE jest dosyłką: to bywa
+     oryginał w drodze albo paczka u przewoźnika spoza Allegro. */
+  const cicha = new Map([["X", { dostarczonoAt: null, status: "IN_TRANSIT", ostatnioAt: "2026-09-18T10:00:00Z" }]]);
+  assert.equal(D.wybierzNumer([p("X", null)], new Set(), cicha, zwrotAt), null, "ruch tylko sprzed zwrotu");
+  assert.equal(D.wybierzNumer([p("X", null)], new Set(), new Map(), zwrotAt), null, "bez historii — np. OTHER");
+  assert.equal(D.wybierzNumer([{ waybill: "O", carrierId: "OTHER", createdAt: null }], new Set(), new Map(), zwrotAt),
+    null);
   /* Kilka po odsiewie: najpóźniej zarejestrowana — a bez daty NIE zgadujemy. */
   assert.equal(D.wybierzNumer([p("A", "2026-09-26T10:00:00Z"), p("B", "2026-09-27T10:00:00Z")], new Set(), nic,
     zwrotAt)?.waybill, "B");
-  assert.equal(D.wybierzNumer([p("A", "2026-09-26T10:00:00Z"), p("B", null)], new Set(), nic, zwrotAt), null);
+  const bRusza = new Map([["B", { dostarczonoAt: null, status: "IN_TRANSIT", ostatnioAt: "2026-09-27T10:00:00Z" }]]);
+  assert.equal(D.wybierzNumer([p("A", "2026-09-26T10:00:00Z"), p("B", null)], new Set(), bRusza, zwrotAt), null);
+  assert.equal(D.wybierzNumer([p("A", "2026-09-26T10:00:00Z"), p("B", null)], new Set(), nic, zwrotAt)?.waybill, "A",
+    "numer bez daty i bez ruchu po zwrocie w ogóle nie jest kandydatem");
   assert.equal(D.wybierzNumer([], new Set(), nic, zwrotAt), null);
 });
 
@@ -473,7 +588,9 @@ test("ticker wykrywa numer: paczki zwrotu z lądowiska i `transportingWaybill` o
   assert.deepEqual([wiersz()!.waybill, wiersz()!.przewoznik, wiersz()!.zrodlo, wiersz()!.status, wiersz()!.sprawdzono_at],
     ["DOSYLKA-1", "INPOST", "allegro", "IN_TRANSIT", iso(2)]);
   assert.equal(sprawa("kl", za(2)).wersja, wersja, "ticker nie podnosi wersji — ekran nie ma czego przegrać");
-  assert.deepEqual(wpisy("klient_dosylka_numer").map((e) => JSON.parse(e.payload)), [{ sprawa: sprawa().id, zrodlo: "allegro" }]);
+  assert.deepEqual(wpisy("klient_dosylka_wykryta").map((e) => JSON.parse(e.payload)), [{ sprawa: sprawa().id }]);
+  assert.deepEqual(wpisy("klient_dosylka_numer"), [], "numer wpisany ręką to osobny typ — miara je porównuje");
+  assert.equal(wiersz()!.numer_at, iso(2), "od wykrycia biegnie okno śledzenia numeru");
   assert.doesNotMatch(JSON.stringify(wpisy("%")), /DOSYLKA-1|ZW-A|ORYG/);
   /* Numer jest — następny takt tylko śledzi, o przesyłki zamówienia nie pyta. */
   a.wolane.length = 0;
@@ -525,11 +642,14 @@ test("śledzenie: doręczenie raz, kłopot raz na przejście, potem cisza; wersj
   statusy.P1 = [...statusy.P1, { code: "DELIVERED", occurredAt: "2026-09-28T13:00:00.000Z" }];
   assert.deepEqual(await D.sledzDosylki(db(), a.deps(za(4))), { wykryte: 0, doreczone: 1, problemy: 0 });
   assert.deepEqual([wiersz("z-1")!.status, wiersz("z-1")!.dostarczono_at], ["DELIVERED", "2026-09-28T13:00:00.000Z"]);
+  /* Każda zmiana statusu ma wpis (mutacja), ale samo sprawdzenie bez zmiany — nie. */
   assert.deepEqual(wpisy("klient_dosylka_%").filter((e) => e.type !== "klient_dosylka_zalozona")
-    .map((e) => [e.type, JSON.parse(e.payload)]), [
-    ["klient_dosylka_problem", { sprawa: sprawa().id, status: "ISSUE" }],
+    .map((e) => [e.type, JSON.parse(e.payload)]).sort((a, b) => String(a[0]).localeCompare(String(b[0]))), [
     ["klient_dosylka_doreczona", { sprawa: sprawa().id }],
+    ["klient_dosylka_problem", { sprawa: sprawa().id, status: "ISSUE" }],
+    ["klient_dosylka_stan", { sprawa: sprawa().id, status: "IN_TRANSIT" }],
   ]);
+  assert.deepEqual([wiersz("z-1")!.doreczen, wiersz("z-2")!.problemow], [1, 1]);
   assert.equal(sprawa("kl", za(4)).wersja, wersja);
 
   /* Doręczona i wracająca do nadawcy wypadają ze śledzenia. */
@@ -603,13 +723,13 @@ test("stan zwrotu pieniędzy: dosyłka pod odmową albo propozycja „Śledź do
   const zw = zwrot("kl");
   const bez = zwrot("kl", { zamowienie: null });
   const inny = zwrot("kl", { kod: "ITEM_FIXED", zamowienie: "z-3" });
-  const przed = ZP.stanZwrotuPieniedzy(db(), zw, TERAZ).odmowa!;
-  assert.deepEqual([przed.kod, przed.dosylka, przed.sledzicDosylke], ["NEW_ITEM_SENT", null, true]);
-  assert.equal(ZP.stanZwrotuPieniedzy(db(), bez, TERAZ).odmowa!.sledzicDosylke, false, "bez zamówienia nie ma czego śledzić");
-  assert.equal(ZP.stanZwrotuPieniedzy(db(), inny, TERAZ).odmowa!.sledzicDosylke, false, "naprawa to nie dosyłka");
+  const przed = ZP.stanZwrotuPieniedzy(db(), zw, TERAZ);
+  assert.deepEqual([przed.odmowa!.kod, przed.dosylka, przed.sledzicDosylke], ["NEW_ITEM_SENT", null, true]);
+  assert.equal(ZP.stanZwrotuPieniedzy(db(), bez, TERAZ).sledzicDosylke, false, "bez zamówienia nie ma czego śledzić");
+  assert.equal(ZP.stanZwrotuPieniedzy(db(), inny, TERAZ).sledzicDosylke, false, "naprawa to nie dosyłka");
 
   D.zalozDosylkeZOdmowy(db(), zw, ala, TERAZ);
-  const po = ZP.stanZwrotuPieniedzy(db(), zw, TERAZ).odmowa!;
+  const po = ZP.stanZwrotuPieniedzy(db(), zw, TERAZ);
   assert.deepEqual([po.dosylka, po.sledzicDosylke],
     [{ opis: "Czekamy na numer dosyłki z Allegro", login: "kl", ton: null }, false]);
 });
@@ -624,4 +744,249 @@ test("odczyty niczego nie zapisują: sprawa z dosyłkami, „Moje”, stan zwrot
   P.mojaLista(db(), ala.id, za(2));
   ZP.stanZwrotuPieniedzy(db(), zw, za(2));
   assert.equal(zmiany(), przed);
+});
+
+/* ── Poprawki po przeglądzie (@wydanie) ─────────────────────────────────── */
+
+test("wznowienie zakończonej sprawy odkłada jej dosyłki do historii: karta, „Moje” i ticker ich nie widzą", async () => {
+  /* Dosyłka dotarła, numeru nikt nie wpisał, sprawę zakończono. Miesiąc
+     później klient wraca w innej sprawie — stara dosyłka nie może wołać
+     „brak numeru od 20 dni” w nowej. */
+  zamowienie("z-1", "kl");
+  zamowienie("z-2", "kl");
+  const bezNumeru = zwrot("kl");
+  const doszla = zwrot("kl", { zamowienie: "z-2" });
+  D.zalozDosylkeZOdmowy(db(), bezNumeru, ala, TERAZ);
+  D.zalozDosylkeZOdmowy(db(), doszla, ala, TERAZ);
+  doreczona("z-2", iso(20));
+  let s = sprawa("kl", za(24));
+  P.zakonczSprawe("kl", { wersja: s.wersja, odcisk: s.odcisk }, ala, za(24), db());
+
+  const pozniej = za(24 * 20);
+  s = sprawa("kl", pozniej);
+  P.ustawKrok("kl", { krok: "odpisać w sprawie faktury", krokDo: iso(24 * 5, pozniej), wersja: s.wersja,
+    odcisk: s.odcisk }, ala, pozniej, db());
+  const t = za(1, pozniej);
+  assert.deepEqual(sprawa("kl", t).dosylki, []);
+  const m = P.mojaLista(db(), ala.id, t).find((w) => w.kolejka === "klient")!;
+  assert.deepEqual([m.dosylka, m.dzis, m.czeka], [null, false, true]);
+  assert.equal(PK.profilKlienta("kl", t, db())!.podpowiedzPowod, null);
+  const a = allegro();
+  await D.sledzDosylki(db(), a.deps(t));
+  assert.deepEqual(a.wolane, [], "dosyłka poprzedniego epizodu nie jest już pytana");
+
+  /* Historia zostaje historią: fakt z datą albo „nie śledzimy”, nigdy prośba o numer. */
+  assert.deepEqual(ZP.stanZwrotuPieniedzy(db(), doszla, t).dosylka,
+    { opis: "Dosyłka doręczona 29.09", login: "kl", ton: "ok" });
+  assert.deepEqual(ZP.stanZwrotuPieniedzy(db(), bezNumeru, t).dosylka,
+    { opis: "Dosyłki już nie śledzimy.", login: "kl", ton: null });
+  assert.equal(ZP.stanZwrotuPieniedzy(db(), bezNumeru, t).sledzicDosylke, false, "ta dosyłka była śledzona");
+
+  /* Wznowienie odmową robi to samo — każda droga kroku. */
+  s = sprawa("kl", t);
+  P.zakonczSprawe("kl", { wersja: s.wersja, odcisk: s.odcisk }, ala, t, db());
+  zamowienie("z-3", "kl");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zamowienie: "z-3", zgloszono: iso(-1, t) }), ala, za(2, t));
+  assert.deepEqual(sprawa("kl", za(3, t)).dosylki.map((d) => d.zamowienie), ["z-3"]);
+});
+
+test("numer wpisany po czasie dostaje własne okno śledzenia", async () => {
+  zamowienie("z-1", "kl");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zgloszono: iso(-24 * 35) }), ala, za(-24 * 31));
+  const s = sprawa("kl");
+  D.wpiszNumerDosylki("kl", { zamowienie: "z-1", waybill: "P1", przewoznik: "DPD", wersja: s.wersja,
+    odcisk: s.odcisk }, ala, TERAZ, db());
+  assert.equal(wiersz()!.numer_at, TERAZ.toISOString());
+  const a = allegro({ statusy: { P1: [{ code: "IN_TRANSIT", occurredAt: iso(0.5) }] } });
+  await D.sledzDosylki(db(), a.deps(za(1)));
+  assert.deepEqual(a.wolane.map((u) => u.includes("/tracking")), [true], "okno liczy się od numeru, nie od założenia");
+  assert.equal(wiersz()!.status, "IN_TRANSIT");
+});
+
+test("kłopot, „w drodze” i znów kłopot budzi dwa razy; ISSUE, potem RETURNED — też", async () => {
+  zNumerem("kl", "z-1", "P1");
+  const statusy: Record<string, Array<{ code: string; occurredAt: string }>> = {
+    P1: [{ code: "ISSUE", occurredAt: iso(1) }] };
+  const a = allegro({ statusy });
+  const nowe = (t: Date) => sprawa("kl", t).nowe.map((n) => n.tekst);
+  await D.sledzDosylki(db(), a.deps(za(2)));
+  assert.deepEqual(nowe(za(2)), ["Problem z dosyłką: przewoźnik zgłosił kłopot"]);
+  potwierdz("kl", za(2));
+
+  statusy.P1 = [...statusy.P1, { code: "IN_TRANSIT", occurredAt: iso(20) }];
+  await D.sledzDosylki(db(), a.deps(za(21)));
+  assert.deepEqual(nowe(za(21)), []);
+
+  statusy.P1 = [...statusy.P1, { code: "ISSUE", occurredAt: iso(40) }];
+  await D.sledzDosylki(db(), a.deps(za(41)));
+  assert.deepEqual(nowe(za(41)), ["Problem z dosyłką: przewoźnik zgłosił kłopot"], "drugi kłopot to nowe zdarzenie");
+  assert.equal(P.mojaLista(db(), ala.id, za(41)).find((w) => w.kolejka === "klient")?.nowe,
+    "Problem z dosyłką: przewoźnik zgłosił kłopot", "sito „Moje” mówi to samo co „nowe”");
+  potwierdz("kl", za(41));
+
+  statusy.P1 = [...statusy.P1, { code: "RETURNED", occurredAt: iso(50) }];
+  await D.sledzDosylki(db(), a.deps(za(51)));
+  assert.deepEqual(nowe(za(51)), ["Dosyłka wraca do nadawcy"], "powrót do nadawcy po kłopocie też budzi");
+  assert.deepEqual([wiersz()!.problemow, wpisy("klient_dosylka_problem").length, wpisy("klient_dosylka_stan").length],
+    [3, 3, 1]);
+});
+
+test("wynik spóźniony za zakończeniem sprawy albo jej wznowieniem nie zapisuje się i nie budzi", async () => {
+  /* Ticker czyta wiersze PRZED żądaniem. Człowiek, który w tym czasie
+     zamknął sprawę, nie dostaje jej z powrotem na „Moje” przez paczkę. */
+  zNumerem("kl", "z-1", "P1");
+  let zamknieta = false;
+  const a = allegro({ statusy: { P1: [{ code: "DELIVERED", occurredAt: iso(1) }] },
+    przy: () => {
+      if (zamknieta) return;
+      zamknieta = true;
+      const s = sprawa("kl", za(2));
+      P.zakonczSprawe("kl", { wersja: s.wersja, odcisk: s.odcisk }, ala, za(2), db());
+    } });
+  assert.deepEqual(await D.sledzDosylki(db(), a.deps(za(2))), { wykryte: 0, doreczone: 0, problemy: 0 });
+  assert.deepEqual([wiersz()!.status, wiersz()!.dostarczono_at, wiersz()!.doreczen, wiersz()!.sprawdzono_at],
+    [null, null, 0, null]);
+  assert.deepEqual(wpisy("klient_dosylka_doreczona"), []);
+  assert.deepEqual(sprawa("kl", za(3)).nowe, []);
+
+  /* Wykrycie numeru, gdy w czasie żądania sprawę zakończono i wznowiono
+     krokiem: dosyłka jest już historią poprzedniego epizodu. */
+  zamowienie("z-2", "kl2");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl2", { zamowienie: "z-2", zgloszono: "2026-09-20T10:00:00Z" }), ala, TERAZ);
+  let wznowiona = false;
+  const b = allegro({
+    przesylki: { "z-2": [{ waybill: "N2", carrierId: "DPD", createdAt: "2026-09-28T09:00:00Z" }] },
+    przy: () => {
+      if (wznowiona) return;
+      wznowiona = true;
+      let s = sprawa("kl2", za(4));
+      P.zakonczSprawe("kl2", { wersja: s.wersja, odcisk: s.odcisk }, ala, za(4), db());
+      s = sprawa("kl2", za(4));
+      P.ustawKrok("kl2", { krok: "inna sprawa", krokDo: iso(48), wersja: s.wersja, odcisk: s.odcisk }, ala, za(4), db());
+    } });
+  assert.equal((await D.sledzDosylki(db(), b.deps(za(4)))).wykryte, 0);
+  assert.deepEqual([wiersz("z-2")!.waybill, wiersz("z-2")!.archiwalna], [null, 1]);
+  assert.deepEqual(wpisy("klient_dosylka_wykryta"), []);
+});
+
+test("nakładka zamówienia i szkic: dosyłki, której nie śledzimy, nie ma — chyba że doszła", async () => {
+  /* Etykieta wydrukowana, sprawę zakończono tego samego dnia, numeru nikt nie
+     wpisał. „Czeka na nadanie” w szkicu Copilota byłoby kłamstwem o paczce,
+     która dawno doszła. */
+  const id = zamowienie("z-1", "kl");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl"), ala, TERAZ);
+  const zywa = PZ.przesylkaZamowienia(db(), id, za(1));
+  assert.equal(PZ.stanPrzesylkiKrotko(zywa), "dosyłka: numer jeszcze nieznany");
+  const s = sprawa("kl", za(2));
+  P.zakonczSprawe("kl", { wersja: s.wersja, odcisk: s.odcisk }, ala, za(2), db());
+  const zamrozona = PZ.przesylkaZamowienia(db(), id, za(24 * 20));
+  assert.equal(zamrozona.dosylka, null);
+  assert.equal(PZ.stanPrzesylkiKrotko(zamrozona), null);
+  assert.equal(PZ.zdaniePrzesylki(zamrozona), null);
+
+  /* Doręczenie to fakt z datą — zostaje także przy zakończonej sprawie. */
+  doreczona("z-1", iso(20));
+  assert.equal(PZ.stanPrzesylkiKrotko(PZ.przesylkaZamowienia(db(), id, za(24 * 20))),
+    "dosyłka: doręczona 2026-09-29");
+});
+
+test("przewoźnik bez statusu: zdanie z tonem uwagi, nie „w drodze”", async () => {
+  zNumerem("kl", "z-1", "LITEROWKA");
+  const a = allegro();
+  await D.sledzDosylki(db(), a.deps(za(1)));
+  assert.deepEqual([sprawa("kl", za(1)).dosylki[0].opis, sprawa("kl", za(1)).dosylki[0].ton],
+    ["Przewoźnik nie zna jeszcze tej paczki (stan z 11:00)", "uwaga"]);
+  assert.deepEqual(wpisy("klient_dosylka_stan"), [], "samo sprawdzenie bez statusu to nie zdarzenie");
+});
+
+test("samotny numer bez daty rejestracji i bez ruchu po zwrocie nie zostaje dosyłką", async () => {
+  /* Jedyny numer zamówienia bez `createdAt`: oryginał, który ruszał się
+     tylko przed zwrotem, albo paczka u przewoźnika spoza Allegro. */
+  zamowienie("z-1", "kl");
+  zamowienie("z-2", "kl");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zgloszono: "2026-09-22T10:00:00.000Z" }), ala, TERAZ);
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zamowienie: "z-2", zgloszono: "2026-09-22T10:00:00.000Z" }), ala, TERAZ);
+  const a = allegro({
+    przesylki: { "z-1": [{ waybill: "ORYG", carrierId: "DPD" }], "z-2": [{ waybill: "INNY", carrierId: "OTHER" }] },
+    statusy: { ORYG: [{ code: "IN_TRANSIT", occurredAt: "2026-09-18T10:00:00.000Z" }] },
+  });
+  assert.equal((await D.sledzDosylki(db(), a.deps(za(1)))).wykryte, 0);
+  assert.deepEqual([wiersz("z-1")!.waybill, wiersz("z-1")!.sprawdzono_at], [null, iso(1)]);
+  assert.deepEqual([wiersz("z-2")!.waybill, wiersz("z-2")!.sprawdzono_at], [null, iso(1)]);
+});
+
+test("jeden źle wpisany numer nie zatrzymuje śledzenia pozostałych", async () => {
+  zNumerem("kl", "z-1", "DOBRY");
+  zNumerem("kl", "z-2", "ZLY-NUMER");
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    const a = allegro({
+      statusy: { DOBRY: [{ code: "DELIVERED", occurredAt: iso(1) }] },
+      blad: (u) => (u.includes("ZLY-NUMER") ? new BladOdpowiedzi("Allegro odpowiedziało 400: ul. Tajna", 400) : null),
+    });
+    assert.equal((await D.sledzDosylki(db(), a.deps(za(2)))).doreczone, 1);
+  } finally { console.warn = warn; }
+  assert.equal(wiersz("z-1")!.dostarczono_at, iso(1));
+  assert.equal(wiersz("z-2")!.sprawdzono_at, null, "nieudane pytanie to nie „stan z”");
+});
+
+test("odmowa z panelu Allegro: ekran zwrotu proponuje „Śledź dosyłkę”, a dosyłka niesie numer zwrotu", () => {
+  zamowienie("z-1", "kl");
+  const zw = zwrot("kl", { kod: null, rejection: "NEW_ITEM_SENT" });
+  const przed = ZP.stanZwrotuPieniedzy(db(), zw, TERAZ);
+  assert.deepEqual([przed.odmowa, przed.dosylka, przed.sledzicDosylke], [null, null, true],
+    "kod z synchronizacji wystarcza, choć naszej odmowy nie ma");
+  const w = D.sledzDosylkeZwrotu(db(), zw, ala, TERAZ);
+  assert.equal(w.zalozona && w.krok, "Dosłać nowy towar (etykieta w Sellasist)");
+  const po = ZP.stanZwrotuPieniedzy(db(), zw, TERAZ);
+  assert.deepEqual([po.dosylka?.opis, po.sledzicDosylke], ["Czekamy na numer dosyłki z Allegro", false]);
+  assert.equal(sprawa().dosylki[0].zwrotId, zw);
+});
+
+test("409 tylko przez dosyłkę mówi o dosyłce, nie o kliencie", () => {
+  zNumerem("kl", "z-1", "P1");
+  const s = sprawa();
+  doreczona("z-1", iso(1));
+  assert.throws(() => P.ustawKrok("kl", { krok: "x", krokDo: iso(48), wersja: s.wersja, odcisk: s.odcisk }, ala, za(2), db()),
+    (e: unknown) => e instanceof P.KonfliktSprawy
+      && e.message === "Dosyłka zmieniła stan po otwarciu ekranu — sprawdź i zapisz jeszcze raz.");
+  /* Nowy zwrot to ruch klienta — zdanie zostaje stare. */
+  const s2 = sprawa("kl", za(2));
+  zwrot("kl", { zamowienie: "z-1" });
+  assert.throws(() => P.ustawKrok("kl", { krok: "x", krokDo: iso(48), wersja: s2.wersja, odcisk: s2.odcisk }, ala, za(3),
+    db()), (e: unknown) => e instanceof P.KonfliktSprawy && e.message === "Klient dopisał coś po otwarciu ekranu");
+});
+
+test("rytm tickera dosyłek stoi w konfiguracji: siedemnaście minut, inny niż rabaty", async () => {
+  const { config } = await import("../config.js");
+  assert.equal(config.allegro.dosylkiSyncMs, 1_020_000);
+  assert.notEqual(config.allegro.dosylkiSyncMs, config.allegro.rabatySyncMs);
+});
+
+test("źródło numeru stoi i znika razem z numerem na każdej drodze zapisu", async () => {
+  /* Historia klienta przy źródle dostaje `waybill: null` zawsze, więc panel
+     poznaje brak numeru po `zrodlo`. Rozjazd dwóch pól to „numer jest”
+     przy dosyłce bez numeru albo odwrotnie. */
+  const rozjazd = () => (db().prepare(`SELECT count(*) AS n FROM klient_dosylka
+    WHERE (waybill IS NULL) <> (zrodlo IS NULL)`).get() as { n: number }).n;
+  zamowienie("z-1", "kl");
+  zamowienie("z-2", "kl");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl"), ala, TERAZ);
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zamowienie: "z-2", zgloszono: "2026-09-20T10:00:00Z" }), ala, TERAZ);
+  assert.equal(rozjazd(), 0, "założenie");
+  const s = sprawa();
+  D.wpiszNumerDosylki("kl", { zamowienie: "z-1", waybill: "R1", przewoznik: "DPD", wersja: s.wersja,
+    odcisk: s.odcisk }, ala, za(1), db());
+  assert.equal(rozjazd(), 0, "numer wpisany ręką");
+  await D.sledzDosylki(db(), allegro({
+    przesylki: { "z-2": [{ waybill: "N2", carrierId: "DPD", createdAt: "2026-09-28T09:00:00Z" }] } }).deps(za(2)));
+  assert.equal(wiersz("z-2")!.zrodlo, "allegro");
+  assert.equal(rozjazd(), 0, "numer wykryty");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zgloszono: iso(3) }), ala, za(4));
+  assert.deepEqual([wiersz()!.waybill, wiersz()!.zrodlo], [null, null]);
+  assert.equal(rozjazd(), 0, "zastąpienie");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zamowienie: "z-2", zgloszono: iso(-72) }), ala, za(5));
+  assert.deepEqual([wiersz("z-2")!.waybill, wiersz("z-2")!.zrodlo], ["N2", "allegro"]);
+  assert.equal(rozjazd(), 0, "przejęcie");
 });

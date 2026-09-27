@@ -109,7 +109,7 @@ export function Moje() {
 
    DOSYŁKA (0.536.0) ZASTĘPUJE „dziś” i „czeka do”, a nie dokleja się do
    opisu. Opis jest ucięty, więc dopisek znikałby właśnie przy długim kroku.
-   Sprawa z krokiem „dosłać” czeka na paczkę, a nie na datę. Samo „dziś”
+   Sprawa z dosyłką czeka na paczkę, a nie na datę. Samo „dziś”
    przy dosyłce bez numeru nie mówiłoby, co zrobić. Pogrubienie niesie to,
    co niosło „dziś”: serwer postawił wiersz na dziś. */
 function StanKroku({ s }: { s: MojaSprawa }) {

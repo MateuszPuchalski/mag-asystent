@@ -30,8 +30,10 @@ import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 const KODY: Array<{ kod: string; etykieta: string;
   /** Brzmienie po wysłaniu, gdy etykieta formularza niesie wskazówkę dla operatora. */
   poOdmowie?: string }> = [
+  /* Po wysłaniu fakt, nie pierwsza osoba: „Odmówiono: „Odmawiam…”” mówiło
+     dwa razy to samo i brzmiało, jakby odmowa dopiero szła. */
   { kod: "REFUND_REJECTED", etykieta: "Odmawiam zwrotu pieniędzy (wymaga powodu)",
-    poOdmowie: "Odmawiam zwrotu pieniędzy" },
+    poOdmowie: "Odmowa zwrotu pieniędzy" },
   { kod: "NEW_ITEM_SENT", etykieta: "Wysłaliśmy nowy towar" },
   { kod: "ITEM_FIXED", etykieta: "Naprawiliśmy towar" },
   { kod: "MISSING_PART_SENT", etykieta: "Wysłaliśmy brakującą część" },
@@ -42,17 +44,27 @@ const KODY: Array<{ kod: string; etykieta: string;
 const WYMAGA_POWODU = "REFUND_REJECTED";
 /**
  * Kody, przy których do klienta jedzie druga paczka (0.536.0). Odmowa z nimi
- * zakłada śledzenie dosyłki i krok „dosłać” w sprawie klienta — w tym samym
+ * zakłada śledzenie dosyłki i krok dosyłki w sprawie klienta — w tym samym
  * zapisie, bez nowego wyboru w formularzu (dekalog p. 5).
+ *
+ * `NEW_ITEM_SENT` nazwał właściciel 27 września 2026: zły towar wraca, a biuro
+ * odmawia wypłaty kodem „Wysłaliśmy nowy towar”. `MISSING_PART_SENT` doszedł
+ * w tym wydaniu, bo brakująca część też jedzie drugą paczką — do oceny
+ * właściciela, nie z jego słów.
  */
 const KODY_DOSYLKI = new Set(["NEW_ITEM_SENT", "MISSING_PART_SENT"]);
 
 /**
  * Kod odmowy słowami operatora (0.536.0). Do tego wydania stał tu surowy
  * `NEW_ITEM_SENT`, czyli nazwa pola ze specyfikacji Allegro, nie zdanie.
- * Kod spoza listy zostaje surowy: przychodzi też synchronizacją, a Allegro
- * może dołożyć nowy. Profil klienta bierze stąd brzmienie propozycji
- * dosyłki, żeby jeden kod nie miał dwóch zapisów.
+ *
+ * JEDEN KOD, JEDNO BRZMIENIE. Czytają stąd: ta sekcja, kolumna dowodów
+ * („Rozstrzygnięte w Allegro”) i propozycja dosyłki na profilu klienta.
+ * Kolumna dowodów miała do tego wydania własną mapę z innymi słowami, więc
+ * ta sama odmowa brzmiała na jednym ekranie dwojako.
+ *
+ * Kod spoza listy zostaje surowy. Kolumna dowodów pokazuje `rejection_code`
+ * z synchronizacji, a Allegro może tam dołożyć kod, którego lista nie zna.
  */
 export const etykietaKodu = (kod: string) => {
   const k = KODY.find((x) => x.kod === kod);
@@ -74,7 +86,7 @@ const LIMIT_POWODU = 250;
 const LIMIT_REFERENCJI = 140;
 
 export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCofnijPrzelew,
-  akcje, przedWerdyktem = false, wynikDosylki = null, onSledzDosylke }: {
+  akcje, przedWerdyktem = false, wynikDosylki = null, onSledzDosylke, kodAllegro = null }: {
   stan: StanZwrotuPieniedzy;
   /**
    * Zwrot czeka jeszcze na werdykt (0.453.0). Przeszkoda jest wtedy jedna
@@ -94,12 +106,18 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
   akcje?: MutableRefObject<AkcjeKlawiszy>;
   /**
    * Wynik założenia dosyłki z ODPOWIEDZI ostatniego zapisu (0.536.0). Zdanie
-   * jednorazowe: stan trwały przychodzi odświeżonym `stan.odmowa`, a tego,
-   * czy odmowa podmieniła krok sprawy, stan już nie mówi.
+   * jednorazowe: stan trwały przychodzi odświeżonym `stan.dosylka`, a tego,
+   * czy zapis podmienił krok sprawy, stan już nie mówi.
    */
   wynikDosylki?: WynikDosylki | null;
   /** „Śledź dosyłkę” — gdy odmowa z kodem dosyłki nie ma śledzenia (0.536.0). */
   onSledzDosylke?: () => void;
+  /**
+   * Kod odmowy z synchronizacji Allegro (`Zwrot.rejectionCode`, @wydanie).
+   * Odmowa złożona w panelu Allegro nie ma `stan.odmowa` — to pole niesie
+   * tylko naszą. Bez tego kodu linijka dosyłki wisiałaby bez powodu.
+   */
+  kodAllegro?: string | null;
 }) {
   const [odmawiam, setOdmawiam] = useState(false);
   const [kod, setKod] = useState(BEZ_KODU);
@@ -157,6 +175,13 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
 
       {stan.odmowa && <span className="flex items-center gap-1 text-sm font-semibold text-slate-600">
         <Ban size={14} />Odmówiono: „{etykietaKodu(stan.odmowa.kod)}”</span>}
+      {/* ODMOWA Z PANELU ALLEGRO (@wydanie) — tylko przy dosyłce, bo to ją
+          ta linijka tłumaczy. Kod z synchronizacji stoi też w kolumnie
+          dowodów; tutaj stoi obok dosyłki, której jest powodem. Inne kody
+          z synchronizacji zostają tam, gdzie były. */}
+      {!stan.odmowa && kodAllegro && (stan.dosylka || stan.sledzicDosylke) &&
+        <span className="flex items-center gap-1 text-sm font-semibold text-slate-600">
+          <Ban size={14} aria-hidden="true" />Odmówiono w Allegro: „{etykietaKodu(kodAllegro)}”</span>}
 
       {/* Klawisz STOI PRZY PRZYCISKU, tak jak przy werdykcie i korekcie:
           rozpoznanie jest tańsze od pamiętania, a pasek skrótów na dole ekranu
@@ -180,23 +205,28 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
 
     {/* ── DOSYŁKA POD ODMOWĄ (0.536.0) ───────────────────────────────────
         Zła paczka wraca, biuro odmawia wypłaty kodem „Wysłaliśmy nowy towar”
-        i wysyła właściwy towar. Do tego wydania ekran zwrotu kończył się na
-        odmowie, a o drugiej paczce wiedział tylko Gmail prowadzącego. Zdanie
-        składa serwer, to samo co na profilu; odnośnik prowadzi tam, gdzie
-        stoi krok sprawy. Pracy tu nie ma, poza jednym ponowieniem. */}
-    {stan.odmowa?.dosylka && <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
-      <Truck size={13} className="shrink-0 text-slate-400" />
-      <span className={`font-semibold ${barwaTonu(stan.odmowa.dosylka.ton)}`}>{stan.odmowa.dosylka.opis}</span>
-      <Link to={`/obsluga/klient/${encodeURIComponent(stan.odmowa.dosylka.login)}`}
+        i wysyła właściwy towar z nową etykietą w Sellasist. Do tego wydania
+        ekran zwrotu kończył się na odmowie, a aplikacja o drugiej paczce nie
+        wiedziała nic. Zdanie składa serwer, to samo co na profilu; odnośnik
+        prowadzi tam, gdzie stoi krok sprawy. Pracy tu nie ma, poza jednym
+        ponowieniem.
+
+        Linijka NIE ZALEŻY od `stan.odmowa`: odmowa złożona w panelu Allegro
+        przychodzi synchronizacją i naszej odmowy nie ma, a dosyłkę ma. */}
+    {stan.dosylka && <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+      <Truck size={13} aria-hidden="true" className="shrink-0 text-slate-400" />
+      <span className={`font-semibold ${barwaTonu(stan.dosylka.ton)}`}>{stan.dosylka.opis}</span>
+      <Link to={`/obsluga/klient/${encodeURIComponent(stan.dosylka.login)}`}
         className="inline-flex items-center gap-1 text-sky-700 underline underline-offset-2 hover:text-sky-900">
         <UserRound size={12} aria-hidden="true" />profil klienta</Link>
     </p>}
-    {/* Ponowienie, gdy odmowa wyszła, a śledzenie nie powstało — albo gdy kod
-        złożono poza panelem. Przycisk zamiast automatu, bo zapis zakłada krok
-        w cudzej sprawie klienta, a tego nie robi się przy samym patrzeniu. */}
-    {stan.odmowa?.sledzicDosylke && !stan.odmowa.dosylka && onSledzDosylke &&
+    {/* Ponowienie, gdy odmowa wyszła, a śledzenie nie powstało — albo gdy
+        odmowę złożono w panelu Allegro i jej kod przyszedł synchronizacją.
+        Przycisk zamiast automatu, bo zapis zakłada krok w cudzej sprawie
+        klienta, a tego nie robi się przy samym patrzeniu. */}
+    {stan.sledzicDosylke && !stan.dosylka && onSledzDosylke &&
       <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
-        <Truck size={13} className="shrink-0 text-slate-400" />
+        <Truck size={13} aria-hidden="true" className="shrink-0 text-slate-400" />
         <span>Dosyłki nie śledzimy.</span>
         <Przycisk className="text-xs" disabled={trwa} onClick={() => onSledzDosylke()}>Śledź dosyłkę</Przycisk>
       </p>}
@@ -205,9 +235,10 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
     {wynikDosylki && !wynikDosylki.zalozona && <p className="mt-2 text-xs font-semibold text-ranga-uwaga">
       Odmowa wysłana; śledzenia dosyłki nie założono — {wynikDosylki.blad}</p>}
     {/* Założenie dosyłki ZASTĄPIŁO krok, który prowadzący ustawił sam. Stan
-        tego nie pokaże, a bez zdania prowadzący szukałby swojego kroku na profilu. */}
+        tego nie pokaże, a bez zdania prowadzący szukałby swojego kroku na profilu.
+        Nowy krok pisze się z odpowiedzi serwera, nie z pamięci ekranu. */}
     {wynikDosylki?.zalozona && wynikDosylki.zastapil && <p className="mt-2 text-xs text-slate-600">
-      Krok sprawy klienta: „dosłać” zamiast „{wynikDosylki.zastapil}”</p>}
+      Krok sprawy klienta: „{wynikDosylki.krok}” zamiast „{wynikDosylki.zastapil}”</p>}
 
     {/* ── PRZELEW ODDANY POZA ALLEGRO (0.269.0) ────────────────────────────
         Przy pobraniu klient nigdy nie zapłacił Allegro, więc przycisk wyżej
@@ -257,9 +288,11 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
         </select>
       </label>
       {/* Zdanie, nie pole wyboru: skutek wynika z kodu, więc pytanie
-          „czy śledzić" byłoby decyzją, którą stan pracy już zna (dekalog p. 5). */}
+          „czy śledzić" byłoby decyzją, którą stan pracy już zna (dekalog p. 5).
+          Brzmienia kroku tu nie ma: ustawia je serwer, a ekran pokazuje je
+          dopiero z odpowiedzi. */}
       {KODY_DOSYLKI.has(kod) && <p className="text-xs text-slate-600">
-        Sprawa klienta dostanie krok „dosłać” i śledzenie dosyłki.</p>}
+        Sprawa klienta dostanie krok dosyłki i jej śledzenie.</p>}
       <label className="block text-xs font-semibold text-slate-600">
         Uzasadnienie {kod === BEZ_KODU ? "" : kod === WYMAGA_POWODU ? "(wymagane)" : "(opcjonalne)"}
         <textarea className="field mt-1 min-h-16 w-full text-sm" maxLength={LIMIT_POWODU}

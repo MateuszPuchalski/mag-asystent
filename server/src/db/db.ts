@@ -930,6 +930,28 @@ export function migrate(database: DatabaseSync) {
       addColumn("zastosowanie", kolumna, typ);
     }
   }
+  /* DOSYŁKA: EPIZODY, OKNO NUMERU I LICZNIKI PRZEJŚĆ (@wydanie). Tabela
+     `klient_dosylka` stoi na produkcji od 0.536.0 bez tych czterech kolumn,
+     a `CREATE TABLE IF NOT EXISTS` ich nie dołoży. Bez tej migracji każdy
+     odczyt sprawy kończyłby się „no such column”.
+
+     Liczniki dostają wartość z obecnego stanu, i to tylko w chwili dołożenia
+     kolumny. 0.536.0 liczył odcisk `k` i `q` jako liczbę wierszy doręczonych
+     i z kłopotem. Zero w nowym liczniku przy zapisanym `k: 1` połknęłoby
+     następne doręczenie, bo 1 nie jest większe od 1. */
+  if (database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='klient_dosylka'").get()) {
+    const bylyLiczniki = (database.prepare("PRAGMA table_info(klient_dosylka)").all() as Array<{ name: string }>)
+      .some((c) => c.name === "doreczen");
+    addColumn("klient_dosylka", "numer_at", "TEXT");
+    addColumn("klient_dosylka", "archiwalna", "INTEGER NOT NULL DEFAULT 0");
+    addColumn("klient_dosylka", "doreczen", "INTEGER NOT NULL DEFAULT 0");
+    addColumn("klient_dosylka", "problemow", "INTEGER NOT NULL DEFAULT 0");
+    if (!bylyLiczniki) {
+      database.exec(`UPDATE klient_dosylka
+        SET doreczen = CASE WHEN dostarczono_at IS NOT NULL THEN 1 ELSE 0 END,
+            problemow = CASE WHEN status IN ('ISSUE','RETURNED') THEN 1 ELSE 0 END`);
+    }
+  }
   /* INDEKSY LOGINU BEZ WIELKOŚCI LITER (0.535.0, sprawa klienta). Profil
      i sprawa klienta pytają o login w czterech tabelach przy każdym otwarciu,
      a „Moje” — przy każdym odświeżeniu, raz na każdą prowadzoną sprawę.

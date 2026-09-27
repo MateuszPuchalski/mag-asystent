@@ -90,3 +90,21 @@ describe("Dowody zwrotu — mniej nagłówków", () => {
     expect(screen.getByRole("button", { name: "przebieg (1)" })).toBeInTheDocument();
   });
 });
+
+/* ── Odmowa z Allegro jednym brzmieniem (@wydanie) ──────────────────────────
+   Do tego wydania ta kolumna miała własną mapę kodów i pisała „wysłano nowy
+   towar”, a sekcja pieniędzy obok — „Wysłaliśmy nowy towar”. Jeden kod ma
+   jedno brzmienie: oba miejsca czytają `etykietaKodu` z `Pieniadze.tsx`. */
+describe("Dowody zwrotu — rozstrzygnięte w Allegro", () => {
+  it("kod odmowy brzmi tak samo jak w sekcji pieniędzy", () => {
+    pokaz({ zwrot: zwrot({ rejectionCode: "NEW_ITEM_SENT" }) });
+    expect(screen.getByRole("heading", { name: /Rozstrzygnięte w Allegro/ })).toBeInTheDocument();
+    expect(screen.getByText("Wysłaliśmy nowy towar")).toBeInTheDocument();
+    expect(screen.queryByText("wysłano nowy towar")).toBeNull();
+  });
+
+  it("kod, którego lista nie zna, zostaje surowy — Allegro może dołożyć nowy", () => {
+    pokaz({ zwrot: zwrot({ rejectionCode: "NOWY_KOD_ALLEGRO" }) });
+    expect(screen.getByText("NOWY_KOD_ALLEGRO")).toBeInTheDocument();
+  });
+});

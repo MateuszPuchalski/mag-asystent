@@ -303,3 +303,18 @@ test("profil niesie dosyłkę, propozycję i przewoźników — odczyt bez zapis
   assert.ok(j.przewoznicy.includes("INPOST"));
   assert.equal((db().prepare("SELECT total_changes() AS n").get() as { n: number }).n, zmiany);
 });
+
+test("numer dosyłki stoi tylko na karcie sprawy — historia klienta przy zwrocie niesie samo zdanie", async () => {
+  /* Linia sprawy przy źródle drukuje zdanie dosyłki, a numer prowadzi do
+     adresu odbiorcy. Kopiuje go i poprawia agent wyłącznie na profilu. */
+  const b = login("biuro", "Ola10");
+  const profil = await app.inject({ method: "GET", url: "/api/obsluga/klient/kupujacy2", headers: b });
+  assert.equal(profil.json<{ sprawa: { dosylki: Array<{ waybill: string | null }> } }>().sprawa.dosylki[0].waybill,
+    "AD-TAJNY");
+  const h = await app.inject({ method: "GET", url: `/api/obsluga/zwroty/${zwrotDosylki}/klient`, headers: b });
+  assert.equal(h.statusCode, 200, h.body);
+  const d = h.json<{ sprawa: { dosylki: Array<{ waybill: string | null; opis: string }> } }>().sprawa.dosylki;
+  assert.deepEqual([d.length, d[0].waybill], [1, null]);
+  assert.ok(d[0].opis.length > 0, "zdanie zostaje");
+  assert.doesNotMatch(h.body, /AD-TAJNY/);
+});

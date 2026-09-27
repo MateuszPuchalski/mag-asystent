@@ -208,21 +208,38 @@ test("podpowiedź „dosylka”: doręczona dosyłka, a otwarty zwrot tego zamó
   let p = P.profilKlienta("kl", TERAZ, db())!;
   assert.deepEqual([p.podpowiedzZakonczenia, p.podpowiedzPowod], [false, null], "dosyłka jeszcze jedzie");
 
+  /* Doręczenie PO ostatnim ruchu człowieka — tu po założeniu sprawy odmową. */
+  const potem = (godzin: number) => new Date(TERAZ.getTime() + godzin * 3_600_000);
   db().prepare("UPDATE klient_dosylka SET waybill='W1', przewoznik='DPD', status='DELIVERED', dostarczono_at=?")
-    .run(dni(0));
-  p = P.profilKlienta("kl", TERAZ, db())!;
+    .run(potem(1).toISOString());
+  p = P.profilKlienta("kl", potem(2), db())!;
   assert.ok(p.otwarte.some((o) => o.rodzaj === "zwrot" && o.id === zw), "zwrot wymiany stoi otwarty");
   assert.deepEqual([p.podpowiedzZakonczenia, p.podpowiedzPowod], [true, "dosylka"]);
 
   /* Otwarty zwrot INNEGO zamówienia gasi ją jak przy terminie. */
   zamowienie("z-2", "kl", dni(10));
   const inny = zwrotZOdmowa("kl", "z-2", { kod: "REFUND_REJECTED" });
-  assert.equal(P.profilKlienta("kl", TERAZ, db())!.podpowiedzPowod, null);
+  assert.equal(P.profilKlienta("kl", potem(2), db())!.podpowiedzPowod, null);
   db().prepare("UPDATE zwrot_klienta SET zamkniety_at=? WHERE id=?").run(dni(0), inny);
 
   /* Termin też minął — powodem zostaje dosyłka, bo mówi, CZEMU krok się spełnił. */
   const poTerminie = new Date(TERAZ.getTime() + 10 * 86_400_000);
   assert.equal(P.profilKlienta("kl", poTerminie, db())!.podpowiedzPowod, "dosylka");
+
+  /* Przewoźnik spoza Allegro nie dojdzie nigdy, więc podpowiedzi nie wstrzymuje. */
+  zamowienie("z-3", "kl", dni(5));
+  db().prepare(`INSERT INTO klient_dosylka(sprawa_id,konto,zamowienie,waybill,przewoznik,zrodlo,zalozono_at)
+    SELECT sprawa_id, konto, 'z-3', 'X1', 'OTHER', 'recznie', zalozono_at FROM klient_dosylka WHERE zamowienie='z-1'`).run();
+  assert.equal(P.profilKlienta("kl", poTerminie, db())!.podpowiedzPowod, "dosylka");
+  db().prepare("DELETE FROM klient_dosylka WHERE zamowienie='z-3'").run();
+
+  /* Ruch człowieka PO doręczeniu — nowy krok — znaczy, że agent je widział
+     i sprawa ma jeszcze coś do zrobienia. Podpowiedź milknie. */
+  const { ustawKrok, sprawaKlienta } = await import("./prowadzenie-klienta.js");
+  const s = sprawaKlienta("kl", potem(3), db())!;
+  ustawKrok("kl", { krok: "zadzwonić do klienta", krokDo: potem(24 * 5).toISOString(), wersja: s.wersja,
+    odcisk: s.odcisk }, kto, potem(3), db());
+  assert.equal(P.profilKlienta("kl", potem(4), db())!.podpowiedzPowod, null);
   db().prepare("DELETE FROM klient_dosylka").run();
   db().prepare("UPDATE zwrot_klienta SET zamkniety_at=?").run(dni(0));
   assert.deepEqual([P.profilKlienta("kl", poTerminie, db())!.podpowiedzZakonczenia,
@@ -255,13 +272,16 @@ test("propozycja dosyłki: odmowa z trzydziestu dni, bez śledzonej dosyłki; da
   assert.equal(P.profilKlienta("kl", TERAZ, db())!.propozycjaDosylki, null, "dosyłkę zamówienia już śledzimy");
 });
 
-test("przewoźnicy do formularza: z zamówień, zwrotów i dosyłek, bez powtórzeń i po kolei", () => {
+test("przewoźnicy do formularza: z zamówień, zwrotów i dosyłek, z OTHER, bez UNKNOWN — i tylko przy formularzu", () => {
   zamowienie("z-1", "kl", dni(3));
   db().prepare("UPDATE zamowienie_klienta SET przesylka_przewoznik='INPOST'").run();
-  zwrotZOdmowa("kl", "z-1");
   db().prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,kupujacy_login,przesylka_przewoznik,
-    synced_at) VALUES (?,'z-2','inny','DPD','x')`).run(konto);
-  assert.deepEqual(P.profilKlienta("kl", TERAZ, db())!.przewoznicy, ["DPD", "INPOST"]);
+    synced_at) VALUES (?,'z-2','inny','DPD','x'), (?,'z-3','inny','UNKNOWN','x')`).run(konto, konto);
+  assert.deepEqual(P.profilKlienta("kl", TERAZ, db())!.przewoznicy, [],
+    "bez dosyłki i bez propozycji formularza nie ma — przegląd trzech tabel poszedłby za nic");
+  zwrotZOdmowa("kl", "z-1");
+  assert.deepEqual(P.profilKlienta("kl", TERAZ, db())!.przewoznicy, ["DPD", "INPOST", "OTHER"],
+    "OTHER zawsze — etykieta bywa u przewoźnika spoza Allegro; UNKNOWN nigdy — o nieznanego nie da się spytać");
 });
 
 test("„niedoręczone od N dni” milknie przy zamówieniu z dosyłką — jej los niesie karta sprawy", async () => {

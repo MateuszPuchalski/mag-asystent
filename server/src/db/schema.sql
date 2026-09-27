@@ -3229,30 +3229,41 @@ CREATE TABLE IF NOT EXISTS klient_prowadzenie (
   przed_zakonczeniem_zmieniono_at TEXT
 );
 
--- Dosyłka sprawy klienta (0.536.0, drugi przyrost S6). Zły towar wraca zwrotem
--- przez Allegro, biuro odmawia wypłaty kodem NEW_ITEM_SENT albo MISSING_PART_SENT
--- i wysyła poprawny towar nową etykietą z Sellasist. Krok „dosłać” był dotąd
--- samym zdaniem; tu stoi numer tej drugiej paczki i WYNIK śledzenia, nie historia.
--- Jeden wiersz na sprawę i zamówienie: nowa dosyłka do tego samego zamówienia
--- zastępuje poprzednią. Autora tu nie ma — stoi w dzienniku, a kolumna z kluczem
--- do `app_user` blokowałaby kasowanie kont (pułapka z `klient_prowadzenie`).
+-- Dosyłka sprawy klienta (@wydanie, drugi przyrost S6). Właściciel podał
+-- 27 września 2026, że przy złym towarze biuro odmawia wypłaty kodem
+-- NEW_ITEM_SENT i wysyła poprawny towar nową etykietą z Sellasist.
+-- MISSING_PART_SENT doszedł w tym wydaniu, bo brakująca część jedzie tak samo,
+-- drugą paczką; to do oceny właściciela. Krok „dosłać” był dotąd samym
+-- zdaniem; tu stoi numer drugiej paczki i WYNIK śledzenia, nie historia.
+-- Jeden wiersz na sprawę i zamówienie. Odmowa zwrotu zgłoszonego PO założeniu
+-- wiersza zastępuje dosyłkę, a wcześniejsza ją przejmuje (`dosylka.ts`).
+-- Autora tu nie ma — stoi w dzienniku, a kolumna z kluczem do `app_user`
+-- blokowałaby kasowanie kont (pułapka z `klient_prowadzenie`).
 -- `waybill` prowadzi do adresu odbiorcy, więc żyje jak `przesylka_waybill`
 -- zamówienia: nie idzie do dziennika, Copilota, CSV, migawki ani raportu
 -- tygodnia (polityka w docs/obsluga-klienta.md). Kaskady jak w repo: sprawa
 -- zabiera swoje dosyłki, a zwrot kasowany przez `migrate()` albo sprzątanie
 -- zostawia dosyłkę bez odnośnika. Bez CHECK z tego samego powodu co wyżej.
+-- `archiwalna` oddziela epizody: krok, który wznawia zakończoną sprawę, odkłada
+-- jej dosyłki do historii, żeby stara dosyłka nie wołała w nowej sprawie.
+-- `doreczen` i `problemow` to liczniki PRZEJŚĆ, które nigdy nie maleją — z nich
+-- liczy się odcisk sprawy (`k`, `q`), więc zastąpienie wiersza nie cofa obudzenia.
 CREATE TABLE IF NOT EXISTS klient_dosylka (
   sprawa_id      INTEGER NOT NULL REFERENCES klient_prowadzenie(id) ON DELETE CASCADE,
   konto          INTEGER NOT NULL,        -- konto kanału; numer zamówienia jest unikalny na koncie
   zamowienie     TEXT NOT NULL,           -- Allegro checkoutForm.id
   zwrot_id       INTEGER REFERENCES zwrot_klienta(id) ON DELETE SET NULL,
-  waybill        TEXT,                    -- NULL do wykrycia albo wpisania; najwyżej 64 znaki (schemat)
+  waybill        TEXT,                    -- NULL do wykrycia albo wpisania; do 64 znaków (opis pola w specyfikacji)
   przewoznik     TEXT,                    -- carrierId z Allegro; 'OTHER' nie jest pytany
   zrodlo         TEXT,                    -- 'allegro' (wykryty przy zamówieniu) | 'recznie' (wpisany)
   status         TEXT,                    -- ostatni kod przewoźnika — wynik, nie historia
   dostarczono_at TEXT,                    -- pierwsze DELIVERED; COALESCE, nigdy nadpisane
   sprawdzono_at  TEXT,                    -- ostatnie pytanie do Allegro; NULL = jeszcze nigdy
   zalozono_at    TEXT NOT NULL,
+  numer_at       TEXT,                    -- kiedy numer wykryto albo wpisano; od niego biegnie okno śledzenia
+  archiwalna     INTEGER NOT NULL DEFAULT 0,  -- 1 = dosyłka poprzedniego epizodu sprawy
+  doreczen       INTEGER NOT NULL DEFAULT 0,  -- ile razy wiersz przeszedł w doręczenie; nie maleje
+  problemow      INTEGER NOT NULL DEFAULT 0,  -- ile razy wszedł w ISSUE albo RETURNED; nie maleje
   PRIMARY KEY (sprawa_id, zamowienie)
 );
 
