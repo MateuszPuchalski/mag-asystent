@@ -79,6 +79,22 @@ const DOKUMENT_803: Dokument = {
   ],
 };
 
+/* Rozłożona do końca, a z wyjątkami przy pozycjach `done` — tak zostawia je
+   nadmiar zgłoszony przy ZAKOŃCZ i odłożenie reszty sztuk po zgłoszeniu.
+   Pozycja z rozwiązanym stoi PRZED pozycją z otwartym, żeby test kolejności
+   nie przeszedł na samym porządku z serwera. */
+const LINIA_DONE = DOKUMENT.lines[1];
+const DOKUMENT_809: Dokument = {
+  ...DOKUMENT, dokId: 809, nrPelny: "FZ 809/MAG/09/2026", status: "done",
+  progress: { total: 3, done: 3, remaining: 0, problems: 0 },
+  lines: [
+    { ...LINIA_DONE, lineId: 91, twId: 91, sym: "GP-ROZW", problemy: [wyj(91, { lineId: 91, sym: "GP-ROZW",
+      resolvedAt: "2026-09-26T08:00:00.000Z", resolvedNote: "dosłali" })] },
+    { ...LINIA_DONE, lineId: 92, twId: 92, sym: "GP-OTW", problemy: [wyj(92, { lineId: 92, sym: "GP-OTW" })] },
+    { ...LINIA_DONE, lineId: 93, twId: 93, sym: "GP-ZWYKLA", problemy: [] },
+  ],
+};
+
 let wyslane: string[] = [];
 let archiwumPytania: string[] = [];
 /* Czy instalacja ma zdjęcia kartotek — tak mówi o tym `/api/health`. */
@@ -119,6 +135,7 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
   /* Zgłoszenie ze zdjęciem, którego pliku serwer nie ma — `/api/problems/9/photo` daje 404. */
   if (url === "/api/biuro/dokument/808") return { ...DOKUMENT, dokId: 808, nrPelny: "FZ 808/MAG/09/2026",
     lines: [], problemyBezLinii: [wyj(9, { lineId: null, hasPhoto: true, sym: null, symObcy: "OBCY-9" })] };
+  if (url === "/api/biuro/dokument/809") return DOKUMENT_809;
   if (url.startsWith("/api/biuro/dostawy/archiwum?q=")) {
     archiwumPytania.push(decodeURIComponent(url.split("q=")[1]));
     /* Serwer odcina listę na dwustu — ekran ma to POWIEDZIEĆ. */
@@ -370,6 +387,22 @@ describe("audyt ekranu dostaw", () => {
     const sekcja = screen.getByRole("heading", { name: /Wyjątki poza pozycjami/ }).parentElement!;
     const etykiety = within(sekcja).getAllByText(/^(dosłane|brak w przesyłce)$/).map((e) => e.textContent);
     expect(etykiety).toEqual(["brak w przesyłce", "dosłane"]);
+  });
+
+  it("wyjątek przy pozycji rozłożonej do końca stoi na górze, nie ginie w tabeli", async () => {
+    /* Zgłoszenie właściciela z nagraniem (27.09.2026): nagłówek FZ 65 mówił
+       „1 otwarty wyjątek", a w 42 wierszach tabeli nie było go nigdzie. */
+    pokaz("/obsluga/dostawy/809");
+    await screen.findByRole("heading", { name: "FZ 809/MAG/09/2026" });
+    expect(screen.getByText(/odłożone 3\/3 poz\. · 1 otwarty wyjątek/)).toBeInTheDocument();
+    const sekcja = screen.getByRole("heading", { name: "Pozycje z wyjątkiem · 2" }).parentElement!;
+    const symbole = within(sekcja).getAllByText(/^GP-(OTW|ROZW)$/).map((e) => e.textContent);
+    expect(symbole).toEqual(["GP-OTW", "GP-ROZW"]);
+    expect(within(sekcja).getByRole("button", { name: "Rozwiąż" })).toBeInTheDocument();
+    expect(within(sekcja).getByText("rozwiązany")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Pozostałe pozycje · 1" })).toBeInTheDocument();
+    expect(screen.getByRole("row", { name: /GP-ZWYKLA/ })).toBeInTheDocument();
+    expect(screen.queryByRole("row", { name: /GP-OTW|GP-ROZW/ })).toBeNull();
   });
 
   it("rozłożona z otwartym wyjątkiem nie świeci na zielono", async () => {
