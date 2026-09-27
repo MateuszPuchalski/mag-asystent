@@ -8,6 +8,7 @@ import {
   sprawdzParowanie,
   stanPolaczenia,
 } from "../services/allegro-token.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Konto Allegro — parowanie i stan (0.140.0) ──────────────────────────────
    Te cztery trasy mieszkały do 0.137.2 w `routes/zwroty.ts` i odeszłyby razem
@@ -20,7 +21,7 @@ import {
    informacja o tle pracy („czy połączenie żyje"), a nie władza nad nim.     */
 
 export async function allegroRoutes(app: FastifyInstance) {
-  function odmowa(role: string[] = ["biuro", "admin"]): { kod: number; error: string } | null {
+  function odmowa(role: readonly string[] = ROLE_BIUROWE): { kod: number; error: string } | null {
     const s = sesjaZadania();
     if (!s) return { kod: 401, error: "Brak sesji — zaloguj się" };
     if (!role.includes(s.user.role)) {

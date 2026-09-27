@@ -10,13 +10,14 @@ import {
   zakonczSprawe, type SprawaKlienta,
 } from "../services/prowadzenie-klienta.js";
 import { wpiszNumerDosylki, zalozDosylkeZProfilu } from "../services/dosylka.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy PONAD kolejkami (23 września 2026) ────────────────────────────────
    Szukanie Ctrl+K i historia klienta ze zwrotu albo sprawy nie należą do
    żadnej jednej kolejki — dlatego nie stoją w pliku żadnej z nich. Obie są
    ODCZYTEM: GET, zero zapisu i zero żądań do Allegro. */
 
-const BIURO = ["biuro", "admin"];
+const BIURO = ROLE_BIUROWE;
 
 /**
  * Historia klienta RAZEM ze sprawą klienta — wiązanie w drugą stronę

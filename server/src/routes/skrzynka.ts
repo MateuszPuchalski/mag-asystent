@@ -34,8 +34,9 @@ import { mojeSprawy } from "../services/droga-klienta.js";
 import { mojaLista } from "../services/prowadzenie-klienta.js";
 import { zeSprawa } from "./spoiwo.js";
 import { dokumentySprzedazyZamowienia } from "../services/faktury.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
-const BIURO = ["biuro", "admin"];
+const BIURO = ROLE_BIUROWE;
 const blad = (reply: FastifyReply, e: unknown) =>
   reply.code(400).send({ error: e instanceof Error ? e.message : String(e) });
 

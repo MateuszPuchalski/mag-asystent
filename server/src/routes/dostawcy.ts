@@ -6,6 +6,7 @@ import {
   usunLogo,
   zapiszLogo,
 } from "../services/logo-dostawcy.js";
+import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Logo dostawcy — trasy (0.56.0) ──────────────────────────────────────────
    Trzy trasy biura (wgranie, kasowanie, lista) i jedna czytana przez kolektor.
@@ -15,7 +16,7 @@ import {
    dostaw i jako jedyna z tej czwórki musi być tania. Dlatego siedzi obok tamtych
    trzech, ale ma osobny kontrakt: ETag, 304 i cache po stronie urządzenia.   */
 
-const ORZEKAJACY = ["biuro", "admin"];
+const ORZEKAJACY = ROLE_BIUROWE;
 
 /** Logo waży kilka kB; 1 MB starcza z zapasem i nie zjada globalnego limitu. */
 const LIMIT_WGRANIA = 1024 * 1024;

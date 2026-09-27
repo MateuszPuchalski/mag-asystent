@@ -4,6 +4,7 @@ import { logEvent } from "./events.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 import { sqlZwin, zwin } from "../tekst.js";
 import { sprawdzWarunki, zdanieWarunkow, type WarunkiZastosowania } from "./warunki-zastosowania.js";
+import { ROLE_BIUROWE } from "./users.js";
 
 /**
  * Baza wiedzy zastosowań (§11.3, §11.4, §12, etap E2).
@@ -158,7 +159,8 @@ export function naModel(w: Record<string, unknown>): ModelUrzadzenia {
 export function czlowiekZBiura(database: DatabaseSync, userId: number): string {
   const u = database.prepare("SELECT name, role FROM app_user WHERE user_id=?").get(userId) as
     { name: string; role: string } | undefined;
-  if (!u || !["biuro", "admin"].includes(u.role)) {
+  /* Rola z bazy to zwykły napis, a `ROLE_BIUROWE` zna tylko typ `Rola`. */
+  if (!u || !(ROLE_BIUROWE as readonly string[]).includes(u.role)) {
     throw new Error("Wiedzę rozstrzyga człowiek z biura — automat i hala nie zatwierdzają");
   }
   return u.name;
