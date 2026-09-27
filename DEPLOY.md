@@ -155,7 +155,7 @@ podanym przy tworzeniu — ustaw przypomnienie.
 
 **Nazwy checków to `Serwer`, `Panel`, `Android`, `Instalator`, `Worker Sfery`,
 `Usługa tła` i `Zgoda właściciela`** — czyli pola `name` zadań w workflow'ach.
-Ostatni doszedł w @wydanie i przed importem wymaga kroku z §0d.
+Ostatni doszedł w 0.544.0 i przed importem wymaga kroku z §0d.
 
 `Panel` doszedł
 w 0.491.1, gdy testy panelu wyszły z zadania `Serwer` do równoległego. **Po
@@ -229,7 +229,7 @@ podmienia go na numer. Pomija pliki, które znacznik opisują dosłownie:
 **PR z samym CI albo dokumentacją nie potrzebuje fragmentu.** Nie dostaje
 wtedy wydania; jego zmiana wejdzie z najbliższym wydaniem, które je ma.
 
-## 0d. Zgoda właściciela na zapis do Subiekta (@wydanie)
+## 0d. Zgoda właściciela na zapis do Subiekta (0.544.0)
 
 **Zmiana w kodzie, który pisze do Subiekta, czeka na kliknięcie właściciela.**
 Resztę repo scala zielone CI, bez człowieka. Błąd w reszcie cofa następne

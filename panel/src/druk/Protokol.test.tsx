@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Protokol } from "./Protokol";
 import { atrapaZapisow } from "../test/zapisy";
 
-/* ── ZERO ZAPISU PRZY OTWARCIU PROTOKOŁU (@wydanie) ──────────────────────────
+/* ── ZERO ZAPISU PRZY OTWARCIU PROTOKOŁU (0.544.0) ──────────────────────────
    Protokół to osobna trasa panelu (`/obsluga/druk/protokol/:dokId`), a do tego
    wydania nie miał testu wcale. Strona do druku otwiera się też sama z linku,
    więc zapis przy otwarciu poszedłby przy każdym podglądzie wydruku. */

@@ -1,4 +1,4 @@
-# Zgoda właściciela na zmiany, których nie da się cofnąć (@wydanie).
+# Zgoda właściciela na zmiany, których nie da się cofnąć (0.544.0).
 #
 # DLACZEGO. Zielone CI scala PR samo (`auto-scalanie.yml`), a serwer bierze
 # wydanie sam (`AKTUALIZACJA_AUTO=zaraz`). Między agentem a produkcją nie ma

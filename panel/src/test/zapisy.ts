@@ -1,7 +1,7 @@
 import { vi } from "vitest";
 
 /**
- * Atrapa `fetch`, która LICZY ZAPISY (@wydanie).
+ * Atrapa `fetch`, która LICZY ZAPISY (0.544.0).
  *
  * Reguła „zero zapisu przy patrzeniu" ma strażnika tylko wtedy, gdy test
  * ekranu widzi każde żądanie inne niż GET. Test, który podmienia moduł

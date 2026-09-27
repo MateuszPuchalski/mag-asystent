@@ -166,7 +166,7 @@ export async function buildApp() {
     // zdjęcia dowodowe lecą jako base64 w JSON (~300 KB → ~400 KB po kodowaniu)
     bodyLimit: 6 * 1024 * 1024,
   });
-  /* PUSTY JSON TO BRAK CIAŁA (@wydanie). Domyślny parser Fastify odrzuca
+  /* PUSTY JSON TO BRAK CIAŁA (0.544.0). Domyślny parser Fastify odrzuca
      żądanie z `content-type: application/json` i pustą treścią błędem
      FST_ERR_CTP_EMPTY_JSON_BODY, a ekran pokazuje wtedy gołe „Bad Request".
      Do tego wydania pilnował tego każdy front z osobna i dwa razy któryś

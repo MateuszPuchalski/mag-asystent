@@ -35,7 +35,7 @@ wynik=$(git for-each-ref --sort=-committerdate \
     ile=$(git rev-list --count "origin/main..$galaz" 2>/dev/null || echo 0)
     [ "${ile:-0}" -gt 0 ] || continue
     echo "── ${galaz#origin/}  (+$ile, $(git log -1 --format=%cr "$galaz"))"
-    # Zgłoszenie pracy (@wydanie): tytuł fragmentu `zmiany/*.md`, który gałąź
+    # Zgłoszenie pracy (0.544.0): tytuł fragmentu `zmiany/*.md`, który gałąź
     # dokłada. Sam git, bez `gh` — tego w sesjach chmurowych nie ma, więc
     # lista otwartych PR-ów niżej bywa ślepa, a ta nie. Fragment wypchnięty
     # pierwszym commitem mówi innym sesjom, CO powstaje, zanim powstanie.

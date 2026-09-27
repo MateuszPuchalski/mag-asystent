@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Wiedza } from "./Wiedza";
 import { atrapaZapisow } from "../test/zapisy";
 
-/* ── ZERO ZAPISU PRZY OTWARCIU WIEDZY (@wydanie) ─────────────────────────────
+/* ── ZERO ZAPISU PRZY OTWARCIU WIEDZY (0.544.0) ─────────────────────────────
    Osobny plik z tego samego powodu co `Zadania.zapis.test.tsx`:
    `Wiedza.test.tsx` podmienia moduł `../api/wiedza` dla całego pliku,
    więc zapisu wołanego z pominięciem haka by nie zobaczył. */

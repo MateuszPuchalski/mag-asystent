@@ -4,7 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-/* ── JEDNA LISTA RÓL BIURA (@wydanie) ────────────────────────────────────────
+/* ── JEDNA LISTA RÓL BIURA (0.544.0) ────────────────────────────────────────
    Do tego wydania para `["biuro", "admin"]` stała wpisana z palca w piętnastu
    trasach i jednym serwisie, choć `ROLE_BIUROWE` w `services/users.ts`
    istniało od dawna. Każda kopia to miejsce, w którym dopisanie nowej roli

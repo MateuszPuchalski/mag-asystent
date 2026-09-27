@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate } from "./db.js";
 
-/* ── PRYWATNOŚĆ STOI W KSZTAŁCIE CAŁEGO SCHEMATU (@wydanie) ──────────────────
+/* ── PRYWATNOŚĆ STOI W KSZTAŁCIE CAŁEGO SCHEMATU (0.544.0) ──────────────────
    `migracja-zwrotow.test.ts` pilnuje tego samego, ale tylko dla dwóch tabel
    zwrotów. Nowa tabela nie miała strażnika wcale, a CLAUDE.md przedstawiał
    tamten test jako strażnika zasady prywatności. Ten plik przechodzi przez

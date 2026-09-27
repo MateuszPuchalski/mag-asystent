@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Zadania } from "./Zadania";
 import { atrapaZapisow } from "../test/zapisy";
 
-/* ── ZERO ZAPISU PRZY OTWARCIU ZADAŃ (@wydanie) ──────────────────────────────
+/* ── ZERO ZAPISU PRZY OTWARCIU ZADAŃ (0.544.0) ──────────────────────────────
    Osobny plik, bo `Zadania.test.tsx` podmienia moduł `../api/rozmowy`,
    a podmiana obowiązuje cały plik. Tamte testy widzą więc tylko haki, które
    same podstawiły. Ten patrzy na `fetch`, gdzie zapisu nie da się ominąć. */

@@ -120,7 +120,7 @@ test("kasowanie działa, a kasowanie nieistniejącego to 404", async () => {
   assert.equal(znowu.statusCode, 404);
 });
 
-/* ── Pusty JSON to brak ciała (@wydanie) ─────────────────────────────────────
+/* ── Pusty JSON to brak ciała (0.544.0) ─────────────────────────────────────
    Ta blizna przebrała się kiedyś za błąd w logo: panel wysyłał
    `content-type: application/json` przy żądaniu bez ciała, domyślny parser
    Fastify odrzucał to jako FST_ERR_CTP_EMPTY_JSON_BODY, a biuro widziało gołe

@@ -7,7 +7,7 @@ const MAIN = (import.meta.glob("./main.tsx", { query: "?raw", eager: true, impor
 const TESTY = import.meta.glob("./**/*.test.tsx",
   { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
-/* ── KAŻDA TRASA MA STRAŻNIKA ZERA ZAPISU (@wydanie) ─────────────────────────
+/* ── KAŻDA TRASA MA STRAŻNIKA ZERA ZAPISU (0.544.0) ─────────────────────────
    Reguła „otwarcie ekranu niczego nie mutuje" miała strażnika w testach
    ekranów, ale tylko tam, gdzie autor pamiętał go dopisać. Zadania, Wiedza
    i Protokół chodziły bez niego, a CLAUDE.md twierdził, że pilnują go
