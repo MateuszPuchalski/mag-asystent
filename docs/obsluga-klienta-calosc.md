@@ -471,7 +471,11 @@ Krok podpowiada zwrot z powodem `DIFFERENT` albo odmowa wypłaty
 Przy tym trzeba naprawić `services/przesylka-zamowienia.ts`: zna jedną paczkę
 na zamówienie, więc doręczona pierwsza zasłoniłaby niedoręczoną dosyłkę.
 
-Właściciel podał 27 września dwa fakty, jeszcze niesprawdzone na żywym
+Przy złym towarze biuro odrzuca wypłatę za zwrot opcją „Wysłaliśmy nowy
+towar”, czyli `NEW_ITEM_SENT` — tak podał właściciel 27 września. Ten kod
+WERTIS już zapisuje przy zwrocie, więc może sam zaproponować krok „dosłać”.
+
+Właściciel podał 27 września jeszcze dwa fakty, niesprawdzone na żywym
 koncie. Numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro, obok
 pierwszej paczki. Dosyłka jedzie prawie zawsze tym samym przewoźnikiem.
 Jeśli oba się potwierdzą, dosyłkę widać bez wklejania: to druga pozycja
