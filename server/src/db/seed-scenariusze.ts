@@ -546,6 +546,18 @@ function wyczysc(): void {
       `DELETE FROM device_session WHERE user_id IN
          (SELECT user_id FROM app_user WHERE login IN (${luki(LOGINY.length)}))`
     ).run(...LOGINY);
+    /* Sprawa klienta (@wydanie) wskazuje prowadzącego i kończącego kluczem
+       obcym bez kaskady. Sprawa założona na koncie ze scenariuszy (ktoś
+       przeklikał profil na bazie pokazowej) wywracałaby kasowanie kont niżej
+       i ponowny seed stawałby w pół drogi. Sprawy odchodzą z kontami: bez
+       prowadzącego nikt by ich nie zobaczył na „Moje”. */
+    const kontaScenariuszy = `SELECT user_id FROM app_user
+       WHERE login IN (${luki(LOGINY.length)})
+          OR (login IS NULL AND name IN (${luki(PODPISY.length)}))`;
+    d.prepare(
+      `DELETE FROM klient_prowadzenie WHERE prowadzi_user_id IN (${kontaScenariuszy})
+          OR zakonczyl_user_id IN (${kontaScenariuszy})`
+    ).run(...LOGINY, ...PODPISY, ...LOGINY, ...PODPISY);
     d.prepare(`DELETE FROM app_user WHERE login IN (${luki(LOGINY.length)})`).run(...LOGINY);
     /* Konta bez loginu podpisane nazwą ze scenariuszy: konto-ślad zakładane
        niżej ORAZ to, co z tych samych nazw zrobiła migracja historii

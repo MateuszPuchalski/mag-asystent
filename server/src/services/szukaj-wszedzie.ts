@@ -117,6 +117,19 @@ export function szukajWszedzie(
     q, `${naLike(q)}%`, q, like, like, jakTelefon ? 1 : 0, `%${cyfry}`, q, NA_RODZAJ,
   ) as Wiersz[];
 
+  /* KUPUJĄCY ZAMÓWIENIA jako klient (@wydanie, sprawa klienta). Brak w dostawie
+     przychodzi z numerem zamówienia, a sprawę klienta zakłada się na profilu.
+     Bez tego wiersza droga szła przez zamówienie w Allegro i z powrotem po
+     login. Trafienie po loginie ma już swój wiersz wyżej (i jego limit), więc
+     dokładamy tylko kupujących z trafień po numerze, liście albo telefonie.
+     Stoi PRZED zamówieniami, bo klienci są na górze listy. */
+  for (const z of zamowienia) {
+    const login = tekst(z.kupujacy_login);
+    if (!login || String(z.dlaczego) === "login kupującego") continue;
+    dodaj({ rodzaj: "klient", id: login.toLowerCase(), tytul: login, dlaczego: "kupujący zamówienia",
+      cel: `/obsluga/klient/${encodeURIComponent(login)}`, link: null });
+  }
+
   for (const z of zamowienia) {
     const id = String(z.external_id);
     dodaj({

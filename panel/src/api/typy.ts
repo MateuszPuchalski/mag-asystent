@@ -394,15 +394,33 @@ export interface SprawaZakupu {
  *
  * TRZY KOLEJKI, nie cztery: zwrot nie ma prowadzącego od 0.370.0, bo
  * przechodzi przez biuro jako kolejka decyzji, a nie jako czyjaś sprawa.
+ *
+ * `klient` TO NIE CZWARTA KOLEJKA (S6, @wydanie), tylko sprawa klienta, którą
+ * ta osoba prowadzi. Wchodzi do tej samej listy, bo „Moje" odpowiada na „co
+ * teraz zrobić", a krok z terminem jest dokładnie taką odpowiedzią. Lustro
+ * `MojaSprawa` z `services/droga-klienta.ts`.
  */
 export interface MojaSprawa {
-  kolejka: "rozmowa" | "reklamacja" | "dyskusja";
+  kolejka: "rozmowa" | "reklamacja" | "dyskusja" | "klient";
   id: number;
+  /** Przy sprawie klienta: „{login}: {krok}". */
   opis: string;
   /** Ostatni ruch przy sprawie — zegar opisowy, nie termin. */
   at: string;
-  /** Termin z Allegro; `null` przy rozmowie i dyskusji, które go nie mają. */
+  /** Termin z Allegro; `null` przy rozmowie i dyskusji. Przy sprawie klienta — termin kroku,
+   *  ale tylko w toku: obudzona zakończona ma `null`, bo jej krok już nie biegnie. */
   terminDo: string | null;
+  /* Pola poniżej niesie WYŁĄCZNIE wiersz sprawy klienta. Opcjonalne, bo
+     trzy kolejki ich nie mają, a starszy serwer nie niesie ich wcale. */
+  /** Dokąd prowadzi wiersz: źródło najnowszego zdarzenia albo profil klienta. */
+  cel?: string;
+  login?: string;
+  /** Krok czeka na swój dzień — wiersz stoi na końcu listy i nie świeci. */
+  czeka?: boolean;
+  poTerminie?: boolean;
+  dzis?: boolean;
+  /** Zdanie pierwszego zdarzenia od klienta po naszym ostatnim ruchu. */
+  nowe?: string | null;
 }
 
 /** Jeden miesiąc miary eskalacji (S5 spoiwa) — zawsze z własną podstawą. */
@@ -1067,7 +1085,55 @@ export type DokumentySprzedazy = {
 
 export type HistoriaKlienta = {
   login: string | null; maszyny: MaszynaKlienta[]; wpisy: WpisHistorii[];
+  /* Sprawa klienta przy historii źródła (S6, @wydanie). Wiązanie po loginie
+     musi działać w obie strony (`CLAUDE.md`): profil prowadzi do rozmowy, więc
+     rozmowa, zwrot i reklamacja prowadzą do sprawy. Opcjonalne, bo profil
+     składa historię sam i sprawę pokazuje własną kartą. */
+  sprawa?: SprawaKlienta | null;
 };
+
+/**
+ * Zdarzenie od klienta (albo Allegro) po naszym ostatnim ruchu przy sprawie.
+ * Zdanie składa serwer — ekran go nie buduje, żeby „Klient napisał" znaczyło
+ * na każdym ekranie to samo.
+ */
+export interface NoweZdarzenie {
+  rodzaj: "rozmowa" | "zwrot_nowy" | "zwrot_nadany" | "zwrot_dotarl" | "reklamacja" | "dyskusja"
+    | "wiadomosc_sprawy";
+  tekst: string;
+  at: string | null;
+  /** Adres źródła w panelu; `null`, gdy źródło nie ma własnego ekranu. */
+  cel: string | null;
+}
+
+/**
+ * Sprawa klienta (S6, @wydanie) — lustro `SprawaKlienta`
+ * z `services/prowadzenie-klienta.ts`.
+ *
+ * Stoi TUTAJ, a nie w `spoiwo.ts`, choć tam mieszkają jej hooki: niesie ją
+ * też `HistoriaKlienta`, a ten plik kształtów niczego nie importuje i nie
+ * powinien zaczynać — `spoiwo.ts` oddaje ją dalej.
+ */
+export interface SprawaKlienta {
+  id: number;
+  login: string;
+  /** 0 nie przychodzi nigdy — tak ekran pisze „wiersza jeszcze nie ma". */
+  wersja: number;
+  stan: "w_toku" | "zakonczona";
+  /** Ostatni krok; po zakończeniu zostaje, żeby „Cofnij" miało co przywrócić. */
+  krok: string;
+  krokDo: string;
+  /** Liczy serwer w dacie magazynu, nie przeglądarka w swojej strefie. */
+  dzis: boolean;
+  poTerminie: boolean;
+  prowadzi: string | null;
+  prowadziId: number | null;
+  zakonczonoAt: string | null;
+  zakonczyl: string | null;
+  nowe: NoweZdarzenie[];
+  /** Odcisk faktów, które ekran narysował — zapis go odsyła (świeżość, dekalog 4). */
+  odcisk: string;
+}
 
 export type Zadanie = {
   id: number; rodzaj: string; tytul: string; instrukcja: string;

@@ -179,6 +179,102 @@ export function historiaSprawy(
 }
 
 /**
+ * Konta, na których ten login coś ma, z loginem TAK, JAK ZAPISAŁO GO ALLEGRO.
+ *
+ * Cztery źródła naraz: zamówienia, zwroty, sprawy i wątki skrzynki. Zwykle
+ * jedno konto, ale login jest unikalny w obrębie konta sprzedawcy, nie
+ * globalnie — historia składa się per konto. Pusta lista znaczy „nie znamy”.
+ *
+ * Stała w profilu klienta; tu jest od @wydanie, bo sprawa klienta pyta
+ * o dokładnie to samo. Dwie kopie tego złączenia rozjechałyby się przy
+ * pierwszym piątym źródle, a sprawa budziłaby się z innych rozmów, niż
+ * profil pokazuje.
+ */
+export function kontaLoginu(
+  database: DatabaseSync, login: string,
+): Array<{ konto: number; login: string }> {
+  return (database.prepare(`
+    SELECT channel_account_id AS k, kupujacy_login AS l FROM zamowienie_klienta WHERE kupujacy_login = ?1 COLLATE NOCASE
+    UNION SELECT channel_account_id, kupujacy_login FROM zwrot_klienta WHERE kupujacy_login = ?1 COLLATE NOCASE
+    UNION SELECT channel_account_id, kupujacy_login FROM reklamacja_klienta WHERE kupujacy_login = ?1 COLLATE NOCASE
+    UNION SELECT c.channel_account_id, t.interlocutor_login FROM conversation c
+      JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
+     WHERE t.interlocutor_login = ?1 COLLATE NOCASE`).all(login) as Array<Record<string, unknown>>)
+    .map((w) => ({ konto: Number(w.k), login: String(w.l) }));
+}
+
+/**
+ * Rozmowy loginu na jednym koncie — dwiema drogami: login rozmówcy z wątku
+ * i numery zamówień tego loginu (także wskazane ręcznie, przez
+ * `ROZMOWA_ZAMOWIENIA`). Od najświeższej.
+ *
+ * JEDNA definicja dla osi profilu i dla sprawy klienta (@wydanie). Sprawa
+ * budzi się z wiadomości w tych rozmowach, więc ręczna kopia zapytania
+ * dawałaby obudzenie z rozmowy, której profil nie pokazuje — albo odwrotnie.
+ */
+export function rozmowyPoLoginie(
+  database: DatabaseSync, konto: number, login: string,
+): Array<{ id: number; subject: string | null; updated_at: string }> {
+  const numery = (database.prepare(
+    "SELECT external_id FROM zamowienie_klienta WHERE channel_account_id = ? AND kupujacy_login = ? COLLATE NOCASE",
+  ).all(konto, login) as Array<Record<string, unknown>>).map((z) => String(z.external_id));
+  const warunek = numery.length ? numery : [""];
+  /* KANDYDACI NAJPIERW, konto potem. Warunek „login ALBO numer” na każdej
+     rozmowie konta kazał SQLite przejrzeć wszystkie rozmowy — przy „Moje”
+     liczone raz na każdą prowadzoną sprawę, co 30 sekund. Tu obie drogi idą
+     po indeksach (login bez wielkości liter, wątek, numer zamówienia,
+     wskazanie ręczne), a konto sprawdza się na kilku trafieniach. Plus przed
+     `c.channel_account_id` to wskazówka dla planisty: bez niego wybiera indeks
+     konta i wraca do przeglądania wszystkich rozmów. */
+  return (database.prepare(`
+    SELECT c.id, c.subject, c.updated_at
+      FROM conversation c
+     WHERE c.id IN (
+             SELECT k.id FROM allegro_inbox_thread t
+               JOIN conversation k ON k.external_conversation_id = t.id
+              WHERE t.interlocutor_login = ? COLLATE NOCASE
+             UNION
+             SELECT rz.conversation_id FROM ${ROZMOWA_ZAMOWIENIA} rz
+              WHERE rz.numer IN (${warunek.map(() => "?").join(",")}))
+       AND +c.channel_account_id = ?
+     ORDER BY julianday(c.updated_at) DESC, c.id DESC`).all(login, ...warunek, konto) as Array<Record<string, unknown>>)
+    .map((r) => ({ id: Number(r.id), subject: tekst(r.subject), updated_at: String(r.updated_at) }));
+}
+
+/**
+ * Login, którego SPRAWA KLIENTA dotyczy tej rozmowy (@wydanie), albo `null`.
+ *
+ * Najpierw rozmówca z wątku. Gdy wątek go nie niesie (schemat Allegro
+ * dopuszcza `interlocutor: null`), login kupującego z zamówienia tej rozmowy,
+ * na tym samym koncie, przez `ROZMOWA_ZAMOWIENIA` — tą samą drogą, którą
+ * `rozmowyPoLoginie` dowiązuje rozmowę do klienta. Sprawa budzi się z takiej
+ * rozmowy i prowadzi do niej odnośnikiem, więc rozmowa musi pokazać tę
+ * sprawę: wiązanie jednostronne to wiązanie, którego nie ma.
+ *
+ * Dwóch różnych kupujących to `null`, a nie wybór jednego. Numer zamówienia
+ * to fakt z Allegro; wybór między dwoma byłby zgadywaniem klienta — tego
+ * samego, którego ta zakładka nie robi z treści rozmowy.
+ */
+export function loginSprawyRozmowy(database: DatabaseSync, conversationId: number): string | null {
+  const r = database.prepare(`SELECT c.channel_account_id AS konto, t.interlocutor_login AS login
+      FROM conversation c LEFT JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
+     WHERE c.id = ?`).get(conversationId) as Record<string, unknown> | undefined;
+  if (!r) return null;
+  const zWatku = tekst(r.login);
+  if (zWatku) return zWatku;
+  /* Bez wielkości liter: „Chips20” i „chips20” z dwóch zamówień to jeden klient. */
+  const kupujacy = new Map<string, string>();
+  for (const w of database.prepare(`SELECT DISTINCT z.kupujacy_login AS l
+      FROM ${ROZMOWA_ZAMOWIENIA} rz
+      JOIN zamowienie_klienta z ON z.external_id = rz.numer AND z.channel_account_id = ?
+     WHERE rz.conversation_id = ?`).all(Number(r.konto), conversationId) as Array<Record<string, unknown>>) {
+    const l = tekst(w.l);
+    if (l) kupujacy.set(l.toLowerCase(), l);
+  }
+  return kupujacy.size === 1 ? [...kupujacy.values()][0] : null;
+}
+
+/**
  * Historia po SAMYM loginie, bez sprawy, z której się przyszło — dla profilu
  * klienta (24 września 2026). Rozmowy te same dwiema drogami co przy zwrocie:
  * login rozmówcy i numery zamówień tego loginu. Nic nie jest pomijane, bo
@@ -187,20 +283,7 @@ export function historiaSprawy(
 export function historiaPoLoginie(
   konto: number, login: string, database: DatabaseSync = db(),
 ): HistoriaKlienta {
-  const numery = (database.prepare(
-    "SELECT external_id FROM zamowienie_klienta WHERE channel_account_id = ? AND kupujacy_login = ? COLLATE NOCASE",
-  ).all(konto, login) as Array<Record<string, unknown>>).map((z) => String(z.external_id));
-  const warunek = numery.length ? numery : [""];
-  const rozmowy = database.prepare(`
-    SELECT c.id, c.subject, c.updated_at
-      FROM conversation c
-      LEFT JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
-     WHERE c.channel_account_id = ?
-       AND (t.interlocutor_login = ? COLLATE NOCASE
-            OR EXISTS (SELECT 1 FROM ${ROZMOWA_ZAMOWIENIA} rz WHERE rz.conversation_id = c.id
-                        AND rz.numer IN (${warunek.map(() => "?").join(",")})))
-     ORDER BY c.updated_at DESC`).all(konto, login, ...warunek) as Array<Record<string, unknown>>;
-  return zbierz(database, konto, login, rozmowy, { rodzaj: "zakup", id: -1 });
+  return zbierz(database, konto, login, rozmowyPoLoginie(database, konto, login), { rodzaj: "zakup", id: -1 });
 }
 
 /**

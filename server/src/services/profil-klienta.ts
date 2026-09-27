@@ -2,10 +2,11 @@ import type { DatabaseSync } from "node:sqlite";
 import { db as defaultDb } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { linkZamowienia } from "./allegro-linki.js";
-import { historiaPoLoginie, type MaszynaKlienta, type WpisHistorii } from "./klient-historia.js";
+import { historiaPoLoginie, kontaLoginu, type MaszynaKlienta, type WpisHistorii } from "./klient-historia.js";
 import { przesylkaZamowienia, stanPrzesylkiKrotko } from "./przesylka-zamowienia.js";
 import { sprawaOtwarta } from "./statusy-spraw.js";
 import { statusRozmowy } from "./conversations.js";
+import { sprawaKlienta, type SprawaKlienta } from "./prowadzenie-klienta.js";
 
 /* ── Profil klienta: wszystko, co z nim związane, w jednym widoku ────────────
    (24 września 2026, zgłoszenie właściciela). Historia klienta istniała od S2
@@ -13,10 +14,13 @@ import { statusRozmowy } from "./conversations.js";
    zwrotu. Klient jako byt nie miał adresu: nie dało się do niego wejść
    z szukania ani wkleić koledze linku „zobacz, kto to”.
 
-   ODCZYT Z ISTNIEJĄCYCH TABEL, poza notatką. Liczby, sygnały i sprawy otwarte
-   liczą się przy otwarciu z zamówień, zwrotów, spraw i rozmów. Piątej tabeli
-   ze wspólnym statusem nad kolejkami nie ma — klient nie ma własnego statusu,
-   ma tylko sumę swoich spraw (`CLAUDE.md`).
+   ODCZYT Z ISTNIEJĄCYCH TABEL, poza notatką i sprawą klienta. Liczby, sygnały
+   i sprawy otwarte liczą się przy otwarciu z zamówień, zwrotów, spraw
+   i rozmów. Piątej tabeli ze wspólnym statusem nad kolejkami nie ma i nie
+   będzie. Sprawa klienta (@wydanie, S6) nim nie jest: nie zbiera statusów
+   kolejek, tylko niesie NASZ następny krok z terminem i prowadzącego — to,
+   czego żadna kolejka nie wie, bo „czekamy na zwrot, potem dosyłamy”
+   przechodzi przez kilka z nich. Powód i granice w `prowadzenie-klienta.ts`.
 
    TOŻSAMOŚĆ TO LOGIN, BEZ WIELKOŚCI LITER, na wszystkich kontach kanału naraz.
    Login rozmówcy to login kupującego — zweryfikował to właściciel 24 września
@@ -89,6 +93,14 @@ export interface ProfilKlienta {
   maszyny: MaszynaKlienta[];
   os: WpisHistorii[];
   notatka: NotatkaKlienta | null;
+  /** Sprawa klienta (S6): krok, termin, prowadzący; `null`, gdy nikt jej nie założył. */
+  sprawa: SprawaKlienta | null;
+  /**
+   * Podpowiedź „Zakończ sprawę?”: sprawa w toku, w kolejkach nic otwartego,
+   * a termin kroku nadszedł. Wcześniej podpowiedź pchałaby do zamknięcia
+   * sprawy, na której krok jeszcze się nie spełnił.
+   */
+  podpowiedzZakonczenia: boolean;
 }
 
 type Wiersz = Record<string, unknown>;
@@ -121,22 +133,16 @@ export function profilKlienta(
   const q = loginWpisany.trim();
   if (!q) return null;
 
-  /* Konta, na których ten login coś ma. Zwykle jedno, ale login jest unikalny
-     w obrębie konta sprzedawcy, nie globalnie — historia składa się per konto. */
-  const konta = (database.prepare(`
-    SELECT channel_account_id AS k, kupujacy_login AS l FROM zamowienie_klienta WHERE kupujacy_login = ? COLLATE NOCASE
-    UNION SELECT channel_account_id, kupujacy_login FROM zwrot_klienta WHERE kupujacy_login = ? COLLATE NOCASE
-    UNION SELECT channel_account_id, kupujacy_login FROM reklamacja_klienta WHERE kupujacy_login = ? COLLATE NOCASE
-    UNION SELECT c.channel_account_id, t.interlocutor_login FROM conversation c
-      JOIN allegro_inbox_thread t ON t.id = c.external_conversation_id
-     WHERE t.interlocutor_login = ? COLLATE NOCASE`).all(q, q, q, q) as Wiersz[]);
+  /* Konta, na których ten login coś ma — wspólne ze sprawą klienta
+     (`kontaLoginu`), żeby obie strony znały tego samego klienta. */
+  const konta = kontaLoginu(database, q);
   if (konta.length === 0) return null;
   /* Login do nagłówka tak, jak zapisało go Allegro, nie jak wpisał agent. */
-  const login = String(konta[0].l);
+  const login = konta[0].login;
 
   const maszyny: MaszynaKlienta[] = [];
   const os: WpisHistorii[] = [];
-  for (const k of new Set(konta.map((w) => Number(w.k)))) {
+  for (const k of new Set(konta.map((w) => w.konto))) {
     const h = historiaPoLoginie(k, q, database);
     maszyny.push(...h.maszyny);
     os.push(...h.wpisy);
@@ -230,6 +236,7 @@ export function profilKlienta(
       WHERE login = ? COLLATE NOCASE`).get(q) as Wiersz | undefined;
 
   const ile = (r: WpisHistorii["rodzaj"]) => os.filter((w) => w.rodzaj === r).length;
+  const sprawa = sprawaKlienta(q, teraz, database);
   return {
     login,
     liczby: {
@@ -244,6 +251,9 @@ export function profilKlienta(
     notatka: n && tekst(n.tresc)
       ? { tresc: String(n.tresc), at: String(n.at), przez: String(n.przez), cofalna: n.poprzednia != null }
       : null,
+    sprawa,
+    podpowiedzZakonczenia: sprawa !== null && sprawa.stan === "w_toku" && otwarte.length === 0
+      && (sprawa.dzis || sprawa.poTerminie),
   };
 }
 

@@ -237,3 +237,51 @@ test("login z wątku różny wielkością liter od zamówienia dalej znajduje za
   assert.ok(h.wpisy.some((w) => w.rodzaj === "zakup" && w.zamowienieId === "ord-case"));
   assert.ok(h.wpisy.some((w) => w.rodzaj === "rozmowa" && w.rozmowaId === druga));
 });
+
+/* ── Wspólne złączenia profilu i sprawy klienta (@wydanie) ───────────────────
+   `kontaLoginu` i `rozmowyPoLoginie` stały w profilu jako kopie; sprawa
+   klienta pyta o to samo. Jedna definicja — i ten sam klient po obu stronach. */
+test("kontaLoginu: cztery źródła, bez wielkości liter, login tak jak w Allegro; nieznany to pusta lista", async () => {
+  const { kontaLoginu } = await import("./klient-historia.js");
+  zwrotKlienta("Zwrotny", "ZW-9", "2026-09-01T10:00:00Z");
+  assert.deepEqual(kontaLoginu(db(), "zwrotny"), [{ konto, login: "Zwrotny" }]);
+  assert.deepEqual(kontaLoginu(db(), "ZIELONY_OGROD").map((k) => k.login), ["zielony_ogrod"],
+    "sam wątek skrzynki wystarcza, żeby znać klienta");
+  assert.deepEqual(kontaLoginu(db(), "nikt"), []);
+});
+
+test("rozmowyPoLoginie: login rozmówcy i numer zamówienia, bez cudzych, od najświeższej", async () => {
+  const { rozmowyPoLoginie } = await import("./klient-historia.js");
+  zakup("zielony_ogrod", "ord-7", "Nóż", "2026-08-01T10:00:00Z");
+  const bezLoginu = rozmowa("w-bez", null, "gdzie paczka", "2026-09-03T10:00:00Z");
+  db().prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    related_order_id,sent_at) VALUES (?,?,'m-bez','incoming','?','ord-7','2026-09-03T10:00:00Z')`)
+    .run(bezLoginu, konto);
+  assert.deepEqual(rozmowyPoLoginie(db(), konto, "Zielony_Ogrod").map((r) => r.id), [bezLoginu, biezaca, starsza]);
+  assert.ok(!rozmowyPoLoginie(db(), konto, "zielony_ogrod").some((r) => r.id === obca));
+});
+
+test("loginSprawyRozmowy: rozmówca z wątku, a bez niego jedyny kupujący z zamówienia rozmowy", async () => {
+  /* Sprawa budzi się z rozmowy dowiązanej numerem zamówienia, więc ta rozmowa
+     musi znać jej login — ale tylko z numeru, nigdy z treści. Dwóch różnych
+     kupujących to brak odpowiedzi, a nie wybór jednego z nich. */
+  const { loginSprawyRozmowy } = await import("./klient-historia.js");
+  assert.equal(loginSprawyRozmowy(db(), biezaca), "zielony_ogrod");
+  assert.equal(loginSprawyRozmowy(db(), 999_999), null);
+
+  zakup("Kupiec_A", "ord-a", "Nóż", "2026-08-01T10:00:00Z");
+  zakup("kupiec_a", "ord-a2", "Pasek", "2026-08-02T10:00:00Z");
+  zakup("kupiec_b", "ord-b", "Filtr", "2026-08-03T10:00:00Z");
+  const wiadomoscZNumerem = (c: number, numer: string) => db().prepare(`INSERT INTO message(conversation_id,
+      channel_account_id,external_message_id,direction,body,related_order_id,sent_at)
+    VALUES (?,?,?,'incoming','treść',?,'2026-09-03T10:00:00Z')`).run(c, konto, `m-${numer}-${c}`, numer);
+
+  const bezLoginu = rozmowa("w-bez", null, "gdzie paczka", "2026-09-03T10:00:00Z");
+  assert.equal(loginSprawyRozmowy(db(), bezLoginu), null, "bez rozmówcy i bez numeru nie wiemy, czyja");
+  wiadomoscZNumerem(bezLoginu, "ord-a");
+  wiadomoscZNumerem(bezLoginu, "ord-a2");
+  assert.equal(loginSprawyRozmowy(db(), bezLoginu)?.toLowerCase(), "kupiec_a",
+    "ten sam login różnie zapisany to jeden klient");
+  wiadomoscZNumerem(bezLoginu, "ord-b");
+  assert.equal(loginSprawyRozmowy(db(), bezLoginu), null, "dwóch kupujących — nie zgadujemy");
+});

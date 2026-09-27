@@ -1110,6 +1110,58 @@ odczycie.
 **Do dostawcy modelu nie idzie stąd nic.** Copilot nie ma dostępu do tego
 ekranu, tak samo jak nie ma go do reklamacji.
 
+## Polityka danych sprawy klienta (@wydanie)
+
+Ten rozdział powstaje razem ze sprawą klienta (`docs/obsluga-klienta-calosc.md`,
+S6). To druga, po `klient_notatka`, tabela, której kluczem jest sam login
+kupującego. Jej granice stoją osobno, bo trzyma terminy i prowadzącego, czyli
+dane także o nas.
+
+**Co zapisujemy.** Login jako klucz, tak jak zapisało go Allegro. Następny
+krok, najwyżej 200 znaków, i jego termin. Krok zostaje po zakończeniu, bo
+„Cofnij" przywraca go bez pytania, i znika dopiero pod następnym krokiem.
+Obok leży odcisk faktów po stronie klienta: liczby zwrotów, spraw i wiadomości
+w sprawach oraz czas wstawienia najnowszej wiadomości klienta. Treści w nim
+nie ma. Zakończenie odkłada jeszcze odcisk sprzed siebie, dla „Cofnij”, a nowy
+krok go zdejmuje.
+
+**Prowadzący i kończący to dane o NAS.** Przy obu stoi imię dla oka i numer
+konta z `app_user` dla maszyny, jak przy reklamacjach od 0.278.0. Do Allegro
+nie idzie żadne z nich. Sprawy per osoba pokazuje wyłącznie własne „Moje"
+oglądającego, z tożsamością z sesji. Zestawienia dla kogoś innego nie ma, bo
+byłoby monitoringiem pracowniczym (art. 22² Kodeksu pracy).
+
+**Do dziennika nie idzie login ani treść kroku.** Zdarzenia `klient_sprawa_*`
+niosą numer sprawy, długość kroku i termin. Przejęcie niesie jeszcze numer
+konta poprzedniego prowadzącego. `events` nie ma retencji, a krok bywa zdaniem
+o człowieku. Numer sprawy wystarcza do śladu „kto i kiedy", a login leży
+w jednym wierszu tabeli.
+
+**Audyt odrzuceń pisze wzorzec trasy, nie adres.** Pod `/api/obsluga/klient/`
+adres niesie login, a odrzucenie (`http_rejected`) zapisywało go do `events`.
+Od @wydanie idzie tam wzorzec, np. `/api/obsluga/klient/:login/sprawa/krok`.
+To domyka też starszy wyciek przy 404 profilu i przy odmowie notatki. Zdania
+błędów sprawy są stałe, bez loginu i bez kroku. Wpisy `http_rejected` sprzed
+@wydanie zostają z adresem, a w nim z loginem. Czyszczenie ich to decyzja
+właściciela, bo §9 architektury zabrania nadpisywania historii.
+
+**Sprawa nie wychodzi dalej.** Nie czyta jej Copilot i nie ma jej w eksporcie
+CSV, w migawce doby ani w raporcie tygodnia. Do Allegro nie idzie żadnym
+polem. Kopia bazy niesie ją jak każdą inną tabelę. Hala jej nie widzi: bramka
+roli stoi na każdej trasie, także na odczycie.
+
+**Krok nie niesie adresu ani telefonu.** To reguła dla człowieka, bo pole jest
+wolnym tekstem i kod jej nie wymusi. Wyjątek z 0.422.0 dotyczy mapowania
+zamówień, nie tego pola. Numer przesyłki dosyłki dostanie w następnym
+przyroście własną kolumnę. Stanie przy niej własne uzasadnienie, bo numer
+prowadzi do adresu odbiorcy.
+
+**Retencji nie ma, tak jak przy notatce o kliencie.** Wiersz żyje tak długo
+jak klient w bazie. Zakończona sprawa budzi się tylko przez trzydzieści dni
+(S6), ale profil dalej pokazuje jej ostatni krok i to, kto ją prowadził.
+Kasowanie po czasie zabrałoby agentowi ten ślad przy następnym kontakcie
+klienta. O archiwizacji decyduje właściciel, nie kod, jak przy `events`.
+
 ## Co się nie zmienia
 
 Trzy rzeczy nie są przedmiotem tej przebudowy, bo nie mają z nią nic wspólnego:

@@ -2890,6 +2890,21 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do @wydanie — sprawa klienta
+
+**Panel trzeba przebudować, a serwer zrestartować.** Tabela
+`klient_prowadzenie` i sześć indeksów powstają same przy starcie. Indeksy
+przyspieszają pytania o klienta w wątkach, rozmowach, zwrotach, reklamacjach
+i zamówieniach, bo „Moje” zadaje je przy każdym odświeżeniu.
+
+Sprawdzenie: otwórz profil klienta z otwartym zwrotem. Kliknij „Ustaw krok”,
+potem „czekamy na zwrot” i gotowy termin. Karta ma pokazać krok, termin
+i „prowadzisz”. Ten klient ma stanąć na Twoim „Moje”. W dzienniku ma stanąć
+`klient_sprawa_krok` z numerem sprawy, bez loginu.
+
+Odrzucenia pod `/api/obsluga/klient/` zapisują od tego wydania wzorzec trasy
+zamiast loginu. Starsze wpisy `http_rejected` zostają w dzienniku bez zmian.
+
 ### Aktualizacja do 0.534.0 — szkice przed pracą
 
 **Panel trzeba przebudować, a serwer zrestartować.** Migracji nie ma.

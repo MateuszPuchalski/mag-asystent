@@ -22,7 +22,9 @@ import { statusRozmowy } from "./conversations.js";
    ZERO ŻĄDAŃ DO ALLEGRO i zero nowych tabel. Wszystko, czego te odczyty
    potrzebują, leży już w naszej bazie od pierwszej synchronizacji. Piąta
    tabela ze wspólnym statusem nad kolejkami kosztowałaby to, co nakładka
-   spraw w 0.140.0 — cztery tabele i ręczne SCAL. */
+   spraw w 0.140.0 — cztery tabele i ręczne SCAL. `klient_prowadzenie`
+   (@wydanie, S6) taką tabelą nie jest: nie zbiera statusów kolejek, tylko
+   niesie nasz następny krok — powód w `prowadzenie-klienta.ts`. */
 
 type Wiersz = Record<string, unknown>;
 
@@ -285,19 +287,39 @@ export function kontekstZwrotu(
 /** Jedna pozycja listy „Moje" — z której kolejki i co to za sprawa. */
 export interface MojaSprawa {
   /* Trzy kolejki, nie cztery: zwrot nie ma prowadzącego od 0.370.0. Powód
-     stoi przy zapytaniach w `mojeSprawy`. */
-  kolejka: "rozmowa" | "reklamacja" | "dyskusja";
+     stoi przy zapytaniach w `mojeSprawy`.
+
+     `klient` to sprawa klienta (S6, @wydanie) — nie kolejka, tylko nasz
+     następny krok przy kliencie. Wiersze dokłada `mojaLista`
+     w `prowadzenie-klienta.ts`; ten plik zna wyłącznie TYP, bo import
+     w drugą stronę zamknąłby cykl (blizna `statusy-spraw.ts`). */
+  kolejka: "rozmowa" | "reklamacja" | "dyskusja" | "klient";
   id: number;
   /** Zdanie na wiersz: temat rozmowy, numer zwrotu albo temat sprawy. */
   opis: string;
   /** Ostatni ruch przy sprawie — zegar opisowy, nie termin. */
   at: string;
-  /** Termin z Allegro albo ustawowy; `null` przy rozmowie i dyskusji. */
+  /** Termin z Allegro albo ustawowy; `null` przy rozmowie i dyskusji. Przy
+   *  sprawie klienta — termin kroku, gdy sprawa jest w toku. */
   terminDo: string | null;
+  /* Pola niżej niesie WYŁĄCZNIE wiersz `klient`. Wiersz kolejki prowadzi na
+     ekran swojej kolejki po `id`, a sprawa klienta — tam, gdzie klient się
+     ruszył (źródło najnowszego zdarzenia), albo na jego profil. */
+  /** Adres w panelu; przy sprawie klienta źródło najnowszego zdarzenia albo profil. */
+  cel?: string;
+  login?: string;
+  /** Krok na przyszłość — na liście, ale nie woła o ruch dziś. */
+  czeka?: boolean;
+  poTerminie?: boolean;
+  dzis?: boolean;
+  /** Zdanie najnowszego zdarzenia po stronie klienta; `null`, gdy nic nowego. */
+  nowe?: string | null;
 }
 
 /**
  * Wszystko, co prowadzi jedna osoba — trzy kolejki jedną listą (S4 spoiwa).
+ * Sprawy klienta (S6, @wydanie) dokłada do niej `mojaLista`
+ * w `prowadzenie-klienta.ts` i to ją woła trasa „Moje”, nie tę funkcję.
  *
  * ODCZYT Z DWÓCH ZAPYTAŃ, nie piąta kolejka i nie nowa tabela. Kliknięcie
  * prowadzi na ekran właściwy dla rodzaju sprawy, bo to tam stoją jej bramki.

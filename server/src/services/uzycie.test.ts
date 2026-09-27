@@ -110,4 +110,9 @@ test("obszar po przedrostku typu", () => {
   assert.equal(U.obszarZdarzenia("kosz_rozlozony"), "Kosze");
   assert.equal(U.obszarZdarzenia("reklamacje_synchronizacja_reczna"), "Reklamacje");
   assert.equal(U.obszarZdarzenia("cos_nowego"), "Inne");
+  /* Sprawa klienta (@wydanie) żyje na profilu, nie w skrzynce — przedrostek
+     `klient_sprawa` musi stać PRZED ogólnym `klient_`, bo wygrywa pierwszy. */
+  assert.equal(U.obszarZdarzenia("klient_sprawa_krok"), "Profil klienta");
+  assert.equal(U.obszarZdarzenia("klient_sprawa_zakonczona"), "Profil klienta");
+  assert.equal(U.obszarZdarzenia("klient_odrzucona"), "Skrzynka");
 });

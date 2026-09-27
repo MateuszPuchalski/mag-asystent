@@ -45,6 +45,28 @@ test("popsuty znacznik wraca NIEZMIENIONY, nie jako Invalid Date", () => {
   assert.equal(C.stempelLokalny("2026-13-45"), "2026-13-45");
 });
 
+test("znacznik bez strefy to UTC, jak w SQLite — niezależnie od strefy maszyny", () => {
+  /* Strefa PROCESU, nie ustawienie magazynu: `Date.parse` czyta napis ze
+     spacją po zegarze maszyny, i właśnie tego pomocnik ma nie robić. */
+  const byla = process.env.TZ;
+  try {
+    for (const strefa of ["Europe/Warsaw", "America/Sao_Paulo", "UTC"]) {
+      process.env.TZ = strefa;
+      assert.equal(C.chwilaUtc("2026-09-26 10:30:00"), Date.parse("2026-09-26T10:30:00Z"), strefa);
+      assert.equal(C.chwilaUtc("2026-09-26T10:30:00"), Date.parse("2026-09-26T10:30:00Z"), strefa);
+      assert.equal(C.chwilaUtc("2026-09-26 10:30"), Date.parse("2026-09-26T10:30:00Z"), strefa);
+    }
+  } finally {
+    if (byla === undefined) delete process.env.TZ; else process.env.TZ = byla;
+  }
+  /* Znacznik ze strefą zostaje, jaki jest; śmieci i pustka to NaN. */
+  assert.equal(C.chwilaUtc("2026-09-26T10:30:00.123Z"), Date.parse("2026-09-26T10:30:00.123Z"));
+  assert.equal(C.chwilaUtc("2026-09-26T12:30:00+02:00"), Date.parse("2026-09-26T10:30:00Z"));
+  assert.ok(Number.isNaN(C.chwilaUtc("bez sensu")));
+  assert.ok(Number.isNaN(C.chwilaUtc(null)));
+  assert.ok(Number.isNaN(C.chwilaUtc("")));
+});
+
 /* ── Tydzień na zegarze magazynu (raport tygodnia) ─────────────────────────── */
 
 test("północ lokalna: zimą 23:00 UTC dnia poprzedniego, latem 22:00", () => {

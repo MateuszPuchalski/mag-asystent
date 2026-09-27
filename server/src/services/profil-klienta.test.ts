@@ -27,7 +27,9 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["klient_notatka", "zamowienie_klienta_pozycja", "zamowienie_klienta", "zwrot_klienta",
+  /* `klient_prowadzenie` PRZED `app_user`: prowadzący sprawy klienta to klucz
+     obcy bez kaskady. */
+  for (const t of ["klient_prowadzenie", "klient_notatka", "zamowienie_klienta_pozycja", "zamowienie_klienta", "zwrot_klienta",
     "reklamacja_klienta", "message", "conversation", "allegro_inbox_thread", "channel_account", "events",
     "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
   konto = Number(d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
@@ -118,5 +120,57 @@ test("profil jest odczytem — otwarcie niczego nie zapisuje", () => {
   rozmowa("w-1", "kl", dni(1));
   const przed = (db().prepare("SELECT total_changes() n").get() as { n: number }).n;
   P.profilKlienta("kl", TERAZ, db());
+  assert.equal((db().prepare("SELECT total_changes() n").get() as { n: number }).n, przed);
+});
+
+/* ── Sprawa klienta na profilu (@wydanie, S6) ────────────────────────────────
+   Profil niesie sprawę i podpowiedź „Zakończ sprawę?”. Podpowiedź stoi tylko
+   wtedy, gdy trzy rzeczy zachodzą naraz: sprawa w toku, w kolejkach nic nie
+   czeka, a termin kroku nadszedł. Każda z trzech osobno ją gasi. */
+test("profil bez sprawy: `sprawa` null, bez podpowiedzi", () => {
+  zamowienie("z-1", "kl", dni(3));
+  const p = P.profilKlienta("kl", TERAZ, db())!;
+  assert.equal(p.sprawa, null);
+  assert.equal(p.podpowiedzZakonczenia, false);
+});
+
+test("podpowiedź zakończenia: w toku, nic otwartego w kolejkach, termin kroku nadszedł", async () => {
+  const S = await import("./prowadzenie-klienta.js");
+  zamowienie("z-1", "kl", dni(3));
+  const kto = { id: biuro, name: "Ola" };
+  const zalozono = new Date(TERAZ.getTime() - 3 * 86_400_000);
+  S.ustawKrok("kl", { krok: "czekamy na zwrot", krokDo: new Date(TERAZ.getTime() + 86_400_000).toISOString(),
+    wersja: 0, odcisk: "" }, kto, zalozono, db());
+  let p = P.profilKlienta("KL", TERAZ, db())!;
+  assert.equal(p.sprawa?.krok, "czekamy na zwrot");
+  assert.equal(p.podpowiedzZakonczenia, false, "termin kroku jeszcze nie nadszedł");
+
+  const dwaDniPozniej = new Date(TERAZ.getTime() + 2 * 86_400_000);
+  p = P.profilKlienta("kl", dwaDniPozniej, db())!;
+  assert.equal(p.sprawa?.poTerminie, true);
+  assert.deepEqual(p.otwarte, []);
+  assert.equal(p.podpowiedzZakonczenia, true);
+
+  /* Otwarty zwrot w kolejce gasi podpowiedź — sprawa jeszcze trwa. */
+  const zw = Number(db().prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,reference_number,
+    kupujacy_login,created_at,synced_at) VALUES (?,'zw-1','ZW-1','kl',?,'x')`).run(konto, dni(1)).lastInsertRowid);
+  assert.equal(P.profilKlienta("kl", dwaDniPozniej, db())!.podpowiedzZakonczenia, false);
+  db().prepare("DELETE FROM zwrot_klienta WHERE id=?").run(zw);
+
+  const s = P.profilKlienta("kl", dwaDniPozniej, db())!.sprawa!;
+  S.zakonczSprawe("kl", { wersja: s.wersja, odcisk: s.odcisk }, kto, dwaDniPozniej, db());
+  p = P.profilKlienta("kl", dwaDniPozniej, db())!;
+  assert.equal(p.sprawa?.stan, "zakonczona");
+  assert.equal(p.podpowiedzZakonczenia, false, "zakończonej nie ma czego kończyć");
+});
+
+test("profil ze sprawą dalej jest odczytem", async () => {
+  const S = await import("./prowadzenie-klienta.js");
+  zamowienie("z-1", "kl", dni(3));
+  rozmowa("w-1", "kl", dni(1));
+  S.ustawKrok("kl", { krok: "dosłać", krokDo: new Date(TERAZ.getTime() + 86_400_000).toISOString(),
+    wersja: 0, odcisk: "" }, { id: biuro, name: "Ola" }, TERAZ, db());
+  const przed = (db().prepare("SELECT total_changes() n").get() as { n: number }).n;
+  assert.ok(P.profilKlienta("kl", TERAZ, db())!.sprawa);
   assert.equal((db().prepare("SELECT total_changes() n").get() as { n: number }).n, przed);
 });

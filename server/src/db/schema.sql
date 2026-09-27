@@ -3195,6 +3195,40 @@ CREATE TABLE IF NOT EXISTS klient_notatka (
   przez_user_id  INTEGER REFERENCES app_user(user_id)
 );
 
+-- Sprawa klienta (26 września 2026, @wydanie, S6 `docs/obsluga-klienta-calosc.md`).
+-- Jeden wiersz na login: KTO prowadzi i JAKI jest nasz następny krok z terminem.
+-- To nie jest piąta kolejka ze wspólnym statusem — kolejki mają swoje statusy,
+-- a tu stoi tylko to, czego żadna z nich nie wie. Nazwa nie jest `sprawa_klienta`,
+-- bo `migrate()` kasuje tamtą przy każdym starcie (nakładka spraw, 0.388.0).
+-- Bez CHECK: poszerzenie CHECK to przebudowa tabeli (blizna 0.135.0). Stan
+-- wynika z `zakonczono_at` (NULL = w toku); krok zostaje po zakończeniu, bo
+-- „Cofnij” przywraca go bez pytania. Prowadzący ma nazwę DLA OKA i id DLA
+-- MASZYNY — sama nazwa rozjechała się już raz (0.278.0). `znane_json` to odcisk
+-- faktów po stronie klienta z chwili ostatniego ruchu człowieka; „nowe” to różnica
+-- względem odcisku teraz, liczona przy odczycie (services/prowadzenie-klienta.ts).
+-- `id` trafia do dziennika zamiast loginu — `events` nie ma retencji.
+CREATE TABLE IF NOT EXISTS klient_prowadzenie (
+  id                INTEGER PRIMARY KEY AUTOINCREMENT,
+  login             TEXT NOT NULL UNIQUE COLLATE NOCASE,
+  prowadzi          TEXT,
+  prowadzi_user_id  INTEGER REFERENCES app_user(user_id),
+  krok              TEXT NOT NULL,          -- najwyżej 200 znaków (LIMIT_KROKU)
+  krok_do           TEXT NOT NULL,          -- ISO UTC
+  zakonczono_at     TEXT,                   -- NULL = w toku
+  zakonczyl         TEXT,
+  zakonczyl_user_id INTEGER REFERENCES app_user(user_id),
+  znane_json        TEXT NOT NULL,
+  wersja            INTEGER NOT NULL DEFAULT 1,
+  zmieniono_at      TEXT NOT NULL,          -- ISO UTC, zegar serwera
+  zmieniono_przez   TEXT NOT NULL,
+  -- Odcisk i chwila ruchu SPRZED zakończenia. „Cofnij” przywraca je, a nie
+  -- liczy odcisku od nowa: inaczej pomyłkowe „Zakończ sprawę” i jego
+  -- cofnięcie po cichu potwierdzałyby wiadomość, na którą nikt nie odpisał.
+  -- NULL poza zakończeniem sprawy w toku — wtedy cofać nie ma czego.
+  przed_zakonczeniem_znane_json   TEXT,
+  przed_zakonczeniem_zmieniono_at TEXT
+);
+
 -- ── Test na żywym Allegro (0.495.0) ─────────────────────────────────────────
 -- Raz dziennie serwer przechodzi te same drogi co produkcja, bez atrap, i zapisuje
 -- tu WYNIK każdego kroku. Powód: przez 150 wydań Copilot „widział zdjęcia” tylko

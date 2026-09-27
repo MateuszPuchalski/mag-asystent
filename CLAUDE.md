@@ -40,8 +40,10 @@ Magazynowo-biurowy asystent firmy ogrodniczej: serwer Fastify + `node:sqlite`
   Wspólnego statusu przepisanego z kolejek nie było i nie będzie — ten kształt
   kosztował już cztery tabele nakładki spraw. Sprawa klienta (decyzja
   właściciela z 26 września 2026) trzyma wyłącznie to, czego kolejki nie
-  wiedzą: kto prowadzi, następny krok z terminem i zamknięcie, które każde
-  nowe zdarzenie otwiera na nowo. Kształt i powód: S6 w tym samym dokumencie.
+  wiedzą: kto prowadzi, następny krok z terminem i zakończenie. Nowe
+  zdarzenie po stronie klienta albo Allegro budzi sprawę u prowadzącego,
+  nasze własne ruchy — nie. Kształt, powód i okno budzenia: S6 w tym samym
+  dokumencie.
 
 - **Reguła klienta HTTP obowiązuje KAŻDY front z osobna.** Żądanie bez ciała
   nie deklaruje typu treści — pusty JSON to `FST_ERR_CTP_EMPTY_JSON_BODY`
