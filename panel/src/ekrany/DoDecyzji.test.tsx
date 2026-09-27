@@ -37,12 +37,15 @@ let moje: unknown[] = [];
 let pozycje: PozycjaDecyzji[] = POZYCJE;
 /* Ciało i typ treści żądań zapisu — reguła klienta HTTP z `CLAUDE.md`. */
 let ciala: Array<{ body: unknown; typ: string | null }> = [];
+/* Krok, który założenie dosyłki zastąpiło — odpowiedź serwera trasy zwrotu. */
+let zastapil: string | null = null;
 
 beforeEach(() => {
   wyslane = [];
   moje = [];
   pozycje = POZYCJE;
   ciala = [];
+  zastapil = null;
   localStorage.clear();
   localStorage.setItem("wertis-panel-token", "tok-biura");
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
@@ -57,7 +60,7 @@ beforeEach(() => {
     if (url === "/api/obsluga/zwroty/77/dosylka") {
       pozycje = POZYCJE;
       return new Response(JSON.stringify({ zalozona: true, login: "Kowalski_Jan",
-        krokDo: "2026-10-01T06:00:00Z", krok: "Dosłać nowy towar (etykieta w Sellasist)", zastapil: null }));
+        krokDo: "2026-10-01T06:00:00Z", krok: "Dosłać nowy towar (etykieta w Sellasist)", zastapil }));
     }
     if (url === "/api/obsluga/moje") return new Response(JSON.stringify({ sprawy: [], lista: moje }));
     if (url === "/api/obsluga/wzmianki") return new Response(JSON.stringify({ wzmianki: [], nowe: 0 }));
@@ -167,6 +170,20 @@ describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
     expect(wyslane).toEqual(["POST /api/obsluga/zwroty/77/dosylka"]);
     /* Reguła klienta HTTP: żądanie bez ciała nie deklaruje typu treści. */
     expect(ciala).toEqual([{ body: null, typ: null }]);
+  });
+
+  it("krok zastąpiony kliknięciem zostaje na ekranie, choć wiersz już zszedł", async () => {
+    /* Sprawa klienta miała krok ustawiony ręką. Dziennik niesie tylko jego
+       długość, więc to zdanie jest jedynym śladem, co się stało. */
+    zastapil = "Oddzwonić w sprawie faktury";
+    pozycje = [DOSYLKA, ...POZYCJE];
+    pokaz();
+    await userEvent.click(await screen.findByRole("button", { name: /^Śledź dosyłkę — / }));
+    await vi.waitFor(() => expect(screen.queryByText("Śledzić dosyłkę?")).toBeNull());
+    const zdanie = await screen.findByText(
+      "Krok sprawy klienta Kowalski_Jan: „Dosłać nowy towar (etykieta w Sellasist)” zamiast „Oddzwonić w sprawie faktury”");
+    expect(within(zdanie.parentElement!).getByRole("link", { name: "profil klienta" }))
+      .toHaveAttribute("href", "/obsluga/klient/Kowalski_Jan");
   });
 
   it("bez tytułu nad sekcjami; trzy nagłówki mają jeden kształt licznika (0.524.0)", async () => {

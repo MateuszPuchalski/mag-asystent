@@ -537,21 +537,27 @@ spełniło.
 
 **Biuro odmawia w panelu Allegro** — fakt właściciela z 27 września 2026,
 z nawyku. Tamtej odmowy „ten sam ruch” nie obejmuje. Kod przychodzi
-synchronizacją, a zwrot schodzi do grupy „odrzucony”, której nikt nie
-otwiera. Przycisk przy zwrocie i propozycja na profilu stały więc tam,
-gdzie nikt nie patrzy.
+synchronizacją, a zwrot schodzi do grupy „odrzucony”, poza kolejkę decyzji.
+Przycisk przy zwrocie i propozycja na profilu stały więc poza drogą, którą
+biuro chodzi. To wniosek z kodu, nie pomiar.
 
 **Odmowa z panelu Allegro staje w „Do decyzji”** (@wydanie, decyzja
 właściciela z tego samego dnia). Wiersz „Śledzić dosyłkę?” ma przycisk
-„Śledź dosyłkę”, jedyny na tej liście. Przycisk nie decyduje, tylko
-rejestruje odmowę, która już zapadła, więc dowodów nie potrzebuje. Wiersz
-prowadzi też na zwrot i gaśnie, gdy dosyłka powstanie. Obowiązuje go to
-samo okno trzydziestu dni co propozycję na profilu, i ta sama reguła.
+„Śledź dosyłkę”, jedyny na tej liście. Przycisk rejestruje odmowę, która już
+zapadła, więc dowodów nie potrzebuje. Wiersz prowadzi też na zwrot i gaśnie,
+gdy dosyłka powstanie. Obowiązuje go to samo okno trzydziestu dni co
+propozycję na profilu, i ta sama reguła.
+
+Jeden skutek kliknięcia nie jest samą rejestracją. Krok „dosłać” zastępuje
+krok ustawiony ręką, na przykład „Oddzwonić w sprawie faktury”. Ekran mówi
+wtedy, co zastąpił, tak jak ekran zwrotu przy odmowie z WERTIS.
 
 Automat, który zakładałby dosyłkę sam, odpadł. Krok w sprawie stawia
-człowiek, a prowadzi ten, kto kliknął. Allegro nie mówi, kto odmówił, więc
-automat musiałby prowadzącego zgadywać. Odmowa z ekranu zwrotu w WERTIS
-zakłada dosyłkę w tym samym kliknięciu i wiersza nie potrzebuje.
+człowiek. Prowadzący sprawy zostaje, a sprawę bez prowadzącego dostaje ten,
+kto kliknął — ta sama reguła co przy każdym kroku. Automat nie miałby kogo
+wskazać, bo Allegro nie mówi, kto odmówił. Odmowa z ekranu zwrotu w WERTIS
+zakłada dosyłkę w tym samym kliknięciu. Wiersz staje wtedy tylko, gdy
+zapis dosyłki się nie uda.
 
 **Odmowa nie potwierdza „nowego”.** Agent odmawia na ekranie zwrotu i profilu
 nie widział. Porażka zapisu dosyłki nie zamienia odmowy w błąd, bo odmowa

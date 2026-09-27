@@ -936,7 +936,9 @@ export function useSledzDosylkeZwrotu() {
     mutationFn: (v: { id: number }) =>
       api<DosylkaZalozona>(`/api/obsluga/zwroty/${v.id}/dosylka`, { method: "POST" }),
     /* „Do decyzji” też (@wydanie): przycisk stoi tam w wierszu odmowy z panelu
-       Allegro, a wiersz ma zejść od razu, nie po półminutowym odświeżeniu. */
+       Allegro. Listę odświeża i tak każda udana mutacja (`klient-zapytan.ts`),
+       ale `onSettled` na nią CZEKA — przycisk gaśnie dopiero, gdy wiersz już
+       zszedł, więc drugiego kliknięcia w ten sam wiersz nie ma. */
     onSettled: (d, _e, v) => Promise.all([
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true }),
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) }),

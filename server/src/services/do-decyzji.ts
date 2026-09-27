@@ -361,7 +361,11 @@ function kolejkiKlienta(teraz: number): PozycjaDecyzji[] {
   return wiersze;
 }
 
-/** Kod odmowy słowami klienta — te same, które Allegro pokazało mu przy zwrocie. */
+/**
+ * Nasze polskie nazwy kodów odmowy — kopia `etykietaKodu` z panelu
+ * (`panel/src/zwroty/Pieniadze.tsx`). Kopia, bo serwer nie importuje panelu;
+ * zmieniając brzmienie tam, zmień je i tu.
+ */
 const KOD_ODMOWY: Record<string, string> = {
   NEW_ITEM_SENT: "Wysłaliśmy nowy towar", MISSING_PART_SENT: "Wysłaliśmy brakującą część",
 };
@@ -370,13 +374,17 @@ const KOD_ODMOWY: Record<string, string> = {
  * Odmowy wypłaty z kodem dosyłki, których nikt nie śledzi — wiersz na zwrot.
  *
  * BIURO ODMAWIA W PANELU ALLEGRO (fakt właściciela z 27 września 2026),
- * z nawyku. Kod przychodzi synchronizacją, zwrot schodzi do grupy
- * „odrzucony”, a przycisk „Śledź dosyłkę” przy nim i propozycja na profilu
- * stały tam, gdzie nikt nie zagląda. Dosyłka nie była więc śledzona wcale.
+ * z nawyku. Kod przychodzi synchronizacją, a zwrot schodzi do grupy
+ * „odrzucony”, poza kolejkę decyzji. Przycisk „Śledź dosyłkę” przy zwrocie
+ * i propozycja na profilu stały więc poza drogą, którą biuro chodzi — to nasz
+ * wniosek z kodu, nie pomiar.
  *
  * WIERSZ Z PRZYCISKIEM, NIE AUTOMAT — decyzja właściciela z tego samego dnia.
- * Krok w sprawie klienta dalej stawia człowiek, a prowadzi ten, kto kliknął.
- * Automat musiałby zgadywać prowadzącego, bo Allegro nie mówi, kto odmówił.
+ * Krok w sprawie klienta dalej stawia człowiek. Prowadzący sprawy zostaje,
+ * a sprawę bez prowadzącego dostaje ten, kto kliknął — ta sama reguła co
+ * przy każdym kroku. Automat nie miałby kogo wskazać: Allegro nie mówi, kto
+ * odmówił. Kliknięcie może zastąpić krok ustawiony ręką; ekran mówi wtedy,
+ * co zastąpił.
  *
  * Wiersz na zwrot, nie liczba, jak przy magazynie: dosyłek jest kilka,
  * a każda potrzebuje własnego kliknięcia. Gaśnie, gdy dosyłka powstanie

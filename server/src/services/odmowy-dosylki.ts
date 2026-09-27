@@ -5,8 +5,9 @@ import { DOSYLKA_ZWROTU_SQL, jestKodemDosylki, OKNO_SLEDZENIA_MS, type KodDosylk
 /* ── Odmowy wypłaty z kodem dosyłki, których nikt nie śledzi (@wydanie) ──────
    Biuro odmawia wypłaty w PANELU ALLEGRO (fakt właściciela z 27 września
    2026). Kod przychodzi wtedy synchronizacją, a zwrot schodzi do grupy
-   „odrzucony”, której nikt nie otwiera. Przycisk „Śledź dosyłkę” przy
-   zwrocie i propozycja na profilu stały więc tam, gdzie nikt nie patrzy.
+   „odrzucony”, poza kolejkę decyzji. Przycisk „Śledź dosyłkę” przy zwrocie
+   i propozycja na profilu stały więc poza drogą, którą biuro chodzi — to
+   wniosek z kodu, nie pomiar.
 
    JEDNA REGUŁA DLA DWÓCH MIEJSC. Profil pokazuje najświeższą odmowę klienta,
    „Do decyzji” wszystkie. Gdyby każde liczyło po swojemu, wiersz w „Do
