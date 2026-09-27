@@ -3,13 +3,14 @@ import { Link } from "react-router-dom";
 import {
   AlertTriangle, Barcode, ChevronRight, CircleCheck, Inbox, ListChecks, MessageSquareReply,
   FlaskConical, MessagesSquare, Package, PackageSearch, PlugZap, ShieldQuestion, Truck, Undo2,
-  ClipboardList,
+  ClipboardList, AtSign, Briefcase,
 } from "lucide-react";
 import { useDoDecyzji, type Obszar, type PozycjaDecyzji, type ZrodloDecyzji } from "../api/decyzje";
+import { useMojeSprawy, useWzmianki } from "../api/rozmowy";
 import { useSledzDosylkeZwrotu } from "../api/zwroty";
 import type { DosylkaZalozona } from "../api/typy";
 import { Blad, FiltrSegmentowy, Karta, NaglowekSekcji, Przycisk, Pusto, wiek } from "../ui";
-import { Moje } from "./Moje";
+import { Moje, widoczneSprawy } from "./Moje";
 import { Wzmianki } from "./Wzmianki";
 
 /* ── DO DECYZJI — ekran startowy biura (0.435.0) ───────────────────────────
@@ -61,25 +62,58 @@ function Wiek({ p }: { p: PozycjaDecyzji }) {
     title={p.pilne ? "Termin minął albo mija" : "Od kiedy czeka"}>{wiek(ms)}</span>;
 }
 
+/* ── PYTANIE RAZ, SPRAWY POD NIM (@wydanie) ─────────────────────────────
+   Decyzja właściciela z 27 września 2026, wariant B z makiet. Każdy wiersz
+   powtarzał pytanie i źródło: sześć wierszy niosło trzy pytania, a nazwa
+   źródła stała obok ikony, która mówiła to samo. Pytanie stoi teraz raz,
+   w nagłówku grupy, a wiersz niesie tylko sprawę i jej wiek.
+
+   PANEL NICZEGO NIE SORTUJE. Grupy stają tam, gdzie serwer postawił
+   pierwszą sprawę z danym pytaniem, a w grupie zostaje kolejność serwera.
+   Powód reguły z `do-decyzji.ts` — dwie reguły sortowania rozjechałyby się
+   — dalej trzyma: tu nie ma drugiej reguły, jest podział listy serwera.
+   Ceną jest to, że młodsza sprawa znanego pytania staje nad starszą
+   sprawą innego. Biuro i tak rozstrzyga pytanie naraz dla całej grupy. */
+export function grupujPoPytaniu(pozycje: PozycjaDecyzji[]): PozycjaDecyzji[][] {
+  const grupy = new Map<string, PozycjaDecyzji[]>();
+  for (const p of pozycje) {
+    const klucz = `${p.zrodlo}\n${p.pytanie}`;
+    const g = grupy.get(klucz);
+    if (g) g.push(p); else grupy.set(klucz, [p]);
+  }
+  return [...grupy.values()];
+}
+
+function Grupa({ pozycje, onZalozona }: { pozycje: PozycjaDecyzji[]; onZalozona: (w: DosylkaZalozona) => void }) {
+  const [pierwsza] = pozycje;
+  const Ikona = IKONY[pierwsza!.zrodlo];
+  return <li className="border-t border-slate-200 first:border-t-0">
+    <h4 className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pb-1 pt-3">
+      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
+        <Ikona size={16} /></span>
+      <b>{pierwsza!.pytanie}</b>
+      <span className="text-sm text-slate-600">{NAZWY[pierwsza!.zrodlo]} · {pozycje.length}</span>
+    </h4>
+    <ul className="pb-1.5">{pozycje.map((p) => <Wiersz key={p.klucz} p={p} onZalozona={onZalozona} />)}</ul>
+  </li>;
+}
+
 function Wiersz({ p, onZalozona }: { p: PozycjaDecyzji; onZalozona: (w: DosylkaZalozona) => void }) {
-  const Ikona = IKONY[p.zrodlo];
+  /* Wcięcie pod tekstem pytania, nie pod ikoną: oko zjeżdża z pytania
+     prosto na sprawy, które ono obejmuje. */
   const tresc = <>
-    <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-slate-100 text-slate-600">
-      <Ikona size={18} /></span>
-    <span className="w-36 shrink-0 text-xs font-bold text-slate-700">{NAZWY[p.zrodlo]}</span>
-    <span className="min-w-0 flex-1">
-      <b className="block truncate">{p.pytanie}</b>
-      <span className="block truncate text-sm text-slate-600">{p.co}</span>
-    </span>
+    <span className="min-w-0 flex-1 truncate text-sm">{p.co}</span>
     <Wiek p={p} />
   </>;
-  const klasa = "flex items-center gap-3 px-4 py-3 hover:bg-slate-50";
   if (p.akcja?.rodzaj === "sledz_dosylke") {
     return <WierszDosylki p={p} zwrotId={p.akcja.zwrotId} tresc={tresc} onZalozona={onZalozona} />;
   }
-  return <li className="border-t border-slate-200 first:border-t-0">
-    <Link to={p.cel.panel} className={klasa}>{tresc}
-      <ChevronRight size={18} className="shrink-0 text-slate-400" /></Link>
+  /* Nazwa odnośnika niesie też pytanie: czytnik ekranu dostaje wiersz
+     bez nagłówka grupy, a „FZ 802 · 2 wyjątki" samo nie mówi, co zrobić. */
+  return <li>
+    <Link to={p.cel.panel} aria-label={`${p.pytanie} — ${p.co}`}
+      className="flex items-center gap-3 py-1.5 pl-14 pr-4 hover:bg-slate-50">{tresc}
+      <ChevronRight size={18} className="shrink-0 text-slate-600" aria-hidden /></Link>
   </li>;
 }
 
@@ -97,15 +131,16 @@ function WierszDosylki({ p, zwrotId, tresc, onZalozona }: {
   p: PozycjaDecyzji; zwrotId: number; tresc: React.ReactNode; onZalozona: (w: DosylkaZalozona) => void;
 }) {
   const sledz = useSledzDosylkeZwrotu();
-  return <li className="border-t border-slate-200 first:border-t-0">
+  return <li>
     <div className="flex items-center gap-2 pr-4 hover:bg-slate-50">
-      <Link to={p.cel.panel} className="flex min-w-0 flex-1 items-center gap-3 py-3 pl-4">{tresc}</Link>
+      <Link to={p.cel.panel} aria-label={`${p.pytanie} — ${p.co}`}
+        className="flex min-w-0 flex-1 items-center gap-3 py-1.5 pl-14">{tresc}</Link>
       <Przycisk className="shrink-0 text-xs" disabled={sledz.isPending} aria-busy={sledz.isPending}
         aria-label={`Śledź dosyłkę — ${p.co}`}
         onClick={() => sledz.mutate({ id: zwrotId }, { onSuccess: onZalozona })}>
         {sledz.isPending ? "Zakładam…" : "Śledź dosyłkę"}</Przycisk>
     </div>
-    {sledz.error && <p role="alert" className="px-4 pb-2 text-xs font-semibold text-ranga-zle">
+    {sledz.error && <p role="alert" className="pb-2 pl-14 pr-4 text-xs font-semibold text-ranga-zle">
       Śledzenia dosyłki nie założono — {(sledz.error as Error).message}</p>}
   </li>;
 }
@@ -134,6 +169,23 @@ export function DoDecyzji() {
   const pozycje = (dane.data?.pozycje ?? []).filter((p) => filtr === "wszystko" || p.obszar === filtr);
   const l = dane.data?.liczniki;
 
+  /* ── PUSTE SEKCJE JEDNĄ LINIJKĄ (@wydanie) ─────────────────────────────
+     Wariant B, ta sama decyzja. „Wspomniano o mnie · 0" i „Moje sprawy · 0"
+     stały jako dwie karty z nagłówkiem nad listą decyzji i zabierały
+     170 px tylko po to, żeby powiedzieć „nic". Pusta sekcja schodzi do
+     jednej linijki nad decyzjami; pełna wraca w swoim kształcie.
+
+     Te same zapytania co w sekcjach, więc żadnego żądania więcej. Sekcja
+     wczytywana albo z błędem zostaje pełna: błąd ma być widać, a „pusto"
+     przed odpowiedzią serwera byłoby nieprawdą. */
+  const wzmianki = useWzmianki();
+  const mojeSprawy = useMojeSprawy();
+  const [historiaWzmianek, setHistoriaWzmianek] = useState(false);
+  const odhaczonych = (wzmianki.data?.wzmianki ?? []).filter((w) => w.odhaczona).length;
+  const wzmiankiPuste = wzmianki.isSuccess && !historiaWzmianek
+    && (wzmianki.data.wzmianki ?? []).every((w) => w.odhaczona);
+  const mojePuste = mojeSprawy.isSuccess && widoczneSprawy(mojeSprawy.data).length === 0;
+
   /* Własny scroller — jak w Zadaniach; rama panelu nie przewija za ekrany.
 
      TYTUŁ „Do zrobienia" ZESZEDŁ (0.524.0), bo powtarzał podświetloną
@@ -145,8 +197,23 @@ export function DoDecyzji() {
      trzy biorą `NaglowekSekcji` i licznik po kropce, jak „Zawartość · 4"
      w koszu. Oko czyta jeden wzór zamiast trzech. */
   return <div className="space-y-4 lg:h-full lg:overflow-y-auto">
-    <Wzmianki />
-    <Moje />
+    {(wzmiankiPuste || mojePuste) && <div data-puste-sekcje=""
+      className="flex flex-wrap items-center gap-x-5 gap-y-1 px-1 text-sm text-slate-600">
+      {wzmiankiPuste && <span className="flex flex-wrap items-center gap-x-1.5">
+        <AtSign size={14} aria-hidden /><b className="text-slate-800">Wspomniano o mnie</b>
+        · {odhaczonych ? "wszystko odhaczone" : "nikt Cię nie wzmiankował"}
+        {/* Historia to dowód „pisałam ci o tym w środę" — zostaje o jedno
+            kliknięcie, jak w pełnej sekcji. */}
+        {odhaczonych > 0 && <button type="button" onClick={() => setHistoriaWzmianek(true)}
+          className="min-h-6 underline underline-offset-2 hover:text-slate-900">
+          pokaż odhaczone ({odhaczonych})</button>}
+      </span>}
+      {mojePuste && <span className="flex items-center gap-x-1.5">
+        <Briefcase size={14} aria-hidden /><b className="text-slate-800">Moje sprawy</b>
+        · nic nie prowadzisz</span>}
+    </div>}
+    {!wzmiankiPuste && <Wzmianki zHistoriaNaStart={historiaWzmianek} />}
+    {!mojePuste && <Moje />}
     <Karta className="overflow-hidden p-0" role="region" aria-label="Do decyzji biura">
       <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-2">
         <NaglowekSekcji jako="h3" ikona={<ListChecks size={14} />} className="mr-auto">
@@ -165,7 +232,8 @@ export function DoDecyzji() {
         : pozycje.length === 0
           ? <p className="flex items-center gap-2 px-4 py-2 text-sm text-slate-500">
               <CircleCheck size={16} />Nic nie czeka na biuro.</p>
-          : <ul>{pozycje.map((p) => <Wiersz key={p.klucz} p={p} onZalozona={poZalozeniu} />)}</ul>}
+          : <ul>{grupujPoPytaniu(pozycje).map((g) =>
+              <Grupa key={g[0]!.klucz} pozycje={g} onZalozona={poZalozeniu} />)}</ul>}
       {zastapione.map((w, i) => <p key={i} role="status"
         className="flex flex-wrap items-center gap-x-2 border-t border-slate-200 px-4 py-2 text-xs text-slate-600">
         <span>Krok sprawy klienta {w.login}: „{w.krok}” zamiast „{w.zastapil}”</span>
