@@ -34,8 +34,10 @@ const PROFIL: Profil = {
     sumaGrosze: 5000, waluta: "PLN", przesylka: "w drodze do klienta", link: "https://allegro.pl/z-1",
     pozycje: [{ nazwa: "Nóż kosiarki HECHT 1803S", ilosc: 1, cenaGrosze: 5000 }] }],
   maszyny: [], os: [], notatka: { tresc: "Prosi o fakturę", at: "2026-09-20T10:00:00Z", przez: "Ola", cofalna: true },
+  /* Przewoźników serwer liczy tylko przy dosyłce albo propozycji — bez nich
+     lista jest pusta. Testy dosyłki podają ją same (`Z_BAZY`). */
   sprawa: null, podpowiedzZakonczenia: false, podpowiedzPowod: null, propozycjaDosylki: null,
-  przewoznicy: ["DPD", "INPOST"],
+  przewoznicy: [],
 };
 
 /* Sprawę prowadzi Bartek (id 2); zalogowana jest Ola (id 1), chyba że test
@@ -91,7 +93,9 @@ beforeEach(() => {
       const cialo = JSON.parse((init?.body as string) ?? "{}") as { wersja: number };
       const po: SprawaKlienta = { ...(profil.sprawa ?? SPRAWA), wersja: cialo.wersja + 1,
         odcisk: `odcisk-${cialo.wersja + 1}`, nowe: [], stan: sprawa === "zakoncz" ? "zakonczona" : "w_toku",
-        ...(sprawa === "przejmij" ? { prowadzi: "Ola", prowadziId: 1 } : {}) };
+        ...(sprawa === "przejmij" ? { prowadzi: "Ola", prowadziId: 1 } : {}),
+        /* Zakończona sprawa przychodzi bez dosyłek — tak liczy serwer. */
+        ...(sprawa === "zakoncz" ? { dosylki: [] } : {}) };
       profil = { ...profil, sprawa: po };
       return new Response(JSON.stringify({ sprawa: po }));
     }
@@ -463,7 +467,7 @@ describe("granice kalendarza kroku", () => {
    datę i nie dubluje jej linijką „nowe”. */
 
 const dosylka = (n: Partial<DosylkaSprawy> = {}): DosylkaSprawy => ({
-  zamowienie: "z-1", waybill: null, przewoznik: null, przewoznikZamowienia: "DPD", zrodlo: null,
+  zamowienie: "z-1", zwrotId: null, waybill: null, przewoznik: null, przewoznikZamowienia: "DPD", zrodlo: null,
   status: null, dostarczonoAt: null, sprawdzonoAt: null, zalozonoAt: "2026-09-24T10:00:00Z",
   bezNumeru: false, opis: "Czekamy na numer dosyłki z Allegro", ton: null, ...n,
 });
@@ -473,12 +477,15 @@ const W_DRODZE = dosylka({ zamowienie: "z-2", waybill: "620111222333444", przewo
   opis: "Dosyłka w drodze (stan z 14:10)" });
 const BEZ_NUMERU = dosylka({ bezNumeru: true, ton: "uwaga",
   opis: "Allegro nie ma numeru dosyłki od 2 dni roboczych — wpisz go z Sellasist" });
+/* Lista przewoźników z bazy tak, jak ją oddaje serwer przy dosyłce: bez
+   `UNKNOWN`, zawsze z `OTHER`. */
+const Z_BAZY = ["DPD", "INPOST", "OTHER"];
 const DOSLAC: SprawaKlienta = { ...SPRAWA, krok: "dosłać", poTerminie: false, nowe: [], dosylki: [W_DRODZE, BEZ_NUMERU] };
 const listaDosylek = () => screen.getByRole("list", { name: "Dosyłki" });
 
 describe("DOSYŁKA na karcie sprawy", () => {
   it("otwarcie z dosyłkami i propozycją dalej wysyła same GET-y", async () => {
-    profil = { ...PROFIL, sprawa: DOSLAC,
+    profil = { ...PROFIL, przewoznicy: Z_BAZY, sprawa: DOSLAC,
       propozycjaDosylki: { zwrotId: 11, zamowienie: "z-3", kod: "MISSING_PART_SENT", odmowaAt: null } };
     pokaz();
     expect(await screen.findByRole("button", { name: "Przejmij" })).toBeInTheDocument();
@@ -489,15 +496,19 @@ describe("DOSYŁKA na karcie sprawy", () => {
   it("każda dosyłka to linijka z barwą tonu; numer kopiuje się bez serwera", async () => {
     const pisz = vi.fn(async () => {});
     vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText: pisz } });
-    profil = { ...PROFIL, sprawa: DOSLAC };
+    profil = { ...PROFIL, przewoznicy: Z_BAZY, sprawa: DOSLAC };
     pokaz();
     await screen.findByRole("list", { name: "Dosyłki" });
     const [wDrodze, bezNumeru] = within(listaDosylek()).getAllByRole("listitem");
     expect(within(wDrodze).getByText("620111222333444")).toBeInTheDocument();
     expect(within(bezNumeru).getByText(/wpisz go z Sellasist/).className).toContain("text-ranga-uwaga");
-    /* Znany numer — „popraw”, brak numeru — „wpisz”. Kopiowanie tylko przy numerze. */
-    expect(within(wDrodze).getByRole("button", { name: "popraw numer" })).toBeInTheDocument();
-    expect(within(bezNumeru).getByRole("button", { name: "wpisz numer" })).toBeInTheDocument();
+    /* Znany numer — „popraw”, brak numeru — „wpisz”. Kopiowanie tylko przy numerze.
+       Nazwa niesie zamówienie: dwa „wpisz numer” obok siebie czytnik ekranu
+       czytał bez znaku, przy której paczce stoją. */
+    expect(within(wDrodze).getByRole("button", { name: "popraw numer dosyłki zamówienia z-2" }))
+      .toHaveTextContent(/^popraw numer$/);
+    expect(within(bezNumeru).getByRole("button", { name: "wpisz numer dosyłki zamówienia z-1" }))
+      .toHaveTextContent(/^wpisz numer$/);
     expect(within(bezNumeru).queryByRole("button", { name: "Kopiuj" })).toBeNull();
 
     await userEvent.click(within(wDrodze).getByRole("button", { name: "Kopiuj" }));
@@ -506,11 +517,13 @@ describe("DOSYŁKA na karcie sprawy", () => {
   });
 
   it("wpisany numer idzie przycięty, z przewoźnikiem pierwszej paczki, wersją i odciskiem", async () => {
-    profil = { ...PROFIL, sprawa: DOSLAC };
+    profil = { ...PROFIL, przewoznicy: Z_BAZY, sprawa: DOSLAC };
     pokaz();
     await screen.findByRole("list", { name: "Dosyłki" });
     const [, bezNumeru] = within(listaDosylek()).getAllByRole("listitem");
-    await userEvent.click(within(bezNumeru).getByRole("button", { name: "wpisz numer" }));
+    await userEvent.click(within(bezNumeru).getByRole("button", { name: /^wpisz numer/ }));
+    /* Formularz mówi, co robi: wpisanie, nie poprawkę — numeru jeszcze nie było. */
+    expect(screen.getByRole("form", { name: "Wpisz numer dosyłki" })).toBeInTheDocument();
     const pole = screen.getByLabelText("Numer dosyłki");
     expect(pole).toHaveFocus();
     expect(pole).toHaveAttribute("maxLength", "64");
@@ -528,35 +541,37 @@ describe("DOSYŁKA na karcie sprawy", () => {
       przewoznik: "DPD", wersja: 3, odcisk: SPRAWA.odcisk });
     /* Po zapisie formularz się zamyka, a fokus wraca na odnośnik. */
     await waitFor(() => expect(screen.queryByLabelText("Numer dosyłki")).toBeNull());
-    await waitFor(() => expect(within(bezNumeru).getByRole("button", { name: "wpisz numer" })).toHaveFocus());
+    await waitFor(() => expect(within(bezNumeru).getByRole("button", { name: /^wpisz numer/ })).toHaveFocus());
   });
 
   it("poprawka zaczyna od zapisanego numeru i przewoźnika dosyłki; lista zna przewoźników z bazy", async () => {
-    profil = { ...PROFIL, sprawa: DOSLAC, przewoznicy: ["DPD", "GLS"] };
+    profil = { ...PROFIL, sprawa: DOSLAC, przewoznicy: ["DPD", "GLS", "OTHER"] };
     pokaz();
     await screen.findByRole("list", { name: "Dosyłki" });
     const [wDrodze] = within(listaDosylek()).getAllByRole("listitem");
-    await userEvent.click(within(wDrodze).getByRole("button", { name: "popraw numer" }));
+    await userEvent.click(within(wDrodze).getByRole("button", { name: /^popraw numer/ }));
+    expect(screen.getByRole("form", { name: "Popraw numer dosyłki" })).toBeInTheDocument();
     expect(screen.getByLabelText("Numer dosyłki")).toHaveValue("620111222333444");
-    /* INPOST spoza listy z bazy dalej jest domyślny — lista go nie podmienia. */
+    /* INPOST spoza listy z bazy dalej jest domyślny — lista go nie podmienia.
+       Przewoźnik pierwszej paczki (DPD) stoi raz, „inny” zawsze na końcu. */
     const przewoznik = screen.getByLabelText("Przewoźnik");
     expect(przewoznik).toHaveValue("INPOST");
     expect(within(przewoznik).getAllByRole("option").map((o) => o.getAttribute("value")))
-      .toEqual(["INPOST", "DPD", "GLS"]);
+      .toEqual(["INPOST", "DPD", "GLS", "OTHER"]);
     await userEvent.selectOptions(przewoznik, "GLS");
     await userEvent.click(screen.getByRole("button", { name: "Anuluj" }));
     expect(screen.queryByLabelText("Numer dosyłki")).toBeNull();
-    expect(within(wDrodze).getByRole("button", { name: "popraw numer" })).toHaveFocus();
+    expect(within(wDrodze).getByRole("button", { name: /^popraw numer/ })).toHaveFocus();
     expect(zapisy()).toEqual([]);
   });
 
   it("konflikt świeżości przy numerze mówi zdanie i zostawia wpisany numer", async () => {
-    profil = { ...PROFIL, sprawa: DOSLAC };
+    profil = { ...PROFIL, przewoznicy: Z_BAZY, sprawa: DOSLAC };
     konflikt = true;
     pokaz();
     await screen.findByRole("list", { name: "Dosyłki" });
     const [, bezNumeru] = within(listaDosylek()).getAllByRole("listitem");
-    await userEvent.click(within(bezNumeru).getByRole("button", { name: "wpisz numer" }));
+    await userEvent.click(within(bezNumeru).getByRole("button", { name: /^wpisz numer/ }));
     await userEvent.type(screen.getByLabelText("Numer dosyłki"), "620999888777");
     await userEvent.click(screen.getByRole("button", { name: "Zapisz" }));
     expect(await screen.findByText("Klient dopisał coś po otwarciu ekranu")).toBeInTheDocument();
@@ -567,12 +582,61 @@ describe("DOSYŁKA na karcie sprawy", () => {
     expect(JSON.parse(zapisy()[1].body!)).toMatchObject({ wersja: SWIEZA.wersja, odcisk: SWIEZA.odcisk });
   });
 
-  it("zakończona sprawa pokazuje dosyłkę, ale numeru się przy niej nie wpisuje", async () => {
-    profil = { ...PROFIL, sprawa: { ...DOSLAC, stan: "zakonczona", zakonczonoAt: "2026-09-24T12:00:00Z",
-      zakonczyl: "Bartek" } };
+  /* SONDA PRZEGLĄDU: bez znanego przewoźnika lista podsuwała pierwszego
+     z alfabetu i zapis przechodził jednym kliknięciem z przewoźnikiem, którego
+     nikt nie wybrał. `UNKNOWN` przychodzi jako przewoźnik pierwszej paczki
+     (sonda Allegro) i nie nazywa nikogo — nie jest ani domyślny, ani opcją. */
+  it("bez znanego przewoźnika lista zaczyna od pustego wyboru i nie zna `UNKNOWN`", async () => {
+    const nieznany = dosylka({ przewoznikZamowienia: "UNKNOWN", bezNumeru: true, ton: "uwaga",
+      opis: "Allegro nie ma numeru dosyłki od 2 dni roboczych — wpisz go z Sellasist" });
+    profil = { ...PROFIL, przewoznicy: ["ALLEGRO", "DPD", "INPOST", "OTHER"],
+      sprawa: { ...DOSLAC, dosylki: [nieznany] } };
+    pokaz();
+    await userEvent.click(await screen.findByRole("button", { name: /^wpisz numer/ }));
+    await userEvent.type(screen.getByLabelText("Numer dosyłki"), "620999888777");
+    const przewoznik = screen.getByLabelText("Przewoźnik");
+    expect(przewoznik).toHaveValue("");
+    expect(within(przewoznik).getAllByRole("option").map((o) => [o.getAttribute("value"), o.textContent]))
+      .toEqual([["", "— wybierz przewoźnika —"], ["ALLEGRO", "Allegro"], ["DPD", "DPD"],
+        ["INPOST", "InPost"], ["OTHER", "inny (nie śledzimy)"]]);
+    const zapisz = screen.getByRole("button", { name: "Zapisz" });
+    expect(zapisz).toBeDisabled();
+    await userEvent.selectOptions(przewoznik, "OTHER");
+    await userEvent.click(zapisz);
+    await waitFor(() => expect(zapisy()).toHaveLength(1));
+    expect(JSON.parse(zapisy()[0].body!)).toMatchObject({ waybill: "620999888777", przewoznik: "OTHER" });
+  });
+
+  /* Serwer dokłada `OTHER` sam, ale formularz na tym nie polega: bez „inny”
+     przewoźnika spoza Allegro nie dałoby się wpisać wcale. */
+  it("lista z bazy bez „inny” dalej go dostaje — przewoźnik spoza Allegro to też odpowiedź", async () => {
+    profil = { ...PROFIL, przewoznicy: [],
+      sprawa: { ...DOSLAC, dosylki: [dosylka({ przewoznikZamowienia: null })] } };
+    pokaz();
+    await userEvent.click(await screen.findByRole("button", { name: /^wpisz numer/ }));
+    expect(within(screen.getByLabelText("Przewoźnik")).getAllByRole("option").map((o) => o.getAttribute("value")))
+      .toEqual(["", "OTHER"]);
+  });
+
+  /* Wiązanie w obie strony (`CLAUDE.md`): ekran zwrotu prowadzi na profil,
+     linijka dosyłki prowadzi z powrotem do zwrotu, z którego odmowy wyszła. */
+  it("linijka dosyłki mówi, którego zamówienia dotyczy, i prowadzi do zwrotu", async () => {
+    const zOdmowy = dosylka({ zamowienie: "8f3c2a10-5b7e-11ef-a1b2-0242ac120002", zwrotId: 11 });
+    const recznie = dosylka({ zamowienie: "c0ffee00-1111-2222-3333-444455556666", zwrotId: null });
+    profil = { ...PROFIL, przewoznicy: Z_BAZY, sprawa: { ...DOSLAC, dosylki: [zOdmowy, recznie] } };
     pokaz();
     await screen.findByRole("list", { name: "Dosyłki" });
-    expect(within(listaDosylek()).queryByRole("button", { name: /numer/ })).toBeNull();
+    const [pierwsza, druga] = within(listaDosylek()).getAllByRole("listitem");
+    const zamowienie = within(pierwsza).getByText("zamówienie 8f3c2a10…");
+    expect(zamowienie).toHaveAttribute("title", "8f3c2a10-5b7e-11ef-a1b2-0242ac120002");
+    expect(within(pierwsza).getByRole("link", { name: "zwrot zamówienia 8f3c2a10" }))
+      .toHaveAttribute("href", "/obsluga/zwroty/11");
+    expect(within(pierwsza).getByRole("button", { name: "wpisz numer dosyłki zamówienia 8f3c2a10" }))
+      .toBeInTheDocument();
+    /* Numer wpisany ręcznie, bez odmowy — zwrotu nie ma, odnośnika też nie. */
+    expect(within(druga).getByText("zamówienie c0ffee00…")).toBeInTheDocument();
+    expect(within(druga).queryByRole("link")).toBeNull();
+    expect(zapisy()).toEqual([]);
   });
 
   it("propozycja pyta słowami kodu, a „Śledź dosyłkę” niesie zwrot, wersję i odcisk", async () => {

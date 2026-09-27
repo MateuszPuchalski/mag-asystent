@@ -126,10 +126,12 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
  * i zakończenie; tutaj sprawy się nie zmienia.
  */
 function LiniaSprawy({ login, sprawa: s }: { login: string; sprawa: SprawaKlienta }) {
-  /* Dosyłka (0.536.0) doklejona do TEJ SAMEJ linijki: agent przy rozmowie
-     odpowiada zwykle na „gdzie moja paczka”, a odpowiedź stała dotąd
-     o ekran dalej. Jedno zdanie, najpilniejsze — reszta jest na profilu. */
-  const dosylka = s.stan === "w_toku" ? najwazniejszaDosylka(s.dosylki) : null;
+  /* Dosyłka (0.536.0) doklejona do TEJ SAMEJ linijki. Bez niej stan drugiej
+     paczki stał tylko na profilu, o ekran dalej od rozmowy, zwrotu czy
+     reklamacji. Jedno zdanie, najpilniejsze — reszta jest na profilu.
+     Zakończona sprawa przychodzi z pustą listą (`prowadzenie-klienta.ts`),
+     więc osobnego warunku na stan tu nie ma. */
+  const dosylka = najwazniejszaDosylka(s.dosylki);
   return <Link to={`/obsluga/klient/${encodeURIComponent(login)}`}
     className="mt-2 flex items-start gap-1.5 rounded border border-slate-200 px-2 py-1.5 text-xs text-slate-800 hover:bg-slate-50">
     <ClipboardList size={13} className="mt-0.5 shrink-0 text-slate-400" />

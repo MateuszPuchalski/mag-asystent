@@ -16,6 +16,7 @@ import { KafelOferty } from "../towar/Kafel";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { ZlecHali, jedynaKartoteka } from "../sprawy/ZlecHali";
 import { Link as RouterLink } from "react-router-dom";
+import { etykietaKodu } from "./Pieniadze";
 
 /* Kolumna dowodów: wszystko, co trzeba przeczytać, ZANIM padnie decyzja.
    Akcji tu nie ma — te stoją w pasku werdyktu i mają być jedynym miejscem,
@@ -29,10 +30,12 @@ import { Link as RouterLink } from "react-router-dom";
 /* Przewoźnicy i formy płatności po polsku. Kod nieznany pokazuje się SUROWY,
    bo Allegro nie publikuje zamkniętej listy przewoźników — sonda złapała
    `UNKNOWN`, którego nie ma w żadnej specyfikacji. Eksport od 0.536.0:
-   formularz numeru dosyłki na profilu nazywa przewoźników tymi samymi słowami. */
+   formularz numeru dosyłki na profilu nazywa przewoźników tymi samymi słowami.
+   `OTHER` to identyfikator ze specyfikacji dla przewoźnika spoza Allegro
+   (`swagger.yaml`, `OrdersShippingCarrier.id`). */
 export const PRZEWOZNICY: Record<string, string> = {
   INPOST: "InPost", DPD: "DPD", ALLEGRO: "Allegro", POCZTA_POLSKA: "Poczta Polska",
-  DHL: "DHL", UPS: "UPS", GLS: "GLS", FEDEX: "FedEx", UNKNOWN: "nieznany",
+  DHL: "DHL", UPS: "UPS", GLS: "GLS", FEDEX: "FedEx", UNKNOWN: "nieznany", OTHER: "inny",
 };
 
 const PLATNOSCI: Record<string, string> = {
@@ -50,13 +53,6 @@ const PRZESYLKA: Record<string, string> = {
   NOTICE_LEFT: "Awizo — próba doręczenia nie powiodła się.",
   ISSUE: "Problem z przesyłką.",
   RETURNED: "Wraca do nadawcy.",
-};
-
-const ODRZUCENIA: Record<string, string> = {
-  REFUND_REJECTED: "odmowa zwrotu pieniędzy",
-  NEW_ITEM_SENT: "wysłano nowy towar",
-  ITEM_FIXED: "towar naprawiono",
-  MISSING_PART_SENT: "dosłano brakującą część",
 };
 
 /** Stan kosza słowem — te same słowa co pasek kroków na ekranie koszy. */
@@ -470,7 +466,10 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
     </Sekcja>
 
     {zwrot.rejectionCode && <Sekcja ikona={<Receipt size={14} />} tytul="Rozstrzygnięte w Allegro">
-      <p className="font-semibold">{ODRZUCENIA[zwrot.rejectionCode] ?? zwrot.rejectionCode}</p>
+      {/* Brzmienie z `etykietaKodu` (@wydanie), to samo co w sekcji pieniędzy.
+          Do tego wydania stała tu osobna mapa i ta sama odmowa brzmiała na
+          jednym ekranie dwojako: „wysłano nowy towar” i „Wysłaliśmy nowy towar”. */}
+      <p className="font-semibold">{etykietaKodu(zwrot.rejectionCode)}</p>
     </Sekcja>}
 
     {/* SEKCJI „PRACA BIURA" TU JUŻ NIE MA (0.370.0). Stała tu od 0.315.0 ze

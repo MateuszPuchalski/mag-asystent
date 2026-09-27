@@ -3,6 +3,7 @@ import { config } from "../config.js";
 import { db as defaultDb, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { stanZHistorii } from "./allegro-tracking.js";
+import { DOSYLKI_SQL, dosylkaSledzona, zycieWiersza } from "./dosylka-opis.js";
 
 /* ── Gdzie jest paczka do klienta (0.393.0) ──────────────────────────────────
    Zgłoszenie właściciela: „dodaj status przesyłki". Przy reklamacji to jest
@@ -40,6 +41,11 @@ type OdpowiedzPrzesylek = { shipments?: Przesylka[] };
  * w `klient_dosylka` i na karcie sprawy; tu idzie tylko to, co mówi o losie
  * towaru. `zrodlo` rozstrzyga, czy klient widzi numer w Allegro: wykryty
  * stoi przy zamówieniu, wpisany ręką — niekoniecznie.
+ *
+ * Tylko dosyłka, o którą ticker dalej pyta, albo doręczona. Stan dosyłki
+ * zakończonej sprawy, poprzedniego epizodu albo spoza okna śledzenia to
+ * zatrzymany zegar: „w drodze” sprzed miesiąca skłamałoby w szkicu
+ * Copilota. Doręczenie jest faktem z datą, więc zostaje zawsze.
  */
 export interface DosylkaZamowienia {
   status: string | null;
@@ -76,7 +82,7 @@ const PUSTA: StanPrzesylkiZamowienia = {
 
 /** Co wiemy o przesyłce tego zamówienia — CZYSTY ODCZYT z naszej bazy. */
 export function przesylkaZamowienia(
-  database: Db = defaultDb(), zamowienieId: number,
+  database: Db = defaultDb(), zamowienieId: number, teraz = new Date(),
 ): StanPrzesylkiZamowienia {
   const w = database.prepare(`SELECT channel_account_id, external_id, przesylka_waybill, przesylka_przewoznik,
     przesylka_status, przesylka_dostarczono_at, przesylka_sprawdzono_at
@@ -85,9 +91,11 @@ export function przesylkaZamowienia(
   const tekst = (v: unknown) => (v == null || String(v) === "" ? null : String(v));
   /* Surowy SQL, nie import `dosylka.ts`: ten plik czyta skrzynka, reklamacje
      i profil, a serwis dosyłki importuje sprawę klienta — cykl czekałby. */
-  const d = database.prepare(`SELECT waybill, zrodlo, status, dostarczono_at FROM klient_dosylka
-      WHERE konto = ? AND zamowienie = ? ORDER BY julianday(zalozono_at) DESC LIMIT 1`)
+  const wiersz = database.prepare(`${DOSYLKI_SQL} WHERE d.konto = ? AND d.zamowienie = ?
+      ORDER BY julianday(d.zalozono_at) DESC LIMIT 1`)
     .get(Number(w.channel_account_id), String(w.external_id)) as Record<string, unknown> | undefined;
+  const d = wiersz && (tekst(wiersz.dostarczono_at) !== null || dosylkaSledzona(zycieWiersza(wiersz), teraz))
+    ? wiersz : undefined;
   const zrodlo = tekst(d?.zrodlo);
   return {
     waybill: tekst(w.przesylka_waybill),
@@ -198,11 +206,15 @@ const STATUS_DLA_KLIENTA: Record<string, string> = {
   RETURNED: "wraca albo wróciła do nadawcy",
 };
 
-/** Stan dosyłki słowami klienta — ten sam słownik co pierwsza paczka. */
+/**
+ * Stan dosyłki słowami klienta — ten sam słownik co pierwsza paczka. Bez
+ * numeru mówimy „numer jeszcze nieznany”, nie „czeka na nadanie”: nie wiemy,
+ * czy biuro już nadało paczkę, wiemy tylko, że Allegro numeru nie pokazało.
+ */
 function stanDosylki(d: DosylkaZamowienia): string {
   if (d.dostarczonoAt) return `doręczona ${d.dostarczonoAt.slice(0, 10)}`;
   if (d.status) return STATUS_DLA_KLIENTA[d.status] ?? `ostatni status przewoźnika ${d.status}`;
-  return d.maNumer ? "nadana" : "czeka na nadanie";
+  return d.maNumer ? "nadana" : "numer jeszcze nieznany";
 }
 
 /**

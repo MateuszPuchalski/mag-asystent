@@ -1,13 +1,8 @@
 import React from "react";
 import type { Zdrowie } from "../api/typy";
-import { czas } from "../ui";
+import { BARWA_RANGI, czas, type Ranga } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
 import { wiek } from "./AlarmSynchronizacji";
-
-type Ranga = "zle" | "uwaga" | "ok" | "nic";
-const BARWA: Record<Ranga, string> = {
-  zle: "text-ranga-zle", uwaga: "text-ranga-uwaga", ok: "text-ranga-ok", nic: "text-ranga-nic",
-};
 
 /* Ranga statusu, nie jego barwa: „czerwony" przestałby znaczyć cokolwiek
    przy zmianie palety, a `authentication_error` zawsze woła admina. */
@@ -67,7 +62,7 @@ export function StanIntegracji({ zdrowie, odczyt }: { zdrowie: Zdrowie | undefin
     <dl className="-my-2 divide-y text-sm">
       {wiersze.map(([nazwa, wartosc, ranga]) => <div key={nazwa} className="flex gap-3 py-2">
         <dt className="mr-auto text-slate-600">{nazwa}</dt>
-        <dd className={`font-bold ${BARWA[ranga]}`}>{wartosc}</dd>
+        <dd className={`font-bold ${BARWA_RANGI[ranga]}`}>{wartosc}</dd>
       </div>)}
     </dl>
   </KartaWgladu>;

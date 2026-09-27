@@ -97,6 +97,24 @@ test("nieużywane w oknie idą osobno, automaty odpadają, a obcy typ nie ginie"
   assert.deepEqual(r.spozaRejestru.map((w) => w.typ), ["typ_z_przeszlosci"]);
 });
 
+test("dosyłka: numer wpisany ręką to czynność człowieka, a wykrycie i stany tickera — automat", () => {
+  /* Raport pyta, czy ktoś używa „wpisz numer”. Wykrycie numeru przez ticker
+     pod tym samym typem zawyżałoby odpowiedź na „tak”. */
+  const d = db();
+  const teraz = new Date("2026-09-23T12:00:00Z");
+  for (const typ of ["klient_dosylka_wykryta", "klient_dosylka_stan", "klient_dosylka_doreczona",
+    "klient_dosylka_problem"]) {
+    d.prepare("INSERT INTO events(type,user_id,created_at) VALUES (?,?,?)").run(typ, "automat", "2026-09-22T10:00:00Z");
+  }
+  const r = U.raportUzycia(30, teraz, d);
+  const profil = r.obszary.find((o) => o.obszar === "Profil klienta")!;
+  const wszystkie = [...profil.uzywane, ...profil.nieuzywane].map((w) => w.typ);
+  assert.ok(profil.nieuzywane.some((w) => w.typ === "klient_dosylka_numer"), "nikt nie wpisał numeru ręką");
+  for (const automat of ["klient_dosylka_wykryta", "klient_dosylka_stan", "klient_dosylka_doreczona",
+    "klient_dosylka_problem"]) assert.ok(!wszystkie.includes(automat), automat);
+  assert.deepEqual(r.spozaRejestru, [], "typy tickera stoją w rejestrze");
+});
+
 test("raport niczego nie zapisuje", () => {
   const d = db();
   const przed = (d.prepare("SELECT total_changes() AS n").get() as { n: number }).n;

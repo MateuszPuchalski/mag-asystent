@@ -150,6 +150,10 @@ test("odczyt bez pytania Allegro niczego nie mutuje", () => {
    Reguła „doręczona przebija” zostaje — pierwsza paczka odpowiada na pytanie
    „czy on to dostał”. Dosyłka staje OBOK, bez numeru, żeby doręczony
    oryginał nie zasłonił niedoręczonej drugiej paczki. */
+/* Chwila odczytu nakładki — stała, bo dosyłka spoza okna śledzenia znika
+   z nakładki, a zegar maszyny kiedyś to okno przekroczy. */
+const CHWILA = new Date("2026-09-20T12:00:00Z");
+
 function dosylka(n: { waybill?: string | null; zrodlo?: string | null; status?: string | null; doreczona?: string | null }) {
   const d = db();
   const konto = Number((d.prepare("SELECT channel_account_id AS k FROM zamowienie_klienta WHERE id=?")
@@ -168,11 +172,11 @@ test("dosyłka staje obok pierwszej paczki: krótko na profilu i zdaniem w szkic
     query: async (url) => (url.includes("/shipments")
       ? { shipments: [{ waybill: "AD-1", carrierId: "INPOST" }] } : doreczona("AD-1")),
   });
-  assert.equal(przesylkaZamowienia(db(), zamowienie).dosylka, null);
-  assert.equal(Z.stanPrzesylkiKrotko(przesylkaZamowienia(db(), zamowienie)), "doręczona 2026-09-12");
+  assert.equal(przesylkaZamowienia(db(), zamowienie, CHWILA).dosylka, null);
+  assert.equal(Z.stanPrzesylkiKrotko(przesylkaZamowienia(db(), zamowienie, CHWILA)), "doręczona 2026-09-12");
 
   dosylka({ waybill: "DOS-TAJNY", zrodlo: "allegro", status: "IN_TRANSIT" });
-  const s = przesylkaZamowienia(db(), zamowienie);
+  const s = przesylkaZamowienia(db(), zamowienie, CHWILA);
   assert.equal(s.waybill, "AD-1", "pierwsza paczka zostaje tą, która doszła");
   assert.deepEqual(s.dosylka, { status: "IN_TRANSIT", dostarczonoAt: null, maNumer: true, zrodlo: "allegro" });
   assert.equal(Z.stanPrzesylkiKrotko(s), "doręczona 2026-09-12 · dosyłka: w drodze do klienta");
@@ -183,17 +187,31 @@ test("dosyłka staje obok pierwszej paczki: krótko na profilu i zdaniem w szkic
   /* Numer wpisany ręką mógł trafić na inne zamówienie — szkic nie odsyła
      klienta do Allegro po numer, którego tam może nie być. */
   db().prepare("UPDATE klient_dosylka SET zrodlo = 'recznie', status = NULL, waybill = NULL").run();
-  const r = przesylkaZamowienia(db(), zamowienie);
-  assert.equal(Z.stanPrzesylkiKrotko(r), "doręczona 2026-09-12 · dosyłka: czeka na nadanie");
-  assert.match(Z.zdaniePrzesylki(r)!, /druga paczka \(dosyłka\): czeka na nadanie$/);
+  const r = przesylkaZamowienia(db(), zamowienie, CHWILA);
+  /* Bez numeru nie wiemy, czy paczka już wyszła — wiemy tylko, że numeru
+     nie ma. „Czeka na nadanie” zgadywałoby stan magazynu. */
+  assert.equal(Z.stanPrzesylkiKrotko(r), "doręczona 2026-09-12 · dosyłka: numer jeszcze nieznany");
+  assert.match(Z.zdaniePrzesylki(r)!, /druga paczka \(dosyłka\): numer jeszcze nieznany$/);
 });
 
 test("dosyłkę znamy z własnej bazy: mówimy o niej, choć o pierwszą paczkę nikt nie pytał", () => {
   dosylka({ waybill: "D1", zrodlo: "recznie", doreczona: "2026-09-20T10:00:00Z", status: "DELIVERED" });
-  const s = przesylkaZamowienia(db(), zamowienie);
+  const s = przesylkaZamowienia(db(), zamowienie, CHWILA);
   assert.equal(s.sprawdzonoAt, null);
   assert.equal(Z.stanPrzesylkiKrotko(s), "dosyłka: doręczona 2026-09-20");
   assert.equal(Z.zdaniePrzesylki(s), "Przesyłka zamówienia: druga paczka (dosyłka): doręczona 2026-09-20");
   assert.equal(Z.przesylkaDoOdswiezenia(s, Date.parse("2026-09-21T00:00:00Z")), true,
     "reguła odświeżenia pierwszej paczki się nie zmienia");
+});
+
+test("dosyłki zakończonej sprawy albo spoza okna nie ma w nakładce, chyba że doszła", () => {
+  dosylka({ waybill: "D1", zrodlo: "allegro", status: "IN_TRANSIT" });
+  assert.equal(Z.stanPrzesylkiKrotko(przesylkaZamowienia(db(), zamowienie, CHWILA)), "dosyłka: w drodze do klienta");
+  /* Okno śledzenia minęło — „w drodze” sprzed miesiąca byłoby zatrzymanym zegarem. */
+  assert.equal(przesylkaZamowienia(db(), zamowienie, new Date("2026-10-30T00:00:00Z")).dosylka, null);
+  db().prepare("UPDATE klient_prowadzenie SET zakonczono_at = '2026-09-19T00:00:00Z'").run();
+  const s = przesylkaZamowienia(db(), zamowienie, CHWILA);
+  assert.deepEqual([s.dosylka, Z.zdaniePrzesylki(s)], [null, null]);
+  db().prepare("UPDATE klient_dosylka SET status = 'DELIVERED', dostarczono_at = '2026-09-19T10:00:00Z'").run();
+  assert.equal(Z.stanPrzesylkiKrotko(przesylkaZamowienia(db(), zamowienie, CHWILA)), "dosyłka: doręczona 2026-09-19");
 });

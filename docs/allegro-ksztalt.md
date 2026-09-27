@@ -993,19 +993,25 @@ czyli „Date and time of the parcel tracking number registration in UTC".
 Schemat nie ma listy `required`, więc każde z tych pól może nie przyjść.
 
 Końcówkę pyta od 0.393.0 przycisk przesyłki zamówienia, a od 0.536.0 ticker
-dosyłki. Lista niesie WSZYSTKIE numery zamówienia: pierwszą paczkę, czasem
-numer zwrotu i wcześniejsze dosyłki. Dosyłkę wybiera `wybierzNumer`
-w `services/dosylka.ts`. Odrzuca numery paczek zwrotów tego zamówienia:
-`waybill` i `transportingWaybill` z `CustomerReturnReturnParcel` w lądowisku.
-Odrzuca też numer zarejestrowany przed zgłoszeniem zwrotu i paczkę doręczoną
-przed nim — to pierwsza paczka.
+dosyłki. Lista niesie numery przesyłek zamówienia: pierwszą paczkę i każdą
+dopisaną później. Schemat nie wyklucza numeru paczki zwrotu, więc go
+odsiewamy. Dosyłkę wybiera `wybierzNumer` w `services/dosylka.ts`. Odrzuca
+numery paczek zwrotów tego zamówienia: `waybill` i `transportingWaybill`
+z `CustomerReturnReturnParcel` w lądowisku. Odrzuca też numer zarejestrowany
+przed zgłoszeniem zwrotu i paczkę doręczoną przed nim — to pierwsza paczka.
+Numer bez `createdAt` bierze tylko wtedy, gdy tracking pokazał ruch po
+zgłoszeniu zwrotu.
 
-`[WERYFIKUJ]` **Numer dosyłki stoi przy tym samym zamówieniu w Allegro.** Tak
-podał właściciel 27 września 2026, bez sprawdzenia na żywym koncie. Etykietę
-drukuje Sellasist, a specyfikacja nie mówi, czy Sellasist dopisuje numer do
-zamówienia. Pomyłka nie daje złego numeru, tylko jego brak: po dwóch dniach
-roboczych karta sprawy prosi o numer z Sellasist. Rozstrzygnie miara z S6,
-czyli udział numerów wpisanych ręką.
+`[WERYFIKUJ]` **Numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro.**
+Właściciel zapytany o to 27 września 2026 odpowiedział: „Wydaje mi się że
+tak”. Na żywym koncie nikt tego nie sprawdził. Etykietę drukuje
+Sellasist, a specyfikacja nie mówi, czy Sellasist dopisuje numer do
+zamówienia. Gdy numeru przy zamówieniu nie ma, wykrycie nic nie wybiera.
+Po dwóch dniach roboczych karta sprawy prosi wtedy o numer z Sellasist.
+
+Zły numer też jest możliwy. Inna paczka zarejestrowana przy zamówieniu po
+zgłoszeniu zwrotu zostałaby wzięta za dosyłkę. Rozstrzygnie miara z S6:
+udział numerów wpisanych ręką i poprawionych.
 
 ### `external.id` — mostek do kartoteki
 

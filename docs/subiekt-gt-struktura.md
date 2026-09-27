@@ -47,7 +47,8 @@ Przy przeglądzie reguł obsługi klienta doszedł jeden. Nie wiadomo, czy
 W 0.536.0 doszedł jeden, przy dosyłce sprawy klienta. Właściciel podał, że
 numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro. Na tym stoi
 automatyczne wykrycie numeru, a na żywym koncie nikt tego nie sprawdził.
-Pomyłka daje brak numeru i prośbę o wpisanie go ręką, a nie zły numer.
+Gdy numeru tam nie ma, karta sprawy prosi o wpisanie go ręką. Inna paczka
+dopisana do zamówienia po zwrocie mogłaby jednak dać zły numer.
 
 Warto czytać tę liczbę ostrożnie. W tym samym wydaniu wyszło, że mapowanie
 ODCZYTU skrzynki było błędne w każdym polu, choć nie nosiło ani jednego

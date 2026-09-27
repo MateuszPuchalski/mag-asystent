@@ -28,11 +28,19 @@ const BIURO = ["biuro", "admin"];
  * `login` podaje trasa rozmowy osobno: sprawa budzi się też z rozmowy bez
  * rozmówcy w wątku, dowiązanej numerem zamówienia, a historia takiej
  * rozmowy loginu nie ma (`loginSprawyRozmowy`).
+ *
+ * NUMER DOSYŁKI TU NIE JEDZIE (@wydanie). Linia sprawy przy źródle drukuje
+ * samo zdanie dosyłki, a numer prowadzi do adresu odbiorcy. Potrzebuje go
+ * wyłącznie karta sprawy na profilu, gdzie agent go kopiuje albo poprawia.
  */
 export function zeSprawa<H extends { login: string | null }>(
   h: H, login: string | null = h.login,
 ): H & { sprawa: SprawaKlienta | null } {
-  return { ...h, sprawa: login ? sprawaKlienta(login) : null };
+  const sprawa = login ? sprawaKlienta(login) : null;
+  return {
+    ...h,
+    sprawa: sprawa && { ...sprawa, dosylki: sprawa.dosylki.map((d) => ({ ...d, waybill: null })) },
+  };
 }
 
 /* Bramka jak w skrzynce: sprawy klientów widzi biuro, nie hala. */

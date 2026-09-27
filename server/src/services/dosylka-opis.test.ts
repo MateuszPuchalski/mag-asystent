@@ -1,7 +1,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
-  dniRoboczeOd, najwazniejszaDosylka, opisDosylki, poDniachRoboczych, type DosylkaSprawy, type StanDosylki,
+  dniRoboczeOd, doreczonaDoZakonczenia, dosylkaSledzona, najwazniejszaDosylka, opisDosylki, opisZamrozonej,
+  poDniachRoboczych, type DosylkaSprawy, type StanDosylki,
 } from "./dosylka-opis.js";
 
 /* ── Zdanie o dosyłce i dni robocze (0.536.0, S6) ───────────────────────────
@@ -56,8 +57,10 @@ test("z numerem: doręczona, kłopot, powrót, OTHER, w drodze, jeszcze niespraw
   assert.equal(z({ przewoznik: "OTHER" }).opis, "Przewoźnik spoza Allegro — nie śledzimy");
   assert.equal(z({}).opis, "Dosyłka nadana — czekamy na pierwszy stan");
   assert.equal(z({ status: "IN_TRANSIT", sprawdzonoAt: "2026-09-29T12:00:00Z" }).opis, "Dosyłka w drodze (stan z 14:00)");
-  assert.equal(z({ sprawdzonoAt: "2026-09-29T12:00:00Z" }).opis, "Dosyłka w drodze (stan z 14:00)",
-    "przewoźnik bez statusu to też „w drodze” — numer jest, paczka jedzie");
+  /* Pytaliśmy, a przewoźnik nie podał statusu: paczka nienadana albo numer
+     z literówką. „W drodze” schowałoby ten drugi przypadek. */
+  assert.deepEqual(z({ sprawdzonoAt: "2026-09-29T12:00:00Z" }),
+    { opis: "Przewoźnik nie zna jeszcze tej paczki (stan z 14:00)", ton: "uwaga", bezNumeru: false });
   /* Numer z dawna, a dni robocze lecą — z numerem nie ma „brak numeru”. */
   assert.equal(z({ zalozonoAt: "2026-09-01T10:00:00Z" }).bezNumeru, false);
 });
@@ -73,12 +76,14 @@ test("domyślny termin: trzy dni robocze o 8:00 w magazynie, także przez zmian�
   assert.equal(poDniachRoboczych(new Date("2026-09-25T22:30:00Z"), 1).toISOString(), "2026-09-28T06:00:00.000Z");
 });
 
+const dosylka = (zamowienie: string, s: Partial<DosylkaSprawy>): DosylkaSprawy => ({
+  zamowienie, zwrotId: null, waybill: "W", przewoznik: "DPD", przewoznikZamowienia: null, zrodlo: "allegro",
+  status: null, dostarczonoAt: null, sprawdzonoAt: null, zalozonoAt: "2026-09-28T08:00:00Z", bezNumeru: false,
+  opis: zamowienie, ton: null, ...s,
+});
+
 test("„Moje” mówi o dosyłce, która woła: kłopot, brak numeru, w drodze, doręczona", () => {
-  const d = (zamowienie: string, s: Partial<DosylkaSprawy>): DosylkaSprawy => ({
-    zamowienie, waybill: "W", przewoznik: "DPD", przewoznikZamowienia: null, zrodlo: "allegro", status: null,
-    dostarczonoAt: null, sprawdzonoAt: null, zalozonoAt: "2026-09-28T08:00:00Z", bezNumeru: false,
-    opis: zamowienie, ton: null, ...s,
-  });
+  const d = dosylka;
   const doreczona = d("doręczona", { dostarczonoAt: "2026-09-29T08:00:00Z", ton: "ok" });
   const wDrodze = d("w drodze", {});
   const bezNumeru = d("bez numeru", { waybill: null });
@@ -88,4 +93,45 @@ test("„Moje” mówi o dosyłce, która woła: kłopot, brak numeru, w drodze,
   assert.equal(najwazniejszaDosylka([doreczona, wDrodze])?.opis, "w drodze");
   assert.equal(najwazniejszaDosylka([doreczona])?.opis, "doręczona");
   assert.equal(najwazniejszaDosylka([]), null);
+});
+
+test("„Moje”: doręczona sprzed ostatniego ruchu człowieka nie zasłania kroku; kłopot i brak numeru — zawsze", () => {
+  /* Agent postawił krok, widząc doręczenie — „czeka do …” jego kroku mówi
+     więcej niż stare doręczenie. */
+  const doreczona = dosylka("doręczona", { dostarczonoAt: "2026-09-29T08:00:00Z", ton: "ok" });
+  assert.equal(najwazniejszaDosylka([doreczona], "2026-09-29T09:00:00Z"), null);
+  assert.equal(najwazniejszaDosylka([doreczona], "2026-09-29T07:00:00Z")?.opis, "doręczona");
+  const bezNumeru = dosylka("bez numeru", { waybill: null, bezNumeru: true, ton: "uwaga" });
+  const klopot = dosylka("kłopot", { status: "ISSUE", ton: "zle" });
+  assert.equal(najwazniejszaDosylka([doreczona, bezNumeru], "2026-10-09T09:00:00Z")?.opis, "bez numeru");
+  assert.equal(najwazniejszaDosylka([doreczona, klopot], "2026-10-09T09:00:00Z")?.opis, "kłopot");
+});
+
+test("podpowiedź zakończenia: każda śledzona doszła, a ostatnia po ostatnim ruchu człowieka", () => {
+  const a = dosylka("A", { dostarczonoAt: "2026-09-29T08:00:00Z" });
+  const b = dosylka("B", { dostarczonoAt: "2026-09-30T08:00:00Z" });
+  const ruch = "2026-09-29T12:00:00Z";
+  assert.equal(doreczonaDoZakonczenia([a, b], ruch)?.zamowienie, "B");
+  assert.equal(doreczonaDoZakonczenia([a], ruch), null, "doręczenie sprzed ruchu agent już widział");
+  assert.equal(doreczonaDoZakonczenia([b, dosylka("C", {})], ruch), null, "jedna jeszcze jedzie");
+  assert.equal(doreczonaDoZakonczenia([b, dosylka("D", { przewoznik: "OTHER" })], ruch)?.zamowienie, "B",
+    "OTHER nie dojdzie nigdy, więc nie wstrzymuje podpowiedzi");
+  assert.equal(doreczonaDoZakonczenia([dosylka("D", { przewoznik: "OTHER" })], ruch), null);
+  assert.equal(doreczonaDoZakonczenia([], ruch), null);
+});
+
+test("dosyłka, której już nie śledzimy: zdanie z datą doręczenia albo „nie śledzimy”, nigdy prośba o numer", () => {
+  const teraz = new Date("2026-10-30T10:00:00Z");
+  const zycie = { wToku: true, archiwalna: false, dostarczonoAt: null, numerAt: null,
+    zalozonoAt: "2026-10-20T10:00:00Z" };
+  assert.equal(dosylkaSledzona(zycie, teraz), true);
+  assert.equal(dosylkaSledzona({ ...zycie, wToku: false }, teraz), false, "zakończona sprawa");
+  assert.equal(dosylkaSledzona({ ...zycie, archiwalna: true }, teraz), false, "poprzedni epizod");
+  assert.equal(dosylkaSledzona({ ...zycie, zalozonoAt: "2026-09-29T10:00:00Z" }, teraz), false, "okno minęło");
+  assert.equal(dosylkaSledzona({ ...zycie, zalozonoAt: "2026-09-29T10:00:00Z", numerAt: "2026-10-25T10:00:00Z" },
+    teraz), true, "numer wpisany po czasie ma własne okno");
+  assert.equal(dosylkaSledzona({ ...zycie, zalozonoAt: "2026-08-01T10:00:00Z", dostarczonoAt: "2026-08-03T10:00:00Z" },
+    teraz), true, "doręczenie jest ostateczne — jego zdanie się nie starzeje");
+  assert.deepEqual(opisZamrozonej("2026-09-30T08:00:00Z"), { opis: "Dosyłka doręczona 30.09", ton: "ok" });
+  assert.deepEqual(opisZamrozonej(null), { opis: "Dosyłki już nie śledzimy.", ton: null });
 });

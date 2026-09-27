@@ -151,12 +151,14 @@ describe("zakładka klienta", () => {
 });
 
 /* ── Dosyłka w linijce sprawy (0.536.0) ─────────────────────────────────────
-   Agent przy rozmowie odpowiada zwykle na „gdzie moja paczka”. Linijka niesie
-   JEDNO zdanie o dosyłce — najpilniejsze, nie najświeższe: kłopot, brak
-   numeru, w drodze, doręczona. Reszta stoi na profilu.                       */
+   Linijka stoi przy każdej kolejce i niesie JEDNO zdanie o dosyłce —
+   najpilniejsze, nie najświeższe: kłopot, brak numeru, w drodze, doręczona.
+   Reszta stoi na profilu. Zakończona sprawa przychodzi z pustą listą
+   dosyłek, więc takiego przypadku tu nie ma.                                 */
 describe("dosyłka w linijce sprawy", () => {
   const d = (n: Partial<DosylkaSprawy>): DosylkaSprawy => ({
-    zamowienie: "z-1", waybill: "620111", przewoznik: "DPD", przewoznikZamowienia: "DPD", zrodlo: "allegro",
+    zamowienie: "z-1", zwrotId: null, waybill: "620111", przewoznik: "DPD", przewoznikZamowienia: "DPD",
+    zrodlo: "allegro",
     status: "IN_TRANSIT", dostarczonoAt: null, sprawdzonoAt: "2026-09-27T12:10:00Z",
     zalozonoAt: "2026-09-24T10:00:00Z", bezNumeru: false, opis: "Dosyłka w drodze (stan z 14:10)", ton: null, ...n,
   });
@@ -168,8 +170,11 @@ describe("dosyłka w linijce sprawy", () => {
   const DOREC = d({ zamowienie: "z-3", status: "DELIVERED", dostarczonoAt: "2026-09-26T10:00:00Z",
     opis: "Dosyłka doręczona 26.09", ton: "ok" });
   const PROBLEM = d({ zamowienie: "z-2", status: "ISSUE", opis: "Przewoźnik zgłosił problem z dosyłką", ton: "zle" });
-  const BEZ = d({ zamowienie: "z-4", waybill: null, przewoznik: null, status: null, sprawdzonoAt: null,
+  /* Bez numeru serwer zeruje numer i jego źródło naraz. */
+  const BEZ = d({ zamowienie: "z-4", waybill: null, zrodlo: null, przewoznik: null, status: null, sprawdzonoAt: null,
     opis: "Czekamy na numer dosyłki z Allegro" });
+  /* Tak przychodzi dosyłka w HISTORII kolejek: numer idzie tylko na profil. */
+  const wHistorii = (x: DosylkaSprawy): DosylkaSprawy => ({ ...x, waybill: null });
 
   it("dokleja zdanie dosyłki do tej samej linijki, w barwie tonu", () => {
     pokaz(dane({ sprawa: sprawa([PROBLEM]) }));
@@ -183,16 +188,14 @@ describe("dosyłka w linijce sprawy", () => {
     { nazwa: "brak numeru przed paczką w drodze", lista: [d({}), BEZ], jest: BEZ },
     { nazwa: "paczka w drodze przed doręczoną", lista: [DOREC, d({ zamowienie: "z-5" })], jest: d({}) },
     { nazwa: "sama doręczona", lista: [DOREC], jest: DOREC },
+    { nazwa: "w drodze przed doręczoną także bez numerów, jak w historii kolejek",
+      lista: [wHistorii(DOREC), wHistorii(d({ zamowienie: "z-5" }))], jest: d({}) },
+    { nazwa: "brak numeru dalej wygrywa bez numerów w odpowiedzi",
+      lista: [wHistorii(d({})), wHistorii(BEZ)], jest: BEZ },
   ])("wybiera najpilniejszą: $nazwa", ({ lista, jest }) => {
     pokaz(dane({ sprawa: sprawa(lista) }));
     const linia = screen.getByRole("link", { name: /Sprawa klienta: dosłać/ });
     expect(linia).toHaveTextContent(jest.opis);
     for (const inna of lista.filter((x) => x.opis !== jest.opis)) expect(linia).not.toHaveTextContent(inna.opis);
-  });
-
-  it("zakończona sprawa nie mówi o dosyłce — tej już nikt nie śledzi", () => {
-    pokaz(dane({ sprawa: sprawa([PROBLEM], { stan: "zakonczona", zakonczonoAt: "2026-09-24T12:00:00Z",
-      zakonczyl: "Bartek" }) }));
-    expect(screen.getByRole("link", { name: /Sprawa klienta zakończona/ })).not.toHaveTextContent(/dosyłk/);
   });
 });

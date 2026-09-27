@@ -355,6 +355,12 @@ także „Przejmij” i „Cofnij”, bo wiadomość klienta nie podbija wersji.
 nie potwierdzi więc wiadomości, która przyszła po otwarciu profilu. Brak
 klucza w ciele żądania to 400 bez zapisu (blizna 0.224.1).
 
+Od 0.536.0 jest jeden wyjątek: odmowa wypłaty z kodem dosyłki i „Śledź
+dosyłkę” przy zwrocie. Stawiają krok bez wersji i odcisku ekranu, bo agent
+działa na ZWROCIE, a sprawy nie widzi. Obie podnoszą wersję, więc profil
+otwarty w tej chwili dostaje przy zapisie 409. Gdy odcisk różni się tylko
+licznikami dosyłki, 409 mówi o dosyłce, a nie o kliencie.
+
 **Co budzi sprawę.** Wyłącznie zdarzenie po stronie klienta albo Allegro, bo
 tylko o nim prowadzący może nie wiedzieć. Budzi wiadomość klienta w dowolnej
 jego rozmowie, nowy zwrot, nadanie zwrotu i jego doręczenie do nas. Budzi
@@ -368,8 +374,12 @@ decyzji z 26 września, więc stoi tu jawnie, do oceny właściciela. Dosyłkę
 zakłada biuro, ale doręczenie i kłopot zgłasza przewoźnik przez Allegro.
 Prowadzący o nich nie wie, a krok „dosłać” właśnie na nie czeka. Powód stoi
 słowami panelu: „Dosyłka doręczona 30.09” albo „Dosyłka wraca do nadawcy”.
-Zakończonej sprawy ticker nie śledzi, więc to obudzenie nie dokłada szumu do
-miary z punktu 10.
+Zakończonej sprawy ticker nie śledzi, więc to obudzenie nie dokłada szumu.
+
+Powrót NASZEJ dosyłki do nadawcy budzi, choć paczka nieodebrana nie budzi.
+Paczkę nieodebraną zakłada biuro samo, więc o niej wie. Powrót dosyłki
+zgłasza przewoźnik, biuro o nim nie wie, a krok „dosłać” czeka właśnie
+na tę paczkę.
 
 **Czego nie budzi (decyzja właściciela z 27 września 2026).** Decyzja
 z 26 września mówiła o ponownym otwarciu przy każdym zdarzeniu. Właściciel
@@ -427,11 +437,16 @@ z opóźnieniem budzi, bo tej wiadomości agent nie widział. Znacznik bez stref
 czyta się jako UTC, tak jak SQLite, żeby próg i zapytanie mówiły o tej samej
 chwili.
 
-**Odcisk dostał w 0.536.0 dwa klucze: `k` i `q`.** Liczą dosyłki doręczone
-i dosyłki z kłopotem, znów sztukami. Napis odcisku każdej sprawy przez to się
-zmienił. Ekran profilu otwarty w chwili aktualizacji dostaje więc raz 409 ze
-świeżą sprawą i rysuje ją od nowa. Zapamiętany odcisk bez nowych kluczy nie
-budzi, a odmowa z dosyłką dopisuje je bez potwierdzania reszty.
+**Odcisk dostał w 0.536.0 dwa klucze: `k` i `q`.** Od @wydanie liczą PRZEJŚCIA dosyłek
+w doręczenie i w kłopot u przewoźnika. Liczniki stoją w wierszu dosyłki
+i nigdy nie maleją. Kłopot, potem „w drodze” i znów kłopot budzi więc dwa
+razy. Zastąpiona dosyłka nie odejmuje niczego i nie udaje obudzenia.
+
+Napis odcisku każdej sprawy zmienił się w 0.536.0. Ekran profilu otwarty
+w chwili tamtej aktualizacji dostał więc raz 409 ze świeżą sprawą. Zapamiętany
+odcisk bez nowych kluczy nie budzi. Migracja w @wydanie przycina zapisane
+`k` i `q` do nowych sum, żeby następny kłopot obudził sprawę. Odmowa z dosyłką dopisuje brakujące
+klucze bez potwierdzania reszty.
 
 **Zakończenie zależy od tego, co klient dostał:**
 
@@ -452,9 +467,11 @@ spełnił. „Dziś” i „po terminie” liczą się na dobie lokalnej magazyn
 czerwono stoi tylko „po terminie”.
 
 Od 0.536.0 pyta też wtedy, gdy doszła dosyłka: „Dosyłka doręczona 30.09.
-Zakończ sprawę?”. Otwarty zwrot TEGO zamówienia jej nie gasi. Zwrot wymiany
-nie dostaje korekty, bo pieniędzy się nie oddaje, więc stoi otwarty i gasiłby
-podpowiedź na zawsze. Powód podpowiedzi niesie pole `podpowiedzPowod`.
+Zakończ sprawę?”. Doszła każda śledzona dosyłka, a ostatnia po ostatnim
+ruchu człowieka. Nowy krok po doręczeniu znaczy, że agent je widział
+i sprawa ma jeszcze coś do zrobienia. Otwarty zwrot TEGO zamówienia
+podpowiedzi nie gasi, bo zwrot wymiany stoi otwarty na zawsze. Powód niesie
+pole `podpowiedzPowod`.
 
 **Pilnują:**
 
@@ -468,12 +485,15 @@ podpowiedź na zawsze. Powód podpowiedzi niesie pole `podpowiedzPowod`.
 - w panelu `ProfilKlienta.test.tsx`, `Moje.test.tsx` i `Klient.test.tsx`:
   same GET-y przy otwarciu profilu, wiersz „Moje” bez przycisku i linijka
   sprawy przy źródle;
-- od 0.536.0 `dosylka.test.ts`: odmowa stawia krok tą samą drogą, wykrycie
-  numeru, ticker i obudzenie z `k` oraz `q`;
+- od @wydanie `dosylka.test.ts`: odmowa stawia krok tą samą drogą, przejęcie
+  i zastąpienie dosyłki, epizody, wykrycie numeru i obudzenie z `k` oraz `q`;
+- ten sam plik: ticker ze strażą sprawy, ponowienie partii numer po numerze
+  i zamrożony stan w nakładce zamówienia;
 - `dosylka-opis.test.ts`: zdania dosyłki słowo w słowo i dni robocze na
   dobie magazynu;
 - `zwroty.test.ts`: porażka zapisu dosyłki nie zamienia odmowy w błąd,
-  a ponowienie niczego nie dopisuje.
+  a ponowienie niczego nie dopisuje ani nie oddaje 500;
+- `zwrot-pieniedzy.test.ts`: odmowa z panelu Allegro zamyka drugą odmowę.
 
 **Miara (punkt 10 dekalogu z `docs/ergonomia-magazynu.md`).** Dwie liczby
 mówią, czy sprawa pomaga, czy dokłada pracy. Pierwsza to udział obudzeń
@@ -484,12 +504,16 @@ terminie na tydzień: rośnie, gdy terminy są na wyrost albo spraw jest za
 dużo. Obie liczy się bez osi osobowej, a dziś nie liczy ich nic.
 
 **Miara dosyłki (0.536.0).** Trzecia liczba to udział numerów wpisanych
-ręką, czyli `klient_dosylka_numer` z `zrodlo` równym `recznie`. Sprawdza na
-żywo fakt właściciela, że numer dosyłki stoi przy tym samym zamówieniu.
-Czwarta to czas od odmowy do numeru, między `klient_dosylka_zalozona`
-a `klient_dosylka_numer` tej samej sprawy. Krok z terminem postawionym przez
-odmowę niesie `domyslny: true` w `klient_sprawa_krok`. Te też liczy się bez
-osi osobowej i dziś też nie liczy ich nic.
+ręką: `klient_dosylka_numer` wobec `klient_dosylka_wykryta` z tickera. Sprawdza
+na żywo fakt właściciela, że numer dosyłki stoi przy tym samym zamówieniu.
+Czwarta to czas od odmowy do numeru, od `klient_dosylka_zalozona` do
+pierwszego numeru tej samej sprawy. Sprawdza też założenia o terminach:
+etykietę w dniu odmowy i numer w Allegro w ciągu doby.
+
+Krok z terminem postawionym przez odmowę niesie `domyslny: true`
+w `klient_sprawa_krok`. Ponowne wpisanie tego samego numeru nie zostawia
+wpisu, więc nie zawyża trzeciej liczby. Te miary też liczy się bez osi
+osobowej i dziś nie liczy ich nic.
 
 **Zabrania.** Statusu przepisanego ze źródeł, kończenia przez automat
 i otwarcia ekranu, które cokolwiek zapisuje. Zabrania też listy, liczby
@@ -500,43 +524,89 @@ per osoba to monitoring pracowniczy z art. 22² Kodeksu pracy
 treść kroku ani numer przesyłki — polityka stoi w `docs/obsluga-klienta.md`.
 
 **Drugi przyrost: dosyłka ze śledzeniem (0.536.0).** Przy złym towarze
-biuro odmawia wypłaty za zwrot kodem `NEW_ITEM_SENT` albo `MISSING_PART_SENT`.
-Tak podał właściciel 27 września. Ta sama odmowa, w tym samym ruchu, stawia
-w sprawie krok „dosłać” i zakłada śledzenie dosyłki. Krok dostaje termin
-trzech dni roboczych, na 8:00 w magazynie. Sprawie w toku odmowa zastępuje
-krok, bo „czekamy na zwrot” właśnie się spełniło.
+biuro odmawia wypłaty za zwrot kodem `NEW_ITEM_SENT`, czyli „Wysłaliśmy nowy
+towar”. Tak podał właściciel 27 września. Kod `MISSING_PART_SENT` doszedł
+w tym wydaniu, bo brakująca część jedzie tak samo, drugą paczką. To do
+oceny właściciela.
+
+Ta sama odmowa, w tym samym ruchu, stawia w sprawie krok „dosłać” i zakłada
+śledzenie dosyłki. Krok dostaje termin trzech dni roboczych, na 8:00
+w magazynie. Trzy dni to założenie: dzień na etykietę i do dwóch dni kuriera.
+Sprawie w toku odmowa zastępuje krok, bo „czekamy na zwrot” właśnie się
+spełniło.
+
+Gdzie biuro odmawia, na ekranie zwrotu WERTIS czy w panelu Allegro, tego nie
+wiemy. Obie drogi są obsłużone. Kod odmowy z panelu Allegro przychodzi
+synchronizacją i daje przy zwrocie „Śledź dosyłkę” oraz propozycję na
+profilu.
 
 **Odmowa nie potwierdza „nowego”.** Agent odmawia na ekranie zwrotu i profilu
-nie widział. Nowa dosyłka do tego samego zamówienia zastępuje poprzednią.
-Porażka zapisu dosyłki nie zamienia odmowy w błąd, bo odmowa w Allegro już
-poszła. Ekran zwrotu mówi wtedy, czemu śledzenia nie założono, i proponuje
-„Śledź dosyłkę”.
+nie widział. Porażka zapisu dosyłki nie zamienia odmowy w błąd, bo odmowa
+w Allegro już poszła. Ekran zwrotu mówi wtedy, czemu śledzenia nie założono,
+i proponuje „Śledź dosyłkę”.
+
+**Odmowa przejmuje dosyłkę, która należy do zwrotu.** Należy do niego numer
+wpisany ręką w bieżącym epizodzie i dosyłka założona po zgłoszeniu zwrotu.
+Od @wydanie należy też dosyłka, której numer wpisano po zgłoszeniu. Przejęcie
+zostawia numer, stan i doręczenie. Starszą odmowa zastępuje, bo klient odesłał
+i ją. Tę samą regułę czytają
+ekran zwrotu, „Śledź dosyłkę” i propozycja na profilu.
+
+**Wznowienie zakończonej sprawy zaczyna nowy epizod.** Krok, który ją
+wznawia, odkłada do historii jej skończone dosyłki, każdą drogą. Skończona
+to doręczona, zawrócona albo spoza trzydziestu dni okna. Karta sprawy,
+„Moje”, podpowiedź i ticker widzą tylko dosyłki bieżącego epizodu. Dosyłka
+sprzed miesięcy nie woła więc w nowej sprawie o numer, którego nikt nie wpisze.
+
+Dosyłka w drodze zostaje żywa (@wydanie). Agent kończy sprawę po nadaniu
+etykiety, a wznawia, gdy klient pyta „gdzie paczka?”. Odłożona przestałaby
+być śledzona, a panel nie ma jak jej wskrzesić.
+
+**„Po ruchu człowieka” liczy chwila zapisu doręczenia na serwerze** (@wydanie).
+Data kuriera bywa wcześniejsza od numeru wpisanego ręką. Wtedy podpowiedź
+„Zakończ sprawę?” i zdanie w „Moje” gasły mimo świeżego doręczenia.
 
 **Tabela `klient_dosylka` trzyma numer i wynik śledzenia, nie historię.**
 Jeden wiersz przypada na sprawę i zamówienie. Numer wykrywa ticker `dosylki`
-w `main()`, co piętnaście minut. Pyta
+w `main()`, co siedemnaście minut (`ALLEGRO_DOSYLKI_SYNC_MS`). O jedną
+dosyłkę bez numeru pyta najwyżej co pół godziny. Pyta
 `GET /order/checkout-forms/{id}/shipments` i odrzuca numery paczek zwrotu,
-wcześniejszych dosyłek i pierwszej paczki. Pierwszą paczkę poznaje po
-rejestracji albo doręczeniu przed zgłoszeniem zwrotu. Kilku kandydatów bez
-daty nie rozstrzyga: dwa dni robocze później ekran prosi o numer z Sellasist.
+wcześniejszych dosyłek i pierwszej paczki.
+
+Pierwszą paczkę poznaje po rejestracji albo doręczeniu przed zgłoszeniem
+zwrotu. Numer bez daty rejestracji bierze tylko wtedy, gdy przewoźnik
+zgłosił ruch po zgłoszeniu zwrotu. Kilku kandydatów bez daty nie rozstrzyga.
+Dwa dni robocze bez numeru to założenie o Sellasist i Allegro, po którym
+ekran prosi o numer.
 
 **Śledzenie idzie tą samą drogą co zwroty.** `odpytajTracking`
 w `services/allegro-tracking.ts` pyta partiami po przewoźniku. Śledzi
-wyłącznie sprawy w toku i dosyłki z ostatnich trzydziestu dni. Przewoźnika
-`OTHER` Allegro nie śledzi, więc nie pytamy o niego wcale. Limit 429 idzie do
-`uruchomTakt`, a każdy inny błąd zabiera jedną dosyłkę. Ticker nie podnosi
-wersji sprawy i pisze warunkowo, po numerze.
+wyłącznie sprawy w toku i bieżący epizod. Okno ma trzydzieści dni od
+założenia albo od numeru wpisanego po czasie. Przewoźnika `OTHER` Allegro
+nie śledzi, więc nie pytamy o niego wcale.
+
+Limit 429 idzie do `uruchomTakt`. Inny błąd zabiera tylko dosyłkę, o którą
+pytanie padło: partię, która padła, ticker pyta jeszcze raz numer po
+numerze. Ticker nie podnosi wersji sprawy. Pisze warunkowo, po numerze,
+i tylko wtedy, gdy sprawa dalej jest w toku w tym samym epizodzie.
+
+**Dosyłki, której już nie śledzimy, nie opisujemy stanem.** Chodzi
+o zakończoną sprawę, poprzedni epizod albo koniec okna. Ekran zwrotu mówi
+wtedy „Dosyłka doręczona 30.09” albo „Dosyłki już nie śledzimy.”.
+Nakładka zamówienia i szkic Copilota mówią tylko o doręczeniu.
 
 **Wpisany numer jest drogą zapasową.** Profil ma przy dosyłce „wpisz numer”
-z listą przewoźników znanych z bazy. Propozycja „Śledzić dosyłkę?” na
-profilu zostaje wyłącznie dla ponowienia i kodów odmowy z panelu Allegro.
+z listą przewoźników znanych z bazy. Ten sam numer wpisany drugi raz niczego
+nie zapisuje. Propozycja „Śledzić dosyłkę?” na profilu zostaje wyłącznie dla
+ponowienia i kodów odmowy z panelu Allegro.
+
 `services/przesylka-zamowienia.ts` pokazuje dosyłkę obok pierwszej paczki,
 bez numeru. Reguła „doręczona przebija” zostaje, bo przy reklamacji pytanie
 brzmi „czy on to w ogóle dostał”.
 
 Właściciel podał 27 września jeszcze dwa fakty, niesprawdzone na żywym
-koncie. Numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro, obok
-pierwszej paczki. Dosyłka jedzie prawie zawsze tym samym przewoźnikiem. Na
+koncie. O numerze przy tym samym zamówieniu powiedział: „Wydaje mi się że
+tak”. O przewoźniku dosyłki: „Prawie zawsze tym samym co wcześniej”. Na
 pierwszym stoi wykrycie numeru, więc w `docs/allegro-ksztalt.md` ma znacznik
 weryfikacji. Na drugim stoi tylko domyślny przewoźnik w formularzu numeru.
 
@@ -545,6 +615,10 @@ powód zwrotu bez kodu odmowy nie znaczy dosyłki. Plakietka
 `LicznikDoZrobienia` odpadła, bo „Moje” celowo nie ma licznika. Zdecyduje
 o niej miara, nie przyrost. Przycisk „Sprawdź teraz” odpadł, bo ticker
 i wpisany numer wystarczają.
+
+Odpadł też ekran do wpisania numeru przy zamówieniu bez dosyłki. Trasa
+`POST …/sprawa/dosylka/numer` taki wiersz zakłada, ale panel pokazuje
+„wpisz numer” tylko przy dosyłce na karcie sprawy.
 
 ## Sprzeczność: login kupującego
 

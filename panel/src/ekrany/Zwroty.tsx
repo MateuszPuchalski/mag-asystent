@@ -364,12 +364,20 @@ export function Zwroty() {
   const zdejmij = useZdejmijPozycje();
   const [bladDopisania, setBladDopisania] = useState("");
   const [bladRabatu, setBladRabatu] = useState("");
-  const [bladPieniedzy, setBladPieniedzy] = useState("");
-  /* Wynik założenia dosyłki (0.536.0) — zdanie jednorazowe z odpowiedzi.
-     Niesie NUMER ZWROTU, bo pieniądze nie są kluczowane zwrotem: przełączenie
-     na inny zwrot z pamięci podręcznej zostawia sekcję zamontowaną, a zdanie
-     o cudzym kroku stałoby pod cudzymi pieniędzmi. */
+  /* ZDANIA SEKCJI PIENIĘDZY NIOSĄ NUMER ZWROTU (@wydanie) — błąd i wynik
+     założenia dosyłki. Odpowiedź przychodzi po chwili, a operator bywa już
+     przy następnym zwrocie. Bez numeru błąd odmowy zwrotu A stanąłby pod
+     pieniędzmi zwrotu B. Klucz sekcji tego nie załatwi: te zdania mieszkają
+     tutaj, poza nią, bo pisze je odpowiedź mutacji.
+
+     Przejście na inny zwrot ich NIE KASUJE. Odpowiedź, która przyszła po
+     odejściu, czeka przy swoim zwrocie: odmowa jest nieodwracalna, więc jej
+     wynik nie może przepaść bez słowa. Następny zapis przy tym zwrocie
+     zaczyna od czystej sekcji. */
+  const [bladPieniedzy, setBladPieniedzy] = useState<{ zwrotId: number; tekst: string } | null>(null);
   const [wynikDosylki, setWynikDosylki] = useState<{ zwrotId: number; wynik: WynikDosylki } | null>(null);
+  const bladPieniedzyDla = (zwrotId: number, przedrostek = "") => (e: unknown) =>
+    setBladPieniedzy({ zwrotId, tekst: `${przedrostek}${(e as Error).message}` });
   const [bladFaktury, setBladFaktury] = useState("");
   const trwa = werdykt.isPending || ocena2.isPending || kwota.isPending
     || korekta.isPending || cofnijKorekte.isPending || cofnijKwote.isPending
@@ -1208,53 +1216,56 @@ export function Zwroty() {
             {/* Pieniądze STOJĄ POD DECYZJAMI, nie w kolumnie dowodów: to jest
                 ostatni krok tej pracy i ma być tam, gdzie operator właśnie
                 patrzy, a nie o kolumnę dalej. */}
-            {szczegol.data?.pieniadze && <Pieniadze
+            {/* `key` na ZWROCIE, jak przy `Pozycje` niżej (@wydanie). Bez niego
+                sekcja zostawała zamontowana przy przejściu na zwrot z pamięci
+                podręcznej, a z nią otwarty formularz odmowy z kodem i powodem
+                poprzedniego zwrotu — gotowy do wysłania pod cudzym numerem. */}
+            {szczegol.data?.pieniadze && <Pieniadze key={`pieniadze-${zwrot.id}`}
               stan={szczegol.data.pieniadze}
               przedWerdyktem={zwrot.kubelek === "decyzja"}
+              kodAllegro={zwrot.rejectionCode}
               akcje={akcje}
               trwa={pieniadze.isPending || odmowaPlatnosci.isPending
                 || przelew.isPending || cofnijPrzelew.isPending || sledzDosylke.isPending}
-              blad={bladPieniedzy}
+              blad={bladPieniedzy?.zwrotId === zwrot.id ? bladPieniedzy.tekst : ""}
               wynikDosylki={wynikDosylki?.zwrotId === zwrot.id ? wynikDosylki.wynik : null}
               onZwroc={() => {
-                setBladPieniedzy("");
+                setBladPieniedzy(null);
                 setWynikDosylki(null);
                 pieniadze.mutate({ id: zwrot.id, wersja: zwrot.wersja },
-                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+                  { onError: bladPieniedzyDla(zwrot.id) });
               }}
               onPrzelew={(referencja) => {
-                setBladPieniedzy("");
+                setBladPieniedzy(null);
                 setWynikDosylki(null);
                 przelew.mutate({ id: zwrot.id, wersja: zwrot.wersja, referencja },
-                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+                  { onError: bladPieniedzyDla(zwrot.id) });
               }}
               onCofnijPrzelew={() => {
-                setBladPieniedzy("");
+                setBladPieniedzy(null);
                 setWynikDosylki(null);
                 cofnijPrzelew.mutate({ id: zwrot.id, wersja: zwrot.wersja },
-                  { onError: (e) => setBladPieniedzy((e as Error).message) });
+                  { onError: bladPieniedzyDla(zwrot.id) });
               }}
               onOdmow={(kod, powod) => {
-                setBladPieniedzy("");
+                setBladPieniedzy(null);
                 setWynikDosylki(null);
                 const zwrotId = zwrot.id;
                 odmowaPlatnosci.mutate({ id: zwrotId, kod, powod, wersja: zwrot.wersja }, {
                   onSuccess: (w) => { if (w.dosylka) setWynikDosylki({ zwrotId, wynik: w.dosylka }); },
-                  onError: (e) => setBladPieniedzy((e as Error).message),
+                  onError: bladPieniedzyDla(zwrotId),
                 });
               }}
               onSledzDosylke={() => {
-                setBladPieniedzy("");
+                setBladPieniedzy(null);
                 setWynikDosylki(null);
                 const zwrotId = zwrot.id;
                 sledzDosylke.mutate({ id: zwrotId }, {
-                  /* Ta trasa nie wysyła odmowy, więc zdanie „Odmowa wysłana; …”
-                     byłoby tu nieprawdą. Porażka idzie zwykłym błędem sekcji. */
-                  onSuccess: (w) => {
-                    if (w.zalozona) setWynikDosylki({ zwrotId, wynik: w });
-                    else setBladPieniedzy(`Śledzenia dosyłki nie założono — ${w.blad}`);
-                  },
-                  onError: (e) => setBladPieniedzy((e as Error).message),
+                  onSuccess: (w) => setWynikDosylki({ zwrotId, wynik: w }),
+                  /* Porażkę ta trasa mówi błędem 400 ze stałym zdaniem serwera.
+                     Zdanie „Odmowa wysłana; …” byłoby tu nieprawdą, bo ta trasa
+                     odmowy nie wysyła — więc przedrostek mówi tylko o śledzeniu. */
+                  onError: bladPieniedzyDla(zwrotId, "Śledzenia dosyłki nie założono — "),
                 });
               }} />}
             <div className="min-h-0 flex-1 overflow-y-auto">

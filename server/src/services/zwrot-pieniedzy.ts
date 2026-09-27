@@ -3,7 +3,10 @@ import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { dopasujPozycjeZamowienia } from "./dopasowanie-sku.js";
 import { logEvent } from "./events.js";
 import { iloscLiczona } from "./ilosc-zwrotu.js";
-import { DOSYLKI_SQL, jestKodemDosylki, naDosylkeSprawy, type TonDosylki } from "./dosylka-opis.js";
+import {
+  DOSYLKA_ZWROTU_SQL, dosylkaSledzona, jestKodemDosylki, naDosylkeSprawy, opisZamrozonej, zycieWiersza,
+  type TonDosylki,
+} from "./dosylka-opis.js";
 
 /* ── Zwrot pieniędzy i odmowa w Allegro (0.190.0) ────────────────────────────
 
@@ -82,6 +85,8 @@ type Wiersz = {
   zwrot_pieniedzy_id: string | null; zwrot_pieniedzy_command_id: string | null;
   zwrot_pieniedzy_status: string | null; zwrot_pieniedzy_at: string | null;
   odmowa_kod: string | null; odmowa_powod: string | null; odmowa_at: string | null;
+  /** Kod odmowy zsynchronizowany z Allegro — także złożonej w panelu Allegro, nie u nas. */
+  rejection_code: string | null;
   status_allegro: string | null; rozliczony_allegro_at: string | null;
   przelew_at: string | null; przelew_przez: string | null;
   przelew_referencja: string | null;
@@ -92,7 +97,7 @@ const wczytaj = (database: Db, zwrotId: number): Wiersz => {
       z.wersja, z.werdykt, z.zamkniety_at, z.kwota_grosze, z.kwota_dostawa_grosze,
       z.zwrot_pieniedzy_id, z.zwrot_pieniedzy_command_id,
       z.zwrot_pieniedzy_status, z.zwrot_pieniedzy_at,
-      z.odmowa_kod, z.odmowa_powod, z.odmowa_at, z.status_allegro, z.rozliczony_allegro_at,
+      z.odmowa_kod, z.odmowa_powod, z.odmowa_at, z.rejection_code, z.status_allegro, z.rozliczony_allegro_at,
       z.przelew_at, z.przelew_przez, z.przelew_referencja,
       o.platnosc_id, o.platnosc_typ, o.waluta, o.id AS zamowienie_wiersz
     FROM zwrot_klienta z
@@ -199,13 +204,15 @@ export type StanZwrotuPieniedzy = {
      */
     potwierdzone: boolean;
   } | null;
-  odmowa: {
-    kod: string; powod: string | null; kiedy: string | null;
-    /** Dosyłka tego zwrotu (0.536.0): po zwrocie, a bez niego po zamówieniu i koncie. */
-    dosylka: { opis: string; login: string; ton: TonDosylki } | null;
-    /** Kod dosyłki, zamówienie znane, a dosyłki nikt nie śledzi — ekran proponuje „Śledź dosyłkę”. */
-    sledzicDosylke: boolean;
-  } | null;
+  odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
+  /**
+   * Dosyłka tego zwrotu (@wydanie), gdy NASZA odmowa albo kod z Allegro to
+   * kod dosyłki. Poza `odmowa`, bo odmowa złożona w panelu Allegro przychodzi
+   * tylko kodem synchronizacji — a ekran ma pokazać dosyłkę i przy niej.
+   */
+  dosylka: { opis: string; login: string; ton: TonDosylki } | null;
+  /** Kod dosyłki, zamówienie i login znane, a dosyłki nikt nie śledzi — ekran proponuje „Śledź dosyłkę”. */
+  sledzicDosylke: boolean;
   /**
    * Ślad po przelewie oddanym POZA Allegro (0.269.0) — przy pobraniu jedyny,
    * jaki może istnieć. To notatka biura o ruchu pieniędzy, nie sam ruch:
@@ -245,23 +252,25 @@ function bramkaPrzelewu(w: Wiersz): { moznaZapisacPrzelew: boolean; powodPrzelew
 }
 
 /**
- * Dosyłka pod odmową wypłaty (0.536.0). Najpierw ta założona z TEGO zwrotu,
- * potem dosyłka tego samego zamówienia na tym samym koncie — np. wpisana
- * ręką na profilu, zanim ktoś odmówił wypłaty. Surowy SQL i zdanie
- * z `dosylka-opis.ts`, nie import `dosylka.ts`: tamten plik importuje sprawę
- * klienta, a ten czyta synchronizacja zwrotów — cykl czekałby za rogiem.
+ * Dosyłka pod odmową wypłaty (@wydanie) według JEDNEJ reguły
+ * (`DOSYLKA_ZWROTU_SQL`) — tej samej, którą „Śledź dosyłkę” sprawdza, czy
+ * jest co zakładać. Surowy SQL i zdanie z `dosylka-opis.ts`, nie import
+ * `dosylka.ts`: tamten plik importuje sprawę klienta, a ten czyta
+ * synchronizacja zwrotów — cykl czekałby za rogiem.
+ *
+ * Dosyłka, której ticker już nie pyta — sprawa zakończona, epizod minął,
+ * okno się skończyło — mówi zdaniem z datą albo „nie śledzimy”. Jej ostatni
+ * stan byłby zatrzymanym zegarem udającym bieżący.
  */
 function dosylkaZwrotu(
   database: Db, w: Wiersz, teraz: Date,
 ): { opis: string; login: string; ton: TonDosylki } | null {
-  const d = database.prepare(`SELECT x.*, p.login FROM (${DOSYLKI_SQL}) x
-      JOIN klient_prowadzenie p ON p.id = x.sprawa_id
-     WHERE x.zwrot_id = ? OR (x.zamowienie = ? AND x.konto = ?)
-     ORDER BY x.zwrot_id = ? DESC, julianday(x.zalozono_at) DESC LIMIT 1`)
-    .get(w.id, w.order_id ?? "", w.channel_account_id, w.id) as Record<string, unknown> | undefined;
+  const d = database.prepare(DOSYLKA_ZWROTU_SQL).get(w.id, w.channel_account_id, w.order_id ?? "") as
+    Record<string, unknown> | undefined;
   if (!d) return null;
-  const { opis, ton } = naDosylkeSprawy(d, teraz);
-  return { opis, ton, login: String(d.login) };
+  const { opis, ton } = dosylkaSledzona(zycieWiersza(d), teraz) ? naDosylkeSprawy(d, teraz)
+    : opisZamrozonej(d.dostarczono_at == null ? null : String(d.dostarczono_at));
+  return { opis, ton, login: String(d.sprawa_login) };
 }
 
 /**
@@ -276,7 +285,10 @@ export function stanZwrotuPieniedzy(
   database: Db = defaultDb(), zwrotId: number, teraz = new Date(),
 ): StanZwrotuPieniedzy {
   const w = wczytaj(database, zwrotId);
-  const dosylka = w.odmowa_kod ? dosylkaZwrotu(database, w, teraz) : null;
+  /* Nasza odmowa albo kod zsynchronizowany z Allegro — gdzie biuro odmawia,
+     nie wiemy (nagłówek `dosylka.ts`), więc liczą się obie drogi. */
+  const kodDosylki = jestKodemDosylki(w.odmowa_kod) || jestKodemDosylki(w.rejection_code);
+  const dosylka = kodDosylki ? dosylkaZwrotu(database, w, teraz) : null;
   const podstawa = {
     kwotaGrosze: w.kwota_grosze == null ? null : Number(w.kwota_grosze),
     waluta: w.waluta ?? "PLN",
@@ -293,13 +305,11 @@ export function stanZwrotuPieniedzy(
       }
       : null,
     odmowa: w.odmowa_kod
-      ? {
-        kod: w.odmowa_kod, powod: w.odmowa_powod, kiedy: w.odmowa_at, dosylka,
-        /* Bez loginu kupującego dosyłki nie ma do czyjej sprawy przypiąć —
-           przycisk, który zawsze odmawia, uczyłby nie klikać żadnego. */
-        sledzicDosylke: jestKodemDosylki(w.odmowa_kod) && Boolean(w.order_id) && Boolean(w.kupujacy_login)
-          && dosylka === null,
-      } : null,
+      ? { kod: w.odmowa_kod, powod: w.odmowa_powod, kiedy: w.odmowa_at } : null,
+    dosylka,
+    /* Bez loginu kupującego dosyłki nie ma do czyjej sprawy przypiąć —
+       przycisk, który zawsze odmawia, uczyłby nie klikać żadnego. */
+    sledzicDosylke: kodDosylki && Boolean(w.order_id) && Boolean(w.kupujacy_login) && dosylka === null,
     przelew: w.przelew_at
       ? { kiedy: w.przelew_at, przez: w.przelew_przez, referencja: w.przelew_referencja }
       : null,
@@ -309,7 +319,14 @@ export function stanZwrotuPieniedzy(
     ({ ...podstawa, moznaZwrocic: false, moznaOdmowic: false, powod });
 
   if (w.zwrot_pieniedzy_id) return nie("Pieniądze już oddano przez panel.");
-  if (w.odmowa_kod) return nie("Odmowa zwrotu pieniędzy jest już zgłoszona w Allegro.");
+  /* ODMOWA Z PANELU ALLEGRO TO TEN SAM FAKT CO NASZA (@wydanie). `rejection_code`
+     to `CustomerReturn.rejection.code` — w schemacie „Refund rejection code”,
+     ten sam słownik co nasze `POST …/rejection`. Drugiej odmowy Allegro nie
+     przyjmie, a wypłata po odmowie przeczyłaby jej; kolejka zwrotów
+     (`pieniadzeCzekaja`) też uznaje wtedy, że pieniądze nie czekają. Notatki
+     o przelewie poza Allegro (`bramkaPrzelewu`) ten kod nie zamyka: to zapis
+     tego, co już się stało, a zamknięta ukryłaby przelew, nie zatrzymała go. */
+  if (w.odmowa_kod || w.rejection_code) return nie("Odmowa zwrotu pieniędzy jest już zgłoszona w Allegro.");
   /* KOREKTA ZAMYKA ZWROT, ALE NIE DROGĘ DO PIENIĘDZY (audyt, 15 września 2026).
      Do tego wydania zamknięty zwrot odmawiał przelewu, a biuro wystawia korektę
      zwykle PRZED oddaniem pieniędzy. Na nagraniu z pracy przycisk znikał, więc

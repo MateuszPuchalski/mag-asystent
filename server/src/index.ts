@@ -85,7 +85,7 @@ import {
 import { przebiegSieci } from "./services/pasowanie-od-silnika.js";
 import { sondujRzeczywistosc } from "./services/sonda-rzeczywistosci.js";
 import { uruchomTakt } from "./services/takt.js";
-import { ODSTEP_DOSYLEK_MS, sledzDosylki } from "./services/dosylka.js";
+import { sledzDosylki } from "./services/dosylka.js";
 import { czytajStan, problemyKopii, wOknieNocnym } from "./services/kopie-bazy.js";
 import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
 import { przebiegRaportow, TAKT_RAPORTOW_MS } from "./services/raport-tygodnia.js";
@@ -582,9 +582,9 @@ async function main() {
     /* Dosyłka (0.536.0): wykrycie numeru przy zamówieniu i śledzenie paczki
        dla spraw klienta w toku. Osobny takt, nie doklejony do zwrotów —
        jedna końcówka nie ma prawa zabrać drugiej, gdy odpowie błędem (blizna
-       0.149.2). Rytm i powód piętnastu minut przy `ODSTEP_DOSYLEK_MS`. Przebieg
+       0.149.2). Rytm i jego powód przy `dosylkiSyncMs` w `config.ts`. Przebieg
        bez dosyłek w toku nie wysyła ani jednego żądania. */
-    uruchomTakt("dosylki", ODSTEP_DOSYLEK_MS, async () => {
+    uruchomTakt("dosylki", config.allegro.dosylkiSyncMs, async () => {
       const w = await sledzDosylki();
       if (w.wykryte || w.doreczone || w.problemy) {
         console.log(`[dosylki] numerów: ${w.wykryte}, doręczonych: ${w.doreczone}, z kłopotem: ${w.problemy}`);
