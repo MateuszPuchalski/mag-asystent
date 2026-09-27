@@ -11,7 +11,7 @@ odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze, rozpoznanie skanu bez sieci, diagnoza łączności (podsieć, powód odmowy, dziennik przerw i ich zgłaszanie), szukanie zgubionego kolektora (znak urządzenia, stan, wyciszenie po ZNALAZŁEM), czasy odpowiedzi każdego żądania per ekran i trasa (kubełki, zwrot po nieudanej wysyłce) — **337 testów** | działa bez Android SDK (`./gradlew :core:test`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze, rozpoznanie skanu bez sieci, diagnoza łączności (podsieć, powód odmowy, dziennik przerw i ich zgłaszanie), szukanie zgubionego kolektora (znak urządzenia, stan, wyciszenie po ZNALAZŁEM), czasy odpowiedzi każdego żądania per ekran i trasa (kubełki, zwrot po nieudanej wysyłce) — **338 testów** | działa bez Android SDK (`./gradlew :core:test`) |
 | `:app` | aplikacja Compose (18 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
 Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
@@ -277,7 +277,10 @@ przed którą ta pozycja broni.
 
 - [ ] PROBLEM, potem odłożenie reszty: pozycja zostaje wyjątkiem, dostawa czeka na ZAKOŃCZ,
 - [ ] na takiej pozycji jest ZMIEŃ PÓŁKĘ, a nie ma COFNIJ ani POPRAW ILOŚĆ,
-- [ ] ZMIEŃ PÓŁKĘ przy wyjątku przenosi półkę, a zgłoszenie zostaje przy pozycji.
+- [ ] ZMIEŃ PÓŁKĘ przy wyjątku przenosi półkę, a zgłoszenie zostaje przy pozycji,
+- [ ] „zła ilość 7 z 10”, potem skan półki: na półkę idzie 7, nie 10,
+- [ ] kafel pokazuje wtedy 7 z podpisem „tyle przyjechało wg zgłoszenia”,
+- [ ] „zła ilość 12 z 10”: kafel pokazuje 10 jak dotąd, a ZAKOŃCZ nie dokłada drugiego zgłoszenia.
 
 **Korekta ilości odłożonej**
 

@@ -136,7 +136,9 @@ test("ZAKOŃCZ nie zgłasza drugi raz braku zgłoszonego przy pozycji", () => {
   P.raiseProblem({ deliveryId: dostawaId, lineId: l, typ: "missing_item", qty: 2 }, KTO);
   assert.equal(naSerwis(), 2, "brak 2 szt. zdjęty ze sprzedaży raz");
 
-  D.putawayLine(l, "A01-02-03", KTO, { qty: 8 });
+  // bez ilości, jak skan półki na kolektorze — reszta liczy się do 8, które przyjechały
+  D.putawayLine(l, "A01-02-03", KTO);
+  assert.equal(odlozone(l), 8, "na półkę idzie to, co przyjechało, nie 10 z dokumentu");
   const r = D.zakonczDostawe(dostawaId, KTO);
   assert.ok(!("error" in r), "ZAKOŃCZ ma przejść");
 
@@ -146,6 +148,89 @@ test("ZAKOŃCZ nie zgłasza drugi raz braku zgłoszonego przy pozycji", () => {
     { zgloszenia: 1, naSerwis: 2 },
     "jeden brak 2 szt., jedno zgłoszenie i jedno MM"
   );
+});
+
+// ── „cała reszta" po zgłoszeniu braku ────────────────────────────────────────
+/* Decyzja właściciela z 27 września 2026. W bazie biura trzy pozycje miały
+   „zła ilość 47/15/400", a na półkę poszło 50/16/500. Kolektor wysyła przy
+   skanie półki „całą resztę", więc resztę liczy tu serwer. */
+
+test("po „złej ilości 7” skan półki kładzie 7, nie 10", () => {
+  const l = linia();
+  P.raiseProblem({ deliveryId: dostawaId, lineId: l, typ: "qty_mismatch", qty: 7 }, KTO);
+
+  const r = D.putawayLine(l, "A01-02-03", KTO);
+
+  assert.ok(!("error" in r));
+  assert.equal(odlozone(l), 7);
+  assert.equal(statusLinii(l), "problem", "wyjątek dalej stoi");
+});
+
+test("reszta liczy się od tego, co już leży na półce", () => {
+  // najpierw 4 sztuki, potem zgłoszenie „przyjechało 7” — skan dokłada 3
+  const l = linia();
+  D.putawayLine(l, "A01-02-03", KTO, { qty: 4 });
+  P.raiseProblem({ deliveryId: dostawaId, lineId: l, typ: "qty_mismatch", qty: 7 }, KTO);
+
+  D.putawayLine(l, "A01-02-03", KTO);
+
+  assert.equal(odlozone(l), 7);
+});
+
+test("ręcznie ustawiona ilość wygrywa ze zgłoszeniem", () => {
+  // magazynier policzył jeszcze raz — jego liczba jest świeższa niż zgłoszenie
+  const l = linia();
+  P.raiseProblem({ deliveryId: dostawaId, lineId: l, typ: "qty_mismatch", qty: 7 }, KTO);
+
+  D.putawayLine(l, "A01-02-03", KTO, { qty: 9 });
+
+  assert.equal(odlozone(l), 9);
+});
+
+test("gdy według zgłoszenia wszystko już leży, skan bez ilości mówi dlaczego", () => {
+  const l = linia();
+  P.raiseProblem({ deliveryId: dostawaId, lineId: l, typ: "qty_mismatch", qty: 7 }, KTO);
+  D.putawayLine(l, "A01-02-03", KTO);
+
+  const r = D.putawayLine(l, "A01-02-03", KTO);
+
+  assert.ok("error" in r);
+  assert.match(r.error, /przyjechało 7/, "zdanie mówi, skąd zero reszty");
+  assert.equal(odlozone(l), 7, "nic nie dołożone");
+});
+
+test("widok pozycji niesie „przyjechało” tylko przy otwartym zgłoszeniu braku", () => {
+  const brak = linia("W32-0501");
+  const uszkodzone = linia("W32-0502");
+  const nadmiar = linia("W32-0503");
+  const rozwiazane = linia("W32-0504");
+  const bez = linia("W32-0505");
+  P.raiseProblem({ deliveryId: dostawaId, lineId: brak, typ: "missing_item", qty: 3 }, KTO);
+  zglosUszkodzenie(uszkodzone);
+  P.raiseProblem({ deliveryId: dostawaId, lineId: nadmiar, typ: "qty_mismatch", qty: 12 }, KTO);
+  const z = P.raiseProblem({ deliveryId: dostawaId, lineId: rozwiazane, typ: "qty_mismatch", qty: 6 }, KTO);
+  assert.ok(!("error" in z));
+  P.resolveProblem(z.id, "dosłali brakujące", "biuro");
+
+  const widok = new Map(D.getDelivery(dostawaId)!.lines.map((x) => [x.id, x.przyjechalo]));
+  assert.deepEqual(
+    [brak, uszkodzone, nadmiar, rozwiazane, bez].map((id) => widok.get(id)),
+    [7, null, null, null, null],
+    /* uszkodzone leżą na półce, nadmiar liczy się z dokumentu (inaczej ZAKOŃCZ
+       zgłosiłby go drugi raz), a rozwiązane to sprawa zamknięta przez biuro */
+    "brak 3 z 10 → 7; reszta bez zmian"
+  );
+});
+
+test("nadmiar zgłoszony przez człowieka nie zmienia reszty — ZAKOŃCZ nie dubluje zgłoszenia", () => {
+  const l = linia();
+  P.raiseProblem({ deliveryId: dostawaId, lineId: l, typ: "qty_mismatch", qty: 12 }, KTO);
+
+  D.putawayLine(l, "A01-02-03", KTO);
+  D.zakonczDostawe(dostawaId, KTO);
+
+  assert.equal(odlozone(l), 10, "jak dotąd: reszta z dokumentu");
+  assert.equal(P.listByDelivery(dostawaId).length, 1, "tylko zgłoszenie człowieka");
 });
 
 // ── pomyłka przy takim odłożeniu ─────────────────────────────────────────────

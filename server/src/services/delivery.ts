@@ -8,7 +8,7 @@ import { parseLocs, pickingLoc } from "../locs.js";
 import { pomijanaPozycja } from "../pomijane.js";
 import { matchesLocPattern } from "../scan.js";
 import { recordEanConflict } from "./ean.js";
-import { raiseProblem, wyjatkiOtwarteWgDokumentu } from "./problems.js";
+import { brakujaceSztuki, raiseProblem, wyjatkiOtwarteWgDokumentu } from "./problems.js";
 import { bezOdpowiedzi, czekaNaOdpowiedz, notatkiDokumentu } from "./notatki.js";
 import { aliasKodu } from "./ean-alias.js";
 import { ktorzyMajaLogo } from "./logo-dostawcy.js";
@@ -545,6 +545,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
   // pozycja nietknięta bierze adres ŻYWY — powód i cena przy `adresyOczekiwane`
   const adresy = adresyOczekiwane(twIds);
   const zgloszenia = zgloszeniaDoWycofania(id);
+  const przyjechalo = przyjechaloWgZgloszen(id);
   const kody = kodyTowarow(twIds);
 
   const lines: DeliveryLineView[] = rows
@@ -576,6 +577,7 @@ export function getDelivery(id: number): DeliveryView | undefined {
         cofnij: cofnijDlaLinii(r),
         odlozenia: odlozeniaLinii(r),
         zgloszenie: zgloszenia.get(r.id) ?? null,
+        przyjechalo: przyjechalo.get(r.id) ?? null,
         kody: kody.get(r.tw_id) ?? [],
       };
     })
@@ -767,6 +769,44 @@ export interface PutawayLineOpts {
 }
 
 /**
+ * Ile sztuk PRZYJECHAŁO według otwartego zgłoszenia braku — po pozycjach dostawy.
+ *
+ * Decyzja właściciela z 27 września 2026. Do @wydanie „cała reszta" liczyła się
+ * zawsze z dokumentu. Magazynier zgłaszał „zła ilość 400 z 500", skanował
+ * półkę, a kolektor odkładał 500. Baza biura miała trzy takie pozycje w dwa
+ * dni, a skan półki ma być potwierdzeniem POLICZONEJ ilości.
+ *
+ * Liczbę brakujących sztuk daje `brakujaceSztuki`, więc półka i MM na serwis
+ * liczą brak tą samą regułą. Nadmiar i uszkodzenie dają tam zero. Pozycji
+ * nie ma wtedy w mapie, a reszta liczy się z dokumentu jak dotąd: nadmiar
+ * zgłoszony przez człowieka, odłożony w całości, dostałby przy ZAKOŃCZ drugie
+ * zgłoszenie z `zglosNadmiary`.
+ *
+ * Tylko zgłoszenia OTWARTE i tylko człowieka. Rozwiązane to sprawa zamknięta
+ * przez biuro, na przykład „dosłali brakujące 4 sztuki” (D8). Zgłoszenia
+ * z ZAKOŃCZ opisują ilość na półce, a nie tę, która przyjechała. Przy dwóch
+ * zgłoszeniach na pozycji wygrywa nowsze — to ono jest ostatnim słowem.
+ */
+export function przyjechaloWgZgloszen(deliveryId: number): Map<number, number> {
+  const rows = db()
+    .prepare(
+      `SELECT line_id AS lineId, typ, ilosc, ilosc_dok AS iloscDok FROM problem
+        WHERE delivery_id = ? AND line_id IS NOT NULL AND resolved_at IS NULL AND zrodlo IS NULL
+          AND typ IN ('qty_mismatch', 'missing_item')
+        ORDER BY id`
+    )
+    .all(deliveryId) as Array<{ lineId: number; typ: string; ilosc: number | null; iloscDok: number | null }>;
+  const m = new Map<number, number>();
+  // ORDER BY id + nadpisywanie = zostaje najnowsze
+  for (const r of rows) {
+    const brak = brakujaceSztuki(r.typ, r.ilosc, r.iloscDok);
+    if (brak > 0 && r.iloscDok != null) m.set(r.lineId, r.iloscDok - brak);
+    else m.delete(r.lineId);
+  }
+  return m;
+}
+
+/**
  * Odłożenie linii: skan lokalizacji jest OBOWIĄZKOWY (D3) — to jedyny dowód,
  * że towar trafił tam, gdzie system myśli. Zapis lokalizacji idzie do kolejki
  * jako `set_location`; ŻADNEGO dokumentu MM (D1).
@@ -789,8 +829,19 @@ export function putawayLine(
   const locErr = validateDeliveryLocation(code);
   if (locErr) return { error: locErr };
 
-  const putQty = opts.qty ?? Math.max(line.ilosc_dok - line.ilosc_odlozona, 0);
-  if (!Number.isFinite(putQty) || putQty <= 0) return { error: "Ilość musi być większa od zera" };
+  /* „Cała reszta" liczy się do tego, co PRZYJECHAŁO, gdy mówi o tym otwarte
+     zgłoszenie braku — patrz `przyjechaloWgZgloszen`. */
+  const cel = przyjechaloWgZgloszen(line.delivery_id).get(lineId);
+  const putQty = opts.qty ?? Math.max((cel ?? line.ilosc_dok) - line.ilosc_odlozona, 0);
+  if (!Number.isFinite(putQty) || putQty <= 0) {
+    // przy zgłoszeniu zero reszty to zdanie o półce, nie o liczbie — człowiek ma wiedzieć, skąd
+    return {
+      error:
+        cel != null && opts.qty == null
+          ? `Według zgłoszenia przyjechało ${cel} i tyle już leży na półce. Ustaw ilość ręcznie.`
+          : "Ilość musi być większa od zera",
+    };
+  }
 
   const doneQty = line.ilosc_odlozona + putQty;
   /* WYJĄTEK PRZEŻYWA ODŁOŻENIE (decyzja właściciela z 27 września 2026).

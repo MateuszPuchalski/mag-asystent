@@ -654,6 +654,13 @@ data class DeliveryLineView(
     /** Najnowsze nierozstrzygnięte zgłoszenie człowieka przy tej pozycji. */
     val zgloszenie: ZgloszenieLinii? = null,
     /**
+     * Ile sztuk przyjechało według otwartego zgłoszenia braku; `null` = bez
+     * takiego zgłoszenia, reszta liczy się z dokumentu. Serwer liczy „całą
+     * resztę" przy zapisie tą samą liczbą (`celOdlozenia`). Starszy serwer
+     * tego pola nie wysyła i to też jest `null`.
+     */
+    val przyjechalo: Double? = null,
+    /**
      * Kody kreskowe towaru — do rozpoznania skanu BEZ SIECI
      * (`pozycjaPoKodzie`). Pusta lista u starszego serwera: wtedy bez sieci
      * pasuje tylko symbol.

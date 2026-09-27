@@ -61,6 +61,7 @@ import pl.wertis.kolektor.core.delivery.adresWiersza
 import pl.wertis.kolektor.core.delivery.rozbieznoscStanu
 import pl.wertis.kolektor.core.product.liniaZlotaStrefa
 import pl.wertis.kolektor.core.delivery.czekaBezLokalizacji
+import pl.wertis.kolektor.core.delivery.celOdlozenia
 import pl.wertis.kolektor.core.delivery.iloscDoOdlozenia
 import pl.wertis.kolektor.core.delivery.iloscNaKaflu
 import pl.wertis.kolektor.core.delivery.odlozonePoZapisie
@@ -414,7 +415,10 @@ fun DeliveryLinesScreen(graph: AppGraph) {
                        stało tu `qtyDoc`, czyli bufor zamykał całą pozycję nawet
                        przy odłożeniu trzech sztuk z dziesięciu — i reszta partii
                        znikała z listy pracy do czasu odpowiedzi serwera. */
-                    val zrobione = odlozonePoZapisie(wybrana, line.qtyDoc, line.qtyDone)
+                    // cel ze zgłoszenia braku — serwer po wypchnięciu bufora policzy tak samo
+                    val zrobione = odlozonePoZapisie(
+                        wybrana, celOdlozenia(line.qtyDoc, line.przyjechalo), line.qtyDone,
+                    )
                     graph.cards.putDelivery(id, v.copy(
                         lines = v.lines.map {
                             if (it.id == line.id) {
@@ -1606,7 +1610,10 @@ private fun PanelOdkladania(
            wymaga jednego potwierdzenia, a potem licznik idzie swobodnie.
            TA SAMA liczba idzie do zapisu (`iloscDoOdlozenia`) — wcześniej kafel
            i zapis liczyły ją osobno i rozjechały się dokładnie o nadmiar. */
-        val ile = iloscNaKaflu(czesc, line.qtyDoc, line.qtyDone)
+        /* „Cała reszta" do tego, co przyjechało według zgłoszenia braku —
+           `celOdlozenia`. `zostalo` wyżej zostaje liczone od dokumentu, bo
+           pilnuje pytania o nadmiar, a nadmiar to zdanie o fakturze. */
+        val ile = iloscNaKaflu(czesc, celOdlozenia(line.qtyDoc, line.przyjechalo), line.qtyDone)
         /* Pytanie zadajemy RAZ NA POZYCJĘ. Przy każdym kroku byłoby karą za
            liczenie sztuk, a przy zerowej liczbie pytań przypadkowe dotknięcie
            `+` wysyłałoby dostawcy reklamację. */
@@ -1715,7 +1722,13 @@ private fun PanelOdkladania(
                 }
                 // „z 10" pojawia się WYŁĄCZNIE przy odłożeniu częściowym —
                 // przy pełnym byłoby powtórzeniem tej samej liczby obok siebie
-                if (ile < zostalo) {
+                val przyjechalo = line.przyjechalo
+                if (czesc == null && przyjechalo != null) {
+                    /* Liczba mniejsza niż faktura bez słowa wyjaśnienia czyta
+                       się jak pomyłka kolektora. „Reszta zostaje" byłoby tu
+                       nieprawdą: reszty nie ma, bo nie przyjechała. */
+                    Text("tyle przyjechało wg zgłoszenia (${formatQty(przyjechalo)})", fontSize = 11.sp, color = InkMute)
+                } else if (ile < zostalo) {
                     Text("z ${formatQty(zostalo)} · reszta zostaje", fontSize = 11.sp, color = InkMute)
                 } else if (ile > zostalo) {
                     // stan, którego nie widać nigdzie indziej, a zmienia skutek zapisu

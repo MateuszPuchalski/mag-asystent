@@ -37,6 +37,22 @@ fun zostaloDoOdlozenia(qtyDoc: Double, qtyDone: Double): Double =
     (qtyDoc - qtyDone).coerceAtLeast(0.0)
 
 /**
+ * Do ilu liczy się „cała reszta" — do tego, co PRZYJECHAŁO, gdy mówi o tym
+ * zgłoszenie braku, inaczej do dokumentu.
+ *
+ * Decyzja właściciela z 27 września 2026. Magazynier zgłaszał „zła ilość 400
+ * z 500", skanował półkę, a na półkę szło 500 — skan miał być potwierdzeniem
+ * policzonej ilości, a potwierdzał fakturę. Serwer liczy resztę przy zapisie
+ * tą samą regułą, więc kafel i zapis się nie rozjadą.
+ *
+ * Pytanie o nadmiar liczy się DALEJ od dokumentu (`zostaloDoOdlozenia`
+ * z `qtyDoc`): nadmiar to zdanie o fakturze, nie o zgłoszeniu.
+ *
+ * @param przyjechalo ilość z otwartego zgłoszenia braku; `null` = brak zgłoszenia
+ */
+fun celOdlozenia(qtyDoc: Double, przyjechalo: Double?): Double = przyjechalo ?: qtyDoc
+
+/**
  * Ilość do wysłania na serwer; `null` = „cała reszta".
  *
  * `null` NIE jest tu podmieniane na wyliczoną liczbę i to jest celowe: pusta

@@ -68,6 +68,17 @@ class IloscOdlozeniaTest {
         assertEquals(10.0, odlozonePoZapisie(7.0, qtyDoc = 10.0, qtyDone = 3.0), 0.0)
     }
 
+    @Test fun `po zgloszeniu braku reszta liczy sie do tego, co przyjechalo`() {
+        // Baza biura: „zła ilość 400 z 500", a skan półki odkładał 500.
+        // Kafel i echo biorą cel ze zgłoszenia; bez zgłoszenia — dokument.
+        val cel = celOdlozenia(qtyDoc = 500.0, przyjechalo = 400.0)
+        assertEquals(400.0, cel, 0.0)
+        assertEquals(400.0, iloscNaKaflu(null, qtyDoc = cel, qtyDone = 0.0), 0.0)
+        assertEquals(400.0, odlozonePoZapisie(null, qtyDoc = cel, qtyDone = 0.0), 0.0)
+        assertEquals(100.0, iloscNaKaflu(null, qtyDoc = cel, qtyDone = 300.0), 0.0)
+        assertEquals(500.0, celOdlozenia(qtyDoc = 500.0, przyjechalo = null), 0.0)
+    }
+
     @Test fun `ECHO NIE SCINA NADMIARU DO DOKUMENTU`() {
         // Stary sufit `coerceAtMost(qtyDoc)` pokazywał „10 z 10" tam, gdzie na
         // półce leży 15 — kłamstwo dokładnie o tę sztukę, o którą chodzi

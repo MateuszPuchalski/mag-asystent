@@ -258,16 +258,23 @@ export interface DeliveryLineView {
   /**
    * Ostatnie odłożenie, które da się jeszcze cofnąć — `null`, gdy nie ma czego.
    *
-   * Kolektor pokazuje z tego COFNIJ i ZMIEŃ PÓŁKĘ. Znika po korekcie ilości
-   * i po samym cofnięciu, bo wtedy liczba nie wynika już z tamtego skanu.
+   * Kolektor pokazuje z tego COFNIJ. Znika po korekcie ilości i po samym
+   * cofnięciu, bo wtedy liczba nie wynika już z tamtego skanu. Przy wyjątku
+   * też go nie ma — cofnięcie odmawia, dopóki stoi zgłoszenie.
    */
   cofnij?: { qty: number; lok: string } | null;
   /**
    * Wszystkie odłożenia pozycji, które da się cofnąć, najstarsze pierwsze.
    * `locActual` trzyma tylko ostatnią półkę; pozycja rozłożona na dwie
-   * półki ma tu obie.
+   * półki ma tu obie. Ostatnie z nich zmienia ZMIEŃ PÓŁKĘ, także przy wyjątku.
    */
   odlozenia?: Array<{ qty: number; lok: string }>;
+  /**
+   * Ile sztuk przyjechało według otwartego zgłoszenia braku; `null` — bez
+   * takiego zgłoszenia. Kolektor liczy od tego „całą resztę" na kaflu, tak
+   * samo jak serwer przy zapisie (`przyjechaloWgZgloszen`).
+   */
+  przyjechalo?: number | null;
   /**
    * Kody kreskowe towaru (EAN z kartoteki i kody nadane w WERTIS). Kolektor
    * dopasowuje po nich skan bez sieci — patrz `kodyTowarow` w serwisie.
