@@ -10,6 +10,67 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.538.2 — 27 września 2026
+
+**Wyjątek przy pozycji przeżywa odłożenie reszty sztuk.** Po zgłoszeniu
+wyjątku magazynier często odkłada resztę, bo uszkodzone sztuki też idą na
+półkę. Odłożenie liczyło wtedy status z samej ilości i po cichu zdejmowało
+z pozycji wyjątek. Skutki były trzy:
+
+- Dostawa z otwartym zgłoszeniem zamykała się sama po ostatnim odłożeniu,
+  wbrew regule „wyjątek czeka na ZAKOŃCZ” z 22 września.
+- Licznik wyjątków w postępie dostawy spadał do zera.
+- Przy braku ZAKOŃCZ zgłaszał ten sam brak drugi raz. Dostawca dostawał dwie
+  reklamacje, a na serwis szło dwa razy tyle sztuk, ile brakowało.
+
+Pozycja zostaje teraz wyjątkiem, a ilość i półka zapisują się jak zawsze.
+Pomyłkę w ilości cofa się tak jak dotąd przy odwrotnej kolejności: najpierw
+WYCOFAJ ZGŁOSZENIE, potem COFNIJ.
+
+**ZMIEŃ PÓŁKĘ działa też przy wyjątku.** Kolektor chował ten przycisk razem
+z COFNIJ, choć półka nie należy do zgłoszenia. Źle zeskanowaną półkę poprawia
+się teraz od razu, bez wycofywania zgłoszenia ze zdjęciem.
+
+## 0.538.1 — 27 września 2026
+
+**Wyjątek przy rozłożonej pozycji nie ginie w dokumencie dostawy.** Panel
+dzielił pozycje po statusie i na górę wynosił tylko te ze stanem „wyjątek”.
+Pozycja rozłożona do końca, a z otwartym zgłoszeniem, trafiała do zwykłej
+tabeli, która zgłoszeń nie pokazuje. Tak zostawia ją nadmiar zgłoszony przy
+ZAKOŃCZ i odłożenie reszty sztuk po zgłoszeniu. Nagłówek faktury mówił wtedy
+„1 otwarty wyjątek”, a w czterdziestu dwóch pozycjach nie było go nigdzie.
+Teraz każda pozycja ze zgłoszeniem stoi w „Pozycjach z wyjątkiem”. Pozycje
+z otwartym zgłoszeniem idą przed tymi, które mają już tylko rozwiązane.
+
+## 0.538.0 — 27 września 2026
+
+**Nagłówek panelu w jednym rzędzie.** Decyzją właściciela z 27 września 2026
+dolny rząd zniknął, a ekran pracy zyskał 52 px wysokości przy 1180 px.
+Stan systemu, Dziennik, Analiza, Ustawienia i Wyloguj stoją w menu „Więcej”
+na końcu paska. Dostawy są ósmą zakładką, za kreską. Szukanie to sama lupa,
+a Ctrl K działa bez zmian. Synchronizację pokazuje kropka z godziną; gdy
+stanie, pasek pisze „Stanęła” na czerwono.
+
+**Stan systemu jako tablica.** Na górze stoi kafelek na każdy obszar: barwa
+i jedno zdanie, na przykład „2 do decyzji” albo „działa · 11:36”. Pod spodem
+otwarte są wyłącznie karty tego, co nie działa albo czeka na biuro. Kartę
+każdego innego obszaru otwiera klik w kafelek. Kolejka zapisów chowa
+„zapisane” pod przyciskiem, a kody kreskowe mają przyciski decyzji w wierszu.
+
+## 0.537.0 — 27 września 2026
+
+**Grupa „Do sprawdzenia" zawęża listę zwrotów.** Właściciel zapytał, co
+właściwie znaczy pasek nad kolejką zwrotów, a potem napisał „zrób oba".
+
+- Podpis „po terminie ustawowym" mówi teraz „po terminie obsługi (7 dni od
+  doręczenia)". To termin z regulaminu Allegro, nie ustawowy — serwer mówił
+  tak od dawna, a podpis nie.
+- Kliknięcie grupy zwrotów w pasku („po terminie obsługi", „bez śladu po
+  przelewie", „rozliczony w Allegro bez korekty") zostawia na liście tylko te
+  zwroty, ze wszystkich kubełków. Nad listą stoi „Tylko: …" z przyciskiem
+  „wyczyść". Wpisanie frazy zdejmuje ten filtr.
+- Grupy koszy prowadzą do ekranu koszy.
+
 ## 0.536.1 — 27 września 2026
 
 **Formularz odmowy nie przechodzi już na następny zwrot.** Po odmowie na

@@ -63,6 +63,18 @@ const CZEKA_NA_BIURO = { slowo: "rozłożona · czeka na biuro", klasa: "bg-ambe
 const otwarteNajpierw = (lista: WyjatekHali[]) =>
   [...lista].sort((a, b) => Number(a.resolvedAt != null) - Number(b.resolvedAt != null));
 
+/* POZYCJĘ Z WYJĄTKIEM ROZPOZNAJE ZGŁOSZENIE, NIE STATUS (0.538.1). Podział
+   szedł po `status === "problem"`, a dwie drogi serwera zostawiają otwarty
+   wyjątek przy pozycji `done`. Pierwsza to nadmiar zgłaszany przy ZAKOŃCZ
+   (`zachowajStatusLinii`). Druga to odłożenie reszty sztuk po zgłoszeniu,
+   bo odłożenie przelicza status z samej ilości. Taka pozycja szła do tabeli,
+   która wyjątków nie rysuje. Zgłoszenie właściciela z nagraniem: nagłówek
+   FZ 65/MAG/09/2026 mówił „1 otwarty wyjątek", a w 42 pozycjach nie było go
+   nigdzie. Rozwiązany też wychodzi na górę, bo idzie do protokołu, a tabela
+   i tak by go zgubiła. */
+const zWyjatkiem = (l: PozycjaDostawy) => l.status === "problem" || l.problemy.length > 0;
+const czekaNaBiuro = (l: PozycjaDostawy) => l.problemy.some((p) => p.resolvedAt == null);
+
 /** Nagłówek sekcji wyjątków: otwarte zawsze, rozwiązane tylko gdy są. */
 function licznikWyjatkow(lista: WyjatekHali[]): string {
   const rozwiazane = lista.filter((p) => p.resolvedAt != null).length;
@@ -122,8 +134,11 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
   const [bladCsv, setBladCsv] = useState("");
   const zdrowie = useZdrowie();
   const zdjecia = zdrowie.data?.zdjecia != null || zdrowie.data?.zdjeciaWlasne != null;
-  const wyjatkowe = d.lines.filter((l) => l.status === "problem");
-  const reszta = d.lines.filter((l) => l.status !== "problem");
+  /* Pozycje z otwartym wyjątkiem przed tymi z samymi rozwiązanymi, z tego
+     samego powodu co `otwarteNajpierw` o jedno piętro niżej. */
+  const wyjatkowe = d.lines.filter(zWyjatkiem)
+    .sort((a, b) => Number(!czekaNaBiuro(a)) - Number(!czekaNaBiuro(b)));
+  const reszta = d.lines.filter((l) => !zWyjatkiem(l));
   const otwarte = [...d.lines.flatMap((l) => l.problemy), ...d.problemyBezLinii]
     .filter((p) => p.resolvedAt == null).length;
   const stan = d.status === "done" && otwarte > 0 ? CZEKA_NA_BIURO

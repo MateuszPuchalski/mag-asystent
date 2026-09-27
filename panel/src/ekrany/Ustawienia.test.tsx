@@ -9,6 +9,7 @@ import { _wyczyscPamiecZdjec } from "../towar/useZdjecie";
 /* Źródło jako tekst (`?raw`) — Vite umie to podać bez typów Node'a. */
 import zrodloSkrzynki from "./Skrzynka.tsx?raw";
 import zrodloRamy from "../main.tsx?raw";
+import zrodloWiecej from "../nawigacja/Wiecej.tsx?raw";
 import zrodloStanu from "./Stan.tsx?raw";
 import zrodloAnalizy from "./Analiza.tsx?raw";
 
@@ -689,10 +690,13 @@ describe("Ustawienia w panelu", () => {
   });
 
   it("zębatka i trasa istnieją — ekran bez drzwi to ekran, którego nie ma", () => {
-    expect(zrodloRamy).toContain('const USTAWIENIA = "/obsluga/ustawienia"');
+    /* Od 0.538.0 drzwi stoją w menu „Więcej" i tam mieszka adres; rama
+       go importuje, więc trasa i link czytają tę samą stałą. */
+    expect(zrodloWiecej).toContain('export const USTAWIENIA = "/obsluga/ustawienia"');
+    expect(zrodloRamy).toContain('import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej"');
     expect(zrodloRamy).toContain("<Route path={USTAWIENIA}");
-    expect(zrodloRamy).toContain("<Link to={USTAWIENIA}");
-    /* Zębatka NIE wchodzi na pasek zakładek: pasek niesie pracę. */
+    expect(zrodloWiecej).toContain("<Link to={USTAWIENIA}");
+    /* Ustawienia NIE wchodzą na pasek zakładek: pasek niesie pracę. */
     const zakladki = zrodloRamy.slice(zrodloRamy.indexOf("const ZAKLADKI"),
       zrodloRamy.indexOf("]", zrodloRamy.indexOf("const ZAKLADKI")));
     expect(zakladki).not.toContain("ustawienia");

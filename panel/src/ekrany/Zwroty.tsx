@@ -117,7 +117,7 @@ const STANY_SYNCHRONIZACJI: Record<StanZwrotow["status"], string> = {
  */
 /** Nazwa rodzaju po ludzku — w zdaniu zbiorczym, nie w wierszu. */
 const NAZWA_ROZJAZDU: Record<string, string> = {
-  /* TERMIN OBSŁUGI, nie ustawowy (@wydanie) — siedem dni od doręczenia,
+  /* TERMIN OBSŁUGI, nie ustawowy (0.537.0) — siedem dni od doręczenia,
      regulamin Allegro. Serwer mówi tak od 0.339.0, a podpis tutaj został
      przy „ustawowym" i właściciel zapytał, co to właściwie znaczy. */
   zwrot_po_terminie: "po terminie obsługi (7 dni od doręczenia)",
@@ -130,12 +130,12 @@ const NAZWA_ROZJAZDU: Record<string, string> = {
 };
 
 /* Rodzaje, które dotyczą ZWROTU — ich klucz to numer zwrotu, więc zawężają
-   listę. Pozostałe mówią o koszach i prowadzą do ekranu koszy (@wydanie). */
+   listę. Pozostałe mówią o koszach i prowadzą do ekranu koszy (0.537.0). */
 const ROZJAZDY_ZWROTOW = new Set(["zwrot_po_terminie", "zwrot_bez_przelewu", "zwrot_rozliczony_bez_korekty"]);
 
 function PasekRozjazdow({ rozjazdy, filtr, onFiltr }: {
   rozjazdy: RozjazdZwrotu[];
-  /** Rodzaj, po którym lista jest teraz zawężona (@wydanie). */
+  /** Rodzaj, po którym lista jest teraz zawężona (0.537.0). */
   filtr?: string | null;
   onFiltr?: (rodzaj: string | null) => void;
 }) {
@@ -155,7 +155,7 @@ function PasekRozjazdow({ rozjazdy, filtr, onFiltr }: {
 
   return <section aria-label="Rozjazdy zwrotów"
     className="shrink-0 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2">
-    {/* ── GRUPA ZAWĘŻA LISTĘ (@wydanie) ─────────────────────────────────────
+    {/* ── GRUPA ZAWĘŻA LISTĘ (0.537.0) ─────────────────────────────────────
         Zgłoszenie właściciela: „co to właściwie oznacza", a potem „zrób
         oba". Liczba bez drogi do spraw kazała rozwijać czterysta numerów
         i szukać ich w kolejce ręką. Kliknięcie zostawia na liście tylko te
@@ -273,7 +273,7 @@ function PasekUwag({ bilans, stan, rozjazdy, filtr = null, onFiltr }: {
   if (!bez && !rozjazdy.length) return null;
   const alarm = Boolean(stan && stan.status !== "current" && (bilans?.powody.do_zwiazania ?? 0) > 0);
   /* Otwarty filtr trzyma pasek otwarty: zwinięty chowałby przycisk, którym
-     się go zdejmuje (@wydanie). */
+     się go zdejmuje (0.537.0). */
   const otwarte = rozwiniete || alarm || filtr !== null;
   return <section aria-label="Uwagi do kolejki" className="shrink-0 space-y-1">
     <button type="button" onClick={() => setRozwiniete((r) => !r)}
@@ -476,7 +476,7 @@ export function Zwroty() {
   const rozjazdy = useRozjazdyZwrotow();
   const [kod, setKod] = useState("");
   const [fraza, setFraza] = useState("");
-  /* Grupa z paska „Do sprawdzenia", po której zawężona jest lista (@wydanie). */
+  /* Grupa z paska „Do sprawdzenia", po której zawężona jest lista (0.537.0). */
   const [filtrRozjazdu, setFiltrRozjazdu] = useState<string | null>(null);
   /* Login, o którego PACZKI pytamy (0.365.0) — osobno od tego, co operator
      wpisuje, bo pytanie idzie po Enterze i po wyjściu z pola, a nie po każdym
@@ -1228,7 +1228,7 @@ export function Zwroty() {
                   ile: ileWSicie[s.id], podpowiedz: s.podpowiedz })),
               ]} />}
         </div>}
-      {/* Aktywna grupa rozjazdów w miejscu pytania kubełka (@wydanie) — lista
+      {/* Aktywna grupa rozjazdów w miejscu pytania kubełka (0.537.0) — lista
           mówi, dlaczego jest krótsza, i ma wyjście jednym kliknięciem. */}
       {filtrRozjazdu &&
         <div className="flex shrink-0 items-center gap-2 border-b border-amber-200 bg-amber-50 px-2 py-1">
