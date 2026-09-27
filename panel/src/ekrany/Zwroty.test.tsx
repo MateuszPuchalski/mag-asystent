@@ -994,12 +994,36 @@ describe("Pasek rozjazdów", () => {
       await userEvent.click(screen.getByRole("button", { name: /pokaż szczegóły/ }));
       const pasek = screen.getByLabelText("Rozjazdy zwrotów");
       expect(pasek).toHaveTextContent("Do sprawdzenia (3)");
-      expect(pasek).toHaveTextContent("2 po terminie ustawowym");
+      expect(pasek).toHaveTextContent("2 po terminie obsługi (7 dni od doręczenia)");
       expect(pasek).toHaveTextContent("1 kosz bez powrotu z regału");
       expect(pasek).not.toHaveTextContent("ZW-1");
 
       await userEvent.click(screen.getByRole("button", { name: /pokaż numery/ }));
       expect(screen.getByLabelText("Rozjazdy zwrotów")).toHaveTextContent("ZW-1");
+    } finally { scena.rozjazdy = []; }
+  });
+
+  it("grupa rozjazdów zawęża listę przez kubełki, a grupa koszy prowadzi do koszy (@wydanie)", async () => {
+    /* Zgłoszenie właściciela: „co to właściwie oznacza w zakładce zwroty",
+       potem „zrób oba". ZW-2 stoi w DO ZWROTU, a otwarty kubełek to DECYZJA. */
+    scena.rozjazdy = [
+      { rodzaj: "zwrot_rozliczony_bez_korekty", klucz: "ZW-2",
+        opis: "Zwrot ZW-2: Allegro oddało pieniądze", odKiedy: "2026-09-01T09:00:00Z" },
+      { rodzaj: "kosz_bez_powrotu", klucz: "Z-7",
+        opis: "Kosz Z-7 rozłożono ponad dobę temu", odKiedy: "2026-09-02T09:00:00Z" },
+    ];
+    try {
+      pokaz();
+      await userEvent.click(screen.getByRole("button", { name: /pokaż szczegóły/ }));
+      expect(screen.getByRole("link", { name: /kosz bez powrotu z regału/ }))
+        .toHaveAttribute("href", "/obsluga/zwroty/kosze");
+      await userEvent.click(screen.getByRole("button", { name: /rozliczony w Allegro bez korekty/ }));
+      expect(screen.getByText(/Tylko: rozliczony w Allegro bez korekty \(1\)/)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /ZW-2/ })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /ZW-1/ })).toBeNull();
+      await userEvent.click(screen.getByRole("button", { name: "wyczyść" }));
+      expect(screen.queryByText(/Tylko:/)).toBeNull();
+      expect(screen.getByRole("button", { name: /ZW-1/ })).toBeInTheDocument();
     } finally { scena.rozjazdy = []; }
   });
 });
