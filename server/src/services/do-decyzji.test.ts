@@ -134,3 +134,65 @@ test("serwis nie zakłada tabeli ani nie pisze — sprawdzone po źródle", () =
   assert.doesNotMatch(zrodlo, /\b(INSERT|UPDATE|DELETE)\b/i);
   assert.doesNotMatch(zrodlo, /logEvent/, "odczyt nie zostawia śladu w dzienniku");
 });
+
+/* ── Dosyłka bez śledzenia (0.541.0) ────────────────────────────────────────
+   Biuro odmawia w panelu Allegro (fakt właściciela z 27 września 2026). Kod
+   przychodzi synchronizacją, a zwrot schodzi z list pracy — więc wiersz
+   „Śledzić dosyłkę?” stoi tutaj, z przyciskiem, i gaśnie, gdy dosyłka powstanie. */
+
+let licznikZwrotow = 0;
+
+/** Zwrot z kodem odmowy z panelu Allegro — tak, jak kładzie go synchronizacja. */
+function odmowaZAllegro(login: string, kod: string, odrzucono: string): number {
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account WHERE external_account_id = 'dd-sprzedawca'").get() as
+    { id: number } | undefined)?.id ?? d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','dd-sprzedawca')").run().lastInsertRowid);
+  const n = ++licznikZwrotow;
+  const zamowienie = `dd-zam-${n}-abcdef`;
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,kupujacy_login,kupiono_at,
+      suma_grosze,waluta,przesylka_przewoznik,synced_at)
+    VALUES (?,?,'READY_FOR_PROCESSING',?,'2026-09-01T10:00:00Z',5000,'PLN','DPD','x')`).run(konto, zamowienie, login);
+  const ext = `dd-zw-${n}`;
+  d.prepare("INSERT INTO allegro_zwrot(id,created_at,surowe_json,synced_at) VALUES (?,?,?,'x')").run(ext,
+    "2026-09-20T10:00:00Z", JSON.stringify({ id: ext, orderId: zamowienie, parcels: [],
+      createdAt: "2026-09-20T10:00:00Z", rejection: { code: kod, createdAt: odrzucono } }));
+  return Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,reference_number,order_id,
+      kupujacy_login,created_at,rejection_code,zrodlo,synced_at)
+    VALUES (?,?,'ZW',?,?,'2026-09-20T10:00:00Z',?,'allegro','x')`)
+    .run(konto, ext, zamowienie, login, kod).lastInsertRowid);
+}
+
+const TERAZ_DOSYLEK = Date.parse("2026-09-28T08:00:00Z");
+const dosylki = () => D.doDecyzji(TERAZ_DOSYLEK).pozycje.filter((p) => p.zrodlo === "dosylki");
+
+test("odmowa „Wysłaliśmy nowy towar” z panelu Allegro staje wierszem z przyciskiem i prowadzi do zwrotu", () => {
+  const zw = odmowaZAllegro("Kowalski_Jan", "NEW_ITEM_SENT", "2026-09-27T09:00:00Z");
+  const w = dosylki().find((p) => p.klucz === `dosylka:${zw}`);
+  assert.ok(w, "odmowa bez śledzenia ma wiersz");
+  assert.equal(w.obszar, "obsluga");
+  assert.equal(w.pytanie, "Śledzić dosyłkę?");
+  assert.match(w.co, /^Kowalski_Jan: odmowa „Wysłaliśmy nowy towar” przy zamówieniu dd-zam-/);
+  assert.equal(w.od, "2026-09-27T09:00:00Z", "wiek liczy się od odmowy według Allegro");
+  assert.deepEqual(w.cel, { panel: `/obsluga/zwroty/${zw}` });
+  assert.deepEqual(w.akcja, { rodzaj: "sledz_dosylke", zwrotId: zw });
+});
+
+test("wiersz gaśnie, gdy dosyłka powstanie — lista nie ma własnego „załatwione”", async () => {
+  const zw = odmowaZAllegro("Nowak_Anna", "MISSING_PART_SENT", "2026-09-26T09:00:00Z");
+  assert.ok(dosylki().some((p) => p.klucz === `dosylka:${zw}`));
+  const { sledzDosylkeZwrotu } = await import("./dosylka.js");
+  const autor = Number(db().prepare("INSERT INTO app_user(login,name,role) VALUES ('dd-ala','A. Lewandowska','biuro')")
+    .run().lastInsertRowid);
+  const wynik = sledzDosylkeZwrotu(db(), zw, { id: autor, name: "A. Lewandowska" }, new Date(TERAZ_DOSYLEK));
+  assert.equal(wynik.zalozona, true);
+  assert.ok(!dosylki().some((p) => p.klucz === `dosylka:${zw}`), "po założeniu wiersz schodzi sam");
+});
+
+test("inny kod odmowy i odmowa sprzed trzydziestu dni wiersza nie dają", () => {
+  const inny = odmowaZAllegro("Wisniewski_Piotr", "ITEM_FIXED", "2026-09-27T09:00:00Z");
+  const stara = odmowaZAllegro("Zielinska_Ewa", "NEW_ITEM_SENT", "2026-08-20T09:00:00Z");
+  const klucze = dosylki().map((p) => p.klucz);
+  assert.ok(!klucze.includes(`dosylka:${inny}`), "naprawa to nie dosyłka");
+  assert.ok(!klucze.includes(`dosylka:${stara}`), "okno trzydziestu dni, jak śledzenie");
+});
