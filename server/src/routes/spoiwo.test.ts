@@ -223,3 +223,83 @@ test("audyt odrzuceń pod profilem klienta pisze wzorzec trasy, nie login", asyn
       WHERE payload LIKE '%nieznany-kupiec-777%' OR payload LIKE '%kupujacy1%'`).all();
   assert.deepEqual(zLoginem, [], "login kupującego nie ma prawa trafić do dziennika");
 });
+
+/* ── Dosyłka z profilu (@wydanie, S6) ───────────────────────────────────────
+   Dwa zapisy obok czterech wyżej, z tymi samymi strażnikami: bramka biura,
+   każdy klucz wymagany, 409 ze świeżą sprawą. Numer przesyłki jedzie
+   w ciele, więc nie trafia ani do adresu, ani do audytu odrzuceń. */
+const DOSYLKA = (login = "kupujacy2") => ({
+  propozycja: `/api/obsluga/klient/${login}/sprawa/dosylka`,
+  numer: `/api/obsluga/klient/${login}/sprawa/dosylka/numer`,
+});
+let zwrotDosylki = 0;
+
+test("dosyłka z profilu: bramka, wymagane klucze, 409 ze sprawą, a w dzienniku ani loginu, ani numeru", async () => {
+  const d = db();
+  const konto = Number((d.prepare("SELECT id FROM channel_account LIMIT 1").get() as { id: number }).id);
+  d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,kupujacy_login,przesylka_przewoznik,
+    synced_at) VALUES (?,'ord-2','kupujacy2','INPOST','x')`).run(konto);
+  zwrotDosylki = Number(d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,reference_number,order_id,
+      kupujacy_login,created_at,odmowa_kod,odmowa_at,synced_at)
+    VALUES (?,'z-2','ZW-2','ord-2','kupujacy2','2026-09-20T10:00:00Z','NEW_ITEM_SENT','2026-09-26T10:00:00Z','x')`)
+    .run(konto).lastInsertRowid);
+  const hala = login("magazynier", "Hala8");
+  const b = login("biuro", "Ola8");
+  const { propozycja, numer } = DOSYLKA();
+  for (const url of [propozycja, numer]) {
+    assert.equal((await app.inject({ method: "POST", url, payload: {} })).statusCode, 401, url);
+    assert.equal((await app.inject({ method: "POST", url, payload: {}, headers: hala })).statusCode, 403, url);
+  }
+  for (const [url, payload] of [
+    [propozycja, { wersja: 0, odcisk: "" }], [propozycja, { zwrotId: String(zwrotDosylki), wersja: 0, odcisk: "" }],
+    [numer, { zamowienie: "ord-2", przewoznik: "INPOST", wersja: 1, odcisk: "" }],
+    [numer, { zamowienie: "ord-2", waybill: "AD-9", przewoznik: "INPOST", wersja: 1 }],
+  ] as const) {
+    const r = await app.inject({ method: "POST", url, payload, headers: b });
+    assert.equal(r.statusCode, 400, `${url} ${JSON.stringify(payload)}: ${r.body}`);
+  }
+  assert.equal(db().prepare("SELECT count(*) n FROM klient_dosylka").get()!.n, 0);
+
+  const r = await app.inject({ method: "POST", url: propozycja, headers: b,
+    payload: { zwrotId: zwrotDosylki, wersja: 0, odcisk: "" } });
+  assert.equal(r.statusCode, 200, r.body);
+  const s = r.json<{ sprawa: { wersja: number; odcisk: string; krok: string; prowadzi: string;
+    dosylki: Array<{ zamowienie: string; przewoznikZamowienia: string; opis: string }> } }>().sprawa;
+  assert.deepEqual([s.krok, s.prowadzi, s.dosylki.map((x) => [x.zamowienie, x.przewoznikZamowienia])],
+    ["Dosłać nowy towar (etykieta w Sellasist)", "Ola8", [["ord-2", "INPOST"]]]);
+
+  /* Stara wersja to 409 ze świeżą sprawą — ekran rysuje ją bez drugiego żądania. */
+  const k = await app.inject({ method: "POST", url: numer, headers: b,
+    payload: { zamowienie: "ord-2", waybill: "AD-TAJNY", przewoznik: "INPOST", wersja: 0, odcisk: s.odcisk } });
+  assert.equal(k.statusCode, 409, k.body);
+  assert.equal(k.json<{ sprawa: { wersja: number } }>().sprawa.wersja, s.wersja);
+  const zly = await app.inject({ method: "POST", url: numer, headers: b,
+    payload: { zamowienie: "ord-2", waybill: " ", przewoznik: "INPOST", wersja: s.wersja, odcisk: s.odcisk } });
+  assert.equal(zly.statusCode, 400, zly.body);
+
+  const n = await app.inject({ method: "POST", url: numer, headers: b,
+    payload: { zamowienie: "ord-2", waybill: " AD-TAJNY ", przewoznik: "INPOST", wersja: s.wersja, odcisk: s.odcisk } });
+  assert.equal(n.statusCode, 200, n.body);
+  const po = n.json<{ sprawa: { wersja: number; dosylki: Array<{ waybill: string; zrodlo: string }> } }>().sprawa;
+  assert.deepEqual([po.wersja, po.dosylki[0].waybill, po.dosylki[0].zrodlo], [s.wersja + 1, "AD-TAJNY", "recznie"]);
+
+  const wpisy = db().prepare("SELECT type, payload FROM events WHERE type LIKE 'klient_%' OR type = 'http_rejected'")
+    .all() as Array<{ type: string; payload: string }>;
+  assert.ok(wpisy.some((w) => w.payload.includes("/api/obsluga/klient/:login/sprawa/dosylka/numer")),
+    "odrzucenie jest w audycie — pod wzorcem trasy");
+  assert.doesNotMatch(JSON.stringify(wpisy), /kupujacy2|AD-TAJNY/);
+});
+
+test("profil niesie dosyłkę, propozycję i przewoźników — odczyt bez zapisu", async () => {
+  const b = login("biuro", "Ola9");
+  const zmiany = (db().prepare("SELECT total_changes() AS n").get() as { n: number }).n;
+  const p = await app.inject({ method: "GET", url: "/api/obsluga/klient/kupujacy2", headers: b });
+  assert.equal(p.statusCode, 200, p.body);
+  const j = p.json<{ sprawa: { dosylki: unknown[] }; podpowiedzPowod: string | null; propozycjaDosylki: unknown;
+    przewoznicy: string[] }>();
+  assert.equal(j.sprawa.dosylki.length, 1);
+  assert.equal(j.podpowiedzPowod, null);
+  assert.equal(j.propozycjaDosylki, null, "dosyłkę tego zamówienia już śledzimy");
+  assert.ok(j.przewoznicy.includes("INPOST"));
+  assert.equal((db().prepare("SELECT total_changes() AS n").get() as { n: number }).n, zmiany);
+});

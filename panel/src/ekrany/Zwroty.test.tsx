@@ -74,6 +74,12 @@ const scena = vi.hoisted(() => ({
   /* Lista paczek klienta i identyfikator zwrotu założonego z nieodebranej. */
   paczki: null as unknown[] | null,
   przyjetyZwrot: 0,
+  /* Wynik założenia dosyłki w odpowiedzi odmowy wypłaty (@wydanie). `null` =
+     odmowa kodem bez dosyłki, więc odpowiedź tego pola nie niesie. */
+  dosylkaOdmowy: null as Record<string, unknown> | null,
+  /* Odpowiedź „Śledź dosyłkę” przy zwrocie. */
+  wynikSledzenia: { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z", zastapil: null } as
+    Record<string, unknown>,
 }));
 
 vi.mock("../api/zwroty", async () => {
@@ -111,7 +117,19 @@ vi.mock("../api/zwroty", async () => {
     usePotwierdzKartoteke: () => atrapa("kartoteka"),
     useZwrot: () => ({ data: scena.szczegol, isLoading: false, error: null }),
     useZwrocPieniadze: () => atrapa("zwrocPieniadze"),
-    useOdmowPlatnosci: () => atrapa("odmowaPlatnosci"),
+    /* Odmowa i „Śledź dosyłkę” oddają kształt serwera, bo ekran czyta z odpowiedzi
+       zdanie jednorazowe — atrapa z samą wersją by go nigdy nie pokazała. */
+    useOdmowPlatnosci: () => ({ ...atrapa("odmowaPlatnosci"),
+      mutate: (dane: Record<string, unknown>, opcje?: { onSuccess?: (w: unknown) => void }) => {
+        scena.wolano.push({ co: "odmowaPlatnosci", dane });
+        opcje?.onSuccess?.({ kod: dane.kod, wersja: Number(dane.wersja) + 1,
+          ...(scena.dosylkaOdmowy ? { dosylka: scena.dosylkaOdmowy } : {}) });
+      } }),
+    useSledzDosylkeZwrotu: () => ({ ...atrapa("sledzDosylke"),
+      mutate: (dane: Record<string, unknown>, opcje?: { onSuccess?: (w: unknown) => void }) => {
+        scena.wolano.push({ co: "sledzDosylke", dane });
+        opcje?.onSuccess?.(scena.wynikSledzenia);
+      } }),
     /* Skan i dołożenie towaru jako atrapy: test sprawdza, KTÓRĄ drogą poszedł
        kod, a prawdziwe mutacje strzelałyby `fetch`-em w nieistniejący serwer. */
     useSkanZwrotu: () => {
@@ -1118,5 +1136,97 @@ describe("Czego w kolejce zwrotów JUŻ NIE MA (0.370.0)", () => {
     await waitFor(() => expect(scena.wolano).toEqual(
       [{ co: "skan", dane: "600000367616070023174201" }]));
     expect(login).toHaveValue("jan");
+  });
+});
+
+/* ── Dosyłka pod odmową wypłaty (@wydanie) ──────────────────────────────────
+   Zła paczka wraca, biuro odmawia wypłaty kodem „Wysłaliśmy nowy towar”
+   i wysyła właściwy towar. Ekran pilnuje trzech rzeczy: otwarcie zwrotu ze
+   stanem dosyłki niczego nie zapisuje; ponowienie woła trasę bez ciała;
+   zdanie z odpowiedzi odmowy stoi przy TYM zwrocie i schodzi przy następnym. */
+describe("Dosyłka pod odmową wypłaty", () => {
+  const dwaZwroty = () => [
+    { ...zwrot(6, "korekta", "ZK-6"), werdykt: "przyjety" as const, kwotaGrosze: 4999 },
+    { ...zwrot(7, "korekta", "ZK-7"), werdykt: "przyjety" as const, kwotaGrosze: 1500 },
+  ];
+  const pieniadze = (odmowa: Record<string, unknown> | null) => ({
+    pieniadze: {
+      moznaZwrocic: false, moznaOdmowic: odmowa === null, powod: null, kwotaGrosze: 4999,
+      waluta: "PLN", oddane: null, odmowa, przelew: null, moznaZapisacPrzelew: false, powodPrzelewu: null,
+    },
+  });
+  const odmowa = (n: Record<string, unknown> = {}) => ({
+    kod: "NEW_ITEM_SENT", powod: null, kiedy: "2026-09-27T10:00:00Z", dosylka: null, sledzicDosylke: false, ...n,
+  });
+  const sprzatnij = () => {
+    scena.zwroty = null; scena.szczegol = undefined; scena.dosylkaOdmowy = null;
+    scena.wynikSledzenia = { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z", zastapil: null };
+  };
+
+  it("otwarcie zwrotu z odmową i stanem dosyłki niczego nie zapisuje", async () => {
+    scena.wolano = [];
+    scena.zwroty = dwaZwroty();
+    scena.szczegol = pieniadze(odmowa({
+      dosylka: { opis: "Dosyłka w drodze (stan z 14:10)", login: "zielony", ton: null } }));
+    try {
+      pokaz("/obsluga/zwroty/6");
+      expect(await screen.findByText("Dosyłka w drodze (stan z 14:10)")).toBeInTheDocument();
+      expect(screen.getByText("Odmówiono: „Wysłaliśmy nowy towar”")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /profil klienta/ })).toHaveAttribute("href", "/obsluga/klient/zielony");
+      expect(scena.wolano).toEqual([]);
+    } finally { sprzatnij(); }
+  });
+
+  it("„Śledź dosyłkę” woła ponowienie z samym numerem zwrotu", async () => {
+    scena.wolano = [];
+    scena.zwroty = dwaZwroty();
+    scena.szczegol = pieniadze(odmowa({ sledzicDosylke: true }));
+    scena.wynikSledzenia = { zalozona: true, login: "zielony", krokDo: "2026-09-30T06:00:00Z",
+      zastapil: "czekamy na zwrot" };
+    try {
+      pokaz("/obsluga/zwroty/6");
+      expect(scena.wolano).toEqual([]);
+      await userEvent.click(await screen.findByRole("button", { name: "Śledź dosyłkę" }));
+      expect(scena.wolano).toEqual([{ co: "sledzDosylke", dane: { id: 6 } }]);
+      expect(screen.getByText("Krok sprawy klienta: „dosłać” zamiast „czekamy na zwrot”")).toBeInTheDocument();
+    } finally { sprzatnij(); }
+  });
+
+  it("nieudane założenie przy ponowieniu nie udaje, że wysłało odmowę", async () => {
+    scena.zwroty = dwaZwroty();
+    scena.szczegol = pieniadze(odmowa({ sledzicDosylke: true }));
+    scena.wynikSledzenia = { zalozona: false, blad: "Zwrot nie ma numeru zamówienia." };
+    try {
+      pokaz("/obsluga/zwroty/6");
+      await userEvent.click(await screen.findByRole("button", { name: "Śledź dosyłkę" }));
+      expect(screen.getByText("Śledzenia dosyłki nie założono — Zwrot nie ma numeru zamówienia."))
+        .toBeInTheDocument();
+      expect(screen.queryByText(/Odmowa wysłana/)).toBeNull();
+    } finally { sprzatnij(); }
+  });
+
+  it("zdanie z odpowiedzi odmowy stoi przy tym zwrocie i schodzi przy następnym", async () => {
+    scena.wolano = [];
+    scena.zwroty = dwaZwroty();
+    /* Ten sam stan pieniędzy dla obu zwrotów: sekcja zostaje zamontowana, więc
+       tylko numer zwrotu w stanie ekranu chroni przed zdaniem o cudzym kroku. */
+    scena.szczegol = pieniadze(null);
+    scena.dosylkaOdmowy = { zalozona: false, blad: "Zwrot nie ma numeru zamówienia." };
+    try {
+      pokaz("/obsluga/zwroty/6");
+      await userEvent.click(await screen.findByRole("button", { name: /Odmów wypłaty/ }));
+      await userEvent.selectOptions(screen.getByLabelText("Kod odmowy"), "NEW_ITEM_SENT");
+      expect(screen.getByText("Sprawa klienta dostanie krok „dosłać” i śledzenie dosyłki.")).toBeInTheDocument();
+      await userEvent.click(screen.getByRole("button", { name: /Wyślij odmowę/ }));
+      expect(scena.wolano).toEqual([{ co: "odmowaPlatnosci",
+        dane: { id: 6, kod: "NEW_ITEM_SENT", powod: null, wersja: 1 } }]);
+      const zdanie = "Odmowa wysłana; śledzenia dosyłki nie założono — Zwrot nie ma numeru zamówienia.";
+      expect(screen.getByText(zdanie)).toBeInTheDocument();
+
+      (document.activeElement as HTMLElement | null)?.blur();
+      await userEvent.keyboard("j");
+      expect(await screen.findByRole("heading", { name: "ZK-7" })).toBeInTheDocument();
+      expect(screen.queryByText(zdanie)).toBeNull();
+    } finally { sprzatnij(); }
   });
 });

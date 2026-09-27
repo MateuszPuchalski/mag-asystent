@@ -1,7 +1,8 @@
 import React, { useState, type MutableRefObject } from "react";
-import { Banknote, Ban, Check, Lock, Undo2 } from "lucide-react";
-import type { StanZwrotuPieniedzy } from "../api/typy";
-import { Przycisk } from "../ui";
+import { Link } from "react-router-dom";
+import { Banknote, Ban, Check, Lock, Truck, Undo2, UserRound } from "lucide-react";
+import type { StanZwrotuPieniedzy, WynikDosylki } from "../api/typy";
+import { Przycisk, barwaTonu } from "../ui";
 import { zlote } from "../api/zwroty";
 import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 
@@ -26,8 +27,11 @@ import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
    powodu, a nie okna z dwoma przyciskami.                                    */
 
 /** Kody ze schematu `CustomerReturnRefundRejectionRequest` — po polsku. */
-const KODY: Array<{ kod: string; etykieta: string }> = [
-  { kod: "REFUND_REJECTED", etykieta: "Odmawiam zwrotu pieniędzy (wymaga powodu)" },
+const KODY: Array<{ kod: string; etykieta: string;
+  /** Brzmienie po wysłaniu, gdy etykieta formularza niesie wskazówkę dla operatora. */
+  poOdmowie?: string }> = [
+  { kod: "REFUND_REJECTED", etykieta: "Odmawiam zwrotu pieniędzy (wymaga powodu)",
+    poOdmowie: "Odmawiam zwrotu pieniędzy" },
   { kod: "NEW_ITEM_SENT", etykieta: "Wysłaliśmy nowy towar" },
   { kod: "ITEM_FIXED", etykieta: "Naprawiliśmy towar" },
   { kod: "MISSING_PART_SENT", etykieta: "Wysłaliśmy brakującą część" },
@@ -36,6 +40,24 @@ const KODY: Array<{ kod: string; etykieta: string }> = [
   { kod: "NO_RETURN_RIGHT", etykieta: "Brak prawa do zwrotu" },
 ];
 const WYMAGA_POWODU = "REFUND_REJECTED";
+/**
+ * Kody, przy których do klienta jedzie druga paczka (@wydanie). Odmowa z nimi
+ * zakłada śledzenie dosyłki i krok „dosłać” w sprawie klienta — w tym samym
+ * zapisie, bez nowego wyboru w formularzu (dekalog p. 5).
+ */
+const KODY_DOSYLKI = new Set(["NEW_ITEM_SENT", "MISSING_PART_SENT"]);
+
+/**
+ * Kod odmowy słowami operatora (@wydanie). Do tego wydania stał tu surowy
+ * `NEW_ITEM_SENT`, czyli nazwa pola ze specyfikacji Allegro, nie zdanie.
+ * Kod spoza listy zostaje surowy: przychodzi też synchronizacją, a Allegro
+ * może dołożyć nowy. Profil klienta bierze stąd brzmienie propozycji
+ * dosyłki, żeby jeden kod nie miał dwóch zapisów.
+ */
+export const etykietaKodu = (kod: string) => {
+  const k = KODY.find((x) => x.kod === kod);
+  return k?.poOdmowie ?? k?.etykieta ?? kod;
+};
 /**
  * Żadnego kodu nie ma wybranego z góry — i to jest decyzja, nie brak jednej.
  *
@@ -52,7 +74,7 @@ const LIMIT_POWODU = 250;
 const LIMIT_REFERENCJI = 140;
 
 export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCofnijPrzelew,
-  akcje, przedWerdyktem = false }: {
+  akcje, przedWerdyktem = false, wynikDosylki = null, onSledzDosylke }: {
   stan: StanZwrotuPieniedzy;
   /**
    * Zwrot czeka jeszcze na werdykt (0.453.0). Przeszkoda jest wtedy jedna
@@ -70,6 +92,14 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
   onCofnijPrzelew?: () => void;
   /** Rejestr klawiszy ekranu — stąd bierze się `Z`. */
   akcje?: MutableRefObject<AkcjeKlawiszy>;
+  /**
+   * Wynik założenia dosyłki z ODPOWIEDZI ostatniego zapisu (@wydanie). Zdanie
+   * jednorazowe: stan trwały przychodzi odświeżonym `stan.odmowa`, a tego,
+   * czy odmowa podmieniła krok sprawy, stan już nie mówi.
+   */
+  wynikDosylki?: WynikDosylki | null;
+  /** „Śledź dosyłkę” — gdy odmowa z kodem dosyłki nie ma śledzenia (@wydanie). */
+  onSledzDosylke?: () => void;
 }) {
   const [odmawiam, setOdmawiam] = useState(false);
   const [kod, setKod] = useState(BEZ_KODU);
@@ -126,7 +156,7 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
           <Lock size={12} aria-hidden="true" />po werdykcie</span>}
 
       {stan.odmowa && <span className="flex items-center gap-1 text-sm font-semibold text-slate-600">
-        <Ban size={14} />Odmówiono ({stan.odmowa.kod})</span>}
+        <Ban size={14} />Odmówiono: „{etykietaKodu(stan.odmowa.kod)}”</span>}
 
       {/* Klawisz STOI PRZY PRZYCISKU, tak jak przy werdykcie i korekcie:
           rozpoznanie jest tańsze od pamiętania, a pasek skrótów na dole ekranu
@@ -147,6 +177,37 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
         możliwa, bo to dwie różne drogi, nie dwa warianty jednej. */}
     {stan.powod && !stan.oddane && !stan.odmowa && !przedWerdyktem &&
       <p className="mt-2 text-xs text-slate-500">{stan.powod}</p>}
+
+    {/* ── DOSYŁKA POD ODMOWĄ (@wydanie) ───────────────────────────────────
+        Zła paczka wraca, biuro odmawia wypłaty kodem „Wysłaliśmy nowy towar”
+        i wysyła właściwy towar. Do tego wydania ekran zwrotu kończył się na
+        odmowie, a o drugiej paczce wiedział tylko Gmail prowadzącego. Zdanie
+        składa serwer, to samo co na profilu; odnośnik prowadzi tam, gdzie
+        stoi krok sprawy. Pracy tu nie ma, poza jednym ponowieniem. */}
+    {stan.odmowa?.dosylka && <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+      <Truck size={13} className="shrink-0 text-slate-400" />
+      <span className={`font-semibold ${barwaTonu(stan.odmowa.dosylka.ton)}`}>{stan.odmowa.dosylka.opis}</span>
+      <Link to={`/obsluga/klient/${encodeURIComponent(stan.odmowa.dosylka.login)}`}
+        className="inline-flex items-center gap-1 text-sky-700 underline underline-offset-2 hover:text-sky-900">
+        <UserRound size={12} aria-hidden="true" />profil klienta</Link>
+    </p>}
+    {/* Ponowienie, gdy odmowa wyszła, a śledzenie nie powstało — albo gdy kod
+        złożono poza panelem. Przycisk zamiast automatu, bo zapis zakłada krok
+        w cudzej sprawie klienta, a tego nie robi się przy samym patrzeniu. */}
+    {stan.odmowa?.sledzicDosylke && !stan.odmowa.dosylka && onSledzDosylke &&
+      <p className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600">
+        <Truck size={13} className="shrink-0 text-slate-400" />
+        <span>Dosyłki nie śledzimy.</span>
+        <Przycisk className="text-xs" disabled={trwa} onClick={() => onSledzDosylke()}>Śledź dosyłkę</Przycisk>
+      </p>}
+    {/* Odmowy w Allegro nie da się cofnąć, więc nieudany zapis u nas NIE MOŻE
+        jej przykryć. Zdanie mówi najpierw, co wyszło, potem czego zabrakło. */}
+    {wynikDosylki && !wynikDosylki.zalozona && <p className="mt-2 text-xs font-semibold text-ranga-uwaga">
+      Odmowa wysłana; śledzenia dosyłki nie założono — {wynikDosylki.blad}</p>}
+    {/* Założenie dosyłki ZASTĄPIŁO krok, który prowadzący ustawił sam. Stan
+        tego nie pokaże, a bez zdania prowadzący szukałby swojego kroku na profilu. */}
+    {wynikDosylki?.zalozona && wynikDosylki.zastapil && <p className="mt-2 text-xs text-slate-600">
+      Krok sprawy klienta: „dosłać” zamiast „{wynikDosylki.zastapil}”</p>}
 
     {/* ── PRZELEW ODDANY POZA ALLEGRO (0.269.0) ────────────────────────────
         Przy pobraniu klient nigdy nie zapłacił Allegro, więc przycisk wyżej
@@ -185,7 +246,9 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
           {trwa ? "Zapisuję…" : "Zapisz przelew"}</Przycisk>
       </div>}
 
-    {odmawiam && <div className="mt-2 space-y-2 border-t pt-2">
+    {/* Formularz znika razem z odmową: odświeżony stan mówi już „Odmówiono”,
+        a druga odmowa tego samego zwrotu i tak wraca z Allegro błędem. */}
+    {odmawiam && !stan.odmowa && <div className="mt-2 space-y-2 border-t pt-2">
       <label className="block text-xs font-semibold text-slate-600">Powód odmowy
         <select className="field mt-1 w-full text-sm" aria-label="Kod odmowy"
           value={kod} onChange={(e) => setKod(e.target.value)}>
@@ -193,6 +256,10 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
           {KODY.map((k) => <option key={k.kod} value={k.kod}>{k.etykieta}</option>)}
         </select>
       </label>
+      {/* Zdanie, nie pole wyboru: skutek wynika z kodu, więc pytanie
+          „czy śledzić" byłoby decyzją, którą stan pracy już zna (dekalog p. 5). */}
+      {KODY_DOSYLKI.has(kod) && <p className="text-xs text-slate-600">
+        Sprawa klienta dostanie krok „dosłać” i śledzenie dosyłki.</p>}
       <label className="block text-xs font-semibold text-slate-600">
         Uzasadnienie {kod === BEZ_KODU ? "" : kod === WYMAGA_POWODU ? "(wymagane)" : "(opcjonalne)"}
         <textarea className="field mt-1 min-h-16 w-full text-sm" maxLength={LIMIT_POWODU}

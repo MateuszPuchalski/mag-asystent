@@ -23,6 +23,9 @@ const AUTOMATY = new Set([
   "siec_przerwa", "rozmowa_przeczytana_blad", "rozmowa_wysylka_blad", "rozmowa_wysylka_niepewna",
   "rozmowa_wysylka_konflikt", "rozmowa_wysylka_uzgodniona", "reklamacja_wysylka_konflikt",
   "reklamacja_zalacznik_bez_location", "allegro_zamowienie_brak", "ean_conflict", "location_mismatch",
+  /* Dosyłka (@wydanie): doręczenie i kłopot zapisuje wyłącznie ticker. Numer
+     (`klient_dosylka_numer`) zostaje w raporcie, bo wpisuje go też człowiek. */
+  "klient_dosylka_doreczona", "klient_dosylka_problem",
 ]);
 
 /* Obszar po PRZEDROSTKU typu. Typy nazywa się od bytu, którego dotyczą,
@@ -30,7 +33,8 @@ const AUTOMATY = new Set([
 const OBSZARY: Array<[string, string]> = [
   ["rozmowa_", "Skrzynka"], ["skrzynka_", "Skrzynka"], ["wzmianka_", "Skrzynka"],
   ["obsluga.", "Skrzynka"], ["zamowienie_", "Skrzynka"], ["przesylka_", "Skrzynka"],
-  ["klient_notatka", "Profil klienta"], ["klient_sprawa", "Profil klienta"], ["klient_", "Skrzynka"], ["copilot_", "Copilot"], ["klasyfikacja_", "Copilot"],
+  ["klient_notatka", "Profil klienta"], ["klient_sprawa", "Profil klienta"], ["klient_dosylka", "Profil klienta"],
+  ["klient_", "Skrzynka"], ["copilot_", "Copilot"], ["klasyfikacja_", "Copilot"],
   ["dobor_", "Dobór części"], ["kosz_", "Kosze"], ["zwrot", "Zwroty"],
   ["reklamacj", "Reklamacje"], ["dyskusja_", "Dyskusje"], ["sprawa_tag", "Tagi spraw"],
   ["wiedza_", "Wiedza"], ["pasowanie_", "Wiedza"], ["zabudowa_", "Wiedza"], ["token_", "Wiedza"],

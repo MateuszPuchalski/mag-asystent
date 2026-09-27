@@ -4,7 +4,8 @@ import { ClipboardList, ExternalLink, MessageSquare, MessagesSquare, Scale, Trac
 import { Link } from "react-router-dom";
 import type { HistoriaKlienta, MaszynaKlienta, SprawaKlienta, WpisHistorii } from "../api/typy";
 import { useHistoriaKlienta } from "../api/rozmowy";
-import { czas, dzien, LoginKlienta, NaglowekSekcji, Pusto, termin } from "../ui";
+import { najwazniejszaDosylka } from "../api/spoiwo";
+import { barwaTonu, czas, dzien, LoginKlienta, NaglowekSekcji, Pusto, termin } from "../ui";
 
 /**
  * Zakładka KLIENT — historia u nas (makieta „Klient", §10.1).
@@ -125,6 +126,10 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
  * i zakończenie; tutaj sprawy się nie zmienia.
  */
 function LiniaSprawy({ login, sprawa: s }: { login: string; sprawa: SprawaKlienta }) {
+  /* Dosyłka (@wydanie) doklejona do TEJ SAMEJ linijki: agent przy rozmowie
+     odpowiada zwykle na „gdzie moja paczka”, a odpowiedź stała dotąd
+     o ekran dalej. Jedno zdanie, najpilniejsze — reszta jest na profilu. */
+  const dosylka = s.stan === "w_toku" ? najwazniejszaDosylka(s.dosylki) : null;
   return <Link to={`/obsluga/klient/${encodeURIComponent(login)}`}
     className="mt-2 flex items-start gap-1.5 rounded border border-slate-200 px-2 py-1.5 text-xs text-slate-800 hover:bg-slate-50">
     <ClipboardList size={13} className="mt-0.5 shrink-0 text-slate-400" />
@@ -133,7 +138,8 @@ function LiniaSprawy({ login, sprawa: s }: { login: string; sprawa: SprawaKlient
         ? <>Sprawa klienta: {s.krok} · {termin(s.krokDo)}
             {/* Czerwień wyłącznie po terminie — jak na profilu i w „Moje". */}
             {s.poTerminie && <b className="text-ranga-zle"> po terminie</b>}
-            {s.prowadzi && ` · prowadzi ${s.prowadzi}`}</>
+            {s.prowadzi && ` · prowadzi ${s.prowadzi}`}
+            {dosylka && <> · <span className={barwaTonu(dosylka.ton)}>{dosylka.opis}</span></>}</>
         : <>Sprawa klienta zakończona {dzien(s.zakonczonoAt)}</>}
       {/* Pierwsze zdarzenie po naszym ruchu, bo to ono obudziło sprawę. */}
       {s.nowe[0] && <span className="block font-semibold text-slate-900">{s.nowe[0].tekst}</span>}

@@ -5,7 +5,7 @@ import React from "react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProfilKlienta } from "./ProfilKlienta";
-import type { ProfilKlienta as Profil, SprawaKlienta } from "../api/spoiwo";
+import type { DosylkaSprawy, ProfilKlienta as Profil, SprawaKlienta } from "../api/spoiwo";
 import { dataLokalna } from "../ui";
 
 /* ── PROFIL KLIENTA (24 września 2026) ───────────────────────────────────────
@@ -34,7 +34,8 @@ const PROFIL: Profil = {
     sumaGrosze: 5000, waluta: "PLN", przesylka: "w drodze do klienta", link: "https://allegro.pl/z-1",
     pozycje: [{ nazwa: "Nóż kosiarki HECHT 1803S", ilosc: 1, cenaGrosze: 5000 }] }],
   maszyny: [], os: [], notatka: { tresc: "Prosi o fakturę", at: "2026-09-20T10:00:00Z", przez: "Ola", cofalna: true },
-  sprawa: null, podpowiedzZakonczenia: false,
+  sprawa: null, podpowiedzZakonczenia: false, podpowiedzPowod: null, propozycjaDosylki: null,
+  przewoznicy: ["DPD", "INPOST"],
 };
 
 /* Sprawę prowadzi Bartek (id 2); zalogowana jest Ola (id 1), chyba że test
@@ -45,6 +46,7 @@ const SPRAWA: SprawaKlienta = {
   prowadzi: "Bartek", prowadziId: 2, zakonczonoAt: null, zakonczyl: null,
   nowe: [{ rodzaj: "zwrot_dotarl", tekst: "Zwrot dotarł", at: null, cel: "/obsluga/zwroty/11" }],
   odcisk: "{\"m\":null,\"z\":1,\"d\":1}",
+  dosylki: [],
 };
 
 /* Sprawa po cudzym ruchu i nowej wiadomości — inna wersja i inny odcisk niż
@@ -77,10 +79,11 @@ beforeEach(() => {
     if (url === "/api/auth/me") {
       return new Response(JSON.stringify({ user: { userId: jaId, name: jaId === 1 ? "Ola" : "Bartek", role: "biuro" } }));
     }
-    const sprawa = /\/sprawa\/(krok|zakoncz|wznow|przejmij)$/.exec(url)?.[1];
+    const sprawa = /\/sprawa\/(krok|zakoncz|wznow|przejmij|dosylka|dosylka\/numer)$/.exec(url)?.[1];
     if (sprawa && konflikt) {
       konflikt = false;
-      profil = { ...profil, sprawa: SWIEZA };
+      /* Dosyłki zostają: cudzy ruch zmienia wersję i „nowe”, nie paczkę. */
+      profil = { ...profil, sprawa: { ...SWIEZA, dosylki: profil.sprawa?.dosylki ?? [] } };
       return new Response(JSON.stringify({ error: "Klient dopisał coś po otwarciu ekranu", sprawa: SWIEZA }),
         { status: 409 });
     }
@@ -448,5 +451,185 @@ describe("granice kalendarza kroku", () => {
     if (ostatni === 60) expect(zapisz).toBeEnabled(); else expect(zapisz).toBeDisabled();
     fireEvent.change(kalendarz, { target: { value: dzienPo(teraz, 59) } });
     expect(zapisz).toBeEnabled();
+  });
+});
+
+/* ── DOSYŁKA na karcie sprawy (@wydanie) ──────────────────────────────────────
+   Pilnujemy: otwarcie z dosyłkami i propozycją dalej wysyła same GET-y;
+   dosyłka to linijka z barwą tonu i numerem do skopiowania bez serwera;
+   wpisany numer idzie przycięty, z przewoźnikiem domyślnym, wersją i odciskiem
+   narysowanej sprawy; propozycja wysyła numer zwrotu z wersją i odciskiem
+   (albo `wersja: 0`, gdy sprawy nie ma); podpowiedź doręczonej dosyłki mówi
+   datę i nie dubluje jej linijką „nowe”. */
+
+const dosylka = (n: Partial<DosylkaSprawy> = {}): DosylkaSprawy => ({
+  zamowienie: "z-1", waybill: null, przewoznik: null, przewoznikZamowienia: "DPD", zrodlo: null,
+  status: null, dostarczonoAt: null, sprawdzonoAt: null, zalozonoAt: "2026-09-24T10:00:00Z",
+  bezNumeru: false, opis: "Czekamy na numer dosyłki z Allegro", ton: null, ...n,
+});
+
+const W_DRODZE = dosylka({ zamowienie: "z-2", waybill: "620111222333444", przewoznik: "INPOST",
+  zrodlo: "allegro", status: "IN_TRANSIT", sprawdzonoAt: "2026-09-27T12:10:00Z",
+  opis: "Dosyłka w drodze (stan z 14:10)" });
+const BEZ_NUMERU = dosylka({ bezNumeru: true, ton: "uwaga",
+  opis: "Allegro nie ma numeru dosyłki od 2 dni roboczych — wpisz go z Sellasist" });
+const DOSLAC: SprawaKlienta = { ...SPRAWA, krok: "dosłać", poTerminie: false, nowe: [], dosylki: [W_DRODZE, BEZ_NUMERU] };
+const listaDosylek = () => screen.getByRole("list", { name: "Dosyłki" });
+
+describe("DOSYŁKA na karcie sprawy", () => {
+  it("otwarcie z dosyłkami i propozycją dalej wysyła same GET-y", async () => {
+    profil = { ...PROFIL, sprawa: DOSLAC,
+      propozycjaDosylki: { zwrotId: 11, zamowienie: "z-3", kod: "MISSING_PART_SENT", odmowaAt: null } };
+    pokaz();
+    expect(await screen.findByRole("button", { name: "Przejmij" })).toBeInTheDocument();
+    expect(screen.getByText("Dosyłka w drodze (stan z 14:10)")).toBeInTheDocument();
+    expect(zapisy()).toEqual([]);
+  });
+
+  it("każda dosyłka to linijka z barwą tonu; numer kopiuje się bez serwera", async () => {
+    const pisz = vi.fn(async () => {});
+    vi.stubGlobal("navigator", { ...navigator, clipboard: { writeText: pisz } });
+    profil = { ...PROFIL, sprawa: DOSLAC };
+    pokaz();
+    await screen.findByRole("list", { name: "Dosyłki" });
+    const [wDrodze, bezNumeru] = within(listaDosylek()).getAllByRole("listitem");
+    expect(within(wDrodze).getByText("620111222333444")).toBeInTheDocument();
+    expect(within(bezNumeru).getByText(/wpisz go z Sellasist/).className).toContain("text-ranga-uwaga");
+    /* Znany numer — „popraw”, brak numeru — „wpisz”. Kopiowanie tylko przy numerze. */
+    expect(within(wDrodze).getByRole("button", { name: "popraw numer" })).toBeInTheDocument();
+    expect(within(bezNumeru).getByRole("button", { name: "wpisz numer" })).toBeInTheDocument();
+    expect(within(bezNumeru).queryByRole("button", { name: "Kopiuj" })).toBeNull();
+
+    await userEvent.click(within(wDrodze).getByRole("button", { name: "Kopiuj" }));
+    await waitFor(() => expect(pisz).toHaveBeenCalledWith("620111222333444"));
+    expect(zapisy()).toEqual([]);
+  });
+
+  it("wpisany numer idzie przycięty, z przewoźnikiem pierwszej paczki, wersją i odciskiem", async () => {
+    profil = { ...PROFIL, sprawa: DOSLAC };
+    pokaz();
+    await screen.findByRole("list", { name: "Dosyłki" });
+    const [, bezNumeru] = within(listaDosylek()).getAllByRole("listitem");
+    await userEvent.click(within(bezNumeru).getByRole("button", { name: "wpisz numer" }));
+    const pole = screen.getByLabelText("Numer dosyłki");
+    expect(pole).toHaveFocus();
+    expect(pole).toHaveAttribute("maxLength", "64");
+    /* Przewoźnik dosyłki nieznany — domyślny jest przewoźnik PIERWSZEJ paczki. */
+    expect(screen.getByLabelText("Przewoźnik")).toHaveValue("DPD");
+    const zapisz = screen.getByRole("button", { name: "Zapisz" });
+    await userEvent.type(pole, "   ");
+    expect(zapisz).toBeDisabled();
+
+    await userEvent.type(pole, "620999888777 ");
+    await userEvent.click(zapisz);
+    await waitFor(() => expect(zapisy()).toHaveLength(1));
+    expect(zapisy()[0].url).toBe("/api/obsluga/klient/Chrzanowski1234/sprawa/dosylka/numer");
+    expect(JSON.parse(zapisy()[0].body!)).toEqual({ zamowienie: "z-1", waybill: "620999888777",
+      przewoznik: "DPD", wersja: 3, odcisk: SPRAWA.odcisk });
+    /* Po zapisie formularz się zamyka, a fokus wraca na odnośnik. */
+    await waitFor(() => expect(screen.queryByLabelText("Numer dosyłki")).toBeNull());
+    await waitFor(() => expect(within(bezNumeru).getByRole("button", { name: "wpisz numer" })).toHaveFocus());
+  });
+
+  it("poprawka zaczyna od zapisanego numeru i przewoźnika dosyłki; lista zna przewoźników z bazy", async () => {
+    profil = { ...PROFIL, sprawa: DOSLAC, przewoznicy: ["DPD", "GLS"] };
+    pokaz();
+    await screen.findByRole("list", { name: "Dosyłki" });
+    const [wDrodze] = within(listaDosylek()).getAllByRole("listitem");
+    await userEvent.click(within(wDrodze).getByRole("button", { name: "popraw numer" }));
+    expect(screen.getByLabelText("Numer dosyłki")).toHaveValue("620111222333444");
+    /* INPOST spoza listy z bazy dalej jest domyślny — lista go nie podmienia. */
+    const przewoznik = screen.getByLabelText("Przewoźnik");
+    expect(przewoznik).toHaveValue("INPOST");
+    expect(within(przewoznik).getAllByRole("option").map((o) => o.getAttribute("value")))
+      .toEqual(["INPOST", "DPD", "GLS"]);
+    await userEvent.selectOptions(przewoznik, "GLS");
+    await userEvent.click(screen.getByRole("button", { name: "Anuluj" }));
+    expect(screen.queryByLabelText("Numer dosyłki")).toBeNull();
+    expect(within(wDrodze).getByRole("button", { name: "popraw numer" })).toHaveFocus();
+    expect(zapisy()).toEqual([]);
+  });
+
+  it("konflikt świeżości przy numerze mówi zdanie i zostawia wpisany numer", async () => {
+    profil = { ...PROFIL, sprawa: DOSLAC };
+    konflikt = true;
+    pokaz();
+    await screen.findByRole("list", { name: "Dosyłki" });
+    const [, bezNumeru] = within(listaDosylek()).getAllByRole("listitem");
+    await userEvent.click(within(bezNumeru).getByRole("button", { name: "wpisz numer" }));
+    await userEvent.type(screen.getByLabelText("Numer dosyłki"), "620999888777");
+    await userEvent.click(screen.getByRole("button", { name: "Zapisz" }));
+    expect(await screen.findByText("Klient dopisał coś po otwarciu ekranu")).toBeInTheDocument();
+    expect(screen.getByLabelText("Numer dosyłki")).toHaveValue("620999888777");
+    /* Ponowna próba idzie ze świeżą sprawą — tą, którą przyniósł profil. */
+    await userEvent.click(screen.getByRole("button", { name: "Zapisz" }));
+    await waitFor(() => expect(zapisy()).toHaveLength(2));
+    expect(JSON.parse(zapisy()[1].body!)).toMatchObject({ wersja: SWIEZA.wersja, odcisk: SWIEZA.odcisk });
+  });
+
+  it("zakończona sprawa pokazuje dosyłkę, ale numeru się przy niej nie wpisuje", async () => {
+    profil = { ...PROFIL, sprawa: { ...DOSLAC, stan: "zakonczona", zakonczonoAt: "2026-09-24T12:00:00Z",
+      zakonczyl: "Bartek" } };
+    pokaz();
+    await screen.findByRole("list", { name: "Dosyłki" });
+    expect(within(listaDosylek()).queryByRole("button", { name: /numer/ })).toBeNull();
+  });
+
+  it("propozycja pyta słowami kodu, a „Śledź dosyłkę” niesie zwrot, wersję i odcisk", async () => {
+    profil = { ...PROFIL, sprawa: SPRAWA,
+      propozycjaDosylki: { zwrotId: 11, zamowienie: "z-1", kod: "NEW_ITEM_SENT", odmowaAt: "2026-09-26T10:00:00Z" } };
+    pokaz();
+    expect(await within(await screen.findByRole("region", { name: "Sprawa klienta" }))
+      .findByText("Odmówiono wypłaty: „Wysłaliśmy nowy towar”. Śledzić dosyłkę?")).toBeInTheDocument();
+    await userEvent.click(within(karta()).getByRole("button", { name: "Śledź dosyłkę" }));
+    await waitFor(() => expect(zapisy()).toHaveLength(1));
+    expect(zapisy()[0].url).toBe("/api/obsluga/klient/Chrzanowski1234/sprawa/dosylka");
+    expect(JSON.parse(zapisy()[0].body!)).toEqual({ zwrotId: 11, wersja: 3, odcisk: SPRAWA.odcisk });
+  });
+
+  it("propozycja bez sprawy zakłada ją jak pierwszy krok — `wersja: 0`", async () => {
+    profil = { ...PROFIL, sprawa: null,
+      propozycjaDosylki: { zwrotId: 12, zamowienie: "z-1", kod: "MISSING_PART_SENT", odmowaAt: null } };
+    pokaz();
+    expect(await screen.findByText("Odmówiono wypłaty: „Wysłaliśmy brakującą część”. Śledzić dosyłkę?"))
+      .toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Śledź dosyłkę" }));
+    await waitFor(() => expect(zapisy()).toHaveLength(1));
+    expect(JSON.parse(zapisy()[0].body!)).toEqual({ zwrotId: 12, wersja: 0, odcisk: "" });
+  });
+
+  it("podpowiedź doręczonej dosyłki mówi datę i nie powtarza jej linijką „nowe”", async () => {
+    const doreczona = dosylka({ waybill: "620111222333444", przewoznik: "DPD", status: "DELIVERED",
+      dostarczonoAt: "2026-09-30T10:00:00Z", opis: "Dosyłka doręczona 30.09", ton: "ok" });
+    profil = { ...PROFIL, podpowiedzZakonczenia: true, podpowiedzPowod: "dosylka",
+      sprawa: { ...DOSLAC, dosylki: [doreczona],
+        nowe: [{ rodzaj: "dosylka_doreczona", tekst: "Dosyłka doręczona 30.09", at: null, cel: null }] } };
+    pokaz();
+    const k = await screen.findByRole("region", { name: "Sprawa klienta" });
+    expect(within(k).getByText("Dosyłka doręczona 30.09. Zakończ sprawę?")).toBeInTheDocument();
+    expect(within(k).queryByRole("list", { name: "Nowe od klienta" })).toBeNull();
+    expect(within(k).queryByText(/Nic nie czeka w kolejkach/)).toBeNull();
+    expect(within(k).getByText("Dosyłka doręczona 30.09").className).toContain("text-ranga-ok");
+    expect(within(k).getByRole("button", { name: "Zakończ sprawę" }).className).toContain("btn-primary");
+  });
+
+  it("inne „nowe” zostają obok podpowiedzi — klient mógł w tym czasie napisać", async () => {
+    const doreczona = dosylka({ dostarczonoAt: "2026-09-30T10:00:00Z", opis: "Dosyłka doręczona 30.09", ton: "ok",
+      waybill: "620111222333444" });
+    profil = { ...PROFIL, podpowiedzZakonczenia: true, podpowiedzPowod: "dosylka",
+      sprawa: { ...DOSLAC, dosylki: [doreczona], nowe: [
+        { rodzaj: "dosylka_doreczona", tekst: "Dosyłka doręczona 30.09", at: null, cel: null },
+        { rodzaj: "rozmowa", tekst: "Klient napisał 30.09 12:00", at: null, cel: "/obsluga/skrzynka/41" },
+      ] } };
+    pokaz();
+    const nowe = await screen.findByRole("list", { name: "Nowe od klienta" });
+    expect(within(nowe).getAllByRole("listitem").map((li) => li.textContent)).toEqual(["Klient napisał 30.09 12:00"]);
+  });
+
+  it("podpowiedź z powodu terminu mówi dalej o terminie", async () => {
+    profil = { ...PROFIL, podpowiedzZakonczenia: true, podpowiedzPowod: "termin", sprawa: SPRAWA };
+    pokaz();
+    expect(await within(await screen.findByRole("region", { name: "Sprawa klienta" }))
+      .findByText(/Nic nie czeka w kolejkach, a termin kroku „czekamy na zwrot” minął/)).toBeInTheDocument();
   });
 });

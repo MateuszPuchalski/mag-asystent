@@ -35,12 +35,33 @@ import { stanZHistorii } from "./allegro-tracking.js";
 type Przesylka = { waybill?: string; carrierId?: string };
 type OdpowiedzPrzesylek = { shipments?: Przesylka[] };
 
+/**
+ * Druga paczka zamówienia — dosyłka (@wydanie) — bez numeru. Numer zostaje
+ * w `klient_dosylka` i na karcie sprawy; tu idzie tylko to, co mówi o losie
+ * towaru. `zrodlo` rozstrzyga, czy klient widzi numer w Allegro: wykryty
+ * stoi przy zamówieniu, wpisany ręką — niekoniecznie.
+ */
+export interface DosylkaZamowienia {
+  status: string | null;
+  dostarczonoAt: string | null;
+  maNumer: boolean;
+  zrodlo: "allegro" | "recznie" | null;
+}
+
 export interface StanPrzesylkiZamowienia {
   waybill: string | null;
   przewoznik: string | null;
   status: string | null;
   dostarczonoAt: string | null;
   sprawdzonoAt: string | null;
+  /**
+   * Nakładka przy ODCZYCIE, nie druga paczka w regule `sprawdzPrzesylke`:
+   * „doręczona przebija” zostaje, bo przy reklamacji pytanie brzmi „czy on
+   * to w ogóle dostał” i odpowiada na nie pierwsza paczka. Dosyłka stoi obok,
+   * żeby doręczony oryginał nie zasłonił niedoręczonej dosyłki. Pole
+   * opcjonalne, bo `sprawdzPrzesylke` pisze wyłącznie pierwszą paczkę.
+   */
+  dosylka?: DosylkaZamowienia | null;
 }
 
 export interface PrzesylkaDeps {
@@ -57,17 +78,27 @@ const PUSTA: StanPrzesylkiZamowienia = {
 export function przesylkaZamowienia(
   database: Db = defaultDb(), zamowienieId: number,
 ): StanPrzesylkiZamowienia {
-  const w = database.prepare(`SELECT przesylka_waybill, przesylka_przewoznik,
+  const w = database.prepare(`SELECT channel_account_id, external_id, przesylka_waybill, przesylka_przewoznik,
     przesylka_status, przesylka_dostarczono_at, przesylka_sprawdzono_at
     FROM zamowienie_klienta WHERE id=?`).get(zamowienieId) as Record<string, unknown> | undefined;
-  if (!w) return PUSTA;
+  if (!w) return { ...PUSTA, dosylka: null };
   const tekst = (v: unknown) => (v == null || String(v) === "" ? null : String(v));
+  /* Surowy SQL, nie import `dosylka.ts`: ten plik czyta skrzynka, reklamacje
+     i profil, a serwis dosyłki importuje sprawę klienta — cykl czekałby. */
+  const d = database.prepare(`SELECT waybill, zrodlo, status, dostarczono_at FROM klient_dosylka
+      WHERE konto = ? AND zamowienie = ? ORDER BY julianday(zalozono_at) DESC LIMIT 1`)
+    .get(Number(w.channel_account_id), String(w.external_id)) as Record<string, unknown> | undefined;
+  const zrodlo = tekst(d?.zrodlo);
   return {
     waybill: tekst(w.przesylka_waybill),
     przewoznik: tekst(w.przesylka_przewoznik),
     status: tekst(w.przesylka_status),
     dostarczonoAt: tekst(w.przesylka_dostarczono_at),
     sprawdzonoAt: tekst(w.przesylka_sprawdzono_at),
+    dosylka: d ? {
+      status: tekst(d.status), dostarczonoAt: tekst(d.dostarczono_at), maNumer: tekst(d.waybill) !== null,
+      zrodlo: zrodlo === "allegro" || zrodlo === "recznie" ? zrodlo : null,
+    } : null,
   };
 }
 
@@ -167,32 +198,58 @@ const STATUS_DLA_KLIENTA: Record<string, string> = {
   RETURNED: "wraca albo wróciła do nadawcy",
 };
 
+/** Stan dosyłki słowami klienta — ten sam słownik co pierwsza paczka. */
+function stanDosylki(d: DosylkaZamowienia): string {
+  if (d.dostarczonoAt) return `doręczona ${d.dostarczonoAt.slice(0, 10)}`;
+  if (d.status) return STATUS_DLA_KLIENTA[d.status] ?? `ostatni status przewoźnika ${d.status}`;
+  return d.maNumer ? "nadana" : "czeka na nadanie";
+}
+
+/**
+ * Druga paczka dla szkicu (@wydanie). Bez numeru, jak pierwsza. Zdanie
+ * o numerze w Allegro stoi tylko przy numerze wykrytym przy zamówieniu:
+ * wpisany ręką mógł trafić na inne zamówienie, a szkic nie ma prawa
+ * odsyłać klienta tam, gdzie numeru nie ma.
+ */
+function zdanieDosylki(d: DosylkaZamowienia): string {
+  return `druga paczka (dosyłka): ${stanDosylki(d)}`
+    + (d.zrodlo === "allegro" ? ", jej numer też stoi przy zamówieniu w Allegro" : "");
+}
+
 /** Zdanie faktu o paczce; `null`, gdy nigdy nie pytaliśmy — milczenie zamiast zgadywania. */
 export function zdaniePrzesylki(s: StanPrzesylkiZamowienia): string | null {
-  if (s.sprawdzonoAt === null) return null;
+  /* Dosyłkę znamy z własnej bazy, więc mówimy o niej także wtedy, gdy o
+     pierwszą paczkę nikt nie pytał — milczenie dotyczy tamtej, nie tej. */
+  if (s.sprawdzonoAt === null) return s.dosylka ? `Przesyłka zamówienia: ${zdanieDosylki(s.dosylka)}` : null;
+  const dosylka = s.dosylka ? `; ${zdanieDosylki(s.dosylka)}` : "";
   const kiedy = `(stan z ${s.sprawdzonoAt.slice(0, 16).replace("T", " ")} UTC)`;
   if (s.waybill === null) {
     return `Przesyłka zamówienia: Allegro nie ma numeru przesyłki — paczka jeszcze nienadana`
-      + ` albo nadana poza Allegro ${kiedy}`;
+      + ` albo nadana poza Allegro ${kiedy}${dosylka}`;
   }
   const stan = s.dostarczonoAt
     ? `doręczona ${s.dostarczonoAt.slice(0, 10)}`
     : s.status ? (STATUS_DLA_KLIENTA[s.status] ?? `ostatni status przewoźnika ${s.status}`)
       : "przewoźnik nie podał jeszcze statusu";
   return `Przesyłka zamówienia: ${stan}; przewoźnik ${s.przewoznik ?? "nieznany"}; numer przesyłki`
-    + ` klient widzi w Allegro przy zamówieniu ${kiedy}`;
+    + ` klient widzi w Allegro przy zamówieniu ${kiedy}${dosylka}`;
 }
 
 /**
  * Stan paczki kilkoma słowami, dla ekranu (profil klienta, 24 września 2026).
  * Ten sam słownik co zdanie dla szkicu — dwa słowniki rozjechałyby się przy
  * pierwszym nowym statusie przewoźnika. `null`: nie wiemy nic.
+ *
+ * Dosyłka (@wydanie) staje po kropce: „doręczona … · dosyłka: w drodze
+ * do klienta”. Bez niej doręczony oryginał mówiłby, że sprawa skończona.
  */
 export function stanPrzesylkiKrotko(s: StanPrzesylkiZamowienia): string | null {
-  if (s.dostarczonoAt) return `doręczona ${s.dostarczonoAt.slice(0, 10)}`;
-  if (s.status) return STATUS_DLA_KLIENTA[s.status] ?? s.status;
-  if (s.waybill) return "nadana";
-  return null;
+  const pierwsza = s.dostarczonoAt ? `doręczona ${s.dostarczonoAt.slice(0, 10)}`
+    : s.status ? (STATUS_DLA_KLIENTA[s.status] ?? s.status)
+      : s.waybill ? "nadana" : null;
+  if (!s.dosylka) return pierwsza;
+  const druga = `dosyłka: ${stanDosylki(s.dosylka)}`;
+  return pierwsza ? `${pierwsza} · ${druga}` : druga;
 }
 
 /** Stan starszy niż tyle wymaga ponownego pytania przed szkicem. */

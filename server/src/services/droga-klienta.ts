@@ -314,6 +314,9 @@ export interface MojaSprawa {
   dzis?: boolean;
   /** Zdanie najnowszego zdarzenia po stronie klienta; `null`, gdy nic nowego. */
   nowe?: string | null;
+  /** Stan najważniejszej dosyłki sprawy (@wydanie): kłopot, brak numeru, w drodze,
+   *  doręczona — zdaniem z serwera; `null`, gdy sprawa dosyłki nie ma. */
+  dosylka?: string | null;
 }
 
 /**

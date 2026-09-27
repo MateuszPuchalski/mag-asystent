@@ -23,17 +23,19 @@ process.env.SGT_MODE = "seeded";
 let db: typeof import("../db/db.js").db;
 let sprawdzPrzesylke: typeof import("./przesylka-zamowienia.js").sprawdzPrzesylke;
 let przesylkaZamowienia: typeof import("./przesylka-zamowienia.js").przesylkaZamowienia;
+let Z: typeof import("./przesylka-zamowienia.js");
 
 let zamowienie = 0;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ sprawdzPrzesylke, przesylkaZamowienia } = await import("./przesylka-zamowienia.js"));
+  Z = await import("./przesylka-zamowienia.js");
 });
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["zamowienie_klienta", "channel_account", "events"]) {
+  for (const t of ["klient_prowadzenie", "zamowienie_klienta", "channel_account", "events"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   const konto = Number(d.prepare(
@@ -142,4 +144,56 @@ test("odczyt bez pytania Allegro niczego nie mutuje", () => {
   const przed = Number(db().prepare("SELECT COUNT(*) AS n FROM events").get()!.n);
   assert.equal(przesylkaZamowienia(db(), zamowienie).sprawdzonoAt, null);
   assert.equal(Number(db().prepare("SELECT COUNT(*) AS n FROM events").get()!.n), przed);
+});
+
+/* ── Dosyłka jako nakładka przy odczycie (@wydanie) ──────────────────────────
+   Reguła „doręczona przebija” zostaje — pierwsza paczka odpowiada na pytanie
+   „czy on to dostał”. Dosyłka staje OBOK, bez numeru, żeby doręczony
+   oryginał nie zasłonił niedoręczonej drugiej paczki. */
+function dosylka(n: { waybill?: string | null; zrodlo?: string | null; status?: string | null; doreczona?: string | null }) {
+  const d = db();
+  const konto = Number((d.prepare("SELECT channel_account_id AS k FROM zamowienie_klienta WHERE id=?")
+    .get(zamowienie) as { k: number }).k);
+  const sprawa = Number(d.prepare(`INSERT INTO klient_prowadzenie(login,krok,krok_do,znane_json,zmieniono_at,
+      zmieniono_przez) VALUES ('kl','dosłać','2026-09-30T06:00:00Z','{}','2026-09-18T00:00:00Z','Ola')`)
+    .run().lastInsertRowid);
+  d.prepare(`INSERT INTO klient_dosylka(sprawa_id,konto,zamowienie,waybill,przewoznik,zrodlo,status,dostarczono_at,
+      zalozono_at) VALUES (?,?,'ord-1',?,'DPD',?,?,?,'2026-09-18T00:00:00Z')`)
+    .run(sprawa, konto, n.waybill ?? null, n.zrodlo ?? null, n.status ?? null, n.doreczona ?? null);
+}
+
+test("dosyłka staje obok pierwszej paczki: krótko na profilu i zdaniem w szkicu, bez numeru", async () => {
+  await sprawdzPrzesylke(db(), zamowienie, {
+    apiUrl: "https://api.test", teraz: () => "2026-09-18T10:00:00Z",
+    query: async (url) => (url.includes("/shipments")
+      ? { shipments: [{ waybill: "AD-1", carrierId: "INPOST" }] } : doreczona("AD-1")),
+  });
+  assert.equal(przesylkaZamowienia(db(), zamowienie).dosylka, null);
+  assert.equal(Z.stanPrzesylkiKrotko(przesylkaZamowienia(db(), zamowienie)), "doręczona 2026-09-12");
+
+  dosylka({ waybill: "DOS-TAJNY", zrodlo: "allegro", status: "IN_TRANSIT" });
+  const s = przesylkaZamowienia(db(), zamowienie);
+  assert.equal(s.waybill, "AD-1", "pierwsza paczka zostaje tą, która doszła");
+  assert.deepEqual(s.dosylka, { status: "IN_TRANSIT", dostarczonoAt: null, maNumer: true, zrodlo: "allegro" });
+  assert.equal(Z.stanPrzesylkiKrotko(s), "doręczona 2026-09-12 · dosyłka: w drodze do klienta");
+  const zdanie = Z.zdaniePrzesylki(s)!;
+  assert.match(zdanie, /; druga paczka \(dosyłka\): w drodze do klienta, jej numer też stoi przy zamówieniu w Allegro$/);
+  assert.doesNotMatch(zdanie + JSON.stringify(s.dosylka), /DOS-TAJNY/, "numer dosyłki nie idzie do modelu");
+
+  /* Numer wpisany ręką mógł trafić na inne zamówienie — szkic nie odsyła
+     klienta do Allegro po numer, którego tam może nie być. */
+  db().prepare("UPDATE klient_dosylka SET zrodlo = 'recznie', status = NULL, waybill = NULL").run();
+  const r = przesylkaZamowienia(db(), zamowienie);
+  assert.equal(Z.stanPrzesylkiKrotko(r), "doręczona 2026-09-12 · dosyłka: czeka na nadanie");
+  assert.match(Z.zdaniePrzesylki(r)!, /druga paczka \(dosyłka\): czeka na nadanie$/);
+});
+
+test("dosyłkę znamy z własnej bazy: mówimy o niej, choć o pierwszą paczkę nikt nie pytał", () => {
+  dosylka({ waybill: "D1", zrodlo: "recznie", doreczona: "2026-09-20T10:00:00Z", status: "DELIVERED" });
+  const s = przesylkaZamowienia(db(), zamowienie);
+  assert.equal(s.sprawdzonoAt, null);
+  assert.equal(Z.stanPrzesylkiKrotko(s), "dosyłka: doręczona 2026-09-20");
+  assert.equal(Z.zdaniePrzesylki(s), "Przesyłka zamówienia: druga paczka (dosyłka): doręczona 2026-09-20");
+  assert.equal(Z.przesylkaDoOdswiezenia(s, Date.parse("2026-09-21T00:00:00Z")), true,
+    "reguła odświeżenia pierwszej paczki się nie zmienia");
 });

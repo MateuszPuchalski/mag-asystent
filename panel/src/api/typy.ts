@@ -421,6 +421,8 @@ export interface MojaSprawa {
   dzis?: boolean;
   /** Zdanie pierwszego zdarzenia od klienta po naszym ostatnim ruchu. */
   nowe?: string | null;
+  /** Zdanie najważniejszej dosyłki sprawy (@wydanie): kłopot, brak numeru, w drodze, doręczona. */
+  dosylka?: string | null;
 }
 
 /** Jeden miesiąc miary eskalacji (S5 spoiwa) — zawsze z własną podstawą. */
@@ -1098,8 +1100,11 @@ export type HistoriaKlienta = {
  * na każdym ekranie to samo.
  */
 export interface NoweZdarzenie {
+  /* Dwa rodzaje dosyłki (@wydanie) nie przychodzą od klienta, tylko od
+     przewoźnika przez Allegro. Budzą sprawę, bo to na ten fakt czeka krok
+     „dosłać” — `cel` mają zawsze `null`, bo dosyłka nie ma własnego ekranu. */
   rodzaj: "rozmowa" | "zwrot_nowy" | "zwrot_nadany" | "zwrot_dotarl" | "reklamacja" | "dyskusja"
-    | "wiadomosc_sprawy";
+    | "wiadomosc_sprawy" | "dosylka_doreczona" | "dosylka_problem";
   tekst: string;
   at: string | null;
   /** Adres źródła w panelu; `null`, gdy źródło nie ma własnego ekranu. */
@@ -1133,7 +1138,54 @@ export interface SprawaKlienta {
   nowe: NoweZdarzenie[];
   /** Odcisk faktów, które ekran narysował — zapis go odsyła (świeżość, dekalog 4). */
   odcisk: string;
+  /** Dosyłki tej sprawy, najnowsza pierwsza (@wydanie). Zawsze obecne, czasem puste. */
+  dosylki: DosylkaSprawy[];
 }
+
+/**
+ * Dosyłka sprawy klienta (@wydanie) — lustro `DosylkaSprawy` z serwera.
+ *
+ * `opis` SKŁADA SERWER, jak zdanie `NoweZdarzenie`. Ten sam stan dosyłki stoi
+ * na profilu, na liście „Moje” i przy historii każdej kolejki; trzy ekrany
+ * składające zdanie same rozjechałyby się przy pierwszej zmianie brzmienia.
+ * Panel dokłada wyłącznie barwę z `ton` i numer do skopiowania.
+ */
+export interface DosylkaSprawy {
+  /** Identyfikator zamówienia Allegro (checkoutForm). */
+  zamowienie: string;
+  /** `null`, dopóki numeru nie znalazł automat albo nie wpisał człowiek. */
+  waybill: string | null;
+  /** Identyfikator przewoźnika Allegro: `INPOST`, `DPD`, `OTHER`… */
+  przewoznik: string | null;
+  /** Przewoźnik PIERWSZEJ paczki tego zamówienia — domyślny wybór w formularzu numeru. */
+  przewoznikZamowienia: string | null;
+  zrodlo: "allegro" | "recznie" | null;
+  status: string | null;
+  dostarczonoAt: string | null;
+  /** `null` znaczy „jeszcze nie pytaliśmy Allegro”, nie „nie ma przesyłki”. */
+  sprawdzonoAt: string | null;
+  zalozonoAt: string;
+  /** Dwa dni robocze bez numeru — agent ma go wpisać z Sellasist. */
+  bezNumeru: boolean;
+  opis: string;
+  /** Barwa zdania: „ok” doręczona, „uwaga” brak numeru, „zle” kłopot u przewoźnika. */
+  ton: "ok" | "uwaga" | "zle" | null;
+}
+
+/**
+ * Wynik założenia śledzenia dosyłki (@wydanie) — przy odmowie wypłaty
+ * i przy „Śledź dosyłkę” na ekranie zwrotu.
+ *
+ * DWA KSZTAŁTY, NIE JEDEN Z FLAGĄ. Odmowa w Allegro jest nieodwracalna, a
+ * zapis u nas może się nie udać; ekran MUSI wtedy powiedzieć, że odmowa
+ * wyszła, a śledzenie nie. `blad` to stałe zdanie serwera, nigdy treść
+ * odpowiedzi Allegro.
+ */
+export type WynikDosylki =
+  | { zalozona: true; login: string; krokDo: string;
+      /** Krok, który „dosłać” zastąpił; `null`, gdy go nie było albo był ten sam. */
+      zastapil: string | null }
+  | { zalozona: false; blad: string };
 
 export type Zadanie = {
   id: number; rodzaj: string; tytul: string; instrukcja: string;
@@ -1695,7 +1747,17 @@ export type StanZwrotuPieniedzy = {
     /** Czy ALLEGRO potwierdziło wyjście pieniędzy — nie mylić ze `status`. */
     potwierdzone: boolean;
   } | null;
-  odmowa: { kod: string; powod: string | null; kiedy: string | null } | null;
+  odmowa: {
+    kod: string; powod: string | null; kiedy: string | null;
+    /**
+     * Dosyłka związana z tym zwrotem (@wydanie). Zła paczka wraca, biuro
+     * odmawia wypłaty kodem „Wysłaliśmy nowy towar” i wysyła właściwy towar.
+     * Bez tej linijki ekran zwrotu nie mówił, czy ta druga paczka doszła.
+     */
+    dosylka: { opis: string; login: string; ton: "ok" | "uwaga" | "zle" | null } | null;
+    /** Kod dosyłki, zamówienie znane, a nikt jej nie śledzi — ekran daje „Śledź dosyłkę”. */
+    sledzicDosylke: boolean;
+  } | null;
   /**
    * Ślad po przelewie oddanym POZA Allegro (0.269.0). Przy pobraniu jedyny,
    * jaki może istnieć — to notatka biura o ruchu pieniędzy, nie sam ruch.

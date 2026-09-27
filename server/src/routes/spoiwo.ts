@@ -9,6 +9,7 @@ import {
   BladSprawy, BrakKlienta, KonfliktSprawy, przejmijSprawe, sprawaKlienta, ustawKrok, wznowSprawe,
   zakonczSprawe, type SprawaKlienta,
 } from "../services/prowadzenie-klienta.js";
+import { wpiszNumerDosylki, zalozDosylkeZProfilu } from "../services/dosylka.js";
 
 /* ── Trasy PONAD kolejkami (23 września 2026) ────────────────────────────────
    Szukanie Ctrl+K i historia klienta ze zwrotu albo sprawy nie należą do
@@ -102,7 +103,8 @@ export async function spoiwoRoutes(app: FastifyInstance) {
     });
 
   /* ── SPRAWA KLIENTA (0.535.0, S6) ─────────────────────────────────────────
-     Cztery zapisy, każdy z wymaganą `wersją`. KAŻDY KLUCZ CIAŁA JEST
+     Cztery zapisy, każdy z wymaganą `wersją` (od @wydanie jeszcze dwa przy
+     dosyłce, niżej). KAŻDY KLUCZ CIAŁA JEST
      WYMAGANY i sprawdza się go `in`, nie `?? null`: brak klucza to 400 bez
      zapisu. Pole, które nie dojechało z trasy do serwisu, ginęło już po
      cichu (blizna 0.224.1), a wartość domyślna podstawiona w jego miejsce
@@ -173,5 +175,35 @@ export async function spoiwoRoutes(app: FastifyInstance) {
       const b = req.body;
       return wykonaj(reply, () => przejmijSprawe(req.params.login,
         { wersja: Number(b.wersja), odcisk: String(b.odcisk) }, autor()));
+    });
+
+  /* ── DOSYŁKA (@wydanie, drugi przyrost S6) ─────────────────────────────────
+     Dwa zapisy z profilu, z tymi samymi strażnikami co cztery wyżej: każdy
+     klucz wymagany, wersja i odcisk ekranu, 409 ze świeżą sprawą. Zamówienia
+     i konta propozycja NIE niesie — wynikają ze zwrotu po stronie serwera.
+     Numer przesyłki jedzie w CIELE, nie w adresie: adres ląduje w logu
+     żądań, a numer prowadzi do adresu odbiorcy. */
+  app.post<{ Params: { login: string }; Body: Cialo }>(
+    "/api/obsluga/klient/:login/sprawa/dosylka", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const zle = pola(req.body, { zwrotId: "number", wersja: "number", odcisk: "string" });
+      if (zle) return reply.code(400).send({ error: zle });
+      const b = req.body;
+      return wykonaj(reply, () => zalozDosylkeZProfilu(req.params.login,
+        { zwrotId: Number(b.zwrotId), wersja: Number(b.wersja), odcisk: String(b.odcisk) }, autor()));
+    });
+
+  app.post<{ Params: { login: string }; Body: Cialo }>(
+    "/api/obsluga/klient/:login/sprawa/dosylka/numer", async (req, reply) => {
+      const nie = odmowa(reply); if (nie) return nie;
+      const zle = pola(req.body, {
+        zamowienie: "string", waybill: "string", przewoznik: "string", wersja: "number", odcisk: "string",
+      });
+      if (zle) return reply.code(400).send({ error: zle });
+      const b = req.body;
+      return wykonaj(reply, () => wpiszNumerDosylki(req.params.login, {
+        zamowienie: String(b.zamowienie), waybill: String(b.waybill), przewoznik: String(b.przewoznik),
+        wersja: Number(b.wersja), odcisk: String(b.odcisk),
+      }, autor()));
     });
 }

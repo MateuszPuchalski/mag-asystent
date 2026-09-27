@@ -30,7 +30,7 @@ beforeEach(() => {
   /* `klient_prowadzenie` PRZED `app_user`: prowadzący sprawy klienta to klucz
      obcy bez kaskady. */
   for (const t of ["klient_prowadzenie", "klient_notatka", "zamowienie_klienta_pozycja", "zamowienie_klienta", "zwrot_klienta",
-    "reklamacja_klienta", "message", "conversation", "allegro_inbox_thread", "channel_account", "events",
+    "allegro_zwrot", "reklamacja_klienta", "message", "conversation", "allegro_inbox_thread", "channel_account", "events",
     "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
   konto = Number(d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
     .run().lastInsertRowid);
@@ -172,5 +172,116 @@ test("profil ze sprawą dalej jest odczytem", async () => {
     wersja: 0, odcisk: "" }, { id: biuro, name: "Ola" }, TERAZ, db());
   const przed = (db().prepare("SELECT total_changes() n").get() as { n: number }).n;
   assert.ok(P.profilKlienta("kl", TERAZ, db())!.sprawa);
+  assert.equal((db().prepare("SELECT total_changes() n").get() as { n: number }).n, przed);
+});
+
+/* ── Dosyłka na profilu (@wydanie, S6) ──────────────────────────────────────
+   Trzy rzeczy: podpowiedź „Dosyłka doręczona. Zakończ sprawę?” mimo
+   otwartego zwrotu wymiany, propozycja śledzenia odmowy z ostatnich
+   trzydziestu dni i lista przewoźników do formularza numeru. */
+
+/** Zwrot z odmową wypłaty; `odmowa` null — kod zsynchronizowany z panelu Allegro. */
+function zwrotZOdmowa(login: string, zam: string | null, n: {
+  kod?: string; odmowa?: string | null; odrzucono?: string | null; zgloszono?: string | null; zamkniety?: boolean;
+} = {}): number {
+  const ext = `zw-${Math.random()}`;
+  const surowy: Record<string, unknown> = { id: ext, orderId: zam };
+  if (n.zgloszono) surowy.createdAt = n.zgloszono;
+  if (n.odrzucono) surowy.rejection = { code: n.kod ?? "NEW_ITEM_SENT", createdAt: n.odrzucono };
+  db().prepare("INSERT INTO allegro_zwrot(id,created_at,surowe_json,synced_at) VALUES (?,?,?,'x')")
+    .run(ext, TERAZ.toISOString(), JSON.stringify(surowy));
+  const nasza = n.odmowa !== null;
+  return Number(db().prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,reference_number,order_id,
+      kupujacy_login,created_at,odmowa_kod,odmowa_at,rejection_code,zamkniety_at,przewoznik,synced_at)
+    VALUES (?,?,'ZW',?,?,?,?,?,?,?,'INPOST','x')`)
+    .run(konto, ext, zam, login, TERAZ.toISOString(), nasza ? n.kod ?? "NEW_ITEM_SENT" : null,
+      nasza ? n.odmowa ?? dni(1) : null, nasza ? null : n.kod ?? "NEW_ITEM_SENT",
+      n.zamkniety ? dni(1) : null).lastInsertRowid);
+}
+
+test("podpowiedź „dosylka”: doręczona dosyłka, a otwarty zwrot tego zamówienia jej nie gasi", async () => {
+  const D = await import("./dosylka.js");
+  zamowienie("z-1", "kl", dni(20));
+  const kto = { id: biuro, name: "Ola" };
+  const zw = zwrotZOdmowa("kl", "z-1");
+  D.zalozDosylkeZOdmowy(db(), zw, kto, TERAZ);
+  let p = P.profilKlienta("kl", TERAZ, db())!;
+  assert.deepEqual([p.podpowiedzZakonczenia, p.podpowiedzPowod], [false, null], "dosyłka jeszcze jedzie");
+
+  db().prepare("UPDATE klient_dosylka SET waybill='W1', przewoznik='DPD', status='DELIVERED', dostarczono_at=?")
+    .run(dni(0));
+  p = P.profilKlienta("kl", TERAZ, db())!;
+  assert.ok(p.otwarte.some((o) => o.rodzaj === "zwrot" && o.id === zw), "zwrot wymiany stoi otwarty");
+  assert.deepEqual([p.podpowiedzZakonczenia, p.podpowiedzPowod], [true, "dosylka"]);
+
+  /* Otwarty zwrot INNEGO zamówienia gasi ją jak przy terminie. */
+  zamowienie("z-2", "kl", dni(10));
+  const inny = zwrotZOdmowa("kl", "z-2", { kod: "REFUND_REJECTED" });
+  assert.equal(P.profilKlienta("kl", TERAZ, db())!.podpowiedzPowod, null);
+  db().prepare("UPDATE zwrot_klienta SET zamkniety_at=? WHERE id=?").run(dni(0), inny);
+
+  /* Termin też minął — powodem zostaje dosyłka, bo mówi, CZEMU krok się spełnił. */
+  const poTerminie = new Date(TERAZ.getTime() + 10 * 86_400_000);
+  assert.equal(P.profilKlienta("kl", poTerminie, db())!.podpowiedzPowod, "dosylka");
+  db().prepare("DELETE FROM klient_dosylka").run();
+  db().prepare("UPDATE zwrot_klienta SET zamkniety_at=?").run(dni(0));
+  assert.deepEqual([P.profilKlienta("kl", poTerminie, db())!.podpowiedzZakonczenia,
+    P.profilKlienta("kl", poTerminie, db())!.podpowiedzPowod], [true, "termin"]);
+});
+
+test("propozycja dosyłki: odmowa z trzydziestu dni, bez śledzonej dosyłki; data nigdy z `created_at` zwrotu", async () => {
+  const D = await import("./dosylka.js");
+  zamowienie("z-1", "kl", dni(40));
+  assert.equal(P.profilKlienta("kl", TERAZ, db())!.propozycjaDosylki, null);
+  zwrotZOdmowa("kl", "z-1", { odmowa: dni(31) });
+  assert.equal(P.profilKlienta("kl", TERAZ, db())!.propozycjaDosylki, null, "31 dni to poza oknem");
+  zwrotZOdmowa("kl", null, { odmowa: dni(1) });
+  assert.equal(P.profilKlienta("kl", TERAZ, db())!.propozycjaDosylki, null, "bez zamówienia nie ma czego śledzić");
+  zwrotZOdmowa("kl", "z-1", { odmowa: dni(5), kod: "ITEM_FIXED" });
+  assert.equal(P.profilKlienta("kl", TERAZ, db())!.propozycjaDosylki, null, "naprawa to nie dosyłka");
+
+  /* Kod z panelu Allegro: data odmowy z lądowiska, nie z naszej kolumny. */
+  const zAllegro = zwrotZOdmowa("kl", "z-1", { odmowa: null, kod: "MISSING_PART_SENT", odrzucono: dni(29) });
+  assert.deepEqual(P.profilKlienta("kl", TERAZ, db())!.propozycjaDosylki,
+    { zwrotId: zAllegro, zamowienie: "z-1", kod: "MISSING_PART_SENT", odmowaAt: dni(29) });
+  /* Bez żadnej daty Allegro — `created_at` zwrotu bywa czasem synchronizacji,
+     więc na nim propozycja nie stanie. */
+  db().prepare("UPDATE allegro_zwrot SET surowe_json = json_remove(surowe_json, '$.rejection')").run();
+  assert.equal(P.profilKlienta("kl", TERAZ, db())!.propozycjaDosylki, null);
+
+  const nasza = zwrotZOdmowa("kl", "z-1", { odmowa: dni(2) });
+  assert.equal(P.profilKlienta("kl", TERAZ, db())!.propozycjaDosylki?.zwrotId, nasza);
+  D.zalozDosylkeZOdmowy(db(), nasza, { id: biuro, name: "Ola" }, TERAZ);
+  assert.equal(P.profilKlienta("kl", TERAZ, db())!.propozycjaDosylki, null, "dosyłkę zamówienia już śledzimy");
+});
+
+test("przewoźnicy do formularza: z zamówień, zwrotów i dosyłek, bez powtórzeń i po kolei", () => {
+  zamowienie("z-1", "kl", dni(3));
+  db().prepare("UPDATE zamowienie_klienta SET przesylka_przewoznik='INPOST'").run();
+  zwrotZOdmowa("kl", "z-1");
+  db().prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,kupujacy_login,przesylka_przewoznik,
+    synced_at) VALUES (?,'z-2','inny','DPD','x')`).run(konto);
+  assert.deepEqual(P.profilKlienta("kl", TERAZ, db())!.przewoznicy, ["DPD", "INPOST"]);
+});
+
+test("„niedoręczone od N dni” milknie przy zamówieniu z dosyłką — jej los niesie karta sprawy", async () => {
+  const D = await import("./dosylka.js");
+  zamowienie("z-1", "kl", dni(10), { sprawdzono: dni(1) });
+  const sygnal = () => P.profilKlienta("kl", TERAZ, db())!.sygnaly.filter((s) => /niedoręczone/.test(s.tekst)).length;
+  assert.equal(sygnal(), 1);
+  D.zalozDosylkeZOdmowy(db(), zwrotZOdmowa("kl", "z-1"), { id: biuro, name: "Ola" }, TERAZ);
+  assert.equal(sygnal(), 0);
+});
+
+test("profil z dosyłką i propozycją dalej jest odczytem", async () => {
+  const D = await import("./dosylka.js");
+  zamowienie("z-1", "kl", dni(10));
+  zamowienie("z-2", "kl", dni(10));
+  D.zalozDosylkeZOdmowy(db(), zwrotZOdmowa("kl", "z-1"), { id: biuro, name: "Ola" }, TERAZ);
+  zwrotZOdmowa("kl", "z-2");
+  const przed = (db().prepare("SELECT total_changes() n").get() as { n: number }).n;
+  const p = P.profilKlienta("kl", TERAZ, db())!;
+  assert.equal(p.sprawa?.dosylki.length, 1);
+  assert.equal(p.propozycjaDosylki?.zamowienie, "z-2");
   assert.equal((db().prepare("SELECT total_changes() n").get() as { n: number }).n, przed);
 });

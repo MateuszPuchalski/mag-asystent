@@ -2890,6 +2890,19 @@ udział cache zerowy przy drugiej partii znaczy, że prefiks instrukcji się
 rozjeżdża. Model zmienia `COPILOT_MODEL`; nazwa spoza rodziny `claude-`
 dostaje ostrzeżenie w dzienniku.
 
+### Aktualizacja do @wydanie — dosyłka ze śledzeniem
+
+**Panel trzeba przebudować, a serwer zrestartować. Klikać nie trzeba nic.**
+Tabela `klient_dosylka` powstaje sama przy starcie. Ticker `dosylki` rusza sam
+w `main()`, gdy konto Allegro jest połączone. Przebieg bez dosyłek w toku nie
+wysyła do Allegro ani jednego żądania.
+
+Sprawdzenie przy pierwszej prawdziwej odmowie z kodem „Wysłaliśmy nowy
+towar”. Odmowy nie wysyła się na próbę, bo w Allegro jest nieodwracalna. Pod
+„Odmówiono” ma stanąć zdanie o dosyłce. Karta sprawy na profilu klienta ma
+pokazać krok „Dosłać nowy towar (etykieta w Sellasist)”. W dzienniku ma stanąć
+`klient_dosylka_zalozona` z numerem sprawy, bez loginu i bez numeru przesyłki.
+
 ### Aktualizacja do 0.535.0 — sprawa klienta
 
 **Panel trzeba przebudować, a serwer zrestartować.** Tabela

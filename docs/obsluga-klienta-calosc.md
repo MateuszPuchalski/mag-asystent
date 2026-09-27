@@ -306,7 +306,7 @@ i brak danych to „pominięty”, bo czerwień ma znaczyć jedno: droga nie dzi
 Pytanie stało tu otwarte: kiedy sprawa klienta jest skończona, skoro składa
 się z bytów o czterech właścicielach danych? Rozstrzygnął je wywiad
 z właścicielem z 26 września 2026. Pierwszy przyrost stoi w kodzie od
-0.535.0, a następny opisuje koniec tego rozdziału.
+0.535.0, a drugi, dosyłka ze śledzeniem, od @wydanie.
 
 **Powód.** Biuro nazywa swój główny problem wprost: intuicyjne śledzenie
 i prowadzenie sprawy danego klienta. Jedna osoba prowadzi braki towaru,
@@ -344,6 +344,10 @@ sześćdziesiąt dni naprzód, bo na dostawcę czeka się tygodniami. Pomyłkę 
 autor pierwszego ruchu, jak przy odpowiedzi w skrzynce od 0.159.0.
 „Przejmij” widać tylko przy cudzej sprawie w toku.
 
+Od @wydanie krok stawia też odmowa wypłaty z kodem dosyłki na ekranie
+zwrotu. Idzie tą samą drogą w kodzie co „Ustaw krok” (`zapiszKrokSprawy`),
+więc zdanie wyżej zostaje prawdą.
+
 **Zapis sprawdza świeżość.** Każdy zapis niesie numer wersji, więc cudzy ruch
 po otwarciu ekranu daje 409 ze świeżą sprawą. Każdy zapis poza pierwszym
 krokiem niesie też odcisk faktów, które ekran narysował (punkt 4). Dotyczy to
@@ -358,6 +362,14 @@ nowa reklamacja, nowa dyskusja i wiadomość klienta albo doradcy Allegro
 w jednej z nich. Zakończona sprawa z takim zdarzeniem wraca na „Moje”
 prowadzącego, a sprawa w toku staje tam na górze. Powód stoi słowami panelu,
 na przykład „Klient napisał 26.09 14:10”, i prowadzi do źródła.
+
+**Doręczenie dosyłki i kłopot z nią też budzą (@wydanie).** To poszerzenie
+decyzji z 26 września, więc stoi tu jawnie, do oceny właściciela. Dosyłkę
+zakłada biuro, ale doręczenie i kłopot zgłasza przewoźnik przez Allegro.
+Prowadzący o nich nie wie, a krok „dosłać” właśnie na nie czeka. Powód stoi
+słowami panelu: „Dosyłka doręczona 30.09” albo „Dosyłka wraca do nadawcy”.
+Zakończonej sprawy ticker nie śledzi, więc to obudzenie nie dokłada szumu do
+miary z punktu 10.
 
 **Czego nie budzi (decyzja właściciela z 27 września 2026).** Decyzja
 z 26 września mówiła o ponownym otwarciu przy każdym zdarzeniu. Właściciel
@@ -415,24 +427,34 @@ z opóźnieniem budzi, bo tej wiadomości agent nie widział. Znacznik bez stref
 czyta się jako UTC, tak jak SQLite, żeby próg i zapytanie mówiły o tej samej
 chwili.
 
+**Odcisk dostał w @wydanie dwa klucze: `k` i `q`.** Liczą dosyłki doręczone
+i dosyłki z kłopotem, znów sztukami. Napis odcisku każdej sprawy przez to się
+zmienił. Ekran profilu otwarty w chwili aktualizacji dostaje więc raz 409 ze
+świeżą sprawą i rysuje ją od nowa. Zapamiętany odcisk bez nowych kluczy nie
+budzi, a odmowa z dosyłką dopisuje je bez potwierdzania reszty.
+
 **Zakończenie zależy od tego, co klient dostał:**
 
 | rozwiązanie | sprawa kończy się, gdy | skąd to wiemy |
 |---|---|---|
 | sam zwrot | pieniądze wróciły do klienta | oś zwrotu, `zwrot-pieniedzy.ts` |
-| wymiana | poprawny towar doszedł na ten sam adres | dziś znikąd — dosyłka idzie poza aplikacją |
+| wymiana | poprawny towar doszedł na ten sam adres | od @wydanie z trackingu dosyłki, `dosylka.ts` |
 | odpowiedź | klient dostał odpowiedź i nie dopisał | skrzynka, S5a |
 
 Wymiana to zwrot przez Allegro i dosyłka poprawnego towaru. Nie dostaje
-osobnej kolejki, tylko staje jako następny krok sprawy. Dziś krok „dosłać”
-jest samym zdaniem, a numer przesyłki wchodzi w następnym przyroście.
-Kończy zawsze człowiek.
+osobnej kolejki, tylko staje jako następny krok sprawy. Od @wydanie krok
+„dosłać” ma numer przesyłki i jej stan z Allegro. Kończy zawsze człowiek.
 
 **Podpowiedź zakończenia stoi na profilu.** Pyta „Zakończ sprawę?”, gdy
 sprawa jest w toku, w kolejkach nic nie czeka, a dzień kroku nadszedł.
 Wcześniej pchałaby do zakończenia sprawy, której krok jeszcze się nie
 spełnił. „Dziś” i „po terminie” liczą się na dobie lokalnej magazynu. Na
 czerwono stoi tylko „po terminie”.
+
+Od @wydanie pyta też wtedy, gdy doszła dosyłka: „Dosyłka doręczona 30.09.
+Zakończ sprawę?”. Otwarty zwrot TEGO zamówienia jej nie gasi. Zwrot wymiany
+nie dostaje korekty, bo pieniędzy się nie oddaje, więc stoi otwarty i gasiłby
+podpowiedź na zawsze. Powód podpowiedzi niesie pole `podpowiedzPowod`.
 
 **Pilnują:**
 
@@ -445,7 +467,13 @@ czerwono stoi tylko „po terminie”.
   rozmówcy;
 - w panelu `ProfilKlienta.test.tsx`, `Moje.test.tsx` i `Klient.test.tsx`:
   same GET-y przy otwarciu profilu, wiersz „Moje” bez przycisku i linijka
-  sprawy przy źródle.
+  sprawy przy źródle;
+- od @wydanie `dosylka.test.ts`: odmowa stawia krok tą samą drogą, wykrycie
+  numeru, ticker i obudzenie z `k` oraz `q`;
+- `dosylka-opis.test.ts`: zdania dosyłki słowo w słowo i dni robocze na
+  dobie magazynu;
+- `zwroty.test.ts`: porażka zapisu dosyłki nie zamienia odmowy w błąd,
+  a ponowienie niczego nie dopisuje.
 
 **Miara (punkt 10 dekalogu z `docs/ergonomia-magazynu.md`).** Dwie liczby
 mówią, czy sprawa pomaga, czy dokłada pracy. Pierwsza to udział obudzeń
@@ -455,32 +483,68 @@ Wysoki udział znaczy, że budzi szum, a nie klient. Druga to liczba kroków po
 terminie na tydzień: rośnie, gdy terminy są na wyrost albo spraw jest za
 dużo. Obie liczy się bez osi osobowej, a dziś nie liczy ich nic.
 
+**Miara dosyłki (@wydanie).** Trzecia liczba to udział numerów wpisanych
+ręką, czyli `klient_dosylka_numer` z `zrodlo` równym `recznie`. Sprawdza na
+żywo fakt właściciela, że numer dosyłki stoi przy tym samym zamówieniu.
+Czwarta to czas od odmowy do numeru, między `klient_dosylka_zalozona`
+a `klient_dosylka_numer` tej samej sprawy. Krok z terminem postawionym przez
+odmowę niesie `domyslny: true` w `klient_sprawa_krok`. Te też liczy się bez
+osi osobowej i dziś też nie liczy ich nic.
+
 **Zabrania.** Statusu przepisanego ze źródeł, kończenia przez automat
 i otwarcia ekranu, które cokolwiek zapisuje. Zabrania też listy, liczby
 i raportu spraw albo kroków po terminie w podziale na osoby. Jedynym
 wyjątkiem jest własne „Moje” oglądającego, z tożsamością z sesji. Zestawienie
 per osoba to monitoring pracowniczy z art. 22² Kodeksu pracy
-(`docs/architektura.md` §9). Do dziennika idzie numer sprawy, nigdy login ani
-treść kroku — polityka stoi w `docs/obsluga-klienta.md`.
+(`docs/architektura.md` §9). Do dziennika idzie numer sprawy, nigdy login,
+treść kroku ani numer przesyłki — polityka stoi w `docs/obsluga-klienta.md`.
 
-**Następny przyrost: dosyłka ze śledzeniem.** Krok „dosłać” dostaje numer
-przesyłki, przewoźnika i śledzenie z Allegro. Śledzenie pyta partiami, jak
-`services/allegro-tracking.ts`, z jednego wpisu `uruchomTakt` w `main()`.
-Krok podpowiada zwrot z powodem `DIFFERENT` albo odmowa wypłaty
-`NEW_ITEM_SENT`. Liczba spraw do ruchu staje w plakietce `LicznikDoZrobienia`.
-Przy tym trzeba naprawić `services/przesylka-zamowienia.ts`: zna jedną paczkę
-na zamówienie, więc doręczona pierwsza zasłoniłaby niedoręczoną dosyłkę.
+**Drugi przyrost: dosyłka ze śledzeniem (@wydanie).** Przy złym towarze
+biuro odmawia wypłaty za zwrot kodem `NEW_ITEM_SENT` albo `MISSING_PART_SENT`.
+Tak podał właściciel 27 września. Ta sama odmowa, w tym samym ruchu, stawia
+w sprawie krok „dosłać” i zakłada śledzenie dosyłki. Krok dostaje termin
+trzech dni roboczych, na 8:00 w magazynie. Sprawie w toku odmowa zastępuje
+krok, bo „czekamy na zwrot” właśnie się spełniło.
 
-Przy złym towarze biuro odrzuca wypłatę za zwrot opcją „Wysłaliśmy nowy
-towar”, czyli `NEW_ITEM_SENT` — tak podał właściciel 27 września. Ten kod
-WERTIS już zapisuje przy zwrocie, więc może sam zaproponować krok „dosłać”.
+**Odmowa nie potwierdza „nowego”.** Agent odmawia na ekranie zwrotu i profilu
+nie widział. Nowa dosyłka do tego samego zamówienia zastępuje poprzednią.
+Porażka zapisu dosyłki nie zamienia odmowy w błąd, bo odmowa w Allegro już
+poszła. Ekran zwrotu mówi wtedy, czemu śledzenia nie założono, i proponuje
+„Śledź dosyłkę”.
+
+**Tabela `klient_dosylka` trzyma numer i wynik śledzenia, nie historię.**
+Jeden wiersz przypada na sprawę i zamówienie. Numer wykrywa ticker `dosylki`
+w `main()`, co piętnaście minut. Pyta
+`GET /order/checkout-forms/{id}/shipments` i odrzuca numery paczek zwrotu,
+wcześniejszych dosyłek i pierwszej paczki. Pierwszą paczkę poznaje po
+rejestracji albo doręczeniu przed zgłoszeniem zwrotu. Kilku kandydatów bez
+daty nie rozstrzyga: dwa dni robocze później ekran prosi o numer z Sellasist.
+
+**Śledzenie idzie tą samą drogą co zwroty.** `odpytajTracking`
+w `services/allegro-tracking.ts` pyta partiami po przewoźniku. Śledzi
+wyłącznie sprawy w toku i dosyłki z ostatnich trzydziestu dni. Przewoźnika
+`OTHER` Allegro nie śledzi, więc nie pytamy o niego wcale. Limit 429 idzie do
+`uruchomTakt`, a każdy inny błąd zabiera jedną dosyłkę. Ticker nie podnosi
+wersji sprawy i pisze warunkowo, po numerze.
+
+**Wpisany numer jest drogą zapasową.** Profil ma przy dosyłce „wpisz numer”
+z listą przewoźników znanych z bazy. Propozycja „Śledzić dosyłkę?” na
+profilu zostaje wyłącznie dla ponowienia i kodów odmowy z panelu Allegro.
+`services/przesylka-zamowienia.ts` pokazuje dosyłkę obok pierwszej paczki,
+bez numeru. Reguła „doręczona przebija” zostaje, bo przy reklamacji pytanie
+brzmi „czy on to w ogóle dostał”.
 
 Właściciel podał 27 września jeszcze dwa fakty, niesprawdzone na żywym
 koncie. Numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro, obok
-pierwszej paczki. Dosyłka jedzie prawie zawsze tym samym przewoźnikiem.
-Jeśli oba się potwierdzą, dosyłkę widać bez wklejania: to druga pozycja
-w `GET /order/checkout-forms/{id}/shipments`. Wklejony numer zostaje drogą
-zapasową, gdy etykieta trafi na inne zamówienie.
+pierwszej paczki. Dosyłka jedzie prawie zawsze tym samym przewoźnikiem. Na
+pierwszym stoi wykrycie numeru, więc w `docs/allegro-ksztalt.md` ma znacznik
+weryfikacji. Na drugim stoi tylko domyślny przewoźnik w formularzu numeru.
+
+**Odcięte z tego przyrostu.** Krok ze zwrotu z powodem `DIFFERENT` odpadł:
+powód zwrotu bez kodu odmowy nie znaczy dosyłki. Plakietka
+`LicznikDoZrobienia` odpadła, bo „Moje” celowo nie ma licznika. Zdecyduje
+o niej miara, nie przyrost. Przycisk „Sprawdź teraz” odpadł, bo ticker
+i wpisany numer wystarczają.
 
 ## Sprzeczność: login kupującego
 
@@ -524,7 +588,7 @@ od drugiej: nazywa dziurę, a nie funkcję.
 | dyskusja przed reklamacją | dyskusje (0.245.0), wiązanie od 0.386.0 | zegara |
 | prośba o rabat zamiast zwrotu | rabat transakcyjny (0.164.0) | — |
 | pytanie reklamacyjne bez sprawy w Allegro | skrzynka, znacznik „reklamacyjna" (0.390.0) | zegara — rozmowa nie ma terminu (§26) |
-| wymiana na inny towar | zwrot przez Allegro, dosyłka poza aplikacją; od 0.535.0 krok „dosłać" w sprawie klienta (S6) | numeru przesyłki i śledzenia dosyłki — następny przyrost S6 |
+| wymiana na inny towar | zwrot przez Allegro; od 0.535.0 krok „dosłać" w sprawie klienta, od @wydanie numer i śledzenie dosyłki (S6) | potwierdzenia na żywym koncie, że numer dosyłki stoi przy zamówieniu |
 | brak towaru na stanie | rozmowa plus zadanie terenowe | — |
 | brak towaru do sprzedanego zamówienia | Sellasist: magazynier zgłasza brak przy zbieraniu; od 0.535.0 Ctrl+K po numerze zamówienia daje kupującego | drogi braku z Sellasist do sprawy klienta bez przepisywania numeru |
 | klient wraca po miesiącu | rozmowa plus pełna historia (0.386.0) | — |
@@ -540,7 +604,7 @@ w Allegro sprzedawca nie założy — `/sale/issues` ma wyłącznie GET.
 
 **Największe dziury to wymiana i brak towaru.** Obie są codzienne w handlu
 częściami i obie żyły poza aplikacją. Wymiana ma od 0.535.0 krok „dosłać"
-w sprawie klienta (S6), a śledzenie dosyłki to następny przyrost. Brak towaru
+w sprawie klienta (S6), a od @wydanie numer i śledzenie dosyłki. Brak towaru
 czeka na drogę z Sellasist. Do tego czasu numer zamówienia w Ctrl+K daje
 kupującego, a z nim profil i sprawę.
 

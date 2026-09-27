@@ -31,9 +31,12 @@ const POZYCJE: PozycjaDecyzji[] = [
 ];
 
 let wyslane: string[] = [];
+/* Scalona lista „Moje” — domyślnie pusta; test dosyłki wkłada tu sprawę klienta. */
+let moje: unknown[] = [];
 
 beforeEach(() => {
   wyslane = [];
+  moje = [];
   localStorage.clear();
   localStorage.setItem("wertis-panel-token", "tok-biura");
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
@@ -42,7 +45,7 @@ beforeEach(() => {
       return new Response(JSON.stringify({ pozycje: POZYCJE,
         liczniki: { wszystko: 3, magazyn: 2, obsluga: 1 } }));
     }
-    if (url === "/api/obsluga/moje") return new Response(JSON.stringify({ sprawy: [] }));
+    if (url === "/api/obsluga/moje") return new Response(JSON.stringify({ sprawy: [], lista: moje }));
     if (url === "/api/obsluga/wzmianki") return new Response(JSON.stringify({ wzmianki: [], nowe: 0 }));
     if (url === "/api/obsluga/ja") {
       return new Response(JSON.stringify({ user: { userId: 1, name: "Ola Biuro", role: "biuro" } }));
@@ -111,6 +114,16 @@ describe("DO ZROBIENIA — trzy sekcje na jednym ekranie", () => {
       .toEqual(["Wspomniano o mnie", "Moje sprawy", "Do decyzji biura"]);
     expect(await screen.findByText(/Nikt Cię jeszcze nie wzmiankował/)).toBeInTheDocument();
     expect(await screen.findByText(/Nic nie prowadzisz/)).toBeInTheDocument();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("sprawa klienta z dosyłką stoi w „Moje” i otwarcie dalej niczego nie zapisuje (@wydanie)", async () => {
+    moje = [{ kolejka: "klient", id: 5, opis: "zielony: dosłać", at: "2026-09-26T10:00:00Z",
+      terminDo: "2026-09-30T06:00:00Z", login: "zielony", cel: "/obsluga/klient/zielony", dzis: true,
+      dosylka: "Allegro nie ma numeru dosyłki od 2 dni roboczych — wpisz go z Sellasist" }];
+    pokaz();
+    expect(await screen.findByText(/wpisz go z Sellasist/)).toBeInTheDocument();
+    await screen.findByText("Uznać czy odrzucić?");
     expect(wyslane).toEqual([]);
   });
 

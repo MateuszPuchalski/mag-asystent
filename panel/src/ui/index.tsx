@@ -90,6 +90,18 @@ export const KLASA_STATUSU: Record<string, string> = {
   "closed": "bg-stan-zamknieta text-stan-zamknieta-tekst",
   "spam": "bg-stan-spam text-stan-spam-tekst",
 };
+/**
+ * Barwa zdania z tonem serwera (@wydanie) — dziś zdania o dosyłce.
+ *
+ * Stoi tutaj, bo to samo zdanie pada na ekranie zwrotu, na profilu i przy
+ * historii kolejek. Trzy mapy jednej rangi rozjechałyby się przy pierwszej
+ * poprawce. Bez tonu pismo jest zwykłe, bo kolor zapalany zawsze uczy go
+ * ignorować.
+ */
+export const barwaTonu = (ton: "ok" | "uwaga" | "zle" | null | undefined) =>
+  ton === "zle" ? "text-ranga-zle" : ton === "uwaga" ? "text-ranga-uwaga"
+    : ton === "ok" ? "text-ranga-ok" : "text-ranga-nic";
+
 export const Plakietka = ({ status, children, className = "" }:
   { status?: string; children: React.ReactNode; className?: string }) =>
   <span className={`rounded px-1.5 py-0.5 text-podpis font-bold uppercase tracking-wide ${
@@ -428,6 +440,17 @@ export const godzina = (v: string | null | undefined) =>
 export const dzien = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleDateString("pl", { day: "numeric", month: "long", year: "numeric" })
     : "—";
+
+/**
+ * Dzień i miesiąc cyframi — „30.09” (@wydanie).
+ *
+ * Dla podpowiedzi przy doręczonej dosyłce. Serwer pisze tę samą datę w zdaniu
+ * dosyłki jako „DD.MM”, a podpowiedź stoi tuż pod nim — dwa zapisy jednego
+ * dnia obok siebie czytałyby się jak dwa różne dni. Rok nic tu nie
+ * rozstrzyga: dosyłkę śledzimy najwyżej trzydzieści dni.
+ */
+export const dzienMiesiac = (v: string | null | undefined) =>
+  v ? new Date(v).toLocaleDateString("pl", { day: "2-digit", month: "2-digit" }) : "—";
 
 /**
  * Wiersz kolejki biura — rama wspólna dla dostaw i koszy (0.438.0).
