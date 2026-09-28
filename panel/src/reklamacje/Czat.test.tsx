@@ -368,18 +368,31 @@ describe("Kto mówi, widać bez czytania (0.416.0, barwy z 0.418.0)", () => {
   });
 });
 
-describe("Rozmowa przewija się, czynności stoją (0.418.0)", () => {
-  /* Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony" — pasek
-     leżał w połowie cudzej wiadomości, bo cała kolumna była JEDNYM obszarem
-     przewijania. Teraz przewija się wyłącznie oś; pole odpowiedzi i werdykt
-     zostają na dole. */
-  it("pas przewijania obejmuje OŚ, a pole odpowiedzi zostaje poza nim", () => {
+describe("Odpowiedź jest ostatnią wypowiedzią wątku (@wydanie)", () => {
+  /* Decyzja właściciela z 28 września: ten sam układ co w skrzynce. Pole
+     stoi W pasie przewijania, za ostatnią wiadomością, a pod ręką trzyma je
+     przyklejenie do krawędzi. Werdykt zostaje poza pasem, w ekranie. */
+  it("pole odpowiedzi stoi w pasie przewijania, za ostatnią wiadomością", () => {
     const { container } = render(<Czat sprawa={sprawa()} zalaczniki={[]}
       czat={[wiad({ tresc: "wiadomość" })]}
       edytor={<div data-testid="edytor">pole</div>} />);
     const przewijany = container.querySelector(".overflow-y-auto")!;
+    const pole = screen.getByTestId("edytor");
     expect(przewijany.contains(screen.getByText("wiadomość"))).toBe(true);
-    expect(przewijany.contains(screen.getByTestId("edytor"))).toBe(false);
+    expect(przewijany.contains(pole)).toBe(true);
+    expect(screen.getByText("wiadomość").compareDocumentPosition(pole))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("kotwica stoi ZA edytorem — przyklejony rząd nie zakrywa ostatniej wiadomości", () => {
+    const cele: Element[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) { cele.push(this); };
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ tresc: "wiadomość" })]}
+      edytor={<div data-testid="edytor">pole</div>} />);
+    expect(cele).toHaveLength(1);
+    expect(screen.getByTestId("edytor").compareDocumentPosition(cele[0]))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 });
 

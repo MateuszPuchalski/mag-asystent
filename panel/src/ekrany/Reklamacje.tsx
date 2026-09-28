@@ -589,13 +589,11 @@ export function Reklamacje() {
 
       {/* ── TRZY PASY, NIE JEDEN OBSZAR PRZEWIJANIA (0.418.0) ────────────────
           Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony".
-          Cała kolumna przewijała się jako jedna kartka, więc pasek werdyktu
-          wędrował z osią i lądował w połowie cudzej wiadomości.
+          Pasek werdyktu, wędrujący z osią, lądował w połowie cudzej wiadomości.
 
-          Teraz nie przewija się NIC poza rozmową: znacznik „prowadzę" stoi
-          u góry, pole odpowiedzi i werdykt na dole, a oś płynie między nimi.
-          To jest układ okna rozmowy, nie strony — a ta kolumna jest oknem
-          rozmowy od 0.224.0. */}
+          Przewija się więc tylko rozmowa z odpowiedzią: znacznik „prowadzę"
+          stoi u góry, werdykt na dole. Pole odpowiedzi przykleja się do
+          dolnej krawędzi samo, powód stoi w `reklamacje/Czat.tsx`. */}
       <Karta className="flex min-h-0 flex-col overflow-hidden">
         {/* Kto prowadzi — CZYNNOŚĆ, więc stoi przy innych czynnościach, a nie
             w kolumnie faktów (0.392.0, zgłoszenie właściciela ze zrzutem). */}
@@ -621,7 +619,9 @@ export function Reklamacje() {
               }}
               czat={szczegol.data.czat}
               zalaczniki={szczegol.data.zalaczniki}
-              edytor={<Edytor tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
+              /* Klucz sprawy: edytor trzyma własny stan (cofnięcie wyczyszczenia,
+                 zwłokę Ctrl+Enter), a ekran nie montuje go od nowa przy przejściu. */
+              edytor={<Edytor key={szczegol.data.reklamacja.id} tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
                 zalaczniki={zalacznikiWysylki.data?.zalaczniki ?? []}
                 dodajeZalacznik={dodajZalacznik.isPending}
                 bladZalacznika={bladZalacznika}

@@ -103,6 +103,8 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz, moje
       const aktywna = d.id === wybrana;
       return <li key={d.id}>
         <button
+          /* Enter na wierszu prowadzi do pola odpowiedzi, jak w skrzynce. */
+          data-wiersz-kolejki=""
           aria-current={aktywna ? "true" : undefined}
           ref={aktywna ? aktywnyWiersz : null}
           onClick={() => onWybierz(d.id)}

@@ -10,9 +10,9 @@ const { Edytor, LIMIT_ZNAKOW } = await import("./Edytor");
 
    1. PRZYCISK MARTWY PRZY PUSTYM POLU. Puste żądanie i tak wróciłoby z 400,
       tylko o jeden strzał do serwera i jedno zdanie błędu później.
-   2. LIMIT BLOKUJE PRZED WYSŁANIEM. W skrzynce limit pilnuje wyłącznie
-      serwer, więc agent dowiaduje się o przekroczeniu po kliknięciu — tutaj
-      limit znamy ze specyfikacji (`MessageRequest.text`, maxLength 20000).
+   2. LIMIT BLOKUJE PRZED WYSŁANIEM. Limit znamy ze specyfikacji
+      (`MessageRequest.text`, maxLength 20000), więc agent nie czeka na
+      odmowę serwera.
    3. LICZNIK MILCZY, DOPÓKI NIE MA CO POWIEDZIEĆ. Czerwony napis stojący
       cały czas przestaje być czytany — dekalog, punkt 5.
    4. PRZY ZAMKNIĘTEJ ROZMOWIE EDYTORA NIE MA W DRZEWIE. Nie „disabled":
@@ -126,5 +126,84 @@ describe("Edytor reklamacji bez szablonów", () => {
     rerender(<Edytor {...pusty} />);
     await userEvent.keyboard("{Control>}{Enter}{/Control}");
     expect(pusty.onWyslij).not.toHaveBeenCalled();
+  });
+});
+
+/* ── Jeden edytor trzech kolejek (@wydanie) ──────────────────────────────────
+   Sprawa odpowiada edytorem skrzynki. Testy pilnują różnic, które wchodzą
+   ustawieniem: brak notatki, własny napis i sufit, zamknięty czat. Klawisz N
+   należy w sprawach do ekranu („niczyje”), więc edytor nie ma prawa go zjeść. */
+describe("sprawa odpowiada edytorem skrzynki", () => {
+  it("pusty edytor to jeden rząd bez notatki, z martwym „Wyślij odpowiedź”", () => {
+    render(<Edytor {...props()} />);
+    expect(screen.getByRole("button", { name: "Wyślij odpowiedź" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Notatka/ })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Działania odpowiedzi" })).toBeNull();
+    expect(screen.getByLabelText("Odpowiedź w sprawie")).toHaveAttribute("placeholder",
+      expect.stringMatching(/^Odpowiedz w sprawie…/));
+  });
+
+  it("N z tła strony zostaje dla ekranu — edytor go nie przechwytuje", async () => {
+    /* Nasłuch ekranu dopięty PO edytorze, więc widzi, co edytor zrobił. */
+    render(<Edytor {...props()} />);
+    const ekran = vi.fn((e: KeyboardEvent) => e.defaultPrevented);
+    window.addEventListener("keydown", ekran);
+    await userEvent.keyboard("n");
+    window.removeEventListener("keydown", ekran);
+    expect(ekran).toHaveReturnedWith(false);
+    expect(screen.queryByLabelText(/Notatka wewnętrzna/)).toBeNull();
+  });
+
+  it("zamknięty czat: Ctrl+Enter z tła nie wysyła szkicu, który przeżył w sesji", async () => {
+    const onWyslij = vi.fn();
+    render(<Edytor {...props({ tresc: "Szkic sprzed zamknięcia", czatAktywny: false, onWyslij })} />);
+    /* Za zwłoką po otwarciu sprawy, żeby milczenie nie wynikało z niej. */
+    const zegar = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 5000);
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    zegar.mockRestore();
+    expect(onWyslij).not.toHaveBeenCalled();
+  });
+
+  it("Enter z tła strony stawia kursor w polu odpowiedzi", async () => {
+    render(<Edytor {...props({ tresc: "Dzień dobry" })} />);
+    await userEvent.keyboard("{Enter}");
+    expect(document.activeElement).toBe(screen.getByLabelText("Odpowiedź w sprawie"));
+  });
+
+  it("bez „Zapisz szkic” i „Wyślij i zakończ” nie ma strzałki z pustą listą", () => {
+    render(<Edytor {...props({ tresc: "Dobrze" })} />);
+    expect(screen.queryByRole("button", { name: "Inne sposoby wysłania" })).toBeNull();
+  });
+
+  it("w trakcie wysyłki spinacz i usuwanie pliku stoją", () => {
+    /* Serwer bierze pliki na początku wysyłki i czyści listę po niej. Plik
+       dodany w tym oknie wgrałby się do Allegro i zniknął bez słowa. */
+    render(<Edytor {...props({ tresc: "Dobrze", wysyla: true,
+      zalaczniki: [{ id: 4, allegroId: "att-1", nazwa: "nowy-noz.jpg",
+        typ: "image/jpeg", rozmiar: 2048, dodal: "Ala" }],
+      onDodajZalacznik: vi.fn(), onUsunZalacznik: vi.fn() })} />);
+    expect(screen.getByRole("button", { name: "Dołącz plik" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Zdejmij nowy-noz.jpg" })).toBeDisabled();
+  });
+
+  it("Ctrl+Enter z fokusem na przycisku obok (werdykt) nie wysyła odpowiedzi", async () => {
+    const onWyslij = vi.fn();
+    render(<><button type="button">Wyślij werdykt</button>
+      <Edytor {...props({ tresc: "Szkic odpowiedzi", onWyslij })} /></>);
+    const zegar = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 5000);
+    screen.getByRole("button", { name: "Wyślij werdykt" }).focus();
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    expect(onWyslij).not.toHaveBeenCalled();
+    /* Z tła strony skrót dalej wysyła — to jego cel. */
+    (document.activeElement as HTMLElement).blur();
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    zegar.mockRestore();
+    expect(onWyslij).toHaveBeenCalledTimes(1);
+  });
+
+  it("podpowiedź nie mówi o współdzieleniu — szkic sprawy żyje w tej przeglądarce", () => {
+    render(<Edytor {...props({ tresc: "x" })} />);
+    expect(screen.getByLabelText("Odpowiedź w sprawie").getAttribute("placeholder"))
+      .not.toMatch(/współdzielony/);
   });
 });

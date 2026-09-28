@@ -91,6 +91,30 @@ describe("pusty edytor to jedna linijka", () => {
     expect(screen.queryByLabelText(/Notatka wewnętrzna — zobaczy/)).toBeNull();
   });
 
+  it("za sufitem 2000 znaków wysyłka jest martwa, a licznik mówi, ile skrócić", () => {
+    /* Sufit Centrum Wiadomości pilnował sam serwer, więc agent dowiadywał się
+       o nim po kliknięciu. Wspólny edytor zna sufit i blokuje przed wysyłką. */
+    render(<Edytor {...props} szkic={"x".repeat(2003)} onZmiana={() => {}} />);
+    expect(screen.getByRole("button", { name: /Wyślij do klienta/ })).toBeDisabled();
+    expect(screen.getByText(/o 3 za dużo/)).toBeInTheDocument();
+  });
+
+  it("Enter z wybranego wiersza kolejki idzie do pola, z innego otwiera ten wiersz", async () => {
+    const otworz = vi.fn();
+    render(<>
+      <button type="button" data-wiersz-kolejki="" aria-current="true">wybrana</button>
+      <button type="button" data-wiersz-kolejki="" aria-current="false" onClick={otworz}>inna</button>
+      <Sterowany />
+    </>);
+    screen.getByRole("button", { name: "inna" }).focus();
+    await userEvent.keyboard("{Enter}");
+    expect(otworz).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(screen.getByRole("button", { name: "inna" }));
+    screen.getByRole("button", { name: "wybrana" }).focus();
+    await userEvent.keyboard("{Enter}");
+    expect(document.activeElement).toBe(screen.getByLabelText("Szkic odpowiedzi"));
+  });
+
   it("N w polu odpowiedzi pisze literę, nie przełącza trybu", async () => {
     render(<Sterowany />);
     await userEvent.click(screen.getByLabelText("Szkic odpowiedzi"));

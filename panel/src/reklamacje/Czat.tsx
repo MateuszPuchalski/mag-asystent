@@ -196,7 +196,9 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
      zmianie wyrywałoby agentowi miejsce czytania spod oka. Znacznik pamięta,
      którą sprawę już zakotwiczyliśmy; rozmowa dociąga się asynchronicznie,
      więc czekamy z tym na pierwszą wiadomość. */
-  const koniec = useRef<HTMLLIElement | null>(null);
+  /* Kotwica stoi ZA edytorem, nie na ostatniej wiadomości: zwinięty edytor
+     przykleja się do dolnej krawędzi i zakryłby jej ostatnie linie. */
+  const koniec = useRef<HTMLDivElement | null>(null);
   const zakotwiczona = useRef<number | null>(null);
   useEffect(() => {
     if (czat.length === 0 || zakotwiczona.current === sprawa.id) return;
@@ -228,16 +230,16 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
     && zawieraOpis(pierwszaKlienta, sprawa.opisZgloszenia);
   const opisWart = !dubel;
 
-  /* ── ROZMOWA PRZEWIJA SIĘ, CZYNNOŚCI STOJĄ (0.418.0) ─────────────────────
+  /* ── ROZMOWA PRZEWIJA SIĘ, WERDYKT STOI (0.418.0) ────────────────────────
      Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony". Na
      zrzucie pasek werdyktu leżał w połowie wątku, między tekstem wiadomości
      a jej zdjęciem — bo cała kolumna była JEDNYM obszarem przewijania,
      w którym oś, pole odpowiedzi i werdykt płynęły razem.
 
-     Kolumna dzieli się teraz na trzy pasy: rozmowa przewija się w środku,
-     a pole odpowiedzi i pasek werdyktu zostają na dole i nie uciekają.
-     Werdykt dalej stoi POD rozmową (0.412.0) — zmienia się to, że nie trzeba
-     do niego przewijać jedenastu wiadomości. */
+     Rozmowa z odpowiedzią przewija się w środku, a pasek werdyktu zostaje na
+     dole i nie ucieka. Werdykt stoi POD rozmową (0.412.0), więc nie trzeba do
+     niego przewijać jedenastu wiadomości. Pole odpowiedzi nie potrzebuje
+     osobnego pasa: przykleja się do krawędzi samo (niżej). */
   return <div className="flex min-h-0 flex-1 flex-col gap-3">
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
     {(opisWart || zalaczniki.length > 0) &&
@@ -268,7 +270,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
       ? <Pusto waga="lista">
           Rozmowy jeszcze nie pobrano.</Pusto>
       : <ol className="flex flex-col gap-2">
-          {czat.map((w, i) => {
+          {czat.map((w) => {
             /* Rola spoza zbioru dostaje kształt NIEZNANEGO, a nie kształt
                klienta: schemat Allegro może dołożyć wartość, a wtedy ekran ma
                powiedzieć „nie wiem, kto to", zamiast zgadywać stronę. */
@@ -277,7 +279,6 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
               klasa: "bg-white border-slate-200", listwa: "border-l-4 border-dotted border-l-slate-400",
             };
             return <li key={w.id}
-              ref={i === czat.length - 1 ? koniec : undefined}
               className={`rounded-lg border p-3 ${rola.klasa} ${rola.listwa} ${
                 rola.nasza ? "ml-8" : "mr-8"}`}>
               <div className="flex items-center gap-2 text-xs">
@@ -297,16 +298,15 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
           })}
         </ol>}
 
+    {/* ── ODPOWIEDŹ JEST OSTATNIĄ WYPOWIEDZIĄ WĄTKU (@wydanie) ──────────────
+        Decyzja właściciela z 28 września, ten sam układ co w skrzynce. Pole
+        stoi w pasie przewijania, bo pod ręką trzyma je sam edytor: pusty jest
+        jednym rzędem przyklejonym do dolnej krawędzi, a pasek wysyłki pływa.
+        Osobny pas pod rozmową zabierałby jej stałą wysokość przy każdej
+        sprawie. Werdykt zostaje poza przewijaniem (`Werdykt.tsx`), bo
+        nieodwracalne ma stać w jednym miejscu. */}
+    {edytor}
+    <div ref={koniec} aria-hidden="true" />
     </div>
-
-    {/* Od 0.224.0 pod rozmową stoi EDYTOR, a nie zdanie o tym, że odpowiedź
-        wysyła się gdzie indziej. Zdanie było prawdziwe przez dwa wydania
-        i przestało być — komentarz, który skłamał, jest gorszy od jego braku.
-        Werdykt od 0.412.0 stoi POD rozmową (`Werdykt.tsx`) — nieodwracalne
-        pyta dopiero po dowodach, a nie przed nimi.
-
-        POZA PASEM PRZEWIJANIA od 0.418.0: pole, w które się pisze, ma być pod
-        ręką niezależnie od tego, jak długa jest rozmowa. */}
-    <div className="shrink-0">{edytor}</div>
   </div>;
 }

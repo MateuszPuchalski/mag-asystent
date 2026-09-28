@@ -139,6 +139,7 @@ vi.mock("../api/reklamacje", async () => {
 });
 
 const { Reklamacje } = await import("./Reklamacje");
+const { zapamietajSzkic } = await import("../sprawy/useSzkicSprawy");
 
 const wiad = (n: Partial<WiadomoscReklamacji> = {}): WiadomoscReklamacji => ({
   id: 1, externalId: "w-1", autorLogin: "klient1", autorRola: "BUYER",
@@ -366,6 +367,20 @@ describe("Ekran reklamacji", () => {
     expect(screen.getByText(/doradca Allegro dopisał wiadomość/)).toBeInTheDocument();
     /* Szkic zostaje NIETKNIĘTY: serwer odrzucił wysyłkę przed strzałem. */
     expect(screen.getByLabelText("Odpowiedź w sprawie")).toHaveValue("Wysyłam nowy nóż");
+  });
+
+  it("po j edytor nowej sprawy liczy zwłokę od nowa: szybkie Ctrl+Enter nie wysyła jej szkicu", async () => {
+    /* Ekran nie montuje się od nowa przy przejściu, więc edytor dostaje klucz
+       sprawy. Bez niego zegar zwłoki szedłby od otwarcia POPRZEDNIEJ sprawy,
+       a podwójne Ctrl+Enter wysłałoby szkic nowej bez jednego spojrzenia. */
+    for (const r of REKLAMACJE) zapamietajSzkic("reklamacja", r.id, `Szkic sprawy ${r.id}`);
+    pokaz("/obsluga/reklamacje/1");
+    const zegar = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 5000);
+    await userEvent.keyboard("j");
+    expect(screen.getByLabelText("Odpowiedź w sprawie")).not.toHaveValue("Szkic sprawy 1");
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    zegar.mockRestore();
+    expect(bezOdswiezenia().filter((m) => m.startsWith("odpowiedz:"))).toEqual([]);
   });
 
   it("okno konfliktu bierze fokus: pisanie nie idzie w szkic pod nakładką (0.546.0)", async () => {
