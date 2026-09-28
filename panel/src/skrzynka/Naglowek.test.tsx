@@ -2,6 +2,7 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Rozmowa as EkranRozmowy } from "./Rozmowa";
 import type { OsRozmowy, Rozmowa } from "../api/typy";
 
@@ -84,5 +85,49 @@ describe("Nagłówek rozmowy", () => {
     render(<EkranRozmowy {...props({ wlascicielId: 7, wlasciciel: "Ja Sam" })} />);
     await userEvent.click(screen.getByRole("button", { name: "Więcej czynności rozmowy" }));
     expect(screen.getByText("Ty")).toBeInTheDocument();
+  });
+});
+
+/* ── Brakujący zakup nad polem odpowiedzi — wpięcie w ekran (@wydanie) ──────
+   Komponent ma własne testy. Te pilnują wpięcia: pasek stoi w ekranie rozmowy
+   bez zamówienia, dopisuje pytanie do szkicu, a błąd wiązania nie przechodzi
+   do następnej rozmowy. */
+describe("Brakujący zakup w ekranie rozmowy", () => {
+  const kandydat = { externalId: "4e3b1f20-zakup", link: null, status: null,
+    kupionoAt: "2026-09-21T08:00:00.000Z", sumaGrosze: 12900, waluta: "PLN",
+    pozycje: "Nóż do kosiarki NAC LS 46", maTeOferte: false };
+  const zPaskiem = (id: number, szkic = "") => {
+    const p = props({ id });
+    return { ...p, szkic, dane: { ...p.dane, zamowienie: null, kandydaciZamowien: [kandydat] } as OsRozmowy };
+  };
+  const qc = () => new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+
+  it("stoi nad polem i dopisuje pytanie o numer do istniejącego szkicu", async () => {
+    const p = zPaskiem(4821, "Dzień dobry.");
+    render(<QueryClientProvider client={qc()}><EkranRozmowy {...p} /></QueryClientProvider>);
+    expect(screen.getByRole("region", { name: "Rozmowa bez zamówienia" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Wstaw pytanie o numer zamówienia" }));
+    expect(p.onSzkic).toHaveBeenCalledWith("Dzień dobry.\nProszę podać numer zamówienia, którego dotyczy wiadomość.");
+  });
+
+  it("nie stoi przy rozmowie z zamówieniem", () => {
+    const p = zPaskiem(4821);
+    render(<QueryClientProvider client={qc()}><EkranRozmowy {...p}
+      dane={{ ...p.dane, zamowienie: { externalId: "z" } } as unknown as OsRozmowy} /></QueryClientProvider>);
+    expect(screen.queryByRole("region", { name: "Rozmowa bez zamówienia" })).toBeNull();
+  });
+
+  it("błąd wiązania z jednej rozmowy nie stoi w pasku następnej", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ error: "Zakup należy do innego loginu" }),
+      { status: 400, headers: { "content-type": "application/json" } })));
+    try {
+      const klient = qc();
+      const { rerender } = render(<QueryClientProvider client={klient}><EkranRozmowy {...zPaskiem(4821)} /></QueryClientProvider>);
+      await userEvent.click(screen.getByRole("button", { name: /Powiąż ten zakup/ }));
+      expect(await screen.findByRole("alert")).toHaveTextContent("Zakup należy do innego loginu");
+      rerender(<QueryClientProvider client={klient}><EkranRozmowy {...zPaskiem(4822)} /></QueryClientProvider>);
+      expect(screen.getByRole("region", { name: "Rozmowa bez zamówienia" })).toBeInTheDocument();
+      expect(screen.queryByText("Zakup należy do innego loginu")).toBeNull();
+    } finally { vi.unstubAllGlobals(); }
   });
 });

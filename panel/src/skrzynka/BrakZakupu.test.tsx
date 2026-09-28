@@ -70,7 +70,7 @@ describe("brakujący zakup nad polem odpowiedzi", () => {
     expect(screen.getByRole("alert")).toHaveTextContent("Zamówienie należy do innego loginu");
   });
 
-  it("„Wstaw pytanie” dopisuje zdanie o numer, a gdy już stoi w odpowiedzi — znika", async () => {
+  it("„Wstaw pytanie” dopisuje zdanie o numer do odpowiedzi", async () => {
     const wstaw = pokaz();
     await userEvent.click(screen.getByRole("button", { name: /Wstaw pytanie o numer zamówienia/ }));
     expect(wstaw).toHaveBeenCalledWith(PYTANIE_O_ZAMOWIENIE);

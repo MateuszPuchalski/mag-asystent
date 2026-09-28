@@ -26,17 +26,26 @@ export const PYTANIE_O_ZAMOWIENIE = "Proszę podać numer zamówienia, którego 
  * Drugie wyjście to pytanie o numer. Bez niego agent, który nie rozpozna
  * paczki, zostaje z paskiem, którego nie ma jak zamknąć.
  */
-export function BrakZakupu({ kandydaci, rozmowaId, maZamowienie, szkic, onWstawDoSzkicu }: {
+type Wlasciwosci = {
   kandydaci: KandydatZamowienia[];
   rozmowaId: number;
   maZamowienie: boolean;
   szkic: string;
   onWstawDoSzkicu: (tresc: string) => void;
-}) {
+};
+
+export function BrakZakupu(p: Wlasciwosci) {
+  /* Warunek PRZED hakiem mutacji, w osobnym komponencie. Rozmowa związana
+     albo bez kandydata nie potrzebuje klienta zapytań. Testy nagłówka
+     rozmowy rysują ją bez niego i tak ma zostać. */
+  if (p.maZamowienie || p.kandydaci.length === 0) return null;
+  return <Pasek {...p} />;
+}
+
+function Pasek({ kandydaci, rozmowaId, szkic, onWstawDoSzkicu }: Wlasciwosci) {
   const wskaz = useWskazZamowienie();
   const [blad, setBlad] = useState("");
   const k = kandydaci[0];
-  if (maZamowienie || !k) return null;
   const reszta = kandydaci.length - 1;
   /* Pytanie już w odpowiedzi: drugi klik dopisałby je drugi raz. */
   const pytanieJest = szkic.includes(PYTANIE_O_ZAMOWIENIE);
