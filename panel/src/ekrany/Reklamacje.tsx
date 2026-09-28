@@ -621,7 +621,9 @@ export function Reklamacje() {
               }}
               czat={szczegol.data.czat}
               zalaczniki={szczegol.data.zalaczniki}
-              edytor={<Edytor tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
+              /* Klucz sprawy: edytor trzyma własny stan (cofnięcie wyczyszczenia,
+                 zwłokę Ctrl+Enter), a ekran nie montuje go od nowa przy przejściu. */
+              edytor={<Edytor key={szczegol.data.reklamacja.id} tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
                 zalaczniki={zalacznikiWysylki.data?.zalaczniki ?? []}
                 dodajeZalacznik={dodajZalacznik.isPending}
                 bladZalacznika={bladZalacznika}

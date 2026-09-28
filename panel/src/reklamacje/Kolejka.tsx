@@ -149,6 +149,8 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
       const aktywna = r.id === wybrana;
       return <li key={r.id}>
         <button
+          /* Enter na wierszu prowadzi do pola odpowiedzi, jak w skrzynce. */
+          data-wiersz-kolejki=""
           aria-current={aktywna ? "true" : undefined}
           ref={aktywna ? aktywnyWiersz : null}
           onClick={() => onWybierz(r.id)}

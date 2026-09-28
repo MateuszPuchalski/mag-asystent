@@ -61,46 +61,90 @@ export const ZWLOKA_KLAWISZA_MS = 1000;
  * notatka, załącznik, cofnięcie wyczyszczenia. Pole jest przez cały czas TYM
  * SAMYM elementem w tym samym rodzicu, więc przy rozwinięciu nie traci
  * fokusu w pół słowa. Notatkę otwiera N z tła strony albo przycisk w rzędzie.
+ *
+ * ── JEDEN EDYTOR TRZECH KOLEJEK (@wydanie) ─────────────────────────────────
+ * Decyzja właściciela z 28 września: reklamacje i dyskusje odpowiadają tym
+ * samym edytorem, w tym samym miejscu wątku. Osobny edytor sprawy rozjeżdżał
+ * się z tym przy każdym wydaniu: nie miał zwiniętego rzędu, czyszczenia
+ * z cofnięciem, Entera z tła ani Ctrl+Enter spoza pola. To, co w sprawie
+ * Allegro jest naprawdę inne, wchodzi ustawieniem, nie kopią:
+ * - notatka z wzmiankami istnieje tylko w skrzynce, więc zakładki, przycisk
+ *   „Notatka” i klawisz N żyją tylko przy `onDodajKomentarz`. W sprawach
+ *   N znaczy „niczyje” i ten edytor nie ma prawa go przechwycić;
+ * - etykieta wysyłki, bo w sprawie odbiorcą bywa doradca Allegro;
+ * - sufit znaków (2000 w Centrum Wiadomości, 20 000 w sprawie);
+ * - zamknięty czat, przy którym pola nie ma wcale.
+ * Ustawienia sprawy trzyma adapter `reklamacje/Edytor.tsx`.
  */
 export function Edytor({
-  szkic, cudza, wlasciciel, zapisuje, wysyla, onZmiana, onZapisz, onWyslij, onWyslijIZakoncz,
-  komentarz, onKomentarz, onDodajKomentarz, komentuje, agenci, wzmianki, onWzmianki, doNotatki,
-  zalaczniki, dodajeZalacznik, bladZalacznika, onDodajZalacznik, onUsunZalacznik, copilot,
+  szkic, cudza = false, wlasciciel = null, zapisuje = false, wysyla, onZmiana, onZapisz, onWyslij,
+  onWyslijIZakoncz,
+  komentarz = "", onKomentarz, onDodajKomentarz, komentuje = false, agenci = [], wzmianki = [], onWzmianki,
+  doNotatki, zalaczniki, dodajeZalacznik, bladZalacznika, onDodajZalacznik, onUsunZalacznik, copilot,
+  etykietaWyslij = "Wyślij do klienta", limitZnakow = LIMIT_ALLEGRO, etykietaPola = "Szkic odpowiedzi",
+  podpowiedz = "Szkic odpowiedzi — współdzielony z zespołem",
+  podpowiedzZwinieta = "Odpowiedz klientowi…", blad = "", zamkniete = null,
 }: {
   szkic: string;
-  cudza: boolean;
-  wlasciciel: string | null;
-  zapisuje: boolean;
+  /** Rozmowę prowadzi ktoś inny — szkic zapisze tylko on. Tylko skrzynka. */
+  cudza?: boolean;
+  wlasciciel?: string | null;
+  zapisuje?: boolean;
   wysyla: boolean;
   onZmiana: (v: string) => void;
-  onZapisz: () => void;
+  /** „Zapisz szkic” — tylko tam, gdzie szkic stoi na serwerze (skrzynka). */
+  onZapisz?: () => void;
   onWyslij: () => void;
   /** „Wyślij i zakończ" (23 września 2026) — większość spraw kończy się ostatnią odpowiedzią. */
   onWyslijIZakoncz?: () => void;
-  komentarz: string;
-  onKomentarz: (v: string) => void;
+  /* Notatka zespołu — cała grupa albo nic. Bez `onDodajKomentarz` nie ma
+     zakładek: przełącznik z jedną pozycją niczego nie wybiera. */
+  komentarz?: string;
+  onKomentarz?: (v: string) => void;
   /** Licznik zmian z ekranu: każda przełącza tryb na notatkę (prośba o przekazanie). */
   doNotatki?: number;
-  onDodajKomentarz: () => void;
-  komentuje: boolean;
-  agenci: Array<{ userId: number; name: string }>;
-  wzmianki: number[];
-  onWzmianki: (v: number[]) => void;
+  onDodajKomentarz?: () => void;
+  komentuje?: boolean;
+  agenci?: Array<{ userId: number; name: string }>;
+  wzmianki?: number[];
+  onWzmianki?: (v: number[]) => void;
   /* Załączniki (0.195.0) — TYLKO w trybie odpowiedzi. Komentarz wewnętrzny
      nigdzie nie wychodzi, więc dołączanie do niego pliku nie miałoby dokąd
-     pójść, a przycisk obok notatki sugerowałby, że ma. */
+     pójść, a przycisk obok notatki sugerowałby, że ma. Bez obsługi pliku
+     spinacza nie ma: czego nie da się zrobić, tego nie ma na ekranie. */
   zalaczniki: ZalacznikSzkicu[];
   dodajeZalacznik: boolean;
   bladZalacznika: string;
-  onDodajZalacznik: (plik: File) => void;
-  onUsunZalacznik: (id: number) => void;
+  onDodajZalacznik?: (plik: File) => void;
+  onUsunZalacznik?: (id: number) => void;
   /* Szkic z Copilota (0.231.0) — TYLKO w trybie odpowiedzi: propozycja jest
-     dla klienta, a w komentarzu nie ma czego układać. Opcjonalny, bo edytor
-     reklamacji i testy komentarza nie mają Copilota wcale. */
+     dla klienta, a w komentarzu nie ma czego układać. Opcjonalny, bo sprawy
+     Allegro i testy komentarza nie mają Copilota wcale. */
   copilot?: PropsSzkicuCopilota;
+  /** Napis wysyłki. W sprawie „Wyślij odpowiedź”, bo odbiorcą bywa doradca Allegro. */
+  etykietaWyslij?: string;
+  /** Sufit treści u odbiorcy; powyżej wysyłka jest martwa, także z klawiatury. */
+  limitZnakow?: number;
+  /** Nazwa pola dla czytnika ekranu. */
+  etykietaPola?: string;
+  /** Podpowiedź w pustym rozwiniętym polu; dopisek o Enterze edytor dokleja sam. */
+  podpowiedz?: string;
+  /** Podpowiedź w zwiniętym rzędzie — krótka, bo dzieli rząd z przyciskami. */
+  podpowiedzZwinieta?: string;
+  /** Zdanie o nieudanej wysyłce, pod polem. */
+  blad?: string;
+  /** Zdanie, gdy odbiorca nie przyjmie już wiadomości. Pola wtedy nie ma. */
+  zamkniete?: string | null;
 }) {
   const [tryb, setTryb] = useState<"odpowiedz" | "komentarz">("odpowiedz");
-  const wKomentarzu = tryb === "komentarz";
+  const zNotatka = onDodajKomentarz !== undefined;
+  const wKomentarzu = zNotatka && tryb === "komentarz";
+  /* Ten sam warunek dla przycisku i obu skrótów: pusta treść, sufit znaków,
+     cudza rozmowa, trwająca wysyłka i zamknięty czat blokują każdą drogę tak
+     samo. Zamknięty czat liczy się osobno, bo szkic sprawy przeżywa w sesji
+     przeglądarki, a Ctrl+Enter z tła strony nie patrzy, czy pole istnieje. */
+  const zaDlugo = szkic.length > limitZnakow;
+  const mozeWyslac = !zamkniete && !cudza && !wysyla && !zaDlugo && szkic.trim() !== "";
   /* Prośba o przekazanie pisze do notatki (0.533.0) — edytor ma wtedy
      stać na notatce, żeby agent widział, gdzie leży tekst. Porównanie
      z wartością z montowania, bo ekran montuje edytor od nowa przy każdej
@@ -135,9 +179,9 @@ export function Edytor({
   klawisz.current = (e: KeyboardEvent) => {
     /* N — NOTATKA (0.548.0). Pusty edytor chowa przełącznik zakładek, więc
        notatka potrzebuje drogi z klawiatury. N nie jest zajęte w skrzynce.
-       W reklamacjach i dyskusjach znaczy „niczyje”, a nie koliduje, bo te
-       ekrany montują własny edytor i ten nasłuch tam nie żyje. */
-    if ((e.key === "n" || e.key === "N") && !wKomentarzu && !e.ctrlKey && !e.metaKey && !e.altKey
+       W reklamacjach i dyskusjach znaczy „niczyje”, a tam notatki w edytorze
+       nie ma, więc warunek `zNotatka` oddaje klawisz ekranowi. */
+    if ((e.key === "n" || e.key === "N") && zNotatka && !wKomentarzu && !e.ctrlKey && !e.metaKey && !e.altKey
       && !e.isComposing && !klawiszZajety(e.target)) {
       e.preventDefault();
       setTryb("komentarz");
@@ -148,14 +192,17 @@ export function Edytor({
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
       if (Date.now() - zamontowany.current < ZWLOKA_KLAWISZA_MS) return;
-      if (!cudza && !wysyla && szkic.trim()) {
+      if (mozeWyslac) {
         if (e.shiftKey && onWyslijIZakoncz) onWyslijIZakoncz(); else onWyslij();
       }
       return;
     }
     if (e.shiftKey || cudza) return;
     const cel = e.target as HTMLElement | null;
-    if (cel && cel !== document.body && !cel.closest("[data-wiersz-kolejki]")) return;
+    /* Tylko z WYBRANEGO wiersza: na innym wierszu, do którego agent doszedł
+       Tabem, Enter ma go otworzyć, a nie pisać w sprawie, która już stoi. */
+    const wiersz = cel?.closest("[data-wiersz-kolejki]");
+    if (cel && cel !== document.body && wiersz?.getAttribute("aria-current") !== "true") return;
     e.preventDefault();
     const el = pole.current;
     if (!el) return;
@@ -210,15 +257,24 @@ export function Edytor({
      samym warunkiem, którym `KartaSzkicu` decyduje, czy się rysuje. */
   const kartaSzkicu = Boolean(copilot?.szkic && (copilot.szkic.ocena === null
     || (wPolu && copilot.szkic.ocena !== "odrzucony")));
-  /* Wgrywany plik i błąd załącznika też rozwijają: jedyne miejsce, które je
-     mówi (`ZalacznikiWysylki`), stoi w rozwiniętym dymku. Zwinięty rząd
+  /* Wgrywany plik, błąd załącznika i błąd wysyłki też rozwijają: jedyne
+     miejsce, które je mówi, stoi w rozwiniętym dymku. Zwinięty rząd
      zostawiał po odmowie serwera ciszę. */
   const zwiniety = !wKomentarzu && szkic === "" && !cudza && zalaczniki.length === 0
-    && !dodajeZalacznik && !bladZalacznika
+    && !dodajeZalacznik && !bladZalacznika && !blad
     && wyczyszczone === null && !kartaSzkicu && niesprawdzone.length === 0;
 
-  const przelacz = (id: number) => onWzmianki(
+  const przelacz = (id: number) => onWzmianki?.(
     wzmianki.includes(id) ? wzmianki.filter((x) => x !== id) : [...wzmianki, id]);
+
+  /* ZAMKNIĘTEJ ROZMOWY NIE DA SIĘ NAPISAĆ, więc edytora NIE MA — nie jest
+     wyłączony, tylko go nie ma w drzewie. Pole, w które wolno pisać, a którego
+     nie da się wysłać, jest obietnicą bez pokrycia. Warunek stoi po hakach,
+     bo te muszą biec przy każdym rysowaniu. */
+  if (zamkniete) {
+    return <p className="ml-auto w-full max-w-[75ch] rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600">
+      {zamkniete}</p>;
+  }
 
   /* SIATKI 60vh JUŻ NIE MA (0.495.0). Stała od 0.232.1, bo edytor był
      `shrink-0` pod osią i rozepchnięty zjadał rozmowę. Na końcu osi nie ma
@@ -249,7 +305,10 @@ export function Edytor({
         `slate-100` dawało 4.34:1, na bursztynowej około 4.3:1, przy progu
         4.5:1 — zmierzone axe w Chromium przy otwartej rozmowie. */}
     {!zwiniety && <div className="mb-2.5 flex items-center gap-2">
-      <div className={`flex gap-0.5 rounded-lg p-0.5 ${wKomentarzu ? "bg-amber-100" : "bg-slate-100"}`}>
+      {/* Bez notatki zakładek nie ma, a jest nazwa tego, co się pisze —
+          w tym samym miejscu, żeby oko szukało jej tam, gdzie w skrzynce. */}
+      {!zNotatka && <span className="text-xs font-semibold text-slate-700">Odpowiedź</span>}
+      {zNotatka && <div className={`flex gap-0.5 rounded-lg p-0.5 ${wKomentarzu ? "bg-amber-100" : "bg-slate-100"}`}>
         <button className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${!wKomentarzu
           ? "bg-white font-semibold text-slate-900 shadow-sm" : "font-medium text-slate-600"}`}
           onClick={() => setTryb("odpowiedz")}>Odpowiedź do klienta</button>
@@ -267,7 +326,7 @@ export function Edytor({
               utopiłoby trzy widoczne zmiany w diffie bez jednej widocznej. */}
           <MessageSquare size={13} />Notatka wewnętrzna
         </button>
-      </div>
+      </div>}
       {/* ── COPILOT W TYM SAMYM RZĘDZIE (0.249.0) ────────────────────────────
           Zgłoszenie właściciela: „niepotrzebnie ułóż odpowiedź i add
           attachment mają swój własny rząd". 0.247.0 próbowało już tego i
@@ -290,7 +349,7 @@ export function Edytor({
       ? <>
           <textarea ref={poleNotatki} className="field min-h-[88px] text-tresc [field-sizing:content]" value={komentarz}
             aria-label="Notatka wewnętrzna — zobaczy ją tylko zespół"
-            onChange={(e) => onKomentarz(e.target.value)}
+            onChange={(e) => onKomentarz?.(e.target.value)}
             placeholder="Notatka dla zespołu — klient tego nie zobaczy" />
           {agenci.length > 0 && <fieldset className="mt-2">
             <legend className="text-xs font-bold text-slate-600">Wzmianki</legend>
@@ -333,7 +392,7 @@ export function Edytor({
             ? "h-10 min-w-0 flex-1 resize-none overflow-hidden bg-transparent py-2 text-tresc outline-none"
             : `field min-h-[7.5rem] resize-y text-tresc [field-sizing:content] ${wPolu ? "bg-violet-50" : ""}`}
             rows={zwiniety ? 1 : undefined} value={szkic}
-            aria-label="Szkic odpowiedzi" aria-keyshortcuts="Control+Enter"
+            aria-label={etykietaPola} aria-keyshortcuts="Control+Enter"
             onChange={(e) => { if (e.target.value !== "") setWyczyszczone(null); onZmiana(e.target.value); }}
             /* CTRL+ENTER WYSYŁA (23 września 2026). Ten sam warunek co przycisk
                niżej — skrót nie ma prawa ominąć blokady cudzej rozmowy. Sam
@@ -342,7 +401,7 @@ export function Edytor({
               if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
               e.preventDefault();
               /* Ctrl+Shift+Enter — „Wyślij i zakończ" (23 września 2026). */
-              if (!cudza && !wysyla && szkic.trim()) {
+              if (mozeWyslac) {
                 if (e.shiftKey && onWyslijIZakoncz) onWyslijIZakoncz(); else onWyslij();
               }
             }}
@@ -351,33 +410,35 @@ export function Edytor({
             placeholder={zwiniety
               /* Klawisz notatki stoi na jej przycisku, nie tu: podpowiedź
                  z oboma klawiszami zawijała się i ucinała przy 1180 px. */
-              ? (skrotyDzialaja ? "Odpowiedz klientowi… (Enter)" : "Odpowiedz klientowi…")
-              : skrotyDzialaja && !cudza
-                ? "Szkic odpowiedzi — współdzielony z zespołem · Enter, żeby pisać"
-                : "Szkic odpowiedzi — współdzielony z zespołem"} />
+              ? (skrotyDzialaja ? `${podpowiedzZwinieta} (Enter)` : podpowiedzZwinieta)
+              : skrotyDzialaja && !cudza ? `${podpowiedz} · Enter, żeby pisać` : podpowiedz} />
           {zwiniety && <>
             {/* Copilot w rzędzie tylko jako czynność. Zdanie o wyłączonym
                 Copilocie zjadłoby rząd, a nic się z nim nie zrobi. */}
             {copilot?.stan?.wlaczony && <PrzyciskSzkicu p={copilot} />}
-            <button type="button" onClick={() => { setTryb("komentarz"); setFokusNotatki(true); }}
+            {zNotatka && <button type="button" onClick={() => { setTryb("komentarz"); setFokusNotatki(true); }}
               aria-keyshortcuts="N" aria-label="Notatka wewnętrzna"
               title="Notatka wewnętrzna — zobaczy ją tylko zespół (N)"
               className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">
               <MessageSquare size={15} />Notatka
               {/* Znaczek klawisza tylko wtedy, gdy klawisz działa (0.500.0). */}
               {skrotyDzialaja && <kbd aria-hidden="true" className="rounded border border-slate-300 px-1 font-sans text-podpis text-slate-600">N</kbd>}
-            </button>
-            <PrzyciskZalacznika dodaje={dodajeZalacznik} onDodaj={onDodajZalacznik} wylaczone={cudza} />
+            </button>}
+            {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
+              onDodaj={onDodajZalacznik} wylaczone={cudza} />}
             {/* Martwa, dopóki pole jest puste — jak w pasku. Stoi, żeby było
                 widać, gdzie wysyłka będzie, zanim padnie pierwsze słowo. */}
             {/* „Wyślij”, nie „Wyślij do klienta”: rząd dzieli szerokość
                 z polem, a podpowiedź pola ma się zmieścić w jednej linii.
                 Pełna nazwa zostaje dla czytnika i zawiera widoczne słowo. */}
-            <Przycisk wariant="glowny" disabled aria-label="Wyślij do klienta" className="shrink-0 whitespace-nowrap">
+            <Przycisk wariant="glowny" disabled aria-label={etykietaWyslij} className="shrink-0 whitespace-nowrap">
               <Send size={16} />Wyślij</Przycisk>
           </>}
           </div>
           {!zwiniety && <>
+          {/* Błąd wysyłki PRZY POLU, nie w rogu ekranu: tu agent patrzy,
+              gdy wysyłka nie wyszła, i tu poprawia treść. */}
+          {blad && <p role="alert" className="mt-2 text-xs text-red-700">{blad}</p>}
           {uwagiPoPrzyjeciu.length > 0 && <div className="mt-2"><UwagiSzkicu uwagi={uwagiPoPrzyjeciu} /></div>}
           {/* Po „Wyczyść wszystko" karta stoi zwinięta: pusty znaczy pusty,
               a szkic wraca jednym kliknięciem „Wstaw do odpowiedzi". */}
@@ -385,8 +446,8 @@ export function Edytor({
           {/* Lista dołożonych plików stoi POD treścią (0.247.0): należy do
               komponowanej wiadomości, nie do przycisków. Sam spinacz jedzie
               w pasku działań — nie zasługuje na własny rząd. */}
-          <ZalacznikiWysylki lista={zalaczniki} blad={bladZalacznika}
-            onUsun={onUsunZalacznik} wylaczone={cudza} />
+          {onUsunZalacznik && <ZalacznikiWysylki lista={zalaczniki} blad={bladZalacznika}
+            onUsun={onUsunZalacznik} wylaczone={cudza} />}
           {niesprawdzone.length > 0 && <section aria-label="Do sprawdzenia przed wysłaniem"
             className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
             <b>Szkic bez zmian — te twierdzenia nie pochodzą z naszej bazy:</b>
@@ -428,7 +489,7 @@ export function Edytor({
               wczoraj" bez przejmowania sprawy. */}
           <Przycisk wariant="glowny" disabled={komentuje || !komentarz.trim()}
             title="Widoczna tylko dla zespołu — klient jej nie zobaczy"
-            onClick={onDodajKomentarz} className="px-5 py-2.5 text-tresc shadow-sm">
+            onClick={() => onDodajKomentarz?.()} className="px-5 py-2.5 text-tresc shadow-sm">
             <MessageSquare size={17} />{komentuje ? "Zapisuję…" : "Dodaj notatkę"}
           </Przycisk>
         </>
@@ -436,11 +497,14 @@ export function Edytor({
           {/* LICZNIK TYLKO PRZY LIMICIE (0.506.0). „0 znaków" stało przy każdej
               odpowiedzi, a liczy się wyłącznie blisko progu Allegro — tam, gdzie
               zmienia decyzję. Wtedy staje, a za progiem czerwienieje. */}
-          {szkic.length >= LIMIT_ALLEGRO - 400 && <span className={`whitespace-nowrap text-podpis font-semibold ${
-            szkic.length > LIMIT_ALLEGRO ? "text-ranga-zle" : "text-ranga-uwaga"}`}>
-            {szkic.length} / {LIMIT_ALLEGRO}</span>}
-          <PrzyciskZalacznika dodaje={dodajeZalacznik}
-            onDodaj={onDodajZalacznik} wylaczone={cudza} />
+          {/* Próg rośnie z sufitem, ale nie dalej niż 500 znaków przed nim:
+              przy 20 000 dwadzieścia procent to cała odpowiedź. Za sufitem
+              licznik mówi, ile skrócić, bo wysyłka jest wtedy martwa. */}
+          {szkic.length >= limitZnakow - Math.min(500, limitZnakow / 5) && <span className={`whitespace-nowrap text-podpis font-semibold tabular-nums ${
+            zaDlugo ? "text-ranga-zle" : "text-ranga-uwaga"}`}>
+            {szkic.length} / {limitZnakow}{zaDlugo ? ` — o ${szkic.length - limitZnakow} za dużo` : ""}</span>}
+          {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
+            onDodaj={onDodajZalacznik} wylaczone={cudza} />}
           {/* ── JEDNO DZIAŁANIE MA BYĆ NAJGŁOŚNIEJSZE (0.247.0) ───────────────
               Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na
               zewnątrz, i idzie WYŁĄCZNIE na kliknięcie człowieka — innej drogi
@@ -448,9 +512,9 @@ export function Edytor({
               padding i cień; zapis szkicu schodzi do zwykłego tekstu.
               Od 0.495.0 stoi NA PRAWYM KOŃCU paska, pod kciukiem myszy
               przesuwanej od dymka — tam, gdzie kończy się czytanie odpowiedzi. */}
-          <Przycisk wariant="glowny" onClick={onWyslij} disabled={cudza || wysyla || !szkic.trim()}
+          <Przycisk wariant="glowny" onClick={onWyslij} disabled={!mozeWyslac}
             className="whitespace-nowrap px-5 py-2.5 text-tresc shadow-sm">
-            <Send size={17} />{wysyla ? "Wysyłam…" : niesprawdzone.length ? "Wyślij bez zmian" : "Wyślij do klienta"}
+            <Send size={17} />{wysyla ? "Wysyłam…" : niesprawdzone.length ? "Wyślij bez zmian" : etykietaWyslij}
             {/* Skrót NA PRZYCISKU (dekalog, punkt 2): o skrócie, o którym nikt
                 nie wie, nikt nie skorzysta. Poza nazwą dostępną przycisku. */}
             {/* Przy tarciu w miejscu podpisu skrótu staje liczba twierdzeń:
@@ -461,8 +525,10 @@ export function Edytor({
                   {niesprawdzone.length} do sprawdzenia</span>
               : <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans text-podpis">Ctrl+Enter</kbd>}
           </Przycisk>
-          <InneWysylki onZapisz={onZapisz} zapisuje={zapisuje} cudza={cudza}
-            onWyslijIZakoncz={onWyslijIZakoncz} mozeWyslac={!cudza && !wysyla && !!szkic.trim()} />
+          {/* Strzałka tylko wtedy, gdy ma co pokazać: pusta lista pod
+              przyciskiem to obietnica bez pokrycia. */}
+          {(onZapisz || onWyslijIZakoncz) && <InneWysylki onZapisz={onZapisz} zapisuje={zapisuje}
+            cudza={cudza} onWyslijIZakoncz={onWyslijIZakoncz} mozeWyslac={mozeWyslac} />}
         </>}
   </div>}
   </>;
@@ -478,7 +544,7 @@ const LIMIT_ALLEGRO = 2000;
    strzałką, a „Wyślij i zakończ" dalej chodzi z klawiatury Ctrl+Shift+Enter.
    Okienko otwiera się W GÓRĘ, bo pasek pływa przy dolnej krawędzi osi. */
 function InneWysylki({ onZapisz, zapisuje, cudza, onWyslijIZakoncz, mozeWyslac }: {
-  onZapisz: () => void; zapisuje: boolean; cudza: boolean;
+  onZapisz?: () => void; zapisuje: boolean; cudza: boolean;
   onWyslijIZakoncz?: () => void; mozeWyslac: boolean;
 }) {
   const { otwarte, setOtwarte, ramka } = useOkienko<HTMLDivElement>();
@@ -496,10 +562,10 @@ function InneWysylki({ onZapisz, zapisuje, cudza, onWyslijIZakoncz, mozeWyslac }
         onClick={() => { setOtwarte(false); onWyslijIZakoncz(); }}
         className="flex items-center justify-between rounded-lg px-3 py-2 text-left text-sm font-bold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
         Wyślij i zakończ<span className="text-podpis font-normal text-slate-600">Ctrl+Shift+Enter</span></button>}
-      <button type="button" disabled={cudza || zapisuje}
+      {onZapisz && <button type="button" disabled={cudza || zapisuje}
         onClick={() => { setOtwarte(false); onZapisz(); }}
         className="rounded-lg px-3 py-2 text-left text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50">
-        {zapisuje ? "Zapisuję…" : "Zapisz szkic"}</button>
+        {zapisuje ? "Zapisuję…" : "Zapisz szkic"}</button>}
     </div>}
   </div>;
 }

@@ -1,28 +1,25 @@
 import React from "react";
-import { Send } from "lucide-react";
-import { Przycisk } from "../ui";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
-import { PrzyciskZalacznika, ZalacznikiWysylki } from "../skrzynka/ZalacznikiWysylki";
+import { Edytor as EdytorOdpowiedzi } from "../skrzynka/Edytor";
 
-/* ── Edytor odpowiedzi w reklamacji (0.224.0) ────────────────────────────────
-   OSOBNY komponent, nie `skrzynka/Edytor.tsx`, i to nie jest kopia z lenistwa.
-   Tamten ma siedem WYMAGANYCH propsów komentarza z wzmiankami (reklamacja ma
-   jedno pole notatki), twardy import paska załączników z listą typów i limitem
-   Centrum Wiadomości, oraz napis „WYŚLIJ DO KLIENTA" — który tutaj bywałby
-   nieprawdą, bo rozmowa jest trójstronna i odbiorcą bywa doradca Allegro.
+/* ── Edytor odpowiedzi w sprawie Allegro: USTAWIENIA, NIE KOPIA (@wydanie) ──
+   Reklamacje i dyskusje odpowiadają tym samym edytorem co skrzynka, decyzją
+   właściciela z 28 września. Osobny edytor sprawy rozjeżdżał się ze skrzynką
+   przy każdym wydaniu, bo każdą poprawkę trzeba było pamiętać dwa razy.
 
-   Bierzemy z tamtego WZORCE: licznik znaków przy polu, przycisk martwy przy
-   pustej treści, etykieta „WYSYŁAM…" w trakcie. Jedna rzecz jest tu lepsza:
-   licznik NIE JEST niemy. W skrzynce limit 2000 znaków pilnuje wyłącznie
-   serwer, więc agent dowiaduje się o przekroczeniu dopiero po kliknięciu;
-   tutaj limit znamy z `MessageRequest.text` i blokujemy przed wysłaniem.     */
+   Ten plik trzyma tylko to, co w sprawie jest naprawdę inne:
+   - napis „Wyślij odpowiedź”, bo rozmowa jest trójstronna i odbiorcą bywa
+     doradca Allegro, więc „do klienta” bywałoby nieprawdą;
+   - sufit 20 000 znaków z `MessageRequest.text`, nie 2000 z Centrum
+     Wiadomości, bo to inny zasób;
+   - brak notatki z wzmiankami: sprawa ma własną notatkę w kolumnie faktów;
+   - szkic żyje w sesji przeglądarki, nie na serwerze, więc podpowiedź nie
+     mówi o współdzieleniu z zespołem i nie ma „Zapisz szkic”;
+   - zamknięty czat, przy którym pola nie ma wcale. */
 
 /** Limit z `MessageRequest.text` (`maxLength: 20000`) — dziesięć razy więcej
     niż w Centrum Wiadomości, bo to inny zasób. */
 export const LIMIT_ZNAKOW = 20_000;
-
-/** Od ilu znaków przed sufitem licznik w ogóle się pokazuje. */
-const PROG_OSTRZEZENIA = 500;
 
 export function Edytor({
   tresc, wysyla, blad, czatAktywny, onZmiana, onWyslij,
@@ -32,14 +29,8 @@ export function Edytor({
   tresc: string;
   wysyla: boolean;
   blad: string;
-  /* ── Załączniki wychodzące (0.274.0) ──────────────────────────────────────
-     KOMPONENT JEST TEN SAM CO W SKRZYNCE, nie kopia: decyzja właściciela
-     z 0.246.0 o wspólnym załączniku dotyczyła strony przychodzącej, a ta sama
-     racja obowiązuje po drugiej stronie. Spinacz i lista mają wyglądać
-     i zachowywać się identycznie, bo to ta sama czynność.
-
-     Propsy są OPCJONALNE, żeby dyskusja mogła wołać edytor bez plików, gdyby
-     kiedyś tego chciała — a nie żeby ktoś zapomniał ich podać. */
+  /* Załączniki są opcjonalne, żeby sprawa bez obsługi plików nie dostała
+     spinacza, który niczego nie wyśle. */
   zalaczniki?: ZalacznikSzkicu[];
   dodajeZalacznik?: boolean;
   bladZalacznika?: string;
@@ -50,68 +41,14 @@ export function Edytor({
   onZmiana: (v: string) => void;
   onWyslij: () => void;
 }) {
-  /* ZAMKNIĘTEJ ROZMOWY NIE DA SIĘ NAPISAĆ, więc edytora tu NIE MA — nie jest
-     wyłączony, tylko go nie ma w drzewie. Ta sama decyzja co przy trybie
-     komentarza w skrzynce: pole, w które wolno pisać, a którego nie da się
-     wysłać, jest obietnicą bez pokrycia. */
-  if (!czatAktywny) {
-    return <p className="rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-500">
-      Allegro zamknęło rozmowę w tej sprawie — nowej wiadomości nie przyjmie.
-    </p>;
-  }
-
-  const znakow = tresc.length;
-  const zaDlugo = znakow > LIMIT_ZNAKOW;
-  const blisko = !zaDlugo && znakow > LIMIT_ZNAKOW - PROG_OSTRZEZENIA;
-
-  /* ── PAS DO KRAWĘDZI, NIE KARTA W KARCIE (0.418.0) ────────────────────────
-     Zgłoszenie właściciela ze zrzutem: „mniej ramek, okno odpowiadania do
-     granic bez paddingu". Pole do pisania siedziało w zaokrąglonej karcie,
-     ta w kolumnie z własnym `p-4`, a kolumna w karcie ekranu — trzy ramki
-     i trzy oddechy wokół jednego prostokąta, w którym się pisze.
-
-     Zostaje JEDNA krawędź: kreska oddzielająca pas czynności od rozmowy.
-     Pole rozciąga się na całą szerokość kolumny. */
-  return <div className="flex flex-col gap-2 border-t border-slate-200 bg-white px-4 py-3">
-    <label className="sr-only" htmlFor="odpowiedz-reklamacji">Odpowiedź w sprawie</label>
-    <textarea id="odpowiedz-reklamacji" rows={4} value={tresc}
-      onChange={(e) => onZmiana(e.target.value)} aria-keyshortcuts="Control+Enter"
-      /* CTRL+ENTER WYSYŁA, jak w skrzynce (23 września 2026) — te same klawisze
-         na każdej kolejce. Warunek jest ten sam co przy przycisku niżej: skrót
-         nie ma prawa ominąć limitu znaków ani pustej treści. */
-      onKeyDown={(e) => {
-        if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
-        e.preventDefault();
-        if (!wysyla && !zaDlugo && tresc.trim()) onWyslij();
-      }}
-      placeholder="Odpowiedź w tej sprawie — przeczyta ją kupujący, a bywa że i doradca Allegro"
-      className="field resize-y text-sm" />
-
-    {blad && <p className="text-xs text-red-700">{blad}</p>}
-
-    {/* Lista dołożonych plików stoi PRZY wiadomości, którą się komponuje —
-        pokazuje rzeczy, które naprawdę są już u Allegro. */}
-    {onUsunZalacznik && <ZalacznikiWysylki lista={zalaczniki} blad={bladZalacznika}
-      onUsun={onUsunZalacznik} wylaczone={wysyla} />}
-
-    <div className="flex items-center gap-2">
-      {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
-        onDodaj={onDodajZalacznik} wylaczone={wysyla} />}
-      {/* LICZNIK TYLKO PRZY LIMICIE (0.511.0), jak w skrzynce od 0.506.0.
-          Szary „0 znaków" stał przy każdej odpowiedzi, a liczba zmienia decyzję
-          dopiero przy suficie. Wtedy staje, a za sufitem czerwienieje. */}
-      {(blisko || zaDlugo) && <span className={`text-xs font-semibold tabular-nums ${
-        zaDlugo ? "text-ranga-zle" : "text-ranga-uwaga"}`}>
-        {znakow} / {LIMIT_ZNAKOW}{zaDlugo ? ` — o ${znakow - LIMIT_ZNAKOW} za dużo` : ""}
-      </span>}
-      {/* Zdaniem, nie wersalikami (0.511.0): tak piszą przyciski skrzynki. */}
-      <Przycisk className="ml-auto" wariant="glowny" onClick={onWyslij}
-        disabled={wysyla || zaDlugo || !tresc.trim()}>
-        <Send size={16} />{wysyla ? "Wysyłam…" : "Wyślij odpowiedź"}
-      </Przycisk>
-    </div>
-    {/* Do przyrostu trzeciego stało tu zdanie „formalny werdykt wydaje się
-        w Centrum Sprzedaży". Zniknęło razem z paskiem werdyktu nad rozmową —
-        komentarz, który skłamał, jest gorszy od jego braku. */}
-  </div>;
+  return <EdytorOdpowiedzi szkic={tresc} wysyla={wysyla} blad={blad}
+    onZmiana={onZmiana} onWyslij={onWyslij}
+    zalaczniki={zalaczniki} dodajeZalacznik={dodajeZalacznik} bladZalacznika={bladZalacznika}
+    onDodajZalacznik={onDodajZalacznik} onUsunZalacznik={onUsunZalacznik}
+    etykietaWyslij="Wyślij odpowiedź" limitZnakow={LIMIT_ZNAKOW}
+    etykietaPola="Odpowiedź w sprawie"
+    podpowiedz="Odpowiedź w tej sprawie — przeczyta ją kupujący, a bywa że i doradca Allegro"
+    podpowiedzZwinieta="Odpowiedz w sprawie…"
+    zamkniete={czatAktywny ? null
+      : "Allegro zamknęło rozmowę w tej sprawie — nowej wiadomości nie przyjmie."} />;
 }

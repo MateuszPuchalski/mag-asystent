@@ -58,11 +58,15 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
     ["R", "odrzuć szkic Copilota"],
   ] },
   { tytul: "Reklamacje", sciezka: "/obsluga/reklamacje", klawisze: [
+    /* Ten sam edytor co w skrzynce (@wydanie), więc te same klawisze. */
+    ["Enter", "pisz odpowiedź (kursor w polu)"],
     ["Ctrl Enter", "wyślij odpowiedź"],
     ["m", "moje sprawy"],
     ["n", "niczyje sprawy"],
   ] },
   { tytul: "Dyskusje", sciezka: "/obsluga/dyskusje", klawisze: [
+    /* Ten sam edytor co w skrzynce (@wydanie), więc te same klawisze. */
+    ["Enter", "pisz odpowiedź (kursor w polu)"],
     ["Ctrl Enter", "wyślij odpowiedź"],
     ["m", "moje sprawy"],
     ["n", "niczyje sprawy"],

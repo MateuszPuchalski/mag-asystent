@@ -128,3 +128,56 @@ describe("Edytor reklamacji bez szablonów", () => {
     expect(pusty.onWyslij).not.toHaveBeenCalled();
   });
 });
+
+/* ── Jeden edytor trzech kolejek (@wydanie) ──────────────────────────────────
+   Sprawa odpowiada edytorem skrzynki. Testy pilnują różnic, które wchodzą
+   ustawieniem: brak notatki, własny napis i sufit, zamknięty czat. Klawisz N
+   należy w sprawach do ekranu („niczyje”), więc edytor nie ma prawa go zjeść. */
+describe("sprawa odpowiada edytorem skrzynki", () => {
+  it("pusty edytor to jeden rząd bez notatki, z martwym „Wyślij odpowiedź”", () => {
+    render(<Edytor {...props()} />);
+    expect(screen.getByRole("button", { name: "Wyślij odpowiedź" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: /Notatka/ })).toBeNull();
+    expect(screen.queryByRole("group", { name: "Działania odpowiedzi" })).toBeNull();
+    expect(screen.getByLabelText("Odpowiedź w sprawie")).toHaveAttribute("placeholder",
+      expect.stringMatching(/^Odpowiedz w sprawie…/));
+  });
+
+  it("N z tła strony zostaje dla ekranu — edytor go nie przechwytuje", async () => {
+    /* Nasłuch ekranu dopięty PO edytorze, więc widzi, co edytor zrobił. */
+    render(<Edytor {...props()} />);
+    const ekran = vi.fn((e: KeyboardEvent) => e.defaultPrevented);
+    window.addEventListener("keydown", ekran);
+    await userEvent.keyboard("n");
+    window.removeEventListener("keydown", ekran);
+    expect(ekran).toHaveReturnedWith(false);
+    expect(screen.queryByLabelText(/Notatka wewnętrzna/)).toBeNull();
+  });
+
+  it("zamknięty czat: Ctrl+Enter z tła nie wysyła szkicu, który przeżył w sesji", async () => {
+    const onWyslij = vi.fn();
+    render(<Edytor {...props({ tresc: "Szkic sprzed zamknięcia", czatAktywny: false, onWyslij })} />);
+    /* Za zwłoką po otwarciu sprawy, żeby milczenie nie wynikało z niej. */
+    const zegar = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 5000);
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    zegar.mockRestore();
+    expect(onWyslij).not.toHaveBeenCalled();
+  });
+
+  it("Enter z tła strony stawia kursor w polu odpowiedzi", async () => {
+    render(<Edytor {...props({ tresc: "Dzień dobry" })} />);
+    await userEvent.keyboard("{Enter}");
+    expect(document.activeElement).toBe(screen.getByLabelText("Odpowiedź w sprawie"));
+  });
+
+  it("bez „Zapisz szkic” i „Wyślij i zakończ” nie ma strzałki z pustą listą", () => {
+    render(<Edytor {...props({ tresc: "Dobrze" })} />);
+    expect(screen.queryByRole("button", { name: "Inne sposoby wysłania" })).toBeNull();
+  });
+
+  it("podpowiedź nie mówi o współdzieleniu — szkic sprawy żyje w tej przeglądarce", () => {
+    render(<Edytor {...props({ tresc: "x" })} />);
+    expect(screen.getByLabelText("Odpowiedź w sprawie").getAttribute("placeholder"))
+      .not.toMatch(/współdzielony/);
+  });
+});
