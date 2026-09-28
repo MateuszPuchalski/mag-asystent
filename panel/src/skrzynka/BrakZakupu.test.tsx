@@ -11,7 +11,7 @@ vi.mock("../api/rozmowy", () => ({
 
 const { BrakZakupu, PYTANIE_O_ZAMOWIENIE } = await import("./BrakZakupu");
 
-/* ── Brakujący zakup nad polem odpowiedzi (@wydanie) ─────────────────────────
+/* ── Brakujący zakup nad polem odpowiedzi (0.547.0) ─────────────────────────
    Pasek istnieje po to, żeby odpowiedź nie powstawała na domysłach. Testy
    pilnują czterech decyzji:
 

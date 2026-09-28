@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.547.0 — 28 września 2026
+
+**Rozmowa bez zamówienia mówi to nad polem odpowiedzi.** Gdy klient napisał
+bez numeru zamówienia, a jego login ma zakupy w bazie, nad polem stoi jedna
+linijka z tym zakupem. „Powiąż ten zakup” wiąże go z rozmową. „Wstaw pytanie
+o numer zamówienia” dopisuje pytanie do odpowiedzi.
+
 ## 0.546.0 — 27 września 2026
 
 **Klawisz pod otwartym oknem nie działa na sprawie pod spodem.** W zwrotach

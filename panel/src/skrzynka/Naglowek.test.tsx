@@ -88,7 +88,7 @@ describe("Nagłówek rozmowy", () => {
   });
 });
 
-/* ── Brakujący zakup nad polem odpowiedzi — wpięcie w ekran (@wydanie) ──────
+/* ── Brakujący zakup nad polem odpowiedzi — wpięcie w ekran (0.547.0) ──────
    Komponent ma własne testy. Te pilnują wpięcia: pasek stoi w ekranie rozmowy
    bez zamówienia, dopisuje pytanie do szkicu, a błąd wiązania nie przechodzi
    do następnej rozmowy. */

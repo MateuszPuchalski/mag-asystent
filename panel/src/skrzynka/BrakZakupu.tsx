@@ -9,7 +9,7 @@ import { Przycisk, dzien, ile } from "../ui";
 export const PYTANIE_O_ZAMOWIENIE = "Proszę podać numer zamówienia, którego dotyczy wiadomość.";
 
 /**
- * BRAKUJĄCY ZAKUP NAD POLEM ODPOWIEDZI (@wydanie).
+ * BRAKUJĄCY ZAKUP NAD POLEM ODPOWIEDZI (0.547.0).
  *
  * Rozmowa bez zamówienia odpowiada na domysłach. Copilot pisze wtedy „brak
  * w faktach danych o zamówieniu”, a agent pisze „paczka jest w drodze” bez
