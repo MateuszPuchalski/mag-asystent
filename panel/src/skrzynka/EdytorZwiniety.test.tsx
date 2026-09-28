@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Edytor } from "./Edytor";
+import { useOkno } from "../nawigacja/fokus";
 
 /* ── Wątek pierwszy: pusty edytor to jedna linijka (@wydanie) ────────────────
    Wariant C, decyzja właściciela z 28 września. Testy pilnują czterech rzeczy:
@@ -70,6 +71,24 @@ describe("pusty edytor to jedna linijka", () => {
     expect(document.activeElement).toBe(notatka);
     await userEvent.keyboard("to ten sam klient");
     expect(notatka).toHaveValue("to ten sam klient");
+  });
+
+  it("błąd załącznika rozwija pusty edytor i staje zdaniem, nie ginie", () => {
+    /* Recenzja (@wydanie): zwinięty rząd nie rysował `ZalacznikiWysylki`, więc
+       odmowa serwera przy pustym polu kończyła się ciszą. */
+    render(<Edytor {...props} szkic="" onZmiana={() => {}} bladZalacznika="Plik ma więcej niż 4 MB" />);
+    expect(zakladka()).toBeInTheDocument();
+    expect(screen.getByText("Plik ma więcej niż 4 MB")).toBeInTheDocument();
+  });
+
+  it("pod oknem modalnym N milczy — notatki nie otwiera", async () => {
+    function Okno() {
+      const okno = useOkno<HTMLDivElement>({});
+      return <div role="dialog" {...okno} aria-label="Historia klienta"><button type="button">x</button></div>;
+    }
+    render(<><Sterowany /><Okno /></>);
+    await userEvent.keyboard("n");
+    expect(screen.queryByLabelText(/Notatka wewnętrzna — zobaczy/)).toBeNull();
   });
 
   it("N w polu odpowiedzi pisze literę, nie przełącza trybu", async () => {

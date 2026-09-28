@@ -150,6 +150,18 @@ describe("kolumna kontekstu", () => {
     expect(screen.queryByTestId("oferta")).not.toBeInTheDocument();
   });
 
+  it("zamówienie bez oferty i nie z kilku pozycji: wiersz mówi, co zrobić, bo baner wtedy milczy", async () => {
+    /* `brakPowiazania` gasi baner, gdy zamówienie jest znane. Bez tego zdania
+       kolumna zostawiała samo „bez oferty”, bez drogi dalej (recenzja @wydanie). */
+    rysuj(dane({ oferta: null, zamowienie: pusteZamowienie }));
+    /* Wiersz bywa otwarty na starcie (pamięć rozwinięć), więc klikamy tylko zwinięty. */
+    if (wiersz(/^Oferta i towar/).getAttribute("aria-expanded") === "false") {
+      await userEvent.click(wiersz(/^Oferta i towar/));
+    }
+    expect(wiersz(/^Oferta i towar/)).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText(/Wskaż ofertę przy rozmowie, a towar pojawi się tutaj/)).toBeInTheDocument();
+  });
+
   it("zamówienie z kilku pozycji bez oferty świeci i każe wskazać pozycję", () => {
     const pozycja = { offerId: "1", nazwa: "A", sku: null, ilosc: 1, cenaGrosze: 100, waluta: "PLN",
       zwracana: false, wracaIlosc: 0, twId: null, twSymbol: null, twZrodlo: null, ofertaZdjecie: "nieznane" as const };

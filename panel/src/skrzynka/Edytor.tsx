@@ -134,8 +134,9 @@ export function Edytor({
   const klawisz = useRef<(e: KeyboardEvent) => void>(() => {});
   klawisz.current = (e: KeyboardEvent) => {
     /* N — NOTATKA (@wydanie). Pusty edytor chowa przełącznik zakładek, więc
-       notatka potrzebuje drogi z klawiatury. N nie jest zajęte w skrzynce;
-       w reklamacjach i dyskusjach znaczy „niczyje”, ale tam notatki nie ma. */
+       notatka potrzebuje drogi z klawiatury. N nie jest zajęte w skrzynce.
+       W reklamacjach i dyskusjach znaczy „niczyje”, a nie koliduje, bo te
+       ekrany montują własny edytor i ten nasłuch tam nie żyje. */
     if ((e.key === "n" || e.key === "N") && !wKomentarzu && !e.ctrlKey && !e.metaKey && !e.altKey
       && !e.isComposing && !klawiszZajety(e.target)) {
       e.preventDefault();
@@ -209,7 +210,11 @@ export function Edytor({
      samym warunkiem, którym `KartaSzkicu` decyduje, czy się rysuje. */
   const kartaSzkicu = Boolean(copilot?.szkic && (copilot.szkic.ocena === null
     || (wPolu && copilot.szkic.ocena !== "odrzucony")));
+  /* Wgrywany plik i błąd załącznika też rozwijają: jedyne miejsce, które je
+     mówi (`ZalacznikiWysylki`), stoi w rozwiniętym dymku. Zwinięty rząd
+     zostawiał po odmowie serwera ciszę. */
   const zwiniety = !wKomentarzu && szkic === "" && !cudza && zalaczniki.length === 0
+    && !dodajeZalacznik && !bladZalacznika
     && wyczyszczone === null && !kartaSzkicu && niesprawdzone.length === 0;
 
   const przelacz = (id: number) => onWzmianki(
@@ -226,7 +231,9 @@ export function Edytor({
   return <>
   <article aria-label={wKomentarzu ? "Twoja notatka" : "Twoja odpowiedź"}
     className={zwiniety
-      ? "sticky bottom-2 z-10 ml-auto w-full max-w-[75ch] rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-1.5 shadow-lg"
+      /* `focus-within`: pole w rzędzie nie ma własnej ramki, więc fokus
+         pokazuje rama rzędu, tą samą barwą co `.field` (WCAG 2.4.7). */
+      ? "sticky bottom-2 z-10 ml-auto w-full max-w-[75ch] rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-1.5 shadow-lg focus-within:border-wertis-amber focus-within:ring-2 focus-within:ring-amber-100"
       : `ml-auto w-full max-w-[75ch] rounded-lg border-2 border-dashed p-3 ${wKomentarzu
       ? "border-amber-300 bg-amber-50" : wPolu ? "border-violet-300 bg-white" : "border-slate-300 bg-white"}`}>
     {/* ── PRZEŁĄCZNIK JEST JEDNYM ELEMENTEM, NIE DWOMA (0.247.0) ──────────────

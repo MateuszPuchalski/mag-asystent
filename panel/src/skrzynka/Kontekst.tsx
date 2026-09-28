@@ -238,7 +238,17 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
             setOtwarte((o) => new Set(o).add("dobor"));
           }} />}
         </Wiersz>
-        : <Wiersz tytul="Oferta i towar" streszczenie={streszczenieOferty(dane)} />}
+        /* WYJĄTEK: baner milknie, gdy zamówienie jest znane (`brakPowiazania`).
+           Zamówienie bez oferty i nie z kilku pozycji zostawiało wtedy samo
+           „bez oferty”, bez słowa, co zrobić — więc to jedno zdanie wraca tu. */
+        : dane.zamowienie && !kilkaPozycji
+          ? <Wiersz tytul="Oferta i towar" streszczenie={streszczenieOferty(dane)}
+              otwarty={otwarte.has("towar")} onPrzelacz={() => przelacz("towar")}>
+              <p className="px-4 pb-3 text-sm text-slate-600">
+                Zamówienie nie wskazuje oferty, więc nie ma z czego wywieść kartoteki.
+                Wskaż ofertę przy rozmowie, a towar pojawi się tutaj.</p>
+            </Wiersz>
+          : <Wiersz tytul="Oferta i towar" streszczenie={streszczenieOferty(dane)} />}
 
       {/* ── ZAKUPY TEGO KLIENTA (0.397.0) ──────────────────────────────────
           Blok stoi w wierszu zamówienia, bo odpowiada na to samo pytanie —
