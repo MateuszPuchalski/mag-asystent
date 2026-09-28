@@ -8,6 +8,7 @@ import { Os } from "./Os";
 import { Edytor } from "./Edytor";
 import { KonfliktPrzejecia } from "./KonfliktPrzejecia";
 import { BrakOferty } from "./BrakOferty";
+import { BrakZakupu } from "./BrakZakupu";
 import { Status } from "./Status";
 import { EtykietaKategorii } from "./Copilot";
 import { WierszMenu } from "./MenuRozmowy";
@@ -287,6 +288,14 @@ export function Rozmowa(p: {
             disabled={!p.wskazowka.trim()}>
             <Ruler size={16} />Zleć pomiar</Przycisk>
         </div>}
+
+        {/* `key` po rozmowie, z tego samego powodu co przy edytorze niżej:
+            błąd wiązania z jednej rozmowy nie może stać w pasku następnej.
+            Z przedrostkiem, bo edytor jest rodzeństwem z kluczem `rozmowa.id`,
+            a dwa równe klucze obok siebie zostawiały po zmianie rozmowy dwa paski. */}
+        <BrakZakupu key={`zakup-${rozmowa.id}`} kandydaci={p.dane.kandydaciZamowien} rozmowaId={rozmowa.id}
+          maZamowienie={p.dane.zamowienie !== null} szkic={p.szkic}
+          onWstawDoSzkicu={(t) => p.onSzkic(p.szkic ? `${p.szkic}\n${t}` : t)} />
 
         {/* `key` po rozmowie (0.533.0): tryb notatki, „Cofnij wyczyszczenie"
             z tekstem poprzedniej rozmowy i treść Dopytania przechodziły dalej
