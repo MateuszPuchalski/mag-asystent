@@ -712,3 +712,102 @@ describe("kubełek „Do odpowiedzi”", () => {
     expect(wiersz).toHaveTextContent(/do 28\.09\.2026/);
   });
 });
+
+/* ── Wiersz w wariancie C (@wydanie) ─────────────────────────────────────────
+   Decyzja właściciela z 28 września 2026: pierwsza linia to login i wiek,
+   pod nią do dwóch linii pytania, bez kafla po lewej. Zmienia się UKŁAD, nie
+   informacja — każdy znacznik z testów wyżej dalej stoi w wierszu. jsdom nie
+   liczy linii, więc pilnujemy klas i kolejności w drzewie. */
+describe("wiersz w wariancie C", () => {
+  const wiersz = (tekst: string) => screen.getByText(tekst).closest("button")!;
+
+  it("pierwsza linia to login (mono, pogrubiony) i wiek po prawej", () => {
+    pokaz([rozmowa({ status: "waiting_for_us", czekaOdMs: 3 * 3600_000 })]);
+    const login = screen.getByText("Kupujący 44300444");
+    expect(login.className).toMatch(/\bfont-mono\b/);
+    expect(login.className).toMatch(/\bfont-bold\b/);
+    /* Wiek w TEJ SAMEJ linii co login, z barwą pilności z `Czekanie`. */
+    const linia = login.parentElement!;
+    expect(linia).toContainElement(screen.getByTitle("czeka 3 g"));
+    expect(screen.getByTitle("czeka 3 g").className).toMatch(/text-amber-800/);
+    /* Linia loginu jest PIERWSZA w wierszu, przed pytaniem. */
+    expect(wiersz("Kupujący 44300444").firstElementChild).toBe(linia);
+  });
+
+  it("bez zegara wiekiem jest data — w linii loginu, nie pod pytaniem", async () => {
+    await pokazWszystkie([rozmowa({ status: "closed", czekaOdMs: null })]);
+    expect(screen.getByText("Kupujący 44300444").parentElement).toHaveTextContent(/2026/);
+  });
+
+  it("pytanie ma do DWÓCH linii pod loginem, nie jedną uciętą", () => {
+    pokaz([rozmowa()]);
+    const pytanie = screen.getByText(/szarpak pasuje/);
+    expect(pytanie.className).toMatch(/\bline-clamp-2\b/);
+    expect(pytanie.className).not.toMatch(/\btruncate\b/);
+    const login = screen.getByText("Kupujący 44300444");
+    expect(login.compareDocumentPosition(pytanie) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    /* Login nie stoi drugi raz pod pytaniem. */
+    expect(screen.getAllByText("Kupujący 44300444")).toHaveLength(1);
+  });
+
+  it("kafla po lewej nie ma, a znak kategorii dalej niesie nazwę i prośbę o człowieka", () => {
+    pokaz([rozmowa({ kopilot: {
+      kategoria: "PRODUCT_COMPATIBILITY", dodatkowe: [], akcja: "GET_PRODUCT", akcjaModelu: null,
+      wymagaCzlowieka: true, brakDanychZamowienia: false, brakDanychProduktu: false, pewnosc: "wysoka",
+      zrodlo: "MODEL", status: "SUCCESS", kody: [], uzasadnienie: null, nieaktualna: false,
+      kategoriaCzlowieka: null, kategoriaModelu: "PRODUCT_COMPATIBILITY" } })]);
+    const w = wiersz("Kupujący 44300444");
+    /* Wiersz jest kolumną linii, a nie rzędem z kaflem obok treści. */
+    expect(w.className).toMatch(/\bflex-col\b/);
+    expect(w.querySelector(".h-9.w-9")).toBeNull();
+    expect(w.querySelector(".rounded-lg.border")).toBeNull();
+    /* Znak stoi w linii loginu, przed nim — tam, gdzie wzrok wchodzi. */
+    const znak = screen.getByText("Dobór, wymaga człowieka");
+    expect(screen.getByText("Kupujący 44300444").parentElement).toContainElement(znak);
+  });
+
+  it("PILNE stoi w linii loginu, obok wieku", () => {
+    pokaz([rozmowa({ priorytet: "pilny" })]);
+    expect(screen.getByText("Kupujący 44300444").parentElement).toContainElement(screen.getByText("PILNE"));
+  });
+
+  it("zwykły wiersz nie ma pustego rzędu znaczników, a znaczniki stoją pod pytaniem", () => {
+    const { unmount } = pokaz([rozmowa({ status: "waiting_for_us", czekaOdMs: 3600_000 })]);
+    /* Linia loginu i pytanie — nic więcej. Pusty rząd z odstępem wyglądałby
+       jak ucięty wiersz. */
+    expect(wiersz("Kupujący 44300444").children).toHaveLength(2);
+    unmount();
+    pokaz([rozmowa({ status: "waiting_for_us", czekaOdMs: 3600_000, wlasciciel: "M. Wójcik",
+      reklamacyjna: true })]);
+    const w = wiersz("Kupujący 44300444");
+    expect(w.children).toHaveLength(3);
+    const znaczniki = w.lastElementChild!;
+    expect(znaczniki).toContainElement(screen.getByText("M. Wójcik"));
+    expect(znaczniki).toContainElement(screen.getByText("REKLAMACYJNA"));
+  });
+});
+
+/* ── „Więcej" w rzędzie kubełków (@wydanie, wariant C) ─────────────────────
+   Lista brała resztę rzędu i po zawinięciu stawała się pełnoszerokim paskiem
+   pod pigułkami. Teraz jest zwartym elementem TEGO SAMEGO rzędu i zawija się
+   tylko wtedy, gdy się nie mieści. */
+describe("„Więcej” w rzędzie kubełków", () => {
+  it("stoi obok „Do odpowiedzi”, „Nieprzypisane” i „Moje”, w jednym zawijanym rzędzie", () => {
+    pokaz([rozmowa()]);
+    const lista = screen.getByLabelText("Więcej kubełków");
+    const rzad = lista.parentElement!;
+    for (const nazwa of [/^Do odpowiedzi/, /^Nieprzypisane/, /^Moje/]) {
+      expect(rzad).toContainElement(screen.getByRole("button", { name: nazwa }));
+    }
+    expect(rzad.className).toMatch(/\bflex-wrap\b/);
+  });
+
+  it("jest zwarte: szerokość treści, nie reszta rzędu", () => {
+    pokaz([rozmowa()]);
+    const lista = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
+    expect(lista.className).not.toMatch(/\bflex-1\b/);
+    expect(lista.className).toMatch(/\bshrink-0\b/);
+    expect(lista.className).toMatch(/field-sizing:content/);
+    expect(lista.selectedOptions[0].textContent).toBe("Więcej");
+  });
+});

@@ -18,15 +18,26 @@ import { FiltrSegmentowy, type PozycjaFiltra } from "./index";
    zostają przy ekranie, więc ukrycie niczego nie zabiera klawiaturze.
 
    WARTOŚĆ OPCJI TO INDEKS, nie klucz. Klucze kubełków bywają `null`
-   („Wszystkie") i liczbą, a `<select>` zna wyłącznie napisy. */
+   („Wszystkie") i liczbą, a `<select>` zna wyłącznie napisy.
+
+   ── TRYB ZWARTY (@wydanie, wariant C skrzynki) ─────────────────────────────
+   Lista rozciągnięta na resztę rzędu po zawinięciu stawała się pełnoszerokim
+   paskiem pod kubełkami — osobnym pasmem sterowania nad pytaniami. W trybie
+   zwartym „Więcej" ma szerokość swojej treści (`field-sizing: content`):
+   stoi obok pigułek i schodzi do drugiego rzędu tylko wtedy, gdy się nie
+   mieści. Przeglądarka bez `field-sizing` bierze szerokość najdłuższej
+   opcji, czyli dalej zwarty element, tylko szerszy. Tryb jest wyborem
+   ekranu, bo pozostałe kolejki mają inne szerokości kolumn. */
 export function FiltrZWiecej<T extends string | number | null>({
-  wybrany, onWybierz, pozycje, wiecej,
+  wybrany, onWybierz, pozycje, wiecej, zwarty = false,
 }: {
   wybrany: T;
   onWybierz: (v: T) => void;
   pozycje: Array<PozycjaFiltra<T>>;
   /** Klucze kubełków do przeglądania — stoją pod „Więcej", nie na wierzchu. */
   wiecej: ReadonlyArray<T>;
+  /** „Więcej" na szerokość treści, nie na resztę rzędu — patrz komentarz wyżej. */
+  zwarty?: boolean;
 }) {
   const ukryte = pozycje.filter((p) => wiecej.includes(p.klucz));
   const naWierzchu = pozycje.filter((p) => !wiecej.includes(p.klucz));
@@ -38,10 +49,14 @@ export function FiltrZWiecej<T extends string | number | null>({
       title={wybranyUkryty < 0 ? "Kubełki do przeglądania" : ukryte[wybranyUkryty].podpowiedz}
       onChange={(e) => { if (e.target.value !== "") onWybierz(ukryte[Number(e.target.value)].klucz); }}
       /* Reszta rzędu, nie własna szerokość (0.506.0): stała szerokość
-         125 px spadała w kolumnie 360 px pod kubełki i dokładała rząd. */
-      className={`field w-auto min-w-0 flex-1 basis-[5.5rem] py-1 text-xs font-semibold ${
+         125 px spadała w kolumnie 360 px pod kubełki i dokładała rząd.
+         Tryb zwarty mierzy się treścią, więc stałej szerokości też nie ma. */
+      className={`field w-auto py-1 text-xs font-semibold ${zwarty
+        ? "shrink-0 px-2 [field-sizing:content]" : "min-w-0 flex-1 basis-[5.5rem]"} ${
         wybranyUkryty < 0 ? "" : "border-wertis-ink"}`}>
-      <option value="">Więcej…</option>
+      {/* Bez wielokropka w trybie zwartym: strzałkę rysuje sama lista,
+          a „Więcej…" obok niej mówiłoby dwa razy „jest tu coś jeszcze". */}
+      <option value="">{zwarty ? "Więcej" : "Więcej…"}</option>
       {ukryte.map((p, i) => <option key={String(p.klucz)} value={String(i)} title={p.podpowiedz}>
         {p.etykieta}{p.ile === undefined ? "" : ` · ${p.ile}`}</option>)}
     </select>}

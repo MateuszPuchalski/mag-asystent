@@ -133,13 +133,21 @@ describe("kolumna kontekstu", () => {
     expect(screen.getAllByTestId("zamowienie")).toHaveLength(1);
   });
 
-  it("bez oferty kolumna mówi, czego brakuje, zamiast milczeć", () => {
+  /* ── Brak oferty mówi się RAZ (@wydanie, wariant C) ───────────────────────
+     Decyzja właściciela z 28 września 2026. Baner nad rozmową mówi o braku
+     z czynnościami, więc kolumna nie powtarza go dwoma akapitami. Gwarancja
+     „nie milczy" zostaje: wiersz stoi i mówi brak streszczeniem. */
+  it("bez oferty kolumna mówi brak streszczeniem, bez powtórzenia banera", () => {
     rysuj(dane({ oferta: null }));
-    expect(screen.getByText(/nie jest powiązana z ofertą/)).toBeInTheDocument();
-    /* Drugie zdanie mówi osobno o kartotece, bo to osobny brak: numer oferty
-       bywa, a przypisania do Subiekta nie ma. */
-    expect(screen.getByText(/nie ma z czego wywieść kartoteki/)).toBeInTheDocument();
+    const tytul = screen.getByText("Oferta i towar");
+    expect(tytul.parentElement).toHaveTextContent("Oferta i towarbez oferty");
+    expect(screen.queryByText(/nie jest powiązana z ofertą/)).toBeNull();
+    expect(screen.queryByText(/nie ma z czego wywieść kartoteki/)).toBeNull();
+    /* Pod wierszem nic nie leży, więc wiersz nie udaje przycisku: klik
+       rozwijający pustkę byłby klikiem bez odpowiedzi. */
+    expect(screen.queryByRole("button", { name: /^Oferta i towar/ })).toBeNull();
     expect(screen.queryByTestId("towar")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("oferta")).not.toBeInTheDocument();
   });
 
   it("zamówienie z kilku pozycji bez oferty świeci i każe wskazać pozycję", () => {
@@ -153,7 +161,10 @@ describe("kolumna kontekstu", () => {
     const swieci = screen.getByRole("region", { name: "Wymaga Ciebie" });
     expect(within(swieci).getByText(/Zamówienie ma 2 pozycje — wskaż tę/)).toBeInTheDocument();
     expect(within(swieci).getByTestId("zamowienie")).toBeInTheDocument();
-    expect(screen.getByText(/Wskaż pozycję zamówienia wyżej/)).toBeInTheDocument();
+    /* Prośbę niesie „Wymaga Ciebie" — wiersz oferty mówi ją streszczeniem,
+       nie drugim zdaniem o tym samym (@wydanie). */
+    expect(screen.getByText("Oferta i towar").parentElement).toHaveTextContent("do wskazania w zamówieniu");
+    expect(screen.queryByText(/Wskaż pozycję zamówienia wyżej/)).toBeNull();
     expect(screen.queryByText(/nie jest powiązana z ofertą/)).toBeNull();
   });
 
@@ -165,7 +176,10 @@ describe("kolumna kontekstu", () => {
     for (const nazwa of ["Oferta", "Towar"]) {
       expect(screen.queryByRole("button", { name: nazwa })).not.toBeInTheDocument();
     }
-    for (const nazwa of [/^Oferta i towar/, /^Zamówienie/, /^Dobór/, /^Klient/, /^Wiedza/]) {
+    /* Bez oferty wiersz „Oferta i towar" stoi samym streszczeniem, nie
+       przyciskiem (@wydanie) — ale STOI, bo temat ma wiersz zawsze. */
+    expect(screen.getByText("Oferta i towar")).toBeInTheDocument();
+    for (const nazwa of [/^Zamówienie/, /^Dobór/, /^Klient/, /^Wiedza/]) {
       expect(wiersz(nazwa)).toBeInTheDocument();
     }
     /* Bez oferty dobór ISTNIEJE: klient bywa bez numeru oferty, a maszynę

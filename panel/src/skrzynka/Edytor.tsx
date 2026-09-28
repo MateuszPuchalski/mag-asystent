@@ -319,7 +319,11 @@ export function Edytor({
               i zabrał mu fokus przy pierwszej literze. */}
           <div className={zwiniety ? "flex items-center gap-2" : ""}>
           <textarea ref={pole} className={zwiniety
-            ? "min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2 text-tresc outline-none [field-sizing:content]"
+            /* Stała wysokość jednej linii, bez `field-sizing`: puste pole
+               mierzyło się podpowiedzią i zawijało rząd na dwie linie
+               (74 px w Chromium przy 1180 px). Zwinięte pole jest zawsze
+               puste, bo pierwsza litera je rozwija. */
+            ? "h-10 min-w-0 flex-1 resize-none overflow-hidden bg-transparent py-2 text-tresc outline-none"
             : `field min-h-[7.5rem] resize-y text-tresc [field-sizing:content] ${wPolu ? "bg-violet-50" : ""}`}
             rows={zwiniety ? 1 : undefined} value={szkic}
             aria-label="Szkic odpowiedzi" aria-keyshortcuts="Control+Enter"
@@ -338,7 +342,9 @@ export function Edytor({
             /* Podpowiedź Entera tylko wtedy, gdy Enter prowadzi do pola —
                w samym polu robi nową linię (dekalog p. 2, `nawigacja/fokus.ts`). */
             placeholder={zwiniety
-              ? (skrotyDzialaja ? "Odpowiedz klientowi… (Enter) · N — notatka" : "Odpowiedz klientowi…")
+              /* Klawisz notatki stoi na jej przycisku, nie tu: podpowiedź
+                 z oboma klawiszami zawijała się i ucinała przy 1180 px. */
+              ? (skrotyDzialaja ? "Odpowiedz klientowi… (Enter)" : "Odpowiedz klientowi…")
               : skrotyDzialaja && !cudza
                 ? "Szkic odpowiedzi — współdzielony z zespołem · Enter, żeby pisać"
                 : "Szkic odpowiedzi — współdzielony z zespołem"} />
@@ -350,12 +356,18 @@ export function Edytor({
               aria-keyshortcuts="N" aria-label="Notatka wewnętrzna"
               title="Notatka wewnętrzna — zobaczy ją tylko zespół (N)"
               className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">
-              <MessageSquare size={15} />Notatka</button>
+              <MessageSquare size={15} />Notatka
+              {/* Znaczek klawisza tylko wtedy, gdy klawisz działa (0.500.0). */}
+              {skrotyDzialaja && <kbd aria-hidden="true" className="rounded border border-slate-300 px-1 font-sans text-podpis text-slate-600">N</kbd>}
+            </button>
             <PrzyciskZalacznika dodaje={dodajeZalacznik} onDodaj={onDodajZalacznik} wylaczone={cudza} />
             {/* Martwa, dopóki pole jest puste — jak w pasku. Stoi, żeby było
                 widać, gdzie wysyłka będzie, zanim padnie pierwsze słowo. */}
-            <Przycisk wariant="glowny" disabled className="shrink-0 whitespace-nowrap">
-              <Send size={16} />Wyślij do klienta</Przycisk>
+            {/* „Wyślij”, nie „Wyślij do klienta”: rząd dzieli szerokość
+                z polem, a podpowiedź pola ma się zmieścić w jednej linii.
+                Pełna nazwa zostaje dla czytnika i zawiera widoczne słowo. */}
+            <Przycisk wariant="glowny" disabled aria-label="Wyślij do klienta" className="shrink-0 whitespace-nowrap">
+              <Send size={16} />Wyślij</Przycisk>
           </>}
           </div>
           {!zwiniety && <>

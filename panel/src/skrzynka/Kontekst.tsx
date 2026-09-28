@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ChevronRight, PackageSearch, UserRound } from "lucide-react";
+import { ChevronRight, UserRound } from "lucide-react";
 import type { HistoriaKlienta, OsRozmowy, WiedzaDoboru } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Przycisk, Pusto, dzien, odmien } from "../ui";
@@ -212,41 +212,33 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
 
       {/* KOLEJNOŚĆ: oferta i towar, zamówienie, sprawy zamknięte, dobór,
           klient, wiedza. Od tego, co klient kupował, do tego, co wiemy. */}
-      <Wiersz tytul="Oferta i towar" streszczenie={streszczenieOferty(dane)}
-        otwarty={otwarte.has("towar")} onPrzelacz={() => przelacz("towar")}>
-        {oferta
-          ? <OfertaRozmowy oferta={oferta} />
-          /* Zamówienie z kilku pozycji (0.215.0): oferta jest do WSKAZANIA przy
-             pozycji, nie do wpisania z ręki. Prośba stoi w „Wymaga Ciebie"
-             nad wierszem; drugi raz tutaj byłaby tym samym zdaniem. */
-          : kilkaPozycji ? null
-            : <Pusto waga="lista">
-                Ta rozmowa nie jest powiązana z ofertą. Panel nie zgaduje towaru
-                z treści pytania — numer wskazuje agent albo dopytuje klienta.
-              </Pusto>}
-        {oferta
-          /* Wstawki tu NIE MA od 0.404.0 — zeszła do pasma odpowiedzi,
-             gdzie nie trzeba po nią przewijać kolumny. */
-          ? <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id} />
-          /* Bez numeru oferty nie ma z czego wywieść kartoteki. Ekran mówi to
-             wprost, zamiast pokazywać pustą sekcję. */
-          : <p className="flex items-start gap-2 border-t p-4 text-sm text-slate-500">
-              <PackageSearch size={16} className="mt-0.5 shrink-0" />
-              <span>Bez powiązanej oferty nie ma z czego wywieść kartoteki.
-                {kilkaPozycji
-                  ? " Wskaż pozycję zamówienia wyżej, a towar pojawi się tutaj."
-                  : " Wskaż ofertę przy rozmowie, a towar pojawi się tutaj."}</span>
-            </p>}
-        {/* „Szukaj innego towaru mimo to" przy znanym towarze (0.506.0) —
-            tutaj, a nie we własnym wierszu „Dobór: zbędny". Wiersz mówił przy
-            każdej takiej rozmowie, że czegoś NIE trzeba robić. */}
-        {/* Kliknięcie OTWIERA dobór: bez tego wiersz wracał zwinięty i przycisk
-            wyglądał, jakby nie zrobił nic. */}
-        {bramka && <BramkaDoboru dane={dane} onSzukaj={() => {
-          setSzukamMimoTo(true);
-          setOtwarte((o) => new Set(o).add("dobor"));
-        }} />}
-      </Wiersz>
+      {/* ── BRAK OFERTY MÓWI SIĘ RAZ (@wydanie, wariant C) ─────────────────
+          Decyzja właściciela z 28 września 2026. Bez oferty stały tu dwa
+          akapity: „rozmowa nie jest powiązana z ofertą" i „nie ma z czego
+          wywieść kartoteki". Baner nad rozmową mówi to już raz, razem
+          z czynnościami, a przy zamówieniu z kilku pozycji prośbę niesie
+          „Wymaga Ciebie". Trzecie powtórzenie kazało czytać, czy to ten sam
+          brak. Wiersz zostaje streszczeniem, bez treści do rozwinięcia:
+          przycisk, który rozwija pustkę, to klik bez odpowiedzi. */}
+      {oferta
+        ? <Wiersz tytul="Oferta i towar" streszczenie={streszczenieOferty(dane)}
+          otwarty={otwarte.has("towar")} onPrzelacz={() => przelacz("towar")}>
+          <OfertaRozmowy oferta={oferta} />
+          {/* Wstawki tu NIE MA od 0.404.0 — zeszła do pasma odpowiedzi,
+              gdzie nie trzeba po nią przewijać kolumny. */}
+          <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id} />
+          {/* „Szukaj innego towaru mimo to" przy znanym towarze (0.506.0) —
+              tutaj, a nie we własnym wierszu „Dobór: zbędny". Wiersz mówił przy
+              każdej takiej rozmowie, że czegoś NIE trzeba robić. */}
+          {/* Kliknięcie OTWIERA dobór: bez tego wiersz wracał zwinięty i przycisk
+              wyglądał, jakby nie zrobił nic. Bramka wymaga oferty
+              (`towarZnany`), więc stoi wyłącznie w tej gałęzi. */}
+          {bramka && <BramkaDoboru dane={dane} onSzukaj={() => {
+            setSzukamMimoTo(true);
+            setOtwarte((o) => new Set(o).add("dobor"));
+          }} />}
+        </Wiersz>
+        : <Wiersz tytul="Oferta i towar" streszczenie={streszczenieOferty(dane)} />}
 
       {/* ── ZAKUPY TEGO KLIENTA (0.397.0) ──────────────────────────────────
           Blok stoi w wierszu zamówienia, bo odpowiada na to samo pytanie —
@@ -306,13 +298,24 @@ function Rama({ children }: { children: React.ReactNode }) {
  * spodem, zanim ktoś kliknie. Tego nie umiała zakładka z samym zerem.
  * Wysokość 44 px, bo to cel dla myszy i dla palca na tablecie w hali.
  */
-function Wiersz({ tytul, streszczenie, otwarty, onPrzelacz, children }: {
+function Wiersz({ tytul, streszczenie, otwarty = false, onPrzelacz, children }: {
   tytul: string;
   streszczenie: string;
-  otwarty: boolean;
-  onPrzelacz: () => void;
-  children: React.ReactNode;
+  otwarty?: boolean;
+  /** Bez uchwytu wiersz jest samym streszczeniem — nie ma czego rozwijać. */
+  onPrzelacz?: () => void;
+  children?: React.ReactNode;
 }) {
+  /* Wiersz bez treści NIE jest przyciskiem (@wydanie). Ta sama wysokość
+     i to samo wcięcie co wiersz rozwijany, żeby kolumna się nie rozjeżdżała;
+     w miejscu szewronu pusty odstęp, bo szewron obiecuje rozwinięcie. */
+  if (!onPrzelacz) {
+    return <div className="flex min-h-11 items-center gap-2 border-t px-4 py-2 first:border-t-0">
+      <span aria-hidden="true" className="w-3.5 shrink-0" />
+      <b className="shrink-0 text-sm text-wertis-ink">{tytul}</b>
+      <span className="min-w-0 truncate text-xs text-slate-600">{streszczenie}</span>
+    </div>;
+  }
   return <div className="border-t first:border-t-0">
     <button type="button" aria-expanded={otwarty} onClick={onPrzelacz}
       className="flex min-h-11 w-full items-center gap-2 px-4 py-2 text-left hover:bg-slate-50">
@@ -351,7 +354,9 @@ const STATUS_OFERTY: Record<string, string> = {
 
 export function streszczenieOferty(dane: OsRozmowy): string {
   const o = dane.oferta;
-  if (!o) return pozycjiDoWskazania(dane) ? "do wskazania w zamówieniu" : "bez powiązanej oferty";
+  /* „bez oferty" (@wydanie): streszczenie jest jedynym miejscem braku
+     w kolumnie, a słowo „powiązanej" niesie już baner nad rozmową. */
+  if (!o) return pozycjiDoWskazania(dane) ? "do wskazania w zamówieniu" : "bez oferty";
   if (!o.pobrana) return `oferta ${o.externalId} · treść jeszcze nie pobrana`;
   const status = o.pobrana.status ? STATUS_OFERTY[o.pobrana.status] ?? o.pobrana.status : null;
   const cena = o.pobrana.cenaGrosze !== null ? zlote(o.pobrana.cenaGrosze, o.pobrana.waluta ?? "PLN") : null;

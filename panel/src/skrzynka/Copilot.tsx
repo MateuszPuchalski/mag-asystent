@@ -215,7 +215,7 @@ export function PlakietkaKategorii({ kopilot }: { kopilot: Kopilot }) {
 }
 
 /**
- * Nazwa na plakietce i w dymku kafla.
+ * Nazwa na plakietce i w dymku znaku kategorii.
  *
  * NIEUDANE ROZPOZNANIE NIE UDAJE KATEGORII (23 września 2026). Decyzja
  * zastępcza przy awarii dostawcy zapisuje `OTHER`, bo kolumna kategorii nie
@@ -230,10 +230,11 @@ export function nazwaNaPlakietce(k: Kopilot): string {
 
 /* ── ZNAK KATEGORII (23 września 2026) ────────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem skrzynki: „za dużo tekstu". Wiersz kolejki
-   niósł kategorię SŁOWEM w trzecim rzędzie, pod treścią i podpisem. Kafel
-   z ikoną stoi teraz na początku wiersza, gdzie wzrok wchodzi pierwszy.
+   niósł kategorię SŁOWEM w trzecim rzędzie, pod treścią i podpisem. Znak
+   z ikoną stoi teraz na początku wiersza, gdzie wzrok wchodzi pierwszy
+   (od @wydanie bez kafla — powód przy `ZnakKategorii`).
 
-   Fiolet zostaje barwą KAŻDEGO kafla, bo kategoria dalej jest przypuszczeniem
+   Fiolet zostaje barwą KAŻDEGO znaku, bo kategoria dalej jest przypuszczeniem
    maszyny (0.261.0) — kształt ikony niesie rodzaj, barwa niesie pewność. Nazwę
    niesie `title` i tekst dla czytnika, a pełną listę słownik pod „?".
 
@@ -264,15 +265,22 @@ export const CZESTE: ReadonlySet<Kategoria> = new Set<Kategoria>([
 ]);
 
 /**
- * Kafel kategorii na początku wiersza kolejki.
+ * Znak kategorii w pierwszej linii wiersza kolejki, przed loginem.
  *
  * Czerwona kropka to `wymagaCzlowieka` — jedyna rzecz z decyzji, która zmienia,
- * KTO ma się sprawą zająć. Podziękowanie ma kafel szary z sercem: rozmowa nie
+ * KTO ma się sprawą zająć. Podziękowanie ma szary znak z sercem: rozmowa nie
  * czeka na nas i wiersz ma to mówić, zanim ktoś przeczyta treść. Nieudane
- * rozpoznanie i brak rozpoznania mają obrys przerywany — „nie wiem" wygląda
- * inaczej niż każda odpowiedź.
+ * rozpoznanie i brak rozpoznania mają szary przerywany okrąg — „nie wiem"
+ * wygląda inaczej niż każda odpowiedź.
+ *
+ * ── BEZ KAFLA (@wydanie, wariant C skrzynki) ─────────────────────────────
+ * Decyzja właściciela z 28 września 2026. Kafel 36 × 36 px stał w wierszu
+ * jak awatar i zabierał kolumnie szerokość, którą wariant C oddaje dwóm
+ * liniom pytania. Znak zostaje, bo niesie te same trzy fakty: rodzaj
+ * (kształt), pewność (fiolet przypuszczenia albo szarość „nie wiem")
+ * i prośbę o człowieka (kropka). Schodzi tylko obrys i tło.
  */
-export function KafelKategorii({ kopilot, podziekowal = false }: {
+export function ZnakKategorii({ kopilot, podziekowal = false }: {
   kopilot: Kopilot | null;
   podziekowal?: boolean;
 }) {
@@ -283,17 +291,12 @@ export function KafelKategorii({ kopilot, podziekowal = false }: {
     : kopilot === null ? "nierozpoznana" : nazwaNaPlakietce(kopilot);
   const czlowiek = !!kopilot && kopilot.wymagaCzlowieka && !kopilot.nieaktualna && !podziekowal;
   const opis = kopilot && !podziekowal ? dymek(kopilot) : nazwa;
-  const ton = podziekowal || nieWiem || kopilot?.nieaktualna
-    ? "border-slate-200 bg-slate-50 text-slate-600"
-    : "border-violet-200 bg-violet-50 text-violet-800";
-  return <span title={opis}
-    className={`relative inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border ${
-      nieWiem && !podziekowal ? "border-dashed" : ""} ${ton}`}>
-    <Ikona size={18} aria-hidden="true" />
+  const ton = podziekowal || nieWiem || kopilot?.nieaktualna ? "text-slate-500" : "text-violet-700";
+  return <span title={opis} className={`relative inline-flex shrink-0 ${ton}`}>
+    <Ikona size={15} aria-hidden="true" />
     <span className="sr-only">{nazwa}{czlowiek ? ", wymaga człowieka" : ""}</span>
     {czlowiek && <span aria-hidden="true"
-      className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-ranga-zle text-white">
-      <UserRound size={8} /></span>}
+      className="absolute -right-1 -top-1 h-2 w-2 rounded-full border border-white bg-ranga-zle" />}
   </span>;
 }
 
