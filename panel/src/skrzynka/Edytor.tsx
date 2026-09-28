@@ -160,12 +160,19 @@ export function Edytor({
      j/k, `zwroty/klawisze.ts`). Każda rozmowa kosztowała więc ruch ręki do
      myszy, nawet gdy szkic w polu był gotowy. Dwa klawisze to zamykają:
 
-     ENTER — do pola, kursor na końcu. Tylko z tła strony albo z wiersza
-     kolejki; na przycisku Enter dalej go naciska.
+     ENTER — do pola, kursor na końcu. Tylko z tła strony albo z wybranego
+     wiersza kolejki; na przycisku Enter dalej go naciska.
      CTRL+ENTER (i Ctrl+Shift+Enter) — wysyłka także spoza pola, tym samym
      warunkiem co przycisk. Nie w trybie notatki: tam przycisku wysyłki nie
-     ma w drzewie (§10.4) i skrót nie może go udawać. */
+     ma w drzewie (§10.4) i skrót nie może go udawać.
+
+     Oba klawisze działają spoza pola TYLKO z tła, z wybranego wiersza albo
+     z wnętrza edytora. Obok odpowiedzi w sprawie stoją werdykt i prośba
+     o zakończenie: Ctrl+Enter z fokusem na ich przycisku wysyłał szkic,
+     którego agent w tej chwili nie wysyłał. */
   const pole = useRef<HTMLTextAreaElement>(null);
+  const dymek = useRef<HTMLElement>(null);
+  const pasek = useRef<HTMLDivElement>(null);
   const poleNotatki = useRef<HTMLTextAreaElement>(null);
   /* Notatka otwarta klawiszem dostaje fokus od razu: N z tła strony ma
      kończyć się w polu, w którym pisze się dalej, nie na przełączniku. */
@@ -189,7 +196,14 @@ export function Edytor({
       return;
     }
     if (e.key !== "Enter" || wKomentarzu || e.altKey || e.isComposing || klawiszZajety(e.target)) return;
+    const cel = e.target as HTMLElement | null;
+    /* Tylko z WYBRANEGO wiersza: na innym wierszu, do którego agent doszedł
+       Tabem, Enter ma go otworzyć, a nie pisać w sprawie, która już stoi. */
+    const wiersz = cel?.closest("[data-wiersz-kolejki]");
+    const zTla = !cel || cel === document.body || wiersz?.getAttribute("aria-current") === "true";
+    const wEdytorze = !!cel && (!!dymek.current?.contains(cel) || !!pasek.current?.contains(cel));
     if (e.ctrlKey || e.metaKey) {
+      if (!zTla && !wEdytorze) return;
       e.preventDefault();
       if (Date.now() - zamontowany.current < ZWLOKA_KLAWISZA_MS) return;
       if (mozeWyslac) {
@@ -197,12 +211,7 @@ export function Edytor({
       }
       return;
     }
-    if (e.shiftKey || cudza) return;
-    const cel = e.target as HTMLElement | null;
-    /* Tylko z WYBRANEGO wiersza: na innym wierszu, do którego agent doszedł
-       Tabem, Enter ma go otworzyć, a nie pisać w sprawie, która już stoi. */
-    const wiersz = cel?.closest("[data-wiersz-kolejki]");
-    if (cel && cel !== document.body && wiersz?.getAttribute("aria-current") !== "true") return;
+    if (e.shiftKey || cudza || !zTla) return;
     e.preventDefault();
     const el = pole.current;
     if (!el) return;
@@ -285,7 +294,7 @@ export function Edytor({
      bo jest następną naszą wypowiedzią. Przerywana ramka mówi, że jeszcze
      nie wyszła. Pełna szerokość progu 75ch, bo w nim się pisze. */
   return <>
-  <article aria-label={wKomentarzu ? "Twoja notatka" : "Twoja odpowiedź"}
+  <article ref={dymek} aria-label={wKomentarzu ? "Twoja notatka" : "Twoja odpowiedź"}
     className={zwiniety
       /* `focus-within`: pole w rzędzie nie ma własnej ramki, więc fokus
          pokazuje rama rzędu, tą samą barwą co `.field` (WCAG 2.4.7). */
@@ -425,7 +434,7 @@ export function Edytor({
               {skrotyDzialaja && <kbd aria-hidden="true" className="rounded border border-slate-300 px-1 font-sans text-podpis text-slate-600">N</kbd>}
             </button>}
             {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
-              onDodaj={onDodajZalacznik} wylaczone={cudza} />}
+              onDodaj={onDodajZalacznik} wylaczone={cudza || wysyla} />}
             {/* Martwa, dopóki pole jest puste — jak w pasku. Stoi, żeby było
                 widać, gdzie wysyłka będzie, zanim padnie pierwsze słowo. */}
             {/* „Wyślij”, nie „Wyślij do klienta”: rząd dzieli szerokość
@@ -445,9 +454,12 @@ export function Edytor({
           {copilot && <KartaSzkicu p={copilot} wPolu={wPolu} zwinieta={wyczyszczone !== null} />}
           {/* Lista dołożonych plików stoi POD treścią (0.247.0): należy do
               komponowanej wiadomości, nie do przycisków. Sam spinacz jedzie
-              w pasku działań — nie zasługuje na własny rząd. */}
+              w pasku działań — nie zasługuje na własny rząd.
+              W trakcie wysyłki lista i spinacz stoją: serwer bierze pliki
+              na początku wysyłki i czyści listę po niej, więc plik dodany
+              w tym oknie wgrałby się do Allegro i zniknął bez słowa. */}
           {onUsunZalacznik && <ZalacznikiWysylki lista={zalaczniki} blad={bladZalacznika}
-            onUsun={onUsunZalacznik} wylaczone={cudza} />}
+            onUsun={onUsunZalacznik} wylaczone={cudza || wysyla} />}
           {niesprawdzone.length > 0 && <section aria-label="Do sprawdzenia przed wysłaniem"
             className="mt-2 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
             <b>Szkic bez zmian — te twierdzenia nie pochodzą z naszej bazy:</b>
@@ -475,7 +487,7 @@ export function Edytor({
       dostępnej, a podpis głównego — Ctrl+Enter — nie chowa się nigdy. */}
   {!zwiniety && <div className={`sticky bottom-2 z-10 ml-auto flex w-fit max-w-full items-center gap-3 rounded-xl border px-2 py-1.5 shadow-lg ${
     wKomentarzu ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}
-    role="group" aria-label={wKomentarzu ? "Działania notatki" : "Działania odpowiedzi"}>
+    ref={pasek} role="group" aria-label={wKomentarzu ? "Działania notatki" : "Działania odpowiedzi"}>
     {wKomentarzu
       ? <>
           {/* LICZNIK I ZDANIE ZESZŁY (0.523.0), tą samą regułą co licznik
@@ -504,7 +516,7 @@ export function Edytor({
             zaDlugo ? "text-ranga-zle" : "text-ranga-uwaga"}`}>
             {szkic.length} / {limitZnakow}{zaDlugo ? ` — o ${szkic.length - limitZnakow} za dużo` : ""}</span>}
           {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
-            onDodaj={onDodajZalacznik} wylaczone={cudza} />}
+            onDodaj={onDodajZalacznik} wylaczone={cudza || wysyla} />}
           {/* ── JEDNO DZIAŁANIE MA BYĆ NAJGŁOŚNIEJSZE (0.247.0) ───────────────
               Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na
               zewnątrz, i idzie WYŁĄCZNIE na kliknięcie człowieka — innej drogi

@@ -230,7 +230,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
     && zawieraOpis(pierwszaKlienta, sprawa.opisZgloszenia);
   const opisWart = !dubel;
 
-  /* ── ROZMOWA PRZEWIJA SIĘ, CZYNNOŚCI STOJĄ (0.418.0) ─────────────────────
+  /* ── ROZMOWA PRZEWIJA SIĘ, WERDYKT STOI (0.418.0) ────────────────────────
      Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony". Na
      zrzucie pasek werdyktu leżał w połowie wątku, między tekstem wiadomości
      a jej zdjęciem — bo cała kolumna była JEDNYM obszarem przewijania,
@@ -300,12 +300,11 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
 
     {/* ── ODPOWIEDŹ JEST OSTATNIĄ WYPOWIEDZIĄ WĄTKU (@wydanie) ──────────────
         Decyzja właściciela z 28 września, ten sam układ co w skrzynce. Pole
-        stało pod pasem przewijania, żeby było pod ręką przy długiej rozmowie.
-        Ten powód zabiera teraz sam edytor: pusty jest jednym rzędem
-        przyklejonym do dolnej krawędzi, a pasek wysyłki pływa. Pas pod
-        rozmową odejmował jej za to stałą wysokość przy każdej sprawie.
-        Werdykt zostaje poza przewijaniem (`Werdykt.tsx`), bo nieodwracalne
-        ma stać w jednym miejscu. */}
+        stoi w pasie przewijania, bo pod ręką trzyma je sam edytor: pusty jest
+        jednym rzędem przyklejonym do dolnej krawędzi, a pasek wysyłki pływa.
+        Osobny pas pod rozmową zabierałby jej stałą wysokość przy każdej
+        sprawie. Werdykt zostaje poza przewijaniem (`Werdykt.tsx`), bo
+        nieodwracalne ma stać w jednym miejscu. */}
     {edytor}
     <div ref={koniec} aria-hidden="true" />
     </div>

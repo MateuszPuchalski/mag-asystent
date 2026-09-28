@@ -10,9 +10,9 @@ const { Edytor, LIMIT_ZNAKOW } = await import("./Edytor");
 
    1. PRZYCISK MARTWY PRZY PUSTYM POLU. Puste żądanie i tak wróciłoby z 400,
       tylko o jeden strzał do serwera i jedno zdanie błędu później.
-   2. LIMIT BLOKUJE PRZED WYSŁANIEM. W skrzynce limit pilnuje wyłącznie
-      serwer, więc agent dowiaduje się o przekroczeniu po kliknięciu — tutaj
-      limit znamy ze specyfikacji (`MessageRequest.text`, maxLength 20000).
+   2. LIMIT BLOKUJE PRZED WYSŁANIEM. Limit znamy ze specyfikacji
+      (`MessageRequest.text`, maxLength 20000), więc agent nie czeka na
+      odmowę serwera.
    3. LICZNIK MILCZY, DOPÓKI NIE MA CO POWIEDZIEĆ. Czerwony napis stojący
       cały czas przestaje być czytany — dekalog, punkt 5.
    4. PRZY ZAMKNIĘTEJ ROZMOWIE EDYTORA NIE MA W DRZEWIE. Nie „disabled":
@@ -173,6 +173,32 @@ describe("sprawa odpowiada edytorem skrzynki", () => {
   it("bez „Zapisz szkic” i „Wyślij i zakończ” nie ma strzałki z pustą listą", () => {
     render(<Edytor {...props({ tresc: "Dobrze" })} />);
     expect(screen.queryByRole("button", { name: "Inne sposoby wysłania" })).toBeNull();
+  });
+
+  it("w trakcie wysyłki spinacz i usuwanie pliku stoją", () => {
+    /* Serwer bierze pliki na początku wysyłki i czyści listę po niej. Plik
+       dodany w tym oknie wgrałby się do Allegro i zniknął bez słowa. */
+    render(<Edytor {...props({ tresc: "Dobrze", wysyla: true,
+      zalaczniki: [{ id: 4, allegroId: "att-1", nazwa: "nowy-noz.jpg",
+        typ: "image/jpeg", rozmiar: 2048, dodal: "Ala" }],
+      onDodajZalacznik: vi.fn(), onUsunZalacznik: vi.fn() })} />);
+    expect(screen.getByRole("button", { name: "Dołącz plik" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Zdejmij nowy-noz.jpg" })).toBeDisabled();
+  });
+
+  it("Ctrl+Enter z fokusem na przycisku obok (werdykt) nie wysyła odpowiedzi", async () => {
+    const onWyslij = vi.fn();
+    render(<><button type="button">Wyślij werdykt</button>
+      <Edytor {...props({ tresc: "Szkic odpowiedzi", onWyslij })} /></>);
+    const zegar = vi.spyOn(Date, "now").mockReturnValue(Date.now() + 5000);
+    screen.getByRole("button", { name: "Wyślij werdykt" }).focus();
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    expect(onWyslij).not.toHaveBeenCalled();
+    /* Z tła strony skrót dalej wysyła — to jego cel. */
+    (document.activeElement as HTMLElement).blur();
+    await userEvent.keyboard("{Control>}{Enter}{/Control}");
+    zegar.mockRestore();
+    expect(onWyslij).toHaveBeenCalledTimes(1);
   });
 
   it("podpowiedź nie mówi o współdzieleniu — szkic sprawy żyje w tej przeglądarce", () => {
