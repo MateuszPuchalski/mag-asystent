@@ -50,7 +50,7 @@ export const SKROTY: ReadonlyArray<SekcjaSkrotow> = [
        nic — ponowne otwarcie jest wyłącznie przyciskiem. */
     ["Z", "zakończ rozmowę; drugie Z — mimo pytania"],
     ["O", "odłóż do następnego dnia roboczego, 8:00"],
-    /* Pusty edytor chowa zakładki (@wydanie), więc notatka ma klawisz. */
+    /* Pusty edytor chowa zakładki (0.548.0), więc notatka ma klawisz. */
     ["N", "notatka wewnętrzna"],
     /* Opis idzie za napisem przycisku, który od 0.500.0 mówi „Wstaw do
        odpowiedzi" (0.515.0): stary opis obiecywał poprawianie. */

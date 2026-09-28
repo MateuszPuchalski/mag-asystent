@@ -325,7 +325,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         4 i 5 dalej je wybierają. Od 0.522.0 ten układ mieszka
         w `ui/FiltrZWiecej.tsx`, bo te same „Więcej" dostały inne kolejki.
 
-        „WIĘCEJ" W RZĘDZIE KUBEŁKÓW (@wydanie, wariant C). Lista brała resztę
+        „WIĘCEJ" W RZĘDZIE KUBEŁKÓW (0.548.0, wariant C). Lista brała resztę
         rzędu, więc po zawinięciu robiła się pełnoszerokim paskiem pod
         pigułkami — drugim pasmem sterowania nad pytaniami. Tryb zwarty mierzy
         ją treścią: stoi obok „Moje" i schodzi niżej tylko, gdy się nie mieści. */}
@@ -408,7 +408,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         const zegar = NASZ_RUCH.has(r.status) ? r.czekaOdMs : null;
         const wyjatkowy = WYJATKOWE.has(r.status);
         const trafienie = powodTrafienia(r);
-        /* ── ZNACZNIKI POD PYTANIEM (@wydanie, wariant C) ─────────────────
+        /* ── ZNACZNIKI POD PYTANIEM (0.548.0, wariant C) ─────────────────
            Rząd staje tylko wtedy, gdy ma co nieść. Kolejność jak dotąd:
            najpierw to, co krzyczy (reklamacyjna, status-wyjątek), potem
            fakty wyciszone. Lista zamiast warunku na każdym dziecku, bo pusty
@@ -502,7 +502,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
             wybranaId === r.id
               ? "wiersz-wybrany border-l-wertis-amber bg-slate-200"
               : "border-l-transparent hover:bg-slate-50"}`}>
-          {/* ── WARIANT C: KTO I ILE CZEKA, POTEM PYTANIE (@wydanie) ───────────
+          {/* ── WARIANT C: KTO I ILE CZEKA, POTEM PYTANIE (0.548.0) ───────────
               Decyzja właściciela z 28 września 2026. Pierwsza linia to login
               i wiek, pod nią do dwóch linii pytania. Kafla kategorii po lewej
               nie ma: zabierał szerokość, którą pytanie dostaje w drugiej linii.
@@ -524,7 +524,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
               <span className="sr-only">NOWE</span></span>}
             {/* ZNAK KATEGORII NA POCZĄTKU (23 września 2026). Kategoria, prośba
                 o człowieka i podziękowanie czytają się, zanim wzrok dojdzie do
-                treści — patrz `ZnakKategorii`. Od @wydanie bez kafla. */}
+                treści — patrz `ZnakKategorii`. Od 0.548.0 bez kafla. */}
             <ZnakKategorii kopilot={r.kopilot} podziekowal={r.podziekowal} />
             <span className="min-w-0 truncate font-mono text-sm font-bold text-slate-800">{r.klient}</span>
             {/* PILNE w linii loginu: odpowiada na to samo pytanie co wiek po

@@ -11,7 +11,7 @@ import { Przycisk } from "../ui";
  * Tak wygrywały kiedyś „zdemontowanym" i „Pozdrawiam", bo dobór fraz brał
  * słowa po DŁUGOŚCI, a „szarpaku" wypadało przez limit trzech fraz.
  *
- * ── JEDNA LINIJKA (@wydanie, wariant C skrzynki) ──────────────────────────
+ * ── JEDNA LINIJKA (0.548.0, wariant C skrzynki) ──────────────────────────
  * Decyzja właściciela z 28 września 2026. Baner stał w trzech rzędach nad
  * osią rozmowy: tytuł ze zdaniem, dwa przyciski, odstępy. Oś, po którą agent
  * tu przyszedł, zaczynała się przez to niżej. Teraz brak i obie czynności

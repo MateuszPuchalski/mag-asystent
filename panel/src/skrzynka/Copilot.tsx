@@ -232,7 +232,7 @@ export function nazwaNaPlakietce(k: Kopilot): string {
    Zgłoszenie właściciela ze zrzutem skrzynki: „za dużo tekstu". Wiersz kolejki
    niósł kategorię SŁOWEM w trzecim rzędzie, pod treścią i podpisem. Znak
    z ikoną stoi teraz na początku wiersza, gdzie wzrok wchodzi pierwszy
-   (od @wydanie bez kafla — powód przy `ZnakKategorii`).
+   (od 0.548.0 bez kafla — powód przy `ZnakKategorii`).
 
    Fiolet zostaje barwą KAŻDEGO znaku, bo kategoria dalej jest przypuszczeniem
    maszyny (0.261.0) — kształt ikony niesie rodzaj, barwa niesie pewność. Nazwę
@@ -273,7 +273,7 @@ export const CZESTE: ReadonlySet<Kategoria> = new Set<Kategoria>([
  * rozpoznanie i brak rozpoznania mają szary przerywany okrąg — „nie wiem"
  * wygląda inaczej niż każda odpowiedź.
  *
- * ── BEZ KAFLA (@wydanie, wariant C skrzynki) ─────────────────────────────
+ * ── BEZ KAFLA (0.548.0, wariant C skrzynki) ─────────────────────────────
  * Decyzja właściciela z 28 września 2026. Kafel 36 × 36 px stał w wierszu
  * jak awatar i zabierał kolumnie szerokość, którą wariant C oddaje dwóm
  * liniom pytania. Znak zostaje, bo niesie te same trzy fakty: rodzaj

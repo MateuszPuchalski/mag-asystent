@@ -20,7 +20,7 @@ import { FiltrSegmentowy, type PozycjaFiltra } from "./index";
    WARTOŚĆ OPCJI TO INDEKS, nie klucz. Klucze kubełków bywają `null`
    („Wszystkie") i liczbą, a `<select>` zna wyłącznie napisy.
 
-   ── TRYB ZWARTY (@wydanie, wariant C skrzynki) ─────────────────────────────
+   ── TRYB ZWARTY (0.548.0, wariant C skrzynki) ─────────────────────────────
    Lista rozciągnięta na resztę rzędu po zawinięciu stawała się pełnoszerokim
    paskiem pod kubełkami — osobnym pasmem sterowania nad pytaniami. W trybie
    zwartym „Więcej" ma szerokość swojej treści (`field-sizing: content`):

@@ -71,7 +71,7 @@ export function SlownikZnakow({ kubelkow }: {
           <ul className="flex flex-col gap-1.5">
             {kategorie.map((k) => {
               const Ikona = IKONA_KATEGORII[k];
-              /* Znak BEZ KAFLA, tak jak stoi w wierszu kolejki (@wydanie):
+              /* Znak BEZ KAFLA, tak jak stoi w wierszu kolejki (0.548.0):
                  słownik pokazuje to, co agent widzi, a nie jego dawny kształt. */
               return <li key={k} className="flex items-center gap-2">
                 <span className="inline-flex w-7 text-violet-700">

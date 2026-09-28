@@ -51,7 +51,7 @@ describe("Szkic Copilota w edytorze", () => {
     const wylaczony = copilot({ stan: { wlaczony: false, powod: "Copilot jest wyłączony. Włącz go w wertis.env (COPILOT_MODE=anthropic).",
       model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20,
     autoKlasyfikacja: false, autoSzkic: false } });
-    /* Zwinięty rząd pustego edytora (@wydanie) zdania nie niesie: nic się
+    /* Zwinięty rząd pustego edytora (0.548.0) zdania nie niesie: nic się
        z nim nie zrobi, a zjadłoby pole. Staje po rozwinięciu. */
     const { unmount: odmontuj } = edytor(wylaczony);
     expect(screen.queryByText(/COPILOT_MODE=anthropic/)).toBeNull();

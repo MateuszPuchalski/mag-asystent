@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.548.0 — 28 września 2026
+
+**Skrzynka: wątek pierwszy.** Pusty edytor zajmuje jedną linijkę z „Wyślij” w środku i rośnie przy pisaniu. Notatkę otwiera klawisz N albo przycisk „Notatka”. Szkic Copilota albo zespołu otwiera go w pełnej wysokości. Baner braku oferty ma jedną linijkę z przyciskami „Wskaż ofertę” i „Dopytaj o numer”, a prawa kolumna nie powtarza go dwoma akapitami. W kolejce „Więcej” stoi obok kubełków, a wiersz pokazuje login, wiek i do dwóch linii pytania.
+
 ## 0.547.0 — 28 września 2026
 
 **Rozmowa bez zamówienia mówi to nad polem odpowiedzi.** Gdy klient napisał

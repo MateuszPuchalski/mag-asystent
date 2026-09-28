@@ -63,7 +63,7 @@ describe("FiltrZWiecej", () => {
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
 
-  /* Tryb zwarty (@wydanie, wariant C skrzynki): lista na szerokość treści,
+  /* Tryb zwarty (0.548.0, wariant C skrzynki): lista na szerokość treści,
      w rzędzie pigułek. Domyślny zostaje dla kolejek, które go nie wybrały. */
   it("zwarta lista mierzy się treścią, domyślna bierze resztę rzędu", () => {
     const pozycje = [{ klucz: "a", etykieta: "A" }, { klucz: "b", etykieta: "B", ile: 2 }];

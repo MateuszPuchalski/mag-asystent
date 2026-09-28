@@ -52,7 +52,7 @@ export const ZWLOKA_KLAWISZA_MS = 1000;
  * Komponent zwraca więc DWA elementy: dymek i pływający pasek działań.
  * Wołający (`Os` przez `Rozmowa`) wstawia oba na koniec listy wypowiedzi.
  *
- * ── WĄTEK PIERWSZY: PUSTY EDYTOR TO JEDNA LINIJKA (@wydanie) ───────────────
+ * ── WĄTEK PIERWSZY: PUSTY EDYTOR TO JEDNA LINIJKA (0.548.0) ───────────────
  * Wariant C z płótna „Skrzynka — warianty”, decyzja właściciela z 28 września.
  * Przy 1180 px wątek miał około 190 px, bo pusty edytor z zakładkami i polem
  * na pięć linii stał pod nim, zanim agent napisał choć słowo. Teraz pusty
@@ -133,7 +133,7 @@ export function Edytor({
   const skrotyDzialaja = useSkrotyDzialaja();
   const klawisz = useRef<(e: KeyboardEvent) => void>(() => {});
   klawisz.current = (e: KeyboardEvent) => {
-    /* N — NOTATKA (@wydanie). Pusty edytor chowa przełącznik zakładek, więc
+    /* N — NOTATKA (0.548.0). Pusty edytor chowa przełącznik zakładek, więc
        notatka potrzebuje drogi z klawiatury. N nie jest zajęte w skrzynce.
        W reklamacjach i dyskusjach znaczy „niczyje”, a nie koliduje, bo te
        ekrany montują własny edytor i ten nasłuch tam nie żyje. */

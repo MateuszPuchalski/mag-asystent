@@ -223,7 +223,7 @@ describe("plakietka i etykieta człowieka", () => {
   });
 });
 
-/* ── Znak kategorii (23 września 2026, bez kafla od @wydanie) ────────────────
+/* ── Znak kategorii (23 września 2026, bez kafla od 0.548.0) ────────────────
    Znak zamiast słowa na wierszu kolejki. Pilnujemy trzech rzeczy, które łatwo
    zgubić przy zamianie tekstu na ikonę: nazwy dla czytnika, prośby
    o człowieka i tego, że nieudane rozpoznanie nie udaje kategorii „Inne".

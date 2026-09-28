@@ -212,7 +212,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
 
       {/* KOLEJNOŚĆ: oferta i towar, zamówienie, sprawy zamknięte, dobór,
           klient, wiedza. Od tego, co klient kupował, do tego, co wiemy. */}
-      {/* ── BRAK OFERTY MÓWI SIĘ RAZ (@wydanie, wariant C) ─────────────────
+      {/* ── BRAK OFERTY MÓWI SIĘ RAZ (0.548.0, wariant C) ─────────────────
           Decyzja właściciela z 28 września 2026. Bez oferty stały tu dwa
           akapity: „rozmowa nie jest powiązana z ofertą" i „nie ma z czego
           wywieść kartoteki". Baner nad rozmową mówi to już raz, razem
@@ -316,7 +316,7 @@ function Wiersz({ tytul, streszczenie, otwarty = false, onPrzelacz, children }: 
   onPrzelacz?: () => void;
   children?: React.ReactNode;
 }) {
-  /* Wiersz bez treści NIE jest przyciskiem (@wydanie). Ta sama wysokość
+  /* Wiersz bez treści NIE jest przyciskiem (0.548.0). Ta sama wysokość
      i to samo wcięcie co wiersz rozwijany, żeby kolumna się nie rozjeżdżała;
      w miejscu szewronu pusty odstęp, bo szewron obiecuje rozwinięcie. */
   if (!onPrzelacz) {
@@ -364,7 +364,7 @@ const STATUS_OFERTY: Record<string, string> = {
 
 export function streszczenieOferty(dane: OsRozmowy): string {
   const o = dane.oferta;
-  /* „bez oferty" (@wydanie): streszczenie jest jedynym miejscem braku
+  /* „bez oferty" (0.548.0): streszczenie jest jedynym miejscem braku
      w kolumnie, a słowo „powiązanej" niesie już baner nad rozmową. */
   if (!o) return pozycjiDoWskazania(dane) ? "do wskazania w zamówieniu" : "bez oferty";
   if (!o.pobrana) return `oferta ${o.externalId} · treść jeszcze nie pobrana`;

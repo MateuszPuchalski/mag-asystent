@@ -713,7 +713,7 @@ describe("kubełek „Do odpowiedzi”", () => {
   });
 });
 
-/* ── Wiersz w wariancie C (@wydanie) ─────────────────────────────────────────
+/* ── Wiersz w wariancie C (0.548.0) ─────────────────────────────────────────
    Decyzja właściciela z 28 września 2026: pierwsza linia to login i wiek,
    pod nią do dwóch linii pytania, bez kafla po lewej. Zmienia się UKŁAD, nie
    informacja — każdy znacznik z testów wyżej dalej stoi w wierszu. jsdom nie
@@ -787,7 +787,7 @@ describe("wiersz w wariancie C", () => {
   });
 });
 
-/* ── „Więcej" w rzędzie kubełków (@wydanie, wariant C) ─────────────────────
+/* ── „Więcej" w rzędzie kubełków (0.548.0, wariant C) ─────────────────────
    Lista brała resztę rzędu i po zawinięciu stawała się pełnoszerokim paskiem
    pod pigułkami. Teraz jest zwartym elementem TEGO SAMEGO rzędu i zawija się
    tylko wtedy, gdy się nie mieści. */

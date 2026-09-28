@@ -133,7 +133,7 @@ describe("kolumna kontekstu", () => {
     expect(screen.getAllByTestId("zamowienie")).toHaveLength(1);
   });
 
-  /* ── Brak oferty mówi się RAZ (@wydanie, wariant C) ───────────────────────
+  /* ── Brak oferty mówi się RAZ (0.548.0, wariant C) ───────────────────────
      Decyzja właściciela z 28 września 2026. Baner nad rozmową mówi o braku
      z czynnościami, więc kolumna nie powtarza go dwoma akapitami. Gwarancja
      „nie milczy" zostaje: wiersz stoi i mówi brak streszczeniem. */
@@ -152,7 +152,7 @@ describe("kolumna kontekstu", () => {
 
   it("zamówienie bez oferty i nie z kilku pozycji: wiersz mówi, co zrobić, bo baner wtedy milczy", async () => {
     /* `brakPowiazania` gasi baner, gdy zamówienie jest znane. Bez tego zdania
-       kolumna zostawiała samo „bez oferty”, bez drogi dalej (recenzja @wydanie). */
+       kolumna zostawiała samo „bez oferty”, bez drogi dalej (recenzja 0.548.0). */
     rysuj(dane({ oferta: null, zamowienie: pusteZamowienie }));
     /* Wiersz bywa otwarty na starcie (pamięć rozwinięć), więc klikamy tylko zwinięty. */
     if (wiersz(/^Oferta i towar/).getAttribute("aria-expanded") === "false") {
@@ -174,7 +174,7 @@ describe("kolumna kontekstu", () => {
     expect(within(swieci).getByText(/Zamówienie ma 2 pozycje — wskaż tę/)).toBeInTheDocument();
     expect(within(swieci).getByTestId("zamowienie")).toBeInTheDocument();
     /* Prośbę niesie „Wymaga Ciebie" — wiersz oferty mówi ją streszczeniem,
-       nie drugim zdaniem o tym samym (@wydanie). */
+       nie drugim zdaniem o tym samym (0.548.0). */
     expect(screen.getByText("Oferta i towar").parentElement).toHaveTextContent("do wskazania w zamówieniu");
     expect(screen.queryByText(/Wskaż pozycję zamówienia wyżej/)).toBeNull();
     expect(screen.queryByText(/nie jest powiązana z ofertą/)).toBeNull();
@@ -189,7 +189,7 @@ describe("kolumna kontekstu", () => {
       expect(screen.queryByRole("button", { name: nazwa })).not.toBeInTheDocument();
     }
     /* Bez oferty wiersz „Oferta i towar" stoi samym streszczeniem, nie
-       przyciskiem (@wydanie) — ale STOI, bo temat ma wiersz zawsze. */
+       przyciskiem (0.548.0) — ale STOI, bo temat ma wiersz zawsze. */
     expect(screen.getByText("Oferta i towar")).toBeInTheDocument();
     for (const nazwa of [/^Zamówienie/, /^Dobór/, /^Klient/, /^Wiedza/]) {
       expect(wiersz(nazwa)).toBeInTheDocument();
