@@ -51,6 +51,16 @@ export const ZWLOKA_KLAWISZA_MS = 1000;
  *     a przyciski wysyłki pływają przy dolnej krawędzi.
  * Komponent zwraca więc DWA elementy: dymek i pływający pasek działań.
  * Wołający (`Os` przez `Rozmowa`) wstawia oba na koniec listy wypowiedzi.
+ *
+ * ── WĄTEK PIERWSZY: PUSTY EDYTOR TO JEDNA LINIJKA (@wydanie) ───────────────
+ * Wariant C z płótna „Skrzynka — warianty”, decyzja właściciela z 28 września.
+ * Przy 1180 px wątek miał około 190 px, bo pusty edytor z zakładkami i polem
+ * na pięć linii stał pod nim, zanim agent napisał choć słowo. Teraz pusty
+ * edytor to jeden przyklejony rząd z polem i „Wyślij” w środku. Rozwija się
+ * sam, gdy jest co pokazać: pierwsza litera, szkic zespołu albo Copilota,
+ * notatka, załącznik, cofnięcie wyczyszczenia. Pole jest przez cały czas TYM
+ * SAMYM elementem w tym samym rodzicu, więc przy rozwinięciu nie traci
+ * fokusu w pół słowa. Notatkę otwiera N z tła strony albo przycisk w rzędzie.
  */
 export function Edytor({
   szkic, cudza, wlasciciel, zapisuje, wysyla, onZmiana, onZapisz, onWyslij, onWyslijIZakoncz,
@@ -112,10 +122,27 @@ export function Edytor({
      warunkiem co przycisk. Nie w trybie notatki: tam przycisku wysyłki nie
      ma w drzewie (§10.4) i skrót nie może go udawać. */
   const pole = useRef<HTMLTextAreaElement>(null);
+  const poleNotatki = useRef<HTMLTextAreaElement>(null);
+  /* Notatka otwarta klawiszem dostaje fokus od razu: N z tła strony ma
+     kończyć się w polu, w którym pisze się dalej, nie na przełączniku. */
+  const [fokusNotatki, setFokusNotatki] = useState(false);
+  useEffect(() => {
+    if (fokusNotatki && wKomentarzu) { poleNotatki.current?.focus(); setFokusNotatki(false); }
+  }, [fokusNotatki, wKomentarzu]);
   const zamontowany = useRef(Date.now());
   const skrotyDzialaja = useSkrotyDzialaja();
   const klawisz = useRef<(e: KeyboardEvent) => void>(() => {});
   klawisz.current = (e: KeyboardEvent) => {
+    /* N — NOTATKA (@wydanie). Pusty edytor chowa przełącznik zakładek, więc
+       notatka potrzebuje drogi z klawiatury. N nie jest zajęte w skrzynce;
+       w reklamacjach i dyskusjach znaczy „niczyje”, ale tam notatki nie ma. */
+    if ((e.key === "n" || e.key === "N") && !wKomentarzu && !e.ctrlKey && !e.metaKey && !e.altKey
+      && !e.isComposing && !klawiszZajety(e.target)) {
+      e.preventDefault();
+      setTryb("komentarz");
+      setFokusNotatki(true);
+      return;
+    }
     if (e.key !== "Enter" || wKomentarzu || e.altKey || e.isComposing || klawiszZajety(e.target)) return;
     if (e.ctrlKey || e.metaKey) {
       e.preventDefault();
@@ -178,6 +205,13 @@ export function Edytor({
     && (copilot.szkic.ocena === "wstawiony" || copilot.szkic.ocena === "zastapiony")
     ? copilot.szkic.zastrzezenia : [];
 
+  /* ZWINIĘTY = NIC DO POKAZANIA POZA POLEM. Karta Copilota liczy się tym
+     samym warunkiem, którym `KartaSzkicu` decyduje, czy się rysuje. */
+  const kartaSzkicu = Boolean(copilot?.szkic && (copilot.szkic.ocena === null
+    || (wPolu && copilot.szkic.ocena !== "odrzucony")));
+  const zwiniety = !wKomentarzu && szkic === "" && !cudza && zalaczniki.length === 0
+    && wyczyszczone === null && !kartaSzkicu && niesprawdzone.length === 0;
+
   const przelacz = (id: number) => onWzmianki(
     wzmianki.includes(id) ? wzmianki.filter((x) => x !== id) : [...wzmianki, id]);
 
@@ -191,7 +225,9 @@ export function Edytor({
      nie wyszła. Pełna szerokość progu 75ch, bo w nim się pisze. */
   return <>
   <article aria-label={wKomentarzu ? "Twoja notatka" : "Twoja odpowiedź"}
-    className={`ml-auto w-full max-w-[75ch] rounded-lg border-2 border-dashed p-3 ${wKomentarzu
+    className={zwiniety
+      ? "sticky bottom-2 z-10 ml-auto w-full max-w-[75ch] rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-1.5 shadow-lg"
+      : `ml-auto w-full max-w-[75ch] rounded-lg border-2 border-dashed p-3 ${wKomentarzu
       ? "border-amber-300 bg-amber-50" : wPolu ? "border-violet-300 bg-white" : "border-slate-300 bg-white"}`}>
     {/* ── PRZEŁĄCZNIK JEST JEDNYM ELEMENTEM, NIE DWOMA (0.247.0) ──────────────
         Dwa luźne przyciski o tej samej wadze nie mówiły, że wybiera się JEDEN
@@ -205,7 +241,7 @@ export function Edytor({
         Nieaktywna połowa ma `slate-600` (0.546.0). `slate-500` na bieżni
         `slate-100` dawało 4.34:1, na bursztynowej około 4.3:1, przy progu
         4.5:1 — zmierzone axe w Chromium przy otwartej rozmowie. */}
-    <div className="mb-2.5 flex items-center gap-2">
+    {!zwiniety && <div className="mb-2.5 flex items-center gap-2">
       <div className={`flex gap-0.5 rounded-lg p-0.5 ${wKomentarzu ? "bg-amber-100" : "bg-slate-100"}`}>
         <button className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${!wKomentarzu
           ? "bg-white font-semibold text-slate-900 shadow-sm" : "font-medium text-slate-600"}`}
@@ -241,11 +277,11 @@ export function Edytor({
           className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-sky-800 hover:bg-sky-50">
           <Undo2 size={13} />Cofnij wyczyszczenie</button>}
       </div>}
-    </div>
+    </div>}
 
     {wKomentarzu
       ? <>
-          <textarea className="field min-h-[88px] text-tresc [field-sizing:content]" value={komentarz}
+          <textarea ref={poleNotatki} className="field min-h-[88px] text-tresc [field-sizing:content]" value={komentarz}
             aria-label="Notatka wewnętrzna — zobaczy ją tylko zespół"
             onChange={(e) => onKomentarz(e.target.value)}
             placeholder="Notatka dla zespołu — klient tego nie zobaczy" />
@@ -278,8 +314,14 @@ export function Edytor({
               `field-sizing: content` rośnie z tekstem od progu 120 px, bez
               skryptu mierzącego wysokość. Przeglądarka bez tej własności
               dostaje próg i `resize-y`, czyli to, co było, tylko niższe. */}
-          <textarea ref={pole} className={`field min-h-[7.5rem] resize-y text-tresc [field-sizing:content] ${
-            wPolu ? "bg-violet-50" : ""}`} value={szkic}
+          {/* STAŁY RODZIC POLA: zwinięty rząd i rozwinięty dymek różnią się
+              klasami, a nie drzewem. Inny rodzic przemontowałby pole
+              i zabrał mu fokus przy pierwszej literze. */}
+          <div className={zwiniety ? "flex items-center gap-2" : ""}>
+          <textarea ref={pole} className={zwiniety
+            ? "min-h-10 min-w-0 flex-1 resize-none bg-transparent py-2 text-tresc outline-none [field-sizing:content]"
+            : `field min-h-[7.5rem] resize-y text-tresc [field-sizing:content] ${wPolu ? "bg-violet-50" : ""}`}
+            rows={zwiniety ? 1 : undefined} value={szkic}
             aria-label="Szkic odpowiedzi" aria-keyshortcuts="Control+Enter"
             onChange={(e) => { if (e.target.value !== "") setWyczyszczone(null); onZmiana(e.target.value); }}
             /* CTRL+ENTER WYSYŁA (23 września 2026). Ten sam warunek co przycisk
@@ -295,9 +337,28 @@ export function Edytor({
             }}
             /* Podpowiedź Entera tylko wtedy, gdy Enter prowadzi do pola —
                w samym polu robi nową linię (dekalog p. 2, `nawigacja/fokus.ts`). */
-            placeholder={skrotyDzialaja && !cudza
-              ? "Szkic odpowiedzi — współdzielony z zespołem · Enter, żeby pisać"
-              : "Szkic odpowiedzi — współdzielony z zespołem"} />
+            placeholder={zwiniety
+              ? (skrotyDzialaja ? "Odpowiedz klientowi… (Enter) · N — notatka" : "Odpowiedz klientowi…")
+              : skrotyDzialaja && !cudza
+                ? "Szkic odpowiedzi — współdzielony z zespołem · Enter, żeby pisać"
+                : "Szkic odpowiedzi — współdzielony z zespołem"} />
+          {zwiniety && <>
+            {/* Copilot w rzędzie tylko jako czynność. Zdanie o wyłączonym
+                Copilocie zjadłoby rząd, a nic się z nim nie zrobi. */}
+            {copilot?.stan?.wlaczony && <PrzyciskSzkicu p={copilot} />}
+            <button type="button" onClick={() => { setTryb("komentarz"); setFokusNotatki(true); }}
+              aria-keyshortcuts="N" aria-label="Notatka wewnętrzna"
+              title="Notatka wewnętrzna — zobaczy ją tylko zespół (N)"
+              className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+              <MessageSquare size={15} />Notatka</button>
+            <PrzyciskZalacznika dodaje={dodajeZalacznik} onDodaj={onDodajZalacznik} wylaczone={cudza} />
+            {/* Martwa, dopóki pole jest puste — jak w pasku. Stoi, żeby było
+                widać, gdzie wysyłka będzie, zanim padnie pierwsze słowo. */}
+            <Przycisk wariant="glowny" disabled className="shrink-0 whitespace-nowrap">
+              <Send size={16} />Wyślij do klienta</Przycisk>
+          </>}
+          </div>
+          {!zwiniety && <>
           {uwagiPoPrzyjeciu.length > 0 && <div className="mt-2"><UwagiSzkicu uwagi={uwagiPoPrzyjeciu} /></div>}
           {/* Po „Wyczyść wszystko" karta stoi zwinięta: pusty znaczy pusty,
               a szkic wraca jednym kliknięciem „Wstaw do odpowiedzi". */}
@@ -315,6 +376,7 @@ export function Edytor({
             </ul>
             {niesprawdzone.length > 3 && <p className="mt-1">i {niesprawdzone.length - 3} więcej w „Skąd to wiem".</p>}
           </section>}
+          </>}
         </>}
   </article>
 
@@ -331,7 +393,7 @@ export function Edytor({
       kolumnie (ekran 1440 px) chowają się więc rzeczy wtórne: licznik znaków
       i podpis drugiego skrótu. Skrót ZOSTAJE w podpowiedzi i w nazwie
       dostępnej, a podpis głównego — Ctrl+Enter — nie chowa się nigdy. */}
-  <div className={`sticky bottom-2 z-10 ml-auto flex w-fit max-w-full items-center gap-3 rounded-xl border px-2 py-1.5 shadow-lg ${
+  {!zwiniety && <div className={`sticky bottom-2 z-10 ml-auto flex w-fit max-w-full items-center gap-3 rounded-xl border px-2 py-1.5 shadow-lg ${
     wKomentarzu ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}
     role="group" aria-label={wKomentarzu ? "Działania notatki" : "Działania odpowiedzi"}>
     {wKomentarzu
@@ -383,7 +445,7 @@ export function Edytor({
           <InneWysylki onZapisz={onZapisz} zapisuje={zapisuje} cudza={cudza}
             onWyslijIZakoncz={onWyslijIZakoncz} mozeWyslac={!cudza && !wysyla && !!szkic.trim()} />
         </>}
-  </div>
+  </div>}
   </>;
 }
 

@@ -48,9 +48,15 @@ describe("Szkic Copilota w edytorze", () => {
     expect(c.onUloz).toHaveBeenCalledTimes(1);
     unmount();
 
-    edytor(copilot({ stan: { wlaczony: false, powod: "Copilot jest wyłączony. Włącz go w wertis.env (COPILOT_MODE=anthropic).",
+    const wylaczony = copilot({ stan: { wlaczony: false, powod: "Copilot jest wyłączony. Włącz go w wertis.env (COPILOT_MODE=anthropic).",
       model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20,
-    autoKlasyfikacja: false, autoSzkic: false } }));
+    autoKlasyfikacja: false, autoSzkic: false } });
+    /* Zwinięty rząd pustego edytora (@wydanie) zdania nie niesie: nic się
+       z nim nie zrobi, a zjadłoby pole. Staje po rozwinięciu. */
+    const { unmount: odmontuj } = edytor(wylaczony);
+    expect(screen.queryByText(/COPILOT_MODE=anthropic/)).toBeNull();
+    odmontuj();
+    edytor(wylaczony, { szkic: "Dzień dobry" });
     expect(screen.queryByRole("button", { name: /Ułóż odpowiedź/ })).toBeNull();
     expect(screen.getByText(/COPILOT_MODE=anthropic/)).toBeInTheDocument();
   });
