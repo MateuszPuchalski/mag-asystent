@@ -368,7 +368,7 @@ describe("Kto mówi, widać bez czytania (0.416.0, barwy z 0.418.0)", () => {
   });
 });
 
-describe("Odpowiedź jest ostatnią wypowiedzią wątku (@wydanie)", () => {
+describe("Odpowiedź jest ostatnią wypowiedzią wątku (0.549.0)", () => {
   /* Decyzja właściciela z 28 września: ten sam układ co w skrzynce. Pole
      stoi W pasie przewijania, za ostatnią wiadomością, a pod ręką trzyma je
      przyklejenie do krawędzi. Werdykt zostaje poza pasem, w ekranie. */

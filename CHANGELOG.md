@@ -10,6 +10,16 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.549.0 — 28 września 2026
+
+**Reklamacje i dyskusje: ten sam edytor co w skrzynce.** Odpowiedź stoi na końcu rozmowy, a pusta zajmuje jedną linijkę przyklejoną do dolnej krawędzi. Rozmowa dostaje z powrotem wysokość, którą zabierał pas pod nią. Enter z tła strony stawia kursor w polu, Ctrl+Enter wysyła także spoza pola, a „Wyczyść wszystko” ma cofnięcie. Klawisz n dalej przełącza „niczyje”.
+
+**Enter na innym wierszu kolejki otwiera ten wiersz.** Do pola odpowiedzi prowadzi tylko Enter na wybranej sprawie, we wszystkich trzech kolejkach. Ctrl+Enter wysyła spoza pola tylko z tła strony, z wybranego wiersza albo z edytora, więc fokus na przycisku werdyktu niczego nie wyśle.
+
+**W trakcie wysyłki nie da się dołożyć ani zdjąć pliku.** Plik dołożony w tej chwili nie wychodził z odpowiedzią i znikał z listy.
+
+**Skrzynka blokuje odpowiedź dłuższą niż 2000 znaków przed wysłaniem.** Licznik mówi, o ile skrócić, zamiast czekać na odmowę serwera.
+
 ## 0.548.0 — 28 września 2026
 
 **Skrzynka: wątek pierwszy.** Pusty edytor zajmuje jedną linijkę z „Wyślij” w środku i rośnie przy pisaniu. Notatkę otwiera klawisz N albo przycisk „Notatka”. Szkic Copilota albo zespołu otwiera go w pełnej wysokości. Baner braku oferty ma jedną linijkę z przyciskami „Wskaż ofertę” i „Dopytaj o numer”, a prawa kolumna nie powtarza go dwoma akapitami. W kolejce „Więcej” stoi obok kubełków, a wiersz pokazuje login, wiek i do dwóch linii pytania.

@@ -129,7 +129,7 @@ describe("Edytor reklamacji bez szablonów", () => {
   });
 });
 
-/* ── Jeden edytor trzech kolejek (@wydanie) ──────────────────────────────────
+/* ── Jeden edytor trzech kolejek (0.549.0) ──────────────────────────────────
    Sprawa odpowiada edytorem skrzynki. Testy pilnują różnic, które wchodzą
    ustawieniem: brak notatki, własny napis i sufit, zamknięty czat. Klawisz N
    należy w sprawach do ekranu („niczyje”), więc edytor nie ma prawa go zjeść. */

@@ -2,7 +2,7 @@ import React from "react";
 import type { ZalacznikSzkicu } from "../api/rozmowy";
 import { Edytor as EdytorOdpowiedzi } from "../skrzynka/Edytor";
 
-/* ── Edytor odpowiedzi w sprawie Allegro: USTAWIENIA, NIE KOPIA (@wydanie) ──
+/* ── Edytor odpowiedzi w sprawie Allegro: USTAWIENIA, NIE KOPIA (0.549.0) ──
    Reklamacje i dyskusje odpowiadają tym samym edytorem co skrzynka, decyzją
    właściciela z 28 września. Osobny edytor sprawy rozjeżdżał się ze skrzynką
    przy każdym wydaniu, bo każdą poprawkę trzeba było pamiętać dwa razy.

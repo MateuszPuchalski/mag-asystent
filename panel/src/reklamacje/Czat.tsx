@@ -298,7 +298,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
           })}
         </ol>}
 
-    {/* ── ODPOWIEDŹ JEST OSTATNIĄ WYPOWIEDZIĄ WĄTKU (@wydanie) ──────────────
+    {/* ── ODPOWIEDŹ JEST OSTATNIĄ WYPOWIEDZIĄ WĄTKU (0.549.0) ──────────────
         Decyzja właściciela z 28 września, ten sam układ co w skrzynce. Pole
         stoi w pasie przewijania, bo pod ręką trzyma je sam edytor: pusty jest
         jednym rzędem przyklejonym do dolnej krawędzi, a pasek wysyłki pływa.

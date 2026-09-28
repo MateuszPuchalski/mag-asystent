@@ -62,7 +62,7 @@ export const ZWLOKA_KLAWISZA_MS = 1000;
  * SAMYM elementem w tym samym rodzicu, więc przy rozwinięciu nie traci
  * fokusu w pół słowa. Notatkę otwiera N z tła strony albo przycisk w rzędzie.
  *
- * ── JEDEN EDYTOR TRZECH KOLEJEK (@wydanie) ─────────────────────────────────
+ * ── JEDEN EDYTOR TRZECH KOLEJEK (0.549.0) ─────────────────────────────────
  * Decyzja właściciela z 28 września: reklamacje i dyskusje odpowiadają tym
  * samym edytorem, w tym samym miejscu wątku. Osobny edytor sprawy rozjeżdżał
  * się z tym przy każdym wydaniu: nie miał zwiniętego rzędu, czyszczenia

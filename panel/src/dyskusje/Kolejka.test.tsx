@@ -89,7 +89,7 @@ describe("Kolejka dyskusji", () => {
     render(<Kolejka dyskusje={[]} wybrana={null} onWybierz={vi.fn()} />);
     expect(screen.getByText(/Ten kubełek jest pusty/)).toBeInTheDocument();
   });
-  it("wiersz niesie znacznik kolejki: Enter na wybranym idzie do pola odpowiedzi (@wydanie)", () => {
+  it("wiersz niesie znacznik kolejki: Enter na wybranym idzie do pola odpowiedzi (0.549.0)", () => {
     /* Edytor skrzynki rozpoznaje wiersz po `data-wiersz-kolejki`. Bez znacznika
        Enter na wybranej sprawie nie prowadziłby do pisania. */
     render(<Kolejka dyskusje={[d()]} wybrana={1} onWybierz={vi.fn()} />);
