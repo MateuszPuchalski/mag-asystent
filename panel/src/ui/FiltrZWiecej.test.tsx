@@ -62,4 +62,21 @@ describe("FiltrZWiecej", () => {
     expect(screen.queryByLabelText("Więcej kubełków")).not.toBeInTheDocument();
     expect(screen.getAllByRole("button")).toHaveLength(2);
   });
+
+  /* Tryb zwarty (@wydanie, wariant C skrzynki): lista na szerokość treści,
+     w rzędzie pigułek. Domyślny zostaje dla kolejek, które go nie wybrały. */
+  it("zwarta lista mierzy się treścią, domyślna bierze resztę rzędu", () => {
+    const pozycje = [{ klucz: "a", etykieta: "A" }, { klucz: "b", etykieta: "B", ile: 2 }];
+    const { unmount } = render(<FiltrZWiecej<string> zwarty wybrany="a" onWybierz={() => {}}
+      wiecej={["b"]} pozycje={pozycje} />);
+    const zwarta = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
+    expect(zwarta.className).toMatch(/\bshrink-0\b/);
+    expect(zwarta.className).not.toMatch(/\bflex-1\b/);
+    expect(zwarta.selectedOptions[0].textContent).toBe("Więcej");
+    unmount();
+    render(<FiltrZWiecej<string> wybrany="a" onWybierz={() => {}} wiecej={["b"]} pozycje={pozycje} />);
+    const domyslna = screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
+    expect(domyslna.className).toMatch(/\bflex-1\b/);
+    expect(domyslna.selectedOptions[0].textContent).toBe("Więcej…");
+  });
 });

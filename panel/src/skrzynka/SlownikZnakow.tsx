@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  AlarmClock, CircleDashed, CircleHelp, HeartHandshake, MessageSquare, Ruler, UserRound, Wrench, X,
+  AlarmClock, CircleDashed, CircleHelp, HeartHandshake, MessageSquare, Ruler, Wrench, X,
 } from "lucide-react";
 import type { Kategoria } from "../api/typy";
 import { IKONA_KATEGORII } from "./Copilot";
@@ -71,8 +71,10 @@ export function SlownikZnakow({ kubelkow }: {
           <ul className="flex flex-col gap-1.5">
             {kategorie.map((k) => {
               const Ikona = IKONA_KATEGORII[k];
+              /* Znak BEZ KAFLA, tak jak stoi w wierszu kolejki (@wydanie):
+                 słownik pokazuje to, co agent widzi, a nie jego dawny kształt. */
               return <li key={k} className="flex items-center gap-2">
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-violet-200 bg-violet-50 text-violet-800">
+                <span className="inline-flex w-7 text-violet-700">
                   <Ikona size={15} aria-hidden="true" /></span>{NAZWA_KATEGORII[k]}</li>;
             })}
           </ul>
@@ -80,12 +82,12 @@ export function SlownikZnakow({ kubelkow }: {
         <div>
           <p className="mb-2 text-podpis font-bold uppercase tracking-wide text-slate-600">Co z tym zrobić</p>
           <ul className="flex flex-col gap-2">
-            <li className="flex items-center gap-2"><span className="relative inline-flex h-7 w-7 items-center justify-center rounded-md border border-violet-200 bg-violet-50 text-violet-800">
-              <IkonaDobor /><span aria-hidden="true" className="absolute -right-1 -top-1 inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border-2 border-white bg-ranga-zle text-white"><UserRound size={8} /></span></span>
+            <li className="flex items-center gap-2"><span className="inline-flex w-7"><span className="relative inline-flex text-violet-700">
+              <IkonaDobor /><span aria-hidden="true" className="absolute -right-1 -top-1 h-2 w-2 rounded-full border border-white bg-ranga-zle" /></span></span>
               czerwona kropka — wymaga człowieka</li>
-            <li className="flex items-center gap-2"><span className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-dashed border-slate-300 bg-slate-50 text-slate-600"><CircleDashed size={15} aria-hidden="true" /></span>
+            <li className="flex items-center gap-2"><span className="inline-flex w-7 text-slate-500"><CircleDashed size={15} aria-hidden="true" /></span>
               nierozpoznana</li>
-            <li className="flex items-center gap-2"><span className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-600"><HeartHandshake size={15} aria-hidden="true" /></span>
+            <li className="flex items-center gap-2"><span className="inline-flex w-7 text-slate-500"><HeartHandshake size={15} aria-hidden="true" /></span>
               podziękowanie — nie czeka na nas</li>
             <li className="flex items-center gap-2"><span className="w-16"><Czekanie ms={0.5 * G} /></span>krócej niż godzina</li>
             <li className="flex items-center gap-2"><span className="w-16"><Czekanie ms={2 * G} /></span>1–4 godziny</li>
