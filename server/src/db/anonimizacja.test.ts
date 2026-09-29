@@ -381,7 +381,7 @@ test("po migracji żadna kolumna z nazwą osoby ani adresu nie ma reguły „zos
   assert.deepEqual(zostajace, []);
 });
 
-/* ── Poprawki po przeglądzie (@wydanie) ──────────────────────────────────────
+/* ── Poprawki po przeglądzie (0.550.3) ──────────────────────────────────────
    Każdy z poniższych testów pilnuje jednej luki, którą znalazł niezależny
    przegląd narzędzia. Powstały PRZED poprawkami i padały na poprzedniej wersji. */
 

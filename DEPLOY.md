@@ -2269,7 +2269,7 @@ mkdir C:\anonim
 4. Poczekaj na wiersz „Gotowe”. Zmierzone: baza 63 MB z 124 tys. wierszy zajęła 36 sekund.
 5. Wyślij wyłącznie plik `wertis-anonim.db`. Obok leży `wertis-anonim.db.kolumny.txt`, czyli lista kolumn i reguł bez żadnych danych. Można ją wysłać razem z bazą.
 
-`.\node\node.exe` to Node z paczki wydania. Instalacja z klonu repo używa `node` z PATH. Narzędzie jest w paczce od wydania @wydanie, więc starsza instalacja nie ma pliku `tools\anonimizuj-baze.mjs`.
+`.\node\node.exe` to Node z paczki wydania. Instalacja z klonu repo używa `node` z PATH. Narzędzie jest w paczce od wydania 0.550.3, więc starsza instalacja nie ma pliku `tools\anonimizuj-baze.mjs`.
 
 Kod wyjścia 2 i komunikat „Skaner znalazł” znaczą jedno: w wyniku został ślad danych, które miały zniknąć. Pliku wyniku wtedy nie ma. Nic nie wysyłaj i zgłoś tabele oraz kolumny z komunikatu, bo to błąd reguł.
 

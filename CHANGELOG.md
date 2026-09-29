@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.550.3 — 29 września 2026
+
+Przegląd narzędzia `tools/anonimizuj-baze.mjs` znalazł luki w jego głównej własności. Identyfikator kupującego z surowego JSON-a Allegro przeżywał rozsyp, a wynik nieprzeskanowany mógł zostać pod docelową nazwą. Poprawki: klucze osobowe w JSON-ie są zawsze rozsypywane, wynik dostaje docelową nazwę dopiero po skanie, a plik roboczy leży w katalogu tymczasowym. Narzędzie jedzie teraz w paczce wydania, a skaner nie myli się z przypadkową zbieżnością numerów telefonu i pracuje kilka razy szybciej na dużej bazie.
+
 ## 0.550.2 — 29 września 2026
 
 Nowe narzędzie `tools/anonimizuj-baze.mjs` robi z kopii bazy plik bez danych osobowych klientów i pracowników, z zachowaniem kształtu danych. Służy do przeglądu ekranów na prawdziwym wolumenie i prawdziwych długościach tekstów. Serwer i panel się nie zmieniają, narzędzie uruchamia człowiek na kopii z folderu kopii. Instrukcja stoi w DEPLOY.md §7.
