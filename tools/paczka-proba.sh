@@ -19,6 +19,13 @@ trap '[ -n "$PID" ] && kill "$PID" 2>/dev/null; rm -rf "$ROB"' EXIT
 ( cd "$(dirname "$ZIP")" && sha256sum -c "$(basename "$ZIP").sha256" )
 unzip -q "$ZIP" -d "$ROB"
 P="$ROB/wertis-$WERSJA"
+# Paczka nie może nieść katalogu, który aktualizacja przenosi ze starej instalacji.
+# Lista stoi w `WertisDoPrzeniesienia` (instalator/paczka.ps1). Kopiowanie do istniejącego
+# katalogu wkłada źródło do środka, więc `tools\nssm.exe` lądował by w `tools\tools\`,
+# a usługi, które go wskazują, by nie wstały. Wydanie 0.550.3 miało dokładnie ten błąd.
+for kolizja in tools logs sfera-worker tlo-worker; do
+  [ ! -e "$P/$kolizja" ] || { echo "Paczka niesie '$kolizja', który aktualizacja przenosi ze starej instalacji." >&2; exit 1; }
+done
 [ "$(node -p "require('$P/paczka.json').wersja")" = "$WERSJA" ] || { echo "paczka.json nie zgadza się z nazwą" >&2; exit 1; }
 # Node dla Windowsa (0.496.0): tu go nie uruchomimy, ale jego brak albo
 # ucięty plik zatrzymałby instalację w magazynie na pierwszej usłudze.
@@ -59,10 +66,10 @@ npm --prefix server run --silent reconcile > "$ROB/reconcile.log" 2>&1 \
 # Narzędzie do anonimizacji kopii bazy (DEPLOY §7) na kopii zrobionej tak jak
 # serwer: `VACUUM INTO`. Jeśli paczka go nie niesie albo padnie bez repo, wyjdzie to
 # tu, a nie u właściciela, który uruchomi je na prawdziwej bazie.
-[ -f "$P/tools/anonimizuj-baze.mjs" ] || { echo "Paczka nie ma tools/anonimizuj-baze.mjs." >&2; exit 1; }
+[ -f "$P/narzedzia/anonimizuj-baze.mjs" ] || { echo "Paczka nie ma narzedzia/anonimizuj-baze.mjs." >&2; exit 1; }
 node -e "new (require('node:sqlite').DatabaseSync)(process.argv[1]).prepare('VACUUM INTO ?').run(process.argv[2])" \
   "$DB_PATH" "$ROB/kopia.db" 2>/dev/null
-node tools/anonimizuj-baze.mjs "$ROB/kopia.db" "$ROB/anonim.db" > "$ROB/anonim.log" 2>&1 \
+node narzedzia/anonimizuj-baze.mjs "$ROB/kopia.db" "$ROB/anonim.db" > "$ROB/anonim.log" 2>&1 \
   || { cat "$ROB/anonim.log" >&2; echo "narzędzie do anonimizacji z paczki padło" >&2; exit 1; }
 [ -s "$ROB/anonim.db" ] || { echo "narzędzie do anonimizacji nie zostawiło wyniku" >&2; exit 1; }
 
