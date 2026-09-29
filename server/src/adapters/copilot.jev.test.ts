@@ -269,6 +269,15 @@ test("brakujące albo przekręcone pole odpowiedzi to błąd, nie decyzja z domy
   assert.ok(await nadawcaJev(TRESC).then(() => null, (b) => b) instanceof BladOdpowiedziCopilota);
 });
 
+test("brak zużycia w odpowiedzi to błąd, nie koszt zero", async () => {
+  zKluczem();
+  for (const usage of [undefined, {}, { input_tokens: 10 }, { input_tokens: "10", output_tokens: 1 }]) {
+    fetchZwracajacy(json(200, { ...odpowiedz(), usage }));
+    const e = await nadawcaJev(TRESC).then(() => null, (b) => b);
+    assert.ok(e instanceof BladOdpowiedziCopilota, JSON.stringify(usage));
+  }
+});
+
 test("klucz nigdy nie trafia do komunikatu ani śladu błędu", async () => {
   zKluczem();
   const przypadki: Array<Response | (() => never)> = [

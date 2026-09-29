@@ -325,6 +325,24 @@ test("COPILOT_MODEL_KLASYFIKACJA z wklejonym kluczem nie wynosi go do komunikatu
   assert.match(o, /claude-/);
 });
 
+/* Klucz TypeSafe sąsiaduje w wertis.env.example z KLASYFIKATOR_DOSTAWCA i
+   JEV_MODEL, czyli w tej samej pułapce co klucz Anthropic w 0.84.1. Prefiksu
+   klucza TypeSafe nie znamy (dokumentacja go nie podaje), więc lista prefiksów
+   go nie chroni. Chroni długość: wartość dłuższa niż nazwa trybu nie idzie do
+   komunikatu w całości. Wartość poniżej jest zmyślona i tak ma zostać. */
+test("wklejka klucza w JEV_MODEL albo KLASYFIKATOR_DOSTAWCA nie wynosi go w całości", () => {
+  const klucz = "zmyslony-klucz-typesafe-0123456789abcdef";
+  const zly = structuredClone(config) as typeof config;
+  (zly.copilot as { modelJev: string }).modelJev = klucz;
+  const o = bledyKonfiguracji(zly).find((b) => b.startsWith("JEV_MODEL="));
+  assert.ok(o, "brak zdania o JEV_MODEL");
+  assert.ok(!o.includes(klucz), "klucz poszedł do komunikatu w całości");
+  assert.match(o, /jev-/);
+
+  /* `assertMode` przy starcie wypisuje wartość dokładnie przez tę funkcję. */
+  assert.ok(!bezpiecznaWartosc(klucz).includes(klucz), "maska startowa wypuściła klucz w całości");
+});
+
 test("model klasyfikacji odziedziczony po COPILOT_MODEL nie dubluje zdania o błędzie", () => {
   const zly = structuredClone(config) as typeof config;
   (zly.copilot as { model: string }).model = "gpt-5";

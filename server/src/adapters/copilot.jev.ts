@@ -58,10 +58,13 @@ const PROG_CZLOWIEKA = 0.3;
 const PROG_BRAKU_DANYCH = 0.5;
 const PROG_DODATKOWEJ = 0.7;
 const MAKS_DODATKOWYCH = 3;
-/* Pewność słowna z liczbowej `confidence` kategorii. Przy piętnastu opcjach
-   0,8 odpowiada mniej więcej 75% na zwycięzcę, 0,5 — mniej więcej 53%
+/* Pewność słowna z liczbowej `confidence` KATEGORII. Przy piętnastu opcjach
+   0,8 odpowiada mniej więcej 81% na zwycięzcę, 0,5 — mniej więcej 53%
    (wzór z dokumentacji: (n·p − 1)/(n − 1)). Niższe pasmo to „niska”, czyli
-   przejrzenie przez człowieka — błąd w tę stronę jest tani. */
+   przejrzenie przez człowieka — błąd w tę stronę jest tani.
+   Pewność akcji NIE wchodzi do słowa: dwanaście kroków bywa wymiennych, a
+   niepewny krok przy pewnej kategorii nie jest powodem, by wołać człowieka.
+   Czy to słuszne, pokaże raport porównawczy, nie ten komentarz. */
 const PROG_PEWNOSCI_WYSOKIEJ = 0.8;
 const PROG_PEWNOSCI_SREDNIEJ = 0.5;
 
@@ -298,7 +301,15 @@ export const nadawcaJev: NadawcaKlasyfikacji = async (tresc): Promise<OdpowiedzM
   const uzasadnienie =
     `Jev: ${kategoria.wybrana} (${Math.round(kategoria.p * 100)}%), krok ${akcja.wybrana}.`;
 
+  /* Zużycie jest w kontrakcie TypeSafe. Jego brak to odpowiedź, której nie
+     znamy, a zero tokenów wyglądałoby na ekranie kosztów jak „nic nie
+     wydaliśmy”, choć wywołanie było płatne. */
   const u = cialo.usage as Record<string, unknown> | undefined;
+  if (!liczba(u?.input_tokens) || !liczba(u?.output_tokens)) {
+    throw new BladOdpowiedziCopilota(
+      "Jev oddał odpowiedź w nieoczekiwanym kształcie. Kliknij ponownie albo napisz sam.",
+      odp.status, "brak usage.input_tokens albo usage.output_tokens");
+  }
   return {
     /* Enumy przechodzą bez sprawdzania: `walidujOdpowiedz` odrzuci wartość
        spoza słownika i zapisze kod NIEPOPRAWNA_ODPOWIEDZ, tak samo jak przy Claude. */
@@ -317,8 +328,8 @@ export const nadawcaJev: NadawcaKlasyfikacji = async (tresc): Promise<OdpowiedzM
     model: typeof cialo.model === "string" ? cialo.model : model,
     promptWersja: PYTANIA_JEVA,
     zuzycie: {
-      wej: liczba(u?.input_tokens) ? u.input_tokens : 0,
-      wyj: liczba(u?.output_tokens) ? u.output_tokens : 0,
+      wej: u.input_tokens,
+      wyj: u.output_tokens,
       cacheZapis: 0,
       cacheOdczyt: 0,
     },

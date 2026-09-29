@@ -1,7 +1,7 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania, subiekt } from "../context.js";
 import { db } from "../db/db.js";
-import { config, modelKlasyfikatora } from "../config.js";
+import { config, kluczKlasyfikatora, modelKlasyfikatora } from "../config.js";
 import {
   poprawKlasyfikacje, pomiarCopilota, sklasyfikujRozmowy,
 } from "../services/copilot-klasyfikacja.js";
@@ -159,6 +159,15 @@ export async function copilotRoutes(app: FastifyInstance) {
       /* Wyłączony Copilot odpowiada 400 ze zdaniem, a nie 500 z wywrotki
          w adapterze — i nie wychodzi przy tym do sieci ani razu. */
       if (powod) return reply.code(400).send({ error: powod });
+      /* Klucz WYBRANEGO klasyfikatora. `czemuWylaczony` pilnuje klucza Claude,
+         bo Copilot jako całość szkicuje Claude'em; przy Jevie rozpoznanie ma
+         jeszcze własny klucz, a jego brak dawałby 200 z `przerwane`, czyli
+         cichą porażkę tam, gdzie wystarczy jedno zdanie. */
+      if (!kluczKlasyfikatora()) {
+        return reply.code(400).send({
+          error: "Rozpoznawanie nie ma klucza. Ustaw TYPESAFE_API_KEY w wertis.env i zrestartuj usługę.",
+        });
+      }
 
       const ids = (req.body?.rozmowyId ?? []).map(Number).filter(Number.isInteger);
       if (ids.length === 0) {

@@ -1009,13 +1009,13 @@ export const config = {
      * Claude, bo Jev nie generuje tekstu. Powrót do Claude to jedna zmienna
      * i restart, bez wydania.
      */
-    klasyfikator: (process.env.KLASYFIKATOR_DOSTAWCA ?? "jev") as "jev" | "anthropic",
+    klasyfikator: (process.env.KLASYFIKATOR_DOSTAWCA || "jev") as "jev" | "anthropic",
     /**
      * Model Jeva. PRZYPIĘTY do wersji, nie do aliasu `jev-latest`: alias
      * przesuwa się przy nowym wydaniu, a progi pewności w `copilot.jev.ts`
      * są dostrojone do konkretnej wersji. Nowa wersja to świadoma zmiana tu.
      */
-    modelJev: process.env.JEV_MODEL ?? "jev-1.13.0",
+    modelJev: process.env.JEV_MODEL || "jev-1.13.0",
     /** Czy klucz TypeSafe jest. `Boolean`, nigdy sama wartość — jak `klucz` wyżej. */
     kluczJev: Boolean(process.env.TYPESAFE_API_KEY),
     /**
@@ -1505,10 +1505,12 @@ export function ostrzezeniaKonfiguracji(c: Config = config): string[] {
   }
   /* Jev jest domyślnym klasyfikatorem, więc instalacja sprzed tej zmiany, bez
      klucza TypeSafe, przestałaby rozpoznawać wiadomości. Ma to być głośne:
-     takt się nie uruchamia, a ręczne rozpoznanie odpowiada błędem klucza. */
+     ani takt rozpoznawania, ani przebieg przed pracą się nie uruchamia,
+     a ręczne rozpoznanie odpowiada zdaniem o braku klucza. */
   if (c.copilot.mode === "anthropic" && c.copilot.klasyfikator === "jev" && !c.copilot.kluczJev) {
     ostrzezenia.push(
-      "KLASYFIKATOR_DOSTAWCA=jev bez TYPESAFE_API_KEY — wiadomości klientów nie będą rozpoznawane. " +
+      "KLASYFIKATOR_DOSTAWCA=jev bez TYPESAFE_API_KEY — wiadomości klientów nie będą rozpoznawane, " +
+        "a szkice przed pracą nie ruszą. " +
         "Wpisz klucz TypeSafe w wertis.env albo ustaw KLASYFIKATOR_DOSTAWCA=anthropic. Serwer działa dalej.",
     );
   }
