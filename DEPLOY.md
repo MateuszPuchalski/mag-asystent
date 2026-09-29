@@ -2252,6 +2252,32 @@ dokąd ich wstawić bez budowania nowego widoku. To osobna decyzja.
 
 ## 7. Backup i utrzymanie
 
+### Kopia bazy bez danych osobowych
+
+Narzędzie `tools\anonimizuj-baze.mjs` (od wydania @wydanie) robi z kopii bazy plik bez danych klientów i pracowników. Kształt danych zostaje: długości tekstów, liczba wierszy, powiązania po loginie. Po to, żeby ocenić wygląd ekranów na prawdziwym wolumenie, bez wysyłania danych klientów komukolwiek.
+
+1. Znajdź najnowszą kopię nocną w `server\data\kopie`. Nazwa ma postać `noc-RRRR-MM-DD.db`.
+2. Nie wskazuj `wertis.db`. Żywa baza chodzi w WAL, a jej kopia bywa niespójna. Narzędzie odmówi.
+3. Uruchom w PowerShellu, podając nazwę własnej kopii:
+
+```powershell
+cd C:\wertis
+node tools\anonimizuj-baze.mjs server\data\kopie\noc-2026-09-29.db $env:USERPROFILE\Desktop\wertis-anonim.db
+```
+
+4. Poczekaj na wiersz „Gotowe”. Baza 60 MB zajmuje około pół minuty.
+5. Wyślij wyłącznie plik `wertis-anonim.db`. Obok leży `wertis-anonim.db.kolumny.txt`, czyli lista kolumn i reguł bez żadnych danych. Można ją wysłać razem z bazą.
+
+Kod wyjścia 2 i komunikat „Skaner znalazł” znaczą jedno: w wyniku został ślad danych, które miały zniknąć. Narzędzie kasuje wtedy wynik. Nie szukaj go na dysku i nic nie wysyłaj. Zgłoś tabele i kolumny z komunikatu, bo to błąd reguł.
+
+**Co znika.** Loginy Allegro, imiona i nazwiska, adresy dostawy, telefony, e-maile, treści wiadomości, notatki i szkice. Nazwy plików załączników i JSON-y ze zdarzeń też. Tokeny Allegro, sesje kolektorów i skróty haseł są usuwane. Obrazy zamieniają się w biały kwadrat.
+
+**Co zostaje.** Kartoteka towarowa i dokumenty Subiekta. Statusy, znaczniki czasu, kwoty i identyfikatory zamówień, ofert i wiadomości Allegro. Etykiety zespołu. To dane firmy, nie klientów. Jeśli kartoteka jest tajemnicą handlową, nie wysyłaj pliku.
+
+**Jak wygląda wynik.** Tekst zamienia się w litery tej samej wielkości i długości, więc zawijanie wierszy wygląda jak prawdziwe. Treści odpowiedzi nie da się z niego ocenić. Ten sam login ma ten sam zamiennik w każdej tabeli, więc droga klienta dalej łączy sprawy.
+
+Wejście zostaje nietknięte, bo narzędzie pracuje na własnym duplikacie. Przy każdym uruchomieniu losuje inne ziarno, które nigdzie nie leży. Rozsypu nie da się więc odtworzyć.
+
 ### Aktualizacja do nowej wersji
 
 W oknie **jako administrator**, na maszynie z serwerem:
