@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PozycjaZamowienia, WpisOsi, ZamowienieRozmowy as Dane } from "../api/typy";
@@ -100,6 +100,36 @@ describe("Zamówienie przy rozmowie", () => {
   it("zamówienie z JEDNEJ pozycji nie ma „Wskaż” — ofertę wywodzi serwer", () => {
     render(<ZamowienieRozmowy zamowienie={dane({ pobrane: pobrane([pozycja()]) })} rozmowaId={1} />);
     expect(screen.queryByRole("button", { name: /Wskaż jako ofertę/ })).toBeNull();
+  });
+});
+
+/* ── Kopiowanie numeru zamówienia po zwykłym HTTP ────────────────────────────
+   Biuro pracuje pod `http://serwer:3001`, gdzie `navigator.clipboard` jest
+   `undefined`. Przycisk wołał go wprost i po cichu nie robił nic. Test stawia
+   dokładnie takie okno: klik ma pójść drogą zapasową albo powiedzieć, że się
+   nie udało — nigdy nie milczeć. Wzór: `ui/kopiuj.test.tsx`. */
+describe("Kopiowanie numeru zamówienia", () => {
+  const exec = (f: unknown) => { (document as unknown as { execCommand: unknown }).execCommand = f; };
+  beforeEach(() => vi.stubGlobal("navigator", { ...navigator, clipboard: undefined }));
+  afterEach(() => { vi.unstubAllGlobals(); exec(undefined); });
+
+  it("bez `navigator.clipboard` kopiuje drogą zapasową i mówi, że skopiował", async () => {
+    const kopiuj = vi.fn().mockReturnValue(true);
+    exec(kopiuj);
+    render(<ZamowienieRozmowy zamowienie={dane()} rozmowaId={1} />);
+
+    await userEvent.click(screen.getByTitle("Kopiuj numer zamówienia"));
+    expect(kopiuj).toHaveBeenCalledWith("copy");
+    expect(await screen.findByText("Skopiowano")).toBeInTheDocument();
+  });
+
+  it("gdy nic nie działa, MÓWI o porażce zamiast udawać sukces albo milczeć", async () => {
+    exec(undefined);
+    render(<ZamowienieRozmowy zamowienie={dane()} rozmowaId={1} />);
+
+    await userEvent.click(screen.getByTitle("Kopiuj numer zamówienia"));
+    expect(await screen.findByText("Nie udało się skopiować")).toBeInTheDocument();
+    expect(screen.queryByText("Skopiowano")).toBeNull();
   });
 });
 
