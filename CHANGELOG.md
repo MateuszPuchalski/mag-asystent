@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.550.1 — 29 września 2026
+
+Przycisk „Kopiuj numer zamówienia" w rozmowie skrzynki wołał
+`navigator.clipboard` wprost. Pod `http://serwer:3001` ten obiekt nie istnieje,
+więc przycisk nic nie kopiował i nic o tym nie mówił. Teraz idzie przez
+`kopiujDoSchowka` i przy porażce pokazuje „Nie udało się skopiować". Strażnik
+źródeł odmawia każdego innego `navigator.clipboard` w panelu.
+
 ## 0.550.0 — 29 września 2026
 
 Rozpoznawanie wiadomości klientów (kategoria, następny krok, flagi) przechodzi z Claude na Jeva z TypeSafe. Robi to nowy nadawca `adapters/copilot.jev.ts`, który wpina się tą samą drogą co dotychczasowy, więc walidacja i polityka z `klasyfikacja-polityka.ts` zostają bez zmian. Wybór dostawcy stoi w `KLASYFIKATOR_DOSTAWCA` (`jev` albo `anthropic`), więc powrót do Claude to jedna zmienna i restart, bez wydania. Szkice odpowiedzi, dopytanie i reklamacje zostają przy Claude, bo Jev nie generuje tekstu.
