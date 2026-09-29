@@ -2256,27 +2256,39 @@ dokąd ich wstawić bez budowania nowego widoku. To osobna decyzja.
 
 Narzędzie `tools\anonimizuj-baze.mjs` (od wydania 0.550.2) robi z kopii bazy plik bez danych klientów i pracowników. Kształt danych zostaje: długości tekstów, liczba wierszy, powiązania po loginie. Po to, żeby ocenić wygląd ekranów na prawdziwym wolumenie, bez wysyłania danych klientów komukolwiek.
 
-1. Znajdź najnowszą kopię nocną w `server\data\kopie`. Nazwa ma postać `noc-RRRR-MM-DD.db`.
-2. Nie wskazuj `wertis.db`. Żywa baza chodzi w WAL, a jej kopia bywa niespójna. Narzędzie odmówi.
+1. Znajdź najnowszą kopię nocną w `server\data\kopie`. Nazwa ma postać `noc-RRRR-MM-DD.db`. Gdy ustawiono `KOPIE_KATALOG`, szukaj tam.
+2. Nie wskazuj `wertis.db`. Narzędzie odmawia plików w trybie WAL i plików z niepustym `-wal`, czyli żywej bazy i jej surowej kopii.
 3. Uruchom w PowerShellu, podając nazwę własnej kopii:
 
 ```powershell
 cd C:\wertis
-node tools\anonimizuj-baze.mjs server\data\kopie\noc-2026-09-29.db $env:USERPROFILE\Desktop\wertis-anonim.db
+mkdir C:\anonim
+.\node\node.exe tools\anonimizuj-baze.mjs server\data\kopie\noc-2026-09-29.db C:\anonim\wertis-anonim.db
 ```
 
-4. Poczekaj na wiersz „Gotowe”. Baza 60 MB zajmuje około pół minuty.
+4. Poczekaj na wiersz „Gotowe”. Zmierzone: baza 63 MB z 124 tys. wierszy zajęła 36 sekund.
 5. Wyślij wyłącznie plik `wertis-anonim.db`. Obok leży `wertis-anonim.db.kolumny.txt`, czyli lista kolumn i reguł bez żadnych danych. Można ją wysłać razem z bazą.
 
-Kod wyjścia 2 i komunikat „Skaner znalazł” znaczą jedno: w wyniku został ślad danych, które miały zniknąć. Narzędzie kasuje wtedy wynik. Nie szukaj go na dysku i nic nie wysyłaj. Zgłoś tabele i kolumny z komunikatu, bo to błąd reguł.
+`.\node\node.exe` to Node z paczki wydania. Instalacja z klonu repo używa `node` z PATH. Narzędzie jest w paczce od wydania @wydanie, więc starsza instalacja nie ma pliku `tools\anonimizuj-baze.mjs`.
+
+Kod wyjścia 2 i komunikat „Skaner znalazł” znaczą jedno: w wyniku został ślad danych, które miały zniknąć. Pliku wyniku wtedy nie ma. Nic nie wysyłaj i zgłoś tabele oraz kolumny z komunikatu, bo to błąd reguł.
+
+**Pliki robocze.** Pełna kopia z danymi klientów pracuje w katalogu tymczasowym Windows, w folderze `wertis-anonim-…`. Nie leży obok wyniku, więc synchronizacja folderu z chmurą jej nie zabierze.
+
+- Zwykły błąd zamyka narzędzie ze sprzątaniem.
+- Wyłączenie zasilania albo zabicie procesu zostawia folder w `%TEMP%`. Usuń go ręcznie.
+- Następne uruchomienie kasuje foldery starsze niż godzina.
+- Potrzebujesz miejsca na trzy kopie bazy, na dysku z `%TEMP%` i na dysku wyniku.
 
 **Co znika.** Loginy Allegro, imiona i nazwiska, adresy dostawy, telefony, e-maile, treści wiadomości, notatki i szkice. Nazwy plików załączników i JSON-y ze zdarzeń też. Tokeny Allegro, sesje kolektorów i skróty haseł są usuwane. Obrazy zamieniają się w biały kwadrat.
 
 **Co zostaje.** Kartoteka towarowa i dokumenty Subiekta. Statusy, znaczniki czasu, kwoty i identyfikatory zamówień, ofert i wiadomości Allegro. Etykiety zespołu. To dane firmy, nie klientów. Jeśli kartoteka jest tajemnicą handlową, nie wysyłaj pliku.
 
-**Jak wygląda wynik.** Tekst zamienia się w litery tej samej wielkości i długości, więc zawijanie wierszy wygląda jak prawdziwe. Treści odpowiedzi nie da się z niego ocenić. Ten sam login ma ten sam zamiennik w każdej tabeli, więc droga klienta dalej łączy sprawy.
+**Jak wygląda wynik.** Tekst zamienia się w litery tej samej wielkości i długości, więc zawijanie wierszy wygląda jak prawdziwe. Treści odpowiedzi nie da się z niego ocenić. Ten sam login ma ten sam zamiennik w każdej tabeli i w surowych JSON-ach, więc droga klienta dalej łączy sprawy.
 
-Wejście zostaje nietknięte, bo narzędzie pracuje na własnym duplikacie. Przy każdym uruchomieniu losuje inne ziarno, które nigdzie nie leży. Rozsypu nie da się więc odtworzyć.
+Wejście zostaje nietknięte, bo narzędzie pracuje na własnym duplikacie. Przy każdym uruchomieniu losuje inne ziarno, które nigdzie nie leży, i nie przyjmuje ziarna z wiersza poleceń. Rozsypu nie da się więc odtworzyć.
+
+**Czego narzędzie nie gwarantuje.** Skaner szuka wartości, które zebrał z kolumn z osobami. Nie widzi wartości krótszych niż 4 znaki, a narzędzie liczy je i podaje po skanie. Nie zna imion wpisanych w wolny tekst, tam chroni sam rozsyp. Nazwy dostawców z Subiekta zostają, a bywają jednoosobowymi firmami. Sprawdzono je na danych z seedu i na bazach generowanych, nie na prawdziwej kopii.
 
 ### Aktualizacja do nowej wersji
 
