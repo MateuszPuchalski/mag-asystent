@@ -56,7 +56,7 @@ jobs:
             echo "dotyczy=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
           zmiany=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD")
-          if printf '%s\n' "$zmiany" | grep -qE '^(server/|panel/|instalator/|tools/paczka|package(-lock)?\.json|wertis\.env\.example|\.github/workflows/paczka\.yml|\.github/actions/)'; then
+          if printf '%s\n' "$zmiany" | grep -qE '^(server/|panel/|instalator/|tools/paczka|tools/anonimizuj-baze|package(-lock)?\.json|wertis\.env\.example|\.github/workflows/paczka\.yml|\.github/actions/)'; then
             echo "dotyczy=true" >> "$GITHUB_OUTPUT"
           else
             echo "dotyczy=false" >> "$GITHUB_OUTPUT"

@@ -2254,7 +2254,7 @@ dokąd ich wstawić bez budowania nowego widoku. To osobna decyzja.
 
 ### Kopia bazy bez danych osobowych
 
-Narzędzie `tools\anonimizuj-baze.mjs` (od wydania 0.550.2) robi z kopii bazy plik bez danych klientów i pracowników. Kształt danych zostaje: długości tekstów, liczba wierszy, powiązania po loginie. Po to, żeby ocenić wygląd ekranów na prawdziwym wolumenie, bez wysyłania danych klientów komukolwiek.
+Narzędzie `anonimizuj-baze.mjs` (od wydania 0.550.2) robi z kopii bazy plik bez danych klientów i pracowników. Kształt danych zostaje: długości tekstów, liczba wierszy, powiązania po loginie. Po to, żeby ocenić wygląd ekranów na prawdziwym wolumenie, bez wysyłania danych klientów komukolwiek.
 
 1. Znajdź najnowszą kopię nocną w `server\data\kopie`. Nazwa ma postać `noc-RRRR-MM-DD.db`. Gdy ustawiono `KOPIE_KATALOG`, szukaj tam.
 2. Nie wskazuj `wertis.db`. Narzędzie odmawia plików w trybie WAL i plików z niepustym `-wal`, czyli żywej bazy i jej surowej kopii.
@@ -2262,14 +2262,14 @@ Narzędzie `tools\anonimizuj-baze.mjs` (od wydania 0.550.2) robi z kopii bazy pl
 
 ```powershell
 cd C:\wertis
-mkdir C:\anonim
-.\node\node.exe tools\anonimizuj-baze.mjs server\data\kopie\noc-2026-09-29.db C:\anonim\wertis-anonim.db
+New-Item -ItemType Directory -Force C:\anonim | Out-Null
+.\node\node.exe narzedzia\anonimizuj-baze.mjs server\data\kopie\noc-2026-09-29.db C:\anonim\wertis-anonim.db
 ```
 
-4. Poczekaj na wiersz „Gotowe”. Zmierzone: baza 63 MB z 124 tys. wierszy zajęła 36 sekund.
+4. Poczekaj na wiersz „Gotowe”. Zmierzone: baza 63 MB z 124 tys. wierszy zajęła 43 sekundy.
 5. Wyślij wyłącznie plik `wertis-anonim.db`. Obok leży `wertis-anonim.db.kolumny.txt`, czyli lista kolumn i reguł bez żadnych danych. Można ją wysłać razem z bazą.
 
-`.\node\node.exe` to Node z paczki wydania. Instalacja z klonu repo używa `node` z PATH. Narzędzie jest w paczce od wydania 0.550.3, więc starsza instalacja nie ma pliku `tools\anonimizuj-baze.mjs`.
+`.\node\node.exe` to Node z paczki wydania, a `narzedzia\` to katalog z paczki. Instalacja z klonu repo używa `node` z PATH i pliku `tools\anonimizuj-baze.mjs`. Starsza instalacja z paczki nie ma tego pliku.
 
 Kod wyjścia 2 i komunikat „Skaner znalazł” znaczą jedno: w wyniku został ślad danych, które miały zniknąć. Pliku wyniku wtedy nie ma. Nic nie wysyłaj i zgłoś tabele oraz kolumny z komunikatu, bo to błąd reguł.
 
@@ -2278,7 +2278,7 @@ Kod wyjścia 2 i komunikat „Skaner znalazł” znaczą jedno: w wyniku został
 - Zwykły błąd zamyka narzędzie ze sprzątaniem.
 - Wyłączenie zasilania albo zabicie procesu zostawia folder w `%TEMP%`. Usuń go ręcznie.
 - Następne uruchomienie kasuje foldery starsze niż godzina.
-- Potrzebujesz miejsca na trzy kopie bazy, na dysku z `%TEMP%` i na dysku wyniku.
+- Potrzebujesz miejsca na dwie kopie bazy w `%TEMP%` (praca i kandydat) i jedną na dysku wyniku.
 
 **Co znika.** Loginy Allegro, imiona i nazwiska, adresy dostawy, telefony, e-maile, treści wiadomości, notatki i szkice. Nazwy plików załączników i JSON-y ze zdarzeń też. Tokeny Allegro, sesje kolektorów i skróty haseł są usuwane. Obrazy zamieniają się w biały kwadrat.
 

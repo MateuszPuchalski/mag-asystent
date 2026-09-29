@@ -35,7 +35,7 @@ done
 ROB=$(mktemp -d)
 trap 'rm -rf "$ROB"' EXIT
 P="$ROB/$NAZWA"
-mkdir -p "$P/server" "$P/instalator" "$P/tools"
+mkdir -p "$P/server" "$P/instalator" "$P/narzedzia"
 
 cp -r "$KORZEN/server/dist" "$P/server/dist"
 cp -r "$KORZEN/server/seed" "$P/server/seed"
@@ -46,7 +46,13 @@ cp "$KORZEN"/instalator/*.ps1 "$KORZEN"/instalator/URUCHOM.cmd "$KORZEN"/instala
 # Narzędzie do anonimizacji kopii bazy (DEPLOY §7) jedzie w paczce, bo instalacja
 # z paczki nie ma katalogu tools/ z repo, a aktualizacja podmienia cały katalog
 # aplikacji. Bez tej linii polecenie z instrukcji nie miałoby czego uruchomić.
-cp "$KORZEN/tools/anonimizuj-baze.mjs" "$P/tools/"
+#
+# KATALOG `narzedzia`, NIE `tools`. Aktualizacja przenosi ze starej instalacji
+# katalog `tools` z nssm.exe (`WertisDoPrzeniesienia` w instalator/paczka.ps1).
+# Gdy paczka niesie własny `tools`, `Copy-Item -Recurse` wkłada stary do nowego
+# i nssm.exe ląduje w tools\tools\, a usługi wskazują na tools\nssm.exe.
+# Nie dodawaj do paczki katalogu o nazwie z tej listy: próba paczki to sprawdza.
+cp "$KORZEN/tools/anonimizuj-baze.mjs" "$P/narzedzia/"
 
 # ── Manifesty ────────────────────────────────────────────────────────────
 # Skrypty `tsx src/X.ts` przepisane na `node dist/X.js` MECHANICZNIE, żeby
