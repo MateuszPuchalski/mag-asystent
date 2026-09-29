@@ -10,6 +10,15 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.550.5 — 29 września 2026
+
+**Anonimizacja kopii bazy: poprawki po drugim przeglądzie.** Skaner wycieków
+nie uznaje już nazwy oferty ani sposobu dostawy z zamówienia za dane osobowe,
+więc kopia prawdziwej bazy nie kończy się fałszywym alarmem. Kolumny z
+unikalnym indeksem, także na wyrażeniu jak `lower(nazwa)`, dostają zamienniki
+jeden do jednego. Narzędzie odmawia od razu, gdy nie może zapisać pliku
+wynikowego, i nie kasuje cudzego pliku roboczego.
+
 ## 0.550.4 — 29 września 2026
 
 Paczka wydania 0.550.3 niosła katalog `tools`, a aktualizacja przenosi ze starej instalacji katalog `tools` z `nssm.exe`. Przy istniejącym katalogu docelowym PowerShell wkłada źródło do środka, więc `nssm.exe` lądował by w `tools\tools`, a usługi nie wstawałyby. Narzędzie do anonimizacji jedzie teraz w katalogu `narzedzia`, którego aktualizacja nie dotyka. Próba paczki pilnuje, żeby nazwy z listy przenoszonej nigdy nie trafiły do paczki.
