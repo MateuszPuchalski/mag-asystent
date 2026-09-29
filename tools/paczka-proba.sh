@@ -68,7 +68,8 @@ npm --prefix server run --silent reconcile > "$ROB/reconcile.log" 2>&1 \
 # tu, a nie u właściciela, który uruchomi je na prawdziwej bazie.
 [ -f "$P/narzedzia/anonimizuj-baze.mjs" ] || { echo "Paczka nie ma narzedzia/anonimizuj-baze.mjs." >&2; exit 1; }
 node -e "new (require('node:sqlite').DatabaseSync)(process.argv[1]).prepare('VACUUM INTO ?').run(process.argv[2])" \
-  "$DB_PATH" "$ROB/kopia.db" 2>/dev/null
+  "$DB_PATH" "$ROB/kopia.db" > "$ROB/kopia.log" 2>&1 \
+  || { cat "$ROB/kopia.log" >&2; echo "kopia bazy do próby anonimizacji nie powstała" >&2; exit 1; }
 node narzedzia/anonimizuj-baze.mjs "$ROB/kopia.db" "$ROB/anonim.db" > "$ROB/anonim.log" 2>&1 \
   || { cat "$ROB/anonim.log" >&2; echo "narzędzie do anonimizacji z paczki padło" >&2; exit 1; }
 [ -s "$ROB/anonim.db" ] || { echo "narzędzie do anonimizacji nie zostawiło wyniku" >&2; exit 1; }
