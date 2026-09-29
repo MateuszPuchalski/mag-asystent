@@ -1,4 +1,4 @@
-import type { HistoriaKlienta, Kategoria, Kubelek, OsRozmowy, StatusDoboru, WiedzaDoboru, Zwrot }
+import type { HistoriaKlienta, Kategoria, Kubelek, OsRozmowy, StanDoboru, SzkicCopilota, WiedzaDoboru, Zwrot }
   from "../api/typy";
 import { paczkaWSoczewce } from "./soczewki-reguly";
 
@@ -24,13 +24,12 @@ export function zwrotWToku(z: Zwrot): boolean {
   return ZWROT_W_TOKU.has(z.kubelek);
 }
 
-/** Dobór w robocie — ktoś (agent albo automat) szuka i jeszcze nie skończył. */
-const DOBOR_W_TOKU: ReadonlySet<StatusDoboru> = new Set<StatusDoboru>([
-  "extracting_data", "missing_information", "searching", "candidates_found", "requires_expert",
-]);
-
-export function doborWToku(s: StatusDoboru): boolean {
-  return DOBOR_W_TOKU.has(s);
+/**
+ * Dobór w robocie: dane są, a odpowiedzi jeszcze nie ma. Każdy wynik,
+ * także „dopytać", jest już odpowiedzią i ruch przechodzi do klienta.
+ */
+export function doborWToku(stan: StanDoboru): boolean {
+  return stan === "otwarty";
 }
 
 /* ── BRAMKA DOBORU (E) ───────────────────────────────────────────────────────
@@ -45,11 +44,11 @@ export function doborWToku(s: StatusDoboru): boolean {
    możliwe jednym kliknięciem, bo „czy macie zamiennik" też bywa pytaniem —
    ale nie jest już domyślną treścią kolumny.
 
-   Wybór agenta wygrywa z bramką: zatwierdzony kandydat to praca, której nie
-   wolno schować za zdaniem „dobór zbędny". */
+   Wybór agenta wygrywa z bramką: wybrana część to praca, której nie wolno
+   schować za zdaniem „dobór zbędny". */
 export function towarZnany(dane: OsRozmowy): boolean {
   const oferta = dane.oferta;
-  if (!oferta || !dane.zamowienie || dane.dobor.wybrany) return false;
+  if (!oferta || !dane.zamowienie || dane.dobor.wynik === "czesc") return false;
   if (oferta.zrodlo === "zamowienie") return true;
   return (dane.zamowienie.pobrane?.pozycje ?? [])
     .some((p) => p.offerId !== null && p.offerId === oferta.externalId);
@@ -72,15 +71,13 @@ export function paczkaOdchylenie(dane: OsRozmowy): boolean {
 }
 
 /**
- * Czy dobór schować za bramką. Towar znany — ale gdy dobór w toku uruchomił
- * CZŁOWIEK, a nie automat, to jego jawna decyzja i bramka jej nie zasłania.
- * Automat podpisuje się `automat (…)` od 0.341.0 (`services/dobor.ts`).
+ * Czy dobór schować za bramką. Towar znany i brak wyniku, a danych nie
+ * ruszał człowiek. Wynik albo ręczny zapis to jawna decyzja agenta i bramka
+ * jej nie zasłania. Dane wpisane przez automat decyzją nie są.
  */
 export function bramkaDoboru(dane: OsRozmowy): boolean {
-  if (!towarZnany(dane)) return false;
-  const kto = dane.dobor.updatedBy;
-  const czlowiekSzuka = doborWToku(dane.dobor.status) && kto !== null && !kto.startsWith("automat");
-  return !czlowiekSzuka;
+  const d = dane.dobor;
+  return towarZnany(dane) && d.wynik === null && (d.zmienil === null || d.zmienilAutomat);
 }
 
 export type Swiatlo = "zwrot" | "sprawa" | "paczka" | "pozycja" | "dobor";
@@ -99,7 +96,7 @@ export function coSwieci(dane: OsRozmowy): Swiatlo[] {
      byłaby powtórzeniem, a nie drugim sygnałem. */
   if (paczkaOdchylenie(dane) && !paczkaWSoczewce(dane)) s.push("paczka");
   if (pozycjiDoWskazania(dane) > 0) s.push("pozycja");
-  if (doborWToku(dane.dobor.status) && !bramkaDoboru(dane)) s.push("dobor");
+  if (doborWToku(dane.dobor.stan) && !bramkaDoboru(dane)) s.push("dobor");
   return s;
 }
 
@@ -155,10 +152,23 @@ export function nowyKlient(h: HistoriaKlienta | undefined): boolean {
 }
 
 /**
- * Wiersz „Wiedza" ma treść: zatwierdzone zastosowanie albo pomiar z tej
- * rozmowy. Pusty wiersz nie zabiera drogi do dodania wiedzy — jedyny przycisk
- * w nim, „Zaproponuj jako dowód", stoi przy pomiarze, a pomiar wiersz stawia.
+ * Wiersz „Wiedza" ma treść: zatwierdzone zastosowanie, pomiar z tej rozmowy
+ * albo pasowanie rozpoznane przez Copilota, które czeka na decyzję. Pusty
+ * wiersz nie zabiera drogi do dodania wiedzy, bo każdy jego przycisk stoi
+ * przy jednej z tych trzech rzeczy, a każda z nich wiersz stawia.
  */
-export function wiedzaMaTresc(w: WiedzaDoboru | undefined): boolean {
-  return Boolean(w && (w.zastosowanie !== null || w.pomiary.length > 0));
+export function wiedzaMaTresc(w: WiedzaDoboru | undefined, szkic: SzkicCopilota | null = null): boolean {
+  return Boolean(w && (w.zastosowanie !== null || w.pomiary.length > 0)) || paraPasowania(szkic) !== null;
+}
+
+/**
+ * Para rozpoznana w rozmowie („LC170430140-0001 → W09-0211") albo `null`,
+ * gdy nic nie rozpoznano albo agent już zdecydował. Jedna reguła dla paska
+ * szkicu, który o parze mówi, i wiersza Wiedza, w którym się ją proponuje.
+ * Dwie kopie rozjechałyby się, a pasek obiecywałby kartę, której nie ma.
+ */
+export function paraPasowania(szkic: SzkicCopilota | null | undefined): string | null {
+  const p = szkic?.pasowanie;
+  if (!p || szkic.pasowanieOcena !== null) return null;
+  return `${p.czesc.symbol} → ${p.doCzego.symbol}`;
 }

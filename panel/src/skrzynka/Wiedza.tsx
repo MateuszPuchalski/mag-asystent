@@ -1,9 +1,11 @@
 import React, { useState } from "react";
-import { BookMarked } from "lucide-react";
-import type { PomiarRozmowy, PowodNegatywny, Zastosowanie } from "../api/typy";
+import { BookMarked, Sparkles } from "lucide-react";
+import type { PomiarRozmowy, PowodNegatywny, SzkicCopilota, Zastosowanie } from "../api/typy";
 import { usePomiarDoWiedzy, useWiedzaDoboru } from "../api/rozmowy";
+import { useOcenPasowanie } from "../api/copilot";
 import { NaglowekSekcji, Przycisk, czas } from "../ui";
-import { NAZWA_POWODU } from "./statusy";
+import { Kafel } from "../towar/Kafel";
+import { NAZWA_POWODU, NAZWA_ROLI } from "./statusy";
 
 /**
  * Zakładka WIEDZA — dowody pod odpowiedź (makieta „Wiedza", §14.3).
@@ -26,11 +28,13 @@ import { NAZWA_POWODU } from "./statusy";
  * jednak z §14.3 i to jego numer stoi na ekranie: odsyłacz ma prowadzić tam,
  * gdzie naprawdę leży reguła.
  */
-export function Wiedza({ rozmowaId, twId, maMaszyne }: {
+export function Wiedza({ rozmowaId, twId, maMaszyne, propozycja = null }: {
   rozmowaId: number;
   /** Wybrana kartoteka — dowód z pomiaru wiesza się na niej, gdy pomiar swojej nie ma. */
   twId: number | null;
   maMaszyne: boolean;
+  /** Szkic Copilota; niesie pasowanie rozpoznane w rozmowie. */
+  propozycja?: SzkicCopilota | null;
 }) {
   const wiedza = useWiedzaDoboru(rozmowaId);
   const pomiarDoWiedzy = usePomiarDoWiedzy();
@@ -46,6 +50,10 @@ export function Wiedza({ rozmowaId, twId, maMaszyne }: {
       title="Każde twierdzenie techniczne w szkicu wskazuje jeden z tych dowodów.">
       Bez źródła treść jest przypuszczeniem (§14.3).
     </p>
+
+    {/* Para NAD dowodami: to jedyna rzecz w wierszu, która czeka na ruch
+        agenta, a dowody są do czytania (praca na górze, wgląd niżej). */}
+    <PasowanieZRozmowy rozmowaId={rozmowaId} propozycja={propozycja} />
 
     <Dowody zastosowanie={wiedza.data?.zastosowanie ?? null} wczytuje={wiedza.isLoading} />
 
@@ -66,6 +74,54 @@ export function Wiedza({ rozmowaId, twId, maMaszyne }: {
         </ul>
       </section>}
   </div>;
+}
+
+/**
+ * PASOWANIE Z ROZMOWY. Model nazwał parę SYMBOLAMI z faktów, serwer sprawdził
+ * oba końce po kartotekach tej rozmowy, a agent tylko klika. „Zaproponuj"
+ * kładzie parę w kolejce wiedzy ze źródłem copilot; rozstrzyga biuro.
+ *
+ * Karta stoi w Wiedzy, nie w Doborze: para to utrzymanie bazy wiedzy, a nie
+ * odpowiedź klientowi (`docs/dobor-od-zera.md` §2). Po „Zaproponuj" zdanie
+ * bierze się Z DANYCH (`pasowanieOcena`), więc przeżywa odświeżenie.
+ */
+function PasowanieZRozmowy({ rozmowaId, propozycja }: { rozmowaId: number; propozycja: SzkicCopilota | null }) {
+  const ocen = useOcenPasowanie();
+  const para = propozycja?.pasowanie ?? null;
+  const ocena = propozycja?.pasowanieOcena ?? null;
+  if (!para || ocena === "odrzucone") return null;
+  return <section aria-label="Pasowanie z rozmowy" className="mt-2 rounded-lg border border-violet-200 bg-violet-50 p-2">
+    <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs">
+      <b className="text-violet-900"><Sparkles size={12} className="inline" aria-hidden /> Copilot rozpoznał pasowanie</b>
+      {ocena === null && <span className="ml-auto flex flex-wrap items-center gap-2">
+        <Przycisk wariant="glowny" className="text-xs" disabled={ocen.isPending}
+          onClick={() => ocen.mutate({ rozmowaId, ocena: "zaproponowane" })}>Zaproponuj pasowanie</Przycisk>
+        <Przycisk className="text-xs" disabled={ocen.isPending}
+          onClick={() => ocen.mutate({ rozmowaId, ocena: "odrzucone" })}>Odrzuć</Przycisk>
+      </span>}
+    </div>
+    <div className="flex items-center gap-2">
+      <Kafel twId={para.czesc.twId} rozmiar={40} nazwa={para.czesc.nazwa} symbol={para.czesc.symbol} />
+      <div className="min-w-0 flex-1 text-xs">
+        <div className="flex flex-wrap items-center gap-2">
+          <b className="font-mono">{para.czesc.symbol}</b>
+          <span className="text-slate-500">→</span>
+          <b className="font-mono">{para.doCzego.symbol}</b>
+          <span className="rounded border border-violet-200 bg-white px-1.5 py-0.5 text-podpis">
+            {NAZWA_ROLI[para.rola]}{para.pozycja ? ` · ${para.pozycja}` : ""}</span>
+        </div>
+        <p className="truncate text-slate-600">{para.czesc.nazwa} → {para.doCzego.nazwa}</p>
+      </div>
+      <Kafel twId={para.doCzego.twId} rozmiar={40} nazwa={para.doCzego.nazwa} symbol={para.doCzego.symbol} />
+    </div>
+    {ocena === "zaproponowane"
+      ? <p className="mt-1 text-podpis text-emerald-800">
+          Propozycja „{para.czesc.symbol} pasuje do {para.doCzego.symbol}” czeka w kolejce wiedzy — rozstrzyga biuro.</p>
+      : <p className="mt-1 text-podpis text-slate-600">
+          Oba końce to kartoteki z tej rozmowy, sprawdzone przez serwer. Do kolejki trafia po kliknięciu,
+          rozstrzyga biuro. Zła rola albo pozycja: odrzuć i złóż parę na ekranie Wiedza.</p>}
+    {ocen.error && <p className="mt-1 text-podpis font-semibold text-ranga-zle">{(ocen.error as Error).message}</p>}
+  </section>;
 }
 
 /**

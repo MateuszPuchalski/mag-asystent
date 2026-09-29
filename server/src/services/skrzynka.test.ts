@@ -1164,6 +1164,10 @@ test("oś podaje zdarzenia rozłożone na klucze, obok gotowego zdania", () => {
     JSON.stringify({ przed: "searching", po: "confirmed", autor: "Biuro" }), "2026-09-01T09:20:00.000Z");
   zdarz.run(r, "dobor_wybrano",
     JSON.stringify({ symbol: "W09-0513", droga: "wyszukiwarka", autor: "Biuro" }), "2026-09-01T09:30:00.000Z");
+  zdarz.run(r, "dobor_status_changed",
+    JSON.stringify({ przed: "confirmed", po: "candidates_found", autor: "Biuro" }), "2026-09-01T09:32:00.000Z");
+  zdarz.run(r, "dobor_wynik",
+    JSON.stringify({ przed: null, po: "dopytac", autor: "Biuro" }), "2026-09-01T09:35:00.000Z");
   /* Zdarzenie NAKŁADKI SPRAW zostaje w dzienniku, ale na oś już nie wchodzi
      (0.388.0): klamry nie ma, a `conversation_event` nie ma retencji. */
   zdarz.run(r, "sprawa_dolaczona",
@@ -1173,12 +1177,14 @@ test("oś podaje zdarzenia rozłożone na klucze, obok gotowego zdania", () => {
   const zdarzenie = (rodzaj: string) => wpisy.find((w) => w.rodzaj === rodzaj)?.zdarzenie;
 
   assert.deepEqual(zdarzenie("status"), { rodzaj: "status", po: "open" });
-  /* Dwa różne zdarzenia doboru dają DWA różne kształty — panel rysuje z nich
-     co innego, więc zlanie ich w jeden kształt kazałoby mu zgadywać. */
+  /* Wybór i wynik dają DWA różne kształty — panel rysuje z nich co innego.
+     Stare statusy oś tłumaczy na nowe stany, więc panel zna tylko nowe nazwy. */
   const dobory = wpisy.filter((w) => w.rodzaj === "dobor").map((w) => w.zdarzenie);
   assert.deepEqual(dobory, [
-    { rodzaj: "dobor", po: "confirmed" },
+    { rodzaj: "dobor", po: "czesc" },
     { rodzaj: "dobor_wybor", wybrano: true, symbol: "W09-0513" },
+    { rodzaj: "dobor", po: "otwarty" },
+    { rodzaj: "dobor", po: "dopytac" },
   ]);
   /* Nakładka spraw odeszła w 0.388.0, więc oś jej nie rysuje — ale wiersz
      w dzienniku audytu ZOSTAJE i ten test pilnuje obu połów naraz. */

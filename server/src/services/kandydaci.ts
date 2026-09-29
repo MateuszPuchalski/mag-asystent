@@ -5,145 +5,79 @@ import type { SubiektAdapter } from "../adapters/subiekt.js";
 import { kartotekaOferty, kartotekaPoSku } from "./dopasowanie-sku.js";
 import { podzielZamienniki } from "./zamienniki.js";
 import { zamiennicyOem } from "./zamiennosc-oem.js";
-import { doborRozmowy, DROGI_DOBORU, type DrogaDoboru } from "./dobor.js";
+import { doborRozmowy } from "./dobor.js";
 import { kluczModelu, zastosowaniaModelu, type Zastosowanie } from "./wiedza.js";
 import { ocenWarunki, type MaszynaKlienta } from "./warunki-zastosowania.js";
 import { silnikZTekstu, zabudowyMaszyny } from "./silniki.js";
 import { pasowaniaTowaru, type Kartoteka } from "./pasowania.js";
 import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
 import { szukajPelnotekst } from "./pelnotekst.js";
-import { indeksWymiarowPusty, szukajPoWymiarach, wymiaryZParametrow } from "./wymiary.js";
 import { zwin } from "../tekst.js";
 
 /**
- * Kandydaci doboru (§11.2) — osobny plik od `dobor.ts`, bo E2 i E3 dokładają
- * tu szczeble (zastosowanie, OEM, pełny tekst), a kręgosłup doboru ma zostać
- * nietknięty.
+ * Kandydaci doboru w trzech grupach (`docs/dobor-od-zera.md` §4.3): co
+ * wskazał klient, co potwierdza wiedza i co jest podobne po nazwie.
  *
- * Kandydaci NIE jadą w `osRozmowy`: tamten odczyt odświeża się na każde
- * zdarzenie szyny, także `presence`, a to jest wyszukiwarka i parser opisu.
+ * Kandydatów szuka się WYŁĄCZNIE z danych doboru, nigdy z treści wiadomości
+ * (blizna „szarpaka": zgadywanie po treści prowadziło do cudzej kartoteki).
  *
- * Każdy szczebel raportuje się OSOBNO jako sprawdzony albo pominięty
- * z powodem. Szczebel bez danych wejściowych to „pominięty", nie „zero
- * wyników" — blizna 0.153.1: milczący ekran każe zgadywać, czy automat
- * szukał i nie znalazł, czy nie miał czego szukać.
- *
- * Wyszukiwarka klikana ręcznie NIE jest kandydatem — jest od razu wyborem
- * z drogą `wyszukiwarka` (patrz `wybierzKandydata`).
+ * Kandydaci nie jadą w odczycie rozmowy: tamten odświeża się na każde
+ * zdarzenie szyny, a to jest wyszukiwarka i parser opisu. Odczyt niczego
+ * nie zapisuje.
  */
 
-/* Pewność §11.3: `potwierdzone` niesie wyłącznie zatwierdzone zastosowanie
-   z dowodem technicznym (E2); reszta dróg daje najwyżej „prawdopodobne". */
-export type PewnoscKandydata = "potwierdzone" | "prawdopodobne" | "wymaga_danych";
+export type GrupaKandydata = "numer" | "wiedza" | "podobne";
+export type PewnoscKandydata = "potwierdzone" | "prawdopodobne" | "do_sprawdzenia";
 
 export interface KandydatDoboru {
-  nr: number;
-  /** `null` = identyfikator bez wiersza w kartotece (§11.2, makieta Dobor.dc.html) — decyzja właściciela z E3. */
-  twId: number | null;
-  symbol: string;
-  nazwa: string;
-  /** Dostępne na magazynie głównym (stan minus rezerwacje). */
+  twId: number; symbol: string; nazwa: string;
+  /** Dostępne na magazynie głównym; `null` = brak stanu. */
   stan: number | null;
-  droga: DrogaDoboru;
-  pewnosc: PewnoscKandydata;
-  /** Zdanie dla ekranu — §11.3 żąda widocznego źródła, nie samej drogi. */
-  zrodlo: string;
-  /** Zdania negatywnych zastosowań TEJ kartoteki do wpisanej maszyny (§11.4). */
+  grupa: GrupaKandydata; pewnosc: PewnoscKandydata;
+  /** Jedno zdanie: skąd ten kandydat. */
+  powod: string;
+  /** Zdania innych źródeł, które trafiły w tę samą kartotekę. */
+  takze: string[];
+  /** Zastrzeżenia: warunek, kilka silników, negatyw z wiedzy. */
   ostrzezenia: string[];
 }
 
-/* Negatyw dotyczy także kartoteki, której NIE MA wśród kandydatów — dlatego
-   osobna lista, nie tylko `ostrzezenia` przy kandydacie. §11.4: to jest
-   ostrzeżenie, nie brak danych, i ma być widoczne zawsze. */
-export interface NegatywDoboru {
-  twId: number; symbol: string; nazwa: string | null;
-  /** Zdanie z serwera: powód z §11.4 i dowód. */
-  powod: string; zrodlo: string; at: string;
+export interface NegatywDoboru { twId: number; symbol: string; nazwa: string | null; powod: string; zrodlo: string }
+
+export interface KandydaciDoboru {
+  kandydaci: KandydatDoboru[];
+  /** Numery z pola `oem` bez kartoteki. Nie da się ich wybrać. */
+  bezKartoteki: Array<{ numer: string; zdanie: string }>;
+  negatywne: NegatywDoboru[];
+  /** Czego zabrakło do szukania, zdaniami. Pusta lista = sprawdzono wszystko. */
+  brakuje: string[];
 }
+
+const GRUPY: GrupaKandydata[] = ["numer", "wiedza", "podobne"];
+const SILA: Record<PewnoscKandydata, number> = { potwierdzone: 3, prawdopodobne: 2, do_sprawdzenia: 1 };
 
 /**
- * CO AGENT MOŻE Z TYM ZROBIĆ — bez opuszczania rozmowy (0.267.0).
- *
- * Powody pominięcia są instruktażem („dopisz go w Wiedza → Silniki", „wpisz
- * mm, cm albo m"), ale do 0.266.0 panel wsadzał je w atrybut `title` czipa.
- * Jedenaście czipów, jedenaście tooltipów, ani jednego widocznego zdania.
- *
- * Rodzaj akcji nadaje SERWIS, w tej samej gałęzi, w której pisze powód. Panel
- * nie parsuje ani jednego łańcucha: rozbiór polskiego zdania, żeby zgadnąć
- * przycisk, rozjechałby się przy pierwszej poprawce sformułowania.
- *
- * Trzy rodzaje, bo tyle da się zrobić na ekranie doboru. Brak `akcji` jest
- * TREŚCIĄ, nie niedoróbką: przy braku FTS5 albo niepowiązanej ofercie żaden
- * przycisk w rozmowie nie pomoże, a przycisk, który nie pomaga, uczy klikania
- * w nic.
- */
-export interface AkcjaSzczebla {
-  rodzaj: "dane" | "wymiar" | "zabudowa";
-  etykieta: string;
-}
-
-export interface SzczebelDoboru {
-  droga: DrogaDoboru;
-  sprawdzona: boolean;
-  wynikow: number;
-  /** Dlaczego pominięty. Tylko przy `sprawdzona: false`. */
-  powod?: string;
-  /** Czym agent może ten brak zamknąć TU I TERAZ; brak = nie da się w rozmowie. */
-  akcja?: AkcjaSzczebla;
-}
-
-/* Etykieta mówi, CO WPISAĆ, nie „wpisz dane". Agent czytający listę braków ma
-   po niej poznać, którego pola dotyczy przycisk, bez wracania do zdania obok —
-   a przy okazji dwa przyciski otwierające ten sam formularz przestają być
-   nierozróżnialne. */
-const DANE = (co: string): AkcjaSzczebla => ({ rodzaj: "dane", etykieta: `Wpisz ${co}` });
-const WYMIAR: AkcjaSzczebla = { rodzaj: "wymiar", etykieta: "Wpisz wymiar z jednostką" };
-const ZABUDOWA: AkcjaSzczebla = { rodzaj: "zabudowa", etykieta: "Zaproponuj zabudowę" };
-
-/* Kolejność §11.2: dokładny symbol i EAN biją wszystko, oferta jest kontekstem
-   pytania, zamiennik idzie z opisu. Zgodny wymiar stoi za zamiennikiem, a przed
-   pełnym tekstem: liczba z jednostką to mocniejszy ślad niż słowo, słabszy niż
-   zamiennik z opisu. Dedup po `twId` zostawia najmocniejszą. */
-const RANGA: Record<DrogaDoboru, number> = {
-  symbol: 1, ean: 2, oem: 3, zastosowanie: 4, silnik: 5, pasowanie: 6, oferta: 7, zamiennik: 8,
-  wymiar: 9, pelnotekst: 10, wyszukiwarka: 11,
-};
-
-/**
- * ZNACZNIK MOCNEJ PRZESŁANKI — dopisek do zdania źródła trzech pierwszych dróg.
- *
- * Do 0.263.0 siła szczebla była zapisana WYŁĄCZNIE w `RANGA`, czyli w liczbie,
- * której nikt poza sortowaniem nie czyta. Zdania źródła nazywały za to słabość
- * dwóch najniższych dróg („— nie dowód" przy wymiarze i pełnym tekście).
- * Model dostawał więc listę, na której DWA najsłabsze wpisy były opisane jako
- * słabe, a trzy najmocniejsze nie miały przy sobie nic.
+ * ZNACZNIK MOCNEJ PRZESŁANKI przy trafieniu po numerze.
  *
  * Kosztowało to szkic o koło pasowe do Husqvarny TC38. Klient podał numer
- * producenta 197473, kartoteka 20-05006 miała ten numer w opisie, kandydat
- * stanął pierwszy na liście — a model odradził zakup, bo z NAZWY kartoteki
- * („DECK 46") wywnioskował inną szerokość kosiska niż zgadywana dla TC38.
- * Domysł o maszynie pobił trafienie po numerze, bo nic nie mówiło, że to
- * trafienie jest mocne.
- *
- * Jedna stała, nie trzy łańcuchy: dopisek stoi przy trzech drogach i przy
- * pierwszej poprawce sformułowania trzy kopie by się rozjechały.
+ * producenta, kartoteka miała go w opisie i stała pierwsza — a model odradził
+ * zakup, bo z NAZWY kartoteki wywnioskował inną szerokość kosiska. Słabe
+ * drogi miały przy sobie „nie dowód", mocne nie miały nic, więc domysł
+ * pobił numer. Jedna stała, bo kopie zdania rozjechałyby się przy poprawce.
  */
-/**
- * Skąd wzięliśmy numer, który trafił w tę kartotekę. Osobna funkcja, nie
- * wybór w miejscu wywołania: gałęzi jest cztery, a piąta wartość `zrodlo`
- * ma się nie przemycić jako „z opisu kartoteki" bez ani jednego błędu.
- */
+const PO_IDENTYFIKATORZE = "— trafienie po IDENTYFIKATORZE, nie po opisie ani nazwie";
+
+/* Deklaracja sprzedawcy w opisie aukcji i numer z katalogu dostawcy to
+   świadectwa różnej wagi, więc zdanie nazywa źródło numeru. Każda gałąź
+   osobno, żeby nowe źródło nie przemyciło się jako „z opisu kartoteki". */
 function zdanieZrodlaNumeru(
   t: { zrodlo: string; nazwaRodzaju: string; wartosc: string; dodal: string; ofertaId: string | null; dostawca: string | null },
   symbol: string,
 ): string {
   const czolo = `numer ${t.nazwaRodzaju} ${t.wartosc}`;
-  if (t.zrodlo === "reczne") {
-    return `${czolo} wpisany ręcznie przez ${t.dodal} ${PO_IDENTYFIKATORZE}`;
-  }
+  if (t.zrodlo === "reczne") return `${czolo} wpisany ręcznie przez ${t.dodal} ${PO_IDENTYFIKATORZE}`;
   if (t.zrodlo === "oferta") {
-    return `${czolo} z opisu NASZEJ oferty${t.ofertaId ? ` ${t.ofertaId}` : ""}`
-      + ` przy kartotece „${symbol}” ${PO_IDENTYFIKATORZE}`;
+    return `${czolo} z opisu NASZEJ oferty${t.ofertaId ? ` ${t.ofertaId}` : ""} przy kartotece „${symbol}” ${PO_IDENTYFIKATORZE}`;
   }
   if (t.zrodlo === "dostawca") {
     return `${czolo} z tabeli odsyłaczy dostawcy ${t.dostawca ?? "(bez nazwy)"} przy kartotece „${symbol}” ${PO_IDENTYFIKATORZE}`;
@@ -151,18 +85,12 @@ function zdanieZrodlaNumeru(
   return `${czolo} z opisu kartoteki „${symbol}” ${PO_IDENTYFIKATORZE}`;
 }
 
-const PO_IDENTYFIKATORZE = "— trafienie po IDENTYFIKATORZE, nie po opisie ani nazwie";
-
-const POMINIETE_DO: Partial<Record<DrogaDoboru, string>> = {
-  wyszukiwarka: "wyszukiwarka to wybór ręczny, nie kandydat",
-};
-
-/** Coś, co wygląda na symbol albo numer: bez spacji, z cyfrą, rozsądnej długości. */
-const JAK_SYMBOL = /^[A-Za-z0-9][A-Za-z0-9\-_./+*]{1,39}$/;
-const wygladaNaSymbol = (v: string | null) => Boolean(v && /\d/.test(v) && JAK_SYMBOL.test(v));
+/** Coś, co wygląda na symbol: bez spacji, z cyfrą, rozsądnej długości. */
+const wygladaNaSymbol = (v: string | null): v is string =>
+  Boolean(v && /\d/.test(v) && /^[A-Za-z0-9][A-Za-z0-9\-_./+*]{1,39}$/.test(v));
 /* Luźniej niż symbol: `532 16 56-30` ma spacje. Dwie cyfry i cztery znaki,
-   żeby `x2` albo `S` nie uruchamiały szczebla. */
-const wygladaNaNumer = (v: string | null) =>
+   żeby `x2` albo `S` nie uruchamiały szukania po numerze. */
+const wygladaNaNumer = (v: string | null): v is string =>
   Boolean(v && v.trim().length >= 4 && v.trim().length <= 40 && (v.match(/\d/g) ?? []).length >= 2);
 
 /** Oferta, o którą chodzi: ręczne wskazanie bije numer z wiadomości. */
@@ -179,7 +107,7 @@ export function ofertaRozmowy(database: DatabaseSync, conversationId: number): {
   }
   /* Ta sama reguła co w `osRozmowy`: numer z najnowszej wiadomości KLIENTA,
      a gdy klient go nie podał — z najnowszej naszej. Najnowszej PO CZASIE:
-     `id` starych wierszy nie rośnie z czasem (patrz `numerZamowieniaRozmowy`). */
+     `id` starych wierszy nie rośnie z czasem. */
   const m = database.prepare(`SELECT related_object_id AS oferta FROM message
     WHERE conversation_id=? AND related_object_type='OFFER' AND related_object_id IS NOT NULL
     ORDER BY (direction='incoming') DESC, sent_at DESC, id DESC LIMIT 1`)
@@ -189,28 +117,22 @@ export function ofertaRozmowy(database: DatabaseSync, conversationId: number): {
 
 function towar(database: DatabaseSync, twId: number) {
   return database.prepare(`SELECT t.tw_id, t.symbol, t.nazwa, t.opis,
-      COALESCE(s.stan,0) - COALESCE(s.stan_rez,0) AS dostepne
+      CASE WHEN s.tw_id IS NULL THEN NULL ELSE COALESCE(s.stan,0) - COALESCE(s.stan_rez,0) END AS dostepne
     FROM sgt_towar t LEFT JOIN sgt_stan s ON s.tw_id=t.tw_id AND s.mag_id=?
     WHERE t.tw_id=?`).get(config.magId.MAG, twId) as
-    { tw_id: number; symbol: string; nazwa: string; opis: string | null; dostepne: number } | undefined;
+    { tw_id: number; symbol: string; nazwa: string; opis: string | null; dostepne: number | null } | undefined;
 }
 
 /**
- * Wpis z warunkami przeciw maszynie z doboru — jedna reguła dla szczebla
- * maszyny i szczebla silnika, żeby oba mówiły to samo tymi samymi słowami.
+ * Wpis z warunkami przeciw maszynie z doboru — jedna reguła dla wpisu do
+ * maszyny i do silnika, żeby oba mówiły to samo tymi samymi słowami.
  *
- * POZYTYW:
- *   - warunki spełnione albo ich brak → kandydat jak dotąd;
- *   - „nie wiem" → kandydat zostaje, ale z pewnością `wymaga_danych`
- *     i z ostrzeżeniem, O CO zapytać. Zgubić go byłoby gorzej: to często
- *     jedyna właściwa część, a brakuje tylko tabliczki;
- *   - złamane → NIE kandydat, tylko ostrzeżenie „poza zakresem wpisu".
- *     Katalog, który mówi „od nr X", pod X wskazuje INNĄ część — więc przy
- *     tej maszynie to jest wiedza negatywna, nie brak wiedzy.
- * NEGATYW:
- *   - spełnione, brak warunków albo „nie wiem" → ostrzeżenie stoi, przy
- *     „nie wiem" z dopiskiem, czego nie wiemy;
- *   - złamane → negatyw dotyczy innych egzemplarzy i milknie.
+ * POZYTYW: warunek spełniony albo brak → kandydat; „nie wiem" → kandydat
+ * do sprawdzenia z ostrzeżeniem, O CO zapytać (zgubić go byłoby gorzej, to
+ * często jedyna właściwa część); złamany → negatyw „poza zakresem wpisu",
+ * bo katalog, który mówi „od nr X", pod X wskazuje INNĄ część.
+ * NEGATYW: stoi, przy „nie wiem" z dopiskiem; złamany dotyczy innych
+ * egzemplarzy i milknie.
  */
 type Werdykt =
   | { rodzaj: "kandydat"; pewnosc: PewnoscKandydata | null; ostrzezenie: string | null; dopisek: string }
@@ -226,384 +148,214 @@ export function werdyktWarunkow(z: Zastosowanie, maszyna: MaszynaKlienta, czyje:
   }
   if (ocena === "niespelnione") return { rodzaj: "negatyw", powod: `poza zakresem wpisu: ${zdanie}` };
   if (ocena === "nieznane") {
-    return { rodzaj: "kandydat", pewnosc: "wymaga_danych", ostrzezenie: `pasuje warunkowo: ${zdanie}`, dopisek: "" };
+    return { rodzaj: "kandydat", pewnosc: "do_sprawdzenia", ostrzezenie: `pasuje warunkowo: ${zdanie}`, dopisek: "" };
   }
   return { rodzaj: "kandydat", pewnosc: null, ostrzezenie: null, dopisek: ocena === "spelnione" ? `; ${zdanie}` : "" };
 }
 
 export function kandydaciDoboru(
   conversationId: number, subiekt: SubiektAdapter, database: DatabaseSync = db(),
-): { kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[]; negatywne: NegatywDoboru[]; kotwice: Kartoteka[] } {
-  const dobor = doborRozmowy(conversationId, database);
+): KandydaciDoboru & { kotwice: Kartoteka[] } {
+  const { dane } = doborRozmowy(conversationId, database);
   const oferta = ofertaRozmowy(database, conversationId);
-  const znalezione = new Map<number, Omit<KandydatDoboru, "nr">>();
-  const drogi = new Map<DrogaDoboru, SzczebelDoboru>();
-  const pomin = (droga: DrogaDoboru, powod: string, akcja?: AkcjaSzczebla) =>
-    drogi.set(droga, { droga, sprawdzona: false, wynikow: 0, powod, ...(akcja ? { akcja } : {}) });
-  const dodaj = (k: Omit<KandydatDoboru, "nr">) => {
-    // Mapa jest kluczowana po kartotece; kandydat bez niej (twId null) ma osobną
-    // listę `bezKartoteki`, więc tu nigdy nie wchodzi — strażnik przed pomyłką.
-    if (k.twId === null) return;
-    const juz = znalezione.get(k.twId);
-    if (!juz || RANGA[k.droga] < RANGA[juz.droga]) znalezione.set(k.twId, k);
+  const trafione = new Map<number, KandydatDoboru>();
+  const brakuje: string[] = [];
+  const negatywne: NegatywDoboru[] = [];
+  const bezKartoteki: KandydaciDoboru["bezKartoteki"] = [];
+  /* KOTWICE: kartoteki, które wskazał klient — symbolem, numerem albo
+     ofertą. Z nich rośnie grupa pasowań („mam gaźnik W09-0211, jaka
+     uszczelka"), a szkic Copilota bierze je jako kartoteki z kontekstu. */
+  const kotwice = new Map<number, Kartoteka>();
+
+  /* Kartoteka trafiona kilka razy stoi RAZ, w pierwszej grupie z kolejności
+     numer, wiedza, podobne — dlatego grupy biegną w tej kolejności. Pewność
+     bierze najmocniejsze źródło, a zdania pozostałych idą do `takze`, żeby
+     dowód nie zniknął ze szkicu tylko dlatego, że inna grupa była pierwsza. */
+  const dodaj = (twId: number, grupa: GrupaKandydata, pewnosc: PewnoscKandydata, powod: string, ostrzezenia: string[] = []) => {
+    const w = towar(database, twId);
+    if (!w) return null;
+    const juz = trafione.get(twId);
+    if (!juz) {
+      trafione.set(twId, { twId, symbol: w.symbol, nazwa: w.nazwa, stan: w.dostepne == null ? null : Number(w.dostepne),
+        grupa, pewnosc, powod, takze: [], ostrzezenia: [...new Set(ostrzezenia)] });
+      return w;
+    }
+    if (SILA[pewnosc] > SILA[juz.pewnosc]) juz.pewnosc = pewnosc;
+    if (powod !== juz.powod && !juz.takze.includes(powod)) juz.takze.push(powod);
+    for (const o of ostrzezenia) if (!juz.ostrzezenia.includes(o)) juz.ostrzezenia.push(o);
+    return w;
+  };
+  const kotwica = (w: { tw_id: number; symbol: string; nazwa: string } | null) => {
+    if (w) kotwice.set(w.tw_id, { twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa });
   };
 
-  /* SZCZEBEL: dokładny symbol i EAN — tylko, gdy agent wpisał coś, co na nie
-     wygląda. Zawsze `literowki: false`: furtka na literówki prowadziła już
-     do cudzej kartoteki (blizna „szarpaka"), a dobór nie ma prawa zgadywać. */
-  const zapytania = [dobor.dane.oem, dobor.dane.nazwaCzesci].filter(wygladaNaSymbol) as string[];
-  /* Wartości, które trafiły w kartotekę symbolem albo EAN-em. Szczebel OEM nie
-     ma prawa dołożyć do nich karty „bez kartoteki": numer, który JEST naszym
-     symbolem, nie jest „numerem, którego nie mamy". */
+  /* ── NUMER: co wskazał klient ──────────────────────────────────────────
+     Symbol i EAN zawsze `literowki: false`: furtka na literówki prowadziła
+     już do cudzej kartoteki (blizna „szarpaka"). */
+  const wpisane = [dane.oem, dane.nazwaCzesci];
   const trafioneNumery = new Set<string>();
-  /* KOTWICE szczebla `pasowanie`: kartoteki, które agent WSKAZAŁ — symbolem,
-     EAN-em, numerem OEM — oraz kartoteka oferty. Nigdy treść wiadomości. Gdy
-     klient pisze „mam gaźnik W09-0211, jaka uszczelka", agent wpisuje symbol,
-     szczebel `symbol` daje SAM GAŹNIK, a `pasowanie` — części, które do niego
-     pasują. Panel dostaje listę kotwic do przycisku „Pasuje do…". */
-  const kotwice = new Map<number, Kartoteka>();
-  const kotwica = (w: { tw_id: number; symbol: string; nazwa: string }) =>
-    kotwice.set(w.tw_id, { twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa });
-  if (zapytania.length === 0) {
-    pomin("symbol", "agent nie wpisał symbolu ani numeru w danych wejściowych", DANE("symbol lub numer"));
-    pomin("ean", "agent nie wpisał kodu EAN w danych wejściowych", DANE("symbol lub numer"));
-  } else {
-    let poSymbolu = 0; let poEan = 0;
-    for (const q of zapytania) {
-      const cyfry = q.replace(/\D/g, "");
-      const trafienia = subiekt.search(q, 20, { literowki: false });
-      for (const t of trafienia) {
-        if (t.sym.trim().toUpperCase() === q.toUpperCase()) {
-          const w = towar(database, t.id); if (!w) continue;
-          poSymbolu++; trafioneNumery.add(zwin(q)); kotwica(w);
-          dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "symbol",
-            pewnosc: "prawdopodobne", zrodlo: `Dokładny symbol „${q}” z danych wejściowych ${PO_IDENTYFIKATORZE}`, ostrzezenia: [] });
-        } else if (cyfry.length >= 8 && t.ean === cyfry) {
-          const w = towar(database, t.id); if (!w) continue;
-          poEan++; trafioneNumery.add(zwin(q)); kotwica(w);
-          dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "ean",
-            pewnosc: "prawdopodobne", zrodlo: `Kod EAN ${cyfry} z danych wejściowych ${PO_IDENTYFIKATORZE}`, ostrzezenia: [] });
-        }
+  for (const q of wpisane.filter(wygladaNaSymbol)) {
+    const cyfry = q.replace(/\D/g, "");
+    for (const t of subiekt.search(q, 20, { literowki: false })) {
+      if (t.sym.trim().toUpperCase() === q.toUpperCase()) {
+        trafioneNumery.add(zwin(q));
+        kotwica(dodaj(t.id, "numer", "prawdopodobne", `Dokładny symbol „${q}” z danych doboru ${PO_IDENTYFIKATORZE}`));
+      } else if (cyfry.length >= 8 && t.ean === cyfry) {
+        trafioneNumery.add(zwin(q));
+        kotwica(dodaj(t.id, "numer", "prawdopodobne", `Kod EAN ${cyfry} z danych doboru ${PO_IDENTYFIKATORZE}`));
       }
     }
-    drogi.set("symbol", { droga: "symbol", sprawdzona: true, wynikow: poSymbolu });
-    drogi.set("ean", { droga: "ean", sprawdzona: true, wynikow: poEan });
+  }
+  const numery = [...new Set(wpisane.filter(wygladaNaNumer))];
+  if (numery.length === 0) brakuje.push("Brak numeru części w danych doboru — nie ma czego szukać po numerze.");
+  for (const numer of numery) {
+    const trafienia = szukajPoIdentyfikatorze(numer, database);
+    for (const t of trafienia) {
+      const w = towar(database, t.twId);
+      if (w) kotwica(dodaj(t.twId, "numer", "prawdopodobne", zdanieZrodlaNumeru(t, w.symbol)));
+    }
+    /* Numer bez kartoteki NIE znika: „nie mamy tego u siebie" jest
+       odpowiedzią dla klienta. Tylko z pola `oem` — numer wpisany jako
+       nazwa części nie jest deklaracją „mam numer producenta" — i nie dla
+       numeru, który sam jest naszym symbolem. */
+    if (trafienia.length === 0 && numer === dane.oem && !trafioneNumery.has(zwin(numer))) {
+      bezKartoteki.push({ numer: numer.trim(), zdanie: "numer z danych doboru — nie ma go w żadnej kartotece ani opisie" });
+    }
   }
 
-  /* SZCZEBEL: kartoteka oferty (pamięć wskazań albo SKU — `kartotekaOferty`
-     rozstrzyga i pisze zdanie źródła), potem ZAMIENNIKI z jej opisu. */
-  let kartotekaOfertyTwId: number | null = null;
   if (!oferta) {
-    pomin("oferta", "rozmowa nie jest powiązana z ofertą");
+    brakuje.push("Rozmowa bez oferty — nie ma kartoteki, o którą pyta klient.");
   } else {
-    const sku = database.prepare(`SELECT sku FROM offer_snapshot WHERE channel_account_id=? AND external_id=?`)
+    const sku = database.prepare("SELECT sku FROM offer_snapshot WHERE channel_account_id=? AND external_id=?")
       .get(oferta.konto, oferta.ofertaId) as { sku: string | null } | undefined;
     const k = kartotekaOferty(database, oferta.konto, oferta.ofertaId, sku ? sku.sku : undefined);
-    if (k.twId === null) {
-      pomin("oferta", k.zrodlo);
+    const w = k.twId === null ? null
+      : dodaj(k.twId, "numer", "prawdopodobne", `Kartoteka oferty ${oferta.ofertaId} — ${k.zrodlo}`);
+    if (!w) {
+      brakuje.push(`Oferta ${oferta.ofertaId} bez kartoteki: ${k.twId === null ? k.zrodlo : "kartoteki nie ma w read-modelu Subiekta"}.`);
     } else {
-      const w = towar(database, k.twId);
-      if (!w) {
-        pomin("oferta", `kartoteki ${k.symbol ?? k.twId} nie ma w read-modelu Subiekta`);
-      } else {
-        kartotekaOfertyTwId = w.tw_id; kotwica(w);
-        drogi.set("oferta", { droga: "oferta", sprawdzona: true, wynikow: 1 });
-        dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "oferta",
-          pewnosc: "prawdopodobne", zrodlo: `Kartoteka oferty ${oferta.ofertaId} — ${k.zrodlo}`, ostrzezenia: [] });
+      kotwica(w);
+      /* Zamiennik z opisu jest do sprawdzenia: opis mówi „zamiennie", ale
+         nie mówi, do której maszyny. */
+      const { znane } = podzielZamienniki(w.opis ?? "", w.symbol, (s) => kartotekaPoSku(database, s).stan !== "brak");
+      for (const symbol of znane) {
+        const z = kartotekaPoSku(database, symbol);
+        if (z.stan === "jedno" && z.twId !== null) dodaj(z.twId, "numer", "do_sprawdzenia", `Zamiennik z opisu kartoteki „${w.symbol}”`);
+      }
+      /* Para przez wspólny numer oryginału, ZATWIERDZONA przez człowieka.
+         Nie mocniej niż „prawdopodobne": zamiennik nie bywa pewniejszy od
+         kartoteki oferty, którą zastępuje. */
+      for (const { kartoteka, zamiennosc } of zamiennicyOem(w.tw_id, database)) {
+        dodaj(kartoteka.twId, "numer", "prawdopodobne", zamiennosc.zdanie);
       }
     }
   }
 
-  if (kartotekaOfertyTwId === null) {
-    pomin("zamiennik", "bez kartoteki oferty nie ma opisu, z którego czyta się zamienniki");
+  /* ── WIEDZA: co potwierdza baza ────────────────────────────────────────
+     Tylko ZATWIERDZONE wpisy: propozycja w kolejce nie jest wiedzą. Pewność
+     niesie sam wpis, a zdanie źródła pisze serwis wiedzy — kandydat i szkic
+     mówią to samo. */
+  const negatyw = (twId: number, symbol: string, powod: string, zrodlo: string) => {
+    const w = towar(database, twId);
+    negatywne.push({ twId, symbol: w?.symbol ?? symbol, nazwa: w?.nazwa ?? null, powod, zrodlo });
+  };
+  if (!dane.marka || !dane.model) {
+    brakuje.push("Brak marki i modelu maszyny — baza wiedzy nie ma czego sprawdzić.");
   } else {
-    const w = towar(database, kartotekaOfertyTwId)!;
-    const { znane } = podzielZamienniki(w.opis ?? "", w.symbol,
-      (s) => kartotekaPoSku(database, s).stan !== "brak");
-    let ile = 0;
-    for (const symbol of znane) {
-      const k = kartotekaPoSku(database, symbol);
-      if (k.stan !== "jedno" || k.twId === null) continue;
-      const z = towar(database, k.twId); if (!z) continue;
-      ile++;
-      /* `wymaga_danych`, nie `prawdopodobne`: opis mówi „zamiennie", ale nie
-         mówi, do której maszyny — to trzeba sprawdzić parametrami. */
-      dodaj({ twId: z.tw_id, symbol: z.symbol, nazwa: z.nazwa, stan: Number(z.dostepne), droga: "zamiennik",
-        pewnosc: "wymaga_danych", zrodlo: `Zamiennik z opisu kartoteki „${w.symbol}”`, ostrzezenia: [] });
-    }
-    /* Para przez wspólny numer oryginału, ZATWIERDZONA w bazie wiedzy.
-       `prawdopodobne`, nie `wymaga_danych`: tu człowiek już porównał obie
-       części — ale nie `potwierdzone`, bo kartoteka oferty sama jest tylko
-       prawdopodobna, a zamiennik nie bywa pewniejszy od tego, co zastępuje. */
-    for (const { kartoteka: k, zamiennosc: zam } of zamiennicyOem(w.tw_id, database)) {
-      const z = towar(database, k.twId); if (!z) continue;
-      ile++;
-      dodaj({ twId: z.tw_id, symbol: z.symbol, nazwa: z.nazwa, stan: Number(z.dostepne), droga: "zamiennik",
-        pewnosc: "prawdopodobne", zrodlo: zam.zdanie, ostrzezenia: [] });
-    }
-    drogi.set("zamiennik", { droga: "zamiennik", sprawdzona: true, wynikow: ile });
-  }
-
-  /* SZCZEBEL: numer OEM (E3) — z tabeli identyfikatorów, nie z wyszukiwarki.
-     Numer bez kartoteki NIE znika: decyzją właściciela staje się kandydatem
-     bez wiersza (makieta Dobor.dc.html), bo „nie mamy tego u siebie" jest
-     odpowiedzią dla klienta, a puste miejsce na liście nią nie jest. */
-  const bezKartoteki: Array<Omit<KandydatDoboru, "nr">> = [];
-  const numery = [dobor.dane.oem, dobor.dane.nazwaCzesci].filter(wygladaNaNumer) as string[];
-  if (numery.length === 0) {
-    pomin("oem", "agent nie wpisał numeru OEM w danych wejściowych", DANE("numer OEM"));
-  } else {
-    let ile = 0;
-    const widziane = new Set<string>();
-    for (const numer of numery) {
-      const norm = zwin(numer);
-      if (!norm || widziane.has(norm)) continue;
-      widziane.add(norm);
-      const trafienia = szukajPoIdentyfikatorze(numer, database);
-      for (const t of trafienia) {
-        const w = towar(database, t.twId); if (!w) continue;
-        ile++; kotwica(w);
-        dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "oem",
-          pewnosc: "prawdopodobne", ostrzezenia: [],
-          /* TRZY źródła, trzy zdania (0.264.0). Do 0.263.0 stał tu wybór
-             dwugałęziowy i wiersz z oferty wpadłby w gałąź „z opisu
-             kartoteki" — ekran powiedziałby nieprawdę o pochodzeniu numeru,
-             a kompilator by tego nie złapał. Zdanie źródła jest przy §11.3
-             treścią, nie ozdobą: deklaracja sprzedawcy w opisie aukcji
-             i numer z katalogu magazynu to różnej wagi świadectwa. */
-          zrodlo: zdanieZrodlaNumeru(t, w.symbol) });
-      }
-      /* Karta „bez kartoteki" tylko dla pola OEM: numer wpisany jako NAZWA
-         części to nie deklaracja „mam numer producenta". */
-      if (trafienia.length === 0 && numer === dobor.dane.oem && !trafioneNumery.has(norm)) {
-        bezKartoteki.push({ twId: null, symbol: `OEM ${numer.trim()}`, nazwa: "identyfikator bez wiersza w kartotece",
-          stan: null, droga: "oem", pewnosc: "wymaga_danych", ostrzezenia: [],
-          zrodlo: "numer z danych wejściowych — nie ma go w żadnym opisie kartoteki" });
-      }
-    }
-    drogi.set("oem", { droga: "oem", sprawdzona: true, wynikow: ile });
-  }
-
-  /* SZCZEBEL: potwierdzone zastosowanie z bazy wiedzy (E2). Tylko
-     ZATWIERDZONE wpisy: propozycja czekająca w kolejce nie jest wiedzą.
-     Pewność niesie sam wpis (dowód techniczny albo tylko ślad rozmowy),
-     a zdanie źródła pisze serwis wiedzy — kandydat i szkic mówią to samo. */
-  const negatywne: NegatywDoboru[] = [];
-  if (!dobor.dane.marka || !dobor.dane.model) {
-    pomin("zastosowanie", "agent nie wpisał marki i modelu maszyny", DANE("markę i model"));
-  } else {
-    const klucz = kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, dobor.dane.wariant);
-    /* ── BEZ WARIANTU, GDY DOKŁADNY KLUCZ MILCZY (23 września 2026) ─────────
-       Decyzja właściciela po zrzucie: agent wpisał HECHT 1803S z wariantem
-       DYM1182c, a lista zgodności oferty dała wiedzę „Hecht 1803S" — bez
-       wariantu. Klucz jest dokładny, więc szczebel oddał zero i właściwy nóż
-       stał wśród trafień po samym tekście.
-
-       Druga próba idzie po marce i modelu, ale TYLKO gdy pierwsza nic nie
-       dała: wpis dla wariantu jest mocniejszy i nie wolno go rozmyć. Kandydat
-       z drugiej próby ma co najwyżej „prawdopodobne", bo wariant bywa właśnie
-       tym, co zmienia część. Negatyw z drugiej próby też stoi — ostrzeżenie
-       o modelu bazowym jest warte zobaczenia, a podpis mówi, skąd jest. */
-    const bezWariantu = dobor.dane.wariant
-      ? kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, null) : null;
+    const maszyna = [dane.marka, dane.model, dane.wariant].filter(Boolean).join(" ");
+    const klucz = kluczModelu("maszyna", dane.marka, dane.model, dane.wariant);
+    /* ── BEZ WARIANTU, GDY DOKŁADNY KLUCZ MILCZY ────────────────────────
+       Agent wpisał HECHT 1803S z wariantem DYM1182c, a wiedza z listy
+       zgodności mówiła „Hecht 1803S". Druga próba idzie po marce i modelu
+       TYLKO, gdy pierwsza nie dała żadnego pozytywu: wpis dla wariantu jest
+       mocniejszy i nie wolno go rozmyć. Kandydat z drugiej próby ma
+       najwyżej „prawdopodobne", bo wariant bywa tym, co zmienia część. */
     const dokladne = zastosowaniaModelu(klucz, database);
-    const zapas = bezWariantu && !dokladne.some((z) => z.polaryzacja !== "nie_pasuje")
-      ? zastosowaniaModelu(bezWariantu, database) : [];
-    const dopisek = ` — wpis dla ${dobor.dane.marka} ${dobor.dane.model} bez wariantu, wariant niesprawdzony`;
-    let ile = 0;
+    const zapas = dane.wariant && !dokladne.some((z) => z.polaryzacja !== "nie_pasuje")
+      ? zastosowaniaModelu(kluczModelu("maszyna", dane.marka, dane.model, null), database) : [];
+    const dopisek = ` — wpis dla ${dane.marka} ${dane.model} bez wariantu, wariant niesprawdzony`;
     for (const [z, zZapasu] of [...dokladne.map((z) => [z, false] as const), ...zapas.map((z) => [z, true] as const)]) {
-      const w = towar(database, z.twId);
-      const werdykt = werdyktWarunkow(z, dobor.dane, "maszyny");
-      if (werdykt.rodzaj === "nic") continue;
-      if (werdykt.rodzaj === "negatyw") {
-        negatywne.push({ twId: z.twId, symbol: w?.symbol ?? z.symbol, nazwa: w?.nazwa ?? null,
-          powod: werdykt.powod, zrodlo: z.zdanieZrodla + (zZapasu ? dopisek : ""),
-          at: z.rozstrzygnietoAt ?? z.zaproponowanoAt });
-        continue;
-      }
-      if (!w) continue;
-      ile++;
-      const pewnosc = zZapasu && z.pewnosc === "potwierdzone" ? "prawdopodobne" : z.pewnosc;
-      dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "zastosowanie",
-        pewnosc: werdykt.pewnosc ?? pewnosc,
-        zrodlo: z.zdanieZrodla + werdykt.dopisek + (zZapasu ? dopisek : ""),
-        ostrzezenia: werdykt.ostrzezenie ? [werdykt.ostrzezenie] : [] });
+      const werdykt = werdyktWarunkow(z, dane, "maszyny");
+      const zrodlo = z.zdanieZrodla + (zZapasu ? dopisek : "");
+      if (werdykt.rodzaj === "negatyw") negatyw(z.twId, z.symbol, werdykt.powod, zrodlo);
+      if (werdykt.rodzaj !== "kandydat") continue;
+      const zWpisu: PewnoscKandydata = zZapasu && z.pewnosc === "potwierdzone" ? "prawdopodobne" : z.pewnosc;
+      dodaj(z.twId, "wiedza", werdykt.pewnosc ?? zWpisu, z.zdanieZrodla + werdykt.dopisek + (zZapasu ? dopisek : ""),
+        werdykt.ostrzezenie ? [werdykt.ostrzezenie] : []);
     }
-    drogi.set("zastosowanie", { droga: "zastosowanie", sprawdzona: true, wynikow: ile });
-  }
 
-  /* SZCZEBEL: zastosowanie PRZEZ SILNIK. Filtr, gaźnik, świeca i linka pasują
-     do SILNIKA, a kupujący zna wyłącznie model kosiarki — bez tego szczebla
-     „filtr do NAC LS 46-450" nie trafi na filtr Loncina, choć oba wpisy leżą
-     w bazie. Idziemy WYŁĄCZNIE przez zatwierdzoną zabudowę; pola
-     `dobor_rozmowy.silnik` nie czytamy, bo to wolny tekst („B&S 450E" nigdy
-     nie trafi na „Briggs & Stratton 450E") i rozbijanie go byłoby zgadywaniem.
+    /* PRZEZ SILNIK. Filtr, gaźnik i świeca pasują do SILNIKA, a kupujący zna
+       model kosiarki. Wyłącznie przez zatwierdzoną zabudowę: pole „silnik"
+       to wolny tekst („B&S 450E" nigdy nie trafi na „Briggs & Stratton
+       450E"), a rozbijanie go byłoby zgadywaniem.
 
-     PEWNOŚĆ IDZIE Z NAJSŁABSZEGO OGNIWA i to jest INNA reguła niż §11.3.
-     Tam wygrywa najmocniejszy dowód JEDNEGO twierdzenia; tutaj twierdzenia są
-     dwa („część pasuje do silnika" i „silnik stoi w tej maszynie") i łańcuch
-     jest wart tyle, co jego słabsze ogniwo. Nie „naprawiać" tego na spójność.
-
-     Maszyna z kilkoma wersjami silnikowymi NIGDY nie daje `potwierdzone`:
-     klient zna model kosiarki, nie wersję silnika, a milcząca pewność w tym
-     miejscu kończy się zwrotem „nie pasuje". */
-  if (!dobor.dane.marka || !dobor.dane.model) {
-    pomin("silnik", "agent nie wpisał marki i modelu maszyny", DANE("markę i model"));
-  } else {
-    const maszyna = [dobor.dane.marka, dobor.dane.model, dobor.dane.wariant].filter(Boolean).join(" ");
-    const zabudowy = zabudowyMaszyny(
-      kluczModelu("maszyna", dobor.dane.marka, dobor.dane.model, dobor.dane.wariant), database);
+       PEWNOŚĆ Z NAJSŁABSZEGO OGNIWA. Twierdzenia są dwa („część pasuje do
+       silnika" i „silnik stoi w tej maszynie") i łańcuch jest wart tyle, co
+       słabsze. Maszyna z kilkoma silnikami NIGDY nie daje „potwierdzone":
+       klient zna model kosiarki, nie wersję silnika, a milcząca pewność
+       kończy się zwrotem „nie pasuje". */
+    const zabudowy = zabudowyMaszyny(klucz, database);
     if (zabudowy.length === 0) {
-      /* Pole „Silnik" czytamy TU wyłącznie do ZDANIA POWODU, nie do szukania:
-         powód pominięcia to jedyna droga, którą agent dowiaduje się o luce
-         (§11.2), więc ma prowadzić o jeden krok dalej — do przycisku pod
-         polem albo do słownika. Kandydatów z samego aliasu nie ma nigdy. */
-      const tekst = String(dobor.dane.silnik ?? "").trim();
+      /* Pole „silnik" czytamy tu wyłącznie do zdania: agent ma wiedzieć, czy
+         brakuje wpisu w słowniku, czy zabudowy. Kandydatów z aliasu nie ma. */
+      const tekst = String(dane.silnik ?? "").trim();
       const alias = tekst ? silnikZTekstu(tekst, database) : null;
-      pomin("silnik", alias
-        ? `„${tekst}” to ${alias.silnik.etykieta} wg słownika, ale nikt nie zatwierdził, że stoi w ${maszyna}`
-          + " — zaproponuj zabudowę pod polem Silnik"
-        : tekst
-          ? `nie wiadomo, jaki silnik stoi w ${maszyna} — „${tekst}” nie ma w słowniku silników,`
-            + " dopisz go w Wiedza → Silniki"
-          : `nie wiadomo, jaki silnik stoi w ${maszyna} — dopisz go w Wiedza → Silniki`,
-        /* Akcję dostaje TYLKO przypadek z aliasem w słowniku: para maszyna–silnik
-           jest wtedy gotowa do zaproponowania jednym kliknięciem. Bez aliasu
-           przycisk „zaproponuj" nie miałby czego wysłać, więc zdanie zostaje
-           samym zdaniem i prowadzi do ekranu Wiedzy. */
-        alias ? ZABUDOWA : undefined);
-    } else {
-      /* Ostrzeżenie przy KAŻDYM kandydacie tej drogi, nie raz na liście:
-         kandydat wędruje do szkicu osobno i ma nieść swoje zastrzeżenie. */
-      const kilka = zabudowy.length > 1
-        ? [`${maszyna} bywa z kilkoma silnikami — potwierdź z tabliczki znamionowej`]
-        : [];
-      let ile = 0;
-      for (const zab of zabudowy) {
-        for (const z of zastosowaniaModelu(zab.silnik.klucz, database)) {
-          const w = towar(database, z.twId);
-          /* Warunki wpisu do SILNIKA dotyczą silnika, a dobór zna tabliczkę
-             maszyny — stąd „silnika": wynik to najwyżej „nie wiem". */
-          const werdykt = werdyktWarunkow(z, dobor.dane, "silnika");
-          if (werdykt.rodzaj === "nic") continue;
-          if (werdykt.rodzaj === "negatyw") {
-            negatywne.push({ twId: z.twId, symbol: w?.symbol ?? z.symbol, nazwa: w?.nazwa ?? null,
-              powod: werdykt.powod,
-              zrodlo: `${z.zdanieZrodla}; ${zab.zdanieZrodla}`,
-              at: z.rozstrzygnietoAt ?? z.zaproponowanoAt });
-            continue;
-          }
-          if (!w) continue;
-          ile++;
-          const pewne = z.pewnosc === "potwierdzone" && zab.pewnosc === "potwierdzone" && kilka.length === 0;
-          dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne),
-            droga: "silnik", pewnosc: werdykt.pewnosc ?? (pewne ? "potwierdzone" : "prawdopodobne"),
-            zrodlo: `${z.zdanieZrodla}; ${zab.zdanieZrodla}`,
-            ostrzezenia: [...kilka, ...(werdykt.ostrzezenie ? [werdykt.ostrzezenie] : [])] });
-        }
+      brakuje.push(`Nie wiadomo, jaki silnik stoi w ${maszyna}`
+        + (alias ? ` — „${tekst}” to ${alias.silnik.etykieta} wg słownika, ale zabudowy nikt nie zatwierdził.`
+          : tekst ? ` — „${tekst}” nie ma w słowniku silników.` : "."));
+    }
+    const kilka = zabudowy.length > 1 ? [`${maszyna} bywa z kilkoma silnikami — potwierdź z tabliczki znamionowej`] : [];
+    for (const zab of zabudowy) {
+      for (const z of zastosowaniaModelu(zab.silnik.klucz, database)) {
+        /* Warunki wpisu do SILNIKA dotyczą silnika, a dobór zna tabliczkę
+           maszyny — stąd „silnika": wynik to najwyżej „nie wiem". */
+        const werdykt = werdyktWarunkow(z, dane, "silnika");
+        const zrodlo = `${z.zdanieZrodla}; ${zab.zdanieZrodla}`;
+        if (werdykt.rodzaj === "negatyw") negatyw(z.twId, z.symbol, werdykt.powod, zrodlo);
+        if (werdykt.rodzaj !== "kandydat") continue;
+        const pewne = z.pewnosc === "potwierdzone" && zab.pewnosc === "potwierdzone" && kilka.length === 0;
+        dodaj(z.twId, "wiedza", werdykt.pewnosc ?? (pewne ? "potwierdzone" : "prawdopodobne"), zrodlo,
+          [...kilka, ...(werdykt.ostrzezenie ? [werdykt.ostrzezenie] : [])]);
       }
-      /* Silnik znany, ale bez zastosowań to `sprawdzona: true, wynikow: 0` —
-         nie pominięcie. To dwie różne prawdy i agent musi je rozróżnić. */
-      drogi.set("silnik", { droga: "silnik", sprawdzona: true, wynikow: ile });
     }
   }
 
-  /* SZCZEBEL: PASOWANIE — części, które pasują DO kotwicy (uszczelka do
-     gaźnika, membrany, zestaw naprawczy). Wprost i przez zamiennik (obie strony,
-     głębokość jeden, przechodnie nigdy `potwierdzone` — liczy to serwis).
-     Nie filtrujemy po `nazwaCzesci`: gaźnik ma 3–8 części pasujących, agent
-     czyta nazwy. Kotwica trafiona, ale bez pasowań, to `sprawdzona: true`
-     z zerem, nie pominięcie. Dedup po `twId` gubi drugą kotwicę (uszczelka
-     pasująca do obu wpisanych gaźników pokaże zdanie tylko pierwszego) —
-     akceptowalne, bo obie kotwice widać osobno na liście kandydatów. */
-  if (kotwice.size === 0) {
-    pomin("pasowanie", "agent nie wpisał symbolu ani numeru, a rozmowa nie ma kartoteki oferty");
-  } else {
-    let ile = 0;
-    for (const k of kotwice.values()) {
-      const p = pasowaniaTowaru(k.twId, database);
-      for (const t of p.pasujace) {
-        const w = towar(database, t.czesc.twId); if (!w) continue;
-        ile++;
-        dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "pasowanie",
-          pewnosc: t.pewnosc, zrodlo: t.zdanie, ostrzezenia: [] });
-      }
-      for (const n of p.negatywne) {
-        if (n.doCzego.twId !== k.twId) continue;
-        const w = towar(database, n.czesc.twId);
-        negatywne.push({ twId: n.czesc.twId, symbol: w?.symbol ?? n.czesc.symbol, nazwa: w?.nazwa ?? null,
-          powod: n.zdaniePowodu ?? "nie pasuje", zrodlo: n.zdanieZrodla, at: n.rozstrzygnietoAt ?? n.zaproponowanoAt });
-      }
+  /* PASOWANIE: części, które pasują DO kotwicy (uszczelka do gaźnika).
+     Wprost i przez zamiennik; przechodnie nigdy „potwierdzone" — liczy to
+     serwis pasowań. Nie filtrujemy po nazwie części: agent czyta nazwy. */
+  for (const k of kotwice.values()) {
+    const p = pasowaniaTowaru(k.twId, database);
+    for (const t of p.pasujace) dodaj(t.czesc.twId, "wiedza", t.pewnosc, t.zdanie);
+    for (const n of p.negatywne) {
+      if (n.doCzego.twId === k.twId) negatyw(n.czesc.twId, n.czesc.symbol, n.zdaniePowodu ?? "nie pasuje", n.zdanieZrodla);
     }
-    drogi.set("pasowanie", { droga: "pasowanie", sprawdzona: true, wynikow: ile });
   }
 
-  /* SZCZEBEL: zgodne wymiary — liczby z jednostką z PARAMETRÓW doboru przeciw
-     wymiarom wyciętym z nazw i opisów kartotek po imporcie (`wymiar_kartoteki`).
-     Blizna: „linka napędowa 148 cm" nie trafiała w „1170x1480". Wyłącznie
-     z parametrów wpisanych przez agenta, nigdy z treści (blizna szarpaka);
-     jednostka obowiązkowa, dopasowanie co do milimetra, pewność „wymaga
-     danych" — zgodna długość to podpowiedź, nie dowód. Trzy powody pominięcia,
-     bo trzy różne rzeczy może zrobić agent: wpisać parametr, dopisać jednostkę,
-     poczekać na odbudowę indeksu. */
-  const wymiary = wymiaryZParametrow(dobor.dane.parametry);
-  if (Object.keys(dobor.dane.parametry).length === 0) {
-    pomin("wymiar", "agent nie wpisał wymiarów w parametrach doboru (np. długość: 148 cm)", WYMIAR);
-  } else if (wymiary.length === 0) {
-    pomin("wymiar", "parametry nie mają wymiaru z jednostką — wpisz mm, cm albo m", WYMIAR);
-  } else if (indeksWymiarowPusty(database)) {
-    pomin("wymiar", "indeks wymiarów pusty — odbuduje się przy starcie serwera albo po imporcie");
-  } else {
-    let ile = 0;
-    for (const t of szukajPoWymiarach(wymiary.map((w) => w.mm), 8, database)) {
-      const w = towar(database, t.twId); if (!w) continue;
-      ile++;
-      const zdania = t.trafienia.map((x) => {
-        const etykieta = wymiary.find((y) => y.mm === x.mm)?.etykieta ?? `${x.mm} mm`;
-        return `zgodny wymiar ${x.mm} mm (${etykieta}) w ${x.pole === "nazwa" ? "nazwie" : "opisie"} kartoteki „${x.zapis}”`;
-      });
-      dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "wymiar",
-        pewnosc: "wymaga_danych", ostrzezenia: [], zrodlo: `${zdania.join("; ")} — nie dowód` });
-    }
-    drogi.set("wymiar", { droga: "wymiar", sprawdzona: true, wynikow: ile });
-  }
-
-  /* SZCZEBEL: pełny tekst (E3) — bm25 po symbolu, nazwie i opisie, WYŁĄCZNIE
-     z danych wpisanych przez agenta (blizna „szarpaka": nigdy z treści
-     wiadomości). Trafienie po treści to podpowiedź, nie dowód (§11.2). */
-  const fraza = [dobor.dane.nazwaCzesci, dobor.dane.marka, dobor.dane.model].filter(Boolean).join(" ");
+  /* ── PODOBNE: po nazwie ──────────────────────────────────────────────────
+     bm25 po symbolu, nazwie i opisie, wyłącznie z danych doboru. Trafienie
+     po treści to podpowiedź, nie dowód. */
+  if (!dane.nazwaCzesci) brakuje.push("Brak nazwy części — nie ma czego szukać po nazwie.");
+  const fraza = [dane.nazwaCzesci, dane.marka, dane.model].filter(Boolean).join(" ");
   if (!ftsDostepne()) {
-    pomin("pelnotekst", "wyszukiwanie pełnotekstowe niedostępne — SQLite bez FTS5");
-  } else if (!fraza) {
-    pomin("pelnotekst", "agent nie wpisał nazwy części ani maszyny", DANE("nazwę części"));
-  } else {
-    let ile = 0;
-    for (const t of szukajPelnotekst(dobor.dane.nazwaCzesci ?? "", 5, database, [dobor.dane.marka ?? "", dobor.dane.model ?? ""])) {
-      const w = towar(database, t.twId); if (!w) continue;
-      ile++;
-      dodaj({ twId: w.tw_id, symbol: w.symbol, nazwa: w.nazwa, stan: Number(w.dostepne), droga: "pelnotekst",
-        pewnosc: "wymaga_danych", ostrzezenia: [],
-        zrodlo: `trafienie po treści kartoteki dla „${fraza}” — nie dowód` });
+    brakuje.push("Wyszukiwanie po nazwie niedostępne — SQLite bez FTS5.");
+  } else if (fraza) {
+    for (const t of szukajPelnotekst(dane.nazwaCzesci ?? "", 5, database, [dane.marka ?? "", dane.model ?? ""])) {
+      dodaj(t.twId, "podobne", "do_sprawdzenia", `trafienie po treści kartoteki dla „${fraza}” — nie dowód`);
     }
-    drogi.set("pelnotekst", { droga: "pelnotekst", sprawdzona: true, wynikow: ile });
   }
 
-  for (const droga of DROGI_DOBORU) {
-    if (!drogi.has(droga)) pomin(droga, POMINIETE_DO[droga] ?? "szczebel bez nadawcy");
+  /* Negatyw o kartotece z listy stoi też przy niej: ta sama część bywa
+     kandydatem z oferty i negatywem z wiedzy naraz, a kandydat wędruje do
+     szkicu osobno i ma nieść swoje zastrzeżenie. */
+  for (const n of negatywne) {
+    const k = trafione.get(n.twId);
+    const zdanie = `${n.powod} — ${n.zrodlo}`;
+    if (k && !k.ostrzezenia.includes(zdanie)) k.ostrzezenia.push(zdanie);
   }
-
-  /* Ostrzeżenia mają DWA źródła i oba muszą dojechać. Pierwsze to negatyw
-     o tej samej kartotece — ta sama część bywa kandydatem z oferty i negatywem
-     z wiedzy naraz. Drugie stawia sam szczebel: „ta maszyna bywa z kilkoma
-     silnikami". Ta lista SCALA oba; nadpisanie gasiłoby zastrzeżenie szczebla
-     po cichu, a właśnie ono chroni przed zwrotem „nie pasuje". */
-  const kandydaci = [...[...znalezione.values()]
-    .sort((a, b) => RANGA[a.droga] - RANGA[b.droga] || (b.stan ?? 0) - (a.stan ?? 0) || a.symbol.localeCompare(b.symbol)),
-  /* Numery bez kartoteki na końcu: nie da się ich wybrać, więc nie mają
-     wyprzedzać niczego, co się da. */
-  ...bezKartoteki]
-    .map((k, i) => ({ nr: i + 1, ...k,
-      ostrzezenia: [...k.ostrzezenia,
-        ...negatywne.filter((n) => n.twId === k.twId).map((n) => `${n.powod} — ${n.zrodlo}`)] }));
-  return { kandydaci, drogi: DROGI_DOBORU.map((d) => drogi.get(d)!), negatywne, kotwice: [...kotwice.values()] };
+  /* Brak stanu stoi za zerem: „nie wiemy" nie jest lepsze od „nie ma". */
+  const stan = (k: KandydatDoboru) => k.stan ?? Number.MIN_SAFE_INTEGER;
+  const kandydaci = [...trafione.values()].sort((a, b) =>
+    GRUPY.indexOf(a.grupa) - GRUPY.indexOf(b.grupa) || SILA[b.pewnosc] - SILA[a.pewnosc]
+    || stan(b) - stan(a) || a.symbol.localeCompare(b.symbol));
+  return { kandydaci, bezKartoteki, negatywne, brakuje, kotwice: [...kotwice.values()] };
 }

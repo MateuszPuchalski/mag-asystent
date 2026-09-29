@@ -22,7 +22,7 @@ const szkic = (n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
 const copilot = (n: Partial<PropsSzkicuCopilota> = {}): PropsSzkicuCopilota => ({
   stan: { wlaczony: true, powod: null, model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20,
     autoKlasyfikacja: false, autoSzkic: false },
-  szkic: null, nieswiezy: false, doborWersja: 1, nowePolaDoboru: [], paraPasowania: null,
+  szkic: null, nieswiezy: false, doborWersja: 1, paraPasowania: null,
   uklada: false, blad: "", maSzkicAgenta: false, wylaczony: false,
   onUloz: vi.fn(), onPopraw: vi.fn(), onOdrzuc: vi.fn(), ...n,
 });
@@ -248,19 +248,12 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.getByText(/powstał przed nową wiadomością klienta/)).toBeInTheDocument();
   });
 
-  /* Dane doboru z rozmowy (przyrost trzeci): karta w edytorze tylko MÓWI, że
-     są — wpisuje je zakładka Dobór. Druga nieświeżość: fakty się zmieniły. */
-  it("mówi, co WPISAŁ do doboru, bez drugiego przycisku; zmiana doboru po szkicu jest nazwana", () => {
-    /* „Wpisał", nie „rozpoznał" (0.341.0): dane wejściowe wchodzą do doboru
-       same, w puste pola. Zdanie „wpisz je w zakładce Dobór" prosiło agenta
-       o przepisanie tego, co system już zrobił. */
-    edytor(copilot({ szkic: szkic({ doborWersja: 1 }), doborWersja: 2, nowePolaDoboru: ["Marka", "Model", "Silnik"] }));
-    /* Od 0.342.0 zdanie stoi w JEDNYM pasku „Przy okazji" razem z pasowaniem
-       i pokwitowaniem wiedzy — trzy ramki na jeden komunikat to był ścisk,
-       nie porządek. Tekst rozbity na wiele elementów, stąd `textContent`. */
-    expect(screen.getByTestId("luki-kartoteki").textContent)
-      .toMatch(/Do doboru wpisano:\s*Marka, Model, Silnik/);
-    expect(screen.getByTestId("luki-kartoteki").textContent).toMatch(/popraw w Doborze po prawej/i);
+  /* Dane doboru wchodzą same i agent widzi je w „Czego szuka klient", więc
+     pasek szkicu już o nich nie mówi. Zostaje nazwana druga nieświeżość:
+     fakty doboru zmieniły się od szkicu. */
+  it("nie mówi o wpisanych danych doboru; zmiana doboru po szkicu jest nazwana", () => {
+    edytor(copilot({ szkic: szkic({ doborWersja: 1 }), doborWersja: 2 }));
+    expect(screen.queryByText(/Do doboru wpisano/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Wpisz do danych/ })).toBeNull();
     expect(screen.getByText(/dane doboru zmieniły się od szkicu/)).toBeInTheDocument();
   });
@@ -334,7 +327,6 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
        i pokwitowanie wiedzy. Rozdzielenie miało sens, gdy każda niosła
        PRZYCISK; przycisków nie ma od 0.341.0, więc został sam komunikat. */
     edytor(copilot({
-      nowePolaDoboru: ["Marka", "Model"],
       paraPasowania: "W09-0211 → LC170430140-0001",
       szkic: szkic({
         lukiKartoteki: {
@@ -346,7 +338,7 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
     }));
 
     const pasek = screen.getByTestId("luki-kartoteki");
-    for (const fragment of ["Marka, Model", "W09-0211 → LC170430140-0001",
+    for (const fragment of ["W09-0211 → LC170430140-0001", "wierszu Wiedza",
       "16100-ZH8-W61", "STIHL MS 170", "FS450", "czeka tam 2"]) {
       expect(pasek.textContent).toContain(fragment);
     }
@@ -367,13 +359,13 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
   it("pasek „Przy okazji” jest zwinięty do jednej linii z tematami", async () => {
     /* 0.517.0: sześć zdań pod każdym szkicem, z których żadne nie prosi
        o ruch. Podpis mówi, czego dotyczą; treść o jedno kliknięcie. */
-    edytor(copilot({ nowePolaDoboru: ["Marka"], szkic: szkic({ lukiKartoteki:
+    edytor(copilot({ paraPasowania: "W09-0211 → LC170430140-0001", szkic: szkic({ lukiKartoteki:
       { symbol: "W09-0211", numery: [], modele: [], wpisane: [], czeka: 2 } }) }));
     const pasek = screen.getByTestId("luki-kartoteki");
     expect(pasek).not.toHaveAttribute("open");
-    expect(pasek.querySelector("summary")!.textContent).toBe("Przy okazji: dane doboru, wiedza");
-    expect(screen.getByText(/Do doboru wpisano/)).not.toBeVisible();
+    expect(pasek.querySelector("summary")!.textContent).toBe("Przy okazji: pasowanie, wiedza");
+    expect(screen.getByText(/Rozpoznane pasowanie/)).not.toBeVisible();
     await userEvent.click(pasek.querySelector("summary")!);
-    expect(screen.getByText(/Do doboru wpisano/)).toBeVisible();
+    expect(screen.getByText(/Rozpoznane pasowanie/)).toBeVisible();
   });
 });

@@ -16,7 +16,6 @@ const dane = (n: Partial<Pokrycie> = {}): Pokrycie => ({
   modeleZOpisu: { nowych: 0, przerobionych: 10, odrzuconych: 2 },
   zastosowania: { zatwierdzonych: 80, negatywnych: 3, propozycji: 5 },
   tokeny: { tokenow: 12, nowych: 0, zatwierdzonych: 7 },
-  wymiary: { kartotek: 200, wymiarow: 260 },
   fts: { dostepne: true, wpisow: 900 },
   ...n,
 });
@@ -28,7 +27,7 @@ describe("PokrycieWiedzy", () => {
     const szczegoly = screen.getByText("Szczegóły").closest("details")!;
     expect(szczegoly.open).toBe(false);
     expect(szczegoly).toContainElement(screen.getByText("tekstów do przerobienia"));
-    expect(szczegoly).toContainElement(screen.getByText("wymiarów"));
+    expect(szczegoly).toContainElement(screen.getByText("tokenów silników w nazwach"));
     await userEvent.click(screen.getByText("Szczegóły"));
     expect(szczegoly.open).toBe(true);
     expect(screen.getByText(/obejmuje/).textContent).toContain("900");

@@ -69,8 +69,6 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/copilot/szkic", payload: { rozmowaId: rozmowa } },
   { method: "POST" as const, url: `/api/obsluga/copilot/szkic/${rozmowa}/ocena`,
     payload: { ocena: "wstawiony" } },
-  { method: "POST" as const, url: `/api/obsluga/copilot/szkic/${rozmowa}/dane`,
-    payload: { ocena: "odrzucone" } },
   { method: "POST" as const, url: `/api/obsluga/copilot/szkic/${rozmowa}/pasowanie`,
     payload: { ocena: "odrzucone" } },
   { method: "POST" as const, url: "/api/obsluga/copilot/pytania/1/pasowania/0" },
@@ -113,31 +111,29 @@ test("hala nie widzi Copilota — bramka stoi też na odczycie", async () => {
    CZWARTA to werdykt agenta o szkicu: wstawił, zastąpił, odrzucił. Ten sam
    argument co przy drugiej — bez niej „szkic z AI" byłby kosztem bez miary.
 
-   PIĄTA to los danych doboru rozpoznanych w rozmowie (przyrost trzeci):
-   jedno kliknięcie agenta wpisuje je w PUSTE pola doboru albo odsyła.
-   Osobna od `PUT dobor/dane`, bo serwis sam pilnuje „tylko puste pola"
-   i liczy los propozycji — przez zwykły PUT każda wyglądałaby w dzienniku
-   jak ręczny wpis agenta. Automat sam nie wpisuje nigdy.
+   Los danych doboru nie ma trasy: dane z rozmowy wchodzą same, w puste
+   pola, a agent poprawia je w zakładce Dobór (`docs/dobor-od-zera.md` §2).
 
-   SZÓSTA to los pasowania rozpoznanego w rozmowie (przyrost czwarty):
+   PIĄTA to los pasowania rozpoznanego w rozmowie (przyrost czwarty):
    jedno kliknięcie agenta kładzie parę w kolejce wiedzy jako propozycję ze
    źródłem `copilot` albo ją odsyła. Osobna od `POST wiedza/pasowania`, bo
    tamta wywodzi źródło z kontekstu i nie zna wiersza szkicu; para, rola
    i dowód idą z wiersza SPRAWDZONEGO przez serwer, nie z ciała żądania.
    Rozstrzyga biuro, jak przy każdej propozycji. */
-/* SIÓDMA (0.332.0) to dopytanie. Licznik podniósł się o jeden świadomie:
+/* SZÓSTA (0.332.0) to dopytanie. Licznik podniósł się o jeden świadomie:
    trasa produkuje tekst DLA AGENTA i celowo nie ma sit szkicu, więc wspólna
    trasa z tamtą musiałaby wybrać jedno zachowanie dla dwóch różnych rzeczy. */
-/* ÓSMA (0.528.0) to „Zapisz jako propozycję” przy pasowaniu z sieci
+/* SIÓDMA (0.528.0) to „Zapisz jako propozycję” przy pasowaniu z sieci
    znalezionym w dopytaniu. Para leży przy wymianie i przeszła sito strony;
-   trasa bierze ją z wiersza, nie z ciała żądania — jak szósta ze szkicu. */
-test("Copilot ma OSIEM tras zapisu", async () => {
+   trasa bierze ją z wiersza, nie z ciała żądania — jak piąta ze szkicu. */
+test("Copilot ma SIEDEM tras zapisu", async () => {
   const zrodlo = fs.readFileSync(new URL("./copilot.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 8, `tras POST jest ${posty.length}, a umowa mówi o ośmiu`);
-  for (const slowo of ["klasyfikacja", "korekta", "ocena", "szkic", "dane", "pasowanie", "pytanie", "pasowania/:nr"]) {
+  assert.equal(posty.length, 7, `tras POST jest ${posty.length}, a umowa mówi o siedmiu`);
+  for (const slowo of ["klasyfikacja", "korekta", "ocena", "szkic", "pasowanie", "pytanie", "pasowania/:nr"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
+  assert.equal(zrodlo.includes("/:id/dane"), false, "los danych doboru nie ma już trasy");
 });
 
 test("patrzenie na Copilota niczego nie mutuje", async () => {

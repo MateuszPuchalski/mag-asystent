@@ -10,8 +10,8 @@ import { Liczba } from "./PokrycieSygnatur";
    liczby, nie procent, i lista roboty zamiast ozdoby.
 
    SIEDEMNAŚCIE KAFELKÓW TO ZA DUŻO NA JEDNO SPOJRZENIE (0.519.0). Na
-   wierzchu został pierwszy rząd — ile wiedzy mamy. Kolejka, tokeny silników,
-   wymiary i stan indeksu zwinęły się pod „Szczegóły", bo czyta się je
+   wierzchu został pierwszy rząd — ile wiedzy mamy. Kolejka, tokeny silników
+   i stan indeksu zwinęły się pod „Szczegóły", bo czyta się je
    rzadko, a lista roboty mieszka w Wiedzy. Liczba czekająca na człowieka
    nie chowa się jednak w ciszy: stoi przy przełączniku.                     */
 
@@ -72,12 +72,6 @@ export function PokrycieWiedzy({ dane }: { dane: Pokrycie | undefined }) {
         <Liczba etykieta="kartotek z tokenem do decyzji" ile={dane.tokeny.nowych}
           ton={dane.tokeny.nowych > 0 ? "text-ranga-uwaga" : ""} />
         <Liczba etykieta="zatwierdzonych z tokenu" ile={dane.tokeny.zatwierdzonych} ton="text-ranga-ok" />
-      </Rzad>
-
-      <Rzad>
-        {/* Wymiary z nazw i opisów: paliwo szczebla „zgodne wymiary" w doborze. */}
-        <Liczba etykieta="kartotek z wymiarem w nazwie lub opisie" ile={dane.wymiary.kartotek} />
-        <Liczba etykieta="wymiarów" ile={dane.wymiary.wymiarow} />
       </Rzad>
 
       {/* Nazwa indeksu (FTS5) zeszła z ekranu (0.519.0) — agentowi mówi

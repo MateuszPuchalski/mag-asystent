@@ -96,7 +96,7 @@ export function SlownikZnakow({ kubelkow }: {
             <li className="flex items-center gap-2"><span className="inline-flex w-7 items-center gap-0.5 font-bold text-slate-600"><MessageSquare size={13} aria-hidden="true" />3</span>
               wiadomości klienta od naszej odpowiedzi</li>
             <li className="flex items-center gap-2"><span className="inline-flex w-7 text-amber-700"><Wrench size={14} aria-hidden="true" /></span>
-              dobór w toku (zieleń — zatwierdzony)</li>
+              dobór otwarty (zieleń — wybrano część, czerwień — dopytać, szary — nie mamy)</li>
             <li className="flex items-center gap-2"><span className="inline-flex w-7 text-slate-600"><Ruler size={14} aria-hidden="true" /></span>
               zadanie dla hali w toku</li>
             <li className="flex items-center gap-2"><span className="inline-flex w-7 text-ranga-uwaga"><AlarmClock size={14} aria-hidden="true" /></span>

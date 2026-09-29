@@ -31,7 +31,7 @@ import type { Towar } from "../wyszukiwarka";
    zastosowania, silniki i zamienniki na jednym obrazku, bez żadnego zapisu.
 
    Zatwierdza każdy z biura, także autor — decyzja właściciela. Automat nigdy:
-   propozycja z zatwierdzonego doboru ląduje TU, nie w wiedzy.
+   propozycja z części wybranej w doborze ląduje TU, nie w wiedzy.
 
    Otwarcie ekranu niczego nie zapisuje — „zero zapisu przy patrzeniu". */
 type Widok = "kolejka" | "nowa" | "kartoteka" | "z-opisow" | "silniki" | "siec";
@@ -147,7 +147,7 @@ export function Wiedza() {
             && przegladySilnikow.length === 0
             && pasowania.length === 0 && zamiennosci.length === 0 &&
             <Pusto ikona={BookMarked}>
-              Nic nie czeka. Propozycje biorą się z zatwierdzonych doborów, z pomiarów hali i z ręcznych wpisów.
+              Nic nie czeka. Propozycje biorą się z części wybranych w doborze, z pomiarów hali i z ręcznych wpisów.
             </Pusto>}
           {wyslano && <p className="mb-3 rounded-lg bg-emerald-50 p-2 text-sm text-emerald-800">{wyslano}</p>}
           {wykazy.length > 0 && <div className="mb-3 space-y-3">

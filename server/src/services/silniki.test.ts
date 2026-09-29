@@ -40,7 +40,7 @@ beforeEach(() => {
   const d = db();
   /* `zabudowa_silnika` PRZED `model_urzadzenia`: ON DELETE RESTRICT. */
   for (const t of ["alias_silnika", "zabudowa_silnika", "dowod_zastosowania", "zastosowanie", "model_urzadzenia",
-    "dobor_rozmowy", "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
+    "dobor", "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   biuro = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')")

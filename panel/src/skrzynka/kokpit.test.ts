@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { HistoriaKlienta, OsRozmowy, WiedzaDoboru } from "../api/typy";
-import { bramkaDoboru, coSwieci, klientMaHistorie, nowyKlient, towarOtwartyNaStart, towarZnany, wiedzaMaTresc }
-  from "./kokpit";
+import type { HistoriaKlienta, OsRozmowy, StanDoboru, SzkicCopilota, WiedzaDoboru } from "../api/typy";
+import { bramkaDoboru, coSwieci, doborWToku, klientMaHistorie, nowyKlient, paraPasowania, towarOtwartyNaStart,
+  towarZnany, wiedzaMaTresc } from "./kokpit";
 
 /* ── Reguły ciemnego kokpitu (0.498.0) ──────────────────────────────────────
    Szara linia jest bezpieczna tylko wtedy, gdy reguła „w normie" nie kłamie.
@@ -13,9 +13,10 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
   rozmowa: { kopilot: null }, zwroty: [], sprawy: [], zamowienie: null, kandydaciZamowien: [],
   oferta: { externalId: "111", link: null, zrodlo: "wiadomosc", zgodnosc: null, pobrana: null,
     kartoteka: { pewnosc: "brak", twId: null, symbol: null, zrodlo: "—", powod: null } },
-  dobor: { status: "not_started", wersja: 1, brakuje: null, wybrany: null, updatedBy: null, updatedAt: null,
+  dobor: { stan: "pusty", wynik: null, wersja: 1, wybrany: null, dopytac: null, zmienil: null,
+    zmienilAutomat: false, zmienionoAt: null,
     dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
-      oem: null, nazwaCzesci: null, parametry: {} } },
+      oem: null, nazwaCzesci: null } },
   ...n,
 } as unknown as OsRozmowy);
 
@@ -75,12 +76,15 @@ describe("co świeci w kolumnie kontekstu", () => {
     expect(coSwieci(dane({ oferta: null, zamowienie: zamowienie({ pobrane: pobrane(1) }) }))).toEqual([]);
   });
 
-  it("dobór w toku świeci; nierozpoczęty i zatwierdzony nie", () => {
-    const d = (status: string) => dane({ dobor: { ...dane().dobor, status } as never });
-    expect(coSwieci(d("searching"))).toEqual(["dobor"]);
-    expect(coSwieci(d("candidates_found"))).toEqual(["dobor"]);
-    expect(coSwieci(d("not_started"))).toEqual([]);
-    expect(coSwieci(d("confirmed"))).toEqual([]);
+  it("świeci wyłącznie otwarty dobór; pusty i każdy wynik nie", () => {
+    /* „Dopytać" też gaśnie: to odpowiedź, a ruch jest po stronie klienta. */
+    const d = (stan: StanDoboru) => dane({ dobor: { ...dane().dobor, stan } });
+    expect(coSwieci(d("otwarty"))).toEqual(["dobor"]);
+    for (const stan of ["pusty", "czesc", "brak", "dopytac", "nie_dotyczy"] as const) {
+      expect(coSwieci(d(stan))).toEqual([]);
+    }
+    expect(doborWToku("otwarty")).toBe(true);
+    expect(doborWToku("dopytac")).toBe(false);
   });
 });
 
@@ -88,7 +92,7 @@ describe("bramka doboru", () => {
   const zZamowienia = (n: Partial<OsRozmowy["dobor"]> = {}) => dane({
     zamowienie: zamowienie(),
     oferta: { ...dane().oferta!, zrodlo: "zamowienie" },
-    dobor: { ...dane().dobor, status: "searching", updatedBy: "automat (szkic)", ...n },
+    dobor: { ...dane().dobor, stan: "otwarty", zmienil: "automat (szkic)", zmienilAutomat: true, ...n },
   });
 
   it("oferta z jedynej pozycji zamówienia to towar znany — dobór automatu gaśnie", () => {
@@ -108,14 +112,25 @@ describe("bramka doboru", () => {
     expect(towarZnany(dane({ zamowienie: zamowienie({ pobrane: { pozycje: [{ offerId: "999" }] } }) }))).toBe(false);
   });
 
-  it("wybór agenta wygrywa z bramką", () => {
-    expect(towarZnany(zZamowienia({ wybrany: { twId: 1, symbol: "X" } as never }))).toBe(false);
+  it("wybrana część wygrywa z bramką", () => {
+    const d = zZamowienia({ stan: "czesc", wynik: "czesc",
+      wybrany: { twId: 1, symbol: "X", podstawa: "numer", zdanieDoSzkicu: "…" } });
+    expect(towarZnany(d)).toBe(false);
+    expect(bramkaDoboru(d)).toBe(false);
   });
 
-  it("dobór w toku uruchomiony przez człowieka zostaje na wierzchu", () => {
-    const d = zZamowienia({ updatedBy: "A. Lewandowska" });
+  it("dane zapisane przez człowieka zostają na wierzchu", () => {
+    const d = zZamowienia({ zmienil: "A. Lewandowska", zmienilAutomat: false });
     expect(bramkaDoboru(d)).toBe(false);
     expect(coSwieci(d)).toEqual(["dobor"]);
+  });
+
+  it("dobór, którego nikt nie ruszał, też stoi za bramką", () => {
+    expect(bramkaDoboru(zZamowienia({ zmienil: null, zmienilAutomat: false }))).toBe(true);
+  });
+
+  it("każdy wynik zdejmuje bramkę, bo to decyzja człowieka", () => {
+    expect(bramkaDoboru(zZamowienia({ stan: "brak", wynik: "brak" }))).toBe(false);
   });
 });
 
@@ -155,10 +170,20 @@ describe("puste wiersze Klient i Wiedza", () => {
 
   it("Wiedza staje z zastosowaniem albo pomiarem; pusta i przed odczytem — nie", () => {
     const w = (n: Partial<WiedzaDoboru> = {}) => ({ zastosowanie: null, zabudowa: null, pasowanie: null,
-      silniki: [], silnikZPola: null, pomiary: [], ...n }) as WiedzaDoboru;
+      silniki: [], pomiary: [], ...n }) as WiedzaDoboru;
     expect(wiedzaMaTresc(undefined)).toBe(false);
     expect(wiedzaMaTresc(w())).toBe(false);
     expect(wiedzaMaTresc(w({ pomiary: [{ zadanieId: 1 } as never] }))).toBe(true);
     expect(wiedzaMaTresc(w({ zastosowanie: { dowody: [] } as never }))).toBe(true);
+  });
+
+  it("Wiedza staje także z pasowaniem Copilota, które czeka na decyzję", () => {
+    const para = { czesc: { symbol: "A" }, doCzego: { symbol: "B" } };
+    const szkic = (pasowanieOcena: string | null) => ({ pasowanie: para, pasowanieOcena }) as unknown as SzkicCopilota;
+    expect(paraPasowania(szkic(null))).toBe("A → B");
+    expect(wiedzaMaTresc(undefined, szkic(null))).toBe(true);
+    /* Po decyzji agenta karta nie ma już ruchu, więc wiersza nie stawia. */
+    expect(wiedzaMaTresc(undefined, szkic("odrzucone"))).toBe(false);
+    expect(paraPasowania(null)).toBeNull();
   });
 });

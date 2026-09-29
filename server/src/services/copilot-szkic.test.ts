@@ -60,7 +60,7 @@ beforeEach(() => {
      TREŚCIĄ, nie porządkiem — dziecko przed rodzicem. */
   for (const t of ["szkic_copilota", "copilot_wywolanie", "towar_identyfikator", "model_z_opisu",
     "dowod_zastosowania", "zastosowanie",
-    "alias_silnika", "model_urzadzenia", "pasowanie_czesci", "dobor_rozmowy",
+    "alias_silnika", "model_urzadzenia", "pasowanie_czesci", "dobor",
     "conversation_event", "message", "conversation", "offer_snapshot", "allegro_inbox_thread",
     "zamowienie_klienta", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -267,7 +267,7 @@ test("fakt danych doboru niesie kanoniczny silnik ze słownika, gdy alias istnie
 test("intake milknie, gdy agent wybrał kandydata z potwierdzonym dowodem", () => {
   zatwierdzPasowanie();
   const w1 = D.zapiszDane(rozmowa, { oem: "W09-0211", nazwaCzesci: "uszczelka" }, D.doborRozmowy(rozmowa).wersja, biuro);
-  D.wybierzKandydata(rozmowa, ID["LC170430140-0001"], "pasowanie", w1.wersja, biuro);
+  D.ustawWynik(rozmowa, { wynik: "czesc", twId: ID["LC170430140-0001"], podstawa: "wiedza" }, w1.wersja, biuro);
   const k = S.kontekstSzkicu(rozmowa, subiekt);
   assert.equal(k.fakty.some((x) => x.rodzaj === "intake"), false, "przy dowodzie w bazie pytania o wymiary udawałyby niewiedzę");
   assert.match(String(k.tekstFaktow), /Część wybrana przez agenta: Do W09-0211 pasuje LC170430140-0001/);
@@ -282,6 +282,31 @@ test("intake dobiera pytania po nazwie części z danych doboru", () => {
   assert.match(i.zdanie, /otworu centralnego/);
   assert.deepEqual(S.pytaniaIntake("filtr powietrza").typ, "filtr");
   assert.deepEqual(S.pytaniaIntake(null).typ, "część");
+});
+
+test("kandydat w faktach mówi grupą słowami, skąd jest i jak pewny", () => {
+  const f = String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow);
+  assert.match(f, /Kandydat W09-0211 — [^;]+; wskazane przez klienta; pewność: prawdopodobne; Kartoteka oferty/);
+});
+
+test("potwierdzona wiedza idzie w faktach przed kartoteką oferty, bo reguła 7a czyta kolejność", () => {
+  zatwierdzPasowanie();
+  const kand = String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow).split("\n")
+    .filter((l) => /: Kandydat /.test(l));
+  assert.match(kand[0], /Kandydat LC170430140-0001 .*pewność: potwierdzone/);
+  assert.match(kand[1], /Kandydat W09-0211 .*Kartoteka oferty/);
+});
+
+test("wynik doboru wchodzi do faktów, a „nie dotyczy” wyłącza pytania intake", () => {
+  let w = D.ustawWynik(rozmowa, { wynik: "brak" }, D.doborRozmowy(rozmowa).wersja, biuro).wersja;
+  assert.match(String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow), /Agent ustalił: nie mamy tej części/);
+  w = D.ustawWynik(rozmowa, { wynik: "dopytac", dopytac: "numer z tabliczki" }, w, biuro).wersja;
+  assert.match(String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow),
+    /Agent zaznaczył, czego brakuje do doboru: numer z tabliczki/);
+  D.ustawWynik(rozmowa, { wynik: "nie_dotyczy" }, w, biuro);
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  assert.match(String(k.tekstFaktow), /Agent uznał, że rozmowa nie jest pytaniem o dobór części/);
+  assert.equal(k.fakty.some((x) => x.rodzaj === "intake"), false, "pytania o maszynę przy nie-doborze");
 });
 
 test("kontekst niczego nie zapisuje", () => {
@@ -599,12 +624,18 @@ test("pomiar podaje czas czekania na model: mediana i p90 po zadaniu, błąd bez
    Pytanie właściciela z 8.09.2026: „dlaczego dane wejściowe nie zostały
    wprowadzone automatycznie ze szkicu?". Pilnujemy czterech granic: wartość
    spoza rozmowy wypada (model nie może DOPISAĆ), wartość zamaskowana nie
-   wraca, samo ułożenie NIE dotyka `dobor_rozmowy`, a kliknięcie wpisuje
-   WYŁĄCZNIE w puste pola i idzie drogą ręcznego zapisu (wersja, 409). */
+   wraca, a automat wpisuje WYŁĄCZNIE w puste pola, bez parametrów, drogą
+   ręcznego zapisu (wersja, 409). */
 
-const DANE = (n: Partial<import("./dobor.js").DaneDoboru> = {}): import("./dobor.js").DaneDoboru => ({
+/** Odczyt modelu — z parametrami, bo tak brzmi kontrakt z modelem. */
+const DANE = (n: Partial<import("./copilot-szkic.js").DaneZRozmowy> = {}): import("./copilot-szkic.js").DaneZRozmowy => ({
   marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null,
   silnik: null, oem: null, nazwaCzesci: null, parametry: {}, ...n,
+});
+/** Dane doboru — bez parametrów, bo dobór ich nie przyjmuje. */
+const DOBOR = (n: Partial<import("./dobor.js").DaneDoboru> = {}): import("./dobor.js").DaneDoboru => ({
+  marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null,
+  silnik: null, oem: null, nazwaCzesci: null, ...n,
 });
 
 const dopiszKlienta = (tresc: string) => db().prepare(`INSERT INTO message
@@ -650,23 +681,20 @@ test("ułożenie WPISUJE rozpoznane dane do doboru, bez kliknięcia agenta", asy
   assert.deepEqual(s.daneDoboru, DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200",
     nazwaCzesci: "śruba noża" }), "OEM spoza rozmowy wypadł, reszta została");
   assert.equal(s.daneOcena, "wpisane", "nie ma już czego klikać");
-  assert.equal(liczba("dobor_rozmowy"), 1);
+  assert.equal(liczba("dobor"), 1);
 
   const d = D.doborRozmowy(rozmowa);
-  assert.deepEqual(d.dane, DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200",
+  assert.deepEqual(d.dane, DOBOR({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200",
     nazwaCzesci: "śruba noża" }), "OEM spoza rozmowy nie wszedł także tutaj");
-  assert.equal(d.status, "searching", "wpis danych rusza dobór z miejsca, jak ręczny");
+  assert.equal(d.stan, "otwarty", "dane są, wyniku nie ma — automat nigdy go nie ustawia");
   /* Szkic pamięta wersję PO wpisie. Odwrotna kolejność dałaby szkic nieświeży
      w chwili narodzin — ekran mówiłby „ułóż ponownie" o własnej zmianie. */
   assert.equal(s.doborWersja, d.wersja);
 
-  /* PODPIS MASZYNY: `updated_by` z nazwą automatu przy PUSTYM koncie. To
-     jedyny znacznik, po którym agent pozna, skąd wzięła się wartość w polu. */
-  const w = db().prepare(
-    "SELECT updated_by, updated_user_id FROM dobor_rozmowy WHERE conversation_id=?")
-    .get(rozmowa) as Record<string, unknown>;
-  assert.equal(w.updated_by, "automat (szkic)");
-  assert.equal(w.updated_user_id, null);
+  /* PODPIS MASZYNY: nazwa automatu przy PUSTYM koncie. To jedyny znacznik,
+     po którym agent pozna, skąd wzięła się wartość w polu. */
+  assert.equal(d.zmienil, "automat (szkic)");
+  assert.equal(d.zmienilAutomat, true);
   const zd = db().prepare("SELECT payload FROM events WHERE type='copilot_szkic'").get() as { payload: string };
   assert.match(zd.payload, /"polDoboru":4/);
   assert.match(zd.payload, /"polOdrzuconych":1/);
@@ -691,14 +719,11 @@ test("automat wpisuje TYLKO w puste pola — słowo agenta zostaje nietknięte",
   }), subiekt);
 
   const d = D.doborRozmowy(rozmowa);
-  assert.deepEqual(d.dane,
-    DANE({ marka: "Faworyt", model: "GTV51", silnik: "Lonci v200", parametry: { klucz: "16" } }),
-    "model agenta zostaje, reszta dochodzi");
+  assert.deepEqual(d.dane, DOBOR({ marka: "Faworyt", model: "GTV51", silnik: "Lonci v200" }),
+    "model agenta zostaje, reszta dochodzi, a parametrów dobór nie przyjmuje");
   assert.equal(s.daneOcena, "wpisane");
   assert.equal(s.doborWersja, d.wersja);
-
-  /* Drugie kliknięcie nie ma już czego wpisać i mówi to wprost. */
-  assert.throws(() => S.przyjmijDaneDoboru(rozmowa, d.wersja, KTO()), /już oceniona/);
+  assert.deepEqual(s.daneDoboru?.parametry, { klucz: "16" }, "odczyt modelu zostaje przy szkicu w całości");
 
   const typy = (db().prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((e) => e.type);
   assert.ok(typy.includes("dobor_dane"), "wpis idzie tą samą drogą co ręczny, z dziennikiem");
@@ -707,20 +732,13 @@ test("automat wpisuje TYLKO w puste pola — słowo agenta zostaje nietknięte",
   assert.equal(zapis.payload.includes("GTV51N196L-4W1"), false, "wartości w dzienniku nie ma (§19)");
 });
 
-test("odrzucenie zostaje dla propozycji, której automat NIE miał gdzie wpisać", async () => {
-  /* Po 0.341.0 odrzucenie ma sens wyłącznie wtedy, gdy nic nie weszło —
-     czyli gdy wszystkie pola były już zajęte. Odrzucanie wartości, która stoi
-     w doborze, byłoby przyciskiem obiecującym cofnięcie, którego nie robi;
-     agent poprawia takie pole tam, gdzie ono stoi, w zakładce Dobór. */
+test("gdy wszystkie pola są zajęte, automat nic nie wpisuje i nie podnosi wersji", async () => {
   dopiszKlienta("Kosiarka Faworyt.");
-  D.zapiszDane(rozmowa, { marka: "Stiga" }, 1, biuro);
+  const przed = D.zapiszDane(rozmowa, { marka: "Stiga" }, 1, biuro);
   const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({ daneDoboru: DANE({ marka: "Faworyt" }) }), subiekt);
-  assert.equal(s.daneOcena, null, "nic nie weszło, więc jest co ocenić");
+  assert.equal(s.daneOcena, null, "nic nie weszło");
   assert.equal(D.doborRozmowy(rozmowa).dane.marka, "Stiga");
-
-  assert.equal(S.odrzucDaneDoboru(rozmowa, KTO()).daneOcena, "odrzucone");
-  assert.equal(K.pomiarCopilota(db()).szkice.daneOdrzucone, 1);
-  assert.throws(() => S.odrzucDaneDoboru(rozmowa + 1000, KTO()), /nie ma propozycji/);
+  assert.equal(D.doborRozmowy(rozmowa).wersja, przed.wersja);
 });
 
 /* ── Pasowanie z rozmowy (przyrost czwarty) ─────────────────────────────────

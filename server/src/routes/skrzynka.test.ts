@@ -135,10 +135,8 @@ const TRASY = () => [
   { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/kandydaci` },
   { method: "PUT" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/dane`,
     payload: { dane: { marka: "NAC" }, expectedVersion: 1 } },
-  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/status`,
-    payload: { status: "searching" } },
-  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wybor`,
-    payload: { twId: null, droga: "oferta", expectedVersion: 1 } },
+  { method: "PUT" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wynik`,
+    payload: { wynik: "brak", expectedVersion: 1 } },
   { method: "GET" as const, url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wiedza` },
   /* Historia klienta niesie CUDZE ZAKUPY — bramka roli jest tu ostrzejszym
      wymogiem niż przy reszcie skrzynki, nie luźniejszym. */
@@ -665,7 +663,7 @@ test("komentarz wewnętrzny ze skrzynki zapisuje się pod adresem, który panel 
   assert.equal(app.hasRoute({ method: "POST", url: "/api/obsluga/rozmowy/1/komentarz" }), false);
 });
 
-/* ── Dobór części (§11, etap E1) ──────────────────────────────────────────── */
+/* ── Dobór części (`docs/dobor-od-zera.md` §5.2) ────────────────────────── */
 
 test("patrzenie na dobór niczego nie zapisuje — ani wiersza, ani zdarzenia", async () => {
   const b = login("biuro", "Anna");
@@ -675,36 +673,48 @@ test("patrzenie na dobór niczego nie zapisuje — ani wiersza, ani zdarzenia", 
     assert.equal(r.statusCode, 200, r.body);
   }
   const os = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${rozmowa}`, headers: b.naglowki });
-  assert.equal(os.json<{ dobor: { status: string } }>().dobor.status, "not_started");
-  assert.equal(os.json<{ rozmowa: { dobor: string } }>().rozmowa.dobor, "not_started");
+  assert.equal(os.json<{ dobor: { stan: string } }>().dobor.stan, "pusty");
+  assert.equal(os.json<{ rozmowa: { dobor: string } }>().rozmowa.dobor, "pusty");
   assert.equal(liczbaZdarzen(), przed, "odczyt dopisał zdarzenie");
-  assert.equal((db().prepare("SELECT count(*) n FROM dobor_rozmowy").get() as { n: number }).n, 0);
+  assert.equal((db().prepare("SELECT count(*) n FROM dobor").get() as { n: number }).n, 0);
+  /* Kotwice zostają w serwerze — kontrakt kandydatów ich nie zna. */
+  const k = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/kandydaci`, headers: b.naglowki });
+  assert.deepEqual(Object.keys(k.json()).sort(), ["bezKartoteki", "brakuje", "kandydaci", "negatywne"]);
 });
 
-test("nieaktualna wersja doboru dostaje 409 z bieżącym stanem, zły status 400", async () => {
+test("dane i wynik doboru: 409 przy starej wersji, 400 przy wyniku bez kartoteki, stan w wierszu kolejki", async () => {
   const b = login("biuro", "Anna");
+  db().prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (7702,'SZR-148','Szarpak')").run();
   let r = await app.inject({ method: "PUT", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/dane`,
     headers: b.naglowki, payload: { dane: { marka: "NAC", model: "LS 46-450" }, expectedVersion: 1 } });
   assert.equal(r.statusCode, 200, r.body);
-  assert.equal(r.json<{ wersja: number; status: string }>().wersja, 2);
-  assert.equal(r.json<{ status: string }>().status, "searching");
+  assert.deepEqual([r.json<{ wersja: number }>().wersja, r.json<{ stan: string }>().stan], [2, "otwarty"]);
 
   r = await app.inject({ method: "PUT", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/dane`,
     headers: b.naglowki, payload: { dane: { model: "inny" }, expectedVersion: 1 } });
   assert.equal(r.statusCode, 409, r.body);
-  assert.equal(r.json<{ wersja: number }>().wersja, 2);
-  assert.equal(r.json<{ updatedBy: string }>().updatedBy, "Anna");
+  assert.deepEqual([r.json<{ wersja: number }>().wersja, r.json<{ zmienil: string }>().zmienil], [2, "Anna"]);
 
-  r = await app.inject({ method: "POST", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/status`,
-    headers: b.naglowki, payload: { status: "extracting_data" } });
-  assert.equal(r.statusCode, 400);
-  assert.match(r.json<{ error: string }>().error, /Copilot/);
-
-  /* Zatwierdzenie bez wyboru — 400 ze zdaniem, nie milczący sukces. */
-  r = await app.inject({ method: "POST", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/status`,
-    headers: b.naglowki, payload: { status: "confirmed" } });
+  r = await app.inject({ method: "PUT", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wynik`,
+    headers: b.naglowki, payload: { wynik: "czesc", podstawa: "numer", expectedVersion: 2 } });
   assert.equal(r.statusCode, 400);
   assert.match(r.json<{ error: string }>().error, /wybranej kartoteki/);
+
+  r = await app.inject({ method: "PUT", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wynik`,
+    headers: b.naglowki, payload: { wynik: "brak", expectedVersion: 1 } });
+  assert.equal(r.statusCode, 409, r.body);
+
+  r = await app.inject({ method: "PUT", url: `/api/obsluga/rozmowy/${rozmowa}/dobor/wynik`,
+    headers: b.naglowki, payload: { wynik: "czesc", twId: 7702, podstawa: "reczny", expectedVersion: 2 } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json<{ wybrany: { symbol: string } }>().wybrany.symbol, "SZR-148");
+
+  const lista = await app.inject({ method: "GET", url: "/api/obsluga/rozmowy", headers: b.naglowki });
+  const wiersz = lista.json<{ rozmowy: Array<{ id: number; dobor: string }> }>().rozmowy.find((x) => x.id === rozmowa);
+  assert.equal(wiersz?.dobor, "czesc");
+  /* Stare trasy zniknęły, a nie zostały bez obsługi. */
+  assert.equal(app.hasRoute({ method: "POST", url: "/api/obsluga/rozmowy/:id/dobor/status" }), false);
+  assert.equal(app.hasRoute({ method: "POST", url: "/api/obsluga/rozmowy/:id/dobor/wybor" }), false);
 });
 
 test("pomiar z hali idzie do wiedzy tylko z marką i modelem — i jako propozycja", async () => {

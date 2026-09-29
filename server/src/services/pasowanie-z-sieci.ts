@@ -264,8 +264,8 @@ const POPYT = `WITH oferta_tw AS (
      GROUP BY p.tw_id
   ),
   dobory AS (
-    SELECT wybrany_tw_id AS tw_id, COUNT(*) AS n FROM dobor_rozmowy
-     WHERE wybrany_tw_id IS NOT NULL GROUP BY wybrany_tw_id
+    SELECT tw_id, COUNT(*) AS n FROM dobor
+     WHERE wynik = 'czesc' GROUP BY tw_id
   ),
   rozmowy AS (
     SELECT ot.tw_id, COUNT(DISTINCT m.conversation_id) AS n

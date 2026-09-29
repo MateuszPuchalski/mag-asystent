@@ -1,577 +1,341 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import React from "react";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Dobor as DoborTyp, KandydaciDoboru, SzkicCopilota } from "../api/typy";
-import { Konflikt } from "../api/klient";
+import axe from "axe-core";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { Dobor as DoborTyp, KandydaciDoboru } from "../api/typy";
+import { atrapaZapisow } from "../test/zapisy";
 
-/* ── Zakładka doboru (§11, etap E1) ──────────────────────────────────────────
-   Pilnujemy trzech stanów i jednego wyścigu: pusty dobór mówi, czego brakuje
-   (zamiast milczeć); kandydat niesie DROGĘ i ŹRÓDŁO, a wybór jedzie z wersją;
-   wybrany wstawia do szkicu ZDANIE SERWERA i zatwierdza się jednym kliknięciem;
-   409 przy danych nie kasuje wpisanego.                                     */
+/* ── Dobór od zera (`docs/dobor-od-zera.md` §6) ──────────────────────────────
+   Testy patrzą na `fetch`, nie na haki: zapis wołany z pominięciem haka
+   przeszedłby obok atrapy haka, a obok atrapy sieci nie przejdzie. Pilnują
+   czterech odpowiedzi (część, nie mamy, dopytać, nie dotyczy), trzech grup
+   kandydatów, wyścigu wersji i zera zapisów przy samym otwarciu.            */
 
-const kandydaci = vi.fn();
-const zapisz = { mutate: vi.fn(), isPending: false, error: null as unknown };
-const status = { mutate: vi.fn(), isPending: false, error: null as unknown };
-const wybierz = { mutate: vi.fn(), isPending: false, error: null as unknown };
-/* Silniki maszyny jadą tą samą trasą co dowody wiedzy — atrapa oddaje to,
-   co ustawi test, a domyślnie pustą listę (maszyna bez znanego silnika). */
-type WiedzaAtrapa = { data: {
-  zastosowanie: null; zabudowa: null; silniki: unknown[]; pomiary: unknown[]; silnikZPola?: unknown;
-} };
-const wiedzaDoboru = vi.fn<() => WiedzaAtrapa>(
-  () => ({ data: { zastosowanie: null, zabudowa: null, silniki: [], pomiary: [] } }));
-vi.mock("../api/rozmowy", () => ({
-  useKandydaci: (id: number | null) => kandydaci(id),
-  useZapiszDaneDoboru: () => zapisz,
-  useStatusDoboru: () => status,
-  useWybierzKandydata: () => wybierz,
-  useWiedzaDoboru: () => wiedzaDoboru(),
-}));
-/* Los danych z rozmowy (przyrost trzeci) idzie trasą Copilota, nie rozmów. */
-const ocenDane = { mutate: vi.fn(), isPending: false, error: null as unknown };
-/* Para z rozmowy (przyrost czwarty) idzie tą samą drogą, co dane: hook Copilota. */
-const ocenPasowanie = { mutate: vi.fn(), isPending: false, error: null as unknown };
-vi.mock("../api/copilot", () => ({ useOcenDaneDoboru: () => ocenDane, useOcenPasowanie: () => ocenPasowanie }));
-vi.mock("../wyszukiwarka", () => ({ Wyszukiwarka: () => <div data-testid="wyszukiwarka" /> }));
-/* Pasowanie „z pracy" (0.230.0) idzie trasą wiedzy, nie rozmów — hook z tego
-   modułu woła `useQueryClient`, a zakładka renderuje się tu bez dostawcy. */
-const zaproponujPasowanie = { mutate: vi.fn(), isPending: false, error: null as unknown };
-/* Zabudowa spod pola „Silnik" (0.238.0) idzie tą samą trasą wiedzy, co z ekranu Silniki. */
-const zaproponujZabudowe = { mutate: vi.fn(), isPending: false, error: null as unknown };
-vi.mock("../api/wiedza", () => ({
-  useZaproponujPasowanie: () => zaproponujPasowanie,
-  useZaproponujZabudowe: () => zaproponujZabudowe,
-}));
-/* Zdjęcia kartotek (0.203.0). Pobranie idzie `fetch`em, a w jsdomie nie ma
-   dokąd go wysłać — atrapa mówi „każda kartoteka ma obraz". Dzięki temu kafle
-   renderują się jako `<img>` i widać, PRZY KTÓRYCH wierszach stoją. */
-vi.mock("../towar/useZdjecie", () => ({
-  useZdjecie: (twId: number | null) => (twId == null ? null : `blob:${twId}`),
+/* Zdjęcia kartotek idą `fetch`em po blob; tu nie są przedmiotem testu. */
+vi.mock("../towar/useZdjecie", () => ({ useZdjecie: () => null }));
+/* Wyszukiwarka ma własne testy; tu liczy się tylko, co dobór zrobi z wyborem. */
+vi.mock("../wyszukiwarka", () => ({
+  Wyszukiwarka: ({ onWybierz }: { onWybierz: (t: unknown) => void }) =>
+    <button type="button" onClick={() => onWybierz({ id: 77, sym: "GX-77", name: "Gaźnik", locs: [] })}>
+      towar z wyszukiwarki</button>,
 }));
 
 const { Dobor } = await import("./Dobor");
 
+const PUSTE_DANE = { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
+  oem: null, nazwaCzesci: null };
 const dobor = (n: Partial<DoborTyp> = {}): DoborTyp => ({
-  status: "not_started", wersja: 1, brakuje: null, wybrany: null, updatedBy: null, updatedAt: null,
-  dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
-    oem: null, nazwaCzesci: null, parametry: {} },
+  stan: "otwarty", wynik: null, wersja: 4, wybrany: null, dopytac: null,
+  zmienil: "automat (szkic)", zmienilAutomat: true, zmienionoAt: "2026-09-29T08:00:00Z",
+  dane: { ...PUSTE_DANE, marka: "NAC", model: "LS 46-450", wariant: "HS", rocznik: "2019", silnik: "B&S 450E",
+    oem: "532 19 93-77", nazwaCzesci: "szarpak rozrusznika" },
   ...n,
 });
 
-const PUSTE: KandydaciDoboru = {
-  kotwice: [],
-  kandydaci: [], negatywne: [],
-  drogi: [
-    /* `akcja` od 0.267.0 — nadaje ją serwis w tej samej gałęzi, w której pisze
-       powód; szczeble, których nie da się odblokować w rozmowie, jej nie mają. */
-    { droga: "symbol", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał symbolu",
-      akcja: { rodzaj: "dane", etykieta: "Wpisz symbol lub numer" } },
-    { droga: "ean", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał EAN",
-      akcja: { rodzaj: "dane", etykieta: "Wpisz symbol lub numer" } },
-    { droga: "oem", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał numeru OEM",
-      akcja: { rodzaj: "dane", etykieta: "Wpisz symbol lub numer" } },
-    { droga: "zastosowanie", sprawdzona: false, wynikow: 0, powod: "etap E2" },
-    { droga: "silnik", sprawdzona: false, wynikow: 0, powod: "nie wiadomo, jaki silnik stoi w maszynie" },
-    { droga: "pasowanie", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał symbolu ani numeru, a rozmowa nie ma kartoteki oferty" },
-    { droga: "oferta", sprawdzona: false, wynikow: 0, powod: "rozmowa nie jest powiązana z ofertą" },
-    { droga: "zamiennik", sprawdzona: false, wynikow: 0, powod: "bez kartoteki oferty" },
-    { droga: "pelnotekst", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał nazwy części ani maszyny" },
-    { droga: "wymiar", sprawdzona: false, wynikow: 0, powod: "agent nie wpisał wymiarów w parametrach doboru (np. długość: 148 cm)",
-      akcja: { rodzaj: "wymiar", etykieta: "Wpisz wymiar z jednostką" } },
-    { droga: "wyszukiwarka", sprawdzona: false, wynikow: 0, powod: "wybór ręczny" },
-  ],
-};
+const kandydat = (n: Partial<KandydaciDoboru["kandydaci"][number]>) => ({
+  twId: 1, symbol: "S1", nazwa: "Część", stan: 1, grupa: "numer" as const, pewnosc: "prawdopodobne" as const,
+  powod: "trafienie po numerze", takze: [], ostrzezenia: [], ...n,
+});
 
-const Z_KANDYDATAMI: KandydaciDoboru = {
-  negatywne: [],
-  kotwice: [{ twId: 14, symbol: "FTC272", nazwa: "Podkładka przekładni STIHL FS120" }],
+const LISTA: KandydaciDoboru = {
   kandydaci: [
-    { nr: 1, twId: 14, symbol: "FTC272", nazwa: "Podkładka przekładni STIHL FS120", stan: 28,
-      droga: "oferta", pewnosc: "prawdopodobne", zrodlo: 'Kartoteka oferty 148 — SKU oferty „FTC272"', ostrzezenia: [] },
-    { nr: 2, twId: 1654, symbol: "24-04003", nazwa: "Podkładka zamienna", stan: 0,
-      droga: "zamiennik", pewnosc: "wymaga_danych", zrodlo: 'Zamiennik z opisu kartoteki „FTC272"',
-      ostrzezenia: ["nie pasuje do FS250 — inny rozstaw"] },
+    kandydat({ twId: 14, symbol: "532199377", nazwa: "Szarpak rozrusznika NAC", stan: 28,
+      powod: "trafienie po numerze z opisu kartoteki", takze: ["zastosowanie do NAC LS 46-450"] }),
+    kandydat({ twId: 15, symbol: "WK-3", nazwa: "Linka rozrusznika", stan: 3, grupa: "wiedza",
+      pewnosc: "potwierdzone", powod: "zatwierdzone zastosowanie do NAC LS 46-450",
+      ostrzezenia: ["maszyna bywa z kilkoma silnikami — potwierdź z tabliczki"] }),
+    kandydat({ twId: 16, symbol: "SZ-9", nazwa: "Szarpak uniwersalny", stan: 0, grupa: "podobne",
+      pewnosc: "do_sprawdzenia", powod: "podobna nazwa" }),
   ],
-  drogi: PUSTE.drogi.map((d) => d.droga === "oferta" || d.droga === "zamiennik"
-    ? { droga: d.droga, sprawdzona: true, wynikow: 1 } : d),
+  bezKartoteki: [{ numer: "532 19 93-78", zdanie: "numer klienta bez kartoteki u nas" }],
+  negatywne: [{ twId: 20, symbol: "SZ-1", nazwa: "Szarpak MTD", powod: "inny rozstaw mocowania",
+    zrodlo: "pomiar hali, 2.09.2026" }],
+  brakuje: [],
 };
 
-const pokaz = (d: DoborTyp, uchwyty: Partial<{
-  onWstawDoSzkicu: (t: string) => void; onZlecPomiar: () => void; propozycja: SzkicCopilota | null;
-}> = {}) =>
-  render(<Dobor dobor={d} rozmowaId={4821} propozycja={uchwyty.propozycja ?? null}
-    onWstawDoSzkicu={uchwyty.onWstawDoSzkicu ?? vi.fn()} onZlecPomiar={uchwyty.onZlecPomiar ?? vi.fn()} />);
+type Zapis = { metoda: string; url: string; cialo: Record<string, unknown> };
 
-const propozycja = (dane: Partial<SzkicCopilota["daneDoboru"] & object>, n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
-  tresc: "Dzień dobry…", zastrzezenia: [], uzyteFakty: [], twierdzenia: [], odczytZeZdjec: [], lukiKartoteki: { symbol: null, numery: [], modele: [], wpisane: [], czeka: 0 }, messageId: 41, model: "claude-opus-5",
-  at: "2026-09-08T12:00:00Z", przez: "A. Lewandowska", ocena: null, daneOcena: null, doborWersja: 1,
-  daneDoboru: { ...dobor().dane, ...dane }, pasowanie: null, pasowanieOcena: null, ...n,
-});
+/**
+ * Sieć z zapisem ciał. `odpowiedz` pozwala testowi oddać 409 zamiast 200.
+ * Nieznany GET trafia do `nieznane`, bo wyjątek połknęłoby zapytanie.
+ */
+function siec(kandydaci: KandydaciDoboru, odpowiedz: (z: Zapis) => { status: number; cialo: unknown } =
+  () => ({ status: 200, cialo: dobor() })) {
+  const stan = { zapisy: [] as Zapis[], odczyty: [] as string[], nieznane: [] as string[] };
+  vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+    const metoda = init?.method ?? "GET";
+    if (metoda !== "GET") {
+      const z = { metoda, url, cialo: JSON.parse(String(init?.body ?? "{}")) };
+      stan.zapisy.push(z);
+      const o = odpowiedz(z);
+      return new Response(JSON.stringify(o.cialo), { status: o.status });
+    }
+    stan.odczyty.push(url);
+    if (url.endsWith("/dobor/kandydaci")) return new Response(JSON.stringify(kandydaci), { status: 200 });
+    stan.nieznane.push(url);
+    return new Response("{}", { status: 404 });
+  }));
+  return stan;
+}
 
-const PARA: SzkicCopilota["pasowanie"] = {
-  czesc: { twId: 811, symbol: "LC170430140-0001", nazwa: "Uszczelka do gaźników GX160 (od strony filtra)" },
-  doCzego: { twId: 502, symbol: "W09-0211", nazwa: "Gaźnik do silników HONDA GX160" },
-  rola: "uszczelka", pozycja: "od strony filtra",
+const pokaz = (d: DoborTyp, uchwyty: { onWstawDoSzkicu?: (t: string) => void; onZlecPomiar?: () => void } = {}) => {
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return render(<QueryClientProvider client={qc}><Dobor dobor={d} rozmowaId={4821}
+    onWstawDoSzkicu={uchwyty.onWstawDoSzkicu ?? vi.fn()} onZlecPomiar={uchwyty.onZlecPomiar ?? vi.fn()} />
+  </QueryClientProvider>);
 };
 
-beforeEach(() => {
-  zapisz.mutate.mockReset(); status.mutate.mockReset(); wybierz.mutate.mockReset(); zaproponujPasowanie.mutate.mockReset();
-  ocenDane.mutate.mockReset(); ocenPasowanie.mutate.mockReset();
-  kandydaci.mockReturnValue({ data: PUSTE, isLoading: false, error: null });
+const zapisz = async (stan: { zapisy: Zapis[] }, ile = 1) => waitFor(() => expect(stan.zapisy).toHaveLength(ile));
+
+afterEach(() => vi.unstubAllGlobals());
+
+describe("dobór — zero zapisu przy patrzeniu", () => {
+  it("otwarcie zakładki z listą i z wynikiem nie wysyła ani jednego zapisu", async () => {
+    const stan = atrapaZapisow((url) => (url.endsWith("/dobor/kandydaci") ? LISTA : undefined));
+    const { unmount } = pokaz(dobor());
+    expect(await screen.findByText("Szarpak rozrusznika NAC")).toBeInTheDocument();
+    unmount();
+    pokaz(dobor({ stan: "czesc", wynik: "czesc",
+      wybrany: { twId: 14, symbol: "532199377", podstawa: "numer", zdanieDoSzkicu: "Pasuje prawdopodobnie." } }));
+    expect(screen.getByText("Pasuje prawdopodobnie.")).toBeInTheDocument();
+    expect(stan.nieznane).toEqual([]);
+    expect(stan.wyslane).toEqual([]);
+  });
 });
 
-describe("zakładka doboru", () => {
-  it("pusty dobór mówi, czego brakuje, a pominięte drogi niosą powód", () => {
+describe("dobór — nagłówek i dane", () => {
+  it("zakładka nie powtarza stanu, który niesie streszczenie wiersza „Dobór”", async () => {
+    siec(LISTA);
     pokaz(dobor());
-    /* Status stoi raz — w polu wyboru; plakietka obok powtarzała go (23 września 2026). */
-    expect(screen.getByLabelText("Status doboru")).toHaveDisplayValue("Nierozpoczęty");
-    expect(screen.getByText(/o jaką maszynę i część chodzi/)).toBeInTheDocument();
-    expect(screen.getByText(/Żadna sprawdzona droga nic nie dała/)).toBeInTheDocument();
-    /* Szczebel pominięty NIE wygląda jak „zero wyników" (blizna 0.153.1). */
-    expect(screen.getByTitle(/pominięty: rozmowa nie jest powiązana z ofertą/)).toBeInTheDocument();
-    /* Bez wyboru nie ma czego zatwierdzać. */
-    expect(screen.queryByRole("button", { name: /Zatwierdź dobór/ })).not.toBeInTheDocument();
-    expect(kandydaci).toHaveBeenCalledWith(4821);
+    await screen.findByText("Szarpak rozrusznika NAC");
+    expect(screen.queryByText("Otwarty")).toBeNull();
   });
 
-  it("przy pustej liście powody stoją w WIDOCZNYM tekście, nie tylko w tooltipie", () => {
-    /* Do 0.266.0 jedyne, co agent widział, to ogólnik „Uzupełnij dane wejściowe
-       albo wskaż kartotekę z wyszukiwarki", a konkretne zdania serwisu siedziały
-       w `title` czipów. Jedenaście czipów, jedenaście tooltipów. */
+  it("„Czego szuka klient” mówi maszynę i część dwoma wierszami", async () => {
+    siec(LISTA);
+    pokaz(dobor({ dane: { ...dobor().dane, nrSeryjny: "1234" } }));
+    const sekcja = screen.getByRole("region", { name: "Czego szuka klient" });
+    expect(within(sekcja).getByText("Maszyna").nextSibling)
+      .toHaveTextContent("NAC LS 46-450 HS (2019) · silnik B&S 450E · nr seryjny 1234");
+    expect(within(sekcja).getByText("Część").nextSibling).toHaveTextContent("szarpak rozrusznika · nr 532 19 93-77");
+    await screen.findByText("Szarpak rozrusznika NAC");
+  });
+
+  it("„Popraw” otwiera osiem pól i zapisuje je z wersją", async () => {
+    const stan = siec(LISTA);
     pokaz(dobor());
-    const lista = screen.getByLabelText("Czego brakuje do doboru");
-    expect(lista.textContent).toContain("agent nie wpisał numeru OEM");
-    expect(lista.textContent).toContain("nie wiadomo, jaki silnik stoi w maszynie");
-    expect(lista.textContent).toContain("wpisał wymiarów w parametrach doboru");
-  });
-
-  it("szczebel z akcją dostaje przycisk, a szczebel bez akcji zostaje samym zdaniem", async () => {
-    /* Przycisk, który nie pomaga, uczy klikania w nic — dlatego brak akcji jest
-       treścią. „Rozmowa nie jest powiązana z ofertą" nie da się naprawić na tym
-       ekranie i nie udaje, że się da. */
-    pokaz(dobor());
-    const lista = screen.getByLabelText("Czego brakuje do doboru");
-    expect(lista.textContent).toContain("rozmowa nie jest powiązana z ofertą");
-    const wiersze = [...lista.querySelectorAll("li")];
-    const zOferta = wiersze.find((w) => w.textContent?.includes("nie jest powiązana z ofertą"))!;
-    expect(zOferta.querySelector("button")).toBeNull();
-
-    /* Akcja „dane" wchodzi w tryb edycji danych wejściowych — bez opuszczania
-       rozmowy, zgodnie z rozstrzygnięciem właściciela. */
-    await userEvent.click(screen.getAllByRole("button", { name: "Wpisz symbol lub numer" })[0]);
-    expect(screen.getByLabelText("Marka")).toBeInTheDocument();
-  });
-
-  it("czip „zgodne wymiary” pominięty niesie powód, a kandydat z tej drogi nazywa ją po polsku", () => {
-    /* Blizna linki 148 cm: agent ma z czipa wiedzieć, CO wpisać, żeby szczebel ruszył. */
-    kandydaci.mockReturnValue({ data: { ...Z_KANDYDATAMI, kandydaci: [
-      { nr: 1, twId: 1402, symbol: "18-11010", nazwa: "Linka napędu Castel Garden 81000668/1 1170x1480", stan: 0,
-        droga: "wymiar", pewnosc: "wymaga_danych", ostrzezenia: [],
-        zrodlo: "zgodny wymiar 1480 mm (długość: 148 cm) w nazwie kartoteki „1170x1480” — nie dowód" },
-    ] }, isLoading: false, error: null });
-    pokaz(dobor({ status: "searching", dane: { ...dobor().dane, parametry: { "długość": "148 cm" } } }));
-    expect(screen.getByTitle(/pominięty: agent nie wpisał wymiarów w parametrach doboru/)).toHaveTextContent("zgodne wymiary");
-    /* Droga i źródło stoją w dymku pewności od 0.517.0 — nie znikają,
-       schodzą z trzeciego planu do podpowiedzi nad werdyktem. */
-    expect(screen.getByTitle(/droga: zgodne wymiary — zgodny wymiar 1480 mm/)).toHaveTextContent("wymaga danych");
-  });
-
-  it("kandydat niesie drogę, źródło i ostrzeżenie, a wybór jedzie z wersją doboru", async () => {
-    kandydaci.mockReturnValue({ data: Z_KANDYDATAMI, isLoading: false, error: null });
-    pokaz(dobor({ status: "searching", wersja: 3, dane: { ...dobor().dane, marka: "STIHL", model: "FS250" } }));
-    expect(screen.getByText("FTC272")).toBeInTheDocument();
-    expect(screen.getByTitle(/SKU oferty/)).toBeInTheDocument();
-    expect(screen.getByTitle(/droga: zamiennik/)).toBeInTheDocument();
-    expect(screen.getByText(/inny rozstaw/)).toBeInTheDocument();
-    /* Dane wejściowe widać chipami — to one mówią, do czego dobieramy. */
-    expect(screen.getByText("STIHL")).toBeInTheDocument();
-
-    await userEvent.click(screen.getAllByRole("button", { name: /Wybierz/ })[0]);
-    expect(wybierz.mutate).toHaveBeenCalledWith(
-      { id: 4821, twId: 14, droga: "oferta", expectedVersion: 3 }, expect.anything());
-  });
-
-  it("wybrany wstawia do szkicu ZDANIE SERWERA i zatwierdza się jednym kliknięciem", async () => {
-    const onWstawDoSzkicu = vi.fn();
-    const onZlecPomiar = vi.fn();
-    pokaz(dobor({ status: "candidates_found", wersja: 4, wybrany: {
-      twId: 14, symbol: "FTC272", droga: "oferta", przez: "A. Lewandowska", at: "2026-09-02T08:00:00Z",
-      zdanieDoSzkicu: "Do STIHL FS250 prawdopodobnie pasuje FTC272 — źródło: kartoteka oferty, o którą pyta klient; dobór bez potwierdzonego zastosowania.",
-    } }), { onWstawDoSzkicu, onZlecPomiar });
-    expect(screen.getByText(/A\. Lewandowska/)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /Wstaw do szkicu ze źródłem/ }));
-    expect(onWstawDoSzkicu).toHaveBeenCalledWith(expect.stringMatching(/^Do STIHL FS250 prawdopodobnie pasuje FTC272 — źródło:/));
-
-    await userEvent.click(screen.getByRole("button", { name: /Zleć pomiar/ }));
-    expect(onZlecPomiar).toHaveBeenCalledWith(expect.objectContaining({ id: 14, sym: "FTC272" }));
-
-    await userEvent.click(screen.getByRole("button", { name: /Zatwierdź dobór/ }));
-    /* `silnikModelId: null` = wiedza rośnie przy MASZYNIE — zachowanie sprzed
-       dołożenia szczebla „przez silnik". */
-    expect(status.mutate).toHaveBeenCalledWith(
-      { id: 4821, status: "confirmed", brakuje: null, silnikModelId: null }, expect.anything());
-  });
-
-  /* ── Zdjęcia przy doborze (0.203.0) ────────────────────────────────────
-     Dobór odpowiada na pytanie „czy TO jest ta część", a odpowiadał samym
-     symbolem i nazwą. Zdjęcie stoi w trzech miejscach tej zakładki, bo każde
-     odpowiada na inne pytanie: przy kandydacie „którego wybrać", przy
-     negatywie „czy to nie ten odrzucony", przy wyborze „co poszło do
-     odpowiedzi". Test pilnuje wszystkich trzech naraz — pojedyncze zniknięcie
-     wyglądałoby jak brak zdjęcia w kartotece, nie jak regres. */
-  it("kandydat, negatyw i wybrana kartoteka niosą zdjęcie", () => {
-    kandydaci.mockReturnValue({ isLoading: false, error: null, data: {
-      ...Z_KANDYDATAMI,
-      negatywne: [{ twId: 77, symbol: "SZR-140/82", nazwa: "Szarpak 140", powod: "niewłaściwy rozstaw",
-        zrodlo: "pomiar własny", at: "2026-09-01" }],
-    } });
-    pokaz(dobor({ status: "candidates_found", wybrany: {
-      twId: 14, symbol: "FTC272", droga: "oferta", przez: "A. Lewandowska", at: "",
-      zdanieDoSzkicu: "Do STIHL FS250 pasuje FTC272 — źródło: kartoteka oferty." } }));
-
-    expect(screen.getByAltText("Podkładka przekładni STIHL FS120")).toBeInTheDocument();
-    expect(screen.getByAltText("Podkładka zamienna")).toBeInTheDocument();
-    expect(screen.getByAltText("Szarpak 140")).toBeInTheDocument();
-    /* Wybrany dobór zna sam symbol — `WyborDoboru` nie niesie nazwy. */
-    expect(screen.getByAltText("FTC272")).toBeInTheDocument();
-  });
-
-  it("wersja i „ustawił” stoją w dymkach, nie w wierszu", () => {
-    /* 0.517.0: metryka zapisu przydaje się przy sporze, nie przy każdym
-       spojrzeniu — więc jest o najechanie, nie na wierzchu. */
-    pokaz(dobor({ wersja: 7, updatedBy: "M. Wójcik" }));
-    expect(screen.queryByText(/wersja 7/)).toBeNull();
-    expect(screen.getByTitle("wersja 7")).toHaveTextContent("Dane wejściowe");
-    expect(screen.queryByText(/ustawił:/)).toBeNull();
-    expect(screen.getByTitle("ustawił: M. Wójcik")).toContainElement(screen.getByLabelText("Status doboru"));
-  });
-
-  it("zatwierdzony dobór nie ma drugiego przycisku zatwierdzania", () => {
-    pokaz(dobor({ status: "confirmed", wybrany: {
-      twId: 14, symbol: "FTC272", droga: "oferta", przez: "A. Lewandowska", at: "", zdanieDoSzkicu: "Do X pasuje FTC272 — źródło: kartoteka oferty." } }));
-    expect(screen.getByLabelText("Status doboru")).toHaveDisplayValue("Dobór zatwierdzony");
-    expect(screen.queryByRole("button", { name: /Zatwierdź dobór/ })).not.toBeInTheDocument();
-  });
-
-  it("konflikt wersji przy danych mówi, kto zmienił, i NIE kasuje wpisanego", async () => {
-    zapisz.mutate.mockImplementation((_v: unknown, o: { onError: (e: Error) => void }) =>
-      o.onError(new Konflikt("Ktoś zmienił dobór", { wersja: 2, updatedBy: "M. Wójcik" })));
-    pokaz(dobor());
-    await userEvent.click(screen.getByRole("button", { name: /Wpisz dane/ }));
-    await userEvent.type(screen.getByLabelText("Marka"), "NAC");
-    await userEvent.type(screen.getByLabelText("Model"), "LS 46-450");
+    await userEvent.click(screen.getByRole("button", { name: "Popraw" }));
+    for (const pole of ["Marka", "Model", "Wariant", "Rocznik", "Nr seryjny", "Silnik", "Numer części", "Nazwa części"]) {
+      expect(screen.getByLabelText(pole)).toBeInTheDocument();
+    }
+    await userEvent.clear(screen.getByLabelText("Silnik"));
+    await userEvent.type(screen.getByLabelText("Silnik"), "B&S 500E");
     await userEvent.click(screen.getByRole("button", { name: "Zapisz" }));
+    await zapisz(stan);
+    expect(stan.zapisy[0]).toEqual({ metoda: "PUT", url: "/api/obsluga/rozmowy/4821/dobor/dane", cialo: {
+      dane: { ...dobor().dane, silnik: "B&S 500E" }, expectedVersion: 4 } });
+  });
 
-    expect(zapisz.mutate).toHaveBeenCalledWith(expect.objectContaining({
-      id: 4821, expectedVersion: 1, dane: expect.objectContaining({ marka: "NAC", model: "LS 46-450" }),
-    }), expect.anything());
-    expect(screen.getByText(/M\. Wójcik/)).toBeInTheDocument();
+  it("konflikt 409 mówi, kto zmienił, i NIE kasuje wpisanego", async () => {
+    const stan = siec(LISTA, () => ({ status: 409,
+      cialo: { error: "Nieaktualna wersja doboru", wersja: 5, zmienil: "O. Nowak", dobor: dobor({ wersja: 5 }) } }));
+    pokaz(dobor());
+    await userEvent.click(screen.getByRole("button", { name: "Popraw" }));
+    await userEvent.clear(screen.getByLabelText("Wariant"));
+    await userEvent.type(screen.getByLabelText("Wariant"), "HS PRO");
+    await userEvent.click(screen.getByRole("button", { name: "Zapisz" }));
+    await zapisz(stan);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/O\. Nowak zmienił dobór przed Twoim zapisem/);
+    expect(screen.getByLabelText("Wariant")).toHaveValue("HS PRO");
+  });
+
+  it("przy wybranej części formularz uprzedza, że zmiana maszyny ją zdejmie", async () => {
+    siec(LISTA);
+    pokaz(dobor({ stan: "czesc", wynik: "czesc",
+      wybrany: { twId: 14, symbol: "532199377", podstawa: "numer", zdanieDoSzkicu: "…" } }));
+    await userEvent.click(screen.getByRole("button", { name: "Popraw" }));
+    expect(screen.queryByText(/Zmiana maszyny zdejmie/)).toBeNull();
+    await userEvent.type(screen.getByLabelText("Model"), "X");
+    expect(screen.getByText(/Zmiana maszyny zdejmie wybraną część 532199377/)).toBeInTheDocument();
+  });
+});
+
+describe("dobór — kandydaci", () => {
+  it("stoją w trzech grupach; podobne zwinięte, gdy jest coś mocniejszego", async () => {
+    siec(LISTA);
+    pokaz(dobor());
+    const numer = await screen.findByRole("region", { name: "Wskazane przez klienta" });
+    expect(within(numer).getByRole("heading", { name: "Wskazane przez klienta" })).toBeInTheDocument();
+    expect(within(numer).getByText("Szarpak rozrusznika NAC")).toBeInTheDocument();
+    expect(within(screen.getByRole("region", { name: "Z bazy wiedzy" })).getByText("Linka rozrusznika"))
+      .toBeInTheDocument();
+    const podobne = screen.getByText("Podobne po nazwie (1)").closest("details")!;
+    expect(podobne).not.toHaveAttribute("open");
+    expect(within(podobne).getByText("Szarpak uniwersalny")).not.toBeVisible();
+  });
+
+  it("same podobne stoją otwarte — zwinięcie schowałoby wszystko", async () => {
+    siec({ ...LISTA, kandydaci: [LISTA.kandydaci[2]], bezKartoteki: [] });
+    pokaz(dobor());
+    const podobne = await screen.findByRole("region", { name: "Podobne po nazwie" });
+    expect(within(podobne).getByText("Szarpak uniwersalny")).toBeVisible();
+    expect(document.querySelector("details")).toBeNull();
+  });
+
+  it("karta: nazwa, dostępność w barwie, symbol, pewność, powód z resztą źródeł w dymku", async () => {
+    siec(LISTA);
+    pokaz(dobor());
+    const karta = (await screen.findByText("Szarpak rozrusznika NAC")).closest("li")!;
+    expect(within(karta).getByText("dostępne 28")).toHaveClass("text-emerald-700");
+    expect(within(karta).getByText("532199377")).toBeInTheDocument();
+    expect(within(karta).getByText("prawdopodobne")).toBeInTheDocument();
+    const powod = within(karta).getByText(/trafienie po numerze z opisu kartoteki/);
+    expect(powod).toHaveTextContent("+1 źródła");
+    expect(powod).toHaveAttribute("title", expect.stringContaining("zastosowanie do NAC LS 46-450"));
+    const linka = screen.getByText("Linka rozrusznika").closest("li")!;
+    expect(within(linka).getByText(/kilkoma silnikami/)).toBeInTheDocument();
+    const zero = screen.getByText("Szarpak uniwersalny").closest("li")!;
+    expect(within(zero).getByText("dostępne 0")).toHaveClass("text-ranga-zle");
+  });
+
+  it("„Wybierz” wysyła wynik `czesc` z podstawą równą grupie i wersją", async () => {
+    const stan = siec(LISTA);
+    pokaz(dobor());
+    const linka = (await screen.findByText("Linka rozrusznika")).closest("li")!;
+    await userEvent.click(within(linka).getByRole("button", { name: "Wybierz" }));
+    await zapisz(stan);
+    expect(stan.zapisy[0]).toEqual({ metoda: "PUT", url: "/api/obsluga/rozmowy/4821/dobor/wynik",
+      cialo: { wynik: "czesc", twId: 15, podstawa: "wiedza", expectedVersion: 4 } });
+  });
+
+  it("numer bez kartoteki stoi wierszem bez „Wybierz”, negatyw w sekcji „Nie pasuje”", async () => {
+    siec(LISTA);
+    pokaz(dobor());
+    const numer = (await screen.findByText("532 19 93-78")).closest("li")!;
+    expect(numer).toHaveTextContent("numer klienta bez kartoteki u nas");
+    expect(within(numer).queryByRole("button")).toBeNull();
+    const nie = screen.getByRole("region", { name: "Nie pasuje" });
+    expect(within(nie).getByText("inny rozstaw mocowania")).toBeInTheDocument();
+    expect(within(nie).queryByRole("button", { name: "Wybierz" })).toBeNull();
+  });
+
+  it("pusta lista mówi zdaniami, czego brakuje, i prowadzi do poprawy danych", async () => {
+    siec({ kandydaci: [], bezKartoteki: [], negatywne: [],
+      brakuje: ["nie wiadomo, jaki silnik stoi w NAC LS 46-450", "brak numeru części"] });
+    pokaz(dobor());
+    expect(await screen.findByText("nie wiadomo, jaki silnik stoi w NAC LS 46-450")).toBeInTheDocument();
+    expect(screen.getByText("brak numeru części")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Popraw dane" }));
     expect(screen.getByLabelText("Marka")).toHaveValue("NAC");
   });
 
-  it("„brakuje danych” pyta, czego dopytać, i wstawia pytanie do szkicu tylko na kliknięcie", async () => {
-    const onWstawDoSzkicu = vi.fn();
-    pokaz(dobor({ status: "missing_information", brakuje: "pełny numer seryjny" }), { onWstawDoSzkicu });
-    expect(onWstawDoSzkicu).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: /wstaw pytanie do szkicu/ }));
-    expect(onWstawDoSzkicu).toHaveBeenCalledWith(expect.stringContaining("pełny numer seryjny"));
-  });
-
-  /* ── Dane z rozmowy (etap F, przyrost trzeci) ──────────────────────────
-     Pytanie właściciela: „dlaczego dane wejściowe nie zostały wprowadzone
-     automatycznie ze szkicu?". Pilnujemy granic: karta pokazuje TYLKO nowe
-     pola, wpisuje na kliknięcie z wersją doboru, nie nadpisuje słowa agenta,
-     a oceniona albo pusta propozycja nie zostawia po sobie karty. */
-  it("karta z rozmowy pokazuje tylko nowe pola, nazywa różnice i wpisuje jednym kliknięciem z wersją", async () => {
-    pokaz(dobor({ wersja: 2, dane: { ...dobor().dane, model: "GTV51" } }), {
-      propozycja: propozycja({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200", parametry: { klucz: "16" } }),
-    });
-    const karta = screen.getByRole("region", { name: "Dane z rozmowy" });
-    expect(karta).toHaveTextContent("Marka: Faworyt");
-    expect(karta).toHaveTextContent("Silnik: Lonci v200");
-    expect(karta).toHaveTextContent("klucz: 16");
-    /* Model agent ma inaczej — karta to mówi, ale go nie proponuje jako nowy. */
-    expect(karta).toHaveTextContent(/Inaczej niż wpisano.*Model „GTV51N196L-4W1"/);
-    expect(karta.querySelectorAll("b").length).toBeGreaterThanOrEqual(3);
-    await userEvent.click(screen.getByRole("button", { name: "Wpisz do danych" }));
-    expect(ocenDane.mutate).toHaveBeenCalledWith(
-      { rozmowaId: 4821, ocena: "wpisane", expectedVersion: 2 }, expect.anything());
-    await userEvent.click(screen.getByRole("button", { name: "Odrzuć" }));
-    expect(ocenDane.mutate).toHaveBeenLastCalledWith(
-      { rozmowaId: 4821, ocena: "odrzucone", expectedVersion: 2 }, expect.anything());
-  });
-
-  it("bez nowych pól, po ocenie albo bez propozycji karty nie ma", () => {
-    const wpisane = { ...dobor().dane, marka: "Faworyt" };
-    const { unmount } = pokaz(dobor({ dane: wpisane }), { propozycja: propozycja({ marka: "Faworyt" }) });
-    expect(screen.queryByRole("region", { name: "Dane z rozmowy" })).toBeNull();
-    unmount();
-    const drugi = pokaz(dobor(), { propozycja: propozycja({ marka: "Faworyt" }, { daneOcena: "wpisane" }) });
-    expect(screen.queryByRole("region", { name: "Dane z rozmowy" })).toBeNull();
-    drugi.unmount();
-    pokaz(dobor(), { propozycja: propozycja({}, { daneDoboru: null }) });
-    expect(screen.queryByRole("region", { name: "Dane z rozmowy" })).toBeNull();
-  });
-
-  it("konflikt przy wpisywaniu z rozmowy mówi, kto zmienił, i zostawia kartę", async () => {
-    ocenDane.mutate.mockImplementation((_v, o: { onError: (e: unknown) => void }) =>
-      o.onError(new Konflikt("Ktoś zmienił dobór", { wersja: 5, updatedBy: "M. Wójcik" })));
-    pokaz(dobor(), { propozycja: propozycja({ marka: "Faworyt" }) });
-    await userEvent.click(screen.getByRole("button", { name: "Wpisz do danych" }));
-    expect(screen.getByText(/Ktoś zmienił dane doboru \(M\. Wójcik\)/)).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Dane z rozmowy" })).toBeInTheDocument();
-  });
-
-  /* ── Pasowanie z rozmowy (etap F, przyrost czwarty) ──────────────────────
-     Zapowiedź z 0.230.0. Pilnujemy granic: karta pokazuje OBA końce, rolę
-     i pozycję; „Zaproponuj" i „Odrzuć" idą hookiem Copilota z samą oceną
-     (parę zna serwer, nie ciało żądania); po ocenie zdanie z danych, a nie
-     przyciski; odrzucona propozycja nie zostawia karty. */
-  it("karta pary pokazuje oba końce z rolą i pozycją; klik proponuje albo odrzuca samą oceną", async () => {
-    pokaz(dobor(), { propozycja: propozycja({}, { pasowanie: PARA }) });
-    const karta = screen.getByRole("region", { name: "Pasowanie z rozmowy" });
-    expect(karta).toHaveTextContent("LC170430140-0001");
-    expect(karta).toHaveTextContent("W09-0211");
-    expect(karta).toHaveTextContent("uszczelka · od strony filtra");
-    await userEvent.click(within(karta).getByRole("button", { name: "Zaproponuj pasowanie" }));
-    expect(ocenPasowanie.mutate).toHaveBeenCalledWith({ rozmowaId: 4821, ocena: "zaproponowane" });
-    /* Drugi „Odrzuć" stoi w karcie danych — szukamy W REGIONIE pary. */
-    await userEvent.click(within(karta).getByRole("button", { name: "Odrzuć" }));
-    expect(ocenPasowanie.mutate).toHaveBeenLastCalledWith({ rozmowaId: 4821, ocena: "odrzucone" });
-  });
-
-  it("po zaproponowaniu karta mówi, że para czeka w kolejce, i nie ma przycisków; po odrzuceniu karty nie ma", () => {
-    const { unmount } = pokaz(dobor(), { propozycja: propozycja({}, { pasowanie: PARA, pasowanieOcena: "zaproponowane" }) });
-    const karta = screen.getByRole("region", { name: "Pasowanie z rozmowy" });
-    expect(karta).toHaveTextContent(/czeka w kolejce wiedzy/);
-    /* Kafle zdjęć też są przyciskami — pytamy o te dwa z decyzją. */
-    expect(within(karta).queryByRole("button", { name: /Zaproponuj|Odrzuć/ })).toBeNull();
-    unmount();
-    pokaz(dobor(), { propozycja: propozycja({}, { pasowanie: PARA, pasowanieOcena: "odrzucone" }) });
-    expect(screen.queryByRole("region", { name: "Pasowanie z rozmowy" })).toBeNull();
-  });
-
-  it("Copilotowego `extracting_data` nie da się wybrać ręcznie", () => {
+  it("lista i formularz przechodzą WCAG 2.2 AA w strukturze", async () => {
+    siec(LISTA);
     pokaz(dobor());
-    const opcje = [...screen.getByLabelText("Status doboru").querySelectorAll("option")].map((o) => o.value);
-    expect(opcje).not.toContain("extracting_data");
-    expect(opcje).toContain("confirmed");
-  });
-
-  /* ── Baza wiedzy przy doborze (E2) ─────────────────────────────────────── */
-
-  it("negatyw jest widoczny także dla kartoteki spoza kandydatów", () => {
-    kandydaci.mockReturnValue({ data: { ...PUSTE, negatywne: [
-      { twId: 77, symbol: "SZR-140/82", nazwa: "Szarpak 140", powod: "niewłaściwy rozstaw",
-        zrodlo: "nie pasuje do NAC LS 46-450: niewłaściwy rozstaw — pomiar własny, 1.09.2026, M. Kowal", at: "2026-09-01" },
-    ] }, isLoading: false, error: null });
-    pokaz(dobor({ dane: { ...dobor().dane, marka: "NAC", model: "LS 46-450" } }));
-    expect(screen.getByLabelText("Negatywne dopasowania")).toBeInTheDocument();
-    expect(screen.getByText("SZR-140/82")).toBeInTheDocument();
-    expect(screen.getByText(/ostrzeżenie, nie brak danych/)).toBeInTheDocument();
-  });
-
-  /* ── Pasowanie część↔część (0.230.0) ────────────────────────────────────
-     Klient pyta „czy ta uszczelka pasuje do mojego gaźnika". Odpowiedź rodzi
-     się w doborze: wybrany kandydat pasuje DO kotwicy (kartoteki, którą agent
-     wpisał symbolem/numerem albo którą ma oferta). Kierunek jest narzucony,
-     a przycisk nie ma prawa proponować „X pasuje do X". */
-  it("kandydat z drogi pasowania nosi własną plakietkę", () => {
-    kandydaci.mockReturnValue({ data: { ...PUSTE, kandydaci: [
-      { nr: 1, twId: 811, symbol: "LC170430140-0001", nazwa: "Uszczelka gaźnika GX160", stan: 12,
-        droga: "pasowanie", pewnosc: "potwierdzone", ostrzezenia: [],
-        zrodlo: "uszczelka (od strony filtra) LC170430140-0001 pasuje do W09-0211 — katalog dostawcy, 7.09.2026, Anna" },
-    ] }, isLoading: false, error: null });
-    pokaz(dobor({ status: "searching", dane: { ...dobor().dane, oem: "W09-0211" } }));
-    expect(screen.getByTitle(/^droga: pasuje do części — .*od strony filtra/)).toBeInTheDocument();
-  });
-
-  it("„Pasuje do…” stoi tylko przy kotwicy INNEJ niż wybrany i wysyła kierunek z rozmową", async () => {
-    kandydaci.mockReturnValue({ data: { ...PUSTE, kotwice: [
-      { twId: 14, symbol: "FTC272", nazwa: "Podkładka" },
-      { twId: 502, symbol: "W09-0211", nazwa: "Gaźnik GX160" },
-    ] }, isLoading: false, error: null });
-    pokaz(dobor({ status: "candidates_found", wybrany: {
-      twId: 14, symbol: "FTC272", droga: "symbol", przez: "A. Lewandowska", at: "2026-09-02T08:00:00Z",
-      zdanieDoSzkicu: "Do W09-0211 pasuje FTC272.",
-    } }));
-    /* Kotwica równa wybranemu nie dostaje przycisku — relacja do siebie samej. */
-    expect(screen.queryByRole("button", { name: "Pasuje do FTC272" })).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Pasuje do W09-0211" }));
-    /* Dowód z rozmowy jest wypełniony — agent nie przepisuje numeru rozmowy ręcznie. */
-    expect(screen.getByLabelText("Dowód")).toHaveValue("dobór w rozmowie #4821");
-    await userEvent.click(screen.getByRole("button", { name: /Zaproponuj pasowanie/ }));
-    expect(zaproponujPasowanie.mutate).toHaveBeenCalledWith(expect.objectContaining({
-      twId: 14, doTwId: 502, rola: "uszczelka", polaryzacja: "pasuje", rodzajDowodu: "rozmowa",
-      dowodTresc: "dobór w rozmowie #4821", conversationId: 4821,
-    }), expect.anything());
-  });
-
-  it("bez kotwicy innej niż wybrany przycisku pasowania nie ma wcale", () => {
-    kandydaci.mockReturnValue({ data: Z_KANDYDATAMI, isLoading: false, error: null });
-    pokaz(dobor({ status: "candidates_found", wybrany: {
-      twId: 14, symbol: "FTC272", droga: "oferta", przez: "A. Lewandowska", at: "", zdanieDoSzkicu: "Do X pasuje FTC272.",
-    } }));
-    expect(screen.queryByRole("button", { name: /Pasuje do/ })).toBeNull();
-  });
-
-});
-
-describe("kandydat bez kartoteki (E3)", () => {
-  it("numer OEM bez wiersza w kartotece stoi na liście bez stanu i BEZ Wybierz", async () => {
-    /* Decyzja właściciela (makieta Dobor.dc.html): „nie mamy tego u siebie" to
-       odpowiedź dla klienta. Wybierz ukryty, bo `twId: null` w wyborze znaczy „zdejmij". */
-    kandydaci.mockReturnValue({ data: {
-      ...Z_KANDYDATAMI,
-      kandydaci: [...Z_KANDYDATAMI.kandydaci,
-        { nr: 3, twId: null, symbol: "OEM 118550127/0", nazwa: "identyfikator bez wiersza w kartotece", stan: null,
-          droga: "oem", pewnosc: "wymaga_danych", ostrzezenia: [],
-          zrodlo: "numer z danych wejściowych — nie ma go w żadnym opisie kartoteki" }],
-    }, isLoading: false, error: null });
-    pokaz(dobor({ status: "candidates_found", dane: { ...dobor().dane, oem: "118550127/0" } }));
-    expect(screen.getByText("OEM 118550127/0")).toBeInTheDocument();
-    expect(screen.getByText("brak w kartotece")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: /Wybierz/ })).toHaveLength(2);
-    expect(screen.getByTitle(/nie ma go w żadnym opisie/)).toBeInTheDocument();
+    await screen.findByText("Szarpak rozrusznika NAC");
+    await userEvent.click(screen.getByRole("button", { name: "Popraw" }));
+    await userEvent.click(screen.getByRole("button", { name: /Dopytaj o/ }));
+    const wynik = await axe.run(document.body, {
+      runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] },
+      rules: { "color-contrast": { enabled: false } },
+    });
+    expect(wynik.violations.map((v) => v.id)).toEqual([]);
   });
 });
 
-/* ── Silnik przestaje być polem-sierotą ─────────────────────────────────────
-   Do tego wydania agent wypełniał pole „Silnik", a żaden szczebel go nie
-   czytał. Szczebel „przez silnik" idzie przez ZATWIERDZONĄ zabudowę, więc
-   ekran musi rozróżnić trzy stany: silnik znany z bazy, sam wpisany tekst
-   (czyli notatka) i brak jednego i drugiego.                               */
-
-describe("Dobór a silnik maszyny", () => {
-  const zabudowa = (id: number, etykieta: string) => ({
-    id, silnik: { id, etykieta }, maszyna: { etykieta: "NAC LS 46-450" },
-    pewnosc: "potwierdzone", zdanieZrodla: `${etykieta} stoi w NAC LS 46-450 — producent`,
-  });
-  const zDanymi = (n: Partial<DoborTyp> = {}) => dobor({
-    dane: { marka: "NAC", model: "LS 46-450", wariant: null, rocznik: null, nrSeryjny: null,
-      silnik: "B&S 450E", oem: null, nazwaCzesci: null, parametry: {} },
-    ...n,
+describe("dobór — odpowiedzi bez kandydata", () => {
+  it("„Nie mamy” i „Nie dotyczy” wysyłają wynik z wersją", async () => {
+    const stan = siec(LISTA);
+    pokaz(dobor());
+    await userEvent.click(screen.getByRole("button", { name: "Nie mamy" }));
+    await zapisz(stan);
+    await userEvent.click(screen.getByRole("button", { name: "Nie dotyczy" }));
+    await zapisz(stan, 2);
+    expect(stan.zapisy.map((z) => z.cialo)).toEqual([
+      { wynik: "brak", expectedVersion: 4 }, { wynik: "nie_dotyczy", expectedVersion: 4 }]);
   });
 
-  beforeEach(() => {
-    kandydaci.mockReturnValue({ data: PUSTE, isLoading: false, error: null });
-    wiedzaDoboru.mockReturnValue({ data: { zastosowanie: null, zabudowa: null, silniki: [], pomiary: [] } });
+  it("„Dopytaj o…” pyta, o co, i bez tekstu nie zapisuje", async () => {
+    const stan = siec(LISTA);
+    pokaz(dobor());
+    await userEvent.click(screen.getByRole("button", { name: /Dopytaj o/ }));
+    const zapiszPytanie = screen.getByRole("button", { name: "Zapisz" });
+    expect(zapiszPytanie).toBeDisabled();
+    await userEvent.type(screen.getByLabelText("O co dopytać klienta"), "pełny numer seryjny");
+    await userEvent.click(zapiszPytanie);
+    await zapisz(stan);
+    expect(stan.zapisy[0].cialo).toEqual({ wynik: "dopytac", dopytac: "pełny numer seryjny", expectedVersion: 4 });
   });
 
-  it("bez zabudowy i bez aliasu mówi, że tekstu nie ma w słowniku", () => {
-    render(<Dobor dobor={zDanymi()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    expect(screen.getByText(/„B&S 450E" nie ma w słowniku silników/)).toBeInTheDocument();
-    expect(screen.getByText(/Wiedza → Silniki/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Zaproponuj zabudowę" })).toBeNull();
+  it("wskazanie z wyszukiwarki to wynik `czesc` z podstawą `reczny`", async () => {
+    const stan = siec(LISTA);
+    pokaz(dobor());
+    await userEvent.click(screen.getByRole("button", { name: "wskaż z wyszukiwarki" }));
+    await userEvent.click(screen.getByRole("button", { name: "towar z wyszukiwarki" }));
+    await zapisz(stan);
+    expect(stan.zapisy[0].cialo).toEqual({ wynik: "czesc", twId: 77, podstawa: "reczny", expectedVersion: 4 });
   });
 
-  /* Słownik (0.238.0): alias rozpoznaje tekst, a jedno kliknięcie proponuje
-     zabudowę z dowodem „rozmowa" i numerem rozmowy — automat nie zgaduje,
-     człowiek rozstrzyga w Wiedza → Silniki. */
-  it("alias bez pary daje przycisk, który proponuje zabudowę z dowodem „rozmowa” i numerem rozmowy", async () => {
-    const silnik = { id: 9, rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E", wariant: null, lata: null,
-      klucz: "silnik|bs450e", etykieta: "silnik Briggs & Stratton 450E" };
-    wiedzaDoboru.mockReturnValue({ data: { zastosowanie: null, zabudowa: null, silniki: [], pomiary: [],
-      silnikZPola: { alias: { id: 1, tekst: "B&S 450E", silnik, dodal: "Ala", dodanoAt: "x" }, zabudowa: null } } });
-    render(<Dobor dobor={zDanymi()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    expect(screen.getByText(/Nikt nie potwierdził, że stoi w NAC LS 46-450/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Zaproponuj zabudowę" }));
-    expect(zaproponujZabudowe.mutate).toHaveBeenCalledWith({
-      maszyna: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46-450", wariant: null },
-      silnik: { rodzaj: "silnik", marka: "Briggs & Stratton", nazwa: "450E", wariant: null },
-      rodzajDowodu: "rozmowa", dowodTresc: "klient podał silnik „B&S 450E” w rozmowie", conversationId: 4821,
-    }, expect.anything());
+  it("konflikt przy wyniku jest nazwany zdaniem z nazwiskiem", async () => {
+    siec(LISTA, () => ({ status: 409, cialo: { error: "x", wersja: 5, zmienil: "O. Nowak", dobor: dobor() } }));
+    pokaz(dobor());
+    await userEvent.click(screen.getByRole("button", { name: "Nie mamy" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/O\. Nowak zmienił dobór/);
+  });
+});
+
+describe("dobór — wynik zastępuje listę", () => {
+  const zCzescia = dobor({ stan: "czesc", wynik: "czesc", zmienil: "A. Lewandowska", zmienilAutomat: false,
+    wybrany: { twId: 14, symbol: "532199377", podstawa: "numer",
+      zdanieDoSzkicu: "Szarpak 532199377 prawdopodobnie pasuje — numer z opisu kartoteki." } });
+
+  it("rama z symbolem, podstawą i zdaniem serwera; lista i jej zapytanie znikają", async () => {
+    const stan = siec(LISTA);
+    const wstaw = vi.fn();
+    const pomiar = vi.fn();
+    pokaz(zCzescia, { onWstawDoSzkicu: wstaw, onZlecPomiar: pomiar });
+    expect(screen.getByText("532199377")).toBeInTheDocument();
+    expect(screen.getByText(/Wskazane przez klienta/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Wybierz" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Nie mamy" })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Wstaw do odpowiedzi" }));
+    expect(wstaw).toHaveBeenCalledWith("Szarpak 532199377 prawdopodobnie pasuje — numer z opisu kartoteki.");
+    await userEvent.click(screen.getByRole("button", { name: "Zleć pomiar" }));
+    expect(pomiar).toHaveBeenCalledWith({ id: 14, sym: "532199377", name: "532199377", locs: [] });
+    expect(stan.odczyty).toEqual([]);
   });
 
-  it("gdy para już czeka, zamiast przycisku jest zdanie o kolejce", () => {
-    wiedzaDoboru.mockReturnValue({ data: { zastosowanie: null, zabudowa: null, silniki: [], pomiary: [],
-      silnikZPola: { alias: { id: 1, tekst: "B&S 450E", dodal: "Ala", dodanoAt: "x",
-        silnik: { id: 9, etykieta: "silnik Briggs & Stratton 450E", marka: "Briggs & Stratton", nazwa: "450E", wariant: null } },
-        zabudowa: { id: 5, stan: "propozycja" } } } });
-    render(<Dobor dobor={zDanymi()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    expect(screen.getByText(/czeka na rozstrzygnięcie w Wiedza → Silniki/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Zaproponuj zabudowę" })).toBeNull();
+  it("„Zmień” otwiera dobór ponownie wynikiem `null`", async () => {
+    const stan = siec(LISTA);
+    pokaz(zCzescia);
+    await userEvent.click(screen.getByRole("button", { name: "Zmień" }));
+    await zapisz(stan);
+    expect(stan.zapisy[0]).toMatchObject({ url: "/api/obsluga/rozmowy/4821/dobor/wynik",
+      cialo: { wynik: null, expectedVersion: 4 } });
   });
 
-  it("przy dwóch zabudowach każe potwierdzić tabliczkę", () => {
-    wiedzaDoboru.mockReturnValue({ data: { zastosowanie: null, zabudowa: null, pomiary: [],
-      silniki: [zabudowa(7, "silnik Briggs & Stratton 450E"), zabudowa(8, "silnik Honda GCV160")] } });
-    render(<Dobor dobor={zDanymi()} rozmowaId={4821} onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    expect(screen.getByText(/bywa z kilkoma silnikami, potwierdź z tabliczki/)).toBeInTheDocument();
+  it("„dopytać” wstawia pytanie do odpowiedzi tylko na kliknięcie", async () => {
+    siec(LISTA);
+    const wstaw = vi.fn();
+    pokaz(dobor({ stan: "dopytac", wynik: "dopytac", dopytac: "pełny numer seryjny" }), { onWstawDoSzkicu: wstaw });
+    expect(screen.getByText("pełny numer seryjny")).toBeInTheDocument();
+    expect(wstaw).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Wstaw pytanie do odpowiedzi" }));
+    expect(wstaw).toHaveBeenCalledWith("Proszę o pełny numer seryjny — wtedy dobiorę właściwą część.");
+    expect(screen.getByRole("button", { name: "Zmień" })).toBeInTheDocument();
   });
 
-  it("wybór „do silnika” jedzie razem ze statusem — bez zabudowy nie ma go wcale", async () => {
-    const wybrany = { twId: 14, symbol: "FTC272", droga: "silnik" as const, przez: "Ala",
-      at: "2026-09-07T10:00:00Z", zdanieDoSzkicu: "Do NAC LS 46-450 pasuje FTC272." };
-    /* Najpierw bez zabudowy: opcji silnikowej NIE MA, bo nie ma faktu w bazie. */
-    const { unmount } = render(<Dobor dobor={zDanymi({ wybrany })} rozmowaId={4821}
-      onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    expect(screen.queryByText(/zastosowanie zapisz do/)).toBeNull();
+  it("„nie mamy” i „nie dotyczy” mówią zdaniem i otwierają się ponownie", async () => {
+    const stan = siec(LISTA);
+    const { unmount } = pokaz(dobor({ stan: "brak", wynik: "brak" }));
+    expect(screen.getByText(/Nie mamy tej części/)).toBeInTheDocument();
     unmount();
-
-    wiedzaDoboru.mockReturnValue({ data: { zastosowanie: null, zabudowa: null, pomiary: [],
-      silniki: [zabudowa(7, "silnik Briggs & Stratton 450E")] } });
-    render(<Dobor dobor={zDanymi({ wybrany })} rozmowaId={4821}
-      onWstawDoSzkicu={vi.fn()} onZlecPomiar={vi.fn()} />);
-    await userEvent.click(screen.getByRole("radio", { name: /Briggs & Stratton 450E/ }));
-    await userEvent.click(screen.getByRole("button", { name: /Zatwierdź dobór/ }));
-    expect(status.mutate).toHaveBeenCalledWith(
-      { id: 4821, status: "confirmed", brakuje: null, silnikModelId: 7 }, expect.anything());
-  });
-});
-
-/* ── Mniej hałasu w doborze (23 września 2026) ───────────────────────────────
-   Zrzut właściciela: jedenaście pigułek dróg, sześć przekreślonych, i pełne
-   karty rękojeści, noża wertykulatora i noża Boscha przy pytaniu o nóż do
-   kosiarki. Słabe trafienia i drogi bez wyniku nie znikają — schodzą pod
-   jedno rozwinięcie, a wybrany zostaje na wierzchu zawsze. */
-describe("hałas w doborze", () => {
-  it("drogi bez wyniku stoją pod jednym przyciskiem, z wynikiem — na wierzchu", async () => {
-    kandydaci.mockReturnValue({ data: Z_KANDYDATAMI, isLoading: false, error: null });
-    pokaz(dobor({ status: "searching" }));
-    const drogi = screen.getByLabelText("Sprawdzone drogi");
-    expect(within(drogi).getByText("oferta 1")).toBeVisible();
-    expect(within(drogi).getByTitle(/pominięty: agent nie wpisał EAN/)).not.toBeVisible();
-    await userEvent.click(within(drogi).getByRole("button", { name: "+9 bez wyniku" }));
-    expect(within(drogi).getByTitle(/pominięty: agent nie wpisał EAN/)).toBeVisible();
-  });
-
-  it("słabe trafienia schodzą pod rozwinięcie, gdy jest mocniejszy kandydat", () => {
-    kandydaci.mockReturnValue({ data: Z_KANDYDATAMI, isLoading: false, error: null });
-    pokaz(dobor({ status: "searching" }));
-    const slabe = screen.getByText(/Słabsze trafienia \(1\)/).closest("details")!;
-    expect(within(slabe).getByText("24-04003")).toBeInTheDocument();
-    expect(slabe.contains(screen.getByText("FTC272"))).toBe(false);
-  });
-
-  /* Wpis z bazy wiedzy z warunkiem, którego dobór nie sprawdzi, ma dowód —
-     brakuje mu tylko tabliczki klienta. Pod „bez dowodu" kłamałby i chował
-     jedyną właściwą część, a ostrzeżenie mówi agentowi, o co zapytać. */
-  it("warunkowy kandydat z bazy wiedzy stoi na wierzchu z ostrzeżeniem, nie wśród słabych", () => {
-    kandydaci.mockReturnValue({ data: { ...Z_KANDYDATAMI, kandydaci: [...Z_KANDYDATAMI.kandydaci,
-      { nr: 3, twId: 77, symbol: "W09-0211", nazwa: "Gaźnik GX160", stan: 5, droga: "zastosowanie" as const,
-        pewnosc: "wymaga_danych" as const, zrodlo: "potwierdzone zastosowanie do NAC LS 46-450 (roczniki 2014–2018) — producent",
-        ostrzezenia: ["pasuje warunkowo: roczniki 2014–2018 — w doborze brak rocznika, zapytaj klienta"] }] },
-    isLoading: false, error: null });
-    pokaz(dobor({ status: "searching" }));
-    const slabe = screen.getByText(/Słabsze trafienia \(1\)/).closest("details")!;
-    expect(slabe.contains(screen.getByText("W09-0211"))).toBe(false);
-    expect(screen.getByText(/pasuje warunkowo: roczniki 2014–2018/)).toBeVisible();
-  });
-
-  it("wybrany zostaje na wierzchu, choćby był słaby; same słabe — bez zwijania", () => {
-    kandydaci.mockReturnValue({ data: Z_KANDYDATAMI, isLoading: false, error: null });
-    pokaz(dobor({ status: "searching", wybrany: {
-      twId: 1654, symbol: "24-04003", droga: "zamiennik", przez: "A", at: "", zdanieDoSzkicu: "x" } }));
-    expect(screen.queryByText(/Słabsze trafienia/)).toBeNull();
-
-    kandydaci.mockReturnValue({ data: { ...Z_KANDYDATAMI,
-      kandydaci: Z_KANDYDATAMI.kandydaci.map((k) => ({ ...k, pewnosc: "wymaga_danych" as const })) },
-      isLoading: false, error: null });
-    pokaz(dobor({ status: "searching" }));
-    expect(screen.queryByText(/Słabsze trafienia/)).toBeNull();
+    pokaz(dobor({ stan: "nie_dotyczy", wynik: "nie_dotyczy" }));
+    expect(screen.getByText(/nie jest pytaniem o dobór/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Otwórz ponownie" }));
+    await zapisz(stan);
+    expect(stan.zapisy[0].cialo).toEqual({ wynik: null, expectedVersion: 4 });
   });
 });

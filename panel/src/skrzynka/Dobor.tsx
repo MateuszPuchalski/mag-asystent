@@ -1,693 +1,336 @@
 import React, { useState } from "react";
-import { AlertTriangle, Check, FileText, Pencil, Ruler, Search, Sparkles, X as Krzyzyk } from "lucide-react";
+import { AlertTriangle, FileText, MessageCircleQuestion, Pencil, Ruler, Search } from "lucide-react";
 import type {
-  DaneDoboru, Dobor as DoborTyp, DrogaDoboru, KandydatDoboru, NegatywDoboru,
-  StatusDoboru, SzczebelDoboru, SzkicCopilota,
+  DaneDoboru, Dobor as DoborTyp, GrupaKandydata, KandydaciDoboru, KandydatDoboru, PewnoscKandydata,
+  PodstawaWyboru, WynikDoboru,
 } from "../api/typy";
 import { Konflikt } from "../api/klient";
-import {
-  useKandydaci, useStatusDoboru, useWiedzaDoboru, useWybierzKandydata, useZapiszDaneDoboru,
-} from "../api/rozmowy";
-import { useOcenDaneDoboru, useOcenPasowanie } from "../api/copilot";
-import { propozycjaDoboru } from "./propozycjaDoboru";
+import { useKandydaci, useWynikDoboru, useZapiszDaneDoboru } from "../api/rozmowy";
 import { NaglowekSekcji, Przycisk } from "../ui";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
-import { PasowanieForm } from "../wiedza/PasowanieForm";
-import { useZaproponujPasowanie, useZaproponujZabudowe } from "../api/wiedza";
-import { DO_WYBORU_DOBORU, NAZWA_DOBORU, NAZWA_DROGI, NAZWA_ROLI } from "./statusy";
+import { NAZWA_GRUPY, NAZWA_PODSTAWY } from "./statusy";
 
 /**
- * Dobór części przy rozmowie (§11, etap E1) — trzecia zakładka kolumny
- * kontekstu, wg makiety `docs/projekt-widokow/Dobor.dc.html`.
+ * Dobór części przy rozmowie (`docs/dobor-od-zera.md` §6).
  *
- * Komponent woła hooki SAM — precedens `TowarRozmowy.tsx` — więc `Rozmowa.tsx`
- * z jego czterdziestoma sześcioma propsami zostaje nietknięty.
+ * Ekran prowadzi do jednej z czterech odpowiedzi (§1): ta część, nie mamy,
+ * dopytać, nie dotyczy. Wszystko inne jest środkiem i stoi tylko wtedy, gdy
+ * do odpowiedzi prowadzi. Po wyniku lista znika, bo decyzja zapadła, a rama
+ * wyniku mówi, co pojedzie do klienta.
  *
- * Trzy rzeczy, których ekran NIE robi, bo zabrania tego projekt:
- * - nie układa zdania do szkicu (§14.3: pisze je serwer, ze źródłem),
- * - nie zgaduje maszyny z treści pytania (dane wpisuje agent; w E1 nie ma
- *   Copilota, więc nie ma też „propozycji Copilota" z makiety),
- * - nie zatwierdza sam: `confirmed` klika człowiek, a serwer odmawia bez wyboru.
- *
- * DWA zatwierdzenia z makiety to jedno. Stopka makiety zatwierdzała
- * ZASTOSOWANIE — „tylko ekspert". Decyzją właściciela roli eksperta nie ma,
- * a zastosowanie idzie w E2 do kolejki propozycji; tu zatwierdza się DOBÓR.
+ * Czego ekran NIE robi: nie układa zdania do szkicu (pisze je serwer, ze
+ * źródłem), nie zgaduje maszyny z treści rozmowy i nie wybiera sam. Otwarcie
+ * zakładki niczego nie zapisuje; każdy zapis to kliknięcie człowieka.
  */
 
-const POLA: Array<{ klucz: keyof Omit<DaneDoboru, "parametry">; nazwa: string; przyklad: string }> = [
+const POLA: Array<{ klucz: keyof DaneDoboru; nazwa: string; przyklad: string }> = [
   { klucz: "marka", nazwa: "Marka", przyklad: "NAC" },
   { klucz: "model", nazwa: "Model", przyklad: "LS 46-450" },
   { klucz: "wariant", nazwa: "Wariant", przyklad: "HS" },
   { klucz: "rocznik", nazwa: "Rocznik", przyklad: "2019" },
   { klucz: "nrSeryjny", nazwa: "Nr seryjny", przyklad: "pełny, z tabliczki" },
   { klucz: "silnik", nazwa: "Silnik", przyklad: "B&S 450E" },
-  { klucz: "oem", nazwa: "Numer OEM / symbol", przyklad: "532 19 93-77" },
-  { klucz: "nazwaCzesci", nazwa: "Część", przyklad: "szarpak rozrusznika" },
+  { klucz: "oem", nazwa: "Numer części", przyklad: "532 19 93-77" },
+  { klucz: "nazwaCzesci", nazwa: "Nazwa części", przyklad: "szarpak rozrusznika" },
 ];
+/* Te pola opisują MASZYNĘ: ich zmiana zdejmuje wybraną część na serwerze
+   (§4.1), więc formularz ostrzega przed nią, zanim agent zapisze. */
+const POLA_MASZYNY: ReadonlyArray<keyof DaneDoboru> = ["marka", "model", "wariant", "rocznik", "nrSeryjny"];
 
-const PEWNOSC: Record<KandydatDoboru["pewnosc"], { etykieta: string; klasa: string }> = {
+const PEWNOSC: Record<PewnoscKandydata, { etykieta: string; klasa: string }> = {
   potwierdzone: { etykieta: "potwierdzone", klasa: "bg-emerald-100 text-emerald-800" },
   prawdopodobne: { etykieta: "prawdopodobne", klasa: "bg-amber-100 text-amber-800" },
-  wymaga_danych: { etykieta: "wymaga danych", klasa: "bg-slate-100 text-slate-600" },
+  do_sprawdzenia: { etykieta: "do sprawdzenia", klasa: "bg-slate-100 text-slate-700" },
 };
 
-/* Barwa stanu jako kropka przed polem wyboru — te same znaczenia, co
-   dawna plakietka: zieleń zatwierdza, czerwień czeka na klienta, bursztyn
-   ma kandydatów, fiolet czeka na człowieka z wiedzą. */
-const KROPKA_STATUSU: Partial<Record<StatusDoboru, string>> = {
-  confirmed: "bg-emerald-600",
-  missing_information: "bg-red-600",
-  candidates_found: "bg-amber-500",
-  requires_expert: "bg-violet-600",
-  rejected: "bg-slate-500",
-};
+const GRUPY: GrupaKandydata[] = ["numer", "wiedza", "podobne"];
 
-/** Parametry jako tekst „klucz: wartość" wiersz po wierszu — lista jest otwarta. */
-const parametryNaTekst = (p: Record<string, string>) =>
-  Object.entries(p).map(([k, v]) => `${k}: ${v}`).join("\n");
-const tekstNaParametry = (t: string): Record<string, string> => {
-  const wynik: Record<string, string> = {};
-  for (const linia of t.split("\n")) {
-    const i = linia.indexOf(":");
-    if (i <= 0) continue;
-    const k = linia.slice(0, i).trim(); const v = linia.slice(i + 1).trim();
-    if (k && v) wynik[k] = v;
-  }
-  return wynik;
-};
+type Formularz = Record<keyof DaneDoboru, string>;
+const naFormularz = (d: DaneDoboru) =>
+  Object.fromEntries(POLA.map((p) => [p.klucz, d[p.klucz] ?? ""])) as Formularz;
 
-type Formularz = Record<keyof Omit<DaneDoboru, "parametry">, string> & { parametry: string };
-const naFormularz = (d: DaneDoboru): Formularz => ({
-  marka: d.marka ?? "", model: d.model ?? "", wariant: d.wariant ?? "", rocznik: d.rocznik ?? "",
-  nrSeryjny: d.nrSeryjny ?? "", silnik: d.silnik ?? "", oem: d.oem ?? "", nazwaCzesci: d.nazwaCzesci ?? "",
-  parametry: parametryNaTekst(d.parametry),
-});
+/** „NAC LS 46-450 HS (2019) · silnik B&S 450E · nr seryjny …" albo `null`. */
+function opisMaszyny(d: DaneDoboru): string | null {
+  const nazwa = [d.marka, d.model, d.wariant].filter(Boolean).join(" ");
+  return [nazwa ? `${nazwa}${d.rocznik ? ` (${d.rocznik})` : ""}` : d.rocznik ? `rocznik ${d.rocznik}` : null,
+    d.silnik && `silnik ${d.silnik}`, d.nrSeryjny && `nr seryjny ${d.nrSeryjny}`]
+    .filter(Boolean).join(" · ") || null;
+}
+const opisCzesci = (d: DaneDoboru) => [d.nazwaCzesci, d.oem && `nr ${d.oem}`].filter(Boolean).join(" · ") || null;
 
-export function Dobor({ dobor, rozmowaId, propozycja = null, onWstawDoSzkicu, onZlecPomiar }: {
+/** Zdanie konfliktu z nazwiskiem z 409. Serwer daje je w `zmienil`. */
+const zdanieKonfliktu = (e: Konflikt) =>
+  `${String(e.szczegoly.zmienil ?? "Ktoś inny")} zmienił dobór przed Twoim zapisem. `
+  + "Twoje wpisy zostały — sprawdź zmianę i zapisz ponownie.";
+
+export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
   dobor: DoborTyp;
   rozmowaId: number;
-  /** Szkic Copilota z danymi rozpoznanymi w rozmowie (przyrost trzeci). */
-  propozycja?: SzkicCopilota | null;
   onWstawDoSzkicu: (tresc: string) => void;
   onZlecPomiar: (towar: TowarZWyszukiwarki) => void;
 }) {
-  const kandydaci = useKandydaci(rozmowaId);
+  /* Kandydatów szuka się tylko przy otwartym doborze: po wyniku lista
+     zniknęła z ekranu, a zapytanie o nią byłoby pracą, której nikt nie widzi. */
+  const kandydaci = useKandydaci(dobor.wynik === null ? rozmowaId : null);
   const zapisz = useZapiszDaneDoboru();
-  const ocenDane = useOcenDaneDoboru();
-  const zRozmowy = propozycjaDoboru(propozycja, dobor.dane);
-  /* Para z rozmowy (przyrost czwarty): karta stoi, dopóki agent nie kliknie;
-     po „Zaproponuj" zdanie bierze się Z DANYCH (`pasowanieOcena`), więc
-     przeżywa odświeżenie — w odróżnieniu od lokalnego `pasowanieOk` niżej. */
-  const ocenPasowanie = useOcenPasowanie();
-  const para = propozycja?.pasowanie ?? null;
-  const paraOcena = propozycja?.pasowanieOcena ?? null;
-  const status = useStatusDoboru();
-  const wybierz = useWybierzKandydata();
-  /* Ten sam odczyt, z którego zakładka WIEDZA bierze dowody — tu potrzebne są
-     z niego SILNIKI maszyny. Drugie żądanie po to samo byłoby drugim strzałem. */
-  const wiedza = useWiedzaDoboru(rozmowaId);
-  const silniki = wiedza.data?.silniki ?? [];
-  /* Słownik (0.238.0): tekst z pola „Silnik" rozpoznany aliasem biura. Jedno
-     kliknięcie proponuje zabudowę z dowodem „rozmowa" (klient podał silnik);
-     rozstrzyga człowiek w Wiedza → Silniki, a szczebel rusza po zatwierdzeniu. */
-  const zPola = wiedza.data?.silnikZPola ?? null;
-  const zaproponujZabudowe = useZaproponujZabudowe();
-  const [bladZabudowy, setBladZabudowy] = useState("");
-  const zaproponujZPola = () => {
-    if (!zPola || !dobor.dane.marka || !dobor.dane.model) return;
-    setBladZabudowy("");
-    zaproponujZabudowe.mutate({
-      maszyna: { rodzaj: "maszyna", marka: dobor.dane.marka, nazwa: dobor.dane.model, wariant: dobor.dane.wariant },
-      silnik: { rodzaj: "silnik", marka: zPola.alias.silnik.marka, nazwa: zPola.alias.silnik.nazwa,
-        wariant: zPola.alias.silnik.wariant },
-      rodzajDowodu: "rozmowa", dowodTresc: `klient podał silnik „${dobor.dane.silnik}” w rozmowie`,
-      conversationId: rozmowaId,
-    }, { onError: (e) => setBladZabudowy((e as Error).message) });
-  };
-  /* „Pasuje do…": jedyne miejsce, gdzie pasowanie rodzi się Z PRACY. Kotwica
-     to kartoteka, którą agent wskazał symbolem/numerem albo kartoteka oferty —
-     inna niż wybrany kandydat. Kierunek narzucony (wybrany pasuje DO kotwicy),
-     bo taki jest sens pytania klienta. Bez automatu przy „Zatwierdź dobór”: rola
-     nieznana, a kotwica bywa samą częścią (klient pyta o dostępność gaźnika). */
-  const zaproponujPasowanie = useZaproponujPasowanie();
-  const [pasujeDo, setPasujeDo] = useState<number | null>(null);
-  const [pasowanieOk, setPasowanieOk] = useState("");
+  const wynik = useWynikDoboru();
 
   const [edycja, setEdycja] = useState(false);
   const [formularz, setFormularz] = useState<Formularz>(() => naFormularz(dobor.dane));
-  const [konflikt, setKonflikt] = useState<string>("");
-  const [brakuje, setBrakuje] = useState(dobor.brakuje ?? "");
-  const [pytamOBrak, setPytamOBrak] = useState(false);
+  const [konflikt, setKonflikt] = useState("");
+  const [dopytuje, setDopytuje] = useState(false);
+  const [dopytac, setDopytac] = useState(dobor.dopytac ?? "");
   const [szukam, setSzukam] = useState(false);
-  /* `null` = zapisz wiedzę przy MASZYNIE (zachowanie sprzed zmiany). Liczba to
-     model silnika z zatwierdzonej zabudowy — nigdy tekst z pola „Silnik". */
-  const [doSilnika, setDoSilnika] = useState<number | null>(null);
 
-  const blad = [zapisz.error, status.error, wybierz.error, ocenDane.error, ocenPasowanie.error]
-    .find((e) => e && !(e instanceof Konflikt)) as Error | undefined;
+  const blad = [zapisz.error, wynik.error].find((e) => e && !(e instanceof Konflikt)) as Error | undefined;
+  /* 409 NIE kasuje wpisanego: formularz trzyma swój stan, a dobór z nową
+     wersją przychodzi odświeżeniem, więc drugi zapis idzie już na niej. */
+  const przyKonflikcie = (e: unknown) => { if (e instanceof Konflikt) setKonflikt(zdanieKonfliktu(e)); };
 
-  /* Konflikt przy propozycji to ten sam wyścig, co przy formularzu: ktoś zapisał
-     dane, zanim doszło kliknięcie. Zdanie to samo, bo sytuacja ta sama. */
-  const ocenDaneZRozmowy = (ocena: "wpisane" | "odrzucone") =>
-    ocenDane.mutate({ rozmowaId, ocena, expectedVersion: dobor.wersja }, {
-      onSuccess: () => setKonflikt(""),
-      onError: (e) => {
-        if (e instanceof Konflikt) {
-          setKonflikt(`Ktoś zmienił dane doboru (${String(e.szczegoly.updatedBy ?? "inny agent")}) — odśwież i kliknij ponownie`);
-        }
-      },
-    });
-
+  const otworzFormularz = () => { setFormularz(naFormularz(dobor.dane)); setKonflikt(""); setEdycja(true); };
   const zapiszDane = () => {
-    const dane: Partial<DaneDoboru> = { parametry: tekstNaParametry(formularz.parametry) };
-    for (const p of POLA) dane[p.klucz] = formularz[p.klucz].trim() || null;
+    const dane = Object.fromEntries(POLA.map((p) => [p.klucz, formularz[p.klucz].trim() || null])) as DaneDoboru;
     zapisz.mutate({ id: rozmowaId, dane, expectedVersion: dobor.wersja }, {
       onSuccess: () => { setEdycja(false); setKonflikt(""); },
-      /* 409 NIE kasuje wpisanego: agent widzi, kto zmienił dane, i sam decyduje,
-         czy wczytać cudze, czy nadpisać po odświeżeniu. */
-      onError: (e) => {
-        if (e instanceof Konflikt) {
-          setKonflikt(`Ktoś zmienił dane doboru (${String(e.szczegoly.updatedBy ?? "inny agent")}) — odśwież i wpisz ponownie`);
-        }
-      },
+      onError: przyKonflikcie,
     });
   };
+  const ustaw = (w: WynikDoboru | null, reszta: { twId?: number; podstawa?: PodstawaWyboru; dopytac?: string } = {}) =>
+    wynik.mutate({ id: rozmowaId, wynik: w, expectedVersion: dobor.wersja, ...reszta }, {
+      onSuccess: () => { setKonflikt(""); setDopytuje(false); setSzukam(false); },
+      onError: przyKonflikcie,
+    });
 
-  const ustawStatus = (s: StatusDoboru, notatka: string | null = null, silnikModelId: number | null = null) =>
-    status.mutate({ id: rozmowaId, status: s, brakuje: notatka, silnikModelId },
-      { onSuccess: () => setPytamOBrak(false) });
-
-  const wybierzTowar = (twId: number | null, droga: DrogaDoboru) =>
-    wybierz.mutate({ id: rozmowaId, twId, droga, expectedVersion: dobor.wersja },
-      { onSuccess: () => setSzukam(false) });
-
-  const wypelnione = POLA.filter((p) => dobor.dane[p.klucz]);
-
-  /* Karta jednego kandydata — jedna definicja dla listy na wierzchu i dla
-     słabszych trafień pod rozwinięciem. */
-  const kartaKandydata = (k: KandydatDoboru) => {
-    /* Kandydat bez kartoteki (E3): numer OEM, którego nie ma w żadnym
-       opisie. Nie ma stanu i nie ma Wybierz — `twId: null` w wyborze
-       znaczy „zdejmij", więc przycisk zrobiłby odwrotność obietnicy. */
-    const bezKartoteki = k.twId === null;
-    const wybrany = !bezKartoteki && dobor.wybrany?.twId === k.twId;
-    return <li key={k.twId ?? `bez-kartoteki-${k.symbol}`} className={`rounded-lg border p-2 ${wybrany
-      /* Wypełnienie szare, obwódka marki zostaje: to jest ZAZNACZENIE,
-         a bursztynowe tło myliło je z ostrzeżeniem (0.265.0). */
-      ? "border-wertis-amber bg-slate-200" : bezKartoteki ? "border-dashed border-slate-300" : "border-slate-200"}`}>
-      {/* ── CO CZYTA SIĘ PIERWSZE (0.203.0) ─────────────────────────
-          Wiersz kandydata zaczynał się od symbolu, a nazwa leżała pod
-          nim, w tym samym rozmiarze co źródło i droga. Cztery linijki
-          jednej wagi każą przeczytać wszystkie, żeby wybrać jedną.
-
-          Dobór rozstrzyga pytanie „czy TO jest ta część", a odpowiada
-          na nie kształt przedmiotu i jego nazwa. Zdjęcie idzie więc na
-          lewo, nazwa dostaje pierwszy plan, symbol i pewność schodzą
-          do podpisu, a droga ze źródłem — na trzeci plan. Symbol
-          zostaje, bo to on jedzie na dokument i na halę.
-
-          DOSTĘPNOŚĆ MA BARWĘ W OBIE STRONY. Do 0.202.0 tylko zero
-          było czerwone, a dodatnie liczby były szare jak reszta —
-          choć „mamy 28 sztuk" kończy rozmowę z klientem jednym
-          zdaniem, a zero każe szukać dalej. */}
-      {/* `items-start`: kafle mają stać w JEDNEJ pionowej linii, bo
-          wzrok jedzie po nich w dół. Wyśrodkowane skakałyby wraz
-          z długością nazwy — a nazwa raz się łamie, raz nie. */}
-      <div className="flex items-start gap-2">
-        <Kafel twId={k.twId} rozmiar={56} nazwa={k.nazwa} symbol={k.symbol} />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-start gap-2">
-            <span className="mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded bg-slate-100 text-podpis font-bold text-slate-600">{k.nr}</span>
-            <b className="min-w-0 flex-1 text-tresc text-slate-900">{k.nazwa}</b>
-            {k.stan === null
-              ? <span className="shrink-0 text-podpis font-bold text-slate-500">brak w kartotece</span>
-              : <span className={`shrink-0 text-podpis font-bold ${k.stan <= 0
-                  ? "text-ranga-zle" : "text-emerald-700"}`}>dostępne {k.stan}</span>}
-          </div>
-          {/* ── DROGA I ŹRÓDŁO W DYMKU PEWNOŚCI (0.517.0) ──────────────────
-              Do tego wydania stały pod symbolem osobną linią: czip drogi
-              i ucięte zdanie źródła, przy każdym kandydacie. To trzeci
-              plan z komentarza wyżej, a trzeci plan czytany przy każdym
-              wierszu przestaje być trzecim. Pewność JEST werdyktem z tego
-              źródła, więc dymek nad nią odpowiada na „skąd ta ocena". */}
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <span className="font-mono text-xs text-slate-600">{k.symbol}</span>
-            <span className={`cursor-help rounded px-1.5 py-0.5 text-podpis font-bold ${PEWNOSC[k.pewnosc].klasa}`}
-              title={`droga: ${NAZWA_DROGI[k.droga]} — ${k.zrodlo}`}>
-              {PEWNOSC[k.pewnosc].etykieta}</span>
-          </div>
-        </div>
-      </div>
-      {k.ostrzezenia.map((o) => <p key={o} className="mt-1 flex items-center gap-1 rounded border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-podpis text-amber-900">
-        <AlertTriangle size={12} />{o}</p>)}
-      {/* OBRYS, NIE PEŁNA ZIELEŃ (23 września 2026). Pięć pełnych
-          zielonych przycisków jeden pod drugim było najgłośniejszą
-          rzeczą w kolumnie — a to ruch dostępny, nie zalecany. */}
-      {!wybrany && !bezKartoteki && <button type="button" disabled={wybierz.isPending}
-        onClick={() => wybierzTowar(k.twId, k.droga)}
-        className="mt-1.5 inline-flex items-center gap-1 rounded border border-emerald-600 px-2 py-0.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
-        <Check size={12} />Wybierz</button>}
-    </li>;
-  };
+  const maszyna = opisMaszyny(dobor.dane);
+  const czesc = opisCzesci(dobor.dane);
+  const zmianaMaszyny = dobor.wynik === "czesc"
+    && POLA_MASZYNY.some((k) => (formularz[k].trim() || null) !== dobor.dane[k]);
 
   return <div className="flex min-h-0 flex-col text-sm">
-    {/* ── Status ─────────────────────────────────────────────────────────── */}
-    <div className="flex flex-wrap items-center gap-2 border-b p-3">
-      {/* ── STATUS RAZ, NIE DWA (23 września 2026) ─────────────────────────
-          Plakietka „SZUKAMY" stała obok pola wyboru, które też mówiło
-          „Szukamy". Zostaje pole, bo to w nim zmienia się stan, a barwę
-          stanu niesie kropka przed nim. */}
-      {/* „Ustawił: X" zeszło do dymku pola (0.517.0): kto zmienił stan,
-          pyta się przy sporze, nie przy każdym spojrzeniu na zakładkę. */}
-      <label className="flex items-center gap-1.5 text-xs text-slate-500"
-        title={dobor.updatedBy ? `ustawił: ${dobor.updatedBy}` : undefined}>
-        <span aria-hidden="true" className={`h-2.5 w-2.5 shrink-0 rounded-full ${
-          KROPKA_STATUSU[dobor.status] ?? "bg-slate-300"}`} />
-        <select className="field w-auto py-1 text-xs" aria-label="Status doboru" value={dobor.status}
-          disabled={status.isPending}
-          onChange={(e) => {
-            const s = e.target.value as StatusDoboru;
-            if (s === "missing_information") { setPytamOBrak(true); return; }
-            ustawStatus(s);
-          }}>
-          {/* Stan bieżący bywa spoza listy ręcznej (`extracting_data` z F):
-              pole musi mieć opcję dla wartości, którą pokazuje. */}
-          {!DO_WYBORU_DOBORU.includes(dobor.status) &&
-            <option value={dobor.status}>{NAZWA_DOBORU[dobor.status]}</option>}
-          {DO_WYBORU_DOBORU.map((s) => <option key={s} value={s}>{NAZWA_DOBORU[s]}</option>)}
-        </select>
-      </label>
-      {(pytamOBrak || dobor.status === "missing_information") &&
-        <div className="flex w-full flex-wrap items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-900">
-          <AlertTriangle size={14} className="shrink-0" />
-          <input className="field min-w-0 flex-1 py-1 text-xs" aria-label="Czego brakuje" value={brakuje}
-            placeholder="Czego dopytać klienta, np. pełny numer seryjny"
-            onChange={(e) => setBrakuje(e.target.value)} />
-          <Przycisk className="text-xs" disabled={status.isPending}
-            onClick={() => ustawStatus("missing_information", brakuje.trim() || null)}>Zapisz</Przycisk>
-          {/* Pytanie doprecyzowujące idzie do szkicu na kliknięcie, nigdy samo. */}
-          {dobor.brakuje && <button type="button" className="underline underline-offset-2"
-            onClick={() => onWstawDoSzkicu(`Proszę o ${dobor.brakuje} — wtedy dobiorę właściwą część.`)}>
-            wstaw pytanie do szkicu</button>}
-        </div>}
-    </div>
-
-    {/* ── Dane wejściowe (§11.1) ─────────────────────────────────────────── */}
-    <section className="border-b p-3" aria-label="Dane wejściowe">
-      <div className="mb-2 flex items-center gap-2">
-        {/* Numer wersji w dymku (0.517.0): pilnuje zapisu przed
-            nadpisaniem, a agentowi nic nie mówi, dopóki nie ma konfliktu —
-            a konflikt nazywa się wtedy sam, zdaniem z nazwiskiem. */}
-        <span className="cursor-help" title={`wersja ${dobor.wersja}`}>
-          <NaglowekSekcji>Dane wejściowe</NaglowekSekcji></span>
-        {!edycja && <button type="button" className="ml-auto inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-800"
-          onClick={() => { setFormularz(naFormularz(dobor.dane)); setKonflikt(""); setEdycja(true); }}>
-          <Pencil size={12} />{wypelnione.length ? "Popraw" : "Wpisz dane"}</button>}
+    {/* Bez własnego nagłówka: wiersz „Dobór" w kolumnie kontekstu niesie
+        tytuł i stan w streszczeniu, a drugi raz tuż pod nim to szum. */}
+    <section className="border-b p-3" aria-label="Czego szuka klient">
+      <div className="mb-1.5 flex items-center gap-2">
+        {/* Numer wersji w dymku: pilnuje zapisu, a agentowi mówi coś
+            dopiero przy konflikcie, który nazywa się wtedy sam. */}
+        <span title={`wersja ${dobor.wersja}`}><NaglowekSekcji>Czego szuka klient</NaglowekSekcji></span>
+        {!edycja && <button type="button" onClick={otworzFormularz}
+          className="ml-auto inline-flex min-h-6 items-center gap-1 text-xs text-slate-600 hover:text-slate-900">
+          <Pencil size={12} aria-hidden />{maszyna || czesc ? "Popraw" : "Wpisz dane"}</button>}
       </div>
-
-      {/* DANE Z ROZMOWY (etap F, przyrost trzeci). Pytanie właściciela z 8.09.2026:
-          „dlaczego dane wejściowe nie zostały wprowadzone automatycznie ze
-          szkicu?". Odpowiedź stoi tu: Copilot je ROZPOZNAŁ, serwer sprawdził
-          przeciw rozmowie, a wpisuje agent — jednym kliknięciem, w PUSTE pola.
-          To, co agent wpisał sam, zostaje; różnicę karta tylko nazywa. Bez
-          nowych pól karty nie ma, bo nie miałaby czego wpisać. */}
-      {!edycja && zRozmowy.nowe.length > 0 && <section aria-label="Dane z rozmowy"
-        className="mb-2 rounded-lg border border-violet-200 bg-violet-50 p-2">
-        <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs">
-          <b className="text-violet-900"><Sparkles size={12} className="inline" /> Copilot rozpoznał w rozmowie</b>
-          <span className="ml-auto flex flex-wrap items-center gap-2">
-            <Przycisk wariant="glowny" className="text-xs" disabled={ocenDane.isPending}
-              onClick={() => ocenDaneZRozmowy("wpisane")}>Wpisz do danych</Przycisk>
-            <Przycisk className="text-xs" disabled={ocenDane.isPending}
-              onClick={() => ocenDaneZRozmowy("odrzucone")}>Odrzuć</Przycisk>
-          </span>
-        </div>
-        <div className="flex flex-wrap gap-1.5">
-          {zRozmowy.nowe.map((p) => <span key={p.klucz} className="rounded border border-violet-200 bg-white px-2 py-0.5 text-xs">
-            <span className="text-slate-500">{p.nazwa}: </span><b>{p.wartosc}</b></span>)}
-        </div>
-        {zRozmowy.inaczej.length > 0 && <p className="mt-1 text-podpis text-slate-600">
-          Inaczej niż wpisano (zostaje Twoje): {zRozmowy.inaczej.map((p) => `${p.nazwa} „${p.wartosc}"`).join(", ")}.</p>}
-        <p className="mt-1 text-podpis text-slate-500">Wartości dosłownie z rozmowy klienta — sprawdzone przez serwer, wpisane dopiero po kliknięciu.</p>
-        {konflikt && <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-ranga-zle">
-          <AlertTriangle size={13} />{konflikt}</p>}
-      </section>}
-
-      {/* PASOWANIE Z ROZMOWY (etap F, przyrost czwarty). Model nazwał parę
-          SYMBOLAMI z faktów, serwer sprawdził oba końce po kartotekach, które
-          sam położył na stole — tu agent tylko klika. „Zaproponuj" kładzie parę
-          w kolejce wiedzy ze źródłem copilot i JEGO podpisem; rozstrzyga biuro.
-          Zła rola albo pozycja → „Odrzuć" i formularz „Pasuje do…" obok,
-          bo poprawianie propozycji modelu w miejscu byłoby drugim formularzem. */}
-      {!edycja && para && paraOcena !== "odrzucone" && <section aria-label="Pasowanie z rozmowy"
-        className="mb-2 rounded-lg border border-violet-200 bg-violet-50 p-2">
-        <div className="mb-1.5 flex flex-wrap items-center gap-2 text-xs">
-          <b className="text-violet-900"><Sparkles size={12} className="inline" /> Copilot rozpoznał pasowanie</b>
-          {paraOcena === null && <span className="ml-auto flex flex-wrap items-center gap-2">
-            <Przycisk wariant="glowny" className="text-xs" disabled={ocenPasowanie.isPending}
-              onClick={() => ocenPasowanie.mutate({ rozmowaId, ocena: "zaproponowane" })}>Zaproponuj pasowanie</Przycisk>
-            <Przycisk className="text-xs" disabled={ocenPasowanie.isPending}
-              onClick={() => ocenPasowanie.mutate({ rozmowaId, ocena: "odrzucone" })}>Odrzuć</Przycisk>
-          </span>}
-        </div>
-        <div className="flex items-center gap-2">
-          <Kafel twId={para.czesc.twId} rozmiar={40} nazwa={para.czesc.nazwa} symbol={para.czesc.symbol} />
-          <div className="min-w-0 flex-1 text-xs">
-            <div className="flex flex-wrap items-center gap-2">
-              <b className="font-mono">{para.czesc.symbol}</b>
-              <span className="text-slate-500">→</span>
-              <b className="font-mono">{para.doCzego.symbol}</b>
-              <span className="rounded border border-violet-200 bg-white px-1.5 py-0.5 text-podpis">
-                {NAZWA_ROLI[para.rola]}{para.pozycja ? ` · ${para.pozycja}` : ""}</span>
-            </div>
-            <p className="truncate text-slate-600">{para.czesc.nazwa} → {para.doCzego.nazwa}</p>
-          </div>
-          <Kafel twId={para.doCzego.twId} rozmiar={40} nazwa={para.doCzego.nazwa} symbol={para.doCzego.symbol} />
-        </div>
-        {paraOcena === "zaproponowane"
-          ? <p className="mt-1 text-podpis text-emerald-800">
-              Propozycja „{para.czesc.symbol} pasuje do {para.doCzego.symbol}” czeka w kolejce wiedzy — rozstrzyga biuro.</p>
-          : <p className="mt-1 text-podpis text-slate-500">
-              Oba końce to kartoteki z tej rozmowy, sprawdzone przez serwer; do kolejki trafia po kliknięciu,
-              rozstrzyga biuro. Zła rola albo pozycja: Odrzuć i użyj „Pasuje do…” przy wybranym kandydacie.</p>}
-      </section>}
-
-      {!edycja && (wypelnione.length === 0 && Object.keys(dobor.dane.parametry).length === 0
-        ? <p className="text-xs text-slate-500">Nie wiadomo jeszcze, o jaką maszynę i część chodzi.
-            Wpisz, co podał klient — bez tego automat nie ma czego szukać.</p>
-        : <div className="flex flex-wrap gap-1.5">
-            {wypelnione.map((p) => <span key={p.klucz} className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs">
-              <span className="text-slate-500">{p.nazwa}: </span><b>{dobor.dane[p.klucz]}</b></span>)}
-            {Object.entries(dobor.dane.parametry).map(([k, v]) =>
-              <span key={`p-${k}`} className="rounded border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs">
-                <span className="text-slate-500">{k}: </span><b>{v}</b></span>)}
-          </div>)}
-
-      {/* POLE „SILNIK" PRZESTAJE BYĆ SIEROTĄ. Do tego wydania agent je wypełniał,
-          a żaden szczebel go nie czytał. Szczebel „przez silnik" idzie przez
-          ZATWIERDZONĄ zabudowę, więc ekran musi powiedzieć, czy taka jest —
-          inaczej wpisany tekst dalej wygląda na coś, co działa. */}
-      {!edycja && dobor.dane.marka && dobor.dane.model && <p className="mt-1 text-podpis text-slate-500">
-        {silniki.length > 0
-          ? <>Silnik z bazy: <b>{silniki.map((z) => z.silnik.etykieta).join(" · ")}</b>
-            {silniki.length > 1 && " — ta maszyna bywa z kilkoma silnikami, potwierdź z tabliczki"}</>
-          : zPola
-            ? zPola.zabudowa
-              /* Para już czeka: drugi klik dałby 409, więc zamiast przycisku jest zdanie. */
-              ? <>„{dobor.dane.silnik}" to <b>{zPola.alias.silnik.etykieta}</b> (słownik) — para z tą maszyną
-                czeka na rozstrzygnięcie w Wiedza → Silniki.</>
-              : <>„{dobor.dane.silnik}" to <b>{zPola.alias.silnik.etykieta}</b> (słownik). Nikt nie potwierdził,
-                że stoi w {[dobor.dane.marka, dobor.dane.model, dobor.dane.wariant].filter(Boolean).join(" ")}.{" "}
-                <button type="button" className="font-semibold text-violet-800 underline underline-offset-2"
-                  disabled={zaproponujZabudowe.isPending} onClick={zaproponujZPola}>Zaproponuj zabudowę</button>
-                {bladZabudowy && <span className="ml-1 font-semibold text-ranga-zle">{bladZabudowy}</span>}</>
-            : dobor.dane.silnik
-              ? <>„{dobor.dane.silnik}" nie ma w słowniku silników — dopisz go w Wiedza → Silniki,
-                wtedy dobór znajdzie części tego silnika.</>
-              : null}
-      </p>}
-
+      {!edycja && (maszyna || czesc
+        ? <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+            <dt className="text-slate-600">Maszyna</dt><dd className="text-slate-900">{maszyna ?? "nie podano"}</dd>
+            <dt className="text-slate-600">Część</dt><dd className="text-slate-900">{czesc ?? "nie podano"}</dd>
+          </dl>
+        : <p className="text-xs text-slate-600">Nie wiadomo jeszcze, o jaką maszynę i część chodzi.
+            Wpisz, co podał klient — bez tego nie ma czego szukać.</p>)}
       {edycja && <form className="grid grid-cols-2 gap-2" onSubmit={(e) => { e.preventDefault(); zapiszDane(); }}>
-        {POLA.map((p) => <label key={p.klucz} className="text-podpis text-slate-500">{p.nazwa}
+        {POLA.map((p) => <label key={p.klucz} className="text-podpis text-slate-600">{p.nazwa}
           <input className="field mt-0.5 py-1 text-xs" value={formularz[p.klucz]} placeholder={p.przyklad}
-            aria-label={p.nazwa}
-            onChange={(e) => setFormularz({ ...formularz, [p.klucz]: e.target.value })} /></label>)}
-        <label className="col-span-2 text-podpis text-slate-500">Parametry i wymiary (wiersz: nazwa: wartość)
-          <textarea className="field mt-0.5 py-1 text-xs" rows={2} value={formularz.parametry}
-            aria-label="Parametry" placeholder={"rozstaw: 82 mm\nśrednica: 148 mm"}
-            onChange={(e) => setFormularz({ ...formularz, parametry: e.target.value })} /></label>
-        {konflikt && <p className="col-span-2 flex items-center gap-1 text-xs font-semibold text-ranga-zle">
-          <AlertTriangle size={13} />{konflikt}</p>}
+            aria-label={p.nazwa} onChange={(e) => setFormularz({ ...formularz, [p.klucz]: e.target.value })} /></label>)}
+        {zmianaMaszyny && <p className="col-span-2 text-xs text-slate-700">
+          Zmiana maszyny zdejmie wybraną część {dobor.wybrany?.symbol} — wybór dotyczył innej maszyny.</p>}
+        {konflikt && <Ostrzezenie className="col-span-2">{konflikt}</Ostrzezenie>}
         <div className="col-span-2 flex gap-2">
-          {/* Zdaniem, nie WERSALIKAMI (0.517.0) — jak reszta przycisków zakładki. */}
           <Przycisk wariant="glowny" type="submit" disabled={zapisz.isPending}>Zapisz</Przycisk>
           <Przycisk type="button" onClick={() => { setEdycja(false); setKonflikt(""); }}>Anuluj</Przycisk>
         </div>
       </form>}
     </section>
 
-    {/* ── Kandydaci (§11.2) ──────────────────────────────────────────────── */}
-    <section className="border-b p-3" aria-label="Kandydaci">
-      <NaglowekSekcji>Kandydaci</NaglowekSekcji>
-      {kandydaci.data && <Szczeble drogi={kandydaci.data.drogi} />}
-      {kandydaci.isLoading && <p className="mt-2 text-xs text-slate-500">Szukam…</p>}
-      {kandydaci.error && <p className="mt-2 text-xs text-red-700">{(kandydaci.error as Error).message}</p>}
-      {kandydaci.data && kandydaci.data.kandydaci.length === 0 &&
-        <CzegoBrakuje drogi={kandydaci.data.drogi}
-          onDane={() => { setFormularz(naFormularz(dobor.dane)); setKonflikt(""); setEdycja(true); }}
-          onZabudowa={zPola ? zaproponujZPola : null}
-          trwa={zaproponujZabudowe.isPending} />}
-      {/* ── SŁABE TRAFIENIA ZWINIĘTE (23 września 2026) ─────────────────────
-          Zrzut właściciela: przy noża do kosiarki lista niosła rękojeść noża,
-          nóż wertykulatora i nóż Boscha — każdy w pełnej karcie z zieloną
-          „Wybierz". „Wymaga danych" znaczy trafienie po samym tekście, bez
-          dowodu. Gdy jest choć jeden mocniejszy kandydat, słabe schodzą pod
-          jedno rozwinięcie: nie znikają (§4.3), ale nie kosztują uwagi.
-          Wybrany zostaje na wierzchu zawsze, choćby był słaby.
+    <div className="p-3">
+      {dobor.wynik === null && <>
+        {kandydaci.isLoading && <p className="text-xs text-slate-600">Szukam…</p>}
+        {kandydaci.error && <p className="text-xs text-ranga-zle">{(kandydaci.error as Error).message}</p>}
+        {kandydaci.data && <Kandydaci dane={kandydaci.data} trwa={wynik.isPending} onPopraw={otworzFormularz}
+          onWybierz={(k) => ustaw("czesc", { twId: k.twId, podstawa: k.grupa })} />}
 
-          WYJĄTEK: wpis z bazy wiedzy z WARUNKIEM, którego dobór nie umie
-          sprawdzić („roczniki 2014–2018", a rocznika brak). Ma dowód, brakuje
-          mu tylko tabliczki klienta — zwinięty pod „bez dowodu" mówiłby
-          nieprawdę i chował jedyną właściwą część. Rozróżnia go DROGA, nie
-          zdanie: drogi wiedzy „wymaga danych" dają wyłącznie przez warunek. */}
-      {(() => {
-        const lista = kandydaci.data?.kandydaci ?? [];
-        const mocny = (k: KandydatDoboru) => k.pewnosc !== "wymaga_danych"
-          || k.droga === "zastosowanie" || k.droga === "silnik"
-          || (k.twId !== null && dobor.wybrany?.twId === k.twId);
-        const zwijaj = lista.some((k) => k.pewnosc !== "wymaga_danych");
-        const wierzch = zwijaj ? lista.filter(mocny) : lista;
-        const spod = zwijaj ? lista.filter((k) => !mocny(k)) : [];
-        return <>
-          <ul className="mt-2 space-y-2">{wierzch.map(kartaKandydata)}</ul>
-          {spod.length > 0 && <details className="mt-2">
-            <summary className="cursor-pointer text-xs font-semibold text-slate-600 hover:text-slate-900">
-              Słabsze trafienia ({spod.length}) — bez dowodu, wymagają danych</summary>
-            <ul className="mt-2 space-y-2">{spod.map(kartaKandydata)}</ul>
-          </details>}
-        </>;
-      })()}
-      {kandydaci.data && kandydaci.data.negatywne.length > 0 &&
-        <Negatywne lista={kandydaci.data.negatywne} />}
-      {/* Wyszukiwarka klikana ręcznie NIE jest kandydatem — to od razu wybór
-          z drogą `wyszukiwarka`, podpisany agentem. */}
-      {szukam
-        ? <div className="mt-2"><Wyszukiwarka wybrany={null} etykieta="Wskazana przez Ciebie"
-            onWybierz={(t) => t && wybierzTowar(t.id, "wyszukiwarka")} /></div>
-        : <button type="button" onClick={() => setSzukam(true)}
-            className="mt-2 inline-flex items-center gap-1 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
-            <Search size={12} />wskaż kartotekę z wyszukiwarki</button>}
-    </section>
+        {/* Cztery odpowiedzi w jednym rzędzie pod listą: trzy bez kandydata
+            i wyszukiwarka, gdy lista nie ma właściwej części. */}
+        <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+          <Przycisk className="text-xs" disabled={wynik.isPending} onClick={() => ustaw("brak")}>Nie mamy</Przycisk>
+          <Przycisk className="text-xs" aria-expanded={dopytuje} onClick={() => setDopytuje((d) => !d)}>
+            <MessageCircleQuestion size={14} aria-hidden />Dopytaj o…</Przycisk>
+          <Przycisk className="text-xs" disabled={wynik.isPending} onClick={() => ustaw("nie_dotyczy")}>Nie dotyczy</Przycisk>
+          <button type="button" onClick={() => setSzukam((s) => !s)} aria-expanded={szukam}
+            className="ml-auto inline-flex min-h-6 items-center gap-1 text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900">
+            <Search size={12} aria-hidden />wskaż z wyszukiwarki</button>
+        </div>
+        {dopytuje && <form className="mt-2 flex flex-wrap items-center gap-2"
+          onSubmit={(e) => { e.preventDefault(); if (dopytac.trim()) ustaw("dopytac", { dopytac: dopytac.trim() }); }}>
+          <input className="field min-w-0 flex-1 py-1 text-xs" aria-label="O co dopytać klienta" value={dopytac}
+            placeholder="np. pełny numer seryjny z tabliczki" onChange={(e) => setDopytac(e.target.value)} />
+          <Przycisk className="text-xs" type="submit" disabled={wynik.isPending || !dopytac.trim()}>Zapisz</Przycisk>
+        </form>}
+        {/* Wskazanie z wyszukiwarki NIE jest kandydatem — to od razu wybór
+            z podstawą `reczny`, podpisany agentem. */}
+        {szukam && <div className="mt-2"><Wyszukiwarka wybrany={null} etykieta="Wskazana przez Ciebie"
+          onWybierz={(t) => t && ustaw("czesc", { twId: t.id, podstawa: "reczny" })} /></div>}
+      </>}
 
-    {/* ── Wybrano ────────────────────────────────────────────────────────── */}
-    <section className="p-3" aria-label="Wybrano">
-      {dobor.wybrany
-        ? <>
-            {/* ── WNIOSEK MA WYGLĄDAĆ NA WNIOSEK (0.203.0) ─────────────────
-                Sekcja stała gołym tekstem pod listą kandydatów, w tym samym
-                rozmiarze co ich podpisy — a to jest jedyna rzecz na tej
-                zakładce, która trafi do klienta. Rama z barwą stanu oddziela
-                to, co WYBRANO, od tego, co dopiero można wybrać, i mówi bez
-                czytania, czy dobór jest już zatwierdzony.
-
-                Zdjęcie stoi tu drugi raz, choć widać je wyżej przy
-                kandydacie. Nie jest powtórzeniem: przy kandydacie odpowiada
-                na pytanie „którego wybrać", a tutaj — „czy na pewno ten
-                pojechał do odpowiedzi". Lista kandydatów bywa przewinięta
-                poza ekran, gdy agent pisze szkic. */}
-            <div className={`rounded-lg border p-2 ${dobor.status === "confirmed"
-              ? "border-emerald-300 bg-emerald-50" : "border-wertis-amber bg-amber-50"}`}>
-              <div className="flex gap-3">
-                <Kafel twId={dobor.wybrany.twId} rozmiar={56}
-                  nazwa={dobor.wybrany.symbol} symbol={dobor.wybrany.symbol} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs text-slate-500">Wybrano: <b className="font-mono text-sm text-slate-900">{dobor.wybrany.symbol}</b>
-                    {" "}· droga: {NAZWA_DROGI[dobor.wybrany.droga]} · {dobor.wybrany.przez}
-                    <button type="button" title="Zdejmij wybór" disabled={wybierz.isPending}
-                      onClick={() => wybierzTowar(null, dobor.wybrany!.droga)}
-                      className="ml-1 rounded p-0.5 align-middle text-slate-400 hover:bg-slate-200 hover:text-slate-700">
-                      <Krzyzyk size={12} /></button></p>
-                  <p className="mt-1 rounded border border-slate-200 bg-white p-2 text-xs italic text-slate-700">
-                    {dobor.wybrany.zdanieDoSzkicu}</p>
-                </div>
-              </div>
+      {dobor.wynik === "czesc" && dobor.wybrany && <>
+        {/* Wniosek ma wyglądać na wniosek: rama oddziela to, co pojedzie do
+            klienta, od reszty zakładki. Zdjęcie stoi tu, bo odpowiada na
+            pytanie „czy na pewno ten", gdy lista jest już schowana. */}
+        <div className="rounded-lg border border-emerald-300 bg-emerald-50 p-2">
+          <div className="flex items-start gap-3">
+            <Kafel twId={dobor.wybrany.twId} rozmiar={56} nazwa={dobor.wybrany.symbol} symbol={dobor.wybrany.symbol} />
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-slate-700">Wybrano <b className="font-mono text-sm text-slate-900">{dobor.wybrany.symbol}</b>
+                {" "}· {NAZWA_PODSTAWY[dobor.wybrany.podstawa] ?? dobor.wybrany.podstawa}</p>
+              <p className="mt-1 rounded border border-slate-200 bg-white p-2 text-xs italic text-slate-700">
+                {dobor.wybrany.zdanieDoSzkicu}</p>
             </div>
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Przycisk className="text-xs" onClick={() => onZlecPomiar({
-                id: dobor.wybrany!.twId, sym: dobor.wybrany!.symbol, name: dobor.wybrany!.symbol, locs: [] })}>
-                <Ruler size={14} />Zleć pomiar</Przycisk>
-              <Przycisk className="text-xs" onClick={() => onWstawDoSzkicu(dobor.wybrany!.zdanieDoSzkicu)}>
-                <FileText size={14} />Wstaw do szkicu ze źródłem</Przycisk>
-              {dobor.status !== "confirmed" && <Przycisk wariant="glowny" className="text-xs"
-                disabled={status.isPending} onClick={() => ustawStatus("confirmed", null, doSilnika)}>
-                <Check size={14} />Zatwierdź dobór</Przycisk>}
-            </div>
-            {/* DO MASZYNY CZY DO SILNIKA — bez tego wyboru baza silnikowa nie
-                urosłaby nigdy, bo zatwierdzenie zawsze zapisywało maszynę.
-                Opcja silnikowa pojawia się WYŁĄCZNIE przy zatwierdzonej
-                zabudowie: wybór z ekranu nie ma udawać faktu, którego w bazie
-                nie ma. Część silnikowa zapisana raz przy jednej kosiarce
-                odpowiada odtąd na pytania o wszystkie maszyny z tym silnikiem. */}
-            {(() => {
-              const kotwice = (kandydaci.data?.kotwice ?? []).filter((k) => k.twId !== dobor.wybrany!.twId);
-              const cel = kotwice.find((k) => k.twId === pasujeDo);
-              if (kotwice.length === 0) return null;
-              return <div className="mt-2">
-                {!cel && <div className="flex flex-wrap items-center gap-1 text-podpis text-slate-600">
-                  <span>pasowanie:</span>
-                  {kotwice.map((k) => <Przycisk key={k.twId} className="text-xs" onClick={() => { setPasujeDo(k.twId); setPasowanieOk(""); }}>
-                    Pasuje do {k.symbol}</Przycisk>)}
-                  {pasowanieOk && <span className="text-emerald-800">{pasowanieOk}</span>}
-                </div>}
-                {cel && <PasowanieForm
-                  para={{ czesc: { twId: dobor.wybrany!.twId, symbol: dobor.wybrany!.symbol, nazwa: dobor.wybrany!.symbol }, doCzego: cel }}
-                  conversationId={rozmowaId} trwa={zaproponujPasowanie.isPending}
-                  blad={(zaproponujPasowanie.error as Error | null)?.message}
-                  onAnuluj={() => setPasujeDo(null)}
-                  onWyslij={(v) => zaproponujPasowanie.mutate(v, {
-                    onSuccess: () => { setPasujeDo(null); setPasowanieOk(`Propozycja „${dobor.wybrany!.symbol} pasuje do ${cel.symbol}” czeka w kolejce wiedzy.`); },
-                  })} />}
-              </div>;
-            })()}
-            {dobor.status !== "confirmed" && silniki.length > 0 &&
-              <fieldset className="mt-2 flex flex-wrap items-center gap-3 text-podpis text-slate-600">
-                <legend className="sr-only">Gdzie zapisać zastosowanie</legend>
-                <span>zastosowanie zapisz do:</span>
-                <label className="flex items-center gap-1">
-                  <input type="radio" name="doCzego" checked={doSilnika === null}
-                    onChange={() => setDoSilnika(null)} />
-                  maszyny {[dobor.dane.marka, dobor.dane.model].filter(Boolean).join(" ")}</label>
-                {silniki.map((z) => <label key={z.id} className="flex items-center gap-1">
-                  <input type="radio" name="doCzego" checked={doSilnika === z.silnik.id}
-                    onChange={() => setDoSilnika(z.silnik.id)} />
-                  {z.silnik.etykieta}</label>)}
-              </fieldset>}
-          </>
-        : <p className="text-xs text-slate-500">Nic jeszcze nie wybrano. Zatwierdzenie doboru wymaga
-            wybranej kartoteki.</p>}
-      {blad && <p className="mt-2 text-xs text-red-700">{blad.message}</p>}
-    </section>
+          </div>
+        </div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Przycisk wariant="glowny" className="text-xs" onClick={() => onWstawDoSzkicu(dobor.wybrany!.zdanieDoSzkicu)}>
+            <FileText size={14} aria-hidden />Wstaw do odpowiedzi</Przycisk>
+          <Przycisk className="text-xs" onClick={() => onZlecPomiar({
+            id: dobor.wybrany!.twId, sym: dobor.wybrany!.symbol, name: dobor.wybrany!.symbol, locs: [] })}>
+            <Ruler size={14} aria-hidden />Zleć pomiar</Przycisk>
+          <Przycisk className="text-xs" disabled={wynik.isPending} onClick={() => ustaw(null)}>Zmień</Przycisk>
+        </div>
+      </>}
 
+      {dobor.wynik === "dopytac" && <>
+        <div className="rounded-lg border border-red-200 bg-red-50 p-2 text-xs text-red-900">
+          Dopytać klienta o: <b>{dobor.dopytac}</b></div>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {/* Pytanie idzie do szkicu na kliknięcie, nigdy samo. */}
+          <Przycisk wariant="glowny" className="text-xs"
+            onClick={() => onWstawDoSzkicu(`Proszę o ${dobor.dopytac} — wtedy dobiorę właściwą część.`)}>
+            <FileText size={14} aria-hidden />Wstaw pytanie do odpowiedzi</Przycisk>
+          <Przycisk className="text-xs" disabled={wynik.isPending} onClick={() => ustaw(null)}>Zmień</Przycisk>
+        </div>
+      </>}
+
+      {(dobor.wynik === "brak" || dobor.wynik === "nie_dotyczy") && <div className="flex flex-wrap items-center gap-2">
+        <p className="min-w-0 flex-1 text-xs text-slate-700">{dobor.wynik === "brak"
+          ? "Nie mamy tej części. „Nie” jest tu odpowiedzią, nie porażką."
+          : "Ta rozmowa nie jest pytaniem o dobór części."}</p>
+        <Przycisk className="text-xs" disabled={wynik.isPending} onClick={() => ustaw(null)}>Otwórz ponownie</Przycisk>
+      </div>}
+
+      {!edycja && konflikt && <Ostrzezenie className="mt-2">{konflikt}</Ostrzezenie>}
+      {blad && <p className="mt-2 text-xs text-ranga-zle">{blad.message}</p>}
+    </div>
   </div>;
 }
 
+function Ostrzezenie({ className = "", children }: { className?: string; children: React.ReactNode }) {
+  return <p role="alert" className={`flex items-center gap-1 text-xs font-semibold text-ranga-zle ${className}`}>
+    <AlertTriangle size={13} aria-hidden className="shrink-0" />{children}</p>;
+}
+
 /**
- * Negatywne dopasowania (§11.4). Sekcja OSOBNA od kandydatów, bo negatyw
- * dotyczy także kartoteki, której na liście nie ma — to ostrzeżenie, nie
- * brak danych, i nie usuwa go automat (§14.2).
+ * Kandydaci w trzech grupach (§4.3): co klient wskazał, co wiedza potwierdza,
+ * co jest podobne. „Podobne po nazwie" to trafienia bez dowodu, więc stoją
+ * zwinięte, gdy jest coś mocniejszego. Nie znikają, ale nie kosztują uwagi.
+ * Jako jedyna niepusta grupa stoją otwarte, bo zwinięcie schowałoby wszystko.
  */
-function Negatywne({ lista }: { lista: NegatywDoboru[] }) {
-  return <div className="mt-3 rounded-lg border border-red-200" aria-label="Negatywne dopasowania">
+function Kandydaci({ dane, trwa, onWybierz, onPopraw }: {
+  dane: KandydaciDoboru; trwa: boolean;
+  onWybierz: (k: KandydatDoboru) => void; onPopraw: () => void;
+}) {
+  const wGrupie = (g: GrupaKandydata) => dane.kandydaci.filter((k) => k.grupa === g);
+  const niepuste = GRUPY.filter((g) => wGrupie(g).length > 0 || (g === "numer" && dane.bezKartoteki.length > 0));
+  const lista = (g: GrupaKandydata) => <ul className="mt-1.5 space-y-2">
+    {wGrupie(g).map((k) => <Kandydat key={k.twId} k={k} trwa={trwa} onWybierz={() => onWybierz(k)} />)}
+    {/* Numer bez kartoteki nie znika, bo „nie mamy" też jest odpowiedzią.
+        Nie ma przycisku: nie ma czego wybrać. */}
+    {g === "numer" && dane.bezKartoteki.map((b) => <li key={b.numer}
+      className="rounded-lg border border-dashed border-slate-300 p-2 text-xs text-slate-700">
+      <b className="font-mono">{b.numer}</b> · {b.zdanie}</li>)}
+  </ul>;
+
+  return <>
+    {niepuste.length === 0 && <div aria-label="Czego brakuje do doboru">
+      {dane.brakuje.length > 0
+        ? <><p className="text-xs font-semibold text-slate-700">Nic nie znaleziono. Brakuje:</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-slate-700">
+              {dane.brakuje.map((z) => <li key={z}>{z}</li>)}</ul></>
+        : <p className="text-xs text-slate-700">Sprawdzono wszystkie źródła i nic nie pasuje.</p>}
+      <Przycisk className="mt-2 text-xs" onClick={onPopraw}><Pencil size={12} aria-hidden />Popraw dane</Przycisk>
+    </div>}
+    {niepuste.map((g) => g === "podobne" && niepuste.length > 1
+      ? <details key={g} className="mt-3">
+          <summary className="min-h-6 cursor-pointer text-xs font-semibold text-slate-700 hover:text-slate-900">
+            {NAZWA_GRUPY[g]} ({wGrupie(g).length})</summary>
+          {lista(g)}
+        </details>
+      : <section key={g} className="mt-3 first:mt-0" aria-label={NAZWA_GRUPY[g]}>
+          <NaglowekSekcji jako="h3">{NAZWA_GRUPY[g]}</NaglowekSekcji>
+          {lista(g)}
+        </section>)}
+    {dane.negatywne.length > 0 && <Negatywne lista={dane.negatywne} />}
+  </>;
+}
+
+function Kandydat({ k, trwa, onWybierz }: { k: KandydatDoboru; trwa: boolean; onWybierz: () => void }) {
+  return <li className="rounded-lg border border-slate-200 p-2">
+    {/* CO CZYTA SIĘ PIERWSZE. Dobór rozstrzyga „czy TO jest ta część", a na
+        to odpowiada kształt i nazwa. Zdjęcie idzie więc na lewo, nazwa
+        dostaje pierwszy plan, symbol i pewność schodzą do podpisu. Symbol
+        zostaje, bo to on jedzie na dokument i na halę.
+
+        `items-start`: kafle stoją w JEDNEJ pionowej linii, bo wzrok jedzie
+        po nich w dół. Wyśrodkowane skakałyby z długością nazwy. */}
+    <div className="flex items-start gap-2">
+      <Kafel twId={k.twId} rozmiar={56} nazwa={k.nazwa} symbol={k.symbol} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-start gap-2">
+          <b className="min-w-0 flex-1 text-tresc text-slate-900">{k.nazwa}</b>
+          {/* DOSTĘPNOŚĆ MA BARWĘ W OBIE STRONY: „mamy 28 sztuk" kończy
+              rozmowę jednym zdaniem, a zero każe szukać dalej. */}
+          {k.stan === null
+            ? <span className="shrink-0 text-podpis font-bold text-slate-600">brak stanu</span>
+            : <span className={`shrink-0 text-podpis font-bold ${k.stan <= 0 ? "text-ranga-zle" : "text-emerald-700"}`}>
+                dostępne {k.stan}</span>}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-1.5">
+          <span className="font-mono text-xs text-slate-600">{k.symbol}</span>
+          <span className={`rounded px-1.5 py-0.5 text-podpis font-bold ${PEWNOSC[k.pewnosc].klasa}`}>
+            {PEWNOSC[k.pewnosc].etykieta}</span>
+        </div>
+        {/* Powód jednym wierszem; inne źródła tej kartoteki w dymku, bo przy
+            każdym wierszu czytane przestałyby być trzecim planem. */}
+        <p className="mt-0.5 truncate text-podpis text-slate-600"
+          title={k.takze.length ? [k.powod, ...k.takze].join("\n") : k.powod}>
+          {k.powod}{k.takze.length > 0 && <span className="font-semibold"> · +{k.takze.length} źródła</span>}</p>
+      </div>
+      {/* OBRYS, NIE PEŁNA ZIELEŃ: kilka pełnych przycisków jeden pod drugim
+          byłoby najgłośniejszą rzeczą w kolumnie, a to ruch dostępny, nie zalecany. */}
+      <button type="button" disabled={trwa} onClick={onWybierz}
+        className="min-h-6 shrink-0 rounded border border-emerald-600 px-2 py-0.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
+        Wybierz</button>
+    </div>
+    {k.ostrzezenia.map((o) => <p key={o} className="mt-1 flex items-center gap-1 rounded border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-podpis text-amber-900">
+      <AlertTriangle size={12} aria-hidden className="shrink-0" />{o}</p>)}
+  </li>;
+}
+
+/**
+ * „Nie pasuje". Sekcja OSOBNA od kandydatów, bo negatyw dotyczy także
+ * kartoteki, której na liście nie ma: to ostrzeżenie, nie brak danych.
+ * Kafel jest mniejszy niż przy kandydacie, żeby nie konkurował z częściami,
+ * które wolno wybrać.
+ */
+function Negatywne({ lista }: { lista: KandydaciDoboru["negatywne"] }) {
+  return <section className="mt-3 rounded-lg border border-red-200" aria-label="Nie pasuje">
     <p className="flex items-center gap-1 rounded-t-lg bg-red-50 px-2 py-1 text-podpis font-bold text-red-900">
-      {/* „Nie pasuje", nie „do tej maszyny": negatyw pasowania dotyczy części klienta. */}
-      <AlertTriangle size={12} />Nie pasuje
-      <span className="font-normal text-red-800">· ostrzeżenie, nie brak danych</span></p>
-    {/* Kafel jest MNIEJSZY niż przy kandydacie i to jest celowe: negatyw ma
-        się rzucić w oczy, gdy agent pojedzie wzrokiem po liście, ale nie ma
-        konkurować z częściami, które wolno wybrać. */}
+      <AlertTriangle size={12} aria-hidden />Nie pasuje</p>
     <ul className="divide-y divide-red-100">
       {lista.map((n) => <li key={n.twId} className="flex items-start gap-2 px-2 py-1.5 text-xs">
         <Kafel twId={n.twId} rozmiar={36} nazwa={n.nazwa ?? n.symbol} symbol={n.symbol} />
         <div className="min-w-0 flex-1">
           <b className="font-mono">{n.symbol}</b>{n.nazwa && <span className="text-slate-600"> · {n.nazwa}</span>}
           <p className="text-red-900">{n.powod}</p>
-          <p className="text-podpis text-slate-500">{n.zrodlo}</p>
+          <p className="text-podpis text-slate-600">{n.zrodlo}</p>
         </div>
       </li>)}
     </ul>
-  </div>;
-}
-
-/**
- * Pasek szczebli §11.2. Szczebel POMINIĘTY mówi dlaczego — blizna 0.153.1:
- * milczący ekran każe zgadywać, czy automat szukał i nie znalazł, czy nie
- * miał czego szukać.
- */
-/**
- * CZEGO BRAKUJE — powody pominięcia jako WIDOCZNY tekst, z przyciskiem (0.267.0).
- *
- * Do 0.266.0 stał tu jeden ogólnik: „Żadna sprawdzona droga nic nie dała.
- * Uzupełnij dane wejściowe albo wskaż kartotekę z wyszukiwarki". Tymczasem
- * serwis produkuje zdania konkretne — „nie wiadomo, jaki silnik stoi w NAC
- * LS 46-450", „parametry nie mają wymiaru z jednostką" — i wsadzał je
- * wyłącznie w `title` czipa. Jedenaście czipów, jedenaście tooltipów.
- *
- * TYLKO PRZY PUSTEJ LIŚCIE. Wypisywanie jedenastu powodów, gdy kandydaci są,
- * byłoby hałasem; zdanie jest warte miejsca dokładnie wtedy, gdy agent utknął.
- *
- * AKTYWNE PIERWSZE. Szczeble z przyciskiem stoją na górze, bo to one prowadzą
- * o krok dalej. Reszta zostaje tekstem — i to jest treść, nie niedoróbka:
- * przycisk, który nie pomaga, uczy klikania w nic.
- *
- * Czipy `Szczeble` zostają nietknięte nad listą. Są przeglądem gęstości
- * („jedenaście dróg, dwie sprawdzone"), a to inne pytanie niż „co teraz zrobić".
- */
-function CzegoBrakuje({ drogi, onDane, onZabudowa, trwa }: {
-  drogi: SzczebelDoboru[];
-  onDane: () => void;
-  /** `null`, gdy w polu Silnik nie ma nic, co da się zaproponować jednym kliknięciem. */
-  onZabudowa: (() => void) | null;
-  trwa: boolean;
-}) {
-  const pominiete = drogi.filter((d) => !d.sprawdzona && d.powod);
-  if (pominiete.length === 0) {
-    return <p className="mt-2 text-xs text-slate-500">Żadna sprawdzona droga nic nie dała
-      — wskaż kartotekę z wyszukiwarki.</p>;
-  }
-  const uchwyt = (d: SzczebelDoboru) => {
-    if (d.akcja?.rodzaj === "dane" || d.akcja?.rodzaj === "wymiar") return onDane;
-    if (d.akcja?.rodzaj === "zabudowa") return onZabudowa;
-    return null;
-  };
-  const zAkcja = pominiete.filter((d) => uchwyt(d));
-  const bezAkcji = pominiete.filter((d) => !uchwyt(d));
-  return <div className="mt-2" aria-label="Czego brakuje do doboru">
-    <p className="text-xs font-semibold text-slate-700">Żadna sprawdzona droga nic nie dała. Brakuje:</p>
-    <ul className="mt-1 space-y-1">
-      {[...zAkcja, ...bezAkcji].map((d) => {
-        const klik = uchwyt(d);
-        return <li key={d.droga} className="flex flex-wrap items-baseline gap-x-2 text-xs text-slate-600">
-          <span className="font-semibold text-slate-500">{NAZWA_DROGI[d.droga]}:</span>
-          <span className="flex-1">{d.powod}</span>
-          {klik && d.akcja && <button type="button" disabled={trwa} onClick={klik}
-            className="rounded border border-slate-300 px-1.5 py-0.5 font-semibold
-              text-slate-700 hover:border-slate-500 disabled:opacity-50">
-            {d.akcja.etykieta}</button>}
-        </li>;
-      })}
-    </ul>
-  </div>;
-}
-
-/**
- * Drogi doboru: na wierzchu tylko te, które coś dały (23 września 2026).
- *
- * Zrzut właściciela: jedenaście pigułek nad kandydatami, sześć z nich
- * przekreślonych, trzy z zerem. Pytanie agenta brzmi „skąd ci kandydaci",
- * a odpowiadają na nie drogi z wynikiem. Reszta — zero i pominięte z powodem
- * — stoi pod jednym rozwinięciem, bo przydaje się dopiero, gdy kandydatów
- * brak. Wtedy i tak mówi o nich „Czego brakuje" niżej.
- */
-function Szczeble({ drogi }: { drogi: SzczebelDoboru[] }) {
-  const pigulka = (d: SzczebelDoboru) => <span key={d.droga}
-    title={d.sprawdzona ? `${d.wynikow} wyników` : `pominięty: ${d.powod ?? ""}`}
-    className={`rounded px-1.5 py-0.5 text-podpis font-semibold ${d.sprawdzona
-      ? "bg-slate-200 text-slate-700" : "bg-slate-50 text-slate-500 line-through"}`}>
-    {NAZWA_DROGI[d.droga]}{d.sprawdzona ? ` ${d.wynikow}` : ""}</span>;
-  const [wszystkie, setWszystkie] = useState(false);
-  const dalo = drogi.filter((d) => d.sprawdzona && d.wynikow > 0);
-  const reszta = drogi.filter((d) => !(d.sprawdzona && d.wynikow > 0));
-  return <div className="mt-1 flex flex-wrap items-center gap-1" aria-label="Sprawdzone drogi">
-    {dalo.map(pigulka)}
-    {reszta.length > 0 && <button type="button" aria-expanded={wszystkie}
-      onClick={() => setWszystkie((w) => !w)}
-      className="rounded px-1.5 py-0.5 text-podpis text-slate-500 underline-offset-2 hover:text-slate-800 hover:underline">
-      {wszystkie ? "zwiń" : `+${reszta.length} bez wyniku`}</button>}
-    {/* `hidden`, nie brak w drzewie: powód pominięcia stoi w dymku pigułki
-        i ma być pod ręką od razu po rozwinięciu. Klasa idzie razem
-        z atrybutem, bo `flex` z Tailwinda przebija `[hidden]` przeglądarki. */}
-    <div hidden={!wszystkie} className={wszystkie ? "flex w-full flex-wrap gap-1" : "hidden"}>
-      {reszta.map(pigulka)}</div>
-  </div>;
+  </section>;
 }

@@ -32,8 +32,6 @@ export interface PropsSzkicuCopilota {
   nieswiezy: boolean;
   /** Bieżąca wersja doboru; inna niż w szkicu = fakty się zmieniły od szkicu. `null` = nieznana. */
   doborWersja: number | null;
-  /** Nazwy pól doboru, które Copilot rozpoznał w rozmowie, a agent jeszcze nie ma (liczy `propozycjaDoboru`). */
-  nowePolaDoboru: string[];
   /** Para „X → Y" rozpoznana w rozmowie, jeszcze bez decyzji agenta (liczy `paraPasowania`). */
   paraPasowania: string | null;
   uklada: boolean;
@@ -123,7 +121,7 @@ export function szkicNaStartRozmowy(dane: OsRozmowy, mojeId: number | null): str
   return szkicNaStart({
     stan: undefined, szkic: dane.szkicCopilota,
     nieswiezy: (dane.szkicCopilota?.messageId ?? null) !== ostatniaKlienta,
-    doborWersja: dane.dobor.wersja, nowePolaDoboru: [], paraPasowania: null,
+    doborWersja: dane.dobor.wersja, paraPasowania: null,
     uklada: false, blad: "", maSzkicAgenta: false,
     wylaczony: wl != null && wl !== mojeId,
     onUloz: () => {}, onPopraw: () => {}, onOdrzuc: () => {},
@@ -242,7 +240,6 @@ export function UwagiSzkicu({ uwagi }: { uwagi: string[] }) {
 function przyOkazji(p: PropsSzkicuCopilota, s: SzkicCopilota): string[] {
   const l = s.lukiKartoteki;
   return [
-    p.nowePolaDoboru.length > 0 && "dane doboru",
     !!p.paraPasowania && "pasowanie",
     l.numery.length > 0 && "numery w kartotece",
     (l.wpisane.length > 0 || l.modele.length > 0 || l.czeka > 0) && "wiedza",
@@ -317,7 +314,7 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
 
           ── ZWINIĘTY DO JEDNEJ LINII (0.517.0) ────────────────────────────
           Pasek bywał sześcioma zdaniami pod każdym szkicem, a żadne nie
-          prosi o ruch: dane weszły same, pasowanie czeka w Doborze, wiedza
+          prosi o ruch: dane weszły same, pasowanie czeka w wierszu Wiedza, wiedza
           w swojej kolejce. Zwinięty mówi, CZEGO dotyczy, a treść stoi
           o jedno kliknięcie. Ostrzeżenia modelu stoją niżej, rozwinięte. */}
       {tematy.length > 0 &&
@@ -326,12 +323,8 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
           <summary className="cursor-pointer">
             <b className="text-sky-950">Przy okazji:</b> {tematy.join(", ")}</summary>
           <p className="mt-1">
-          {p.nowePolaDoboru.length > 0 && <>
-            Do doboru wpisano: <b>{p.nowePolaDoboru.join(", ")}</b> (popraw w Doborze po prawej,
-            jeśli się myli).{" "}
-          </>}
           {p.paraPasowania && <>
-            Rozpoznane pasowanie <b>{p.paraPasowania}</b> — zaproponuj je w Doborze po prawej.{" "}
+            Rozpoznane pasowanie <b>{p.paraPasowania}</b> — zaproponuj je w wierszu Wiedza po prawej.{" "}
           </>}
           {s.lukiKartoteki.numery.length > 0 && <>
             Z oferty do kartoteki {s.lukiKartoteki.symbol}:{" "}
