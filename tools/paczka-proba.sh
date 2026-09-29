@@ -56,4 +56,14 @@ timeout 5 node server/dist/worker/worker.js > "$ROB/worker.log" 2>&1 || [ $? -eq
 npm --prefix server run --silent reconcile > "$ROB/reconcile.log" 2>&1 \
   || { cat "$ROB/reconcile.log" >&2; echo "rekoncyliacja z paczki padła" >&2; exit 1; }
 
-echo "Paczka $WERSJA działa bez repo: API, panel, worker i wsad."
+# Narzędzie do anonimizacji kopii bazy (DEPLOY §7) na kopii zrobionej tak jak
+# serwer: `VACUUM INTO`. Jeśli paczka go nie niesie albo padnie bez repo, wyjdzie to
+# tu, a nie u właściciela, który uruchomi je na prawdziwej bazie.
+[ -f "$P/tools/anonimizuj-baze.mjs" ] || { echo "Paczka nie ma tools/anonimizuj-baze.mjs." >&2; exit 1; }
+node -e "new (require('node:sqlite').DatabaseSync)(process.argv[1]).prepare('VACUUM INTO ?').run(process.argv[2])" \
+  "$DB_PATH" "$ROB/kopia.db" 2>/dev/null
+node tools/anonimizuj-baze.mjs "$ROB/kopia.db" "$ROB/anonim.db" > "$ROB/anonim.log" 2>&1 \
+  || { cat "$ROB/anonim.log" >&2; echo "narzędzie do anonimizacji z paczki padło" >&2; exit 1; }
+[ -s "$ROB/anonim.db" ] || { echo "narzędzie do anonimizacji nie zostawiło wyniku" >&2; exit 1; }
+
+echo "Paczka $WERSJA działa bez repo: API, panel, worker, wsad i anonimizacja kopii."

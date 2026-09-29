@@ -29,6 +29,23 @@ const schema = fs.readFileSync(new URL("./schema.sql", import.meta.url), "utf8")
 const UUID_ZAM = "4e3b1f20-1111-4222-8333-000000000001";
 const UUID_ZAM2 = "4e3b1f20-1111-4222-8333-000000000002";
 
+/** Surowy JSON zamówienia w kształcie, w jakim leży w lądowisku po `oczyscSurowy`. */
+const SUROWY_ZAMOWIENIA = {
+  id: UUID_ZAM,
+  buyer: { id: "23123123", login: "OGRODNIK_77", email: "[usunięte przy pobraniu]", numer: 501234567 },
+  delivery: { address: { city: "GDANSK", zipCode: "50-123" }, method: { name: "Kurier DPD" } },
+  parcels: [{ waybill: "605500000123" }],
+  orderNote: "Jan Kowalczyk płaci gotówką",
+  statusDetail: "ul.Lipowa12",
+  orderBuyerLogin: "ogrodnik_77",
+  orderId: "abc-123",
+  checkoutFormId: UUID_ZAM2,
+  status: "READY_FOR_PROCESSING",
+  createdAt: "2026-09-21T09:00:00.000Z",
+  kwota: 12900,
+  trackingNumber: 501234568,
+};
+
 /** Wstawia wiersz, dopełniając kolumny NOT NULL bez wartości domyślnej neutralną wartością. */
 function wstaw(d: DatabaseSync, tabela: string, wartosci: Record<string, unknown>) {
   const kolumny = d.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string; type: string; notnull: number; dflt_value: unknown; pk: number }>;
@@ -46,8 +63,25 @@ function wstaw(d: DatabaseSync, tabela: string, wartosci: Record<string, unknown
   }
 }
 
-/** Baza z rozpoznawalnymi danymi osobowymi we wszystkich rodzajach kolumn. */
-function zbudujBaze(sciezka: string) {
+/**
+ * Baza z rozpoznawalnymi danymi osobowymi we wszystkich rodzajach kolumn.
+ * Trafia do pliku tak jak kopia z serwera: przez `VACUUM INTO`, czyli bez WAL-a.
+ * Żywa baza po `migrate()` ma tryb WAL w nagłówku i narzędzie słusznie jej odmawia.
+ */
+function zbudujBaze(sciezka: string, dodatki?: (d: DatabaseSync) => void) {
+  const zrodlo = `${sciezka}.zrodlo`;
+  budujZrodlo(zrodlo);
+  const d = new DatabaseSync(zrodlo);
+  if (dodatki) {
+    d.exec("PRAGMA foreign_keys = OFF");
+    dodatki(d);
+  }
+  d.prepare("VACUUM INTO ?").run(sciezka);
+  d.close();
+  for (const koniec of ["", "-wal", "-shm"]) fs.rmSync(`${zrodlo}${koniec}`, { force: true });
+}
+
+function budujZrodlo(sciezka: string) {
   const d = new DatabaseSync(sciezka);
   d.exec(schema);
   migrate(d);
@@ -67,6 +101,11 @@ function zbudujBaze(sciezka: string) {
   wstaw(d, "zamowienie_klienta", { external_id: UUID_ZAM, status: "READY_FOR_PROCESSING", kupujacy_login: "ogrodnik_77", odbiorca_nazwa: "Jan Kowalczyk", odbiorca_telefon: "+48 501 234 567", odbiorca_telefon_cyfry: "48501234567", odbiorca_ulica: "ul. Lipowa 12/4", odbiorca_miasto: "Wrocław", odbiorca_kod: "50-123", dostawa_metoda: "Kurier", platnosc_typ: "ONLINE", waluta: "PLN", kupiono_at: "2026-09-18T09:00:00.000Z", przesylka_waybill: "620123456789", przesylka_przewoznik: "DPD" });
   wstaw(d, "zamowienie_klienta", { external_id: UUID_ZAM2, status: "SENT", kupujacy_login: "Dzialkowiec_PL", odbiorca_nazwa: "Ewa Zielińska-Wróbel", odbiorca_telefon: "600 700 800", odbiorca_telefon_cyfry: "600700800", odbiorca_ulica: "Polna 3", odbiorca_miasto: "Gdańsk", odbiorca_kod: "80-001", dostawa_metoda: "Paczkomat", platnosc_typ: "ONLINE", waluta: "PLN", kupiono_at: "2026-09-19T09:00:00.000Z" });
   wstaw(d, "zamowienie_klienta_pozycja", { external_id: UUID_ZAM, offer_id: "9876543210", nazwa: "Nóż do kosiarki NAC LS 46", sku: "NOZ-LS46", waluta: "PLN" });
+  /* Numer oferty ma 9 cyfr jak telefon. Klient wpisał go w wiadomość, więc trafia na listę
+     telefonów do skanu, a w kolumnie-identyfikatorze zostaje. Skaner nie może się o to przewrócić. */
+  wstaw(d, "zamowienie_klienta_pozycja", { external_id: UUID_ZAM2, offer_id: "123456789", nazwa: "Świeca zapłonowa", sku: "SW-1", waluta: "PLN" });
+  wstaw(d, "allegro_inbox_message", { id: "m-3", thread_id: "th-1", author_login: "ogrodnik_77", text: "Numer oferty 123456789, proszę sprawdzić", subject: "Oferta", status: "READ", created_at: "2026-09-20T12:00:00.000Z", surowe_json: "{}" });
+  wstaw(d, "allegro_zamowienie", { id: UUID_ZAM, surowe_json: JSON.stringify(SUROWY_ZAMOWIENIA), synced_at: "2026-09-21T09:00:00.000Z" });
 
   wstaw(d, "reklamacja_klienta", { external_id: "rk-1", reference_number: "RK-OKNA-1", order_id: UUID_ZAM, kupujacy_login: "dzialkowiec_pl", powod_opis: "Silnik traci moc po dziesięciu minutach", opis: "Dzwoniłem do Państwa, pan Zbigniew nic nie wiedział", prowadzi: "Anna Lewandowska", notatka: "Klient nerwowy, oddzwonić do 602111222", notatka_przez: "Anna Lewandowska", zwrot_towaru: "wymagany", status_allegro: "OPEN" });
   wstaw(d, "reklamacja_wiadomosc", { external_id: "rw-1", autor_login: "dzialkowiec_pl", autor_rola: "BUYER", tresc: "Mój numer to 700-800-900, proszę dzwonić po 16.", utworzono_at: "2026-09-20T12:00:00.000Z" });
@@ -112,6 +151,7 @@ const WRAZLIWE = [
   "700-800-900", "lipowa", "wrocław", "polna 3", "gdańsk", "jan.kowalczyk", "example.com", "lewandowska", "zielińska",
   "wróbel", "sklep_wertis", "secret-access", "secret-refresh", "sesja-kolektora", "hash0123", "5252525252", "fabryczna",
   "poznań", "marek wertis", "zbigniew", "mbanku", "tabliczki", "kosiarka nie pali",
+  "23123123", "gdansk", "gotówką", "lipowa12", "501234567",
 ];
 
 test("żadna rozpoznawalna dana osobowa nie przeżywa, sprawdzone niezależnym skanem", () => {
@@ -186,7 +226,7 @@ test("ten sam login ma ten sam zamiennik w każdej tabeli, także przy innej wie
     assert.equal(pol("SELECT COUNT(*) AS n FROM zamowienie_klienta z JOIN reklamacja_klienta r ON lower(z.kupujacy_login)=lower(r.kupujacy_login)"), 1);
     assert.equal(pol("SELECT COUNT(*) AS n FROM zamowienie_klienta z JOIN klient_prowadzenie p ON lower(z.kupujacy_login)=lower(p.login)"), 1);
     assert.equal(pol("SELECT COUNT(*) AS n FROM allegro_inbox_thread t JOIN zwrot_klienta z ON lower(t.interlocutor_login)=lower(z.kupujacy_login)"), 1);
-    assert.equal(pol("SELECT COUNT(*) AS n FROM allegro_inbox_thread t JOIN allegro_inbox_message m ON t.id=m.thread_id AND lower(t.interlocutor_login)=lower(m.author_login)"), 1);
+    assert.equal(pol("SELECT COUNT(*) AS n FROM allegro_inbox_thread t JOIN allegro_inbox_message m ON t.id=m.thread_id AND lower(t.interlocutor_login)=lower(m.author_login)"), 2, "dwie wiadomości klienta w jego wątku");
     const pracownicy = po.prepare("SELECT DISTINCT prowadzi AS p FROM klient_prowadzenie UNION SELECT DISTINCT prowadzi FROM reklamacja_klienta UNION SELECT DISTINCT prowadzi FROM zwrot_klienta").all();
     assert.equal(pracownicy.length, 1, "ten sam pracownik w trzech tabelach");
     po.close();
@@ -237,8 +277,7 @@ test("wejście zostaje nietknięte, ziarno decyduje o wyniku, a wynik jest samod
     anonimizuj(we, path.join(k, "b.db"), { ziarno: "jedno" });
     anonimizuj(we, path.join(k, "c.db"), { ziarno: "drugie" });
     assert.equal(skrot(we), przed, "wejście bez zmian");
-    assert.equal(fs.existsSync(path.join(k, "a.db.praca")), false, "plik roboczy sprzątnięty");
-    assert.equal(fs.existsSync(path.join(k, "a.db-wal")), false, "wynik bez WAL");
+    assert.deepEqual(fs.readdirSync(k).sort(), ["a.db", "b.db", "c.db", "kopia.db"], "obok wyniku nie leży żaden plik roboczy");
     assert.equal(wszystkieTeksty(path.join(k, "a.db")), wszystkieTeksty(path.join(k, "b.db")), "to samo ziarno, ten sam wynik");
     assert.notEqual(wszystkieTeksty(path.join(k, "a.db")), wszystkieTeksty(path.join(k, "c.db")), "inne ziarno, inny wynik");
   });
@@ -251,7 +290,7 @@ test("odmawia: istniejący wynik, ten sam plik i żywa baza z niepustym WAL-em",
     fs.writeFileSync(path.join(k, "jest.db"), "x");
     assert.throws(() => anonimizuj(we, path.join(k, "jest.db")), /już istnieje/);
     assert.equal(fs.readFileSync(path.join(k, "jest.db"), "utf8"), "x", "cudzego pliku nie ruszamy");
-    assert.throws(() => anonimizuj(we, we), /już istnieje|ten sam plik/);
+    assert.throws(() => anonimizuj(we, we), /ten sam plik/);
     fs.writeFileSync(`${we}-wal`, "niepusty");
     assert.throws(() => anonimizuj(we, path.join(k, "z-wal.db")), /żywa baza/);
     assert.equal(fs.existsSync(path.join(k, "z-wal.db")), false);
@@ -340,4 +379,261 @@ test("po migracji żadna kolumna z nazwą osoby ani adresu nie ma reguły „zos
   }
   d.close();
   assert.deepEqual(zostajace, []);
+});
+
+/* ── Poprawki po przeglądzie (@wydanie) ──────────────────────────────────────
+   Każdy z poniższych testów pilnuje jednej luki, którą znalazł niezależny
+   przegląd narzędzia. Powstały PRZED poprawkami i padały na poprzedniej wersji. */
+
+const wynikJson = (wy: string, tabela: string, kolumna: string) => {
+  const d = new DatabaseSync(wy);
+  const w = d.prepare(`SELECT ${kolumna} AS v FROM ${tabela}`).get() as { v: string };
+  d.close();
+  return JSON.parse(w.v);
+};
+
+test("JSON: pod kluczem osobowym znika wszystko, także identyfikator kupującego i login WIELKIMI literami", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    zbudujBaze(we);
+    anonimizuj(we, wy, { ziarno: "test" });
+    const j = wynikJson(wy, "allegro_zamowienie", "surowe_json");
+    assert.notEqual(j.buyer.id, "23123123", "buyer.id to stały identyfikator osoby na platformie");
+    assert.equal(j.buyer.id.length, 8);
+    assert.match(j.buyer.id, /^\d+$/);
+    assert.notEqual(j.buyer.login.toLowerCase(), "ogrodnik_77", "login wielkimi literami nie jest słownikiem");
+    assert.notEqual(j.buyer.numer, 501234567, "liczba pod kluczem osobowym też");
+    assert.equal(j.buyer.email, "[usunięte przy pobraniu]", "znacznik wycięcia zostaje znacznikiem");
+    assert.notEqual(j.delivery.address.city, "GDANSK");
+    assert.notEqual(j.delivery.address.zipCode, "50-123");
+    assert.notEqual(j.orderNote, SUROWY_ZAMOWIENIA.orderNote, "tekst od człowieka");
+    assert.equal(j.orderNote.length, SUROWY_ZAMOWIENIA.orderNote.length);
+    assert.notEqual(j.statusDetail, "ul.Lipowa12", "klucz zawierający „status” nie jest słownikiem");
+    assert.notEqual(j.orderBuyerLogin.toLowerCase(), "ogrodnik_77", "klucz zawierający „order” nie jest identyfikatorem");
+  });
+});
+
+test("JSON: identyfikatory, słowniki, czas i liczby poza kluczami osobowymi zostają", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    zbudujBaze(we);
+    anonimizuj(we, wy, { ziarno: "test" });
+    const j = wynikJson(wy, "allegro_zamowienie", "surowe_json");
+    assert.equal(j.orderId, "abc-123");
+    assert.equal(j.checkoutFormId, UUID_ZAM2);
+    assert.equal(j.status, "READY_FOR_PROCESSING");
+    assert.equal(j.createdAt, "2026-09-21T09:00:00.000Z");
+    assert.equal(j.kwota, 12900);
+    assert.equal(j.trackingNumber, 501234568, "liczba 9-cyfrowa poza kluczem osobowym nie jest telefonem");
+  });
+});
+
+test("ten sam login i ten sam numer listu wyglądają tak samo w JSON-ie i w kolumnie", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    zbudujBaze(we);
+    anonimizuj(we, wy, { ziarno: "test" });
+    const j = wynikJson(wy, "allegro_zamowienie", "surowe_json");
+    const po = new DatabaseSync(wy);
+    const kol = po.prepare("SELECT kupujacy_login AS l FROM zamowienie_klienta WHERE status='READY_FOR_PROCESSING'").get() as { l: string };
+    const zwrot = po.prepare("SELECT waybill AS w FROM zwrot_klienta").get() as { w: string };
+    po.close();
+    /* Serwer łączy zwroty z przesyłkami po numerze listu, a drogę klienta po loginie. */
+    assert.equal(j.buyer.login.toLowerCase(), kol.l.toLowerCase(), "login z JSON-a = login z kolumny");
+    assert.equal(j.orderBuyerLogin.toLowerCase(), kol.l.toLowerCase());
+    assert.equal(j.parcels[0].waybill, zwrot.w, "numer listu z JSON-a = numer z kolumny");
+  });
+});
+
+test("skaner rzuca wyjątkiem: pod docelową nazwą nie zostaje nic i nic nie leży w katalogu tymczasowym", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    zbudujBaze(we);
+    const tmpPrzed = fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("wertis-anonim-")).length;
+    assert.throws(() => anonimizuj(we, wy, { ziarno: "test", skaner: () => { throw new Error("awaria skanera"); } }), /awaria skanera/);
+    assert.equal(fs.existsSync(wy), false, "nieprzeskanowany wynik nie ma prawa leżeć pod docelową nazwą");
+    assert.deepEqual(fs.readdirSync(k), ["kopia.db"], "ani plik częściowy, ani roboczy");
+    assert.equal(fs.readdirSync(os.tmpdir()).filter((n) => n.startsWith("wertis-anonim-")).length, tmpPrzed, "katalog tymczasowy sprzątnięty");
+  });
+});
+
+test("pełna kopia z danymi osobowymi pracuje w katalogu tymczasowym, a resztki po przerwanym przebiegu są zamiatane", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    zbudujBaze(we);
+    const stary = fs.mkdtempSync(path.join(os.tmpdir(), "wertis-anonim-"));
+    const swiezy = fs.mkdtempSync(path.join(os.tmpdir(), "wertis-anonim-"));
+    fs.writeFileSync(path.join(stary, "praca.db"), "resztka");
+    const dawno = new Date(Date.now() - 3 * 60 * 60 * 1000);
+    fs.utimesSync(stary, dawno, dawno);
+    try {
+      /* Skaner dostaje plik, który za chwilę zostanie wynikiem. Jeśli leży obok wyniku
+         (pulpit, Dokumenty), nieprzeskanowany plik bywa w chmurze, zanim praca się skończy. */
+      let widziany = "";
+      anonimizuj(we, path.join(k, "wynik.db"), { ziarno: "test", skaner: (sciezka: string) => { widziany = sciezka; return []; } });
+      assert.ok(widziany, "skaner został wywołany");
+      assert.ok(path.resolve(widziany).startsWith(path.resolve(os.tmpdir()) + path.sep), "kandydat leży w katalogu tymczasowym systemu");
+      assert.ok(!path.resolve(widziany).startsWith(path.resolve(k) + path.sep), "i nie w katalogu wyniku");
+      assert.equal(fs.existsSync(stary), false, "godzinna resztka po przerwaniu zniknęła");
+      assert.equal(fs.existsSync(swiezy), true, "świeżego katalogu, może cudzego przebiegu, nie ruszamy");
+    } finally {
+      fs.rmSync(stary, { recursive: true, force: true });
+      fs.rmSync(swiezy, { recursive: true, force: true });
+    }
+  });
+});
+
+test("odmawia surowej kopii żywej bazy (WAL w nagłówku) i pliku, który nie jest bazą", () => {
+  wKatalogu((k) => {
+    const surowa = path.join(k, "wertis.db");
+    budujZrodlo(surowa);
+    const d = new DatabaseSync(surowa);
+    d.close();
+    for (const koniec of ["-wal", "-shm"]) fs.rmSync(`${surowa}${koniec}`, { force: true });
+    assert.throws(() => anonimizuj(surowa, path.join(k, "w.db")), /trybie WAL/);
+    const smiec = path.join(k, "smiec.db");
+    fs.writeFileSync(smiec, "to nie jest baza, tylko tekst dłuższy niż nagłówek");
+    assert.throws(() => anonimizuj(smiec, path.join(k, "s.db")), /nie jest baza SQLite/);
+    assert.deepEqual(fs.readdirSync(k).sort(), ["smiec.db", "wertis.db"], "żadnego wyniku");
+  });
+});
+
+test("zamienniki są różnowartościowe i nie trafiają w prawdziwy login innego klienta", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    /* Trzyliterowe loginy z małego alfabetu: bez zakazu kolizji z oryginałami
+       zamiennik jednego klienta bywa cudzym prawdziwym loginem. */
+    const loginy = new Set<string>();
+    for (let i = 0; loginy.size < 600; i++) {
+      const h = crypto.createHash("sha256").update(`login-${i}`).digest();
+      loginy.add(String.fromCharCode(97 + (h[0] % 12), 97 + (h[1] % 12), 97 + (h[2] % 12)));
+    }
+    zbudujBaze(we, (d) => {
+      for (const l of loginy) {
+        wstaw(d, "klient_prowadzenie", { login: l, prowadzi: "Anna Lewandowska" });
+        wstaw(d, "klient_notatka", { login: l, tresc: "x", przez: "Anna Lewandowska", at: "2026-09-21T08:00:00.000Z" });
+      }
+    });
+    anonimizuj(we, wy, { ziarno: "test" });
+    const po = new DatabaseSync(wy);
+    const nowe = (po.prepare("SELECT login FROM klient_prowadzenie WHERE length(login) < 8").all() as Array<{ login: string }>).map((r) => r.login);
+    po.close();
+    assert.equal(new Set(nowe).size, nowe.length, "różnowartościowe");
+    const wspolne = nowe.filter((l) => loginy.has(l));
+    assert.deepEqual(wspolne, [], "żaden zamiennik nie jest cudzym prawdziwym loginem");
+  });
+});
+
+test("numer oferty o dziewięciu cyfrach w wiadomości nie zatrzymuje pracy, choć wygląda jak telefon", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    zbudujBaze(we);
+    /* Fikstura ma taką liczbę w wiadomości i w kolumnie-identyfikatorze. */
+    anonimizuj(we, wy, { ziarno: "test" });
+    const po = new DatabaseSync(wy);
+    const oferta = po.prepare("SELECT offer_id AS o FROM zamowienie_klienta_pozycja WHERE sku='SW-1'").get() as { o: string };
+    po.close();
+    assert.equal(oferta.o, "123456789", "identyfikator zostaje");
+  });
+});
+
+/** Wstawia wiele wierszy jednym przygotowanym zapytaniem, dopełniając NOT NULL jak `wstaw`. */
+function wstawSeria(d: DatabaseSync, tabela: string, wiersze: Array<Record<string, unknown>>) {
+  const kolumny = d.prepare(`PRAGMA table_info(${tabela})`).all() as Array<{ name: string; type: string; notnull: number; dflt_value: unknown; pk: number }>;
+  const podane = Object.keys(wiersze[0]);
+  const dodatkowe = kolumny.filter((k) => !podane.includes(k.name) && k.notnull && k.dflt_value === null && !(k.pk === 1 && /INT/i.test(k.type)));
+  const nazwy = [...podane, ...dodatkowe.map((k) => k.name)];
+  const stale = dodatkowe.map((k) => (/INT|REAL|NUM/i.test(k.type) ? 0 : ""));
+  const st = d.prepare(`INSERT INTO ${tabela} (${nazwy.join(",")}) VALUES (${nazwy.map(() => "?").join(",")})`);
+  d.exec("BEGIN");
+  for (const w of wiersze) st.run(...([...podane.map((n) => w[n]), ...stale] as never[]));
+  d.exec("COMMIT");
+}
+
+test("losowe cyfry nie trafiają w prawdziwy numer innego klienta, nawet gdy numerów jest dużo", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    /* Osiem tysięcy siedmiocyfrowych numerów w przestrzeni dziesięciu milionów: bez zakazu
+       około sześć zamienników zgodziłoby się z cudzym prawdziwym numerem, a skaner
+       odmówiłby każdego przebiegu takiej bazy. */
+    const oryginalne = Array.from({ length: 8000 }, (_, i) => String(1000000 + i));
+    zbudujBaze(we, (d) => wstawSeria(d, "zamowienie_klienta", oryginalne.map((t, i) => ({
+      external_id: `zam-${i}`, status: "SENT", kupujacy_login: `klient${i}`, odbiorca_nazwa: `Osoba ${i}`,
+      odbiorca_telefon: t, odbiorca_telefon_cyfry: t, waluta: "PLN",
+    }))));
+    const raport = anonimizuj(we, wy, { ziarno: "test" });
+    assert.deepEqual(raport.skaner, []);
+    const po = new DatabaseSync(wy);
+    const nowe = (po.prepare("SELECT odbiorca_telefon_cyfry AS c FROM zamowienie_klienta WHERE external_id LIKE 'zam-%'").all() as Array<{ c: string }>).map((r) => r.c);
+    po.close();
+    const zbior = new Set(oryginalne);
+    assert.equal(nowe.length, 8000);
+    assert.deepEqual(nowe.filter((c) => zbior.has(c)), [], "żaden zamiennik nie jest prawdziwym numerem");
+  });
+});
+
+test("firma, adres odbiorcy i konto sprzedawcy trafiają do skanu: błędna reguła kończy się odmową", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    zbudujBaze(we);
+    for (const kolumna of ["firma.nazwa", "firma.adres", "zamowienie_klienta.odbiorca_ulica", "channel_account.display_name"]) {
+      let blad: (Error & { raport?: { skaner: Array<{ miejsce: string }> } }) | undefined;
+      try {
+        anonimizuj(we, path.join(k, `${kolumna}.db`), { ziarno: "test", reguly: { [kolumna]: R.ZOSTAJE } });
+      } catch (e) {
+        blad = e as typeof blad;
+      }
+      assert.ok(blad?.raport?.skaner.some((t) => t.miejsce === kolumna), `${kolumna}: skaner musi to wykryć`);
+    }
+  });
+});
+
+test("dobór z rozmowy i warunek zastosowania to tekst od człowieka, numer OEM i symbol zostają", () => {
+  for (const kolumna of ["marka", "model", "wariant", "rocznik", "silnik", "nazwa_czesci"]) {
+    assert.equal(regulaKolumny("dobor_rozmowy", kolumna).regula, R.TEKST, `dobor_rozmowy.${kolumna}`);
+  }
+  assert.equal(regulaKolumny("zastosowanie", "warunek").regula, R.TEKST);
+  assert.equal(regulaKolumny("dobor_rozmowy", "oem").regula, R.ZOSTAJE);
+  assert.equal(regulaKolumny("dobor_rozmowy", "wybrany_symbol").regula, R.ZOSTAJE);
+});
+
+test("wiersz poleceń: kod 0 z liczbą sprawdzonych wartości, kod 2 bez ani jednej wartości osobowej na wyjściu", async () => {
+  const { uruchom } = narzedzie;
+  const przechwyc = (fn: () => number) => {
+    const linie: string[] = [];
+    const [log, err] = [console.log, console.error];
+    console.log = (...a: unknown[]) => { linie.push(a.join(" ")); };
+    console.error = (...a: unknown[]) => { linie.push(a.join(" ")); };
+    try { return { kod: fn(), tekst: linie.join("\n") }; } finally { console.log = log; console.error = err; }
+  };
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    zbudujBaze(we);
+    const dobry = przechwyc(() => uruchom([we, path.join(k, "wynik.db")]));
+    assert.equal(dobry.kod, 0);
+    assert.match(dobry.tekst, /Skaner wycieków sprawdził [1-9]\d* wartości/, "operator widzi, że skaner miał co sprawdzać");
+    const kolumny = fs.readFileSync(path.join(k, "wynik.db.kolumny.txt"), "utf8").toLowerCase();
+    for (const w of WRAZLIWE) assert.ok(!kolumny.includes(w.toLowerCase()) && !dobry.tekst.toLowerCase().includes(w.toLowerCase()), `wyjście nie zawiera „${w}”`);
+
+    const nieznana = przechwyc(() => uruchom([we, path.join(k, "inny.db"), "--ziarno=stale"]));
+    assert.equal(nieznana.kod, 1, "wiersz poleceń nie przyjmuje ziarna");
+    assert.equal(fs.existsSync(path.join(k, "inny.db")), false);
+  });
+  /* Cały przebieg odmowy przez wiersz poleceń: login wpisany do etykiety zespołu, która zostaje. */
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    zbudujBaze(we, (d) => wstaw(d, "reklamacja_tag", { nazwa: "czeka na ogrodnik_77" }));
+    const zly = przechwyc(() => uruchom([we, path.join(k, "wynik.db")]));
+    assert.equal(zly.kod, 2);
+    assert.match(zly.tekst, /reklamacja_tag\.nazwa/, "mówi GDZIE");
+    for (const w of WRAZLIWE) assert.ok(!zly.tekst.toLowerCase().includes(w.toLowerCase()), `komunikat nie zawiera „${w}”`);
+    assert.deepEqual(fs.readdirSync(k), ["kopia.db"], "po odmowie nie zostaje nic");
+  });
 });

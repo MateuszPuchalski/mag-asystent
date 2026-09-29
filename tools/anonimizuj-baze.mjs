@@ -6,12 +6,13 @@
    prawdziwych długościach i prawdziwym wolumenie, a dane klientów nie mają
    prawa opuścić biura.
 
-     node tools/anonimizuj-baze.mjs <kopia.db> <wynik.db> [--ziarno=tekst]
+     node tools/anonimizuj-baze.mjs <kopia.db> <wynik.db>
 
    Wejściem jest KOPIA z folderu kopii serwera (`server\data\kopie`), nigdy
    żywa baza. Kopia z `VACUUM INTO` jest samodzielnym plikiem. Żywa baza chodzi
-   w WAL, więc jej kopia bywa niespójna. Wejście zostaje nietknięte: narzędzie
-   pracuje na własnym duplikacie.
+   w WAL, więc jej kopia bywa niespójna: narzędzie odmawia pliku z trybem WAL
+   w nagłówku i pliku z niepustym `-wal`. Wejście zostaje nietknięte,
+   narzędzie pracuje na własnym duplikacie.
 
    ── JAK DZIAŁA I DLACZEGO TAK ─────────────────────────────────────────────
    1. DOMYŚLNIE ODMOWA. Każda kolumna tekstowa jest rozsypywana, chyba że
@@ -28,18 +29,28 @@
       (bez wielkości liter) dostaje ten sam zamiennik w każdej tabeli, bo
       droga klienta łączy sprawy po loginie. Zamienniki są różnowartościowe,
       bo baza pilnuje unikalności loginów.
-   4. JSON ZOSTAJE JSON-em. Klucze, liczby i identyfikatory stoją, teksty są
-      rozsypane. Bez tego payload zdarzeń nie dałby się otworzyć.
-   5. ZIARNO JEST LOSOWE przy każdym uruchomieniu i nigdzie nie leży.
-      Rozsypu nie da się odtworzyć nawet znając to narzędzie.
+   4. JSON ZOSTAJE JSON-em. Klucze zostają. Pod kluczem osobowym (`buyer`,
+      `login`, `address`, `text` i podobne) rozsypane jest wszystko, także
+      liczby i identyfikatory, bo Allegro zostawia w lądowisku `buyer.id`.
+      Poza nimi stoją liczby, UUID-y, znaczniki czasu, słowa
+      WIELKIMI_LITERAMI i krótkie identyfikatory pod kluczem na Id. Loginy
+      z JSON-a dostają ten sam zamiennik co loginy z kolumn.
+   5. ZIARNO JEST LOSOWE przy każdym uruchomieniu i nigdzie nie leży. Wiersz
+      poleceń nie przyjmuje ziarna: jawne ziarno daje wynik odtwarzalny, a kto
+      je zna, może sprawdzać loginy przez ponowny rozsyp.
    6. SKANER WYCIEKÓW NA KOŃCU. Przed rozsypem narzędzie zbiera wartości,
       które MUSZĄ zniknąć: loginy, imiona, telefony, ulice, adresy e-mail,
       tokeny. Potem szuka ich w gotowym pliku, po wartościach i po bajtach.
-      Znalezienie czegokolwiek kasuje wynik i kończy pracę kodem 2. Skaner
-      nie wypisuje znalezionych wartości, tylko miejsce i liczbę.
-   7. WYNIK POWSTAJE PRZEZ `VACUUM INTO`, więc nie zawiera stron po
-      skasowanych danych. Zwykły `UPDATE` zostawia stare treści w wolnych
-      stronach pliku.
+      Znalezienie czegokolwiek kończy pracę kodem 2. Skaner nie wypisuje
+      znalezionych wartości, tylko miejsce i liczbę. Nie widzi wartości
+      krótszych niż 4 znaki i nie zna imion wpisanych w wolny tekst, tam
+      chroni sam rozsyp.
+   7. WYNIK DOSTAJE DOCELOWĄ NAZWĘ DOPIERO PO SKANIE. Cała praca, łącznie
+      z pełną kopią z danymi osobowymi, idzie w katalogu tymczasowym systemu,
+      a nie obok wyniku: pulpit i Dokumenty bywają synchronizowane z chmurą.
+      Wynik powstaje przez `VACUUM INTO`, więc nie zawiera stron po
+      skasowanych danych. Jeśli skaner albo cokolwiek innego zawiedzie, pod
+      docelową nazwą nie ma nic.
 
    ── CO ZOSTAJE BEZ ZMIAN ──────────────────────────────────────────────────
    Kartoteka towarowa i dokumenty Subiekta (`sgt_*`, oferty, silniki, modele,
@@ -54,6 +65,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import os from "node:os";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 
@@ -85,7 +97,7 @@ const KATALOG = [
 ];
 
 /** Kolumny swobodnego tekstu: w kartotece też są rozsypywane, bo pisze je człowiek o czymkolwiek. */
-const SWOBODNY = /(komentarz|notatka|powod|uzasadnienie|dowod_|tresc|instrukcja|blad|opis_zdarzenia)/;
+const SWOBODNY = /(komentarz|notatka|powod|uzasadnienie|dowod_|tresc|instrukcja|blad|opis_zdarzenia|warunek)/;
 
 /** Kto sprawił, że wiersz powstał: nazwa albo login pracownika. */
 const PRACOWNIK = /(^|_)(przez|by)$|^(dodal|zaimportowal|wycofal|rozstrzygnal|zaproponowal|prowadzi|kto|zakonczyl|autor)$/;
@@ -135,13 +147,13 @@ const JAWNE = {
   "zamowienie_klienta_pozycja.nazwa": [R.ZOSTAJE, "nazwa towaru z oferty"],
   "zwrot_klienta_pozycja.nazwa": [R.ZOSTAJE, "nazwa towaru z oferty"],
   "zadanie_terenowe.zrodlo_ref": [R.ZOSTAJE, "odsyłacz do obiektu, po którym ekran nawiguje"],
-  "dobor_rozmowy.marka": [R.ZOSTAJE, "opis maszyny, nie osoby"],
-  "dobor_rozmowy.model": [R.ZOSTAJE, "opis maszyny, nie osoby"],
-  "dobor_rozmowy.wariant": [R.ZOSTAJE, "opis maszyny, nie osoby"],
-  "dobor_rozmowy.rocznik": [R.ZOSTAJE, "opis maszyny, nie osoby"],
-  "dobor_rozmowy.silnik": [R.ZOSTAJE, "opis maszyny, nie osoby"],
+  "dobor_rozmowy.marka": [R.TEKST, "wpisuje pracownik w trakcie rozmowy, bez walidacji"],
+  "dobor_rozmowy.model": [R.TEKST, "wpisuje pracownik w trakcie rozmowy, bez walidacji"],
+  "dobor_rozmowy.wariant": [R.TEKST, "wpisuje pracownik w trakcie rozmowy, bez walidacji"],
+  "dobor_rozmowy.rocznik": [R.TEKST, "wpisuje pracownik w trakcie rozmowy, bez walidacji"],
+  "dobor_rozmowy.silnik": [R.TEKST, "wpisuje pracownik w trakcie rozmowy, bez walidacji"],
   "dobor_rozmowy.oem": [R.ZOSTAJE, "numer części"],
-  "dobor_rozmowy.nazwa_czesci": [R.ZOSTAJE, "nazwa części"],
+  "dobor_rozmowy.nazwa_czesci": [R.TEKST, "wpisuje pracownik w trakcie rozmowy, bez walidacji"],
   "dobor_rozmowy.wybrany_symbol": [R.ZOSTAJE, "symbol z kartoteki"],
   "dobor_rozmowy.wybrany_droga": [R.ZOSTAJE, "słownik"],
   "copilot_wywolanie.zadanie": [R.ZOSTAJE, "nazwa zadania modelu, nie jego treść"],
@@ -207,11 +219,25 @@ const SAMOGLOSKI = "aeiouy";
 const SAMOGLOSKI_PL = "ąęó";
 const SPOLGLOSKI = "bcdfghjklmnpqrstvwxz";
 const SPOLGLOSKI_PL = "ćłńśźż";
-const UUID_ROZDZIEL = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi;
+/* Zostają UUID-y (na nich ekran łączy obiekty) i znacznik „wycięto przy pobraniu”
+   z `services/allegro-oczyszczanie.ts` (`USUNIETE`): bez niego sygnał, że pole
+   celowo puste, wyglądałby po rozsypie jak losowy tekst. Znacznik jest stałą,
+   nie daną, więc nie trafia też na listę wartości do skanu. */
+const ZNACZNIK_USUNIECIA = "[usunięte przy pobraniu]";
+const ZACHOWANE_ROZDZIEL = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\[usunięte przy pobraniu\])/gi;
 const UUID_CALY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CZAS_ISO = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
 const WYLICZENIE = /^[A-Z][A-Z0-9_]{1,40}$/;
-const KLUCZ_IDENTYFIKATORA = /(^|_)ids?$|Ids?$|^(id|ids)$|offer|order|zamow|ofert|symbol|sku|ean|status|stan|type|typ$|kind|rodzaj|role|rola|kod$|code|currency|waluta|reference|external|version|wersja|model|zrodlo|source/i;
+/* Klucze, pod którymi JSON niesie osobę albo tekst od człowieka. Wartość pod takim
+   kluczem, i pod każdym kluczem w jego wnętrzu, jest rozsypywana bez wyjątków:
+   także liczba, identyfikator, UUID i słowo pisane wielkimi literami. Allegro
+   zostawia w lądowisku `buyer.id`, a login bywa zapisany jako `OGRODNIK_77`. */
+const KLUCZ_OSOBOWY = /login|name|nazw|imi[eę]|mail|phone|tel|miast|city|street|ulic|address|adres|zip|post|poczt|nip|pesel|iban|konto|account|note|uwag|komentarz|message|wiadom|text|tresc|buyer|interlocutor|author|seller|sender|recipient|odbiorc|kupuj|klient|customer|person|osob|owner|company|firma|pickup/i;
+/* Poza kluczami osobowymi zostaje krótki identyfikator pod kluczem kończącym się na Id
+   oraz słowo pod kluczem-słownikiem. Nie szukamy tu podciągów: „order” czy „source”
+   w środku klucza otwierały furtkę dla loginu pod `orderBuyerLogin`. */
+const KLUCZ_IDENTYFIKATORA = /^(id|ids|uuid)$|(Id|Ids|_id|_ids|UUID)$/;
+const KLUCZ_WYLICZENIA = /^(status|stan|type|typ|kind|rodzaj|role|rola|currency|waluta|code|kod|direction|priorytet|tryb|channel)$/i;
 
 /** Generator liczb z ziarna. Mały, szybki, wystarczy do rozsypu. */
 function generator(ziarno, klucz) {
@@ -245,16 +271,28 @@ function rozsypZnak(c, los) {
  * ten sam wynik, więc cytat powtórzony w dwóch wiadomościach zostaje cytatem.
  * UUID-y stoją: to identyfikatory, na których ekran łączy obiekty.
  */
-export function rozsypTekst(tekst, ziarno, przestrzen) {
-  const los = generator(ziarno, `${przestrzen}\0${tekst}`);
-  const kawalki = tekst.split(UUID_ROZDZIEL);
-  return kawalki.map((k, i) => (i % 2 === 1 ? k : Array.from(k, (c) => rozsypZnak(c, los)).join(""))).join("");
+export function rozsypTekst(tekst, ziarno, przestrzen, unikaj = null) {
+  const kawalki = tekst.split(ZACHOWANE_ROZDZIEL);
+  /* Losowe cyfry trafiają czasem w PRAWDZIWY numer innego klienta: przy 16 tysiącach
+     telefonów i dziewięciu cyfrach to około jedna taka zbieżność na przebieg. Skaner
+     nie odróżni jej od wycieku i odmówi. Dlatego `unikaj` (zbiór numerów, które muszą
+     zniknąć) odrzuca każdy wynik z takim ciągiem cyfr i losuje jeszcze raz. */
+  for (let proba = 0; ; proba++) {
+    const los = generator(ziarno, `${przestrzen}${proba ? `~${proba}` : ""}\0${tekst}`);
+    const wynik = kawalki.map((k, i) => (i % 2 === 1 ? k : Array.from(k, (c) => rozsypZnak(c, los)).join(""))).join("");
+    if (!unikaj || unikaj.size === 0 || proba >= 30) return wynik;
+    let trafia = false;
+    for (const m of wynik.matchAll(/\d{7,}/g)) if (unikaj.has(m[0])) { trafia = true; break; }
+    if (!trafia) return wynik;
+  }
 }
 
 /**
  * Zamiennik różnowartościowy. Dwa różne wejścia nigdy nie dostają tego samego
- * wyjścia, a wyjście nigdy nie równa się wejściu. Unikalność loginów pilnuje
- * baza, więc kolizja wywaliłaby cały `UPDATE`.
+ * wyjścia, wyjście nigdy nie równa się wejściu, a także żadnej innej wartości,
+ * która jeszcze czeka na zamianę. Bez ostatniego warunku login `ab` mógłby dostać
+ * zamiennik `cd`, będący prawdziwym loginem innego klienta, i baza odrzuciłaby
+ * `UPDATE` na unikalności w połowie przebiegu.
  */
 class Zamienniki {
   constructor(nazwa, ziarno, { bezWielkosci = true } = {}) {
@@ -263,19 +301,30 @@ class Zamienniki {
     this.bezWielkosci = bezWielkosci;
     this.mapa = new Map();
     this.uzyte = new Set();
+    this.zabronione = new Set();
+  }
+
+  #klucz(w) {
+    return this.bezWielkosci ? w.trim().toLowerCase() : w;
+  }
+
+  /** Zgłasza wartość, która istnieje w bazie i nie może stać się czyimś zamiennikiem. */
+  zabron(wejscie) {
+    this.zabronione.add(this.#klucz(wejscie));
   }
 
   daj(wejscie) {
-    const klucz = this.bezWielkosci ? wejscie.trim().toLowerCase() : wejscie;
+    const surowy = this.bezWielkosci ? wejscie.trim() : wejscie;
+    const klucz = this.#klucz(wejscie);
     const znany = this.mapa.get(klucz);
     if (znany !== undefined) return znany;
     for (let proba = 0; ; proba++) {
-      const rdzen = rozsypTekst(this.bezWielkosci ? wejscie.trim() : wejscie, this.ziarno, `${this.nazwa}:${proba}`);
+      const rdzen = rozsypTekst(surowy, this.ziarno, `${this.nazwa}:${proba}`);
       /* Bardzo krótkie wejścia mają za mało możliwych wyjść. Po wielu próbach
          dopisujemy numer, żeby pętla zawsze się kończyła. */
       const kandydat = proba > 200 ? `${rdzen}${proba}` : rdzen;
-      const porownanie = kandydat.toLowerCase();
-      if (porownanie === klucz || this.uzyte.has(porownanie)) continue;
+      const porownanie = this.#klucz(kandydat);
+      if (porownanie === klucz || this.uzyte.has(porownanie) || this.zabronione.has(porownanie)) continue;
       this.mapa.set(klucz, kandydat);
       this.uzyte.add(porownanie);
       return kandydat;
@@ -283,29 +332,63 @@ class Zamienniki {
   }
 }
 
-/** JSON: klucze, liczby i identyfikatory zostają, teksty są rozsypane. */
-function rozsypJson(w, klucz, ziarno) {
-  if (Array.isArray(w)) return w.map((x) => rozsypJson(x, klucz, ziarno));
+/**
+ * JSON: klucze zostają zawsze. Pod kluczem osobowym rozsypane jest wszystko,
+ * także liczby. Poza nim zostają liczby, znaczniki czasu, UUID-y, słowa
+ * WIELKIMI_LITERAMI, krótkie identyfikatory pod kluczem na Id i słowa pod
+ * kluczem-słownikiem. Reszta jest tekstem od człowieka.
+ *
+ * Teksty idą przez tę samą przestrzeń rozsypu co zwykłe kolumny, więc numer
+ * listu w kolumnie i w surowym JSON-ie dostaje ten sam zamiennik. Serwer łączy
+ * zwroty z przesyłkami po numerze listu.
+ */
+function rozsypJson(w, klucz, ctx, rodzicOsobowy = false) {
+  const osobowe = rodzicOsobowy || KLUCZ_OSOBOWY.test(klucz);
+  if (Array.isArray(w)) return w.map((x) => rozsypJson(x, klucz, ctx, rodzicOsobowy));
   if (w !== null && typeof w === "object") {
-    return Object.fromEntries(Object.entries(w).map(([k, v]) => [k, rozsypJson(v, k, ziarno)]));
+    return Object.fromEntries(Object.entries(w).map(([k, v]) => [k, rozsypJson(v, k, ctx, osobowe)]));
+  }
+  if (typeof w === "number") {
+    if (!osobowe) return w;
+    ctx.igly.dodajCyfry(String(w));
+    const n = Number(rozsypTekst(String(w), ctx.ziarno, "liczba", ctx.igly.cyfry));
+    return Number.isFinite(n) ? n : 0;
   }
   if (typeof w !== "string") return w;
+  ctx.igly.zTekstu(w);
+  if (osobowe) {
+    if (w !== ZNACZNIK_USUNIECIA) ctx.igly.dodaj(w);
+    if (/login/i.test(klucz)) return ctx.klient.daj(w);
+    if (/phone|tel/i.test(klucz)) {
+      ctx.igly.dodajCyfry(w);
+      return rozsypTekst(w, ctx.ziarno, "telefon", ctx.igly.cyfry);
+    }
+    return rozsypTekst(w, ctx.ziarno, "tekst", ctx.igly.cyfry);
+  }
   if (CZAS_ISO.test(w) || UUID_CALY.test(w) || WYLICZENIE.test(w)) return w;
   /* Tekst pod kluczem-identyfikatorem zostaje, ale tylko gdy wygląda jak
-     identyfikator: bez odstępów. Zdanie pod kluczem `orderNote` ma zniknąć. */
-  if (KLUCZ_IDENTYFIKATORA.test(klucz) && w.length <= 64 && /^[\w\-:./]+$/.test(w)) return w;
-  return rozsypTekst(w, ziarno, "json");
+     identyfikator: bez odstępów. */
+  const wyglada = w.length <= 64 && /^[\w\-:./]+$/.test(w);
+  if (wyglada && (KLUCZ_IDENTYFIKATORA.test(klucz) || KLUCZ_WYLICZENIA.test(klucz))) return w;
+  return rozsypTekst(w, ctx.ziarno, "tekst", ctx.igly.cyfry);
 }
 
-/** Rozsypuje tekst albo JSON w tekście. */
-function rozsypWartosc(w, ziarno) {
-  const przyciety = w.trim();
-  if ((przyciety.startsWith("{") && przyciety.endsWith("}")) || (przyciety.startsWith("[") && przyciety.endsWith("]"))) {
+const wyglądaNaJson = (t) => {
+  const p = t.trim();
+  return (p.startsWith("{") && p.endsWith("}")) || (p.startsWith("[") && p.endsWith("]"));
+};
+
+/** Rozsypuje tekst albo JSON w tekście. E-maile i telefony wyłuskuje tylko z tekstów, nie z liczb JSON-a. */
+function rozsypWartosc(w, ctx) {
+  if (wyglądaNaJson(w)) {
+    let drzewo;
     try {
-      return JSON.stringify(rozsypJson(JSON.parse(w), "", ziarno));
+      drzewo = JSON.parse(w);
     } catch { /* nie JSON, więc zwykły tekst */ }
+    if (drzewo !== undefined) return JSON.stringify(rozsypJson(drzewo, "", ctx));
   }
-  return rozsypTekst(w, ziarno, "tekst");
+  ctx.igly.zTekstu(w);
+  return rozsypTekst(w, ctx.ziarno, "tekst", ctx.igly.cyfry);
 }
 
 function rozsypPlik(nazwa, ziarno) {
@@ -348,6 +431,8 @@ const TELEFON_W_TEKSCIE = /(?<![\d])(?:\+?48[\s-]?)?\d{3}[\s-]?\d{3}[\s-]?\d{3}(
 export class Igly {
   constructor() {
     this.slowa = new Set();
+    /** Ciągi cyfr (telefony, NIP), które rozsyp ma omijać. */
+    this.cyfry = new Set();
     this.pominiete = 0;
   }
 
@@ -360,7 +445,10 @@ export class Igly {
 
   dodajCyfry(wartosc) {
     const c = String(wartosc ?? "").replace(/\D/g, "");
-    if (c.length >= 7) this.slowa.add(c);
+    if (c.length >= 7) {
+      this.slowa.add(c);
+      this.cyfry.add(c);
+    }
   }
 
   /** Adresy e-mail i telefony wpisane w tekst klienta. */
@@ -392,8 +480,10 @@ class Automat {
     }
     const kolejka = [];
     for (const nast of this.wezly[0].dalej.values()) kolejka.push(nast);
-    while (kolejka.length) {
-      const n = kolejka.shift();
+    /* Indeks zamiast `shift()`: przy dwustu tysiącach wartości `shift` kopiuje tablicę
+       za każdym razem i budowa trwała ponad minutę. */
+    for (let i = 0; i < kolejka.length; i++) {
+      const n = kolejka[i];
       for (const [c, nast] of this.wezly[n].dalej) {
         let p = this.wezly[n].porazka;
         while (p !== 0 && !this.wezly[p].dalej.has(c)) p = this.wezly[p].porazka;
@@ -467,7 +557,7 @@ export function skanujWycieki(sciezka, igly, kolumnyStale = new Set()) {
   const bajtowe = slowa.filter((s) => s.length >= 6).map((s) => Buffer.from(s, "utf8").toString("latin1"));
   if (bajtowe.length) {
     const automat = new Automat(bajtowe);
-    const maks = Math.max(...bajtowe.map((s) => s.length));
+    const maks = bajtowe.reduce((m, s) => Math.max(m, s.length), 0);
     const fd = fs.openSync(sciezka, "r");
     try {
       const ROZMIAR = 8 * 1024 * 1024;
@@ -500,23 +590,36 @@ export function skanujWycieki(sciezka, igly, kolumnyStale = new Set()) {
 
 const TYP_LICZBOWY = /INT|REAL|NUM|BOOL|FLOA|DOUB|DEC/i;
 const PORCJA = 2000;
-const KROTKIE = 12;
 
-function przetworzWartosc(regula, v, kolumnaId, ctx, igly) {
+/** Reguła kolumny z uwzględnieniem nadpisań z wywołania (tylko testy). */
+function regulaDla(ctx, tabela, kolumna) {
+  const nadpisana = ctx.nadpisania?.[`${tabela}.${kolumna}`];
+  return nadpisana
+    ? { regula: nadpisana, powod: "nadpisana w wywołaniu" }
+    : regulaKolumny(tabela, kolumna, ctx.wyliczenia);
+}
+
+function przetworzWartosc(regula, v, kolumnaId, ctx) {
+  const { igly } = ctx;
+  const nazwa = v.trim().toLowerCase();
   switch (regula) {
     case R.KLIENT:
-      if (!SLOWA_SLOWNIKOWE.has(v.trim().toLowerCase())) igly.dodaj(v);
+      /* Słowo słownikowe („admin”) jest loginem, ale nie osobą do szukania:
+         baza z samym kontem administratora nie ma czego skanować i nie jest błędem. */
+      if (!SLOWA_SLOWNIKOWE.has(nazwa)) { ctx.osobowych++; igly.dodaj(v); }
       return ctx.klient.daj(v);
     case R.PRACOWNIK:
-      if (AUTOMATY.has(v.trim().toLowerCase())) return v;
-      if (!SLOWA_SLOWNIKOWE.has(v.trim().toLowerCase())) igly.dodaj(v);
+      if (AUTOMATY.has(nazwa)) return v;
+      if (!SLOWA_SLOWNIKOWE.has(nazwa)) { ctx.osobowych++; igly.dodaj(v); }
       return ctx.pracownik.daj(v);
     case R.OSOBA:
+      ctx.osobowych++;
       igly.dodaj(v);
       return ctx.osoba.daj(v);
     case R.TELEFON:
+      ctx.osobowych++;
       igly.dodajCyfry(v);
-      return rozsypTekst(v, ctx.ziarno, "telefon");
+      return rozsypTekst(v, ctx.ziarno, "telefon", igly.cyfry);
     case R.SEKRET:
       igly.dodaj(v, { minimum: 8 });
       /* Sam wykrzyknik: nie jest poprawnym skrótem, więc nikt się nie zaloguje,
@@ -525,16 +628,45 @@ function przetworzWartosc(regula, v, kolumnaId, ctx, igly) {
     case R.PLIK:
       return rozsypPlik(v, ctx.ziarno);
     default: {
-      igly.zTekstu(v);
-      const przyciety = v.trim();
-      const jsonowy = (przyciety.startsWith("{") && przyciety.endsWith("}")) || (przyciety.startsWith("[") && przyciety.endsWith("]"));
-      if (jsonowy || v.length >= KROTKIE) return rozsypWartosc(v, ctx.ziarno);
-      /* Krótkie teksty mogą stać w kolumnach z unikalnością, więc dostają
-         zamiennik różnowartościowy. Tekst bez liter i cyfr nic nie zdradza. */
-      if (!/[\p{L}\p{N}]/u.test(v)) return v;
-      let z = ctx.krotkie.get(kolumnaId);
-      if (!z) ctx.krotkie.set(kolumnaId, (z = new Zamienniki(`krotki:${kolumnaId}`, ctx.ziarno, { bezWielkosci: false })));
-      return z.daj(v);
+      /* Kolumna z unikalnością dostaje zamiennik różnowartościowy: baza
+         odrzuciłaby dwa równe zamienniki. Zwykłe kolumny idą przez wspólną
+         przestrzeń rozsypu, więc ta sama wartość wygląda tak samo w kolumnie
+         i w JSON-ie. */
+      const mapa = ctx.unikalne.get(kolumnaId);
+      if (mapa && !wyglądaNaJson(v) && /[\p{L}\p{N}]/u.test(v)) {
+        igly.zTekstu(v);
+        return mapa.daj(v);
+      }
+      return rozsypWartosc(v, ctx);
+    }
+  }
+}
+
+/** Kolumny objęte unikalnością: klucz główny i każdy indeks UNIQUE. */
+function kolumnyUnikalne(db, tabela) {
+  const wynik = new Set();
+  for (const k of db.prepare(`PRAGMA table_info("${tabela}")`).all()) if (k.pk > 0) wynik.add(k.name);
+  for (const ix of db.prepare(`PRAGMA index_list("${tabela}")`).all()) {
+    if (!ix.unique) continue;
+    for (const c of db.prepare(`PRAGMA index_info("${ix.name}")`).all()) if (c.name) wynik.add(c.name);
+  }
+  return wynik;
+}
+
+const rozne = (db, tabela, kolumna) =>
+  db.prepare(`SELECT DISTINCT "${kolumna}" AS v FROM "${tabela}" WHERE typeof("${kolumna}")='text'`).all().map((w) => w.v);
+
+/** Zgłasza wszystkie istniejące loginy, nazwy i odbiorców jako zabronione zamienniki, zanim ktokolwiek dostanie zamiennik. */
+function zabronZamienniki(db, tabele, ctx) {
+  const przestrzenie = { [R.KLIENT]: ctx.klient, [R.PRACOWNIK]: ctx.pracownik, [R.OSOBA]: ctx.osoba };
+  for (const t of tabele) {
+    for (const k of db.prepare(`PRAGMA table_info("${t}")`).all()) {
+      if (TYP_LICZBOWY.test(k.type)) continue;
+      const regula = regulaDla(ctx, t, k.name).regula;
+      const przestrzen = przestrzenie[regula];
+      if (przestrzen) for (const v of rozne(db, t, k.name)) przestrzen.zabron(v);
+      /* Telefony też: rozsyp nie może wylosować numeru istniejącego klienta. */
+      if (regula === R.TELEFON || regula === R.TELEFON_CYFRY) for (const v of rozne(db, t, k.name)) ctx.igly.dodajCyfry(v);
     }
   }
 }
@@ -547,18 +679,22 @@ class BladKolumny extends Error {
   }
 }
 
-function przetworzTabele(db, tabela, ctx, igly, raport) {
+function przetworzTabele(db, tabela, ctx, raport) {
   const kolumny = db.prepare(`PRAGMA table_info("${tabela}")`).all();
+  const unikalne = kolumnyUnikalne(db, tabela);
   const plan = [];
   for (const k of kolumny) {
     const blob = /BLOB/i.test(k.type) || k.type === "";
     if (TYP_LICZBOWY.test(k.type) && !blob) continue;
-    const nadpisana = ctx.nadpisania?.[`${tabela}.${k.name}`];
-    const { regula, powod } = nadpisana
-      ? { regula: nadpisana, powod: "nadpisana w wywołaniu" }
-      : regulaKolumny(tabela, k.name, ctx.wyliczenia);
+    const { regula, powod } = regulaDla(ctx, tabela, k.name);
     raport.kolumny.push({ tabela, kolumna: k.name, regula, powod });
     if (regula !== R.ZOSTAJE || blob) plan.push({ nazwa: k.name, regula });
+    if (regula === R.TEKST && unikalne.has(k.name)) {
+      const id = `${tabela}.${k.name}`;
+      const z = new Zamienniki(`unikalna:${id}`, ctx.ziarno, { bezWielkosci: false });
+      for (const v of rozne(db, tabela, k.name)) z.zabron(v);
+      ctx.unikalne.set(id, z);
+    }
   }
   if (plan.length === 0) return 0;
   /* Telefon musi być przed swoimi cyframi, bo cyfry wynikają z niego. */
@@ -581,10 +717,10 @@ function przetworzTabele(db, tabela, ctx, igly, raport) {
         if (v instanceof Uint8Array) { podmienionoObraz = true; return PNG_ZASTEPCZY; }
         if (typeof v !== "string" || p.regula === R.ZOSTAJE || v === "") return v;
         if (p.regula === R.TELEFON_CYFRY) {
-          igly.dodajCyfry(v);
-          return nowyTelefon !== null ? nowyTelefon.replace(/\D/g, "") : rozsypTekst(v, ctx.ziarno, "telefon");
+          ctx.igly.dodajCyfry(v);
+          return nowyTelefon !== null ? nowyTelefon.replace(/\D/g, "") : rozsypTekst(v, ctx.ziarno, "telefon", ctx.igly.cyfry);
         }
-        const wynik = przetworzWartosc(p.regula, v, `${tabela}.${p.nazwa}`, ctx, igly);
+        const wynik = przetworzWartosc(p.regula, v, `${tabela}.${p.nazwa}`, ctx);
         if (p.regula === R.TELEFON) nowyTelefon = wynik;
         return wynik;
       });
@@ -601,36 +737,90 @@ function przetworzTabele(db, tabela, ctx, igly, raport) {
   return zmienionych;
 }
 
+/* ── PLIKI ROBOCZE ───────────────────────────────────────────────────────────
+   Pełna kopia bazy z danymi osobowymi nie może leżeć obok wyniku: pulpit
+   i Dokumenty bywają synchronizowane z chmurą, zanim praca się skończy.
+   Praca idzie w katalogu tymczasowym systemu, a wynik dostaje docelową nazwę
+   dopiero po skanie. Zwykły błąd sprząta `finally`. Po zabiciu procesu (Ctrl+C
+   przy pracy synchronicznej, wyłączenie zasilania) katalog zostaje, więc
+   każdy następny przebieg zamiata takie resztki. */
+const PREFIKS_TMP = "wertis-anonim-";
+const STARE_PO_MS = 60 * 60 * 1000;
+const SPRZATANIE = new Set();
+
+function sprzatnij() {
+  for (const p of SPRZATANIE) fs.rmSync(p, { recursive: true, force: true });
+  SPRZATANIE.clear();
+}
+
+function zamiotStare() {
+  const teraz = Date.now();
+  let nazwy = [];
+  try { nazwy = fs.readdirSync(os.tmpdir()); } catch { return; }
+  for (const nazwa of nazwy) {
+    if (!nazwa.startsWith(PREFIKS_TMP)) continue;
+    const p = path.join(os.tmpdir(), nazwa);
+    try {
+      if (teraz - fs.statSync(p).mtimeMs > STARE_PO_MS) fs.rmSync(p, { recursive: true, force: true });
+    } catch { /* ktoś inny go właśnie sprząta */ }
+  }
+}
+
+/** Żywa baza ma w nagłówku tryb WAL (bajty 18–19 równe 2). Kopia z `VACUUM INTO` ma 1. */
+function nagloweWal(sciezka) {
+  const b = Buffer.alloc(20);
+  const fd = fs.openSync(sciezka, "r");
+  try {
+    fs.readSync(fd, b, 0, 20, 0);
+  } finally {
+    fs.closeSync(fd);
+  }
+  return { sqlite: b.toString("latin1", 0, 15) === "SQLite format 3", wal: b[18] === 2 || b[19] === 2 };
+}
+
 /* ── CAŁOŚĆ ──────────────────────────────────────────────────────────────── */
 
 /**
  * @param {string} wejscie kopia bazy z folderu kopii
  * @param {string} wyjscie plik do utworzenia; nie może istnieć
- * @param {{ ziarno?: string, log?: (s: string) => void, reguly?: Record<string, string> }} [opcje]
- *   `reguly` nadpisuje regułę kolumny (`"tabela.kolumna": R.ZOSTAJE`). Służy testom,
- *   które sprawdzają, że błędna reguła kończy się odmową skanera, a nie wyciekiem.
+ * @param {{ ziarno?: string, log?: (s: string) => void, reguly?: Record<string, string>, skaner?: Function }} [opcje]
+ *   `ziarno`, `reguly` i `skaner` służą testom. Ziarno jawne daje wynik
+ *   odtwarzalny, więc wiersz poleceń go nie przyjmuje. `reguly` nadpisuje regułę
+ *   kolumny (`"tabela.kolumna": R.ZOSTAJE`), a `skaner` podmienia skaner, żeby
+ *   sprawdzić, że jego awaria nie zostawia wyniku.
  */
 export function anonimizuj(wejscie, wyjscie, opcje = {}) {
   const log = opcje.log ?? (() => {});
   if (!fs.existsSync(wejscie)) throw new Error(`Nie ma pliku ${wejscie}.`);
-  if (fs.existsSync(wyjscie)) throw new Error(`Plik ${wyjscie} już istnieje. Wskaż nową nazwę, nic nie nadpisuję.`);
   if (path.resolve(wejscie) === path.resolve(wyjscie)) throw new Error("Wejście i wynik to ten sam plik.");
+  if (fs.existsSync(wyjscie)) throw new Error(`Plik ${wyjscie} już istnieje. Wskaż nową nazwę, nic nie nadpisuję.`);
   const wal = `${wejscie}-wal`;
   if (fs.existsSync(wal) && fs.statSync(wal).size > 0) {
     throw new Error("Obok pliku leży niepusty -wal, więc to żywa baza. Użyj kopii z folderu kopii serwera.");
   }
+  const naglowek = nagloweWal(wejscie);
+  if (!naglowek.sqlite) throw new Error("To nie jest baza SQLite.");
+  if (naglowek.wal) {
+    throw new Error("Plik jest w trybie WAL, czyli to żywa baza albo jej surowa kopia. Użyj kopii z folderu kopii serwera.");
+  }
   const ziarno = opcje.ziarno ?? crypto.randomBytes(32).toString("hex");
-  const praca = `${wyjscie}.praca`;
-  fs.copyFileSync(wejscie, praca);
+  zamiotStare();
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), PREFIKS_TMP));
+  const czesciowy = `${wyjscie}.czesciowy`;
+  SPRZATANIE.add(tmp);
   const igly = new Igly();
-  const raport = { tabele: 0, wierszy: 0, oproznione: [], kolumny: [], skaner: [], pominieteIgly: 0 };
+  const raport = { tabele: 0, wierszy: 0, oproznione: [], kolumny: [], skaner: [], pominieteIgly: 0, igly: 0 };
   const liczby = new Map();
   try {
+    const praca = path.join(tmp, "praca.db");
+    const kandydat = path.join(tmp, "wynik.db");
+    fs.copyFileSync(wejscie, praca);
     const db = new DatabaseSync(praca);
     try {
       db.exec("PRAGMA foreign_keys = OFF; PRAGMA synchronous = OFF; PRAGMA journal_mode = OFF;");
       const ctx = {
-        ziarno, wyliczenia: wyliczeniaZeSchematu(db), krotkie: new Map(), nadpisania: opcje.reguly,
+        ziarno, igly, wyliczenia: wyliczeniaZeSchematu(db), nadpisania: opcje.reguly, osobowych: 0,
+        unikalne: new Map(),
         klient: new Zamienniki("klient", ziarno),
         pracownik: new Zamienniki("pracownik", ziarno),
         osoba: new Zamienniki("osoba", ziarno),
@@ -638,6 +828,7 @@ export function anonimizuj(wejscie, wyjscie, opcje = {}) {
       const tabele = db.prepare(
         "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'towar_fts%' AND sql NOT LIKE 'CREATE VIRTUAL%' ORDER BY name").all().map((t) => t.name);
       for (const t of tabele) liczby.set(t, db.prepare(`SELECT COUNT(*) AS n FROM "${t}"`).get().n);
+      zabronZamienniki(db, tabele, ctx);
       /* Adres dostawy i dane firmy nie mają reguły, która by je zbierała jako
          wartości do skanu, więc dopisujemy je tu, zanim znikną. */
       const doZebrania = [
@@ -649,10 +840,10 @@ export function anonimizuj(wejscie, wyjscie, opcje = {}) {
         if (!liczby.has(t)) continue;
         let wartosci = [];
         try {
-          wartosci = db.prepare(`SELECT DISTINCT "${k}" AS v FROM "${t}"`).all();
+          wartosci = rozne(db, t, k);
         } catch { /* kopia sprzed migracji: kolumny jeszcze nie ma */ }
-        for (const w of wartosci) {
-          if (k === "nip" || k === "telefon") igly.dodajCyfry(w.v); else igly.dodaj(w.v);
+        for (const v of wartosci) {
+          if (k === "nip" || k === "telefon") igly.dodajCyfry(v); else igly.dodaj(v);
         }
       }
       for (const t of tabele) {
@@ -664,69 +855,88 @@ export function anonimizuj(wejscie, wyjscie, opcje = {}) {
           raport.oproznione.push(t);
           continue;
         }
-        raport.wierszy += przetworzTabele(db, t, ctx, igly, raport);
+        raport.wierszy += przetworzTabele(db, t, ctx, raport);
         raport.tabele++;
       }
       db.exec("COMMIT");
+      raport.osobowych = ctx.osobowych;
     } finally {
       db.close();
     }
     const koncowa = new DatabaseSync(praca);
     try {
       koncowa.exec("PRAGMA journal_mode = DELETE");
-      koncowa.prepare("VACUUM INTO ?").run(wyjscie);
+      koncowa.prepare("VACUUM INTO ?").run(kandydat);
     } finally {
       koncowa.close();
     }
-  } catch (e) {
-    fs.rmSync(wyjscie, { force: true });
-    throw e;
-  } finally {
-    fs.rmSync(praca, { force: true });
-  }
-  raport.pominieteIgly = igly.pominiete;
+    raport.pominieteIgly = igly.pominiete;
+    raport.igly = igly.slowa.size;
 
-  /* Sprawdzenie wyniku: spójność pliku, liczba wierszy, skaner wycieków. */
-  const wynik = new DatabaseSync(wyjscie);
-  try {
-    const kontrola = wynik.prepare("PRAGMA quick_check").all().map((r) => Object.values(r)[0]);
-    if (kontrola.length !== 1 || kontrola[0] !== "ok") throw new Error(`Wynik nie przeszedł quick_check: ${kontrola.join("; ")}`);
-    for (const [t, n] of liczby) {
-      if (TABELE_DO_OPROZNIENIA.includes(t)) continue;
-      const po = wynik.prepare(`SELECT COUNT(*) AS n FROM "${t}"`).get().n;
-      if (po !== n) throw new Error(`Tabela ${t} miała ${n} wierszy, a po anonimizacji ${po}.`);
+    /* Skaner, który nie miał czego szukać, nie dowodzi niczego. Baza z wartościami
+       osobowymi i zerem igieł to błąd narzędzia, a nie czysty wynik. */
+    if (raport.osobowych > 0 && igly.slowa.size === 0 && igly.pominiete === 0) {
+      throw new Error("Skaner nie miał czego szukać, choć w bazie są loginy albo odbiorcy. Przerwano.");
     }
-  } catch (e) {
-    wynik.close();
-    fs.rmSync(wyjscie, { force: true });
-    throw e;
-  }
-  wynik.close();
-  const stale = new Set(raport.kolumny.filter((k) => k.regula === R.ZOSTAJE).map((k) => `${k.tabela}.${k.kolumna}`));
-  raport.skaner = skanujWycieki(wyjscie, igly, stale);
-  log(`skaner: ${igly.slowa.size} wartości do sprawdzenia`);
-  if (raport.skaner.length) {
-    fs.rmSync(wyjscie, { force: true });
-    const blad = new Error("Skaner znalazł w wyniku dane, które miały zniknąć. Wynik skasowany.");
-    blad.raport = raport;
-    throw blad;
+
+    /* Spójność wyniku: plik jest bazą i nic nie zginęło ani nie doszło. */
+    const wynik = new DatabaseSync(kandydat);
+    try {
+      const kontrola = wynik.prepare("PRAGMA quick_check").all().map((r) => Object.values(r)[0]);
+      if (kontrola.length !== 1 || kontrola[0] !== "ok") throw new Error(`Wynik nie przeszedł quick_check: ${kontrola.join("; ")}`);
+      for (const [t, n] of liczby) {
+        if (TABELE_DO_OPROZNIENIA.includes(t)) continue;
+        const po = wynik.prepare(`SELECT COUNT(*) AS n FROM "${t}"`).get().n;
+        if (po !== n) throw new Error(`Tabela ${t} miała ${n} wierszy, a po anonimizacji ${po}.`);
+      }
+    } finally {
+      wynik.close();
+    }
+
+    const stale = new Set(raport.kolumny.filter((k) => k.regula === R.ZOSTAJE).map((k) => `${k.tabela}.${k.kolumna}`));
+    raport.skaner = (opcje.skaner ?? skanujWycieki)(kandydat, igly, stale);
+    log(`skaner: ${igly.slowa.size} wartości do sprawdzenia`);
+    if (raport.skaner.length) {
+      const blad = new Error("Skaner znalazł w wyniku dane, które miały zniknąć. Wynik nie powstał.");
+      blad.raport = raport;
+      throw blad;
+    }
+
+    /* Docelowa nazwa pojawia się dopiero teraz i tylko w całości: kopia obok,
+       potem zmiana nazwy w tym samym katalogu. */
+    if (fs.existsSync(wyjscie)) throw new Error(`Plik ${wyjscie} pojawił się w trakcie pracy. Nic nie nadpisuję.`);
+    SPRZATANIE.add(czesciowy);
+    fs.copyFileSync(kandydat, czesciowy);
+    fs.renameSync(czesciowy, wyjscie);
+    SPRZATANIE.delete(czesciowy);
+  } finally {
+    fs.rmSync(czesciowy, { force: true });
+    fs.rmSync(tmp, { recursive: true, force: true });
+    SPRZATANIE.delete(tmp);
   }
   return raport;
 }
 
 /* ── WIERSZ POLECEŃ ──────────────────────────────────────────────────────── */
 
-function uruchom(argv) {
-  const ziarno = argv.find((a) => a.startsWith("--ziarno="))?.slice(9);
+/** Kody wyjścia: 0 gotowe, 1 błąd użycia albo pliku, 2 skaner znalazł dane osobowe. */
+export function uruchom(argv) {
+  const opcje = argv.filter((a) => a.startsWith("--"));
   const pozycyjne = argv.filter((a) => !a.startsWith("--"));
-  if (argv.includes("--pomoc") || pozycyjne.length !== 2) {
-    console.error("Użycie: node tools/anonimizuj-baze.mjs <kopia.db> <wynik.db> [--ziarno=tekst]");
+  const nieznana = opcje.find((o) => o !== "--pomoc");
+  if (nieznana) {
+    console.error(`Nieznana opcja ${nieznana}. Narzędzie nie przyjmuje żadnych, bo jawne ziarno daje wynik odtwarzalny.`);
+    return 1;
+  }
+  if (opcje.includes("--pomoc") || pozycyjne.length !== 2) {
+    console.error("Użycie: node tools/anonimizuj-baze.mjs <kopia.db> <wynik.db>");
     console.error("Wejściem jest kopia z folderu kopii serwera, nigdy żywa baza.");
     return pozycyjne.length === 2 ? 0 : 1;
   }
   const [wejscie, wyjscie] = pozycyjne;
+  process.on("exit", sprzatnij);
   try {
-    const r = anonimizuj(wejscie, wyjscie, { ziarno });
+    const r = anonimizuj(wejscie, wyjscie);
     const licz = {};
     for (const k of r.kolumny) licz[k.regula] = (licz[k.regula] ?? 0) + 1;
     fs.writeFileSync(`${wyjscie}.kolumny.txt`,
@@ -735,7 +945,7 @@ function uruchom(argv) {
     console.log(`Tabel: ${r.tabele}, przetworzonych wierszy: ${r.wierszy}.`);
     console.log(`Opróżnione tabele: ${r.oproznione.join(", ") || "brak"}.`);
     console.log(`Kolumny tekstowe wg reguły: ${Object.entries(licz).map(([k, n]) => `${k} ${n}`).join(", ")}.`);
-    console.log(`Skaner wycieków: nic nie znaleziono (pominięto ${r.pominieteIgly} wartości krótszych niż 4 znaki).`);
+    console.log(`Skaner wycieków sprawdził ${r.igly} wartości i nic nie znalazł. Pominięto ${r.pominieteIgly} krótszych niż 4 znaki, których skaner nie widzi.`);
     console.log(`Lista kolumn i reguł, bez danych: ${wyjscie}.kolumny.txt`);
     return 0;
   } catch (e) {
