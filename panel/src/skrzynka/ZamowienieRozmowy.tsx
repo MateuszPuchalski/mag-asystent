@@ -1,9 +1,9 @@
-import React, { useState } from "react";
-import { Copy, ExternalLink, ShoppingCart, Truck } from "lucide-react";
+import React from "react";
+import { ExternalLink, ShoppingCart, Truck } from "lucide-react";
 import type { StanPrzesylki, ZamowienieRozmowy as Dane } from "../api/typy";
 import { useSprawdzPrzesylkeRozmowy, useWskazOferte } from "../api/rozmowy";
 import { zlote } from "../api/zwroty";
-import { NaglowekSekcji, czas } from "../ui";
+import { NaglowekSekcji, Skopiuj, czas } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
 import { ZnakAllegro } from "../ui/ZnakAllegro";
 
@@ -44,7 +44,6 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null,
    */
   bezPaczki?: boolean;
 }) {
-  const [skopiowano, setSkopiowano] = useState(false);
   const wskaz = useWskazOferte();
   const z = zamowienie.pobrane;
   const doWskazania = Boolean(z && z.pozycje.length > 1 && ofertaRozmowy === null);
@@ -56,19 +55,12 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null,
           jest przycisk kopiowania obok, a od sprawdzenia podpowiedź. */}
       <span className="font-mono text-podpis text-slate-500" title={zamowienie.externalId}>
         {zamowienie.externalId.slice(0, 8)}…</span>
-      {/* UUID nikt nie przepisuje z ekranu ręcznie — jak przy zwrotach. */}
-      {/* kontrast: to przycisk ikonowy, ikona nie niesie pisma */}
-      <button type="button" title="Kopiuj numer zamówienia"
-        className="rounded p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-700"
-        onClick={() => {
-          void navigator.clipboard?.writeText(zamowienie.externalId).then(() => {
-            setSkopiowano(true);
-            setTimeout(() => setSkopiowano(false), 1500);
-          }).catch(() => {});
-        }}>
-        <Copy size={13} />
-        <span className="sr-only">{skopiowano ? "Skopiowano" : "Kopiuj"}</span>
-      </button>
+      {/* UUID nikt nie przepisuje z ekranu ręcznie — jak przy zwrotach.
+          `Skopiuj` idzie przez `kopiujDoSchowka`, bo biuro pracuje po zwykłym
+          HTTP, gdzie `navigator.clipboard` nie istnieje: surowe wywołanie
+          milczało, a przycisk nie kopiował niczego. Porażkę `Skopiuj` mówi
+          sam (`ui/kopiuj.ts`, strażnik `Schowek.test.ts`). */}
+      <Skopiuj tekst={zamowienie.externalId} tytul="Kopiuj numer zamówienia" />
       {zamowienie.link && <a href={zamowienie.link} target="_blank" rel="noopener noreferrer"
         aria-label="Otwórz w Allegro"
         /* Cichnie jak bliźniak przy ofercie (0.249.0): dwa identyczne błękitne
