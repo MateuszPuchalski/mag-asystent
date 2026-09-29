@@ -1,73 +1,45 @@
 # Worker Sfery — dokumenty w Subiekcie (C#/.NET)
 
 Trzeci proces WERTIS, obok `wertis-api` i `wertis-worker`. Czyta tę samą
-tabelę `sfera_queue` w SQLite i wykonuje **zadania dokumentowe** przez COM
-Sfery Subiekta GT:
+kolejkę `sfera_queue` w SQLite i wykonuje **zadania dokumentowe** przez COM
+Sfery Subiekta GT. `set_location` zostaje w workerze Node, bo to UPDATE jednej
+kolumny i Sfera nie jest do niego potrzebna.
 
 | typ zadania | co powstaje |
 |---|---|
 | `mm` | dokument przesunięcia magazynowego |
-| `korekta_zwrot` | korekta sprzedaży, MM na magazyn zwrotów oraz (0.67.0) RW dla pozycji zniszczonych — atomowo |
-| `zw` | ZW do paragonu (0.349.0), sam dokument bez MM — zlecany po zapisaniu kwoty zwrotu, kroki w `docs/sfera-com.md` §2m |
+| `korekta_zwrot` | korekta sprzedaży, MM na magazyn zwrotów i RW dla pozycji zniszczonych — atomowo |
+| `zw` | ZW do paragonu, bez MM; kroki w `docs/sfera-com.md` §2m |
 
-`set_location` zostaje w workerze Node (bezpośredni UPDATE jednej kolumny,
-Sfera do niego niepotrzebna).
-
-**Atomowo** znaczy: gdy któreś ogniwo padnie, wszystko przed nim zostaje
-usunięte — pad RW wycofuje MM i korektę, pad MM wycofuje korektę. Subiekt nie
-ma transakcji obejmującej kilka dokumentów, więc wycofanie robi ten kod ręką.
-Gdy nie uda się i wycofanie, zadanie kończy się błędem wymieniającym Z IMIENIA
-dokumenty do ręcznego usunięcia w Subiekcie przed ponowieniem.
-
-Dlaczego MM nie da się zrobić SQL-em i dlaczego to osobny proces — spec §9
-oraz [`docs/architektura.md`](../docs/architektura.md). Kontrakt wywołań,
-z którego wynika ten kod: [`server/src/adapters/sfera.ts`](../server/src/adapters/sfera.ts).
+**Atomowo** znaczy: gdy ogniwo padnie, wszystko przed nim zostaje usunięte,
+bo Subiekt nie ma transakcji na kilka dokumentów. Nieudane wycofanie kończy się
+błędem, który wymienia Z IMIENIA dokumenty do ręcznego usunięcia. Dlaczego
+osobny proces: [`docs/architektura.md`](../docs/architektura.md) §3. Kontrakt:
+[`server/src/adapters/sfera.ts`](../server/src/adapters/sfera.ts).
 
 ## Wymagania
 
 | co | po co |
 |---|---|
-| Windows z zainstalowanym Subiektem GT | COM Sfery jest biblioteką lokalną |
-| **licencja Sfery** do Subiekta GT | bez niej COM nie wystartuje; na podmiocie testowym wystarczy próbna Sfera (15 dni) |
-| konto operatora Subiekta z prawem wystawiania MM i korekt | to użytkownik Subiekta, nie login SQL |
+| Windows z Subiektem GT | COM Sfery jest biblioteką lokalną |
+| **licencja Sfery** | bez niej COM nie wystartuje; na podmiocie testowym wystarczy próbna |
+| operator Subiekta z prawem do MM i korekt | to użytkownik Subiekta, nie login SQL |
 | dostęp do `C:\wertis\server\data\wertis.db` | wspólna kolejka z API i workerem Node |
-| `SFERA_WORKER=1` w `wertis.env` | inaczej zadania dokumentowe bierze worker Node — proces odmawia startu, żeby nie było dwóch wykonawców |
+| `SFERA_WORKER=1` w `wertis.env` | bez tego proces odmawia startu, żeby nie było dwóch wykonawców |
 
 ## Budowa i wdrożenie
 
-**Najkrócej: weź exe z CI.** Workflow `Worker Sfery` buduje przy każdej zmianie
-w `sfera-worker/` samowystarczalny `wertis-sfera-worker.exe` dla Windows x64
-i wiesza go jako artefakt przebiegu (Actions → wybrany przebieg → Artifacts →
-`wertis-sfera-worker`). Late binding sprawia, że kompilacja nie potrzebuje ani
-Subiekta, ani Windowsa, więc ta sama maszyna, która sprawdza testy, produkuje
-gotowy plik. Wtedy **nie instalujesz .NET SDK nigdzie** — ani u siebie, ani
-u klienta — i nie ma pytania „skąd ten exe".
-
-Droga poniżej zostaje na wypadek pracy bez sieci albo poprawki, której nie ma
-jeszcze w repozytorium.
-
-**Bez .NET 8 SDK ten skrypt nie ruszy.** Instalacja na Windowsie:
+**Najkrócej: weź exe z CI** (workflow `Worker Sfery` → Artifacts →
+`wertis-sfera-worker`). Late binding sprawia, że kompilacja nie potrzebuje
+Subiekta ani Windowsa. Build lokalny wymaga **.NET 8 SDK**, nie Runtime
+(`winget install Microsoft.DotNet.SDK.8`, potem nowe okno). SDK idzie na maszynę
+dewelopera, **nie na serwer firmy**: `--self-contained` wkłada runtime do exe.
 
 ```powershell
-winget install Microsoft.DotNet.SDK.8
-```
-
-Potem otwórz **nowe** okno PowerShella (instalator zmienia `PATH`, bieżąca sesja
-go nie widzi) i sprawdź `dotnet --version` — ma wyjść `8.x`.
-
-Pobierając ręcznie, weź **SDK**, nie Runtime, i wariant **Windows x64 `.exe`**.
-Plik `.pkg` jest instalatorem macOS i na Windowsie się nie otworzy.
-
-SDK idzie na maszynę dewelopera, **nie na serwer firmy**. Po to jest
-`--self-contained`: gotowy exe niesie runtime w sobie, więc pod `C:\wertis\`
-nie trzeba instalować niczego.
-
-```powershell
-# maszyna z .NET 8 SDK (deweloper — NIE serwer firmy).
-# Ścieżka jest względna wobec katalogu, w którym stoisz — stąd dwie drogi:
+# maszyna z .NET 8 SDK (NIE serwer firmy); ścieżka względna wobec katalogu:
 powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\build.ps1  # z korzenia repo
 powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1                # z katalogu sfera-worker
-# → sfera-worker\publish\wertis-sfera-worker.exe (samowystarczalny, win-x64)
+# → sfera-worker\publish\wertis-sfera-worker.exe
 
 # serwer firmy:
 #  1. skopiuj exe do C:\wertis\sfera-worker\
@@ -77,206 +49,102 @@ nssm install wertis-sfera C:\wertis\sfera-worker\wertis-sfera-worker.exe
 #  4. zrestartuj WSZYSTKIE usługi (wszystkie czytają wertis.env)
 ```
 
-Kolejność i bramki wdrożenia — [`DEPLOY.md`](../DEPLOY.md) §6, etap 2 oraz
-[`docs/wdrozenie.md`](../docs/wdrozenie.md). Najkrócej: najpierw `--dry-run`
-na PODMIOCIE TESTOWYM (na kopii bazy Sfera nie wstaje — traci licencję), potem
-jedno MM na kartotece próbnej, dopiero potem produkcja.
+Kolejność i bramki: [`DEPLOY.md`](../DEPLOY.md) §6, etap 2, oraz
+[`docs/wdrozenie.md`](../docs/wdrozenie.md). Najpierw `--dry-run` na podmiocie
+testowym (na kopii bazy Sfera traci licencję), potem jedno MM na kartotece
+próbnej, dopiero potem produkcja.
 
 ## Konfiguracja — ten sam `wertis.env` co API i worker
 
-Szuka pliku: `WERTIS_ENV_FILE` → katalog exe → katalog wyżej (`C:\wertis`) →
-bieżący. Zmienna środowiskowa wygrywa z plikiem (semantyka jak w Node).
-Czytane klucze: `DB_PATH`, `SGT_MODE` (wymagane `mssql`), `WORKER_POLL_MS`,
-`MSSQL_SERVER`, `MSSQL_INSTANCE`, `MSSQL_PORT`, `MSSQL_DATABASE`,
-`SFERA_WORKER`, `SFERA_OPERATOR`, `SFERA_OPERATOR_HASLO`, `SFERA_SQL_LOGIN`,
-`SFERA_SQL_HASLO`, `SFERA_PROGID`, `SFERA_PRODUKT`, `SFERA_AUTENTYKACJA`,
-`SFERA_TRYB_URUCHOMIENIA`.
+Plik szuka się w kolejności: `WERTIS_ENV_FILE` → katalog exe → katalog wyżej
+(`C:\wertis`) → bieżący. Zmienna środowiskowa wygrywa z plikiem. Klucze:
+`DB_PATH`, `SGT_MODE` (wymagane `mssql`), `WORKER_POLL_MS`, `MSSQL_SERVER`,
+`MSSQL_INSTANCE`, `MSSQL_PORT`, `MSSQL_DATABASE`, `SFERA_WORKER`,
+`SFERA_OPERATOR`, `SFERA_OPERATOR_HASLO`, `SFERA_SQL_LOGIN`, `SFERA_SQL_HASLO`,
+`SFERA_PROGID`, `SFERA_PRODUKT`, `SFERA_AUTENTYKACJA`, `SFERA_TRYB_URUCHOMIENIA`.
 
-Dwie rzeczy warto wiedzieć, zanim się je wypełni. **Login SQL jest osobny od
-operatora**: `SFERA_SQL_LOGIN` otwiera bazę, `SFERA_OPERATOR` jest użytkownikiem
-Subiekta, a przy autentykacji mieszanej Sfera chce obu. To nie jest `MSSQL_USER`
-— tamten login ma prawa do sześciu tabel, a Sfera wystawia dokumenty.
-**Adres serwera niesie instancję**: worker skleja `MSSQL_SERVER\MSSQL_INSTANCE`
-(domyślnie `INSERTGT`), bo tego oczekuje Sfera. Powód i źródła:
-[`docs/sfera-com.md`](../docs/sfera-com.md).
+**Login SQL jest osobny od operatora**: `SFERA_SQL_LOGIN` otwiera bazę,
+`SFERA_OPERATOR` jest użytkownikiem Subiekta, a przy autentykacji mieszanej
+Sfera chce obu. To nie jest `MSSQL_USER`: tamten login ma wąskie prawa do kilku
+tabel, a Sfera wystawia dokumenty. **Adres serwera niesie instancję**: worker
+skleja `MSSQL_SERVER\MSSQL_INSTANCE` (domyślnie `INSERTGT`), bo tego oczekuje
+Sfera ([`docs/sfera-com.md`](../docs/sfera-com.md)).
 
-Stałe retry (backoff 5 s / 30 s / 2 min, trzy próby, ponowienie bufora co
-60 s) są zaszyte identycznie jak w workerze Node — źródłem jest
-`config.worker` w [`server/src/config.ts`](../server/src/config.ts).
+Retry (5 s / 30 s / 2 min, trzy próby, bufor co 60 s) jest taki sam jak
+w workerze Node; źródłem jest `config.worker` w
+[`server/src/config.ts`](../server/src/config.ts).
 
 ## Flagi
 
 | flaga | działanie |
 |---|---|
-| `--dry-run` | pełny cykl pick → done **bez Sfery**; numer `MM DRY-RUN/n` w `sgt_doc_number`, `sfera_mode='dry-run'` w heartbeacie. Działa też na Linuksie. |
+| `--dry-run` | pełny cykl pick → done **bez Sfery**; numer `MM DRY-RUN/n`, `sfera_mode='dry-run'` w heartbeacie. Działa też na Linuksie |
 | `--once` | jeden tick pętli i wyjście — do testów |
 
-Obie razem bramkują całą kolejkę w CI — `test-dymny.sh` zakłada bazę ze schematu
-serwera, przepuszcza przez workera jedno MM i sprawdza status, numer, zdarzenie
-audytu, heartbeat oraz guard kolejności. Uruchamiasz to samo u siebie:
-
-```bash
-sfera-worker/test-dymny.sh
-```
+Obie razem bramkują kolejkę w CI. `sfera-worker/test-dymny.sh` zakłada bazę ze
+schematu serwera, przepuszcza jedno MM i sprawdza status, numer, zdarzenie
+audytu, heartbeat oraz guard kolejności. To samo uruchamiasz u siebie.
 
 ## Sonda — nazwy Sfery bez wystawiania dokumentu
 
-[`sonda.ps1`](sonda.ps1) otwiera sesję Subiekta i wypisuje nazwy składowych:
-obiektu GT, Subiekta, managerów dokumentów wraz z sygnaturami metod.
-**Niczego nie zapisuje** — `Zapisz()` nie pada w niej ani razu. Odpowiada na
-większość listy niżej w jednym przebiegu, bez pakietu SDK i bez śladu w bazie.
+[`sonda.ps1`](sonda.ps1) otwiera sesję Subiekta i wypisuje nazwy składowych
+obiektów z sygnaturami metod. **Niczego nie zapisuje** — `Zapisz()` nie pada
+ani razu. Ustawienia bierze z `wertis.env` albo z parametrów (`-PlikEnv`,
+`-Baza`, `-Operator`, `-LoginSql`). Wynik idzie na ekran i do
+`sonda-sfery.txt`, a ustalenia do `docs/sfera-com.md`.
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File sfera-worker\sonda.ps1
+powershell ... -File sonda.ps1 -SzkicMM -Towar 1234    # MM z pozycją, tylko w pamięci
+powershell ... -File sonda.ps1 -SzkicZW -Paragon 123456 -Ilosci "1=0,2=1" -WzorZW 654321
 ```
 
-Ustawienia bierze z `wertis.env`: szuka go od katalogu skryptu i od katalogu
-roboczego, w górę aż do korzenia dysku, na końcu w `C:\wertis`. Gdy nie znajdzie,
-wypisuje wszystkie sprawdzone ścieżki. Można też wskazać plik wprost albo podać
-wartości z ręki:
-
-```powershell
-powershell ... -File sonda.ps1 -PlikEnv C:\wertis\wertis.env
-powershell ... -File sonda.ps1 -Baza PODMIOT -Operator Szef -OperatorHaslo *** -LoginSql sa -HasloSql ***
-```
-
-Wynik ląduje na ekranie i w `sonda-sfery.txt`. To on wraca do repozytorium jako
-wypełniona lista — ustalenia dopisuje się do
-[`docs/sfera-com.md`](../docs/sfera-com.md).
-
-Ostatni przełącznik, `-SzkicMM`, jest jedynym miejscem, gdzie sonda woła
-`Dodaj*`. Tworzy MM jako obiekt w pamięci i wypisuje jego właściwości —
-`Zapisz()` nie pada, więc dokument nie powstaje. To zamyka nazwy widoczne
-wyłącznie na obiekcie dokumentu, bez wystawiania czegokolwiek. Domyślnie
-wyłączony, bo obietnica „sonda niczego nie tworzy" ma zostać dosłowna.
-
-Sonda ustawia magazyny, zanim sięgnie po `Pozycje` — bierze je z `wertis.env`
-(`MAG_ID_MAG` → `MAG_ID_ZWROTY`, ten sam kierunek co MM zwrotu), więc nie trzeba
-ich podawać:
-
-```powershell
-powershell ... -File sonda.ps1 -SzkicMM
-```
-
-Kartoteka podana parametrem dokłada do szkicu jedną POZYCJĘ — też w pamięci,
-bo `Zapisz()` dalej nie pada. To jedyna droga do nazwy pola ilości:
-
-```powershell
-powershell ... -File sonda.ps1 -SzkicMM -Towar 1234
-```
-
-Gdy w pliku ich nie ma, sonda mówi to wprost. Wtedy podaje się LICZBY, nie nazwy:
-
-```powershell
-powershell ... -File sonda.ps1 -SzkicMM -MagNadawczy 1 -MagOdbiorczy 3
-```
-
-### Szkic ZW — zwrot do paragonu (audyt zwrotów, 15 września 2026)
-
-Biuro wystawia dziś ZW ręką: paragon PA, „Wypisz zwrot", zera w pozycjach, które
-nie wróciły. Zanim zrobi to worker, trzeba znać nazwy na obiekcie ZW. Przełącznik
-`-SzkicZW` tworzy ZW w pamięci i podpina go pod paragon. `Zapisz()` nie pada,
-więc dokument nie powstaje.
-
-Paragon podaje się jego `dok_Id`, nie numerem. Znajdziesz go w SQL Server
-Management Studio na bazie podmiotu:
-
-```sql
-SELECT dok_Id, dok_NrPelny FROM dok__Dokument WHERE dok_NrPelny = 'PA 3351/MAG/09/2026';
-```
-
-```powershell
-powershell ... -File sonda.ps1 -PlikEnv C:\wertis\wertis.env -SzkicZW -Paragon 123456 -Wynik C:\wertis\sonda-zw.txt
-```
-
-Sonda wypisuje pozycje ZW po powiązaniu, z ilościami, oraz pola rodzaju zwrotu,
-płatności i skutku magazynowego. Danych kontrahenta nie wypisuje, bo plik wynikowy
-wraca do repozytorium.
-
-Dwa przełączniki odpowiadają na pytania, których nie rozstrzyga sam szkic
-(`docs/sfera-com.md` §2m):
-
-```powershell
-powershell ... -File sonda.ps1 -PlikEnv C:\wertis\wertis.env -SzkicZW -Paragon 123456 -Ilosci "1=0,2=1" -WzorZW 654321
-```
-
-`-Ilosci` ustawia ilości na szkicu tak, jak biuro w oknie ZW, i pokazuje
-przeliczoną wartość oraz płatność. `-WzorZW` tylko WCZYTUJE ZW wystawiony
-ręcznie, żeby odczytać liczbę rodzaju „zwrot ze sprzedaży".
+`-SzkicMM` i `-SzkicZW` to jedyne miejsca, gdzie sonda woła `Dodaj*`; dokument
+powstaje w pamięci i nie jest zapisywany. Magazyny szkicu MM idą
+z `MAG_ID_MAG` → `MAG_ID_ZWROTY` albo z `-MagNadawczy` i `-MagOdbiorczy`.
+Paragon podaje się jego `dok_Id`. `-WzorZW` tylko WCZYTUJE ręczny ZW. Danych
+kontrahenta sonda nie wypisuje, bo plik wynikowy wraca do repozytorium.
 
 ## `[WERYFIKUJ]` — do ustalenia na maszynie ze Sferą
 
-Wszystko, co dotyczy COM, siedzi w **jednym pliku**
-[`src/SferaComAdapter.cs`](src/SferaComAdapter.cs) i jest oznaczone
-`[WERYFIKUJ]` (konwencja repo — wartość do potwierdzenia na własnym systemie):
+Wszystko, co dotyczy COM, siedzi w jednym pliku,
+[`src/SferaComAdapter.cs`](src/SferaComAdapter.cs). Gdy nazwa jest zła, worker
+podaje w komunikacie wywołanie i **numer punktu z tej listy**:
 
-1. **Zamknięte (0.197.4):** ProgID `"InsERT.GT"` działa, a `gtaProduktSubiekt`
-   to **1** — sonda odczytała `ProduktNazwa` dla kolejnych numerów.
-   Tabela w `docs/sfera-com.md` §2c.
-2. **Nazwy ustalone (0.197.2)**, sonda wypisała komplet właściwości logowania.
-   Do potwierdzenia zostaje sama wartość `SFERA_AUTENTYKACJA` — mieszana kontra
-   Windows. Przy mieszanej Sfera chce ZARÓWNO `Uzytkownik`/`UzytkownikHaslo`,
-   jak i `Operator`/`OperatorHaslo`.
-
-   > Odmowa z kodem `0x80041329` to najczęściej **hasło loginu SQL zaczynające
-   > się od cyfry albo litery `a`–`f`**. Windows dokleja do tego kodu opis
-   > Harmonogramu zadań — tekst o „aparacie planowania" jest mylący i nie
-   > dotyczy Sfery. Szczegóły: `docs/sfera-com.md` §2b.
-3. **Zamknięte (0.198.5):** `Uruchom(gtaUruchomDopasuj, gtaUruchomNowy |
-   gtaUruchomWTle)`, czyli `Uruchom(0x0, 0x6)` — zmierzone, sesja otwiera się
-   BEZ OKNA. Usługa da się uruchomić bez pulpitu. `docs/sfera-com.md` §2g.
-4. **Zamknięte w całości (0.198.12):** `SuDokumentyManager.DodajMM()`,
-   magazyny `MagazynNadawczyId` i `MagazynOdbiorczyId` (zgadnięte
-   `MagazynZrodlowyId`/`MagazynDocelowyId` NIE ISTNIEJĄ),
-   `Pozycje.Dodaj(tw_Id)` oraz `IloscJm` na pozycji. Cała ścieżka MM stoi na
-   nazwach zmierzonych.
+1. **Zamknięte:** ProgID `"InsERT.GT"` działa, `gtaProduktSubiekt` to **1**
+   (`docs/sfera-com.md` §2c).
+2. Nazwy logowania ustalone. Otwarta zostaje wartość `SFERA_AUTENTYKACJA`
+   (mieszana kontra Windows). Przy mieszanej Sfera chce `Uzytkownik`/
+   `UzytkownikHaslo` oraz `Operator`/`OperatorHaslo`. Odmowa `0x80041329` to
+   najczęściej hasło loginu SQL zaczynające się od cyfry albo litery `a`–`f`;
+   opis o Harmonogramie zadań jest mylący (`docs/sfera-com.md` §2b).
+3. **Zamknięte:** `Uruchom(0x0, 0x6)` otwiera sesję BEZ OKNA, więc usługa działa
+   bez pulpitu (`docs/sfera-com.md` §2g).
+4. **Zamknięte:** `SuDokumentyManager.DodajMM()`, `MagazynNadawczyId`,
+   `MagazynOdbiorczyId`, `Pozycje.Dodaj(tw_Id)` i `IloscJm` na pozycji.
 5. Czy `Zapisz()` wystawia dokument **wykonany**, czy odkłada do bufora.
-   Skutek magazynowy ma własne wywołania, a sygnatura mówi czym się posługują:
-   `void SkutekMagazynowyWywolaj(int)` — identyfikatorem dokumentu (0.198.6).
-   Czy `Zapisz()` robi to sam, pokaże pierwszy dokument.
-6. **Metoda, sygnatura i powiązanie zamknięte (0.198.7):**
-   `SuDokument DodajKFS()`, a dokument pierwotny wskazuje się wywołaniem
-   `NaPodstawie(dok_Id)`. Że Variant bierze identyfikator, mówi bliźniacze
-   `NaPodstawieWielu(SAFEARRAY(int))`.
+   Skutek magazynowy ma własne wywołanie `SkutekMagazynowyWywolaj(int)`.
+6. **Zamknięte:** `SuDokument DodajKFS()` i `NaPodstawie(dok_Id)`. Pozycję
+   znajduje się przez `Element(i)` od jedynki i `TowarId`. Otwarte zostaje
+   znaczenie `IloscJm` na korekcie; kod ustawia ilość docelową.
+7. Sygnatura `void Usun(bool)` zamknięta, znaczenie flagi nie. Adapter podaje
+   `false` jako działanie węższe; na tym stoi wycofanie łańcucha.
+8. `SuDokumentyManager.DodajRW()` zamknięte. `MagazynId` istnieje na sesji,
+   dokumencie i pozycji; właściwą drogę rozstrzyga pierwszy RW.
 
-   > **Adresowanie pozycji zamknięte (0.198.12).** `SzukajTowar` NIE ISTNIEJE;
-   > kod przechodzi po `Element(i)` i porównuje `TowarId`. `Element` liczy
-   > **od jedynki** — zmierzone. Otwarte zostaje znaczenie `IloscJm` na
-   > korekcie: pozycja ma jedno pole ilości, a `IloscPoKorekcie` nie istnieje,
-   > więc kod ustawia ilość docelową. Rozstrzyga pierwsza prawdziwa korekta.
-7. **Sygnatura zamknięta (0.198.7):** `void Usun(bool)`. Znaczenie flagi nie —
-   adapter podaje `false` jako działanie węższe. Na tym stoi wycofanie
-   łańcucha, gdy dalsze ogniwo padnie.
-8. **Manager i metoda zamknięte (0.198.7):** `SuDokumentyManager.DodajRW()`.
-   Magazyn dostaje `MagazynNadawczyId` na dokumencie, ale `MagazynId` istnieje
-   też na SESJI i — od 0.198.12 — na samej POZYCJI. Trzy drogi, jedna prawdziwa;
-   rozstrzyga pierwszy RW na podmiocie testowym.
-
-Po ustaleniach poprawia się wyłącznie ten plik i buduje exe od nowa. Trzy
-wartości, które najczęściej wymagają korekty na miejscu, poprawia się jednak
-**bez budowania** — `SFERA_PROGID`, `SFERA_PRODUKT` i `SFERA_AUTENTYKACJA` stoją
-w `wertis.env`, więc kosztują restart usługi.
-
-Kolejność, która oszczędza wyjazdy: najpierw [sonda](#sonda--nazwy-sfery-bez-wystawiania-dokumentu)
-(punkty 1, 2, 4, 6, 8), potem jedno MM na kartotece próbnej (punkty 5 i 7 oraz
-nazwy właściwości dokumentu). Ustalenia zapisuje się w
-[`docs/sfera-com.md`](../docs/sfera-com.md), razem ze źródłem.
-
-Gdy nazwa jest zła, worker mówi to wprost: komunikat nazywa wywołanie i **numer
-punktu z tej listy**, zamiast zostawiać gołe „`__ComObject` does not contain
-a definition for `DodajMM`" w środku wystawiania dokumentu.
+`SFERA_PROGID`, `SFERA_PRODUKT` i `SFERA_AUTENTYKACJA` stoją w `wertis.env`,
+więc ich korekta kosztuje restart, nie budowanie. Kolejność oszczędzająca
+wyjazdy: najpierw sonda (punkty 1, 2, 4, 6, 8), potem jedno MM na kartotece
+próbnej (punkty 5 i 7). Ustalenia zapisuje się w `docs/sfera-com.md` ze źródłem.
 
 ## Niezmienniki, których pilnuje ten proces
 
-- **Adres przed sprzedawalnością** — zapytania wyboru zadania
-  ([`sql/pick_mm_pending.sql`](sql/pick_mm_pending.sql)) pomijają MM, dopóki
-  wcześniejsze niewykonane `set_location` tego samego towaru nie wejdzie.
-  Te same pliki SQL wykonuje test po stronie Node
-  (`server/src/worker/sfera-pick.test.ts`) — zmiana guardu jest mierzona w CI.
+- **Adres przed sprzedawalnością**:
+  [`sql/pick_mm_pending.sql`](sql/pick_mm_pending.sql) pomija zadanie, dopóki
+  wcześniejsze `set_location` tego towaru nie wejdzie.
 - **Dokument w buforze** → `waiting_for_doc`, ponawiane co 60 s.
 - **Audyt**: `queue_retry` / `queue_applied` / `queue_failed` z autorem
-  z wiersza kolejki — te same typy i klucze co worker Node.
-- **Padnięcie w trakcie zapisu** → zadanie w `error` z ostrzeżeniem
-  o możliwym duplikacie; wznowienie to decyzja człowieka (PONÓW), nie automatu.
-- **Heartbeat** co tick do `process_state` (`name='sfera'`) — brak meldunku
-  przez 30 s widzi `/api/health` (przy `SFERA_WORKER=1`).
+  z wiersza kolejki, jak w workerze Node.
+- **Padnięcie w trakcie zapisu** → `error` z ostrzeżeniem o duplikacie;
+  ponowienie to decyzja człowieka (PONÓW).
+- **Heartbeat** do `process_state` (`sfera`); 30 s ciszy widzi `/api/health`.
