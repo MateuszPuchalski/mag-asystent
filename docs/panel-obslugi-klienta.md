@@ -300,9 +300,8 @@ z nim dwie różne sprawy. Odhaczone zostają na liście jako dowód.
 **Rozmowa:** `new`, `open`, `waiting_for_customer`, `waiting_for_us`,
 `waiting_for_internal`, `snoozed`, `resolved`, `closed`, `spam`.
 
-**Dobór:** `not_started`, `extracting_data`, `missing_information`, `searching`,
-`candidates_found`, `requires_expert`, `confirmed`, `rejected`,
-`not_applicable`.
+**Dobór:** wynik `czesc`, `brak`, `dopytac`, `nie_dotyczy` albo brak wyniku.
+Stan dla kolejki jest wyliczany (`docs/dobor-od-zera.md`, §4.2).
 
 **Szkic:** `none`, `draft`, `needs_review`, `ready`, `sending`, `sent`,
 `send_uncertain`, `send_failed`.
@@ -464,6 +463,10 @@ na inną niż `OTHER` zdejmuje regułę od razu. Liczą to `klientPodziekowal`
 i `statusZKierunku`, jedną regułą dla kolejki i otwartej rozmowy.
 
 ### 7.2. Statusy doboru w kodzie (etap E1)
+
+> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
+> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
+> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
 
 Lista doboru stoi, jak lista rozmowy, w trzech miejscach: `STATUSY_DOBORU`
 w `services/dobor.ts`, `CHECK` na kolumnie `dobor_rozmowy.status` i typ
@@ -1553,6 +1556,10 @@ rozmowy ją zastępuje, kontekst jako panel albo zakładka, szkic nie ginie przy
 powrocie. Gdyby decyzja wróciła, to jest punkt wyjścia.
 
 ## 11. Dobór części
+
+> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
+> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
+> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
 
 ### 11.1. Dane wejściowe
 
@@ -2854,6 +2861,10 @@ jest domyślnie wyłączony, bo wydaje pieniądze bez kliknięcia.
 
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
+> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
+> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
+> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
+
 Pytanie właściciela z 8 września 2026, nad szkicem o śrubę noża do kosiarki
 Faworyt GTV51N196L-4W1 z silnikiem „Lonci v200": „dlaczego dane wejściowe nie
 zostały wprowadzone automatycznie ze szkicu?". Model czytał te dane i odsyłał
@@ -3090,6 +3101,10 @@ danych.
 **Treść wiadomości nie trafia do ogólnego dziennika zdarzeń.**
 
 ### 19a. Skuteczność doboru — raport za zębatką (0.267.0)
+
+> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
+> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
+> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
 
 `dobor_rozmowy.wybrany_droga` zapisuje, którym z jedenastu szczebli §11.2
 przyszedł kandydat wybrany przez agenta. Kolumna stała w bazie od 0.229.0
