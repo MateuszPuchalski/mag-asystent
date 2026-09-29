@@ -173,6 +173,25 @@ export interface Powroty {
   wgOsoby: WierszPowrotu[] | null;
 }
 
+/* ── Trzy wskaźniki (`services/wskazniki.ts`) ───────────────────────────── */
+
+export interface OkresWskaznikow {
+  od: string;
+  do: string;
+  dostawy: { n: number; medianaDni: number | null; medianaMinPracy: number | null };
+  szukanie: { n: number; zAdresem: number; bezAdresu: number; bezWyniku: number; odsetekZAdresem: number | null };
+  odpowiedz: { n: number; medianaMin: number | null; p90Min: number | null };
+}
+
+export interface Wskazniki { dni: number; teraz: OkresWskaznikow; poprzednio: OkresWskaznikow }
+
+export function useWskazniki(dni: number) {
+  return useQuery({
+    queryKey: ["analiza", "wskazniki", dni],
+    queryFn: () => api<Wskazniki>(`/api/analiza/wskazniki?days=${dni}`),
+  });
+}
+
 export function useCzasOdpowiedzi(dni: number, wlaczona: boolean) {
   return useQuery({
     queryKey: ["analiza", "obsluga", dni],
