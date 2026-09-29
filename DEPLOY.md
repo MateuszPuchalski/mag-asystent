@@ -2254,7 +2254,7 @@ dokąd ich wstawić bez budowania nowego widoku. To osobna decyzja.
 
 ### Kopia bazy bez danych osobowych
 
-Narzędzie `tools\anonimizuj-baze.mjs` (od wydania @wydanie) robi z kopii bazy plik bez danych klientów i pracowników. Kształt danych zostaje: długości tekstów, liczba wierszy, powiązania po loginie. Po to, żeby ocenić wygląd ekranów na prawdziwym wolumenie, bez wysyłania danych klientów komukolwiek.
+Narzędzie `tools\anonimizuj-baze.mjs` (od wydania 0.550.2) robi z kopii bazy plik bez danych klientów i pracowników. Kształt danych zostaje: długości tekstów, liczba wierszy, powiązania po loginie. Po to, żeby ocenić wygląd ekranów na prawdziwym wolumenie, bez wysyłania danych klientów komukolwiek.
 
 1. Znajdź najnowszą kopię nocną w `server\data\kopie`. Nazwa ma postać `noc-RRRR-MM-DD.db`.
 2. Nie wskazuj `wertis.db`. Żywa baza chodzi w WAL, a jej kopia bywa niespójna. Narzędzie odmówi.

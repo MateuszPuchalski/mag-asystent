@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.550.2 — 29 września 2026
+
+Nowe narzędzie `tools/anonimizuj-baze.mjs` robi z kopii bazy plik bez danych osobowych klientów i pracowników, z zachowaniem kształtu danych. Służy do przeglądu ekranów na prawdziwym wolumenie i prawdziwych długościach tekstów. Serwer i panel się nie zmieniają, narzędzie uruchamia człowiek na kopii z folderu kopii. Instrukcja stoi w DEPLOY.md §7.
+
 ## 0.550.1 — 29 września 2026
 
 Przycisk „Kopiuj numer zamówienia" w rozmowie skrzynki wołał

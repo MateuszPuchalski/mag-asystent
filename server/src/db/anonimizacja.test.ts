@@ -8,7 +8,7 @@ import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { migrate } from "./db.js";
 
-/* ── ANONIMIZACJA KOPII BAZY (@wydanie) ──────────────────────────────────────
+/* ── ANONIMIZACJA KOPII BAZY (0.550.2) ──────────────────────────────────────
    Narzędzie `tools/anonimizuj-baze.mjs` ma jedno zadanie, którego pomyłka
    kosztuje najwięcej: dane klientów nie mogą wyjść z biura. Testy pilnują
    trzech rzeczy.

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-/* ── ANONIMIZACJA KOPII BAZY (@wydanie) ──────────────────────────────────────
+/* ── ANONIMIZACJA KOPII BAZY (0.550.2) ──────────────────────────────────────
    Robi z kopii `wertis.db` plik bez danych osobowych klientów i pracowników.
    Plik ma zachować KSZTAŁT danych: długości tekstów, liczbę wierszy, powiązania
    po loginie i numerze zamówienia. Po to powstał: ekran ocenia się na
