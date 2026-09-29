@@ -42,7 +42,7 @@ zapisu patrzy na `fetch`, a nie na haki.
 
 Pliki `*.test.ts` leżące wprost w `src/` czytają źródła panelu przez `?raw`
 i pilnują zasad wyglądu i czasu: `Bursztyn`, `Kontrast`, `Skala`, `Czas`,
-`RamaOkna`, `Wielkosc` i `ZeroZapisu`. Zwolnienia są jawne, a ich formę
+`RamaOkna`, `Wielkosc`, `Schowek` i `ZeroZapisu`. Zwolnienia są jawne, a ich formę
 opisuje nagłówek każdego strażnika — zwykle komentarz `<nazwa>: <powód>`
 z co najmniej trzema wyrazami powodu. Odmowa strażnika zwykle znaczy, że
 łamiesz zasadę.
