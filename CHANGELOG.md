@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.550.4 — 29 września 2026
+
+Paczka wydania 0.550.3 niosła katalog `tools`, a aktualizacja przenosi ze starej instalacji katalog `tools` z `nssm.exe`. Przy istniejącym katalogu docelowym PowerShell wkłada źródło do środka, więc `nssm.exe` lądował by w `tools\tools`, a usługi nie wstawałyby. Narzędzie do anonimizacji jedzie teraz w katalogu `narzedzia`, którego aktualizacja nie dotyka. Próba paczki pilnuje, żeby nazwy z listy przenoszonej nigdy nie trafiły do paczki.
+
 ## 0.550.3 — 29 września 2026
 
 Przegląd narzędzia `tools/anonimizuj-baze.mjs` znalazł luki w jego głównej własności. Identyfikator kupującego z surowego JSON-a Allegro przeżywał rozsyp, a wynik nieprzeskanowany mógł zostać pod docelową nazwą. Poprawki: klucze osobowe w JSON-ie są zawsze rozsypywane, wynik dostaje docelową nazwę dopiero po skanie, a plik roboczy leży w katalogu tymczasowym. Narzędzie jedzie teraz w paczce wydania, a skaner nie myli się z przypadkową zbieżnością numerów telefonu i pracuje kilka razy szybciej na dużej bazie.
