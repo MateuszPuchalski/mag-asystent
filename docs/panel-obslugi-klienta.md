@@ -758,8 +758,8 @@ tam, gdzie agent pisze, a nie tylko w tym dokumencie.
 
 Klientowi odmawialiśmy zdaniem „nie ma bytu". Było prawdziwe o TABELI i
 fałszywe o danych: login kupującego wiąże jego zamówienia (`zamowienie_klienta`),
-jego rozmowy (`allegro_inbox_thread.interlocutor_login`) i maszyny z domkniętych
-doborów (`dobor_rozmowy`). Zakładka jest czystym odczytem i NIE ZAKŁADA ANI
+jego rozmowy (`allegro_inbox_thread.interlocutor_login`) i maszyny z doborów
+z wybraną częścią (tabela `dobor`, wynik `czesc`). Zakładka jest czystym odczytem i NIE ZAKŁADA ANI
 JEDNEJ NOWEJ TABELI — osobny rejestr maszyn trzeba by utrzymywać przy każdej
 poprawce doboru, czyli ten sam kształt, który w 0.128.0 kosztował cztery tabele
 nakładki spraw.
@@ -805,9 +805,9 @@ klienta i znak oczekującego zadania.** Jednej pozycji z listy wyżej dalej nie
 ma i to jest decyzja, nie przeoczenie. TERMIN odpowiedzi czeka na
 rozstrzygnięcie z §26 — bez niego byłby zmyślony.
 
-**Status doboru doszedł w etapie E1.** Wiersz milczy przy `not_started`
-i `not_applicable`: plakietka „nierozpoczęty" na każdym wierszu nie mówiłaby
-niczego, a „nie dotyczy" to wiersz, przy którym doboru nie trzeba robić.
+**Stan doboru na wierszu.** Wiersz milczy przy stanie `pusty` i `nie_dotyczy`:
+plakietka „nie zaczęty" na każdym wierszu nie mówiłaby niczego, a „nie
+dotyczy" to wiersz, przy którym doboru nie trzeba robić (`docs/dobor-od-zera.md`).
 
 **Licznik mówi to, co mierzy.** To liczba wiadomości klienta od NASZEJ
 ostatniej odpowiedzi, nie „nieprzeczytane przez agenta". Tamtego policzyć się
@@ -2565,10 +2565,10 @@ zmiana: „wiedza z ofert powinna wskakiwać bez potwierdzania przez agenta"
 oraz „dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".
 
 **Dane wejściowe wchodzą do doboru same.** Marka, model, silnik i nazwa części
-rozpoznane w rozmowie trafiają do `dobor_rozmowy` w tym samym przebiegu, który
+rozpoznane w rozmowie trafiają do tabeli `dobor` w tym samym przebiegu, który
 układa szkic. Wchodzą **tylko w puste pola** — to, co agent wpisał sam, jest
-jego słowem i zostaje. Wpis idzie tą samą drogą co ręczny, więc dostaje wersję,
-dziennik i przejście `not_started → searching`.
+jego słowem i zostaje. Wpis idzie tą samą drogą co ręczny, więc dostaje wersję
+i dziennik. Wyniku nie rusza: ustawia go wyłącznie człowiek.
 
 Kolejność jest tu treścią, nie porządkiem: wpis stoi PRZED zapisem szkicu, bo
 podnosi wersję doboru. Odwrotnie dałby szkic nieświeży w chwili narodzin, a
@@ -2596,9 +2596,8 @@ myśleć, że nic się nie dzieje. Pasek mówi teraz osobno, co weszło do wiedz
 a co czeka bez rozpoznanej marki.
 
 **Wpis maszyny jest odróżnialny** wszędzie tam, gdzie powstaje:
-`dobor_rozmowy.updated_by='automat (szkic)'` i `zastosowanie.rozstrzygnal=
-'automat (oferta)'`, oba przy pustym koncie. Od 0.499.0 automat przy towarze znanym
-z zamówienia wpisuje dane, ale statusu doboru nie podnosi. Agent poprawia takie pole tam,
+`dobor.zmienil='automat (szkic)'` i `zastosowanie.rozstrzygnal=
+'automat (oferta)'`, oba przy pustym koncie. Agent poprawia takie pole tam,
 gdzie ono stoi — w zakładce Dobór albo w Wiedzy.
 
 **Dopytanie Copilota (0.332.0).** Właściciel: „dodaj możliwość kontynuowania
@@ -2949,10 +2948,10 @@ Tabele docelowe, nazwami z kodu:
 channel_account          conversation            message
 conversation_event       conversation_comment     conversation_mention    offer_snapshot           customer                customer_machine
 order_snapshot           product_link
-dobor_rozmowy            model_urzadzenia        zastosowanie
+dobor                    model_urzadzenia        zastosowanie
 dowod_zastosowania       towar_identyfikator     model_z_opisu
 zabudowa_silnika         pasowanie_czesci        alias_silnika
-token_silnika            token_silnika_kartoteka wymiar_kartoteki
+token_silnika            token_silnika_kartoteka
 towar_fts                knowledge_document      zadanie_terenowe
 zadanie_zalacznik        allegro_inbox_thread    allegro_inbox_message
 allegro_inbox_sync_state outbox                  events

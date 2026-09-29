@@ -6,8 +6,9 @@ import { NAZWA_PODSTAWY, NAZWA_STANU_DOBORU } from "../skrzynka/statusy";
 
 /* ── Miary doboru (`docs/dobor-od-zera.md` §5.1, §7) ─────────────────────────
    Dobór odpowiada klientowi jedną z czterech odpowiedzi, więc karta liczy
-   właśnie je, a przy wybranej części — grupę, z której część przyszła. To
-   są dane, których dotąd nie było: które grupy dają wybierane części.
+   właśnie je, a przy wybranej części — grupę, z której część przyszła.
+   Z tej liczby widać, które grupy kandydatów warto rozwijać, a które nie
+   dają części nikomu.
 
    `n` STOI OBOK każdego udziału. „60%" bez podstawy jest liczbą bez wagi,
    a i tak zostanie przeczytana jako fakt o pracy biura.

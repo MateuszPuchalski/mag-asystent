@@ -65,7 +65,7 @@ const SILA: Record<PewnoscKandydata, number> = { potwierdzone: 3, prawdopodobne:
  * drogi miały przy sobie „nie dowód", mocne nie miały nic, więc domysł
  * pobił numer. Jedna stała, bo kopie zdania rozjechałyby się przy poprawce.
  */
-const PO_IDENTYFIKATORZE = "— trafienie po IDENTYFIKATORZE, nie po opisie ani nazwie";
+export const PO_IDENTYFIKATORZE = "— trafienie po IDENTYFIKATORZE, nie po opisie ani nazwie";
 
 /* Deklaracja sprzedawcy w opisie aukcji i numer z katalogu dostawcy to
    świadectwa różnej wagi, więc zdanie nazywa źródło numeru. Każda gałąź
@@ -334,8 +334,13 @@ export function kandydaciDoboru(
   /* ── PODOBNE: po nazwie ──────────────────────────────────────────────────
      bm25 po symbolu, nazwie i opisie, wyłącznie z danych doboru. Trafienie
      po treści to podpowiedź, nie dowód. */
-  if (!dane.nazwaCzesci) brakuje.push("Brak nazwy części — nie ma czego szukać po nazwie.");
   const fraza = [dane.nazwaCzesci, dane.marka, dane.model].filter(Boolean).join(" ");
+  /* Bez nazwy części szukanie po treści idzie samą marką i modelem, więc
+     zdanie mówi, co się stało, a nie że nie szukano wcale. */
+  if (!dane.nazwaCzesci) {
+    brakuje.push(fraza ? "Brak nazwy części — po nazwie szukano tylko marką i modelem."
+      : "Brak nazwy części i maszyny — nie ma czego szukać po nazwie.");
+  }
   if (!ftsDostepne()) {
     brakuje.push("Wyszukiwanie po nazwie niedostępne — SQLite bez FTS5.");
   } else if (fraza) {

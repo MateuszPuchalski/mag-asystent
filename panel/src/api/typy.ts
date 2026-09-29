@@ -515,14 +515,6 @@ export type SzkicCopilota = {
   at: string;
   przez: string;
   ocena: OcenaSzkicu | null;
-  /**
-   * Dane doboru rozpoznane w rozmowie (przyrost trzeci), sprawdzone przez
-   * serwer przeciw wątkowi. `null` = nic nie rozpoznano. Serwer wpisuje je
-   * sam w puste pola doboru, więc panel ich nie pokazuje osobno: agent widzi
-   * je w „Czego szuka klient" i tam poprawia.
-   */
-  daneDoboru: DaneDoboru | null;
-  daneOcena: OcenaDanych | null;
   /** Wersja doboru, na której szkic powstał — inna dziś = szkic nieświeży. */
   doborWersja: number;
   /**
@@ -664,7 +656,6 @@ export type TwierdzenieCopilota = {
 };
 /** Co model odczytał z jednego zdjęcia. `zdjecie` to `Z1`, `Z2` ze spisu. */
 export type OdczytZdjecia = { zdjecie: string; tekst: string };
-export type OcenaDanych = "wpisane" | "odrzucone";
 export type OcenaPasowania = "zaproponowane" | "odrzucone";
 export type PropozycjaPasowaniaCopilota = {
   czesc: KartotekaPasowania; doCzego: KartotekaPasowania; rola: RolaPasowania; pozycja: string | null;

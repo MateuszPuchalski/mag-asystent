@@ -12,7 +12,7 @@ import { doborRozmowy, wiedzaDoboru, zapiszDane, type DaneDoboru } from "./dobor
 
 /** Podpis maszyny piszącej dane doboru. Jedno miejsce, bo po nim się poznaje. */
 const AUTOMAT_DANYCH = { automat: "szkic" } as const;
-import { kandydaciDoboru, ofertaRozmowy, type GrupaKandydata } from "./kandydaci.js";
+import { kandydaciDoboru, ofertaRozmowy, PO_IDENTYFIKATORZE, type GrupaKandydata } from "./kandydaci.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { dociagnijTresc } from "./allegro-oferta-tresc.js";
 import { buildProductCard } from "./stock.js";
@@ -1019,7 +1019,7 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
      osobnym porządkiem: trafienie po identyfikatorze (blizna TC38), potem
      pewność. Sortowanie jest stabilne, więc w remisie zostaje kolejność ekranu. */
   const sila = (k: (typeof kand.kandydaci)[number]) =>
-    k.powod.includes("IDENTYFIKATORZE") ? 0 : { potwierdzone: 1, prawdopodobne: 2, do_sprawdzenia: 3 }[k.pewnosc];
+    k.powod.includes(PO_IDENTYFIKATORZE) ? 0 : { potwierdzone: 1, prawdopodobne: 2, do_sprawdzenia: 3 }[k.pewnosc];
   for (const k of [...kand.kandydaci].sort((a, b) => sila(a) - sila(b)).slice(0, 6)) {
     dodaj("kandydat", `Kandydat ${k.symbol} — ${k.nazwa}; ${GRUPA_SLOWAMI[k.grupa]}; pewność: ${k.pewnosc}; ${k.powod}`
       + `${k.takze.length ? `; także: ${k.takze.join("; ")}` : ""}; ${dostepnosc(k.stan, null)}`

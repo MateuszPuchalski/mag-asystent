@@ -443,7 +443,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
            zaczęty" na każdym wierszu nie mówiłby niczego, a „nie dotyczy" to
            wiersz, przy którym doboru NIE trzeba robić. Barwa niesie wagę
            (mapa w `statusy.ts`), a nazwę `title` i czytnik. */
-        const barwaDoboru = BARWA_STANU_DOBORU[r.dobor]?.znak;
+        const barwaDoboru = BARWA_STANU_DOBORU[r.dobor];
         if (barwaDoboru) znaczniki.push(<span key="dobor"
           title={`dobór: ${NAZWA_STANU_DOBORU[r.dobor]}`} className={`flex items-center ${barwaDoboru}`}>
           <Wrench size={13} aria-hidden="true" />

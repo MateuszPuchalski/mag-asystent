@@ -259,7 +259,10 @@ function naDobor(w: Record<string, unknown> | undefined, database: DatabaseSync)
   return {
     stan, wynik, wersja: Number(w.wersja), dane, wybrany,
     dopytac: wynik === "dopytac" ? tekst(w.dopytac) : null,
-    zmienil, zmienilAutomat: zmienil !== null && w.zmienil_user_id == null,
+    zmienil,
+    /* Po podpisie, nie po pustym koncie: wiersze przeniesione z czasów
+       sprzed kolumny konta mają podpis człowieka bez `user_id`. */
+    zmienilAutomat: zmienil !== null && zmienil.startsWith("automat ("),
     zmienionoAt: tekst(w.zmieniono_at),
   };
 }
@@ -308,7 +311,8 @@ function sladWyniku(
  * wersji koledze i nie zostawia śladu.
  *
  * Zmiana maszyny przy wyniku `czesc` zdejmuje wynik w tej samej transakcji:
- * wybór dotyczył innej maszyny, a jego propozycja w wiedzy też.
+ * wybór dotyczył innej maszyny, a jego propozycja w wiedzy też. Dopisanie
+ * pustego pola maszyny zmianą nie jest.
  */
 export function zapiszDane(
   conversationId: number, dane: Partial<DaneDoboru>, expectedVersion: number, kto: AutorDanych,
@@ -328,7 +332,14 @@ export function zapiszDane(
       kolumny[kolumna] = v;
     }
     if (Object.keys(zmiany).length === 0) return przed;
-    const zdejmij = przed.wybrany && POLA_MASZYNY.some((p) => p in zmiany) ? przed.wybrany : null;
+    /* Zdejmuje tylko ZMIANA maszyny: pole miało wartość i dostaje inną.
+       Dopisanie brakującej marki czy rocznika maszynę doprecyzowuje, nie
+       podmienia. Automat pisze wyłącznie w puste pola, więc tą drogą nigdy
+       nie zdejmie wyboru człowieka. Zdanie do szkicu liczy się przy odczycie
+       z bieżących danych, więc numer łamiący warunek wpisu i tak zmieni je
+       na „może nie pasować". */
+    const zdejmij = przed.wybrany && POLA_MASZYNY.some((p) => zmiany[p] && zmiany[p].z !== null)
+      ? przed.wybrany : null;
     zapisz(database, conversationId,
       zdejmij ? { ...kolumny, wynik: null, tw_id: null, symbol: null, podstawa: null } : kolumny, autor, userId);
     logEvent("dobor_dane", autor, null, { conversationId, zmiany }, userId, database);

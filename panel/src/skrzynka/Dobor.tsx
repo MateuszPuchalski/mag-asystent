@@ -167,7 +167,11 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
         {/* Wskazanie z wyszukiwarki NIE jest kandydatem — to od razu wybór
             z podstawą `reczny`, podpisany agentem. */}
         {szukam && <div className="mt-2"><Wyszukiwarka wybrany={null} etykieta="Wskazana przez Ciebie"
-          onWybierz={(t) => t && ustaw("czesc", { twId: t.id, podstawa: "reczny" })} /></div>}
+          onWybierz={(t) => {
+            /* Jak przy „Wybierz": drugi strzał w trakcie zapisu dałby 409
+               z nazwiskiem samego agenta. */
+            if (t && !wynik.isPending) ustaw("czesc", { twId: t.id, podstawa: "reczny" });
+          }} /></div>}
       </>}
 
       {dobor.wynik === "czesc" && dobor.wybrany && <>
@@ -323,7 +327,8 @@ function Negatywne({ lista }: { lista: KandydaciDoboru["negatywne"] }) {
     <p className="flex items-center gap-1 rounded-t-lg bg-red-50 px-2 py-1 text-podpis font-bold text-red-900">
       <AlertTriangle size={12} aria-hidden />Nie pasuje</p>
     <ul className="divide-y divide-red-100">
-      {lista.map((n) => <li key={n.twId} className="flex items-start gap-2 px-2 py-1.5 text-xs">
+      {/* Ta sama kartoteka bywa negatywem z maszyny i przez silnik naraz. */}
+      {lista.map((n, i) => <li key={`${n.twId}-${i}`} className="flex items-start gap-2 px-2 py-1.5 text-xs">
         <Kafel twId={n.twId} rozmiar={36} nazwa={n.nazwa ?? n.symbol} symbol={n.symbol} />
         <div className="min-w-0 flex-1">
           <b className="font-mono">{n.symbol}</b>{n.nazwa && <span className="text-slate-600"> · {n.nazwa}</span>}

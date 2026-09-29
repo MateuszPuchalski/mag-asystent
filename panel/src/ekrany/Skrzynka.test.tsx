@@ -50,7 +50,7 @@ const szczegoly = (id: number, n: Record<string, unknown> = {}) => ({
 const SZKIC = (id: number) => ({
   tresc: `Dzień dobry, odpowiedź ${id}.`, zastrzezenia: [], uzyteFakty: [], messageId: id * 10,
   model: "m", at: "2026-09-26T08:01:00.000Z", przez: "Copilot", ocena: null,
-  daneDoboru: null, daneOcena: null, doborWersja: 1, pasowanie: null, pasowanieOcena: null,
+  doborWersja: 1, pasowanie: null, pasowanieOcena: null,
   twierdzenia: [], odczytZeZdjec: [],
   lukiKartoteki: { symbol: null, numery: [], modele: [], wpisane: [], czeka: 0 },
 });

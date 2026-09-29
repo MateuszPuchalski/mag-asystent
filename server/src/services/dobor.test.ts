@@ -180,12 +180,13 @@ test("warunek wpisu: nieznany zbija do „prawdopodobnie”, złamany mówi „m
   czesc(SZARPAK, 2, "wiedza");
   assert.match(D.doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu,
     /^Do NAC LS 46-450 prawdopodobnie pasuje SZR-148\/82 — źródło: potwierdzone zastosowanie do NAC LS 46-450 \(nr seryjny od 175000000\)/);
-  /* Numer seryjny opisuje egzemplarz, więc jego wpisanie zdejmuje wybór.
-     Zdanie sprawdzamy na świeżym wyborze po każdej zmianie. */
+  /* Dopisany numer seryjny doprecyzowuje maszynę, więc wybór zostaje,
+     a zdanie liczy się od nowa z bieżących danych. */
   D.zapiszDane(rozmowa, { nrSeryjny: "175 000 001" }, 3, biuro);
-  assert.match(czesc(SZARPAK, 4, "wiedza").wybrany!.zdanieDoSzkicu, /^Do NAC LS 46-450 pasuje SZR-148\/82 — źródło: potwierdzone/);
-  D.zapiszDane(rozmowa, { nrSeryjny: "174999999" }, 5, biuro);
-  assert.match(czesc(SZARPAK, 6, "wiedza").wybrany!.zdanieDoSzkicu, new RegExp("^SZR-148/82 do NAC LS 46-450 może nie pasować"
+  assert.match(D.doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, /^Do NAC LS 46-450 pasuje SZR-148\/82 — źródło: potwierdzone/);
+  /* Inny numer to inny egzemplarz: wybór schodzi i trzeba wybrać od nowa. */
+  assert.equal(D.zapiszDane(rozmowa, { nrSeryjny: "174999999" }, 4, biuro).wybrany, null);
+  assert.match(czesc(SZARPAK, 5, "wiedza").wybrany!.zdanieDoSzkicu, new RegExp("^SZR-148/82 do NAC LS 46-450 może nie pasować"
     + " — wpis obejmuje nr seryjny od 175000000, a w doborze nr 174999999; źródło: potwierdzone zastosowanie"));
 });
 
@@ -257,6 +258,15 @@ test("zejście z części i zmiana kartoteki wycofują własną propozycję; zat
   W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
   czesc(SZARPAK, 5);
   assert.equal(W.zastosowanie(z.id)!.stan, "zatwierdzone", "człowiek zatwierdził — automat nie cofa");
+});
+
+test("automat dopisujący pustą markę nie zdejmuje części wybranej przez człowieka", () => {
+  D.zapiszDane(rozmowa, { oem: "532199377" }, 1, biuro);
+  czesc(SZARPAK, 2, "numer");
+  const d = D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 3, { automat: "szkic" });
+  assert.equal(d.wynik, "czesc", "wynik ustawia wyłącznie człowiek — automat go nie zdejmuje");
+  assert.equal(d.wybrany?.twId, SZARPAK);
+  assert.equal(d.dane.marka, "NAC");
 });
 
 test("zmiana marki zdejmuje wybraną część, wycofuje propozycję i zostawia ślad na osi", () => {

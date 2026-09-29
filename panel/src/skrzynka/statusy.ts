@@ -46,17 +46,16 @@ export const NAZWA_STANU_DOBORU: Record<StanDoboru, string> = {
   nie_dotyczy: "Nie dotyczy",
 };
 
-/* Barwa stanu: kropka w nagłówku doboru i znak w kolejce czytają jedną mapę,
-   żeby ten sam stan nie miał dwóch kolorów. Zieleń to gotowa odpowiedź,
-   czerwień czeka na klienta, bursztyn jest robotą w toku, szarość mówi
-   „nie ma czego szukać". `null` = stan bez znaku w kolejce. */
-export const BARWA_STANU_DOBORU: Record<StanDoboru, { kropka: string; znak: string | null }> = {
-  pusty: { kropka: "bg-slate-300", znak: null },
-  otwarty: { kropka: "bg-amber-500", znak: "text-amber-700" },
-  czesc: { kropka: "bg-emerald-600", znak: "text-emerald-700" },
-  brak: { kropka: "bg-slate-500", znak: "text-slate-600" },
-  dopytac: { kropka: "bg-red-600", znak: "text-ranga-zle" },
-  nie_dotyczy: { kropka: "bg-slate-300", znak: null },
+/* Barwa znaku doboru w kolejce. Zieleń to gotowa odpowiedź, czerwień czeka
+   na klienta, bursztyn jest robotą w toku, szarość mówi „nie mamy".
+   `null` = stan bez znaku, bo nie ma w nim nic do zrobienia. */
+export const BARWA_STANU_DOBORU: Record<StanDoboru, string | null> = {
+  pusty: null,
+  otwarty: "text-amber-700",
+  czesc: "text-emerald-700",
+  brak: "text-slate-600",
+  dopytac: "text-ranga-zle",
+  nie_dotyczy: null,
 };
 
 /* Grupy kandydatów (§4.3) — trzy pytania, nie jedenaście dróg: co klient

@@ -297,6 +297,11 @@ test("potwierdzona wiedza idzie w faktach przed kartoteką oferty, bo reguła 7a
   assert.match(kand[1], /Kandydat W09-0211 .*Kartoteka oferty/);
 });
 
+test("numer z pola OEM bez kartoteki idzie do faktów jako materiał na „nie mamy”", () => {
+  D.zapiszDane(rozmowa, { oem: "999-NIEMA-77" }, D.doborRozmowy(rozmowa).wersja, biuro);
+  assert.match(String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow), /Numer 999-NIEMA-77 z danych doboru: /);
+});
+
 test("wynik doboru wchodzi do faktów, a „nie dotyczy” wyłącza pytania intake", () => {
   let w = D.ustawWynik(rozmowa, { wynik: "brak" }, D.doborRozmowy(rozmowa).wersja, biuro).wersja;
   assert.match(String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow), /Agent ustalił: nie mamy tej części/);

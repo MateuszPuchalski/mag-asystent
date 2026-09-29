@@ -101,6 +101,13 @@ test("bez oferty i bez danych nic nie ma, a `brakuje` mówi zdaniami czego — i
   assert.equal((db().prepare("SELECT count(*) n FROM dobor").get() as { n: number }).n, 0);
 });
 
+test("bez nazwy części, ale z maszyną, `brakuje` mówi, że szukano samą marką i modelem", () => {
+  dane({ marka: "NAC", model: "LS 46-450" });
+  const { brakuje } = kandydaciDoboru(rozmowa, subiekt);
+  assert.ok(brakuje.includes("Brak nazwy części — po nazwie szukano tylko marką i modelem."), brakuje.join(" | "));
+  assert.ok(!brakuje.some((b) => /nie ma czego szukać po nazwie/.test(b)));
+});
+
 /* ── Numer: co wskazał klient ─────────────────────────────────────────────── */
 
 test("kartoteka oferty i zamiennik z opisu stoją w grupie „numer”; zamiennik do sprawdzenia", () => {
