@@ -1,13 +1,14 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania, subiekt } from "../context.js";
 import { db } from "../db/db.js";
-import { config } from "../config.js";
+import { config, modelKlasyfikatora } from "../config.js";
 import {
   poprawKlasyfikacje, pomiarCopilota, sklasyfikujRozmowy,
 } from "../services/copilot-klasyfikacja.js";
 import {
-  nadawcaAnthropic, nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
+  nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
 } from "../adapters/copilot.anthropic.js";
+import { nadawcaKlasyfikacji } from "../adapters/copilot.klasyfikator.js";
 import { wymianyRozmowy, zadajPytanie, zapiszPasowanieZDopytania } from "../services/copilot-pytania.js";
 import { czekajaNaSzkic, zlecSzkicPoRozpoznaniu } from "../services/copilot-szkic-po-rozpoznaniu.js";
 import {
@@ -123,7 +124,7 @@ export async function copilotRoutes(app: FastifyInstance) {
       model: config.copilot.model,
       /* Osobny model klasyfikacji (22 września 2026) — bez niego ekran nie
          miałby jak powiedzieć, że etykieta i szkic idą różnymi modelami. */
-      modelKlasyfikacji: config.copilot.modelKlasyfikacji,
+      modelKlasyfikacji: modelKlasyfikatora(),
       maxPartia: config.copilot.maxPartia,
       /* Czy automat sam rozpoznaje i układa (22 września 2026). Panel chowa
          po tym ręczne „Rozpoznaj" do roli ponowienia: przycisk, który robi to
@@ -175,7 +176,7 @@ export async function copilotRoutes(app: FastifyInstance) {
          ekranowi wyrzucić wynik, za który już zapłaciliśmy. */
       /* `ponowNieudane`: kliknięcie człowieka to jawne ponowienie decyzji
          FAILED i tworzy jej nową wersję. Takt tego nie robi — patrz serwis. */
-      const wynik = await sklasyfikujRozmowy(db(), ids, kto(), nadawcaAnthropic, new Date(),
+      const wynik = await sklasyfikujRozmowy(db(), ids, kto(), nadawcaKlasyfikacji, new Date(),
         { ponowNieudane: true });
       return { ...wynik, szkicow: szkicPoRozpoznaniu(ids) };
     });

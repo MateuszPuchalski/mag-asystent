@@ -28,8 +28,9 @@ import { LIMIT_ZNAKOW } from "../services/wysylka.js";
 
 /* ── Wyjście do Anthropic (etap F) ───────────────────────────────────────────
 
-   Ten plik jest JEDYNYM miejscem, w którym treść rozmowy opuszcza firmę.
-   Przyjmuje `TrescBezpieczna`, więc goły `string` nie wejdzie tu nawet przez
+   Ten plik jest jednym z DWÓCH miejsc, w których treść rozmowy opuszcza
+   firmę; drugie to `copilot.jev.ts`, tylko do rozpoznawania (od 29 września
+   2026). Przyjmuje `TrescBezpieczna`, więc goły `string` nie wejdzie tu nawet przez
    pomyłkę — maskowania pilnuje kompilator, nie przegląd kodu.
 
    KLUCZA NIE CZYTAMY SAMI. `new Anthropic()` bierze `ANTHROPIC_API_KEY` ze

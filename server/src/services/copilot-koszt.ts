@@ -15,6 +15,11 @@ const CENNIK: Record<string, { wej: number; wyj: number }> = {
   "claude-opus-5": { wej: 5, wyj: 25 },
   "claude-sonnet-5": { wej: 2, wyj: 10 },
   "claude-haiku-4-5": { wej: 1, wyj: 5 },
+  /* Jev (TypeSafe), odczyt z docs.typesafe.ai/models 29 września 2026: 42 dolary
+     za MILIARD tokenów wejścia, czyli 0,042 za milion, a wyjście jest darmowe.
+     Bez wpisu model liczyłby się stawką najdroższego znanego (niżej), czyli
+     około stu dwudziestu razy drożej, i ekran kosztów pokazywałby fikcję. */
+  "jev-1.13.0": { wej: 0.042, wyj: 0 },
 };
 
 /* Model spoza cennika nie ma prawa policzyć się jako darmowy — zero na ekranie

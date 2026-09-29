@@ -2202,6 +2202,17 @@ o dziesięciu polach. Silnikiem zostaje Claude, decyzją właściciela z 22
 września; Jev wpina się później tym samym nadawcą (`NadawcaKlasyfikacji`),
 bo walidacja i polityka stoją po naszej stronie, nie w adapterze.
 
+**Od 29 września 2026 silnikiem jest Jev, nie Claude.** Właściciel zlecił
+przełączenie i to zastępuje decyzję z 22 września („silnikiem zostaje Claude”).
+Wpina się dokładnie tak, jak tu zapisano: nadawcą `NadawcaKlasyfikacji`
+(`adapters/copilot.jev.ts`), więc walidacja i polityka są wspólne. Kategoria
+i następny krok to Choice, flagi i kategorie dodatkowe to Nouly, pewność
+słowna wynika z liczbowej `confidence`. Powrót do Claude:
+`KLASYFIKATOR_DOSTAWCA=anthropic`. Czego nie wiadomo: trafność po polsku.
+Dokumentacja TypeSafe wskazuje angielski jako język o najlepszej trafności,
+więc porównanie z Claude na prawdziwych wiadomościach jest pierwszym pomiarem,
+nie formalnością.
+
 **Decyzja ma piętnaście kategorii, kategorie dodatkowe i jeden następny
 krok z dwunastu.** Słownik stoi w `services/klasyfikacja-slownik.ts`. Wartości
 są po angielsku, bo to kontrakt niezależny od dostawcy; nazwy po polsku stoją
