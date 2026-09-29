@@ -227,12 +227,21 @@ const ZNACZNIK_USUNIECIA = "[usunięte przy pobraniu]";
 const ZACHOWANE_ROZDZIEL = /([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|\[usunięte przy pobraniu\])/gi;
 const UUID_CALY = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CZAS_ISO = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
-const WYLICZENIE = /^[A-Z][A-Z0-9_]{1,40}$/;
+/* Bez cyfr: „READY_FOR_PROCESSING” jest słownikiem, „GLS12345678” numerem listu. */
+const WYLICZENIE = /^[A-Z][A-Z_]{1,40}$/;
 /* Klucze, pod którymi JSON niesie osobę albo tekst od człowieka. Wartość pod takim
    kluczem, i pod każdym kluczem w jego wnętrzu, jest rozsypywana bez wyjątków:
    także liczba, identyfikator, UUID i słowo pisane wielkimi literami. Allegro
    zostawia w lądowisku `buyer.id`, a login bywa zapisany jako `OGRODNIK_77`. */
-const KLUCZ_OSOBOWY = /login|name|nazw|imi[eę]|mail|phone|tel|miast|city|street|ulic|address|adres|zip|post|poczt|nip|pesel|iban|konto|account|note|uwag|komentarz|message|wiadom|text|tresc|buyer|interlocutor|author|seller|sender|recipient|odbiorc|kupuj|klient|customer|person|osob|owner|company|firma|pickup/i;
+const KLUCZ_OSOBOWY = /login|name|nazw|imi[eę]|mail|phone|tel|miast|city|street|ulic|address|adres|zip|post|poczt|nip|pesel|iban|konto|account|note|uwag|komentarz|message|wiadom|text|tresc|buyer|interlocutor|author|seller|sender|recipient|odbiorc|kupuj|klient|customer|person|osob|owner|company|firma|pickup|tax|user|receiver|participant|autor|konta|full/i;
+/* Co trafia na listę wartości do skanu. To węższy zbiór niż kluczy rozsypywanych:
+   `name` pod `offer` czy `method` to nazwa towaru i sposobu dostawy, która zostaje
+   w kolumnach z kartoteki, więc jako „dana do wyszukania” dawałaby fałszywy alarm na
+   każdej bazie z zamówieniami. Igłą jest wartość pod kluczem, który sam mówi „człowiek”,
+   albo pod dowolnym kluczem wewnątrz obiektu, który jest człowiekiem (`buyer.id`). */
+const KLUCZ_DO_IGIEL = /login|mail|phone|tel|first|last|full|company|street|city|zip|post|poczt|nip|pesel|iban|konto|account|text|note|uwag|komentarz|message|wiadom|tresc|imi|nazw|adres|address|tax|user|autor/i;
+const KLUCZ_CZLOWIEKA = /buyer|interlocutor|author|seller|sender|recipient|receiver|odbiorc|kupuj|customer|person|osob|participant|autor/i;
+
 /* Poza kluczami osobowymi zostaje krótki identyfikator pod kluczem kończącym się na Id
    oraz słowo pod kluczem-słownikiem. Nie szukamy tu podciągów: „order” czy „source”
    w środku klucza otwierały furtkę dla loginu pod `orderBuyerLogin`. */
@@ -280,7 +289,7 @@ export function rozsypTekst(tekst, ziarno, przestrzen, unikaj = null) {
   for (let proba = 0; ; proba++) {
     const los = generator(ziarno, `${przestrzen}${proba ? `~${proba}` : ""}\0${tekst}`);
     const wynik = kawalki.map((k, i) => (i % 2 === 1 ? k : Array.from(k, (c) => rozsypZnak(c, los)).join(""))).join("");
-    if (!unikaj || unikaj.size === 0 || proba >= 30) return wynik;
+    if (!unikaj || unikaj.size === 0 || proba >= 200) return wynik;
     let trafia = false;
     for (const m of wynik.matchAll(/\d{7,}/g)) if (unikaj.has(m[0])) { trafia = true; break; }
     if (!trafia) return wynik;
@@ -295,10 +304,17 @@ export function rozsypTekst(tekst, ziarno, przestrzen, unikaj = null) {
  * `UPDATE` na unikalności w połowie przebiegu.
  */
 class Zamienniki {
-  constructor(nazwa, ziarno, { bezWielkosci = true } = {}) {
+  /**
+   * `bezWielkosci`: wejścia różniące się wielkością liter to jedna wartość (login).
+   * `unikalneBezWielkosci`: dwa zamienniki różniące się tylko wielkością liter też
+   * kolidują. Indeks na `lower(nazwa)` w etykietach zespołu odrzuciłby taką parę,
+   * choć dla samej mapy są to dwie różne wartości.
+   */
+  constructor(nazwa, ziarno, { bezWielkosci = true, unikalneBezWielkosci = bezWielkosci } = {}) {
     this.nazwa = nazwa;
     this.ziarno = ziarno;
     this.bezWielkosci = bezWielkosci;
+    this.unikalneBezWielkosci = unikalneBezWielkosci;
     this.mapa = new Map();
     this.uzyte = new Set();
     this.zabronione = new Set();
@@ -308,9 +324,13 @@ class Zamienniki {
     return this.bezWielkosci ? w.trim().toLowerCase() : w;
   }
 
+  #porownanie(w) {
+    return this.unikalneBezWielkosci ? w.trim().toLowerCase() : w;
+  }
+
   /** Zgłasza wartość, która istnieje w bazie i nie może stać się czyimś zamiennikiem. */
   zabron(wejscie) {
-    this.zabronione.add(this.#klucz(wejscie));
+    this.zabronione.add(this.#porownanie(wejscie));
   }
 
   daj(wejscie) {
@@ -323,8 +343,8 @@ class Zamienniki {
       /* Bardzo krótkie wejścia mają za mało możliwych wyjść. Po wielu próbach
          dopisujemy numer, żeby pętla zawsze się kończyła. */
       const kandydat = proba > 200 ? `${rdzen}${proba}` : rdzen;
-      const porownanie = this.#klucz(kandydat);
-      if (porownanie === klucz || this.uzyte.has(porownanie) || this.zabronione.has(porownanie)) continue;
+      const porownanie = this.#porownanie(kandydat);
+      if (porownanie === this.#porownanie(surowy) || this.uzyte.has(porownanie) || this.zabronione.has(porownanie)) continue;
       this.mapa.set(klucz, kandydat);
       this.uzyte.add(porownanie);
       return kandydat;
@@ -342,25 +362,26 @@ class Zamienniki {
  * listu w kolumnie i w surowym JSON-ie dostaje ten sam zamiennik. Serwer łączy
  * zwroty z przesyłkami po numerze listu.
  */
-function rozsypJson(w, klucz, ctx, rodzicOsobowy = false) {
+function rozsypJson(w, klucz, ctx, rodzicOsobowy = false, kluczRodzica = "") {
   const osobowe = rodzicOsobowy || KLUCZ_OSOBOWY.test(klucz);
-  if (Array.isArray(w)) return w.map((x) => rozsypJson(x, klucz, ctx, rodzicOsobowy));
+  if (Array.isArray(w)) return w.map((x) => rozsypJson(x, klucz, ctx, rodzicOsobowy, kluczRodzica));
   if (w !== null && typeof w === "object") {
-    return Object.fromEntries(Object.entries(w).map(([k, v]) => [k, rozsypJson(v, k, ctx, osobowe)]));
+    return Object.fromEntries(Object.entries(w).map(([k, v]) => [k, rozsypJson(v, k, ctx, osobowe, klucz)]));
   }
+  const doIgiel = osobowe && (KLUCZ_DO_IGIEL.test(klucz) || KLUCZ_CZLOWIEKA.test(kluczRodzica));
   if (typeof w === "number") {
     if (!osobowe) return w;
-    ctx.igly.dodajCyfry(String(w));
+    if (doIgiel) ctx.igly.dodajCyfry(String(w));
     const n = Number(rozsypTekst(String(w), ctx.ziarno, "liczba", ctx.igly.cyfry));
     return Number.isFinite(n) ? n : 0;
   }
   if (typeof w !== "string") return w;
   ctx.igly.zTekstu(w);
   if (osobowe) {
-    if (w !== ZNACZNIK_USUNIECIA) ctx.igly.dodaj(w);
+    if (w !== ZNACZNIK_USUNIECIA && doIgiel) ctx.igly.dodaj(w);
     if (/login/i.test(klucz)) return ctx.klient.daj(w);
     if (/phone|tel/i.test(klucz)) {
-      ctx.igly.dodajCyfry(w);
+      if (doIgiel) ctx.igly.dodajCyfry(w);
       return rozsypTekst(w, ctx.ziarno, "telefon", ctx.igly.cyfry);
     }
     return rozsypTekst(w, ctx.ziarno, "tekst", ctx.igly.cyfry);
@@ -646,9 +667,19 @@ function przetworzWartosc(regula, v, kolumnaId, ctx) {
 function kolumnyUnikalne(db, tabela) {
   const wynik = new Set();
   for (const k of db.prepare(`PRAGMA table_info("${tabela}")`).all()) if (k.pk > 0) wynik.add(k.name);
+  const kolumny = db.prepare(`PRAGMA table_info("${tabela}")`).all().map((k) => k.name);
   for (const ix of db.prepare(`PRAGMA index_list("${tabela}")`).all()) {
     if (!ix.unique) continue;
-    for (const c of db.prepare(`PRAGMA index_info("${ix.name}")`).all()) if (c.name) wynik.add(c.name);
+    let wyrazenie = false;
+    for (const c of db.prepare(`PRAGMA index_info("${ix.name}")`).all()) {
+      if (c.name) wynik.add(c.name); else wyrazenie = true;
+    }
+    /* Indeks na wyrażeniu (`lower(nazwa)`) nie podaje nazwy kolumny w `index_info`.
+       Bierzemy z jego definicji każdą kolumnę tabeli, która się w niej pojawia. */
+    if (wyrazenie) {
+      const def = db.prepare("SELECT sql FROM sqlite_master WHERE type='index' AND name=?").get(ix.name)?.sql ?? "";
+      for (const k of kolumny) if (new RegExp(`\\b${k}\\b`).test(def)) wynik.add(k);
+    }
   }
   return wynik;
 }
@@ -691,7 +722,7 @@ function przetworzTabele(db, tabela, ctx, raport) {
     if (regula !== R.ZOSTAJE || blob) plan.push({ nazwa: k.name, regula });
     if (regula === R.TEKST && unikalne.has(k.name)) {
       const id = `${tabela}.${k.name}`;
-      const z = new Zamienniki(`unikalna:${id}`, ctx.ziarno, { bezWielkosci: false });
+      const z = new Zamienniki(`unikalna:${id}`, ctx.ziarno, { bezWielkosci: false, unikalneBezWielkosci: true });
       for (const v of rozne(db, tabela, k.name)) z.zabron(v);
       ctx.unikalne.set(id, z);
     }
@@ -797,6 +828,15 @@ export function anonimizuj(wejscie, wyjscie, opcje = {}) {
   const wal = `${wejscie}-wal`;
   if (fs.existsSync(wal) && fs.statSync(wal).size > 0) {
     throw new Error("Obok pliku leży niepusty -wal, więc to żywa baza. Użyj kopii z folderu kopii serwera.");
+  }
+  const czesciowyWczesnie = `${wyjscie}.czesciowy`;
+  if (fs.existsSync(czesciowyWczesnie)) {
+    throw new Error(`Obok wyniku leży ${czesciowyWczesnie}. To nie mój plik, więc go nie ruszam. Usuń go albo wskaż inną nazwę.`);
+  }
+  try {
+    fs.accessSync(path.dirname(path.resolve(wyjscie)), fs.constants.W_OK);
+  } catch {
+    throw new Error(`Do katalogu wyniku (${path.dirname(path.resolve(wyjscie))}) nie da się zapisać. Sprawdzam to teraz, żeby nie wyszło po całej pracy.`);
   }
   const naglowek = nagloweWal(wejscie);
   if (!naglowek.sqlite) throw new Error("To nie jest baza SQLite.");
@@ -919,6 +959,8 @@ export function anonimizuj(wejscie, wyjscie, opcje = {}) {
 
 /* ── WIERSZ POLECEŃ ──────────────────────────────────────────────────────── */
 
+let uruchomiono = false;
+
 /** Kody wyjścia: 0 gotowe, 1 błąd użycia albo pliku, 2 skaner znalazł dane osobowe. */
 export function uruchom(argv) {
   const opcje = argv.filter((a) => a.startsWith("--"));
@@ -934,7 +976,10 @@ export function uruchom(argv) {
     return pozycyjne.length === 2 ? 0 : 1;
   }
   const [wejscie, wyjscie] = pozycyjne;
-  process.on("exit", sprzatnij);
+  if (!uruchomiono) {
+    uruchomiono = true;
+    process.on("exit", sprzatnij);
+  }
   try {
     const r = anonimizuj(wejscie, wyjscie);
     const licz = {};

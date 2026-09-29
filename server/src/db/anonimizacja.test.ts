@@ -33,8 +33,16 @@ const UUID_ZAM2 = "4e3b1f20-1111-4222-8333-000000000002";
 const SUROWY_ZAMOWIENIA = {
   id: UUID_ZAM,
   buyer: { id: "23123123", login: "OGRODNIK_77", email: "[usunięte przy pobraniu]", numer: 501234567 },
-  delivery: { address: { city: "GDANSK", zipCode: "50-123" }, method: { name: "Kurier DPD" } },
-  parcels: [{ waybill: "605500000123" }],
+  /* `offer.name` i `method.name` są równe wartościom w kolumnach, które zostają w bazie
+     (`zamowienie_klienta_pozycja.nazwa`, `zamowienie_klienta.dostawa_metoda`). Synchronizacja
+     zapisuje dokładnie taki kształt, a skaner nie może brać tych nazw za dane osobowe. */
+  lineItems: [{ offer: { id: "9876543210", name: "Nóż do kosiarki NAC LS 46" }, quantity: 1 }],
+  delivery: { address: { city: "GDANSK", zipCode: "50-123" }, method: { name: "Kurier" } },
+  parcels: [{ waybill: "605500000123" }, { waybill: "GLS12345678" }],
+  taxId: "5252525253",
+  userId: "12345678",
+  type: "kurier",
+  currency: "pln",
   orderNote: "Jan Kowalczyk płaci gotówką",
   statusDetail: "ul.Lipowa12",
   orderBuyerLogin: "ogrodnik_77",
@@ -114,9 +122,8 @@ function budujZrodlo(sciezka: string) {
   wstaw(d, "zwrot_klienta", { external_id: "zw-1", order_id: UUID_ZAM, kupujacy_login: "ogrodnik_77", odbiorca_nazwa: "Jan Kowalczyk", przewoznik: "InPost", waybill: "605500000123", rejection_code: "NOT_AS_DESCRIBED", notatka: "Zwrot na konto w mBanku", prowadzi: "Anna Lewandowska", status_allegro: "DELIVERED" });
   wstaw(d, "outbox", { conversation_id: 0, idempotency_key: "k-1", body: "Dzień dobry, odsyłamy nóż na adres ul. Lipowa 12/4.", status: "sent", szkic_los: "bez_zmian" });
 
-  /* `events.user_id` to TEXT z NAZWĄ pracownika, mimo nazwy. Zwykła kopia z żywego
-     serwera miała tam „Jan Kowalski”, a reguła „_id to identyfikator” ją zostawiała.
-     Znalazł to skaner na prawdziwej kopii, nie przegląd kolumn. */
+  /* `events.user_id` to TEXT z NAZWĄ pracownika, mimo nazwy. Reguła „_id to identyfikator”
+     zostawiłaby ją, więc fikstura ma tam człowieka i pilnuje, żeby znikł. */
   wstaw(d, "events", { type: "reklamacja.notatka", payload: JSON.stringify({ login: "dzialkowiec_pl", orderId: UUID_ZAM, kwota: 12900, note: "Proszę o fakturę na firmę Kowalczyk", ok: true }), user_id: "Anna Lewandowska", created_at: "2026-09-21T09:00:00.000Z" });
   wstaw(d, "events", { type: "kopia.nocna", payload: "{}", user_id: "system", created_at: "2026-09-21T03:00:00.000Z" });
   wstaw(d, "events", { type: "zamowienie.podglad", payload: "{}", user_id: "anonim", created_at: "2026-09-21T03:01:00.000Z" });
@@ -381,9 +388,9 @@ test("po migracji żadna kolumna z nazwą osoby ani adresu nie ma reguły „zos
   assert.deepEqual(zostajace, []);
 });
 
-/* ── Poprawki po przeglądzie (0.550.3) ──────────────────────────────────────
-   Każdy z poniższych testów pilnuje jednej luki, którą znalazł niezależny
-   przegląd narzędzia. Powstały PRZED poprawkami i padały na poprzedniej wersji. */
+/* ── Luki znalezione przeglądem narzędzia ────────────────────────────────────
+   Każdy z poniższych testów pilnuje jednej własności, której naruszenie kończyło się
+   wyciekiem albo odmową na prawdziwej bazie. */
 
 const wynikJson = (wy: string, tabela: string, kolumna: string) => {
   const d = new DatabaseSync(wy);
@@ -427,6 +434,13 @@ test("JSON: identyfikatory, słowniki, czas i liczby poza kluczami osobowymi zos
     assert.equal(j.createdAt, "2026-09-21T09:00:00.000Z");
     assert.equal(j.kwota, 12900);
     assert.equal(j.trackingNumber, 501234568, "liczba 9-cyfrowa poza kluczem osobowym nie jest telefonem");
+    assert.equal(j.type, "kurier", "słowo pod kluczem-słownikiem");
+    assert.equal(j.currency, "pln");
+    assert.equal(j.lineItems[0].offer.id, "9876543210", "identyfikator oferty");
+    assert.equal(j.lineItems[0].quantity, 1);
+    assert.notEqual(j.parcels[1].waybill, "GLS12345678", "numer listu z cyframi to nie słownik, choć pisany wielkimi literami");
+    assert.notEqual(j.taxId, "5252525253", "NIP kupującego");
+    assert.notEqual(j.userId, "12345678", "identyfikator osoby");
   });
 });
 
@@ -615,9 +629,10 @@ test("wiersz poleceń: kod 0 z liczbą sprawdzonych wartości, kod 2 bez ani jed
   };
   wKatalogu((k) => {
     const we = path.join(k, "kopia.db");
-    zbudujBaze(we);
+    zbudujBaze(we, (d) => wstaw(d, "klient_notatka", { login: "ola", tresc: "x", przez: "Anna Lewandowska", at: "2026-09-21T08:00:00.000Z" }));
     const dobry = przechwyc(() => uruchom([we, path.join(k, "wynik.db")]));
     assert.equal(dobry.kod, 0);
+    assert.match(dobry.tekst, /Pominięto [1-9]\d* krótszych niż 4 znaki/, "operator widzi, czego skaner nie obejmuje");
     assert.match(dobry.tekst, /Skaner wycieków sprawdził [1-9]\d* wartości/, "operator widzi, że skaner miał co sprawdzać");
     const kolumny = fs.readFileSync(path.join(k, "wynik.db.kolumny.txt"), "utf8").toLowerCase();
     for (const w of WRAZLIWE) assert.ok(!kolumny.includes(w.toLowerCase()) && !dobry.tekst.toLowerCase().includes(w.toLowerCase()), `wyjście nie zawiera „${w}”`);
@@ -635,5 +650,69 @@ test("wiersz poleceń: kod 0 z liczbą sprawdzonych wartości, kod 2 bez ani jed
     assert.match(zly.tekst, /reklamacja_tag\.nazwa/, "mówi GDZIE");
     for (const w of WRAZLIWE) assert.ok(!zly.tekst.toLowerCase().includes(w.toLowerCase()), `komunikat nie zawiera „${w}”`);
     assert.deepEqual(fs.readdirSync(k), ["kopia.db"], "po odmowie nie zostaje nic");
+  });
+});
+
+test("baza z zamówieniami: nazwa oferty i sposobu dostawy z surowego JSON-a nie jest daną osobową", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    zbudujBaze(we);
+    /* Bez rozróżnienia kluczy do rozsypu i kluczy do skanu narzędzie odmawia na KAŻDEJ prawdziwej
+       kopii z zamówieniami: te same nazwy stoją w kolumnach, które zostają. */
+    const raport = anonimizuj(we, path.join(k, "wynik.db"), { ziarno: "test" });
+    assert.deepEqual(raport.skaner, []);
+    const po = new DatabaseSync(path.join(k, "wynik.db"));
+    const pozycja = po.prepare("SELECT nazwa FROM zamowienie_klienta_pozycja WHERE sku='NOZ-LS46'").get() as { nazwa: string };
+    const dostawa = po.prepare("SELECT dostawa_metoda AS m FROM zamowienie_klienta WHERE status='READY_FOR_PROCESSING'").get() as { m: string };
+    po.close();
+    assert.equal(pozycja.nazwa, "Nóż do kosiarki NAC LS 46", "kartoteka zostaje");
+    assert.equal(dostawa.m, "Kurier");
+    const j = wynikJson(path.join(k, "wynik.db"), "allegro_zamowienie", "surowe_json");
+    assert.notEqual(j.lineItems[0].offer.name, "Nóż do kosiarki NAC LS 46", "w JSON-ie pod kluczem osobowym nazwa dalej jest rozsypana");
+  });
+});
+
+test("kolumna z unikalnością dostaje zamienniki różnowartościowe", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    /* Etykiety zespołu mają indeks UNIQUE. Wymuszamy dla nich rozsyp i dajemy im krótkie nazwy,
+       bo dwa różne krótkie teksty łatwo rozsypują się do tego samego. */
+    const nazwy = new Set<string>();
+    for (let i = 0; nazwy.size < 600; i++) {
+      const h = crypto.createHash("sha256").update(`etykieta-${i}`).digest();
+      nazwy.add(String.fromCharCode(97 + (h[0] % 12), 97 + (h[1] % 12), 97 + (h[2] % 12)));
+    }
+    zbudujBaze(we, (d) => wstawSeria(d, "reklamacja_tag", [...nazwy].map((n) => ({ nazwa: n }))));
+    anonimizuj(we, wy, { ziarno: "test", reguly: { "reklamacja_tag.nazwa": R.TEKST } });
+    const po = new DatabaseSync(wy);
+    const nowe = (po.prepare("SELECT nazwa FROM reklamacja_tag").all() as Array<{ nazwa: string }>).map((r) => r.nazwa);
+    po.close();
+    assert.equal(new Set(nowe).size, nowe.length, "bez wyjątku na UNIQUE i bez powtórzeń");
+  });
+});
+
+test("siedemdziesiąt tysięcy loginów pisanych mieszaną wielkością liter nie przewraca skanera", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    /* Login liczy się w skanie dwa razy (oryginał i małe litery), a spread na tablicy
+       ponad ok. 125 tysięcy elementów kończył się `Maximum call stack size exceeded`. */
+    const wiersze = Array.from({ length: 70000 }, (_, i) => ({ login: `Klient_${i}_Ab`, tresc: "x", przez: "Anna Lewandowska", at: "2026-09-21T08:00:00.000Z" }));
+    zbudujBaze(we, (d) => wstawSeria(d, "klient_notatka", wiersze));
+    const raport = anonimizuj(we, wy, { ziarno: "test" });
+    assert.deepEqual(raport.skaner, []);
+    assert.ok(fs.existsSync(wy));
+  });
+});
+
+test("odmawia cudzego pliku .czesciowy i katalogu, do którego nie da się zapisać, zanim zacznie pracę", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    zbudujBaze(we);
+    fs.writeFileSync(path.join(k, "wynik.db.czesciowy"), "cudzy");
+    assert.throws(() => anonimizuj(we, path.join(k, "wynik.db")), /nie mój plik/);
+    assert.equal(fs.readFileSync(path.join(k, "wynik.db.czesciowy"), "utf8"), "cudzy", "cudzego pliku nie kasujemy");
+    assert.throws(() => anonimizuj(we, path.join(k, "nie-ma-takiego-katalogu", "wynik.db")), /nie da się zapisać/);
   });
 });
