@@ -107,18 +107,17 @@ Jeden login = jedna rzecz do założenia i jedna do pilnowania. Uprawnienia są
 kolumnowe: nawet przy przejęciu credentiala da się zmienić wyłącznie dwie
 kolumny, reszta bazy pozostaje nietykalna.
 
-> **Instalacja sprzed sierpnia 2026 musi uruchomić ten skrypt PONOWNIE.**
-> Doszedł `GRANT SELECT ON dbo.sl_Magazyn` — bez niego karta towaru pokazuje
-> tylko MAG, MGP i Zwroty, a `/api/health` mówi o tym wprost w `problemy`.
-> Aplikacja działa dalej; traci wyłącznie zestawienie „gdzie towar jeszcze leży".
+> **Istniejąca instalacja uruchamia ten skrypt PONOWNIE, gdy dochodzi grant.**
+> Bez `GRANT SELECT ON dbo.sl_Magazyn` karta towaru pokazuje tylko MAG, MGP
+> i Zwroty, a `/api/health` mówi o tym wprost w `problemy`. Aplikacja traci
+> wyłącznie zestawienie „gdzie towar jeszcze leży".
 
-> **Instalacja sprzed 0.405.0 też musi uruchomić go PONOWNIE.** Doszły
-> `GRANT SELECT ON dbo.tw_Cena` i `dbo.vwPoziomyCen` — bez nich karta towaru
-> nie pokazuje ani jednej ceny. Objaw jest NIEMY: wygląda dokładnie tak, jak
-> wyglądała przed tym wydaniem, więc `/api/health` mówi o tym osobnym zdaniem.
-> Import stanów i dokumentów idzie dalej bez zmian; cennik degraduje sam.
+> Bez `GRANT SELECT ON dbo.tw_Cena` i `dbo.vwPoziomyCen` karta towaru nie
+> pokazuje ani jednej ceny. Objaw jest NIEMY: karta wygląda jak bez cennika,
+> więc `/api/health` mówi o tym osobnym zdaniem. Import stanów i dokumentów
+> idzie dalej bez zmian; cennik degraduje sam.
 
-> Oba nadaje INSTALATOR — wystarczy `.\wertis-instalator.ps1` na istniejącej
+> Brakujące granty nadaje INSTALATOR — wystarczy `.\wertis-instalator.ps1` na istniejącej
 > instalacji. Widok poziomów cen jest przy tym sprawdzany, a nie zakładany.
 > Gdy go w tej bazie nie ma, instalator pomija tę jedną linię i mówi o tym
 > wprost, zamiast wywalić cały skrypt uprawnień.
@@ -149,7 +148,7 @@ GRANT SELECT ON dbo.dok_Pozycja    TO wertis;
 GRANT SELECT ON dbo.kh__Kontrahent TO wertis;
 GRANT SELECT ON dbo.sl_Magazyn     TO wertis;   -- nazwy i symbole magazynów
 GRANT SELECT ON dbo.tw_Cena        TO wertis;   -- cennik kartoteki, poziomy 0..10
--- Widok nazw poziomów. Instalator sprawdza od 0.407.0, czy w tej bazie jest,
+-- Widok nazw poziomów. Instalator sprawdza, czy w tej bazie jest,
 -- i pomija tę linię, gdy go nie ma — tak samo jak przy tabeli zdjęć. Uruchamiając
 -- skrypt RĘCZNIE, sprawdź to sam: GRANT na nieistniejący obiekt przerywa całe
 -- wykonanie i konto zostaje bez ani jednego uprawnienia.
@@ -161,9 +160,8 @@ GRANT SELECT ON dbo.tw_ZdjecieTw   TO wertis;   -- zdjęcia kartotek na karcie t
 
 -- ZAPIS — DWIE kolumny na kartotece i ani jedna więcej.
 --
--- Do 0.37.0 była to JEDNA kolumna. Rozszerzenie granicy było świadome i ma
--- konkretny powód: magazynier stojący z kartonem, którego kodu kartoteka nie
--- zna, nie miał gdzie tego kodu wpisać.
+-- Druga kolumna (kod kreskowy) jest świadoma: magazynier stojący z kartonem,
+-- którego kodu kartoteka nie zna, musi mieć gdzie ten kod wpisać.
 --
 -- Do dok__Dokument, tw_Stan i tabel dokumentów aplikacja nie ma żadnego prawa
 -- zapisu — i to się nie zmienia.
@@ -171,7 +169,7 @@ GRANT SELECT ON dbo.tw_ZdjecieTw   TO wertis;   -- zdjęcia kartotek na karcie t
 -- 1. Lokalizacja. Podmień tw_Pole1 na pole wybrane w §1a (MSSQL_LOC_COLUMN
 --    musi się zgadzać!).
 GRANT UPDATE ON dbo.tw__Towar (tw_Pole1) TO wertis;
--- 2. Podstawowy kod kreskowy (0.37.0). Kolumna jest STAŁA — nie ma ustawienia,
+-- 2. Podstawowy kod kreskowy. Kolumna jest STAŁA — nie ma ustawienia,
 --    którym dałoby się ją pomylić.
 --    BEZ TEGO GRANT-U FUNKCJA NIE PADA: kod działa na kolektorze od razu
 --    (WERTIS trzyma go u siebie), a zadanie zapisu ląduje w kolejce ze
@@ -204,8 +202,7 @@ InsERT dla wersji bazy 1.8731.31.6933 — patrz
 [`subiekt-gt-struktura.md`](subiekt-gt-struktura.md).
 
 Stałe w `config.ts` są z niego wzięte, więc nie trzeba ich już ustalać: typ
-FZ = 1, PZ = 10, bufor = `dok_Status = 3`. Od 0.489.0 nie są to klucze
-`wertis.env`.
+FZ = 1, PZ = 10, bufor = `dok_Status = 3`. Nie są to klucze `wertis.env`.
 
 Zostały **dwie** rzeczy, których dokumentacja nie zawiera, bo zależą od
 konkretnego podmiotu. Uruchom w SSMS na kartotece/dokumencie z §1b:
@@ -231,7 +228,7 @@ SELECT COL_LENGTH('tw__Towar','tw_Pole1');          -- → LOC_FIELD_LIMIT (spod
 
 -- odłóż dokument do bufora w Subiekcie i sprawdź, czy dostał dok_Status = 3:
 SELECT dok_Id, dok_NrPelny, dok_Typ, dok_Status FROM dok__Dokument ORDER BY dok_Id DESC;
---    → jeśli tak, stała bufora pasuje; jeśli nie, to zmiana kodu (0.489.0)
+--    → jeśli tak, stała bufora pasuje; jeśli nie, to zmiana kodu
 ```
 
 ## 4. Konfiguracja i uruchomienie aplikacji
@@ -266,7 +263,7 @@ export MSSQL_LOC_COLUMN=tw_Pole1      # pole własne wybrane w §1a
 export MAG_ID_MAG=1                   # z checklisty (a)
 export MAG_ID_MGP=2
 export MAG_ID_ZWROTY=3
-# kody typów dokumentów i bufor są stałymi ze struktury InsERT (0.489.0)
+# kody typów dokumentów i bufor są stałymi ze struktury InsERT
 ```
 
 Uruchomienie — **oba okna z tego samego pliku**:
@@ -337,9 +334,6 @@ curl -s -X POST http://localhost:3001/api/admin/resync
   dotyczą TYLKO tej instalacji edu. Przy podłączaniu do prawdziwego Subiekta
   ustala się je od nowa, na tamtej bazie. Checklistę §3 powtarza ktoś
   z dostępem do niej.
-- Kolumna „Zamówione" w karcie towaru pokazuje 0 w trybie mssql. W bazie SGT
-  nie ma prostej kolumny — wartość pochodzi z dokumentów ZK/ZD. Zostaje to do
-  ewentualnej rozbudowy importera.
 - Nazwa dostawcy na liście dokumentów to `kh_Symbol` (pewna kolumna w każdej
   wersji). Pełną nazwę można dociągnąć z `adr__Ekran (adr_NazwaPelna)`.
   Wymaga to dodatkowego `GRANT SELECT` i korekty JOIN-a

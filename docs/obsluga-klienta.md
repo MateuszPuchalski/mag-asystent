@@ -1,442 +1,183 @@
-# Obsługa klienta od zera — zasady
+# Obsługa klienta — decyzje i dowody
 
-Dotychczasowa obsługa klienta — rozmowy, nakładka spraw, rejestr zwrotów
-i reklamacje — została skasowana w 0.140.0. Ten dokument opisuje, co ma
-stanąć na jej miejscu. Poprzednik, `architektura-spraw.md`, opisywał kod
-i odszedł razem z nim.
+Ten plik jest rejestrem decyzji o obsłudze klienta, dowodów za nimi i polityki
+danych. Docelowy panel opisuje `docs/panel-obslugi-klienta.md`, a reguły
+obowiązujące MIĘDZY kolejkami — `docs/obsluga-klienta-calosc.md`.
 
-Projekt docelowy panelu opisuje `docs/panel-obslugi-klienta.md`. Ten plik
-zostaje rejestrem decyzji i dowodów; tamten mówi, dokąd idziemy.
-
-Trzeci plik doszedł, gdy kolejek zrobiły się cztery:
-`docs/obsluga-klienta-calosc.md`. Tamten nie opisuje ekranu ani decyzji, tylko
-reguły obowiązujące MIĘDZY kolejkami. Siedem wiązań, których w nim brakowało,
-stoi od 0.386.0.
-
-**Stan: BUDOWA.** Wydanie 0.141.0 dostarcza pierwszy pionowy kawałek:
-panel React/Tailwind → zadanie terenowe → kolektor → wynik w panelu.
-Osiem pytań niżej nadal prowadzi projekt pełnej skrzynki Allegro. Wypełnia się je
-dowodami z dwóch narzędzi, nie z pamięci — o tym mówi następny rozdział.
-Właściciel zdecydował ciąć przed zebraniem dowodów, żeby nie budować nowego
-na starym; dowody rozstrzygają, co powstanie, a nie czy ciąć.
+Obsługa klienta powstała od zera, po skasowaniu poprzedniej: rozmów, nakładki
+spraw, rejestru zwrotów i reklamacji. Właściciel zdecydował ciąć przed
+zebraniem dowodów, żeby nie budować nowego na starym. Dowody rozstrzygają, co
+powstaje, a nie czy ciąć.
 
 ## Dlaczego od zera
 
-Bezpośredni powód jest jednostkowy. Pytanie klienta o rozrusznik przyjechało
-do panelu **bez numeru oferty**, choć mail z Allegro tę ofertę nazywa po
-tytule i numerze. Bez oferty dopasowanie towaru zeszło do zgadywania z treści
-i pokazało klin drwalski: dobór fraz bierze słowa po DŁUGOŚCI, więc wygrały
-„zdemontowanym", „oferowanym" i „Pozdrawiam", a jedyne słowo nazywające
-produkt („szarpaku") wypadło przez limit trzech fraz.
-
-Powód głębszy jest inny. **Model danych stał na kształcie JSON-a, który sami
-wymyśliliśmy w testach adaptera.** Nikt nigdy nie sprawdził go na żywym
-koncie. Inwentarz mówił to wprost o statusach dyskusji („niezweryfikowana
-lista"); okazuje się, że dotyczy też wątków wiadomości. Przy takim fundamencie
-każda kolejna warstwa — sprawa, piłka, oś czasu, tagi — dziedziczy niepewność
-po tej pierwszej i nie da się jej z zewnątrz zobaczyć.
+Pytanie klienta o rozrusznik przyjechało **bez numeru oferty**, choć mail
+z Allegro go nazywał. Dopasowanie zgadywało więc z treści: dobór fraz brał
+słowa po DŁUGOŚCI i wybrał „Pozdrawiam" zamiast „szarpaku". Powód głębszy:
+**model danych stał na kształcie JSON-a wymyślonym w testach adaptera**,
+nigdy nie sprawdzonym na żywym koncie, a każda warstwa dziedziczyła tę
+niepewność.
 
 ## Metoda: najpierw dowody, potem zasady
 
-Skoro wszystko jest do rewizji, nowych zasad nie wolno wyprowadzić ze starych.
-Wyprowadzamy je z trzech rzeczy.
+Nowe zasady wyprowadza się z trzech źródeł, nie ze starych zasad.
 
-**1. Co naprawdę przyjeżdża z Allegro** — `npm run sonda`
-([`server/src/sonda-run.ts`](../server/src/sonda-run.ts)). Wyłącznie GET,
-siedem rodzin końcówek, raport o KSZTAŁCIE: nazwy pól, typy, w ilu rekordach
-pole było obecne i w ilu niepuste. Treści, loginów, nazwisk i numerów nie
-wypisuje — pilnują tego reguły w
-[`services/ksztalt.ts`](../server/src/services/ksztalt.ts) i testy obok.
-Wynik zapisujemy obok tego pliku jako `allegro-sonda.md` — z datą, bo to
-OBSERWACJA. `allegro-ksztalt.md` to co innego: KONTRAKT mapowania, pisany ze
-specyfikacji. Do 0.164.0 stało tu, że raport zapisujemy właśnie jako
-`allegro-ksztalt.md`, czyli zdanie kazało nadpisać kontrakt raportem — tak
-powstała blizna 0.151.0, gdy plik wymyślony razem z kodem nosił etykietę
-„raport z produkcji".
-
-Pierwsze pytanie do sondy: **gdzie siedzi numer oferty i czy siedzi tam
-zawsze.** Kolumna „niepuste" odpowie też na pytanie ogólniejsze — które pola
-tylko wyglądają na pewne.
-
-**2. Jaka praca naprawdę przychodzi** — `npm run inwentarz`
-([`server/src/inwentarz-run.ts`](../server/src/inwentarz-run.ts)). Odczyt
-z naszej bazy, uruchamiany **przed** cięciem, bo po `DROP TABLE` tych liczb
-nikt nie odtworzy: wpływ miesiąc po miesiącu, udział pytań z numerem oferty
-i bez, trafienia w kartotekę, szkice puszczone bez edycji, czasy odpowiedzi,
-decyzje na pozycjach zwrotu, wyniki reklamacji oraz to, którędy napełniały się
-kosze. Wynik zapisujemy obok tego pliku jako `obsluga-stan-zastany.md`.
-
-**3. Czego nie wolno zgubić** — lista blizn na końcu tego dokumentu.
+1. **Co przyjeżdża z Allegro** — `npm run sonda`
+   ([`server/src/sonda-run.ts`](../server/src/sonda-run.ts)). Wyłącznie GET,
+   siedem rodzin końcówek, raport o KSZTAŁCIE: nazwy pól, typy, obecność
+   i niepustość. Treści, loginów i numerów nie wypisuje — pilnują tego reguły
+   w [`services/ksztalt.ts`](../server/src/services/ksztalt.ts). Wynik to
+   OBSERWACJA z datą (`allegro-sonda.md`). KONTRAKT mapowania, pisany ze
+   specyfikacji, to `allegro-ksztalt.md`; raport sondy go nie nadpisuje.
+2. **Jaka praca przychodzi** — `npm run inwentarz`
+   ([`server/src/inwentarz-run.ts`](../server/src/inwentarz-run.ts)). Odczyt
+   z naszej bazy: wpływ po miesiącach, udział pytań z numerem oferty, trafienia
+   w kartotekę, szkice bez edycji, czasy odpowiedzi, decyzje przy zwrotach,
+   wyniki reklamacji i drogi napełniania koszy. Wynik trafia do
+   `obsluga-stan-zastany.md`.
+3. **Czego nie wolno zgubić** — lista blizn niżej.
 
 ## Osiem pytań
 
-Każda odpowiedź ma wskazywać dowód z punktu 1 albo 2. Odpowiedź bez dowodu
-jest kolejnym domysłem — a od domysłów właśnie odchodzimy.
+Każda odpowiedź wskazuje dowód albo mówi wprost, że jest decyzją właściciela
+bez dowodu.
 
 ### 1. Jaka jest jednostka pracy?
 
-Wątek, problem klienta, zamówienie? Poprzednia odpowiedź brzmiała „sprawa
-skleja obiekty Allegro w jeden problem" i kosztowała cztery tabele nakładki
-plus ręczne SCAL i ROZKLEJ. Inwentarz powie, ile spraw naprawdę miało więcej
-niż jedno źródło — czyli czy było co sklejać.
-
-> **Odpowiedź (0.161.0):** Rozmowa, sprawa, dobór i zadanie to CZTERY osobne
-> byty. Sprawa stoi ponad rozmowami i skleja te, które dotyczą jednego
-> problemu klienta.
->
-> **To decyzja właściciela podjęta przed liczbami, których to pytanie żądało.**
-> Inwentarz miał powiedzieć, ile spraw naprawdę miało więcej niż jedno źródło,
-> czyli czy było co sklejać. Poprzednia odpowiedź o tym samym kształcie
-> kosztowała cztery tabele nakładki oraz ręczne SCAL i ROZKLEJ. Zapisujemy to
-> jawnie, żeby nikt nie wziął tej odpowiedzi za wniosek z dowodów.
->
-> ### Odpowiedź zmieniona w 0.388.0: SPRAWY NIE MA
->
-> Liczby, których to pytanie żądało, nie padły nigdy. Sprawa przeżyła
-> dwadzieścia siedem wydań jako tytuł plus lista rozmów: bez statusu, bez osi,
-> bez terminu, bez prowadzącego. Nie wchodziła do żadnego licznika i nie dało
-> się jej zamknąć.
->
-> **Zastąpiła ją DROGA ZAKUPU z 0.387.0.** Tamta odpowiada na to samo pytanie
-> — „co jeszcze dotyczy tego klienta" — po numerze zamówienia, przez cztery
-> kolejki, bez kliknięcia i bez wpisywania tytułu. Sprawa spinała rozmowy
-> ręką; droga spina wszystko sama.
->
-> Dwa paski nad jedną rozmową mówiące o tym samym to podwojenie, którego
-> dekalog obsługi zabrania w punkcie 2 (`docs/obsluga-klienta-calosc.md`;
-> do 0.426.1 był to punkt 3).
-> Decyzja właściciela z 18 września 2026: martwy kod, usunąć.
->
-> **Czego przy tym świadomie tracimy.** Droga wiąże po numerze zamówienia,
-> więc dwóch rozmów o jednym problemie BEZ wspólnego zakupu nie sklei. Pytanie
-> przed zakupem zadane w dwóch wątkach zostaje dwoma wątkami. To jest cena
-> zapisana tu jawnie, a nie przeoczenie.
->
-> Jednostek domenowych zostaje trzy: rozmowa, dobór i zadanie.
+Jednostki domenowe są trzy: rozmowa, dobór i zadanie. Osobnej „sprawy"
+sklejającej rozmowy NIE MA. Istniała z decyzji podjętej PRZED liczbami,
+których żądało to pytanie, a te liczby nie padły nigdy. Pytanie „co jeszcze
+dotyczy tego klienta" rozstrzyga **droga zakupu**: wiąże po numerze
+zamówienia, przez cztery kolejki, bez kliknięcia. Drugi pasek o tym samym
+byłby podwojeniem, którego zabrania punkt 2 dekalogu
+(`docs/obsluga-klienta-calosc.md`). **Cena:** dwóch rozmów o jednym problemie
+BEZ wspólnego zakupu droga nie sklei.
 
 ### 2. Co wjeżdża i skąd?
 
-Lista końcówek z `allegro-ksztalt.md`, z jawnym podziałem na pola pewne
-i takie, które bywają puste. Każde pole, na którym stanie logika, ma tu mieć
-liczbę „niepuste" przy sobie.
+Kształty bierzemy z **oficjalnej dokumentacji Allegro**, nie z sondy —
+decyzja właściciela. Potwierdzone pola zapisuje `docs/allegro-ksztalt.md`
+i to on jest kontraktem dla kodu. Pole, którego nie da się odczytać
+z dokumentacji wprost, dostaje `[WERYFIKUJ]` i wchodzi do licznika
+w preambule `docs/subiekt-gt-struktura.md`.
 
-> **Odpowiedź:** Kształty bierzemy z **oficjalnej dokumentacji Allegro**, nie
-> z sondy — decyzja właściciela. Potwierdzone pola zapisuje
-> `docs/allegro-ksztalt.md` i to on jest kontraktem dla kodu. Pole, którego nie
-> da się odczytać z dokumentacji wprost, dostaje `[WERYFIKUJ]` i wchodzi do
-> licznika w preambule `docs/subiekt-gt-struktura.md`.
->
-> Zakaz zostaje bez zmian: żadnego mapowania z pamięci, z wymyślonego JSON-a,
-> z usuniętej implementacji ani z treści e-maila powiadamiającego. Ta lista
-> kosztowała już jedno wydanie — `external.id` czytany z wiadomości zamiast
-> z oferty dawał `NaN`.
+Zakaz: żadnego mapowania z pamięci, z wymyślonego JSON-a, z usuniętej
+implementacji ani z treści e-maila powiadamiającego. Przykład kosztu:
+`external.id` czytany z wiadomości zamiast z oferty dawał `NaN`.
 
 ### 3. Co trzymamy u siebie?
 
-Do 0.142.1 treści rozmów nie zapisywaliśmy wcale — i to był jeden z powodów,
-dla których szukanie po sprawach i dopasowania towarów były słabe: wiedza
-o tym, o co klient pytał, ginęła po zamknięciu ekranu. Od 0.142.1 zapisujemy je
-lokalnie; czym za to płacimy, mówi rozdział „Polityka danych skrzynki" niżej.
-
-> **Odpowiedź:** Trzymamy u siebie treści wiadomości, w dwóch warstwach —
-> surowej i modelu obsługi. Pełny zapis stoi w rozdziale „Polityka danych
-> skrzynki" na końcu tego pliku i on jest odpowiedzią na to pytanie.
+Treści wiadomości, w dwóch warstwach — surowej i modelu obsługi. Bez nich
+wiedza o tym, o co klient pytał, ginęła po zamknięciu ekranu. Zakres i cena
+stoją w rozdziale „Polityka danych skrzynki".
 
 ### 4. Kto ma następny ruch i skąd to wiemy?
 
-Z metadanych, z treści, czy z jawnego stanu stawianego ręką człowieka?
-Poprzednia odpowiedź (piłka liczona z metadanych) działała, ale wymagała
-osobnej tabeli `watek_meta` i dociągania rozmów przy każdej synchronizacji.
+Status rozmowy wynika wyłącznie z FAKTÓW, które i tak zapisujemy: przyszła
+wiadomość, ktoś przejął rozmowę, odpowiedź poszła, zlecono pomiar, wrócił
+wynik z hali. Zapisuje go ta sama transakcja co fakt, więc typowa rozmowa nie
+wymaga ANI JEDNEGO kliknięcia w status. Statusy wymienia
+`panel-obslugi-klienta.md` §7. **Ręcznych stanów nie ma**, decyzją
+właściciela; cena jest świadoma: spamu nie da się uciszyć.
 
-> **Odpowiedź:** Z **jawnego stanu**, ale stawianego RĘKĄ TYLKO TAM, GDZIE
-> automat nie ma go z czego policzyć. Statusy rozmowy wymienia
-> `panel-obslugi-klienta.md` §7: `waiting_for_customer` znaczy „piłka po
-> stronie klienta", `waiting_for_internal` — po stronie pracownika lub hali.
->
-> Odpada liczenie piłki z metadanych, które wymagało osobnej tabeli
-> `watek_meta` i dociągania rozmów przy każdej synchronizacji.
->
-> **Poprawka z 0.157.0 — druga połowa tej odpowiedzi.** Do tego wydania
-> rozdział mówił „stawianego ręką człowieka" i tak też miał powstać ekran.
-> Właściciel rozstrzygnął inaczej, tym samym kryterium co przy zwrotach:
-> minimum klikań. Status wynika więc z FAKTÓW, które i tak zapisujemy —
-> przyszła wiadomość, ktoś przejął rozmowę, odpowiedź poszła do klienta,
-> zlecono pomiar, wrócił wynik z hali.
->
-> Ręką zostają cztery stany, których automat nie ma jak zgadnąć: odłożenie
-> (z terminem), załatwione, zamknięte i spam. To nie jest liczenie piłki
-> z metadanych — status zapisuje ta sama transakcja co fakt, z którego
-> wynika, i nikt go potem nie odgaduje przy odczycie.
->
-> Różnica jest mierzalna: typowa rozmowa nie wymaga ANI JEDNEGO kliknięcia
-> w status. Wersja ręczna kłamałaby przy pierwszej rozmowie, w której agent
-> się spieszył — a status, który kłamie, jest gorszy od jego braku.
->
-> **Zmiana z 22 września 2026: ręki nie ma wcale.** Właściciel usunął cztery
-> ręczne stany razem z trasą, która je nadawała. Status wynika odtąd wyłącznie
-> z faktów. Cena jest przyjęta świadomie: podziękowanie klienta zostawia rozmowę
-> w „Czeka na nas", a spamu nie da się uciszyć. Akapit wyżej zostaje, bo
-> tłumaczy kolumnę, w której dawne werdykty dalej stoją.
->
-> **Tego samego dnia podziękowanie przestało czekać na nas.** Rozstrzyga
-> decyzja klasyfikatora, bez sprawdzania tekstu: `OTHER` z `NO_ACTION`,
-> wysoka pewność i nasza wcześniejsza odpowiedź. To dalej fakt, nie ręka,
-> tylko fakt z przypuszczenia maszyny — dlatego każdy warunek jest wąski.
+**Podziękowanie nie czeka na nas**, gdy klasyfikator zwrócił `OTHER`
+z `NO_ACTION` z wysoką pewnością, a my już odpowiedzieliśmy. To fakt
+z przypuszczenia maszyny, dlatego każdy warunek jest wąski.
 
 ### 5. Czym jest odpowiedź i gdzie stoi granica automatu?
 
-Dotychczasowa granica: automat proponuje, do klienta mówi wyłącznie człowiek.
-Ta zasada nie jest podważana przez żaden znany nam fakt — ale ma tu zostać
-zapisana świadomie, a nie odziedziczona.
+Właściciel usunął zasadę „człowiek wysyła każdą odpowiedź" (§27 projektu
+panelu, punkt 2), ale kodu wysyłki bez człowieka nie ma. Kod działa według
+granicy **automat proponuje, do klienta mówi człowiek** (§14.2 projektu
+panelu). Według §14.3 każde twierdzenie techniczne w szkicu wskazuje źródło.
 
-> **Odpowiedź zmieniona 22 września 2026.** Właściciel usunął zasadę
-> „człowiek wysyła każdą odpowiedź" (§27 projektu panelu, punkt 2). Wysyłka
-> bez człowieka przestaje być zakazana, ale jej kodu nie ma. Specyfikacja
-> z 20 września opisuje warunki: bramka per klasa, dowody i wyłącznik.
-> Pierwotna odpowiedź zostaje niżej, bo tłumaczy kod dwustu wydań.
->
-> **Odpowiedź:** Granica zostaje tam, gdzie była, i zostaje zapisana
-> świadomie: **automat proponuje, do klienta mówi wyłącznie człowiek.**
-> Rozwinięcie w `panel-obslugi-klienta.md` §14.2 — automat nie wysyła
-> odpowiedzi, nie potwierdza niepewnego dopasowania, nie obiecuje dostępności
-> ani terminu i nie usuwa negatywnego dopasowania.
->
-> Do tego §14.3: każde twierdzenie techniczne w szkicu wskazuje źródło, a treść
-> bez źródła jest oznaczona jako przypuszczenie.
->
-> **Uzupełnienie z etapu E2 — kto zatwierdza wiedzę.** Projekt przewidywał
-> rolę eksperta. Właściciel rozstrzygnął: zatwierdza każdy z biura, także autor
-> propozycji, bo w biurze bywa jedna osoba i zasada dwóch par oczu zatrzymałaby
-> wiedzę na zawsze. Autor i zatwierdzający są zapisani osobno. Automat składa
-> propozycje (z doboru, z pomiaru), ale nie rozstrzyga — pilnuje tego serwis,
-> nie dyscyplina. Bazę zaczynamy od zera, bez importu.
->
-> **Doprecyzowanie z 0.239.0 — co znaczy „bez importu".** Bez importu
-> CUDZEJ bazy pasowań. Własne nazwy kartotek są źródłem, a tokeny silników
-> (§12 panelu) to zapis ręki biura: człowiek wpisuje słowo i silnik, przegląda
-> listę kartotek i zatwierdza zaznaczone. Propozycja i rozstrzygnięcie idą
-> wtedy jedną transakcją tego samego człowieka — to ta sama zasada „zatwierdza
-> każdy z biura, także autor", tylko za jednym kliknięciem.
+**Wiedzę zatwierdza każdy z biura, także autor propozycji**, bo w biurze bywa
+jedna osoba. Autor i zatwierdzający są zapisani osobno, a automat tylko
+proponuje — pilnuje tego serwis. Baza startuje bez importu CUDZEJ bazy
+pasowań. Tokeny silników (§12 panelu) zatwierdza człowiek jedną transakcją.
 
 ### 6. Czym jest zwrot?
 
-Sprawą klienta, procesem magazynowym, czy dwoma bytami o jednym numerze?
-Decyzja właściciela: rejestr zwrotu znika, kosz napełnia się wyłącznie
-dokumentem MM ZWROTY z Subiekta, a zwroty wracają później **zaprojektowane od
-nowa**. Ten rozdział jest miejscem na ten projekt — po liczbach z inwentarza,
-zwłaszcza po tabelce „którędy napełniane były kosze".
+**Dwoma bytami o jednym numerze** — i panel pokazuje to wprost. Sprawa
+klienta żyje w Allegro: identyfikator zwrotu, zegar ustawowy, pieniądze.
+Proces magazynowy żyje w Subiekcie: paczka wraca, korekta, MM na bufor.
+WERTIS trzyma jeden wiersz spinający oba i jest **kolejką decyzji**.
+Trzeciego obiegu magazynowego nie ma: odłożenie zostaje w koszach z MM ZWROTY
+(`DEPLOY.md` §6a), a ocena towaru idzie przez `zadanie_terenowe` z rodzajem
+`weryfikacja`.
 
-> **Odpowiedź:** **Dwoma bytami o jednym numerze** — i panel ma to pokazywać
-> wprost. Sprawa klienta żyje w Allegro: identyfikator zwrotu, zegar ustawowy,
-> pieniądze. Proces magazynowy żyje w Subiekcie: paczka wraca, korekta, MM na
-> bufor. WERTIS trzyma jeden wiersz spinający oba.
->
-> **Czego ten projekt NIE robi.** Nie buduje trzeciego obiegu magazynowego.
-> Fizyczne odłożenie zostaje w koszach z dokumentu MM ZWROTY (`DEPLOY.md` §6a),
-> a ocena towaru idzie istniejącym `zadanie_terenowe` — rodzaj `weryfikacja`
-> już jest w ograniczeniu tabeli, więc kolektor nie dostaje nowego ekranu.
->
-> Tu leży różnica wobec rejestru skasowanego w 0.140.0. Tamten próbował być
-> naraz kartą zwrotu, dokumentem magazynowym i kolejką korekt. Ten jest
-> **kolejką decyzji** nad danymi, których właścicielami są Allegro i Subiekt.
->
-> **Kształt ekranu wynika z jednego kryterium: minimum klikań.** Rejestr każe
-> najpierw znaleźć zwrot, potem wybrać akcję z menu — dwa kliknięcia przed
-> jakąkolwiek decyzją. Panel dzieli pracę na kubełki, a w każdym stoi
-> dokładnie jedno pytanie:
->
-> | kubełek | pytanie |
-> |---|---|
-> | DO DECYZJI | przyjąć czy odrzucić? |
-> | DO OCENY | co z towarem? |
-> | DO ZWROTU | ile oddać? |
-> | DO KOREKTY | zlecić korektę? |
->
-> Operator nie wybiera, co zrobić — kubełek już to powiedział. Odpowiada
-> tylko „tak", „nie" albo „ile". Wiersz przyjeżdża z policzoną propozycją,
-> więc typowy zwrot to jeden klawisz.
->
-> **Kolejność bierze się z zegara ustawowego**, nie z daty wpływu. To blizna
-> 0.121.0 zastosowana do zwrotów: termin jest osobnym bytem i steruje
-> kolejnością pracy. Zwrot z dwoma dniami zapasu stoi nad wczorajszym.
->
-> **Sygnały są trzy**, bo kolor zapalany zawsze uczy go ignorować: termin
-> blisko, towar jeszcze nie wrócił, sprawa rozstrzygnięta już w panelu
-> Allegro. Wszystko inne wiersz mówi bez czytania.
->
-> **Potwierdzenie dostają dwie rzeczy nieodwracalne** — oddanie pieniędzy
-> i odmowa zwrotu. Reszta ma cofnięcie, jak trzy cofnięcia koszy z 0.79.0:
-> dopóki zapis czeka w kolejce, aplikacja go anuluje.
->
-> Pełny projekt ekranu stoi w `docs/panel-obslugi-klienta.md`, rozdział
-> „Zwroty klienckie".
+**Kształt ekranu wynika z kryterium minimum klikań.** Kubełki DO DECYZJI,
+DO OCENY, DO ZWROTU i DO KOREKTY zadają po jednym pytaniu: przyjąć, co
+z towarem, ile oddać, czy zlecić korektę. Wiersz przyjeżdża z policzoną
+propozycją, więc typowy zwrot to jeden klawisz. Kolejność bierze się
+z zegara ustawowego. Sygnały są trzy, bo kolor zapalany zawsze uczy go
+ignorować: termin blisko, towar nie wrócił, sprawa rozstrzygnięta w Allegro.
+Potwierdzenie dostają dwie rzeczy nieodwracalne: oddanie pieniędzy i odmowa.
+Pełny projekt: `docs/panel-obslugi-klienta.md`, rozdział „Zwroty klienckie".
 
 ### 7. Jak wygląda ekran?
 
-Czy zostaje jeden panel bez bundlera (`biuro.html`), czy obsługa klienta
-dostaje własne miejsce. Reguła „jeden front" z `CLAUDE.md` obowiązuje, dopóki
-ten rozdział jej nie zmieni — a zmiana wymaga zdania o koszcie, nie o modzie.
+**Jeden front.** Całe biuro mieszka w `panel/` pod `/obsluga`, w React z Vite
+i Tailwindem. `/` i `/biuro` przekierowują (302) do `/obsluga/`. Decyzja
+właściciela po audycie: dawna `biuro.html` była konsolą pracy z dwudziestoma
+dwoma zapisami, a ci sami ludzie logowali się do dwóch frontów.
 
-> **Odpowiedź:** Obsługa klienta dostaje własne miejsce — `panel/` pod
-> `/obsluga`, React z Vite i Tailwindem. Decyzja właściciela z 0.141.0.
->
-> **Co to kosztuje.** Wdrożenie przestaje być kopiowaniem pliku: `npm run
-> build` musi zbudować panel, zanim serwer skopiuje go do `dist/web/obsluga`.
-> Dochodzi drzewo zależności npm, którego `biuro.html` nie miał wcale.
-> Rośnie też koszt czytania: dwa fronty to dwa zestawy nawyków, a odruch
-> „szukaj w `biuro.html`" przestaje wystarczać.
->
-> **Koszt urósł w 0.145.0 z trzech bibliotek do ośmiu.** Pierwotna wycena
-> obejmowała React, Vite i Tailwind. `panel-obslugi-klienta.md` §10 dokłada
-> React Router, TanStack Query, shadcn, React Hook Form, Zod oraz testy
-> w Vitest, Testing Library i Playwright. Decyzja właściciela, świadoma.
->
-> Kupujemy za to rzeczy, których panel dziś nie ma: adresowalne ekrany zamiast
-> jednego przełącznika, wspólny cache zapytań zamiast ręcznego odświeżania co
-> dwadzieścia sekund, walidację formularzy w jednym miejscu i testy frontu,
-> których nie ma wcale. Płacimy ośmioma zależnościami i dłuższym buildem.
->
-> **To odwraca decyzję z 0.143.0**, gdzie TanStack Query odrzuciłem jako
-> przedwczesny przy pierwszym, czytającym wydaniu skrzynki. Przedwczesny
-> przestaje być, gdy ekranów jest kilka i mają wspólny stan.
->
-> **Co to kupuje.** Ekrany obsługi są stanowe — lista zadań, formularz wyniku,
-> odświeżanie w tle. `biuro.html` robi to ręcznie na `innerHTML`, a testy-
-> strażnicy dubli i delegacji istnieją właśnie dlatego, że ten sposób się tam
-> już raz wymknął. Nowa obsługa startuje od zera i nie musi tego dziedziczyć.
->
-> **Gdzie stoi granica.** Magazyn zostaje w `biuro.html`; przepisywanie go nie
-> jest częścią tej decyzji. Trzeciego frontu nie ma.
+**Cel biura, od którego liczy się każdy ekran:** biuro rozstrzyga to, czego
+hala nie rozstrzygnie sama — w drodze towaru przez magazyn. Reszta jest
+nadzorem albo ustawieniem. **Test dla każdej funkcji:** czy kończy się
+decyzją biura, której hala nie podejmie? Tak znaczy pracę na górnym rzędzie.
+Coś, co trzeba sprawdzać, to wgląd na dolnym rzędzie. Rzadka zmiana idzie za
+zębatkę. Reszta wypada.
 
-> **Zmiana z 0.431.0: jeden front.** Decyzja właściciela po audycie biura
-> z 0.427.0. Całe biuro przechodzi do `panel/`, a `biuro.html` znika widok po
-> widoku. Granica z akapitu wyżej przestaje obowiązywać.
->
-> **Dlaczego.** Audyt pokazał, że `biuro.html` nie jest już podglądem. Ma
-> dwadzieścia dwa zapisy w sześciu widokach, czyli jest konsolą pracy biura.
-> Ci sami ludzie pracują w obu frontach: bramka ról to w obu `biuro` i `admin`.
-> Dwa fronty kazały im pamiętać, który ekran jest gdzie, i logować się dwa razy.
-> Cztery kontrole zwrotów wisiały w `/biuro`, gdzie obsługa nie zagląda (0.313.0).
->
-> **Co to kosztuje.** Biuro traci wdrożenie przez kopię jednego pliku; build
-> panelu i tak już jest. Przeprowadzka to sześć wydań i nowe strażniki
-> w miejsce testów struktury `biuro.html`. Nawyk „szukaj w `biuro.html`"
-> przestaje działać wcześniej, niż znika plik.
->
-> **Co to kupuje.** Jeden zestaw nawyków, jedno logowanie, jeden nagłówek
-> i jedna lista spraw do rozstrzygnięcia nad wszystkimi kolejkami.
->
-> **Cel biura, od którego liczy się każdy ekran:** biuro rozstrzyga to, czego
-> hala nie rozstrzygnie sama — w drodze towaru przez magazyn. Reszta jest
-> nadzorem albo ustawieniem.
->
-> Test dla każdej funkcji: czy kończy się decyzją biura, której hala nie
-> podejmie? Tak znaczy pracę na górnym rzędzie. Coś, co trzeba sprawdzać,
-> to wgląd w dolnym rzędzie. Rzadka zmiana idzie za zębatkę. Reszta wypada.
->
-> **Kolejność.** F0 dokumentuje decyzję i makiety
-> (`docs/projekt-widokow-jeden-front/`). F1 kładzie fundament panelu
-> i poprawki z audytu. F2 to DO DECYZJI i dostawy, F3 kosze, a F4 stan
-> systemu, dziennik i analiza. F5 to ustawienia, a F6 przekierowuje `/biuro`
-> i kasuje plik. Każde wydanie usuwa z `biuro.html` dokładnie to, co przeniosło.
->
-> **F2 w 0.435.0.** DO DECYZJI stanęło jako ekran startowy panelu, liczone
-> w locie z istniejących źródeł — bez tabeli i bez własnego statusu, zgodnie
-> z zakazem piątej tabeli nad kolejkami. DOSTAWY przeszły do panelu i zniknęły
-> z `biuro.html` razem ze swoimi strażnikami; ich gwarancje przejęły testy
-> ekranu w panelu. Jedno odstępstwo od planu: dane firmy do druków NIE poszły
-> jeszcze na serwer. Druk w panelu czyta ten sam klucz przeglądarki co biuro,
-> bo oba fronty stoją na jednym originie. Przeniesienie czeka na F5, bo
-> wymagałoby zmiany zapisu w `biuro.html`, któremu nic nowego nie wolno.
->
-> **F3 w 0.438.0 — zmiana kształtu decyzją właściciela.** Kosze NIE dostały
-> własnego ekranu w drugim rzędzie, jak rysowały makiety. Mieszkają w zakładce
-> Zwroty, pod przełącznikiem Zwroty · Kosze, bo kosz jest dalszym ciągiem
-> zwrotu. Wiązanie kosz ↔ zwrot działa odtąd w obie strony. MAGAZYN ZWROTÓW
-> zniknął z `biuro.html`; dolny rząd panelu niesie już tylko Dostawy i wgląd.
->
-> **F4 idzie dwoma wydaniami, nie jednym.** Stan systemu niesie siedem
-> zapisów, czytnik arkuszy i parowanie Allegro, więcej niż F2 i F3 razem.
-> Krótszy PR to mniej zderzeń numerów, które kosztowały już kilka wydań.
->
-> **F4a w 0.440.0.** DZIENNIK i ANALIZA przeszły do panelu i zniknęły
-> z `biuro.html`. Trzy zmiany kształtu. Metryki etykiet i kodów przeszły ze
-> stanu systemu do analizy, bo mówią o pracy hali w oknie i słuchają tego
-> samego okna. Dziennik filtruje bez przycisku „szukaj", a doba filtra jest
-> lokalna, nie UTC. Analiza NIE ma zakresu „Obsługa klienta" z makiety F0:
-> brakuje mu źródła danych, a przeprowadzka nie wymyśla liczb. To luka do
-> osobnej decyzji. Reguły strefy złotej zostają za zębatką biura do F5;
-> analiza prowadzi do nich mostem, z sesją.
->
-> **F4b w 0.441.0.** STAN SYSTEMU przeszedł do panelu jako ostatni widok
-> wglądu. W `biuro.html` zostały wyłącznie ustawienia za zębatką. Stan
-> integracji zszedł spod zębatki panelu do stanu systemu, więc jest jedno
-> miejsce na pytanie „czemu nie działa". Wiersze DO DECYZJI prowadzą wprost
-> do właściwej karty, a ostatni most z panelu do `/biuro` służy regułom
-> strefy złotej. Dwie zmiany kształtu. Arkusz lokalizacji widzi tylko admin,
-> bo pozostałym serwer i tak odmawia. Rekoncyliacja nazywa wszystkie
-> dziewięć rodzajów rozjazdu, a nie cztery.
->
-> **F5 w 0.444.0.** Ustawienia przeszły do panelu jako ostatni widok
-> `biuro.html`; strona została drogowskazem na jedno wydanie, decyzją
-> właściciela. Dane firmy poszły na serwer, zamykając odstępstwo z F2.
-> To dane SPRZEDAWCY, nie kupującego, więc reguła prywatności adresu
-> z `CLAUDE.md` ich nie dotyczy. Pomiary obsługi zeszły spod zębatki do
-> Analizy → Obsługa klienta, bo są wynikiem, nie ustawieniem. Zakres ten
-> stanął wcześniej, w 0.443.0, i domknął lukę zapisaną przy F4a. Most
-> z panelu do `/biuro` zniknął — reguły strefy stoją za zębatką panelu.
->
-> **F6 w 0.446.0 — przeprowadzka skończona.** `biuro.html` zniknął razem
-> z fontami i ikoną, a `/` i `/biuro` przekierowują (302) do `/obsluga/`.
-> Testy tras przeszły do `routes/biuro-api.test.ts`; strażnicy struktury
-> strony odeszli, bo ich gwarancje przejęły testy ekranów panelu. Dwa
-> sygnały paska biura nie miały jeszcze miejsca w panelu i przeszły do
-> nagłówka: etykieta instancji innej niż produkcja i plakietka spóźnionych
-> spraw. Jedno odstępstwo od planu: zapas danych firmy z przeglądarki
-> ZOSTAJE. Biuro może przeskoczyć 0.444.0 przy aktualizacji, a wtedy nikt
-> nie kliknął „Przenieś na serwer".
->
-> **Nagłówek w jednym rzędzie (0.538.0, decyzja właściciela z 27 września
-> 2026).** Podział „praca na górnym rzędzie, wgląd na dolnym" zostaje jako
-> podział treści, ale nie jako dwa rzędy. Praca to zakładki, a wgląd,
-> ustawienia i wyjście stoją w menu „Więcej" na końcu rzędu. Dolny rząd
-> kosztował ~50 px wysokości na każdym ekranie pracy za rzeczy otwierane
-> kilka razy w miesiącu. Dostawy są ósmą zakładką, za kreską, bo przyjęcie
-> dostawy to praca dzienna. Szukanie zostało samą lupą, a pigułka
-> synchronizacji kropką z godziną; w alarmie pisze „Stanęła".
->
-> Zmierzone w Chromium na zasianym serwerze, przy 1180 px. Nagłówek ma
-> 65 px zamiast 117 px. Z godziną synchronizacji i licznikami „6" i „12"
-> rząd ma 55 px luzu. Alarm „Stanęła" mieści się z luzem 23 px, a etykieta
-> „DEV" równo na styk. Drugi rząd daje dopiero „DEV" razem z alarmem albo
-> plakietka spóźnień. To cena świadoma: `flex-wrap` z 0.233.0 zostaje, bo
-> menu niesie wylogowanie. Makiety wariantów leżą w artefakcie projektu.
+**Nagłówek ma jeden rząd.** Podział „praca na górnym rzędzie, wgląd na
+dolnym" obowiązuje jako podział treści. Praca to zakładki, a wgląd,
+ustawienia i wyjście stoją w menu „Więcej", bo drugi rząd kosztował ~50 px na
+każdym ekranie pracy. Dostawy są ósmą zakładką, za kreską, bo to praca
+dzienna. Pomiar przy 1180 px: 65 px zamiast 117 px; `flex-wrap` zostaje, bo
+menu niesie wylogowanie.
+
+**Co to kosztuje.** Wdrożenie wymaga `npm run build`, który buduje panel,
+zanim serwer skopiuje go do `dist/web/obsluga`. Dochodzi drzewo zależności
+npm: React, Vite, Tailwind oraz, według `panel-obslugi-klienta.md` §10, React
+Router, TanStack Query, shadcn, React Hook Form i Zod. Testy frontu idą
+w Vitest, Testing Library i Playwright. Decyzja właściciela, świadoma.
+
+**Co to kupuje.** Adresowalne ekrany zamiast jednego przełącznika. Wspólny
+cache zapytań zamiast ręcznego odświeżania co dwadzieścia sekund. Walidację
+formularzy w jednym miejscu i testy frontu. Jeden zestaw nawyków, jedno
+logowanie, jeden nagłówek i jedną listę spraw do rozstrzygnięcia.
+
+**Przeprowadzka szła widok po widoku**, z makietami
+w `docs/projekt-widokow-jeden-front/`. F0 to decyzja, F1 fundament, F2 DO
+DECYZJI i dostawy, F3 kosze, F4 stan systemu, dziennik i analiza, F5
+ustawienia, F6 skasowanie `biuro.html`. Trasy API biura zostały te same.
+Odstępstwa od makiet:
+
+- DO DECYZJI to ekran startowy, liczony w locie, bez tabeli i statusu.
+- Kosze mieszkają w zakładce Zwroty (przełącznik Zwroty · Kosze), bo kosz
+  jest dalszym ciągiem zwrotu; wiązanie działa w obie strony.
+- Metryki etykiet i kodów oraz pomiary obsługi stoją w analizie. Stan
+  integracji stoi w stanie systemu. Arkusz lokalizacji widzi tylko admin.
+- Dane firmy do druków leżą na serwerze, z zapasem w przeglądarce. To dane
+  SPRZEDAWCY, więc reguła prywatności adresu ich nie dotyczy.
 
 ### 8. Kiedy nowa obsługa jest gotowa?
 
-Lista zdań sprawdzalnych okiem na produkcji („agent odpowiada na pytanie
-o dobór części bez otwierania Allegro"), nie lista funkcji. Ma też nazwać
-**dopuszczalną długość przerwy** w pracy biura między cięciem a pierwszym
-użytecznym kawałkiem — bo przez ten czas biuro pracuje w panelu Allegro
-i w Subiekcie.
-
-> **Odpowiedź:** Siedemnaście zdań sprawdzalnych okiem stoi
-> w `panel-obslugi-klienta.md` §25. Najkrótsze z nich niesie sens całości:
-> agent obsłuży typowe pytanie bez otwierania panelu Allegro.
->
-> **Druga połowa pytania zostaje bez odpowiedzi.** Dopuszczalnej długości
-> przerwy w pracy biura nie nazwał ani ten rozdział, ani projekt docelowy.
-> Przez ten czas biuro pracuje w panelu Allegro i w Subiekcie.
+Siedemnaście zdań sprawdzalnych okiem stoi w `panel-obslugi-klienta.md` §25.
+Najkrótsze niesie sens całości: agent obsłuży typowe pytanie bez otwierania
+panelu Allegro. **Dopuszczalnej długości przerwy** w pracy biura nie nazwał
+ani ten plik, ani projekt docelowy.
 
 ## Lista blizn
 
 Usterki już zapłacone wydaniem. Nowy kod ma prawo wyglądać zupełnie inaczej,
-ale nie ma prawa kupić ich drugi raz.
+ale nie ma prawa kupić ich drugi raz. Kolumna „wydanie" jest kluczem, po
+którym cytują je komentarze w kodzie.
 
 | wydanie | blizna | czego nie wolno zgubić |
 |---|---|---|
 | 0.18.0 | zapis przy samym patrzeniu na ekran | otwarcie ekranu niczego nie mutuje; liczniki zapisów w teście panelu są umową |
-| 0.56.6 | „brak korespondencji" przy istniejącym wątku — Allegro MASKUJE rozmówcę jako `client:44300444` | rozmowy szukano po identyfikatorze kupującego, nie po loginie; 24 września 2026 właściciel potwierdził, że to login kupującego bez konta, nie maska — rozbieżność dawała wielkość liter, więc login porównuje się bez niej (`allegro-ksztalt.md`) |
+| 0.56.6 | „brak korespondencji" przy istniejącym wątku rozmówcy `client:44300444` | to login kupującego bez konta, nie maska; rozbieżność dawała wielkość liter, więc login porównuje się bez niej (`allegro-ksztalt.md`) |
 | 0.102.1 | pobranie przerabiało 60 rozmów i zakładało zero pytań | kto pisał, ustala się po roli autora (`BUYER`/`SELLER`), a login rozmówcy jest dopiero zapasem |
 | 0.105.0 | szkic dostawał szum, a Allegro zbędne strzały | kontekst dociąga się pod PYTANIE, nie do każdej sprawy |
 | 0.110.0 | dopisek klienta zakładał drugą sprawę, a odpowiedź szła na starą wersję pytania | kontrola świeżości przy wysyłce: 409 i jawne „wyślij mimo to", nigdy ciche nadpisanie |
@@ -451,799 +192,309 @@ ale nie ma prawa kupić ich drugi raz.
 | 0.152.0 | encje HTML DRUGI RAZ — `odkodujEncje` czekała gotowa z testami, a mapowanie jej nie wołało | odtrutka bez wołającego to odtrutka nieużyta; przepisując funkcję od nowa, sprawdź, co po starej zostało |
 | 0.152.0 | 62 przebiegi pod słowem `failed`, gdy serwer znał zdanie „konto niepołączone" | powód zapisuje się SŁOWEM, nie tylko kodem HTTP; wiersz nazwany „połączenie" pokazuje połączenie |
 | 0.224.1 | flaga jawnej zgody ginęła na trasie, choć serwis ją obsługiwał i panel ją wysyłał | pole nieopisane w typie `Body` znika po cichu; flagi ciała testuje się na TRASIE, nie tylko w serwisie |
-| 0.250.0 | encje HTML TRZECI RAZ — czeskie, słowackie i węgierskie litery wracały dosłownie, a sprawy posprzedażowe nie przechodziły przez dekoder w ogóle | tablicę encji GENERUJE się parserem przeglądarki, nie pisze z pamięci pod jeden alfabet; nowy synchronizator dostaje dekoder razem z mapowaniem, nie później |
-| 0.253.0 | zakaz wiedzy własnej dawał szkic suchy, a opis oferty z wymiarami i listą zgodności leżał nietknięty | swobodę modelu kupuje się JAWNOŚCIĄ, nie zaufaniem: źródło przy każdym twierdzeniu, pewność przyznaje serwer wg źródła, a agent widzi rachunek przed wysłaniem |
-| 0.253.1 | nowe pole w wyjściu modelu przy starym suficie `max_tokens` ucinało JSON, a błąd odczytu SDK spadał do gałęzi „coś u nas" | rosnąc o pole w wyjściu, rośnij o sufit; `APIError` dziedziczy po `AnthropicError`, więc kolejność `instanceof` jest logiką, nie stylem |
-| 0.254.0 | szkic mówił klientowi, że zapisujemy jego model, czego nam brak w kartotece i ile sztuk leży na półce | odpowiedź jest o MASZYNIE KLIENTA, nie o naszej pracy; stan wiedzy i stan magazynu idą do agenta, nie do klienta |
-| 0.59.0 | bufor zwrotów cofał się bez porządku | guard „adres przed sprzedawalnością" przy zadaniach MM (dotyczy koszy, które zostają) |
+| 0.250.0 | encje HTML TRZECI RAZ — czeskie, słowackie i węgierskie litery wracały dosłownie, a sprawy posprzedażowe omijały dekoder | tablicę encji GENERUJE się parserem przeglądarki, nie pisze z pamięci pod jeden alfabet; nowy synchronizator dostaje dekoder razem z mapowaniem |
+| 0.253.0 | zakaz wiedzy własnej dawał szkic suchy, a opis oferty z wymiarami i listą zgodności leżał nietknięty | swobodę modelu kupuje się JAWNOŚCIĄ: źródło przy każdym twierdzeniu, pewność przyznaje serwer wg źródła, a agent widzi rachunek przed wysłaniem |
+| 0.253.1 | nowe pole w wyjściu modelu przy starym suficie `max_tokens` ucinało JSON, a błąd odczytu SDK spadał do gałęzi „coś u nas" | rosnąc o pole w wyjściu, rośnij o sufit; `APIError` dziedziczy po `AnthropicError`, więc kolejność `instanceof` jest logiką |
+| 0.254.0 | szkic mówił klientowi, że zapisujemy jego model, czego nam brak w kartotece i ile sztuk leży na półce | odpowiedź jest o MASZYNIE KLIENTA, nie o naszej pracy; stan wiedzy i magazynu idą do agenta, nie do klienta |
+| 0.59.0 | bufor zwrotów cofał się bez porządku | guard „adres przed sprzedawalnością" przy zadaniach MM (dotyczy koszy) |
 
-## Polityka danych skrzynki (0.143.0)
+## Polityka danych skrzynki
 
-**Załączniki (0.155.0).** Trzymamy nazwę pliku, typ i stan — nie trzymamy
-samego pliku. Nazwa bywa daną osobową (`faktura_Kowalski.pdf`) i przyjmujemy
-to świadomie: skoro w bazie leży treść rozmowy, nazwa załącznika niczego nie
-zmienia w skali ryzyka, a bez niej agent nie wie, co dostał.
+- **Treści wiadomości SĄ przechowywane lokalnie, w dwóch warstwach.**
+  Synchronizator zapisuje surową odpowiedź do `allegro_inbox_thread`
+  i `allegro_inbox_message`, a z niej składa model obsługi: `channel_account`,
+  `conversation` i `message`. Ekran czyta wyłącznie ten drugi. Kopia lokalna
+  jest ceną za ekran, który otwiera się przy niedostępnym Allegro. Lądowisko
+  trzyma w `surowe_json` także adresy załączników i `additionalInformation`.
+- **Załączniki: nazwa, typ i stan, bez pliku.** Nazwa bywa daną osobową
+  (`faktura_Kowalski.pdf`); przy treści rozmowy w bazie nie zmienia to skali
+  ryzyka. Pobranie idzie przez nasz serwer, bo token konta firmy nie opuszcza
+  maszyny. Pliku `UNSAFE` nie da się pobrać.
+- **Szkic i komentarze zostają u nas.** Szkic wychodzi WYŁĄCZNIE przez wysyłkę,
+  na jawne kliknięcie agenta. Komentarz wewnętrzny ma osobną tabelę, a adapter
+  Allegro czyta wyłącznie `message`.
+- **Zadanie dla hali niesie kopię pytania**: treść, numer oferty
+  i identyfikatory rozmowy i wiadomości trafiają do `zadanie_terenowe`, bo
+  streszczenie gubi to, co w pomiarze rozstrzyga.
+- **Hala nie widzi rozmowy.** Kolektor czyta wyłącznie zadanie, a trasy
+  skrzynki mają bramkę roli także na odczycie.
+- **Wynik nie staje się odpowiedzią sam.** Wraca na oś rozmowy jako osobny
+  wpis i do szkicu trafia na jawne kliknięcie agenta.
 
-Pobranie idzie przez nasz serwer, nie z przeglądarki do Allegro — token konta
-firmy nie ma prawa opuścić maszyny. Plik o stanie `UNSAFE` nie jest do
-pobrania wcale.
-
-`CLAUDE.md` żąda, żeby nowa obsługa zapisała swoją politykę danych, zanim
-dotknie pierwszej rozmowy. To jest ten zapis, w stanie na 0.143.0.
-
-**Treści wiadomości SĄ przechowywane lokalnie, w dwóch warstwach.**
-Synchronizator zapisuje surową odpowiedź Allegro do `allegro_inbox_thread`
-i `allegro_inbox_message`, a z niej składa model obsługi: `channel_account`,
-`conversation` i `message`. Ekran skrzynki czyta wyłącznie ten drugi.
-Wcześniejszy szkic tego rozdziału mówił, że treści nie trafiają do bazy, i był
-nieprawdziwy — kopia lokalna jest ceną za ekran, który otwiera się przy
-niedostępnym Allegro.
-
-**Szkic odpowiedzi i komentarze zostają u nas.** Szkic jest współdzielony
-w zespole i wychodzi na zewnątrz WYŁĄCZNIE przez wysyłkę, na jawne kliknięcie
-agenta. Komentarz
-wewnętrzny ma osobną tabelę, żeby nie dało się go pomylić z wiadomością
-kanału — adapter Allegro czyta wyłącznie `message`.
-
-**Zadanie dla hali niesie kopię pytania.** Treść wiadomości źródłowej, numer
-oferty oraz identyfikatory rozmowy i wiadomości trafiają do `zadanie_terenowe`.
-Magazynier ma zobaczyć pytanie w oryginale, bo streszczenie gubi to, co
-w pomiarze rozstrzyga.
-
-**Hala nie widzi rozmowy.** Kolektor czyta wyłącznie zadanie. Trasy skrzynki
-mają bramkę roli także na odczycie — rozmowy z klientami to dane biura.
-
-**Wynik nie staje się odpowiedzią sam.** Wraca na oś rozmowy jako osobny wpis
-i do szkicu trafia wyłącznie na jawne kliknięcie agenta.
-
-**Treść wychodzi do dostawcy modelu — na kliknięcie i po maskowaniu (etap F).**
-Copilot rozpoznaje, o co pyta klient. Do dostawcy idzie WYŁĄCZNIE ostatnia
-wiadomość klienta, nigdy cała historia wątku. Przed wysłaniem tekst przechodzi
-przez maskowanie: znikają e-mail, telefon, kod pocztowy z miastem, wiersz
-z markerem adresu, ciąg szesnastu cyfr i login kupującego. W miejscu wartości
-zostaje znacznik.
-
-Adres bez markera i bez kodu pocztowego przejdzie — wyrażenia regularne tego
-nie rozstrzygają. Ta granica jest zapisana, bo milczenie o niej kosztowało już
-raz (0.151.0).
+### Copilot: co wychodzi do dostawcy modelu
 
 Copilot jest wyłączony domyślnie. Bez `COPILOT_MODE=anthropic` i bez klucza
-z firmy nie wychodzi ani jeden znak. Nic nie idzie taktem w tle: partię
-uruchamia agent klawiszem, a potwierdzenie mówi wprost, że to kosztuje.
-Klasyfikacja nie pisze do klienta ani jednego znaku.
-
-**Od 22 września 2026 klasyfikacja wysyła WĄTEK, nie jedną wiadomość —
-i może chodzić taktem.** Dwa zdania wyżej opisują stan sprzed tej daty.
-Specyfikacja właściciela z 20 września każe rozpoznawać bieżącą prośbę
-„z rozmową jako kontekstem": samo „tak, to ten model" nie mówi nic bez
-pytania, na które odpowiada. Klasyfikacja idzie więc tą samą drogą co szkic:
-cały wątek tej jednej rozmowy, to samo maskowanie, ten sam sufit dwunastu
-wiadomości i sześciu tysięcy znaków. Nad wątkiem stoi nagłówek, który piszemy
-my: czy rozmowa ma zamówienie, czy ofertę i ile załączników ma wiadomość.
-Numerów zamówienia i oferty w nagłówku nie ma — model dostaje sam fakt. Typ
-i podtyp wątku Allegro idą tam jako enumy Allegro — nie ma w nich nic od
-klienta. Loginów uczestników z `beta.v1` nie zapisujemy wcale.
-
-Takt rozpoznaje każdą nową wiadomość klienta — decyzja właściciela z 22
-września. Włącza go dopiero `COPILOT_AUTO_KLASYFIKACJA=1`, z sufitem na
-godzinę liczonym z księgi i z oknem siedmiu dni wstecz. Wiadomość z samym
-załącznikiem nie wychodzi wcale: klasyfikacja zdjęć nie czyta, więc decyzja
-mówi „sam załącznik" i woła człowieka.
-
-**Od 29 września 2026 wątek do rozpoznania trafia do DRUGIEGO podmiotu.**
-Decyzją właściciela klasyfikację robi Jev z TypeSafe (`KLASYFIKATOR_DOSTAWCA=jev`,
-domyślnie), a nie Claude. Do TypeSafe idzie to samo, co szło do Claude: ten
-sam zamaskowany wątek, ten sam nagłówek z faktów, ten sam sufit. Maskowanie
-stoi przed OBIEMA drogami, bo nadawca przyjmuje `TrescBezpieczna`, nie tekst.
-Szkice, dopytanie i reklamacje zostają przy Claude, więc Anthropic nadal dostaje
-wątki do szkiców. Powrót do Claude to jedna zmienna w `wertis.env`.
-
-Czego NIE wiemy o TypeSafe i co trzeba przeczytać przed włączeniem na
-produkcji: Data Processing Agreement, politykę prywatności i warunki
-przechowywania na typesafe.ai/legal. Dokumentacja TypeSafe deklaruje, że nie
-trenuje na danych klientów, a zerową retencję (ZDR) oferuje wyłącznie w planach
-enterprise. Tej deklaracji nikt tu nie sprawdził. Adres dostawy, telefon i
-reszta danych wyciętych przez maskowanie nie wychodzą do żadnego z dwóch.
-
-Przy decyzji zapisujemy, NA CZYM ją liczono: identyfikatory wiadomości, skrót
-SHA-256 zamaskowanego wejścia i to, czy sufit coś uciął. Treści wejścia nie
-kopiujemy — leży w `message`, pod tą samą polityką co dotąd.
-
-**Szkic z taktu nie jest już tylko pod ofertą (22 września 2026).** Przy
-`COPILOT_AUTO_SZKIC=1` szkic powstaje też dla wiadomości, której rozpoznanie
-każe coś zrobić — pytania o paczkę, fakturę albo zwrot. Do dostawcy idzie
-więc zamaskowany wątek także takich rozmów, tą samą drogą i z tym samym
-sufitem co dotąd. Fakty szkicu dostały rozpoznanie klasyfikatora: kategorię,
-następny krok i flagi braków. To nasze dane, bez treści klienta.
-
-**Szkic odpowiedzi z Copilota wysyła CAŁY WĄTEK — zamaskowany, z sufitem
-(0.231.0).** Decyzja właściciela z 7 września: krótka odpowiedź klienta
-(„tak, GX160") bez naszego pytania nie mówi modelowi nic. Do dostawcy idą
-wszystkie wiadomości TEJ JEDNEJ rozmowy, także nasze wychodzące, bo agent bywa
-cytuje klienta. Każda przechodzi przez to samo maskowanie co przy
-klasyfikacji; stopka firmowa jest wycięta. Sufit to dwanaście wiadomości albo
-sześć tysięcy znaków, liczone od najnowszej; starsze zastępuje jeden znacznik
-`[wcześniejsze wiadomości pominięte]`. Login do maskowania bierze się z wątku
-Allegro, nie z tematu rozmowy — temat bywa tytułem oferty i wtedy login
-w treści zostawał odsłonięty. Od 0.232.1 tak samo robi klasyfikacja; temat
-jest zapasem tylko dla rozmów bez wątku.
-
-Obok rozmowy idą FAKTY, które układa serwer: kartoteka oferty (symbol, nazwa,
-EAN, numery, dostępność dziś), TREŚĆ OFERTY od 0.253.0 (opis, parametry
-i lista zgodności), dane doboru wpisane przez agenta, kandydaci
-i negatywy ze zdaniami źródła, wiedza o zastosowaniach, silnikach, pasowaniach
-i pomiarach z tej rozmowy. Podpisy dowodów jadą BEZ nazwiska pracownika —
-model go nie potrzebuje, a klient nie ma go dostać. Nie idą: półka,
-rezerwacje, rozbicie na magazyny, opis kartoteki w całości (bywa notatką
-magazynu), historia zakupów klienta ani jego adres.
-
-Granica gwarancji maskowania jest ta sama, co wyżej: adres bez markera i bez
-kodu pocztowego przejdzie. Od przyrostu trzeciego etapu F dziewięć cyfr tuż
-po słowie OEM, nr, numer, symbol albo kod NIE jest maskowane jako telefon —
-decyzja właściciela, żeby numer OEM dało się rozpoznać. Cena: telefon podany
-jako „nr 601…" bez słowa „tel" wyjdzie do dostawcy. Szkic nie staje się
-odpowiedzią sam — wraca jako propozycja i do szkicu trafia na jawny ruch
-agenta. Od 0.499.0 stoi w pustym polu jako zwykły tekst do poprawiania,
-wstawiony przez ekran, nie zapisany. Do klienta idzie dopiero po „Wyślij".
-
-Z tego samego wywołania wracają DANE DOBORU rozpoznane w rozmowie: marka,
-model, silnik, numer, nazwa części, parametry. Serwer sprawdza każdą wartość
-przeciw zamaskowanemu wątkowi i wyrzuca te, których tam nie ma. Do pól doboru
-wchodzą dopiero na kliknięcie agenta, wyłącznie w puste pola.
-
-### Treść oferty i wiedza własna modelu (0.253.0)
-
-Właściciel postawił dwie rzeczy naraz. Pierwsza: „często oferta ma w sobie
-opis, do jakich wersji pasuje, wymiary z oferty, dane techniczne". Druga:
-„Copilot powinien też korzystać z wiedzy ogólnej modelu AI".
-
-Treść oferty dociągamy z `GET /sale/product-offers/{offerId}`. Ta końcówka
-kosztuje jedno żądanie NA OFERTĘ, więc nie synchronizujemy jej hurtem. Idziemy
-po nią leniwie, dla oferty tej jednej rozmowy, przy kliknięciu „Ułóż
-odpowiedź", i trzymamy tydzień. Do dostawcy modelu jedzie od tej pory także
-opis oferty — czyli tekst, który sprzedawca sam opublikował. Nie zmienia to
-polityki wobec danych KLIENTA: te są maskowane jak dotąd.
-
-Wiedza własna modelu przestała być zakazana. Do 0.252.0 numer spoza faktów
-odrzucał cały szkic, więc szkic był suchy i sprawdzalny bez czytania.
-Właściciel zdjął ten zakaz pod warunkiem: „pełna swoboda, ale niech przy tym
-załącza źródła, sztywno oceniany poziom pewności".
-
-Zakaz zamienił się więc w rachunek. Każde twierdzenie techniczne stoi na
-liście `twierdzenia` z podpisem, skąd pochodzi: z bazy, z opisu oferty albo
-z wiedzy modelu. Numer, którego nie pokrywa żadne zadeklarowane twierdzenie,
-dalej odrzuca szkic — nie dlatego, że jest zmyślony, ale dlatego, że agent
-nie ma jak go sprawdzić przed wysłaniem.
-
-Pewność przyznaje SERWER, nie model, i to jest cała sztywność tej oceny. Sufit
-zależy od źródła: baza może być „pewna", opis oferty najwyżej
-„prawdopodobny", wiedza modelu zawsze „niepewna". W dół model może zawsze.
-Bez sufitu ocena byłaby jego zdaniem o sobie samym.
-
-Agent czyta to w osobnym oknie „Skąd to wiem", pod szkicem. Klient dostaje
-gładki tekst, agent — rachunek za ten tekst. Okno stoi otwarte tylko wtedy,
-gdy pada choć jedno zdanie spoza bazy.
-
-**Czego jeszcze nie ma.** Adresy dostawy, załączniki i dane osobowe poza
-loginem rozmówcy nie są pobierane.
-
-## Polityka danych zwrotów (0.150.0)
-
-Zwroty pobierają WIĘCEJ niż skrzynka, więc dostają własny zapis. Ten rozdział
-powstał, zanim powstała pierwsza tabela.
-
-**Trzymamy to, co rozstrzyga zwrot.** Identyfikator i numer zwrotu, numer
-zamówienia, datę zgłoszenia, pozycje z nazwą, ilością, ceną i powodem oraz
-sam FAKT powrotu paczki. Surową odpowiedź Allegro trzyma osobne lądowisko
-`allegro_zwrot`, jak przy skrzynce — jest dowodem źródłowym przy sporze
-o kształt.
-
-**Konta bankowego i telefonu nadawcy NIE ZAPISUJEMY.** Odpowiedź Allegro
-niesie `refund.bankAccount` z właścicielem, numerem konta, IBAN-em, SWIFT-em
-i adresem, a przy paczce `sender.phoneNumber`. Zwrot da się rozstrzygnąć bez
-nich. Kolumn na te pola nie ma wcale, więc nieuważne mapowanie wywali się na
-zapytaniu, zamiast wyciec po cichu.
-
-**To zdanie było do 0.151.0 nieprawdziwe i tu jest poprawka.** Mówiło „nie
-pobieramy", a lądowisko `allegro_zwrot` zapisywało odpowiedź DOSŁOWNIE —
-razem z IBAN-em i telefonem. Model pracy był czysty, kopia zapasowa nie.
-
-Od 0.152.0 obie odpowiedzi przechodzą przez `services/allegro-oczyszczanie.ts`
-ZANIM trafią do bazy: wartość znika, klucz zostaje. Lądowisko dalej niesie
-kształt, po który istnieje, ale nie niesie już treści, której nie wolno nam
-trzymać. Kosztuje to część dowodu przy sporze o kształt — i dlatego pełny
-kontrakt czyta się dziś ze specyfikacji w repo, nie z kopii cudzych danych.
-
-To ten sam gatunek poprawki co w 0.143.0, gdzie szkic tej polityki twierdził,
-że treści rozmów nie trafiają do bazy. Wtedy poprawiliśmy ZDANIE, bo kopia
-treści była ceną za działający ekran. Tu poprawiliśmy KOD, bo konto bankowe
-nie kupuje nam niczego.
-
-**Zasada adresów zostaje nietknięta.** Adresy dostawy nie przechodzą przez
-mapowanie ani tu, ani w skrzynce.
-
-### Nazwa odbiorcy z naklejki (0.367.0) — zdjęcie fragmentu tej polityki
-
-To jedyne miejsce, w którym ta polityka się cofa, i cofa się o dokładnie jedno
-pole. Decyzja właściciela, podjęta po przedstawieniu zakresu blokady.
-
-**Powód.** Paczka, której klient nie odebrał, wraca do nas z naklejką, którą
-naklejał klient albo kurier — tych numerów w Allegro NIE MA. Numeru listu
-z wracającego kartonu nasz system nie widział nigdy i nie zobaczy, więc
-pierwszy skan takiej paczki chybia z definicji, a nie z opóźnienia
-synchronizacji. Zostaje to, co na naklejce widać: nazwa odbiorcy i przewoźnik.
-Bez nazwy operator nie ma żadnego uchwytu poza loginem, którego przy takiej
-paczce najczęściej nie zna.
-
-**Zakres.** Bierzemy `firstName` i `lastName` z `delivery.address`, a gdy jest
-`companyName` — jego, bo paczka firmowa nosi na naklejce nazwę firmy zamiast
-osoby. Wszystko idzie do JEDNEJ kolumny `odbiorca_nazwa`, przy zamówieniu
-i przy zwrocie. Szukanie nie rozróżnia imienia od nazwiska, a jedna kolumna to
-jedna rzecz do pilnowania.
-
-**Czego to NIE zdejmowało.** `street`, `city`, `zipCode` i `phoneNumber` stały
-w tym samym obiekcie i zostawały zablokowane. Blokadę tych czterech pól zdjął
-właściciel w 0.422.0 — rozdział niżej. E-mail, PESEL i konto bankowe bez zmian.
-
-### Reszta adresu dostawy (0.422.0) — zdjęcie drugiego fragmentu
-
-Drugie cofnięcie tej polityki, decyzja właściciela, podjęta po przedstawieniu
-zakresu i skutków. Pytanie i odpowiedź padły wprost: cały adres dostawy,
-razem z szukaniem po telefonie w tym samym wydaniu.
-
-**Powód, część pierwsza.** Klient pisze „gdzie moja paczka" i podaje SAM NUMER
-TELEFONU. Do 0.421.1 numer telefonu nie istniał nigdzie w panelu ani w trasach
-serwera, więc agent musiał wyjść do Allegro albo Sellasista, zamienić numer na
-login, wrócić i szukać po loginie. Uchwyt, który klient podaje najczęściej, był
-jedynym, którego panel nie znał.
-
-**Powód, część druga.** Szukanie po fragmencie nazwiska świadomie pokazuje
-cudze zakupy przy zbieżności nazwisk, a wiersz listy niósł samą nazwę. Dwaj
-Kowalscy z jednego miasta wyglądali identycznie, a z tego ekranu wychodzi się
-z czyimś numerem zamówienia w ręku. Ulica rozstrzyga to w jednym spojrzeniu.
-
-**Zakres.** Cztery pola `delivery.address`: `street`, `city`, `zipCode`
-i `phoneNumber`. Pięć nazwanych kolumn przy `zamowienie_klienta`, bo telefon
-dostaje drugą, z samymi cyframi — Allegro zapisuje numer tak, jak wpisał go
-człowiek, a porównanie znak w znak nie trafiłoby ani razu.
-
-**Szukanie po telefonie idzie po KOŃCÓWCE, od dziewięciu cyfr.** Tyle ma polski
-numer bez prefiksu kraju. Krótszy ciąg to fragment, a fragment numeru telefonu
-nie jest uchwytem, tylko losowaniem. Końcówka, nie równość, bo prefiks bywa po
-jednej stronie i nie ma po drugiej.
-
-**Przy zwrocie kolumn NIE MA.** Zwrot bierze adres z zamówienia; druga kopia
-rozjechałaby się przy pierwszej zmianie adresu u Allegro.
-
-**Czego to NIE zdejmuje.** `invoice.address` zostaje nietknięte — właściciel
-odblokował adres DOSTAWY, a adres z faktury to inne pole i innej decyzji nie
-było. Dane z `buyer` (e-mail, telefon i własny adres kupującego) też zostają:
-mapowanie czyta wyłącznie `delivery.address`. Raport sondy kształtu
-(`ksztalt.ts`) dalej tych pól nie pokazuje, bo raport wchodzi do REPO, a baza
-biura zostaje w biurze — ta sama różnica, którą 0.155.0 zapisało przy numerze
-listu przewozowego. E-mail, PESEL i konto bankowe bez zmian.
-
-**Lądowisko adresu NIE dostaje.** `allegro-oczyszczanie.ts` zostaje nietknięty
-i dalej wycina cały `address`. Właściciel odblokował adres w panelu, nie adres
-w prywatnej kopii odpowiedzi na lata.
-
-**Lądowisko nazwy NIE dostaje.** `allegro-oczyszczanie.ts` zostaje nietknięty
-i dalej wycina cały `address`. Mapowanie czyta żywą odpowiedź, więc model
-pracy ma nazwę jedną nazwaną kolumną, a prywatna kopia odpowiedzi nie ma jej
-wcale. Zdjęcie dotyczy pola, nie nazwy pola w każdym ładunku.
-
-**Do CSV nazwa nie wychodzi.** Plik na dysku jest zapisem trwalszym niż baza,
-a decyzja dotyczyła szukania na ekranie. Ta sama granica co przy numerze listu
-od 0.344.0.
-
-**Odczyt zostawia ślad.** Wyszukanie paczek klienta po nazwisku dopisuje
-zdarzenie z LICZBĄ trafień i długością uchwytu — nigdy z samym uchwytem.
-Odpowiada ono na pytanie „kto i kiedy przeglądał", nie „czego szukał".
-Z tego samego powodu uchwyt jedzie w ciele żądania, nie w adresie: adres
-ląduje w logu żądań serwera, którego ta polityka nie obejmuje.
-
-**Hala nie widzi zwrotu.** Trasy mają bramkę roli także na odczycie. Do
-magazyniera idzie wyłącznie zadanie oceny towaru, tak jak przy pytaniach
-idzie samo zadanie pomiaru.
-
-**Zamówienie pobieramy w całości, bez danych kupującego.** Od 0.152.0 zwrot
-dociąga swoje zamówienie: pozycje, koszt dostawy i SKU sprzedawcy
-(`offer.external.id`). Adres dostawy, e-mail, telefon i PESEL kupującego nie
-przechodzą przez mapowanie ani przez lądowisko. Zostają login, nazwa odbiorcy
-z naklejki od 0.367.0 oraz reszta adresu dostawy od 0.422.0 — dane osobowe,
-które ta polityka dopuszcza
-wprost, każda z własnym uzasadnieniem wyżej.
-
-**Kartotekę wskazuje człowiek, a automat tylko proponuje.** Dopasowanie po
-SKU liczy się przy ODCZYCIE i niczego nie zapisuje; do bazy trafia dopiero
-potwierdzenie agenta, razem ze źródłem (`sku` albo `reczne`). Projekt panelu
-§4.3 nie pozwala, żeby wybór człowieka udawał fakt z Allegro — wybór automatu
-tym bardziej.
-
-**Pamięć wskazań trzyma identyfikatory, nie ludzi.** Od 0.154.0 potwierdzenie
-zapisuje w `oferta_kartoteka` parę oferta–kartoteka razem z symbolem, datą
-i IMIENIEM AGENTA. To ostatnie jest daną pracownika, nie klienta, i stoi tam
-z tego samego powodu co przy każdej innej mutacji: zapis bez autora nie da się
-później rozliczyć. Zdjęcie powiązania kasuje wpis.
-
-**Numer listu przewozowego STOI w modelu pracy od 0.344.0.** Decyzja
-właściciela: „zapisuj numery paczek". Do 0.343.0 obowiązywała reguła odwrotna
-i warto wiedzieć, co dokładnie się zmieniło, a co nie.
-
-Od 0.163.0 do 0.343.0 kolumny `zwrot_klienta.waybill` nie wypełnialiśmy przy
-zwrotach z Allegro. Numer leżał wyłącznie w kopii odpowiedzi
-(`allegro_zwrot.surowe_json`) i stamtąd go czytaliśmy — skan etykiety otwierał
-zwrot, tracking brał parę numer-przewoźnik. Panel numeru nie znał, więc nie
-mógł go ani pokazać, ani przefiltrować w locie.
-
-Synchronizacja zapisuje teraz numer PIERWSZEJ paczki zwrotu — tej samej, z
-której idą data nadania i przewoźnik. Trzy pola z jednego źródła, bo zwrot
-w dwóch przesyłkach pokazywałby inaczej datę jednej, firmę drugiej, a numer
-trzeciej. Odświeżenie bez paczek numeru nie kasuje: Allegro oddaje zgłoszenie
-bez tablicy `parcels`, zanim klient nada przesyłkę.
-
-**Co się NIE zmieniło, i to celowo.** Eksport CSV numeru nie niesie — plik na
-dysku zostaje trwalszy niż baza, a ta część polityki nie była przedmiotem
-decyzji. Trasa skanu zostaje POST-em, żeby zeskanowany kod nie trafiał do
-adresu żądania ani do logu serwera. Dziennik zdarzeń numeru nie zapisuje.
-
-**Paczka nieodebrana (0.172.0) przestaje być wyjątkiem.** Tam numer stał
-w modelu pracy od początku, bo przesyłki, której klient nie odebrał, Allegro
-nie zna wcale — nie ma kopii, w której dałoby się szukać. Od 0.344.0 obie
-drogi wypełniają tę samą kolumnę i różnią się już tylko tym, kto ją wpisuje:
-tam człowiek ze skanu, tu synchronizacja.
-
-**Dwie oceny tego numeru są obie prawdziwe.** Raport sondy nazywa go daną
-osobową okrężną drogą (`services/ksztalt.ts`, 0.155.0), a czyszczenie lądowisk
-przepuszcza go bez zmian (`allegro-oczyszczanie.test.ts`). Różnią się miejscem,
-nie oceną: raport sondy WCHODZI DO REPO i czyta go każdy, kto ma dostęp do
-kodu, a lądowisko jest prywatną kopią w bazie biura, pod tą samą bramką roli
-co reszta zwrotu. To, co wolno trzymać w bazie, nie zawsze wolno wypisać
-w pliku.
-
-**Potrącenie za utratę wartości zapisuje kwotę, powód i autora (0.170.0).**
-Powód jest obowiązkowy, bo to jego treść zobaczy klient pytający, czemu dostał
-mniej. Kwotę do oddania dalej składa serwer z zaznaczenia; potrącenie tylko ją
-obniża i mieści się w widełkach `0…wartość pozycji`.
-
-**Login kupującego stoi teraz PRZY ZWROCIE (0.169.0).** Do tego wydania mieliśmy
-go wyłącznie przy zamówieniu, więc znikał, dopóki zamówienia nie pobrano — choć
-Allegro przysyła go z każdym zwrotem. To ta sama dana, którą polityka dopuszcza
-wprost, w innej kolumnie. Imienia i nazwiska Allegro przy zwrocie nie podaje
-w ogóle, a przy zamówieniu ich nie mapujemy.
-
-**Forma płatności i ŻĄDANIE faktury — bez danych firmy.** Bierzemy `payment.type`
-i samą flagę `invoice.required`. Adres z faktury niesie ulicę i miasto, a zasada
-„adresy nie przechodzą przez mapowanie" nie ma wyjątków. Ekran mówi więc
-„paragon", „faktura" albo „nie wiadomo", i nic ponadto.
-
-**Read-model sprzedaży bierze cztery kolumny i ani jednej więcej (0.174.0).**
-`sgt_faktura` niesie identyfikator dokumentu, typ, numer pełny, numer obcy
-i datę. Nie ma tam `kh_Symbol`, bo przy sprzedaży konsumenckiej bywa w nim imię
-i nazwisko człowieka — a polityka dopuszcza wprost sam login kupującego. Nie ma
-też `dok_Uwagi`: pięćset znaków dowolnego tekstu, w które ktoś kiedyś wpisze
-adres albo telefon. Read-model kopiuje to, co przeczyta, razem do kopii
-zapasowych.
-
-Stary model z 0.53.0 kopiował oba te pola i punktował kontrahenta przeciw
-loginowi kupującego. Wskrzeszenie nie jest przywróceniem — te dwie kolumny nie
-wracają.
-
-**Produkt dopisany do zwrotu nie wnosi nowych danych (0.184.0).** Pozycja
-przepisuje się z zamówienia, które i tak już mamy: nazwa, ilość, cena, waluta.
-Nie ma tu pola tekstowego, więc nie ma czym wpisać niczego o człowieku. Autor
-dopisania trafia do dziennika — jak przy każdej mutacji.
-
-**Zestawienie CSV wynosi loginy, więc zostawia ślad.** Eksport kolejki zwrotów
-dopisuje zdarzenie `zwroty_eksport` — kto pobiera zestawienie o ludziach, sam
-trafia do dziennika. To ta sama zasada co przy analizie i audycie. Numeru listu
-przewozowego w pliku nie ma: plik na dysku jest zapisem trwalszym niż baza,
-a polityka z 0.163.0 mówi, że tego numeru nie zapisujemy.
-
-**Do Allegro nadal nie wychodzi z tego ekranu nic.** Zapisy zwrotów są dwa:
-potwierdzenie kartoteki i ręczne dociągnięcie zamówień. Drugi WYCHODZI do
-Allegro, ale wyłącznie po odczyt — pobiera to samo co ticker i tak samo
-przerywa na 429. Werdykt, kwota, ocena hali i korekta wciąż czekają. Pilnuje
-tego licznik tras zapisu w teście.
-
-## Wysyłka odpowiedzi (0.148.0)
-
-Ten rozdział unieważnia zdanie, które stało tu do 0.147.0: „wysyłka jest
-wyłączona, więc żadna treść nie wychodzi z WERTIS na zewnątrz". Od 0.148.0
-wychodzi — i dlatego dostaje własny zapis.
-
-**Wychodzi wyłącznie to, co człowiek wysłał.** Automat nie wysyła niczego.
-Wysyła agent, który prowadzi rozmowę, jednym kliknięciem, po zatwierdzeniu
-treści. Do 22 września 2026 stała za tym druga zasada nadrzędna projektu
-panelu; właściciel ją usunął. Zdanie wyżej opisuje kod, nie zakaz: wysyłki
-bez człowieka dziś nie ma.
-
-**Nie wychodzi nic poza treścią odpowiedzi.** Do Allegro idzie sam tekst.
-Komentarze wewnętrzne mają osobną tabelę i adapter ich nie widzi. Załączników
-nie wysyłamy wcale.
-
-**Każda próba zostawia wiersz w kolejce.** Tabela `outbox` trzyma treść, klucz
-idempotencji, wersję rozmowy i stan próby. Podwójne kliknięcie nie tworzy
-drugiej odpowiedzi, bo klucz wylicza serwer z rozmowy, pytania i treści.
-
-**Dopisek klienta zatrzymuje wysyłkę.** Serwer zwraca 409, szkic zostaje
-nietknięty, a agent decyduje: poprawić odpowiedź albo wysłać mimo to. Zgoda
-jest jawna — to blizna 0.110.0 i nie wolno jej kupić drugi raz.
-
-**Po niejednoznacznym timeoucie nic nie idzie ponownie.** Stan `send_uncertain`
-blokuje kolejną próbę, dopóki synchronizacja nie sprawdzi, czy odpowiedź już
-jest w wątku.
-
-**Kształt żądania jest potwierdzony specyfikacją** (0.151.0). Mapowanie POST
-powstało z pamięci, wbrew regule §8.2, na polecenie właściciela — i okazało się
-trafione co do znaku. Ciało to `{ text }`, a limit `text` wynosi 2000 znaków
-i jest sprawdzany przed wysłaniem, nie po odmowie Allegro.
-
-Ta sama specyfikacja pokazała, że mapowanie ODCZYTU skrzynki, które żadnego
-znacznika nie nosiło, było błędne w każdym polu i przez dwa wydania nie
-zapisało ani jednego wątku. Zakaz z §8.2 zostaje w mocy tym mocniej: nie
-chroni przed zgadywaniem oznaczonym, tylko przed nieoznaczonym.
-
-**Dane, które zostają w bazie.** Lądowisko (`allegro_inbox_*`) trzyma całą
-odpowiedź Allegro w `surowe_json`, więc adresy załączników
-i `additionalInformation` zostają, choć nie mają własnych kolumn ani ekranu.
-Model kanoniczny bierze z wiadomości wyłącznie treść, autora, datę, temat
-i numer oferty.
-
-## Polityka danych reklamacji (0.222.0, wysyłka od 0.224.0)
-
-Ten rozdział powstaje razem z pierwszym ekranem reklamacji, a nie po nim —
-`CLAUDE.md` wymaga tego zapisu, zanim moduł dotknie pierwszej sprawy.
-
-**Co zapisujemy.** Treść zgłoszenia i całą rozmowę, login kupującego, powód
-i oczekiwanie klienta, kwotę, którą podał, terminy z Allegro, statusy oraz
-nasze własne notatki i znacznik „kto prowadzi". Rozmowa reklamacyjna jest
-dowodem w sporze i jej kopia lokalna jest ceną za działający ekran — dokładnie
-tak samo, jak przy skrzynce w 0.143.0.
-
-**Tożsamość prowadzącego (0.278.0).** Przy znaczniku „kto prowadzi" stoi od
-tego wydania także numer konta z `app_user`, a nie samo imię. To dana o NAS,
-nie o kliencie, i nigdzie nie wychodzi: sito „Moje" liczy się w pamięci
-przeglądarki, a do Allegro nie idzie żadnym polem. Imię zostaje obok, bo czip
-na wierszu ma pozostać czytelny po skasowaniu konta.
-
-**Tagi spraw (0.279.0).** Nazwa tagu jest słowem BIURA o sprawie, nie daną
-klienta, i pisze ją agent. Do Allegro nie idzie żadnym polem, a kupujący jej
-nie widzi. Do dziennika trafia nazwa tagu razem z numerem sprawy — tak samo
-jak nazwa załącznika, i z tą samą świadomością: `events` nie ma retencji.
-Kto wpisuje tam treść zamiast etykiety, zapisuje ją na zawsze.
-
-**Poprzednia treść notatki (0.280.0).** Żeby zmianę dało się cofnąć, wiersz
-sprawy trzyma JEDNĄ poprzednią wersję notatki obok bieżącej. Ginie razem ze
-sprawą i nie trafia do `events` ani przed cofnięciem, ani po nim. Dziennik
-dostaje samą długość, tak jak dotąd. Jednego szczebla, a nie tabeli historii,
-użyliśmy właśnie dlatego: druga tabela byłaby drugim miejscem na te same dane.
-
-**Czego nie zapisujemy, bo tego nie ma.** Schemat `PostPurchaseIssue` nie
-niesie ani adresu, ani telefonu, ani numeru konta bankowego. Kolumn na nie po
-prostu nie ma, więc nieuważne mapowanie wywali się na SQL-u, zamiast wyciec po
-cichu. Lądowisko i tak przechodzi przez `services/allegro-oczyszczanie.ts`.
-
-**Plików załączników nie trzymamy.** Zostaje nazwa i adres u Allegro; pobranie
-idzie przez nasz serwer, żeby token firmy nie opuścił maszyny, i zostawia ślad
-w dzienniku. Nazwa pliku bywa daną osobową i przyjmujemy to świadomie, tak jak
-w skrzynce.
-
-**Zdjęcie widać na osi, ale przez WĄSKIE gardło (0.223.0).**
-`PostPurchaseIssueAttachment` ma dwa pola — nazwę i adres — więc bramki `SAFE`
-ze skrzynki nie da się tu POWTÓRZYĆ. Powtarzamy jej skutek: na oś idą wyłącznie
-JPEG, PNG i GIF, a rozpoznaje je sygnatura pliku po stronie serwera, nie pole
-przysłane z zewnątrz i nie rozszerzenie w nazwie. `content-type` bierzemy z tej
-listy, `nosniff` zabrania przeglądarce zgadywać lepiej, a wszystko inne — PDF,
-BMP, TIFF — zostaje przy pobieraniu.
-
-Powód jest ten sam, co w skrzynce w 0.218.0: w sklepie z częściami zdjęcie
-pękniętego elementu bywa całym zgłoszeniem, a nazwa pliku nie mówi o nim nic.
-Sonda widziała załączniki przy 57 sprawach na 100.
-
-**Hala nie widzi reklamacji.** Bramka roli stoi na każdej trasie, także na
-odczycie — tak samo jak przy skrzynce i przy zwrotach.
-
-**Do dostawcy modelu idzie ZAMASKOWANA rozmowa (0.275.0).** Do 0.274.0 Copilot
-nie miał dostępu do tego ekranu wcale. Właściciel poprosił 11 września o wersję
-„zbierającą dane", więc rozmowa reklamacyjna wychodzi do dostawcy — ale przez
-ten sam moduł maskowania, co w skrzynce (§14.4), i pod tą samą gwarancją:
-wartość znika, ślad zostaje.
-
-Co wychodzi: treść wiadomości po maskowaniu, ponumerowana, z sufitem dwunastu
-ostatnich wiadomości i sześciu tysięcy znaków. Login kupującego jest podmieniany
-po ZNANEJ wartości, nie po wzorcu.
-
-**Od 0.282.0 wychodzą też FAKTY ZE SPRAWY i to jest odwrócenie zdania, które
-stało tu wcześniej.** Do tego wydania obowiązywało „nie wychodzi nic spoza
-rozmowy". Kosztowało to konkretnie: Copilot prosił agenta o datę zakupu
-i o numer zamówienia, czyli o dane, które Allegro przysłało razem ze sprawą
-i które leżały o jedno złączenie dalej.
-
-Wychodzi blok z formularza reklamacyjnego i z danych Allegro: temat, opis
-zgłoszenia (przycięty), powód, podstawa prawna, oczekiwanie z kwotą, ilość,
-nazwa reklamowanego towaru, numery oferty i zamówienia, data zakupu, data
-otwarcia i termin decyzji. Blok przechodzi przez to samo maskowanie co rozmowa.
-
-**Granica została w tym samym miejscu, tylko przesunięta o jedno pojęcie:
-wychodzą fakty o SPRAWIE i o ZAKUPIE, nie fakty o NAS.** Dalej nie wychodzi
-notatka biura, znacznik „kto prowadzi", tagi, kartoteka Subiekta ani nasze
-kwoty.
-
-**Od 0.283.0 wychodzą też ZDJĘCIA klienta i to jest największa zmiana
-w polityce danych tego modułu.** Właściciel poprosił wprost: „copilot powinien
-czytać zdjęcia". Karta, którą pokazał, prosiła agenta o zdjęcia, które
-w sprawie już były.
-
-**Pikseli zamaskować się nie da i nie udajemy, że jest inaczej.** Cała reszta
-tego rozdziału stoi na gwarancji „wartość znika, ślad zostaje", wymuszanej
-typem, którego nie da się wyprodukować poza modułem maskowania. Przy obrazie
-taka gwarancja nie istnieje. Zdjęcie paragonu z imieniem i adresem, etykieta
-przesyłki, ekran telefonu z numerem — wszystko to wychodzi do dostawcy
-w całości. Typ zdjęcia nazywa się więc `ZdjecieZBramki`, a nie „bezpieczne",
-i obiecuje dokładnie trzy rzeczy: bajty pochodzą z załącznika TEJ sprawy, są
-obrazem w typie rozstrzygniętym po SYGNATURZE, i mieszczą się w suficie.
-
-Bajtów nie trzymamy ani chwili dłużej, niż trwa żądanie — tak samo jak przy
-pobraniu na ekran. Do dziennika idą LICZBY: ile zdjęć poszło, ile pominięto,
-ile pobrań padło. Nazwy plików nie, bo bywają daną osobową, a `events` nie ma
-retencji.
-
-**Sufitu sztuk nie ma i to jest decyzja właściciela**, podjęta ze znajomością
-kosztu: obraz w pełnej rozdzielczości to u dostawcy do kilku tysięcy tokenów
-wejścia, więc sprawa z dziesięcioma zdjęciami kosztuje kilkadziesiąt razy
-więcej niż samo rozpoznanie tekstu. Zostaje sufit bajtów, bez którego żądanie
-nie przeszłoby technicznie, i zdanie na karcie mówiące, ile zdjęć pominięto.
-Budżetu kwotowego w konfiguracji **nie ma** — to jest znana i nazwana
-ekspozycja, nie przeoczenie.
-
-**Od 0.330.0 to samo dotyczy ZDJĘĆ W ROZMOWIE ze skrzynki, także bez udziału
-człowieka.** Właściciel pokazał zdjęcie tabliczki kosiarki i stwierdzenie, że
-model nie umiał odczytać z niego modelu. Nie umiał, bo tego zdjęcia nigdy nie
-dostał: wątek szedł do dostawcy jako goły tekst i nie wspominał nawet, że
-załącznik istnieje. Blizna z 0.283.0 wróciła na drugim froncie, dokładnie tak,
-jak ostrzega `CLAUDE.md` przy strażnikach postawionych dla jednego pliku.
-
-Cena jest ta sama i trzeba ją nazwać drugi raz, bo warunki są gorsze.
-Pikseli dalej zamaskować się nie da. Zdjęcie w rozmowie bywa paragonem,
-etykietą przesyłki albo ekranem telefonu i wychodzi do dostawcy w całości.
-Nowe jest to, że **przy szkicu automatycznym (0.317.0) nikt tego nie klika** —
-takt bierze rozmowę co kilka minut. Właściciel, pytany wprost o tę różnicę,
-wybrał obie ścieżki.
-
-Trzy zawężenia tej drogi, każde wymuszone kodem, nie regulaminem:
-
-- **tylko `SAFE`** — plik, który Allegro uznało za niebezpieczny, nie jedzie
-  nigdzie; ta sama reguła, którą oś rozmowy stosuje do podglądu;
-- **tylko przychodzące** — czytamy zdjęcia klienta, nie własne; nasze nic nie
-  mówią o jego maszynie, a kosztują tyle samo;
-- **sufit sztuk** (`SUFIT_SZTUK_ROZMOWY`, dziś cztery) — tu, inaczej niż przy
-  reklamacji, sufit JEST, bo tamtą ścieżkę uruchamia kliknięcie człowieka,
-  a tę takt. Idą najnowsze, a spis mówi modelowi, ile zostało poza.
-
-Co wraca: kolumna `szkic_copilota.odczyt_zdjec` z tym, co model odczytał, przy
-numerze zdjęcia. To nie jest ozdoba ani wygoda — bez niej zdjęć do szkicu
-włożyć się nie da, bo odsiew numerów odrzucałby każdy poprawnie odczytany
-numer katalogowy. Odczyt jest jednocześnie ceną i kontrolą: otwiera numerom
-drogę do szkicu i pokazuje agentowi, co dokładnie model twierdzi, że widzi.
-Twierdzenia oparte na zdjęciu mają własne źródło `zdjecie` z sufitem
-„prawdopodobne", bo z tego, że tabliczkę widać, nie wynika, że to tabliczka
-maszyny, o którą klient pyta.
-
-**Od 0.332.0 do dostawcy idzie też PYTANIE AGENTA.** Dopytanie o szkic wysyła
-ten sam materiał co szkic, a do niego zdanie napisane przez pracownika biura.
-
-To pytanie **nie przechodzi przez maskowanie** i jest to decyzja, nie luka.
-Maskowanie wycina telefon, adres i login, bo pisze je KLIENT o sobie. Pytanie
-agenta pisze pracownik o naszym towarze, a wycięcie z niego numerów zabrałoby
-mu sens: „czy 17211-ZL8-023 to ten sam filtr" bez numeru nie jest pytaniem.
-
-Wynika z tego obowiązek po stronie biura, nie po stronie kodu: **w pytaniu do
-Copilota nie pisze się o kliencie**. Nazwisko, adres i numer telefonu nie mają
-tam czego szukać, a wątek rozmowy model i tak dostaje osobno, zamaskowany.
-Dziennik zapisuje wyłącznie DŁUGOŚĆ pytania, nigdy jego treść — `events` nie
-ma retencji, a pytanie bywa o konkretnej sprawie.
-
-Co wraca i gdzie ląduje: karta faktów przy sprawie, a od 0.276.0 także RADA —
-co maszyna zrobiłaby ze sprawą, z uzasadnieniem, pewnością i listą rzeczy,
-których nie wie. Właściciel odwrócił 11 września wcześniejszą regułę „maszyna
-nie radzi"; bramka w kodzie pilnuje teraz czego innego: żeby opinia nie trafiła
-do pól opisujących słowa klienta.
-
-Rada nie wychodzi do kupującego i nie dotyka formularza werdyktu. Werdykt
-wysyła człowiek, osobnym kliknięciem i z jawną zgodą, tak samo jak przedtem.
-
-Do dziennika idą liczby: ile braków, ile dowodów, ile pól odsiano jako
-niepokryte cytatem. Rachunek u dostawcy zapisuje się w księdze Copilota razem
-z numerem sprawy — także wtedy, gdy wywołanie skończyło się błędem, bo próba,
-która nie doszła, też bywa płatna.
-
-**Do dziennika nie idzie treść.** `logEvent` przy notatce i przy wysyłce
-zapisuje jej DŁUGOŚĆ, nigdy słowa: `events` nie ma retencji i nie jest kasowane.
-
-**Co opuszcza maszynę przy odpowiedzi (0.224.0).** Wyłącznie tekst napisany
-przez agenta i identyfikator sprawy. Nic więcej: ani notatka wewnętrzna, ani
-znacznik „kto prowadzi", ani cokolwiek z kartoteki czy z zamówienia. Ciało
-żądania ma dwa pola — `text` i `type: "REGULAR"` — i składa je adapter, więc
-nie ma drogi, którą dołożyłoby się trzecie.
-
-**Załączniki wychodzące ISTNIEJĄ od 0.274.0.** Właściciel odwrócił decyzję
-z 7 września cztery dni później. Od tego wydania plik z naszego dysku opuszcza
-maszynę i to jest zmiana w polityce danych, nie w wyglądzie ekranu.
-
-Co dokładnie wychodzi: bajty pliku, jego nazwa i rozmiar — nic więcej. Plik
-idzie do Allegro W CHWILI DODANIA, nie przy wysyłce wiadomości, więc odmowa
-typu albo rozmiaru pada, gdy jeszcze da się wybrać inny. U nas zostaje numer
-nadany przez Allegro, nazwa, typ i rozmiar; BAJTÓW NIE TRZYMAMY ani chwili
-dłużej, niż trwa żądanie.
-
-Nazwa pliku bywa daną osobową i przyjmujemy to świadomie, tak samo jak przy
-załącznikach przychodzących. Do dziennika idą nazwa, typ i rozmiar — nigdy
-zawartość.
-
-Cena tej decyzji jest jawna: plik dodany i nigdy niewysłany zostaje u Allegro
-jako deklaracja bez wiadomości. To śmieć po ICH stronie i nie ma końcówki,
-którą dałoby się go sprzątnąć — ekran nie ma więc prawa obiecywać, że zdjęcie
-załącznika „usunęło go z Allegro". Kasuje wyłącznie nasz wiersz.
-
-**Kopia wysłanego tekstu zostaje u nas dwa razy.** Raz w `reklamacja_outbox`
-jako ślad PRÓBY — także tej nieudanej i tej niejednoznacznej — i raz na osi
-rozmowy po potwierdzeniu. To ta sama cena, co przy skrzynce w 0.148.0:
-bez kopii próby timeout znaczyłby ciszę, a cisza po wysyłce do kupującego jest
-gorsza od podwójnej wiadomości.
-
-**Werdykt (przyrost trzeci) wychodzi jednym strzałem, wydanym przez
-człowieka.** Do Allegro idą trzy rzeczy: status z listy jedenastu wartości,
-wiadomość agenta (kupujący ją czyta) i — wyłącznie przy częściowym zwrocie —
-kwota. Nic poza tym: ani notatka biura, ani dane z rozmowy. U nas zostaje
-kopia wiadomości na wierszu `reklamacja_klienta` (Allegro nie oddaje jej
-w czacie), kwota, kto i kiedy, oraz los próby (`werdykt_status`) — także
-niepewny po timeoucie, bo cisza po werdykcie jest gorsza niż wpis „nie
-wiadomo". Do dziennika idą długości, kody HTTP i nazwa operacji
-uprzywilejowanej, nigdy treść. Stanowisko o towarze po uznaniu jedzie tą
-samą kolejką co odpowiedź i podlega tym samym regułom kopii.
-
-## Polityka danych dyskusji (0.245.0)
-
-Dyskusja jest tym samym zasobem Allegro co reklamacja i leży w tej samej
-tabeli, więc obowiązuje ją cała polityka rozdziału wyżej. Ten rozdział mówi
-wyłącznie o RÓŻNICACH, bo powtórzenie reszty zestarzałoby się osobno.
-
-**Zapisujemy mniej, bo Allegro daje mniej.** Dyskusja nie niesie numeru
-sprawy, terminu, tytułu prawnego, powodu, oczekiwania ani kwoty — schemat
-opisuje każde z tych pól jako nieobecne przy `type: "DISPUTE"`. Kolumny na nie
-zostają puste i nic ich nie podstawia. Zostaje login kupującego, temat,
-zgłoszenie własnymi słowami, numer zamówienia, cała rozmowa i nasze notatki.
-
-**Rozmowa dyskusyjna jest dowodem w sporze** i jej kopia lokalna jest ceną za
-działający ekran — dokładnie tak samo, jak przy skrzynce w 0.143.0 i przy
-reklamacji w 0.222.0.
-
-**Co opuszcza maszynę przy odpowiedzi.** Wyłącznie tekst napisany przez agenta
-i identyfikator sprawy. Nic poza tym: ani notatka wewnętrzna, ani znacznik
-„kto prowadzi", ani cokolwiek z kartoteki czy z zamówienia.
-
-**Prośba o zakończenie wysyła to samo**: tekst agenta i identyfikator sprawy,
-z inną wartością pola `type`. Kupujący czyta ten tekst, więc panel wymaga go
-przed wysłaniem, zamiast pozwolić Allegro odrzucić puste żądanie.
-
-**Załączników wychodzących nie ma** — decyzja właściciela z 7 września 2026
-obowiązuje tu tak samo.
-
-**Do dziennika nie idzie treść.** Zapisujemy DŁUGOŚĆ, los próby i kody, nigdy
-słowa: `events` nie ma retencji i nie jest kasowane. Zdarzenia mają własne
-nazwy (`dyskusja_odpowiedz`, `dyskusja_zakonczenie`), żeby ślad mówił, o którą
-sprawę chodziło.
-
-**Hala nie widzi dyskusji.** Bramka roli stoi na każdej trasie, także na
-odczycie.
-
-**Do dostawcy modelu nie idzie stąd nic.** Copilot nie ma dostępu do tego
-ekranu, tak samo jak nie ma go do reklamacji.
-
-## Polityka danych sprawy klienta (0.535.0)
-
-Ten rozdział powstaje razem ze sprawą klienta (`docs/obsluga-klienta-calosc.md`,
-S6). To druga, po `klient_notatka`, tabela, której kluczem jest sam login
-kupującego. Jej granice stoją osobno, bo trzyma terminy i prowadzącego, czyli
-dane także o nas.
-
-**Co zapisujemy.** Login jako klucz, tak jak zapisało go Allegro. Następny
-krok, najwyżej 200 znaków, i jego termin. Krok zostaje po zakończeniu, bo
-„Cofnij" przywraca go bez pytania, i znika dopiero pod następnym krokiem.
-Obok leży odcisk faktów po stronie klienta: liczby zwrotów, spraw i wiadomości
-w sprawach oraz czas wstawienia najnowszej wiadomości klienta. Treści w nim
-nie ma. Zakończenie odkłada jeszcze odcisk sprzed siebie, dla „Cofnij”, a nowy
-krok go zdejmuje.
-
-**Prowadzący i kończący to dane o NAS.** Przy obu stoi imię dla oka i numer
-konta z `app_user` dla maszyny, jak przy reklamacjach od 0.278.0. Do Allegro
-nie idzie żadne z nich. Sprawy per osoba pokazuje wyłącznie własne „Moje"
-oglądającego, z tożsamością z sesji. Zestawienia dla kogoś innego nie ma, bo
-byłoby monitoringiem pracowniczym (art. 22² Kodeksu pracy).
-
-**Do dziennika nie idzie login ani treść kroku.** Zdarzenia `klient_sprawa_*`
-niosą numer sprawy, długość kroku i termin. Przejęcie niesie jeszcze numer
-konta poprzedniego prowadzącego. `events` nie ma retencji, a krok bywa zdaniem
-o człowieku. Numer sprawy wystarcza do śladu „kto i kiedy", a login leży
-w jednym wierszu tabeli.
-
-**Audyt odrzuceń pisze wzorzec trasy, nie adres.** Pod `/api/obsluga/klient/`
-adres niesie login, a odrzucenie (`http_rejected`) zapisywało go do `events`.
-Od 0.535.0 idzie tam wzorzec, np. `/api/obsluga/klient/:login/sprawa/krok`.
-To domyka też starszy wyciek przy 404 profilu i przy odmowie notatki. Zdania
-błędów sprawy są stałe, bez loginu i bez kroku. Wpisy `http_rejected` sprzed
-0.535.0 zostają z adresem, a w nim z loginem. Czyszczenie ich to decyzja
-właściciela, bo §9 architektury zabrania nadpisywania historii.
-
-**Sprawa nie wychodzi dalej.** Nie czyta jej Copilot i nie ma jej w eksporcie
-CSV, w migawce doby ani w raporcie tygodnia. Do Allegro nie idzie żadnym
-polem. Kopia bazy niesie ją jak każdą inną tabelę. Hala jej nie widzi: bramka
-roli stoi na każdej trasie, także na odczycie.
-
-**Krok nie niesie adresu ani telefonu.** To reguła dla człowieka, bo pole jest
-wolnym tekstem i kod jej nie wymusi. Wyjątek z 0.422.0 dotyczy mapowania
-zamówień, nie tego pola. Numer przesyłki dosyłki ma od 0.536.0 własną
-kolumnę i własne uzasadnienie — rozdział niżej.
-
-**Retencji nie ma, tak jak przy notatce o kliencie.** Wiersz żyje tak długo
-jak klient w bazie. Zakończona sprawa budzi się tylko przez trzydzieści dni
-(S6), ale profil dalej pokazuje jej ostatni krok i to, kto ją prowadził.
-Kasowanie po czasie zabrałoby agentowi ten ślad przy następnym kontakcie
-klienta. O archiwizacji decyduje właściciel, nie kod, jak przy `events`.
-
-## Polityka danych dosyłki (0.536.0)
-
-Drugi przyrost sprawy klienta (S6) dokłada tabelę `klient_dosylka`. Jej
-granice stoją osobno, bo przy sprawie po raz pierwszy leży numer przesyłki.
-
-**Co zapisujemy.** Numer zamówienia z kontem kanału, numer przesyłki dosyłki
-i identyfikator przewoźnika z Allegro. Obok stoi wynik śledzenia: ostatni kod
-statusu, pierwsze doręczenie i chwila ostatniego pytania. Są też liczniki
-przejść w doręczenie i w kłopot oraz znacznik poprzedniego epizodu sprawy.
-Historii statusów nie ma, bo żyje u przewoźnika. Autora też nie ma: stoi
-w dzienniku, a klucz do `app_user` blokowałby kasowanie kont.
-
-**Numer przesyłki leży tak jak numer pierwszej paczki.** Trzymają go już
-`zamowienie_klienta.przesylka_waybill` (0.393.0) i `zwrot_klienta.waybill`
-(0.172.0). Powód jest ten sam: bez numeru nie ma śledzenia, a agent kopiuje go
-do Sellasist albo do rozmowy z przewoźnikiem. W systemie przewoźnika numer
-prowadzi do adresu odbiorcy, więc wychodzi z tabeli tylko w dwa miejsca.
-
-**Gdzie numer wychodzi z tabeli.** Pierwsze miejsce to sprawa klienta
-w profilu, `GET /api/obsluga/klient/:login`, bo karta sprawy go kopiuje
-i poprawia. Drugie to odpowiedzi zapisów sprawy pod
-`/api/obsluga/klient/:login/sprawa/`, także ciało 409 ze świeżą sprawą.
-Historia klienta przy zwrocie, sprawie i rozmowie niesie sprawę z numerem
-dosyłki pustym, bo jej linia drukuje samo zdanie. Ekran zwrotu, „Moje”
-i trasy zwrotu dostają zdanie o dosyłce, bez numeru.
-
-**Czego nie ma i nie będzie.** Adresu, telefonu ani nazwy odbiorcy dosyłki:
-jedzie na adres zamówienia, a ten już znamy. Treści odpowiedzi Allegro nie ma
-w zdaniach błędów dosyłki ani w logu jej tickera, bo bywa czymkolwiek. Log
-tickera niesie stałe zdanie, a log trackingu dokłada tylko przewoźnika i kod
-HTTP.
-
-**Numer przesyłki nie wychodzi dalej.** Nie idzie do dziennika: zdarzenia
-`klient_dosylka_*` niosą numer sprawy, źródło założenia i kod statusu. Nie
-dostaje go Copilot: szkic zna tylko stan drugiej paczki, tak jak pierwszej
-(`zdaniePrzesylki`). Nie ma go w eksporcie CSV, w migawce doby ani w raporcie
-tygodnia. Każdy z nich wybiera tabele i pola z nazwy, więc nowa tabela nie
-wchodzi do nich sama. Kopia bazy niesie ją jak każdą inną tabelę.
-
-**Numer jedzie w ciele żądania, nie w adresie.** Adres ląduje w logu żądań
-serwera i w audycie odrzuceń. Trasy dosyłki stoją pod `/api/obsluga/klient/`,
-więc audyt pisze wzorzec trasy zamiast loginu, jak przy pozostałych zapisach
-sprawy.
-
-**Retencja idzie za sprawą.** Wiersz znika razem ze sprawą klienta (kaskada),
-a zwrot skasowany przy sprzątaniu zostawia dosyłkę bez odnośnika. Ticker
-przestaje pytać po trzydziestu dniach od założenia albo od numeru. Numeru
-nie kasuje: przy reklamacji dosyłki agent potrzebuje go tak samo jak numeru
-pierwszej paczki.
+z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
+
+- **Maskowanie stoi przed każdą drogą.** Znikają e-mail, telefon, kod pocztowy
+  z miastem, wiersz z markerem adresu, ciąg szesnastu cyfr i login kupującego;
+  zostaje znacznik. Stopka firmowa jest wycięta. Nadawca przyjmuje typ
+  `TrescBezpieczna`, nie tekst.
+- **Granica maskowania.** Adres bez markera i bez kodu pocztowego przejdzie —
+  wyrażenia regularne tego nie rozstrzygają. Dziewięć cyfr tuż po słowie OEM,
+  nr, numer, symbol albo kod NIE jest maskowane jako telefon, żeby numer OEM
+  dało się rozpoznać. Cena: „nr 601…" bez słowa „tel" wyjdzie do dostawcy.
+- **Wychodzi CAŁY WĄTEK tej jednej rozmowy**, przy szkicu i przy klasyfikacji,
+  razem z naszymi wiadomościami. Krótka odpowiedź („tak, GX160") bez naszego
+  pytania nie mówi modelowi nic. Sufit: dwanaście wiadomości albo sześć
+  tysięcy znaków od najnowszej; starsze zastępuje znacznik
+  `[wcześniejsze wiadomości pominięte]`.
+- **Login do maskowania bierze się z wątku Allegro**, nie z tematu, który
+  bywa tytułem oferty. **Nagłówek klasyfikacji piszemy my**: czy jest
+  zamówienie, oferta i ile załączników, bez numerów. Typ i podtyp wątku idą
+  jako enumy Allegro. Loginów uczestników z `beta.v1` nie zapisujemy.
+- **Klasyfikację robi Jev z TypeSafe** (`KLASYFIKATOR_DOSTAWCA=jev`,
+  domyślnie), z tym samym wejściem co Claude. Szkice, dopytanie i reklamacje
+  zostają przy Claude. Przed włączeniem na produkcji trzeba przeczytać DPA,
+  politykę prywatności i warunki przechowywania na typesafe.ai/legal.
+  Deklaracji TypeSafe o braku treningu i o ZDR (tylko enterprise) nikt tu nie
+  sprawdził.
+- **Takt.** `COPILOT_AUTO_KLASYFIKACJA=1` rozpoznaje każdą nową wiadomość
+  klienta, z sufitem na godzinę z księgi i oknem siedmiu dni. Bez flagi partię
+  uruchamia agent, a potwierdzenie mówi, że to kosztuje. Wiadomość z samym
+  załącznikiem nie wychodzi: decyzja mówi „sam załącznik" i woła człowieka.
+- **Przy decyzji zapisujemy, NA CZYM ją liczono**: identyfikatory
+  wiadomości, SHA-256 wejścia i to, czy sufit coś uciął. Treści nie kopiujemy.
+- **Szkic z taktu** (`COPILOT_AUTO_SZKIC=1`) powstaje pod ofertą i dla
+  wiadomości, która każe coś zrobić: pytania o paczkę, fakturę albo zwrot.
+  Fakty szkicu niosą rozpoznanie klasyfikatora — nasze dane, bez treści.
+- **Obok rozmowy idą FAKTY serwera.** Kartoteka oferty (symbol, nazwa, EAN,
+  numery, dostępność dziś), treść oferty, dane doboru, kandydaci i negatywy
+  ze zdaniami źródła oraz wiedza o zastosowaniach, silnikach, pasowaniach
+  i pomiarach z rozmowy. Podpisy dowodów jadą BEZ nazwiska pracownika. Nie
+  idą: półka, rezerwacje, rozbicie na magazyny, pełny opis kartoteki, historia
+  zakupów klienta ani jego adres.
+- **Szkic nie staje się odpowiedzią sam.** Stoi w pustym polu jako tekst do
+  poprawiania, nie zapisany; do klienta idzie po „Wyślij". Dane doboru
+  z rozmowy serwer sprawdza przeciw wątkowi i wyrzuca te, których tam nie ma.
+  Wchodzą na kliknięcie agenta, wyłącznie w puste pola.
+
+**Zdjęcia w rozmowie wychodzą do dostawcy, także bez kliknięcia.** Pikseli
+zamaskować się nie da: zdjęcie bywa paragonem, etykietą albo ekranem telefonu
+i wychodzi w całości. Przy szkicu z taktu nikt tego nie klika; właściciel,
+pytany wprost, wybrał obie ścieżki. Kod wymusza trzy zawężenia: tylko `SAFE`,
+tylko przychodzące i sufit sztuk (`SUFIT_SZTUK_ROZMOWY`, dziś cztery, idą
+najnowsze). Sufit jest, bo tę ścieżkę uruchamia takt, nie człowiek.
+
+Wraca `szkic_copilota.odczyt_zdjec`, bez którego odsiew numerów odrzucałby
+każdy numer odczytany ze zdjęcia. Twierdzenia ze zdjęcia mają źródło
+`zdjecie` z sufitem „prawdopodobne".
+
+### Treść oferty i wiedza własna modelu
+
+Treść oferty dociągamy z `GET /sale/product-offers/{offerId}` leniwie: jedno
+żądanie na ofertę tej rozmowy, przy „Ułóż odpowiedź", trzymane tydzień. Opis
+to tekst opublikowany przez sprzedawcę, więc może jechać do dostawcy.
+
+Wiedza własna modelu jest dozwolona pod warunkiem: źródło przy każdym
+twierdzeniu i sztywna ocena pewności. Każde twierdzenie techniczne stoi na
+liście `twierdzenia` ze źródłem: baza, opis oferty albo wiedza modelu. Numer
+bez pokrycia w twierdzeniach odrzuca szkic, bo agent nie ma jak go sprawdzić.
+Pewność przyznaje SERWER wg źródła: baza może być „pewna", opis oferty
+najwyżej „prawdopodobny", wiedza modelu zawsze „niepewna". Agent czyta
+rachunek w oknie „Skąd to wiem", otwartym, gdy pada zdanie spoza bazy.
+
+## Polityka danych zwrotów
+
+- **Trzymamy to, co rozstrzyga zwrot**: identyfikator i numer zwrotu, numer
+  zamówienia, datę zgłoszenia, pozycje z nazwą, ilością, ceną i powodem oraz
+  FAKT powrotu paczki. Surowa odpowiedź leży w lądowisku `allegro_zwrot`.
+- **Konta bankowego i telefonu nadawcy NIE ZAPISUJEMY.** `refund.bankAccount`
+  i `sender.phoneNumber` nie mają kolumn, więc nieuważne mapowanie wywali się
+  na zapytaniu. Lądowiska przechodzą przez `services/allegro-oczyszczanie.ts`
+  ZANIM trafią do bazy: wartość znika, klucz zostaje. Dlatego kontrakt czyta
+  się ze specyfikacji w repo, nie z kopii cudzych danych.
+- **Zamówienie pobieramy bez danych kupującego**: pozycje, koszt dostawy i SKU
+  sprzedawcy (`offer.external.id`). Z `buyer` przechodzi wyłącznie login.
+  Login stoi też przy zwrocie, bo Allegro przysyła go z każdym zwrotem.
+- **Forma płatności i ŻĄDANIE faktury, bez danych firmy.** Bierzemy
+  `payment.type` i flagę `invoice.required`; `invoice.address` nie przechodzi.
+
+### Nazwa odbiorcy z naklejki
+
+Paczka, której klient nie odebrał, wraca z naklejką, której numeru w Allegro
+NIE MA, więc pierwszy skan chybia z definicji. Zostaje to, co widać: nazwa
+odbiorcy i przewoźnik. Bierzemy `firstName` i `lastName` z `delivery.address`,
+a gdy jest `companyName` — jego, bo paczka firmowa nosi nazwę firmy. Wszystko
+idzie do JEDNEJ kolumny `odbiorca_nazwa`, przy zamówieniu i przy zwrocie.
+
+### Reszta adresu dostawy
+
+Decyzja właściciela, podjęta po przedstawieniu zakresu i skutków. Klient pisze
+„gdzie moja paczka" i podaje SAM NUMER TELEFONU — uchwyt, którego panel nie
+znał. Szukanie po nazwisku pokazuje cudze zakupy przy zbieżności nazwisk,
+a ulica rozstrzyga to w jednym spojrzeniu.
+
+- **Zakres**: `street`, `city`, `zipCode` i `phoneNumber` z
+  `delivery.address`. Pięć kolumn przy `zamowienie_klienta`, bo telefon ma
+  drugą, z samymi cyframi: Allegro zapisuje numer tak, jak go wpisano.
+- **Szukanie po telefonie idzie po KOŃCÓWCE, od dziewięciu cyfr** — tyle ma
+  polski numer bez prefiksu. Krótszy ciąg to losowanie. Końcówka, bo prefiks
+  bywa tylko po jednej stronie.
+- **Przy zwrocie kolumn adresu NIE MA.** Zwrot bierze adres z zamówienia;
+  druga kopia rozjechałaby się przy zmianie adresu u Allegro.
+- **Nie przechodzą**: `invoice.address` (innej decyzji nie było), reszta
+  `buyer` (e-mail, telefon, własny adres kupującego), PESEL i konto bankowe.
+  Raport sondy (`ksztalt.ts`) nie pokazuje pól adresu, bo wchodzi do REPO.
+- **Lądowisko nie dostaje nic z adresu.** `allegro-oczyszczanie.ts` wycina
+  cały `address`, także nazwę odbiorcy. Mapowanie czyta żywą odpowiedź.
+- **Do CSV nazwa nie wychodzi**, bo plik na dysku jest trwalszy niż baza.
+- **Odczyt zostawia ślad.** Szukanie paczek po nazwisku dopisuje zdarzenie
+  z LICZBĄ trafień i długością uchwytu, nigdy z uchwytem. Uchwyt jedzie
+  w ciele żądania, bo adres ląduje w logu żądań serwera.
+
+### Pozostałe zasady zwrotów
+
+- **Hala nie widzi zwrotu.** Bramka roli także na odczycie; magazynier dostaje
+  wyłącznie zadanie oceny towaru.
+- **Kartotekę wskazuje człowiek.** Dopasowanie po SKU liczy się przy ODCZYCIE.
+  Potwierdzenie agenta trafia do `oferta_kartoteka` ze źródłem (`sku` albo
+  `reczne`), symbolem, datą i IMIENIEM AGENTA, bo zapisu bez autora nie da się
+  rozliczyć (projekt panelu §4.3).
+- **Numer listu przewozowego STOI w modelu pracy.** Synchronizacja zapisuje
+  w `zwrot_klienta.waybill` numer PIERWSZEJ paczki, tej samej co data nadania
+  i przewoźnik. Odświeżenie bez tablicy `parcels` numeru nie kasuje. Przy
+  paczce nieodebranej kolumnę wypełnia człowiek ze skanu. CSV numeru nie
+  niesie, skan idzie POST-em, a dziennik numeru nie zapisuje.
+- **Raport sondy nazywa numer listu daną osobową** (`services/ksztalt.ts`),
+  a czyszczenie lądowisk go przepuszcza (`allegro-oczyszczanie.test.ts`).
+  Raport WCHODZI DO REPO, a lądowisko jest prywatną kopią w bazie biura.
+- **Potrącenie za utratę wartości** zapisuje kwotę, obowiązkowy powód i autora.
+  Powód zobaczy klient pytający, czemu dostał mniej. Kwota mieści się
+  w widełkach `0…wartość pozycji`.
+- **Read-model `sgt_faktura`** niesie identyfikator, typ, numer pełny, numer
+  obcy i datę. Nie ma `kh_Symbol` (bywa w nim imię i nazwisko) ani
+  `dok_Uwagi` (wolny tekst na adres albo telefon).
+- **Produkt dopisany do zwrotu** przepisuje się z zamówienia, bez pola
+  tekstowego. **Eksport CSV kolejki** wynosi loginy, więc dopisuje zdarzenie
+  `zwroty_eksport`.
+- **Z ekranu zwrotów do Allegro wychodzi wyłącznie odczyt**, przerywany na
+  429 jak ticker. Pilnuje tego licznik tras zapisu w teście.
+
+## Wysyłka odpowiedzi
+
+- **Wychodzi wyłącznie to, co człowiek wysłał**, jednym kliknięciem, po
+  zatwierdzeniu treści. To opis kodu, nie zakaz — patrz pytanie 5.
+- **Do Allegro idzie sam tekst.** Komentarze wewnętrzne mają osobną tabelę.
+  Załączników ze skrzynki nie wysyłamy.
+- **Każda próba zostawia wiersz w `outbox`**: treść, klucz idempotencji,
+  wersję rozmowy i stan. Klucz wylicza serwer z rozmowy, pytania i treści,
+  więc podwójne kliknięcie nie tworzy drugiej odpowiedzi.
+- **Dopisek klienta zatrzymuje wysyłkę**: 409, szkic nietknięty, agent
+  poprawia albo wysyła mimo to, jawnie (blizna 0.110.0).
+- **Po niejednoznacznym timeoucie nic nie idzie ponownie.** `send_uncertain`
+  blokuje próbę, dopóki synchronizacja nie sprawdzi wątku.
+- **Kształt żądania potwierdza specyfikacja**: ciało `{ text }`, limit 2000
+  znaków sprawdzany przed wysłaniem.
+
+## Polityka danych reklamacji
+
+- **Zapisujemy** treść zgłoszenia i całą rozmowę, login kupującego, powód,
+  oczekiwanie i kwotę klienta, terminy, statusy, nasze notatki i „kto
+  prowadzi". Rozmowa jest dowodem w sporze, a kopia — ceną za ekran.
+- **Prowadzący** ma numer konta z `app_user` i imię. To dana o NAS: „Moje"
+  liczy się w przeglądarce, a do Allegro nie idzie. Imię zostaje, żeby czip
+  był czytelny po skasowaniu konta.
+- **Tagi spraw** są słowem BIURA i nie idą do Allegro. **Poprzednia treść
+  notatki** to jeden szczebel w wierszu sprawy, dla cofnięcia. Dziennik
+  dostaje długość notatki i nazwę tagu, a `events` nie ma retencji.
+- **`PostPurchaseIssue` nie niesie** adresu, telefonu ani konta, więc kolumn
+  na nie nie ma. Plików załączników nie trzymamy; pobranie idzie przez nasz
+  serwer. Na oś idą wyłącznie JPEG, PNG i GIF, rozpoznane po sygnaturze,
+  z `nosniff`, bo załącznik nie ma pola `SAFE`. Hala reklamacji nie widzi.
+- **Do dostawcy modelu idzie ZAMASKOWANA rozmowa** (§14.4 projektu panelu),
+  z tym samym sufitem co w skrzynce. Login podmienia się po ZNANEJ wartości.
+- **Wychodzą FAKTY ZE SPRAWY**: temat, opis zgłoszenia (przycięty), powód,
+  podstawa prawna, oczekiwanie z kwotą, ilość, nazwa towaru, numery oferty
+  i zamówienia, data zakupu, otwarcia i termin decyzji, zamaskowane. Nie
+  wychodzą fakty o NAS: notatka, „kto prowadzi", tagi, kartoteka ani kwoty.
+- **Wychodzą ZDJĘCIA klienta, a pikseli zamaskować się nie da.** Typ nazywa
+  się `ZdjecieZBramki`, nie „bezpieczne". Obiecuje trzy rzeczy: bajty z TEJ
+  sprawy, obraz rozpoznany po SYGNATURZE i mieszczący się w suficie. Bajtów
+  nie trzymamy, a dziennik dostaje liczby, nie nazwy plików.
+- **Sufitu sztuk nie ma**, decyzją właściciela, ze znajomością kosztu. Zostaje
+  sufit bajtów i zdanie, ile pominięto. Budżetu kwotowego **nie ma**.
+- **Pytanie agenta przy dopytaniu idzie bez maskowania**, bo pisze je
+  pracownik o towarze, a numer części jest jego sensem. **W pytaniu do
+  Copilota nie pisze się o kliencie.** Dziennik zapisuje wyłącznie długość.
+- **Wraca karta faktów i RADA** z uzasadnieniem, pewnością i niewiadomymi.
+  Bramka pilnuje, żeby opinia nie trafiła do pól o słowach klienta. Rada nie
+  wychodzi do kupującego i nie dotyka werdyktu. Rachunek trafia do księgi
+  Copilota także przy błędzie, bo nieudana próba też bywa płatna.
+- **Odpowiedź wysyła tekst agenta i identyfikator sprawy.** Ciało ma dwa pola,
+  `text` i `type: "REGULAR"`, i składa je adapter. Dziennik dostaje długość.
+- **Załączniki wychodzące** idą do Allegro W CHWILI DODANIA, więc odmowa pada,
+  gdy da się wybrać inny plik. Zostaje numer z Allegro, nazwa, typ i rozmiar,
+  bez bajtów. Plik niewysłany zostaje u Allegro bez sposobu na sprzątnięcie,
+  więc ekran nie obiecuje usunięcia go z Allegro.
+- **Kopia wysłanego tekstu zostaje dwa razy**: w `reklamacja_outbox` jako ślad
+  PRÓBY i na osi po potwierdzeniu. Bez kopii próby timeout znaczyłby ciszę.
+- **Werdykt wychodzi jednym strzałem człowieka**: status z listy jedenastu
+  wartości, wiadomość agenta i — przy częściowym zwrocie — kwota. U nas zostaje
+  kopia wiadomości na `reklamacja_klienta`, kwota, kto i kiedy oraz los próby
+  (`werdykt_status`), także niepewny. Dziennik dostaje długości, kody HTTP
+  i nazwę operacji uprzywilejowanej.
+
+## Polityka danych dyskusji
+
+Dyskusja leży w tej samej tabeli co reklamacja i obowiązuje ją ta sama
+polityka. Różnice:
+
+- **Zapisujemy mniej, bo Allegro daje mniej.** Przy `type: "DISPUTE"` schemat
+  nie niesie numeru sprawy, terminu, tytułu prawnego, powodu, oczekiwania ani
+  kwoty. Prośba o zakończenie wysyła tekst agenta z inną wartością `type`.
+- **Załączników wychodzących nie ma.** Zdarzenia `dyskusja_odpowiedz`
+  i `dyskusja_zakonczenie` niosą długość, los próby i kody.
+- **Hala nie widzi dyskusji. Do dostawcy modelu nie idzie stąd nic.**
+
+## Polityka danych sprawy klienta
+
+Sprawa klienta (`docs/obsluga-klienta-calosc.md`, S6) ma klucz w loginie
+kupującego, jak `klient_notatka`, i trzyma dane także o nas.
+
+- **Zapisujemy** login jako klucz, następny krok (najwyżej 200 znaków) z
+  terminem i odcisk faktów klienta: liczby zwrotów, spraw i wiadomości oraz
+  czas najnowszej wiadomości, bez treści. Krok i odcisk sprzed zakończenia
+  zostają dla „Cofnij".
+- **Prowadzący i kończący to dane o NAS**: imię i konto z `app_user`. Sprawy
+  per osoba pokazuje wyłącznie własne „Moje". Zestawienia dla kogoś innego nie
+  ma, bo byłoby monitoringiem pracowniczym (art. 22² Kodeksu pracy).
+- **Dziennik nie dostaje loginu ani treści kroku.** Zdarzenia
+  `klient_sprawa_*` niosą numer sprawy, długość kroku i termin.
+- **Audyt odrzuceń pisze wzorzec trasy**, np.
+  `/api/obsluga/klient/:login/sprawa/krok`, bo adres niesie login. Starsze
+  wpisy `http_rejected` zostają z loginem; ich czyszczenie to decyzja
+  właściciela, bo §9 architektury zabrania nadpisywania historii.
+- **Sprawa nie wychodzi dalej**: Copilot, CSV, migawka doby i raport tygodnia
+  jej nie mają, a hala jej nie widzi. Krok nie niesie adresu ani telefonu —
+  to reguła dla człowieka, bo pole jest wolnym tekstem.
+- **Retencji nie ma.** Zakończona sprawa budzi się przez trzydzieści dni (S6),
+  a profil dalej pokazuje ostatni krok. O archiwizacji decyduje właściciel.
+
+## Polityka danych dosyłki
+
+Drugi przyrost S6 dokłada tabelę `klient_dosylka` z numerem przesyłki.
+
+- **Zapisujemy** numer zamówienia z kontem kanału, numer przesyłki
+  i przewoźnika, ostatni kod statusu, pierwsze doręczenie, chwilę ostatniego
+  pytania, liczniki przejść i znacznik poprzedniego epizodu. Historii statusów
+  nie ma. Autor stoi w dzienniku, bo klucz do `app_user` blokowałby kasowanie
+  kont.
+- **Numer leży tak jak numer pierwszej paczki**
+  (`zamowienie_klienta.przesylka_waybill`, `zwrot_klienta.waybill`). Prowadzi
+  do adresu odbiorcy, więc wychodzi tylko do profilu
+  (`GET /api/obsluga/klient/:login`) i do odpowiedzi zapisów pod
+  `/api/obsluga/klient/:login/sprawa/`, także 409. Reszta ekranów dostaje
+  zdanie o dosyłce, bez numeru.
+- **Nie ma** adresu, telefonu ani nazwy odbiorcy dosyłki. Zdarzenia
+  `klient_dosylka_*` niosą numer sprawy, źródło i kod statusu, bez numeru
+  przesyłki. Copilot zna tylko stan paczki (`zdaniePrzesylki`), a CSV,
+  migawka i raport wybierają tabele z nazwy.
+- **Retencja idzie za sprawą** (kaskada). Ticker przestaje pytać po
+  trzydziestu dniach, ale numeru nie kasuje, bo reklamacja dosyłki go wymaga.
 
 ## Co się nie zmienia
 
-Trzy rzeczy nie są przedmiotem tej przebudowy, bo nie mają z nią nic wspólnego:
-kosze i przyjęcia z dokumentu MM, kolektor (dotyka wyłącznie `/api/kosze`,
-`/api/kartony`, `/api/przyjecia`) oraz dostawy, kartoteka i strefa złota.
+Poza tą przebudową stoją: kosze i przyjęcia z dokumentu MM, kolektor (dotyka
+wyłącznie `/api/kosze`, `/api/kartony`, `/api/przyjecia`) oraz dostawy,
+kartoteka i strefa złota.

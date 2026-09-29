@@ -11,50 +11,10 @@ Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
 
-Liczba urosła w 0.150.0 z ośmiu na trzynaście — pięć nowych pozycji to były
-zwroty klienckie, mapowane z kopii specyfikacji Allegro sprzed dwóch lat.
-W 0.164.0 zeszła na dwanaście: znacznik przy `status` zwrotu okazał się
-nieaktualny, bo schemat leżał już w repo od 0.151.0.
-
-W 0.174.0 doszedł jeden, razem z read-modelem sprzedaży: nie wiadomo, czy
-integracja tej firmy wypełnia `dok_NrPelnyOryg` i czym. Pomyłka daje pustą
-listę pewnych trafień, a nie złe dane.
-
-W 0.201.0 doszedł jeden, razem z automatem numerów korekt: nie wiadomo, czym
-ta firma księguje zwrot do paragonu. Kod `ZW` jest ze struktury, praktyka
-podmiotu nie. Pomyłka zatrzymuje koszyk, a nie wystawia złego dokumentu.
-
-W 0.187.0 doszedł jeden, przy trackingu przesyłki zwrotnej: końcówka
-`/order/carriers/{id}/tracking` jest w dokumentacji opisana przy przesyłkach
-ZAMÓWIENIA, a my pytamy o przesyłkę zwrotną. Odmowa degraduje, nie przerywa.
-
-Rozkład dzisiejszy: siedem pozycji dotyczy Subiekta GT, sześć mapowania
-Allegro. Z tych drugich cztery to końcówki ZAPISU, których sonda nie dosięgnie,
-bo jest GET-em.
-
-W 0.151.0 zeszła do jedenastu. Właściciel wgrał `swagger.yaml`, a specyfikacja
-potwierdziła zgadnięty kształt wysyłki do Centrum wiadomości. Dwa znaczniki
-zdjęte, żaden nowy.
-
-W 0.154.0 doszedł jeden. Nie wiadomo, czy `offerId` na pozycji zwrotu należy
-do tej samej przestrzeni co `offer.id` na pozycji zamówienia. Specyfikacja tego
-nie rozstrzyga, a sonda nie pokazuje wartości pól niesłownikowych.
-
-Przy przeglądzie reguł obsługi klienta doszedł jeden. Nie wiadomo, czy
-`interlocutor.login` z listy wątków jest loginem kupującego. Blizna 0.56.6 mówi,
-że bywa zamaskowany, a dwie funkcje wiążą się po nim od 0.386.0 i 0.397.0.
-
-W 0.536.0 doszedł jeden, przy dosyłce sprawy klienta. Właściciel podał, że
-numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro. Na tym stoi
-automatyczne wykrycie numeru, a na żywym koncie nikt tego nie sprawdził.
-Gdy numeru tam nie ma, karta sprawy prosi o wpisanie go ręką. Inna paczka
-dopisana do zamówienia po zwrocie mogłaby jednak dać zły numer.
-
-Warto czytać tę liczbę ostrożnie. W tym samym wydaniu wyszło, że mapowanie
-ODCZYTU skrzynki było błędne w każdym polu, choć nie nosiło ani jednego
-znacznika. Zgadnięta wysyłka, która nosiła dwa, okazała się trafiona. Znacznik
-mierzy to, komu się przyznano, a nie to, co jest sprawdzone. Jedyne, co
-sprawdza, to specyfikacja i `npm run sonda` na żywym koncie.
+Liczbę czyta się ostrożnie. Znacznik mierzy to, komu się przyznano, a nie to,
+co jest sprawdzone. Mapowanie bez znacznika bywało błędne w każdym polu,
+a zgadnięte ze znacznikiem — trafione. Sprawdza wyłącznie specyfikacja
+i `npm run sonda` na żywym koncie.
 
 ## Kody `dok_Typ` — już nie zgadujemy
 
@@ -63,13 +23,8 @@ sprawdza, to specyfikacja i `npm run sonda` na żywym koncie.
 12-PW  13-RW   14-ZW   15-ZD   16-ZK   21-PA   29-IW  35-ZPZ 36-ZWZ
 ```
 
-Stąd stałe w `config.ts`: FZ = 1, PZ = 10. Do 0.489.0 były to klucze
-`DOK_TYP_FZ` i `DOK_TYP_PZ`.
-
-> **Uwaga historyczna.** WERTIS miał wcześniej `DOK_TYP_PZ=5`, a 5 to **KFZ —
-> korekta faktury zakupu**. Na prawdziwej bazie aplikacja listowałaby korekty
-> jako dostawy i nie zobaczyła ani jednego PZ. Poprawione po sprawdzeniu
-> w strukturze.
+Stąd stałe w `config.ts`: FZ = 1, PZ = 10. Uwaga: 5 to **KFZ — korekta
+faktury zakupu**, nie PZ. Pomyłka listowałaby korekty jako dostawy.
 
 ## Tabele czytane przez importer
 
@@ -90,9 +45,9 @@ obiekt Sfery ma dokładnie `DoDokumentuId`, `DoDokumentuNumerPelny`
 i `DoDokumentuDataWystawienia`. Zgodność w obie strony jest tu całym dowodem.
 
 Po `dok_DoDokId` automat znajduje korektę do zwrotu i zamyka go bez
-przepisywania numeru ręką (0.201.0).
+przepisywania numeru ręką.
 
-**Ta kolumna NIE znaczy „to jest korekta".** Zrzut z bazy firmy (0.201.1) pokazał
+**Ta kolumna NIE znaczy „to jest korekta".** Zrzut z bazy firmy pokazał
 ją wypełnioną na 20 418 paragonach i 25 778 dokumentach WZ. To ogólny odnośnik
 „do dokumentu", a nie znacznik korygowania. Faktura do paragonu wskazuje nim ten
 paragon, i to jest w detalu rzecz codzienna.
@@ -120,9 +75,8 @@ Allegro to UUID o **36 znakach** (`format: uuid` w schemacie, przykład
 `29738e61-7f6a-11e8-ac45-09db60ede9d6`). Cały numer się tam nie zmieści i nie
 trzeba tego sprawdzać na bazie — wystarczy odjąć.
 
-To unieważnia założenie z 0.53.0, które kazało szukać w tej kolumnie CAŁEGO
-numeru zamówienia. Read-model wskrzeszony w 0.174.0 dopasowuje więc dwiema
-drogami: numer zamówienia zawarty w numerze obcym ALBO numer obcy będący jego
+Nie szuka się więc w tej kolumnie CAŁEGO numeru zamówienia. Read-model
+dopasowuje dwiema drogami: numer zamówienia zawarty w numerze obcym ALBO numer obcy będący jego
 początkiem uciętym dokładnie do trzydziestu znaków. Krótszego prefiksu nie
 uznajemy — „1234" pasowałoby do co drugiego dokumentu w oknie.
 
@@ -132,7 +86,7 @@ wskazanie człowieka, a nie wiąże się z cudzą sprzedażą.
 
 Wolnego pola tekstowego (`dok_Uwagi`, varchar 500) **nie kopiujemy**. Mieści
 się w nim adres i telefon, a read-model kopiuje to, co przeczyta, razem do
-kopii zapasowych. Od 0.175.0 wycinamy z niego w SQL wyłącznie ciąg o kształcie
+kopii zapasowych. Wycinamy z niego w SQL wyłącznie ciąg o kształcie
 UUID-a — bo tam Sellasist wpisuje numer zamówienia Allegro. Przez `PATINDEX`
 przechodzi 36 znaków szesnastkowych z myślnikami i nic więcej; wolny tekst
 nie opuszcza serwera Subiekta. Uzasadnienie stoi w `server/src/adapters/subiekt.uuid.ts`.
@@ -159,12 +113,9 @@ którego nie używa do niczego innego — worker nadpisuje je bezwarunkowo.
 5..8-zamówienia (różne stany realizacji)
 ```
 
-Dokument „w buforze" to **odłożony (3)**. Stałe wyrażenie bufora (do 0.489.0
-klucz `MSSQL_BUFFER_EXPR`) sprawdza więc `dok_Status = 3`.
-
-> **Uwaga historyczna.** Wcześniej domyślne wyrażenie sprawdzało `= 0`, czyli
-> **wycofany**. Myliło się w obie strony: dokument wycofany pokazywałby się jako
-> bufor, a odłożony jako gotowy do pracy.
+Dokument „w buforze" to **odłożony (3)**. Stałe wyrażenie bufora sprawdza
+więc `dok_Status = 3`. `0` to **wycofany**: pomyłka pokazałaby dokument
+wycofany jako bufor, a odłożony jako gotowy do pracy.
 
 ## Zamówienia do dostawcy (ZD) — karta towaru
 
@@ -194,15 +145,15 @@ założenie: sprawdzono komplet 57 kolumn `dok_Pozycja` na bazie 1.8731.31.6933.
 Są ilości tego dokumentu, ceny, wartości, podatki, akcyza, opłata cukrowa,
 kaucje, GTU i węgiel. Stopnia realizacji nie niesie żadne pole.
 
-Domyślne `MSSQL_ZD_ZREAL_COLUMN=ob_IloscZrealizowana` było więc **zgadnięte
-i zgadnięte źle**. Właściwą wartością dla tej wersji jest **pusta**:
+Kolumny `ob_IloscZrealizowana` nie ma. Właściwą wartością
+`MSSQL_ZD_ZREAL_COLUMN` dla tej wersji jest **pusta**:
 
 ```bash
 export MSSQL_ZD_ZREAL_COLUMN=
 ```
 
 Sprawdź to u siebie **bez filtru na przedrostek** — filtr `LIKE 'ob_Ilosc%'`
-przegapiłby kolumnę nazwaną inaczej i sam był kiedyś źródłem fałszywego tropu:
+przegapiłby kolumnę nazwaną inaczej:
 
 ```sql
 SELECT name, TYPE_NAME(system_type_id) AS typ
@@ -269,16 +220,11 @@ procesu — wtedy zostawiasz listę zawężoną.
 Pusta lista znaczy **żaden typ**, a nie „każdy". Literówka w ustawieniu daje
 więc pustą listę pracy, zauważalną od razu.
 
-> **Uwaga historyczna.** Do sierpnia 2026 para FZ/PZ była **zaszyta w zapytaniu
-> importu**, choć zwroty tuż obok miały już listę z konfiguracji. Firma
-> przyjmująca towar wyłącznie na FZ nie mogła odfiltrować PZ bez zmiany kodu.
-> To była niespójność, nie decyzja projektowa.
-
 ## Magazyny
 
 `sl_Magazyn`: `mag_Id`, `mag_Symbol` varchar(3), `mag_Nazwa`, `mag_Glowny` (bit).
 
-Od sierpnia 2026 importer **czyta tę tabelę**. Pobiera stany ze WSZYSTKICH
+Importer **czyta tę tabelę**. Pobiera stany ze WSZYSTKICH
 magazynów, nie tylko z trzech skonfigurowanych. Karta towaru odpowiada dzięki
 temu na pytanie „gdzie ten towar jeszcze leży".
 
@@ -447,14 +393,13 @@ struktura używa dwóch pól magazynowych:
 - `dok_OdbiorcaId` — „dla MM oznacza identyfikator magazynu" (docelowy).
 
 Typ dokumentu MM to `dok_Typ = 9`. Obie kolumny magazynowe są **potwierdzone
-na bazie firmy** — po nich chodzi import przyjęć na regał zwrotów (0.75.0).
+na bazie firmy** — po nich chodzi import przyjęć na regał zwrotów.
 
 ### Pozycje MM wiszą na `ob_DokMagId`, nie na `ob_DokHanId`
 
-To kosztowało wydanie. Pozycje dokumentu MAGAZYNOWEGO mają `ob_DokHanId`
-ustawione na **NULL** — dokumentu handlowego po prostu nie ma. Zapytanie
-przepisane ze sprzedaży nie zwracało błędu, tylko **pustkę**, więc każdy kosz
-na kolektorze pokazywał zero pozycji i wyglądało to na dzień bez zwrotów.
+Pozycje dokumentu MAGAZYNOWEGO mają `ob_DokHanId` ustawione na **NULL** —
+dokumentu handlowego po prostu nie ma. Zapytanie przepisane ze sprzedaży nie
+zwraca błędu, tylko **pustkę**, a kosz na kolektorze wygląda wtedy na pusty.
 
 Sprawdzone na produkcji (sierpień 2026) tym zapytaniem:
 
@@ -471,8 +416,8 @@ przesunięcia. Reguła: dokument handlowy (FZ, FS, ZD) łączy się przez
 
 ## Audyt kolizji kodów — założenie klasyfikatora skanów
 
-Od lipca 2026 kolektor rozpoznaje etykietę regału **po wzorcu**, nie po
-heurystyce „ma literę, nie ma spacji". `LOC` jest kategorią **zamkniętą**:
+Kolektor rozpoznaje etykietę regału **po wzorcu**, nie po heurystyce „ma
+literę, nie ma spacji". `LOC` jest kategorią **zamkniętą**:
 
 ```
 regał   ^[A-Z]\d{2}-\d{2}-\d{2}$     A01-02-03    2 myślniki
@@ -673,10 +618,10 @@ co innego, a wtedy odpowiedzi szuka się tą samą drogą:
 | ścieżka do pliku w polu tekstowym | żaden | `ZDJECIA_ZRODLO=plik`, `ZDJECIA_KATALOG` |
 | OLE / RTF / nic | — | funkcja zostaje wyłączona, wynik dopisujemy tutaj jako obalony |
 
-## Dopisanie zdjęcia do kartoteki — 0.88.0
+## Dopisanie zdjęcia do kartoteki
 
-Do 0.87.0 zdjęcia były **tylko do odczytu**. Od 0.88.0 magazynier może dodać
-zdjęcie z kolektora, a zadanie `set_zdjecie` dopisuje wiersz do `tw_ZdjecieTw`.
+Magazynier może dodać zdjęcie z kolektora, a zadanie `set_zdjecie` dopisuje
+wiersz do `tw_ZdjecieTw`.
 
 ```sql
 INSERT INTO tw_ZdjecieTw (zd_IdTowar, zd_Zdjecie, zd_Glowne)
@@ -721,8 +666,8 @@ w `sfera.sql.ts`.
 istnieje i niesie datę zmiany zdjęcia, ale nikt jej dotąd nie zapisywał.
 
 `[WERYFIKUJ]` **czy Sfera umie POKAZAĆ okno istniejącego dokumentu**. Znane
-nam wywołania zakładają dokumenty nowe (`DokumentyMagazynoweManager.DodajMM`,
-`DokumentyHandloweManager.DodajKorekte` w `sfera-worker/`). Otwarcie okna
+nam wywołania zakładają dokumenty nowe (`SuDokumentyManager.Dodaj*`
+w `sfera-worker/`, `docs/sfera-com.md` §2h). Otwarcie okna
 dokumentu, który już jest — po `dok_Id` — nie zostało sprawdzone na żywej
 Sferze. Pytanie postawił właściciel: czy kliknięcie w numer paragonu w panelu
 może otworzyć ten paragon w Subiekcie. Dlaczego samo panelu to nie załatwi,
@@ -730,13 +675,10 @@ tłumaczy `docs/architektura.md` §4.
 
 ## Ceny na kartotece — SPRAWDZONE 19 września 2026
 
-Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". I nie widział,
-bo ich nigdy nie było. Sekcja stała tu pusta z rozmysłem. Cennika nie opisywał
-nasz zweryfikowany wyciąg ze struktury InsERT. Nazwa tabeli wpisana z pamięci to
-ta sama klasa błędu, która przy Allegro kosztowała trzy wydania.
-
-Właściciel uruchomił `tools/sonda-cen.sql` na produkcyjnej bazie 19 września
-2026. Poniżej stoi to, co odpowiedziała baza — nie to, co zakładaliśmy.
+Cennika nie opisuje nasz zweryfikowany wyciąg ze struktury InsERT, a nazwy
+tabeli nie wpisuje się z pamięci. Właściciel uruchomił `tools/sonda-cen.sql`
+na produkcyjnej bazie 19 września 2026. Poniżej stoi to, co odpowiedziała
+baza.
 
 ### Tabela
 
@@ -788,7 +730,8 @@ danymi, nie decyzją projektową. Padnie sama przy pierwszym imporcie — liczni
 ### Nowe uprawnienia
 
 `GRANT SELECT ON dbo.tw_Cena` oraz `GRANT SELECT ON dbo.vwPoziomyCen`
-(`docs/subiekt-gt-edu-setup.md` §2). Żadna instalacja sprzed 0.405.0 ich nie ma.
+(`docs/subiekt-gt-edu-setup.md` §2). Instalacja założona przed importem cen
+ich nie ma.
 Brak uprawnienia DEGRADUJE import — ceny zostają puste, stany i dokumenty
 wchodzą — i melduje się zdaniem w `/api/health`. Objaw jest niemy: karta towaru
 bez cen wygląda dokładnie tak, jak wyglądała przedtem.
