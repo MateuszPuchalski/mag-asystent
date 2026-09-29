@@ -8,7 +8,8 @@ import type { SubiektAdapter } from "../adapters/subiekt.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota, BladPrzeciazeniaCopilota,
 } from "../adapters/copilot.js";
-import { nadawcaAnthropic, nadawcaSzkicuAnthropic } from "../adapters/copilot.anthropic.js";
+import { nadawcaSzkicuAnthropic } from "../adapters/copilot.anthropic.js";
+import { nadawcaKlasyfikacji } from "../adapters/copilot.klasyfikator.js";
 import {
   CEL_KLASYFIKACJI, sklasyfikujRozmowy, type Autor, type NadawcaKlasyfikacji,
 } from "./copilot-klasyfikacja.js";
@@ -187,7 +188,7 @@ export async function szkicePrzedPraca(deps: PrzedPracaDeps = {}): Promise<Wynik
   const database = deps.database ?? defaultDb();
   const limit = deps.limit ?? config.copilot.przedPracaLimit;
   const oknoDni = deps.oknoDni ?? config.copilot.klasyfikacjaOknoDni;
-  const nadajK = deps.nadajKlasyfikacji ?? nadawcaAnthropic;
+  const nadajK = deps.nadajKlasyfikacji ?? nadawcaKlasyfikacji;
   const nadajS = deps.nadajSzkic ?? nadawcaSzkicuAnthropic;
   const subiekt = deps.subiekt ?? domyslnySubiekt;
 

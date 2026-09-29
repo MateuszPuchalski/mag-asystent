@@ -530,6 +530,21 @@ godzinę liczonym z księgi i z oknem siedmiu dni wstecz. Wiadomość z samym
 załącznikiem nie wychodzi wcale: klasyfikacja zdjęć nie czyta, więc decyzja
 mówi „sam załącznik" i woła człowieka.
 
+**Od 29 września 2026 wątek do rozpoznania trafia do DRUGIEGO podmiotu.**
+Decyzją właściciela klasyfikację robi Jev z TypeSafe (`KLASYFIKATOR_DOSTAWCA=jev`,
+domyślnie), a nie Claude. Do TypeSafe idzie to samo, co szło do Claude: ten
+sam zamaskowany wątek, ten sam nagłówek z faktów, ten sam sufit. Maskowanie
+stoi przed OBIEMA drogami, bo nadawca przyjmuje `TrescBezpieczna`, nie tekst.
+Szkice, dopytanie i reklamacje zostają przy Claude, więc Anthropic nadal dostaje
+wątki do szkiców. Powrót do Claude to jedna zmienna w `wertis.env`.
+
+Czego NIE wiemy o TypeSafe i co trzeba przeczytać przed włączeniem na
+produkcji: Data Processing Agreement, politykę prywatności i warunki
+przechowywania na typesafe.ai/legal. Dokumentacja TypeSafe deklaruje, że nie
+trenuje na danych klientów, a zerową retencję (ZDR) oferuje wyłącznie w planach
+enterprise. Tej deklaracji nikt tu nie sprawdził. Adres dostawy, telefon i
+reszta danych wyciętych przez maskowanie nie wychodzą do żadnego z dwóch.
+
 Przy decyzji zapisujemy, NA CZYM ją liczono: identyfikatory wiadomości, skrót
 SHA-256 zamaskowanego wejścia i to, czy sufit coś uciął. Treści wejścia nie
 kopiujemy — leży w `message`, pod tą samą polityką co dotąd.

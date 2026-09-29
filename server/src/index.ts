@@ -1,6 +1,6 @@
 import Fastify from "fastify";
 import { pathToFileURL } from "node:url";
-import { config, envFile } from "./config.js";
+import { config, envFile, kluczKlasyfikatora } from "./config.js";
 import { problemPrzykrytejKonfiguracji } from "./env-file.js";
 import { withRequestContext, sesjaZadania } from "./context.js";
 import { autoryzuj } from "./services/auth.js";
@@ -639,8 +639,11 @@ async function main() {
   /* ROZPOZNANIE KAŻDEJ NOWEJ WIADOMOŚCI KLIENTA (22 września 2026). Ten sam
      warunek co szkic z taktu — klucz dostawcy, nie konto Allegro — i ta sama
      zasada: włącza się jedną zmienną w `wertis.env`, bo wydaje pieniądze bez
-     kliknięcia. Rytm własny, żeby nie opóźniać pobierania wiadomości. */
-  if (config.copilot.autoKlasyfikacja && config.copilot.mode === "anthropic" && config.copilot.klucz) {
+     kliknięcia. Rytm własny, żeby nie opóźniać pobierania wiadomości.
+     Sprawdza się klucz WYBRANEGO klasyfikatora (`kluczKlasyfikatora`): przy
+     Jevie klucz Claude niczego tu nie rozpoznaje. `COPILOT_MODE` zostaje
+     głównym wyłącznikiem, bo szkice po rozpoznaniu wołają Claude. */
+  if (config.copilot.autoKlasyfikacja && config.copilot.mode === "anthropic" && kluczKlasyfikatora()) {
     uruchomTakt("copilot-auto-klasyfikacja", config.copilot.autoKlasyfikacjaMs, async () => {
       /* Jak wyżej: w oknie przed pracą rozpoznaje i szkicuje przebieg poranka,
          inaczej dwie drogi płaciłyby za te same rozmowy naraz. */
@@ -660,8 +663,11 @@ async function main() {
   /* SZKICE PRZED PRACĄ (26 września 2026, decyzja właściciela). Ten sam
      warunek co każde wywołanie modelu bez kliknięcia: przełącznik w
      `wertis.env` i klucz dostawcy. Poza oknem takt wychodzi od razu; limit
-     poranka liczy się z księgi. Powód i rachunek w serwisie. */
-  if (config.copilot.przedPraca && config.copilot.mode === "anthropic" && config.copilot.klucz) {
+     poranka liczy się z księgi. Powód i rachunek w serwisie. Potrzebuje OBU
+     kluczy: przebieg rozpoznaje (klasyfikator) i szkicuje (Claude), a brak
+     klucza klasyfikatora przerywałby go co dwie minuty bez żadnego szkicu. */
+  if (config.copilot.przedPraca && config.copilot.mode === "anthropic" && config.copilot.klucz
+    && kluczKlasyfikatora()) {
     uruchomTakt("copilot-przed-praca", TAKT_PRZED_PRACA_MS, async () => {
       const w = await szkicePrzedPraca();
       if (w.przerwane && w.przerwane !== "koniec okna przed pracą") {

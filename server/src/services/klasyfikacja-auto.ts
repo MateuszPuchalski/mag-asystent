@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { config } from "../config.js";
 import { db as defaultDb } from "../db/db.js";
 import { logEvent } from "./events.js";
-import { nadawcaAnthropic } from "../adapters/copilot.anthropic.js";
+import { nadawcaKlasyfikacji } from "../adapters/copilot.klasyfikator.js";
 import {
   CEL_KLASYFIKACJI, sklasyfikujRozmowy, type Autor, type NadawcaKlasyfikacji,
 } from "./copilot-klasyfikacja.js";
@@ -109,7 +109,7 @@ export async function sklasyfikujNowe(deps: AutoKlasyfikacjaDeps = {}): Promise<
   if (rozmowy.length === 0) return { sklasyfikowanych: 0, rozmowy: [], bledow: 0, przerwane: null, budzet };
 
   const w = await sklasyfikujRozmowy(database, rozmowy, AUTOMAT_KLASYFIKACJI,
-    deps.nadaj ?? nadawcaAnthropic, teraz);
+    deps.nadaj ?? nadawcaKlasyfikacji, teraz);
 
   /* Zdarzenie zbiorcze na przebieg: pojedyncze decyzje zapisuje już serwis. */
   logEvent("copilot_auto_klasyfikacja", AUTOMAT_KLASYFIKACJI.name, null,

@@ -1003,6 +1003,22 @@ export const config = {
      */
     klucz: Boolean(process.env.ANTHROPIC_API_KEY),
     /**
+     * Kto rozpoznaje wiadomości klientów (29 września 2026, decyzja
+     * właściciela): `jev` (TypeSafe) albo `anthropic` (Claude). Zmienia się
+     * wyłącznie klasyfikacja. Szkice, dopytanie i reklamacje zostają przy
+     * Claude, bo Jev nie generuje tekstu. Powrót do Claude to jedna zmienna
+     * i restart, bez wydania.
+     */
+    klasyfikator: (process.env.KLASYFIKATOR_DOSTAWCA || "jev") as "jev" | "anthropic",
+    /**
+     * Model Jeva. PRZYPIĘTY do wersji, nie do aliasu `jev-latest`: alias
+     * przesuwa się przy nowym wydaniu, a progi pewności w `copilot.jev.ts`
+     * są dostrojone do konkretnej wersji. Nowa wersja to świadoma zmiana tu.
+     */
+    modelJev: process.env.JEV_MODEL || "jev-1.13.0",
+    /** Czy klucz TypeSafe jest. `Boolean`, nigdy sama wartość — jak `klucz` wyżej. */
+    kluczJev: Boolean(process.env.TYPESAFE_API_KEY),
+    /**
      * SZKIC SAM DLA NOWEGO PYTANIA POD OFERTĄ (0.317.0).
      *
      * Domyślnie WYŁĄCZONY, i to nie jest ostrożność na zapas. Przełącznik
@@ -1216,6 +1232,7 @@ assertMode("SGT_MODE", config.sgtMode, ["seeded", "mssql"]);
    w którą wpadł AI_PROVIDER w 0.84.1. Maska nie jest tu ostrożnością na wyrost,
    tylko powtórzeniem strażnika, którego to pole jeszcze nie ma. */
 assertMode("COPILOT_MODE", config.copilot.mode, ["off", "anthropic"]);
+assertMode("KLASYFIKATOR_DOSTAWCA", config.copilot.klasyfikator, ["jev", "anthropic"]);
 
 /**
  * Reguły, które muszą być spełnione, żeby wdrożenie w ogóle mogło działać.
@@ -1321,6 +1338,15 @@ export function bledyKonfiguracji(c: Config = config): string[] {
     bledy.push(
       `COPILOT_MODEL_KLASYFIKACJA=${bezpiecznaWartosc(c.copilot.modelKlasyfikacji)} — nazwa ` +
         "modelu Anthropic zaczyna się od „claude-" + "\u201d (np. claude-sonnet-5).",
+    );
+  }
+
+  /* Model Jeva: inna rodzina to niemal na pewno wklejka nie w to pole, a
+     TypeSafe odpowiedziałoby 422 dopiero przy pierwszym rozpoznaniu. */
+  if (c.copilot.modelJev && !c.copilot.modelJev.startsWith("jev-")) {
+    bledy.push(
+      `JEV_MODEL=${bezpiecznaWartosc(c.copilot.modelJev)} — nazwa modelu Jev ` +
+        "zaczyna się od „jev-" + "\u201d (np. jev-1.13.0).",
     );
   }
 
@@ -1477,8 +1503,31 @@ export function ostrzezeniaKonfiguracji(c: Config = config): string[] {
         "a przycisk w panelu powie o tym wprost. Serwer działa dalej.",
     );
   }
+  /* Jev jest domyślnym klasyfikatorem, więc instalacja sprzed tej zmiany, bez
+     klucza TypeSafe, przestałaby rozpoznawać wiadomości. Ma to być głośne:
+     ani takt rozpoznawania, ani przebieg przed pracą się nie uruchamia,
+     a ręczne rozpoznanie odpowiada zdaniem o braku klucza. */
+  if (c.copilot.mode === "anthropic" && c.copilot.klasyfikator === "jev" && !c.copilot.kluczJev) {
+    ostrzezenia.push(
+      "KLASYFIKATOR_DOSTAWCA=jev bez TYPESAFE_API_KEY — wiadomości klientów nie będą rozpoznawane, " +
+        "a szkice przed pracą nie ruszą. " +
+        "Wpisz klucz TypeSafe w wertis.env albo ustaw KLASYFIKATOR_DOSTAWCA=anthropic. Serwer działa dalej.",
+    );
+  }
   return ostrzezenia;
 }
+
+/**
+ * Czy dostawca klasyfikacji ma klucz. Takt rozpoznawania startuje po TEJ
+ * odpowiedzi, nie po `klucz` Anthropic: przy Jevie klucz Claude niczego nie
+ * rozpoznaje.
+ */
+export const kluczKlasyfikatora = (c: Config = config): boolean =>
+  c.copilot.klasyfikator === "jev" ? c.copilot.kluczJev : c.copilot.klucz;
+
+/** Model, który faktycznie rozpoznaje wiadomości: to pokazuje ekran, nie zgadywana nazwa. */
+export const modelKlasyfikatora = (c: Config = config): string =>
+  c.copilot.klasyfikator === "jev" ? c.copilot.modelJev : c.copilot.modelKlasyfikacji;
 
 const bledy = bledyKonfiguracji();
 if (bledy.length) {
