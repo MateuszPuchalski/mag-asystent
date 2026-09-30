@@ -602,9 +602,9 @@ test("nowa wiadomość klienta otwiera rozmowę uznaną za rozwiązaną", async 
    w połowie nie zostawiał NICZEGO i następny pytał o to samo od nowa.       */
 
 /** Pełna strona listy — 20 wątków o tej samej dacie, różnych identyfikatorach. */
-const strona = (od: number) =>
+const strona = (od: number, data = "2026-09-15T12:00:00.000Z") =>
   Array.from({ length: 20 }, (_, i) => ({
-    id: `p-${od + i}`, read: false, lastMessageDateTime: "2026-09-15T12:00:00.000Z",
+    id: `p-${od + i}`, read: false, lastMessageDateTime: data,
     interlocutor: { login: `anon-${od + i}` },
   }));
 
@@ -630,10 +630,10 @@ test("po zejściu do dna SUFIT ucina przebieg, a kursor i tak idzie do przodu", 
     database, apiUrl: "https://api.test", query: fake([[thread(1)]]).query,
   });
 
-  /* Przebieg drugi: 30 pełnych stron samych NOWYCH wątków, więc kursor
-     z pierwszego przebiegu nie trafi nigdzie. Dokładnie ten stan zjadł dobę
+  /* Przebieg drugi: 30 pełnych stron samych NOWYCH wątków, czyli z datą późniejszą
+     niż kursor z pierwszego przebiegu. Dokładnie ten stan zjadł dobę
      żądań: pętla szła do końca historii, bo nie miała się o co zatrzymać. */
-  const api = fake(Array.from({ length: 30 }, (_, s) => strona(s * 20)));
+  const api = fake(Array.from({ length: 30 }, (_, s) => strona(s * 20, "2026-10-01T12:00:00.000Z")));
   await synchronizujAllegroInbox({ database, apiUrl: "https://api.test", query: api.query });
 
   const strony = api.urls.filter((u) => u.includes("/threads?"));
@@ -867,4 +867,138 @@ test("nasza wiadomość z synchronizacji zamyka niepewną wysyłkę tej samej tr
   assert.equal(t.external_message_id, "m-nasza");
   assert.equal(w.find((x) => x.id === inna).status, "send_uncertain", "inna treść zostaje do decyzji człowieka");
   assert.ok(database.prepare("SELECT 1 FROM events WHERE type='rozmowa_wysylka_uzgodniona'").get());
+});
+
+/* ── Kursor jako próg daty ───────────────────────────────────────────────────
+   Kolejna wiadomość w wątku, który był kursorem (nasza odpowiedź albo klienta),
+   zmienia jego datę. Para (data, id) z poprzedniego przebiegu nie występuje już
+   nigdzie na liście, więc przebieg czytał cały sufit stron po każdej wiadomości
+   w najnowszym wątku. Atrapa niżej zwraca listę posortowaną tak jak Allegro:
+   od najnowszej daty. */
+
+type WatekAtrapy = { id: string; data: string; wiadomosci: string[] };
+
+/** Konto z `n` wątkami, każdy o minutę starszy od poprzedniego. */
+function konto(n: number): WatekAtrapy[] {
+  const t0 = Date.parse("2026-09-29T12:00:00Z");
+  return Array.from({ length: n }, (_, i) => ({
+    id: `k-${i}`, data: new Date(t0 - i * 60_000).toISOString(), wiadomosci: [`m-k-${i}-0`],
+  }));
+}
+
+/** Nowa wiadomość: data wątku przeskakuje ponad wszystkie inne. */
+function dopisz(watki: WatekAtrapy[], id: string, minuty = 1): void {
+  const w = watki.find((x) => x.id === id)!;
+  const maks = Math.max(...watki.map((x) => Date.parse(x.data)));
+  w.data = new Date(maks + minuty * 60_000).toISOString();
+  w.wiadomosci.push(`m-${id}-${w.wiadomosci.length}`);
+}
+
+function atrapaKonta(watki: WatekAtrapy[]) {
+  const licznik = { listy: 0, wiadomosci: [] as string[] };
+  const query = async (url: string): Promise<unknown> => {
+    if (url.includes("/messages")) {
+      const id = decodeURIComponent(url.split("/").at(-2)!);
+      licznik.wiadomosci.push(id);
+      const w = watki.find((x) => x.id === id)!;
+      return { messages: w.wiadomosci.map((m) => message(m, { createdAt: w.data, thread: { id } })), offset: 0, limit: 20 };
+    }
+    licznik.listy++;
+    const offset = Number(new URL(url).searchParams.get("offset"));
+    const posortowane = [...watki].sort((a, b) => b.data.localeCompare(a.data));
+    return {
+      threads: posortowane.slice(offset, offset + 20).map((w) => ({
+        id: w.id, read: false, lastMessageDateTime: w.data, interlocutor: { login: `anon-${w.id}` } })),
+      offset, limit: 20,
+    };
+  };
+  return { licznik, query, zeruj: () => { licznik.listy = 0; licznik.wiadomosci = []; } };
+}
+
+/** Jeden przebieg z wyciszonym `console.warn`; zwraca, czy dziennik doniósł o obcięciu. */
+async function przebiegKonta(database: DatabaseSync, a: ReturnType<typeof atrapaKonta>): Promise<boolean> {
+  a.zeruj();
+  const ostrzezenia: string[] = [];
+  const oryginal = console.warn;
+  console.warn = (...x: unknown[]) => { ostrzezenia.push(x.join(" ")); };
+  try {
+    await synchronizujAllegroInbox({ database, query: a.query, apiUrl: "https://api.test", inboxOd: null });
+  } finally {
+    console.warn = oryginal;
+  }
+  return ostrzezenia.some((z) => z.includes("obcięty"));
+}
+
+test("wiadomość w wątku będącym kursorem kończy przebieg na pierwszej stronie", async () => {
+  const database = mkDb(); const watki = konto(50); const a = atrapaKonta(watki);
+  await przebiegKonta(database, a);
+  assert.equal(a.licznik.listy, 3, "pierwsze zejście czyta całą listę");
+
+  dopisz(watki, "k-0");
+  const obciety = await przebiegKonta(database, a);
+
+  assert.equal(a.licznik.listy, 1, "wątek starszy od kursora kończy czytanie listy");
+  assert.deepEqual(a.licznik.wiadomosci, ["k-0"], "pobrane są wiadomości tylko wątku, który się zmienił");
+  assert.equal(obciety, false, "to nie jest zaległość, więc dziennik milczy");
+  const zapisane = database.prepare("SELECT count(*) n FROM allegro_inbox_message WHERE thread_id='k-0'").get() as { n: number };
+  assert.equal(zapisane.n, 2, "nowa wiadomość jest w bazie");
+  const kursor = database.prepare("SELECT cursor_id id, cursor_at at FROM allegro_inbox_sync_state").get() as { id: string; at: string };
+  assert.equal(kursor.id, "k-0");
+  assert.equal(kursor.at, watki.find((w) => w.id === "k-0")!.data, "kursor idzie za nową datą");
+});
+
+test("rozmowa w jednym wątku, wiadomość co przebieg, nie kosztuje więcej niż jedną stronę", async () => {
+  const database = mkDb(); const watki = konto(50); const a = atrapaKonta(watki);
+  await przebiegKonta(database, a);
+  dopisz(watki, "k-7");
+  await przebiegKonta(database, a);
+  for (let i = 0; i < 4; i++) {
+    dopisz(watki, "k-7");
+    const obciety = await przebiegKonta(database, a);
+    assert.equal(a.licznik.listy, 1, `wiadomość ${i + 1} w kursorze`);
+    assert.equal(obciety, false);
+  }
+  const zapisane = database.prepare("SELECT count(*) n FROM allegro_inbox_message WHERE thread_id='k-7'").get() as { n: number };
+  assert.equal(zapisane.n, 6, "żadna wiadomość nie zginęła");
+});
+
+test("wiadomość w innym wątku niż kursor też kończy przebieg na pierwszej stronie", async () => {
+  const database = mkDb(); const watki = konto(50); const a = atrapaKonta(watki);
+  await przebiegKonta(database, a);
+  dopisz(watki, "k-30");
+  await przebiegKonta(database, a);
+  assert.equal(a.licznik.listy, 1);
+  assert.deepEqual(a.licznik.wiadomosci, ["k-30"]);
+});
+
+test("nowy wątek o dokładnie tej samej dacie co kursor nie zostaje pominięty", async () => {
+  const database = mkDb(); const watki = konto(5); const a = atrapaKonta(watki);
+  await przebiegKonta(database, a);
+  const kursorAt = watki[0]!.data;
+  /* Kursor (k-0) dostaje wiadomość, a obok pojawia się nieznany wątek z datą
+     równą starej dacie kursora. Nie jest starszy od progu, więc musi być
+     przeczytany. Dopiero pierwszy starszy wątek kończy przebieg. */
+  dopisz(watki, "k-0");
+  watki.push({ id: "nowy", data: kursorAt, wiadomosci: ["m-nowy-0"] });
+  await przebiegKonta(database, a);
+  assert.deepEqual([...a.licznik.wiadomosci].sort(), ["k-0", "nowy"]);
+  const nowy = database.prepare("SELECT count(*) n FROM allegro_inbox_message WHERE thread_id='nowy'").get() as { n: number };
+  assert.equal(nowy.n, 1);
+});
+
+test("wątek bez daty i data, której nie da się odczytać, nie kończą przebiegu przed czasem", async () => {
+  const database = mkDb();
+  const bezDaty = { id: "bez-daty", read: false, interlocutor: { login: "anon-bd" } };
+  const zepsuta = { id: "zla-data", read: false, lastMessageDateTime: "nie-data", interlocutor: { login: "anon-zd" } };
+  /* Kursor z pierwszego przebiegu stoi na k-1. Wątki bez daty i z nieczytelną
+     datą są nowsze w kolejności listy, więc przebieg ma przejść przez nie
+     do kursora zamiast uznać je za „starsze od progu". */
+  const pierwszy = atrapaKonta(konto(2));
+  await przebiegKonta(database, pierwszy);
+  const api = fake([[bezDaty, zepsuta, thread(1, "2026-09-29T12:00:00.000Z"), thread(2, "2026-09-01T12:00:00.000Z")]]);
+  await synchronizujAllegroInbox({ database, query: api.query, apiUrl: "https://api.test", inboxOd: null });
+  assert.ok(api.urls.some((u) => u.includes("/threads/bez-daty/messages")), "wątek bez daty jest czytany");
+  assert.ok(api.urls.some((u) => u.includes("/threads/zla-data/messages")), "nieczytelna data nie jest progiem");
+  assert.ok(api.urls.some((u) => u.includes("/threads/t-1/messages")), "przebieg doszedł do wątku pod nimi");
+  assert.ok(!api.urls.some((u) => u.includes("/threads/t-2/messages")), "wątek starszy od kursora kończy przebieg");
 });
