@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter } from "react-router-dom";
@@ -75,6 +75,15 @@ const W38 = tydzien("2026-W38", ["2026-09-14", "2026-09-15", "2026-09-16", "2026
 const W37 = tydzien("2026-W37", ["2026-09-07", "2026-09-08", "2026-09-09", "2026-09-10", "2026-09-11", "2026-09-12", "2026-09-13"], 400);
 let tygodnie: string[] = ["2026-W38", "2026-W37"];
 
+/* Trzy wskaźniki — kształt jak `services/wskazniki.ts`. */
+const okresWskaznikow = (medianaDni: number | null, odsetek: number | null, medianaMin: number | null) => ({
+  od: "x", do: "x",
+  dostawy: { n: medianaDni === null ? 0 : 12, medianaDni, medianaMinPracy: medianaDni === null ? null : 48 },
+  szukanie: { n: odsetek === null ? 0 : 210, zAdresem: 170, bezAdresu: 25, bezWyniku: 15, odsetekZAdresem: odsetek },
+  odpowiedz: { n: 1, medianaMin, p90Min: medianaMin === null ? null : 300 },
+});
+const WSKAZNIKI = { dni: 30, teraz: okresWskaznikow(2, 81, 41), poprzednio: okresWskaznikow(null, null, null) };
+
 let adresy: string[] = [];
 let zapisy: string[] = [];
 let wydajnosc: RaportWydajnosci | null = WYDAJNOSC;
@@ -90,6 +99,7 @@ beforeEach(() => {
         niedopasowanych: 0, przykladyNiedopasowanych: [], odrzuconychWierszy: 0, okres: { od: "2026-09-01", do: "2026-09-21" } }));
     }
     if (url.startsWith("/api/biuro/dostawy/analiza?dni=")) return new Response(JSON.stringify({ analiza: DOSTAWY }));
+    if (url === "/api/analiza/wskazniki?days=30") return new Response(JSON.stringify(WSKAZNIKI));
     if (url.startsWith("/api/analiza?days=")) return new Response(JSON.stringify(hala(wydajnosc)));
     if (url.startsWith("/api/metrics?days=")) return new Response(JSON.stringify(METRYKI));
     if (url.startsWith("/api/analiza/ergonomia?days=")) return new Response(JSON.stringify(ERGONOMIA));
@@ -162,7 +172,7 @@ describe("Analiza w panelu", () => {
   it("startuje na dostawach i pobiera WYŁĄCZNIE ten zakres", async () => {
     pokaz();
     await screen.findByText("Rosa-Pol");
-    expect(adresy).toEqual(["/api/biuro/dostawy/analiza?dni=90"]);
+    expect([...adresy].sort()).toEqual(["/api/analiza/wskazniki?days=30", "/api/biuro/dostawy/analiza?dni=90"]);
     expect(screen.getByRole("button", { name: "90 dni" }).getAttribute("aria-pressed")).toBe("true");
     /* Zakres dostaw nie ma trasy eksportu, więc nie ma przycisku CSV. */
     expect(screen.queryByRole("button", { name: /CSV/ })).toBeNull();
@@ -399,5 +409,18 @@ describe("Analiza: okno podane raz", () => {
     expect(screen.getAllByText("odpowiedzi").length).toBeGreaterThan(0);
     expect(screen.queryByText(/w oknie 30 dni|wynikiem, okno/)).toBeNull();
     expect(screen.getByText("młodsze niż 7 dni, jeszcze bez wyniku")).toBeInTheDocument();
+  });
+  it("trzy wskaźniki stoją nad zakresem, z poprzednim okresem i uczciwym brakiem danych", async () => {
+    pokaz();
+    const karta = within((await screen.findByRole("heading", { name: "Trzy wskaźniki" })).closest("header")!.parentElement!);
+    expect(karta.getByText("2 dni")).toBeTruthy();
+    expect(karta.getByText("81%")).toBeTruthy();
+    expect(karta.getByText("41 min")).toBeTruthy();
+    expect(karta.getByText("210 szukań · bez wyniku 15 · wynik bez adresu 25")).toBeTruthy();
+    expect(karta.getByText("1 odpowiedź · co dziesiąty dłużej niż 5 g 0 min")).toBeTruthy();
+    /* Poprzedni okres bez próbki mówi „—", nie zero. */
+    expect(karta.getByText("Wcześniej: —, 0 dostaw")).toBeTruthy();
+    expect(karta.getByText("Wcześniej: —, 0 szukań")).toBeTruthy();
+    expect(zapisy).toEqual([]);
   });
 });

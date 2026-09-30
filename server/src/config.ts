@@ -147,10 +147,10 @@ export const config = {
   sferaWorker: process.env.SFERA_WORKER === "1",
 
   /**
-   * Automatyczny ZW do paragonu (0.349.0) — zlecany sam po zapisaniu kwoty.
+   * Automatyczny ZW do paragonu — zlecany sam po zapisaniu kwoty.
    *
    * Domyślnie WYŁĄCZONY. ZW to dokument fiskalny ze skutkiem magazynowym,
-   * a pierwszy prawdziwy ma powstać przy właścicielu (DEPLOY, akapit 0.349.0).
+   * a pierwszy prawdziwy ma powstać przy właścicielu (DEPLOY §6g, „Automatyczny ZW do paragonu").
    * Wystawia go worker Sfery, więc przełącznik wymaga `SFERA_WORKER=1` —
    * pilnuje tego `bledyKonfiguracji`.
    */

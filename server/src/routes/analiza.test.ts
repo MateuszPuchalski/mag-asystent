@@ -48,7 +48,7 @@ function zalogowany(rola: Rola): string {
    Powód jest inny i wypisany przy trasie: karta odpowiada na „u którego
    dostawcy jest problem", a to ocena kontrahenta, nie stan magazynu. */
 const CHRONIONE = ["/api/analiza", "/api/analiza/csv", "/api/biuro/dostawy/analiza", "/api/analiza/obsluga",
-  "/api/analiza/tarcie", "/api/analiza/tygodnie", "/api/analiza/tygodnie/2026-W38"];
+  "/api/analiza/tarcie", "/api/analiza/wskazniki", "/api/analiza/tygodnie", "/api/analiza/tygodnie/2026-W38"];
 
 test("bez sesji 401 — dane o ludziach nie mają prawa być otwarte", async () => {
   for (const url of CHRONIONE) {
@@ -245,4 +245,33 @@ test("raporty tygodni: lista, raport z poprzednim, 404 i zero zapisu", async () 
   assert.equal(zly.statusCode, 400);
   assert.equal(zdarzen(), przed, "patrzenie niczego nie zapisuje");
   assert.equal((db().prepare("SELECT COUNT(*) AS n FROM raport_tygodnia").get() as { n: number }).n, 2);
+});
+
+test("wskaźniki: bieżący i poprzedni okres, wybór okna z trzech wartości", async () => {
+  const token = zalogowany("biuro");
+  const r = await app.inject({ method: "GET", url: "/api/analiza/wskazniki?days=30", headers: { "x-session": token } });
+  assert.equal(r.statusCode, 200);
+  const w = r.json();
+  assert.equal(w.dni, 30);
+  for (const o of [w.teraz, w.poprzednio]) {
+    assert.ok(o.dostawy && o.szukanie && o.odpowiedz);
+  }
+  assert.equal(w.poprzednio.do, w.teraz.od, "poprzedni okres kończy się tam, gdzie zaczyna bieżący");
+  const inne = await app.inject({ method: "GET", url: "/api/analiza/wskazniki?days=13", headers: { "x-session": token } });
+  assert.equal(inne.json().dni, 7, "okno spoza zbioru wraca do domyślnego");
+});
+
+test("szukanie zapisuje w zdarzeniu, ile wyników ma adres półki", async () => {
+  const token = zalogowany("magazynier");
+  const r = await app.inject({
+    method: "GET", url: "/api/products/search?q=a",
+    headers: { "x-session": token, "x-device": "kolektor-7" },
+  });
+  assert.equal(r.statusCode, 200);
+  const wyniki = r.json().results as Array<{ locs: string[] }>;
+  const z = db().prepare("SELECT payload FROM events WHERE type = 'search' ORDER BY id DESC LIMIT 1")
+    .get() as { payload: string };
+  const p = JSON.parse(z.payload);
+  assert.equal(p.wynikow, wyniki.length);
+  assert.equal(p.zAdresem, wyniki.filter((w) => w.locs.length > 0).length);
 });

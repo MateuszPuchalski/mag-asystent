@@ -5,7 +5,7 @@ import os from "node:os";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 import {
-  czytajFragment, dataPl, nastepnaWersja, planuj, podmienZnacznik, sprawdz, wstawDoChangelogu, zastosuj,
+  BEZ_PODMIANY, czytajFragment, dataPl, nastepnaWersja, planuj, podmienZnacznik, sprawdz, wstawDoChangelogu, zastosuj,
 } from "./wydanie.mjs";
 
 /* Numer wydania nadawany przy scaleniu. Najważniejsze gwarancje:
@@ -145,4 +145,9 @@ test("bramka PR-a: zły fragment zatrzymuje", () => {
   pisz("zmiany/zly.md", "bez nagłówka\n");
   git("add", "-A"); git("commit", "-qm", "zły");
   assert.match(sprawdz(k, "main").join("\n"), /zmiany\/zly\.md: brak nagłówka/);
+});
+
+test("bramka numerów w komentarzach zostaje nietknięta, bo niesie znacznik we wzorcu", () => {
+  assert.ok(BEZ_PODMIANY.has("tools/styl_check.py"));
+  assert.ok(fs.readFileSync(new URL("./styl_check.py", import.meta.url), "utf8").includes(ZN));
 });

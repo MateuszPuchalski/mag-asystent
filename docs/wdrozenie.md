@@ -10,7 +10,6 @@ Polecenia — instalacja, usługi, zapytania — mieszkają w [`DEPLOY.md`](../D
 Ten dokument mówi, **w jakiej kolejności** ich użyć i **co ma być prawdą**,
 zanim zrobi się następny krok.
 
-
 Etapy niżej prowadzą PRODUKCJĘ na prawdziwe dane. Stałe środowisko dev
 obok produkcji — do rozwoju, gdy magazyn już pracuje — opisuje DEPLOY.md,
 rozdział „Środowisko dev obok produkcji".
@@ -18,13 +17,9 @@ rozdział „Środowisko dev obok produkcji".
 ## Dlaczego etapami
 
 Aplikacja zapisuje do bazy firmy DWA pola kartoteki: lokalizację i podstawowy
-kod kreskowy (od 0.37.0). Oba są odwracalne wyłącznie z kopii zapasowej.
-Etapy istnieją po to, żeby każdy błąd wyszedł tam, gdzie kosztuje jedno
-zapytanie, a nie tam, gdzie kosztuje dzień pracy magazynu.
-
-Na kopii bazy tej firmy wyszły w ten sposób dwie usterki. Pierwsza to kolumna
-ilości zrealizowanej, której w tej wersji Subiekta nie ma wcale. Druga to
-dokumenty PZ na liście rozkładania, pochodzące z zupełnie innego procesu.
+kod kreskowy. Oba są odwracalne wyłącznie z kopii zapasowej. Etapy istnieją
+po to, żeby każdy błąd wyszedł tam, gdzie kosztuje jedno zapytanie, a nie tam,
+gdzie kosztuje dzień pracy magazynu.
 
 ## Najważniejsze narzędzie: zatrzymany worker
 
@@ -62,7 +57,7 @@ nietknięty.
 **Bramka:** magazynier przeszedł pełną ścieżkę na kolektorze. Zeskanował towar,
 zobaczył kartę, zapisał lokalizację.
 
-**Druga bramka, od 0.52.0:** kolektor po restarcie sam zaproponował wersję
+**Druga bramka:** kolektor po restarcie sam zaproponował wersję
 z serwera i zainstalował ją bez `adb`. Wymaga trzech rzeczy przygotowanych
 wcześniej — patrz sekcja o APK niżej.
 
@@ -132,8 +127,8 @@ widać — patrz sekcja „Jak odinstalować" na końcu.
 
 Dwa ostatnie punkty nie są formalnością. Audyt powie, co w polu stało, ale
 wpisanie tego z powrotem przy wielu kartotekach robi się kopią bazy
-Subiekta — patrz sekcja niżej. Kopię bazy aplikacji robi od 0.487.0 sam
-serwer, ale kopia nigdy nieodtworzona jest przypuszczeniem.
+Subiekta — patrz sekcja niżej. Kopię bazy aplikacji robi sam serwer, ale
+kopia nigdy nieodtworzona jest przypuszczeniem.
 
 **Wycofanie:** zatrzymanie usług. Kolejka zostaje, ale nic z niej nie poszło.
 
@@ -160,15 +155,15 @@ Cofnięcie już wykonanych wymaga kopii zapasowej.
 
 ### Etap 5 — pełna praca
 
-Bramek nie ma. Nocną kopię bazy aplikacji i rekoncyliację robi serwer sam
-(od 0.487.0). Człowiekowi zostaje przegląd `/api/health` — tam lądują
+Bramek nie ma. Nocną kopię bazy aplikacji i rekoncyliację robi serwer sam.
+Człowiekowi zostaje przegląd `/api/health` — tam lądują
 zaległa kopia i rozjazdy z nocy — oraz kopia bazy Subiekta.
 
 ---
 
 ## APK kolektora — trzy rzeczy przed pierwszym wdrożeniem
 
-Od 0.52.0 kolektory aktualizują się same, z serwera WERTIS. Instalator kładzie
+Kolektory aktualizują się same, z serwera WERTIS. Instalator kładzie
 plik w `server\data\apk`, urządzenia pytają o niego przy otwarciu aplikacji.
 Bez trzech rzeczy poniżej ta droga nie zadziała, a dowiesz się o tym dopiero
 przy pierwszej aktualizacji.
@@ -197,10 +192,10 @@ już po wierzchu i niczego nie kasuje.
 
 **3. Zgoda „Instalowanie nieznanych aplikacji".** Android pyta o nią raz, per
 urządzenie; kolektor sam prowadzi do właściwego ekranu. Gdy MDM tego zabrania,
-aplikacja powie to wprost i nie pobierze nic — wtedy aktualizacje idą przez MDM,
-jak przed 0.52.0. **Sprawdź profil MDM, zanim ruszysz reinstalację floty.**
+aplikacja powie to wprost i nie pobierze nic — wtedy aktualizacje idą przez
+MDM. **Sprawdź profil MDM, zanim ruszysz reinstalację floty.**
 
-**Nazwa pliku niesie wersję** (`wertis-kolektor-0.52.0.apk`) i po niej serwer
+**Nazwa pliku niesie wersję** (`wertis-kolektor-<wersja>.apk`) i po niej serwer
 rozpoznaje, co ma do wydania. Plik o innej nazwie jest po cichu pomijany, więc
 literówka wygląda jak brak aktualizacji, a nie jak błąd.
 
@@ -294,7 +289,7 @@ samemu — z kartoteki w Subiekcie albo z kopii bazy. Przy większej liczbie
 kartotek kopia jest jedyną rozsądną drogą.
 
 Chodzi tu o kopię bazy **Subiekta**, bo pole lokalizacji żyje w niej.
-Kopie robione przez serwer WERTIS od 0.487.0 obejmują wyłącznie jego własną
+Kopie robione przez serwer WERTIS obejmują wyłącznie jego własną
 bazę, czyli ślad audytowy, kolejkę i postęp dostaw. Ślad mówi, co wpisać,
 a kopia podmiotu daje to hurtem. Potrzebne są obie.
 

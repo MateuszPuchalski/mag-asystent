@@ -30,8 +30,9 @@ aktualizacją. Ta pozycja zatrzymuje aktualizację automatyczną serwera.
   pracy, i pisz to jego słowami. Zmianę techniczną — serwer, CI, zasady repo —
   opisz bez pogrubienia. Pasek, który mówi o JSON-ie, uczy zamykać go bez
   czytania. `[wymaga działania]` pasek pomija sam.
-- **Numer w komentarzach i dokumentach:** zamiast numeru pisz `@wydanie`.
-  Automat zamieni znacznik na numer w całym repozytorium.
+- **Numer w dokumentach:** zamiast numeru pisz `@wydanie`. Automat zamieni
+  znacznik na numer w całym repozytorium. W komentarzu kodu numeru nie ma
+  wcale, pilnuje tego `tools/styl_check.py`.
 
 PR z samym CI albo dokumentacją fragmentu nie potrzebuje. Nie dostaje wtedy
 wydania, a jego zmiana wejdzie z najbliższym wydaniem.

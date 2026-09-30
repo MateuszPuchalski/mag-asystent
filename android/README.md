@@ -1,69 +1,80 @@
 # WERTIS Kolektor — natywna aplikacja Android
 
-**Jedyny klient kolektora** WERTIS — natywna aplikacja (Kotlin + Jetpack
-Compose), czysty klient REST istniejącego serwera (`server/`, Fastify).
-Skanowanie wyłącznie sprzętowe (Zebra DataWedge / Honeywell DataCollection,
-fallback klawiaturowy); bez funkcji głosowych i skanu kamerą. (Historycznie
-aplikacja powstała jako port PWA — dawny kod webowy usunięto z repo, więc
-odniesienia „jak w PWA" niżej opisują tylko pochodzenie rozwiązania.)
+**Jedyny klient kolektora** WERTIS: Kotlin i Jetpack Compose, czysty klient
+REST serwera z `server/`. Skan jest wyłącznie sprzętowy, bez kamery i głosu.
+Zasady zmian w tym katalogu stoją w `android/CLAUDE.md`.
 
 ## Moduły
 
 | Moduł | Co zawiera | Build |
 |---|---|---|
-| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja lokalizacji, DTO REST, model nawigacji, model wyjątków (pięć kategorii formularza), reguły przesunięcia stanu, logowanie i sesja urządzenia, tryb wiersza listy rozkładania, ostatnie znane odpowiedzi odczytów (cache ekranów), teksty karty towaru, lista „ostatnio skanowane", jednostka miary przy ilościach, porównanie wersji APK, widoczna ramka logo dostawcy, reguły dodania zdjęcia kartoteki, ilość wpisana z klawiatury, dopasowanie tekstu przy szukaniu na liście, faza, kolejność i podpis półek w kartonie, drugi skan towaru kończący odłożenie, ilość i nadmiar przy odkładaniu, pamięć decyzji o rozjeździe półek, wybór wiersza przy powtórzonym towarze, rozpoznanie skanu bez sieci, diagnoza łączności (podsieć, powód odmowy, dziennik przerw i ich zgłaszanie), szukanie zgubionego kolektora (znak urządzenia, stan, wyciszenie po ZNALAZŁEM), czasy odpowiedzi każdego żądania per ekran i trasa (kubełki, zwrot po nieudanej wysyłce) — **337 testów** | działa bez Android SDK (`./gradlew :core:test`) |
-| `:app` | aplikacja Compose (18 ekranów, skanery, czujniki) | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
+| `:core` | czysta logika JVM: klasyfikacja skanów, walidacja adresów, DTO REST, nawigacja, sesja, bufor offline, reguły rozkładania, przesunięcia i kartonu, diagnoza łączności | bez Android SDK (`./gradlew :core:test`) |
+| `:app` | aplikacja Compose: ekrany, skanery, czujniki | wymaga Android SDK (`ANDROID_HOME` albo `local.properties`) |
 
-Bez SDK `settings.gradle.kts` konfiguruje tylko `:core` — dlatego testy logiki
-przechodzą także w środowiskach bez Androida (CI sandbox). Pełny build APK robi
-workflow `.github/workflows/android.yml` (ubuntu-latest ma SDK preinstalowany)
-albo dowolna maszyna z Android Studio.
+Bez SDK `settings.gradle.kts` konfiguruje tylko `:core`, więc testy logiki
+przechodzą wszędzie. Pełny APK buduje `.github/workflows/android.yml`.
+
+## Co robi kolektor
+
+Dolny pasek ma cztery zakładki: SKAN, DOSTAWY, ZWROTY i KARTON. WSTECZ stoi
+w prawym dolnym rogu, żeby wracać jedną ręką.
+
+- **Karta towaru** ma w nagłówku symbol, dostępne sztuki i adres pickingowy.
+  Sekcje HISTORIA, POZOSTAŁE MAGAZYNY oraz ZAMIENNIKI I OPIS są zwinięte.
+- **„W dostawie, nierozłożone”** mówi, ile sztuk przyszło w ostatnich 14 dniach
+  i nie trafiło w regał, z dostawcą. Na palecie widać nazwę dostawcy, nie numer.
+- **„Zamówione u dostawcy”** mówi, czego nie ma i kiedy przyjedzie.
+- **Wyszukiwarka wybacza** polskie znaki, kolejność słów i myślnik w symbolu.
+  Literówkę wybacza dopiero wtedy, gdy nic innego nie wyszło. Skan tej furtki
+  nie ma, bo otwiera kartę przy jednym wyniku.
+- **Zmiana adresu to skan półki przy otwartej karcie.** Przy jednym adresie
+  zastępuje, przy kilku pyta arkuszem. Chip „+ DODAJ” dokłada adres.
+- **Adres „w drodze”** ma przerywaną ramkę. Nieudany zapis świeci na czerwono
+  i pulsuje, a dotknięcie prowadzi do kolejki z PONÓW.
+- **DOSTAWY** pokazują typy z `DOK_TYPY_DOSTAW` z okna `DOK_DNI_WSTECZ`.
+  Ścieżka codzienna to dwa skany na pozycję: towar, potem półka.
+- **Niejednoznaczny kod kreskowy zatrzymuje operację.** Jedyne automatyczne
+  zawężenie: dokładnie jeden kandydat stoi w otwartym dokumencie.
+- **Skan innej półki niż w kartotece** pyta PRZED zapisem: ZAMIEŃ podmienia
+  adres pickingowy, DODAJ dokłada nowy na końcu.
+- **Wyjątki** mają pięć kategorii firmowego formularza i zawsze ilość. Przy
+  uszkodzeniu i błędnym artykule zdjęcie jest obowiązkowe.
+- **Brak w przesyłce** kolejkuje MM na magazyn serwisowy (`MAG_ID_SERWIS`),
+  bo Subiekt księguje fakturę w całości.
+- **POPRAW ILOŚĆ** poprawia własną pomyłkę w liczeniu bez Subiekta i bez
+  wyjątku. COFNIJ cofa ostatnie odłożenie.
+- **KARTON** zbiera towar źle zebrany pod zamówienia. Po ZATWIERDŹ rozkłada
+  się jak kosz i zapisuje wyłącznie adresy, bez żadnego dokumentu.
+- **Przesunięcie stanu** między magazynami kolejkuje MM. Kolejka jest zarazem
+  rezerwacją, a przesunięcie nie idzie przez bufor offline.
+- **Czas skan → odpowiedź mierzy kolektor** (`scan_timing`), bo serwer nie
+  widzi sieci ani rysowania.
+
+Reguły i powody: `docs/analiza-rozkladanie.md` i `docs/architektura.md`.
 
 ## Budowanie
 
-### Najpierw sprawdź, czy w ogóle musisz
+**Gotowy APK wychodzi z CI** (Actions → **Android** → **Artifacts**).
+`wertis-kolektor-debug-apk` powstaje przy każdym biegu i służy do pracy nad
+kodem. `wertis-kolektor-apk` powstaje tylko na `main` i **tylko on idzie na
+kolektory**. Build debugowy podpisuje klucz losowany w CI, więc wyłącza
+samoaktualizację: kolejny APK ma inny podpis.
 
-**Gotowy APK wychodzi z CI**, i są dwa różne. Wybór nie jest kwestią wygody.
-
-| artefakt | kiedy powstaje | do czego |
-|---|---|---|
-| `wertis-kolektor-debug-apk` | każdy bieg, także z PR | praca nad kodem, emulator |
-| `wertis-kolektor-apk` | tylko push na `main` | **kolektory na hali** |
-
-> Actions → **Android** → ostatni zielony bieg → **Artifacts**
-
-**Na kolektory idzie wyłącznie ten drugi.** Build debugowy jest podpisywany
-kluczem, który runner CI losuje przy każdym biegu. Zainstalowany na urządzeniu
-wyłącza samoaktualizację z serwera: kolejny APK ma inny podpis, więc Android
-odmówi instalacji. Pobranie artefaktu **nie wymaga ani Javy, ani Android SDK**;
-build lokalny ma sens przy pracy nad kodem, nie przy wdrożeniu.
-
-### Czego wymaga build lokalny
-
-**JDK 17** — Temurin, ta sama dystrybucja co w CI (`android.yml:22`). Nowszy JDK
-nie zadziała: moduły są przypięte do `VERSION_17` i `jvmTarget = "17"`.
-
-```powershell
-winget install EclipseAdoptium.Temurin.17.JDK   # Windows
-```
-
-Bez tego Gradle wita komunikatem `JAVA_HOME is not set and no 'java' command
-could be found in your PATH`, który nie mówi, **której** wersji brakuje.
-Po instalacji otwórz nowy terminal — zmienne środowiskowe nie wchodzą do już
-otwartego.
+Build lokalny wymaga **JDK 17** (Temurin, jak w CI). Nowszy JDK nie zadziała,
+bo moduły są przypięte do `VERSION_17`. Po instalacji otwórz nowy terminal.
 
 ```bash
+winget install EclipseAdoptium.Temurin.17.JDK   # Windows
 cd android
-./gradlew :core:test          # testy logiki — wystarczy sam JDK, bez SDK
-./gradlew :app:assembleDebug  # APK → app/build/outputs/apk/debug/
+./gradlew :core:test          # testy logiki — wystarczy sam JDK
+./gradlew :app:assembleDebug  # APK → app/build/outputs/apk/debug/, wymaga też Android SDK
 ```
 
-Druga komenda potrzebuje **dodatkowo Android SDK** (Android Studio albo
-command-line tools plus akceptacja licencji) — samo JDK jej nie wystarczy.
-
-**Build wydania wymaga klucza.** Od 0.52.0 kolektory aktualizują się z serwera,
-a Android odrzuca aktualizację podpisaną innym kluczem niż zainstalowana
-aplikacja. `assembleRelease` odmawia bez keystore i mówi, czego brakuje.
+**Build wydania wymaga klucza**, bo Android odrzuca aktualizację podpisaną
+innym kluczem. `assembleRelease` bez keystore odmawia i mówi, czego brakuje.
+Te same wartości przyjmuje plik `local.properties` w katalogu kolektora, w polach
+`wertis.keystore`, `wertis.keystore.haslo`, `wertis.klucz.alias`
+i `wertis.klucz.haslo`. Skąd wziąć klucz: `DEPLOY.md` §5.
 
 ```bash
 WERTIS_KEYSTORE=/sciezka/wertis.keystore WERTIS_KEYSTORE_HASLO=... \
@@ -71,450 +82,139 @@ WERTIS_KLUCZ_ALIAS=wertis WERTIS_KLUCZ_HASLO=... \
 ./gradlew :app:assembleRelease
 ```
 
-**Wydanie nie jest minifikowane.** R8 i `shrinkResources` są wyłączone
-w `app/build.gradle.kts`. Reguły `proguard-rules.pro` nie przeszły nigdy
-żadnego builda wydania, a Retrofit i kotlinx.serialization łamią się po
-minifikacji dopiero w czasie działania. Plik jedzie sam na całą halę, więc do
-czasu sprawdzenia zminifikowanego APK na fizycznym kolektorze zostaje pełny.
-Rozmiar nie jest tu ceną: transfer idzie po sieci magazynu, nie przez sklep.
-
-`keytool` przychodzi z JDK, więc na maszynie bez Javy tego polecenia nie ma.
-Instrukcja wraz z komendą instalującą JDK stoi w `DEPLOY.md` §5.
-
-Zamiast zmiennych te same wartości przyjmuje plik `local.properties`
-w katalogu `android/`, w polach `wertis.keystore`, `wertis.keystore.haslo`, `wertis.klucz.alias`
-i `wertis.klucz.haslo`. Plik jest poza gitem. Skąd wziąć klucz: `DEPLOY.md` §5.
+**Wydanie nie jest minifikowane**, bo Retrofit i kotlinx.serialization łamią
+się po minifikacji dopiero w czasie działania. Plik idzie po sieci magazynu.
 
 ## Uruchomienie przeciwko serwerowi dev
 
-1. W katalogu głównym repo: `npm install && npm run seed && npm run dev` (API na `:3001`).
-2. Adres serwera:
-   - emulator: `http://10.0.2.2:3001` — wpisz go, adres fabryczny wskazuje
-     serwer magazynu,
-   - fizyczny kolektor: `http://<IP-serwera-w-LAN>:3001` — wpisz go na
-     **ekranie startowym** (`ZMIEŃ ADRES SERWERA`). Ustawienia siedzą pod
-     paskiem górnym, a paska nie ma przed zalogowaniem, więc na świeżej
-     instalacji ekran startowy jest jedynym wejściem. Po zalogowaniu ten sam
-     adres jest w **Ustawienia → Serwer WERTIS**.
-3. Manifest zezwala na cleartext HTTP (sieć magazynowa on-premise). HTTPS przez
-   Caddy działa bez zmian — podaj `https://mag.wertis.local` jako adres.
+1. W korzeniu repo: `npm ci && npm run seed && npm run dev` (API na `:3001`).
+2. Emulator: wpisz `http://10.0.2.2:3001`, bo adres fabryczny wskazuje magazyn.
+3. Fizyczny kolektor: wpisz `http://<IP-serwera>:3001` przez
+   `ZMIEŃ ADRES SERWERA`.
+4. Po zalogowaniu ten sam adres jest w **Ustawienia → Serwer WERTIS**.
 
-### Symulacja skanera bez sprzętu
-
-Skaner klawiaturowy (wedge) emuluje się przez adb:
+Manifest zezwala na cleartext HTTP, bo sieć magazynowa jest on-premise. Skaner
+klawiaturowy emuluje się przez adb. Na wolnym emulatorze `input text` bywa
+wolniejsze niż 300 ms na znak i bufor wedge się resetuje.
 
 ```bash
-adb shell input text 'E08-03-01' && adb shell input keyevent 66   # etykieta lokalizacji
+adb shell input text 'E08-03-01' && adb shell input keyevent 66      # etykieta regału
 adb shell input text '5905947595303' && adb shell input keyevent 66  # EAN
 ```
 
-Uwaga: `input text` na wolnym emulatorze potrafi wpisywać znaki wolniej niż
-300 ms — wtedy bufor wedge się zresetuje. Pewniejsza jest fizyczna klawiatura
-podpięta do emulatora albo prawdziwy kolektor.
-
 ## Skanery sprzętowe
 
-Aplikacja wybiera źródło po `Build.MANUFACTURER`; wedge klawiaturowy działa
-zawsze jako fallback (skaner skonfigurowany jako klawiatura z sufiksem Enter).
+Aplikacja wybiera źródło po `Build.MANUFACTURER`. Wedge klawiaturowy z sufiksem
+Enter działa zawsze jako fallback.
 
-### Zebra (DataWedge)
+**Zebra (DataWedge).** Zero zależności, czyste intenty. Przy starcie aplikacja
+tworzy profil **WERTIS** przez `SET_CONFIG`. Gdy MDM blokuje zdalną
+konfigurację, utwórz profil ręcznie:
 
-Zero zależności — czyste intenty. Przy starcie aplikacja sama tworzy profil
-**WERTIS** przez `SET_CONFIG` (BARCODE→INTENT broadcast
-`pl.wertis.kolektor.SCAN`, wyjście klawiaturowe wyłączone). Jeśli MDM blokuje
-zdalną konfigurację DataWedge, utwórz profil ręcznie:
-
-1. DataWedge → nowy profil `WERTIS`, powiąż z aplikacją `pl.wertis.kolektor` (wszystkie aktywności).
+1. DataWedge → nowy profil `WERTIS`, powiązany z `pl.wertis.kolektor`.
 2. Barcode input: włączony. Keystroke output: **wyłączony**.
-3. Intent output: włączony, action `pl.wertis.kolektor.SCAN`, delivery **Broadcast intent**.
+3. Intent output: action `pl.wertis.kolektor.SCAN`, delivery **Broadcast intent**.
 
-### Honeywell (DataCollection SDK)
+**Honeywell (DataCollection SDK).** SDK jest własnościowe. Pobierz
+**DataCollection.aar** z portalu Honeywell i zapisz jako
+`android/app/libs/honeywell-datacollection.aar`. Build podepnie go sam. Bez
+AAR-a aplikacja też działa (`HoneywellSource` przez refleksję), a skany lecą
+przez wedge. Plik jest w `.gitignore`, bo licencja zabrania redystrybucji.
 
-SDK jest własnościowe — pobierz **DataCollection.aar** z portalu Honeywell
-(Mobility SDK for Android) i wrzuć jako:
+## Checklist smoke-test na sprzęcie
 
-```
-android/app/libs/honeywell-datacollection.aar
-```
+Jedna pozycja to jedna rzecz do sprawdzenia. Nawias nazywa regresję.
 
-Build automatycznie go podepnie (patrz `app/build.gradle.kts`); bez AAR-a
-aplikacja też się buduje i działa (integracja przez refleksję —
-`HoneywellSource`), a skany lecą przez wedge. Plik `.aar` jest w `.gitignore`
-(licencja nie zezwala na redystrybucję).
+**Skan i kontekst**
 
-### Checklist smoke-test na sprzęcie
+- [ ] na ekranie głównym EAN otwiera kartę, a etykieta regału jego zawartość,
+- [ ] skan symbolu tam, gdzie oczekiwana jest półka, mówi „To kod towaru”,
+- [ ] karta A → karta B → skan regału: adres dostaje B (kontekst przyklejony),
+- [ ] skan INNEGO regału przełącza podgląd regału,
+- [ ] Zebra: profil WERTIS istnieje, a kod NIE wpisuje się do pól,
+- [ ] Honeywell: skaner działa po `onPause`/`onResume`,
+- [ ] hasło z klawiatury sprzętowej NIE trafia do wyszukiwarki.
 
-Jedna pozycja = jedna rzecz do sprawdzenia. Nawias na końcu nazywa regresję,
-przed którą ta pozycja broni.
+**Offline i łączność**
 
-**Skan**
+- [ ] zapis adresu offline daje baner, a po powrocie sieci bufor się opróżnia,
+- [ ] DIAGNOSTYKA POŁĄCZENIA pyta serwer od razu i pokazuje adres kolektora,
+- [ ] serwer z innej podsieci daje „INNA PODSIEĆ”, a podany nazwą — milczenie,
+- [ ] 10 s bez sieci to JEDNA przerwa, także w DZIENNIKU (`siec_przerwa`).
 
-- [ ] skan EAN na ekranie głównym otwiera kartę towaru (beep OK),
-- [ ] skan etykiety regału **na ekranie głównym** otwiera zawartość tego regału,
-- [ ] skan etykiety regału na karcie towaru zmienia adres (chip-duch → potwierdzony),
-- [ ] skan **symbolu towaru** tam, gdzie oczekiwana jest lokalizacja, mówi
-      „To kod towaru, nie etykieta regału",
-- [ ] ten sam skan **nie zapisuje** widmowego adresu,
-- [ ] Zebra: profil WERTIS widoczny w DataWedge,
-- [ ] Zebra: kod NIE jest „wpisywany" do pól tekstowych,
-- [ ] Honeywell: skaner działa po `onPause`/`onResume` (claim/release),
-- [ ] tryb samolotowy → zapis lokalizacji → baner „operacja czeka na sieć",
-- [ ] po powrocie sieci bufor się opróżnia (flush).
+**Karta towaru i adres**
 
-**Diagnostyka połączenia** (0.323.0)
-
-- [ ] Ustawienia → DIAGNOSTYKA POŁĄCZENIA pyta serwer od razu po wejściu,
-- [ ] adres kolektora i rodzaj sieci zgadzają się z ustawieniami Androida,
-- [ ] serwer podany adresem IP z innej podsieci → ekran mówi „INNA PODSIEĆ",
-- [ ] serwer podany nazwą → ekran o podsieci MILCZY (nie zgaduje),
-- [ ] tryb samolotowy na 10 s → po powrocie na liście stoi JEDNA przerwa
-      z czasem trwania, a nie siedem wpisów.
-- [ ] ta sama przerwa pojawia się w panelu biura w DZIENNIKU ZDARZEŃ
-      jako `siec_przerwa`, z czasem trwania i liczbą prób,
-- [ ] przerwa krótsza niż 5 s zostaje TYLKO w kolektorze,
-- [ ] Ustawienia → „Log przerw w łączności" wyłączone → nic nie jedzie.
-
-**Kontekst = otwarty ekran**
-
-- [ ] karta towaru otwarta → skan regału zmienia adres TEGO towaru,
-- [ ] ten sam skan bez otwartej karty pokazuje zawartość regału,
-- [ ] karta towaru A → wstecz → karta towaru B → skan regału: adres dostaje
-      **B**, nigdy A (regresja: kontekst przyklejony),
-- [ ] podgląd regału otwarty → skan INNEGO regału przełącza widok
-      (regresja: `locCode` nieobserwowalny, ekran zostawał na pierwszym).
-
-**Zapis adresu**
-
-- [ ] towar z JEDNYM adresem → „+ DODAJ" → skan półki → towar ma **dwa** adresy,
-- [ ] skan wprost z karty, bez „+ DODAJ", nadal **zastępuje** adres,
-- [ ] pod kartą NIE MA już przycisku „ZMIEŃ LOKALIZACJĘ" (0.41.0 — był
-      duplikatem skanu półki),
-- [ ] pasek górny ekranu skanu mówi „DODANIE LOKALIZACJI" na każdej drodze,
-- [ ] po skanie półki NIE ma zielonego kafla na środku ekranu,
-- [ ] chip nowego adresu jest przygaszony i bez cienia,
-- [ ] po przejściu kolejki Sfery ten sam chip robi się normalny,
-- [ ] po relokacji i powrocie na ekran główny „Ostatnio skanowane" pokazuje
-      **nowy** adres (regresja: lista była migawką z chwili otwarcia karty),
-- [ ] odświeżony wpis **zostaje na swoim miejscu** listy, nie wskakuje na górę,
-- [ ] dotknięcie pozycji „Ostatnio skanowane" nie gubi nazwy towaru.
+- [ ] „+ DODAJ” dokłada drugi adres, a skan półki wprost z karty zastępuje,
+- [ ] „+ DODAJ ADRES” ma wielkość pastylki z adresem i otwiera skan półki,
+- [ ] linia „W dostawie …” maleje z odłożeniem i znika po całości,
+- [ ] dotknięcie linii „W dostawie” otwiera dostawę z rozwiniętą pozycją.
 
 **Rozkładanie dostawy**
 
-- [ ] pole „Szukaj w dostawie" zawęża listę po symbolu i po nazwie,
-- [ ] licznik postępu dostawy NIE zmienia się przy pisaniu w polu szukania,
-- [ ] „POKAŻ WSZYSTKIE POZYCJE" wraca do pełnej listy,
-- [ ] w panelu odkładania **−** i **+** zmieniają ilość, domyślnie cała reszta,
-- [ ] odłożenie 3 z 10 zostawia pozycję na liście z „odłożono 3",
-- [ ] to samo w trybie samolotowym: pozycja NIE znika z listy (regresja:
-      bufor zamykał całą pozycję),
-- [ ] „ZAKOŃCZ DOSTAWĘ" pokazuje najpierw podsumowanie, dopiero potem zapisuje,
-- [ ] pozycja odłożona częściowo trafia do zgłoszeń „zła ilość",
-- [ ] pozycja nietknięta jest POMINIĘTA i NIE trafia do dostawcy,
-- [ ] „ZGŁOŚ PROBLEM DOSTAWY" i „ZAKOŃCZ DOSTAWĘ" leżą POD listą pozycji,
-      za ostatnim wierszem,
-- [ ] po odłożeniu OSTATNIEJ pozycji przycisk zakończenia znika ze stopki,
-- [ ] wtedy NA GÓRZE ekranu staje „WRÓĆ DO LISTY DOSTAW",
-- [ ] to wyjście widać BEZ przewijania — zamkniętą dostawę da się opuścić od razu,
-- [ ] ten przycisk wraca na listę dokumentów i nie zostawia po sobie
-      kontekstu pracy,
-- [ ] miniatura towaru stoi po LEWEJ, przy symbolu, także po rozwinięciu
-      wiersza; po prawej nie ma już drugiego zdjęcia.
+- [ ] skan towaru rozwija wiersz w miejscu, reszta listy zostaje widoczna,
+- [ ] inna półka niż w kartotece pokazuje ZAMIEŃ / DODAJ pod wierszem,
+- [ ] odłożenie 3 z 10 zostawia pozycję z „odłożono 3”, także offline,
+- [ ] `+` ponad fakturę pyta raz, a nadmiar trafia do wyjątków w panelu,
+- [ ] ZAKOŃCZ z nietkniętymi wymaga wyboru BRAK albo POMIŃ,
+- [ ] po ostatniej pozycji na górze stoi „WRÓĆ DO LISTY DOSTAW” bez przewijania,
+- [ ] PROBLEM na ostatniej pozycji NIE zamyka dostawy,
+- [ ] filtr dostawy pokazuje „Skaner milczy”, a GOTOWE oddaje fokus skanerowi.
 
-**Wybrana pozycja — układ po przebudowie** (0.57.0)
+**Cofanie i korekta**
 
-- [ ] rozwinięta pozycja ma nagłówek z kafelkiem zdjęcia, symbolem i ✕,
-- [ ] ✕ zwija pozycję; powtórny tap w pasek robi to samo,
-- [ ] pod nagłówkiem są DWA kafle: biały ze stepperem, ciemny z adresem,
-- [ ] adres w ciemnym kaflu czyta się z odległości ramienia,
-- [ ] „lub wpisz…" w ciemnym kaflu otwiera pole ręcznego wpisu,
-- [ ] przy wyłączonym wpisie ręcznym zostaje samo „skanuj regał",
-- [ ] `−` i `+` są trafialne w rękawicy i szarzeją na krańcach zakresu,
-- [ ] nie ma już przycisków „INNA ILOŚĆ" ani „ANULUJ",
-- [ ] „POPRAW ILOŚĆ (N)" jest tam, gdzie było — pod „PROBLEMEM".
+- [ ] pasek „ODŁOŻONO … → półka” ma COFNIJ; na ostatniej pozycji otwiera dostawę,
+- [ ] OTWÓRZ PONOWNIE działa w dniu zamknięcia, dzień później stoi zdanie,
+- [ ] POPRAW ILOŚĆ nie istnieje na pozycji bez odłożeń ani z wyjątkiem,
+- [ ] korekta do zera zostawia adres, a na zamkniętej dostawie odmawia.
 
-**Kategorie problemu zależne od zakresu** (0.57.0)
+**Wyjątki i notatki**
 
-- [ ] „PROBLEM" na pozycji pokazuje CZTERY kategorie, „Zła ilość" pierwsza,
-- [ ] „ZGŁOŚ PROBLEM DOSTAWY" pokazuje JEDNĄ, od razu wybraną,
-- [ ] nie da się zgłosić „Artykułu niezamówionego" na konkretnej pozycji,
-- [ ] nie da się zgłosić „Złej ilości" bez wskazania pozycji.
-
-**Logo dostawcy na liście dostaw** (0.56.0)
-
-- [ ] dostawca z wgranym logo ma je po LEWEJ stronie wiersza,
-- [ ] dostawca bez logo ma tam dotychczasowy kafelek z ikoną i kolorem stanu,
-- [ ] logo nie jest przycięte do kwadratu — wąskie mieści się w całości,
-- [ ] wejście na listę NIE zostawia w dzienniku wpisów o brakującym logo.
-
-**Cofanie pomyłek w dostawie** (0.439.0)
-
-- [ ] po odłożeniu nad listą stoi pasek „ODŁOŻONO … → półka" z COFNIJ,
-- [ ] pasek znika przy następnym skanie towaru,
-- [ ] odłożenie w trybie samolotowym paska NIE pokazuje,
-- [ ] COFNIJ na ostatniej pozycji otwiera dostawę z powrotem,
-- [ ] po COFNIJ pozycja stoi rozwinięta i czeka na skan półki,
-- [ ] ZMIEŃ PÓŁKĘ przyjmuje skan etykiety, a skan EAN odrzuca zdaniem,
-- [ ] na zamkniętej dostawie jest OTWÓRZ PONOWNIE pod WRÓĆ DO LISTY DOSTAW,
-- [ ] dzień później w tym miejscu stoi zdanie zamiast przycisku,
-- [ ] przedwczesne ZAKOŃCZ → OTWÓRZ PONOWNIE → pominięte wracają do pracy,
-- [ ] WYCOFAJ ZGŁOSZENIE działa na własnym zgłoszeniu, na cudzym odmawia,
-- [ ] ustawione 3 z 10 + drugi skan tego samego kartonu → kafel dalej 3,
-- [ ] symbol towaru zeskanowany przy otwartej pozycji NIE zapisuje półki,
-- [ ] przytrzymany spust na etykiecie półki daje JEDEN sygnał zapisu,
-- [ ] ściszony kolektor: błąd wibruje trzy razy, zapis dwa.
-- [ ] ZAKOŃCZ z nietkniętymi: przycisk nieaktywny, dopóki nie wybierzesz BRAK albo POMIŃ,
-- [ ] BRAK tworzy zgłoszenie „brak w przesyłce", POMIŃ — żadnego,
-- [ ] nadmiar na ostatniej pozycji NIE zamyka dostawy; ZAKOŃCZ pokazuje go w podglądzie,
-- [ ] korekta do zera: komunikat mówi, że półka wraca sprzed dostawy,
-- [ ] korekta przyjmuje liczbę ponad fakturę i mówi o nadmiarze,
-- [ ] dostawa z pominiętymi nie mówi „KOMPLET" ani „ZAKOŃCZONA",
-- [ ] ten sam towar w dwóch wierszach: tap otwiera dotknięty wiersz,
-- [ ] tryb samolotowy: skan EAN z listy otwiera pozycję, skan półki idzie do bufora,
-- [ ] „ZAMIEŃ" dla towaru A nie powtarza się samo dla towaru B.
-- [ ] PROBLEM na ostatniej pozycji NIE zamyka dostawy; nagłówek każe nacisnąć ZAKOŃCZ.
-
-**Odłożenie po zgłoszeniu wyjątku** (0.538.2)
-
-- [ ] PROBLEM, potem odłożenie reszty: pozycja zostaje wyjątkiem, dostawa czeka na ZAKOŃCZ,
-- [ ] na takiej pozycji jest ZMIEŃ PÓŁKĘ, a nie ma COFNIJ ani POPRAW ILOŚĆ,
-- [ ] ZMIEŃ PÓŁKĘ przy wyjątku przenosi półkę, a zgłoszenie zostaje przy pozycji.
-
-**Korekta ilości odłożonej**
-
-- [ ] „POPRAW ILOŚĆ (N)" jest w rozwiniętej pozycji, pod „INNĄ ILOŚCIĄ",
-- [ ] pozycja bez ani jednej odłożonej sztuki przycisku NIE ma,
-- [ ] pozycja ze zgłoszonym wyjątkiem przycisku NIE ma,
-- [ ] arkusz startuje od liczby zapisanej dziś, a **+** nie przekracza ilości
-      z dokumentu,
-- [ ] „ZAPISZ" jest wyszarzony, dopóki liczba się nie zmieni,
-- [ ] korekta w dół wraca pozycję na listę, w górę potrafi domknąć dostawę,
-- [ ] adres pozycji po korekcie do zera ZOSTAJE na miejscu,
-- [ ] korekta na dostawie już zamkniętej odmawia z czytelnym komunikatem.
-
-**Notatki biura**
-
-- [ ] notatka dodana w panelu biura (Dostawy) pojawia się na GÓRZE ekranu rozkładania,
-- [ ] nieodpowiedziana jest bursztynowa i klikalna,
-- [ ] „ZAKOŃCZ DOSTAWĘ" odmawia i CYTUJE treść notatki,
-- [ ] odłożenie ostatniej pozycji też NIE domyka dostawy (regresja: bramka
-      musi stać w `closeIfComplete`, nie tylko przy przycisku),
-- [ ] po odpowiedzi dostawa domyka się normalnie,
-- [ ] odpowiedź widać w panelu biura z nazwiskiem i czasem.
-
-**W dostawie, nierozłożone**
-
-- [ ] towar z nierozłożonej dostawy ma na karcie amber linię z numerem
-      dokumentu, ilością i dostawcą,
-- [ ] dostawca stoi między numerem a statusem („… · OGRÓD-POL · w toku"),
-- [ ] dokument bez kontrahenta nie zostawia w linii wiszącej kropki,
-- [ ] po odłożeniu części ilość w linii maleje o tyle, ile odłożono,
-- [ ] po odłożeniu całości linia znika,
-- [ ] pozycja ze zgłoszonym problemem ZOSTAJE, z dopiskiem „zgłoszony problem",
-- [ ] karta nie reaguje na dotknięcie (wejście w dokument z karty otwierałoby
-      rozkładanie w tle, bez zamiaru magazyniera).
-
-**Karta towaru — nagłówek i sekcje**
-
-- [ ] nagłówek pokazuje symbol, liczbę dostępnych sztuk i adres pickingowy,
-- [ ] towar bez adresu ma w nagłówku pastylkę „+ DODAJ ADRES",
-- [ ] ta pastylka jest **tej samej wielkości** co pastylka z adresem — ta sama
-      wysokość, ten sam cień, ten sam obrys (0.41.0),
-- [ ] ta pastylka otwiera skan półki, a rząd chipów pod spodem znika,
-- [ ] adres w kolejce Sfery prowadzi z pastylki wprost do kolejki,
-- [ ] trzy sekcje są zwinięte po wejściu na kartę,
-- [ ] nagłówek sekcji niesie podsumowanie bez rozwijania,
-- [ ] sekcja bez danych nie pokazuje się wcale,
-- [ ] wejście w zamiennik zwija sekcje z powrotem.
-
-**Rozkładanie**
-
-- [ ] skan towaru z dostawy rozwija wiersz W MIEJSCU, z ilością i lokalizacją
-      dużym drukiem,
-- [ ] reszta listy zostaje widoczna pod spodem,
-- [ ] skan półki zwija wiersz jako odłożony,
-- [ ] rozwinięty wiersz idzie pod górną krawędź (ma się dać odczytać w drodze
-      do regału),
-- [ ] powtórny tap w rozwinięty wiersz zwija go z powrotem,
-- [ ] skan innej półki niż w kartotece pokazuje ZAMIEŃ / DODAJ **pod wierszem**,
-      nie na pełnym ekranie,
-- [ ] PROBLEM wysuwa się jako arkusz od dołu, z listą dostawy widoczną pod
-      spodem,
-- [ ] aparat w arkuszu PROBLEM działa,
-- [ ] po zgłoszeniu problemu wiersz zostaje oznaczony i NIE zwija się.
-- [ ] pobranie aktualizacji kończy się w hali, nie tylko przy biurku,
-- [ ] wyłączone Wi-Fi nadal daje SZYBKI komunikat o braku sieci,
-- [ ] linia „W dostawie …" na karcie towaru ma szewron i jest klikalna,
-- [ ] klik otwiera dostawę z ROZWINIĘTĄ pozycją tego towaru,
-- [ ] linia zamówienia i linia przeslotowania szewronu NIE mają,
-- [ ] pozycja szybko rotująca ma pod kaflami radę o strefie złotej,
-- [ ] ta rada brzmi identycznie jak na karcie towaru.
-- [ ] kafel ilości i kafel lokalizacji mają **tę samą wysokość**, także gdy
-      biały niesie linijkę „reszta zostaje",
-- [ ] linijka „na hali N" dostaje strzałkę, gdy stan różni się od dokumentu,
-- [ ] nadwyżka jest bursztynowa i ma ▲, niedobór czerwony i ma ▼,
-- [ ] przy zgodnych liczbach linijka jest szara i bez strzałki (wskaźnik
-      zapalony bez powodu przestaje być czytany),
-- [ ] przy liczbie w kaflu nie ma „szt."; metry i komplety zostają.
-- [ ] `+` ponad ilość z faktury pyta raz i mówi o zgłoszeniu do biura,
-- [ ] po potwierdzeniu licznik idzie dalej bez kolejnych pytań,
-- [ ] ANULUJ zostawia liczbę z faktury i niczego nie zapisuje,
-- [ ] po zamknięciu dostawy nadmiar jest w wyjątkach w panelu biura,
-- [ ] pozycja z nadmiarem jest odłożona, nie wraca do roboty.
-- [ ] logo dostawcy na liście dostaw jest szersze niż wysokie,
-- [ ] wiersz bez logo ma kafelek stanu w tym samym miejscu i nie przeskakuje.
-- [ ] po wpisaniu czegoś w filtr dostawy widać pasek „Skaner milczy",
-- [ ] GOTOWE oddaje fokus i skan znów działa,
-- [ ] wybranie pozycji z filtra samo oddaje fokus,
-- [ ] po tym da się nadać lokalizację skanem regału.
-
-**Kreator kont i rola admina**
-
-- [ ] na pustej instalacji pierwszy wiersz kreatora ma rolę **Administrator**
-      i pole roli jest zablokowane,
-- [ ] lista bez konta admina nie przechodzi — komunikat mówi dlaczego,
-- [ ] konto biura widzi DODAJ OSOBY i sekcję „Magazyny" w Ustawieniach,
-- [ ] konto admina widzi to samo (regresja: dwa sprawdzenia `role == "biuro"`
-      odbierałyby adminowi oba ekrany),
-- [ ] konto magazyniera nie widzi ani jednego, ani drugiego.
+- [ ] PROBLEM na pozycji ma cztery kategorie, „Zła ilość” pierwsza,
+- [ ] ZGŁOŚ PROBLEM DOSTAWY ma jedną kategorię, od razu wybraną,
+- [ ] drugie uszkodzenie w tej samej dostawie nie pyta o przesyłkę,
+- [ ] notatka biura stoi na górze rozkładania, a ZAKOŃCZ ją cytuje,
+- [ ] ostatnie odłożenie NIE domyka dostawy z notatką bez odpowiedzi.
 
 **Przesunięcie stanu**
 
-- [ ] kafel magazynu w sekcji „Pozostałe magazyny" otwiera arkusz przesunięcia,
-- [ ] kafel pustego magazynu NIE reaguje na dotknięcie,
-- [ ] podlinijka „MGP N — PRZESUŃ" w nagłówku karty otwiera ten sam arkusz,
-- [ ] przy celu MAG przycisk jest nieaktywny do skanu półki,
-- [ ] przy celu innym niż MAG strefa skanu znika i jest zdanie o hali,
-- [ ] zmiana magazynu docelowego **czyści** zeskanowany kod
-      (regresja: kod z poprzedniego wyboru leciał cicho w żądaniu),
-- [ ] tryb samolotowy → przesunięcie **nie** trafia do bufora, tylko mówi
-      o braku sieci (świadomie inaczej niż zapis lokalizacji),
-- [ ] po przesunięciu karta pokazuje „⏳ w drodze" na MAG i mniejszy MGP,
-- [ ] drugie przesunięcie tego samego towaru widzi mniejszy stan dostępny,
-- [ ] w kolejce zadanie `set_location` ma NIŻSZY numer niż `mm`.
+- [ ] kafel magazynu i „MGP N — PRZESUŃ” otwierają arkusz przesunięcia,
+- [ ] przy celu MAG przycisk czeka na skan półki,
+- [ ] zmiana magazynu docelowego czyści zeskanowany kod,
+- [ ] offline przesunięcie mówi o braku sieci i nie idzie do bufora,
+- [ ] w kolejce `set_location` ma niższy numer niż `mm`,
+- [ ] kontener z MGP ma pastylkę „przyjęcia” i przycisk „PRZESUŃ NA HALĘ”.
 
-**Kontener na liście dostaw**
+**Konta i tożsamość**
 
-- [ ] w zakładce DOSTAWY nie ma już przycisku KONTENERY,
-- [ ] dokument z MGP ma pastylkę „przyjęcia" i otwiera się jak każdy inny,
-- [ ] rozwinięty wiersz kontenera ma przycisk „PRZESUŃ NA HALĘ",
-- [ ] ten sam wiersz w dostawie krajowej przycisku NIE ma,
-- [ ] przesunięcie z wiersza odkłada linię i zamyka ją jako `done`.
+- [ ] zły login i złe hasło dają ten sam komunikat,
+- [ ] po pięciu pomyłkach ekran każe odczekać,
+- [ ] kolektor odłożony na godzinę wraca do dostawy bez logowania,
+- [ ] pusty serwer proponuje ZAŁÓŻ KONTA z rolą Administrator w pierwszym wierszu,
+- [ ] biuro i admin widzą DODAJ OSOBY i „Magazyny”, magazynier nie,
+- [ ] błędny adres serwera daje „Nie widzę serwera” z rozwiniętym polem adresu.
 
-**Niezgodność w dostawie (arkusz PROBLEM)**
+**Zgubiony kolektor**
 
-- [ ] arkusz pokazuje **pięć kafli**, nie siedem,
-- [ ] INNA ILOŚĆ otwiera arkusz z zaznaczoną „Zła ilość",
-- [ ] przy złej ilości widać „Zamówiono N szt" jako TEKST, a pole pyta o to,
-      ile faktycznie przyszło,
-- [ ] błędny artykuł pyta o numer katalogowy tego, co przyszło,
-- [ ] „a miało przyjść" startuje **zwinięte** i rozwija się dopiero na tap,
-- [ ] uszkodzenie w transporcie pyta o numer przesyłki i protokół kuriera,
-- [ ] drugie uszkodzenie w TEJ SAMEJ dostawie o przesyłkę już **nie pyta**,
-      tylko pokazuje zapisany numer,
-- [ ] wyjście z aplikacji i powrót nie wskrzesza pytania o przesyłkę
-      (regresja: stan pytany raz trzymany wyłącznie w pamięci ekranu),
-- [ ] lista WYJĄTKI pokazuje nazwę, nie surowy klucz — także dla zgłoszeń
-      sprzed 0.21.0 (`qty_short` → „Za mało").
-
-**Układ ekranu**
-
-- [ ] dostawa 10 pozycji mieści się na jednym ekranie bez przewijania,
-- [ ] odłożone wiersze są cienkie, przekreślone i schodzą na **dół** listy,
-- [ ] pozycja ze zgłoszonym problemem NIE schodzi na dół (czeka na decyzję),
-- [ ] pozycje bez lokalizacji zostają osobną grupą tuż nad odłożonymi,
-- [ ] nie ma nagłówków alejek; lokalizacja jest pastylką przy każdym wierszu,
-- [ ] „BEZ LOKALIZACJI (n)" zostaje osobną sekcją na końcu,
-- [ ] WSTECZ jest w prawym DOLNYM rogu, nie w lewym górnym,
-- [ ] da się wrócić jedną ręką, nie przekładając kolektora,
-- [ ] wejdź w podekran i wróć: SKAN i DOSTAWY zostają na swoich miejscach
-      (slot WSTECZ jest zarezerwowany zawsze).
-
-**Tożsamość**
-
-- [ ] login i hasło logują, a pole loginu jest wypełnione ostatnią wartością,
-- [ ] zły login i złe hasło dają TEN SAM komunikat,
-- [ ] po pięciu pomyłkach ekran mówi, żeby odczekać chwilę,
-- [ ] **hasło wpisane z klawiatury sprzętowej NIE trafia do wyszukiwarki
-      towarów** — regresja na wedge, patrz `scan/WedgeKeySource.kt`,
-- [ ] odłóż kolektor na godzinę: wraca do otwartej dostawy bez logowania i bez
-      ekranu blokady (regresja: usunięty TTL sesji),
-- [ ] skan towaru rozkładanego przez kolegę otwiera pozycję normalnie —
-      blokad pozycji nie ma od 0.47.0 i nic już nie „proponuje odebrania",
-- [ ] w kreatorze kont są TRZY role: magazynier, biuro, administrator.
-
-**Zgubiony kolektor** (0.482.0)
-
-- [ ] Ustawienia pokazują znak tego kolektora, np. `#A3F9`,
-- [ ] ZNAJDŹ KOLEKTOR nie pokazuje na liście własnego kolektora,
-- [ ] ZADZWOŃ na drugi kolektor: syrena gra najpóźniej po 10 s,
-- [ ] syrena gra także przy głośności ściszonej do zera (strumień alarmu),
-- [ ] po syrenie głośność alarmu wraca do poprzedniej,
-- [ ] dotknięcie w dowolnym miejscu nakładki ucisza syrenę,
-- [ ] to dotknięcie nie otwiera niczego na ekranie pod nakładką,
-- [ ] panel biura pokazuje „Dzwoni", a po ZNALAZŁEM wiersz wraca do spokoju,
-- [ ] PRZESTAŃ z listy albo z panelu ucisza kolektor najpóźniej po 10 s,
-- [ ] wyłączone Wi-Fi w trakcie syreny: gra dalej, ale cichnie po 5 minutach,
-- [ ] wylogowany kolektor ma w panelu „Wylogowany — nie zadzwoni",
-- [ ] DZIENNIK ZDARZEŃ ma `kolektor_wezwany` i `kolektor_odnaleziony`.
-
-**Czasy odpowiedzi w raporcie ergonomii** (0.482.0)
-
-- [ ] po 5 minutach pracy panel pokazuje w ANALIZIE → Praca hali żądania z tego kolektora,
-- [ ] ekran rozkładania dostawy ma w tabeli „Gdzie jest wolno” nazwę „Dostawa”,
-- [ ] tryb samolotowy na 6 minut: po powrocie pomiary sprzed przerwy nadal dochodzą,
-- [ ] pytanie o wezwanie i pobranie APK NIE pojawiają się w tabeli tras.
+- [ ] Ustawienia pokazują znak kolektora, np. `#A3F9`,
+- [ ] ZADZWOŃ: syrena drugiego kolektora gra po ≤10 s, także bez głośności,
+- [ ] dotknięcie nakładki ucisza syrenę i nie otwiera niczego pod spodem,
+- [ ] DZIENNIK ma `kolektor_wezwany` i `kolektor_odnaleziony`.
 
 **Aktualizacja z serwera**
 
-- [ ] serwer z nowszym APK: karta pojawia się zaraz po otwarciu aplikacji,
-- [ ] karta wychodzi też przy żywej sesji, nie tylko na ekranie logowania,
-- [ ] serwer z tą samą wersją: karty NIE ma (regresja: proponowany downgrade),
-- [ ] serwer bez APK: karty NIE ma i nic się nie dzieje,
-- [ ] „NIE TERAZ" chowa kartę, a logowanie pod spodem działa przez cały czas,
-- [ ] po ponownym otwarciu aplikacji karta wraca,
-- [ ] dotknięcie paska wersji na dole pyta serwer od razu,
-- [ ] brak zgody na nieznane źródła: karta prosi o zgodę PRZED pobraniem,
-- [ ] wyłączone Wi-Fi w trakcie pobierania: komunikat, plik częściowy znika,
-- [ ] po instalacji zostają adres serwera i bufor offline,
-- [ ] kolektor z MDM blokującym instalacje: komunikat o dziale IT.
-
-**Pierwsze uruchomienie**
-
-- [ ] pusty serwer: ekran startowy proponuje ZAŁÓŻ KONTA obok pól logowania,
-- [ ] kreator zakłada całą listę i pokazuje loginy, nigdy haseł,
-- [ ] po wyjściu z kreatora ta sama instalacja prosi już o logowanie,
-- [ ] świeża instalacja w sieci magazynu **łączy się bez wpisywania adresu**
-      (od 0.72.1 fabryczny wskazuje serwer produkcyjny),
-- [ ] instalacja z BŁĘDNYM adresem nadal pokazuje „Nie widzę serwera" i
-      ROZWINIĘTE pole adresu,
-- [ ] to jedyna droga wyjścia z tego ekranu i nie wolno jej stracić,
-- [ ] nie pokazuje samych pól logowania bez wyjścia (bez konta nie dało się
-      z tego ekranu wyjść),
-- [ ] wpisz właściwy adres LAN i naciśnij ZAPISZ I SPRAWDŹ,
-- [ ] ekran przechodzi do ZAŁÓŻ KONTA albo do logowania, bez restartu
-      aplikacji,
-- [ ] wyłącz Wi-Fi w połowie zakładania kont: ekran pokazuje konta, które JUŻ
-      powstały, a nie sam komunikat o błędzie.
+- [ ] nowszy APK na serwerze: karta pojawia się zaraz po otwarciu aplikacji,
+- [ ] ta sama wersja albo brak APK: karty NIE ma; „NIE TERAZ” ją chowa,
+- [ ] brak zgody na nieznane źródła: karta prosi o nią PRZED pobraniem,
+- [ ] po instalacji zostają adres serwera i bufor offline.
 
 ## Architektura (skrót)
 
-- **Nawigacja**: statyczna mapa powrotów, nie stos
-  (`core/nav/NavModel.kt` + `nav/AppNavState.kt`) — bez Navigation Compose.
-- **Skany**: `ScannerBus` = łańcuch handlerów
-  (aktywny ekran ma pierwszeństwo, `false` = przekaż niżej, fallback globalny).
-  Rozpoznanie kodu należy do serwera (`core/scan/ScanRules`). To, co skan
-  ZNACZY, wynika z OTWARTEGO EKRANU: karta towaru bierze skan regału dla siebie,
-  reszta spada do globalnego fallbacku (`ui/scan/ScanRouter.kt`). Nie ma
-  ukrytego stanu między skanami — kontekst przyklejony został wycięty, bo dało
-  się mieć przypięty jeden towar i otwartą kartę drugiego.
-- **Tożsamość**: login i hasło → token sesji (`core/session/SessionModel.kt`
-  + `data/SessionRepository.kt`). Kolektor zapamiętuje ostatni login, nigdy
-  hasła — zapamiętane hasło byłoby plakietką pod inną nazwą, tylko bez
-  możliwości świadomego oddania jej.
-- **Offline**: `core/offline/OfflineQueue.kt`
-  (bufor tylko przy awarii sieci; błędy serwera propagują do UI). Trwałość:
-  plik JSON, flush: powrót sieci / tyker 15 s / start / ręcznie / WorkManager.
-- **Polling**: kolejka Sfery 1.5 s (wspólna pętla dla pastylki i ekranu),
-  karta towaru i sesja rozkładania 2 s — jak `refetchInterval` w PWA.
-- **Kiosk**: aplikację można przypiąć przez Android lock-task/MDM — nie
-  potrzeba Fully Kiosk Browser ani lokalnego CA (brak service workera).
+- **Nawigacja**: statyczna mapa powrotów (`core/nav/NavModel.kt`), nie stos.
+- **Skany**: `ScannerBus` to łańcuch handlerów z pierwszeństwem aktywnego
+  ekranu. Znaczenie skanu wynika z otwartego ekranu (`ui/scan/ScanRouter.kt`).
+- **Tożsamość**: token sesji (`core/session/SessionModel.kt`). Kolektor pamięta
+  ostatni login, nigdy hasła.
+- **Offline**: `core/offline/OfflineQueue.kt`, plik JSON opróżniany po powrocie
+  sieci, co 15 s, przy starcie, ręcznie i przez WorkManager.
+- **Polling**: kolejka Sfery co 1,5 s, karta towaru i rozkładanie co 2 s.
+- **Kiosk**: Android lock-task albo MDM, bez lokalnego CA.

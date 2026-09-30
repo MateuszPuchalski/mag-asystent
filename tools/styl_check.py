@@ -21,6 +21,8 @@ Skrypt istnieje, bo bez pomiaru styl wraca do stanu wyjściowego przy pierwszym
 PR. Dokładnie tak zestarzało się `docs/analiza-rozkladanie.md` względem kodu,
 zanim powstał `docs_check.py`.
 """
+import json
+import os
 import re
 import sys
 
@@ -193,6 +195,90 @@ def akapity(sciezka: str):
         yield biezacy
 
 
+# ── Numer wydania w komentarzu kodu ──────────────────────────────────────────
+# Komentarz mówi, dlaczego kod jest taki, jaki jest. Numer wydania mówi, kiedy
+# się taki stał, a to jest historia: mieszka w CHANGELOG.md i w gicie.
+# Zdanie „od 0.NN.0 robimy X" przestaje być potrzebne w dniu zmiany, a zostaje
+# w kodzie i wygląda na regułę.
+#
+# ZAPADKA, NIE ZAKAZ. W dniu wprowadzenia bramki komentarze niosły kilkaset
+# numerów. Próg per plik stoi w WERSJE_PROG i może tylko maleć. Plik z nowym
+# numerem zatrzymuje CI. Plik z mniejszą liczbą niż próg też, bo inaczej
+# próg zostałby na starej wysokości i dopuścił nowy numer w miejsce starego.
+# Obniżenie progu: `python3 tools/styl_check.py --zapisz-wersje`.
+#
+# `@wydanie` liczy się jak numer, bo automat wydania zamienia go na numer
+# w całym repozytorium. Bez tego próg przekroczyłoby dopiero scalenie.
+WERSJE_PROG = "tools/wersje_w_komentarzach.json"
+WERSJE_KATALOGI = ["server/src", "panel/src", "android", "sfera-worker", "tlo-worker"]
+WERSJE_ROZSZERZENIA = (".ts", ".tsx", ".kt", ".kts", ".cs", ".sql")
+WERSJE_POMIJANE = ("node_modules", "/build/", "/bin/", "/obj/", "/dist/")
+# Bez cyfry ani kropki po bokach, bo `127.0.0.1` i `0.0.0.0` to adresy, nie wydania.
+WERSJA_RE = re.compile(r"(?<![\d.])0\.\d{1,3}\.(?:\d{1,3}|x)\b(?!\.\d)|@wydanie")
+
+
+def komentarz(linia: str, sql: bool) -> str:
+    """Część linii, która jest komentarzem — w przybliżeniu, bez parsera.
+
+    Liczy się linia zaczęta znakiem komentarza i ogon po ` // `, ` /* `
+    albo ` -- `. Numer w napisie w kodzie (test porównania wersji) nie jest
+    komentarzem i nie wchodzi do liczby.
+    """
+    s = linia.strip()
+    poczatki = ("--",) if sql else ("//", "/*", "*", "{/*")
+    if s.startswith(poczatki):
+        return s
+    for znak in ((" -- ",) if sql else (" // ", " /* ", "{/* ")):
+        i = linia.find(znak)
+        if i >= 0:
+            return linia[i:]
+    return ""
+
+
+def policz_wersje() -> dict:
+    wynik = {}
+    for katalog in WERSJE_KATALOGI:
+        for korzen, _, pliki in os.walk(katalog):
+            if any(p in korzen + "/" for p in WERSJE_POMIJANE):
+                continue
+            for nazwa in pliki:
+                if not nazwa.endswith(WERSJE_ROZSZERZENIA):
+                    continue
+                sciezka = os.path.join(korzen, nazwa).replace(os.sep, "/")
+                sql = nazwa.endswith(".sql")
+                ile = 0
+                with open(sciezka, encoding="utf-8", errors="replace") as f:
+                    for linia in f:
+                        ile += len(WERSJA_RE.findall(komentarz(linia, sql)))
+                if ile:
+                    wynik[sciezka] = ile
+    return dict(sorted(wynik.items()))
+
+
+def sprawdz_wersje_w_komentarzach(zapisz: bool) -> int:
+    teraz = policz_wersje()
+    if zapisz:
+        with open(WERSJE_PROG, "w", encoding="utf-8") as f:
+            json.dump(teraz, f, ensure_ascii=False, indent=1)
+            f.write("\n")
+        print(f"próg numerów w komentarzach zapisany: {sum(teraz.values())}")
+        return 0
+    prog = json.load(open(WERSJE_PROG, encoding="utf-8"))
+    bad = 0
+    for sciezka in sorted(set(teraz) | set(prog)):
+        n, p = teraz.get(sciezka, 0), prog.get(sciezka, 0)
+        if n > p:
+            print(f"NUMER WYDANIA   {sciezka} → {n} w komentarzach, próg {p}.")
+            print("                Komentarz mówi dlaczego, nie od kiedy. Historia: CHANGELOG.md.")
+            bad += 1
+        elif n < p:
+            print(f"OBNIŻ PRÓG      {sciezka} → {n}, próg {p}. Uruchom:")
+            print("                python3 tools/styl_check.py --zapisz-wersje")
+            bad += 1
+    print(f"numerów wydań w komentarzach kodu: {sum(teraz.values())} (próg {sum(prog.values())})")
+    return bad
+
+
 def main() -> int:
     odrzucone = wczytaj_odrzucone()
     if not odrzucone:
@@ -236,6 +322,8 @@ def main() -> int:
                     nr = [n for o, n in mapa if o <= m.start()][-1]
                     print(f"ODRZUCONY TERMIN {doc}:{nr} → „{zly}\", ma być „{dobry}\"")
                     bad += 1
+
+    bad += sprawdz_wersje_w_komentarzach("--zapisz-wersje" in sys.argv)
 
     print(f"\nzdań: {zdan}, najdłuższe: {najdluzsze} wyrazów, "
           f"dokumentów: {len(DOCS)}, terminów w słowniczku: {len(odrzucone)}")
