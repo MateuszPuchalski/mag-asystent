@@ -1,81 +1,49 @@
 # Usługa tła — zdjęcie kartoteki bez tła (C#/.NET)
 
-Czwarty proces WERTIS, obok `wertis-api`, `wertis-worker` i `wertis-sfera`.
-Przyjmuje jedno zdjęcie po HTTP z pętli lokalnej i oddaje PNG z przezroczystością.
+Czwarty proces WERTIS: przyjmuje zdjęcie po HTTP z pętli lokalnej i oddaje PNG
+z alfą. Kontrakt: [`server/src/adapters/tlo.ts`](../server/src/adapters/tlo.ts).
 
 | trasa | wejście | wyjście |
 |---|---|---|
 | `POST /tlo` | JPEG albo PNG w ciele żądania | `200` PNG z alfą, `422` gdy na zdjęciu nie widać przedmiotu |
 
-`422` nie jest awarią. Zdjęcie regału z pięcioma kartonami wygląda dla modelu
-tak samo jak zdjęcie noża. Serwer zamienia tę odpowiedź na podgląd z tłem
-i przycisk „ZOSTAW TŁO" — decyzję podejmuje człowiek przy regale.
-
-Kontrakt, z którego wynika ten kod: [`server/src/adapters/tlo.ts`](../server/src/adapters/tlo.ts).
+`422` nie jest awarią: zdjęcie regału z kartonami wygląda dla modelu jak
+zdjęcie noża. Serwer pokazuje wtedy podgląd z tłem i „ZOSTAW TŁO”.
 
 ## Dlaczego osobny proces
 
-Model chodzi na runtime ONNX, czyli na module natywnym. Serwer WERTIS ma dwie
-zależności i zero modułów natywnych. To reguła powtórzona w czterech plikach
-i jej powodem jest maszyna: serwer stoi tam, gdzie biuro wystawia faktury,
-i ma się dać zainstalować bez kompilatora.
-
-Wzorzec na taki przypadek repozytorium już ma. `sfera-worker/` to trzeci proces,
-samowystarczalny exe pod `nssm`, domyślnie wyłączony. Ten jest czwarty i działa
-tak samo: bez niego zdjęcia zapisują się z tłem, a nie przestają się zapisywać.
+Model chodzi na runtime ONNX, czyli na module natywnym. Serwer nie ma modułów
+natywnych, bo instaluje się go bez kompilatora na maszynie biura. Wzorzec jak
+w `sfera-worker/`: samowystarczalny exe pod `nssm`, domyślnie wyłączony. Bez
+usługi zdjęcia zapisują się z tłem, a nie przestają się zapisywać.
 
 ## Wymagania
 
 | co | po co |
 |---|---|
-| Windows z .NET | wydanie jest samowystarczalne, więc runtime jedzie w exe |
+| Windows | wydanie jest samowystarczalne, więc runtime .NET jedzie w exe |
 | plik modelu `.onnx` | wycinanie tła; pobiera go `build.ps1` |
 | `TLO_URL` w `wertis.env` | ten sam klucz czyta serwer; bez niego proces odmawia startu |
 
-Modelu **nie ma w repozytorium** — to kilka megabajtów binariów, których nie da
-się przeglądać ani różnicować. Tak samo jest z AAR-em Honeywella w kolektorze.
+Modelu **nie ma w repozytorium** (binaria bez przeglądu i różnic). `build.ps1`
+pobiera go i sprawdza sumę SHA-256; niezgodna suma zatrzymuje budowanie.
 
 ## Budowa i wdrożenie
 
-**Przy pierwszym budowaniu skrypt odmówi — i to jest krok procedury, nie awaria.**
-Suma kontrolna modelu jest w nim pusta, bo repozytorium nie zna sumy pliku,
-którego nie zawiera. Skrypt pobiera model, wypisuje jego sumę i każe ją porównać
-ze źródłem u wydawcy. Wpisana suma pilnuje każdego następnego budowania.
-
-Odmowa przychodzi **po** `dotnet publish`, czyli po kilku minutach. Inaczej się
-nie da: żeby policzyć sumę pliku, trzeba go najpierw pobrać.
-
-**Bez .NET 8 SDK ten skrypt nie ruszy.** Instalacja na Windowsie:
-
-```powershell
-winget install Microsoft.DotNet.SDK.8
-```
-
-Potem otwórz **nowe** okno PowerShella (instalator zmienia `PATH`, bieżąca sesja
-go nie widzi) i sprawdź `dotnet --version` — ma wyjść `8.x`.
-
-Pobierając ręcznie, weź **SDK**, nie Runtime, i wariant **Windows x64 `.exe`**.
-Plik `.pkg` jest instalatorem macOS i na Windowsie się nie otworzy.
-
-SDK idzie na maszynę dewelopera, **nie na serwer firmy**. Po to jest
-`--self-contained`: gotowy exe niesie runtime w sobie, więc pod `C:\wertis\`
-nie trzeba instalować niczego.
-
-Buduje się **z repozytorium na maszynie dewelopera**, nigdy w `C:\wertis\tlo-worker`
-— to katalog docelowy na serwerze firmy.
+Build wymaga **.NET 8 SDK**, nie Runtime:
+`winget install Microsoft.DotNet.SDK.8`, potem nowe okno i `dotnet --version`.
+SDK idzie na maszynę dewelopera, **nie na serwer firmy**: `--self-contained`
+wkłada runtime do exe. `C:\wertis\tlo-worker` to katalog docelowy, nie roboczy.
 
 **`-ExecutionPolicy Bypass` nie jest ozdobnikiem.** Windows domyślnie odmawia
-uruchomienia skryptu słowami „running scripts is disabled on this system".
-Bypass dotyczy **tego jednego uruchomienia**; polityka systemowa zostaje
-nietknięta. Ta sama reguła co przy instalatorze.
+uruchomienia skryptu („running scripts is disabled on this system”). Bypass
+dotyczy tego jednego uruchomienia; polityka systemowa zostaje nietknięta.
 
 ```powershell
-# maszyna z .NET 8 SDK (deweloper — NIE serwer firmy).
-# Ścieżka jest względna wobec katalogu, w którym stoisz — stąd dwie drogi:
+# maszyna z .NET 8 SDK (NIE serwer firmy); ścieżka względna wobec katalogu:
 powershell -NoProfile -ExecutionPolicy Bypass -File tlo-worker\build.ps1  # z korzenia repo
 powershell -NoProfile -ExecutionPolicy Bypass -File build.ps1              # z katalogu tlo-worker
-# → tlo-worker\publish\wertis-tlo-worker.exe  (samowystarczalny, win-x64)
-# → tlo-worker\publish\model\u2netp.onnx
+# → tlo-worker\publish\wertis-tlo-worker.exe, tlo-worker\publish\model\u2netp.onnx
 
 # serwer firmy:
 #  1. skopiuj CAŁY katalog publish do C:\wertis\tlo-worker\
@@ -85,12 +53,13 @@ nssm install wertis-tlo C:\wertis\tlo-worker\wertis-tlo-worker.exe
 #  4. zrestartuj usługę wertis-api (czyta ten sam plik konfiguracji)
 ```
 
-Kolejność i bramki wdrożenia — [`DEPLOY.md`](../DEPLOY.md) §6, etap 2a.
+Instalator tej usługi nie zakłada, ale aktualizacja zatrzymuje ją na czas
+zamiany katalogów. Bramki wdrożenia: [`DEPLOY.md`](../DEPLOY.md) §6, etap 2a.
 
 ## Konfiguracja — ten sam `wertis.env` co pozostałe procesy
 
-Szuka pliku: `WERTIS_ENV_FILE` → katalog exe → katalog wyżej (`C:\wertis`) →
-bieżący. Zmienna środowiskowa wygrywa z plikiem, jak w Node.
+Kolejność szukania: `WERTIS_ENV_FILE` → katalog exe → katalog wyżej
+(`C:\wertis`) → bieżący. Zmienna środowiskowa wygrywa z plikiem.
 
 | klucz | domyślnie | rola |
 |---|---|---|
@@ -98,7 +67,7 @@ bieżący. Zmienna środowiskowa wygrywa z plikiem, jak w Node.
 | `TLO_MODEL` | `model\u2netp.onnx` obok exe | plik modelu |
 | `TLO_BOK` | `1024` | dłuższy bok zapisywanego zdjęcia |
 
-`TLO_TIMEOUT_MS` czyta wyłącznie serwer — to jego cierpliwość, nie nasza.
+`TLO_TIMEOUT_MS` czyta wyłącznie serwer — to jego cierpliwość, nie usługi.
 
 ## Flagi
 
@@ -107,45 +76,25 @@ bieżący. Zmienna środowiskowa wygrywa z plikiem, jak w Node.
 | `--dry-run` | odpowiada `422` na każde zdjęcie, bez modelu i bez pliku `.onnx` |
 | `--once` | jedno żądanie i wyjście — do testów |
 
-`--dry-run` odpowiada tak, jak gdyby model nie znalazł przedmiotu, a **nie**
-udanym wycięciem. Cały łańcuch — kolektor, podgląd, przycisk „ZOSTAW TŁO" —
-da się dzięki temu przejść bez modelu, a żadne ogniwo nie usłyszy nieprawdy
-o tym, co się z jego zdjęciem stało.
+`--dry-run` odpowiada jak model, który nie znalazł przedmiotu, a **nie**
+udanym wycięciem: łańcuch aż do „ZOSTAW TŁO” przechodzi bez modelu i bez
+nieprawdy o zdjęciu.
 
-## Wybór modelu
+## Model
 
-Domyślny jest **u2netp** — mała odmiana U^2-Net, licencja Apache-2.0, około
-4,7 MB. Na towarze sfotografowanym na blacie radzi sobie dobrze.
+Domyślny jest **u2netp**: mała odmiana U^2-Net, licencja Apache-2.0, około
+4,7 MB, dobry na towarze sfotografowanym na blacie. Przy zagraconym tle lepszy
+jest **isnet-general-use** (około 176 MB), wskazywany kluczem `TLO_MODEL` bez
+przebudowy exe. Oba mają wejście 320 × 320 i to samo przetwarzanie wstępne.
 
-Przy zagraconym tle lepszy jest **isnet-general-use** (około 176 MB). Wskazuje
-się go kluczem `TLO_MODEL`, bez przebudowy exe. Oba mają wejście 320 × 320
-i to samo przetwarzanie wstępne, więc podmiana jest naprawdę podmianą pliku.
-
-## Co ustalono na pobranym pliku — 22 sierpnia 2026
-
-Cztery pozycje `[WERYFIKUJ]` z 0.88.0 są zamknięte. Sprawdzono je na pliku
-`u2netp.onnx` o sumie `sha256 309c8469…f4ddd8`.
-
-| pytanie | odpowiedź |
-|---|---|
-| nazwa i kształt wejścia | `input.1` (**nie** `input`), 1 × 3 × 320 × 320, NCHW float32 |
-| który tensor jest maską | wyjść jest siedem, maską jest **pierwsze**, kształt 1 × 1 × 320 × 320 |
-| czy jest sigmoida | jest — siedem operacji `Sigmoid` na końcu grafu, wartości 0…1 |
-| adres i suma modelu | wpisane w [`build.ps1`](build.ps1) razem z historią sprawdzenia |
-
-Nazwa wejścia okazała się inna, niż zakładał komentarz. Kod jej nie wpisuje na
-sztywno — bierze ją z metadanych sesji — więc podmiana modelu na `isnet` nadal
-nie wymaga zmiany w `UsuwanieTla.cs`.
-
-Suma kontrolna potwierdzona trzema niezależnymi odczytami: pobranie na maszynie
-wdrożeniowej, pobranie z innej maszyny i innej sieci, oraz `md5`, które `rembg`
-deklaruje w swoim źródle (`rembg/sessions/u2netp.py`). Dowodzi to, że pobrane
-bajty są dokładnie tymi, które publikuje wydawca — nie tego, że sam model jest
-dobry.
+Wejście `u2netp.onnx` to `input.1` (1 × 3 × 320 × 320, NCHW float32), maską
+jest pierwsze z siedmiu wyjść, a graf kończy się sigmoidą. Nazwę wejścia kod
+bierze z metadanych sesji, więc podmiana modelu nie zmienia `UsuwanieTla.cs`.
+Sumę potwierdziły trzy niezależne odczyty ([`build.ps1`](build.ps1)); dowodzą
+one zgodności bajtów z wydawcą, nie jakości modelu.
 
 ## `[WERYFIKUJ]` — co zostaje
 
-Jakość wycięcia na **towarze magazynowym**. Model uczono na zdjęciach ogólnych,
-nie na częściach do kosiarek, i tego nie rozstrzygnie żaden plik `.onnx` — tylko
-zdjęcia zrobione w hali. Dlatego w kolektorze stoi przycisk „ZOSTAW TŁO",
-a model podmienia się jednym kluczem `TLO_MODEL`.
+Jakość wycięcia na **towarze magazynowym**: model uczono na zdjęciach ogólnych,
+a rozstrzygną to tylko zdjęcia z hali. Dlatego jest „ZOSTAW TŁO”, a model
+podmienia się kluczem `TLO_MODEL`.

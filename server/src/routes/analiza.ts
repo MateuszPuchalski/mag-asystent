@@ -9,6 +9,7 @@ import { czasOdpowiedzi } from "../services/czas-odpowiedzi.js";
 import { raportUzycia } from "../services/uzycie.js";
 import { pomiarTarcia } from "../services/tarcie.js";
 import { ergonomia } from "../services/ergonomia.js";
+import { wskazniki } from "../services/wskazniki.js";
 import { listaRaportow, raportTygodnia } from "../services/raport-tygodnia.js";
 
 /* ── Analiza śladu audytowego dla biura ──────────────────────────────────────
@@ -98,6 +99,15 @@ export async function analizaRoutes(app: FastifyInstance) {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     return czasOdpowiedzi(dniZQuery(req.query.days), mozeWidziecLudzi());
+  });
+
+  /* Trzy wskaźniki na górze Analizy: dostawa na półce, szukanie z adresem,
+     odpowiedź klientowi. Bez ludzi, więc bramka biura wystarcza. Odczyt
+     niczego nie zapisuje. Reguły przy `services/wskazniki.ts`. */
+  app.get<{ Querystring: { days?: string } }>("/api/analiza/wskazniki", async (req, reply) => {
+    const nie = odmowa();
+    if (nie) return reply.code(nie.kod).send({ error: nie.error });
+    return wskazniki(dniZQuery(req.query.days));
   });
 
   /* Pomiar tarcia w skrzynce (0.500.0) — cofnięcia, czas do wysyłki

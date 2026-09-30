@@ -157,8 +157,11 @@ export async function productRoutes(app: FastifyInstance) {
        to najtańsza lista braków w kartotece — zapytania z zerem trafień to
        towary, których ludzie szukają, a które mają złe nazwy albo nie istnieją.
        Zdarzenia sprzed tej zmiany mają samo `q`; analiza traktuje brak pola
-       jako „nieznane", nigdy jako zero. */
-    logEvent("search", userOf(req), null, { q, wynikow: wyniki.length, przyblizone });
+       jako „nieznane", nigdy jako zero.
+       `zAdresem` mówi, czy szukanie kończy się półką, a nie samą kartoteką.
+       Z niego liczy się wskaźnik szukania w `services/wskazniki.ts`. */
+    const zAdresem = wyniki.filter((w) => w.locs.length > 0).length;
+    logEvent("search", userOf(req), null, { q, wynikow: wyniki.length, zAdresem, przyblizone });
     /* Pole addytywne — kolektor ma `ignoreUnknownKeys` (Dtos.kt), więc stare
        APK je zignoruje. Mówi „nie znalazłem dosłownie, to są podobne" i czeka
        na ekran, który to pokaże. */

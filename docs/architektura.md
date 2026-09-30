@@ -1,844 +1,347 @@
 # Architektura WERTIS
 
-Dokument dla kogoś, kto ma ten system utrzymywać albo rozszerzać. Opisuje **jak
-to jest zbudowane i dlaczego tak** — nie jak wdrożyć (to `DEPLOY.md`) ani jak
-podpiąć Subiekta (to `docs/subiekt-gt-edu-setup.md`).
-
----
+Dokument dla kogoś, kto ma ten system utrzymywać albo rozszerzać. Opisuje, **jak
+to jest zbudowane i dlaczego tak**. Wdrożenie opisuje `DEPLOY.md`, podpięcie
+Subiekta `docs/subiekt-gt-edu-setup.md`, a historię `CHANGELOG.md` i git.
 
 ## 1. Po co to istnieje
 
-Subiekt GT nie ma pojęcia lokalizacji półkowej. Wie, ile czegoś jest na
-magazynie, ale nie wie, **gdzie to leży**. W magazynie o 342 m² z ~3600
-kartotekami oznacza to, że znalezienie towaru jest zadaniem pamięciowym.
+Subiekt GT wie, ile czegoś jest na magazynie, ale nie wie, **gdzie to leży**.
+W magazynie o 342 m² z ~3600 kartotekami znalezienie towaru jest więc zadaniem
+pamięciowym. WERTIS dokłada Subiektowi tę warstwę, a obok niej obsługę klienta
+Allegro. Do Subiekta pisze **wyłącznie to, co wymienia tabela niżej** — z tego
+zdania wynikają wszystkie granice opisane dalej.
 
-WERTIS dokłada Subiektowi tę jedną brakującą warstwę i **nic więcej**. To jest
-najważniejsze zdanie w tym dokumencie, bo z niego wynikają wszystkie granice
-opisane niżej.
+| co | gdzie | kto | warunek |
+|---|---|---|---|
+| pole lokalizacji | `tw__Towar.tw_Pole1..8` (konfigurowalne) | worker Node | zawsze |
+| podstawowy kod kreskowy | `tw__Towar.tw_PodstKodKresk` | worker Node | osobny `GRANT UPDATE` |
+| zdjęcie kartoteki | tabela zdjęć Subiekta (`INSERT`) | worker Node | `ZDJECIA_DODAWANIE` i `GRANT INSERT` |
+| MM, korekta ze zwrotem, ZW | Sfera COM (`sfera-worker/`) | worker Sfery | `SFERA_WORKER=1` |
 
-### Co WERTIS zapisuje do Subiekta
-
-Przez kolejkę i osobne procesy:
-
-| co | gdzie | kiedy |
-|---|---|---|
-| pole lokalizacji na kartotece | `tw__Towar.tw_Pole1` (konfigurowalne) | po skanie regału |
-| podstawowy kod kreskowy | `tw__Towar.tw_PodstKodKresk` (0.37.0) | gdy człowiek nada go kartotece |
-| dokument MM | Sfera COM (`sfera-worker/`) | tylko przy `SFERA_WORKER=1` |
-
-Kod kreskowy rozszerzył tę listę z jednej pozycji do dwóch i było to świadome:
-magazynier stojący z kartonem, którego kodu kartoteka nie zna, nie miał gdzie go
-wpisać. Rozszerzenie kosztuje osobny `GRANT UPDATE` na tę jedną kolumnę, a bez
-niego funkcja **nie pada** — kod działa na kolektorze (tabela `ean_alias`),
-a zadanie czeka w kolejce ze statusem `error`.
-
-**Procesy Node nie robią żadnego `INSERT` do tabel dokumentów i nie modyfikują
-stanów.** Nie tworzą dokumentów, nie zmieniają ilości i nie ruszają cen.
-Dokumenty MM (`createMM`, kontrakt w `adapters/sfera.ts`) wykonuje worker Sfery
-(`sfera-worker/`, C#) — osobny, opcjonalny proces włączany `SFERA_WORKER=1`
-(§3, „Trzeci proces").
-
-Wniosek praktyczny: przy wyłączonym `SFERA_WORKER` **najgorsze, co WERTIS może
-zrobić Subiektowi, to wpisać zły adres w jednym polu tekstowym kartoteki** —
-odwraca to jeden `UPDATE`. Włączenie workera Sfery świadomie rozszerza pole
-rażenia o dokument MM ze skutkiem magazynowym; dlatego siedzi za osobnym
-przełącznikiem i osobnymi bramkami wdrożenia (`docs/wdrozenie.md`).
-
----
+Każdy zapis idzie przez kolejkę `sfera_queue`, a każde prawo zapisu to osobny
+`GRANT`. Bez niego funkcja nie pada: zadanie czeka ze statusem `error`, a kod
+nadany kartotece działa na kolektorze od razu (`ean_alias`). **Procesy Node nie
+tworzą dokumentów, nie zmieniają stanów i nie ruszają cen.** Bez workera Sfery
+najgorsze, co WERTIS może zrobić Subiektowi, to zły adres w polu kartoteki.
+Worker Sfery świadomie rozszerza pole rażenia o dokumenty, więc ma osobne
+bramki wdrożenia (`docs/wdrozenie.md`), a zmiany jego kodu czekają na zgodę
+właściciela (`.github/workflows/zgoda.yml`).
 
 ## 2. Rzut oka
 
 ```
-┌─────────────────────┐
-│ Kolektor (Android)  │  Kotlin + Compose, skan sprzętowy
-│  :core  — logika    │  Zebra DataWedge / Honeywell DataCollection
-│  :app   — ekrany    │  offline: bufor plikowy + WorkManager
-└──────────┬──────────┘
-           │ REST/JSON po HTTP w LAN (bez chmury, bez HTTPS-a)
-           │ nagłówki: x-session (tożsamość), x-device (diagnostyka)
-┌──────────▼──────────────────────────────────────────────────┐
-│ Serwer — Fastify 5 + TypeScript          jeden host w LAN   │
-│                                                              │
-│  SQLite (node:sqlite, WAL) — 52 tabele + indeks FTS5:        │
-│    delivery + delivery_line   rozkładanie faktur zakupu      │
-│    delivery_note              notatki biura do dostawy       │
-│    problem, ean_conflict      wyjątki                        │
-│    ean_alias                  kody nadane w WERTIS           │
-│    zdjecie_cache              zdjęcia kartotek z Subiekta    │
-│    dostawca_logo              logo dostawcy wgrane w biurze  │
-│    zbiorka, strefa_regula     rotacja i strefa złota         │
-│    kosz + kosz_pozycja        cyfrowe kosze zwrotowe (MM)    │
-│    zadanie_terenowe           zlecenia biura dla hali        │
-│    channel_account            konto kanału obsługi klienta   │
-│    conversation + message     rozmowy z klientem             │
-│    conversation_draft, _comment, _event, _assignment, _mention│
-│    outbox                     kolejka odpowiedzi do Allegro  │
-│    towar_identyfikator        numery OEM z opisów (E3)       │
-│    model_z_opisu, towar_fts   sekcje „Modele:”, pełny tekst  │
-│    zwrot_klienta + _pozycja   zwroty klienckie (0.150.0)     │
-│    zwrot_zdarzenie            oś zwrotu                      │
-│    allegro_token              parowanie konta Allegro        │
-│    allegro_inbox_*            surowe lądowisko skrzynki      │
-│    allegro_zwrot              surowe lądowisko zwrotów       │
-│    allegro_*_sync_state       stan dwóch synchronizatorów    │
-│    app_user, device_session   tożsamość (§7)                 │
-│    sfera_queue                kolejka zapisów do Subiekta    │
-│    events                     audyt — każdy skan i decyzja   │
-│    process_state              meldunki procesów (api|worker|sfera)
-│    counters, magazyn_widocznosc                              │
-│    sgt_*                      READ-MODEL Subiekta (9 tabel)  │
-└──────────┬───────────────┬───────────────┬──────────────────┘
-           │ ta sama baza SQLite            │ odczyt co 60 s
-┌──────────▼──────────┐    │    ┌───────────▼──────────────────┐
-│ Worker (osobny      │    │    │ MSSQL Subiekta GT            │
-│ proces Node)        │────┼───▶│  odczyt: kartoteki, stany,   │
-│ pętla poll, retry,  │ UPDATE  │          dokumenty           │
-│ backoff             │    │    │  zapis: dwa pola (§1)        │
-└─────────────────────┘    │    └──────────────▲───────────────┘
-┌ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┐    │                   │ MM przez COM
-  Worker Sfery (C#)   ◀────┘                   │ Sfery
-│ opcjonalny:         │────────────────────────┘
-  SFERA_WORKER=1 (§3)
-└ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ┘
+Kolektor (Android: :core logika, :app ekrany)   Panel biura (React, /obsluga)
+            └──────── REST/JSON po HTTP w LAN, nagłówek x-session ────────┘
+                                      │
+      wertis-api — Fastify 5 + TypeScript; migruje schemat, trasy, takty (§10)
+      SQLite (node:sqlite, WAL): server/data/wertis.db
+         │ ta sama baza              │ ta sama baza            │ HTTP, pętla lokalna
+   wertis-worker (Node)      wertis-sfera (C#, opcja)     wertis-tlo (C#, opcja)
+   lokalizacja, kod, zdjęcie MM, korekta, ZW przez COM   zdjęcie bez tła
+         └──────── MSSQL Subiekta GT ─┘   (odczyt do sgt_* co MSSQL_SYNC_MS)
 ```
 
-**Biuro przeszło do panelu (0.431.0–0.446.0).** Poniżej historia `/biuro` tak,
-jak powstawało. Od 0.431.0 obowiązuje jeden front, decyzją właściciela z
-`docs/obsluga-klienta.md` §7. `biuro.html` znikał widok po widoku, a w
-0.446.0 zniknął cały; `/biuro` przekierowuje do `/obsluga/`. Zdanie
-„zero frameworka, zero zapisu" przestało być prawdą dużo wcześniej: audyt
-0.427.0 policzył w biurze dwadzieścia dwa zapisy. Z tamtej reguły został jej
-rdzeń — **zero zapisu przy patrzeniu** — i ten obowiązuje panel tak samo.
-
-Cel, od którego liczy się każdy ekran biura: biuro rozstrzyga to, czego hala
-nie rozstrzygnie sama — w drodze towaru przez magazyn. Reszta jest nadzorem
-albo ustawieniem.
-
-**Biuro miało podgląd pod `/biuro`** — jedną stronę HTML bez builda
-(`server/src/web/biuro.html`), serwowaną przez API i czytającą istniejące trasy
-z tokenem sesji. Wcześniejszy `/lookup` zniknął razem z klientem PWA; nowy
-podgląd świadomie nie był drugim frontem: zero frameworka, zero zapisu.
-Powstał w 0.18.0, bo wycięcie flagi faktury (0.16.0) zamknęło jedyny kanał,
-którym biuro widziało stan dostaw.
-
-Od 0.36.0 da się z listy **wejść w fakturę** i zobaczyć jej pozycje: zdjęcie,
-postęp, adres, autora odłożenia i wyjątek przy właściwej linii. Także taką,
-której nikt nie zaczął — a to jest cała trudność tej trasy. Otwarcie dostawy
-(`openDelivery`) jest ZAPISEM: zakłada rekord, sprząta pozycje usługowe
-i przestawia dokument na W TOKU. Podgląd nie ma prawa go wołać, bo wtedy samo
-patrzenie zapełniałoby listę pracy dokumentami, których nikt nie tknął. Dlatego
-`services/podglad-dostawy.ts` czyta dwoma drogami — snapshot z `delivery_line`
-albo pozycje z faktury tym samym helperem, którego użyje otwarcie — i mówi
-w odpowiedzi, którą z nich pokazuje.
-
-Od 0.235.0 lista ma czwarty czip: **archiwum**. Trzy poprzednie pokazują okno
-importu, więc dostawa starsza znikała z panelu w całości. Odpowiedź leży
-w tabelach `delivery` i `delivery_line`, których import nigdy nie czyści.
-Granicą jest nieobecność dokumentu w read-modelu, a nie liczba dni. Dzięki temu
-dokument stoi zawsze w dokładnie jednym z dwóch miejsc.
-
-Od 0.27.0 ma zakładki i pasek stanu: dostawy z reklamacjami, stan systemu
-(metryki, kolejka, rekoncyliacja, kolizje kodów, meldunek serwera) oraz ślad
-audytowy z filtrami. Zasada „zero zapisu" nie drgnęła — ponowienie zadania
-z kolejki zostaje na kolektorze, bo jest zapisem do bazy firmy wykonywanym
-przez osobę stojącą przy półce.
-
-Od 0.48.0 doszła zakładka ANALIZA: operacje per dzień i per godzinę, rytm
-dostaw, najczęstsze wyszukiwania (w tym bez wyniku), zdrowie urządzeń oraz —
-decyzją właściciela ODWRACAJĄCĄ wcześniejszą — raport wydajności per osoba.
-Do 0.47.x strona celowo go nie odpytywała; teraz pokazuje go z podstawą
-prawną nad tabelą, bo obowiązek informacyjny z Kodeksu pracy nie zniknął.
-
-Od 0.50.0 zakładka ANALIZA przyjmuje pierwszy kanał danych spoza Subiekta:
-eksport zbiórek z systemu sprzedażowego (Sellasist, CSV). Serwer liczy z niego
-kandydatów do strefy złotej — górne 15% rotacji stojące poza strefą — tą samą
-regułą progu co roczny raport przeslotowania. Kandydat dostaje adnotację na
-karcie towaru w kolektorze. Import jest idempotentny po `ID Koszyka`, a plik
-z dopasowaniem poniżej połowy wierszy jest odrzucany w całości. Reguły strefy
-(które poziomy regału są „złote") mieszkają w tabeli `strefa_regula` i są
-edytowalne z tej samej zakładki, za rolą `biuro`/`admin`. Docelowo ten sam
-`POST /api/biuro/zbiorki/import` ma wołać integracja — bez zmian po naszej
-stronie.
-
----
+Na zewnątrz serwer rozmawia z Allegro i, przy włączonym Copilocie, z dostawcami
+modeli (§11). Panel serwuje proces API z `dist/web/obsluga`. **Obszary bazy**
+(`server/src/db/schema.sql`): rozkładanie i wyjątki (`delivery*`, `problem`,
+`ean_*`), kosze i kartony (`kosz*`), zlecenia dla hali (`zadanie_terenowe`),
+rotacja (`zbiorka`, `strefa_regula`), zdjęcia i logo, kolejka zapisów
+(`sfera_queue`), tożsamość (`app_user`, `device_session`), audyt i pomiar
+(`events`, `migawka_dnia`, `raport_tygodnia`), meldunki procesów
+(`process_state`), read-model Subiekta (`sgt_*`), surowe lądowiska Allegro
+(`allegro_*`), sprawy klienta (`conversation*`, `outbox`, `zwrot_klienta*`,
+`reklamacja_*`, `klient_*`) oraz Copilot i wiedza o częściach (`copilot_*`,
+`pasowanie_*`, `towar_identyfikator`). Obok stoi indeks FTS5 kartoteki. Dane
+osobowe przechodzące z lądowisk do spraw pilnuje
+`server/src/db/prywatnosc-schematu.test.ts`.
 
 ## 3. Dlaczego osobne procesy
 
-API i worker to **osobne procesy z tą samą bazą**, i to nie jest podział dla
-elegancji. (Na produkcji z MM dochodzi trzeci — worker Sfery, niżej.)
+API i worker to **osobne procesy z tą samą bazą**. Zapis do Subiekta potrafi
+się zawiesić, a COM Sfery nie jest thread-safe. Gdyby zapisywał proces
+obsługujący skany, jedno zawieszenie zamrażałoby **cały magazyn**. Skan
+odpowiada więc od razu, bo API tylko wpisuje wiersz do kolejki (cel p95: 150 ms,
+mierzony na kolektorze przez `scan_timing`). Zapis ponawia się bez wiedzy
+magazyniera (3 próby, 5 s / 30 s / 2 min), a zatrzymany worker zostawia zadania
+w kolejce. Cena: stan w Subiekcie jest opóźniony o sekundy, więc karta towaru
+pokazuje stany **skorygowane o kolejkę** (`services/stock.ts`) i chipy „w drodze”.
 
-Zapis do Subiekta przez Sferę idzie po COM, który nie jest thread-safe i potrafi
-się zawiesić. Gdyby robił to ten sam proces, który obsługuje skany, jedno
-zawieszenie COM zamrażałoby **cały magazyn** — skan przestałby odpowiadać.
+**Schemat bazy ma jednego właściciela: API, przy starcie.** Pozostałe procesy
+bazę otwierają, ale schematu nie dotykają. Migracja w każdym procesie kładłaby
+wszystkie naraz, a NSSM zrobiłby z tego pętlę restartów. Worker, który zastanie
+stary schemat, czeka i próbuje dalej.
 
-Rozdzielenie daje trzy rzeczy naraz:
+**Trzeci proces: worker Sfery (`sfera-worker/`, opcjonalny).** Dokumentu nie da
+się wystawić SQL-em: numeracja, skutki magazynowe i wycena to domena Sfery COM,
+a COM żyje tylko na Windows z Subiektem. Worker w C# bierze wyłącznie zadania
+dokumentowe (`mm`, `korekta_zwrot`, `zw`). Bez `SFERA_WORKER=1` takie zadanie
+kończy się czytelnym błędem, a dokument wystawia biuro. Przy `SFERA_WORKER=1`
+worker Node nie dotyka zadań dokumentowych (`pickTask` w `worker/kolejka.ts`).
+Worker Sfery pomija zadanie, dopóki wcześniejsze `set_location` tego towaru nie
+wejdzie (`sfera-worker/sql/pick_mm_pending.sql`, niezmiennik z §5). Te same
+pliki SQL wykonuje `server/src/worker/sfera-pick.test.ts`, więc guard jest
+mierzony w CI bez dotneta. Szczegóły:
+[`sfera-worker/README.md`](../sfera-worker/README.md).
 
-- skan odpowiada od razu, bo API tylko wpisuje wiersz do kolejki i wraca —
-  nie czeka na Subiekta (docelowy p95 skan → informacja zwrotna to 150 ms,
-  mierzony u człowieka przez `scan_timing`, nie po stronie serwera),
-- zapis może się nie udać i być **ponowiony** (3 próby, backoff 5 s / 30 s /
-  2 min) bez wiedzy magazyniera,
-- worker można zatrzymać (aktualizacja Subiekta, restart) i praca w magazynie
-  toczy się dalej — zadania czekają w kolejce.
-
-### Schemat bazy ma JEDNEGO właściciela: API (0.177.1)
-
-Osobne procesy dzielą jeden plik SQLite, więc trzeba powiedzieć wprost, kto ten
-plik kształtuje. **Migruje wyłącznie serwer API, przy starcie.** Worker, sonda,
-inwentarz i rekoncyliacja bazę otwierają, ale schematu nie dotykają; zakłada go
-ten, kto bazę tworzy (API i `seed`).
-
-To nie jest ostrożność na zapas, tylko blizna z 2 września. Migracja siedziała
-w `db()`, czyli wykonywał ją każdy proces otwierający bazę — jeden wyjątek
-w niej położył API i workera naraz, a NSSM zamienił to w pętlę restartów.
-W logu workera zostawało „database is locked", czyli objaw prowadzący diagnozę
-w złe miejsce.
-
-Worker Sfery w C# pracował tak od początku i mówił to wprost
-(`sfera-worker/src/Db.cs`). Worker w Node był jedynym procesem piszącym, który
-tej zasady nie dostał.
-
-Worker, który zastanie stary schemat, **czeka i próbuje dalej** — nie kończy
-się. Proces, który pada, NSSM podnosi z powrotem, więc odmowa startu byłaby
-pętlą restartów z wyboru.
-
-Cena: **stan w Subiekcie jest opóźniony o sekundy**. Dlatego karta towaru
-pokazuje stany **skorygowane o kolejkę** (`services/stock.ts`) i chipy
-lokalizacji „w drodze" — inaczej człowiek widziałby stan sprzed własnego skanu
-i skanowałby drugi raz.
-
-### Trzeci proces: worker Sfery (`sfera-worker/`, opcjonalny)
-
-Na produkcji dokumentów MM nie da się wystawić SQL-em (numeracja, skutki
-magazynowe, wycena — domena Sfery COM), a COM żyje tylko na Windows
-z Subiektem. Stąd trzeci proces — C#/.NET, ta sama baza, ta sama kolejka —
-wykonujący **wyłącznie zadania `mm`**. Włącza go `SFERA_WORKER=1`; bez
-przełącznika nic się nie zmienia (mm kończy się czytelnym błędem, dokument
-wystawia biuro).
-
-Podział pracy jest pilnowany z obu stron:
-
-- worker Node przy `SFERA_WORKER=1` **nie dotyka** zadań `mm`
-  (filtr w `pickTask`, `worker/kolejka.ts`),
-- worker Sfery bierze wyłącznie `mm` — i **pomija** zadanie, dopóki wcześniejsze
-  niewykonane `set_location` tego samego towaru nie wejdzie
-  (`sfera-worker/sql/pick_mm_pending.sql`).
-
-Ten drugi punkt to nowy strażnik starego niezmiennika. Przy jednym workerze
-„adres przed sprzedawalnością" gwarantowała kolejność wstawienia (`ORDER BY id`,
-patrz `services/przesuniecie.ts`); dwa niezależne pollery łamią ją
-konstrukcyjnie, więc guard przeniósł się do zapytania wyboru zadania. Te same
-pliki SQL wykonuje test `server/src/worker/sfera-pick.test.ts` — zmiana guardu
-jest mierzona w CI bez dotneta.
-
-Worker Sfery melduje się w `process_state` (wiersz `sfera`) jak pozostałe
-procesy, a `/api/health` przy `SFERA_WORKER=1` raportuje jego stan i zaległe
-MM. Szczegóły wdrożenia: [`sfera-worker/README.md`](../sfera-worker/README.md).
-
----
+**Czwarty proces: usługa tła (`tlo-worker/`, opcjonalna).** Wycinanie tła wymaga
+runtime'u ONNX, czyli modułu natywnego. Serwer nie ma modułów natywnych, bo
+instaluje się go bez kompilatora na maszynie biura. Usługa słucha na pętli
+lokalnej (`TLO_URL`); bez niej zdjęcie zapisuje się z tłem. Szczegóły:
+[`tlo-worker/README.md`](../tlo-worker/README.md).
 
 ## 4. Granica do Subiekta — adaptery
 
 Cała wiedza o Subiekcie siedzi za dwoma interfejsami. Reszta kodu nie wie, czy
 pracuje na prawdziwej bazie, czy na demo.
 
-| interfejs | co robi | implementacje |
-|---|---|---|
-| `adapters/subiekt.ts` | **odczyt**: kartoteki, stany, dokumenty | `subiekt.seeded.ts` (SQLite z `products.json`), `subiekt.mssql.ts` (produkcja) |
-| `adapters/sfera.ts` | **zapis**: lokalizacja, kod kreskowy, MM | `sfera.dev.ts` (mutacja `sgt_*` — lokalizacja i MM), `sfera.sql.ts` (UPDATE w MSSQL — lokalizacja i kod kreskowy, MM rzuca błąd) + `sfera-worker/` (C#/COM) — jedyna produkcyjna implementacja MM |
+**Odczyt** to `adapters/subiekt.ts` (`subiekt.seeded.ts` z `products.json`,
+`subiekt.mssql.ts`). **Zapis** to `adapters/sfera.ts` (`sfera.dev.ts` mutuje
+`sgt_*`, `sfera.sql.ts` robi UPDATE i INSERT w MSSQL, dokumenty `sfera-worker/`).
+Wybór to **jeden przełącznik**: `SGT_MODE=seeded|mssql`. Adapter zapisu wynika
+ze źródła danych (`config.sferaMode`), więc nie da się czytać z demo i pisać do
+produkcji. `SFERA_WORKER` wybiera tylko **wykonawcę** zadań dokumentowych
+i wymaga `SGT_MODE=mssql` (walidacja w `config.ts`).
 
-Wybór adaptera jest **jednym przełącznikiem**: `SGT_MODE=seeded|mssql`. Adapter
-zapisu nie jest osobną decyzją — wynika ze źródła danych (`config.sferaMode`).
-`SFERA_WORKER` nie wybiera adaptera, tylko **wykonawcę** zadań `mm` (worker
-Node czy worker Sfery) — i wymaga `SGT_MODE=mssql`, czego pilnuje walidacja
-w `config.ts` (sprzeczne ustawienie nie przechodzi startu).
+**Czego ta granica NIE przepuszcza: okna Subiekta.** Kliknięcie w numer
+dokumentu w panelu nie otworzy go w Subiekcie. Okno wystawia **program na
+stanowisku**: przeglądarka nie sięga do COM, a Sfera na serwerze otworzyłaby
+okno na maszynie, której nikt nie ogląda. Wymagałoby to na KAŻDYM stanowisku
+protokołu `wertis://dokument/<dok_id>`, programu lokalnego i licencji Sfery — to
+ostatnie jest decyzją zakupową. Czy Sfera umie POKAZAĆ istniejący dokument, jest
+pytaniem otwartym w `docs/subiekt-gt-struktura.md`. Do tego czasu numer ma
+przycisk kopiowania do „Znajdź dokument” Subiekta.
 
-### Czego ta granica NIE przepuszcza: okna Subiekta
+**Read-model `sgt_*`.** Serwer **nie odpytuje MSSQL przy każdym skanie**.
+Importer kopiuje kartoteki, stany i dokumenty do `sgt_*` przy starcie, co
+`MSSQL_SYNC_MS` (domyślnie 60 s) i na żądanie (`POST /api/admin/resync`). Potem
+`services/po-imporcie.ts` odbudowuje identyfikatory, sekcje „Modele:” i indeks
+FTS5. Baza Subiekta stoi na maszynie, na której biuro wystawia faktury, więc
+odpytywanie jej w rytmie skanów obciążałoby tę pracę. Do rozkładania wystarczy
+stan sprzed minuty.
 
-Właściciel zapytał (2 września 2026), czy kliknięcie w numer paragonu może
-otworzyć ten dokument w Subiekcie. Odpowiedź brzmi „nie z samego panelu" i to
-wynika wprost z rysunku wyżej, a nie z braku chęci.
-
-Okno dokumentu wystawia **program na stanowisku**, nie serwer. Panel jest
-stroną w przeglądarce; przeglądarka nie ma jak sięgnąć do COM Subiekta ani na
-serwerze, ani na cudzym komputerze. Serwer też nie: gdyby wywołał Sferę u
-siebie, okno otworzyłoby się na maszynie serwera, której nikt nie ogląda.
-
-Zrobić się to daje, ale kosztem trzeciego elementu na KAŻDYM stanowisku biura:
-
-1. własny protokół (`wertis://dokument/<dok_id>`) wpisany do rejestru Windows,
-2. mały program lokalny, który ten protokół obsługuje i woła Sferę,
-3. licencja Sfery na tym stanowisku — bez niej COM nie wystartuje.
-
-Punkt 3 jest twardy: dziś Sfery wymaga tylko `sfera-worker/`, czyli jedna
-maszyna. Rozłożenie tego na biurka jest decyzją zakupową, nie techniczną.
-Czy Sfera w ogóle umie POKAZAĆ okno istniejącego dokumentu, zamiast wystawić
-nowy — pytanie otwarte, oznaczone w `docs/subiekt-gt-struktura.md`.
-
-Do tego czasu ekran robi rzecz, która działa wszędzie i od razu: numer
-dokumentu ma przycisk kopiowania (0.176.0), a numer wklejony w „Znajdź
-dokument" Subiekta prowadzi do tego samego okna dwoma klawiszami.
-
-<!-- docs_check: historia -->
-Był kiedyś drugi przełącznik, `SFERA_MODE`. Usunięto go, bo dawało się ustawić
-oba sprzecznie: czytać z demo i pisać do produkcji. Jeśli natrafisz na niego
-w starym `wertis.env`, po prostu go skasuj — dziś nic go nie czyta.
-
-### Read-model `sgt_*`
-
-Serwer **nie odpytuje MSSQL przy każdym skanie**. Importer kopiuje kartoteki,
-stany i dokumenty do lokalnych tabel `sgt_*` przy starcie, co `MSSQL_SYNC_MS`
-(domyślnie 60 s) i na żądanie (`POST /api/admin/resync`). Po każdym imporcie
-(i po seedzie) `services/po-imporcie.ts` odbudowuje pochodne opisów:
-identyfikatory, sekcje „Modele:” i indeks FTS5 — poza transakcją importu,
-każdą w osobnym try/catch.
-
-Powód jest praktyczny: baza Subiekta stoi na tej samej maszynie co Subiekt,
-z którego korzysta biuro. Odpytywanie jej z częstotliwością skanów obciążałoby
-system, na którym ludzie wystawiają faktury. Stany na ekranie są więc **do 60 s
-opóźnione** — i to jest akceptowalne, bo do rozkładania towaru wystarczy
-wiedzieć, że coś jest, a nie ile dokładnie w tej sekundzie.
-
-### Stan to nie to samo co „leży w regale"
-
-Przy dostawie krajowej skutek magazynowy niesie sam dokument w Subiekcie —
-księgowany wprost na MAG. Towar figuruje więc w stanie od chwili zaksięgowania,
-choć fizycznie stoi na palecie w przyjęciach.
-
-Kafel „MAG · DOSTĘPNE" pokazywał z tego powodu 12 szt przy pustej półce
-i nie mówił dlaczego. Karta ma dziś osobną sekcję **„w dostawie, nierozłożone"**
-(`services/dostawy-towaru.ts`): dokumenty z ostatnich 14 dni, na których ten
-towar przyjechał, minus to, co już odłożono.
-
-Liczbę składają dwa źródła i to jest jej cała logika:
-
-- **`sgt_pozycja` + `sgt_dokument`** — co przyszło, wprost z lustra Subiekta,
-- **`delivery_line.ilosc_odlozona`** — co z tego trafiło w regał.
-
-Kryterium „co jest dostawą" siedzi w adapterze obok `listDeliveryDocuments`,
-a nie w serwisie. Dwie kopie tego warunku rozjechałyby się przy pierwszej
-zmianie, a objawem byłby towar policzony dwa razy albo wcale.
-
-Kontener na MGP wchodzi tu od 0.22.0, odkąd rozkłada się tą samą ścieżką. Nie
-dubluje to kafla strefy przyjęć: kafel mówi, ILE tam stoi, a ten wiersz — na
-którym dokumencie i ile z tego nie ma jeszcze adresu.
-
----
+**Stan to nie to samo co „leży w regale”**, bo dokument krajowy księguje towar
+na MAG, zanim zejdzie z palety. Karta pokazuje więc „w dostawie, nierozłożone”
+(`services/dostawy-towaru.ts`). Kryterium „co jest dostawą” stoi w jednym
+miejscu, obok `listDeliveryDocuments`, bo dwie kopie liczyłyby towar podwójnie.
 
 ## 5. Rozkładanie i przesunięcie stanu
 
-Szczegóły w `docs/analiza-rozkladanie.md`; tu tylko podział.
+Kroki i reguły opisuje `docs/analiza-rozkladanie.md`. **Rozkładanie jest
+jedno** i zapisuje wyłącznie adres. Po odłożeniu na `MAG` (dostawa krajowa) nie
+zostaje nic, a na `MGP` (kontener) zostaje stan do przesunięcia na halę.
+O skutku decyduje **magazyn, nie typ dokumentu**, bo ten sam `dok_Typ` bywa
+księgowany na różne magazyny. **Przesunięcie stanu jest osobną czynnością**
+z karty towaru albo z wiersza dostawy; MM wystawia worker Sfery albo biuro.
 
-**Rozkładanie jest jedno** i zapisuje wyłącznie adres. Magazyn skutku mówi,
-co zostaje po nim:
+**Niezmiennik: adres przed sprzedawalnością.** `set_location` trafia do kolejki
+**przed** `mm`, inaczej handlowiec widziałby towar, a magazynier nie wiedziałby,
+gdzie po niego iść. **Pomyłkę w liczeniu odkręca korekta (`korygujIlosc`), nie
+wyjątek.** `ilosc_odlozona` jest licznikiem po stronie WERTIS, a wyjątek jest
+twierdzeniem wobec dostawcy i idzie do protokołu. Blokad pozycji nie ma, bo
+dostawę rozkłada jedna osoba; podwójne odłożenie poprawia ta sama korekta.
+**Notatka biura trzyma dostawę otwartą**: bramka stoi w `closeIfComplete`, bo
+ostatnie odłożenie też domyka dostawę. **Karton jest rodzajem kosza** (tabela
+`kosz`, kolumna `rodzaj`), bo po zatwierdzeniu rozkłada się co do znaku jak
+kosz. Dla kartonu `zakonczKosz` nie kolejkuje dokumentu: towar nie opuścił
+magazynu.
 
-| magazyn skutku | co to jest | co zostaje po odłożeniu |
-|---|---|---|
-| `MAG` | dostawa krajowa | nic — towar leży na hali z adresem |
-| `MGP` | kontener importowy | stan do przesunięcia na halę |
+## 6. Tożsamość
 
-**Przesunięcie stanu jest osobną czynnością**, nie końcem sesji. Do 0.22.0
-dokument MM umiał powstać wyłącznie przy zatwierdzeniu wózka w trybie
-kontenerowym; dziś wychodzi z karty towaru i z wiersza dostawy, dla dowolnej
-pary magazynów.
+**Login i hasło → token sesji urządzenia.** Hasło leży w `app_user` jako hasz
+(scrypt, sól per konto, porównanie stałoczasowe), minimum osiem znaków. Każda
+operacja niesie `user_ref`. Nagłówek `x-user` zostaje podpowiedzią nazwy,
+kodowaną procentowo w UTF-8 (`userOf()`), bo OkHttp odmawia polskiej litery.
+Nieznany login i błędne hasło wyglądają identycznie, także w czasie odpowiedzi,
+bo czas zdradzałby istniejące konta. Pięć pomyłek zamyka login na minutę
+odpowiedzią 429, nie 401: kolektor po 401 kasuje operację z bufora offline.
+Login jest daną osobową, więc `GET /api/users` dostają tylko role biura. Kont
+się nie kasuje (`active = 0`), bo `events` musi mieć na co wskazywać.
 
-Kolejkowanie jest bezwarunkowe, wykonanie nie: przy `SFERA_WORKER=1` dokument
-MM wystawia worker Sfery (§3), a przy wyłączonym zadanie kończy się czytelnym
-błędem i dokument wystawia ręcznie biuro — adres na półce zapisuje się
-w obu wariantach.
+**Sesja nie wygasa sama** — trwa do wylogowania, bo kolektory nie opuszczają
+hali. **Role:** `magazynier`, `biuro`, `admin`. Role biura bierze się
+z `ROLE_BIUROWE` (`services/users.ts`). Operacje uprzywilejowane — konta,
+domknięcie dostawy poza WERTIS, zwrot pieniędzy, werdykt reklamacji,
+konfiguracja i aktualizacja serwera — stoją w jednej tabeli w
+`services/auth.ts` i przechodzą przez `autoryzuj()`. Drugiego czynnika nie ma:
+porzucony zalogowany kolektor pozwala na wszystko, co może jego właściciel.
 
-Że o skutku decyduje **magazyn, nie typ dokumentu**, kosztowało jeden nieudany
-projekt modelu danych: `dok_Typ` nie mówi, gdzie towar wyląduje, bo ten sam typ
-bywa księgowany na różne magazyny. Decyduje `mag_Id`, snapshotowany w chwili
-otwarcia dostawy — żeby przeksięgowanie dokumentu w połowie pracy nie zmieniło
-reguł w jej trakcie.
+**Pierwsze konto** powstaje bez sesji (`POST /api/users`) z panelu albo
+z kreatora na kolektorze, z wymuszoną rolą `admin`. Furtka zamyka się przy
+pierwszym koncie Z LOGINEM, bo konta-ślady po migracji zamknęłyby ją na każdej
+istniejącej instalacji. W trybie `seeded` pusta baza dostaje konto demo
+`admin`/`admin`; w `mssql` nie powstaje nigdy.
 
-### Pomyłkę w liczeniu odkręca korekta, nie wyjątek
-
-Skan półki dodaje sztuki i nigdy ich nie odejmuje, więc do 0.45.0 jedyną drogą
-cofnięcia było zgłoszenie wyjątku — czyli wpis do protokołu rozbieżności,
-dokumentu idącego do dostawcy. Pomyłka w liczeniu zamieniała się w reklamację.
-
-`korygujIlosc` ustawia wartość **bezwzględną** i przelicza z niej status
-pozycji. Nie tworzy zadania w kolejce Sfery, nie kasuje zapisanego adresu i nie
-tworzy wyjątku: `ilosc_odlozona` jest licznikiem postępu po stronie WERTIS,
-więc poprawka jest lokalna. Pozycja ze zgłoszonym wyjątkiem jest poza jej
-zasięgiem — wyjątek jest twierdzeniem wobec dostawcy i żyje własnym trybem.
-
-Od 0.47.0 korekta jest też jedyną drogą odkręcenia **podwójnego odłożenia**.
-Blokady pozycji wyszły razem z rolą brygadzisty, więc dwie osoby przy jednym
-kartonie mogą policzyć tę samą pozycję dwa razy. Widać to na liście
-(„odłożono 8 z 5") i poprawia bez niczyjej zgody.
-
-### Notatka biura trzyma dostawę otwartą
-
-Biuro dopisuje do dostawy pytanie (`delivery_note`), a rozkładający musi na nie
-odpowiedzieć, zanim faktura się domknie. Bramka stoi w `closeIfComplete`, a nie
-tylko przy przycisku zakończenia — inaczej odłożenie ostatniej pozycji
-domykałoby dostawę z pytaniem bez odpowiedzi.
-
-Odpowiadanie jest świadomie **bez bramki roli**: odpowiada człowiek przy
-palecie, bo to on sprawdza, czy dosłali. Pisanie notatki jest pod `/api/biuro`,
-odpowiadanie przy trasach kolektora — i ten podział jest całą regułą.
-
-### Niezmiennik: adres zawsze przed sprzedawalnością
-
-Przy przesunięciu zadanie `set_location` trafia do kolejki **przed** zadaniem
-`mm`. Kolejka jest FIFO, więc towar staje się sprzedawalny dopiero wtedy, gdy
-wiadomo, gdzie leży. Odwrotna kolejność dawałaby okno, w którym handlowiec widzi
-towar dostępny, a magazynier nie wie, gdzie po niego iść — i przy nieudanym
-zapisie adresu stan ten byłby trwały.
-
-Przy `SFERA_WORKER=1` samo FIFO przestaje wystarczać — zadania biorą dwa
-niezależne procesy. Gwarantem staje się wtedy guard w zapytaniu wyboru zadania
-mm (`sfera-worker/sql/`, opis w §3): MM stoi, dopóki wcześniejsze niewykonane
-`set_location` tego samego towaru nie wejdzie.
-
-### Karton jest rodzajem kosza, nie własną tabelą
-
-Rozkładanie ma trzy źródła pracy: dokument dostawy, kosz zwrotowy i — od
-0.122.0 — KARTON, czyli pudło z towarem źle zebranym pod zamówienia. Karton
-nie ma dokumentu i nigdy nie będzie go miał: towar nie opuścił magazynu.
-
-Mimo to siedzi w tabeli `kosz`, odróżniony kolumną `rodzaj`. Powód jest jeden
-i mierzalny: od chwili zatwierdzenia rozkładanie kartonu jest **co do znaku**
-tym samym, co rozkładanie kosza. Ten sam skan towaru, ten sam skan półki, to
-samo pomijanie z powodem, te same trzy drogi powrotne z pomyłki. Osobna tabela
-znaczyłaby przepisanie sześciuset linii `services/kosze.ts` i drugi zestaw
-usterek w kodzie, który już raz je przeszedł.
-
-Różnice są dwie i obie mają w kodzie jedno miejsce. Zawartość kartonu zbiera
-HALA, bo nikt inny jej nie zna — to `services/karton.ts` i faza `otwarty`.
-A `zakonczKosz` nie kolejkuje dla kartonu **żadnego** dokumentu: MM ZWROTY→MAG
-zdjęłoby z bufora zwrotów stan, którego na tym buforze nigdy nie było.
-
----
-
-## 6. Tożsamość (§7)
-
-Do lipca 2026 „użytkownik" był dowolnym łańcuchem wpisywanym na kolektorze
-i wysyłanym w `X-User`. Każdy mógł podać się za kogokolwiek, a `events.user_id`
-zbierał warianty tej samej osoby.
-
-`X-User` został jako podpowiedź dla instalacji bez badge'ów. Od 0.60.3 jego
-wartość jedzie **zakodowana procentowo w UTF-8**, bo OkHttp odmawia wysłania
-nagłówka ze znakiem spoza zakresu ASCII drukowalnego. Serwer odkodowuje ją
-w `userOf()`. Powód jest twardy: bez tego kolektor ginął przy nazwisku
-z polską literą.
-
-Dziś: **login i hasło → token sesji urządzenia**. Hasło leży w `app_user`
-wyłącznie jako hasz (scrypt, sól per konto, porównanie stałoczasowe), minimum
-osiem znaków, bez wymagań na klasy znaków.
-
-Trzy decyzje, każda z powodem:
-
-- **Nieznany login i błędne hasło wyglądają identycznie** — jeden komunikat
-  i ten sam czas odpowiedzi, bo nieznany login też przechodzi przez scrypt po
-  atrapie hasza. Bez tego czas odpowiedzi mówi, które konta istnieją.
-- **Pięć nieudanych prób zamyka login na minutę.** Licznik żyje w pamięci
-  procesu, odpowiedź to 429, nie 401 — kolektor po 401 kasuje operację z bufora
-  offline, więc kod błędu jest tu decyzją o cudzej pracy, nie kosmetyką.
-- **Login JEST daną osobową**, w odróżnieniu od kodu plakietki. To realna
-  strata przy tej zmianie i nie ma sensu jej przemilczać: `GET /api/users`
-  wystawia listę loginów, więc zostaje zastrzeżone dla ról `biuro` i `admin`.
-
-<!-- docs_check: historia -->
-Do sierpnia 2026 tożsamością był skan plakietki `PRC-0007-3` — prefiks, numer
-nadawany przez serwer i cyfra kontrolna licząca wagami 3-1-3-1. Jedna sekunda
-zamiast wpisywania, kod bez nazwiska (plakietka się gubi i zostaje na kurtce)
-i kategoria zamknięta w klasyfikatorze skanów. Wypadło razem z PIN-em w 0.20.0,
-bo firma wszędzie indziej loguje się loginem i hasłem, a dwa wzorce naraz to
-dwa razy tyle do wytłumaczenia nowej osobie.
-
-### Sesja nie wygasa sama
-
-Sesja urządzenia trwa do jawnej decyzji człowieka: wylogowania z Ustawień.
-Bezczynność jej nie rusza — kolektor odłożony na regale na całą przerwę wraca
-do otwartej dostawy bez logowania.
-
-Do sierpnia 2026 działał tu TTL: po 10 minutach sesja przechodziła w stan
-`zablokowana`, kolektor pokazywał pełnoekranowy komunikat, a zapis dostawał
-z serwera 423. Blokada nigdy nie gubiła pracy — zachowywała token, dostawę
-i postęp — więc jej jedynym mierzalnym skutkiem był skan przy każdym powrocie
-do urządzenia.
-
-Kupowała za to obronę przed scenariuszem, który tu nie występuje: kolektory nie
-opuszczają hali.
-
-### Zmiana osoby to wylogowanie i zalogowanie
-
-Przy plakietce ten sam gest — skan — znaczył trzy różne rzeczy naraz, więc
-kolektor musiał pytać „przejąć pracę?", zamiast przełączać po cichu. Przy haśle
-nie ma czego przejmować: kto siada do kolektora, ten się loguje, a poprzednik
-wylogowuje. Audyt na tym nie traci, bo każda operacja i tak niesie własne
-`user_ref` — przejęcie było zdarzeniem o SESJI, nie o pracy.
-
-### Aktualizacja kolektora idzie z serwera, nie z CI
-
-Do 0.52.0 nowy APK wgrywał człowiek: artefakt z GitHuba, potem MDM albo
-`adb install` na każdym urządzeniu. Od 0.52.0 plik leży w `server/data/apk/`,
-a kolektor pyta o niego przy otwarciu aplikacji. Wersję niesie NAZWA pliku —
-czytanie `versionName` z APK znaczyłoby własny dekoder binarnego
-`AndroidManifest.xml` dla jednego pola.
-
-Obie trasy (`GET /api/aktualizacja` i `/api/aktualizacja/apk`) są poza bramką
-sesji. Powód jest ten sam, co przy kreatorze kont: bez nich kolektora, którego
-aplikacja jest zepsuta albo przestarzała, nie da się doprowadzić do stanu,
-w którym da się zalogować. Konsekwencja jest jawna — plik pobierze każdy w sieci
-magazynu, więc do APK nie wolno wbudować niczego tajnego.
-
-Tym, co odróżnia aktualizację WERTIS od dowolnego APK podanego kolektorowi
-z tej samej sieci, jest PODPIS: Android odmawia instalacji pliku podpisanego
-innym kluczem. Suma SHA-256 chroni wyłącznie przed uszkodzeniem w transporcie,
-bo przychodzi tym samym kanałem co plik. Dlatego klucz wydania jest tu
-zabezpieczeniem nośnym, a nie higieną, i nie może leżeć w repozytorium.
-
-### Operacje uprzywilejowane rozstrzyga rola
-
-Dwie operacje są zastrzeżone dla ról:
-
-- **zarządzanie kontami** — jedyna operacja tworząca *tożsamość*, dlatego
-  zastrzeżona dla roli `biuro`. Człowiek z hali mogący zakładać konta założyłby
-  konto biura z własnym hasłem i reszta reguł przestałaby cokolwiek znaczyć,
-- **domknięcie dostawy jako rozłożonej poza WERTIS** (`biuro`) — jedyna
-  operacja zdejmująca pracę z listy bez ani jednego skanu. Hali tu nie ma
-  świadomie: to *orzeka*, że pracy nie ma. Wymaga powodu wpisanego z ręki
-  i zawsze idzie do `events`; dostępna wyłącznie z panelu biura, nigdy z kolektora.
-
-Trzecia — zdjęcie cudzej blokady pozycji — zniknęła w 0.47.0 razem z samymi
-blokadami i rolą brygadzisty, która istniała głównie dla niej.
-
-Drugiego czynnika nie ma. Do 0.20.0 obie wymagały PIN-u, bo plakietkę dawało
-się pożyczyć razem z tożsamością. Hasła się tak nie pożycza — ale porzucony
-zalogowany kolektor pozwala teraz obcej osobie na wszystko, co może jego
-właściciel, i to jest cena zapisana wprost w `services/auth.ts`.
-
-### Konta zakłada się z kolektora
-
-Pusta instalacja → ekran startowy proponuje kreator (`ui/setup/`). Pierwsze
-konto powstaje **bez sesji**, ale tylko dopóki nie ma ani jednego konta
-Z LOGINEM — furtka zamyka się przy pierwszym takim koncie i jest wymuszona jako
-konto biura, bo będzie jedyną drogą do wszystkich następnych.
-
-Warunek liczy konta z loginem, nie wiersze, i to nie jest szczegół
-implementacji. Konta-ślady po migracji historii zostają w tabeli na zawsze;
-gdyby liczyły się do tego warunku, furtka byłaby na każdej istniejącej
-instalacji zamknięta na głucho: żeby założyć konto, trzeba sesji, a żeby mieć
-sesję, trzeba konta.
-
-Kolejność wysyłki nie jest dowolna: biuro idzie pierwsze niezależnie od
-kolejności wpisywania. Gdyby poszedł pierwszy magazynier, zająłby tę jedyną
-furtkę i reszta listy odbiłaby się od 401 z kontami założonymi w połowie.
-
----
+**Aktualizacja kolektora idzie z serwera.** APK leży w `server/data/apk/`,
+a wersję niesie nazwa pliku. `GET /api/aktualizacja` i `/api/aktualizacja/apk`
+są poza bramką sesji, bo zepsutej aplikacji nie da się inaczej doprowadzić do
+logowania. Do APK nie wolno więc wbudować niczego tajnego. Obcy plik odrzuca
+Android po PODPISIE, a suma SHA-256 chroni tylko transport. Klucz wydania jest
+zabezpieczeniem nośnym i nie leży w repozytorium.
 
 ## 7. Klasyfikacja skanu — jedno źródło reguły
 
-Ze skanera przychodzi łańcuch znaków. Trzeba rozstrzygnąć, czym jest.
-
 ```
-prefiks LOC:  →  adres (etykieta QR)
+prefiks LOC:   →  adres (etykieta QR)
 wzorzec adresu →  adres          A01-02-03 (2 myślniki) | PAL-042
 13 cyfr        →  EAN
 reszta         →  tekst (wyszukiwarka)
 ```
 
-**`LOC` jest kategorią ZAMKNIĘTĄ**: kod, który nie pasuje do wzorca, adresem nie
-jest — nigdy nie „spróbujemy mimo wszystko". Wzorzec należy do **serwera**
-(`config.locPatterns`), a kolektor pobiera go w `GET /api/locations` i nie ma
-własnej kopii.
+**`LOC` jest kategorią ZAMKNIĘTĄ**: kod spoza wzorca adresem nie jest. Wzorzec
+należy do serwera (`config.locPatterns`), a kolektor pobiera go z
+`GET /api/locations`. Adres i symbol są rozłączne **po liczbie myślników**;
+reguła w kilku kopiach pozwoliłaby symbolowi `W32-0203` zapisywać widmowe
+adresy. Przed pobraniem reguły adresem jest tylko kod z prefiksem `LOC:`.
 
-Powód jest historyczny i konkretny: ta sama reguła żyła kiedyś w czterech
-miejscach w trzech różnych kształtach, przez co symbol towaru `W32-0203` udawał
-lokalizację i zapisywał widmowe adresy. Formaty są rozłączne **po liczbie
-myślników** i to jest cały dyskryminator.
-
-Zanim kolektor pobierze regułę, pracuje ostrożnie: adresem jest wyłącznie kod
-z prefiksem `LOC:`. Ostrożnie ≠ zgadywać.
-
-### Kontekstem jest otwarty ekran
-
-Skan robi to, co widać:
-
-| sytuacja | skutek |
-|---|---|
-| karta towaru otwarta + skan regału | **ten** towar dostaje ten adres |
-| skan regału bez otwartej karty | pokaż zawartość regału |
-| skan towaru | otwórz jego kartę |
-
-Istniał wcześniej „kontekst przyklejony" — pierwszy skan przypinał regał albo
-towar, kolejne wpadały w to przypięcie. Oszczędzał skany (8 indeksów na jeden
-regał = 9 skanów zamiast 16), ale dało się mieć **przypięty towar A i otwartą
-kartę towaru B**. Adres zapisany na niewłaściwy towar jest błędem cichym: nic
-nie wygląda na zepsute, dopóki ktoś nie pójdzie po ten towar. Mechanizm
-wycięto — siedem skanów tego nie warte.
-
----
+**Kontekstem jest otwarty ekran**: skan regału przy otwartej karcie nadaje
+adres TEMU towarowi, bez karty pokazuje regał, a skan towaru otwiera kartę.
+Ukrytego stanu między skanami nie ma, bo adres na złym towarze to błąd cichy.
 
 ## 8. Offline
 
-Magazyn ma martwe punkty Wi-Fi przy metalowych regałach. Bufor jest więc
-wymaganiem, nie ozdobą.
-
-**Buforujemy tylko awarie sieci.** Błąd serwera (`ApiError`) propaguje do UI
-i nie trafia do bufora — bo „serwer odmówił" znaczy coś innego niż „nie było
-zasięgu", a zbuforowana odmowa wracałaby w kółko.
-
-Operacja z bufora niesie **konto autora z chwili wykonania** (`x-buffered-user`).
-Bez tego dwanaście pozycji odłożonych przez Jana poza zasięgiem dostałoby
-nazwisko Piotra, który przejął kolektor, zanim wróciło Wi-Fi — czyli ta sama
-cicha podmiana tożsamości, przed którą broni jawne przejęcie pracy, tylko
-wejściem od tyłu. Serwer przyjmuje nagłówek tylko wtedy, gdy wskazuje istniejące
-konto, a fakt wysyłki przez kogoś innego zapisuje w payloadzie zdarzenia.
-
----
+Magazyn ma martwe punkty Wi-Fi, więc bufor jest wymaganiem. **Buforujemy tylko
+awarie sieci**; błąd serwera (`ApiError`) idzie do UI, bo zbuforowana odmowa
+wracałaby w kółko. Przejściowe 5xx, 408 i 429 zostawiają operację w buforze.
+Operacja z bufora niesie **konto autora z chwili wykonania**
+(`x-buffered-user`), żeby praca Jana nie dostała nazwiska Piotra, który przejął
+kolektor.
 
 ## 9. Audyt i pomiar
 
-`events` to jedyna tabela, do której piszą wszystkie warstwy: **31 typów
-zapisywanych przez serwer** plus 3 przysyłane przez kolektor (`device_drop`,
-`battery_low`, `scan_timing` — lista dozwolonych w `routes/device.ts`, żeby
-klient nie mógł wstrzyknąć dowolnego typu). Każdy wiersz niesie `user_id`
-(tekst), `user_ref` (konto), `device_id` i payload JSON.
+`events` to jedyna tabela, do której piszą wszystkie warstwy; każda mutacja
+woła `logEvent`. Kolektor przysyła tylko typy z listy w `routes/device.ts`.
+Wiersz niesie `user_id`, `user_ref`, `device_id` i payload JSON. Historii **nie
+kasujemy i nie nadpisujemy**; zdarzenie bez autora zostaje z `NULL`. **`events`
+nie ma retencji**: to rząd 10⁵ wierszy rocznie, a reklamacja przychodzi po
+miesiącach. O archiwizacji decyduje właściciel, nie kod, więc do `events` nie
+trafia treść, którą trzeba by kiedyś skasować.
 
-Historii **nie kasujemy i nie nadpisujemy**: `user_id` został jako tekstowy
-snapshot tego, co aplikacja wtedy wiedziała, a `user_ref` doszedł obok.
-Zdarzenie, którego nie da się przypisać, zostaje z `NULL` — to jest uczciwe,
-w odróżnieniu od zgadywania po podobieństwie.
+Raporty: cztery liczby (`GET /api/metrics`: dotknięcia na pozycję, p95 skanu,
+etykiety do przedruku, towary bez kodu), rekoncyliacja (`GET /api/reconcile`,
+`npm run reconcile`; zerowy wynik nie tworzy raportu), analiza
+(`GET /api/analiza` + `/csv`), przeslotowanie (`npm run reslot`, 1–2× w roku),
+kandydaci do strefy złotej (`GET /api/biuro/zbiorki/kandydaci`) i ślad audytowy
+(`GET /api/events` + `/csv`, role biura).
 
-| raport | trasa | co mówi |
-|---|---|---|
-| Cztery liczby | `GET /api/metrics` | dotknięcia/pozycję, p95 skanu, etykiety do przedruku, towary bez czytelnego kodu |
-| Rekoncyliacja | `GET /api/reconcile`, `npm run reconcile` | 4 kontrole (czwarta, `mm_czeka`, tylko przy `SFERA_WORKER=1`); zerowy wynik **nie tworzy raportu** |
-| Wydajność per osoba | `GET /api/analiza`, pole `wydajnosc` — tylko admin | patrz ostrzeżenie niżej |
-| Przeslotowanie | `npm run reslot` | pion i martwe kartoteki, 1–2× w roku |
-| Kandydaci do strefy złotej | `GET /api/biuro/zbiorki/kandydaci` (+ `/csv`) | bieżąca rotacja ze zbiórek Sellasist; ten sam próg co reslot |
-| **Ślad audytowy** | `GET /api/events`, `/api/events/csv` | surowe zdarzenia z filtrem; rola biura albo admina |
+**Łańcuch „poprosił → wykonane” jest pełny.** Po `location_set` oba workery
+dopisują `queue_applied`, `queue_retry` albo `queue_failed`, z autorem
+z `sfera_queue.created_by_ref` (strona C#: `sfera-worker/src/Queue.cs`).
+Odrzucone żądania zapisuje hook `onSend` jako `http_rejected`. **Ciała żądania
+nie zapisujemy nigdy**, bo przez `POST /api/users` idzie hasło
+(`routes/audyt.test.ts`). `BEZ_AUDYTU_404` w `context.ts` wycisza 404 tras
+pytanych przy każdym rysowaniu wiersza, gdzie „nie ma” jest normą. Śladu nie
+zostawi operacja z bufora urządzenia, które zginie przed powrotem sieci.
+Odrzuconą trwale kolektor zgłasza jako `klient_odrzucona`.
 
-### Łańcuch „poprosił → wykonane" musi być pełny w obie strony
+**Raport wydajności to monitoring pracowniczy.** Raport per osoba podlega
+Kodeksowi pracy (art. 22² i nast.): wymaga zapisu w regulaminie albo
+obwieszczeniu i uprzedzenia pracowników **2 tygodnie przed** uruchomieniem.
+Odpowiedź niesie pole `podstawaPrawna`. Raport widzi tylko admin
+w `GET /api/analiza`; biuro dostaje `wydajnosc: null`. Sprawy klienta też nie mają
+zestawień per osoba (`docs/obsluga-klienta-calosc.md`). Reguły raportu mają
+testy: zgłoszony problem nie obciąża zgłaszającego, kolumny błędów nie ma, a
+tempo poniżej 20 pozycji to `null`.
 
-Raporty wyżej agregują. Reklamacja potrzebuje czegoś innego: pojedynczego
-zdarzenia z godziną i nazwiskiem. Do sierpnia 2026 łańcuch urywał się w dwóch
-miejscach i oba były po tej samej stronie — po stronie SKUTKU.
+**Migawka doby i raport tygodnia.** `events` pamięta czynności, nie stan.
+Takt `raporty` (§10) zapisuje `migawka_dnia` tymi samymi funkcjami co ekrany
+i zamrożony `raport_tygodnia`; zmiana reguły podbija `WERSJA_RAPORTU`. Raport
+nie niesie ludzi. `pominiecia_dzien` liczy rozmowy zostawione bez ruchu, bez
+autora i godziny, i nie woła `logEvent` (`services/tarcie.ts`).
 
-`location_set` mówił, że człowiek o coś POPROSIŁ. Czy zapis wszedł do Subiekta,
-nie mówiło nic: sukces nie był logowany, a porażka istniała wyłącznie jako
-`error_msg` w wierszu kolejki, czyli poza tabelą, w której ktokolwiek by jej
-szukał. Dziś **oba workery** — Node i Sfery — dopisują `queue_applied`,
-`queue_retry` i `queue_failed`, a autora biorą z `sfera_queue.created_by_ref`,
-bo działają poza żądaniem i sesji tam nie ma. To jedyne miejsce, w którym ślad
-audytowy przekracza granicę Node/C#, i strona C# honoruje tę samą regułę autora
-(`sfera-worker/src/Queue.cs`).
+## 10. Praca w tle — takty
 
-Drugie urwanie to **odrzucenia**. Żądanie zwrócone z 400 nie zostawiało nic,
-więc „skanowałem i się nie zapisało" dało się zbyć zdaniem „nie widzę takiej
-operacji" — prawdziwym i jednocześnie nieprawdziwym. Hook `onSend` zapisuje je
-jako `http_rejected`.
+Pracę w tle uruchamia wyłącznie `main()` w `server/src/index.ts`, nigdy
+`buildApp()`. Testy tras nie mają prawa strzelać do Allegro ani wydawać
+pieniędzy na model. Każda pętla idzie przez `uruchomTakt`
+(`services/takt.ts`): rozrzut ±10% odstępu, losowy start i odczekanie
+`Retry-After` po 429. Równy rytm kilku pętli z jednego adresu wygląda dla
+Allegro jak maszyna i skończył się już blokadą IP.
 
-**Ciała żądania nie zapisujemy nigdy** — przez `POST /api/users` przechodzi
-hasło, a log audytowy z hasłami w środku jest gorszy niż jego brak. Pilnuje tego osobna
-asercja w `routes/audyt.test.ts`. Z tego samego powodu `401` na `GET` jest
-pomijane: karta odpytuje serwer co 2 s i wygasła sesja utopiłaby resztę audytu
-w szumie.
+Takty Allegro (skrzynka, zwroty, rabaty, reklamacje, zamówienia, oferty,
+dosyłki, sonda rzeczywistości) wymagają `ALLEGRO_CLIENT_ID` i trybu `http`.
+Takty modelu (auto-szkic, auto-klasyfikacja, szkice przed pracą, automat wiedzy,
+pasowanie z sieci) wymagają przełącznika w `wertis.env` i klucza. Zawsze chodzą
+`noc` (kopia bazy, rekoncyliacja), `raporty`, `wydania` i `autoaktualizacja`.
+Każda końcówka Allegro ma **własny takt**, żeby błąd jednej nie zabierał
+drugiej. Kopia bazy to `VACUUM INTO`, w nocy i przed każdą migracją, bo zwykłe
+kopiowanie w trybie WAL gubi zapisy.
 
-Ta sama reguła objęła w 0.52.3 **brak zdjęcia kartoteki**, i to na dowodach
-z produkcji: w oknie czterech dni 355 z 1000 zdarzeń było wpisem „404 Brak
-zdjęcia", przy 301 różnych kartotekach i zerze trafień, bo instalacja nie ma
-włączonych `ZDJECIA_*`. Prawdziwych odrzuceń było w tym samym oknie pięć.
-Kolektor pyta o miniaturę każdego rysowanego wiersza, więc częstotliwość bierze
-się z rysowania ekranu, a nie z pracy człowieka — a brak zdjęcia jest
-odpowiedzią, nie odmową: nikomu niczego nie odebrano.
+**Allegro.** Klient HTTP stoi w `adapters/allegro.http.ts`, a kształt czyta się
+z `docs/allegro/swagger.yaml`, nie z pamięci. Dane lądują w surowych tabelach
+`allegro_*`, a do spraw przechodzą tylko pola opisane w
+`docs/obsluga-klienta.md`. Wysyłki idą przez `outbox`, jeden wiersz na próbę,
+żeby niejednoznaczny timeout miał gdzie zostać. Kolejki — skrzynka, zwroty,
+reklamacje, dyskusje — są NASZE, nie klienta. `services/droga-klienta.ts`
+wiąże je po numerze zamówienia w obie strony (`docs/obsluga-klienta-calosc.md`).
 
-Lista wyciszonych tras (`BEZ_AUDYTU_404` w `context.ts`) jest wąska celowo.
-Wpis wymaga OBU warunków naraz: częstotliwości rysowania ekranu i normalności
-odpowiedzi „nie ma". Sam brak czegoś nie wystarcza — inaczej lista zjadłaby
-cały audyt odrzuceń, czyli to, po co on istnieje.
+## 11. Copilot i Jev
 
-### Czego ślad nie obejmie
+Tekst dla klienta układa Claude, wołany wyłącznie z
+`adapters/copilot.anthropic.ts` — to jedyny import `@anthropic-ai/sdk`.
+Rozpoznawanie wiadomości może iść do Jeva (`adapters/copilot.jev.ts`), który
+tekstu nie generuje. Klasyfikację woła się przez `nadawcaKlasyfikacji`
+(`adapters/copilot.klasyfikator.ts`); wybór `KLASYFIKATOR_DOSTAWCA` zapada przy
+każdym wywołaniu, żeby wszystkie drogi szły do jednego dostawcy. Głównym
+wyłącznikiem jest `COPILOT_MODE`. Każde wywołanie modelu bez kliknięcia ma
+własny przełącznik, domyślnie wyłączony: coś, co wydaje pieniądze samo, włącza
+się decyzją, nie aktualizacją. Klucza nie ma w `config`, bo `config` bywa
+wypisywany do diagnostyki; SDK czyta `ANTHROPIC_API_KEY` sam.
 
-Operacja wykonana bez Wi-Fi żyje w pliku na kolektorze aż do połączenia.
-Urządzenie zginie przed odzyskaniem sieci — śladu nie ma i **żadna zmiana po
-stronie serwera tego nie naprawi**. Lukę zawęża to, że buforowana jest wyłącznie
-zmiana lokalizacji.
+## 12. Wydanie i aktualizacja
 
-Co dało się naprawić, naprawione: bufor przestał kasować operacje przy
-przejściowym błędzie serwera (5xx/408/429 zostawiają je w kolejce), a operacja
-odrzucona trwale idzie na serwer jako `klient_odrzucona`. Prefiks `klient_` jest
-celowy — to relacja urządzenia, nie fakt zaobserwowany przez serwer.
+PR z fragmentem `zmiany/<nazwa>.md` → zielone CI → auto-scalanie →
+`wydanie.yml` (numer, CHANGELOG, tag) → `android.yml` (podpisany APK)
+i `paczka.yml` (ZIP serwera z SHA-256) → takt `wydania` na serwerze. Numer
+nadaje automat z fragmentów `zmiany/*.md`, więc PR-y nie kłócą się
+o wersję. Zmiany zapisu do Subiekta czekają na zgodę właściciela, bo złego
+dokumentu następne wydanie nie cofnie. Paczka niesie własny Node i gotowy
+build, więc na serwerze nic się nie kompiluje.
 
-### Raport wydajności to monitoring pracowniczy
+**Serwer sam się nie aktualizuje**, bo zatrzymanie `wertis-api` kończy całe
+drzewo jego procesów. Kładzie zlecenie i woła zadanie Harmonogramu, a resztę
+robi `instalator/zlecenie.ps1`. Wersja, która nie wstanie, oddaje miejsce
+poprzedniej razem z bazą sprzed migracji. Automat (`AKTUALIZACJA_AUTO`) nie
+klika przy „[wymaga działania]” po drodze, przy zbyt młodym wydaniu, gdy kanarek
+dev nie pracuje na tej wersji, gdy wersja już raz padła albo gdy ktoś pracuje.
+Decyzja jest czystą funkcją (`services/aktualizacja-auto.ts`).
 
-Raport per osoba podlega Kodeksowi pracy (art. 22² i nast.): wymaga zapisu
-w regulaminie albo obwieszczeniu i uprzedzenia pracowników **2 tygodnie przed**
-uruchomieniem. Kod tego nie blokuje, ale odpowiedź niesie pole `podstawaPrawna`.
+**Ustawienia z panelu zapisują `wertis.env`**, jedyne źródło konfiguracji
+wszystkich procesów. Przed zapisem osobny proces ładuje `config.ts` na
+kandydacie, więc panel nie zapisze pliku, z którym serwer by nie wstał.
+Procedury: `DEPLOY.md` §0a–§0d i
+[`instalator/README.md`](../instalator/README.md).
 
-Od 0.431.0 raport jedzie wyłącznie w `GET /api/analiza` i jej CSV, i tylko
-dla admina — biuro dostaje tam `wydajnosc: null`. Osobna trasa
-`/api/wydajnosc` zniknęła, bo nikt jej nie wołał, a wpuszczała magazyniera.
+## 13. Testy i bramki
 
-Raport ma trzy reguły wbudowane w kod, każda z testem:
+Serwer: `cd server && npm test`. Panel: `cd panel && npm test`. `:core`:
+`cd android && ./gradlew :core:test`, bez Android SDK. `:app` buduje tylko CI.
+Liczb testów ten dokument nie podaje, bo starzeją się po cichu.
 
-1. **Zgłoszony problem nie jest błędem zgłaszającego.** Cały projekt wyjątków
-   opiera się na tym, że opłaca się je zgłosić; policzenie `problem_raised` na
-   czyjąś niekorzyść sprawiłoby, że problemy nie znikną — przestaną być widoczne.
-2. **Nie ma kolumny błędów**, bo aplikacja nie ma zdarzenia „pomyłka".
-   `location_mismatch` znaczy „adres w Subiekcie był nieaktualny" — to odkrycie.
-3. **Tempo poniżej 20 pozycji to `null`.** Czas aktywny liczony z odstępów
-   ≤ 15 min, więc z natury zaniżony: zawyżone tempo krzywdziłoby ludzi.
+**`:core` jest osobnym modułem**, żeby logika dała się testować bez Androida.
+**DTO z serwera są modelem kolektora** (`core/net/Dtos.kt`), bez mappera:
+kształt danych ma jednego właściciela, serwer. Regułę, co z danymi zrobić,
+wypycha się do `:core`, nie do ekranu (komentarz przy `AppGraph`).
 
-### Raport tygodnia i migawka doby (0.497.0)
+## 14. Decyzje, które wyglądają dziwnie, a mają powód
 
-Ślad `events` pamięta czynności, ale nie stan. Ile spraw czekało DO DECYZJI,
-ile zwrotów stało w kubełku, jak długo czekał klient — te liczby istniały
-tylko w chwili otwarcia ekranu. Pytanie „czy zaległość rośnie" nie miało
-odpowiedzi, bo nikt ich nie zapisywał.
+**SQLite**, bo jeden host i zero administracji. **Brak HTTPS**, bo LAN
+magazynowy i klient natywny; lokalne CA na kolektorach kosztuje więcej, niż
+wnosi. **Polling 2 s zamiast WebSocketów**, bo kolektor traci Wi-Fi kilkanaście
+razy dziennie, a polling nie ma kodu reconnectu. **Zero modułów natywnych
+w serwerze**, bo instaluje się go bez kompilatora; natywne rzeczy idą do
+procesów C#. **Unikalności loginu pilnuje baza**, bo dwa takie same loginy to
+jedno żądanie od pomyłki.
 
-Takt `raporty` w `main()` robi dwie rzeczy, co godzinę:
+## 15. Znane ograniczenia
 
-1. **Migawka doby** (`migawka_dnia`) — raz na dobę lokalną, pierwsza wygrywa.
-   Liczą ją te same funkcje co ekrany: `doDecyzji`, `listaZwrotow`,
-   `listaReklamacji`, `czasOdpowiedzi`. Sekcja, która padnie, jest `null`.
-2. **Raport tygodnia** (`raport_tygodnia`) — od poniedziałku 00:00 do
-   poniedziałku 00:00 czasu magazynu. Automat nadrabia do czterech tygodni
-   wstecz. Tygodnia sprzed pierwszego wpisu dziennika nie liczy.
-
-Raport jest **zamrożony**. Rozmowy sprzed `ALLEGRO_INBOX_OD` znikają przy
-starcie, więc tydzień liczony od nowa po pół roku kłamałby. Zmiana reguły
-podbija `WERSJA_RAPORTU` i nie przepisuje starych tygodni.
-
-Raport **nie niesie ludzi**. Zapisany co tydzień i czytany przez biuro byłby
-trwałą kopią monitoringu pracowniczego, który od 0.431.0 widzi tylko admin,
-na żywo. Ekran: Analiza → Tydzień, tylko odczyt.
-
-### Pominięcia w skrzynce (0.532.0)
-
-`pominiecia_dzien` to nowa miara zapisana w bazie: ile rozmów otwarto
-i zostawiono bez ruchu, na dobę i kategorię. Nie ma w niej autora, rozmowy
-ani godziny, bo każda z tych kolumn wskazałaby człowieka. Z tego samego
-powodu zapis nie woła `logEvent` — to jedyny taki wyjątek w biurze. Powód
-stoi przy `zapiszPominiecie` w `services/tarcie.ts` i w §26c.1 panelu obsługi.
-
----
-
-## 10. Testy i bramki
-
-| co | gdzie |
-|---|---|
-| serwer (jednostkowe + trasy przez `app.inject()`) | `cd server && npm test` (node:test przez tsx) |
-| `:core` | `cd android && ./gradlew :core:test` — **bez Android SDK** |
-| `:app` | tylko CI: wymaga Android SDK; testów nie ma |
-
-> Liczb testów ta tabela celowo **nie podaje**. `tools/docs_check.py` pilnuje
-> ich wyłącznie w `README.md` i `android/README.md`, a policzyć ich statycznie
-> się nie da (`grep` po `test(` daje 610 przy 650 uruchomionych — testy
-> parametryzowane i zagnieżdżone). Liczba poza kontrolą narzędzia starzeje się
-> po cichu; tak właśnie ten dokument doszedł do „153" przy 199 — i do „138",
-> zanim ktoś znów policzył.
-
-Cztery workflow: `android.yml` (`:core` + APK debug), `server.yml` (testy,
-`tsc`, `docs_check`), `instalator.yml` (składnia + przebieg `-DryRun`)
-i `sfera-worker.yml` (sama kompilacja C#, path-filtered do `sfera-worker/**` —
-dlatego guard kolejności jest mierzony testem Node w `server.yml`, bez dotneta).
-
-### Dlaczego `:core` jest osobnym modułem
-
-Żeby logika dała się testować **bez Androida**. `settings.gradle.kts` konfiguruje
-sam `:core`, gdy nie ma SDK — dlatego walidacja adresów, klasyfikacja skanów,
-model sesji, reguły zakładania kont i bufor offline mają testy uruchamialne
-wszędzie. To nie jest podział „bo warstwy": to jest podział przebiegający tam,
-gdzie kończy się możliwość szybkiego sprawdzenia.
-
-### DTO z serwera SĄ modelem kolektora — nie ma warstwy mapowania
-
-`core/net/Dtos.kt` to sto kilka klas `@Serializable`, importowanych wprost przez
-dwadzieścia kilka plików ekranów. Podręcznikowa warstwowość każe wstawić tu
-mapper DTO→model domenowy. Nie wstawiamy go świadomie i z jednego powodu:
-**kształt danych ma jednego właściciela, a jest nim serwer.** Mapper byłby
-drugim miejscem do zmiany przy każdym nowym polu, a drugie miejsce w tym repo
-zawsze starzeje się po cichu. Tak zestarzało się mapowanie Allegro pisane
-z pamięci — trzy wydania i jedna niema skrzynka.
-
-Cena jest realna i warto ją nazwać: zmiana kształtu odpowiedzi dotyka ekranów
-bezpośrednio, bez amortyzatora. Kupujemy za nią jedno źródło prawdy o polach
-i brak klasy, która istnieje wyłącznie po to, żeby przepisać dziesięć pól na
-dziesięć identycznych.
-
-To NIE jest zgoda na logikę w ekranie. Kształt danych wolno dzielić z serwerem;
-regułę, co z tymi danymi zrobić, wypycha się do `:core` — powód stoi w komentarzu
-przy `AppGraph`.
-
-### Dwa narzędzia zamiast kompilatora
-
-`:app` nie kompiluje się poza CI, więc powstały dwa tanie strażniki:
-
-- `tools/docs_check.py` — liczby i ścieżki w dokumentacji kontra repo. Złapał
-  m.in. merge, który zostawił w README dwie sprzeczne liczby testów obok siebie
-  (git nie widzi konfliktu semantycznego — plik był poprawny składniowo).
-- `tools/kt_imports_check.py` — brakujące importy, bilans nawiasów, domknięcie
-  komentarzy blokowych i `@OptIn`. Złapał właściwość rozszerzającą użytą bez
-  importu oraz polski cudzysłów zamknięty prostym `"` wewnątrz łańcucha.
-  Sprawdzenie komentarzy dopisano po 0.122.0: komentarze Kotlina **się
-  zagnieżdżają**, więc ścieżka z gwiazdką napisana w prozie otwiera kolejny
-  poziom i zjada resztę pliku. Kompilator zgłasza to jako kilkadziesiąt
-  „Unresolved reference" w cudzych plikach, czyli wszędzie poza przyczyną.
-
-Żadne nie jest kompilatorem i nie udaje. Zielony wynik znaczy „nie ten błąd".
-
----
-
-## 11. Decyzje, które wyglądają dziwnie, a mają powód
-
-| decyzja | powód |
-|---|---|
-| SQLite, nie Postgres | jeden host, jeden proces piszący, zero administracji. Baza to plik, backup to `copy` |
-| Brak HTTPS | LAN magazynowy, klient natywny, brak service workera. Certyfikat lokalnego CA na kolektorach kosztowałby więcej niż wnosi |
-| Polling 2 s zamiast WebSocketów | kolektor traci Wi-Fi kilkanaście razy dziennie; reconnect WS to kod, którego przy pollingu nie ma |
-| Konta się nie kasuje | historia w `events` musi mieć na co wskazywać; jest `active = 0` |
-| `events` bez retencji | przy szacowanych kilkuset zdarzeniach dziennie to rząd 10⁵ wierszy rocznie — SQLite z indeksami tego nie zauważa. To ślad audytu, więc automatyczne kasowanie byłoby gorsze niż wzrost. Gdyby tabela urosła ponad oczekiwania, decyzję o archiwizacji podejmuje właściciel, nie kod |
-| Kopie bazy i rekoncyliację robi serwer API, nie Harmonogram zadań (0.487.0) | wpis w Harmonogramie był krokiem człowieka, którego instalator nie robił, a bramka etapu 4 stała na nim. API ma bazę otwartą stale i wie, kiedy migruje. Kopia to `VACUUM INTO` przed migracją i w nocy, bo zwykłe `cp` w trybie WAL gubi zapisy |
-| Ustawienia z panelu zapisują `wertis.env`, nie tabelę w bazie (0.491.0) | plik zostaje jedynym źródłem konfiguracji dla czterech programów i instalatora. Przed zapisem osobny proces ładuje prawdziwy `config.ts` na kandydacie, więc panel nie zapisze pliku, z którym serwer by nie wstał |
-| Login wpisuje biuro, unikalności pilnuje baza | dwie osoby z tym samym loginem to jedno żądanie od pomyłki |
-
----
-
-## 12. Znane ograniczenia
-
-- **Brak testów adapterów MSSQL.** `adapters/subiekt.mssql.ts`
-  i `adapters/sfera.sql.ts` to jedyny kod piszący do bazy firmy, a sensowny
-  test wymagałby działającego SQL Servera. Weryfikuje je **ręczna** checklista
-  na Subiekcie edu (`docs/subiekt-gt-edu-setup.md` §5) — zielone `npm test`
-  nie mówi o nich nic.
-- **Brak testów w module `:app`** (~8,6 tys. linii Kotlina). Logika, którą dało
-  się wynieść, siedzi w `:core` i ma testy; w `:app` zostają ViewModele,
-  obsługa błędów sieci i wyzwalacze flusha bufora.
-- **Wywołania COM workera Sfery są niezweryfikowane na żywej Sferze** —
-  implementacja istnieje (`sfera-worker/`), ale każde wywołanie COM nosi
-  `[WERYFIKUJ]` (wszystkie w `SferaComAdapter.cs`), a `SFERA_WORKER` jest
-  domyślnie wyłączony. Do czasu weryfikacji dokument MM wystawia biuro.
-- **Zdjęcia kartotek są wyłączone, dopóki nie wskaże się źródła.** Dla tego
-  podmiotu źródło jest już ustalone — `tw_ZdjecieTw`, komplet ustawień
-  w `docs/subiekt-gt-struktura.md` — ale funkcja rusza dopiero po wpisaniu ich
-  do `wertis.env` i nadaniu siódmego `GRANT SELECT`.
-- **Otwarte `[WERYFIKUJ]`** dla własnej bazy (komplet z `config.ts`):
-  `MAG_ID_*`, `MSSQL_LOC_COLUMN` (które `tw_Pole1..8` trzyma lokalizację),
-  `DOK_STATUS_ZD_OTWARTE`, `MSSQL_ZD_ZREAL_COLUMN`, `LOC_FIELD_LIMIT`.
-  Zapytania: `docs/subiekt-gt-edu-setup.md` §3. Osobna rodzina: wywołania COM
-  w `sfera-worker/src/SferaComAdapter.cs` — lista w `sfera-worker/README.md`.
-  Trzecia: `ZDJECIA_*`, gdy funkcja zdjęć ma być włączona.
-- **Reguły strefy złotej** nie pokrywają w ziarnie regałów `D00`, `D06`,
-  `D07`, `E01` — raport przeslotowania i kandydaci ze zbiórek wskazują je na
-  osobnej liście „brak reguły" zamiast zgadywać. Od 0.50.0 reguły są
-  edytowalne z panelu biura, więc lukę zamyka wpis, nie wydanie.
-
----
-
-## Gdzie szukać dalej
-
-| pytanie | plik |
-|---|---|
-| Jak to wdrożyć? | `DEPLOY.md` |
-| Jak podpiąć Subiekta? | `docs/subiekt-gt-edu-setup.md` |
-| Co dokładnie jest w bazie Subiekta? | `docs/subiekt-gt-struktura.md` |
-| Jak wygląda rozkładanie w praktyce? | `docs/analiza-rozkladanie.md` |
-| Dokąd zmierza obsługa klienta? | `docs/obsluga-klienta.md` |
-| Jak zbudować kolektor? | `android/README.md` |
+- **Brak testów adapterów MSSQL** (`subiekt.mssql.ts`, `sfera.sql.ts`) i modułu
+  `:app`. Adaptery sprawdza ręczna checklista (`docs/subiekt-gt-edu-setup.md` §5).
+- **Część wywołań COM** nosi `[WERYFIKUJ]`; lista w `sfera-worker/README.md`.
+- **Zdjęcia kartotek** ruszają po wpisaniu `ZDJECIA_*` do `wertis.env`
+  i nadaniu `GRANT SELECT` na tabelę zdjęć (`docs/subiekt-gt-struktura.md`).
+- **Otwarte `[WERYFIKUJ]`** własnej bazy: `MAG_ID_*`, `MSSQL_LOC_COLUMN`,
+  `DOK_STATUS_ZD_OTWARTE`, `MSSQL_ZD_ZREAL_COLUMN`, `LOC_FIELD_LIMIT`
+  (`docs/subiekt-gt-edu-setup.md` §3).
+- **Reguły strefy złotej** nie pokrywają regałów `D00`, `D06`, `D07`, `E01`;
+  raporty pokazują je jako „brak reguły”, a lukę zamyka wpis w panelu.

@@ -20,7 +20,7 @@ import type { Kategoria } from "../api/typy";
    się tu przychodzi, brzmi „gdzie tracimy czas" — i odpowiada na nie wiersz
    z długim paskiem, a nie wiersz na górze. */
 
-function czasPo(min: number | null): string {
+export function czasPo(min: number | null): string {
   if (min === null) return "—";
   if (min < 60) return `${min} min`;
   const g = Math.floor(min / 60);

@@ -27,9 +27,10 @@ export const ZNACZNIK = "@wydanie";
 const RODZAJE = ["patch", "minor"];
 
 /* Pliki, które OPISUJĄ znacznik, a nie go używają — podmiana zrobiłaby
-   z instrukcji numer wersji. */
+   z instrukcji numer wersji. `styl_check.py` szuka znacznika w komentarzach
+   kodu, więc podmiana zamieniłaby jego wzorzec na numer i bramka by ślepła. */
 export const BEZ_PODMIANY = new Set([
-  "tools/wydanie.mjs", "tools/wydanie.test.mjs", "CLAUDE.md", "zmiany/README.md",
+  "tools/wydanie.mjs", "tools/wydanie.test.mjs", "CLAUDE.md", "zmiany/README.md", "tools/styl_check.py",
 ]);
 
 /** Fragment: nagłówek `---` z polami `rodzaj` i `tytul`, potem treść wpisu. */

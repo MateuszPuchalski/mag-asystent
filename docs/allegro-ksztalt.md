@@ -1,54 +1,32 @@
 # Kształt Centrum wiadomości Allegro
 
-Kontrakt mapowania skrzynki. **Pochodzi ze specyfikacji OpenAPI Allegro**,
-a od 0.164.0 stoi obok niego obserwacja z żywego konta:
+Kontrakt mapowania Allegro. **Pochodzi ze specyfikacji OpenAPI Allegro**,
+która leży w repo: `docs/allegro/swagger.yaml`, z notatką o pochodzeniu
+i odświeżaniu w `docs/allegro/README.md`. Obok stoi obserwacja z żywego konta:
 [`allegro-sonda.md`](allegro-sonda.md), zdjęta 2 września 2026. Ten plik mówi,
 co WOLNO czytać kodowi; tamten mówi, co konto firmy naprawdę oddało danego dnia.
-Przy rozjeździe wygrywa obserwacja, a kontrakt się poprawia — i tak powstały
-poprawki opisane niżej.
+Przy rozjeździe wygrywa obserwacja, a kontrakt się poprawia.
 
-Specyfikacja leży w repo: `docs/allegro/swagger.yaml`, razem z notatką
-o pochodzeniu i sposobie odświeżania w `docs/allegro/README.md`. Nie trzeba
-już wychodzić do sieci, żeby sprawdzić kształt pola — i to jest jedyna zmiana,
-która naprawia przyczynę opisaną niżej, a nie kolejny jej skutek.
-
-Do 0.151.0 ten plik przedstawiał się jako „raport zanonimizowanej odpowiedzi
-produkcyjnej". Nie był nim: powstał w tym samym commicie co synchronizacja
-i fixture'y (`2e9984a`), a opisane w nim pola nie istnieją w Allegro. Skutek —
-skrzynka nie zapisała ani jednego wątku przez dwa wydania, bo każdy z nich
-wywracał wstawkę na niezwiązanym parametrze.
-
-To ta sama blizna trzeci raz. `adapters/allegro.http.ts` nosi o niej akapit:
-kształt wymyślony w testach i nigdy niesprawdzony na żywym koncie. Za drugim
-razem założenie nosiło znacznik do sprawdzenia i było uczciwe. Za trzecim nosiło
-etykietę „raport z produkcji" — i dlatego nikt go nie sprawdził.
+Kształt czyta się z pliku, nie z pamięci. Kształt wymyślony w testach
+i nieoznaczony jako założenie kosztował już wydania, w których skrzynka nie
+zapisała ani jednego wątku. Znacznik weryfikacji mierzy to, komu się
+przyznano, a nie ryzyko.
 
 ## Co potwierdziła sonda (1 września 2026)
 
 Pierwszy przebieg `npm run sonda` na koncie firmy potwierdził **całe mapowanie
-odczytu** pole po polu. Trzy liczby z niego zmieniają jednak decyzje, więc
-stoją tutaj, a nie tylko w raporcie:
+odczytu** pole po polu. Trzy liczby z niego zmieniają decyzje:
 
 - `relatesTo.offer` jest niepuste w **5 z 39** wiadomości. Ekran zbudowany na
   numerze oferty byłby pusty przy większości rozmów.
 - `subject` jest niepuste w **5 z 39**, a `type` to `MESSAGE_CENTER` ×25,
   `ASK_QUESTION` ×9 i `MAIL` ×5. Temat mają praktycznie tylko maile.
-- `attachments` jest niepuste w **7 z 39**. Załączniki są realne i od 0.155.0
-  wchodzą do modelu pracy.
+- `attachments` jest niepuste w **7 z 39**. Załączniki są realne i wchodzą do
+  modelu pracy.
 
-Pełny raport wchodzi obok tego dokumentu po najbliższym przebiegu sondy — ten
-z 1 września wyniósł numery listów przewozowych i nie może trafić do repo
-(poprawka w `server/src/services/ksztalt.ts` weszła w 0.155.0). Ten dokument
-jest KONTRAKTEM, czyli mówi, co wolno czytać kodowi; raport będzie OBSERWACJĄ
-z datą. Przy rozjeździe wygrywa obserwacja, a kontrakt się poprawia.
-
-Znaczniki weryfikacji niżej dotyczą **w większości** końcówek ZAPISU i tych
-sonda nie tknie, bo jest z założenia GET-em. Do 0.164.0 stało tu twardsze
-zdanie — „wyłącznie zapisu, licznik nie zejdzie ani o jeden" — i było
-nieprawdziwe: trzy z siedmiu znaczników w tym pliku mówiły o czym innym,
-a jeden z nich (`status` zwrotu) dało się zdjąć samą lekturą `swagger.yaml`
-leżącego w tym repo. Zdanie przeczyło zresztą innemu, kilkadziesiąt linii
-niżej, w sekcji o zwrotach.
+Raport sondy nie może wynosić numerów listów przewozowych do repo; pilnuje
+tego `server/src/services/ksztalt.ts`. Znaczniki weryfikacji niżej dotyczą
+**w większości** końcówek ZAPISU, a tych sonda nie tknie, bo jest GET-em.
 
 ### `commission.amount` jest LICZBĄ
 
@@ -59,7 +37,7 @@ przyjmuje tekst i na liczbie się wywróci.
 ## `GET /messaging/threads`
 
 Obiekt ma tablicę `threads` oraz `offset` i `limit`. Pola `totalCount`
-w odpowiedzi NIE MA, choć poprzednia wersja tego pliku je opisywała.
+w odpowiedzi NIE MA.
 
 Wątek ma `id`, `read`, **`lastMessageDateTime`** oraz `interlocutor` z polami
 `login` i `avatarUrl`. Lista jest od najnowszej zmiany. Endpoint przyjmuje
@@ -68,27 +46,21 @@ Wątek ma `id`, `read`, **`lastMessageDateTime`** oraz `interlocutor` z polami
 **Wymagane są WYŁĄCZNIE `id` i `read`.** `lastMessageDateTime` i `interlocutor`
 są opcjonalne i jawnie `nullable` — wątek świeżo założony nie ma jak mieć
 ostatniej wiadomości. Kolumny `last_message_at` i `interlocutor_login`
-dopuszczają więc NULL; do 0.151.0 stało na nich `NOT NULL`, co zamieniało
-poprawną odpowiedź Allegro w błąd zapisu.
+dopuszczają więc NULL; `NOT NULL` zamieniałby poprawną odpowiedź w błąd zapisu.
 
 Kursor synchronizacji porównuje się PARĄ (data, id), więc wątek bez daty nie ma
 jak w tej parze stanąć i kursora nie przesuwa. Bierze go najnowszy wątek,
 który datę ma.
 
 **`interlocutor.login` to login kupującego — zweryfikowane przez właściciela
-24 września 2026** na żywym koncie. Do tej daty stał tu znacznik weryfikacji,
-bo dwa zapisy w repo mówiły o tym polu przeciwnie. Blizna 0.56.6 widziała
-w nim `client:44300444` i uznała to za maskę. Wydanie 0.397.0 widziało zwykły
-login „chips20", różny od podpisu zamówienia tylko wielkością liter.
-
-Oba zapisy da się pogodzić. Kupujący bez konta na Allegro dostaje login
+24 września 2026** na żywym koncie. Kupujący bez konta na Allegro dostaje login
 nadany automatycznie, w kształcie `Client:<liczba>` [pewność umiarkowana —
-znajomość Allegro, nie pomiar]. To jest jego prawdziwy login, nie maska.
-Porównanie z 0.56.6 najpewniej nie trafiło przez wielkość liter.
+znajomość Allegro, nie pomiar]. To jest jego prawdziwy login, nie maska
+(blizna 0.56.6 wzięła go za maskę przez wielkość liter).
 
 Z tego wynika jedna reguła: **login porównuje się bez wielkości liter**
-(`COLLATE NOCASE`), wszędzie. Zakładka KLIENT porównywała do 0.483.0 dokładnie
-i przez to potrafiła oddać pustą historię klientowi, który u nas kupował.
+(`COLLATE NOCASE`), wszędzie. Porównanie dokładne oddaje pustą historię
+klientowi, który u nas kupował.
 
 Awatara nie mapujemy: panel pokazuje login, a obrazek z serwera Allegro
 znaczyłby wyjście przeglądarki biura poza własną sieć przy każdym otwarciu
@@ -107,18 +79,13 @@ to nie są warianty tej samej odpowiedzi. Wersja beta ma `participants` zamiast
 `offset`, a autora wiadomości opisuje polem `role` (`BUYER`, `SELLER`, `USER`,
 `CONSULTANT`, `ALLEGRO`) zamiast `isInterlocutor`.
 
-Mapowanie stoi na wersji STABILNEJ i to nie jest obojętne. `zapytajAllegro`
-próbuje nagłówków po kolei i zapamiętuje działający — `public.v1` jest pierwszy,
-więc dostajemy jego kształt. Gdyby Allegro kiedyś odpowiedziało na niego 406,
-klient zszedłby na betę i dostał odpowiedź, której to mapowanie nie rozumie.
-Wtedy wątki zaczną wpadać do `error_thread_count`, a nie zapisywać się po cichu
-w złym kształcie.
+Mapowanie stoi na wersji STABILNEJ. `zapytajAllegro` próbuje nagłówków po
+kolei i zapamiętuje działający — `public.v1` jest pierwszy, więc dostajemy jego
+kształt. Gdyby Allegro odpowiedziało na niego 406, klient zszedłby na betę
+i dostał odpowiedź, której to mapowanie nie rozumie. Wtedy wątki wpadają do
+`error_thread_count`, a nie zapisują się po cichu w złym kształcie.
 
-Warto odnotować, że wymyślone `author.role` z `BUYER`/`SELLER` przypominało
-akurat wersję beta. Zgadywanie trafiło w kształt, który istnieje — tylko nie
-w ten, którym chodzimy.
-
-### Struktura wątku z `beta.v1` (22 września 2026)
+### Struktura wątku z `beta.v1`
 
 Klasyfikacja wiadomości bierze wskazówkę z tego, co Allegro mówi o wątku samo.
 Mówi to wyłącznie `beta.v1`: schemat `ThreadVBeta1` ma wymagane `type`
@@ -159,39 +126,32 @@ i **`isInterlocutor`**, `text`, `subject`, **`relatesTo`** (gałęzie `offer.id`
 i `order.id`), `hasAdditionalAttachments`, `attachments` oraz
 `additionalInformation`.
 
-Trzy pola z tej listy zmieniają działanie synchronizatora:
+Te pola zmieniają działanie synchronizatora:
 
 - **`author.isInterlocutor`** daje KIERUNEK. Rozmówca to ten, który nie jest
-  nami, więc `true` znaczy wiadomość przychodzącą. Pola `author.role`
-  z wartościami `BUYER` i `SELLER` — opisanego tu do 0.151.0 — Allegro nie
-  przysyła w tej wersji zasobu wcale.
-- **`createdAt`** daje datę POJEDYNCZEJ wiadomości. Poprzednia wersja tego
-  pliku twierdziła, że Allegro takiej daty nie podaje, więc wszystkie
-  wiadomości wątku dostawały jedną godzinę i oś czasu rozmowy była zmyślona.
+  nami, więc `true` znaczy wiadomość przychodzącą. Pola `author.role` Allegro
+  w tej wersji zasobu nie przysyła wcale.
+- **`createdAt`** daje datę POJEDYNCZEJ wiadomości, więc oś czasu rozmowy
+  stoi na datach wiadomości, nie wątku.
 - **`relatesTo.offer.id`** daje ofertę. Nie ma pola `relatedObject`
-  ani `type` — `OFFER` w kolumnie `related_object_type` to NASZE słowo,
-  nazwane tak w modelu kanonicznym, a nie cytat z Allegro.
+  ani `type` — `OFFER` w kolumnie `related_object_type` to NASZE słowo
+  z modelu kanonicznego, a nie cytat z Allegro.
 - **`relatesTo.order.id`** daje zamówienie i idzie do OSOBNEJ kolumny
-  `message.related_order_id` (0.166.0). Obie gałęzie są od siebie niezależne:
+  `message.related_order_id`. Obie gałęzie są od siebie niezależne:
   wiadomość niesie jedną, obie albo żadną. Raport z 2 września liczy
   `order` w 7 z 33 wiadomości, `offer` w 5 z 33 — zamówienie jest częstszym
-  powiązaniem, a do 0.165.0 było wyrzucane przy mapowaniu.
+  powiązaniem. Ticker `uzupelnijZamowienia` dociąga treść zamówienia tą samą
+  drogą co przy zwrotach.
 
 ### Czego nie mapujemy i dlaczego
 
-`attachments[]` niesie `fileName`, `mimeType`, `url` i `status` — od 0.155.0
-mapujemy je do `message_attachment`, od 0.195.0 wysyłamy, a od 0.244.0
-upsertujemy przy każdym przebiegu (patrz „Pobranie załącznika Centrum
-Wiadomości" niżej). `hasAdditionalAttachments` zostaje w `surowe_json`:
-sonda widziała `false` w 33 na 33 wiadomościach, a specyfikacja nie mówi, co
-znaczy `true`. `type` (`MESSAGE_CENTER`) rozróżnia kanały, których mamy jeden.
-`additionalInformation` niesie dane właściwe branży (w przykładzie `vin`)
-i nie ma u nas ekranu.
-
-Do 0.165.0 stało tu zdanie, że `relatesTo.order.id` „czeka na ekran
-zamówienia". Ekran jest od 0.166.0: numer trafia do modelu, ticker
-`uzupelnijZamowienia` dociąga treść tą samą drogą co przy zwrotach, a stare
-wiadomości dostają numer dosypką z `surowe_json` lądowiska.
+`attachments[]` niesie `fileName`, `mimeType`, `url` i `status` — mapujemy je
+do `message_attachment`, wysyłamy i upsertujemy przy każdym przebiegu (patrz
+„Pobranie załącznika Centrum Wiadomości" niżej). `hasAdditionalAttachments`
+zostaje w `surowe_json`: sonda widziała `false` w 33 na 33 wiadomościach,
+a specyfikacja nie mówi, co znaczy `true`. `type` (`MESSAGE_CENTER`) rozróżnia
+kanały, których mamy jeden. `additionalInformation` niesie dane właściwe
+branży (w przykładzie `vin`) i nie ma u nas ekranu.
 
 **Uwaga o danych:** `surowe_json` w lądowisku trzyma CAŁĄ odpowiedź, więc
 adresy załączników i `additionalInformation` zostają w bazie mimo braku kolumn.
@@ -203,22 +163,23 @@ mówi, co z tego wychodzi dalej.
 `POST /messaging/threads/{id}/messages` przyjmuje `{ text, attachments? }`
 i oddaje obiekt wiadomości w kształcie opisanym wyżej — czyli z polem `id`.
 Wymagane jest samo `text`, a jego **`maxLength` to 2000 znaków**.
+Specyfikacja potwierdza ten kształt co do znaku.
 
-Ten limit sprawdzamy PRZED wysłaniem (`services/wysylka.ts`). Po wysłaniu
-jedyną informacją zwrotną byłoby 400 od Allegro i `send_failed` w kolejce —
-agent traciłby wtedy napisany tekst i nie wiedziałby dlaczego.
+Limit sprawdzamy PRZED wysłaniem (`services/wysylka.ts`). Po wysłaniu jedyną
+informacją zwrotną byłoby 400 od Allegro i `send_failed` w kolejce — agent
+traciłby wtedy napisany tekst i nie wiedziałby dlaczego.
 
-Adres jest ten sam co przy odczycie (`urlWiadomosci`). Nagłówki, negocjacja
-wersji zasobu po 406 oraz obsługa 401, 403, 404 i 429 robi `zapytajAllegro`,
+Adres jest ten sam co przy odczycie (`urlWiadomosci`). Nagłówki, negocjację
+wersji zasobu po 406 oraz obsługę 401, 403, 404 i 429 robi `zapytajAllegro`,
 ta sama funkcja co przy pobieraniu.
 
-**Ciało deklaruje WERSJĘ ZASOBU, nie `application/json`** (od 0.173.0).
-Specyfikacja wymienia przy tym zapisie dwa typy treści:
+**Ciało deklaruje WERSJĘ ZASOBU, nie `application/json`.** Specyfikacja
+wymienia przy tym zapisie dwa typy treści:
 `application/vnd.allegro.public.v1+json` i `…beta.v1+json`. Gołego
 `application/json` nie wymienia ani tutaj, ani przy wniosku o rabat —
-odpowiedzią na niezadeklarowany typ bywa 415. Klient wysyła teraz w
-`content-type` tę samą wersję, którą negocjuje w `accept`, a 415 traktuje jak
-406: próbuje następnej.
+odpowiedzią na niezadeklarowany typ bywa 415. Klient wysyła w `content-type`
+tę samą wersję, którą negocjuje w `accept`, a 415 traktuje jak 406: próbuje
+następnej.
 
 **Uprawnienie jest to samo co przy odczycie** — `allegro:api:messaging`.
 Konto, które czyta wiadomości, ma czym odpisywać; ponowne parowanie nie jest
@@ -229,23 +190,14 @@ wprost jej opis w specyfikacji. Odpowiedzi pisze człowiek, więc limit nie
 dotyka pracy biura — ale przy każdym pomyśle na wysyłkę masową to jest
 pierwsza liczba do sprawdzenia.
 
-Do 0.151.0 ta sekcja nosiła nagłówek „kształt NIEPOTWIERDZONY" i dwa znaczniki:
-ciało powstało z pamięci, wbrew §8.2 projektu panelu, na polecenie właściciela.
-**Specyfikacja potwierdziła je co do znaku.** Warto to zapisać obok zdania
-wyżej: w tym samym wydaniu okazało się, że mapowanie ODCZYTU, które żadnego
-znacznika nie nosiło i przedstawiało się jako raport z produkcji, było błędne
-w każdym polu. Znacznik nie mierzy ryzyka; mierzy to, komu się przyznano.
-
-Załączników nie wysyłamy, więc opcjonalnego pola nie budujemy. Specyfikacja zna
-też `POST /messaging/messages` z `recipient.login` i `order.id` — to końcówka
-do ZAKŁADANIA wątku, a my odpisujemy w istniejącym.
+Specyfikacja zna też `POST /messaging/messages` z `recipient.login`
+i `order.id` — to końcówka do ZAKŁADANIA wątku, a my odpisujemy w istniejącym.
 
 ### Co się stanie, jeśli kształt jest inny
 
 Przy odczycie: wątek łamiący schemat jest pomijany, liczy się
-w `error_thread_count`, a panel
-pokazuje wiersz „Wątki z błędem". Przebieg leci dalej i kursor nie staje na
-pominiętym wątku — to jest zabezpieczenie z 0.149.2 i ono zostaje.
+w `error_thread_count`, a panel pokazuje wiersz „Wątki z błędem". Przebieg
+leci dalej i kursor nie staje na pominiętym wątku.
 
 Przy wysyłce: Allegro odpowie 400 albo 422, kolejka `outbox` zapisze to jako
 `send_failed` razem z treścią odpowiedzi, a wiersz `message` nie powstanie.
@@ -253,19 +205,11 @@ Do klienta nic nie wyjdzie po cichu.
 
 ## Zwroty klienckie — kształt z dokumentacji, nie z produkcji
 
-Ta sekcja różni się od dwóch pierwszych POCHODZENIEM. Tamte są raportem
-sondy z żywego konta. Ta powstała z oficjalnej specyfikacji OpenAPI Allegro
-(`developer.allegro.pl/swagger.yaml`), odczytanej z publicznej kopii
-wygenerowanego klienta z 26 lutego 2024 — sam portal jest niedostępny
-z sieci, w której pisano ten kod.
-
-To spełnia regułę §8.2 projektu panelu: mapowanie wynika z dokumentacji
-Allegro. Nie zastępuje jednak sondy. Kopia ma dwa lata, a Allegro w tym
-czasie dokładało pola — dlatego rzeczy młodsze od niej noszą znacznik.
-
-`npm run sonda` zdejmuje dziś także zwroty i ich szczegół — przebieg
-z 2 września potwierdził tę sekcję pole po polu i zdjął z niej jeden znacznik
-(`status`). Reszta znaczników dotyczy ZAPISÓW, których GET nie dosięgnie.
+Ta sekcja powstała z oficjalnej specyfikacji OpenAPI Allegro, co spełnia
+regułę §8.2 projektu panelu: mapowanie wynika z dokumentacji Allegro.
+`npm run sonda` zdejmuje także zwroty i ich szczegół; przebieg z 2 września
+potwierdził tę sekcję pole po polu. Znaczniki dotyczą ZAPISÓW, których GET nie
+dosięgnie, i rzeczy nieopisanych w schemacie.
 
 ### `GET /order/customer-returns`
 
@@ -274,8 +218,7 @@ Negocjuje to `zapytajAllegro` i zapamiętuje wynik osobno dla tej rodziny.
 
 Obiekt ma liczbę `count` i tablicę `customerReturns`. Zwrot ma pola `id`,
 `createdAt`, `referenceNumber`, `orderId`, `items`, `refund`, `parcels`,
-`rejection`, `marketplaceId` oraz — dopisane w 0.164.0 — `status`, `buyer`
-i `isFulfillment`.
+`rejection`, `marketplaceId`, `status`, `buyer` i `isFulfillment`.
 
 `status` to OŚ CZASU ZWROTU po stronie Allegro, nie nasza decyzja. Jedenaście
 wartości ze schematu: `CREATED`, `DISPATCHED`, `IN_TRANSIT`, `DELIVERED`,
@@ -292,12 +235,9 @@ Pieniądze klienta opisuje dopiero `FINISHED`. Obserwacja z 2 września ma
 całą kolejkę.
 
 `buyer` niesie `login` ORAZ `email` — patrz „Czego NIE mapujemy". Login stoi
-TAKŻE przy zamówieniu (`checkout-forms.buyer.login`), więc od 0.177.0 ekran
-zwrotu bierze go z zamówienia, gdy sam zwrot go nie niesie. To ten sam
-człowiek, a dwa źródła jednego pola nie są tu nadmiarem: `buyer` wszedł do
-mapowania zwrotów dopiero w 0.164.0.
-`isFulfillment` mówi, że zwrotem zajmuje się One Fulfillment; u tej firmy
-było `false` w stu rekordach na sto.
+TAKŻE przy zamówieniu (`checkout-forms.buyer.login`), więc ekran zwrotu bierze
+go z zamówienia, gdy sam zwrot go nie niesie. `isFulfillment` mówi, że zwrotem
+zajmuje się One Fulfillment; u tej firmy było `false` w stu rekordach na sto.
 
 Pozycja (`items[]`) ma `offerId`, `quantity`, `name`, `price`, `url` oraz
 `reason` z polami `type` i `userComment`. Zaobserwowane wartości `reason.type`:
@@ -310,49 +250,41 @@ Kwota (`price`) ma `amount` i `currency`. Specyfikacja mówi wprost, że
 
 Paczka (`parcels[]`) ma `createdAt`, `waybill`, `carrierId` oraz `sender`.
 Odrzucenie (`rejection`) ma `code`, `reason` i `createdAt`. Kodów jest
-SIEDEM, nie cztery: `REFUND_REJECTED`, `NEW_ITEM_SENT`, `ITEM_FIXED`,
-`MISSING_PART_SENT`, `ITEM_MISMATCH`, `BUSINESS_PURCHASE` i `NO_RETURN_RIGHT`.
-Do 0.164.0 stała tu lista czterech, przepisana z ogłoszenia zamiast ze
-schematu.
+SIEDEM: `REFUND_REJECTED`, `NEW_ITEM_SENT`, `ITEM_FIXED`, `MISSING_PART_SENT`,
+`ITEM_MISMATCH`, `BUSINESS_PURCHASE` i `NO_RETURN_RIGHT`.
 
 Filtry listy: `customerReturnId`, `orderId`, `items.offerId`, `items.name`,
 `parcels.waybill`, `parcels.carrierId`, `parcels.senderPhoneNumber`,
 `referenceNumber`, `from`, `createdAt.gte`, `createdAt.lte`, `marketplaceId`,
 `limit` (domyślnie 100) i `offset`.
 
-Od 0.163.0 używamy jednego z tych filtrów: `parcels.waybill` przy skanie
-etykiety zwrotnej. Pytamy o JEDEN numer listu, poza rytmem synchronizacji,
-i nie ruszamy przy tym kursora — inaczej ręczne pytanie przestawiłoby
-ticker i zgubiło zwroty pomiędzy.
+Filtra `parcels.waybill` używa skan etykiety zwrotnej. Pytamy o JEDEN numer
+listu, poza rytmem synchronizacji, i nie ruszamy przy tym kursora — inaczej
+ręczne pytanie przestawiłoby ticker i zgubiło zwroty pomiędzy.
 
 Parametr `from` jest KURSOREM: dokumentacja opisuje go jako identyfikator
 ostatnio widzianego zwrotu, a odpowiedź niesie zwroty utworzone po nim.
 Synchronizator idzie kursorem, bo offset gubi rekord przy wstawce w środku
-strony — i to jest blizna 0.127.0 zdjęta u źródła.
+strony (blizna 0.127.0).
 
 ### `GET /order/customer-returns/{id}`
 
 Szczegół zwrotu ma TEN SAM kształt co element listy — obie ścieżki oddają
-`CustomerReturn`. Sekcji tu nie było do 0.164.0, choć sonda mierzy szczegół od
-0.154.0; obserwacja z 2 września potwierdza zgodność pole po polu na dziesięciu
-zwrotach.
+`CustomerReturn`. Obserwacja z 2 września potwierdza zgodność pole po polu na
+dziesięciu zwrotach.
 
 Synchronizator dlatego czyta LISTĘ i po szczegół nie sięga: dokłada jedno
 wywołanie na zwrot, a nie dokłada ani jednego pola. Wyjątek jest jeden —
 `parcels[].waybill` bywa na liście pusty, w 6 rekordach z 94, a w szczególe był
-niepusty w dziesięciu na dziesięć. Do 0.187.0 stało tu, że pusty jest w 88
-z 94 — czyli odwrotnie, niż mówi sonda. Poprawka 0.187.0 zdjęła tę samą
-pomyłkę o dwie sekcje niżej i TEGO zdania nie ruszyła.
+niepusty w dziesięciu na dziesięć. Te zwroty zostają bez daty doręczenia, bo
+bez numeru listu nie ma o co zapytać przewoźnika. To jest miejsce, w którym
+szczegół dałby więcej.
 
-Różnica dotyczy dziś sześciu paczek: bez numeru listu nie ma o co zapytać
-przewoźnika, więc te zwroty zostają bez daty doręczenia. To jest miejsce,
-w którym szczegół dałby więcej.
-
-### Co zaczęliśmy mapować w 0.169.0
+### Co mapujemy ze zwrotu i zamówienia
 
 `buyer.login` przy ZWROCIE (sonda: 100 na 100 niepustych), `parcels[].carrierId`
-z tej samej paczki, co data, oraz przy zamówieniu `payment.type`,
-`payment.finishedAt` i `invoice.required`.
+i `parcels[].waybill` z tej samej paczki co data, oraz przy zamówieniu
+`payment.type`, `payment.finishedAt` i `invoice.required`.
 
 `carrierId` nie ma w schemacie ani enuma, ani listy — Allegro oddaje słownik
 osobno, pod `GET /order/carriers`. Sonda złapała `INPOST`, `ALLEGRO`, `DPD`
@@ -360,46 +292,40 @@ i `UNKNOWN`, przy czym ostatniej wartości nie ma w żadnej specyfikacji. Dlateg
 kolumna jest bez `CHECK`, a panel buduje filtr z tego, co przyjechało.
 
 `items[].reason.type` też nie ma enuma: schemat wymienia SIEDEMNAŚCIE wartości
-słownie, a sonda zaobserwowała jedenaście. Panel tłumaczy dziś wszystkie
+słownie, a sonda zaobserwowała jedenaście. Panel tłumaczy wszystkie
 siedemnaście, a kod spoza listy pokazuje surowy.
 
 **Obiekt zwrotu nie niesie daty doręczenia — ale API ją podaje.** `parcels[]`
 ma wyłącznie `createdAt`, czyli moment utworzenia paczki przez klienta, i tak
-się to nazywa na ekranie od 0.169.0. Czasu doręczenia szuka się gdzie indziej:
+się to nazywa na ekranie. Czasu doręczenia szuka się gdzie indziej:
 
     GET /order/carriers/{carrierId}/tracking?waybill=…
 
 Każdy wpis historii niesie `occurredAt` („actual shipment status change time"),
 a wśród ośmiu kodów jest `DELIVERED`. Jedno wywołanie bierze do dwudziestu
-numerów. Od 0.187.0 pyta o to synchronizacja zwrotów.
+numerów. Pyta o to synchronizacja zwrotów.
 
 **Numer do zapytania bierze się z LĄDOWISKA, nie ze świeżo pobranej strony.**
 To wynika wprost z kursora opisanego wyżej: `from` oddaje zwroty utworzone PO
 podanym, więc raz zobaczony zwrot na listę nie wraca. Pytanie o tracking
-wyłącznie tego, co właśnie przyszło, dotyczyłoby więc zawsze zwrotów sprzed
-chwili — a te nie są doręczone. Pierwsza wersja poprawki tak właśnie działała
-i nie zapisała ani jednej daty.
-
-**Poprzednia wersja tego akapitu odczytała sondę ODWROTNIE.** Twierdziła, że
-`waybill` „jest pusty w 88 z 94 rekordów" — a kolumna nosi nagłówek `niepuste`.
-Numer jest więc WYPEŁNIONY w 88 przypadkach na 94, czyli prawie zawsze, gdy
-zwrot ma w ogóle paczkę. Ta pomyłka kazałaby uznać całą drogę za bezużyteczną.
+wyłącznie tego, co właśnie przyszło, dotyczyłoby zawsze zwrotów sprzed chwili
+— a te nie są doręczone. Kolumna sondy nosi nagłówek `niepuste`: numer jest
+WYPEŁNIONY w 88 przypadkach na 94.
 
 **`status` NIE odpowiada na pytanie o doręczenie**, choć ma wartość `DELIVERED`
 na liście. Sonda pokazuje, czym to pole naprawdę bywa: `COMMISSION_REFUNDED`
 ×95, `COMMISSION_REFUND_CLAIMED` ×3, `DELIVERED` ×2. Stan prowizji nadpisuje
 stan przesyłki, więc po tym polu nie da się poznać, czy karton u nas jest.
-Z tego samego powodu kolejka bramek nie routuje po nim od 0.164.0.
+Z tego samego powodu kolejka bramek nie routuje po nim.
 
 `[WERYFIKUJ]` **`checkoutForm.createdAt` przy sprawie posprzedażowej.**
 Schemat `PostPurchaseIssueCheckoutForm` ma dokładnie dwa pola: `id`
-i `createdAt` (`date-time`). Do 0.282.0 czytaliśmy pierwsze, a drugie ginęło
-na etapie typu — i właśnie o tę datę Copilot prosił agenta w liście braków.
-Czym dokładnie jest ten moment, nie jest potwierdzone na żywym koncie:
-schemat nie mówi, czy to złożenie koszyka, czy jego opłacenie, a `boughtAt`
-przy pozycji zamówienia bywa późniejszy. Dlatego ekran nazywa tę datę
-„zamówienie złożone", a nie „kupiono", i ustępuje dacie z zamówienia, gdy ją
-mamy.
+i `createdAt` (`date-time`). Czytamy oba, bo o tę datę Copilot prosił agenta
+w liście braków. Czym dokładnie jest ten moment, nie jest potwierdzone na
+żywym koncie: schemat nie mówi, czy to złożenie koszyka, czy jego opłacenie,
+a `boughtAt` przy pozycji zamówienia bywa późniejszy. Dlatego ekran nazywa tę
+datę „zamówienie złożone", a nie „kupiono", i ustępuje dacie z zamówienia,
+gdy ją mamy.
 
 `[WERYFIKUJ]` zostaje przy jednym: końcówka trackingu jest w dokumentacji
 opisana przy przesyłkach ZAMÓWIENIA, a my pytamy o przesyłkę ZWROTNĄ. Odmowa
@@ -411,29 +337,20 @@ Trzy rzeczy z tej odpowiedzi nie mają u nas kolumny.
 
 `refund.bankAccount` niesie `owner`, `accountNumber`, `iban`, `swift`
 i `address`. `parcels[].sender.phoneNumber` niesie telefon nadawcy.
-`buyer.email` niesie adres e-mail kupującego — dopisany do tej listy
-w 0.164.0, bo `buyer` wszedł wtedy do kontraktu i bez tego zdania wyglądałby
-na pole do wzięcia w całości. W obserwacji z 2 września `buyer.email` było
-puste w stu rekordach na sto, ale schemat je przewiduje i to schemat
-rozstrzyga, czego nie wolno zapisać.
+`buyer.email` niesie adres e-mail kupującego. W obserwacji z 2 września
+`buyer.email` było puste w stu rekordach na sto, ale schemat je przewiduje
+i to schemat rozstrzyga, czego nie wolno zapisać.
 
 Zwrot da się rozstrzygnąć bez nich, a raz pobrane dane osobowe zostają
 w kopii zapasowej na lata. Kolumn na nie po prostu nie ma, więc nieuważne
 mapowanie wywali się na SQL-u, zamiast wyciec po cichu. Pilnuje tego
 `server/src/db/migracja-zwrotow.test.ts`.
 
-Zostaje sam FAKT powrotu paczki — `paczka_at` z najwcześniejszego
-`parcels[].createdAt`. To wystarcza, żeby powiedzieć „towar wrócił".
-
-Numeru listu (`parcels[].waybill`) NIE BIERZEMY z tej odpowiedzi, mimo że skan
-etykiety go szuka. Szukamy po kopii odpowiedzi w lądowisku, więc numer żyje
-przez jedno żądanie zamiast zostać u nas na lata. Politykę opisuje
-`docs/obsluga-klienta.md`, rozdział o danych zwrotów.
-
-Kolumna `zwrot_klienta.waybill` powstała w 0.172.0 i tego zdania nie łamie.
-Wypełnia się wyłącznie dla wierszy `zrodlo='nieodebrana'`, a te nie pochodzą
-z Allegro wcale — wpisuje je operator ze skanu. Z mapowania odpowiedzi Allegro
-nadal nie trafia tam ani jeden numer.
+Zostaje FAKT powrotu paczki — `paczka_at` z najwcześniejszego
+`parcels[].createdAt` — oraz numer listu i przewoźnik z tej samej paczki
+w `zwrot_klienta.waybill`. Politykę opisuje `docs/obsluga-klienta.md`,
+rozdział o danych zwrotów. Dla wierszy `zrodlo='nieodebrana'` numer wpisuje
+operator ze skanu, bo te nie pochodzą z Allegro wcale.
 
 ### Paczki nieodebranej Allegro nie zna
 
@@ -448,27 +365,25 @@ dopasowuje po `external_id` z Allegro, a lokalny nosi własny przedrostek.
 
 ### Pola młodsze od kopii specyfikacji
 
-Znacznik przy `status` zwrotu ZDJĘTY w 0.164.0. Twierdził, że „kopia
-specyfikacji z 2024 roku go nie zawiera" — a `docs/allegro/swagger.yaml`
-opisuje to pole razem z jedenastoma wartościami. Znacznik przeżył wymianę
-źródła z 0.151.0: sekcja o zwrotach dalej była pisana z dwuletniej kopii, choć
-schemat leżał już w repo. Kształt czyta się z pliku, nie z pamięci o pliku.
+`status` zwrotu nie nosi znacznika: `docs/allegro/swagger.yaml` opisuje to
+pole razem z jedenastoma wartościami. Kształt czyta się z pliku, nie
+z pamięci o pliku.
 
 ### Zapisy — kształt NIEPOTWIERDZONY
 
-Trzy końcówki zapisu wchodzą dopiero w 0.151.0. Ich kształt notujemy tutaj
-z tej samej kopii specyfikacji, żeby nie odtwarzać go z pamięci później.
+Kształt trzech końcówek zapisu notujemy ze specyfikacji, żeby nie odtwarzać
+go z pamięci.
 
 `[WERYFIKUJ]` `POST /order/customer-returns/{id}/rejection` przyjmuje obiekt
 `rejection` z polem `code` i opcjonalnym `reason`. Nazwa końcówki mówi
 o odmowie ZWROTU PIENIĘDZY, a nie o odrzuceniu samego zwrotu — panel nazywa to
 tak samo (przycisk ODMÓW WYPŁATY).
 
-**Kodów jest SIEDEM, nie cztery.** Do 0.190.0 stały tu tylko `REFUND_REJECTED`,
-`NEW_ITEM_SENT`, `ITEM_FIXED` i `MISSING_PART_SENT`; schemat
-`CustomerReturnRefundRejectionRequest` wymienia jeszcze `ITEM_MISMATCH`,
-`BUSINESS_PURCHASE` i `NO_RETURN_RIGHT`. Wymagany jest sam `code`; `reason`
-staje się obowiązkowy przy `REFUND_REJECTED` i ma `maxLength: 250`.
+**Kodów jest SIEDEM.** Schemat `CustomerReturnRefundRejectionRequest` wymienia
+`REFUND_REJECTED`, `NEW_ITEM_SENT`, `ITEM_FIXED`, `MISSING_PART_SENT`,
+`ITEM_MISMATCH`, `BUSINESS_PURCHASE` i `NO_RETURN_RIGHT`. Wymagany jest sam
+`code`; `reason` staje się obowiązkowy przy `REFUND_REJECTED` i ma
+`maxLength: 250`.
 
 Końcówka deklaruje WYŁĄCZNIE `application/vnd.allegro.beta.v1+json` i jest
 oznaczona `[BETA]` — inaczej niż zwrot pieniędzy, który bierze `public.v1`.
@@ -480,11 +395,10 @@ pola wymagane: `payment`, `order`, `commandId` i `reason`. Opcjonalne są
 `additionalServices` i `sellerComment`. Pozycja `lineItems[]` ma `id`, `type`
 (`QUANTITY` albo `AMOUNT`), `quantity` i `value`.
 
-Do 15 września 2026 panel wysyłał same pola wymagane i dostawę. Kwota
-z zaznaczenia nie docierała więc do Allegro. Teraz żądanie niesie `lineItems`:
-`QUANTITY` przy pełnej cenie bez potrącenia, `AMOUNT` z kwotą wprost w każdym
-innym przypadku. Otwarte zostaje, czy `QUANTITY` liczy się po cenie pozycji
-zamówienia. Pierwszy zwrot oddany z panelu to pokaże.
+Żądanie niesie `lineItems`: `QUANTITY` przy pełnej cenie bez potrącenia,
+`AMOUNT` z kwotą wprost w każdym innym przypadku. Otwarte zostaje, czy
+`QUANTITY` liczy się po cenie pozycji zamówienia. Pierwszy zwrot oddany
+z panelu to pokaże.
 
 Wartości `reason` jest SIEDEM: `REFUND`, `COMPLAINT`, `PRODUCT_NOT_AVAILABLE`,
 `PAID_VALUE_TOO_LOW`, `OVERPAID`, `CANCELLED_BY_BUYER` i `NOT_COLLECTED`.
@@ -496,15 +410,13 @@ Uprawnienie to `allegro:api:payments:write` i jest INNE niż przy rabacie.
 Wersja zasobu: `public.v1`. Odpowiedź (`RefundDetails`) niesie `id`, `payment`,
 `reason`, `status`, `createdAt` i `totalValue`.
 
-`[WERYFIKUJ]` Zachowanie idempotencji `commandId` na żywym koncie. Do 0.190.0
-stało tu, że kopia specyfikacji nie ma `commandId` ani `order` — NIEPRAWDA:
-oba stoją w `required` schematu `InitializeRefund`, zgodnie z ogłoszeniem
-Allegro o zmianie z 15 grudnia 2025. Zdanie zestarzało się przy odświeżeniu
-kopii i nikt go nie przeczytał ponownie.
+`[WERYFIKUJ]` Zachowanie idempotencji `commandId` na żywym koncie. `commandId`
+i `order` stoją w `required` schematu `InitializeRefund`, zgodnie
+z ogłoszeniem Allegro o zmianie z 15 grudnia 2025.
 
 Otwarte zostaje to, czego z pliku wyczytać się nie da: czy powtórzone żądanie
-z tym samym `commandId` naprawdę NIE oddaje pieniędzy drugi raz. Od 0.190.0
-identyfikator powstaje raz na zwrot i wraca ten sam przy ponowieniu
+z tym samym `commandId` naprawdę NIE oddaje pieniędzy drugi raz.
+Identyfikator powstaje raz na zwrot i wraca ten sam przy ponowieniu
 (`zwrot_klienta.zwrot_pieniedzy_command_id`), więc pierwszy ponowiony zwrot
 odpowie na to pytanie. Do tego czasu obowiązuje ostrożność: nasz własny
 strażnik nie wypuszcza drugiego żądania po udanym pierwszym.
@@ -512,17 +424,13 @@ strażnik nie wypuszcza drugiego żądania po udanym pierwszym.
 `[WERYFIKUJ]` `POST /order/refund-claims` — kształt ŻĄDANIA jest znany
 ze schematu (`RefundClaimRequest`, patrz sekcja niżej), ale nie przeszedł
 jeszcze przez żywe konto. Znacznik schodzi po PIERWSZYM udanym wniosku
-złożonym z panelu, nie wcześniej. Do 0.164.0 stało tu, że kształt jest
-„najsłabiej udokumentowany z całej trójki" — nieprawda, bo schemat leży
-w repo; nieznana jest wyłącznie odpowiedź konta.
+złożonym z panelu, nie wcześniej. Nieznana jest wyłącznie odpowiedź konta.
 
 ### Rabat transakcyjny — `/order/refund-claims`
 
-Zwrot prowizji od sprzedaży, po polsku „rabat transakcyjny". Do 0.164.0 firma
-klikała po niego ręcznie przy każdym zwrocie w panelu Allegro; obserwacja
-z 2 września pokazuje, dlaczego to była praca: `type` to `MANUAL` ×60
-i `AUTOMATIC` ×40, czyli Allegro część wniosków zakłada samo, a resztę trzeba
-złożyć.
+Zwrot prowizji od sprzedaży, po polsku „rabat transakcyjny". Obserwacja
+z 2 września pokazuje `type` `MANUAL` ×60 i `AUTOMATIC` ×40: Allegro część
+wniosków zakłada samo, a resztę trzeba złożyć.
 
 **Odczyt** — `GET /order/refund-claims`, nagłówek
 `application/vnd.allegro.public.v1+json`, uprawnienie `allegro:api:orders:read`.
@@ -541,20 +449,30 @@ większe od zera. Odpowiedź 201 niesie samo `{ id }` utworzonego wniosku.
 z `/order/checkout-forms`), nie oferty i nie pozycji zwrotu. Trzymamy go
 w `zamowienie_klienta_pozycja.external_id`.
 
-Od 0.320.0 to żądanie wysyła też AUTOMAT, zaraz po zaciągnięciu odstąpienia
-(§25a.20 panelu). Dlatego czeka pół godziny: `AUTOMATIC` w 40 rekordach na 100
-znaczy, że Allegro zakłada część wniosków samo, a końcówka bez idempotencji
-przyjęłaby nasz jako drugi.
+**TA KOŃCÓWKA NIE MA IDEMPOTENCJI.** Pole `commandId` jest przy zwrocie
+pieniędzy, nie tutaj — więc powtórzone żądanie zakłada DRUGI wniosek, a nie
+ten sam. Strażnik przed dubletem musi stać po naszej stronie i dlatego stoi
+potrójny (`services/rabaty.ts`).
+
+To żądanie wysyła też AUTOMAT, zaraz po zaciągnięciu odstąpienia (§25a.20
+panelu). Dlatego czeka pół godziny: `AUTOMATIC` w 40 rekordach na 100 znaczy,
+że Allegro zakłada część wniosków samo, a końcówka bez idempotencji przyjęłaby
+nasz jako drugi.
+
+**Anulowanie** — `DELETE /order/refund-claims/{claimId}`, odpowiedź 204, to samo
+uprawnienie do zapisu. Specyfikacja pisze przy nim „this cannot be undone":
+anulowania nie da się cofnąć, ale sam wniosek anulować można. Dlatego złożenie
+wniosku dostaje w panelu COFNIĘCIE, a nie potwierdzenie — §25a.5 rezerwuje
+potwierdzenie dla rzeczy nieodwracalnych.
 
 **LISTA WNIOSKÓW TO NIE JEDYNE ŹRÓDŁO.** Wniosek złożony w panelu Allegro
 trafia do niej dopiero z opóźnieniem, a my czytamy ją taktem co kwadrans.
 Drugim źródłem jest sam zwrot: `COMMISSION_REFUND_CLAIMED` i
 `COMMISSION_REFUNDED` mówią, że prowizja jest już objęta wnioskiem — bez jego
-numeru i bez kwoty. Od 0.176.0 `stanRabatu` czyta OBA i mówi, z którego wie,
-bo do 0.175.0 ekran pisał przy takim zwrocie „brak wniosku" i podstawiał
-przycisk, który zawsze kończył się konfliktem.
+numeru i bez kwoty. `stanRabatu` czyta OBA i mówi, z którego wie. Inaczej
+ekran pisałby „brak wniosku" i podstawiał przycisk kończący się konfliktem.
 
-### Wątek przeczytany i załączniki wiadomości (0.195.0)
+### Wątek przeczytany i załączniki wiadomości
 
 `PUT /messaging/threads/{threadId}/read`, uprawnienie `allegro:api:messaging`.
 Ciało to `{ "read": true }` ze schematu `ThreadReadFlag` — pole jest `required`,
@@ -569,7 +487,11 @@ specyfikacja wymienia `image/png`, `image/gif`, `image/bmp`, `image/tiff`,
 `image/jpeg` i `application/pdf`. To jedyny nasz zapis, przy którym 415 znaczy
 „zły plik", a nie „zła wersja zasobu".
 
-### Pobranie załącznika Centrum Wiadomości — `GET` bez `Accept` (0.244.0, poprawione w 0.248.0)
+Gotowe identyfikatory idą w `NewMessageInThread.attachments` jako lista
+`{ id }`. Deklaracji nie da się cofnąć — nie ma takiej końcówki — więc plik
+dodany i nigdy niewysłany zostaje po ich stronie i wygasa sam.
+
+### Pobranie załącznika Centrum Wiadomości — `GET` bez `Accept`
 
 Do ODCZYTU specyfikacja daje dwie rzeczy: pole `url` w `MessageAttachmentInfo`
 (w przykładzie `https://upload.allegro.pl/message-center/message-attachments/{uuid}`)
@@ -577,37 +499,22 @@ oraz operację `downloadAttachmentGET` na `/messaging/message-attachments/{attac
 (scope `allegro:api:messaging`). Ta druga deklaruje odpowiedź 200 jako `*/*`
 z nagłówkami `Content-Type` i `Content-Disposition` — plik binarny, bez wersji
 zasobu, dokładnie jak `GET /sale/issues/attachments/{attachmentId}`, z którego
-reklamacje czytają zdjęcia bez `Accept` od 0.223.0.
+reklamacje czytają zdjęcia bez `Accept`.
 
-0.244.0 przeczytało plik źle: zapisało, że „operacji w swaggerze nie ma", i dało
-drodze API nagłówek `Accept` z JSON-em z pamięci. Sonda właściciela (10 września
-2026, `npm run sonda:zalacznik`) pokazała skutek: API z `public.v1` i `beta.v1`
-odpowiada **406**, API bez `Accept` **200 `image/jpeg`**, a zapisany adres na
-`upload.allegro.pl` **403** na brzegu (portal deweloperski: `EDGE_CLIENT_ERROR`,
-którego specyfikacja nie zna). Odmawiał nasz nagłówek, nie Allegro.
+Sonda właściciela (10 września 2026, `npm run sonda:zalacznik`) zmierzyła: API
+z `public.v1` i `beta.v1` odpowiada **406**, API bez `Accept` **200
+`image/jpeg`**, a zapisany adres na `upload.allegro.pl` **403** na brzegu
+(portal deweloperski: `EDGE_CLIENT_ERROR`, którego specyfikacja nie zna).
+Odmawia nagłówek `Accept`, nie Allegro.
 
-Od 0.248.0 adapter idzie KANDYDATAMI (`kandydaciPobrania`): `GET {api}/messaging/message-attachments/{uuid}`
-bez `Accept`, a gdy odmówi — zapisany `url` bez `Accept` jako zapas. UUID
-bierzemy z OGONA `url`; `MessageAttachmentInfoVBeta1` ma go w `id`, a oba
-przykłady w swaggerze niosą ten sam ciąg. 401 kończy próby od razu, bo token
-jest jeden. Odmowa każdej drogi wraca jednym zdaniem z kodem każdej próby, bez
-adresów i bez identyfikatora. Sonda zostaje jako potwierdzenie na żywo po
-aktualizacji: dwie próby kontrolne Z nagłówkiem mają pokazać 406.
-
-Gotowe identyfikatory idą w `NewMessageInThread.attachments` jako lista
-`{ id }`. Deklaracji nie da się cofnąć — nie ma takiej końcówki — więc plik
-dodany i nigdy niewysłany zostaje po ich stronie i wygasa sam.
-
-**TA KOŃCÓWKA NIE MA IDEMPOTENCJI.** Pole `commandId` jest przy zwrocie
-pieniędzy, nie tutaj — więc powtórzone żądanie zakłada DRUGI wniosek, a nie
-ten sam. Strażnik przed dubletem musi stać po naszej stronie i dlatego stoi
-potrójny (`services/rabaty.ts`).
-
-**Anulowanie** — `DELETE /order/refund-claims/{claimId}`, odpowiedź 204, to samo
-uprawnienie do zapisu. Specyfikacja pisze przy nim „this cannot be undone":
-anulowania nie da się cofnąć, ale sam wniosek anulować można. Dlatego złożenie
-wniosku dostaje w panelu COFNIĘCIE, a nie potwierdzenie — §25a.5 rezerwuje
-potwierdzenie dla rzeczy nieodwracalnych.
+Adapter idzie KANDYDATAMI (`kandydaciPobrania`):
+`GET {api}/messaging/message-attachments/{uuid}` bez `Accept`, a gdy odmówi —
+zapisany `url` bez `Accept` jako zapas. UUID bierzemy z OGONA `url`;
+`MessageAttachmentInfoVBeta1` ma go w `id`, a oba przykłady w swaggerze niosą
+ten sam ciąg. 401 kończy próby od razu, bo token jest jeden. Odmowa każdej
+drogi wraca jednym zdaniem z kodem każdej próby, bez adresów i bez
+identyfikatora. Sonda zostaje jako potwierdzenie na żywo po aktualizacji: dwie
+próby kontrolne Z nagłówkiem mają pokazać 406.
 
 ### Co się stanie, jeśli kształt jest inny
 
@@ -615,20 +522,16 @@ Przy odczycie: `tablica()` rzuca zdaniem wskazującym ten plik, a przebieg
 kończy się porażką z kodem HTTP w `allegro_zwroty_sync_state`. Panel pokazuje
 wtedy status z §21, a nie pustą kolejkę udającą brak zwrotów.
 
-Przy zapisie (0.151.0): Allegro odpowie 400 albo 422, kolejka zapisze to jako
-porażkę razem z treścią odpowiedzi, a do klienta nic nie wyjdzie po cichu.
+Przy zapisie: Allegro odpowie 400 albo 422, kolejka zapisze to jako porażkę
+razem z treścią odpowiedzi, a do klienta nic nie wyjdzie po cichu.
 
 ## Sprawy posprzedażowe — kształt ze specyfikacji i z sondy
 
 Rodzina `/sale/issues` („Post Purchase Issues") niesie DWA byty pod jednym
-zasobem: dyskusje (`type: "DISPUTE"`) i reklamacje (`type: "CLAIM"`). Do
-0.244.0 panel prowadził wyłącznie reklamacje, a dyskusje odsiewał filtr
-w mapowaniu synchronizatora — decyzja właściciela z 6 września 2026.
-
-**Właściciel odwrócił ją 9 września 2026.** Od 0.245.0 obie gałęzie lądują
-w bazie, a rozróżnia je kolumna `typ`; dyskusje mają własny ekran (§25c
-projektu panelu). Licznik odsianych ZOSTAŁ i zmienił znaczenie na „ile dyskusji
-przyjechało" — jest teraz kontrolą krzyżową dla licznika kolejki.
+zasobem: dyskusje (`type: "DISPUTE"`) i reklamacje (`type: "CLAIM"`). Obie
+gałęzie lądują w bazie, a rozróżnia je kolumna `typ`; dyskusje mają własny
+ekran (§25c projektu panelu). Licznik dyskusji w przebiegu jest kontrolą
+krzyżową dla licznika kolejki.
 
 Identyfikatory obu bytów żyją w JEDNEJ przestrzeni: specyfikacja opisuje
 `{issueId}` jako `Dispute or claim identifier` przy każdej końcówce rodziny.
@@ -637,9 +540,8 @@ umowę, której baza nie pilnuje.
 
 Cała rodzina chodzi po `application/vnd.allegro.beta.v1+json` i po uprawnieniu
 `allegro:api:disputes` — specyfikacja podaje je przy wszystkich trzech zapisach
-tak samo, jak przy odczytach. Wysyłka odpowiedzi (0.224.0) nie prosi więc
-o nowe uprawnienie i werdykt też nie będzie prosił; parowania konta żaden
-z tych przyrostów nie powtarza.
+tak samo, jak przy odczytach. Wysyłka odpowiedzi i werdykt nie proszą więc
+o nowe uprawnienie ani o ponowne parowanie konta.
 
 ### Ile tego jest
 
@@ -648,10 +550,8 @@ DISPUTE**, `right: COMPLAINT` przy wszystkich sześćdziesięciu pięciu. Status
 `CLAIM_ACCEPTED` 33, `DISPUTE_ONGOING` 25, `CLAIM_SUBMITTED` 20,
 `CLAIM_REJECTED` 12, `DISPUTE_CLOSED` 10. Powody: `DEFECT_FOUND_DURING_USE` 34,
 `NOT_AS_DESCRIBED` 17, `OTHER` 6, `MISSING_PRODUCT_ELEMENT` 5,
-`PRODUCT_DAMAGED_PARCEL_INTACT` 3.
-
-Dwadzieścia spraw czekało na decyzję sprzedawcy i żadna z nich nie miała
-u nas kolejki ani zegara.
+`PRODUCT_DAMAGED_PARCEL_INTACT` 3. Dwadzieścia spraw czekało na decyzję
+sprzedawcy.
 
 ### `GET /sale/issues`
 
@@ -666,31 +566,31 @@ ogon przebiegu będzie policzony; gdy nie, zostaje „nie wiem".
 
 **ŻADEN ze schematów `PostPurchaseIssue*` nie ma listy `required`.** Wymagalność
 pola mówi wyłącznie ta lista, więc kod traktuje każde pole jako opcjonalne —
-poza `id`, bez którego nie ma czego zapisać. Tak samo potraktowaliśmy
-`OfferListingDto` w 0.214.0 i to nie była wtedy usterka Allegro.
+poza `id`, bez którego nie ma czego zapisać. Tak samo traktujemy
+`OfferListingDto`.
 
-### Filtr statusów: przebieg bierze NAJPIERW sprawy otwarte (0.273.0)
+### Filtr statusów: przebieg bierze NAJPIERW sprawy otwarte
 
 `getListOfIssuesUsingGET` przyjmuje `status` — tablicę `PostPurchaseIssueStatus`
 (`CLAIM_SUBMITTED`, `CLAIM_ACCEPTED`, `CLAIM_REJECTED`, `DISPUTE_ONGOING`,
-`DISPUTE_CLOSED`, `DISPUTE_UNRESOLVED`). Do 0.272.0 nie używaliśmy go wcale.
+`DISPUTE_CLOSED`, `DISPUTE_UNRESOLVED`).
 
 Lista jedzie MALEJĄCO PO DACIE OTWARCIA, a bezpiecznik stron ucina jej ogon —
-czyli sprawy najstarsze, czyli najbardziej spóźnione, czyli dokładnie te, dla
-których panel reklamacji powstał. Przebieg pyta więc najpierw o trzy statusy
-spraw żywych, a dopiero potem o całą listę. Spraw otwartych jest garść, więc
-mieszczą się przed bezpiecznikiem niezależnie od tego, jak długie jest archiwum.
+czyli sprawy najstarsze i najbardziej spóźnione. Przebieg pyta więc najpierw
+o trzy statusy spraw żywych, a dopiero potem o całą listę. Spraw otwartych
+jest garść, więc mieszczą się przed bezpiecznikiem niezależnie od długości
+archiwum.
 
-Przelot pełny ZOSTAJE nietknięty: to on zamyka sprawy rozstrzygnięte poza
-panelem i z niego liczy się ogon (`pozostalo`). Sprawa widziana w obu przelotach
-zapisuje się raz — przebieg trzyma je w mapie po identyfikatorze.
+Przelot pełny zamyka sprawy rozstrzygnięte poza panelem i z niego liczy się
+ogon (`pozostalo`). Sprawa widziana w obu przelotach zapisuje się raz —
+przebieg trzyma je w mapie po identyfikatorze.
 
-### Język: `Accept-Language` przy każdym żądaniu (0.273.0)
+### Język: `Accept-Language` przy każdym żądaniu
 
 Specyfikacja wymienia ten nagłówek przy `GET /sale/issues` („Expected language
 of subject field") i przy `GET …/chat` („Expected language of messages",
-z przykładem `en-US`). Do 0.272.0 nie było go w serwerze NIGDZIE, więc pola
-zależne od języka przychodziły w domyślnym Allegro.
+z przykładem `en-US`). Bez niego pola zależne od języka przychodzą
+w domyślnym języku Allegro.
 
 Wysyłamy `pl-PL` z jednego miejsca — bloku nagłówków `zapytajAllegro` — dla
 całej rodziny końcówek. Rozjazd języka między listą a rozmową tej samej sprawy
@@ -720,10 +620,9 @@ byłby gorszy niż konsekwentna angielszczyzna.
 | `chat.initialMessage` | wiersz w `reklamacja_wiadomosc` | treść zgłoszenia bez dodatkowego żądania |
 | `attachments[]` | `reklamacja_zalacznik` | nazwa i adres, **nigdy plik** |
 
-`decisionDueDate` jest tu najważniejszy. Implementacja skasowana w 0.140.0
-liczyła ustawowe czternaście dni SAMA, bo komentarz obok twierdził, że ten
-zasób żadnego zegara nie oddaje. Twierdzenie było nieprawdziwe już wtedy,
-a liczba wzięta z naszego kodu rozjeżdżałaby się z tą, którą widzi kupujący.
+`decisionDueDate` jest tu najważniejszy. Termin czytamy od Allegro, a nie
+liczymy sami: liczba wzięta z naszego kodu rozjeżdżałaby się z tą, którą widzi
+kupujący.
 
 Kwotę z `expectations[].refund.amount` liczymy na TEKŚCIE, tą samą funkcją co
 przy zwrotach (`naGrosze`). Allegro oddaje ją stringiem i mówi wprost dlaczego:
@@ -733,30 +632,24 @@ przy zwrotach (`naGrosze`). Allegro oddaje ją stringiem i mówi wprost dlaczego
 
 `product.id` — identyfikator katalogu Allegro, a my wiążemy przez ofertę
 i sygnaturę. `offer.quantity` — liczba sztuk objętych sprawą; przyda się
-dopiero przy częściowym zwrocie pieniędzy, czyli w przyroście trzecim.
-Danych adresowych i kontaktowych schemat `PostPurchaseIssue` nie niesie
-w ogóle, więc kolumn na nie po prostu nie ma.
+dopiero przy częściowym zwrocie pieniędzy. Danych adresowych i kontaktowych
+schemat `PostPurchaseIssue` nie niesie w ogóle, więc kolumn na nie nie ma.
 
 ### `GET /sale/issues/{issueId}/chat`
 
-Zwraca obiekt z tablicą `chat`, a nie `messages` — do 0.164.0 sonda pytała
-o zły klucz i dlatego jej sekcja rozmowy była pusta przy stu sprawach
-z niezerowym `chat.messagesCount`. Domyślny `limit` przy tej jednej końcówce
-to **10**, nie 100 jak przy listach obok, więc podajemy go jawnie.
+Zwraca obiekt z tablicą `chat`, a nie `messages`. Domyślny `limit` przy tej
+jednej końcówce to **10**, nie 100 jak przy listach obok, więc podajemy go
+jawnie.
 
 `PostPurchaseIssueMessageAuthor.login` bywa PUSTY i schemat mówi wprost, kiedy:
 „not present if role is ADMIN, SYSTEM or FULFILLMENT". Doradca Allegro
 (`ADMIN`) odpisał w 61 sprawach na 100, więc to jest przypadek typowy.
 
-**Rozmowa STRONICUJE SIĘ od 0.273.0.** Do 0.272.0 to żądanie szło raz, bez
-`offset`, choć adres umiał go od początku — więc rozmowa dłuższa niż sto
-wiadomości była przycięta na zawsze, a ekran obiecywał przy niej resztę, która
-nie miała skąd przyjść. Bezpiecznik stoi na pięciu stronach; rozmowa dłuższa
-dostaje znak `czat_urwany` i wtedy ekran mówi co innego, zamiast obiecywać.
-
-Bezpiecznik był potrzebny z osobnego powodu niż przy liście: budżet rozmów na
-przebieg liczy SPRAWY, nie żądania, więc bez granicy jedna rozmowa o tysiącu
-wiadomości zjadłaby cały takt sama.
+**Rozmowa STRONICUJE SIĘ** przez `offset`. Bezpiecznik stoi na pięciu
+stronach; rozmowa dłuższa dostaje znak `czat_urwany` i wtedy ekran mówi, że
+jest ucięta, zamiast obiecywać resztę. Budżet rozmów na przebieg liczy SPRAWY,
+nie żądania, więc bez granicy jedna rozmowa o tysiącu wiadomości zjadłaby cały
+takt sama.
 
 `[WERYFIKUJ]` Kształt rozmowy na ŻYWYM koncie. `docs/allegro-sonda.md` ma tę
 sekcję pustą, bo próbkę zdjęto przed poprawką klucza. Kolumna „niepuste" dla
@@ -777,37 +670,30 @@ Typem jest `string`, więc rozstrzyga to dopiero pierwsze trafienie w
 `offer_snapshot` — to jest ta sama otwarta sprawa dwóch przestrzeni
 identyfikatora oferty, co przy pozycji zwrotu.
 
-### `GET /sale/issues/{issueId}` — odświeżenie jednej sprawy (0.273.0)
+### `GET /sale/issues/{issueId}` — odświeżenie jednej sprawy
 
-Czwarta końcówka rodziny i do 0.272.0 jedyna nieużywana wcale. Oddaje ten sam
-kształt `PostPurchaseIssue`, co wiersz listy, więc zapisuje ją ta sama funkcja —
-jedna droga zapisu, nie dwie.
+Oddaje ten sam kształt `PostPurchaseIssue`, co wiersz listy, więc zapisuje ją
+ta sama funkcja — jedna droga zapisu, nie dwie.
 
 Powód istnienia jest po stronie człowieka, nie danych: bez niej świeży stan
 sprawy dawał wyłącznie PEŁNY przebieg listy, czyli takt trzech minut. Agent,
-który właśnie wysłał odpowiedź albo werdykt, patrzy na ekran teraz — i najbardziej
-wtedy, gdy wysyłka skończyła się niejednoznacznie, bo pasek odsyłał go wtedy do
-Centrum Sprzedaży po coś, co jedno żądanie rozstrzyga.
+który właśnie wysłał odpowiedź albo werdykt, patrzy na ekran teraz —
+zwłaszcza gdy wysyłka skończyła się niejednoznacznie.
 
 Rozmowa dociąga się przy okazji i tylko wtedy, gdy licznik Allegro rozjechał się
 z naszym — odświeżenie ma kosztować jedno żądanie, gdy nic nowego nie przyszło.
 
-### Załączniki WYCHODZĄCE: `POST /sale/issues/attachments` + `PUT` (0.274.0)
+### Załączniki WYCHODZĄCE: `POST /sale/issues/attachments` + `PUT`
 
-Decyzja właściciela z 7 września brzmiała „sam tekst" i trzymała się cztery dni;
-11 września ją odwrócił. Droga jest dwukrokowa jak w Centrum Wiadomości:
-deklaracja oddaje numer, `PUT` niesie bajty, a `MessageRequest.attachments`
-wymienia numery przy wiadomości (`PostPurchaseIssueAttachmentId`, czyli `{ id }`).
+Droga jest dwukrokowa jak w Centrum Wiadomości: deklaracja oddaje numer, `PUT`
+niesie bajty, a `MessageRequest.attachments` wymienia numery przy wiadomości
+(`PostPurchaseIssueAttachmentId`, czyli `{ id }`).
 
 **TO INNY KSZTAŁT NIŻ PRZY CENTRUM WIADOMOŚCI, choć robi to samo.** Deklaracja
 sprawy używa schematu `AttachmentDeclaration` z polem **`fileName`**, a
 `/messaging/message-attachments` — schematu `NewAttachmentDeclaration` z polem
-**`filename`**. Różnica jednej litery przy polu obowiązkowym w obu.
-
-To jest dokładnie ta pułapka, przed którą ostrzega `CLAUDE.md`: `public.v1`
-i `beta.v1` bywają RÓŻNYMI kształtami, nie wariantami jednego. Kształt czyta się
-z pliku, nie z pamięci o sąsiedniej końcówce — a sąsiednia końcówka stała
-gotowa i kusiła.
+**`filename`**. Różnica jednej litery przy polu obowiązkowym w obu. Kształt
+czyta się z pliku, nie z pamięci o sąsiedniej końcówce.
 
 Druga różnica: schemat spraw **nie podaje maksymalnego rozmiaru** (messaging
 podaje 5 MiB), więc granicą jest wyłącznie nasza — cztery megabajty, bo plik
@@ -826,15 +712,13 @@ i PDF. Innych `requestBody` wgrania NIE wymienia.
 ### Załącznik: typ rozstrzygają BAJTY
 
 `PostPurchaseIssueAttachment` ma DWA pola: `fileName` i `url`. Nie ma ani typu
-MIME, ani stanu `SAFE`/`UNSAFE`, na którym stoi podgląd zdjęć w skrzynce
-(0.218.0). Do 0.222.0 wyciągaliśmy z tego wniosek, że zdjęcia nie da się
-pokazać na osi — i ten wniosek był zbyt szeroki.
+MIME, ani stanu `SAFE`/`UNSAFE`, na którym stoi podgląd zdjęć w skrzynce.
 
-Bramka ze skrzynki pilnowała JEDNEJ rzeczy: żeby na osi rysowały się wyłącznie
-typy, które przeglądarka narysuje, i nic innego. Tego da się dopilnować bez
-pola, po SYGNATURZE pliku — bajty i tak przechodzą przez nasz serwer. Od
-0.223.0 robi to `rozpoznajMime` (ta sama funkcja, co przy zdjęciach z Subiekta)
-przecięte z `TYPY_PODGLADU`.
+Bramka ze skrzynki pilnuje JEDNEJ rzeczy: żeby na osi rysowały się wyłącznie
+typy, które przeglądarka narysuje. Tego da się dopilnować bez pola, po
+SYGNATURZE pliku — bajty i tak przechodzą przez nasz serwer. Robi to
+`rozpoznajMime` (ta sama funkcja, co przy zdjęciach z Subiekta) przecięte
+z `TYPY_PODGLADU`.
 
 Przechodzą TRZY typy, i to jest przecięcie dwóch list. Allegro przyjmuje przy
 tym zasobie `image/png`, `image/gif`, `image/bmp`, `image/tiff`, `image/jpeg`
@@ -847,27 +731,25 @@ Nazwa pliku niczego nie rozstrzyga: decyduje o UKŁADZIE po stronie panelu
 (pole `podglad`), a plik nazwany `usterka.jpg`, który sygnatury obrazu nie ma,
 dostaje 415 i spada z powrotem na przycisk pobrania.
 
-Pobranie ma tu za to WŁASNĄ końcówkę w specyfikacji
-(`GET /sale/issues/attachments/{attachmentId}`), czego brakuje przy
-załącznikach Centrum Wiadomości — tamte dostały w 0.244.0 kandydatów
-i znacznik (sekcja „Pobranie załącznika Centrum Wiadomości"). Adres i tak
-czytamy z bazy, a host sprawdza `pobierzZalacznik` — dwie niezależne zapory,
-bo obie kosztują jedną linijkę.
+Pobranie ma tu WŁASNĄ końcówkę w specyfikacji
+(`GET /sale/issues/attachments/{attachmentId}`). Adres i tak czytamy z bazy,
+a host sprawdza `pobierzZalacznik` — dwie niezależne zapory, bo obie kosztują
+jedną linijkę.
 
-### `POST /sale/issues/{issueId}/message` — odpowiedź w sprawie (0.224.0)
+### `POST /sale/issues/{issueId}/message` — odpowiedź w sprawie
 
-Pierwszy zapis tego modułu. Ciało to `MessageRequest`: `text` (**maxLength
-20 000** — dziesięć razy więcej niż 2000 w Centrum Wiadomości), `attachments`
-i `type`. Wysyłamy `{ text, type: "REGULAR" }` i nic więcej.
+Ciało to `MessageRequest`: `text` (**maxLength 20 000** — dziesięć razy więcej
+niż 2000 w Centrum Wiadomości), `attachments` i `type`. Wysyłamy
+`{ text, type: "REGULAR" }` i nic więcej.
 
 Lista `required: [text, attachment, type]` w tym schemacie jest FIKCJĄ:
 właściwości `attachment` w nim nie ma, a lista przeczy własnemu opisowi obok.
 Wiążący jest opis końcówki — „At least one of fields: 'text', 'attachment'".
-To trzeci raz, gdy przykład albo lista `required` u Allegro kłóci się z resztą
-schematu, i trzeci raz wygrywa schemat czytany w całości.
+Gdy przykład albo lista `required` u Allegro kłóci się z resztą schematu,
+wygrywa schemat czytany w całości.
 
 `[WERYFIKUJ]` `END_REQUEST` jest ŻĄDANIEM, nie zakończeniem. Panel wysyła tę
-wartość od 0.245.0 jako „poproś o zakończenie dyskusji". Nazwa mówi `request`,
+wartość jako „poproś o zakończenie dyskusji". Nazwa mówi `request`,
 a specyfikacja nie łączy jej ani jednym zdaniem ze statusem `DISPUTE_CLOSED`;
 że dyskusja od niej się zamyka, byłoby wnioskiem z nazwy, nie z kontraktu.
 Sonda tej operacji nigdy nie wykonała — znacznik schodzi po pierwszym udanym
@@ -878,11 +760,11 @@ Enum `type` niesie też `END_REQUEST` (wyłącznie dyskusje) i trzy `RETURN_*`
 (wyłącznie reklamacje). Te trzy są JEDYNĄ drogą do `currentState.returnRequired`
 — osiem trafień w całej specyfikacji i ani jednej innej końcówki. Ale
 specyfikacja nie łączy tych miejsc ani jednym zdaniem: to wniosek z nazw,
-a wysłanie takiego typu jest formalnym stanowiskiem sprzedawcy. Od przyrostu
-trzeciego panel wysyła dwa z nich po uznaniu (`RETURN_REQUIRED_CUSTOM`,
-`RETURN_NOT_REQUIRED`) jako krok „towar do odesłania?" — tą samą końcówką,
-z `typ` zapisanym na próbie w `reklamacja_outbox`. `RETURN_REQUIRED_SELLER_LABEL`
-(etykieta od sprzedawcy) zostaje poza panelem.
+a wysłanie takiego typu jest formalnym stanowiskiem sprzedawcy. Panel wysyła
+dwa z nich po uznaniu (`RETURN_REQUIRED_CUSTOM`, `RETURN_NOT_REQUIRED`) jako
+krok „towar do odesłania?" — tą samą końcówką, z `typ` zapisanym na próbie
+w `reklamacja_outbox`. `RETURN_REQUIRED_SELLER_LABEL` (etykieta od sprzedawcy)
+zostaje poza panelem.
 
 `[WERYFIKUJ]` czy `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` naprawdę
 przestawiają `currentState.returnRequired`. Panel zapisuje decyzję lokalnie
@@ -903,12 +785,11 @@ nie jest.
 
 `[WERYFIKUJ]` czy odpowiedź `201` ZAWSZE niesie `id` wiadomości. Schemat
 `Message` nie ma listy `required`, więc formalnie każde pole jest opcjonalne.
-Sukces bez `id` traktujemy dziś jak wynik niejednoznaczny i nie dopisujemy
-wiersza na osi rozmowy — `reklamacja_wiadomosc` ma
-`UNIQUE(reklamacja_id, external_id)`, więc wiersz bez identyfikatora nie miałby
-jak być idempotentny.
+Sukces bez `id` traktujemy jak wynik niejednoznaczny i nie dopisujemy wiersza
+na osi rozmowy — `reklamacja_wiadomosc` ma `UNIQUE(reklamacja_id, external_id)`,
+więc wiersz bez identyfikatora nie miałby jak być idempotentny.
 
-### Werdykt: `POST /sale/issues/{issueId}/status` (przyrost trzeci, 0.242.0)
+### Werdykt: `POST /sale/issues/{issueId}/status`
 
 `changeStatusOfIssueUsingPOST`, wyłącznie `application/vnd.allegro.beta.v1+json`,
 uprawnienie `allegro:api:disputes` — to samo, co odczyt spraw, więc nowego
@@ -916,11 +797,13 @@ parowania nie ma. Ciało `ClaimStatusChangeRequest`: `required: [status, message
 `status` z enumu jedenastu wartości (cztery `ACCEPTED_*`, siedem `REJECTED_*`),
 `partialRefund` to `Price` (`amount` jako TEKST „40.00", `currency`) i jedzie
 wyłącznie przy `ACCEPTED_PARTIAL_REFUND` — ciało układa `cialoWerdyktu()`
-w adapterze, a test sprawdza je bez sieci. Odpowiedzi: `200` „Status changed
-correctly" BEZ ciała, `400`, `401`, `403`, `404`. Sukcesem jest brak wyjątku,
-nie kształt odpowiedzi; `404` jest przy tym zapisie błędem (`blad404`), bo
-pusta `200` też oddaje `null` i bez tej opcji „sprawa nie istnieje" wyglądałoby
-jak „werdykt przyjęty". Kolumna `werdykt` ma `CHECK` z pełnym enumem od razu.
+w adapterze, a test sprawdza je bez sieci.
+
+Odpowiedzi: `200` „Status changed correctly" BEZ ciała, `400`, `401`, `403`,
+`404`. Sukcesem jest brak wyjątku, nie kształt odpowiedzi. `404` jest przy tym
+zapisie błędem (`blad404`), bo pusta `200` też oddaje `null` i bez tej opcji
+„sprawa nie istnieje" wyglądałoby jak „werdykt przyjęty". Kolumna `werdykt` ma
+`CHECK` z pełnym enumem.
 
 `[WERYFIKUJ]` `message` nie ma w schemacie `maxLength` — inaczej niż
 `MessageRequest.text` (20 000). Panel przyjmuje limit czatu jako własny, żeby
@@ -937,11 +820,9 @@ z sygnałem „status?", żeby właściciel potwierdził wartość na żywym kon
 
 ## Zamówienie klienta — kształt ze specyfikacji w repo
 
-Ta sekcja różni się od poprzednich pochodzeniem po raz drugi, tym razem na
-lepsze. Od 0.151.0 cała specyfikacja Allegro leży w repo
-(`docs/allegro/swagger.yaml`), więc pola niżej odczytano ze SCHEMATU, nie
-z pamięci ani z kopii sprzed dwóch lat. Znacznik stoi tu jeden, przy
-dosyłce, i dotyczy faktu podanego przez właściciela, nie kształtu.
+Pola niżej odczytano ze SCHEMATU w `docs/allegro/swagger.yaml`. Znacznik stoi
+tu jeden, przy dosyłce, i dotyczy faktu podanego przez właściciela, nie
+kształtu.
 
 ### `GET /order/checkout-forms/{id}`
 
@@ -957,7 +838,7 @@ przypadkową.
 Oferta (`OfferReference`) ma `id`, `name` i **`external`**. To ostatnie pole
 jest powodem, dla którego w ogóle pobieramy zamówienia.
 
-### `GET /order/checkout-forms?buyer.login=…` — paczka nieodebrana (0.450.0)
+### `GET /order/checkout-forms?buyer.login=…` — paczka nieodebrana
 
 Lista zamówień ma parametr `buyer.login`, a opis w schemacie brzmi „Find
 checkout-forms having specified buyer login". Odpowiedź to `CheckoutForms`:
@@ -970,37 +851,29 @@ zamówieniu. `limit` ma w schemacie maksimum 100; bierzemy 50. Sortowania nie
 podajemy, bo domyślne jest malejące po `lineItems.boughtAt`.
 
 Po co: nasza baza zna tylko zamówienia, do których prowadzi zwrot, wiadomość
-albo reklamacja. Paczka nieodebrana nie ma żadnego z nich, więc jej
-zamówienia u nas nie było. Biuro szukało go na stronie Allegro.
+albo reklamacja. Paczka nieodebrana nie ma żadnego z nich.
 
-**Login bez pseudonimu: `client:124843816` (0.452.0).** Zrzut Sales Center
-od właściciela pokazał kupującego z loginem „Client:124843816”. Sales Center
-wyszukiwał go po tym napisie, a nasz panel nie pytał Allegro wcale. Dwukropek
-nie mieścił się w dopuszczonych znakach. Ten kształt braliśmy dotąd za MASKĘ
-rozmówcy (blizna 0.56.6); w zamówieniu jest zwykłym loginem.
+**Login bez pseudonimu: `client:124843816`.** Sales Center pokazuje kupującego
+z loginem „Client:124843816” i wyszukuje go po tym napisie. W zamówieniu jest
+to zwykły login. Schemat nie mówi, czy filtr `buyer.login` rozróżnia wielkość
+liter. Dla tego kształtu pytamy więc najpierw „client:”, a przy pustej
+odpowiedzi „Client:”.
 
-Schemat nie mówi, czy filtr `buyer.login` rozróżnia wielkość liter. Dla tego
-kształtu pytamy więc najpierw „client:”, a przy pustej odpowiedzi „Client:”.
-Znacznik weryfikacji przy rozmówcy w wiadomościach został wtedy, bo zrzut
-dotyczył zamówienia, a nie wątku. Zdjęto go 24 września 2026 — rozdział
-`GET /messaging/threads`.
-
-### `GET /order/checkout-forms/{id}/shipments` — dosyłka (0.536.0)
+### `GET /order/checkout-forms/{id}/shipments` — dosyłka
 
 Schemat `CheckoutFormOrderWaybillResponse`: `shipments[]` z elementem
 `CheckoutFormAddWaybillCreated`. Bierzemy `waybill`, `carrierId` i `createdAt`,
 czyli „Date and time of the parcel tracking number registration in UTC".
 Schemat nie ma listy `required`, więc każde z tych pól może nie przyjść.
 
-Końcówkę pyta od 0.393.0 przycisk przesyłki zamówienia, a od 0.536.0 ticker
-dosyłki. Lista niesie numery przesyłek zamówienia: pierwszą paczkę i każdą
-dopisaną później. Schemat nie wyklucza numeru paczki zwrotu, więc go
-odsiewamy. Dosyłkę wybiera `wybierzNumer` w `services/dosylka.ts`. Odrzuca
-numery paczek zwrotów tego zamówienia: `waybill` i `transportingWaybill`
-z `CustomerReturnReturnParcel` w lądowisku. Odrzuca też numer zarejestrowany
-przed zgłoszeniem zwrotu i paczkę doręczoną przed nim — to pierwsza paczka.
-Numer bez `createdAt` bierze tylko wtedy, gdy tracking pokazał ruch po
-zgłoszeniu zwrotu.
+Końcówkę pyta przycisk przesyłki zamówienia i ticker dosyłki. Lista niesie
+numery przesyłek zamówienia: pierwszą paczkę i każdą dopisaną później.
+Schemat nie wyklucza numeru paczki zwrotu, więc go odsiewamy. Dosyłkę wybiera
+`wybierzNumer` w `services/dosylka.ts`. Odrzuca numery paczek zwrotów tego
+zamówienia: `waybill` i `transportingWaybill` z `CustomerReturnReturnParcel`
+w lądowisku. Odrzuca też numer zarejestrowany przed zgłoszeniem zwrotu
+i paczkę doręczoną przed nim — to pierwsza paczka. Numer bez `createdAt`
+bierze tylko wtedy, gdy tracking pokazał ruch po zgłoszeniu zwrotu.
 
 `[WERYFIKUJ]` **Numer dosyłki stoi zwykle przy tym samym zamówieniu w Allegro.**
 Właściciel zapytany o to 27 września 2026 odpowiedział: „Wydaje mi się że
@@ -1020,15 +893,13 @@ system": identyfikator, który sprzedawca sam wpisał przy ofercie. U tej firmy
 to symbol z Subiekta.
 
 **Pole jest OPCJONALNE w schemacie** — `OfferReference` wymaga tylko `id`
-i `name` — więc do 0.164.0 cały mostek do kartoteki stał na nieznanym
-pokryciu. Obserwacja z 2 września odpowiada: `lineItems[].offer.external.id`
-było niepuste w **165 na 165** pozycji. Grunt jest pewny, ale nie z definicji:
+i `name`. Obserwacja z 2 września: `lineItems[].offer.external.id` było
+niepuste w **165 na 165** pozycji. Grunt jest pewny, ale nie z definicji:
 to liczba z jednego dnia i jednego konta, a kod ma dalej znosić brak SKU
 („oferta bez SKU" jest jednym z sześciu powodów w łańcuchu kartotek).
 
 Bez tego mostka pozycja zwrotu nie ma zdjęcia, bo `zdjecie_cache`
-i `zdjecie_wlasne` są kluczowane po `tw_id`. Projekt panelu §28 nazywał to
-„czeka na dostęp do dokumentacji Allegro" — dokumentacja przyszła.
+i `zdjecie_wlasne` są kluczowane po `tw_id`.
 
 Dopasowanie jest PROPOZYCJĄ, nie faktem: `services/dopasowanie-sku.ts`
 porównuje SKU z `sgt_towar.symbol`, a zapisuje dopiero potwierdzenie
@@ -1052,8 +923,8 @@ wyłącznie dla pól słownikowych, a identyfikator oferty nim nie jest.
 Zamiast zgadywać, `dopasowanie-sku.ts` łączy pozycję zwrotu z pozycją
 zamówienia po `offer_id` **albo** po `external_id` i zapisuje w polu
 `poKolumnie`, która z nich trafiła. Odpowiedź przyjedzie z produkcji.
-Wcześniejsze złączenie po samym `offer_id` nie trafiało nigdy — cicho
-i w stu procentach — jeśli rozjazd jest faktem.
+Złączenie po samym `offer_id` nie trafiałoby nigdy — cicho i w stu
+procentach — jeśli rozjazd jest faktem.
 
 ### Pamięć wskazań — `oferta_kartoteka`
 
@@ -1078,55 +949,40 @@ schemat dopuszcza w `include` wyłącznie `stock` i `price`.
 
 404 na `GET /order/checkout-forms/{id}` jest ODPOWIEDZIĄ, a nie awarią.
 Numer prowadzi tu ze zwrotu albo z wiadomości i bywa numerem zamówienia
-sprzed lat, skasowanego albo z innego środowiska.
+sprzed lat, skasowanego albo z innego środowiska. Bez zapisu takiej odmowy ten
+sam zbiór numerów wracałby w każdym przebiegu tickera.
 
-Do 0.249.0 nie było tego gdzie zapisać. Adapter oddawał przy 404 `null`,
-`zamowienie_klienta` nie dostawało wiersza, a warunek „nie mamy tego
-zamówienia" był prawdą na zawsze — ten sam zbiór najwyżej dwudziestu numerów
-wracał w każdym przebiegu tickera. Portal deweloperski pokazał 432 takie
-wywołania w krótkim czasie.
+`server/src/services/allegro-zamowienia-sync.ts` woła tę końcówkę z `blad404`,
+a odmowę zapisuje w `zamowienie_klienta_brak`. Numer wraca do kolejki po
+tygodniu, na jedną próbę; każda kolejna odmowa wydłuża odstęp do czternastu,
+dwudziestu jeden i dwudziestu ośmiu dni.
 
-Od 0.249.1 `server/src/services/allegro-zamowienia-sync.ts` woła tę końcówkę
-z `blad404`, a odmowę zapisuje w `zamowienie_klienta_brak`. Numer wraca do
-kolejki po tygodniu, na jedną próbę; każda kolejna odmowa wydłuża odstęp do
-czternastu, dwudziestu jeden i dwudziestu ośmiu dni.
-
-Timeout i 5xx nie tworzą takiego wpisu i to jest różnica, o którą tu chodzi.
-Allegro mówi wtedy „nie wiadomo", a nie „nie ma", a zapamiętany brak
-zabrałby zamówienie na tydzień z powodu jednej minuty bez internetu.
-Ręczne „dociągnij zamówienia" w panelu pyta o wszystko, także o zapamiętane
-braki — inaczej przycisk do diagnozy przez tydzień milczałby.
+Timeout i 5xx nie tworzą takiego wpisu. Allegro mówi wtedy „nie wiadomo",
+a nie „nie ma", a zapamiętany brak zabrałby zamówienie na tydzień z powodu
+jednej minuty bez internetu. Ręczne „dociągnij zamówienia" w panelu pyta
+o wszystko, także o zapamiętane braki — inaczej przycisk do diagnozy przez
+tydzień milczałby.
 
 ### Czego z zamówienia NIE bierzemy
 
 `CheckoutForm.buyer` niesie `email`, `firstName`, `lastName`, `companyName`,
-`personalIdentity`, `phoneNumber` i `address`, a `CheckoutFormDeliveryReference`
-— adres dostawy z imieniem i nazwiskiem. `CLAUDE.md` mówi twardo: adresy
-dostawy nie przechodzą przez mapowanie.
+`personalIdentity`, `phoneNumber` i `address`. Z `buyer` bierzemy wyłącznie
+`login` i `id` — login to klucz klienta, a bez niego nie da się powiązać
+zamówienia z rozmową. `invoice.address` nie przechodzi.
 
-Zostaje `buyer.login` i `buyer.id` — polityka danych skrzynki dopuszcza login
-rozmówcy wprost, a bez niego nie da się powiązać zamówienia z rozmową.
+**Z adresu DOSTAWY bierzemy nazwę odbiorcy i adres.** `firstName` z `lastName`
+z `delivery.address`, a gdy jest `companyName` — jego. To ODBIORCA DOSTAWY,
+nie kupujący: `CheckoutFormDeliveryAddress` ma oba pola w `required` i to ta
+nazwa stoi na naklejce. Do tego `street`, `city`, `zipCode` i `phoneNumber`.
+Lądowisko wycina cały `address` razem z nazwą. Zakres decyzji i powody stoją
+w `docs/obsluga-klienta.md`.
 
-**Od 0.367.0 dochodzi NAZWA ODBIORCY, i tylko ona.** Bierzemy `firstName`
-z `lastName` z `delivery.address`, a gdy jest `companyName` — jego. To ODBIORCA
-DOSTAWY, nie kupujący: `CheckoutFormDeliveryAddress` ma oba pola w `required`
-i to ta nazwa stoi na naklejce. Bywa inna niż kupujący.
+### Lądowiska są OKROJONE
 
-Powód jest jeden: paczki, których klient nie odebrał, nakleja klient albo
-kurier, więc ich numerów w Allegro nie ma wcale. Po chybionym skanie zostaje
-nazwa z naklejki. Reszta tego obiektu — `street`, `city`, `zipCode`,
-`phoneNumber` — dalej nie przechodzi, a lądowisko wycina cały `address` razem
-z nazwą. Zakres decyzji stoi w `docs/obsluga-klienta.md`.
-
-### Lądowiska są OKROJONE — i to jest zmiana z 0.152.0
-
-Do 0.151.0 `allegro_zwrot.surowe_json` trzymało odpowiedź dosłownie, razem
-z numerem konta bankowego kupującego i telefonem nadawcy paczki. Polityka
-danych mówiła tymczasem „nie pobieramy" i to zdanie było nieprawdziwe.
-
-Od 0.152.0 oba lądowiska przechodzą przez `services/allegro-oczyszczanie.ts`:
-**wartość znika, klucz zostaje**. Kształt nadal da się obejrzeć, a pełny
-kontrakt czyta się ze specyfikacji w repo, nie z kopii cudzych danych.
+Oba lądowiska przechodzą przez `services/allegro-oczyszczanie.ts`: **wartość
+znika, klucz zostaje**. Dotyczy to m.in. numeru konta bankowego kupującego
+i telefonu nadawcy paczki. Kształt nadal da się obejrzeć, a pełny kontrakt
+czyta się ze specyfikacji w repo, nie z kopii cudzych danych.
 
 Lista pól idzie po NAZWIE, nie po ścieżce — tak, żeby pole, które Allegro
 doda w przyszłości pod tą samą nazwą, odpadło samo.
@@ -1184,18 +1040,16 @@ końcówkę bez `offer.id`, z filtrem `publication.status=ACTIVE`. Strona to
 Specyfikacja dopuszcza sumę `offset` i `limit` do 10 000 000. Koniec listy
 wyznacza `totalCount`, a gdy go brak — strona krótsza niż 1000.
 
-**Zdjęcie z `primaryImage` bierzemy od 0.213.0.** Schemat `OfferListingDtoImage`
-opisuje je wprost: „The image used as a thumbnail on the listings", czyli to,
-co kupujący widzi na liście ofert. Pole jedzie w TEJ SAMEJ odpowiedzi, więc nie
-kosztuje żądania, uprawnienia ani limitu; do 0.210.0 po prostu wypadało przy
-mapowaniu.
+**Zdjęcie z `primaryImage`.** Schemat `OfferListingDtoImage` opisuje je wprost:
+„The image used as a thumbnail on the listings", czyli to, co kupujący widzi na
+liście ofert. Pole jedzie w TEJ SAMEJ odpowiedzi, więc nie kosztuje żądania,
+uprawnienia ani limitu.
 
-Decyzja z 0.178.0 brzmiała „nie pobieramy, bo obrazek z serwera Allegro to
-wyjście przeglądarki biura poza własną sieć". To jest zakaz HOTLINKA i on
-obowiązuje dalej — panel nie dostaje adresu w `allegroimg.com` i nie ma go po
-co dostawać. Po plik idzie SERWER, który i tak rozmawia z Allegro, i podaje go
-z własnej trasy `/api/obsluga/oferta/:externalId/zdjecie`. Ta sama droga, którą
-od 0.30.0 idą zdjęcia kartotek.
+Panel nie dostaje adresu w `allegroimg.com`, bo obrazek z serwera Allegro to
+wyjście przeglądarki biura poza własną sieć (zakaz HOTLINKA). Po plik idzie
+SERWER, który i tak rozmawia z Allegro, i podaje go z własnej trasy
+`/api/obsluga/oferta/:externalId/zdjecie`. Ta sama droga, którą idą zdjęcia
+kartotek.
 
 Kopia ma trzy uzasadnienia poza prywatnością: zachowuje obraz, który klient
 NAPRAWDĘ widział (sprzedawca podmienia zdjęcie, a rozmowa sprzed tygodnia ma
@@ -1210,13 +1064,10 @@ zdjęcia".
 dokumentuje wyłącznie adres w rozmiarze ORYGINALNYM. Podmiana segmentu
 (`/original/` → `/s320/`) daje miniaturę i tak robią to strony Allegro, ale
 w `swagger.yaml` tego nie ma. Serwer traktuje ją więc jako PRÓBĘ i w tym samym
-przebiegu wraca do oryginału, gdy CDN nie odda obrazu. Tym różni się to od
-mapowania z pamięci: tam pomyłka jest cicha, tu ma jawną drogę wyjścia.
+przebiegu wraca do oryginału, gdy CDN nie odda obrazu. Pomyłka ma więc jawną
+drogę wyjścia, a nie jest cicha.
 
-## `GET /payments/payment-operations` — czy wypłata naprawdę poszła (0.426.0)
-
-Zgłoszenie właściciela: zwroty stały w DO DECYZJI, choć pieniądze wróciły
-do klienta w sierpniu. W kolejce było ich 934.
+## `GET /payments/payment-operations` — czy wypłata naprawdę poszła
 
 **Obiekt zwrotu o wypłacie nie mówi.** `CustomerReturn.refund` niesie w schemacie
 wyłącznie `bankAccount` — ani kwoty, ani daty, ani stanu. Jedynym polem, które
@@ -1232,13 +1083,14 @@ DELIVERED → FINISHED → COMMISSION_REFUND_CLAIMED → COMMISSION_REFUNDED
 Dwa ostatnie dotyczą NASZEJ PROWIZJI, nie pieniędzy klienta — mówi to opis pola
 w schemacie. Kto nie odpytał Allegro dokładnie w oknie `FINISHED`, nie dowie się
 o wypłacie nigdy. Okno bywa krótsze niż takt synchronizacji, bo spycha z niego
-także nasz własny automat rabatów.
+także nasz własny automat rabatów. Zwroty stały przez to w DO DECYZJI, choć
+pieniądze dawno wróciły.
 
 **Fakt stoi gdzie indziej.** `GET /payments/payment-operations` oddaje historię
 operacji płatniczych sprzedawcy, a `payment.id` jest jej **parametrem
-zapytania**. Identyfikator płatności trzymamy przy zamówieniu od 0.190.0, więc
-pytanie jest punktowe i bez stanu: „czy na tej płatności jest obciążenie
-zwrotem". Odpowiedź nie wygasa.
+zapytania**. Identyfikator płatności trzymamy przy zamówieniu, więc pytanie
+jest punktowe i bez stanu: „czy na tej płatności jest obciążenie zwrotem".
+Odpowiedź nie wygasa.
 
 Uprawnienie: `allegro:api:payments:read`.
 
@@ -1268,13 +1120,13 @@ Adres oferty przy pozycji zwrotu (`CustomerReturnItem.url`, przykład
 na ekran wprost.
 
 Adresy PANELU SPRZEDAWCY to strony UI, więc nie opisuje ich ani ta
-specyfikacja, ani żadna inna.
+specyfikacja, ani żadna inna. Adres panelu zgadnięty z analogii do innego
+adresu trafia w 404, a znacznik przy nim wisi, dopóki ktoś go nie kliknie.
 
-**Zwrot — adres ZWERYFIKOWANY (0.207.0).** Właściciel podał działający:
-lista zwrotów Centrum Sprzedaży z numerem w wyszukiwaniu,
+**Zwrot — adres ZWERYFIKOWANY.** Właściciel podał działający: lista zwrotów
+Centrum Sprzedaży z numerem w wyszukiwaniu,
 `https://salescenter.allegro.com/returns?page=1&limit=25&from={od}&search={id}`.
-Dawny `moje-allegro/sprzedaz/zwroty/{id}` był zgadnięty i zwrot nie ma pod nim
-własnej strony.
+Zwrot nie ma własnej strony pod `moje-allegro/sprzedaz/zwroty/{id}`.
 
 `{od}` to dolna granica zakresu dat listy i bierze się z DNIA ZGŁOSZENIA tego
 zwrotu. Stała granica — na przykład sprzed trzech miesięcy — wycięłaby starszy
@@ -1290,16 +1142,14 @@ wpisem w `wertis.env`, nie nowym wydaniem. Udokumentowany przykład
 `CustomerReturnItem.url` niesie w adresie także slug tytułu; czy sam numer
 wystarczy, sprawdza się kliknięciem.
 
-**Reklamacja — adres ZWERYFIKOWANY (0.226.1).** Wzorzec z 0.222.0 zbudowano
-z ANALOGII do zwrotu: lista Centrum Sprzedaży z numerem sprawy w wyszukiwaniu.
-Właściciel kliknął i dostał „Ups, nic tu nie ma". Domysł mylił się w OBU
-członach naraz — sprawa ma WŁASNĄ stronę, a adresuje się identyfikatorem
-zasobu, nie numerem czytelnym:
+**Reklamacja — adres ZWERYFIKOWANY.** Sprawa ma WŁASNĄ stronę i adresuje się
+identyfikatorem zasobu, nie numerem czytelnym:
 
 `https://salescenter.allegro.com/claims/{id}?sellerId={sprzedawca}`
 
 `{id}` to `PostPurchaseIssue.id`, czyli UUID. Numer `2585498/2026` widzi
-kupujący i widzi go agent, ale w adresie jest bezużyteczny.
+kupujący i widzi go agent, ale w adresie jest bezużyteczny. Lista Centrum
+Sprzedaży z numerem sprawy w wyszukiwaniu oddaje „Ups, nic tu nie ma".
 
 `{sprzedawca}` to identyfikator konta sprzedawcy i nie mamy go skąd wziąć
 sami: `channel_account.external_account_id` trzyma clientId OAuth, a `GET /me`
@@ -1309,10 +1159,6 @@ odnośnik działał bez wpisu przy wdrożeniu. Doklejany jest w kodzie, a nie we
 wzorcu: przy pustej wartości w adresie zawisłby goły `?sellerId=`, o którym nic
 nie wiemy.
 
-Lekcja jest ta sama, co przy zwrocie w 0.207.0 i kosztowała drugi raz tyle
-samo: adres panelu zgadnięty z analogii do innego adresu panelu trafia w 404,
-a znacznik przy nim wisi dopóty, dopóki ktoś go nie kliknie.
-
 Hosta Centrum Sprzedaży dla SANDBOKSU nie znamy, więc `ALLEGRO_SANDBOX=1`
-zostaje przy dawnym wzorcu. Zgadywanie go drugi raz kosztowałoby to samo, co
-pierwszy.
+zostaje przy dawnym wzorcu. Zgadywanie go kosztowałoby tyle samo, co przy
+produkcji.

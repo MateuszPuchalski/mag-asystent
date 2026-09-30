@@ -1,9 +1,7 @@
 # Analiza rozkładania towaru
 
 Rozkładanie skonfrontowane z realiami pracy magazyniera na kolektorze.
-Dokument opisuje **stan po redesignie v2.0**. Sekcja 3 mówi,
-czym to się różni od pierwszej wersji analizy (lipiec 2026). Czytelnik starszych
-PR-ów dowie się z niej, co zniknęło i dlaczego.
+Dokument opisuje stan obecny; co zniknęło i dlaczego, mówi `CHANGELOG.md`.
 
 **Rozkładanie jest jedno.** Wszystkie dostawy idą tą samą ścieżką: dokument
 jest jednostką pracy, a zapisem jest sam adres. Magazyn skutku mówi tylko,
@@ -14,9 +12,16 @@ co zostaje PO rozłożeniu.
 | `MAG` | dostawa krajowa | nic — towar leży na hali z adresem |
 | `MGP` | kontener importowy | stan do przesunięcia na halę |
 
-Do 0.22.0 kontener miał własną zakładkę, własne tabele i sesję z wózkiem.
-Cała ta machineria obsługiwała proces zdarzający się cztery razy w roku
-i prowadziła do jednego wywołania, które na produkcji i tak rzucało wyjątkiem.
+Kontener nie ma osobnej ścieżki, bo przychodzi cztery razy w roku. Rozkłada
+się jak każda dostawa, a przesunięcie stanu jest osobną czynnością (§2).
+
+Kolektor przy rozkładaniu:
+
+- skanuje sprzętowo (Zebra/Honeywell), bez dotyku i chipów z adresami,
+- odróżnia kod lokalizacji od EAN-u twardą walidacją,
+- przy rozjeździe półek zostawia człowiekowi wybór „zamień / dodaj
+  lokalizację",
+- przetrwa dziury Wi-Fi dzięki trwałemu buforowi offline (Room).
 
 ## 1. Dostawa krajowa — dokument jako jednostka pracy
 
@@ -35,9 +40,9 @@ i prowadziła do jednego wywołania, które na produkcji i tak rzucało wyjątki
 
    Zero dialogu potwierdzającego, zero tapnięć i **zero podmieniania ekranu**.
    Lista zostaje widoczna, bo to na niej widać, ile jeszcze zostało w kartonie.
-   Wcześniej wchodziła tu pełnoekranowa karta, która listę gasiła.
+   Pełnoekranowa karta gasiłaby listę.
 
-   Rozwinięty wiersz ma od 0.57.0 nagłówek z ✕ i **dwa kafle**: biały ze
+   Rozwinięty wiersz ma nagłówek z ✕ i **dwa kafle**: biały ze
    stepperem ilości i stanem na hali, ciemny z adresem i podpowiedzią skanu.
    Po lewej to, co magazynier ustawia; po prawej to, dokąd towar idzie.
 4. **Zapis** — wyłącznie zadanie `set_location` do `sfera_queue`. Żadnego MM,
@@ -45,10 +50,10 @@ i prowadziła do jednego wywołania, które na produkcji i tak rzucało wyjątki
 5. **Domknięcie** (`closeIfComplete`) — dostawa zamyka się sama, gdy nie ma już
    czego rozkładać. Nie zamknie się jednak, dopóki wisi nieodpowiedziana
    notatka biura — bramka stoi w tej funkcji, a nie tylko przy przycisku.
-   Od 0.439.0 nie zamknie się też sama z NADMIAREM ani z pozycją z WYJĄTKIEM.
+   Nie zamknie się też sama z NADMIAREM ani z pozycją z WYJĄTKIEM.
    Nadmiar jest twierdzeniem wobec dostawcy, a wyjątek czeka na decyzję.
    Obie takie dostawy zamyka wyłącznie ZAKOŃCZ z podglądem.
-6. **Wyjątek** (`raiseProblem`) — kategoria zna swój ZAKRES (0.57.0). Cztery
+6. **Wyjątek** (`raiseProblem`) — kategoria zna swój ZAKRES. Cztery
    dotyczą pozycji: zła ilość, brak w przesyłce, uszkodzone, błędny artykuł.
    Jedna dotyczy dostawy: artykuł niezamówiony, czyli towar spoza dokumentu.
    Walidacja działa w obie strony, więc kategoria dostawy nie przypnie się do
@@ -58,15 +63,15 @@ i prowadziła do jednego wywołania, które na produkcji i tak rzucało wyjątki
    wyjątek „zła ilość", a nadmiary jako nadmiar. Dla pozycji nietkniętych
    człowiek MUSI wybrać: BRAK („brak w przesyłce" na całą ilość, z MM braku)
    albo POMIŃ (bez zgłoszenia). Bez wyboru serwer odmawia z kodem
-   `wybor_nietknietych` (0.439.0). Przycisk jest
+   `wybor_nietknietych`. Przycisk jest
    dla dostawy OTWARTEJ; po domknięciu z punktu 5 kolektor pokazuje w jego
    miejscu wyjście na listę. Odmowa „już zamknięta" niesie kod `juz_zamknieta`
-   i też prowadzi na listę — cel jest wtedy osiągnięty (0.54.0).
+   i też prowadzi na listę — cel jest wtedy osiągnięty.
 8. **Korekta ilości** (`korygujIlosc`) — poprawka pomyłki w liczeniu, dopóki
    faktura jest otwarta. Ustawia liczbę bezwzględną, nie różnicę, i nie tworzy
    wyjątku. Korekta do zera cofa też adres, gdy stos odłożeń pokrywa całą
    ilość. Anuluje wtedy zapis w kolejce albo pisze adres sprzed dostawy.
-9. **Cofanie pomyłek** (`services/cofanie-dostawy.ts`, 0.439.0) — COFNIJ
+9. **Cofanie pomyłek** (`services/cofanie-dostawy.ts`) — COFNIJ
    kolejne odłożenia od ostatniego, ZMIEŃ PÓŁKĘ, OTWÓRZ PONOWNIE w dniu
    zamknięcia, WYCOFAJ własne zgłoszenie. Granica przez Subiekta jak przy
    koszu: czekający zapis się anuluje, wykonany dostaje zapis odwrotny.
@@ -93,53 +98,13 @@ Przesunięcie **nie ma bufora offline**. Walidacja „dostępne minus w drodze"
 liczy się na serwerze w chwili zapisu. Operacja odtworzona po dwóch godzinach
 zbudowałaby dokument na stan, którego już nie ma.
 
-## 3. Czym to się różni od pierwszej analizy (lipiec 2026)
-
-Tamta wersja opisywała jeden proces (MGP→MAG, sesja z wózkiem) w kliencie PWA.
-Zniknęły od tego czasu:
-
-- **klient PWA** — zastąpiony natywnym kolektorem Android, a jego kod usunięty
-  z repo; aplikacji webowej nie ma — `/lookup` i serwowanie statyk usunięte,
-- **tryb „ROZKŁADAJ CAŁE MGP"** — sesja bez dokumentu; jednostką pracy jest
-  dokument, a strefa przyjęć przestała być workiem bez ewidencji,
-- **`POST /api/mm`** (MM ad-hoc z karty towaru) — wycięte jako nieużywane.
-  W 0.22.0 **wróciło** jako `POST /api/przesuniecie`; wtedy jedynym wejściem
-  miał być wózek, a dziś wózka nie ma,
-- **cały tryb kontenerowy** (0.22.0) — sesja z wózkiem, `putaway_sessions`
-  i `putaway_items`, osiem tras i dwa ekrany. Kontener rozkłada się dziś jak
-  każda inna dostawa, a przesunięcie stanu jest osobną czynnością,
-- **tryb marszu** — nakładka „NASTĘPNE" po zatwierdzeniu wózka; istniała
-  wyłącznie w sesji i nie ma dokąd jej przenieść,
-- **rozkładanie zwrotów koszykami** — wejścia do tej ścieżki nie było od
-  d131f75. Jej finał wymagał workera Sfery, którego wtedy nie było. Zwroty
-  rozlicza biuro w Subiekcie (0.17.0). **Wróciło w 0.192.0**: koszyk składa
-  się w panelu obsługi, a MM na regał zwrotów wystawia Sfera. Od 0.266.0
-  wraca też druga połowa drogi — po rozłożeniu kosza aplikacja zamawia jedno
-  MM ZWROTY→MAG, więc stan schodzi z bufora bez ręki biura.
-
-  **Od 0.359.0 ten sam towar z kilku zwrotów to jedna linijka kosza.** Wierszy
-  w bazie zostaje tyle, ile zwrotów: każdy niesie ślad na oś swojego.
-  Magazynier widzi jednak jedną pozycję z sumą sztuk i odkłada ją jednym
-  ruchem.
-  Dokument MM sumował te wiersze od początku, więc rozbicie żyło tylko na
-  ekranie (dekalog, punkt 3).
-
-Problemy P1–P4 z tamtej analizy są naprawione, a większość backlogu wykonana:
-
-- skanowanie sprzętowe (Zebra/Honeywell) zastąpiło dotyk i chipy `DEMO_LOCS`,
-- rozróżnienie kodu lokalizacji od EAN-u to dziś twarda walidacja,
-- przełącznik „zamień / dodaj lokalizację" jest decyzją człowieka przy
-  rozjeździe półek,
-- odporność na dziury Wi-Fi daje trwały bufor offline (Room).
-
-## 4. Backlog — co nadal boli
+## 3. Backlog — co nadal boli
 
 > **Przeslotowanie ma już narzędzie.** `npm run reslot` (opis w README
 > i DEPLOY §7) liczy pion, nie odległość. Przy 342 m² przejście róg–róg to
 > ~20 s. Pobranie z drabiny albo z podłogi trwa 10–25 s wobec ~3 s ze strefy
 > złotej. Klasyczny argument za slottingiem ABC „po alejkach" nie broni się tu
 > liczbowo.
-
 
 0. **Czym się mierzy skutek.** `npm run zwroty:cykl` liczy mediany siedmiu
    odcinków życia jednego kartonu i mówi przy każdym, czyja to praca.
@@ -149,8 +114,8 @@ Problemy P1–P4 z tamtej analizy są naprawione, a większość backlogu wykona
    miejsca. Aplikacja może podpowiadać pozostałe lokalizacje tego towaru.
    Może też podpowiadać lokalizacje towarów o podobnym symbolu.
 2. **Korekta po przesunięciu.** Pomyłkowej lokalizacji nie trzeba cofać —
-   wystarczy zeskanować właściwą półkę (dlatego mechanizm COFNIJ i jego karencja
-   zostały usunięte). Pomyłkową ILOŚĆ poprawia od 0.45.0 przycisk POPRAW ILOŚĆ:
+   wystarczy zeskanować właściwą półkę. Pomyłkową ILOŚĆ poprawia przycisk
+   POPRAW ILOŚĆ:
    podaje się liczbę całkowitą, a status pozycji przelicza się z niej sam. Ale
    pomyłkowego przesunięcia odkręcić się nie da — to wymagałoby drugiego,
    odwrotnego.
@@ -158,11 +123,10 @@ Problemy P1–P4 z tamtej analizy są naprawione, a większość backlogu wykona
    otwarcia; korekta dokumentu przez księgowość w trakcie pracy nie dochodzi.
    Świadomy kompromis (postęp się nie rozjeżdża), ale przydałby się sygnał
    „dokument zmieniony od otwarcia".
-4. **Dług danych w kartotece — większy, niż się wydawało.** Audyt z 2026-07-26
-   naliczył **93 kody adresowe w 158 kartotekach**, których walidator nie
-   przyjmuje. Wcześniejszy zapis („około 16 literówek") mylił się co do skali
-   i co do rodzaju. Większość to nie pomyłki, lecz **trzy martwe konwencje**
-   (`PALETA22`, `PAL38II`, `KT1`). Literówek jest 21.
+4. **Dług danych w kartotece.** Audyt z 2026-07-26 naliczył **93 kody
+   adresowe w 158 kartotekach**, których walidator nie przyjmuje. Większość to
+   nie pomyłki, lecz **trzy martwe konwencje** (`PALETA22`, `PAL38II`, `KT1`).
+   Literówek jest 21.
 
    Żadna z tych konwencji nie jest już używana, więc odrzucanie ich jest
    poprawne. Poprawia się je po stronie Subiekta, nie aplikacji. Lista:
