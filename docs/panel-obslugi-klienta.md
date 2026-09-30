@@ -6545,9 +6545,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Autoodpowiedź nie liczy się jako nasz ruch | **działa** od 0.227.0 | `message.auto_odpowiedz`, liczone przy zapisie w `zapiszWiadomosc` |
 | Pasek o nowej wiadomości tylko przy kliencie | **działa** od 0.228.0 | kierunek w zdarzeniu `message.created` |
 | Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
-| Wynik doboru (§7) | **działa** od @wydanie | tabela `dobor`, `services/dobor.ts`: cztery wyniki ustawiane przez człowieka, stan wyliczany (`docs/dobor-od-zera.md`) |
-| Kandydaci doboru (§11.2) | **działa** od @wydanie | `services/kandydaci.ts`: trzy grupy — wskazane przez klienta, z bazy wiedzy, podobne po nazwie; numer spoza kartoteki to wiersz bez wyboru |
-| Wymiary z kartotek (§11.2) | **usunięte** w @wydanie | droga „zgodne wymiary" wyszła z doborem; tabela `wymiar_kartoteki` zostaje w starych bazach bez zapisu |
+| Wynik doboru (§7) | **działa** od 0.552.0 | tabela `dobor`, `services/dobor.ts`: cztery wyniki ustawiane przez człowieka, stan wyliczany (`docs/dobor-od-zera.md`) |
+| Kandydaci doboru (§11.2) | **działa** od 0.552.0 | `services/kandydaci.ts`: trzy grupy — wskazane przez klienta, z bazy wiedzy, podobne po nazwie; numer spoza kartoteki to wiersz bez wyboru |
+| Wymiary z kartotek (§11.2) | **usunięte** w 0.552.0 | droga „zgodne wymiary" wyszła z doborem; tabela `wymiar_kartoteki` zostaje w starych bazach bez zapisu |
 | Identyfikatory z opisów (OEM, nr oryg., stare SKU, zamienniki) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts`; sekcje `Zamiennik:` od 0.234.0 |
 | Sekcje „Modele:" z opisów do przerobienia | **działa** od 0.186.0 | `model_z_opisu`, ekran Wiedza → „Z opisów"; automat nie proponuje z opisu |
 | Pełny tekst kartotek (FTS5, bm25) | **działa** od 0.186.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
@@ -6596,7 +6596,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wiedza z ofert bez kolejki (§11.3) | **działa** od 0.341.0 | `wiedza-z-oferty.ts`: klucz składany przy zbieraniu z trzech źródeł deterministycznych, podpis `automat (oferta)`; bez rozpoznanej marki wiersz zostaje w kolejce |
 | Dopytanie Copilota (§14.6) | **działa** od 0.332.0 | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; odpowiedź dla agenta, bez przycisku wstawiania, sufit dopytań na rozmowę |
 | Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
-| Miary doboru w analizie | **działa** od @wydanie | `GET /api/obsluga/miary-doboru`, `services/miary-doboru.ts`, `analiza/MiaryDoboru.tsx`: ostatni wynik każdej rozmowy i podstawa wybranej części z księgi zdarzeń |
+| Miary doboru w analizie | **działa** od 0.552.0 | `GET /api/obsluga/miary-doboru`, `services/miary-doboru.ts`, `analiza/MiaryDoboru.tsx`: ostatni wynik każdej rozmowy i podstawa wybranej części z księgi zdarzeń |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
 | Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |
