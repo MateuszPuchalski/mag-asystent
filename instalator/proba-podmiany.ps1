@@ -71,6 +71,15 @@ function Atrapa-Zdrowia([string]$Wersja) {
     throw "Atrapa zdrowia nie wstała."
 }
 
+# Program, który trzyma katalog: powershell uruchomiony "w" nim i śpiący zadany czas.
+# Katalog roboczy procesu blokuje zmianę nazwy tego katalogu, choć nie ma w nim
+# żadnego pliku wykonywalnego, i dokładnie tak blokuje ją konsola u klienta.
+function Trzymacz([string]$Katalog, [int]$Sekund) {
+    return Start-Process -FilePath "powershell" `
+        -ArgumentList "-NoProfile", "-Command", "Start-Sleep -Seconds $Sekund" `
+        -WorkingDirectory $Katalog -PassThru -WindowStyle Hidden
+}
+
 $wynik = 0
 try {
     # ── Podrobiona instalacja z Gita: dane w środku, jak przed 0.492.0 ──────
@@ -139,6 +148,39 @@ try {
         Zaloz ((Tresc (Join-Path $dane "wertis.db")) -eq "baza sprzed migracji") "baza nietknięta po sprzątaniu starej wersji"
         Zaloz (Test-Path (Join-Path $dane "kopie")) "kopie bazy nietknięte"
     }
+
+    Write-Host "`n4. Program trzyma katalog: instalator go nazywa i czeka" -ForegroundColor Cyan
+    $t = Join-Path $korzen "trzymany"
+    New-Item -ItemType Directory -Force -Path (Join-Path $t "podkatalog") | Out-Null
+    $h = Trzymacz (Join-Path $t "podkatalog") 6
+    try {
+        Start-Sleep -Milliseconds 1500
+        $cwd = Get-WertisKatalogRoboczyProcesu -Id $h.Id
+        Zaloz ($cwd -and ($cwd -like "*trzymany\podkatalog*")) "odczytano katalog roboczy cudzego procesu (dostałem: $cwd)"
+        $widoczni = @(Get-WertisProcesyTrzymajaceKatalog -Katalog $t -Procesy @(Get-Process -Id $h.Id))
+        Zaloz ($widoczni.Count -eq 1 -and $widoczni[0].Id -eq $h.Id) "program z katalogiem roboczym w katalogu jest wskazany z nazwy i numeru"
+        $zablokowane = $false
+        try { Rename-Item -LiteralPath $t -NewName "trzymany-bez-ponowien" -ErrorAction Stop } catch { $zablokowane = $true }
+        Zaloz $zablokowane "zwykła zmiana nazwy jest blokowana (bez tego test niczego nie dowodzi)"
+        $start = Get-Date
+        Rename-WertisZPonowieniem -Sciezka $t -NowaNazwa "trzymany-po" -Prob 12 -PauzaSekund 1
+        $czas = ((Get-Date) - $start).TotalSeconds
+        Zaloz (Test-Path (Join-Path $korzen "trzymany-po")) "po odejściu programu zmiana nazwy się udała"
+        Zaloz ($czas -ge 1) "zmiana nazwy naprawdę czekała ($czas s)"
+    } finally { Stop-Process -Id $h.Id -Force -ErrorAction SilentlyContinue }
+
+    Write-Host "`n5. Aktualizacja 9.4.0 -> 9.5.0, gdy program trzyma katalog do końca" -ForegroundColor Cyan
+    $zip = Nowa-Paczka "9.5.0"
+    $h = Trzymacz (Join-Path $k "logs") 90
+    try {
+        Start-Sleep -Milliseconds 1500
+        $kod = Update-WertisZPaczki -Katalog $k -Repo "https://github.com/a/b.git" -Paczka $zip `
+            -Uslugi @("wertis-proba-brak") -Port $PORT
+    } finally { Stop-Process -Id $h.Id -Force -ErrorAction SilentlyContinue }
+    Zaloz ($kod -eq 1) "kod wyjścia 1 (dostałem $kod)"
+    Zaloz ((Tresc (Join-Path $k "paczka.json")) -match '9\.4\.0') "na miejscu nadal 9.4.0"
+    Zaloz ((Tresc (Join-Path $dane "wertis.db")) -eq "baza sprzed migracji") "baza nietknięta"
+    Zaloz (Test-WertisDowiazanie -Sciezka (Join-Path $k "server\data")) "dowiązanie danych na miejscu"
 } catch {
     Write-Host "  [x]  $($_.Exception.Message)" -ForegroundColor Red
     $wynik = 1

@@ -1008,6 +1008,159 @@ function Stop-WertisProcesyWKatalogu {
     return $doUbicia
 }
 
+function Get-WertisKatalogRoboczyProcesu {
+    <#
+        .SYNOPSIS
+        Zwraca katalog roboczy cudzego procesu albo $null, gdy go nie da się odczytać.
+        .DESCRIPTION
+        Konsola albo program uruchomiony "w" katalogu trzyma go otwartego, choć nie ma
+        tam żadnego pliku wykonywalnego, więc Get-WertisProcesyDoUbicia go nie widzi,
+        a zmiana nazwy katalogu kończy się odmową dostępu. Windows nie podaje katalogu
+        roboczego przez Get-Process, więc czytamy go z pamięci procesu (PEB), tą samą
+        drogą co narzędzia diagnostyczne. Działa dla procesów 64-bitowych; reszta i
+        procesy bez prawa odczytu dają $null, a nie błąd. Gdy kompilacja pomocnika
+        się nie uda, funkcja też oddaje $null: to tylko podpowiedź dla człowieka,
+        a aktualizacja nie może przez nią paść.
+    #>
+    param([Parameter(Mandatory)][int]$Id)
+    if (-not ('WertisKatalogRoboczy' -as [type])) {
+        $kod = @'
+using System;
+using System.Runtime.InteropServices;
+using System.Text;
+
+public static class WertisKatalogRoboczy
+{
+    [StructLayout(LayoutKind.Sequential)]
+    private struct PBI
+    {
+        public IntPtr ExitStatus;
+        public IntPtr PebBaseAddress;
+        public IntPtr AffinityMask;
+        public IntPtr BasePriority;
+        public IntPtr UniqueProcessId;
+        public IntPtr InheritedFromUniqueProcessId;
+    }
+
+    [DllImport("ntdll.dll")]
+    private static extern int NtQueryInformationProcess(IntPtr h, int klasa, ref PBI pbi, int rozmiar, out int zwrot);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr OpenProcess(uint prawa, bool dziedzicz, int pid);
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool ReadProcessMemory(IntPtr h, IntPtr adres, byte[] bufor, IntPtr rozmiar, out IntPtr przeczytano);
+    [DllImport("kernel32.dll")]
+    private static extern bool CloseHandle(IntPtr h);
+    [DllImport("kernel32.dll")]
+    private static extern bool IsWow64Process(IntPtr h, out bool wow);
+
+    public static string Pobierz(int pid)
+    {
+        if (IntPtr.Size != 8) return null;
+        IntPtr h = OpenProcess(0x0410, false, pid);
+        if (h == IntPtr.Zero) return null;
+        try
+        {
+            bool wow;
+            if (IsWow64Process(h, out wow) && wow) return null;
+            PBI pbi = new PBI();
+            int zwrot;
+            if (NtQueryInformationProcess(h, 0, ref pbi, Marshal.SizeOf(typeof(PBI)), out zwrot) != 0) return null;
+            byte[] wskaznik = new byte[8];
+            IntPtr n;
+            if (!ReadProcessMemory(h, new IntPtr(pbi.PebBaseAddress.ToInt64() + 0x20), wskaznik, new IntPtr(8), out n)) return null;
+            long parametry = BitConverter.ToInt64(wskaznik, 0);
+            byte[] napis = new byte[16];
+            if (!ReadProcessMemory(h, new IntPtr(parametry + 0x38), napis, new IntPtr(16), out n)) return null;
+            int dlugosc = BitConverter.ToUInt16(napis, 0);
+            long bufor = BitConverter.ToInt64(napis, 8);
+            if (dlugosc <= 0 || dlugosc > 4096 || bufor == 0) return null;
+            byte[] tekst = new byte[dlugosc];
+            if (!ReadProcessMemory(h, new IntPtr(bufor), tekst, new IntPtr(dlugosc), out n)) return null;
+            return Encoding.Unicode.GetString(tekst);
+        }
+        finally
+        {
+            CloseHandle(h);
+        }
+    }
+}
+'@
+        try { Add-Type -TypeDefinition $kod -ErrorAction Stop } catch { return $null }
+    }
+    try { return [WertisKatalogRoboczy]::Pobierz($Id) } catch { return $null }
+}
+
+function Get-WertisProcesyTrzymajaceKatalog {
+    <#
+        .SYNOPSIS
+        Wybiera z podanej listy procesy, które mają katalog roboczy wewnątrz $Katalog,
+        choć nie uruchomiono ich z niego.
+        .DESCRIPTION
+        To dopełnienie Get-WertisProcesyDoUbicia. Tamta funkcja wybiera procesy z
+        plikiem wykonywalnym w katalogu i te instalator sam zatrzymuje. Ta wybiera
+        resztę: konsole i programy człowieka, których instalator NIE ubija, bo mogą
+        trzymać niezapisaną pracę. Służy wyłącznie do nazwania winnego.
+        Odczyt katalogu roboczego jest parametrem, żeby dało się ją sprawdzić bez
+        prawdziwych procesów.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Katalog,
+        [object[]]$Procesy = @(),
+        [int]$WlasnyPid = $PID,
+        [scriptblock]$OdczytKatalogu = { param($Id) Get-WertisKatalogRoboczyProcesu -Id $Id }
+    )
+    $wynik = @()
+    foreach ($p in @($Procesy)) {
+        if ($null -eq $p) { continue }
+        if ($p.Id -eq $WlasnyPid) { continue }
+
+        $exe = $null
+        try { $exe = $p.Path } catch { $exe = $null }
+        if ($exe -and (Test-SciezkaWewnatrz -Sciezka $exe -Katalog $Katalog)) { continue }
+
+        $cwd = $null
+        try { $cwd = & $OdczytKatalogu $p.Id } catch { $cwd = $null }
+        if (-not $cwd) { continue }
+        if (Test-SciezkaWewnatrz -Sciezka $cwd -Katalog $Katalog) {
+            $wynik += [pscustomobject]@{ Id = $p.Id; Nazwa = $p.ProcessName; KatalogRoboczy = $cwd }
+        }
+    }
+    return @($wynik)
+}
+
+function Rename-WertisZPonowieniem {
+    <#
+        .SYNOPSIS
+        Zmienia nazwę katalogu i ponawia próbę, gdy ktoś go chwilowo trzyma.
+        .DESCRIPTION
+        Skaner antywirusowy, indeksowanie i kopia zapasowa potrafią przez kilka sekund
+        trzymać katalog, który za chwilę znowu będzie wolny. Jedna próba kończyła
+        aktualizację wycofaniem, choć wystarczyło poczekać. Brak źródła i zajęty cel
+        nie miną z czasem, więc na nie nie czekamy.
+        Zmiana nazwy jest parametrem, żeby dało się sprawdzić ponawianie bez systemu.
+    #>
+    param(
+        [Parameter(Mandatory)][string]$Sciezka,
+        [Parameter(Mandatory)][string]$NowaNazwa,
+        [int]$Prob = 10,
+        [int]$PauzaSekund = 3,
+        [scriptblock]$Zmien = { param($Stara, $Nowa) Rename-Item -LiteralPath $Stara -NewName $Nowa -ErrorAction Stop }
+    )
+    $cel = Join-Path (Split-Path -Parent $Sciezka) $NowaNazwa
+    for ($i = 1; $i -le $Prob; $i++) {
+        try {
+            & $Zmien $Sciezka $NowaNazwa
+            return
+        } catch {
+            if (-not (Test-Path -LiteralPath $Sciezka)) { throw }
+            if (Test-Path -LiteralPath $cel) { throw }
+            if ($i -eq $Prob) { throw }
+            Write-Info "Katalog jest chwilowo zajęty (próba $i z $Prob), czekam $PauzaSekund s."
+            Start-Sleep -Seconds $PauzaSekund
+        }
+    }
+}
+
 function Remove-WertisUslugi {
     <#
         .SYNOPSIS
