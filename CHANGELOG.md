@@ -10,6 +10,16 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.552.3 — 30 września 2026
+
+**Anonimizacja kopii bazy: raport skanera pokazuje pochodzenie trafień.** Na
+prawdziwej bazie skaner zatrzymywał pracę na tysiącach trafień w kolumnach,
+które mają zostać, i lista miejsc nie mówiła, skąd wzięła się szukana wartość.
+Raport podaje teraz dla każdego miejsca źródło igieł: kolumnę albo ścieżkę
+kluczy JSON, kształt wartości i liczbę trafień. Wartości nie wychodzą z
+narzędzia. Znaczniki czasu i identyfikatory UUID przestają być igłami, bo
+nie identyfikują człowieka.
+
 ## 0.552.2 — 30 września 2026
 
 **Skrzynka Allegro czyta jedną stronę listy zamiast dwudziestu pięciu.** Do tej
