@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.552.1 — 30 września 2026
+
+**Anonimizacja kopii bazy: szczelniejsza siatka skanera.** Nazwa osoby stojąca
+w surowym JSON-ie pod adresem dostawy, użytkownikiem, firmą albo kontaktem
+trafia teraz do skanu, więc kopia tej samej nazwy w kolumnie, która zostaje,
+zatrzyma narzędzie. Plik roboczy `.czesciowy` jest usuwany tylko wtedy, gdy
+powstał w tym przebiegu, i nie nadpisuje cudzego.
+
 ## 0.552.0 — 30 września 2026
 
 **Dobór części od nowa.** Na górze widać, czego szuka klient: maszynę
