@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.552.4 — 30 września 2026
+
+**Rozpoznawanie wiadomości klientów robi znów tylko Claude.** Klasyfikator Jev
+z TypeSafe został usunięty razem z kluczem `TYPESAFE_API_KEY` i ustawieniami
+`KLASYFIKATOR_DOSTAWCA` oraz `JEV_MODEL`. Serwer z takim wpisem w `wertis.env`
+wstaje normalnie i pomija go z ostrzeżeniem.
+
+Do tej pory instalacja bez klucza TypeSafe nie rozpoznawała wiadomości wcale, a
+szkice przed pracą nie ruszały. Teraz oba takty, jeśli są włączone w `wertis.env`
+(`COPILOT_AUTO_KLASYFIKACJA` i `COPILOT_PRZED_PRACA`), znów pracują na Claude i
+wydają pieniądze w granicach swoich limitów.
+
 ## 0.552.3 — 30 września 2026
 
 **Anonimizacja kopii bazy: raport skanera pokazuje pochodzenie trafień.** Na
