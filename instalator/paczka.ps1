@@ -524,17 +524,28 @@ function Update-WertisZPaczki {
         }
         New-Item -ItemType Junction -Path (Join-Path $nowy "server\data") -Target (Get-WertisKatalogDanych -Katalog $Katalog) | Out-Null
         Remove-WertisKatalogAplikacji -Sciezka $poprzedni
-        Rename-Item -LiteralPath $Katalog -NewName (Split-Path -Leaf $poprzedni)
-        Rename-Item -LiteralPath $nowy -NewName (Split-Path -Leaf $Katalog)
+        Rename-WertisZPonowieniem -Sciezka $Katalog -NowaNazwa (Split-Path -Leaf $poprzedni)
+        Rename-WertisZPonowieniem -Sciezka $nowy -NowaNazwa (Split-Path -Leaf $Katalog)
     } catch {
         # Zamiana nie doszła do końca. Najczęstsza przyczyna: coś trzyma plik
         # w starym katalogu (okno Eksploratora, konsola stojąca w nim).
         Write-Blad "Zamiana katalogów nie powiodła się: $($_.Exception.Message)"
+        # Usługi są już zatrzymane, więc ich procesy pomocnicze nie zmylą listy.
+        # Nazywamy tylko to, czego instalator sam nie ubija: konsole i programy człowieka.
+        $trzymaja = @(Get-WertisProcesyTrzymajaceKatalog -Katalog $Katalog -Procesy @(Get-Process -ErrorAction SilentlyContinue))
+        if ($trzymaja.Count -gt 0) {
+            Write-Info "Katalog $Katalog trzymają te programy:"
+            foreach ($t in $trzymaja) {
+                Write-Info ("  - {0} (PID {1}), katalog roboczy {2}" -f $t.Nazwa, $t.Id, $t.KatalogRoboczy)
+            }
+        } else {
+            Write-Info "Nie widzę programu z katalogiem roboczym w $Katalog. Sprawdź okno Eksploratora, edytor z otwartym plikiem albo Monitor zasobów (resmon), zakładka Procesor, Skojarzone dojścia, szukaj: wertis."
+        }
         if (-not (Test-Path -LiteralPath $Katalog) -and (Test-Path -LiteralPath $poprzedni)) {
             Rename-Item -LiteralPath $poprzedni -NewName (Split-Path -Leaf $Katalog)
         }
         Restart-WertisUslugi -Uslugi $Uslugi
-        Write-Info "Usługi wróciły na $obecna. Zamknij okna Eksploratora i konsole stojące w $Katalog i spróbuj ponownie."
+        Write-Info "Usługi wróciły na $obecna. Zamknij te programy, okna Eksploratora i konsole stojące w $Katalog i spróbuj ponownie."
         return 1
     }
     Restart-WertisUslugi -Uslugi $Uslugi

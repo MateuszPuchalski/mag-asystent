@@ -767,6 +767,97 @@ Sprawdz "pusta lista procesów to pusty wynik" {
     Zaloz (@(Get-WertisProcesyDoUbicia -Katalog "C:\wertis" -Procesy @()).Count -eq 0)
 }
 
+Write-Host ""
+Write-Host "Get-WertisProcesyTrzymajaceKatalog"
+
+Sprawdz "bierze programy z katalogiem roboczym w katalogu, zostawia resztę" {
+    $katalogi = @{ 10 = "C:\wertis\logs\"; 11 = "C:\Users\ala"; 12 = "C:\wertis2"; 13 = "C:\wertis" }
+    $trzymaja = Get-WertisProcesyTrzymajaceKatalog -Katalog "C:\wertis" -WlasnyPid 1 `
+        -OdczytKatalogu { param($Id) $katalogi[$Id] } -Procesy @(
+        (Proc 10 "powershell" "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"),
+        (Proc 11 "cmd" "C:\Windows\System32\cmd.exe"),
+        (Proc 12 "cmd" "C:\Windows\System32\cmd.exe"),
+        (Proc 13 "explorer" "C:\Windows\explorer.exe")
+    )
+    Zaloz (@($trzymaja).Count -eq 2) "wybrano $(@($trzymaja).Count) programów zamiast dwóch"
+    $numery = (@($trzymaja | ForEach-Object { $_.Id }) | Sort-Object) -join ","
+    Zaloz ($numery -eq "10,13") "wybrano złe programy: $numery"
+    Zaloz ($trzymaja[0].KatalogRoboczy -match "wertis") "brak katalogu roboczego w wyniku"
+}
+
+Sprawdz "proces uruchomiony z katalogu zostaje dla instalatora, nie trafia na listę winnych" {
+    # Usługi i sieroty z plikiem wykonywalnym w katalogu zatrzymuje instalator sam.
+    $trzymaja = Get-WertisProcesyTrzymajaceKatalog -Katalog "C:\wertis" -WlasnyPid 1 `
+        -OdczytKatalogu { param($Id) "C:\wertis\server" } -Procesy @(
+        (Proc 20 "node" "C:\wertis\node\node.exe")
+    )
+    Zaloz (@($trzymaja).Count -eq 0) "usługa aplikacji wpadła na listę winnych"
+}
+
+Sprawdz "własny PID i procesy bez czytelnego katalogu nie trafiają na listę" {
+    $trzymaja = Get-WertisProcesyTrzymajaceKatalog -Katalog "C:\wertis" -WlasnyPid 30 `
+        -OdczytKatalogu { param($Id) if ($Id -eq 30) { "C:\wertis" } else { $null } } -Procesy @(
+        (Proc 30 "powershell" "C:\Windows\powershell.exe"),
+        (Proc 31 "System" $null)
+    )
+    Zaloz (@($trzymaja).Count -eq 0) "własny proces albo proces bez katalogu wpadł na listę"
+}
+
+Sprawdz "wyjątek przy odczycie katalogu nie wywraca wyboru" {
+    $trzymaja = Get-WertisProcesyTrzymajaceKatalog -Katalog "C:\wertis" -WlasnyPid 1 `
+        -OdczytKatalogu { param($Id) throw "brak dostępu" } -Procesy @((Proc 40 "cmd" "C:\Windows\cmd.exe"))
+    Zaloz (@($trzymaja).Count -eq 0)
+}
+
+Write-Host ""
+Write-Host "Rename-WertisZPonowieniem"
+
+Sprawdz "chwilowa blokada mija: trzecia próba się udaje" {
+    $dir = Join-Path ([IO.Path]::GetTempPath()) ("wertis-rn-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+    New-Item -ItemType Directory -Path $dir | Out-Null
+    try {
+        $script:proby = 0
+        Rename-WertisZPonowieniem -Sciezka $dir -NowaNazwa "wynik" -Prob 5 -PauzaSekund 0 -Zmien {
+            param($Stara, $Nowa)
+            $script:proby++
+            if ($script:proby -lt 3) { throw "Odmowa dostępu do ścieżki" }
+        }
+        Zaloz ($script:proby -eq 3) "zmiana wykonana $($script:proby) razy zamiast trzech"
+    } finally { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "stała blokada kończy się błędem po ustalonej liczbie prób" {
+    $dir = Join-Path ([IO.Path]::GetTempPath()) ("wertis-rn-" + [guid]::NewGuid().ToString("N").Substring(0, 8))
+    New-Item -ItemType Directory -Path $dir | Out-Null
+    try {
+        $script:proby = 0
+        $rzucono = $false
+        try {
+            Rename-WertisZPonowieniem -Sciezka $dir -NowaNazwa "wynik" -Prob 4 -PauzaSekund 0 -Zmien {
+                param($Stara, $Nowa)
+                $script:proby++
+                throw "Odmowa dostępu do ścieżki"
+            }
+        } catch { $rzucono = $true }
+        Zaloz $rzucono "stała blokada nie zakończyła się błędem"
+        Zaloz ($script:proby -eq 4) "prób było $($script:proby) zamiast czterech"
+    } finally { Remove-Item -LiteralPath $dir -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
+Sprawdz "brak katalogu nie jest powodem do czekania" {
+    $script:proby = 0
+    $rzucono = $false
+    try {
+        Rename-WertisZPonowieniem -Sciezka (Join-Path ([IO.Path]::GetTempPath()) "wertis-nie-ma-takiego") -NowaNazwa "x" -Prob 5 -PauzaSekund 0 -Zmien {
+            param($Stara, $Nowa)
+            $script:proby++
+            throw "nie znaleziono"
+        }
+    } catch { $rzucono = $true }
+    Zaloz $rzucono "brak katalogu nie zakończył się błędem"
+    Zaloz ($script:proby -eq 1) "czekano na katalog, którego nie ma ($($script:proby) prób)"
+}
+
 # ── Środowisko usług, które potrafi przykryć wertis.env ─────────────────────
 # Wdrożenie przeszło cały kreator i wylądowało na danych demo: instalator
 # zapisał SGT_MODE=mssql, plik został wczytany, a proces startował w trybie
