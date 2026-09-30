@@ -7,7 +7,7 @@
 
    WARTOŚCI SĄ PO ANGIELSKU I TO JEST WYJĄTEK OD JĘZYKA REPO. Specyfikacja
    nazywa je kontraktem niezależnym od dostawcy: te same wartości ma oddać
-   Claude dziś i Jev jutro, a raport porównawczy zestawi je znak w znak.
+   każdy dostawca, a raport porównawczy zestawi je znak w znak.
    Polska nazwa dla człowieka mieszka na ekranie, nie w danych.
 
    Priorytetu 1–5 ze specyfikacji NIE MA — decyzja właściciela z 22 września
@@ -54,7 +54,7 @@ export type Akcja = (typeof AKCJE)[number];
 /**
  * Pewność zgłoszona przez model. Trzy słowa, nie procent — i ekran nie udaje,
  * że to prawdopodobieństwo trafienia. Specyfikacja zastrzega to samo o
- * „confidence" Jeva: miarą trafności jest dopiero porównanie z człowiekiem.
+ * liczbowej „confidence": miarą trafności jest dopiero porównanie z człowiekiem.
  */
 export const PEWNOSCI = ["wysoka", "srednia", "niska"] as const;
 export type Pewnosc = (typeof PEWNOSCI)[number];

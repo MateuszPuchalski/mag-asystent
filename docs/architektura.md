@@ -275,14 +275,13 @@ z `docs/allegro/swagger.yaml`, nie z pamięci. Dane lądują w surowych tabelach
 reklamacje, dyskusje — są NASZE, nie klienta. `services/droga-klienta.ts`
 wiąże je po numerze zamówienia w obie strony (`docs/obsluga-klienta-calosc.md`).
 
-## 11. Copilot i Jev
+## 11. Copilot
 
 Tekst dla klienta układa Claude, wołany wyłącznie z
 `adapters/copilot.anthropic.ts` — to jedyny import `@anthropic-ai/sdk`.
-Rozpoznawanie wiadomości może iść do Jeva (`adapters/copilot.jev.ts`), który
-tekstu nie generuje. Klasyfikację woła się przez `nadawcaKlasyfikacji`
-(`adapters/copilot.klasyfikator.ts`); wybór `KLASYFIKATOR_DOSTAWCA` zapada przy
-każdym wywołaniu, żeby wszystkie drogi szły do jednego dostawcy. Głównym
+Rozpoznawanie wiadomości klientów robi ten sam Claude. Klasyfikację woła się
+przez `nadawcaKlasyfikacji` (`adapters/copilot.klasyfikator.ts`), żeby
+wszystkie drogi szły do jednego dostawcy. Głównym
 wyłącznikiem jest `COPILOT_MODE`. Każde wywołanie modelu bez kliknięcia ma
 własny przełącznik, domyślnie wyłączony: coś, co wydaje pieniądze samo, włącza
 się decyzją, nie aktualizacją. Klucza nie ma w `config`, bo `config` bywa

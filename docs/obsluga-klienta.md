@@ -243,12 +243,8 @@ z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
   bywa tytułem oferty. **Nagłówek klasyfikacji piszemy my**: czy jest
   zamówienie, oferta i ile załączników, bez numerów. Typ i podtyp wątku idą
   jako enumy Allegro. Loginów uczestników z `beta.v1` nie zapisujemy.
-- **Klasyfikację robi Jev z TypeSafe** (`KLASYFIKATOR_DOSTAWCA=jev`,
-  domyślnie), z tym samym wejściem co Claude. Szkice, dopytanie i reklamacje
-  zostają przy Claude. Przed włączeniem na produkcji trzeba przeczytać DPA,
-  politykę prywatności i warunki przechowywania na typesafe.ai/legal.
-  Deklaracji TypeSafe o braku treningu i o ZDR (tylko enterprise) nikt tu nie
-  sprawdził.
+- **Klasyfikację, szkice, dopytanie i reklamacje robi Claude**, z tym samym
+  maskowanym wejściem. Treść wątku wychodzi do jednego podmiotu.
 - **Takt.** `COPILOT_AUTO_KLASYFIKACJA=1` rozpoznaje każdą nową wiadomość
   klienta, z sufitem na godzinę z księgi i oknem siedmiu dni. Bez flagi partię
   uruchamia agent, a potwierdzenie mówi, że to kosztuje. Wiadomość z samym

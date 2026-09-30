@@ -104,7 +104,7 @@ const PRACOWNIK = /(^|_)(przez|by)$|^(dodal|zaimportowal|wycofal|rozstrzygnal|za
 
 /** Autorzy, którzy nie są ludźmi. Zamiennik zrobiłby z automatu osobę. */
 const AUTOMATY = new Set([
-  "automat", "system", "copilot", "takt", "sync", "import", "instalator", "dev", "jev",
+  "automat", "system", "copilot", "takt", "sync", "import", "instalator", "dev",
   "allegro", "wlasciciel", "zaawansowane", "anonim",
 ]);
 
