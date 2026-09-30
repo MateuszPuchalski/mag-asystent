@@ -52,6 +52,11 @@ Kursor synchronizacji porównuje się PARĄ (data, id), więc wątek bez daty ni
 jak w tej parze stanąć i kursora nie przesuwa. Bierze go najnowszy wątek,
 który datę ma.
 
+Przebieg kończy się na kursorze albo na pierwszym wątku STARSZYM od jego daty.
+Sama para nie wystarcza: kolejna wiadomość w wątku-kursorze zmienia jego datę,
+więc starej pary nie ma już na liście. Wątek o dokładnie tej samej dacie idzie
+dalej, a wątek bez daty albo z nieczytelną datą progu nie uruchamia.
+
 **`interlocutor.login` to login kupującego — zweryfikowane przez właściciela
 24 września 2026** na żywym koncie. Kupujący bez konta na Allegro dostaje login
 nadany automatycznie, w kształcie `Client:<liczba>` [pewność umiarkowana —

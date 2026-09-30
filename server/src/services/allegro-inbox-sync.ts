@@ -64,6 +64,9 @@ function tablica<T>(value: unknown, pole: string): T[] {
    Zejść pod sufit może więc wyłącznie rozmowa, w której nic się nie zmieniło
    od 500 nowszych wątków — a takiej nie ma czego dociągać.
 
+   Sufit odcina teraz wyłącznie prawdziwą zaległość: kursor jest progiem daty,
+   więc kolejna wiadomość w najnowszym wątku kończy przebieg na pierwszej stronie.
+
    CZEGO SUFIT NIE GWARANTUJE: gdyby między dwoma przebiegami przybyło ponad
    500 wątków z nowymi wiadomościami, te spod sufitu poczekają do następnego
    przebiegu. Przy takcie 60 s to jest ruch, którego ta firma nie generuje —
@@ -175,6 +178,8 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
      każdy przebieg czytałby te same 25 stron i zawracał. Pierwsze zejście
      jest jednorazowe i ograniczone granicą czasu, więc wolno mu być długie. */
   const limitStron = startState.dnoAt === null ? Number.POSITIVE_INFINITY : MAKS_STRON;
+  const kursorParsowany = startState.cursorAt ? Date.parse(startState.cursorAt) : NaN;
+  const kursorMs = Number.isNaN(kursorParsowany) ? null : kursorParsowany;
 
   /**
    * Zapis JEDNEJ STRONY listy. Wydzielone z ciała przebiegu, bo od 0.164.1
@@ -268,6 +273,20 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
           poniżejGranicy = true;
           break;
         }
+        /* KURSOR TO PROG DATY, nie tylko konkretny wątek. Wątek starszy od kursora
+           przeszedł już w którymś z poprzednich przebiegów, a lista idzie od
+           najnowszego, więc dalej są same starsze. Sama para (data, id) nie
+           wystarcza: kolejna wiadomość w wątku, który był kursorem, zmienia jego
+           datę i starej pary nie ma już nigdzie na liście. Przebieg czytał wtedy
+           cały sufit stron po KAŻDEJ wiadomości w najnowszym wątku, także po naszej
+           własnej odpowiedzi. Wątek o dokładnie tej samej dacie idzie dalej:
+           znany i niezmieniony nie kosztuje żądania, a nieznany nie może zostać
+           pominięty. Data, której nie da się odczytać, progu nie uruchamia. */
+        if (kursorMs !== null && thread.lastMessageDateTime
+          && Date.parse(thread.lastMessageDateTime) < kursorMs) {
+          reachedCursor = true;
+          break;
+        }
         widziane.push(thread);
         if (thread.lastMessageDateTime === startState.cursorAt && thread.id === startState.cursorId) {
           reachedCursor = true;
@@ -313,7 +332,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
          dotknął. Cisza w tym miejscu znaczyłaby, że nikt się nie dowie
          o skrzynce, która nie nadąża. */
       console.warn(`[allegro-inbox] przebieg obcięty na ${MAKS_STRON} stronach —`,
-        "kursor nie trafił, reszta listy poczeka na następny przebieg.");
+        "tyle wątków ma datę nowszą od kursora, reszta listy poczeka na następny przebieg.");
     }
 
     /* §8.3: kursora nie przesuwa się „po niepełnym zapisie". Może więc stanąć
