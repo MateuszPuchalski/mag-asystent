@@ -717,6 +717,90 @@ test("odmawia cudzego pliku .czesciowy i katalogu, do którego nie da się zapis
   });
 });
 
+/** Wynik `anonimizuj`, który ma odmówić: zwraca miejsca, w których skaner coś znalazł. */
+function trafieniaOdmowy(we: string, wy: string, reguly: Record<string, unknown>): string[] {
+  try {
+    anonimizuj(we, wy, { ziarno: "test", reguly });
+  } catch (e) {
+    return ((e as { raport?: { skaner: Array<{ miejsce: string }> } }).raport?.skaner ?? []).map((t) => t.miejsce);
+  }
+  return [];
+}
+
+/** Zamówienie z jednym polem do sprawdzenia i ta sama wartość w kolumnie, która zostaje. */
+function zamowienieZPolem(pole: Record<string, unknown>, wartoscWKolumnie: string) {
+  return (d: DatabaseSync) => {
+    wstaw(d, "allegro_zamowienie", { id: "zam-siatka", surowe_json: JSON.stringify(pole), synced_at: "2026-09-21T09:00:00.000Z" });
+    wstaw(d, "reklamacja_tag", { nazwa: wartoscWKolumnie });
+  };
+}
+
+test("skaner: identyfikator kupującego z JSON-a, zostawiony w kolumnie, zatrzymuje pracę", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    /* `buyer.id` nie pasuje do kluczy igieł, więc do skanu trafia tylko przez klucz rodzica. */
+    zbudujBaze(we, zamowienieZPolem({ buyer: { id: "id-kupujacego-9911" } }, "id-kupujacego-9911"));
+    const miejsca = trafieniaOdmowy(we, path.join(k, "wynik.db"), { "reklamacja_tag.nazwa": R.ZOSTAJE });
+    assert.ok(miejsca.includes("reklamacja_tag.nazwa"), `skaner musi to wykryć, znalazł: ${miejsca.join(", ") || "nic"}`);
+  });
+});
+
+test("skaner: nazwa pod adresem, użytkownikiem, firmą i kontaktem zatrzymuje pracę, sam czas pod adresem nie", () => {
+  wKatalogu((k) => {
+    for (const klucz of ["address", "user", "owner", "company", "contact"]) {
+      const we = path.join(k, `${klucz}.db`);
+      zbudujBaze(we, zamowienieZPolem({ delivery: { [klucz]: { name: "Zenon Wartomski" } } }, "Zenon Wartomski"));
+      const miejsca = trafieniaOdmowy(we, path.join(k, `${klucz}-wynik.db`), { "reklamacja_tag.nazwa": R.ZOSTAJE });
+      assert.ok(miejsca.includes("reklamacja_tag.nazwa"), `${klucz}.name: skaner musi to wykryć`);
+    }
+    /* Znacznik czasu pod adresem to nie człowiek: ta sama chwila stoi w kolumnie, która zostaje. */
+    const we = path.join(k, "czas.db");
+    zbudujBaze(we, (d) => wstaw(d, "allegro_zamowienie", { id: "zam-czas", surowe_json: JSON.stringify({ delivery: { address: { modifiedAt: "2026-09-18T09:00:00.000Z" } } }), synced_at: "2026-09-21T09:00:00.000Z" }));
+    const raport = anonimizuj(we, path.join(k, "czas-wynik.db"), { ziarno: "test" });
+    assert.deepEqual(raport.skaner, []);
+  });
+});
+
+test("zamienniki kolumny unikalnej bez względu na wielkość liter nie kolidują na indeksie lower(nazwa)", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    /* Rozsyp zachowuje wielkość liter na każdej pozycji, więc wejścia o różnych wzorach wielkości
+       mogą dać wyjścia różniące się tylko nią. Indeks `lower(nazwa)` odrzuca taką parę, a mapa
+       zamienników bez uwzględnienia wielkości by jej nie zauważyła. Same małe litery tego nie łapią. */
+    const nazwy = new Set<string>();
+    const bezWielkosci = new Set<string>();
+    for (let i = 0; nazwy.size < 600; i++) {
+      const h = crypto.createHash("sha256").update(`wielkosc-${i}`).digest();
+      const litery = [0, 1, 2].map((j) => 97 + (h[j] % 12));
+      const male = String.fromCharCode(...litery);
+      if (bezWielkosci.has(male)) continue;
+      bezWielkosci.add(male);
+      nazwy.add(String.fromCharCode(...litery.map((c, j) => ((h[3] >> j) & 1 ? c - 32 : c))));
+    }
+    zbudujBaze(we, (d) => wstawSeria(d, "reklamacja_tag", [...nazwy].map((n) => ({ nazwa: n }))));
+    anonimizuj(we, wy, { ziarno: "test", reguly: { "reklamacja_tag.nazwa": R.TEKST } });
+    const po = new DatabaseSync(wy);
+    const nowe = (po.prepare("SELECT nazwa FROM reklamacja_tag").all() as Array<{ nazwa: string }>).map((r) => r.nazwa);
+    po.close();
+    assert.equal(new Set(nowe.map((n) => n.toLowerCase())).size, nowe.length);
+  });
+});
+
+test("plik .czesciowy, który pojawił się w trakcie pracy, jest cudzy: nie nadpisujemy go i nie kasujemy", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    const wy = path.join(k, "wynik.db");
+    zbudujBaze(we);
+    /* Skaner to ostatni krok przed publikacją, więc tu wstawiamy plik, którego wczesne
+       sprawdzenie jeszcze nie widziało. */
+    const skanerZPodrzutem = () => { fs.writeFileSync(`${wy}.czesciowy`, "cudzy"); return []; };
+    assert.throws(() => anonimizuj(we, wy, { ziarno: "test", skaner: skanerZPodrzutem }));
+    assert.equal(fs.readFileSync(`${wy}.czesciowy`, "utf8"), "cudzy");
+    assert.ok(!fs.existsSync(wy), "wynik nie powstał");
+  });
+});
+
 /* ── Tabela `dobor` (dobór od zera) ─────────────────────────────────────────
    Osobny blok, bo stare reguły `dobor_rozmowy.*` zostają dla baz, które
    niosą jeszcze starą tabelę. Dane maszyny i zdanie „czego brakuje" pisze

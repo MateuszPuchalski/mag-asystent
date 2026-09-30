@@ -252,7 +252,7 @@ const KLUCZ_OSOBOWY = /login|name|nazw|imi[eę]|mail|phone|tel|miast|city|street
    każdej bazie z zamówieniami. Igłą jest wartość pod kluczem, który sam mówi „człowiek”,
    albo pod dowolnym kluczem wewnątrz obiektu, który jest człowiekiem (`buyer.id`). */
 const KLUCZ_DO_IGIEL = /login|mail|phone|tel|first|last|full|company|street|city|zip|post|poczt|nip|pesel|iban|konto|account|text|note|uwag|komentarz|message|wiadom|tresc|imi|nazw|adres|address|tax|user|autor/i;
-const KLUCZ_CZLOWIEKA = /buyer|interlocutor|author|seller|sender|recipient|receiver|odbiorc|kupuj|customer|person|osob|participant|autor/i;
+const KLUCZ_CZLOWIEKA = /buyer|interlocutor|author|seller|sender|recipient|receiver|odbiorc|kupuj|customer|person|osob|participant|autor|user|owner|company|contact|address/i;
 
 /* Poza kluczami osobowymi zostaje krótki identyfikator pod kluczem kończącym się na Id
    oraz słowo pod kluczem-słownikiem. Nie szukamy tu podciągów: „order” czy „source”
@@ -380,7 +380,11 @@ function rozsypJson(w, klucz, ctx, rodzicOsobowy = false, kluczRodzica = "") {
   if (w !== null && typeof w === "object") {
     return Object.fromEntries(Object.entries(w).map(([k, v]) => [k, rozsypJson(v, k, ctx, osobowe, klucz)]));
   }
-  const doIgiel = osobowe && (KLUCZ_DO_IGIEL.test(klucz) || KLUCZ_CZLOWIEKA.test(kluczRodzica));
+  /* Pole pod kluczem człowieka (`buyer.id`, `delivery.address.name`) jest igłą, bo jego wartość
+     stoi też w kolumnach, które zostają. Czas i UUID pod takim kluczem (`modifiedAt`) nie są:
+     wpadłyby do skanu i zatrzymały narzędzie na kolumnie z datą. */
+  const podCzlowiekiem = KLUCZ_CZLOWIEKA.test(kluczRodzica) && !(typeof w === "string" && (CZAS_ISO.test(w) || UUID_CALY.test(w)));
+  const doIgiel = osobowe && (KLUCZ_DO_IGIEL.test(klucz) || podCzlowiekiem);
   if (typeof w === "number") {
     if (!osobowe) return w;
     if (doIgiel) ctx.igly.dodajCyfry(String(w));
@@ -863,6 +867,7 @@ export function anonimizuj(wejscie, wyjscie, opcje = {}) {
   const igly = new Igly();
   const raport = { tabele: 0, wierszy: 0, oproznione: [], kolumny: [], skaner: [], pominieteIgly: 0, igly: 0 };
   const liczby = new Map();
+  let mojCzesciowy = false;
   try {
     const praca = path.join(tmp, "praca.db");
     const kandydat = path.join(tmp, "wynik.db");
@@ -957,12 +962,16 @@ export function anonimizuj(wejscie, wyjscie, opcje = {}) {
     /* Docelowa nazwa pojawia się dopiero teraz i tylko w całości: kopia obok,
        potem zmiana nazwy w tym samym katalogu. */
     if (fs.existsSync(wyjscie)) throw new Error(`Plik ${wyjscie} pojawił się w trakcie pracy. Nic nie nadpisuję.`);
+    /* Plik z tą nazwą, który pojawił się po wczesnym sprawdzeniu, jest cudzy: `COPYFILE_EXCL`
+       odmawia jego nadpisania, a `finally` kasuje wyłącznie plik, który sami utworzyliśmy. */
+    fs.copyFileSync(kandydat, czesciowy, fs.constants.COPYFILE_EXCL);
+    mojCzesciowy = true;
     SPRZATANIE.add(czesciowy);
-    fs.copyFileSync(kandydat, czesciowy);
     fs.renameSync(czesciowy, wyjscie);
+    mojCzesciowy = false;
     SPRZATANIE.delete(czesciowy);
   } finally {
-    fs.rmSync(czesciowy, { force: true });
+    if (mojCzesciowy) fs.rmSync(czesciowy, { force: true });
     fs.rmSync(tmp, { recursive: true, force: true });
     SPRZATANIE.delete(tmp);
   }
