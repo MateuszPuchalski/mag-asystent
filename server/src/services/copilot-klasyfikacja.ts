@@ -56,7 +56,7 @@ export type { Kategoria, Pewnosc, Akcja } from "./klasyfikacja-slownik.js";
 
 /**
  * Odpowiedź nadawcy, SUROWA. Walidacja stoi w polityce, nie w adapterze:
- * inny dostawca (Jev) wpina się tą samą drogą i przechodzi te same sita.
+ * inny dostawca wpina się tą samą drogą i przechodzi te same sita.
  */
 export interface OdpowiedzModelu {
   surowa: unknown;

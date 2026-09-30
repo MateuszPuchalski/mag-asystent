@@ -28,9 +28,8 @@ import { LIMIT_ZNAKOW } from "../services/wysylka.js";
 
 /* ── Wyjście do Anthropic (etap F) ───────────────────────────────────────────
 
-   Ten plik jest jednym z DWÓCH miejsc, w których treść rozmowy opuszcza
-   firmę; drugie to `copilot.jev.ts`, tylko do rozpoznawania (od 29 września
-   2026). Przyjmuje `TrescBezpieczna`, więc goły `string` nie wejdzie tu nawet przez
+   Ten plik jest JEDYNYM miejscem, w którym treść rozmowy opuszcza firmę.
+   Przyjmuje `TrescBezpieczna`, więc goły `string` nie wejdzie tu nawet przez
    pomyłkę — maskowania pilnuje kompilator, nie przegląd kodu.
 
    KLUCZA NIE CZYTAMY SAMI. `new Anthropic()` bierze `ANTHROPIC_API_KEY` ze
@@ -42,7 +41,7 @@ import { LIMIT_ZNAKOW } from "../services/wysylka.js";
    września 2026. Enumy biorą się ze słownika serwisu, bez trzeciej kopii.
    Walidacja po naszej stronie (`klasyfikacja-polityka.ts`) zostaje mimo to:
    odmowa albo ucięcie odpowiedzi dają `parsed_output === null`, a inny
-   nadawca (Jev) przyjdzie bez tego schematu. `powodInne` jest `nullable`,
+   nadawca przyjdzie bez tego schematu. `powodInne` jest `nullable`,
    bo wyjście strukturalne wymaga WSZYSTKICH kluczy. */
 const Wynik = z.object({
   kategoria: z.enum(KATEGORIE),

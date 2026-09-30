@@ -325,22 +325,27 @@ test("COPILOT_MODEL_KLASYFIKACJA z wklejonym kluczem nie wynosi go do komunikatu
   assert.match(o, /claude-/);
 });
 
-/* Klucz TypeSafe sąsiaduje w wertis.env.example z KLASYFIKATOR_DOSTAWCA i
-   JEV_MODEL, czyli w tej samej pułapce co klucz Anthropic w 0.84.1. Prefiksu
-   klucza TypeSafe nie znamy (dokumentacja go nie podaje), więc lista prefiksów
-   go nie chroni. Chroni długość: wartość dłuższa niż nazwa trybu nie idzie do
-   komunikatu w całości. Wartość poniżej jest zmyślona i tak ma zostać. */
-test("wklejka klucza w JEV_MODEL albo KLASYFIKATOR_DOSTAWCA nie wynosi go w całości", () => {
-  const klucz = "zmyslony-klucz-typesafe-0123456789abcdef";
-  const zly = structuredClone(config) as typeof config;
-  (zly.copilot as { modelJev: string }).modelJev = klucz;
-  const o = bledyKonfiguracji(zly).find((b) => b.startsWith("JEV_MODEL="));
-  assert.ok(o, "brak zdania o JEV_MODEL");
-  assert.ok(!o.includes(klucz), "klucz poszedł do komunikatu w całości");
-  assert.match(o, /jev-/);
-
-  /* `assertMode` przy starcie wypisuje wartość dokładnie przez tę funkcję. */
+/* Maska startowa: `assertMode` wypisuje nieobsługiwaną wartość przez `bezpiecznaWartosc`.
+   Wartość dłuższa niż nazwa trybu nie idzie do komunikatu w całości, bo bywa wklejonym kluczem.
+   Wartość poniżej jest zmyślona i tak ma zostać. */
+test("maska startowa nie wypuszcza wklejonego klucza w całości", () => {
+  const klucz = "zmyslony-klucz-0123456789abcdef";
   assert.ok(!bezpiecznaWartosc(klucz).includes(klucz), "maska startowa wypuściła klucz w całości");
+});
+
+/* Wpisy po wycofanym klasyfikatorze mogą zostać w `wertis.env` na instalacji, która je kiedyś
+   dostała. Serwer nie ma prawa na nich paść: ostrzega i wstaje. */
+test("stare ustawienia po wycofanym klasyfikatorze dają ostrzeżenie, a nie błąd startu", () => {
+  const stary = structuredClone(config) as typeof config;
+  (stary.copilot as { wycofane: string[] }).wycofane = ["KLASYFIKATOR_DOSTAWCA", "TYPESAFE_API_KEY"];
+  assert.deepEqual(bledyKonfiguracji(stary).filter((b) => /KLASYFIKATOR|TYPESAFE|JEV/.test(b)), []);
+  const o = ostrzezeniaKonfiguracji(stary).find((z) => z.includes("KLASYFIKATOR_DOSTAWCA"));
+  assert.ok(o, "brak ostrzeżenia o wycofanych ustawieniach");
+  assert.match(o, /TYPESAFE_API_KEY/);
+  assert.match(o, /Claude/);
+  const czysty = structuredClone(config) as typeof config;
+  (czysty.copilot as { wycofane: string[] }).wycofane = [];
+  assert.equal(ostrzezeniaKonfiguracji(czysty).some((z) => z.includes("nic już nie robi")), false);
 });
 
 test("model klasyfikacji odziedziczony po COPILOT_MODEL nie dubluje zdania o błędzie", () => {

@@ -179,29 +179,6 @@ test("stan mówi wprost, dlaczego przycisku nie ma", async () => {
   assert.ok(s.maxPartia > 0);
 });
 
-/* Jev jest domyślnym klasyfikatorem i ma własny klucz. Copilot z kluczem Claude,
-   ale bez klucza TypeSafe, ma odmówić rozpoznania ZDANIEM o właściwym kluczu:
-   inaczej kliknięcie kończyłoby się 200 z `przerwane`, czyli cichą porażką.
-   Guard stoi przed listą rozmów i przed adapterem, więc test nie wychodzi do sieci. */
-test("Jev bez klucza TypeSafe: rozpoznanie odmawia zdaniem o TYPESAFE_API_KEY", async () => {
-  const { config } = await import("../config.js");
-  const c = config.copilot as { mode: string; klucz: boolean; klasyfikator: string; kluczJev: boolean };
-  const przed = { ...c };
-  Object.assign(c, { mode: "anthropic", klucz: true, klasyfikator: "jev", kluczJev: false });
-  try {
-    const b = login("biuro", "Ala");
-    const r = await app.inject({
-      method: "POST", url: "/api/obsluga/copilot/klasyfikacja",
-      headers: b.naglowki, payload: { rozmowyId: [rozmowa] },
-    });
-    assert.equal(r.statusCode, 400);
-    assert.match(r.json<{ error: string }>().error, /TYPESAFE_API_KEY/);
-    assert.equal(liczba("copilot_wywolanie"), 0, "odmowa nie ma prawa nic kosztować");
-  } finally {
-    Object.assign(c, przed);
-  }
-});
-
 /* Kolejność bramek jest DECYZJĄ: wyłączony Copilot odmawia, ZANIM zajrzy do
    listy rozmów. Człowiek ma najpierw usłyszeć o problemie fundamentalnym,
    a nie o pustym polu w żądaniu, które i tak nie miałoby czego zrobić. */

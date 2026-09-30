@@ -2203,22 +2203,10 @@ Klucz stoi wyłącznie w `ANTHROPIC_API_KEY` i nie ma go w konfiguracji serwera
 
 ### 14.5a. Klasyfikacja w kształcie specyfikacji (22 września 2026)
 
-Specyfikacja właściciela z 20 września („Allegro customer message
-classification with Jev") zastąpiła słownik ośmiu etykiet decyzją
-o dziesięciu polach. Silnikiem zostaje Claude, decyzją właściciela z 22
-września; Jev wpina się później tym samym nadawcą (`NadawcaKlasyfikacji`),
-bo walidacja i polityka stoją po naszej stronie, nie w adapterze.
-
-**Od 29 września 2026 silnikiem jest Jev, nie Claude.** Właściciel zlecił
-przełączenie i to zastępuje decyzję z 22 września („silnikiem zostaje Claude”).
-Wpina się dokładnie tak, jak tu zapisano: nadawcą `NadawcaKlasyfikacji`
-(`adapters/copilot.jev.ts`), więc walidacja i polityka są wspólne. Kategoria
-i następny krok to Choice, flagi i kategorie dodatkowe to Nouly, pewność
-słowna wynika z liczbowej `confidence`. Powrót do Claude:
-`KLASYFIKATOR_DOSTAWCA=anthropic`. Czego nie wiadomo: trafność po polsku.
-Dokumentacja TypeSafe wskazuje angielski jako język o najlepszej trafności,
-więc porównanie z Claude na prawdziwych wiadomościach jest pierwszym pomiarem,
-nie formalnością.
+Specyfikacja właściciela z 20 września zastąpiła słownik ośmiu etykiet
+decyzją o dziesięciu polach. Silnikiem jest Claude. Kolejny dostawca wpiąłby
+się tym samym nadawcą (`NadawcaKlasyfikacji`), bo walidacja i polityka stoją
+po naszej stronie, nie w adapterze.
 
 **Decyzja ma piętnaście kategorii, kategorie dodatkowe i jeden następny
 krok z dwunastu.** Słownik stoi w `services/klasyfikacja-slownik.ts`. Wartości

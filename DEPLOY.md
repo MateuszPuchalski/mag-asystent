@@ -1194,9 +1194,10 @@ zajrzyj na nią po pierwszej godzinie każdego automatu. Dlaczego tak:
 `wertis-api`. **Klucz wpisz WYŁĄCZNIE do `ANTHROPIC_API_KEY`** — w innym polu
 potrafi zatrzymać start. Model szkiców zmienia
 `COPILOT_MODEL`, model klasyfikacji — `COPILOT_MODEL_KLASYFIKACJA`.
-**Rozpoznawanie** robi dostawca z `KLASYFIKATOR_DOSTAWCA`: `jev` (domyślny,
-z `TYPESAFE_API_KEY`) albo `anthropic`. Bez klucza Jeva wiadomości nie są
-rozpoznawane, a serwer działa dalej.
+**Rozpoznawanie** wiadomości klientów robi ten sam Claude i ten sam klucz.
+Wpisy `KLASYFIKATOR_DOSTAWCA`, `TYPESAFE_API_KEY` i `JEV_MODEL`, jeśli stoją
+w `wertis.env`, niczego już nie robią. Serwer wstaje z nimi i ostrzega, że
+można je usunąć.
 
 | klucz | co włącza | hamulce |
 |---|---|---|
