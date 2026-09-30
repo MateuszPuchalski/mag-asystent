@@ -12,9 +12,8 @@ import { nadawcaKlasyfikacji } from "../adapters/copilot.klasyfikator.js";
 import { wymianyRozmowy, zadajPytanie, zapiszPasowanieZDopytania } from "../services/copilot-pytania.js";
 import { czekajaNaSzkic, zlecSzkicPoRozpoznaniu } from "../services/copilot-szkic-po-rozpoznaniu.js";
 import {
-  ocenSzkic, odrzucDaneDoboru, odrzucPasowanie, przyjmijDaneDoboru, przyjmijPasowanie, ulozSzkic,
+  ocenSzkic, odrzucPasowanie, przyjmijPasowanie, ulozSzkic,
 } from "../services/copilot-szkic.js";
-import { ConversationConflict } from "../services/conversations.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
   BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
@@ -292,30 +291,6 @@ export async function copilotRoutes(app: FastifyInstance) {
       try {
         return ocenSzkic(Number(req.params.id), req.body?.ocena ?? "", kto());
       } catch (e) {
-        return reply.code(400).send({ error: (e as Error).message });
-      }
-    });
-
-  /**
-   * Los danych doboru rozpoznanych w rozmowie: `wpisane` (w puste pola,
-   * przez `zapiszDane` — stąd wersja doboru i 409 jak przy ręcznym zapisie)
-   * albo `odrzucone`. Jedno kliknięcie agenta; automat sam nie wpisuje.
-   */
-  app.post<{ Params: { id: string }; Body: { ocena?: string; expectedVersion?: number } }>(
-    "/api/obsluga/copilot/szkic/:id/dane", async (req, reply) => {
-      const nie = odmowa(reply);
-      if (nie) return nie;
-      const id = Number(req.params.id);
-      try {
-        if (req.body?.ocena === "wpisane") {
-          return { szkic: przyjmijDaneDoboru(id, Number(req.body.expectedVersion), kto()) };
-        }
-        if (req.body?.ocena === "odrzucone") return { szkic: odrzucDaneDoboru(id, kto()) };
-        return reply.code(400).send({ error: "Ocena danych może być „wpisane” albo „odrzucone”." });
-      } catch (e) {
-        if (e instanceof ConversationConflict) {
-          return reply.code(409).send({ error: e.message, ...e.details });
-        }
         return reply.code(400).send({ error: (e as Error).message });
       }
     });

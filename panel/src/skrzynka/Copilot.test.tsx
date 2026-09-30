@@ -15,7 +15,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, podziekowal: false, oglada: null,
   priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0,
-  zadanieWToku: false, dobor: "not_started", kopilot: null, ...n,
+  zadanieWToku: false, dobor: "pusty", kopilot: null, ...n,
 });
 
 const kopilot = (n: Partial<Kopilot> = {}): Kopilot => ({

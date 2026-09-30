@@ -1,12 +1,12 @@
 import React from "react";
 import {
-  useEskalacja, usePokrycieSygnatur, usePokrycieWiedzy, useSkutecznoscDoboru, useWiedzaAutomat,
+  useEskalacja, useMiaryDoboru, usePokrycieSygnatur, usePokrycieWiedzy, useWiedzaAutomat,
 } from "../api/rozmowy";
 import { useCopilot, usePomiarCopilota } from "../api/copilot";
 import { PokrycieSygnatur } from "../ustawienia/PokrycieSygnatur";
 import { PokrycieWiedzy } from "../ustawienia/PokrycieWiedzy";
 import { PomiarCopilota } from "../ustawienia/PomiarCopilota";
-import { SkutecznoscDoboru } from "../ustawienia/SkutecznoscDoboru";
+import { MiaryDoboru } from "./MiaryDoboru";
 import { Eskalacja } from "../ustawienia/Eskalacja";
 import { WiedzaAutomat } from "../ustawienia/WiedzaAutomat";
 
@@ -31,10 +31,9 @@ export function MiaryObslugi({ dni }: { dni: number }) {
   const pomiar = usePomiarCopilota(copilot.data?.wlaczony === true);
   /* Dobór liczy się z OKNA ZAKRESU — tego samego, które rządzi czasem
      odpowiedzi nad nim. Dwa selektory okna na jednym ekranie to dwie
-     decyzje o tym samym (dekalog pkt 5). Samej karcie okna już nie
-     podajemy (0.519.0): powtarzała je w nagłówku, dwa wiersze pod
-     selektorem zakresu. */
-  const skutecznosc = useSkutecznoscDoboru(dni);
+     decyzje o tym samym (dekalog pkt 5). Samej karcie okna nie podajemy:
+     powtarzałaby je w nagłówku, dwa wiersze pod selektorem zakresu. */
+  const miaryDoboru = useMiaryDoboru(dni);
   const eskalacja = useEskalacja();
   const automat = useWiedzaAutomat();
 
@@ -45,8 +44,8 @@ export function MiaryObslugi({ dni }: { dni: number }) {
         ta — co z kolejki wyszło bez człowieka. Jedno czytanie, dwa stany. */}
     <WiedzaAutomat wpisy={automat.data} />
     <PomiarCopilota dane={pomiar.data} />
-    <SkutecznoscDoboru dane={skutecznosc.data} />
-    {/* Eskalacja POD skutecznością doboru: tamta mierzy naszą pracę, ta jej
+    <MiaryDoboru dane={miaryDoboru.data} />
+    {/* Eskalacja POD miarami doboru: tamta mierzy naszą pracę, ta jej
         skutek u klienta. Razem odpowiadają na pytanie „czy to działa". */}
     <Eskalacja miesiace={eskalacja.data?.miesiace} />
   </>;

@@ -165,37 +165,29 @@ CREATE INDEX IF NOT EXISTS ix_message_conversation ON message(conversation_id, s
 -- i znikała sekundę później przy każdym starcie — ta sama pułapka, którą
 -- opisywał komentarz `dopasowanie` niżej.
 
--- ── Dobór części przy rozmowie (§11, etap E1) ──────────────────────────────
--- Nazwa z sufiksem tym samym ruchem co `zwrot_klienta`:
--- `dopasowanie` stoi na liście nakładek, które `migrate()` KASUJE przy każdym
--- starcie. Tabela o tamtej nazwie powstałaby stąd i znikała sekundę później.
+-- ── Dobór części przy rozmowie (`docs/dobor-od-zera.md`) ──────────────────
+-- Jedna rozmowa = jeden dobór, więc `conversation_id` jest kluczem głównym.
+-- Pilnuje tego kształt tabeli, nie serwis. Brak wiersza znaczy dobór pusty
+-- i liczy się przy odczycie: otwarcie zakładki niczego nie wstawia.
 --
--- Jedna rozmowa = jeden dobór, więc `conversation_id` jest kluczem głównym,
--- a nie kolumną z indeksem. Pilnuje tego kształt tabeli, nie serwis.
+-- Stan dla kolejki (`pusty`, `otwarty`) jest WYLICZANY z danych i wyniku,
+-- nigdy zapisywany. Stan zapisany obok faktów rozjeżdża się z nimi, a ręczne
+-- statusy poprzedniego doboru pokazały to dziewięć razy.
 --
--- Brak wiersza znaczy `not_started` i liczy się przy odczycie: otwarcie
--- zakładki niczego nie wstawia („zero zapisu przy patrzeniu").
+-- Nazwa `dobor`, nie `dopasowanie`: tamta stoi na liście nakładek, które
+-- `migrate()` kasuje przy każdym starcie.
 --
 -- `wersja` jest WŁASNA, nie `conversation.version`. Tamta pilnuje przejęcia
--- i szkicu; edycja chipów doboru podnosząca ją wywracałaby cudzy szkic na 409.
---
--- Dane wejściowe §11.1 jako KOLUMNY, nie jeden JSON: etapy E2/E3 filtrują po
--- marce i modelu, a `json_extract` w każdym takim zapytaniu to skan tabeli.
--- Parametry i wymiary zostają w `parametry_json`, bo ich lista jest otwarta.
+-- i szkicu; edycja danych doboru wywracałaby cudzy szkic na 409.
 --
 -- Bez klucza obcego do `sgt_towar`: import z Subiekta kasuje i odtwarza
--- read-model co `MSSQL_SYNC_MS` (blizna 0.154.0). Goły `wybrany_tw_id` plus
--- snapshot `wybrany_symbol`, jak w `oferta_kartoteka` i `ean_alias`.
-CREATE TABLE IF NOT EXISTS dobor_rozmowy (
+-- read-model co `MSSQL_SYNC_MS`. Goły `tw_id` plus migawka `symbol`, jak
+-- w `oferta_kartoteka`.
+--
+-- `zmienil` bez `zmienil_user_id` znaczy automat (np. `automat (szkic)`).
+-- To jedyny znacznik, który odróżnia wpis maszyny od wpisu agenta.
+CREATE TABLE IF NOT EXISTS dobor (
   conversation_id INTEGER PRIMARY KEY REFERENCES conversation(id) ON DELETE CASCADE,
-  -- DZIEWIĘĆ wartości z §7. `CHECK` jest strażnikiem dokumentu, tak jak przy
-  -- `conversation.status` (0.158.0). `extracting_data` nie ma w etapie E
-  -- nadawcy: serwis go odrzuca, nada mu go dopiero Copilot (etap F).
-  status          TEXT NOT NULL DEFAULT 'not_started' CHECK (status IN (
-                    'not_started','extracting_data','missing_information','searching',
-                    'candidates_found','requires_expert','confirmed','rejected',
-                    'not_applicable')),
-  wersja          INTEGER NOT NULL DEFAULT 1,
   marka           TEXT,
   model           TEXT,
   wariant         TEXT,
@@ -204,26 +196,24 @@ CREATE TABLE IF NOT EXISTS dobor_rozmowy (
   silnik          TEXT,
   oem             TEXT,
   nazwa_czesci    TEXT,
-  parametry_json  TEXT,
-  -- Czego jeszcze dopytać klienta; zdanie agenta, nie lista kodów.
-  brakuje         TEXT,
-  wybrany_tw_id   INTEGER,
-  wybrany_symbol  TEXT,
-  -- JEDENAŚCIE dróg z §11.2. `silnik` doszła z `zabudowa_silnika` (0.229.0),
-  -- `pasowanie` z `pasowanie_czesci` (0.230.0), `wymiar` z `wymiar_kartoteki`;
-  -- bazy sprzed tych wydań znają osiem, dziewięć albo dziesięć, więc `CHECK`
-  -- przebudowuje `doborZnaDrogi()` w `migrate()` — RAZ, do kształtu
-  -- docelowego. Bez tego „Wybierz" przy kandydacie z nowej drogi rzuciłby
-  -- `SQLITE_CONSTRAINT` dopiero u klienta.
-  wybrany_droga   TEXT CHECK (wybrany_droga IS NULL OR wybrany_droga IN (
-                    'oferta','zamiennik','symbol','ean','wyszukiwarka',
-                    'zastosowanie','silnik','pasowanie','oem','pelnotekst','wymiar')),
-  wybrano_przez   TEXT,
-  wybrano_user_id INTEGER REFERENCES app_user(user_id),
-  wybrano_at      TEXT,
-  updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-  updated_by      TEXT,
-  updated_user_id INTEGER REFERENCES app_user(user_id)
+  -- Cztery odpowiedzi klientowi; NULL = jeszcze żadnej. Ustawia je wyłącznie
+  -- człowiek. Trzy kopie listy (tu, w serwisie, w panelu), bo każda pilnuje
+  -- innej granicy.
+  wynik           TEXT CHECK (wynik IS NULL OR wynik IN ('czesc','brak','dopytac','nie_dotyczy')),
+  tw_id           INTEGER,
+  symbol          TEXT,
+  -- Skąd agent wziął część: co wskazał klient, co mówi wiedza, co podobne
+  -- po nazwie, czy wskazał ją sam. Miary doboru liczą po tej kolumnie.
+  podstawa        TEXT CHECK (podstawa IS NULL OR podstawa IN ('numer','wiedza','podobne','reczny')),
+  -- Czego dopytać klienta; zdanie agenta przy wyniku `dopytac`.
+  dopytac         TEXT,
+  wersja          INTEGER NOT NULL DEFAULT 1,
+  zmienil         TEXT,
+  zmienil_user_id INTEGER REFERENCES app_user(user_id),
+  zmieniono_at    TEXT,
+  -- Wynik „ta część" bez kartoteki nie mówi niczego, co dałoby się wstawić
+  -- do odpowiedzi. Reguła stoi w kształcie, żeby żaden zapis jej nie ominął.
+  CHECK (wynik IS NOT 'czesc' OR tw_id IS NOT NULL)
 );
 
 -- ── Klasyfikacja wiadomości: DECYZJE z wersjami (22 września 2026) ─────────
@@ -424,19 +414,17 @@ CREATE TABLE IF NOT EXISTS szkic_copilota (
   przez_user_id   INTEGER REFERENCES app_user(user_id),
   ocena           TEXT CHECK (ocena IS NULL OR ocena IN ('wstawiony','zastapiony','odrzucony')),
   ocena_at        TEXT,
-  -- DANE DOBORU ROZPOZNANE W ROZMOWIE (etap F, przyrost trzeci). JSON w kształcie
-  -- `DaneDoboru`; NULL = model niczego nie znalazł albo nic nie przeszło
-  -- sprawdzenia. Kolumny PRZY SZKICU, nie osobna tabela: propozycja rodzi się
-  -- z tego samego wywołania i ginie z następnym, a jej los liczy się tak samo
-  -- jak los szkicu. To NIE jest `dobor_rozmowy` — tam trafia wyłącznie to, co
-  -- agent kliknął (blizna szarpaka: szczeble czytają tylko tamtą tabelę).
+  -- DANE DOBORU ROZPOZNANE W ROZMOWIE. JSON w kształcie `DaneZRozmowy`
+  -- (`copilot-szkic.ts`); NULL = model niczego nie znalazł albo nic nie
+  -- przeszło sprawdzenia. Przy szkicu, bo rodzi je to samo wywołanie. To NIE
+  -- jest tabela `dobor`: tam wchodzą wyłącznie puste pola, a kandydatów szuka
+  -- się tylko z tamtej tabeli (blizna szarpaka).
   dane_doboru     TEXT,
-  -- Los propozycji danych: `wpisane` = agent kliknął i puste pola dostały
-  -- wartości; `odrzucone` = odesłał. Osobno od `ocena`, bo szkic i dane mają
-  -- różne losy — dobry szkic z błędnym modelem i odwrotnie.
+  -- Los propozycji danych: `wpisane` = puste pola dostały wartości. Wartość
+  -- `odrzucone` zostaje w CHECK, bo stare wiersze ją niosą.
   dane_ocena      TEXT CHECK (dane_ocena IS NULL OR dane_ocena IN ('wpisane','odrzucone')),
   dane_ocena_at   TEXT,
-  -- Wersja `dobor_rozmowy` w chwili szkicu: zmiana danych doboru po szkicu
+  -- Wersja `dobor` w chwili szkicu: zmiana danych doboru po szkicu
   -- czyni go nieświeżym tak samo jak dopisek klienta.
   dobor_wersja    INTEGER NOT NULL DEFAULT 0,
   -- PASOWANIE ROZPOZNANE W ROZMOWIE (etap F, przyrost czwarty). JSON
@@ -912,24 +900,6 @@ CREATE TABLE IF NOT EXISTS zamiennosc_oem (
 CREATE UNIQUE INDEX IF NOT EXISTS ux_zamiennosc_oem_zywa ON zamiennosc_oem(tw_a, tw_b)
   WHERE stan IN ('zatwierdzone','odrzucone');
 CREATE INDEX IF NOT EXISTS ix_zamiennosc_oem_b ON zamiennosc_oem(tw_b, stan);
-
--- Wymiary z nazw i opisów kartotek — szczebel „zgodne wymiary" (§11.2).
--- Blizna: klient pytał o „linkę 148 cm", katalog miał „1170x1480", a żaden
--- szczebel liczby nie czytał. TABELA POCHODNA jak `towar_identyfikator`:
--- powstaje przy przebudowie po imporcie, bez cyklu życia i bez wpisów
--- ręcznych. Czyta NAZWĘ i OPIS — wymiar w opisie nie bywa negacją, inaczej
--- niż tokeny silników. Milimetry całkowite, dokładne: tolerancja byłaby
--- zgadywaniem. Bez klucza obcego do `sgt_towar` (blizna 0.154.0).
-CREATE TABLE IF NOT EXISTS wymiar_kartoteki (
-  tw_id     INTEGER NOT NULL,
-  tw_symbol TEXT NOT NULL,
-  mm        INTEGER NOT NULL,
-  -- Oryginalny zapis („1170x1480", „148 cm") do zdania źródła kandydata.
-  zapis     TEXT NOT NULL,
-  pole      TEXT NOT NULL CHECK (pole IN ('nazwa','opis')),
-  PRIMARY KEY (tw_id, mm)
-);
-CREATE INDEX IF NOT EXISTS ix_wymiar_kartoteki_mm ON wymiar_kartoteki(mm);
 
 -- Sekcje „Modele:" z opisów kartotek do PRZEROBIENIA przez człowieka.
 -- Decyzja właściciela: automat nie zgaduje marki z `FS450` ani `236; 240`.

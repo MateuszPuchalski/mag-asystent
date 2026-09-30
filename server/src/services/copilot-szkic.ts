@@ -12,7 +12,7 @@ import { doborRozmowy, wiedzaDoboru, zapiszDane, type DaneDoboru } from "./dobor
 
 /** Podpis maszyny piszącej dane doboru. Jedno miejsce, bo po nim się poznaje. */
 const AUTOMAT_DANYCH = { automat: "szkic" } as const;
-import { kandydaciDoboru, ofertaRozmowy } from "./kandydaci.js";
+import { kandydaciDoboru, ofertaRozmowy, PO_IDENTYFIKATORZE, type GrupaKandydata } from "./kandydaci.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { dociagnijTresc } from "./allegro-oferta-tresc.js";
 import { buildProductCard } from "./stock.js";
@@ -29,7 +29,6 @@ import { zapiszWiedzeZOferty } from "./wiedza-z-oferty.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 import { wzorzecOdpowiedzi } from "./wzorce-odpowiedzi.js";
 import { numerZamowieniaRozmowy } from "./zamowienia-kandydaci.js";
-import { towarZnanyZZamowienia } from "./towar-znany.js";
 import { naLiscieZgodnosci, zdanieZgodnosci } from "./zgodnosc-oferty.js";
 import {
   idZamowienia, przesylkaDoOdswiezenia, przesylkaZamowienia, sprawdzPrzesylke, zdaniePrzesylki,
@@ -314,7 +313,7 @@ export interface OdpowiedzSzkicu {
    * `null` = nadawca ich nie oddaje (atrapy w testach). Surowe: sprawdzenie
    * przeciw rozmowie robi `oczyscPropozycje`, nie adapter.
    */
-  daneDoboru: DaneDoboru | null;
+  daneDoboru: DaneZRozmowy | null;
   /** Para część→część z rozmowy (przyrost czwarty); `null` = nic albo nadawca nie oddaje. */
   pasowanie: PasowanieZRozmowy | null;
   /**
@@ -370,10 +369,10 @@ export interface SzkicCopilota {
   ocena: OcenaSzkicu | null;
   /**
    * Dane doboru rozpoznane w rozmowie i SPRAWDZONE przeciw niej. `null` = nic
-   * nie rozpoznano. To propozycja: do `dobor_rozmowy` wchodzi na kliknięcie
-   * agenta (`przyjmijDaneDoboru`), wyłącznie w puste pola.
+   * nie rozpoznano. Do tabeli `dobor` weszły same, wyłącznie w puste pola
+   * i bez parametrów; tu zostaje pełny odczyt modelu dla pomiaru.
    */
-  daneDoboru: DaneDoboru | null;
+  daneDoboru: DaneZRozmowy | null;
   daneOcena: OcenaDanych | null;
   /** Wersja doboru, na której szkic powstał — inna dziś = szkic nieświeży. */
   doborWersja: number;
@@ -564,7 +563,22 @@ export function numeryNiezadeklarowane(
    wątkowi, bo to on poszedł do modelu: wartość, która zniknęła jako
    `[telefon]`, nie ma jak wrócić do danych.                                  */
 
-const KLUCZE_DANYCH: Array<keyof Omit<DaneDoboru, "parametry">> = [
+/**
+ * Dane maszyny i części, które model odczytał z rozmowy. Kształt modelu,
+ * nie doboru: `parametry` zostają, bo prompt i schemat odpowiedzi je znają,
+ * a dobór ich nie przyjmuje (droga „zgodne wymiary" wyszła). Osobny typ,
+ * żeby zmiana doboru nie zmieniała po cichu kontraktu z modelem.
+ */
+export interface DaneZRozmowy {
+  marka: string | null; model: string | null; wariant: string | null;
+  rocznik: string | null; nrSeryjny: string | null; silnik: string | null;
+  oem: string | null; nazwaCzesci: string | null;
+  parametry: Record<string, string>;
+}
+
+/* Pola, które przechodzą do doboru. Typ z doboru pilnuje, że każde z nich
+   tam istnieje; parametrów na tej liście nie ma. */
+const KLUCZE_DANYCH: Array<keyof DaneDoboru & keyof DaneZRozmowy> = [
   "marka", "model", "wariant", "rocznik", "nrSeryjny", "silnik", "oem", "nazwaCzesci",
 ];
 
@@ -592,12 +606,12 @@ export function wartoscZRozmowy(wartosc: string, watek: string): boolean {
  * idzie do dziennika jako miara, ile model zmyśla.
  */
 export function oczyscPropozycje(
-  dane: DaneDoboru | null, watek: string,
-): { dane: DaneDoboru | null; odrzuconych: number } {
+  dane: DaneZRozmowy | null, watek: string,
+): { dane: DaneZRozmowy | null; odrzuconych: number } {
   if (!dane) return { dane: null, odrzuconych: 0 };
   let odrzuconych = 0;
   let cokolwiek = false;
-  const czyste: DaneDoboru = {
+  const czyste: DaneZRozmowy = {
     marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null,
     silnik: null, oem: null, nazwaCzesci: null, parametry: {},
   };
@@ -856,6 +870,12 @@ function czytajListe<T>(json: string | null): T[] {
   }
 }
 
+/* Grupa kandydata słowami: model ma wiedzieć, czy część wskazał klient,
+   czy tylko wygląda podobnie. */
+const GRUPA_SLOWAMI: Record<GrupaKandydata, string> = {
+  numer: "wskazane przez klienta", wiedza: "z bazy wiedzy", podobne: "podobne po nazwie",
+};
+
 const dostepnosc = (ile: number | null, jednostka: string | null) =>
   ile != null && ile > 0 ? `dostępne dziś: ${ile} ${jednostka ?? "szt."}` : "dziś brak na stanie";
 
@@ -955,7 +975,8 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
     }
   }
 
-  /* Dane doboru wpisane przez AGENTA — nigdy wyciągnięte z treści (blizna szarpaka). */
+  /* Dane doboru: to, co agent sprawdził albo poprawił po automacie. Kandydaci
+     rosną wyłącznie z nich, nigdy z treści wiadomości (blizna szarpaka). */
   const dobor = doborRozmowy(conversationId);
   const d = dobor.dane;
   const pola = [
@@ -965,11 +986,7 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
     ["numer seryjny", d.nrSeryjny], ["silnik", zdanieSilnika(d.silnik)], ["numer OEM lub symbol", d.oem],
     ["szukana część", d.nazwaCzesci],
   ].filter((p): p is [string, string] => Boolean(p[1]));
-  const parametry = Object.entries(d.parametry).map(([k, v]) => `${k}: ${v}`);
-  if (pola.length || parametry.length) {
-    dodaj("dobor", `Dane doboru wpisane przez agenta: ${[...pola.map(([k, v]) => `${k} ${v}`), ...parametry].join("; ")}`);
-  }
-  if (dobor.brakuje) dodaj("dobor", `Agent zaznaczył, czego brakuje do doboru: ${dobor.brakuje}`);
+  if (pola.length) dodaj("dobor", `Dane doboru wpisane przez agenta: ${pola.map(([k, v]) => `${k} ${v}`).join("; ")}`);
 
   /* ── JEST / NIE MA NA LIŚCIE ZGODNOŚCI (23 września 2026) ───────────────────
      Decyzja właściciela. Lista z oferty szła do modelu surowa i przycięta do
@@ -983,19 +1000,34 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
     const zdanie = zdanieZgodnosci({ lista: trescOferty.zgodnosc, ...z }, d.wariant);
     if (zdanie) dodaj("oferta_zgodnosc", zdanie);
   }
+  /* Wynik doboru to odpowiedź, którą agent już wybrał. Zdanie przy części
+     pisze serwer doboru, ze źródłem — szkic go nie wzmacnia. */
   if (dobor.wybrany) {
     dodaj("dobor", `Część wybrana przez agenta: ${dobor.wybrany.zdanieDoSzkicu}`);
     /* Wybrany bywa z wyszukiwarki, poza listą kandydatów — nazwa z kartoteki. */
     const w = db().prepare("SELECT nazwa FROM sgt_towar WHERE tw_id=?").get(dobor.wybrany.twId) as { nazwa: string } | undefined;
     zapamietaj({ twId: dobor.wybrany.twId, symbol: dobor.wybrany.symbol, nazwa: w?.nazwa ?? dobor.wybrany.symbol });
   }
+  if (dobor.wynik === "brak") dodaj("dobor", "Agent ustalił: nie mamy tej części");
+  if (dobor.dopytac) dodaj("dobor", `Agent zaznaczył, czego brakuje do doboru: ${dobor.dopytac}`);
+  if (dobor.wynik === "nie_dotyczy") dodaj("dobor", "Agent uznał, że rozmowa nie jest pytaniem o dobór części");
 
   const kand = kandydaciDoboru(conversationId, subiekt);
-  for (const k of kand.kandydaci.slice(0, 6)) {
-    dodaj("kandydat", `Kandydat ${k.symbol} — ${k.nazwa}; pewność: ${k.pewnosc}; ${k.zrodlo};`
-      + ` ${dostepnosc(k.stan, null)}${k.ostrzezenia.length ? `; ostrzeżenia: ${k.ostrzezenia.join("; ")}` : ""}`);
-    if (k.twId !== null) zapamietaj({ twId: k.twId, symbol: k.symbol, nazwa: k.nazwa });
+  /* Reguła 7a promptu mówi modelowi, że pierwszy kandydat jest najmocniejszy.
+     Ekran układa kandydatów w grupy, a grupa „numer" niesie też kartotekę
+     oferty i zamienniki, słabsze od potwierdzonej wiedzy. Fakty idą więc
+     osobnym porządkiem: trafienie po identyfikatorze (blizna TC38), potem
+     pewność. Sortowanie jest stabilne, więc w remisie zostaje kolejność ekranu. */
+  const sila = (k: (typeof kand.kandydaci)[number]) =>
+    k.powod.includes(PO_IDENTYFIKATORZE) ? 0 : { potwierdzone: 1, prawdopodobne: 2, do_sprawdzenia: 3 }[k.pewnosc];
+  for (const k of [...kand.kandydaci].sort((a, b) => sila(a) - sila(b)).slice(0, 6)) {
+    dodaj("kandydat", `Kandydat ${k.symbol} — ${k.nazwa}; ${GRUPA_SLOWAMI[k.grupa]}; pewność: ${k.pewnosc}; ${k.powod}`
+      + `${k.takze.length ? `; także: ${k.takze.join("; ")}` : ""}; ${dostepnosc(k.stan, null)}`
+      + `${k.ostrzezenia.length ? `; ostrzeżenia: ${k.ostrzezenia.join("; ")}` : ""}`);
+    zapamietaj({ twId: k.twId, symbol: k.symbol, nazwa: k.nazwa });
   }
+  /* Numer bez kartoteki to materiał na uczciwe „nie mamy", nie kandydat. */
+  for (const b of kand.bezKartoteki) dodaj("kandydat", `Numer ${b.numer} z danych doboru: ${b.zdanie}`);
   for (const k of kand.kotwice) zapamietaj(k);
   for (const n of kand.negatywne) {
     dodaj("negatyw", `NIE PASUJE: ${n.symbol}${n.nazwa ? ` (${n.nazwa})` : ""} — ${n.powod}; ${n.zrodlo}`);
@@ -1067,7 +1099,9 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
   const wybranyPewny = dobor.wybrany
     && kand.kandydaci.some((k) => k.twId === dobor.wybrany!.twId && k.pewnosc === "potwierdzone");
   const oTowar = !rozpoznanie || KATEGORIE_Z_INTAKE.has(rozpoznanie.kategoria);
-  if (!wybranyPewny && oTowar) {
+  /* „Nie dotyczy" to słowo agenta, że to nie dobór: pytania o maszynę
+     odpowiadałyby na pytanie, którego klient nie zadał. */
+  if (!wybranyPewny && oTowar && dobor.wynik !== "nie_dotyczy") {
     const i = pytaniaIntake(d.nazwaCzesci);
     /* „TYLKO o to, czego jeszcze nie podał" stoi w FAKCIE, nie tylko w
        instrukcji (0.232.2): klientka podała komplet danych z tabliczki,
@@ -1352,25 +1386,22 @@ export async function ulozSzkic(
      w zakładce Dobór" — agent przepisywał klikiem to, co model już odczytał.
 
      PRZED ZAPISEM SZKICU, i to nie jest szczegół porządkowy. Wpis podnosi
-     `dobor_rozmowy.wersja`, a szkic pamięta wersję, na której powstał. Zapis
+     `dobor.wersja`, a szkic pamięta wersję, na której powstał. Zapis
      w odwrotnej kolejności dawałby szkic nieświeży w chwili narodzin: ekran
      mówiłby „dane doboru zmieniły się od szkicu — ułóż ponownie" o zmianie,
      którą sam ten szkic właśnie wprowadził.
 
-     TYLKO W PUSTE POLA, tą samą regułą co kliknięcie. Cofnięcie jest tam,
-     gdzie zawsze: agent poprawia pole w zakładce Dobór, a `updated_by`
-     mówi, że poprzednią wartość wpisała maszyna. */
+     TYLKO W PUSTE POLA i bez parametrów, których dobór nie przyjmuje.
+     Cofnięcie jest tam, gdzie zawsze: agent poprawia pole w zakładce Dobór,
+     a `zmienilAutomat` mówi, że poprzednią wartość wpisała maszyna. Wynik
+     zostaje nietknięty: automat nigdy nie wybiera części. */
   let wersjaDoboru = k.doborWersja;
   let wpisanePol = 0;
   if (propozycja.dane) {
     const { czesc, pol } = tylkoWPuste(propozycja.dane, doborRozmowy(conversationId).dane);
     if (pol > 0) {
       try {
-        /* BEZ STARTU PRZY ZNANYM TOWARZE (0.499.0): dane wchodzą, ale status
-           zostaje. Zwrot kupionego noża nie jest szukaniem innego — powód
-           przy `towarZnanyZZamowienia`. */
-        wersjaDoboru = zapiszDane(conversationId, czesc, wersjaDoboru, AUTOMAT_DANYCH, db(),
-          { bezStartu: towarZnanyZZamowienia(conversationId) }).wersja;
+        wersjaDoboru = zapiszDane(conversationId, czesc, wersjaDoboru, AUTOMAT_DANYCH).wersja;
         wpisanePol = pol;
       } catch {
         /* Wyścig z agentem piszącym ręcznie w tej samej chwili kończy się
@@ -1403,8 +1434,8 @@ export async function ulozSzkic(
         JSON.stringify(twierdzenia), JSON.stringify(pokwitowanie),
         JSON.stringify(odp.odczytZeZdjec), k.decyzjaId);
     /* Los propozycji danych ustawiamy OD RAZU, bo nie ma już czego klikać.
-       `dane_ocena_at` niesie czas, a KTO wpisał, mówi `dobor_rozmowy`:
-       `updated_by='automat (szkic)'` przy pustym `updated_user_id`. */
+       `dane_ocena_at` niesie czas, a KTO wpisał, mówi tabela `dobor`:
+       `zmienil='automat (szkic)'` przy pustym `zmienil_user_id`. */
     if (wpisanePol > 0) {
       db().prepare(`UPDATE szkic_copilota SET dane_ocena='wpisane', dane_ocena_at=?
         WHERE conversation_id=?`).run(teraz.toISOString(), conversationId);
@@ -1451,70 +1482,18 @@ export function ocenSzkic(
   return { ocena: ocena as OcenaSzkicu };
 }
 
-const liczbaPol = (d: DaneDoboru) =>
+const liczbaPol = (d: DaneZRozmowy) =>
   KLUCZE_DANYCH.filter((k) => d[k]).length + Object.keys(d.parametry).length;
 
 /**
- * TYLKO W PUSTE POLA — jedna reguła, dwa wołające.
- *
- * To, co agent wpisał sam, jest jego słowem i zostaje. Reguła stała przy
- * kliknięciu od przyrostu trzeciego; automatyczny wpis (0.341.0) nie ma prawa
- * być hojniejszy, bo nadpisanie pola wpisanego ręką byłoby jedyną rzeczą
- * w tym module, której agent nie mógłby cofnąć bez pamiętania, co tam było.
+ * TYLKO W PUSTE POLA. To, co agent wpisał sam, jest jego słowem i zostaje:
+ * nadpisanie pola wpisanego ręką byłoby jedyną rzeczą w tym module, której
+ * agent nie cofnąłby bez pamiętania, co tam było.
  */
-function tylkoWPuste(
-  propozycja: DaneDoboru, biezace: DaneDoboru,
-): { czesc: Partial<DaneDoboru>; pol: number } {
+function tylkoWPuste(propozycja: DaneZRozmowy, biezace: DaneDoboru): { czesc: Partial<DaneDoboru>; pol: number } {
   const czesc: Partial<DaneDoboru> = {};
-  let pol = 0;
-  for (const k of KLUCZE_DANYCH) {
-    if (propozycja[k] && !biezace[k]) { czesc[k] = propozycja[k]; pol += 1; }
-  }
-  const parametry = { ...biezace.parametry };
-  for (const [n, v] of Object.entries(propozycja.parametry)) {
-    if (!(n in parametry)) { parametry[n] = v; pol += 1; }
-  }
-  if (pol > 0) czesc.parametry = parametry;
-  return { czesc, pol };
-}
-
-/**
- * Agent kliknął „Wpisz do danych": propozycja wchodzi do `dobor_rozmowy`
- * WYŁĄCZNIE w puste pola — to, co agent wpisał sam, jest jego słowem i zostaje.
- * Zapis idzie przez `zapiszDane`, więc dostaje wszystko, co ręczny: wersję,
- * dziennik `dobor_dane`, przejście `not_started → searching`, zdarzenie dla
- * ekranów i 409 przy wyścigu (leci dalej, jak z ręki). Gdy nic nie było puste,
- * los jest „wpisane" bez zapisu doboru — agent to już miał.
- */
-export function przyjmijDaneDoboru(
-  conversationId: number, expectedVersion: number, kto: { id: number; name: string }, teraz = new Date(),
-): SzkicCopilota {
-  const s = szkicCopilota(conversationId);
-  if (!s || !s.daneDoboru) throw new Error("Ta rozmowa nie ma propozycji danych doboru");
-  if (s.daneOcena !== null) throw new Error("Propozycja danych została już oceniona");
-  const { czesc, pol } = tylkoWPuste(s.daneDoboru, doborRozmowy(conversationId).dane);
-  if (pol > 0) zapiszDane(conversationId, czesc, expectedVersion, kto.id);
-  transaction(db(), () => {
-    db().prepare("UPDATE szkic_copilota SET dane_ocena='wpisane', dane_ocena_at=? WHERE conversation_id=?")
-      .run(teraz.toISOString(), conversationId);
-    /* Liczby, nie wartości (§19) — wartości są w `dobor_dane` z ręcznego zapisu. */
-    logEvent("copilot_dane_doboru", kto.name, null, { conversationId, ocena: "wpisane", pol }, kto.id, db());
-  })();
-  return szkicCopilota(conversationId)!;
-}
-
-/** Agent odesłał propozycję danych. Wiersz zostaje dla pomiaru. */
-export function odrzucDaneDoboru(
-  conversationId: number, kto: { id: number; name: string }, teraz = new Date(),
-): SzkicCopilota {
-  const s = szkicCopilota(conversationId);
-  if (!s || !s.daneDoboru) throw new Error("Ta rozmowa nie ma propozycji danych doboru");
-  transaction(db(), () => {
-    db().prepare("UPDATE szkic_copilota SET dane_ocena='odrzucone', dane_ocena_at=? WHERE conversation_id=?")
-      .run(teraz.toISOString(), conversationId);
-    logEvent("copilot_dane_doboru", kto.name, null, { conversationId, ocena: "odrzucone" }, kto.id, db());
-  })();
-  return szkicCopilota(conversationId)!;
+  for (const k of KLUCZE_DANYCH) if (propozycja[k] && !biezace[k]) czesc[k] = propozycja[k];
+  return { czesc, pol: Object.keys(czesc).length };
 }
 
 /**
@@ -1585,7 +1564,7 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
     messageId: w.message_id == null ? null : Number(w.message_id),
     model: String(w.model), at: String(w.at), przez: String(w.przez),
     ocena: w.ocena == null ? null : String(w.ocena) as OcenaSzkicu,
-    daneDoboru: w.dane_doboru == null ? null : JSON.parse(String(w.dane_doboru)) as DaneDoboru,
+    daneDoboru: w.dane_doboru == null ? null : JSON.parse(String(w.dane_doboru)) as DaneZRozmowy,
     daneOcena: w.dane_ocena == null ? null : String(w.dane_ocena) as OcenaDanych,
     doborWersja: Number(w.dobor_wersja ?? 0),
     pasowanie: w.pasowanie_propozycja == null

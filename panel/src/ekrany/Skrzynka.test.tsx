@@ -31,7 +31,7 @@ const wiersz = (id: number, n: Record<string, unknown> = {}) => ({
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "waiting_for_us", priorytet: "normalny", reklamacyjna: false,
   czekaOdMs: (10 - id) * 60_000, nowychOdOdpowiedzi: 1, zadanieWToku: false,
-  dobor: "not_started", odlozoneDo: null, poTerminie: false, podziekowal: false,
+  dobor: "pusty", odlozoneDo: null, poTerminie: false, podziekowal: false,
   zakonczenie: null, kopilot: null, oglada: null, ...n,
 });
 
@@ -42,15 +42,15 @@ const szczegoly = (id: number, n: Record<string, unknown> = {}) => ({
     ofertaId: null, nazwaOferty: null, zamowienieId: null }],
   szkic: null, ofertaWskazana: null, zamowienie: null, oferta: null,
   kandydaciZamowien: [], zwroty: [], sprawy: [], droga: [],
-  dobor: { status: "not_started", wersja: 1, dane: {}, brakuje: null, wybrany: null,
-    updatedBy: null, updatedAt: null },
+  dobor: { stan: "pusty", wynik: null, wersja: 1, dane: {}, wybrany: null, dopytac: null,
+    zmienil: null, zmienilAutomat: false, zmienionoAt: null },
   szkicCopilota: null, ...n,
 });
 
 const SZKIC = (id: number) => ({
   tresc: `Dzień dobry, odpowiedź ${id}.`, zastrzezenia: [], uzyteFakty: [], messageId: id * 10,
   model: "m", at: "2026-09-26T08:01:00.000Z", przez: "Copilot", ocena: null,
-  daneDoboru: null, daneOcena: null, doborWersja: 1, pasowanie: null, pasowanieOcena: null,
+  doborWersja: 1, pasowanie: null, pasowanieOcena: null,
   twierdzenia: [], odczytZeZdjec: [],
   lukiKartoteki: { symbol: null, numery: [], modele: [], wpisane: [], czeka: 0 },
 });

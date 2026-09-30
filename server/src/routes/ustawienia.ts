@@ -4,7 +4,7 @@ import { db } from "../db/db.js";
 import { pokrycieSygnatur } from "../services/sygnatury.js";
 import { coAutomatDopisal } from "../services/wiedza-automat.js";
 import { pokrycieWiedzy } from "../services/identyfikatory.js";
-import { skutecznoscDoboru } from "../services/skutecznosc-doboru.js";
+import { miaryDoboru } from "../services/miary-doboru.js";
 import { eskalacje } from "../services/droga-klienta.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
@@ -14,9 +14,7 @@ import { ROLE_BIUROWE } from "../services/users.js";
    razem ze zdaniem w uzasadnieniu, dlaczego musi.
 
    Bramka roli jak przy skrzynce i zwrotach: pokrycie sygnatur mówi o
-   kartotekach i zamówieniach, czyli o danych biura. Od 0.267.0 stoi tu także
-   raport z osią osobową, więc bramka przestała być wyłącznie kwestią tego,
-   komu te liczby są potrzebne.                                              */
+   kartotekach i zamówieniach, czyli o danych biura.                        */
 
 const BIURO = ROLE_BIUROWE;
 
@@ -41,17 +39,12 @@ export async function ustawieniaRoutes(app: FastifyInstance) {
   app.get("/api/obsluga/pokrycie-wiedzy", async (_req, reply) =>
     odmowa(reply) ?? pokrycieWiedzy(db()));
 
-  /* Skuteczność doboru (0.267.0): którym z jedenastu szczebli §11.2 przyszedł
-     kandydat, którego agent naprawdę wybrał. Liczone z księgi zdarzeń, nie
-     z `dobor_rozmowy` — tamta pamięta ostatni wybór, a pytanie brzmi „która
-     droga dała trafienie". Uzasadnienie w nagłówku serwisu.
-
-     Ta trasa niesie OŚ OSOBOWĄ, więc jest tu jedyną, przy której bramka roli
-     znaczy więcej niż wygodę: raport per osoba to monitoring pracowniczy.
-     Zdanie o podstawie prawnej jedzie w ładunku, żeby panel nie mógł go
-     zgubić po drodze. */
-  app.get<{ Querystring: { dni?: string } }>("/api/obsluga/skutecznosc-doboru", async (req, reply) =>
-    odmowa(reply) ?? skutecznoscDoboru(dniZQuery(req.query.dni), db()));
+  /* Miary doboru: ostatni wynik każdej rozmowy z oknem, podstawy wyboru
+     przy „ta część" i ile doborów leży dziś otwartych. Bez osi osobowej:
+     pytanie brzmi, które grupy kandydatów dają odpowiedź, nie kto ją dał.
+     Uzasadnienie źródła liczb w nagłówku serwisu. */
+  app.get<{ Querystring: { dni?: string } }>("/api/obsluga/miary-doboru", async (req, reply) =>
+    odmowa(reply) ?? miaryDoboru(dniZQuery(req.query.dni), db()));
 
   /* MIARA ESKALACJI (S5 spoiwa, `docs/obsluga-klienta-calosc.md`): po ilu
      rozmowach klient szedł dalej — w dyskusję albo w reklamację. Kolejka pusta
@@ -60,8 +53,7 @@ export async function ustawieniaRoutes(app: FastifyInstance) {
 
      BEZ OSI OSOBOWEJ, celowo. Ta liczba mówi o naszych odpowiedziach jako
      całości; rozbita na ludzi stałaby się oceną pracownika liczoną z decyzji
-     klienta, na którą pracownik ma wpływ częściowy. Skuteczność doboru wyżej
-     ma oś osobową, bo tam mierzymy wybór agenta, a nie cudzy ruch. */
+     klienta, na którą pracownik ma wpływ częściowy. */
   app.get("/api/obsluga/eskalacja", async (_req, reply) =>
     odmowa(reply) ?? { miesiace: eskalacje(db()) });
 

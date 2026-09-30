@@ -40,7 +40,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["szkic_copilota", "copilot_wywolanie", "dobor_rozmowy", "conversation_event",
+  for (const t of ["szkic_copilota", "copilot_wywolanie", "dobor", "conversation_event",
     "message", "conversation", "channel_account", "events", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
   konto = Number(d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
     .run().lastInsertRowid);

@@ -320,15 +320,16 @@ function zbierz(
      WHERE channel_account_id = ? AND kupujacy_login = ? COLLATE NOCASE
      ORDER BY otwarto_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
 
-  /* Maszyny: dobory domknięte w rozmowach tego klienta. `marka` I `model`
-     muszą stać oba — sama marka nie nazywa maszyny. */
+  /* Maszyny: dobory, w których agent wybrał część — wybór jest ustaleniem
+     maszyny, samo wpisanie danych nie. `marka` I `model` muszą stać oba:
+     sama marka nie nazywa maszyny. */
   const idRozmow = rozmowyKlienta.map((r) => Number(r.id));
   const dobory = idRozmow.length === 0 ? [] : database.prepare(`
-    SELECT conversation_id, marka, model, wariant, rocznik, silnik, updated_at
-      FROM dobor_rozmowy
-     WHERE status = 'confirmed' AND marka IS NOT NULL AND model IS NOT NULL
+    SELECT conversation_id, marka, model, wariant, rocznik, silnik, zmieniono_at AS updated_at
+      FROM dobor
+     WHERE wynik = 'czesc' AND marka IS NOT NULL AND model IS NOT NULL
        AND conversation_id IN (${idRozmow.map(() => "?").join(",")})
-     ORDER BY updated_at`).all(...idRozmow) as Array<Record<string, unknown>>;
+     ORDER BY zmieniono_at`).all(...idRozmow) as Array<Record<string, unknown>>;
 
   const maszyny = new Map<string, MaszynaKlienta>();
   for (const d of dobory) {
@@ -337,7 +338,7 @@ function zbierz(
       rocznik: tekst(d.rocznik), silnik: tekst(d.silnik),
       rozmowaId: Number(d.conversation_id), at: String(d.updated_at),
     };
-    // `ORDER BY updated_at` wyżej + `has` tutaj = zostaje pierwsze ustalenie.
+    // `ORDER BY zmieniono_at` wyżej + `has` tutaj = zostaje pierwsze ustalenie.
     if (!maszyny.has(kluczMaszyny(m))) maszyny.set(kluczMaszyny(m), m);
   }
 

@@ -300,9 +300,8 @@ z nim dwie różne sprawy. Odhaczone zostają na liście jako dowód.
 **Rozmowa:** `new`, `open`, `waiting_for_customer`, `waiting_for_us`,
 `waiting_for_internal`, `snoozed`, `resolved`, `closed`, `spam`.
 
-**Dobór:** `not_started`, `extracting_data`, `missing_information`, `searching`,
-`candidates_found`, `requires_expert`, `confirmed`, `rejected`,
-`not_applicable`.
+**Dobór:** wynik `czesc`, `brak`, `dopytac`, `nie_dotyczy` albo brak wyniku.
+Stan dla kolejki jest wyliczany (`docs/dobor-od-zera.md`, §4.2).
 
 **Szkic:** `none`, `draft`, `needs_review`, `ready`, `sending`, `sent`,
 `send_uncertain`, `send_failed`.
@@ -464,6 +463,10 @@ na inną niż `OTHER` zdejmuje regułę od razu. Liczą to `klientPodziekowal`
 i `statusZKierunku`, jedną regułą dla kolejki i otwartej rozmowy.
 
 ### 7.2. Statusy doboru w kodzie (etap E1)
+
+> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
+> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
+> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
 
 Lista doboru stoi, jak lista rozmowy, w trzech miejscach: `STATUSY_DOBORU`
 w `services/dobor.ts`, `CHECK` na kolumnie `dobor_rozmowy.status` i typ
@@ -701,7 +704,7 @@ Właściciel wybrał z kanwy trzy zmiany naraz („E + A + D"):
   odsłania go jednym kliknięciem. Dobór uruchomiony przez człowieka bramka
   zostawia na wierzchu.
 - **Bez „Szukamy" przy znanym towarze (0.499.0).** Tę samą regułę stosuje
-  serwer (`services/towar-znany.ts`). Automat szkicu dalej wpisuje dane
+  serwer (plik `towar-znany.ts`, usunięty razem ze starym doborem). Automat szkicu dalej wpisuje dane
   doboru, ale przy znanym towarze nie podnosi statusu do `searching`. Nagłówek
   i plakietka kolejki nie mówią więc „Szukamy" przy zwrocie kupionego noża.
   Rozmowy oznaczone tak przed tym wydaniem porządkuje start serwera. Cofa
@@ -755,8 +758,8 @@ tam, gdzie agent pisze, a nie tylko w tym dokumencie.
 
 Klientowi odmawialiśmy zdaniem „nie ma bytu". Było prawdziwe o TABELI i
 fałszywe o danych: login kupującego wiąże jego zamówienia (`zamowienie_klienta`),
-jego rozmowy (`allegro_inbox_thread.interlocutor_login`) i maszyny z domkniętych
-doborów (`dobor_rozmowy`). Zakładka jest czystym odczytem i NIE ZAKŁADA ANI
+jego rozmowy (`allegro_inbox_thread.interlocutor_login`) i maszyny z doborów
+z wybraną częścią (tabela `dobor`, wynik `czesc`). Zakładka jest czystym odczytem i NIE ZAKŁADA ANI
 JEDNEJ NOWEJ TABELI — osobny rejestr maszyn trzeba by utrzymywać przy każdej
 poprawce doboru, czyli ten sam kształt, który w 0.128.0 kosztował cztery tabele
 nakładki spraw.
@@ -802,9 +805,9 @@ klienta i znak oczekującego zadania.** Jednej pozycji z listy wyżej dalej nie
 ma i to jest decyzja, nie przeoczenie. TERMIN odpowiedzi czeka na
 rozstrzygnięcie z §26 — bez niego byłby zmyślony.
 
-**Status doboru doszedł w etapie E1.** Wiersz milczy przy `not_started`
-i `not_applicable`: plakietka „nierozpoczęty" na każdym wierszu nie mówiłaby
-niczego, a „nie dotyczy" to wiersz, przy którym doboru nie trzeba robić.
+**Stan doboru na wierszu.** Wiersz milczy przy stanie `pusty` i `nie_dotyczy`:
+plakietka „nie zaczęty" na każdym wierszu nie mówiłaby niczego, a „nie
+dotyczy" to wiersz, przy którym doboru nie trzeba robić (`docs/dobor-od-zera.md`).
 
 **Licznik mówi to, co mierzy.** To liczba wiadomości klienta od NASZEJ
 ostatniej odpowiedzi, nie „nieprzeczytane przez agenta". Tamtego policzyć się
@@ -1553,6 +1556,10 @@ rozmowy ją zastępuje, kontekst jako panel albo zakładka, szkic nie ginie przy
 powrocie. Gdyby decyzja wróciła, to jest punkt wyjścia.
 
 ## 11. Dobór części
+
+> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
+> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
+> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
 
 ### 11.1. Dane wejściowe
 
@@ -2558,10 +2565,10 @@ zmiana: „wiedza z ofert powinna wskakiwać bez potwierdzania przez agenta"
 oraz „dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".
 
 **Dane wejściowe wchodzą do doboru same.** Marka, model, silnik i nazwa części
-rozpoznane w rozmowie trafiają do `dobor_rozmowy` w tym samym przebiegu, który
+rozpoznane w rozmowie trafiają do tabeli `dobor` w tym samym przebiegu, który
 układa szkic. Wchodzą **tylko w puste pola** — to, co agent wpisał sam, jest
-jego słowem i zostaje. Wpis idzie tą samą drogą co ręczny, więc dostaje wersję,
-dziennik i przejście `not_started → searching`.
+jego słowem i zostaje. Wpis idzie tą samą drogą co ręczny, więc dostaje wersję
+i dziennik. Wyniku nie rusza: ustawia go wyłącznie człowiek.
 
 Kolejność jest tu treścią, nie porządkiem: wpis stoi PRZED zapisem szkicu, bo
 podnosi wersję doboru. Odwrotnie dałby szkic nieświeży w chwili narodzin, a
@@ -2589,9 +2596,8 @@ myśleć, że nic się nie dzieje. Pasek mówi teraz osobno, co weszło do wiedz
 a co czeka bez rozpoznanej marki.
 
 **Wpis maszyny jest odróżnialny** wszędzie tam, gdzie powstaje:
-`dobor_rozmowy.updated_by='automat (szkic)'` i `zastosowanie.rozstrzygnal=
-'automat (oferta)'`, oba przy pustym koncie. Od 0.499.0 automat przy towarze znanym
-z zamówienia wpisuje dane, ale statusu doboru nie podnosi. Agent poprawia takie pole tam,
+`dobor.zmienil='automat (szkic)'` i `zastosowanie.rozstrzygnal=
+'automat (oferta)'`, oba przy pustym koncie. Agent poprawia takie pole tam,
 gdzie ono stoi — w zakładce Dobór albo w Wiedzy.
 
 **Dopytanie Copilota (0.332.0).** Właściciel: „dodaj możliwość kontynuowania
@@ -2854,6 +2860,10 @@ jest domyślnie wyłączony, bo wydaje pieniądze bez kliknięcia.
 
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
+> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
+> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
+> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
+
 Pytanie właściciela z 8 września 2026, nad szkicem o śrubę noża do kosiarki
 Faworyt GTV51N196L-4W1 z silnikiem „Lonci v200": „dlaczego dane wejściowe nie
 zostały wprowadzone automatycznie ze szkicu?". Model czytał te dane i odsyłał
@@ -2938,10 +2948,10 @@ Tabele docelowe, nazwami z kodu:
 channel_account          conversation            message
 conversation_event       conversation_comment     conversation_mention    offer_snapshot           customer                customer_machine
 order_snapshot           product_link
-dobor_rozmowy            model_urzadzenia        zastosowanie
+dobor                    model_urzadzenia        zastosowanie
 dowod_zastosowania       towar_identyfikator     model_z_opisu
 zabudowa_silnika         pasowanie_czesci        alias_silnika
-token_silnika            token_silnika_kartoteka wymiar_kartoteki
+token_silnika            token_silnika_kartoteka
 towar_fts                knowledge_document      zadanie_terenowe
 zadanie_zalacznik        allegro_inbox_thread    allegro_inbox_message
 allegro_inbox_sync_state outbox                  events
@@ -3090,6 +3100,10 @@ danych.
 **Treść wiadomości nie trafia do ogólnego dziennika zdarzeń.**
 
 ### 19a. Skuteczność doboru — raport za zębatką (0.267.0)
+
+> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
+> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
+> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
 
 `dobor_rozmowy.wybrany_droga` zapisuje, którym z jedenastu szczebli §11.2
 przyszedł kandydat wybrany przez agenta. Kolumna stała w bazie od 0.229.0
@@ -6531,9 +6545,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Autoodpowiedź nie liczy się jako nasz ruch | **działa** od 0.227.0 | `message.auto_odpowiedz`, liczone przy zapisie w `zapiszWiadomosc` |
 | Pasek o nowej wiadomości tylko przy kliencie | **działa** od 0.228.0 | kierunek w zdarzeniu `message.created` |
 | Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
-| Statusy doboru (§7) | **działa** od E1 | `dobor_rozmowy.status`, `services/dobor.ts`, zakładka „Dobór" |
-| Kandydaci doboru (§11.2) | **działa** od E3 | `services/kandydaci.ts`: symbol, EAN, OEM, zastosowanie, silnik (0.229.0), pasowanie (0.230.0), oferta, zamiennik, zgodne wymiary (0.241.0), pełny tekst; numer OEM spoza opisów to kandydat bez kartoteki |
-| Wymiary z kartotek (§11.2) | **działa** od 0.241.0 | `wymiar_kartoteki`, `services/wymiary.ts`: parser nazw i opisów po imporcie, szczebel „zgodne wymiary" z parametrów doboru, wiersz w pokryciu wiedzy |
+| Wynik doboru (§7) | **działa** od @wydanie | tabela `dobor`, `services/dobor.ts`: cztery wyniki ustawiane przez człowieka, stan wyliczany (`docs/dobor-od-zera.md`) |
+| Kandydaci doboru (§11.2) | **działa** od @wydanie | `services/kandydaci.ts`: trzy grupy — wskazane przez klienta, z bazy wiedzy, podobne po nazwie; numer spoza kartoteki to wiersz bez wyboru |
+| Wymiary z kartotek (§11.2) | **usunięte** w @wydanie | droga „zgodne wymiary" wyszła z doborem; tabela `wymiar_kartoteki` zostaje w starych bazach bez zapisu |
 | Identyfikatory z opisów (OEM, nr oryg., stare SKU, zamienniki) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts`; sekcje `Zamiennik:` od 0.234.0 |
 | Sekcje „Modele:" z opisów do przerobienia | **działa** od 0.186.0 | `model_z_opisu`, ekran Wiedza → „Z opisów"; automat nie proponuje z opisu |
 | Pełny tekst kartotek (FTS5, bm25) | **działa** od 0.186.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
@@ -6552,7 +6566,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Tokeny silników w nazwach kartotek (§12) | **działa** od 0.239.0 | `token_silnika`, `token_silnika_kartoteka`, `services/tokeny-silnikow.ts`, sekcja „Tokeny silników w nazwach kartotek" na ekranie Z opisów, hak po imporcie |
 | Pasowanie części (§12) | **działa** od 0.230.0 | `pasowanie_czesci`, `services/pasowania.ts`; przycisk „Pasuje do…" w Doborze, sekcja w kolejce Wiedza, blok przy kartotece w rozmowie |
 | Ekran Wiedza — kolejka propozycji | **działa** od E2 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
-| Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: dowody wybranej kartoteki, sekcja negatywów, pomiary do wiedzy |
+| Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: sekcja „Nie pasuje"; dowody i pomiary w wierszu „Wiedza" (`skrzynka/Wiedza.tsx`) |
 | Copilot — klasyfikacja wiadomości (§14.5) | **zastąpiona** 22 września 2026 | słownik ośmiu etykiet i kciuki; zastąpiła je decyzja z §14.5a |
 | Klasyfikacja w kształcie specyfikacji (§14.5a) | **działa** od 22 września 2026 | `services/copilot-klasyfikacja.ts`, `klasyfikacja-slownik.ts`, `klasyfikacja-polityka.ts`, tabela `decyzja_klasyfikacji`, `skrzynka/Copilot.tsx` (`EtykietaKategorii`) |
 | Takt klasyfikacji każdej nowej wiadomości (§14.5a) | **działa** od 22 września 2026, wyłączony domyślnie | `services/klasyfikacja-auto.ts`, `COPILOT_AUTO_KLASYFIKACJA` |
@@ -6563,8 +6577,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa** od 22 września 2026, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
 | Wiedza z ofert w doborze (§11.2) | **działa** od 0.264.0 | `services/wiedza-z-oferty.ts`: numery z parametrów i opisu oferty wprost do `towar_identyfikator` (`zrodlo='oferta'`), pozycje listy zgodności do kolejki Wiedzy z marką; zapis przed wywołaniem modelu, bramka na pewności kartoteki, porcja 20 na kliknięcie, wąska trasa cofnięcia |
-| Copilot — propozycja pasowania z rozmowy (§14.8) | **działa** od 0.240.0 | `pasowanie` w odpowiedzi szkicu, kolumny `pasowanie_propozycja`/`pasowanie_ocena` w `szkic_copilota`, karta „Copilot rozpoznał pasowanie" w `skrzynka/Dobor.tsx`, pastylka „z Copilota" w kolejce; proponuje agent, rozstrzyga biuro |
-| Copilot — dane doboru z rozmowy (§14.7) | **działa** od przyrostu trzeciego | `daneDoboru` w odpowiedzi szkicu, kolumny `dane_doboru`/`dane_ocena` w `szkic_copilota`, karta „Copilot rozpoznał w rozmowie" w `skrzynka/Dobor.tsx`; wpisuje agent, tylko w puste pola |
+| Copilot — propozycja pasowania z rozmowy (§14.8) | **działa** od 0.240.0 | `pasowanie` w odpowiedzi szkicu, kolumny `pasowanie_propozycja`/`pasowanie_ocena` w `szkic_copilota`, karta „Copilot rozpoznał pasowanie" w wierszu „Wiedza" (`skrzynka/Wiedza.tsx`); proponuje agent, rozstrzyga biuro |
+| Copilot — dane doboru z rozmowy (§14.7) | **działa** od przyrostu trzeciego | `daneDoboru` w odpowiedzi szkicu; automat wpisuje je sam w puste pola doboru, bez karty do kliknięcia |
 | Copilot — OCR, kandydaci, porównanie (§14.1) | **projekt** | etap F, przyrosty dalsze |
 | Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |
 | Testy frontu (Vitest, Playwright) | **działa** od 0.146.0 | `panel/src/**/*.test.tsx`, `panel/e2e/` |
@@ -6582,7 +6596,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wiedza z ofert bez kolejki (§11.3) | **działa** od 0.341.0 | `wiedza-z-oferty.ts`: klucz składany przy zbieraniu z trzech źródeł deterministycznych, podpis `automat (oferta)`; bez rozpoznanej marki wiersz zostaje w kolejce |
 | Dopytanie Copilota (§14.6) | **działa** od 0.332.0 | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; odpowiedź dla agenta, bez przycisku wstawiania, sufit dopytań na rozmowę |
 | Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
-| Skuteczność doboru w ustawieniach | **działa** od 0.267.0 | `GET /api/obsluga/skutecznosc-doboru`, `services/skutecznosc-doboru.ts`, `ustawienia/SkutecznoscDoboru.tsx`: rozkład jedenastu dróg liczony z księgi zdarzeń, mediana czasu do wyboru, oś osobowa z progiem i podstawą prawną |
+| Miary doboru w analizie | **działa** od @wydanie | `GET /api/obsluga/miary-doboru`, `services/miary-doboru.ts`, `analiza/MiaryDoboru.tsx`: ostatni wynik każdej rozmowy i podstawa wybranej części z księgi zdarzeń |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
 | Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |

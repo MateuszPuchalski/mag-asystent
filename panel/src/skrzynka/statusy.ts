@@ -1,6 +1,6 @@
 import type {
-  Akcja, DrogaDoboru, Kategoria, Pewnosc, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora, StatusDoboru,
-  StatusRozmowy, ZrodloPropozycji, RolaPasowania, ZrodloZakonczenia } from "../api/typy";
+  Akcja, GrupaKandydata, Kategoria, Pewnosc, PodstawaWyboru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora,
+  StanDoboru, StatusRozmowy, ZrodloPropozycji, RolaPasowania, ZrodloZakonczenia } from "../api/typy";
 
 /* Nazwy statusów PO POLSKU w jednym miejscu. Lista jest zamknięta i pochodzi
    z §7 — `Record<StatusRozmowy, string>` sprawia, że dołożenie statusu
@@ -34,29 +34,46 @@ export const ZRODLO_ZAKONCZENIA: Record<ZrodloZakonczenia, string> = {
   allegro: "wątek zamknięty w Allegro",
 };
 
-/* Statusy DOBORU (§7, etap E1) — ta sama zasada: polszczyzna na ekran, klucze
-   w bazie i w API. `Record` nie skompiluje się bez nazwy dla nowego statusu. */
-export const NAZWA_DOBORU: Record<StatusDoboru, string> = {
-  not_started: "Nierozpoczęty",
-  extracting_data: "Copilot czyta dane",
-  missing_information: "Brakuje danych",
-  searching: "Szukamy",
-  candidates_found: "Są kandydaci",
-  requires_expert: "Do sprawdzenia",
-  confirmed: "Dobór zatwierdzony",
-  rejected: "Odrzucony",
-  not_applicable: "Nie dotyczy",
+/* Stany DOBORU (`docs/dobor-od-zera.md` §4.2). `Record` nie skompiluje się
+   bez nazwy dla nowego stanu. Nazwa mówi ODPOWIEDŹ dla klienta, bo po nią
+   agent otwiera dobór, a nie etap roboty. */
+export const NAZWA_STANU_DOBORU: Record<StanDoboru, string> = {
+  pusty: "Nie zaczęty",
+  otwarty: "Otwarty",
+  czesc: "Wybrano część",
+  brak: "Nie mamy",
+  dopytac: "Dopytać klienta",
+  nie_dotyczy: "Nie dotyczy",
 };
 
-/* Do wyboru RĘCZNIE: bez `extracting_data`, bo tego stanu człowiek nie nadaje
-   uczciwie — on dane wpisuje, nie wyciąga; nada go Copilot (etap F). */
-export const DO_WYBORU_DOBORU: StatusDoboru[] = [
-  "not_started", "missing_information", "searching", "candidates_found",
-  "requires_expert", "confirmed", "rejected", "not_applicable",
-];
+/* Barwa znaku doboru w kolejce. Zieleń to gotowa odpowiedź, czerwień czeka
+   na klienta, bursztyn jest robotą w toku, szarość mówi „nie mamy".
+   `null` = stan bez znaku, bo nie ma w nim nic do zrobienia. */
+export const BARWA_STANU_DOBORU: Record<StanDoboru, string | null> = {
+  pusty: null,
+  otwarty: "text-amber-700",
+  czesc: "text-emerald-700",
+  brak: "text-slate-600",
+  dopytac: "text-ranga-zle",
+  nie_dotyczy: null,
+};
+
+/* Grupy kandydatów (§4.3) — trzy pytania, nie jedenaście dróg: co klient
+   wskazał, co wiedza potwierdza, co jest podobne. Te same nazwy czyta raport
+   miar, bo podstawa wyboru to grupa, z której przyszła część. */
+export const NAZWA_GRUPY: Record<GrupaKandydata, string> = {
+  numer: "Wskazane przez klienta",
+  wiedza: "Z bazy wiedzy",
+  podobne: "Podobne po nazwie",
+};
+
+export const NAZWA_PODSTAWY: Record<PodstawaWyboru, string> = {
+  ...NAZWA_GRUPY,
+  reczny: "Wskazane z wyszukiwarki",
+};
 
 /* KATEGORIE klasyfikatora (specyfikacja z 20 września 2026). Ta sama zasada,
-   co przy `NAZWA_DOBORU`: `Record<Kategoria, string>` NIE SKOMPILUJE SIĘ, gdy
+   co przy `NAZWA_STANU_DOBORU`: `Record<Kategoria, string>` NIE SKOMPILUJE SIĘ, gdy
    dojdzie szesnasta kategoria bez nazwy dla człowieka. Nazwy są krótkie, bo
    stoją na plakietce wiersza kolejki, a wiersz ma pokazywać pytanie klienta.
 
@@ -153,18 +170,8 @@ export const DOWODY_DO_WYBORU: RodzajDowodu[] = [
 ];
 
 /* Skąd propozycja (E2/E3). Surowy klucz `opis` na ekranie mówił tyle, co nic. */
-/* Etykiety jedenastu dróg §11.2. Stały do 0.266.0 lokalnie w `Dobor.tsx`,
-   a od 0.267.0 czyta je także karta skuteczności doboru w ustawieniach.
-   Druga kopia rozjechałaby się przy pierwszej nowej drodze — a wtedy ekran
-   pracy i raport o tej pracy nazywałyby tę samą rzecz inaczej. */
-export const NAZWA_DROGI: Record<DrogaDoboru, string> = {
-  symbol: "symbol", ean: "EAN", oem: "OEM", zastosowanie: "zastosowanie", silnik: "przez silnik",
-  pasowanie: "pasuje do części", zamiennik: "zamiennik", oferta: "oferta", pelnotekst: "pełny tekst",
-  wyszukiwarka: "wyszukiwarka", wymiar: "zgodne wymiary",
-};
-
 export const NAZWA_ZRODLA: Record<ZrodloPropozycji, string> = {
-  dobor: "z zatwierdzonego doboru",
+  dobor: "z doboru w rozmowie",
   pomiar: "z pomiaru hali",
   reczne: "wpis ręczny",
   opis: "z opisu kartoteki",

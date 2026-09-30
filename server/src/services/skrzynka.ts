@@ -16,7 +16,7 @@ import { drogaZakupu, sprawyZakupu, type PrzystanekDrogi, type SprawaZakupu }
 import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
-import { doborRozmowy, type Dobor, type StatusDoboru } from "./dobor.js";
+import { doborRozmowy, stanDoboruSql, type Dobor, type StanDoboru } from "./dobor.js";
 import { zgodnoscOferty, type ZgodnoscOferty } from "./zgodnosc-oferty.js";
 import { szkicCopilota, type SzkicCopilota } from "./copilot-szkic.js";
 import { AKTYWNA_DECYZJA, CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
@@ -72,10 +72,9 @@ export interface RozmowaSkrzynki {
   nowychOdOdpowiedzi: number;
   /** Czy przy rozmowie stoi niezamknięte zadanie terenowe (§10.2). */
   zadanieWToku: boolean;
-  /* Status doboru (§7, §10.2, etap E1). Brak wiersza `dobor_rozmowy` to
-     `not_started` — liczone tu, w SQL, żeby lista nie robiła zapytania na
-     wiersz i żeby otwarcie ekranu niczego nie wstawiało. */
-  dobor: StatusDoboru;
+  /* Stan doboru, WYLICZANY w SQL z tabeli `dobor`: lista nie robi zapytania
+     na wiersz, a brak wiersza to `pusty` bez niczego wstawionego. */
+  dobor: StanDoboru;
   odlozoneDo: string | null;
   /* Odłożenie, którego termin minął. Liczy to SERWER, bo reguła „minął termin"
      ma jedno źródło; panel dwa razy tej samej reguły nie wyprowadza (blizna
@@ -348,7 +347,7 @@ const LISTA = `
          ) AS nowych,
          EXISTS(SELECT 1 FROM zadanie_terenowe z
                  WHERE z.conversation_id=c.id AND z.status IN ('nowe','w_toku')) AS zadanie,
-         COALESCE(d.status, 'not_started') AS dobor,
+         ${stanDoboruSql("d")} AS dobor,
          kop.kategoria AS kopKategoria, kop.pewnosc AS kopPewnosc,
          kop.kategorie_dodatkowe AS kopDodatkowe, kop.akcja AS kopAkcja,
          kop.akcja_modelu AS kopAkcjaModelu, kop.wymaga_czlowieka AS kopWymaga,
@@ -369,7 +368,7 @@ const LISTA = `
                   AND n.direction='outgoing' AND n.auto_odpowiedz=0) AS naszaOdpowiedz
     FROM conversation c
     LEFT JOIN app_user u ON u.user_id=c.assigned_user_id
-    LEFT JOIN dobor_rozmowy d ON d.conversation_id=c.id
+    LEFT JOIN dobor d ON d.conversation_id=c.id
     LEFT JOIN decyzja_klasyfikacji kop ON kop.id = ${AKTYWNA_DECYZJA}
     LEFT JOIN message o ON o.id = (
       SELECT m.id FROM message m WHERE m.conversation_id=c.id
@@ -419,7 +418,7 @@ const naRozmowe = (
     czekaOdMs: w.pytanieAt == null ? null : Math.max(0, teraz - Date.parse(String(w.pytanieAt))),
     nowychOdOdpowiedzi: Number(w.nowych ?? 0),
     zadanieWToku: Boolean(Number(w.zadanie ?? 0)),
-    dobor: String(w.dobor ?? "not_started") as StatusDoboru,
+    dobor: String(w.dobor ?? "pusty") as StanDoboru,
     odlozoneDo,
     poTerminie: String(w.status) === "snoozed" && minal,
     /* Znacznik tylko tam, gdzie reguła naprawdę zmieniła stan: przy
@@ -960,29 +959,34 @@ export function osRozmowy(id: number): {
     });
   }
 
-  /* DOBÓR NA OSI (etap E1): zmiana statusu, wybór i zdjęcie wyboru — kreską,
-     jak status rozmowy. Bez tych wpisów „dlaczego dobór stoi na
-     `missing_information`" byłoby pytaniem do kolegi, nie do ekranu. */
+  /* DOBÓR NA OSI: zmiana wyniku kreską, jak status rozmowy. Stare
+     `dobor_status_changed` tłumaczymy na nowe stany, więc panel zna tylko
+     nowe nazwy; historia starych wyborów zostaje, bo jest prawdziwa. */
+  const STARE_STANY: Record<string, string> = {
+    confirmed: "czesc", rejected: "brak", missing_information: "dopytac", not_applicable: "nie_dotyczy",
+  };
   for (const z of db().prepare(`
     SELECT id, event_type, payload, created_at FROM conversation_event
-     WHERE conversation_id=? AND event_type IN ('dobor_status_changed','dobor_wybrano','dobor_wybor_zdjety')
+     WHERE conversation_id=? AND event_type IN ('dobor_wynik','dobor_status_changed','dobor_wybrano','dobor_wybor_zdjety')
      ORDER BY id
   `).all(id) as Array<Record<string, unknown>>) {
     const p = JSON.parse(String(z.payload ?? "{}")) as
-      { przed?: string; po?: string; brakuje?: string; symbol?: string; droga?: string; autor?: string };
+      { przed?: string | null; po?: string | null; symbol?: string; autor?: string };
     const typ = String(z.event_type);
-    const tresc = typ === "dobor_status_changed"
-      ? `dobór: ${p.przed ?? "?"} → ${p.po ?? "?"}${p.brakuje ? ` (brakuje: ${p.brakuje})` : ""}`
-      : typ === "dobor_wybrano"
-      ? `dobór: wybrano ${p.symbol ?? "?"} (droga: ${p.droga ?? "?"})`
-      : `dobór: zdjęto wybór ${p.symbol ?? "?"}`;
-    os.push({
-      id: `dobor-${z.id}`, rodzaj: "dobor", autor: String(p.autor ?? "system"),
-      odKlienta: false, tresc, at: String(z.created_at), ofertaId: null,
-      zdarzenie: typ === "dobor_status_changed"
-        ? { rodzaj: "dobor", po: p.po ?? null }
-        : { rodzaj: "dobor_wybor", wybrano: typ === "dobor_wybrano", symbol: p.symbol ?? null },
-    });
+    const wspolne = { id: `dobor-${z.id}`, autor: String(p.autor ?? "system"), odKlienta: false,
+      at: String(z.created_at), ofertaId: null } as const;
+    if (typ === "dobor_wybrano" || typ === "dobor_wybor_zdjety") {
+      const wybrano = typ === "dobor_wybrano";
+      os.push({ ...wspolne, rodzaj: "dobor",
+        tresc: wybrano ? `dobór: wybrano ${p.symbol ?? "?"}` : `dobór: zdjęto wybór ${p.symbol ?? "?"}`,
+        zdarzenie: { rodzaj: "dobor_wybor", wybrano, symbol: p.symbol ?? null } });
+      continue;
+    }
+    const nowy = (v: string | null | undefined) => typ === "dobor_wynik" ? v ?? "otwarty" : STARE_STANY[v ?? ""] ?? "otwarty";
+    const po = nowy(p.po);
+    os.push({ ...wspolne, rodzaj: "dobor",
+      tresc: `dobór: ${nowy(p.przed)} → ${po}${p.symbol && po === "czesc" ? ` (${p.symbol})` : ""}`,
+      zdarzenie: { rodzaj: "dobor", po } });
   }
 
   /* ZWROT NA OSI (0.502.0) — decyzja, korekta i pieniądze zwrotu tego

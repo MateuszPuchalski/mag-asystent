@@ -115,7 +115,7 @@ export class WiedzaConflict extends Error {
 }
 
 /* Mutacje wiedzy bywają wołane Z WNĘTRZA cudzej transakcji (hak w
-   `ustawStatusDoboru`), a `node:sqlite` nie zagnieżdża BEGIN. Otwarta
+   `ustawWynik` w `dobor.ts`), a `node:sqlite` nie zagnieżdża BEGIN. Otwarta
    transakcja jest wtedy transakcją wołającego — zapis idzie w niej, a jej
    ROLLBACK cofa także wiedzę. Tego właśnie chcemy: dobór bez propozycji
    albo propozycja bez doboru byłyby stanem w połowie. */
@@ -438,7 +438,7 @@ export interface NowaPropozycja {
 /**
  * Propozycja zastosowania. Może ją złożyć automat (E3 opis, F Copilot) albo
  * człowiek; rodzi się ZAWSZE z dowodem, bo zatwierdzenie bez dowodu odbija
- * się. Symbol idzie z bazy, nie z żądania (wzorzec `wybierzKandydata`).
+ * się. Symbol idzie z bazy, nie z żądania (wzorzec `ustawWynik` w `dobor.ts`).
  *
  * `null` = aktywny duplikat (ta sama kartoteka, model i polaryzacja czeka
  * albo już stoi). Bez śladu — drugie zatwierdzenie tego samego doboru nie ma
@@ -627,12 +627,13 @@ export function propozycjaZPomiaru(
 }
 
 /**
- * Hak na zdjęciu wyboru przy zatwierdzonym doborze: automat wycofuje WŁASNĄ,
- * jeszcze nierozstrzygniętą propozycję z tej rozmowy. Zatwierdzonej nie
- * dotyka — tę rozstrzygnął człowiek i tylko człowiek ją wycofa.
+ * Hak na zejściu z wybranej części w doborze: wycofuje WŁASNĄ, jeszcze
+ * nierozstrzygniętą propozycję z tej rozmowy. Zatwierdzonej nie dotyka — tę
+ * rozstrzygnął człowiek i tylko człowiek ją wycofa. Konto bywa puste, gdy
+ * część zdjął automat zmianą maszyny w danych doboru.
  */
 export function wycofajPropozycjeDoboru(
-  conversationId: number, twId: number, autor: { userId: number; name: string }, database: DatabaseSync = db(),
+  conversationId: number, twId: number, autor: { userId: number | null; name: string }, database: DatabaseSync = db(),
 ): number {
   const ids = (database.prepare(`SELECT id FROM zastosowanie WHERE conversation_id=? AND tw_id=?
     AND stan='propozycja' AND zrodlo_propozycji='dobor'`).all(conversationId, twId) as Array<{ id: number }>)

@@ -53,8 +53,8 @@ export type Rozmowa = {
   nowychOdOdpowiedzi: number;
   /** Niezamknięte zadanie terenowe przy rozmowie. */
   zadanieWToku: boolean;
-  /** Status doboru (§7, §10.2, etap E1). Bez wiersza doboru — `not_started`. */
-  dobor: StatusDoboru;
+  /** Stan doboru liczy SERWER z wyniku i danych; panel go nie wylicza. */
+  dobor: StanDoboru;
   odlozoneDo: string | null;
   /** Odłożenie, którego termin minął. Liczy SERWER — panel tej reguły nie powtarza. */
   poTerminie: boolean;
@@ -240,7 +240,10 @@ export type WpisOsi = {
    * to jest zdanie dla człowieka, a nie format.
    */
   zdarzenie?:
-    | { rodzaj: "status" | "dobor"; po: string | null }
+    | { rodzaj: "status"; po: string | null }
+    /* Przy `dobor` oś niesie wyłącznie nowe stany (`StanDoboru`): stare
+       zdarzenia tłumaczy serwer, więc panel zna jedną listę nazw. */
+    | { rodzaj: "dobor"; po: string | null }
     | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null }
     /* Kamień milowy zwrotu tego zamówienia (0.502.0) — `server/src/services/zwrot-na-osi.ts`. */
     | { rodzaj: "zwrot"; co: string; zwrotId: number; numer: string | null };
@@ -512,13 +515,6 @@ export type SzkicCopilota = {
   at: string;
   przez: string;
   ocena: OcenaSzkicu | null;
-  /**
-   * Dane doboru rozpoznane w rozmowie (przyrost trzeci), sprawdzone przez
-   * serwer przeciw wątkowi. `null` = nic nie rozpoznano. To PROPOZYCJA: do
-   * pól doboru wchodzi na kliknięcie agenta, wyłącznie w puste.
-   */
-  daneDoboru: DaneDoboru | null;
-  daneOcena: OcenaDanych | null;
   /** Wersja doboru, na której szkic powstał — inna dziś = szkic nieświeży. */
   doborWersja: number;
   /**
@@ -660,83 +656,72 @@ export type TwierdzenieCopilota = {
 };
 /** Co model odczytał z jednego zdjęcia. `zdjecie` to `Z1`, `Z2` ze spisu. */
 export type OdczytZdjecia = { zdjecie: string; tekst: string };
-export type OcenaDanych = "wpisane" | "odrzucone";
 export type OcenaPasowania = "zaproponowane" | "odrzucone";
 export type PropozycjaPasowaniaCopilota = {
   czesc: KartotekaPasowania; doCzego: KartotekaPasowania; rola: RolaPasowania; pozycja: string | null;
 };
 
-/* ── Dobór części (§11, etap E1) ─────────────────────────────────────────────
-   Lista statusów ZAMKNIĘTA, wprost z §7 — trzecia kopia obok `STATUSY_DOBORU`
-   na serwerze i `CHECK` na kolumnie. `extracting_data` nie ma w E nadawcy:
-   serwer go odrzuca, nada go Copilot (F). */
-export type StatusDoboru =
-  | "not_started" | "extracting_data" | "missing_information" | "searching"
-  | "candidates_found" | "requires_expert" | "confirmed" | "rejected" | "not_applicable";
-
-/* Jedenaście dróg §11.2. `silnik` to zastosowanie o jeden przeskok dalej:
-   część pasuje do silnika, a silnik stoi w maszynie, o którą pyta klient.
-   `wymiar` to zgodna liczba z jednostką z parametrów doboru — podpowiedź. */
-export type DrogaDoboru =
-  | "oferta" | "zamiennik" | "symbol" | "ean" | "wyszukiwarka" | "zastosowanie" | "silnik" | "pasowanie"
-  | "oem" | "pelnotekst" | "wymiar";
-
+/* ── Dobór części (`docs/dobor-od-zera.md` §5.1) ────────────────────────────
+   Kontrakt z serwerem; nazwy i kształty są wiążące po obu stronach. Dobór
+   odpowiada na jedno pytanie klienta jedną z czterech odpowiedzi (§1), więc
+   wynik jest zamkniętą listą, a stan dla kolejki SERWER z niej wylicza. */
 export type DaneDoboru = {
-  marka: string | null; model: string | null; wariant: string | null; rocznik: string | null;
-  nrSeryjny: string | null; silnik: string | null; oem: string | null; nazwaCzesci: string | null;
-  parametry: Record<string, string>;
+  marka: string | null; model: string | null; wariant: string | null;
+  rocznik: string | null; nrSeryjny: string | null; silnik: string | null;
+  oem: string | null; nazwaCzesci: string | null;
 };
-
-export type WyborDoboru = {
-  twId: number; symbol: string; droga: DrogaDoboru; przez: string; at: string;
-  /** Zdanie do szkicu pisze SERWER (§14.3) — ze źródłem; panel go nie układa. */
-  zdanieDoSzkicu: string;
-};
+export type WynikDoboru = "czesc" | "brak" | "dopytac" | "nie_dotyczy";
+/** `pusty` i `otwarty` to brak wyniku, rozróżniony pustością danych. */
+export type StanDoboru = "pusty" | "otwarty" | WynikDoboru;
+export type PodstawaWyboru = "numer" | "wiedza" | "podobne" | "reczny";
 
 export type Dobor = {
-  status: StatusDoboru;
-  /** Wersja DANYCH doboru — własna, nie `Rozmowa.wersja`. */
+  stan: StanDoboru;
+  wynik: WynikDoboru | null;
+  /** Wersja doboru — własna, nie `Rozmowa.wersja`; pilnuje zapisu przed nadpisaniem. */
   wersja: number;
   dane: DaneDoboru;
-  brakuje: string | null;
-  wybrany: WyborDoboru | null;
-  updatedBy: string | null;
-  updatedAt: string | null;
+  /** Tylko przy wyniku `czesc`. Zdanie do szkicu pisze SERWER, ze źródłem (§3). */
+  wybrany: { twId: number; symbol: string; podstawa: PodstawaWyboru; zdanieDoSzkicu: string } | null;
+  /** Tylko przy wyniku `dopytac`. */
+  dopytac: string | null;
+  zmienil: string | null;
+  /** Ostatni zapis zrobił automat, nie człowiek. */
+  zmienilAutomat: boolean;
+  zmienionoAt: string | null;
 };
 
+export type GrupaKandydata = "numer" | "wiedza" | "podobne";
+export type PewnoscKandydata = "potwierdzone" | "prawdopodobne" | "do_sprawdzenia";
 export type KandydatDoboru = {
-  /** `twId: null` = numer OEM bez wiersza w kartotece (§11.2, E3, makieta Dobor.dc.html): bez stanu i bez Wybierz. */
-  nr: number; twId: number | null; symbol: string; nazwa: string; stan: number | null;
-  droga: DrogaDoboru;
-  pewnosc: "potwierdzone" | "prawdopodobne" | "wymaga_danych";
-  /** Zdanie z serwera (§11.3): skąd kandydat, nie sam kod drogi. */
-  zrodlo: string;
+  twId: number; symbol: string; nazwa: string;
+  /** Dostępne na magazynie głównym; `null` = brak stanu. */
+  stan: number | null;
+  grupa: GrupaKandydata; pewnosc: PewnoscKandydata;
+  /** Jedno zdanie: skąd ten kandydat. */
+  powod: string;
+  /** Zdania innych źródeł, które trafiły w tę samą kartotekę. */
+  takze: string[];
+  /** Zastrzeżenia: warunek, kilka silników, negatyw z wiedzy. */
   ostrzezenia: string[];
 };
-
-/** Szczebel §11.2: sprawdzony z liczbą wyników albo pominięty Z POWODEM. */
-/**
- * Czym agent może zamknąć brak TU I TERAZ, bez opuszczania rozmowy (0.267.0).
- * Rodzaj nadaje serwer, w tej samej gałęzi, w której pisze powód — panel nie
- * rozbiera zdania po polsku, żeby zgadnąć przycisk.
- */
-export type AkcjaSzczebla = { rodzaj: "dane" | "wymiar" | "zabudowa"; etykieta: string };
-
-export type SzczebelDoboru = {
-  droga: DrogaDoboru; sprawdzona: boolean; wynikow: number; powod?: string;
-  /** Brak akcji znaczy „tego nie da się załatwić w rozmowie" — i tak ma zostać. */
-  akcja?: AkcjaSzczebla;
-};
-
-/* Negatyw jest widoczny także dla kartoteki, której NIE MA wśród kandydatów (§11.4). */
-export type NegatywDoboru = {
-  twId: number; symbol: string; nazwa: string | null; powod: string; zrodlo: string; at: string;
-};
-
-/** Kartoteka wskazana przez agenta (symbol/EAN/OEM) albo kartoteka oferty — cel przycisku „Pasuje do…". */
-export type KotwicaDoboru = { twId: number; symbol: string; nazwa: string };
 export type KandydaciDoboru = {
-  kandydaci: KandydatDoboru[]; drogi: SzczebelDoboru[]; negatywne: NegatywDoboru[]; kotwice: KotwicaDoboru[];
+  kandydaci: KandydatDoboru[];
+  /** Numery z pola `oem` bez kartoteki. Nie da się ich wybrać. */
+  bezKartoteki: Array<{ numer: string; zdanie: string }>;
+  negatywne: Array<{ twId: number; symbol: string; nazwa: string | null; powod: string; zrodlo: string }>;
+  /** Czego zabrakło do szukania, zdaniami. Pusta lista = sprawdzono wszystko. */
+  brakuje: string[];
+};
+
+export type MiaryDoboru = {
+  dni: number;
+  /** Ostatni wynik każdej rozmowy z oknem, z dziennika zdarzeń. */
+  wyniki: Record<WynikDoboru, number>;
+  /** Podstawy przy wyniku `czesc`. */
+  podstawy: Record<PodstawaWyboru, number>;
+  /** Stan dziś: rozmowy w stanie `otwarty`. */
+  otwarte: number;
 };
 
 /* ── Baza wiedzy (§11.3, §11.4, §12, etap E2) ────────────────────────────────
@@ -919,32 +904,6 @@ export type ModelZOpisu = {
   zrodlo: "opis" | "oferta"; ofertaId: string | null;
 };
 
-/**
- * Skuteczność doboru (0.267.0) — którym z jedenastu szczebli §11.2 przyszedł
- * kandydat, którego agent naprawdę wybrał. Liczone z KSIĘGI ZDARZEŃ, nie ze
- * stanu tabeli: tamta pamięta ostatni wybór, a pytanie brzmi „która droga dała
- * trafienie". `naStole` jest jedyną częścią liczoną ze stanu i dlatego stoi
- * osobno — to inne pytanie i inna populacja.
- */
-export type SkutecznoscDoboru = {
-  dni: number;
-  /** Próg, przed którym rozmów w bazie nie ma; bez niego selektor „90 dni" obiecuje kwartał. */
-  granicaHistorii: string | null;
-  wyborow: number;
-  drogi: Array<{ droga: DrogaDoboru; wybranych: number; zatwierdzonych: number }>;
-  medianaDoWyboruMin: number | null;
-  wyborowZCzasem: number;
-  osoby: Array<{
-    userId: number | null; osoba: string; wybranych: number; zatwierdzonych: number;
-    najczestszaDroga: DrogaDoboru | null; medianaMin: number | null;
-  }>;
-  bezKonta: number;
-  naStole: { doborow: number; statusy: Array<{ status: StatusDoboru; ile: number }> };
-  progWiarygodnosci: number;
-  /** Art. 22² Kodeksu pracy — jedzie w ładunku, żeby karta nie mogła go zgubić. */
-  podstawaPrawna: string;
-};
-
 export type PokrycieWiedzy = {
   kartotek: number; zOpisem: number; zIdentyfikatorem: number;
   identyfikatorow: number; identyfikatorowRecznych: number;
@@ -954,8 +913,6 @@ export type PokrycieWiedzy = {
   zastosowania: { zatwierdzonych: number; negatywnych: number; propozycji: number };
   /** Tokeny silników w nazwach kartotek (0.239.0): ile słów, ile kartotek czeka, ile zatwierdzono. */
   tokeny: { tokenow: number; nowych: number; zatwierdzonych: number };
-  /** Wymiary z nazw i opisów kartotek — paliwo szczebla „zgodne wymiary". */
-  wymiary: { kartotek: number; wymiarow: number };
   fts: { dostepne: boolean; wpisow: number };
 };
 
@@ -1002,14 +959,8 @@ export type WiedzaDoboru = {
   zabudowa: Zabudowa | null;
   /** Pasowanie do części, którą agent wskazał (symbol/numer w danych doboru) — inaczej `null`. */
   pasowanie: TrafieniePasowania | null;
-  /** ZATWIERDZONE silniki wpisanej maszyny: czipy pod polem i wybór przy zatwierdzeniu. */
+  /** ZATWIERDZONE silniki wpisanej maszyny. */
   silniki: Zabudowa[];
-  /**
-   * Tekst z pola „Silnik" rozpoznany SŁOWNIKIEM (0.238.0) i żywa para z wpisaną
-   * maszyną (`propozycja` albo `zatwierdzone`); `zabudowa: null` = można
-   * zaproponować. `null` = tekstu nie ma w słowniku albo pole jest puste.
-   */
-  silnikZPola: { alias: AliasSilnika; zabudowa: Zabudowa | null } | null;
   pomiary: PomiarRozmowy[];
 };
 
