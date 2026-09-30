@@ -119,7 +119,7 @@ const CZEKAJACE = `
        WHERE m2.conversation_id = c.id AND m2.auto_odpowiedz = 0
        ORDER BY m2.sent_at DESC, m2.id DESC LIMIT 1)
     LEFT JOIN szkic_copilota s ON s.conversation_id = c.id
-    LEFT JOIN dobor_rozmowy d ON d.conversation_id = c.id
+    LEFT JOIN dobor d ON d.conversation_id = c.id
    WHERE m.direction = 'incoming'
      AND ((m.related_object_type = 'OFFER' AND m.related_object_id IS NOT NULL)
           /* Od 22 września 2026 także KAŻDA wiadomość z rozpoznaniem, które

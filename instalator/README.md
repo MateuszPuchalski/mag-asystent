@@ -1,444 +1,200 @@
 # Instalator WERTIS dla Windows
 
-Stawia serwer WERTIS na maszynie z Subiektem GT. Instaluje zależności, pobiera
-i buduje aplikację, rejestruje dwie usługi Windows i otwiera port dla
-kolektorów. Wypełnia konfigurację odpytując bazę Subiekta. Zakłada konto SQL
-o minimalnych uprawnieniach.
+Stawia serwer WERTIS na maszynie z Subiektem GT. Rozpakowuje paczkę wydania,
+rejestruje usługi Windows i otwiera port dla kolektorów. Wypełnia
+konfigurację, odpytując bazę Subiekta, i zakłada konto SQL o minimalnych
+uprawnieniach. Aktualizuje też działającą instalację.
 
 Robi to, co [`DEPLOY.md`](../DEPLOY.md) każe zrobić ręcznie. **Tamta instrukcja
-zostaje i jest referencją tego katalogu.** Gdy instalator zawiedzie w połowie,
-ręczna droga nadal działa. Każdy krok da się dokończyć z palca.
+zostaje referencją tego katalogu.** Gdy instalator zawiedzie w połowie, każdy
+krok da się dokończyć z palca.
 
-## Aktualizacja z paczki wydania (0.492.0)
+## Uruchomienie
+
+Pobierz `WERTIS-Instalator.exe` z [wydań](https://github.com/MateuszPuchalski/mag-asystent/releases)
+i uruchom **jako administrator**. Z repo albo z gołego `.ps1` użyj
+**`URUCHOM.cmd`**: prawy przycisk → *Uruchom jako administrator*.
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1
+```
+
+**`-ExecutionPolicy Bypass` nie jest ozdobnikiem.** Windows domyślnie odmawia
+uruchamiania plików `.ps1` (`running scripts is disabled on this system`).
+Przełącznik dotyczy **tego jednego uruchomienia** i nie zmienia polityki
+systemu.
+
+**Windows PowerShell, nie `pwsh`.** Instalator używa `System.Data.SqlClient`
+z .NET Framework, którego w PowerShellu 7 nie ma w komplecie. Plik `.exe` ma
+właściwy silnik w środku.
+
+| przełącznik | do czego |
+|---|---|
+| *(brak)* | pełna instalacja z kreatorem i kontem SQL |
+| `-Demo` | instalacja pilotażowa: dane demo, **Subiekt nietknięty** (Etap 0 z `DEPLOY.md` §6) |
+| `-Dev` | druga, rozwojowa instancja obok produkcji: usługi z sufiksem `-dev`, dane demo, własny `-Katalog` i `-Port` |
+| `-Aktualizuj -Paczka <wersja>` | nowa wersja z paczki wydania (`najnowsza`, numer albo ścieżka ZIP-a) |
+| `-Aktualizuj` | nowa wersja na instalacji z Gita (`git pull`, budowanie) |
+| `-TylkoKonfiguracja` | sam kreator na działającej instalacji |
+| `-ZdjeciaZapis` | pozwala dodać zdjęcie kartoteki z kolektora; kosztuje `GRANT INSERT` do bazy firmy |
+| `-DryRun` | wypisuje, co by zrobił, i **nie zmienia niczego**; nie zadaje pytań |
+| `-Odinstaluj` | zdejmuje usługi, regułę zapory i katalog; **Subiekta nie rusza** |
+| `-UsunDane` | tylko z `-Odinstaluj`: kasuje też ślad audytowy, po drugim potwierdzeniu |
+| `-Katalog`, `-Port`, `-Galaz` | odstępstwa od domyślnych `C:\wertis`, `3001`, `main` |
+| `-SerwerSql`, `-InstancjaSql` | serwer i instancja SQL, gdy nie `localhost` i nie jedyna instancja |
+
+## Co instalator robi
+
+1. Pobiera paczkę `wertis-<wersja>.zip`, sprawdza sumę i rozpakowuje do `C:\wertis`.
+2. Paczka niesie własny Node, więc na serwerze nic się nie instaluje ani nie kompiluje.
+3. Dane lądują w `C:\wertis-dane`, a ponowna instalacja po awarii je podpina.
+4. Dla `-Galaz` i instalacji z `.git` stawia Node (≥ 22.5) i Git przez `winget`.
+5. Rejestruje `wertis-api` i `wertis-worker` w NSSM, z logami i restartem po awarii.
+6. Otwiera port API w zaporze, wyłącznie dla sieci lokalnej.
+7. Kreator pyta tylko o to, czego nie da się ustalić samemu.
+8. Zakłada login SQL `wertis` z losowym hasłem i uprawnieniami kolumnowymi.
+
+Kreator bierze serwer `localhost`, instancję z rejestru (INSERTGT albo jedyną)
+i jedyną bazę bez pytania. **Pole lokalizacji zostaje decyzją człowieka**, bo
+aplikacja nadpisuje je bezwarunkowo. Na koniec instalator pokazuje z
+`/api/health` stan API i workera, bo zapis do Subiekta idzie przez workera.
+
+## Aktualizacja
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Aktualizuj -Paczka najnowsza
 ```
 
-Zamiast `najnowsza` można podać numer wersji. Można też podać ścieżkę
-pobranego ZIP-a, z plikiem `.sha256` obok. Paczka jest zbudowana w CI, więc na serwerze nie ma
-`git pull`, `npm ci` ani kompilacji. Nowa wersja rozpakowuje się obok,
-a usługi stoją tylko na czas zamiany katalogów. Serwer, który nie wstanie,
-oddaje miejsce poprzedniej wersji razem z bazą sprzed migracji.
+Zamiast `najnowsza` można podać numer wersji albo ścieżkę ZIP-a z plikiem
+`.sha256` obok niego. Nowa wersja rozpakowuje się obok starej, a usługi stoją
+tylko na czas zamiany katalogów. Serwer, który nie wstanie, oddaje miejsce
+poprzedniej wersji razem z bazą sprzed migracji. To samo robią przycisk
+w panelu i automat, przez zadanie Harmonogramu (`zlecenie.ps1`). Kroki
+i powody: `DEPLOY.md` §0b.
 
-To samo robi przycisk w panelu (Ustawienia → „Aktualizacja serwera") przez
-zadanie Harmonogramu, które zakłada instalator. Kolejność kroków i powody
-stoją w [`DEPLOY.md`](../DEPLOY.md) §0b.
+Aktualizacja **nie zadaje pytań** i nie dotyka bazy, konta SQL, GRANT-ów,
+`wertis.env`, kont, zapory ani rejestracji usług. W `server\data` rusza tylko
+katalog `apk`: kładzie APK dla kolektorów i kasuje starsze. **Nieudane
+pobranie APK nie przerywa aktualizacji**, bo kolektory mogą zostać na swojej
+wersji. Aktualizowany jest `-Katalog`, a nie katalog ze skryptem.
 
-## Sama aktualizacja, bez ruszania bazy
-
-W oknie **uruchomionym jako administrator**:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\wertis-instalator.ps1 -Aktualizuj
-```
-
-Zatrzymuje usługi, pobiera nową wersję, buduje, **ściąga APK dla kolektorów**
-i uruchamia z powrotem. **Nie zadaje ani jednego pytania.**
-
-APK ląduje w `server\data\apk` pod nazwą niosącą wersję. Stamtąd rozdają go
-kolektory: pytają o nowe wydanie przy otwarciu aplikacji i instalują je same
-(`DEPLOY.md` §5). Instalator sprząta przy okazji starsze pliki.
-
-> **Nieudane pobranie APK nie przerywa aktualizacji.** Serwer wstaje i pracuje,
-> a kolektory zostają na wersji, którą mają. Wypisane zostaje ostrzeżenie ze
-> ścieżką, do której plik można dołożyć ręką. Zatrzymywanie aktualizacji firmy
-> przez plik, którego nikt w tej minucie nie potrzebuje, kosztowałoby więcej
-> niż jego brak.
-
-> **`-ExecutionPolicy Bypass` nie jest ozdobnikiem.** Windows domyślnie odmawia
-> uruchamiania plików `.ps1` (`running scripts is disabled on this system`).
-> Przełącznik dotyczy **tego jednego uruchomienia** i nie zmienia polityki
-> systemu.
-
-> **Aktualizowany jest `-Katalog`, a nie katalog ze skryptem.** Domyślnie
-> `C:\wertis`. Instalator uruchomiony z klonu repo na pulpicie zaktualizuje
-> instalację w `C:\wertis`, a nie ten klon. Przy innej lokalizacji serwera
-> dopisz `-Katalog "D:\wertis"`.
-
-Podgląd bez zmieniania czegokolwiek — ten sam wiersz z `-DryRun`.
-
-Nie dotyka: bazy aplikacji, konta SQL ani GRANT-ów, `wertis.env`, konfiguracji
-Subiekta, kont użytkowników, reguły zapory i rejestracji usług w NSSM.
-
-W `server\data` rusza **jedno miejsce**: katalog `apk`. Kładzie tam APK dla
-kolektorów w wersji, którą właśnie zbudował, i kasuje starsze. Baza, zdjęcia
-i raporty w sąsiednich katalogach zostają nietknięte.
-
-> **Dlaczego osobny tryb.** Pełny przebieg instalatora też aktualizuje kod.
-> Robi przy tym jednak jeszcze siedem innych rzeczy. Pyta o Subiekta, przelicza
-> magazyny, sprawdza pole lokalizacji, zakłada konto SQL, nadaje GRANT-y,
-> przepisuje `wertis.env` i pyta o konto administratora. Na działającej
-> instalacji to jest siedem okazji do zmiany czegoś, co działa.
-
-Usługi stoją przez **cały** czas budowania, nie tylko przy podmianie plików:
-`npm ci` kasuje `node_modules`, więc działający worker traciłby moduły w locie.
-
-Gdy `git pull` się nie uda, usługi **wracają** na poprzedniej wersji. Gdy nie
-uda się budowanie, zostają **zatrzymane celowo** — stary `dist` z nową bazą
+`-Aktualizuj` bez `-Paczka` działa tylko na instalacji z Gita. Usługi stoją
+wtedy przez całe budowanie, bo `npm ci` kasuje `node_modules` pod workerem.
+Nieudane budowanie zostawia je zatrzymane, bo stary `dist` z nową bazą
 mieszałby dwie wersje.
 
-## Uruchomienie
+## Konfiguracja: jeden plik `wertis.env`
 
-Pobierz `WERTIS-Instalator.exe` z [wydań](https://github.com/MateuszPuchalski/mag-asystent/releases)
-i uruchom **jako administrator**.
+Wszystkie procesy czytają `wertis.env` wprost z dysku
+([`server/src/env-file.ts`](../server/src/env-file.ts)). **Zapis jest
+scaleniem, nie nadpisaniem**: klucz spoza pytań kreatora zostaje taki, jak
+w pliku. `MSSQL_INSTANCE` i `MSSQL_ZD_ZREAL_COLUMN` przy pustej odpowiedzi
+dostają `''`, bo ich wartość domyślna nie jest pusta. `ADMIN_LOGIN`
+i `ADMIN_HASLO` instalator usuwa, bo sekret konta nie leży na dysku serwera.
+Kasuje też środowisko usług w NSSM (`AppEnvironment` i `AppEnvironmentExtra`),
+bo zmienna środowiskowa po cichu wygrałaby z plikiem.
 
-Z repo albo z gołego `.ps1` — **`URUCHOM.cmd`**, prawym przyciskiem →
-*Uruchom jako administrator*. Windows domyślnie odmawia uruchamiania plików
-`.ps1` (`running scripts is disabled on this system`), a ten plik omija to
-dla jednego uruchomienia, nie ruszając polityki systemowej:
+## Konto SQL: wartością są uprawnienia
 
-```powershell
-# to samo z wiersza poleceń:
-powershell -ExecutionPolicy Bypass -File instalator\wertis-instalator.ps1
-```
+Skrypt z [`docs/subiekt-gt-edu-setup.md`](../docs/subiekt-gt-edu-setup.md) §2
+nadaje `SELECT` na tabelach z `Get-WertisTabeleOdczytu` oraz `UPDATE` na
+dwóch kolumnach z `Get-WertisKolumnyZapisu`: lokalizacji i `tw_PodstKodKresk`.
+`INSERT` na tabelę zdjęć dochodzi wyłącznie z `-ZdjeciaZapis`. Innego prawa
+zapisu nie ma. Obiekt opcjonalny (zdjęcia, nazwy poziomów cen) sprawdza się
+przed budową skryptu, bo `GRANT` na nieistniejący obiekt przerywa cały skrypt.
 
-| przełącznik | do czego |
-|---|---|
-| *(brak)* | pełna instalacja z kreatorem i kontem SQL |
-| `-Demo` | instalacja pilotażowa: dane demonstracyjne, **Subiekt nietknięty** (Etap 0 z `DEPLOY.md` §6) |
-| `-Aktualizuj` | wgrywa nową wersję kodu i APK dla kolektorów; nie pyta o nic i nie rusza konfiguracji |
-| `-Aktualizuj -Paczka <wersja>` | jak wyżej, ale z gotowej paczki wydania: podmiana katalogu i powrót do poprzedniej wersji, gdy nowa nie wstanie |
-| `-TylkoKonfiguracja` | sam kreator na działającej instalacji — do zmiany ustawień albo dokończenia po nieudanym podłączeniu |
-| `-DryRun` | wypisuje, co by zrobił, i **nie zmienia niczego**; nie zadaje pytań |
-| `-Odinstaluj` | zdejmuje usługi, regułę zapory i katalog; **Subiekta nie rusza** — patrz [`docs/wdrozenie.md`](../docs/wdrozenie.md) |
-| `-UsunDane` | tylko z `-Odinstaluj`: kasuje też ślad audytowy, po drugim potwierdzeniu |
-| `-Katalog`, `-Port`, `-Galaz` | odstępstwa od domyślnych `C:\wertis`, `3001`, `main` |
-
-> **Windows PowerShell, nie `pwsh`.** Instalator używa `System.Data.SqlClient`
-> z .NET Framework — w PowerShellu 7 tego typu nie ma w komplecie. Plik `.exe`
-> ma właściwy silnik w środku; przy uruchamianiu `.ps1` użyj `powershell.exe`.
-
-## Co instalator robi
-
-1. **Aplikacja** — od 0.496.0 z **paczki wydania**: pobiera najnowszy
-   `wertis-<wersja>.zip`, sprawdza sumę i rozpakowuje do `C:\wertis`. Paczka
-   niesie własny Node, więc instalator **nie instaluje żadnych programów**,
-   a na serwerze nic się nie kompiluje. Dane od razu lądują w
-   `C:\wertis-dane`. Gdy ten katalog już istnieje — ponowna instalacja po
-   awarii — instalator go podpina i baza wraca.
-2. **Git tylko na życzenie** — dla `-Galaz <gałąź>` i instalacji z `.git`.
-   Te idą po staremu: Node i Git przez `winget`, `git clone`, `npm ci`,
-   `npm run build`. Sprawdzana jest wtedy **wersja Node**
-   (co najmniej 22.5, bo serwer używa wbudowanego sterownika SQLite).
-3. **Usługi** — `wertis-api` i `wertis-worker` przez NSSM, z logami, rotacją,
-   autostartem i restartem po awarii.
-4. **Sieć** — reguła zapory na porcie API, wpuszczająca **tylko sieć lokalną**.
-5. **Kreator** — pyta tylko o to, czego nie da się ustalić. Serwer SQL to
-   `localhost` (inny: `-SerwerSql`), instancję czyta z rejestru (INSERTGT albo
-   jedyna; pyta przy kilku). Jedyną bazę bierze bez pytania, magazyny podsuwa
-   po symbolu. **Pole lokalizacji zostaje decyzją człowieka**, bo aplikacja
-   nadpisuje wybrane pole bezwarunkowo.
-6. **Konto SQL** — zakłada login `wertis` z losowym hasłem i uprawnieniami
-   **kolumnowymi**, po czym sprawdza, co faktycznie zostało nadane.
-
-### Konfiguracja: jeden plik i sprzątanie po starych instalacjach
-
-API i worker to **osobne procesy**, ale czytają dziś ten sam `wertis.env`
-wprost z dysku ([`server/src/env-file.ts`](../server/src/env-file.ts)) — NSSM
-nie przenosi już żadnej konfiguracji. Instalator zapisuje więc **jeden plik**.
-
-**Zapis jest scaleniem, nie nadpisaniem.** Kreator wygrywa tam, gdzie ma
-zdanie: klucz, o który zapytał, idzie z jego odpowiedzi. Klucza, o który nie
-pytał, instalator nie rusza — wartość zostaje taka, jak w pliku. Dzięki temu
-ustawienia dopisywane ręką (np. `DOK_TYPY_DOSTAW`) przeżywają kolejne przebiegi
-z `-TylkoKonfiguracja`.
-
-Jest jeden wyjątek od reguły „pusto znaczy nie ustawiono". `MSSQL_INSTANCE`
-i `MSSQL_ZD_ZREAL_COLUMN` mają **niepustą wartość domyślną**, więc pustka jest
-przy nich odpowiedzią, nie brakiem odpowiedzi — zapisuje się do pliku wprost
-jako `''`. Bez tego nie dałoby się wskazać instancji domyślnej ani powiedzieć,
-że kolumny ilości zrealizowanej w bazie nie ma.
-
-> **Do 0.31.2 plik powstawał od zera.** Każdy klucz spoza pytań kreatora znikał
-> przy najbliższym przebiegu, a objawem była zgaszona funkcja bez jednego błędu
-> w logu. Dwa wyjątki od scalania zostają. **Komentarze własne** — plik jest
-> generowany. **Klucze od kont** (`ADMIN_LOGIN`, `ADMIN_HASLO`) — instalator
-> usuwa je z pliku, bo sekret konta nie ma prawa leżeć na dysku serwera.
-
-Robi przy tym drugą rzecz, mniej oczywistą: **kasuje środowisko obu usług**.
-Zmienne środowiskowe mają pierwszeństwo nad plikiem, więc pozostałość po
-starszej instalacji — choćby hasło sprzed zmiany — po cichu wygrałaby z tym,
-co instalator właśnie zapisał. Bez żadnego objawu poza „u mnie nie działa".
-
-> **Dwa ustawienia, nie jedno.** `AppEnvironmentExtra` **dokłada** zmienne do
-> środowiska procesu, a `AppEnvironment` **zastępuje je w całości**. Z nazw tej
-> różnicy nie widać, a kosztowała jedno wdrożenie.
->
-> Kreator przeszedł wtedy do końca i zapisał `SGT_MODE=mssql`. Aplikacja i tak
-> wstała na danych demo, bo kasowane było tylko pierwsze z tych dwóch. Od
-> 0.12.0 lecą oba.
-
-Na koniec instalator odpytuje `/api/health` i pokazuje **stan obu procesów**:
-tryb API, tryb workera i listę `problemy`. Zapis do Subiekta idzie przez
-workera, więc samo zielone API mówiłoby o połowie instalacji.
-
-### Konto SQL: wartością są uprawnienia, nie samo konto
-
-Skrypt pochodzi z [`docs/subiekt-gt-edu-setup.md`](../docs/subiekt-gt-edu-setup.md) §2
-i nadaje:
-
-- `SELECT` na **sześciu** tabelach, plus siódma ze zdjęciami, gdy jest w bazie,
-- `UPDATE` na **dwóch kolumnach** kartoteki: wybranej na lokalizację oraz
-  `tw_PodstKodKresk` (kod kreskowy nadawany z kolektora, od 0.37.0),
-- **ani jednego innego prawa zapisu**.
-
-Siódmy grant jest warunkowy nie z ostrożności, tylko z konieczności. Skrypt
-idzie do bazy jednym poleceniem, więc `GRANT` na nieistniejącą tabelę przerywa
-wykonanie i konto zostaje **bez ani jednego uprawnienia**. Kreator sprawdza
-obecność `tw_ZdjecieTw` przed budową skryptu, a próg weryfikacji idzie za tą
-samą decyzją — obie liczby biorą się z jednej listy.
-
-Kolumny zapisu biorą się z jednej listy (`Get-WertisKolumnyZapisu`), tak samo
-jak tabele odczytu — i z tego samego powodu. Do 0.38.0 liczba „jedna kolumna"
-stała wpisana w trzech miejscach: w skrypcie, w progu weryfikacji i w teście.
-Kod kreskowy dołożył drugą po stronie serwera, instalatora nikt nie ruszył,
-a objawem była **odmowa uprawnienia na produkcji** — długo po instalacji,
-która zameldowała sukces.
-
-**Instalacja zastana dostaje brakujący grant po ponownym uruchomieniu
-kreatora**: skrypt jest idempotentny, więc przebieg na już działającej
-instalacji dokłada wyłącznie to, czego brakuje. Kto nie chce uruchamiać
-kreatora, wykonuje jedną linię z `docs/subiekt-gt-edu-setup.md` §2.
-
-Przy przejęciu tego credentiala da się zmienić adres na półce i kod kreskowy.
-Nic więcej — dokumenty, stany i numeracja pozostają nietykalne. Właśnie to
-ograniczenie ginie pierwsze, gdy konto zakłada się ręcznie w pośpiechu.
-
-Instalator **weryfikuje nadane uprawnienia po fakcie**, bo błąd `CREATE LOGIN`
-nie przerywa reszty skryptu: bez sprawdzenia „udana" instalacja mogłaby zostawić
-konto bez ani jednego uprawnienia.
-
-**Gdy nie ma praw administratora bazy**, instalator nie przerywa wdrożenia:
-zapisuje gotowy, podstawiony skrypt do `C:\wertis\nadaj-uprawnienia-wertis.sql`
-i mówi, komu go przekazać. Hasło jest już w środku i w `wertis.env`, więc nic
-nie trzeba podmieniać — po wykonaniu skryptu wystarczy restart obu usług.
-
-## Konto administratora
-
-**Od 0.496.0 instalator o nie nie pyta.** Pusta instalacja pokazuje w panelu
-(`http://<serwer>:3001/obsluga/`) formularz pierwszego konta zamiast
-logowania. To konto dostaje rolę `admin` i zakłada wszystkie następne.
-
-Dotąd (od 0.24.0) instalator pytał o login i hasło w oknie PowerShella na
-serwerze. Instalacja czekała więc na człowieka przy klawiaturze serwera,
-a hasło przechodziło przez skrypt. Serwer umiał przyjąć pierwsze konto bez
-sesji od początku (`POST /api/users` przy pustej bazie), więc panel tylko z tego
-korzysta. Kreator na kolektorze (`DEPLOY.md` §5a) działa dalej.
+Instalator **weryfikuje nadane uprawnienia po fakcie**, bo błąd
+`CREATE LOGIN` nie przerywa reszty skryptu. Skrypt jest idempotentny, więc
+ponowny kreator dokłada tylko brakujące granty. **Bez praw administratora
+bazy** instalator zapisuje gotowy skrypt do
+`C:\wertis\nadaj-uprawnienia-wertis.sql` i mówi, komu go przekazać.
 
 ## Czego instalator NIE robi
 
-- **Nie zakłada żadnych kont.** Pierwsze, administratora, zakłada się w panelu
-  (wyżej); resztę z panelu albo z kolektora (`DEPLOY.md` §5a).
-- **Nie buduje workera Sfery** (dokumenty MM, Etap 2 z `DEPLOY.md` §6) — exe
-  buduje się osobno wg `sfera-worker/README.md`. Gdy `wertis-sfera-worker.exe`
-  leży już w `<katalog>\sfera-worker\`, instalator pyta o włączenie i rejestruje
-  trzecią usługę `wertis-sfera`. Bez exe dokumenty MM wystawia biuro
-  w Subiekcie, jak dotąd.
-- **Nie musi konfigurować kopii bazy aplikacji ani nocnej rekoncyliacji.**
-  Od 0.487.0 robi je sam serwer: co noc i przed każdą migracją schematu
-  (`DEPLOY.md` §7). Do człowieka należy jedna próba odtworzenia z takiej kopii.
-- **Nie robi kopii bazy Subiekta.** Kopie serwera obejmują wyłącznie
-  `wertis.db`. Pole lokalizacji żyje w bazie podmiotu, więc jego cofnięcie
-  wymaga kopii podmiotu, robionej narzędziami InsERT-a albo SQL Servera.
-- **Nie usuwa loginu SQL przy deinstalacji.** `-Odinstaluj` zdejmuje usługi,
-  zaporę i katalog, ale login `wertis` zostaje: powstał na poziomie **instancji**,
-  więc pomyłka dotknęłaby wszystkich baz na serwerze. Skrypt podaje gotowe
-  `DROP USER` i `DROP LOGIN` do wykonania przez administratora bazy.
-- **Nie cofa tego, co aplikacja zapisała do Subiekta.** Deinstalacja usuwa
-  program, nie jego pracę. Pole lokalizacji odwraca wyłącznie
-  kopia bazy — patrz [`docs/wdrozenie.md`](../docs/wdrozenie.md).
+- **Nie zakłada kont.** Pusta instalacja pokazuje w panelu
+  (`http://<serwer>:3001/obsluga/`) formularz pierwszego konta z rolą `admin`.
+  Resztę kont zakłada się w panelu albo na kolektorze (`DEPLOY.md` §5a).
+- **Nie buduje workera Sfery.** Gdy `wertis-sfera-worker.exe` leży
+  w `<katalog>\sfera-worker\`, pyta o włączenie i rejestruje usługę
+  `wertis-sfera` (`sfera-worker/README.md`).
+- **Nie zakłada usługi tła.** `wertis-tlo` rejestruje się ręcznie
+  (`tlo-worker/README.md`). Aktualizacja zatrzymuje jednak każdą działającą
+  usługę z programem w katalogu instalacji.
+- **Nie konfiguruje kopii bazy aplikacji ani rekoncyliacji.** Robi je serwer co
+  noc i przed każdą migracją (`DEPLOY.md` §7).
+- **Nie robi kopii bazy Subiekta.** Pole lokalizacji cofa wyłącznie kopia
+  podmiotu, robiona narzędziami InsERT-a albo SQL Servera.
+- **Nie usuwa loginu SQL przy deinstalacji.** Login powstał na poziomie
+  instancji, więc skrypt podaje gotowe `DROP USER` i `DROP LOGIN`.
+- **Nie cofa tego, co aplikacja zapisała do Subiekta**
+  ([`docs/wdrozenie.md`](../docs/wdrozenie.md)).
 
-## Trzy rzeczy, o których instalator pyta osobno
+## Trzy rzeczy, o które instalator pyta osobno
 
-**Baza podmiotu, a nie jej kopia.**
+**Baza podmiotu, a nie jej kopia.** Kopia ma te same tabele, a pomyłka jest
+cicha: stany byłyby nieaktualne, a adresy szłyby w martwą bazę. Kreator
+pokazuje datę ostatniego dokumentu, liczbę dokumentów i datę utworzenia.
+Podpowiada tylko ściśle najświeższą bazę i nigdy nie odrzuca bazy sam.
 
-> ⚠️ Kopia podmiotu ma **te same tabele** co baza produkcyjna. Kontrola „czy to
-> jest baza Subiekta" jej nie odsieje — odpowiada na inne pytanie niż „czy to
-> jest TA baza".
+**Restart usługi SQL** wyrzuca wszystkich z Subiekta na kilkanaście sekund.
+Wymaga go dopiero włączenie TCP/IP albo uwierzytelniania mieszanego.
 
-Pomyłka jest cicha i dlatego kosztowna. Konto powstałoby na kopii, aplikacja
-czytałaby nieaktualne stany i zapisywała lokalizacje w martwą bazę. Wszystko
-wyglądałoby poprawnie, a objawem byłby dopiero magazynier, któremu stany nie
-zgadzają się z półką.
-
-Kreator pokazuje przy każdej bazie **datę ostatniego dokumentu**, liczbę
-dokumentów i datę utworzenia, a listę sortuje od najświeższej:
-
-```
- *  1. WERTIS            ost. dokument: 2026-07-29   dok:    48 210   utw.: 2019-03-11
-    2. WERTIS_KOPIA      ost. dokument: 2026-06-30   dok:    47 001   utw.: 2026-07-01
-    3. FK_ARCHIWUM       (nie jest bazą Subiekta)
-```
-
-Gwiazdka to podpowiedź Enterem. Pojawia się **tylko przy ściśle najświeższej**
-bazie — dwie kopie z tego samego dnia podpowiedzi nie dostaną, bo byłaby rzutem
-monetą udającym radę.
-
-Po wyborze bazy z dokumentem starszym niż tydzień kreator ostrzega i pyta
-o potwierdzenie. To heurystyka, nie dowód: firma z przerwą w wystawianiu
-dokumentów wygląda tak samo jak kopia, więc instalator nigdy nie odrzuca bazy
-sam.
-
-**Restart usługi SQL.**
-
-> ⚠️ Restart instancji **wyrzuca wszystkich z Subiekta** na kilkanaście sekund.
-> To jedyny krok instalatora o skutku poza samą aplikacją.
-
-Restartu wymaga włączenie TCP/IP i uwierzytelniania mieszanego. Gdy oba
-ustawienia są już włączone — a zwykle są — restartu nie ma wcale.
-
-**Pole lokalizacji.**
-
-> ⚠️ Aplikacja **nadpisuje wybrane pole bezwarunkowo**. Wskazanie pola, którego
-> firma używa do czegoś innego, kasuje te dane bezpowrotnie.
-
-Subiekt w tych wersjach nie ma kolumny „lokalizacja". Używa się jednego
-z ośmiu pól własnych kartoteki. Kreator pokazuje, ile kartotek ma każde pole
-zajęte i czym. Przy niepustym polu żąda potwierdzenia.
+**Pole lokalizacji.** Wybrane pole aplikacja nadpisuje bezwarunkowo. Kreator
+pokazuje zajętość każdego z ośmiu pól własnych i przy niepustym żąda
+potwierdzenia.
 
 ## Rozwój
 
 ```powershell
 .\testy.ps1                 # asercje — najtańsza i najkonkretniejsza bramka
-.\build.ps1                 # scalenie do dist\WERTIS-Instalator.ps1
-.\build.ps1 -Exe            # dodatkowo .exe (wymaga modulu ps2exe)
+.\proba-podmiany.ps1        # prawdziwa podmiana katalogów i wycofanie, w TEMP
+.\build.ps1                 # scalenie do dist\WERTIS-Instalator.ps1 (+ URUCHOM.cmd)
+.\build.ps1 -Exe            # dodatkowo .exe (wymaga modułu ps2exe)
 .\wertis-instalator.ps1 -DryRun -Katalog C:\proba
 ```
 
-| plik | rola |
-|---|---|
-| `wertis-instalator.ps1` | przebieg główny — kolejność kroków i wszystkie pytania |
-| `ui.ps1` | komunikaty, pytania, generator hasła |
-| `sql.ps1` | połączenie z SQL Serverem, checklista, konto aplikacji |
-| `uslugi.ps1` | zależności, NSSM, zapora, publikacja konfiguracji |
-| `testy.ps1` | asercje na logice wywoływalnej bez dotykania systemu |
-| `build.ps1` | scalenie czterech plików w jeden + `.exe` + `URUCHOM.cmd` |
-| `URUCHOM.cmd` | uruchomienie z pominięciem polityki wykonywania |
+`wertis-instalator.ps1` to przebieg główny. Moduły `ui.ps1`, `sql.ps1`,
+`uslugi.ps1` i `paczka.ps1` `build.ps1` wstawia między znaczniki
+`MODULY-POCZATEK` i `MODULY-KONIEC`, bo `ps2exe` pakuje dokładnie jeden plik.
+`zlecenie.ps1` wykonuje aktualizację zleconą z panelu.
 
-`build.ps1` podmienia blok między znacznikami `MODULY-POCZATEK` i
-`MODULY-KONIEC` w skrypcie głównym. Scalanie jest konieczne, bo `ps2exe` pakuje
-dokładnie jeden plik, a `.exe` u klienta nie ma obok siebie tego katalogu.
+**Pliki `.ps1` muszą być zapisane w UTF-8 z BOM.** Windows PowerShell 5.1
+czyta plik bez BOM jako ANSI i polskie znaki się rozsypują. Pilnuje tego krok
+w [`.github/workflows/instalator.yml`](../.github/workflows/instalator.yml).
 
-**Pliki `.ps1` muszą być zapisane w UTF-8 z BOM.** Windows PowerShell 5.1 czyta
-skrypt bez BOM jako ANSI i polskie znaki w komunikatach rozsypują się na
-ekranie osoby przeprowadzającej instalację. Pilnuje tego osobny krok w
-[`.github/workflows/instalator.yml`](../.github/workflows/instalator.yml).
+CI sprawdza kodowanie, składnię, asercje z `testy.ps1`, próbę podmiany,
+scalanie i przebieg `-DryRun`. **`-DryRun` dowodzi przebiegu sterowania, nie
+poprawności kroków**, bo każdy krok wykonawczy siedzi za `Test-DryRun`.
+Bramką na błędy kroków są asercje w `testy.ps1`. Niczego, co wymaga Subiekta,
+CI nie sprawdza: połączenia, konta, usług i zapory. Te cztery rzeczy
+weryfikuje się ręcznie na Subiekcie edu.
 
-### Co bramkuje CI, a czego nie
-
-CI sprawdza kodowanie, składnię, **asercje z `testy.ps1`**, scalanie i przebieg
-`-DryRun` (wariant zwykły i `-Demo`) na `windows-latest`, przez Windows
-PowerShell.
-
-**`-DryRun` dowodzi PRZEBIEGU STEROWANIA, nie poprawności kroków** — i to
-zdanie jest tu po przejściach. Każdy krok wykonawczy siedzi za `Test-DryRun`
-i w przebiegu próbnym jest pomijany, więc zielone CI nie znaczy, że kroki
-działają. Tak przeszła awaria z 27 lipca: `New-Item` na korzeniu dysku
-(`Split-Path "C:\wertis"` → `C:\`) wywracał instalację przy **domyślnych**
-ustawieniach, a CI świeciło zielono. Od tego czasu asercje w `testy.ps1`
-obejmują całą logikę wywoływalną bez dotykania systemu. To one, a nie
-`-DryRun`, są bramką na tę klasę błędów.
-
-Nadal **nie sprawdzamy** niczego, co wymaga Subiekta: połączenia z bazą,
-zakładania konta, rejestracji usług i reguły zapory. Te cztery rzeczy
-weryfikuje się ręcznie — najtaniej na Subiekcie w wersji edu, wg
-[`docs/subiekt-gt-edu-setup.md`](../docs/subiekt-gt-edu-setup.md).
-
-## Antywirus zablokował instalator (IDP.Generic i podobne)
+## Antywirus zablokował instalator
 
 **To jest spodziewane i nie znaczy, że plik jest zarażony.** `IDP.Generic`
-(AVG/Avast), `Trojan:Script/Wacatac` (Defender) i pokrewne to detekcje
-**heurystyczne** — reagują na zachowanie, nie na sygnaturę znanego szkodnika.
+(AVG/Avast) czy `Trojan:Script/Wacatac` (Defender) to detekcje heurystyczne.
+Legalny instalator usługi i dropper wykonują te same czynności: pobierają
+archiwum, zakładają usługi i podnoszą uprawnienia.
 
-Instalator robi po kolei sześć rzeczy, z których każda osobno jest niewinna,
-a razem układają się w podręcznikowy profil droppera:
+`.ps1` to czysty tekst: przeczytaj go i sprawdź sumę
+(`Get-FileHash -Algorithm SHA256`). Instalator sięga wyłącznie do
+`github.com`, `api.github.com`, `nodejs.org` (tylko instalacja z Gita)
+i `nssm.cc`. Ciąg base64, `Invoke-Expression`, `-EncodedCommand` albo inny
+adres to **nie jest** fałszywy alarm — nie uruchamiaj i zgłoś.
 
-| zachowanie | gdzie |
-|---|---|
-| pobiera archiwum z sieci, rozpakowuje i uruchamia z niego plik | `uslugi.ps1` — NSSM |
-| sam **NSSM jest narzędziem dwojakiego użytku** — malware zakłada nim usługi | `uslugi.ps1` |
-| cicha instalacja MSI (`/qn`, bez pytania) | `uslugi.ps1` — Node |
-| rozpakowanie `SecureString` do jawnego hasła | `wertis-instalator.ps1` — hasło `sa` |
-| nadpisanie protokołu TLS | `Initialize-WertisSiec` |
-| podniesienie uprawnień i zakładanie usług | `Test-Administrator`, `Register-WertisUsluga` |
+1. Zgłoś fałszywy alarm producentowi antywirusa.
+2. Użyj `.ps1` zamiast `.exe`, bo binarka z `ps2exe` jest flagowana częściej.
+3. Wykluczenie tylko w ostateczności i wyłącznie na konkretny plik.
 
-Sześć na sześć. Antywirus zachował się poprawnie — kłopot w tym, że legalny
-instalator usługi Windows i dropper wykonują te same czynności.
-
-### Sprawdź to sam, nie na słowo
-
-`.ps1` to **czysty tekst** i to jest jego przewaga nad `.exe`: da się go
-przeczytać przed uruchomieniem.
-
-```powershell
-notepad .\WERTIS-Instalator.ps1
-Get-FileHash .\WERTIS-Instalator.ps1 -Algorithm SHA256
-```
-
-Instalator sięga do **czterech** adresów i żadnego innego:
-
-- `github.com/MateuszPuchalski/mag-asystent.git` — kod aplikacji,
-- `nodejs.org` — instalator Node (suma kontrolna sprawdzana, patrz niżej),
-- `nssm.cc` — opakowanie usług Windows,
-- `github.com/MateuszPuchalski/mag-asystent/releases` — APK dla kolektorów
-  (od 0.52.0, wyłącznie przy `-Aktualizuj`).
-
-**Kiedy zacząć się naprawdę martwić.** Jeśli w pliku zobaczysz długi ciąg
-base64, `Invoke-Expression`, `IEX (New-Object Net.WebClient).DownloadString(...)`,
-`-EncodedCommand` albo adres spoza tej trójki — to **nie jest** fałszywy alarm.
-Nie uruchamiaj i zgłoś. W wydanym pliku żadnej z tych rzeczy nie ma.
-
-Dodatkowo wrzuć plik na [VirusTotal](https://www.virustotal.com). Jeden silnik
-na siedemdziesiąt to fałszywka; dwadzieścia silników to nie fałszywka.
-
-### Co zrobić
-
-1. **Zgłoś fałszywy alarm producentowi.** AVG i Avast:
-   `https://www.avg.com/false-positive-file-form` (Avast ma bliźniaczy).
-   Microsoft: `https://www.microsoft.com/wdsi/filesubmission`. Zwykle poprawiają
-   w kilka dni i problem znika u wszystkich klientów naraz.
-2. **Użyj `.ps1` zamiast `.exe`.** Binarka z `ps2exe` jest flagowana **znacznie
-   częściej** — pakowanie skryptu w plik wykonywalny samo w sobie jest sygnałem
-   dla heurystyki. Każde wydanie niesie oba pliki.
-3. **Wykluczenie tylko w ostateczności** i **wyłącznie na konkretny plik**, na
-   czas instalacji. Nie wyłączaj ochrony i nie wykluczaj całego katalogu — to
-   zamienia jeden fałszywy alarm w trwałą dziurę.
-
-### Sumy kontrolne pobieranych plików
-
-Instalator ściąga trzy pliki, a dwa z nich **uruchamia z uprawnieniami
-administratora**.
-Do sierpnia 2026 robił to bez żadnej weryfikacji — czyli przejęcie DNS w sieci
-klienta wystarczyło, żeby maszyna wykonała cudzy kod jako SYSTEM. **To była
-realna dziura**, w odróżnieniu od detekcji heurystycznej opisanej wyżej.
-
-Dziś każda pozycja ma sprawdzaną sumę SHA-256 **przed użyciem**:
-
-- **Node** — suma z oficjalnego `SHASUMS256.txt` na nodejs.org; niezgodność
-  przerywa instalację.
-- **NSSM** — sumę policzył runner Windows w CI. Pobrał plik wprost
-  z `nssm.cc`. Nie jest wpisana „z pamięci", bo weryfikacja pozorna jest gorsza
-  od jawnego jej braku.
-
-  **Czego ta suma dowodzi, a czego nie.** Nie jest dowodem, że `nssm.cc` było
-  wtedy nienaruszone — to zaufanie przy pierwszym użyciu. Jest natomiast
-  gwarancją, że **od tamtej chwili plik się nie zmienił**. Podmiana zatrzyma
-  instalację u klienta, a w CI **zatrzyma budowę**. Niedostępne `nssm.cc` jest
-  odróżniane od niezgodnej sumy i samo w sobie CI nie psuje.
-
-- **APK kolektora** — suma z pliku `.sha256` leżącego obok wydania. Plik jedzie
-  pod nazwą tymczasową i dostaje właściwą dopiero po zgodnej sumie. Serwer
-  wystawia go kolektorom w tej samej sekundzie, w której go zobaczy, więc
-  pobranie w połowie nie ma prawa wyglądać na gotowe.
+**Każdy pobrany plik ma sumę SHA-256 sprawdzaną przed użyciem.** Paczka ma ją
+obowiązkowo, bo uruchamia ją usługa jako SYSTEM. Przy APK brak sumy daje
+ostrzeżenie, bo Android i tak sprawdzi podpis. Node sprawdza się z
+`SHASUMS256.txt`, a NSSM z sumy policzonej w CI.
 
 ## Znane ograniczenia
 
 - **`.exe` jest niepodpisany.** SmartScreen pokaże ostrzeżenie („Więcej
-  informacji" → „Uruchom mimo to"). Podpisanie wymaga certyfikatu
-  code-signing (OV około 400–600 zł rocznie), czyli decyzji i kosztu po stronie
-  firmy. Szczegóły detekcji antywirusowych — w sekcji wyżej.
-- **Instalator zakłada, że SQL Server jest na tej samej maszynie**, bo tak
-  wygląda instalacja Subiekta. Zdalna instancja zadziała, ale wykrywanie TCP/IP
-  i uwierzytelniania mieszanego czyta rejestr **lokalny** — tam trzeba ustawić
-  je samodzielnie.
+  informacji” → „Uruchom mimo to”). Certyfikat code-signing to decyzja
+  i koszt po stronie firmy.
+- **Instalator zakłada SQL Server na tej samej maszynie.** Zdalna instancja
+  zadziała, ale TCP/IP i uwierzytelnianie mieszane trzeba tam ustawić ręcznie.

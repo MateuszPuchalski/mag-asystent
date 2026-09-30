@@ -17,7 +17,7 @@ import { czasLokalny, dataLokalna } from "../czas.js";
  * Klamra okna raportu: 1–365 dni, w formacie modyfikatora SQLite.
  *
  * Eksportowane od 0.267.0, bo czytelników jest dwóch: raporty magazynu tutaj
- * i `skutecznosc-doboru.ts`. Druga kopia tej klamry rozjechałaby się przy
+ * i `miary-doboru.ts`. Druga kopia tej klamry rozjechałaby się przy
  * pierwszej poprawce granic, a wtedy dwa raporty na jednym ekranie liczyłyby
  * różne „ostatnie 30 dni".
  */
@@ -33,7 +33,7 @@ export const OKNO = (days: number) => `-${Math.max(1, Math.min(365, Math.trunc(d
  * choć 00:05 jest wcześniej niż 19:59. Okno z `>=` było więc do doby
  * SZERSZE, niż deklaruje, a z `<` — do doby WĘŻSZE.
  *
- * Mieszkała w `skutecznosc-doboru.ts` od 0.267.0, a `problems.ts` miał
+ * Mieszkała w raporcie doboru od 0.267.0, a `problems.ts` miał
  * własną kopię. Reszta raportów dalej porównywała z `datetime()`, więc
  * „7 dni" w Analizie liczyło do ośmiu, także w raporcie per osoba
  * (0.494.1). Jedna definicja tutaj, bo trzecia kopia by się rozjechała.

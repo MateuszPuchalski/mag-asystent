@@ -1,7 +1,7 @@
 import React from "react";
 import { ArrowRight, Bot, Camera, ClipboardList, Lock, Paperclip, Ruler, ScanSearch, Send, User, Undo2 } from "lucide-react";
-import type { StatusDoboru, StatusRozmowy, WpisOsi, ZalacznikOsi } from "../api/typy";
-import { NAZWA, NAZWA_DOBORU } from "./statusy";
+import type { StanDoboru, StatusRozmowy, WpisOsi, ZalacznikOsi } from "../api/typy";
+import { NAZWA, NAZWA_STANU_DOBORU } from "./statusy";
 import { LoginKlienta, Przycisk, czas } from "../ui";
 import { pobierzPlik } from "../api/klient";
 import { useZdjecieZalacznika } from "../towar/useZdjecie";
@@ -500,7 +500,7 @@ function etykieta(z: Zdarzenie): string {
      oś bywa czytana z odpowiedzi zapisanej przed 0.243.0. */
   if (!e) return z.tresc;
   if (e.rodzaj === "status") return e.po ? NAZWA[e.po as StatusRozmowy] ?? e.po : z.tresc;
-  if (e.rodzaj === "dobor") return e.po ? NAZWA_DOBORU[e.po as StatusDoboru] ?? e.po : z.tresc;
+  if (e.rodzaj === "dobor") return e.po ? NAZWA_STANU_DOBORU[e.po as StanDoboru] ?? e.po : z.tresc;
   if (e.rodzaj === "zwrot") return `zwrot: ${NAZWA_ZDARZENIA_ZWROTU[e.co] ?? e.co.replace(/_/g, " ")}`;
   if (e.rodzaj === "dobor_wybor") {
     return `${e.wybrano ? "wybrano" : "zdjęto"} ${e.symbol ?? "?"}`;

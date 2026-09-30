@@ -7,19 +7,13 @@ import path from "node:path";
 process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-dobor-")), "t.db");
 process.env.SGT_MODE = "seeded";
 
-/* ── Dobór przy rozmowie (§11, etap E1) ──────────────────────────────────────
-   Kręgosłup doboru: dane wejściowe, status z §7, wybór kartoteki. Testy
-   pilnują granic, które kosztują najwięcej, gdy pękną: odczyt nic nie zapisuje
-   (zero zapisu przy patrzeniu), cudze dane nie giną po cichu (wersja),
-   a zatwierdzenie nie bierze się z niczego (wymaga wyboru). Statusu bez
-   nadawcy — `extracting_data` — człowiek ustawić nie może.                  */
+/* ── Dobór przy rozmowie (`docs/dobor-od-zera.md`) ───────────────────────────
+   Granice, które kosztują najwięcej, gdy pękną: odczyt nic nie zapisuje,
+   cudze dane nie giną po cichu (wersja), wynik „ta część" nie bierze się
+   z niczego, a zdanie do szkicu nie mówi „pasuje" bez dowodu w wiedzy. */
 
 let db: typeof import("../db/db.js").db;
-let doborRozmowy: typeof import("./dobor.js").doborRozmowy;
-let zapiszDane: typeof import("./dobor.js").zapiszDane;
-let ustawStatusDoboru: typeof import("./dobor.js").ustawStatusDoboru;
-let wybierzKandydata: typeof import("./dobor.js").wybierzKandydata;
-let wiedzaDoboru: typeof import("./dobor.js").wiedzaDoboru;
+let D: typeof import("./dobor.js");
 let ConversationConflict: typeof import("./conversations.js").ConversationConflict;
 let W: typeof import("./wiedza.js");
 let S: typeof import("./silniki.js");
@@ -29,10 +23,12 @@ let biuro = 0;
 let rozmowa = 0;
 const SZARPAK = 501;
 const SZARPAK_ALT = 502;
+const NAC = { rodzaj: "maszyna" as const, marka: "NAC", nazwa: "LS 46-450" };
+const BS450 = { rodzaj: "silnik" as const, marka: "Briggs & Stratton", nazwa: "450E" };
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
-  ({ doborRozmowy, zapiszDane, ustawStatusDoboru, wybierzKandydata, wiedzaDoboru } = await import("./dobor.js"));
+  D = await import("./dobor.js");
   ({ ConversationConflict } = await import("./conversations.js"));
   W = await import("./wiedza.js");
   S = await import("./silniki.js");
@@ -44,350 +40,256 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  /* Wiedza PRZED użytkownikami: zatwierdzony dobór rodzi propozycję (E2),
-     a jej autor wskazuje na `app_user` bez kaskady. */
-  for (const t of ["pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika", "model_urzadzenia", "dobor_rozmowy",
-    "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
+  /* Wiedza PRZED użytkownikami: jej autor wskazuje na `app_user` bez kaskady. */
+  for (const t of ["pasowanie_czesci", "dowod_zastosowania", "zastosowanie", "alias_silnika", "zabudowa_silnika",
+    "model_urzadzenia", "dobor", "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
   biuro = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')")
     .run().lastInsertRowid);
-  const konto = Number(d.prepare(
-    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-a')")
+  const konto = Number(d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','seller-a')")
     .run().lastInsertRowid);
-  rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,
-    external_conversation_id,subject) VALUES (?,'w-1','zielony_ogrod')`).run(konto).lastInsertRowid);
+  rozmowa = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,subject)
+    VALUES (?,'w-1','zielony_ogrod')`).run(konto).lastInsertRowid);
 });
 
-const liczba = (tabela: string) =>
-  (db().prepare(`SELECT count(*) n FROM ${tabela}`).get() as { n: number }).n;
-const osDoboru = () => (db().prepare(`SELECT event_type FROM conversation_event
-  WHERE conversation_id=? AND event_type LIKE 'dobor_%' ORDER BY id`).all(rozmowa) as
-  Array<{ event_type: string }>).map((z) => z.event_type);
+const liczba = (tabela: string) => (db().prepare(`SELECT count(*) n FROM ${tabela}`).get() as { n: number }).n;
+const os_ = () => (db().prepare(`SELECT payload FROM conversation_event
+  WHERE conversation_id=? AND event_type='dobor_wynik' ORDER BY id`).all(rozmowa) as Array<{ payload: string }>)
+  .map((z) => JSON.parse(z.payload) as Record<string, unknown>);
+const autor = () => ({ userId: biuro, name: "A. Lewandowska" });
+const czesc = (twId: number, wersja: number, podstawa: "numer" | "wiedza" | "podobne" | "reczny" = "numer") =>
+  D.ustawWynik(rozmowa, { wynik: "czesc", twId, podstawa }, wersja, biuro);
 
-test("bez wiersza dobór jest `not_started` i odczyt niczego nie zapisuje", () => {
-  const d = doborRozmowy(rozmowa);
-  assert.equal(d.status, "not_started");
+test("bez wiersza dobór jest pusty, a odczyt niczego nie zapisuje", () => {
+  const d = D.doborRozmowy(rozmowa);
+  assert.equal(d.stan, "pusty");
+  assert.equal(d.wynik, null);
   assert.equal(d.wersja, 1);
-  assert.equal(d.wybrany, null);
-  assert.equal(liczba("dobor_rozmowy"), 0, "odczyt założył wiersz");
+  assert.equal(liczba("dobor"), 0, "odczyt założył wiersz");
   assert.equal(liczba("events"), 0, "odczyt dopisał zdarzenie");
-  assert.throws(() => doborRozmowy(rozmowa + 999), /Nie znaleziono rozmowy/);
+  D.wiedzaDoboru(rozmowa);
+  assert.equal(liczba("dobor") + liczba("events"), 0);
+  assert.throws(() => D.doborRozmowy(rozmowa + 999), /Nie znaleziono rozmowy/);
 });
 
-test("zapis danych podnosi wersję, startuje dobór i zostawia ślad z różnicą pól", () => {
-  const d = zapiszDane(rozmowa, { marka: " NAC ", model: "LS 46-450", parametry: { "rozstaw": "82 mm" } }, 1, biuro);
+test("zapis danych zapisuje tylko zmienione pola, podnosi wersję i otwiera dobór", () => {
+  const d = D.zapiszDane(rozmowa, { marka: " NAC ", model: "LS 46-450" }, 1, biuro);
   assert.equal(d.wersja, 2);
   assert.equal(d.dane.marka, "NAC", "wartości są przycinane");
-  assert.deepEqual(d.dane.parametry, { rozstaw: "82 mm" });
-  /* Wpisana maszyna znaczy, że dobór SIĘ ZACZĄŁ — wiersz z danymi w `not_started`
-     nie dostałby plakietki w kolejce. */
-  assert.equal(d.status, "searching");
-  assert.equal(d.updatedBy, "A. Lewandowska");
-  assert.deepEqual(osDoboru(), ["dobor_status_changed"]);
-  const audyt = db().prepare("SELECT type, payload FROM events ORDER BY id").all() as
-    Array<{ type: string; payload: string }>;
-  assert.deepEqual(audyt.map((a) => a.type), ["dobor_dane", "dobor_status"]);
+  /* Stan jest wyliczany: dane są, wyniku nie ma. Nic go nie zapisało. */
+  assert.equal(d.stan, "otwarty");
+  assert.equal(d.zmienil, "A. Lewandowska");
+  assert.equal(d.zmienilAutomat, false);
+  const audyt = db().prepare("SELECT type, payload FROM events").all() as Array<{ type: string; payload: string }>;
+  assert.deepEqual(audyt.map((a) => a.type), ["dobor_dane"]);
   assert.match(audyt[0].payload, /"marka":\{"z":null,"na":"NAC"\}/);
+  assert.doesNotMatch(audyt[0].payload, /wariant/, "niezmienione pole nie trafia do śladu");
+  /* Zapis bez zmian nie podnosi wersji koledze ani nie zostawia śladu. */
+  assert.equal(D.zapiszDane(rozmowa, { marka: "NAC " }, 2, biuro).wersja, 2);
+  assert.equal(liczba("events"), 1);
 });
 
-test("zapis bez zmian nie podnosi wersji ani nie zostawia śladu", () => {
-  zapiszDane(rozmowa, { marka: "NAC" }, 1, biuro);
-  const przed = liczba("events");
-  const d = zapiszDane(rozmowa, { marka: "NAC " }, 2, biuro);
-  assert.equal(d.wersja, 2);
-  assert.equal(liczba("events"), przed);
+test("automat podpisuje się jako automat i nie ma konta", () => {
+  const d = D.zapiszDane(rozmowa, { nazwaCzesci: "szarpak" }, 1, { automat: "szkic" });
+  assert.equal(d.zmienil, "automat (szkic)");
+  assert.equal(d.zmienilAutomat, true);
+  assert.equal((db().prepare("SELECT zmienil_user_id u FROM dobor").get() as { u: number | null }).u, null);
 });
 
-test("nieaktualna wersja to konflikt z bieżącym stanem, nie cichy zapis", () => {
-  zapiszDane(rozmowa, { marka: "NAC" }, 1, biuro);
-  /* Drugi agent czytał wersję 1 i wpisuje model. Bez tego strażnika jego zapis
-     wywróciłby markę koleżanki — jak przy szkicu. */
-  assert.throws(() => zapiszDane(rozmowa, { model: "LS 46-450" }, 1, biuro), (e: unknown) => {
+test("nieaktualna wersja to 409 z bieżącym stanem — w obu zapisach", () => {
+  D.zapiszDane(rozmowa, { marka: "NAC" }, 1, biuro);
+  const konflikt = (e: unknown) => {
     assert.ok(e instanceof ConversationConflict);
     assert.equal(e.details.wersja, 2);
-    assert.equal(e.details.updatedBy, "A. Lewandowska");
+    assert.equal(e.details.zmienil, "A. Lewandowska");
+    assert.equal((e.details.dobor as { dane: { marka: string } }).dane.marka, "NAC");
     return true;
-  });
-  assert.equal(doborRozmowy(rozmowa).dane.marka, "NAC");
-  assert.equal(doborRozmowy(rozmowa).dane.model, null);
+  };
+  assert.throws(() => D.zapiszDane(rozmowa, { model: "LS 46-450" }, 1, biuro), konflikt);
+  assert.throws(() => D.ustawWynik(rozmowa, { wynik: "brak" }, 1, biuro), konflikt);
+  assert.equal(D.doborRozmowy(rozmowa).dane.model, null);
+  assert.equal(D.doborRozmowy(rozmowa).wynik, null);
 });
 
-test("`extracting_data` nie ma nadawcy — człowiek nie może go ustawić", () => {
-  assert.throws(() => ustawStatusDoboru(rozmowa, "extracting_data", null, biuro), /Copilot/);
-  assert.throws(() => ustawStatusDoboru(rozmowa, "in_progress", null, biuro), /Nieznany status/);
-  assert.equal(liczba("dobor_rozmowy"), 0);
-});
-
-test("`missing_information` niesie, czego dopytać; wyjście z niego kasuje notatkę", () => {
-  let d = ustawStatusDoboru(rozmowa, "missing_information", "pełny numer seryjny", biuro);
-  assert.equal(d.status, "missing_information");
-  assert.equal(d.brakuje, "pełny numer seryjny");
-  assert.equal(d.wersja, 1, "status nie podnosi wersji danych");
-  d = ustawStatusDoboru(rozmowa, "searching", null, biuro);
-  assert.equal(d.brakuje, null);
-  assert.deepEqual(osDoboru(), ["dobor_status_changed", "dobor_status_changed"]);
-  const p = JSON.parse(String((db().prepare(
-    "SELECT payload FROM conversation_event WHERE event_type='dobor_status_changed' ORDER BY id LIMIT 1")
-    .get() as { payload: string }).payload)) as Record<string, unknown>;
-  assert.equal(p.przed, "not_started");
-  assert.equal(p.po, "missing_information");
-  assert.equal(p.autor, "A. Lewandowska");
-});
-
-test("zatwierdzenie bez wyboru odbija się — nie ma czego wstawić do szkicu", () => {
-  assert.throws(() => ustawStatusDoboru(rozmowa, "confirmed", null, biuro), /wymaga wybranej kartoteki/);
-});
-
-test("wybór bierze symbol z bazy, podnosi status i pisze zdanie do szkicu ze źródłem", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
-  const d = wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
-  assert.equal(d.wersja, 3);
-  assert.equal(d.status, "candidates_found");
+test("wynik „ta część” wymaga kartoteki z bazy i podstawy z listy", () => {
+  assert.throws(() => D.ustawWynik(rozmowa, { wynik: "czesc", podstawa: "numer" }, 1, biuro), /wymaga wybranej kartoteki/);
+  assert.throws(() => D.ustawWynik(rozmowa, { wynik: "czesc", twId: SZARPAK }, 1, biuro), /wymaga podstawy/);
+  assert.throws(() => D.ustawWynik(rozmowa, { wynik: "czesc", twId: SZARPAK, podstawa: "wymiar" as never }, 1, biuro),
+    /wymaga podstawy/);
+  assert.throws(() => czesc(999999, 1), /Nie ma takiej kartoteki/);
+  assert.throws(() => D.ustawWynik(rozmowa, { wynik: "pasuje" as never }, 1, biuro), /Nieznany wynik/);
+  assert.equal(liczba("dobor"), 0, "odmowa niczego nie zapisała");
+  /* Symbol idzie Z BAZY, nie z żądania. */
+  const d = czesc(SZARPAK, 1);
+  assert.equal(d.stan, "czesc");
   assert.equal(d.wybrany?.symbol, "SZR-148/82");
-  assert.equal(d.wybrany?.przez, "A. Lewandowska");
-  /* Zdanie pisze SERWER (§14.3): maszyna, kartoteka i ŹRÓDŁO. Przed
-     zatwierdzeniem to przypuszczenie i zdanie ma to mówić. */
-  assert.match(d.wybrany!.zdanieDoSzkicu, /^Do NAC LS 46-450 prawdopodobnie pasuje SZR-148\/82 — źródło: kartoteka oferty/);
-  const z = ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
-  assert.equal(z.wybrany!.zdanieDoSzkicu, "Do NAC LS 46-450 pasuje SZR-148/82 — źródło: kartoteka oferty, o którą pyta klient.");
-  assert.deepEqual(osDoboru(), ["dobor_status_changed", "dobor_wybrano", "dobor_status_changed", "dobor_status_changed"]);
+  assert.equal(d.wybrany?.podstawa, "numer");
 });
 
-test("wybór bez wskazanej maszyny mówi, że to przypuszczenie", () => {
-  const d = wybierzKandydata(rozmowa, SZARPAK, "wyszukiwarka", 1, biuro);
-  assert.match(d.wybrany!.zdanieDoSzkicu, /bez wskazanej maszyny — to przypuszczenie/);
-  assert.match(d.wybrany!.zdanieDoSzkicu, /wskazane ręcznie przez agenta/);
+test("„dopytać” wymaga zdania, a wynik null otwiera dobór ponownie", () => {
+  assert.throws(() => D.ustawWynik(rozmowa, { wynik: "dopytac", dopytac: "  " }, 1, biuro), /czego brakuje/);
+  let d = D.ustawWynik(rozmowa, { wynik: "dopytac", dopytac: "numer z tabliczki" }, 1, biuro);
+  assert.equal(d.dopytac, "numer z tabliczki");
+  d = D.ustawWynik(rozmowa, { wynik: null }, d.wersja, biuro);
+  assert.equal(d.wynik, null);
+  assert.equal(d.dopytac, null, "zdanie należało do wyniku, którego już nie ma");
+  assert.equal(d.stan, "pusty");
+  assert.deepEqual(os_().map((p) => [p.przed, p.po, p.autor]),
+    [[null, "dopytac", "A. Lewandowska"], ["dopytac", null, "A. Lewandowska"]]);
+  assert.deepEqual((db().prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((e) => e.type),
+    ["dobor_wynik", "dobor_wynik"]);
 });
 
-test("zdjęcie wyboru cofa zatwierdzenie, a nieistniejąca kartoteka i obca droga odbijają się", () => {
-  wybierzKandydata(rozmowa, SZARPAK, "oferta", 1, biuro);
-  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
-  const d = wybierzKandydata(rozmowa, null, "oferta", 2, biuro);
-  assert.equal(d.wybrany, null);
-  assert.equal(d.status, "candidates_found", "zatwierdzenie dotyczyło TEJ kartoteki");
-  assert.ok(osDoboru().includes("dobor_wybor_zdjety"));
+/* ── Zdanie do szkicu: „pasuje" wyłącznie przy potwierdzonym wpisie ───────── */
 
-  assert.throws(() => wybierzKandydata(rozmowa, 999999, "oferta", 3, biuro), /Nie ma takiej kartoteki/);
-  /* Droga spoza §11.2 (semantyka to etap F) — wybór z drogą bez nadawcy
-     udawałby dowód, którego panel nie ma. */
-  assert.throws(() => wybierzKandydata(rozmowa, SZARPAK_ALT, "semantyka", 3, biuro), /nie ma w tym wydaniu nadawcy/);
-  assert.equal(doborRozmowy(rozmowa).wersja, 3);
+test("bez podparcia w wiedzy zdanie NIGDY nie mówi samego „pasuje” — przy każdej podstawie", () => {
+  D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  const zdania = (["numer", "wiedza", "podobne", "reczny"] as const).map((podstawa, i) =>
+    czesc(SZARPAK, 2 + i, podstawa).wybrany!.zdanieDoSzkicu);
+  assert.equal(zdania[0], "SZR-148/82 to część o numerze z pytania klienta; zgodności z NAC LS 46-450 baza wiedzy nie potwierdza.");
+  assert.equal(zdania[1], "Do NAC LS 46-450 prawdopodobnie pasuje SZR-148/82 — źródło: wpis bazy wiedzy bez potwierdzenia;"
+    + " bez potwierdzonego zastosowania.");
+  assert.match(zdania[2], /źródło: trafienie po nazwie — nie dowód; bez potwierdzonego/);
+  assert.match(zdania[3], /źródło: wskazane ręcznie przez agenta; bez potwierdzonego/);
+  for (const z of zdania) assert.doesNotMatch(z, /(?<!prawdopodobnie )pasuje SZR/, z);
 });
 
-test("zmiana wyboru na inną kartotekę przy zatwierdzonym doborze cofa do kandydatów", () => {
-  wybierzKandydata(rozmowa, SZARPAK, "oferta", 1, biuro);
-  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
-  const d = wybierzKandydata(rozmowa, SZARPAK_ALT, "zamiennik", 2, biuro);
-  assert.equal(d.status, "candidates_found");
-  assert.equal(d.wybrany?.symbol, "SZR-150/82");
+test("bez maszyny zdanie mówi, że to przypuszczenie; numer mówi tylko o numerze", () => {
+  assert.equal(czesc(SZARPAK, 1, "reczny").wybrany!.zdanieDoSzkicu,
+    "SZR-148/82 — źródło: wskazane ręcznie przez agenta; dobór bez wskazanej maszyny — to przypuszczenie.");
+  assert.equal(czesc(SZARPAK, 2, "numer").wybrany!.zdanieDoSzkicu, "SZR-148/82 to część o numerze z pytania klienta.");
 });
 
-/* ── Dobór karmi bazę wiedzy (E2) ─────────────────────────────────────────── */
+test("zatwierdzone zastosowanie z dowodem technicznym daje „pasuje” ze źródłem, bez nazwiska", () => {
+  D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  const z = W.zaproponujZastosowanie({ twId: SZARPAK, model: NAC, polaryzacja: "pasuje", zrodlo: "reczne",
+    dowod: { rodzaj: "pomiar_wlasny", tresc: "rozstaw 148 mm" } }, autor())!;
+  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
+  const zdanie = czesc(SZARPAK, 2, "wiedza").wybrany!.zdanieDoSzkicu;
+  assert.match(zdanie, /^Do NAC LS 46-450 pasuje SZR-148\/82 — źródło: potwierdzone zastosowanie do NAC LS 46-450 — pomiar własny, /);
+  assert.doesNotMatch(zdanie, /Lewandowska/, "nazwisko pracownika w zdaniu dla klienta");
+  assert.match(zdanie, /pomiar własny, \d{1,2}\.\d{2}\.\d{4}\.$/, "źródło z datą zostaje");
+});
 
-test("zatwierdzony dobór z marką i modelem rodzi PROPOZYCJĘ z dowodem rozmowy — nie fakt", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
-  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
-  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
+test("warunek wpisu: nieznany zbija do „prawdopodobnie”, złamany mówi „może nie pasować”", () => {
+  D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  const z = W.zaproponujZastosowanie({ twId: SZARPAK, model: NAC, polaryzacja: "pasuje", zrodlo: "reczne",
+    dowod: { rodzaj: "producent", tresc: "IPL 2024" }, warunki: { seryjnyOd: "175000000" } }, autor())!;
+  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
+  czesc(SZARPAK, 2, "wiedza");
+  assert.match(D.doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu,
+    /^Do NAC LS 46-450 prawdopodobnie pasuje SZR-148\/82 — źródło: potwierdzone zastosowanie do NAC LS 46-450 \(nr seryjny od 175000000\)/);
+  /* Dopisany numer seryjny doprecyzowuje maszynę, więc wybór zostaje,
+     a zdanie liczy się od nowa z bieżących danych. */
+  D.zapiszDane(rozmowa, { nrSeryjny: "175 000 001" }, 3, biuro);
+  assert.match(D.doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, /^Do NAC LS 46-450 pasuje SZR-148\/82 — źródło: potwierdzone/);
+  /* Inny numer to inny egzemplarz: wybór schodzi i trzeba wybrać od nowa. */
+  assert.equal(D.zapiszDane(rozmowa, { nrSeryjny: "174999999" }, 4, biuro).wybrany, null);
+  assert.match(czesc(SZARPAK, 5, "wiedza").wybrany!.zdanieDoSzkicu, new RegExp("^SZR-148/82 do NAC LS 46-450 może nie pasować"
+    + " — wpis obejmuje nr seryjny od 175000000, a w doborze nr 174999999; źródło: potwierdzone zastosowanie"));
+});
+
+const zabuduj = (rodzajDowodu: "producent" | "rozmowa" = "producent") => S.rozstrzygnijZabudowe(S.zaproponujZabudowe({
+  maszyna: NAC, silnik: BS450, rodzajDowodu, dowodTresc: "karta katalogowa", zrodlo: "reczne" }, autor())!.id,
+"zatwierdz", null, biuro);
+const doSilnika = (rodzaj: "katalog_dostawcy" | "producent") => W.rozstrzygnijZastosowanie(W.zaproponujZastosowanie({
+  twId: SZARPAK, model: BS450, polaryzacja: "pasuje", zrodlo: "reczne", dowod: { rodzaj, tresc: "katalog 2024" } },
+autor())!.id, "zatwierdz", null, biuro);
+
+test("zdanie przez silnik nazywa OBA ogniwa, a słabsze ogniwo zbija je do „prawdopodobnie”", () => {
+  D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  zabuduj();
+  doSilnika("katalog_dostawcy");
+  const zdanie = czesc(SZARPAK, 2, "wiedza").wybrany!.zdanieDoSzkicu;
+  assert.match(zdanie, /^Do NAC LS 46-450 pasuje SZR-148\/82 — pasuje do silnik Briggs & Stratton 450E, który stoi w tej maszynie/);
+  assert.match(zdanie, /silnik Briggs & Stratton 450E stoi w NAC LS 46-450 — producent/);
+  assert.equal(D.wiedzaDoboru(rozmowa).zabudowa?.silnik.etykieta, "silnik Briggs & Stratton 450E");
+});
+
+test("zabudowa na samym śladzie rozmowy to słabe ogniwo — „prawdopodobnie pasuje”", () => {
+  D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  zabuduj("rozmowa");
+  doSilnika("producent");
+  assert.match(czesc(SZARPAK, 2, "wiedza").wybrany!.zdanieDoSzkicu, /prawdopodobnie pasuje/);
+});
+
+test("pasowanie do części klienta podpiera zdanie bez maszyny", () => {
+  const p = P.zaproponujPasowanie({ twId: SZARPAK_ALT, doTwId: SZARPAK, rola: "uszczelka", pozycja: "od strony filtra",
+    polaryzacja: "pasuje", rodzajDowodu: "katalog_dostawcy", dowodTresc: "katalog 2024", zrodlo: "reczne" }, autor())!;
+  P.rozstrzygnijPasowanie(p.id, "zatwierdz", null, biuro);
+  /* Agent wpisał SYMBOL części klienta w polu OEM; maszyny nie zna wcale. */
+  D.zapiszDane(rozmowa, { oem: "SZR-148/82", nazwaCzesci: "uszczelka" }, 1, biuro);
+  assert.match(czesc(SZARPAK_ALT, 2, "wiedza").wybrany!.zdanieDoSzkicu,
+    /^Do SZR-148\/82 pasuje SZR-150\/82 \(uszczelka, od strony filtra\) — źródło: /);
+  assert.equal(D.wiedzaDoboru(rozmowa).pasowanie?.doCzego.symbol, "SZR-148/82");
+});
+
+/* ── Wiedza rośnie z pracy ────────────────────────────────────────────────── */
+
+test("„ta część” przy marce i modelu rodzi PROPOZYCJĘ z dowodem rozmowy — nie fakt", () => {
+  D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  czesc(SZARPAK, 2);
   const { propozycje } = W.kolejkaPropozycji();
   assert.equal(propozycje.length, 1);
   assert.equal(propozycje[0].stan, "propozycja", "automat proponuje, nie zatwierdza");
-  assert.equal(propozycje[0].twId, SZARPAK);
   assert.equal(propozycje[0].model.etykieta, "NAC LS 46-450");
   assert.equal(propozycje[0].zrodlo, "dobor");
   assert.equal(propozycje[0].conversationId, rozmowa);
   assert.equal(propozycje[0].dowody[0].rodzaj, "rozmowa");
-  /* Drugie zatwierdzenie tej samej pary (po cofnięciu i ponownym wyborze) nie dubluje. */
-  ustawStatusDoboru(rozmowa, "candidates_found", null, biuro);
-  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
+  /* Ta sama kartoteka drugi raz nie dubluje propozycji. */
+  czesc(SZARPAK, 3, "reczny");
   assert.equal(W.kolejkaPropozycji().liczba, 1);
-  /* Szkic: propozycja to jeszcze nie wiedza — zdanie zostaje zdaniem agenta. */
-  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, /źródło: kartoteka oferty/);
 });
 
-test("dobór bez marki albo modelu nie rodzi propozycji", () => {
-  zapiszDane(rozmowa, { marka: "NAC" }, 1, biuro);
-  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
-  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
+test("bez marki albo modelu wynik nie rodzi propozycji", () => {
+  D.zapiszDane(rozmowa, { marka: "NAC" }, 1, biuro);
+  czesc(SZARPAK, 2);
   assert.equal(W.kolejkaPropozycji().liczba, 0);
-  assert.equal(liczba("model_urzadzenia"), 0);
 });
 
-test("zdjęcie wyboru wycofuje własną propozycję; zatwierdzonej nie rusza", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
-  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
-  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
-  wybierzKandydata(rozmowa, null, "oferta", 3, biuro);
+test("zejście z części i zmiana kartoteki wycofują własną propozycję; zatwierdzonej nie rusza", () => {
+  D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
+  czesc(SZARPAK, 2);
+  D.ustawWynik(rozmowa, { wynik: "brak" }, 3, biuro);
   assert.equal(W.kolejkaPropozycji().liczba, 0);
-  assert.equal(W.zastosowaniaTowaru(SZARPAK).propozycje.length, 0);
-
-  wybierzKandydata(rozmowa, SZARPAK_ALT, "zamiennik", 4, biuro);
-  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
+  czesc(SZARPAK_ALT, 4);
   const z = W.kolejkaPropozycji().propozycje[0];
   W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
-  wybierzKandydata(rozmowa, SZARPAK, "oferta", 5, biuro);
+  czesc(SZARPAK, 5);
   assert.equal(W.zastosowanie(z.id)!.stan, "zatwierdzone", "człowiek zatwierdził — automat nie cofa");
 });
 
-test("zatwierdzone zastosowanie z dowodem technicznym wchodzi do zdania szkicu", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
-  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
-  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
-  const z = W.kolejkaPropozycji().propozycje[0];
-  W.dodajDowod(z.id, { rodzaj: "pomiar_wlasny", tresc: "rozstaw 148 mm" }, biuro);
-  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
-  const zdanie = doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu;
-  assert.match(zdanie, /^Do NAC LS 46-450 pasuje SZR-148\/82 — źródło: potwierdzone zastosowanie do NAC LS 46-450 — pomiar własny, /);
-  /* Do klienta bez nazwiska pracownika (0.232.1) — to samo, co szkic Copilota. */
-  assert.doesNotMatch(zdanie, /Lewandowska|Kowal/, "nazwisko pracownika w zdaniu dla klienta");
-  assert.match(zdanie, /pomiar własny, \d{1,2}\.\d{2}\.\d{4}\.$/, "źródło z datą zostaje");
-  /* Odczyt nadal niczego nie zapisuje. */
-  const przed = liczba("events");
-  doborRozmowy(rozmowa);
-  assert.equal(liczba("events"), przed);
+test("automat dopisujący pustą markę nie zdejmuje części wybranej przez człowieka", () => {
+  D.zapiszDane(rozmowa, { oem: "532199377" }, 1, biuro);
+  czesc(SZARPAK, 2, "numer");
+  const d = D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 3, { automat: "szkic" });
+  assert.equal(d.wynik, "czesc", "wynik ustawia wyłącznie człowiek — automat go nie zdejmuje");
+  assert.equal(d.wybrany?.twId, SZARPAK);
+  assert.equal(d.dane.marka, "NAC");
 });
 
-test("warunek wpisu decyduje o zdaniu: nieznany zbija do „prawdopodobnie”, złamany nie jest źródłem", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
-  const z = W.zaproponujZastosowanie({ twId: SZARPAK, model: { rodzaj: "maszyna", marka: "NAC", nazwa: "LS 46-450" },
-    polaryzacja: "pasuje", zrodlo: "reczne", dowod: { rodzaj: "producent", tresc: "IPL 2024" },
-    warunki: { seryjnyOd: "175000000" } }, { userId: biuro, name: "A. Lewandowska" })!;
-  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
-  wybierzKandydata(rozmowa, SZARPAK, "zastosowanie", 2, biuro);
-  /* Numeru w danych brak: dowód producenta jest, ale nie wiemy, czy ten egzemplarz się łapie. */
-  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu,
-    /^Do NAC LS 46-450 prawdopodobnie pasuje SZR-148\/82 — źródło: potwierdzone zastosowanie do NAC LS 46-450 \(nr seryjny od 175000000\)/);
-  zapiszDane(rozmowa, { nrSeryjny: "175 000 001" }, 3, biuro);
-  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, /^Do NAC LS 46-450 pasuje SZR-148\/82 — źródło: potwierdzone/);
-  /* Pod granicą wpis mówi o INNYCH egzemplarzach — cytowany jako źródło kłamałby. */
-  zapiszDane(rozmowa, { nrSeryjny: "174999999" }, 4, biuro);
-  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, new RegExp("^SZR-148/82 do NAC LS 46-450 może nie pasować"
-    + " — wpis obejmuje nr seryjny od 175000000, a w doborze nr 174999999; źródło: potwierdzone zastosowanie do NAC LS 46-450 \\("));
-  assert.equal(W.zastosowanie(z.id)!.stan, "zatwierdzone", "odczyt doboru niczego w wiedzy nie rusza");
+test("zmiana marki zdejmuje wybraną część, wycofuje propozycję i zostawia ślad na osi", () => {
+  D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450", nazwaCzesci: "szarpak" }, 1, biuro);
+  czesc(SZARPAK, 2);
+  assert.equal(W.kolejkaPropozycji().liczba, 1);
+  /* Silnik i nazwa części opisują pytanie, nie maszynę — wybór zostaje. */
+  let d = D.zapiszDane(rozmowa, { nazwaCzesci: "szarpak rozrusznika", silnik: "B&S 450E" }, 3, biuro);
+  assert.equal(d.wynik, "czesc");
+  d = D.zapiszDane(rozmowa, { marka: "Stiga" }, 4, { automat: "szkic" });
+  assert.equal(d.wynik, null);
+  assert.equal(d.wybrany, null);
+  assert.equal(d.stan, "otwarty");
+  assert.equal(d.dane.marka, "Stiga");
+  assert.equal(W.kolejkaPropozycji().liczba, 0, "propozycja dotyczyła innej maszyny");
+  const ostatni = os_().at(-1)!;
+  assert.deepEqual([ostatni.przed, ostatni.po, ostatni.symbol, ostatni.autor], ["czesc", null, "SZR-148/82", "automat (szkic)"]);
+  /* Miary liczą z dziennika — zejście musi tam stać, inaczej rozmowa
+     liczyłaby się jako „ta część". */
+  const wpis = db().prepare("SELECT payload FROM events WHERE type='dobor_wynik' ORDER BY id DESC LIMIT 1").get() as { payload: string };
+  assert.equal((JSON.parse(wpis.payload) as { po: unknown }).po, null);
 });
 
-/* ── Silnik jako drugie ogniwo: zdanie do szkicu i wybór przy zatwierdzeniu ── */
-
-const NAC = { rodzaj: "maszyna" as const, marka: "NAC", nazwa: "LS 46-450" };
-const BS450 = { rodzaj: "silnik" as const, marka: "Briggs & Stratton", nazwa: "450E" };
-
-/** Zatwierdzona para NAC → B&S 450E. */
-const zabuduj = () => S.rozstrzygnijZabudowe(S.zaproponujZabudowe({
-  maszyna: NAC, silnik: BS450, rodzajDowodu: "producent", dowodTresc: "karta katalogowa",
-  zrodlo: "reczne" }, { userId: biuro, name: "A. Lewandowska" })!.id, "zatwierdz", null, biuro);
-
-test("zdanie do szkicu przez silnik nazywa OBA ogniwa — inaczej kłamałoby przez pominięcie", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
-  const zab = zabuduj();
-  /* Zastosowanie części do SILNIKA, nie do maszyny. */
-  const z = W.zaproponujZastosowanie({ twId: SZARPAK, model: BS450, polaryzacja: "pasuje", zrodlo: "reczne",
-    dowod: { rodzaj: "katalog_dostawcy", tresc: "katalog 2024" } }, { userId: biuro, name: "A. Lewandowska" })!;
-  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
-  wybierzKandydata(rozmowa, SZARPAK, "silnik", 2, biuro);
-
-  const zdanie = doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu;
-  assert.match(zdanie, /^Do NAC LS 46-450 pasuje SZR-148\/82 — pasuje do silnik Briggs & Stratton 450E, który stoi w tej maszynie/);
-  assert.match(zdanie, /zastosowanie do silnik Briggs & Stratton 450E — katalog dostawcy/);
-  assert.match(zdanie, /silnik Briggs & Stratton 450E stoi w NAC LS 46-450 — producent/);
-  assert.doesNotMatch(zdanie, /Lewandowska|Kowal/, "nazwisko pracownika w zdaniu dla klienta");
-  assert.equal(zab.pewnosc, "potwierdzone");
-});
-
-test("słabsze ogniwo zbija zdanie na „prawdopodobnie”", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
-  S.rozstrzygnijZabudowe(S.zaproponujZabudowe({ maszyna: NAC, silnik: BS450, rodzajDowodu: "rozmowa",
-    dowodTresc: "klient podał z tabliczki", zrodlo: "reczne" },
-    { userId: biuro, name: "A. Lewandowska" })!.id, "zatwierdz", null, biuro);
-  const z = W.zaproponujZastosowanie({ twId: SZARPAK, model: BS450, polaryzacja: "pasuje", zrodlo: "reczne",
-    dowod: { rodzaj: "producent", tresc: "IPL" } }, { userId: biuro, name: "A. Lewandowska" })!;
-  W.rozstrzygnijZastosowanie(z.id, "zatwierdz", null, biuro);
-  wybierzKandydata(rozmowa, SZARPAK, "silnik", 2, biuro);
-  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, /prawdopodobnie pasuje/);
-});
-
-test("zatwierdzenie „do silnika” rodzi propozycję przy MODELU SILNIKA, nie maszyny", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
-  const zab = zabuduj();
-  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
-  ustawStatusDoboru(rozmowa, "confirmed", null, biuro, undefined, zab.silnik.id);
-
-  const p = W.kolejkaPropozycji().propozycje;
-  assert.equal(p.length, 1);
-  assert.equal(p[0].model.rodzaj, "silnik");
-  assert.equal(p[0].model.etykieta, "silnik Briggs & Stratton 450E");
-  /* Ślad mówi, DO CZEGO zatwierdzono — inaczej kolejka nie odróżni obu gałęzi. */
-  assert.match(p[0].dowody[0].tresc, /do silnika silnik Briggs & Stratton 450E/);
-});
-
-test("bez wskazania silnika propozycja idzie do maszyny — zachowanie sprzed zmiany", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
-  zabuduj();
-  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
-  ustawStatusDoboru(rozmowa, "confirmed", null, biuro);
-  assert.equal(W.kolejkaPropozycji().propozycje[0].model.rodzaj, "maszyna");
-});
-
-test("silnik spoza ZATWIERDZONYCH zabudów tej maszyny odbija się ze zdaniem", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
-  /* Propozycja zabudowy to jeszcze nie zabudowa — wybór z ekranu nie ma prawa
-     udawać faktu, którego w bazie nie ma. */
-  const propozycja = S.zaproponujZabudowe({ maszyna: NAC, silnik: BS450, rodzajDowodu: "producent",
-    dowodTresc: "karta", zrodlo: "reczne" }, { userId: biuro, name: "A. Lewandowska" })!;
-  wybierzKandydata(rozmowa, SZARPAK, "oferta", 2, biuro);
-  assert.throws(() => ustawStatusDoboru(rozmowa, "confirmed", null, biuro, undefined, propozycja.silnik.id),
-    /nie jest zatwierdzony silnik tej maszyny/);
-  /* Transakcja się cofnęła: status nie przeszedł na `confirmed`. */
-  assert.notEqual(doborRozmowy(rozmowa).status, "confirmed");
-});
-
-test("wiedzaDoboru oddaje silniki maszyny — jedno żądanie, nie drugie na to samo", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450" }, 1, biuro);
-  const zab = zabuduj();
-  const w = wiedzaDoboru(rozmowa);
-  assert.deepEqual(w.silniki.map((z) => z.silnik.id), [zab.silnik.id]);
-  assert.equal(w.zastosowanie, null);
-  assert.equal(w.zabudowa, null);
-  assert.equal(w.silnikZPola, null, "pole „Silnik” puste — nie ma czego rozpoznawać");
-});
-
-test("wiedzaDoboru rozpoznaje tekst z pola „Silnik” słownikiem i mówi, czy para już istnieje", () => {
-  zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450", silnik: "Lonci v200" }, 1, biuro);
-  assert.equal(wiedzaDoboru(rozmowa).silnikZPola, null, "bez aliasu tekst nic nie znaczy");
-  const LONCIN = { rodzaj: "silnik" as const, marka: "Loncin", nazwa: "V200" };
-  S.dodajAliasSilnika({ tekst: "Lonci v200", silnik: LONCIN }, { userId: biuro, name: "A. Lewandowska" });
-  let w = wiedzaDoboru(rozmowa);
-  assert.equal(w.silnikZPola?.alias.silnik.etykieta, "silnik Loncin V200");
-  assert.equal(w.silnikZPola?.zabudowa, null, "pary nie ma — można zaproponować");
-  const z = S.zaproponujZabudowe({ maszyna: NAC, silnik: LONCIN, rodzajDowodu: "rozmowa",
-    dowodTresc: "klient podał", zrodlo: "dobor", conversationId: rozmowa }, { userId: biuro, name: "A. Lewandowska" })!;
-  w = wiedzaDoboru(rozmowa);
-  assert.equal(w.silnikZPola?.zabudowa?.id, z.id);
-  assert.equal(w.silnikZPola?.zabudowa?.stan, "propozycja");
-  assert.equal(w.silnikZPola?.zabudowa?.pewnosc, "prawdopodobne", "ślad rozmowy to nie dowód techniczny");
-});
-
-/* ── Pasowanie w szkicu: klient nazwał CZĘŚĆ, nie maszynę ─────────────────── */
-
-test("wybór z drogi `pasowanie` wchodzi, a szkic nazywa gaźnik, rolę i pozycję — bez maszyny", () => {
-  const p = P.zaproponujPasowanie({ twId: SZARPAK_ALT, doTwId: SZARPAK, rola: "uszczelka", pozycja: "od strony filtra",
-    polaryzacja: "pasuje", rodzajDowodu: "katalog_dostawcy", dowodTresc: "katalog 2024", zrodlo: "reczne" },
-    { userId: biuro, name: "A. Lewandowska" })!;
-  P.rozstrzygnijPasowanie(p.id, "zatwierdz", null, biuro);
-  /* Agent wpisał SYMBOL części klienta w polu OEM; maszyny nie zna wcale. */
-  zapiszDane(rozmowa, { oem: "SZR-148/82", nazwaCzesci: "uszczelka" }, 1, biuro);
-  wybierzKandydata(rozmowa, SZARPAK_ALT, "pasowanie", 2, biuro);
-  const d = doborRozmowy(rozmowa);
-  assert.equal(d.wybrany!.droga, "pasowanie", "CHECK zna nową drogę");
-  assert.match(d.wybrany!.zdanieDoSzkicu,
-    /^Do SZR-148\/82 pasuje SZR-150\/82 \(uszczelka, od strony filtra\) — źródło: uszczelka \(od strony filtra\) SZR-150\/82 pasuje do SZR-148\/82 — katalog dostawcy, /);
-  assert.equal(wiedzaDoboru(rozmowa).pasowanie?.doCzego.symbol, "SZR-148/82");
-});
-
-test("bez wskazanej części klienta pasowanie nie podpiera szkicu — zostaje przypuszczenie", () => {
-  const p = P.zaproponujPasowanie({ twId: SZARPAK_ALT, doTwId: SZARPAK, rola: "uszczelka", polaryzacja: "pasuje",
-    rodzajDowodu: "katalog_dostawcy", dowodTresc: "katalog", zrodlo: "reczne" }, { userId: biuro, name: "A. Lewandowska" })!;
-  P.rozstrzygnijPasowanie(p.id, "zatwierdz", null, biuro);
-  zapiszDane(rozmowa, { nazwaCzesci: "uszczelka" }, 1, biuro);
-  wybierzKandydata(rozmowa, SZARPAK_ALT, "wyszukiwarka", 2, biuro);
-  assert.match(doborRozmowy(rozmowa).wybrany!.zdanieDoSzkicu, /to przypuszczenie/);
+test("pomiar do wiedzy wymaga marki i modelu z danych doboru", () => {
+  assert.throws(() => D.pomiarDoWiedzy(rozmowa, { zadanieId: 1, polaryzacja: "pasuje" }, biuro), /Wpisz markę i model/);
 });

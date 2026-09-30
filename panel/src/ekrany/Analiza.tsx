@@ -12,6 +12,7 @@ import { ZakresUzycia } from "../analiza/ZakresUzycia";
 import { MiaryObslugi } from "../analiza/MiaryObslugi";
 import { TarcieSkrzynki } from "../analiza/TarcieSkrzynki";
 import { ZakresTygodnia } from "../analiza/ZakresTygodnia";
+import { Wskazniki } from "../analiza/Wskazniki";
 
 /* ── ANALIZA (0.440.0) ───────────────────────────────────────────────────
    Przeniesiona z ANALIZY w `biuro.html`. Wgląd, nie praca: nic tu nie czeka
@@ -38,8 +39,8 @@ import { ZakresTygodnia } from "../analiza/ZakresTygodnia";
    stałe, od poniedziałku do poniedziałku, i liczy go serwer sam. Czipy okna
    znikają, bo czip, który niczego nie zmienia, jest decyzją za dużo.
 
-   Pobierany jest WYŁĄCZNIE widoczny zakres — ta sama zasada, która trzymała
-   biuro: nie pobiera się danych, na które nikt nie patrzy. */
+   Pobierany jest WYŁĄCZNIE widoczny zakres i trzy wskaźniki, które stoją
+   nad każdym z nich: nie pobiera się danych, na które nikt nie patrzy. */
 
 type Zakres = "dostawy" | "tydzien" | "hala" | "obsluga" | "uzycie";
 
@@ -96,6 +97,10 @@ export function Analiza() {
             pozycje={OKNA[zakres].map((d) => ({ klucz: d, etykieta: `${d} dni` }))} /></div>}
       </div>
     </Karta>
+
+    {/* Nad zakresami, bo odpowiadają na pytania całego systemu, nie jednego
+        zakresu. Własne stałe okno — patrz `analiza/Wskazniki.tsx`. */}
+    <Wskazniki />
 
     <Blad>{bladCsv || biezacy?.error?.message}</Blad>
 

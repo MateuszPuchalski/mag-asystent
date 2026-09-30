@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import React from "react";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import type { SzkicCopilota } from "../api/typy";
 
 /* ── Zakładka WIEDZA (§14.3) ─────────────────────────────────────────────────
    Dowody i pomiary przyjechały tu z „Doboru" razem z tymi testami. Pilnujemy
@@ -11,7 +12,9 @@ import userEvent from "@testing-library/user-event";
       bez źródła jest przypuszczeniem — zdanie ma stać tam, gdzie agent pisze.
    2. Brak wpisu w bazie wiedzy MÓWI o sobie, zamiast pokazywać pustkę.
    3. Pomiar z hali NIE JEST jeszcze wiedzą i ekran to nazywa („niezatwierdzone
-      jako wiedza"), a propozycja idzie wyłącznie na kliknięcie (§13.4).      */
+      jako wiedza"), a propozycja idzie wyłącznie na kliknięcie (§13.4).
+   4. Pasowanie rozpoznane przez Copilota stoi tutaj, a nie w Doborze, i idzie
+      do kolejki wiedzy wyłącznie na kliknięcie (`docs/dobor-od-zera.md` §6). */
 
 const wiedza = vi.fn();
 const pomiar = { mutate: vi.fn(), isPending: false, error: null as unknown };
@@ -19,11 +22,23 @@ vi.mock("../api/rozmowy", () => ({
   useWiedzaDoboru: (id: number | null) => wiedza(id),
   usePomiarDoWiedzy: () => pomiar,
 }));
+const ocenPasowanie = { mutate: vi.fn(), isPending: false, error: null as unknown };
+vi.mock("../api/copilot", () => ({ useOcenPasowanie: () => ocenPasowanie }));
+/* Kafle pary pobierają zdjęcie `fetch`em; w jsdomie nie ma dokąd go wysłać. */
+vi.mock("../towar/useZdjecie", () => ({ useZdjecie: () => null }));
 
 const { Wiedza } = await import("./Wiedza");
 
-const pokaz = (p: { twId?: number | null; maMaszyne?: boolean } = {}) =>
-  render(<Wiedza rozmowaId={4821} twId={p.twId ?? 14} maMaszyne={p.maMaszyne ?? false} />);
+const pokaz = (p: { twId?: number | null; maMaszyne?: boolean; propozycja?: SzkicCopilota | null } = {}) =>
+  render(<Wiedza rozmowaId={4821} twId={p.twId ?? 14} maMaszyne={p.maMaszyne ?? false}
+    propozycja={p.propozycja ?? null} />);
+
+const PARA: SzkicCopilota["pasowanie"] = {
+  czesc: { twId: 811, symbol: "LC170430140-0001", nazwa: "Uszczelka do gaźników GX160 (od strony filtra)" },
+  doCzego: { twId: 502, symbol: "W09-0211", nazwa: "Gaźnik do silników HONDA GX160" },
+  rola: "uszczelka", pozycja: "od strony filtra",
+};
+const szkic = (n: Partial<SzkicCopilota>) => ({ pasowanie: PARA, pasowanieOcena: null, ...n }) as SzkicCopilota;
 
 const ZASTOSOWANIE = {
   id: 3, twId: 14, symbol: "FTC272", polaryzacja: "pasuje", powodNegatywny: null, zdaniePowodu: null,
@@ -108,5 +123,27 @@ describe("zakładka wiedzy", () => {
     await userEvent.click(screen.getByRole("button", { name: /Zaproponuj jako dowód/ }));
     expect(pomiar.mutate).toHaveBeenCalledWith(
       { id: 4821, zadanieId: 400, twId: 99, polaryzacja: "pasuje", powodNegatywny: null });
+  });
+
+  it("karta pary pokazuje oba końce z rolą i pozycją; klik proponuje albo odrzuca samą oceną", async () => {
+    pokaz({ propozycja: szkic({}) });
+    const karta = screen.getByRole("region", { name: "Pasowanie z rozmowy" });
+    expect(karta).toHaveTextContent("LC170430140-0001");
+    expect(karta).toHaveTextContent("W09-0211");
+    expect(karta).toHaveTextContent("uszczelka · od strony filtra");
+    await userEvent.click(within(karta).getByRole("button", { name: "Zaproponuj pasowanie" }));
+    expect(ocenPasowanie.mutate).toHaveBeenCalledWith({ rozmowaId: 4821, ocena: "zaproponowane" });
+    await userEvent.click(within(karta).getByRole("button", { name: "Odrzuć" }));
+    expect(ocenPasowanie.mutate).toHaveBeenLastCalledWith({ rozmowaId: 4821, ocena: "odrzucone" });
+  });
+
+  it("po zaproponowaniu karta mówi, że para czeka, i nie ma przycisków; po odrzuceniu karty nie ma", () => {
+    const { unmount } = pokaz({ propozycja: szkic({ pasowanieOcena: "zaproponowane" }) });
+    const karta = screen.getByRole("region", { name: "Pasowanie z rozmowy" });
+    expect(karta).toHaveTextContent(/czeka w kolejce wiedzy/);
+    expect(within(karta).queryByRole("button", { name: /Zaproponuj|Odrzuć/ })).toBeNull();
+    unmount();
+    pokaz({ propozycja: szkic({ pasowanieOcena: "odrzucone" }) });
+    expect(screen.queryByRole("region", { name: "Pasowanie z rozmowy" })).toBeNull();
   });
 });

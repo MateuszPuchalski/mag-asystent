@@ -912,7 +912,7 @@ export function migrate(database: DatabaseSync) {
   addColumn("delivery_line", "cofniecie", "TEXT");
   addColumn("problem", "zrodlo",
     "TEXT CHECK (zrodlo IS NULL OR zrodlo IN ('zakonczenie','nadmiar'))");
-  doborZnaDrogi(database);
+  przeniesDobor(database);
   identyfikatorZamiennika(database);
   typZakonczeniaWSkrzynce(database);
   znacznikiIso(database);
@@ -2495,77 +2495,52 @@ function bezBrygadzisty(database: DatabaseSync) {
  * NOT NULL zwykłym ALTER-em. Wiersze zostają co do jednego.
  */
 /**
- * Drogi doboru w `dobor_rozmowy.wybrany_droga` — PRZEBUDOWA TABELI.
+ * Jednorazowa kopia `dobor_rozmowy` do `dobor` (`docs/dobor-od-zera.md` §5.4).
  *
- * `CHECK` na tej kolumnie stoi WYŁĄCZNIE w `schema.sql`, a `CREATE TABLE IF
- * NOT EXISTS` nie poprawi bazy, która już istnieje. Bez tej funkcji agent
- * kliknąłby „Wybierz" przy kandydacie z nowej drogi i dostał surowy
- * `SQLITE_CONSTRAINT` — najgorszy możliwy objaw, bo wyszedłby dopiero
- * u klienta i dopiero przy pierwszym trafieniu nowego szczebla.
+ * Status i droga starego doboru tłumaczą się na wynik i podstawę. Biegnie
+ * tylko przy pustej `dobor`: drugi start nie ma czego kopiować, a zapis
+ * nowego doboru nie może zostać nadpisany starym stanem.
  *
- * JEDNA funkcja dla WSZYSTKICH dołożonych dróg, nie jedna na drogę. 0.229.0
- * dołożyło `silnik`, 0.230.0 `pasowanie`, szczebel zgodnych wymiarów `wymiar`;
- * klient, który przeskakuje kilka wydań, przebudowałby tabelę kilka razy
- * z rzędu. Warunek wejścia sprawdza OSTATNIĄ
- * dołożoną drogę w treści `sqlite_master` — brak jej znaczy, że tabela ma
- * dowolny starszy kształt i idzie od razu do docelowego. Dokładając kolejną
- * drogę: dopisz ją do `CREATE` niżej i podmień wartość w warunku.
+ * STARA TABELA ZOSTAJE NIETKNIĘTA. Powrót do poprzedniej wersji musi zastać
+ * jej dane, bo poprzedni serwer czyta tylko ją.
  *
- * Rozszerzenia `CHECK` SQLite nie robi w miejscu (blizna 0.135.0), więc idzie
- * pełna przebudowa wzorem `kosz_pozycja`. `ON DELETE CASCADE` z `conversation`
- * odtwarzamy JAWNIE: przebudowa gubi klucze obce, a bez niego skasowana
- * rozmowa zostawiałaby dobór-sierotę.
+ * Kolumny sprawdzamy w `PRAGMA`, bo baza klienta bywa starsza niż ostatni
+ * kształt starej tabeli. Brakująca kolumna daje NULL, nie błąd startu.
  */
-function doborZnaDrogi(database: DatabaseSync) {
-  const w = database
-    .prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='dobor_rozmowy'")
-    .get() as { sql: string | null } | undefined;
-  /* Wartownik to OSTATNIA dołożona droga: `wymiar` (szczebel zgodnych wymiarów). */
-  if (!w?.sql || w.sql.includes("'wymiar'")) return;
-
-  const stare = (
-    database.prepare("PRAGMA table_info(dobor_rozmowy)").all() as Array<{ name: string }>
-  ).map((c) => c.name);
-
+function przeniesDobor(database: DatabaseSync) {
+  const jest = database
+    .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='dobor_rozmowy'").get();
+  if (!jest) return;
+  if (database.prepare("SELECT 1 FROM dobor LIMIT 1").get()) return;
+  const kolumny = new Set((database.prepare("PRAGMA table_info(dobor_rozmowy)").all() as Array<{ name: string }>)
+    .map((c) => c.name));
+  const k = (nazwa: string) => (kolumny.has(nazwa) ? nazwa : "NULL");
+  /* Wybrana kartoteka wygrywa z „czego brakuje": agent, który wybrał część
+     i dopytuje o tabliczkę, ma już odpowiedź do wysłania. `rejected`
+     i `not_applicable` wygrywają z wyborem, bo to ostatnie słowo agenta. */
+  const wynik = `CASE WHEN ${k("status")} = 'rejected' THEN 'brak'
+      WHEN ${k("status")} = 'not_applicable' THEN 'nie_dotyczy'
+      WHEN ${k("wybrany_tw_id")} IS NOT NULL THEN 'czesc'
+      WHEN ${k("status")} = 'missing_information' THEN 'dopytac'
+      ELSE NULL END`;
+  /* Droga bez odpowiednika w słowniku daje „reczny": wiemy tylko tyle,
+     że kartotekę wskazał agent. */
+  const podstawa = `CASE WHEN ${k("wybrany_droga")} IN ('symbol','ean','oem','oferta','zamiennik') THEN 'numer'
+      WHEN ${k("wybrany_droga")} IN ('zastosowanie','silnik','pasowanie') THEN 'wiedza'
+      WHEN ${k("wybrany_droga")} IN ('pelnotekst','wymiar') THEN 'podobne'
+      ELSE 'reczny' END`;
   database.exec(`
-    CREATE TABLE dobor_rozmowy_nowa (
-      conversation_id INTEGER PRIMARY KEY REFERENCES conversation(id) ON DELETE CASCADE,
-      status          TEXT NOT NULL DEFAULT 'not_started' CHECK (status IN (
-                        'not_started','extracting_data','missing_information','searching',
-                        'candidates_found','requires_expert','confirmed','rejected',
-                        'not_applicable')),
-      wersja          INTEGER NOT NULL DEFAULT 1,
-      marka           TEXT,
-      model           TEXT,
-      wariant         TEXT,
-      rocznik         TEXT,
-      nr_seryjny      TEXT,
-      silnik          TEXT,
-      oem             TEXT,
-      nazwa_czesci    TEXT,
-      parametry_json  TEXT,
-      brakuje         TEXT,
-      wybrany_tw_id   INTEGER,
-      wybrany_symbol  TEXT,
-      wybrany_droga   TEXT CHECK (wybrany_droga IS NULL OR wybrany_droga IN (
-                        'oferta','zamiennik','symbol','ean','wyszukiwarka',
-                        'zastosowanie','silnik','pasowanie','oem','pelnotekst','wymiar')),
-      wybrano_przez   TEXT,
-      wybrano_user_id INTEGER REFERENCES app_user(user_id),
-      wybrano_at      TEXT,
-      updated_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-      updated_by      TEXT,
-      updated_user_id INTEGER REFERENCES app_user(user_id)
-    );
-  `);
-  const nowe = (
-    database.prepare("PRAGMA table_info(dobor_rozmowy_nowa)").all() as Array<{ name: string }>
-  ).map((c) => c.name);
-  const wspolne = nowe.filter((c) => stare.includes(c)).join(", ");
-  database.exec(`
-    INSERT INTO dobor_rozmowy_nowa(${wspolne}) SELECT ${wspolne} FROM dobor_rozmowy;
-    DROP TABLE dobor_rozmowy;
-    ALTER TABLE dobor_rozmowy_nowa RENAME TO dobor_rozmowy;
+    INSERT INTO dobor(conversation_id, marka, model, wariant, rocznik, nr_seryjny, silnik, oem, nazwa_czesci,
+      wynik, tw_id, symbol, podstawa, dopytac, wersja, zmienil, zmienil_user_id, zmieniono_at)
+    SELECT conversation_id, ${k("marka")}, ${k("model")}, ${k("wariant")}, ${k("rocznik")}, ${k("nr_seryjny")},
+      ${k("silnik")}, ${k("oem")}, ${k("nazwa_czesci")}, w,
+      CASE WHEN w = 'czesc' THEN ${k("wybrany_tw_id")} END,
+      CASE WHEN w = 'czesc' THEN ${k("wybrany_symbol")} END,
+      CASE WHEN w = 'czesc' THEN ${podstawa} END,
+      CASE WHEN w = 'dopytac'
+        THEN COALESCE(NULLIF(trim(${k("brakuje")}), ''), 'czego brakuje — nie zapisano') END,
+      COALESCE(${k("wersja")}, 1), ${k("updated_by")}, ${k("updated_user_id")}, ${k("updated_at")}
+    FROM (SELECT *, ${wynik} AS w FROM dobor_rozmowy);
   `);
 }
 

@@ -25,7 +25,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "waiting_for_us", odlozoneDo: null, poTerminie: false, oglada: null,
   priorytet: "normalny", czekaOdMs: null, reklamacyjna: false,
-  nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started", kopilot: null, ...n,
+  nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "pusty", kopilot: null, ...n,
 } as unknown as Rozmowa);
 
 const dane = (n: Partial<Rozmowa> = {}): OsRozmowy => ({
@@ -48,7 +48,7 @@ const props = (n: Partial<Rozmowa> = {}) => ({
   onDodajZalacznik: vi.fn(), onUsunZalacznik: vi.fn(),
   copilot: {
     stan: undefined, szkic: null, nieswiezy: false, doborWersja: null,
-    nowePolaDoboru: [], paraPasowania: null, uklada: false, blad: "",
+    paraPasowania: null, uklada: false, blad: "",
     maSzkicAgenta: false, wylaczony: false,
   } as never,
   konflikt: null, mozeWymusic: false, wymusza: false, bladKonfliktu: "",

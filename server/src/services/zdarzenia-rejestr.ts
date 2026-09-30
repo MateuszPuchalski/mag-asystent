@@ -12,7 +12,10 @@
    `zwrot_werdykt_${decyzja}` (zwroty.ts), notatki spraw (reklamacje.ts),
    ślady doboru (dobor.ts), zadania workera (worker/kolejka.ts) i zdarzenia
    kolektora z `ALLOWED` w routes/device.ts. Czego nie ma w rejestrze, a jest
-   w dzienniku, raport pokazuje osobno — nic nie ginie po cichu. */
+   w dzienniku, raport pokazuje osobno — nic nie ginie po cichu.
+
+   Stare typy doboru (`dobor_status`, `dobor_wybor`…) zostają na liście,
+   choć nikt ich już nie pisze: dziennik je niesie, a historia jest prawdziwa. */
 
 export const ZDARZENIA: readonly string[] = [
   "alias_silnika_dodany", "alias_silnika_usuniety", "allegro_polaczono", "allegro_rozlaczono",
@@ -25,7 +28,7 @@ export const ZDARZENIA: readonly string[] = [
   "delivery_external_undo",
   "delivery_finished", "delivery_note_added", "delivery_note_answered", "delivery_open",
   "delivery_reopened", "device_drop", "dobor_dane", "dobor_status", "dobor_wybor",
-  "dobor_wybor_zdjety", "dyskusja_notatka", "dyskusja_notatka_cofnieta", "dyskusja_odpowiedz",
+  "dobor_wybor_zdjety", "dobor_wynik", "dyskusja_notatka", "dyskusja_notatka_cofnieta", "dyskusja_odpowiedz",
   "dyskusja_odswiezenie", "dyskusja_zalacznik_dodany", "dyskusja_zalacznik_zdjety",
   "dyskusja_prowadzi", "dyskusja_przesylka_reczna", "dyskusja_zakonczenie", "ean_conflict",
   "ean_conflict_autoresolved", "ean_kolizja_rozstrzygnieta", "ean_set", "firma_zapis",

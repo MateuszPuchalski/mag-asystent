@@ -59,7 +59,7 @@ before(async () => {
 beforeEach(() => {
   const d = db();
   for (const t of ["model_z_opisu", "dowod_zastosowania", "zastosowanie", "model_urzadzenia",
-    "dobor_rozmowy", "conversation_event", "message",
+    "dobor", "conversation_event", "message",
     "conversation", "channel_account", "events", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
   d.prepare("DELETE FROM towar_identyfikator WHERE zrodlo!='opis'").run();
   biuro = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')")
@@ -86,15 +86,15 @@ test("numer z oferty JEST OD RAZU znajdowany szczeblem OEM — to cała obietnic
   assert.equal(p.numery.length, 1);
 
   zapiszDane(rozmowa, { oem: numer }, 1, biuro, db());
-  const { kandydaci, drogi } = kandydaciDoboru(rozmowa, subiekt);
-  assert.equal(drogi.find((d) => d.droga === "oem")!.wynikow, 1, "szczebel OEM ma trafić");
+  const { kandydaci } = kandydaciDoboru(rozmowa, subiekt);
   const k = kandydaci.find((c) => c.symbol === "FTC272");
   assert.ok(k, `kartoteka nie wróciła; kandydaci: ${kandydaci.map((c) => c.symbol).join(", ")}`);
+  assert.equal(k!.grupa, "numer", "numer z oferty ma trafić jak każdy numer");
   /* Zdanie źródła mówi, że numer jest Z NASZEJ OFERTY, a nie z opisu
-     kartoteki. Do 0.263.0 stał tu wybór dwugałęziowy i ekran skłamałby. */
-  assert.match(k!.zrodlo, /z opisu NASZEJ oferty/);
-  assert.match(k!.zrodlo, new RegExp(OFERTA));
-  assert.doesNotMatch(k!.zrodlo, /z opisu kartoteki/);
+     kartoteki: deklaracja sprzedawcy i katalog to świadectwa różnej wagi. */
+  assert.match(k!.powod, /z opisu NASZEJ oferty/);
+  assert.match(k!.powod, new RegExp(OFERTA));
+  assert.doesNotMatch(k!.powod, /z opisu kartoteki/);
 });
 
 test("wpis nie jest podpisany agentem — kliknięcie mówi dziennik, nie kartoteka", () => {

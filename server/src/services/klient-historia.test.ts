@@ -41,10 +41,12 @@ function rozmowa(watek: string, login: string | null, temat: string, kiedy: stri
     .run(konto, watek, temat, kiedy).lastInsertRowid);
 }
 
+/** Dobór z wybraną częścią; `wynik: null` to dobór otwarty, bez ustalenia. */
 function dobor(rozmowaId: number, marka: string, model: string, kiedy: string,
-  extra: { status?: string; silnik?: string; rocznik?: string } = {}): void {
-  db().prepare(`INSERT INTO dobor_rozmowy(conversation_id,status,marka,model,rocznik,silnik,updated_at)
-    VALUES (?,?,?,?,?,?,?)`).run(rozmowaId, extra.status ?? "confirmed", marka, model,
+  extra: { wynik?: string | null; silnik?: string; rocznik?: string } = {}): void {
+  const wynik = extra.wynik === undefined ? "czesc" : extra.wynik;
+  db().prepare(`INSERT INTO dobor(conversation_id,wynik,tw_id,marka,model,rocznik,silnik,zmieniono_at)
+    VALUES (?,?,?,?,?,?,?,?)`).run(rozmowaId, wynik, wynik === "czesc" ? 1 : null, marka, model,
     extra.rocznik ?? null, extra.silnik ?? null, kiedy);
 }
 
@@ -74,7 +76,7 @@ function sprawaKlienta(login: string, typ: string, temat: string, kiedy: string)
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dobor_rozmowy", "zamowienie_klienta_pozycja", "zamowienie_klienta",
+  for (const t of ["dobor", "zamowienie_klienta_pozycja", "zamowienie_klienta",
     "reklamacja_klienta", "zwrot_klienta",
     "message", "conversation", "allegro_inbox_thread", "channel_account", "events"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -107,7 +109,7 @@ test("dobór w trakcie NIE jest ustaleniem — maszyna wchodzi dopiero z domkni�
   /* Agent wpisuje markę, zanim cokolwiek ustali. Gdyby liczył się każdy
      dobór z marką, zakładka mówiłaby „klient ma taką maszynę" o zgadywance
      sprzed pięciu minut. */
-  dobor(starsza, "NAC", "LS 46-450", "2024-06-14T09:30:00.000Z", { status: "searching" });
+  dobor(starsza, "NAC", "LS 46-450", "2024-06-14T09:30:00.000Z", { wynik: null });
   assert.deepEqual(historiaKlienta(biezaca).maszyny, []);
 });
 

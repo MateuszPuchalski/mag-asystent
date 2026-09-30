@@ -260,7 +260,7 @@ export interface LukaSilnika {
 /**
  * Czego brakuje, od najczęstszego — CZYSTY ODCZYT.
  *
- * Ranking liczymy z `dobor_rozmowy.marka/model/wariant`, czyli z PÓL
+ * Ranking liczymy z `dobor.marka/model/wariant`, czyli z PÓL
  * WPISANYCH PRZEZ AGENTA. Blizna „szarpaka" zakazuje szukać po treści
  * wiadomości klienta i ten zakaz obowiązuje także tutaj: tytuł pytania i tak
  * nigdy nie powie „Loncin LC1P65FE", a rozbijanie go na markę i model byłoby
@@ -274,7 +274,7 @@ export function lukiSilnikow(
 ): { luki: LukaSilnika[]; liczba: number } {
   const wiersze = database.prepare(`
     SELECT marka, model, wariant, silnik, count(*) ile
-      FROM dobor_rozmowy
+      FROM dobor
      WHERE marka IS NOT NULL AND marka != '' AND model IS NOT NULL AND model != ''
      GROUP BY marka, model, wariant, silnik`)
     .all() as Array<Record<string, unknown>>;

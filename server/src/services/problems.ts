@@ -471,7 +471,7 @@ export function listRozstrzygniete(dni = 7): ProblemView[] {
   /* `datetime` ze SPACJĄ nie zadziała: `created_at` i `resolved_at` zapisuje
      `nowIso()`, czyli ISO z `T` i `Z`. Porównanie tekstowe z formatem bez `T`
      przesuwałoby okno o dobę — ta sama pułapka, którą opisuje komentarz przy
-     `GRANICA` w `skutecznosc-doboru.ts`. */
+     `GRANICA_OKNA` w `raporty.ts`. */
   const dniLimit = Math.max(1, Math.min(90, Math.trunc(dni)));
   return (db().prepare(
     `${SELECT_JOIN} WHERE p.resolved_at IS NOT NULL

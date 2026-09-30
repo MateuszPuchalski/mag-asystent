@@ -2,13 +2,13 @@ import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
-  DaneDoboru, Dobor, DrogaDoboru, KandydaciDoboru, KartaTowaru, OsRozmowy, PokrycieSygnatur, PokrycieWiedzy,
-  SkutecznoscDoboru,
+  DaneDoboru, Dobor, KandydaciDoboru, KartaTowaru, MiaryDoboru, OsRozmowy, PodstawaWyboru, PokrycieSygnatur,
+  PokrycieWiedzy,
   PowodNegatywny,
   DokumentySprzedazy, HistoriaKlienta, MiesiacEskalacji, MojaSprawa,
-  Rozmowa, StanPrzesylki, StanSkrzynki, StatusDoboru, StatusRozmowy, WiedzaDoboru, WpisWzmianki,
+  Rozmowa, StanPrzesylki, StanSkrzynki, StatusRozmowy, WiedzaDoboru, WpisWzmianki,
   WpisAutomatu,
-  WynikWysylki, Zadanie, Zastosowanie, Zdrowie,
+  WynikDoboru, WynikWysylki, Zadanie, Zastosowanie, Zdrowie,
 } from "./typy";
 
 /* Klucze cache w jednym miejscu. Literał rozsypany po plikach kończy się tym,
@@ -24,7 +24,7 @@ export const klucze = {
   moje: ["mojeSprawy"] as const,
   sygnatury: ["sygnatury"] as const,
   pokrycieWiedzy: ["pokrycie-wiedzy"] as const,
-  skutecznoscDoboru: (dni: number) => ["skutecznosc-doboru", dni] as const,
+  miaryDoboru: (dni: number) => ["miary-doboru", dni] as const,
   eskalacja: ["eskalacja"] as const,
   wiedzaAutomat: ["wiedza-automat"] as const,
   towar: (twId: number) => ["towar", twId] as const,
@@ -699,25 +699,23 @@ export function usePokrycieWiedzy() {
 }
 
 /**
- * Skuteczność doboru (0.267.0) — obraz PRACY, nie katalogu, ale i tak bez
- * `refetchInterval`: to jest tabela czytana raz na tydzień, a nie licznik,
- * który ma drgać pod okiem. Okno w kluczu cache, bo przełączenie selektora
+ * Miary doboru (`docs/dobor-od-zera.md` §5.1): wyniki i podstawy wyboru
+ * z okna. Bez `refetchInterval`, bo to raport czytany raz na jakiś czas,
+ * a nie licznik pod okiem. Okno w kluczu cache, bo przełączenie selektora
  * ma pobrać inne dane, a nie podmienić te same.
  */
-export function useSkutecznoscDoboru(dni: number) {
+export function useMiaryDoboru(dni: number) {
   return useQuery({
-    queryKey: klucze.skutecznoscDoboru(dni),
-    queryFn: () => api<SkutecznoscDoboru>(`/api/obsluga/skutecznosc-doboru?dni=${dni}`),
+    queryKey: klucze.miaryDoboru(dni),
+    queryFn: () => api<MiaryDoboru>(`/api/obsluga/miary-doboru?dni=${dni}`),
     staleTime: 60_000,
   });
 }
 
-/* ── Dobór części (§11, etap E1) ─────────────────────────────────────────────
-   Sam dobór jedzie w `useRozmowa` (jeden wiersz). KANDYDACI mają własne
-   zapytanie: to wyszukiwarka i parser opisu, a rozmowa odświeża się na każde
-   zdarzenie szyny, także `presence`. Każda mutacja unieważnia rozmowę, listę
-   (plakietka statusu w kolejce) i kandydatów (dane wejściowe zmieniają, co
-   automat ma sprawdzać). */
+/* ── Dobór części (`docs/dobor-od-zera.md` §5.2) ──────────────────────────────
+   Sam dobór jedzie w `useRozmowa`. KANDYDACI mają własne zapytanie, bo to
+   wyszukiwanie po kartotekach, a rozmowa odświeża się na każde zdarzenie
+   szyny, także `presence`. */
 export function useKandydaci(id: number | null) {
   return useQuery({
     queryKey: klucze.kandydaci(id ?? 0),
@@ -726,16 +724,20 @@ export function useKandydaci(id: number | null) {
   });
 }
 
+/* Każdy zapis doboru unieważnia rozmowę (dobór jedzie w niej), kolejkę (znak
+   stanu na wierszu), kandydatów (nowe dane to nowe szukanie) i wiedzę (wynik
+   `czesc` składa propozycję zastosowania, a zejście z części ją wycofuje). */
 function poDoborze(qc: ReturnType<typeof useQueryClient>, id: number) {
   qc.invalidateQueries({ queryKey: klucze.rozmowa(id) });
   qc.invalidateQueries({ queryKey: klucze.rozmowy });
   qc.invalidateQueries({ queryKey: klucze.kandydaci(id) });
+  qc.invalidateQueries({ queryKey: klucze.wiedzaDoboru(id) });
 }
 
 /**
- * Dane wejściowe niosą WERSJĘ doboru. Konflikt (409) NIE jest tu łapany:
- * `Konflikt` leci do zakładki, bo to ona ma powiedzieć „ktoś zmienił dane —
- * odśwież" i ZOSTAWIĆ wpisane wartości, zamiast zamienić je w komunikat.
+ * Dane doboru niosą WERSJĘ. Konflikt (409) NIE jest tu łapany: `Konflikt`
+ * leci do zakładki, bo to ona ma nazwać, kto zmienił dane, i ZOSTAWIĆ
+ * wpisane wartości, zamiast zamienić je w komunikat.
  */
 export function useZapiszDaneDoboru() {
   const qc = useQueryClient();
@@ -748,31 +750,23 @@ export function useZapiszDaneDoboru() {
   });
 }
 
-export function useStatusDoboru() {
+/**
+ * Wynik doboru. `czesc` wymaga `twId` i `podstawa`, `dopytac` niepustego
+ * tekstu, a `null` otwiera dobór ponownie. Symbol i zdanie do szkicu bierze
+ * SERWER z bazy — panel wysyła wyłącznie wskazanie.
+ */
+export function useWynikDoboru() {
   const qc = useQueryClient();
   return useMutation({
-    /* `silnikModelId` jedzie tą samą trasą co status: to jedno pole przy JEDNEJ
-       czynności („zatwierdź dobór"), a wskazuje, czy wiedza ma urosnąć przy
-       maszynie, czy przy jej silniku. */
-    mutationFn: (v: { id: number; status: StatusDoboru; brakuje?: string | null; silnikModelId?: number | null }) =>
-      api<Dobor>(`/api/obsluga/rozmowy/${v.id}/dobor/status`, {
-        method: "POST", body: JSON.stringify({
-          status: v.status, brakuje: v.brakuje ?? null, silnikModelId: v.silnikModelId ?? null,
-        }),
-      }),
-    onSettled: (_d, _e, v) => poDoborze(qc, v.id),
-  });
-}
-
-/** Wybór kandydata; `twId: null` zdejmuje. Symbol bierze SERWER z bazy. */
-export function useWybierzKandydata() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: number; twId: number | null; droga: DrogaDoboru; expectedVersion: number }) =>
-      api<Dobor>(`/api/obsluga/rozmowy/${v.id}/dobor/wybor`, {
-        method: "POST",
-        body: JSON.stringify({ twId: v.twId, droga: v.droga, expectedVersion: v.expectedVersion }),
-      }),
+    mutationFn: (v: {
+      id: number; wynik: WynikDoboru | null; expectedVersion: number;
+      twId?: number; podstawa?: PodstawaWyboru; dopytac?: string;
+    }) => {
+      const { id, ...cialo } = v;
+      return api<Dobor>(`/api/obsluga/rozmowy/${id}/dobor/wynik`, {
+        method: "PUT", body: JSON.stringify(cialo),
+      });
+    },
     onSettled: (_d, _e, v) => poDoborze(qc, v.id),
   });
 }

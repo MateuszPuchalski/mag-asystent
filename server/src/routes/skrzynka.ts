@@ -27,7 +27,9 @@ import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { sciezkaZdjeciaOferty, zapewnijZdjecieOferty } from "../services/zdjecia-ofert.js";
 import { kontoKanalu } from "../services/kanal-konto.js";
 import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../services/wzmianki.js";
-import { pomiarDoWiedzy, ustawStatusDoboru, wiedzaDoboru, wybierzKandydata, zapiszDane, type DaneDoboru } from "../services/dobor.js";
+import {
+  pomiarDoWiedzy, ustawWynik, wiedzaDoboru, zapiszDane, type DaneDoboru, type PodstawaWyboru, type WynikDoboru,
+} from "../services/dobor.js";
 import { kandydaciDoboru } from "../services/kandydaci.js";
 import { historiaKlienta, loginSprawyRozmowy } from "../services/klient-historia.js";
 import { mojeSprawy } from "../services/droga-klienta.js";
@@ -331,16 +333,19 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     } catch (e) { return blad(reply, e); }
   });
 
-  /* DOBÓR CZĘŚCI (§11, etap E1). Sam dobór jedzie w `GET …/rozmowy/:id`;
-     kandydaci mają OSOBNĄ trasę, bo to wyszukiwarka i parser opisu, a tamten
-     odczyt odświeża się na każde zdarzenie szyny. Odczyt niczego nie zapisuje.
-     Bramka to zwykłe `odmowa()`: dobór to codzienna praca biura, a zatwierdza
-     go każdy z biura — decyzja właściciela, roli „ekspert" nie ma. */
+  /* DOBÓR CZĘŚCI (`docs/dobor-od-zera.md` §5.2). Sam dobór jedzie w
+     `GET …/rozmowy/:id`; kandydaci mają OSOBNĄ trasę, bo to wyszukiwarka
+     i parser opisu, a tamten odczyt odświeża się na każde zdarzenie szyny.
+     Bramka to zwykłe `odmowa()`: wynik ustawia każdy z biura, roli
+     „ekspert" nie ma. */
   app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/dobor/kandydaci",
     async (req, reply) => {
       const nie = odmowa(reply); if (nie) return nie;
-      try { return kandydaciDoboru(Number(req.params.id), subiekt); }
-      catch (e) { return blad(reply, e); }
+      try {
+        /* Kotwice zostają w serwerze: potrzebuje ich szkic Copilota, nie ekran. */
+        const { kotwice: _kotwice, ...kandydaci } = kandydaciDoboru(Number(req.params.id), subiekt);
+        return kandydaci;
+      } catch (e) { return blad(reply, e); }
     });
 
   app.put<{ Params: { id: string }; Body: { dane?: Partial<DaneDoboru>; expectedVersion?: number } }>(
@@ -352,30 +357,21 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       } catch (e) { return konflikt(reply, e); }
     });
 
-  /* `silnikModelId` jedzie tą samą trasą co status, a nie własną: to jedno
-     pole przy JEDNEJ czynności („zatwierdź dobór"), a nowa trasa podniosłaby
-     licznik zapisów panelu bez nowej decyzji do podjęcia. */
-  app.post<{ Params: { id: string }; Body: { status?: string; brakuje?: string | null; silnikModelId?: number | null } }>(
-    "/api/obsluga/rozmowy/:id/dobor/status", async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try {
-        return ustawStatusDoboru(Number(req.params.id), req.body?.status ?? "",
-          req.body?.brakuje ?? null, sesjaZadania()!.user.userId, undefined,
-          req.body?.silnikModelId ?? null);
-      } catch (e) { return blad(reply, e); }
-    });
+  app.put<{ Params: { id: string }; Body: {
+    wynik?: WynikDoboru | null; twId?: number | null; podstawa?: PodstawaWyboru | null; dopytac?: string | null;
+    expectedVersion?: number;
+  } }>("/api/obsluga/rozmowy/:id/dobor/wynik", async (req, reply) => {
+    const nie = odmowa(reply); if (nie) return nie;
+    const b = req.body ?? {};
+    try {
+      return ustawWynik(Number(req.params.id), { wynik: b.wynik ?? null, twId: b.twId ?? null,
+        podstawa: b.podstawa ?? null, dopytac: b.dopytac ?? null },
+      Number(b.expectedVersion), sesjaZadania()!.user.userId);
+    } catch (e) { return konflikt(reply, e); }
+  });
 
-  app.post<{ Params: { id: string }; Body: { twId?: number | null; droga?: string; expectedVersion?: number } }>(
-    "/api/obsluga/rozmowy/:id/dobor/wybor", async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try {
-        return wybierzKandydata(Number(req.params.id), req.body?.twId ?? null, req.body?.droga ?? "",
-          Number(req.body?.expectedVersion), sesjaZadania()!.user.userId);
-      } catch (e) { return konflikt(reply, e); }
-    });
-
-  /* WIEDZA PRZY DOBORZE (E2): dowody wybranej kartoteki i pomiary z tej
-     rozmowy, które mogą stać się dowodem. Odczyt nic nie zapisuje; wynik
+  /* WIEDZA PRZY DOBORZE: dowody wybranej kartoteki, silniki maszyny i pomiary
+     z tej rozmowy, które mogą stać się dowodem. Odczyt nic nie zapisuje; wynik
      pomiaru trafia do bazy wiedzy WYŁĄCZNIE na kliknięcie (§13.4). */
   app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/dobor/wiedza",
     async (req, reply) => {

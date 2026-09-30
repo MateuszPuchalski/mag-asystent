@@ -1262,8 +1262,7 @@ test("dopasowanie jest DOKŁADNE, nigdy po fragmencie", () => {
 });
 
 test("zwrot bez lądowiska nie wywraca szukania", () => {
-  /* Lądowisko bywa skasowane ręcznie (DEPLOY §0.153.0 każe to zrobić przy
-     aktualizacji), a kolejka ma wtedy działać dalej. */
+  /* Lądowisko bywa skasowane ręcznie, a kolejka ma wtedy działać dalej. */
   const d = stanowisko();
   d.prepare(`INSERT INTO zwrot_klienta(channel_account_id,external_id,reference_number,
     created_at,synced_at) VALUES (1,'zw-1','1234/Z04A','2026-09-01T08:00:00Z','2026-09-01T08:00:00Z')`)

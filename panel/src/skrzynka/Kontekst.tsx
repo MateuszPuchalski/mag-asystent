@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { ChevronRight, UserRound } from "lucide-react";
-import type { HistoriaKlienta, OsRozmowy, WiedzaDoboru } from "../api/typy";
+import type { HistoriaKlienta, OsRozmowy, SzkicCopilota, WiedzaDoboru } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Przycisk, Pusto, dzien, odmien } from "../ui";
 import { OfertaRozmowy } from "./OfertaRozmowy";
@@ -17,8 +17,8 @@ import { Soczewka } from "./Soczewki";
 import { paczkaWSoczewce } from "./soczewki-reguly";
 import { useHistoriaKlienta, useWiedzaDoboru } from "../api/rozmowy";
 import type { Towar } from "../wyszukiwarka";
-import { NAZWA_DOBORU } from "./statusy";
-import { bramkaDoboru, coSwieci, doborWToku, klientMaHistorie, nowyKlient, pozycjiDoWskazania,
+import { NAZWA_STANU_DOBORU } from "./statusy";
+import { bramkaDoboru, coSwieci, doborWToku, klientMaHistorie, nowyKlient, paraPasowania, pozycjiDoWskazania,
   towarOtwartyNaStart, wiedzaMaTresc, zwrotWToku } from "./kokpit";
 
 /**
@@ -86,7 +86,7 @@ import { bramkaDoboru, coSwieci, doborWToku, klientMaHistorie, nowyKlient, pozyc
  *
  * STRESZCZENIE MÓWI TO, CZEGO NIE MÓWI PASMO (D z kanwy). Nazwa, SKU i stan
  * stoją raz, w paśmie nad kolumną. Wiersz dokłada tylko to, co jego źródło ma
- * inne: oferta cenę i stan, zamówienie datę i paczkę, dobór swój status.
+ * inne: oferta cenę i stan, zamówienie datę i paczkę, dobór swój stan.
  *
  * Kolumna niczego nie zapisuje przy rozwijaniu: wiersze to stan ekranu,
  * a treść pod nimi to te same odczyty, co w dawnych zakładkach.
@@ -142,7 +142,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
   const sprawyOtwarte = dane.sprawy.filter((x) => x.otwarta);
   const sprawyZamkniete = dane.sprawy.filter((x) => !x.otwarta);
   const bramka = bramkaDoboru(dane) && !szukamMimoTo;
-  const doborSwieci = swiatla.includes("dobor") || (szukamMimoTo && doborWToku(dane.dobor.status));
+  const doborSwieci = swiatla.includes("dobor") || (szukamMimoTo && doborWToku(dane.dobor.stan));
   /* Zamówienie idzie do świecącej części, gdy to ono wymaga ruchu: paczka
      poza zwykłą drogą albo pozycja do wskazania. Wtedy nie stoi drugi raz
      w wierszu „Zamówienie" — ta sama karta w dwóch miejscach to dokładnie
@@ -155,7 +155,6 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
     + (doborSwieci ? 1 : 0);
 
   const dobor = <Dobor key={dane.rozmowa.id} dobor={dane.dobor} rozmowaId={dane.rozmowa.id}
-    propozycja={dane.szkicCopilota}
     onWstawDoSzkicu={onWstawDoSzkicu} onZlecPomiar={onZlecPomiar} />;
 
   return <section className="card flex min-h-0 flex-col overflow-hidden" aria-label="Kontekst">
@@ -284,13 +283,15 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
       </Wiersz>}
 
       {/* Maszyna z DANYCH DOBORU, nie z historii klienta: pomiar ma pasować do
-          tego, o co pyta ta rozmowa. */}
-      {wiedza.data && wiedzaMaTresc(wiedza.data) && <Wiersz tytul="Wiedza"
-        streszczenie={streszczenieWiedzy(wiedza.data)}
+          tego, o co pyta ta rozmowa. Szkic Copilota jedzie tu, bo pasowanie
+          rozpoznane w rozmowie jest pracą nad wiedzą, nie odpowiedzią klientowi. */}
+      {wiedzaMaTresc(wiedza.data, dane.szkicCopilota) && <Wiersz tytul="Wiedza"
+        streszczenie={streszczenieWiedzy(wiedza.data, dane.szkicCopilota)}
         otwarty={otwarte.has("wiedza")} onPrzelacz={() => przelacz("wiedza")}>
         <Wiedza key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id}
           twId={dane.dobor.wybrany?.twId ?? null}
-          maMaszyne={Boolean(dane.dobor.dane.marka && dane.dobor.dane.model)} />
+          maMaszyne={Boolean(dane.dobor.dane.marka && dane.dobor.dane.model)}
+          propozycja={dane.szkicCopilota} />
       </Wiersz>}
     </div>
   </section>;
@@ -341,14 +342,11 @@ function Wiersz({ tytul, streszczenie, otwarty = false, onPrzelacz, children }: 
 /** Bramka doboru (E z kanwy) — reguła i powód w `kokpit.ts` przy `towarZnany`. */
 function BramkaDoboru({ dane, onSzukaj }: { dane: OsRozmowy; onSzukaj: () => void }) {
   const o = dane.oferta;
-  const status = dane.dobor.status;
   return <div className="space-y-2 px-4 pb-4 pt-1 text-sm">
     <p><b>Towar znany z zamówienia.</b> Klient pisze o{" "}
       {o?.pobrana?.nazwa ?? `ofercie ${o?.externalId ?? ""}`}
       {o?.pobrana?.sku && <> (<span className="font-mono">{o.pobrana.sku}</span>)</>}, który
       kupił w tym zamówieniu. Dobór nie ma tu czego szukać.</p>
-    {doborWToku(status) && <p className="text-xs text-slate-600">
-      Automat zaczął szukać ({NAZWA_DOBORU[status]}) — kandydaci czekają pod przyciskiem.</p>}
     <p className="text-xs text-slate-600">
       Czy towar pasuje do maszyny klienta, mówi lista „Pasuje do" w ofercie i wiersz Wiedza.</p>
     <Przycisk className="text-sm" onClick={onSzukaj}>Szukaj innego towaru mimo to</Przycisk>
@@ -404,11 +402,14 @@ export function streszczenieZamknietych(zwrotow: number, spraw: number): string 
     spraw ? `${spraw} ${odmien(spraw, "sprawa", "sprawy", "spraw")}` : null].filter(Boolean).join(" · ");
 }
 
+/* Stan i to, co go opisuje: przy wybranej części jej symbol, przy reszcie
+   to, czego klient szuka. Symbol wygrywa, bo po wyniku liczy się odpowiedź. */
 export function streszczenieDoboru(dane: OsRozmowy): string {
   const d = dane.dobor;
-  if (d.wybrany) return `${NAZWA_DOBORU[d.status]} · ${d.wybrany.symbol}`;
+  const stan = NAZWA_STANU_DOBORU[d.stan] ?? d.stan;
+  if (d.wybrany) return `${stan} · ${d.wybrany.symbol}`;
   const czego = [d.dane.nazwaCzesci, d.dane.marka, d.dane.model].filter(Boolean).join(" ");
-  return czego ? `${NAZWA_DOBORU[d.status]} · ${czego}` : NAZWA_DOBORU[d.status];
+  return czego ? `${stan} · ${czego}` : stan;
 }
 
 const RODZAJ_HISTORII: Record<string, [string, string, string]> = {
@@ -430,8 +431,11 @@ export function streszczenieKlienta(h: HistoriaKlienta): string {
   return czesci.join(" · ");
 }
 
-export function streszczenieWiedzy(w: WiedzaDoboru): string {
+export function streszczenieWiedzy(w: WiedzaDoboru | undefined, szkic: SzkicCopilota | null = null): string {
+  const para = paraPasowania(szkic) ? "pasowanie od Copilota" : null;
+  if (!w || (w.zastosowanie === null && w.pomiary.length === 0)) return para ?? "wpis bez dowodów";
   const n = (w.zastosowanie?.dowody.length ?? 0) + w.pomiary.length;
   /* Wiersz staje tylko z treścią, więc zero dowodów znaczy tu wpis bez nich. */
-  return n ? `${n} ${odmien(n, "dowód", "dowody", "dowodów")}` : "wpis bez dowodów";
+  return [n ? `${n} ${odmien(n, "dowód", "dowody", "dowodów")}` : "wpis bez dowodów", para]
+    .filter(Boolean).join(" · ");
 }

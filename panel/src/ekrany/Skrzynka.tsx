@@ -19,7 +19,7 @@ import {
 } from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
-import { paraPasowania, propozycjaDoboru } from "../skrzynka/propozycjaDoboru";
+import { paraPasowania } from "../skrzynka/kokpit";
 import { szkicNaStartRozmowy } from "../skrzynka/SzkicCopilota";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
@@ -662,8 +662,6 @@ export function Skrzynka() {
            po identyfikatorze ostatniej wiadomości KLIENTA, tak jak przy wysyłce. */
         nieswiezy: (rozmowa.data?.szkicCopilota?.messageId ?? null) !== ostatniaKlienta,
         doborWersja: rozmowa.data?.dobor.wersja ?? null,
-        nowePolaDoboru: propozycjaDoboru(rozmowa.data?.szkicCopilota, rozmowa.data?.dobor.dane)
-          .nowe.map((n) => n.nazwa),
         paraPasowania: paraPasowania(rozmowa.data?.szkicCopilota),
         uklada: ulozSzkic.isPending,
         blad: bladSzkicu,

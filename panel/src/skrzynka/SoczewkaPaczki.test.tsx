@@ -26,7 +26,7 @@ beforeEach(() => {
     if (url.endsWith("/klient")) return new Response(JSON.stringify({ login: "k", wpisy: [], maszyny: [] }));
     if (url.endsWith("/dobor/wiedza")) {
       return new Response(JSON.stringify({ zastosowanie: null, zabudowa: null, pasowanie: null,
-        silniki: [], silnikZPola: null, pomiary: [] }));
+        silniki: [], pomiary: [] }));
     }
     if (url.endsWith("/przesylka")) {
       return new Response(JSON.stringify({ waybill: "X1", przewoznik: "DPD", status: "IN_TRANSIT",
@@ -42,7 +42,7 @@ const dane = (kategoria: Kategoria): OsRozmowy => ({
     id: 51, klient: "k", ostatniaWiadomosc: "", ostatniaWiadomoscAt: "", ostatniaOdKlienta: true,
     nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1, status: "open", odlozoneDo: null,
     poTerminie: false, podziekowal: false, oglada: null, priorytet: "normalny", czekaOdMs: null,
-    reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
+    reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "pusty",
     kopilot: { kategoria, dodatkowe: [], zrodlo: "MODEL", status: "SUCCESS", nieaktualna: false,
       kategoriaCzlowieka: null } as never,
   },
@@ -50,9 +50,10 @@ const dane = (kategoria: Kategoria): OsRozmowy => ({
   kandydaciZamowien: [], oferta: null,
   zamowienie: { externalId: "z-51", link: null, pobrane: null, przesylka: {
     waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null } },
-  dobor: { status: "not_started", wersja: 1, brakuje: null, wybrany: null, updatedBy: null, updatedAt: null,
+  dobor: { stan: "pusty", wynik: null, wersja: 1, wybrany: null, dopytac: null, zmienil: null,
+    zmienilAutomat: false, zmienionoAt: null,
     dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
-      oem: null, nazwaCzesci: null, parametry: {} } },
+      oem: null, nazwaCzesci: null } },
 } as unknown as OsRozmowy);
 
 function pokaz(kategoria: Kategoria) {

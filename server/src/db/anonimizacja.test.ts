@@ -800,3 +800,19 @@ test("plik .czesciowy, który pojawił się w trakcie pracy, jest cudzy: nie nad
     assert.ok(!fs.existsSync(wy), "wynik nie powstał");
   });
 });
+
+/* ── Tabela `dobor` (dobór od zera) ─────────────────────────────────────────
+   Osobny blok, bo stare reguły `dobor_rozmowy.*` zostają dla baz, które
+   niosą jeszcze starą tabelę. Dane maszyny i zdanie „czego brakuje" pisze
+   człowiek o czymkolwiek; numer, symbol i słowniki muszą przetrwać, inaczej
+   kopia nie powie, które kandydaty agent wybierał. */
+test("dobór: dane maszyny i „dopytać” są tekstem od człowieka, numer, symbol i słowniki zostają", () => {
+  for (const kolumna of ["marka", "model", "wariant", "rocznik", "silnik", "nazwa_czesci", "dopytac"]) {
+    assert.equal(regulaKolumny("dobor", kolumna).regula, R.TEKST, `dobor.${kolumna}`);
+  }
+  for (const kolumna of ["oem", "symbol", "podstawa", "wynik"]) {
+    assert.equal(regulaKolumny("dobor", kolumna).regula, R.ZOSTAJE, `dobor.${kolumna}`);
+  }
+  assert.equal(regulaKolumny("dobor", "zmienil").regula, R.PRACOWNIK);
+  assert.equal(regulaKolumny("dobor", "nr_seryjny").regula, R.TEKST, "numer seryjny egzemplarza klienta");
+});

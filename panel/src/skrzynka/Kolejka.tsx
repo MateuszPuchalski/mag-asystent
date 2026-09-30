@@ -8,7 +8,7 @@ import type {
 import { Blad, czas, Plakietka, Pusto } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { klawiszZajety } from "../nawigacja/fokus";
-import { NAZWA, NAZWA_DOBORU } from "./statusy";
+import { BARWA_STANU_DOBORU, NAZWA, NAZWA_STANU_DOBORU } from "./statusy";
 import { CZESTE, PasekCopilota, ZnakCopilota, ZnakKategorii, doRozpoznania, nazwaNaPlakietce } from "./Copilot";
 import { Czekanie } from "./Czekanie";
 import { SlownikZnakow } from "./SlownikZnakow";
@@ -439,17 +439,15 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         if (r.zadanieWToku) znaczniki.push(<span key="zadanie" title="zadanie w toku"
           className="flex items-center text-slate-600">
           <Ruler size={13} aria-hidden="true" /><span className="sr-only">zadanie w toku</span></span>);
-        /* Status DOBORU (§10.2, E1). `not_started` i `not_applicable` milczą:
-           plakietka „nierozpoczęty" na każdym wierszu nie mówiłaby niczego,
-           a „nie dotyczy" to wiersz, przy którym doboru NIE trzeba robić.
-           Znakiem (23 września 2026): barwa niesie wagę — zieleń zatwierdzony,
-           czerwień brak danych, reszta w toku — a nazwę `title` i czytnik. */
-        if (r.dobor !== "not_started" && r.dobor !== "not_applicable") znaczniki.push(<span key="dobor"
-          title={`dobór: ${NAZWA_DOBORU[r.dobor]}`} className={`flex items-center ${
-            r.dobor === "confirmed" ? "text-emerald-700"
-              : r.dobor === "missing_information" ? "text-ranga-zle" : "text-amber-700"}`}>
+        /* Stan DOBORU znakiem. `pusty` i `nie_dotyczy` milczą: znak „nie
+           zaczęty" na każdym wierszu nie mówiłby niczego, a „nie dotyczy" to
+           wiersz, przy którym doboru NIE trzeba robić. Barwa niesie wagę
+           (mapa w `statusy.ts`), a nazwę `title` i czytnik. */
+        const barwaDoboru = BARWA_STANU_DOBORU[r.dobor];
+        if (barwaDoboru) znaczniki.push(<span key="dobor"
+          title={`dobór: ${NAZWA_STANU_DOBORU[r.dobor]}`} className={`flex items-center ${barwaDoboru}`}>
           <Wrench size={13} aria-hidden="true" />
-          <span className="sr-only">{NAZWA_DOBORU[r.dobor]}</span></span>);
+          <span className="sr-only">{NAZWA_STANU_DOBORU[r.dobor]}</span></span>);
         /* Rzadka kategoria dostaje SŁOWO obok znaku — patrz `CZESTE`. Znak
            stoi w pierwszej linii, słowo tutaj: w pierwszej ścisnęłoby login. */
         if (r.kopilot && r.kopilot.status !== "FAILED" && !r.podziekowal

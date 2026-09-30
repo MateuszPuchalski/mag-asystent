@@ -60,14 +60,15 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
     id: 4821, klient: "Kupujący 44300444", ostatniaWiadomosc: "", ostatniaWiadomoscAt: "",
     ostatniaOdKlienta: true, nieprzeczytana: false, wlascicielId: null, wlasciciel: null,
     wersja: 1, status: "open", odlozoneDo: null, poTerminie: false, podziekowal: false, oglada: null,
-    priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
+    priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "pusty",
     kopilot: null,
   },
   os: [], szkic: null, ofertaWskazana: null, zamowienie: null, zwroty: [],
   sprawy: [], droga: [], szkicCopilota: null, kandydaciZamowien: [],
-  dobor: { status: "not_started", wersja: 1, brakuje: null, wybrany: null, updatedBy: null, updatedAt: null,
+  dobor: { stan: "pusty", wynik: null, wersja: 1, wybrany: null, dopytac: null, zmienil: null,
+    zmienilAutomat: false, zmienionoAt: null,
     dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
-      oem: null, nazwaCzesci: null, parametry: {} } },
+      oem: null, nazwaCzesci: null } },
   oferta: { externalId: "12096815384", link: null, zrodlo: "wiadomosc", zgodnosc: null, pobrana: null,
     kartoteka: { pewnosc: "brak", twId: null, symbol: null, zrodlo: "—", powod: null } },
   ...n,
@@ -287,7 +288,7 @@ describe("kolumna kontekstu", () => {
   const znany = (n: Partial<OsRozmowy["dobor"]> = {}) => dane({
     zamowienie: pusteZamowienie,
     oferta: { ...dane().oferta!, zrodlo: "zamowienie" },
-    dobor: { ...dane().dobor, status: "searching", updatedBy: "automat (szkic)", ...n },
+    dobor: { ...dane().dobor, stan: "otwarty", zmienil: "automat (szkic)", zmienilAutomat: true, ...n },
   });
 
   it("towar znany z zamówienia chowa dobór automatu za bramką", async () => {
@@ -302,10 +303,23 @@ describe("kolumna kontekstu", () => {
     expect(screen.getByTestId("dobor")).toBeInTheDocument();
   });
 
-  it("bramka ustępuje, gdy szukać zaczął człowiek, a nie automat", () => {
-    rysuj(znany({ updatedBy: "A. Lewandowska" }));
+  it("bramka ustępuje, gdy dane zapisał człowiek, a nie automat", () => {
+    rysuj(znany({ zmienil: "A. Lewandowska", zmienilAutomat: false }));
     const swieci = screen.getByRole("region", { name: "Wymaga Ciebie" });
-    expect(within(swieci).getByRole("button", { name: /^Dobór/ })).toHaveTextContent("Szukamy");
+    expect(within(swieci).getByRole("button", { name: /^Dobór/ })).toHaveTextContent("Otwarty");
+  });
+
+  it("bramka nie mówi już, że automat zaczął szukać", () => {
+    rysuj(znany());
+    expect(screen.queryByText(/Automat zaczął szukać/)).toBeNull();
+  });
+
+  /* Pasowanie rozpoznane przez Copilota przeszło z Doboru do Wiedzy
+     (`docs/dobor-od-zera.md` §6), więc samo stawia wiersz Wiedza. */
+  it("pasowanie Copilota stawia wiersz Wiedza, także bez dowodów", () => {
+    rysuj(dane({ szkicCopilota: { pasowanie: { czesc: { symbol: "A" }, doCzego: { symbol: "B" } },
+      pasowanieOcena: null } as never }));
+    expect(wiersz(/^Wiedza/)).toHaveTextContent("pasowanie od Copilota");
   });
 });
 
@@ -335,5 +349,19 @@ describe("streszczenie zamówienia", () => {
         pobrane: { kupionoAt: "2026-09-22T10:00:00Z", sumaGrosze: 5549, waluta: "PLN" } as never } }));
     expect(s.startsWith("kupione 22 września 2026")).toBe(true);
     expect(s).not.toMatch(/w drodze/);
+  });
+});
+
+describe("streszczenie doboru", () => {
+  it("mówi stan, a przy wybranej części jej symbol zamiast danych", async () => {
+    const { streszczenieDoboru } = await import("./Kontekst");
+    const d = dane();
+    const zDanymi = { ...d.dobor, stan: "otwarty" as const,
+      dane: { ...d.dobor.dane, nazwaCzesci: "szarpak", marka: "NAC", model: "LS 46" } };
+    expect(streszczenieDoboru(d)).toBe("Nie zaczęty");
+    expect(streszczenieDoboru({ ...d, dobor: zDanymi })).toBe("Otwarty · szarpak NAC LS 46");
+    expect(streszczenieDoboru({ ...d, dobor: { ...zDanymi, stan: "czesc", wynik: "czesc",
+      wybrany: { twId: 1, symbol: "532199377", podstawa: "numer", zdanieDoSzkicu: "…" } } }))
+      .toBe("Wybrano część · 532199377");
   });
 });

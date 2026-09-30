@@ -95,28 +95,22 @@ test("pokrycie wiedzy (E3) to liczby dla biura, bez zapisu i bez hali", async ()
   assert.equal(zdarzen(), przed);
 });
 
-test("skuteczność doboru: liczby dla biura, oś osobowa z podstawą prawną, bez zapisu", async () => {
-  /* Ta trasa niesie OŚ OSOBOWĄ, więc bramka roli znaczy tu więcej niż wygodę.
-     Do tego zdanie o podstawie prawnej monitoringu musi dojechać w ładunku —
-     panel, który go nie dostanie, nie ma jak go pokazać. */
-  let r = await app.inject({ method: "GET", url: "/api/obsluga/skutecznosc-doboru" });
+test("miary doboru: liczby dla biura, bez osi osobowej i bez zapisu", async () => {
+  let r = await app.inject({ method: "GET", url: "/api/obsluga/miary-doboru" });
   assert.equal(r.statusCode, 401, "401 przed 403 — brak sesji to nie brak roli");
-  r = await app.inject({ method: "GET", url: "/api/obsluga/skutecznosc-doboru", headers: login("magazynier") });
+  r = await app.inject({ method: "GET", url: "/api/obsluga/miary-doboru", headers: login("magazynier") });
   assert.equal(r.statusCode, 403, "hala nie ogląda pracy biura");
 
   const zdarzen = () => (db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
   const przed = zdarzen();
-  r = await app.inject({ method: "GET", url: "/api/obsluga/skutecznosc-doboru?dni=90", headers: login("biuro") });
+  r = await app.inject({ method: "GET", url: "/api/obsluga/miary-doboru?dni=90", headers: login("biuro") });
   assert.equal(r.statusCode, 200, r.body);
-  const body = r.json<{ dni: number; drogi: unknown[]; osoby: unknown[]; podstawaPrawna: string;
-    progWiarygodnosci: number; naStole: { statusy: unknown[] } }>();
+  const body = r.json<Record<string, unknown>>();
+  assert.deepEqual(Object.keys(body).sort(), ["dni", "otwarte", "podstawy", "wyniki"], "bez osi osobowej");
   assert.equal(body.dni, 90);
-  assert.equal(body.drogi.length, 11, "jedenaście szczebli §11.2, także z zerami");
-  assert.equal(body.naStole.statusy.length, 9, "dziewięć statusów §7, także z zerami");
-  assert.match(body.podstawaPrawna, /Kodeks pracy art\. 22²/);
-  assert.equal(body.progWiarygodnosci, 20);
+  assert.deepEqual(Object.keys(body.wyniki as object).sort(), ["brak", "czesc", "dopytac", "nie_dotyczy"]);
   /* Okno spoza selektora spada na tydzień, nie na wartość z żądania. */
-  r = await app.inject({ method: "GET", url: "/api/obsluga/skutecznosc-doboru?dni=9999", headers: login("biuro") });
+  r = await app.inject({ method: "GET", url: "/api/obsluga/miary-doboru?dni=9999", headers: login("biuro") });
   assert.equal(r.json<{ dni: number }>().dni, 7);
   assert.equal(zdarzen(), przed, "raport o zdarzeniach nie ma prawa dopisywać do zdarzeń");
 });

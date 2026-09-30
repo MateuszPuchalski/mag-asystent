@@ -10,7 +10,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, podziekowal: false, oglada: null,
-  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "not_started",
+  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "pusty",
   kopilot: null, ...n,
 });
 
@@ -277,16 +277,20 @@ describe("wiersz kolejki niesie to, co §10.2 wymienia", () => {
     expect(screen.getByText(/zadanie w toku/)).toBeInTheDocument();
   });
 
-  it("status doboru stoi w wierszu, ale nierozpoczęty i „nie dotyczy” milczą", () => {
-    /* §10.2 domknięty w E1: plakietka mówi, na czym stanął dobór. Na wierszu
-       bez doboru nie ma czego mówić — „nierozpoczęty" wszędzie to szum. */
-    const { rerender } = render(<Kolejka rozmowy={[rozmowa({ dobor: "missing_information" })]}
+  it("stan doboru stoi w wierszu znakiem z nazwą, ale „nie zaczęty” i „nie dotyczy” milczą", () => {
+    /* Znak mówi, na czym stanął dobór. Na wierszu bez doboru nie ma czego
+       mówić, a „nie dotyczy" to wiersz, przy którym doboru nie trzeba robić. */
+    const { rerender } = render(<Kolejka rozmowy={[rozmowa({ dobor: "dopytac" })]}
       stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
-    expect(screen.getByText("Brakuje danych")).toBeInTheDocument();
-    rerender(<Kolejka rozmowy={[rozmowa({ dobor: "not_applicable" }), rozmowa({ id: 2, dobor: "not_started" })]}
+    expect(screen.getByText("Dopytać klienta")).toBeInTheDocument();
+    expect(screen.getByTitle("dobór: Dopytać klienta")).toHaveClass("text-ranga-zle");
+    rerender(<Kolejka rozmowy={[rozmowa({ dobor: "czesc" })]}
+      stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(screen.getByTitle("dobór: Wybrano część")).toHaveClass("text-emerald-700");
+    rerender(<Kolejka rozmowy={[rozmowa({ dobor: "nie_dotyczy" }), rozmowa({ id: 2, dobor: "pusty" })]}
       stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
     expect(screen.queryByText("Nie dotyczy")).not.toBeInTheDocument();
-    expect(screen.queryByText("Nierozpoczęty")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nie zaczęty")).not.toBeInTheDocument();
   });
 });
 

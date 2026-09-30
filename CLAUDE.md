@@ -49,7 +49,11 @@ Każda zasada: co robić, dlaczego i kto tego pilnuje.
   „Robimy X, bo Y" zostaje prawdziwe. „Do wersji N było inaczej" przestaje
   być potrzebne w dniu zmiany, a historia mieszka w `CHANGELOG.md` i gicie.
   Decyzja bez powodu w komentarzu to decyzja do wycofania.
-  *Strażnik: konwencja.*
+  *Strażnik: `tools/styl_check.py`* — nowy numer wydania w komentarzu kodu
+  zatrzyma CI. Stare numery trzyma próg per plik
+  (`tools/wersje_w_komentarzach.json`), który może tylko maleć. Usuwając
+  numer, obniż próg: `python3 tools/styl_check.py --zapisz-wersje`.
+  Reszta zasady: konwencja.
 
 - **Jeden front: `panel/`.** Całe biuro mieszka w `panel/`, a `/` i `/biuro`
   przekierowują do `/obsluga/`. Nowy ekran biura, magazynowy czy obsługi,
@@ -145,9 +149,10 @@ Każda zasada: co robić, dlaczego i kto tego pilnuje.
   `zmiany/README.md`): `rodzaj: minor` dla widocznej funkcji albo działania
   przy wdrożeniu, `patch` dla reszty, `tytul:` i treść wpisu. PR z samym CI
   albo dokumentacją fragmentu nie potrzebuje.
-- **Numer swojego wydania pisz jako `@wydanie`.** Automat podmieni znacznik
-  w komentarzach i dokumentach przy scaleniu. Ten plik jest z podmiany
-  wyłączony, bo znacznik opisuje.
+- **Numer swojego wydania pisz jako `@wydanie`, ale tylko w dokumentach.**
+  Automat podmieni znacznik przy scaleniu. W komentarzu kodu numeru nie ma
+  wcale, także jako znacznika. Ten plik jest z podmiany wyłączony, bo
+  znacznik opisuje.
 - **`[wymaga działania]` w fragmencie wstrzymuje automatyczną aktualizację
   serwera**, aż ktoś kliknie ją w panelu. Pisz go zawsze, gdy wdrożenie
   potrzebuje czegoś poza samą aktualizacją: nowego klucza w `wertis.env`,

@@ -257,8 +257,10 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   copilot_pasowanie_z_sieci: "Pasowanie Copilota z sieci",
   klasyfikacja_mapowanie_do_przegladu: "Rozpoznanie do przeglądu",
 
-  /* Dobór części */
+  /* Dobór części. `dobor_status`, `dobor_wybor` i `dobor_wybor_zdjety` nie
+     mają już nadawcy, ale dziennik trzyma je w historii i ma je nazwać. */
   dobor_dane: "Dane doboru zapisane",
+  dobor_wynik: "Wynik doboru",
   dobor_status: "Stan doboru zmieniony",
   dobor_wybor: "Część dobrana",
   dobor_wybor_zdjety: "Dobór cofnięty",
