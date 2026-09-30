@@ -816,3 +816,94 @@ test("dobór: dane maszyny i „dopytać” są tekstem od człowieka, numer, sy
   assert.equal(regulaKolumny("dobor", "zmienil").regula, R.PRACOWNIK);
   assert.equal(regulaKolumny("dobor", "nr_seryjny").regula, R.TEKST, "numer seryjny egzemplarza klienta");
 });
+
+/* ── Raport skanera: skąd wzięła się igła ────────────────────────────────────
+   Na prawdziwej kopii skaner odmawiał na tysiącach trafień w kolumnach, które
+   zostają (daty, identyfikatory, nazwy towarów), a lista miejsc nie mówiła, skąd
+   pochodzą igły. Raport podaje teraz źródło, kształt i liczby. Wartości nie
+   wychodzą z narzędzia. */
+
+const zamowienieZJson = (json: unknown, wKolumnie: string) => (d: DatabaseSync) => {
+  wstaw(d, "allegro_zamowienie", { id: "zam-zrodlo", surowe_json: JSON.stringify(json), synced_at: "2026-09-21T09:00:00.000Z" });
+  wstaw(d, "reklamacja_tag", { nazwa: wKolumnie });
+};
+
+function odmowa(we: string, wy: string, reguly: Record<string, unknown>) {
+  try {
+    anonimizuj(we, wy, { ziarno: "test", reguly });
+  } catch (e) {
+    return (e as { raport?: { skaner: Array<{ miejsce: string; ile: number; zrodla?: Array<{ zrodlo: string; ksztalt: string; trafien: number; roznych: number }> }> } }).raport?.skaner ?? [];
+  }
+  return [];
+}
+
+test("czas i UUID pod kluczem osobowym nie są igłą: ta sama chwila stoi w kolumnie, która zostaje", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    /* `lastMessageDateTime` pasuje do „message” i „last”, więc jego wartość trafiała na listę igieł
+       i zatrzymywała skaner na każdej kolumnie z datą. */
+    zbudujBaze(we, (d) => {
+      wstaw(d, "allegro_zamowienie", { id: "zam-czas", surowe_json: JSON.stringify({ lastMessageDateTime: "2026-09-18T09:00:00.000Z", messageId: "4e3b1f20-1111-4222-8333-0000000000aa" }), synced_at: "2026-09-21T09:00:00.000Z" });
+      wstaw(d, "reklamacja_tag", { nazwa: "4e3b1f20-1111-4222-8333-0000000000aa" });
+    });
+    const raport = anonimizuj(we, path.join(k, "wynik.db"), { ziarno: "test", reguly: { "reklamacja_tag.nazwa": R.ZOSTAJE } });
+    assert.deepEqual(raport.skaner, []);
+  });
+});
+
+test("sekret w kształcie UUID zostaje igłą, bo wyjątek dla czasu i UUID go nie obejmuje", () => {
+  const igly = new Igly();
+  const uuid = "4e3b1f20-1111-4222-8333-0000000000aa";
+  igly.dodaj(uuid);
+  igly.dodaj("2026-09-18T09:00:00.000Z");
+  assert.equal(igly.slowa.size, 0, "zwykła igła w kształcie UUID albo czasu jest pomijana");
+  igly.dodaj(uuid, { bezWyjatkow: true });
+  assert.ok(igly.slowa.has(uuid), "sekret zostaje na liście");
+});
+
+test("raport mówi, skąd pochodzi igła, i nie zawiera jej wartości", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    zbudujBaze(we, zamowienieZJson({ delivery: { address: { name: "Zenon Wartomski" } } }, "Zenon Wartomski"));
+    const skaner = odmowa(we, path.join(k, "wynik.db"), { "reklamacja_tag.nazwa": R.ZOSTAJE });
+    const trafienie = skaner.find((t) => t.miejsce === "reklamacja_tag.nazwa");
+    assert.ok(trafienie, "miejsce trafienia");
+    const zrodlo = trafienie!.zrodla?.[0];
+    assert.equal(zrodlo?.zrodlo, "allegro_zamowienie.surowe_json: delivery.address.name", "kolumna i ścieżka kluczy");
+    assert.equal(zrodlo?.ksztalt, "kilka słów");
+    assert.equal(zrodlo?.trafien, 1);
+    assert.equal(zrodlo?.roznych, 1);
+    assert.ok(!JSON.stringify(skaner).toLowerCase().includes("wartomski"), "wartość nie trafia do raportu");
+  });
+});
+
+test("klucz JSON, który wygląda jak dana, jest w raporcie zastąpiony", () => {
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    /* Klucze bywają danymi: obiekt indeksowany nazwą, SKU albo numerem. Schemat pisze klucze od małej litery. */
+    zbudujBaze(we, zamowienieZJson({ delivery: { address: { "Honda GCV 160": { lastName: "Zenon Wartomski" }, "99887766": { lastName: "Zenon Wartomski" } } } }, "Zenon Wartomski"));
+    const skaner = odmowa(we, path.join(k, "wynik.db"), { "reklamacja_tag.nazwa": R.ZOSTAJE });
+    const opis = JSON.stringify(skaner);
+    assert.ok(!opis.includes("Honda") && !opis.includes("99887766"), "klucz-dana nie wychodzi");
+    assert.match(opis, /delivery\.address\.<klucz>\.lastName/);
+  });
+});
+
+test("wiersz poleceń wypisuje pochodzenie igieł i skrót pliku, ale nie wartości", () => {
+  const { uruchom } = narzedzie;
+  const linie: string[] = [];
+  const [log, err] = [console.log, console.error];
+  wKatalogu((k) => {
+    const we = path.join(k, "kopia.db");
+    zbudujBaze(we, (d) => wstaw(d, "reklamacja_tag", { nazwa: "czeka na ogrodnik_77" }));
+    console.log = (...a: unknown[]) => { linie.push(a.join(" ")); };
+    console.error = (...a: unknown[]) => { linie.push(a.join(" ")); };
+    let kod: number;
+    try { kod = uruchom([we, path.join(k, "wynik.db")]); } finally { console.log = log; console.error = err; }
+    const tekst = linie.join("\n");
+    assert.equal(kod, 2);
+    assert.match(tekst, /<- .*\| .*\| trafień [1-9]/, "źródło, kształt i liczba");
+    assert.match(tekst, /Narzędzie: anonimizuj-baze\.mjs, skrót pliku [0-9a-f]{8}\./);
+    for (const w of WRAZLIWE) assert.ok(!tekst.toLowerCase().includes(w.toLowerCase()), `raport nie zawiera „${w}”`);
+  });
+});

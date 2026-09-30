@@ -67,7 +67,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import os from "node:os";
 import { DatabaseSync } from "node:sqlite";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 /* ── REGUŁY ─────────────────────────────────────────────────────────────── */
 
@@ -374,11 +374,16 @@ class Zamienniki {
  * listu w kolumnie i w surowym JSON-ie dostaje ten sam zamiennik. Serwer łączy
  * zwroty z przesyłkami po numerze listu.
  */
-function rozsypJson(w, klucz, ctx, rodzicOsobowy = false, kluczRodzica = "") {
+/** Klucz JSON do raportu. Schemat Allegro pisze klucze camelCase od małej litery; klucz, który
+    wygląda jak dana (wielka litera, cyfry), nie trafia do raportu, bo mógłby nią być. */
+const kluczDoRaportu = (k) => (/^[a-z_][A-Za-z0-9_]{0,39}$/.test(k) && !/\d{4}/.test(k) ? k : "<klucz>");
+
+function rozsypJson(w, klucz, ctx, rodzicOsobowy = false, kluczRodzica = "", sciezka = "") {
   const osobowe = rodzicOsobowy || KLUCZ_OSOBOWY.test(klucz);
-  if (Array.isArray(w)) return w.map((x) => rozsypJson(x, klucz, ctx, rodzicOsobowy, kluczRodzica));
+  if (Array.isArray(w)) return w.map((x) => rozsypJson(x, klucz, ctx, rodzicOsobowy, kluczRodzica, `${sciezka}[]`));
   if (w !== null && typeof w === "object") {
-    return Object.fromEntries(Object.entries(w).map(([k, v]) => [k, rozsypJson(v, k, ctx, osobowe, klucz)]));
+    return Object.fromEntries(Object.entries(w).map(([k, v]) =>
+      [k, rozsypJson(v, k, ctx, osobowe, klucz, sciezka ? `${sciezka}.${kluczDoRaportu(k)}` : kluczDoRaportu(k))]));
   }
   /* Pole pod kluczem człowieka (`buyer.id`, `delivery.address.name`) jest igłą, bo jego wartość
      stoi też w kolumnach, które zostają. Czas i UUID pod takim kluczem (`modifiedAt`) nie są:
@@ -394,7 +399,7 @@ function rozsypJson(w, klucz, ctx, rodzicOsobowy = false, kluczRodzica = "") {
   if (typeof w !== "string") return w;
   ctx.igly.zTekstu(w);
   if (osobowe) {
-    if (w !== ZNACZNIK_USUNIECIA && doIgiel) ctx.igly.dodaj(w);
+    if (w !== ZNACZNIK_USUNIECIA && doIgiel) ctx.igly.dodaj(w, { zrodlo: `${ctx.zrodloJson}: ${sciezka}` });
     if (/login/i.test(klucz)) return ctx.klient.daj(w);
     if (/phone|tel/i.test(klucz)) {
       if (doIgiel) ctx.igly.dodajCyfry(w);
@@ -416,13 +421,16 @@ const wyglądaNaJson = (t) => {
 };
 
 /** Rozsypuje tekst albo JSON w tekście. E-maile i telefony wyłuskuje tylko z tekstów, nie z liczb JSON-a. */
-function rozsypWartosc(w, ctx) {
+function rozsypWartosc(w, ctx, kolumnaId = "json") {
   if (wyglądaNaJson(w)) {
     let drzewo;
     try {
       drzewo = JSON.parse(w);
     } catch { /* nie JSON, więc zwykły tekst */ }
-    if (drzewo !== undefined) return JSON.stringify(rozsypJson(drzewo, "", ctx));
+    if (drzewo !== undefined) {
+      ctx.zrodloJson = kolumnaId;
+      return JSON.stringify(rozsypJson(drzewo, "", ctx));
+    }
   }
   ctx.igly.zTekstu(w);
   return rozsypTekst(w, ctx.ziarno, "tekst", ctx.igly.cyfry);
@@ -471,13 +479,39 @@ export class Igly {
     /** Ciągi cyfr (telefony, NIP), które rozsyp ma omijać. */
     this.cyfry = new Set();
     this.pominiete = 0;
+    /** Skąd wzięła się igła (małe litery → numer etykiety). Bez tego raport skanera
+        mówi tylko GDZIE igła trafiła, a nie skąd ją mamy, i nie da się rozróżnić
+        wycieku od nazwy towaru, która stoi też w kolumnie osobowej. */
+    this.zrodla = new Map();
+    this.etykiety = [];
+    this.numeryEtykiet = new Map();
   }
 
-  dodaj(wartosc, { minimum = 4 } = {}) {
+  #etykieta(zrodlo) {
+    let n = this.numeryEtykiet.get(zrodlo);
+    if (n === undefined) {
+      n = this.etykiety.length;
+      this.etykiety.push(zrodlo);
+      this.numeryEtykiet.set(zrodlo, n);
+    }
+    return n;
+  }
+
+  /**
+   * `bezWyjatkow`: czas i UUID zwykle nie identyfikują człowieka, a lądowały na
+   * liście i zatrzymywały skaner na każdej kolumnie z datą. Wyjątek nie obejmuje
+   * sekretów: token w kształcie UUID ma zostać na liście.
+   */
+  dodaj(wartosc, { minimum = 4, zrodlo = null, bezWyjatkow = false } = {}) {
     const w = String(wartosc ?? "").trim();
     if (w.length < minimum) { if (w.length > 0) this.pominiete++; return; }
+    if (!bezWyjatkow && (CZAS_ISO.test(w) || UUID_CALY.test(w))) return;
     this.slowa.add(w);
     this.slowa.add(w.toLowerCase());
+    if (zrodlo) {
+      const male = w.toLowerCase();
+      if (!this.zrodla.has(male)) this.zrodla.set(male, this.#etykieta(zrodlo));
+    }
   }
 
   dodajCyfry(wartosc) {
@@ -532,6 +566,26 @@ class Automat {
     }
   }
 
+  /** Trafione fragmenty tekstu (w postaci, w jakiej stoją w tekście), z tymi samymi granicami co `ile`. */
+  znajdz(tekst, { granice = true } = {}) {
+    const wynik = [];
+    let n = 0;
+    for (let i = 0; i < tekst.length; i++) {
+      const c = tekst[i];
+      while (n !== 0 && !this.wezly[n].dalej.has(c)) n = this.wezly[n].porazka;
+      n = this.wezly[n].dalej.get(c) ?? 0;
+      for (const dl of this.wezly[n].koniec) {
+        if (granice) {
+          const przed = tekst[i - dl];
+          const po = tekst[i + 1];
+          if ((przed && /[\p{L}\p{N}]/u.test(przed)) || (po && /[\p{L}\p{N}]/u.test(po))) continue;
+        }
+        wynik.push(tekst.slice(i - dl + 1, i + 1));
+      }
+    }
+    return wynik;
+  }
+
   /** Liczba trafień. Z `granice` trafienie musi stać między znakami niebędącymi literą ani cyfrą. */
   ile(tekst, { granice = true } = {}) {
     let n = 0;
@@ -551,6 +605,43 @@ class Automat {
   }
 }
 
+/** Kształt igły do raportu. Nie zdradza wartości, a mówi, czy trafienie mogło być przypadkiem. */
+function ksztaltIgly(s) {
+  if (/^\d+$/.test(s)) return "same cyfry";
+  if (s.includes("@")) return "adres e-mail";
+  if (/\s/.test(s)) return "kilka słów";
+  const dl = [...s].length;
+  return dl <= 5 ? "jedno słowo, 4-5 znaków" : dl <= 9 ? "jedno słowo, 6-9 znaków" : "jedno słowo, 10+ znaków";
+}
+
+/**
+ * Dla jednej kolumny z trafieniami: skąd pochodzą igły, które w niej trafiły. Wartości zostają
+ * w narzędziu; do raportu idzie etykieta źródła, kształt igły i liczby.
+ */
+function skadTrafienia(db, tabela, kolumna, malePelne, cyfrowe, cyfryDozwolone, igly) {
+  const grupy = new Map();
+  for (const w of db.prepare(`SELECT "${kolumna}" AS v FROM "${tabela}"`).all()) {
+    const v = w.v;
+    if (typeof v !== "string" || v.length < 4) continue;
+    const znalezione = malePelne.znajdz(v.toLowerCase());
+    if (cyfrowe && cyfryDozwolone) znalezione.push(...cyfrowe.znajdz(v));
+    for (const igla of znalezione) {
+      const numer = igly.zrodla?.get(igla);
+      const zrodlo = numer !== undefined ? igly.etykiety[numer]
+        : /^\d+$/.test(igla) ? "(cyfry z kolumn telefonu i NIP)" : "(bez śladu pochodzenia)";
+      const klucz = `${zrodlo}\u0000${ksztaltIgly(igla)}`;
+      const g = grupy.get(klucz) ?? { zrodlo, ksztalt: ksztaltIgly(igla), trafien: 0, rozne: new Set() };
+      g.trafien++;
+      if (g.rozne.size < 5000) g.rozne.add(igla);
+      grupy.set(klucz, g);
+    }
+  }
+  return [...grupy.values()]
+    .sort((a, b) => b.trafien - a.trafien)
+    .slice(0, 6)
+    .map((g) => ({ zrodlo: g.zrodlo, ksztalt: g.ksztalt, trafien: g.trafien, roznych: g.rozne.size }));
+}
+
 /**
  * Szuka `igly` w gotowym pliku: po wartościach komórek (bez wielkości liter)
  * i po surowych bajtach (z wielkością). Drugie sito łapie to, czego pierwsze
@@ -568,7 +659,9 @@ export function skanujWycieki(sciezka, igly, kolumnyStale = new Set()) {
   const trafienia = [];
   const db = new DatabaseSync(sciezka);
   try {
-    const malePelne = new Automat(slowa.map((s) => s.toLowerCase()));
+    /* Lista igieł niesie każdą wartość w dwóch wielkościach liter. Po zamianie na małe litery to
+       duplikaty, a duplikat w automacie liczy każde trafienie podwójnie. */
+    const malePelne = new Automat([...new Set(slowa.map((s) => s.toLowerCase()))]);
     const cyfrowe = cyfry.length ? new Automat(cyfry) : null;
     const tabele = db.prepare(
       "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' AND name NOT LIKE 'towar_fts%' AND sql NOT LIKE 'CREATE VIRTUAL%'").all();
@@ -585,7 +678,12 @@ export function skanujWycieki(sciezka, igly, kolumnyStale = new Set()) {
           if (t > 0) ile.set(k, (ile.get(k) ?? 0) + t);
         }
       }
-      for (const [k, n] of ile) trafienia.push({ miejsce: `${name}.${k}`, ile: n });
+      for (const [k, n] of ile) {
+        trafienia.push({
+          miejsce: `${name}.${k}`, ile: n,
+          zrodla: skadTrafienia(db, name, k, malePelne, cyfrowe, !kolumnyStale.has(`${name}.${k}`), igly),
+        });
+      }
     }
   } finally {
     db.close();
@@ -643,22 +741,22 @@ function przetworzWartosc(regula, v, kolumnaId, ctx) {
     case R.KLIENT:
       /* Słowo słownikowe („admin”) jest loginem, ale nie osobą do szukania:
          baza z samym kontem administratora nie ma czego skanować i nie jest błędem. */
-      if (!SLOWA_SLOWNIKOWE.has(nazwa)) { ctx.osobowych++; igly.dodaj(v); }
+      if (!SLOWA_SLOWNIKOWE.has(nazwa)) { ctx.osobowych++; igly.dodaj(v, { zrodlo: kolumnaId }); }
       return ctx.klient.daj(v);
     case R.PRACOWNIK:
       if (AUTOMATY.has(nazwa)) return v;
-      if (!SLOWA_SLOWNIKOWE.has(nazwa)) { ctx.osobowych++; igly.dodaj(v); }
+      if (!SLOWA_SLOWNIKOWE.has(nazwa)) { ctx.osobowych++; igly.dodaj(v, { zrodlo: kolumnaId }); }
       return ctx.pracownik.daj(v);
     case R.OSOBA:
       ctx.osobowych++;
-      igly.dodaj(v);
+      igly.dodaj(v, { zrodlo: kolumnaId });
       return ctx.osoba.daj(v);
     case R.TELEFON:
       ctx.osobowych++;
       igly.dodajCyfry(v);
       return rozsypTekst(v, ctx.ziarno, "telefon", igly.cyfry);
     case R.SEKRET:
-      igly.dodaj(v, { minimum: 8 });
+      igly.dodaj(v, { minimum: 8, bezWyjatkow: true, zrodlo: kolumnaId });
       /* Sam wykrzyknik: nie jest poprawnym skrótem, więc nikt się nie zaloguje,
          a nie zawiera słów, które skaner mógłby znaleźć w samym sobie. */
       return "!";
@@ -674,7 +772,7 @@ function przetworzWartosc(regula, v, kolumnaId, ctx) {
         igly.zTekstu(v);
         return mapa.daj(v);
       }
-      return rozsypWartosc(v, ctx);
+      return rozsypWartosc(v, ctx, kolumnaId);
     }
   }
 }
@@ -900,13 +998,13 @@ export function anonimizuj(wejscie, wyjscie, opcje = {}) {
           wartosci = rozne(db, t, k);
         } catch { /* kopia sprzed migracji: kolumny jeszcze nie ma */ }
         for (const v of wartosci) {
-          if (k === "nip" || k === "telefon") igly.dodajCyfry(v); else igly.dodaj(v);
+          if (k === "nip" || k === "telefon") igly.dodajCyfry(v); else igly.dodaj(v, { zrodlo: `${t}.${k}` });
         }
       }
       for (const t of tabele) {
         if (TABELE_DO_OPROZNIENIA.includes(t)) {
           for (const k of SEKRETNE_KOLUMNY[t] ?? []) {
-            for (const w of db.prepare(`SELECT "${k}" AS v FROM "${t}"`).all()) igly.dodaj(w.v, { minimum: 16 });
+            for (const w of db.prepare(`SELECT "${k}" AS v FROM "${t}"`).all()) igly.dodaj(w.v, { minimum: 16, bezWyjatkow: true, zrodlo: `${t}.${k}` });
           }
           db.exec(`DELETE FROM "${t}"`);
           raport.oproznione.push(t);
@@ -1013,14 +1111,32 @@ export function uruchom(argv) {
     console.log(`Kolumny tekstowe wg reguły: ${Object.entries(licz).map(([k, n]) => `${k} ${n}`).join(", ")}.`);
     console.log(`Skaner wycieków sprawdził ${r.igly} wartości i nic nie znalazł. Pominięto ${r.pominieteIgly} krótszych niż 4 znaki, których skaner nie widzi.`);
     console.log(`Lista kolumn i reguł, bez danych: ${wyjscie}.kolumny.txt`);
+    console.log(skrotNarzedzia());
     return 0;
   } catch (e) {
     console.error(`Błąd: ${e instanceof Error ? e.message : e}`);
     if (e && e.raport) {
-      for (const t of e.raport.skaner) console.error(`  ${t.miejsce}: ${t.ile}`);
+      for (const t of e.raport.skaner) {
+        console.error(`  ${t.miejsce}: ${t.ile}`);
+        for (const z of t.zrodla ?? []) {
+          console.error(`      <- ${z.zrodlo} | ${z.ksztalt} | trafień ${z.trafien}, różnych igieł ${z.roznych}`);
+        }
+      }
+      console.error("Raport nie zawiera wartości z bazy. Klucz JSON, który wygląda jak dana, jest zastąpiony przez <klucz>.");
+      console.error(skrotNarzedzia());
       return 2;
     }
     return 1;
+  }
+}
+
+/** Skrót własnego pliku: po raporcie widać, której wersji narzędzia użyto. */
+function skrotNarzedzia() {
+  try {
+    const skrot = crypto.createHash("sha256").update(fs.readFileSync(fileURLToPath(import.meta.url))).digest("hex").slice(0, 8);
+    return `Narzędzie: anonimizuj-baze.mjs, skrót pliku ${skrot}.`;
+  } catch {
+    return "Narzędzie: anonimizuj-baze.mjs, skrótu pliku nie udało się policzyć.";
   }
 }
 
