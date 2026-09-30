@@ -10,6 +10,15 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.552.5 — 30 września 2026
+
+**Aktualizacja serwera nie poddaje się od razu, gdy coś trzyma katalog
+aplikacji.** Zmiana nazwy `C:\wertis` kończyła się odmową dostępu, gdy jakaś
+konsola albo program miał ten katalog otwarty. Instalator wracał na starą wersję
+i mówił tylko, żeby zamknąć okna. Teraz ponawia zmianę nazwy przez około pół
+minuty, bo chwilowe blokady same znikają. Gdy blokada trwa, podaje nazwę i numer
+procesu, który trzyma katalog, razem z jego katalogiem roboczym.
+
 ## 0.552.4 — 30 września 2026
 
 **Rozpoznawanie wiadomości klientów robi znów tylko Claude.** Klasyfikator Jev
