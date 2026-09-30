@@ -10,6 +10,16 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.551.0 — 30 września 2026
+
+**Trzy wskaźniki na górze analizy.** Czas od przyjęcia dostawy do jej
+rozłożenia, odsetek wyszukiwań zakończonych adresem na półce i czas pierwszej
+odpowiedzi klientowi Allegro. Każdy z medianą i liczbą przypadków za wybrany
+okres.
+
+Dokumentacja opisuje stan, nie drogę do niego. Historia zostaje
+w `CHANGELOG.md` i w gicie. Nowy numer wydania w komentarzu kodu zatrzymuje CI.
+
 ## 0.550.5 — 29 września 2026
 
 **Anonimizacja kopii bazy: poprawki po drugim przeglądzie.** Skaner wycieków
