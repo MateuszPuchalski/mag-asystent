@@ -10,6 +10,24 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.553.2 — 1 października 2026
+
+**Poprawka skanera z poprzedniego wydania nie weszła do narzędzia.** Opis
+zmiany trafił do wydania, ale sam kod `anonimizuj-baze.mjs` został na gałęzi,
+więc paczka niosła starą wersję. To wydanie dokłada kod: skaner nie szuka już
+nazw towarów i modeli, ról, autorów systemowych, krótkich tekstów ani
+komentarzy z dziennika biura. Imiona, nazwiska, loginy, adresy, telefony
+i pełne treści wiadomości dalej zatrzymują narzędzie.
+
+**Pamięć serwera widać bez zgadywania.** `/api/health` ma blok `pamiec`:
+pamięć procesu, zajętą stertę, jej limit i czas pracy. Serwer zapisuje próbkę
+co godzinę w logu (`[pamiec]`) i trzyma ostatnie dwie doby w pamięci. Blok
+liczy też trend: o ile wzrosło dno pamięci między starszą a młodszą połową
+okna. Dno, nie szczyt, bo sterta Node faluje przy każdym odświeżeniu
+read-modelu. Stały wzrost dna po kilku godzinach oznacza wyciek, a wahania
+wokół jednej wartości są normalne. Trend nie zmienia `ok` ani listy
+`problemy`, więc aktualizacja nie może przez niego wycofać wydania.
+
 ## 0.553.1 — 1 października 2026
 
 **Anonimizacja kopii bazy: skaner nie bierze nazw towarów, ról i autorów
