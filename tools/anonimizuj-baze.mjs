@@ -105,7 +105,7 @@ const PRACOWNIK = /(^|_)(przez|by)$|^(dodal|zaimportowal|wycofal|rozstrzygnal|za
 /** Autorzy, którzy nie są ludźmi. Zamiennik zrobiłby z automatu osobę. */
 const AUTOMATY = new Set([
   "automat", "system", "copilot", "takt", "sync", "import", "instalator", "dev",
-  "allegro", "wlasciciel", "zaawansowane", "anonim",
+  "allegro", "wlasciciel", "zaawansowane", "anonim", "oferta",
 ]);
 
 /**
@@ -114,6 +114,19 @@ const AUTOMATY = new Set([
  * w której to słowo ma prawo stać.
  */
 const SLOWA_SLOWNIKOWE = new Set(["admin", "biuro", "magazynier", "system", "automat"]);
+
+/**
+ * Autor systemowy: sam znacznik („automat”) albo znacznik z dopiskiem („automat (oferta)”).
+ * Kod zapisuje takie wartości wprost, w kolumnach autora i w JSON-ie. To nie człowiek,
+ * więc nie dostaje zamiennika i nie jest igłą.
+ */
+const autorSystemowy = (v) => {
+  const n = String(v).trim().toLowerCase();
+  if (AUTOMATY.has(n)) return true;
+  const m = /^([\p{L}_-]+) \(.*\)$/u.exec(n);
+  return m !== null && AUTOMATY.has(m[1]);
+};
+const slowoNieOsobowe = (v) => autorSystemowy(v) || SLOWA_SLOWNIKOWE.has(String(v).trim().toLowerCase());
 
 /** Kolumny, których wartości są słownikiem, znacznikiem czasu albo identyfikatorem. */
 const ZOSTAJE = [
@@ -251,7 +264,15 @@ const KLUCZ_OSOBOWY = /login|name|nazw|imi[eę]|mail|phone|tel|miast|city|street
    w kolumnach z kartoteki, więc jako „dana do wyszukania” dawałaby fałszywy alarm na
    każdej bazie z zamówieniami. Igłą jest wartość pod kluczem, który sam mówi „człowiek”,
    albo pod dowolnym kluczem wewnątrz obiektu, który jest człowiekiem (`buyer.id`). */
-const KLUCZ_DO_IGIEL = /login|mail|phone|tel|first|last|full|company|street|city|zip|post|poczt|nip|pesel|iban|konto|account|text|note|uwag|komentarz|message|wiadom|tresc|imi|nazw|adres|address|tax|user|autor/i;
+/* BEZ `nazw`: pasowało do `nazwa`, czyli do nazwy części, modelu maszyny i dostawcy, które stoją też
+   w kartotece i w słownikach. Do nazwisk służy `nazwisk`. */
+const KLUCZ_DO_IGIEL = /login|mail|phone|tel|first|last|full|company|street|city|zip|post|poczt|nip|pesel|iban|konto|account|text|note|uwag|komentarz|message|wiadom|tresc|imi|nazwisk|odbiorc|kupuj|adres|address|tax|user|autor/i;
+/* Klucze z tekstem pisanym przez człowieka. Krótki tekst („Okej”, „Tak”) nic nie identyfikuje, a stoi
+   w tysiącach komórek, więc jako igła zatrzymywałby narzędzie na każdej kolumnie. */
+const KLUCZ_TEKSTU_SWOBODNEGO = /text|note|uwag|komentarz|message|wiadom|tresc/i;
+const MIN_TEKST_SWOBODNY = 12;
+/* Dziennik działań biura niesie wiedzę o kartotece (komentarze do zastosowań), nie treść od klientów. */
+const ZRODLA_BEZ_TEKSTU_KLIENTA = new Set(["events.payload"]);
 const KLUCZ_CZLOWIEKA = /buyer|interlocutor|author|seller|sender|recipient|receiver|odbiorc|kupuj|customer|person|osob|participant|autor|user|owner|company|contact|address/i;
 
 /* Poza kluczami osobowymi zostaje krótki identyfikator pod kluczem kończącym się na Id
@@ -378,6 +399,19 @@ class Zamienniki {
     wygląda jak dana (wielka litera, cyfry), nie trafia do raportu, bo mógłby nią być. */
 const kluczDoRaportu = (k) => (/^[a-z_][A-Za-z0-9_]{0,39}$/.test(k) && !/\d{4}/.test(k) ? k : "<klucz>");
 
+/** Czy wartość spod klucza może być igłą skanera. Rozsypywana jest zawsze, igłą bywa rzadziej. */
+function mozeBycIgla(w, klucz, ctx) {
+  if (typeof w !== "string") return true;
+  if (w === ZNACZNIK_USUNIECIA) return false;
+  if (KLUCZ_WYLICZENIA.test(klucz)) return false;
+  if (slowoNieOsobowe(w)) return false;
+  if (KLUCZ_TEKSTU_SWOBODNEGO.test(klucz)) {
+    if (w.trim().length < MIN_TEKST_SWOBODNY) return false;
+    if (ZRODLA_BEZ_TEKSTU_KLIENTA.has(ctx.zrodloJson)) return false;
+  }
+  return true;
+}
+
 function rozsypJson(w, klucz, ctx, rodzicOsobowy = false, kluczRodzica = "", sciezka = "") {
   const osobowe = rodzicOsobowy || KLUCZ_OSOBOWY.test(klucz);
   if (Array.isArray(w)) return w.map((x) => rozsypJson(x, klucz, ctx, rodzicOsobowy, kluczRodzica, `${sciezka}[]`));
@@ -399,7 +433,7 @@ function rozsypJson(w, klucz, ctx, rodzicOsobowy = false, kluczRodzica = "", sci
   if (typeof w !== "string") return w;
   ctx.igly.zTekstu(w);
   if (osobowe) {
-    if (w !== ZNACZNIK_USUNIECIA && doIgiel) ctx.igly.dodaj(w, { zrodlo: `${ctx.zrodloJson}: ${sciezka}` });
+    if (doIgiel && mozeBycIgla(w, klucz, ctx)) ctx.igly.dodaj(w, { zrodlo: `${ctx.zrodloJson}: ${sciezka}` });
     if (/login/i.test(klucz)) return ctx.klient.daj(w);
     if (/phone|tel/i.test(klucz)) {
       if (doIgiel) ctx.igly.dodajCyfry(w);
@@ -744,7 +778,7 @@ function przetworzWartosc(regula, v, kolumnaId, ctx) {
       if (!SLOWA_SLOWNIKOWE.has(nazwa)) { ctx.osobowych++; igly.dodaj(v, { zrodlo: kolumnaId }); }
       return ctx.klient.daj(v);
     case R.PRACOWNIK:
-      if (AUTOMATY.has(nazwa)) return v;
+      if (autorSystemowy(v)) return v;
       if (!SLOWA_SLOWNIKOWE.has(nazwa)) { ctx.osobowych++; igly.dodaj(v, { zrodlo: kolumnaId }); }
       return ctx.pracownik.daj(v);
     case R.OSOBA:
