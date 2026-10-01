@@ -1267,6 +1267,23 @@ nie da się odtworzyć z Subiekta. Kopiuj je razem z bazą:
 cp -r /c/wertis/server/data/photos "/d/backup/photos-$(date +%Y%m%d)"
 ```
 
+### Pamięć serwera
+
+`/api/health` ma blok `pamiec`: pamięć procesu, zajętą stertę i jej limit.
+Serwer zapisuje też próbkę co godzinę w logu usługi. Oś czasu daje:
+
+```powershell
+Select-String -Path C:\wertis\logs\wertis-api.log -Pattern "\[pamiec\]" | Select-Object -Last 24
+```
+
+Pojedynczy odczyt niczego nie dowodzi, bo sterta falowała przy każdym
+odświeżeniu danych z Subiekta. Liczy się trend dna w `pamiec.trend`: o ile
+najniższy odczyt młodszej połowy okna leży wyżej niż starszej. `rosnie: true`
+znaczy wzrost dna o co najmniej 100 MB i co najmniej 10 MB na godzinę.
+Trend pojawia się po sześciu godzinach pracy. Restart usługi zaczyna okno od
+nowa. Trend jest daną, nie alarmem: nie wchodzi do `problemy` i nie
+cofa aktualizacji.
+
 ### Kopia bazy bez danych osobowych
 
 `anonimizuj-baze.mjs` robi z kopii bazy plik bez danych klientów i pracowników,

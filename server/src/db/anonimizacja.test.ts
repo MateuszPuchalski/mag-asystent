@@ -907,3 +907,90 @@ test("wiersz poleceń wypisuje pochodzenie igieł i skrót pliku, ale nie warto�
     for (const w of WRAZLIWE) assert.ok(!tekst.toLowerCase().includes(w.toLowerCase()), `raport nie zawiera „${w}”`);
   });
 });
+
+/* ── Skaner szuka danych osobowych, nie nazw towarów i ról ───────────────────
+   Raport z prawdziwej bazy pokazał dziesiątki tysięcy trafień w kolumnach, które mają zostać.
+   Źródłem były wartości, które nie są osobowe, a stoją też w kartotece i słownikach: nazwy części
+   i modeli maszyn, rola „BUYER”, autorzy systemowi i krótkie teksty. Każdy test niżej ma kontrolę
+   odwrotną: ta sama wartość pod kluczem osobowym dalej zatrzymuje narzędzie. */
+
+/** Zamówienie z JSON-em i wiersz zdarzeń; w kolumnie, która zostaje, stoją podane etykiety. */
+function bazaZEtykietami(json: unknown, etykiety: string[], zdarzenie?: unknown) {
+  return (d: DatabaseSync) => {
+    wstaw(d, "allegro_zamowienie", { id: "zam-igly", surowe_json: JSON.stringify(json), synced_at: "2026-09-21T09:00:00.000Z" });
+    if (zdarzenie !== undefined) wstaw(d, "events", { type: "zastosowanie", payload: JSON.stringify(zdarzenie) });
+    for (const e of etykiety) wstaw(d, "reklamacja_tag", { nazwa: e });
+  };
+}
+
+function wynikPrzebiegu(k: string, nazwa: string, budowa: (d: DatabaseSync) => void) {
+  const we = path.join(k, `${nazwa}.db`);
+  zbudujBaze(we, budowa);
+  return odmowa(we, path.join(k, `${nazwa}-wynik.db`), { "reklamacja_tag.nazwa": R.ZOSTAJE });
+}
+
+test("nazwa części, modelu i dostawcy nie jest igłą, a nazwisko pod tym samym kształtem jest", () => {
+  wKatalogu((k) => {
+    const nazwy = ["Honda HRX 537", "pasuje do modeli z 2018 roku", "Dostawca Stiga", "nóż do kosiarki"];
+    const bezAlarmu = wynikPrzebiegu(k, "nazwy", bazaZEtykietami(
+      { nazwaCzesci: "nóż do kosiarki" }, nazwy,
+      { zastosowanie: { model: { nazwa: "Honda HRX 537" }, komentarz: "pasuje do modeli z 2018 roku" }, nazwa: "Dostawca Stiga" }));
+    assert.deepEqual(bezAlarmu, [], "nazwy z kartoteki wywołały alarm");
+
+    const naprawde = wynikPrzebiegu(k, "nazwisko", bazaZEtykietami({ nazwisko: "Zenon Wartomski" }, ["Zenon Wartomski"]));
+    assert.ok(naprawde.some((t) => t.miejsce === "reklamacja_tag.nazwa"), "nazwisko ma dalej zatrzymywać narzędzie");
+  });
+});
+
+test("rola i status pod kluczem człowieka nie są igłą, a jego login jest", () => {
+  wKatalogu((k) => {
+    const json = { chat: { initialMessage: { author: { role: "BUYER", login: "kupiec_77x" } } } };
+    assert.deepEqual(wynikPrzebiegu(k, "rola", bazaZEtykietami(json, ["BUYER"])), [], "rola wywołała alarm");
+    const naprawde = wynikPrzebiegu(k, "login", bazaZEtykietami(json, ["kupiec_77x"]));
+    assert.ok(naprawde.some((t) => t.miejsce === "reklamacja_tag.nazwa"), "login ma dalej zatrzymywać narzędzie");
+  });
+});
+
+test("autor systemowy, także z dopiskiem, nie dostaje zamiennika i nie jest igłą", () => {
+  wKatalogu((k) => {
+    const etykiety = ["automat", "automat (oferta)", "oferta"];
+    const raport = wynikPrzebiegu(k, "autorzy", (d) => {
+      bazaZEtykietami({ autor: "automat", zrodlo: { autor: "automat (oferta)" }, dodal: { autor: "oferta" } }, etykiety)(d);
+      wstaw(d, "towar_identyfikator", { rodzaj: "oem", wartosc: "X1", wartosc_norm: "x1", zrodlo: "oferta", dodal: "automat (oferta)" });
+    });
+    assert.deepEqual(raport, [], "autorzy systemowi wywołali alarm");
+    const naprawde = wynikPrzebiegu(k, "czlowiek", bazaZEtykietami({ autor: "Jan Kowalczyk" }, ["Jan Kowalczyk"]));
+    assert.ok(naprawde.some((t) => t.miejsce === "reklamacja_tag.nazwa"), "człowiek jako autor ma dalej zatrzymywać narzędzie");
+
+    const we = path.join(k, "dodal.db");
+    zbudujBaze(we, (d) => wstaw(d, "towar_identyfikator", { rodzaj: "oem", wartosc: "X1", wartosc_norm: "x1", zrodlo: "oferta", dodal: "automat (oferta)" }));
+    anonimizuj(we, path.join(k, "dodal-wynik.db"), { ziarno: "test" });
+    const po = new DatabaseSync(path.join(k, "dodal-wynik.db"));
+    const dodal = (po.prepare("SELECT dodal FROM towar_identyfikator WHERE wartosc='X1'").get() as { dodal: string } | undefined)?.dodal;
+    po.close();
+    assert.equal(dodal, "automat (oferta)", "autor systemowy zostaje czytelny");
+  });
+});
+
+test("krótki tekst nie jest igłą, pełna treść wiadomości jest", () => {
+  wKatalogu((k) => {
+    assert.deepEqual(wynikPrzebiegu(k, "krotki", bazaZEtykietami({ text: "Okej", subject: "Tak" }, ["Okej", "Tak"])), [], "krótki tekst wywołał alarm");
+    const naprawde = wynikPrzebiegu(k, "dluga", bazaZEtykietami({ text: "Proszę o szybki kontakt w sprawie zwrotu" }, ["Proszę o szybki kontakt w sprawie zwrotu"]));
+    assert.ok(naprawde.some((t) => t.miejsce === "reklamacja_tag.nazwa"), "pełna treść ma dalej zatrzymywać narzędzie");
+  });
+});
+
+test("komentarz w dzienniku działań biura nie jest igłą, ten sam komentarz w treści klienta jest", () => {
+  wKatalogu((k) => {
+    const komentarz = "klient pisał, że pasuje do modelu z 2018";
+    assert.deepEqual(wynikPrzebiegu(k, "dziennik", bazaZEtykietami({}, [komentarz], { zastosowanie: { komentarz } })), [], "komentarz z dziennika wywołał alarm");
+    const naprawde = wynikPrzebiegu(k, "tresc", bazaZEtykietami({ komentarz }, [komentarz]));
+    assert.ok(naprawde.some((t) => t.miejsce === "reklamacja_tag.nazwa"), "komentarz w treści ma dalej zatrzymywać narzędzie");
+  });
+});
+
+test("słowo słownikowe pod kluczem loginu nie jest igłą", () => {
+  wKatalogu((k) => {
+    assert.deepEqual(wynikPrzebiegu(k, "slownik", bazaZEtykietami({ login: "admin" }, ["admin"])), [], "słowo słownikowe wywołało alarm");
+  });
+});

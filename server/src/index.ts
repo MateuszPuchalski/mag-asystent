@@ -87,6 +87,7 @@ import { sondujRzeczywistosc } from "./services/sonda-rzeczywistosci.js";
 import { uruchomTakt } from "./services/takt.js";
 import { sledzDosylki } from "./services/dosylka.js";
 import { czytajStan, problemyKopii, wOknieNocnym } from "./services/kopie-bazy.js";
+import { liniaLogu, stanPamieci, zapiszProbke } from "./services/pamiec-procesu.js";
 import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
 import { przebiegRaportow, TAKT_RAPORTOW_MS } from "./services/raport-tygodnia.js";
 import { podNssm, ustawRestart } from "./services/restart.js";
@@ -234,6 +235,7 @@ export async function buildApp() {
     const obsluga = bez("obsługa klienta", stanObslugiHealth);
     const audyt = bez("audyt", statystykiAudytu);
     const kopie = bez("kopie bazy", () => czytajStan());
+    const pamiec = bez("pamięć procesu", () => stanPamieci());
 
     const problemy = [
       worker.problem,
@@ -399,6 +401,9 @@ export async function buildApp() {
               : null,
           }
         : null,
+      /* Pamięć procesu i trend jej dna. Same liczby, więc trasa może zostać
+         publiczna. Trend nie wchodzi do `problemy`: powód w `pamiec-procesu.ts`. */
+      pamiec,
       /* Liczby cache'u zdjęć — po to, żeby ZDJECIA_MAX_KB dobierać na danych
          z własnej bazy, a nie na przypuszczeniu, ile waży typowe zdjęcie. */
       ...(config.zdjecia.zrodlo ? { zdjecia: statystykiZdjec() } : {}),
@@ -703,6 +708,14 @@ async function main() {
      każdej instalacji. Dotąd były wpisami w Harmonogramie zadań, których
      instalator nie zakładał. Powód i okno nocne: `services/przebieg-nocny.ts`. */
   uruchomTakt("noc", TAKT_NOCNY_MS, async () => { przebiegNocny(); });
+
+  /* PAMIĘĆ PROCESU: próbka przy starcie i co godzinę. Zwykły `setInterval`,
+     nie `uruchomTakt`: to lokalny odczyt, bez Allegro, więc rozrzut i respekt
+     dla 429 nic tu nie dają. `unref`, żeby timer nie trzymał procesu przy
+     życiu. Wpis w logu daje oś czasu bez żadnego narzędzia. */
+  const probkaPamieci = () => console.log(liniaLogu(zapiszProbke()));
+  probkaPamieci();
+  setInterval(probkaPamieci, 60 * 60_000).unref();
 
   /* MIGAWKA DOBY I RAPORT TYGODNIA (0.497.0) — bez warunku, jak noc: każda
      instalacja ma stan, który jutro zniknie, i tydzień do porównania. Poza
