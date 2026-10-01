@@ -44,3 +44,34 @@ describe("protokół dla dostawcy", () => {
     expect(d.tresc).toContain("Zły &lt;b&gt;dostawca&lt;/b&gt;");
   });
 });
+
+describe("numer faktury dostawcy na drukach", () => {
+  const zNumerem = (dostawca: string) => ({ ...dok(dostawca), nrDostawcy: "FV/5512/09/2026" });
+
+  it("GEKO dostaje w kolumnie faktury SWÓJ numer, nie nasz FZ", () => {
+    /* Przypis 2 druku GEKO: bez ich numeru korektę dostaje faktura
+       wybrana przez księgowość GEKO. Nasz FZ jest dla nich obcy. */
+    const d = protokol(zNumerem("GEKO"), [p()], {});
+    expect(d.tresc).toContain('<td class="wask">FV/5512/09/2026</td>');
+    expect(d.tresc).not.toContain('<td class="wask">FZ 802/MAG/09/2026</td>');
+  });
+
+  it("GEKO bez numeru dostawcy zostawia kolumnę pustą do wpisania ręką", () => {
+    const d = protokol(dok("GEKO"), [p()], {});
+    expect(d.tresc).toContain('<td class="wask"></td>');
+    expect(d.tresc).not.toContain('<td class="wask">FZ 802/MAG/09/2026</td>');
+  });
+
+  it("PARTNER wpisuje numer dostawcy, a bez niego zostawia kropki", () => {
+    expect(protokol(zNumerem("PARTNER"), [p()], {}).tresc)
+      .toContain('NR DOKUMENTU ZAKUPU*: <span class="wpis">FV/5512/09/2026</span>');
+    expect(protokol(dok("PARTNER"), [p()], {}).tresc)
+      .toMatch(/NR DOKUMENTU ZAKUPU\*: <span class="kropki"/);
+  });
+
+  it("protokół WERTIS pokazuje oba numery", () => {
+    const d = protokol(zNumerem("Rosa-Pol"), [p()], {});
+    expect(d.tresc).toContain("<b>Dokument:</b> FZ 802/MAG/09/2026");
+    expect(d.tresc).toContain("<b>Faktura dostawcy:</b> FV/5512/09/2026");
+  });
+});

@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało trzydzieści.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało trzydzieści jeden.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -83,6 +83,27 @@ uznajemy — „1234" pasowałoby do co drugiego dokumentu w oknie.
 `[WERYFIKUJ]` czy integracja tej firmy w ogóle wypełnia tę kolumnę i czym.
 Pomyłka daje pustą listę pewnych trafień, a nie złe dane: zwrot czeka wtedy na
 wskazanie człowieka, a nie wiąże się z cudzą sprzedażą.
+
+## Numer faktury dostawcy na dokumencie zakupu
+
+Ta sama kolumna `dok_NrPelnyOryg` na fakturze zakupu niesie numer dokumentu
+dostawcy. Read-model kopiuje ją do `sgt_dokument.nr_oryg`, a lista dostaw,
+karta dostawy i druki reklamacyjne pokazują ją obok naszego FZ. Numer widzi
+wyłącznie biuro, bo to ono reklamuje. Puste pole daje `NULL`, więc druk GEKO
+zostawia wtedy kolumnę do wpisania ręką.
+
+`[WERYFIKUJ]` **Czy biuro wpisuje numer faktury dostawcy w numer oryginału FZ.**
+Sprawdzenie na bazie firmy:
+
+```sql
+SELECT TOP 20 dok_NrPelny, dok_NrPelnyOryg
+FROM dok__Dokument
+WHERE dok_Typ = 1 AND dok_DataWyst >= DATEADD(month, -1, GETDATE())
+ORDER BY dok_DataWyst DESC;
+```
+
+Puste kolumny w wyniku znaczą, że biuro trzyma ten numer gdzie indziej.
+Ekran pokaże wtedy „bez numeru faktury dostawcy” zamiast cudzego numeru.
 
 Wolnego pola tekstowego (`dok_Uwagi`, varchar 500) **nie kopiujemy**. Mieści
 się w nim adres i telefon, a read-model kopiuje to, co przeczyta, razem do

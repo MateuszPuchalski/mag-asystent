@@ -185,6 +185,10 @@ export function migrate(database: DatabaseSync) {
     }
   };
   usunSesjeRozkladania(database);
+  /* Numer dokumentu dostawcy — patrz `sgt_dokument.nr_oryg` i `delivery.nr_oryg`
+     w `schema.sql`. Stare wiersze mają NULL, czyli „numeru nie znamy". */
+  addColumn("sgt_dokument", "nr_oryg", "TEXT");
+  addColumn("delivery", "nr_oryg", "TEXT");
   /* Sygnatura oferty w chwili wskazania (0.219.0) — patrz `oferta_kartoteka`
      w `schema.sql`. Stare wiersze zostają z NULL i obowiązują jak dotąd. */
   addColumn("oferta_kartoteka", "sku_wtedy", "TEXT");

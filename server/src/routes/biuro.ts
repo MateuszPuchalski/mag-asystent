@@ -15,6 +15,7 @@ import {
 } from "../services/notatki.js";
 import { podgladDokumentu } from "../services/podglad-dostawy.js";
 import { archiwumDostaw } from "../services/archiwum-dostaw.js";
+import { numerDostawcyDlaRoli } from "../services/delivery.js";
 import { doDecyzji } from "../services/do-decyzji.js";
 import { sondujRzeczywistosc, stanSondy } from "../services/sonda-rzeczywistosci.js";
 import { config } from "../config.js";
@@ -77,7 +78,7 @@ export async function biuroRoutes(app: FastifyInstance) {
   app.get<{ Params: { dokId: string } }>("/api/biuro/dokument/:dokId", async (req, reply) => {
     const d = podgladDokumentu(Number(req.params.dokId));
     if (!d) return reply.code(404).send({ error: "Nie znaleziono dokumentu" });
-    return d;
+    return numerDostawcyDlaRoli(d, sesjaZadania()?.user.role);
   });
 
   /**
@@ -94,9 +95,11 @@ export async function biuroRoutes(app: FastifyInstance) {
    * znajduje się mimo poprawnego numeru — i wygląda to identycznie jak
    * faktura, której nigdy nie było.
    */
-  app.get<{ Querystring: { q?: string } }>("/api/biuro/dostawy/archiwum", async (req) =>
-    archiwumDostaw(req.query.q ?? "")
-  );
+  app.get<{ Querystring: { q?: string } }>("/api/biuro/dostawy/archiwum", async (req) => {
+    const rola = sesjaZadania()?.user.role;
+    const a = archiwumDostaw(req.query.q ?? "", undefined, rola !== undefined && ROLE_BIUROWE.includes(rola));
+    return { ...a, documents: a.documents.map((d) => numerDostawcyDlaRoli(d, rola)) };
+  });
 
   /**
    * Dostawy zdjęte z listy pracy jako rozłożone poza WERTIS.

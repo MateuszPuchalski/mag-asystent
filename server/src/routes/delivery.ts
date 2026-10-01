@@ -1,10 +1,11 @@
 import type { FastifyInstance } from "fastify";
 import { config } from "../config.js";
-import { autorOperacji, userOf } from "../context.js";
+import { autorOperacji, sesjaZadania, userOf } from "../context.js";
 import {
   getDelivery,
   korygujIlosc,
   listDocuments,
+  numerDostawcyDlaRoli,
   openDelivery,
   podgladZakonczenia,
   putawayLine,
@@ -34,10 +35,13 @@ export async function deliveryRoutes(app: FastifyInstance) {
    * pokazuje. Wcześniej miał ją wpisaną w kodzie i był trzecim miejscem, gdzie
    * ta sama czternastka mogła się rozjechać.
    */
-  app.get("/api/delivery/documents", async () => ({
-    documents: listDocuments(config.mssql.dokDniWstecz),
-    dniWstecz: config.mssql.dokDniWstecz,
-  }));
+  app.get("/api/delivery/documents", async () => {
+    const rola = sesjaZadania()?.user.role;
+    return {
+      documents: listDocuments(config.mssql.dokDniWstecz).map((d) => numerDostawcyDlaRoli(d, rola)),
+      dniWstecz: config.mssql.dokDniWstecz,
+    };
+  });
 
   /** Otwórz/wznów rozkładanie dokumentu — snapshot pozycji w chwili otwarcia. */
   app.post<{ Params: { dokId: string } }>("/api/delivery/documents/:dokId/open", async (req, reply) => {

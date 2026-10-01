@@ -16,6 +16,8 @@ export interface DokumentDostawy {
   dokId: number;
   typ: string;
   nrPelny: string;
+  /** Numer faktury dostawcy (numer oryginału w Subiekcie); `null`, gdy pusty. */
+  nrDostawcy: string | null;
   dataWyst: string;
   dostawca: string;
   khId: number | null;
@@ -94,6 +96,7 @@ export interface Dokument {
   dokId: number;
   deliveryId: number | null;
   nrPelny: string;
+  nrDostawcy: string | null;
   typ: string;
   dostawca: string;
   khId: number | null;

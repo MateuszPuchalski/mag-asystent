@@ -61,6 +61,8 @@ export interface PodgladDokumentu {
   /** `null` = nikt nigdy nie otwierał tego dokumentu. */
   deliveryId: number | null;
   nrPelny: string;
+  /** Numer dokumentu dostawcy; `null`, gdy w Subiekcie pole puste. */
+  nrDostawcy: string | null;
   typ: string;
   dostawca: string;
   /** Płatnik z dokumentu — po nim panel sięga po logo. `null` = dokument bez kontrahenta. */
@@ -153,11 +155,11 @@ function naglowekZArchiwum(dokId: number): RawDocument | undefined {
   const w = db()
     .prepare(
       `SELECT sgt_dok_numer AS nr_pelny, COALESCE(dostawca,'') AS dostawca,
-              COALESCE(data_dok,'') AS data_wyst, source_mag_id AS mag_id
+              COALESCE(data_dok,'') AS data_wyst, source_mag_id AS mag_id, nr_oryg
          FROM delivery WHERE sgt_dok_id = ?`
     )
     .get(dokId) as
-    | { nr_pelny: string; dostawca: string; data_wyst: string; mag_id: number | null }
+    | { nr_pelny: string; dostawca: string; data_wyst: string; mag_id: number | null; nr_oryg: string | null }
     | undefined;
   if (!w) return undefined;
   return {
@@ -173,6 +175,7 @@ function naglowekZArchiwum(dokId: number): RawDocument | undefined {
     dostawca: w.dostawca,
     kh_id: null,
     w_buforze: 0,
+    nr_oryg: w.nr_oryg,
   };
 }
 
@@ -214,6 +217,7 @@ export function podgladDokumentu(dokId: number): PodgladDokumentu | undefined {
     dokId: doc.dok_id,
     deliveryId: d?.id ?? null,
     nrPelny: doc.nr_pelny,
+    nrDostawcy: doc.nr_oryg ?? null,
     typ: doc.typ,
     dostawca: doc.dostawca ?? "",
     khId: doc.kh_id ?? null,

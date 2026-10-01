@@ -41,6 +41,7 @@ export interface ArchiwumDostaw {
 interface WierszArchiwum {
   dokId: number;
   nrPelny: string;
+  nrDostawcy: string | null;
   dataWyst: string;
   dostawca: string;
   status: string;
@@ -67,15 +68,20 @@ function wzorzec(q: string): string {
  * pominięcie całej klasy dostaw czyniłoby z tej listy niepełną historię, czyli
  * dokładnie to, czego się po archiwum nie spodziewamy.
  *
- * @param q  fragment numeru dokumentu albo nazwy dostawcy; puste = wszystko
+ * @param q  fragment numeru dokumentu, numeru dostawcy albo nazwy dostawcy;
+ *           puste = wszystko
+ * @param poNumerzeDostawcy  czy szukać też po numerze faktury dostawcy. Ten
+ *           numer widzi wyłącznie biuro, więc dla hali trafienie po nim
+ *           zdradzałoby pole, którego hala nie dostaje.
  */
-export function archiwumDostaw(q = "", limit = LIMIT): ArchiwumDostaw {
+export function archiwumDostaw(q = "", limit = LIMIT, poNumerzeDostawcy = true): ArchiwumDostaw {
   const szukane = q.trim();
   /* Filtr WYŁĄCZONY przy pustym zapytaniu, zamiast `LIKE '%%'`: pusty wzorzec
      odrzuciłby wiersze z NULL-owym dostawcą przez `COALESCE`… a nade wszystko
      czytelniej mówi, że wtedy nie filtrujemy wcale. */
   const filtr = szukane
-    ? `AND (d.sgt_dok_numer LIKE @q ESCAPE '\\' OR COALESCE(d.dostawca,'') LIKE @q ESCAPE '\\')`
+    ? `AND (d.sgt_dok_numer LIKE @q ESCAPE '\\' OR COALESCE(d.dostawca,'') LIKE @q ESCAPE '\\'
+           ${poNumerzeDostawcy ? "OR COALESCE(d.nr_oryg,'') LIKE @q ESCAPE '\\'" : ""})`
     : "";
   /* `LIKE` w SQLite ignoruje wielkość liter TYLKO dla ASCII — „Łuczniczka"
      znajdzie się po „uczni", ale nie po „łuczni" z małej litery. Numer
@@ -96,6 +102,7 @@ export function archiwumDostaw(q = "", limit = LIMIT): ArchiwumDostaw {
     .prepare(
       `SELECT d.sgt_dok_id AS dokId,
               d.sgt_dok_numer AS nrPelny,
+              d.nr_oryg AS nrDostawcy,
               COALESCE(d.data_dok, '') AS dataWyst,
               COALESCE(d.dostawca, '') AS dostawca,
               d.status AS status,
@@ -122,6 +129,7 @@ export function archiwumDostaw(q = "", limit = LIMIT): ArchiwumDostaw {
          przed serią 404 dokładnie tak, jak przy zwykłej liście. */
       typ: "",
       nrPelny: w.nrPelny,
+      nrDostawcy: w.nrDostawcy ?? null,
       dataWyst: w.dataWyst,
       dostawca: w.dostawca,
       khId: null,
