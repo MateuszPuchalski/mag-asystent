@@ -168,6 +168,27 @@ test("szuka po numerze dokumentu i po dostawcy", () => {
   assert.deepEqual(A.archiwumDostaw("nie ma takiego").documents, []);
 });
 
+test("numer dokumentu dostawcy jedzie na wiersz i daje się po nim szukać", () => {
+  /* Biuro reklamuje z numerem faktury dostawcy w ręku, a nie z naszym FZ. */
+  dostawa(814);
+  dostawa(815);
+  db().prepare("UPDATE delivery SET nr_oryg = 'FV/2231/09/2026' WHERE sgt_dok_id = 815").run();
+  const wynik = A.archiwumDostaw("2231/09");
+  assert.deepEqual(wynik.documents.map((w) => w.dokId), [815]);
+  assert.equal(wynik.documents[0].nrDostawcy, "FV/2231/09/2026");
+  assert.equal(A.archiwumDostaw("").documents.find((w) => w.dokId === 814)?.nrDostawcy, null,
+    "brak numeru to null, nie pusty napis udający numer");
+});
+
+test("bez prawa do numeru dostawcy szukanie po nim nic nie znajduje", () => {
+  /* Hala nie dostaje numeru hurtowni, więc trafienie po nim zdradzałoby pole. */
+  dostawa(816);
+  db().prepare("UPDATE delivery SET nr_oryg = 'FV/3300/09/2026' WHERE sgt_dok_id = 816").run();
+  assert.deepEqual(A.archiwumDostaw("3300", undefined, false).documents, []);
+  assert.deepEqual(A.archiwumDostaw("816", undefined, false).documents.map((w) => w.dokId), [816],
+    "po naszym FZ szuka się dalej");
+});
+
 test("znak wieloznaczny w wyszukiwarce nie otwiera całego archiwum", () => {
   dostawa(812);
   dostawa(813);
@@ -210,6 +231,15 @@ test("dokument w oknie importu nadal czyta się z read-modelu", () => {
   assert.ok(p);
   assert.equal(p.archiwalny, false);
   assert.equal(p.typ, "FZ", "typ dokumentu jest tylko po stronie Subiekta");
+});
+
+test("numer dostawcy idzie z read-modelu, a po oknie importu z naszej kopii", () => {
+  dostawa(832);
+  db().prepare("UPDATE delivery SET nr_oryg = 'FV/77/2026' WHERE sgt_dok_id = 832").run();
+  assert.equal(P.podgladDokumentu(832)?.nrDostawcy, "FV/77/2026", "archiwum czyta kopię");
+  wOknie(832);
+  db().prepare("UPDATE sgt_dokument SET nr_oryg = 'FV/78/2026' WHERE dok_id = 832").run();
+  assert.equal(P.podgladDokumentu(832)?.nrDostawcy, "FV/78/2026", "w oknie importu wygrywa Subiekt");
 });
 
 test("dokument, o którym nie wiemy nic, nadal jest brakiem", () => {

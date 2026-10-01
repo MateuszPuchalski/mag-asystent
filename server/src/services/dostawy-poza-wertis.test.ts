@@ -226,3 +226,17 @@ test("lista zamkniętych niesie powód, nazwisko i liczbę linii", () => {
   assert.equal(d.linie, 1);
   assert.equal(d.dostawca, "OGRÓD-POL");
 });
+
+test("numer dokumentu dostawcy: na liście z Subiekta, w dostawie jako kopia", () => {
+  /* Biuro reklamuje z numerem faktury dostawcy. Kopia w `delivery` zostaje,
+     gdy dokument wypadnie z okna importu i lista czyta już tylko archiwum. */
+  db().prepare("UPDATE sgt_dokument SET nr_oryg = 'FV/9001/07/2026' WHERE dok_id = ?").run(DOK);
+  assert.equal(D.listDocuments(14)[0].nrDostawcy, "FV/9001/07/2026");
+  D.openDelivery(DOK, "tester");
+  const kopia = db().prepare("SELECT nr_oryg FROM delivery WHERE sgt_dok_id = ?").get(DOK) as { nr_oryg: string };
+  assert.equal(kopia.nr_oryg, "FV/9001/07/2026");
+});
+
+test("dokument bez numeru dostawcy daje null, a nie pusty napis", () => {
+  assert.equal(D.listDocuments(14)[0].nrDostawcy, null);
+});

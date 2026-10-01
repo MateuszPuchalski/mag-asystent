@@ -1,3 +1,4 @@
+import { ROLE_BIUROWE, type Rola } from "./users.js";
 import { db, transaction } from "../db/db.js";
 import { config } from "../config.js";
 import { subiekt } from "../context.js";
@@ -122,6 +123,19 @@ export function validateDeliveryLocation(code: string): string | null {
 }
 
 /**
+ * Numer faktury dostawcy czyta wyłącznie biuro (decyzja właściciela).
+ *
+ * Kolektor dostaje tę samą listę dostaw, ale numer hurtowni nie jest mu do
+ * niczego potrzebny: reklamuje biuro. Zerujemy go na serwerze, bo pole
+ * schowane tylko w przeglądarce dalej jedzie do każdego urządzenia w hali.
+ */
+export function numerDostawcyDlaRoli<T extends { nrDostawcy: string | null }>(
+  wiersz: T, rola: Rola | undefined
+): T {
+  return rola && ROLE_BIUROWE.includes(rola) ? wiersz : { ...wiersz, nrDostawcy: null };
+}
+
+/**
  * Lista faktur zakupu (N dni) z postępem liczonym z delivery_line.
  *
  * Dostawy oznaczone jako rozłożone POZA WERTIS wypadają z listy w całości.
@@ -162,6 +176,7 @@ export function listDocuments(days = 14): DeliveryDocument[] {
       dokId: d.dok_id,
       typ: d.typ,
       nrPelny: d.nr_pelny,
+      nrDostawcy: d.nr_oryg ?? null,
       dataWyst: d.data_wyst,
       dostawca: d.dostawca ?? "",
       khId: d.kh_id ?? null,
@@ -450,10 +465,10 @@ export function openDelivery(dokId: number, user: string): number {
   const id = Number(
     db()
       .prepare(
-        `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, dostawca, data_dok, source_mag_id, status, opened_at)
-         VALUES (?,?,?,?,?, 'open', ?)`
+        `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, dostawca, data_dok, source_mag_id, status, opened_at, nr_oryg)
+         VALUES (?,?,?,?,?, 'open', ?, ?)`
       )
-      .run(doc.dok_id, doc.nr_pelny, doc.dostawca ?? "", doc.data_wyst, doc.mag_id, nowIso())
+      .run(doc.dok_id, doc.nr_pelny, doc.dostawca ?? "", doc.data_wyst, doc.mag_id, nowIso(), doc.nr_oryg ?? null)
       .lastInsertRowid
   );
 
@@ -1138,10 +1153,11 @@ export function zamknijPozaWertis(
       db()
         .prepare(
           `INSERT INTO delivery(sgt_dok_id, sgt_dok_numer, dostawca, data_dok, source_mag_id,
-                                status, opened_at, closed_at, closed_by, powod_zamkniecia)
-           VALUES (?,?,?,?,?, 'external', ?,?,?,?)`
+                                status, opened_at, closed_at, closed_by, powod_zamkniecia, nr_oryg)
+           VALUES (?,?,?,?,?, 'external', ?,?,?,?,?)`
         )
-        .run(doc.dok_id, doc.nr_pelny, doc.dostawca ?? "", doc.data_wyst, doc.mag_id, at, at, user, powod)
+        .run(doc.dok_id, doc.nr_pelny, doc.dostawca ?? "", doc.data_wyst, doc.mag_id, at, at, user, powod,
+          doc.nr_oryg ?? null)
         .lastInsertRowid
     );
     logEvent("delivery_external", user, null, { deliveryId: id, dokId, powod, linie: 0 });

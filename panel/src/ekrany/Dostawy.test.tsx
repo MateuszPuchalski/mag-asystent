@@ -31,7 +31,7 @@ import { _wyczyscPamiecZdjec } from "../towar/useZdjecie";
    stopką i powiększenie dowodu zamykane kliknięciem albo Escape. */
 
 const dok = (dokId: number, o: Partial<DokumentDostawy> = {}): DokumentDostawy => ({
-  dokId, typ: "FZ", nrPelny: `FZ ${dokId}/MAG/09/2026`, dataWyst: "2026-09-20",
+  dokId, typ: "FZ", nrPelny: `FZ ${dokId}/MAG/09/2026`, nrDostawcy: null, dataWyst: "2026-09-20",
   dostawca: "Rosa-Pol", khId: null, wyjatkiOtwarte: 0, maLogo: false, positions: 4,
   wBuforze: false, wPrzyjeciach: false, linesTotal: 4, linesDone: 2, status: "open", ...o,
 });
@@ -51,7 +51,7 @@ const DOKUMENT_ZE_ZDJECIEM = (): Dokument => ({
 });
 
 const DOKUMENT: Dokument = {
-  dokId: 802, deliveryId: 50, nrPelny: "FZ 802/MAG/09/2026", typ: "FZ", dostawca: "Rosa-Pol",
+  dokId: 802, deliveryId: 50, nrPelny: "FZ 802/MAG/09/2026", nrDostawcy: "FV/4410/09/2026", typ: "FZ", dostawca: "Rosa-Pol",
   khId: null, maLogo: false, dataWyst: "2026-09-20", wBuforze: false, wPrzyjeciach: false,
   status: "open", zamkniecie: null, dostawcaStat: null, notatki: [], archiwalny: false,
   zrodlo: "snapshot", progress: { total: 2, done: 1, remaining: 1, problems: 1 },
@@ -107,7 +107,7 @@ function odpowiedz(url: string, init?: RequestInit): unknown {
   if (url === "/api/delivery/documents") {
     return { documents: [
       /* Rosa-Pol ma logo (khId 5) — wiersz listy ma je pokazać. */
-      dok(802, { wyjatkiOtwarte: 1, khId: 5, maLogo: true }),
+      dok(802, { wyjatkiOtwarte: 1, khId: 5, maLogo: true, nrDostawcy: "FV/4410/09/2026" }),
       /* „Zamknięta" z otwartym wyjątkiem — gwarancja 2. */
       dok(803, { status: "done", linesDone: 4, wyjatkiOtwarte: 1 }),
       dok(804), dok(805, { status: null, linesDone: 0 }),
@@ -347,6 +347,24 @@ describe("Ekran dostaw", () => {
    Wiersz dostawcy w Analizie prowadzi tu z kubełkiem archiwum i nazwą
    dostawcy. Adres czyta się raz, przy wejściu, i od razu pyta archiwum. */
 describe("adres z kubełkiem i frazą", () => {
+  it("wiersz i karta niosą numer faktury dostawcy, a szukanie go znajduje", async () => {
+    /* Biuro reklamuje z numerem hurtowni, a hurtownia nie zna naszego FZ. */
+    pokaz();
+    const wiersz = await screen.findByRole("button", { name: /FZ 802\/MAG\/09\/2026/ });
+    expect(wiersz).toHaveTextContent("faktura dostawcy FV/4410/09/2026");
+    expect(screen.getByRole("button", { name: /FZ 803\/MAG/ })).not.toHaveTextContent("faktura dostawcy");
+    await userEvent.type(screen.getByRole("textbox", { name: "Szukaj dostawy" }), "4410");
+    await waitFor(() => expect(screen.queryByRole("button", { name: /FZ 803\/MAG/ })).toBeNull());
+    expect(screen.getByRole("button", { name: /FZ 802\/MAG/ })).toBeInTheDocument();
+  });
+
+  it("karta dostawy pokazuje numer dostawcy z kopiowaniem", async () => {
+    pokaz("/obsluga/dostawy/802");
+    await screen.findByRole("heading", { name: "FZ 802/MAG/09/2026" });
+    expect(screen.getByText("FV/4410/09/2026")).toBeInTheDocument();
+    expect(screen.getByTitle("Kopiuj numer faktury dostawcy")).toBeInTheDocument();
+  });
+
   it("otwiera archiwum z frazą dostawcy", async () => {
     pokaz("/obsluga/dostawy?kubelek=archiwum&q=Rosa-Pol");
     await waitFor(() => expect(archiwumPytania).toContain("Rosa-Pol"));

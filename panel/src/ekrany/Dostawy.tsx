@@ -90,8 +90,10 @@ export function Dostawy() {
   }, [dokumenty, wyjatki.data]);
 
   const q = fraza.trim().toLowerCase();
-  const pasuje = (nr: string, kto: string) =>
-    !q || nr.toLowerCase().includes(q) || kto.toLowerCase().includes(q);
+  /* Numer dostawcy szuka się tak samo jak nasz FZ: z nim dzwoni hurtownia. */
+  const pasuje = (nr: string, kto: string, nrDostawcy?: string | null) =>
+    !q || nr.toLowerCase().includes(q) || kto.toLowerCase().includes(q)
+      || (nrDostawcy ?? "").toLowerCase().includes(q);
   const wKubelku = (k: KubelekDostaw) => dokumenty.filter((d) => kubelekDokumentu(d, zOdpowiedzia) === k);
   /* Bez danych licznik nie zna liczby, więc jej nie pokazuje (0.546.0).
      „0" przy zerwanym połączeniu mówiło „nic nie ma", a prawda brzmiała
@@ -187,7 +189,7 @@ export function Dostawy() {
     }
     return <>
       {kubelek === "decyzja" && <WierszeSpozaOkna grupy={spozaOkna} wybrany={wybrany} onWybierz={idz} />}
-      <KolejkaDostaw dokumenty={wKubelku(kubelek).filter((d) => pasuje(d.nrPelny, d.dostawca))}
+      <KolejkaDostaw dokumenty={wKubelku(kubelek).filter((d) => pasuje(d.nrPelny, d.dostawca, d.nrDostawcy))}
         zOdpowiedzia={zOdpowiedzia} wybrany={dokId} onWybierz={idz}
         pusto={kubelek === "decyzja" && spozaOkna.length ? ""
           : kubelek === "decyzja" ? "Nic nie czeka na biuro — hala rozkłada bez pytań."
@@ -229,7 +231,7 @@ export function Dostawy() {
         </nav>
         <div className="shrink-0 border-t border-slate-200 p-2">
           <Pole value={fraza} onChange={(e) => setFraza(e.target.value)}
-            placeholder={kubelek === "archiwum" ? "Szukaj w archiwum: numer albo dostawca" : "Numer albo dostawca"}
+            placeholder={kubelek === "archiwum" ? "Szukaj w archiwum: numer albo dostawca" : "Numer FZ, faktury dostawcy albo dostawca"}
             aria-label="Szukaj dostawy" />
         </div>
         {/* PYTANIE KUBEŁKA I STOPKA W JEDNYM PAŚMIE (0.525.0). Stały dwoma

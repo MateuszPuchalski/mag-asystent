@@ -144,6 +144,7 @@ interface DokRow {
      wolno poprawić, a ta sama firma potrafi wystąpić pod dwoma napisami. */
   kh_id: number | null;
   w_buforze: number;
+  nr_oryg: string | null;
 }
 interface PozRow {
   ob_DokHanId: number;
@@ -801,7 +802,8 @@ export async function importFromMssql(): Promise<ImportStats> {
                 d.dok_MagId,
                 ISNULL(k.kh_Symbol, '') AS dostawca,
                 k.kh_Id AS kh_id,
-                ${c.bufferExpr} AS w_buforze
+                ${c.bufferExpr} AS w_buforze,
+                NULLIF(LTRIM(RTRIM(d.dok_NrPelnyOryg)), '') AS nr_oryg
          FROM dok__Dokument d
          LEFT JOIN kh__Kontrahent k ON k.kh_Id = d.dok_PlatnikId
          -- Dostawy krajowe (MAG) i kontenery (MGP) idą jedną listą i jedną
@@ -895,8 +897,8 @@ export async function importFromMssql(): Promise<ImportStats> {
     "INSERT INTO sgt_stan(tw_id, mag_id, stan, stan_rez) VALUES (?,?,?,?)"
   );
   const insDok = d.prepare(
-    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, kh_id, w_buforze)
-     VALUES (?,?,?,?,?,?,?,?)`
+    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, kh_id, w_buforze, nr_oryg)
+     VALUES (?,?,?,?,?,?,?,?,?)`
   );
   const insPoz = d.prepare(
     "INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)"
@@ -981,9 +983,16 @@ export async function importFromMssql(): Promise<ImportStats> {
         doc.dok_MagId,
         doc.dostawca ?? "",
         doc.kh_id ?? null,
-        doc.w_buforze ? 1 : 0
+        doc.w_buforze ? 1 : 0,
+        doc.nr_oryg ?? null
       );
     }
+    /* Kopia numeru dostawcy w `delivery` idzie za Subiektem przy każdym
+       imporcie. Biuro bywa, że uzupełnia numer oryginału po otwarciu dostawy,
+       a archiwum czyta już tylko kopię. */
+    d.prepare(`UPDATE delivery SET nr_oryg =
+                 (SELECT s.nr_oryg FROM sgt_dokument s WHERE s.dok_id = delivery.sgt_dok_id)
+               WHERE sgt_dok_id IN (SELECT dok_id FROM sgt_dokument)`).run();
     for (const p of pozycje) {
       if (!knownTw.has(p.ob_TowId)) continue;
       insPoz.run(p.ob_DokHanId, p.ob_TowId, p.ob_IloscMag ?? 0);

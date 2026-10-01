@@ -13,7 +13,13 @@ import { dataLokalna } from "../ui";
    z własnym arkuszem stylów, a przepisanie go na JSX zmieniłoby druk przy
    pierwszym przeoczonym `<br>`. Każda wartość z bazy przechodzi przez `esc`. */
 
-export interface DokumentDruku { nrPelny: string; dostawca: string; dataWyst: string }
+export interface DokumentDruku {
+  nrPelny: string;
+  /** Numer faktury dostawcy — ten, który zna hurtownia. `null`, gdy pusty. */
+  nrDostawcy?: string | null;
+  dostawca: string;
+  dataWyst: string;
+}
 
 /** Dane zgłaszającego z ustawień — patrz `druk/firma.ts`. */
 export type Firma = Partial<Record<"Nazwa" | "Nip" | "Adres" | "Miejscowosc" | "Osoba" | "Telefon", string>>;
@@ -51,7 +57,8 @@ function formularzWertis(dok: DokumentDruku, problemy: Wyjatek[]): Druk {
       .podpisy div{flex:1;border-top:1px solid #222;padding-top:4px;font-size:11px;color:#555;text-align:center}`,
     tresc: `
     <h1>Protokół rozbieżności w dostawie <small>WERTIS</small></h1>
-    <p><b>Dokument:</b> ${esc(dok.nrPelny)} &nbsp; <b>Dostawca:</b> ${esc(dok.dostawca || "—")}
+    <p><b>Dokument:</b> ${esc(dok.nrPelny)}${dok.nrDostawcy ? ` &nbsp; <b>Faktura dostawcy:</b> ${esc(dok.nrDostawcy)}` : ""}
+       &nbsp; <b>Dostawca:</b> ${esc(dok.dostawca || "—")}
        &nbsp; <b>Data dostawy:</b> ${esc(dok.dataWyst || "—")}
        &nbsp; <b>Sporządzono:</b> ${dzis()}</p>
     <table><tr><th>Lp</th><th>Towar</th><th>Rozbieżność</th><th>Policzone</th><th>Opis</th><th>Zgłosił</th><th>Stan</th></tr>
@@ -62,15 +69,21 @@ function formularzWertis(dok: DokumentDruku, problemy: Wyjatek[]): Druk {
 
 /* ── Szablon GEKO: „Protokół zgłoszenia reklamacji B2B" ───────────────────────
    Wierna kopia druku serwisu GEKO (tabela poziomo, checkboxy do ręki, przypisy
-   1–4 i klauzula RODO). Wypełniamy to, co system wie: numer FZ, kod i nazwę
-   towaru, ilość, opis usterki oraz dane firmy z ustawień. Rodzaj usterki
-   i dowód zakupu zaznacza biuro — o tym system wiedzieć nie może. */
+   1–4 i klauzula RODO). Wypełniamy to, co system wie: numer faktury GEKO, kod
+   i nazwę towaru, ilość, opis usterki oraz dane firmy z ustawień. Rodzaj
+   usterki i dowód zakupu zaznacza biuro — o tym system wiedzieć nie może.
+
+   KOLUMNA „NR FAKTURY ZAKUPU [w GEKO]" CHCE NUMERU GEKO, nie naszego FZ.
+   Nasz numer jest dla GEKO obcy, a przypis 2 mówi, że bez właściwego
+   korektę dostaje faktura wybrana przez ich księgowość. Gdy numeru dostawcy
+   brak, pole zostaje puste do wpisania ręką. */
 function formularzGeko(dok: DokumentDruku, problemy: Wyjatek[], f: Firma): Druk {
   const nrDok = dok.nrPelny;
+  const nrGeko = dok.nrDostawcy ?? "";
   const dealer = [f.Nazwa, f.Nip && `NIP ${f.Nip}`, f.Adres].filter(Boolean).map(esc).join("<br>");
   const wiersze = problemy.map((p) => `
     <tr>
-      <td class="wask">${esc(nrDok)}</td>
+      <td class="wask">${esc(nrGeko)}</td>
       <td><b>${esc(p.symObcy || p.sym || "")}</b><br><small>${esc(p.name || "")}</small></td>
       <td class="wask">${p.qty ?? ""}</td>
       <td class="check">☐ Mechaniczny&nbsp;&nbsp;☐ Elektryczny</td>
@@ -135,6 +148,9 @@ function formularzGeko(dok: DokumentDruku, problemy: Wyjatek[], f: Firma): Druk 
    rozwiązanie to decyzja biura, nie zapis magazyniera). */
 function formularzPartner(dok: DokumentDruku, problemy: Wyjatek[], f: Firma): Druk {
   const nrDok = dok.nrPelny;
+  /* „Dokument zakupu" to faktura PARTNERA — ten sam powód co przy GEKO.
+     Bez numeru dostawcy zostaje kropkowana linia do wpisania ręką. */
+  const nrZakupu = dok.nrDostawcy ?? undefined;
   const linia = (v: string | undefined, min?: number) => v
     ? `<span class="wpis">${esc(v)}</span>`
     : `<span class="kropki" style="min-width:${min || 320}px"></span>`;
@@ -156,7 +172,7 @@ function formularzPartner(dok: DokumentDruku, problemy: Wyjatek[], f: Firma): Dr
       <p>NIP: ${linia(f.Nip)}</p>
       <p>ADRES: ${linia(f.Adres)}</p>
       <br>
-      <p>NR DOKUMENTU ZAKUPU*: <b>${esc(nrDok)}</b></p>
+      <p>NR DOKUMENTU ZAKUPU*: ${linia(nrZakupu, 220)}</p>
       <p>DATA ZAKUPU: <b>${esc(dok.dataWyst || "")}</b></p>
       <p class="mala">*(warunkiem rozpatrzenia reklamacji jest załączenie kopii dokumentu)</p>
       <br>

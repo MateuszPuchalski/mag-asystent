@@ -139,6 +139,10 @@ export function KolejkaDostaw({ dokumenty, zOdpowiedzia, wybrany, onWybierz, pus
             </span>
             <span className="w-full truncate text-sm text-slate-600">
               {d.dostawca} · {ile(wszystkie, "pozycja", "pozycje", "pozycji")}</span>
+            {/* Własna linia, nie dopisek do dostawcy: przy długiej nazwie
+                obcięcie zjadłoby właśnie numer, z którym biuro reklamuje. */}
+            {d.nrDostawcy && <span className="w-full truncate text-sm text-slate-600">
+              faktura dostawcy {d.nrDostawcy}</span>}
             <span className="w-full"><Pasek zrobione={d.linesDone} wszystkie={wszystkie}
               czeka={d.wyjatkiOtwarte > 0} /></span>
             {(zOdpowiedzia.has(d.dokId) || d.wyjatkiOtwarte > 0) &&

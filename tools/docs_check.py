@@ -224,6 +224,9 @@ for _dz, _n in _DZIESIATKI.items():
     for _j, _m in list(LICZEBNIKI.items()):
         if 1 <= _m <= 9:
             LICZEBNIKI[f"{_dz} {_j}"] = _n + _m
+    # W liczebniku złożonym jedynka nie odmienia się przez rodzaj:
+    # „trzydzieści jeden rzeczy", nie „trzydzieści jedna".
+    LICZEBNIKI[f"{_dz} jeden"] = _n + 1
 
 # Znacznik otwierający akapit — taka jest konwencja tego dokumentu. Wystąpienie
 # w środku zdania (jak w samej preambule) NIE jest pozycją do ustalenia.

@@ -720,8 +720,8 @@ function logoDostawcow(): void {
 function dokumenty(): { dokumentow: number; dostaw: number; linii: number; idDostaw: Map<number, number> } {
   const d = db();
   const insDok = d.prepare(
-    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, kh_id, w_buforze)
-     VALUES (?,?,?,?,?,?,?,?)`
+    `INSERT INTO sgt_dokument(dok_id, typ, nr_pelny, data_wyst, mag_id, dostawca, kh_id, w_buforze, nr_oryg)
+     VALUES (?,?,?,?,?,?,?,?,?)`
   );
   const insPoz = d.prepare("INSERT INTO sgt_pozycja(dok_id, tw_id, ilosc) VALUES (?,?,?)");
 
@@ -736,7 +736,10 @@ function dokumenty(): { dokumentow: number; dostaw: number; linii: number; idDos
       dok.magId,
       dok.dostawca,
       dok.khId ?? null,
-      dok.wBuforze ? 1 : 0
+      dok.wBuforze ? 1 : 0,
+      /* Co trzecia faktura bez numeru dostawcy, bo tak bywa w Subiekcie,
+         a ekran ma pokazać oba przypadki. */
+      dok.typ === "FZ" && dok.dokId % 3 !== 0 ? `FV/${dok.dokId}/${mmrrrr(data)}` : null
     );
     for (const [twId, ilosc] of dok.pozycje) insPoz.run(dok.dokId, twId, ilosc);
   }

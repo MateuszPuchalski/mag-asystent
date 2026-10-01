@@ -1197,7 +1197,11 @@ CREATE TABLE IF NOT EXISTS sgt_dokument (
   -- się logo dostawcy (0.56.0): symbol wolno w Subiekcie poprawić, a ta sama
   -- firma potrafi wystąpić pod dwoma napisami. NULL = dokument bez płatnika.
   kh_id      INTEGER,
-  w_buforze  INTEGER NOT NULL DEFAULT 0
+  w_buforze  INTEGER NOT NULL DEFAULT 0,
+  -- Numer dokumentu DOSTAWCY (`dok_NrPelnyOryg`, numer oryginału z FZ).
+  -- Biuro reklamuje u dostawcy, a dostawca zna swoją fakturę, nie nasz FZ.
+  -- NULL, gdy w Subiekcie pole zostało puste.
+  nr_oryg    TEXT
 );
 
 CREATE TABLE IF NOT EXISTS sgt_pozycja (
@@ -1290,7 +1294,11 @@ CREATE TABLE IF NOT EXISTS delivery (
   nr_przesylki  TEXT,
   kurier_protokol TEXT,             -- tak | nie | NULL (nie pytano)
   przesylka_at  TEXT,
-  przesylka_by  TEXT
+  przesylka_by  TEXT,
+  -- Numer dokumentu dostawcy, kopia `sgt_dokument.nr_oryg`. Dostawa zostaje
+  -- w archiwum dłużej niż dokument w oknie importu, a numer ma zostać z nią.
+  -- Odświeża go każdy import, bo biuro bywa, że uzupełnia pole później.
+  nr_oryg       TEXT
 );
 
 -- Postęp per linia (D4): zapis natychmiastowy, przerwanie pracy nic nie kosztuje.

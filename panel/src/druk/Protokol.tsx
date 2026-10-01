@@ -40,7 +40,8 @@ export function Protokol() {
 
   const firma = useFirmaDruku();
   const druk = dok.data && wyjatki.data && firma
-    ? protokol({ nrPelny: dok.data.nrPelny, dostawca: dok.data.dostawca, dataWyst: dok.data.dataWyst },
+    ? protokol({ nrPelny: dok.data.nrPelny, nrDostawcy: dok.data.nrDostawcy,
+        dostawca: dok.data.dostawca, dataWyst: dok.data.dataWyst },
         wyjatki.data.problems, firma)
     : null;
   useEffect(() => { if (druk) document.title = druk.tytul; }, [druk?.tytul]);

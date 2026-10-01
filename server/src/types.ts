@@ -167,6 +167,11 @@ export interface DeliveryDocument {
   dokId: number;
   typ: string;
   nrPelny: string;
+  /**
+   * Numer dokumentu dostawcy (numer oryginału w Subiekcie). Z nim biuro
+   * reklamuje, bo dostawca nie zna naszego FZ. `null`, gdy pole puste.
+   */
+  nrDostawcy: string | null;
   dataWyst: string;
   dostawca: string;
   /** Identyfikator kontrahenta z Subiekta; `null`, gdy dokument nie ma płatnika. */

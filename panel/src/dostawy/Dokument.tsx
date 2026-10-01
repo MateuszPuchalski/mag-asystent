@@ -5,7 +5,7 @@ import { ilosc } from "../api/dostawy";
 import { pobierzPlik } from "../api/klient";
 import { Zdjecie } from "../towar/Zdjecie";
 import { useZdrowie } from "../api/rozmowy";
-import { Blad, NaglowekSekcji, Plakietka, Przycisk, czas, dzien, ile } from "../ui";
+import { Blad, NaglowekSekcji, Plakietka, Przycisk, Skopiuj, czas, dzien, ile } from "../ui";
 import { Wyjatek } from "./Wyjatek";
 import { PrzyciskTowaru } from "../towar/Szuflada";
 import { otwarteWyjatki } from "./Kolejka";
@@ -177,6 +177,14 @@ export function Dokument({ d, rozwiaz }: { d: DokumentDostawy; rozwiaz: RozwiazP
             („6 wyjątków"). Teraz obie mówią to samo i tym samym słowem. */}
         {d.dostawca} · wystawiona {dzien(d.dataWyst)} · odłożone {d.progress.done}/{d.progress.total} poz.
         {otwarte ? ` · ${otwarteWyjatki(otwarte)}` : ""}
+      </p>
+      {/* Numer z kopiowaniem, bo trafia do maila albo formularza hurtowni.
+          Brak mówimy wprost: biuro uzupełnia go w Subiekcie, nie tutaj. */}
+      <p className="mt-1 flex items-center gap-2 text-sm text-slate-600">
+        {d.nrDostawcy
+          ? <>Faktura dostawcy <b className="text-slate-800">{d.nrDostawcy}</b>
+              <Skopiuj tekst={d.nrDostawcy} tytul="Kopiuj numer faktury dostawcy" /></>
+          : "Bez numeru faktury dostawcy w Subiekcie."}
       </p>
       {/* Dwa zdania osobno, bo mówią o czym innym: jedno CZY ktoś to
           rozkładał, drugie SKĄD są liczby. */}

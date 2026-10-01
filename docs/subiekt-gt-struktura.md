@@ -84,6 +84,27 @@ uznajemy — „1234" pasowałoby do co drugiego dokumentu w oknie.
 Pomyłka daje pustą listę pewnych trafień, a nie złe dane: zwrot czeka wtedy na
 wskazanie człowieka, a nie wiąże się z cudzą sprzedażą.
 
+## Numer faktury dostawcy na dokumencie zakupu
+
+Ta sama kolumna `dok_NrPelnyOryg` na fakturze zakupu niesie numer dokumentu
+dostawcy. Read-model kopiuje ją do `sgt_dokument.nr_oryg`, a lista dostaw,
+karta dostawy i druki reklamacyjne pokazują ją obok naszego FZ. Numer widzi
+wyłącznie biuro, bo to ono reklamuje. Puste pole daje `NULL`, więc druk GEKO
+zostawia wtedy kolumnę do wpisania ręką.
+
+**Sprawdzone na bazie firmy 1 października 2026.** Dwadzieścia ostatnich FZ
+ma numer oryginału wypełniony numerem faktury dostawcy. Format jest każdego
+dostawcy własny, np. `FS-4726/9/26`, `F.VAT/327/9/SKS/2026` albo `44656315`.
+Dlatego numer pokazujemy i szukamy jako tekst, bez parsowania. Zapytanie
+kontrolne:
+
+```sql
+SELECT TOP 20 dok_NrPelny, dok_NrPelnyOryg
+FROM dok__Dokument
+WHERE dok_Typ = 1 AND dok_DataWyst >= DATEADD(month, -1, GETDATE())
+ORDER BY dok_DataWyst DESC;
+```
+
 Wolnego pola tekstowego (`dok_Uwagi`, varchar 500) **nie kopiujemy**. Mieści
 się w nim adres i telefon, a read-model kopiuje to, co przeczyta, razem do
 kopii zapasowych. Wycinamy z niego w SQL wyłącznie ciąg o kształcie
