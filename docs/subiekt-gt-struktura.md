@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało trzydzieści jeden.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostało trzydzieści.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -92,8 +92,11 @@ karta dostawy i druki reklamacyjne pokazują ją obok naszego FZ. Numer widzi
 wyłącznie biuro, bo to ono reklamuje. Puste pole daje `NULL`, więc druk GEKO
 zostawia wtedy kolumnę do wpisania ręką.
 
-`[WERYFIKUJ]` **Czy biuro wpisuje numer faktury dostawcy w numer oryginału FZ.**
-Sprawdzenie na bazie firmy:
+**Sprawdzone na bazie firmy 1 października 2026.** Dwadzieścia ostatnich FZ
+ma numer oryginału wypełniony numerem faktury dostawcy. Format jest każdego
+dostawcy własny, np. `FS-4726/9/26`, `F.VAT/327/9/SKS/2026` albo `44656315`.
+Dlatego numer pokazujemy i szukamy jako tekst, bez parsowania. Zapytanie
+kontrolne:
 
 ```sql
 SELECT TOP 20 dok_NrPelny, dok_NrPelnyOryg
@@ -101,9 +104,6 @@ FROM dok__Dokument
 WHERE dok_Typ = 1 AND dok_DataWyst >= DATEADD(month, -1, GETDATE())
 ORDER BY dok_DataWyst DESC;
 ```
-
-Puste kolumny w wyniku znaczą, że biuro trzyma ten numer gdzie indziej.
-Ekran pokaże wtedy „bez numeru faktury dostawcy” zamiast cudzego numeru.
 
 Wolnego pola tekstowego (`dok_Uwagi`, varchar 500) **nie kopiujemy**. Mieści
 się w nim adres i telefon, a read-model kopiuje to, co przeczyta, razem do
