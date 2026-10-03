@@ -91,14 +91,17 @@ Każda zasada: co robić, dlaczego i kto tego pilnuje.
   w `buildApp()`, bo testy tras nie mają prawa strzelać do Allegro.
   *Strażnik: konwencja.*
 
-- **Copilot woła się wyłącznie z `adapters/copilot.anthropic.ts`.**
-  Rozpoznawanie wiadomości klientów wchodzi przez `nadawcaKlasyfikacji`
+- **Copilot woła się z `adapters/copilot.anthropic.ts`, a rozpoznawanie
+  wiadomości klientów także z `adapters/copilot.jev.ts`.** Jev z TypeSafe
+  rozpoznaje, gdy stoi `TYPESAFE_API_KEY`; szkice zawsze pisze Claude, bo Jev
+  nie generuje tekstu. Rozpoznawanie wchodzi przez `nadawcaKlasyfikacji`
   (`copilot.klasyfikator.ts`), nigdy przez konkretnego dostawcę. Przed zmianą
   wywołania przeczytaj nagłówek pliku i `server/CLAUDE.md`. Reguły modelu
-  zależą od jego wersji i starzeją się z nią. Nowy dostawca modelu to decyzja
-  właściciela, nie zmiana przy okazji. *Strażnik: konwencja — innego importu
-  `@anthropic-ai/sdk` w repo nie ma. Test `copilot.klasyfikator.test.ts`
-  pilnuje, że klasyfikacja idzie przez wspólne wejście.*
+  zależą od jego wersji i starzeją się z nią. Kolejny dostawca modelu to
+  decyzja właściciela, nie zmiana przy okazji. *Strażnik:
+  `copilot.klasyfikator.test.ts` pilnuje wspólnego wejścia, a
+  `copilot.jev.test.ts` — że klucz TypeSafe nie trafia do błędów. Jedyny
+  import `@anthropic-ai/sdk` to konwencja.*
 
 - **Kształt Allegro czyta się z pliku, nie z pamięci.** Specyfikacja leży
   w `docs/allegro/swagger.yaml`, cudza i nietykalna. Czytaj SCHEMAT, nie

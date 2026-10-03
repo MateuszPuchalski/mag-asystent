@@ -2204,9 +2204,17 @@ Klucz stoi wyłącznie w `ANTHROPIC_API_KEY` i nie ma go w konfiguracji serwera
 ### 14.5a. Klasyfikacja w kształcie specyfikacji (22 września 2026)
 
 Specyfikacja właściciela z 20 września zastąpiła słownik ośmiu etykiet
-decyzją o dziesięciu polach. Silnikiem jest Claude. Kolejny dostawca wpiąłby
-się tym samym nadawcą (`NadawcaKlasyfikacji`), bo walidacja i polityka stoją
-po naszej stronie, nie w adapterze.
+decyzją o dziesięciu polach. Walidacja i polityka stoją po naszej stronie,
+nie w adapterze, więc każdy dostawca wpina się tym samym nadawcą
+(`NadawcaKlasyfikacji`).
+
+**Z kluczem TypeSafe silnikiem rozpoznawania jest Jev, decyzją właściciela
+z 3 października 2026.** Bez klucza rozpoznaje Claude. Kategoria i następny
+krok to Choice, flagi i kategorie dodatkowe to Nouly, a pewność słowna
+wynika z liczbowej `confidence`. Uzasadnienie składa się z odpowiedzi, bo
+Jev nie pisze zdań. Czego nie wiadomo: trafność po polsku. Porównanie
+z Claude na prawdziwych wiadomościach jest pierwszym pomiarem, nie
+formalnością.
 
 **Decyzja ma piętnaście kategorii, kategorie dodatkowe i jeden następny
 krok z dwunastu.** Słownik stoi w `services/klasyfikacja-slownik.ts`. Wartości

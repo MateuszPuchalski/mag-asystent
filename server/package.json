@@ -22,6 +22,7 @@
     "reslot": "tsx src/reslot-run.ts",
     "sonda": "tsx src/sonda-run.ts",
     "sonda:zalacznik": "tsx src/sonda-zalacznik-run.ts",
+    "sonda:jev": "tsx src/jev-sonda-run.ts",
     "inwentarz": "tsx src/inwentarz-run.ts",
     "zwroty:reset": "tsx src/zwroty-reset-run.ts",
     "zwroty:sprzatnij": "tsx src/zwroty-sprzatanie-run.ts",
