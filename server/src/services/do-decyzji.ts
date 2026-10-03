@@ -353,7 +353,7 @@ function kolejkiKlienta(teraz: number): PozycjaDecyzji[] {
       klucz: "kolejka:dyskusje", obszar: "obsluga", zrodlo: "dyskusje",
       pytanie: "Odpowiedzieć w dyskusji",
       co: `${ile(dyskusje.length, "dyskusja czeka", "dyskusje czekają", "dyskusji czeka")} na nas`,
-      od: najstarsza(dyskusje.map((d) => d.bezOdpowiediOd ?? d.ostatniaWiadomoscAt ?? d.otwartoAt)),
+      od: najstarsza(dyskusje.map((d) => d.bezOdpowiedziOd ?? d.ostatniaWiadomoscAt ?? d.otwartoAt)),
       pilne: dyskusje.some((d) => d.dlugoCzeka || d.pilna),
       cel: { panel: "/obsluga/dyskusje" },
     });

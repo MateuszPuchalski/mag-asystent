@@ -2094,7 +2094,7 @@ export interface Dyskusja {
   /** Ta sama miara w godzinach; ekran pokazuje ją poniżej doby. */
   czekaOdGodzin: number | null;
   /** Od kiedy pytanie czeka na nasze słowo. */
-  bezOdpowiediOd: string | null;
+  bezOdpowiedziOd: string | null;
   /** Czekanie przekroczyło próg alarmu z `DYSKUSJE_ALARM_GODZIN`. */
   pilna: boolean;
   dlugoCzeka: boolean;

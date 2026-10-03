@@ -291,7 +291,7 @@ function wiadomosc(sprawaId: number, rola: string, at: string): void {
 test("zegar liczy od pytania kupującego, także gdy doradca odpisał dzisiaj", () => {
   /* Dokładnie przypadek ze zrzutu od właściciela: doradca na końcu, kolejka
      mówi „dziś", a kupujący zapytał cztery dni temu. */
-  const t = D.bezOdpowiediOd([
+  const t = D.bezOdpowiedziOd([
     { rola: "BUYER", at: przedDniami(4) },
     { rola: "ADMIN", at: przedGodzinami(1) },
   ], przedGodzinami(1), true);
@@ -299,7 +299,7 @@ test("zegar liczy od pytania kupującego, także gdy doradca odpisał dzisiaj", 
 });
 
 test("nasza odpowiedź zeruje zegar, a nowe pytanie zaczyna go od nowa", () => {
-  const t = D.bezOdpowiediOd([
+  const t = D.bezOdpowiedziOd([
     { rola: "BUYER", at: przedDniami(6) },
     { rola: "SELLER", at: przedDniami(5) },
     { rola: "BUYER", at: przedDniami(2) },
@@ -309,16 +309,16 @@ test("nasza odpowiedź zeruje zegar, a nowe pytanie zaczyna go od nowa", () => {
 });
 
 test("automaty nie uruchamiają zegara, a bez wiadomości wracamy do ostatniej daty", () => {
-  assert.equal(D.bezOdpowiediOd([
+  assert.equal(D.bezOdpowiedziOd([
     { rola: "SELLER", at: przedDniami(5) },
     { rola: "SYSTEM", at: przedDniami(4) },
     { rola: "BUYER", at: przedDniami(2) },
   ], przedDniami(2), true), przedDniami(2));
-  assert.equal(D.bezOdpowiediOd([], przedDniami(3), true), przedDniami(3),
+  assert.equal(D.bezOdpowiedziOd([], przedDniami(3), true), przedDniami(3),
     "bez wiadomości i bez naszej odpowiedzi: od ostatniej wiadomości");
-  assert.equal(D.bezOdpowiediOd([], null, true, przedDniami(7)), przedDniami(7),
+  assert.equal(D.bezOdpowiedziOd([], null, true, przedDniami(7)), przedDniami(7),
     "bez żadnej daty: od otwarcia sprawy, żeby sprawa nie wypadła z alarmu");
-  assert.equal(D.bezOdpowiediOd([{ rola: "BUYER", at: przedDniami(9) }], przedDniami(9), false), null,
+  assert.equal(D.bezOdpowiedziOd([{ rola: "BUYER", at: przedDniami(9) }], przedDniami(9), false), null,
     "gdy piłka jest u klienta, zegara nie ma");
 });
 
@@ -326,7 +326,7 @@ test("niepełna lista wiadomości ZAWYŻA czas: liczymy od naszej ostatniej odpo
   /* Czat urwany bezpiecznikiem stron: mamy naszą starą odpowiedź, a status mówi,
      że po niej ktoś napisał, tylko tej wiadomości nie mamy. Cisza byłaby gorsza
      od nadmiarowego paska. */
-  assert.equal(D.bezOdpowiediOd([{ rola: "SELLER", at: przedDniami(5) }], przedGodzinami(1), true),
+  assert.equal(D.bezOdpowiedziOd([{ rola: "SELLER", at: przedDniami(5) }], przedGodzinami(1), true),
     przedDniami(5));
 });
 
@@ -334,13 +334,13 @@ test("sprawa bez wiadomości i bez daty ostatniej nadal wchodzi do alarmu", () =
   const id = sprawa({ id: "d-bez-dat", ostatniaAt: null });
   assert.ok(id > 0);
   const w = D.listaDyskusji(db(), TERAZ)[0];
-  assert.equal(w.bezOdpowiediOd, przedDniami(9), "zapas to otwarto_at z fixtury: dziewięć dni temu");
+  assert.equal(w.bezOdpowiedziOd, przedDniami(9), "zapas to otwarto_at z fixtury: dziewięć dni temu");
   assert.equal(w.pilna, true);
   assert.equal(D.stanDyskusjiHealth(db(), TERAZ, 24, null).alarm?.ile, 1);
 });
 
 test("samo pytanie doradcy Allegro też uruchamia zegar", () => {
-  assert.equal(D.bezOdpowiediOd([
+  assert.equal(D.bezOdpowiedziOd([
     { rola: "SELLER", at: przedDniami(5) },
     { rola: "ADMIN", at: przedDniami(2) },
   ], przedGodzinami(1), true), przedDniami(2),

@@ -538,6 +538,13 @@ gałęzie lądują w bazie, a rozróżnia je kolumna `typ`; dyskusje mają włas
 ekran (§25c projektu panelu). Licznik dyskusji w przebiegu jest kontrolą
 krzyżową dla licznika kolejki.
 
+Dyskusja nie ma terminu w schemacie: `decisionDueDate` i `currentState.statusDueDate`
+są opisane jako `Null for disputes`. Okna odpowiedzi, po którym Allegro nakłada
+sankcję na konto, nie podaje żaden plik w repo. Próg alarmu to nasza decyzja
+(`DYSKUSJE_ALARM_GODZIN`, domyślnie 24 godziny) i czeka na potwierdzenie
+z komunikatu Allegro o blokadzie. Zegar „bez odpowiedzi od" liczymy sami
+z wiadomości, od najstarszej po naszej ostatniej odpowiedzi.
+
 Identyfikatory obu bytów żyją w JEDNEJ przestrzeni: specyfikacja opisuje
 `{issueId}` jako `Dispute or claim identifier` przy każdej końcówce rodziny.
 Dlatego trzyma je jedna tabela — dwie czyniłyby z „jedna sprawa = jeden wiersz"

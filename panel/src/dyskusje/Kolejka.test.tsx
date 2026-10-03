@@ -23,7 +23,7 @@ const d = (n: Partial<Dyskusja> = {}): Dyskusja => ({
   temat: "Przesyłka nie dotarła", opis: null,
   statusAllegro: "DISPUTE_ONGOING", czatAktywny: true, wiadomosciIle: 2, czatUrwany: false,
   ostatniaWiadomoscStatus: "BUYER_REPLIED", ostatniaWiadomoscAt: "2026-09-04T10:00:00.000Z",
-  ruchNasz: true, czekaOdDni: 5, czekaOdGodzin: 120, bezOdpowiediOd: null, pilna: true, dlugoCzeka: true,
+  ruchNasz: true, czekaOdDni: 5, czekaOdGodzin: 120, bezOdpowiedziOd: null, pilna: true, dlugoCzeka: true,
   otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [],
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null,
   zakonczenieStatus: null, zakonczenieAt: null, zakonczeniePrzez: null,

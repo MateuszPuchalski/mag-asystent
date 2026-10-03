@@ -119,13 +119,13 @@ export interface WierszDyskusji {
    * i rozjeżdżający się z tym, co widział kupujący.
    *
    * LICZONA OD PYTANIA, NA KTÓRE NIE ODPOWIEDZIELIŚMY, nie od ostatniej
-   * wiadomości: patrz `bezOdpowiediOd`.
+   * wiadomości: patrz `bezOdpowiedziOd`.
    */
   czekaOdDni: number | null;
   /** Ta sama miara w godzinach — dla ekranu, który poniżej doby pokazuje godziny. */
   czekaOdGodzin: number | null;
   /** Od kiedy pytanie czeka na nasze słowo. `null`, gdy ruch nie jest nasz. */
-  bezOdpowiediOd: string | null;
+  bezOdpowiedziOd: string | null;
   /**
    * Czekanie przekroczyło próg alarmu (`DYSKUSJE_ALARM_GODZIN`). Próg liczy
    * serwer, żeby wiersz, pasek alarmu i zdanie w stanie systemu nie mogły
@@ -223,7 +223,7 @@ export interface WiadomoscCzasu {
  *   2. Nie ma żadnej naszej odpowiedzi: od ostatniej wiadomości, a bez jej
  *      daty od otwarcia sprawy, które jest ustawione zawsze.
  */
-export function bezOdpowiediOd(
+export function bezOdpowiedziOd(
   wiadomosci: WiadomoscCzasu[], ostatniaAt: string | null, ruchNasz: boolean,
   otwartoAt: string | null = null,
 ): string | null {
@@ -317,7 +317,7 @@ function zWiersza(w: Wiersz, teraz: number, wiadomosci: WiadomoscCzasu[] = []): 
   const ostatniaAt = tekst(w.ostatnia_wiadomosc_at);
   const rdzen = { statusAllegro, ostatniaWiadomoscStatus: ostatnia, czatAktywny };
   const ruchNasz = ruchNalezyDoNas(rdzen);
-  const bezOdpowiedzi = bezOdpowiediOd(wiadomosci, ostatniaAt, ruchNasz, tekst(w.otwarto_at));
+  const bezOdpowiedzi = bezOdpowiedziOd(wiadomosci, ostatniaAt, ruchNasz, tekst(w.otwarto_at));
   const czeka = czekaOdDni(bezOdpowiedzi, ruchNasz, teraz);
   const godzin = ruchNasz ? godzinyOd(bezOdpowiedzi, teraz) : null;
   const kubelek = kubelekDyskusji(rdzen);
@@ -337,7 +337,7 @@ function zWiersza(w: Wiersz, teraz: number, wiadomosci: WiadomoscCzasu[] = []): 
     ruchNasz,
     czekaOdDni: czeka,
     czekaOdGodzin: godzin,
-    bezOdpowiediOd: bezOdpowiedzi,
+    bezOdpowiedziOd: bezOdpowiedzi,
     pilna: kubelek === "odpowiedz" && godzin !== null && godzin >= config.allegro.dyskusjeAlarmGodzin,
     dlugoCzeka: czeka !== null && czeka >= PROG_CZEKANIA_DNI,
     otwartoAt: String(w.otwarto_at),
@@ -397,7 +397,7 @@ export function listaDyskusji(
      ostatniej wiadomości, więc SQL go już nie rozstrzyga. Sprawy, w których
      ruch jest po stronie klienta, nie mają zegara i idą na koniec. */
   const czas = (d: WierszDyskusji): number =>
-    d.bezOdpowiediOd ? Date.parse(d.bezOdpowiediOd) : Number.POSITIVE_INFINITY;
+    d.bezOdpowiedziOd ? Date.parse(d.bezOdpowiedziOd) : Number.POSITIVE_INFINITY;
   return wiersze
     .map((w) => {
       const d = zWiersza(w, teraz, wiadomosci.get(Number(w.id)) ?? []);
