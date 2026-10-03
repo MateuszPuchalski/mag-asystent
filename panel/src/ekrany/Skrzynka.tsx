@@ -5,7 +5,7 @@ import { Konflikt } from "../api/klient";
 import { naBase64 } from "../api/plik";
 import {
   zglosCofnietaWysylke, useAgenci, useDodajKomentarz, useJa, useOdloz, usePrzygotujRozmowe,
-  usePrzekaz, useRozmowa, useUstawReklamacyjna, useZakoncz, useOtworz,
+  useHistoriaKlienta, usePrzekaz, useRozmowa, useUstawReklamacyjna, useZakoncz, useOtworz,
   usePisze, useRozmowy, useSynchronizuj, useUchwytRozmowy, useUstawPriorytet, useWskazOferte, useWyslij,
   useZapiszSzkic, useZdrowie, useZlecPomiar,
   useDodajZalacznik, useUsunZalacznik, useZalaczniki,
@@ -69,6 +69,8 @@ export function Skrzynka() {
   const ja = useJa();
   const lista = useRozmowy();
   const rozmowa = useRozmowa(wybranaId);
+  /* Ten sam klucz zapytania co w kolumnie kontekstu: jedna odpowiedź z serwera na obie. */
+  const historiaKlienta = useHistoriaKlienta(rozmowa.data?.rozmowa.id ?? null);
   /* Copilot (§14, etap F). Stan to odczyt KONFIGURACJI, więc jeden na wejście
      do ekranu — hak trzyma go do restartu usługi. Mutacje siedzą tutaj, a nie
      w widokach: cały katalog `skrzynka/` to komponenty czyste. */
@@ -629,6 +631,7 @@ export function Skrzynka() {
 
     <Rozmowa
       dane={rozmowa.data}
+      historiaKlienta={historiaKlienta.data}
       laduje={wybranaId !== null && rozmowa.isLoading}
       mojeId={ja.data?.user.userId ?? null}
       obecni={obecnosc}

@@ -210,12 +210,18 @@ export type WpisOsi = {
   rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania"
     | "komentarz" | "status" | "dobor"
     /* Kamień milowy zwrotu (0.502.0) — zdarzenie, nie wypowiedź; `Os.tsx` ZDARZENIE. */
-    | "zwrot";
+    | "zwrot"
+    /* Zdarzenie ZAKUPU wstawione do osi po stronie panelu (`skrzynka/zakup.ts`):
+       złożone, opłacone, dostarczone, zwrot, reklamacja, dyskusja. Nie przychodzi
+       z serwera, nie jest wypowiedzią i nie wchodzi do paska przebiegu. */
+    | "zakup";
   autor: string;
   odKlienta: boolean;
   tresc: string;
   at: string;
   ofertaId: string | null;
+  /** Adres ekranu w panelu, do którego prowadzi wpis `zakup`. */
+  adres?: string;
   /** Tytuł oferty ze snapshotu, a gdy go nie ma — nazwa z pozycji zamówienia. */
   nazwaOferty?: string | null;
   /** Zamówienie, którego dotyczy wiadomość (`relatesTo.order`, 0.166.0). */
