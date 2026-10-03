@@ -63,7 +63,7 @@ const Wynik = z.object({
  * a bez numeru nie da się oddzielić decyzji starej instrukcji od nowej.
  * ZMIENIASZ `INSTRUKCJA` — podnosisz numer.
  */
-export const PROMPT_KLASYFIKACJI = "k4";
+export const PROMPT_KLASYFIKACJI = "k5";
 
 /* INSTRUKCJA JEST STAŁA I STOI PIERWSZA — na tym stoi cache. Dopasowanie idzie
    po prefiksie, więc jeden zmienny bajt tutaj (data, numer rozmowy, imię

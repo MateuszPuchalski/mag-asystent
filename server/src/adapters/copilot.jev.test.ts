@@ -1,14 +1,14 @@
 import { test, afterEach } from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { _ustawFetch, MODEL_JEV, nadawcaJev, PYTANIA_JEVA } from "./copilot.jev.js";
+import { _ustawFetch, krokDlaKategorii, MODEL_JEV, nadawcaJev, PYTANIA_JEVA } from "./copilot.jev.js";
 import { PROMPT_KLASYFIKACJI } from "./copilot.anthropic.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
   BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
 } from "./copilot.js";
-import { AKCJE, KATEGORIE, OPISY_KATEGORII } from "../services/klasyfikacja-slownik.js";
-import { walidujOdpowiedz } from "../services/klasyfikacja-polityka.js";
+import { KATEGORIE, KODY, OPISY_KATEGORII } from "../services/klasyfikacja-slownik.js";
+import { decyzjaZModelu, walidujOdpowiedz } from "../services/klasyfikacja-polityka.js";
 import { kosztUsd, znanyModel } from "../services/copilot-koszt.js";
 import type { TrescBezpieczna } from "../services/copilot-maskowanie.js";
 
@@ -36,7 +36,7 @@ const noul = (v: number) => ({ type: "noul", noul: v });
 function odpowiedz(nadpisz: Record<string, unknown> = {}) {
   const answers: Record<string, unknown> = {
     kategoria: wybor("PRODUCT_COMPATIBILITY", 0.9),
-    akcja: wybor("CHECK_COMPATIBILITY", 0.7),
+    czeka_na_odpowiedz: noul(0.9),
     prosi_o_czlowieka: noul(0.02),
     wymaga_czlowieka: noul(0.05),
     brak_danych_zamowienia: noul(0.1),
@@ -93,7 +93,8 @@ test("pytania: Choice z kompletem opcji ze słownika, flagi i kategorie dodatkow
 
   assert.deepEqual(Object.keys(q.kategoria.criteria), [...KATEGORIE]);
   assert.deepEqual(q.kategoria.criteria, OPISY_KATEGORII, "te same granice co w instrukcji Claude");
-  assert.deepEqual(Object.keys(q.akcja.criteria), [...AKCJE]);
+  assert.equal(q.akcja, undefined, "krok wynika z kategorii, nie z pytania");
+  assert.equal(q.czeka_na_odpowiedz.type, "noul");
   for (const nazwa of ["prosi_o_czlowieka", "wymaga_czlowieka", "brak_danych_zamowienia", "brak_danych_produktu"]) {
     assert.equal(q[nazwa].type, "noul", nazwa);
   }
@@ -178,7 +179,7 @@ test("kategorie dodatkowe: próg wysoki, bez głównej, najwyżej trzy, od najpe
 });
 
 test("OTHER przechodzi przez politykę bez powodu „inne”", async () => {
-  const s = await surowa({ kategoria: wybor("OTHER", 0.8), akcja: wybor("NO_ACTION", 0.9) });
+  const s = await surowa({ kategoria: wybor("OTHER", 0.8), czeka_na_odpowiedz: noul(0.1) });
   assert.equal(s.powodInne, null);
   assert.ok(walidujOdpowiedz(s).ok);
 });
@@ -195,6 +196,49 @@ test("kategoria spoza słownika przechodzi do polityki, która ją odrzuca", asy
   const w = walidujOdpowiedz(await surowa({ kategoria: wybor("NIE_MA_TAKIEJ", 0.9) }));
   assert.equal(w.ok, false);
   assert.match(w.ok ? "" : w.powod, /kategoria spoza słownika/);
+});
+
+/* ── Następny krok ─────────────────────────────────────────────────────────── */
+
+test("krok wynika z kategorii i flag, nie z pytania", async () => {
+  const bez = { brakDanychProduktu: false, czeka: true, czlowiek: false };
+  assert.equal(krokDlaKategorii("DELIVERY_DELAY", bez), "GET_SHIPMENT");
+  assert.equal(krokDlaKategorii("PRODUCT_COMPATIBILITY", bez), "CHECK_COMPATIBILITY");
+  assert.equal(krokDlaKategorii("PRODUCT_COMPATIBILITY", { ...bez, brakDanychProduktu: true }), "ASK_FOR_MACHINE_MODEL");
+  assert.equal(krokDlaKategorii("CANCEL_ORDER", bez), "GET_ORDER");
+  assert.equal(krokDlaKategorii("RETURN", bez), "START_RETURN");
+  assert.equal(krokDlaKategorii("NIE_MA_TAKIEJ", bez), "HUMAN_REVIEW");
+
+  const s = await surowa({ kategoria: wybor("PRODUCT_AVAILABILITY", 0.9) });
+  assert.equal(s.akcja, "CHECK_STOCK");
+});
+
+test("OTHER: podziękowanie nie wymaga niczego, niejasna prośba idzie do przeglądu", async () => {
+  const dzieki = await surowa({ kategoria: wybor("OTHER", 0.9), czeka_na_odpowiedz: noul(0.1) });
+  assert.equal(dzieki.akcja, "NO_ACTION");
+  const niejasne = await surowa({ kategoria: wybor("OTHER", 0.9), czeka_na_odpowiedz: noul(0.8) });
+  assert.equal(niejasne.akcja, "HUMAN_REVIEW");
+  const w = walidujOdpowiedz(niejasne);
+  assert.ok(w.ok);
+  assert.equal(decyzjaZModelu(w.odp).status, "NEEDS_REVIEW");
+});
+
+/* Tabela kroków nie ma prawa wyprodukować odpowiedzi, którą polityka uzna za
+   sprzeczną: wtedy każda taka rozmowa szłaby do przeglądu z powodu tabeli. */
+test("żaden krok z tabeli nie jest dla polityki sprzeczny z kategorią", () => {
+  for (const kategoria of KATEGORIE) {
+    for (const brakDanychProduktu of [false, true]) for (const czeka of [false, true]) {
+      for (const czlowiek of [false, true]) {
+        const akcja = krokDlaKategorii(kategoria, { brakDanychProduktu, czeka, czlowiek });
+        const w = walidujOdpowiedz({
+          kategoria, dodatkowe: [], akcja, wymagaCzlowieka: czlowiek, prosiOCzlowieka: false,
+          brakDanychZamowienia: false, brakDanychProduktu, pewnosc: "wysoka", powodInne: null, uzasadnienie: "",
+        });
+        assert.ok(w.ok, `${kategoria}: ${w.ok ? "" : w.powod}`);
+        assert.ok(!decyzjaZModelu(w.odp).kody.includes(KODY.niespojna), `${kategoria} → ${akcja}`);
+      }
+    }
+  }
 });
 
 /* ── Błędy ───────────────────────────────────────────────────────────────── */
@@ -249,7 +293,7 @@ test("422 i odpowiedź nie do odczytania to błąd odpowiedzi", async () => {
 test("brakujące albo przekręcone pole odpowiedzi to błąd, nie decyzja z domysłu", async () => {
   zKluczem();
   const bez = odpowiedz();
-  delete (bez.answers as Record<string, unknown>).akcja;
+  delete (bez.answers as Record<string, unknown>).czeka_na_odpowiedz;
   fetchZwracajacy(json(200, bez));
   assert.ok(await blad(nadawcaJev(TRESC)) instanceof BladOdpowiedziCopilota);
 
@@ -298,7 +342,7 @@ test("klucz nigdy nie trafia do komunikatu ani śladu błędu", async () => {
 test("zmiana opisów kategorii podnosi wersję instrukcji Claude i pytań Jeva", () => {
   const suma = createHash("sha256").update(JSON.stringify(OPISY_KATEGORII)).digest("hex").slice(0, 16);
   assert.deepEqual({ suma, PROMPT_KLASYFIKACJI, PYTANIA_JEVA },
-    { suma: "4a183396fd982ada", PROMPT_KLASYFIKACJI: "k4", PYTANIA_JEVA: "jev-j3" });
+    { suma: "877d07799c459d45", PROMPT_KLASYFIKACJI: "k5", PYTANIA_JEVA: "jev-j4" });
 });
 
 test("model Jeva ma cennik, więc nie liczy się stawką najdroższego modelu", () => {

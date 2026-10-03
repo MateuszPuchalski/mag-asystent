@@ -2209,12 +2209,18 @@ nie w adapterze, więc każdy dostawca wpina się tym samym nadawcą
 (`NadawcaKlasyfikacji`).
 
 **Z kluczem TypeSafe silnikiem rozpoznawania jest Jev, decyzją właściciela
-z 3 października 2026.** Bez klucza rozpoznaje Claude. Kategoria i następny
-krok to Choice, flagi i kategorie dodatkowe to Nouly, a pewność słowna
-wynika z liczbowej `confidence`. Uzasadnienie składa się z odpowiedzi, bo
-Jev nie pisze zdań. Czego nie wiadomo: trafność po polsku. Porównanie
-z Claude na prawdziwych wiadomościach jest pierwszym pomiarem, nie
-formalnością.
+z 3 października 2026.** Bez klucza rozpoznaje Claude. Kategoria to Choice,
+flagi i kategorie dodatkowe to Nouly, a pewność słowna wynika z liczbowej
+`confidence`. Następny krok przy Jevie nie jest pytaniem, tylko wynika
+z kategorii i flag (tabela `KROK` w `copilot.jev.ts`). Powód: pytany wprost
+Jev wskazywał „pobierz zamówienie” przy dwudziestu dwóch z trzydziestu
+jeden wiadomości, a krok trafia do kontekstu szkicu. Uzasadnienie składa się
+z odpowiedzi, bo Jev nie pisze zdań. Czego nie wiadomo: trafność po polsku.
+
+Karta „Copilot” liczy trafność dla jednego klasyfikatora naraz: model
+i wersję instrukcji najnowszej decyzji. Obok stoi porównanie wszystkich
+klasyfikatorów ze zgodnością z etykietą człowieka. Precyzja zlana z decyzji
+Claude i Jeva nie mówiłaby nic o żadnym z nich.
 
 **Decyzja ma piętnaście kategorii, kategorie dodatkowe i jeden następny
 krok z dwunastu.** Słownik stoi w `services/klasyfikacja-slownik.ts`. Wartości

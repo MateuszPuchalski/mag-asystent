@@ -1,6 +1,6 @@
 ---
-rodzaj: patch
-tytul: Jev — flagi i progi ustawione z sondy na żywym API
+rodzaj: minor
+tytul: Jev — flagi, krok i progi z sondy, trafność osobno dla każdego klasyfikatora
 ---
 
 Pierwsza sonda Jeva na żywym API TypeSafe potwierdziła kształt odpowiedzi
@@ -17,3 +17,21 @@ pytań mają `promptWersja` `jev-j3`.
 
 Sonda (`npm run sonda:jev` w `server/`) wypisuje teraz surowe wartości flag
 przy każdej wiadomości, żeby następne strojenie też szło z liczb.
+
+**Karta „Copilot” liczy trafność osobno dla każdego klasyfikatora.** Tabela
+precyzji dotyczy modelu i wersji instrukcji najnowszej decyzji i mówi to
+wprost. Gdy decyzje mają więcej niż jeden klasyfikator, obok stoi tabela
+porównania, na przykład Claude i Jeva, ze zgodnością z poprawkami agentów.
+Wcześniej obie trafności zlewały się w jedną liczbę.
+
+Następny krok przy Jevie wynika z kategorii i flag, a nie z pytania do
+modelu. W sondzie na trzydziestu jeden trudniejszych wiadomościach Jev
+pytany wprost wskazywał „pobierz zamówienie” przy dwudziestu dwóch, także
+przy anulowaniu i fakturze. Teraz dostawa daje śledzenie przesyłki,
+dostępność stan magazynu, a zwrot i reklamacja krok ręczny. Podziękowanie
+nie wymaga niczego, a niejasna wiadomość idzie do przejrzenia. Wersja pytań
+`jev-j4`.
+
+Opis kategorii „towar wadliwy” ma przykład: pęknięty albo wygięty towar
+w całym kartonie. Bez niego Jev brał go za szkodę w transporcie. Opis jest
+wspólny z instrukcją Claude, więc jej wersja rośnie do `k5`.

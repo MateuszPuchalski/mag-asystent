@@ -17,6 +17,9 @@ const dane = (n: Partial<Pomiar> = {}): Pomiar => ({
     taksonomia: "v3", decyzji: 20, wgZrodla: { MODEL: 15, ALLEGRO_MAPPING: 4, FALLBACK: 1 },
     wgStatusu: { FAILED: 1 }, wymagaCzlowieka: 2, oznaczonych: 10, nieoznaczonych: 10,
     poprawionych: 3, mapowanie: null,
+    biezacy: { model: "claude-opus-5", promptWersja: "k4" },
+    klasyfikatory: [{ model: "claude-opus-5", promptWersja: "k4", decyzji: 15, oznaczonych: 10,
+      zgodnosc: { k: 7, n: 10, p: 0.7, dolna: 0.4, gorna: 0.89 } }],
     wgKategorii: [{ kategoria: "PRODUCT_COMPATIBILITY", przewidzianych: 8,
       precyzja: { k: 6, n: 8, p: 0.75, dolna: 0.41, gorna: 0.93 }, czulosc: null }],
   },
@@ -44,6 +47,29 @@ describe("PomiarCopilota", () => {
     expect(szczegoly).toContainElement(screen.getByLabelText("Decyzje klasyfikatora"));
     expect(szczegoly).toContainElement(screen.getByText("Dobór"));
     expect(screen.getByText("6 z 8 · 75 % (41–93 %)")).toBeInTheDocument();
+  });
+
+  /* Precyzja zlana z dwóch klasyfikatorów nie mówi nic o żadnym, więc karta
+     nazywa ten, którego dotyczy tabela, a przy dwóch pokazuje porównanie. */
+  it("nazywa klasyfikator tabeli, a porównanie pokazuje dopiero przy dwóch", () => {
+    const { unmount } = render(<PomiarCopilota dane={dane()} />);
+    expect(screen.getByLabelText("Decyzje klasyfikatora").textContent).toContain("claude-opus-5 (k4)");
+    expect(screen.queryByLabelText("Porównanie klasyfikatorów")).toBeNull();
+    unmount();
+
+    const d = dane();
+    d.klasyfikacja = { ...d.klasyfikacja,
+      biezacy: { model: "jev-1.13.0", promptWersja: "jev-j4" },
+      klasyfikatory: [
+        { model: "jev-1.13.0", promptWersja: "jev-j4", decyzji: 40, oznaczonych: 12,
+          zgodnosc: { k: 11, n: 12, p: 0.917, dolna: 0.646, gorna: 0.985 } },
+        ...d.klasyfikacja.klasyfikatory,
+      ] };
+    render(<PomiarCopilota dane={d} />);
+    const tabela = screen.getByLabelText("Porównanie klasyfikatorów");
+    expect(within(tabela).getByText("jev-1.13.0 (jev-j4)")).toBeInTheDocument();
+    expect(within(tabela).getByText("11 z 12 · 92 % (65–99 %)")).toBeInTheDocument();
+    expect(within(tabela).getByText("claude-opus-5 (k4)")).toBeInTheDocument();
   });
 
   /* Szkice przed pracą (26 września 2026): własny wiersz, bo poranek ma
