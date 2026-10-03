@@ -58,8 +58,11 @@ test("konkretnych nadawców rozpoznawania woła się wyłącznie przez wspólne 
     const p = path.join(d, e.name);
     return e.isDirectory() ? pliki(p) : e.name.endsWith(".ts") && !e.name.endsWith(".test.ts") ? [p] : [];
   });
+  /* Sonda Jeva woła Jeva wprost, bo sprawdza właśnie jego, zanim klucz stanie
+     na serwerze. Nie jest drogą rozpoznawania i nie zapisuje decyzji. */
   const dozwolone = new Set([
     "adapters/copilot.anthropic.ts", "adapters/copilot.jev.ts", "adapters/copilot.klasyfikator.ts",
+    "jev-sonda-run.ts",
   ]);
   const naruszenia = pliki(src)
     .map((p) => path.relative(src, p).split(path.sep).join("/"))
