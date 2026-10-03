@@ -815,3 +815,65 @@ describe("„Więcej” w rzędzie kubełków", () => {
     expect(lista.selectedOptions[0].textContent).toBe("Więcej");
   });
 });
+
+describe("Kolejka: ruch", () => {
+  const wiersz = (id: number) => screen.getByText(`Kupujący ${id}`).closest("button") as HTMLElement;
+  const komplet = (ids: number[], n: Partial<Rozmowa> = {}) => ids.map((id) =>
+    rozmowa({ id, klient: `Kupujący ${id}`, ...n }));
+  const pokaz = (rozmowy: Rozmowa[], p: { mojeId?: number | null; laduje?: boolean; odswieza?: boolean } = {}) =>
+    <Kolejka rozmowy={rozmowy} stan={STAN} wybranaId={null} laduje={p.laduje ?? false}
+      mojeId={p.mojeId === undefined ? 7 : p.mojeId} odswieza={p.odswieza}
+      onWybierz={() => {}} onOdswiez={() => {}} />;
+
+  it("wiersze z pierwszego odczytu nie błyskają", () => {
+    render(pokaz(komplet([1, 2, 3])));
+    for (const id of [1, 2, 3]) expect(wiersz(id).className).not.toContain("animate-wiersz-nowy");
+  });
+
+  it("wiersz, który doszedł w tle, błyska, a pozostałe nie", () => {
+    const { rerender } = render(pokaz(komplet([1, 2])));
+    rerender(pokaz(komplet([1, 2, 3])));
+    expect(wiersz(3).className).toContain("motion-safe:animate-wiersz-nowy");
+    expect(wiersz(1).className).not.toContain("animate-wiersz-nowy");
+  });
+
+  it("błysk idzie wyłącznie za motion-safe, żeby wyłączone animacje go nie widziały", () => {
+    const { rerender } = render(pokaz(komplet([1])));
+    rerender(pokaz(komplet([1, 2])));
+    expect(wiersz(2).className).not.toMatch(/(^|\s)animate-wiersz-nowy/);
+  });
+
+  it("wątek przejęty przez kolegę nie błyska, a wątek moj, który wrócił, tak", () => {
+    const moj = (status: Rozmowa["status"]) => komplet([1], { status, wlascicielId: 7 });
+    const { rerender } = render(pokaz([...moj("waiting_for_customer"), ...komplet([2])]));
+    // wątek 1 czeka na klienta, więc nie ma go w „Do odpowiedzi"; po odpowiedzi klienta wraca
+    rerender(pokaz([...moj("open"), ...komplet([2])]));
+    expect(wiersz(1).className).toContain("motion-safe:animate-wiersz-nowy");
+    expect(wiersz(2).className).not.toContain("animate-wiersz-nowy");
+  });
+
+  it("dopóki nie wiadomo, kim jestem, moje wątki nie błyskają przy starcie", () => {
+    const moje = komplet([1, 2], { wlascicielId: 7 });
+    const { rerender } = render(pokaz(moje, { mojeId: null }));
+    rerender(pokaz(moje, { mojeId: 7 }));
+    for (const id of [1, 2]) expect(wiersz(id).className).not.toContain("animate-wiersz-nowy");
+  });
+
+  it("wybrany wiersz nie błyska, bo jest już szary", () => {
+    const { rerender } = render(pokaz(komplet([1])));
+    rerender(<Kolejka rozmowy={komplet([1, 2])} stan={STAN} wybranaId={2} laduje={false} mojeId={7}
+      onWybierz={() => {}} onOdswiez={() => {}} />);
+    expect(wiersz(2).className).not.toContain("animate-wiersz-nowy");
+  });
+
+  it("ikona odświeżania kręci się tylko podczas odświeżania, a bez animacji ciemnieje", () => {
+    const { rerender } = render(pokaz([]));
+    const ikona = () => screen.getByRole("button", { name: "Odśwież" });
+    expect(ikona().querySelector("svg")?.getAttribute("class") ?? "").not.toContain("animate-spin");
+    rerender(pokaz([], { odswieza: true }));
+    const klasa = ikona().querySelector("svg")?.getAttribute("class") ?? "";
+    expect(klasa).toContain("motion-safe:animate-spin");
+    expect(klasa).toContain("motion-reduce:opacity-40");
+    expect(ikona().getAttribute("aria-busy")).toBe("true");
+  });
+});

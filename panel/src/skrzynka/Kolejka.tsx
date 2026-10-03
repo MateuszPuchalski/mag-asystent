@@ -13,6 +13,7 @@ import { CZESTE, PasekCopilota, ZnakCopilota, ZnakKategorii, doRozpoznania, nazw
 import { Czekanie } from "./Czekanie";
 import { SlownikZnakow } from "./SlownikZnakow";
 import type { StanPowiadomien } from "./Sygnaly";
+import { useNoweKlucze } from "./Ruch";
 
 /* Kubełki kolejki z §10.1: „Nieprzypisane, Moje, Oczekujące". Filtr jest po
    stronie EKRANU, bo lista i tak przyjeżdża w całości — dokładanie parametru
@@ -135,7 +136,7 @@ function wKubelku(r: Rozmowa, kubelek: Kubelek, mojeId: number | null): boolean 
    przebiegł minutę temu. Bez tej daty ekran kłamałby ciszą. */
 export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = () => {},
   wybranaId, mojeId = null, onWybierz, onWidoczne, powiadomienia, onOdswiez, laduje, nieswieza,
-  bladBezDanych = null }: {
+  bladBezDanych = null, odswieza = false }: {
   rozmowy: Rozmowa[];
   stan: StanSkrzynki;
   /** Stan Copilota (§14, etap F). `undefined` = jeszcze nie wiadomo, milcz. */
@@ -156,6 +157,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   powiadomienia?: { stan: StanPowiadomien; przelacz: () => void };
   onOdswiez: () => void;
   laduje: boolean;
+  /** Trwa odświeżanie w tle lub z przycisku — ikona wtedy się kręci (albo ciemnieje). */
+  odswieza?: boolean;
   /* Kolejka nieświeża wygląda inaczej, bo znaczy co innego. Pusta lista przy
      stojącym synchronizatorze to nie „brak pytań", tylko „nie wiem". */
   nieswieza?: boolean;
@@ -164,6 +167,14 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   bladBezDanych?: string | null;
 }) {
   const [kubelek, setKubelek] = useState<Kubelek>("doOdpowiedzi");
+  /* Wiersze, które WESZŁY do „Do odpowiedzi" po pierwszym odczycie: nowy wątek
+     albo wątek, który wrócił po odpowiedzi klienta. Klucz liczy się z CAŁEJ
+     listy, nie z widocznego kubełka, więc przełączanie zakładek niczego nie
+     błyska. Bez `mojeId` „moje" jeszcze się nie rozstrzygnęły — czekamy, bo
+     inaczej wszystkie moje wątki weszłyby do kubełka przy starcie. */
+  const doOdpowiedziKlucze = rozmowy
+    .filter((r) => wKubelku(r, "doOdpowiedzi", mojeId)).map((r) => String(r.id));
+  const nowe = useNoweKlucze(doOdpowiedziKlucze, !laduje && mojeId !== null);
   /* ── Szukanie w kolejce (0.195.0) ──────────────────────────────────────────
      Zwroty mają wyszukiwarkę od 0.165.0, skrzynka nie miała żadnej: kubełek
      mówi „czyje to", a pytania „czy TA rozmowa gdzieś
@@ -307,7 +318,10 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           alarmie synchronizacji, a baner alarmu nad kolumnami mówi już „dane
           sprzed…" pełnym zdaniem. Godzinę niesie zdanie obok tytułu. */}
       <button type="button" className="rounded p-1 text-slate-500 hover:bg-slate-100" onClick={onOdswiez}
-        title="Odśwież" aria-label="Odśwież"><RefreshCw size={16} /></button>
+        title="Odśwież" aria-label="Odśwież" aria-busy={odswieza}>
+        {/* Kręci się tylko z `motion-safe:`; bez animacji w systemie ikona
+            ciemnieje, żeby kliknięcie nadal coś pokazywało. */}
+        <RefreshCw size={16} className={odswieza ? "motion-safe:animate-spin motion-reduce:opacity-40" : ""} /></button>
     </header>
     {/* ── CEL KLIKALNY MA 24 px, A ZA WYSOKOŚĆ PŁACI PASMO (0.255.0) ─────────
         0.251.0 ścisnęło pigułki z `py-1` do `py-0.5`, żeby odzyskać wysokość
@@ -499,7 +513,9 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
           className={`flex w-full flex-col gap-1 border-b border-l-[3px] px-3 py-2 text-left ${
             wybranaId === r.id
               ? "wiersz-wybrany border-l-wertis-amber bg-slate-200"
-              : "border-l-transparent hover:bg-slate-50"}`}>
+              : "border-l-transparent hover:bg-slate-50"} ${
+            /* Wybrany wiersz nie błyska: jest już szary. */
+            wybranaId !== r.id && nowe.has(String(r.id)) ? "motion-safe:animate-wiersz-nowy" : ""}`}>
           {/* ── WARIANT C: KTO I ILE CZEKA, POTEM PYTANIE (0.548.0) ───────────
               Decyzja właściciela z 28 września 2026. Pierwsza linia to login
               i wiek, pod nią do dwóch linii pytania. Kafla kategorii po lewej
