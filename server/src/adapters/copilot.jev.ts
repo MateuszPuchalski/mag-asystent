@@ -24,9 +24,9 @@ import {
    wywołania i wycinamy go z każdego tekstu, który stąd wychodzi. Tą drogą
    zginął kiedyś klucz Anthropic. `config.copilot.kluczJev` mówi tylko „jest".
 
-   Progi niżej to nastawy startowe, nie pomiar. Dokumentacja TypeSafe mówi, że
-   najlepszą trafność Jev ma po angielsku, więc polską pokaże dopiero
-   porównanie z Claude na prawdziwych wiadomościach.                         */
+   Progi niżej stoją na sondzie ze zmyślonych wiadomości, nie na skrzynce.
+   Dokumentacja TypeSafe mówi, że najlepszą trafność Jev ma po angielsku, więc
+   polską pokaże dopiero porównanie z Claude na prawdziwych wiadomościach.                         */
 
 const ADRES = "https://api.typesafe.ai/v1/systemone";
 const CZAS_NA_ODPOWIEDZ_MS = 30_000;
@@ -56,9 +56,8 @@ export const PYTANIA_JEVA = "jev-j4";
      o coś, co klient już podał.
    - kategoria dodatkowa łapie się najwyżej, bo liczą się tylko wyraźne
      prośby. Podziękowanie dostawało „status zamówienia” przy 0,78.
-   Pewność słowna bierze się z `confidence` KATEGORII. Pewność kroku do niej
-   nie wchodzi: kroki bywają wymienne, a niepewny krok przy pewnej kategorii
-   nie jest powodem, by wołać człowieka. */
+   Pewność słowna bierze się z `confidence` kategorii, bo krok wynika z niej
+   tabelą i własnej pewności nie ma. */
 const PROG_CZLOWIEKA = 0.3;
 const PROG_BRAKU_DANYCH = 0.7;
 const PROG_DODATKOWEJ = 0.8;

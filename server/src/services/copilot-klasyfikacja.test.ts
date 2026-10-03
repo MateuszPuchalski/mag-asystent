@@ -482,6 +482,23 @@ test("pomiar: trafność liczy się dla jednego klasyfikatora, a porównanie sto
   assert.equal(p.klasyfikatory[1]!.zgodnosc!.k, 0);
 });
 
+/* Poprawka to nowy wiersz z modelem starej decyzji. Poprawka starej rozmowy
+   Claude nie ma prawa przełączyć tabeli trafności z powrotem na Claude. */
+test("pomiar: poprawka starej rozmowy nie zmienia bieżącego klasyfikatora", async () => {
+  const d = stanowisko();
+  const claude = rozmowa(d, "a");
+  const jev = [rozmowa(d, "b"), rozmowa(d, "c")];
+  await sklasyfikujRozmowy(d, [claude], KTO, nadawca());
+  await sklasyfikujRozmowy(d, jev, KTO, nadawca({}, { model: "jev-1.13.0", promptWersja: "jev-j4" }));
+  poprawKlasyfikacje(d, jev[0], "PRODUCT_COMPATIBILITY", null, KTO);
+  poprawKlasyfikacje(d, claude, "WRONG_PRODUCT", null, KTO);
+
+  const p = pomiarCopilota(d).klasyfikacja;
+  assert.deepEqual(p.biezacy, { model: "jev-1.13.0", promptWersja: "jev-j4" });
+  assert.equal(p.oznaczonych, 1);
+  assert.equal(p.klasyfikatory[0]!.model, "jev-1.13.0", "bieżący stoi pierwszy");
+});
+
 test("przedział Wilsona mówi, ile wie mała próbka", () => {
   const w = wilson(3, 3)!;
   assert.equal(w.p, 1);

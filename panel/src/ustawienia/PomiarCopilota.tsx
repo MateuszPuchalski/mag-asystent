@@ -171,8 +171,6 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         </Tabela>
       </div>}
 
-      {/* Tabela wspólna z resztą analizy (0.519.0) zamiast własnej, pisanej
-          wersalikami. */}
       {/* Porównanie klasyfikatorów: zgodność modelu z etykietą człowieka,
           każdy osobno. Dopiero ta tabela rozstrzyga, który rozpoznaje lepiej. */}
       {dane.klasyfikacja.klasyfikatory.length > 1 && <div className="mt-3 border-t pt-3"
@@ -187,6 +185,8 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
         </Tabela>
       </div>}
 
+      {/* Tabela wspólna z resztą analizy (0.519.0) zamiast własnej, pisanej
+          wersalikami. */}
       {dane.klasyfikacja.wgKategorii.length > 0 && <div className="mt-3 border-t pt-3">
         <Tabela naglowki={["kategoria", "przewidzianych", "precyzja", "czułość"]} pusto="">
           {dane.klasyfikacja.wgKategorii.map((k) => <tr key={k.kategoria}>

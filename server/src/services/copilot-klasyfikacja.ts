@@ -645,11 +645,16 @@ export function pomiarKlasyfikacji(database: DatabaseSync): PomiarKlasyfikacji {
       zgodnosc: wilson(z.filter((w) => w.kategoria_czlowieka === w.kategoria_modelu).length, z.length),
     };
   });
-  /* Najnowsza decyzja modelu wyznacza bieżący klasyfikator: wiersze idą od
-     najwyższego `id`, a `Map` trzyma kolejność pierwszego wstawienia. */
-  const biezacyKlucz = zModelu[0] ? klucz(zModelu[0]) : null;
-  const pierwszy = klasyfikatory[0];
-  const biezacy = pierwszy ? { model: pierwszy.model, promptWersja: pierwszy.promptWersja } : null;
+  /* Bieżący klasyfikator to ten z najnowszej decyzji BEZ etykiety człowieka.
+     Poprawka agenta to nowy wiersz z modelem skopiowanym ze starej decyzji,
+     więc poprawka starej rozmowy Claude przełączałaby tabelę z Jeva na Claude.
+     Wiersze idą od najwyższego `id`. */
+  const wzor = zModelu.find((w) => !w.kategoria_czlowieka) ?? zModelu[0];
+  const biezacyKlucz = wzor ? klucz(wzor) : null;
+  const biezacy = wzor ? { model: String(wzor.model), promptWersja: String(wzor.prompt_wersja ?? "") } : null;
+  /* Porównanie od bieżącego, potem w kolejności najnowszej decyzji. */
+  klasyfikatory.sort((a, b) =>
+    Number(`${b.model}\u0000${b.promptWersja}` === biezacyKlucz) - Number(`${a.model}\u0000${a.promptWersja}` === biezacyKlucz));
 
   const wgZrodla: Record<Zrodlo, number> = { ALLEGRO_MAPPING: 0, MODEL: 0, FALLBACK: 0 };
   const wgStatusu: Record<string, number> = { SUCCESS: 0, FAILED: 0, NEEDS_REVIEW: 0 };

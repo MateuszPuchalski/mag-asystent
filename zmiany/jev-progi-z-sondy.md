@@ -12,13 +12,12 @@ brakuje.
 Trzy flagi dostały wąskie pytanie z opisem odpowiedzi „tak” i „nie”. Progi
 stoją teraz na rozkładzie z sondy. Brak danych łapie się od 0,7, a kategoria
 dodatkowa od 0,8, bo podziękowanie dostawało „status zamówienia”. Po zmianie
-każda flaga w sondzie zapala się tam, gdzie powinna. Decyzje nowej wersji
-pytań mają `promptWersja` `jev-j3`.
+każda flaga w sondzie zapala się tam, gdzie powinna.
 
 Sonda (`npm run sonda:jev` w `server/`) wypisuje teraz surowe wartości flag
 przy każdej wiadomości, żeby następne strojenie też szło z liczb.
 
-**Karta „Copilot” liczy trafność osobno dla każdego klasyfikatora.** Tabela
+Karta „Copilot” za zębatką liczy trafność osobno dla każdego klasyfikatora. Tabela
 precyzji dotyczy modelu i wersji instrukcji najnowszej decyzji i mówi to
 wprost. Gdy decyzje mają więcej niż jeden klasyfikator, obok stoi tabela
 porównania, na przykład Claude i Jeva, ze zgodnością z poprawkami agentów.

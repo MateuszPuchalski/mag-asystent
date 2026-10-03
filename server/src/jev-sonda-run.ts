@@ -110,14 +110,15 @@ _ustawFetch((async (url: string, init: RequestInit) => {
   return r;
 }) as unknown as typeof fetch);
 
-/** Linia z surowymi Nouli: cztery flagi i kategorie dodatkowe od 0,5 w górę. */
+/** Linia z surowymi Nouli: flagi, oczekiwanie odpowiedzi i kategorie dodatkowe od 0,5. */
 function linieNouli(): string {
   const n = (k: string) => (noule[k] ?? NaN).toFixed(2);
   const dodatkowe = Object.entries(noule)
     .filter(([k, v]) => k.startsWith("dodatkowa_") && v >= 0.5)
     .map(([k, v]) => `${k.slice("dodatkowa_".length)}=${v.toFixed(2)}`).join(",") || "-";
   return `    noul: prosi ${n("prosi_o_czlowieka")} wymaga ${n("wymaga_czlowieka")} ` +
-    `brak-zam ${n("brak_danych_zamowienia")} brak-prod ${n("brak_danych_produktu")} | dodatkowe≥0,5 ${dodatkowe}`;
+    `brak-zam ${n("brak_danych_zamowienia")} brak-prod ${n("brak_danych_produktu")} ` +
+    `czeka ${n("czeka_na_odpowiedz")} | dodatkowe≥0,5 ${dodatkowe}`;
 }
 
 async function main() {
