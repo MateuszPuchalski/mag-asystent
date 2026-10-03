@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Check, ChevronDown, ChevronRight, CircleDashed, ExternalLink, UserRound } from "lucide-react";
 import type { HistoriaKlienta, OsRozmowy } from "../api/typy";
 import { zlote } from "../api/zwroty";
-import { Skopiuj, dzienMiesiac } from "../ui";
+import { Skopiuj, dzienMiesiac, ile } from "../ui";
 import { KafelOferty } from "../towar/Kafel";
 import { klientMaHistorie, nowyKlient } from "./kokpit";
 import { streszczenieKlienta } from "./Kontekst";
@@ -134,7 +134,7 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
             </div>
           </li>)}
           {pozycje.length > 2 && <li className="text-podpis text-slate-500">
-            + {pozycje.length - 2} {pozycje.length - 2 === 1 ? "pozycja" : "pozycji"} w zamówieniu — pełna lista w kolumnie obok</li>}
+            + {ile(pozycje.length - 2, "pozycja", "pozycje", "pozycji")} w zamówieniu — pełna lista w kolumnie obok</li>}
         </ul>
       : oferta && <div className="flex items-start gap-2.5">
           <KafelOferty externalId={dane.oferta?.externalId ?? null} stan={oferta.zdjecie} rozmiar={48}

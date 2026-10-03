@@ -138,8 +138,17 @@ describe("KartaKontekstu", () => {
     pokaz(d);
     expect(screen.getByText("Drugi")).toBeInTheDocument();
     expect(screen.queryByText("Trzeci")).toBeNull();
-    expect(screen.getByText(/\+ 2 pozycji/)).toBeInTheDocument();
+    expect(screen.getByText(/\+ 2 pozycje w zamówieniu/)).toBeInTheDocument();
   });
+
+  it.each([[3, "+ 1 pozycja"], [4, "+ 2 pozycje"], [7, "+ 5 pozycji"], [13, "+ 11 pozycji"], [14, "+ 12 pozycji"]])(
+    "resztę pozycji odmienia w trzech formach: %i pozycji → „%s”", (razem, oczekiwane) => {
+      const d = dane();
+      ((d.zamowienie as never as { pobrane: { pozycje: unknown[] } }).pobrane).pozycje =
+        Array.from({ length: razem }, (_, i) => pozycja({ offerId: `o${i}`, nazwa: `Towar ${i}` }));
+      pokaz(d);
+      expect(screen.getByText(new RegExp(`^${oczekiwane.replace("+", "\\+")} w zamówieniu`))).toBeInTheDocument();
+    });
 
   it("niczego nie zapisuje i nie pyta serwera o przesyłkę", () => {
     pokaz(dane(), historia());
