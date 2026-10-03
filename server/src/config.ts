@@ -1019,12 +1019,19 @@ export const config = {
      */
     klucz: Boolean(process.env.ANTHROPIC_API_KEY),
     /**
-     * Ustawienia po wycofanym klasyfikatorze, które nadal stoją w `wertis.env`.
-     * Serwer ich nie czyta, więc wpis nic nie zmienia. Lista trafia do
-     * ostrzeżenia, żeby operator wiedział, że może je usunąć, a serwer z takim
-     * wpisem wstaje normalnie zamiast padać na nieznanej wartości.
+     * Czy stoi klucz TypeSafe. `Boolean`, nigdy sama wartość — patrz nagłówek.
+     * To jest jedyny przełącznik dostawcy rozpoznawania: z kluczem rozpoznaje
+     * Jev, bez niego Claude (`copilot.klasyfikator.ts`). Szkice robi Claude
+     * w obu przypadkach, więc `klucz` wyżej nadal jest potrzebny.
      */
-    wycofane: ["KLASYFIKATOR_DOSTAWCA", "TYPESAFE_API_KEY", "JEV_MODEL"].filter((k) => process.env[k]),
+    kluczJev: Boolean(process.env.TYPESAFE_API_KEY),
+    /**
+     * Ustawienia po dawnym przełączniku dostawcy, które mogą stać w
+     * `wertis.env`. Serwer ich nie czyta, bo dostawcę wybiera sam klucz
+     * TypeSafe. Lista trafia do ostrzeżenia, a serwer z takim wpisem wstaje
+     * normalnie zamiast padać na nieznanej wartości.
+     */
+    wycofane: ["KLASYFIKATOR_DOSTAWCA", "JEV_MODEL"].filter((k) => process.env[k]),
     /**
      * SZKIC SAM DLA NOWEGO PYTANIA POD OFERTĄ (0.317.0).
      *
@@ -1502,8 +1509,8 @@ export function ostrzezeniaKonfiguracji(c: Config = config): string[] {
   }
   if (c.copilot.wycofane.length) {
     ostrzezenia.push(
-      `${c.copilot.wycofane.join(", ")} w wertis.env nic już nie robi — wiadomości klientów rozpoznaje Claude. ` +
-        "Wpis można usunąć. Serwer działa dalej.",
+      `${c.copilot.wycofane.join(", ")} w wertis.env nic już nie robi — dostawcę rozpoznawania wybiera ` +
+        "sam TYPESAFE_API_KEY. Wpis można usunąć. Serwer działa dalej.",
     );
   }
   return ostrzezenia;

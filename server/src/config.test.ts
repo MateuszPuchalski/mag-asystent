@@ -333,16 +333,16 @@ test("maska startowa nie wypuszcza wklejonego klucza w całości", () => {
   assert.ok(!bezpiecznaWartosc(klucz).includes(klucz), "maska startowa wypuściła klucz w całości");
 });
 
-/* Wpisy po wycofanym klasyfikatorze mogą zostać w `wertis.env` na instalacji, która je kiedyś
-   dostała. Serwer nie ma prawa na nich paść: ostrzega i wstaje. */
-test("stare ustawienia po wycofanym klasyfikatorze dają ostrzeżenie, a nie błąd startu", () => {
+/* Wpisy po dawnym przełączniku dostawcy mogą zostać w `wertis.env` na instalacji, która je kiedyś
+   dostała. Serwer nie ma prawa na nich paść: ostrzega i wstaje. Klucz TypeSafe NIE jest wycofany. */
+test("stare ustawienia po przełączniku dostawcy dają ostrzeżenie, a nie błąd startu", () => {
   const stary = structuredClone(config) as typeof config;
-  (stary.copilot as { wycofane: string[] }).wycofane = ["KLASYFIKATOR_DOSTAWCA", "TYPESAFE_API_KEY"];
+  (stary.copilot as { wycofane: string[] }).wycofane = ["KLASYFIKATOR_DOSTAWCA", "JEV_MODEL"];
   assert.deepEqual(bledyKonfiguracji(stary).filter((b) => /KLASYFIKATOR|TYPESAFE|JEV/.test(b)), []);
   const o = ostrzezeniaKonfiguracji(stary).find((z) => z.includes("KLASYFIKATOR_DOSTAWCA"));
   assert.ok(o, "brak ostrzeżenia o wycofanych ustawieniach");
-  assert.match(o, /TYPESAFE_API_KEY/);
-  assert.match(o, /Claude/);
+  assert.match(o, /JEV_MODEL/);
+  assert.match(o, /TYPESAFE_API_KEY/, "ostrzeżenie mówi, co dziś wybiera dostawcę");
   const czysty = structuredClone(config) as typeof config;
   (czysty.copilot as { wycofane: string[] }).wycofane = [];
   assert.equal(ostrzezeniaKonfiguracji(czysty).some((z) => z.includes("nic już nie robi")), false);

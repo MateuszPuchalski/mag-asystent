@@ -25,8 +25,8 @@ export const TAKSONOMIA_WERSJA = "v2";
 export const POLITYKA_WERSJA = "p1";
 
 /**
- * Piętnaście kategorii ze specyfikacji. Granice między nimi stoją w
- * instrukcji dla modelu (`adapters/copilot.anthropic.ts`); tu jest tylko lista.
+ * Piętnaście kategorii ze specyfikacji. Granice między nimi stoją niżej,
+ * w `OPISY_KATEGORII`.
  *
  * Granica najważniejsza dla tej firmy: część dostarczona zgodnie z zamówieniem,
  * która nie pasuje do maszyny, to `PRODUCT_COMPATIBILITY`, a nie
@@ -41,6 +41,33 @@ export const KATEGORIE = [
 export type Kategoria = (typeof KATEGORIE)[number];
 
 /**
+ * Granice kategorii, przepisane ze specyfikacji. Jedno źródło dla obu
+ * dostawców: instrukcja Claude składa z nich swoje linie, a Jev dostaje je
+ * jako opisy opcji. Dwie kopie rozjechałyby się przy pierwszej poprawce
+ * granicy i pomiar porównałby dwa różne słowniki.
+ *
+ * ZMIENIASZ OPIS — zmieniasz instrukcję Claude, więc podnosisz
+ * `PROMPT_KLASYFIKACJI` i `PYTANIA_JEVA`.
+ */
+export const OPISY_KATEGORII: Readonly<Record<Kategoria, string>> = {
+  ORDER_STATUS: "ogólnie o postępie zamówienia; bez twierdzenia, że jest spóźnione albo zaginęło.",
+  DELIVERY_DELAY: "klient mówi, że dostawa się spóźnia; zaginięcia nie stwierdzono.",
+  DELIVERY_LOST: "klient wprost zgłasza zaginięcie przesyłki albo przewoźnik to potwierdza; samo „nie doszło” to za mało.",
+  DELIVERY_DAMAGED: "uszkodzenie przypisane transportowi albo opakowaniu. Nie myl z wadą towaru bez śladów transportu.",
+  PRODUCT_COMPATIBILITY: "czy część pasuje do maszyny, modelu, silnika albo numeru części; wymiary i przydatność do konkretnego sprzętu.",
+  PRODUCT_QUESTION: "cechy, użycie, montaż, dane techniczne — inne niż pasowanie i dostępność.",
+  PRODUCT_AVAILABILITY: "stan, dostawa towaru do sklepu, dostępna liczba sztuk, cena.",
+  WRONG_PRODUCT: "klient mówi, że dostał INNY towar niż zamówił. Część zgodna z zamówieniem, która nie pasuje do maszyny, to PRODUCT_COMPATIBILITY.",
+  MISSING_PRODUCT: "w otrzymanej paczce brakuje pozycji, elementu albo sztuk. Nie cała zaginiona przesyłka.",
+  DAMAGED_PRODUCT: "towar wadliwy albo uszkodzony bez jasnego śladu transportu.",
+  RETURN: "klient chce zwrócić albo wymienić towar, a nie prosi wprost o procedurę reklamacyjną.",
+  COMPLAINT: "wprost reklamacja, gwarancja, rękojmia albo żądanie naprawy wady; wadę zostaw jako kategorię dodatkową.",
+  CANCEL_ORDER: "prośba o anulowanie zamówienia.",
+  INVOICE: "wystawienie, korekta albo dane faktury.",
+  OTHER: "poza słownikiem albo za mało treści. Podziękowanie i potwierdzenie to OTHER z akcją NO_ACTION.",
+};
+
+/**
  * Następny użyteczny krok. NIE jest pozwoleniem na wykonanie — specyfikacja
  * mówi to wprost, a panel żadnej z tych akcji sam nie uruchamia.
  */
@@ -50,6 +77,28 @@ export const AKCJE = [
   "ASK_FOR_PHOTO", "HUMAN_REVIEW", "NO_ACTION",
 ] as const;
 export type Akcja = (typeof AKCJE)[number];
+
+/**
+ * Kroki opisane dla Jeva, który dostaje je jako opisy opcji. Instrukcja Claude
+ * opisuje te same kroki własnymi słowami, pogrupowanymi w kilku liniach.
+ * Przepisanie jej na tę listę zmieniłoby tekst instrukcji i rozcięło pomiar
+ * Claude na dwie wersje, a granice kroków nie są sporne tak jak granice
+ * kategorii.
+ */
+export const OPISY_AKCJI: Readonly<Record<Akcja, string>> = {
+  GET_ORDER: "pobrać zamówienie",
+  GET_SHIPMENT: "sprawdzić śledzenie przesyłki",
+  GET_PRODUCT: "pobrać dane oferty lub towaru",
+  CHECK_COMPATIBILITY: "sprawdzić pasowanie w danych, nigdy nie zgadywać",
+  CHECK_STOCK: "sprawdzić stan magazynu",
+  START_RETURN: "przygotować zwrot; robi to człowiek",
+  START_COMPLAINT: "przygotować reklamację; robi to człowiek",
+  ASK_FOR_MACHINE_MODEL: "dopytać o dokładny model maszyny, bo go brakuje",
+  ASK_FOR_PART_NUMBER: "dopytać o numer części, bo go brakuje",
+  ASK_FOR_PHOTO: "poprosić o zdjęcie towaru, tabliczki albo uszkodzenia",
+  HUMAN_REVIEW: "oddać człowiekowi: niepewność, konflikt albo prośba o człowieka",
+  NO_ACTION: "nic nie trzeba robić, na przykład podziękowanie",
+};
 
 /**
  * Pewność zgłoszona przez model. Trzy słowa, nie procent — i ekran nie udaje,

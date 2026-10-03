@@ -47,11 +47,19 @@ wypchnięciem; tu to, co dotyczy wyłącznie `server/`.
 
 ## Copilot (model językowy)
 
-Model językowy woła się wyłącznie z `src/adapters/copilot.anthropic.ts`.
-Rozpoznawanie wiadomości klientów wchodzi przez `nadawcaKlasyfikacji`
-(`copilot.klasyfikator.ts`), a trasy i takty wołają tylko to wejście, nigdy
-konkretnego dostawcę. Trzy drogi rozpoznawania muszą iść do tego samego
-dostawcy, inaczej pomiar trafności zmiesza dwa klasyfikatory.
+Model językowy woła się z `src/adapters/copilot.anthropic.ts`. Jedyny wyjątek
+to rozpoznawanie wiadomości klientów, które robi Jev z
+`src/adapters/copilot.jev.ts`, gdy stoi `TYPESAFE_API_KEY`. Rozpoznawanie
+wchodzi przez `nadawcaKlasyfikacji` (`copilot.klasyfikator.ts`), a trasy
+i takty wołają tylko to wejście, nigdy konkretnego dostawcę. Trzy drogi
+rozpoznawania muszą iść do tego samego dostawcy, inaczej pomiar trafności
+zmiesza dwa klasyfikatory.
+
+Jev: model przypięty w kodzie (`MODEL_JEV`), nigdy alias `jev-latest`, bo
+progi są dostrojone do wersji. Zmieniając pytania albo progi, podnieś
+`PYTANIA_JEVA`. Granice kategorii stoją raz, w `OPISY_KATEGORII`, i czytają
+je oba adaptery. Ich zmiana podnosi też `PROMPT_KLASYFIKACJI`. Jev ma
+najlepszą trafność po angielsku, więc polską mierzy porównanie z Claude.
 
 Cztery reguły Claude z audytu promptów, każda po awarii albo o krok od niej:
 

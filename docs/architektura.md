@@ -279,9 +279,12 @@ wiąże je po numerze zamówienia w obie strony (`docs/obsluga-klienta-calosc.md
 
 Tekst dla klienta układa Claude, wołany wyłącznie z
 `adapters/copilot.anthropic.ts` — to jedyny import `@anthropic-ai/sdk`.
-Rozpoznawanie wiadomości klientów robi ten sam Claude. Klasyfikację woła się
-przez `nadawcaKlasyfikacji` (`adapters/copilot.klasyfikator.ts`), żeby
-wszystkie drogi szły do jednego dostawcy. Głównym
+Rozpoznawanie wiadomości klientów robi Jev z TypeSafe
+(`adapters/copilot.jev.ts`), gdy stoi `TYPESAFE_API_KEY`, a bez klucza ten sam
+Claude. Jev nie generuje tekstu, więc szkice zostają przy Claude. Klasyfikację
+woła się przez `nadawcaKlasyfikacji` (`adapters/copilot.klasyfikator.ts`),
+żeby wszystkie drogi szły do jednego dostawcy. Sam klucz jest przełącznikiem,
+bo osobny przełącznik dawał stan „Jev bez klucza” bez rozpoznawania. Głównym
 wyłącznikiem jest `COPILOT_MODE`. Każde wywołanie modelu bez kliknięcia ma
 własny przełącznik, domyślnie wyłączony: coś, co wydaje pieniądze samo, włącza
 się decyzją, nie aktualizacją. Klucza nie ma w `config`, bo `config` bywa

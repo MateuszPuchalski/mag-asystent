@@ -8,7 +8,7 @@ import {
 import {
   nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
 } from "../adapters/copilot.anthropic.js";
-import { nadawcaKlasyfikacji } from "../adapters/copilot.klasyfikator.js";
+import { modelKlasyfikatora, nadawcaKlasyfikacji } from "../adapters/copilot.klasyfikator.js";
 import { wymianyRozmowy, zadajPytanie, zapiszPasowanieZDopytania } from "../services/copilot-pytania.js";
 import { czekajaNaSzkic, zlecSzkicPoRozpoznaniu } from "../services/copilot-szkic-po-rozpoznaniu.js";
 import {
@@ -123,7 +123,7 @@ export async function copilotRoutes(app: FastifyInstance) {
       model: config.copilot.model,
       /* Osobny model klasyfikacji (22 września 2026) — bez niego ekran nie
          miałby jak powiedzieć, że etykieta i szkic idą różnymi modelami. */
-      modelKlasyfikacji: config.copilot.modelKlasyfikacji,
+      modelKlasyfikacji: modelKlasyfikatora(),
       maxPartia: config.copilot.maxPartia,
       /* Czy automat sam rozpoznaje i układa (22 września 2026). Panel chowa
          po tym ręczne „Rozpoznaj" do roli ponowienia: przycisk, który robi to
