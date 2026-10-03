@@ -1,7 +1,7 @@
 import React from "react";
 import { Bell, Inbox, LoaderCircle, Ruler } from "lucide-react";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
-import type { Kategoria, OsRozmowy, SzczegolyKonfliktu, WpisOsi } from "../api/typy";
+import type { Kategoria, HistoriaKlienta, OsRozmowy, SzczegolyKonfliktu, WpisOsi } from "../api/typy";
 import type { Obecnosc } from "../api/zdarzenia";
 import { LoginKlienta, Przycisk, Pusto } from "../ui";
 import { Os } from "./Os";
@@ -14,6 +14,8 @@ import { EtykietaKategorii } from "./Copilot";
 import { WierszMenu } from "./MenuRozmowy";
 import { ProwadziZnak } from "./ProwadziZnak";
 import { Obecni } from "./Obecni";
+import { KartaKontekstu } from "./KartaKontekstu";
+import { scalOs, zdarzeniaZakupu } from "./zakup";
 
 /**
  * Pytanie bez żadnego powiązania z towarem (§4.3).
@@ -37,6 +39,8 @@ export function brakPowiazania(os: WpisOsi[],
 
 export function Rozmowa(p: {
   dane: OsRozmowy | undefined;
+  /** Historia klienta do karty nad rozmową; zapytanie wisi na ekranie, tu tylko widok. */
+  historiaKlienta?: HistoriaKlienta;
   /** Rozmowa wybrana, a treść jeszcze w drodze — patrz pusty stan niżej. */
   laduje?: boolean;
   mojeId: number | null;
@@ -250,7 +254,8 @@ export function Rozmowa(p: {
     {/* ── EDYTOR NA KOŃCU OSI (0.495.0) — powód w `Edytor.tsx`. ─────────────
         Formularz pomiaru jedzie tą samą drogą i stoi PRZED edytorem: zlecenie
         dla hali to zwykle krok przed odpowiedzią klientowi, nie po niej. */}
-    <Os wpisy={os} rozmowaId={rozmowa.id} skokNaDol={zjazdy}
+    <Os wpisy={scalOs(os, zdarzeniaZakupu(p.dane))} rozmowaId={rozmowa.id} skokNaDol={zjazdy}
+      naGorze={<KartaKontekstu dane={p.dane} historia={p.historiaKlienta} />}
       zrodloPomiaru={p.zrodloPomiaru} mozeZlecac={!cudza}
       onZrodlo={p.onZrodlo}
       powiazanie={{ ofertaId: p.dane.oferta?.externalId ?? null,
