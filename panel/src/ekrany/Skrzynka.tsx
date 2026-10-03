@@ -606,6 +606,7 @@ export function Skrzynka() {
       wybranaId={wybranaId}
       mojeId={ja.data?.user.userId ?? null}
       laduje={lista.isLoading}
+      odswieza={lista.isFetching}
       bladBezDanych={lista.error && !lista.data ? (lista.error as Error).message : null}
       onOdswiez={() => lista.refetch()}
       onWidoczne={(ids) => { widoczne.current = ids; }}

@@ -96,6 +96,33 @@ export default {
       },
 
       fontFamily: { sans: ["Barlow", "sans-serif"] },
+
+      /* ── RUCH SKRZYNKI: DWA KRÓTKIE, JEDNORAZOWE ─────────────────────────────
+         Ruch pokazuje zmianę, która w tle łatwo umyka, i nic więcej: bez pętli,
+         bez ruchu przy otwarciu ekranu. Obie animacje wolno użyć wyłącznie
+         z `motion-safe:` — pilnuje tego `src/Ruch.test.ts`.
+
+         WIERSZ BŁYSKA SZAROŚCIĄ, nie barwą. Bursztyn znaczy „coś jest nie tak"
+         (`Bursztyn.test.ts`), a wolnej rodziny barw w kolejce nie ma: czerwień
+         to błąd, zieleń powodzenie, fiolet Copilot, błękit zdarzenie doboru.
+         Błysk zgaśnie w półtorej sekundy, więc pokrywanie się z szarością
+         zaznaczenia (`slate-200`) nie wprowadza w błąd na stałe, a wybrany
+         wiersz i tak nie błyska. `slate-300` to wartość o stopień ciemniejsza
+         od zaznaczenia, żeby błysk było widać na tle samego wiersza.
+
+         WIADOMOŚĆ WSUWA SIĘ O 6 PX W 120 ms: dość, by oko to złapało, za mało,
+         by przesunąć czytany tekst. */
+      keyframes: {
+        "wiersz-nowy": { "0%": { backgroundColor: "#cbd5e1" }, "100%": { backgroundColor: "transparent" } },
+        "wiadomosc-nowa": {
+          "0%": { opacity: "0", transform: "translateY(6px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+      },
+      animation: {
+        "wiersz-nowy": "wiersz-nowy 1.6s ease-out 1",
+        "wiadomosc-nowa": "wiadomosc-nowa 120ms ease-out 1",
+      },
     },
   },
   plugins: [],

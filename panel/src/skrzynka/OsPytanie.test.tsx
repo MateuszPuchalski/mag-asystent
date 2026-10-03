@@ -191,3 +191,25 @@ describe("Pytanie klienta przypięte nad edytorem", () => {
     skok.mockRestore();
   });
 });
+
+describe("Oś: ruch nowej wiadomości", () => {
+  const wiadomosc = (id: string) => (c: HTMLElement) =>
+    c.querySelector(`[data-wpis="${id}"]`) as HTMLElement;
+
+  it("wiadomości z otwarcia rozmowy nie animują się, nowa dołożona w tle tak", () => {
+    const { container, rerender } = os([pytanie(), nasza()]);
+    expect(wiadomosc("msg-1")(container).className).not.toContain("animate-wiadomosc-nowa");
+    rerender(<Os wpisy={[pytanie(), nasza(), pytanie({ id: "msg-3", tresc: "A jeszcze…" })]} rozmowaId={1}
+      zrodloPomiaru={null} mozeZlecac={false} onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
+    expect(wiadomosc("msg-3")(container).className).toContain("motion-safe:animate-wiadomosc-nowa");
+    expect(wiadomosc("msg-1")(container).className).not.toContain("animate-wiadomosc-nowa");
+  });
+
+  it("otwarcie innej rozmowy nie animuje jej starych wiadomości", () => {
+    const { container, rerender } = os([pytanie()], { rozmowaId: 1 });
+    rerender(<Os wpisy={[pytanie({ id: "x-1" }), nasza({ id: "x-2" })]} rozmowaId={2}
+      zrodloPomiaru={null} mozeZlecac={false} onZrodlo={() => {}} onWstawDoSzkicu={() => {}} />);
+    expect(wiadomosc("x-1")(container).className).not.toContain("animate-wiadomosc-nowa");
+    expect(wiadomosc("x-2")(container).className).not.toContain("animate-wiadomosc-nowa");
+  });
+});

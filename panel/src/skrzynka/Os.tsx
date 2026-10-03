@@ -10,6 +10,7 @@ import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
 import { PrzypietePytanie } from "./PrzypietePytanie";
 import { NAZWA_ZDARZENIA_ZWROTU } from "../zwroty/Os";
 import { DlugiTekst, KLASA_PRZELACZNIKA, useRozwiniecie } from "./DlugiTekst";
+import { useNoweKlucze } from "./Ruch";
 
 /* Załączniki wiadomości (0.155.0). Sonda pokazała je w 7 z 39 wiadomości —
    do tej pory rozmowa milczała o tym, że klient coś przysłał.
@@ -190,6 +191,10 @@ export function Os({
   const [podswietlony, setPodswietlony] = React.useState<string | null>(null);
 
   const { wypowiedzi, zdarzenia } = React.useMemo(() => rozdziel(wpisy), [wpisy]);
+  /* Wsuwa się TYLKO wiadomość, która doszła do otwartej rozmowy. Otwarcie
+     rozmowy (zmiana `rozmowaId`) zaczyna od zera, więc pięćdziesiąt starych
+     wypowiedzi nie animuje się naraz. */
+  const nowe = useNoweKlucze(wypowiedzi.map((w) => w.id), true, rozmowaId);
 
   /* Szukanie po DZIECIACH, nie selektorem `[data-wpis="..."]`: identyfikator
      wpisu jest ciągiem z serwera, a wstawiony do selektora wymagałby ucieczki.
@@ -282,8 +287,9 @@ export function Os({
     onScroll={() => { const el = listaRef.current; if (el) naDole.current = dogonicDol(el); }}
     className="min-h-40 flex-1 space-y-3 overflow-y-auto p-4">
     {wypowiedzi.map((w) => <div key={w.id} data-wpis={w.id}
-      className={podswietlony === w.id
-        ? "rounded-lg ring-2 ring-amber-400 ring-offset-2 transition-shadow" : "transition-shadow"}>
+      className={`${podswietlony === w.id
+        ? "rounded-lg ring-2 ring-amber-400 ring-offset-2 transition-shadow" : "transition-shadow"} ${
+        nowe.has(w.id) ? "motion-safe:animate-wiadomosc-nowa" : ""}`}>
     {w.rodzaj === "komentarz"
       /* §6.4: komentarz ma być WIZUALNIE ODRÓŻNIONY od wiadomości klienta.
          Inna barwa to za mało — kłódka i podpis mówią wprost, że klient tego
