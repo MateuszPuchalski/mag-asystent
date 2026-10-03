@@ -30,6 +30,7 @@ export const OBOWIAZUJE: Readonly<Record<string, Pole>> = {
   ALLEGRO_INBOX_OD: (c) => c.allegro.inboxOd,
   ALLEGRO_ZWROTY_OD: (c) => c.allegro.zwrotyOd,
   REKLAMACJE_OD: (c) => c.allegro.reklamacjeOd,
+  DYSKUSJE_ALARM_GODZIN: (c) => c.allegro.dyskusjeAlarmGodzin,
   ZWROT_ROZLICZONE_OD: (c) => c.allegro.zwrotyRozliczoneOd,
   ZWROT_TERMIN_DNI: (c) => c.allegro.zwrotTerminDni,
   ZWROT_WYGASA_DNI: (c) => c.allegro.zwrotWygasaDni,

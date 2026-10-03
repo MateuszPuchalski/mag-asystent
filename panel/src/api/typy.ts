@@ -1193,6 +1193,14 @@ export type Zdrowie = {
   allegro?: { stan?: string };
   /** Zdania „co zrobić" z trasy zdrowia — pusta lista nie przyjeżdża wcale. */
   problemy?: string[];
+  /**
+   * Ile dyskusji czeka na nas i czy któraś przekroczyła próg alarmu. Same
+   * liczby: trasa jest publiczna, więc nie ma tu loginu ani zamówienia.
+   */
+  dyskusje?: {
+    czekaNaNas: number;
+    alarm: { ile: number; najstarszaGodzin: number; progGodzin: number } | null;
+  };
   allegroInbox: {
     status: StatusSynchronizacji;
     alarm: boolean;
@@ -2078,8 +2086,17 @@ export interface Dyskusja {
    *
    * TO NIE JEST TERMIN i ekran nie ma prawa tak tego nazwać. Allegro dla
    * dyskusji zegara nie oddaje — to jest fakt o naszej skrzynce.
+   *
+   * Liczone od pytania, na które nie odpowiedzieliśmy, nie od ostatniej
+   * wiadomości: odpowiedź doradcy Allegro nie zeruje licznika.
    */
   czekaOdDni: number | null;
+  /** Ta sama miara w godzinach; ekran pokazuje ją poniżej doby. */
+  czekaOdGodzin: number | null;
+  /** Od kiedy pytanie czeka na nasze słowo. */
+  bezOdpowiediOd: string | null;
+  /** Czekanie przekroczyło próg alarmu z `DYSKUSJE_ALARM_GODZIN`. */
+  pilna: boolean;
   dlugoCzeka: boolean;
   otwartoAt: string;
   prowadzi: string | null;

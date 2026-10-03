@@ -11,9 +11,10 @@ import v8 from "node:v8";
    zbieranie śmieci nie odzyskuje. Dlatego porównujemy minima połówek, nie
    średnie ani ostatni odczyt.
 
-   Trend jest DANĄ w `/api/health`, nigdy zdaniem w `problemy`. Instalator
-   odpytuje tę trasę po aktualizacji i wycofuje wydanie, gdy `ok` jest
-   fałszywe; wolna zmiana pamięci nie ma prawa uruchomić wycofania.          */
+   Trend jest DANĄ w `/api/health`, nigdy zdaniem w `problemy`. Progi są
+   konwencją, a zdanie w `problemy` zapala pasek stanu na każdym ekranie
+   panelu. Fałszywy alarm o pamięci zagłuszałby alarmy, które wymagają
+   działania tego samego dnia, np. dyskusję bez odpowiedzi.                   */
 
 const MB = 1024 * 1024;
 

@@ -23,7 +23,7 @@ const d = (n: Partial<Dyskusja> = {}): Dyskusja => ({
   temat: "Przesyłka nie dotarła", opis: null,
   statusAllegro: "DISPUTE_ONGOING", czatAktywny: true, wiadomosciIle: 2, czatUrwany: false,
   ostatniaWiadomoscStatus: "BUYER_REPLIED", ostatniaWiadomoscAt: "2026-09-04T10:00:00.000Z",
-  ruchNasz: true, czekaOdDni: 5, dlugoCzeka: true,
+  ruchNasz: true, czekaOdDni: 5, czekaOdGodzin: 120, bezOdpowiediOd: null, pilna: true, dlugoCzeka: true,
   otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [],
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null,
   zakonczenieStatus: null, zakonczenieAt: null, zakonczeniePrzez: null,
@@ -37,8 +37,29 @@ describe("Kolejka dyskusji", () => {
     render(<Kolejka dyskusje={[d()]} wybrana={null} onWybierz={vi.fn()} />);
     expect(screen.getByText("5 dni")).toBeInTheDocument();
     expect(screen.queryByText(/termin/i)).not.toBeInTheDocument();
-    expect(screen.getByTitle(/od ostatniej wiadomości, która nie była nasza/i))
-      .toBeInTheDocument();
+    expect(screen.getByTitle(/alarm/i)).toBeInTheDocument();
+  });
+
+  it("zegar liczy od pytania bez odpowiedzi, więc tytuł nie mówi o ostatniej wiadomości", () => {
+    render(<Kolejka dyskusje={[d({ pilna: false })]} wybrana={null} onWybierz={vi.fn()} />);
+    expect(screen.getByTitle(/pytania, na które nie odpowiedzieliśmy/i)).toBeInTheDocument();
+    expect(screen.queryByTitle(/ostatniej wiadomości/i)).not.toBeInTheDocument();
+  });
+
+  it("poniżej doby wiersz pokazuje godziny, nie „dziś”", () => {
+    render(<Kolejka dyskusje={[d({ czekaOdDni: 0, czekaOdGodzin: 7, pilna: false, dlugoCzeka: false })]}
+      wybrana={null} onWybierz={vi.fn()} />);
+    expect(screen.getByText("7 godz.")).toBeInTheDocument();
+    expect(screen.queryByText("dziś")).not.toBeInTheDocument();
+  });
+
+  it("po progu alarmu znaczek jest czerwony, przed progiem szary", () => {
+    const { rerender } = render(
+      <Kolejka dyskusje={[d({ czekaOdDni: 1, czekaOdGodzin: 30, pilna: true })]} wybrana={null} onWybierz={vi.fn()} />);
+    expect(screen.getByText("1 dzień").className).toContain("bg-red-100");
+    rerender(<Kolejka dyskusje={[d({ czekaOdDni: 1, czekaOdGodzin: 30, pilna: false, dlugoCzeka: false })]}
+      wybrana={null} onWybierz={vi.fn()} />);
+    expect(screen.getByText("1 dzień").className).not.toContain("bg-red-100");
   });
 
   it("liczba MILCZY, gdy ruch należy do klienta", () => {
@@ -55,7 +76,8 @@ describe("Kolejka dyskusji", () => {
     expect(screen.getByText("1 dzień")).toBeInTheDocument();
     rerender(<Kolejka dyskusje={[d({ czekaOdDni: 2 })]} wybrana={null} onWybierz={vi.fn()} />);
     expect(screen.getByText("2 dni")).toBeInTheDocument();
-    rerender(<Kolejka dyskusje={[d({ czekaOdDni: 0 })]} wybrana={null} onWybierz={vi.fn()} />);
+    rerender(<Kolejka dyskusje={[d({ czekaOdDni: 0, czekaOdGodzin: 0, pilna: false })]}
+      wybrana={null} onWybierz={vi.fn()} />);
     expect(screen.getByText("dziś")).toBeInTheDocument();
   });
 

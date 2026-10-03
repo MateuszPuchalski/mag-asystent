@@ -131,9 +131,9 @@ before(async () => {
 });
 
 test("/api/health niesie blok pamięci, a trend nie wchodzi do problemów", async () => {
-  /* Zdrowie służy instalatorowi do decyzji o wycofaniu wydania. Blok pamięci
-     ma być daną; gdyby jego trend dopisywał zdanie do `problemy`, wolny
-     wzrost pamięci mógłby cofnąć aktualizację. */
+  /* Zdanie w `problemy` zapala pasek stanu na każdym ekranie. Trend pamięci
+     opiera się na progach z konwencji, więc ma być daną w bloku, a nie
+     alarmem, który zagłuszy ważniejsze zdania. */
   for (let i = 0; i < 10; i++) zapiszProbke(new Date(T0 + i * GODZINA), odczyt(400 + i * 40));
   const h = (await app.inject({ method: "GET", url: "/api/health" })).json();
   assert.equal(typeof h.pamiec.rssMb, "number");

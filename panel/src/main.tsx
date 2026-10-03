@@ -21,6 +21,7 @@ import { Zadania } from "./ekrany/Zadania";
 import { SzukajIKlawisze } from "./nawigacja/Klawisze";
 import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
 import { PasekPolaczenia } from "./nawigacja/Polaczenie";
+import { PasekAlarmuDyskusji } from "./nawigacja/AlarmDyskusji";
 import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej";
 import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
@@ -274,6 +275,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         pierwszym wejściu po wydaniu. Powód w `coNowego/CoNowego.tsx`.
         Pasek braku połączenia stoi NAD nim: awaria jest ważniejsza niż nowość. */}
     <PasekPolaczenia />
+    {/* Dyskusja bez odpowiedzi grozi blokadą konta Allegro, więc alarm stoi
+        nad nowościami: nowość może poczekać, odpowiedź nie. */}
+    <PasekAlarmuDyskusji />
     <CoNowego />
     {/* BEZ `max-w` i bez `mx-auto` (0.198.0). Ogranicznik 1500 px przyszedł
         z makiety i nikt go nigdy nie uzasadnił w kodzie. Na monitorze 1920

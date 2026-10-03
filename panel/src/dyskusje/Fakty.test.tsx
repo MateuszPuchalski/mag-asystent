@@ -22,7 +22,7 @@ const d = (n: Partial<Dyskusja> = {}): Dyskusja => ({
   temat: "Przesyłka nie dotarła", opis: null,
   statusAllegro: "DISPUTE_ONGOING", czatAktywny: true, wiadomosciIle: 4, czatUrwany: false,
   ostatniaWiadomoscStatus: "BUYER_REPLIED", ostatniaWiadomoscAt: null,
-  ruchNasz: true, czekaOdDni: 5, dlugoCzeka: true,
+  ruchNasz: true, czekaOdDni: 5, czekaOdGodzin: 120, bezOdpowiediOd: null, pilna: true, dlugoCzeka: true,
   otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [],
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null,
   zakonczenieStatus: null, zakonczenieAt: null, zakonczeniePrzez: null,
@@ -46,6 +46,11 @@ function pokaz(s: SzczegolDyskusji, onNotatka = vi.fn()) {
 afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
 
 describe("Kolumna faktów o dyskusji", () => {
+  it("poniżej doby podpis stanu niesie godziny, nie „od dziś”", () => {
+    pokaz(szczegol({}, { czekaOdDni: 0, czekaOdGodzin: 9 }));
+    expect(screen.getByRole("button", { name: /Stan/ })).toHaveTextContent("czeka na nas 9 godz.");
+  });
+
   it("„Sprawa” i „Stan” startują zwinięte, a podpis niesie czekanie", async () => {
     pokaz(szczegol());
     const stan = screen.getByRole("button", { name: /Stan/ });

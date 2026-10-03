@@ -292,7 +292,8 @@ const STATUS_DOMYSLNY = "DISPUTE_ONGOING";
 /** Jak długo piłka leży u nas — słowem, bo terminu dyskusja nie ma. */
 function czekaSlowem(d: Dyskusja): string {
   if (d.czekaOdDni === null) return "ruch należy do klienta";
-  return d.czekaOdDni === 0 ? "od dziś" : dniSlowo(d.czekaOdDni);
+  if (d.czekaOdDni > 0) return dniSlowo(d.czekaOdDni);
+  return d.czekaOdGodzin !== null && d.czekaOdGodzin >= 1 ? `${d.czekaOdGodzin} godz.` : "od dziś";
 }
 
 /** Co stoi w sprawie — kto i od kiedy, żeby zamknięta zwijka nie kazała zgadywać. */

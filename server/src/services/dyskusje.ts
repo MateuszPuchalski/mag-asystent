@@ -117,8 +117,21 @@ export interface WierszDyskusji {
    * skrzynce, nie zobowiązaniem wobec kupującego. Blizna 0.121.0 była
    * dokładnie odwrotna — ustawowy zegar czternastu dni liczony przez nas
    * i rozjeżdżający się z tym, co widział kupujący.
+   *
+   * LICZONA OD PYTANIA, NA KTÓRE NIE ODPOWIEDZIELIŚMY, nie od ostatniej
+   * wiadomości: patrz `bezOdpowiediOd`.
    */
   czekaOdDni: number | null;
+  /** Ta sama miara w godzinach — dla ekranu, który poniżej doby pokazuje godziny. */
+  czekaOdGodzin: number | null;
+  /** Od kiedy pytanie czeka na nasze słowo. `null`, gdy ruch nie jest nasz. */
+  bezOdpowiediOd: string | null;
+  /**
+   * Czekanie przekroczyło próg alarmu (`DYSKUSJE_ALARM_GODZIN`). Próg liczy
+   * serwer, żeby wiersz, pasek alarmu i zdanie w stanie systemu nie mogły
+   * się rozjechać na dwóch liczbach.
+   */
+  pilna: boolean;
   dlugoCzeka: boolean;
   otwartoAt: string;
   prowadzi: string | null;
@@ -174,6 +187,83 @@ export function ruchNalezyDoNas(w: {
   return w.czatAktywny && RUCH_NASZ.includes(w.ostatniaWiadomoscStatus ?? "");
 }
 
+/** Rola, którą Allegro podpisuje nasze wiadomości (`MessageAuthorRole`). */
+const NASZA_ROLA = "SELLER";
+
+/**
+ * Role, których wiadomość czeka na nasze słowo: kupujący i doradca Allegro.
+ * `SYSTEM` i `FULFILLMENT` to automaty, które niczego od nas nie żądają.
+ */
+const ROLE_CZEKAJACE: readonly string[] = ["BUYER", "ADMIN"];
+
+const GODZINA_MS = 3_600_000;
+
+export interface WiadomoscCzasu {
+  rola: string | null;
+  at: string | null;
+}
+
+/**
+ * Od kiedy dyskusja czeka na naszą odpowiedź — czysta arytmetyka na liście
+ * wiadomości.
+ *
+ * LICZYMY OD NAJSTARSZEJ WIADOMOŚCI PO NASZEJ OSTATNIEJ ODPOWIEDZI, nie od
+ * ostatniej wiadomości w ogóle. Doradca Allegro odpisuje jako ostatni w co
+ * drugiej dyskusji, a jego zdanie zerowało licznik: pytanie kupującego sprzed
+ * czterech dni, na które nikt nie odpowiedział, wyglądało na sprawę z dzisiaj.
+ * Tak wyglądała dyskusja, za którą Allegro zablokowało konto: stała w kolejce
+ * jako „dziś" i nikt jej nie otworzył.
+ *
+ * Gdy lista wiadomości jest niepełna (czat urwany bezpiecznikiem stron, sprawa
+ * jeszcze niedociągnięta), zapas ZAWYŻA czas, nigdy go nie zaniża: blokada
+ * konta kosztuje więcej niż nadmiarowy pasek.
+ *   1. Jest nasza odpowiedź, a po niej niczego od drugiej strony: liczymy od
+ *      NASZEJ odpowiedzi. Status ostatniej wiadomości mówi, że ktoś napisał
+ *      po nas, tylko tej wiadomości nie mamy.
+ *   2. Nie ma żadnej naszej odpowiedzi: od ostatniej wiadomości, a bez jej
+ *      daty od otwarcia sprawy, które jest ustawione zawsze.
+ */
+export function bezOdpowiediOd(
+  wiadomosci: WiadomoscCzasu[], ostatniaAt: string | null, ruchNasz: boolean,
+  otwartoAt: string | null = null,
+): string | null {
+  if (!ruchNasz) return null;
+  const wg = wiadomosci
+    .map((m) => ({ rola: m.rola ?? "", t: Date.parse(m.at ?? "") }))
+    .filter((m) => Number.isFinite(m.t))
+    .sort((a, b) => a.t - b.t);
+  let naszaOstatnia = -1;
+  wg.forEach((m, i) => { if (m.rola === NASZA_ROLA) naszaOstatnia = i; });
+  const pierwsza = wg.slice(naszaOstatnia + 1).find((m) => ROLE_CZEKAJACE.includes(m.rola));
+  if (pierwsza) return new Date(pierwsza.t).toISOString();
+  if (naszaOstatnia >= 0) return new Date(wg[naszaOstatnia].t).toISOString();
+  return ostatniaAt ?? otwartoAt;
+}
+
+/** Pełne godziny od `od` do `teraz`; `null` bez daty. */
+export function godzinyOd(od: string | null, teraz = Date.now()): number | null {
+  if (!od) return null;
+  const t = Date.parse(od);
+  if (!Number.isFinite(t)) return null;
+  return Math.max(0, Math.floor((teraz - t) / GODZINA_MS));
+}
+
+/** Wiadomości wskazanych dyskusji jednym zapytaniem, pogrupowane po sprawie. */
+function wiadomosciCzasu(database: Db, ids: number[]): Map<number, WiadomoscCzasu[]> {
+  const wynik = new Map<number, WiadomoscCzasu[]>();
+  if (ids.length === 0) return wynik;
+  const wiersze = database.prepare(
+    `SELECT reklamacja_id, autor_rola, utworzono_at FROM reklamacja_wiadomosc
+      WHERE reklamacja_id IN (${ids.map(() => "?").join(",")})`,
+  ).all(...ids) as Array<{ reklamacja_id: number; autor_rola: string | null; utworzono_at: string | null }>;
+  for (const m of wiersze) {
+    const lista = wynik.get(m.reklamacja_id) ?? [];
+    lista.push({ rola: m.autor_rola, at: m.utworzono_at });
+    wynik.set(m.reklamacja_id, lista);
+  }
+  return wynik;
+}
+
 /**
  * Ile dni czekamy z odpowiedzią — czysta arytmetyka, osobno od bazy.
  *
@@ -220,14 +310,17 @@ export function sygnalyDyskusji(w: {
   return s;
 }
 
-function zWiersza(w: Wiersz, teraz: number): WierszDyskusji {
+function zWiersza(w: Wiersz, teraz: number, wiadomosci: WiadomoscCzasu[] = []): WierszDyskusji {
   const statusAllegro = tekst(w.status_allegro);
   const czatAktywny = Number(w.czat_aktywny ?? 1) === 1;
   const ostatnia = tekst(w.ostatnia_wiadomosc_status);
   const ostatniaAt = tekst(w.ostatnia_wiadomosc_at);
   const rdzen = { statusAllegro, ostatniaWiadomoscStatus: ostatnia, czatAktywny };
   const ruchNasz = ruchNalezyDoNas(rdzen);
-  const czeka = czekaOdDni(ostatniaAt, ruchNasz, teraz);
+  const bezOdpowiedzi = bezOdpowiediOd(wiadomosci, ostatniaAt, ruchNasz, tekst(w.otwarto_at));
+  const czeka = czekaOdDni(bezOdpowiedzi, ruchNasz, teraz);
+  const godzin = ruchNasz ? godzinyOd(bezOdpowiedzi, teraz) : null;
+  const kubelek = kubelekDyskusji(rdzen);
   return {
     id: Number(w.id),
     externalId: String(w.external_id),
@@ -243,6 +336,9 @@ function zWiersza(w: Wiersz, teraz: number): WierszDyskusji {
     ostatniaWiadomoscAt: ostatniaAt,
     ruchNasz,
     czekaOdDni: czeka,
+    czekaOdGodzin: godzin,
+    bezOdpowiediOd: bezOdpowiedzi,
+    pilna: kubelek === "odpowiedz" && godzin !== null && godzin >= config.allegro.dyskusjeAlarmGodzin,
     dlugoCzeka: czeka !== null && czeka >= PROG_CZEKANIA_DNI,
     otwartoAt: String(w.otwarto_at),
     prowadzi: tekst(w.prowadzi),
@@ -258,7 +354,7 @@ function zWiersza(w: Wiersz, teraz: number): WierszDyskusji {
     zakonczenieAt: tekst(w.zakonczenie_at),
     zakonczeniePrzez: tekst(w.zakonczenie_przez),
     wersja: Number(w.wersja ?? 1),
-    kubelek: kubelekDyskusji(rdzen),
+    kubelek,
     sygnaly: sygnalyDyskusji(rdzen),
     linkZamowienia: linkZamowienia(tekst(w.order_id)),
   };
@@ -296,13 +392,20 @@ export function listaDyskusji(
      musiałby powtórzyć tę regułę drugi raz i rozjechać się przy pierwszej
      poprawce. Wierszy są dziesiątki, więc to nic nie kosztuje. */
   const tagi = tagiWszystkichSpraw(database, TAGI_REKLAMACJI);
+  const wiadomosci = wiadomosciCzasu(database, wiersze.map((w) => Number(w.id)));
+  /* Porządek „kto czeka najdłużej" liczymy od PYTANIA bez odpowiedzi, a nie od
+     ostatniej wiadomości, więc SQL go już nie rozstrzyga. Sprawy, w których
+     ruch jest po stronie klienta, nie mają zegara i idą na koniec. */
+  const czas = (d: WierszDyskusji): number =>
+    d.bezOdpowiediOd ? Date.parse(d.bezOdpowiediOd) : Number.POSITIVE_INFINITY;
   return wiersze
     .map((w) => {
-      const d = zWiersza(w, teraz);
+      const d = zWiersza(w, teraz, wiadomosci.get(Number(w.id)) ?? []);
       d.tagi = tagi.get(d.id) ?? [];
       return d;
     })
-    .sort((a, b) => Number(b.ruchNasz) - Number(a.ruchNasz));
+    .sort((a, b) => Number(b.ruchNasz) - Number(a.ruchNasz)
+      || (czas(a) === czas(b) ? 0 : czas(a) < czas(b) ? -1 : 1));
 }
 
 export function licznikiDyskusji(
@@ -346,7 +449,7 @@ export function szczegolDyskusji(
      i zegar, których ten ekran nie pokazuje, więc otwarcie jej tutaj
      pokazałoby sprawę uboższą, niż jest naprawdę. */
   if (!w) throw new BladReklamacji(`Dyskusja ${id} nie istnieje`, 404);
-  const dyskusja = zWiersza(w, teraz);
+  const dyskusja = zWiersza(w, teraz, wiadomosciCzasu(database, [id]).get(id) ?? []);
   dyskusja.tagi = tagiSprawy(database, TAGI_REKLAMACJI, id);
   const { zwroty, rozmowy, sprawy, droga, zamowienie, przesylka } = kontekstZamowienia(
     database, Number(w.channel_account_id), dyskusja.orderId, teraz, id);
@@ -429,4 +532,87 @@ function odczytaj(database: Db, id: number): Wiersz {
   return database.prepare(
     "SELECT * FROM reklamacja_klienta WHERE id=? AND typ='DISPUTE'",
   ).get(id) as Wiersz;
+}
+
+/* ── Alarm o dyskusjach bez odpowiedzi ───────────────────────────────────────
+   Allegro zablokowało konto za dyskusję, na którą nikt nie odpowiedział, choć
+   stała w kolejce „Do odpowiedzi". Kolejka pokazuje, że sprawa jest, ale nie
+   woła; w ten sposób nikt jej nie otworzył na czas. Alarm woła z każdego
+   ekranu panelu i ze stanu systemu.
+
+   PRÓG JEST NASZĄ DECYZJĄ, NIE REGUŁĄ ALLEGRO. Dla dyskusji schemat nie ma
+   terminu (`decisionDueDate` i `statusDueDate` to „Null for disputes"), a okno
+   odpowiedzi, po którym Allegro nakłada sankcję, nie wynika z żadnego pliku
+   w repo. Dlatego godziny stoją w `DYSKUSJE_ALARM_GODZIN`. [WERYFIKUJ]       */
+
+export interface AlarmDyskusji {
+  /** Ile dyskusji czeka na nas dłużej niż próg. */
+  ile: number;
+  /** Jak długo czeka najstarsza z nich. */
+  najstarszaGodzin: number;
+  progGodzin: number;
+}
+
+export interface StanDyskusjiHealth {
+  /** Wszystkie dyskusje, w których ruch jest po naszej stronie. */
+  czekaNaNas: number;
+  alarm: AlarmDyskusji | null;
+}
+
+/** Alarm z listy wierszy — czysta arytmetyka, osobno od bazy. */
+export function alarmDyskusji(lista: WierszDyskusji[], progGodzin: number): AlarmDyskusji | null {
+  const po = lista.filter((d) => d.kubelek === "odpowiedz"
+    && d.czekaOdGodzin !== null && d.czekaOdGodzin >= progGodzin);
+  if (po.length === 0) return null;
+  return {
+    ile: po.length,
+    najstarszaGodzin: Math.max(...po.map((d) => d.czekaOdGodzin ?? 0)),
+    progGodzin,
+  };
+}
+
+/**
+ * Stan dla `/api/health`. Własne, wąskie zapytanie zamiast `listaDyskusji` (tylko kolumny zegara):
+ * panel pyta tę trasę co kilka sekund, a lista czyta całe archiwum dyskusji
+ * z tagami. Tutaj wystarczą otwarte sprawy, w których ruch jest nasz.
+ *
+ * Ten sam próg widoku (`REKLAMACJE_OD`) co kolejka: alarm o sprawie, której
+ * kolejka nie pokazuje, kazałby szukać czegoś, czego nie ma na ekranie.
+ */
+export function stanDyskusjiHealth(
+  database: Db = defaultDb(), teraz = Date.now(),
+  progGodzin: number = config.allegro.dyskusjeAlarmGodzin,
+  od: string | null = config.allegro.reklamacjeOd,
+): StanDyskusjiHealth {
+  const wiersze = database.prepare(`
+    SELECT r.id, r.external_id, r.status_allegro, r.czat_aktywny, r.wiadomosci_ile,
+           r.ostatnia_wiadomosc_status, r.ostatnia_wiadomosc_at, r.otwarto_at
+      FROM reklamacja_klienta r
+     WHERE r.typ = 'DISPUTE' AND (? IS NULL OR r.otwarto_at >= ?)
+       AND COALESCE(r.status_allegro, '') <> ? AND COALESCE(r.czat_aktywny, 1) = 1
+       AND r.ostatnia_wiadomosc_status IN (${RUCH_NASZ.map(() => "?").join(",")})`,
+  ).all(od, od, ZAMKNIETA, ...RUCH_NASZ) as Wiersz[];
+  const wiadomosci = wiadomosciCzasu(database, wiersze.map((w) => Number(w.id)));
+  const lista = wiersze.map((w) => zWiersza(w, teraz, wiadomosci.get(Number(w.id)) ?? []));
+  return {
+    czekaNaNas: lista.filter((d) => d.kubelek === "odpowiedz").length,
+    alarm: alarmDyskusji(lista, progGodzin),
+  };
+}
+
+/** „1 dyskusja czeka", „2 dyskusje czekają", „5 dyskusji czeka" — trzy formy, nie dwie. */
+export function ileDyskusjiCzeka(n: number): string {
+  const j = n % 10;
+  const dz = n % 100;
+  if (n === 1) return "1 dyskusja czeka";
+  if (j >= 2 && j <= 4 && !(dz >= 12 && dz <= 14)) return `${n} dyskusje czekają`;
+  return `${n} dyskusji czeka`;
+}
+
+/** Zdanie do `problemy`; `null`, gdy żadna dyskusja nie przekroczyła progu. */
+export function problemDyskusji(stan: StanDyskusjiHealth | null): string | null {
+  const a = stan?.alarm;
+  if (!a) return null;
+  return `${ileDyskusjiCzeka(a.ile)} na odpowiedź dłużej niż ${a.progGodzin} godz. (najstarsza ${a.najstarszaGodzin} godz.). `
+    + "Allegro może zablokować konto za dyskusje bez odpowiedzi. Otwórz kolejkę Dyskusje w panelu.";
 }
