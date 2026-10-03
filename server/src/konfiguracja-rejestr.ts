@@ -265,7 +265,7 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "Model, który układa szkice odpowiedzi." },
   { klucz: "COPILOT_MODEL_KLASYFIKACJA", grupa: "copilot", kto: "wlasciciel", edycja: TEKST,
     nazwa: "Model rozpoznawania",
-    opis: "Model do rozpoznawania wiadomości; puste = ten sam co do szkiców." },
+    opis: "Model Claude do rozpoznawania wiadomości; puste = ten sam co do szkiców. Przy kluczu TypeSafe rozpoznaje Jev." },
   { klucz: "COPILOT_AUTO_SZKIC", grupa: "copilot", kto: "wlasciciel", edycja: PRZELACZNIK,
     nazwa: "Szkic w tle", wartosci: WL_Y,
     opis: "Szkic sam dla nowego pytania pod ofertą." },

@@ -5,7 +5,7 @@ tytul: rozpoznawanie wiadomości klientów przez Jeva, gdy stoi klucz TypeSafe
 
 Rozpoznawanie wiadomości klientów (kategoria, następny krok, flagi) może znów
 robić Jev z TypeSafe. Włącza go sam klucz `TYPESAFE_API_KEY` w `wertis.env`.
-Bez klucza nic się nie zmienia i rozpoznaje Claude. Szkice odpowiedzi,
+Bez klucza rozpoznaje Claude, jak dotąd. Szkice odpowiedzi,
 dopytanie i reklamacje zawsze pisze Claude, bo Jev nie generuje tekstu.
 Dlatego `COPILOT_MODE=anthropic` i `ANTHROPIC_API_KEY` są potrzebne także
 z kluczem Jeva.
@@ -21,6 +21,11 @@ Jak włączyć: dopisz klucz z console.typesafe.ai/keys i zrestartuj
 `wertis-api`. Kliknij „Rozpoznaj” na jednej rozmowie i sprawdź w księdze
 wywołań, że wpis ma model `jev-1.13.0` i niezerowe tokeny. Dopiero wtedy
 zostaw takt. Powrót do Claude: usuń klucz i zrestartuj usługę.
+
+**[wymaga działania]** Sprawdź, czy w `wertis.env` stoi `TYPESAFE_API_KEY`.
+Mogło go zostawić wydanie 0.550.0. Jeśli stoi, po tej aktualizacji wiadomości
+od razu rozpoznaje Jev, także w takcie. Wpis `KLASYFIKATOR_DOSTAWCA=anthropic`
+już tego nie zatrzyma. Usuń klucz albo przejdź kroki włączenia wyżej.
 
 Przed włączeniem przeczytaj Data Processing Agreement na typesafe.ai/legal.
 Zamaskowana treść wątków trafia wtedy do drugiego podmiotu. Trafność po

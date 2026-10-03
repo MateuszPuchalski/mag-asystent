@@ -10,8 +10,8 @@ import { MODEL_JEV, nadawcaJev } from "./copilot.jev.js";
  * klasyfikatory.
  *
  * Dostawcę wybiera sam klucz TypeSafe: jest — rozpoznaje Jev, nie ma — Claude.
- * Osobny przełącznik dawał stan „Jev bez klucza”, w którym serwer przestawał
- * rozpoznawać wiadomości. Szkice zawsze robi Claude, bo Jev nie generuje
+ * Osobny przełącznik pozwalałby na stan „Jev bez klucza”, w którym serwer nie
+ * rozpoznaje wiadomości wcale. Szkice zawsze robi Claude, bo Jev nie generuje
  * tekstu. Pole czytamy przy każdym wywołaniu, żeby test mógł je przestawić.
  */
 export const nadawcaKlasyfikacji: NadawcaKlasyfikacji = (tresc) =>

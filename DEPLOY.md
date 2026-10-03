@@ -1195,7 +1195,7 @@ zajrzyj na nią po pierwszej godzinie każdego automatu. Dlaczego tak:
 **Włączenie:** `COPILOT_MODE=anthropic` i `ANTHROPIC_API_KEY`, potem restart
 `wertis-api`. **Klucz wpisz WYŁĄCZNIE do `ANTHROPIC_API_KEY`** — w innym polu
 potrafi zatrzymać start. Model szkiców zmienia
-`COPILOT_MODEL`, model klasyfikacji — `COPILOT_MODEL_KLASYFIKACJA`.
+`COPILOT_MODEL`, model klasyfikacji Claude — `COPILOT_MODEL_KLASYFIKACJA`.
 
 **Rozpoznawanie** wiadomości klientów robi Claude, chyba że stoi
 `TYPESAFE_API_KEY`. Z tym kluczem rozpoznaje Jev z TypeSafe, a szkice dalej
@@ -1203,8 +1203,9 @@ pisze Claude, więc oba warunki włączenia wyżej obowiązują nadal. Powrót d
 Claude: usuń klucz i zrestartuj `wertis-api`.
 
 Pierwsze rozpoznanie po włączeniu Jeva kliknij na jednej rozmowie. W księdze
-wywołań wpis ma mieć model `jev-1.13.0` i niezerowe tokeny. Wpisy `KLASYFIKATOR_DOSTAWCA` i `JEV_MODEL`
-niczego nie robią, a serwer ostrzega, że można je usunąć.
+wywołań wpis ma mieć model `jev-1.13.0` i niezerowe tokeny. Wpisy
+`KLASYFIKATOR_DOSTAWCA` i `JEV_MODEL` niczego nie robią, a serwer ostrzega,
+że można je usunąć.
 
 | klucz | co włącza | hamulce |
 |---|---|---|
