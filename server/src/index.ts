@@ -88,6 +88,7 @@ import { uruchomTakt } from "./services/takt.js";
 import { sledzDosylki } from "./services/dosylka.js";
 import { czytajStan, problemyKopii, wOknieNocnym } from "./services/kopie-bazy.js";
 import { liniaLogu, stanPamieci, zapiszProbke } from "./services/pamiec-procesu.js";
+import { problemDyskusji, stanDyskusjiHealth } from "./services/dyskusje.js";
 import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
 import { przebiegRaportow, TAKT_RAPORTOW_MS } from "./services/raport-tygodnia.js";
 import { podNssm, ustawRestart } from "./services/restart.js";
@@ -236,6 +237,7 @@ export async function buildApp() {
     const audyt = bez("audyt", statystykiAudytu);
     const kopie = bez("kopie bazy", () => czytajStan());
     const pamiec = bez("pamięć procesu", () => stanPamieci());
+    const dyskusje = bez("dyskusje bez odpowiedzi", () => stanDyskusjiHealth());
 
     const problemy = [
       worker.problem,
@@ -338,6 +340,13 @@ export async function buildApp() {
          starej wersji i wygląda zdrowo — bez tego zdania nikt by nie wiedział. */
       bez("aktualizacja", () => problemAktualizacji(stanZadania())),
       ...awarie,
+      /* Dyskusja bez odpowiedzi grozi blokadą konta Allegro. Zdanie wchodzi do
+         `problemy`, bo to stąd panel rysuje pasek na każdym ekranie. Instalator
+         wycofuje wydanie po wersji w odpowiedzi, nie po `ok`, więc zaległa
+         dyskusja nie zatrzyma aktualizacji. NA KOŃCU listy: baner awarii
+         synchronizacji czyta `problemy[0]` i nie ma brać za jej powód zdania
+         o dyskusjach. */
+      problemDyskusji(dyskusje),
     ].filter((x): x is string => x !== null);
     return {
       ok: problemy.length === 0,
@@ -404,6 +413,9 @@ export async function buildApp() {
       /* Pamięć procesu i trend jej dna. Same liczby, więc trasa może zostać
          publiczna. Trend nie wchodzi do `problemy`: powód w `pamiec-procesu.ts`. */
       pamiec,
+      /* Ile dyskusji czeka na nas i czy któraś przekroczyła próg alarmu. Same
+         liczby, bez loginu i numeru zamówienia: trasa jest publiczna. */
+      dyskusje,
       /* Liczby cache'u zdjęć — po to, żeby ZDJECIA_MAX_KB dobierać na danych
          z własnej bazy, a nie na przypuszczeniu, ile waży typowe zdjęcie. */
       ...(config.zdjecia.zrodlo ? { zdjecia: statystykiZdjec() } : {}),

@@ -272,3 +272,166 @@ test("próg daty odcina dyskusje sprzed niego, a granicę przepuszcza", () => {
   assert.equal(D.listaDyskusji(db(), TERAZ, null).length, 3,
     "bez progu wraca wszystko, inaczej dyskusja sprzed progu byłaby nieosiągalna");
 });
+
+/* ── Zegar „bez odpowiedzi od" i alarm ───────────────────────────────────────
+   Allegro zablokowało konto za dyskusję, która stała w kolejce jako „dziś":
+   odpowiedź doradcy zerowała licznik liczony od ostatniej wiadomości. Testy
+   pilnują dwóch rzeczy: zegar liczy od pytania, na które nie odpowiedzieliśmy,
+   a alarm odpala dokładnie na progu. */
+
+const przedGodzinami = (h: number) => new Date(TERAZ - h * 3_600_000).toISOString();
+
+function wiadomosc(sprawaId: number, rola: string, at: string): void {
+  db().prepare(
+    `INSERT INTO reklamacja_wiadomosc(reklamacja_id, external_id, autor_rola, tresc, utworzono_at)
+     VALUES (?,?,?,?,?)`,
+  ).run(sprawaId, `m-${sprawaId}-${rola}-${at}`, rola, "tekst", at);
+}
+
+test("zegar liczy od pytania kupującego, także gdy doradca odpisał dzisiaj", () => {
+  /* Dokładnie przypadek ze zrzutu od właściciela: doradca na końcu, kolejka
+     mówi „dziś", a kupujący zapytał cztery dni temu. */
+  const t = D.bezOdpowiedziOd([
+    { rola: "BUYER", at: przedDniami(4) },
+    { rola: "ADMIN", at: przedGodzinami(1) },
+  ], przedGodzinami(1), true);
+  assert.equal(t, przedDniami(4));
+});
+
+test("nasza odpowiedź zeruje zegar, a nowe pytanie zaczyna go od nowa", () => {
+  const t = D.bezOdpowiedziOd([
+    { rola: "BUYER", at: przedDniami(6) },
+    { rola: "SELLER", at: przedDniami(5) },
+    { rola: "BUYER", at: przedDniami(2) },
+    { rola: "BUYER", at: przedDniami(1) },
+  ], przedDniami(1), true);
+  assert.equal(t, przedDniami(2), "liczy się najstarsze pytanie PO naszej odpowiedzi");
+});
+
+test("automaty nie uruchamiają zegara, a bez wiadomości wracamy do ostatniej daty", () => {
+  assert.equal(D.bezOdpowiedziOd([
+    { rola: "SELLER", at: przedDniami(5) },
+    { rola: "SYSTEM", at: przedDniami(4) },
+    { rola: "BUYER", at: przedDniami(2) },
+  ], przedDniami(2), true), przedDniami(2));
+  assert.equal(D.bezOdpowiedziOd([], przedDniami(3), true), przedDniami(3),
+    "bez wiadomości i bez naszej odpowiedzi: od ostatniej wiadomości");
+  assert.equal(D.bezOdpowiedziOd([], null, true, przedDniami(7)), przedDniami(7),
+    "bez żadnej daty: od otwarcia sprawy, żeby sprawa nie wypadła z alarmu");
+  assert.equal(D.bezOdpowiedziOd([{ rola: "BUYER", at: przedDniami(9) }], przedDniami(9), false), null,
+    "gdy piłka jest u klienta, zegara nie ma");
+});
+
+test("niepełna lista wiadomości ZAWYŻA czas: liczymy od naszej ostatniej odpowiedzi", () => {
+  /* Czat urwany bezpiecznikiem stron: mamy naszą starą odpowiedź, a status mówi,
+     że po niej ktoś napisał, tylko tej wiadomości nie mamy. Cisza byłaby gorsza
+     od nadmiarowego paska. */
+  assert.equal(D.bezOdpowiedziOd([{ rola: "SELLER", at: przedDniami(5) }], przedGodzinami(1), true),
+    przedDniami(5));
+});
+
+test("sprawa bez wiadomości i bez daty ostatniej nadal wchodzi do alarmu", () => {
+  const id = sprawa({ id: "d-bez-dat", ostatniaAt: null });
+  assert.ok(id > 0);
+  const w = D.listaDyskusji(db(), TERAZ)[0];
+  assert.equal(w.bezOdpowiedziOd, przedDniami(9), "zapas to otwarto_at z fixtury: dziewięć dni temu");
+  assert.equal(w.pilna, true);
+  assert.equal(D.stanDyskusjiHealth(db(), TERAZ, 24, null).alarm?.ile, 1);
+});
+
+test("samo pytanie doradcy Allegro też uruchamia zegar", () => {
+  assert.equal(D.bezOdpowiedziOd([
+    { rola: "SELLER", at: przedDniami(5) },
+    { rola: "ADMIN", at: przedDniami(2) },
+  ], przedGodzinami(1), true), przedDniami(2),
+    "ostatnia data jest inna niż pytanie doradcy, więc zwrot nie bierze się z zapasowej");
+});
+
+test("wiersz niesie prawdziwy zegar: cztery dni, nie „dziś”", () => {
+  const id = sprawa({ id: "d-doradca", ostatniStatus: "ALLEGRO_ADVISOR_REPLIED", ostatniaAt: przedGodzinami(1) });
+  wiadomosc(id, "BUYER", przedDniami(4));
+  wiadomosc(id, "ADMIN", przedGodzinami(1));
+  const w = D.listaDyskusji(db(), TERAZ)[0];
+  assert.equal(w.czekaOdDni, 4);
+  assert.equal(w.czekaOdGodzin, 96);
+  assert.equal(w.dlugoCzeka, true, "wiersz wyróżnia się od progu dni także przy odpowiedzi doradcy");
+  assert.equal(w.pilna, true, "96 godz. przekracza domyślny próg alarmu (24)");
+  const swieza = sprawa({ id: "d-swieza", ostatniaAt: przedGodzinami(3) });
+  wiadomosc(swieza, "BUYER", przedGodzinami(3));
+  const s = D.listaDyskusji(db(), TERAZ).find((d) => d.externalId === "d-swieza");
+  assert.equal(s?.pilna, false);
+  assert.equal(s?.czekaOdGodzin, 3);
+});
+
+test("kolejka układa się po prawdziwym zegarze, nie po ostatniej wiadomości", () => {
+  const a = sprawa({ id: "a-doradca-dzis", ostatniStatus: "ALLEGRO_ADVISOR_REPLIED", ostatniaAt: przedGodzinami(1) });
+  wiadomosc(a, "BUYER", przedDniami(6));
+  wiadomosc(a, "ADMIN", przedGodzinami(1));
+  const b = sprawa({ id: "b-trzy-dni", ostatniaAt: przedDniami(3) });
+  wiadomosc(b, "BUYER", przedDniami(3));
+  assert.deepEqual(D.listaDyskusji(db(), TERAZ).map((d) => d.externalId),
+    ["a-doradca-dzis", "b-trzy-dni"]);
+});
+
+test("alarm odpala dokładnie na progu i liczy tylko dyskusje do odpowiedzi", () => {
+  const wiersz = (id: string, godzin: number | null, kubelek: "odpowiedz" | "klient" | "zamknieta") =>
+    ({ externalId: id, czekaOdGodzin: godzin, kubelek }) as unknown as import("./dyskusje.js").WierszDyskusji;
+  assert.equal(D.alarmDyskusji([wiersz("a", 23, "odpowiedz")], 24), null, "23 godz. to jeszcze cisza");
+  assert.deepEqual(D.alarmDyskusji([wiersz("a", 24, "odpowiedz")], 24),
+    { ile: 1, najstarszaGodzin: 24, progGodzin: 24 });
+  const a = D.alarmDyskusji([
+    wiersz("a", 30, "odpowiedz"), wiersz("b", 80, "odpowiedz"),
+    wiersz("c", 500, "klient"), wiersz("d", 900, "zamknieta"), wiersz("e", null, "odpowiedz"),
+  ], 24);
+  assert.deepEqual(a, { ile: 2, najstarszaGodzin: 80, progGodzin: 24 },
+    "sprawa u klienta, zamknięta i bez daty nie zapalają alarmu");
+});
+
+test("stan do zdrowia pomija sprawy zamknięte, u klienta i sprzed progu widoku", () => {
+  const stara = sprawa({ id: "do-odpowiedzi", ostatniaAt: przedDniami(3) });
+  wiadomosc(stara, "BUYER", przedDniami(3));
+  sprawa({ id: "u-klienta", ostatniStatus: "SELLER_REPLIED", ostatniaAt: przedDniami(9) });
+  sprawa({ id: "zamknieta", status: "DISPUTE_CLOSED", ostatniaAt: przedDniami(9) });
+  sprawa({ id: "czat-zamkniety", czatAktywny: 0, ostatniaAt: przedDniami(9) });
+  const s = D.stanDyskusjiHealth(db(), TERAZ, 24, null);
+  assert.equal(s.czekaNaNas, 1);
+  assert.deepEqual(s.alarm, { ile: 1, najstarszaGodzin: 72, progGodzin: 24 });
+  // Próg widoku jest PO otwarciu sprawy: otwarto_at to dziewięć dni temu.
+  const po = D.stanDyskusjiHealth(db(), TERAZ, 24, przedDniami(1));
+  assert.equal(po.czekaNaNas, 0, "sprawy, której kolejka nie pokazuje, alarm nie zgłasza");
+  assert.equal(po.alarm, null);
+});
+
+test("zdanie alarmu mówi ile, jak długo i gdzie iść, a bez alarmu milczy", () => {
+  assert.equal(D.problemDyskusji(null), null);
+  assert.equal(D.problemDyskusji({ czekaNaNas: 3, alarm: null }), null);
+  const jedna = D.problemDyskusji({ czekaNaNas: 1, alarm: { ile: 1, najstarszaGodzin: 30, progGodzin: 24 } });
+  assert.match(jedna ?? "", /^1 dyskusja czeka na odpowiedź dłużej niż 24 godz\. \(najstarsza 30 godz\.\)/);
+  assert.match(jedna ?? "", /Dyskusje/);
+  const dwie = D.problemDyskusji({ czekaNaNas: 2, alarm: { ile: 2, najstarszaGodzin: 50, progGodzin: 24 } });
+  assert.match(dwie ?? "", /^2 dyskusje czekają/);
+});
+
+test("odmiana „czeka” ma trzy formy, jak po polsku", () => {
+  assert.deepEqual([1, 2, 4, 5, 12, 14, 21, 22, 25].map(D.ileDyskusjiCzeka), [
+    "1 dyskusja czeka", "2 dyskusje czekają", "4 dyskusje czekają", "5 dyskusji czeka",
+    "12 dyskusji czeka", "14 dyskusji czeka", "21 dyskusji czeka", "22 dyskusje czekają",
+    "25 dyskusji czeka",
+  ]);
+});
+
+test("alarm ze zdrowia zgadza się z wierszami pilnymi z listy", () => {
+  /* Dwie ścieżki SQL liczą to samo pytanie. Rozjazd między paskiem a kolejką
+     byłby alarmem o sprawie, której kolejka nie pokazuje, albo odwrotnie. */
+  const a = sprawa({ id: "a", ostatniaAt: przedDniami(3) }); wiadomosc(a, "BUYER", przedDniami(3));
+  const b = sprawa({ id: "b", ostatniStatus: "ALLEGRO_ADVISOR_REPLIED", ostatniaAt: przedGodzinami(1) });
+  wiadomosc(b, "BUYER", przedDniami(2)); wiadomosc(b, "ADMIN", przedGodzinami(1));
+  const c = sprawa({ id: "c", ostatniaAt: przedGodzinami(5) }); wiadomosc(c, "BUYER", przedGodzinami(5));
+  sprawa({ id: "d", ostatniStatus: "SELLER_REPLIED", ostatniaAt: przedDniami(8) });
+  sprawa({ id: "e", status: "DISPUTE_CLOSED", ostatniaAt: przedDniami(8) });
+  const pilne = D.listaDyskusji(db(), TERAZ, null).filter((x) => x.pilna);
+  const z = D.stanDyskusjiHealth(db(), TERAZ, 24, null);
+  assert.equal(z.alarm?.ile, pilne.length);
+  assert.equal(z.alarm?.najstarszaGodzin, Math.max(...pilne.map((x) => x.czekaOdGodzin ?? 0)));
+  assert.deepEqual(pilne.map((x) => x.externalId).sort(), ["a", "b"]);
+});

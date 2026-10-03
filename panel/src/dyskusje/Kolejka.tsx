@@ -67,12 +67,21 @@ export { dniSlowo } from "../ui";
  * MILCZY, GDY RUCH NIE JEST NASZ. Liczba przy sprawie, przy której nie mamy
  * nic do zrobienia, czytałaby się jak zaległość.
  */
-function Czeka({ dni, dlugo }: { dni: number | null; dlugo: boolean }) {
+function Czeka({ dni, godzin, dlugo, pilna }: {
+  dni: number | null; godzin: number | null; dlugo: boolean; pilna: boolean;
+}) {
   if (dni === null) return null;
+  /* Poniżej doby godziny, nie „dziś": dyskusja, która czeka od rana, ma być
+     widoczna jako taka. Alarm (czerwień) bierze próg z serwera, więc wiersz,
+     pasek i stan systemu mówią tą samą liczbą. */
+  const tekst = dni > 0 ? dniSlowo(dni) : godzin !== null && godzin >= 1 ? `${godzin} godz.` : "dziś";
   return <span className={`inline-flex shrink-0 items-center gap-1 rounded px-2 py-0.5 text-xs font-bold tabular-nums ${
-    dlugo ? "bg-amber-100 text-ranga-uwaga" : "bg-slate-100 text-slate-600"}`}
-    title="Tyle czasu minęło od ostatniej wiadomości, która nie była nasza">
-    <Hourglass size={12} />{dni === 0 ? "dziś" : dniSlowo(dni)}</span>;
+    pilna ? "bg-red-100 text-red-900"
+      : dlugo ? "bg-amber-100 text-ranga-uwaga" : "bg-slate-100 text-slate-600"}`}
+    title={pilna
+      ? "Pytanie bez naszej odpowiedzi od tak dawna, że przekroczyło próg alarmu"
+      : "Tyle czasu minęło od pytania, na które nie odpowiedzieliśmy"}>
+    <Hourglass size={12} />{tekst}</span>;
 }
 
 export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz, mojeId = null }: {
@@ -136,7 +145,7 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz, moje
             <span className="ml-auto" />
             {zKubelkiem && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">
               {KUBELKI.find((k) => k.id === d.kubelek)?.etykieta}</span>}
-            <Czeka dni={d.czekaOdDni} dlugo={d.dlugoCzeka} />
+            <Czeka dni={d.czekaOdDni} godzin={d.czekaOdGodzin} dlugo={d.dlugoCzeka} pilna={d.pilna} />
           </div>
           <div className="truncate text-sm text-slate-600">
             {d.kupujacyLogin ?? "bez loginu"}

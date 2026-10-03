@@ -169,7 +169,7 @@ export function Dyskusje() {
   const widoczne = useMemo(
     () => posortuj(pasujace ?? poSitach, porzadek, {
       otwarto: (d) => d.otwartoAt,
-      ruch: (d) => d.ostatniaWiadomoscAt ?? d.otwartoAt,
+      ruch: (d) => d.bezOdpowiedziOd ?? d.ostatniaWiadomoscAt ?? d.otwartoAt,
     }),
     [pasujace, poSitach, porzadek]);
   /* Zdanie liczy WYŁĄCZNIE to, co chowa „Moje". Doliczenie tu spraw odsianych

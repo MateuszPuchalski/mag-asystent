@@ -1007,6 +1007,8 @@ biura: <https://ifconfig.me>. Ten sam adres w obu miejscach znaczy wspólne
 - `ALLEGRO_INBOX_OD`, `ALLEGRO_ZWROTY_OD` — od kiedy skrzynka i zwroty są
   w bazie. Starsze dane znikają przy starcie; granica skrzynki działa na wątek.
 - `REKLAMACJE_OD` — próg WIDOKU reklamacji i dyskusji; pusty wyłącza próg.
+- `DYSKUSJE_ALARM_GODZIN` — po ilu godzinach bez odpowiedzi dyskusja zapala
+  alarm w panelu; domyślnie 24. To nasz próg, nie termin Allegro.
 - `ALLEGRO_PANEL_ZAMOWIENIE`, `_OFERTA`, `_ZWROT`, `_REKLAMACJA` — wzorce
   odnośników do panelu sprzedawcy. Odnośnik w 404 poprawia się wzorcem.
 - `ALLEGRO_SELLER_ID` — zmienia się tylko przy innym koncie (`sellerId=`
@@ -1281,8 +1283,8 @@ odświeżeniu danych z Subiekta. Liczy się trend dna w `pamiec.trend`: o ile
 najniższy odczyt młodszej połowy okna leży wyżej niż starszej. `rosnie: true`
 znaczy wzrost dna o co najmniej 100 MB i co najmniej 10 MB na godzinę.
 Trend pojawia się po sześciu godzinach pracy. Restart usługi zaczyna okno od
-nowa. Trend jest daną, nie alarmem: nie wchodzi do `problemy` i nie
-cofa aktualizacji.
+nowa. Trend jest daną, nie alarmem: nie wchodzi do `problemy`, bo jego progi
+są konwencją.
 
 ### Kopia bazy bez danych osobowych
 
