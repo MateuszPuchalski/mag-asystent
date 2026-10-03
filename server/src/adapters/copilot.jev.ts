@@ -43,21 +43,25 @@ export const MODEL_JEV = "jev-1.13.0";
  * porównuje decyzje jednego zestawu pytań. ZMIENIASZ PYTANIA ALBO PROGI —
  * podnosisz numer.
  */
-export const PYTANIA_JEVA = "jev-j2";
+export const PYTANIA_JEVA = "jev-j3";
 
-/* Asymetria progów jest celowa:
+/* Progi wybrane z sondy na żywym API (`npm run sonda:jev`), z rozkładu
+   surowych wartości, a nie z pamięci. Asymetria jest celowa:
    - prośba o człowieka i potrzeba człowieka łapią się NISKO. Pomyłka w tę
      stronę kosztuje jedną rozmowę więcej w kolejce, a pominięta prośba
-     kosztuje klienta.
-   - brak danych to podpowiedź, nie decyzja: próg pośrodku.
-   - kategoria dodatkowa łapie się WYSOKO, bo liczą się tylko wyraźne prośby,
-     a niski próg dokładałby każdej rozmowie trzy etykiety.
+     kosztuje klienta. W sondzie wyraźna prośba dawała 0,97, a reszta
+     najwyżej 0,27.
+   - brak danych łapie się WYSOKO. Prawdziwe braki dawały 0,83–0,95, a pytanie
+     o stan bez zamówienia 0,55. Fałszywa flaga podpowiada agentowi dopytanie
+     o coś, co klient już podał.
+   - kategoria dodatkowa łapie się najwyżej, bo liczą się tylko wyraźne
+     prośby. Podziękowanie dostawało „status zamówienia” przy 0,78.
    Pewność słowna bierze się z `confidence` KATEGORII. Pewność kroku do niej
    nie wchodzi: kroki bywają wymienne, a niepewny krok przy pewnej kategorii
    nie jest powodem, by wołać człowieka. */
 const PROG_CZLOWIEKA = 0.3;
-const PROG_BRAKU_DANYCH = 0.5;
-const PROG_DODATKOWEJ = 0.7;
+const PROG_BRAKU_DANYCH = 0.7;
+const PROG_DODATKOWEJ = 0.8;
 const MAKS_DODATKOWYCH = 3;
 const PROG_PEWNOSCI_WYSOKIEJ = 0.8;
 const PROG_PEWNOSCI_SREDNIEJ = 0.5;
@@ -75,7 +79,11 @@ const ZASADY = [
 
 /** Pytania jednego wywołania. Klucze wracają w odpowiedzi bez zmian. */
 function pytania(): Record<string, unknown> {
-  const noul = (instructions: string) => ({ type: "noul", instructions });
+  /* Jev czyta pytanie dosłownie. Ogólne „czy brakuje danych” dostawało „tak”
+     prawie zawsze, bo w wątku zawsze czegoś brakuje. Dlatego flagi mają
+     wąskie pytanie i opis obu odpowiedzi w `criteria`. */
+  const noul = (instructions: string, criteria?: { true: string; false: string }) =>
+    ({ type: "noul", instructions, ...(criteria ? { criteria } : {}) });
   const q: Record<string, unknown> = {
     kategoria: {
       type: "choice",
@@ -88,9 +96,18 @@ function pytania(): Record<string, unknown> {
       criteria: OPISY_AKCJI,
     },
     prosi_o_czlowieka: noul("Czy klient WPROST prosi o rozmowę z człowiekiem, telefon albo kierownika?"),
-    wymaga_czlowieka: noul("Czy sprawa wymaga decyzji człowieka, na przykład przez spór, groźbę, pieniądze albo sprzeczne prośby?"),
-    brak_danych_zamowienia: noul("Czy do następnego kroku potrzebne jest zamówienie, a w rozmowie go nie ma?"),
-    brak_danych_produktu: noul("Czy do następnego kroku potrzebne są dane towaru albo maszyny, a w rozmowie ich brakuje?"),
+    wymaga_czlowieka: noul("Czy ta sprawa wymaga decyzji człowieka, a nie zwykłej obsługi według procedury?", {
+      true: "klient grozi, spiera się, żąda pieniędzy albo jego prośby sobie przeczą",
+      false: "zwykłe pytanie albo prośba, którą agent załatwi według procedury",
+    }),
+    brak_danych_zamowienia: noul("Czy klient pisze o konkretnym zakupie, a w `rozmowa` stoi „zamówienie powiązane z rozmową: nie”?", {
+      true: "sprawa dotyczy zakupu (dostawa, zwrot, reklamacja, faktura), a zamówienie nie jest powiązane",
+      false: "zamówienie jest powiązane albo klient pyta o towar przed zakupem",
+    }),
+    brak_danych_produktu: noul("Czy klient pyta o pasowanie albo dobór części i nie podał ani modelu maszyny, ani numeru części?", {
+      true: "pyta, czy część pasuje albo jaką wybrać, bez modelu maszyny i bez numeru części",
+      false: "podał model albo numer części, albo sprawa nie zależy od maszyny",
+    }),
   };
   /* Choice wybiera jedną opcję, a kategorii dodatkowych bywa kilka, więc każda
      ma własny Noul. Dodatkowe pytania nic nie kosztują: TypeSafe liczy `state`

@@ -141,26 +141,37 @@ test("odpowiedź staje się surową decyzją, którą przyjmuje polityka", async
   assert.equal(w.odp.uzasadnienie, "Jev: PRODUCT_COMPATIBILITY (pewność 90%), krok CHECK_COMPATIBILITY.");
 });
 
-test("prośba o człowieka łapie się przy NISKIM progu, brak danych przy pośrednim", async () => {
+test("prośba o człowieka łapie się przy NISKIM progu, brak danych przy wysokim", async () => {
   const s = await surowa({
     prosi_o_czlowieka: noul(0.35),
     wymaga_czlowieka: noul(0.31),
-    brak_danych_zamowienia: noul(0.4),
-    brak_danych_produktu: noul(0.55),
+    brak_danych_zamowienia: noul(0.55),
+    brak_danych_produktu: noul(0.75),
   });
   assert.equal(s.prosiOCzlowieka, true, "0,35 przekracza próg 0,3: pominięcie kosztuje klienta");
   assert.equal(s.wymagaCzlowieka, true);
-  assert.equal(s.brakDanychZamowienia, false, "0,4 to jeszcze nie brak danych");
+  assert.equal(s.brakDanychZamowienia, false, "0,55 dawało w sondzie pytanie o stan, nie brak zamówienia");
   assert.equal(s.brakDanychProduktu, true);
+});
+
+test("flagi mają wąskie pytanie i opis obu odpowiedzi", async () => {
+  zKluczem();
+  const w = fetchZwracajacy(json(200, odpowiedz()));
+  await nadawcaJev(TRESC);
+  const q = JSON.parse(String(w[0]!.init.body)).questions;
+  for (const nazwa of ["wymaga_czlowieka", "brak_danych_zamowienia", "brak_danych_produktu"]) {
+    assert.equal(typeof q[nazwa].criteria?.true, "string", `${nazwa}: brak opisu „tak”`);
+    assert.equal(typeof q[nazwa].criteria?.false, "string", `${nazwa}: brak opisu „nie”`);
+  }
 });
 
 test("kategorie dodatkowe: próg wysoki, bez głównej, najwyżej trzy, od najpewniejszej", async () => {
   const s = await surowa({
-    dodatkowa_RETURN: noul(0.75),
+    dodatkowa_RETURN: noul(0.85),
     dodatkowa_COMPLAINT: noul(0.95),
-    dodatkowa_INVOICE: noul(0.71),
+    dodatkowa_INVOICE: noul(0.81),
     dodatkowa_CANCEL_ORDER: noul(0.9),
-    dodatkowa_ORDER_STATUS: noul(0.69),
+    dodatkowa_ORDER_STATUS: noul(0.78),
     dodatkowa_PRODUCT_COMPATIBILITY: noul(0.99),
   });
   assert.deepEqual(s.dodatkowe, ["COMPLAINT", "CANCEL_ORDER", "RETURN"]);
@@ -287,7 +298,7 @@ test("klucz nigdy nie trafia do komunikatu ani śladu błędu", async () => {
 test("zmiana opisów kategorii podnosi wersję instrukcji Claude i pytań Jeva", () => {
   const suma = createHash("sha256").update(JSON.stringify(OPISY_KATEGORII)).digest("hex").slice(0, 16);
   assert.deepEqual({ suma, PROMPT_KLASYFIKACJI, PYTANIA_JEVA },
-    { suma: "4a183396fd982ada", PROMPT_KLASYFIKACJI: "k4", PYTANIA_JEVA: "jev-j2" });
+    { suma: "4a183396fd982ada", PROMPT_KLASYFIKACJI: "k4", PYTANIA_JEVA: "jev-j3" });
 });
 
 test("model Jeva ma cennik, więc nie liczy się stawką najdroższego modelu", () => {
