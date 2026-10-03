@@ -5,7 +5,7 @@ import {
 } from "./copilot.js";
 import type { NadawcaKlasyfikacji, OdpowiedzModelu } from "../services/copilot-klasyfikacja.js";
 import {
-  KATEGORIE, OPISY_AKCJI, OPISY_KATEGORII, type Pewnosc,
+  KATEGORIE, OPISY_KATEGORII, type Akcja, type Kategoria, type Pewnosc,
 } from "../services/klasyfikacja-slownik.js";
 
 /* ── Wyjście do TypeSafe: rozpoznawanie przez Jeva ───────────────────────────
@@ -24,9 +24,9 @@ import {
    wywołania i wycinamy go z każdego tekstu, który stąd wychodzi. Tą drogą
    zginął kiedyś klucz Anthropic. `config.copilot.kluczJev` mówi tylko „jest".
 
-   Progi niżej to nastawy startowe, nie pomiar. Dokumentacja TypeSafe mówi, że
-   najlepszą trafność Jev ma po angielsku, więc polską pokaże dopiero
-   porównanie z Claude na prawdziwych wiadomościach.                         */
+   Progi niżej stoją na sondzie ze zmyślonych wiadomości, nie na skrzynce.
+   Dokumentacja TypeSafe mówi, że najlepszą trafność Jev ma po angielsku, więc
+   polską pokaże dopiero porównanie z Claude na prawdziwych wiadomościach.                         */
 
 const ADRES = "https://api.typesafe.ai/v1/systemone";
 const CZAS_NA_ODPOWIEDZ_MS = 30_000;
@@ -43,21 +43,27 @@ export const MODEL_JEV = "jev-1.13.0";
  * porównuje decyzje jednego zestawu pytań. ZMIENIASZ PYTANIA ALBO PROGI —
  * podnosisz numer.
  */
-export const PYTANIA_JEVA = "jev-j2";
+export const PYTANIA_JEVA = "jev-j4";
 
-/* Asymetria progów jest celowa:
+/* Progi wybrane z sondy na żywym API (`npm run sonda:jev`), z rozkładu
+   surowych wartości, a nie z pamięci. Asymetria jest celowa:
    - prośba o człowieka i potrzeba człowieka łapią się NISKO. Pomyłka w tę
      stronę kosztuje jedną rozmowę więcej w kolejce, a pominięta prośba
-     kosztuje klienta.
-   - brak danych to podpowiedź, nie decyzja: próg pośrodku.
-   - kategoria dodatkowa łapie się WYSOKO, bo liczą się tylko wyraźne prośby,
-     a niski próg dokładałby każdej rozmowie trzy etykiety.
-   Pewność słowna bierze się z `confidence` KATEGORII. Pewność kroku do niej
-   nie wchodzi: kroki bywają wymienne, a niepewny krok przy pewnej kategorii
-   nie jest powodem, by wołać człowieka. */
+     kosztuje klienta. W sondzie wyraźna prośba dawała 0,97, a reszta
+     najwyżej 0,27.
+   - brak danych łapie się WYSOKO. Prawdziwe braki dawały 0,83–0,95, a pytanie
+     o stan bez zamówienia 0,55. Fałszywa flaga podpowiada agentowi dopytanie
+     o coś, co klient już podał.
+   - kategoria dodatkowa łapie się najwyżej, bo liczą się tylko wyraźne
+     prośby. Podziękowanie dostawało „status zamówienia” przy 0,78.
+   Pewność słowna bierze się z `confidence` kategorii, bo krok wynika z niej
+   tabelą i własnej pewności nie ma. */
 const PROG_CZLOWIEKA = 0.3;
-const PROG_BRAKU_DANYCH = 0.5;
-const PROG_DODATKOWEJ = 0.7;
+const PROG_BRAKU_DANYCH = 0.7;
+const PROG_DODATKOWEJ = 0.8;
+/* Oczekiwanie odpowiedzi rozstrzyga tylko w OTHER: „tak” wysyła rozmowę do
+   przeglądu, więc pomyłka w tę stronę kosztuje jedno spojrzenie agenta. */
+const PROG_CZEKA = 0.5;
 const MAKS_DODATKOWYCH = 3;
 const PROG_PEWNOSCI_WYSOKIEJ = 0.8;
 const PROG_PEWNOSCI_SREDNIEJ = 0.5;
@@ -75,22 +81,36 @@ const ZASADY = [
 
 /** Pytania jednego wywołania. Klucze wracają w odpowiedzi bez zmian. */
 function pytania(): Record<string, unknown> {
-  const noul = (instructions: string) => ({ type: "noul", instructions });
+  /* Jev czyta pytanie dosłownie. Ogólne „czy brakuje danych” dostawało „tak”
+     prawie zawsze, bo w wątku zawsze czegoś brakuje. Dlatego flagi mają
+     wąskie pytanie i opis obu odpowiedzi w `criteria`. */
+  const noul = (instructions: string, criteria?: { true: string; false: string }) =>
+    ({ type: "noul", instructions, ...(criteria ? { criteria } : {}) });
   const q: Record<string, unknown> = {
     kategoria: {
       type: "choice",
       instructions: "Jaka jest główna kategoria ostatniej wiadomości klienta? Gdy klient jasno żąda konkretnego rozwiązania, ono jest główne.",
       criteria: OPISY_KATEGORII,
     },
-    akcja: {
-      type: "choice",
-      instructions: "Jaki JEDEN następny krok jest najbardziej użyteczny dla agenta? To podpowiedź, nie pozwolenie.",
-      criteria: OPISY_AKCJI,
-    },
+    /* Krok nie jest pytaniem do Jeva, tylko wynika z kategorii (`KROK`).
+       Ten Noul rozróżnia w OTHER podziękowanie od niejasnej prośby. */
+    czeka_na_odpowiedz: noul("Czy klient czeka na odpowiedź albo działanie sklepu?", {
+      true: "pyta, prosi albo czegoś oczekuje, nawet niejasno",
+      false: "dziękuje, potwierdza albo zamyka sprawę",
+    }),
     prosi_o_czlowieka: noul("Czy klient WPROST prosi o rozmowę z człowiekiem, telefon albo kierownika?"),
-    wymaga_czlowieka: noul("Czy sprawa wymaga decyzji człowieka, na przykład przez spór, groźbę, pieniądze albo sprzeczne prośby?"),
-    brak_danych_zamowienia: noul("Czy do następnego kroku potrzebne jest zamówienie, a w rozmowie go nie ma?"),
-    brak_danych_produktu: noul("Czy do następnego kroku potrzebne są dane towaru albo maszyny, a w rozmowie ich brakuje?"),
+    wymaga_czlowieka: noul("Czy ta sprawa wymaga decyzji człowieka, a nie zwykłej obsługi według procedury?", {
+      true: "klient grozi, spiera się, żąda pieniędzy albo jego prośby sobie przeczą",
+      false: "zwykłe pytanie albo prośba, którą agent załatwi według procedury",
+    }),
+    brak_danych_zamowienia: noul("Czy klient pisze o konkretnym zakupie, a w `rozmowa` stoi „zamówienie powiązane z rozmową: nie”?", {
+      true: "sprawa dotyczy zakupu (dostawa, zwrot, reklamacja, faktura), a zamówienie nie jest powiązane",
+      false: "zamówienie jest powiązane albo klient pyta o towar przed zakupem",
+    }),
+    brak_danych_produktu: noul("Czy klient pyta o pasowanie albo dobór części i nie podał ani modelu maszyny, ani numeru części?", {
+      true: "pyta, czy część pasuje albo jaką wybrać, bez modelu maszyny i bez numeru części",
+      false: "podał model albo numer części, albo sprawa nie zależy od maszyny",
+    }),
   };
   /* Choice wybiera jedną opcję, a kategorii dodatkowych bywa kilka, więc każda
      ma własny Noul. Dodatkowe pytania nic nie kosztują: TypeSafe liczy `state`
@@ -100,6 +120,47 @@ function pytania(): Record<string, unknown> {
     q[`dodatkowa_${k}`] = noul(`Czy ostatnia wiadomość klienta WYRAŹNIE zgłasza także taką sprawę: ${OPISY_KATEGORII[k]}`);
   }
   return q;
+}
+
+/* ── Następny krok ────────────────────────────────────────────────────────────
+
+   Krok wynika z kategorii i flag, a nie z pytania do Jeva. W sondzie na
+   trzydziestu jeden wiadomościach Jev wskazał „pobierz zamówienie” dwadzieścia
+   dwa razy, także przy anulowaniu, fakturze i samym „?”. Krok trafia do
+   kontekstu szkicu Claude, więc szum stamtąd przechodził do odpowiedzi.
+   Tabela daje ten sam krok dla tej samej sprawy i nie kosztuje pytania.
+   `akcjaModelu` przy decyzji Jeva to krok z tej tabeli.                     */
+
+type Flagi = { brakDanychProduktu: boolean; czeka: boolean; czlowiek: boolean };
+
+const KROK: Record<Kategoria, Akcja | ((f: Flagi) => Akcja)> = {
+  ORDER_STATUS: "GET_SHIPMENT",
+  DELIVERY_DELAY: "GET_SHIPMENT",
+  DELIVERY_LOST: "GET_SHIPMENT",
+  /* Szkoda w transporcie zaczyna się od przewoźnika i numeru przesyłki. */
+  DELIVERY_DAMAGED: "GET_SHIPMENT",
+  PRODUCT_COMPATIBILITY: (f) => (f.brakDanychProduktu ? "ASK_FOR_MACHINE_MODEL" : "CHECK_COMPATIBILITY"),
+  PRODUCT_QUESTION: (f) => (f.brakDanychProduktu ? "ASK_FOR_MACHINE_MODEL" : "GET_PRODUCT"),
+  PRODUCT_AVAILABILITY: "CHECK_STOCK",
+  WRONG_PRODUCT: "GET_ORDER",
+  MISSING_PRODUCT: "GET_ORDER",
+  /* Wadę bez śladu transportu ocenia się ze zdjęcia. */
+  DAMAGED_PRODUCT: "ASK_FOR_PHOTO",
+  /* Zwrot i reklamacja zostają ręczne; polityka dopisze `AKCJA_RECZNA`. */
+  RETURN: "START_RETURN",
+  COMPLAINT: "START_COMPLAINT",
+  CANCEL_ORDER: "GET_ORDER",
+  INVOICE: "GET_ORDER",
+  /* OTHER bez oczekiwań to podziękowanie. Z oczekiwaniem albo potrzebą
+     człowieka trafia do przeglądu, bo nie wiadomo, czego klient chce. */
+  OTHER: (f) => (f.czeka || f.czlowiek ? "HUMAN_REVIEW" : "NO_ACTION"),
+};
+
+/** Krok dla kategorii. Kategoria spoza słownika dostaje przegląd, a polityka i tak ją odrzuci. */
+export function krokDlaKategorii(kategoria: string, f: Flagi): Akcja {
+  const k = KROK[kategoria as Kategoria];
+  if (!k) return "HUMAN_REVIEW";
+  return typeof k === "function" ? k(f) : k;
 }
 
 /* ── Odczyt odpowiedzi ─────────────────────────────────────────────────────── */
@@ -209,7 +270,14 @@ export const nadawcaJev: NadawcaKlasyfikacji = async (tresc): Promise<OdpowiedzM
   }
 
   const kategoria = wybor(a, "kategoria");
-  const akcja = wybor(a, "akcja");
+  const wymagaCzlowieka = tak(a, "wymaga_czlowieka") >= PROG_CZLOWIEKA;
+  const prosiOCzlowieka = tak(a, "prosi_o_czlowieka") >= PROG_CZLOWIEKA;
+  const brakDanychProduktu = tak(a, "brak_danych_produktu") >= PROG_BRAKU_DANYCH;
+  const akcja = krokDlaKategorii(kategoria.wybrana, {
+    brakDanychProduktu,
+    czeka: tak(a, "czeka_na_odpowiedz") >= PROG_CZEKA,
+    czlowiek: wymagaCzlowieka || prosiOCzlowieka,
+  });
   const dodatkowe = KATEGORIE
     .filter((k) => k !== "OTHER" && k !== kategoria.wybrana)
     .map((k) => ({ k, p: tak(a, `dodatkowa_${k}`) }))
@@ -225,15 +293,15 @@ export const nadawcaJev: NadawcaKlasyfikacji = async (tresc): Promise<OdpowiedzM
     surowa: {
       kategoria: kategoria.wybrana,
       dodatkowe,
-      akcja: akcja.wybrana,
-      wymagaCzlowieka: tak(a, "wymaga_czlowieka") >= PROG_CZLOWIEKA,
-      prosiOCzlowieka: tak(a, "prosi_o_czlowieka") >= PROG_CZLOWIEKA,
+      akcja,
+      wymagaCzlowieka,
+      prosiOCzlowieka,
       brakDanychZamowienia: tak(a, "brak_danych_zamowienia") >= PROG_BRAKU_DANYCH,
-      brakDanychProduktu: tak(a, "brak_danych_produktu") >= PROG_BRAKU_DANYCH,
+      brakDanychProduktu,
       pewnosc: pewnoscSlowna(kategoria.pewnosc),
       powodInne: null,
       /* Jev nie pisze zdań, więc uzasadnienie składa się z tego, co zwrócił. */
-      uzasadnienie: `Jev: ${kategoria.wybrana} (pewność ${Math.round(kategoria.pewnosc * 100)}%), krok ${akcja.wybrana}.`,
+      uzasadnienie: `Jev: ${kategoria.wybrana} (pewność ${Math.round(kategoria.pewnosc * 100)}%), krok ${akcja}.`,
     },
     model: typeof cialo.model === "string" ? cialo.model : MODEL_JEV,
     promptWersja: PYTANIA_JEVA,

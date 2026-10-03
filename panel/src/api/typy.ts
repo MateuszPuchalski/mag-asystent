@@ -158,6 +158,8 @@ export type PomiarKlasyfikacji = {
   wgZrodla: Record<Kopilot["zrodlo"], number>;
   wgStatusu: Record<string, number>;
   wymagaCzlowieka: number;
+  /** Klasyfikator, którego dotyczą etykiety i tabela kategorii; `null` = jeszcze żaden. */
+  biezacy: { model: string; promptWersja: string } | null;
   oznaczonych: number;
   /** Bez tej liczby każdy procent udawałby pomiar. */
   nieoznaczonych: number;
@@ -166,6 +168,9 @@ export type PomiarKlasyfikacji = {
     precyzja: Udzial | null; czulosc: Udzial | null }>;
   /** Zgodność mapowania struktury Allegro z etykietą człowieka — osobno od modelu. */
   mapowanie: Udzial | null;
+  /** Każdy klasyfikator osobno, od najnowszego: tu stoi porównanie Claude z Jevem. */
+  klasyfikatory: Array<{ model: string; promptWersja: string; decyzji: number;
+    oznaczonych: number; zgodnosc: Udzial | null }>;
 };
 
 /** Pomiar zza zębatki (0.168.0: diagnostyka nie stoi na ekranie pracy). */

@@ -571,7 +571,12 @@ export interface PomiarKlasyfikacji {
   wgZrodla: Record<Zrodlo, number>;
   wgStatusu: Record<string, number>;
   wymagaCzlowieka: number;
-  /** Decyzje modelu z etykietą człowieka — mianownik trafności. */
+  /**
+   * Klasyfikator, którego dotyczą liczby etykiet i tabela kategorii: model
+   * i wersja instrukcji NAJNOWSZEJ decyzji modelu. `null` = żadnej jeszcze nie było.
+   */
+  biezacy: { model: string; promptWersja: string } | null;
+  /** Decyzje bieżącego klasyfikatora z etykietą człowieka — mianownik trafności. */
   oznaczonych: number;
   /** Decyzje modelu BEZ etykiety. Bez tej liczby każdy procent kłamie. */
   nieoznaczonych: number;
@@ -589,6 +594,18 @@ export interface PomiarKlasyfikacji {
    * wskazaniem Allegro (wąskie i szerokie), przy których człowiek coś wskazał.
    */
   mapowanie: Udzial | null;
+  /**
+   * Każdy klasyfikator osobno, od najnowszego: ile decyzji, ile etykiet
+   * człowieka i jak często etykieta zgadzała się z modelem. Tu stoi
+   * porównanie Claude z Jevem.
+   */
+  klasyfikatory: Array<{
+    model: string;
+    promptWersja: string;
+    decyzji: number;
+    oznaczonych: number;
+    zgodnosc: Udzial | null;
+  }>;
 }
 
 /**
@@ -598,15 +615,46 @@ export interface PomiarKlasyfikacji {
  * Próbka jest skrzywiona i ekran ma to mówić: agent częściej poprawia
  * pomyłkę, niż potwierdza trafienie, więc precyzja wychodzi tu raczej
  * zaniżona. Specyfikacja każe to równoważyć audytem próbki, nie wzorem.
+ *
+ * TRAFNOŚĆ LICZY SIĘ DLA JEDNEGO KLASYFIKATORA NARAZ. Precyzja zlana z decyzji
+ * Claude i Jeva nie mówi nic o żadnym z nich, a przełączenie dostawcy to
+ * jedna zmienna w `wertis.env`. Tabela kategorii i liczby etykiet dotyczą
+ * więc najnowszego klasyfikatora, a porównanie stoi w `klasyfikatory`.
+ * Liczby decyzji, źródeł i statusów zostają wspólne, bo opisują kolejkę.
  */
 export function pomiarKlasyfikacji(database: DatabaseSync): PomiarKlasyfikacji {
   const wiersze = database.prepare(`SELECT zrodlo, status, wymaga_czlowieka,
-      kategoria_modelu, kategoria_czlowieka, kategoria_allegro
-    FROM decyzja_klasyfikacji WHERE aktywna=1 AND taksonomia_wersja=?`)
+      kategoria_modelu, kategoria_czlowieka, kategoria_allegro, model, prompt_wersja
+    FROM decyzja_klasyfikacji WHERE aktywna=1 AND taksonomia_wersja=?
+    ORDER BY id DESC`)
     .all(TAKSONOMIA_WERSJA) as Array<{
       zrodlo: Zrodlo; status: string; wymaga_czlowieka: number;
       kategoria_modelu: string | null; kategoria_czlowieka: string | null;
-      kategoria_allegro: string | null }>;
+      kategoria_allegro: string | null; model: string | null; prompt_wersja: string | null }>;
+
+  const klucz = (w: { model: string | null; prompt_wersja: string | null }) =>
+    `${w.model ?? ""}\u0000${w.prompt_wersja ?? ""}`;
+  const zModelu = wiersze.filter((w) => w.zrodlo === "MODEL" && w.kategoria_modelu && w.model);
+  const grupy = new Map<string, typeof zModelu>();
+  for (const w of zModelu) grupy.set(klucz(w), [...(grupy.get(klucz(w)) ?? []), w]);
+  const klasyfikatory = [...grupy.values()].map((g) => {
+    const z = g.filter((w) => w.kategoria_czlowieka);
+    return {
+      model: String(g[0]!.model), promptWersja: String(g[0]!.prompt_wersja ?? ""),
+      decyzji: g.length, oznaczonych: z.length,
+      zgodnosc: wilson(z.filter((w) => w.kategoria_czlowieka === w.kategoria_modelu).length, z.length),
+    };
+  });
+  /* Bieżący klasyfikator to ten z najnowszej decyzji BEZ etykiety człowieka.
+     Poprawka agenta to nowy wiersz z modelem skopiowanym ze starej decyzji,
+     więc poprawka starej rozmowy Claude przełączałaby tabelę z Jeva na Claude.
+     Wiersze idą od najwyższego `id`. */
+  const wzor = zModelu.find((w) => !w.kategoria_czlowieka) ?? zModelu[0];
+  const biezacyKlucz = wzor ? klucz(wzor) : null;
+  const biezacy = wzor ? { model: String(wzor.model), promptWersja: String(wzor.prompt_wersja ?? "") } : null;
+  /* Porównanie od bieżącego, potem w kolejności najnowszej decyzji. */
+  klasyfikatory.sort((a, b) =>
+    Number(`${b.model}\u0000${b.promptWersja}` === biezacyKlucz) - Number(`${a.model}\u0000${a.promptWersja}` === biezacyKlucz));
 
   const wgZrodla: Record<Zrodlo, number> = { ALLEGRO_MAPPING: 0, MODEL: 0, FALLBACK: 0 };
   const wgStatusu: Record<string, number> = { SUCCESS: 0, FAILED: 0, NEEDS_REVIEW: 0 };
@@ -617,14 +665,14 @@ export function pomiarKlasyfikacji(database: DatabaseSync): PomiarKlasyfikacji {
     wgZrodla[w.zrodlo] = (wgZrodla[w.zrodlo] ?? 0) + 1;
     wgStatusu[w.status] = (wgStatusu[w.status] ?? 0) + 1;
     if (Number(w.wymaga_czlowieka)) wymaga++;
-    if (w.zrodlo !== "MODEL" || !w.kategoria_modelu) continue;
+    if (w.zrodlo !== "MODEL" || !w.kategoria_modelu || klucz(w) !== biezacyKlucz) continue;
     if (w.kategoria_czlowieka) oznaczone.push({ model: w.kategoria_modelu, czlowiek: w.kategoria_czlowieka });
     else nieoznaczonych++;
   }
 
   const przewidziane = new Map<string, number>();
   for (const w of wiersze) {
-    if (w.zrodlo === "MODEL" && w.kategoria_modelu) {
+    if (w.zrodlo === "MODEL" && w.kategoria_modelu && klucz(w) === biezacyKlucz) {
       przewidziane.set(w.kategoria_modelu, (przewidziane.get(w.kategoria_modelu) ?? 0) + 1);
     }
   }
@@ -641,7 +689,7 @@ export function pomiarKlasyfikacji(database: DatabaseSync): PomiarKlasyfikacji {
   return {
     taksonomia: TAKSONOMIA_WERSJA,
     decyzji: wiersze.length, wgZrodla, wgStatusu, wymagaCzlowieka: wymaga,
-    oznaczonych: oznaczone.length, nieoznaczonych,
+    biezacy, oznaczonych: oznaczone.length, nieoznaczonych,
     poprawionych: oznaczone.filter((o) => o.model !== o.czlowiek).length,
     wgKategorii,
     mapowanie: (() => {
@@ -649,6 +697,7 @@ export function pomiarKlasyfikacji(database: DatabaseSync): PomiarKlasyfikacji {
       return wilson(zAllegro.filter((w) => w.kategoria_allegro === w.kategoria_czlowieka).length,
         zAllegro.length);
     })(),
+    klasyfikatory,
   };
 }
 

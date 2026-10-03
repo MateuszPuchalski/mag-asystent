@@ -100,6 +100,10 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
           {" "}ze struktury Allegro {k.wgZrodla.ALLEGRO_MAPPING}, zastępczych {k.wgZrodla.FALLBACK}.
           {" "}Nieudanych <b>{k.wgStatusu.FAILED ?? 0}</b>, do przejrzenia {k.wgStatusu.NEEDS_REVIEW ?? 0},
           {" "}wymaga człowieka {k.wymagaCzlowieka}.
+          {/* Etykiety i tabela niżej dotyczą JEDNEGO klasyfikatora: precyzja zlana
+              z Claude i Jeva nie mówiłaby nic o żadnym z nich. */}
+          {k.biezacy && <>{" "}Etykiety i tabela dotyczą klasyfikatora
+            {" "}<b>{k.biezacy.model}</b> ({k.biezacy.promptWersja}).</>}
           {" "}Etykiet człowieka: <b>{k.oznaczonych}</b> (w tym poprawek {k.poprawionych}),
           {" "}bez etykiety: <b>{k.nieoznaczonych}</b>.
           {/* Próg podany JAWNIE, bo „wygląda dobrze" to nie jest decyzja o modelu. */}
@@ -163,6 +167,20 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
             <Td className="tabular-nums">{z.wywolan}</Td>
             <Td className="tabular-nums">{sek(z.medianaMs)}</Td>
             <Td className="tabular-nums">{sek(z.p90Ms)}</Td>
+          </tr>)}
+        </Tabela>
+      </div>}
+
+      {/* Porównanie klasyfikatorów: zgodność modelu z etykietą człowieka,
+          każdy osobno. Dopiero ta tabela rozstrzyga, który rozpoznaje lepiej. */}
+      {dane.klasyfikacja.klasyfikatory.length > 1 && <div className="mt-3 border-t pt-3"
+        aria-label="Porównanie klasyfikatorów">
+        <Tabela naglowki={["klasyfikator", "decyzji", "etykiet", "zgodność z etykietą"]} pusto="">
+          {dane.klasyfikacja.klasyfikatory.map((k) => <tr key={`${k.model} ${k.promptWersja}`}>
+            <Td>{k.model} ({k.promptWersja})</Td>
+            <Td className="tabular-nums">{k.decyzji}</Td>
+            <Td className="tabular-nums">{k.oznaczonych}</Td>
+            <Td>{udzial(k.zgodnosc)}</Td>
           </tr>)}
         </Tabela>
       </div>}

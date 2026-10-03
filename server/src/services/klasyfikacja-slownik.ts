@@ -59,7 +59,10 @@ export const OPISY_KATEGORII: Readonly<Record<Kategoria, string>> = {
   PRODUCT_AVAILABILITY: "stan, dostawa towaru do sklepu, dostępna liczba sztuk, cena.",
   WRONG_PRODUCT: "klient mówi, że dostał INNY towar niż zamówił. Część zgodna z zamówieniem, która nie pasuje do maszyny, to PRODUCT_COMPATIBILITY.",
   MISSING_PRODUCT: "w otrzymanej paczce brakuje pozycji, elementu albo sztuk. Nie cała zaginiona przesyłka.",
-  DAMAGED_PRODUCT: "towar wadliwy albo uszkodzony bez jasnego śladu transportu.",
+  /* Przykład stoi tutaj, a nie przy DELIVERY_DAMAGED: Jev czyta dosłownie
+     i bez niego brał pęknięty towar w całym kartonie za szkodę w transporcie.
+     Zakaz przy DELIVERY_DAMAGED osłabiał prawdziwe szkody, a przykład nie. */
+  DAMAGED_PRODUCT: "towar wadliwy albo uszkodzony bez jasnego śladu transportu, na przykład pęknięty albo wygięty w całym kartonie.",
   RETURN: "klient chce zwrócić albo wymienić towar, a nie prosi wprost o procedurę reklamacyjną.",
   COMPLAINT: "wprost reklamacja, gwarancja, rękojmia albo żądanie naprawy wady; wadę zostaw jako kategorię dodatkową.",
   CANCEL_ORDER: "prośba o anulowanie zamówienia.",
@@ -77,28 +80,6 @@ export const AKCJE = [
   "ASK_FOR_PHOTO", "HUMAN_REVIEW", "NO_ACTION",
 ] as const;
 export type Akcja = (typeof AKCJE)[number];
-
-/**
- * Kroki opisane dla Jeva, który dostaje je jako opisy opcji. Instrukcja Claude
- * opisuje te same kroki własnymi słowami, pogrupowanymi w kilku liniach.
- * Przepisanie jej na tę listę zmieniłoby tekst instrukcji i rozcięło pomiar
- * Claude na dwie wersje, a granice kroków nie są sporne tak jak granice
- * kategorii.
- */
-export const OPISY_AKCJI: Readonly<Record<Akcja, string>> = {
-  GET_ORDER: "pobrać zamówienie",
-  GET_SHIPMENT: "sprawdzić śledzenie przesyłki",
-  GET_PRODUCT: "pobrać dane oferty lub towaru",
-  CHECK_COMPATIBILITY: "sprawdzić pasowanie w danych, nigdy nie zgadywać",
-  CHECK_STOCK: "sprawdzić stan magazynu",
-  START_RETURN: "przygotować zwrot; robi to człowiek",
-  START_COMPLAINT: "przygotować reklamację; robi to człowiek",
-  ASK_FOR_MACHINE_MODEL: "dopytać o dokładny model maszyny, bo go brakuje",
-  ASK_FOR_PART_NUMBER: "dopytać o numer części, bo go brakuje",
-  ASK_FOR_PHOTO: "poprosić o zdjęcie towaru, tabliczki albo uszkodzenia",
-  HUMAN_REVIEW: "oddać człowiekowi: niepewność, konflikt albo prośba o człowieka",
-  NO_ACTION: "nic nie trzeba robić, na przykład podziękowanie",
-};
 
 /**
  * Pewność zgłoszona przez model. Trzy słowa, nie procent — i ekran nie udaje,
