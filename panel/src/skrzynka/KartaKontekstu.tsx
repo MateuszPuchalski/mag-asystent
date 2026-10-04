@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Check, ChevronDown, ChevronRight, CircleDashed, ExternalLink, UserRound } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { Check, ChevronDown, ChevronRight, ChevronUp, CircleDashed, ExternalLink, UserRound } from "lucide-react";
 import type { HistoriaKlienta, OsRozmowy } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Skopiuj, dzienMiesiac, ile } from "../ui";
@@ -15,8 +15,11 @@ import { stanZakupu, type KrokZakupu } from "./zakup";
    i kim jest klient.
 
    STOI W PRZEWIJANIU OSI, nie nad nią. Przypięta zabierałaby wysokość edytorowi
-   przez cały dzień, a wysokość należy do odpowiedzi. Cena: przy długiej
-   rozmowie karta jest za górną krawędzią i trzeba przewinąć w górę.
+   przez cały dzień, a wysokość należy do odpowiedzi. Cena: oś zjeżdża na dół
+   przy otwarciu, więc karta ląduje za górną krawędzią. Dlatego, GDY KARTY NIE
+   WIDAĆ, u góry osi stoi jednolinijkowe streszczenie, które przewija do niej.
+   Pasek istnieje tylko wtedy: przy krótkiej rozmowie karta jest w kadrze
+   i streszczenie dublowałoby ją o jedną linię wyżej.
 
    ZWIJA SIĘ DO JEDNEJ LINII, a wybór zostaje w przeglądarce, bo to nawyk
    stanowiska, nie decyzja na jedno otwarcie (jak kolejność kolejki).
@@ -57,6 +60,11 @@ function Krok({ krok }: { krok: KrokZakupu }) {
 
 export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?: HistoriaKlienta }) {
   const [zwinieta, setZwinieta] = useState(odczytajZwinieta);
+  const kartaRef = useRef<HTMLElement>(null);
+  /* `true` na starcie, jak przy pytaniu klienta w osi: obserwator oddaje wynik
+     dopiero po renderze, a pasek, który mignąłby przed pierwszym pomiarem,
+     dublowałby kartę widoczną w kadrze. */
+  const [wKadrze, setWKadrze] = useState(true);
   const zam = dane.zamowienie?.pobrane ?? null;
   const oferta = dane.oferta?.pobrana ?? null;
   const stan = zam ? stanZakupu(zam, dane.zamowienie?.przesylka ?? null) : null;
@@ -69,9 +77,23 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
   if (nowyKlient(h)) znaczniki.push("Nowy klient");
   const wczesniej = h && klientMaHistorie(h) ? streszczenieKlienta(h) : null;
 
+  const jestKarta = Boolean(zam || oferta || znaczniki.length > 0 || wczesniej);
+  /* Zależność od `zwinieta`: rozwinięta i zwinięta karta to dwa różne elementy
+     pod tym samym refem, więc obserwator musi złapać nowy. */
+  useEffect(() => {
+    const el = kartaRef.current;
+    if (!jestKarta || !el || typeof IntersectionObserver === "undefined") {
+      setWKadrze(true);
+      return;
+    }
+    const o = new IntersectionObserver(([w]) => setWKadrze(w.isIntersecting));
+    o.observe(el);
+    return () => o.disconnect();
+  }, [jestKarta, zwinieta]);
+
   /* Karta bez treści nie zostaje pustą ramką: rozmowa bez zakupu i bez historii
      jest częsta, a pusta ramka mówiłaby, że czegoś brakuje. */
-  if (!zam && !oferta && znaczniki.length === 0 && !wczesniej) return null;
+  if (!jestKarta) return null;
 
   const pozycje = zam?.pozycje ?? [];
   const nazwa = pozycje[0]?.nazwa ?? oferta?.nazwa ?? null;
@@ -84,26 +106,56 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
     {wczesniej && <span>Wcześniej u nas: {wczesniej}</span>}
   </div>;
 
+  /* Skraca się NAZWA towaru, a cena, anulowanie i historia zostają: to one są
+     odpowiedzią na „co z tym zakupem", a nazwa bywa sześćdziesięcioznakowa.
+     Ten sam fragment czyta karta zwinięta i pasek u góry osi. */
+  const streszczenie = <span className="flex min-w-0 flex-1 items-baseline gap-1 overflow-hidden">
+    {nazwa && <b className="min-w-0 truncate font-semibold">{nazwa}</b>}
+    {suma && <span className="shrink-0">· {suma}</span>}
+    {stan?.anulowane && <span className="shrink-0 font-semibold text-ranga-zle">· anulowane</span>}
+    {wczesniej && <span className="shrink-0 text-slate-500">· {wczesniej}</span>}
+    {!nazwa && znaczniki.length > 0 && <span>{znaczniki.join(" · ")}</span>}
+  </span>;
+
+  /* Przewija OŚ, nie `scrollIntoView`: ten przewija też stronę i wypchnął
+     nagłówek ekranu za górną krawędź (zmierzone w przeglądarce). Karta jest
+     bezpośrednim dzieckiem przewijanej listy, a margines 16 px zostawia jej
+     oddech nad górną krawędzią. */
+  const pokazKarte = () => {
+    const karta = kartaRef.current;
+    const lista = karta?.parentElement;
+    if (!karta || !lista) return;
+    const przesuniecie = karta.getBoundingClientRect().top - lista.getBoundingClientRect().top;
+    lista.scrollTo?.({ top: Math.max(0, lista.scrollTop + przesuniecie - 16), behavior: "smooth" });
+  };
+
+  /* Wrapper ma wysokość ZERO i `!mt-0`: `space-y-3` osi doliczyłby mu odstęp,
+     a pasek przypięty NAD kadrem nie ma prawa przesunąć ani jednej wypowiedzi.
+     Sam pasek wisi absolutnie wewnątrz, więc nie bierze miejsca w układzie. */
+  const pasek = <div className="pointer-events-none sticky top-0 z-10 !mt-0 h-0">
+    {!wKadrze && <button type="button" onClick={pokazKarte}
+      aria-label={`Pokaż kartę zakupu${nazwa ? `: ${nazwa}` : ""}`}
+      className="pointer-events-auto absolute inset-x-0 top-2 flex w-full min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-left text-xs text-slate-700 shadow-md hover:bg-slate-50">
+      <ChevronUp size={14} aria-hidden="true" className="shrink-0 text-slate-500" />
+      {streszczenie}
+      <span className="shrink-0 text-podpis font-semibold text-sky-800">pokaż kartę</span>
+    </button>}
+  </div>;
+
   if (zwinieta) {
-    return <section aria-label="Kontekst zakupu" className="rounded-lg border border-slate-200 bg-white px-3 py-1.5">
+    return <><section ref={kartaRef} aria-label="Kontekst zakupu"
+      className="rounded-lg border border-slate-200 bg-white px-3 py-1.5">
       <button type="button" aria-expanded={false} onClick={przelacz}
         className="flex w-full min-w-0 items-center gap-2 text-left text-xs text-slate-700">
         <ChevronRight size={14} aria-hidden="true" className="shrink-0 text-slate-500" />
-        {/* Skraca się NAZWA towaru, a cena, anulowanie i historia zostają: to one
-            są odpowiedzią na „co z tym zakupem", a nazwa bywa sześćdziesięcioznakowa. */}
-        <span className="flex min-w-0 flex-1 items-baseline gap-1 overflow-hidden">
-          {nazwa && <b className="min-w-0 truncate font-semibold">{nazwa}</b>}
-          {suma && <span className="shrink-0">· {suma}</span>}
-          {stan?.anulowane && <span className="shrink-0 font-semibold text-ranga-zle">· anulowane</span>}
-          {wczesniej && <span className="shrink-0 text-slate-500">· {wczesniej}</span>}
-          {!nazwa && znaczniki.length > 0 && <span>{znaczniki.join(" · ")}</span>}
-        </span>
+        {streszczenie}
         <span className="shrink-0 text-podpis font-semibold text-sky-800">rozwiń</span>
       </button>
-    </section>;
+    </section>{pasek}</>;
   }
 
-  return <section aria-label="Kontekst zakupu" className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
+  return <><section ref={kartaRef} aria-label="Kontekst zakupu"
+    className="space-y-2 rounded-lg border border-slate-200 bg-white p-3">
     <div className="flex items-center gap-2 text-podpis text-slate-500">
       <button type="button" aria-expanded onClick={przelacz} aria-label="Zwiń kartę zakupu"
         className="-ml-1 rounded p-1 hover:bg-slate-100"><ChevronDown size={14} /></button>
@@ -151,5 +203,5 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
       {stan.kroki.map((k) => <Krok key={k.klucz} krok={k} />)}
     </ol>}
     {klient && <div className="border-t border-slate-100 pt-2">{klient}</div>}
-  </section>;
+  </section>{pasek}</>;
 }

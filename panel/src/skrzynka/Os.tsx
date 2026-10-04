@@ -239,6 +239,26 @@ export function Os({
     if (naDole.current) zjedzNaDol();
   }, [wypowiedzi.length, zjedzNaDol]);
 
+  /* ZJAZD CZEKA NA UKŁAD. Efekty wyżej odpalają się po renderze, ale zanim
+     dojdą zdjęcia oferty, karta zakupu, szkic Copilota i pasek odpowiedzi.
+     Oś zjeżdżała więc do „dołu z chwili otwarcia" i zatrzymywała się nad
+     prawdziwym: pływający pasek „Wyślij" (`sticky bottom-2`) zasłaniał wtedy
+     ostatni wiersz. Każda zmiana wysokości dziecka listy dogania dół, ale
+     tylko gdy agent na nim stał — przewinięty w górę czyta i nie wolno go
+     ściągać. Bez `ResizeObserver` (jsdom) zostaje zjazd z efektów wyżej.
+     `border-box`, bo liczy się CAŁA wysokość dziecka, nie sama treść: padding
+     i ramka też przesuwają dół.
+     Efekt bez tablicy zależności: dzieci listy przybywają i znikają razem
+     z kartą, edytorem i formularzem pomiaru, więc obserwowany zbiór trzeba
+     odświeżać po każdym renderze, a odłączenie jest tanie. */
+  React.useEffect(() => {
+    const lista = listaRef.current;
+    if (!lista || typeof ResizeObserver === "undefined") return;
+    const o = new ResizeObserver(() => { if (naDole.current) zjedzNaDol(); });
+    for (const dziecko of Array.from(lista.children)) o.observe(dziecko, { box: "border-box" });
+    return () => o.disconnect();
+  });
+
   /** Ostatnia wypowiedź KLIENTA — to, na co agent właśnie odpowiada. */
   const pytanie = React.useMemo(() => {
     for (let i = wypowiedzi.length - 1; i >= 0; i--) {
