@@ -243,7 +243,10 @@ describe("Ekran dyskusji", () => {
        stoi w cichym wierszu tła, więc jest krótsze — ale dalej odsyła. */
     pokaz();
     expect(screen.queryByRole("button", { name: /synchronizuj/i })).not.toBeInTheDocument();
-    expect(screen.getByText(/odświeżasz ją w reklamacjach/i)).toBeInTheDocument();
+    /* Zdanie jest samodzielne: w ciszy schodzi „synchronizacja: ...", więc zaimek
+       „ją" nie miałby do czego się odnosić. */
+    expect(screen.getByText(/synchronizację odświeżasz w reklamacjach/i)).toBeInTheDocument();
+    expect(screen.queryByText(/odświeżasz ją/i)).not.toBeInTheDocument();
   });
 
   it("punkt świeżości bierze ostatnią NIE naszą wiadomość, także doradcy", async () => {

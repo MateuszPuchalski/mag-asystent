@@ -368,13 +368,17 @@ export function Dyskusje() {
              w `ekrany/Reklamacje.tsx`. Schodzi WYŁĄCZNIE „synchronizacja:
              działa": zdanie prawdziwe zawsze i przez to puste.
 
-             „Odświeżasz ją w reklamacjach" ZOSTAJE także w ciszy i to jest
+             „Synchronizację odświeżasz w reklamacjach" ZOSTAJE także w ciszy i to jest
              rozróżnienie, nie niekonsekwencja. Tamto mówiło o stanie, ten
              odpowiada na pytanie „czemu nie ma tu przycisku" — a ono pada
-             wtedy, gdy wszystko działa, bo wtedy właśnie ktoś go szuka. */
+             wtedy, gdy wszystko działa, bo wtedy właśnie ktoś go szuka.
+
+             Zdanie nazywa rzecz („synchronizację"), a nie odsyła zaimkiem:
+             bez pierwszej połowy („synchronizacja: ..."), która w ciszy
+             schodzi, „ją" nie miało do czego się odnosić. */
           stanTekst={data?.stan && data.stan.status !== "current"
             ? `synchronizacja: ${STANY[data.stan.status] ?? data.stan.status} · odświeżasz ją w reklamacjach`
-            : "odświeżasz ją w reklamacjach"} />}
+            : "synchronizację odświeżasz w reklamacjach"} />}
 
     <div className={SIATKA_TRZECH_KOLUMN}>
       <Karta className="flex min-h-0 flex-col overflow-hidden">
