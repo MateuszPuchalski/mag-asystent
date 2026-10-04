@@ -671,3 +671,36 @@ describe("Ekran reklamacji", () => {
     expect(screen.getByText("ruch po liście")).toBeInTheDocument();
   });
 });
+
+describe("Szyna listy: kubełki pracy na wierzchu, widoki pod „Więcej”", () => {
+  /* Trzy pigułki wypełniały całą szerokość kolumny, więc zwarte „Więcej”
+     zawsze spadało do osobnego rzędu nad sprawami. „Wszystkie” to widok, nie
+     kubełek pracy, i leży pod „Więcej” razem z pozostałymi widokami. */
+  const wiecej = () => screen.getByLabelText("Więcej kubełków") as HTMLSelectElement;
+  const opcje = () => Array.from(wiecej().options).map((o) => o.textContent ?? "");
+
+  it("„Wszystkie” nie jest pigułką, tylko opcją listy „Więcej”", () => {
+    pokaz();
+    expect(screen.queryByRole("button", { name: /^Wszystkie/ })).not.toBeInTheDocument();
+    expect(opcje().some((t) => /^Wszystkie · \d+$/.test(t))).toBe(true);
+  });
+
+  it("lista „Więcej” ma szerokość treści, nie resztę rzędu", () => {
+    /* Bez trybu zwartego rozciąga się na resztę rzędu i po zawinięciu robi się
+       pełnoszerokim paskiem nad sprawami. */
+    pokaz();
+    expect(wiecej().className).toMatch(/field-sizing:content/);
+  });
+
+  it("wybór „Wszystkie” z listy działa i lista pokazuje wybraną nazwę", async () => {
+    pokaz();
+    await userEvent.selectOptions(wiecej(), opcje().find((t) => /^Wszystkie/.test(t))!);
+    expect(wiecej().selectedOptions[0].textContent).toMatch(/^Wszystkie/);
+  });
+
+  it("kreska oddziela sita od tagów", () => {
+    pokaz();
+    const tag = screen.getByTitle(/^Sprawy z tagiem/);
+    expect(tag.closest(".border-l")).not.toBeNull();
+  });
+});
