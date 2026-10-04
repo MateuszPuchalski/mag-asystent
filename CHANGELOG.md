@@ -10,6 +10,16 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.557.4 — 4 października 2026
+
+Dyskusja: czas, przez jaki pytanie klienta czeka na naszą odpowiedź, stoi teraz
+na górze kolumny faktów jako osobny blok (czerwony po przekroczeniu progu
+alarmu), a nie tylko w szarym podpisie zwiniętego wiersza „Stan". Zegar nie
+powtarza się już w podpisie i w środku tej zwijki.
+
+Zwrot: gdy nie ma dokumentu sprzedaży, trzy powody tego braku są pod
+rozwijanym „Czemu go nie ma?". Na wierzchu zostaje to, co robić dalej.
+
 ## 0.557.3 — 4 października 2026
 
 Wiersze kolejek mówią każdą rzecz raz. W dyskusjach znika czip „czeka na nas"
