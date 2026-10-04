@@ -1,9 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { KartaKontekstu } from "./KartaKontekstu";
+import { ustawKadr } from "../test/kadr";
 import type { HistoriaKlienta, OsRozmowy } from "../api/typy";
 
 /* ── Karta zakupu i klienta nad rozmową ─────────────────────────────────────
@@ -154,5 +155,69 @@ describe("KartaKontekstu", () => {
     pokaz(dane(), historia());
     expect(zapisy.filter((z) => !z.startsWith("GET "))).toEqual([]);
     expect(zapisy.some((z) => /przesylk/i.test(z))).toBe(false);
+  });
+
+  describe("streszczenie przypięte, gdy karty nie widać", () => {
+    /* Oś zjeżdża na dół przy otwarciu i chowa kartę za górną krawędzią. Pasek
+       ma istnieć WYŁĄCZNIE wtedy; w kadrze dublowałby kartę o linię wyżej. */
+    const przypiety = () => screen.queryByRole("button", { name: /Pokaż kartę zakupu/ });
+
+    it("karta w kadrze — paska nie ma", () => {
+      pokaz(dane());
+      expect(przypiety()).toBeNull();
+    });
+
+    it("karta poza kadrem — pasek niesie towar i cenę, a kliknięcie przewija do karty", async () => {
+      pokaz(dane());
+      act(() => ustawKadr(false));
+      const pasek = przypiety();
+      expect(pasek).not.toBeNull();
+      expect(pasek).toHaveTextContent("NÓŻ TRAKTORKA KOSIARKI DO MTD 54cm");
+      expect(pasek).toHaveTextContent("89,99 PLN");
+      /* Przewija listę, nie stronę: `scrollIntoView` wypychał nagłówek ekranu. */
+      const przewin = vi.fn();
+      const wstrzyknieto = Object.getOwnPropertyDescriptor(Element.prototype, "scrollTo");
+      Element.prototype.scrollTo = przewin as unknown as typeof Element.prototype.scrollTo;
+      const skokStrony = vi.spyOn(Element.prototype, "scrollIntoView");
+      skokStrony.mockClear();
+      await userEvent.click(pasek!);
+      if (wstrzyknieto) Object.defineProperty(Element.prototype, "scrollTo", wstrzyknieto);
+      else delete (Element.prototype as unknown as Record<string, unknown>).scrollTo;
+      expect(przewin).toHaveBeenCalledTimes(1);
+      expect(przewin.mock.calls[0][0]).toMatchObject({ behavior: "smooth" });
+      expect(skokStrony).not.toHaveBeenCalled();
+    });
+
+    it("powrót karty do kadru zdejmuje pasek", () => {
+      pokaz(dane());
+      act(() => ustawKadr(false));
+      expect(przypiety()).not.toBeNull();
+      act(() => ustawKadr(true));
+      expect(przypiety()).toBeNull();
+    });
+
+    it("zwinięta karta poza kadrem też ma pasek", () => {
+      window.localStorage.setItem("wertis.skrzynka.karta.zwinieta", "1");
+      pokaz(dane());
+      act(() => ustawKadr(false));
+      expect(przypiety()).not.toBeNull();
+    });
+
+    it("pasek nie zabiera miejsca w układzie osi", () => {
+      /* `space-y-3` osi doliczyłby odstęp każdemu dziecku; wrapper musi go mieć
+         wyzerowanego i zerową wysokość, inaczej pasek przesuwa wypowiedzi. */
+      const { container } = pokaz(dane());
+      const wrapper = container.querySelector(".sticky");
+      expect(wrapper).not.toBeNull();
+      expect(wrapper!.className).toMatch(/!mt-0/);
+      expect(wrapper!.className).toMatch(/\bh-0\b/);
+    });
+
+    it("rozmowa bez zakupu i historii nie ma ani karty, ani paska", () => {
+      pokaz(dane({ zamowienie: null, oferta: null }));
+      act(() => ustawKadr(false));
+      expect(przypiety()).toBeNull();
+      expect(screen.queryByRole("region", { name: "Kontekst zakupu" })).toBeNull();
+    });
   });
 });

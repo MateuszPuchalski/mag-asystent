@@ -134,6 +134,66 @@ describe("Oś zjeżdża na dół sama", () => {
   });
 });
 
+describe("Zjazd czeka, aż treść się ułoży", () => {
+  /* Zdjęcia oferty, karta zakupu i szkic Copilota dochodzą PO pierwszym
+     renderze. Zjazd z chwili otwarcia zatrzymywał oś nad prawdziwym dołem,
+     a pływający pasek „Wyślij" zasłaniał wtedy ostatni wiersz. jsdom nie
+     liczy układu, więc atrapa `ResizeObserver` mówi, że rozmiar się zmienił,
+     a wysokość listy zmienia sam test. */
+  let wysokosc = WYSOKOSC;
+  const wolania: Array<() => void> = [];
+  const obserwowane: Element[] = [];
+
+  beforeEach(() => {
+    wysokosc = WYSOKOSC;
+    wolania.length = 0;
+    obserwowane.length = 0;
+    Object.defineProperty(HTMLElement.prototype, "scrollHeight",
+      { configurable: true, get: () => wysokosc });
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(private readonly cb: () => void) { wolania.push(() => this.cb()); }
+      observe(el: Element) { obserwowane.push(el); }
+      unobserve() {}
+      disconnect() {}
+    });
+  });
+  afterEach(() => {
+    delete (HTMLElement.prototype as unknown as Record<string, unknown>).scrollHeight;
+    vi.unstubAllGlobals();
+  });
+
+  const urosloDoSzczytu = () => act(() => { for (const w of [...wolania]) w(); });
+
+  it("lista dorasta po otwarciu — oś dogania nowy dół", () => {
+    const { container } = os([pytanie(), nasza()]);
+    const el = lista(container);
+    expect(el.scrollTop).toBe(WYSOKOSC);
+    wysokosc = 1300;
+    urosloDoSzczytu();
+    expect(el.scrollTop).toBe(1300);
+  });
+
+  it("agent przewinięty w górę NIE jest ściągany, gdy treść dorasta", () => {
+    const { container } = os([pytanie(), nasza()]);
+    const el = lista(container);
+    el.scrollTop = 0;
+    fireEvent.scroll(el);
+    wysokosc = 1300;
+    urosloDoSzczytu();
+    expect(el.scrollTop).toBe(0);
+  });
+
+  it("obserwuje dzieci listy, w tym blok `koniec` z edytorem", () => {
+    const { container } = render(<Os wpisy={[pytanie(), nasza()]} rozmowaId={1}
+      zrodloPomiaru={null} mozeZlecac={false} onZrodlo={() => {}} onWstawDoSzkicu={() => {}}
+      naGorze={<section data-testid="karta" />} koniec={<div data-testid="edytor" />} />);
+    const el = lista(container);
+    expect(obserwowane).toContain(screen.getByTestId("karta"));
+    expect(obserwowane).toContain(screen.getByTestId("edytor"));
+    expect(obserwowane.every((x) => x.parentElement === el)).toBe(true);
+  });
+});
+
 describe("Pytanie klienta przypięte nad edytorem", () => {
   it("w kadrze — paska NIE MA, bo dublowałby zdanie o krok wyżej", () => {
     const { container } = os([pytanie()]);
