@@ -10,6 +10,15 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.557.2 — 4 października 2026
+
+Dyskusje i reklamacje: lista „Więcej" stoi w tym samym rzędzie co kubełki pracy,
+zamiast zajmować osobny pełnoszeroki rząd nad sprawami. Żeby się zmieściła,
+„Wszystkie" przeszło z pigułek pod „Więcej" (jak już „Zamknięte"); klawisz
+cyfry dalej je wybiera. Pierwsza sprawa na liście stoi o około 28 px wyżej.
+Sita „Moje" i „Niczyje" są oddzielone od tagów kreską, bo to dwa różne
+zawężenia.
+
 ## 0.557.1 — 4 października 2026
 
 Skrzynka: po otwarciu rozmowy oś zjeżdża na dół i chowała kartę zakupu za górną
