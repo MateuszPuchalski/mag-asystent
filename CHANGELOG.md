@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.557.3 — 4 października 2026
+
+Wiersze kolejek mówią każdą rzecz raz. W dyskusjach znika czip „czeka na nas"
+z kubełka „Do odpowiedzi" (kubełek już to mówi), a surowy identyfikator
+zamówienia skraca się do ośmiu znaków (pełny w podpowiedzi). W reklamacjach
+znika czip „termin", bo mówi to samo co plakietka z dniami do terminu.
+
 ## 0.557.2 — 4 października 2026
 
 Dyskusje i reklamacje: lista „Więcej" stoi w tym samym rzędzie co kubełki pracy,
