@@ -101,16 +101,26 @@ describe("Kolejka reklamacji", () => {
 
   it("każdy sygnał ma etykietę — także ten dołożony jako ostatni", () => {
     /* Mapa zamiast łańcucha `?:` (poprawka z 0.209.0 przy zwrotach): łańcuch
-       podpisywałby każdy nowy sygnał ostatnią gałęzią, czyli kłamał. */
+       podpisywałby każdy nowy sygnał ostatnią gałęzią, czyli kłamał.
+       „termin" jest w mapie, ale na wierszu go nie ma — mówi to plakietka. */
     render(<Kolejka reklamacje={[rek({
-      sygnaly: ["termin", "klient_czeka", "doradca", "czat_zamkniety",
+      sygnaly: ["klient_czeka", "doradca", "czat_zamkniety",
         "zwrot_wymagany", "status_nieznany", "werdykt_niepotwierdzony",
         "werdykt_nieudany", "towar_do_decyzji"],
     })]} wybrana={null} onWybierz={() => {}} />);
-    for (const t of ["termin", "klient czeka", "doradca", "czat zamknięty",
+    for (const t of ["klient czeka", "doradca", "czat zamknięty",
       "zwrot towaru", "status?", "werdykt czeka", "werdykt nieudany", "towar?"]) {
       expect(screen.getByText(t)).toBeInTheDocument();
     }
+  });
+
+  it("termin mówi jedna plakietka z dniami, nie plakietka i czip naraz", () => {
+    /* Czip „termin" odpalał przy tym samym progu (≤ 3 dni), przy którym plakietka
+       robi się czerwona — dwa znaki jednej rzeczy na jednym wierszu. */
+    render(<Kolejka reklamacje={[rek({ dniDoTerminu: 2, sygnaly: ["termin"] })]}
+      wybrana={null} onWybierz={() => {}} />);
+    expect(screen.queryByText("termin")).not.toBeInTheDocument();
+    expect(screen.getByTitle("Termin decyzji: za 2 dni")).toHaveTextContent("2 dni");
   });
 
   it("kto prowadzi sprawę, widać z kolejki — to znacznik dla reszty biura", () => {
