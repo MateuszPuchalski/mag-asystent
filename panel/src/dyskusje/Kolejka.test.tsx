@@ -119,3 +119,36 @@ describe("Kolejka dyskusji", () => {
     expect(screen.getByRole("button")).toHaveAttribute("aria-current", "true");
   });
 });
+
+describe("Kolejka dyskusji: wiersz mówi każdą rzecz raz", () => {
+  const wiersz = (n: Partial<Dyskusja>) => render(
+    <Kolejka dyskusje={[d(n)]} wybrana={null} onWybierz={() => {}} />);
+
+  it("czip „czeka na nas” nie stoi w kubełku „Do odpowiedzi”, bo to samo mówi kubełek", () => {
+    wiersz({ kubelek: "odpowiedz", sygnaly: ["klient_czeka", "doradca"] });
+    expect(screen.queryByText("czeka na nas")).not.toBeInTheDocument();
+    /* Pozostałe sygnały zostają: filtr dotyczy jednego, nie wszystkich. */
+    expect(screen.getByText("doradca")).toBeInTheDocument();
+  });
+
+  it("poza tym kubełkiem ten sam sygnał zostaje — nic go tam nie zastępuje", () => {
+    wiersz({ kubelek: "zamknieta", sygnaly: ["klient_czeka"] });
+    expect(screen.getByText("czeka na nas")).toBeInTheDocument();
+  });
+
+  it("wiersz bez tagów i sygnałów nie dokłada pustego rzędu czipów", () => {
+    const { container } = wiersz({ kubelek: "odpowiedz", sygnaly: ["klient_czeka"], tagi: [] });
+    expect(container.querySelector(".flex-wrap")).toBeNull();
+  });
+
+  it("UUID zamówienia skraca się do ośmiu znaków, a pełny numer jest w podpowiedzi", () => {
+    wiersz({ orderId: "663f38f1-b98e-11f1-97b7-874d04101a2b" });
+    expect(screen.getByText(/kowalski · zamówienie 663f38f1$/)).toBeInTheDocument();
+    expect(screen.getByTitle("Zamówienie 663f38f1-b98e-11f1-97b7-874d04101a2b")).toBeInTheDocument();
+  });
+
+  it("numer, który nie jest UUID-em, zostaje w całości", () => {
+    wiersz({ orderId: "17147703077" });
+    expect(screen.getByText(/zamówienie 17147703077$/)).toBeInTheDocument();
+  });
+});

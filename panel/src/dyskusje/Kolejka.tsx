@@ -4,6 +4,7 @@ import type { Dyskusja, KubelekDyskusji, SygnalDyskusji } from "../api/typy";
 import { Pusto, dniSlowo } from "../ui";
 import { CzipTagu } from "../sprawy/Tagi";
 import { mojaSprawa } from "../sprawy/Moje";
+import { krotkiNumerZamowienia } from "../sprawy/numer";
 
 /* ── Kolejka dyskusji ────────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU i niesie PIĘĆ rzeczy: temat, kupującego, numer
@@ -110,6 +111,12 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz, moje
   return <ul className="divide-y divide-slate-200">
     {dyskusje.map((d) => {
       const aktywna = d.id === wybrana;
+      /* „Czeka na nas" w kubełku „Do odpowiedzi" mówi to, co kubełek: oba
+         liczą się z tego samego `ruchNalezyDoNas` (serwer, `services/dyskusje.ts`).
+         Czip stojący na KAŻDYM wierszu kubełka nie odróżnia żadnego od żadnego,
+         a zabiera rząd. Poza tym kubełkiem (szukanie miesza kubełki) zostaje. */
+      const sygnaly = d.sygnaly.filter((s) => !(s === "klient_czeka" && d.kubelek === "odpowiedz"));
+      const maCzipy = Boolean(d.zakonczenieStatus) || d.tagi.length > 0 || sygnaly.length > 0;
       return <li key={d.id}>
         <button
           /* Enter na wierszu prowadzi do pola odpowiedzi, jak w skrzynce. */
@@ -147,11 +154,12 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz, moje
               {KUBELKI.find((k) => k.id === d.kubelek)?.etykieta}</span>}
             <Czeka dni={d.czekaOdDni} godzin={d.czekaOdGodzin} dlugo={d.dlugoCzeka} pilna={d.pilna} />
           </div>
-          <div className="truncate text-sm text-slate-600">
+          <div className="truncate text-sm text-slate-600"
+            title={d.orderId ? `Zamówienie ${d.orderId}` : undefined}>
             {d.kupujacyLogin ?? "bez loginu"}
-            {d.orderId ? ` · zamówienie ${d.orderId}` : ""}
+            {d.orderId ? ` · zamówienie ${krotkiNumerZamowienia(d.orderId)}` : ""}
           </div>
-          <div className="flex flex-wrap items-center gap-1.5">
+          {maCzipy && <div className="flex flex-wrap items-center gap-1.5">
             {/* Prośba o zakończenie NIE jest zamknięciem, więc czip mówi
                 „poproszono", a nie „zamknięta". Zamknięcie przyniesie dopiero
                 `DISPUTE_CLOSED` z synchronizacji. */}
@@ -162,13 +170,13 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz, moje
             {/* Tagi przed sygnałami — powód przy tej samej linii
                 w `reklamacje/Kolejka.tsx`. */}
             {d.tagi.map((t) => <CzipTagu key={t.id} nazwa={t.nazwa} />)}
-            {d.sygnaly.map((s) => (
+            {sygnaly.map((s) => (
               <span key={s} title={SYGNALY[s].tytul}
                 className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${SYGNALY[s].klasa}`}>
                 {SYGNALY[s].ikona}{SYGNALY[s].krotko}
               </span>
             ))}
-          </div>
+          </div>}
         </button>
       </li>;
     })}

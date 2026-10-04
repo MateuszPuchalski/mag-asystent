@@ -147,6 +147,11 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
   return <ul className="divide-y divide-slate-200">
     {reklamacje.map((r) => {
       const aktywna = r.id === wybrana;
+      /* Czip „termin" odpala przy tym samym progu (≤ 3 dni, `PROG_TERMINU_DNI`
+         na serwerze), przy którym plakietka `Termin` robi się czerwona. Dwa
+         znaki jednej rzeczy na jednym wierszu: plakietka niesie przy tym
+         liczbę dni, czip tylko ostrzeżenie. */
+      const sygnaly = r.sygnaly.filter((s) => s !== "termin");
       return <li key={r.id}>
         <button
           /* Enter na wierszu prowadzi do pola odpowiedzi, jak w skrzynce. */
@@ -210,7 +215,7 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
                 które się samemu wpisało. Kolejności wiersza to nie zmienia
                 (§14.5): czip zawęża listę, nie podnosi jej wyżej. */}
             {r.tagi.map((t) => <CzipTagu key={t.id} nazwa={t.nazwa} />)}
-            {r.sygnaly.map((s) => (
+            {sygnaly.map((s) => (
               <span key={s} title={SYGNALY[s].tytul}
                 className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-bold ${SYGNALY[s].klasa}`}>
                 {SYGNALY[s].ikona}{SYGNALY[s].krotko}
