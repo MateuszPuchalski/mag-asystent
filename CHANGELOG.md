@@ -10,6 +10,15 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.557.5 — 4 października 2026
+
+Dyskusje: wiersz nad kolejką, gdy synchronizacja działa, mówił „odświeżasz ją
+w reklamacjach", a „ją" nie miało do czego się odnosić. Teraz: „synchronizację
+odświeżasz w reklamacjach".
+
+Do zrobienia: wiek sprawy młodszej niż doba pokazuje się w godzinach
+(„22 godz."), tak jak w dyskusjach, bez minut, które nie zmieniają decyzji.
+
 ## 0.557.4 — 4 października 2026
 
 Dyskusja: czas, przez jaki pytanie klienta czeka na naszą odpowiedź, stoi teraz
