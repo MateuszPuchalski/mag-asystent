@@ -95,6 +95,19 @@ describe("Dokument sprzedaży przy zwrocie", () => {
     expect(screen.getByText(/starsza niż okno importu/)).toBeInTheDocument();
   });
 
+  it("powody braku są pod rozwijanym, a zdanie o tym, co robić dalej, na wierzchu", () => {
+    /* Powody to wyjaśnienie systemu i stały tekst przy każdym zwrocie bez
+       dokumentu. Zdanie kończące się ruchem operatora zostaje widoczne: sam
+       powód zostawiał operatora przy ścianie. */
+    pokaz(BRAK, []);
+    const szczegoly = screen.getByText("Czemu go nie ma?").closest("details")!;
+    expect(szczegoly.open).toBe(false);
+    expect(szczegoly).toContainElement(screen.getByText(/starsza niż okno importu/));
+    const ruch = screen.getByText(/Zwrotu to nie zatrzymuje/);
+    expect(szczegoly).not.toContainElement(ruch);
+    expect(screen.getByText(/Nie znalazłem dokumentu sprzedaży/).closest("details")).toBeNull();
+  });
+
   it("odmowa serwera ląduje przy sekcji, a nie w konsoli", () => {
     render(<Dokument faktura={BRAK} kandydaci={[KANDYDAT()]} trwa={false}
       blad="Zwrot jest zamknięty" onWskaz={vi.fn()} />);

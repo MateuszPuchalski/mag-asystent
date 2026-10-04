@@ -46,21 +46,55 @@ function pokaz(s: SzczegolDyskusji, onNotatka = vi.fn()) {
 afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
 
 describe("Kolumna faktów o dyskusji", () => {
-  it("poniżej doby podpis stanu niesie godziny, nie „od dziś”", () => {
+  const blok = () => screen.queryByRole("group", { name: "Czas bez naszej odpowiedzi" });
+
+  it("poniżej doby blok niesie godziny, nie „od dziś”", () => {
     pokaz(szczegol({}, { czekaOdDni: 0, czekaOdGodzin: 9 }));
-    expect(screen.getByRole("button", { name: /Stan/ })).toHaveTextContent("czeka na nas 9 godz.");
+    expect(blok()).toHaveTextContent("9 godz.");
+    expect(blok()).not.toHaveTextContent("od dziś");
   });
 
-  it("„Sprawa” i „Stan” startują zwinięte, a podpis niesie czekanie", async () => {
+  it("„Sprawa” i „Stan” startują zwinięte, a zegar stoi w bloku nad nimi, nie w podpisie", async () => {
     pokaz(szczegol());
     const stan = screen.getByRole("button", { name: /Stan/ });
     expect(stan).toHaveAttribute("aria-expanded", "false");
     expect(screen.getByRole("button", { name: /Sprawa/ })).toHaveAttribute("aria-expanded", "false");
-    /* Czekanie to jedyna miara pilności dyskusji — zwinięta zwijka jej nie chowa. */
-    expect(stan).toHaveTextContent("czeka na nas 5 dni · 4 wiadomości");
+    /* Czekanie to jedyna miara pilności dyskusji. Nie chowa go zwijka, bo stoi
+       POZA nią — i nie powtarza się w podpisie ani w środku. */
+    expect(blok()).toHaveTextContent("Czeka na nas");
+    expect(blok()).toHaveTextContent("5 dni");
+    expect(stan).toHaveTextContent("4 wiadomości");
+    expect(stan).not.toHaveTextContent("czeka na nas");
     await userEvent.click(stan);
     expect(stan).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("5 dni")).toBeVisible();
+    expect(screen.getAllByText("5 dni")).toHaveLength(1);
+  });
+
+  it("blok jest czerwony po przekroczeniu progu alarmu, a poniżej neutralny", () => {
+    const { unmount } = pokaz(szczegol({}, { pilna: true }));
+    expect(blok()!.className).toMatch(/bg-red-50/);
+    unmount();
+    pokaz(szczegol({}, { pilna: false }));
+    expect(blok()!.className).toMatch(/bg-slate-50/);
+    expect(blok()!.className).not.toMatch(/bg-red-50/);
+  });
+
+  it("blok niesie chwilę pytania bez odpowiedzi, gdy serwer ją zna", () => {
+    pokaz(szczegol({}, { bezOdpowiedziOd: "2026-09-04T10:00:00.000Z" }));
+    expect(blok()).toHaveTextContent("pytanie bez naszej odpowiedzi od");
+  });
+
+  it("przy ruchu klienta bloku nie ma, a podpis mówi, czyj jest ruch", () => {
+    /* Liczba przy sprawie, przy której nie mamy nic do zrobienia, czytałaby się
+       jak zaległość. */
+    pokaz(szczegol({}, { czekaOdDni: null, czekaOdGodzin: null, ruchNasz: false, pilna: false }));
+    expect(blok()).toBeNull();
+    expect(screen.getByRole("button", { name: /Stan/ })).toHaveTextContent("ruch klienta");
+  });
+
+  it("zamknięta rozmowa nie ma bloku, nawet gdy serwer jeszcze niesie czekanie", () => {
+    pokaz(szczegol({}, { czatAktywny: false, czekaOdDni: 4 }));
+    expect(blok()).toBeNull();
   });
 
   it("czekanie nie niesie już dopisku o terminie Allegro", () => {
