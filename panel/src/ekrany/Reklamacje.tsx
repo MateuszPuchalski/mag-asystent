@@ -514,9 +514,13 @@ export function Reklamacje() {
               kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
           {/* Rozstrzygnięte i Bez ruchu pod „Więcej" (0.522.0): oba mówią
               „tylko wgląd", więc nie stoją w wadze kubełka pracy. Cyfry dalej
-              je wybierają — powód przy `ui/FiltrZWiecej.tsx`. */}
-          <FiltrZWiecej<KubelekReklamacji | null> wybrany={kubelek} onWybierz={przelacz}
-            wiecej={["zamknieta", "bez_ruchu"]}
+              je wybierają — powód przy `ui/FiltrZWiecej.tsx`.
+
+              „Wszystkie" też: to widok, nie kubełek pracy, a z nim na wierzchu
+              zwarte „Więcej" nie mieściło się w rzędzie pigułek i zajmowało
+              własny. Dwie pigułki pracy i lista mieszczą się w jednym rzędzie. */}
+          <FiltrZWiecej<KubelekReklamacji | null> zwarty wybrany={kubelek} onWybierz={przelacz}
+            wiecej={["zamknieta", "bez_ruchu", null]}
             pozycje={[
               ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
                 ile: data?.liczniki?.[k.id] ?? 0,
@@ -560,7 +564,12 @@ export function Reklamacje() {
           <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
             moich={wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)).length}
             niczyich={wKubelku.filter((r) => r.prowadziId === null).length} />
-          <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} />
+          {/* Kreska oddziela dwa różne zawężenia: „czyje to" (sita) od „o czym to"
+              (tagi). Obie rodziny wyglądają jak pigułki, więc bez niej czyta się
+              je jak jeden rząd tej samej rzeczy. Pusty filtr tagów nie zostawia
+              po sobie kreski. */}
+          {wgTagow.length > 0 && <span className="ml-1 flex items-center gap-1 border-l border-slate-200 pl-2">
+            <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} /></span>}
         </div>
 
         {/* ── PYTANIE KUBEŁKA ZOSTAJE (0.402.0) ──────────────────────────────
