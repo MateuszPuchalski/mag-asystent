@@ -20,9 +20,10 @@ import { scalOs, zdarzeniaZakupu } from "./zakup";
 /**
  * Pytanie bez żadnego powiązania z towarem (§4.3).
  *
- * Do 0.165.0 liczyła się sama oferta. Zamówienie nazywa towar DOKŁADNIEJ niż
+ * Liczy się oferta albo zamówienie. Zamówienie nazywa towar DOKŁADNIEJ niż
  * oferta (pozycje z nazwą i SKU), więc rozmowa z numerem zamówienia nie
- * dostaje bloku „brak powiązania z ofertą" — dostaje blok zamówienia.
+ * dostaje bloku „brak powiązania z ofertą" — dostaje kartę zakupu nad osią
+ * i wiersz „Zamówienie" w kolumnie kontekstu.
  * Ekran dalej nie podstawia oferty zgadniętej z treści — tak wygrywały
  * kiedyś „zdemontowanym" i „Pozdrawiam".
  */

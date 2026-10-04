@@ -71,7 +71,7 @@ export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null }: {
 }
 
 /**
- * Sama historia, bez pobierania — rysuje ją zakładka KLIENT w skrzynce i szuflada
+ * Sama historia, bez pobierania — rysuje ją wiersz „Klient" w skrzynce i szuflada
  * historii przy zwrocie, reklamacji i dyskusji (23 września 2026). Jeden widok
  * na cztery wejścia: agent czyta klienta tak samo, skądkolwiek przyszedł.
  */

@@ -59,7 +59,7 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
   /* ── JEDEN RAZ KAŻDY FAKT (23 września 2026) ──────────────────────────────
      Zrzut właściciela: „prawa kolumna jest wciąż chaotyczna". Nazwa towaru
      stała na ekranie trzy razy, symbol cztery, stan i półka dwa. Pasmo
-     odpowiedzi nad zakładkami (`PasmoOdpowiedzi.tsx`) mówi już „to jest",
+     odpowiedzi nad kolumną (`PasmoOdpowiedzi.tsx`) mówi już „to jest",
      „mamy" i półkę — pod tym samym warunkiem, pod którym rysuje się ta sekcja:
      kartoteka potwierdzona i odczytana. Tu zostaje więc to, czego pasmo NIE
      mówi: zdjęcie z półki, proporcja wolne–zarezerwowane, identyfikatory,

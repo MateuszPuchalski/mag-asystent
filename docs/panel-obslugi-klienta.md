@@ -1126,8 +1126,9 @@ dnia.** Dlatego są tylko dwa powody. Pierwszy odczyt po otwarciu skrzynki
 niczego nie ogłasza — rano byłaby to lawina z całej nocy.
 
 **Stan paczki pyta Allegro tylko w dwóch miejscach.** Pierwsze to kliknięcie
-„sprawdź" w bloku zamówienia. Drugie to układanie szkicu, gdy zapisany stan
-jest pusty albo starszy niż pół godziny. Doręczonej paczki nie sprawdzamy
+„sprawdź" w bloku paczki (od @wydanie jeden blok, §10.2g). Drugie to
+układanie szkicu, gdy zapisany stan jest pusty albo starszy niż pół godziny.
+Doręczonej paczki nie sprawdzamy
 ponownie. Otwarcie rozmowy czyta wyłącznie stan zapisany wcześniej.
 
 **Numer przesyłki nie idzie do dostawcy modelu.** Prowadzi do adresu
@@ -1269,19 +1270,24 @@ mamy w Subiekcie, gdzie jest paczka i co czeka na ruch.
 | fakt | dom | co zeszło z kolumny |
 |---|---|---|
 | numer zamówienia, suma, data zakupu | karta i linie osi | nagłówek bloku zamówienia, „Kupione · zapłacono”, daty w streszczeniu i w „Zamówił” |
-| nazwa, SKU, zdjęcie i cena oferty | karta | tytuł i kafel w „Oferta i towar”, nazwa i SKU w bramce doboru; tytuł zostaje, gdy karta oferty nie pokazuje |
+| nazwa, SKU, zdjęcie i cena oferty | karta | tytuł, kafel i cena w „Oferta i towar”, kwota w zdaniu osi cen, nazwa i SKU w bramce doboru |
 | stan oferty | słowo w streszczeniu „Oferta i towar” | plakietka „ACTIVE” |
 | „Nowy klient” i „Wcześniej u nas” | karta, także zwinięta i w pasku | linijka pod pasmem i liczniki w wierszu „Klient” |
+| zamówienie rozmowy wśród zakupów klienta | karta | pozycja na liście, która nazywa się teraz „Inne zakupy klienta” |
 | droga zakupu przez kolejki | linie zakupu w osi | czipy „Droga tego zakupu” |
+| data doręczenia | krok „Dostarczone” w karcie i linia osi | data w streszczeniu „Zamówienie” i zdanie w soczewce zwrotu |
+| zgłoszenie zwrotu | linia osi „Zwrot zgłoszony” | „Zgłoszony …” w bloku zwrotu |
 | przesyłka | jeden blok „Paczka zamówienia” | druga linijka paczki z innym „sprawdź” w bloku zamówienia |
 
 **Dwa świadome wyjątki.** Pasmo zostaje z wierszem „Zamówił”, bo karta bywa
 poza kadrem. Wiersz mówi już tylko ilość i SKU, bez daty. Blok paczki mówi
 datę doręczenia, bo soczewka paczki ma odpowiadać bez karty.
 
-**Cena oferty tylko przy różnicy.** Gdy karta pokazuje ofertę, kolumna nie
-powtarza jej tytułu ani ceny. „Cena w ofercie” staje wyłącznie wtedy, gdy
-oferta kosztuje dziś inaczej niż w zamówieniu.
+**Tytuł i cena oferty tylko tam, gdzie karty brak.** Gdy karta pokazuje
+ofertę, kolumna nie powtarza jej tytułu, zdjęcia ani ceny. „Cena w ofercie”
+staje wtedy wyłącznie przy innej cenie niż w zamówieniu. Oferta spoza
+zamówienia albo bez treści zostaje w kolumnie z tytułem. Zdanie przy osi cen
+mówi samo położenie oferty, a jej kwotę niesie dymek kropki.
 
 **Karta nie liczy bieżącego zakupu jako „wcześniej”.** Serwer oddaje historię
 razem z tym zakupem, jego zwrotem i sprawami. Panel wycina zakup, zwrot,
@@ -1290,8 +1296,12 @@ w `skrzynka/kokpit.ts`). Rozmowy zostają, bo inna rozmowa to wcześniejszy
 kontakt. Dopiero wtedy plakietka „Nowy klient” staje przy pierwszym zakupie.
 Ta sama funkcja filtruje historię w wierszu „Klient”.
 
+**Pozycja rozmowy stoi w karcie pierwsza.** Karta pokazuje dwie pozycje, a ta,
+o którą pyta klient, bywała trzecia. Przy kilku pozycjach bez oferty karta
+mówi ich liczbę, zamiast podawać pierwszą jako towar rozmowy.
+
 **Wiersz „Klient” staje tylko z treścią spoza tego zakupu.** Jego streszczenie
-mówi sprawę klienta z krokiem i terminem, maszynę i datę ostatniego kontaktu.
+mówi sprawę klienta z krokiem i terminem, maszynę i datę ostatniego wpisu.
 Liczników nie mówi, bo mówi je karta.
 
 **„Wymaga Ciebie” ma jedną bursztynową ramę.** Nagłówek stoi w ramie, a pozycje
@@ -1303,29 +1313,33 @@ zajmują kilkaset pikseli.
 Klient, Wiedza. Dobór stoi pod towarem, bo „Szukaj innego towaru mimo to”
 otwiera go tuż pod przyciskiem. W bloku towaru opis kartoteki stoi przed
 cenami, bo niesie wymiary i gwinty. Wiersz „Zamówienie” mówi paczkę słowem
-i metodę dostawy. Przyciskiem jest tylko wtedy, gdy ma co rozwinąć.
+i metodę dostawy, a liczbę pozycji tylko wtedy, gdy ich lista stoi pod nim.
+Przyciskiem jest tylko wtedy, gdy ma co rozwinąć.
 
 **Paczka: jeden blok, jedna reguła** (`skrzynka/Paczka.tsx`). Blok stoi
 w soczewce, w ramie albo w wierszu „Zamówienie”, nigdy w dwóch miejscach.
 Pełny przycisk sprawdzenia staje przy stanie nieznanym albo starszym niż pół
-godziny, także w wierszu, a przy świeżym zostaje ciche „sprawdź”. Sprawdzenie
-dalej idzie wyłącznie kliknięciem.
+godziny, także w wierszu. Przy świeżym albo doręczonym stanie zostaje ciche
+„sprawdź”. Sprawdzenie dalej idzie wyłącznie kliknięciem.
 
 **Pasmo nie rośnie pod okiem.** Przy potwierdzonej kartotece „To jest” i „Mamy”
 stoją od pierwszego renderu. Zanim Subiekt odpowie, mówią „wczytuję…”, a przy
 błędzie „Subiekt nie odpowiedział” i „nie wiemy”. Wcześniej pasmo dorastało
-o 45 px w chwili czytania.
+o 45 px w chwili czytania. Symbol kartoteki staje tylko przy różnicy od
+sygnatury, którą agent już widzi, także w rozmowie bez zamówienia.
 
-**Jedna gramatyka.** Kreskę między blokami daje kolumna, a żaden blok nie ma
-własnej. Tekst zaczyna się na 16 px, także w ramie. Szewron wiersza stoi po
-prawej. Odnośniki mają trzy kształty: praca w panelu, cicha poprawka i wyjście
-do Allegro (`skrzynka/odnosniki.tsx`). Nic nie jest większe od tytułu wiersza,
+**Jedna gramatyka.** Kreskę między blokami daje kolumna, a żaden blok pod
+pasmem nie ma własnej. Pasmo ma swoją, bo stoi poza przewijaniem. Tekst
+zaczyna się na 16 px, także w ramie. Szewron wiersza stoi po prawej.
+Odnośniki mają trzy kształty: praca w panelu, cicha poprawka i wyjście do
+Allegro (`skrzynka/odnosniki.tsx`). Nic nie jest większe od tytułu wiersza,
 a każde rozwijanie niesie `aria-expanded`.
 
 **Strażnicy.** `skrzynka/JedenDom.test.tsx` stawia kolumnę na prawdziwych
 hakach i rozwija każdy wiersz. Pilnuje, że fakty karty do kolumny nie wracają,
 a rozwijanie niczego nie zapisuje. `skrzynka/Gramatyka.test.ts` zatrzymuje
 własne kreski bloków, szare tła, ręczne wersaliki, większe pismo i `<details>`.
+Zatrzymuje też dawne barwy błędu i odnośnika.
 
 **Czego nie ruszono.** Karta pokazuje dalej dwie pozycje i odsyła po resztę do
 kolumny. Przy dwóch i więcej pozycjach lista w kolumnie powtarza więc te dwie.
