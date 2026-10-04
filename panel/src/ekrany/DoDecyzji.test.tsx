@@ -127,6 +127,28 @@ describe("DO DECYZJI", () => {
     expect(wyslane).toEqual([]);
   });
 
+  it("wiek młodszy niż doba stoi w godzinach, bez minut", async () => {
+    /* „22 g 27 min" w pastylce czyta się wolniej niż „22 godz." i nie zmienia
+       decyzji. Pod godziną i od doby zostaje `wiek()`. */
+    const teraz = Date.now();
+    const odTemu = (ms: number) => new Date(teraz - ms).toISOString();
+    const GODZ = 3_600_000;
+    const wiersz = (klucz: string, od: string): PozycjaDecyzji => ({ klucz, obszar: "obsluga", zrodlo: "skrzynka",
+      pytanie: `Pytanie ${klucz}`, co: `Sprawa ${klucz}`, od, pilne: false, cel: { panel: "/obsluga/skrzynka" } });
+    pozycje = [
+      wiersz("a", odTemu(22 * GODZ + 27 * 60_000)),
+      wiersz("b", odTemu(40 * 60_000)),
+      wiersz("c", odTemu(50 * GODZ)),
+    ];
+    pokaz();
+    await screen.findByText("Sprawa a");
+    const wiekW = (co: string) => within(screen.getByText(co).closest("a") as HTMLElement)
+      .getByTitle("Od kiedy czeka").textContent;
+    expect(wiekW("Sprawa a")).toBe("22 godz.");
+    expect(wiekW("Sprawa b")).toBe("40 min");
+    expect(wiekW("Sprawa c")).toBe("2 dni");
+  });
+
   it("każdy wiersz prowadzi do ekranu panelu — zapis w błędzie wprost do karty kolejki (0.441.0)", async () => {
     /* Do 0.441.0 zapis w błędzie prowadził mostem do `/biuro`, na STAN
        SYSTEMU. Stan przeszedł do panelu, a wiersz trafia wprost do karty,

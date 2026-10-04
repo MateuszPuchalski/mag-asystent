@@ -55,11 +55,17 @@ function Wiek({ p }: { p: PozycjaDecyzji }) {
     ? <span className="shrink-0 rounded bg-red-100 px-2 py-0.5 text-xs font-bold text-ranga-zle">pilne</span>
     : null;
   const ms = Math.max(0, Date.now() - Date.parse(p.od));
+  /* Młodsze niż doba w GODZINACH, jak „9 godz." w dyskusjach. Minuty w pastylce
+     wieku nie zmieniają decyzji, a „22 g 27 min" czyta się wolniej niż „22 godz.".
+     Pod godziną i od doby zostaje `wiek()`: tam minuty albo dni niosą informację,
+     a sama funkcja ma osiem innych wołających (alarm synchronizacji liczy minuty). */
+  const godzin = Math.floor(ms / 3_600_000);
+  const napis = godzin >= 1 && godzin < 24 ? `${godzin} godz.` : wiek(ms);
   /* Czerwień TYLKO przy pilnym — kolor zapalany zawsze uczy go ignorować
      (ta sama reguła co przy terminie w „Moje"). */
   return <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-bold tabular-nums ${
     p.pilne ? "bg-red-100 text-ranga-zle" : "bg-slate-100 text-slate-600"}`}
-    title={p.pilne ? "Termin minął albo mija" : "Od kiedy czeka"}>{wiek(ms)}</span>;
+    title={p.pilne ? "Termin minął albo mija" : "Od kiedy czeka"}>{napis}</span>;
 }
 
 /* ── PYTANIE RAZ, SPRAWY POD NIM (0.545.0) ─────────────────────────────
