@@ -69,4 +69,20 @@ describe("zwrot przy rozmowie", () => {
     expect(screen.getByText("paczka nieodebrana")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Otwórz w Allegro/ })).toBeNull();
   });
+
+  /* Zegar pierwszy, bo termin rozstrzyga, czy zwrot czeka na ruch dziś.
+     Datę zgłoszenia mówi linia osi, a tło i kreskę daje miejsce w kolumnie. */
+  it("termin stoi pierwszy, bez daty zgłoszenia, płasko — bez tła i własnej kreski", () => {
+    const { container } = pokaz(zwrot());
+    expect(screen.queryByText(/Zgłoszony/)).toBeNull();
+    expect(container.querySelector("dt")).toHaveTextContent("Termin");
+    const blok = screen.getByRole("region", { name: "Zwrot" });
+    expect(blok).not.toHaveClass("bg-slate-50");
+    expect(blok).not.toHaveClass("border-b");
+  });
+
+  it("bez paczki u nas termin mówi, kiedy ruszy", () => {
+    pokaz(zwrot({ terminAt: null, dniDoTerminu: null }));
+    expect(screen.getByText("rusza, gdy paczka wróci")).toBeInTheDocument();
+  });
 });

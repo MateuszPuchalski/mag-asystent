@@ -6,6 +6,7 @@ import type { HistoriaKlienta, MaszynaKlienta, SprawaKlienta, WpisHistorii } fro
 import { useHistoriaKlienta } from "../api/rozmowy";
 import { najwazniejszaDosylka } from "../api/spoiwo";
 import { barwaTonu, czas, dzien, LoginKlienta, NaglowekSekcji, Pusto, termin } from "../ui";
+import { historiaPozaZakupem } from "./kokpit";
 
 /**
  * Zakładka KLIENT — historia u nas (makieta „Klient", §10.1).
@@ -26,24 +27,33 @@ import { barwaTonu, czas, dzien, LoginKlienta, NaglowekSekcji, Pusto, termin } f
  * poprawce doboru i rozjechałby się przy pierwszej. To ten sam kształt, który
  * w 0.128.0 kosztował cztery tabele nakładki spraw.
  */
-export function Klient({ rozmowaId, onOtworzRozmowe }: {
+export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null }: {
   rozmowaId: number;
   onOtworzRozmowe: (id: number) => void;
+  /** Zamówienie rozmowy — jego wpisy schodzą z historii, bo mają dom gdzie indziej. */
+  zamowienieId?: string | null;
 }) {
   const h = useHistoriaKlienta(rozmowaId);
 
   if (h.isLoading) return <Pusto waga="lista">Szukam historii klienta…</Pusto>;
 
+  /* HISTORIA BEZ TEGO ZAKUPU. Wpisy tego zakupu — sam zakup, jego zwrot,
+     reklamacja i dyskusja — mają dom w karcie zakupu, w ramie „Wymaga
+     Ciebie", w „Zamkniętych sprawach" i w osi rozmowy. Tutaj byłyby
+     czwartym zapisem tego samego. Reguła w `kokpit.ts`. */
+  const poza = historiaPozaZakupem(h.data, zamowienieId);
+
   /* Wątek bez rozmówcy to „nie wiem, kto to", a nie „klient bez historii".
      Różnica jest cała: drugie zdanie byłoby kłamstwem o kliencie, który kupuje
      u nas od lat, tylko napisał z konta bez loginu w lądowisku wątku. */
-  if (!h.data?.login) {
+  if (!poza?.login) {
     /* Sprawa klienta i tak bywa tu znana (0.535.0): serwer bierze jej login
        z zamówienia rozmowy, nie z treści. Sprawa budzi się z takiej rozmowy
        i do niej odsyła, więc rozmowa pokazuje ją z powrotem — wiązanie
        jednostronne to wiązanie, którego nie ma. Historii dalej nie ma. */
-    const sprawa = h.data?.sprawa;
-    return <div className="p-4">
+    const sprawa = poza?.sprawa;
+    /* Bez własnego wcięcia: oddech daje treść wiersza „Klient". */
+    return <div>
       <p className="flex items-start gap-2 text-sm text-slate-500">
         <UserRound size={16} className="mt-0.5 shrink-0" />
         <span>Ten wątek nie niesie loginu kupującego, więc nie wiemy, czyja to
@@ -53,7 +63,10 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
     </div>;
   }
 
-  return <WidokHistorii historia={{ ...h.data, login: h.data.login }} tutaj="tą rozmową"
+  /* Pusta oś przy zakupie mówi „poza tym zakupem". „Pierwszy kontakt"
+     byłby kłamstwem: zakup jest, tylko ma dom w karcie nad osią. */
+  return <WidokHistorii historia={{ ...poza, login: poza.login }} tutaj="tą rozmową" className=""
+    pustaOs={zamowienieId ? "Poza tym zakupem nie mamy u tego klienta nic więcej." : undefined}
     bezLoginu onOtworzRozmowe={onOtworzRozmowe} />;
 }
 
@@ -62,10 +75,18 @@ export function Klient({ rozmowaId, onOtworzRozmowe }: {
  * historii przy zwrocie, reklamacji i dyskusji (23 września 2026). Jeden widok
  * na cztery wejścia: agent czyta klienta tak samo, skądkolwiek przyszedł.
  */
-export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = false, bezLoginu = false }: {
+export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = false, bezLoginu = false,
+  className = "p-3", pustaOs }: {
   historia: HistoriaKlienta & { login: string };
   /** „tą rozmową", „tym zwrotem" — o czym mówi pusta oś. */
   tutaj: string;
+  /**
+   * Wcięcie widoku. Profil i szuflady przy zwrocie, reklamacji i dyskusji
+   * stawiają go samodzielnie; w kolumnie skrzynki oddech daje wiersz.
+   */
+  className?: string;
+  /** Zdanie pustej osi zamiast obu domyślnych — gdy historia jest przycięta i „pierwszy kontakt" kłamałby. */
+  pustaOs?: string;
   onOtworzRozmowe: (id: number) => void;
   /** Na samym profilu odnośnik do profilu prowadziłby w miejsce. */
   bezProfilu?: boolean;
@@ -74,7 +95,7 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
 }) {
   const { login, maszyny, wpisy } = historia;
 
-  return <div className="p-3" aria-label="Historia klienta">
+  return <div className={className || undefined} aria-label="Historia klienta">
     <NaglowekSekcji jako="p">Historia u nas</NaglowekSekcji>
     {/* Klik kopiuje (0.228.0): po loginie szuka się klienta w panelu Allegro
         i w Subiekcie, a przepisany z ekranu bywa przekręcony. */}
@@ -104,9 +125,9 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
     <section className="mt-3" aria-label="Oś historii klienta">
       {wpisy.length === 0
         ? <p className="text-xs text-slate-500">
-            {maszyny.length === 0
+            {pustaOs ?? (maszyny.length === 0
               ? "Pierwszy kontakt — nie mamy u tego klienta ani zakupu, ani wcześniejszej rozmowy."
-              : `Poza ${tutaj} nie mamy u tego klienta nic więcej.`}
+              : `Poza ${tutaj} nie mamy u tego klienta nic więcej.`)}
           </p>
         : <ul className="space-y-1">
             {wpisy.map((w, i) => <Wpis key={`${w.rodzaj}-${w.sprawaId ?? w.zamowienieId ?? w.rozmowaId}-${i}`}

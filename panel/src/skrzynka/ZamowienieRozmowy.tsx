@@ -1,23 +1,23 @@
 import React from "react";
-import { ExternalLink, ShoppingCart, Truck } from "lucide-react";
-import type { StanPrzesylki, ZamowienieRozmowy as Dane } from "../api/typy";
-import { useSprawdzPrzesylkeRozmowy, useWskazOferte } from "../api/rozmowy";
+import type { ZamowienieRozmowy as Dane } from "../api/typy";
+import { useWskazOferte } from "../api/rozmowy";
 import { zlote } from "../api/zwroty";
-import { NaglowekSekcji, Skopiuj, czas } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
-import { ZnakAllegro } from "../ui/ZnakAllegro";
+import { ODNOSNIK } from "./odnosniki";
 
 /**
- * Zamówienie, którego dotyczy rozmowa (0.166.0).
+ * Lista pozycji zamówienia rozmowy.
  *
- * Mail Allegro „Wiadomość dotyczy" pokazywał towar, a panel — nic: gałąź
- * `relatesTo.order` była wyrzucana przy mapowaniu. Blok ma trzy stany i każdy
- * mówi coś innego: numer z odnośnikiem (od razu), pozycje z nazwą i ceną (gdy
- * ticker dociągnął treść) albo zdanie, że treść dopiero przyjedzie. Milczenie
- * w trzecim stanie wyglądałoby jak usterka.
+ * Stoi w kolumnie, gdy któraś pozycja nie jest ofertą rozmowy: wtedy jej
+ * kartoteki nie pokazuje „Oferta i towar", a kartoteka pozycji ma dom tylko
+ * tutaj. Karta zakupu nad osią pokazuje dwie pozycje i odsyła tu po pełną
+ * listę. Numer zamówienia, kopiowanie, odnośnik do Allegro, sumę i kroki
+ * mówi karta, a paczkę — blok `Paczka.tsx`; lista ich nie powtarza.
  *
- * Przycisku „dociągnij teraz" ze zwrotów tu NIE ma: to zapis, a ekran rozmowy
- * nie ma żadnego zapisu przy patrzeniu — liczniki tras skrzynki tego pilnują.
+ * Bez treści zamówienia lista mówi zdaniem, że treść dopiero przyjedzie.
+ * Milczenie w tym miejscu wyglądałoby jak usterka. Przycisku „dociągnij
+ * teraz" ze zwrotów tu NIE ma: to zapis, a ekran rozmowy nie ma żadnego
+ * zapisu przy patrzeniu — liczniki tras skrzynki tego pilnują.
  *
  * ── DWA ZDJĘCIA PRZY POZYCJI (0.215.0) ─────────────────────────────────────
  * Właściciel przysłał zrzut rozmowy z samym zamówieniem: „tutaj powinny być
@@ -33,52 +33,26 @@ import { ZnakAllegro } from "../ui/ZnakAllegro";
  * agenta. Wskazanie zapisuje się jako wybór człowieka, jak w `BrakOferty`.
  * Hak woła komponent SAM — precedens `TowarRozmowy.tsx`.
  */
-export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null, bezPaczki = false }: {
+export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null }: {
   zamowienie: Dane;
   rozmowaId: number;
   /** Numer oferty, którą rozmowa JUŻ ma — wtedy „Wskaż" nie stoi przy żadnej pozycji. */
   ofertaRozmowy?: string | null;
-  /**
-   * Paczkę pokazuje soczewka nad kolumną (0.531.0). Druga linijka tej samej
-   * paczki z drugim „sprawdź" kazałaby porównywać dwa miejsca.
-   */
-  bezPaczki?: boolean;
 }) {
   const wskaz = useWskazOferte();
   const z = zamowienie.pobrane;
   const doWskazania = Boolean(z && z.pozycje.length > 1 && ofertaRozmowy === null);
-  return <section className="border-b px-4 py-3 text-sm" aria-label="Zamówienie">
-    <div className="flex flex-wrap items-center gap-2">
-      <NaglowekSekcji ikona={<ShoppingCart size={13} />}>Zamówienie</NaglowekSekcji>
-      {/* UUID SKRÓCONY (0.249.0). Pełne trzydzieści sześć znaków w wadze treści
-          zajmowało pół wiersza nagłówka, a nikt ich nie czyta — od przepisania
-          jest przycisk kopiowania obok, a od sprawdzenia podpowiedź. */}
-      <span className="font-mono text-podpis text-slate-500" title={zamowienie.externalId}>
-        {zamowienie.externalId.slice(0, 8)}…</span>
-      {/* UUID nikt nie przepisuje z ekranu ręcznie — jak przy zwrotach.
-          `Skopiuj` idzie przez `kopiujDoSchowka`, bo biuro pracuje po zwykłym
-          HTTP, gdzie `navigator.clipboard` nie istnieje: surowe wywołanie
-          milczało, a przycisk nie kopiował niczego. Porażkę `Skopiuj` mówi
-          sam (`ui/kopiuj.ts`, strażnik `Schowek.test.ts`). */}
-      <Skopiuj tekst={zamowienie.externalId} tytul="Kopiuj numer zamówienia" />
-      {zamowienie.link && <a href={zamowienie.link} target="_blank" rel="noopener noreferrer"
-        aria-label="Otwórz w Allegro"
-        /* Cichnie jak bliźniak przy ofercie (0.249.0): dwa identyczne błękitne
-           odnośniki były jedynym błękitem w kolumnie i ciągnęły wzrok mocniej
-           niż nazwa towaru — a to nawigacja, nie treść. */
-        className="inline-flex items-center gap-1 text-podpis font-semibold text-slate-500 hover:text-slate-800">
-        Otwórz w <ZnakAllegro wysokosc={10} /><ExternalLink size={11} /></a>}
-    </div>
-
+  return <section aria-label="Lista pozycji zamówienia" className="text-sm">
     {z
       ? <>
-          <ul className="mt-2 space-y-1">
+          {/* Kreska listy, bez pigułek: pozycje dzieli linia jak każdą listę
+              kolumny, a tło pod każdą ważyło więcej niż sama pozycja. */}
+          <ul className="divide-y divide-slate-200">
             {z.pozycje.map((p, i) => <li key={`${p.offerId}-${i}`}
-              className="flex items-start gap-2 rounded bg-slate-50 px-2 py-1.5 text-xs"
+              className="flex items-start gap-2 py-1.5 text-xs"
               aria-label={`Pozycja: ${p.nazwa}`}>
-              {/* `stan` od 0.217.0: bez niego kafel pisał „bez zdjęcia" także
-                  wtedy, gdy o obraz nikt jeszcze nie pytał — ta sama pomyłka,
-                  którą 0.214.0 naprawiło przy pozycji zwrotu. */}
+              {/* `stan` mówi, czy o obraz w ogóle pytano: bez niego kafel pisał
+                  „bez zdjęcia" także wtedy, gdy nikt jeszcze nie pytał. */}
               <KafelOferty externalId={p.offerId} stan={p.ofertaZdjecie} rozmiar={40}
                 nazwa={`${p.nazwa} — zdjęcie oferty`} symbol={p.sku} />
               <Kafel twId={p.twId} rozmiar={40} nazwa={p.nazwa} symbol={p.twSymbol} />
@@ -98,78 +72,22 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null,
                     <span className="rounded bg-amber-100 px-1 font-semibold text-amber-900">oferta rozmowy</span>}
                   {doWskazania && p.offerId && <button type="button" disabled={wskaz.isPending}
                     onClick={() => wskaz.mutate({ id: rozmowaId, ofertaId: p.offerId! })}
-                    className="ml-auto font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900 disabled:opacity-50">
+                    className={`ml-auto ${ODNOSNIK}`}>
                     Wskaż jako ofertę rozmowy</button>}
                 </div>
               </div>
             </li>)}
           </ul>
           {/* Podpis źródeł obu kafli (§4.3): dwa obrazy obok siebie bez podpisu
-              wyglądałyby jak dwa ujęcia tej samej rzeczy. */}
+              wyglądałyby jak dwa ujęcia tej samej rzeczy. Jedna linia, bo §4.3
+              żąda źródła przy fakcie, a nie zdania złożonego pod każdą pozycją. */}
           <p className="mt-1 text-podpis text-slate-500">
-            {/* JEDNA LINIA, oba źródła nadal nazwane (0.249.0). §4.3 żąda, żeby
-                przy każdym fakcie było widać źródło — nie żąda zdania złożonego.
-                Dwa wiersze szarej prozy pod każdą pozycją ważyły więcej niż
-                sama pozycja. */}
             Zdjęcia: oferta Allegro (widział klient) · kartoteka Subiekta (mamy na półce)
           </p>
-          {wskaz.error && <p className="mt-1 text-xs text-red-700">{(wskaz.error as Error).message}</p>}
-          <p className="mt-1 text-xs text-slate-500">
-            {z.kupionoAt && <>Kupione {czas(z.kupionoAt)} · </>}
-            {z.dostawaMetoda && <>{z.dostawaMetoda} · </>}
-            zapłacono {zlote(z.sumaGrosze, z.waluta)}
-          </p>
+          {wskaz.error && <p className="mt-1 text-xs text-ranga-zle">{(wskaz.error as Error).message}</p>}
         </>
-      : <p className="mt-1 text-xs text-slate-500">
+      : <p className="text-xs text-slate-500">
           Treści zamówienia jeszcze nie pobrano — dociągnie ją najbliższa synchronizacja (do 10 min).
         </p>}
-    {zamowienie.przesylka && !bezPaczki && <Paczka przesylka={zamowienie.przesylka} rozmowaId={rozmowaId} />}
   </section>;
-}
-
-/* Kody przewoźnika słowem, z perspektywy KLIENTA — paczka jedzie do niego.
-   Słownik zwrotów mówi „w drodze do nas" i tu dałby zdanie odwrotne. Nieznany
-   kod stoi surowy, jak u przewoźnika. Eksport od 0.498.0: wiersz zamówienia
-   w kolumnie kontekstu streszcza paczkę tymi samymi słowami, a od 0.531.0
-   mówi nimi także soczewka paczki. */
-export const STATUS: Record<string, string> = {
-  PENDING: "czeka na nadanie",
-  IN_TRANSIT: "w drodze do klienta",
-  RELEASED_FOR_DELIVERY: "wydana do doręczenia",
-  AVAILABLE_FOR_PICKUP: "czeka w punkcie odbioru",
-  NOTICE_LEFT: "awizo — nieudana próba doręczenia",
-  ISSUE: "problem z przesyłką",
-  RETURNED: "wraca do nadawcy",
-};
-
-/**
- * Gdzie jest paczka (23 września 2026). Klient pod zamówieniem pyta
- * najczęściej o to, a agent szedł po odpowiedź do panelu Allegro.
- *
- * „Sprawdź" to JAWNE kliknięcie: dwa żądania u Allegro nie wychodzą
- * z otwarcia rozmowy. Świeży stan dociąga też układanie szkicu, więc po
- * „Ułóż odpowiedź" linijka zwykle jest już wypełniona.
- */
-function Paczka({ przesylka, rozmowaId }: { przesylka: StanPrzesylki; rozmowaId: number }) {
-  const sprawdz = useSprawdzPrzesylkeRozmowy();
-  return <div className="mt-2 flex flex-wrap items-baseline gap-x-2 text-xs" aria-label="Przesyłka">
-    <Truck size={13} className="self-center text-slate-500" aria-hidden="true" />
-    {przesylka.sprawdzonoAt === null
-      ? <span className="text-slate-600">nie pytaliśmy jeszcze Allegro o paczkę</span>
-      : przesylka.waybill === null
-        ? <span className="text-slate-600">Allegro nie ma numeru — paczka nienadana albo nadana poza Allegro</span>
-        : <>
-            {przesylka.dostarczonoAt
-              ? <b className="text-ranga-ok">doręczona {czas(przesylka.dostarczonoAt)}</b>
-              : <b>{przesylka.status ? STATUS[przesylka.status] ?? przesylka.status
-                : "przewoźnik nie podał statusu"}</b>}
-            <span className="text-slate-600">{przesylka.przewoznik}{" "}
-              <span className="font-mono">{przesylka.waybill}</span></span>
-          </>}
-    {przesylka.sprawdzonoAt && <span className="text-slate-500">stan z {czas(przesylka.sprawdzonoAt)}</span>}
-    <button type="button" disabled={sprawdz.isPending} onClick={() => sprawdz.mutate({ id: rozmowaId })}
-      className="font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900 disabled:opacity-50">
-      {sprawdz.isPending ? "pytam…" : "sprawdź"}</button>
-    {sprawdz.error && <p className="w-full text-red-700">{(sprawdz.error as Error).message}</p>}
-  </div>;
 }

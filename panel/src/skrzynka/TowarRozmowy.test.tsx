@@ -244,6 +244,45 @@ describe("towar przy rozmowie", () => {
     expect(screen.getByText("EX055 · 10-02001 (+2 numery obce w opisie)")).toBeInTheDocument();
   });
 
+  /* ── Jedna gramatyka kolumny ─────────────────────────────────────────────
+     Opis stoi przed cenami, bo w nim są wymiary i gwinty. Pismo nie jest
+     większe od tytułu wiersza, braki stoją jedną linią zamiast obrysów,
+     a liczba wpisów wiedzy — zwykłym tekstem, nie plakietką w wersalikach. */
+  it("opis kartoteki stoi przed cenami, pismem nie większym od tytułu wiersza", () => {
+    wiedza.mockReturnValue({ data: undefined });
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA,
+      desc: "Korek wlewu paliwa. Gwint M41 x 1,5.",
+      ceny: [{ poziom: 1, nazwa: "Detaliczna", nettoGrosze: 4062, bruttoGrosze: 4996, waluta: "PLN" }] } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    const opis = screen.getByText(/Gwint M41/);
+    expect(opis.compareDocumentPosition(screen.getByText("Ceny")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(opis).toHaveClass("text-sm");
+    expect(opis).not.toHaveClass("text-tresc");
+  });
+
+  it("braki stoją jedną linią, bez przerywanych obrysów", () => {
+    wiedza.mockReturnValue({ data: undefined });
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, ean: null } });
+    const { container } = render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    expect(screen.getByText(/^brak: EAN · identyfikatory · zamienniki$/)).toBeInTheDocument();
+    expect(container.querySelector(".border-dashed")).toBeNull();
+  });
+
+  it("wiedza o kartotece stoi zwykłym tekstem w linii Subiekt GT, bez wersalików", () => {
+    karta.mockReturnValue({ isLoading: false, error: null, data: PELNA });
+    wiedza.mockReturnValue({ data: { potwierdzone: [{}, {}] as never[], negatywne: [], propozycje: [],
+      pasowania: { pasujace: [], pasujeDo: [], negatywne: [], propozycje: [] } as never } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "sku", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: 'SKU oferty „NOZ-STIGA-43"', powod: null,
+    })} />);
+    expect(screen.getByText(/wiedza: 2 potwierdzone · 0 negatywnych/)).not.toHaveClass("uppercase");
+    wiedza.mockReturnValue({ data: undefined });
+  });
+
   it("każdy fakt magazynowy jest podpisany źródłem", () => {
     karta.mockReturnValue(PUSTA);
     render(<TowarRozmowy rozmowaId={1} oferta={oferta({
@@ -344,6 +383,9 @@ describe("położenie ceny oferty", () => {
     const { polozenieOferty } = await import("./TowarRozmowy");
     const p = polozenieOferty(kartoteka, { grosze: 4500, waluta: "PLN" });
     expect(p?.zdanie).toMatch(/43% nad najwyższym poziomem \(Serwisanci 31,49/);
+    /* Kwotę oferty mówi karta, dymek kropki i nazwa figury — zdanie mówi
+       samo położenie. */
+    expect(p?.zdanie).not.toContain("45,00");
     /* Poziom zakupowy (brutto 0) nie wchodzi na oś: zero to brak, nie cena. */
     expect(p?.min).toBe(2422);
     expect(p?.max).toBe(4500);
@@ -355,6 +397,15 @@ describe("położenie ceny oferty", () => {
       .toMatch(/17% pod najniższym poziomem \(Bazowa 24,22/);
     expect(polozenieOferty(kartoteka, { grosze: 3000, waluta: "PLN" })?.zdanie)
       .toMatch(/mieści się między poziomami/);
+  });
+
+  it("figura niesie kwotę oferty w nazwie dla czytnika ekranu", () => {
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, ceny: kartoteka } });
+    render(<TowarRozmowy rozmowaId={1} oferta={{ ...oferta({
+      pewnosc: "sku", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: 'SKU oferty „NOZ-STIGA-43"', powod: null,
+    }), pobrana: { nazwa: "Nóż", sku: "NOZ-STIGA-43", cenaGrosze: 4500, waluta: "PLN", status: "ACTIVE",
+      syncedAt: "2026-09-02T14:50:00Z", zdjecie: "brak" } }} />);
+    expect(screen.getByRole("figure", { name: /Cena oferty 45,00/ })).toBeInTheDocument();
   });
 
   it("bez poziomu brutto w tej walucie nie ma osi", async () => {

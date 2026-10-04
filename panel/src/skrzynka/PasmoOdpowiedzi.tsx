@@ -1,32 +1,34 @@
 import React from "react";
 import type { KartaTowaru, OsRozmowy } from "../api/typy";
 import { useKartaTowaru } from "../api/rozmowy";
-import { dzien } from "../ui";
+import { EtykietaWartosci, dzien } from "../ui";
 
-/* ── PASMO ODPOWIEDZI (0.404.0) ──────────────────────────────────────────────
+/* ── PASMO ODPOWIEDZI ────────────────────────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: „popraw skrzynkę odpowiadania pytań".
 
    Prawa kolumna wie wszystko i nie mówi nic pierwsza. Przy pytaniu „przyszły
    nie te prowadnice co trzeba" rozstrzygają TRZY fakty: co klient zamówił,
    czym to jest u nas i czy to mamy. Leżały wśród około czterdziestu innych,
-   w tej samej wadze, pod czterema zakładkami — a stan i półka dopiero po
-   przewinięciu sześciu sekcji.
+   w tej samej wadze, a stan i półka dopiero po przewinięciu sześciu sekcji.
 
    TRZY WIERSZE, NIE SKRÓT WSZYSTKIEGO. Czwarty wiersz zaczyna być drugą
    kolumną, a wtedy pasmo przestaje być pasmem. Dekalog ergonomii, punkt 2:
    pierwszeństwo ma to, co rozstrzyga bieżącą czynność.
 
-   NAD ZAKŁADKAMI, nie w jednej z nich: te fakty są odpowiedzią na pytanie
-   z rozmowy, a nie zawartością kartoteki — i mają zostać, gdy agent zajrzy
-   do „Doboru" albo „Klienta".
+   „ZAMÓWIŁ" BEZ DATY. Datę zakupu mówi krok „Złożone" w karcie zakupu i linia
+   osi rozmowy. Wiersz zostaje mimo karty, bo karta bywa poza kadrem, a ilość
+   z sygnaturą rozstrzyga odpowiedź tak samo jak stan.
 
-   NIC NIE ZNIKA POD SPODEM. Sekcje zostają w tej samej kolejności i z tą samą
-   treścią; pasmo je STRESZCZA, a nie zastępuje. Wiersz, którego nie mamy
-   z czego złożyć, po prostu nie staje — pusta etykieta udawałaby brak
-   towaru zamiast braku wiedzy.
+   NAD WIERSZAMI KOLUMNY, poza jej przewijaniem: te fakty są odpowiedzią na
+   pytanie z rozmowy, a nie zawartością kartoteki, i mają zostać w kadrze, gdy
+   agent rozwinie „Dobór" albo „Klienta".
 
-   BEZ WSTAWKI (22 września 2026, decyzja właściciela). Do tej wersji wiersz
-   „Mamy" niósł „wstaw do szkicu". Szkic Copilota czeka dziś przy każdej
+   Wiersz, którego nie mamy z czego złożyć, nie staje: bez potwierdzonej
+   kartoteki nie ma „To jest" ani „Mamy". Pusta etykieta udawałaby brak towaru
+   zamiast braku wiedzy, a „wczytuję…" mówi wprost, że wiedza jest w drodze.
+
+   BEZ WSTAWKI (22 września 2026, decyzja właściciela). Wiersz „Mamy" niósł
+   kiedyś „wstaw do szkicu". Szkic Copilota czeka dziś przy każdej
    wiadomości i układa odpowiedź z tych samych faktów, więc wstawka dublowała
    treść w polu. Pasmo zostaje, bo agent sprawdza szkic właśnie z tymi
    trzema faktami przed oczami.                                              */
@@ -34,8 +36,7 @@ import { dzien } from "../ui";
 /** Jeden wiersz pasma; bez wartości nie rysuje się wcale. */
 function Wiersz({ etykieta, children }: { etykieta: string; children: React.ReactNode }) {
   return <div className="flex items-baseline gap-2 text-sm">
-    <span className="w-16 shrink-0 text-podpis font-semibold uppercase tracking-wide text-slate-600">
-      {etykieta}</span>
+    <EtykietaWartosci className="w-16 shrink-0">{etykieta}</EtykietaWartosci>
     <span className="min-w-0 flex-1 text-slate-900">{children}</span>
   </div>;
 }
@@ -82,46 +83,54 @@ export function PasmoOdpowiedzi({ dane }: { dane: OsRozmowy }) {
      rzeczy. */
   const pozycja = dane.zamowienie?.pobrane?.pozycje
     .find((p) => p.offerId !== null && p.offerId === oferta?.externalId) ?? null;
-  const kupiono = dane.zamowienie?.pobrane?.kupionoAt ?? null;
 
   const zamowil = pozycja
     ? `${pozycja.ilosc} × ${pozycja.sku ?? pozycja.offerId ?? "bez sygnatury"}`
     : null;
-  const toJest = karta.data?.name ?? null;
-  const mamy = karta.data
-    ? karta.data.mag.avail > 0
-      ? `${karta.data.mag.avail} ${karta.data.unit ?? "szt."}`
-      : "brak na stanie"
-    : null;
+  /* Sygnatura, którą agent już widzi: z pozycji zamówienia, a bez zamówienia
+     z oferty. Karta zakupu nad osią pokazuje tę samą, więc symbol kartoteki
+     równy jej byłby powtórzeniem. */
+  const sygnatura = pozycja?.sku ?? oferta?.pobrana?.sku ?? null;
 
-  /* Pasmo bez ani jednego wiersza to pasek z samym nagłówkiem — czyli koszt
-     bez treści. Rozmowa bez oferty i bez zamówienia nie dostaje go wcale. */
-  if (!zamowil && !toJest && !mamy) return null;
+  /* Pasmo bez ani jednego wiersza to pasek bez treści, czyli koszt bez
+     pożytku. Rozmowa bez zamówionej pozycji i bez potwierdzonej kartoteki
+     nie dostaje go wcale. */
+  if (!zamowil && potwierdzona === null) return null;
 
-  return <aside aria-label="Do tej odpowiedzi"
+  /* WARTOŚCI ZAJMUJĄ WIERSZ OD PIERWSZEGO RENDERU. Gdy „To jest" i „Mamy"
+     czekały na Subiekta, pasmo dorastało o 45 px pod okiem agenta i spychało
+     kolumnę w chwili czytania. „wczytuję…" trzyma miejsce, a wiersz potem nie
+     znika, tylko się wypełnia. To nie jest więc „ruch za nic", przez który
+     puste wiersze „Klient" i „Wiedza" nie stają przed odczytem. */
+  const d = karta.data;
+  const czekam = <span className="text-slate-500">wczytuję…</span>;
+
+  return <aside aria-label="Do tej odpowiedzi" aria-busy={karta.isLoading || undefined}
+    /* gramatyka: pasmo stoi poza przewijaniem kolumny */
     className="shrink-0 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
     <div className="flex flex-col gap-1">
       {zamowil && <Wiersz etykieta="Zamówił">
         <span className="font-mono font-semibold">{zamowil}</span>
-        {kupiono && <span className="text-slate-600"> · {dzien(kupiono)}</span>}
       </Wiersz>}
-      {toJest && <Wiersz etykieta="To jest">
-        <span className="font-semibold">{toJest}</span>
-        {/* Symbol tylko wtedy, gdy RÓŻNI SIĘ od sygnatury z „Zamówił" (0.506.0).
-            Równy powtarzał to samo słowo wiersz niżej; różny to sygnał, że
-            oferta wskazuje inną kartotekę, i ten zostaje. */}
-        {karta.data?.sym && karta.data.sym !== pozycja?.sku
-          && <span className="font-mono text-slate-600"> · {karta.data.sym}</span>}
+      {potwierdzona !== null && <Wiersz etykieta="To jest">
+        {d ? <>
+          <span className="font-semibold">{d.name}</span>
+          {/* Symbol tylko wtedy, gdy RÓŻNI SIĘ od sygnatury, którą agent już
+              widzi. Równy powtarzał to samo słowo; różny to sygnał, że oferta
+              wskazuje inną kartotekę, i ten zostaje. */}
+          {d.sym && d.sym !== sygnatura && <span className="font-mono text-slate-600"> · {d.sym}</span>}
+        </> : karta.isError ? <span className="text-ranga-zle">Subiekt nie odpowiedział</span> : czekam}
       </Wiersz>}
-      {mamy && <Wiersz etykieta="Mamy">
-        {/* Zero na stanie jest CZERWONE, nie wyciszone: to jedyny wiersz
-            pasma, który sam z siebie zmienia treść odpowiedzi do klienta. */}
-        <b className={karta.data && karta.data.mag.avail > 0 ? "text-ranga-ok" : "text-ranga-zle"}>
-          {mamy}</b>
-        {karta.data?.locs?.length ? <span className="font-mono text-slate-600">
-          {" · "}{karta.data.locs.join(", ")}</span> : null}
-        {karta.data && dopisekDostaw(karta.data) && <span className="text-slate-700">
-          {" · "}{dopisekDostaw(karta.data)}</span>}
+      {potwierdzona !== null && <Wiersz etykieta="Mamy">
+        {d ? <>
+          {/* Zero na stanie jest CZERWONE, nie wyciszone: to jedyny wiersz
+              pasma, który sam z siebie zmienia treść odpowiedzi do klienta. */}
+          <b className={d.mag.avail > 0 ? "text-ranga-ok" : "text-ranga-zle"}>
+            {d.mag.avail > 0 ? `${d.mag.avail} ${d.unit ?? "szt."}` : "brak na stanie"}</b>
+          {d.locs?.length ? <span className="font-mono text-slate-600">
+            {" · "}{d.locs.join(", ")}</span> : null}
+          {dopisekDostaw(d) && <span className="text-slate-700">{" · "}{dopisekDostaw(d)}</span>}
+        </> : karta.isError ? <span className="text-slate-500">nie wiemy</span> : czekam}
       </Wiersz>}
     </div>
   </aside>;

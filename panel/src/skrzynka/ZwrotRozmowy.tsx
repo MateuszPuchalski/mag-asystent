@@ -1,11 +1,10 @@
 import React from "react";
 import { Link } from "react-router-dom";
-import { ExternalLink, Undo2 } from "lucide-react";
 import type { Zwrot } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { czas } from "../ui";
 import { KUBELKI, SYGNALY } from "../zwroty/Kolejka";
-import { ZnakAllegro } from "../ui/ZnakAllegro";
+import { ODNOSNIK, OdnosnikAllegro } from "./odnosniki";
 
 /**
  * Zwrot tego zamówienia przy rozmowie (0.221.0).
@@ -28,10 +27,11 @@ const NAZWA_WARIANTU: Record<string, string> = { pelna: "pełna", bez_wysylki: "
 export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
   const kubelek = KUBELKI.find((k) => k.id === zwrot.kubelek);
   const wracaja = zwrot.pozycje;
-  return <section className="border-b bg-slate-50 px-4 py-3 text-sm" aria-label="Zwrot">
+  /* Płasko, bez tła i kreski: zwrot stoi w ramie „Wymaga Ciebie" albo
+     w wierszu „Zamknięte sprawy", a kreskę i oddech daje mu tamto miejsce. */
+  return <section aria-label="Zwrot" className="space-y-2 text-sm">
     <div className="flex flex-wrap items-center gap-2">
-      <Undo2 size={15} className="text-slate-500" />
-      <b>Zwrot</b>
+      <b className="text-wertis-ink">Zwrot</b>
       {zwrot.numer && <span className="font-mono text-xs text-slate-600">{zwrot.numer}</span>}
       {zwrot.zrodlo === "nieodebrana" && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-podpis font-bold text-slate-700">
         paczka nieodebrana</span>}
@@ -42,27 +42,17 @@ export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
       {zwrot.sygnaly.map((s) => <span key={s} title={SYGNALY[s].tytul}
         className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-podpis font-bold ${SYGNALY[s].klasa}`}>
         {SYGNALY[s].ikona}{SYGNALY[s].krotko}</span>)}
-      <Link to={`/obsluga/zwroty/${zwrot.id}`}
-        className="ml-auto inline-flex items-center gap-1 text-xs font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
-        Otwórz w Zwrotach</Link>
-      {zwrot.linkZwrotu && <a href={zwrot.linkZwrotu} target="_blank" rel="noopener noreferrer"
-        aria-label="Otwórz w Allegro"
-        className="inline-flex items-center gap-1 text-xs font-semibold text-sky-700 hover:text-sky-900">
-        {/* Bez podkreślenia (0.252.0): kreska pod znakiem graficznym wygląda
-            jak usterka. Sąsiedni „Otwórz w Zwrotach" ZOSTAJE podkreślony i to
-            jest rozróżnienie, nie niekonsekwencja — tamten prowadzi w GŁĄB
-            panelu i ma wyglądać jak tekst, ten wychodzi na zewnątrz. */}
-        Otwórz w <ZnakAllegro wysokosc={11} /><ExternalLink size={12} /></a>}
     </div>
 
-    {/* Trzy daty, na które klient pyta najczęściej: kiedy zgłosił, czy paczka
-        doszła, ile zostało do terminu. Brak paczki to zdanie, nie pusta komórka. */}
-    <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
-      <dt className="text-slate-500">Zgłoszony</dt>
-      {/* Termin rusza dopiero od paczki u nas (0.339.0), więc bywa pusty. */}
-      <dd>{czas(zwrot.utworzono)}{zwrot.terminAt === null || zwrot.dniDoTerminu === null
-        ? " · termin rusza, gdy paczka wróci"
-        : <> · termin {czas(zwrot.terminAt)}
+    {/* ZEGAR PIERWSZY: termin rozstrzyga, czy zwrot czeka na ruch dziś, więc
+        stoi tam, gdzie oko czyta na pewno. Datę zgłoszenia mówi linia osi
+        „Zwrot zgłoszony", a brak paczki to zdanie, nie pusta komórka. */}
+    <dl className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-xs">
+      <dt className="text-slate-500">Termin</dt>
+      {/* Termin rusza dopiero od paczki u nas, więc bywa pusty. */}
+      <dd>{zwrot.terminAt === null || zwrot.dniDoTerminu === null
+        ? "rusza, gdy paczka wróci"
+        : <>{czas(zwrot.terminAt)}
             <span className={zwrot.dniDoTerminu < 0
               ? " font-bold text-ranga-zle" : " text-slate-500"}>
               {zwrot.dniDoTerminu < 0
@@ -89,14 +79,24 @@ export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
       </>}
     </dl>
 
-    <ul className="mt-2 space-y-1">
-      {wracaja.map((p) => <li key={p.id} className="flex items-baseline gap-2 rounded bg-white px-2 py-1 text-xs">
+    <ul className="space-y-0.5">
+      {wracaja.map((p) => <li key={p.id} className="flex items-baseline gap-2 text-xs">
         <span className="truncate">{p.nazwa}</span>
         {p.twSymbol && <span className="shrink-0 font-mono text-slate-500">{p.twSymbol}</span>}
         {p.powod && <span className="shrink-0 text-slate-500">{p.powod}</span>}
         <span className="ml-auto shrink-0 tabular-nums">{p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
       </li>)}
     </ul>
-    {zwrot.notatka && <p className="mt-1 text-xs text-slate-600">{zwrot.notatka}</p>}
+    {zwrot.notatka && <p className="text-xs text-slate-600">{zwrot.notatka}</p>}
+
+    {/* ODNOŚNIKI NA STAŁE W OSTATNIEJ LINII. W linii tytułu przy wąskiej
+        kolumnie przeskakiwały raz obok numeru, raz pod niego, a cel kliknięcia
+        zmieniał miejsce z każdą plakietką. „Otwórz w Zwrotach" jest podkreślony,
+        bo prowadzi w głąb panelu; znak Allegro podkreślenia nie ma, bo kreska
+        pod znakiem graficznym wygląda jak usterka, a ten wychodzi na zewnątrz. */}
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+      <Link to={`/obsluga/zwroty/${zwrot.id}`} className={ODNOSNIK}>Otwórz w Zwrotach</Link>
+      {zwrot.linkZwrotu && <OdnosnikAllegro href={zwrot.linkZwrotu} etykieta="Otwórz w Allegro" />}
+    </div>
   </section>;
 }

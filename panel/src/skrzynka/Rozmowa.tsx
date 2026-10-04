@@ -28,10 +28,11 @@ import { scalOs, zdarzeniaZakupu } from "./zakup";
  */
 export function brakPowiazania(os: WpisOsi[],
   znane?: Pick<OsRozmowy, "zamowienie" | "oferta">): boolean {
-  /* Baner mówi „nie wiemy, o co pyta", więc milknie, gdy wiemy to inną drogą
-     (0.506.0). Zamówienie wskazane z kandydatów albo z numeru w treści nie
-     trafia na oś jako `zamowienieId`, a prawa kolumna już je pokazuje. Runda
-     krytyki złapała obie kolumny naraz: „brak powiązania" nad „Zamówił 1 ×". */
+  /* Baner mówi „nie wiemy, o co pyta", więc milknie, gdy wiemy to inną drogą.
+     Zamówienie wskazane z kandydatów albo z numeru w treści nie trafia na oś
+     jako `zamowienieId`, a karta zakupu nad osią i wiersz „Zamówienie"
+     w kolumnie już je pokazują. Runda krytyki złapała ekran, który mówił oba
+     naraz: „brak powiązania" nad „Zamówił 1 ×". */
   if (znane?.zamowienie || znane?.oferta) return false;
   return os.some((w) => w.rodzaj === "wiadomosc" && w.odKlienta && !w.ofertaId && !w.zamowienieId)
     && !os.some((w) => w.ofertaId || w.zamowienieId);

@@ -40,7 +40,9 @@ export function Wiedza({ rozmowaId, twId, maMaszyne, propozycja = null }: {
   const pomiarDoWiedzy = usePomiarDoWiedzy();
   const pomiary = wiedza.data?.pomiary ?? [];
 
-  return <div className="p-3" aria-label="Wiedza">
+  /* Bez własnego wcięcia: oddech daje treść wiersza „Wiedza", więc tekst
+     stoi na tej samej osi co reszta kolumny. */
+  return <div aria-label="Wiedza">
     {/* Zdanie, nie ramka (23 września 2026): obramowana klauzula była
         najcięższym elementem zakładki, która poza nią zwykle nie ma nic.
         Jedno zdanie, nie dwa (0.513.0): na ekranie zostaje sama reguła,
@@ -165,7 +167,8 @@ function Pomiar({ pomiar, maMaszyne, trwa, onZaproponuj }: {
   return <li className="rounded border border-amber-200 bg-amber-50/40 p-2 text-xs">
     <p><b>{pomiar.tytul}</b> <span className="text-slate-500">· {pomiar.wykonanoPrzez}, {czas(pomiar.wykonanoAt)}
       {pomiar.symbol && <> · <span className="font-mono">{pomiar.symbol}</span></>}</span></p>
-    <p className="mt-0.5 whitespace-pre-wrap text-tresc text-slate-800">{pomiar.wynik}</p>
+    {/* Wynik w piśmie treści, nie większym od tytułu wiersza kolumny. */}
+    <p className="mt-0.5 whitespace-pre-wrap text-sm text-slate-800">{pomiar.wynik}</p>
     {pomiar.zaproponowano
       ? <p className="mt-1 text-podpis font-semibold text-emerald-700">w kolejce wiedzy jako dowód</p>
       : <>

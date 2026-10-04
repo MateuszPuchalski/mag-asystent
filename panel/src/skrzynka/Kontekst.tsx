@@ -1,95 +1,77 @@
 import React, { useState } from "react";
-import { ChevronRight, UserRound } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 import type { HistoriaKlienta, OsRozmowy, SzkicCopilota, WiedzaDoboru } from "../api/typy";
-import { zlote } from "../api/zwroty";
-import { Przycisk, Pusto, dzien, odmien } from "../ui";
+import { NaglowekSekcji, Przycisk, dzien, ile, odmien, termin } from "../ui";
 import { OfertaRozmowy } from "./OfertaRozmowy";
-import { STATUS as STATUS_PACZKI, ZamowienieRozmowy } from "./ZamowienieRozmowy";
+import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
 import { ZamowieniaKlienta } from "./ZamowieniaKlienta";
 import { ZwrotRozmowy } from "./ZwrotRozmowy";
-import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
+import { SprawyZakupu } from "../sprawy/Spoiwo";
 import { TowarRozmowy } from "./TowarRozmowy";
 import { Dobor } from "./Dobor";
 import { Klient } from "./Klient";
 import { Wiedza } from "./Wiedza";
+import { Paczka } from "./Paczka";
 import { PasmoOdpowiedzi } from "./PasmoOdpowiedzi";
 import { Soczewka } from "./Soczewki";
-import { paczkaWSoczewce } from "./soczewki-reguly";
 import { useHistoriaKlienta, useWiedzaDoboru } from "../api/rozmowy";
 import type { Towar } from "../wyszukiwarka";
-import { NAZWA_STANU_DOBORU } from "./statusy";
-import { bramkaDoboru, coSwieci, doborWToku, klientMaHistorie, nowyKlient, paraPasowania, pozycjiDoWskazania,
-  towarOtwartyNaStart, wiedzaMaTresc, zwrotWToku } from "./kokpit";
+import { NAZWA_STANU_DOBORU, STATUS_PACZKI } from "./statusy";
+import { bramkaDoboru, coSwieci, historiaPozaZakupem, klientWKolumnie, ofertaWKarcie, paczkaWyzej,
+  paraPasowania, pozycjeWKolumnie, pozycjiDoWskazania, towarOtwartyNaStart, wiedzaMaTresc,
+  zwrotWToku } from "./kokpit";
 
 /**
- * Trzecia kolumna ekranu skrzynki (§10.1, 0.180.0).
+ * Trzecia kolumna ekranu skrzynki (§10.1).
  *
  * Układ z trzema kolumnami stoi w projekcie od początku, a makieta
- * `docs/projekt-widokow/Main.dc.html` narysowała go poprawnie — front po
- * prostu do niej nie doszedł. Do 0.179.0 kontekst leżał w środkowej kolumnie,
- * nad osią: cztery bloki jeden pod drugim spychały pytanie klienta poniżej
- * krawędzi okna, a to ono jest powodem, dla którego agent tu przyszedł.
+ * `docs/projekt-widokow/Main.dc.html` narysowała go poprawnie. Kontekst
+ * leżał kiedyś w środkowej kolumnie, nad osią: cztery bloki jeden pod drugim
+ * spychały pytanie klienta poniżej krawędzi okna, a to ono jest powodem,
+ * dla którego agent tu przyszedł.
  *
- * ZAKŁADEK JUŻ NIE MA (0.498.0) — patrz „Ciemny kokpit" niżej. Do tego
- * wydania były cztery: „Oferta" i „Towar" zeszły się w jedną, a „Klient"
- * i „Wiedza" wróciły decyzją właściciela. Uzasadnienia tamtych decyzji
- * zostają poniżej, bo te same tematy żyją dziś jako wiersze.
- *
- * ── DLACZEGO OFERTA I TOWAR ZESZŁY SIĘ W JEDNO (0.198.0) ────────────────────
+ * ── DLACZEGO OFERTA I TOWAR TO JEDEN TEMAT ─────────────────────────────────
  * Właściciel przysłał zrzut z pracy: „powinniśmy wykorzystać puste miejsce
- * z boku". Zakładka „Oferta" to jedenaście linijek — numer, tytuł, SKU, cena —
- * w kolumnie wysokiej na osiemset pikseli. Reszta świeciła bielą.
+ * z boku". Osobna „Oferta" to jedenaście linijek w kolumnie wysokiej na
+ * osiemset pikseli, a obok, niewidoczne, leżały zdjęcie towaru, stan, półka
+ * i PARAMETRY KARTOTEKI. Klient pytał o wymiar gwintu korka, a parametr
+ * „Gwint" stał w schowanej zakładce. Niewidoczne znaczyło nieistniejące.
+ * Co klient kupuje i co mamy na półce to jeden temat oglądany z dwóch stron,
+ * a odpowiedź prawie zawsze potrzebuje obu naraz.
  *
- * A pod zakładką obok, niewidoczne, leżały: zdjęcie towaru, stan magazynowy,
- * półka i PARAMETRY KARTOTEKI. Na tamtym zrzucie klient pytał o wymiar gwintu
- * korka, a parametr „Gwint" stał w schowanej zakładce. Jeden klik dalej, ale
- * niewidoczny — czyli dla kogoś, kto nie wie, że tam jest, nieistniejący.
- *
- * §10.1 uzasadniał zakładki tym, że kolumna niesie „dwa RÓWNORZĘDNE tematy:
- * co klient kupuje i co mamy na półce". To jeden temat oglądany z dwóch stron
- * i odpowiedź prawie zawsze potrzebuje obu naraz. Argument o przewijaniu „obok
- * tematu, którego akurat nie czytasz" trzymał się, dopóki obie zakładki były
- * wysokie; oferta ma jedenaście linijek.
- *
- * „Dobór" ZOSTAJE osobno, bo to nie jest karta faktów, tylko robota: własne
- * kroki, kandydaci, dowody i przyciski zmieniające stan rozmowy.
- *
- * „Wiedza" i „Klient" wracają — obie z powodów, które unieważniły tamte dwa
- * zdania, a nie wbrew nim.
- *
- * Wiedzy odmawialiśmy, bo dowody stały już w „Doborze" i druga zakładka z tą
- * samą treścią kazałaby zgadywać, w której szukać. Argument był słuszny, więc
- * dowody STAMTĄD WYSZŁY: stoją w jednym miejscu, nie w dwóch. Dobór został
- * robotą (kroki, kandydaci, przyciski), Wiedza jest kartą faktów pod szkic —
- * sięga się po nią także wtedy, gdy dobór dawno domknięto.
- *
- * Klientowi odmawialiśmy, bo „historii maszyn kupującego nie trzyma żadna
- * tabela". To była prawda o TABELI, nie o danych: login kupującego wiąże jego
- * zamówienia, jego rozmowy i maszyny z domkniętych doborów. Zakładka jest
- * czystym odczytem i nie zakłada ani jednej nowej tabeli.
+ * „Dobór" zostaje osobno, bo to nie karta faktów, tylko robota: własne
+ * kroki, kandydaci, dowody i przyciski zmieniające stan rozmowy. „Wiedza"
+ * stoi osobno, bo dowody wyszły z doboru i mają jedno miejsce, do którego
+ * sięga się także po domkniętym doborze. „Klient" to czysty odczyt: login
+ * wiąże zamówienia, rozmowy i maszyny z domkniętych doborów.
  *
  * Dwa zwrotne uchwyty idą ze `Skrzynka.tsx`, gdzie leży szkic i formularz
  * pomiaru: dobór wstawia zdanie do szkicu i podstawia kartotekę do zlecenia
  * — obu rzeczy nie ma prawa robić po cichu.
  *
- * ── CIEMNY KOKPIT ZAMIAST ZAKŁADEK (0.498.0) ───────────────────────────────
- * Nagranie właściciela pokazało cztery zakładki i trzy kłopoty naraz. W „Ofercie
- * i towarze" nazwa towaru stała cztery razy, a zwrot do decyzji — jedyna
- * rzecz z terminem — w połowie przewijania. „Klient 2" i „Wiedza 0" niosły po
- * zdaniu na całą kolumnę. Zakładka z zerem kazała kliknąć, żeby dowiedzieć się,
- * że nic tam nie ma.
+ * ── CIEMNY KOKPIT ───────────────────────────────────────────────────────────
+ * Nagranie właściciela pokazało zakładki i trzy kłopoty naraz. Nazwa towaru
+ * stała cztery razy, zwrot do decyzji — jedyna rzecz z terminem — w połowie
+ * przewijania, a zakładka z zerem kazała kliknąć, żeby usłyszeć „nic tu nie ma".
  *
- * Kolumna ma teraz dwie części. „Wymaga Ciebie" świeci i jest rozwinięte.
- * „W normie" to jedna linia na temat ze streszczeniem, rozwijana kliknięciem.
- * Reguły świecenia stoją w `kokpit.ts`, każda z testem — szara linia jest
- * bezpieczna tylko wtedy, gdy reguła „w normie" nie kłamie.
+ * Świeci to, co ma zegar albo czeka na ruch agenta: zwrot i sprawa w toku,
+ * paczka poza zwykłą drogą, pozycja do wskazania i dobór w robocie. Stoi
+ * w jednej ramie „Wymaga Ciebie". Dobór w ramie stoi zwinięty, bo kandydaci
+ * zajmują kilkaset pikseli i zepchnęliby resztę ramy z kadru; jego stan mówi
+ * streszczenie. Reszta to jedna linia na temat ze streszczeniem, rozwijana
+ * kliknięciem. Reguły świecenia stoją w `kokpit.ts`, każda z testem, bo szara
+ * linia jest bezpieczna tylko wtedy, gdy reguła „w normie" nie kłamie.
  *
- * STRESZCZENIE MÓWI TO, CZEGO NIE MÓWI PASMO (D z kanwy). Nazwa, SKU i stan
- * stoją raz, w paśmie nad kolumną. Wiersz dokłada tylko to, co jego źródło ma
- * inne: oferta cenę i stan, zamówienie datę i paczkę, dobór swój stan.
+ * ── JEDEN DOM FAKTU ─────────────────────────────────────────────────────────
+ * Karta zakupu nad osią mówi zakup i klienta: towar, numer, sumę, kroki
+ * z datami i historię w liczbach. Kolumna mówi Subiekt, paczkę i robotę.
+ * Ten sam fakt w dwóch domach kazał sprawdzać, czy oba mówią to samo.
+ * Fakt z karty wraca tu tylko jako odpowiedź, którą agent musi mieć bez
+ * przewijania osi: wiersz „Zamówił" w paśmie i data doręczenia w bloku
+ * paczki. Karta bywa poza kadrem, a obie rzeczy rozstrzygają odpowiedź.
  *
  * Kolumna niczego nie zapisuje przy rozwijaniu: wiersze to stan ekranu,
- * a treść pod nimi to te same odczyty, co w dawnych zakładkach.
+ * a treść pod nimi to te same odczyty, które i tak stoją w pamięci zapytań.
  */
 type Temat = "towar" | "zamowienie" | "zamkniete" | "dobor" | "klient" | "wiedza";
 
@@ -130,10 +112,10 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
      wraca przy następnym otwarciu rozmowy, bo towar dalej jest znany. */
   const [szukamMimoTo, setSzukamMimoTo] = useState(false);
 
-  /* ── LICZNIKI Z ZAKŁADEK ŻYJĄ JAKO STRESZCZENIA (23 września 2026) ─────────
-     Oba zapytania to te same klucze, które wiersze i tak wołają po rozwinięciu
-     — przy rozwinięciu nic nie idzie drugi raz. To są odczyty: zero zapisu
-     przy patrzeniu zostaje nietknięte. */
+  /* Historia i wiedza decydują, czy wiersze „Klient" i „Wiedza" w ogóle
+     staną. To te same klucze, które wiersze wołają po rozwinięciu, więc przy
+     rozwinięciu nic nie idzie drugi raz. Same odczyty: zero zapisu przy
+     patrzeniu zostaje nietknięte. */
   const historia = useHistoriaKlienta(dane.rozmowa.id);
   const wiedza = useWiedzaDoboru(dane.rozmowa.id);
 
@@ -142,97 +124,107 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
   const sprawyOtwarte = dane.sprawy.filter((x) => x.otwarta);
   const sprawyZamkniete = dane.sprawy.filter((x) => !x.otwarta);
   const bramka = bramkaDoboru(dane) && !szukamMimoTo;
-  const doborSwieci = swiatla.includes("dobor") || (szukamMimoTo && doborWToku(dane.dobor.stan));
-  /* Zamówienie idzie do świecącej części, gdy to ono wymaga ruchu: paczka
-     poza zwykłą drogą albo pozycja do wskazania. Wtedy nie stoi drugi raz
-     w wierszu „Zamówienie" — ta sama karta w dwóch miejscach to dokładnie
-     powtórzenie, które to wydanie zdejmuje. */
-  const zamowienieSwieci = Boolean(dane.zamowienie) && (swiatla.includes("paczka") || kilkaPozycji > 0);
-  /* Paczkę pokazuje soczewka nad kolumną (0.531.0), więc karta zamówienia
-     niżej jej nie powtarza — ani w „Wymaga Ciebie", ani w swoim wierszu. */
-  const paczkaWyzej = paczkaWSoczewce(dane);
-  const ileSwieci = zwrotyWToku.length + sprawyOtwarte.length + (zamowienieSwieci ? 1 : 0)
-    + (doborSwieci ? 1 : 0);
+  /* Dobór po „Szukaj mimo to" NIE świeci. Agent sam go otworzył, więc nie
+     czeka na niego nic nowego, a wiersz staje otwarty tuż pod przyciskiem. */
+  const doborSwieci = swiatla.includes("dobor");
+  const paczkaSwieci = swiatla.includes("paczka");
+  const pozycjaSwieci = swiatla.includes("pozycja");
+  /* Licznik liczy każdą narysowaną pozycję osobno. Dwie sprawy pod jedną
+     liczbą mówiły „1", a agent szukał drugiej na ślepo. */
+  const ileSwieci = zwrotyWToku.length + sprawyOtwarte.length + (paczkaSwieci ? 1 : 0)
+    + (pozycjaSwieci ? 1 : 0) + (doborSwieci ? 1 : 0);
+
+  const zamowienieId = dane.zamowienie?.externalId ?? null;
+  /* Pozycja tej oferty w zamówieniu: jej cena z chwili zakupu pozwala
+     powiedzieć, że oferta dziś kosztuje inaczej. */
+  const pozycjaRozmowy = dane.zamowienie?.pobrane?.pozycje
+    .find((p) => p.offerId !== null && p.offerId === oferta?.externalId) ?? null;
+  /* Paczka stoi w kolumnie dokładnie raz: w soczewce, w ramie albo tutaj. */
+  const paczkaWRzedzie = dane.zamowienie !== null && !paczkaWyzej(dane);
+  const pozycjeWRzedzie = pozycjeWKolumnie(dane) && !pozycjaSwieci;
+  /* Zamówienie rozmowy ma dom w karcie zakupu. Na liście zakupów klienta
+     stałoby drugi raz, a „to nie ta paczka?" wskazywałoby samo siebie. */
+  const inneZakupy = dane.kandydaciZamowien.filter((k) => k.externalId !== zamowienieId);
+  const zamowienieMaTresc = paczkaWRzedzie || pozycjeWRzedzie || inneZakupy.length > 0;
+  const klient = historia.data && klientWKolumnie(historia.data, zamowienieId)
+    ? historiaPozaZakupem(historia.data, zamowienieId) ?? null : null;
 
   const dobor = <Dobor key={dane.rozmowa.id} dobor={dane.dobor} rozmowaId={dane.rozmowa.id}
     onWstawDoSzkicu={onWstawDoSzkicu} onZlecPomiar={onZlecPomiar} />;
 
   return <section className="card flex min-h-0 flex-col overflow-hidden" aria-label="Kontekst">
-    {/* ── PASMO ODPOWIEDZI NAD KOLUMNĄ (0.404.0) ──────────────────────────────
-        Trzy fakty, które rozstrzygają odpowiedź, stoją nad wszystkim innym.
-        Od 0.498.0 to także JEDYNE miejsce nazwy, SKU i stanu towaru —
-        wiersze niżej ich nie powtarzają. Granice w `PasmoOdpowiedzi.tsx`. */}
+    {/* PASMO ODPOWIEDZI NAD KOLUMNĄ. Trzy fakty, które rozstrzygają odpowiedź,
+        stoją nad wszystkim innym i poza przewijaniem. Granice w
+        `PasmoOdpowiedzi.tsx`. */}
     <PasmoOdpowiedzi dane={dane} />
 
-    {/* JEDEN scroller na kolumnę, jak przy zwrotach: dwa zagnieżdżone dają
-        pasek w pasku, a treść bez `min-h-0` rozpycha kartę poza okno. */}
-    <div className="min-h-0 flex-1 overflow-y-auto">
-      {/* SOCZEWKA NAD WSZYSTKIM (0.499.0): odpowiedź na pytanie klienta stoi
-          przed tym, co ma termin, bo po nią agent otwiera rozmowę. Niczego nie
-          chowa — „Wymaga Ciebie" i wiersze stoją pod nią jak bez niej. */}
-      {/* NOWY KLIENT JEDNĄ LINIJKĄ (0.531.0). Pusty wiersz „Klient" zniknął
-          decyzją właściciela, a pierwszy kontakt dalej jest informacją. Login
-          stoi tylko w nagłówku rozmowy, więc znak stoi tu, pod pasmem — nad
-          pasmem zepchnąłby trzy fakty, które mają stać nad wszystkim. */}
-      {nowyKlient(historia.data) && <p
-        className="flex items-center gap-1.5 border-b px-4 py-1.5 text-podpis text-slate-600">
-        <UserRound size={12} className="shrink-0" aria-hidden />
-        Nowy klient — pierwszy kontakt u nas</p>}
+    {/* JEDEN przewijak na kolumnę, jak przy zwrotach: dwa zagnieżdżone dają
+        pasek w pasku, a treść bez `min-h-0` rozpycha kartę poza okno.
+        KRESKĘ DAJE RODZIC. Każdy blok z własną kreską dawał podwójne linie
+        w pięciu miejscach, bo sąsiad dokładał swoją. Żaden blok niżej nie ma
+        więc ani `border-b`, ani `border-t`. */}
+    <div className="min-h-0 flex-1 divide-y divide-slate-200 overflow-y-auto">
+      {/* SOCZEWKA NAD WSZYSTKIM: odpowiedź na pytanie klienta stoi przed tym,
+          co ma termin, bo po nią agent otwiera rozmowę. Niczego nie chowa —
+          „Wymaga Ciebie" i wiersze stoją pod nią jak bez niej. */}
       <Soczewka dane={dane} onWstawDoSzkicu={onWstawDoSzkicu} />
-      {ileSwieci > 0 && <section aria-label="Wymaga Ciebie" className="space-y-2 pb-3">
-        <h3 className="px-4 pt-3 text-podpis font-bold uppercase tracking-wide text-amber-900">
-          Wymaga Ciebie · {ileSwieci}</h3>
-        {/* Zwrot POD zamówieniem był zwrotem tego zakupu (0.221.0) — dziś
-            stoi NAD nim, bo ma termin, a zamówienie nie. Jeden zakup miewa
-            kilka zwrotów, stąd lista. */}
-        {zwrotyWToku.map((z) => <Rama key={z.id}><ZwrotRozmowy zwrot={z} /></Rama>)}
-        {/* Reklamacje i dyskusje tego zakupu (S1 spoiwa) — mają zegar,
-            którego pytanie nie ma. */}
-        {sprawyOtwarte.length > 0 && <Rama><SprawyZakupu sprawy={sprawyOtwarte} /></Rama>}
-        {zamowienieSwieci && dane.zamowienie && <Rama>
-          {kilkaPozycji > 0 && <Pusto waga="lista">
-            Zamówienie ma {kilkaPozycji} pozycje — wskaż tę, o którą pyta klient,
-            a oferta i kartoteka pojawią się niżej.
-          </Pusto>}
-          <ZamowienieRozmowy zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id}
-            ofertaRozmowy={oferta?.externalId ?? null} bezPaczki={paczkaWyzej} />
-        </Rama>}
-        {doborSwieci && <Rama>
-          <Wiersz tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
-            otwarty={otwarte.has("dobor")} onPrzelacz={() => przelacz("dobor")}>{dobor}</Wiersz>
-        </Rama>}
-      </section>}
 
-      <DrogaZakupu droga={dane.droga} tutaj={{ rodzaj: "rozmowa", id: dane.rozmowa.id }} />
+      {/* JEDNA RAMA, NAGŁÓWEK W ŚRODKU. Ramka wokół każdej pozycji osobno
+          dawała stos pudełek, a nagłówek nad nimi stał poza żadnym. Rama
+          siedzi w opakowaniu, bo `divide-y` rodzica nadpisałby jej grubość
+          u góry. 6 px wcięcia, 2 px ramy i 8 px pozycji trzymają tekst na
+          osi 16 px, tej samej co w całej kolumnie. */}
+      {ileSwieci > 0 && <div className="px-1.5 py-3">
+        <section aria-label="Wymaga Ciebie" className="rounded-lg border-2 border-amber-400">
+          <NaglowekSekcji jako="h3" ton="text-ranga-uwaga" className="px-2 pb-1 pt-2.5">
+            Wymaga Ciebie · {ileSwieci}</NaglowekSekcji>
+          {/* Kolejność zegara: zwrot i sprawa mają termin Allegro, paczka
+              czeka na klienta, wskazanie i dobór to praca bez terminu. */}
+          <div className="divide-y divide-slate-200">
+            {zwrotyWToku.map((z) => <div key={`zwrot-${z.id}`} className="px-2 py-2.5">
+              <ZwrotRozmowy zwrot={z} /></div>)}
+            {/* Każda sprawa osobno, ta sama linijka co na zwrotach, reklamacjach
+                i dyskusjach. Spoiwo daje elementowi `px-2`, więc tu go nie ma. */}
+            {sprawyOtwarte.map((s) => <div key={`sprawa-${s.id}`} className="py-1.5">
+              <SprawyZakupu sprawy={[s]} wSekcji /></div>)}
+            {/* Zdanie prowadzące paczki jest tytułem tej pozycji. */}
+            {paczkaSwieci && dane.zamowienie && <div className="px-2 py-2.5">
+              <Paczka zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id} /></div>}
+            {/* Prośba jest tytułem pozycji, a liczba pozycji stoi przy niej.
+                Osobne zdanie „Zamówienie ma N pozycji" mówiło to samo drugi raz. */}
+            {pozycjaSwieci && dane.zamowienie && <div className="space-y-2 px-2 py-2.5">
+              <p className="text-sm"><b className="text-wertis-ink">Wskaż pozycję, o którą pyta klient</b>
+                <span className="text-xs text-slate-600"> · {ile(kilkaPozycji, "pozycja", "pozycje", "pozycji")}</span></p>
+              <ZamowienieRozmowy zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id} ofertaRozmowy={null} />
+            </div>}
+            {doborSwieci && <Wiersz wRamie tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
+              otwarty={otwarte.has("dobor")} onPrzelacz={() => przelacz("dobor")}>{dobor}</Wiersz>}
+          </div>
+        </section>
+      </div>}
 
-      {/* Nagłówek „W normie” zszedł (0.513.0): wiersze niżej mówią o sobie
-          streszczeniem i szewronem, a bursztynowa rama nad nimi już oddziela
-          to, co świeci. Trzeci poziom tytułów w wąskiej kolumnie był szumem. */}
-
-      {/* KOLEJNOŚĆ: oferta i towar, zamówienie, sprawy zamknięte, dobór,
+      {/* KOLEJNOŚĆ: oferta i towar, dobór, zamówienie, sprawy zamknięte,
           klient, wiedza. Od tego, co klient kupował, do tego, co wiemy. */}
-      {/* ── BRAK OFERTY MÓWI SIĘ RAZ (0.548.0, wariant C) ─────────────────
-          Decyzja właściciela z 28 września 2026. Bez oferty stały tu dwa
-          akapity: „rozmowa nie jest powiązana z ofertą" i „nie ma z czego
-          wywieść kartoteki". Baner nad rozmową mówi to już raz, razem
-          z czynnościami, a przy zamówieniu z kilku pozycji prośbę niesie
-          „Wymaga Ciebie". Trzecie powtórzenie kazało czytać, czy to ten sam
-          brak. Wiersz zostaje streszczeniem, bez treści do rozwinięcia:
-          przycisk, który rozwija pustkę, to klik bez odpowiedzi. */}
+      {/* BRAK OFERTY MÓWI SIĘ RAZ (decyzja właściciela z 28 września 2026).
+          Baner nad rozmową mówi o braku razem z czynnościami, a przy
+          zamówieniu z kilku pozycji prośbę niesie „Wymaga Ciebie". Wiersz
+          zostaje streszczeniem bez treści do rozwinięcia: przycisk, który
+          rozwija pustkę, to klik bez odpowiedzi. */}
       {oferta
         ? <Wiersz tytul="Oferta i towar" streszczenie={streszczenieOferty(dane)}
           otwarty={otwarte.has("towar")} onPrzelacz={() => przelacz("towar")}>
-          <OfertaRozmowy oferta={oferta} />
-          {/* Wstawki tu NIE MA od 0.404.0 — zeszła do pasma odpowiedzi,
-              gdzie nie trzeba po nią przewijać kolumny. */}
+          {/* Tytuł, SKU i zdjęcie oferty stoją tu tylko wtedy, gdy karta
+              zakupu ich nie pokazuje. Cena z zakupu pozwala ofercie powiedzieć
+              wyłącznie różnicę. */}
+          <OfertaRozmowy oferta={oferta} zTytulem={!ofertaWKarcie(dane)}
+            cenaZakupuGrosze={pozycjaRozmowy?.cenaGrosze ?? null} />
           <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id} />
-          {/* „Szukaj innego towaru mimo to" przy znanym towarze (0.506.0) —
-              tutaj, a nie we własnym wierszu „Dobór: zbędny". Wiersz mówił przy
-              każdej takiej rozmowie, że czegoś NIE trzeba robić. */}
-          {/* Kliknięcie OTWIERA dobór: bez tego wiersz wracał zwinięty i przycisk
-              wyglądał, jakby nie zrobił nic. Bramka wymaga oferty
-              (`towarZnany`), więc stoi wyłącznie w tej gałęzi. */}
-          {bramka && <BramkaDoboru dane={dane} onSzukaj={() => {
+          {/* „Szukaj innego towaru mimo to" stoi tutaj, a nie we własnym
+              wierszu „Dobór: zbędny", który przy każdej takiej rozmowie mówił,
+              że czegoś NIE trzeba robić. Kliknięcie OTWIERA dobór: bez tego
+              wiersz wracał zwinięty i przycisk wyglądał, jakby nie zrobił nic.
+              Bramka wymaga oferty, więc stoi wyłącznie w tej gałęzi. */}
+          {bramka && <BramkaDoboru onSzukaj={() => {
             setSzukamMimoTo(true);
             setOtwarte((o) => new Set(o).add("dobor"));
           }} />}
@@ -243,21 +235,30 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
         : dane.zamowienie && !kilkaPozycji
           ? <Wiersz tytul="Oferta i towar" streszczenie={streszczenieOferty(dane)}
               otwarty={otwarte.has("towar")} onPrzelacz={() => przelacz("towar")}>
-              <p className="px-4 pb-3 text-sm text-slate-600">
+              <p className="text-sm text-slate-600">
                 Zamówienie nie wskazuje oferty, więc nie ma z czego wywieść kartoteki.
                 Wskaż ofertę przy rozmowie, a towar pojawi się tutaj.</p>
             </Wiersz>
           : <Wiersz tytul="Oferta i towar" streszczenie={streszczenieOferty(dane)} />}
 
-      {/* ── ZAKUPY TEGO KLIENTA (0.397.0) ──────────────────────────────────
-          Blok stoi w wierszu zamówienia, bo odpowiada na to samo pytanie —
-          „o którą paczkę chodzi" — a przy braku powiązania jest jedyną drogą
-          do niego. Wiersz stoi więc także wtedy, gdy zamówienia nie ma. */}
+      {/* DOBÓR POD TOWAREM. Bramka jest ostatnią linią bloku towaru, więc dobór
+          otwiera się dokładnie w miejscu klikniętego przycisku i wzrok nie
+          musi go szukać na dole kolumny. */}
+      {!doborSwieci && !bramka && <Wiersz tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
+        otwarty={otwarte.has("dobor")} onPrzelacz={() => przelacz("dobor")}>
+        {dobor}
+      </Wiersz>}
+
+      {/* ZAMÓWIENIE: paczka, gdy nie stoi wyżej, lista pozycji, gdy któraś nie
+          jest ofertą rozmowy, i inne zakupy klienta. Wiersz stoi także bez
+          zamówienia, bo zakupy klienta są wtedy jedyną drogą do powiązania.
+          Bez żadnej z tych rzeczy jest samym streszczeniem, nie przyciskiem. */}
       <Wiersz tytul="Zamówienie" streszczenie={streszczenieZamowienia(dane)}
-        otwarty={otwarte.has("zamowienie")} onPrzelacz={() => przelacz("zamowienie")}>
-        {dane.zamowienie && !zamowienieSwieci && <ZamowienieRozmowy zamowienie={dane.zamowienie}
-          rozmowaId={dane.rozmowa.id} ofertaRozmowy={oferta?.externalId ?? null} bezPaczki={paczkaWyzej} />}
-        <ZamowieniaKlienta kandydaci={dane.kandydaciZamowien} rozmowaId={dane.rozmowa.id}
+        {...(zamowienieMaTresc ? { otwarty: otwarte.has("zamowienie"), onPrzelacz: () => przelacz("zamowienie") } : {})}>
+        {paczkaWRzedzie && dane.zamowienie && <Paczka zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id} />}
+        {pozycjeWRzedzie && dane.zamowienie && <ZamowienieRozmowy zamowienie={dane.zamowienie}
+          rozmowaId={dane.rozmowa.id} ofertaRozmowy={oferta?.externalId ?? null} />}
+        <ZamowieniaKlienta kandydaci={inneZakupy} rozmowaId={dane.rozmowa.id}
           maZamowienie={dane.zamowienie !== null} />
       </Wiersz>
 
@@ -265,21 +266,20 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
         <Wiersz tytul="Zamknięte sprawy" streszczenie={streszczenieZamknietych(
           zwrotyZamkniete.length, sprawyZamkniete.length)}
           otwarty={otwarte.has("zamkniete")} onPrzelacz={() => przelacz("zamkniete")}>
-          {zwrotyZamkniete.map((z) => <ZwrotRozmowy key={z.id} zwrot={z} />)}
-          {sprawyZamkniete.length > 0 && <SprawyZakupu sprawy={sprawyZamkniete} />}
+          {zwrotyZamkniete.length > 0 && <ul className="divide-y divide-slate-200">
+            {zwrotyZamkniete.map((z) => <li key={z.id} className="py-2"><ZwrotRozmowy zwrot={z} /></li>)}
+          </ul>}
+          {/* Bez drugiego nagłówka: tytuł wiersza mówi już, co leży pod nim. */}
+          {sprawyZamkniete.length > 0 && <SprawyZakupu sprawy={sprawyZamkniete} wSekcji />}
         </Wiersz>}
 
-      {!doborSwieci && !bramka && <Wiersz tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
-        otwarty={otwarte.has("dobor")} onPrzelacz={() => przelacz("dobor")}>
-        {dobor}
-      </Wiersz>}
-
-      {/* Klient i Wiedza stają tylko z treścią (0.531.0) — reguła i powód
-          w `kokpit.ts` przy `klientMaHistorie`. */}
-      {historia.data && klientMaHistorie(historia.data) && <Wiersz tytul="Klient"
-        streszczenie={streszczenieKlienta(historia.data)}
+      {/* Klient staje tylko z treścią POZA tym zakupem. Wpisy tego zakupu mają
+          dom w karcie, w ramie, w „Zamkniętych sprawach" i w osi; reguła stoi
+          w `kokpit.ts` przy `klientWKolumnie`. */}
+      {klient && <Wiersz tytul="Klient" streszczenie={streszczenieWierszaKlienta(klient)}
         otwarty={otwarte.has("klient")} onPrzelacz={() => przelacz("klient")}>
-        <Klient key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id} onOtworzRozmowe={onOtworzRozmowe} />
+        <Klient key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id} onOtworzRozmowe={onOtworzRozmowe}
+          zamowienieId={zamowienieId} />
       </Wiersz>}
 
       {/* Maszyna z DANYCH DOBORU, nie z historii klienta: pomiar ma pasować do
@@ -297,64 +297,68 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
   </section>;
 }
 
-/** Ramka świecącej pozycji. Bursztyn, bo to rodzina „uwaga", nie zaznaczenie. */
-function Rama({ children }: { children: React.ReactNode }) {
-  return <div className="mx-3 overflow-hidden rounded-lg border-2 border-amber-400 bg-white">{children}</div>;
-}
-
 /**
  * Jeden temat kolumny: tytuł, streszczenie, treść po rozwinięciu.
  *
  * Streszczenie jest ZAPACHEM informacji (Pirolli i Card): mówi, co jest pod
  * spodem, zanim ktoś kliknie. Tego nie umiała zakładka z samym zerem.
  * Wysokość 44 px, bo to cel dla myszy i dla palca na tablecie w hali.
+ *
+ * SZEWRON PO PRAWEJ. Z lewej spychał tytuł na 38 px, a treść po rozwinięciu
+ * stała lewiej od własnego tytułu. Teraz tytuł, treść i pozycje ramy
+ * zaczynają się na tej samej osi 16 px.
  */
-function Wiersz({ tytul, streszczenie, otwarty = false, onPrzelacz, children }: {
+function Wiersz({ tytul, streszczenie, otwarty = false, onPrzelacz, wRamie = false, children }: {
   tytul: string;
-  streszczenie: string;
+  streszczenie: React.ReactNode;
   otwarty?: boolean;
   /** Bez uchwytu wiersz jest samym streszczeniem — nie ma czego rozwijać. */
   onPrzelacz?: () => void;
+  /** W ramie „Wymaga Ciebie" wcięcie daje po części rama, więc wiersz bierze mniej. */
+  wRamie?: boolean;
   children?: React.ReactNode;
 }) {
-  /* Wiersz bez treści NIE jest przyciskiem (0.548.0). Ta sama wysokość
-     i to samo wcięcie co wiersz rozwijany, żeby kolumna się nie rozjeżdżała;
-     w miejscu szewronu pusty odstęp, bo szewron obiecuje rozwinięcie. */
+  const px = wRamie ? "px-2" : "px-4";
+  /* Wiersz bez treści NIE jest przyciskiem. Ta sama wysokość i ta sama oś
+     co wiersz rozwijany, tylko bez szewronu, bo szewron obiecuje rozwinięcie. */
   if (!onPrzelacz) {
-    return <div className="flex min-h-11 items-center gap-2 border-t px-4 py-2 first:border-t-0">
-      <span aria-hidden="true" className="w-3.5 shrink-0" />
+    return <div className={`flex min-h-11 items-center gap-2 ${px} py-2`}>
       <b className="shrink-0 text-sm text-wertis-ink">{tytul}</b>
       <span className="min-w-0 truncate text-xs text-slate-600">{streszczenie}</span>
     </div>;
   }
-  return <div className="border-t first:border-t-0">
+  /* Streszczenie zostaje także po rozwinięciu: stan doboru niesie właśnie
+     ono, a treść pod spodem bywa długa. */
+  return <div>
     <button type="button" aria-expanded={otwarty} onClick={onPrzelacz}
-      className="flex min-h-11 w-full items-center gap-2 px-4 py-2 text-left hover:bg-slate-50">
-      <ChevronRight size={14} aria-hidden
-        className={`shrink-0 text-slate-500 transition-transform ${otwarty ? "rotate-90" : ""}`} />
+      className={`flex min-h-11 w-full items-center gap-2 ${px} py-2 text-left hover:bg-slate-50`}>
       <b className="shrink-0 text-sm text-wertis-ink">{tytul}</b>
-      <span className="min-w-0 truncate text-xs text-slate-600">{streszczenie}</span>
+      <span className="min-w-0 flex-1 truncate text-xs text-slate-600">{streszczenie}</span>
+      <ChevronDown size={14} aria-hidden
+        className={`ml-auto shrink-0 text-slate-500 transition-transform ${otwarty ? "rotate-180" : ""}`} />
     </button>
-    {otwarty && <div>{children}</div>}
+    {otwarty && <div className={`space-y-4 ${px} pb-4 pt-1`}>{children}</div>}
   </div>;
 }
 
-/** Bramka doboru (E z kanwy) — reguła i powód w `kokpit.ts` przy `towarZnany`. */
-function BramkaDoboru({ dane, onSzukaj }: { dane: OsRozmowy; onSzukaj: () => void }) {
-  const o = dane.oferta;
-  return <div className="space-y-2 px-4 pb-4 pt-1 text-sm">
-    <p><b>Towar znany z zamówienia.</b> Klient pisze o{" "}
-      {o?.pobrana?.nazwa ?? `ofercie ${o?.externalId ?? ""}`}
-      {o?.pobrana?.sku && <> (<span className="font-mono">{o.pobrana.sku}</span>)</>}, który
-      kupił w tym zamówieniu. Dobór nie ma tu czego szukać.</p>
-    <p className="text-xs text-slate-600">
-      Czy towar pasuje do maszyny klienta, mówi lista „Pasuje do" w ofercie i wiersz Wiedza.</p>
-    <Przycisk className="text-sm" onClick={onSzukaj}>Szukaj innego towaru mimo to</Przycisk>
+/**
+ * Bramka doboru — reguła i powód w `kokpit.ts` przy `towarZnany`.
+ *
+ * Nazwy i SKU tu nie ma, bo mówi je karta zakupu, a „Pasuje do" stoi w tym
+ * samym bloku wyżej. Zostaje fakt, że dobór nie szuka, i droga, żeby mimo to
+ * zaczął.
+ */
+function BramkaDoboru({ onSzukaj }: { onSzukaj: () => void }) {
+  return <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-600">
+    <span><b className="text-slate-900">Towar znany z zamówienia.</b> Dobór części nie szuka innego.</span>
+    <Przycisk className="text-xs" onClick={onSzukaj}>Szukaj innego towaru mimo to</Przycisk>
   </div>;
 }
 
 /* ── STRESZCZENIA WIERSZY ──────────────────────────────────────────────────
-   Każde mówi WYŁĄCZNIE to, czego nie ma w paśmie: bez nazwy, SKU i stanu. */
+   Każde mówi WYŁĄCZNIE to, czego nie mówi pasmo ani karta zakupu: bez nazwy,
+   SKU, stanu, ceny, numeru, sumy i dat zakupu. Fakt z cudzego domu byłby
+   tu drugim zapisem, który trzeba porównywać z pierwszym. */
 
 const STATUS_OFERTY: Record<string, string> = {
   ACTIVE: "aktywna", ENDED: "zakończona", INACTIVE: "nieaktywna", ACTIVATING: "aktywuje się",
@@ -362,13 +366,17 @@ const STATUS_OFERTY: Record<string, string> = {
 
 export function streszczenieOferty(dane: OsRozmowy): string {
   const o = dane.oferta;
-  /* „bez oferty" (0.548.0): streszczenie jest jedynym miejscem braku
-     w kolumnie, a słowo „powiązanej" niesie już baner nad rozmową. */
+  /* „bez oferty": streszczenie jest jedynym miejscem braku w kolumnie,
+     a słowo „powiązanej" niesie już baner nad rozmową. */
   if (!o) return pozycjiDoWskazania(dane) ? "do wskazania w zamówieniu" : "bez oferty";
-  if (!o.pobrana) return `oferta ${o.externalId} · treść jeszcze nie pobrana`;
+  if (!o.pobrana) return "treść oferty jeszcze nie pobrana";
+  /* Stan oferty słowem i to, skąd mamy kartotekę. Cenę mówi karta zakupu,
+     a stałe „kartoteka, ceny, opis" nie było daną, tylko spisem treści. */
   const status = o.pobrana.status ? STATUS_OFERTY[o.pobrana.status] ?? o.pobrana.status : null;
-  const cena = o.pobrana.cenaGrosze !== null ? zlote(o.pobrana.cenaGrosze, o.pobrana.waluta ?? "PLN") : null;
-  return [status, cena, "kartoteka, ceny, opis"].filter(Boolean).join(" · ");
+  const k = o.kartoteka;
+  const kartoteka = k.pewnosc === "sku" ? "kartoteka po SKU" : k.pewnosc === "pamiec" ? "kartoteka wskazana"
+    : k.twId !== null ? "propozycja kartoteki" : "bez kartoteki";
+  return [status, kartoteka].filter(Boolean).join(" · ");
 }
 
 export function streszczenieZamowienia(dane: OsRozmowy): string {
@@ -377,24 +385,22 @@ export function streszczenieZamowienia(dane: OsRozmowy): string {
     const n = dane.kandydaciZamowien.length;
     return n ? `niepowiązane · ${n} ${odmien(n, "zakup", "zakupy", "zakupów")} klienta` : "niepowiązane";
   }
-  const p = z.pobrane;
-  /* Gdy paczkę pokazuje soczewka (0.531.0), streszczenie jej nie powtarza:
-     ten sam stan dwa razy w jednej kolumnie każe sprawdzać, czy się zgadza. */
-  const paczka = paczkaWSoczewce(dane) ? null : z.przesylka?.dostarczonoAt
-    ? `doręczona ${dzien(z.przesylka.dostarczonoAt)}`
-    : z.przesylka?.status ? STATUS_PACZKI[z.przesylka.status] ?? z.przesylka.status
-      : "paczki nie sprawdzano";
-  /* PACZKA PIERWSZA (0.500.0): wzrok czyta początek wiersza i pomija resztę
-     (NN/g, wzorzec F, potwierdzony w 2017). O zamówieniu pytają najczęściej
-     „gdzie paczka", więc to słowo ma stać tam, gdzie oko na pewno trafi. */
-  if (!p) return [paczka, "treść jeszcze nie pobrana"].filter(Boolean).join(" · ");
-  /* „kupione" przy dacie (0.506.0): obok „doręczona 15 września" goła druga
-     data czytała się jak druga data dostawy. */
-  /* Bez paczki, daty i kwoty streszczenie byłoby puste — a pusty wiersz
-     wygląda jak usterka. Mówi wtedy, co leży pod nim. */
-  return [paczka, p.kupionoAt ? `kupione ${dzien(p.kupionoAt)}` : null,
-    p.sumaGrosze !== null ? zlote(p.sumaGrosze, p.waluta) : null].filter(Boolean).join(" · ")
-    || "pozycje zamówienia";
+  /* PACZKA PIERWSZA: wzrok czyta początek wiersza i pomija resztę (NN/g,
+     wzorzec F). O zamówieniu pytają najczęściej „gdzie paczka". Gdy paczka
+     stoi wyżej, w soczewce albo w ramie, streszczenie jej nie powtarza.
+     Daty doręczenia tu nie ma: mówi ją karta zakupu i blok paczki. */
+  const s = z.przesylka;
+  const paczka = paczkaWyzej(dane) ? null
+    : s?.dostarczonoAt ? "doręczona"
+      : s?.status ? STATUS_PACZKI[s.status] ?? s.status
+        : s?.sprawdzonoAt ? (s.waybill ? "nadana, bez statusu" : "bez numeru przesyłki")
+          : "paczki nie sprawdzano";
+  /* Metoda dostawy odpowiada na „kurier czy paczkomat". Liczba pozycji staje
+     tylko wtedy, gdy lista pod wierszem naprawdę stoi. */
+  const lista = pozycjeWKolumnie(dane) && !pozycjiDoWskazania(dane);
+  return [paczka, z.pobrane ? z.pobrane.dostawaMetoda : "treść jeszcze nie pobrana",
+    lista ? ile(z.pobrane?.pozycje.length ?? 0, "pozycja", "pozycje", "pozycji") : null]
+    .filter(Boolean).join(" · ") || "paczka wyżej";
 }
 
 export function streszczenieZamknietych(zwrotow: number, spraw: number): string {
@@ -412,6 +418,33 @@ export function streszczenieDoboru(dane: OsRozmowy): string {
   return czego ? `${stan} · ${czego}` : stan;
 }
 
+/**
+ * Streszczenie wiersza „Klient": tylko to, czego karta zakupu nie ma.
+ *
+ * Liczniki („2 zakupy · 1 zwrot") mówi karta jako „Wcześniej u nas". Tu
+ * zostaje sprawa klienta z następnym krokiem, maszyna z domkniętego doboru
+ * i data ostatniego kontaktu. Historia przychodzi już bez tego zakupu.
+ */
+export function streszczenieWierszaKlienta(h: HistoriaKlienta): React.ReactNode {
+  const czesci: React.ReactNode[] = [];
+  const s = h.sprawa;
+  if (s?.stan === "w_toku") {
+    czesci.push(<>sprawa: {s.krok} · {termin(s.krokDo)}
+      {s.poTerminie && <b className="text-ranga-zle"> po terminie</b>}</>);
+  }
+  const m = h.maszyny[0];
+  if (m) {
+    czesci.push([m.marka, m.nazwa, m.wariant].filter(Boolean).join(" ")
+      + (m.rocznik ? ` (${m.rocznik})` : "")
+      + (h.maszyny.length > 1 ? ` +${h.maszyny.length - 1}` : ""));
+  }
+  /* Wpis bez czytelnej daty pomijamy: „ostatnio —" nie mówi nic. */
+  const ostatni = h.wpisy.find((w) => Boolean(w.at) && !Number.isNaN(Date.parse(w.at)));
+  if (ostatni) czesci.push(`ostatnio ${dzien(ostatni.at)}`);
+  if (czesci.length === 0) return s ? "sprawa klienta zakończona" : "historia u nas";
+  return czesci.map((c, i) => <React.Fragment key={i}>{i > 0 && " · "}{c}</React.Fragment>);
+}
+
 const RODZAJ_HISTORII: Record<string, [string, string, string]> = {
   zakup: ["zakup", "zakupy", "zakupów"],
   rozmowa: ["rozmowa", "rozmowy", "rozmów"],
@@ -420,10 +453,17 @@ const RODZAJ_HISTORII: Record<string, [string, string, string]> = {
   dyskusja: ["dyskusja", "dyskusje", "dyskusji"],
 };
 
+/**
+ * Historia w liczbach — „Wcześniej u nas" w karcie zakupu.
+ *
+ * Jedynym użytkownikiem jest karta: wiersz „Klient" liczników nie mówi,
+ * bo karta mówi je już nad osią. Funkcja stoi tutaj, bo słownik rodzajów
+ * jest wspólny z resztą streszczeń kolumny.
+ */
 export function streszczenieKlienta(h: HistoriaKlienta): string {
-  const ile = new Map<string, number>();
-  for (const w of h.wpisy) ile.set(w.rodzaj, (ile.get(w.rodzaj) ?? 0) + 1);
-  const czesci = [...ile].map(([r, n]) => {
+  const liczby = new Map<string, number>();
+  for (const w of h.wpisy) liczby.set(w.rodzaj, (liczby.get(w.rodzaj) ?? 0) + 1);
+  const czesci = [...liczby].map(([r, n]) => {
     const f = RODZAJ_HISTORII[r];
     return f ? `${n} ${odmien(n, f[0], f[1], f[2])}` : `${n} × ${r}`;
   });

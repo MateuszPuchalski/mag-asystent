@@ -53,6 +53,9 @@ describe("soczewka w kolumnie kontekstu", () => {
 
   it("mówi, skąd kategoria: od Copilota albo od zespołu", () => {
     const { unmount } = rysuj(dane({ kategoria: "INVOICE" }));
+    /* Nagłówek tym samym kształtem co każda etykieta bloku kolumny, a dla
+       czytnika ekranu dalej nagłówkiem. */
+    expect(screen.getByRole("heading", { name: /Pytanie klienta · Faktura/ })).toBeInTheDocument();
     /* Źródło stoi słowem; „gdzie poprawić" czeka w dymku (0.513.0), bo nad
        każdą soczewką czytało się jak instrukcja obsługi ekranu. */
     const zrodlo = screen.getByText(/kategoria wg Copilota/);
@@ -128,6 +131,14 @@ describe("soczewka w kolumnie kontekstu", () => {
     unmount();
     const { container } = rysuj(dane({ kategoria: "RETURN" }, { zwroty: [{ id: 3 }] } as unknown as Partial<OsRozmowy>));
     expect(container).toBeEmptyDOMElement();
+  });
+
+  it("zwrot bez zgłoszenia nie powtarza daty doręczenia — ma ją karta zakupu i oś", () => {
+    rysuj(dane({ kategoria: "RETURN" }, { zamowienie: { ...dane({}).zamowienie!, przesylka: {
+      waybill: "X1", przewoznik: "DPD", status: "DELIVERED", dostarczonoAt: "2026-09-24T10:00:00Z",
+      sprawdzonoAt: "2026-09-25T10:00:00Z" } } }));
+    expect(screen.getByText(/Zwrotu tego zamówienia w Allegro jeszcze nie ma/)).toBeInTheDocument();
+    expect(screen.queryByText(/doręczona/)).toBeNull();
   });
 
   /* ── Paczka (0.531.0) ────────────────────────────────────────────────────

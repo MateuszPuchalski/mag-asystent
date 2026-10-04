@@ -1254,6 +1254,83 @@ zapisu przy patrzeniu”.
 z tym samym widokiem co zakładka KLIENT. Login z samej sprawy, rozmowy
 wyłącznie numerem zamówienia.
 
+### 10.2g. Prawa kolumna skrzynki: każdy fakt stoi raz (@wydanie)
+
+Zgłoszenie właściciela z 4 października 2026: „prawy panel w skrzynce jest
+nadal dość chaotyczny”. Od 3 października nad osią stoi karta zakupu
+i powtarzała wiele faktów kolumny. Siedem wcześniejszych przeróbek zdejmowało
+powtórzenia, ale prawie każda dokładała warstwę nad wierszami. Ta niczego nie
+dokłada, tylko zdejmuje. Nad wierszami stało pięć warstw, zostały trzy: pasmo,
+soczewka i „Wymaga Ciebie”.
+
+**Dwa domy.** Karta zakupu mówi, co klient kupił i kim jest. Kolumna mówi, co
+mamy w Subiekcie, gdzie jest paczka i co czeka na ruch.
+
+| fakt | dom | co zeszło z kolumny |
+|---|---|---|
+| numer zamówienia, suma, data zakupu | karta i linie osi | nagłówek bloku zamówienia, „Kupione · zapłacono”, daty w streszczeniu i w „Zamówił” |
+| nazwa, SKU, zdjęcie i cena oferty | karta | tytuł i kafel w „Oferta i towar”, nazwa i SKU w bramce doboru; tytuł zostaje, gdy karta oferty nie pokazuje |
+| stan oferty | słowo w streszczeniu „Oferta i towar” | plakietka „ACTIVE” |
+| „Nowy klient” i „Wcześniej u nas” | karta, także zwinięta i w pasku | linijka pod pasmem i liczniki w wierszu „Klient” |
+| droga zakupu przez kolejki | linie zakupu w osi | czipy „Droga tego zakupu” |
+| przesyłka | jeden blok „Paczka zamówienia” | druga linijka paczki z innym „sprawdź” w bloku zamówienia |
+
+**Dwa świadome wyjątki.** Pasmo zostaje z wierszem „Zamówił”, bo karta bywa
+poza kadrem. Wiersz mówi już tylko ilość i SKU, bez daty. Blok paczki mówi
+datę doręczenia, bo soczewka paczki ma odpowiadać bez karty.
+
+**Cena oferty tylko przy różnicy.** Gdy karta pokazuje ofertę, kolumna nie
+powtarza jej tytułu ani ceny. „Cena w ofercie” staje wyłącznie wtedy, gdy
+oferta kosztuje dziś inaczej niż w zamówieniu.
+
+**Karta nie liczy bieżącego zakupu jako „wcześniej”.** Serwer oddaje historię
+razem z tym zakupem, jego zwrotem i sprawami. Panel wycina zakup, zwrot,
+reklamację i dyskusję z numerem zamówienia rozmowy (`historiaPozaZakupem`
+w `skrzynka/kokpit.ts`). Rozmowy zostają, bo inna rozmowa to wcześniejszy
+kontakt. Dopiero wtedy plakietka „Nowy klient” staje przy pierwszym zakupie.
+Ta sama funkcja filtruje historię w wierszu „Klient”.
+
+**Wiersz „Klient” staje tylko z treścią spoza tego zakupu.** Jego streszczenie
+mówi sprawę klienta z krokiem i terminem, maszynę i datę ostatniego kontaktu.
+Liczników nie mówi, bo mówi je karta.
+
+**„Wymaga Ciebie” ma jedną bursztynową ramę.** Nagłówek stoi w ramie, a pozycje
+dzieli kreska. Licznik liczy każdą narysowaną pozycję: zwrot, sprawę, paczkę,
+wskazanie pozycji i dobór. Świecący dobór stoi w ramie zwinięty, bo kandydaci
+zajmują kilkaset pikseli.
+
+**Kolejność wierszy:** Oferta i towar, Dobór, Zamówienie, Zamknięte sprawy,
+Klient, Wiedza. Dobór stoi pod towarem, bo „Szukaj innego towaru mimo to”
+otwiera go tuż pod przyciskiem. W bloku towaru opis kartoteki stoi przed
+cenami, bo niesie wymiary i gwinty. Wiersz „Zamówienie” mówi paczkę słowem
+i metodę dostawy. Przyciskiem jest tylko wtedy, gdy ma co rozwinąć.
+
+**Paczka: jeden blok, jedna reguła** (`skrzynka/Paczka.tsx`). Blok stoi
+w soczewce, w ramie albo w wierszu „Zamówienie”, nigdy w dwóch miejscach.
+Pełny przycisk sprawdzenia staje przy stanie nieznanym albo starszym niż pół
+godziny, także w wierszu, a przy świeżym zostaje ciche „sprawdź”. Sprawdzenie
+dalej idzie wyłącznie kliknięciem.
+
+**Pasmo nie rośnie pod okiem.** Przy potwierdzonej kartotece „To jest” i „Mamy”
+stoją od pierwszego renderu. Zanim Subiekt odpowie, mówią „wczytuję…”, a przy
+błędzie „Subiekt nie odpowiedział” i „nie wiemy”. Wcześniej pasmo dorastało
+o 45 px w chwili czytania.
+
+**Jedna gramatyka.** Kreskę między blokami daje kolumna, a żaden blok nie ma
+własnej. Tekst zaczyna się na 16 px, także w ramie. Szewron wiersza stoi po
+prawej. Odnośniki mają trzy kształty: praca w panelu, cicha poprawka i wyjście
+do Allegro (`skrzynka/odnosniki.tsx`). Nic nie jest większe od tytułu wiersza,
+a każde rozwijanie niesie `aria-expanded`.
+
+**Strażnicy.** `skrzynka/JedenDom.test.tsx` stawia kolumnę na prawdziwych
+hakach i rozwija każdy wiersz. Pilnuje, że fakty karty do kolumny nie wracają,
+a rozwijanie niczego nie zapisuje. `skrzynka/Gramatyka.test.ts` zatrzymuje
+własne kreski bloków, szare tła, ręczne wersaliki, większe pismo i `<details>`.
+
+**Czego nie ruszono.** Karta pokazuje dalej dwie pozycje i odsyła po resztę do
+kolumny. Przy dwóch i więcej pozycjach lista w kolumnie powtarza więc te dwie.
+To powtórzenie i wiersz „Zamówił” w paśmie czekają na decyzję właściciela.
+
 ### 10.3. Oś rozmowy
 
 Oś zawiera wiadomości klienta, odpowiedzi firmy, komentarze wewnętrzne, zmiany
@@ -6323,7 +6400,7 @@ Po §26d ta sama reguła objęła resztę panelu. Właściciel poprosił krótko
 - tarcie „Wyślij bez zmian” (§26c.3);
 - wiersze Klient i Wiedza w Skrzynce, tylko skrócone (0.216.0).
 
-**Odwrócone 26 września 2026 decyzją właściciela (0.531.0).** Puste wiersze Klient i Wiedza znikają, bo przy większości rozmów mówiły tylko „nic tu nie ma”. Wiersz z treścią zostaje zwinięty jak dotąd. Pierwszy kontakt ze znanym loginem mówi jedna linijka „Nowy klient” pod pasmem.
+**Odwrócone 26 września 2026 decyzją właściciela (0.531.0).** Puste wiersze Klient i Wiedza znikają, bo przy większości rozmów mówiły tylko „nic tu nie ma”. Wiersz z treścią zostaje zwinięty jak dotąd. Pierwszy kontakt ze znanym loginem mówi jedna linijka „Nowy klient” pod pasmem. Od @wydanie tę linijkę zastępuje plakietka w karcie zakupu (§10.2g).
 
 **Jedna zmiana do potwierdzenia.** Ściąga skrótów w kolejce Skrzynki otwiera się teraz kliknięciem, nie najechaniem. Najechanie przyszło w 0.402.0 po uwadze właściciela. Pełna lista skrótów dalej stoi pod klawiszem `?`.
 
@@ -6603,12 +6680,12 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
 | Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |
 | Podgląd kolejki = ostatnia wiadomość klienta | **działa** od 0.167.0 | `LISTA` w `services/skrzynka.ts`, `ostatniaOdKlienta` |
-| Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.167.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx`; od 0.215.0 pozycja ze zdjęciem oferty, kartoteką i „Wskaż" |
+| Zamówienie przy rozmowie (`relatesTo.order`) | **działa** od 0.167.0 | `message.related_order_id`, `skrzynka/ZamowienieRozmowy.tsx`; od 0.215.0 pozycja ze zdjęciem oferty, kartoteką i „Wskaż"; od @wydanie sama lista pozycji, bo numer, sumę i kroki mówi karta zakupu (§10.2g) |
 | Oferta przy rozmowie (`relatesTo.offer`) | **działa** od 0.178.0 | `offer_snapshot`, `services/allegro-oferty-sync.ts`, `skrzynka/OfertaRozmowy.tsx`; od 0.215.0 także ze wskazania agenta i z jedynej pozycji zamówienia |
 | Kolejność listy rozmów — przełącznik „od najnowszych" | **działa** od 0.215.0 | `skrzynka/Kolejka.tsx`, `odNajnowszych`; domyślnie PILNE i najdłużej czekające |
 | Nazwa towaru przy ofercie w rozmowie | **z oferty** od 0.178.0 | `nazwaOferty` — snapshot, a bez niego pozycja zamówienia |
 | Kartoteka Subiekta przy rozmowie | **działa** od 0.179.0 | `kartotekaOferty`, `skrzynka/TowarRozmowy.tsx` — stan, półka, zdjęcie; od 0.219.0 jedno trafienie po SKU bez „Zatwierdź" |
-| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`; od 0.498.0 bez zakładek: „Wymaga Ciebie" i wiersze „W normie" (`skrzynka/kokpit.ts`) |
+| Trzy kolumny w skrzynce (§10.1) | **działa** od 0.180.0 | `skrzynka/Kontekst.tsx`; od 0.498.0 bez zakładek: „Wymaga Ciebie" i wiersze „W normie" (`skrzynka/kokpit.ts`); od @wydanie każdy fakt raz: zakup i klient w karcie nad osią, kolumna mówi Subiekt, paczkę i robotę (§10.2g) |
 | Opis kartoteki przy rozmowie | **działa** od 0.198.0 | `skrzynka/TowarRozmowy.tsx`, pole `desc` z `/api/products/:twId` |
 | Wiersz kolejki wg §10.2 | **częściowo** od 0.181.0 | priorytet, czas oczekiwania, dopiski, zadanie, od E1 status doboru; bez terminu |
 | Historia przypisań rozmowy | **działa** od 0.145.1 | `conversation_assignment` |
@@ -6694,7 +6771,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Krok „towar do odesłania?" po uznaniu | **działa** od 0.242.0 | `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
 | Podgląd załącznika reklamacji na osi | **działa** od 0.223.0, wyrównane w 0.246.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF; od 0.246.0 ta sama powłoka co w skrzynce (`towar/Zalacznik.tsx`), odmowa Allegro 502 / awaria drogi 503 ze zdaniem i „Spróbuj ponownie" (`routes/pobranie.ts`), błąd pobrania widoczny |
 | Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |
-| Spoiwo czterech kolejek — sprawy i droga zakupu | **działa** od 0.387.0 | `services/droga-klienta.ts`, `panel/src/sprawy/Spoiwo.tsx`; mostek po `order_id`, blok wspólny dla skrzynki, zwrotów, reklamacji i dyskusji |
+| Spoiwo czterech kolejek — sprawy i droga zakupu | **działa** od 0.387.0 | `services/droga-klienta.ts`, `panel/src/sprawy/Spoiwo.tsx`; mostek po `order_id`, blok wspólny dla skrzynki, zwrotów, reklamacji i dyskusji; w skrzynce od @wydanie bez czipów drogi, bo mówią ją linie zakupu w osi (§10.2g) |
 | Historia klienta ze zwrotami i sprawami | **działa** od 0.387.0 | `services/klient-historia.ts`; pięć rodzajów wpisu, wiązanie po `kupujacy_login` — wolno, bo zwrot i sprawa niosą go z Allegro |
 | Profil klienta: liczby, sygnały, otwarte sprawy, zamówienia, notatka | **działa** od 0.484.0 | `services/profil-klienta.ts`, `GET /api/obsluga/klient/:login`, `panel/src/ekrany/ProfilKlienta.tsx`; login przez konta, bez wielkości liter; sygnały wyliczane; zapisy tylko na kliknięcie: `klient_notatka` z cofnięciem i od 0.535.0 sprawa klienta; karta „Otwarte sprawy” nazywa się od 0.535.0 „Otwarte w kolejkach” |
 | Sprawa klienta: kto prowadzi, następny krok z terminem, zakończenie | **działa** od 0.535.0 (pierwszy przyrost S6) | `services/prowadzenie-klienta.ts`, tabela `klient_prowadzenie`, cztery `POST /api/obsluga/klient/:login/sprawa/…` (`krok`, `zakoncz`, `wznow`, `przejmij`), karta na profilu, linijka przy historii klienta, wiersz w „Moje”; dwa stany, krok jako jedyna droga założenia i wznowienia, „nowe” z odcisku przy odczycie, obudzenie zakończonej przez 30 dni od zakończenia, `wersja` i odcisk pilnują świeżości każdego zapisu; w dzienniku numer sprawy, nigdy login ani krok; Ctrl+K po numerze zamówienia daje wiersz kupującego (`szukajWszedzie`), żeby brak w dostawie był o krok od sprawy (`docs/obsluga-klienta-calosc.md` S6, `docs/obsluga-klienta.md`) |

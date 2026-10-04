@@ -135,6 +135,30 @@ describe("zakładka klienta", () => {
     expect(screen.getByText("po terminie").className).toContain("text-ranga-zle");
   });
 
+  /* Wpisy tego zakupu mają dom w karcie zakupu, w ramie „Wymaga Ciebie",
+     w „Zamkniętych sprawach" i w osi. Historia w kolumnie mówi resztę. */
+  it("w kolumnie rozmowy historia nie powtarza tego zakupu; rozmowy zostają", () => {
+    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ wpisy: [
+      { rodzaj: "zakup", at: "2026-09-14T12:00:00Z", tresc: "Szarpak SZR-148/82",
+        zamowienieId: "z-1", link: null, rozmowaId: null, sprawaId: null },
+      { rodzaj: "rozmowa", at: "2026-09-14T09:00:00Z", tresc: "ustalono model kosiarki",
+        zamowienieId: null, link: null, rozmowaId: 3140, sprawaId: null },
+    ] }) });
+    render(<MemoryRouter><Klient rozmowaId={4821} onOtworzRozmowe={vi.fn()} zamowienieId="z-1" /></MemoryRouter>);
+    expect(screen.queryByText(/Zakup:/)).toBeNull();
+    expect(screen.getByRole("button", { name: /ustalono model kosiarki/ })).toBeInTheDocument();
+  });
+
+  it("przy samej sprawie i zakupie pusta oś nie mówi „pierwszy kontakt”", () => {
+    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ sprawa: {
+      id: 5, login: "zielony_ogrod", wersja: 2, stan: "w_toku", krok: "czekamy na zwrot",
+      krokDo: "2026-09-25T06:00:00Z", dzis: false, poTerminie: false, prowadzi: "Bartek", prowadziId: 2,
+      zakonczonoAt: null, zakonczyl: null, odcisk: "{}", nowe: [], dosylki: [] } }) });
+    render(<MemoryRouter><Klient rozmowaId={4821} onOtworzRozmowe={vi.fn()} zamowienieId="z-1" /></MemoryRouter>);
+    expect(screen.queryByText(/Pierwszy kontakt/)).toBeNull();
+    expect(screen.getByText(/Poza tym zakupem nie mamy/)).toBeInTheDocument();
+  });
+
   it("bez sprawy i na samym profilu linijki sprawy nie ma", () => {
     pokaz(dane({ sprawa: null }));
     expect(screen.queryByRole("link", { name: /Sprawa klienta/ })).toBeNull();
