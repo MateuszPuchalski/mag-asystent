@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.557.6 — 4 października 2026
+
+Zwroty: gdy „Wszystko OK" nie może ruszyć (brak linku do Allegro, paczka jeszcze
+nie wróciła, część pozycji oceniona inaczej), nad prawdziwą akcją nie stoi już
+wyblakły zielony przycisk na około 85 px. Zostaje jedna linia z tym samym
+wyjaśnieniem, co zrobić najpierw. Gdy ścieżka jest gotowa, wszystko wygląda
+jak dotąd. Skrót W nadal nic nie robi, dopóki jest przeszkoda.
+
 ## 0.557.5 — 4 października 2026
 
 Dyskusje: wiersz nad kolejką, gdy synchronizacja działa, mówił „odświeżasz ją
