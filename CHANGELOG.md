@@ -10,6 +10,14 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.557.1 — 4 października 2026
+
+Skrzynka: po otwarciu rozmowy oś zjeżdża na dół i chowała kartę zakupu za górną
+krawędzią, więc nikt jej nie widział. Gdy karta jest poza kadrem, u góry osi
+stoi teraz jednolinijkowe streszczenie, a kliknięcie przewija do karty. Zjazd
+na dół trwa, dopóki treść się układa (zdjęcia, karta, edytor), więc pływający
+pasek „Wyślij" nie zasłania już ostatniego wiersza Copilota.
+
 ## 0.557.0 — 3 października 2026
 
 Pierwsza sonda Jeva na żywym API TypeSafe potwierdziła kształt odpowiedzi
