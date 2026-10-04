@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
 
@@ -423,5 +423,63 @@ describe("Nasza długa wypowiedź zwija się do czterech linii (0.511.0)", () =>
       czat={[wiad({ autorRola: "BUYER", tresc: dluga })]} />);
     expect(screen.getByText(/Dzień dobry/).className).not.toContain("line-clamp-4");
     expect(screen.queryByRole("button", { name: "Pokaż całą wiadomość" })).not.toBeInTheDocument();
+  });
+});
+
+describe("Kolumna zdjęć obok rozmowy", () => {
+  /* Zgłoszenie właściciela: zdjęcia zajmowały dużą część czatu. Zdjęcie
+     stoi w kolumnie, a w wątku zostaje odnośnik w miejscu wiadomości. */
+  const zZdjeciami = () => render(<Czat sprawa={sprawa()} kolumnaZdjec
+    zalaczniki={[zal(5, "dowod.png", true), zal(6, "paragon.pdf", false)]}
+    czat={[wiad({ zalaczniki: [zal(9, "usterka.jpg", true)] })]} />);
+
+  it("zdjęcia stoją w kolumnie, w wątku zostaje sam odnośnik", () => {
+    scena.obrazy = { 5: "blob:dowod", 9: "blob:usterka" };
+    zZdjeciami();
+    const kolumna = screen.getByRole("complementary", { name: "Zdjęcia w sprawie" });
+    expect(within(kolumna).getByRole("img", { name: "usterka.jpg" })).toBeInTheDocument();
+    expect(within(kolumna).getByRole("img", { name: "dowod.png" })).toBeInTheDocument();
+    expect(screen.getAllByRole("img")).toHaveLength(2);
+    expect(screen.getByRole("button", { name: "Pokaż zdjęcie w kolumnie: usterka.jpg" }))
+      .toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pokaż zdjęcie w kolumnie: dowod.png" }))
+      .toBeInTheDocument();
+  });
+
+  it("plik bez podglądu zostaje w wątku, nie w kolumnie", () => {
+    scena.obrazy = { 5: "blob:dowod", 9: "blob:usterka" };
+    zZdjeciami();
+    const kolumna = screen.getByRole("complementary", { name: "Zdjęcia w sprawie" });
+    expect(within(kolumna).queryByText("paragon.pdf")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "paragon.pdf" })).toBeInTheDocument();
+  });
+
+  it("kolumna podpisuje zdjęcie autorem wiadomości", () => {
+    scena.obrazy = { 5: "blob:dowod", 9: "blob:usterka" };
+    zZdjeciami();
+    expect(screen.getByRole("region", { name: /^Zdjęcia: Klient · / })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Zdjęcia: Zgłoszenie" })).toBeInTheDocument();
+  });
+
+  it("odnośnik przenosi fokus na swoje zdjęcie w kolumnie", async () => {
+    scena.obrazy = { 5: "blob:dowod", 9: "blob:usterka" };
+    zZdjeciami();
+    await userEvent.click(screen.getByRole("button", { name: "Pokaż zdjęcie w kolumnie: usterka.jpg" }));
+    expect(document.activeElement).toContainElement(screen.getByRole("img", { name: "usterka.jpg" }));
+  });
+
+  it("bez zdjęć kolumny nie ma — rozmowa nie traci ćwiartki na pustkę", () => {
+    scena.obrazy = {};
+    render(<Czat sprawa={sprawa()} kolumnaZdjec zalaczniki={[zal(6, "paragon.pdf", false)]}
+      czat={[wiad()]} />);
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+  });
+
+  it("bez włączenia kolumny zdjęcie stoi w wątku jak dotąd (dyskusje)", () => {
+    scena.obrazy = { 9: "blob:usterka" };
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ zalaczniki: [zal(9, "usterka.jpg", true)] })]} />);
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "usterka.jpg" })).toBeInTheDocument();
   });
 });

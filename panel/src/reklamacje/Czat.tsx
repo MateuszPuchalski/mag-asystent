@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useState } from "react";
-import { Bot, LifeBuoy, Store, User, type LucideIcon } from "lucide-react";
+import React, { useEffect, useId, useRef, useState } from "react";
+import { Bot, Image, LifeBuoy, Store, User, type LucideIcon } from "lucide-react";
 import type { Reklamacja, WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
 import { pobierzZalacznik } from "../api/reklamacje";
 import { useZdjecieZalacznikaReklamacji } from "../towar/useZdjecie";
@@ -115,6 +115,37 @@ function Zalaczniki({ reklamacjaId, lista }: {
 }
 
 /**
+ * Odnośniki do zdjęć, które stoją w kolumnie obok rozmowy.
+ *
+ * Wiadomość zachowuje MIEJSCE zdjęcia w wątku, ale nie jego wysokość. Agent
+ * widzi, że klient coś przysłał właśnie tu, a kliknięcie pokazuje to zdjęcie
+ * w kolumnie i przenosi na nie fokus.
+ */
+function OdnosnikiZdjec({ lista, onPokaz }: {
+  lista: ZalacznikReklamacji[]; onPokaz: (id: number) => void;
+}) {
+  if (!lista.length) return null;
+  return <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
+    {lista.map((z) => <li key={z.id} className="min-w-0">
+      <button type="button" onClick={() => onPokaz(z.id)}
+        aria-label={`Pokaż zdjęcie w kolumnie: ${z.nazwa || "zdjęcie"}`}
+        className="inline-flex max-w-full items-center gap-1 font-semibold text-slate-700
+          underline underline-offset-2 hover:text-slate-900">
+        <Image size={12} aria-hidden="true" className="shrink-0 text-slate-500" />
+        <span className="truncate">{z.nazwa || "zdjęcie"}</span>
+        <span aria-hidden="true">→</span>
+      </button>
+    </li>)}
+  </ul>;
+}
+
+/** Rola autora z kształtem NIEZNANEGO dla wartości spoza zbioru (niżej powód). */
+const rolaWiadomosci = (w: WiadomoscReklamacji) => ROLE[w.autorRola ?? ""] ?? {
+  etykieta: w.autorRola ?? "Nieznany autor", Ikona: User, nasza: false,
+  klasa: "bg-white border-slate-200", listwa: "border-l-4 border-dotted border-l-slate-400",
+};
+
+/**
  * Tyle o sprawie, ile ten komponent naprawdę czyta.
  *
  * KSZTAŁT STRUKTURALNY, nie `Reklamacja`, od 0.245.0 — bo ten sam czat rysuje
@@ -170,7 +201,7 @@ function TrescKarty({ tekst, nasza }: { tekst: string; nasza: boolean }) {
   </>;
 }
 
-export function Czat({ sprawa, czat, zalaczniki, edytor }: {
+export function Czat({ sprawa, czat, zalaczniki, edytor, kolumnaZdjec = false }: {
   sprawa: SprawaCzatu;
   czat: WiadomoscReklamacji[];
   /** Załączniki SAMEJ sprawy — te spoza rozmowy. */
@@ -178,6 +209,8 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
   /* Edytor wstrzykiwany, nie wołany stąd: cały katalog `reklamacje/` trzyma
      komponenty czyste, a mutacje mieszkają w ekranie (wzorzec `skrzynka/`). */
   edytor?: React.ReactNode;
+  /** Zdjęcia w kolumnie obok rozmowy, a w wątku tylko odnośnik do nich. */
+  kolumnaZdjec?: boolean;
 }) {
   /* Ile wiadomości Allegro widzi, a ilu jeszcze nie mamy. Rozmowa dociąga się
      taktem synchronizacji, więc świeża sprawa bywa przez chwilę niepełna —
@@ -240,9 +273,48 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
      dole i nie ucieka. Werdykt stoi POD rozmową (0.412.0), więc nie trzeba do
      niego przewijać jedenastu wiadomości. Pole odpowiedzi nie potrzebuje
      osobnego pasa: przykleja się do krawędzi samo (niżej). */
-  return <div className="flex min-h-0 flex-1 flex-col gap-3">
+  /* ── ZDJĘCIA W KOLUMNIE OBOK ROZMOWY ─────────────────────────────────────
+     Zgłoszenie właściciela: zdjęcia zajmowały dużą część czatu. Kafel ma
+     do 256 px wysokości, więc trzy zdjęcia z telefonu wypychały następną
+     wiadomość poza ekran, a rozmowę czyta się od końca.
+
+     Zdjęcie idzie do prawej ćwiartki, a w wątku zostaje odnośnik w tym
+     samym miejscu. Kolejność czytania się nie zmienia, zmienia się tylko
+     wysokość wiadomości. Kolumna przewija się osobno, bo zdjęć bywa więcej
+     niż wiadomości.
+
+     Plik bez podglądu zostaje w wątku: to jedna linia z nazwą, a odnośnik
+     do niej byłby tej samej wysokości. Bez zdjęć kolumny nie ma wcale, żeby
+     rozmowa nie traciła ćwiartki na pustkę. */
+  const przedrostek = useId();
+  const idZdjecia = (z: number) => `${przedrostek}-zdjecie-${z}`;
+  const zdjecia = (lista: ZalacznikReklamacji[]) => lista.filter((z) => z.podglad);
+  const pliki = (lista: ZalacznikReklamacji[]) =>
+    kolumnaZdjec ? lista.filter((z) => !z.podglad) : lista;
+  const grupyZdjec = !kolumnaZdjec ? [] : [
+    { klucz: "zgloszenie", podpis: "Zgłoszenie", lista: zdjecia(zalaczniki) },
+    ...czat.map((w) => ({
+      klucz: `w-${w.id}`,
+      podpis: `${rolaWiadomosci(w).etykieta} · ${czas(w.utworzonoAt)}`,
+      lista: zdjecia(w.zalaczniki),
+    })),
+  ].filter((g) => g.lista.length > 0);
+  const zKolumna = grupyZdjec.length > 0;
+  /* Fokus, nie samo przewinięcie: obramowanie fokusu pokazuje, KTÓRE zdjęcie
+     z kolumny jest tym z wiadomości, a czytnik ekranu idzie za nim. */
+  const pokazZdjecie = (z: number) => {
+    const el = document.getElementById(idZdjecia(z));
+    el?.scrollIntoView?.({ block: "nearest" });
+    el?.focus();
+  };
+  const sekcjaZgloszenia = opisWart || pliki(zalaczniki).length > 0
+    || (zKolumna && zdjecia(zalaczniki).length > 0);
+
+  return <div className={zKolumna
+    ? "grid min-h-0 flex-1 grid-cols-[minmax(0,3fr)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)]"
+    : "flex min-h-0 flex-1 flex-col gap-3"}>
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
-    {(opisWart || zalaczniki.length > 0) &&
+    {sekcjaZgloszenia &&
       <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
         <NaglowekSekcji jako="h3">
           {opisWart ? "Zgłoszenie" : "Załączniki zgłoszenia"}</NaglowekSekcji>
@@ -250,7 +322,8 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
           ? <p className="mt-1 text-sm text-slate-800">
               Klient nie opisał sprawy własnymi słowami.</p>
           : <Tresc tekst={sprawa.opisZgloszenia} className="mt-1 text-sm text-slate-800" />)}
-        <Zalaczniki reklamacjaId={sprawa.id} lista={zalaczniki} />
+        {zKolumna && <OdnosnikiZdjec lista={zdjecia(zalaczniki)} onPokaz={pokazZdjecie} />}
+        <Zalaczniki reklamacjaId={sprawa.id} lista={pliki(zalaczniki)} />
       </section>}
 
     {/* DWA POWODY NIEPEŁNEJ ROZMOWY I DWA RÓŻNE ZDANIA (0.273.0). Do 0.272.0
@@ -274,10 +347,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
             /* Rola spoza zbioru dostaje kształt NIEZNANEGO, a nie kształt
                klienta: schemat Allegro może dołożyć wartość, a wtedy ekran ma
                powiedzieć „nie wiem, kto to", zamiast zgadywać stronę. */
-            const rola = ROLE[w.autorRola ?? ""] ?? {
-              etykieta: w.autorRola ?? "Nieznany autor", Ikona: User, nasza: false,
-              klasa: "bg-white border-slate-200", listwa: "border-l-4 border-dotted border-l-slate-400",
-            };
+            const rola = rolaWiadomosci(w);
             return <li key={w.id}
               className={`rounded-lg border p-3 ${rola.klasa} ${rola.listwa} ${
                 rola.nasza ? "ml-8" : "mr-8"}`}>
@@ -293,7 +363,8 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
                 <span className="ml-auto text-slate-600">{czas(w.utworzonoAt)}</span>
               </div>
               <TrescKarty tekst={w.tresc} nasza={rola.nasza} />
-              <Zalaczniki reklamacjaId={sprawa.id} lista={w.zalaczniki} />
+              {zKolumna && <OdnosnikiZdjec lista={zdjecia(w.zalaczniki)} onPokaz={pokazZdjecie} />}
+              <Zalaczniki reklamacjaId={sprawa.id} lista={pliki(w.zalaczniki)} />
             </li>;
           })}
         </ol>}
@@ -308,5 +379,25 @@ export function Czat({ sprawa, czat, zalaczniki, edytor }: {
     {edytor}
     <div ref={koniec} aria-hidden="true" />
     </div>
+
+    {zKolumna && <aside aria-label="Zdjęcia w sprawie"
+      className="flex min-h-0 flex-col gap-3 overflow-y-auto border-l border-slate-200 bg-slate-50 px-2 py-3">
+      <NaglowekSekcji jako="h3">Zdjęcia</NaglowekSekcji>
+      {grupyZdjec.map((g) => <section key={g.klucz} aria-label={`Zdjęcia: ${g.podpis}`}>
+        <p className="text-podpis text-slate-600">{g.podpis}</p>
+        <div className="mt-1 flex flex-col gap-2">
+          {g.lista.map((z) => <React.Fragment key={z.id}>
+            {/* Cel odnośnika z wątku. `tabIndex={-1}` przyjmuje fokus z kodu,
+                ale nie dokłada przystanku tabulatora przed każdym zdjęciem. */}
+            <div id={idZdjecia(z.id)} tabIndex={-1}
+              className="rounded focus:outline-none focus:ring-2 focus:ring-slate-400">
+              <ListaZalacznikow className="!mt-0">
+                <ZalacznikReklamacji reklamacjaId={sprawa.id} z={z} />
+              </ListaZalacznikow>
+            </div>
+          </React.Fragment>)}
+        </div>
+      </section>)}
+    </aside>}
   </div>;
 }

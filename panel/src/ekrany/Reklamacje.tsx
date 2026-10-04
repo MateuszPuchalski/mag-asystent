@@ -628,6 +628,9 @@ export function Reklamacje() {
               }}
               czat={szczegol.data.czat}
               zalaczniki={szczegol.data.zalaczniki}
+              /* Zdjęcie reklamacji bywa całym zgłoszeniem i przychodzi seriami
+                 z telefonu, więc stoi w kolumnie obok, a nie w wątku. */
+              kolumnaZdjec
               /* Klucz sprawy: edytor trzyma własny stan (cofnięcie wyczyszczenia,
                  zwłokę Ctrl+Enter), a ekran nie montuje go od nowa przy przejściu. */
               edytor={<Edytor key={szczegol.data.reklamacja.id} tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
