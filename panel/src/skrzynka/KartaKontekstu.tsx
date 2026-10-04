@@ -4,7 +4,7 @@ import type { HistoriaKlienta, OsRozmowy } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Skopiuj, dzienMiesiac, ile } from "../ui";
 import { KafelOferty } from "../towar/Kafel";
-import { klientMaHistorie, nowyKlient } from "./kokpit";
+import { historiaPozaZakupem, klientMaHistorie, nowyKlient } from "./kokpit";
 import { streszczenieKlienta } from "./Kontekst";
 import { stanZakupu, type KrokZakupu } from "./zakup";
 
@@ -25,8 +25,8 @@ import { stanZakupu, type KrokZakupu } from "./zakup";
    stanowiska, nie decyzja na jedno otwarcie (jak kolejność kolejki).
 
    ZERO ZAPISU. Karta niczego nie odpytuje u przewoźnika ani u Allegro:
-   „nie sprawdzano przesyłki" mówi wprost, a sprawdzenie zostaje tam, gdzie
-   było, w kolumnie zamówienia.
+   „nie sprawdzano przesyłki" mówi wprost, a sprawdzenie stoi w bloku paczki
+   w prawej kolumnie (`Paczka.tsx`), wyłącznie na kliknięcie.
 
    PRYWATNOŚĆ. Tylko to, co panel już dostaje: towar, cena, numer zamówienia,
    login kupującego pokazuje nagłówek rozmowy. Adresu dostawy, telefonu i
@@ -72,7 +72,13 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
   /* Zły ładunek historii nie wywraca rozmowy: karta jest dodatkiem do osi, a
      błąd w zapytaniu pomocniczym nie ma prawa zabrać ze sobą ekranu, na którym
      agent odpowiada klientowi. Kształt, którego nie znamy, czytamy jak brak. */
-  const h = Array.isArray(historia?.wpisy) && Array.isArray(historia?.maszyny) ? historia : undefined;
+  const zgodna = Array.isArray(historia?.wpisy) && Array.isArray(historia?.maszyny) ? historia : undefined;
+  /* „WCZEŚNIEJ" ZNACZY PRZED TYM ZAKUPEM. Serwer oddaje historię razem z tym
+     zakupem, jego zwrotem i sprawami, więc karta mówiła „Wcześniej u nas:
+     1 zakup" o tym samym zakupie, a „Nowy klient" nie stawał przy pierwszym.
+     Kolumna obok nie mówi już tego faktu wcale, więc jedyny dom musi mówić
+     prawdę. Reguła w `kokpit.ts`, wspólna z wierszem „Klient". */
+  const h = historiaPozaZakupem(zgodna, dane.zamowienie?.externalId ?? null);
   const znaczniki: string[] = [];
   if (nowyKlient(h)) znaczniki.push("Nowy klient");
   const wczesniej = h && klientMaHistorie(h) ? streszczenieKlienta(h) : null;
@@ -95,8 +101,17 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
      jest częsta, a pusta ramka mówiłaby, że czegoś brakuje. */
   if (!jestKarta) return null;
 
-  const pozycje = zam?.pozycje ?? [];
-  const nazwa = pozycje[0]?.nazwa ?? oferta?.nazwa ?? null;
+  /* POZYCJA ROZMOWY PIERWSZA. Karta pokazuje dwie pozycje, a ta, o którą
+     pyta klient, bywała trzecia i nie stała w karcie wcale. Bez wskazanej
+     oferty karta nie zgaduje: przy kilku pozycjach mówi ich liczbę, bo
+     pierwsza podana jako towar rozmowy przeczyłaby ramie „Wymaga Ciebie",
+     która prosi właśnie o wskazanie. */
+  const ofertaId = dane.oferta?.externalId ?? null;
+  const pozycje = [...(zam?.pozycje ?? [])].sort((a, b) =>
+    Number(ofertaId !== null && b.offerId === ofertaId) - Number(ofertaId !== null && a.offerId === ofertaId));
+  const pozycjaRozmowy = ofertaId === null ? undefined : pozycje.find((p) => p.offerId === ofertaId);
+  const nazwa = pozycjaRozmowy?.nazwa ?? (pozycje.length === 1 ? pozycje[0].nazwa
+    : pozycje.length > 1 ? ile(pozycje.length, "pozycja", "pozycje", "pozycji") : oferta?.nazwa ?? null);
   const suma = zam ? zlote(zam.sumaGrosze, zam.waluta) : oferta ? zlote(oferta.cenaGrosze, oferta.waluta ?? "PLN") : null;
   const przelacz = () => setZwinieta((z) => { zapiszZwinieta(!z); return !z; });
 
@@ -114,7 +129,11 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
     {suma && <span className="shrink-0">· {suma}</span>}
     {stan?.anulowane && <span className="shrink-0 font-semibold text-ranga-zle">· anulowane</span>}
     {wczesniej && <span className="shrink-0 text-slate-500">· {wczesniej}</span>}
-    {!nazwa && znaczniki.length > 0 && <span>{znaczniki.join(" · ")}</span>}
+    {/* „Nowy klient" stoi w każdej postaci karty. Przy oknie 1366 px karta
+        jest zwykle poza kadrem i widać tylko pasek, a fakt zdjęty z kolumny
+        nie może stać się kliknięciem. */}
+    {znaczniki.length > 0 && <span className="shrink-0 font-semibold text-slate-700">
+      {nazwa || suma ? "· " : ""}{znaczniki.join(" · ")}</span>}
   </span>;
 
   /* Przewija OŚ, nie `scrollIntoView`: ten przewija też stronę i wypchnął

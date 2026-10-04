@@ -111,6 +111,59 @@ describe("KartaKontekstu", () => {
     expect(screen.queryByText("Nowy klient")).toBeNull();
   });
 
+  /* Serwer oddaje historię razem z tym zakupem. „Wcześniej" znaczy przed nim,
+     więc zakup rozmowy i jego sprawy nie liczą się jako wcześniejsze. */
+  it("nie liczy bieżącego zakupu jako „wcześniej”", () => {
+    pokaz(dane(), historia({ wpisy: [{ rodzaj: "zakup", zamowienieId: "17147703077" } as never] }));
+    expect(screen.getByText("Nowy klient")).toBeInTheDocument();
+    expect(screen.queryByText(/Wcześniej u nas/)).toBeNull();
+  });
+
+  it("zwrot tego zakupu też nie robi z klienta stałego", () => {
+    pokaz(dane(), historia({ wpisy: [{ rodzaj: "zwrot", zamowienieId: "17147703077" } as never] }));
+    expect(screen.getByText("Nowy klient")).toBeInTheDocument();
+  });
+
+  it("inny zakup to historia", () => {
+    pokaz(dane(), historia({ wpisy: [{ rodzaj: "zakup", zamowienieId: "inne" } as never] }));
+    expect(screen.getByText(/Wcześniej u nas: 1 zakup/)).toBeInTheDocument();
+    expect(screen.queryByText("Nowy klient")).toBeNull();
+  });
+
+  /* Linijka „Nowy klient" zeszła z kolumny obok. Przy 1366 px karta bywa
+     poza kadrem i zwinięta, więc fakt musi stać także w jednej linii. */
+  it("„Nowy klient” stoi w karcie zwiniętej i w pasku nad osią", async () => {
+    const { unmount } = pokaz(dane(), historia());
+    await userEvent.click(screen.getByRole("button", { name: "Zwiń kartę zakupu" }));
+    expect(screen.getByRole("button", { name: /rozwiń/ })).toHaveTextContent("Nowy klient");
+    unmount();
+    window.localStorage.clear();
+    pokaz(dane(), historia());
+    act(() => ustawKadr(false));
+    expect(screen.getByRole("button", { name: /Pokaż kartę zakupu/ })).toHaveTextContent("Nowy klient");
+  });
+
+  it("pozycja, o którą pyta klient, stoi pierwsza", () => {
+    const d = dane({ oferta: { externalId: "o3", pobrana: null } });
+    ((d.zamowienie as never as { pobrane: { pozycje: unknown[] } }).pobrane).pozycje =
+      [pozycja(), pozycja({ offerId: "o2", nazwa: "Drugi" }), pozycja({ offerId: "o3", nazwa: "Trzeci" })];
+    pokaz(d);
+    const lista = screen.getByText("Trzeci").closest("ul")!;
+    expect(lista.firstElementChild).toHaveTextContent("Trzeci");
+    expect(lista).toHaveTextContent("+ 1 pozycja");
+  });
+
+  it("kilka pozycji bez oferty: karta mówi ich liczbę, nie zgaduje towaru", async () => {
+    const d = dane({ oferta: null });
+    ((d.zamowienie as never as { pobrane: { pozycje: unknown[] } }).pobrane).pozycje =
+      [pozycja(), pozycja({ offerId: "o2", nazwa: "Drugi" }), pozycja({ offerId: "o3", nazwa: "Trzeci" })];
+    pokaz(d);
+    await userEvent.click(screen.getByRole("button", { name: "Zwiń kartę zakupu" }));
+    const zwinieta = screen.getByRole("button", { name: /rozwiń/ });
+    expect(zwinieta).toHaveTextContent("3 pozycje");
+    expect(zwinieta).not.toHaveTextContent("NÓŻ TRAKTORKA");
+  });
+
   it("zły ładunek historii nie wywraca karty", () => {
     expect(() => pokaz(dane(), {} as never)).not.toThrow();
     expect(screen.getByRole("region", { name: "Kontekst zakupu" })).toBeInTheDocument();
