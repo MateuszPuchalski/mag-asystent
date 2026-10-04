@@ -74,10 +74,18 @@ export function Dokument({ faktura, kandydaci, trwa, blad, onWskaz, enter = fals
       <p>Nie znalazłem dokumentu sprzedaży dla tego zwrotu.</p>
       {/* Trzy powody i wszystkie prawdziwe — bez nich „nie znalazłem" wygląda
           na awarię, a bywa po prostu starą sprzedażą albo brakiem kartoteki. */}
-      <p className="mt-1">
-        Sprzedaż bywa starsza niż okno importu, integracja nie zawsze wpisuje
-        numer zamówienia na dokument, a bez potwierdzonej kartoteki nie ma
-        po czym dopasować towarów.</p>
+      {/* Powody są pod rozwijanym, bo to wyjaśnienie systemu, a nie ruch
+          operatora: czytane za każdym razem przy każdym zwrocie bez dokumentu
+          zajmowały pięć linii kolumny. Zdanie o tym, co robić dalej, stoi niżej
+          na wierzchu. */}
+      <details className="mt-1">
+        <summary className="cursor-pointer font-semibold text-slate-600 underline underline-offset-2">
+          Czemu go nie ma?</summary>
+        <p className="mt-1">
+          Sprzedaż bywa starsza niż okno importu, integracja nie zawsze wpisuje
+          numer zamówienia na dokument, a bez potwierdzonej kartoteki nie ma
+          po czym dopasować towarów.</p>
+      </details>
       {/* ZDANIE KOŃCZY SIĘ RUCHEM (audyt, 15 września 2026). Trzy powody bez
           czwartego zdania zostawiały operatora przy ścianie: ekran tłumaczył się
           i milkł. Wskazać dokumentu nie ma jak — kandydatów jest zero, a panel

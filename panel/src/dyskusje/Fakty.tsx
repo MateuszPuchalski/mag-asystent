@@ -138,6 +138,26 @@ export function Fakty({
         w kolumnie reklamacji od 0.403.0: podpis zwijki mówi najważniejsze,
         reszta jest jedno kliknięcie dalej, a wybór pamięta stanowisko. */}
     <div className="px-2 pb-2">
+      {/* ── ZEGAR DYSKUSJI NA WIERZCHU ──────────────────────────────────────
+          Dyskusja nie ma terminu od Allegro, więc jedyną miarą pilności jest to,
+          jak długo pytanie klienta czeka na naszą odpowiedź — a brak odpowiedzi
+          kosztował już blokadę konta. Siedział w szarym podpisie zwiniętego
+          „Stanu", czyli w najcichszym miejscu kolumny. Blok stoi tylko wtedy,
+          gdy piłka jest po NASZEJ stronie: przy ruchu klienta albo zamkniętej
+          rozmowie liczba czytałaby się jak zaległość.
+
+          Czerwień bierze `pilna` z serwera (próg `DYSKUSJE_ALARM_GODZIN`), więc
+          blok, wiersz kolejki i pasek alarmu mówią tą samą liczbą. */}
+      {zegarWidoczny(d) && <div role="group" aria-label="Czas bez naszej odpowiedzi"
+        className={`mb-2 mt-2 rounded-lg border px-3 py-2 ${d.pilna
+          ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"}`}>
+        <p className="text-podpis font-semibold uppercase tracking-wide text-slate-600">Czeka na nas</p>
+        <p className={`mt-0.5 text-2xl font-bold leading-none tracking-tight tabular-nums ${
+          d.pilna ? "text-red-900" : "text-slate-900"}`}>{czekaSlowem(d)}</p>
+        {d.bezOdpowiedziOd && <p className="mt-1 text-podpis text-slate-600">
+          pytanie bez naszej odpowiedzi od {czas(d.bezOdpowiedziOd)}</p>}
+      </div>}
+
       <Zwijka tytul="Sprawa" Ikona={MessagesSquare} podpis={podpisSprawy(d)}
         pamietajJako="wertis.dyskusje.sprawa">
         <div className="px-2 py-2">
@@ -150,7 +170,7 @@ export function Fakty({
         </div>
       </Zwijka>
 
-      <Zwijka tytul="Stan" Ikona={Activity} podpis={podpisStanu(d)}
+      <Zwijka tytul="Stan" Ikona={Activity} podpis={podpisStanu(d, zegarWidoczny(d))}
         pamietajJako="wertis.dyskusje.stan">
         <div className="px-2 py-2">
           {/* TERMINU TU NIE MA i to nie jest brak danych. Allegro nie oddaje przy
@@ -159,7 +179,9 @@ export function Fakty({
 
               Dopisek „Allegro terminu tu nie stawia" zszedł (0.520.0): to było
               zdanie programisty do agenta, a agent nie szukał tu terminu. */}
-          <Wiersz etykieta="Czeka na nas">{czekaSlowem(d)}</Wiersz>
+          {/* Zegar stoi już w bloku nad zwijkami; drugi raz tylko, gdy bloku nie ma
+              i wiersz mówi, czyj jest ruch. */}
+          {!zegarWidoczny(d) && <Wiersz etykieta="Czeka na nas">{czekaSlowem(d)}</Wiersz>}
           {/* ── STATUS DOMYŚLNY NIE JEST INFORMACJĄ (0.520.0) ────────────────
               Ta sama reguła co w głowicy reklamacji od 0.414.0.
               `DISPUTE_ONGOING` ma każda trwająca dyskusja, więc wiersz mówił
@@ -289,6 +311,11 @@ export function Fakty({
 /** Status, który ma każda trwająca dyskusja — nie wołamy go wierszem. */
 const STATUS_DOMYSLNY = "DISPUTE_ONGOING";
 
+/** Czy blok z zegarem ma stanąć: rozmowa otwarta i piłka po naszej stronie. */
+function zegarWidoczny(d: Dyskusja): boolean {
+  return d.czatAktywny && d.czekaOdDni !== null;
+}
+
 /** Jak długo piłka leży u nas — słowem, bo terminu dyskusja nie ma. */
 function czekaSlowem(d: Dyskusja): string {
   if (d.czekaOdDni === null) return "ruch należy do klienta";
@@ -313,8 +340,12 @@ function podpisSprawy(d: Dyskusja): string {
  * Przy zamkniętej rozmowie „ruch klienta" byłoby nieprawdą — nikt już nie
  * odpisze. Serwer oddaje wtedy puste czekanie, więc rozstrzygamy to tutaj.
  */
-function podpisStanu(d: Dyskusja): string {
-  const ruch = !d.czatAktywny ? "rozmowa zamknięta"
+function podpisStanu(d: Dyskusja, zegarWBloku = false): string {
+  /* Gdy zegar niesie blok nad zwijkami, podpis go nie powtarza: ten sam fakt
+     zapisany dwa razy w jednej kolumnie. Reguła „zwinięta zwijka nie chowa
+     czekania" jest spełniona blokiem, który stoi poza zwijką. */
+  const ruch = zegarWBloku ? null
+    : !d.czatAktywny ? "rozmowa zamknięta"
     : d.czekaOdDni !== null ? `czeka na nas ${czekaSlowem(d)}`
       : d.ruchNasz ? "czeka na nas" : "ruch klienta";
   const status = d.statusAllegro && d.statusAllegro !== STATUS_DOMYSLNY ? d.statusAllegro : null;
