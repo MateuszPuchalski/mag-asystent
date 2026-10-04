@@ -693,7 +693,9 @@ describe("Klawisze kubełka", () => {
       const otworz = vi.spyOn(window, "open");
       try {
         pokaz("/obsluga/zwroty/8");
-        expect(screen.getByRole("button", { name: /Wszystko OK/ })).toBeDisabled();
+        /* Zablokowana ścieżka to jedna linia z powodem, nie wyłączony przycisk:
+           przycisk, którego nie wolno kliknąć, nie jest drogą. */
+        expect(screen.queryByRole("button", { name: /Wszystko OK/ })).toBeNull();
         expect(screen.getByText(/potrącenie albo brak sztuk/)).toBeInTheDocument();
         await userEvent.keyboard("w");
         expect(scena.wolano).toEqual([]);
