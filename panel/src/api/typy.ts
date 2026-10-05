@@ -2130,6 +2130,8 @@ export interface Dyskusja {
   wersja: number;
   kubelek: KubelekDyskusji;
   sygnaly: SygnalDyskusji[];
+  /** Sama dyskusja w Centrum Sprzedaży; `null`, gdy wzorzec jest pusty. */
+  link: string | null;
   linkZamowienia: string | null;
 }
 

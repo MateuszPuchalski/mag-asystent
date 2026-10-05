@@ -644,6 +644,18 @@ export const config = {
         ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/dyskusje"
         : "https://salescenter.allegro.com/claims/{id}"),
     /**
+     * Dyskusja w Centrum Sprzedaży — adres ZWERYFIKOWANY kliknięciem właściciela.
+     *
+     * Dyskusja ma WŁASNĄ stronę, inną niż reklamacja, choć obie przychodzą
+     * jedną listą `/sale/issues`. Adresuje się ją tym samym UUID zasobu,
+     * a `sellerId` dokleja `linkDyskusji`, z tego samego powodu co wyżej.
+     */
+    panelDyskusja:
+      process.env.ALLEGRO_PANEL_DYSKUSJA ??
+      (process.env.ALLEGRO_SANDBOX === "1"
+        ? "https://allegro.pl.allegrosandbox.pl/moje-allegro/sprzedaz/dyskusje"
+        : "https://salescenter.allegro.com/discussions-with-buyers/{id}"),
+    /**
      * Identyfikator sprzedawcy do adresów Centrum Sprzedaży (0.226.1).
      *
      * Strona sprawy chce `?sellerId=` i tej liczby nie mamy skąd wziąć sami:

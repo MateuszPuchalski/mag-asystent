@@ -175,11 +175,12 @@ test("liczniki kubełków liczą to, co widać na ekranie", () => {
     { odpowiedz: 1, klient: 1, zamknieta: 1 });
 });
 
-test("adresu SAMEJ dyskusji nie zgadujemy — zostaje odnośnik do zamówienia", () => {
-  /* Blizna 0.226.1: wzorzec adresu wywiedziony z analogii dał 404 przy
-     pierwszym kliknięciu właściciela. Wzorca dla dyskusji nikt nie sprawdził. */
+test("dyskusja prowadzi na WŁASNĄ stronę Centrum Sprzedaży, nie na stronę reklamacji", () => {
+  /* Blizna 0.226.1: adres wywiedziony z analogii dał 404. Adres dyskusji
+     podał właściciel z paska przeglądarki; `/claims/` to strona reklamacji. */
   const w = (sprawa({ id: "d-2" }), D.listaDyskusji(db(), TERAZ)[0]);
-  assert.ok(!("link" in w), "pola z adresem sprawy w ogóle nie ma");
+  assert.match(w.link ?? "", /\/discussions-with-buyers\/d-2(\?|$)/);
+  assert.doesNotMatch(w.link ?? "", /\/claims\//);
   assert.equal(typeof w.linkZamowienia, "string");
 });
 

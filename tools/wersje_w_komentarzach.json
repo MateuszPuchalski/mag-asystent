@@ -626,7 +626,7 @@
  "server/src/services/dyskusja-zakonczenie.test.ts": 1,
  "server/src/services/dyskusja-zakonczenie.ts": 1,
  "server/src/services/dyskusje.test.ts": 2,
- "server/src/services/dyskusje.ts": 11,
+ "server/src/services/dyskusje.ts": 10,
  "server/src/services/ean-alias.test.ts": 1,
  "server/src/services/ean-alias.ts": 1,
  "server/src/services/ean.test.ts": 2,
