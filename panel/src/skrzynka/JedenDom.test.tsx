@@ -48,7 +48,6 @@ const FAKTY_KARTY: Array<[RegExp, string]> = [
   [/28 września|28\.09/, "data zakupu — krok „Złożone” w karcie i linia osi"],
   [/a7f3c2e0/, "numer zamówienia — karta"],
   [/Nowy klient|Wcześniej u nas/, "historia klienta — plakietka w karcie i w pasku"],
-  [/Klient pisze o/, "nazwa i SKU w bramce doboru — karta"],
   [/kupione|zapłacono/i, "kroki zakupu — karta"],
   [/NÓŻ DO KOSIARKI MTD SMART/, "tytuł oferty — karta"],
   [/\bACTIVE\b/, "surowy status oferty — słowo w streszczeniu wiersza"],
@@ -64,16 +63,11 @@ const KARTA: KartaTowaru = {
   ],
 };
 
-const WIEDZA_TOWARU = { potwierdzone: [], negatywne: [], propozycje: [],
-  pasowania: { pasujeDo: [], pasujace: [], negatywne: [] }, zamiennosciOem: [] };
-
 /* Historia tak, jak oddaje ją serwer: RAZEM z bieżącym zakupem. Wiersz
    „Klient" ma ten zakup wyciąć, a jego treść niesie nazwę oferty i sumę,
    więc przeciek byłoby widać od razu. */
 const HISTORIA: HistoriaKlienta = {
   login: "ogrodnik_janusz",
-  maszyny: [{ marka: "MTD", nazwa: "Smart 53 SPO", wariant: null, rocznik: "2019", silnik: null,
-    rozmowaId: 4310, at: "2026-05-11T10:00:00.000Z" }],
   wpisy: [
     { rodzaj: "zakup", at: "2026-09-28T17:42:00.000Z", tresc: "NÓŻ DO KOSIARKI MTD SMART 53 SPO 53 cm · 77,98 zł",
       zamowienieId: ZAMOWIENIE, link: null, rozmowaId: null, sprawaId: null },
@@ -89,8 +83,6 @@ const HISTORIA: HistoriaKlienta = {
    mówi wtedy „Nowy klient", a kolumna nie mówi o kliencie nic. */
 const HISTORIA_NOWEGO: HistoriaKlienta = { ...HISTORIA, wpisy: [HISTORIA.wpisy[0]] };
 
-const WIEDZA_DOBORU = { zastosowanie: null, zabudowa: null, pasowanie: null, silniki: [], pomiary: [] };
-
 let zadania: Array<{ metoda: string; url: string }> = [];
 let historiaSerwera: HistoriaKlienta = HISTORIA;
 
@@ -101,9 +93,7 @@ beforeEach(() => {
     zadania.push({ metoda: init?.method ?? "GET", url });
     const json = (x: unknown) => new Response(JSON.stringify(x));
     if (url.endsWith(`/api/products/${TW_ID}`)) return json(KARTA);
-    if (url.endsWith(`/api/obsluga/wiedza/towar/${TW_ID}`)) return json(WIEDZA_TOWARU);
     if (url.endsWith("/klient")) return json(historiaSerwera);
-    if (url.endsWith("/dobor/wiedza")) return json(WIEDZA_DOBORU);
     return json({});
   }));
 });
@@ -118,14 +108,13 @@ const INNY_ZAKUP = { externalId: INNE_ZAMOWIENIE, link: null, status: "READY_FOR
   kupionoAt: "2026-05-12T09:10:00.000Z", sumaGrosze: 4598, waluta: "PLN", pozycje: "FILTR POWIETRZA BRIGGS & STRATTON",
   maTeOferte: false };
 
-/** Rozmowa o towarze: jedna pozycja, oferta z zamówienia, paczka doręczona, dobór za bramką. */
+/** Rozmowa o towarze: jedna pozycja, oferta z zamówienia, paczka doręczona. */
 const dane = (kandydaci: unknown[]): OsRozmowy => ({
   rozmowa: {
     id: 4821, klient: "ogrodnik_janusz", ostatniaWiadomosc: "", ostatniaWiadomoscAt: "2026-10-04T07:43:00.000Z",
     ostatniaOdKlienta: true, nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 3,
     status: "waiting_for_us", odlozoneDo: null, poTerminie: false, podziekowal: false, oglada: null,
     priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 1, zadanieWToku: false,
-    dobor: "otwarty",
     kopilot: { kategoria: "PRODUCT_QUESTION", dodatkowe: [], zrodlo: "MODEL", status: "SUCCESS",
       nieaktualna: false, kategoriaCzlowieka: null },
   },
@@ -143,8 +132,7 @@ const dane = (kandydaci: unknown[]): OsRozmowy => ({
   },
   oferta: {
     externalId: OFERTA, link: `https://allegro.pl/oferta/${OFERTA}`, zrodlo: "zamowienie",
-    zgodnosc: { lista: ["MTD Smart 53 SPO", "MTD 53 SPO"], maszyna: "MTD Smart 53 SPO",
-      trafienia: ["MTD Smart 53 SPO"], wariantSprawdzony: false },
+    zgodnosc: { lista: ["MTD Smart 53 SPO", "MTD 53 SPO"] },
     pobrana: { nazwa: NAZWA_OFERTY, sku: SKU, cenaGrosze: 6499, waluta: "PLN", status: "ACTIVE",
       syncedAt: "2026-10-04T07:50:00.000Z", zdjecie: "jest" },
     /* Zdanie DOKŁADNIE takie, jakie pisze serwer (`dopasowanie-sku.ts`): niesie
@@ -161,11 +149,6 @@ const dane = (kandydaci: unknown[]): OsRozmowy => ({
     { rodzaj: "zwrot", id: 77, at: "2026-09-30T15:05:00.000Z", opis: "ZW/2026/10/0077" },
     { rodzaj: "dyskusja", id: 311, at: "2026-10-03T19:20:00.000Z", opis: "Zwrot pieniędzy" },
   ],
-  /* Automat wpisał dane i dobór czeka za bramką: towar jest znany z zamówienia. */
-  dobor: { stan: "otwarty", wynik: null, wersja: 2, wybrany: null, dopytac: null, zmienil: "automat",
-    zmienilAutomat: true, zmienionoAt: "2026-10-04T07:44:00.000Z",
-    dane: { marka: "MTD", model: "Smart 53 SPO", wariant: null, rocznik: "2019", nrSeryjny: null, silnik: null,
-      oem: null, nazwaCzesci: "nóż" } },
 } as unknown as OsRozmowy);
 
 const kolumna = () => screen.getByRole("region", { name: "Kontekst" });
@@ -207,7 +190,7 @@ describe("Fakt z karty zakupu nie wraca do prawej kolumny", () => {
       </MemoryRouter></QueryClientProvider>);
 
       /* Czekamy, aż kolumna dociągnie wszystko, co czyta przy otwarciu: kartę
-         z Subiekta (pasmo), historię klienta i wiedzę. Inaczej sprawdzalibyśmy
+         z Subiekta (pasmo) i historię klienta. Inaczej sprawdzalibyśmy
          kolumnę, w której przeciek jeszcze nie zdążył stanąć. */
       const pasmo = await screen.findByRole("complementary", { name: "Do tej odpowiedzi" });
       expect(await within(pasmo).findByText(KARTA.name)).toBeInTheDocument();
