@@ -492,7 +492,7 @@ describe("Sztuka do dostawcy po uznaniu", () => {
   it("po zgłoszeniu: kto, kiedy, numer i dwa równe przyciski wyniku z wersją rekordu", async () => {
     const onUDostawcy = vi.fn();
     pokaz(uznana(), { onUDostawcy, dostawa: DOSTAWA, uDostawcy: ZGLOSZENIE });
-    expect(krok()).toHaveTextContent(/Zgłoszone u HURT-OGR · 08\.09\.2026 · nr RK-77/);
+    expect(krok()).toHaveTextContent(/Zgłoszone u HURT-OGR · 8 września 2026 · nr RK-77/);
     expect(within(krok()).queryByRole("button", { name: "Zgłoś u dostawcy" })).not.toBeInTheDocument();
     await userEvent.click(within(krok()).getByRole("button", { name: /Dostawca odrzucił/ }));
     expect(onUDostawcy).toHaveBeenCalledWith({ dostawca: "HURT-OGR", wynik: "odrzucil", wersja: 3 });
@@ -502,7 +502,7 @@ describe("Sztuka do dostawcy po uznaniu", () => {
     const onUDostawcy = vi.fn();
     pokaz(uznana(), { onUDostawcy, uDostawcy: { ...ZGLOSZENIE, wynik: "uznal",
       wynikAt: "2026-09-20T10:00:00.000Z", wersja: 4 } });
-    expect(krok()).toHaveTextContent(/Dostawca uznał · 20\.09\.2026/);
+    expect(krok()).toHaveTextContent(/Dostawca uznał · 20 września 2026/);
     await userEvent.click(within(krok()).getByRole("button", { name: "zmień wynik" }));
     expect(onUDostawcy).toHaveBeenCalledWith({ dostawca: "HURT-OGR", wynik: null, wersja: 4 });
   });
