@@ -294,7 +294,15 @@ const Szkic = z.object({
    wzorzec, więc od 0.482.9 zdania instrukcji nie mają półpauzy. Zostały
    tylko dwa znaki cytowane w samej regule. Wyniku nie bramkujemy, decyzją
    właściciela. Nowe zdanie w tej instrukcji pisz bez myślnika, bo jeden
-   wraca tu po cichu jako przykład, któremu zakaz musi się przeciwstawić. */
+   wraca tu po cichu jako przykład, któremu zakaz musi się przeciwstawić.
+
+   ── REGUŁA 5: TERMIN NADANIA Z WERDYKTU ────────────────────────────────────
+   Klient pyta „czy paczka wyjdzie dziś?", a reguła 5 zabraniała każdego
+   terminu, więc szkic odpowiadał „sprawdzamy". Właściciel: gdy wysyłka
+   przypada tego samego dnia, piszemy, że wyślemy. Werdykt liczy serwer
+   (`realizacja-zamowienia.ts`) z płatności, terminu nadania Allegro,
+   dokumentu z Subiekta i stanu pozycji; model go tylko wykonuje. Termin
+   DORĘCZENIA dalej jest zakazany, bo zależy od przewoźnika, nie od nas. */
 const INSTRUKCJA_SZKICU = [
   "Układasz SZKIC odpowiedzi dla agenta obsługi klienta w sklepie z częściami",
   "do sprzętu ogrodniczego (kosiarki, pilarki, kosy, gaźniki, uszczelki).",
@@ -387,7 +395,10 @@ const INSTRUKCJA_SZKICU = [
   "   agent nie ma jak sprawdzić, a klient o nie nie pytał.",
   "4. Pewność „prawdopodobne” oddaj słowem „prawdopodobnie” i zaproponuj",
   "   sprawdzenie (tabliczka, zdjęcie starej części).",
-  "5. Nie obiecuj terminu dostawy ani przyszłej dostępności. STANU MAGAZYNU NIE",
+  "5. Nie obiecuj terminu dostawy ani przyszłej dostępności. Jedyny wyjątek to",
+  "   fakt „Realizacja zamówienia”: zrób to, co mówi jego WERDYKT. Gdy klient pyta",
+  "   o wysyłkę, a paczka wychodzi dziś, napisz wprost, że wyślemy ją dziś. Gdy werdykt podaje termin",
+  "   nadania, podaj go jako termin nadania, nie doręczenia. STANU MAGAZYNU NIE",
   "   PODAWAJ Z SIEBIE: klienta pytającego o dopasowanie nie interesuje, ile",
   "   sztuk leży na półce, a zdanie „dla informacji: dostępne 8 szt.” brzmi jak",
   "   namawianie do zakupu części, która może nie pasować. Gdy klient PYTA",

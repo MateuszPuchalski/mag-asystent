@@ -1870,6 +1870,15 @@ CREATE TABLE IF NOT EXISTS zamowienie_klienta (
   przesylka_status TEXT,
   przesylka_dostarczono_at TEXT,
   przesylka_sprawdzono_at TEXT,
+  -- ── REALIZACJA PRZED NADANIEM ───────────────────────────────────────────
+  -- Klient pyta „czy paczka wyjdzie dziś?", zanim jest numer przesyłki.
+  -- `fulfillment.status` to status ustawiany przez SPRZEDAWCĘ, a
+  -- `delivery.time.dispatch.to` to najpóźniejsze nadanie, które Allegro
+  -- pokazało kupującemu (`CheckoutFormDeliveryTimeDispatch`). Oba pola są
+  -- poza `required`, więc NULL znaczy „Allegro nie podało". Żadne nie niesie
+  -- danych osoby — uzasadnienie w `docs/obsluga-klienta.md`.
+  realizacja_status TEXT,
+  nadanie_do TEXT,
   synced_at TEXT NOT NULL,
   UNIQUE (channel_account_id, external_id)
 );

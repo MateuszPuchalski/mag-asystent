@@ -24,11 +24,14 @@ import type { Kategoria } from "./klasyfikacja-slownik.js";
 export const WZORCE_ODPOWIEDZI: Record<Kategoria, string> = {
   ORDER_STATUS:
     "podaj stan zamówienia i przesyłki z faktów (status, przewoźnik, numer listu); "
-    + "gdy faktu o przesyłce nie ma, napisz, że sprawdzamy, bez daty; o maszynę ani część nie pytaj",
+    + "przed nadaniem odpowiedz według werdyktu faktu o realizacji: gdy paczka wychodzi dziś, "
+    + "napisz, że wyślemy ją dziś; gdy werdykt podaje termin nadania, podaj go; "
+    + "gdy żadnego z tych faktów nie ma, napisz, że sprawdzamy, bez daty; o maszynę ani część nie pytaj",
   DELIVERY_DELAY:
     "powiedz, gdzie jest paczka według faktu o przesyłce, i krótko przeproś za zwłokę; "
     + "daty doręczenia nie obiecuj i nie obwiniaj przewoźnika z siebie; "
-    + "gdy paczka stoi bez ruchu, napisz, że sprawdzimy to u przewoźnika",
+    + "gdy paczka stoi bez ruchu, napisz, że sprawdzimy to u przewoźnika; "
+    + "gdy paczka nie jest jeszcze nadana, odpowiedz według werdyktu faktu o realizacji",
   DELIVERY_LOST:
     "zaginięcia nie potwierdzaj z siebie — podaj ostatni stan przesyłki z faktów "
     + "i napisz, że wyjaśniamy to z przewoźnikiem; ponownej wysyłki ani zwrotu pieniędzy nie obiecuj",
@@ -60,7 +63,7 @@ export const WZORCE_ODPOWIEDZI: Record<Kategoria, string> = {
     "przyjmij zgłoszenie rzeczowo i poproś o opis usterki oraz zdjęcia, jeśli ich nie ma; "
     + "reklamacji nie uznawaj ani nie odrzucaj w wiadomości — werdykt wydaje człowiek",
   CANCEL_ORDER:
-    "sprawdź w faktach, czy paczka już wyszła: gdy nie, napisz, że przekazujemy prośbę "
+    "sprawdź w faktach o przesyłce i realizacji, czy paczka już wyszła: gdy nie, napisz, że przekazujemy prośbę "
     + "o anulowanie i potwierdzimy; gdy wyszła, wyjaśnij, że anulować się nie da, i wskaż zwrot "
     + "po odbiorze; samego anulowania nie potwierdzaj",
   INVOICE:

@@ -27,6 +27,8 @@ import {
   przygotujZdjeciaRozmowy, spisZdjec, type Pobieracz, type WynikZdjec, type ZdjecieZBramki,
 } from "./copilot-zdjecia.js";
 import { faktZwrotu, zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
+import { ocenRealizacji, stanRealizacji } from "./realizacja-zamowienia.js";
+import { odswiezZamowienie } from "./allegro-zamowienia-sync.js";
 
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
 
@@ -71,7 +73,11 @@ export type RodzajFaktu =
   /* Kamienie milowe zwrotu tego zamówienia (0.502.0) — `zwrot-na-osi.ts`.
      Osobny rodzaj z tego samego powodu co przesyłka: to stan z naszego
      systemu z datą, a nie obietnica, i model ma go podać jako taki. */
-  | "zwrot";
+  | "zwrot"
+  /* Realizacja zamówienia przed nadaniem (`realizacja-zamowienia.ts`):
+     płatność, termin nadania, dokument z Subiekta i werdykt „wyślemy dziś".
+     Osobny rodzaj, bo jako jedyny niesie gotowe zdanie dla klienta o terminie. */
+  | "realizacja";
 
 export interface Fakt { id: string; rodzaj: RodzajFaktu; zdanie: string }
 
@@ -535,7 +541,9 @@ export function kiedyBedzie(
  * adres regału mówi obcemu, jak zbudowany jest magazyn), opis kartoteki
  * w całości (bywa notatką magazynu), historia zakupów klienta (§14.4).
  */
-export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter): KontekstSzkicu {
+export function kontekstSzkicu(
+  conversationId: number, subiekt: SubiektAdapter, teraz = new Date(),
+): KontekstSzkicu {
   const wiadomosci = db().prepare(`SELECT id, direction, body FROM message
       WHERE conversation_id=? ORDER BY sent_at, id`).all(conversationId) as
     Array<{ id: number; direction: string; body: string | null }>;
@@ -616,8 +624,16 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
      dociąga `ulozSzkic`, bo ta funkcja zostaje czystym odczytem. */
   const numerZam = numerZamowieniaRozmowy(conversationId);
   const idZam = numerZam ? idZamowienia(db(), numerZam.konto, numerZam.externalId) : null;
-  const zdanieP = idZam === null ? null : zdaniePrzesylki(przesylkaZamowienia(db(), idZam));
+  const paczka = idZam === null ? null : przesylkaZamowienia(db(), idZam);
+  const zdanieP = paczka ? zdaniePrzesylki(paczka) : null;
   if (zdanieP) dodaj("przesylka", zdanieP);
+  /* REALIZACJA PRZED NADANIEM. Stoi przy każdej rozmowie z zamówieniem, jak
+     przesyłka: „czy wyjdzie dziś" pada też w wątku o fakturze. Po nadaniu
+     milczy, bo wtedy odpowiada fakt o przesyłce. */
+  const realizacja = idZam === null || !paczka ? null : stanRealizacji(
+    idZam, paczka.waybill !== null || paczka.dostarczonoAt !== null, subiekt, db());
+  const ocena = realizacja ? ocenRealizacji(realizacja, teraz) : null;
+  if (ocena) dodaj("realizacja", ocena.zdanie);
   const zdanieZ = faktZwrotu(zdarzeniaZwrotowRozmowy(db(), conversationId));
   if (zdanieZ) dodaj("zwrot", zdanieZ);
 
@@ -705,6 +721,21 @@ export async function odswiezPrzesylke(
 }
 
 /**
+ * Zamówienie rozmowy od nowa przed szkicem — płatność i termin nadania
+ * zmieniają się po pierwszym pobraniu. Ta sama bramka co przy przesyłce:
+ * bez konta Allegro i bez wstrzykniętych zależności nie pytamy nikogo.
+ */
+async function odswiezZamowienieRozmowy(
+  conversationId: number, deps: PrzesylkaDeps | undefined, teraz: number,
+): Promise<void> {
+  if (!deps && !config.allegro.clientId) return;
+  const numer = numerZamowieniaRozmowy(conversationId);
+  const id = numer ? idZamowienia(db(), numer.konto, numer.externalId) : null;
+  if (id === null) return;
+  await odswiezZamowienie(db(), id, deps, teraz).catch(() => undefined);
+}
+
+/**
  * Ułożenie szkicu: fakty → model → SPRAWDZENIE → zapis. Rzuca, gdy dostawca
  * odmówił albo gdy model wyszedł poza fakty; w obu razach wywołanie było
  * płatne i ląduje w księdze jako `blad`.
@@ -747,9 +778,10 @@ export async function ulozSzkic(
      treść oferty: dwa żądania do Allegro wolno wysłać tylko stąd, a nie
      z otwarcia rozmowy. Odmowa Allegro nie przerywa szkicu — zostaje stan
      zapisany wcześniej albo milczenie, a to jest szkic sprzed tego wydania. */
+  await odswiezZamowienieRozmowy(conversationId, przesylka, teraz.getTime());
   await odswiezPrzesylke(conversationId, przesylka);
 
-  const kontekst = kontekstSzkicu(conversationId, subiekt);
+  const kontekst = kontekstSzkicu(conversationId, subiekt, teraz);
 
   /* LINKI DO NASZYCH AKTYWNYCH AUKCJI (0.270.0). Do 0.269.0 model nie dostawał
      ani jednego adresu, więc zamiast wskazać ofertę pisał klientowi, żeby
