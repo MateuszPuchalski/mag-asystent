@@ -64,7 +64,7 @@ export function KartaZalacznika({ nazwa, podglad, obraz, pobierz, powodBrakuPobr
         a przy porażce nie zostawało nic — agent widział samą nazwę pliku
         i nie miał jak zgadnąć, że zdjęcie w ogóle było spodziewane. */}
     {podglad && url === undefined &&
-      <span className="mb-1 flex h-32 w-48 items-center justify-center rounded border border-dashed
+      <span className="mb-1 flex h-32 w-48 max-w-full items-center justify-center rounded border border-dashed
         border-slate-300 text-xs text-slate-500">wczytuję…</span>}
     {/* Wysokość ograniczona, nie szerokość: zdjęcie z telefonu bywa pionowe
         i rozpychałoby oś na cały ekran. Przycisk, bo obraz jest też wejściem
@@ -78,12 +78,14 @@ export function KartaZalacznika({ nazwa, podglad, obraz, pobierz, powodBrakuPobr
     </button>}
     {powiekszone && url && <Powiekszenie url={url} nazwa={nazwa} symbol={null}
       zamknij={() => setPowiekszone(false)} />}
-    <span className="flex items-center gap-1.5">
+    {/* `min-w-0` i `break-all`: w wąskiej kolumnie zdjęć nazwa z aparatu
+        („IMG_20260912_101010.jpg") nie ma spacji i wyszłaby za krawędź. */}
+    <span className="flex min-w-0 items-center gap-1.5">
       <Paperclip size={12} className="shrink-0 text-slate-400" />
       {pobierz
         /* PRZYCISK, nie odnośnik: `<a href>` nie niesie nagłówka `x-session`
            i pobranie było przez to zepsute od 0.155.0 do 0.219.1. */
-        ? <button type="button" className="font-bold text-slate-700 underline hover:text-slate-900"
+        ? <button type="button" className="min-w-0 break-all text-left font-bold text-slate-700 underline hover:text-slate-900"
             onClick={() => {
               setBladPobrania(null);
               pobierz().catch((e: unknown) =>

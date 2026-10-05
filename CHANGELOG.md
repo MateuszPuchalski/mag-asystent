@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.559.0 — 5 października 2026
+
+**Zdjęcia w reklamacji stoją w kolumnie obok rozmowy.** Zdjęcia klienta
+zajmowały dotąd większość czatu i rozciągały go na kilka ekranów. Teraz
+stoją w prawej ćwiartce środkowej części, a rozmowa zostaje zwarta.
+Przy wiadomości zostaje odnośnik do jej zdjęć w kolumnie.
+
 ## 0.558.0 — 5 października 2026
 
 **Prawy panel mówi każdą rzecz raz.** Zakup i klienta pokazuje karta nad
