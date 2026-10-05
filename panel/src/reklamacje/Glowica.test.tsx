@@ -2,9 +2,11 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { Reklamacja, SzczegolReklamacji, WiadomoscReklamacji, Zamowienie } from "../api/typy";
+import type {
+  DopasowanieKartoteki, Reklamacja, SzczegolReklamacji, WiadomoscReklamacji, Zamowienie,
+} from "../api/typy";
 import { Dowody } from "./Dowody";
-import { Glowica, twIdSprawy } from "./Glowica";
+import { Glowica, kartotekaKolumny } from "./Glowica";
 
 /* Kolumna faktów pyta o cennik kartoteki (`useKartaTowaru`), a ten plik nie
    stawia klienta TanStacka — pilnuje UKŁADU głowicy i zwijek, nie cen. Własne
@@ -170,10 +172,18 @@ describe("Wiersz towaru mówi, skąd jest sygnatura", () => {
     expect(screen.queryByText("z paragonu")).not.toBeInTheDocument();
   });
 
-  it("bez kartoteki mówi, czemu jej nie ma, zamiast pustego miejsca", () => {
-    glowica({ kartoteka: { pewnosc: "brak", twId: null, symbol: null, zrodlo: null,
-      powod: "oferta bez SKU" } }, { twId: null, twSymbol: null });
-    expect(screen.getByText("oferta bez SKU")).toBeInTheDocument();
+  it("bez kartoteki mówi ZDANIEM serwera, czemu jej nie ma — nie kodem powodu", () => {
+    glowica({ kartoteka: { pewnosc: "brak", twId: null, symbol: null,
+      zrodlo: "oferta nie ma SKU", powod: "brak_sku" } }, { twId: null, twSymbol: null });
+    expect(screen.getByText("oferta nie ma SKU")).toBeInTheDocument();
+    expect(screen.queryByText("brak_sku")).not.toBeInTheDocument();
+  });
+
+  it("sygnatura z SKU oferty mówi, że stoi za nią SKU, a nie paragon ani człowiek", () => {
+    glowica({ kartoteka: { pewnosc: "sku", twId: 42, symbol: "14-25001",
+      zrodlo: "SKU oferty", powod: null } }, { twId: null, twSymbol: null });
+    expect(screen.getByText("14-25001")).toBeInTheDocument();
+    expect(screen.getByText("z SKU oferty")).toBeInTheDocument();
   });
 
 });
@@ -182,21 +192,28 @@ describe("Kartoteka efektywna", () => {
   /* Symbol z sugestii po SKU, a stan z samego `twId` sprawy, to dwa różne
      towary na jednym ekranie. Paragon i mapowanie wygrywają; bez nich liczy
      się wyłącznie kartoteka wywiedziona pewnie — ta sama reguła co na serwerze. */
-  const k = (pewnosc: string, twId: number | null) =>
-    ({ pewnosc, twId, symbol: "X", zrodlo: null, powod: null });
+  const k = (pewnosc: DopasowanieKartoteki["pewnosc"], twId: number | null): DopasowanieKartoteki =>
+    ({ pewnosc, twId, symbol: "X", zrodlo: "zdanie serwera", powod: null });
+  const sprawa = (twId: number | null, kartoteka: DopasowanieKartoteki | null) =>
+    ({ reklamacja: rek({ twId, twSymbol: twId === null ? null : "W09-0804" }), kartoteka });
 
   it("paragon albo mapowanie wygrywa z każdą kartoteką wywiedzioną", () => {
-    expect(twIdSprawy({ reklamacja: rek({ twId: 11 }), kartoteka: k("sku", 99) })).toBe(11);
+    expect(kartotekaKolumny(sprawa(11, k("sku", 99))))
+      .toEqual({ twId: 11, symbol: "W09-0804", zrodlo: "paragon" });
   });
 
   it("bez nich bierze kartotekę PEWNĄ — z pamięci wskazań albo jedynego trafienia po SKU", () => {
-    expect(twIdSprawy({ reklamacja: rek({ twId: null }), kartoteka: k("sku", 99) })).toBe(99);
-    expect(twIdSprawy({ reklamacja: rek({ twId: null }), kartoteka: k("pamiec", 98) })).toBe(98);
+    expect(kartotekaKolumny(sprawa(null, k("sku", 99)))).toEqual({ twId: 99, symbol: "X", zrodlo: "sku" });
+    expect(kartotekaKolumny(sprawa(null, k("pamiec", 98))))
+      .toEqual({ twId: 98, symbol: "X", zrodlo: "mapowanie" });
   });
 
-  it("propozycja niejednoznaczna nie wchodzi — zgadywanie to nie kartoteka", () => {
-    expect(twIdSprawy({ reklamacja: rek({ twId: null }), kartoteka: k("propozycja", 97) })).toBeNull();
-    expect(twIdSprawy({ reklamacja: rek({ twId: null }), kartoteka: null })).toBeNull();
+  it("trafienie niepewne nie wchodzi — zgadywanie to nie kartoteka", () => {
+    const brak = { twId: null, symbol: null, zrodlo: null };
+    expect(kartotekaKolumny(sprawa(null, k("jedyna_pozycja", 97)))).toEqual(brak);
+    expect(kartotekaKolumny(sprawa(null, k("nazwa_w_zamowieniu", 96)))).toEqual(brak);
+    expect(kartotekaKolumny(sprawa(null, k("niejednoznaczne", null)))).toEqual(brak);
+    expect(kartotekaKolumny(sprawa(null, null))).toEqual(brak);
   });
 });
 

@@ -22,11 +22,12 @@ import { OCZEKIWANIA, POWODY } from "./Kolejka";
    TERMIN DECYZJI tylko przed werdyktem. Po nim liczba dni do terminu nie
    rozstrzyga już niczego, a czerwona stałaby przy sprawie zamkniętej. */
 
-/* ── JEDNA KARTOTEKA NA CAŁĄ KOLUMNĘ ─────────────────────────────────────────
-   Symbol, kafel, przekrój towaru, triaż i zlecenie hali pytają o TĘ SAMĄ
-   rzecz: która to kartoteka u nas. Każdy element pyta tej funkcji, bo
-   osobne pytania się rozjeżdżają. Symbol z dopasowania po SKU obok „sprawa
-   bez kartoteki" to dwie sprzeczne odpowiedzi w jednym wierszu.
+/* ── JEDNA KARTOTEKA NA CAŁĄ SPRAWĘ ──────────────────────────────────────────
+   Symbol w głowicy z przekrojem towaru, kafel pod „Wysłaliśmy", fakty
+   „Mamy" i „nasz zakup" oraz kartoteka cen pytają o TĘ SAMĄ rzecz: która to
+   kartoteka u nas. Każdy element pyta tej funkcji, bo osobne pytania się
+   rozjeżdżają. Symbol z dopasowania po SKU obok „sprawa bez kartoteki" to
+   dwie sprzeczne odpowiedzi na jednym ekranie.
 
    KOLEJNOŚĆ ZA SERWEREM: najpierw `r.twId`, który niesie paragon albo
    wskazanie człowieka, potem `kartotekaOferty`. Z niej bierzemy wyłącznie
@@ -58,11 +59,6 @@ export function kartotekaKolumny(szczegol: Pick<SzczegolReklamacji, "reklamacja"
     return { twId: k.twId, symbol: k.symbol, zrodlo: k.pewnosc === "sku" ? "sku" : "mapowanie" };
   }
   return { twId: null, symbol: null, zrodlo: null };
-}
-
-/** Sam numer kartoteki — dla miejsc, które nie pokazują symbolu. */
-export function twIdSprawy(s: Pick<SzczegolReklamacji, "reklamacja" | "kartoteka">): number | null {
-  return kartotekaKolumny(s).twId;
 }
 
 /** Werdykt Allegro poza panelem — wtedy `werdykt` jest pusty, a sprawa zamknięta. */
