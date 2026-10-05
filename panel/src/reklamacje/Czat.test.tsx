@@ -487,10 +487,10 @@ describe("Kolumna zdjęć obok rozmowy (dyskusje)", () => {
   it("obie drogi naraz typ odrzuca, a ekran z własną kolumną wygrywa — bez dwóch kolumn", () => {
     scena.obrazy = { 9: "blob:usterka" };
     const pokaz = vi.fn();
-    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+    render(
       // @ts-expect-error kolumna rozmowy i kolumna ekranu wykluczają się
-      kolumnaZdjec zdjeciaObok={{ pokaz }}
-      czat={[wiad({ zalaczniki: [zal(9, "usterka.jpg", true)] })]} />);
+      <Czat sprawa={sprawa()} zalaczniki={[]} kolumnaZdjec zdjeciaObok={{ pokaz }}
+        czat={[wiad({ zalaczniki: [zal(9, "usterka.jpg", true)] })]} />);
     expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
