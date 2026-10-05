@@ -61,14 +61,13 @@ const PODPISY_SPRAWY = [
 ] as const;
 
 /**
- * Czy wiadomość SPRZEDAWCY w dyskusji albo reklamacji jest autoodpowiedzią.
+ * Czy wiadomość SPRZEDAWCY w dyskusji jest autoodpowiedzią.
  *
  * ── PO CO ─────────────────────────────────────────────────────────────────
  * Allegro podpisuje ją rolą `SELLER` i przestawia status ostatniej wiadomości
- * na `SELLER_REPLIED`. Dla nas wyglądało to jak odpowiedź biura, więc sprawa
- * spadała do „czeka na klienta". Allegro pisze w tych samych dyskusjach, że
- * „wiadomości automatyczne nie są uznawane" — sprawa dalej czeka na nas,
- * a zegar blokady konta biegnie.
+ * na `SELLER_REPLIED`, czyli na „odpowiedzieliśmy". Allegro jednak pisze
+ * w tych samych dyskusjach, że „wiadomości automatyczne nie są uznawane" —
+ * po autoodpowiedzi sprawa dalej czeka na nas, a zegar blokady konta biegnie.
  *
  * WYSTARCZY, ŻE ZDANIE STOI W TREŚCI, nie musi być całą treścią: podpis albo
  * godziny pracy dopisane w ustawieniach Allegro nie mają wyłączać rozpoznania.

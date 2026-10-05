@@ -438,10 +438,9 @@ test("alarm ze zdrowia zgadza się z wierszami pilnymi z listy", () => {
 });
 
 /* ── Autoodpowiedź z naszego konta ─────────────────────────────────────────
-   Zgłoszenie właściciela: Allegro wysyła z naszego konta „Dziękujemy za
-   wiadomość…", status skacze na `SELLER_REPLIED`, a dyskusja spadała do
-   „czeka na klienta". Allegro automatów nie uznaje, więc zegar blokady konta
-   biegł dalej, a sprawa zniknęła z kolejki pracy. */
+   Allegro wysyła z naszego konta „Dziękujemy za wiadomość…" i daje status
+   `SELLER_REPLIED`, ale automatów za odpowiedź nie uznaje. Sprawa ma więc
+   zostać w kolejce pracy, a zegar blokady konta liczyć od pytania. */
 
 const AUTO = "Dziękujemy za wiadomość, odpowiemy najszybciej jak to tylko będzie możliwe.";
 
@@ -458,7 +457,7 @@ test("autoodpowiedź nie przenosi dyskusji do „czeka na klienta” i nie zeruj
   wpis(id, "SELLER", przedGodzinami(29), AUTO);
   const [d] = D.listaDyskusji(db(), TERAZ, null);
   assert.equal(d.kubelek, "odpowiedz");
-  assert.equal(d.ostatniaWiadomoscStatus, "BUYER_REPLIED");
+  assert.equal(d.ostatniaWiadomoscStatus, "NEW", "biuro nie napisało jeszcze ani słowa");
   assert.equal(d.czekaOdGodzin, 30, "zegar liczy od pytania klienta, nie od automatu");
   assert.equal(D.stanDyskusjiHealth(db(), TERAZ, 24, null).alarm?.ile, 1,
     "alarm widzi sprawę mimo statusu SELLER_REPLIED");
@@ -472,12 +471,27 @@ test("prawdziwa odpowiedź po autoodpowiedzi przenosi dyskusję do klienta", () 
   assert.equal(D.listaDyskusji(db(), TERAZ, null)[0].kubelek, "klient");
 });
 
-test("przy urwanej liście wierzymy Allegro, nie ostatniej wiadomości, jaką mamy", () => {
-  /* Rozmowa dociąga się taktem: Allegro zna już naszą odpowiedź, a lokalnie
-     ostatnie jest pytanie klienta. Przestawienie kubełka byłoby zgadywaniem. */
+test("niedociągnięty ogon rozmowy zostawia sprawę u nas", () => {
+  /* Autoodpowiedź przychodzi sekundy po pytaniu, rozmowa dociąga się osobnym
+     przebiegiem. Brakujący ogon jest nieznany, a blokada konta kosztuje
+     więcej niż nadmiarowy pasek. Fikstura mówi o trzech wiadomościach. */
   const id = sprawa({ id: "auto-3", ostatniStatus: "SELLER_REPLIED" });
   wpis(id, "BUYER", przedGodzinami(30), "Gdzie moja paczka?");
+  assert.equal(D.listaDyskusji(db(), TERAZ, null)[0].kubelek, "odpowiedz");
+});
+
+test("rozmowa urwana bezpiecznikiem stron zostaje przy statusie Allegro", () => {
+  /* Jej ogon nie przyjdzie nigdy, więc „nieznany" znaczyłby „u nas na zawsze". */
+  const id = sprawa({ id: "auto-4", ostatniStatus: "SELLER_REPLIED" });
+  db().prepare("UPDATE reklamacja_klienta SET czat_urwany=1 WHERE id=?").run(id);
+  wpis(id, "BUYER", przedGodzinami(30), "Gdzie moja paczka?");
   assert.equal(D.listaDyskusji(db(), TERAZ, null)[0].kubelek, "klient");
+});
+
+test("same automaty bez pytania: zegar liczy od otwarcia, nie od automatu", () => {
+  assert.equal(D.bezOdpowiedziOd(
+    [{ rola: "SELLER", at: przedGodzinami(1), auto: true }],
+    przedGodzinami(1), true, przedDniami(4)), przedDniami(4));
 });
 
 test("status po zdjęciu automatu bierze się z ostatniej PRAWDZIWEJ wiadomości", () => {

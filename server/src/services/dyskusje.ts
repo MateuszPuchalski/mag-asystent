@@ -225,13 +225,19 @@ const ROLE_AUTOMATOW: readonly string[] = ["SYSTEM", "FULFILLMENT"];
  * jest — Allegro samo pisze kupującym i nam, że automatów nie uznaje. Kubełek,
  * zegar i alarm mają więc patrzeć na ostatnią PRAWDZIWĄ wiadomość.
  *
- * Zmieniamy status WYŁĄCZNIE wtedy, gdy ostatnią wiadomością, jaką mamy, jest
- * właśnie autoodpowiedź. Rozmowa dociąga się taktem, więc przy niepełnej
- * liście ostatnią może być stare pytanie klienta, a Allegro mówi już o naszej
- * prawdziwej odpowiedzi. Wtedy wierzymy Allegro, nie urwanej liście.
+ * KOMPLETNA ROZMOWA: zmieniamy status tylko wtedy, gdy na jej końcu stoi
+ * autoodpowiedź. Inaczej `SELLER_REPLIED` mówi o naszej prawdziwej odpowiedzi.
+ *
+ * NIEPEŁNA ROZMOWA (`brakuje`): rozstrzygają wiadomości, które mamy, a brakujący
+ * ogon uznajemy za nieznany. Autoodpowiedź przychodzi sekundy po pytaniu,
+ * a rozmowa dociąga się osobnym przebiegiem, więc to najczęstszy przypadek.
+ * Sprawa zostaje wtedy u nas, chyba że widzimy naszą prawdziwą odpowiedź.
+ * Ta sama asymetria co w `bezOdpowiedziOd`: nadmiarowy pasek kosztuje mniej
+ * niż blokada konta. Rozmowy urwanej bezpiecznikiem stron to nie dotyczy, bo
+ * jej ogon nie przyjdzie nigdy i sprawa wisiałaby u nas na zawsze.
  */
 export function statusBezAutoodpowiedzi(
-  status: string | null, wiadomosci: WiadomoscCzasu[],
+  status: string | null, wiadomosci: WiadomoscCzasu[], brakuje = false,
 ): string | null {
   if (status !== "SELLER_REPLIED") return status;
   const wg = wiadomosci
@@ -239,13 +245,16 @@ export function statusBezAutoodpowiedzi(
     .filter((m) => Number.isFinite(m.t))
     .sort((a, b) => a.t - b.t);
   const ostatnia = wg[wg.length - 1];
-  if (!ostatnia || ostatnia.rola !== NASZA_ROLA || !ostatnia.auto) return status;
+  if (!brakuje && (!ostatnia || ostatnia.rola !== NASZA_ROLA || !ostatnia.auto)) return status;
+  /* `BUYER_REPLIED` wymaga wcześniejszego słowa sprzedawcy (specyfikacja
+     `PostPurchaseIssueLastMessage`), a automat słowem biura nie jest. */
+  const pisalismy = wg.some((m) => m.rola === NASZA_ROLA && !m.auto);
   for (let i = wg.length - 1; i >= 0; i -= 1) {
     const m = wg[i];
     if (m.auto || ROLE_AUTOMATOW.includes(m.rola ?? "")) continue;
     if (m.rola === NASZA_ROLA) return "SELLER_REPLIED";
     if (m.rola === "ADMIN") return "ALLEGRO_ADVISOR_REPLIED";
-    return "BUYER_REPLIED";
+    return pisalismy ? "BUYER_REPLIED" : "NEW";
   }
   /* Same automaty: nikt z biura jeszcze nie napisał ani słowa. */
   return "NEW";
@@ -287,6 +296,9 @@ export function bezOdpowiedziOd(
   const pierwsza = wg.slice(naszaOstatnia + 1).find((m) => ROLE_CZEKAJACE.includes(m.rola));
   if (pierwsza) return new Date(pierwsza.t).toISOString();
   if (naszaOstatnia >= 0) return new Date(wg[naszaOstatnia].t).toISOString();
+  /* Same automaty, a pytania brak: ostatnią wiadomością jest automat, więc
+     liczenie od niej zaniżyłoby czas. Otwarcie sprawy jest górną granicą. */
+  if (wg.some((m) => m.auto)) return otwartoAt ?? ostatniaAt;
   return ostatniaAt ?? otwartoAt;
 }
 
@@ -368,7 +380,13 @@ export function sygnalyDyskusji(w: {
 function zWiersza(w: Wiersz, teraz: number, wiadomosci: WiadomoscCzasu[] = []): WierszDyskusji {
   const statusAllegro = tekst(w.status_allegro);
   const czatAktywny = Number(w.czat_aktywny ?? 1) === 1;
-  const ostatnia = statusBezAutoodpowiedzi(tekst(w.ostatnia_wiadomosc_status), wiadomosci);
+  /* Niepełna rozmowa liczy się tylko wtedy, gdy jej ogon może jeszcze przyjść
+     i gdy mamy z niej cokolwiek. Pierwsza wiadomość zapisuje się razem ze
+     sprawą, więc pusta lista znaczy „rozmowy nie znamy wcale" — nie ma na
+     czym oprzeć decyzji i zostaje status Allegro. */
+  const brakuje = Number(w.czat_urwany ?? 0) !== 1 && wiadomosci.length > 0
+    && wiadomosci.length < Number(w.wiadomosci_ile ?? 0);
+  const ostatnia = statusBezAutoodpowiedzi(tekst(w.ostatnia_wiadomosc_status), wiadomosci, brakuje);
   const ostatniaAt = tekst(w.ostatnia_wiadomosc_at);
   const rdzen = { statusAllegro, ostatniaWiadomoscStatus: ostatnia, czatAktywny };
   const ruchNasz = ruchNalezyDoNas(rdzen);
@@ -652,7 +670,7 @@ export function stanDyskusjiHealth(
   od: string | null = config.allegro.reklamacjeOd,
 ): StanDyskusjiHealth {
   const wiersze = database.prepare(`
-    SELECT r.id, r.external_id, r.status_allegro, r.czat_aktywny, r.wiadomosci_ile,
+    SELECT r.id, r.external_id, r.status_allegro, r.czat_aktywny, r.wiadomosci_ile, r.czat_urwany,
            r.ostatnia_wiadomosc_status, r.ostatnia_wiadomosc_at, r.otwarto_at
       FROM reklamacja_klienta r
      WHERE r.typ = 'DISPUTE' AND (? IS NULL OR r.otwarto_at >= ?)
