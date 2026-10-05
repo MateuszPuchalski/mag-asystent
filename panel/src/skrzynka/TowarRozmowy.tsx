@@ -1,8 +1,7 @@
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { Check, Database, PackageSearch, X as Krzyzyk } from "lucide-react";
-import { EtykietaWartosci, NaglowekSekcji, ile, odmien } from "../ui";
-import type { CenaPoziomu, DopasowanieKartoteki, KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
-import { zlote } from "../api/zwroty";
+import { NaglowekSekcji, ile } from "../ui";
+import type { DopasowanieKartoteki, KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
 import { BrakPolaczenia } from "../api/klient";
 import { useWiedzaTowaru } from "../api/wiedza";
@@ -11,6 +10,13 @@ import { Kafel } from "../towar/Kafel";
 import { PrzyciskTowaru } from "../towar/Szuflada";
 import { dlugi } from "./DlugiTekst";
 import { ODNOSNIK_CICHY } from "./odnosniki";
+import { CenyKartoteki } from "./OsCenKartoteki";
+
+/* Ceny kartoteki mieszkają w `OsCenKartoteki.tsx` i `cenyNaOsi.ts`. Stąd idą
+   dalej pod starymi nazwami, bo reklamacje (`reklamacje/Dowody.tsx`) i testy
+   tego pliku importują je właśnie stąd. */
+export { CenyKartoteki } from "./OsCenKartoteki";
+export { grupujCeny, polozenieOferty } from "./cenyNaOsi";
 
 /**
  * Towar z Subiekta przy rozmowie (0.179.0).
@@ -356,165 +362,6 @@ export function PasekStanu({ stan, wolne, rezerwacje }: { stan: number; wolne: n
       <span className="bg-amber-500" style={{ width: `${proc(rezerwacje)}%` }} />
     </div>
     <span className="sr-only">{zdanie}</span>
-  </div>;
-}
-
-/**
- * Poziomy o TEJ SAMEJ parze brutto–netto sklejone w jeden wiersz (23 września 2026).
- *
- * Zrzut właściciela: sześć poziomów, pięć z nich co do grosza równych. Agent
- * czytał sześć wierszy, żeby dowiedzieć się jednej ceny. Kolejność grup to
- * kolejność Subiekta — decyzja z 0.396.0 zostaje: wiersz stoi tam, gdzie
- * pierwszy poziom tej ceny.
- */
-export function grupujCeny(ceny: CenaPoziomu[]): Array<{ cena: CenaPoziomu; nazwy: string[] }> {
-  const grupy = new Map<string, { cena: CenaPoziomu; nazwy: string[] }>();
-  for (const c of ceny) {
-    const klucz = `${c.bruttoGrosze ?? "-"}|${c.nettoGrosze ?? "-"}|${c.waluta}`;
-    const nazwa = c.nazwa || `poziom ${c.poziom}`;
-    const g = grupy.get(klucz);
-    if (g) g.nazwy.push(nazwa); else grupy.set(klucz, { cena: c, nazwy: [nazwa] });
-  }
-  return [...grupy.values()];
-}
-
-/**
- * Ceny z kartoteki Subiekta (0.396.0).
- *
- * Zgłoszenie właściciela: „nie widzę cen z Subiekta przy towarach". Kolumna
- * mówiła CZY MAMY i GDZIE, a na pytanie „ile to kosztuje" — padające w tej
- * samej rozmowie — agent musiał otwierać Subiekta. To dokładnie ta czynność,
- * której §25 zabrania.
- *
- * WSZYSTKIE POZIOMY, w kolejności Subiekta — decyzja właściciela. Sortowanie
- * po kwocie przestawiałoby wiersze przy każdej przecenie, a agent uczy się
- * miejsca, nie liczby.
- *
- * BRUTTO GRUBE, NETTO SZARE OBOK. Klient detaliczny pyta o brutto i tę kwotę
- * agent przepisuje; netto potrzebne jest firmie proszącej o fakturę i wtedy
- * ma być pod ręką, a nie do policzenia w głowie.
- *
- * PUSTY BLOK NIE RYSUJE SIĘ WCALE — ta sama zasada, co przy pasowaniach:
- * brak wiedzy nie jest informacją wartą kolumny. Na produkcji blok milczy,
- * dopóki import nie dostanie nazw cennika i nowego GRANT-u (`tools/sonda-cen.sql`).
- */
-/**
- * Czy ten poziom NIE MA ceny brutto — `null` albo zero (0.412.0).
- *
- * Zero jest tu brakiem, nie kwotą: cennik zakupowy Subiekta wypełnia wyłącznie
- * kolumnę netto, a druga strona pary zostaje zerem. Podanie tego zera jako
- * ceny znaczyłoby „za darmo".
- */
-function brakBrutto(c: CenaPoziomu): boolean {
-  return c.bruttoGrosze === null || c.bruttoGrosze === 0;
-}
-
-/* ── CENY NA JEDNEJ OSI (0.498.0, D z kanwy „prawa kolumna") ────────────────
-   Nagranie właściciela: oferta sprzedawała nóż za 45,00 zł, a detaliczna
-   w kartotece to 29,06 zł — o 55% mniej. Tabela sześciu cen tego nie mówiła,
-   bo cena oferty stała trzy sekcje wyżej, a porównanie trzeba było zrobić
-   w głowie. Położenie na wspólnej skali to zadanie, które oko rozwiązuje
-   najdokładniej (Cleveland i McGill, 1984), więc oferta staje na tej samej
-   osi co poziomy kartoteki.
-
-   Która cena jest nieaktualna, oś NIE rozstrzyga — mówi tylko, że się
-   rozjechały. Rozstrzyga człowiek w Allegro albo w Subiekcie. */
-
-/** Gdzie cena oferty stoi wobec poziomów brutto kartoteki; `null`, gdy nie ma czego porównać. */
-export function polozenieOferty(ceny: CenaPoziomu[], oferta: { grosze: number; waluta: string }):
-  { min: number; max: number; zdanie: string } | null {
-  const brutto = ceny.filter((c) => !brakBrutto(c) && c.waluta === oferta.waluta)
-    .map((c) => ({ grosze: c.bruttoGrosze as number, nazwa: c.nazwa || `poziom ${c.poziom}` }));
-  if (brutto.length === 0) return null;
-  const najnizszy = brutto.reduce((a, b) => (b.grosze < a.grosze ? b : a));
-  const najwyzszy = brutto.reduce((a, b) => (b.grosze > a.grosze ? b : a));
-  /* Zdanie mówi samo POŁOŻENIE. Kwotę oferty mówi karta zakupu, dymek
-     kropki i nazwa figury dla czytnika ekranu; czwarty zapis tej samej
-     liczby w jednym zdaniu zasłaniał to, co zdanie ma powiedzieć. */
-  const zdanie = oferta.grosze > najwyzszy.grosze
-    ? `Oferta stoi ${Math.round((oferta.grosze / najwyzszy.grosze - 1) * 100)}% nad najwyższym poziomem (${najwyzszy.nazwa} ${zlote(najwyzszy.grosze, oferta.waluta)}).`
-    : oferta.grosze < najnizszy.grosze
-      ? `Oferta stoi ${Math.round((1 - oferta.grosze / najnizszy.grosze) * 100)}% pod najniższym poziomem (${najnizszy.nazwa} ${zlote(najnizszy.grosze, oferta.waluta)}).`
-      : "Oferta mieści się między poziomami kartoteki.";
-  return { min: Math.min(najnizszy.grosze, oferta.grosze), max: Math.max(najwyzszy.grosze, oferta.grosze), zdanie };
-}
-
-function OsCen({ ceny, oferta }: { ceny: CenaPoziomu[]; oferta: { grosze: number; waluta: string } }) {
-  const p = polozenieOferty(ceny, oferta);
-  if (!p) return null;
-  const rozpietosc = Math.max(1, p.max - p.min);
-  /* Margines 4% z obu stron, żeby skrajna kropka nie wisiała na krawędzi. */
-  const x = (g: number) => `${4 + ((g - p.min) / rozpietosc) * 92}%`;
-  const poziomy = grupujCeny(ceny).filter(({ cena: c }) => !brakBrutto(c) && c.waluta === oferta.waluta);
-  return <figure className="mt-2" aria-label={`Cena oferty ${zlote(oferta.grosze, oferta.waluta)} na tle poziomów kartoteki`}>
-    <div className="relative h-6" aria-hidden>
-      <div className="absolute inset-x-0 top-1/2 h-px bg-slate-300" />
-      {poziomy.map(({ cena: c, nazwy }) => <span key={c.poziom} title={`${nazwy.join(", ")} · ${zlote(c.bruttoGrosze, c.waluta)}`}
-        className="absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-slate-500"
-        style={{ left: x(c.bruttoGrosze as number) }} />)}
-      <span title={`oferta · ${zlote(oferta.grosze, oferta.waluta)}`}
-        className="absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-white bg-amber-500"
-        style={{ left: x(oferta.grosze) }} />
-    </div>
-    <div className="flex justify-between text-podpis tabular-nums text-slate-600" aria-hidden>
-      <span>{zlote(p.min, oferta.waluta)}</span><span>{zlote(p.max, oferta.waluta)}</span>
-    </div>
-    <figcaption className="mt-1 text-xs text-slate-700">{p.zdanie}</figcaption>
-  </figure>;
-}
-
-export function CenyKartoteki({ ceny, ramka = true, oferta = null }: {
-  ceny: CenaPoziomu[];
-  /* `false` w skrzynce (23 września 2026): tam ceny stoją W sekcji „Subiekt
-     GT", więc ramka i drugi podpis źródła byłyby pudełkiem w pudełku.
-     Reklamacje stawiają blok samodzielnie i ramkę zostawiają. */
-  ramka?: boolean;
-  /** Cena oferty rozmowy — wtedy pod listą staje oś (0.498.0). Reklamacje jej nie podają. */
-  oferta?: { grosze: number; waluta: string } | null;
-}) {
-  if (ceny.length === 0) return null;
-  /* W skrzynce bez klasy: odstęp od bloku wyżej daje rodzic, a kreski
-     wewnątrz bloku kolumna nie ma. Reklamacje zostawiają ramkę. */
-  return <div className={ramka ? "rounded-lg border border-slate-200 p-3" : undefined}>
-    {ramka
-      ? <EtykietaWartosci className="block">Ceny · Subiekt GT</EtykietaWartosci>
-      : <NaglowekSekcji jako="p">Ceny</NaglowekSekcji>}
-    <ul className="mt-1 space-y-0.5">
-      {grupujCeny(ceny).map(({ cena: c, nazwy }) => <li key={c.poziom}
-        className="flex items-baseline gap-2 text-xs">
-        {/* Nazwa poziomu, a gdy baza jej nie trzyma — sam numer. Wymyślona
-            nazwa byłaby gorsza od numeru: agent uwierzyłby, że to detaliczna.
-            Grupa kilku poziomów mówi liczbę, a nazwy stoją w dymku. */}
-        <span className="min-w-0 flex-1 truncate text-slate-600" title={nazwy.join(", ")}>
-          {nazwy.length > 1
-            ? `${nazwy[0]} i ${nazwy.length - 1} ${odmien(nazwy.length - 1, "inny", "inne", "innych")}`
-            : nazwy[0]}</span>
-        {/* ── ZERO TO BRAK, NIE CENA (0.412.0) ────────────────────────────
-            Poziom zakupu (numer 0) nie ma u nas ceny brutto — Subiekt trzyma
-            tam parę „netto 18,64 / brutto 0,00". Do tego wydania wiersz
-            krzyczał więc `0,00 PLN` grubym drukiem, a jedyną prawdziwą liczbę
-            wyciszał jako „netto". Najgłośniejsza liczba bloku cen była
-            nieprawdą, i to przy triażu reklamacji.
-
-            Bez ceny brutto GŁÓWNĄ liczbą zostaje netto, a podpis mówi wprost,
-            czego Subiekt nie prowadzi. `rozwinCeny` poziomu z dwoma zerami
-            nie wpuszcza wcale, więc ten przypadek to zawsze jedna strona
-            pary — czyli dane do obejrzenia przez człowieka. */}
-        {brakBrutto(c)
-          ? <>
-              <b className="shrink-0 tabular-nums text-slate-900">
-                {zlote(c.nettoGrosze, c.waluta)}</b>
-              <span className="shrink-0 text-slate-500">netto · bez ceny brutto</span>
-            </>
-          : <>
-              <b className="shrink-0 tabular-nums text-slate-900">
-                {zlote(c.bruttoGrosze, c.waluta)}</b>
-              <span className="shrink-0 tabular-nums text-slate-500">
-                netto {zlote(c.nettoGrosze, c.waluta)}</span>
-            </>}
-      </li>)}
-    </ul>
-    {oferta && <OsCen ceny={ceny} oferta={oferta} />}
   </div>;
 }
 

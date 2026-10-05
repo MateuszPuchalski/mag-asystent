@@ -33,12 +33,19 @@ function opisz(naruszenia: axe.Result[]): string {
     .map((n) => `    ${n.target.join(" ")} :: ${n.html.slice(0, 140)}`).join("\n")).join("\n");
 }
 
+/**
+ * Naruszenia WCAG 2.2 A i AA w bieżącym DOM, opisane do komunikatu testu;
+ * pusty napis znaczy brak naruszeń. Dla bloków spoza `ekrany/` i `druk/`,
+ * których żaden test ekranu nie renderuje w stanie, który trzeba zmierzyć.
+ */
+export async function naruszeniaWcag(korzen: Element = document.body): Promise<string> {
+  return opisz((await axe.run(korzen, OPCJE)).violations);
+}
+
 /** Sprawdza bieżący DOM, jeśli test należy do obszaru ekranów. */
 export async function sprawdzDostepnosc(sciezkaTestu: string | undefined): Promise<void> {
   if (!sciezkaTestu || !OBSZAR.test(sciezkaTestu)) return;
   if (!document.body.textContent?.trim()) return;
-  const wynik = await axe.run(document.body, OPCJE);
-  if (wynik.violations.length) {
-    throw new Error(`Naruszenia dostępności (WCAG 2.2 AA) w DOM ekranu:\n${opisz(wynik.violations)}`);
-  }
+  const opis = await naruszeniaWcag();
+  if (opis) throw new Error(`Naruszenia dostępności (WCAG 2.2 AA) w DOM ekranu:\n${opis}`);
 }
