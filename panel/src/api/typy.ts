@@ -1981,10 +1981,10 @@ export interface SzczegolReklamacji {
   zamowienie: Zamowienie | null;
   /** Gdzie jest paczka do klienta (0.393.0); `null` = nie ma zamówienia. */
   przesylka: StanPrzesylki | null;
-  kartoteka: {
-    pewnosc: string; twId: number | null; symbol: string | null;
-    zrodlo: string | null; powod: string | null;
-  } | null;
+  /* Ten sam kształt, co kartoteka przy rozmowie: serwer liczy oba
+     `kartotekaOferty`. Wąski typ pewności pozwala kolumnie dowodów odróżnić
+     powiązanie od braku bez porównywania napisów z palca. */
+  kartoteka: DopasowanieKartoteki | null;
   /** Karta faktów Copilota (0.275.0); `null`, gdy nikt jeszcze nie prosił. */
   karta: KartaSprawy | null;
   /** Ile razy TO SAMO już się zdarzyło (0.413.0). */
@@ -2130,6 +2130,8 @@ export interface Dyskusja {
   wersja: number;
   kubelek: KubelekDyskusji;
   sygnaly: SygnalDyskusji[];
+  /** Sama dyskusja w Centrum Sprzedaży; `null`, gdy wzorzec jest pusty. */
+  link: string | null;
   linkZamowienia: string | null;
 }
 

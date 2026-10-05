@@ -1171,6 +1171,15 @@ odnośnik działał bez wpisu przy wdrożeniu. Doklejany jest w kodzie, a nie we
 wzorcu: przy pustej wartości w adresie zawisłby goły `?sellerId=`, o którym nic
 nie wiemy.
 
+**Dyskusja — adres ZWERYFIKOWANY.** Właściciel podał go z paska przeglądarki.
+Dyskusja ma własną stronę, INNĄ niż reklamacja, choć API oddaje obie jedną
+listą `/sale/issues`:
+
+`https://salescenter.allegro.com/discussions-with-buyers/{id}?sellerId={sprzedawca}`
+
+`{id}` to `PostPurchaseIssue.id`, a `sellerId` dokleja kod, jak przy
+reklamacji. Wzorzec stoi w `ALLEGRO_PANEL_DYSKUSJA`.
+
 Hosta Centrum Sprzedaży dla SANDBOKSU nie znamy, więc `ALLEGRO_SANDBOX=1`
 zostaje przy dawnym wzorcu. Zgadywanie go kosztowałoby tyle samo, co przy
 produkcji.

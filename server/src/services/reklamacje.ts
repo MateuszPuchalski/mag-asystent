@@ -6,7 +6,7 @@ import {
 } from "./tagi-spraw.js";
 import { listaZwrotow, type WierszZwrotu } from "./zwroty.js";
 import { kartaSprawy } from "./copilot-reklamacja.js";
-import { kartotekaOferty } from "./dopasowanie-sku.js";
+import { kartotekaOferty, ofertyKartoteki } from "./dopasowanie-sku.js";
 import { linkOferty, linkReklamacji, linkZamowienia } from "./allegro-linki.js";
 import { zamowienieRozmowy, type Zamowienie } from "./zamowienia.js";
 import { przesylkaZamowienia, type StanPrzesylkiZamowienia } from "./przesylka-zamowienia.js";
@@ -1047,14 +1047,18 @@ export function historiaSprawy(
   twId: number | null, login: string | null,
 ): HistoriaSprawy {
   /* Po KARTOTECE, nie po numerze oferty: ten sam towar bywa wystawiony
-     w kilku ofertach, a reklamacje rozstrzyga rzecz, nie ogłoszenie. */
-  const towar = twId === null ? null : slad(database.prepare(`
+     w kilku ofertach, a reklamacje rozstrzyga rzecz, nie ogłoszenie.
+     Oferty towaru wybiera `ofertyKartoteki`, ta sama co w przekroju towaru:
+     pamięć wskazań i sygnatura. Sama pamięć nie wystarcza, bo ekran sprawy
+     pokazuje także kartotekę powiązaną po SKU. */
+  const oferty = twId === null ? [] : ofertyKartoteki(database, twId)
+    .filter((o) => o.konto === konto).map((o) => o.ofertaId);
+  const towar = oferty.length === 0 ? null : slad(database.prepare(`
     SELECT ${LICZNIKI_HISTORII}
       FROM reklamacja_klienta r
-      JOIN oferta_kartoteka k
-        ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
      WHERE r.channel_account_id = ? AND r.typ = 'CLAIM'
-       AND k.tw_id = ? AND r.id <> ?`).get(konto, twId, pomin) as Wiersz | undefined);
+       AND r.offer_id IN (${oferty.map(() => "?").join(",")})
+       AND r.id <> ?`).get(konto, ...oferty, pomin) as Wiersz | undefined);
   const klient = login === null ? null : slad(database.prepare(`
     SELECT ${LICZNIKI_HISTORII}
       FROM reklamacja_klienta r
@@ -1138,6 +1142,13 @@ export function szczegolReklamacji(
     kartoteka = kartotekaOferty(database, konto, reklamacja.offerId,
       snap ? snap.sku : undefined);
   }
+  /* Licznik „ten towar" pyta o kartotekę, którą pokazuje kolumna dowodów:
+     paragon albo wskazanie człowieka, a bez nich powiązanie po SKU lub
+     z pamięci. Tę samą regułę ma `kartotekaKolumny` w panelu. Propozycja bez
+     `twId` (symbol zdublowany) zostaje brakiem i licznik milczy. */
+  const twIdTowaru = reklamacja.twId
+    ?? (kartoteka && (kartoteka.pewnosc === "sku" || kartoteka.pewnosc === "pamiec")
+      ? kartoteka.twId : null);
 
   return {
     reklamacja,
@@ -1145,7 +1156,7 @@ export function szczegolReklamacji(
     zalaczniki: zalacznikiSprawy(database, id),
     zwroty, rozmowy, sprawy, droga, zamowienie, przesylka, kartoteka,
     karta: kartaSprawy(database, id),
-    historia: historiaSprawy(database, konto, id, reklamacja.twId, reklamacja.kupujacyLogin),
+    historia: historiaSprawy(database, konto, id, twIdTowaru, reklamacja.kupujacyLogin),
   };
 }
 

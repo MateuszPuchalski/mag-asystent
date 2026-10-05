@@ -28,6 +28,7 @@ const d = (n: Partial<Dyskusja> = {}): Dyskusja => ({
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null,
   zakonczenieStatus: null, zakonczenieAt: null, zakonczeniePrzez: null,
   wersja: 1, kubelek: "odpowiedz", sygnaly: ["klient_czeka"],
+  link: null,
   linkZamowienia: "https://example.invalid/zam",
   ...n,
 });

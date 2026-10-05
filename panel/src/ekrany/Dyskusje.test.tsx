@@ -32,7 +32,7 @@ const dys = (id: number, kubelek: KubelekDyskusji, temat: string): Dyskusja => (
   otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [],
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null,
   zakonczenieStatus: null, zakonczenieAt: null, zakonczeniePrzez: null,
-  wersja: 1, kubelek, sygnaly: [], linkZamowienia: null,
+  wersja: 1, kubelek, sygnaly: [], link: null, linkZamowienia: null,
 });
 
 const DYSKUSJE = [
@@ -387,5 +387,46 @@ describe("Szyna listy: kubełki pracy na wierzchu, widoki pod „Więcej”", ()
     expect(screen.queryByRole("button", { name: /Sprawa wyjaśniona/ })).not.toBeInTheDocument();
     await userEvent.selectOptions(wiecej(), opcje().find((t) => /^Wszystkie/.test(t))!);
     expect(screen.getByRole("button", { name: /Sprawa wyjaśniona/ })).toBeInTheDocument();
+  });
+});
+
+describe("Kolejność, zdjęcia i wyjście do Allegro", () => {
+  it("domyślnie na górze stoi dyskusja, która NAJDŁUŻEJ czeka na nas", () => {
+    /* Dyskusja nie ma terminu, a za brak odpowiedzi Allegro blokuje konto,
+       więc pilność mierzy wyłącznie czas czekania na nas. */
+    const stara = DYSKUSJE.find((d) => d.id === 6)!;
+    const kopia = { ...stara };
+    Object.assign(stara, { czekaOdDni: 19, czekaOdGodzin: 475, otwartoAt: "2026-08-01T10:00:00.000Z" });
+    try {
+      pokaz();
+      const wiersze = screen.getAllByRole("button").filter((b) => b.hasAttribute("data-wiersz-kolejki"));
+      expect(wiersze[0]).toHaveTextContent("Paczka zaginęła");
+      expect(screen.getByRole("button", { name: "Najdłużej czeka" })).toHaveAttribute("aria-haspopup", "menu");
+    } finally { Object.assign(stara, kopia); }
+  });
+
+  it("zdjęcia z rozmowy stoją w kolumnie obok, jak w reklamacjach", () => {
+    pokaz("/obsluga/dyskusje/1", [wiad({
+      zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "paczka.jpg", podglad: true }],
+    })]);
+    expect(screen.getByRole("complementary", { name: "Zdjęcia w sprawie" })).toBeInTheDocument();
+  });
+
+  it("dyskusja prowadzi do swojej strony w Centrum Sprzedaży", () => {
+    const d = DYSKUSJE[0];
+    const adres = "https://salescenter.allegro.com/discussions-with-buyers/d-1?sellerId=1";
+    d.link = adres;
+    try {
+      pokaz("/obsluga/dyskusje/1");
+      expect(screen.getByRole("link", { name: "Otwórz tę dyskusję w Centrum Sprzedaży Allegro" }))
+        .toHaveAttribute("href", adres);
+    } finally { d.link = null; }
+  });
+
+  it("bez adresu nie ma odnośnika donikąd", () => {
+    pokaz("/obsluga/dyskusje/1");
+    /* Po etykiecie, nie po roli: `<a>` bez `href` traci rolę odnośnika,
+       więc zapytanie o rolę przeszłoby także przy pustym odnośniku. */
+    expect(screen.queryByLabelText(/Centrum Sprzedaży/)).toBeNull();
   });
 });

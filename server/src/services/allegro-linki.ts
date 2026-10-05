@@ -77,10 +77,23 @@ export const linkOferty = (id: string | null | undefined) =>
  * żywym Centrum Sprzedaży. Ogólna reguła zmieniałaby działający adres przy
  * okazji naprawiania zepsutego.
  */
-export const linkReklamacji = (id: string | null | undefined) => {
-  const adres = zWzorca(config.allegro.panelReklamacja, id);
+export const linkReklamacji = (id: string | null | undefined) =>
+  zSprzedawca(zWzorca(config.allegro.panelReklamacja, id));
+
+/**
+ * Dyskusja w Centrum Sprzedaży — adres ZWERYFIKOWANY kliknięciem właściciela.
+ *
+ * Własna strona `/discussions-with-buyers/{uuid}`, nie `/claims/{uuid}`:
+ * Allegro rozdziela oba rodzaje spraw w panelu, choć API oddaje je jedną
+ * listą. `{id}` to `external_id` sprawy, jak przy reklamacji.
+ */
+export const linkDyskusji = (id: string | null | undefined) =>
+  zSprzedawca(zWzorca(config.allegro.panelDyskusja, id));
+
+/** Dokleja `sellerId`, gdy go znamy — powód przy `linkReklamacji`. */
+function zSprzedawca(adres: string | null): string | null {
   if (!adres) return null;
   const sprzedawca = config.allegro.sellerId;
   if (!sprzedawca) return adres;
   return `${adres}${adres.includes("?") ? "&" : "?"}sellerId=${encodeURIComponent(sprzedawca)}`;
-};
+}

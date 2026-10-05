@@ -22,7 +22,7 @@ import { Blad, Karta, Przycisk, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { KUBELKI, Kolejka } from "../dyskusje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
-import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
+import { PasekPorzadku, posortuj, usePorzadek, type OsPorzadku } from "../sprawy/Porzadek";
 import { PasekProgu } from "../sprawy/Prog";
 import { PasekTla, tloAlarmuje } from "../sprawy/PasekTla";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
@@ -33,6 +33,7 @@ import { Zakonczenie } from "../dyskusje/Zakonczenie";
 import { Prowadzi } from "../sprawy/Prowadzi";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 import { klawiszZajety } from "../nawigacja/fokus";
+import { OdnosnikAllegro } from "../skrzynka/odnosniki";
 
 /* ── Ekran dyskusji (0.245.0) ────────────────────────────────────────────────
    Trzy kolumny, jak skrzynka, zwroty i reklamacje — CZTERY ekrany obsługi mają
@@ -88,12 +89,17 @@ export function Dyskusje() {
   const ja = useJa();
   const mojeId = ja.data?.user.userId ?? null;
   const { sito, przelacz: przelaczSito } = useSito();
-  /* DWIE OSIE, nie cztery, i to nie jest niedoróbka: dyskusja NIE MA terminu
-     (Allegro nie oddaje przy niej ani `decisionDueDate`, ani `statusDueDate` —
-     powód stoi w `dyskusje/Fakty.tsx`) ani oczekiwanej kwoty. Pigułka
-     sortująca po polu, którego nie ma, uczy, że pigułki nic nie robią. */
+  /* TRZY OSIE, bez terminu i kwoty: dyskusja NIE MA terminu (Allegro nie
+     oddaje przy niej ani `decisionDueDate`, ani `statusDueDate` — powód stoi
+     w `dyskusje/Fakty.tsx`) ani oczekiwanej kwoty. Pigułka sortująca po polu,
+     którego nie ma, uczy, że pigułki nic nie robią.
+
+     DOMYŚLNIE „Najdłużej czeka". Bez terminu jedyną miarą pilności jest to,
+     jak długo piłka leży po naszej stronie, a za dyskusję bez odpowiedzi
+     Allegro blokuje konto. Najstarsza zaległość ma więc stać na górze. */
+  const OSIE: OsPorzadku[] = ["czekanie", "otwarto", "ruch"];
   const { porzadek, ustaw: ustawPorzadek } = usePorzadek(
-    "wertis.dyskusje.porzadek", ["otwarto", "ruch"], "otwarto");
+    "wertis.dyskusje.porzadek", OSIE, "czekanie");
   const [tag, setTag] = useState<number | null>(null);
   const slownikTagow = useTagi();
   const nowyTag = useNowyTag();
@@ -170,6 +176,10 @@ export function Dyskusje() {
     () => posortuj(pasujace ?? poSitach, porzadek, {
       otwarto: (d) => d.otwartoAt,
       ruch: (d) => d.bezOdpowiedziOd ?? d.ostatniaWiadomoscAt ?? d.otwartoAt,
+      /* Godziny, nie dni: dwie sprawy z „3 dni" różnią się kolejnością
+         o całą dobę. Sprawa, przy której ruch nie jest nasz, nie czeka
+         wcale i schodzi na koniec. */
+      czekanie: (d) => d.czekaOdGodzin ?? (d.czekaOdDni === null ? null : d.czekaOdDni * 24),
     }),
     [pasujace, poSitach, porzadek]);
   /* Zdanie liczy WYŁĄCZNIE to, co chowa „Moje". Doliczenie tu spraw odsianych
@@ -419,7 +429,7 @@ export function Dyskusje() {
           <input id="szukaj-dyskusji" className="field min-w-0 flex-1 !py-1 text-xs" value={fraza}
             onChange={(e) => setFraza(e.target.value)}
             placeholder="Temat, zamówienie, login, notatka" />
-          <PasekPorzadku porzadek={porzadek} dozwolone={["otwarto", "ruch"]}
+          <PasekPorzadku porzadek={porzadek} dozwolone={OSIE}
             onZmien={ustawPorzadek} />
           <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length} />
         </div>
@@ -455,7 +465,10 @@ export function Dyskusje() {
         </div>
       </Karta>
 
-      <Karta className="flex min-h-0 flex-col overflow-y-auto p-4">
+      {/* Karta się NIE przewija, przewija się rozmowa. Kolumna zdjęć potrzebuje
+          ograniczonej wysokości, żeby przewijać się osobno — przy przewijanej
+          karcie urosłaby razem z rozmową i zdjęcia uciekałyby z rozmową. */}
+      <Karta className="flex min-h-0 flex-col overflow-hidden">
         {szczegol.data
           ? <>
               {/* ── JEDEN WIERSZ NAGŁÓWKA (0.520.0) ─────────────────────────
@@ -467,7 +480,11 @@ export function Dyskusje() {
                   agent tu przyszedł, zaczyna się dwa rzędy wyżej.
 
                   Kto prowadzi — czynność przy czynnościach (0.392.0). */}
-              <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
+              {/* `max-h` i własne przewijanie: w tym wierszu rozwija się
+                  formularz prośby o zakończenie (około 260 px). Karta się nie
+                  przewija, więc przy niskim oknie albo powiększeniu 200%
+                  przycisk „Wyślij prośbę" uciekłby za jej krawędź. */}
+              <div className="flex max-h-[60%] shrink-0 flex-wrap items-center justify-end gap-2 overflow-y-auto border-b border-slate-200 px-4 py-2">
                 {/* `mr-auto`, nie `flex-1`: rozciągnięty blok łamał „Prowadzę tę
                     sprawę" pod własne imię przy 1366 px. Tak wiersz łamie się
                     całymi przyciskami, a `justify-end` trzyma złamane czynności
@@ -486,6 +503,12 @@ export function Dyskusje() {
                     kupującego albo doradcy, nie musi z niej wychodzić, żeby
                     zobaczyć nową wiadomość. Przeniesiony do wiersza nagłówka,
                     nie zdjęty. */}
+                {/* Wyjście do tej samej dyskusji w Centrum Sprzedaży. Stoi przy
+                    odświeżeniu, bo oba odpowiadają na pytanie „co widzi
+                    Allegro", a nie w kolumnie faktów, gdzie trzeba by jej
+                    szukać wzrokiem. */}
+                {szczegol.data.dyskusja.link && <OdnosnikAllegro href={szczegol.data.dyskusja.link}
+                  etykieta="Otwórz tę dyskusję w Centrum Sprzedaży Allegro" />}
                 <Przycisk className="!px-2 !py-1 !text-xs" disabled={odswiez.isPending}
                   onClick={() => {
                     setBladOdswiezenia("");
@@ -513,6 +536,10 @@ export function Dyskusje() {
                 }}
                 czat={szczegol.data.czat}
                 zalaczniki={szczegol.data.zalaczniki}
+                /* Zdjęcia w kolumnie obok, jak w reklamacjach: kupujący wysyła
+                   je seriami z telefonu, a kafel w wątku wypychał następną
+                   wiadomość poza ekran. Rozmowę czyta się od końca. */
+                kolumnaZdjec
                 /* Klucz sprawy: edytor trzyma własny stan (cofnięcie wyczyszczenia,
                    zwłokę Ctrl+Enter), a ekran nie montuje go od nowa przy przejściu. */
                 edytor={<Edytor key={szczegol.data.dyskusja.id} tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
@@ -536,9 +563,9 @@ export function Dyskusje() {
                   czatAktywny={szczegol.data.dyskusja.czatAktywny}
                   onZmiana={setTresc} onWyslij={() => wyslij()} />} />
             </>
-          : <Pusto ikona={MessagesSquare}>
+          : <div className="p-4"><Pusto ikona={MessagesSquare}>
               {wybrana ? "Wczytuję dyskusję…" : "Wybierz dyskusję z kolejki po lewej"}
-            </Pusto>}
+            </Pusto></div>}
       </Karta>
 
       <Karta className="flex min-h-0 flex-col overflow-y-auto">

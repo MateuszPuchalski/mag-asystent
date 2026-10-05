@@ -26,7 +26,7 @@ const d = (n: Partial<Dyskusja> = {}): Dyskusja => ({
   otwartoAt: "2026-09-01T10:00:00.000Z", prowadzi: null, prowadziId: null, tagi: [],
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, prowadziAt: null, notatka: null,
   zakonczenieStatus: null, zakonczenieAt: null, zakonczeniePrzez: null,
-  wersja: 1, kubelek: "odpowiedz", sygnaly: [], linkZamowienia: null,
+  wersja: 1, kubelek: "odpowiedz", sygnaly: [], link: null, linkZamowienia: null,
   ...n,
 });
 
