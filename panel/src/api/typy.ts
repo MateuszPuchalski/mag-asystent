@@ -2233,7 +2233,26 @@ export interface WynikWerdyktu {
   status: StatusWerdyktu;
   blad: string | null;
   wersja: number;
+  /** Los stanowiska o towarze wysłanego razem z uznaniem; brak, gdy go nie było. */
+  towar?: WynikTowaruWerdyktu;
 }
+
+/** Stanowisko o towarze wysyłane tym samym żądaniem co uznanie. */
+export interface TowarWerdyktu {
+  decyzja: "wymagany" | "niewymagany";
+  tresc: string;
+  expectedLastMessageId: number | null;
+  mimoNowejWiadomosci?: boolean;
+}
+
+/* Każdy wariant to inne zdanie na ekranie, a żaden nie cofa werdyktu: ten
+   wyszedł nieodwracalnie, więc los towaru jedzie OBOK, nie zamiast niego.
+   `konflikt` to ładunek tego samego 409, który daje osobny krok o towarze. */
+export type WynikTowaruWerdyktu =
+  | { status: WynikOdpowiedziReklamacji["status"] }
+  | { pominiety: string }
+  | { blad: string }
+  | { konflikt: SzczegolyWysylki & { error?: string } };
 
 /* ── Pasowanie części: uszczelka pasuje DO gaźnika (§11.2) ─────────────────
    Trzecia kopia list obok `services/pasowania.ts` i `CHECK`. */
