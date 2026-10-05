@@ -5,7 +5,10 @@ import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Konflikt } from "../api/klient";
-import type { DowodReklamacji, KubelekReklamacji, Reklamacja, WiadomoscReklamacji } from "../api/typy";
+import type {
+  DowodReklamacji, KubelekReklamacji, OstatniaDostawaReklamacji, Reklamacja, ReklamacjaUDostawcy,
+  WiadomoscReklamacji, WynikWerdyktu,
+} from "../api/typy";
 
 /* ── Ekran reklamacji ────────────────────────────────────────────────────────
    Trzy rzeczy warte testu, bo żadnej nie widać w serwisie:
@@ -72,6 +75,14 @@ const scena = vi.hoisted(() => ({
   bladSynchronizacji: null as Error | null,
   /* Dowody biura w szczególe sprawy; domyślnie żadnych. */
   dowody: [] as DowodReklamacji[],
+  /* Ostatnia dostawa i nasze zgłoszenie u dostawcy w szczególe sprawy. */
+  dostawa: null as OstatniaDostawaReklamacji | null,
+  uDostawcy: null as ReklamacjaUDostawcy | null,
+  /* Czym kończy się werdykt: `Error` do `onError`, wynik do `onSuccess`,
+     `null` nie woła żadnego. `poWerdykcie` udaje dociągnięcie sprawy, zanim
+     ekran dostanie wynik — tak jak robi to `onSettled` prawdziwego haka. */
+  wynikWerdyktu: null as unknown,
+  poWerdykcie: null as null | (() => void),
 }));
 
 /* Tożsamość zalogowanego: bez niej sita „Moje" nie ma w drzewie, bo filtr
@@ -117,7 +128,7 @@ vi.mock("../api/reklamacje", async () => {
         reklamacja: REKLAMACJE.find((r) => r.id === id) ?? REKLAMACJE[0],
         czat: scena.czat,
         zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [], kartoteka: null,
-        dowody: scena.dowody,
+        dowody: scena.dowody, dostawa: scena.dostawa, uDostawcy: scena.uDostawcy,
       },
     }),
     /* Wysyłka ma WŁASNY podrabiacz, bo jako jedyna oddaje sterowanie z
@@ -146,8 +157,22 @@ vi.mock("../api/reklamacje", async () => {
       },
       isPending: false, error: null,
     }),
-    useWerdykt: mutacja("werdykt"),
+    /* Werdykt ma własny podrabiacz: los stanowiska o towarze wraca do ekranu
+       w `onSuccess` i to on rozstrzyga, czy staje krok zapasowy albo dialog. */
+    useWerdykt: () => ({
+      mutate: (v: unknown, opcje?: {
+        onSuccess?: (w: unknown) => void; onError?: (e: unknown) => void;
+      }) => {
+        scena.mutacje.push(`werdykt:${JSON.stringify(v)}`);
+        const w = scena.wynikWerdyktu;
+        if (w instanceof Error) opcje?.onError?.(w);
+        else if (w) { scena.poWerdykcie?.(); opcje?.onSuccess?.(w); }
+      },
+      isPending: false, error: null,
+    }),
     useZwrotTowaru: mutacja("zwrot-towaru"),
+    /* Zgłoszenie u dostawcy to nasz zapis — test zera zapisu ma je widzieć. */
+    useZapiszUDostawcy: mutacja("u-dostawcy"),
     /* Dowody biura to zapisy, więc test zera zapisu ma je WIDZIEĆ — prawdziwy
        hak wysłałby żądanie obok licznika `mutacje`. */
     useDodajDowod: mutacja("dodaj-dowod"),
@@ -169,6 +194,7 @@ function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wia
   scena.mutacje = [];
   scena.czat = czat;
   scena.wynikWysylki = null;
+  scena.wynikWerdyktu = null;
   scena.bladSynchronizacji = null;
   scena.stan = {
     status: "current", alarm: false, ostatniaProba: null,
@@ -193,7 +219,9 @@ function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wia
    sprawy w teście nie mającym z sitem nic wspólnego. */
 afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
 /* Dowody ustawia test PRZED renderem, więc sprząta się je po nim. */
-afterEach(() => { scena.dowody = []; });
+afterEach(() => {
+  scena.dowody = []; scena.dostawa = null; scena.uDostawcy = null; scena.poWerdykcie = null;
+});
 
 /* ── MUTACJE BEZ ODŚWIEŻENIA WEJŚCIOWEGO (0.410.0) ──────────────────────────
    Od tego wydania wejście w sprawę wysyła JEDNĄ mutację: `odswiez` (decyzja
@@ -344,21 +372,26 @@ describe("Ekran reklamacji", () => {
       expect(within(stopka()).getByText("Allegro odmówiło: limit zapytań")).toBeInTheDocument();
     });
 
-  it("pasek werdyktu stoi POD rozmową, bo nieodwracalne pyta po dowodach", () => {
+  it("pasek werdyktu stoi ZA rozmową i pod faktami, bo nieodwracalne pyta po dowodach", () => {
     /* Od przyrostu trzeciego werdykt wychodzi STĄD. Napis odsyłający do
        Centrum Sprzedaży byłby nieprawdą — tak samo jak w 0.224.0 napis
        o odpowiedzi.
 
-       KOLEJNOŚĆ JEST UMOWĄ od 0.412.0. Do 0.411.0 ten pasek był pierwszym
-       elementem środkowej kolumny, czyli ekran pytał „uznać czy odrzucić",
-       zanim pokazał treść zgłoszenia. Dekalog obsługi, punkt 9: nieodwracalne
-       pyta — a pytanie zadaje się PO dowodach, nie przed nimi. */
+       KOLEJNOŚĆ JEST UMOWĄ. Pasek będący pierwszym elementem kolumny pytał
+       „uznać czy odrzucić", zanim ekran pokazał treść zgłoszenia. Dekalog
+       obsługi, punkt 9: nieodwracalne pyta — a pytanie zadaje się PO
+       dowodach, nie przed nimi. Stoi w kolumnie faktów, zaraz pod liczbami,
+       z których się go wydaje, i nad zwijkami ze szczegółem. */
     pokaz("/obsluga/reklamacje/1");
     const pasek = screen.getByRole("region", { name: "Werdykt" });
     expect(pasek).toBeInTheDocument();
     const rozmowa = screen.getByText("Opis sprawy 1");
     /* `DOCUMENT_POSITION_FOLLOWING` liczone OD rozmowy: pasek ma stać za nią. */
     expect(rozmowa.compareDocumentPosition(pasek)
+      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const fakty = screen.getByText("Klient zapłacił");
+    expect(fakty.compareDocumentPosition(pasek) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pasek.compareDocumentPosition(screen.getByRole("button", { name: /Zakup i oferta/ }))
       & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("button", { name: /Uznaję/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Odrzucam/ })).toBeInTheDocument();
@@ -867,6 +900,131 @@ describe("Sprawa po przebudowie", () => {
     scena.mutacje = [];
     await userEvent.click(screen.getByRole("button", { name: /^Usuń dowód: Tabliczka/ }));
     expect(bezOdswiezenia()).toEqual([`usun-dowod:${JSON.stringify({ id: 1, dowodId: 3 })}`]);
+  });
+});
+
+/* ── Werdykt z towarem i sztuka do dostawcy ─────────────────────────────────
+   Uznanie niesie stanowisko o towarze TYM SAMYM żądaniem, a serwer oddaje
+   jego los obok werdyktu. Werdykt jest nieodwracalny, więc porażka towaru
+   nie może go cofnąć — ekran zostawia krok zapasowy albo dialog dopisku,
+   ten sam co przy osobnym kroku. Sprawę „dociągniętą" po werdykcie udaje
+   `poWerdykcie`, bo atrapa szczegółu czyta tablicę spraw przy każdym renderze. */
+describe("Werdykt z towarem i sztuka do dostawcy", () => {
+  const WYNIK: WynikWerdyktu = {
+    werdykt: "ACCEPTED_REPAIR", werdyktNazwa: "Uznana — naprawa", status: "sent", blad: null, wersja: 2,
+  };
+  /* Sprawa po werdykcie, tak jak przyjdzie z serwera po odświeżeniu. */
+  const uznana = (n: Partial<Reklamacja> = {}): Partial<Reklamacja> => ({
+    werdykt: "ACCEPTED_REPAIR", werdyktNazwa: "Uznana — naprawa", werdyktStatus: "sent",
+    werdyktWiadomosc: "Naprawimy.", wersja: 2, ...n,
+  });
+  /** Podmienia pola sprawy 111 na czas jednego testu. */
+  const zSprawa = async (n: Partial<Reklamacja>, test: () => Promise<void>) => {
+    const r = REKLAMACJE[0];
+    const kopia = { ...r };
+    Object.assign(r, n);
+    try { await test(); } finally {
+      for (const k of Object.keys(r)) delete (r as Record<string, unknown>)[k];
+      Object.assign(r, kopia);
+    }
+  };
+
+  const uznaj = async (towar: RegExp) => {
+    await userEvent.click(screen.getByRole("button", { name: /Uznaję/ }));
+    await userEvent.click(screen.getByRole("button", { name: towar }));
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Naprawimy.");
+    await userEvent.click(within(screen.getByRole("region", { name: "Werdykt" })).getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij werdykt/ }));
+  };
+
+  it("uznanie niesie TOWAR tym samym żądaniem, z ostatnią NIE naszą wiadomością", async () => {
+    pokaz("/obsluga/reklamacje/1");
+    await uznaj(/Do odesłania/);
+    expect(bezOdswiezenia()).toEqual([`werdykt:${JSON.stringify({
+      id: 1, werdykt: "ACCEPTED_REPAIR", wiadomosc: "Naprawimy.", kwotaGrosze: null, wersja: 1,
+      towar: {
+        decyzja: "wymagany",
+        tresc: "Prosimy o odesłanie reklamowanego towaru na adres sklepu. Po otrzymaniu paczki zrealizujemy uznaną reklamację.",
+        expectedLastMessageId: 1,
+      },
+    })}`]);
+  });
+
+  it("porażka towaru zostawia KROK ZAPASOWY z tą samą treścią i zdaniem serwera", async () => {
+    pokaz("/obsluga/reklamacje/1");
+    await zSprawa({}, async () => {
+      scena.wynikWerdyktu = { ...WYNIK, towar: { blad: "Allegro nie przyjęło wiadomości o towarze" } };
+      scena.poWerdykcie = () => Object.assign(REKLAMACJE[0], uznana());
+      await uznaj(/Zostaje u klienta/);
+      expect(screen.getByText("Allegro nie przyjęło wiadomości o towarze")).toBeInTheDocument();
+      expect(screen.getByText("Towar do odesłania?")).toBeInTheDocument();
+      /* Werdykt NIE wraca do formularza — wyszedł i drugi raz nie poleci. */
+      expect(screen.queryByRole("button", { name: /Uznaję/ })).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Wiadomość o towarze")).toHaveValue(
+        "Towaru nie trzeba odsyłać. Uznaną reklamację zrealizujemy bez zwrotu przesyłki.");
+    });
+  });
+
+  it("werdykt niepewny pomija towar i MÓWI to, zamiast milczeć", async () => {
+    pokaz("/obsluga/reklamacje/1");
+    await zSprawa({}, async () => {
+      scena.wynikWerdyktu = { ...WYNIK, status: "send_uncertain",
+        towar: { pominiety: "Werdykt mógł nie dojść do Allegro, więc stanowiska o towarze nie wysłaliśmy." } };
+      scena.poWerdykcie = () => Object.assign(REKLAMACJE[0], uznana({ werdyktStatus: "send_uncertain" }));
+      await uznaj(/Do odesłania/);
+      expect(screen.getByText(/stanowiska o towarze nie wysłaliśmy/)).toBeInTheDocument();
+    });
+  });
+
+  it("dopisek klienta przy towarze otwiera TEN SAM dialog, a „wyślij mimo to” idzie krokiem o towarze", async () => {
+    pokaz("/obsluga/reklamacje/1");
+    await zSprawa({}, async () => {
+      scena.wynikWerdyktu = { ...WYNIK, towar: { konflikt: {
+        error: "Ktoś dopisał wiadomość", lastMessageId: 7,
+        nowaWiadomosc: { id: 7, tresc: "A co z paczką?", at: null, rola: "BUYER" },
+      } } };
+      scena.poWerdykcie = () => Object.assign(REKLAMACJE[0], uznana());
+      await uznaj(/Zostaje u klienta/);
+      const dialog = screen.getByRole("dialog", { name: "Wysyłka zatrzymana" });
+      expect(within(dialog).getByText(/klient dopisał wiadomość/)).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole("checkbox"));
+      scena.mutacje = [];
+      await userEvent.click(within(dialog).getByRole("button", { name: "WYŚLIJ MIMO TO" }));
+      expect(bezOdswiezenia()).toEqual([`zwrot-towaru:${JSON.stringify({
+        id: 1, decyzja: "niewymagany",
+        tresc: "Towaru nie trzeba odsyłać. Uznaną reklamację zrealizujemy bez zwrotu przesyłki.",
+        expectedWersja: 2, expectedLastMessageId: 1, mimoNowejWiadomosci: true,
+      })}`]);
+    });
+  });
+
+  it("po uznaniu z odesłaniem sztuka idzie do dostawcy — otwarcie nie zapisuje niczego", async () => {
+    scena.dostawa = { dostawca: "HURT-OGR", data: "2026-08-20T00:00:00.000Z", numer: "FV 12/08", przedZakupem: true };
+    await zSprawa(uznana({ zwrotTowaru: "wymagany", kubelek: "decyzja" }), async () => {
+      pokaz("/obsluga/reklamacje/1");
+      expect(bezOdswiezenia()).toEqual([]);
+      const krok = screen.getByRole("group", { name: "Dalej: sztuka do dostawcy" });
+      await userEvent.click(within(krok).getByRole("button", { name: "Zgłoś u dostawcy" }));
+      expect(within(krok).getByLabelText("Dostawca")).toHaveValue("HURT-OGR");
+      await userEvent.type(within(krok).getByLabelText(/Nr u dostawcy/), "RK-77");
+      await userEvent.click(within(krok).getByRole("button", { name: "Zapisz" }));
+      expect(bezOdswiezenia()).toEqual([`u-dostawcy:${JSON.stringify({
+        id: 1, dostawca: "HURT-OGR", nrUDostawcy: "RK-77", wersja: 0,
+      })}`]);
+    });
+  });
+
+  it("wynik u dostawcy zapisuje się z WERSJĄ rekordu, nie sprawy", async () => {
+    scena.uDostawcy = { dostawca: "HURT-OGR", nrUDostawcy: "RK-77", zgloszonoAt: "2026-09-08T10:00:00.000Z",
+      wynik: null, wynikAt: null, autor: "A. Lewandowska", wersja: 4 };
+    await zSprawa(uznana({ zwrotTowaru: "wymagany", kubelek: "decyzja" }), async () => {
+      pokaz("/obsluga/reklamacje/1");
+      expect(bezOdswiezenia()).toEqual([]);
+      await userEvent.click(screen.getByRole("button", { name: /Dostawca uznał/ }));
+      expect(bezOdswiezenia()).toEqual([`u-dostawcy:${JSON.stringify({
+        id: 1, dostawca: "HURT-OGR", wynik: "uznal", wersja: 4,
+      })}`]);
+    });
   });
 });
 
