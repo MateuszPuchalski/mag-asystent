@@ -198,11 +198,12 @@ describe("Wiek zakupu w triażu (0.413.0)", () => {
     /* „Uszkodzone w transporcie" zgłoszone po dwóch dniach i po trzech
        miesiącach to dwie różne sprawy, a z samego wieku tego nie widać. */
     const { unmount } = render(<Dowody {...props({ dniOdZakupu: 30, zgloszonoPoDniach: 12 })} />);
-    expect(screen.getByText("zgłoszone 12 dni po zakupie")).toBeInTheDocument();
+    /* Data zakupu stoi na widoku przed liczbą dni, nie tylko w podpowiedzi. */
+    expect(screen.getByText(/^\d{1,2} \S+ \d{4} · zgłoszone 12 dni po zakupie$/)).toBeInTheDocument();
     unmount();
     /* Starszy serwer pola nie zna — liczymy je z jego własnych dwóch dat. */
     render(<Dowody {...props({ dniOdZakupu: 30 })} />);
-    expect(screen.getByText("zgłoszone 2 dni po zakupie")).toBeInTheDocument();
+    expect(screen.getByText(/ · zgłoszone 2 dni po zakupie$/)).toBeInTheDocument();
   });
 
   it("bez daty zakupu kostka mówi „nie wiemy” — brak wiedzy to nie „dziś”", () => {

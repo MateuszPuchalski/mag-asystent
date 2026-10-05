@@ -51,7 +51,7 @@ describe("Kolejka reklamacji", () => {
     expect(screen.getByText("zwrot pieniędzy")).toBeInTheDocument();
   });
 
-  it("numer zszedł z widoku, ale wiersz dalej nazywa się nim dla czytnika ekranu", () => {
+  it("numeru nie ma na widoku, ale wiersz nazywa się nim dla czytnika ekranu", () => {
     /* Ekran szuka wierszy po numerze, a czytnik ogłasza go przy wyborze. */
     render(<Kolejka reklamacje={[rek()]} wybrana={null} onWybierz={() => {}} />);
     expect(screen.getByRole("button", { name: /reklamacja 123\/2026/ })).toBeInTheDocument();

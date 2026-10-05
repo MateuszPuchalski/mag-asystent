@@ -124,9 +124,13 @@ describe("Werdykt", () => {
   });
 
   it("niepewny los nie daje ponowienia — drugi strzał mógłby być drugim werdyktem", () => {
+    /* Potwierdzony werdykt: blok mówi tylko kto i kiedy, a ponowienia nie ma. */
     const { unmount } = pokaz({ werdykt: "REJECTED_OTHER", werdyktNazwa: "Odrzucona — inny powód",
-      werdyktStatus: "sent", statusAllegro: "CLAIM_REJECTED", kubelek: "zamknieta" });
-    expect(screen.queryByText(/Potwierdzony przez Allegro/)).not.toBeInTheDocument();
+      werdyktStatus: "sent", statusAllegro: "CLAIM_REJECTED", kubelek: "zamknieta",
+      werdyktPrzez: "Ala", werdyktAt: "2026-09-09T10:00:00.000Z" });
+    expect(within(screen.getByRole("region", { name: "Po werdykcie" }))
+      .getByText(/^Werdykt z panelu: Ala, /)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Spróbuj/ })).not.toBeInTheDocument();
     unmount();
     pokaz({ werdykt: "REJECTED_OTHER", werdyktNazwa: "Odrzucona — inny powód",
       werdyktStatus: "send_uncertain", kubelek: "zamknieta" });

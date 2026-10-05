@@ -9,10 +9,10 @@ import {
 } from "./statusy";
 
 /* ── CO SIĘ DZIEJE W SPRAWIE — dwa zdania z pól, które ekran już ma ─────────
-   Uwaga właściciela: „w tym panelu nawet nie wiem co się dzieje". Głowica
-   miała etykiety („Decyzja do:", „Allegro: KOD", „Ostatnie słowo: my"),
-   a etap sprawy trzeba było złożyć w głowie z czterech miejsc. Teraz mówią
-   go dwa zdania pod rzędem klienta.
+   Uwaga właściciela: „w tym panelu nawet nie wiem co się dzieje". Etap mówią
+   dwa zdania pod rzędem klienta, bo etykiety rozrzucone po czterech miejscach
+   („Decyzja do:", „Allegro: KOD", „Ostatnie słowo: my") kazały składać go
+   w głowie.
 
    ZDANIE A mówi o etapie i terminie. ZDANIE B mówi o rozmowie i towarze.
    Oba liczy jedna czysta funkcja z propsów głowicy, więc otwarcie sprawy

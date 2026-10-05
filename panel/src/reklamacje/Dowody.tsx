@@ -362,8 +362,10 @@ function Triaz({ szczegol, pozycja, twId, karta, zakup }: {
       /* KTÓRY TO ZEGAR, mówi podpowiedź kostki: data z zamówienia i data
          z ładunku sprawy to dwie różne daty pod jedną etykietą. */
       tytul={r.kupionoAt ? `Data zakupu: ${dzien(r.kupionoAt)}, ${ZEGAR[r.kupionoZrodlo ?? "sprawa"]}` : undefined}
-      pod={poDniach !== null ? `zgłoszone ${dniSlowo(poDniach)} po zakupie`
-        : wiek ? ZEGAR[r.kupionoZrodlo ?? "sprawa"] : "brak daty zakupu"} />
+      /* Data zakupu stoi na widoku, nie tylko w podpowiedzi: podpowiedzi nie
+         czyta klawiatura ani dotyk, a datę przepisuje się klientowi. */
+      pod={poDniach !== null && r.kupionoAt ? `${dzien(r.kupionoAt)} · zgłoszone ${dniSlowo(poDniach)} po zakupie`
+        : r.kupionoAt ? `${dzien(r.kupionoAt)} · ${ZEGAR[r.kupionoZrodlo ?? "sprawa"]}` : "brak daty zakupu"} />
 
     <Kostka etykieta="Klient zapłacił"
       wartosc={cena !== null ? zlote(cena, waluta) : "nie wiemy"}
@@ -585,12 +587,15 @@ function Zamowienie({ szczegol }: { szczegol: SzczegolReklamacji }) {
       {r.orderId
         ? <span className="inline-flex items-center gap-1">
             <Link href={r.linkZamowienia} title={`Zamówienie ${r.orderId}`}>
-              {r.linkZamowienia ? "zamówienie w Allegro" : "numer zamówienia"}</Link>
+              {r.linkZamowienia ? "zamówienie w Allegro" : <span className="font-mono">{r.orderId}</span>}</Link>
             <Skopiuj tekst={r.orderId} tytul="Kopiuj numer zamówienia" />
           </span>
         : <span className="text-slate-600">reklamacja bez numeru zamówienia</span>}
-      {r.offerId && r.linkOferty &&
-        <Link href={r.linkOferty} title={`Oferta ${r.offerId}`}>oferta w Allegro</Link>}
+      {/* Bez łącza z konfiguracji numer stoi na widoku: identyfikator tylko
+          w podpowiedzi albo w schowku nie istnieje dla klawiatury i dotyku. */}
+      {r.offerId && (r.linkOferty
+        ? <Link href={r.linkOferty} title={`Oferta ${r.offerId}`}>oferta w Allegro</Link>
+        : <span>oferta <span className="font-mono">{r.offerId}</span></span>)}
     </p>
   </div>;
 }

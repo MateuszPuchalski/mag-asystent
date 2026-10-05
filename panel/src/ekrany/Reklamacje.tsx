@@ -239,8 +239,8 @@ const kody = (r: Reklamacja) =>
      znaczyło, że im lepiej ktoś opisał sprawę, tym trudniej ją znaleźć. */
   /* LOGIN I NAZWA OFERTY WCHODZĄ DO SZUKANIA, bo stoją na wierszu w dwóch
      pierwszych liniach: pole, które nie znajduje tego, co widać na liście,
-     kłamałoby. Numer zszedł z widoku wiersza, ale szukanie dalej po nim
-     trafia — przepisuje się go z rozmowy z klientem i z Allegro. */
+     kłamałoby. Numeru nie ma na wierszu, ale szukanie po nim trafia, bo
+     przepisuje się go z rozmowy z klientem i z Allegro. */
   [r.numer, r.externalId, r.orderId, r.kupujacyLogin, r.prowadzi, r.notatka, r.ofertaNazwa]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 

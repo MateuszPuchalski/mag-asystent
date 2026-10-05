@@ -26,8 +26,8 @@ import { coSieDzieje, ileReklamacji, tytulStatusu, type Czlon, type Ton } from "
    kursorem zdania A, bo na ekranie stoją słowa, nie kody.
 
    O CO CHODZI. Pod kreską towar z symbolem i żądanie klienta. Nazwa towaru
-   schodzi do 14 px, bo 17 px należy teraz do klienta, a tożsamość towaru
-   niesie też zdjęcie w kolumnie dowodów.
+   stoi w 14 px, bo 17 px należy do klienta, a tożsamość towaru niesie też
+   zdjęcie w kolumnie dowodów.
 
    Numer reklamacji i data zgłoszenia stoją w prawej szczelinie pod
    „Prowadzi”. To ich jedyny dom: kolumna faktów ich nie powtarza, bo
@@ -177,6 +177,8 @@ export function Glowica({ szczegol, mojeId = null, trwa, blad = "", onProwadze, 
       {/* ── CO SIĘ DZIEJE ─────────────────────────────────────────────────── */}
       <p className="mt-1 text-tresc text-slate-700" title={tytulStatusu(etap.kodAllegro)}>
         <Czlony czlony={etap.a} /></p>
+      {/* Zdanie B o szczebel niżej niż A: A mówi, co mamy zrobić, B tylko
+          tłumaczy tło, więc oko ma najpierw trafić na A. */}
       {etap.b.length > 0 && <p className="text-sm text-slate-700"><Czlony czlony={etap.b} /></p>}
       <hr className="my-0.5 border-slate-200" />
 

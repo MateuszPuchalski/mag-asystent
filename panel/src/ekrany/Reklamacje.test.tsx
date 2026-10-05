@@ -298,7 +298,7 @@ describe("Ekran reklamacji", () => {
 
   it("kubełek DO DECYZJI pokazuje tylko sprawy przed werdyktem", () => {
     pokaz();
-    /* Numer zszedł z widoku wiersza, ale wiersz dalej się nim nazywa. */
+    /* Numeru nie ma na widoku wiersza, ale wiersz się nim nazywa. */
     expect(screen.getByRole("button", { name: /111\/2026/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /222\/2026/ })).not.toBeInTheDocument();
   });
@@ -872,7 +872,7 @@ describe("Kolejka po przebudowie", () => {
     });
   });
 
-  it("szukanie trafia po LOGINIE i dalej po NUMERZE, choć numer zszedł z widoku wiersza", async () => {
+  it("szukanie trafia po LOGINIE i po NUMERZE, choć numeru nie ma na widoku wiersza", async () => {
     pokaz();
     const pole = screen.getByLabelText("Szukaj reklamacji");
     expect(pole).toHaveAttribute("placeholder", "Login, towar, numer, notatka");

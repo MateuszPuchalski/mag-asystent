@@ -17,11 +17,10 @@ import { mojaSprawa } from "../sprawy/Moje";
    doczytać, stoi w obszarze sprawy po prawej.
 
    KLIENT NA CZELE WIERSZA. Uwaga właściciela: „Client powinien być bardziej
-   widoczny". Login był najdrobniejszym pismem wiersza, ucinanym na końcu
-   linii numeru. Teraz stoi pierwszy, mono i pogrubiony, jak w wierszu
-   skrzynki — to ten sam klucz klienta w całej drodze i ta sama notacja.
-   Towar schodzi o stopień niżej, a numer sprawy zostaje dla czytnika ekranu
-   i dla pola szukania, które dalej po nim trafia.
+   widoczny". Login stoi pierwszy, mono i pogrubiony, jak w wierszu skrzynki,
+   bo to klucz klienta w całej drodze — ta sama notacja na obu ekranach.
+   Towar stoi stopień niżej, a numer sprawy służy czytnikowi ekranu i polu
+   szukania, które po nim trafia.
 
    Zdjęcie oferty zostaje, bo jest tożsamością sprawy — „pękła obudowa" przy
    zdjęciu kosiarki czyta się w biegu. Bierzemy obraz OFERTY, nie kartoteki:
@@ -262,7 +261,7 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
           </div>
           {/* Bez snapshotu oferty linię towaru niesie numer — wiersz ma dalej
               mówić, o jaką sprawę chodzi, zamiast udawać, że zna towar. Numer
-              jest też w nazwie wiersza dla czytnika ekranu, bo z widoku zszedł. */}
+              jest też w nazwie wiersza dla czytnika ekranu, bo na widoku wiersza go nie ma. */}
           {r.ofertaNazwa
             ? <span className="truncate text-sm text-slate-800">{r.ofertaNazwa}
                 <span className="sr-only">, reklamacja {numer}</span></span>
