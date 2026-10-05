@@ -72,12 +72,19 @@ test("otwarte zwroty i sprawy tego towaru; zamknięte odpadają; udział zwrotó
   assert.equal(p.okno.udzialZwrotow, 0.5);
 });
 
-test("sygnatura wiąże regułą kartotekaOferty: spacja i wielkość liter tak, dubel symbolu nie", () => {
-  /* Przekrój i licznik „ten towar" w reklamacji czytają `ofertyKartoteki`.
-     Ścisłe `s.sku = symbol` gubiło oferty, które sprawa przypisuje towarowi,
-     a symbol pod dwiema kartotekami przypisywało obu naraz. */
+test("sygnatura wiąże regułą kartotekaOferty: spacja tak, oferta przepięta i dubel symbolu nie", () => {
+  /* Przekrój i licznik „ten towar" w reklamacji czytają `ofertyKartoteki`,
+     więc przekrój ma znać dokładnie te oferty, które sprawa przypisuje
+     towarowi. Wielkość liter pilnuje `reklamacje.test.ts` — ten symbol ma
+     same cyfry. */
   const { d, k } = stanowisko();
-  d.prepare("INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,sku,synced_at) VALUES (?,'of-spacja','Nóż','14-25001 ','2026-09-01')").run(k);
+  const oferta = (ext: string, sku: string) => d.prepare(`INSERT INTO offer_snapshot
+    (channel_account_id,external_id,nazwa,sku,synced_at) VALUES (?,?,'Nóż',?,'2026-09-01')`).run(k, ext, sku);
+  oferta("of-spacja", "14-25001 ");
+  /* Sygnatura trafia w 501, ale człowiek wskazał 777 — oferta jest tamta. */
+  oferta("of-przepieta", "14-25001");
+  d.prepare(`INSERT INTO oferta_kartoteka(channel_account_id,offer_id,tw_id,tw_symbol,wskazano_at,wskazano_przez)
+    VALUES (?,'of-przepieta',777,'X-1','2026-09-01','Ola')`).run(k);
   assert.deepEqual(przekrojTowaru(501, d, TERAZ).oferty.map((o) => o.ofertaId).sort(),
     ["of-pamiec", "of-sku", "of-spacja"]);
 

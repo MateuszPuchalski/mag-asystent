@@ -612,10 +612,9 @@ function terminSlowem(r: Reklamacja): { napis: string; pilny: boolean } {
 
 /* ── JEDNA KARTOTEKA NA CAŁĄ KOLUMNĘ ─────────────────────────────────────────
    Symbol, kafel, przekrój towaru, triaż i zlecenie hali pytają o TĘ SAMĄ
-   rzecz: która to kartoteka u nas. Gdy każdy pytał sam, wiersz towaru brał
-   symbol także z dopasowania po SKU, a reszta wyłącznie `r.twId`. Sprawa
-   z ofertą powiązaną samą sygnaturą pokazywała wtedy symbol obok „sprawa bez
-   kartoteki", bez ceny zakupu i z martwym przyciskiem przekroju.
+   rzecz: która to kartoteka u nas. Każdy element pyta tej funkcji, bo
+   osobne pytania się rozjeżdżają. Symbol z dopasowania po SKU obok „sprawa
+   bez kartoteki" to dwie sprzeczne odpowiedzi w jednym wierszu.
 
    KOLEJNOŚĆ ZA SERWEREM: najpierw `r.twId`, który niesie paragon albo
    wskazanie człowieka, potem `kartotekaOferty`. Z niej bierzemy wyłącznie

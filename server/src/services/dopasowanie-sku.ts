@@ -323,8 +323,14 @@ export function kartotekaOferty(
  * przypisywałaby towarowi oferty, których sprawa mu nie przypisuje, i licznik
  * „ten towar" rozjechałby się z kartoteką na ekranie tej samej sprawy.
  *
- * Czytają ją przekrój towaru i historia reklamacji. Dwie kopie tego złączenia
- * już się rozjechały: historia znała samą pamięć i gubiła oferty po SKU.
+ * PAMIĘĆ BIJE SYGNATURĘ: oferta z wierszem w `oferta_kartoteka` należy
+ * wyłącznie do wskazanej kartoteki, nawet gdy jej SKU trafia w inną.
+ * Człowiek przepina ofertę ze skrzynki właśnie wtedy, gdy sygnatura myli.
+ * Bierzemy KAŻDY wiersz pamięci, także sprzed zmiany sygnatury, bo z tego
+ * samego złączenia `r.twId` bierze kartotekę na ekranie reklamacji.
+ *
+ * Czytają ją przekrój towaru i historia reklamacji. Jedna funkcja, bo dwie
+ * kopie tego złączenia rozjeżdżają się przy pierwszej poprawce jednej z nich.
  */
 export function ofertyKartoteki(
   database: Db, twId: number,
@@ -342,7 +348,10 @@ export function ofertyKartoteki(
      WHERE k.tw_id = ?
     UNION
     SELECT s.channel_account_id, s.external_id, s.nazwa FROM offer_snapshot s
-     WHERE ? = 1 AND TRIM(s.sku) = ? COLLATE NOCASE`).all(twId, jedyny ? 1 : 0, symbol) as
+     WHERE ? = 1 AND TRIM(s.sku) = ? COLLATE NOCASE
+       AND NOT EXISTS (SELECT 1 FROM oferta_kartoteka p
+                        WHERE p.channel_account_id = s.channel_account_id
+                          AND p.offer_id = s.external_id)`).all(twId, jedyny ? 1 : 0, symbol) as
     Array<{ konto: number; oferta: string; nazwa: string | null }>) {
     oferty.set(`${w.konto}|${w.oferta}`, { konto: Number(w.konto), ofertaId: String(w.oferta),
       nazwa: w.nazwa ?? null });

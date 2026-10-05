@@ -1049,8 +1049,8 @@ export function historiaSprawy(
   /* Po KARTOTECE, nie po numerze oferty: ten sam towar bywa wystawiony
      w kilku ofertach, a reklamacje rozstrzyga rzecz, nie ogłoszenie.
      Oferty towaru wybiera `ofertyKartoteki`, ta sama co w przekroju towaru:
-     pamięć wskazań i sygnatura. Sama pamięć gubiła reklamacje z ofert
-     powiązanych po SKU, choć ekran sprawy pokazuje ich kartotekę. */
+     pamięć wskazań i sygnatura. Sama pamięć nie wystarcza, bo ekran sprawy
+     pokazuje także kartotekę powiązaną po SKU. */
   const oferty = twId === null ? [] : ofertyKartoteki(database, twId)
     .filter((o) => o.konto === konto).map((o) => o.ofertaId);
   const towar = oferty.length === 0 ? null : slad(database.prepare(`
