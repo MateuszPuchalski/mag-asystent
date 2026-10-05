@@ -1364,7 +1364,7 @@ Zatrzymuje też dawne barwy błędu i odnośnika.
 kolumny. Przy dwóch i więcej pozycjach lista w kolumnie powtarza więc te dwie.
 To powtórzenie i wiersz „Zamówił” w paśmie czekają na decyzję właściciela.
 
-### 10.2h. Ceny kartoteki na jednej osi (@wydanie)
+### 10.2h. Ceny kartoteki na jednej osi (0.560.0)
 
 Zgłoszenie właściciela z 5 października 2026: blok „Ceny” zajmuje za dużo
 miejsca. Lista poziomów, oś z kropkami i zdanie mówiły trzy razy to samo.
