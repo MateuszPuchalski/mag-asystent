@@ -1,53 +1,51 @@
 import React, { useEffect, useState } from "react";
-import { Coins, ExternalLink, Gavel, NotebookPen, PackageSearch, Receipt, Route } from "lucide-react";
+import { Coins, ExternalLink, NotebookPen, PackageSearch, Receipt, Route } from "lucide-react";
 import type {
-  CenaPoziomu, PozycjaZamowienia, Reklamacja, SladHistorii, SzczegolReklamacji, Tag,
+  CenaPoziomu, PozycjaZamowienia, Reklamacja, SzczegolReklamacji, Tag,
 } from "../api/typy";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
-import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
 import { zlote } from "../api/zwroty";
-import {
-  EtykietaWartosci, czas, dzien, dniSlowo, ile, LoginKlienta, odmien, Przycisk, Skopiuj,
-} from "../ui";
+import { EtykietaWartosci, czas, dzien, dniSlowo, ile, Przycisk, Skopiuj } from "../ui";
 import { CenyKartoteki } from "../skrzynka/TowarRozmowy";
 import { dopisekDostaw } from "../skrzynka/PasmoOdpowiedzi";
+import { STATUS_PACZKI } from "../skrzynka/statusy";
+import { PRZEWOZNICY } from "../zwroty/Dowody";
 import { useKartaTowaru } from "../api/rozmowy";
 import { Zwijka } from "../skrzynka/Zwijka";
 import { kartotekaKolumny } from "./Glowica";
+import { ileReklamacji, poWerdykcie } from "./etap";
 
 /* ── Kolumna faktów o reklamacji ─────────────────────────────────────────────
-   Trzecia kolumna obszaru sprawy, za rozmową i dowodami biura. Jedna lista
-   faktów o jednej sprawie, więc SEKCJE jedna pod drugą, a nie zakładki — ta
-   sama decyzja co przy zwrocie w 0.180.0. Zakładki mają sens tam, gdzie
-   kolumna niesie dwa RÓWNORZĘDNE tematy; tutaj jest jeden.
+   Trzecia kolumna obszaru sprawy, za rozmową i dowodami biura. Trzyma tylko
+   to, czego głowica nie mówi: kostki do decyzji, blok werdyktu z czynnościami
+   i zwijki ze szczegółem. Uwaga właściciela: „informacje powtarzają się".
+   Kto, numer, zgłoszenie, tytuł prawny, status Allegro i stan rozmowy mają
+   dom w głowicy, więc tu nie wracają. Jeden dom na fakt.
+
+   ZWIJKI PODPISUJE ZDANIE, nie licznik. Zamknięta zwijka ma powiedzieć, co
+   jest w środku, żeby nie trzeba było jej otwierać tylko po to, by
+   sprawdzić, czy jest tam coś ważnego. Kody przewoźnika i statusów stoją
+   słowami — surowy kod nie mówi agentowi nic.
 
    Wszystko poniżej to ODCZYT. Notatka, tagi, pytanie o paczkę i wstrzyknięty
    werdykt zapisują, ale każde jawnym kliknięciem, nie skutkiem ubocznym
    patrzenia. */
 
-/* ── GĘSTOŚĆ KOLUMNY (0.389.0) ───────────────────────────────────────────────
-   Zgłoszenie właściciela ze zrzutem: kolumna dowodów nie mieściła się
-   w oknie, a agent przewijał, żeby zobaczyć termin. Rusztowanie samych
-   sekcji — nagłówek plus dwa paddingi plus krawędź — zjadało około połowy
-   wysokości, którą miały zająć fakty.
-
-   Zwężamy ODDECH, nie treść: ani jeden fakt nie zszedł z ekranu. Etykieta
-   z `w-32` na `w-28` (najdłuższa, „Zamówienie złożone", i tak łamie się na
-   dwie linie w obu wariantach), `py-1` na `py-0.5`, sekcja z `py-3` na `py-2`.
-   Dekalog, punkt 2: pierwszeństwo ma to, co rozstrzyga bieżącą czynność. */
-const Wiersz = ({ etykieta, children }: { etykieta: string; children: React.ReactNode }) =>
-  <div className="flex items-baseline gap-2 py-0.5 text-sm">
-    <EtykietaWartosci className="w-28 shrink-0">{etykieta}</EtykietaWartosci>
-    <span className="min-w-0 flex-1 text-slate-800">{children}</span>
-  </div>;
-
-const Link = ({ href, children }: { href: string | null; children: React.ReactNode }) =>
+/** Odnośnik do Allegro z ikoną wyjścia; bez adresu zostaje sam tekst. */
+const Link = ({ href, title, children }: { href: string | null; title?: string; children: React.ReactNode }) =>
   href
-    ? <a href={href} target="_blank" rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-wertis-ink">
-        {children}<ExternalLink size={12} /></a>
-    : <>{children}</>;
+    ? <a href={href} target="_blank" rel="noopener noreferrer" title={title}
+        className="inline-flex min-h-6 items-center gap-1 font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
+        {children}<ExternalLink size={12} aria-hidden="true" /></a>
+    : <span title={title}>{children}</span>;
+
+/* Powody, przy których pytanie „czy on to w ogóle dostał" jest całą sprawą.
+   Przed werdyktem otwierają paczkę same, bo odpowiedź leży w niej. */
+const POWODY_DORECZENIA = new Set([
+  "NO_PRODUCT_RECEIVED", "NO_PRODUCT_IN_PARCEL",
+  "PRODUCT_AND_PARCEL_DAMAGED_IN_TRANSIT", "RECEIVED_INCOMPLETE_ORDER",
+]);
 
 /**
  * Notatka biura — nasze ustalenia, których Allegro nie zna.
@@ -106,28 +104,37 @@ function Notatka({ reklamacja, trwa, blad, onZapisz, onCofnij }: {
 }
 
 /**
- * Co stoi w tagach i notatce — jedno zdanie do zamkniętego nagłówka.
+ * Co zapisało biuro — nazwy tagów i początek notatki, a nie ich liczba.
  *
- * Bez niego zwinięty blok kazałby otwierać go tylko po to, żeby sprawdzić,
- * czy ktoś już coś zapisał. To ten jeden klik, dla którego blok się zwija.
+ * Zwinięty blok czyta treść w podpisie, więc nie trzeba go otwierać tylko
+ * po to, by sprawdzić, czy ktoś już coś zapisał. „Nic nie zapisano" mówi
+ * to wprost, zamiast „pusto", które czytało się jak awaria.
  */
 function podpisPracy(r: Reklamacja): string {
-  const ma: string[] = [];
-  if (r.tagi.length > 0) ma.push(ile(r.tagi.length, "tag", "tagi", "tagów"));
-  if (r.notatka) ma.push("notatka");
-  return ma.length ? ma.join(" · ") : "pusto";
+  const ma = r.tagi.map((t) => t.nazwa);
+  if (r.notatka?.trim()) ma.push(`notatka: „${poczatek(r.notatka, 40)}”`);
+  return ma.length ? ma.join(" · ") : "nic nie zapisano";
+}
+
+/** Początek tekstu do około `ile` znaków, ucięty na granicy wyrazu, nie w jego środku. */
+function poczatek(tekst: string, ile: number): string {
+  const n = tekst.trim().replace(/\s+/g, " ");
+  if (n.length <= ile) return n;
+  const ciecie = n.slice(0, ile);
+  const spacja = ciecie.lastIndexOf(" ");
+  return `${(spacja > ile / 2 ? ciecie.slice(0, spacja) : ciecie).replace(/[\s,.;:—-]+$/, "")}…`;
 }
 
 export function Dowody({
   szczegol, trwa, bladZapisu, onNotatka, onCofnijNotatke,
   onSprawdzPrzesylke, sprawdzaPrzesylke = false, bladPrzesylki = "",
-  tagi, decyzja,
+  tagi, decyzja, pokazZakup,
 }: {
   szczegol: SzczegolReklamacji;
   trwa: boolean;
   bladZapisu: string;
   onNotatka: (tekst: string) => void;
-  /** Cofnięcie ZMIANY notatki (0.280.0) — §25a.5. */
+  /** Cofnięcie ZMIANY notatki — §25a.5: cofnięcie zamiast potwierdzenia. */
   onCofnijNotatke?: () => void;
   /* Tagi są OPCJONALNE: czego nie da się zrobić, tego nie ma na ekranie —
      sekcja bez obsługi byłaby obietnicą bez pokrycia. */
@@ -139,8 +146,8 @@ export function Dowody({
     onOdepnij: (tagId: number) => void;
     onNowy: (nazwa: string) => void;
   };
-  /* Sprawdzenie przesyłki (0.393.0) — opcjonalne tym samym wzorcem co reszta:
-     czego nie da się zrobić, tego nie ma na ekranie. */
+  /* Sprawdzenie przesyłki — opcjonalne tym samym wzorcem co reszta: czego
+     nie da się zrobić, tego nie ma na ekranie. */
   onSprawdzPrzesylke?: () => void;
   sprawdzaPrzesylke?: boolean;
   bladPrzesylki?: string;
@@ -148,6 +155,10 @@ export function Dowody({
      a zapisy i ich błędy mieszkają w ekranie. Stoi pod faktami, z których
      się go wydaje, i nad zwijkami ze szczegółem. */
   decyzja?: React.ReactNode;
+  /* Sygnał z głowicy: wskaźnik innej otwartej sprawy tego zakupu przewija
+     do zwijki „Ten zakup u nas" i ją otwiera. Każde kliknięcie podbija
+     licznik, więc drugie kliknięcie działa tak samo jak pierwsze. */
+  pokazZakup?: number;
 }) {
   const r = szczegol.reklamacja;
   /* Pozycja paragonu tej właśnie oferty — z niej bierze się cena w kostce
@@ -169,158 +180,39 @@ export function Dowody({
   const pozostale = ceny.filter((c) => c.poziom !== 0);
   const polki = karta.data?.locs ?? [];
 
+  /* ── ZWIJKI OTWIERA ETAP SPRAWY, NIE PAMIĘĆ STANOWISKA ───────────────────
+     Inna otwarta sprawa tego zakupu to klient, który czeka też gdzie indziej.
+     Przed werdyktem powód o doręczeniu otwiera paczkę, a żądanie pieniędzy
+     otwiera zamówienie, bo koszt dostawy i suma kształtują kwotę. Te trzy
+     zwijki nie pamiętają wyboru: zapamiętane „zwinięte" chowałoby właśnie
+     ten alarm. Klucz sprawy liczy ich stan od nowa przy każdej sprawie. */
+  const przedWerdyktem = !poWerdykcie(r);
+  const otwartaInnaSprawa = szczegol.sprawy.some((s) => s.otwarta);
+
   return <div className="flex min-h-0 flex-col">
     {/* ── STAŁA KOLEJNOŚĆ: FAKTY, HISTORIA, WERDYKT, SZCZEGÓŁ ──────────────
-        Kwota żądania, termin, powód i sygnatura stoją w głowicy sprawy nad
-        kolumnami, a zdjęcia oferty i kartoteki pod „Wysłaliśmy". Tu zostaje
-        to, z czego wydaje się werdykt, sam werdykt i zwijki ze szczegółem.
-        Kolejność się nie zmienia, więc oko szuka faktu tam, gdzie był. */}
+        Tu stoi to, z czego wydaje się werdykt, sam werdykt i zwijki ze
+        szczegółem. Kolejność się nie zmienia, więc oko szuka faktu tam,
+        gdzie był. */}
     <Triaz szczegol={szczegol} pozycja={pozycja} twId={towar.twId} karta={karta} zakup={zakup} />
     <Historia historia={szczegol.historia} />
 
     {decyzja}
 
     <div className="px-2 pb-2">
-      {szczegol.przesylka && <Paczka przesylka={szczegol.przesylka} onSprawdz={onSprawdzPrzesylke}
-        trwa={sprawdzaPrzesylke} blad={bladPrzesylki} />}
-
-      <Zwijka
-        tytul="Zakup i oferta"
-        Ikona={Receipt}
-        podpis={podpisZakupu(szczegol)}
-        /* ── ZAMKNIĘTA OD 0.414.0 ──────────────────────────────────────────
-           Kwoty rozstrzygające stoją w kostkach nad nią, więc otwarta
-           powtarzałaby je, zamiast dokładać cokolwiek. W środku zostaje to,
-           po co się ją naprawdę otwiera: reszta pozycji zamówienia, dostawa
-           i identyfikatory zamówienia i oferty. */
-        pamietajJako="wertis.reklamacje.zakup"
-      >
-        <div className="px-2 py-2">
-          {szczegol.zamowienie ? <>
-            {/* ── CENY (0.393.0, układ z 0.403.0) ──────────────────────────
-                DOSTAWA OSOBNO OD SUMY, bo klient żądający zwrotu pyta czasem
-                właśnie o nią. Sklejenie ich kazałoby liczyć w głowie.
-
-                Pozycja reklamowana jest POGRUBIONA: zamówienie bywa
-                kilkupozycyjne, a spór dotyczy jednej rzeczy. */}
-            <ul className="flex flex-col gap-1">
-              {szczegol.zamowienie.pozycje.map((p, i) => {
-                const sporna = p.offerId !== null && p.offerId === r.offerId;
-                return <li key={`${p.offerId ?? p.sku ?? i}`}
-                  className={`flex items-baseline gap-2 text-sm ${
-                    sporna ? "font-semibold text-slate-900" : "text-slate-700"}`}>
-                  <span className="min-w-0 flex-1 truncate">{p.nazwa}</span>
-                  <span className="shrink-0 tabular-nums">
-                    {p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
-                </li>;
-              })}
-            </ul>
-            {/* ── „RAZEM" W ŚRODKU (0.416.0) ──────────────────────────────
-                Przy zamówieniu jednopozycyjnym suma w podpisie powtarzała
-                kostkę „Klient zapłacił". W środku stoi obok dostawy
-                i pozostałych pozycji, czyli tam, gdzie mówi coś więcej niż
-                cena reklamowanej rzeczy. */}
-            <div className="mt-2 border-t border-slate-200 pt-1">
-              <Wiersz etykieta="Dostawa">
-                {zlote(szczegol.zamowienie.dostawaGrosze, szczegol.zamowienie.waluta)}
-                {szczegol.zamowienie.dostawaMetoda &&
-                  <span className="text-slate-500"> · {szczegol.zamowienie.dostawaMetoda}</span>}
-              </Wiersz>
-              <Wiersz etykieta="Razem">
-                <b className="tabular-nums">
-                  {zlote(szczegol.zamowienie.sumaGrosze, szczegol.zamowienie.waluta)}</b>
-              </Wiersz>
-            </div>
-          </> : <p className="text-sm text-slate-600">zamówienia nie pobraliśmy</p>}
-
-          <div className="mt-1 border-t border-slate-200 pt-1">
-            <Wiersz etykieta="Zamówienie">
-              {r.orderId
-                ? <><Link href={r.linkZamowienia}>{r.orderId}</Link>
-                    <Skopiuj tekst={r.orderId} tytul="Kopiuj numer zamówienia" /></>
-                : "reklamacja bez numeru zamówienia"}
-            </Wiersz>
-            {/* Data zakupu ma jeden dom: wiek i zegar w kostce „Kupione",
-                data bezwzględna w podpisie tej zwijki. Wiersz tutaj nie
-                dokładałby niczego. */}
-            <Wiersz etykieta="Oferta">
-              {r.offerId ? <Link href={r.linkOferty}>{r.offerId}</Link> : "—"}
-            </Wiersz>
-          </div>
-        </div>
-      </Zwijka>
-
-      {/* ── KARTOTEKA: CENNIKI SPRZEDAŻY I PÓŁKA ─────────────────────────────
-          Cena zakupu stoi w kostce „Klient zapłacił", więc poziom 0 tu nie
-          wraca. Zostają cenniki SPRZEDAŻY — przydają się przy rozmowie
-          o wymianie, nie przy werdykcie — i półka, która zeszła z kostki
-          „Mamy", gdy jej podpis zaczął mówić o dostawach. Nic nie znika
-          z ekranu, tylko schodzi o jedno kliknięcie niżej. */}
-      {towar.twId !== null && (pozostale.length > 0 || polki.length > 0) && <Zwijka
-        tytul="Kartoteka"
-        Ikona={Coins}
-        podpis={podpisKartoteki(pozostale, polki)}
-        pamietajJako="wertis.reklamacje.cennik"
-      >
-        <div className="px-2 py-2">
-          {polki.length > 0 && <Wiersz etykieta="Półka">{polki.join(", ")}</Wiersz>}
-          {pozostale.length > 0 && <div className={polki.length > 0 ? "mt-1" : ""}>
-            <CenyKartoteki ceny={pozostale} /></div>}
-        </div>
-      </Zwijka>}
-
-      {/* ── SPRAWA ZWINIĘTA, BO GŁOWICA JĄ JUŻ POWIEDZIAŁA (0.403.0) ─────────
-          Termin, kwota, powód i werdykt stoją w głowicy nad kolumnami — tu
-          zostają IDENTYFIKATORY, tytuł prawny i stan rozmowy, czyli to, czego
-          szuka się wtedy, gdy trzeba coś skopiować albo sprawdzić, czy Allegro
-          jeszcze słucha. */}
-      <Zwijka
-        tytul="Sprawa"
-        Ikona={Gavel}
-        podpis={podpisSprawy(r)}
-        pamietajJako="wertis.reklamacje.sprawa"
-      >
-        <div className="px-2 py-2">
-          <Wiersz etykieta="Numer">
-            <Link href={r.link}>{r.numer ?? r.externalId}</Link>
-            <Skopiuj tekst={r.numer ?? r.externalId} tytul="Kopiuj numer reklamacji" />
-          </Wiersz>
-          <Wiersz etykieta="Kupujący">{r.kupujacyLogin
-            ? <span className="inline-flex flex-wrap items-center gap-2"><LoginKlienta login={r.kupujacyLogin} />
-                <PrzyciskHistorii rodzaj="sprawa" id={r.id} /></span>
-            : "—"}</Wiersz>
-          <Wiersz etykieta="Zgłoszono">{czas(r.otwartoAt)}</Wiersz>
-          {/* Rękojmia i gwarancja to dwie różne rozmowy z klientem, więc tytuł
-              stoi słowem, a nie kodem Allegro. Status Allegro stoi surowo:
-              głowica tłumaczy go na werdykt, a tu szuka się dokładnej wartości. */}
-          <Wiersz etykieta="Tytuł">
-            <b className="font-semibold">{r.prawo === "COMPLAINT" ? "rękojmia"
-              : r.prawo === "WARRANTY" ? "gwarancja" : "tytuł nieznany"}</b></Wiersz>
-          {r.statusAllegro && <Wiersz etykieta="Status Allegro">{r.statusAllegro}</Wiersz>}
-          <Wiersz etykieta="Rozmowa">
-            {r.czatAktywny ? "otwarta" : "zamknięta przez Allegro"}
-            {` · ${r.wiadomosciIle} wiadomości`}
-          </Wiersz>
-        </div>
-      </Zwijka>
-
-      {/* ── JEDNA ZWIJKA ZAMIAST CZTERECH SEKCJI (0.416.0) ─────────────────────
-          Pod kolumną stały kiedyś cztery sekcje o jednym zakupie, a ta sama
-          dyskusja stała w dwóch z nich. DROGA JEST NADZBIOREM i to jest fakt
-          ze źródła: `services/droga-klienta.ts` składa przystanki z tych
-          samych tabel, a każdy przystanek niesie odnośnik do swojej kolejki.
-
-          ZOSTAJE RODZEŃSTWO SPRAW, bo niesie to, czego droga nie ma: termin
-          cudzej sprawy, kto ją prowadzi i czy jest otwarta. Z nim zwijka
-          otwiera się sama — inna otwarta sprawa tego zakupu to coś, co agent
-          ma zobaczyć, zanim odpisze. To wiązanie drogi klienta w obie strony,
-          więc zostaje także na tym ekranie. */}
+      {/* ── TEN ZAKUP U NAS: PIERWSZA POD WERDYKTEM ──────────────────────────
+          Droga jest nadzbiorem sekcji o jednym zakupie: `services/droga-
+          klienta.ts` składa przystanki z tych samych tabel, a każdy przystanek
+          niesie odnośnik do swojej kolejki. Rodzeństwo spraw zostaje, bo niesie
+          to, czego droga nie ma: termin cudzej sprawy, kto ją prowadzi i czy
+          jest otwarta. To wiązanie drogi klienta w obie strony. */}
       {(szczegol.droga.length > 1 || szczegol.sprawy.length > 0) && <Zwijka
+        key={`zakup-${r.id}`}
         tytul="Ten zakup u nas"
         Ikona={Route}
         podpis={podpisDrogi(szczegol)}
-        domyslnieOtwarte={szczegol.sprawy.length > 0}
-        pamietajJako="wertis.reklamacje.droga"
+        domyslnieOtwarte={otwartaInnaSprawa}
+        otworz={pokazZakup}
       >
         <div className="px-2 py-2">
           {szczegol.droga.length > 1 && <DrogaZakupu droga={szczegol.droga}
@@ -331,14 +223,46 @@ export function Dowody({
         </div>
       </Zwijka>}
 
-      {/* ── „PROWADZI" STOI W GŁOWICY ──────────────────────────────────────────
-          Wzięcie sprawy jest CZYNNOŚCIĄ, a ta kolumna odpowiada na pytanie
-          „co wiemy". Zostają tu tagi i notatka, bo to zapiski O SPRAWIE. */}
+      {szczegol.przesylka && <Paczka key={`paczka-${r.id}`} przesylka={szczegol.przesylka}
+        onSprawdz={onSprawdzPrzesylke} trwa={sprawdzaPrzesylke} blad={bladPrzesylki}
+        domyslnieOtwarte={przedWerdyktem && POWODY_DORECZENIA.has(r.powodTyp ?? "")} />}
+
+      <Zwijka
+        key={`zamowienie-${r.id}`}
+        tytul="Zamówienie"
+        Ikona={Receipt}
+        podpis={podpisZamowienia(szczegol)}
+        domyslnieOtwarte={przedWerdyktem && (r.oczekiwanie === "REFUND" || r.oczekiwanie === "PARTIAL_REFUND")}
+      >
+        <Zamowienie szczegol={szczegol} />
+      </Zwijka>
+
+      {/* ── CENY I PÓŁKA ──────────────────────────────────────────────────────
+          Cena zakupu stoi w kostce „Klient zapłacił", więc poziom 0 tu nie
+          wraca. Zostają cenniki SPRZEDAŻY — przydają się przy rozmowie
+          o wymianie, nie przy werdykcie — i półka. Zwijka pamięta wybór, bo
+          to nawyk stanowiska, a nie etap sprawy. */}
+      {towar.twId !== null && (pozostale.length > 0 || polki.length > 0) && <Zwijka
+        tytul="Ceny i półka"
+        Ikona={Coins}
+        podpis={podpisCen(pozostale, polki)}
+        pamietajJako="wertis.reklamacje.cennik"
+      >
+        <div className="px-2 py-2">
+          {polki.length > 0 && <p className="text-sm text-slate-800">Półka {polki.join(", ")}.</p>}
+          {pozostale.length > 0 && <div className={polki.length > 0 ? "mt-1" : ""}>
+            <CenyKartoteki ceny={pozostale} /></div>}
+        </div>
+      </Zwijka>}
+
+      {/* ── PRACA BIURA ───────────────────────────────────────────────────────
+          Zapiski O SPRAWIE: tagi i notatka. Zwinięta, bo podpis czyta już
+          ich treść; pamięta wybór, bo to nawyk stanowiska. „Prowadzi" stoi
+          w głowicy, bo wzięcie sprawy jest czynnością, a nie zapiskiem. */}
       <Zwijka
         tytul="Praca biura"
         Ikona={NotebookPen}
         podpis={podpisPracy(r)}
-        domyslnieOtwarte={Boolean(r.notatka) || r.tagi.length > 0}
         pamietajJako="wertis.reklamacje.praca"
       >
         <div className="px-2 py-2">
@@ -438,8 +362,10 @@ function Triaz({ szczegol, pozycja, twId, karta, zakup }: {
       /* KTÓRY TO ZEGAR, mówi podpowiedź kostki: data z zamówienia i data
          z ładunku sprawy to dwie różne daty pod jedną etykietą. */
       tytul={r.kupionoAt ? `Data zakupu: ${dzien(r.kupionoAt)}, ${ZEGAR[r.kupionoZrodlo ?? "sprawa"]}` : undefined}
-      pod={poDniach !== null ? `zgłoszone ${dniSlowo(poDniach)} po zakupie`
-        : wiek ? ZEGAR[r.kupionoZrodlo ?? "sprawa"] : "brak daty zakupu"} />
+      /* Data zakupu stoi na widoku, nie tylko w podpowiedzi: podpowiedzi nie
+         czyta klawiatura ani dotyk, a datę przepisuje się klientowi. */
+      pod={poDniach !== null && r.kupionoAt ? `${dzien(r.kupionoAt)} · zgłoszone ${dniSlowo(poDniach)} po zakupie`
+        : r.kupionoAt ? `${dzien(r.kupionoAt)} · ${ZEGAR[r.kupionoZrodlo ?? "sprawa"]}` : "brak daty zakupu"} />
 
     <Kostka etykieta="Klient zapłacił"
       wartosc={cena !== null ? zlote(cena, waluta) : "nie wiemy"}
@@ -449,7 +375,10 @@ function Triaz({ szczegol, pozycja, twId, karta, zakup }: {
     <Kostka etykieta="Dostawca"
       wartosc={dostawa?.dostawca ?? "nie wiemy"}
       kolor={dostawa ? "text-slate-900" : "text-slate-700"}
-      tytul={dostawa?.numer ? `Dokument dostawy: ${dostawa.numer}` : undefined}
+      /* W kostce stoi SYMBOL kontrahenta, bo pełnej nazwy serwer nie
+         importuje. Podpowiedź mówi to wprost, żeby nikt nie szukał nazwy. */
+      tytul={dostawa ? `Symbol dostawcy w Subiekcie${
+        dostawa.numer ? `. Dokument dostawy: ${dostawa.numer}` : ""}` : undefined}
       /* Partia SPRZED zakupu to ta, z której klient dostał sztukę. Gdy takiej
          nie ma, ostatnia dostawa w ogóle jest tylko tropem i tak się nazywa. */
       pod={dostawa
@@ -476,42 +405,27 @@ function zgloszonoPoDniach(r: Reklamacja): number | null {
   return Number.isFinite(dni) && dni >= 0 ? dni : null;
 }
 
-/* ── CZY TO SIĘ JUŻ ZDARZAŁO (0.413.0) ──────────────────────────────────────
-   Cennik mówi, ile kosztuje ustąpienie. Te dwie liczby mówią, czy w ogóle jest
+/* ── CZY TEN TOWAR SIĘ JUŻ SYPAŁ ─────────────────────────────────────────────
+   Cennik mówi, ile kosztuje ustąpienie. Ta liczba mówi, czy w ogóle jest
    o co się spierać: towar z pięcioma reklamacjami, z których cztery
-   uznaliśmy, to wada partii, a nie sprawa do rozstrzygania od zera. Druga
-   strona tej samej monety — klient z czterema odmowami — też jest inną
-   rozmową niż pierwsza.
+   uznaliśmy, to wada partii, a nie sprawa do rozstrzygania od zera.
 
-   JEDEN WIERSZ, NIE SEKCJA. To jest tło decyzji, a nie sama decyzja: dostaje
-   tyle miejsca, ile potrzeba na dwie liczby, i ani piksela więcej. Brak
+   Tylko TOWAR. O kliencie mówi rząd klienta w głowicy, obok jego loginu,
+   bo tam szuka się wszystkiego o kupującym. Jeden dom na fakt.
+
+   JEDEN WIERSZ, NIE SEKCJA. To jest tło decyzji, a nie sama decyzja. Brak
    historii nie rysuje się wcale — pierwsza sprawa przy tym towarze nie jest
-   informacją o towarze.                                                     */
+   informacją o towarze. */
 function Historia({ historia }: { historia: SzczegolReklamacji["historia"] }) {
   /* Czytamy OSTROŻNIE, choć typ mówi, że pole jest. Panel i serwer wdrażają
      się jednym `git pull`, ale nie w tej samej sekundzie: przez chwilę nowy
      panel pyta starego serwera, a ładunek bez tego pola wywracałby CAŁĄ
      kolumnę dowodów zamiast pominąć jeden wiersz. */
-  const czesci = [
-    slad("Ten towar", historia?.towar ?? null),
-    slad("Ten klient", historia?.klient ?? null),
-  ].filter(Boolean) as string[];
-  if (czesci.length === 0) return null;
+  const towar = historia?.towar ?? null;
+  if (!towar) return null;
   return <p className="border-b border-slate-200 px-4 py-1.5 text-podpis text-slate-700">
-    {czesci.join(" · ")}
+    Ten towar: {ileReklamacji(towar)}
   </p>;
-}
-
-/** „Ten towar: 3 reklamacje, 2 uznane". Bez rozstrzygnięć — sam licznik. */
-function slad(kto: string, s: SladHistorii | null): string | null {
-  if (!s) return null;
-  const ogon = [
-    s.uznanych > 0 ? `${s.uznanych} ${odmien(s.uznanych, "uznana", "uznane", "uznanych")}` : null,
-    s.odrzuconych > 0
-      ? `${s.odrzuconych} ${odmien(s.odrzuconych, "odrzucona", "odrzucone", "odrzuconych")}` : null,
-  ].filter(Boolean).join(", ");
-  const ile_ = ile(s.ile, "reklamacja", "reklamacje", "reklamacji");
-  return `${kto}: ${ile_}${ogon ? ` (${ogon})` : ""}`;
 }
 
 /**
@@ -546,47 +460,57 @@ function wiekZakupuSlowem(dni: number | null): { napis: string; poDwochLatach: b
 /* ── GDZIE JEST PACZKA DO KLIENTA ────────────────────────────────────────────
    „Czy on to w ogóle dostał" jest przy reklamacji pytaniem PIERWSZYM, a przy
    powodach „nie otrzymałem produktu" — całą sprawą. Dlatego odpowiedź stoi
-   w PODPISIE zwijki i widać ją przy zamkniętej. W środku zostaje to, po co się
-   ją otwiera: przewoźnik z numerem, kiedy pytaliśmy i pytanie od nowa.
+   w PODPISIE zwijki i widać ją przy zamkniętej. W środku dwa zdania: którą
+   paczką to jechało i kiedy pytaliśmy, z pytaniem od nowa.
 
    Ładunek zamówienia numeru przesyłki NIE MA — stoi pod osobną końcówką
    `/order/checkout-forms/{id}/shipments`. Pytamy na JAWNE kliknięcie: żądanie
-   u dostawcy nie wychodzi z patrzenia.                                      */
-function Paczka({ przesylka, onSprawdz, trwa, blad }: {
+   u dostawcy nie wychodzi z patrzenia. */
+function Paczka({ przesylka: p, onSprawdz, trwa, blad, domyslnieOtwarte }: {
   przesylka: NonNullable<SzczegolReklamacji["przesylka"]>;
   onSprawdz?: () => void;
   trwa: boolean;
   blad: string;
+  domyslnieOtwarte: boolean;
 }) {
   return <Zwijka
-    tytul="Paczka"
+    tytul="Paczka do klienta"
     Ikona={PackageSearch}
-    podpis={podpisPaczki(przesylka)}
-    pamietajJako="wertis.reklamacje.paczka"
+    podpis={podpisPaczki(p)}
+    domyslnieOtwarte={domyslnieOtwarte}
   >
-    <div className="px-2 py-2">
-      {przesylka.waybill !== null
-        ? <Wiersz etykieta="Przewoźnik">{przesylka.przewoznik}{" "}
-            <span className="font-mono">{przesylka.waybill}</span></Wiersz>
-        : przesylka.sprawdzonoAt !== null
-          && <p className="text-sm text-slate-600">Paczka jeszcze nienadana albo nadana poza Allegro.</p>}
-      <Wiersz etykieta="Pytaliśmy">
-        {przesylka.sprawdzonoAt ? czas(przesylka.sprawdzonoAt) : "jeszcze nie — pytamy na kliknięcie"}
-        {onSprawdz && <button type="button" disabled={trwa} onClick={onSprawdz}
-          className="ml-2 min-h-6 font-semibold underline underline-offset-2 disabled:opacity-50">
-          {trwa ? "pytam…" : "sprawdź"}</button>}
-      </Wiersz>
+    <div className="flex flex-col gap-1 px-2 py-2 text-sm text-slate-800">
+      {/* Przewoźnik słowem ze wspólnego słownika zwrotów, numer listu mono,
+          bo czyta się go znak po znaku z naklejki. */}
+      {p.waybill !== null
+        ? <p>List <span className="break-all font-mono">{p.waybill}</span>
+            {p.przewoznik && <>, przewoźnik {PRZEWOZNICY[p.przewoznik] ?? p.przewoznik}</>}.</p>
+        : p.sprawdzonoAt !== null
+          && <p className="text-slate-600">Paczka jeszcze nienadana albo nadana poza Allegro.</p>}
+      <p className="text-slate-700">
+        {p.sprawdzonoAt ? `Pytaliśmy Allegro ${czas(p.sprawdzonoAt)}.` : "Allegro jeszcze nie pytaliśmy."}
+        {onSprawdz && <>{" "}<button type="button" disabled={trwa} onClick={onSprawdz}
+          className="min-h-6 font-semibold underline underline-offset-2 disabled:opacity-50">
+          {trwa ? "pytam…" : p.sprawdzonoAt ? "sprawdź jeszcze raz" : "sprawdź"}</button></>}
+      </p>
       {blad && <p className="text-xs text-red-700">{blad}</p>}
     </div>
   </Zwijka>;
 }
 
-/** Stan paczki jednym zdaniem — to jest odpowiedź, którą widać bez otwierania. */
+/**
+ * Stan paczki jednym zdaniem — to jest odpowiedź, którą widać bez otwierania.
+ *
+ * Kod przewoźnika idzie przez słownik skrzynki, bo „IN_TRANSIT" nie mówi
+ * agentowi nic. Kod spoza słownika stoi z dopiskiem, skąd jest: kod da się
+ * dopisać do słownika, a pustego miejsca nikt nie zauważy.
+ */
 function podpisPaczki(p: NonNullable<SzczegolReklamacji["przesylka"]>): string {
   if (p.sprawdzonoAt === null) return "nie pytaliśmy jeszcze Allegro";
   if (p.waybill === null) return "Allegro nie ma numeru";
   if (p.dostarczonoAt) return `doręczona ${dzien(p.dostarczonoAt)}`;
-  return p.status ?? "przewoźnik nie podał statusu";
+  if (p.status === null) return "przewoźnik nie podał statusu";
+  return STATUS_PACZKI[p.status] ?? `przewoźnik podał: ${p.status}`;
 }
 
 /** Jedna liczba triażu: etykieta, kwota grubym drukiem, zdanie pod spodem. */
@@ -602,10 +526,84 @@ function Kostka({ etykieta, wartosc, kolor, pod, tytul }: {
   </div>;
 }
 
-/** Co stoi w kartotece — ile cenników i półka, żeby zamknięta nie kazała zgadywać. */
-function podpisKartoteki(ceny: CenaPoziomu[], polki: string[]): string {
+/** Pozycja sporna i reszta zamówienia — po ofercie, której dotyczy reklamacja. */
+function pozycjeZamowienia(pozycje: PozycjaZamowienia[], offerId: string | null) {
+  const sporna = (p: PozycjaZamowienia) => p.offerId !== null && p.offerId === offerId;
+  return { sporne: pozycje.filter(sporna), inne: pozycje.filter((p) => !sporna(p)) };
+}
+
+/**
+ * Co jest w zamówieniu poza reklamowanym towarem — i ile razem.
+ *
+ * Przy jednej pozycji suma byłaby tą samą liczbą, co kostka „Klient zapłacił"
+ * dwa centymetry wyżej, więc podpis mówi wtedy tylko „tylko ten towar".
+ * Gdy żadna pozycja nie pasuje do oferty, podpis liczy wszystkie.
+ */
+function podpisZamowienia(szczegol: SzczegolReklamacji): string {
+  const z = szczegol.zamowienie;
+  if (!z) return "zamówienia nie pobraliśmy";
+  const { sporne, inne } = pozycjeZamowienia(z.pozycje, szczegol.reklamacja.offerId);
+  if (sporne.length > 0 && inne.length === 0) return "tylko ten towar";
+  const razem = z.sumaGrosze !== null ? `razem ${zlote(z.sumaGrosze, z.waluta)}` : null;
+  const ileInnych = sporne.length > 0
+    ? `+${ile(inne.length, "inna pozycja", "inne pozycje", "innych pozycji")}`
+    : ile(z.pozycje.length, "pozycja", "pozycje", "pozycji");
+  return [ileInnych, razem].filter(Boolean).join(" · ");
+}
+
+/* ── ZAMÓWIENIE: TO, CZEGO NIE MÓWI ANI GŁOWICA, ANI KOSTKI ──────────────────
+   Pozycji spornej się nie powtarza: nazwa stoi w głowicy, cena w kostce.
+   Zostaje reszta zamówienia, dostawa i odnośniki do Allegro. DOSTAWA STOI
+   OSOBNO, bo klient żądający zwrotu pyta czasem właśnie o nią.
+
+   SUMA MA JEDEN DOM. Gdy podpis niesie „razem", w środku jej nie ma, bo
+   podpis widać także przy otwartej zwijce. Przy jednej pozycji podpis sumy
+   nie ma, więc wtedy stoi w środku obok dostawy.
+
+   Identyfikatory zamówienia i oferty stoją w podpowiedzi odnośnika
+   i w schowku. Jako tekst wiersza nie mówiły agentowi nic. */
+function Zamowienie({ szczegol }: { szczegol: SzczegolReklamacji }) {
+  const r = szczegol.reklamacja;
+  const z = szczegol.zamowienie;
+  const { sporne, inne } = z ? pozycjeZamowienia(z.pozycje, r.offerId) : { sporne: [], inne: [] };
+  const lista = sporne.length > 0 ? inne : (z?.pozycje ?? []);
+  const sumaWPodpisie = sporne.length === 0 || inne.length > 0;
+  return <div className="flex flex-col gap-1.5 px-2 py-2 text-sm text-slate-800">
+    {lista.length > 0 && <div>
+      <p className="text-slate-700">{sporne.length > 0 ? "Poza reklamowanym towarem:" : "Pozycje zamówienia:"}</p>
+      <ul className="mt-0.5 flex flex-col gap-0.5">
+        {lista.map((p, i) => <li key={`${p.offerId ?? p.sku ?? i}`} className="flex items-baseline gap-2">
+          <span className="min-w-0 flex-1 truncate">{p.nazwa}</span>
+          <span className="shrink-0 tabular-nums">{p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
+        </li>)}
+      </ul>
+    </div>}
+    {z && <p>
+      Dostawa {zlote(z.dostawaGrosze, z.waluta)}{z.dostawaMetoda ? ` (${z.dostawaMetoda})` : ""}.
+      {!sumaWPodpisie && z.sumaGrosze !== null &&
+        <> Razem <b className="tabular-nums">{zlote(z.sumaGrosze, z.waluta)}</b>.</>}
+    </p>}
+    <p className="flex flex-wrap items-center gap-x-3 text-xs">
+      {r.orderId
+        ? <span className="inline-flex items-center gap-1">
+            <Link href={r.linkZamowienia} title={`Zamówienie ${r.orderId}`}>
+              {r.linkZamowienia ? "zamówienie w Allegro" : <span className="font-mono">{r.orderId}</span>}</Link>
+            <Skopiuj tekst={r.orderId} tytul="Kopiuj numer zamówienia" />
+          </span>
+        : <span className="text-slate-600">reklamacja bez numeru zamówienia</span>}
+      {/* Bez łącza z konfiguracji numer stoi na widoku: identyfikator tylko
+          w podpowiedzi albo w schowku nie istnieje dla klawiatury i dotyku. */}
+      {r.offerId && (r.linkOferty
+        ? <Link href={r.linkOferty} title={`Oferta ${r.offerId}`}>oferta w Allegro</Link>
+        : <span>oferta <span className="font-mono">{r.offerId}</span></span>)}
+    </p>
+  </div>;
+}
+
+/** Co stoi w cenach — ile cenników sprzedaży i półka, żeby zamknięta nie kazała zgadywać. */
+function podpisCen(ceny: CenaPoziomu[], polki: string[]): string {
   return [
-    ceny.length ? ile(ceny.length, "poziom cen", "poziomy cen", "poziomów cen") : null,
+    ceny.length ? ile(ceny.length, "cena sprzedaży", "ceny sprzedaży", "cen sprzedaży") : null,
     polki.length ? `półka ${polki[0]}${polki.length > 1 ? ` i ${polki.length - 1} inne` : ""}` : null,
   ].filter(Boolean).join(" · ");
 }
@@ -618,27 +616,4 @@ function podpisDrogi(szczegol: SzczegolReklamacji): string {
     szczegol.droga.length > 1
       ? ile(szczegol.droga.length, "przystanek", "przystanki", "przystanków") : null,
   ].filter(Boolean).join(" · ");
-}
-
-/**
- * Co stoi w zakupie — ile pozycji i z którego dnia (0.416.0).
- *
- * KWOTY TU NIE MA, choć stała tu od 0.403.0. Przy zamówieniu jednopozycyjnym —
- * czyli przy większości reklamacji — suma zamówienia jest tą samą liczbą, co
- * kostka „Klient zapłacił" dwa centymetry wyżej. Podpis ma mówić, CO jest
- * w środku; suma wróciła do wiersza „Razem", gdzie stoi obok dostawy i reszty
- * pozycji, czyli tam, gdzie znaczy coś więcej niż powtórzenie.
- */
-function podpisZakupu(szczegol: SzczegolReklamacji): string {
-  const z = szczegol.zamowienie;
-  if (!z) return "zamówienia nie pobraliśmy";
-  const kiedy = z.kupionoAt ?? szczegol.reklamacja.kupionoAt;
-  return [ile(z.pozycje.length, "pozycja", "pozycje", "pozycji"),
-    kiedy ? dzien(kiedy) : null].filter(Boolean).join(" · ");
-}
-
-/** Co stoi w sprawie — identyfikatory i długość rozmowy. */
-function podpisSprawy(r: Reklamacja): string {
-  return [r.numer ?? r.externalId, r.kupujacyLogin,
-    `${r.wiadomosciIle} wiadomości`].filter(Boolean).join(" · ");
 }

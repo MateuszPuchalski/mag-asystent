@@ -5,9 +5,10 @@ import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Konflikt } from "../api/klient";
+import { atrapaZapisow } from "../test/zapisy";
 import type {
   DowodReklamacji, KubelekReklamacji, OstatniaDostawaReklamacji, Reklamacja, ReklamacjaUDostawcy,
-  WiadomoscReklamacji, WynikWerdyktu,
+  SprawaZakupu, WiadomoscReklamacji, WynikWerdyktu,
 } from "../api/typy";
 
 /* ── Ekran reklamacji ────────────────────────────────────────────────────────
@@ -78,6 +79,8 @@ const scena = vi.hoisted(() => ({
   /* Ostatnia dostawa i nasze zgłoszenie u dostawcy w szczególe sprawy. */
   dostawa: null as OstatniaDostawaReklamacji | null,
   uDostawcy: null as ReklamacjaUDostawcy | null,
+  /* Rodzeństwo zakupu w szczególe sprawy; domyślnie żadnego. */
+  sprawy: [] as SprawaZakupu[],
   /* Czym kończy się werdykt: `Error` do `onError`, wynik do `onSuccess`,
      `null` nie woła żadnego. `poWerdykcie` udaje dociągnięcie sprawy, zanim
      ekran dostanie wynik — tak jak robi to `onSettled` prawdziwego haka. */
@@ -127,7 +130,7 @@ vi.mock("../api/reklamacje", async () => {
       data: id === null ? undefined : {
         reklamacja: REKLAMACJE.find((r) => r.id === id) ?? REKLAMACJE[0],
         czat: scena.czat,
-        zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [], kartoteka: null,
+        zalaczniki: [], zwroty: [], rozmowy: [], sprawy: scena.sprawy, droga: [], kartoteka: null,
         dowody: scena.dowody, dostawa: scena.dostawa, uDostawcy: scena.uDostawcy,
       },
     }),
@@ -209,6 +212,8 @@ function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wia
         <Routes>
           <Route path="/obsluga/reklamacje" element={<Reklamacje />} />
           <Route path="/obsluga/reklamacje/:id" element={<Reklamacje />} />
+          {/* Profil klienta jako sam znacznik: test pyta, DOKĄD prowadzi łącze. */}
+          <Route path="/obsluga/klient/:login" element={<p>ekran profilu klienta</p>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>);
@@ -221,6 +226,7 @@ afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } })
 /* Dowody ustawia test PRZED renderem, więc sprząta się je po nim. */
 afterEach(() => {
   scena.dowody = []; scena.dostawa = null; scena.uDostawcy = null; scena.poWerdykcie = null;
+  scena.sprawy = [];
 });
 
 /* ── MUTACJE BEZ ODŚWIEŻENIA WEJŚCIOWEGO (0.410.0) ──────────────────────────
@@ -292,8 +298,9 @@ describe("Ekran reklamacji", () => {
 
   it("kubełek DO DECYZJI pokazuje tylko sprawy przed werdyktem", () => {
     pokaz();
-    expect(screen.getByText("111/2026")).toBeInTheDocument();
-    expect(screen.queryByText("222/2026")).not.toBeInTheDocument();
+    /* Numeru nie ma na widoku wiersza, ale wiersz się nim nazywa. */
+    expect(screen.getByRole("button", { name: /111\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /222\/2026/ })).not.toBeInTheDocument();
   });
 
   it("przełączenie kubełka przestawia KURSOR na jego pierwszą sprawę", async () => {
@@ -392,7 +399,7 @@ describe("Ekran reklamacji", () => {
       & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const fakty = screen.getByText("Klient zapłacił");
     expect(fakty.compareDocumentPosition(pasek) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(pasek.compareDocumentPosition(screen.getByRole("button", { name: /Zakup i oferta/ }))
+    expect(pasek.compareDocumentPosition(screen.getByRole("button", { name: /^Zamówienie/ }))
       & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("button", { name: /Uznaję/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Odrzucam/ })).toBeInTheDocument();
@@ -577,7 +584,8 @@ describe("Ekran reklamacji", () => {
     try {
       pokaz("/obsluga/reklamacje/2");
       expect(screen.queryByLabelText("Odpowiedź w sprawie")).not.toBeInTheDocument();
-      expect(screen.getByText(/nowej wiadomości nie przyjmie/)).toBeInTheDocument();
+      /* Edytor mówi to w miejscu pisania; głowica mówi to samo w zdaniu B. */
+      expect(screen.getByText(/w tej sprawie — nowej wiadomości nie przyjmie/)).toBeInTheDocument();
     } finally {
       REKLAMACJE[1].czatAktywny = true;
     }
@@ -855,7 +863,7 @@ describe("Kolejka po przebudowie", () => {
     });
   });
 
-  it("szukanie znajduje sprawę po NAZWIE TOWARU — to tytuł wiersza", async () => {
+  it("szukanie znajduje sprawę po NAZWIE TOWARU — stoi w drugiej linii wiersza", async () => {
     await zmienionymi([[3, { ofertaNazwa: "Gaźnik do Stihl MS181" }]], async () => {
       pokaz();
       await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "gaźnik stihl");
@@ -863,16 +871,74 @@ describe("Kolejka po przebudowie", () => {
       expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
     });
   });
+
+  it("szukanie trafia po LOGINIE i po NUMERZE, choć numeru nie ma na widoku wiersza", async () => {
+    pokaz();
+    const pole = screen.getByLabelText("Szukaj reklamacji");
+    expect(pole).toHaveAttribute("placeholder", "Login, towar, numer, notatka");
+    await userEvent.type(pole, "klient4");
+    expect(screen.getByRole("button", { name: /444\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /555\/2026/ })).not.toBeInTheDocument();
+    await userEvent.clear(pole);
+    await userEvent.type(pole, "555/2026");
+    expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /444\/2026/ })).not.toBeInTheDocument();
+  });
 });
 
 describe("Sprawa po przebudowie", () => {
-  it("głowica stoi NAD rozmową: towar, czego klient chce i kto ma ostatnie słowo", () => {
+  it("głowica stoi NAD rozmową: klient, co się dzieje i towar", () => {
     pokaz("/obsluga/reklamacje/1");
-    const tytul = screen.getByRole("heading", { name: "Towar 1" });
-    expect(screen.getByText(/Ostatnie słowo: klient/)).toBeInTheDocument();
+    /* Klient jest nagłówkiem sprawy — uwaga właściciela o widoczności klienta. */
+    const tytul = screen.getByRole("heading", { name: /klient1/ });
+    expect(screen.getByText(/^Ostatnia wiadomość od klienta: /)).toBeInTheDocument();
+    expect(screen.getByText("Czeka na naszą decyzję")).toBeInTheDocument();
+    expect(screen.getAllByText("Towar 1").length).toBeGreaterThan(0);
     /* Głowica przed rozmową w DOM — czyta się ją pierwszą. */
     expect(tytul.compareDocumentPosition(screen.getByText("Opis sprawy 1"))
       & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("profil i historia klienta z głowicy niczego nie zapisują — historia to GET po kliknięciu", async () => {
+    /* Zero zapisu liczone na samym `fetch`: historia idzie prawdziwym hakiem,
+       z pominięciem atrapy haków reklamacji. Jedyną mutacją zostaje
+       udokumentowane odświeżenie przy wejściu w sprawę. */
+    const odczyty: Record<string, unknown> = {
+      "/api/obsluga/sprawy/1/klient": { login: "klient1", wpisy: [] },
+      /* Odczyty, które ekran robi sam, poza podmienionymi hakami reklamacji. */
+      "/api/obsluga/reklamacje/1/zalaczniki-wysylki": { zalaczniki: [] },
+      "/api/obsluga/reklamacje/1/zalaczniki/9/podglad": {},
+    };
+    const zapisy = atrapaZapisow((url) => odczyty[url]);
+    try {
+      pokaz("/obsluga/reklamacje/1");
+      await userEvent.click(screen.getByRole("button", { name: "Historia" }));
+      expect(await screen.findByRole("dialog", { name: "Historia klienta" })).toBeInTheDocument();
+      await userEvent.keyboard("{Escape}");
+      await userEvent.click(screen.getByRole("link", { name: "profil" }));
+      expect(screen.getByText("ekran profilu klienta")).toBeInTheDocument();
+      expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
+      expect(zapisy.wyslane).toEqual([]);
+      expect(zapisy.nieznane).toEqual([]);
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("wskaźnik innej otwartej sprawy przewija do „Ten zakup u nas” i ją otwiera — bez zapisu", async () => {
+    scena.sprawy = [{ id: 8, typ: "DISPUTE", numer: null, temat: "gdzie paczka", statusAllegro: null,
+      decyzjaDo: null, otwartoAt: "2026-09-07T10:00:00.000Z", prowadzi: null, otwarta: true }];
+    pokaz("/obsluga/reklamacje/1");
+    const zwijka = screen.getByRole("button", { name: /^Ten zakup u nas/ });
+    /* Otwiera się sama, bo inna sprawa tego zakupu jest otwarta. */
+    expect(zwijka).toHaveAttribute("aria-expanded", "true");
+    await userEvent.click(zwijka);
+    expect(zwijka).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(screen.getByRole("button", { name: /jeszcze 1 otwarta sprawa tego zakupu/ }));
+    expect(zwijka).toHaveAttribute("aria-expanded", "true");
+    expect(zwijka).toHaveFocus();
+    expect(screen.getByText("gdzie paczka")).toBeVisible();
+    expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
   });
 
   it("zdjęcie klienta stoi w kolumnie dowodów jako Z1, a w wątku zostaje odnośnik", () => {

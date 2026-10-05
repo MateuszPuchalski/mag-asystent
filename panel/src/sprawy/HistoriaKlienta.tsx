@@ -31,7 +31,9 @@ export function PrzyciskHistorii({ rodzaj, id }: {
   return <>
     <button type="button" onClick={() => setOtwarta(true)} aria-haspopup="dialog"
       title="Cała historia tego kupującego u nas"
-      className="inline-flex items-center gap-1 rounded border border-slate-300 px-1.5 py-0.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+      /* `min-h-6`: przycisk stoi obok innych celów (login, profil, nagłówki
+         zwrotu i dyskusji), a każdy cel ma mieć 24 px (WCAG 2.5.8). */
+      className="inline-flex min-h-6 items-center gap-1 rounded border border-slate-300 px-1.5 py-0.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">
       <History size={13} />Historia</button>
     {otwarta && <Szuflada rodzaj={rodzaj} id={id} onZamknij={() => setOtwarta(false)} />}
   </>;

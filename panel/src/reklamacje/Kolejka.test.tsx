@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Kolejka, SYGNALY, kwotaWiersza, wGrupach, wspolneSygnaly } from "./Kolejka";
 import type { Reklamacja } from "../api/typy";
@@ -34,16 +34,40 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
 });
 
 describe("Kolejka reklamacji", () => {
-  it("wiersz niesie numer, klienta, powód i czego klient chce", () => {
+  it("wiersz zaczyna się od KLIENTA, potem towar, potem czego klient chce", () => {
+    /* Uwaga właściciela: „Client powinien być bardziej widoczny". Login stoi
+       pierwszy, mono i pogrubiony — ta sama notacja co w wierszu skrzynki. */
     render(<Kolejka reklamacje={[rek()]} wybrana={null} onWybierz={() => {}} />);
-    /* Numer schodzi do podpisu, ale stoi tam SAM — kopiuje się go i szuka
-       oczami jako jednej rzeczy. */
-    expect(screen.getByText("123/2026")).toBeInTheDocument();
-    expect(screen.getByText(/kupujacy1/)).toBeInTheDocument();
+    const login = screen.getByText("kupujacy1");
+    expect(login.className).toMatch(/font-mono/);
+    expect(login.className).toMatch(/font-bold/);
+    const towar = screen.getByText("Kosiarka spalinowa NAC LS 46-450");
+    expect(login.compareDocumentPosition(towar) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    /* Towar schodzi o stopień, żeby prowadził klient. */
+    expect(towar.className).not.toMatch(/font-semibold|font-bold/);
     /* Kod Allegro po polsku — słownik jest po naszej stronie, bo wiersz czyta
        człowiek przy biurku, a nie integrator. */
     expect(screen.getByText(/usterka przy używaniu/)).toBeInTheDocument();
     expect(screen.getByText("zwrot pieniędzy")).toBeInTheDocument();
+  });
+
+  it("numeru nie ma na widoku, ale wiersz nazywa się nim dla czytnika ekranu", () => {
+    /* Ekran szuka wierszy po numerze, a czytnik ogłasza go przy wyborze. */
+    render(<Kolejka reklamacje={[rek()]} wybrana={null} onWybierz={() => {}} />);
+    expect(screen.getByRole("button", { name: /reklamacja 123\/2026/ })).toBeInTheDocument();
+    expect(screen.getByText(/reklamacja 123\/2026/).className).toContain("sr-only");
+  });
+
+  it("login jest zwykłym tekstem — w przycisku wiersza nie ma drugiego przycisku", () => {
+    /* Przycisków się nie zagnieżdża. Kopiuje głowica sprawy. */
+    render(<Kolejka reklamacje={[rek()]} wybrana={null} onWybierz={() => {}} />);
+    expect(within(screen.getByRole("button")).queryAllByRole("button")).toHaveLength(0);
+    expect(screen.getByText("kupujacy1").tagName).toBe("SPAN");
+  });
+
+  it("bez loginu mówi to wprost, zwykłym pismem, zamiast pustej linii", () => {
+    render(<Kolejka reklamacje={[rek({ kupujacyLogin: null })]} wybrana={null} onWybierz={() => {}} />);
+    expect(screen.getByText("bez loginu").className).not.toMatch(/font-mono/);
   });
 
   it("kwota stoi OSOBNO z prawej, a nie w środku zdania o oczekiwaniu", () => {
@@ -93,8 +117,9 @@ describe("Kolejka reklamacji", () => {
     /* „Czekam na Allegro" to inny stan niż „Allegro zdjęcia nie ma" — i kafel
        jest jedynym miejscem, w którym widać, który to. */
     expect(screen.getByTitle(/jeszcze nie pobrano/)).toBeInTheDocument();
-    /* Numer i powód zostają — wiersz ma dalej mówić, o jaką sprawę chodzi. */
-    expect(screen.getByText("123/2026")).toBeInTheDocument();
+    /* Numer staje w linii towaru — wiersz ma dalej mówić, o jaką sprawę chodzi. */
+    expect(screen.getByText(/123\/2026/)).toBeVisible();
+    expect(screen.getByText(/123\/2026/).className).not.toContain("sr-only");
   });
 
   it("nieznany powód zostaje SUROWY, zamiast zniknąć", () => {
@@ -181,10 +206,13 @@ describe("Kolejka reklamacji", () => {
     expect(screen.getByTitle("Termin decyzji: za 2 dni")).toHaveTextContent("2 dni");
   });
 
-  it("kto prowadzi sprawę, widać z kolejki — to znacznik dla reszty biura", () => {
+  it("kto prowadzi sprawę, widać z kolejki — w pierwszej linii, za loginem", () => {
     render(<Kolejka reklamacje={[rek({ prowadzi: "A. Lewandowska" })]}
       wybrana={null} onWybierz={() => {}} />);
-    expect(screen.getByText("A. Lewandowska")).toBeInTheDocument();
+    const kto = screen.getByText("A. Lewandowska");
+    expect(screen.getByText("kupujacy1").compareDocumentPosition(kto)
+      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(kto.parentElement).toBe(screen.getByText("kupujacy1").parentElement);
   });
 
   it("własna sprawa mówi „prowadzisz” — rozstrzyga numer konta, nie imię", () => {

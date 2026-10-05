@@ -56,15 +56,27 @@ const props = (r: Reklamacja, n = {}) => ({
   onProwadze: vi.fn(), onNotatka: vi.fn(), ...n,
 });
 
+/* „Praca biura" startuje zwinięta, bo jej podpis czyta już treść notatki.
+   Testy notatki otwierają ją tak, jak agent: kliknięciem w nagłówek. */
+const otworzPrace = () => userEvent.click(screen.getByRole("button", { name: /^Praca biura/ }));
+
 describe("Notatka i jej droga powrotna", () => {
-  it("mówi, KTO zmienił i kiedy — dotąd nie mówiła tego nikt", () => {
+  it("zwinięta zwijka czyta notatkę w podpisie — nie trzeba jej otwierać, by wiedzieć", () => {
     render(<Dowody {...props(rek())} />);
-    expect(screen.getByText(/A\. Lewandowska/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Praca biura/ }))
+      .toHaveTextContent("notatka: „ustalono wymianę”");
+  });
+
+  it("mówi, KTO zmienił i kiedy — dotąd nie mówiła tego nikt", async () => {
+    render(<Dowody {...props(rek())} />);
+    await otworzPrace();
+    expect(screen.getByText(/A\. Lewandowska/)).toBeVisible();
   });
 
   it("cofnięcie jest ZDANIEM pod polem, nie ramką z decyzją", async () => {
     const onCofnijNotatke = vi.fn();
     render(<Dowody {...props(rek(), { onCofnijNotatke })} />);
+    await otworzPrace();
     const cofnij = screen.getByRole("button", { name: "cofnij zmianę" });
     expect(cofnij).toBeInTheDocument();
     /* Żadnego dialogu potwierdzenia: to jest właśnie ta zamiana z §25a.5. */
@@ -93,12 +105,13 @@ describe("Notatka i jej droga powrotna", () => {
     expect(screen.queryByText(/^Zmiana:/)).not.toBeInTheDocument();
   });
 
-  it("WERDYKT cofnięcia nie dostaje i to jest granica, nie przeoczenie", () => {
+  it("WERDYKT cofnięcia nie dostaje i to jest granica, nie przeoczenie", async () => {
     /* Allegro nie przyjmie drugiego werdyktu w sprawie (§25b.8), więc przycisk
        „cofnij" przy nim byłby obietnicą bez pokrycia. Cofnięcie należy się
        temu, co zostaje u nas. */
     render(<Dowody {...props(rek({ werdykt: "ACCEPTED_REFUND" } as Partial<Reklamacja>),
       { onCofnijNotatke: vi.fn() })} />);
+    await otworzPrace();
     const cofniecia = screen.getAllByRole("button", { name: /cofnij/i });
     expect(cofniecia).toHaveLength(1);
     expect(cofniecia[0]).toHaveAccessibleName("cofnij zmianę");
@@ -135,6 +148,7 @@ describe("Kolumna faktów bez pustych czynności (0.511.0)", () => {
   it("„Zapisz notatkę” pojawia się dopiero przy zmianie", async () => {
     const onNotatka = vi.fn();
     render(<Dowody {...props(rek(), { onNotatka })} />);
+    await otworzPrace();
     expect(screen.queryByRole("button", { name: "Zapisz notatkę" })).not.toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("Notatka biura"), " i zwrot");
     await userEvent.click(screen.getByRole("button", { name: "Zapisz notatkę" }));

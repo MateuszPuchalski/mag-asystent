@@ -12,17 +12,20 @@ import { mojaSprawa } from "../sprawy/Moje";
 
 /* ── Kolejka reklamacji ──────────────────────────────────────────────────────
    Wiersz ma się czytać W BIEGU, więc niesie TRZY linie i jedną barwę sygnału.
-   Pierwsza to towar i ile zostało do terminu, druga — czego klient chce, za
-   co i za ile, trzecia — numer, login i kto prowadzi. Wszystko, co trzeba
+   Pierwsza to klient, kto u nas prowadzi i ile zostało do terminu. Druga to
+   towar, trzecia — czego klient chce, za co i za ile. Wszystko, co trzeba
    doczytać, stoi w obszarze sprawy po prawej.
 
-   TYTUŁEM JEST TOWAR, nie numer: oko szuka kosiarki, a numer sprawy czyta
-   się dopiero przy kopiowaniu, więc schodzi do podpisu. Zdjęcie oferty
-   zostaje, bo jest tożsamością sprawy — „pękła obudowa" przy zdjęciu
-   kosiarki czyta się w biegu, przy samym numerze wymaga otwarcia sprawy.
-   Bierzemy obraz OFERTY, nie kartoteki: klient reklamuje to, co kupił.
-   Kafel ma stały rozmiar także bez obrazu, żeby wiersze nie skakały pod
-   kursorem.
+   KLIENT NA CZELE WIERSZA. Uwaga właściciela: „Client powinien być bardziej
+   widoczny". Login stoi pierwszy, mono i pogrubiony, jak w wierszu skrzynki,
+   bo to klucz klienta w całej drodze — ta sama notacja na obu ekranach.
+   Towar stoi stopień niżej, a numer sprawy służy czytnikowi ekranu i polu
+   szukania, które po nim trafia.
+
+   Zdjęcie oferty zostaje, bo jest tożsamością sprawy — „pękła obudowa" przy
+   zdjęciu kosiarki czyta się w biegu. Bierzemy obraz OFERTY, nie kartoteki:
+   klient reklamuje to, co kupił. Kafel ma stały rozmiar także bez obrazu,
+   żeby wiersze nie skakały pod kursorem.
 
    SYGNAŁ WSPÓLNY DLA CAŁEGO KUBEŁKA ZNIKA Z WIERSZA. W „Do odpowiedzi"
    każda sprawa ma „klient czeka", bo tak liczy się sam kubełek — jedenaście
@@ -229,14 +232,41 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
           nazwa={r.ofertaNazwa ?? numer} />
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <div className="flex items-baseline gap-2">
-            {/* Bez snapshotu oferty tytułem zostaje numer — wiersz ma dalej
-                mówić, o jaką sprawę chodzi, zamiast udawać, że zna towar. */}
-            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">
-              {r.ofertaNazwa ?? numer}</span>
+            {/* Login jest ZWYKŁYM TEKSTEM, nie przyciskiem kopiowania: cały
+                wiersz jest przyciskiem, a przycisków się nie zagnieżdża.
+                Kopiuje głowica sprawy. Przy wąskiej kolejce pierwszy ustępuje
+                prowadzący, dopiero potem login. */}
+            <span className="flex min-w-0 flex-1 items-baseline gap-1">
+              {r.kupujacyLogin
+                ? <span title={r.kupujacyLogin}
+                    className="min-w-0 truncate font-mono text-sm font-bold text-slate-800">{r.kupujacyLogin}</span>
+                : <span className="min-w-0 truncate text-sm text-slate-600">bez loginu</span>}
+              {/* ── „PROWADZISZ", GDY SPRAWA JEST MOJA ──────────────────────
+                  Właściciel pytał wprost: „które reklamacje są moje". Samo imię
+                  na to nie odpowiada — dwie osoby w biurze bywają imienniczkami.
+                  Rozstrzyga NUMER KONTA, ten sam, po którym liczy się sito.
+                  Odpowiedź stoi na wierszu bez filtru, bo pytanie zadaje się
+                  przy przeglądaniu całej kolejki. */}
+              {r.prowadzi && <>
+                <span aria-hidden="true" className="shrink-0 text-xs text-slate-600">·</span>
+                <span title={moja ? `Prowadzisz tę sprawę (${r.prowadzi})` : `Prowadzi: ${r.prowadzi}`}
+                  className={`min-w-0 shrink-[999] truncate text-xs font-semibold ${
+                    moja ? "text-emerald-800" : "text-slate-700"}`}>
+                  {moja ? "prowadzisz" : r.prowadzi}</span>
+              </>}
+            </span>
             {zKubelkiem && <span className="shrink-0 text-podpis font-semibold text-slate-600">
               {KUBELKI.find((k) => k.id === r.kubelek)?.etykieta}</span>}
             <Termin dni={r.dniDoTerminu} wGrupie={r.poTerminie} />
           </div>
+          {/* Bez snapshotu oferty linię towaru niesie numer — wiersz ma dalej
+              mówić, o jaką sprawę chodzi, zamiast udawać, że zna towar. Numer
+              jest też w nazwie wiersza dla czytnika ekranu, bo na widoku wiersza go nie ma. */}
+          {r.ofertaNazwa
+            ? <span className="truncate text-sm text-slate-800">{r.ofertaNazwa}
+                <span className="sr-only">, reklamacja {numer}</span></span>
+            : <span className="truncate text-sm tabular-nums text-slate-800">
+                <span className="sr-only">reklamacja </span>{numer}</span>}
           <div className="flex items-baseline gap-2 text-sm">
             <span className="min-w-0 flex-1 truncate">
               {oczekiwanie && <b className="font-semibold text-slate-800">{oczekiwanie}</b>}
@@ -247,26 +277,6 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
             {kwota !== null && <span className="shrink-0 text-xs tabular-nums text-slate-700"
               title={r.kwotaZrodlo ? ZRODLO_KWOTY[r.kwotaZrodlo] : undefined}>
               {zlote(kwota, r.waluta)}</span>}
-          </div>
-          <div className="flex min-w-0 items-baseline gap-1 text-podpis text-slate-600">
-            {r.ofertaNazwa && <>
-              <span className="shrink-0 tabular-nums">{numer}</span>
-              <span aria-hidden="true">·</span>
-            </>}
-            <span className="min-w-0 truncate">{r.kupujacyLogin ?? "bez loginu"}</span>
-            {/* ── „PROWADZISZ", GDY SPRAWA JEST MOJA ──────────────────────────
-                Właściciel pytał wprost: „które reklamacje są moje". Samo imię
-                na to nie odpowiada — dwie osoby w biurze bywają imienniczkami,
-                a przy własnym nazwisku i tak trzeba je przeczytać. Rozstrzyga
-                NUMER KONTA, ten sam, po którym liczy się sito. Odpowiedź stoi
-                na wierszu bez włączania filtru, bo pytanie zadaje się przy
-                przeglądaniu całej kolejki. */}
-            {r.prowadzi && <>
-              <span aria-hidden="true">·</span>
-              <span title={moja ? `Prowadzisz tę sprawę (${r.prowadzi})` : `Prowadzi: ${r.prowadzi}`}
-                className={`shrink-0 font-semibold ${moja ? "text-emerald-800" : "text-slate-700"}`}>
-                {moja ? "prowadzisz" : r.prowadzi}</span>
-            </>}
           </div>
           {czipy && <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {/* Werdykt z PANELU na wierszu rozstrzygniętym — zdanie pisze serwer.

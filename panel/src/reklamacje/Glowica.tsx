@@ -1,26 +1,41 @@
 import React from "react";
-import type { SzczegolReklamacji, WiadomoscReklamacji } from "../api/typy";
+import { Link as RouterLink } from "react-router-dom";
+import { ExternalLink, UserRound } from "lucide-react";
+import type { SzczegolReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
-import { czas, dniSlowo, LoginKlienta, Skopiuj } from "../ui";
+import { czas, ile, LoginKlienta, Skopiuj } from "../ui";
 import { Prowadzi } from "../sprawy/Prowadzi";
 import { mojaSprawa } from "../sprawy/Moje";
+import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
 import { PrzyciskTowaru } from "../towar/Szuflada";
 import { OCZEKIWANIA, POWODY } from "./Kolejka";
+import { PRAWO } from "./statusy";
+import { coSieDzieje, ileReklamacji, tytulStatusu, type Czlon, type Ton } from "./etap";
 
-/* ── Głowica sprawy: co, kto i gdzie stoimy ──────────────────────────────────
+/* ── Głowica sprawy: kto, co się dzieje, o co chodzi ─────────────────────────
    Jeden pas na całą szerokość obszaru sprawy, nad rozmową, dowodami
-   i faktami. Odpowiada na trzy pytania zadawane przy KAŻDYM otwarciu, zanim
-   agent przeczyta choćby jedno zdanie klienta: o jaki towar chodzi, czego
-   klient chce i czyj jest ruch. Dlatego stoi nad trzema kolumnami, a nie
-   w jednej z nich — każda z nich czyta się dopiero na tym tle.
+   i faktami. Czyta się go z góry na dół w trzech warstwach.
+
+   KTO. Uwaga właściciela: „Client powinien być bardziej widoczny". Login
+   stoi pierwszy, w 17 px, bo to klucz klienta w całej drodze, a nie podpis
+   przy numerze. Obok profil, historia i liczba jego innych reklamacji, a po
+   prawej, kto u nas prowadzi sprawę.
+
+   CO SIĘ DZIEJE. Dwa zdania z `etap.ts` zamiast czterech etykiet. Etap
+   i termin, potem rozmowa i towar. Surowy status Allegro zostaje pod
+   kursorem zdania A, bo na ekranie stoją słowa, nie kody.
+
+   O CO CHODZI. Pod kreską towar z symbolem i żądanie klienta. Nazwa towaru
+   stoi w 14 px, bo 17 px należy do klienta, a tożsamość towaru niesie też
+   zdjęcie w kolumnie dowodów.
+
+   Numer reklamacji i data zgłoszenia stoją w prawej szczelinie pod
+   „Prowadzi”. To ich jedyny dom: kolumna faktów ich nie powtarza, bo
+   uwaga właściciela brzmiała „informacje powtarzają się”.
 
    ZDJĘĆ TU NIE MA. Obraz oferty i kartoteki stoi w kolumnie zdjęć pod
    „Wysłaliśmy", obok tego, co przysłał klient — tam się je porównuje.
-   Cena też nie: wiersz towaru mówi, CO to jest, a ile kosztowało, mówią
-   kwota na wierszu kolejki i fakty po prawej. Jeden dom na jeden fakt.
-
-   TERMIN DECYZJI tylko przed werdyktem. Po nim liczba dni do terminu nie
-   rozstrzyga już niczego, a czerwona stałaby przy sprawie zamkniętej. */
+   Cena też nie: ile kosztowało, mówią kostki faktów po prawej. */
 
 /* ── JEDNA KARTOTEKA NA CAŁĄ SPRAWĘ ──────────────────────────────────────────
    Symbol w głowicy z przekrojem towaru, kafel pod „Wysłaliśmy", fakty
@@ -61,123 +76,163 @@ export function kartotekaKolumny(szczegol: Pick<SzczegolReklamacji, "reklamacja"
   return { twId: null, symbol: null, zrodlo: null };
 }
 
-/** Werdykt Allegro poza panelem — wtedy `werdykt` jest pusty, a sprawa zamknięta. */
-const ROZSTRZYGNIETE: Record<string, string> = {
-  CLAIM_ACCEPTED: "uznana", CLAIM_REJECTED: "odrzucona",
+/* Rola członu zdania na barwę i wagę — w jednym miejscu, żeby czysta funkcja
+   w `etap.ts` nie znała Tailwinda. Bursztyn („czeka", „uwaga") znaczy
+   wyłącznie „uwaga”; czerwień tylko błąd albo termin od trzech dni w dół. */
+const KLASA_TONU: Record<Ton, string> = {
+  glowny: "font-semibold text-slate-900",
+  zle: "font-semibold text-ranga-zle",
+  uwaga: "font-semibold text-ranga-uwaga",
+  ok: "font-semibold text-ranga-ok",
+  spokojny: "font-semibold text-slate-700",
+  tekst: "",
+  termin: "font-bold text-slate-900",
+  terminPilny: "font-bold text-ranga-zle",
+  data: "tabular-nums text-slate-600",
+  cichy: "text-slate-600",
+  czeka: "font-semibold text-ranga-uwaga",
 };
 
-/** Kto ma ostatnie słowo — szukamy człowieka, automat Allegro nie czeka na nikogo. */
-const OSTATNIE_SLOWO: Record<string, string> = {
-  BUYER: "klient", SELLER: "my", ADMIN: "doradca Allegro",
-};
-
-function ostatnieSlowo(czat: WiadomoscReklamacji[]): WiadomoscReklamacji | null {
-  for (let i = czat.length - 1; i >= 0; i -= 1) {
-    if (OSTATNIE_SLOWO[czat[i].autorRola ?? ""]) return czat[i];
-  }
-  return null;
-}
-
-/**
- * Termin jednym słowem — „za 6 dni" zamiast „24.09.2026, 23:59".
- *
- * Pytanie przy sprawie brzmi „ile mam czasu", nie „który to dzień", więc
- * odejmowanie dat w głowie to praca, którą głowica ma zdjąć. Data bezwzględna
- * stoi obok, bo czasem jest potrzebna.
- */
-function terminSlowem(r: SzczegolReklamacji["reklamacja"]): { napis: string; pilny: boolean } {
-  if (r.poTerminie) return { napis: "po terminie", pilny: true };
-  if (r.decyzjaDo === null || r.dniDoTerminu === null) return { napis: "bez terminu", pilny: false };
-  if (r.dniDoTerminu === 0) return { napis: "dziś", pilny: true };
-  return { napis: `za ${dniSlowo(r.dniDoTerminu)}`, pilny: r.dniDoTerminu <= 3 };
-}
+/** Człony zdania jeden za drugim; klient czekający na nas dostaje kropkę przed swoim zdaniem. */
+const Czlony = ({ czlony }: { czlony: Czlon[] }) => <>
+  {czlony.map((c, i) => <span key={i} className={KLASA_TONU[c.ton] || undefined}>
+    {c.ton === "czeka" &&
+      <span aria-hidden="true" className="mr-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" />}
+    {c.tekst}</span>)}
+</>;
 
 /** Kropka między członami — dla oka, nie dla czytnika ekranu. */
 const Kropka = () => <span aria-hidden="true" className="text-slate-500">·</span>;
 
-export function Glowica({ szczegol, mojeId = null, trwa, blad = "", onProwadze }: {
+export function Glowica({ szczegol, mojeId = null, trwa, blad = "", onProwadze, onPokazZakup }: {
   szczegol: SzczegolReklamacji;
   /** Konto patrzącego — po nim „Ty" i „Odłóż sprawę" zamiast cudzego imienia. */
   mojeId?: number | null;
   trwa: boolean;
   blad?: string;
   onProwadze: () => void;
+  /* Przewinięcie do zwijki „Ten zakup u nas" i jej otwarcie. Opcjonalne tym
+     samym wzorcem co reszta: bez procedury wskaźnik zostaje zdaniem, a nie
+     martwym przyciskiem. */
+  onPokazZakup?: () => void;
 }) {
   const r = szczegol.reklamacja;
   const numer = r.numer ?? r.externalId;
+  const login = r.kupujacyLogin;
   const powod = r.powodTyp ? (POWODY[r.powodTyp] ?? r.powodTyp) : null;
   const oczekiwanie = r.oczekiwanie ? (OCZEKIWANIA[r.oczekiwanie] ?? r.oczekiwanie) : null;
   const kwota = r.oczekiwanaKwotaGrosze !== null ? zlote(r.oczekiwanaKwotaGrosze, r.waluta) : null;
   const towar = kartotekaKolumny(szczegol);
-
-  /* Werdykt NASZ ma pierwszeństwo przed statusem Allegro, bo niesie nazwę
-     z panelu; nieudana próba werdyktem nie jest. Werdykt z Centrum Sprzedaży
-     mówi o sobie wprost — pochodzenie decyzji jest informacją. */
-  const naszWerdykt = r.werdyktNazwa && r.werdyktStatus !== "send_failed" ? r.werdyktNazwa : null;
-  const uAllegro = r.statusAllegro ? ROZSTRZYGNIETE[r.statusAllegro] : undefined;
-  const maWerdykt = Boolean(naszWerdykt) || Boolean(uAllegro);
-  const termin = terminSlowem(r);
-  const slowo = ostatnieSlowo(szczegol.czat ?? []);
-  const klientCzeka = slowo?.autorRola === "BUYER";
-  /* Status, którego nie tłumaczy werdykt ani kubełek, stoi surowy — tak samo
-     jak nieznany powód. Pusty slot byłby gorszy od kodu: kod da się
-     dopisać do słownika, pustego miejsca nikt nie zauważy. */
-  const innyStatus = r.statusAllegro && r.statusAllegro !== "CLAIM_SUBMITTED" && !uAllegro
-    ? r.statusAllegro : null;
+  const etap = coSieDzieje(szczegol);
+  /* Czytamy ostrożnie: starszy serwer historii nie zna, a jej brak ma znaczyć
+     „nie wiemy", nie wywracać głowicy. `null` serwer daje też przy zerze,
+     więc ekran nigdy nie mówi „pierwsza reklamacja". */
+  const historiaKlienta = szczegol.historia?.klient ?? null;
+  const otwarteRodzenstwo = (szczegol.sprawy ?? []).filter((s) => s.otwarta).length;
+  const rodzenstwo = otwarteRodzenstwo > 0
+    ? `jeszcze ${ile(otwarteRodzenstwo, "otwarta sprawa", "otwarte sprawy", "otwartych spraw")} tego zakupu`
+    : null;
 
   return <div className="flex flex-wrap items-start gap-x-6 gap-y-2 px-5 py-3">
     <div className="flex min-w-0 flex-[999_1_24rem] flex-col gap-1">
-      <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-slate-600">
-        <span className="font-bold tabular-nums text-slate-900">{numer}</span>
-        <Skopiuj tekst={numer} tytul="Kopiuj numer reklamacji" />
-        {r.kupujacyLogin && <><Kropka /><LoginKlienta login={r.kupujacyLogin} className="text-slate-800" /></>}
-        {powod && <><Kropka /><span>{powod}</span></>}
-        <Kropka />
-        <span>klient chce:{" "}
-          <b className="text-slate-900">{oczekiwanie ?? "nie podał"}</b>
-          {kwota && <>{" "}<b className="tabular-nums text-slate-900">{kwota}</b></>}
-        </span>
-      </p>
-      <h2 className="text-naglowek font-bold text-slate-900">{r.ofertaNazwa ?? "Oferty nie pobrano"}</h2>
-      {/* SYGNATURA MÓWI, SKĄD JEST. Symbol bywa wzięty z PARAGONU, a bywa
+      {/* ── KTO ─────────────────────────────────────────────────────────────
+          Login KOPIUJE po kliknięciu, więc profil i historia są osobnymi
+          celami po 24 px z odstępem 8 px (WCAG 2.5.8). W nagłówku stoi sam
+          login: szuflada historii nie może wylądować w środku `h2`. */}
+      {login
+        ? <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-700">
+            <h2 className="flex min-w-0 items-center gap-1.5">
+              <UserRound size={16} aria-hidden="true" className="shrink-0 text-slate-600" />
+              <LoginKlienta login={login} className="font-mono text-naglowek font-bold text-slate-900" />
+            </h2>
+            <Kropka />
+            {/* Profil domyka wiązanie klienta w obie strony: profil prowadzi
+                do reklamacji, a reklamacja do profilu. Słowa i kolejność jak
+                w nagłówku zwrotu, żeby ręka znała je z tamtego ekranu. */}
+            <RouterLink to={`/obsluga/klient/${encodeURIComponent(login)}`}
+              title="Profil klienta — zakupy, zwroty, reklamacje i rozmowy"
+              className="inline-flex min-h-6 items-center gap-1 font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
+              <UserRound size={12} aria-hidden="true" />profil</RouterLink>
+            <PrzyciskHistorii rodzaj="sprawa" id={r.id} />
+            {historiaKlienta && <>
+              <Kropka />
+              <span>jeszcze {ileReklamacji(historiaKlienta, " u nas")}</span>
+            </>}
+            {rodzenstwo && <>
+              <Kropka />
+              {/* Inna otwarta sprawa tego zakupu to klient, który czeka też
+                  gdzie indziej. Wskaźnik tylko przewija do listy i ją otwiera,
+                  niczego nie zapisuje. */}
+              {onPokazZakup
+                ? <button type="button" onClick={onPokazZakup}
+                    className="min-h-6 font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
+                    {rodzenstwo} <span aria-hidden="true">↓</span></button>
+                : <span className="font-semibold">{rodzenstwo}</span>}
+            </>}
+          </div>
+        /* Brak loginu mówi o sobie: pusty slot czytałby się jak awaria, a to
+           Allegro go nie podało. Bez loginu nie ma czyjego profilu ani historii. */
+        : <h2 className="text-tresc text-slate-600">kupujący: Allegro nie podało loginu</h2>}
+
+      {/* ── CO SIĘ DZIEJE ─────────────────────────────────────────────────── */}
+      <p className="mt-1 text-tresc text-slate-700" title={tytulStatusu(etap.kodAllegro)}>
+        <Czlony czlony={etap.a} /></p>
+      {/* Zdanie B o szczebel niżej niż A: A mówi, co mamy zrobić, B tylko
+          tłumaczy tło, więc oko ma najpierw trafić na A. */}
+      {etap.b.length > 0 && <p className="text-sm text-slate-700"><Czlony czlony={etap.b} /></p>}
+      <hr className="my-0.5 border-slate-200" />
+
+      {/* ── O CO CHODZI ─────────────────────────────────────────────────────
+          SYGNATURA MÓWI, SKĄD JEST. Symbol bywa wzięty z PARAGONU, a bywa
           z dzisiejszego mapowania oferty — to dwie różne rzeczy, gdy sprzedawca
           przepiął sygnaturę po wyczerpaniu dostawy. Bez tej adnotacji ekran
           kazałby ufać jednakowo obu. */}
-      <p className="flex flex-wrap items-baseline gap-x-1.5 text-xs text-slate-600">
-        {towar.symbol
-          ? <>
-              <PrzyciskTowaru twId={towar.twId}>
-                <span className="font-mono font-semibold text-slate-800">{towar.symbol}</span></PrzyciskTowaru>
-              {towar.zrodlo && <><Kropka /><span>{NAPIS_ZRODLA[towar.zrodlo]}</span></>}
-            </>
-          /* Przy braku stoi ZDANIE serwera, nie kod powodu: `powod` jest
-             kluczem dla liczników, a agent ma przeczytać, które ogniwo pękło. */
-          : <span>{szczegol.kartoteka?.zrodlo ?? "bez kartoteki"}</span>}
+      <p className="text-sm">
+        {r.ofertaNazwa
+          ? <span className="font-semibold text-slate-900">{r.ofertaNazwa}</span>
+          : <span className="text-slate-600">Oferty nie pobrano</span>}
+        <span className="ml-2 inline-flex flex-wrap items-baseline gap-x-1.5 text-xs text-slate-600">
+          {towar.symbol
+            ? <>
+                <PrzyciskTowaru twId={towar.twId}>
+                  <span className="font-mono font-semibold text-slate-800">{towar.symbol}</span></PrzyciskTowaru>
+                {towar.zrodlo && <><Kropka /><span>{NAPIS_ZRODLA[towar.zrodlo]}</span></>}
+              </>
+            /* Przy braku stoi ZDANIE serwera, nie kod powodu: `powod` jest
+               kluczem dla liczników, a agent ma przeczytać, które ogniwo pękło. */
+            : <span>{szczegol.kartoteka?.zrodlo ?? "bez kartoteki"}</span>}
+        </span>
       </p>
-      <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm">
-        {slowo && <span className={`inline-flex items-center gap-1.5 ${
-          klientCzeka ? "font-semibold text-ranga-uwaga" : "text-slate-700"}`}>
-          {klientCzeka && <span aria-hidden="true" className="h-2 w-2 rounded-full bg-amber-500" />}
-          Ostatnie słowo: {OSTATNIE_SLOWO[slowo.autorRola ?? ""]} · {czas(slowo.utworzonoAt)}</span>}
-        {naszWerdykt && <span className="text-slate-700">Werdykt:{" "}
-          <b className="text-slate-900">{naszWerdykt}</b></span>}
-        {!naszWerdykt && uAllegro && <span className="text-slate-700">Werdykt:{" "}
-          <b className="text-slate-900">{uAllegro}</b> w Centrum Sprzedaży</span>}
-        {!maWerdykt && <span className="text-slate-700">Decyzja do:{" "}
-          <b className={termin.pilny ? "text-ranga-zle" : "text-slate-900"}>{termin.napis}</b>
-          {r.decyzjaDo && <span className="text-slate-600"> · {czas(r.decyzjaDo)}</span>}</span>}
-        {r.zwrotWymagany !== null && <span className="text-slate-700">
-          {r.zwrotWymagany ? "zwrot towaru wymagany" : "zwrot towaru niewymagany"}</span>}
-        {innyStatus && <span className="text-slate-700">Allegro: <b>{innyStatus}</b></span>}
+      <p className="text-sm text-slate-700">
+        <span className="text-slate-600">Chce:</span>{" "}
+        <b className="font-bold text-slate-900">{oczekiwanie ?? "nie podał"}</b>
+        {kwota && <>{" "}<b className="font-bold tabular-nums text-slate-900">{kwota}</b></>}
+        {powod && <>{" "}<Kropka />{" "}<span>{powod}</span></>}
+        {" "}<Kropka />{" "}
+        <span>{r.prawo ? (PRAWO[r.prawo] ?? "tytuł nieznany") : "tytuł nieznany"}</span>
       </p>
     </div>
-    {/* Kto prowadzi — CZYNNOŚĆ, więc stoi w głowicy przy decyzji „biorę to",
-        a nie w kolumnie faktów. Własną sprawę da się odłożyć tym samym
-        przyciskiem, bo serwer zdejmuje znacznik drugim kliknięciem. */}
+
+    {/* ── PRAWA SZCZELINA: KTO PROWADZI, NUMER I ZGŁOSZENIE ────────────────
+        Wzięcie sprawy jest CZYNNOŚCIĄ, więc stoi w głowicy, a nie w kolumnie
+        faktów. Własną sprawę da się odłożyć tym samym przyciskiem, bo serwer
+        zdejmuje znacznik drugim kliknięciem. Numer i data zgłoszenia stoją
+        pod spodem: to fakty do skopiowania, nie do decyzji. */}
     <div className="ml-auto flex min-w-0 flex-col items-end gap-1">
       <Prowadzi wWierszu prowadzi={r.prowadzi} trwa={trwa} onProwadze={onProwadze}
         jaProwadze={mojaSprawa(r.prowadziId, mojeId)} />
       {blad && <p className="text-xs text-red-700">{blad}</p>}
+      <p className="flex items-center gap-1 text-xs text-slate-600">
+        reklamacja <b className="font-bold tabular-nums text-slate-900">{numer}</b>
+        {/* Przycisk kopiowania nie niesie numeru w nazwie: kolejka szuka
+            wierszy po numerze, a drugi przycisk z nim byłby drugim wierszem. */}
+        <Skopiuj tekst={numer} tytul="Kopiuj numer reklamacji" />
+        {r.link && <a href={r.link} target="_blank" rel="noopener noreferrer"
+          aria-label="Reklamacja w Allegro" title="Reklamacja w Allegro"
+          className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-600 hover:bg-slate-100 hover:text-slate-900">
+          <ExternalLink size={12} aria-hidden="true" /></a>}
+      </p>
+      <p className="text-xs text-slate-600">zgłoszona {czas(r.otwartoAt)}</p>
     </div>
   </div>;
 }

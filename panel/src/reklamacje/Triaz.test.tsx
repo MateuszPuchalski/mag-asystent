@@ -78,13 +78,15 @@ beforeEach(() => {
 });
 
 describe("Triaż w kolumnie dowodów", () => {
-  it("mówi, CZY MAMY bez otwierania czegokolwiek, a półka stoi w podpisie Kartoteki", () => {
+  it("mówi, CZY MAMY bez otwierania czegokolwiek, a półka stoi w podpisie cen", () => {
     /* Żadnego kliknięcia przed tą asercją i to jest cały jej sens: przy
        żądaniu wymiany ta liczba rozstrzyga sprawę. Podpis kostki mówi dziś
        o dostawach, więc półka zeszła do zwijki — i widać ją w jej podpisie. */
     render(<Dowody {...props()} />);
     expect(screen.getByText("7 szt.")).toBeVisible();
-    expect(screen.getByRole("button", { name: /Kartoteka/ })).toHaveTextContent("półka D02-01-04");
+    /* Podpis liczy cenniki SPRZEDAŻY — poziom 0 to zakup i stoi w kostce. */
+    expect(screen.getByRole("button", { name: /^Ceny i półka/ }))
+      .toHaveTextContent("2 ceny sprzedaży · półka D02-01-04");
   });
 
   it("BRAK NA STANIE mówi o sobie wprost — to zmienia decyzję, nie tylko liczbę", () => {
@@ -196,11 +198,12 @@ describe("Wiek zakupu w triażu (0.413.0)", () => {
     /* „Uszkodzone w transporcie" zgłoszone po dwóch dniach i po trzech
        miesiącach to dwie różne sprawy, a z samego wieku tego nie widać. */
     const { unmount } = render(<Dowody {...props({ dniOdZakupu: 30, zgloszonoPoDniach: 12 })} />);
-    expect(screen.getByText("zgłoszone 12 dni po zakupie")).toBeInTheDocument();
+    /* Data zakupu stoi na widoku przed liczbą dni, nie tylko w podpowiedzi. */
+    expect(screen.getByText(/^\d{1,2} \S+ \d{4} · zgłoszone 12 dni po zakupie$/)).toBeInTheDocument();
     unmount();
     /* Starszy serwer pola nie zna — liczymy je z jego własnych dwóch dat. */
     render(<Dowody {...props({ dniOdZakupu: 30 })} />);
-    expect(screen.getByText("zgłoszone 2 dni po zakupie")).toBeInTheDocument();
+    expect(screen.getByText(/ · zgłoszone 2 dni po zakupie$/)).toBeInTheDocument();
   });
 
   it("bez daty zakupu kostka mówi „nie wiemy” — brak wiedzy to nie „dziś”", () => {
@@ -234,15 +237,16 @@ describe("Ilość objęta sprawą (0.413.0)", () => {
   });
 });
 
-describe("Historia towaru i klienta (0.413.0)", () => {
-  it("mówi, ile razy TO SAMO już się zdarzyło i jak się skończyło", () => {
+describe("Historia towaru w kolumnie, klienta w głowicy", () => {
+  it("mówi, ile razy TEN TOWAR już się sypał i jak się skończyło", () => {
     render(<Dowody {...props({}, true, {
       towar: { ile: 3, uznanych: 2, odrzuconych: 1 },
       klient: { ile: 1, uznanych: 0, odrzuconych: 1 },
     })} />);
     expect(screen.getByText(
       /Ten towar: 3 reklamacje \(2 uznane, 1 odrzucona\)/)).toBeInTheDocument();
-    expect(screen.getByText(/Ten klient: 1 reklamacja \(1 odrzucona\)/)).toBeInTheDocument();
+    /* O kliencie mówi rząd klienta w głowicy, obok loginu — jeden dom na fakt. */
+    expect(screen.queryByText(/Ten klient/)).not.toBeInTheDocument();
   });
 
   it("bez historii nie rysuje wiersza — pierwsza sprawa to nie informacja o towarze", () => {
@@ -251,12 +255,12 @@ describe("Historia towaru i klienta (0.413.0)", () => {
     expect(screen.queryByText(/Ten klient/)).not.toBeInTheDocument();
   });
 
-  it("jedna strona wiedzy wystarcza — drugiej nie udaje zerem", () => {
+  it("bez historii towaru linii nie ma, choć klient ją ma — nie udaje zera", () => {
     render(<Dowody {...props({}, true, {
       towar: null, klient: { ile: 2, uznanych: 2, odrzuconych: 0 },
     })} />);
-    expect(screen.getByText(/Ten klient: 2 reklamacje \(2 uznane\)/)).toBeInTheDocument();
     expect(screen.queryByText(/Ten towar/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/2 reklamacje/)).not.toBeInTheDocument();
   });
 });
 
@@ -270,37 +274,35 @@ describe("Jeden dom na fakt (0.414.0)", () => {
   it("cena NIE stoi przy wierszu towaru — tam pytanie brzmi „co to jest”", () => {
     /* Wiersz towaru stoi w głowicy sprawy, nad kolumnami — i tam też zostaje
        bez ceny. Kwota z paragonu ma swój dom w kostce „Klient zapłacił". */
-    render(<Glowica szczegol={props().szczegol} trwa={false} onProwadze={vi.fn()} />);
+    render(<MemoryRouter><Glowica szczegol={props().szczegol} trwa={false} onProwadze={vi.fn()} /></MemoryRouter>);
     const symbol = screen.getByText("14-31051");
     expect(symbol.parentElement!.textContent).not.toContain("49,90");
   });
 
-  it("wiersza „Kupiono” nie ma — datę niesie kostka i podpis zwijki", () => {
+  it("wiersza „Kupiono” nie ma — datę niesie wyłącznie kostka „Kupione”", () => {
     render(<Dowody {...props({ dniOdZakupu: 3 })} />);
     expect(screen.queryByText("Kupiono")).not.toBeInTheDocument();
     expect(screen.queryByText("Zamówienie złożone")).not.toBeInTheDocument();
   });
 
-  it("suma zamówienia ma JEDEN dom — w zwijce, nie w jej podpisie (0.416.0)", () => {
-    /* 0.414.0 wyniosło sumę do podpisu, żeby nie stała dwa razy w tym samym
-       bloku. Wyszło gorzej: przy zamówieniu jednopozycyjnym podpis powtarzał
-       wtedy kostkę „Klient zapłacił", czyli ten sam dubel piętro wyżej.
-       Podpis mówi teraz, CO jest w środku; kwota stoi w środku. */
+  it("przy jednej pozycji podpis zamówienia nie powtarza kostki „Klient zapłacił”", () => {
+    /* Suma jednopozycyjnego zamówienia to ta sama liczba, co kostka piętro
+       wyżej. Podpis mówi więc, CO jest w środku, a nie ile kosztowało. */
     render(<Dowody {...props()} />);
-    const zwijka = screen.getByRole("button", { name: /Zakup/ });
-    expect(zwijka.textContent).toContain("1 pozycja");
+    const zwijka = screen.getByRole("button", { name: /^Zamówienie/ });
+    expect(zwijka.textContent).toContain("tylko ten towar");
     expect(zwijka.textContent).not.toContain("49,90");
   });
 
-  it("ZAKUP startuje zamknięty, bo jego kwoty stoją już w kostkach", () => {
+  it("ZAMÓWIENIE przy wymianie startuje zamknięte, bo jego kwoty stoją już w kostkach", () => {
     render(<Dowody {...props()} />);
-    expect(screen.getByRole("button", { name: /Zakup/ }))
+    expect(screen.getByRole("button", { name: /^Zamówienie/ }))
       .toHaveAttribute("aria-expanded", "false");
   });
 
-  it("KARTOTEKA startuje zamknięta — koszt mówi kostka „Klient zapłacił”", () => {
+  it("CENY I PÓŁKA startują zamknięte — koszt mówi kostka „Klient zapłacił”", () => {
     render(<Dowody {...props()} />);
-    expect(screen.getByRole("button", { name: /Kartoteka/ }))
+    expect(screen.getByRole("button", { name: /^Ceny i półka/ }))
       .toHaveAttribute("aria-expanded", "false");
     /* A liczba, dla której ten blok w ogóle powstał, stoi bez kliknięcia. */
     expect(screen.getByText("Klient zapłacił").parentElement!.textContent).toContain("18,64");
@@ -424,7 +426,9 @@ describe("Kolumna w stałej kolejności", () => {
       screen.getByText("Dostawca"),
       screen.getByText(/Ten towar: 2 reklamacje/),
       screen.getByRole("region", { name: "Werdykt" }),
-      ...["Paczka", "Zakup i oferta", "Kartoteka", "Sprawa", "Ten zakup u nas", "Praca biura"]
+      /* „Ten zakup u nas" stoi pierwsza pod werdyktem: inna otwarta sprawa
+         tego zakupu to klient, który czeka też gdzie indziej. */
+      ...["Ten zakup u nas", "Paczka do klienta", "Zamówienie", "Ceny i półka", "Praca biura"]
         .map((t) => screen.getByRole("button", { name: new RegExp(`^${t}`) })),
     ];
     for (let i = 1; i < kolejnosc.length; i += 1) {

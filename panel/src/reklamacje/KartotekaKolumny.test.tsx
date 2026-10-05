@@ -1,6 +1,7 @@
 import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 
 /* ── Jedna kartoteka na całą sprawę ──────────────────────────────────────────
@@ -76,12 +77,13 @@ const rysuj = (r: Partial<Reklamacja>, kartoteka: SzczegolReklamacji["kartoteka"
     droga: [], kartoteka, karta: null, przesylka: null, zamowienie: null,
     historia: { towar: null, klient: null },
   } as unknown as SzczegolReklamacji;
-  return render(<SzufladaTowaru>
+  /* Router, bo głowica prowadzi łączem na profil klienta. */
+  return render(<MemoryRouter><SzufladaTowaru>
     <Glowica szczegol={szczegol} trwa={false} onProwadze={vi.fn()} />
     <KolumnaDowodow szczegol={szczegol} trwa={false} blad="" idZdjecia={(z) => `zdjecie-${z}`}
       onPokaz={vi.fn()} onDodaj={vi.fn()} onUsun={vi.fn()} />
     <Dowody szczegol={szczegol} trwa={false} bladZapisu="" onNotatka={vi.fn()} />
-  </SzufladaTowaru>);
+  </SzufladaTowaru></MemoryRouter>);
 };
 
 beforeEach(() => {
