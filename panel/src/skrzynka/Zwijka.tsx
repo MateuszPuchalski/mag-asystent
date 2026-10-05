@@ -36,7 +36,7 @@ import type { LucideIcon } from "lucide-react";
  */
 /* Prywatne okno rzuca przy odczycie I przy zapisie — wtedy wybór zostaje na
    jedno wejście na ekran. Ten sam wzorzec co sito w `sprawy/Moje.tsx`. */
-function zapamietane(klucz: string | undefined): boolean | null {
+export function zapamietane(klucz: string | undefined): boolean | null {
   if (!klucz) return null;
   try {
     const v = localStorage.getItem(klucz);
@@ -44,7 +44,7 @@ function zapamietane(klucz: string | undefined): boolean | null {
   } catch { return null; }
 }
 
-function zapamietaj(klucz: string | undefined, otwarte: boolean): void {
+export function zapamietaj(klucz: string | undefined, otwarte: boolean): void {
   if (!klucz) return;
   try { localStorage.setItem(klucz, otwarte ? "1" : "0"); } catch { /* prywatne okno */ }
 }

@@ -1364,6 +1364,80 @@ Zatrzymuje też dawne barwy błędu i odnośnika.
 kolumny. Przy dwóch i więcej pozycjach lista w kolumnie powtarza więc te dwie.
 To powtórzenie i wiersz „Zamówił” w paśmie czekają na decyzję właściciela.
 
+### 10.2h. Ceny kartoteki na jednej osi (@wydanie)
+
+Zgłoszenie właściciela z 5 października 2026: blok „Ceny” zajmuje za dużo
+miejsca. Lista poziomów, oś z kropkami i zdanie mówiły trzy razy to samo.
+Zostaje jedna oś z podpisami. Blok z sześcioma poziomami ma przy kolumnie
+384 px 122 px zamiast 194 px, a przy 448 px 106 px. Przy 256 px schodzi
+z 210 do 150 px (Chromium, krój Barlow).
+
+**Jedna oś brutto.** Każdy poziom ma kropkę na wspólnej skali z ofertą
+i etykietę z nazwą i kwotą brutto. Rodzaj ceny i waluta stoją raz,
+w nagłówku „Ceny brutto · PLN”. Poziomy o tej samej cenie dzielą jedną kropkę.
+Bez biblioteki wykresów: skala to jedna linijka, a rozkład etykiet to nasza
+reguła (`skrzynka/cenyNaOsi.ts`).
+
+**Oferta to bursztynowy pierścień.** Poziom o tej samej cenie widać w jego
+środku. Etykieta oferty nie ma kwoty, bo kwota ma dom w karcie zakupu
+(§10.2g). Kwotę mówi dymek pierścienia i nazwa figury dla czytnika ekranu.
+Pierścień jest w amber-600, bo obiekt graficzny potrzebuje kontrastu 3:1
+na bieli.
+
+**Ogonek wskazuje etykietę.** Krótka kreska biegnie od kropki do strony, po
+której stoi jej etykieta. Cudza kropka pod etykietą ma ogonek w drugą stronę.
+Przy pierścieniu kreska ma niecałe 3 px, bo etykieta stoi tuż przy nim.
+Kropka poziomu bliska ofercie leży nad pierścieniem, więc nie znika pod nim.
+Detaliczna stoi tuż pod osią, więc najczęściej czytana kwota ma stałe miejsce.
+
+**Pasek zakresu.** Grubsza szara kreska biegnie od najniższego do najwyższego
+poziomu. Oferta poza cennikiem siedzi na cienkiej osi za jej końcem.
+
+**Netto jedno kliknięcie dalej.** „pokaż tabelę z netto” rozwija wszystkie
+poziomy w kolejności Subiekta, każdy osobno. Panel pamięta ten wybór na
+stanowisku, jak zwinięcie karty zakupu. Netto pokazuje też dymek przy
+najechaniu i przy fokusie klawiatury. Tabela nie ma wiersza oferty.
+
+**Dymek.** Stoi na zdaniu pod osią, a przy dole kolumny nad wykresem. Nie jest
+szerszy od bloku, a długą listę nazw łamie. Kursor może na niego wjechać,
+a Escape chowa go z każdego miejsca, także z pola odpowiedzi (WCAG 1.4.13).
+Klik w kwotę tylko ją zaznacza: dymek się nie przypina, a strzałki zostają
+przy kolejce.
+
+**Klawiatura.** Wykres to jeden przystanek tabulatora, a wchodzi się na
+ofertę. Strzałki, Home i End chodzą po etykietach, a Escape chowa dymek.
+Strzałka w wykresie nie przerzuca rozmowy w kolejce.
+
+**Zero brutto to brak.** Poziom bez ceny brutto nie wchodzi na oś. Stoi
+wierszem pod zdaniem, z pogrubionym netto i dopiskiem „bez ceny brutto”.
+W tabeli ma „brak” i pogrubione netto. Poziom w innej walucie niż oferta też
+stoi wierszem pod zdaniem, z dopiskiem „inna waluta niż oferta”. W tabeli jego
+kwoty mają kod waluty.
+
+**Zdanie położenia zostaje.** Doszły dwie gałęzie. Oferta równa poziomowi
+mówi „Oferta równa poziomowi Detaliczna.”, a różnica poniżej procenta mówi
+„mniej niż 1%” zamiast „0%”.
+
+**Kolejność.** Na osi poziomy stoją według ceny, bo tak działa skala.
+Kolejność Subiekta trzyma tabela. To świadome odejście od listy, którą agent
+znał na pamięć.
+
+**Bez oferty nic się nie zmienia.** Reklamacje i rozmowa bez pobranej oferty
+pokazują dotychczasową listę z netto, bo oś bez oferty nie odpowiada na żadne
+pytanie. Ta sama lista staje, gdy etykiety nie mieszczą się w kolumnie.
+Staje też wtedy, gdy przeglądarka narysuje napis szerzej, niż policzono, na
+przykład przy większym piśmie. Wtedy pod listą stoi zdanie położenia,
+a przełącznika tabeli nie ma.
+
+**Strażnicy.** `skrzynka/cenyNaOsi.test.ts` układa sześć zestawów cen przy
+czterech szerokościach treści kolumny: 222, 335, 350 i 414 px. 335 px to
+kolumna 384 px z paskiem przewijania. Etykiety nie nachodzą na siebie ani nie
+wychodzą poza blok, a kropka leży pod własną etykietą.
+`skrzynka/TowarRozmowy.test.tsx` pilnuje etykiety oferty bez kwoty, tabeli,
+pamięci, klawiatury i zera zapisu. Pilnuje też kolejności malowania, dymka,
+listy awaryjnej i struktury WCAG 2.2 AA (axe).
+`Gramatyka.test.ts` czyta też `OsCenKartoteki.tsx`.
+
 ### 10.3. Oś rozmowy
 
 Oś zawiera wiadomości klienta, odpowiedzi firmy, komentarze wewnętrzne, zmiany
