@@ -55,13 +55,12 @@ export const EtykietaWartosci = ({ className = "", children }: {
    stało `<h3>`, czytnik ekranu ma dalej słyszeć nagłówek. Domyślny `<span>`
    zostaje dla nagłówków, które siedzą w rzędzie obok numeru i plakietek.
 
-   `ton` bierze wyłącznie barwę, nie resztę łańcucha — nagłówek „Wymaga
-   Ciebie" jest bursztynowy, bo mówi o randze tego, co pod nim, a nie
-   dlatego, że ma inny kształt. */
+   `ton` bierze wyłącznie barwę, nie resztę łańcucha — barwa mówi o źródle
+   albo randze treści pod nagłówkiem, a nie o innym kształcie nagłówka. */
 export function NaglowekSekcji({ ikona, ton = "text-slate-500", jako: Znacznik = "span",
   className = "", children }: {
   ikona?: React.ReactNode;
-  /** Sama barwa. Domyślnie szara; zielona i bursztynowa mówią o źródle. */
+  /** Sama barwa. Domyślnie szara; inna mówi o źródle albo randze treści. */
   ton?: string;
   /** Znacznik HTML — `h3` tam, gdzie to naprawdę nagłówek dokumentu. */
   jako?: "span" | "h3" | "p" | "div";

@@ -17,8 +17,8 @@ import { ZDARZENIA } from "./zdarzenia-rejestr.js";
 
 const AUTOMATY = new Set([
   "copilot_auto_klasyfikacja", "copilot_auto_klasyfikacja_sufit", "copilot_auto_szkic",
-  "copilot_auto_szkic_sufit", "copilot_przed_praca", "copilot_szkic_po_rozpoznaniu", "pasowanie_siec", "pasowanie_siec_silnik", "ean_conflict_autoresolved", "http_rejected", "login_failed",
-  "privileged", "read_model_po_imporcie", "kopia_bazy", "migawka_dnia", "raport_tygodnia", "aktualizacja_automatyczna", "aktualizacja_wynik", "rekoncyliacja", "wiedza_automat_przebieg", "zwrot_rabat_automat_blad",
+  "copilot_auto_szkic_sufit", "copilot_przed_praca", "copilot_szkic_po_rozpoznaniu", "ean_conflict_autoresolved", "http_rejected", "login_failed",
+  "privileged", "read_model_po_imporcie", "kopia_bazy", "migawka_dnia", "raport_tygodnia", "aktualizacja_automatyczna", "aktualizacja_wynik", "rekoncyliacja", "zwrot_rabat_automat_blad",
   "queue_applied", "queue_failed", "queue_retry", "device_drop", "battery_low", "scan_timing",
   "siec_przerwa", "rozmowa_przeczytana_blad", "rozmowa_wysylka_blad", "rozmowa_wysylka_niepewna",
   "rozmowa_wysylka_konflikt", "rozmowa_wysylka_uzgodniona", "reklamacja_wysylka_konflikt",
@@ -36,10 +36,8 @@ const OBSZARY: Array<[string, string]> = [
   ["obsluga.", "Skrzynka"], ["zamowienie_", "Skrzynka"], ["przesylka_", "Skrzynka"],
   ["klient_notatka", "Profil klienta"], ["klient_sprawa", "Profil klienta"], ["klient_dosylka", "Profil klienta"],
   ["klient_", "Skrzynka"], ["copilot_", "Copilot"], ["klasyfikacja_", "Copilot"],
-  ["dobor_", "Dobór części"], ["kosz_", "Kosze"], ["zwrot", "Zwroty"],
+  ["kosz_", "Kosze"], ["zwrot", "Zwroty"], ["oferta_komplet", "Zwroty"],
   ["reklamacj", "Reklamacje"], ["dyskusja_", "Dyskusje"], ["sprawa_tag", "Tagi spraw"],
-  ["wiedza_", "Wiedza"], ["pasowanie_", "Wiedza"], ["zabudowa_", "Wiedza"], ["token_", "Wiedza"],
-  ["alias_", "Wiedza"], ["wykaz_", "Wiedza"], ["zamiennosc_", "Wiedza"], ["odsylacze_", "Wiedza"], ["oferta_", "Wiedza"],
   ["delivery_", "Dostawy"], ["przyjecie_", "Dostawy"], ["notatka_", "Dostawy"],
   ["zadanie_terenowe", "Zadania"], ["brak_na_serwis", "Zadania"],
   ["putaway", "Kolektor"], ["karton_", "Kolektor"], ["location_", "Kolektor"],

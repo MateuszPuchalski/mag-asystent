@@ -61,7 +61,7 @@ describe("Nagłówek sekcji: znacznik i barwa", () => {
   });
 
   it("`ton` bierze samą barwę, reszta łańcucha zostaje", () => {
-    /* Barwa nagłówka mówi o randze treści pod nim, a nie o innym kształcie —
+    /* Barwa nagłówka mówi o źródle albo randze treści, a nie o kształcie —
        dlatego wolno podmienić wyłącznie barwę. */
     const { container } = render(
       <NaglowekSekcji ton="text-emerald-800">Pasuje do</NaglowekSekcji>);

@@ -574,7 +574,8 @@ export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta" | "dostawca";
  * ostrożność na wyrost: z tego, że na fotografii widać tabliczkę, nie wynika,
  * że to tabliczka maszyny, o którą klient pyta.
  */
-/* `siec` (0.528.0): strona przeczytana w dopytaniu; sufit „prawdopodobne”. */
+/* `siec`: strona przeczytana w dopytaniu. Serwer już jej nie czyta, ale
+   zapisane wymiany ją niosą, a twierdzenie bez etykiety źródła kłamałoby. */
 export type ZrodloTwierdzenia = "fakty" | "oferta" | "zdjecie" | "siec" | "model";
 export type PoziomPewnosci = "pewne" | "prawdopodobne" | "niepewne";
 export type TwierdzenieCopilota = {

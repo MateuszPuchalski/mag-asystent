@@ -15,7 +15,9 @@ const typyRejestru = (() => {
 
 describe("nazwy zdarzeń dziennika", () => {
   it("strażnik widzi rejestr — pusta lista przepuściłaby wszystko", () => {
-    expect(typyRejestru.length).toBeGreaterThan(250);
+    /* Próg łapie zepsuty wycinek, nie liczy typów: rejestr maleje, gdy
+       funkcja odchodzi z serwera, a wycinek, który nie trafił, daje zero. */
+    expect(typyRejestru.length).toBeGreaterThan(200);
   });
 
   it("każdy typ z rejestru ma polską nazwę", () => {
