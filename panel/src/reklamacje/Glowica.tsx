@@ -154,7 +154,9 @@ export function Glowica({ szczegol, mojeId = null, trwa, blad = "", onProwadze }
                 <span className="font-mono font-semibold text-slate-800">{towar.symbol}</span></PrzyciskTowaru>
               {towar.zrodlo && <><Kropka /><span>{NAPIS_ZRODLA[towar.zrodlo]}</span></>}
             </>
-          : <span>{szczegol.kartoteka?.powod ?? "bez kartoteki"}</span>}
+          /* Przy braku stoi ZDANIE serwera, nie kod powodu: `powod` jest
+             kluczem dla liczników, a agent ma przeczytać, które ogniwo pękło. */
+          : <span>{szczegol.kartoteka?.zrodlo ?? "bez kartoteki"}</span>}
       </p>
       <p className="mt-1 flex flex-wrap items-center gap-x-4 gap-y-0.5 text-sm">
         {slowo && <span className={`inline-flex items-center gap-1.5 ${

@@ -5,7 +5,7 @@ import { czas, dzienMiesiac, ile, NaglowekSekcji, Przycisk } from "../ui";
 import { Kafel, KafelOferty } from "../towar/Kafel";
 import { ListaZalacznikow } from "../towar/Zalacznik";
 import { ZalacznikSprawy, etykietaRoli } from "./Czat";
-import { twIdSprawy } from "./Glowica";
+import { kartotekaKolumny } from "./Glowica";
 
 /* ── Kolumna dowodów i zdjęć — obok rozmowy ──────────────────────────────────
    Decyzja właściciela przy przebudowie ekranu: lista dowodów stoi NA GÓRZE
@@ -84,7 +84,9 @@ export function KolumnaDowodow({ szczegol, trwa, blad, idZdjecia, onPokaz, onDod
      jak pusta lista wpisów, a nie wywracać kolumny. */
   const dowody: DowodReklamacji[] = szczegol.dowody ?? [];
   const { grupy, znaki, poNumerze } = zdjeciaSprawy(szczegol);
-  const twId = twIdSprawy(szczegol);
+  /* Ta sama kartoteka co symbol w głowicy i fakty obok — kafel z innej
+     kartoteki pokazywałby zdjęcie nie tego towaru, o którym mowa. */
+  const towar = kartotekaKolumny(szczegol);
   const [tresc, setTresc] = useState("");
   const [zalacznik, setZalacznik] = useState("");
   const idPola = useId();
@@ -163,8 +165,8 @@ export function KolumnaDowodow({ szczegol, trwa, blad, idZdjecia, onPokaz, onDod
         </figure>
         {/* Kartoteka tylko wtedy, gdy wiemy, która to — pusty kafel przy
             sprawie bez kartoteki czytałby się jak „u nas nie ma zdjęcia". */}
-        {twId !== null && <figure className="flex flex-col items-center gap-1">
-          <Kafel twId={twId} rozmiar={64} nazwa={r.ofertaNazwa ?? "Kartoteka"} symbol={r.twSymbol} />
+        {towar.twId !== null && <figure className="flex flex-col items-center gap-1">
+          <Kafel twId={towar.twId} rozmiar={64} nazwa={r.ofertaNazwa ?? "Kartoteka"} symbol={towar.symbol} />
           <figcaption className="text-podpis text-slate-600">kartoteka</figcaption>
         </figure>}
       </div>
