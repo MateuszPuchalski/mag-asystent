@@ -219,6 +219,8 @@ export const KLUCZE: readonly Klucz[] = [
     opis: "Wzorzec adresu zwrotu w Centrum Sprzedaży." },
   { klucz: "ALLEGRO_PANEL_REKLAMACJA", grupa: "allegro", kto: "zaawansowane",
     opis: "Wzorzec adresu reklamacji w Centrum Sprzedaży." },
+  { klucz: "ALLEGRO_PANEL_DYSKUSJA", grupa: "allegro", kto: "zaawansowane",
+    opis: "Wzorzec adresu dyskusji w Centrum Sprzedaży." },
 
   // ── Zwroty i reklamacje ───────────────────────────────────────────────────
   { klucz: "ALLEGRO_ZWROTY_OD", grupa: "zwroty", kto: "wlasciciel", edycja: DATA,

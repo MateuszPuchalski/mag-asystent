@@ -1,6 +1,6 @@
 ---
 rodzaj: minor
-tytul: zdjęcia dyskusji w kolumnie obok rozmowy i najdłużej czekające na górze
+tytul: dyskusje ze zdjęciami obok rozmowy, odnośnikiem do Allegro i najdłużej czekającą na górze
 ---
 
 **Zdjęcia w dyskusji stoją w kolumnie obok rozmowy, jak w reklamacjach.**
@@ -11,3 +11,7 @@ następnej wiadomości poza ekran.
 Dotąd stała od najnowszych, więc dyskusja czekająca 19 dni lądowała w połowie
 listy, choć to za nią Allegro może zablokować konto. Dawną kolejność da się
 wybrać przyciskiem nad listą.
+
+**Dyskusję otworzysz jednym kliknięciem w Centrum Sprzedaży.** Odnośnik
+„Otwórz w Allegro" stoi nad rozmową, obok „Odśwież z Allegro", i prowadzi na
+stronę tej dyskusji, a nie tylko zamówienia.

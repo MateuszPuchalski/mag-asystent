@@ -4,7 +4,7 @@ import { logEvent } from "./events.js";
 import {
   TAGI_REKLAMACJI, tagiSprawy, tagiWszystkichSpraw, type TagSprawy,
 } from "./tagi-spraw.js";
-import { linkZamowienia } from "./allegro-linki.js";
+import { linkDyskusji, linkZamowienia } from "./allegro-linki.js";
 import {
   BladReklamacji,
   cofnijNotatkeSprawy,
@@ -155,11 +155,12 @@ export interface WierszDyskusji {
   kubelek: KubelekDyskusji;
   sygnaly: SygnalDyskusji[];
   /**
-   * Odnośnik do zamówienia. Adresu SAMEJ dyskusji w Centrum Sprzedaży
-   * świadomie nie budujemy — wzorzec `/claims/{id}` dotyczy reklamacji,
-   * a zgadnięty z analogii dał już raz 404 (blizna 0.226.1). Zamówienie
-   * jest adresem sprawdzonym i prowadzi tam, skąd dyskusję widać.
+   * Sama dyskusja w Centrum Sprzedaży. Adres sprawdzony kliknięciem, a nie
+   * zgadnięty z analogii do reklamacji: tamten wzorzec `/claims/{id}` dotyczy
+   * innej strony i przy dyskusji dałby 404.
    */
+  link: string | null;
+  /** Odnośnik do zamówienia, z którego dyskusja wyrosła. */
   linkZamowienia: string | null;
 }
 
@@ -356,6 +357,7 @@ function zWiersza(w: Wiersz, teraz: number, wiadomosci: WiadomoscCzasu[] = []): 
     wersja: Number(w.wersja ?? 1),
     kubelek,
     sygnaly: sygnalyDyskusji(rdzen),
+    link: linkDyskusji(tekst(w.external_id)),
     linkZamowienia: linkZamowienia(tekst(w.order_id)),
   };
 }

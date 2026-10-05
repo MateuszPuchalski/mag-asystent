@@ -19,10 +19,10 @@ import { Zwijka } from "../skrzynka/Zwijka";
    pustych wierszy „—" udawałoby, że dane są, tylko puste; sekcja, której nie
    ma, mówi prawdę taniej.
 
-   ADRESU SAMEJ DYSKUSJI W CENTRUM SPRZEDAŻY NIE ZGADUJEMY. Wzorzec
-   `/claims/{id}` dotyczy reklamacji, a wywiedziony z analogii dał już raz 404
-   (blizna 0.226.1) — dlatego jedynym odnośnikiem jest ZAMÓWIENIE, adres
-   sprawdzony, prowadzący tam, skąd dyskusję widać.
+   ODNOŚNIK DO SAMEJ DYSKUSJI stoi nad rozmową, przy „Odśwież z Allegro",
+   a nie tutaj: oba odpowiadają na pytanie „co widzi Allegro". Tu zostaje
+   zamówienie. Adres dyskusji jest sprawdzony kliknięciem, nie wywiedziony
+   z `/claims/{id}` reklamacji, bo taka analogia dała już raz 404.
 
    Wszystko poniżej to ODCZYT. Dwa zapisy tego ekranu — „prowadzę" i notatka —
    są jawnymi kliknięciami, nie skutkiem ubocznym patrzenia.                 */

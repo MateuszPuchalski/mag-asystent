@@ -39,8 +39,8 @@ const PODPISY: Record<OsPorzadku, { napis: string; podpowiedz: string }> = {
   ruch: { napis: "Ostatni ruch", podpowiedz: "Kiedy w sprawie ostatnio cokolwiek się wydarzyło" },
   termin: { napis: "Termin", podpowiedz: "Najbliższy termin decyzji na górze — co się pali" },
   kwota: { napis: "Kwota", podpowiedz: "Najdroższe sprawy na górze" },
-  /* Oś WYŁĄCZNIE skrzynki: rozmowa nie ma terminu, więc jedyną miarą pilności
-     jest to, jak długo piłka leży po naszej stronie (powód przy `czekaOdMs`). */
+  /* Oś skrzynki i dyskusji: ani rozmowa, ani dyskusja nie ma terminu, więc
+     jedyną miarą pilności jest to, jak długo piłka leży po naszej stronie. */
   czekanie: { napis: "Najdłużej czeka", podpowiedz: "Jak długo pytanie klienta leży po naszej stronie" },
 };
 
