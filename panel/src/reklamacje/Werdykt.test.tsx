@@ -106,28 +106,31 @@ describe("Werdykt", () => {
     expect(naGrosze("1,234")).toBeNull();
   });
 
-  it("po wysłaniu: blok tylko do odczytu ze stanem, kwotą, autorem i kopiowaniem — bez przycisków werdyktu", () => {
+  it("po wysłaniu blok nazywa się „Po werdykcie”: kto, kiedy i wiadomość — bez przycisków werdyktu", () => {
     pokaz({
       werdykt: "ACCEPTED_PARTIAL_REFUND", werdyktNazwa: "Uznana — częściowy zwrot pieniędzy",
       werdyktStatus: "sent", werdyktWiadomosc: "Zwracamy 40 zł.", werdyktKwotaGrosze: 4000,
       werdyktPrzez: "Ala", werdyktAt: "2026-09-09T10:00:00.000Z", kubelek: "zamknieta",
     });
-    expect(screen.getByText("Uznana — częściowy zwrot pieniędzy")).toBeInTheDocument();
-    expect(screen.getByText(/40,00 PLN/)).toBeInTheDocument();
-    expect(screen.getByText(/Wysłany — Allegro jeszcze nie potwierdziło/)).toBeInTheDocument();
-    expect(screen.getByText(/^Ala/)).toBeInTheDocument();
+    const blok = screen.getByRole("region", { name: "Po werdykcie" });
+    expect(within(blok).getByText(/^Werdykt z panelu: Ala, /)).toBeInTheDocument();
     expect(screen.getByTitle("Kopiuj wiadomość werdyktu")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Uznaję|Odrzucam|Spróbuj/ })).not.toBeInTheDocument();
+    /* Nazwa, kwota i los próby mają dom w zdaniu A głowicy (`etap.ts`).
+       Blok ich nie powtarza — uwaga właściciela o powtórzeniach. */
+    expect(screen.queryByText(/Uznana — częściowy zwrot pieniędzy/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/40,00 PLN/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Allegro jeszcze nie potwierdziło/)).not.toBeInTheDocument();
   });
 
-  it("potwierdzenie z Allegro zieleni stan; niepewny los mówi, czego NIE robić", () => {
+  it("niepewny los nie daje ponowienia — drugi strzał mógłby być drugim werdyktem", () => {
     const { unmount } = pokaz({ werdykt: "REJECTED_OTHER", werdyktNazwa: "Odrzucona — inny powód",
       werdyktStatus: "sent", statusAllegro: "CLAIM_REJECTED", kubelek: "zamknieta" });
-    expect(screen.getByText(/Potwierdzony przez Allegro/)).toBeInTheDocument();
+    expect(screen.queryByText(/Potwierdzony przez Allegro/)).not.toBeInTheDocument();
     unmount();
     pokaz({ werdykt: "REJECTED_OTHER", werdyktNazwa: "Odrzucona — inny powód",
       werdyktStatus: "send_uncertain", kubelek: "zamknieta" });
-    expect(screen.getByText(/nie wysyłaj drugi raz/)).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Po werdykcie" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Spróbuj/ })).not.toBeInTheDocument();
   });
 
@@ -143,10 +146,18 @@ describe("Werdykt", () => {
     expect(onWerdykt).toHaveBeenCalledWith({ werdykt: "REJECTED_MINOR_DEFECT", wiadomosc: "Wada nieistotna.", kwotaGrosze: null });
   });
 
-  it("werdykt z Centrum Sprzedaży nie udaje naszego", () => {
-    pokaz({ statusAllegro: "CLAIM_ACCEPTED", kubelek: "zamknieta" });
-    expect(screen.getByText(/Rozstrzygnięta poza panelem/)).toBeInTheDocument();
+  it("werdykt z Centrum Sprzedaży nie udaje naszego — bez „kto i kiedy” i bez pustej ramy", () => {
+    /* Bez kroku towaru i dostawcy blok nie ma nic do powiedzenia: skąd jest
+       decyzja, mówi zdanie A głowicy. Pusta rama byłaby drugim domem niczego. */
+    const { unmount } = pokaz({ statusAllegro: "CLAIM_ACCEPTED", kubelek: "zamknieta" });
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
+    unmount();
+    /* Z krokiem dostawcy blok stoi, ale nie udaje, że decyzja jest z panelu. */
+    pokaz({ statusAllegro: "CLAIM_ACCEPTED", zwrotWymagany: true, kubelek: "zamknieta" },
+      { onUDostawcy: vi.fn() });
+    expect(screen.getByRole("group", { name: "Dalej: sztuka do dostawcy" })).toBeInTheDocument();
+    expect(screen.queryByText(/Werdykt z panelu/)).not.toBeInTheDocument();
   });
 
   it("krok „towar do odesłania?” tylko po NASZYM uznaniu; zdanie startowe do edycji; po decyzji potwierdzenie z Allegro", async () => {
@@ -329,10 +340,11 @@ describe("Werdykt bez nadmiaru (0.511.0)", () => {
   });
 
   it("wiadomości, którą Allegro oddało w rozmowie jako naszą, tu już nie ma", () => {
-    pokaz(wyslany(dluga), { czat: [wpis("SELLER")] });
+    pokaz({ ...wyslany(dluga), werdyktPrzez: "Ala" }, { czat: [wpis("SELLER")] });
     expect(screen.queryByText(/Po oględzinach/)).not.toBeInTheDocument();
-    /* Stan werdyktu zostaje — znika tylko powtórzone zdanie. */
-    expect(screen.getByText("Odrzucona — inny powód")).toBeInTheDocument();
+    /* Blok zostaje — znika tylko powtórzone zdanie. */
+    expect(within(screen.getByRole("region", { name: "Po werdykcie" }))
+      .getByText(/^Werdykt z panelu: Ala/)).toBeInTheDocument();
   });
 
   it("to samo zdanie od KLIENTA nie jest dublem — blok zostaje", () => {

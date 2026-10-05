@@ -60,11 +60,29 @@ export function Zwijka(p: {
   domyslnieOtwarte?: boolean;
   /** Klucz w `localStorage`; bez niego wybór żyje jedno wejście na ekran. */
   pamietajJako?: string;
+  /**
+   * Sygnał z innego miejsca ekranu: każda NOWA wartość otwiera blok,
+   * przewija do niego i stawia fokus na nagłówku.
+   *
+   * Głowica reklamacji wskazuje tak inną otwartą sprawę tego zakupu.
+   * Wartość zastana przy montażu niczego nie robi, bo przejście do innej
+   * sprawy nie może kraść fokusu z pola, w którym agent pisze.
+   */
+  otworz?: number;
   children: React.ReactNode;
 }) {
   const [otwarte, setOtwarte] = React.useState(
     () => zapamietane(p.pamietajJako) ?? p.domyslnieOtwarte ?? false);
   const { Ikona } = p;
+  const naglowek = React.useRef<HTMLButtonElement | null>(null);
+  const sygnal = React.useRef(p.otworz);
+  React.useEffect(() => {
+    if (p.otworz === undefined || p.otworz === sygnal.current) return;
+    sygnal.current = p.otworz;
+    setOtwarte(true);
+    naglowek.current?.scrollIntoView?.({ block: "nearest" });
+    naglowek.current?.focus();
+  }, [p.otworz]);
 
   const przelacz = () => {
     const nowe = !otwarte;
@@ -74,6 +92,7 @@ export function Zwijka(p: {
 
   return <div className="mt-2 rounded border border-slate-200 bg-white">
     <button
+      ref={naglowek}
       type="button"
       className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs text-slate-700"
       aria-expanded={otwarte}

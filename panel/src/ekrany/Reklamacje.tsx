@@ -237,8 +237,10 @@ const kody = (r: Reklamacja) =>
      NICZEGO, choć stał on na ekranie obok. Notatka jest zresztą jedynym
      miejscem, gdzie biuro pisze WŁASNYMI słowami; wykluczenie jej z szukania
      znaczyło, że im lepiej ktoś opisał sprawę, tym trudniej ją znaleźć. */
-  /* NAZWA OFERTY WCHODZI DO SZUKANIA, bo jest tytułem wiersza: pole, które
-     nie znajduje tego, co stoi na liście największym pismem, kłamałoby. */
+  /* LOGIN I NAZWA OFERTY WCHODZĄ DO SZUKANIA, bo stoją na wierszu w dwóch
+     pierwszych liniach: pole, które nie znajduje tego, co widać na liście,
+     kłamałoby. Numer zszedł z widoku wiersza, ale szukanie dalej po nim
+     trafia — przepisuje się go z rozmowy z klientem i z Allegro. */
   [r.numer, r.externalId, r.orderId, r.kupujacyLogin, r.prowadzi, r.notatka, r.ofertaNazwa]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
 
@@ -299,6 +301,11 @@ export function Reklamacje() {
     el?.focus();
   };
   const trwa = prowadze.isPending || notatka.isPending;
+  /* Wskaźnik innej otwartej sprawy tego zakupu w głowicy przewija do zwijki
+     „Ten zakup u nas" i ją otwiera. Licznik, nie przełącznik: każde
+     kliknięcie ma zadziałać, także drugie. Samo przewinięcie niczego nie
+     zapisuje. */
+  const [pokazZakup, setPokazZakup] = useState(0);
 
   const [bladWysylki, setBladWysylki] = useState("");
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
@@ -664,7 +671,7 @@ export function Reklamacje() {
           <label className="sr-only" htmlFor="szukaj-reklamacji">Szukaj reklamacji</label>
           <input id="szukaj-reklamacji" className="field min-w-0 flex-[1_1_8rem] !py-1 text-xs" value={fraza}
             onChange={(e) => setFraza(e.target.value)}
-            placeholder="Numer, towar, login, notatka" />
+            placeholder="Login, towar, numer, notatka" />
           <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
             moich={wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)).length}
             niczyich={wKubelku.filter((r) => r.prowadziId === null).length} />
@@ -716,6 +723,7 @@ export function Reklamacje() {
         ? <div className="flex min-h-0 min-w-0 flex-col gap-4">
           <Karta className="shrink-0">
             <Glowica szczegol={d} mojeId={mojeId} trwa={prowadze.isPending} blad={bladProwadze}
+              onPokazZakup={() => setPokazZakup((n) => n + 1)}
               onProwadze={() => {
                 setBladProwadze("");
                 prowadze.mutate({ id: d.reklamacja.id, wersja: d.reklamacja.wersja },
@@ -799,7 +807,7 @@ export function Reklamacje() {
               </Karta>
 
               <Karta className={KARTA_OBOK_ROZMOWY}>
-                <Dowody szczegol={d} trwa={trwa} bladZapisu={bladZapisu}
+                <Dowody szczegol={d} trwa={trwa} bladZapisu={bladZapisu} pokazZakup={pokazZakup}
                   /* ── WERDYKT POD FAKTAMI ────────────────────────────────────
                       Dekalog obsługi, punkt 9: nieodwracalne pyta — a pytanie
                       zadaje się PO dowodach, nie przed nimi. W kolejności strony

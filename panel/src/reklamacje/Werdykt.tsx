@@ -6,7 +6,8 @@ import type {
 } from "../api/typy";
 import { FiltrSegmentowy, Przycisk, Skopiuj, czas } from "../ui";
 import { zlote } from "../api/zwroty";
-import { NAZWA_STANU_WERDYKTU, NAZWA_WERDYKTU, ODMOWY, UZNANIA } from "./statusy";
+import { NAZWA_WERDYKTU, ODMOWY, UZNANIA, rozstrzygniecie } from "./statusy";
+import { doDostawcy as sztukaDoDostawcy } from "./etap";
 import { LIMIT_ZNAKOW } from "./Edytor";
 import { DlugaTresc, scisle, zawieraOpis } from "./tresc";
 import { SztukaDoDostawcy, type ZapisUDostawcy } from "./SztukaDoDostawcy";
@@ -36,14 +37,16 @@ import { SztukaDoDostawcy, type ZapisUDostawcy } from "./SztukaDoDostawcy";
    przyciskiem, jak przy odmowie wypłaty. Zgoda jest KLIKNIĘCIEM W ZDANIE,
    które mówi, co się stanie, a nie oknem „na pewno?" z dwoma przyciskami.
 
-   LOS PRÓBY JEST ZDANIEM, NIE KODEM. `sent` mówi „Allegro jeszcze nie
-   potwierdziło" — zieleń należy się dopiero statusowi z synchronizacji, jak
-   przy pieniądzach (0.209.0). `send_uncertain` mówi, czego NIE robić.
-   Ponowienie dostaje wyłącznie `send_failed`: przy niepewnym losie drugi
-   strzał mógłby być drugim werdyktem.
+   PO WERDYKCIE BLOK NAZYWA SIĘ „PO WERDYKCIE". Nazwa werdyktu, kwota i los
+   próby („czekamy, aż Allegro potwierdzi", „nie wysyłaj drugi raz") stoją
+   w zdaniu A głowicy (`etap.ts`), bo tam czyta się, gdzie stoi sprawa.
+   Uwaga właściciela: „informacje powtarzają się". W bloku zostaje to, co
+   się czyta albo robi: kto i kiedy, wiadomość werdyktu, krok o towarze
+   i kroki u dostawcy. Ponowienie dostaje wyłącznie `send_failed`: przy
+   niepewnym losie drugi strzał mógłby być drugim werdyktem.
 
    WERDYKT Z CENTRUM SPRZEDAŻY nie udaje naszego: `werdykt: null` przy
-   `CLAIM_ACCEPTED` to sprawa rozstrzygnięta poza panelem i pasek to mówi.
+   `CLAIM_ACCEPTED` nie dostaje „kto i kiedy", bo panel tego nie wie.
 
    TRZY ROZDZIELENIA OD PRZYCISKU WYSYŁKI (0.421.0). Zgłoszenie właściciela ze
    zrzutem: „werdykt jest za blisko guzika wyślij wiadomość". Do 0.420.1 pas
@@ -65,10 +68,6 @@ import { SztukaDoDostawcy, type ZapisUDostawcy } from "./SztukaDoDostawcy";
    Tło `slate-50` pod paskiem to ta sama myśl co przy osi rozmowy w 0.418.0:
    barwa tła jest cechą pojedynczą, czytaną równolegle, więc granica dwóch
    pasów widać bez czytania (Treisman i Gelade, 1980).                       */
-
-const ROZSTRZYGNIETE: Record<string, string> = {
-  CLAIM_ACCEPTED: "uznana", CLAIM_REJECTED: "odrzucona",
-};
 
 /** Zdania startowe kroku o towarze — do edycji, nie do wysłania w ciemno. */
 const ZDANIE_O_TOWARZE = {
@@ -142,7 +141,7 @@ export function Werdykt({
 
   const status = r.werdyktStatus;
   const wydany = status === "sent" || status === "send_uncertain" || status === "sending";
-  const uAllegro = r.statusAllegro ? ROZSTRZYGNIETE[r.statusAllegro] : undefined;
+  const uAllegro = rozstrzygniecie(r.statusAllegro);
   const uznana = (r.werdykt ?? "").startsWith("ACCEPTED");
   /* Równość po ściśnięciu łapie krótkie zdania, zawarcie — nasze zdanie
      wklejone przez Allegro w dłuższą wiadomość (próg dubla z `tresc.tsx`). */
@@ -169,41 +168,32 @@ export function Werdykt({
     setTowar(d); setTrescTowaru(ZDANIE_O_TOWARZE[d]); setZgoda(false);
   };
 
-  /* Sztuka wraca, gdy uznaliśmy (tu albo w Centrum Sprzedaży) i towar ma być
-     odesłany. Zapisane zgłoszenie stoi zawsze — raz zapisanego się nie chowa. */
-  const doDostawcy = status !== "sending" && (uznana || uAllegro === "uznana")
-    && (r.zwrotTowaru === "wymagany" || r.zwrotWymagany === true || uDostawcy !== null);
+  /* Regułę zna `etap.ts`, bo zdanie A głowicy mówi o tym samym kroku. */
+  const doDostawcy = sztukaDoDostawcy(r, uDostawcy);
 
   /* ── Blok po werdykcie (nasz albo z Centrum Sprzedaży) ───────────────────── */
   if (wydany || (uAllegro && status !== "send_failed")) {
-    const potwierdzony = Boolean(uAllegro);
-    return <section aria-label="Werdykt" className="border-t-4 border-slate-200 bg-slate-50 px-4 pb-3 pt-5">
+    const krokTowaru = uznana && status !== "sending";
+    const krokDostawcy = doDostawcy && Boolean(onUDostawcy);
+    /* Pusty blok to rama bez treści. Rozstrzygnięcie z Centrum Sprzedaży bez
+       kroku towaru i dostawcy mówi w całości zdanie A głowicy. */
+    if (!r.werdykt && !krokTowaru && !krokDostawcy) return null;
+    return <section aria-label="Po werdykcie" className="border-t-4 border-slate-200 bg-slate-50 px-4 pb-3 pt-5">
       <div className="flex flex-wrap items-center gap-2">
         <Gavel size={15} className="shrink-0 text-slate-400" />
-        <b className="text-naglowek">Werdykt</b>
-        {r.werdykt
-          ? <span className="text-sm font-semibold">{r.werdyktNazwa ?? r.werdykt}
-              {r.werdyktKwotaGrosze !== null && <span className="ml-1 tabular-nums">
-                · {zlote(r.werdyktKwotaGrosze, r.waluta)}</span>}</span>
-          : <span className="text-sm">Rozstrzygnięta poza panelem — <b>{uAllegro}</b> w Centrum Sprzedaży</span>}
-        {r.werdykt && (potwierdzony
-          ? <span className="ml-auto flex items-center gap-1 text-xs font-semibold text-ranga-ok">
-              <Check size={14} />Potwierdzony przez Allegro</span>
-          : <span className={`ml-auto text-xs font-semibold ${
-              status === "send_uncertain" ? "text-ranga-zle" : "text-ranga-uwaga"}`}
-              title="Status Allegro przestawia dopiero synchronizacja">
-              {NAZWA_STANU_WERDYKTU[status ?? "sent"]}</span>)}
+        <b className="text-naglowek">Po werdykcie</b>
       </div>
       {r.werdykt && <>
-        <p className="mt-1 text-xs text-slate-500">
-          {r.werdyktPrzez ?? "?"}{r.werdyktAt ? `, ${czas(r.werdyktAt)}` : ""}
+        {/* Kto i kiedy — bez rodzaju gramatycznego, bo panel nie zna płci
+            osoby. Ten sam zapis co podpowiedź czipa werdyktu w kolejce. */}
+        <p className="mt-1 text-xs text-slate-600">
+          Werdykt z panelu{r.werdyktPrzez ? `: ${r.werdyktPrzez}` : ""}{r.werdyktAt ? `, ${czas(r.werdyktAt)}` : ""}
         </p>
-        {/* ── WIADOMOŚĆ WERDYKTU RAZ I KRÓTKO (0.511.0) ──────────────────────
-            Stała w całości w stopce, która się nie przewija, więc długa
-            zjadała okno rozmowy nad nią. Zwija się do czterech linii jak
-            nasza wypowiedź na osi. Gdy Allegro oddało ją w rozmowie jako
-            naszą wiadomość, tu już jej nie ma — to samo zdanie dwa razy
-            to dwa miejsca do przeczytania. */}
+        {/* ── WIADOMOŚĆ WERDYKTU RAZ I KRÓTKO ────────────────────────────────
+            Zwija się do czterech linii jak nasza wypowiedź na osi, bo długa
+            zjadałaby kolumnę. Gdy Allegro oddało ją w rozmowie jako naszą
+            wiadomość, tu już jej nie ma — to samo zdanie dwa razy to dwa
+            miejsca do przeczytania. */}
         {r.werdyktWiadomosc && !wRozmowie && <div className="mt-2 flex items-start gap-2 rounded bg-slate-50 p-2">
           <div className="min-w-0 flex-1">
             <DlugaTresc key={r.id} tekst={r.werdyktWiadomosc} className="text-tresc text-slate-800"
@@ -217,7 +207,7 @@ export function Werdykt({
           Tylko przy NASZYM uznaniu, które wyszło albo mogło wyjść. Po decyzji
           zostaje zdanie i potwierdzenie z `zwrotWymagany` — Allegro ma to
           samo zrozumieć, a specyfikacja tego nie obiecuje wprost. */}
-      {uznana && status !== "sending" && <div className="mt-3 border-t pt-2">
+      {krokTowaru && <div className="mt-3 border-t pt-2">
         <div className="flex flex-wrap items-center gap-2">
           <PackageSearch size={15} className="shrink-0 text-slate-400" />
           <b className="text-naglowek">Towar do odesłania?</b>
@@ -255,7 +245,7 @@ export function Werdykt({
         {bladTowaru && <p className="mt-2 text-xs font-semibold text-ranga-zle">{bladTowaru}</p>}
       </div>}
 
-      {doDostawcy && onUDostawcy && <SztukaDoDostawcy key={r.id} reklamacja={r} dostawa={dostawa}
+      {krokDostawcy && onUDostawcy && <SztukaDoDostawcy key={r.id} reklamacja={r} dostawa={dostawa}
         uDostawcy={uDostawcy} trwa={trwaUDostawcy} blad={bladUDostawcy} onZapisz={onUDostawcy} />}
     </section>;
   }
