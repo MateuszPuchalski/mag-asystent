@@ -85,7 +85,8 @@ describe("Kolejka dyskusji", () => {
   it("wiersz niesie TEMAT jako tożsamość sprawy, bez zdjęcia oferty", () => {
     render(<Kolejka dyskusje={[d()]} wybrana={null} onWybierz={vi.fn()} />);
     expect(screen.getByText("Przesyłka nie dotarła")).toBeInTheDocument();
-    expect(screen.getByText(/kowalski · zamówienie ZAM-1/)).toBeInTheDocument();
+    expect(screen.getByText("kowalski")).toBeInTheDocument();
+    expect(screen.getByText("zam. ZAM-1")).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
@@ -144,12 +145,26 @@ describe("Kolejka dyskusji: wiersz mówi każdą rzecz raz", () => {
 
   it("UUID zamówienia skraca się do ośmiu znaków, a pełny numer jest w podpowiedzi", () => {
     wiersz({ orderId: "663f38f1-b98e-11f1-97b7-874d04101a2b" });
-    expect(screen.getByText(/kowalski · zamówienie 663f38f1$/)).toBeInTheDocument();
+    expect(screen.getByText("zam. 663f38f1")).toBeInTheDocument();
     expect(screen.getByTitle("Zamówienie 663f38f1-b98e-11f1-97b7-874d04101a2b")).toBeInTheDocument();
   });
 
   it("numer, który nie jest UUID-em, zostaje w całości", () => {
     wiersz({ orderId: "17147703077" });
-    expect(screen.getByText(/zamówienie 17147703077$/)).toBeInTheDocument();
+    expect(screen.getByText("zam. 17147703077")).toBeInTheDocument();
+  });
+
+  it("powód i login klienta stoją przed numerem — decyzja właściciela", () => {
+    /* Temat ucięty w pół zdania nie mówi, o co chodzi. Zawija się do dwóch
+       linii, a login, klucz klienta, stoi wyraźniej niż numer zamówienia. */
+    wiersz({ temat: "brak zwrotu wpłaty po odesłaniu towaru i anulowaniu zamówienia" });
+    const temat = screen.getByText(/brak zwrotu wpłaty/);
+    expect(temat.className).toContain("line-clamp-2");
+    expect(temat.className).not.toContain("truncate");
+    const login = screen.getByText("kowalski");
+    const numer = screen.getByText(/^zam\. /);
+    expect(login.compareDocumentPosition(numer) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(login.className).toContain("font-semibold");
+    expect(numer.className).toContain("text-xs");
   });
 });
