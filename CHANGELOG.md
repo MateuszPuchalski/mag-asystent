@@ -10,6 +10,21 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.561.0 — 5 października 2026
+
+**Zdjęcia w dyskusji stoją w kolumnie obok rozmowy, jak w reklamacjach.**
+W wątku zostaje odnośnik, więc zdjęcia z telefonu nie wypychają już
+następnej wiadomości poza ekran.
+
+**Kolejka dyskusji zaczyna od tej, która najdłużej czeka na odpowiedź.**
+Dotąd stała od najnowszych, więc dyskusja czekająca 19 dni lądowała w połowie
+listy, choć to za nią Allegro może zablokować konto. Dawną kolejność da się
+wybrać przyciskiem nad listą.
+
+**Dyskusję otworzysz jednym kliknięciem w Centrum Sprzedaży.** Odnośnik
+„Otwórz w Allegro" stoi nad rozmową, obok „Odśwież z Allegro", i prowadzi na
+stronę tej dyskusji, a nie tylko zamówienia.
+
 ## 0.560.1 — 5 października 2026
 
 **Reklamacja z kartoteką znalezioną po SKU oferty pokazuje stan, cenę zakupu
