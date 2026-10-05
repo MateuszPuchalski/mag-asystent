@@ -239,8 +239,8 @@ describe("towar przy rozmowie", () => {
     expect(screen.queryAllByRole("button", { name: /wstaw|szkic/i })).toHaveLength(0);
   });
 
-  /* Zamienniki jechały w JSON-ie od dawna i rysował je tylko kolektor. Agent,
-     który widzi kandydata „przez zamiennik EX055", musi mieć skąd ten EX055 wziąć. */
+  /* Zamienniki jechały w JSON-ie od dawna i rysował je tylko kolektor. Agent
+     pytany o zamiennik musi mieć skąd go wziąć bez Subiekta. */
   it("zamienniki z opisu widać w tabeli: nasze symbolem, obce licznikiem", () => {
     karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA,
       zamienniki: { znane: [{ id: 5, sym: "EX055", name: "Gaźnik" }, { id: 6, sym: "10-02001", name: "Gaźnik" }], obce: ["16100-ZH8-W61", "520070"] } } });

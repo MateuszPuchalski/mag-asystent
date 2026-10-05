@@ -4,10 +4,9 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 /* ── Wyszukiwarka kartotek (0.203.0) ─────────────────────────────────────────
-   To pole nie miało własnego testu, choć obsługuje pięć ekranów: dobór,
-   kartotekę przy rozmowie, zlecenie pomiaru, sprawdzenie wiedzy i nową
-   propozycję. Zdjęcie przy wyniku weszło tu raz dla wszystkich pięciu, więc
-   i strażnik jest jeden.
+   To pole nie miało własnego testu, choć obsługuje kilka ekranów: kartotekę
+   przy rozmowie, zlecenie pomiaru, zadania hali i pozycje zwrotu. Zdjęcie
+   przy wyniku weszło tu raz dla wszystkich, więc i strażnik jest jeden.
 
    Pilnujemy dwóch rzeczy naraz, bo obie odpowiadają na to samo pytanie
    („który z tych wierszy to TA część"): wynik niesie obraz kartoteki,

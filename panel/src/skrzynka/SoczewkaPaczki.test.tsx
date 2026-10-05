@@ -24,10 +24,6 @@ beforeEach(() => {
     zadania.push({ metoda: init?.method ?? "GET", url, body: init?.body ?? null,
       typ: naglowki.get("content-type") });
     if (url.endsWith("/klient")) return new Response(JSON.stringify({ login: "k", wpisy: [] }));
-    if (url.endsWith("/dobor/wiedza")) {
-      return new Response(JSON.stringify({ zastosowanie: null, zabudowa: null, pasowanie: null,
-        silniki: [], pomiary: [] }));
-    }
     if (url.endsWith("/przesylka")) {
       return new Response(JSON.stringify({ waybill: "X1", przewoznik: "DPD", status: "IN_TRANSIT",
         dostarczonoAt: null, sprawdzonoAt: new Date().toISOString() }));
@@ -50,10 +46,6 @@ const dane = (kategoria: Kategoria): OsRozmowy => ({
   kandydaciZamowien: [], oferta: null,
   zamowienie: { externalId: "z-51", link: null, pobrane: null, przesylka: {
     waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null } },
-  dobor: { stan: "pusty", wynik: null, wersja: 1, wybrany: null, dopytac: null, zmienil: null,
-    zmienilAutomat: false, zmienionoAt: null,
-    dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
-      oem: null, nazwaCzesci: null } },
 } as unknown as OsRozmowy);
 
 function pokaz(kategoria: Kategoria) {

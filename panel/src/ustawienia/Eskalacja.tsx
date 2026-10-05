@@ -8,13 +8,12 @@ import { KartaWgladu, Tabela, Td } from "../ui/wglad";
    który po pytaniu składa reklamację, powiedział coś o naszej odpowiedzi.
 
    KOLEJKA PUSTA PRZY ROSNĄCEJ ESKALACJI JEST MIARĄ, KTÓRA KŁAMIE, a do 0.386.0
-   biuro nie miało tej liczby wcale: mierzyliśmy skuteczność doboru i czas
-   wymiany z halą, czyli własną pracę, nigdy jej skutku u klienta.
+   biuro nie miało tej liczby wcale: mierzyliśmy czas wymiany z halą, czyli
+   własną pracę, nigdy jej skutku u klienta.
 
    BEZ OSI OSOBOWEJ, celowo. Ta liczba mówi o naszych odpowiedziach jako
    całości; rozbita na ludzi stałaby się oceną pracownika liczoną z cudzej
-   decyzji. Skuteczność doboru obok ma oś osobową, bo tam mierzymy WYBÓR
-   agenta, a nie ruch klienta — i dlatego niesie zdanie o podstawie prawnej. */
+   decyzji. */
 
 /** Udział w procentach; zero rozmów to brak podstawy, nie zero procent. */
 const udzial = (m: MiesiacEskalacji) =>
@@ -41,8 +40,7 @@ export function Eskalacja({ miesiace }: { miesiace: MiesiacEskalacji[] | undefin
             <Td className="tabular-nums">{m.zRozmowa}</Td>
             <Td className="tabular-nums">{m.eskalowane}</Td>
             {/* Podstawa przy liczbie, bo 50% z dwóch spraw i 50% z dwustu
-                to dwie różne informacje — ta sama zasada, co przy progu
-                wiarygodności w skuteczności doboru. */}
+                to dwie różne informacje. */}
             <Td className="tabular-nums">{udzial(m) === null ? "—" : `${udzial(m)}%`}</Td>
           </tr>)}
         </Tabela>}

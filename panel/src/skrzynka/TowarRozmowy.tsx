@@ -270,9 +270,8 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
     ["EAN", karta.ean || "brak"],
     /* Identyfikatory z opisu (E3): to, po czym klient pyta, gdy nie zna naszego symbolu. */
     ["Identyfikatory", karta.identyfikatory?.length ? karta.identyfikatory.map((i) => i.wartosc).join(" · ") : "brak"],
-    /* Zamienniki JEDZIŁY w JSON-ie od dawna i rysował je tylko kolektor. Bez
-       nich agent widzi kandydata „przez zamiennik EX055" i nie ma jak
-       sprawdzić, skąd ten EX055. Obce tylko jako licznik — to szary tekst dla
+    /* Zamienniki z opisu odpowiadają na „czy macie coś zamiast”, więc stoją
+       naszymi symbolami. Obce tylko jako licznik — to szary tekst dla
        rozmowy z dostawcą, nie klikalna lista. */
     ["Zamienniki", karta.zamienniki?.znane.length
       ? karta.zamienniki.znane.map((z) => z.sym).join(" · ")

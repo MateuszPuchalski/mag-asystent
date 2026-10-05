@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  AlarmClock, CircleDashed, CircleHelp, HeartHandshake, MessageSquare, Ruler, Wrench, X,
+  AlarmClock, CircleDashed, CircleHelp, HeartHandshake, MessageSquare, Ruler, X,
 } from "lucide-react";
 import type { Kategoria } from "../api/typy";
 import { IKONA_KATEGORII } from "./Copilot";
@@ -95,8 +95,6 @@ export function SlownikZnakow({ kubelkow }: {
             <li className="flex items-center gap-2"><span className="w-16"><Czekanie ms={14 * G} /></span>ponad 8 godzin</li>
             <li className="flex items-center gap-2"><span className="inline-flex w-7 items-center gap-0.5 font-bold text-slate-600"><MessageSquare size={13} aria-hidden="true" />3</span>
               wiadomości klienta od naszej odpowiedzi</li>
-            <li className="flex items-center gap-2"><span className="inline-flex w-7 text-amber-700"><Wrench size={14} aria-hidden="true" /></span>
-              dobór otwarty (zieleń — wybrano część, czerwień — dopytać, szary — nie mamy)</li>
             <li className="flex items-center gap-2"><span className="inline-flex w-7 text-slate-600"><Ruler size={14} aria-hidden="true" /></span>
               zadanie dla hali w toku</li>
             <li className="flex items-center gap-2"><span className="inline-flex w-7 text-ranga-uwaga"><AlarmClock size={14} aria-hidden="true" /></span>

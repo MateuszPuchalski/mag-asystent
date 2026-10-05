@@ -18,8 +18,8 @@ import type { StanZdjeciaOferty } from "../api/typy";
 
    Słowo „bez zdjęcia" zostaje na kaflach od 44 px w górę — czyli wszędzie,
    gdzie stało do 0.202.0, bo w dwóch wierszach dziewięciopunktowego pisma
-   jeszcze się mieści. Próg jest dla kafli MNIEJSZYCH, które weszły w tym
-   wydaniu: negatyw doboru ma 36 px i słowo by się w nim rozjechało. */
+   jeszcze się mieści. Próg jest dla kafli MNIEJSZYCH, jak 36 px w koszach
+   i 32 px na osi rozmowy: tam słowo by się rozjechało. */
 
 /**
  * Sama PŁYTKA — pudełko o stałym rozmiarze z trzema stanami (0.213.0).

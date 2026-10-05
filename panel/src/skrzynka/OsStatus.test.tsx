@@ -4,8 +4,8 @@ import { Os, rozdziel } from "./Os";
 import type { WpisOsi } from "../api/typy";
 
 /* ── Zdarzenia sprawy: pasek pod oknem wiadomości (0.243.0) ──────────────────
-   Do 0.242.0 zmiana statusu (§10.3, 0.158.0), sklejenie sprawy (0.161.0)
-   i krok doboru stały na osi jako kreski między wypowiedziami. Zgłoszenie
+   Do 0.242.0 zmiana statusu (§10.3, 0.158.0) i sklejenie sprawy (0.161.0)
+   stały na osi jako kreski między wypowiedziami. Zgłoszenie
    właściciela: przenieść je do jednego poziomego rzędu pod oknem wiadomości,
    a kliknięcie ma prowadzić do tego miejsca w rozmowie.
 
