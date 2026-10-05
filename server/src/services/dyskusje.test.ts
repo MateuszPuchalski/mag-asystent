@@ -436,3 +436,71 @@ test("alarm ze zdrowia zgadza się z wierszami pilnymi z listy", () => {
   assert.equal(z.alarm?.najstarszaGodzin, Math.max(...pilne.map((x) => x.czekaOdGodzin ?? 0)));
   assert.deepEqual(pilne.map((x) => x.externalId).sort(), ["a", "b"]);
 });
+
+/* ── Autoodpowiedź z naszego konta ─────────────────────────────────────────
+   Allegro wysyła z naszego konta „Dziękujemy za wiadomość…" i daje status
+   `SELLER_REPLIED`, ale automatów za odpowiedź nie uznaje. Sprawa ma więc
+   zostać w kolejce pracy, a zegar blokady konta liczyć od pytania. */
+
+const AUTO = "Dziękujemy za wiadomość, odpowiemy najszybciej jak to tylko będzie możliwe.";
+
+function wpis(sprawaId: number, rola: string, at: string, tresc: string): void {
+  db().prepare(
+    `INSERT INTO reklamacja_wiadomosc(reklamacja_id, external_id, autor_rola, tresc, utworzono_at)
+     VALUES (?,?,?,?,?)`,
+  ).run(sprawaId, `a-${sprawaId}-${rola}-${at}`, rola, tresc, at);
+}
+
+test("autoodpowiedź nie przenosi dyskusji do „czeka na klienta” i nie zeruje zegara", () => {
+  const id = sprawa({ id: "auto-1", ostatniStatus: "SELLER_REPLIED", ostatniaAt: przedGodzinami(29) });
+  wpis(id, "BUYER", przedGodzinami(30), "Gdzie moja paczka?");
+  wpis(id, "SELLER", przedGodzinami(29), AUTO);
+  const [d] = D.listaDyskusji(db(), TERAZ, null);
+  assert.equal(d.kubelek, "odpowiedz");
+  assert.equal(d.ostatniaWiadomoscStatus, "NEW", "biuro nie napisało jeszcze ani słowa");
+  assert.equal(d.czekaOdGodzin, 30, "zegar liczy od pytania klienta, nie od automatu");
+  assert.equal(D.stanDyskusjiHealth(db(), TERAZ, 24, null).alarm?.ile, 1,
+    "alarm widzi sprawę mimo statusu SELLER_REPLIED");
+});
+
+test("prawdziwa odpowiedź po autoodpowiedzi przenosi dyskusję do klienta", () => {
+  const id = sprawa({ id: "auto-2", ostatniStatus: "SELLER_REPLIED", ostatniaAt: przedGodzinami(1) });
+  wpis(id, "BUYER", przedGodzinami(30), "Gdzie moja paczka?");
+  wpis(id, "SELLER", przedGodzinami(29), AUTO);
+  wpis(id, "SELLER", przedGodzinami(1), "Paczka wyszła wczoraj, numer w zamówieniu.");
+  assert.equal(D.listaDyskusji(db(), TERAZ, null)[0].kubelek, "klient");
+});
+
+test("niedociągnięty ogon rozmowy zostawia sprawę u nas", () => {
+  /* Autoodpowiedź przychodzi sekundy po pytaniu, rozmowa dociąga się osobnym
+     przebiegiem. Brakujący ogon jest nieznany, a blokada konta kosztuje
+     więcej niż nadmiarowy pasek. Fikstura mówi o trzech wiadomościach. */
+  const id = sprawa({ id: "auto-3", ostatniStatus: "SELLER_REPLIED" });
+  wpis(id, "BUYER", przedGodzinami(30), "Gdzie moja paczka?");
+  assert.equal(D.listaDyskusji(db(), TERAZ, null)[0].kubelek, "odpowiedz");
+});
+
+test("rozmowa urwana bezpiecznikiem stron zostaje przy statusie Allegro", () => {
+  /* Jej ogon nie przyjdzie nigdy, więc „nieznany" znaczyłby „u nas na zawsze". */
+  const id = sprawa({ id: "auto-4", ostatniStatus: "SELLER_REPLIED" });
+  db().prepare("UPDATE reklamacja_klienta SET czat_urwany=1 WHERE id=?").run(id);
+  wpis(id, "BUYER", przedGodzinami(30), "Gdzie moja paczka?");
+  assert.equal(D.listaDyskusji(db(), TERAZ, null)[0].kubelek, "klient");
+});
+
+test("same automaty bez pytania: zegar liczy od otwarcia, nie od automatu", () => {
+  assert.equal(D.bezOdpowiedziOd(
+    [{ rola: "SELLER", at: przedGodzinami(1), auto: true }],
+    przedGodzinami(1), true, przedDniami(4)), przedDniami(4));
+});
+
+test("status po zdjęciu automatu bierze się z ostatniej PRAWDZIWEJ wiadomości", () => {
+  assert.equal(D.statusBezAutoodpowiedzi("SELLER_REPLIED", [
+    { rola: "SELLER", at: przedGodzinami(2), auto: true },
+  ]), "NEW", "same automaty — nikt z biura jeszcze nie napisał");
+  assert.equal(D.statusBezAutoodpowiedzi("SELLER_REPLIED", [
+    { rola: "ADMIN", at: przedGodzinami(3) },
+    { rola: "SELLER", at: przedGodzinami(2), auto: true },
+  ]), "ALLEGRO_ADVISOR_REPLIED");
+  assert.equal(D.statusBezAutoodpowiedzi("BUYER_REPLIED", []), "BUYER_REPLIED");
+});

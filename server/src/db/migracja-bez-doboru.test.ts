@@ -135,3 +135,37 @@ test("druga migracja niczego nie rusza, a świeża baza nie zakłada spalonych n
   for (const t of TABELE) assert.equal(istnieje(swieza, t), false, `${t} nie ma prawa powstać ze schematu`);
   swieza.close();
 });
+
+test("baza ze świeżej instalacji, z komentarzem przed ostatnią kolumną, wstaje", () => {
+  /* Tak wyglądał `schema.sql` przed kasatą: komentarz `--` tuż przed ostatnią
+     kolumną. SQLite nie umie jej wtedy zdjąć („incomplete input"), a wywrócony
+     start cofał aktualizację i blokował każde następne wydanie. Kolumna ma
+     zostać, a migracja przejść. */
+  const d = new DatabaseSync(":memory:");
+  d.exec(schema);
+  d.exec(`DROP TABLE copilot_pytanie`);
+  d.exec(`CREATE TABLE copilot_pytanie (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+  pytanie         TEXT NOT NULL,
+  odpowiedz       TEXT NOT NULL,
+  twierdzenia     TEXT NOT NULL DEFAULT '[]',
+  model           TEXT NOT NULL,
+  at              TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+  przez           TEXT NOT NULL,
+  przez_user_id   INTEGER REFERENCES app_user(user_id),
+  -- Narzędzia, po które model sięgnął: [{nazwa, argument, znakow}].
+  narzedzia       TEXT NOT NULL DEFAULT '[]',
+  -- Pasowania z sieci po sicie: [{twId, symbol, marka, model, url, cytat, …}].
+  pasowania       TEXT NOT NULL DEFAULT '[]'
+)`);
+  const ostrzezenia: string[] = [];
+  const warn = console.warn;
+  console.warn = (m: string) => { ostrzezenia.push(m); };
+  try {
+    assert.doesNotThrow(() => migrate(d));
+  } finally { console.warn = warn; }
+  assert.ok(kolumny(d, "copilot_pytanie").includes("pasowania"), "kolumna zostaje, start nie pada");
+  assert.ok(ostrzezenia.some((m) => m.includes("copilot_pytanie.pasowania")), "zostawienie mówi o sobie");
+  assert.doesNotThrow(() => migrate(d), "druga migracja też przechodzi");
+});

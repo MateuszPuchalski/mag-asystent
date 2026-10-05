@@ -1075,7 +1075,20 @@ function bezDoboruIWiedzy(database: DatabaseSync) {
     if (!jest(tabela)) continue;
     const ma = kolumny(tabela);
     for (const kolumna of lista) {
-      if (ma.has(kolumna)) database.exec(`ALTER TABLE ${tabela} DROP COLUMN ${kolumna}`);
+      if (!ma.has(kolumna)) continue;
+      /* KOLUMNA, KTÓREJ SQLITE NIE UMIE ZDJĄĆ, ZOSTAJE. Baza założona ze
+         `schema.sql`, w którym przed ostatnią kolumną stał komentarz `--`,
+         kończy DROP COLUMN błędem „incomplete input": SQLite wycina definicję
+         razem z przecinkiem i zostawia nawias w komentarzu. Wywrócenie startu
+         cofnęłoby aktualizację i zablokowało każde następne wydanie. Martwa
+         kolumna ma wartość domyślną i nikt do niej nie pisze, więc nic nie psuje. */
+      try {
+        database.exec(`ALTER TABLE ${tabela} DROP COLUMN ${kolumna}`);
+      } catch (e) {
+        if (!/after drop column/i.test((e as Error).message)) throw e;
+        console.warn(`[migracja] kolumna ${tabela}.${kolumna} zostaje: SQLite nie umie jej zdjąć ` +
+          `(${(e as Error).message})`);
+      }
     }
   }
   /* Indeks pełnotekstowy karmił wyłącznie kandydatów doboru. Tabela wirtualna
