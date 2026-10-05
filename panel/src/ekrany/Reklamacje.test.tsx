@@ -924,7 +924,7 @@ describe("Werdykt z towarem i sztuka do dostawcy", () => {
     const kopia = { ...r };
     Object.assign(r, n);
     try { await test(); } finally {
-      for (const k of Object.keys(r)) delete (r as Record<string, unknown>)[k];
+      for (const k of Object.keys(r)) delete (r as unknown as Record<string, unknown>)[k];
       Object.assign(r, kopia);
     }
   };
