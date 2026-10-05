@@ -113,9 +113,9 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
   const [szukamMimoTo, setSzukamMimoTo] = useState(false);
 
   /* Historia i wiedza decydują, czy wiersze „Klient" i „Wiedza" w ogóle
-     staną. To te same klucze, które wiersze wołają po rozwinięciu, więc przy
-     rozwinięciu nic nie idzie drugi raz. Same odczyty: zero zapisu przy
-     patrzeniu zostaje nietknięte. */
+     staną. To te same klucze, które wiersze wołają po rozwinięciu, więc
+     rozwinięcie czyta z pamięci zapytań i najwyżej odświeża ją jednym GET-em.
+     Same odczyty: zero zapisu przy patrzeniu zostaje nietknięte. */
   const historia = useHistoriaKlienta(dane.rozmowa.id);
   const wiedza = useWiedzaDoboru(dane.rozmowa.id);
 
@@ -124,15 +124,18 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
   const sprawyOtwarte = dane.sprawy.filter((x) => x.otwarta);
   const sprawyZamkniete = dane.sprawy.filter((x) => !x.otwarta);
   const bramka = bramkaDoboru(dane) && !szukamMimoTo;
-  /* Dobór po „Szukaj mimo to" NIE świeci. Agent sam go otworzył, więc nie
-     czeka na niego nic nowego, a wiersz staje otwarty tuż pod przyciskiem. */
   const doborSwieci = swiatla.includes("dobor");
+  /* Dobór po „Szukaj mimo to" NIE trafia do ramy aż do końca tej rozmowy.
+     Agent sam go otworzył, więc nie czeka na niego nic nowego. Pierwszy
+     zapis człowieka gasi bramkę i zapala świecenie, a blok skakałby wtedy
+     spod towaru na górę kolumny, pod okiem, w chwili zapisu. */
+  const doborWRamie = doborSwieci && !szukamMimoTo;
   const paczkaSwieci = swiatla.includes("paczka");
   const pozycjaSwieci = swiatla.includes("pozycja");
   /* Licznik liczy każdą narysowaną pozycję osobno. Dwie sprawy pod jedną
      liczbą mówiły „1", a agent szukał drugiej na ślepo. */
   const ileSwieci = zwrotyWToku.length + sprawyOtwarte.length + (paczkaSwieci ? 1 : 0)
-    + (pozycjaSwieci ? 1 : 0) + (doborSwieci ? 1 : 0);
+    + (pozycjaSwieci ? 1 : 0) + (doborWRamie ? 1 : 0);
 
   const zamowienieId = dane.zamowienie?.externalId ?? null;
   /* Pozycja tej oferty w zamówieniu: jej cena z chwili zakupu pozwala
@@ -197,7 +200,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
                 <span className="text-xs text-slate-600"> · {ile(kilkaPozycji, "pozycja", "pozycje", "pozycji")}</span></p>
               <ZamowienieRozmowy zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id} ofertaRozmowy={null} />
             </div>}
-            {doborSwieci && <Wiersz wRamie tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
+            {doborWRamie && <Wiersz wRamie tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
               otwarty={otwarte.has("dobor")} onPrzelacz={() => przelacz("dobor")}>{dobor}</Wiersz>}
           </div>
         </section>
@@ -244,7 +247,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
       {/* DOBÓR POD TOWAREM. Bramka jest ostatnią linią bloku towaru, więc dobór
           otwiera się dokładnie w miejscu klikniętego przycisku i wzrok nie
           musi go szukać na dole kolumny. */}
-      {!doborSwieci && !bramka && <Wiersz tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
+      {!doborWRamie && !bramka && <Wiersz tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
         otwarty={otwarte.has("dobor")} onPrzelacz={() => przelacz("dobor")}>
         {dobor}
       </Wiersz>}
@@ -269,17 +272,24 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
           {zwrotyZamkniete.length > 0 && <ul className="divide-y divide-slate-200">
             {zwrotyZamkniete.map((z) => <li key={z.id} className="py-2"><ZwrotRozmowy zwrot={z} /></li>)}
           </ul>}
-          {/* Bez drugiego nagłówka: tytuł wiersza mówi już, co leży pod nim. */}
-          {sprawyZamkniete.length > 0 && <SprawyZakupu sprawy={sprawyZamkniete} wSekcji />}
+          {/* Bez drugiego nagłówka: tytuł wiersza mówi już, co leży pod nim.
+              Ujemny margines, bo Spoiwo daje każdej linijce własne `px-2`,
+              a oś tekstu kolumny to 16 px: bez niego sprawy stałyby o 8 px
+              na prawo od zwrotów nad nimi. Rama robi to samo opakowaniem
+              bez `px`. */}
+          {sprawyZamkniete.length > 0 && <div className="-mx-2">
+            <SprawyZakupu sprawy={sprawyZamkniete} wSekcji /></div>}
         </Wiersz>}
 
       {/* Klient staje tylko z treścią POZA tym zakupem. Wpisy tego zakupu mają
           dom w karcie, w ramie, w „Zamkniętych sprawach" i w osi; reguła stoi
-          w `kokpit.ts` przy `klientWKolumnie`. */}
+          w `kokpit.ts` przy `klientWKolumnie`. Inne zakupy klienta mają dom
+          w wierszu „Zamówienie", gdzie da się je powiązać, więc historia ich
+          nie powtarza. */}
       {klient && <Wiersz tytul="Klient" streszczenie={streszczenieWierszaKlienta(klient)}
         otwarty={otwarte.has("klient")} onPrzelacz={() => przelacz("klient")}>
         <Klient key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id} onOtworzRozmowe={onOtworzRozmowe}
-          zamowienieId={zamowienieId} />
+          zamowienieId={zamowienieId} pomin={new Set(inneZakupy.map((k) => k.externalId))} />
       </Wiersz>}
 
       {/* Maszyna z DANYCH DOBORU, nie z historii klienta: pomiar ma pasować do
@@ -395,11 +405,13 @@ export function streszczenieZamowienia(dane: OsRozmowy): string {
       : s?.status ? STATUS_PACZKI[s.status] ?? s.status
         : s?.sprawdzonoAt ? (s.waybill ? "nadana, bez statusu" : "bez numeru przesyłki")
           : "paczki nie sprawdzano";
-  /* Metoda dostawy odpowiada na „kurier czy paczkomat". Liczba pozycji staje
-     tylko wtedy, gdy lista pod wierszem naprawdę stoi. */
+  /* Metoda dostawy odpowiada na „kurier czy paczkomat". Blok paczki niesie
+     ją w linii stanu, więc gdy paczka stoi wyżej, metoda stoi tam razem z nią,
+     a tutaj byłaby drugim zapisem. Liczba pozycji staje tylko wtedy, gdy
+     lista pod wierszem naprawdę stoi. */
   const lista = pozycjeWKolumnie(dane) && !pozycjiDoWskazania(dane);
-  return [paczka, z.pobrane ? z.pobrane.dostawaMetoda : "treść jeszcze nie pobrana",
-    lista ? ile(z.pobrane?.pozycje.length ?? 0, "pozycja", "pozycje", "pozycji") : null]
+  const metoda = z.pobrane ? (paczkaWyzej(dane) ? null : z.pobrane.dostawaMetoda) : "treść jeszcze nie pobrana";
+  return [paczka, metoda, lista ? ile(z.pobrane?.pozycje.length ?? 0, "pozycja", "pozycje", "pozycji") : null]
     .filter(Boolean).join(" · ") || "paczka wyżej";
 }
 
@@ -428,9 +440,12 @@ export function streszczenieDoboru(dane: OsRozmowy): string {
 export function streszczenieWierszaKlienta(h: HistoriaKlienta): React.ReactNode {
   const czesci: React.ReactNode[] = [];
   const s = h.sprawa;
+  /* „Po terminie" stoi NA POCZĄTKU, bo streszczenie się skraca. Na końcu,
+     za długim krokiem, wielokropek zjadał jedyny termin, który ten zwinięty
+     wiersz wynosi na wierzch. */
   if (s?.stan === "w_toku") {
-    czesci.push(<>sprawa: {s.krok} · {termin(s.krokDo)}
-      {s.poTerminie && <b className="text-ranga-zle"> po terminie</b>}</>);
+    czesci.push(<>{s.poTerminie && <><b className="text-ranga-zle">po terminie</b>{" · "}</>}
+      sprawa: {s.krok} · {termin(s.krokDo)}</>);
   }
   const m = h.maszyny[0];
   if (m) {

@@ -21,3 +21,5 @@ sprawdzenia. „To jest” i „Mamy” w paśmie nad kolumną stoją od razu,
 z „wczytuję…”, więc pasmo nie rośnie pod okiem. Karta zakupu nie liczy już
 bieżącego zakupu jako „Wcześniej u nas”, a pozycję, o którą pyta klient,
 stawia pierwszą.
+Numer zamówienia z kopiowaniem stoi w karcie od razu, zanim przyjedzie treść
+zamówienia. Linia klienta w karcie prowadzi na profil klienta.

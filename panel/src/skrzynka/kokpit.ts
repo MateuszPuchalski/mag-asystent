@@ -116,9 +116,10 @@ export function ofertaWKarcie(dane: OsRozmowy): boolean {
    samym zakupie, o który właśnie pisze. Zakup, jego zwrot, reklamacja
    i dyskusja niosą numer zamówienia rozmowy i mają dom w karcie zakupu.
 
-   Rozmowy zostają, choć niosą ten sam numer: inna rozmowa to wcześniejszy
-   kontakt, a nie ten zakup. Gdy serwer zacznie pomijać zakup sam, funkcja
-   nic nie zmieni, bo nie znajdzie czego wyciąć. */
+   Rozmowy zostają: inna rozmowa to wcześniejszy kontakt, a nie ten zakup.
+   Serwer daje im dziś pusty numer zamówienia, a człon `rodzaj === "rozmowa"`
+   trzyma regułę także wtedy, gdy zacznie go podawać. Gdy serwer zacznie
+   pomijać zakup sam, funkcja nic nie zmieni, bo nie znajdzie czego wyciąć. */
 export function historiaPozaZakupem(h: HistoriaKlienta | undefined, zamowienieId: string | null):
   HistoriaKlienta | undefined {
   if (!h || !zamowienieId) return h;

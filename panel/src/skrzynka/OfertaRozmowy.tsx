@@ -72,8 +72,12 @@ export function OfertaRozmowy({ oferta, zTytulem = true, cenaZakupuGrosze = null
           tam jest decyzją; wywód serwera z jedynej pozycji jest rutyną. */}
       {oferta.zrodlo === "reczne" && <span className="rounded bg-amber-100 px-1.5 py-0.5 text-podpis font-semibold text-amber-900">
         wskazana przez agenta</span>}
-      {oferta.zrodlo === "zamowienie" && <span className="text-podpis text-slate-500">
-        z jedynej pozycji zamówienia</span>}
+      {/* Krótko, z pełnym zdaniem w dymku: przy 1366 px dłuższy podpis
+          spychał odnośnik do Allegro do osobnej linii. Źródło dalej stoi
+          przy fakcie (§4.3). */}
+      {oferta.zrodlo === "zamowienie" && <span className="text-podpis text-slate-500"
+        title="Numer oferty wywiedziony z jedynej pozycji zamówienia">
+        z zamówienia</span>}
       {innaCena && o && <span className="text-podpis text-slate-600" title={`stan oferty z ${czas(o.syncedAt)}`}>
         cena w ofercie <b className="tabular-nums text-slate-900">{zlote(o.cenaGrosze, o.waluta ?? "PLN")}</b></span>}
       {/* Wyjście do Allegro cichnie: to nawigacja, nie treść, a błękit ciągnął
@@ -149,16 +153,20 @@ function PasujeDo({ z }: { z: ZgodnoscOferty }) {
         className="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-slate-900">
         <ChevronRight size={12} aria-hidden="true" className={`transition-transform ${otwarta ? "rotate-90" : ""}`} />
         Pasuje do ({z.lista.length})</button>
+      {/* Pigułka płynie jak zdanie, nie jak dwa elementy flex: w wąskiej
+          kolumnie dopisek o wariancie stawał obok w osobnej kolumnie. */}
       {z.maszyna && (z.trafienia.length > 0
-        ? <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 font-semibold text-emerald-900">
-            <Check size={11} aria-hidden="true" />{z.maszyna} jest na liście
+        ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-semibold text-emerald-900">
+            <Check size={11} aria-hidden="true" className="mr-1 inline align-middle" />{z.maszyna} jest na liście
             {!z.wariantSprawdzony && <span className="font-normal"> · wariant niesprawdzony</span>}</span>
         : <span className="text-slate-600">
             {z.maszyna} — nie ma na liście; to nie dowód, że nie pasuje</span>)}
     </div>
+    {/* Trafienie ma tło z wcięciem, więc ujemny margines oddaje je w bok:
+        tekst zostaje na osi sąsiadów. */}
     {otwarta && <ul className="mt-1.5 columns-2 gap-4">
       {z.lista.map((p, i) => <li key={`${p}-${i}`} className={`break-inside-avoid py-0.5 ${trafienia.has(p)
-        ? "rounded bg-emerald-100 px-1 font-semibold text-emerald-900" : "text-slate-700"}`}>
+        ? "-mx-1 rounded bg-emerald-100 px-1 font-semibold text-emerald-900" : "text-slate-700"}`}>
         {p}{trafienia.has(p) && <span className="sr-only"> — maszyna klienta</span>}</li>)}
     </ul>}
   </div>;

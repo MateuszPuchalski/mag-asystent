@@ -1269,7 +1269,7 @@ mamy w Subiekcie, gdzie jest paczka i co czeka na ruch.
 
 | fakt | dom | co zeszło z kolumny |
 |---|---|---|
-| numer zamówienia, suma, data zakupu | karta i linie osi | nagłówek bloku zamówienia, „Kupione · zapłacono”, daty w streszczeniu i w „Zamówił” |
+| numer zamówienia, suma, data zakupu | karta i linie osi; numer z kopiowaniem i Allegro także przed treścią zamówienia | nagłówek bloku zamówienia, „Kupione · zapłacono”, daty w streszczeniu i w „Zamówił” |
 | nazwa, SKU, zdjęcie i cena oferty | karta | tytuł, kafel i cena w „Oferta i towar”, kwota w zdaniu osi cen, nazwa i SKU w bramce doboru |
 | stan oferty | słowo w streszczeniu „Oferta i towar” | plakietka „ACTIVE” |
 | „Nowy klient” i „Wcześniej u nas” | karta, także zwinięta i w pasku | linijka pod pasmem i liczniki w wierszu „Klient” |
@@ -1294,7 +1294,10 @@ razem z tym zakupem, jego zwrotem i sprawami. Panel wycina zakup, zwrot,
 reklamację i dyskusję z numerem zamówienia rozmowy (`historiaPozaZakupem`
 w `skrzynka/kokpit.ts`). Rozmowy zostają, bo inna rozmowa to wcześniejszy
 kontakt. Dopiero wtedy plakietka „Nowy klient” staje przy pierwszym zakupie.
-Ta sama funkcja filtruje historię w wierszu „Klient”.
+Ta sama funkcja filtruje historię w wierszu „Klient”. Linia klienta w karcie
+prowadzi na profil („Profil klienta”). Przy pierwszym zakupie wiersz „Klient”
+nie staje, a sprawę klienta zakłada się na profilu. Wiązanie idzie więc
+w obie strony także wtedy.
 
 **Pozycja rozmowy stoi w karcie pierwsza.** Karta pokazuje dwie pozycje, a ta,
 o którą pyta klient, bywała trzecia. Przy kilku pozycjach bez oferty karta
@@ -1302,7 +1305,10 @@ mówi ich liczbę, zamiast podawać pierwszą jako towar rozmowy.
 
 **Wiersz „Klient” staje tylko z treścią spoza tego zakupu.** Jego streszczenie
 mówi sprawę klienta z krokiem i terminem, maszynę i datę ostatniego wpisu.
-Liczników nie mówi, bo mówi je karta.
+Liczników nie mówi, bo mówi je karta. Sprawa po terminie stoi na początku
+streszczenia, bo skracany koniec wiersza mógłby ją uciąć. Inne zakupy klienta
+nie stoją w jego historii drugi raz. Ich dom to „Inne zakupy klienta”
+w wierszu „Zamówienie”, skąd się je wiąże z rozmową.
 
 **„Wymaga Ciebie” ma jedną bursztynową ramę.** Nagłówek stoi w ramie, a pozycje
 dzieli kreska. Licznik liczy każdą narysowaną pozycję: zwrot, sprawę, paczkę,
@@ -1314,7 +1320,11 @@ Klient, Wiedza. Dobór stoi pod towarem, bo „Szukaj innego towaru mimo to”
 otwiera go tuż pod przyciskiem. W bloku towaru opis kartoteki stoi przed
 cenami, bo niesie wymiary i gwinty. Wiersz „Zamówienie” mówi paczkę słowem
 i metodę dostawy, a liczbę pozycji tylko wtedy, gdy ich lista stoi pod nim.
-Przyciskiem jest tylko wtedy, gdy ma co rozwinąć.
+Gdy paczka stoi wyżej, wiersz mówi „paczka wyżej”, bo metodę niesie linia
+stanu bloku paczki. Przyciskiem jest tylko wtedy, gdy ma co rozwinąć.
+Dobór otwarty przyciskiem „Szukaj innego towaru mimo to” zostaje pod towarem.
+Pierwszy zapis agenta nie przenosi go do „Wymaga Ciebie”, bo blok skakałby
+pod okiem.
 
 **Paczka: jeden blok, jedna reguła** (`skrzynka/Paczka.tsx`). Blok stoi
 w soczewce, w ramie albo w wierszu „Zamówienie”, nigdy w dwóch miejscach.
@@ -1324,16 +1334,21 @@ godziny, także w wierszu. Przy świeżym albo doręczonym stanie zostaje ciche
 
 **Pasmo nie rośnie pod okiem.** Przy potwierdzonej kartotece „To jest” i „Mamy”
 stoją od pierwszego renderu. Zanim Subiekt odpowie, mówią „wczytuję…”, a przy
-błędzie „Subiekt nie odpowiedział” i „nie wiemy”. Wcześniej pasmo dorastało
-o 45 px w chwili czytania. Symbol kartoteki staje tylko przy różnicy od
-sygnatury, którą agent już widzi, także w rozmowie bez zamówienia.
+błędzie odczytu „odczyt kartoteki nie przeszedł” i „nie wiemy”. Bez połączenia
+z serwerem oba mówią „nie wiemy”, bo przyczynę ogłasza pasek pod nagłówkiem.
+Wcześniej pasmo dorastało o 45 px w chwili czytania. To świadomie odwraca
+regułę „wiersz bez danych nie staje” z nagłówka `PasmoOdpowiedzi.tsx`. Symbol
+kartoteki staje tylko przy różnicy od sygnatury, którą agent już widzi, także
+w rozmowie bez zamówienia.
 
 **Jedna gramatyka.** Kreskę między blokami daje kolumna, a żaden blok pod
 pasmem nie ma własnej. Pasmo ma swoją, bo stoi poza przewijaniem. Tekst
 zaczyna się na 16 px, także w ramie. Szewron wiersza stoi po prawej.
 Odnośniki mają trzy kształty: praca w panelu, cicha poprawka i wyjście do
 Allegro (`skrzynka/odnosniki.tsx`). Nic nie jest większe od tytułu wiersza,
-a każde rozwijanie niesie `aria-expanded`.
+a każde rozwijanie niesie `aria-expanded`. Przy kartotece po SKU podpis
+źródła mówi „SKU oferty = symbol kartoteki”, bo symbol stoi już w paśmie.
+Pełne zdanie serwera stoi w dymku.
 
 **Strażnicy.** `skrzynka/JedenDom.test.tsx` stawia kolumnę na prawdziwych
 hakach i rozwija każdy wiersz. Pilnuje, że fakty karty do kolumny nie wracają,

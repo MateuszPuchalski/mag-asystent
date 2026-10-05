@@ -79,11 +79,14 @@ export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
       </>}
     </dl>
 
+    {/* Stała jest tylko cena. Nazwa, symbol i powód skracają się razem, bo
+        przy kolumnie 256 px trzy sztywne kawałki zjadały całą nazwę, a cena
+        wychodziła na bursztynową ramę i za nią. */}
     <ul className="space-y-0.5">
       {wracaja.map((p) => <li key={p.id} className="flex items-baseline gap-2 text-xs">
-        <span className="truncate">{p.nazwa}</span>
-        {p.twSymbol && <span className="shrink-0 font-mono text-slate-500">{p.twSymbol}</span>}
-        {p.powod && <span className="shrink-0 text-slate-500">{p.powod}</span>}
+        <span className="min-w-0 truncate">{p.nazwa}</span>
+        {p.twSymbol && <span className="min-w-0 truncate font-mono text-slate-500">{p.twSymbol}</span>}
+        {p.powod && <span className="min-w-0 truncate text-slate-500">{p.powod}</span>}
         <span className="ml-auto shrink-0 tabular-nums">{p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
       </li>)}
     </ul>

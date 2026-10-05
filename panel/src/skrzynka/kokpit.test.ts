@@ -203,11 +203,15 @@ describe("historia bez tego zakupu", () => {
   it("wycina zakup, zwrot, reklamację i dyskusję tego zamówienia; resztę zostawia", () => {
     const pelna = h({
       wpisy: [wpis("zakup", "z"), wpis("zwrot", "z"), wpis("reklamacja", "z"), wpis("dyskusja", "z"),
-        wpis("rozmowa", null), wpis("zakup", "inne")],
+        wpis("rozmowa", null), wpis("zakup", "inne"), wpis("rozmowa", "z")],
       maszyny: [{ marka: "NAC" } as never], sprawa,
     });
     const poza = historiaPozaZakupem(pelna, "z")!;
-    expect(poza.wpisy.map((w) => `${w.rodzaj}:${w.zamowienieId}`)).toEqual(["rozmowa:null", "zakup:inne"]);
+    /* Rozmowa z numerem tego zamówienia też zostaje. Serwer daje dziś
+       rozmowom pusty numer, a reguła ma przetrwać dzień, w którym zacznie
+       go podawać: inna rozmowa to wcześniejszy kontakt, nie ten zakup. */
+    expect(poza.wpisy.map((w) => `${w.rodzaj}:${w.zamowienieId}`))
+      .toEqual(["rozmowa:null", "zakup:inne", "rozmowa:z"]);
     expect(poza.maszyny).toHaveLength(1);
     expect(poza.login).toBe("pasikonik5");
     expect(poza.sprawa).toBe(sprawa);

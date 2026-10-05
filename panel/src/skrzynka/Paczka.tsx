@@ -34,7 +34,7 @@ export function Paczka({ zamowienie, rozmowaId }: { zamowienie: ZamowienieRozmow
   /* Serwer odmawia sprawdzenia zamówienia, którego nie ma w bazie, więc
      przycisk dałby tylko błąd. Zdanie mówi, kiedy to się zmieni. */
   if (!p) {
-    return <div aria-label="Paczka zamówienia" className="space-y-1.5 text-sm">
+    return <div role="group" aria-label="Paczka zamówienia" className="space-y-1.5 text-sm">
       <p className="text-slate-600">Zamówienia jeszcze nie pobraliśmy — paczkę sprawdzisz
         po najbliższej synchronizacji.</p>
     </div>;
@@ -45,7 +45,9 @@ export function Paczka({ zamowienie, rozmowaId }: { zamowienie: ZamowienieRozmow
      „kurier czy paczkomat" pada razem z „gdzie jest". */
   const stan = [zamowienie.pobrane?.dostawaMetoda, p.sprawdzonoAt && `stan z ${czas(p.sprawdzonoAt)}`]
     .filter(Boolean).join(" · ");
-  return <div aria-label="Paczka zamówienia" className="space-y-1.5 text-sm">
+  /* Rola grupy, bo nazwy `div` bez roli czytnik ekranu nie ogłasza, a blok
+     stoi w trzech miejscach kolumny i agent ma go rozpoznać w każdym. */
+  return <div role="group" aria-label="Paczka zamówienia" className="space-y-1.5 text-sm">
     <p className={`font-semibold ${p.dostarczonoAt ? "text-ranga-ok"
       : odchyleniePrzesylki(p) ? "text-ranga-uwaga" : "text-slate-900"}`}>
       {p.sprawdzonoAt === null ? "Nie pytaliśmy jeszcze Allegro o tę paczkę."

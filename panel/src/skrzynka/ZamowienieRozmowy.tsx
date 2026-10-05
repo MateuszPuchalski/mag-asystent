@@ -57,12 +57,16 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
                 nazwa={`${p.nazwa} — zdjęcie oferty`} symbol={p.sku} />
               <Kafel twId={p.twId} rozmiar={40} nazwa={p.nazwa} symbol={p.twSymbol} />
               <div className="min-w-0 flex-1">
+                {/* Nazwa w dwóch liniach, a SKU linię niżej. W ramie przy
+                    kolumnie 256 px SKU i cena zabierały nazwie całe miejsce,
+                    a przy 1366 px dwa podobne filtry różniły się dopiero
+                    w uciętej końcówce, po której agent wybiera pozycję. */}
                 <div className="flex items-baseline gap-2">
-                  <span className="truncate">{p.nazwa}</span>
-                  {p.sku && <span className="shrink-0 text-slate-500">{p.sku}</span>}
-                  <span className="ml-auto shrink-0 tabular-nums">{p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
+                  <span className="line-clamp-2 min-w-0 flex-1">{p.nazwa}</span>
+                  <span className="shrink-0 tabular-nums">{p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
                 </div>
                 <div className="mt-0.5 flex flex-wrap items-center gap-2 text-podpis text-slate-500">
+                  {p.sku && <span className="text-slate-500">{p.sku}</span>}
                   {/* Kartoteka z podpisem źródła: SKU albo wskazanie człowieka — zdanie z serwera. */}
                   {p.twId !== null
                     ? <span title={p.twZrodlo ?? undefined}>
@@ -72,7 +76,7 @@ export function ZamowienieRozmowy({ zamowienie, rozmowaId, ofertaRozmowy = null 
                     <span className="rounded bg-amber-100 px-1 font-semibold text-amber-900">oferta rozmowy</span>}
                   {doWskazania && p.offerId && <button type="button" disabled={wskaz.isPending}
                     onClick={() => wskaz.mutate({ id: rozmowaId, ofertaId: p.offerId! })}
-                    className={`ml-auto ${ODNOSNIK}`}>
+                    className={`ml-auto text-xs ${ODNOSNIK}`}>
                     Wskaż jako ofertę rozmowy</button>}
                 </div>
               </div>

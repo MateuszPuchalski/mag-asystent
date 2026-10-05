@@ -27,11 +27,13 @@ import { historiaPozaZakupem } from "./kokpit";
  * poprawce doboru i rozjechałby się przy pierwszej. To ten sam kształt, który
  * w 0.128.0 kosztował cztery tabele nakładki spraw.
  */
-export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null }: {
+export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null, pomin }: {
   rozmowaId: number;
   onOtworzRozmowe: (id: number) => void;
   /** Zamówienie rozmowy — jego wpisy schodzą z historii, bo mają dom gdzie indziej. */
   zamowienieId?: string | null;
+  /** Inne zakupy klienta, które stoją w wierszu „Zamówienie" — historia ich nie powtarza. */
+  pomin?: ReadonlySet<string>;
 }) {
   const h = useHistoriaKlienta(rozmowaId);
 
@@ -63,11 +65,20 @@ export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null }: {
     </div>;
   }
 
+  /* INNE ZAKUPY RAZ. Ten sam drugi zakup stał w „Innych zakupach klienta"
+     i tutaj, raz z „PLN" i uciętym numerem, raz z „zł" i pełnym. Dom ma tam,
+     bo stamtąd się go wiąże z rozmową. Zwroty i sprawy innych zakupów
+     zostają, bo w tamtej liście ich nie ma. */
+  const wpisy = poza.wpisy.filter((w) =>
+    !(w.rodzaj === "zakup" && w.zamowienieId !== null && pomin?.has(w.zamowienieId)));
   /* Pusta oś przy zakupie mówi „poza tym zakupem". „Pierwszy kontakt"
-     byłby kłamstwem: zakup jest, tylko ma dom w karcie nad osią. */
-  return <WidokHistorii historia={{ ...poza, login: poza.login }} tutaj="tą rozmową" className=""
-    pustaOs={zamowienieId ? "Poza tym zakupem nie mamy u tego klienta nic więcej." : undefined}
-    bezLoginu onOtworzRozmowe={onOtworzRozmowe} />;
+     byłby kłamstwem: zakup jest, tylko ma dom w karcie nad osią. Gdy oś
+     opróżniły inne zakupy, zdanie mówi, gdzie one stoją. */
+  const pustaOs = wpisy.length < poza.wpisy.length
+    ? "Zakupy klienta stoją w wierszu „Zamówienie”, a poza nimi nie mamy u niego nic więcej."
+    : zamowienieId ? "Poza tym zakupem nie mamy u tego klienta nic więcej." : undefined;
+  return <WidokHistorii historia={{ ...poza, wpisy, login: poza.login }} tutaj="tą rozmową" wKolumnie
+    pustaOs={pustaOs} bezLoginu onOtworzRozmowe={onOtworzRozmowe} />;
 }
 
 /**
@@ -76,15 +87,17 @@ export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null }: {
  * na cztery wejścia: agent czyta klienta tak samo, skądkolwiek przyszedł.
  */
 export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = false, bezLoginu = false,
-  className = "p-3", pustaOs }: {
+  wKolumnie = false, pustaOs }: {
   historia: HistoriaKlienta & { login: string };
   /** „tą rozmową", „tym zwrotem" — o czym mówi pusta oś. */
   tutaj: string;
   /**
-   * Wcięcie widoku. Profil i szuflady przy zwrocie, reklamacji i dyskusji
-   * stawiają go samodzielnie; w kolumnie skrzynki oddech daje wiersz.
+   * Widok w wierszu „Klient" prawej kolumny skrzynki. Profil i szuflady przy
+   * zwrocie, reklamacji i dyskusji stawiają go samodzielnie, z wcięciem
+   * i nagłówkiem. W kolumnie oddech daje wiersz, tytuł wiersza mówi już
+   * „Klient", a maszyny stoją listą z kreską jak każda lista kolumny.
    */
-  className?: string;
+  wKolumnie?: boolean;
   /** Zdanie pustej osi zamiast obu domyślnych — gdy historia jest przycięta i „pierwszy kontakt" kłamałby. */
   pustaOs?: string;
   onOtworzRozmowe: (id: number) => void;
@@ -95,8 +108,8 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
 }) {
   const { login, maszyny, wpisy } = historia;
 
-  return <div className={className || undefined} aria-label="Historia klienta">
-    <NaglowekSekcji jako="p">Historia u nas</NaglowekSekcji>
+  return <div className={wKolumnie ? undefined : "p-3"} aria-label="Historia klienta">
+    {!wKolumnie && <NaglowekSekcji jako="p">Historia u nas</NaglowekSekcji>}
     {/* Klik kopiuje (0.228.0): po loginie szuka się klienta w panelu Allegro
         i w Subiekcie, a przepisany z ekranu bywa przekręcony. */}
     {/* Profil klienta (24 września 2026): cały klient na jednym ekranie —
@@ -116,9 +129,9 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
 
     {maszyny.length > 0 && <section className="mt-3" aria-label="Maszyny klienta">
       <NaglowekSekcji>Maszyny klienta</NaglowekSekcji>
-      <ul className="mt-1 space-y-1">
+      <ul className={wKolumnie ? "mt-1 divide-y divide-slate-200" : "mt-1 space-y-1"}>
         {maszyny.map((m) => <Maszyna key={`${m.marka}|${m.nazwa}|${m.wariant ?? ""}`} maszyna={m}
-          onOtworzRozmowe={onOtworzRozmowe} />)}
+          plasko={wKolumnie} onOtworzRozmowe={onOtworzRozmowe} />)}
       </ul>
     </section>}
 
@@ -177,11 +190,14 @@ function LiniaSprawy({ login, sprawa: s }: { login: string; sprawa: SprawaKlient
  * bez pokrycia, a §4.3 żąda, żeby każdy fakt niósł swoje. Klik prowadzi do
  * rozmowy, w której ktoś to ustalił — tam stoi dobór, który za tym stoi.
  */
-function Maszyna({ maszyna, onOtworzRozmowe }: {
-  maszyna: MaszynaKlienta; onOtworzRozmowe: (id: number) => void;
+function Maszyna({ maszyna, plasko, onOtworzRozmowe }: {
+  maszyna: MaszynaKlienta;
+  /** W kolumnie skrzynki bez ramki: jedyne pudełko w treści kolumny ważyło więcej niż ustalenie. */
+  plasko: boolean;
+  onOtworzRozmowe: (id: number) => void;
 }) {
   const opis = [maszyna.marka, maszyna.nazwa, maszyna.wariant].filter(Boolean).join(" ");
-  return <li className="rounded border border-slate-200 p-2 text-xs">
+  return <li className={plasko ? "py-1.5 text-xs" : "rounded border border-slate-200 p-2 text-xs"}>
     <p className="flex items-center gap-1.5 font-semibold text-slate-900">
       <Tractor size={13} className="shrink-0 text-slate-400" />
       {opis}{maszyna.rocznik && <span className="font-normal text-slate-500">({maszyna.rocznik})</span>}
@@ -209,7 +225,9 @@ function Wpis({ wpis, onOtworzRozmowe }: {
   wpis: WpisHistorii; onOtworzRozmowe: (id: number) => void;
 }) {
   return <li className="flex gap-2 border-t border-slate-100 py-1.5 text-xs first:border-t-0">
-    <span className="w-20 shrink-0 pt-0.5 text-podpis text-slate-500">{czas(wpis.at)}</span>
+    {/* Data w jednej linii: przy `w-20` część dat łamała się na dwie,
+        a sąsiednie nie, i kolumna dat skakała z wiersza na wiersz. */}
+    <span className="w-24 shrink-0 whitespace-nowrap pt-0.5 text-podpis tabular-nums text-slate-500">{czas(wpis.at)}</span>
     <span className="min-w-0 flex-1">
       {wpis.rodzaj !== "zakup" && wpis.rodzaj !== "rozmowa" && wpis.sprawaId !== null
         ? (() => {

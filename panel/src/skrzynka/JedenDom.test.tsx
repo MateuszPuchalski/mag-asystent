@@ -147,7 +147,10 @@ const dane = (kandydaci: unknown[]): OsRozmowy => ({
       trafienia: ["MTD Smart 53 SPO"], wariantSprawdzony: false },
     pobrana: { nazwa: NAZWA_OFERTY, sku: SKU, cenaGrosze: 6499, waluta: "PLN", status: "ACTIVE",
       syncedAt: "2026-10-04T07:50:00.000Z", zdjecie: "jest" },
-    kartoteka: { pewnosc: "sku", twId: TW_ID, symbol: SKU, zrodlo: "SKU oferty = symbol kartoteki", powod: null },
+    /* Zdanie DOKŁADNIE takie, jakie pisze serwer (`dopasowanie-sku.ts`): niesie
+       samo SKU. Zmyślone zdanie bez SKU przepuszczało drugi zapis w podpisie
+       źródła przy towarze. */
+    kartoteka: { pewnosc: "sku", twId: TW_ID, symbol: SKU, zrodlo: `SKU oferty „${SKU}"`, powod: null },
   },
   kandydaciZamowien: kandydaci,
   zwroty: [], sprawy: [],
@@ -187,14 +190,15 @@ function sprawdzDomy() {
 /* Dwa przypadki, bo fakt o kliencie wraca dwiema drogami: licznikami przy
    kliencie z historią i linijką „Nowy klient" przy pierwszym zakupie. */
 const PRZYPADKI = [
-  { nazwa: "klient z historią", historia: HISTORIA, kandydaci: [BIEZACY_ZAKUP, INNY_ZAKUP], wierszKlient: true },
+  { nazwa: "klient z historią", historia: HISTORIA, kandydaci: [BIEZACY_ZAKUP, INNY_ZAKUP], wierszKlient: true,
+    innychZakupow: 1 },
   { nazwa: "nowy klient, jedynym wpisem jest ten zakup", historia: HISTORIA_NOWEGO, kandydaci: [BIEZACY_ZAKUP],
-    wierszKlient: false },
+    wierszKlient: false, innychZakupow: 0 },
 ];
 
 describe("Fakt z karty zakupu nie wraca do prawej kolumny", () => {
   it.each(PRZYPADKI)("$nazwa: ani przy otwarciu, ani po rozwinięciu wszystkiego; zero zapisu",
-    async ({ historia, kandydaci, wierszKlient }) => {
+    async ({ historia, kandydaci, wierszKlient, innychZakupow }) => {
       historiaSerwera = historia;
       const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       render(<QueryClientProvider client={qc}><MemoryRouter>
@@ -232,6 +236,10 @@ describe("Fakt z karty zakupu nie wraca do prawej kolumny", () => {
       expect(obroty).toBeGreaterThanOrEqual(2);
       expect(within(kolumna()).getByLabelText("Paczka zamówienia")).toBeInTheDocument();
       sprawdzDomy();
+      /* Inny zakup klienta ma dom w „Innych zakupach klienta", skąd się go
+         wiąże z rozmową. Historia w wierszu „Klient" mówiła go drugi raz,
+         z inną walutą i innym zapisem numeru. */
+      expect(kolumna().textContent?.match(/FILTR POWIETRZA/g) ?? []).toHaveLength(innychZakupow);
 
       expect(zadania.filter((z) => z.metoda !== "GET")).toEqual([]);
     });

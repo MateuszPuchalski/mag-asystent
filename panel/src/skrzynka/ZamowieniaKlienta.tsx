@@ -48,8 +48,9 @@ export function ZamowieniaKlienta({ kandydaci, rozmowaId, maZamowienie }: {
 
   return <section className="text-sm" aria-label={nazwa}>
     <div className="flex flex-wrap items-center gap-2">
-      <NaglowekSekcji ikona={<ShoppingBag size={13} />}>{nazwa}</NaglowekSekcji>
-      <span className="text-podpis text-slate-500">{kandydaci.length}</span>
+      {/* Liczba w nagłówku tym samym kształtem co „Wymaga Ciebie · N":
+          luźna cyfra obok była trzecim zapisem liczenia w jednej kolumnie. */}
+      <NaglowekSekcji ikona={<ShoppingBag size={13} />}>{nazwa} · {kandydaci.length}</NaglowekSekcji>
       {maZamowienie && <button type="button" aria-expanded={otwarte} onClick={() => setOtwarte((o) => !o)}
         className={`ml-auto text-xs ${ODNOSNIK_CICHY}`}>
         {otwarte ? "zwiń" : "to nie ta paczka?"}</button>}

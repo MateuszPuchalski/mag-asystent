@@ -1,14 +1,14 @@
-import React, { useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import { Check, Database, PackageSearch, X as Krzyzyk } from "lucide-react";
 import { EtykietaWartosci, NaglowekSekcji, ile, odmien } from "../ui";
-import type { CenaPoziomu, KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
+import type { CenaPoziomu, DopasowanieKartoteki, KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
 import { useWiedzaTowaru } from "../api/wiedza";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
 import { PrzyciskTowaru } from "../towar/Szuflada";
-import { PROG_ZNAKOW } from "./DlugiTekst";
+import { dlugi } from "./DlugiTekst";
 import { ODNOSNIK_CICHY } from "./odnosniki";
 
 /**
@@ -78,9 +78,10 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
           sekcje tej samej rangi miały trzy różne kształty, więc nie było jak
           odczytać, że stoją na jednym poziomie. */}
       <NaglowekSekcji ikona={<Database size={13} />}>Subiekt GT</NaglowekSekcji>
-      {/* Puste `sku` w pamięci znaczy „wskazał człowiek". Serwer pisze to
-          zdanie; panel go nie układa drugi raz. */}
-      {potwierdzona !== null && <span className="text-podpis text-slate-500">{k.zrodlo}</span>}
+      {/* Puste `sku` w pamięci znaczy „wskazał człowiek". Zdanie pisze serwer,
+          a panel skraca je tylko przy powiązaniu po SKU (`zrodloKartoteki`). */}
+      {potwierdzona !== null && <span className="text-podpis text-slate-500" title={k.zrodlo}>
+        {zrodloKartoteki(k, oferta.pobrana?.sku)}</span>}
       {/* OSOBNE zdanie w barwie wiedzy: §4.3 nie miesza źródeł, a to jest
           nasza baza wiedzy, nie dane z ERP. Zwykłym pismem, bo plakietka
           w ramce i wersalikach ważyła jak ustalenie, a to liczba wpisów. */}
@@ -180,6 +181,23 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
 }
 
 /**
+ * Podpis źródła kartoteki (§4.3).
+ *
+ * BEZ DRUGIEGO SKU. Przy powiązaniu po sygnaturze serwer pisze „SKU oferty
+ * „X"", a to samo X stoi w paśmie przy „Zamówił" i w karcie zakupu. Podpis
+ * mówi wtedy samą regułę, a pełne zdanie zostaje w dymku. Zdanie z czymkolwiek
+ * więcej, np. z dopiskiem o zmienionej sygnaturze, stoi w całości, bo dopisek
+ * jest ostrzeżeniem, a nie powtórzeniem. Nieznany kształt zdania też.
+ */
+export function zrodloKartoteki(k: Pick<DopasowanieKartoteki, "pewnosc" | "zrodlo">,
+  sku: string | null | undefined): string {
+  const s = sku?.trim();
+  if (k.pewnosc !== "sku" || !s) return k.zrodlo;
+  const reszta = k.zrodlo.replace(s, "").replace(/[„”"]/g, "").trim();
+  return reszta === "SKU oferty" ? "SKU oferty = symbol kartoteki" : k.zrodlo;
+}
+
+/**
  * Stan magazynowy. „Dostępny" stoi OSOBNO od stanu, bo to on odpowiada na
  * pytanie klienta — stan bez odjętych rezerwacji obiecuje towar, który jest
  * już czyjś.
@@ -203,24 +221,47 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
  */
 function OpisKartoteki({ desc }: { desc?: string }) {
   const [calosc, setCalosc] = useState(false);
+  /* `null` znaczy „nie zmierzono": element bez wysokości (jsdom, ukryty
+     rodzic) nie mówi nic o obcięciu. */
+  const [przyciete, setPrzyciete] = useState<boolean | null>(null);
+  const ref = useRef<HTMLParagraphElement>(null);
   const tresc = (desc ?? "").trim();
+  /* OBCIĘCIE MIERZY PRZEGLĄDARKA. Sam próg znaków przepuszczał opis krótszy
+     od progu, który i tak nie mieścił się w sześciu liniach: zawinięta
+     pierwsza linia zjadała szóstą, a wielokropek urywał moment dokręcenia
+     śruby bez niczego do kliknięcia. W wąskiej kolumnie to częsty przypadek,
+     a szerokość kolumny zmienia się z oknem, więc pomiar idzie też po niej. */
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || calosc) return;
+    const zmierz = () => {
+      if (el.clientHeight > 0) setPrzyciete(el.scrollHeight > el.clientHeight + 1);
+    };
+    zmierz();
+    if (typeof ResizeObserver === "undefined") return;
+    const obserwator = new ResizeObserver(zmierz);
+    obserwator.observe(el);
+    return () => obserwator.disconnect();
+  }, [tresc, calosc]);
   if (!tresc) return null;
 
+  /* Przełącznik stoi tylko wtedy, gdy jest co rozwijać. Bez pomiaru
+     rozstrzyga próg znaków i linii wspólny z osią rozmowy (`dlugi`).
+     Przełącznik stoi w linii nagłówka, więc nie dokłada wysokości bloku. */
+  const pokazPrzelacznik = calosc || (przyciete ?? dlugi(tresc));
   /* Pismo nie większe od tytułu wiersza: opis jest treścią bloku, a nie
-     nagłówkiem nad nim, więc stoi w tym samym rozmiarze co reszta kolumny. */
+     nagłówkiem nad nim, więc stoi w tym samym rozmiarze co reszta kolumny.
+     Sześć linii, a nie osiem, bo domyślna skala Tailwinda kończy się na
+     sześciu, a `line-clamp-8` nie powstałoby w arkuszu i opis jechałby CAŁY. */
   return <div>
-    <NaglowekSekcji jako="p" className="mb-1">Opis kartoteki</NaglowekSekcji>
-    <p className={`whitespace-pre-wrap text-sm text-slate-700 ${calosc ? "" : "line-clamp-6"}`}>
+    <div className="mb-1 flex items-baseline gap-2">
+      <NaglowekSekcji jako="p">Opis kartoteki</NaglowekSekcji>
+      {pokazPrzelacznik && <button type="button" aria-expanded={calosc} onClick={() => setCalosc((c) => !c)}
+        className={`ml-auto text-xs ${ODNOSNIK_CICHY}`}>
+        {calosc ? "zwiń opis" : "pokaż cały opis"}</button>}
+    </div>
+    <p ref={ref} className={`whitespace-pre-wrap text-sm text-slate-700 ${calosc ? "" : "line-clamp-6"}`}>
       {tresc}</p>
-    {/* Przycisk tylko wtedy, gdy jest co rozwijać. Linii nie liczymy w kodzie
-        — `line-clamp` robi to w przeglądarce. Sześć, a nie osiem, bo domyślna
-        skala Tailwinda kończy się na sześciu, a `line-clamp-8` nie powstałoby
-        w arkuszu i opis jechałby CAŁY. Próg znaków jest wspólny z osią
-        rozmowy (0.523.0): dwa zapisy tej samej liczby rozjechałyby się
-        przy pierwszej poprawce. Wierszy nie liczymy, bo sześć się mieści. */}
-    {tresc.length > PROG_ZNAKOW && <button type="button" aria-expanded={calosc} onClick={() => setCalosc((c) => !c)}
-      className={`mt-1 text-xs ${ODNOSNIK_CICHY}`}>
-      {calosc ? "zwiń opis" : "pokaż cały opis"}</button>}
   </div>;
 }
 
@@ -273,7 +314,9 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
       {pozostale.filter(([, w]) => w !== "brak").map(([nazwa, wartosc]) =>
         <div key={nazwa} className="flex items-baseline gap-2 text-xs">
           <span className="w-24 shrink-0 text-slate-500">{nazwa}</span>
-          <span className="font-semibold text-slate-900">{wartosc}</span>
+          {/* `min-w-0` i łamanie słów: przy kolumnie 256 px EAN wychodził
+              poza krawędź i kolumna przewijała się w bok. */}
+          <span className="min-w-0 break-words font-semibold text-slate-900">{wartosc}</span>
         </div>)}
       {/* BRAK JEDNĄ LINIĄ, NIE WIERSZAMI. Trzy wiersze „brak" zajmowały tyle
           miejsca co wartości. Fakt „tego nie mamy" zostaje, znika obrys, który

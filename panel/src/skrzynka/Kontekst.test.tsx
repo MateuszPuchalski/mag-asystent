@@ -299,6 +299,8 @@ describe("kolumna kontekstu", () => {
     rysuj(dane());
     expect(wiersz(/^Klient/)).toHaveTextContent(/sprawa: Oddzwonić/);
     expect(screen.getByText(/po terminie/)).toHaveClass("text-ranga-zle");
+    /* Ostrzeżenie stoi na początku streszczenia, bo koniec zjada wielokropek. */
+    expect(wiersz(/^Klient/)).toHaveTextContent(/^Klientpo terminie · sprawa: Oddzwonić/);
   });
 
   /* ── Soczewka nad kolumną ────────────────────────────────────────────────
@@ -349,7 +351,7 @@ describe("kolumna kontekstu", () => {
   });
 
   it("towar znany z zamówienia chowa dobór za bramką, a „mimo to” otwiera go tuż pod nią", async () => {
-    rysuj(znany());
+    const { rerender } = rysuj(znany());
     expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
     /* Wiersza „Dobór: zbędny" nie ma — bramka stoi w „Oferta i towar". */
     expect(screen.queryByRole("button", { name: /^Dobór/ })).toBeNull();
@@ -363,6 +365,13 @@ describe("kolumna kontekstu", () => {
     /* Dobór otwarty ręką nie świeci: agent sam po niego sięgnął. */
     expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
     /* Stoi zaraz pod towarem, czyli w miejscu klikniętego przycisku. */
+    expect(wiersz(/^Oferta i towar/).parentElement!.nextElementSibling).toContainElement(wiersz(/^Dobór/));
+    /* Pierwszy zapis agenta w doborze gasi bramkę i zapala świecenie. Dobór,
+       który agent sam otworzył, zostaje jednak w miejscu: skok na górę
+       kolumny w chwili zapisu przesuwałby blok pod okiem. */
+    rerender(uklad(znany({ zmienil: "A. Lewandowska", zmienilAutomat: false })));
+    expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
+    expect(wiersz(/^Dobór/)).toHaveAttribute("aria-expanded", "true");
     expect(wiersz(/^Oferta i towar/).parentElement!.nextElementSibling).toContainElement(wiersz(/^Dobór/));
   });
 
@@ -456,13 +465,15 @@ describe("streszczenie zamówienia", () => {
       status: null, sprawdzonoAt: "2026-09-24T11:00:00Z" }) }))).toMatch(/^bez numeru przesyłki/);
   });
 
-  it("przy soczewce paczki nie mówi paczki — stoi wyżej", async () => {
+  /* Metoda dostawy stoi w linii stanu bloku paczki, więc przy paczce wyżej
+     stoi tam razem z nią. Streszczenie mówi wtedy, GDZIE jest odpowiedź. */
+  it("przy soczewce paczki nie mówi paczki ani metody — stoją wyżej", async () => {
     const { streszczenieZamowienia } = await import("./Kontekst");
     const rozmowa = { ...dane().rozmowa, kopilot: kopilot("ORDER_STATUS") };
     expect(streszczenieZamowienia(dane({ rozmowa, zamowienie: zamowienie({}) }))).toBe("paczka wyżej");
     const s = streszczenieZamowienia(dane({ rozmowa, zamowienie: zamowienie({}, { dostawaMetoda: "Kurier DPD" }) }));
-    expect(s).toBe("Kurier DPD");
-    expect(s).not.toMatch(/w drodze|kupione/);
+    expect(s).toBe("paczka wyżej");
+    expect(s).not.toMatch(/Kurier DPD|w drodze|kupione/);
   });
 
   it("liczy pozycje, gdy ich lista stoi pod wierszem", async () => {

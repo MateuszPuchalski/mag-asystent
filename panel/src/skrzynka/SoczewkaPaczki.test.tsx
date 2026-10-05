@@ -58,22 +58,24 @@ const dane = (kategoria: Kategoria): OsRozmowy => ({
 
 function pokaz(kategoria: Kategoria) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(<QueryClientProvider client={qc}><MemoryRouter>
+  return { qc, ...render(<QueryClientProvider client={qc}><MemoryRouter>
     <Kontekst dane={dane(kategoria)} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}}
       onOtworzRozmowe={() => {}} />
-  </MemoryRouter></QueryClientProvider>);
+  </MemoryRouter></QueryClientProvider>) };
 }
 
 describe("soczewka paczki na prawdziwych hakach", () => {
   it("otwarcie kolumny przy każdej kategorii dostawy wysyła wyłącznie GET", async () => {
     for (const k of ["ORDER_STATUS", "DELIVERY_DELAY", "DELIVERY_LOST", "DELIVERY_DAMAGED"] as const) {
       const od = zadania.length;
-      const { unmount } = pokaz(k);
+      const { qc, unmount } = pokaz(k);
       expect(await screen.findByRole("button", { name: "Sprawdź paczkę" })).toBeInTheDocument();
       /* Historia klienta przychodzi z odczytu, a pusta nie stawia w kolumnie
-         niczego. Czekamy więc na samo żądanie, żeby policzyć zapisy dopiero
-         po tym, jak kolumna dociągnęła swoje — przy każdej kategorii osobno. */
+         niczego. Czekamy więc na samo żądanie, a potem na przetworzenie
+         każdej odpowiedzi. Zapis wywołany przyjściem historii zdążyłby
+         inaczej nie paść przed odmontowaniem i przeszedłby niezauważony. */
       await vi.waitFor(() => expect(zadania.slice(od).some((z) => z.url.endsWith("/51/klient"))).toBe(true));
+      await vi.waitFor(() => expect(qc.isFetching()).toBe(0));
       unmount();
     }
     expect(zadania.length).toBeGreaterThan(0);

@@ -2,6 +2,7 @@ import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { KartaTowaru, OsRozmowy } from "../api/typy";
+import { BrakPolaczenia } from "../api/klient";
 
 /* ── Pasmo odpowiedzi ────────────────────────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: „popraw skrzynkę odpowiadania pytań".
@@ -147,12 +148,21 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
     expect(screen.getByText("3 × MFG163856")).toBeInTheDocument();
   });
 
-  it("gdy Subiekt nie odpowiedział, mówi to wprost — „nie wiemy” zamiast zera", () => {
-    karta.mockReturnValue({ isLoading: false, isError: true, error: new Error("x"), data: undefined });
+  it("gdy odczyt kartoteki padł, mówi to wprost — „nie wiemy” zamiast zera", () => {
+    karta.mockReturnValue({ isLoading: false, isError: true, error: new Error("Nie znaleziono towaru"), data: undefined });
     render(<PasmoOdpowiedzi dane={dane()} />);
-    expect(screen.getByText("Subiekt nie odpowiedział")).toBeInTheDocument();
+    expect(screen.getByText("odczyt kartoteki nie przeszedł")).toHaveClass("text-ranga-zle");
     expect(screen.getByText("nie wiemy")).toBeInTheDocument();
     expect(screen.queryByText("brak na stanie")).toBeNull();
+  });
+
+  /* Brak połączenia ogłasza pasek pod nagłówkiem. Pasmo nie podaje innej
+     przyczyny: „Subiekt nie odpowiedział" kazało zgłaszać awarię, której nie było. */
+  it("przy braku połączenia z serwerem nie obwinia Subiekta — samo „nie wiemy”", () => {
+    karta.mockReturnValue({ isLoading: false, isError: true, error: new BrakPolaczenia(), data: undefined });
+    render(<PasmoOdpowiedzi dane={dane()} />);
+    expect(screen.getAllByText("nie wiemy")).toHaveLength(2);
+    expect(screen.queryByText(/Subiekt|nie przeszedł/)).toBeNull();
   });
 
   it("PROPOZYCJI kartoteki nie podaje jako faktu — o kartotekę pyta dopiero pewność", () => {

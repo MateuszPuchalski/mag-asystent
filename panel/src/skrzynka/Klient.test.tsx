@@ -149,6 +149,37 @@ describe("zakładka klienta", () => {
     expect(screen.getByRole("button", { name: /ustalono model kosiarki/ })).toBeInTheDocument();
   });
 
+  /* Inny zakup klienta ma dom w wierszu „Zamówienie", skąd się go wiąże.
+     W historii stał drugi raz, z inną walutą i innym zapisem numeru. */
+  it("inne zakupy z wiersza „Zamówienie” nie stoją drugi raz w historii; zwrot i rozmowa zostają", () => {
+    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ wpisy: [
+      { rodzaj: "zakup", at: "2026-05-12T09:10:00Z", tresc: "Filtr powietrza",
+        zamowienieId: "z-2", link: null, rozmowaId: null, sprawaId: null },
+      { rodzaj: "zwrot", at: "2026-05-20T09:10:00Z", tresc: "ZW/2026/05/0003",
+        zamowienieId: "z-2", link: null, rozmowaId: null, sprawaId: 3 },
+      { rodzaj: "rozmowa", at: "2026-05-11T09:00:00Z", tresc: "ustalono model kosiarki",
+        zamowienieId: null, link: null, rozmowaId: 3140, sprawaId: null },
+    ] }) });
+    render(<MemoryRouter><Klient rozmowaId={4821} onOtworzRozmowe={vi.fn()} zamowienieId="z-1"
+      pomin={new Set(["z-2"])} /></MemoryRouter>);
+    expect(screen.queryByText(/Filtr powietrza/)).toBeNull();
+    expect(screen.getByText("ZW/2026/05/0003")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ustalono model kosiarki/ })).toBeInTheDocument();
+    /* Tytuł wiersza mówi już „Klient", więc drugiego nagłówka nie ma. */
+    expect(screen.queryByText("Historia u nas")).toBeNull();
+  });
+
+  it("gdy oś opróżniły same inne zakupy, mówi, gdzie stoją — nie „nic więcej” o tym zakupie", () => {
+    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ maszyny: [], wpisy: [
+      { rodzaj: "zakup", at: "2026-05-12T09:10:00Z", tresc: "Filtr powietrza",
+        zamowienieId: "z-2", link: null, rozmowaId: null, sprawaId: null },
+    ] }) });
+    render(<MemoryRouter><Klient rozmowaId={4821} onOtworzRozmowe={vi.fn()} zamowienieId="z-1"
+      pomin={new Set(["z-2"])} /></MemoryRouter>);
+    expect(screen.getByText(/Zakupy klienta stoją w wierszu „Zamówienie”/)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Profil klienta" })).toBeInTheDocument();
+  });
+
   it("przy samej sprawie i zakupie pusta oś nie mówi „pierwszy kontakt”", () => {
     historia.mockReturnValue({ isLoading: false, error: null, data: dane({ sprawa: {
       id: 5, login: "zielony_ogrod", wersja: 2, stan: "w_toku", krok: "czekamy na zwrot",

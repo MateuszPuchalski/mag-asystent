@@ -15,7 +15,7 @@ vi.mock("../api/wiedza", () => ({ useWiedzaTowaru: () => wiedza() }));
 vi.mock("../towar/Zdjecie", () => ({ Zdjecie: () => <div data-testid="zdjecie" /> }));
 vi.mock("../towar/Powiekszenie", () => ({ Powiekszenie: () => null }));
 
-const { TowarRozmowy } = await import("./TowarRozmowy");
+const { TowarRozmowy, zrodloKartoteki } = await import("./TowarRozmowy");
 
 const oferta = (kartoteka: DopasowanieKartoteki): OfertaRozmowy => ({
   externalId: "12096815384", link: null, zrodlo: "wiadomosc", zgodnosc: null, pobrana: null, kartoteka,
@@ -151,6 +151,48 @@ describe("towar przy rozmowie", () => {
     })} />);
     await userEvent.click(screen.getByRole("button", { name: /pokaż cały opis/ }));
     expect(screen.getByRole("button", { name: /zwiń opis/ })).toBeInTheDocument();
+  });
+
+  /* Opis krótszy od progu znaków bywał obcięty i tak: zawinięta linia
+     zjadała szóstą, a wielokropek urywał moment dokręcenia bez przycisku. */
+  it("sześć linii poniżej progu znaków też dostaje przycisk rozwijania", () => {
+    const desc = ["Nóż tnący 53 cm.", "Otwór 5/8\".", "Gwint M41.", "Pasuje bez podkładki dystansowej.",
+      "Hartowany.", "Montaż: śruba 5/8\" momentem 60 Nm."].join("\n");
+    expect(desc.length).toBeLessThan(320);
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, desc } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    expect(screen.getByRole("button", { name: /pokaż cały opis/ })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("krótki opis obcięty w wąskiej kolumnie dostaje przycisk — rozstrzyga pomiar przeglądarki", () => {
+    /* jsdom nie liczy układu, więc wysokości podstawiamy: treść wyższa niż
+       sześć linii, które widać. */
+    const wys = vi.spyOn(Element.prototype, "scrollHeight", "get").mockReturnValue(160);
+    const widac = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(120);
+    try {
+      karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, desc: "Gwint M41 x 1,5. Pasuje bez podkładki." } });
+      render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+        pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+      })} />);
+      expect(screen.getByRole("button", { name: /pokaż cały opis/ })).toBeInTheDocument();
+    } finally {
+      wys.mockRestore();
+      widac.mockRestore();
+    }
+  });
+
+  /* SKU oferty stoi w paśmie przy „Zamówił" i w karcie zakupu. Podpis źródła
+     mówi więc samą regułę, a pełne zdanie serwera zostaje w dymku. */
+  it("podpis źródła po SKU nie powtarza samego SKU; zdanie z dopiskiem stoi w całości", () => {
+    expect(zrodloKartoteki({ pewnosc: "sku", zrodlo: 'SKU oferty „NOZ-STIGA-43"' }, "NOZ-STIGA-43"))
+      .toBe("SKU oferty = symbol kartoteki");
+    const zDopiskiem = 'SKU oferty „NOZ-STIGA-43" — sygnatura zmieniła się z „NOZ-43”, dawne wskazanie (Ola) nie obowiązuje';
+    expect(zrodloKartoteki({ pewnosc: "sku", zrodlo: zDopiskiem }, "NOZ-STIGA-43")).toBe(zDopiskiem);
+    expect(zrodloKartoteki({ pewnosc: "pamiec", zrodlo: "Wskazane wcześniej przez: Ola" }, "X"))
+      .toBe("Wskazane wcześniej przez: Ola");
+    expect(zrodloKartoteki({ pewnosc: "sku", zrodlo: 'SKU oferty „A"' }, null)).toBe('SKU oferty „A"');
   });
 
   /* Opis to WOLNY TEKST, w którym bywa notatka dla magazynu. Wstawka

@@ -1,6 +1,7 @@
 import React from "react";
 import type { KartaTowaru, OsRozmowy } from "../api/typy";
 import { useKartaTowaru } from "../api/rozmowy";
+import { BrakPolaczenia } from "../api/klient";
 import { EtykietaWartosci, dzien } from "../ui";
 
 /* ── PASMO ODPOWIEDZI ────────────────────────────────────────────────────────
@@ -104,6 +105,13 @@ export function PasmoOdpowiedzi({ dane }: { dane: OsRozmowy }) {
      puste wiersze „Klient" i „Wiedza" nie stają przed odczytem. */
   const d = karta.data;
   const czekam = <span className="text-slate-500">wczytuję…</span>;
+  /* PRZYCZYNĘ MÓWI TEN, KTO JĄ ZNA. Brak połączenia z serwerem ogłasza pasek
+     pod nagłówkiem (`Polaczenie.tsx`), więc tu stoi samo „nie wiemy".
+     Czerwone „Subiekt nie odpowiedział" kazało zgłaszać awarię Subiekta,
+     której nie było. Inny błąd mówi, co pękło, bez zgadywania czemu:
+     serwer odmawia też, gdy kartoteki już nie ma. */
+  const bezSerwera = karta.error instanceof BrakPolaczenia;
+  const nieWiemy = <span className="text-slate-500">nie wiemy</span>;
 
   return <aside aria-label="Do tej odpowiedzi" aria-busy={karta.isLoading || undefined}
     /* gramatyka: pasmo stoi poza przewijaniem kolumny */
@@ -119,7 +127,9 @@ export function PasmoOdpowiedzi({ dane }: { dane: OsRozmowy }) {
               widzi. Równy powtarzał to samo słowo; różny to sygnał, że oferta
               wskazuje inną kartotekę, i ten zostaje. */}
           {d.sym && d.sym !== sygnatura && <span className="font-mono text-slate-600"> · {d.sym}</span>}
-        </> : karta.isError ? <span className="text-ranga-zle">Subiekt nie odpowiedział</span> : czekam}
+        </> : karta.isError
+          ? bezSerwera ? nieWiemy : <span className="text-ranga-zle">odczyt kartoteki nie przeszedł</span>
+          : czekam}
       </Wiersz>}
       {potwierdzona !== null && <Wiersz etykieta="Mamy">
         {d ? <>
@@ -130,7 +140,7 @@ export function PasmoOdpowiedzi({ dane }: { dane: OsRozmowy }) {
           {d.locs?.length ? <span className="font-mono text-slate-600">
             {" · "}{d.locs.join(", ")}</span> : null}
           {dopisekDostaw(d) && <span className="text-slate-700">{" · "}{dopisekDostaw(d)}</span>}
-        </> : karta.isError ? <span className="text-slate-500">nie wiemy</span> : czekam}
+        </> : karta.isError ? nieWiemy : czekam}
       </Wiersz>}
     </div>
   </aside>;
