@@ -6,15 +6,7 @@ import userEvent from "@testing-library/user-event";
 import type {
   DopasowanieKartoteki, Reklamacja, SzczegolReklamacji, WiadomoscReklamacji, Zamowienie,
 } from "../api/typy";
-import { FaktySprawy } from "./Fakty";
-/* Fakty stoją w głowicy jako pas komórek. Test patrzy na sam pas, w ramie
-   routera, bo „Ten zakup u nas" niesie odnośniki do kolejek. */
-const Fakty = ({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke, bladPrzesylki }: {
-  szczegol: SzczegolReklamacji; onSprawdzPrzesylke?: () => void;
-  sprawdzaPrzesylke?: boolean; bladPrzesylki?: string;
-}) => <MemoryRouter><FaktySprawy szczegol={szczegol} towar={kartotekaKolumny(szczegol)}
-  onSprawdzPrzesylke={onSprawdzPrzesylke} sprawdzaPrzesylke={sprawdzaPrzesylke}
-  bladPrzesylki={bladPrzesylki} /></MemoryRouter>;
+import { Fakty } from "../test/fakty";
 
 import { Glowica, kartotekaKolumny } from "./Glowica";
 
@@ -88,7 +80,7 @@ const glowica = (n: Partial<SzczegolReklamacji> = {}, r: Partial<Reklamacja> = {
 const zdanieA = () => screen.getByTitle(/^Status w Allegro|^Allegro nie podało statusu/);
 
 const props = (n: Partial<SzczegolReklamacji> = {}, r: Partial<Reklamacja> = {}) => ({
-  szczegol: szczegol(n, r), trwa: false, bladZapisu: "", onNotatka: vi.fn(),
+  szczegol: szczegol(n, r),
 });
 
 describe("Klient na czele głowicy", () => {
@@ -341,8 +333,8 @@ describe("Kto prowadzi — czynność stoi w głowicy", () => {
   });
 });
 
-describe("Kolumna faktów nie powtarza głowicy", () => {
-  it("kwoty żądania i terminu w kolumnie faktów nie ma — mówi je głowica", () => {
+describe("Pas faktów nie powtarza reszty głowicy", () => {
+  it("kwoty żądania i terminu w pasie faktów nie ma — mówi je zdanie wyżej", () => {
     render(<Fakty {...props()} />);
     expect(screen.queryByText("za 6 dni")).not.toBeInTheDocument();
     expect(screen.queryByText("68,25 PLN")).not.toBeInTheDocument();
@@ -382,6 +374,18 @@ describe("Komórka zamówienia i odnośniki do Allegro", () => {
     expect(zamowienie()).not.toHaveTextContent("68,25");
   });
 
+  it("przy kilku sztukach suma zostaje — komórka obok niesie cenę jednej sztuki", () => {
+    const dwie = { ...ZAMOWIENIE, pozycje: [{ ...ZAMOWIENIE.pozycje[1], ilosc: 2 }], sumaGrosze: 13650 } as unknown as Zamowienie;
+    render(<Fakty {...props({ zamowienie: dwie }, { oczekiwanaKwotaGrosze: null })} />);
+    expect(zamowienie()).toHaveTextContent("razem 136,50 PLN");
+  });
+
+  it("nieznana dostawa to nie zero — suma zostaje", () => {
+    const jedna = { ...ZAMOWIENIE, pozycje: [ZAMOWIENIE.pozycje[1]], dostawaGrosze: null, sumaGrosze: 6825 } as unknown as Zamowienie;
+    render(<Fakty {...props({ zamowienie: jedna }, { oczekiwanaKwotaGrosze: null })} />);
+    expect(zamowienie()).toHaveTextContent("razem 68,25 PLN");
+  });
+
   it("z płatną dostawą suma zostaje — koszt dostawy kształtuje kwotę zwrotu", () => {
     const jedna = { ...ZAMOWIENIE, pozycje: [ZAMOWIENIE.pozycje[1]], dostawaGrosze: 999, sumaGrosze: 7824 } as unknown as Zamowienie;
     render(<Fakty {...props({ zamowienie: jedna })} />);
@@ -390,8 +394,9 @@ describe("Komórka zamówienia i odnośniki do Allegro", () => {
 
   it("identyfikatory zamówienia i oferty stoją w łączach przy numerze reklamacji, nie jako tekst", () => {
     glowica({}, { linkZamowienia: "https://allegro.pl/z/ord-5", linkOferty: "https://allegro.pl/oferta/of-1" });
-    expect(screen.getByRole("link", { name: "zamówienie" })).toHaveAttribute("title", "Zamówienie ord-5");
-    expect(screen.getByRole("link", { name: "oferta" })).toHaveAttribute("title", "Oferta of-1");
+    /* Czytnik ekranu dostaje cel odnośnika, na widoku stoi krótko. */
+    expect(screen.getByRole("link", { name: "zamówienie w Allegro" })).toHaveAttribute("title", "Zamówienie ord-5");
+    expect(screen.getByRole("link", { name: "oferta w Allegro" })).toHaveAttribute("title", "Oferta of-1");
     expect(screen.getByTitle("Kopiuj numer zamówienia")).toBeInTheDocument();
     expect(screen.queryByText("ord-5")).not.toBeInTheDocument();
   });

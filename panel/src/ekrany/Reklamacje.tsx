@@ -70,7 +70,7 @@ const SIATKA_REKLAMACJI =
   "lg:grid-cols-[21rem_minmax(0,1fr)] xl:grid-cols-[23rem_minmax(0,1fr)]";
 
 /* ROZMOWA ROŚNIE, a dowody z werdyktem stoją w jednej wąskiej kolumnie.
-   Fakty poszły do głowicy, więc werdykt sam w drugiej kolumnie zostawiał
+   Fakty stoją w głowicy, więc werdykt sam w drugiej kolumnie zostawiałby
    pod sobą pustą kartę na całą wysokość. Jedna kolumna oddaje tę szerokość
    rozmowie. Na wąskim oknie wszystko łamie się w dół. */
 const SIATKA_SPRAWY =

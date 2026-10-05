@@ -1,5 +1,4 @@
 import React from "react";
-import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
@@ -21,16 +20,7 @@ import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 const karta = vi.fn();
 vi.mock("../api/rozmowy", () => ({ useKartaTowaru: (twId: number | null) => karta(twId) }));
 
-const { FaktySprawy } = await import("./Fakty");
-const { kartotekaKolumny } = await import("./Glowica");
-/* Fakty stoją w głowicy jako pas komórek. Test patrzy na sam pas, w ramie
-   routera, bo „Ten zakup u nas" niesie odnośniki do kolejek. */
-const Fakty = ({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke, bladPrzesylki }: {
-  szczegol: SzczegolReklamacji; onSprawdzPrzesylke?: () => void;
-  sprawdzaPrzesylke?: boolean; bladPrzesylki?: string;
-}) => <MemoryRouter><FaktySprawy szczegol={szczegol} towar={kartotekaKolumny(szczegol)}
-  onSprawdzPrzesylke={onSprawdzPrzesylke} sprawdzaPrzesylke={sprawdzaPrzesylke}
-  bladPrzesylki={bladPrzesylki} /></MemoryRouter>;
+const { Fakty } = await import("../test/fakty");
 
 
 const CENY = [
@@ -58,7 +48,6 @@ const props = (r: Partial<Reklamacja> = {}) => ({
     reklamacja: rek(r), czat: [], zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [],
     droga: [], kartoteka: null, karta: null, zamowienie: null, przesylka: null,
   } as unknown as SzczegolReklamacji,
-  trwa: false, bladZapisu: "", onNotatka: vi.fn(),
 });
 
 beforeEach(() => {
@@ -86,7 +75,8 @@ describe("Cennik Subiekta w komórce „Klient zapłacił”", () => {
   it("bez kartoteki MILCZY — pusta ramka to nie jest informacja", () => {
     karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
     render(<Fakty {...props({ twId: null })} />);
-    expect(screen.queryByText(/Ceny · Subiekt GT/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Ceny")).not.toBeInTheDocument();
+    expect(screen.queryByText("Detaliczna")).not.toBeInTheDocument();
   });
 
   it("pyta o kartotekę POTWIERDZONĄ tej sprawy, a nie o cokolwiek", () => {

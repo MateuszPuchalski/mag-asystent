@@ -70,9 +70,8 @@ type Oferta = { grosze: number; waluta: string };
  */
 export function CenyKartoteki({ ceny, ramka = true, oferta = null }: {
   ceny: CenaPoziomu[];
-  /* `false` w skrzynce: tam ceny stoją W sekcji „Subiekt GT", więc ramka
-     i drugi podpis źródła byłyby pudełkiem w pudełku. Reklamacje stawiają
-     blok samodzielnie i ramkę zostawiają. */
+  /* `false` w skrzynce i w reklamacjach: ceny stoją tam W sekcji albo
+     w komórce faktów, więc ramka byłaby pudełkiem w pudełku. */
   ramka?: boolean;
   /** Cena oferty rozmowy — wtedy blok staje osią. Reklamacje jej nie podają. */
   oferta?: Oferta | null;
@@ -83,8 +82,8 @@ export function CenyKartoteki({ ceny, ramka = true, oferta = null }: {
      (`tools/sonda-cen.sql`). */
   if (ceny.length === 0) return null;
   const naOsi = oferta !== null && polozenieOferty(ceny, oferta) !== null;
-  /* W skrzynce bez klasy: odstęp od bloku wyżej daje rodzic, a kreski
-     wewnątrz bloku kolumna nie ma. Reklamacje zostawiają ramkę. */
+  /* Bez ramki bez klasy: odstęp od bloku wyżej daje rodzic, a kreski
+     wewnątrz bloku kolumna nie ma. */
   return <div className={ramka ? "rounded-lg border border-slate-200 p-3" : undefined}>
     {naOsi && oferta
       ? <OsCenKartoteki ceny={ceny} oferta={oferta} ramka={ramka} />

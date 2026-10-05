@@ -98,18 +98,6 @@ vi.mock("../api/rozmowy", async () => {
   };
 });
 
-/* Tagi: atrapa bez klienta zapytań, bo ten ekran stawia własny `QueryClient`
-   tylko dla haków reklamacji. */
-vi.mock("../api/tagi", () => ({
-  useTagi: () => ({ data: { tagi: [
-    { id: 11, nazwa: "czeka na część", aktywny: true },
-    { id: 12, nazwa: "u producenta", aktywny: true },
-  ] } }),
-  useNowyTag: () => ({ mutate: () => {}, isPending: false }),
-  usePrzypnijTag: () => ({ mutate: () => {}, isPending: false }),
-  useOdepnijTag: () => ({ mutate: () => {}, isPending: false }),
-}));
-
 vi.mock("../api/reklamacje", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/reklamacje")>("../api/reklamacje");
   const mutacja = (nazwa: string) => () => ({
@@ -150,7 +138,6 @@ vi.mock("../api/reklamacje", async () => {
     }),
     useOdswiez: mutacja("odswiez"),
     useProwadze: mutacja("prowadze"),
-    useNotatka: mutacja("notatka"),
     /* Synchronizacja ma własny podrabiacz z tego samego powodu co wysyłka:
        błąd wraca do ekranu przez `onError`, a test pilnuje, że go widać. */
     useSynchronizuj: () => ({

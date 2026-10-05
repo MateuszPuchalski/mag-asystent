@@ -10,5 +10,5 @@ Te same informacje nie powtarzają się już w kilku miejscach.
 **Rozmowa w reklamacji jest szersza.** Prawa kolumna to dowody, a pod nimi
 werdykt.
 
-**Sekcja „Praca biura" zeszła z reklamacji.** Zapiski o sprawie dopisuje
-się w kolumnie dowodów.
+**Sekcja „Praca biura" zeszła z reklamacji.** Tagów i notatki nie zmienia się
+już na ekranie reklamacji.

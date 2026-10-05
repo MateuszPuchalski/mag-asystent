@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useId } from "react";
 import { Route } from "lucide-react";
 import type { CenaPoziomu, PozycjaZamowienia, Reklamacja, SzczegolReklamacji } from "../api/typy";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
@@ -13,7 +13,7 @@ import type { KartotekaKolumny } from "./Glowica";
 
 /* ── Fakty o reklamacji: pas komórek w głowicy ───────────────────────────────
    Decyzja właściciela: fakty z prawej kolumny idą do głowicy, a te same
-   informacje łączą się w jedną. Prawa kolumna trzyma już tylko werdykt.
+   informacje łączą się w jedną. Prawa kolumna trzyma dowody i werdykt.
    Powód: rozmowę i dowody czyta się w środku, a fakt do decyzji ma stać
    nad nimi, w jednym pasie, który oko obejmuje bez przewijania kolumny.
 
@@ -306,10 +306,13 @@ function Zamowienie({ szczegol }: { szczegol: SzczegolReklamacji }) {
   const wartosc = tylkoTen ? "tylko ten towar"
     : sporne.length > 0 ? `+${ile(inne.length, "inna pozycja", "inne pozycje", "innych pozycji")}`
       : ile(z.pozycje.length, "pozycja", "pozycje", "pozycji");
-  /* Suma jednej pozycji z darmową dostawą to ta sama liczba, co komórka
-     „Klient zapłacił" obok, więc wtedy jej nie ma. Z dostawą zostaje, bo
-     koszt dostawy kształtuje kwotę zwrotu. */
-  const razemPowtarza = tylkoTen && (z.dostawaGrosze ?? 0) === 0;
+  /* Suma JEDNEJ SZTUKI z darmową dostawą to ta sama liczba, co komórka
+     „Klient zapłacił" obok, więc wtedy jej nie ma. Komórka niesie cenę
+     sztuki, więc przy kilku sztukach suma mówi coś nowego i zostaje. Zostaje
+     też przy dostawie płatnej albo nieznanej: koszt dostawy kształtuje kwotę
+     zwrotu, a nieznany koszt to nie zero. */
+  const razemPowtarza = tylkoTen && sporne.length === 1 && sporne[0].ilosc === 1
+    && z.dostawaGrosze === 0;
   return <Kostka etykieta="Zamówienie" wartosc={wartosc} kolor="text-slate-900"
     pod={[
       `dostawa ${zlote(z.dostawaGrosze, z.waluta)}${z.dostawaMetoda ? `, ${z.dostawaMetoda}` : ""}`,
@@ -329,13 +332,14 @@ function Zamowienie({ szczegol }: { szczegol: SzczegolReklamacji }) {
    składa przystanki z tych samych tabel, a każdy przystanek niesie odnośnik
    do swojej kolejki. Rodzeństwo spraw zostaje, bo niesie to, czego droga nie
    ma: termin cudzej sprawy, kto ją prowadzi i czy jest otwarta. To wiązanie
-   drogi klienta w obie strony. Stoi w głowicy, więc wskaźnik „jeszcze N
-   spraw ↓", który do niego przewijał, nie jest już potrzebny. */
+   drogi klienta w obie strony. Stoi w głowicy, widoczny bez przewijania,
+   więc żaden wskaźnik do niego nie prowadzi. */
 function ZakupUNas({ szczegol }: { szczegol: SzczegolReklamacji }) {
   const r = szczegol.reklamacja;
+  const idNapisu = useId();
   if (szczegol.droga.length < 2 && szczegol.sprawy.length === 0) return null;
-  return <section aria-label="Ten zakup u nas" className="flex flex-wrap items-start gap-x-3 gap-y-1">
-    <span className="inline-flex items-center gap-1 py-0.5 text-xs font-semibold text-slate-700">
+  return <section aria-labelledby={idNapisu} className="flex flex-wrap items-start gap-x-3 gap-y-1">
+    <span id={idNapisu} className="inline-flex items-center gap-1 py-0.5 text-xs font-semibold text-slate-700">
       <Route size={14} aria-hidden="true" />Ten zakup u nas</span>
     {szczegol.droga.length > 1 && <DrogaZakupu droga={szczegol.droga}
       tutaj={{ rodzaj: "reklamacja", id: r.id }} wSekcji />}

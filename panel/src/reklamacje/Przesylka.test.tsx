@@ -1,22 +1,12 @@
 import React from "react";
-import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Reklamacja, StanPrzesylki, SzczegolReklamacji, Zamowienie } from "../api/typy";
-import { FaktySprawy } from "./Fakty";
-import { kartotekaKolumny } from "./Glowica";
-/* Fakty stoją w głowicy jako pas komórek. Test patrzy na sam pas, w ramie
-   routera, bo „Ten zakup u nas" niesie odnośniki do kolejek. */
-const Fakty = ({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke, bladPrzesylki }: {
-  szczegol: SzczegolReklamacji; onSprawdzPrzesylke?: () => void;
-  sprawdzaPrzesylke?: boolean; bladPrzesylki?: string;
-}) => <MemoryRouter><FaktySprawy szczegol={szczegol} towar={kartotekaKolumny(szczegol)}
-  onSprawdzPrzesylke={onSprawdzPrzesylke} sprawdzaPrzesylke={sprawdzaPrzesylke}
-  bladPrzesylki={bladPrzesylki} /></MemoryRouter>;
+import { Fakty } from "../test/fakty";
 
 
-/* Kolumna dowodów pyta od 0.411.0 o cennik kartoteki (`useKartaTowaru`), a ten
+/* Pas faktów pyta od 0.411.0 o cennik kartoteki (`useKartaTowaru`), a ten
    plik nie stawia klienta TanStacka — pilnuje UKŁADU kolumny, nie cen. Własne
    testy cennik ma w `skrzynka/TowarRozmowy.test.tsx`. */
 vi.mock("../api/rozmowy", () => ({
@@ -76,8 +66,7 @@ const szczegol = (n: Partial<SzczegolReklamacji> = {}): SzczegolReklamacji => ({
 } as unknown as SzczegolReklamacji);
 
 const props = (n: Partial<SzczegolReklamacji> = {}, extra = {}) => ({
-  szczegol: szczegol(n), trwa: false, bladZapisu: "",
-  onProwadze: vi.fn(), onNotatka: vi.fn(), ...extra,
+  szczegol: szczegol(n), ...extra,
 });
 
 const stan = (n: Partial<StanPrzesylki> = {}): StanPrzesylki => ({

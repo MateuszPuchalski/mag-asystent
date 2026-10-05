@@ -4,12 +4,12 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 
-/* ── Triaż reklamacji: cztery kostki w siatce dwa na dwa ─────────────────────
+/* ── Triaż reklamacji: komórki pasa faktów w głowicy ────────────────────────
    Zgłoszenie właściciela ze zrzutem: „potrzebujemy wyraźnej hierarchii, żeby
    podjąć decyzję o reklamacji". Kolumna niosła sześć równorzędnych poziomów
    cen i ani jednej sztuki stanu — przy sprawie, w której klient żąda WYMIANY.
-   Dziś cztery kostki: Mamy, Kupione, Klient zapłacił, Dostawca — zawsze
-   w tym samym miejscu, a brak wiedzy mówi w nich słowami.
+   Dziś komórki pasa w głowicy: Mamy, Kupione, Klient zapłacił, Dostawca —
+   zawsze w tym samym miejscu, a brak wiedzy mówi w nich słowami.
 
    Testy pilnują TEGO, co rozstrzyga decyzję, a nie wyglądu pasma:
 
@@ -27,17 +27,9 @@ import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 const karta = vi.fn();
 vi.mock("../api/rozmowy", () => ({ useKartaTowaru: (twId: number | null) => karta(twId) }));
 
-const { FaktySprawy } = await import("./Fakty");
-/* Fakty stoją w głowicy jako pas komórek. Test patrzy na sam pas, w ramie
-   routera, bo „Ten zakup u nas" niesie odnośniki do kolejek. */
-const Fakty = ({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke, bladPrzesylki }: {
-  szczegol: SzczegolReklamacji; onSprawdzPrzesylke?: () => void;
-  sprawdzaPrzesylke?: boolean; bladPrzesylki?: string;
-}) => <MemoryRouter><FaktySprawy szczegol={szczegol} towar={kartotekaKolumny(szczegol)}
-  onSprawdzPrzesylke={onSprawdzPrzesylke} sprawdzaPrzesylke={sprawdzaPrzesylke}
-  bladPrzesylki={bladPrzesylki} /></MemoryRouter>;
+const { Fakty } = await import("../test/fakty");
 
-const { Glowica, kartotekaKolumny } = await import("./Glowica");
+const { Glowica } = await import("./Glowica");
 
 const CENY = [
   { poziom: 0, nazwa: "", nettoGrosze: 1864, bruttoGrosze: 0, waluta: "PLN" },
@@ -78,7 +70,6 @@ const props = (n: Partial<Reklamacja> = {}, zPozycja = true,
         cenaGrosze: 4990, waluta: "PLN" }],
     } : null,
   } as unknown as SzczegolReklamacji,
-  trwa: false, bladZapisu: "", onNotatka: vi.fn(),
 });
 
 beforeEach(() => {
@@ -86,7 +77,7 @@ beforeEach(() => {
   karta.mockReturnValue({ data: KARTA, isLoading: false, error: null });
 });
 
-describe("Triaż w kolumnie dowodów", () => {
+describe("Triaż w pasie faktów", () => {
   it("mówi, CZY MAMY bez otwierania czegokolwiek, a półka stoi w podpisie komórki", () => {
     /* Żadnego kliknięcia przed tą asercją i to jest cały jej sens: przy
        żądaniu wymiany ta liczba rozstrzyga sprawę. Półka stoi pod stanem,
@@ -149,6 +140,25 @@ describe("Triaż w kolumnie dowodów", () => {
     expect(kostka.textContent).not.toContain("49,90");
     /* Nasz zakup zostaje — tej liczby zdanie „Chce:" nie niesie. */
     expect(kostka.textContent).toContain("nasz zakup 18,64 PLN netto");
+  });
+
+  it("tę jedną kwotę niesie zdanie „Chce:” w głowicy — dokładnie raz na ekranie sprawy", () => {
+    /* „Tyle, ile żąda" wskazuje na zdanie wyżej. Bez kwoty w nim komórka
+       wskazywałaby w próżnię, więc pilnujemy obu połówek naraz. */
+    render(<MemoryRouter><Glowica szczegol={props({ oczekiwanie: "REFUND", oczekiwanaKwotaGrosze: 4990 }).szczegol}
+      trwa={false} onProwadze={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByText("tyle, ile żąda")).toBeInTheDocument();
+    expect(screen.getAllByText("49,90 PLN")).toHaveLength(1);
+    expect(screen.getByText("Chce:").parentElement!.textContent).toContain("49,90 PLN");
+  });
+
+  it("poziom zakupu NIE wchodzi drugi raz do listy cen sprzedaży", () => {
+    /* Poziom 0 to zakup i stoi w zdaniu „nasz zakup". W cenniku obok byłby
+       drugim domem tej samej liczby, i to bez nazwy. */
+    render(<Fakty {...props()} />);
+    expect(screen.getByText("Detaliczna")).toBeInTheDocument();
+    expect(screen.getByText("Hurtowa")).toBeInTheDocument();
+    expect(screen.queryByText("poziom 0")).not.toBeInTheDocument();
   });
 
   it("bez zamówienia bierze cenę z PARAGONU z wiersza sprawy", () => {

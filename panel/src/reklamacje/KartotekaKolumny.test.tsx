@@ -104,7 +104,7 @@ describe("Sprawa bez r.twId, z kartoteką po SKU oferty", () => {
     expect(screen.getByText("Klient zapłacił").parentElement!.textContent)
       .toContain("nasz zakup 18,64 PLN netto");
     expect(screen.queryByText("nie wiadomo")).not.toBeInTheDocument();
-    expect(screen.queryByText(/sprawa bez kartoteki/)).not.toBeInTheDocument();
+    expect(screen.queryByText("stanu ani dostaw nie znamy")).not.toBeInTheDocument();
   });
 
   it("symbol w głowicy otwiera przekrój towaru — przycisk żyje", () => {

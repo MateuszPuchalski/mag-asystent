@@ -5604,6 +5604,9 @@ a schowane przypomnienie to znowu pamiętanie.
 
 ### 25b.3b. Tagi spraw (0.279.0)
 
+Od @wydanie tagu reklamacji nie przypina się na ekranie sprawy — patrz
+§25b.10. Kolejka dalej pokazuje tagi przypięte wcześniej.
+
 Ta sama prośba właściciela, co przy sicie: łatwiej znaleźć swoje sprawy. Sito
 odpowiada na pytanie „czyje to", tag na pytanie „o czym to" — najczęściej
 „czego ta sprawa czeka".
@@ -5649,6 +5652,9 @@ panelu przypuszczenie maszyny, a tag jest zdaniem człowieka; bursztyn jest
 tłem marki i zaznaczeniem wiersza.
 
 ### 25b.3c. Notatka i jej droga powrotna (0.280.0)
+
+Od @wydanie notatki reklamacji nie pisze się na ekranie sprawy — patrz
+§25b.10. Szukanie w kolejce dalej czyta notatki zapisane wcześniej.
 
 §25a.5 mówi: cofnięcie zamiast potwierdzenia, wszędzie, gdzie da się cofnąć.
 Przy reklamacji ta zasada stała dotąd odwrócona (§25b.8), bo wszystko, co
@@ -6077,7 +6083,13 @@ stać nad całą sprawą, a nie w kolumnie, którą trzeba przewijać.
 - **Prawa kolumna** to dowody, a pod nimi werdykt. Rozmowa dostała szerokość,
   którą zajmowała kolumna faktów.
 - **Zeszło:** „Praca biura" (tagi i notatka sprawy) oraz wskaźnik „jeszcze
-  N spraw tego zakupu ↓". Zapiski o sprawie mają dom w kolumnie dowodów.
+  N spraw tego zakupu ↓". Dane i trasy serwera zostają.
+
+**Otwarte do decyzji właściciela.** Kolejka reklamacji dalej pokazuje tagi
+przypięte wcześniej i szuka po starych notatkach. Notatki tej na ekranie
+sprawy nie widać, a numeru sprawy Allegro biuro nie ma już gdzie zapisać tak,
+żeby kolejka go znalazła. Ekran dyskusji ma dalej własną „Pracę biura",
+choć oba ekrany miały być bliźniacze.
 
 ## 25c. Dyskusje
 

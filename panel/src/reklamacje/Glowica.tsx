@@ -3,7 +3,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { ExternalLink, UserRound } from "lucide-react";
 import type { SzczegolReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
-import { czas, ile, LoginKlienta, Skopiuj } from "../ui";
+import { czas, LoginKlienta, Skopiuj } from "../ui";
 import { Prowadzi } from "../sprawy/Prowadzi";
 import { mojaSprawa } from "../sprawy/Moje";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
@@ -31,7 +31,7 @@ import { FaktySprawy } from "./Fakty";
    a tożsamość towaru niesie też zdjęcie w kolumnie dowodów.
 
    FAKTY. Pas komórek z `Fakty.tsx` na całą szerokość. Decyzja właściciela:
-   fakty z prawej kolumny idą tutaj, a te same informacje łączą się w jedną.
+   fakty do decyzji stoją tutaj, a te same informacje łączą się w jedną.
 
    Numer reklamacji, data zgłoszenia i odnośniki do Allegro stoją w prawej
    szczelinie pod „Prowadzi”. To ich jedyny dom, bo uwaga właściciela
@@ -210,7 +210,7 @@ export function Glowica({
     </div>
 
     {/* ── PRAWA SZCZELINA: KTO PROWADZI, NUMER I ZGŁOSZENIE ────────────────
-        Wzięcie sprawy jest CZYNNOŚCIĄ, więc stoi w głowicy, a nie w kolumnie
+        Wzięcie sprawy jest CZYNNOŚCIĄ, więc stoi w szczelinie, a nie w pasie
         faktów. Własną sprawę da się odłożyć tym samym przyciskiem, bo serwer
         zdejmuje znacznik drugim kliknięciem. Numer i data zgłoszenia stoją
         pod spodem: to fakty do skopiowania, nie do decyzji. */}
@@ -236,13 +236,13 @@ export function Glowica({
       <p className="flex flex-wrap items-center justify-end gap-x-3 text-xs">
         {r.orderId
           ? <span className="inline-flex items-center gap-1">
-              <LinkAllegro href={r.linkZamowienia} title={`Zamówienie ${r.orderId}`}>
+              <LinkAllegro href={r.linkZamowienia} title={`Zamówienie ${r.orderId}`} nazwa="zamówienie w Allegro">
                 {r.linkZamowienia ? "zamówienie" : <span className="font-mono">{r.orderId}</span>}</LinkAllegro>
               <Skopiuj tekst={r.orderId} tytul="Kopiuj numer zamówienia" />
             </span>
           : <span className="text-slate-600">bez numeru zamówienia</span>}
         {r.offerId && (r.linkOferty
-          ? <LinkAllegro href={r.linkOferty} title={`Oferta ${r.offerId}`}>oferta</LinkAllegro>
+          ? <LinkAllegro href={r.linkOferty} title={`Oferta ${r.offerId}`} nazwa="oferta w Allegro">oferta</LinkAllegro>
           : <span>oferta <span className="font-mono">{r.offerId}</span></span>)}
       </p>
     </div>
@@ -254,10 +254,18 @@ export function Glowica({
   </div>;
 }
 
-/** Odnośnik do Allegro z ikoną wyjścia; bez adresu zostaje sam tekst. */
-const LinkAllegro = ({ href, title, children }: { href: string | null; title?: string; children: React.ReactNode }) =>
+/**
+ * Odnośnik do Allegro z ikoną wyjścia; bez adresu zostaje sam tekst.
+ *
+ * Na widoku krótko, bo szczelina jest wąska. Czytnik ekranu dostaje pełną
+ * nazwę z celem: na liście odnośników samo „oferta" nie mówi, dokąd prowadzi.
+ * Pełna nazwa zaczyna się od widocznego słowa (WCAG 2.5.3).
+ */
+const LinkAllegro = ({ href, title, nazwa, children }: {
+  href: string | null; title?: string; nazwa?: string; children: React.ReactNode;
+}) =>
   href
-    ? <a href={href} target="_blank" rel="noopener noreferrer" title={title}
+    ? <a href={href} target="_blank" rel="noopener noreferrer" title={title} aria-label={nazwa}
         className="inline-flex min-h-6 items-center gap-1 font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
         {children}<ExternalLink size={12} aria-hidden="true" /></a>
     : <span title={title}>{children}</span>;
