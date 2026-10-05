@@ -6,11 +6,20 @@ import userEvent from "@testing-library/user-event";
 import type {
   DopasowanieKartoteki, Reklamacja, SzczegolReklamacji, WiadomoscReklamacji, Zamowienie,
 } from "../api/typy";
-import { Dowody } from "./Dowody";
+import { FaktySprawy } from "./Fakty";
+/* Fakty stoją w głowicy jako pas komórek. Test patrzy na sam pas, w ramie
+   routera, bo „Ten zakup u nas" niesie odnośniki do kolejek. */
+const Fakty = ({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke, bladPrzesylki }: {
+  szczegol: SzczegolReklamacji; onSprawdzPrzesylke?: () => void;
+  sprawdzaPrzesylke?: boolean; bladPrzesylki?: string;
+}) => <MemoryRouter><FaktySprawy szczegol={szczegol} towar={kartotekaKolumny(szczegol)}
+  onSprawdzPrzesylke={onSprawdzPrzesylke} sprawdzaPrzesylke={sprawdzaPrzesylke}
+  bladPrzesylki={bladPrzesylki} /></MemoryRouter>;
+
 import { Glowica, kartotekaKolumny } from "./Glowica";
 
 /* Kolumna faktów pyta o cennik kartoteki (`useKartaTowaru`), a ten plik nie
-   stawia klienta TanStacka — pilnuje UKŁADU głowicy i zwijek, nie cen. Własne
+   stawia klienta TanStacka — pilnuje UKŁADU głowicy i pasa faktów, nie cen. Własne
    testy cennik ma w `skrzynka/TowarRozmowy.test.tsx`. */
 vi.mock("../api/rozmowy", () => ({
   useKartaTowaru: () => ({ data: undefined, isLoading: false, error: null }),
@@ -116,23 +125,21 @@ describe("Klient na czele głowicy", () => {
     expect(screen.queryByText(/u nas/)).not.toBeInTheDocument();
   });
 
-  it("otwarta inna sprawa tego zakupu stoi przy kliencie i prowadzi do listy", async () => {
-    const onPokazZakup = vi.fn();
+  it("inna sprawa tego zakupu stoi w głowicy z odnośnikiem — bez wskaźnika „↓”", () => {
+    /* Decyzja właściciela: fakty z prawej kolumny idą do głowicy. „Ten zakup
+       u nas" stoi więc w niej, a wskaźnik, który do niego przewijał, odszedł. */
     const sprawy = [
       { id: 8, typ: "DISPUTE", numer: null, temat: "inna", statusAllegro: null, decyzjaDo: null,
         otwartoAt: "2026-09-12T08:15:00.000Z", prowadzi: null, otwarta: true },
       { id: 9, typ: "CLAIM", numer: "9/2026", temat: "stara", statusAllegro: null, decyzjaDo: null,
         otwartoAt: "2026-09-01T08:15:00.000Z", prowadzi: null, otwarta: false },
     ];
-    glowica({ sprawy } as Partial<SzczegolReklamacji>, {}, { onPokazZakup });
-    await userEvent.click(screen.getByRole("button", { name: /jeszcze 1 otwarta sprawa tego zakupu/ }));
-    expect(onPokazZakup).toHaveBeenCalledTimes(1);
-  });
-
-  it("zamknięta inna sprawa nie zapala wskaźnika — to nie jest klient, który czeka", () => {
-    glowica({ sprawy: [{ id: 9, typ: "CLAIM", numer: "9/2026", temat: "stara", statusAllegro: null,
-      decyzjaDo: null, otwartoAt: "2026-09-01T08:15:00.000Z", prowadzi: null, otwarta: false }] });
-    expect(screen.queryByText(/otwart.* tego zakupu/)).not.toBeInTheDocument();
+    glowica({ sprawy } as Partial<SzczegolReklamacji>);
+    const zakup = screen.getByRole("region", { name: "Ten zakup u nas" });
+    expect(within(zakup).getByText("inna")).toBeInTheDocument();
+    expect(within(zakup).getByText("stara")).toBeInTheDocument();
+    expect(within(zakup).getAllByRole("link").length).toBeGreaterThan(0);
+    expect(screen.queryByText(/tego zakupu/)).not.toBeInTheDocument();
   });
 });
 
@@ -336,13 +343,13 @@ describe("Kto prowadzi — czynność stoi w głowicy", () => {
 
 describe("Kolumna faktów nie powtarza głowicy", () => {
   it("kwoty żądania i terminu w kolumnie faktów nie ma — mówi je głowica", () => {
-    render(<Dowody {...props()} />);
+    render(<Fakty {...props()} />);
     expect(screen.queryByText("za 6 dni")).not.toBeInTheDocument();
     expect(screen.queryByText("68,25 PLN")).not.toBeInTheDocument();
   });
 
   it("zwijki „Sprawa” nie ma — numer, login, zgłoszenie, tytuł i status mają dom w głowicy", () => {
-    render(<Dowody {...props()} />);
+    render(<Fakty {...props()} />);
     expect(screen.queryByRole("button", { name: /^Sprawa/ })).not.toBeInTheDocument();
     for (const fakt of ["2743634/2026", "Client:43897233", "rękojmia", "CLAIM_SUBMITTED"]) {
       expect(screen.queryByText(new RegExp(fakt))).not.toBeInTheDocument();
@@ -350,72 +357,57 @@ describe("Kolumna faktów nie powtarza głowicy", () => {
   });
 });
 
-describe("Zwijki mówią zdaniem, co w środku", () => {
-  it("cenę spornej pozycji niesie kostka, a zamówienie pokazuje tylko resztę", async () => {
-    render(<Dowody {...props({ zamowienie: ZAMOWIENIE }, { oczekiwanie: "EXCHANGE" })} />);
+describe("Komórka zamówienia i odnośniki do Allegro", () => {
+  const zamowienie = () => screen.getByText("Zamówienie").parentElement!;
+
+  it("cenę spornej pozycji niesie „Klient zapłacił”, a zamówienie pokazuje tylko resztę", () => {
+    render(<Fakty {...props({ zamowienie: ZAMOWIENIE }, { oczekiwanie: "EXCHANGE", oczekiwanaKwotaGrosze: null })} />);
     expect(screen.getByText("Klient zapłacił").parentElement!).toHaveTextContent("68,25 PLN");
-    await userEvent.click(screen.getByRole("button", { name: /^Zamówienie/ }));
-    expect(screen.getByText("Poza reklamowanym towarem:")).toBeInTheDocument();
-    expect(screen.getByText("1 × 10,49 PLN")).toBeInTheDocument();
+    expect(screen.getByText("1 × 10,49 PLN")).toBeVisible();
     expect(screen.queryByText("1 × 68,25 PLN")).not.toBeInTheDocument();
   });
 
-  it("podpis zamówienia liczy inne pozycje, a suma ma w nim JEDEN dom", async () => {
-    /* Podpis widać także przy otwartej zwijce, więc „Razem" w środku stałoby
-       zaraz pod tą samą liczbą. */
-    render(<Dowody {...props({ zamowienie: ZAMOWIENIE }, { oczekiwanie: "EXCHANGE" })} />);
-    const zwijka = screen.getByRole("button", { name: /^Zamówienie/ });
-    expect(zwijka).toHaveTextContent("+1 inna pozycja · razem 78,74 PLN");
-    await userEvent.click(zwijka);
+  it("komórka liczy inne pozycje, a suma ma w niej JEDEN dom", () => {
+    render(<Fakty {...props({ zamowienie: ZAMOWIENIE }, { oczekiwanie: "EXCHANGE" })} />);
+    expect(zamowienie()).toHaveTextContent("+1 inna pozycja");
+    expect(zamowienie()).toHaveTextContent("razem 78,74 PLN");
     expect(screen.getAllByText(/78,74 PLN/)).toHaveLength(1);
   });
 
-  it("przy jednej pozycji podpis mówi „tylko ten towar”, a suma z dostawą stoi w środku", async () => {
+  it("przy jednej pozycji z darmową dostawą suma nie powtarza „Klient zapłacił”", () => {
     const jedna = { ...ZAMOWIENIE, pozycje: [ZAMOWIENIE.pozycje[1]], sumaGrosze: 6825 } as unknown as Zamowienie;
-    render(<Dowody {...props({ zamowienie: jedna }, { oczekiwanie: "EXCHANGE" })} />);
-    const zwijka = screen.getByRole("button", { name: /^Zamówienie/ });
-    expect(zwijka).toHaveTextContent("tylko ten towar");
-    expect(zwijka).not.toHaveTextContent("68,25");
-    await userEvent.click(zwijka);
-    expect(screen.getByText(/Dostawa 0,00 PLN \(Allegro Paczkomaty InPost\)\./)).toBeInTheDocument();
+    render(<Fakty {...props({ zamowienie: jedna }, { oczekiwanie: "EXCHANGE", oczekiwanaKwotaGrosze: null })} />);
+    expect(zamowienie()).toHaveTextContent("tylko ten towar");
+    expect(zamowienie()).toHaveTextContent("dostawa 0,00 PLN, Allegro Paczkomaty InPost");
+    expect(zamowienie()).not.toHaveTextContent("68,25");
   });
 
-  it("zamówienie startuje zwinięte przy wymianie, a przy żądaniu pieniędzy otwiera się samo", () => {
-    const { unmount } = render(<Dowody {...props({ zamowienie: ZAMOWIENIE }, { oczekiwanie: "EXCHANGE" })} />);
-    expect(screen.getByRole("button", { name: /^Zamówienie/ })).toHaveAttribute("aria-expanded", "false");
-    unmount();
-    /* Koszt dostawy i suma kształtują kwotę zwrotu — przed werdyktem. */
-    const drugi = render(<Dowody {...props({ zamowienie: ZAMOWIENIE })} />);
-    expect(screen.getByRole("button", { name: /^Zamówienie/ })).toHaveAttribute("aria-expanded", "true");
-    drugi.unmount();
-    /* Po werdykcie kwota jest już rozstrzygnięta. */
-    render(<Dowody {...props({ zamowienie: ZAMOWIENIE }, { statusAllegro: "CLAIM_ACCEPTED", kubelek: "zamknieta" })} />);
-    expect(screen.getByRole("button", { name: /^Zamówienie/ })).toHaveAttribute("aria-expanded", "false");
+  it("z płatną dostawą suma zostaje — koszt dostawy kształtuje kwotę zwrotu", () => {
+    const jedna = { ...ZAMOWIENIE, pozycje: [ZAMOWIENIE.pozycje[1]], dostawaGrosze: 999, sumaGrosze: 7824 } as unknown as Zamowienie;
+    render(<Fakty {...props({ zamowienie: jedna })} />);
+    expect(zamowienie()).toHaveTextContent("dostawa 9,99 PLN, Allegro Paczkomaty InPost · razem 78,24 PLN");
   });
 
-  it("identyfikatory zamówienia i oferty stoją w łączach i w schowku, nie jako tekst", async () => {
-    render(<Dowody {...props({}, { oczekiwanie: "EXCHANGE", linkZamowienia: "https://allegro.pl/z/ord-5",
-      linkOferty: "https://allegro.pl/oferta/of-1" })} />);
-    await userEvent.click(screen.getByRole("button", { name: /^Zamówienie/ }));
-    expect(screen.getByRole("link", { name: "zamówienie w Allegro" })).toHaveAttribute("title", "Zamówienie ord-5");
-    expect(screen.getByRole("link", { name: "oferta w Allegro" })).toHaveAttribute("title", "Oferta of-1");
+  it("identyfikatory zamówienia i oferty stoją w łączach przy numerze reklamacji, nie jako tekst", () => {
+    glowica({}, { linkZamowienia: "https://allegro.pl/z/ord-5", linkOferty: "https://allegro.pl/oferta/of-1" });
+    expect(screen.getByRole("link", { name: "zamówienie" })).toHaveAttribute("title", "Zamówienie ord-5");
+    expect(screen.getByRole("link", { name: "oferta" })).toHaveAttribute("title", "Oferta of-1");
     expect(screen.getByTitle("Kopiuj numer zamówienia")).toBeInTheDocument();
     expect(screen.queryByText("ord-5")).not.toBeInTheDocument();
   });
+});
 
-  it("praca biura podpisuje się treścią, a pusta mówi „nic nie zapisano”", () => {
-    const { unmount } = render(<Dowody {...props()} />);
-    expect(screen.getByRole("button", { name: /^Praca biura/ })).toHaveTextContent("nic nie zapisano");
-    unmount();
-    render(<Dowody {...props({}, {
-      tagi: [{ id: 1, nazwa: "czeka na część" }, { id: 2, nazwa: "do decyzji właściciela" }],
-      notatka: "Klient dzwonił, prosi o szybką wymianę przed sezonem koszenia trawy",
-    } as Partial<Reklamacja>)} />);
-    const praca = screen.getByRole("button", { name: /^Praca biura/ });
-    expect(praca).toHaveTextContent(
-      "czeka na część · do decyzji właściciela · notatka: „Klient dzwonił, prosi o szybką wymianę…”");
-    /* Zwinięta, bo podpis już czyta treść. */
-    expect(praca).toHaveAttribute("aria-expanded", "false");
-    expect(within(praca).queryByText(/tag/)).not.toBeInTheDocument();
+describe("Pracy biura nie ma", () => {
+  /* Decyzja właściciela: sekcja „Praca biura" — tagi i notatka — odeszła
+     z ekranu reklamacji. Zapiski o sprawie stoją w kolumnie dowodów. */
+  it("głowica z pasem faktów nie niesie ani tagów, ani notatki", () => {
+    glowica({}, {
+      tagi: [{ id: 1, nazwa: "czeka na część" }],
+      notatka: "Klient dzwonił, prosi o szybką wymianę",
+    } as Partial<Reklamacja>);
+    expect(screen.queryByText(/Praca biura/)).not.toBeInTheDocument();
+    expect(screen.queryByText("czeka na część")).not.toBeInTheDocument();
+    expect(screen.queryByText(/Klient dzwonił/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox")).toBeNull();
   });
 });

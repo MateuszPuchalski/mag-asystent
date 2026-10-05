@@ -2,10 +2,10 @@ import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ShieldQuestion } from "lucide-react";
 import {
-  useDodajZalacznikSprawy, useNotatka, useOdpowiedz, useOdswiez,
+  useDodajZalacznikSprawy, useOdpowiedz, useOdswiez,
   useSprawdzPrzesylke, useUsunZalacznikSprawy, useZalacznikiSprawy,
   useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
-  useWerdykt, useZwrotTowaru, useCofnijNotatke, useDodajDowod, useUsunDowod, useZapiszUDostawcy,
+  useWerdykt, useZwrotTowaru, useDodajDowod, useUsunDowod, useZapiszUDostawcy,
 } from "../api/reklamacje";
 import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
@@ -28,9 +28,7 @@ import { PasekProgu } from "../sprawy/Prog";
 import { PasekTla, tloAlarmuje } from "../sprawy/PasekTla";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
-import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import { Czat } from "../reklamacje/Czat";
-import { Dowody } from "../reklamacje/Dowody";
 import { Glowica } from "../reklamacje/Glowica";
 import { KolumnaDowodow, zdjeciaSprawy } from "../reklamacje/KolumnaDowodow";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
@@ -71,22 +69,19 @@ const SIATKA_REKLAMACJI =
   "grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)] " +
   "lg:grid-cols-[21rem_minmax(0,1fr)] xl:grid-cols-[23rem_minmax(0,1fr)]";
 
-/* ROZMOWA ROŚNIE, dowody i fakty mają stałą szerokość: około 252 px na
-   zdjęcia z dowodami i około 340 px na fakty. Poniżej najszerszego progu obie
-   te kolumny stają jedna pod drugą w jednym pasie, żeby rozmowa nie zeszła
-   do szerokości kolumny faktów. Na wąskim oknie wszystko łamie się w dół. */
+/* ROZMOWA ROŚNIE, a dowody z werdyktem stoją w jednej wąskiej kolumnie.
+   Fakty poszły do głowicy, więc werdykt sam w drugiej kolumnie zostawiał
+   pod sobą pustą kartę na całą wysokość. Jedna kolumna oddaje tę szerokość
+   rozmowie. Na wąskim oknie wszystko łamie się w dół. */
 const SIATKA_SPRAWY =
   "grid min-h-0 gap-4 lg:flex-1 lg:grid-rows-[minmax(0,1fr)] " +
-  "lg:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_38rem]";
-const KOLUMNY_OBOK_ROZMOWY =
-  "flex min-h-0 flex-col gap-4 lg:overflow-y-auto " +
-  "2xl:grid 2xl:grid-cols-[15.75rem_minmax(0,1fr)] 2xl:grid-rows-[minmax(0,1fr)] 2xl:overflow-visible";
-/* Karta w pasie NIE KURCZY SIĘ poniżej najszerszego progu. Pas jest wtedy
-   kolumną flex o stałej wysokości i to on przewija obie karty razem.
-   Kurcząca się karta oddawałaby treść poza swoją ramkę, pod sąsiednią kartę,
-   a odnośnik „Z1" z wątku przewijałby do zdjęcia, którego nie widać. Własne
-   przewijanie karta dostaje dopiero obok drugiej, w siatce. */
-const KARTA_OBOK_ROZMOWY = "shrink-0 2xl:min-h-0 2xl:overflow-y-auto";
+  "lg:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]";
+const KOLUMNY_OBOK_ROZMOWY = "flex min-h-0 flex-col gap-4 lg:overflow-y-auto";
+/* Karta w kolumnie NIE KURCZY SIĘ. Kolumna jest flexem o stałej wysokości
+   i to ona przewija obie karty razem. Kurcząca się karta oddawałaby treść
+   poza swoją ramkę, pod sąsiednią kartę, a odnośnik „Z1" z wątku przewijałby
+   do zdjęcia, którego nie widać. */
+const KARTA_OBOK_ROZMOWY = "shrink-0";
 
 /* Niepewny los stanowiska o towarze. Serwer drugiego nie wyśle, a nic
    w panelu tej próby nie rozstrzyga, więc zdanie wskazuje Centrum Sprzedaży
@@ -258,13 +253,6 @@ export function Reklamacje() {
   const { porzadek, ustaw: ustawPorzadek } = usePorzadek(
     "wertis.reklamacje.porzadek", ["termin", "otwarto", "ruch", "kwota"], "termin");
   const [tag, setTag] = useState<number | null>(null);
-  const slownikTagow = useTagi();
-  const nowyTag = useNowyTag();
-  const przypnij = usePrzypnijTag();
-  const odepnij = useOdepnijTag();
-  const [bladTagu, setBladTagu] = useState("");
-  const cofnijNotatke = useCofnijNotatke();
-  const [bladZapisu, setBladZapisu] = useState("");
   const [bladSync, setBladSync] = useState("");
 
   /* Próg daty jest zdejmowany NA ŻĄDANIE i wybór nie przeżywa zamknięcia
@@ -273,7 +261,6 @@ export function Reklamacje() {
   const [bezProgu, setBezProgu] = useState(false);
   const { data, isLoading, error } = useReklamacje(bezProgu);
   const prowadze = useProwadze();
-  const notatka = useNotatka();
   const synchronizuj = useSynchronizuj();
   const odpowiedz = useOdpowiedz();
   const odswiez = useOdswiez();
@@ -300,12 +287,6 @@ export function Reklamacje() {
     el?.scrollIntoView?.({ block: "nearest" });
     el?.focus();
   };
-  const trwa = prowadze.isPending || notatka.isPending;
-  /* Wskaźnik innej otwartej sprawy tego zakupu w głowicy przewija do zwijki
-     „Ten zakup u nas" i ją otwiera. Licznik, nie przełącznik: każde
-     kliknięcie ma zadziałać, także drugie. Samo przewinięcie niczego nie
-     zapisuje. */
-  const [pokazZakup, setPokazZakup] = useState(0);
 
   const [bladWysylki, setBladWysylki] = useState("");
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
@@ -723,7 +704,13 @@ export function Reklamacje() {
         ? <div className="flex min-h-0 min-w-0 flex-col gap-4">
           <Karta className="shrink-0">
             <Glowica szczegol={d} mojeId={mojeId} trwa={prowadze.isPending} blad={bladProwadze}
-              onPokazZakup={() => setPokazZakup((n) => n + 1)}
+              sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
+              bladPrzesylki={bladPrzesylki}
+              onSprawdzPrzesylke={() => {
+                setBladPrzesylki("");
+                sprawdzPrzesylke.mutate({ id: d.reklamacja.id },
+                  { onError: (e) => setBladPrzesylki((e as Error).message) });
+              }}
               onProwadze={() => {
                 setBladProwadze("");
                 prowadze.mutate({ id: d.reklamacja.id, wersja: d.reklamacja.wersja },
@@ -783,9 +770,8 @@ export function Reklamacje() {
                   onZmiana={setTresc} onWyslij={() => wyslij()} />} />
             </Karta>
 
-            {/* Dowody i fakty: obok siebie na szerokim oknie, jedne pod drugimi
-                na węższym — wtedy przewijają się razem, a rozmowa nie traci
-                szerokości na trzecią kolumnę. */}
+            {/* Dowody i werdykt jedne pod drugimi, przewijają się razem,
+                a rozmowa nie traci szerokości na trzecią kolumnę. */}
             <div className={KOLUMNY_OBOK_ROZMOWY}>
               <Karta className={KARTA_OBOK_ROZMOWY}>
                 {/* Klucz sprawy czyści niedokończony wpis — dowód napisany do
@@ -807,65 +793,23 @@ export function Reklamacje() {
               </Karta>
 
               <Karta className={KARTA_OBOK_ROZMOWY}>
-                <Dowody szczegol={d} trwa={trwa} bladZapisu={bladZapisu} pokazZakup={pokazZakup}
-                  /* ── WERDYKT POD FAKTAMI ────────────────────────────────────
-                      Dekalog obsługi, punkt 9: nieodwracalne pyta — a pytanie
-                      zadaje się PO dowodach, nie przed nimi. W kolejności strony
-                      stoi za rozmową i dowodami, a w kolumnie zaraz pod
-                      liczbami, z których się go wydaje. Zgoda przed wysłaniem
-                      zostaje przy OBU gałęziach — uznanie kosztuje pieniądze
-                      i jest równie nieodwracalne co odmowa. */
-                  decyzja={<Werdykt reklamacja={d.reklamacja}
-                    czat={d.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
-                    trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
-                    onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)}
-                    dostawa={d.dostawa ?? null} uDostawcy={d.uDostawcy ?? null}
-                    trwaUDostawcy={zapiszUDostawcy.isPending} bladUDostawcy={bladUDostawcy}
-                    onUDostawcy={(z) => {
-                      setBladUDostawcy("");
-                      zapiszUDostawcy.mutate({ id: d.reklamacja.id, ...z },
-                        { onError: (e) => setBladUDostawcy((e as Error).message) });
-                    }} />}
-                  onCofnijNotatke={d.reklamacja.maPoprzedniaNotatke
-                    ? () => {
-                      setBladZapisu("");
-                      cofnijNotatke.mutate(
-                        { id: d.reklamacja.id, wersja: d.reklamacja.wersja },
-                        { onError: (e) => setBladZapisu((e as Error).message) });
-                    }
-                    : undefined}
-                  tagi={{
-                    slownik: slownikTagow.data?.tagi ?? [],
-                    trwa: nowyTag.isPending || przypnij.isPending || odepnij.isPending,
-                    blad: bladTagu,
-                    onPrzypnij: (tagId) => {
-                      setBladTagu("");
-                      przypnij.mutate({ id: d.reklamacja.id, rodzaj: "reklamacje", tagId },
-                        { onError: (e) => setBladTagu((e as Error).message) });
-                    },
-                    onOdepnij: (tagId) => {
-                      setBladTagu("");
-                      odepnij.mutate({ id: d.reklamacja.id, rodzaj: "reklamacje", tagId },
-                        { onError: (e) => setBladTagu((e as Error).message) });
-                    },
-                    onNowy: (nazwa) => {
-                      setBladTagu("");
-                      nowyTag.mutate({ id: d.reklamacja.id, rodzaj: "reklamacje", nazwa },
-                        { onError: (e) => setBladTagu((e as Error).message) });
-                    },
-                  }}
-                  sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
-                  bladPrzesylki={bladPrzesylki}
-                  onSprawdzPrzesylke={() => {
-                    setBladPrzesylki("");
-                    sprawdzPrzesylke.mutate({ id: d.reklamacja.id },
-                      { onError: (e) => setBladPrzesylki((e as Error).message) });
-                  }}
-                  onNotatka={(tekst) => {
-                    setBladZapisu("");
-                    notatka.mutate({
-                      id: d.reklamacja.id, notatka: tekst, wersja: d.reklamacja.wersja,
-                    }, { onError: (e) => setBladZapisu((e as Error).message) });
+                {/* ── WERDYKT SAM W PRAWEJ KARCIE ────────────────────────────
+                    Fakty, z których się go wydaje, stoją w głowicy nad całą
+                    sprawą, więc karta trzyma już tylko decyzję. Pytanie
+                    nieodwracalne zadaje się PO dowodach: w kolejności strony
+                    stoi za rozmową i dowodami. Zgoda przed wysłaniem zostaje
+                    przy OBU gałęziach — uznanie kosztuje pieniądze i jest
+                    równie nieodwracalne co odmowa. */}
+                <Werdykt reklamacja={d.reklamacja}
+                  czat={d.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
+                  trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
+                  onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)}
+                  dostawa={d.dostawa ?? null} uDostawcy={d.uDostawcy ?? null}
+                  trwaUDostawcy={zapiszUDostawcy.isPending} bladUDostawcy={bladUDostawcy}
+                  onUDostawcy={(z) => {
+                    setBladUDostawcy("");
+                    zapiszUDostawcy.mutate({ id: d.reklamacja.id, ...z },
+                      { onError: (e) => setBladUDostawcy((e as Error).message) });
                   }} />
               </Karta>
             </div>

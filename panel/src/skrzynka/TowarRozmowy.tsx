@@ -12,7 +12,7 @@ import { ODNOSNIK_CICHY } from "./odnosniki";
 import { CenyKartoteki } from "./OsCenKartoteki";
 
 /* Ceny kartoteki mieszkają w `OsCenKartoteki.tsx` i `cenyNaOsi.ts`. Stąd idą
-   dalej pod starymi nazwami, bo reklamacje (`reklamacje/Dowody.tsx`) i testy
+   dalej pod starymi nazwami, bo reklamacje (`reklamacje/Fakty.tsx`) i testy
    tego pliku importują je właśnie stąd. */
 export { CenyKartoteki } from "./OsCenKartoteki";
 export { grupujCeny, polozenieOferty } from "./cenyNaOsi";

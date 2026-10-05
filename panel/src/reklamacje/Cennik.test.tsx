@@ -1,4 +1,5 @@
 import React from "react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
@@ -20,7 +21,17 @@ import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 const karta = vi.fn();
 vi.mock("../api/rozmowy", () => ({ useKartaTowaru: (twId: number | null) => karta(twId) }));
 
-const { Dowody } = await import("./Dowody");
+const { FaktySprawy } = await import("./Fakty");
+const { kartotekaKolumny } = await import("./Glowica");
+/* Fakty stoją w głowicy jako pas komórek. Test patrzy na sam pas, w ramie
+   routera, bo „Ten zakup u nas" niesie odnośniki do kolejek. */
+const Fakty = ({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke, bladPrzesylki }: {
+  szczegol: SzczegolReklamacji; onSprawdzPrzesylke?: () => void;
+  sprawdzaPrzesylke?: boolean; bladPrzesylki?: string;
+}) => <MemoryRouter><FaktySprawy szczegol={szczegol} towar={kartotekaKolumny(szczegol)}
+  onSprawdzPrzesylke={onSprawdzPrzesylke} sprawdzaPrzesylke={sprawdzaPrzesylke}
+  bladPrzesylki={bladPrzesylki} /></MemoryRouter>;
+
 
 const CENY = [
   { poziom: 1, nazwa: "Detaliczna", nettoGrosze: 690, bruttoGrosze: 849, waluta: "PLN" },
@@ -55,9 +66,9 @@ beforeEach(() => {
   karta.mockReturnValue({ data: { ceny: CENY }, isLoading: false, error: null });
 });
 
-describe("Cennik Subiekta w kolumnie dowodów", () => {
-  it("stoi na wierzchu — BEZ otwierania zwijki, bo służy do triażu", () => {
-    render(<Dowody {...props()} />);
+describe("Cennik Subiekta w komórce „Klient zapłacił”", () => {
+  it("stoi na wierzchu — BEZ klikania, bo służy do triażu", () => {
+    render(<Fakty {...props()} />);
     /* Żadnego kliknięcia przed tą asercją i to jest cały jej sens. */
     expect(screen.getByText("Detaliczna")).toBeInTheDocument();
     expect(screen.getByText("8,49 PLN")).toBeInTheDocument();
@@ -68,18 +79,18 @@ describe("Cennik Subiekta w kolumnie dowodów", () => {
     /* Decyzja właściciela z 0.396.0: „wszystkie poziomy cen". Wybranie
        jednego za niego byłoby zgadywaniem, który cennik jest tym właściwym
        przy tej konkretnej reklamacji. */
-    render(<Dowody {...props()} />);
+    render(<Fakty {...props()} />);
     expect(screen.getAllByText(/PLN/).length).toBeGreaterThanOrEqual(4);
   });
 
   it("bez kartoteki MILCZY — pusta ramka to nie jest informacja", () => {
     karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
-    render(<Dowody {...props({ twId: null })} />);
+    render(<Fakty {...props({ twId: null })} />);
     expect(screen.queryByText(/Ceny · Subiekt GT/)).not.toBeInTheDocument();
   });
 
   it("pyta o kartotekę POTWIERDZONĄ tej sprawy, a nie o cokolwiek", () => {
-    render(<Dowody {...props()} />);
+    render(<Fakty {...props()} />);
     expect(karta).toHaveBeenCalledWith(11);
   });
 });

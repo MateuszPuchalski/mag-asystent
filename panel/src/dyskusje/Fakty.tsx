@@ -207,7 +207,7 @@ export function Fakty({
       </Wiersz>
 
       {/* ── CENY I PACZKA (0.393.0) ─────────────────────────────────────────
-          Ten sam blok co w `reklamacje/Dowody.tsx` i stoi tu z tego samego
+          Te same fakty co w `reklamacje/Fakty.tsx` i stoją tu z tego samego
           powodu: dyskusja zwykle POPRZEDZA reklamację, więc pytanie „ile on
           zapłacił" i „czy to w ogóle dostał" pada tu wcześniej, nie później.
           Dwie kolejki mają odpowiadać jednakowo — doktryna jednej drogi.
@@ -258,7 +258,7 @@ export function Fakty({
 
     {/* ── JEDNA SEKCJA ZAMIAST CZTERECH (0.520.0) ────────────────────────────
         Ten sam ruch, który kolumna reklamacji zrobiła w 0.416.0; pełny powód
-        stoi tam, w `reklamacje/Dowody.tsx`. Pod kolumną dyskusji zostały
+        stoi tam, w `reklamacje/Fakty.tsx`. Pod kolumną dyskusji zostały
         CZTERY sekcje o jednym zakupie: zwroty, inne sprawy, droga i rozmowy.
         Dwie ostatnie miały przy tym podwójny nagłówek — sekcja nad blokiem,
         który rysował własny, bo nie dostał `wSekcji`.
@@ -295,7 +295,8 @@ export function Fakty({
         sam powód co przy reklamacji: wzięcie sprawy jest czynnością, a ta
         kolumna niesie fakty. Oba ekrany mają zostać bliźniacze. */}
     <Sekcja tytul="Praca biura">
-      {/* Tagi nad notatką — powód przy tej samej sekcji w `reklamacje/Dowody.tsx`. */}
+      {/* Tagi nad notatką, bo odpowiadają na pytanie zadawane częściej: „czego
+          ta sprawa czeka". Notatkę czyta się, gdy tag nie wystarczy. */}
       {tagi && <div className="mt-3">
         <TagiSprawy przypiete={d.tagi} slownik={tagi.slownik} trwa={tagi.trwa}
           blad={tagi.blad} onPrzypnij={tagi.onPrzypnij} onOdepnij={tagi.onOdepnij}

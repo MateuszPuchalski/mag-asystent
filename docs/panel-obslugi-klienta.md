@@ -6059,6 +6059,26 @@ Odpowiedź: wzorzec zgadnięty z analogii do zwrotu NIE otwierał niczego —
 sprawa ma własną stronę `/claims/{uuid}?sellerId={id}`, a numer czytelny
 w adresie jest bezużyteczny.
 
+### 25b.10. Fakty w głowicy, werdykt pod dowodami (@wydanie)
+
+Decyzja właściciela: „Praca biura" odchodzi, fakty z prawej kolumny idą do
+głowicy, a te same informacje łączą się w jedną. Powód: fakt do decyzji ma
+stać nad całą sprawą, a nie w kolumnie, którą trzeba przewijać.
+
+- **Pas komórek w głowicy** (`reklamacje/Fakty.tsx`): Mamy, Kupione, Klient
+  zapłacił, Dostawca, Paczka do klienta i Zamówienie. Pod nim „Ten zakup
+  u nas". Zwijek nie ma, więc wszystko widać bez klikania.
+- **Połączone fakty.** Bez kartoteki „Mamy" i „Dostawca" stają jedną komórką,
+  bo brak kartoteki mówi już wiersz towaru. Kwota równa żądaniu stoi raz,
+  w zdaniu „Chce:", a komórka mówi „tyle, ile żąda". Historia towaru stoi przy
+  jego nazwie. Odnośniki do zamówienia i oferty stoją przy numerze reklamacji.
+- **Cenniki sprzedaży** stoją w komórce „Klient zapłacił", obok naszego
+  zakupu. Półka stoi pod stanem w komórce „Mamy".
+- **Prawa kolumna** to dowody, a pod nimi werdykt. Rozmowa dostała szerokość,
+  którą zajmowała kolumna faktów.
+- **Zeszło:** „Praca biura" (tagi i notatka sprawy) oraz wskaźnik „jeszcze
+  N spraw tego zakupu ↓". Zapiski o sprawie mają dom w kolumnie dowodów.
+
 ## 25c. Dyskusje
 
 Zaprojektowane 9 września 2026, zbudowane w 0.245.0. Jeden przyrost, nie trzy:

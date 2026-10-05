@@ -1,9 +1,20 @@
 import React from "react";
+import { MemoryRouter } from "react-router-dom";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Reklamacja, StanPrzesylki, SzczegolReklamacji, Zamowienie } from "../api/typy";
-import { Dowody } from "./Dowody";
+import { FaktySprawy } from "./Fakty";
+import { kartotekaKolumny } from "./Glowica";
+/* Fakty stoją w głowicy jako pas komórek. Test patrzy na sam pas, w ramie
+   routera, bo „Ten zakup u nas" niesie odnośniki do kolejek. */
+const Fakty = ({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke, bladPrzesylki }: {
+  szczegol: SzczegolReklamacji; onSprawdzPrzesylke?: () => void;
+  sprawdzaPrzesylke?: boolean; bladPrzesylki?: string;
+}) => <MemoryRouter><FaktySprawy szczegol={szczegol} towar={kartotekaKolumny(szczegol)}
+  onSprawdzPrzesylke={onSprawdzPrzesylke} sprawdzaPrzesylke={sprawdzaPrzesylke}
+  bladPrzesylki={bladPrzesylki} /></MemoryRouter>;
+
 
 /* Kolumna dowodów pyta od 0.411.0 o cennik kartoteki (`useKartaTowaru`), a ten
    plik nie stawia klienta TanStacka — pilnuje UKŁADU kolumny, nie cen. Własne
@@ -13,7 +24,7 @@ vi.mock("../api/rozmowy", () => ({
 }));
 
 
-/* ── Ceny i paczka w kolumnie dowodów (0.393.0) ──────────────────────────────
+/* ── Ceny i paczka w pasie faktów (0.393.0) ──────────────────────────────
    Zgłoszenie właściciela: „dodaj status przesyłki i ceny produktów". Testujemy
    to, co przy reklamacji rozstrzyga rozmowę, a nie to, co ładnie wygląda.
 
@@ -28,9 +39,9 @@ vi.mock("../api/rozmowy", () => ({
       żądania — zasada „zero zapisu przy patrzeniu" obowiązuje też koszt
       u dostawcy.
 
-   Stan paczki stoi w PODPISIE zwijki „Paczka do klienta" — zdaniem, nie
-   kodem przewoźnika — więc odpowiedź widać przy zamkniętej. Pytanie od nowa
-   jest w środku, jedno kliknięcie niżej.                                    */
+   Stan paczki stoi w komórce „Paczka do klienta" w pasie faktów głowicy —
+   zdaniem, nie kodem przewoźnika — więc odpowiedź widać bez klikania.
+   Pytanie od nowa stoi w tej samej komórce.                                    */
 
 const rek = (): Reklamacja => ({
   id: 7, externalId: "i-7", numer: "7/2026", orderId: "zam-7", offerId: null,
@@ -73,122 +84,104 @@ const stan = (n: Partial<StanPrzesylki> = {}): StanPrzesylki => ({
   waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null, ...n,
 });
 
-describe("Ceny zamówienia w kolumnie dowodów", () => {
+describe("Ceny zamówienia w pasie faktów", () => {
+  /* Pas stoi w głowicy bez zwijek, więc wszystko poniżej widać bez kliknięcia. */
+  const zamowienie = () => screen.getByText("Zamówienie").parentElement!;
+
   it("pokazuje kwotę KAŻDEJ pozycji razem z ilością", () => {
-    render(<Dowody {...props({ zamowienie: ZAMOWIENIE })} />);
-    expect(screen.getByText("Sekator ogrodowy")).toBeInTheDocument();
+    render(<Fakty {...props({ zamowienie: ZAMOWIENIE })} />);
+    expect(screen.getByText("Sekator ogrodowy")).toBeVisible();
     expect(screen.getByText("2 × 49,95 PLN")).toBeInTheDocument();
     expect(screen.getByText("1 × 9,95 PLN")).toBeInTheDocument();
   });
 
   it("DOSTAWĘ trzyma osobno od sumy, bo o nią klient pyta osobno", () => {
-    /* Suma stoi w podpisie zwijki, a podpis widać także przy otwartym
-       bloku — w środku drugi raz jej nie ma. Dostawa zostaje w środku. */
-    render(<Dowody {...props({ zamowienie: ZAMOWIENIE })} />);
-    expect(screen.getByText(/^Dostawa 19,90 PLN \(Kurier DPD\)\./)).toBeVisible();
+    render(<Fakty {...props({ zamowienie: ZAMOWIENIE })} />);
+    expect(zamowienie().textContent).toContain("2 pozycje");
+    expect(screen.getByText("dostawa 19,90 PLN, Kurier DPD · razem 129,80 PLN")).toBeVisible();
+    /* Suma ma jeden dom. */
     expect(screen.getAllByText(/129,80 PLN/)).toHaveLength(1);
-    expect(screen.getByRole("button", { name: /^Zamówienie/ })).toHaveTextContent("2 pozycje · razem 129,80 PLN");
   });
 
-  it("przy żądaniu pieniędzy przed werdyktem zamówienie otwiera się samo", () => {
-    /* Koszt dostawy i suma kształtują kwotę zwrotu, więc odpowiedź ma stać
-       bez kliknięcia. Zwijka nie pamięta wyboru: etap, nie nawyk. */
-    render(<Dowody {...props({ zamowienie: ZAMOWIENIE })} />);
-    expect(screen.getByRole("button", { name: /^Zamówienie/ })).toHaveAttribute("aria-expanded", "true");
-  });
-
-  it("bez pobranego zamówienia NIE pokazuje pustych kwot", () => {
-    render(<Dowody {...props()} />);
-    expect(screen.queryByText("Dostawa")).not.toBeInTheDocument();
+  it("bez pobranego zamówienia mówi to wprost i NIE pokazuje pustych kwot", () => {
+    render(<Fakty {...props()} />);
+    expect(zamowienie().textContent).toContain("nie pobraliśmy");
+    expect(screen.queryByText(/dostawa/)).not.toBeInTheDocument();
   });
 });
 
 describe("Stan przesyłki do klienta", () => {
+  const paczka = () => screen.getByText("Paczka do klienta").parentElement!;
+
   it("mówi wprost, że jeszcze NIE PYTALIŚMY — to brak wiedzy nasz, nie Allegro", () => {
-    render(<Dowody {...props({ przesylka: stan() })} />);
-    expect(screen.getByRole("button", { name: /^Paczka/ })).toHaveTextContent("nie pytaliśmy jeszcze Allegro");
+    render(<Fakty {...props({ przesylka: stan() })} />);
+    expect(paczka().textContent).toContain("nie wiemy");
+    expect(paczka().textContent).toContain("nie pytaliśmy jeszcze Allegro");
   });
 
   it("odróżnia BRAK NUMERU u Allegro od braku pytania", () => {
-    render(<Dowody {...props({ przesylka: stan({ sprawdzonoAt: "2026-09-18T07:00:00.000Z" }) })} />);
+    render(<Fakty {...props({ przesylka: stan({ sprawdzonoAt: "2026-09-18T07:00:00.000Z" }) })} />);
     expect(screen.getByText(/Allegro nie ma numeru/)).toBeInTheDocument();
     expect(screen.queryByText("nie pytaliśmy jeszcze Allegro")).not.toBeInTheDocument();
   });
 
   it("DORĘCZENIE pokazuje z datą, bo ono zamyka spór o niedostarczenie", () => {
-    render(<Dowody {...props({
+    render(<Fakty {...props({
       przesylka: stan({
         waybill: "1234567890", przewoznik: "DPD", status: "DELIVERED",
         dostarczonoAt: "2026-09-10T12:00:00.000Z", sprawdzonoAt: "2026-09-18T07:00:00.000Z",
       }),
     })} />);
-    /* Doręczenie widać BEZ otwierania — to ono zamyka spór. */
-    expect(screen.getByRole("button", { name: /^Paczka/ })).toHaveTextContent("doręczona 10 września 2026");
-    expect(screen.getByText("1234567890")).toBeInTheDocument();
-    expect(screen.getByText(/DPD/)).toBeInTheDocument();
+    /* Doręczenie widać bez kliknięcia — to ono zamyka spór. */
+    expect(paczka().textContent).toContain("doręczona");
+    expect(paczka().textContent).toContain("10 września 2026");
+    expect(screen.getByText("1234567890")).toBeVisible();
+    expect(paczka().textContent).toContain("DPD");
   });
 
   it("w drodze mówi SŁOWEM, nie kodem przewoźnika i nie zmyśloną datą doręczenia", () => {
-    const { unmount } = render(<Dowody {...props({
+    const { unmount } = render(<Fakty {...props({
       przesylka: stan({
         waybill: "999", przewoznik: "INPOST", status: "IN_TRANSIT",
         sprawdzonoAt: "2026-09-18T07:00:00.000Z",
       }),
     })} />);
-    const paczka = screen.getByRole("button", { name: /^Paczka do klienta/ });
-    expect(paczka).toHaveTextContent("w drodze do klienta");
-    expect(paczka).not.toHaveTextContent("IN_TRANSIT");
+    expect(paczka().textContent).toContain("w drodze do klienta");
+    expect(paczka().textContent).not.toContain("IN_TRANSIT");
     expect(screen.queryByText(/doręczona/)).not.toBeInTheDocument();
     /* Przewoźnik też słowem, ze słownika zwrotów. */
-    expect(screen.getByText(/przewoźnik InPost/)).toBeInTheDocument();
+    expect(paczka().textContent).toContain("InPost");
     unmount();
     /* Kod spoza słownika nie znika: mówi, skąd jest, żeby dało się go dopisać. */
-    render(<Dowody {...props({
+    render(<Fakty {...props({
       przesylka: stan({ waybill: "999", status: "OUT_FOR_DELIVERY", sprawdzonoAt: "2026-09-18T07:00:00.000Z" }),
     })} />);
-    expect(screen.getByRole("button", { name: /^Paczka do klienta/ }))
-      .toHaveTextContent("przewoźnik podał: OUT_FOR_DELIVERY");
-  });
-
-  it("powód o doręczeniu otwiera paczkę sam — przed werdyktem to cała sprawa", () => {
-    const sprawa = szczegol({ przesylka: stan() });
-    const r = { ...sprawa.reklamacja, powodTyp: "NO_PRODUCT_RECEIVED" };
-    const { unmount } = render(<Dowody {...props()} szczegol={{ ...sprawa, reklamacja: r }} />);
-    expect(screen.getByRole("button", { name: /^Paczka do klienta/ })).toHaveAttribute("aria-expanded", "true");
-    unmount();
-    /* Po werdykcie paczka niczego już nie rozstrzyga. */
-    render(<Dowody {...props()} szczegol={{ ...sprawa,
-      reklamacja: { ...r, statusAllegro: "CLAIM_ACCEPTED", kubelek: "zamknieta" } }} />);
-    expect(screen.getByRole("button", { name: /^Paczka do klienta/ })).toHaveAttribute("aria-expanded", "false");
+    expect(paczka().textContent).toContain("przewoźnik podał: OUT_FOR_DELIVERY");
   });
 
   it("pyta Allegro TYLKO na kliknięcie — samo otwarcie ekranu nie pyta", async () => {
     const onSprawdzPrzesylke = vi.fn();
-    render(<Dowody {...props({ przesylka: stan() }, { onSprawdzPrzesylke })} />);
-    expect(onSprawdzPrzesylke).not.toHaveBeenCalled();
-    /* Otwarcie zwijki to też patrzenie — dalej nikt nie pyta. */
-    await userEvent.click(screen.getByRole("button", { name: /^Paczka/ }));
+    render(<Fakty {...props({ przesylka: stan() }, { onSprawdzPrzesylke })} />);
     expect(onSprawdzPrzesylke).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "sprawdź" }));
     expect(onSprawdzPrzesylke).toHaveBeenCalledTimes(1);
   });
 
-  it("po pytaniu mówi, kiedy pytaliśmy, i daje „sprawdź jeszcze raz”", async () => {
-    render(<Dowody {...props({ przesylka: stan({ sprawdzonoAt: "2026-09-18T07:00:00.000Z" }) },
+  it("po pytaniu mówi krótko, kiedy pytaliśmy, i daje „sprawdź jeszcze raz”", () => {
+    render(<Fakty {...props({ przesylka: stan({ sprawdzonoAt: "2026-09-18T07:00:00.000Z" }) },
       { onSprawdzPrzesylke: vi.fn() })} />);
-    await userEvent.click(screen.getByRole("button", { name: /^Paczka/ }));
-    expect(screen.getByText(/^Pytaliśmy Allegro /)).toBeVisible();
+    /* Pełna chwila stoi w podpowiedzi, na widoku — krótka data. */
+    expect(screen.getByTitle(/^Pytaliśmy Allegro /)).toHaveTextContent(/^sprawdzone /);
     expect(screen.getByRole("button", { name: "sprawdź jeszcze raz" })).toBeInTheDocument();
   });
 
-  it("bez procedury pytania NIE rysuje martwego przycisku", async () => {
-    render(<Dowody {...props({ przesylka: stan() })} />);
-    await userEvent.click(screen.getByRole("button", { name: /^Paczka/ }));
+  it("bez procedury pytania NIE rysuje martwego przycisku", () => {
+    render(<Fakty {...props({ przesylka: stan() })} />);
     expect(screen.queryByRole("button", { name: "sprawdź" })).not.toBeInTheDocument();
   });
 
-  it("bez zamówienia zwijki Paczka nie ma — nie ma o co pytać", () => {
-    render(<Dowody {...props()} />);
-    expect(screen.queryByRole("button", { name: /^Paczka/ })).not.toBeInTheDocument();
+  it("bez danych o przesyłce komórki Paczka nie ma — nie ma o co pytać", () => {
+    render(<Fakty {...props()} />);
+    expect(screen.queryByText("Paczka do klienta")).not.toBeInTheDocument();
   });
 });
