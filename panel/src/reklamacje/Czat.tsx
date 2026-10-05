@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useId, useRef, useState } from "react";
 import { Bot, ChevronUp, Image, LifeBuoy, Store, User, type LucideIcon } from "lucide-react";
 import type { Reklamacja, WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
 import { pobierzZalacznik } from "../api/reklamacje";
@@ -217,8 +217,24 @@ function TrescKarty({ tekst, nasza }: { tekst: string; nasza: boolean }) {
   </>;
 }
 
+/** Zdjęcia w kolumnie ekranu: `pokaz` przewija do zdjęcia, `znak` podaje numer `Z1`. */
+export interface ZdjeciaObok {
+  pokaz: (zalacznikId: number) => void;
+  znak?: (zalacznikId: number) => string | null;
+}
+
+/* ── DWIE DROGI ZDJĘĆ, NIGDY OBIE NARAZ ─────────────────────────────────────
+   `kolumnaZdjec` rysuje kolumnę zdjęć SAMA rozmowa — tak ma ją ekran dyskusji,
+   który poza zdjęciami nie ma obok czego postawić. `zdjeciaObok` oddaje
+   kolumnę ekranowi reklamacji, bo tam obok zdjęć stoją dowody biura i to, co
+   wysłaliśmy. Obie naraz dałyby dwie kolumny tych samych zdjęć, więc typ
+   pozwala na jedną z nich. */
+type ZdjeciaCzatu =
+  | { kolumnaZdjec?: boolean; zdjeciaObok?: undefined }
+  | { kolumnaZdjec?: false; zdjeciaObok?: ZdjeciaObok };
+
 export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = false,
-  zwinStarsze, bursztynTylkoOstatniej = false, zdjeciaObok }: {
+  zwinStarsze, bursztynTylkoOstatniej = false, kolumnaZdjec = false, zdjeciaObok }: ZdjeciaCzatu & {
   sprawa: SprawaCzatu;
   czat: WiadomoscReklamacji[];
   /** Załączniki SAMEJ sprawy — te spoza rozmowy. */
@@ -235,11 +251,6 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
   zwinStarsze?: number;
   /** Bursztyn tylko na ostatniej wiadomości klienta, starsze cichną. */
   bursztynTylkoOstatniej?: boolean;
-  /**
-   * Zdjęcia stoją w kolumnie EKRANU, a w wątku zostaje odnośnik do nich.
-   * `pokaz` przewija do zdjęcia, `znak` podaje jego numer `Z1`, `Z2`…
-   */
-  zdjeciaObok?: { pokaz: (zalacznikId: number) => void; znak?: (zalacznikId: number) => string | null };
 }) {
   /* Ile wiadomości Allegro widzi, a ilu jeszcze nie mamy. Rozmowa dociąga się
      taktem synchronizacji, więc świeża sprawa bywa przez chwilę niepełna —
@@ -325,19 +336,42 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
      do 256 px wysokości, więc trzy zdjęcia z telefonu wypychały następną
      wiadomość poza ekran, a rozmowę czyta się od końca.
 
-     Kolumnę rysuje EKRAN, bo stoją w niej też dowody biura i zdjęcia, które
-     my wysłaliśmy — a tego rozmowa nie wie. W wątku zostaje odnośnik w tym
-     samym miejscu, więc kolejność czytania się nie zmienia, zmienia się tylko
-     wysokość wiadomości. Plik bez podglądu zostaje w wątku: to jedna linia
-     z nazwą, a odnośnik do niej byłby tej samej wysokości. */
+     Zdjęcie idzie do kolumny obok, a w wątku zostaje odnośnik w tym samym
+     miejscu. Kolejność czytania się nie zmienia, zmienia się tylko wysokość
+     wiadomości. Plik bez podglądu zostaje w wątku: to jedna linia z nazwą,
+     a odnośnik do niej byłby tej samej wysokości.
+
+     Kolumnę rysuje rozmowa (`kolumnaZdjec`, prawa ćwiartka) albo ekran
+     (`zdjeciaObok`). Własna kolumna rozmowy przewija się osobno, bo zdjęć
+     bywa więcej niż wiadomości, a bez zdjęć nie ma jej wcale, żeby rozmowa
+     nie traciła ćwiartki na pustkę. */
+  const przedrostek = useId();
+  const idZdjecia = (z: number) => `${przedrostek}-zdjecie-${z}`;
+  const wlasnaKolumna = kolumnaZdjec && !zdjeciaObok;
   const zdjecia = (lista: ZalacznikReklamacji[]) => lista.filter((z) => z.podglad);
   const pliki = (lista: ZalacznikReklamacji[]) =>
-    zdjeciaObok ? lista.filter((z) => !z.podglad) : lista;
+    wlasnaKolumna || zdjeciaObok ? lista.filter((z) => !z.podglad) : lista;
+  const grupyZdjec = !wlasnaKolumna ? [] : [
+    { klucz: "zgloszenie", podpis: "Zgłoszenie", lista: zdjecia(zalaczniki) },
+    ...czat.map((w) => ({
+      klucz: `w-${w.id}`,
+      podpis: `${rolaWiadomosci(w).etykieta} · ${czas(w.utworzonoAt)}`,
+      lista: zdjecia(w.zalaczniki),
+    })),
+  ].filter((g) => g.lista.length > 0);
+  const zKolumna = grupyZdjec.length > 0;
+  /* Fokus, nie samo przewinięcie: obramowanie fokusu pokazuje, KTÓRE zdjęcie
+     z kolumny jest tym z wiadomości, a czytnik ekranu idzie za nim. */
+  const pokazZdjecie = (z: number) => {
+    const el = document.getElementById(idZdjecia(z));
+    el?.scrollIntoView?.({ block: "nearest" });
+    el?.focus();
+  };
   const odnosniki = (lista: ZalacznikReklamacji[]) => zdjeciaObok
     ? <OdnosnikiZdjec lista={zdjecia(lista)} onPokaz={zdjeciaObok.pokaz} znak={zdjeciaObok.znak} />
-    : null;
+    : zKolumna ? <OdnosnikiZdjec lista={zdjecia(lista)} onPokaz={pokazZdjecie} /> : null;
   const sekcjaZgloszenia = opisWart || pliki(zalaczniki).length > 0
-    || (Boolean(zdjeciaObok) && zdjecia(zalaczniki).length > 0);
+    || ((zKolumna || Boolean(zdjeciaObok)) && zdjecia(zalaczniki).length > 0);
 
   const zgloszenie = sekcjaZgloszenia &&
     <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -356,7 +390,7 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
       <Zalaczniki reklamacjaId={sprawa.id} lista={pliki(zalaczniki)} />
     </section>;
 
-  return <div className="flex min-h-0 flex-1 flex-col">
+  const rozmowa = <div className="flex min-h-0 flex-1 flex-col">
     {przypnijZgloszenie && zgloszenie &&
       <div className="shrink-0 border-b border-slate-200 px-4 py-3">{zgloszenie}</div>}
     <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
@@ -426,5 +460,29 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
     {edytor}
     <div ref={koniec} aria-hidden="true" />
     </div>
+  </div>;
+
+  if (!zKolumna) return rozmowa;
+  return <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,3fr)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">
+    {rozmowa}
+    <aside aria-label="Zdjęcia w sprawie"
+      className="flex min-h-0 flex-col gap-3 overflow-y-auto border-l border-slate-200 bg-slate-50 px-2 py-3">
+      <NaglowekSekcji jako="h3">Zdjęcia</NaglowekSekcji>
+      {grupyZdjec.map((g) => <section key={g.klucz} aria-label={`Zdjęcia: ${g.podpis}`}>
+        <p className="text-podpis text-slate-600">{g.podpis}</p>
+        <div className="mt-1 flex flex-col gap-2">
+          {g.lista.map((z) => <React.Fragment key={z.id}>
+            {/* Cel odnośnika z wątku. `tabIndex={-1}` przyjmuje fokus z kodu,
+                ale nie dokłada przystanku tabulatora przed każdym zdjęciem. */}
+            <div id={idZdjecia(z.id)} tabIndex={-1}
+              className="rounded focus:outline-none focus:ring-2 focus:ring-slate-400">
+              <ListaZalacznikow className="!mt-0">
+                <ZalacznikSprawy reklamacjaId={sprawa.id} z={z} />
+              </ListaZalacznikow>
+            </div>
+          </React.Fragment>)}
+        </div>
+      </section>)}
+    </aside>
   </div>;
 }
