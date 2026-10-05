@@ -765,3 +765,61 @@ test("bez kartoteki historia towaru MILCZY, zamiast pisać zero", () => {
   const s = szczegolReklamacji(d, id, TERAZ);
   assert.equal(s.historia.towar, null);
 });
+
+/* ── HISTORIA ZNA TE SAME OFERTY, CO PRZEKRÓJ TOWARU ─────────────────────────
+   Licznik „ten towar" złączał samą pamięć wskazań. Sprawa z ofertą powiązaną
+   wyłącznie sygnaturą nie ma `r.twId`, więc nie dostawała licznika wcale,
+   a jej siostry z takich ofert nie liczyły się nigdzie. Oferty towaru wybiera
+   teraz `ofertyKartoteki`, wspólna z przekrojem.                           */
+
+function zOfertami() {
+  const s = stanowisko();
+  const { d, konto } = s;
+  const oferta = (ext: string, sku: string) => d.prepare(`INSERT INTO offer_snapshot
+    (channel_account_id,external_id,nazwa,sku,synced_at) VALUES (?,?,'Nóż',?,'2026-09-01')`)
+    .run(konto, ext, sku);
+  const sprawa = (ext: string, offer: string, status: string | null) => Number(d.prepare(
+    `INSERT INTO reklamacja_klienta(channel_account_id,external_id,offer_id,kupujacy_login,
+      status_allegro,otwarto_at,synced_at)
+     VALUES (?,?,?,?,?,'2026-09-01T08:00:00Z','2026-09-07T11:00:00Z')`)
+    .run(konto, ext, offer, `k-${ext}`, status).lastInsertRowid);
+  return { ...s, oferta, sprawa };
+}
+
+test("historia łapie oferty powiązane SAMĄ sygnaturą, także przy spacji i wielkości liter", () => {
+  const { d, konto, oferta, sprawa } = zOfertami();
+  /* Import Subiekta nie trimuje `tw_Symbol`, a sprzedawca pisze sygnaturę
+     jak chce — reguła `kartotekaPoSku` wybacza oba. */
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'NZ-46 ','Nóż 46')").run();
+  oferta("of-1", "NZ-46");
+  oferta("of-2", "nz-46");
+  oferta("of-9", "INNY");
+  d.prepare(`INSERT INTO oferta_kartoteka(channel_account_id,offer_id,tw_id,tw_symbol,
+    wskazano_at,wskazano_przez) VALUES (?,'of-3',77,'NZ-46','2026-01-01T00:00:00Z','test')`)
+    .run(konto);
+  const ta = sprawa("w-0", "of-1", "CLAIM_SUBMITTED");
+  sprawa("w-1", "of-2", "CLAIM_ACCEPTED");
+  sprawa("w-2", "of-3", "CLAIM_REJECTED");
+  sprawa("w-3", "of-9", "CLAIM_REJECTED");
+
+  const s = szczegolReklamacji(d, ta, TERAZ);
+  assert.equal(s.reklamacja.twId, null, "pamięci ani paragonu ta sprawa nie ma");
+  assert.equal(s.kartoteka?.pewnosc, "sku");
+  assert.equal(s.kartoteka?.twId, 77);
+  assert.deepEqual(s.historia.towar, { ile: 2, uznanych: 1, odrzuconych: 1 });
+});
+
+test("symbol pod dwiema kartotekami nie wiąże ofert — licznik milczy", () => {
+  /* `kartotekaOferty` mówi wtedy „niejednoznaczne" i nie daje kartoteki.
+     Licznik przypisujący sprawę jednej z dwóch zgadywałby za człowieka. */
+  const { d, oferta, sprawa } = zOfertami();
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'NZ-46','Raz')").run();
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (78,'nz-46 ','Dwa')").run();
+  oferta("of-1", "NZ-46");
+  const ta = sprawa("w-0", "of-1", "CLAIM_SUBMITTED");
+  sprawa("w-1", "of-1", "CLAIM_ACCEPTED");
+
+  const s = szczegolReklamacji(d, ta, TERAZ);
+  assert.equal(s.kartoteka?.pewnosc, "niejednoznaczne");
+  assert.equal(s.historia.towar, null);
+});

@@ -72,6 +72,20 @@ test("otwarte zwroty i sprawy tego towaru; zamknięte odpadają; udział zwrotó
   assert.equal(p.okno.udzialZwrotow, 0.5);
 });
 
+test("sygnatura wiąże regułą kartotekaOferty: spacja i wielkość liter tak, dubel symbolu nie", () => {
+  /* Przekrój i licznik „ten towar" w reklamacji czytają `ofertyKartoteki`.
+     Ścisłe `s.sku = symbol` gubiło oferty, które sprawa przypisuje towarowi,
+     a symbol pod dwiema kartotekami przypisywało obu naraz. */
+  const { d, k } = stanowisko();
+  d.prepare("INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,sku,synced_at) VALUES (?,'of-spacja','Nóż','14-25001 ','2026-09-01')").run(k);
+  assert.deepEqual(przekrojTowaru(501, d, TERAZ).oferty.map((o) => o.ofertaId).sort(),
+    ["of-pamiec", "of-sku", "of-spacja"]);
+
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (502,' 14-25001','Drugi nóż')").run();
+  assert.deepEqual(przekrojTowaru(501, d, TERAZ).oferty.map((o) => o.ofertaId), ["of-pamiec"],
+    "wskazanie człowieka zostaje, sygnatura pod dwiema kartotekami nie wiąże");
+});
+
 test("towar bez ofert i bez sprzedaży: udział milczy zamiast dzielić przez zero", () => {
   const { d } = stanowisko();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (777,'X-1','Samotny')").run();

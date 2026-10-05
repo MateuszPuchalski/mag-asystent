@@ -343,11 +343,12 @@ export function Dowody({
      pozycji; ta sama oferta dwa razy na zamówieniu niesie tę samą cenę. */
   const pozycja = szczegol.zamowienie?.pozycje
     .find((p) => p.offerId !== null && p.offerId === r.offerId) ?? null;
+  const towar = kartotekaKolumny(szczegol);
 
   return <div className="flex min-h-0 flex-col">
     <Glowica r={r} />
-    <Towar szczegol={szczegol} />
-    <Triaz szczegol={szczegol} pozycja={pozycja} />
+    <Towar szczegol={szczegol} towar={towar} />
+    <Triaz szczegol={szczegol} pozycja={pozycja} twId={towar.twId} />
     <Paczka przesylka={szczegol.przesylka} onSprawdz={onSprawdzPrzesylke}
       trwa={sprawdzaPrzesylke} blad={bladPrzesylki} />
 
@@ -513,7 +514,7 @@ export function Dowody({
         Nagłówek „Hala" zszedł (0.511.0): stał nad jednym przyciskiem
         „Zleć hali", który mówi to samo i sam jest nagłówkiem swojej czynności. */}
     <section className="border-t border-slate-200 px-4 py-2 first:border-t-0">
-      <ZlecHali zrodlo="reklamacja" zrodloRef={r.id} tytul={`Reklamacja ${r.numer ?? r.id}`} twId={r.twId} />
+      <ZlecHali zrodlo="reklamacja" zrodloRef={r.id} tytul={`Reklamacja ${r.numer ?? r.id}`} twId={towar.twId} />
     </section>
 
     {/* ── COPILOT NA DOLE (0.403.0) ───────────────────────────────────────────
@@ -609,6 +610,45 @@ function terminSlowem(r: Reklamacja): { napis: string; pilny: boolean } {
   return { napis: `za ${dniSlowo(r.dniDoTerminu)}`, pilny: r.dniDoTerminu <= 3 };
 }
 
+/* ── JEDNA KARTOTEKA NA CAŁĄ KOLUMNĘ ─────────────────────────────────────────
+   Symbol, kafel, przekrój towaru, triaż i zlecenie hali pytają o TĘ SAMĄ
+   rzecz: która to kartoteka u nas. Gdy każdy pytał sam, wiersz towaru brał
+   symbol także z dopasowania po SKU, a reszta wyłącznie `r.twId`. Sprawa
+   z ofertą powiązaną samą sygnaturą pokazywała wtedy symbol obok „sprawa bez
+   kartoteki", bez ceny zakupu i z martwym przyciskiem przekroju.
+
+   KOLEJNOŚĆ ZA SERWEREM: najpierw `r.twId`, który niesie paragon albo
+   wskazanie człowieka, potem `kartotekaOferty`. Z niej bierzemy wyłącznie
+   POWIĄZANIE, czyli `sku` i `pamiec`. Jedno trafienie po sygnaturze to
+   decyzja właściciela, nie propozycja (`services/dopasowanie-sku.ts`).
+   Symbol zdublowany przychodzi bez `twId` i zostaje brakiem, bo dwie
+   kartoteki pod jednym symbolem rozstrzyga człowiek. */
+type ZrodloKartoteki = "paragon" | "mapowanie" | "sku";
+
+interface KartotekaKolumny {
+  twId: number | null;
+  symbol: string | null;
+  zrodlo: ZrodloKartoteki | null;
+}
+
+const NAPIS_ZRODLA: Record<ZrodloKartoteki, string> = {
+  paragon: "z paragonu",
+  mapowanie: "z mapowania oferty",
+  sku: "z SKU oferty",
+};
+
+function kartotekaKolumny(szczegol: SzczegolReklamacji): KartotekaKolumny {
+  const r = szczegol.reklamacja;
+  if (r.twId !== null) {
+    return { twId: r.twId, symbol: r.twSymbol, zrodlo: r.twZParagonu ? "paragon" : "mapowanie" };
+  }
+  const k = szczegol.kartoteka;
+  if (k && k.twId !== null && (k.pewnosc === "sku" || k.pewnosc === "pamiec")) {
+    return { twId: k.twId, symbol: k.symbol, zrodlo: k.pewnosc === "sku" ? "sku" : "mapowanie" };
+  }
+  return { twId: null, symbol: null, zrodlo: null };
+}
+
 /* ── DWA OBRAZY, DWA ŹRÓDŁA (0.223.0) ────────────────────────────────────────
    Lewy to oferta Allegro: dokładnie to, co widział klient, kupując. Prawy to
    kartoteka Subiekta: to, co leży u nas na półce. Przy reklamacji różnica
@@ -619,21 +659,22 @@ function terminSlowem(r: Reklamacja): { napis: string; pilny: boolean } {
    z PARAGONU, a bywa z dzisiejszego mapowania oferty — i to są dwie różne
    rzeczy, gdy sprzedawca przepiął sygnaturę po wyczerpaniu dostawy. Wiersz
    bez tej adnotacji kazał ufać jednakowo obu. */
-function Towar({ szczegol }: { szczegol: SzczegolReklamacji }) {
+function Towar({ szczegol, towar }: { szczegol: SzczegolReklamacji; towar: KartotekaKolumny }) {
   const r = szczegol.reklamacja;
-  const symbol = r.twSymbol ?? szczegol.kartoteka?.symbol ?? null;
   return <div className="flex items-start gap-3 border-b border-slate-200 px-4 py-3">
     <KafelOferty externalId={r.offerId} stan={r.ofertaZdjecie} rozmiar={56}
       nazwa={r.ofertaNazwa ?? "Oferta"} symbol={r.offerId} />
-    <Kafel twId={r.twId} rozmiar={56} nazwa={r.ofertaNazwa ?? "Kartoteka"} symbol={r.twSymbol} />
+    <Kafel twId={towar.twId} rozmiar={56} nazwa={r.ofertaNazwa ?? "Kartoteka"} symbol={towar.symbol} />
     <div className="min-w-0 flex-1">
       <p className="text-sm font-semibold leading-snug text-slate-900">
         {r.ofertaNazwa ?? "Oferty nie pobrano"}</p>
       <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-slate-600">
-        {symbol
-          ? <PrzyciskTowaru twId={r.twId}><span className="font-mono font-semibold text-slate-800">{symbol}</span></PrzyciskTowaru>
-          : <span>{szczegol.kartoteka?.powod ?? "bez kartoteki"}</span>}
-        {symbol && <span>{r.twZParagonu ? "z paragonu" : "z mapowania oferty"}</span>}
+        {/* Przy braku stoi ZDANIE serwera, nie kod powodu: `powod` jest
+            kluczem dla liczników, a agent ma przeczytać, które ogniwo pękło. */}
+        {towar.symbol
+          ? <PrzyciskTowaru twId={towar.twId}><span className="font-mono font-semibold text-slate-800">{towar.symbol}</span></PrzyciskTowaru>
+          : <span>{szczegol.kartoteka?.zrodlo ?? "bez kartoteki"}</span>}
+        {towar.symbol && towar.zrodlo && <span>{NAPIS_ZRODLA[towar.zrodlo]}</span>}
         {/* ── CENY TU NIE MA (0.414.0) ──────────────────────────────────────
             Ta sama kwota stała w trzech miejscach kolumny: tutaj, w kostce
             „Klient zapłacił" i w pozycji zwijki Zakup. Wiersz towaru
@@ -673,13 +714,15 @@ function Towar({ szczegol }: { szczegol: SzczegolReklamacji }) {
    BRAK KARTOTEKI MÓWI O SOBIE (punkt 10 z `docs/obsluga-klienta-calosc.md`:
    czego nie wiemy, ekran mówi wprost). Pusty slot po stanie czytałby się jak
    „nie mamy", a to dwie różne odpowiedzi klientowi i dwie różne decyzje. */
-function Triaz({ szczegol, pozycja }: {
+function Triaz({ szczegol, pozycja, twId }: {
   szczegol: SzczegolReklamacji; pozycja: PozycjaZamowienia | null;
+  /** Kartoteka całej kolumny — ta sama, której symbol stoi w wierszu towaru. */
+  twId: number | null;
 }) {
   const r = szczegol.reklamacja;
   /* Ten sam hak, co w skrzynce — TanStack trzyma to pod jednym kluczem, więc
      otwarcie sprawy nie pyta serwera drugi raz o tę samą kartotekę. */
-  const karta = useKartaTowaru(r.twId);
+  const karta = useKartaTowaru(twId);
   const ceny = karta.data?.ceny ?? [];
   /* POZIOM 0 TO CENA ZAKUPU. Kolumny `tw_Cena` numerują się od zera, a widok
      nazw od jedynki — dlatego ten jeden poziom nie ma nazwy i mieć nie musi
@@ -705,7 +748,7 @@ function Triaz({ szczegol, pozycja }: {
      paska wcale i wiek zakupu przepadał razem z nim. Warunek liczy teraz to,
      co naprawdę miałoby stanąć: pasek znika dopiero, gdy nie stanęłaby ani
      jedna kostka i nie ma żadnego poziomu cen. */
-  const kostek = (stanZnany || r.twId === null ? 1 : 0) + (wiek ? 1 : 0)
+  const kostek = (stanZnany || twId === null ? 1 : 0) + (wiek ? 1 : 0)
     + (pozycja ? 1 : 0) + (zakup ? 1 : 0);
   if (kostek === 0 && pozostale.length === 0) return null;
 
@@ -719,7 +762,7 @@ function Triaz({ szczegol, pozycja }: {
               zadane ? `sprawa o ${zadane} szt.` : null,
               karta.data?.locs?.length ? karta.data.locs.join(", ") : "bez półki",
             ].filter(Boolean).join(" · ")} />
-        : r.twId === null
+        : twId === null
           ? <Kostka etykieta="Mamy" wartosc="nie wiadomo" kolor="text-slate-700"
               pod="sprawa bez kartoteki Subiekta" />
           : null}
