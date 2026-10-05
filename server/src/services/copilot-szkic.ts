@@ -774,10 +774,11 @@ export async function ulozSzkic(
   const oferta = ofertaRozmowy(db(), conversationId);
   if (oferta) await dociagnijTresc(oferta.konto, oferta.ofertaId);
 
-  /* STAN PACZKI PRZED KONTEKSTEM (23 września 2026), z tego samego powodu co
-     treść oferty: dwa żądania do Allegro wolno wysłać tylko stąd, a nie
-     z otwarcia rozmowy. Odmowa Allegro nie przerywa szkicu — zostaje stan
-     zapisany wcześniej albo milczenie, a to jest szkic sprzed tego wydania. */
+  /* ZAMÓWIENIE I STAN PACZKI PRZED KONTEKSTEM, z tego samego powodu co treść
+     oferty: żądania do Allegro wolno wysłać tylko stąd, a nie z otwarcia
+     rozmowy. Zamówienie idzie pierwsze, bo płatność i termin nadania stoją
+     pod werdyktem „wyślemy dziś". Odmowa Allegro nie przerywa szkicu:
+     zostaje stan zapisany wcześniej albo milczenie. */
   await odswiezZamowienieRozmowy(conversationId, przesylka, teraz.getTime());
   await odswiezPrzesylke(conversationId, przesylka);
 

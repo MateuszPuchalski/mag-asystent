@@ -307,7 +307,7 @@ rachunek w oknie „Skąd to wiem", otwartym, gdy pada zdanie spoza bazy.
 - **Status realizacji i termin nadania** (`fulfillment.status`,
   `delivery.time.dispatch.to`). Szkic odpowiada z nich na „czy paczka wyjdzie
   dziś", zanim jest numer przesyłki. Żadne z tych pól nie opisuje osoby:
-  to stan zamówienia i data nadania ustalona przez Allegro.
+  to stan zamówienia i termin nadania z formularza zamówienia.
 
 ### Nazwa odbiorcy z naklejki
 

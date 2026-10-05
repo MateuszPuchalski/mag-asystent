@@ -14,8 +14,9 @@ import { buildProductCard } from "./stock.js";
    ŹRÓDŁA, każde z innej strony zamówienia:
    - `status` formularza — oś PŁATNOŚCI. `FILLED_IN` znaczy, że dane mogą się
      jeszcze zmienić, więc wysyłki nie obiecujemy.
-   - `delivery.time.dispatch.to` — najpóźniejsze nadanie, które Allegro
-     pokazało kupującemu. To jedyne pole zamówienia o terminie NADANIA.
+   - `delivery.time.dispatch.to` — najpóźniejsze nadanie z formularza
+     zamówienia; schemat mówi tylko, że te daty idą do przewoźnika. To jedyne
+     pole zamówienia o terminie NADANIA.
    - `fulfillment.status` — status ustawiany przez SPRZEDAWCĘ (u nas
      Sellasist). Opisuje, nie rozstrzyga: jego automat bywa wyłączony.
    - dokument sprzedaży z Subiekta z numerem zamówienia — magazyn je obsłużył.
@@ -45,6 +46,11 @@ const REALIZACJA_SLOWAMI: Record<string, string> = {
 
 /** Statusy sprzedawcy, przy których „wyślemy dziś" byłoby nieprawdą. */
 const BEZ_WYSYLKI = new Set(["CANCELLED", "SUSPENDED", "RETURNED", "READY_FOR_PICKUP", "PICKED_UP"]);
+
+/* `SENT` bez numeru przesyłki to paczka, która już wyszła, a numer jeszcze
+   nie doszedł z Allegro. Obietnica „wyślemy dziś" byłaby wtedy nieprawdą
+   w drugą stronę, więc ma własny powód, nie wspólny z anulowaniem. */
+const WYSLANE = "SENT";
 
 export interface BrakPozycji { nazwa: string; potrzeba: number; jest: number }
 
@@ -106,6 +112,8 @@ export function ocenRealizacji(s: StanRealizacji, teraz: Date): OcenaRealizacji 
   /* Powód odmowy idzie do zdania, bo bez niego model dopisze własny. */
   const powod = s.status === "CANCELLED" || (s.realizacja !== null && BEZ_WYSYLKI.has(s.realizacja))
     ? "zamówienie nie czeka na wysyłkę"
+    : s.realizacja === WYSLANE
+      ? "sprzedawca oznaczył paczkę jako wysłaną, a numeru przesyłki jeszcze nie widać; napisz, że paczka wyszła"
     : !oplacone ? "płatność niezakończona"
       : termin === null ? "brak terminu nadania"
         : termin < dzis ? "termin nadania minął, napisz, że sprawdzamy w magazynie, bez daty"

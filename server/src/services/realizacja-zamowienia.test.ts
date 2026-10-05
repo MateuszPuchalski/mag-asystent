@@ -74,6 +74,8 @@ test("każdy brak zamienia werdykt na „nie obiecuj” i mówi dlaczego", () =>
     [{ nadanieDo: "2026-10-05T15:00:00Z" }, /termin nadania minął/],
     [{ nadanieDo: null }, /brak terminu nadania/],
     [{ realizacja: "SUSPENDED" }, /nie czeka na wysyłkę/],
+    /* Sprzedawca oznaczył wysyłkę, a numer jeszcze nie doszedł z Allegro. */
+    [{ realizacja: "SENT" }, /oznaczył paczkę jako wysłaną/],
     [{ status: "CANCELLED" }, /nie czeka na wysyłkę/],
     [{ braki: [{ nazwa: "Gaźnik", potrzeba: 2, jest: 1 }] }, /brakuje towaru na stanie/],
   ];
