@@ -160,8 +160,8 @@ export function przebudujIdentyfikatory(database: DatabaseSync = db()): { kartot
 
 /* ── Odczyt ────────────────────────────────────────────────────────────── */
 
-/** Skąd wziął się wiersz. `oferta` i `dostawca` dopisywała baza wiedzy, której
- *  już nie ma. Ich wiersze zostają, bo szukanie po numerze dalej je znajduje. */
+/** Skąd wziął się wiersz. `oferta` i `dostawca` pisała baza wiedzy, której już
+ *  nie ma, a migracja skasowała ich wiersze. Typ je zna, bo zna je CHECK. */
 export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta" | "dostawca";
 
 export interface WierszIdentyfikatora {

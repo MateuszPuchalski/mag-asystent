@@ -44,15 +44,16 @@ function staraBaza() {
 const sqlTabeli = (d: DatabaseSync) =>
   (d.prepare("SELECT sql FROM sqlite_master WHERE name='towar_identyfikator'").get() as { sql: string }).sql;
 
-test("każdy wiersz przeżywa przebudowę z `id`, źródłem i numerem oferty", () => {
+test("wiersze z opisu i ręczne przeżywają przebudowę z `id`; numer z oferty zabiera kasata wiedzy", () => {
   const d = staraBaza();
   migrate(d);
   assert.match(sqlTabeli(d), /'dostawca'/);
   const w = d.prepare("SELECT id, zrodlo, oferta_id, dostawca, import_id FROM towar_identyfikator ORDER BY id").all();
+  /* `oferta` pisała baza wiedzy; po jej odejściu `bezDoboruIWiedzy` kasuje
+     te wiersze, bo nic już nie umie ich cofnąć. */
   assert.deepEqual(w.map((r) => ({ ...r })), [
     { id: 5, zrodlo: "opis", oferta_id: null, dostawca: null, import_id: null },
     { id: 9, zrodlo: "reczne", oferta_id: null, dostawca: null, import_id: null },
-    { id: 12, zrodlo: "oferta", oferta_id: "14023867457", dostawca: null, import_id: null },
   ]);
 });
 

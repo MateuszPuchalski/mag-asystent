@@ -115,8 +115,7 @@ przycisk kopiowania do „Znajdź dokument” Subiekta.
 **Read-model `sgt_*`.** Serwer **nie odpytuje MSSQL przy każdym skanie**.
 Importer kopiuje kartoteki, stany i dokumenty do `sgt_*` przy starcie, co
 `MSSQL_SYNC_MS` (domyślnie 60 s) i na żądanie (`POST /api/admin/resync`). Potem
-`services/po-imporcie.ts` odbudowuje identyfikatory, sekcje „Modele:” i indeks
-FTS5. Baza Subiekta stoi na maszynie, na której biuro wystawia faktury, więc
+`services/po-imporcie.ts` odbudowuje identyfikatory z opisów kartotek. Baza Subiekta stoi na maszynie, na której biuro wystawia faktury, więc
 odpytywanie jej w rytmie skanów obciążałoby tę pracę. Do rozkładania wystarczy
 stan sprzed minuty.
 

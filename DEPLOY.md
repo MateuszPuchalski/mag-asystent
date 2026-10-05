@@ -267,7 +267,7 @@ i stałego adresu maszyny. Paczka niesie Node, a NSSM pobiera instalator. Droga
 ręczna z repozytorium potrzebuje dodatkowo:
 
 - [Node.js LTS 22](https://nodejs.org) — **wymagane ≥ 22.5** (`node -v`), bo
-  serwer używa wbudowanego `node:sqlite` z FTS5. Modułów natywnych nie ma,
+  serwer używa wbudowanego `node:sqlite`. Modułów natywnych nie ma,
   więc `npm ci` nie potrzebuje build tools;
 - [Git](https://git-scm.com) z **Git Bash**, w którym wykonuje się polecenia
   bash z tej instrukcji (albo WSL);

@@ -435,10 +435,11 @@ CREATE TABLE IF NOT EXISTS towar_identyfikator (
   -- bo agent go nie napisał — kliknął przycisk, a to mówi dziennik.
   --
   -- `dostawca` doszło przy imporcie odsyłaczy od dostawców i kosztowało
-  -- trzecią przebudowę. Tabela odsyłaczy dostawcy (jego numer ↔ numery OEM)
-  -- to te same numery, które opis kartoteki niesie ręcznie — tylko z pliku,
-  -- setkami naraz. Osobne źródło, bo przebudowa po imporcie z Subiekta kasuje
-  -- `opis`, a import dostawcy ZASTĘPUJE wyłącznie własne wiersze.
+  -- trzecią przebudowę.
+  --
+  -- `oferta` i `dostawca` zostają w CHECK, choć nic ich już nie pisze: oba
+  -- karmiła baza wiedzy, która zeszła, a migracja skasowała ich wiersze.
+  -- Zawężenie CHECK-a to czwarta przebudowa tabeli bez żadnego zysku.
   zrodlo          TEXT NOT NULL CHECK (zrodlo IN ('opis','reczne','oferta','dostawca')),
   dodal           TEXT NOT NULL,
   dodal_user_id   INTEGER REFERENCES app_user(user_id),

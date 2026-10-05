@@ -43,7 +43,7 @@ liter. Po loginie chodzą zakładka KLIENT (S2), kandydaci zamówień (S1)
 i sprawa klienta (S6), która spina rozmowy BEZ wspólnego zamówienia.
 
 **Trzecim mostkiem jest towar (`tw_id`).** Symbol otwiera szufladę
-(`panel/src/towar/Szuflada.tsx`): stan, dostawy, wiedzę, otwarte sprawy o nim
+(`panel/src/towar/Szuflada.tsx`): stan, dostawy, otwarte sprawy o nim
 i liczby z 90 dni. Szuflada to wgląd, nie kolejka. **Wgląd prowadzi do
 pracy:** liczba w Analizie o stanie BIEŻĄCYM otwiera listę, którą liczy.
 Liczby z minionego okna odnośnika nie mają, bo lista dziś znaczy co innego.

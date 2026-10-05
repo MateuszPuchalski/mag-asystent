@@ -220,8 +220,8 @@ export function migrate(database: DatabaseSync) {
      widzieć, CO sprawdzono, zanim uwierzy odpowiedzi. Stare wymiany mają
      pustą listę i to jest o nich prawda: modele wtedy narzędzi nie miały. */
   addColumn("copilot_pytanie", "narzedzia", "TEXT NOT NULL DEFAULT '[]'");
-  /* Zapytania do wyszukiwarki w księdze Copilota (0.507.0) — pasowanie
-     z sieci. Stare wiersze mają zero i to jest o nich prawda. */
+  /* Zapytania do wyszukiwarki w księdze Copilota. Dziś nikt ich nie zleca,
+     ale stare wiersze je niosą, a pomiar kosztów liczy je do rachunku. */
   addColumn("copilot_wywolanie", "wyszukiwania", "INTEGER NOT NULL DEFAULT 0");
   /* Treść oferty dla Copilota (0.253.0) — patrz `offer_snapshot`. Wiersze
      sprzed tego wydania mają NULL w `tresc_synced_at`, czyli „nie pytaliśmy
@@ -1040,8 +1040,12 @@ function bezSzablonowOdpowiedzi(database: DatabaseSync) {
  * Oba stały na chwiejnym fundamencie, więc nowy kształt, jeśli powstanie,
  * zacznie od zera. Kod odszedł razem z tabelami, bo TABELA BEZ CZYTELNIKA
  * NIE JEST ARCHIWUM, TYLKO PUŁAPKĄ —
- * to samo zdanie co przy szablonach wyżej. Kto chce tych danych, robi kopię
- * bazy PRZED aktualizacją; mówi o tym `DEPLOY.md`.
+ * to samo zdanie co przy szablonach wyżej. Dane zostają w kopii
+ * `przed-*.db`, którą `kopiaPrzedMigracja` robi przed każdą migracją.
+ *
+ * Z `towar_identyfikator` schodzą wiersze `oferta` i `dostawca`. Pisała je
+ * baza wiedzy i tylko ona umiała je cofnąć, więc zły numer zostałby na
+ * zawsze. Wpisy `reczne` zostają, bo napisał je człowiek z katalogu.
  *
  * Klucze obce schodzą PRZED transakcją, bo tabele wskazują na siebie
  * nawzajem, a w transakcji `PRAGMA foreign_keys` jest ignorowane po cichu.
@@ -1072,8 +1076,13 @@ function bezDoboruIWiedzy(database: DatabaseSync) {
   }
   /* Indeks pełnotekstowy karmił wyłącznie kandydatów doboru. Tabela wirtualna
      bez modułu FTS5 w tym buildzie nie da się nawet skasować, a skoro go nie
-     ma, to i tabela nigdy nie powstała — błąd nie ma tu nic do powiedzenia. */
-  try { database.exec("DROP TABLE IF EXISTS towar_fts"); } catch { /* bez FTS5 tabeli nie było */ }
+     ma, to i tabela nigdy nie powstała. Inny błąd ma wywrócić start głośno. */
+  try { database.exec("DROP TABLE IF EXISTS towar_fts"); } catch (e) {
+    if (!/no such module/i.test((e as Error).message)) throw e;
+  }
+  if (jest("towar_identyfikator")) {
+    database.exec("DELETE FROM towar_identyfikator WHERE zrodlo IN ('oferta','dostawca')");
+  }
   database.exec("PRAGMA foreign_keys = OFF");
   try {
     /* NAWIASY NA KOŃCU SĄ KONIECZNE: `transaction` ZWRACA opakowaną funkcję. */

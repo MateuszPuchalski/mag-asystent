@@ -69,6 +69,11 @@ function staraBaza(): DatabaseSync {
       VALUES (1, 'Dzień dobry', 'claude', '2026-09-01T10:01:00.000Z', 'Ala', 'wpisane');
     INSERT INTO conversation_event(conversation_id, event_type, payload, created_at)
       VALUES (1, 'dobor_wynik', '{"po":"czesc"}', '2026-09-01T10:02:00.000Z');
+    INSERT INTO towar_identyfikator(tw_id, tw_symbol, rodzaj, wartosc, wartosc_norm, zrodlo, dodal) VALUES
+      (7, 'W07-1301', 'oem', '195945', '195945', 'opis', 'import'),
+      (7, 'W07-1301', 'katalog_obcy', 'HQ-12345', 'HQ12345', 'reczne', 'Ala'),
+      (7, 'W07-1301', 'oem', '698083', '698083', 'oferta', 'oferta'),
+      (7, 'W07-1301', 'nr_oryg', 'RO12378', 'RO12378', 'dostawca', 'import');
   `);
   return d;
 }
@@ -93,6 +98,17 @@ test("szkic Copilota traci kolumny doboru i pasowań, a jego treść zostaje", (
   assert.equal(kolumny(d, "copilot_pytanie").includes("pasowania"), false);
   assert.equal((d.prepare("SELECT tresc FROM szkic_copilota WHERE conversation_id=1").get() as
     { tresc: string }).tresc, "Dzień dobry");
+  d.close();
+});
+
+test("numery z ofert i od dostawców schodzą, numery z opisów i wpisy ręczne zostają", () => {
+  /* Oba źródła pisała baza wiedzy i tylko ona umiała je cofnąć. Wpis ręczny
+     napisał człowiek, a numer z opisu odtworzy przebudowa po imporcie. */
+  const d = staraBaza();
+  migrate(d);
+  const zrodla = (d.prepare("SELECT zrodlo FROM towar_identyfikator ORDER BY zrodlo").all() as
+    Array<{ zrodlo: string }>).map((w) => w.zrodlo);
+  assert.deepEqual(zrodla, ["opis", "reczne"]);
   d.close();
 });
 

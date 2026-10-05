@@ -14,18 +14,21 @@ pasowań. Narzędzia dopytania szukają kartoteki i czytają ofertę.
 
 Lista „Pasuje do" z oferty zostaje przy rozmowie, bez podświetlania maszyny
 klienta, bo maszynę znał wyłącznie dobór. Historia i profil klienta nie
-pokazują już maszyn z doborów. Numery OEM z opisów kartotek zostają: karta
-towaru i szukanie po numerze dalej z nich korzystają.
+pokazują już maszyn z doborów. Numery OEM z opisów kartotek i wpisy ręczne
+zostają, bo czyta je karta towaru i narzędzie Copilota.
 
-Migracja kasuje tabele doboru i wiedzy (`dobor`, `model_urzadzenia`,
+Migracja kasuje tabele doboru i wiedzy oraz kolumny doboru i pasowań
+w szkicu i dopytaniu Copilota. Tabele to `dobor`, `model_urzadzenia`,
 `zastosowanie`, `dowod_zastosowania`, `zabudowa_silnika`, `alias_silnika`,
 `pasowanie_czesci`, `zamiennosc_oem`, `import_odsylaczy`, `import_wykazu`,
-`model_z_opisu`, `token_silnika*`, `pasowanie_siec*`, `wymiar_kartoteki`,
-`towar_fts`) oraz kolumny doboru i pasowań w szkicu i dopytaniu Copilota.
-Zdarzenia w dzienniku audytu zostają.
+`model_z_opisu`, `token_silnika*`, `pasowanie_siec*`, `wymiar_kartoteki`
+i `towar_fts`. Kasuje też numery z ofert i od dostawców, które dopisała baza
+wiedzy, bo nic już nie umie ich poprawić. Zdarzenia w dzienniku audytu
+zostają.
 
 **[wymaga działania]** Migracja kasuje dane bazy wiedzy bezpowrotnie poza
-kopią `server\data\kopie\przed-*.db`, którą serwer robi przed migracją.
+kopią `przed-*.db` w katalogu kopii (domyślnie `server\data\kopie\`),
+którą serwer robi przed migracją.
 Zanim klikniesz aktualizację, upewnij się, że kopie działają (Ustawienia →
 Serwer i kopie). Jeśli w `wertis.env` stoją `WIEDZA_AUTOMAT`,
 `WIEDZA_AUTOMAT_MODEL`, `WIEDZA_AUTOMAT_NA_PRZEBIEG`, `PASOWANIE_Z_SIECI`

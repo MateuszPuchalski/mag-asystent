@@ -425,7 +425,7 @@
  "server/src/context.ts": 6,
  "server/src/czas.ts": 2,
  "server/src/db/anonimizacja.test.ts": 1,
- "server/src/db/db.ts": 137,
+ "server/src/db/db.ts": 136,
  "server/src/db/kasata-spraw.test.ts": 3,
  "server/src/db/migracja-autoodpowiedzi.test.ts": 1,
  "server/src/db/migracja-dosylki.test.ts": 4,

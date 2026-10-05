@@ -751,6 +751,10 @@ tematem jest decyzja z terminem, a karta towaru jest tłem.
 **„Klient" i „Wiedza" WRACAJĄ z makiety (0.216.0)** — decyzja właściciela,
 która unieważnia oba powody odmowy z 0.198.0, a nie idzie wbrew nim.
 
+> **Od @wydanie Wiedzy i maszyn klienta nie ma.** Zeszły razem z doborem.
+> Zakładka Klient pokazuje zakupy, rozmowy i sprawy po loginie. Dwa akapity
+> niżej o Wiedzy i maszynach zostają jako zapis powodów.
+
 Wiedzy odmawialiśmy, bo dowody stały już w „Doborze", a druga zakładka z tą
 samą treścią kazałaby zgadywać, w której szukać. Argument był słuszny, więc
 dowody STAMTĄD WYSZŁY: stoją w jednym miejscu, nie w dwóch. Dobór został
@@ -1170,11 +1174,16 @@ Listę mamy od 0.253.0, ale do tej wersji czytał ją tylko model. Na zrzucie
 klient miał HECHT 1803S i ten model stał na liście. Dobór oddał jednak zero,
 a panel listy nie pokazywał wcale.
 
+> **Od @wydanie lista stoi bez maszyny klienta.** Maszynę znał wyłącznie
+> dobór, więc podświetlenie trafienia i zdanie „jest / nie ma na liście"
+> zeszły razem z nim. Zostaje sama lista: w sekcji „Oferta" jako zwinięta
+> „Pasuje do (N)" i w faktach szkicu. Tabela i akapity niżej to zapis powodów.
+
 | co | gdzie | reguła |
 |---|---|---|
-| Szukanie bez wariantu | szczebel „zastosowanie" w doborze | Gdy dokładny klucz nic nie da, druga próba idzie po marce i modelu. Kandydat ma co najwyżej „prawdopodobne" i dopisek „wariant niesprawdzony". |
-| Zdanie „jest / nie ma na liście" | fakt szkicu Copilota | Serwer sprawdza maszynę z danych doboru na całej liście. „Nie ma" niesie zastrzeżenie, że to nie dowód. |
-| Lista w panelu | sekcja „Oferta" | Zwinięta „Pasuje do (N)". Maszyna z doboru stoi na wierzchu, a jej pozycja jest podświetlona. |
+| Szukanie bez wariantu | szczebel „zastosowanie" w doborze | **usunięte** w @wydanie |
+| Zdanie „jest / nie ma na liście" | fakt szkicu Copilota | **usunięte** w @wydanie |
+| Lista w panelu | sekcja „Oferta" | Zwinięta „Pasuje do (N)", bez podświetlenia. |
 
 **Jedno dopasowanie dla szkicu i ekranu** — `services/zgodnosc-oferty.ts`.
 Model musi stać w pozycji jako ciąg całych słów, więc „46" nie trafia
@@ -2491,9 +2500,9 @@ a nie uruchamia partię na dwadzieścia rozmów.
 
 **Serwer układa FAKTY, model pisze prozę, serwer sprawdza wynik.** Fakty (F1,
 F2, …) powstają ze zdań, które serwer już pisze dla ekranu: kartoteka oferty
-z dostępnością dziś, treść oferty od 0.253.0, dane doboru wpisane przez
-agenta, kandydaci i negatywy ze zdaniem źródła, zastosowania, silniki,
-pasowania, pomiary z tej rozmowy. Model cytuje identyfikatory faktów, a serwer
+z dostępnością dziś, treść oferty i rozpoznanie klasyfikatora. Dane doboru,
+kandydaci, zastosowania, silniki i pasowania zeszły z faktów w @wydanie
+razem z doborem. Model cytuje identyfikatory faktów, a serwer
 SPRAWDZA wynik w kodzie: każdy cytowany fakt musi istnieć, a długość nie może
 przekroczyć limitu wysyłki.
 Odwołania „(F3)" znikają z treści dopiero po tym sprawdzeniu (0.232.1) —
@@ -3048,10 +3057,6 @@ Przeciążenie dostawcy rozmowy nie skreśla. Przełącznik `COPILOT_PRZED_PRACA
 jest domyślnie wyłączony, bo wydaje pieniądze bez kliknięcia.
 
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
-
-> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
-> decyzją właściciela w @wydanie (5 października 2026), razem z kodem
-> i tabelami. Tekst zostaje jako zapis powodów i blizn.
 
 > **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
 > decyzją właściciela w @wydanie (5 października 2026), razem z kodem
@@ -6742,7 +6747,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Autoodpowiedź nie liczy się jako nasz ruch | **działa** od 0.227.0 | `message.auto_odpowiedz`, liczone przy zapisie w `zapiszWiadomosc` |
 | Pasek o nowej wiadomości tylko przy kliencie | **działa** od 0.228.0 | kierunek w zdarzeniu `message.created` |
 | Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
-| Wynik doboru (§7) | **usunięte** w @wydanie | tabela `dobor`, `services/dobor.ts`: cztery wyniki ustawiane przez człowieka, stan wyliczany (`docs/dobor-od-zera.md`) |
+| Wynik doboru (§7) | **usunięte** w @wydanie | tabela `dobor`, `services/dobor.ts`: cztery wyniki ustawiane przez człowieka, stan wyliczany |
 | Kandydaci doboru (§11.2) | **usunięte** w @wydanie | `services/kandydaci.ts`: trzy grupy — wskazane przez klienta, z bazy wiedzy, podobne po nazwie; numer spoza kartoteki to wiersz bez wyboru |
 | Wymiary z kartotek (§11.2) | **usunięte** w 0.552.0 | droga „zgodne wymiary" wyszła z doborem; tabelę `wymiar_kartoteki` kasuje migracja od @wydanie |
 | Identyfikatory z opisów (OEM, nr oryg., stare SKU, zamienniki) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts`; sekcje `Zamiennik:` od 0.234.0 |
