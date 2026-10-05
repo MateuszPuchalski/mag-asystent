@@ -2,6 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { db as defaultDb } from "../db/db.js";
 import { sprawaOtwarta } from "./statusy-spraw.js";
 import { statusRozmowy } from "./conversations.js";
+import { ofertyKartoteki } from "./dopasowanie-sku.js";
 
 /* ── Towar jako trzeci mostek (0.502.0) ─────────────────────────────────────
    Numer zamówienia wiąże kolejki JEDNEGO zakupu, login — jednego klienta.
@@ -16,7 +17,9 @@ import { statusRozmowy } from "./conversations.js";
 
    OFERTY TOWARU to pamięć człowieka (`oferta_kartoteka`) oraz oferty,
    których sygnatura jest symbolem kartoteki — ta sama para dróg, którą
-   `kartotekaOferty` idzie w drugą stronę. Oferty bez żadnej z nich nie
+   `kartotekaOferty` idzie w drugą stronę. Liczy je `ofertyKartoteki`,
+   wspólna z historią reklamacji, żeby przekrój i licznik „ten towar"
+   znały te same oferty. Oferty bez żadnej z nich nie
    wiemy, że są tym towarem, i przekrój tego nie udaje: liczby sprzedaży
    mówią wprost „z ofert powiązanych". */
 
@@ -45,22 +48,7 @@ type W = Record<string, unknown>;
 
 export function przekrojTowaru(twId: number, database: DatabaseSync = defaultDb(), teraz = Date.now()): PrzekrojTowaru {
   const od = new Date(teraz - OKNO_PRZEKROJU_DNI * 86_400_000).toISOString();
-  const symbol = (database.prepare("SELECT symbol FROM sgt_towar WHERE tw_id=?").get(twId) as { symbol?: string } | undefined)
-    ?.symbol ?? null;
-
-  const oferty = new Map<string, { konto: number; ofertaId: string; nazwa: string | null }>();
-  for (const w of database.prepare(`
-    SELECT k.channel_account_id AS konto, k.offer_id AS oferta, s.nazwa
-      FROM oferta_kartoteka k
-      LEFT JOIN offer_snapshot s ON s.channel_account_id = k.channel_account_id AND s.external_id = k.offer_id
-     WHERE k.tw_id = ?
-    UNION
-    SELECT s.channel_account_id, s.external_id, s.nazwa FROM offer_snapshot s
-     WHERE ? IS NOT NULL AND s.sku = ?`).all(twId, symbol, symbol) as W[]) {
-    oferty.set(`${w.konto}|${w.oferta}`, { konto: Number(w.konto), ofertaId: String(w.oferta),
-      nazwa: (w.nazwa as string) ?? null });
-  }
-  const pary = [...oferty.values()];
+  const pary = ofertyKartoteki(database, twId);
   /* Warunek na parę (konto, oferta) jako lista OR — ofert jednej kartoteki
      jest kilka, nie kilkaset. Pusta lista to warunek fałszywy, nie błąd SQL. */
   const naPary = (kolKonto: string, kolOferta: string) => pary.length

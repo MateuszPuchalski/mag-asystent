@@ -312,3 +312,49 @@ export function kartotekaOferty(
     zrodlo: `SKU oferty „${szukane}"${dopisek}`, powod: null, poKolumnie: null,
   };
 }
+
+/**
+ * Oferty kartoteki — `kartotekaOferty` w drugą stronę.
+ *
+ * Te same dwie drogi: pamięć wskazań (`oferta_kartoteka`) i oferty, których
+ * sygnatura jest symbolem kartoteki. Sygnaturę porównujemy regułą
+ * `kartotekaPoSku`: trim po obu stronach, bez wielkości liter, a symbol pod
+ * dwiema kartotekami nie wiąże żadnej. Inna reguła po tej stronie
+ * przypisywałaby towarowi oferty, których sprawa mu nie przypisuje, i licznik
+ * „ten towar" rozjechałby się z kartoteką na ekranie tej samej sprawy.
+ *
+ * PAMIĘĆ BIJE SYGNATURĘ: oferta z wierszem w `oferta_kartoteka` należy
+ * wyłącznie do wskazanej kartoteki, nawet gdy jej SKU trafia w inną.
+ * Człowiek przepina ofertę ze skrzynki właśnie wtedy, gdy sygnatura myli.
+ * Bierzemy KAŻDY wiersz pamięci, także sprzed zmiany sygnatury, bo z tego
+ * samego złączenia `r.twId` bierze kartotekę na ekranie reklamacji.
+ *
+ * Czytają ją przekrój towaru i historia reklamacji. Jedna funkcja, bo dwie
+ * kopie tego złączenia rozjeżdżają się przy pierwszej poprawce jednej z nich.
+ */
+export function ofertyKartoteki(
+  database: Db, twId: number,
+): Array<{ konto: number; ofertaId: string; nazwa: string | null }> {
+  const symbol = String((database.prepare("SELECT symbol FROM sgt_towar WHERE tw_id=?")
+    .get(twId) as { symbol?: string | null } | undefined)?.symbol ?? "").trim();
+  const jedyny = symbol !== "" && (database.prepare(
+    "SELECT tw_id FROM sgt_towar WHERE TRIM(symbol) = ? COLLATE NOCASE LIMIT 2",
+  ).all(symbol)).length === 1;
+  const oferty = new Map<string, { konto: number; ofertaId: string; nazwa: string | null }>();
+  for (const w of database.prepare(`
+    SELECT k.channel_account_id AS konto, k.offer_id AS oferta, s.nazwa
+      FROM oferta_kartoteka k
+      LEFT JOIN offer_snapshot s ON s.channel_account_id = k.channel_account_id AND s.external_id = k.offer_id
+     WHERE k.tw_id = ?
+    UNION
+    SELECT s.channel_account_id, s.external_id, s.nazwa FROM offer_snapshot s
+     WHERE ? = 1 AND TRIM(s.sku) = ? COLLATE NOCASE
+       AND NOT EXISTS (SELECT 1 FROM oferta_kartoteka p
+                        WHERE p.channel_account_id = s.channel_account_id
+                          AND p.offer_id = s.external_id)`).all(twId, jedyny ? 1 : 0, symbol) as
+    Array<{ konto: number; oferta: string; nazwa: string | null }>) {
+    oferty.set(`${w.konto}|${w.oferta}`, { konto: Number(w.konto), ofertaId: String(w.oferta),
+      nazwa: w.nazwa ?? null });
+  }
+  return [...oferty.values()];
+}
