@@ -22,8 +22,9 @@ import { kartotekaKolumny } from "./Glowica";
    sama decyzja co przy zwrocie w 0.180.0. Zakładki mają sens tam, gdzie
    kolumna niesie dwa RÓWNORZĘDNE tematy; tutaj jest jeden.
 
-   Wszystko poniżej to ODCZYT. Notatka, tagi i pytanie o paczkę zapisują,
-   ale każde jawnym kliknięciem, nie skutkiem ubocznym patrzenia. */
+   Wszystko poniżej to ODCZYT. Notatka, tagi, pytanie o paczkę i wstrzyknięty
+   werdykt zapisują, ale każde jawnym kliknięciem, nie skutkiem ubocznym
+   patrzenia. */
 
 /* ── GĘSTOŚĆ KOLUMNY (0.389.0) ───────────────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: kolumna dowodów nie mieściła się

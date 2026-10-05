@@ -5,7 +5,7 @@ import {
   useDodajZalacznikSprawy, useNotatka, useOdpowiedz, useOdswiez,
   useSprawdzPrzesylke, useUsunZalacznikSprawy, useZalacznikiSprawy,
   useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
-  useWerdykt, useZwrotTowaru, useCofnijNotatke, useDodajDowod, useUsunDowod,
+  useWerdykt, useZwrotTowaru, useCofnijNotatke, useDodajDowod, useUsunDowod, useZapiszUDostawcy,
 } from "../api/reklamacje";
 import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
@@ -46,8 +46,9 @@ import { klawiszZajety } from "../nawigacja/fokus";
    pozostałych ekranów obsługi bez zmian.
 
    OD 0.224.0 ODPOWIEDŹ WYCHODZI STĄD, a od przyrostu trzeciego także WERDYKT
-   i stanowisko o towarze — pasek nad rozmową (`reklamacje/Werdykt.tsx`).
-   Kryterium §25 „bez otwierania panelu Allegro" jest przy reklamacji spełnione.
+   i stanowisko o towarze — w kolumnie faktów, pod faktami, z których się go
+   wydaje (`reklamacje/Werdykt.tsx`). Kryterium §25 „bez otwierania panelu
+   Allegro" jest przy reklamacji spełnione.
 
    TRZY RODZAJE 409 i każdy każe co innego zrobić: dopisek klienta albo doradcy
    otwiera dialog z jawną zgodą, zamknięta rozmowa kończy temat, a rozjazd
@@ -272,6 +273,8 @@ export function Reklamacje() {
   const dodajDowod = useDodajDowod();
   const usunDowod = useUsunDowod();
   const [bladDowodu, setBladDowodu] = useState("");
+  const zapiszUDostawcy = useZapiszUDostawcy();
+  const [bladUDostawcy, setBladUDostawcy] = useState("");
   const [bladProwadze, setBladProwadze] = useState("");
   /* Miejsce zdjęcia w kolumnie dowodów. Odnośnik z wątku i numer przy wpisie
      prowadzą w to samo miejsce, a fokus — nie samo przewinięcie — pokazuje,
@@ -444,6 +447,7 @@ export function Reklamacje() {
     setKonfliktTowaru(null);
     setBladDowodu("");
     setBladProwadze("");
+    setBladUDostawcy("");
   }, [wybrana]);
 
   /**
@@ -495,14 +499,37 @@ export function Reklamacje() {
 
   /* Werdykt: los próby przychodzi w odpowiedzi, a po `onSettled` sprawa
      dociąga się z kolumnami `werdykt_*` i pasek pokazuje stan z WIERSZA.
-     Tu zostaje tylko zdanie o porażce, żeby agent nie czekał na odświeżenie. */
+     Tu zostaje tylko zdanie o porażce, żeby agent nie czekał na odświeżenie.
+
+     STANOWISKO O TOWARZE jedzie tym samym żądaniem, a jego los w polu
+     `towar` — werdykt wyszedł nieodwracalnie, więc porażka towaru nie jest
+     porażką werdyktu. Każdy los kończy się tak samo jak osobny krok: dopisek
+     klienta otwiera ten sam dialog, reszta to zdanie pod krokiem zapasowym
+     „Towar do odesłania?", który po werdykcie zostaje na ekranie. */
   const wyslijWerdykt = (z: ZadanieWerdyktu) => {
     const d = szczegol.data;
     if (!d) return;
     setBladWerdyktu("");
-    werdykt.mutate({ id: d.reklamacja.id, ...z, wersja: d.reklamacja.wersja }, {
+    setBladTowaru("");
+    setKonfliktTowaru(null);
+    const { towar, ...werdyktSam } = z;
+    werdykt.mutate({
+      id: d.reklamacja.id, ...werdyktSam, wersja: d.reklamacja.wersja,
+      ...(towar ? { towar: { ...towar, expectedLastMessageId: ostatniaNieNasza(d.czat) } } : {}),
+    }, {
       onSuccess: (w) => {
         if (w.status === "send_failed") setBladWerdyktu(w.blad ?? "Allegro odmówiło");
+        const los = w.towar;
+        if (towar && los) {
+          if ("konflikt" in los) {
+            if (los.konflikt.nowaWiadomosc !== undefined) {
+              setKonfliktTowaru({ szczegoly: los.konflikt, decyzja: towar.decyzja, tresc: towar.tresc });
+            } else setBladTowaru(los.konflikt.error ?? "Stanowisko o towarze nie wyszło — wyślij je jeszcze raz.");
+          } else if ("blad" in los) setBladTowaru(los.blad);
+          else if ("pominiety" in los) setBladTowaru(los.pominiety);
+          else if (los.status !== "sent") setBladTowaru(
+            "Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj sprawę, zanim spróbujesz znowu.");
+        }
         /* Werdykt zmienia `status_allegro`, a zieleń „Potwierdzony przez
            Allegro" należy się dopiero statusowi z synchronizacji — więc
            dociągamy go od razu, zamiast kazać czekać na takt. */
@@ -738,18 +765,6 @@ export function Reklamacje() {
                     { onError: (e) => setBladZalacznika((e as Error).message) })}
                   czatAktywny={d.reklamacja.czatAktywny}
                   onZmiana={setTresc} onWyslij={() => wyslij()} />} />
-
-              {/* ── WERDYKT POD ROZMOWĄ ──────────────────────────────────────
-                  Dekalog obsługi, punkt 9: nieodwracalne pyta — a pytanie
-                  zadaje się PO dowodach, nie przed nimi. UZNAJĘ i ODRZUCAM są
-                  nieodwracalne wobec Allegro, więc pasek stoi tam, gdzie
-                  kończy się czytanie sprawy. Zgoda przed wysłaniem zostaje
-                  przy OBU gałęziach — uznanie kosztuje pieniądze i jest
-                  równie nieodwracalne co odmowa. */}
-              <div className="shrink-0"><Werdykt reklamacja={d.reklamacja}
-                czat={d.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
-                trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
-                onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)} /></div>
             </Karta>
 
             {/* Dowody i fakty: obok siebie na szerokim oknie, jedne pod drugimi
@@ -776,6 +791,24 @@ export function Reklamacje() {
 
               <Karta className="min-h-0 2xl:overflow-y-auto">
                 <Dowody szczegol={d} trwa={trwa} bladZapisu={bladZapisu}
+                  /* ── WERDYKT POD FAKTAMI ────────────────────────────────────
+                      Dekalog obsługi, punkt 9: nieodwracalne pyta — a pytanie
+                      zadaje się PO dowodach, nie przed nimi. W kolejności strony
+                      stoi za rozmową i dowodami, a w kolumnie zaraz pod
+                      liczbami, z których się go wydaje. Zgoda przed wysłaniem
+                      zostaje przy OBU gałęziach — uznanie kosztuje pieniądze
+                      i jest równie nieodwracalne co odmowa. */
+                  decyzja={<Werdykt reklamacja={d.reklamacja}
+                    czat={d.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
+                    trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
+                    onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)}
+                    dostawa={d.dostawa ?? null} uDostawcy={d.uDostawcy ?? null}
+                    trwaUDostawcy={zapiszUDostawcy.isPending} bladUDostawcy={bladUDostawcy}
+                    onUDostawcy={(z) => {
+                      setBladUDostawcy("");
+                      zapiszUDostawcy.mutate({ id: d.reklamacja.id, ...z },
+                        { onError: (e) => setBladUDostawcy((e as Error).message) });
+                    }} />}
                   onCofnijNotatke={d.reklamacja.maPoprzedniaNotatke
                     ? () => {
                       setBladZapisu("");
