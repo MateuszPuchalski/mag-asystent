@@ -91,10 +91,9 @@ panelu, punkt 2), ale kodu wysyłki bez człowieka nie ma. Kod działa według
 granicy **automat proponuje, do klienta mówi człowiek** (§14.2 projektu
 panelu). Według §14.3 każde twierdzenie techniczne w szkicu wskazuje źródło.
 
-**Wiedzę zatwierdza każdy z biura, także autor propozycji**, bo w biurze bywa
-jedna osoba. Autor i zatwierdzający są zapisani osobno, a automat tylko
-proponuje — pilnuje tego serwis. Baza startuje bez importu CUDZEJ bazy
-pasowań. Tokeny silników (§12 panelu) zatwierdza człowiek jedną transakcją.
+**Doboru części i bazy wiedzy nie ma** od @wydanie, decyzją właściciela:
+stały na chwiejnym fundamencie. Ich tabele skasowała migracja, a dane
+zostały w kopii bazy sprzed niej.
 
 ### 6. Czym jest zwrot?
 
@@ -259,15 +258,11 @@ z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
   wiadomości, która każe coś zrobić: pytania o paczkę, fakturę albo zwrot.
   Fakty szkicu niosą rozpoznanie klasyfikatora — nasze dane, bez treści.
 - **Obok rozmowy idą FAKTY serwera.** Kartoteka oferty (symbol, nazwa, EAN,
-  numery, dostępność dziś), treść oferty, dane doboru, kandydaci i negatywy
-  ze zdaniami źródła oraz wiedza o zastosowaniach, silnikach, pasowaniach
-  i pomiarach z rozmowy. Podpisy dowodów jadą BEZ nazwiska pracownika. Nie
+  numery, dostępność dziś), treść oferty i rozpoznanie klasyfikatora. Nie
   idą: półka, rezerwacje, rozbicie na magazyny, pełny opis kartoteki, historia
   zakupów klienta ani jego adres.
 - **Szkic nie staje się odpowiedzią sam.** Stoi w pustym polu jako tekst do
-  poprawiania, nie zapisany; do klienta idzie po „Wyślij". Dane doboru
-  z rozmowy serwer sprawdza przeciw wątkowi i wyrzuca te, których tam nie ma.
-  Wchodzą na kliknięcie agenta, wyłącznie w puste pola.
+  poprawiania, nie zapisany; do klienta idzie po „Wyślij".
 
 **Zdjęcia w rozmowie wychodzą do dostawcy, także bez kliknięcia.** Pikseli
 zamaskować się nie da: zdjęcie bywa paragonem, etykietą albo ekranem telefonu

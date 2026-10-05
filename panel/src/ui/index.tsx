@@ -55,13 +55,12 @@ export const EtykietaWartosci = ({ className = "", children }: {
    stało `<h3>`, czytnik ekranu ma dalej słyszeć nagłówek. Domyślny `<span>`
    zostaje dla nagłówków, które siedzą w rzędzie obok numeru i plakietek.
 
-   `ton` bierze wyłącznie barwę, nie resztę łańcucha — nagłówek „Wiedza:
-   pasowania części" jest zielony, bo mówi o innym źródle danych, a nie
-   dlatego, że jest ważniejszy. */
+   `ton` bierze wyłącznie barwę, nie resztę łańcucha — barwa mówi o źródle
+   albo randze treści pod nagłówkiem, a nie o innym kształcie nagłówka. */
 export function NaglowekSekcji({ ikona, ton = "text-slate-500", jako: Znacznik = "span",
   className = "", children }: {
   ikona?: React.ReactNode;
-  /** Sama barwa. Domyślnie szara; zielona i bursztynowa mówią o źródle. */
+  /** Sama barwa. Domyślnie szara; inna mówi o źródle albo randze treści. */
   ton?: string;
   /** Znacznik HTML — `h3` tam, gdzie to naprawdę nagłówek dokumentu. */
   jako?: "span" | "h3" | "p" | "div";
@@ -593,8 +592,8 @@ export function LoginKlienta({ login, className = "" }: { login: string; classNa
 
    REGUŁA STOI W JEDNYM MIEJSCU, bo osiem kopii dwuformowego wyrażenia to
    dokładnie to, co dało osiem różnych wyników. Jedyna poprawna kopia mieszkała
-   w `ekrany/Wiedza.tsx` i nikt jej nie znalazł — prywatna funkcja w ekranie
-   nie jest miejscem na regułę języka.
+   jako prywatna funkcja jednego ekranu i nikt jej nie znalazł — ekran nie jest
+   miejscem na regułę języka.
 
    `dniSlowo` stało w TRZECH kolejkach przepisane znak w znak i przyjechało
    tutaj razem z regułą. „dni" brzmi tak samo w obu formach mnogich, więc tamte

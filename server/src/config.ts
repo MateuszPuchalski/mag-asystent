@@ -1148,64 +1148,6 @@ export const config = {
     przedPracaLimit: Math.max(1,
       Number(process.env.COPILOT_PRZED_PRACA_LIMIT ?? 100) || 100),
   },
-
-  /**
-   * KOLEJKA WIEDZY OPRÓŻNIA SIĘ SAMA (0.331.0).
-   *
-   * Właściciel: „wiedza powinna uzupełniać się automatycznie", a pytany
-   * o zakres wybrał najdalszy — cała kolejka automatycznie, człowiek tylko
-   * prostuje. To ODWRACA zasadę „automat nie zatwierdza", która do 0.330.0
-   * stała w nagłówku `services/wiedza.ts` i w `czlowiekZBiura`.
-   *
-   * Domyślnie WYŁĄCZONE, i to nie jest cofanie decyzji właściciela. Rzecz,
-   * która sama dopisuje wiedzę karmiącą dobór, ma się włączać świadomie przy
-   * `wertis.env` — tak samo jak automatyczny szkic w 0.317.0, o który ten sam
-   * właściciel prosił i który też wrócił wyłączony.
-   */
-  wiedzaAutomat: {
-    wlaczony: process.env.WIEDZA_AUTOMAT === "1",
-    /**
-     * Rytm własny. Przebieg bez modelu językowego to kilka zapytań SQL, więc
-     * pół godziny wystarcza z zapasem: kolejka rośnie po imporcie z Subiekta
-     * i po synchronizacji ofert, a nie z minuty na minutę.
-     */
-    ms: 1_800_000,
-    /**
-     * Ile wierszy bierze JEDEN przebieg — osobno dla kluczy, zastosowań
-     * i pasowań. Hamulec na pierwsze uruchomienie na zaległej kolejce:
-     * dwa tysiące wpisów naraz to dwa tysiące wierszy do prostowania,
-     * zanim ktokolwiek zdąży spojrzeć na pierwszy.
-     */
-    naPrzebieg: Math.max(1, Number(process.env.WIEDZA_AUTOMAT_NA_PRZEBIEG ?? 25) || 25),
-    /**
-     * Czy wolno dopytać model językowy, gdy trzy źródła deterministyczne
-     * milczą. Osobno od wyłącznika głównego, bo to jedyna część automatu,
-     * która KOSZTUJE — i jedyna, która nie stoi na naszych danych.
-     */
-    model: process.env.WIEDZA_AUTOMAT_MODEL === "1",
-  },
-
-  /**
-   * PASOWANIE Z SIECI (0.507.0). Automat nocny szuka na stronach spoza
-   * Allegro, do czego pasują nasze części z numerem OEM, i składa propozycje
-   * do kolejki Wiedzy. Nic nie zatwierdza sam.
-   *
-   * Domyślnie WYŁĄCZONE z tego samego powodu co automat wiedzy i szkic
-   * z taktu: wydaje pieniądze bez kliknięcia (wyszukiwanie i tokeny stron),
-   * więc włącza się decyzją w `wertis.env`, nie aktualizacją.
-   */
-  pasowanieZSieci: {
-    wlaczony: process.env.PASOWANIE_Z_SIECI === "1",
-    /** Takt co godzinę; pracuje tylko w oknie nocnym, reszta taktów wychodzi od razu. */
-    ms: 3_600_000,
-    /**
-     * Ile kartotek na jedną noc. Jedna to zwykle kilka wyszukiwań i kilka
-     * przeczytanych stron — kilka do kilkunastu centów. Dziesięć na start,
-     * żeby pierwszy tydzień dał się przejrzeć w kolejce, zanim urośnie.
-     */
-    naNoc: Math.max(1, Number(process.env.PASOWANIE_Z_SIECI_NA_NOC ?? 10) || 10),
-  },
-
 };
 
 /**

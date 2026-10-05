@@ -1,8 +1,8 @@
 import React from "react";
 import { ArrowRight, Bot, Camera, ClipboardList, Lock, Paperclip, Ruler, ScanSearch, Send, User, Undo2 } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { StanDoboru, StatusRozmowy, WpisOsi, ZalacznikOsi } from "../api/typy";
-import { NAZWA, NAZWA_STANU_DOBORU } from "./statusy";
+import type { StatusRozmowy, WpisOsi, ZalacznikOsi } from "../api/typy";
+import { NAZWA } from "./statusy";
 import { LoginKlienta, Przycisk, czas, dzienMiesiac, godzina } from "../ui";
 import { pobierzPlik } from "../api/klient";
 import { useZdjecieZalacznika } from "../towar/useZdjecie";
@@ -471,7 +471,7 @@ export function Os({
    horizontal row below messaging window like a timeline, when clicking on
    event it goes to that part in messaging window".
 
-   Do 0.242.0 każda zmiana statusu, sklejenie sprawy i każdy krok doboru stały
+   Do 0.242.0 każda zmiana statusu i każde sklejenie sprawy stały
    na osi jako osobna kreska między wypowiedziami. Przy jednej sprawie to jest
    znak, że coś się wydarzyło; przy siedmiu — ściana szarego tekstu, przez
    którą trzeba się przewinąć, żeby dojść do zdania klienta. Na zrzucie od
@@ -492,7 +492,7 @@ export function Os({
 /* „zwrot" (0.502.0) MUSI tu stać: rodzaj spoza tego zbioru rysuje się jak
    wypowiedź, a decyzja zwrotu udająca zdanie do klienta to najgorszy możliwy
    wynik (ta sama blizna co `odeslanie_zadania`, `api/typy.ts`). */
-const ZDARZENIE: ReadonlySet<string> = new Set(["status", "dobor", "zwrot"]);
+const ZDARZENIE: ReadonlySet<string> = new Set(["status", "zwrot"]);
 
 type Zdarzenie = WpisOsi & { cel: string | null };
 
@@ -561,12 +561,10 @@ function LiniaZakupuWiersz({ wpis }: { wpis: WpisOsi }) {
    i godzina zostają w podpowiedzi, bo to są dane do sprawdzenia, nie do
    przeglądania.
 
-   RODZAJ NIESIE BARWA, nie prefiks. „dobór: " przed każdym chipem kosztowało
-   siedem znaków na każdym z nich i mówiło to samo co kolor. */
+   RODZAJ NIESIE BARWA, nie prefiks. Prefiks przed każdym chipem kosztowałby
+   kilka znaków na każdym z nich i mówiłby to samo co kolor. */
 const BARWA_ZDARZENIA: Record<string, string> = {
   status: "bg-slate-100 text-slate-600",
-  dobor: "bg-sky-100 text-sky-900",
-  dobor_wybor: "bg-sky-100 text-sky-900",
   sprawa: "bg-violet-100 text-violet-900",
   /* Zwrot barwą pieniędzy z osi zwrotu — to ta sama rodzina zdarzeń. */
   zwrot: "bg-emerald-100 text-emerald-800",
@@ -578,11 +576,7 @@ function etykieta(z: Zdarzenie): string {
      oś bywa czytana z odpowiedzi zapisanej przed 0.243.0. */
   if (!e) return z.tresc;
   if (e.rodzaj === "status") return e.po ? NAZWA[e.po as StatusRozmowy] ?? e.po : z.tresc;
-  if (e.rodzaj === "dobor") return e.po ? NAZWA_STANU_DOBORU[e.po as StanDoboru] ?? e.po : z.tresc;
   if (e.rodzaj === "zwrot") return `zwrot: ${NAZWA_ZDARZENIA_ZWROTU[e.co] ?? e.co.replace(/_/g, " ")}`;
-  if (e.rodzaj === "dobor_wybor") {
-    return `${e.wybrano ? "wybrano" : "zdjęto"} ${e.symbol ?? "?"}`;
-  }
   return z.tresc;
 }
 

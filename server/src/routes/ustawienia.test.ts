@@ -77,44 +77,6 @@ test("biuro dostaje liczby, nie sam procent", async () => {
   assert.deepEqual(body.pudla, [], "nic nie pudłuje, bo symbol stoi w kartotece");
 });
 
-test("pokrycie wiedzy (E3) to liczby dla biura, bez zapisu i bez hali", async () => {
-  let r = await app.inject({ method: "GET", url: "/api/obsluga/pokrycie-wiedzy" });
-  assert.equal(r.statusCode, 401);
-  r = await app.inject({ method: "GET", url: "/api/obsluga/pokrycie-wiedzy", headers: login("magazynier") });
-  assert.equal(r.statusCode, 403);
-  const zdarzen = () => (db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
-  const przed = zdarzen();
-  r = await app.inject({ method: "GET", url: "/api/obsluga/pokrycie-wiedzy", headers: login("biuro") });
-  assert.equal(r.statusCode, 200, r.body);
-  const body = r.json<{ kartotek: number; identyfikatorow: number; fts: { dostepne: boolean; wpisow: number };
-    modeleZOpisu: { nowych: number } }>();
-  assert.equal(typeof body.kartotek, "number");
-  assert.equal(typeof body.identyfikatorow, "number");
-  assert.equal(typeof body.modeleZOpisu.nowych, "number");
-  assert.equal(body.fts.dostepne, true, "node:sqlite testów ma FTS5");
-  assert.equal(zdarzen(), przed);
-});
-
-test("miary doboru: liczby dla biura, bez osi osobowej i bez zapisu", async () => {
-  let r = await app.inject({ method: "GET", url: "/api/obsluga/miary-doboru" });
-  assert.equal(r.statusCode, 401, "401 przed 403 — brak sesji to nie brak roli");
-  r = await app.inject({ method: "GET", url: "/api/obsluga/miary-doboru", headers: login("magazynier") });
-  assert.equal(r.statusCode, 403, "hala nie ogląda pracy biura");
-
-  const zdarzen = () => (db().prepare("SELECT count(*) n FROM events").get() as { n: number }).n;
-  const przed = zdarzen();
-  r = await app.inject({ method: "GET", url: "/api/obsluga/miary-doboru?dni=90", headers: login("biuro") });
-  assert.equal(r.statusCode, 200, r.body);
-  const body = r.json<Record<string, unknown>>();
-  assert.deepEqual(Object.keys(body).sort(), ["dni", "otwarte", "podstawy", "wyniki"], "bez osi osobowej");
-  assert.equal(body.dni, 90);
-  assert.deepEqual(Object.keys(body.wyniki as object).sort(), ["brak", "czesc", "dopytac", "nie_dotyczy"]);
-  /* Okno spoza selektora spada na tydzień, nie na wartość z żądania. */
-  r = await app.inject({ method: "GET", url: "/api/obsluga/miary-doboru?dni=9999", headers: login("biuro") });
-  assert.equal(r.json<{ dni: number }>().dni, 7);
-  assert.equal(zdarzen(), przed, "raport o zdarzeniach nie ma prawa dopisywać do zdarzeń");
-});
-
 test("ZERO TRAS ZAPISU i to jest umowa", async () => {
   /* Ta sama umowa co licznik `method:` w `biuro.test.ts` i licznik POST-ów
      w `zwroty.test.ts`: ustawienia obsługi opisują TŁO pracy. Gdy kiedyś

@@ -16,8 +16,8 @@ import { czasLokalny, dataLokalna } from "../czas.js";
 /**
  * Klamra okna raportu: 1–365 dni, w formacie modyfikatora SQLite.
  *
- * Eksportowane od 0.267.0, bo czytelników jest dwóch: raporty magazynu tutaj
- * i `miary-doboru.ts`. Druga kopia tej klamry rozjechałaby się przy
+ * Eksportowane, bo czytelników jest kilku: raporty magazynu tutaj,
+ * ergonomia i wymiana. Druga kopia tej klamry rozjechałaby się przy
  * pierwszej poprawce granic, a wtedy dwa raporty na jednym ekranie liczyłyby
  * różne „ostatnie 30 dni".
  */

@@ -20,11 +20,9 @@ import { useOkno } from "../nawigacja/fokus";
    więc liczniki żądań w testach ekranów się nie zmieniają. Widok jest ten sam
    co w skrzynce (`WidokHistorii`), żeby klienta czytało się tak samo. */
 
-export function PrzyciskHistorii({ rodzaj, id, tutaj }: {
+export function PrzyciskHistorii({ rodzaj, id }: {
   rodzaj: "zwrot" | "sprawa";
   id: number;
-  /** „tym zwrotem", „tą reklamacją" — o czym mówi pusta oś. */
-  tutaj: string;
 }) {
   const [otwarta, setOtwarta] = useState(false);
   /* Inna sprawa to inna szuflada — przejście do rodzeństwa zamyka starą,
@@ -35,12 +33,12 @@ export function PrzyciskHistorii({ rodzaj, id, tutaj }: {
       title="Cała historia tego kupującego u nas"
       className="inline-flex items-center gap-1 rounded border border-slate-300 px-1.5 py-0.5 text-xs font-semibold text-slate-700 hover:bg-slate-100">
       <History size={13} />Historia</button>
-    {otwarta && <Szuflada rodzaj={rodzaj} id={id} tutaj={tutaj} onZamknij={() => setOtwarta(false)} />}
+    {otwarta && <Szuflada rodzaj={rodzaj} id={id} onZamknij={() => setOtwarta(false)} />}
   </>;
 }
 
-function Szuflada({ rodzaj, id, tutaj, onZamknij }: {
-  rodzaj: "zwrot" | "sprawa"; id: number; tutaj: string; onZamknij: () => void;
+function Szuflada({ rodzaj, id, onZamknij }: {
+  rodzaj: "zwrot" | "sprawa"; id: number; onZamknij: () => void;
 }) {
   const h = useHistoriaSprawy(rodzaj, id, true);
   const nawiguj = useNavigate();
@@ -62,7 +60,7 @@ function Szuflada({ rodzaj, id, tutaj, onZamknij }: {
         {h.isLoading && <Pusto waga="lista">Szukam historii klienta…</Pusto>}
         <Blad>{(h.error as Error | null)?.message}</Blad>
         {h.data && (h.data.login
-          ? <WidokHistorii historia={{ ...h.data, login: h.data.login }} tutaj={tutaj}
+          ? <WidokHistorii historia={{ ...h.data, login: h.data.login }}
               onOtworzRozmowe={(r) => nawiguj(`/obsluga/skrzynka/${r}`)} />
           : <Pusto waga="lista" ikona={UserRound}>
               Allegro nie podało loginu kupującego, więc nie wiemy, czyja to historia.</Pusto>)}

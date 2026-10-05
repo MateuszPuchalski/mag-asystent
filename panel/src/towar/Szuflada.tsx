@@ -1,8 +1,7 @@
 import React, { createContext, useContext, useState } from "react";
 import { Link } from "react-router-dom";
-import { MessageSquare, Package, Scale, Undo2, X } from "lucide-react";
+import { MessageSquare, Scale, Undo2, X } from "lucide-react";
 import { useKartaTowaru } from "../api/rozmowy";
-import { useWiedzaTowaru } from "../api/wiedza";
 import { usePrzekrojTowaru } from "../api/towar";
 import { dopisekDostaw } from "../skrzynka/PasmoOdpowiedzi";
 import { Kafel } from "./Kafel";
@@ -10,19 +9,19 @@ import { dzien } from "../ui";
 import { useOkno } from "../nawigacja/fokus";
 
 /* ── SZUFLADA TOWARU — TRZECI MOSTEK (0.502.0) ──────────────────────────────
-   Towar stał na dziewięciu ekranach — w skrzynce, zwrotach, koszach,
-   dostawach, zadaniach, wiedzy, stanie, dzienniku i w szukaniu — i nigdzie
+   Towar stał na wielu ekranach — w skrzynce, zwrotach, koszach,
+   dostawach, zadaniach, stanie, dzienniku i w szukaniu — i nigdzie
    nie był odnośnikiem. „Ten nóż wraca trzeci raz w tym miesiącu" składało
    się z trzech kolejek w głowie agenta. Tu stoi w jednym miejscu: stan,
-   dostawy, wiedza, otwarte sprawy i liczby z 90 dni.
+   dostawy, otwarte sprawy i liczby z 90 dni.
 
    SZUFLADA, NIE EKRAN (§7 celu biura): to wgląd, nie praca. Nie ma w niej
    decyzji — każdy wiersz prowadzi do sprawy, w której ta decyzja zapada.
    Otwiera się nad bieżącym ekranem, więc agent nie traci miejsca w pracy.
 
    KONTEKST, NIE PROPSY. Przycisk towaru stoi głęboko w komponentach
-   dziewięciu ekranów; przekazywanie „otwórz szufladę" przez każdy poziom
-   byłoby dziewięcioma łańcuchami propsów. Bez dostawcy kontekstu (testy
+   wielu ekranów; przekazywanie „otwórz szufladę" przez każdy poziom
+   byłoby łańcuchem propsów na każdym z nich. Bez dostawcy kontekstu (testy
    pojedynczych komponentów) przycisk jest zwykłym tekstem. */
 
 const Kontekst = createContext<((twId: number) => void) | null>(null);
@@ -51,7 +50,6 @@ const procent = (u: number | null) => (u === null ? "—" : `${Math.round(u * 10
 function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) {
   const karta = useKartaTowaru(twId);
   const przekroj = usePrzekrojTowaru(twId);
-  const wiedza = useWiedzaTowaru(twId);
   /* NIEMODALNA (0.546.0): szuflada stoi obok pracy, bez nakładki, więc
      skróty strony działają dalej, a tabulator może z niej wyjść. Fokus
      wchodzi do niej i wraca do przycisku towaru, jak z każdego okna. */
@@ -108,13 +106,6 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
             wiersze={p.otwarteRozmowy.map((r) => ({ klucz: `r${r.id}`, do: `/obsluga/skrzynka/${r.id}`,
               napis: r.temat ?? "Rozmowa bez tematu", at: r.at }))} onIdz={onZamknij} />
         </>)}
-
-      {wiedza.data && <section aria-label="Wiedza">
-        <h3 className="mb-1 flex items-center gap-1 text-podpis font-bold uppercase tracking-wide text-slate-700">
-          <Package size={14} />Wiedza</h3>
-        <p>{wiedza.data.potwierdzone.length} potwierdzonych zastosowań · {wiedza.data.negatywne.length} negatywnych
-          {wiedza.data.propozycje.length ? ` · ${wiedza.data.propozycje.length} propozycji` : ""}</p>
-      </section>}
     </div>
   </div>;
 }

@@ -33,7 +33,7 @@ const PROFIL: Profil = {
   zamowienia: [{ id: "z-1", kupionoAt: "2026-09-19T10:00:00Z", status: "READY_FOR_PROCESSING",
     sumaGrosze: 5000, waluta: "PLN", przesylka: "w drodze do klienta", link: "https://allegro.pl/z-1",
     pozycje: [{ nazwa: "Nóż kosiarki HECHT 1803S", ilosc: 1, cenaGrosze: 5000 }] }],
-  maszyny: [], os: [], notatka: { tresc: "Prosi o fakturę", at: "2026-09-20T10:00:00Z", przez: "Ola", cofalna: true },
+  os: [], notatka: { tresc: "Prosi o fakturę", at: "2026-09-20T10:00:00Z", przez: "Ola", cofalna: true },
   /* Przewoźników serwer liczy tylko przy dosyłce albo propozycji — bez nich
      lista jest pusta. Testy dosyłki podają ją same (`Z_BAZY`). */
   sprawa: null, podpowiedzZakonczenia: false, podpowiedzPowod: null, propozycjaDosylki: null,

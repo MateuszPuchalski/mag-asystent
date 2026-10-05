@@ -1,25 +1,21 @@
 import React, { useState } from "react";
 import { ChevronDown } from "lucide-react";
-import type { HistoriaKlienta, OsRozmowy, SzkicCopilota, WiedzaDoboru } from "../api/typy";
-import { NaglowekSekcji, Przycisk, dzien, ile, odmien, termin } from "../ui";
+import type { HistoriaKlienta, OsRozmowy } from "../api/typy";
+import { NaglowekSekcji, dzien, ile, odmien, termin } from "../ui";
 import { OfertaRozmowy } from "./OfertaRozmowy";
 import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
 import { ZamowieniaKlienta } from "./ZamowieniaKlienta";
 import { ZwrotRozmowy } from "./ZwrotRozmowy";
 import { SprawyZakupu } from "../sprawy/Spoiwo";
 import { TowarRozmowy } from "./TowarRozmowy";
-import { Dobor } from "./Dobor";
 import { Klient } from "./Klient";
-import { Wiedza } from "./Wiedza";
 import { Paczka } from "./Paczka";
 import { PasmoOdpowiedzi } from "./PasmoOdpowiedzi";
 import { Soczewka } from "./Soczewki";
-import { useHistoriaKlienta, useWiedzaDoboru } from "../api/rozmowy";
-import type { Towar } from "../wyszukiwarka";
-import { NAZWA_STANU_DOBORU, STATUS_PACZKI } from "./statusy";
-import { bramkaDoboru, coSwieci, historiaWierszaKlienta, klientWKolumnie, ofertaWKarcie, paczkaWyzej,
-  paraPasowania, pozycjeWKolumnie, pozycjiDoWskazania, towarOtwartyNaStart, wiedzaMaTresc,
-  zwrotWToku } from "./kokpit";
+import { useHistoriaKlienta } from "../api/rozmowy";
+import { STATUS_PACZKI } from "./statusy";
+import { coSwieci, historiaWierszaKlienta, klientWKolumnie, ofertaWKarcie, paczkaWyzej,
+  pozycjeWKolumnie, pozycjiDoWskazania, towarOtwartyNaStart, zwrotWToku } from "./kokpit";
 
 /**
  * Trzecia kolumna ekranu skrzynki (§10.1).
@@ -39,15 +35,10 @@ import { bramkaDoboru, coSwieci, historiaWierszaKlienta, klientWKolumnie, oferta
  * Co klient kupuje i co mamy na półce to jeden temat oglądany z dwóch stron,
  * a odpowiedź prawie zawsze potrzebuje obu naraz.
  *
- * „Dobór" zostaje osobno, bo to nie karta faktów, tylko robota: własne
- * kroki, kandydaci, dowody i przyciski zmieniające stan rozmowy. „Wiedza"
- * stoi osobno, bo dowody wyszły z doboru i mają jedno miejsce, do którego
- * sięga się także po domkniętym doborze. „Klient" to czysty odczyt: login
- * wiąże zamówienia, rozmowy i maszyny z domkniętych doborów.
+ * „Klient" to czysty odczyt: login wiąże zamówienia, rozmowy i sprawy.
  *
- * Dwa zwrotne uchwyty idą ze `Skrzynka.tsx`, gdzie leży szkic i formularz
- * pomiaru: dobór wstawia zdanie do szkicu i podstawia kartotekę do zlecenia
- * — obu rzeczy nie ma prawa robić po cichu.
+ * Uchwyt wstawiania idzie ze `Skrzynka.tsx`, gdzie leży szkic: soczewka
+ * wstawia zdanie do szkicu, a nie ma prawa robić tego po cichu.
  *
  * ── CIEMNY KOKPIT ───────────────────────────────────────────────────────────
  * Nagranie właściciela pokazało zakładki i trzy kłopoty naraz. Nazwa towaru
@@ -55,10 +46,8 @@ import { bramkaDoboru, coSwieci, historiaWierszaKlienta, klientWKolumnie, oferta
  * przewijania, a zakładka z zerem kazała kliknąć, żeby usłyszeć „nic tu nie ma".
  *
  * Świeci to, co ma zegar albo czeka na ruch agenta: zwrot i sprawa w toku,
- * paczka poza zwykłą drogą, pozycja do wskazania i dobór w robocie. Stoi
- * w jednej ramie „Wymaga Ciebie". Dobór w ramie stoi zwinięty, bo kandydaci
- * zajmują kilkaset pikseli i zepchnęliby resztę ramy z kadru; jego stan mówi
- * streszczenie. Reszta to jedna linia na temat ze streszczeniem, rozwijana
+ * paczka poza zwykłą drogą i pozycja do wskazania. Stoi w jednej ramie
+ * „Wymaga Ciebie". Reszta to jedna linia na temat ze streszczeniem, rozwijana
  * kliknięciem. Reguły świecenia stoją w `kokpit.ts`, każda z testem, bo szara
  * linia jest bezpieczna tylko wtedy, gdy reguła „w normie" nie kłamie.
  *
@@ -73,24 +62,22 @@ import { bramkaDoboru, coSwieci, historiaWierszaKlienta, klientWKolumnie, oferta
  * Kolumna niczego nie zapisuje przy rozwijaniu: wiersze to stan ekranu,
  * a treść pod nimi to te same odczyty, które i tak stoją w pamięci zapytań.
  */
-type Temat = "towar" | "zamowienie" | "zamkniete" | "dobor" | "klient" | "wiedza";
+type Temat = "towar" | "zamowienie" | "zamkniete" | "klient";
 
 export function Kontekst(p: {
   dane: OsRozmowy;
   onWstawDoSzkicu: (tresc: string) => void;
-  onZlecPomiar: (towar: Towar) => void;
   onOtworzRozmowe: (id: number) => void;
 }) {
   /* KLUCZ Z ROZMOWY: rozwinięte wiersze to stan TEJ rozmowy. Bez klucza
-     dobór rozwinięty przy jednej sprawie stałby rozwinięty przy następnej,
+     wiersz rozwinięty przy jednej sprawie stałby rozwinięty przy następnej,
      a domyślne „towar otwarty" liczyłoby się tylko raz, przy pierwszej. */
   return <Kolumna key={p.dane.rozmowa.id} {...p} />;
 }
 
-function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
+function Kolumna({ dane, onWstawDoSzkicu, onOtworzRozmowe }: {
   dane: OsRozmowy;
   onWstawDoSzkicu: (tresc: string) => void;
-  onZlecPomiar: (towar: Towar) => void;
   onOtworzRozmowe: (id: number) => void;
 }) {
   const oferta = dane.oferta;
@@ -108,34 +95,23 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
     if (n.has(t)) n.delete(t); else n.add(t);
     return n;
   });
-  /* „Szukaj mimo to" przy bramce doboru. Stan ekranu, nie zapis: bramka
-     wraca przy następnym otwarciu rozmowy, bo towar dalej jest znany. */
-  const [szukamMimoTo, setSzukamMimoTo] = useState(false);
 
-  /* Historia i wiedza decydują, czy wiersze „Klient" i „Wiedza" w ogóle
-     staną. To te same klucze, które wiersze wołają po rozwinięciu, więc
-     rozwinięcie czyta z pamięci zapytań i najwyżej odświeża ją jednym GET-em.
-     Same odczyty: zero zapisu przy patrzeniu zostaje nietknięte. */
+  /* Historia decyduje, czy wiersz „Klient" w ogóle stanie. To ten sam klucz,
+     który wiersz woła po rozwinięciu, więc rozwinięcie czyta z pamięci
+     zapytań i najwyżej odświeża ją jednym GET-em. Sam odczyt: zero zapisu
+     przy patrzeniu zostaje nietknięte. */
   const historia = useHistoriaKlienta(dane.rozmowa.id);
-  const wiedza = useWiedzaDoboru(dane.rozmowa.id);
 
   const zwrotyWToku = dane.zwroty.filter(zwrotWToku);
   const zwrotyZamkniete = dane.zwroty.filter((z) => !zwrotWToku(z));
   const sprawyOtwarte = dane.sprawy.filter((x) => x.otwarta);
   const sprawyZamkniete = dane.sprawy.filter((x) => !x.otwarta);
-  const bramka = bramkaDoboru(dane) && !szukamMimoTo;
-  const doborSwieci = swiatla.includes("dobor");
-  /* Dobór po „Szukaj mimo to" NIE trafia do ramy aż do końca tej rozmowy.
-     Agent sam go otworzył, więc nie czeka na niego nic nowego. Pierwszy
-     zapis człowieka gasi bramkę i zapala świecenie, a blok skakałby wtedy
-     spod towaru na górę kolumny, pod okiem, w chwili zapisu. */
-  const doborWRamie = doborSwieci && !szukamMimoTo;
   const paczkaSwieci = swiatla.includes("paczka");
   const pozycjaSwieci = swiatla.includes("pozycja");
   /* Licznik liczy każdą narysowaną pozycję osobno. Dwie sprawy pod jedną
      liczbą mówiły „1", a agent szukał drugiej na ślepo. */
   const ileSwieci = zwrotyWToku.length + sprawyOtwarte.length + (paczkaSwieci ? 1 : 0)
-    + (pozycjaSwieci ? 1 : 0) + (doborWRamie ? 1 : 0);
+    + (pozycjaSwieci ? 1 : 0);
 
   const zamowienieId = dane.zamowienie?.externalId ?? null;
   /* Pozycja tej oferty w zamówieniu: jej cena z chwili zakupu pozwala
@@ -154,9 +130,6 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
   const zakupyNaLiscie = zamowienieId === null ? new Set(inneZakupy.map((k) => k.externalId)) : undefined;
   const klient = historia.data && klientWKolumnie(historia.data, zamowienieId, zakupyNaLiscie)
     ? historiaWierszaKlienta(historia.data, zamowienieId, zakupyNaLiscie) ?? null : null;
-
-  const dobor = <Dobor key={dane.rozmowa.id} dobor={dane.dobor} rozmowaId={dane.rozmowa.id}
-    onWstawDoSzkicu={onWstawDoSzkicu} onZlecPomiar={onZlecPomiar} />;
 
   return <section className="card flex min-h-0 flex-col overflow-hidden" aria-label="Kontekst">
     {/* PASMO ODPOWIEDZI NAD KOLUMNĄ. Trzy fakty, które rozstrzygają odpowiedź,
@@ -185,7 +158,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
           <NaglowekSekcji jako="h3" ton="text-ranga-uwaga" className="px-2 pb-1 pt-2.5">
             Wymaga Ciebie · {ileSwieci}</NaglowekSekcji>
           {/* Kolejność zegara: zwrot i sprawa mają termin Allegro, paczka
-              czeka na klienta, wskazanie i dobór to praca bez terminu. */}
+              czeka na klienta, wskazanie to praca bez terminu. */}
           <div className="divide-y divide-slate-200">
             {zwrotyWToku.map((z) => <div key={`zwrot-${z.id}`} className="px-2 py-2.5">
               <ZwrotRozmowy zwrot={z} /></div>)}
@@ -203,14 +176,12 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
                 <span className="text-xs text-slate-600"> · {ile(kilkaPozycji, "pozycja", "pozycje", "pozycji")}</span></p>
               <ZamowienieRozmowy zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id} ofertaRozmowy={null} />
             </div>}
-            {doborWRamie && <Wiersz wRamie tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
-              otwarty={otwarte.has("dobor")} onPrzelacz={() => przelacz("dobor")}>{dobor}</Wiersz>}
           </div>
         </section>
       </div>}
 
-      {/* KOLEJNOŚĆ: oferta i towar, dobór, zamówienie, sprawy zamknięte,
-          klient, wiedza. Od tego, co klient kupował, do tego, co wiemy. */}
+      {/* KOLEJNOŚĆ: oferta i towar, zamówienie, sprawy zamknięte, klient.
+          Od tego, co klient kupował, do tego, kim jest. */}
       {/* BRAK OFERTY MÓWI SIĘ RAZ (decyzja właściciela z 28 września 2026).
           Baner nad rozmową mówi o braku razem z czynnościami, a przy
           zamówieniu z kilku pozycji prośbę niesie „Wymaga Ciebie". Wiersz
@@ -226,15 +197,6 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
             cenaZakupuGrosze={pozycjaRozmowy?.cenaGrosze ?? null} />
           <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id}
             skuPozycji={pozycjaRozmowy?.sku ?? null} />
-          {/* „Szukaj innego towaru mimo to" stoi tutaj, a nie we własnym
-              wierszu „Dobór: zbędny", który przy każdej takiej rozmowie mówił,
-              że czegoś NIE trzeba robić. Kliknięcie OTWIERA dobór: bez tego
-              wiersz wracał zwinięty i przycisk wyglądał, jakby nie zrobił nic.
-              Bramka wymaga oferty, więc stoi wyłącznie w tej gałęzi. */}
-          {bramka && <BramkaDoboru onSzukaj={() => {
-            setSzukamMimoTo(true);
-            setOtwarte((o) => new Set(o).add("dobor"));
-          }} />}
         </Wiersz>
         /* WYJĄTEK: baner milknie, gdy zamówienie jest znane (`brakPowiazania`).
            Zamówienie bez oferty i nie z kilku pozycji zostawiało wtedy samo
@@ -247,14 +209,6 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
                 Wskaż ofertę przy rozmowie, a towar pojawi się tutaj.</p>
             </Wiersz>
           : <Wiersz tytul="Oferta i towar" streszczenie={streszczenieOferty(dane)} />}
-
-      {/* DOBÓR POD TOWAREM. Bramka jest ostatnią linią bloku towaru, więc dobór
-          otwiera się dokładnie w miejscu klikniętego przycisku i wzrok nie
-          musi go szukać na dole kolumny. */}
-      {!doborWRamie && !bramka && <Wiersz tytul="Dobór" streszczenie={streszczenieDoboru(dane)}
-        otwarty={otwarte.has("dobor")} onPrzelacz={() => przelacz("dobor")}>
-        {dobor}
-      </Wiersz>}
 
       {/* ZAMÓWIENIE: paczka, gdy nie stoi wyżej, lista pozycji, gdy któraś nie
           jest ofertą rozmowy, i inne zakupy klienta. Wiersz stoi także bez
@@ -295,18 +249,6 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
         <Klient key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id} onOtworzRozmowe={onOtworzRozmowe}
           zamowienieId={zamowienieId} pomin={zakupyNaLiscie} />
       </Wiersz>}
-
-      {/* Maszyna z DANYCH DOBORU, nie z historii klienta: pomiar ma pasować do
-          tego, o co pyta ta rozmowa. Szkic Copilota jedzie tu, bo pasowanie
-          rozpoznane w rozmowie jest pracą nad wiedzą, nie odpowiedzią klientowi. */}
-      {wiedzaMaTresc(wiedza.data, dane.szkicCopilota) && <Wiersz tytul="Wiedza"
-        streszczenie={streszczenieWiedzy(wiedza.data, dane.szkicCopilota)}
-        otwarty={otwarte.has("wiedza")} onPrzelacz={() => przelacz("wiedza")}>
-        <Wiedza key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id}
-          twId={dane.dobor.wybrany?.twId ?? null}
-          maMaszyne={Boolean(dane.dobor.dane.marka && dane.dobor.dane.model)}
-          propozycja={dane.szkicCopilota} />
-      </Wiersz>}
     </div>
   </section>;
 }
@@ -322,17 +264,15 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
  * stała lewiej od własnego tytułu. Teraz tytuł, treść i pozycje ramy
  * zaczynają się na tej samej osi 16 px.
  */
-function Wiersz({ tytul, streszczenie, otwarty = false, onPrzelacz, wRamie = false, children }: {
+function Wiersz({ tytul, streszczenie, otwarty = false, onPrzelacz, children }: {
   tytul: string;
   streszczenie: React.ReactNode;
   otwarty?: boolean;
   /** Bez uchwytu wiersz jest samym streszczeniem — nie ma czego rozwijać. */
   onPrzelacz?: () => void;
-  /** W ramie „Wymaga Ciebie" wcięcie daje po części rama, więc wiersz bierze mniej. */
-  wRamie?: boolean;
   children?: React.ReactNode;
 }) {
-  const px = wRamie ? "px-2" : "px-4";
+  const px = "px-4";
   /* Wiersz bez treści NIE jest przyciskiem. Ta sama wysokość i ta sama oś
      co wiersz rozwijany, tylko bez szewronu, bo szewron obiecuje rozwinięcie. */
   if (!onPrzelacz) {
@@ -341,8 +281,8 @@ function Wiersz({ tytul, streszczenie, otwarty = false, onPrzelacz, wRamie = fal
       <span className="min-w-0 truncate text-xs text-slate-600">{streszczenie}</span>
     </div>;
   }
-  /* Streszczenie zostaje także po rozwinięciu: stan doboru niesie właśnie
-     ono, a treść pod spodem bywa długa. */
+  /* Streszczenie zostaje także po rozwinięciu: niesie stan tematu,
+     a treść pod spodem bywa długa. */
   return <div>
     <button type="button" aria-expanded={otwarty} onClick={onPrzelacz}
       className={`flex min-h-11 w-full items-center gap-2 ${px} py-2 text-left hover:bg-slate-50`}>
@@ -352,20 +292,6 @@ function Wiersz({ tytul, streszczenie, otwarty = false, onPrzelacz, wRamie = fal
         className={`ml-auto shrink-0 text-slate-500 transition-transform ${otwarty ? "rotate-180" : ""}`} />
     </button>
     {otwarty && <div className={`space-y-4 ${px} pb-4 pt-1`}>{children}</div>}
-  </div>;
-}
-
-/**
- * Bramka doboru — reguła i powód w `kokpit.ts` przy `towarZnany`.
- *
- * Nazwy i SKU tu nie ma, bo mówi je karta zakupu, a „Pasuje do" stoi w tym
- * samym bloku wyżej. Zostaje fakt, że dobór nie szuka, i droga, żeby mimo to
- * zaczął.
- */
-function BramkaDoboru({ onSzukaj }: { onSzukaj: () => void }) {
-  return <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs text-slate-600">
-    <span><b className="text-slate-900">Towar znany z zamówienia.</b> Dobór części nie szuka innego.</span>
-    <Przycisk className="text-xs" onClick={onSzukaj}>Szukaj innego towaru mimo to</Przycisk>
   </div>;
 }
 
@@ -424,22 +350,11 @@ export function streszczenieZamknietych(zwrotow: number, spraw: number): string 
     spraw ? `${spraw} ${odmien(spraw, "sprawa", "sprawy", "spraw")}` : null].filter(Boolean).join(" · ");
 }
 
-/* Stan i to, co go opisuje: przy wybranej części jej symbol, przy reszcie
-   to, czego klient szuka. Symbol wygrywa, bo po wyniku liczy się odpowiedź. */
-export function streszczenieDoboru(dane: OsRozmowy): string {
-  const d = dane.dobor;
-  const stan = NAZWA_STANU_DOBORU[d.stan] ?? d.stan;
-  if (d.wybrany) return `${stan} · ${d.wybrany.symbol}`;
-  const czego = [d.dane.nazwaCzesci, d.dane.marka, d.dane.model].filter(Boolean).join(" ");
-  return czego ? `${stan} · ${czego}` : stan;
-}
-
 /**
  * Streszczenie wiersza „Klient": tylko to, czego karta zakupu nie ma.
  *
  * Liczniki („2 zakupy · 1 zwrot") mówi karta jako „Wcześniej u nas". Tu
- * zostaje sprawa klienta z następnym krokiem, maszyna z domkniętego doboru
- * i data ostatniego kontaktu. Historia przychodzi już bez tego zakupu.
+ * zostaje sprawa klienta z następnym krokiem i data ostatniego kontaktu. Historia przychodzi już bez tego zakupu.
  */
 export function streszczenieWierszaKlienta(h: HistoriaKlienta): React.ReactNode {
   const czesci: React.ReactNode[] = [];
@@ -450,12 +365,6 @@ export function streszczenieWierszaKlienta(h: HistoriaKlienta): React.ReactNode 
   if (s?.stan === "w_toku") {
     czesci.push(<>{s.poTerminie && <><b className="text-ranga-zle">po terminie</b>{" · "}</>}
       sprawa: {s.krok} · {termin(s.krokDo)}</>);
-  }
-  const m = h.maszyny[0];
-  if (m) {
-    czesci.push([m.marka, m.nazwa, m.wariant].filter(Boolean).join(" ")
-      + (m.rocznik ? ` (${m.rocznik})` : "")
-      + (h.maszyny.length > 1 ? ` +${h.maszyny.length - 1}` : ""));
   }
   /* Wpis bez czytelnej daty pomijamy: „ostatnio —" nie mówi nic. */
   const ostatni = h.wpisy.find((w) => Boolean(w.at) && !Number.isNaN(Date.parse(w.at)));
@@ -486,15 +395,5 @@ export function streszczenieKlienta(h: HistoriaKlienta): string {
     const f = RODZAJ_HISTORII[r];
     return f ? `${n} ${odmien(n, f[0], f[1], f[2])}` : `${n} × ${r}`;
   });
-  if (h.maszyny.length) czesci.push(`${h.maszyny.length} ${odmien(h.maszyny.length, "maszyna", "maszyny", "maszyn")}`);
   return czesci.join(" · ");
-}
-
-export function streszczenieWiedzy(w: WiedzaDoboru | undefined, szkic: SzkicCopilota | null = null): string {
-  const para = paraPasowania(szkic) ? "pasowanie od Copilota" : null;
-  if (!w || (w.zastosowanie === null && w.pomiary.length === 0)) return para ?? "wpis bez dowodów";
-  const n = (w.zastosowanie?.dowody.length ?? 0) + w.pomiary.length;
-  /* Wiersz staje tylko z treścią, więc zero dowodów znaczy tu wpis bez nich. */
-  return [n ? `${n} ${odmien(n, "dowód", "dowody", "dowodów")}` : "wpis bez dowodów", para]
-    .filter(Boolean).join(" · ");
 }

@@ -6,13 +6,13 @@ import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
 /* ── Historia klienta u nas (§10.1, zakładka KLIENT) ─────────────────────────
    Zakładka wróciła z makiety decyzją właściciela. §10.1 skreślił ją w 0.198.0
    zdaniem „nie ma bytu" — i to zdanie było prawdziwe o TABELI, nie o danych.
-   Kupujący ma u nas login, po którym wiąże się jego zamówienia, jego rozmowy
-   i maszyny ustalone w tych rozmowach. Wszystkie trzy rzeczy już leżą w bazie.
+   Kupujący ma u nas login, po którym wiążą się jego zamówienia, rozmowy
+   i sprawy. Wszystko to już leży w bazie.
 
-   DLATEGO TU NIE MA ANI JEDNEJ NOWEJ TABELI. Osobny rejestr maszyn klienta
-   trzeba by utrzymywać przy każdej zmianie doboru, a rozjechałby się przy
-   pierwszej poprawce — to jest dokładnie ten kształt, który w 0.128.0
-   kosztował cztery tabele nakładki spraw. Historia jest ODCZYTEM.
+   DLATEGO TU NIE MA ANI JEDNEJ NOWEJ TABELI. Osobny rejestr klienta
+   rozjechałby się z kolejkami przy pierwszej poprawce — to jest dokładnie
+   ten kształt, który w 0.128.0 kosztował cztery tabele nakładki spraw.
+   Historia jest ODCZYTEM.
 
    TOŻSAMOŚĆ KLIENTA TO LOGIN ALLEGRO i nic więcej. Polityka danych skrzynki
    dopuszcza go wprost (`zamowienie_klienta.kupujacy_login`). Adres dostawy
@@ -29,17 +29,6 @@ import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
    potrafią podać ten sam login różnie zapisany („Chips20" i „chips20").
    Dokładne porównanie dawało wtedy pustą historię klientowi, który u nas
    kupował, a zakładka stała tak do 24 września 2026. */
-
-export interface MaszynaKlienta {
-  marka: string;
-  nazwa: string;
-  wariant: string | null;
-  rocznik: string | null;
-  silnik: string | null;
-  /** Rozmowa, w której ustalono maszynę — makieta pisze „ustalone w rozmowie #N". */
-  rozmowaId: number;
-  at: string;
-}
 
 export interface WpisHistorii {
   /* ── Trzy rodzaje doszły w S2 spoiwa (`docs/obsluga-klienta-calosc.md`) ────
@@ -69,15 +58,10 @@ export interface WpisHistorii {
 
 export interface HistoriaKlienta {
   login: string | null;
-  maszyny: MaszynaKlienta[];
   wpisy: WpisHistorii[];
 }
 
-const PUSTA: HistoriaKlienta = { login: null, maszyny: [], wpisy: [] };
-
-/** Klucz maszyny — ten sam zwijacz co w `wiedza.ts`, żeby „NAC" i „nac" były jedną. */
-const kluczMaszyny = (m: { marka: string; nazwa: string; wariant: string | null }) =>
-  [m.marka, m.nazwa, m.wariant ?? ""].join("|").toLowerCase().replace(/\s+/g, " ").trim();
+const PUSTA: HistoriaKlienta = { login: null, wpisy: [] };
 
 const tekst = (v: unknown): string | null => {
   const s = v == null ? "" : String(v).trim();
@@ -85,17 +69,7 @@ const tekst = (v: unknown): string | null => {
 };
 
 /**
- * Historia kupującego z tej rozmowy: maszyny, zakupy i wcześniejsze rozmowy.
- *
- * MASZYNY BIORĄ SIĘ Z DOBORÓW ZAMKNIĘTYCH (`confirmed`), nie z każdego, który
- * ma wpisaną markę. Dobór w trakcie niesie notatki robocze — agent wpisuje
- * markę, zanim cokolwiek ustali. „Ustalone w rozmowie" znaczy, że ktoś tę
- * rozmowę domknął doborem, i tylko to wolno pokazać jako wiedzę o kliencie.
- * Cena tej reguły jest widoczna: klient bez ani jednego domkniętego doboru
- * nie ma tu maszyn, choć rozmowa o nich była.
- *
- * Ta sama maszyna wpisana w kilku rozmowach zostaje JEDNA, z rozmową
- * NAJSTARSZĄ — pytanie brzmi „od kiedy to wiemy", nie „gdzie ostatnio padło".
+ * Historia kupującego z tej rozmowy: zakupy, wcześniejsze rozmowy i sprawy.
  */
 export function historiaKlienta(
   conversationId: number, database: DatabaseSync = db(),
@@ -287,8 +261,8 @@ export function historiaPoLoginie(
 }
 
 /**
- * Wspólna reszta obu wejść: zakupy, zwroty i sprawy po loginie kupującego,
- * maszyny z doborów podanych rozmów. `pomin` wycina sprawę, z której ekran
+ * Wspólna reszta obu wejść: zakupy, zwroty i sprawy po loginie kupującego
+ * oraz podane rozmowy. `pomin` wycina sprawę, z której ekran
  * pyta — stoi otwarta obok, a wiersz „jesteś tutaj" zabierałby miejsce.
  */
 function zbierz(
@@ -319,28 +293,6 @@ function zbierz(
       FROM reklamacja_klienta
      WHERE channel_account_id = ? AND kupujacy_login = ? COLLATE NOCASE
      ORDER BY otwarto_at DESC`).all(konto, login) as Array<Record<string, unknown>>;
-
-  /* Maszyny: dobory, w których agent wybrał część — wybór jest ustaleniem
-     maszyny, samo wpisanie danych nie. `marka` I `model` muszą stać oba:
-     sama marka nie nazywa maszyny. */
-  const idRozmow = rozmowyKlienta.map((r) => Number(r.id));
-  const dobory = idRozmow.length === 0 ? [] : database.prepare(`
-    SELECT conversation_id, marka, model, wariant, rocznik, silnik, zmieniono_at AS updated_at
-      FROM dobor
-     WHERE wynik = 'czesc' AND marka IS NOT NULL AND model IS NOT NULL
-       AND conversation_id IN (${idRozmow.map(() => "?").join(",")})
-     ORDER BY zmieniono_at`).all(...idRozmow) as Array<Record<string, unknown>>;
-
-  const maszyny = new Map<string, MaszynaKlienta>();
-  for (const d of dobory) {
-    const m: MaszynaKlienta = {
-      marka: String(d.marka), nazwa: String(d.model), wariant: tekst(d.wariant),
-      rocznik: tekst(d.rocznik), silnik: tekst(d.silnik),
-      rozmowaId: Number(d.conversation_id), at: String(d.updated_at),
-    };
-    // `ORDER BY zmieniono_at` wyżej + `has` tutaj = zostaje pierwsze ustalenie.
-    if (!maszyny.has(kluczMaszyny(m))) maszyny.set(kluczMaszyny(m), m);
-  }
 
   const wpisy: WpisHistorii[] = [
     ...zakupy.map((z) => ({
@@ -382,5 +334,5 @@ function zbierz(
   ].filter((w) => !(w.rodzaj === pomin.rodzaj && (w.rozmowaId ?? w.sprawaId) === pomin.id))
     .sort((a, b) => b.at.localeCompare(a.at));
 
-  return { login, maszyny: [...maszyny.values()], wpisy };
+  return { login, wpisy };
 }

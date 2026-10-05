@@ -46,9 +46,6 @@ export const OBOWIAZUJE: Readonly<Record<string, Pole>> = {
   COPILOT_PRZED_PRACA: (c) => c.copilot.przedPraca,
   COPILOT_PRZED_PRACA_OKNO: (c) => c.copilot.przedPracaOkno,
   COPILOT_PRZED_PRACA_LIMIT: (c) => c.copilot.przedPracaLimit,
-  WIEDZA_AUTOMAT: (c) => c.wiedzaAutomat.wlaczony,
-  WIEDZA_AUTOMAT_MODEL: (c) => c.wiedzaAutomat.model,
-  PASOWANIE_Z_SIECI: (c) => c.pasowanieZSieci.wlaczony,
   SFERA_ZW: (c) => c.sferaZw,
 
   KOPIE_KATALOG: (c) => c.kopie.katalog,

@@ -145,9 +145,9 @@ describe("nagłówek w jednym rzędzie", () => {
     expect(bieznia).toContain("title={z.etykieta}");
   });
 
-  it("Dostawy są ósmą zakładką pracy, za kreską", () => {
+  it("Dostawy są siódmą, ostatnią zakładką pracy, za kreską", () => {
     const zakladki = tsx.slice(tsx.indexOf("const ZAKLADKI"), tsx.indexOf("\n];", tsx.indexOf("const ZAKLADKI")));
-    expect(zakladki.match(/\{ do: "/g)).toHaveLength(8);
+    expect(zakladki.match(/\{ do: "/g)).toHaveLength(7);
     expect(zakladki).toMatch(/do: "\/obsluga\/dostawy".*kreska: true/);
   });
 });

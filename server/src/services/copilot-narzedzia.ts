@@ -4,19 +4,13 @@ import type { SubiektAdapter } from "../adapters/subiekt.js";
 import { buildProductCard } from "./stock.js";
 import { kiedyBedzie } from "./copilot-szkic.js";
 import { szukajPoIdentyfikatorze } from "./identyfikatory.js";
-import { szukajModeli, zastosowaniaModelu, zastosowaniaTowaru, type Zastosowanie } from "./wiedza.js";
-import { pasowaniaTowaru } from "./pasowania.js";
-import { zamiennicyOem } from "./zamiennosc-oem.js";
 import { zwin } from "../tekst.js";
 
 /* ── Narzędzia Copilota: model sam sięga do bazy (0.507.0) ──────────────────
 
-   Do tego wydania model dostawał fakty, które mu wybraliśmy, i nic więcej.
-   Agent pytał „czy ten gaźnik pasuje do MS 250", a model mógł odpowiedzieć
-   tylko z tego, co `kontekstSzkicu` położył na stole — albo z pamięci, ze
-   źródłem `model` i sufitem „niepewne". Odpowiedź leżała w bazie, obok.
-
-   Teraz model dostaje NARZĘDZIA i sam decyduje, o co zapytać. Każde jest:
+   Fakty szkicu to tylko to, co `kontekstSzkicu` położył na stole. Agent
+   dopytuje często o towar spoza nich, a odpowiedź leży w bazie, obok.
+   Dlatego model dostaje NARZĘDZIA i sam decyduje, o co zapytać. Każde jest:
 
    - TYLKO DO ODCZYTU. Żadne nie pisze, nie wysyła i nie woła sieci — ani
      Allegro, ani Subiekta na żywo (adapter czyta lokalny odczyt `sgt_*`).
@@ -26,16 +20,9 @@ import { zwin } from "../tekst.js";
      nie ma, z tego samego powodu co w faktach szkicu (§14.4). Nie ma też
      półki ani opisu kartoteki w całości (§10.4 — opis bywa notatką magazynu).
    - UCIĘTE. Wynik ma sufit znaków, bo każdy wraca do modelu w następnej
-     rundzie i płaci się za niego przy każdej kolejnej.
+     rundzie i płaci się za niego przy każdej kolejnej.                    */
 
-   ZNACZNIKI WIEDZY. Zatwierdzone zastosowanie niesie znacznik `WZ<id>`,
-   niezatwierdzona propozycja `WP<id>`. Model wpisuje go w `odwolanie`
-   twierdzenia, a serwer obniża do „niepewne" każde twierdzenie oparte na
-   propozycji (`naPropozycjiNiepewne`). Instrukcja mówi to samo, ale sufit
-   pewności stoi w kodzie, nie w dyscyplinie modelu — ta sama zasada, co
-   przy fakcie „rozpoznanie". Litera `Z` była zajęta przez zdjęcia.        */
-
-/** Wynik narzędzia. Rodzi się WYŁĄCZNIE tutaj, z naszej kartoteki i wiedzy. */
+/** Wynik narzędzia. Rodzi się WYŁĄCZNIE tutaj, z naszej kartoteki i kopii ofert. */
 export type WynikNarzedzia = string & { readonly __narzedzie: unique symbol };
 
 /** Kształt definicji zgodny z `Anthropic.Tool`; SDK zna tylko adapter. */
@@ -68,8 +55,6 @@ export interface UzycieNarzedzia {
 export const SUFIT_WYNIKU = 4000;
 /** Ile trafień zwraca wyszukiwanie. Więcej i tak nie przeczyta nikt. */
 const TRAFIEN = 8;
-/** Ile modeli rozwija „części do maszyny". Fraza „Stihl" pasuje do setek. */
-const MODELI = 5;
 /** Ile pozycji listy zgodności oferty. Tyle samo co w faktach szkicu. */
 const ZGODNOSCI = 30;
 /** Ile znaków opisu oferty. Słowa sprzedawcy, nie kartoteka. */
@@ -94,13 +79,7 @@ export const DEFINICJE: DefinicjaNarzedzia[] = [
     + "numer z katalogu obcego). Zwraca symbole, nazwy i dostępność. Użyj, gdy nie znasz naszego symbolu."),
   argument("karta_towaru",
     "Karta jednej kartoteki po naszym symbolu: nazwa, EAN, numery OEM i oryginalne, dostępność dziś, "
-    + "zamówienia u dostawcy przy braku, zamienniki z kartoteki i zatwierdzeni zamiennicy po numerze OEM."),
-  argument("pasowanie_towaru",
-    "Do jakich maszyn i silników pasuje kartoteka o danym symbolu, do czego NIE pasuje, jakie propozycje "
-    + "czekają na zatwierdzenie i z jakimi częściami współpracuje. Użyj przy każdym pytaniu o pasowanie."),
-  argument("czesci_do_maszyny",
-    "Odwrotny kierunek: marka i model maszyny albo silnika (np. „Stihl MS 250”) → nasze kartoteki "
-    + "zatwierdzone jako pasujące lub niepasujące. Użyj, gdy klient podał model maszyny."),
+    + "zamówienia u dostawcy przy braku i zamienniki z kartoteki."),
   argument("tresc_oferty",
     "Treść naszych ofert Allegro dla kartoteki o danym symbolu, z kopii w naszej bazie: parametry, "
     + "lista „Pasuje do” i początek opisu. To słowa sprzedawcy, nie kartoteka."),
@@ -149,7 +128,7 @@ function szukajTowaru(subiekt: SubiektAdapter, fraza: string, database: Database
   return wynik([`Trafienia w naszej kartotece dla „${fraza}”:`, ...linie]);
 }
 
-function kartaTowaru(subiekt: SubiektAdapter, symbol: string, database: DatabaseSync): WynikNarzedzia {
+function kartaTowaru(subiekt: SubiektAdapter, symbol: string): WynikNarzedzia {
   const t = towarPoSymbolu(subiekt, symbol);
   if (!t) return brakSymbolu(symbol);
   const k = buildProductCard(subiekt, t.tw_id);
@@ -168,66 +147,6 @@ function kartaTowaru(subiekt: SubiektAdapter, symbol: string, database: Database
   }
   if (k.zamienniki.obce.length) {
     linie.push("Zamienniki z opisu, których NIE mamy w kartotece: " + k.zamienniki.obce.join(", "));
-  }
-  const oem = zamiennicyOem(k.id, database);
-  if (oem.length) {
-    linie.push("Zatwierdzeni zamiennicy po wspólnym numerze OEM: "
-      + oem.map((z) => `${z.kartoteka.symbol} ${z.kartoteka.nazwa}`).join("; "));
-  }
-  return wynik(linie);
-}
-
-/* Zastosowanie jednym wierszem, ze znacznikiem na przodzie. Warunki idą
-   w tym samym wierszu, bo „pasuje od 2014" bez roku to inne zdanie. */
-const wierszZastosowania = (z: Zastosowanie, przod: string) =>
-  `[${z.stan === "zatwierdzone" ? "WZ" : "WP"}${z.id}] ${przod}`
-  + (z.zdanieWarunkow ? ` (${z.zdanieWarunkow})` : "")
-  + (z.zdaniePowodu && z.polaryzacja === "nie_pasuje" ? ` — ${z.zdaniePowodu}` : "")
-  + ` — ${z.zdanieZrodla}`;
-
-function pasowanieTowaru(subiekt: SubiektAdapter, symbol: string, database: DatabaseSync): WynikNarzedzia {
-  const t = towarPoSymbolu(subiekt, symbol);
-  if (!t) return brakSymbolu(symbol);
-  const z = zastosowaniaTowaru(t.tw_id, database);
-  const p = pasowaniaTowaru(t.tw_id, database);
-  const linie = [`Pasowanie kartoteki ${t.symbol}:`];
-  linie.push(z.potwierdzone.length ? "PASUJE (zatwierdzone):" : "PASUJE: nic nie zatwierdzono.");
-  for (const x of z.potwierdzone) linie.push(wierszZastosowania(x, x.model.etykieta));
-  if (z.negatywne.length) linie.push("NIE PASUJE (zatwierdzone):");
-  for (const x of z.negatywne) linie.push(wierszZastosowania(x, x.model.etykieta));
-  /* Propozycje stoją osobno i mówią o sobie wprost. To kolejka dla
-     człowieka — także ta z sieci, którą składa automat nocny. */
-  if (z.propozycje.length) linie.push("PROPOZYCJE — NIEZATWIERDZONE, to nie są fakty:");
-  for (const x of z.propozycje) {
-    const link = x.dowody.find((d) => d.link)?.link;
-    linie.push(wierszZastosowania(x, `${x.polaryzacja === "pasuje" ? "pasuje do" : "nie pasuje do"} `
-      + x.model.etykieta) + (link ? ` — źródło: ${link}` : ""));
-  }
-  const pary = [...p.pasujeDo, ...p.pasujace];
-  if (pary.length) linie.push("Współpracuje z częściami:");
-  for (const x of pary) linie.push(`- ${x.zdanie}`);
-  return wynik(linie);
-}
-
-function czesciDoMaszyny(fraza: string, database: DatabaseSync): WynikNarzedzia {
-  const modele = szukajModeli(fraza, database);
-  if (!modele.length) {
-    return wynik([`W naszej bazie wiedzy nie ma maszyny ani silnika pasującego do „${fraza}”. `
-      + "To znaczy: nie wiemy, nie: nic nie pasuje."]);
-  }
-  const linie: string[] = [];
-  if (modele.length > MODELI) {
-    linie.push(`Fraza pasuje do ${modele.length} modeli; rozwijam pierwsze ${MODELI}. `
-      + `Pozostałe: ${modele.slice(MODELI).map((m) => m.etykieta).join("; ")}.`);
-  }
-  for (const m of modele.slice(0, MODELI)) {
-    const z = zastosowaniaModelu(m.klucz, database);
-    linie.push(`${m.etykieta}:`);
-    if (!z.length) linie.push("  brak zatwierdzonych kartotek");
-    for (const x of z) {
-      linie.push("  " + wierszZastosowania(x,
-        `${x.polaryzacja === "pasuje" ? "pasuje" : "NIE pasuje"}: ${x.symbol}`));
-    }
   }
   return wynik(linie);
 }
@@ -286,9 +205,7 @@ export function zestawNarzedzi(subiekt: SubiektAdapter, database: DatabaseSync =
       try {
         switch (nazwa) {
           case "szukaj_towaru": return { wynik: szukajTowaru(subiekt, q, database), blad: false };
-          case "karta_towaru": return { wynik: kartaTowaru(subiekt, q, database), blad: false };
-          case "pasowanie_towaru": return { wynik: pasowanieTowaru(subiekt, q, database), blad: false };
-          case "czesci_do_maszyny": return { wynik: czesciDoMaszyny(q, database), blad: false };
+          case "karta_towaru": return { wynik: kartaTowaru(subiekt, q), blad: false };
           case "tresc_oferty": return { wynik: trescOferty(subiekt, q, database), blad: false };
           default: return { wynik: `Nie ma narzędzia „${nazwa}”.` as WynikNarzedzia, blad: true };
         }
@@ -297,20 +214,4 @@ export function zestawNarzedzi(subiekt: SubiektAdapter, database: DatabaseSync =
       }
     },
   };
-}
-
-/** Znacznik niezatwierdzonej propozycji w odwołaniu twierdzenia. */
-const ZNACZNIK_PROPOZYCJI = /\bWP\d+\b/;
-
-/**
- * Twierdzenie oparte na PROPOZYCJI schodzi do „niepewne". Propozycja czeka
- * na człowieka — także ta z sieci — więc model, który powoła się na nią jak
- * na bazę, dostałby sufit „pewne" za cudzą niezatwierdzoną tezę.
- */
-export function naPropozycjiNiepewne<T extends { odwolanie: string | null; pewnosc: string; obnizona?: boolean }>(
-  tw: T[],
-): T[] {
-  return tw.map((t) => t.odwolanie && ZNACZNIK_PROPOZYCJI.test(t.odwolanie) && t.pewnosc !== "niepewne"
-    ? { ...t, pewnosc: "niepewne", obnizona: true }
-    : t);
 }

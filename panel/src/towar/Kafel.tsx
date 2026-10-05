@@ -10,8 +10,8 @@ import type { StanZdjeciaOferty } from "../api/typy";
  * Do 0.202.0 każde miejsce ze zdjęciem trzymało własny stan powiększenia
  * i własny warunek na `Powiekszenie` — trzy kopie tych samych sześciu linijek
  * w `zwroty/Pozycje.tsx`, `skrzynka/TowarRozmowy.tsx` i nigdzie indziej.
- * Zdjęcie weszło w tym wydaniu do kandydatów doboru, do wyników wyszukiwarki
- * i do zadań terenowych; szósta kopia rozjechałaby się z pierwszą.
+ * Zdjęcie weszło w tym wydaniu do wyników wyszukiwarki i do zadań
+ * terenowych; kolejna kopia rozjechałaby się z pierwszą.
  *
  * Stan siedzi W KAFLU, nie w liście nad nim. Otwarty jest zawsze jeden, bo
  * otwiera go kliknięcie — a lista, która musiałaby pamiętać, KTÓRY wiersz

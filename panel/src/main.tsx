@@ -3,14 +3,13 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { nowyKlientZapytan } from "./api/klient-zapytan";
-import { BookMarked, ClipboardList, Inbox, ListChecks, MessagesSquare, ShieldQuestion, Truck, Undo2 } from "lucide-react";
+import { ClipboardList, Inbox, ListChecks, MessagesSquare, ShieldQuestion, Truck, Undo2 } from "lucide-react";
 import logo from "./assets/wertis-logo.png";
 import { SESJA_WYGASLA, token, wyczyscToken } from "./api/klient";
 import { useJa, useWzmianki } from "./api/rozmowy";
 import { BrakDostepu } from "./ekrany/BrakDostepu";
 import { EtykietaInstancji } from "./stan/Instancja";
 import { PlakietkaSpoznien } from "./stan/Spoznione";
-import { useKolejkaWiedzy } from "./api/wiedza";
 import { useDoDecyzji } from "./api/decyzje";
 import { Logowanie } from "./ekrany/Logowanie";
 import { Skrzynka } from "./ekrany/Skrzynka";
@@ -23,7 +22,6 @@ import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
 import { PasekPolaczenia } from "./nawigacja/Polaczenie";
 import { LicznikAlarmuDyskusji, PasekAlarmuDyskusji } from "./nawigacja/AlarmDyskusji";
 import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej";
-import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
 import { DoDecyzji } from "./ekrany/DoDecyzji";
 import { ProfilKlienta } from "./ekrany/ProfilKlienta";
@@ -64,9 +62,8 @@ const ZAKLADKI = [
      dyskusja nie ma ani jednego. Wspólny ekran kazałby najpierw rozpoznać
      rodzaj sprawy, żeby wiedzieć, co się na nim da zrobić — blizna 0.121.0. */
   { do: "/obsluga/dyskusje", etykieta: "Dyskusje", ikona: <MessagesSquare size={16} />, korzen: false, kreska: false },
-  { do: "/obsluga/wiedza", etykieta: "Wiedza", ikona: <BookMarked size={16} />, korzen: false, kreska: false },
   { do: "/obsluga/zadania", etykieta: "Zadania", ikona: <ClipboardList size={16} />, korzen: false, kreska: false },
-  /* DOSTAWY ÓSMĄ ZAKŁADKĄ (0.538.0), nie w menu „Więcej". Do 27 września
+  /* DOSTAWY ZAKŁADKĄ (0.538.0), nie w menu „Więcej". Do 27 września
      2026 stały w dolnym rzędzie obok wglądu. Przyjęcie dostawy to praca
      dzienna, a menu jest na rzeczy otwierane kilka razy w miesiącu.
      KOSZY TU NIE MA od 0.438.0 — decyzją właściciela mieszkają w zakładce
@@ -77,22 +74,11 @@ const ZAKLADKI = [
 /* Licznik nieodhaczonych wzmianek stoi przy ZAKŁADCE, a nie na jej ekranie:
    prośba kolegi ma być widoczna z każdego widoku panelu. Wzmianka, o której
    wie tylko własny ekran, dociera wtedy, gdy ktoś na niego wejdzie — czyli
-   dokładnie wtedy, gdy nie jest już potrzebna.
-
-   JEDNA PLAKIETKA NA DWA LICZNIKI (0.515.0). Wiedza i „Do zrobienia" miały
-   dwie kopie tego samego znacznika; druga kopia rozjeżdża się z pierwszą
-   przy pierwszej poprawce koloru. Liczniki różnią się tylko źródłem liczby. */
+   dokładnie wtedy, gdy nie jest już potrzebna. */
 function Licznik({ liczba, opis }: { liczba: number; opis: string }) {
   if (!liczba) return null;
   return <span className="ml-0.5 rounded-full bg-wertis-amber px-1.5 text-podpis font-bold text-wertis-ink"
     aria-label={opis}>{liczba}</span>;
-}
-
-/* Ten sam powód co przy wzmiankach: propozycja wiedzy przychodzi z CUDZEJ
-   rozmowy i cudzego pomiaru, więc licznik stoi przy zakładce, nie na ekranie. */
-function LicznikWiedzy() {
-  const liczba = useKolejkaWiedzy().data?.liczba ?? 0;
-  return <Licznik liczba={liczba} opis={`propozycji wiedzy do rozstrzygnięcia: ${liczba}`} />;
 }
 
 /* Ta sama zasada co przy wzmiankach: sprawa czekająca na biuro ma być widoczna
@@ -187,7 +173,6 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
                 aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
               {z.ikona}<span className="max-[899px]:sr-only">{z.etykieta}</span>
               {z.do === "/obsluga/" && <LicznikDoZrobienia />}
-              {z.do === "/obsluga/wiedza" && <LicznikWiedzy />}
               {/* Czerwony alarm dyskusji stoi przy zakładce na każdym ekranie,
                   także na reklamacjach, gdzie paska nad pracą nie ma. Powód
                   i barwa przy `nawigacja/AlarmDyskusji.tsx`. */}
@@ -329,7 +314,6 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         {/* Profil klienta ma adres po loginie (24 września 2026): link da się
             wkleić koledze, a szukanie i każda historia prowadzą tu wprost. */}
         <Route path="/obsluga/klient/:login" element={<ProfilKlienta />} />
-        <Route path="/obsluga/wiedza" element={<Wiedza />} />
         {/* Ustawienia mają własny adres jak każdy ekran: link da się wkleić
             koledze, a odświeżenie strony nie wyrzuca z powrotem do Zadań. */}
         <Route path={USTAWIENIA} element={<Ustawienia />} />

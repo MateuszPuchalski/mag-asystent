@@ -9,11 +9,9 @@ import {
   nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
 } from "../adapters/copilot.anthropic.js";
 import { modelKlasyfikatora, nadawcaKlasyfikacji } from "../adapters/copilot.klasyfikator.js";
-import { wymianyRozmowy, zadajPytanie, zapiszPasowanieZDopytania } from "../services/copilot-pytania.js";
+import { wymianyRozmowy, zadajPytanie } from "../services/copilot-pytania.js";
 import { czekajaNaSzkic, zlecSzkicPoRozpoznaniu } from "../services/copilot-szkic-po-rozpoznaniu.js";
-import {
-  ocenSzkic, odrzucPasowanie, przyjmijPasowanie, ulozSzkic,
-} from "../services/copilot-szkic.js";
+import { ocenSzkic, ulozSzkic } from "../services/copilot-szkic.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
   BladOdpowiedziCopilota, BladPrzeciazeniaCopilota,
@@ -21,40 +19,20 @@ import {
 import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy Copilota (§14, etap F) ────────────────────────────────────────────
-   OSIEM TRAS ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
+   PIĘĆ TRAS ZAPISU i to jest umowa pilnowana testem: partia klasyfikacji,
    etykieta człowieka o jej kategorii (do 22 września 2026 werdykt
-   „trafna/nietrafna"), szkic odpowiedzi (0.231.0), werdykt
-   o szkicu, los danych doboru z rozmowy (przyrost trzeci) i los pasowania
-   z rozmowy (przyrost czwarty). Werdykty wyglądają na drobiazg, a bez nich
-   nie da się policzyć, CZY Copilot jest dobry — czyli nie da się podjąć
-   decyzji „zejdź na tańszy model", dla której cały pomiar powstał.
+   „trafna/nietrafna"), szkic odpowiedzi (0.231.0), werdykt o szkicu
+   i dopytanie. Werdykty wyglądają na drobiazg, a bez nich nie da się
+   policzyć, CZY Copilot jest dobry — czyli nie da się podjąć decyzji
+   „zejdź na tańszy model", dla której cały pomiar powstał.
 
-   Piąta trasa jest OSOBNA od `PUT dobor/dane` z rozkładu skrzynki, choć
-   kończy w tej samej tabeli: serwis sam pilnuje „tylko puste pola" i liczy
-   los propozycji. Gdyby panel przepisywał wartości do zwykłego PUT, każda
-   propozycja wyglądałaby w dzienniku jak ręczny wpis agenta — i pomiar
-   nie miałby czego mierzyć.
-
-   Szósta trasa jest OSOBNA od `POST wiedza/pasowania` z tego samego powodu
-   i z jednego więcej: tamta trasa WYWODZI źródło z kontekstu (`dobor` albo
-   `reczne`) i nie ma jak oznaczyć Copilota, a bez `zrodlo: copilot` pomiar
-   nie policzy, ile par model trafia. Do tego para, rola i dowód pochodzą
-   z wiersza szkicu SPRAWDZONEGO przez serwer, nie z ciała żądania — panel
-   nie ma jak podać cudzej pary.
-
-   SIÓDMA (0.332.0) to dopytanie: agent pyta o szkic, model odpowiada JEMU.
-   Licznik podniósł się o jeden i oto zdanie, które umowa za to bierze.
+   Dopytanie (0.332.0): agent pyta o szkic, model odpowiada JEMU.
    Osobna od trasy szkicu, choć obie wołają model o tej samej rozmowie, bo
    robi rzecz przeciwną: tamta produkuje tekst DLA KLIENTA i przepuszcza go
    przez sita (numery spoza faktów, fakty spoza listy), ta produkuje tekst
    DLA AGENTA i celowo tych sit nie ma. Wspólna trasa musiałaby wybrać jedno
    zachowanie dla obu — a wtedy albo szkic przestałby być sprawdzany, albo
    dopytanie przestałoby umieć powiedzieć „tego numeru u nas nie ma".
-
-   ÓSMA (0.528.0) to „Zapisz jako propozycję” przy pasowaniu, które dopytanie
-   znalazło w sieci. Osobna od `szkic/:id/pasowanie`, bo para leży przy
-   WYMIANIE, nie przy szkicu, i przeszła inne sito: stronę, nie fakty. Para
-   idzie z wiersza sprawdzonego przez serwer, nie z ciała żądania.
 
    Szkic dostał WŁASNĄ trasę, choć 0.191.0 obiecywało przycisk w rozmowie bez
    nowej trasy: tamta obietnica dotyczyła klasyfikacji jednej rozmowy (lista
@@ -261,18 +239,6 @@ export async function copilotRoutes(app: FastifyInstance) {
       }
     });
 
-  /** Pasowanie z sieci z dopytania → propozycja w Kolejce Wiedzy (0.528.0). */
-  app.post<{ Params: { id: string; nr: string } }>(
-    "/api/obsluga/copilot/pytania/:id/pasowania/:nr", async (req, reply) => {
-      const nie = odmowa(reply);
-      if (nie) return nie;
-      try {
-        return { wymiana: zapiszPasowanieZDopytania(Number(req.params.id), Number(req.params.nr), kto()) };
-      } catch (e) {
-        return reply.code(400).send({ error: (e as Error).message });
-      }
-    });
-
   /** Werdykt agenta o szkicu: wstawił, zastąpił, odrzucił. To jest miernik. */
   app.post<{ Params: { id: string }; Body: { ocena?: string } }>(
     "/api/obsluga/copilot/szkic/:id/ocena", async (req, reply) => {
@@ -280,26 +246,6 @@ export async function copilotRoutes(app: FastifyInstance) {
       if (nie) return nie;
       try {
         return ocenSzkic(Number(req.params.id), req.body?.ocena ?? "", kto());
-      } catch (e) {
-        return reply.code(400).send({ error: (e as Error).message });
-      }
-    });
-
-  /**
-   * Los pasowania rozpoznanego w rozmowie (przyrost czwarty): `zaproponowane`
-   * kładzie parę w kolejce wiedzy jako propozycję ze źródłem `copilot`
-   * i podpisem klikającego agenta; `odrzucone` odsyła. Rozstrzyga biuro
-   * w Wiedza → Kolejka. Bez gałęzi 409: dubel nie jest tu błędem (serwis).
-   */
-  app.post<{ Params: { id: string }; Body: { ocena?: string } }>(
-    "/api/obsluga/copilot/szkic/:id/pasowanie", async (req, reply) => {
-      const nie = odmowa(reply);
-      if (nie) return nie;
-      const id = Number(req.params.id);
-      try {
-        if (req.body?.ocena === "zaproponowane") return { szkic: przyjmijPasowanie(id, kto()) };
-        if (req.body?.ocena === "odrzucone") return { szkic: odrzucPasowanie(id, kto()) };
-        return reply.code(400).send({ error: "Ocena pasowania może być „zaproponowane” albo „odrzucone”." });
       } catch (e) {
         return reply.code(400).send({ error: (e as Error).message });
       }

@@ -1,5 +1,4 @@
-import type { HistoriaKlienta, Kategoria, Kubelek, OsRozmowy, StanDoboru, StanPrzesylki, SzkicCopilota, WiedzaDoboru,
-  Zwrot } from "../api/typy";
+import type { HistoriaKlienta, Kategoria, Kubelek, OsRozmowy, StanPrzesylki, Zwrot } from "../api/typy";
 import { paczkaWSoczewce } from "./soczewki-reguly";
 
 /* ── CIEMNY KOKPIT: CO W KOLUMNIE KONTEKSTU ŚWIECI (0.498.0) ────────────────
@@ -22,36 +21,6 @@ const ZWROT_W_TOKU: ReadonlySet<Kubelek> = new Set<Kubelek>(["decyzja", "ocena",
 
 export function zwrotWToku(z: Zwrot): boolean {
   return ZWROT_W_TOKU.has(z.kubelek);
-}
-
-/**
- * Dobór w robocie: dane są, a odpowiedzi jeszcze nie ma. Każdy wynik,
- * także „dopytać", jest już odpowiedzią i ruch przechodzi do klienta.
- */
-export function doborWToku(stan: StanDoboru): boolean {
-  return stan === "otwarty";
-}
-
-/* ── BRAMKA DOBORU (E) ───────────────────────────────────────────────────────
-   Na nagraniu klient ZWRACAŁ nóż 14-25001, kupiony w tym zamówieniu. Dobór
-   szukał „noża 16 mm" po wymiarach i pokazał jedenaście kandydatów — świecę
-   NGK, sprężynę do gięcia rur, przewody paliwa — a kupionego 14-25001 wśród
-   nich nie było. Lista nie była pusta, tylko myląca, a mylący kandydat to
-   gorszy wynik niż żaden.
-
-   Towar jest ZNANY, gdy oferta rozmowy jest pozycją jej zamówienia: wtedy
-   klient mówi o rzeczy, którą od nas kupił. Szukanie innego towaru zostaje
-   możliwe jednym kliknięciem, bo „czy macie zamiennik" też bywa pytaniem —
-   ale nie jest już domyślną treścią kolumny.
-
-   Wybór agenta wygrywa z bramką: wybrana część to praca, której nie wolno
-   schować za zdaniem „Towar znany z zamówienia". */
-export function towarZnany(dane: OsRozmowy): boolean {
-  const oferta = dane.oferta;
-  if (!oferta || !dane.zamowienie || dane.dobor.wynik === "czesc") return false;
-  if (oferta.zrodlo === "zamowienie") return true;
-  return (dane.zamowienie.pobrane?.pozycje ?? [])
-    .some((p) => p.offerId !== null && p.offerId === oferta.externalId);
 }
 
 /** Pozycji w zamówieniu, gdy jest ich więcej niż jedna i żadna nie jest wskazana. */
@@ -128,13 +97,13 @@ export function historiaPozaZakupem(h: HistoriaKlienta | undefined, zamowienieId
 
 /**
  * Wiersz „Klient" staje, gdy poza tym zakupem jest coś do powiedzenia:
- * inny wpis, maszyna albo sprawa klienta. Sprawa liczy się także bez loginu,
+ * inny wpis albo sprawa klienta. Sprawa liczy się także bez loginu,
  * bo serwer bierze jej login z zamówienia, a rozmowa ma do niej odsyłać.
  */
 export function klientWKolumnie(h: HistoriaKlienta | undefined, zamowienieId: string | null,
   zakupyNaLiscie?: ReadonlySet<string>): boolean {
   const p = historiaWierszaKlienta(h, zamowienieId, zakupyNaLiscie);
-  return Boolean(p && (p.wpisy.length > 0 || p.maszyny.length > 0 || p.sprawa));
+  return Boolean(p && (p.wpisy.length > 0 || p.sprawa));
 }
 
 /**
@@ -156,22 +125,12 @@ export function historiaWierszaKlienta(h: HistoriaKlienta | undefined, zamowieni
     !(w.rodzaj === "zakup" && w.zamowienieId !== null && zakupyNaLiscie.has(w.zamowienieId))) };
 }
 
-/**
- * Czy dobór schować za bramką. Towar znany i brak wyniku, a danych nie
- * ruszał człowiek. Wynik albo ręczny zapis to jawna decyzja agenta i bramka
- * jej nie zasłania. Dane wpisane przez automat decyzją nie są.
- */
-export function bramkaDoboru(dane: OsRozmowy): boolean {
-  const d = dane.dobor;
-  return towarZnany(dane) && d.wynik === null && (d.zmienil === null || d.zmienilAutomat);
-}
-
-export type Swiatlo = "zwrot" | "sprawa" | "paczka" | "pozycja" | "dobor";
+export type Swiatlo = "zwrot" | "sprawa" | "paczka" | "pozycja";
 
 /**
  * Co świeci, w kolejności pilności. Zwrot i sprawa mają zegar Allegro, więc
  * idą pierwsze; paczka poza zwykłą drogą — za nimi. Wskazanie pozycji
- * i dobór to praca bez terminu.
+ * to praca bez terminu.
  */
 export function coSwieci(dane: OsRozmowy): Swiatlo[] {
   const s: Swiatlo[] = [];
@@ -182,7 +141,6 @@ export function coSwieci(dane: OsRozmowy): Swiatlo[] {
      byłaby powtórzeniem, a nie drugim sygnałem. */
   if (paczkaOdchylenie(dane) && !paczkaWSoczewce(dane)) s.push("paczka");
   if (pozycjiDoWskazania(dane) > 0) s.push("pozycja");
-  if (doborWToku(dane.dobor.stan) && !bramkaDoboru(dane)) s.push("dobor");
   return s;
 }
 
@@ -193,8 +151,7 @@ export function coSwieci(dane: OsRozmowy): Swiatlo[] {
 
    Zwija się wyłącznie przy zwrocie albo sprawie w toku. Wtedy temat rozmowy
    to decyzja z terminem, a karta towaru jest tłem, które spychało decyzję
-   w połowę przewijania. Dobór w toku niczego nie zwija: szuka się właśnie
-   po to, żeby porównać z kartoteką. */
+   w połowę przewijania. */
 export function towarOtwartyNaStart(swiatla: Swiatlo[], kategoria: Kategoria | null = null): boolean {
   if (swiatla.includes("zwrot") || swiatla.includes("sprawa")) return false;
   /* ── TYLKO PRZY PYTANIU O TOWAR (0.506.0) ────────────────────────────────
@@ -213,10 +170,10 @@ const KATEGORIE_O_TOWAR: ReadonlySet<Kategoria> = new Set<Kategoria>([
   "MISSING_PRODUCT", "DAMAGED_PRODUCT", "OTHER",
 ]);
 
-/* ── PUSTE WIERSZE „KLIENT" I „WIEDZA" ZNIKAJĄ (0.531.0) ───────────────────
+/* ── PUSTY WIERSZ „KLIENT" ZNIKA (0.531.0) ─────────────────────────────────
    Decyzja właściciela z 26 września 2026, wbrew wyłączeniu z §26e. Przy
-   większości rozmów oba wiersze mówiły tylko „nic tu nie ma": dwa cele po
-   44 px, które trzeba przeczytać, żeby się tego dowiedzieć. §26d mówi
+   większości rozmów wiersz mówił tylko „nic tu nie ma": cel 44 px, który
+   trzeba przeczytać, żeby się tego dowiedzieć. §26d mówi
    „flagi tylko aktywne", więc wiersz staje dopiero z treścią.
 
    PRZED ODCZYTEM TEŻ NIE STAJE. Pusty wynik to najczęstszy przypadek, a
@@ -229,7 +186,7 @@ const KATEGORIE_O_TOWAR: ReadonlySet<Kategoria> = new Set<Kategoria>([
  * sprawę klienta.
  */
 export function klientMaHistorie(h: HistoriaKlienta | undefined): boolean {
-  return Boolean(h && (h.wpisy.length > 0 || h.maszyny.length > 0));
+  return Boolean(h && h.wpisy.length > 0);
 }
 
 /**
@@ -240,26 +197,4 @@ export function klientMaHistorie(h: HistoriaKlienta | undefined): boolean {
  */
 export function nowyKlient(h: HistoriaKlienta | undefined): boolean {
   return Boolean(h?.login) && !klientMaHistorie(h);
-}
-
-/**
- * Wiersz „Wiedza" ma treść: zatwierdzone zastosowanie, pomiar z tej rozmowy
- * albo pasowanie rozpoznane przez Copilota, które czeka na decyzję. Pusty
- * wiersz nie zabiera drogi do dodania wiedzy, bo każdy jego przycisk stoi
- * przy jednej z tych trzech rzeczy, a każda z nich wiersz stawia.
- */
-export function wiedzaMaTresc(w: WiedzaDoboru | undefined, szkic: SzkicCopilota | null = null): boolean {
-  return Boolean(w && (w.zastosowanie !== null || w.pomiary.length > 0)) || paraPasowania(szkic) !== null;
-}
-
-/**
- * Para rozpoznana w rozmowie („LC170430140-0001 → W09-0211") albo `null`,
- * gdy nic nie rozpoznano albo agent już zdecydował. Jedna reguła dla paska
- * szkicu, który o parze mówi, i wiersza Wiedza, w którym się ją proponuje.
- * Dwie kopie rozjechałyby się, a pasek obiecywałby kartę, której nie ma.
- */
-export function paraPasowania(szkic: SzkicCopilota | null | undefined): string | null {
-  const p = szkic?.pasowanie;
-  if (!p || szkic.pasowanieOcena !== null) return null;
-  return `${p.czesc.symbol} → ${p.doCzego.symbol}`;
 }

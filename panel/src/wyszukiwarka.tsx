@@ -9,8 +9,8 @@ import { Zdjecie } from "./towar/Zdjecie";
    głowie, a literówka w nim wysyłała na halę zadanie o cudzym towarze.
 
    ── ZDJĘCIE PRZY WYNIKU (0.203.0) ────────────────────────────────────────
-   To pole obsługuje pięć miejsc: dobór, kartotekę przy rozmowie, zlecenie
-   pomiaru, sprawdzenie wiedzy i nową propozycję. Wszędzie kończy się tym
+   To pole obsługuje kilka miejsc: kartotekę przy rozmowie, zlecenie pomiaru,
+   zadania hali i pozycje zwrotu. Wszędzie kończy się tym
    samym pytaniem — „który z tych dwudziestu wierszy to TA część" — a
    odpowiadały na nie sam symbol i nazwa. Nazwy w kartotece tej firmy różnią
    się końcówką („szarpak NAC LS46" i „szarpak NAC LS51"), więc wybór

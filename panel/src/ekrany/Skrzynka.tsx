@@ -15,11 +15,10 @@ import { Blad, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { Kolejka } from "../skrzynka/Kolejka";
 import {
   LIMIT_PYTANIA, useCopilot, useKlasyfikuj, usePoprawKlasyfikacje, useOcenSzkic, useUlozSzkic,
-  useWymianyCopilota, useZadajPytanie, useZapiszPasowanieZDopytania,
+  useWymianyCopilota, useZadajPytanie,
 } from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
-import { paraPasowania } from "../skrzynka/kokpit";
 import { szkicNaStartRozmowy } from "../skrzynka/SzkicCopilota";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
@@ -85,7 +84,6 @@ export function Skrzynka() {
      żeby żądanie odpadło przed siecią. Dwie granice, jedna liczba. */
   const wymiany = useWymianyCopilota(wybranaId ?? 0);
   const zadajPytanie = useZadajPytanie();
-  const zapiszPasowanie = useZapiszPasowanieZDopytania();
   const [bladPytania, setBladPytania] = useState<string | null>(null);
   const klasyfikuj = useKlasyfikuj();
   const poprawKategorie = usePoprawKlasyfikacje();
@@ -665,8 +663,6 @@ export function Skrzynka() {
         /* Nieświeży = klient dopisał po tym, jak model czytał wątek. Porównanie
            po identyfikatorze ostatniej wiadomości KLIENTA, tak jak przy wysyłce. */
         nieswiezy: (rozmowa.data?.szkicCopilota?.messageId ?? null) !== ostatniaKlienta,
-        doborWersja: rozmowa.data?.dobor.wersja ?? null,
-        paraPasowania: paraPasowania(rozmowa.data?.szkicCopilota),
         uklada: ulozSzkic.isPending,
         blad: bladSzkicu,
         maSzkicAgenta: szkic.trim() !== "",
@@ -708,11 +704,6 @@ export function Skrzynka() {
           limitZnakow: LIMIT_PYTANIA,
           onPytaj: (pytanie: string) => rozmowa.data && zadajPytanie.mutate(
             { rozmowaId: rozmowa.data.rozmowa.id, pytanie },
-            { onError: (e) => setBladPytania((e as Error).message),
-              onSuccess: () => setBladPytania(null) }),
-          zapisuje: zapiszPasowanie.isPending,
-          onZapiszPasowanie: (wymianaId: number, nr: number) => rozmowa.data && zapiszPasowanie.mutate(
-            { rozmowaId: rozmowa.data.rozmowa.id, wymianaId, nr },
             { onError: (e) => setBladPytania((e as Error).message),
               onSuccess: () => setBladPytania(null) }),
         },
@@ -850,17 +841,9 @@ export function Skrzynka() {
         zamiast stać pusta i zabierać środkowi 340 px. */}
     {rozmowa.data && <Kontekst dane={rozmowa.data}
       onWstawDoSzkicu={(t) => ustawSzkic(szkic ? `${szkic}\n${t}` : t)}
-      /* Ta sama droga, co z osi rozmowy: historia klienta prowadzi do rozmowy,
-         w której maszynę ustalono. */
-      onOtworzRozmowe={(x) => nawiguj(`/obsluga/skrzynka/${x}`)}
-      /* „Zleć pomiar" z doboru to ISTNIEJĄCY przepływ: kartoteka wskazana
-         z góry, źródłem ostatnia wiadomość klienta — agent widzi formularz
-         i sam klika ZLEĆ. Bez wiadomości klienta nie ma z czego zlecać. */
-      onZlecPomiar={(t) => {
-        const ostatniaKlienta = [...(rozmowa.data?.os ?? [])].reverse()
-          .find((w) => w.odKlienta && w.messageId)?.messageId ?? null;
-        setTowar(t); setZrodlo(ostatniaKlienta);
-      }} />}
+      /* Ta sama droga, co z osi rozmowy: historia klienta prowadzi do jego
+         wcześniejszej rozmowy. */
+      onOtworzRozmowe={(x) => nawiguj(`/obsluga/skrzynka/${x}`)} />}
     </div>
 
     {/* Dialog jest `fixed`, ale jako dziecko gridu założyłby niejawny wiersz —

@@ -32,7 +32,7 @@ const BAZA = process.env.PANEL_URL ?? "http://127.0.0.1:5174";
 const TRASY = [
   "/obsluga/", "/obsluga/zadania", "/obsluga/dostawy", "/obsluga/skrzynka", "/obsluga/zwroty",
   "/obsluga/zwroty/kosze", "/obsluga/reklamacje", "/obsluga/dyskusje", "/obsluga/stan",
-  "/obsluga/dziennik", "/obsluga/analiza", "/obsluga/wiedza", "/obsluga/ustawienia",
+  "/obsluga/dziennik", "/obsluga/analiza", "/obsluga/ustawienia",
 ];
 const TAGI = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"];
 

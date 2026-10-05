@@ -28,7 +28,7 @@ const nadaj: import("./copilot-szkic.js").NadawcaSzkicu = async (_watek, fakty) 
   ostatniaKategoriaWFaktach = /Rozpoznanie bieżącej prośby[^:]*: ([A-Z_]+)/.exec(String(fakty))?.[1] ?? "";
   return {
     tresc: "Dzień dobry, paczka jest w drodze.", uzyteFakty: [], zastrzezenia: [],
-    daneDoboru: null, pasowanie: null, twierdzenia: [], odczytZeZdjec: [],
+    twierdzenia: [], odczytZeZdjec: [],
     model: "atrapa", ms: 5, zuzycie: { wej: 10, wyj: 5, cacheZapis: 0, cacheOdczyt: 0 },
   };
 };
@@ -42,7 +42,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["szkic_copilota", "copilot_wywolanie", "decyzja_klasyfikacji", "dobor",
+  for (const t of ["szkic_copilota", "copilot_wywolanie", "decyzja_klasyfikacji",
     "conversation_event", "message", "conversation", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }

@@ -2,13 +2,10 @@ import { useEffect, useRef } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import type {
-  DaneDoboru, Dobor, KandydaciDoboru, KartaTowaru, MiaryDoboru, OsRozmowy, PodstawaWyboru, PokrycieSygnatur,
-  PokrycieWiedzy,
-  PowodNegatywny,
+  KartaTowaru, OsRozmowy, PokrycieSygnatur,
   DokumentySprzedazy, HistoriaKlienta, MiesiacEskalacji, MojaSprawa,
-  Rozmowa, StanPrzesylki, StanSkrzynki, StatusRozmowy, WiedzaDoboru, WpisWzmianki,
-  WpisAutomatu,
-  WynikDoboru, WynikWysylki, Zadanie, Zastosowanie, Zdrowie,
+  Rozmowa, StanPrzesylki, StanSkrzynki, StatusRozmowy, WpisWzmianki,
+  WynikWysylki, Zadanie, Zdrowie,
 } from "./typy";
 
 /* Klucze cache w jednym miejscu. Literał rozsypany po plikach kończy się tym,
@@ -23,14 +20,9 @@ export const klucze = {
   wzmianki: ["wzmianki"] as const,
   moje: ["mojeSprawy"] as const,
   sygnatury: ["sygnatury"] as const,
-  pokrycieWiedzy: ["pokrycie-wiedzy"] as const,
-  miaryDoboru: (dni: number) => ["miary-doboru", dni] as const,
   eskalacja: ["eskalacja"] as const,
-  wiedzaAutomat: ["wiedza-automat"] as const,
   towar: (twId: number) => ["towar", twId] as const,
   zalaczniki: (id: number) => ["zalaczniki", id] as const,
-  kandydaci: (id: number) => ["kandydaci", id] as const,
-  wiedzaDoboru: (id: number) => ["wiedzaDoboru", id] as const,
   historiaKlienta: (id: number) => ["historiaKlienta", id] as const,
   dokumentySprzedazy: (id: number) => ["dokumentySprzedazy", id] as const,
 };
@@ -675,120 +667,9 @@ export function usePokrycieSygnatur() {
   });
 }
 
-/**
- * Co automat dopisał do wiedzy (0.331.0) — lista do prostowania.
- *
- * Bez `refetchInterval`: takt chodzi co pół godziny, a karta jest miejscem,
- * do którego się ZAGLĄDA, nie licznikiem do patrzenia. `staleTime` krótszy
- * niż przy pokryciu, bo tu liczy się świeżość: im wcześniej ktoś zobaczy zły
- * wpis, tym mniej doborów zdąży on nakarmić.
- */
-export function useWiedzaAutomat() {
-  return useQuery({
-    queryKey: klucze.wiedzaAutomat,
-    queryFn: () => api<WpisAutomatu[]>("/api/obsluga/wiedza-automat"),
-    staleTime: 30_000,
-  });
-}
-
-/** Pokrycie wiedzy z opisów (E3) — ten sam rytm, co sygnatury: zmienia się po imporcie. */
-export function usePokrycieWiedzy() {
-  return useQuery({
-    queryKey: klucze.pokrycieWiedzy,
-    queryFn: () => api<PokrycieWiedzy>("/api/obsluga/pokrycie-wiedzy"),
-    staleTime: 60_000,
-  });
-}
-
-/**
- * Miary doboru (`docs/dobor-od-zera.md` §5.1): wyniki i podstawy wyboru
- * z okna. Bez `refetchInterval`, bo to raport czytany raz na jakiś czas,
- * a nie licznik pod okiem. Okno w kluczu cache, bo przełączenie selektora
- * ma pobrać inne dane, a nie podmienić te same.
- */
-export function useMiaryDoboru(dni: number) {
-  return useQuery({
-    queryKey: klucze.miaryDoboru(dni),
-    queryFn: () => api<MiaryDoboru>(`/api/obsluga/miary-doboru?dni=${dni}`),
-    staleTime: 60_000,
-  });
-}
-
-/* ── Dobór części (`docs/dobor-od-zera.md` §5.2) ──────────────────────────────
-   Sam dobór jedzie w `useRozmowa`. KANDYDACI mają własne zapytanie, bo to
-   wyszukiwanie po kartotekach, a rozmowa odświeża się na każde zdarzenie
-   szyny, także `presence`. */
-export function useKandydaci(id: number | null) {
-  return useQuery({
-    queryKey: klucze.kandydaci(id ?? 0),
-    queryFn: () => api<KandydaciDoboru>(`/api/obsluga/rozmowy/${id}/dobor/kandydaci`),
-    enabled: id !== null,
-  });
-}
-
-/* Każdy zapis doboru unieważnia rozmowę (dobór jedzie w niej), kolejkę (znak
-   stanu na wierszu), kandydatów (nowe dane to nowe szukanie) i wiedzę (wynik
-   `czesc` składa propozycję zastosowania, a zejście z części ją wycofuje). */
-function poDoborze(qc: ReturnType<typeof useQueryClient>, id: number) {
-  qc.invalidateQueries({ queryKey: klucze.rozmowa(id) });
-  qc.invalidateQueries({ queryKey: klucze.rozmowy });
-  qc.invalidateQueries({ queryKey: klucze.kandydaci(id) });
-  qc.invalidateQueries({ queryKey: klucze.wiedzaDoboru(id) });
-}
-
-/**
- * Dane doboru niosą WERSJĘ. Konflikt (409) NIE jest tu łapany: `Konflikt`
- * leci do zakładki, bo to ona ma nazwać, kto zmienił dane, i ZOSTAWIĆ
- * wpisane wartości, zamiast zamienić je w komunikat.
- */
-export function useZapiszDaneDoboru() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: number; dane: Partial<DaneDoboru>; expectedVersion: number }) =>
-      api<Dobor>(`/api/obsluga/rozmowy/${v.id}/dobor/dane`, {
-        method: "PUT", body: JSON.stringify({ dane: v.dane, expectedVersion: v.expectedVersion }),
-      }),
-    onSettled: (_d, _e, v) => poDoborze(qc, v.id),
-  });
-}
-
-/**
- * Wynik doboru. `czesc` wymaga `twId` i `podstawa`, `dopytac` niepustego
- * tekstu, a `null` otwiera dobór ponownie. Symbol i zdanie do szkicu bierze
- * SERWER z bazy — panel wysyła wyłącznie wskazanie.
- */
-export function useWynikDoboru() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: {
-      id: number; wynik: WynikDoboru | null; expectedVersion: number;
-      twId?: number; podstawa?: PodstawaWyboru; dopytac?: string;
-    }) => {
-      const { id, ...cialo } = v;
-      return api<Dobor>(`/api/obsluga/rozmowy/${id}/dobor/wynik`, {
-        method: "PUT", body: JSON.stringify(cialo),
-      });
-    },
-    onSettled: (_d, _e, v) => poDoborze(qc, v.id),
-  });
-}
-
-/* ── Wiedza przy doborze (E2) ────────────────────────────────────────────────
-   Dowody wybranej kartoteki i pomiary z tej rozmowy — osobno od rozmowy
-   z tego samego powodu co kandydaci. Wynik pomiaru idzie do bazy wiedzy
-   WYŁĄCZNIE na kliknięcie (§13.4). */
-export function useWiedzaDoboru(id: number | null) {
-  return useQuery({
-    queryKey: klucze.wiedzaDoboru(id ?? 0),
-    queryFn: () => api<WiedzaDoboru>(`/api/obsluga/rozmowy/${id}/dobor/wiedza`),
-    enabled: id !== null,
-  });
-}
-
 /* ── Historia klienta (§10.1, zakładka KLIENT) ───────────────────────────────
-   Osobne zapytanie, nie pole rozmowy: dwa złączenia po loginie i przegląd
-   doborów kosztują, a oś rozmowy przeładowuje się przy każdym zdarzeniu
-   szyny. Zakładkę otwiera się rzadziej niż rozmowę, więc płaci za siebie
+   Osobne zapytanie, nie pole rozmowy: złączenia po loginie kosztują, a oś
+   rozmowy przeładowuje się przy każdym zdarzeniu szyny. Zakładkę otwiera się rzadziej niż rozmowę, więc płaci za siebie
    dopiero wtedy, gdy ktoś na nią patrzy. */
 export function useHistoriaKlienta(id: number | null) {
   return useQuery({
@@ -808,23 +689,5 @@ export function useDokumentySprzedazy(id: number | null, wlaczone: boolean) {
     queryKey: klucze.dokumentySprzedazy(id ?? 0),
     queryFn: () => api<DokumentySprzedazy>(`/api/obsluga/rozmowy/${id}/dokumenty-sprzedazy`),
     enabled: id !== null && wlaczone,
-  });
-}
-
-export function usePomiarDoWiedzy() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: number; zadanieId: number; twId?: number | null; polaryzacja: "pasuje" | "nie_pasuje"; powodNegatywny?: PowodNegatywny | null }) =>
-      api<Zastosowanie>(`/api/obsluga/rozmowy/${v.id}/dobor/pomiar-do-wiedzy`, {
-        method: "POST",
-        body: JSON.stringify({ zadanieId: v.zadanieId, twId: v.twId ?? null, polaryzacja: v.polaryzacja,
-          powodNegatywny: v.powodNegatywny ?? null }),
-      }),
-    onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.id) });
-      qc.invalidateQueries({ queryKey: klucze.kandydaci(v.id) });
-      qc.invalidateQueries({ queryKey: klucze.wiedzaDoboru(v.id) });
-      qc.invalidateQueries({ queryKey: ["wiedza"] });
-    },
   });
 }

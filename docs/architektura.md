@@ -51,8 +51,8 @@ rotacja (`zbiorka`, `strefa_regula`), zdjęcia i logo, kolejka zapisów
 (`events`, `migawka_dnia`, `raport_tygodnia`), meldunki procesów
 (`process_state`), read-model Subiekta (`sgt_*`), surowe lądowiska Allegro
 (`allegro_*`), sprawy klienta (`conversation*`, `outbox`, `zwrot_klienta*`,
-`reklamacja_*`, `klient_*`) oraz Copilot i wiedza o częściach (`copilot_*`,
-`pasowanie_*`, `towar_identyfikator`). Obok stoi indeks FTS5 kartoteki. Dane
+`reklamacja_*`, `klient_*`) oraz Copilot i numery części z opisów
+(`copilot_*`, `towar_identyfikator`). Dane
 osobowe przechodzące z lądowisk do spraw pilnuje
 `server/src/db/prywatnosc-schematu.test.ts`.
 
@@ -115,8 +115,7 @@ przycisk kopiowania do „Znajdź dokument” Subiekta.
 **Read-model `sgt_*`.** Serwer **nie odpytuje MSSQL przy każdym skanie**.
 Importer kopiuje kartoteki, stany i dokumenty do `sgt_*` przy starcie, co
 `MSSQL_SYNC_MS` (domyślnie 60 s) i na żądanie (`POST /api/admin/resync`). Potem
-`services/po-imporcie.ts` odbudowuje identyfikatory, sekcje „Modele:” i indeks
-FTS5. Baza Subiekta stoi na maszynie, na której biuro wystawia faktury, więc
+`services/po-imporcie.ts` odbudowuje identyfikatory z opisów kartotek. Baza Subiekta stoi na maszynie, na której biuro wystawia faktury, więc
 odpytywanie jej w rytmie skanów obciążałoby tę pracę. Do rozkładania wystarczy
 stan sprzed minuty.
 
@@ -260,8 +259,7 @@ Allegro jak maszyna i skończył się już blokadą IP.
 
 Takty Allegro (skrzynka, zwroty, rabaty, reklamacje, zamówienia, oferty,
 dosyłki, sonda rzeczywistości) wymagają `ALLEGRO_CLIENT_ID` i trybu `http`.
-Takty modelu (auto-szkic, auto-klasyfikacja, szkice przed pracą, automat wiedzy,
-pasowanie z sieci) wymagają przełącznika w `wertis.env` i klucza. Zawsze chodzą
+Takty modelu (auto-szkic, auto-klasyfikacja, szkice przed pracą) wymagają przełącznika w `wertis.env` i klucza. Zawsze chodzą
 `noc` (kopia bazy, rekoncyliacja), `raporty`, `wydania` i `autoaktualizacja`.
 Każda końcówka Allegro ma **własny takt**, żeby błąd jednej nie zabierał
 drugiej. Kopia bazy to `VACUUM INTO`, w nocy i przed każdą migracją, bo zwykłe

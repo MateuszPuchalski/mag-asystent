@@ -48,9 +48,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  /* Propozycje z „Zapisz jako propozycję” (0.528.0) wskazują konto biura,
-     więc schodzą przed nim — inaczej klucz obcy wywraca następny test. */
-  for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia", "copilot_pytanie", "szkic_copilota", "copilot_wywolanie", "message",
+  for (const t of ["copilot_pytanie", "szkic_copilota", "copilot_wywolanie", "message",
     "conversation", "offer_snapshot", "allegro_inbox_thread", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
@@ -105,7 +103,7 @@ test("dopytanie NIE rusza szkicu ani jednym znakiem", async () => {
        więc numer w szkicu wywróciłby go na odsiewie i test mierzyłby co
        innego, niż mówi jego nazwa. */
     tresc: "Dzień dobry, ta uszczelka pasuje.", uzyteFakty: [], zastrzezenia: [],
-    daneDoboru: null, pasowanie: null, twierdzenia: [], odczytZeZdjec: [],
+    twierdzenia: [], odczytZeZdjec: [],
     model: "atrapa", zuzycie: { wej: 1, wyj: 1, cacheZapis: 0, cacheOdczyt: 0 }, ms: 1,
   }), subiekt);
 
@@ -119,7 +117,7 @@ test("dopytanie NIE rusza szkicu ani jednym znakiem", async () => {
 test("model widzi szkic i poprzednie wymiany, bo pyta się O NIE", async () => {
   await S.ulozSzkic(rozmowa, KTO(), async () => ({
     tresc: "Szkic pierwszy.", uzyteFakty: [], zastrzezenia: [],
-    daneDoboru: null, pasowanie: null, twierdzenia: [], odczytZeZdjec: [],
+    twierdzenia: [], odczytZeZdjec: [],
     model: "atrapa", zuzycie: { wej: 1, wyj: 1, cacheZapis: 0, cacheOdczyt: 0 }, ms: 1,
   }), subiekt);
 
@@ -188,15 +186,14 @@ test("odczyt wymian niczego nie mutuje", async () => {
 
 /* ── Narzędzia (0.507.0) ─────────────────────────────────────────────────
    Model dostaje zestaw narzędzi i sam sięga do bazy. Pilnujemy trzech
-   rzeczy: zestaw dochodzi do nadawcy, ślad wywołań zostaje przy wymianie,
-   a twierdzenie oparte na PROPOZYCJI nie wychodzi jako pewne.            */
+   rzeczy: zestaw dochodzi do nadawcy, a ślad wywołań zostaje przy wymianie. */
 
 test("model dostaje narzędzia, a wymiana pamięta, po co sięgnął", async () => {
   let wynik = "";
   const nadaj: import("./copilot-pytania.js").NadawcaPytania = async (k) => {
     assert.ok(k.narzedzia, "dopytanie idzie z zestawem narzędzi");
     assert.deepEqual(k.narzedzia!.definicje.map((d) => d.name),
-      ["szukaj_towaru", "karta_towaru", "pasowanie_towaru", "czesci_do_maszyny", "tresc_oferty"]);
+      ["szukaj_towaru", "karta_towaru", "tresc_oferty"]);
     wynik = String(k.narzedzia!.wykonaj("szukaj_towaru", { zapytanie: "gaźnik" }).wynik);
     return {
       tresc: "Sprawdziłem kartotekę.", twierdzenia: [], model: "atrapa",
@@ -212,18 +209,6 @@ test("model dostaje narzędzia, a wymiana pamięta, po co sięgnął", async () 
   const zd = db().prepare("SELECT payload FROM events WHERE type='copilot_pytanie'").get() as { payload: string };
   assert.ok(zd.payload.includes("szukaj_towaru"));
   assert.ok(!zd.payload.includes("gaźnik"), "argument narzędzia nie staje w dzienniku");
-});
-
-test("twierdzenie oparte na propozycji WP schodzi do „niepewne”, choć źródłem są fakty", async () => {
-  const n = nadawca("Propozycja mówi, że pasuje do MS 250.", [
-    { teza: "pasuje do Stihl MS 250", zrodlo: "fakty", odwolanie: "WP17", pewnosc: "pewne" },
-    { teza: "pasuje do Stihl MS 230", zrodlo: "fakty", odwolanie: "WZ4", pewnosc: "pewne" },
-  ]);
-  const w = await Q.zadajPytanie(rozmowa, "Pasuje do MS 250?", KTO(), n.nadaj, subiekt);
-
-  assert.equal(w.twierdzenia[0]!.pewnosc, "niepewne", "niezatwierdzona propozycja to nie baza");
-  assert.equal(w.twierdzenia[0]!.obnizona, true);
-  assert.equal(w.twierdzenia[1]!.pewnosc, "pewne", "zatwierdzone zastosowanie zostaje pewne");
 });
 
 test("błąd po zapłaconych rundach narzędzi zostawia ich koszt w księdze", async () => {
@@ -245,87 +230,4 @@ test("dziennik niesie DŁUGOŚCI, nigdy treści pytania", async () => {
   assert.ok(zd, "zdarzenie miało powstać");
   assert.ok(!zd!.payload.includes("Kowalski"), "treść pytania nie ma prawa stanąć w dzienniku");
   assert.ok(zd!.payload.includes("znakowPytania"));
-});
-
-/* ── Sieć w dopytaniu (0.528.0) ─────────────────────────────────────────────
-   Metoda SZPERACZA: numer i pasowanie tylko ze strony przeczytanej w tej
-   rozmowie. Pasowanie przechodzi to samo sito co przebieg nocny, a „Zapisz
-   jako propozycję” bierze parę z wiersza wymiany, nie z żądania. */
-const STRONA = "https://www.partstree.com/mtd-belt";
-const TEKST_STRONY = "MTD deck belt 954-0430. Fits Cub Cadet LT1050, LT1045. Will not fit manual gearbox models.";
-
-function nadawcaSieci(
-  pasowania: NonNullable<import("./copilot-pytania.js").OdpowiedzNaPytanie["pasowania"]>,
-  twierdzenia: import("./copilot-szkic.js").TwierdzenieSurowe[] = [],
-  strony = [{ url: STRONA, tekst: TEKST_STRONY }],
-) {
-  const widziane: { ostatni: import("./copilot-pytania.js").KontekstPytania | null } = { ostatni: null };
-  const nadaj: import("./copilot-pytania.js").NadawcaPytania = async (k) => {
-    widziane.ostatni = k;
-    return { tresc: "Według partstree pasuje do LT1050.", twierdzenia, pasowania, strony, pdfy: [], model: "atrapa",
-      zuzycie: { wej: 100, wyj: 20, cacheZapis: 0, cacheOdczyt: 0, wyszukiwania: 2 }, ms: 5, narzedzia: [] };
-  };
-  return { widziane, nadaj };
-}
-
-const pas = (n: Partial<import("./copilot-pytania.js").PasowanieModelu> = {}) => ({
-  symbol: "W30-754", rodzaj: "maszyna" as const, marka: "Cub Cadet", model: "LT1050", wariant: null,
-  url: STRONA, cytat: "Fits Cub Cadet LT1050, LT1045.", zrodloStrony: "katalog_dostawcy" as const, ...n,
-});
-
-function kartotekaPaska() {
-  const d = db();
-  d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (90001,'W30-754','Pasek napędowy')").run();
-  d.prepare(`INSERT OR IGNORE INTO towar_identyfikator(tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal,at)
-    VALUES (90001,'W30-754','oem','754-0430','7540430','opis','import','2026-09-01T00:00:00Z')`).run();
-  for (const t of ["dowod_zastosowania", "zastosowanie"]) d.prepare(`DELETE FROM ${t}`).run();
-}
-
-test("pasowanie z sieci przechodzi sito strony; zmyślone i cudze odpadają", async () => {
-  kartotekaPaska();
-  const n = nadawcaSieci([
-    pas(),
-    pas({ model: "LT2000", cytat: "Fits Cub Cadet LT2000." }),
-    pas({ symbol: "NIE-MA-TAKIEJ" }),
-  ], [{ teza: "754-0430 pasuje do LT1050", zrodlo: "siec", odwolanie: STRONA, pewnosc: "pewne" }]);
-  const w = await Q.zadajPytanie(rozmowa, "Do czego pasuje 754-0430?", KTO(), n.nadaj, subiekt);
-
-  assert.equal(w.pasowania.length, 1, "cytat spoza strony i nieznana kartoteka nie wchodzą");
-  assert.equal(w.pasowania[0]!.twId, 90001);
-  assert.match(w.pasowania[0]!.warunek ?? "", /Will not fit manual/, "ukryty warunek ze strony idzie z pasowaniem");
-  assert.equal(w.twierdzenia[0]!.pewnosc, "prawdopodobne", "sufit źródła `siec` to „prawdopodobne”");
-  const ksiega = db().prepare("SELECT wyszukiwania FROM copilot_wywolanie WHERE zadanie='pytanie'").get() as { wyszukiwania: number };
-  assert.equal(ksiega.wyszukiwania, 2, "wyszukiwania dopytania są w księdze kosztu");
-});
-
-test("twierdzenie „siec” bez przeczytanej strony schodzi do wiedzy modelu", async () => {
-  const n = nadawcaSieci([], [{ teza: "pasuje do LT1050", zrodlo: "siec", odwolanie: null, pewnosc: "prawdopodobne" }], []);
-  const w = await Q.zadajPytanie(rozmowa, "Pasuje?", KTO(), n.nadaj, subiekt);
-  assert.equal(w.twierdzenia[0]!.zrodlo, "model");
-  assert.equal(w.twierdzenia[0]!.pewnosc, "niepewne");
-});
-
-test("„Zapisz jako propozycję” kładzie parę w Kolejce z podpisem agenta, raz", async () => {
-  kartotekaPaska();
-  const w = await Q.zadajPytanie(rozmowa, "Do czego pasuje 754-0430?", KTO(), nadawcaSieci([pas()]).nadaj, subiekt);
-  const po = Q.zapiszPasowanieZDopytania(w.id, 0, KTO());
-  assert.equal(po.pasowania[0]!.zapis, "nowa");
-  const z = db().prepare(`SELECT z.stan, z.zrodlo_propozycji AS zrodlo, z.zaproponowal, z.warunek, d.link FROM zastosowanie z
-      JOIN dowod_zastosowania d ON d.zastosowanie_id=z.id WHERE z.tw_id=90001`).all() as Array<Record<string, unknown>>;
-  assert.equal(z.length, 1);
-  assert.equal(z[0]!.stan, "propozycja");
-  assert.equal(z[0]!.zrodlo, "copilot");
-  assert.equal(z[0]!.zaproponowal, "A. Lewandowska");
-  assert.equal(z[0]!.link, STRONA);
-  assert.match(String(z[0]!.warunek), /manual/);
-
-  Q.zapiszPasowanieZDopytania(w.id, 0, KTO());
-  assert.equal(liczba("zastosowanie"), 1, "drugie kliknięcie niczego nie dokłada");
-  assert.throws(() => Q.zapiszPasowanieZDopytania(w.id, 5, KTO()), /Nie ma takiego pasowania/);
-});
-
-test("bez PASOWANIE_Z_SIECI model nie dostaje sieci", async () => {
-  const n = nadawcaSieci([]);
-  await Q.zadajPytanie(rozmowa, "Pasuje?", KTO(), n.nadaj, subiekt);
-  assert.equal(n.widziane.ostatni!.siec, false);
 });

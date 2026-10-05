@@ -9,7 +9,7 @@ process.env.SGT_MODE = "seeded";
 process.env.LOG_LEVEL = "silent";
 
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6) ──────────────────────────────
-   Na SEEDZIE, jak `pasowania.test.ts`: scenariusz GX160 jest w nim kompletny.
+   Na SEEDZIE: scenariusz GX160 jest w nim kompletny.
    Pilnujemy czterech rzeczy: co idzie do dostawcy (i czego NIE), że model nie
    ma jak przemycić numeru spoza faktów, że zapis jest jedną transakcją bez
    treści w dzienniku, i że odczyt niczego nie mutuje.                        */
@@ -17,9 +17,6 @@ process.env.LOG_LEVEL = "silent";
 let db: typeof import("../db/db.js").db;
 let config: typeof import("../config.js").config;
 let S: typeof import("./copilot-szkic.js");
-let P: typeof import("./pasowania.js");
-let W: typeof import("./wiedza.js");
-let D: typeof import("./dobor.js");
 let K: typeof import("./copilot-klasyfikacja.js");
 let subiekt: typeof import("../context.js").subiekt;
 let biuro = 0;
@@ -33,9 +30,6 @@ before(async () => {
   ({ config } = await import("../config.js"));
   ({ subiekt } = await import("../context.js"));
   S = await import("./copilot-szkic.js");
-  P = await import("./pasowania.js");
-  W = await import("./wiedza.js");
-  D = await import("./dobor.js");
   K = await import("./copilot-klasyfikacja.js");
   const d = db();
   const rows = JSON.parse(fs.readFileSync(config.seedProducts, "utf8")) as string[][];
@@ -54,13 +48,8 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  /* `dowod_zastosowania` i `zastosowanie` doszły w 0.341.0: od tego wydania
-     wiedza z oferty wchodzi od razu, więc ten plik zostawia po sobie wiersze,
-     które trzymają `model_urzadzenia` kluczem obcym. Kolejność jest tu
-     TREŚCIĄ, nie porządkiem — dziecko przed rodzicem. */
-  for (const t of ["szkic_copilota", "copilot_wywolanie", "towar_identyfikator", "model_z_opisu",
-    "dowod_zastosowania", "zastosowanie",
-    "alias_silnika", "model_urzadzenia", "pasowanie_czesci", "dobor",
+  /* Kolejność to dziecko przed rodzicem, bo klucze obce. */
+  for (const t of ["szkic_copilota", "copilot_wywolanie", "towar_identyfikator",
     "conversation_event", "message", "conversation", "offer_snapshot", "allegro_inbox_thread",
     "zamowienie_klienta", "channel_account", "events", "app_user"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -88,9 +77,7 @@ const odpowiedz = (n: Partial<import("./copilot-szkic.js").OdpowiedzSzkicu> = {}
   /* Domyślna odpowiedź cytuje wyłącznie numer, który JEST w faktach (kartoteka
      oferty) — testy sprawdzenia dokładają własne numery świadomie. */
   tresc: "Dzień dobry, gaźnik W09-0211 jest dziś dostępny (F1).",
-  /* `daneDoboru: null` domyślnie — testy propozycji dokładają dane świadomie,
-     a reszta nie zmienia znaczenia przez sam fakt, że model coś rozpoznał. */
-  uzyteFakty: ["F1"], zastrzezenia: [], daneDoboru: null, pasowanie: null, twierdzenia: [],
+  uzyteFakty: ["F1"], zastrzezenia: [], twierdzenia: [],
   odczytZeZdjec: [],
   model: "claude-opus-5", ms: 800,
   zuzycie: { wej: 2000, wyj: 300, cacheZapis: 0, cacheOdczyt: 1500 }, ...n,
@@ -99,92 +86,7 @@ const nadawca = (n: Partial<import("./copilot-szkic.js").OdpowiedzSzkicu> = {}):
   async () => odpowiedz(n);
 const liczba = (t: string) => (db().prepare(`SELECT count(*) n FROM ${t}`).get() as { n: number }).n;
 
-const zatwierdzPasowanie = () => P.rozstrzygnijPasowanie(P.zaproponujPasowanie({
-  twId: ID["LC170430140-0001"], doTwId: ID["W09-0211"], rola: "uszczelka", pozycja: "od strony filtra",
-  polaryzacja: "pasuje", rodzajDowodu: "katalog_dostawcy", dowodTresc: "katalog 2024", zrodlo: "reczne",
-}, { userId: biuro, name: "A. Lewandowska" })!.id, "zatwierdz", null, biuro);
-
 /* ── Co idzie do dostawcy ──────────────────────────────────────────────── */
-
-test("luki w kartotece liczy KOD i to na przykładzie właściciela", () => {
-  /* Cewka do FS56: oferta wymienia jedenaście modeli, kartoteka zna dwa.
-     Dziewięć pozostałych nikt nigdy nie wpisał, bo nikt ich nie zobaczył
-     obok siebie — właśnie to ma zaznaczyć ta lista. */
-  const luki = S.lukiZOferty({
-    parametry: [{ nazwa: "Kod producenta", wartosci: ["4134 400 1306"] }],
-    zgodnosc: ["STIHL FS120", "STIHL FS200", "STIHL FS250", "STIHL FR450", "STIHL BT120C"],
-    opis: "",
-  }, "Kartoteka oferty: W02-0401 — CEWKA ZAPŁONOWA DO STIHL FS120 FS200; EAN brak");
-
-  assert.deepEqual(luki.numery, [{ rodzaj: "oem", wartosc: "4134 400 1306" }]);
-  /* CAŁE pozycje, z MARKĄ (0.264.0). Człowiek w kolejce Wiedzy składa klucz
-     modelu i bez marki nie ma z czego: `FS250` nie mówi, czyj to model,
-     a automat marki nie zgaduje od 0.186.0. */
-  assert.deepEqual(luki.modele, ["STIHL FS250", "STIHL FR450", "STIHL BT120C"],
-    "kartoteka zna FS120 i FS200, reszta jest okazją do uzupełnienia");
-});
-
-test("numer katalogowy z pola parametru zostaje W CAŁOŚCI, nie w kawałkach", () => {
-  /* „4134 400 1306" rozbite na trzy liczby przestaje być numerem, po którym
-     szuka człowiek. Pole to jedna wartość — czytamy je jako jedną. */
-  assert.deepEqual(S.lukiZOferty(
-    { parametry: [{ nazwa: "Numer katalogowy", wartosci: ["4134 400 1306"] }], zgodnosc: [], opis: "" },
-    "nic").numery, [{ rodzaj: "oem", wartosc: "4134 400 1306" }]);
-});
-
-test("pole, które nie obiecuje numeru katalogowego, do tabeli numerów nie wchodzi", () => {
-  /* Filtr zapisu MUSI być węższy od dawnego filtru wyświetlania (0.264.0).
-     „Moc [KM]: 204" w `towar_identyfikator` znaczy, że pytanie o numer 204
-     prowadzi do kosiarki. EAN odpada mimo że jest numerem: ma własny szczebel
-     doboru, drugi z jedenastu, i wpisanie go jako `oem` osłabia trafienie. */
-  const luki = S.lukiZOferty({
-    parametry: [
-      { nazwa: "Moc [KM]", wartosci: ["204"] },
-      { nazwa: "EAN (GTIN)", wartosci: ["5901234123457"] },
-      { nazwa: "Numer katalogowy części oryginalnej", wartosci: ["698083"] },
-    ],
-    zgodnosc: [], opis: "",
-  }, "nic");
-  assert.deepEqual(luki.numery, [{ rodzaj: "nr_oryg", wartosc: "698083" }]);
-});
-
-test("numery z OPISU oferty wchodzą, ale tylko spod etykiety z dwukropkiem", () => {
-  /* Ten sam parser, którym czytamy opisy kartotek. Wymaga etykiety, więc na
-     prozie sprzedażowej nie znajduje nic — a to jest cała jego obrona przed
-     wciągnięciem numeru telefonu z podpisu sprzedawcy. */
-  const luki = S.lukiZOferty({ parametry: [], zgodnosc: [],
-    opis: "Najlepszy filtr w tej cenie, 12345678 sztuk sprzedanych. OEM: 698083 // 794422",
-  }, "nic");
-  assert.deepEqual(luki.numery.map((n) => n.wartosc), ["698083", "794422"]);
-});
-
-test("rok i sama liczba nie są oznaczeniem części", () => {
-  /* Bez tego każda oferta motoryzacyjna zgłaszałaby zakres lat jako brak. */
-  const luki = S.lukiZOferty(
-    { parametry: [], zgodnosc: ["CITROËN C6 (TD_) 2005/09-2011/12 204KM/150kW"], opis: "" }, "nic");
-  assert.deepEqual(luki.modele, ["CITROËN C6 (TD_) 2005/09-2011/12 204KM/150kW"],
-    "pozycja wraca w całości — wykrywa ją token z literą, nie sam zakres lat");
-  assert.deepEqual(luki.numery, [], "zdanie zgodności to nie jest numer katalogowy");
-});
-
-test("oznaczenie zapisane inaczej niż w kartotece nie jest brakiem", () => {
-  /* „STIHL FS 120" i „FS120" to ten sam model. Porównanie po `zwin`, tak jak
-     przy danych doboru — inaczej spacja sprzedawcy robiłaby fałszywy brak. */
-  assert.deepEqual(S.lukiZOferty(
-    { parametry: [], zgodnosc: ["STIHL FS 120"], opis: "" }, "CEWKA DO FS120").modele, []);
-});
-
-test("luki NIE wchodzą do faktów, bo to zdanie o nas, nie o maszynie klienta", () => {
-  db().prepare(`UPDATE offer_snapshot SET pasuje_do_json=?,
-      tresc_synced_at='2026-09-10T10:00:00Z' WHERE external_id='of-1'`)
-    .run(JSON.stringify(["HONDA GX160", "HONDA GX999"]));
-
-  const k = S.kontekstSzkicu(rozmowa, subiekt);
-  assert.ok(k.luki.modele.some((m) => m.includes("GX999")), "brak nie został policzony");
-  const f = String(k.tekstFaktow);
-  assert.equal(/brak w kartotece|luk|uzupełni/i.test(f), false,
-    "lista braków poszła do modelu — ma ją widzieć wyłącznie agent");
-});
 
 test("treść oferty wchodzi do faktów i mówi o sobie, że jest słowem SPRZEDAWCY", () => {
   /* Właściciel: „często oferta ma w sobie opis, do jakich wersji pasuje,
@@ -221,22 +123,18 @@ test("uszkodzony JSON w snapshocie nie wywraca faktów", () => {
   assert.equal(k.fakty.some((x) => x.rodzaj === "oferta_parametry"), false);
 });
 
-test("fakty niosą kartotekę oferty z dostępnością, pasowanie z pozycją i intake — bez nazwiska i loginu", () => {
-  zatwierdzPasowanie();
+test("fakty niosą kartotekę oferty z dostępnością i intake — bez nazwiska i loginu", () => {
   const k = S.kontekstSzkicu(rozmowa, subiekt);
   const f = String(k.tekstFaktow);
   assert.match(f, /Kartoteka oferty: W09-0211/);
   assert.match(f, /dostępne dziś: 4/, "stan minus rezerwacja, jak w wstawce parametrów");
-  assert.match(f, /LC170430140-0001 pasuje do W09-0211/);
-  assert.match(f, /od strony filtra/);
-  assert.match(f, /katalog dostawcy, \d{1,2}\.\d{2}\.\d{4}/, "podpis dowodu z datą");
   assert.equal(f.includes("A. Lewandowska"), false, "nazwisko pracownika wyszło w faktach");
   assert.equal(f.includes("Lewandowska"), false);
   assert.equal(/zielony_ogrod/i.test(f), false, "login w faktach");
   assert.equal(/rezerwac|półk|regał/i.test(f), false, "półka albo rezerwacje w faktach (§10.4)");
-  assert.ok(k.fakty.some((x) => x.rodzaj === "intake"), "bez potwierdzonego wyboru fakty niosą pytania intake");
-  /* Typ części bierze się z DANYCH DOBORU, nie z treści pytania (blizna szarpaka) — tu ich nie ma. */
-  assert.match(f, /zapytaj klienta TYLKO o to, czego w rozmowie jeszcze nie podał \(część\)/);
+  assert.ok(k.fakty.some((x) => x.rodzaj === "intake"), "pytanie pod ofertą niesie pytania intake");
+  assert.deepEqual([...new Set(k.fakty.map((x) => x.rodzaj))].sort(),
+    ["intake", "kartoteka", "oferta"], "fakty mówią wyłącznie o tym, co serwer wie");
 });
 
 test("wątek idzie w całości, zamaskowany, z loginem z WĄTKU Allegro, nie z tematu", () => {
@@ -253,80 +151,30 @@ test("wątek idzie w całości, zamaskowany, z loginem z WĄTKU Allegro, nie z t
   assert.equal(k.ostatniaWiadomoscId, pytanie, "świeżość liczy się na ostatniej wiadomości KLIENTA");
 });
 
-test("fakt danych doboru niesie kanoniczny silnik ze słownika, gdy alias istnieje", async () => {
-  const Sl = await import("./silniki.js");
-  D.zapiszDane(rozmowa, { marka: "NAC", model: "LS 46-450", silnik: "Lonci v200" }, 1, biuro);
-  let f = S.kontekstSzkicu(rozmowa, subiekt).fakty.find((x) => x.rodzaj === "dobor")!;
-  assert.match(f.zdanie, /silnik Lonci v200(?!\s*\(wg)/);
-  Sl.dodajAliasSilnika({ tekst: "Lonci v200", silnik: { rodzaj: "silnik", marka: "Loncin", nazwa: "V200" } },
-    { userId: biuro, name: "A. Lewandowska" });
-  f = S.kontekstSzkicu(rozmowa, subiekt).fakty.find((x) => x.rodzaj === "dobor")!;
-  assert.match(f.zdanie, /silnik Lonci v200 \(wg słownika: silnik Loncin V200\)/);
-});
-
-test("intake milknie, gdy agent wybrał kandydata z potwierdzonym dowodem", () => {
-  zatwierdzPasowanie();
-  const w1 = D.zapiszDane(rozmowa, { oem: "W09-0211", nazwaCzesci: "uszczelka" }, D.doborRozmowy(rozmowa).wersja, biuro);
-  D.ustawWynik(rozmowa, { wynik: "czesc", twId: ID["LC170430140-0001"], podstawa: "wiedza" }, w1.wersja, biuro);
-  const k = S.kontekstSzkicu(rozmowa, subiekt);
-  assert.equal(k.fakty.some((x) => x.rodzaj === "intake"), false, "przy dowodzie w bazie pytania o wymiary udawałyby niewiedzę");
-  assert.match(String(k.tekstFaktow), /Część wybrana przez agenta: Do W09-0211 pasuje LC170430140-0001/);
-  assert.match(String(k.tekstFaktow), /Dane doboru wpisane przez agenta: .*numer OEM lub symbol W09-0211/);
-});
-
-test("intake dobiera pytania po nazwie części z danych doboru", () => {
-  D.zapiszDane(rozmowa, { nazwaCzesci: "nóż" }, D.doborRozmowy(rozmowa).wersja, biuro);
-  const k = S.kontekstSzkicu(rozmowa, subiekt);
-  const i = k.fakty.find((x) => x.rodzaj === "intake")!;
+test("intake dobiera pytania po typie części z tytułu NASZEJ oferty, nie z treści pytania", () => {
+  /* Klient pisze o uszczelce pod gaźnikiem z oferty; typ bierze się z tytułu
+     oferty, bo to jedyna nazwa części, którą zna serwer, a nie klient. */
+  let i = S.kontekstSzkicu(rozmowa, subiekt).fakty.find((x) => x.rodzaj === "intake")!;
+  assert.match(i.zdanie, /\(gaźnik lub uszczelka\)/);
+  db().prepare("UPDATE offer_snapshot SET nazwa='Nóż do kosiarki 46 cm' WHERE external_id='of-1'").run();
+  i = S.kontekstSzkicu(rozmowa, subiekt).fakty.find((x) => x.rodzaj === "intake")!;
   assert.match(i.zdanie, /\(nóż\)/);
   assert.match(i.zdanie, /otworu centralnego/);
   assert.deepEqual(S.pytaniaIntake("filtr powietrza").typ, "filtr");
   assert.deepEqual(S.pytaniaIntake(null).typ, "część");
 });
 
-test("kandydat w faktach mówi grupą słowami, skąd jest i jak pewny", () => {
-  const f = String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow);
-  assert.match(f, /Kandydat W09-0211 — [^;]+; wskazane przez klienta; pewność: prawdopodobne; Kartoteka oferty/);
-});
-
-test("potwierdzona wiedza idzie w faktach przed kartoteką oferty, bo reguła 7a czyta kolejność", () => {
-  zatwierdzPasowanie();
-  const kand = String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow).split("\n")
-    .filter((l) => /: Kandydat /.test(l));
-  assert.match(kand[0], /Kandydat LC170430140-0001 .*pewność: potwierdzone/);
-  assert.match(kand[1], /Kandydat W09-0211 .*Kartoteka oferty/);
-});
-
-test("numer z pola OEM bez kartoteki idzie do faktów jako materiał na „nie mamy”", () => {
-  D.zapiszDane(rozmowa, { oem: "999-NIEMA-77" }, D.doborRozmowy(rozmowa).wersja, biuro);
-  assert.match(String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow), /Numer 999-NIEMA-77 z danych doboru: /);
-});
-
-test("wynik doboru wchodzi do faktów, a „nie dotyczy” wyłącza pytania intake", () => {
-  let w = D.ustawWynik(rozmowa, { wynik: "brak" }, D.doborRozmowy(rozmowa).wersja, biuro).wersja;
-  assert.match(String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow), /Agent ustalił: nie mamy tej części/);
-  w = D.ustawWynik(rozmowa, { wynik: "dopytac", dopytac: "numer z tabliczki" }, w, biuro).wersja;
-  assert.match(String(S.kontekstSzkicu(rozmowa, subiekt).tekstFaktow),
-    /Agent zaznaczył, czego brakuje do doboru: numer z tabliczki/);
-  D.ustawWynik(rozmowa, { wynik: "nie_dotyczy" }, w, biuro);
-  const k = S.kontekstSzkicu(rozmowa, subiekt);
-  assert.match(String(k.tekstFaktow), /Agent uznał, że rozmowa nie jest pytaniem o dobór części/);
-  assert.equal(k.fakty.some((x) => x.rodzaj === "intake"), false, "pytania o maszynę przy nie-doborze");
-});
-
 test("kontekst niczego nie zapisuje", () => {
-  /* Także po 0.264.0, i to jest tu treść, nie formalność. Zapis wiedzy
-     z oferty wisi na `ulozSzkic`, czyli na kliknięciu, gdzie zapis i tak był.
-     Przeniesienie go do `kontekstSzkicu` sprawiłoby, że SAMO OTWARCIE rozmowy
-     mutuje bazę wiedzy — to jest blizna 0.18.0 z gorszą ceną. */
+  /* Kontekst składa się przy otwarciu rozmowy, a otwarcie niczego nie
+     mutuje. Zapisy wiszą na `ulozSzkic`, czyli na kliknięciu. */
   db().prepare("UPDATE offer_snapshot SET pasuje_do_json=?, tresc_synced_at='2026-09-10T10:00:00Z' WHERE external_id='of-1'")
     .run(JSON.stringify(["HONDA GX999"]));
   const przed = [liczba("events"), liczba("copilot_wywolanie"), liczba("szkic_copilota"),
-    liczba("conversation_event"), liczba("towar_identyfikator"), liczba("model_z_opisu")];
+    liczba("conversation_event"), liczba("towar_identyfikator")];
   S.kontekstSzkicu(rozmowa, subiekt);
   S.kontekstSzkicu(rozmowa, subiekt);
   assert.deepEqual([liczba("events"), liczba("copilot_wywolanie"), liczba("szkic_copilota"),
-    liczba("conversation_event"), liczba("towar_identyfikator"), liczba("model_z_opisu")], przed);
+    liczba("conversation_event"), liczba("towar_identyfikator")], przed);
 });
 
 /* ── Linki do naszych aktywnych aukcji (0.270.0) ─────────────────────────── */
@@ -377,83 +225,6 @@ test("odmowa Allegro przy linkach NIE przerywa szkicu", async () => {
   assert.equal(liczba("szkic_copilota"), 1);
 });
 
-/* ── Wiedza z oferty przestaje ginąć razem z rozmową (0.264.0) ───────────── */
-
-const zOferty = (pasujeDo: string[], opis = "") => db().prepare(
-  `UPDATE offer_snapshot SET pasuje_do_json=?, opis=?, tresc_synced_at='2026-09-10T10:00:00Z'
-   WHERE external_id='of-1'`).run(JSON.stringify(pasujeDo), opis);
-
-test("wiedza z oferty zostaje w bazie, choć dostawca ODMÓWIŁ — to cała treść wydania", async () => {
-  /* Za nieudanym szkicem stoi jedno kliknięcie i agent kliknie ponownie.
-     Za utratą tych numerów nie stoi nic: opis oferty jest cache'em na tydzień,
-     nadpisywanym, a `przebudujIdentyfikatory` czyta opisy KARTOTEK. Dlatego
-     zapis idzie PRZED wywołaniem modelu, nie po nim. */
-  zOferty(["HONDA GX999"], "OEM: 16100-ZH8-W61");
-  const odmowa: import("./copilot-szkic.js").NadawcaSzkicu =
-    async () => { throw new Error("dostawca odmówił"); };
-
-  await assert.rejects(S.ulozSzkic(rozmowa, KTO(), odmowa, subiekt));
-
-  const numer = db().prepare(
-    "SELECT zrodlo, dodal, oferta_id FROM towar_identyfikator WHERE wartosc='16100-ZH8-W61'")
-    .get() as Record<string, unknown> | undefined;
-  assert.ok(numer, "numer z opisu oferty miał zostać mimo odmowy dostawcy");
-  assert.equal(numer!.zrodlo, "oferta");
-  assert.equal(numer!.oferta_id, "of-1");
-  assert.equal(liczba("model_z_opisu"), 1, "pozycja zgodności miała trafić do kolejki Wiedzy");
-  assert.equal(liczba("szkic_copilota"), 0, "szkic ma nie powstać — odmowa to odmowa");
-});
-
-test("numer zapisany przy pierwszym szkicu przestaje być luką przy drugim", async () => {
-  /* Samowygaszanie zamiast paska postępu. Do 0.263.0 pasek liczył tę samą
-     listę od zera przy każdym kliknięciu: system zauważał lukę za każdym
-     razem i za każdym razem o niej zapominał. */
-  zOferty(["HONDA GX999"], "OEM: 16100-ZH8-W61");
-  const pierwszy = await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
-  assert.deepEqual(pierwszy.lukiKartoteki.numery, [{ rodzaj: "oem", wartosc: "16100-ZH8-W61" }]);
-  assert.deepEqual(pierwszy.lukiKartoteki.modele, ["HONDA GX999"]);
-  assert.equal(pierwszy.lukiKartoteki.symbol, "W09-0211", "pokwitowanie bez kartoteki jest zdaniem bez podmiotu");
-  assert.equal(pierwszy.lukiKartoteki.czeka, 1);
-
-  const drugi = await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
-  assert.deepEqual(drugi.lukiKartoteki.numery, [], "zapisane przestało być luką");
-  assert.deepEqual(drugi.lukiKartoteki.modele, []);
-  assert.equal(drugi.lukiKartoteki.czeka, 1, "licznik kolejki to stan, nie przyrost — widać go i tak");
-  assert.equal(liczba("towar_identyfikator"), 1, "drugie kliknięcie nie mnoży wierszy");
-});
-
-test("bez PEWNEJ kartoteki oferty nie zapisujemy NIC", async () => {
-  /* Numer wpisany do CUDZEJ kartoteki jest najdroższą awarią tego wydania,
-     bo wraca do klienta jako zły towar. Domysł po nazwie wystarcza, żeby
-     pokazać kartotekę obok oferty, ale nie żeby dopisać jej cudzy numer. */
-  db().prepare("UPDATE offer_snapshot SET sku=NULL WHERE external_id='of-1'").run();
-  zOferty(["HONDA GX999"], "OEM: 16100-ZH8-W61");
-
-  /* Treść bez numeru kartoteki: bez SKU nie ma faktu o kartotece, więc
-     domyślny szkic wywróciłby się na sprawdzeniu numerów, a nie na tym, o co
-     tu chodzi. */
-  const s = await S.ulozSzkic(rozmowa, KTO(),
-    nadawca({ tresc: "Dzień dobry, proszę o numer z tabliczki (F1).", uzyteFakty: ["F1"] }), subiekt);
-
-  assert.equal(liczba("towar_identyfikator"), 0, "oferta bez SKU nie wskazuje kartoteki");
-  assert.equal(liczba("model_z_opisu"), 0);
-  assert.deepEqual(s.lukiKartoteki, { symbol: null, numery: [], modele: [], wpisane: [], czeka: 0 });
-});
-
-test("szkic sprzed 0.264.0 czyta się jako lista MODELI, bez dorabiania rodzaju", () => {
-  /* Gołą tablicę zostawiły szkice z 0.254.0 i była listą OZNACZEŃ. Dorobienie
-     im `rodzaju` byłoby zmyśleniem danych o tym, czym te oznaczenia są. */
-  db().prepare(`INSERT INTO szkic_copilota(conversation_id,tresc,zastrzezenia,uzyte_fakty,model,at,przez,
-    przez_user_id,luki_kartoteki) VALUES (?,'x','[]','[]','m','2026-09-01T00:00:00Z','Ala',?,?)`)
-    .run(rozmowa, biuro, JSON.stringify(["FS250", "FR450"]));
-  const s = S.szkicCopilota(rozmowa)!;
-  /* `wpisane` pusta i to jest o tamtych szkicach PRAWDA: wiedza z ofert
-     zaczęła wchodzić od razu dopiero w 0.341.0. Dorobienie im niepustej listy
-     byłoby zmyśleniem tak samo jak dorobienie rodzaju. */
-  assert.deepEqual(s.lukiKartoteki,
-    { symbol: null, numery: [], modele: ["FS250", "FR450"], wpisane: [], czeka: 0 });
-});
-
 test("odwołania (F…) znikają z treści PO sprawdzeniu, uzyteFakty zostaje", async () => {
   const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
     tresc: "Gaźnik W09-0211 pasuje (F1). Dziś dostępny (F1, F2) .", uzyteFakty: ["F1"],
@@ -466,11 +237,10 @@ test("odwołania (F…) znikają z treści PO sprawdzeniu, uzyteFakty zostaje", 
 /* ── Sprawdzenie deterministyczne ──────────────────────────────────────── */
 
 test("ścieżka szczęśliwa: wiersz, księga „szkic”, zdarzenie bez treści, ślad na osi", async () => {
-  zatwierdzPasowanie();
   const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
-    tresc: "Dzień dobry, do gaźnika W09-0211 pasuje uszczelka LC170430140-0001 (F3).", uzyteFakty: ["F1", "F3"],
+    tresc: "Dzień dobry, gaźnik W09-0211 jest dziś dostępny (F2).", uzyteFakty: ["F1", "F2"],
   }), subiekt);
-  assert.match(s.tresc, /LC170430140-0001/);
+  assert.match(s.tresc, /W09-0211/);
   assert.equal(s.messageId, pytanie);
   assert.equal(s.ocena, null);
   assert.equal(liczba("szkic_copilota"), 1);
@@ -483,7 +253,7 @@ test("ścieżka szczęśliwa: wiersz, księga „szkic”, zdarzenie bez treści
   assert.match(zd.payload, /znakow/);
   const os = db().prepare("SELECT payload FROM conversation_event WHERE event_type='copilot_szkic'").get() as { payload: string };
   assert.equal(os.payload.includes("Dzień dobry"), false, "treść na osi — oś niesie tylko metadane");
-  assert.deepEqual(S.szkicCopilota(rozmowa)?.uzyteFakty, ["F1", "F3"]);
+  assert.deepEqual(S.szkicCopilota(rozmowa)?.uzyteFakty, ["F1", "F2"]);
 });
 
 test("numer BEZ deklaracji źródła odrzuca szkic: księga notuje błąd, wiersza nie ma", async () => {
@@ -603,8 +373,6 @@ test("pomiar rozbija księgę po zadaniu i liczy odrzucenia, nie wstawienia", as
   assert.ok(sz.kosztUsd > 0);
   assert.deepEqual(p.szkice, {
     ile: 1, odrzuconych: 0,
-    daneZaproponowane: 0, daneWpisane: 0, daneOdrzucone: 0,
-    pasowaniaRozpoznane: 0, pasowaniaZaproponowane: 0, pasowaniaOdrzucone: 0, pasowaniaZatwierdzonePrzezBiuro: 0,
     /* Los przy wysyłce (22 września 2026) — tu nic nie wysłano. */
     wyslanychBezZmian: 0, wyslanychPoprawionych: 0,
   });
@@ -623,250 +391,6 @@ test("pomiar podaje czas czekania na model: mediana i p90 po zadaniu, błąd bez
   assert.equal(sz.medianaMs, 5_500);
   assert.equal(sz.p90Ms, 9_000, "najbliższa ranga: dziewiąta z dziesięciu");
   assert.equal(p.wgZadania.find((z) => z.zadanie === "klasyfikacja")!.p90Ms, 800);
-});
-
-/* ── Dane doboru z rozmowy (przyrost trzeci) ───────────────────────────────
-   Pytanie właściciela z 8.09.2026: „dlaczego dane wejściowe nie zostały
-   wprowadzone automatycznie ze szkicu?". Pilnujemy czterech granic: wartość
-   spoza rozmowy wypada (model nie może DOPISAĆ), wartość zamaskowana nie
-   wraca, a automat wpisuje WYŁĄCZNIE w puste pola, bez parametrów, drogą
-   ręcznego zapisu (wersja, 409). */
-
-/** Odczyt modelu — z parametrami, bo tak brzmi kontrakt z modelem. */
-const DANE = (n: Partial<import("./copilot-szkic.js").DaneZRozmowy> = {}): import("./copilot-szkic.js").DaneZRozmowy => ({
-  marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null,
-  silnik: null, oem: null, nazwaCzesci: null, parametry: {}, ...n,
-});
-/** Dane doboru — bez parametrów, bo dobór ich nie przyjmuje. */
-const DOBOR = (n: Partial<import("./dobor.js").DaneDoboru> = {}): import("./dobor.js").DaneDoboru => ({
-  marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null,
-  silnik: null, oem: null, nazwaCzesci: null, ...n,
-});
-
-const dopiszKlienta = (tresc: string) => db().prepare(`INSERT INTO message
-    (conversation_id,channel_account_id,external_message_id,direction,body,sent_at)
-    VALUES (?,?,?,'incoming',?,?)`)
-  .run(rozmowa, konto, `m-${Date.now()}-${Math.random()}`, tresc, "2026-09-08T09:00:00Z");
-
-test("wartość z rozmowy zostaje, zmyślona wypada — po zwinięciu numeru i po rdzeniu słowa", () => {
-  const w = "KLIENT: Mam kosiarkę Faworyt GTV51N196L-4W1 z silnikiem Lonci v200, szukam śrubę do noża. OEM 532 19 93-77.";
-  assert.equal(S.wartoscZRozmowy("Faworyt", w), true);
-  assert.equal(S.wartoscZRozmowy("GTV51N196L-4W1", w), true);
-  assert.equal(S.wartoscZRozmowy("Lonci v200", w), true);
-  assert.equal(S.wartoscZRozmowy("śruba noża", w), true, "odmiana: „śrubę do noża” pokrywa „śruba noża”");
-  assert.equal(S.wartoscZRozmowy("532199377", w), true, "„532 19 93-77” to ten sam numer po zwinięciu");
-  /* Rdzeń czterech liter przepuszcza „Loncin" przy „Lonci" w rozmowie — to
-     zapisana cena reguły odmiany, nie zaproszenie: instrukcja każe pisać
-     dosłownie, a poprawia agent. */
-  assert.equal(S.wartoscZRozmowy("Loncin", w), true);
-  assert.equal(S.wartoscZRozmowy("Husqvarna", w), false, "marki nie ma w rozmowie");
-  assert.equal(S.wartoscZRozmowy("GTV51N196L-4W2", w), false, "inny numer");
-  assert.equal(S.wartoscZRozmowy("", w), false);
-  const p = S.oczyscPropozycje(DANE({ marka: "Faworyt", model: "GX160", nazwaCzesci: "śruba noża",
-    parametry: { "klucz": "16", "długość": "50 mm" } }), w + " Klucz 16.");
-  assert.deepEqual(p.dane, DANE({ marka: "Faworyt", nazwaCzesci: "śruba noża", parametry: { klucz: "16" } }));
-  assert.equal(p.odrzuconych, 2, "GX160 i „50 mm” nie stoją w rozmowie");
-  assert.deepEqual(S.oczyscPropozycje(DANE({ model: "GX160" }), w), { dane: null, odrzuconych: 1 });
-  assert.deepEqual(S.oczyscPropozycje(null, w), { dane: null, odrzuconych: 0 });
-});
-
-/* ── UMOWA ZMIENIŁA SIĘ W 0.341.0 ────────────────────────────────────────────
-   Do 0.338.0 ten test nazywał się „…i NIE dotyka doboru", a `liczba(...)===0`
-   była jego sednem: propozycja czekała na kliknięcie agenta. Właściciel:
-   „dane wejściowe po rozpoznaniu powinny wchodzić automatycznie".
-
-   Co z tamtej umowy ZOSTAŁO i dalej jest tu pilnowane: wartość spoza rozmowy
-   nie wchodzi nigdzie, a dziennik nie niesie wartości.                      */
-test("ułożenie WPISUJE rozpoznane dane do doboru, bez kliknięcia agenta", async () => {
-  dopiszKlienta("Kosiarka Faworyt GTV51N196L-4W1, silnik Lonci v200, szukam śruby noża.");
-  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
-    daneDoboru: DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200",
-      nazwaCzesci: "śruba noża", oem: "17211-ZL8-023" }),
-  }), subiekt);
-  assert.deepEqual(s.daneDoboru, DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200",
-    nazwaCzesci: "śruba noża" }), "OEM spoza rozmowy wypadł, reszta została");
-  assert.equal(s.daneOcena, "wpisane", "nie ma już czego klikać");
-  assert.equal(liczba("dobor"), 1);
-
-  const d = D.doborRozmowy(rozmowa);
-  assert.deepEqual(d.dane, DOBOR({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200",
-    nazwaCzesci: "śruba noża" }), "OEM spoza rozmowy nie wszedł także tutaj");
-  assert.equal(d.stan, "otwarty", "dane są, wyniku nie ma — automat nigdy go nie ustawia");
-  /* Szkic pamięta wersję PO wpisie. Odwrotna kolejność dałaby szkic nieświeży
-     w chwili narodzin — ekran mówiłby „ułóż ponownie" o własnej zmianie. */
-  assert.equal(s.doborWersja, d.wersja);
-
-  /* PODPIS MASZYNY: nazwa automatu przy PUSTYM koncie. To jedyny znacznik,
-     po którym agent pozna, skąd wzięła się wartość w polu. */
-  assert.equal(d.zmienil, "automat (szkic)");
-  assert.equal(d.zmienilAutomat, true);
-  const zd = db().prepare("SELECT payload FROM events WHERE type='copilot_szkic'").get() as { payload: string };
-  assert.match(zd.payload, /"polDoboru":4/);
-  assert.match(zd.payload, /"polOdrzuconych":1/);
-  assert.equal(zd.payload.includes("Faworyt"), false, "wartość w dzienniku (§19)");
-});
-
-test("wartość zamaskowana nie wraca do danych — telefon podany jako numer seryjny wypada", async () => {
-  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
-    daneDoboru: DANE({ nrSeryjny: "601 234 567", nazwaCzesci: "uszczelka" }),
-  }), subiekt);
-  assert.deepEqual(s.daneDoboru, DANE({ nazwaCzesci: "uszczelka" }));
-});
-
-test("automat wpisuje TYLKO w puste pola — słowo agenta zostaje nietknięte", async () => {
-  dopiszKlienta("Kosiarka Faworyt GTV51N196L-4W1, silnik Lonci v200, klucz 16.");
-  /* Agent wpisał model sam, inaczej niż widzi go model. To jest ta jedna
-     rzecz, której automatowi nie wolno ruszyć: nadpisanie pola wpisanego ręką
-     byłoby jedyną zmianą, której agent nie cofnie bez pamiętania, co tam było. */
-  D.zapiszDane(rozmowa, { model: "GTV51" }, 1, biuro);
-  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({
-    daneDoboru: DANE({ marka: "Faworyt", model: "GTV51N196L-4W1", silnik: "Lonci v200", parametry: { klucz: "16" } }),
-  }), subiekt);
-
-  const d = D.doborRozmowy(rozmowa);
-  assert.deepEqual(d.dane, DOBOR({ marka: "Faworyt", model: "GTV51", silnik: "Lonci v200" }),
-    "model agenta zostaje, reszta dochodzi, a parametrów dobór nie przyjmuje");
-  assert.equal(s.daneOcena, "wpisane");
-  assert.equal(s.doborWersja, d.wersja);
-  assert.deepEqual(s.daneDoboru?.parametry, { klucz: "16" }, "odczyt modelu zostaje przy szkicu w całości");
-
-  const typy = (db().prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((e) => e.type);
-  assert.ok(typy.includes("dobor_dane"), "wpis idzie tą samą drogą co ręczny, z dziennikiem");
-  const zapis = db().prepare(
-    "SELECT payload FROM events WHERE type='dobor_dane' ORDER BY id DESC").get() as { payload: string };
-  assert.equal(zapis.payload.includes("GTV51N196L-4W1"), false, "wartości w dzienniku nie ma (§19)");
-});
-
-test("gdy wszystkie pola są zajęte, automat nic nie wpisuje i nie podnosi wersji", async () => {
-  dopiszKlienta("Kosiarka Faworyt.");
-  const przed = D.zapiszDane(rozmowa, { marka: "Stiga" }, 1, biuro);
-  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({ daneDoboru: DANE({ marka: "Faworyt" }) }), subiekt);
-  assert.equal(s.daneOcena, null, "nic nie weszło");
-  assert.equal(D.doborRozmowy(rozmowa).dane.marka, "Stiga");
-  assert.equal(D.doborRozmowy(rozmowa).wersja, przed.wersja);
-});
-
-/* ── Pasowanie z rozmowy (przyrost czwarty) ─────────────────────────────────
-   Zapowiedź z 0.230.0. Pilnujemy trzech granic właściciela: oba końce pary
-   muszą być kartotekami, które serwer SAM położył na stole (biała lista
-   z kontekstu — nigdy symbol z treści wiadomości), para wypada bez szkody
-   dla szkicu, a do kolejki wiedzy wchodzi dopiero na kliknięcie agenta,
-   jako propozycja ze źródłem `copilot`, którą rozstrzyga biuro. */
-
-const PARA = (n: Partial<import("./copilot-szkic.js").PasowanieZRozmowy> = {}) =>
-  ({ czesc: "LC170430140-0001", doCzego: "W09-0211", rola: "uszczelka", pozycja: null, ...n });
-
-test("biała lista kartotek: oferta zawsze, kotwica po wpisaniu symbolu przez agenta — kontekst nic nie zapisuje", () => {
-  let k = S.kontekstSzkicu(rozmowa, subiekt);
-  const ma = (sym: string) => [...k.kartoteki.values()].some((x) => x.symbol === sym);
-  assert.equal(ma("W09-0211"), true, "kartoteka oferty stoi na liście");
-  assert.equal(ma("LC170430140-0001"), false, "uszczelki nikt jeszcze nie wskazał");
-  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
-  const przed = liczba("events");
-  k = S.kontekstSzkicu(rozmowa, subiekt);
-  assert.equal(ma("LC170430140-0001"), true, "symbol wpisany przez agenta jest kotwicą, więc i kartoteką z kontekstu");
-  assert.equal(liczba("events"), przed, "kontekst niczego nie zapisuje");
-});
-
-test("sprawdzPasowanie: symbole po zwinięciu, cztery powody odrzucenia, pozycja tylko z rozmowy", () => {
-  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
-  const k = S.kontekstSzkicu(rozmowa, subiekt);
-  const w = String(k.watek);
-  const ok = S.sprawdzPasowanie(PARA({ czesc: "lc 170430140-0001", doCzego: "w09 0211" }), k.kartoteki, w);
-  assert.equal(ok.powod, null);
-  assert.equal(ok.propozycja!.czesc.twId, ID["LC170430140-0001"], "symbol trafia po zwinięciu, jak wszędzie");
-  assert.equal(ok.propozycja!.doCzego.twId, ID["W09-0211"]);
-  assert.equal(ok.propozycja!.rola, "uszczelka");
-  assert.equal(S.sprawdzPasowanie(PARA({ czesc: "06-12038" }), k.kartoteki, w).powod, "symbol_spoza_kontekstu",
-    "uszczelka z seedu, ale NIE z kontekstu — model nie ma jak jej nazwać");
-  assert.equal(S.sprawdzPasowanie(PARA({ czesc: "W09-0211" }), k.kartoteki, w).powod, "ta_sama_kartoteka");
-  assert.equal(S.sprawdzPasowanie(PARA({ rola: "kolo" }), k.kartoteki, w).powod, "zla_rola");
-  assert.equal(S.sprawdzPasowanie(null, k.kartoteki, w).powod, null);
-  /* Pozycja: „od strony filtra" stoi w fakcie intake, nie w rozmowie — wypada, para zostaje. */
-  const bez = S.sprawdzPasowanie(PARA({ pozycja: "od strony filtra" }), k.kartoteki, w);
-  assert.equal(bez.propozycja!.pozycja, null);
-  dopiszKlienta("Chodzi o uszczelkę od strony filtra.");
-  const z = S.sprawdzPasowanie(PARA({ pozycja: "od strony filtra" }), k.kartoteki, String(S.kontekstSzkicu(rozmowa, subiekt).watek));
-  assert.equal(z.propozycja!.pozycja, "od strony filtra");
-  /* Para już żywa w bazie — w dowolnej polaryzacji — wypada. */
-  zatwierdzPasowanie();
-  assert.equal(S.sprawdzPasowanie(PARA(), k.kartoteki, w).powod, "juz_jest");
-});
-
-test("ułożenie zapisuje parę przy szkicu i NIE dotyka pasowań; para spoza kontekstu wypada, szkic zostaje", async () => {
-  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
-  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA() }), subiekt);
-  assert.deepEqual(s.pasowanie, {
-    czesc: { twId: ID["LC170430140-0001"], symbol: "LC170430140-0001", nazwa: "Uszczelka do gaźników GX160 (od strony filtra)" },
-    doCzego: { twId: ID["W09-0211"], symbol: "W09-0211", nazwa: "Gaźnik do silników HONDA GX160 z kranikiem i odsto" },
-    rola: "uszczelka", pozycja: null,
-  });
-  assert.equal(s.pasowanieOcena, null);
-  assert.equal(liczba("pasowanie_czesci"), 0, "samo ułożenie nic nie wkłada do kolejki wiedzy");
-  let zd = db().prepare("SELECT payload FROM events WHERE type='copilot_szkic' ORDER BY id DESC").get() as { payload: string };
-  assert.match(zd.payload, /"pasowanie":1/);
-  assert.match(zd.payload, /"pasowanieOdrzucone":null/);
-  const bez = await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA({ czesc: "06-12038" }) }), subiekt);
-  assert.equal(bez.pasowanie, null);
-  assert.equal(bez.tresc.length > 0, true, "szkic jest wart pieniędzy sam w sobie");
-  zd = db().prepare("SELECT payload FROM events WHERE type='copilot_szkic' ORDER BY id DESC").get() as { payload: string };
-  assert.match(zd.payload, /"pasowanieOdrzucone":"symbol_spoza_kontekstu"/);
-  assert.equal(zd.payload.includes("06-12038"), false, "symbol w dzienniku (§19)");
-});
-
-test("„Zaproponuj pasowanie”: propozycja ze źródłem copilot, dowodem rozmowa i podpisem agenta; rozstrzyga biuro", async () => {
-  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
-  dopiszKlienta("Chodzi o uszczelkę od strony filtra.");
-  await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA({ pozycja: "od strony filtra" }) }), subiekt);
-  const po = S.przyjmijPasowanie(rozmowa, KTO());
-  assert.equal(po.pasowanieOcena, "zaproponowane");
-  const kolejka = P.kolejkaPasowan().propozycje;
-  assert.equal(kolejka.length, 1);
-  const z = kolejka[0]!;
-  assert.equal(z.zrodlo, "copilot");
-  assert.equal(z.rodzajDowodu, "rozmowa");
-  assert.equal(z.pewnosc, "prawdopodobne", "ślad rozmowy nie jest dowodem technicznym");
-  assert.equal(z.conversationId, rozmowa);
-  assert.equal(z.zaproponowal, "A. Lewandowska", "autorem jest klikający, nie automat");
-  assert.equal(z.pozycja, "od strony filtra");
-  assert.match(z.dowodTresc, /^Copilot rozpoznał w rozmowie #\d+: LC170430140-0001 pasuje do W09-0211 \(od strony filtra\)/);
-  const typy = (db().prepare("SELECT type FROM events ORDER BY id").all() as Array<{ type: string }>).map((e) => e.type);
-  assert.ok(typy.includes("pasowanie_propozycja") && typy.includes("copilot_pasowanie"));
-  const los = db().prepare("SELECT payload FROM events WHERE type='copilot_pasowanie'").get() as { payload: string };
-  assert.match(los.payload, /"dubel":false/);
-  assert.throws(() => S.przyjmijPasowanie(rozmowa, KTO()), /już oceniona/);
-  assert.throws(() => S.odrzucPasowanie(rozmowa, KTO()), /już oceniona/);
-  let pomiar = K.pomiarCopilota(db()).szkice;
-  assert.equal(pomiar.pasowaniaRozpoznane, 1);
-  assert.equal(pomiar.pasowaniaZaproponowane, 1);
-  assert.equal(pomiar.pasowaniaZatwierdzonePrzezBiuro, 0);
-  P.rozstrzygnijPasowanie(z.id, "zatwierdz", null, biuro);
-  pomiar = K.pomiarCopilota(db()).szkice;
-  assert.equal(pomiar.pasowaniaZatwierdzonePrzezBiuro, 1, "właściwa miara: biuro zatwierdza to, co Copilot widzi");
-});
-
-test("dubel nie jest błędem: para wpisana ręcznie między szkicem a kliknięciem daje ocenę bez drugiego wiersza", async () => {
-  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
-  await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA() }), subiekt);
-  P.zaproponujPasowanie({ twId: ID["LC170430140-0001"], doTwId: ID["W09-0211"], rola: "uszczelka",
-    polaryzacja: "pasuje", rodzajDowodu: "katalog_dostawcy", dowodTresc: "katalog", zrodlo: "reczne" },
-    { userId: biuro, name: "A. Lewandowska" });
-  const po = S.przyjmijPasowanie(rozmowa, KTO());
-  assert.equal(po.pasowanieOcena, "zaproponowane");
-  assert.equal(liczba("pasowanie_czesci"), 1, "drugiego wiersza nie ma");
-  const los = db().prepare("SELECT payload FROM events WHERE type='copilot_pasowanie'").get() as { payload: string };
-  assert.match(los.payload, /"dubel":true/);
-});
-
-test("odrzucenie pary zostawia wiersz dla pomiaru; nowy szkic zeruje ocenę pary", async () => {
-  D.zapiszDane(rozmowa, { oem: "LC170430140-0001" }, 1, biuro);
-  await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA() }), subiekt);
-  assert.equal(S.odrzucPasowanie(rozmowa, KTO()).pasowanieOcena, "odrzucone");
-  assert.equal(liczba("pasowanie_czesci"), 0);
-  assert.equal(K.pomiarCopilota(db()).szkice.pasowaniaOdrzucone, 1);
-  const znow = await S.ulozSzkic(rozmowa, KTO(), nadawca({ pasowanie: PARA() }), subiekt);
-  assert.equal(znow.pasowanieOcena, null);
-  assert.throws(() => S.przyjmijPasowanie(rozmowa + 1000, KTO()), /nie ma propozycji pasowania/);
 });
 
 test("rozmowa bez wiadomości nie ma na co odpowiadać", async () => {
@@ -969,38 +493,6 @@ test("odczyt powołany na zdjęcie, którego NIE wysłaliśmy, wywraca cały szk
   assert.equal(liczba("szkic_copilota"), 0, "odrzucony szkic nie zostaje w bazie");
 });
 
-test("dane doboru wolno wziąć z tabliczki, ale tylko przez zadeklarowany odczyt", async () => {
-  powieszZdjecie("tabliczka.png");
-  const s = await S.ulozSzkic(rozmowa, KTO(), szpieg({
-    tresc: "Dzień dobry, potwierdzamy (F1).", uzyteFakty: ["F1"],
-    odczytZeZdjec: [{ zdjecie: "Z1", tekst: "PARKSIDE PBRM 39 E4" }],
-    daneDoboru: {
-      marka: "PARKSIDE", model: "PBRM 39 E4", wariant: null, rocznik: null,
-      nrSeryjny: null, silnik: null, oem: null, nazwaCzesci: null, parametry: {},
-    },
-  }).nadaj, subiekt, new Date(), pobierzPng);
-
-  assert.equal(s.daneDoboru?.model, "PBRM 39 E4");
-  assert.equal(s.daneDoboru?.marka, "PARKSIDE");
-});
-
-test("wartość, której nie ma ANI w rozmowie, ANI w odczycie, dalej odpada", async () => {
-  powieszZdjecie("tabliczka.png");
-  /* Sprawdzenie zostaje deterministyczne. Zdjęcia poszerzyły materiał
-     o odczyt, nie zniosły reguły — inaczej `daneDoboru` karmiłyby szczeble
-     doboru wartościami, których nikt nigdy nie widział. */
-  const s = await S.ulozSzkic(rozmowa, KTO(), szpieg({
-    tresc: "Dzień dobry, potwierdzamy (F1).", uzyteFakty: ["F1"],
-    odczytZeZdjec: [{ zdjecie: "Z1", tekst: "PARKSIDE PBRM 39 E4" }],
-    daneDoboru: {
-      marka: null, model: "STIGA COMBI 48", wariant: null, rocznik: null,
-      nrSeryjny: null, silnik: null, oem: null, nazwaCzesci: null, parametry: {},
-    },
-  }).nadaj, subiekt, new Date(), pobierzPng);
-
-  assert.equal(s.daneDoboru, null, "model spoza rozmowy i spoza odczytu nie przechodzi");
-});
-
 test("twierdzenie ze zdjęcia nie może być PEWNE — tabliczka to nie nasza baza", () => {
   /* Sufit ma dwa powody i żaden nie znika przy ostrym zdjęciu: litery mylą
      się z cyframi, a z tego, że tabliczkę widać, nie wynika, że to tabliczka
@@ -1037,64 +529,6 @@ test("ten sam numer BEZ zadeklarowanego odczytu dalej wywraca szkic", async () =
     /nie mówiąc, skąd go ma/);
 });
 
-/* ── Wiedza z ofert wskakuje bez agenta (0.341.0) ────────────────────────────
-   Właściciel: „wiedza z ofert powinna wskakiwać bez potwierdzania przez
-   agenta". Numery robiły to od 0.264.0; pozycje listy zgodności czekały
-   w kolejce, bo w wierszu stoi goły tekst bez marki.
-
-   Granica, która tu została i jest pilnowana niżej: automat NIE ZGADUJE
-   MARKI. Wiersz, przy którym trzy źródła deterministyczne milczą, zostaje
-   w kolejce — pusty klucz byłby gorszy od braku klucza.                     */
-
-/* POZYCJA MUSI BYĆ LUKĄ, żeby w ogóle trafić do kolejki: `lukiZOferty` uznaje
-   za lukę dopiero tę, która ma token z CYFRĄ I LITERĄ naraz. „NAC LS 46-450"
-   nie ma takiego tokenu („46-450" to same cyfry) i nie dociera tu wcale —
-   pierwsza wersja tych testów sprawdzała ścieżkę, w którą dane nie wchodzą.
-   „STIHL FS450" ma „FS450" i jest właściwym materiałem. */
-test("pozycja zgodności ze ZNANĄ marką wchodzi do wiedzy od razu, podpisana automatem", async () => {
-  /* „STIHL" przeszło już przez człowieka przy innym modelu, więc odczytanie
-     go z początku tekstu nie jest zgadywaniem. */
-  W.upewnijModel({ rodzaj: "maszyna", marka: "STIHL", nazwa: "MS 170" },
-    { userId: biuro, name: "A. Lewandowska" });
-  zOferty(["STIHL FS450"]);
-
-  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
-  assert.deepEqual(s.lukiKartoteki.wpisane, ["STIHL FS450"]);
-  assert.deepEqual(s.lukiKartoteki.modele, [], "wiersz wpisany nie jest „odłożony do kolejki”");
-
-  const z = db().prepare(
-    `SELECT stan, zrodlo_propozycji, rozstrzygnal, rozstrzygnal_user_id FROM zastosowanie`)
-    .get() as Record<string, unknown>;
-  assert.equal(z.stan, "zatwierdzone", "wiedza z oferty nie czeka na kliknięcie");
-  assert.equal(z.zrodlo_propozycji, "oferta");
-  assert.equal(z.rozstrzygnal, "automat (oferta)");
-  assert.equal(z.rozstrzygnal_user_id, null, "pusty user_id to znacznik wpisu maszyny");
-});
-
-test("pozycja bez rozpoznawalnej marki ZOSTAJE w kolejce — automat nie zgaduje", async () => {
-  /* Żadnego modelu w bazie, więc lista znanych marek jest pusta i wszystkie
-     trzy źródła milczą. Pusty klucz byłby gorszy od braku klucza. */
-  zOferty(["FS450"]);
-  const s = await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
-
-  assert.deepEqual(s.lukiKartoteki.wpisane, []);
-  assert.deepEqual(s.lukiKartoteki.modele, ["FS450"]);
-  assert.equal(s.lukiKartoteki.czeka, 1);
-  assert.equal(liczba("zastosowanie"), 0);
-});
-
-test("drugie ułożenie nie mnoży wiedzy z tej samej oferty", async () => {
-  W.upewnijModel({ rodzaj: "maszyna", marka: "STIHL", nazwa: "MS 170" },
-    { userId: biuro, name: "A. Lewandowska" });
-  zOferty(["STIHL FS450"]);
-
-  await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
-  const drugi = await S.ulozSzkic(rozmowa, KTO(), nadawca(), subiekt);
-
-  assert.deepEqual(drugi.lukiKartoteki.wpisane, [], "drugi przebieg nie ma czego wpisać");
-  assert.equal(liczba("zastosowanie"), 1, "jedna para, jeden wiersz");
-});
-
 /* ── Rozpoznanie w faktach szkicu (22 września 2026) ────────────────────────
    Szkic był szyty pod dobór i prosił o tabliczkę także klienta, który pytał
    o paczkę. Teraz dostaje rozpoznanie jako fakt — przypuszczenie, nie źródło. */
@@ -1118,7 +552,7 @@ test("rozpoznanie wchodzi do faktów, a pytanie o paczkę nie dostaje intake o m
   assert.equal(k.fakty.some((f) => f.rodzaj === "intake"), false);
 });
 
-test("przy doborze intake zostaje obok rozpoznania", () => {
+test("przy pytaniu o towar intake zostaje obok rozpoznania", () => {
   rozpoznaj("PRODUCT_COMPATIBILITY", "CHECK_COMPATIBILITY");
   const k = S.kontekstSzkicu(rozmowa, subiekt);
   assert.ok(k.fakty.some((f) => f.rodzaj === "rozpoznanie"));
@@ -1206,22 +640,6 @@ test("przed szkicem pytamy Allegro o stan pusty albo stary, o doręczoną już n
   db().prepare("UPDATE zamowienie_klienta SET przesylka_dostarczono_at='2026-09-07T11:00:00Z' WHERE id=?").run(id);
   await S.odswiezPrzesylke(rozmowa, deps, Date.parse("2026-09-08T12:00:00Z"));
   assert.equal(wolane.length, 0, "doręczona już się nie zmieni");
-});
-
-/* ── Jest / nie ma na liście zgodności (23 września 2026) ────────────────────
-   Serwer sam sprawdza maszynę z danych AGENTA na całej liście oferty i daje
-   jedno zdanie — model nie przeczesuje listy przyciętej do trzydziestu. */
-test("maszyna z danych doboru dostaje zdanie JEST albo NIE MA na liście oferty", () => {
-  db().prepare("UPDATE offer_snapshot SET pasuje_do_json=? WHERE external_id='of-1'")
-    .run(JSON.stringify(["Honda GX160", "Honda GX200"]));
-  const zgodnosc = () => S.kontekstSzkicu(rozmowa, subiekt).fakty
-    .filter((f) => f.rodzaj === "oferta_zgodnosc").map((f) => f.zdanie);
-
-  assert.equal(zgodnosc().some((z) => /JEST|NIE MA/.test(z)), false, "bez maszyny agenta zdania nie ma");
-  D.zapiszDane(rozmowa, { marka: "Honda", model: "GX160" }, 1, biuro);
-  assert.ok(zgodnosc().some((z) => z.includes("Honda GX160 JEST na liście zgodności")));
-  D.zapiszDane(rozmowa, { marka: "Honda", model: "GX390" }, D.doborRozmowy(rozmowa).wersja, biuro);
-  assert.ok(zgodnosc().some((z) => z.includes("Honda GX390 NIE MA na liście") && z.includes("NIE znaczy")));
 });
 
 /* ── „Kiedy będzie" przy braku na stanie (0.502.0) ─────────────────────────

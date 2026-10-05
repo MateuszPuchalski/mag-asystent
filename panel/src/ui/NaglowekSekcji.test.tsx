@@ -61,10 +61,10 @@ describe("Nagłówek sekcji: znacznik i barwa", () => {
   });
 
   it("`ton` bierze samą barwę, reszta łańcucha zostaje", () => {
-    /* Zielony nagłówek mówi o INNYM ŹRÓDLE danych, a nie o wyższej randze —
+    /* Barwa nagłówka mówi o źródle albo randze treści, a nie o kształcie —
        dlatego wolno podmienić wyłącznie barwę. */
     const { container } = render(
-      <NaglowekSekcji ton="text-emerald-800">Wiedza: pasowania</NaglowekSekcji>);
+      <NaglowekSekcji ton="text-emerald-800">Pasuje do</NaglowekSekcji>);
     const k = container.querySelector("span")!.className;
     expect(k).toContain("text-emerald-800");
     expect(k).not.toContain("text-slate-500");

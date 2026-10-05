@@ -7,7 +7,7 @@ import { describe, expect, it } from "vitest";
 const ZRODLA = import.meta.glob([
   "./Kontekst.tsx", "./PasmoOdpowiedzi.tsx", "./Soczewki.tsx", "./OfertaRozmowy.tsx",
   "./TowarRozmowy.tsx", "./ZamowienieRozmowy.tsx", "./ZamowieniaKlienta.tsx", "./ZwrotRozmowy.tsx",
-  "./Paczka.tsx", "./Dobor.tsx", "./Wiedza.tsx", "./odnosniki.tsx", "./OsCenKartoteki.tsx",
+  "./Paczka.tsx", "./odnosniki.tsx", "./OsCenKartoteki.tsx",
 ], { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
 
 /* ── PRAWA KOLUMNA SKRZYNKI MA JEDNĄ GRAMATYKĘ ─────────────────────────────────
@@ -63,10 +63,10 @@ function bezKomentarzy(tekst: string): string {
 }
 
 describe("Gramatyka prawej kolumny skrzynki", () => {
-  it("czyta wszystkie trzynaście plików kolumny", () => {
+  it("czyta wszystkie jedenaście plików kolumny", () => {
     /* Plik przeniesiony albo przemianowany wypada z listy po cichu, a strażnik
        bez źródeł jest zielonym kwadratem. */
-    expect(Object.keys(ZRODLA)).toHaveLength(13);
+    expect(Object.keys(ZRODLA)).toHaveLength(11);
   });
 
   it("żaden blok nie przynosi własnej kreski, tła, wersalików ani większego pisma", () => {

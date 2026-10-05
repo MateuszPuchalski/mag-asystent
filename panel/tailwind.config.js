@@ -104,7 +104,7 @@ export default {
 
          WIERSZ BŁYSKA SZAROŚCIĄ, nie barwą. Bursztyn znaczy „coś jest nie tak"
          (`Bursztyn.test.ts`), a wolnej rodziny barw w kolejce nie ma: czerwień
-         to błąd, zieleń powodzenie, fiolet Copilot, błękit zdarzenie doboru.
+         to błąd, zieleń powodzenie, fiolet Copilot, błękit zdarzenie na osi.
          Błysk zgaśnie w półtorej sekundy, więc pokrywanie się z szarością
          zaznaczenia (`slate-200`) nie wprowadza w błąd na stałe, a wybrany
          wiersz i tak nie błyska. `slate-300` to wartość o stopień ciemniejsza

@@ -37,7 +37,6 @@ import { reklamacjeRoutes } from "./routes/reklamacje.js";
 import { dyskusjeRoutes } from "./routes/dyskusje.js";
 import { tagiRoutes } from "./routes/tagi.js";
 import { ustawieniaRoutes } from "./routes/ustawienia.js";
-import { wiedzaRoutes } from "./routes/wiedza.js";
 import { koszeRoutes } from "./routes/kosze.js";
 import { spoiwoRoutes } from "./routes/spoiwo.js";
 import { konfiguracjaRoutes } from "./routes/konfiguracja.js";
@@ -79,15 +78,10 @@ import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
 import { sklasyfikujNowe } from "./services/klasyfikacja-auto.js";
 import { szkicujPoRozpoznaniu } from "./services/copilot-szkic-po-rozpoznaniu.js";
 import { przedPracaTrwa, szkicePrzedPraca, TAKT_PRZED_PRACA_MS } from "./services/copilot-przed-praca.js";
-import { oproznijKolejke } from "./services/wiedza-automat.js";
-import {
-  nadawcaKluczaAnthropic, nadawcaPasowaniaSieciAnthropic, nadawcaWykazuSilnikaAnthropic,
-} from "./adapters/copilot.anthropic.js";
-import { przebiegSieci } from "./services/pasowanie-od-silnika.js";
 import { sondujRzeczywistosc } from "./services/sonda-rzeczywistosci.js";
 import { uruchomTakt } from "./services/takt.js";
 import { sledzDosylki } from "./services/dosylka.js";
-import { czytajStan, problemyKopii, wOknieNocnym } from "./services/kopie-bazy.js";
+import { czytajStan, problemyKopii } from "./services/kopie-bazy.js";
 import { liniaLogu, stanPamieci, zapiszProbke } from "./services/pamiec-procesu.js";
 import { problemDyskusji, stanDyskusjiHealth } from "./services/dyskusje.js";
 import { przebiegNocny, TAKT_NOCNY_MS } from "./services/przebieg-nocny.js";
@@ -593,7 +587,6 @@ export async function buildApp(opcje: {
   await app.register(dyskusjeRoutes);
   await app.register(tagiRoutes);
   await app.register(ustawieniaRoutes);
-  await app.register(wiedzaRoutes);
   await app.register(aktualizacjaRoutes);
   await app.register(konfiguracjaRoutes);
 
@@ -774,45 +767,6 @@ async function main() {
       if (w.przerwane && w.przerwane !== "koniec okna przed pracą") {
         console.warn(`[copilot-przed-praca] przebieg przerwany: ${w.przerwane}`);
       }
-    });
-  }
-
-  /* KOLEJKA WIEDZY OPRÓŻNIA SIĘ SAMA (0.331.0). Takt, nie `buildApp()` —
-     ta sama reguła, co przy każdym innym: testy tras nie mają dopisywać
-     wiedzy do bazy w tle.
-
-     Źródło czwarte (model językowy) podpinamy TYLKO wtedy, gdy właściciel
-     włączył je osobno i Copilot ma czym mówić. Bez niego automat chodzi na
-     trzech źródłach deterministycznych i nie kosztuje ani grosza. */
-  if (config.wiedzaAutomat.wlaczony) {
-    const zModelem = config.wiedzaAutomat.model
-      && config.copilot.mode === "anthropic" && config.copilot.klucz;
-    uruchomTakt("wiedza-automat", config.wiedzaAutomat.ms, async () => {
-      const w = await oproznijKolejke({
-        naPrzebieg: config.wiedzaAutomat.naPrzebieg,
-        ...(zModelem ? { nadajKlucz: nadawcaKluczaAnthropic } : {}),
-      });
-      /* Głośno tylko o tym, co woła o reakcję: wiersze bez marki zostają
-         człowiekowi, a błędy znaczą, że coś w kolejce nie przechodzi. */
-      if (w.bezMarki || w.bledow) {
-        console.warn(`[wiedza-automat] bez marki: ${w.bezMarki}, błędów: ${w.bledow}`);
-      }
-    });
-  }
-
-  /* PASOWANIE Z SIECI (0.507.0). Takt co godzinę, praca tylko w oknie
-     nocnym: wyszukiwanie trwa sekundy na kartotekę, a w dzień tokeny i łącze
-     należą do biura. Ten sam warunek co każde wywołanie modelu bez kliknięcia
-     — wyłącznik w `wertis.env` i klucz dostawcy. Do Allegro nie idzie stąd
-     ani jedno żądanie; powód i trzy bariery w `services/pasowanie-z-sieci.ts`. */
-  if (config.pasowanieZSieci.wlaczony && config.copilot.mode === "anthropic" && config.copilot.klucz) {
-    uruchomTakt("pasowanie-z-sieci", config.pasowanieZSieci.ms, async () => {
-      if (!wOknieNocnym(new Date().toISOString())) return;
-      /* Najpierw popularne silniki, potem kartoteki — patrz `przebiegSieci`. */
-      const w = await przebiegSieci({
-        nadaj: nadawcaPasowaniaSieciAnthropic, nadajSilnik: nadawcaWykazuSilnikaAnthropic, naNoc: config.pasowanieZSieci.naNoc,
-      });
-      if (w.przerwane) console.warn(`[pasowanie-z-sieci] przebieg przerwany: ${w.przerwane}`);
     });
   }
 

@@ -10,7 +10,7 @@ process.env.LOG_LEVEL = "silent";
 
 /* ── Szkic sam dla nowego pytania pod ofertą (0.317.0) ───────────────────────
    Ta funkcja WYDAJE PIENIĄDZE BEZ KLIKNIĘCIA i cała jej ostrożność siedzi
-   w dwóch hamulcach oraz w doborze rozmów. Testy pilnują dokładnie tego:
+   w dwóch hamulcach oraz w wyborze rozmów. Testy pilnują dokładnie tego:
    kogo takt bierze, kogo pomija, ile naraz i kiedy staje.
 
    Nadawca jest ATRAPĄ — test nie ma prawa strzelać do dostawcy ani płacić. */
@@ -26,7 +26,7 @@ const nadaj: import("./copilot-szkic.js").NadawcaSzkicu = async () => {
   wywolan++;
   return {
     tresc: "Dzień dobry, ten gaźnik pasuje (F1).", uzyteFakty: ["F1"], zastrzezenia: [],
-    daneDoboru: null, pasowanie: null, twierdzenia: [], odczytZeZdjec: [],
+    twierdzenia: [], odczytZeZdjec: [],
     model: "atrapa", ms: 5,
     zuzycie: { wej: 10, wyj: 5, cacheZapis: 0, cacheOdczyt: 0 },
   };
@@ -40,7 +40,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["szkic_copilota", "copilot_wywolanie", "dobor", "conversation_event",
+  for (const t of ["szkic_copilota", "copilot_wywolanie", "conversation_event",
     "message", "conversation", "channel_account", "events", "app_user"]) d.prepare(`DELETE FROM ${t}`).run();
   konto = Number(d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
     .run().lastInsertRowid);
@@ -90,7 +90,7 @@ test("pytanie pod ofertą dostaje szkic, a podpisuje go AUTOMAT, nie człowiek",
 });
 
 test("pytanie BEZ oferty nie dostaje nic — to rozstrzygnięcie właściciela o zakresie", async () => {
-  /* Przy „dziękuję", zmianie adresu i reklamacji szkic z faktów doboru
+  /* Przy „dziękuję", zmianie adresu i reklamacji szkic z faktów oferty
      niewiele wnosi, a kosztuje tyle samo. */
   rozmowa("w-1", { oferta: null });
   const w = await biegnij();
@@ -202,27 +202,6 @@ test("LIMIT dostawcy przerywa przebieg — dalsze wywołania pogłębiają przer
   assert.equal(w.ulozonych, 0);
   assert.match(String(w.przerwane), /limit/);
   assert.equal(wywolan, 1, "po limicie nie wołamy drugi raz");
-});
-
-test("zmiana danych doboru budzi takt — bez tego 0.341.0 jest połową funkcji", async () => {
-  /* Klient pyta pod ofertą A o część do innej maszyny. Model rozpoznaje markę
-     i model, dane wchodzą do doboru same, ale kandydatów policzono PRZED tym
-     wpisem, więc pierwszy szkic ich nie zna. Gdyby takt patrzył wyłącznie na
-     ostatnią wiadomość, nikt by po tych kandydatów nie wrócił. */
-  const D = await import("./dobor.js");
-  const r = rozmowa("w-dobor");
-  await biegnij();
-  assert.equal(wywolan, 1);
-
-  /* Ktoś dopisał dane doboru — tak samo, jak robi to teraz sam szkic. */
-  D.zapiszDane(r, { marka: "STIHL" }, 1, { automat: "test" });
-
-  await biegnij();
-  assert.equal(wywolan, 2, "nowe dane to nowy materiał, więc nowy szkic");
-
-  /* I NIE W KÓŁKO: trzeci przebieg zastaje szkic na aktualnej wersji. */
-  await biegnij();
-  assert.equal(wywolan, 2);
 });
 
 /* ── Rozpoznanie wiadomości a szkic z taktu (22 września 2026) ───────────────

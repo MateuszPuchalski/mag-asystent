@@ -25,11 +25,11 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "waiting_for_us", odlozoneDo: null, poTerminie: false, oglada: null,
   priorytet: "normalny", czekaOdMs: null, reklamacyjna: false,
-  nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "pusty", kopilot: null, ...n,
+  nowychOdOdpowiedzi: 0, zadanieWToku: false, kopilot: null, ...n,
 } as unknown as Rozmowa);
 
 const dane = (n: Partial<Rozmowa> = {}): OsRozmowy => ({
-  rozmowa: rozmowa(n), os: [], dobor: { dane: {}, wersja: 1 },
+  rozmowa: rozmowa(n), os: [],
   szkicCopilota: null, ofertaWskazana: null,
 } as unknown as OsRozmowy);
 
@@ -47,8 +47,7 @@ const props = (n: Partial<Rozmowa> = {}) => ({
   zalaczniki: [], dodajeZalacznik: false, bladZalacznika: "",
   onDodajZalacznik: vi.fn(), onUsunZalacznik: vi.fn(),
   copilot: {
-    stan: undefined, szkic: null, nieswiezy: false, doborWersja: null,
-    paraPasowania: null, uklada: false, blad: "",
+    stan: undefined, szkic: null, nieswiezy: false, uklada: false, blad: "",
     maSzkicAgenta: false, wylaczony: false,
   } as never,
   konflikt: null, mozeWymusic: false, wymusza: false, bladKonfliktu: "",

@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import Anthropic from "@anthropic-ai/sdk";
 import {
-  _ustawKlienta, nadawcaAnthropic, nadawcaKluczaAnthropic, nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
+  _ustawKlienta, nadawcaAnthropic, nadawcaPytaniaAnthropic, nadawcaSzkicuAnthropic,
   SUFIT_RUND_NARZEDZI, wspieraWysilek,
 } from "./copilot.anthropic.js";
 import type { KontekstPytania } from "../services/copilot-pytania.js";
@@ -177,8 +177,8 @@ test("klasyfikacja wysyła model z modelKlasyfikacji i oddaje go w odpowiedzi", 
 });
 
 /* Ten sam warunek przy pozostałych zadaniach: `COPILOT_MODEL` na Haiku 4.5
-   dawał 400 na każdym szkicu, dopytaniu, kluczu i karcie reklamacyjnej. */
-test("szkic i klucz modelu też nie wysyłają wysiłku do Haiku 4.5", async () => {
+   dawał 400 na każdym szkicu, dopytaniu i karcie reklamacyjnej. */
+test("szkic też nie wysyła wysiłku do Haiku 4.5", async () => {
   const { config } = await import("../config.js");
   const bylo = config.copilot.model;
   (config.copilot as { model: string }).model = "claude-haiku-4-5";
@@ -190,13 +190,34 @@ test("szkic i klucz modelu też nie wysyłają wysiłku do Haiku 4.5", async () 
   } } } as unknown as Anthropic);
   try {
     await nadawcaSzkicuAnthropic(TRESC, FAKTY).catch(() => null);
-    await nadawcaKluczaAnthropic("FS450", { kartoteka: "Nóż", oferta: null, marki: [] });
-    assert.equal(wyslane.length, 2);
+    assert.equal(wyslane.length, 1);
     for (const p of wyslane) {
       assert.equal("effort" in (p.output_config as object), false, "Haiku 4.5 odrzuca effort");
     }
   } finally {
     (config.copilot as { model: string }).model = bylo;
+    _ustawKlienta(null);
+  }
+});
+
+/* Szkic pisze tekst i rachunek źródeł, nic więcej. Pole, którego serwis już
+   nie czyta, model i tak by wypełniał, płacąc tokenami za nic. */
+test("schemat i instrukcja szkicu nie znają danych doboru ani pasowania", async () => {
+  let wyslane: Record<string, unknown> | null = null;
+  _ustawKlienta({ messages: { parse: async (p: Record<string, unknown>) => {
+    wyslane = p;
+    return { parsed_output: null, model: undefined, stop_reason: "end_turn",
+      usage: { input_tokens: 1, output_tokens: 1 } };
+  } } } as unknown as Anthropic);
+  try {
+    await nadawcaSzkicuAnthropic(TRESC, FAKTY).catch(() => null);
+    const p = wyslane as unknown as { system: Array<{ text: string }>; output_config: { format: { schema: unknown } } };
+    const schemat = JSON.stringify(p.output_config.format.schema);
+    assert.deepEqual(Object.keys((p.output_config.format.schema as { properties: object }).properties).sort(),
+      ["odczytZeZdjec", "tresc", "twierdzenia", "uzyteFakty", "zastrzezenia"]);
+    assert.doesNotMatch(schemat, /daneDoboru|pasowanie/);
+    assert.doesNotMatch(p.system[0]!.text, /daneDoboru|`pasowanie`|kandydat/i);
+  } finally {
     _ustawKlienta(null);
   }
 });
@@ -208,8 +229,7 @@ test("szkic i klucz modelu też nie wysyłają wysiłku do Haiku 4.5", async () 
    wywołaniem nie wywraca parsowania, że tokeny sumują się po rundach i że
    sufit rund kończy pętlę wymuszoną odpowiedzią.                          */
 
-/* `pasowania` od 0.528.0: schemat wymaga pola, więc prawdziwe API zawsze je oddaje. */
-const ODPOWIEDZ = JSON.stringify({ tresc: "Pasuje do MS 230 (WZ4).", twierdzenia: [], pasowania: [] });
+const ODPOWIEDZ = JSON.stringify({ tresc: "Pasuje do MS 230.", twierdzenia: [] });
 const zuzycieRundy = { input_tokens: 100, output_tokens: 10, cache_creation_input_tokens: 0, cache_read_input_tokens: 50 };
 
 function kontekstPytania(narzedzia: ZestawNarzedzi | null): KontekstPytania {
@@ -261,7 +281,7 @@ test("dopytanie: wynik narzędzia wraca do modelu, a wstęp przed wywołaniem ni
   ]);
   try {
     const o = await nadawcaPytaniaAnthropic(kontekstPytania(zestaw));
-    assert.equal(o.tresc, "Pasuje do MS 230 (WZ4).");
+    assert.equal(o.tresc, "Pasuje do MS 230.");
     assert.deepEqual(wywolania, [{ nazwa: "karta_towaru", wejscie: { zapytanie: "GAZ-1" } }]);
     assert.deepEqual(o.narzedzia, [{ nazwa: "karta_towaru", argument: "GAZ-1", znakow: 23 }]);
     assert.deepEqual([o.zuzycie.wej, o.zuzycie.wyj, o.zuzycie.cacheOdczyt], [200, 20, 100], "suma z obu rund");
@@ -287,7 +307,7 @@ test("dopytanie: sufit rund kończy pętlę rundą bez narzędzi", async () => {
       content: [{ type: "tool_use", id: `tu_${Math.random()}`, name: "karta_towaru", input: { zapytanie: "X" } }] })]);
   try {
     const o = await nadawcaPytaniaAnthropic(kontekstPytania(zestaw));
-    assert.equal(o.tresc, "Pasuje do MS 230 (WZ4).");
+    assert.equal(o.tresc, "Pasuje do MS 230.");
     assert.equal(wywolania.length, SUFIT_RUND_NARZEDZI, "tyle rund z narzędziami, ani jednej więcej");
     assert.equal(zadania.length, SUFIT_RUND_NARZEDZI + 1);
     assert.deepEqual(zadania.at(-1)!.tool_choice, { type: "none" });
@@ -296,34 +316,7 @@ test("dopytanie: sufit rund kończy pętlę rundą bez narzędzi", async () => {
   }
 });
 
-/* Sieć w dopytaniu (0.528.0): narzędzia serwerowe tylko przy `siec`,
-   z zablokowanym Allegro, OLX i Ceneo; `pause_turn` wznawia turę, a tekst
-   przeczytanych stron wraca do serwisu jako materiał sita. */
-test("dopytanie z siecią: wyszukiwarka bez Allegro, wznowienie po pause_turn i strony dla sita", async () => {
-  const zadania = klientSekwencja([
-    () => ({ stop_reason: "pause_turn", model: "m", usage: { ...zuzycieRundy, server_tool_use: { web_search_requests: 1 } },
-      content: [{ type: "web_fetch_tool_result", tool_use_id: "srv_1", content: { type: "web_fetch_result",
-        url: "https://www.partstree.com/x", content: { type: "document", source: { type: "text", media_type: "text/plain",
-          data: "Fits LT1050" } } } }] }),
-    () => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy, content: [{ type: "text", text: ODPOWIEDZ }] }),
-  ]);
-  try {
-    const o = await nadawcaPytaniaAnthropic({ ...kontekstPytania(null), siec: true });
-    const narzedzia = zadania[0]!.tools as Array<{ name: string; blocked_domains?: string[] }>;
-    assert.deepEqual(narzedzia.map((t) => t.name), ["web_search", "web_fetch"]);
-    for (const t of narzedzia) {
-      for (const d of ["allegro.pl", "olx.pl", "ceneo.pl"]) assert.ok(t.blocked_domains!.includes(d), `${t.name} bez blokady ${d}`);
-    }
-    assert.equal(zadania.length, 2, "pause_turn wznawia turę");
-    assert.deepEqual(o.strony, [{ url: "https://www.partstree.com/x", tekst: "Fits LT1050" }]);
-    assert.equal(o.zuzycie.wyszukiwania, 1);
-    assert.deepEqual(o.pasowania, []);
-  } finally {
-    _ustawKlienta(null);
-  }
-});
-
-test("dopytanie bez sieci nie dostaje wyszukiwarki", async () => {
+test("dopytanie bez zestawu nie dostaje żadnych narzędzi, także sieci", async () => {
   const zadania = klientSekwencja([() => ({ stop_reason: "end_turn", model: "m", usage: zuzycieRundy,
     content: [{ type: "text", text: ODPOWIEDZ }] })]);
   try {
@@ -343,57 +336,6 @@ test("dopytanie bez zestawu nie wysyła narzędzi, a ucięta odpowiedź niesie k
     assert.ok(e instanceof BladOdpowiedziCopilota);
     assert.equal((e as { zuzycie?: { wej: number } }).zuzycie?.wej, 100, "koszt uciętej rundy idzie do księgi");
     assert.equal("tools" in zadania[0]!, false);
-  } finally {
-    _ustawKlienta(null);
-  }
-});
-
-/* ── Pasowanie z sieci (0.507.0) ────────────────────────────────────────────
-   Tu sprawdzamy to, czego nie widzi test serwisu: że Allegro jest zablokowane
-   w OBU narzędziach serwerowych, że tekst przeczytanych stron wraca do sita,
-   że `pause_turn` wznawia się bez nowej wiadomości i że wyszukiwania liczą się
-   do kosztu. */
-
-test("pasowanie z sieci: Allegro zablokowane w wyszukiwarce i w pobieraniu, strony wracają do sita", async () => {
-  const { nadawcaPasowaniaSieciAnthropic } = await import("./copilot.anthropic.js");
-  const wynik = JSON.stringify({ znaleziska: [{
-    rodzaj: "maszyna", marka: "Stihl", model: "MS 250", wariant: null,
-    url: "https://czesci.example.com/a", cytat: "Stihl MS 250", zrodloStrony: "sklep",
-    rokOd: null, rokDo: null, seryjnyOd: null, seryjnyDo: null,
-  }] });
-  const uzycie = (wysz: number) => ({ ...zuzycieRundy, server_tool_use: { web_search_requests: wysz, web_fetch_requests: 1 } });
-  const zadania = klientSekwencja([
-    () => ({ stop_reason: "pause_turn", model: "m", usage: uzycie(2), content: [
-      { type: "server_tool_use", id: "s1", name: "web_fetch", input: { url: "https://czesci.example.com/a" } },
-      { type: "web_fetch_tool_result", tool_use_id: "s1", content: { type: "web_fetch_result",
-        url: "https://czesci.example.com/a", retrieved_at: null,
-        content: { type: "document", title: null, citations: null,
-          source: { type: "text", media_type: "text/plain", data: "Nr 1123 120 0650. Stihl MS 250" } } } },
-      { type: "web_fetch_tool_result", tool_use_id: "s2", content: { type: "web_fetch_result",
-        url: "https://producent.example.com/ipl.pdf", retrieved_at: null,
-        content: { type: "document", title: null, citations: null,
-          source: { type: "base64", media_type: "application/pdf", data: "JVBERi0=" } } } },
-    ] }),
-    () => ({ stop_reason: "end_turn", model: "m", usage: uzycie(1), content: [{ type: "text", text: wynik }] }),
-  ]);
-  try {
-    const o = await nadawcaPasowaniaSieciAnthropic({ symbol: "GAZ-1", nazwa: "Gaźnik", numery: ["1123 120 0650"] });
-    for (const t of zadania[0]!.tools as Array<{ name: string; blocked_domains?: string[] }>) {
-      assert.ok(t.blocked_domains?.includes("allegro.pl"), `${t.name} bez blokady Allegro`);
-    }
-    assert.deepEqual(o.strony, [{ url: "https://czesci.example.com/a", tekst: "Nr 1123 120 0650. Stihl MS 250" }]);
-    assert.deepEqual(o.pdfy, [{ url: "https://producent.example.com/ipl.pdf", base64: "JVBERi0=" }],
-      "PDF wraca surowy — tekst wyciąga serwis, nie adapter");
-    assert.equal(o.znaleziska.length, 1);
-    assert.equal(o.wyszukiwan, 3, "wyszukiwania z obu tur — płatne od sztuki");
-    assert.equal(zadania.length, 2);
-    const druga = zadania[1]!.messages as Array<{ role: string }>;
-    assert.deepEqual(druga.map((m) => m.role), ["user", "assistant"], "wznowienie bez nowej wiadomości");
-    const tresc = String((zadania[0]!.messages as Array<{ content: string }>)[0]!.content);
-    assert.ok(tresc.includes("1123 120 0650"), "numer OEM to klucz wyszukiwania");
-    /* Właściciel (0.527.0): nasz symbol trafia najwyżej w naszą aukcję, więc
-       nie idzie do dostawcy wcale — inaczej model wydaje na nim wyszukiwania. */
-    assert.ok(!tresc.includes("GAZ-1"), "nasz symbol nie idzie do dostawcy");
   } finally {
     _ustawKlienta(null);
   }

@@ -102,7 +102,7 @@ export function PasmoOdpowiedzi({ dane }: { dane: OsRozmowy }) {
      czekały na Subiekta, pasmo dorastało o 45 px pod okiem agenta i spychało
      kolumnę w chwili czytania. „wczytuję…" trzyma miejsce, a wiersz potem nie
      znika, tylko się wypełnia. To nie jest więc „ruch za nic", przez który
-     puste wiersze „Klient" i „Wiedza" nie stają przed odczytem. */
+     pusty wiersz „Klient" nie staje przed odczytem. */
   const d = karta.data;
   const czekam = <span className="text-slate-500">wczytuję…</span>;
   /* PRZYCZYNĘ MÓWI TEN, KTO JĄ ZNA. Brak połączenia z serwerem ogłasza pasek

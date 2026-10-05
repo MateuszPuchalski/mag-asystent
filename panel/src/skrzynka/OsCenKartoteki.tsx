@@ -77,8 +77,8 @@ export function CenyKartoteki({ ceny, ramka = true, oferta = null }: {
   /** Cena oferty rozmowy — wtedy blok staje osią. Reklamacje jej nie podają. */
   oferta?: Oferta | null;
 }) {
-  /* PUSTY BLOK NIE RYSUJE SIĘ WCALE — ta sama zasada, co przy pasowaniach:
-     brak wiedzy nie jest informacją wartą kolumny. Na produkcji blok milczy,
+  /* PUSTY BLOK NIE RYSUJE SIĘ WCALE: brak danych nie jest informacją
+     wartą kolumny. Na produkcji blok milczy,
      dopóki import nie dostanie nazw cennika i nowego GRANT-u
      (`tools/sonda-cen.sql`). */
   if (ceny.length === 0) return null;

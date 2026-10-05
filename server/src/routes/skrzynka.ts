@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import type { FastifyInstance, FastifyReply } from "fastify";
-import { sesjaZadania, subiekt } from "../context.js";
+import { sesjaZadania } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
 import { typPodgladu } from "../services/typ-podgladu.js";
@@ -28,10 +28,6 @@ import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { sciezkaZdjeciaOferty, zapewnijZdjecieOferty } from "../services/zdjecia-ofert.js";
 import { kontoKanalu } from "../services/kanal-konto.js";
 import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../services/wzmianki.js";
-import {
-  pomiarDoWiedzy, ustawWynik, wiedzaDoboru, zapiszDane, type DaneDoboru, type PodstawaWyboru, type WynikDoboru,
-} from "../services/dobor.js";
-import { kandydaciDoboru } from "../services/kandydaci.js";
 import { historiaKlienta, loginSprawyRozmowy } from "../services/klient-historia.js";
 import { mojeSprawy } from "../services/droga-klienta.js";
 import { mojaLista } from "../services/prowadzenie-klienta.js";
@@ -334,53 +330,6 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     } catch (e) { return blad(reply, e); }
   });
 
-  /* DOBÓR CZĘŚCI (`docs/dobor-od-zera.md` §5.2). Sam dobór jedzie w
-     `GET …/rozmowy/:id`; kandydaci mają OSOBNĄ trasę, bo to wyszukiwarka
-     i parser opisu, a tamten odczyt odświeża się na każde zdarzenie szyny.
-     Bramka to zwykłe `odmowa()`: wynik ustawia każdy z biura, roli
-     „ekspert" nie ma. */
-  app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/dobor/kandydaci",
-    async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try {
-        /* Kotwice zostają w serwerze: potrzebuje ich szkic Copilota, nie ekran. */
-        const { kotwice: _kotwice, ...kandydaci } = kandydaciDoboru(Number(req.params.id), subiekt);
-        return kandydaci;
-      } catch (e) { return blad(reply, e); }
-    });
-
-  app.put<{ Params: { id: string }; Body: { dane?: Partial<DaneDoboru>; expectedVersion?: number } }>(
-    "/api/obsluga/rozmowy/:id/dobor/dane", async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try {
-        return zapiszDane(Number(req.params.id), req.body?.dane ?? {},
-          Number(req.body?.expectedVersion), sesjaZadania()!.user.userId);
-      } catch (e) { return konflikt(reply, e); }
-    });
-
-  app.put<{ Params: { id: string }; Body: {
-    wynik?: WynikDoboru | null; twId?: number | null; podstawa?: PodstawaWyboru | null; dopytac?: string | null;
-    expectedVersion?: number;
-  } }>("/api/obsluga/rozmowy/:id/dobor/wynik", async (req, reply) => {
-    const nie = odmowa(reply); if (nie) return nie;
-    const b = req.body ?? {};
-    try {
-      return ustawWynik(Number(req.params.id), { wynik: b.wynik ?? null, twId: b.twId ?? null,
-        podstawa: b.podstawa ?? null, dopytac: b.dopytac ?? null },
-      Number(b.expectedVersion), sesjaZadania()!.user.userId);
-    } catch (e) { return konflikt(reply, e); }
-  });
-
-  /* WIEDZA PRZY DOBORZE: dowody wybranej kartoteki, silniki maszyny i pomiary
-     z tej rozmowy, które mogą stać się dowodem. Odczyt nic nie zapisuje; wynik
-     pomiaru trafia do bazy wiedzy WYŁĄCZNIE na kliknięcie (§13.4). */
-  app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/dobor/wiedza",
-    async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try { return wiedzaDoboru(Number(req.params.id)); }
-      catch (e) { return blad(reply, e); }
-    });
-
   /* DOKUMENTY SPRZEDAŻY ZAMÓWIENIA (0.499.0) — soczewka „Faktura". Osobna
      trasa z tego samego powodu co historia klienta niżej: panel woła ją
      tylko przy pytaniu o fakturę, a oś przeładowuje się przy każdym
@@ -403,7 +352,7 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
 
   /* HISTORIA KLIENTA (§10.1, zakładka KLIENT). Osobna trasa, nie pole
      w `GET …/rozmowy/:id`: zakładkę otwiera się rzadziej niż rozmowę, a to
-     są dwa złączenia po loginie i przegląd doborów. Oś rozmowy przeładowuje
+     są złączenia po loginie. Oś rozmowy przeładowuje
      się przy każdym zdarzeniu — dokładanie do niej pracy, której nikt w tej
      chwili nie ogląda, kosztowałoby przy każdym odświeżeniu. */
   app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id/klient",
@@ -427,18 +376,6 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       const twId = Number(req.params.twId);
       if (!Number.isInteger(twId) || twId <= 0) return reply.code(400).send({ error: "Zły numer kartoteki" });
       return przekrojTowaru(twId);
-    });
-
-  app.post<{ Params: { id: string }; Body: { zadanieId?: number; twId?: number | null; polaryzacja?: string; powodNegatywny?: string | null } }>(
-    "/api/obsluga/rozmowy/:id/dobor/pomiar-do-wiedzy", async (req, reply) => {
-      const nie = odmowa(reply); if (nie) return nie;
-      try {
-        return pomiarDoWiedzy(Number(req.params.id), {
-          zadanieId: Number(req.body?.zadanieId), twId: req.body?.twId ?? null,
-          polaryzacja: (req.body?.polaryzacja ?? "pasuje") as "pasuje" | "nie_pasuje",
-          powodNegatywny: (req.body?.powodNegatywny ?? null) as never,
-        }, sesjaZadania()!.user.userId);
-      } catch (e) { return blad(reply, e); }
     });
 
   /* SKRZYNKA WZMIANEK (§6.4, 0.160.0). `userId` bierze się z SESJI, nigdy

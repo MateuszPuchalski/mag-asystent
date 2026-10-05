@@ -17,7 +17,7 @@ beforeEach(() => {
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     adresy.push(`${init?.method ?? "GET"} ${url}`);
     return new Response(JSON.stringify({
-      login: "chips20", maszyny: [],
+      login: "chips20",
       wpisy: [{ rodzaj: "rozmowa", at: "2026-09-02T10:00:00Z", tresc: "gdzie paczka", zamowienieId: null,
         link: null, rozmowaId: 41, sprawaId: null }],
     }));
@@ -28,7 +28,7 @@ afterEach(() => vi.unstubAllGlobals());
 function pokaz(rodzaj: "zwrot" | "sprawa") {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(<QueryClientProvider client={qc}><MemoryRouter>
-    <PrzyciskHistorii rodzaj={rodzaj} id={7} tutaj="tym zwrotem" /></MemoryRouter></QueryClientProvider>);
+    <PrzyciskHistorii rodzaj={rodzaj} id={7} /></MemoryRouter></QueryClientProvider>);
 }
 
 describe("przycisk historii klienta", () => {

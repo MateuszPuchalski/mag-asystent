@@ -17,8 +17,8 @@ const ZRODLA = import.meta.glob(
 
    Drugi błąd jest CZĘSTSZY, choć wygląda niewinniej: dwa i trzy zdarzają się
    na ekranie o wiele częściej niż pięć. Jedyna poprawna kopia reguły mieszkała
-   jako prywatna funkcja w `ekrany/Wiedza.tsx` — i właśnie dlatego, że w
-   ekranie, nikt jej nie znalazł przy ośmiu pozostałych miejscach.
+   jako prywatna funkcja jednego ekranu — i właśnie dlatego, że w ekranie,
+   nikt jej nie znalazł przy ośmiu pozostałych miejscach.
 
    CO PILNUJE. Dwugałęziowy wybór formy rzeczownika nie odradza się TAM, GDZIE
    OBOK STOI LICZBA. Sama liczba jest tu warunkiem, nie ozdobą: bez liczebnika

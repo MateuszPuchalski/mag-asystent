@@ -106,12 +106,10 @@ describe("zdjęcie listingowe oferty", () => {
 });
 
 /* ── Lista „Pasuje do" (23 września 2026) ────────────────────────────────────
-   Zwinięta, bo bywa na dwieście pozycji. Na wierzchu stoi odpowiedź — czy
-   maszyna z doboru jest na liście — a „nie ma" nie udaje „nie pasuje". */
+   Zwinięta, bo bywa na dwieście pozycji. Na wierzchu stoi sama liczba. */
 describe("lista zgodności oferty", () => {
   const Z = (n: Partial<NonNullable<Dane["zgodnosc"]>> = {}): NonNullable<Dane["zgodnosc"]> => ({
-    lista: ["Faworyt 4618", "Hecht 1803S", "Honda HRX 476"], maszyna: null, trafienia: [],
-    wariantSprawdzony: true, ...n,
+    lista: ["Faworyt 4618", "Hecht 1803S", "Honda HRX 476"], ...n,
   });
 
   it("zwinięta z liczbą, rozwija się na miejscu", async () => {
@@ -122,18 +120,9 @@ describe("lista zgodności oferty", () => {
     expect(screen.getByText("Faworyt 4618")).toBeInTheDocument();
   });
 
-  it("maszyna z doboru na liście: widać bez rozwijania, a pozycja jest podświetlona", async () => {
-    render(<OfertaRozmowy oferta={dane(null, BEZ_KARTOTEKI, Z({
-      maszyna: "HECHT 1803S DYM1182c", trafienia: ["Hecht 1803S"], wariantSprawdzony: false }))} />);
-    expect(screen.getByText(/HECHT 1803S DYM1182c jest na liście/)).toBeInTheDocument();
-    expect(screen.getByText(/wariant niesprawdzony/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /Pasuje do/ }));
-    expect(screen.getByText("Hecht 1803S").closest("li")).toHaveTextContent("maszyna klienta");
-  });
-
-  it("brak na liście mówi, że to nie dowód; bez listy bloku nie ma", () => {
-    const { rerender } = render(<OfertaRozmowy oferta={dane(null, BEZ_KARTOTEKI, Z({ maszyna: "Stiga Combi 48" }))} />);
-    expect(screen.getByText(/nie ma na liście; to nie dowód, że nie pasuje/)).toBeInTheDocument();
+  it("bez listy bloku nie ma", () => {
+    const { rerender } = render(<OfertaRozmowy oferta={dane(null, BEZ_KARTOTEKI, Z())} />);
+    expect(screen.getByLabelText("Pasuje do")).toBeInTheDocument();
     rerender(<OfertaRozmowy oferta={dane(null)} />);
     expect(screen.queryByLabelText("Pasuje do")).toBeNull();
   });

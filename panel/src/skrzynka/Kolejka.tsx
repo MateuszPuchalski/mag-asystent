@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AlarmClock, Bell, BellOff, Eye, Inbox, MessageSquare, RefreshCw, Ruler, Search, UserCheck, Wrench, X,
+  AlarmClock, Bell, BellOff, Eye, Inbox, MessageSquare, RefreshCw, Ruler, Search, UserCheck, X,
 } from "lucide-react";
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
@@ -8,7 +8,7 @@ import type {
 import { Blad, czas, Plakietka, Pusto } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { klawiszZajety } from "../nawigacja/fokus";
-import { BARWA_STANU_DOBORU, NAZWA, NAZWA_STANU_DOBORU } from "./statusy";
+import { NAZWA } from "./statusy";
 import { CZESTE, PasekCopilota, ZnakCopilota, ZnakKategorii, doRozpoznania, nazwaNaPlakietce } from "./Copilot";
 import { Czekanie } from "./Czekanie";
 import { SlownikZnakow } from "./SlownikZnakow";
@@ -453,15 +453,6 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         if (r.zadanieWToku) znaczniki.push(<span key="zadanie" title="zadanie w toku"
           className="flex items-center text-slate-600">
           <Ruler size={13} aria-hidden="true" /><span className="sr-only">zadanie w toku</span></span>);
-        /* Stan DOBORU znakiem. `pusty` i `nie_dotyczy` milczą: znak „nie
-           zaczęty" na każdym wierszu nie mówiłby niczego, a „nie dotyczy" to
-           wiersz, przy którym doboru NIE trzeba robić. Barwa niesie wagę
-           (mapa w `statusy.ts`), a nazwę `title` i czytnik. */
-        const barwaDoboru = BARWA_STANU_DOBORU[r.dobor];
-        if (barwaDoboru) znaczniki.push(<span key="dobor"
-          title={`dobór: ${NAZWA_STANU_DOBORU[r.dobor]}`} className={`flex items-center ${barwaDoboru}`}>
-          <Wrench size={13} aria-hidden="true" />
-          <span className="sr-only">{NAZWA_STANU_DOBORU[r.dobor]}</span></span>);
         /* Rzadka kategoria dostaje SŁOWO obok znaku — patrz `CZESTE`. Znak
            stoi w pierwszej linii, słowo tutaj: w pierwszej ścisnęłoby login. */
         if (r.kopilot && r.kopilot.status !== "FAILED" && !r.podziekowal
@@ -498,7 +489,7 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
              Zaznaczenie schodzi na szarość, bo jest stanem STRUKTURALNYM, nie
              znaczeniowym — a wolnej rodziny barw już nie ma: czerwień to błąd,
              zieleń powodzenie, fiolet przypuszczenie Copilota, błękit zdarzenia
-             doboru. Marka zostaje na belce 3 px, gdzie nie udaje pasma.
+             na osi. Marka zostaje na belce 3 px, gdzie nie udaje pasma.
 
              STOPIEŃ SZAROŚCI ZMIERZONY, nie dobrany okiem. `slate-100` różni się
              od `slate-50` (czyli od najechania kursorem) o ΔE 2,2, a próg

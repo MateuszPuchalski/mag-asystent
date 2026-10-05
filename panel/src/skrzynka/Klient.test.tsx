@@ -6,13 +6,9 @@ import userEvent from "@testing-library/user-event";
 import type { DosylkaSprawy, HistoriaKlienta, SprawaKlienta } from "../api/typy";
 
 /* ── Zakładka KLIENT (§10.1) ─────────────────────────────────────────────────
-   Zakładka jest ODCZYTEM i te testy pilnują dwóch rzeczy, które o niej
-   stanowią:
+   Zakładka jest ODCZYTEM i te testy pilnują tego, co o niej stanowi.
 
-   1. MASZYNA NIESIE SWOJE ŹRÓDŁO. „NAC LS 46-450" bez rozmowy, w której to
-      ustalono, jest twierdzeniem bez pokrycia — §4.3 żąda źródła przy każdym
-      fakcie, a klik ma prowadzić tam, gdzie ono stoi.
-   2. BRAK LOGINU TO NIE BRAK HISTORII. Wątek bez rozmówcy znaczy „nie wiemy,
+   BRAK LOGINU TO NIE BRAK HISTORII. Wątek bez rozmówcy znaczy „nie wiemy,
       czyja to historia". Pokazanie wtedy pustej osi byłoby kłamstwem
       o kliencie, który kupuje u nas od lat.                                 */
 
@@ -22,7 +18,7 @@ vi.mock("../api/rozmowy", () => ({ useHistoriaKlienta: (id: number | null) => hi
 const { Klient, WidokHistorii } = await import("./Klient");
 
 const dane = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta =>
-  ({ login: "zielony_ogrod", maszyny: [], wpisy: [], ...n });
+  ({ login: "zielony_ogrod", wpisy: [], ...n });
 
 const pokaz = (d: HistoriaKlienta, onOtworz = vi.fn()) => {
   historia.mockReturnValue({ data: d, isLoading: false, error: null });
@@ -33,18 +29,6 @@ const pokaz = (d: HistoriaKlienta, onOtworz = vi.fn()) => {
 beforeEach(() => vi.clearAllMocks());
 
 describe("zakładka klienta", () => {
-  it("maszyna niesie rocznik, silnik i rozmowę, w której ją ustalono", async () => {
-    const onOtworz = pokaz(dane({ maszyny: [{ marka: "NAC", nazwa: "LS 46-450", wariant: null,
-      rocznik: "2019", silnik: "1P70FV", rozmowaId: 3140, at: "2024-06-14T09:30:00Z" }] }));
-
-    expect(screen.getByText(/NAC LS 46-450/)).toBeInTheDocument();
-    expect(screen.getByText("(2019)")).toBeInTheDocument();
-    expect(screen.getByText("1P70FV")).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: /rozmowie #3140/ }));
-    expect(onOtworz).toHaveBeenCalledWith(3140);
-  });
-
   it("oś rozdziela zakup od rozmowy i prowadzi w dwa różne miejsca", async () => {
     const onOtworz = pokaz(dane({ wpisy: [
       { rodzaj: "zakup", at: "2024-06-14T12:00:00Z", tresc: "Szarpak SZR-148/82",
@@ -171,7 +155,7 @@ describe("zakładka klienta", () => {
   });
 
   it("gdy oś opróżniły zakupy z listy, mówi, gdzie stoją — nie „pierwszy kontakt”", () => {
-    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ maszyny: [], wpisy: [
+    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ wpisy: [
       { rodzaj: "zakup", at: "2026-05-12T09:10:00Z", tresc: "Filtr powietrza",
         zamowienieId: "z-2", link: null, rozmowaId: null, sprawaId: null },
     ] }) });
@@ -211,8 +195,8 @@ describe("zakładka klienta", () => {
     expect(screen.queryByRole("link", { name: /Sprawa klienta/ })).toBeNull();
 
     /* Profil ma własną kartę sprawy — druga, w historii, mówiłaby to samo. */
-    render(<MemoryRouter><WidokHistorii tutaj="tym profilem" bezProfilu onOtworzRozmowe={vi.fn()}
-      historia={{ login: "zielony_ogrod", maszyny: [], wpisy: [], sprawa: {
+    render(<MemoryRouter><WidokHistorii bezProfilu onOtworzRozmowe={vi.fn()}
+      historia={{ login: "zielony_ogrod", wpisy: [], sprawa: {
         id: 5, login: "zielony_ogrod", wersja: 2, stan: "zakonczona", krok: "dosłać",
         krokDo: "2026-09-25T06:00:00Z", dzis: false, poTerminie: false, prowadzi: "Bartek", prowadziId: 2,
         zakonczonoAt: "2026-09-24T12:00:00Z", zakonczyl: "Bartek", odcisk: "{}", nowe: [], dosylki: [] } }} />

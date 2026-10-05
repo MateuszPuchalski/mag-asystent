@@ -27,32 +27,26 @@ vi.mock("./ZamowieniaKlienta", () => ({
   ZamowieniaKlienta: ({ kandydaci }: { kandydaci: unknown[] }) =>
     <div data-testid="zakupy-klienta">zakupy {kandydaci.length}</div>,
 }));
-vi.mock("./Dobor", () => ({
-  Dobor: () => <div data-testid="dobor">blok doboru</div>,
-}));
 /* Pasmo odpowiedzi woła kartotekę z Subiekta, a ten plik nie stawia klienta
    TanStacka. Własne testy pasmo ma w `PasmoOdpowiedzi.test.tsx`. */
 vi.mock("./PasmoOdpowiedzi", () => ({
   PasmoOdpowiedzi: () => <div data-testid="pasmo">pasmo odpowiedzi</div>,
 }));
 
-/* Wiersze „Klient" i „Wiedza" czytają historię klienta i wiedzę. Ten plik
-   pilnuje UKŁADU, więc hak oddaje stałe dane. */
+/* Wiersz „Klient" czyta historię klienta. Ten plik pilnuje UKŁADU, więc hak
+   oddaje stałe dane. */
 const historia = { data: undefined as unknown };
-const wiedza = { data: undefined as unknown };
 /* Blok paczki woła hak sprawdzenia; tu tylko liczymy, że samo rysowanie
    kolumny go nie odpala. */
 const sprawdz = { mutate: vi.fn(), isPending: false, error: null };
 vi.mock("../api/rozmowy", () => ({
   useHistoriaKlienta: () => historia,
-  useWiedzaDoboru: () => wiedza,
   useSprawdzPrzesylkeRozmowy: () => sprawdz,
 }));
-/* Wiersze Klient i Wiedza stają tylko z treścią. */
-const zHistoria = { login: "pasikonik5", maszyny: [], wpisy: [{ rodzaj: "zakup" }, { rodzaj: "zwrot" }] };
-const zWiedza = { zastosowanie: null, pomiary: [{ zadanieId: 1 }], silniki: [] };
+/* Wiersz Klient staje tylko z treścią. */
+const zHistoria = { login: "pasikonik5", wpisy: [{ rodzaj: "zakup" }, { rodzaj: "zwrot" }] };
 
-afterEach(() => { historia.data = undefined; wiedza.data = undefined; });
+afterEach(() => { historia.data = undefined; });
 
 const { Kontekst } = await import("./Kontekst");
 
@@ -61,15 +55,11 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
     id: 4821, klient: "Kupujący 44300444", ostatniaWiadomosc: "", ostatniaWiadomoscAt: "",
     ostatniaOdKlienta: true, nieprzeczytana: false, wlascicielId: null, wlasciciel: null,
     wersja: 1, status: "open", odlozoneDo: null, poTerminie: false, podziekowal: false, oglada: null,
-    priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "pusty",
+    priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false,
     kopilot: null,
   },
   os: [], szkic: null, ofertaWskazana: null, zamowienie: null, zwroty: [],
   sprawy: [], droga: [], szkicCopilota: null, kandydaciZamowien: [],
-  dobor: { stan: "pusty", wynik: null, wersja: 1, wybrany: null, dopytac: null, zmienil: null,
-    zmienilAutomat: false, zmienionoAt: null,
-    dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
-      oem: null, nazwaCzesci: null } },
   oferta: { externalId: "12096815384", link: null, zrodlo: "wiadomosc", zgodnosc: null, pobrana: null,
     kartoteka: { pewnosc: "brak", twId: null, symbol: null, zrodlo: "—", powod: null } },
   ...n,
@@ -89,7 +79,7 @@ const pobrane = (n: Record<string, unknown> = {}) => ({
 
 const pusteZamowienie = { externalId: "zam-77", link: null, pobrane: null, przesylka: null };
 const uklad = (d: OsRozmowy) => <MemoryRouter><Kontekst dane={d} onWstawDoSzkicu={() => {}}
-  onZlecPomiar={() => {}} onOtworzRozmowe={() => {}} /></MemoryRouter>;
+  onOtworzRozmowe={() => {}} /></MemoryRouter>;
 const rysuj = (d: OsRozmowy) => render(uklad(d));
 const wiersz = (nazwa: RegExp) => screen.getByRole("button", { name: nazwa });
 const swieci = () => screen.getByRole("region", { name: "Wymaga Ciebie" });
@@ -201,10 +191,9 @@ describe("kolumna kontekstu", () => {
       expect(screen.queryByText(/nie jest powiązana z ofertą/)).toBeNull();
     });
 
-  /* „Oferta" i „Towar" zostają JEDNYM tematem, a dobór, klient i wiedza mają
-     własne wiersze. */
-  it("każdy temat ma wiersz, a dobór działa nawet bez oferty", async () => {
-    historia.data = zHistoria; wiedza.data = zWiedza;
+  /* „Oferta" i „Towar" zostają JEDNYM tematem, a klient ma własny wiersz. */
+  it("każdy temat ma wiersz, także bez oferty", () => {
+    historia.data = zHistoria;
     const { unmount } = rysuj(dane({ oferta: null }));
     for (const nazwa of ["Oferta", "Towar"]) {
       expect(screen.queryByRole("button", { name: nazwa })).not.toBeInTheDocument();
@@ -215,61 +204,40 @@ describe("kolumna kontekstu", () => {
     /* Bez zamówienia i bez zakupów klienta „Zamówienie" nie ma czego rozwinąć. */
     expect(screen.getByText("Zamówienie").parentElement).toHaveTextContent("Zamówienieniepowiązane");
     expect(screen.queryByRole("button", { name: /^Zamówienie/ })).toBeNull();
-    for (const nazwa of [/^Dobór/, /^Klient/, /^Wiedza/]) {
-      expect(wiersz(nazwa)).toBeInTheDocument();
-    }
-    /* Bez oferty dobór ISTNIEJE: klient bywa bez numeru oferty, a maszynę
-       i część wpisuje agent. */
-    await userEvent.click(wiersz(/^Dobór/));
-    expect(screen.getByTestId("dobor")).toBeInTheDocument();
+    expect(wiersz(/^Klient/)).toBeInTheDocument();
     unmount();
     /* Zakup klienta do wskazania to treść: wiersz staje się przyciskiem. */
     rysuj(dane({ oferta: null, kandydaciZamowien: [{ externalId: "k-1" } as never] }));
     expect(wiersz(/^Zamówienie/)).toHaveAttribute("aria-expanded", "false");
   });
 
-  /* „Dobór" to robota z krokami i przyciskami, nie karta faktów. Doklejony
-     pod kartotekę zepchnąłby stan magazynowy z ekranu. */
-  it("dobór nie stoi rozwinięty pod towarem", () => {
-    rysuj(dane());
-    expect(screen.queryByTestId("dobor")).not.toBeInTheDocument();
-  });
-
   /* Zakładka z zerem kosztowała klik, żeby usłyszeć „tu nic nie ma". Pusty
      wiersz nie staje wcale (decyzja właściciela z 26 września) — ani przed
      odczytem, ani po pustym wyniku. Z treścią mówi to, czego karta nie ma. */
-  it("Klient i Wiedza stają tylko z treścią; Klient mówi maszynę i ostatni kontakt, nie liczniki", () => {
+  it("Klient staje tylko z treścią i mówi ostatni kontakt, nie liczniki", () => {
     const { rerender } = rysuj(dane());
     expect(screen.queryByRole("button", { name: /^Klient/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Wiedza/ })).toBeNull();
     historia.data = {
       login: "k",
-      maszyny: [{ marka: "MTD", nazwa: "Smart 53 SPO", wariant: null, rocznik: "2019", silnik: null,
-        rozmowaId: 4310, at: "2026-05-12T10:00:00Z" }],
       wpisy: [{ rodzaj: "zakup", at: "2026-05-12T10:00:00Z", tresc: "Nóż", zamowienieId: "inne",
         link: null, rozmowaId: null, sprawaId: null }],
     } satisfies HistoriaKlienta;
-    wiedza.data = zWiedza;
     rerender(uklad(dane()));
-    expect(wiersz(/^Klient/)).toHaveTextContent("MTD Smart 53 SPO (2019)");
     expect(wiersz(/^Klient/)).toHaveTextContent("ostatnio 12 maja 2026");
     /* Liczniki mówi karta zakupu jako „Wcześniej u nas". */
     expect(wiersz(/^Klient/)).not.toHaveTextContent(/1 zakup/);
     expect(wiersz(/^Klient/)).toHaveAttribute("aria-expanded", "false");
-    expect(wiersz(/^Wiedza/)).toHaveTextContent("1 dowód");
   });
 
   /* „Nowy klient" i „Wcześniej u nas" mają jeden dom: kartę zakupu, także
      zwiniętą i w pasku nad osią. Linijka pod pasmem była drugim. */
   it("pusta historia nie stawia ani wiersza, ani linijki „Nowy klient” — mówi to karta zakupu", () => {
-    historia.data = { login: "pasikonik5", maszyny: [], wpisy: [] };
-    wiedza.data = { zastosowanie: null, pomiary: [], silniki: [] };
+    historia.data = { login: "pasikonik5", wpisy: [] };
     const { rerender } = rysuj(dane());
     const kolumna = screen.getByRole("region", { name: "Kontekst" });
     expect(within(kolumna).queryByText(/Nowy klient|Wcześniej u nas/)).toBeNull();
     expect(screen.queryByRole("button", { name: /^Klient/ })).toBeNull();
-    expect(screen.queryByRole("button", { name: /^Wiedza/ })).toBeNull();
-    historia.data = { login: null, maszyny: [], wpisy: [] };
+    historia.data = { login: null, wpisy: [] };
     rerender(uklad(dane()));
     expect(within(kolumna).queryByText(/Nowy klient|Wcześniej u nas/)).toBeNull();
     expect(screen.queryByRole("button", { name: /^Klient/ })).toBeNull();
@@ -280,10 +248,10 @@ describe("kolumna kontekstu", () => {
   it("historia z samym tym zakupem nie stawia wiersza „Klient”; inny zakup go stawia", () => {
     const wpis = (zamowienieId: string, at: string) => ({ rodzaj: "zakup" as const, at, tresc: "Nóż",
       zamowienieId, link: null, rozmowaId: null, sprawaId: null });
-    historia.data = { login: "k", maszyny: [], wpisy: [wpis("zam-77", "2026-09-28T10:00:00Z")] };
+    historia.data = { login: "k", wpisy: [wpis("zam-77", "2026-09-28T10:00:00Z")] };
     const { rerender } = rysuj(dane({ zamowienie: pusteZamowienie }));
     expect(screen.queryByRole("button", { name: /^Klient/ })).toBeNull();
-    historia.data = { login: "k", maszyny: [],
+    historia.data = { login: "k",
       wpisy: [wpis("zam-77", "2026-09-28T10:00:00Z"), wpis("inne", "2026-09-20T10:00:00Z")] };
     rerender(uklad(dane({ zamowienie: pusteZamowienie })));
     expect(wiersz(/^Klient/)).toHaveTextContent("ostatnio 20 września 2026");
@@ -292,7 +260,7 @@ describe("kolumna kontekstu", () => {
   /* Serwer bierze login sprawy z zamówienia, więc sprawa bywa znana przy
      wątku bez loginu. Rozmowa ma do niej odsyłać — w obie strony. */
   it("sprawa klienta stawia wiersz także bez loginu i mówi krok z terminem", () => {
-    historia.data = { login: null, wpisy: [], maszyny: [], sprawa: { id: 1, login: "k", wersja: 1,
+    historia.data = { login: null, wpisy: [], sprawa: { id: 1, login: "k", wersja: 1,
       stan: "w_toku", krok: "Oddzwonić", krokDo: "2026-10-02T08:00:00Z", dzis: false, poTerminie: true,
       prowadzi: null, prowadziId: null, zakonczonoAt: null, zakonczyl: null, nowe: [], odcisk: "o",
       dosylki: [] } } satisfies HistoriaKlienta;
@@ -314,8 +282,8 @@ describe("kolumna kontekstu", () => {
     }));
     const soczewka = screen.getByRole("region", { name: "Pytanie klienta" });
     expect(soczewka.compareDocumentPosition(swieci()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    /* Klient i Wiedza bez treści nie stają wcale — z soczewką czy bez. */
-    for (const nazwa of [/^Oferta i towar/, /^Zamówienie/, /^Dobór/]) {
+    /* Klient bez treści nie staje wcale — z soczewką czy bez. */
+    for (const nazwa of [/^Oferta i towar/, /^Zamówienie/]) {
       expect(wiersz(nazwa)).toBeInTheDocument();
     }
   });
@@ -341,58 +309,6 @@ describe("kolumna kontekstu", () => {
     expect(sprawdz.mutate).not.toHaveBeenCalled();
   });
 
-  /* ── Bramka doboru ───────────────────────────────────────────────────────
-     Nagranie: klient zwracał kupiony nóż 14-25001, a dobór szukał po wymiarach
-     i pokazał świecę, sprężynę i przewody paliwa — bez kupionego towaru. */
-  const znany = (n: Partial<OsRozmowy["dobor"]> = {}) => dane({
-    zamowienie: pusteZamowienie,
-    oferta: { ...dane().oferta!, zrodlo: "zamowienie" },
-    dobor: { ...dane().dobor, stan: "otwarty", zmienil: "automat (szkic)", zmienilAutomat: true, ...n },
-  });
-
-  it("towar znany z zamówienia chowa dobór za bramką, a „mimo to” otwiera go tuż pod nią", async () => {
-    const { rerender } = rysuj(znany());
-    expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
-    /* Wiersza „Dobór: zbędny" nie ma — bramka stoi w „Oferta i towar". */
-    expect(screen.queryByRole("button", { name: /^Dobór/ })).toBeNull();
-    expect(screen.getByText(/Towar znany z zamówienia\./)).toBeInTheDocument();
-    /* Nazwę i SKU kupionego towaru mówi karta zakupu. */
-    expect(screen.queryByText(/Klient pisze o/)).toBeNull();
-    expect(screen.queryByTestId("dobor")).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Szukaj innego towaru mimo to" }));
-    expect(wiersz(/^Dobór/)).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByTestId("dobor")).toBeInTheDocument();
-    /* Dobór otwarty ręką nie świeci: agent sam po niego sięgnął. */
-    expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
-    /* Stoi zaraz pod towarem, czyli w miejscu klikniętego przycisku. */
-    expect(wiersz(/^Oferta i towar/).parentElement!.nextElementSibling).toContainElement(wiersz(/^Dobór/));
-    /* Pierwszy zapis agenta w doborze gasi bramkę i zapala świecenie. Dobór,
-       który agent sam otworzył, zostaje jednak w miejscu: skok na górę
-       kolumny w chwili zapisu przesuwałby blok pod okiem. */
-    rerender(uklad(znany({ zmienil: "A. Lewandowska", zmienilAutomat: false })));
-    expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
-    expect(wiersz(/^Dobór/)).toHaveAttribute("aria-expanded", "true");
-    expect(wiersz(/^Oferta i towar/).parentElement!.nextElementSibling).toContainElement(wiersz(/^Dobór/));
-  });
-
-  it("bramka ustępuje, gdy dane zapisał człowiek, a nie automat", () => {
-    rysuj(znany({ zmienil: "A. Lewandowska", zmienilAutomat: false }));
-    expect(within(swieci()).getByRole("button", { name: /^Dobór/ })).toHaveTextContent("Otwarty");
-  });
-
-  it("bramka nie mówi już, że automat zaczął szukać", () => {
-    rysuj(znany());
-    expect(screen.queryByText(/Automat zaczął szukać/)).toBeNull();
-  });
-
-  /* Pasowanie rozpoznane przez Copilota przeszło z Doboru do Wiedzy
-     (`docs/dobor-od-zera.md` §6), więc samo stawia wiersz Wiedza. */
-  it("pasowanie Copilota stawia wiersz Wiedza, także bez dowodów", () => {
-    rysuj(dane({ szkicCopilota: { pasowanie: { czesc: { symbol: "A" }, doCzego: { symbol: "B" } },
-      pasowanieOcena: null } as never }));
-    expect(wiersz(/^Wiedza/)).toHaveTextContent("pasowanie od Copilota");
-  });
-
   /* Drogę zakupu przez kolejki mówią linie zakupu w osi rozmowy. Czipy
      w kolumnie były drugim zapisem tej samej drogi. */
   it("droga zakupu nie stoi w kolumnie", () => {
@@ -412,17 +328,15 @@ describe("kolumna kontekstu", () => {
     expect(within(swieci()).getAllByRole("link", { name: "Otwórz" })).toHaveLength(2);
   });
 
-  /* Dobór stoi pod towarem, bo „Szukaj mimo to" otwiera go w miejscu
-     przycisku. Klient i Wiedza nie zmieniają miejsca względem siebie. */
+  /* Od tego, co klient kupował, do tego, kim jest — wiersze nie skaczą. */
   it("wiersze stoją w stałej kolejności", () => {
-    historia.data = { login: "k", wpisy: [], maszyny: [{ marka: "MTD", nazwa: "Smart 53 SPO", wariant: null,
-      rocznik: "2019", silnik: null, rozmowaId: 4310, at: "2026-05-12T10:00:00Z" }] } satisfies HistoriaKlienta;
-    wiedza.data = zWiedza;
+    historia.data = { login: "k", wpisy: [{ rodzaj: "zakup", at: "2026-05-12T10:00:00Z", tresc: "Nóż",
+      zamowienieId: "inne", link: null, rozmowaId: null, sprawaId: null }] } satisfies HistoriaKlienta;
     rysuj(dane({ zamowienie: pusteZamowienie, zwroty: [{ id: 9, kubelek: "zamkniety" } as never] }));
     const nazwy = screen.getAllByRole("button",
-      { name: /^(Oferta i towar|Dobór|Zamówienie|Zamknięte sprawy|Klient|Wiedza)/ })
+      { name: /^(Oferta i towar|Zamówienie|Zamknięte sprawy|Klient)/ })
       .map((b) => b.querySelector("b")?.textContent);
-    expect(nazwy).toEqual(["Oferta i towar", "Dobór", "Zamówienie", "Zamknięte sprawy", "Klient", "Wiedza"]);
+    expect(nazwy).toEqual(["Oferta i towar", "Zamówienie", "Zamknięte sprawy", "Klient"]);
   });
 });
 
@@ -516,19 +430,5 @@ describe("streszczenie oferty", () => {
   it("bez pobranej treści mówi to jednym zdaniem", async () => {
     const { streszczenieOferty } = await import("./Kontekst");
     expect(streszczenieOferty(dane())).toBe("treść oferty jeszcze nie pobrana");
-  });
-});
-
-describe("streszczenie doboru", () => {
-  it("mówi stan, a przy wybranej części jej symbol zamiast danych", async () => {
-    const { streszczenieDoboru } = await import("./Kontekst");
-    const d = dane();
-    const zDanymi = { ...d.dobor, stan: "otwarty" as const,
-      dane: { ...d.dobor.dane, nazwaCzesci: "szarpak", marka: "NAC", model: "LS 46" } };
-    expect(streszczenieDoboru(d)).toBe("Nie zaczęty");
-    expect(streszczenieDoboru({ ...d, dobor: zDanymi })).toBe("Otwarty · szarpak NAC LS 46");
-    expect(streszczenieDoboru({ ...d, dobor: { ...zDanymi, stan: "czesc", wynik: "czesc",
-      wybrany: { twId: 1, symbol: "532199377", podstawa: "numer", zdanieDoSzkicu: "…" } } }))
-      .toBe("Wybrano część · 532199377");
   });
 });

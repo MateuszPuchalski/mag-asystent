@@ -114,7 +114,7 @@ export function Analiza() {
         {/* Tarcie zaraz pod czasem odpowiedzi: tamto mówi, jak szybko,
             to — ile kosztował sam ekran (0.500.0). */}
         <TarcieSkrzynki dni={okna.obsluga} />
-        <MiaryObslugi dni={okna.obsluga} />
+        <MiaryObslugi />
       </>}
       {zakres === "uzycie" && uzycie.data && <ZakresUzycia r={uzycie.data} />}
       {zakres === "hala" && hala.data && <>

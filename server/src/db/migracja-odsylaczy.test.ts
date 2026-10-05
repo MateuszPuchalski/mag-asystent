@@ -5,8 +5,9 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate } from "./db.js";
 
 /* ── Źródło identyfikatora `dostawca`: trzecia przebudowa tabeli ────────────
-   Import odsyłaczy dokłada `dostawca` do CHECK-a na `towar_identyfikator.zrodlo`
-   i dwie kolumny. SQLite nie rozszerza CHECK-a w miejscu, więc tabela idzie
+   Import odsyłaczy dołożył `dostawca` do CHECK-a na `towar_identyfikator.zrodlo`
+   i dwie kolumny. Importu już nie ma, ale jego wiersze zostają wyszukiwalne,
+   a baza sprzed tamtej przebudowy dalej musi przez nią przejść. SQLite nie rozszerza CHECK-a w miejscu, więc tabela idzie
    przez przepisanie. Pilnujemy trzech rzeczy: każdy wiersz przeżywa z `id`
    (wpis biura i numer z oferty nie mają z czego wrócić), nowe źródło da się
    zapisać, a druga migracja niczego już nie rusza.                         */
@@ -43,15 +44,16 @@ function staraBaza() {
 const sqlTabeli = (d: DatabaseSync) =>
   (d.prepare("SELECT sql FROM sqlite_master WHERE name='towar_identyfikator'").get() as { sql: string }).sql;
 
-test("każdy wiersz przeżywa przebudowę z `id`, źródłem i numerem oferty", () => {
+test("wiersze z opisu i ręczne przeżywają przebudowę z `id`; numer z oferty zabiera kasata wiedzy", () => {
   const d = staraBaza();
   migrate(d);
   assert.match(sqlTabeli(d), /'dostawca'/);
   const w = d.prepare("SELECT id, zrodlo, oferta_id, dostawca, import_id FROM towar_identyfikator ORDER BY id").all();
+  /* `oferta` pisała baza wiedzy; po jej odejściu `bezDoboruIWiedzy` kasuje
+     te wiersze, bo nic już nie umie ich cofnąć. */
   assert.deepEqual(w.map((r) => ({ ...r })), [
     { id: 5, zrodlo: "opis", oferta_id: null, dostawca: null, import_id: null },
     { id: 9, zrodlo: "reczne", oferta_id: null, dostawca: null, import_id: null },
-    { id: 12, zrodlo: "oferta", oferta_id: "14023867457", dostawca: null, import_id: null },
   ]);
 });
 
@@ -78,5 +80,4 @@ test("druga migracja niczego nie rusza, a świeża baza ze schematu jest od razu
   swieza.exec(schema);
   migrate(swieza);
   assert.match(sqlTabeli(swieza), /'dostawca'/);
-  assert.ok(swieza.prepare("SELECT 1 FROM sqlite_master WHERE name='import_odsylaczy'").get(), "historia importów stoi");
 });

@@ -43,7 +43,7 @@ const dane = (n: {
 } = {}): OsRozmowy => ({
   rozmowa: { id: 5 },
   os: [], szkic: null, ofertaWskazana: null, zwroty: [], sprawy: [], droga: [],
-  kandydaciZamowien: [], dobor: {}, szkicCopilota: null,
+  kandydaciZamowien: [], szkicCopilota: null,
   oferta: n.bezOferty ? null : {
     externalId: "of-1", link: null, zrodlo: "zamowienie",
     pobrana: n.skuOferty ? { nazwa: "Prowadnica", sku: n.skuOferty, cenaGrosze: 4500, waluta: "PLN",

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import type { HistoriaKlienta, OsRozmowy, StanDoboru, SzkicCopilota, WiedzaDoboru } from "../api/typy";
-import { bramkaDoboru, coSwieci, doborWToku, historiaPozaZakupem, historiaWierszaKlienta, klientMaHistorie, klientWKolumnie, nowyKlient,
-  ofertaWKarcie, paczkaWyzej, paraPasowania, pozycjeWKolumnie, towarOtwartyNaStart, towarZnany, wiedzaMaTresc }
+import type { HistoriaKlienta, OsRozmowy } from "../api/typy";
+import { coSwieci, historiaPozaZakupem, historiaWierszaKlienta, klientMaHistorie, klientWKolumnie, nowyKlient,
+  ofertaWKarcie, paczkaWyzej, pozycjeWKolumnie, towarOtwartyNaStart }
   from "./kokpit";
 
 /* ── Reguły ciemnego kokpitu (0.498.0) ──────────────────────────────────────
@@ -14,10 +14,6 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
   rozmowa: { kopilot: null }, zwroty: [], sprawy: [], zamowienie: null, kandydaciZamowien: [],
   oferta: { externalId: "111", link: null, zrodlo: "wiadomosc", zgodnosc: null, pobrana: null,
     kartoteka: { pewnosc: "brak", twId: null, symbol: null, zrodlo: "—", powod: null } },
-  dobor: { stan: "pusty", wynik: null, wersja: 1, wybrany: null, dopytac: null, zmienil: null,
-    zmienilAutomat: false, zmienionoAt: null,
-    dane: { marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null, silnik: null,
-      oem: null, nazwaCzesci: null } },
   ...n,
 } as unknown as OsRozmowy);
 
@@ -45,10 +41,10 @@ describe("co świeci w kolumnie kontekstu", () => {
     expect(coSwieci(dane({ sprawy: [{ otwarta: false } as never] }))).toEqual([]);
   });
 
-  it("zwrot i sprawa zwijają kartę towaru, dobór jej nie zwija", () => {
+  it("zwrot i sprawa zwijają kartę towaru, paczka i pozycja jej nie zwijają", () => {
     expect(towarOtwartyNaStart(["zwrot"])).toBe(false);
     expect(towarOtwartyNaStart(["sprawa"])).toBe(false);
-    expect(towarOtwartyNaStart(["dobor", "paczka"])).toBe(true);
+    expect(towarOtwartyNaStart(["pozycja", "paczka"])).toBe(true);
   });
 
   it("paczka świeci przy awizo, problemie i powrocie — nie w drodze i nie po doręczeniu", () => {
@@ -76,63 +72,6 @@ describe("co świeci w kolumnie kontekstu", () => {
     expect(coSwieci(dane({ oferta: null, zamowienie: zamowienie({ pobrane: pobrane(2) }) }))).toEqual(["pozycja"]);
     expect(coSwieci(dane({ oferta: null, zamowienie: zamowienie({ pobrane: pobrane(1) }) }))).toEqual([]);
   });
-
-  it("świeci wyłącznie otwarty dobór; pusty i każdy wynik nie", () => {
-    /* „Dopytać" też gaśnie: to odpowiedź, a ruch jest po stronie klienta. */
-    const d = (stan: StanDoboru) => dane({ dobor: { ...dane().dobor, stan } });
-    expect(coSwieci(d("otwarty"))).toEqual(["dobor"]);
-    for (const stan of ["pusty", "czesc", "brak", "dopytac", "nie_dotyczy"] as const) {
-      expect(coSwieci(d(stan))).toEqual([]);
-    }
-    expect(doborWToku("otwarty")).toBe(true);
-    expect(doborWToku("dopytac")).toBe(false);
-  });
-});
-
-describe("bramka doboru", () => {
-  const zZamowienia = (n: Partial<OsRozmowy["dobor"]> = {}) => dane({
-    zamowienie: zamowienie(),
-    oferta: { ...dane().oferta!, zrodlo: "zamowienie" },
-    dobor: { ...dane().dobor, stan: "otwarty", zmienil: "automat (szkic)", zmienilAutomat: true, ...n },
-  });
-
-  it("oferta z jedynej pozycji zamówienia to towar znany — dobór automatu gaśnie", () => {
-    expect(towarZnany(zZamowienia())).toBe(true);
-    expect(bramkaDoboru(zZamowienia())).toBe(true);
-    expect(coSwieci(zZamowienia())).toEqual([]);
-  });
-
-  it("oferta wskazana ręcznie, ale będąca pozycją zamówienia, też jest znana", () => {
-    const d = dane({ zamowienie: zamowienie({ pobrane: { pozycje: [{ offerId: "111" }] } }),
-      oferta: { ...dane().oferta!, zrodlo: "reczne" } });
-    expect(towarZnany(d)).toBe(true);
-  });
-
-  it("oferta spoza zamówienia i rozmowa bez zamówienia — towar nieznany", () => {
-    expect(towarZnany(dane())).toBe(false);
-    expect(towarZnany(dane({ zamowienie: zamowienie({ pobrane: { pozycje: [{ offerId: "999" }] } }) }))).toBe(false);
-  });
-
-  it("wybrana część wygrywa z bramką", () => {
-    const d = zZamowienia({ stan: "czesc", wynik: "czesc",
-      wybrany: { twId: 1, symbol: "X", podstawa: "numer", zdanieDoSzkicu: "…" } });
-    expect(towarZnany(d)).toBe(false);
-    expect(bramkaDoboru(d)).toBe(false);
-  });
-
-  it("dane zapisane przez człowieka zostają na wierzchu", () => {
-    const d = zZamowienia({ zmienil: "A. Lewandowska", zmienilAutomat: false });
-    expect(bramkaDoboru(d)).toBe(false);
-    expect(coSwieci(d)).toEqual(["dobor"]);
-  });
-
-  it("dobór, którego nikt nie ruszał, też stoi za bramką", () => {
-    expect(bramkaDoboru(zZamowienia({ zmienil: null, zmienilAutomat: false }))).toBe(true);
-  });
-
-  it("każdy wynik zdejmuje bramkę, bo to decyzja człowieka", () => {
-    expect(bramkaDoboru(zZamowienia({ stan: "brak", wynik: "brak" }))).toBe(false);
-  });
 });
 
 /* ── Karta towaru otwarta tylko przy pytaniu o towar (0.506.0) ─────────────
@@ -152,14 +91,13 @@ describe("karta towaru na starcie według rodzaju pytania", () => {
 /* ── Puste wiersze znikają (0.531.0, decyzja właściciela z 26 września) ──
    Para przy każdej regule: stan, w którym wiersz gaśnie, i stan, w którym
    MUSI stanąć. Reguła gasząca wszystko schowałaby klienta z historią. */
-describe("puste wiersze Klient i Wiedza", () => {
-  const h = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta => ({ login: "pasikonik5", wpisy: [], maszyny: [], ...n });
+describe("pusty wiersz Klient", () => {
+  const h = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta => ({ login: "pasikonik5", wpisy: [], ...n });
 
-  it("Klient staje z historią albo maszyną; bez nich i przed odczytem — nie", () => {
+  it("Klient staje z historią; bez niej i przed odczytem — nie", () => {
     expect(klientMaHistorie(undefined)).toBe(false);
     expect(klientMaHistorie(h())).toBe(false);
     expect(klientMaHistorie(h({ wpisy: [{ rodzaj: "zakup" } as never] }))).toBe(true);
-    expect(klientMaHistorie(h({ maszyny: [{ marka: "NAC" } as never] }))).toBe(true);
   });
 
   it("„nowy klient” tylko przy znanym loginie bez historii — bez loginu nie wiemy, kto pisze", () => {
@@ -167,25 +105,6 @@ describe("puste wiersze Klient i Wiedza", () => {
     expect(nowyKlient(h({ login: null }))).toBe(false);
     expect(nowyKlient(h({ wpisy: [{ rodzaj: "rozmowa" } as never] }))).toBe(false);
     expect(nowyKlient(undefined)).toBe(false);
-  });
-
-  it("Wiedza staje z zastosowaniem albo pomiarem; pusta i przed odczytem — nie", () => {
-    const w = (n: Partial<WiedzaDoboru> = {}) => ({ zastosowanie: null, zabudowa: null, pasowanie: null,
-      silniki: [], pomiary: [], ...n }) as WiedzaDoboru;
-    expect(wiedzaMaTresc(undefined)).toBe(false);
-    expect(wiedzaMaTresc(w())).toBe(false);
-    expect(wiedzaMaTresc(w({ pomiary: [{ zadanieId: 1 } as never] }))).toBe(true);
-    expect(wiedzaMaTresc(w({ zastosowanie: { dowody: [] } as never }))).toBe(true);
-  });
-
-  it("Wiedza staje także z pasowaniem Copilota, które czeka na decyzję", () => {
-    const para = { czesc: { symbol: "A" }, doCzego: { symbol: "B" } };
-    const szkic = (pasowanieOcena: string | null) => ({ pasowanie: para, pasowanieOcena }) as unknown as SzkicCopilota;
-    expect(paraPasowania(szkic(null))).toBe("A → B");
-    expect(wiedzaMaTresc(undefined, szkic(null))).toBe(true);
-    /* Po decyzji agenta karta nie ma już ruchu, więc wiersza nie stawia. */
-    expect(wiedzaMaTresc(undefined, szkic("odrzucone"))).toBe(false);
-    expect(paraPasowania(null)).toBeNull();
   });
 });
 
@@ -198,13 +117,13 @@ describe("historia bez tego zakupu", () => {
   const wpis = (rodzaj: string, zamowienieId: string | null) =>
     ({ rodzaj, at: "2026-09-01T10:00:00Z", tresc: "x", zamowienieId, link: null, rozmowaId: null, sprawaId: null }) as never;
   const sprawa = { id: 5, stan: "w_toku" } as never;
-  const h = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta => ({ login: "pasikonik5", wpisy: [], maszyny: [], ...n });
+  const h = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta => ({ login: "pasikonik5", wpisy: [], ...n });
 
   it("wycina zakup, zwrot, reklamację i dyskusję tego zamówienia; resztę zostawia", () => {
     const pelna = h({
       wpisy: [wpis("zakup", "z"), wpis("zwrot", "z"), wpis("reklamacja", "z"), wpis("dyskusja", "z"),
         wpis("rozmowa", null), wpis("zakup", "inne"), wpis("rozmowa", "z")],
-      maszyny: [{ marka: "NAC" } as never], sprawa,
+      sprawa,
     });
     const poza = historiaPozaZakupem(pelna, "z")!;
     /* Rozmowa z numerem tego zamówienia też zostaje. Serwer daje dziś
@@ -212,7 +131,6 @@ describe("historia bez tego zakupu", () => {
        go podawać: inna rozmowa to wcześniejszy kontakt, nie ten zakup. */
     expect(poza.wpisy.map((w) => `${w.rodzaj}:${w.zamowienieId}`))
       .toEqual(["rozmowa:null", "zakup:inne", "rozmowa:z"]);
-    expect(poza.maszyny).toHaveLength(1);
     expect(poza.login).toBe("pasikonik5");
     expect(poza.sprawa).toBe(sprawa);
   });
@@ -228,11 +146,10 @@ describe("historia bez tego zakupu", () => {
     expect(nowyKlient(historiaPozaZakupem(h({ wpisy: [wpis("zakup", "inne")] }), "z"))).toBe(false);
   });
 
-  it("wiersz Klient: bez historii i z samym tym zakupem nie staje; z innym wpisem, maszyną albo sprawą — staje", () => {
+  it("wiersz Klient: bez historii i z samym tym zakupem nie staje; z innym wpisem albo sprawą — staje", () => {
     expect(klientWKolumnie(undefined, "z")).toBe(false);
     expect(klientWKolumnie(h({ wpisy: [wpis("zakup", "z")] }), "z")).toBe(false);
     expect(klientWKolumnie(h({ wpisy: [wpis("zakup", "z"), wpis("rozmowa", null)] }), "z")).toBe(true);
-    expect(klientWKolumnie(h({ maszyny: [{ marka: "NAC" } as never] }), "z")).toBe(true);
     /* Bez loginu historii nie ma, ale sprawa klienta tak — rozmowa ma do niej odsyłać. */
     expect(klientWKolumnie(h({ login: null, sprawa }), "z")).toBe(true);
   });

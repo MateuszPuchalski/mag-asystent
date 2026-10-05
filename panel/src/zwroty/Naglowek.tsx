@@ -80,7 +80,7 @@ export function Naglowek({ zwrot }: { zwrot: Zwrot }) {
           className="inline-flex items-center gap-1 text-xs text-sky-700 underline underline-offset-2">
           <UserRound size={12} aria-hidden="true" />profil</RouterLink>}
       {/* Historia kupującego jednym kliknięciem — powód w `sprawy/HistoriaKlienta.tsx`. */}
-      {zwrot.kupujacyLogin && <PrzyciskHistorii rodzaj="zwrot" id={zwrot.id} tutaj="tym zwrotem" />}
+      {zwrot.kupujacyLogin && <PrzyciskHistorii rodzaj="zwrot" id={zwrot.id} />}
     </p>
 
     {/* ── DRUGI ZWROT TEGO ZAMÓWIENIA (0.493.0) ─────────────────────────────

@@ -1,6 +1,6 @@
 # Projekt widoków obsługi klienta
 
-Źródła makiet do `docs/panel-obslugi-klienta.md`. Pięć ekranów, każdy jako
+Źródła makiet do `docs/panel-obslugi-klienta.md`. Cztery ekrany, każdy jako
 osobny plik `.dc.html`; `canvas.json` układa je na jednej kanwie.
 
 Kanwa: https://claude.ai/code/artifact/cee721cd-f98c-41b7-a9c0-d32fbbb1941a
@@ -8,7 +8,6 @@ Kanwa: https://claude.ai/code/artifact/cee721cd-f98c-41b7-a9c0-d32fbbb1941a
 | plik | ekran | paragraf projektu |
 |---|---|---|
 | `Main.dc.html` | skrzynka: kolejka, rozmowa, kontekst | §10.1–10.4 |
-| `Dobor.dc.html` | dobór części: kandydaci, dowody, negatywne | §11 |
 | `Konflikt.dc.html` | konflikt świeżości przy wysyłce | §8.5 |
 | `Awaria.dc.html` | trwały alarm synchronizacji | §21 |
 | `Przejecie.dc.html` | wyścig o przejęcie, brak powiązania z ofertą | §6.2 |
@@ -42,16 +41,8 @@ oznaczone. Ekran nie uzupełnia go z kartoteki, bo to mieszałoby źródła.
 
 ## Poprawki po decyzjach właściciela
 
-**Kłódka zdjęta z zatwierdzania (0.190.0).** Stopka `Dobor.dc.html` rysowała
-wyłączony przycisk „ZATWIERDŹ ZASTOSOWANIE — tylko ekspert". Roli eksperta
-technicznego NIE MA: zniosła ją decyzja właściciela z etapów E1 i E2, a §26
-zdjęła z listy pytanie, kto zatwierdza zastosowania. Zatwierdza każdy z biura,
-także autor propozycji.
-
-Makieta z rolą, której nie ma, jest gorsza od jej braku. Następna sesja
-zbudowałaby bramkę uprawnień pod byt, którego nikt nie zamawiał — a to repo
-ma dwa udokumentowane przypadki zbudowania tej samej rzeczy dwa razy.
-Przycisk nazywa się dziś tak jak w kodzie: **ZATWIERDŹ DOBÓR**.
+**Makieta doboru zeszła.** Dobór części i baza wiedzy wyszły z WERTIS
+w @wydanie, więc ekran, który je rysował, nie ma już czego pokazywać.
 
 ## Skąd wzięte
 

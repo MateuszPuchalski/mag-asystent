@@ -53,8 +53,6 @@ export type Rozmowa = {
   nowychOdOdpowiedzi: number;
   /** Niezamknięte zadanie terenowe przy rozmowie. */
   zadanieWToku: boolean;
-  /** Stan doboru liczy SERWER z wyniku i danych; panel go nie wylicza. */
-  dobor: StanDoboru;
   odlozoneDo: string | null;
   /** Odłożenie, którego termin minął. Liczy SERWER — panel tej reguły nie powtarza. */
   poTerminie: boolean;
@@ -188,11 +186,6 @@ export type PomiarCopilota = {
     medianaMs: number | null; p90Ms: number | null }>;
   szkice: {
     ile: number; odrzuconych: number;
-    /** Los danych doboru z rozmowy — osobno od losu szkicu. */
-    daneZaproponowane: number; daneWpisane: number; daneOdrzucone: number;
-    /** Pasowania z rozmowy (przyrost czwarty); ostatnia liczba to właściwa miara jakości. */
-    pasowaniaRozpoznane: number; pasowaniaZaproponowane: number; pasowaniaOdrzucone: number;
-    pasowaniaZatwierdzonePrzezBiuro: number;
     /** Los szkicu przy wysyłce: poszedł bez zmian albo z poprawką. */
     wyslanychBezZmian: number; wyslanychPoprawionych: number;
   };
@@ -213,7 +206,7 @@ export type WpisOsi = {
      rysuje się jak wypowiedź w rozmowie z klientem. Odmowa hali udająca
      zdanie wysłane kupującemu to najgorszy możliwy wynik tej zmiany. */
   rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania"
-    | "komentarz" | "status" | "dobor"
+    | "komentarz" | "status"
     /* Kamień milowy zwrotu (0.502.0) — zdarzenie, nie wypowiedź; `Os.tsx` ZDARZENIE. */
     | "zwrot"
     /* Zdarzenie ZAKUPU wstawione do osi po stronie panelu (`skrzynka/zakup.ts`):
@@ -243,7 +236,7 @@ export type WpisOsi = {
     twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   };
   /**
-   * Zdarzenie w postaci KLUCZY (0.243.0) — przy `status` i `dobor`.
+   * Zdarzenie w postaci KLUCZY (0.243.0) — przy `status` i `zwrot`.
    * `tresc` zostaje zdaniem dla podpowiedzi, a to pole niesie
    * to samo rozłożone na części, żeby pasek zdarzeń mógł pokazać krótką
    * etykietę po polsku. Słownik polszczyzny stoi w panelu — angielskie klucze
@@ -252,10 +245,6 @@ export type WpisOsi = {
    */
   zdarzenie?:
     | { rodzaj: "status"; po: string | null }
-    /* Przy `dobor` oś niesie wyłącznie nowe stany (`StanDoboru`): stare
-       zdarzenia tłumaczy serwer, więc panel zna jedną listę nazw. */
-    | { rodzaj: "dobor"; po: string | null }
-    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null }
     /* Kamień milowy zwrotu tego zamówienia (0.502.0) — `server/src/services/zwrot-na-osi.ts`. */
     | { rodzaj: "zwrot"; co: string; zwrotId: number; numer: string | null };
   messageId?: number;
@@ -302,7 +291,7 @@ export type OfertaRozmowy = {
   /** Skąd numer (0.215.0): wskazanie agenta, wiadomość klienta albo jedyna pozycja zamówienia. */
   zrodlo: "wiadomosc" | "reczne" | "zamowienie";
   /**
-   * Lista „Pasuje do" z oferty z trafieniami maszyny z doboru (23 września 2026).
+   * Lista „Pasuje do" z treści oferty.
    * `null`: treści oferty jeszcze nie pobrano albo lista jest pusta.
    */
   zgodnosc: ZgodnoscOferty | null;
@@ -368,10 +357,6 @@ export type KartaTowaru = {
 /** Lista zgodności oferty — to samo dopasowanie, co fakt szkicu (`zgodnosc-oferty.ts`). */
 export type ZgodnoscOferty = {
   lista: string[];
-  /** „HECHT 1803S DYM1182c", gdy agent wpisał markę i model w doborze. */
-  maszyna: string | null;
-  trafienia: string[];
-  wariantSprawdzony: boolean;
 };
 
 /** Jeden poziom cenowy kartoteki; kwoty w GROSZACH całkowitych. */
@@ -506,7 +491,6 @@ export type OsRozmowy = {
      i dyskusje tego zakupu oraz jego droga przez kolejki. */
   sprawy: SprawaZakupu[];
   droga: PrzystanekDrogi[];
-  dobor: Dobor;
   /** Propozycja Copilota (§14.6) — osobny byt, nie szkic agenta. `null` = nikt nie prosił. */
   szkicCopilota: SzkicCopilota | null;
 };
@@ -526,15 +510,6 @@ export type SzkicCopilota = {
   at: string;
   przez: string;
   ocena: OcenaSzkicu | null;
-  /** Wersja doboru, na której szkic powstał — inna dziś = szkic nieświeży. */
-  doborWersja: number;
-  /**
-   * Pasowanie rozpoznane w rozmowie (przyrost czwarty): oba końce to kartoteki
-   * z kontekstu tej rozmowy, sprawdzone przez serwer. `null` = nic. To
-   * PROPOZYCJA: do kolejki wiedzy wchodzi na kliknięcie agenta, rozstrzyga biuro.
-   */
-  pasowanie: PropozycjaPasowaniaCopilota | null;
-  pasowanieOcena: OcenaPasowania | null;
   /**
    * SKĄD MODEL TO WIE (0.253.0) — rachunek za tekst, który agent zaraz wyśle.
    *
@@ -548,19 +523,6 @@ export type SzkicCopilota = {
    * wyżej, niż wolno przy tym źródle.
    */
   twierdzenia: TwierdzenieCopilota[];
-  /**
-   * POKWITOWANIE wiedzy odzyskanej z oferty (0.264.0).
-   *
-   * Właściciel w 0.254.0: „jeśli jakieś numery są w ofercie, a nie ma
-   * w kartotece, zaznacz — to jest organiczna okazja do uzupełnienia danych".
-   * Do 0.263.0 był to sam akapit z listą braków, liczony od zera przy każdym
-   * kliknięciu. Teraz mówi, co przy tym szkicu FAKTYCZNIE trafiło do bazy
-   * i ile pozycji tej kartoteki czeka w kolejce Wiedzy.
-   *
-   * Liczy je serwer, nie model, i do faktów nie wchodzą: czego nam brakuje
-   * w danych, to zdanie o NAS, a nie o maszynie klienta.
-   */
-  lukiKartoteki: PokwitowanieZOferty;
   /**
    * CO MODEL ODCZYTAŁ ZE ZDJĘĆ przysłanych przez klienta.
    *
@@ -577,37 +539,6 @@ export type SzkicCopilota = {
    * powołać.
    */
   odczytZeZdjec: OdczytZdjecia[];
-};
-
-export type PokwitowanieZOferty = {
-  /** Do KTÓREJ kartoteki to poszło; `null`, gdy oferta nie wskazuje pewnej kartoteki. */
-  symbol: string | null;
-  numery: Array<{ rodzaj: string; wartosc: string }>;
-  /** Pozycje zgodności ODŁOŻONE do kolejki — te, przy których marka milczała. */
-  modele: string[];
-  /**
-   * Pozycje, które weszły do wiedzy OD RAZU (0.341.0), bo markę dało się
-   * odczytać z tekstu, z naszej bazy albo z tytułu oferty. Rozłączne
-   * z `modele`. Szkice sprzed tego wydania mają tu pustą listę.
-   */
-  wpisane: string[];
-  czeka: number;
-};
-
-/**
- * Wpis, który automat wiedzy dopisał BEZ człowieka (0.331.0).
- *
- * Rozpoznany po parze `rozstrzygnal` niepuste i `rozstrzygnal_user_id` puste.
- * Karta w ustawieniach pokazuje te wiersze do PROSTOWANIA — cofanie idzie
- * istniejącymi trasami wiedzy, bo to dalej to samo wycofanie, tylko cudzego
- * wpisu zamiast własnego.
- */
-export type WpisAutomatu = {
-  rodzaj: "zastosowanie" | "pasowanie";
-  id: number;
-  symbol: string;
-  etykieta: string;
-  at: string;
 };
 
 /**
@@ -628,23 +559,13 @@ export type WymianaCopilota = {
   przez: string;
   /** Po co model sięgnął do bazy (0.507.0). Brak = starszy serwer albo nie sięgał. */
   narzedzia?: UzycieNarzedziaCopilota[];
-  /** Pasowania z sieci po sicie serwera (0.528.0). Brak = starszy serwer albo bez sieci. */
-  pasowania?: PasowanieZDopytania[];
-};
-
-/** Pasowanie z przeczytanej strony — kształt z `services/copilot-pytania.ts`. */
-export type PasowanieZDopytania = {
-  twId: number; symbol: string; rodzaj: "maszyna" | "silnik"; marka: string; model: string; wariant: string | null;
-  url: string; cytat: string; zrodloStrony: "producent" | "katalog_dostawcy" | "sklep"; warunek: string | null;
-  /** `nowa` — stanęła w Kolejce, `juz_byla` — ta para już tam jest, `null` — nie zapisano. */
-  zapis: "nowa" | "juz_byla" | null;
 };
 
 /** Jedno wywołanie narzędzia: nazwa, zapytanie modelu i długość wyniku. */
 export type UzycieNarzedziaCopilota = { nazwa: string; argument: string; znakow: number };
 
-/** Skąd wziął się wiersz identyfikatora. `oferta` doszło w 0.264.0, `dostawca`
- *  z importem odsyłaczy od dostawców. */
+/** Skąd wziął się wiersz identyfikatora. `oferta` i `dostawca` nie przybywa,
+ *  ale wiersze zostają w bazie, więc karta towaru musi je nazwać. */
 export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta" | "dostawca";
 
 /**
@@ -653,7 +574,8 @@ export type ZrodloIdentyfikatora = "opis" | "reczne" | "oferta" | "dostawca";
  * ostrożność na wyrost: z tego, że na fotografii widać tabliczkę, nie wynika,
  * że to tabliczka maszyny, o którą klient pyta.
  */
-/* `siec` (0.528.0): strona przeczytana w dopytaniu; sufit „prawdopodobne”. */
+/* `siec`: strona przeczytana w dopytaniu. Serwer już jej nie czyta, ale
+   zapisane wymiany ją niosą, a twierdzenie bez etykiety źródła kłamałoby. */
 export type ZrodloTwierdzenia = "fakty" | "oferta" | "zdjecie" | "siec" | "model";
 export type PoziomPewnosci = "pewne" | "prawdopodobne" | "niepewne";
 export type TwierdzenieCopilota = {
@@ -667,366 +589,13 @@ export type TwierdzenieCopilota = {
 };
 /** Co model odczytał z jednego zdjęcia. `zdjecie` to `Z1`, `Z2` ze spisu. */
 export type OdczytZdjecia = { zdjecie: string; tekst: string };
-export type OcenaPasowania = "zaproponowane" | "odrzucone";
-export type PropozycjaPasowaniaCopilota = {
-  czesc: KartotekaPasowania; doCzego: KartotekaPasowania; rola: RolaPasowania; pozycja: string | null;
-};
-
-/* ── Dobór części (`docs/dobor-od-zera.md` §5.1) ────────────────────────────
-   Kontrakt z serwerem; nazwy i kształty są wiążące po obu stronach. Dobór
-   odpowiada na jedno pytanie klienta jedną z czterech odpowiedzi (§1), więc
-   wynik jest zamkniętą listą, a stan dla kolejki SERWER z niej wylicza. */
-export type DaneDoboru = {
-  marka: string | null; model: string | null; wariant: string | null;
-  rocznik: string | null; nrSeryjny: string | null; silnik: string | null;
-  oem: string | null; nazwaCzesci: string | null;
-};
-export type WynikDoboru = "czesc" | "brak" | "dopytac" | "nie_dotyczy";
-/** `pusty` i `otwarty` to brak wyniku, rozróżniony pustością danych. */
-export type StanDoboru = "pusty" | "otwarty" | WynikDoboru;
-export type PodstawaWyboru = "numer" | "wiedza" | "podobne" | "reczny";
-
-export type Dobor = {
-  stan: StanDoboru;
-  wynik: WynikDoboru | null;
-  /** Wersja doboru — własna, nie `Rozmowa.wersja`; pilnuje zapisu przed nadpisaniem. */
-  wersja: number;
-  dane: DaneDoboru;
-  /** Tylko przy wyniku `czesc`. Zdanie do szkicu pisze SERWER, ze źródłem (§3). */
-  wybrany: { twId: number; symbol: string; podstawa: PodstawaWyboru; zdanieDoSzkicu: string } | null;
-  /** Tylko przy wyniku `dopytac`. */
-  dopytac: string | null;
-  zmienil: string | null;
-  /** Ostatni zapis zrobił automat, nie człowiek. */
-  zmienilAutomat: boolean;
-  zmienionoAt: string | null;
-};
-
-export type GrupaKandydata = "numer" | "wiedza" | "podobne";
-export type PewnoscKandydata = "potwierdzone" | "prawdopodobne" | "do_sprawdzenia";
-export type KandydatDoboru = {
-  twId: number; symbol: string; nazwa: string;
-  /** Dostępne na magazynie głównym; `null` = brak stanu. */
-  stan: number | null;
-  grupa: GrupaKandydata; pewnosc: PewnoscKandydata;
-  /** Jedno zdanie: skąd ten kandydat. */
-  powod: string;
-  /** Zdania innych źródeł, które trafiły w tę samą kartotekę. */
-  takze: string[];
-  /** Zastrzeżenia: warunek, kilka silników, negatyw z wiedzy. */
-  ostrzezenia: string[];
-};
-export type KandydaciDoboru = {
-  kandydaci: KandydatDoboru[];
-  /** Numery z pola `oem` bez kartoteki. Nie da się ich wybrać. */
-  bezKartoteki: Array<{ numer: string; zdanie: string }>;
-  negatywne: Array<{ twId: number; symbol: string; nazwa: string | null; powod: string; zrodlo: string }>;
-  /** Czego zabrakło do szukania, zdaniami. Pusta lista = sprawdzono wszystko. */
-  brakuje: string[];
-};
-
-export type MiaryDoboru = {
-  dni: number;
-  /** Ostatni wynik każdej rozmowy z oknem, z dziennika zdarzeń. */
-  wyniki: Record<WynikDoboru, number>;
-  /** Podstawy przy wyniku `czesc`. */
-  podstawy: Record<PodstawaWyboru, number>;
-  /** Stan dziś: rozmowy w stanie `otwarty`. */
-  otwarte: number;
-};
-
-/* ── Baza wiedzy (§11.3, §11.4, §12, etap E2) ────────────────────────────────
-   Listy ZAMKNIĘTE — trzecia kopia obok `services/wiedza.ts` i `CHECK`. */
-export type PowodNegatywny =
-  | "nie_pasuje" | "tylko_inny_wariant" | "niewlasciwy_rozstaw"
-  | "srednica_ok_inne_mocowanie" | "mylace_oznaczenie" | "wymaga_pomiaru";
-export type RodzajDowodu =
-  | "producent" | "katalog_dostawcy" | "pomiar_wlasny" | "sprzedaz_weryfikacja" | "decyzja_biura" | "rozmowa";
-export type StanZastosowania = "propozycja" | "zatwierdzone" | "odrzucone" | "wycofane";
-/* `oferta` (0.264.0): propozycja z pozycji listy zgodności NASZEJ oferty
-   Allegro, złożona ręką biura w kolejce Wiedzy. Osobno od `opis`, bo to inne
-   świadectwo — deklaracja sprzedawcy w aukcji, nie opis towaru z magazynu. */
-export type ZrodloPropozycji = "dobor" | "pomiar" | "reczne" | "opis" | "copilot" | "oferta";
-
-export type ModelUrzadzenia = {
-  id: number; rodzaj: "maszyna" | "silnik"; marka: string; nazwa: string;
-  wariant: string | null; lata: string | null; klucz: string; etykieta: string;
-};
-
-export type DowodZastosowania = {
-  id: number; rodzaj: RodzajDowodu; nazwaRodzaju: string; tresc: string; link: string | null;
-  zadanieId: number | null; conversationId: number | null; autor: string; at: string;
-};
-
-/** Kwalifikatory wpisu: lata, zakres numerów seryjnych, warunek słowny. Wszystkie `null` = bez warunków. */
-export type WarunkiZastosowania = {
-  rokOd: number | null; rokDo: number | null; seryjnyOd: string | null; seryjnyDo: string | null; warunek: string | null;
-};
-
-export type Zastosowanie = {
-  id: number; twId: number; symbol: string; model: ModelUrzadzenia;
-  polaryzacja: "pasuje" | "nie_pasuje"; powodNegatywny: PowodNegatywny | null; zdaniePowodu: string | null;
-  stan: StanZastosowania; zrodlo: ZrodloPropozycji; komentarz: string | null;
-  conversationId: number | null; zastepujeId: number | null;
-  zaproponowal: string; zaproponowanoAt: string;
-  rozstrzygnal: string | null; rozstrzygnietoAt: string | null; powodRozstrzygniecia: string | null;
-  dowody: DowodZastosowania[];
-  pewnosc: "potwierdzone" | "prawdopodobne";
-  warunki: WarunkiZastosowania;
-  /** „roczniki 2014–2018, nr seryjny od 175000000" — pisze SERWER; `null` = bez warunków. */
-  zdanieWarunkow: string | null;
-  /** Wykaz części, z którego przyszła propozycja; `null` = inne źródło. Brak pola = serwer sprzed przeglądu wykazów. */
-  importId?: number | null;
-  /** Zdanie źródła pisze SERWER (§14.3). */
-  zdanieZrodla: string;
-};
-
-/* ── Identyfikatory i sekcje „Modele:" z opisów (§11.2, etap E3) ─────────── */
+/* ── Identyfikatory części z opisów kartotek (§11.2, etap E3) ────────────── */
 export type RodzajIdentyfikatora = "oem" | "nr_oryg" | "katalog_obcy" | "stare_sku" | "zamiennik";
-
-export type Identyfikator = {
-  id: number; twId: number; symbol: string; nazwa: string | null;
-  rodzaj: RodzajIdentyfikatora; nazwaRodzaju: string; wartosc: string;
-  zrodlo: ZrodloIdentyfikatora; dodal: string; at: string;
-  /** Z KTÓREJ oferty; `null` dla `opis` i `reczne`. */
-  ofertaId: string | null;
-  /** Od KOGO — nazwa dostawcy z importu odsyłaczy; `null` poza źródłem `dostawca`. */
-  dostawca: string | null;
-};
-
-/* ── Import odsyłaczy od dostawców ───────────────────────────────────────────
-   Kształt z `services/odsylacze-dostawcow.ts`. Kolumny wskazuje MAPOWANIE po
-   pozycji, bo każdy cennik ma inne nagłówki. */
-export type MapowanieOdsylaczy = {
-  symbol: number | null; ean: number | null; numery: number[]; rodzaj: "oem" | "katalog_obcy";
-};
-
-export type TrescImportu = { csv?: string; tabela?: string[][] };
-
-export type RaportImportuOdsylaczy = {
-  naglowki: string[];
-  probka: string[][];
-  mapowanie: MapowanieOdsylaczy | null;
-  zgadniete: boolean;
-  wierszy: number;
-  dopasowanych: number;
-  kartotek: number;
-  bezKartoteki: { liczba: number; przyklady: string[] };
-  niejednoznaczne: { liczba: number; przyklady: string[] };
-  bezNumerow: number;
-  numerow: { nowych: number; znanych: number };
-  zastapi: number;
-  noweKandydaty: number;
-  przyklady: Array<{ symbol: string; nazwa: string; numery: string[] }>;
-  zapisano: { importId: number; numerow: number } | null;
-};
-
-export type ImportOdsylaczy = {
-  id: number; dostawca: string; plik: string | null; wierszy: number; dopasowanych: number; numerow: number;
-  stan: "aktywny" | "zastapiony" | "wycofany"; zaimportowal: string; at: string;
-  wycofal: string | null; wycofanoAt: string | null;
-};
-
-/* ── Wykaz części producenta (IPL) ───────────────────────────────────────────
-   Kształt z `services/wykaz-czesci.ts`. Marka, model i wariant to kolumna
-   ALBO jedna wartość dla całego pliku — wykaz jednej maszyny nie ma kolumny
-   „model". */
-export type PoleWykazu = { kolumna: number } | { tekst: string } | null;
-
-export type MapowanieWykazu = {
-  marka: PoleWykazu; model: PoleWykazu; wariant: PoleWykazu; numery: number[];
-  rokOd: number | null; rokDo: number | null; seryjnyOd: number | null; seryjnyDo: number | null;
-  rodzaj: "maszyna" | "silnik";
-};
-
-export type ParaWykazu = { symbol: string; nazwa: string; maszyna: string; numery: string[]; warunki: string | null };
-
-export type RaportWykazu = {
-  naglowki: string[];
-  probka: string[][];
-  mapowanie: MapowanieWykazu | null;
-  zgadniete: boolean;
-  wierszy: number;
-  dopasowanych: number;
-  bezMaszyny: number;
-  bezNumerow: number;
-  bledneWarunki: { liczba: number; przyklady: string[] };
-  bezKartoteki: { liczba: number; przyklady: string[] };
-  maszyn: { nowych: number; znanych: number };
-  par: { nowych: number; znanych: number; znanychInneWarunki: number };
-  przyklady: ParaWykazu[];
-  inneWarunki: ParaWykazu[];
-  zapisano: { importId: number; propozycji: number } | null;
-};
-
-/* ── „Pasuje do" ze wszystkich ofert Allegro: zbiórka i sprawdzenie ──────────
-   Kształt z `services/pasuje-do-ofert.ts`. Wyłącznie czytanie Allegro —
-   publikacji listy do ofert nie ma, decyzją właściciela. */
-export type StanPasujeDo = {
-  ofert: number; zKartoteka: number; zTresca: number; zListe: number; pozycji: number; doZebrania: number;
-  listaAt: string | null;
-};
-export type RozjazdOferty = {
-  konto: number; ofertaId: string; nazwa: string; twId: number; symbol: string; link: string | null; pozycji: number;
-  sprzeczne: Array<{ pozycja: string; maszyna: string; powod: string; warunki: string | null; zrodlo: string }>;
-  brakujace: Array<{ maszyna: string; warunki: string | null; zrodlo: string }>;
-};
-export type SprawdzenieOfert = {
-  sprawdzonych: number; bezTresci: number; sprzecznych: number; brakujacych: number; oferty: RozjazdOferty[];
-};
-export type WynikListyOfert = { zapisano: number; nastepny: number | null; razem: number | null };
-export type WynikPartiiPasujeDo = {
-  przejrzano: number; pobrano: number; numerow: number; wpisanych: number; wKolejce: number; znanych: number;
-  /** Pominięte, bo wiedza mówi „nie pasuje" — pokazuje je sprawdzenie ofert. */
-  sprzecznych: number;
-  pozostalo: number; przerwano: { powod: "limit"; poIluMs: number | null } | null;
-};
-
-/** Czekające propozycje jednego wykazu — przegląd listą w kolejce. */
-export type PozycjaPrzegladu = {
-  id: number; twId: number; symbol: string; nazwa: string | null; maszyna: string; warunki: string | null; dowod: string;
-  /** Adres strony dowodu (0.527.0) — przy wykazach z sieci każdy wiersz ma własny. */
-  link?: string | null;
-  /** Pewność z sieci (0.528.0), tylko przy wykazach silników z sieci. */
-  pewnosc?: PewnoscZSieci; zrodel?: number;
-};
-export type PrzegladWykazu = {
-  id: number; zrodlo: string; link: string | null; rodzaj: "maszyna" | "silnik"; pozycje: PozycjaPrzegladu[];
-};
-
-export type ImportWykazu = {
-  id: number; zrodlo: string; link: string | null; plik: string | null; rodzaj: "maszyna" | "silnik";
-  wierszy: number; par: number; propozycji: number; czeka: number; zatwierdzonych: number;
-  stan: "aktywny" | "wycofany"; zaimportowal: string; at: string; wycofal: string | null; wycofanoAt: string | null;
-};
-
-/**
- * Tekst, z którego CZŁOWIEK składa klucz modelu, i który zamienia na
- * propozycję albo odrzuca. Od 0.264.0 kolejka niesie dwa źródła: sekcję
- * „Modele:" z opisu kartoteki i pozycję listy zgodności z naszej oferty.
- * Zadanie człowieka jest to samo, więc kolejka jedna — ale wiersz mówi,
- * na co człowiek patrzy: na wycinek opisu magazynu czy na deklarację
- * sprzedawcy z aukcji.
- */
-export type ModelZOpisu = {
-  id: number; twId: number; symbol: string; nazwa: string | null; tekst: string;
-  stan: "nowy" | "przerobiony" | "odrzucony"; zastosowanieId: number | null;
-  rozstrzygnal: string | null; rozstrzygnietoAt: string | null; at: string;
-  zrodlo: "opis" | "oferta"; ofertaId: string | null;
-};
-
-export type PokrycieWiedzy = {
-  kartotek: number; zOpisem: number; zIdentyfikatorem: number;
-  identyfikatorow: number; identyfikatorowRecznych: number;
-  /** Numery odzyskane z opisów NASZYCH ofert Allegro (0.264.0). */
-  identyfikatorowZOfert: number;
-  modeleZOpisu: { nowych: number; przerobionych: number; odrzuconych: number };
-  zastosowania: { zatwierdzonych: number; negatywnych: number; propozycji: number };
-  /** Tokeny silników w nazwach kartotek (0.239.0): ile słów, ile kartotek czeka, ile zatwierdzono. */
-  tokeny: { tokenow: number; nowych: number; zatwierdzonych: number };
-  fts: { dostepne: boolean; wpisow: number };
-};
-
-/* ── Tokeny silników w nazwach kartotek (0.239.0) ────────────────────────────
-   Token to słowo wpisane ręką biura („GX160") z modelem silnika; serwer
-   dopasowuje je do NAZW kartotek po `zwin`. Kartoteka z tokenem ma cykl jak
-   sekcja „Modele:": `nowa` czeka na decyzję, `zatwierdzona` ma zastosowanie,
-   `pominieta` nie wraca po imporcie. */
-export type KartotekaTokenu = {
-  twId: number; symbol: string; nazwa: string | null;
-  stan: "nowa" | "zatwierdzona" | "pominieta"; zastosowanieId: number | null;
-};
-
-export type TokenSilnika = {
-  id: number; token: string; silnik: ModelUrzadzenia; dodal: string; dodanoAt: string;
-  nowych: number; zatwierdzonych: number; pominietych: number;
-  /** Kartoteki do decyzji — najwyżej 200, jak lista „Z opisów". */
-  nowe: KartotekaTokenu[];
-};
-
-export type NowaPropozycja = {
-  twId: number;
-  model: { rodzaj: "maszyna" | "silnik"; marka: string; nazwa: string; wariant?: string | null; lata?: string | null };
-  polaryzacja: "pasuje" | "nie_pasuje";
-  powodNegatywny?: PowodNegatywny | null;
-  komentarz?: string | null;
-  dowod: { rodzaj: RodzajDowodu; tresc: string; link?: string | null };
-  zastepujeId?: number | null;
-  warunki?: WarunkiDoZapisu | null;
-};
-
-/* Rok jedzie tak, jak go wpisano, gdy nie jest liczbą — serwer odpowiada
-   zdaniem „rok z czterech cyfr", zamiast przyjąć wpis bez granicy. */
-export type WarunkiDoZapisu = { [K in keyof WarunkiZastosowania]: string | number | null };
-
-export type PomiarRozmowy = {
-  zadanieId: number; tytul: string; wynik: string; wykonanoAt: string; wykonanoPrzez: string;
-  twId: number | null; symbol: string | null; zaproponowano: boolean;
-};
-
-export type WiedzaDoboru = {
-  zastosowanie: Zastosowanie | null;
-  /** Drugie ogniwo, gdy podparcie idzie przez silnik — inaczej `null`. */
-  zabudowa: Zabudowa | null;
-  /** Pasowanie do części, którą agent wskazał (symbol/numer w danych doboru) — inaczej `null`. */
-  pasowanie: TrafieniePasowania | null;
-  /** ZATWIERDZONE silniki wpisanej maszyny. */
-  silniki: Zabudowa[];
-  pomiary: PomiarRozmowy[];
-};
-
-/** Słownik silników: co znaczy tekst z pola „Silnik". Zapis ręki biura, bez cyklu życia. */
-export type AliasSilnika = {
-  id: number; tekst: string; silnik: ModelUrzadzenia; dodal: string; dodanoAt: string;
-};
-
-/* ── Zabudowa silnika (§11.2) ─────────────────────────────────────────────── */
-
-export type Zabudowa = {
-  id: number; maszyna: ModelUrzadzenia; silnik: ModelUrzadzenia;
-  stan: StanZastosowania; zrodlo: "reczne" | "dobor" | "copilot";
-  rodzajDowodu: RodzajDowodu; nazwaRodzajuDowodu: string;
-  dowodTresc: string; dowodLink: string | null; komentarz: string | null;
-  conversationId: number | null; zastepujeId: number | null;
-  zaproponowal: string; zaproponowanoAt: string;
-  rozstrzygnal: string | null; rozstrzygnietoAt: string | null; powodRozstrzygniecia: string | null;
-  pewnosc: "potwierdzone" | "prawdopodobne";
-  /** Zdanie źródła z serwera — drugie ogniwo łańcucha. Panel go nie układa. */
-  zdanieZrodla: string;
-};
-
-/** Maszyna z doborów i to, czego o jej silniku jeszcze nie wiemy. */
-export type LukaSilnika = {
-  marka: string; model: string; wariant: string | null; klucz: string;
-  /** Ile doborów wskazało tę maszynę — po tym idzie kolejność. */
-  pytan: number;
-  /**
-   * SUROWY tekst z pola „Silnik" z licznikiem, scalony po zwinięciu. Automat go
-   * NIE rozbija — `silnik` to wyłącznie wpis biura ze słownika, `null` bez aliasu.
-   */
-  wpisaneSilniki: Array<{ tekst: string; ile: number; silnik: ModelUrzadzenia | null }>;
-  zabudowy: Zabudowa[];
-};
-
-export type NowaZabudowa = {
-  maszyna: { rodzaj: "maszyna"; marka: string; nazwa: string; wariant?: string | null; lata?: string | null };
-  silnik: { rodzaj: "silnik"; marka: string; nazwa: string; wariant?: string | null; lata?: string | null };
-  rodzajDowodu: RodzajDowodu; dowodTresc: string; dowodLink?: string | null;
-  /** Para spod pola „Silnik" w rozmowie — serwer nadaje wtedy źródło `dobor`. */
-  conversationId?: number | null;
-};
 
 /* ── Historia klienta (§10.1, zakładka KLIENT) ───────────────────────────────
    Kształt jest ODCZYTEM po loginie kupującego — panel nie ma tu czego zapisać.
    `login: null` znaczy „wątek bez rozmówcy", a nie „klient bez historii":
    ekran mówi wtedy, że nie wie, zamiast pokazywać pustą oś. */
-export type MaszynaKlienta = {
-  marka: string; nazwa: string; wariant: string | null;
-  rocznik: string | null; silnik: string | null;
-  /** Rozmowa, w której maszynę ustalono — makieta: „ustalone w rozmowie #N". */
-  rozmowaId: number; at: string;
-};
-
 export type WpisHistorii = {
   /* Trzy rodzaje doszły w S2 spoiwa (`docs/obsluga-klienta-calosc.md`).
      Zakładka obiecywała historię klienta, a znała wyłącznie zakupy i rozmowy:
@@ -1048,7 +617,7 @@ export type DokumentySprzedazy = {
 };
 
 export type HistoriaKlienta = {
-  login: string | null; maszyny: MaszynaKlienta[]; wpisy: WpisHistorii[];
+  login: string | null; wpisy: WpisHistorii[];
   /* Sprawa klienta przy historii źródła (S6, 0.535.0). Wiązanie po loginie
      musi działać w obie strony (`CLAUDE.md`): profil prowadzi do rozmowy, więc
      rozmowa, zwrot i reklamacja prowadzą do sprawy. Opcjonalne, bo profil
@@ -2253,149 +1822,3 @@ export type WynikTowaruWerdyktu =
   | { pominiety: string }
   | { blad: string }
   | { konflikt: SzczegolyWysylki & { error?: string } };
-
-/* ── Pasowanie części: uszczelka pasuje DO gaźnika (§11.2) ─────────────────
-   Trzecia kopia list obok `services/pasowania.ts` i `CHECK`. */
-export type RolaPasowania = "uszczelka" | "membrana" | "zestaw_naprawczy" | "lacznik" | "element_zestawu" | "inne";
-
-export type KartotekaPasowania = { twId: number; symbol: string; nazwa: string };
-
-export type Pasowanie = {
-  id: number;
-  /** Część, która PASUJE (uszczelka). */
-  czesc: KartotekaPasowania;
-  /** DO CZEGO pasuje (gaźnik). */
-  doCzego: KartotekaPasowania;
-  rola: RolaPasowania; nazwaRoli: string; pozycja: string | null;
-  polaryzacja: "pasuje" | "nie_pasuje"; powodNegatywny: PowodNegatywny | null; zdaniePowodu: string | null;
-  stan: StanZastosowania; zrodlo: "reczne" | "dobor" | "opis" | "copilot";
-  rodzajDowodu: RodzajDowodu; nazwaRodzajuDowodu: string; dowodTresc: string; dowodLink: string | null;
-  komentarz: string | null; conversationId: number | null; zastepujeId: number | null;
-  zaproponowal: string; zaproponowanoAt: string;
-  rozstrzygnal: string | null; rozstrzygnietoAt: string | null; powodRozstrzygniecia: string | null;
-  pewnosc: "potwierdzone" | "prawdopodobne";
-  /** Zdanie źródła z serwera. Panel go nie układa. */
-  zdanieZrodla: string;
-};
-
-/** Trafienie przy odczycie: wprost albo przez zamiennik (wtedy pewność najwyżej `prawdopodobne`). */
-export type TrafieniePasowania = {
-  czesc: KartotekaPasowania; doCzego: KartotekaPasowania; pasowanie: Pasowanie;
-  przezZamiennik: string | null; pewnosc: "potwierdzone" | "prawdopodobne"; zdanie: string;
-};
-
-export type PasowaniaTowaru = {
-  pasujeDo: TrafieniePasowania[]; pasujace: TrafieniePasowania[]; negatywne: Pasowanie[]; propozycje: Pasowanie[];
-};
-
-/* Zamienność przez wspólny numer oryginału. Kandydat nie ma wiersza — serwer
-   liczy go przy odczycie z identyfikatorów; wiersz ma dopiero DECYZJA. Kształt
-   z `services/zamiennosc-oem.ts`. */
-export type KandydatZamiennosci = {
-  a: KartotekaPasowania;
-  b: KartotekaPasowania;
-  /** Wspólne numery w zapisie z opisu — po nich człowiek rozstrzyga. */
-  numery: string[];
-};
-
-export type Zamiennosc = {
-  id: number;
-  a: KartotekaPasowania;
-  b: KartotekaPasowania;
-  stan: "zatwierdzone" | "odrzucone" | "wycofane";
-  numery: string[];
-  powod: string | null;
-  rozstrzygnal: string;
-  rozstrzygnietoAt: string;
-  wycofal: string | null;
-  wycofanoAt: string | null;
-  powodWycofania: string | null;
-  /** Zdanie z serwera. Panel go nie układa. */
-  zdanie: string;
-};
-
-/* Sieć wiedzy (widok „Sieć"): cztery warstwy — pasowania część→część,
-   zastosowania część→maszyna/silnik, zabudowy silnik→maszyna i zamienniki
-   z opisów. Kształt z `services/siec-wiedzy.ts`. Krawędź zamiennika to odczyt
-   opisu, nie wiersz — stąd `wierszId: null` i pewność najwyżej `prawdopodobne`. */
-export type RodzajWezla = "kartoteka" | "maszyna" | "silnik";
-
-export type WezelSieci = {
-  /** `tw:<tw_id>` albo `model:<id>`. */
-  klucz: string;
-  rodzaj: RodzajWezla;
-  twId: number | null;
-  /** Krótko, pod węzłem: symbol kartoteki albo „Honda GX160". */
-  etykieta: string;
-  nazwa: string;
-};
-
-export type WarstwaSieci = "pasowania" | "zastosowania" | "zabudowy" | "zamienniki";
-export type RodzajKrawedzi = "pasuje" | "nie_pasuje" | "propozycja" | "zabudowa" | "zamiennik";
-
-export type KrawedzSieci = {
-  /** Część, silnik albo kartoteka, której opis podaje zamiennik. */
-  z: string;
-  /** Do czego pasuje, w czym stoi albo symbol wymieniony w opisie. */
-  do: string;
-  warstwa: WarstwaSieci;
-  rodzaj: RodzajKrawedzi;
-  polaryzacja: "pasuje" | "nie_pasuje" | null;
-  wierszId: number | null;
-  rola: RolaPasowania | null;
-  pewnosc: "potwierdzone" | "prawdopodobne";
-  obustronnie: boolean;
-  /** Zdanie z serwera. Panel go nie układa. */
-  zdanie: string;
-};
-
-export type SiecWiedzy = { wezly: WezelSieci[]; krawedzie: KrawedzSieci[] };
-
-export type NowePasowanie = {
-  twId: number; doTwId: number; rola: RolaPasowania; pozycja?: string | null;
-  polaryzacja: "pasuje" | "nie_pasuje"; powodNegatywny?: PowodNegatywny | null;
-  rodzajDowodu: RodzajDowodu; dowodTresc: string; dowodLink?: string | null; komentarz?: string | null;
-  /** Obecność mówi serwerowi, że propozycja idzie z pracy (`dobor`), nie z ekranu Wiedza (`reczne`). */
-  conversationId?: number | null;
-};
-
-/* ── Pasowanie z sieci (0.508.0) ─────────────────────────────────────────────
-   Kształt z `services/pasowanie-z-sieci.ts`. Automat szuka pasowania części na
-   stronach SPOZA Allegro i składa wyłącznie propozycje do kolejki Wiedzy. */
-export type PowodOdrzuceniaSieci =
-  | "zly_adres" | "allegro" | "strona_nieprzeczytana" | "cytat_spoza_strony"
-  | "model_spoza_cytatu" | "marka_spoza_strony" | "numer_spoza_strony" | "za_krotki_model";
-export type OstatniPrzebiegSieci = {
-  /** Kartoteka albo silnik z listy (0.528.1). Brak = starszy serwer, same kartoteki. */
-  rodzaj?: "kartoteka" | "silnik";
-  symbol: string; at: string; wynik: "ok" | "blad"; znalezisk: number; zaproponowano: number;
-  odrzucone: Partial<Record<PowodOdrzuceniaSieci, number>>; blad: string | null;
-};
-export type StanPasowaniaZSieci = {
-  /** `null` = można uruchomić; inaczej zdanie, czego brakuje. */
-  niegotowy: string | null;
-  naNoc: number;
-  sprawdzono: number;
-  doSprawdzenia: number;
-  ostatnie: OstatniPrzebiegSieci[];
-  /** Lista popularnych silników (0.527.0): ile ich razem i ile czeka. Brak = starszy serwer. */
-  silniki?: { razem: number; doSprawdzenia: number };
-  /** Ręczne szukanie (0.528.0): własny limit na godzinę, osobny od nocy. Brak = starszy serwer. */
-  reczne?: { naGodzine: number; wGodzinie: number };
-};
-export type WynikPrzebieguSieci = {
-  sprawdzono: number; zaproponowano: number; bledow: number;
-  odrzucono: Partial<Record<PowodOdrzuceniaSieci, number>>;
-  przerwane: string | null;
-};
-
-/* ── Przegląd listą propozycji z sieci (0.527.0) ─────────────────────────────
-   Kształt z `services/pasowanie-z-sieci.ts` (`przegladZSieci`). Grupa to
-   KARTOTEKA: automat pyta o jedną część naraz. */
-/** Reguła SZPERACZA (0.528.0): „potwierdzone” to dwa niezależne źródła, w tym katalog. */
-export type PewnoscZSieci = "potwierdzone" | "prawdopodobne" | "slabe";
-export type PozycjaZSieci = {
-  id: number; maszyna: string; warunki: string | null; cytat: string; link: string | null;
-  pewnosc: PewnoscZSieci; zrodel: number;
-};
-export type PrzegladZSieci = { twId: number; symbol: string; nazwa: string | null; pozycje: PozycjaZSieci[] };
