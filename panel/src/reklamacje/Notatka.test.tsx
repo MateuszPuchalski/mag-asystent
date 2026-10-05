@@ -141,8 +141,12 @@ describe("Kolumna faktów bez pustych czynności (0.511.0)", () => {
     expect(onNotatka).toHaveBeenCalledWith("ustalono wymianę i zwrot");
   });
 
-  it("nad „Zleć hali” nie stoi już nagłówek „Hala”", () => {
+  it("reklamacja nie zleca pracy hali — ani przycisku, ani nagłówka „Hala”", () => {
+    /* Decyzja właściciela przy przebudowie ekranu reklamacji. Zlecenie hali
+       zostaje w zwrotach i dyskusjach; tutaj kolumna nie obiecuje go wcale. */
     render(<Dowody {...props(rek())} />);
+    expect(screen.queryByRole("button", { name: /Zleć hali/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Zleć hali/)).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Hala" })).not.toBeInTheDocument();
   });
 });

@@ -2,8 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, pobierzPlik } from "./klient";
 import type { ZalacznikSzkicu } from "./rozmowy";
 import type {
-  KartaSprawy,
-  KolejkaReklamacji, Reklamacja, StanPrzesylki, SzczegolReklamacji,
+  DowodReklamacji, KolejkaReklamacji, Reklamacja, StanPrzesylki, SzczegolReklamacji,
   WynikOdpowiedziReklamacji, WynikWerdyktu,
 } from "./typy";
 
@@ -289,27 +288,10 @@ export function useUsunZalacznikSprawy() {
 }
 
 /**
- * Rozpoznanie sprawy przez Copilota (0.275.0).
- *
- * Kliknięcie JAWNE, nigdy przy otwarciu ekranu: żądanie kosztuje pieniądze
- * u dostawcy, a karta jest pomocą w czytaniu, nie warunkiem pracy.
- */
-export function useRozpoznaj() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: number }) =>
-      api<{ karta: KartaSprawy }>(`/api/obsluga/reklamacje/${v.id}/rozpoznaj`,
-        { method: "POST" }),
-    onSettled: (_d, _e, v) =>
-      qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) }),
-  });
-}
-
-/**
  * Gdzie jest paczka do klienta (0.393.0).
  *
- * Kliknięcie JAWNE, z tego samego powodu co przy Copilocie: pytanie kosztuje
- * DWA żądania u Allegro, więc nie ma prawa wyjść z samego otwarcia ekranu.
+ * Kliknięcie JAWNE: pytanie kosztuje DWA żądania u Allegro, więc nie ma
+ * prawa wyjść z samego otwarcia ekranu.
  *
  * Unieważniamy wyłącznie SPRAWĘ, nie kolejkę: stan przesyłki nie wchodzi do
  * listy i przeładowanie kolejki byłoby robotą bez skutku widocznego na ekranie.
@@ -321,6 +303,40 @@ export function useSprawdzPrzesylke() {
        i gołe „Bad Request" na ekranie; `api()` i jego test pilnują nagłówka. */
     mutationFn: (v: { id: number }) =>
       api<StanPrzesylki>(`/api/obsluga/reklamacje/${v.id}/przesylka`, { method: "POST" }),
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) }),
+  });
+}
+
+/* ── Dowody biura ────────────────────────────────────────────────────────────
+   Swobodne wpisy w kolumnie obok rozmowy: co widać na zdjęciu, czego brakuje,
+   co ustaliliśmy. Zostają wyłącznie u nas, więc bez `autoryzuj()` i bez
+   wersji sprawy — dopisanie zdania nie ma wywracać kontroli świeżości koledze,
+   który właśnie pisze odpowiedź.
+
+   Unieważniamy wyłącznie SPRAWĘ: dowody nie wchodzą do wiersza kolejki, więc
+   przeładowanie listy byłoby robotą bez skutku na ekranie. */
+
+export function useDodajDowod() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; tresc: string; zalacznikId: number | null }) =>
+      api<{ dowody: DowodReklamacji[] }>(`/api/obsluga/reklamacje/${v.id}/dowody`, {
+        method: "POST",
+        body: JSON.stringify({ tresc: v.tresc, zalacznikId: v.zalacznikId }),
+      }),
+    onSettled: (_d, _e, v) =>
+      qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) }),
+  });
+}
+
+export function useUsunDowod() {
+  const qc = useQueryClient();
+  return useMutation({
+    /* DELETE bez ciała, więc i bez typu treści — reguła klienta HTTP. */
+    mutationFn: (v: { id: number; dowodId: number }) =>
+      api<{ dowody: DowodReklamacji[] }>(`/api/obsluga/reklamacje/${v.id}/dowody/${v.dowodId}`,
+        { method: "DELETE" }),
     onSettled: (_d, _e, v) =>
       qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) }),
   });

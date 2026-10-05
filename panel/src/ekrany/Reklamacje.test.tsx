@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Konflikt } from "../api/klient";
-import type { KubelekReklamacji, Reklamacja, WiadomoscReklamacji } from "../api/typy";
+import type { DowodReklamacji, KubelekReklamacji, Reklamacja, WiadomoscReklamacji } from "../api/typy";
 
 /* ── Ekran reklamacji ────────────────────────────────────────────────────────
    Trzy rzeczy warte testu, bo żadnej nie widać w serwisie:
@@ -68,6 +68,10 @@ const scena = vi.hoisted(() => ({
   /* Czym kończy się wysyłka w danym teście: `Error` idzie do `onError`,
      cokolwiek innego do `onSuccess`, `null` nie woła żadnego z nich. */
   wynikWysylki: null as unknown,
+  /* Błąd ręcznej synchronizacji — `null` znaczy, że przycisk nie zawiódł. */
+  bladSynchronizacji: null as Error | null,
+  /* Dowody biura w szczególe sprawy; domyślnie żadnych. */
+  dowody: [] as DowodReklamacji[],
 }));
 
 /* Tożsamość zalogowanego: bez niej sita „Moje" nie ma w drzewie, bo filtr
@@ -113,6 +117,7 @@ vi.mock("../api/reklamacje", async () => {
         reklamacja: REKLAMACJE.find((r) => r.id === id) ?? REKLAMACJE[0],
         czat: scena.czat,
         zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [], kartoteka: null,
+        dowody: scena.dowody,
       },
     }),
     /* Wysyłka ma WŁASNY podrabiacz, bo jako jedyna oddaje sterowanie z
@@ -132,9 +137,21 @@ vi.mock("../api/reklamacje", async () => {
     useOdswiez: mutacja("odswiez"),
     useProwadze: mutacja("prowadze"),
     useNotatka: mutacja("notatka"),
-    useSynchronizuj: mutacja("synchronizuj"),
+    /* Synchronizacja ma własny podrabiacz z tego samego powodu co wysyłka:
+       błąd wraca do ekranu przez `onError`, a test pilnuje, że go widać. */
+    useSynchronizuj: () => ({
+      mutate: (v: unknown, opcje?: { onError?: (e: unknown) => void }) => {
+        scena.mutacje.push(`synchronizuj:${JSON.stringify(v)}`);
+        if (scena.bladSynchronizacji) opcje?.onError?.(scena.bladSynchronizacji);
+      },
+      isPending: false, error: null,
+    }),
     useWerdykt: mutacja("werdykt"),
     useZwrotTowaru: mutacja("zwrot-towaru"),
+    /* Dowody biura to zapisy, więc test zera zapisu ma je WIDZIEĆ — prawdziwy
+       hak wysłałby żądanie obok licznika `mutacje`. */
+    useDodajDowod: mutacja("dodaj-dowod"),
+    useUsunDowod: mutacja("usun-dowod"),
   };
 });
 
@@ -147,15 +164,17 @@ const wiad = (n: Partial<WiadomoscReklamacji> = {}): WiadomoscReklamacji => ({
   zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad: true }], ...n,
 });
 
-function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wiad()]) {
+function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wiad()],
+  stan: Record<string, unknown> = {}) {
   scena.mutacje = [];
   scena.czat = czat;
   scena.wynikWysylki = null;
+  scena.bladSynchronizacji = null;
   scena.stan = {
     status: "current", alarm: false, ostatniaProba: null,
     ostatniaUdanaSynchronizacja: "2026-09-07T11:00:00.000Z", kodOstatniegoBledu: null,
     liczbaBledow: 0, opoznienieMs: 0, nastepnaProba: null, interwalMs: 180000,
-    pozostaloDoPobrania: 0, dyskusjiPominietych: 35,
+    pozostaloDoPobrania: 0, dyskusjiPominietych: 35, ...stan,
   };
   const klient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -173,6 +192,8 @@ function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wia
    test włączałby filtr następnemu — a objawem byłaby lista, która „gubi"
    sprawy w teście nie mającym z sitem nic wspólnego. */
 afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
+/* Dowody ustawia test PRZED renderem, więc sprząta się je po nim. */
+afterEach(() => { scena.dowody = []; });
 
 /* ── MUTACJE BEZ ODŚWIEŻENIA WEJŚCIOWEGO (0.410.0) ──────────────────────────
    Od tego wydania wejście w sprawę wysyła JEDNĄ mutację: `odswiez` (decyzja
@@ -184,6 +205,9 @@ afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } })
    dołożona kiedyś „przy okazji" do otwarcia sprawy wywali te testy, zamiast
    przejść niezauważona. */
 const bezOdswiezenia = () => scena.mutacje.filter((m) => !m.startsWith("odswiez:"));
+
+/** Stopka karty kolejki: próg, stan synchronizacji i jej przycisk. */
+const stopka = () => screen.getByRole("group", { name: "Zakres i synchronizacja kolejki" });
 
 describe("Ekran reklamacji", () => {
   /* ── ZERO ZAPISU PRZY PATRZENIU, Z JEDNYM WYJĄTKIEM (0.410.0) ──────────────
@@ -265,8 +289,60 @@ describe("Ekran reklamacji", () => {
        jest krótsze — ale liczba zostaje. Nikt nie ma szukać „zaginionej"
        reklamacji, która nigdy reklamacją nie była. */
     pokaz();
-    expect(screen.getByText(/pominiętych dyskusji 35/)).toBeInTheDocument();
+    expect(within(stopka()).getByText(/pominiętych dyskusji 35/)).toBeInTheDocument();
   });
+
+  /* ── TŁO PRACY W STOPCE KOLEJKI ───────────────────────────────────────────
+     Decyzja właściciela przy przebudowie ekranu: rząd progu i synchronizacji
+     zszedł ze szczytu strony pod ostatni wiersz kolejki. Teksty zostają te
+     same, zmienia się miejsce — i tego miejsca pilnują testy niżej. */
+  it("stopka stoi W KARCIE KOLEJKI, pod ostatnim wierszem, a nie nad kolumnami", () => {
+    pokaz();
+    const pasek = stopka();
+    /* Ta sama karta co pole szukania — czyli kolejka, nie pas strony. */
+    expect(pasek.parentElement).toContainElement(screen.getByLabelText("Szukaj reklamacji"));
+    const wiersze = screen.getAllByRole("button", { name: /\/2026/ });
+    expect(wiersze[wiersze.length - 1].compareDocumentPosition(pasek)
+      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    /* Nad siatką kolumn nie zostało nic z dawnego rzędu. */
+    expect(screen.getAllByText(/pominiętych dyskusji/)).toHaveLength(1);
+  });
+
+  it("w ALARMIE stopka niesie głośny pasek i dalej JEDEN przycisk synchronizacji", async () => {
+    pokaz("/obsluga/reklamacje", [wiad()], { status: "failed", kodOstatniegoBledu: 503 });
+    const pasek = stopka();
+    expect(within(pasek).getByText(/Synchronizacja reklamacji:/)).toBeInTheDocument();
+    expect(within(pasek).getByText("nie działa")).toBeInTheDocument();
+    expect(within(pasek).getByText(/dyskusji pominiętych:/)).toBeInTheDocument();
+    /* Cichy wiersz ustępuje głośnemu — dwa przyciski to dwie drogi do 429. */
+    expect(screen.getAllByRole("button", { name: /synchronizuj/i })).toHaveLength(1);
+    expect(scena.mutacje).toEqual([]);
+    await userEvent.click(within(pasek).getByRole("button", { name: /synchronizuj/i }));
+    expect(scena.mutacje).toEqual(["synchronizuj:undefined"]);
+  });
+
+  it("niekompletna lista woła w stopce pełnym zdaniem", () => {
+    pokaz("/obsluga/reklamacje", [wiad()], { pozostaloDoPobrania: 12 });
+    expect(within(stopka()).getByText(/Ta kolejka nie jest kompletna: 12 spraw/)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /synchronizuj/i })).toHaveLength(1);
+  });
+
+  it("w pełnej ciszy przycisk synchronizacji zostaje — dyskusje odsyłają tutaj", () => {
+    /* Bez progu i bez odsianych dyskusji cichy wiersz nie ma nic do
+       powiedzenia. Ekran dyskusji nie ma własnego przycisku i mówi, że
+       synchronizację odświeża się w reklamacjach — więc tu nie może zniknąć. */
+    pokaz("/obsluga/reklamacje", [wiad()], { dyskusjiPominietych: 0 });
+    expect(within(stopka()).getAllByRole("button", { name: /synchronizuj/i })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /synchronizuj/i })).toHaveLength(1);
+  });
+
+  it.each([["w ciszy", {}], ["w alarmie", { status: "delayed" }]])(
+    "błąd synchronizacji widać zawsze — %s", async (_opis, stan) => {
+      pokaz("/obsluga/reklamacje", [wiad()], stan);
+      scena.bladSynchronizacji = new Error("Allegro odmówiło: limit zapytań");
+      await userEvent.click(screen.getByRole("button", { name: /synchronizuj/i }));
+      expect(within(stopka()).getByText("Allegro odmówiło: limit zapytań")).toBeInTheDocument();
+    });
 
   it("pasek werdyktu stoi POD rozmową, bo nieodwracalne pyta po dowodach", () => {
     /* Od przyrostu trzeciego werdykt wychodzi STĄD. Napis odsyłający do
@@ -314,6 +390,8 @@ describe("Ekran reklamacji", () => {
   it("„synchronizuj teraz” jest JAWNYM kliknięciem, nie skutkiem otwarcia", async () => {
     pokaz();
     expect(scena.mutacje).toEqual([]);
+    /* Przycisk jest jeden na ekran i stoi w stopce kolejki. */
+    expect(within(stopka()).getByRole("button", { name: /synchronizuj/i })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /synchronizuj/i }));
     expect(scena.mutacje).toEqual(["synchronizuj:undefined"]);
   });
@@ -625,11 +703,11 @@ describe("Ekran reklamacji", () => {
   /* ── „Które są moje" bez włączania filtru (0.281.0) ───────────────────────
      Właściciel pytał wprost. Sito odpowiada po włączeniu; czip odpowiada
      od razu, przy przeglądaniu całej kolejki. */
-  it("czip mówi „Ty”, gdy sprawa jest moja, i IMIĘ, gdy cudza", () => {
+  it("wiersz mówi „prowadzisz”, gdy sprawa jest moja, i IMIĘ, gdy cudza", () => {
     pokaz();
     /* 444 prowadzę ja (konto 7), 555 — imienniczka o koncie 9. Obie noszą
        to samo imię, więc imię na wierszu na to pytanie nie odpowiada. */
-    expect(screen.getByTitle(/Prowadzisz tę sprawę/)).toHaveTextContent("Ty");
+    expect(screen.getByTitle(/Prowadzisz tę sprawę/)).toHaveTextContent("prowadzisz");
     expect(screen.getByTitle("Prowadzi: A. Lewandowska")).toHaveTextContent("A. Lewandowska");
   });
 
@@ -669,6 +747,126 @@ describe("Ekran reklamacji", () => {
       expect(screen.getByText(k, { selector: "kbd" })).toBeInTheDocument();
     }
     expect(screen.getByText("ruch po liście")).toBeInTheDocument();
+  });
+});
+
+
+/* ── Przebudowa ekranu: kolejka, głowica, dowody ─────────────────────────────
+   Decyzja właściciela z projektu ekranu. Testy niżej pilnują tego, co
+   zmieniło się CELOWO — każdy razem z regułą, która za zmianą stoi. */
+
+/** Zmienia fikstury na czas jednego testu i oddaje je w `finally`. */
+async function zmienionymi(zmiany: Array<[number, Partial<Reklamacja>]>, test: () => Promise<void> | void) {
+  const kopie = zmiany.map(([i]) => ({ ...REKLAMACJE[i] }));
+  zmiany.forEach(([i, z]) => Object.assign(REKLAMACJE[i], z));
+  try { await test(); } finally { zmiany.forEach(([i], k) => { REKLAMACJE[i] = kopie[k]; }); }
+}
+
+/** Numery spraw z wierszy kolejki w kolejności DOM. */
+const numeryWierszy = () => screen.getAllByRole("button")
+  .filter((b) => b.hasAttribute("data-wiersz-kolejki"))
+  .map((b) => b.textContent!.match(/\d{3}\/2026/)![0]);
+
+describe("Kolejka po przebudowie", () => {
+  it("sygnał wspólny CAŁEMU kubełkowi schodzi z wierszy i staje raz nad listą", async () => {
+    /* Jedenaście identycznych czipów nie rozróżnia niczego. Sygnał, który ma
+       tylko część spraw, zostaje na wierszu — tylko on coś mówi. */
+    const czeka = "Ostatnie słowo było klienta — ruch należy do nas";
+    await zmienionymi([
+      [0, { sygnaly: ["klient_czeka"] }],
+      [2, { sygnaly: ["klient_czeka", "doradca"] }],
+      [3, { sygnaly: ["klient_czeka"] }],
+      [4, { sygnaly: ["klient_czeka"] }],
+    ], async () => {
+      pokaz();
+      expect(screen.queryByTitle(czeka)).not.toBeInTheDocument();
+      expect(screen.getByTitle("W rozmowie jest doradca Allegro")).toBeInTheDocument();
+      expect(screen.getByText("Na każdej sprawie tutaj: klient czeka")).toBeInTheDocument();
+      /* Szukanie miesza kubełki — wspólnego wtedy nie ma i wiersz mówi swoje. */
+      await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "444");
+      expect(screen.getByTitle(czeka)).toBeInTheDocument();
+      expect(screen.queryByText(/Na każdej sprawie tutaj/)).not.toBeInTheDocument();
+    });
+  });
+
+  it("sprawy PO TERMINIE stoją pierwsze pod nagłówkiem, a strzałki idą tą samą drogą", async () => {
+    /* 555 jest trzecia w porządku terminu, ale jedyna po terminie — staje
+       pierwsza. Strzałka w dół z niej prowadzi do 111, nie do 666: kursor
+       chodzi po liście, którą widać, a nie po kolejności sprzed grupowania. */
+    await zmienionymi([[3, { poTerminie: true, dniDoTerminu: -3 }]], async () => {
+      pokaz("/obsluga/reklamacje/5");
+      expect(screen.getByRole("heading", { name: "Po terminie decyzji" })).toBeInTheDocument();
+      expect(numeryWierszy()).toEqual(["555/2026", "111/2026", "444/2026", "666/2026"]);
+      await userEvent.keyboard("j");
+      expect(await screen.findByRole("button", { name: /111\/2026/, current: true })).toBeInTheDocument();
+      await userEvent.keyboard("k");
+      expect(await screen.findByRole("button", { name: /555\/2026/, current: true })).toBeInTheDocument();
+    });
+  });
+
+  it("kwota stoi z prawej i porządek „kwota” idzie po TEJ SAMEJ liczbie", async () => {
+    /* Wszystkie fikstury żądają 50 zł. Gdyby porządek szedł po żądaniu,
+       a wiersz pokazywał kwotę z paragonu, lista stałaby w kolejności,
+       której na ekranie nie widać. */
+    await zmienionymi([
+      [0, { kwotaGrosze: null }],
+      [2, { kwotaGrosze: 9000, kwotaZrodlo: "paragon" }],
+      [4, { kwotaGrosze: 7000, kwotaZrodlo: "paragon" }],
+    ], () => {
+      localStorage.setItem("wertis.reklamacje.porzadek", "kwota");
+      pokaz();
+      expect(screen.getByText("90,00 PLN")).toBeInTheDocument();
+      /* `null` od serwera to „kwoty nie znamy" i spada na koniec, nie na zero. */
+      expect(numeryWierszy()).toEqual(["444/2026", "666/2026", "555/2026", "111/2026"]);
+    });
+  });
+
+  it("szukanie znajduje sprawę po NAZWIE TOWARU — to tytuł wiersza", async () => {
+    await zmienionymi([[3, { ofertaNazwa: "Gaźnik do Stihl MS181" }]], async () => {
+      pokaz();
+      await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "gaźnik stihl");
+      expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("Sprawa po przebudowie", () => {
+  it("głowica stoi NAD rozmową: towar, czego klient chce i kto ma ostatnie słowo", () => {
+    pokaz("/obsluga/reklamacje/1");
+    const tytul = screen.getByRole("heading", { name: "Towar 1" });
+    expect(screen.getByText(/Ostatnie słowo: klient/)).toBeInTheDocument();
+    /* Głowica przed rozmową w DOM — czyta się ją pierwszą. */
+    expect(tytul.compareDocumentPosition(screen.getByText("Opis sprawy 1"))
+      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("zdjęcie klienta stoi w kolumnie dowodów jako Z1, a w wątku zostaje odnośnik", () => {
+    pokaz("/obsluga/reklamacje/1");
+    expect(screen.getByRole("region", { name: /^Zdjęcia: Klient · / })).toHaveTextContent("Z1");
+    expect(screen.getByRole("button", { name: "Pokaż zdjęcie w kolumnie: usterka.jpg" }))
+      .toHaveTextContent("Z1");
+  });
+
+  it("dowód biura dopisuje się i usuwa JAWNYM kliknięciem, z wybranym zdjęciem", async () => {
+    scena.dowody = [{ id: 3, tresc: "Tabliczka znamionowa nieczytelna", zalacznikId: 9,
+      autor: "A. Lewandowska", utworzonoAt: "2026-09-07T09:00:00.000Z" }];
+    pokaz("/obsluga/reklamacje/1");
+    /* Otwarcie sprawy z dowodami nie zapisuje niczego poza odświeżeniem. */
+    expect(bezOdswiezenia()).toEqual([]);
+    expect(screen.getByText("Tabliczka znamionowa nieczytelna")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pokaż zdjęcie Z1" })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("Nowy dowód"), "Bok szczotki krzywy");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Powiąż ze zdjęciem" }), "9");
+    await userEvent.click(screen.getByRole("button", { name: "Dodaj" }));
+    expect(bezOdswiezenia()).toEqual([
+      `dodaj-dowod:${JSON.stringify({ id: 1, tresc: "Bok szczotki krzywy", zalacznikId: 9 })}`,
+    ]);
+
+    scena.mutacje = [];
+    await userEvent.click(screen.getByRole("button", { name: /^Usuń dowód: Tabliczka/ }));
+    expect(bezOdswiezenia()).toEqual([`usun-dowod:${JSON.stringify({ id: 1, dowodId: 3 })}`]);
   });
 });
 

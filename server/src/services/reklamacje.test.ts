@@ -4,9 +4,10 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
-  adresZalacznika, BladReklamacji, czyObrazZNazwy, dniDoTerminu, dniOdZakupu, klientCzeka,
-  kubelek, cofnijNotatke, licznikiKubelkow, listaReklamacji, progKolejki, ReklamacjaConflict,
-  stempelProwadzi, sygnaly, szczegolReklamacji, zapiszNotatke,
+  adresZalacznika, BladReklamacji, czyObrazZNazwy, dniDoTerminu, dniOdZakupu,
+  dniZakupuDoZgloszenia, klientCzeka, kubelek, kwotaSprawy, cofnijNotatke, licznikiKubelkow,
+  listaReklamacji, progKolejki, ReklamacjaConflict, stempelProwadzi, sygnaly,
+  szczegolReklamacji, zapiszNotatke,
 } from "./reklamacje.js";
 
 /* Ten plik pilnuje reguł, których na ekranie nie widać: że kolejka ustawia się
@@ -845,4 +846,83 @@ test("symbol pod dwiema kartotekami nie wiąże ofert po SKU — wskazania zosta
   const s = szczegolReklamacji(d, ta, TERAZ);
   assert.equal(s.reklamacja.twId, 77);
   assert.deepEqual(s.historia.towar, { ile: 1, uznanych: 1, odrzuconych: 0 });
+});
+
+/* ── ILE JEST W GRZE I KIEDY KLIENT SIĘ ODEZWAŁ ──────────────────────────────
+   Kolejka ma pokazać kwotę przy każdym wierszu, a karta faktów — ile dni
+   minęło od zakupu do zgłoszenia. Obie liczby liczy serwer, bo panel nie zna
+   paragonu, a dwie kopie tej samej reguły rozjechałyby się przy pierwszej
+   poprawce.                                                                  */
+
+test("kwota sprawy: żądanie klienta, potem paragon razy ilość, bez zgadywania jednej sztuki", () => {
+  const k = (n: Partial<Parameters<typeof kwotaSprawy>[0]>) => kwotaSprawy({
+    oczekiwanaKwotaGrosze: null, cenaParagonuGrosze: null, ilosc: null, iloscParagonu: null, ...n,
+  });
+  assert.deepEqual(k({ oczekiwanaKwotaGrosze: 5_000, cenaParagonuGrosze: 2_000, ilosc: 3 }),
+    { grosze: 5_000, zrodlo: "zadanie" }, "kwota, o którą prosi klient, bije paragon");
+  assert.deepEqual(k({ cenaParagonuGrosze: 2_000, ilosc: 3, iloscParagonu: 1 }),
+    { grosze: 6_000, zrodlo: "paragon" }, "cena z paragonu jest ZA SZTUKĘ");
+  assert.deepEqual(k({ cenaParagonuGrosze: 2_000, iloscParagonu: 1 }),
+    { grosze: 2_000, zrodlo: "paragon" }, "jedna sztuka na paragonie to jedna sztuka w sprawie");
+  /* Trzy sztuki na paragonie, a sprawa nie mówi ile: jedna sztuka byłaby
+     zgadywaniem, a trzy — przesadą. Ekran ma powiedzieć „nie wiemy". */
+  assert.deepEqual(k({ cenaParagonuGrosze: 2_000, iloscParagonu: 3 }), { grosze: null, zrodlo: null });
+  assert.deepEqual(k({ ilosc: 2 }), { grosze: null, zrodlo: null }, "bez paragonu nie ma ceny");
+  assert.deepEqual(k({ oczekiwanaKwotaGrosze: 0, cenaParagonuGrosze: 2_000, ilosc: 2 }),
+    { grosze: 4_000, zrodlo: "paragon" }, "zero w żądaniu to brak żądania kwoty");
+});
+
+test("dni od zakupu do zgłoszenia: pełne dni, a brak albo odwrócona kolejność dat to brak liczby", () => {
+  assert.equal(dniZakupuDoZgloszenia("2026-09-01T10:00:00Z", "2026-09-06T09:00:00Z"), 4);
+  assert.equal(dniZakupuDoZgloszenia("2026-09-01T10:00:00Z", "2026-09-01T18:00:00Z"), 0);
+  assert.equal(dniZakupuDoZgloszenia(null, "2026-09-06T09:00:00Z"), null);
+  assert.equal(dniZakupuDoZgloszenia("2026-09-01T10:00:00Z", null), null);
+  assert.equal(dniZakupuDoZgloszenia("nie-data", "2026-09-06T09:00:00Z"), null);
+  /* Zgłoszenie PRZED zakupem znaczy złe dane, nie ujemną liczbę dni. */
+  assert.equal(dniZakupuDoZgloszenia("2026-09-06T10:00:00Z", "2026-09-01T09:00:00Z"), null);
+});
+
+test("kolejka i szczegół niosą cenę z PIERWSZEJ pozycji paragonu i tę samą kwotę", () => {
+  const { d, konto, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a", otwarto: "2026-09-06T09:00:00Z" });
+  d.prepare("UPDATE reklamacja_klienta SET offer_id='of-1', order_id='ord-1' WHERE id=?").run(id);
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,
+    kupiono_at,synced_at) VALUES (?,'ord-1','2026-09-01T10:00:00Z','2026-09-07T08:00:00Z')`)
+    .run(konto).lastInsertRowid);
+  /* Ta sama oferta dwa razy na zamówieniu — bierze się pozycja o NIŻSZYM
+     numerze, ta sama, z której idzie sygnatura. */
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,sku,ilosc,
+    cena_grosze,waluta) VALUES (?,'of-1','Kosiarka','SYM',2,5500,'PLN')`).run(zam);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,sku,ilosc,
+    cena_grosze,waluta) VALUES (?,'of-1','Kosiarka','SYM',1,9999,'PLN')`).run(zam);
+
+  let [r] = listaReklamacji(d, TERAZ);
+  assert.equal(r.cenaParagonuGrosze, 5_500);
+  assert.equal(r.kwotaGrosze, null, "dwie sztuki na paragonie, a sprawa nie mówi ile");
+  assert.equal(r.kwotaZrodlo, null);
+  assert.equal(r.zgloszonoPoDniach, 4);
+
+  d.prepare("UPDATE reklamacja_klienta SET ilosc=2 WHERE id=?").run(id);
+  [r] = listaReklamacji(d, TERAZ);
+  assert.equal(r.kwotaGrosze, 11_000);
+  assert.equal(r.kwotaZrodlo, "paragon");
+
+  /* Szczegół składa wiersz TYM SAMYM zapytaniem — inaczej kwota w kolejce
+     i w głowicy sprawy mogłyby się różnić. */
+  const s = szczegolReklamacji(d, id, TERAZ).reklamacja;
+  assert.deepEqual(
+    [s.cenaParagonuGrosze, s.kwotaGrosze, s.kwotaZrodlo, s.zgloszonoPoDniach],
+    [r.cenaParagonuGrosze, r.kwotaGrosze, r.kwotaZrodlo, r.zgloszonoPoDniach]);
+});
+
+test("szczegół bez dowodów, zgłoszenia u dostawcy i dostawy mówi „nie wiemy”, a kartę dalej niesie", () => {
+  const { d, dodaj } = stanowisko();
+  const id = dodaj({ ext: "a" });
+  const s = szczegolReklamacji(d, id, TERAZ);
+  assert.deepEqual(s.dowody, []);
+  assert.equal(s.uDostawcy, null);
+  assert.equal(s.dostawa, null, "brak kartoteki to brak dostawy, nie dostawa pusta");
+  /* Karta Copilota zostaje w odpowiedzi, choć ekran jej już nie czyta:
+     zapisane dane są własnością biura, nie ekranu. */
+  assert.ok("karta" in s);
 });

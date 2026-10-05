@@ -1,33 +1,29 @@
 import React, { useEffect, useState } from "react";
-import { Bot, Coins, ExternalLink, Gavel, NotebookPen, Receipt } from "lucide-react";
+import { Coins, ExternalLink, Gavel, NotebookPen, Receipt } from "lucide-react";
 import type {
-  CenaPoziomu, PozycjaZamowienia, RadaMaszyny, Reklamacja, SladHistorii, SzczegolReklamacji, Tag,
-  Werdykt, ZdjecieKarty,
+  CenaPoziomu, PozycjaZamowienia, Reklamacja, SladHistorii, SzczegolReklamacji, Tag,
 } from "../api/typy";
 import { TagiSprawy } from "../sprawy/Tagi";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
-import { ZlecHali } from "../sprawy/ZlecHali";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
 import { zlote } from "../api/zwroty";
 import {
   EtykietaWartosci, NaglowekSekcji, czas, dzien, dniSlowo, ile, LoginKlienta, odmien, Przycisk,
   Skopiuj,
 } from "../ui";
-import { Kafel, KafelOferty } from "../towar/Kafel";
 import { CenyKartoteki } from "../skrzynka/TowarRozmowy";
 import { useKartaTowaru } from "../api/rozmowy";
-import { OCZEKIWANIA, POWODY } from "./Kolejka";
-import { NAZWA_WERDYKTU } from "./statusy";
 import { Zwijka } from "../skrzynka/Zwijka";
-import { PrzyciskTowaru } from "../towar/Szuflada";
+import { kartotekaKolumny } from "./Glowica";
 
-/* ── Kolumna dowodów o reklamacji ────────────────────────────────────────────
-   Jedna lista faktów o jednej sprawie, więc SEKCJE jedna pod drugą, a nie
-   zakładki — ta sama decyzja co przy zwrocie w 0.180.0. Zakładki mają sens
-   tam, gdzie kolumna niesie dwa RÓWNORZĘDNE tematy; tutaj jest jeden.
+/* ── Kolumna faktów o reklamacji ─────────────────────────────────────────────
+   Trzecia kolumna obszaru sprawy, za rozmową i dowodami biura. Jedna lista
+   faktów o jednej sprawie, więc SEKCJE jedna pod drugą, a nie zakładki — ta
+   sama decyzja co przy zwrocie w 0.180.0. Zakładki mają sens tam, gdzie
+   kolumna niesie dwa RÓWNORZĘDNE tematy; tutaj jest jeden.
 
-   Wszystko poniżej to ODCZYT. Jedyne dwa zapisy tego ekranu — „prowadzę"
-   i notatka — są jawnymi kliknięciami, nie skutkiem ubocznym patrzenia. */
+   Wszystko poniżej to ODCZYT. Notatka, tagi i pytanie o paczkę zapisują,
+   ale każde jawnym kliknięciem, nie skutkiem ubocznym patrzenia. */
 
 /* ── GĘSTOŚĆ KOLUMNY (0.389.0) ───────────────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: kolumna dowodów nie mieściła się
@@ -115,117 +111,6 @@ function Notatka({ reklamacja, trwa, blad, onZapisz, onCofnij }: {
 }
 
 /**
- * Karta faktów Copilota (0.275.0) — CO WYCZYTAŁ, nigdy co radzi.
- *
- * Werdyktu tu nie ma i nie będzie: uznanie i odrzucenie są nieodwracalne wobec
- * kupującego i należą do człowieka. Najcenniejsza pozycja to „brakuje" —
- * sprawa stoi tygodniami nie dlatego, że nikt nie umie zdecydować, tylko
- * dlatego, że nikt nie zapytał o zdjęcie tabliczki.
- *
- * Każde zdanie niesie CYTAT, czyli numer wiadomości. Bez niego karta byłaby
- * drugą wersją rozmowy, a nie skrótem tej, którą agent ma przed oczami.
- */
-function KartaFaktow({ karta, trwa, blad, onRozpoznaj }: {
-  karta: SzczegolReklamacji["karta"];
-  trwa: boolean;
-  blad: string;
-  onRozpoznaj: () => void;
-}) {
-  return <section className="border-t border-slate-200 px-4 pb-3 pt-1 first:border-t-0">
-    {/* ── KARTA ZWIJA SIĘ (0.389.0) ─────────────────────────────────────────
-        Zgłoszenie właściciela: „zasłania sporo ekranu po prawej stronie".
-        Ta kolumna jest DOWODAMI — zamówieniem, ofertą, kartoteką, rozmowami
-        o tym zakupie — a karta maszyny rosła nad nimi i spychała je poniżej
-        krawędzi okna. Dekalog ergonomii, punkt 2: na wierzchu to, co
-        rozstrzyga bieżącą czynność; reszta zwinięta, nie na drugim ekranie.
-
-        DOMYŚLNIE OTWARTA, a nie zamknięta: zwinięcie na starcie zabrałoby
-        kartę tym, którzy jej używają, a zgłoszenie mówiło o MOŻLIWOŚCI
-        zwinięcia, nie o ukryciu. Jedno kliknięcie zamyka ją na stałe.
-
-        Podpis niesie treść karty w jednym zdaniu, więc zamknięta mówi, czy
-        warto ją otwierać — inaczej agent klikałby, żeby się dowiedzieć. */}
-    <Zwijka
-      tytul="Co wyczytał Copilot"
-      Ikona={Bot}
-      podpis={podpisKarty(karta)}
-      plakietka={karta && karta.brakuje.length > 0
-        ? <span className="rounded bg-amber-100 px-1.5 py-0.5 text-podpis font-bold text-amber-900">
-            {ile(karta.brakuje.length, "brak", "braki", "braków")}</span>
-        : undefined}
-      /* ZWINIĘTA DOMYŚLNIE — decyzja właściciela z 18 września 2026, po
-         zobaczeniu wersji otwartej na własnym ekranie.
-         
-         Odradzałem to w 0.389.0: zamknięty blok chowa „PRZECZYTAJ SPRAWĘ" za
-         kliknięciem przy każdej nieprzeczytanej sprawie. Właściciel zna ten
-         koszt i wybrał miejsce na ekranie — jego decyzja, jego kolumna.
-         
-         Cena jest mniejsza, niż wyglądała: `pamietajJako` pamięta ROZWINIĘCIE
-         tak samo jak zwinięcie, więc agent pracujący z Copilotem otwiera blok
-         raz, a nie przy każdej sprawie. Podpis nagłówka mówi, co w środku,
-         więc zamknięty blok nie każe zgadywać. */
-      pamietajJako="wertis.reklamacje.copilot"
-    >
-    <div className="px-2 py-2">
-    {blad && <p className="py-1 text-xs text-red-700">{blad}</p>}
-    {karta ? <>
-      {karta.rada && <Rada rada={karta.rada} ocena={karta.ocena} />}
-      {karta.usterka && <Wiersz etykieta="Usterka">
-        {karta.usterka.tresc} <Cytat z={karta.usterka.zrodlo} zdjecia={karta.zdjecia} /></Wiersz>}
-      {karta.kiedy && <Wiersz etykieta="Od kiedy">
-        {karta.kiedy.tresc} <Cytat z={karta.kiedy.zrodlo} zdjecia={karta.zdjecia} /></Wiersz>}
-      {karta.oczekiwanie && <Wiersz etykieta="Klient chce">
-        {karta.oczekiwanie.tresc} <Cytat z={karta.oczekiwanie.zrodlo} zdjecia={karta.zdjecia} /></Wiersz>}
-      {karta.dowody.length > 0 && <Wiersz etykieta="Dowody">
-        {karta.dowody.map((d, i) => <span key={i} className="mr-2">
-          {d.tresc} <Cytat z={d.zrodlo} zdjecia={karta.zdjecia} /></span>)}
-      </Wiersz>}
-      {karta.brakuje.length > 0 && <div className="mt-1 rounded-lg bg-amber-50 px-3 py-2">
-        <EtykietaWartosci>Brakuje do rozstrzygnięcia</EtykietaWartosci>
-        <ul className="mt-1 list-disc pl-5 text-sm text-amber-900">
-          {karta.brakuje.map((b, i) => <li key={i}>{b}</li>)}
-        </ul>
-      </div>}
-      {/* ── CO KARTA PRZECZYTAŁA (0.283.0) ──────────────────────────────────
-          Bez tej liczby „Copilot nic nie zobaczył na zdjęciu" i „Copilot nie
-          dostał zdjęć" wyglądają na ekranie identycznie — a to dwie zupełnie
-          różne sprawy i dwa różne następne ruchy agenta. */}
-      <p className="pt-2 text-xs text-slate-500">
-        {karta.przez ?? "—"}, {czas(karta.at)} · {karta.model}
-        {karta.zdjecia.length > 0 && ` · przeczytał ${zdjecSlowo(karta.zdjecia.length)}`}
-      </p>
-    </> : <p className="pt-1 text-xs text-slate-500">Werdykt zostaje przy Tobie.</p>}
-    {/* Zdaniem, nie wersalikami (0.511.0) — tak piszą przyciski skrzynki. */}
-    <Przycisk className="mt-2 !px-2 !py-1 !text-xs" disabled={trwa} onClick={onRozpoznaj}>
-      {trwa ? "Czytam…" : karta ? "Przeczytaj jeszcze raz" : "Przeczytaj sprawę"}
-    </Przycisk>
-    </div>
-    </Zwijka>
-  </section>;
-}
-
-/**
- * Co stoi w karcie — jedno zdanie do nagłówka zamkniętego bloku.
- *
- * Bez niego zamknięta karta mówiłaby wyłącznie „Copilot" i agent musiałby ją
- * otwierać, żeby sprawdzić, czy jest tam cokolwiek. To jest dokładnie ten
- * jeden klik, dla którego blok się zwija.
- */
-function podpisKarty(karta: SzczegolReklamacji["karta"]): string {
-  /* Bez karty podpis tłumaczy, CO ten blok robi — to samo zdanie, które do
-     0.388.1 stało w trzech linijkach prozy nad przyciskiem. W nagłówku zajmuje
-     jedną linię i znika, gdy karta już jest. */
-  if (!karta) return "wyczyta usterkę, oczekiwanie i braki";
-  const ma: string[] = [];
-  if (karta.rada) ma.push("rada");
-  if (karta.usterka) ma.push("usterka");
-  if (karta.oczekiwanie) ma.push("oczekiwanie klienta");
-  if (karta.dowody.length > 0) ma.push("dowody");
-  return ma.length ? ma.join(", ") : "przeczytał, ale nic nie wyczytał";
-}
-
-
-/**
  * Co stoi w tagach i notatce — jedno zdanie do zamkniętego nagłówka.
  *
  * Bez niego zwinięty blok kazałby otwierać go tylko po to, żeby sprawdzić,
@@ -238,75 +123,8 @@ function podpisPracy(r: Reklamacja): string {
   return ma.length ? ma.join(" · ") : "pusto";
 }
 
-/**
- * Rada maszyny (0.276.0) — PODPISANA, żeby nie pomylić autora.
- *
- * Do 0.275.0 Copilot nie radził wcale; właściciel odwrócił tę decyzję.
- * Rada stoi więc na ekranie, ale w ramce z własnym nagłówkiem i nigdy nie
- * dotyka formularza werdyktu: agent klika „UZNAJĘ" sam i sam potwierdza
- * zgodę. Allegro nie przyjmie drugiego werdyktu w sprawie, więc różnica
- * między „przeczytaj i zdecyduj" a „potwierdź" jest tu nieodwracalna.
- *
- * „Czego nie wiem" stoi PRZY pewności, nie pod spodem: deklaracja pewności
- * bez tej listy byłaby brawurą, a serwer odrzuca takie karty.
- */
-function Rada({ rada, ocena }: { rada: RadaMaszyny; ocena: string | null }) {
-  const nazwa = rada.co === "POPROSIC_O_DOWODY"
-    ? "Poprosić o dowody — nie ma jeszcze czego rozstrzygać"
-    : NAZWA_WERDYKTU[rada.co as Werdykt] ?? rada.co;
-  return <div className="mb-2 rounded-lg border border-sky-200 bg-sky-50 p-3">
-    <div className="flex flex-wrap items-baseline gap-2">
-      <EtykietaWartosci>Copilot radzi</EtykietaWartosci>
-      <b className="text-sm text-slate-800">{nazwa}</b>
-      <span className="text-podpis text-slate-600">pewność {rada.pewnosc}</span>
-      {/* Trafność liczy się z werdyktu, który agent naprawdę wysłał — nie
-          z ankiety. Przed werdyktem nie ma jej wcale i tak ma być. */}
-      {ocena && <span className={`rounded px-1 text-podpis ${
-        ocena === "trafna" ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"}`}>
-        rada {ocena}</span>}
-    </div>
-    <p className="mt-1 text-sm text-slate-800">
-      {rada.uzasadnienie.tresc} <Cytat z={rada.uzasadnienie.zrodlo} />
-    </p>
-    {rada.czegoNieWiem.length > 0 && <p className="mt-1 text-podpis text-slate-600">
-      Czego nie wie: {rada.czegoNieWiem.join(", ")}
-    </p>}
-    <p className="mt-2 text-podpis text-slate-600">
-      Werdykt wydajesz Ty — ta rada nie wypełnia formularza.
-    </p>
-  </div>;
-}
-
-/**
- * Numer wiadomości, z której model wziął zdanie.
- *
- * Szczebel `podpis` z drabiny, nie arbitralne piksele — i `text-slate-600`,
- * bo `slate-500` na `slate-100` daje 4,34:1 przy progu 4,5. Obie rzeczy
- * wyłapały strażnice panelu, zanim zobaczył je człowiek; zostawiam to zdanie,
- * żeby następny nie sprawdzał tego drugi raz.
- */
-/** „1 zdjęcie", „2 zdjęcia", „5 zdjęć" — trzy formy, jak przy sprawach. */
-function zdjecSlowo(n: number): string {
-  const ostatnia = n % 10;
-  const dwie = n % 100;
-  if (n === 1) return "1 zdjęcie";
-  if (ostatnia >= 2 && ostatnia <= 4 && !(dwie >= 12 && dwie <= 14)) return `${n} zdjęcia`;
-  return `${n} zdjęć`;
-}
-
-const Cytat = ({ z, zdjecia = [] }: { z: string; zdjecia?: ZdjecieKarty[] }) => {
-  /* ── CYTAT ZE ZDJĘCIA MUSI DAĆ SIĘ SPRAWDZIĆ (0.283.0) ────────────────────
-     `W3` agent znajdzie w rozmowie obok. `Z2` bez nazwy pliku jest numerem
-     donikąd, a sprawdzalny cytat jest całą doktryną tej karty — dlatego
-     podpowiedź mówi, o który plik chodziło. */
-  const plik = zdjecia.find((p) => p.numer === z);
-  return <span title={plik ? `Zdjęcie: ${plik.nazwa}` : undefined}
-    className="rounded bg-slate-100 px-1 font-mono text-podpis text-slate-600">{z}</span>;
-};
-
 export function Dowody({
   szczegol, trwa, bladZapisu, onNotatka, onCofnijNotatke,
-  rozpoznaje = false, bladRozpoznania = "", onRozpoznaj,
   onSprawdzPrzesylke, sprawdzaPrzesylke = false, bladPrzesylki = "",
   tagi,
 }: {
@@ -316,8 +134,8 @@ export function Dowody({
   onNotatka: (tekst: string) => void;
   /** Cofnięcie ZMIANY notatki (0.280.0) — §25a.5. */
   onCofnijNotatke?: () => void;
-  /* Tagi są OPCJONALNE tym samym wzorcem co Copilot: czego nie da się zrobić,
-     tego nie ma na ekranie — sekcja bez obsługi byłaby obietnicą bez pokrycia. */
+  /* Tagi są OPCJONALNE: czego nie da się zrobić, tego nie ma na ekranie —
+     sekcja bez obsługi byłaby obietnicą bez pokrycia. */
   tagi?: {
     slownik: Tag[];
     trwa: boolean;
@@ -326,11 +144,6 @@ export function Dowody({
     onOdepnij: (tagId: number) => void;
     onNowy: (nazwa: string) => void;
   };
-  /* Copilot jest OPCJONALNY w propsach, bo ten sam komponent rysuje sprawę
-     także tam, gdzie rozpoznania nie ma po co wołać. */
-  rozpoznaje?: boolean;
-  bladRozpoznania?: string;
-  onRozpoznaj?: () => void;
   /* Sprawdzenie przesyłki (0.393.0) — opcjonalne tym samym wzorcem co reszta:
      czego nie da się zrobić, tego nie ma na ekranie. */
   onSprawdzPrzesylke?: () => void;
@@ -346,8 +159,11 @@ export function Dowody({
   const towar = kartotekaKolumny(szczegol);
 
   return <div className="flex min-h-0 flex-col">
-    <Glowica r={r} />
-    <Towar szczegol={szczegol} towar={towar} />
+    {/* ── GŁOWICA I TOWAR STOJĄ NAD KOLUMNAMI ──────────────────────────────
+        Kwota żądania, termin, powód, towar i jego sygnatura przeszły do
+        głowicy sprawy (`Glowica.tsx`) — na całą szerokość, nad rozmową.
+        Zdjęcia oferty i kartoteki stoją w kolumnie zdjęć pod „Wysłaliśmy".
+        Tu zostają fakty do decyzji i zwijki ze szczegółem. */}
     <Triaz szczegol={szczegol} pozycja={pozycja} twId={towar.twId} />
     <Paczka przesylka={szczegol.przesylka} onSprawdz={onSprawdzPrzesylke}
       trwa={sprawdzaPrzesylke} blad={bladPrzesylki} />
@@ -428,9 +244,10 @@ export function Dowody({
       </Zwijka>
 
       {/* ── SPRAWA ZWINIĘTA, BO GŁOWICA JĄ JUŻ POWIEDZIAŁA (0.403.0) ─────────
-          Termin, kwota, tytuł prawny, powód i status stoją wyżej — tu zostają
-          IDENTYFIKATORY i stan rozmowy, czyli to, czego szuka się wtedy, gdy
-          trzeba coś skopiować albo sprawdzić, czy Allegro jeszcze słucha. */}
+          Termin, kwota, powód i werdykt stoją w głowicy nad kolumnami — tu
+          zostają IDENTYFIKATORY, tytuł prawny i stan rozmowy, czyli to, czego
+          szuka się wtedy, gdy trzeba coś skopiować albo sprawdzić, czy Allegro
+          jeszcze słucha. */}
       <Zwijka
         tytul="Sprawa"
         Ikona={Gavel}
@@ -447,9 +264,13 @@ export function Dowody({
                 <PrzyciskHistorii rodzaj="sprawa" id={r.id} tutaj="tą reklamacją" /></span>
             : "—"}</Wiersz>
           <Wiersz etykieta="Zgłoszono">{czas(r.otwartoAt)}</Wiersz>
-          {/* Statusu Allegro tu NIE MA i to nie jest przeoczenie: stoi
-              znacznikiem w głowicy. Dwa miejsca na jedną wartość to dwa
-              miejsca do przeczytania i jedno do rozjechania się. */}
+          {/* Rękojmia i gwarancja to dwie różne rozmowy z klientem, więc tytuł
+              stoi słowem, a nie kodem Allegro. Status Allegro stoi surowo:
+              głowica tłumaczy go na werdykt, a tu szuka się dokładnej wartości. */}
+          <Wiersz etykieta="Tytuł">
+            <b className="font-semibold">{r.prawo === "COMPLAINT" ? "rękojmia"
+              : r.prawo === "WARRANTY" ? "gwarancja" : "tytuł nieznany"}</b></Wiersz>
+          {r.statusAllegro && <Wiersz etykieta="Status Allegro">{r.statusAllegro}</Wiersz>}
           <Wiersz etykieta="Rozmowa">
             {r.czatAktywny ? "otwarta" : "zamknięta przez Allegro"}
             {` · ${r.wiadomosciIle} wiadomości`}
@@ -509,181 +330,12 @@ export function Dowody({
         </div>}
       </Sekcja>}
 
-    {/* ZLECENIE HALI Z REKLAMACJI (0.502.0) — „zdjęcie towaru z półki",
-        „sprawdź, czy partia ma tę wadę". Powód w `sprawy/ZlecHali.tsx`.
-        Nagłówek „Hala" zszedł (0.511.0): stał nad jednym przyciskiem
-        „Zleć hali", który mówi to samo i sam jest nagłówkiem swojej czynności. */}
-    <section className="border-t border-slate-200 px-4 py-2 first:border-t-0">
-      <ZlecHali zrodlo="reklamacja" zrodloRef={r.id} tytul={`Reklamacja ${r.numer ?? r.id}`} twId={towar.twId} />
-    </section>
-
-    {/* ── COPILOT NA DOLE (0.403.0) ───────────────────────────────────────────
-        Do tego wydania karta maszyny stała PIERWSZA, nad faktami sprawy.
-        Kolejność czytania powinna iść za kolejnością zaufania: najpierw to,
-        co przyszło z Allegro i z paragonu, dopiero potem to, co wyczytał
-        model. Karta i tak jest zwinięta (decyzja właściciela z 18 września),
-        więc zejście na dół nie zabiera ani jednego kliknięcia. */}
-    {onRozpoznaj && <KartaFaktow karta={szczegol.karta} trwa={rozpoznaje}
-      blad={bladRozpoznania} onRozpoznaj={onRozpoznaj} />}
-  </div>;
-}
-
-/* ── GŁOWICA NIESIE WERDYKT (0.403.0) ────────────────────────────────────────
-   Zgłoszenie właściciela ze zrzutem całego ekranu: „panel wygląda chaotycznie".
-   Prawa kolumna miała dwadzieścia jeden wierszy w JEDNEJ WADZE — „Tytuł:
-   rękojmia" ważyło dokładnie tyle, co kwota żądania i termin decyzji.
-
-   Trzy rzeczy rozstrzygają, czy agent uzna, czy odrzuci: ILE klient chce,
-   DO KIEDY trzeba zdecydować i z JAKIEGO tytułu. One idą na górę, w stopniu
-   widocznym z drugiego końca biurka; reszta schodzi do zwijek. Dekalog
-   ergonomii, punkt 2 (pierwszeństwo tego, co rozstrzyga bieżącą czynność)
-   i punkt 1 (mniej decyzji przy jednym spojrzeniu).
-
-   KWOTA NA PIERWSZYM MIEJSCU tylko wtedy, gdy Allegro ją podało. Bez kwoty
-   w tym miejscu staje SŁOWO oczekiwania — pusty slot po kwocie kazałby
-   szukać liczby, której nie ma. */
-function Glowica({ r }: { r: Reklamacja }) {
-  const termin = terminSlowem(r);
-  const oczekiwanie = r.oczekiwanie ? (OCZEKIWANIA[r.oczekiwanie] ?? r.oczekiwanie) : null;
-  const kwota = r.oczekiwanaKwotaGrosze !== null
-    ? zlote(r.oczekiwanaKwotaGrosze, r.waluta) : null;
-  return <div className="border-b border-amber-200 bg-amber-50 px-4 py-3">
-    <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
-      <div className="min-w-0">
-        <EtykietaWartosci>Klient chce</EtykietaWartosci>
-        <p className="mt-0.5 text-2xl font-bold leading-none tracking-tight text-slate-900">
-          <span className={kwota ? "tabular-nums" : ""}>{kwota ?? oczekiwanie ?? "—"}</span>
-        </p>
-        <p className="mt-1 text-xs text-slate-700">
-          {kwota && oczekiwanie ? `${oczekiwanie} · ` : ""}
-          {r.zwrotWymagany === null ? "zwrot towaru nierozstrzygnięty"
-            : r.zwrotWymagany ? "zwrot towaru wymagany" : "zwrot towaru niewymagany"}
-        </p>
-      </div>
-      <div className="ml-auto shrink-0 text-right">
-        <EtykietaWartosci>Decyzja do</EtykietaWartosci>
-        <p className={`mt-0.5 text-lg font-bold leading-tight ${
-          termin.pilny ? "text-ranga-zle" : "text-slate-900"}`}>{termin.napis}</p>
-        <p className="mt-0.5 text-xs text-slate-700">
-          {r.decyzjaDo ? czas(r.decyzjaDo) : "Allegro nie podało terminu"}</p>
-      </div>
-    </div>
-    {/* Tytuł prawny, powód i status Allegro jako ZNACZNIKI, nie wiersze:
-        każde z nich to jedno słowo odpowiedzi, a etykieta obok podwajałaby
-        wysokość bez dokładania treści. Tytuł jest mocny, bo rękojmia
-        i gwarancja to dwie różne rozmowy z klientem. */}
-    <div className="mt-2 flex flex-wrap gap-1.5">
-      <Znacznik mocny>
-        {r.prawo === "COMPLAINT" ? "rękojmia" : r.prawo === "WARRANTY" ? "gwarancja" : "tytuł nieznany"}
-      </Znacznik>
-      {r.powodTyp && <Znacznik>{POWODY[r.powodTyp] ?? r.powodTyp}</Znacznik>}
-      {/* ── STATUS DOMYŚLNY NIE JEST INFORMACJĄ (0.414.0) ──────────────────
-          `CLAIM_SUBMITTED` ma KAŻDA sprawa czekająca na werdykt, czyli cały
-          kubełek DO DECYZJI. Czip mówiący „to zwykła reklamacja" nie zmienia
-          żadnej decyzji, a zajmuje tyle samo uwagi co tytuł prawny obok.
-          Znaczniki mają wołać o uwagę wtedy, gdy stan ODBIEGA od domyślnego —
-          uznana, odrzucona, wycofana. */}
-      {r.statusAllegro && r.statusAllegro !== "CLAIM_SUBMITTED" &&
-        <Znacznik>{r.statusAllegro}</Znacznik>}
-    </div>
-  </div>;
-}
-
-const Znacznik = ({ children, mocny = false }: { children: React.ReactNode; mocny?: boolean }) =>
-  <span className={`rounded-full border border-slate-300 bg-white px-2 py-0.5 text-podpis ${
-    mocny ? "font-semibold text-slate-900" : "text-slate-700"}`}>{children}</span>;
-
-/**
- * Termin jednym słowem — „za 6 dni" zamiast „24.09.2026, 23:59".
- *
- * Data bezwzględna zostaje pod spodem, bo agent czasem jej potrzebuje. Ale
- * pytanie, które zadaje patrząc na sprawę, brzmi „ile mam czasu", a nie
- * „który to dzień" — i odjęcie jednej daty od drugiej w głowie to praca,
- * którą kolumna miała zdjąć. Ta sama zamiana co w kolejce od 0.121.0.
- */
-function terminSlowem(r: Reklamacja): { napis: string; pilny: boolean } {
-  if (r.poTerminie) return { napis: "po terminie", pilny: true };
-  if (r.decyzjaDo === null || r.dniDoTerminu === null) {
-    return { napis: "bez terminu", pilny: false };
-  }
-  if (r.dniDoTerminu === 0) return { napis: "dziś", pilny: true };
-  return { napis: `za ${dniSlowo(r.dniDoTerminu)}`, pilny: r.dniDoTerminu <= 3 };
-}
-
-/* ── JEDNA KARTOTEKA NA CAŁĄ KOLUMNĘ ─────────────────────────────────────────
-   Symbol, kafel, przekrój towaru, triaż i zlecenie hali pytają o TĘ SAMĄ
-   rzecz: która to kartoteka u nas. Każdy element pyta tej funkcji, bo
-   osobne pytania się rozjeżdżają. Symbol z dopasowania po SKU obok „sprawa
-   bez kartoteki" to dwie sprzeczne odpowiedzi w jednym wierszu.
-
-   KOLEJNOŚĆ ZA SERWEREM: najpierw `r.twId`, który niesie paragon albo
-   wskazanie człowieka, potem `kartotekaOferty`. Z niej bierzemy wyłącznie
-   POWIĄZANIE, czyli `sku` i `pamiec`. Jedno trafienie po sygnaturze to
-   decyzja właściciela, nie propozycja (`services/dopasowanie-sku.ts`).
-   Symbol zdublowany przychodzi bez `twId` i zostaje brakiem, bo dwie
-   kartoteki pod jednym symbolem rozstrzyga człowiek. */
-type ZrodloKartoteki = "paragon" | "mapowanie" | "sku";
-
-interface KartotekaKolumny {
-  twId: number | null;
-  symbol: string | null;
-  zrodlo: ZrodloKartoteki | null;
-}
-
-const NAPIS_ZRODLA: Record<ZrodloKartoteki, string> = {
-  paragon: "z paragonu",
-  mapowanie: "z mapowania oferty",
-  sku: "z SKU oferty",
-};
-
-function kartotekaKolumny(szczegol: SzczegolReklamacji): KartotekaKolumny {
-  const r = szczegol.reklamacja;
-  if (r.twId !== null) {
-    return { twId: r.twId, symbol: r.twSymbol, zrodlo: r.twZParagonu ? "paragon" : "mapowanie" };
-  }
-  const k = szczegol.kartoteka;
-  if (k && k.twId !== null && (k.pewnosc === "sku" || k.pewnosc === "pamiec")) {
-    return { twId: k.twId, symbol: k.symbol, zrodlo: k.pewnosc === "sku" ? "sku" : "mapowanie" };
-  }
-  return { twId: null, symbol: null, zrodlo: null };
-}
-
-/* ── DWA OBRAZY, DWA ŹRÓDŁA (0.223.0) ────────────────────────────────────────
-   Lewy to oferta Allegro: dokładnie to, co widział klient, kupując. Prawy to
-   kartoteka Subiekta: to, co leży u nas na półce. Przy reklamacji różnica
-   między nimi bywa całą sprawą — „niezgodny z opisem" to siedemnaście spraw
-   na sto w sondzie.
-
-   SYGNATURA MÓWI, SKĄD JEST (0.403.0). Po 0.400.0 symbol bywa wzięty
-   z PARAGONU, a bywa z dzisiejszego mapowania oferty — i to są dwie różne
-   rzeczy, gdy sprzedawca przepiął sygnaturę po wyczerpaniu dostawy. Wiersz
-   bez tej adnotacji kazał ufać jednakowo obu. */
-function Towar({ szczegol, towar }: { szczegol: SzczegolReklamacji; towar: KartotekaKolumny }) {
-  const r = szczegol.reklamacja;
-  return <div className="flex items-start gap-3 border-b border-slate-200 px-4 py-3">
-    <KafelOferty externalId={r.offerId} stan={r.ofertaZdjecie} rozmiar={56}
-      nazwa={r.ofertaNazwa ?? "Oferta"} symbol={r.offerId} />
-    <Kafel twId={towar.twId} rozmiar={56} nazwa={r.ofertaNazwa ?? "Kartoteka"} symbol={towar.symbol} />
-    <div className="min-w-0 flex-1">
-      <p className="text-sm font-semibold leading-snug text-slate-900">
-        {r.ofertaNazwa ?? "Oferty nie pobrano"}</p>
-      <p className="mt-1 flex flex-wrap items-baseline gap-x-2 text-xs text-slate-600">
-        {/* Przy braku stoi ZDANIE serwera, nie kod powodu: `powod` jest
-            kluczem dla liczników, a agent ma przeczytać, które ogniwo pękło. */}
-        {towar.symbol
-          ? <PrzyciskTowaru twId={towar.twId}><span className="font-mono font-semibold text-slate-800">{towar.symbol}</span></PrzyciskTowaru>
-          : <span>{szczegol.kartoteka?.zrodlo ?? "bez kartoteki"}</span>}
-        {towar.symbol && towar.zrodlo && <span>{NAPIS_ZRODLA[towar.zrodlo]}</span>}
-        {/* ── CENY TU NIE MA (0.414.0) ──────────────────────────────────────
-            Ta sama kwota stała w trzech miejscach kolumny: tutaj, w kostce
-            „Klient zapłacił" i w pozycji zwijki Zakup. Wiersz towaru
-            odpowiada na pytanie „CO to jest u nas", a nie „ile kosztowało" —
-            cena była tu gościem. Kostka niesie ją przy pozostałych liczbach
-            decyzji, a lista zakupu przy pozostałych pozycjach zamówienia;
-            oba miejsca odpowiadają na pytania, których wiersz towaru nie
-            zadaje. */}
-      </p>
-    </div>
+    {/* ── BEZ COPILOTA I BEZ „ZLEĆ HALI" ─────────────────────────────────────
+        Decyzja właściciela przy przebudowie ekranu reklamacji: karta „Co
+        wyczytał Copilot", jego rada i zlecenie dla hali na razie tu nie stoją.
+        Dlatego nic w tej kolumnie nie woła modelu ani nie zleca pracy hali.
+        Zapisane karty zostają w bazie, a `ZlecHali` dalej służy zwrotom
+        i dyskusjom. Strażnik: `BezCopilota.test.tsx` i `Notatka.test.tsx`. */}
   </div>;
 }
 

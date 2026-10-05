@@ -6,25 +6,35 @@ import {
 import type { KubelekReklamacji, Reklamacja, SygnalReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { ZdjecieOferty } from "../towar/Zdjecie";
-import { Pusto, dniSlowo } from "../ui";
+import { NaglowekSekcji, Pusto, dniSlowo } from "../ui";
 import { CzipTagu } from "../sprawy/Tagi";
 import { mojaSprawa } from "../sprawy/Moje";
 
 /* ── Kolejka reklamacji ──────────────────────────────────────────────────────
-   Wiersz ma się czytać W BIEGU, więc niesie SIEDEM rzeczy i ani jednej więcej:
-   zdjęcie, numer, klienta, powód, czego klient chce, dni do terminu decyzji
-   i sygnały. Wszystko, co trzeba doczytać, siedzi w kolumnie dowodów po prawej.
+   Wiersz ma się czytać W BIEGU, więc niesie TRZY linie i jedną barwę sygnału.
+   Pierwsza to towar i ile zostało do terminu, druga — czego klient chce, za
+   co i za ile, trzecia — numer, login i kto prowadzi. Wszystko, co trzeba
+   doczytać, stoi w obszarze sprawy po prawej.
 
-   ZDJĘCIE JEST TOŻSAMOŚCIĄ SPRAWY (0.223.0), nie ozdobą. Reklamacja dotyczy
-   jednej oferty, a „pękła obudowa" przy zdjęciu kosiarki czyta się w biegu —
-   przy samym numerze wymaga otwarcia sprawy. Bierzemy obraz OFERTY, nie
-   kartoteki: klient reklamuje to, co kupił, a kartoteka bywa niepowiązana.
-   Kafel ma stały rozmiar także wtedy, gdy obrazu nie ma — rosnący przesuwałby
-   wiersze pod kursorem (lekcja z `biuro.html`).
+   TYTUŁEM JEST TOWAR, nie numer: oko szuka kosiarki, a numer sprawy czyta
+   się dopiero przy kopiowaniu, więc schodzi do podpisu. Zdjęcie oferty
+   zostaje, bo jest tożsamością sprawy — „pękła obudowa" przy zdjęciu
+   kosiarki czyta się w biegu, przy samym numerze wymaga otwarcia sprawy.
+   Bierzemy obraz OFERTY, nie kartoteki: klient reklamuje to, co kupił.
+   Kafel ma stały rozmiar także bez obrazu, żeby wiersze nie skakały pod
+   kursorem.
 
-   Kolejność liczy SERWER (najkrótszy termin na górze) i panel jej nie zmienia.
-   Dwie reguły sortowania rozjechałyby się przy pierwszej poprawce jednej
-   z nich, a objawem byłby ekran pokazujący inną pilność niż liczniki. */
+   SYGNAŁ WSPÓLNY DLA CAŁEGO KUBEŁKA ZNIKA Z WIERSZA. W „Do odpowiedzi"
+   każda sprawa ma „klient czeka", bo tak liczy się sam kubełek — jedenaście
+   identycznych czipów nie rozróżnia niczego. Które sygnały są wspólne,
+   liczy EKRAN ze składu kubełka (`wspolneSygnaly`) i mówi je raz nad listą.
+   Kolejka sama tego nie liczy, bo lista z jednym wierszem miałaby wtedy
+   wspólne wszystko.
+
+   PO TERMINIE NIESIE NAGŁÓWEK GRUPY. Sprawy po terminie decyzji stoją
+   pierwsze, pod jednym nagłówkiem, a wiersz mówi już tylko „ile". Kolejność
+   grup liczy `wGrupach`, a ekran chodzi strzałkami po tej samej tablicy —
+   inaczej kursor skakałby po liście w innym porządku, niż ją widać.       */
 
 export const KUBELKI: Array<{ id: KubelekReklamacji; etykieta: string; pytanie: string }> = [
   { id: "decyzja", etykieta: "Do decyzji", pytanie: "Uznać czy odrzucić?" },
@@ -102,33 +112,76 @@ export const OCZEKIWANIA: Record<string, string> = {
 export { dniSlowo } from "../ui";
 
 /**
+ * Kwota w grze — ta sama liczba na wierszu i w porządku „kwota".
+ *
+ * Liczy ją serwer: żądany zwrot, a bez niego cena z paragonu razy ilość.
+ * Starszy serwer pola nie zna (`undefined`), więc wtedy zostaje żądany zwrot,
+ * jedyna kwota, jaką wiersz miał zawsze. `null` znaczy „nie wiemy", nie zero.
+ */
+export function kwotaWiersza(r: Reklamacja): number | null {
+  return r.kwotaGrosze !== undefined ? r.kwotaGrosze : r.oczekiwanaKwotaGrosze;
+}
+
+/** Kolejność listy: najpierw sprawy po terminie decyzji, potem reszta, każda grupa w swoim porządku. */
+export function wGrupach(lista: Reklamacja[]): Reklamacja[] {
+  return [...lista.filter((r) => r.poTerminie), ...lista.filter((r) => !r.poTerminie)];
+}
+
+/**
+ * Sygnały, które ma KAŻDA sprawa listy — tylko przy co najmniej dwóch.
+ *
+ * Jedna sprawa nie ma z czym się porównać, więc przy niej nic nie jest
+ * „wspólne". Termin odpada zawsze, bo niesie go liczba dni na wierszu.
+ */
+export function wspolneSygnaly(lista: Reklamacja[]): SygnalReklamacji[] {
+  if (lista.length < 2) return [];
+  return lista[0].sygnaly.filter((s) => s !== "termin" && lista.every((r) => r.sygnaly.includes(s)));
+}
+
+/**
  * Dni do terminu decyzji — jedyna liczba na wierszu, którą czyta się jako pilność.
  *
  * BRAK TERMINU MÓWI TO WPROST. Allegro nie podaje `decisionDueDate` dla
  * każdej sprawy, a puste miejsce w kolumnie pilności czytałoby się jako „zdąży
  * się" — czyli odwrotnie, niż trzeba.
+ *
+ * W GRUPIE PO TERMINIE wystarczy „ile": słowo „po" stoi już w nagłówku grupy,
+ * a powtórzone na każdym wierszu byłoby tą samą czerwoną pigułką jedenaście
+ * razy. Bez pigułki — sama barwa pisma, bo tło na każdym wierszu krzyczało
+ * równo i przez to nie rozróżniało niczego.
  */
-function Termin({ dni }: { dni: number | null }) {
+function Termin({ dni, wGrupie }: { dni: number | null; wGrupie: boolean }) {
   if (dni === null) {
-    return <span className="shrink-0 rounded bg-slate-100 px-2 py-0.5 text-xs font-bold text-slate-600"
+    return <span className="shrink-0 text-xs font-semibold text-slate-600"
       title="Allegro nie podało terminu decyzji przy tej sprawie">bez terminu</span>;
   }
   const pilne = dni <= 3;
-  const tekst = dni < 0 ? `${dniSlowo(Math.abs(dni))} po` : dni === 0 ? "dziś" : dniSlowo(dni);
-  return <span className={`shrink-0 rounded px-2 py-0.5 text-xs font-bold tabular-nums ${
-    pilne ? "bg-red-100 text-ranga-zle" : "bg-slate-100 text-slate-600"}`}
+  const ileDni = dniSlowo(Math.abs(dni));
+  const tekst = dni < 0 ? (wGrupie ? ileDni : `${ileDni} po`) : dni === 0 ? "dziś" : ileDni;
+  return <span className={`shrink-0 text-xs font-bold tabular-nums ${
+    pilne ? "text-ranga-zle" : "text-slate-600"}`}
     title={`Termin decyzji: ${dni < 0 ? "przekroczony" : "za " + dniSlowo(dni)}`}>{tekst}</span>;
 }
 
-export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mojeId = null }: {
+/** Skąd jest kwota z prawej — żądanie klienta to inna rozmowa niż cena z paragonu. */
+const ZRODLO_KWOTY: Record<string, string> = {
+  zadanie: "Kwota, której żąda klient",
+  paragon: "Cena z paragonu za reklamowane sztuki",
+};
+
+export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mojeId = null,
+  ukryjSygnaly = [] }: {
+  /** Lista w kolejności `wGrupach` — tej samej, po której chodzą strzałki. */
   reklamacje: Reklamacja[];
   wybrana: number | null;
   /** Przy szukaniu lista miesza kubełki, więc wiersz musi powiedzieć swój. */
   zKubelkiem?: boolean;
-  /* Tożsamość zalogowanego (0.281.0). Bez niej czip „Ty" nie ma jak powstać,
+  /* Tożsamość zalogowanego. Bez niej „prowadzisz" nie ma jak powstać,
      a lista wygląda dokładnie tak, jak wyglądała. */
   mojeId?: number | null;
   onWybierz: (id: number) => void;
+  /** Sygnały wspólne całemu kubełkowi; mówi je ekran raz, nad listą. */
+  ukryjSygnaly?: SygnalReklamacji[];
 }) {
   const aktywnyWiersz = useRef<HTMLButtonElement | null>(null);
 
@@ -144,69 +197,82 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
         ? "Żadna reklamacja nie pasuje do tego, czego szukasz."
         : "Ten kubełek jest pusty — nic tu nie czeka na ruch."}</Pusto>;
   }
-  return <ul className="divide-y divide-slate-200">
-    {reklamacje.map((r) => {
-      const aktywna = r.id === wybrana;
-      /* Czip „termin" odpala przy tym samym progu (≤ 3 dni, `PROG_TERMINU_DNI`
-         na serwerze), przy którym plakietka `Termin` robi się czerwona. Dwa
-         znaki jednej rzeczy na jednym wierszu: plakietka niesie przy tym
-         liczbę dni, czip tylko ostrzeżenie. */
-      const sygnaly = r.sygnaly.filter((s) => s !== "termin");
-      return <li key={r.id}>
-        <button
-          /* Enter na wierszu prowadzi do pola odpowiedzi, jak w skrzynce. */
-          data-wiersz-kolejki=""
-          aria-current={aktywna ? "true" : undefined}
-          ref={aktywna ? aktywnyWiersz : null}
-          onClick={() => onWybierz(r.id)}
-          /* Zaznaczenie szare, marka na belce 3 px — powód przy tej samej
-             klauzuli w `skrzynka/Kolejka.tsx`. */
-          className={`flex w-full gap-3 border-l-[3px] px-4 py-3 text-left ${aktywna
-            ? "wiersz-wybrany border-l-wertis-amber bg-slate-200"
-            : "border-l-transparent hover:bg-slate-50"}`}>
-          <ZdjecieOferty externalId={r.offerId} stan={r.ofertaZdjecie} rozmiar={44}
-            nazwa={r.ofertaNazwa ?? r.numer ?? r.externalId} />
-          <div className="flex min-w-0 flex-1 flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="truncate font-bold">{r.numer ?? r.externalId}</span>
-            {/* ── CZIP MÓWI „TY", GDY SPRAWA JEST MOJA (0.281.0) ─────────────
+
+  const wiersz = (r: Reklamacja) => {
+    const aktywna = r.id === wybrana;
+    /* Czip „termin" odpala przy tym samym progu (≤ 3 dni, `PROG_TERMINU_DNI`
+       na serwerze), przy którym liczba dni robi się czerwona. Dwa znaki jednej
+       rzeczy na jednym wierszu: liczba niesie przy tym dni, czip tylko
+       ostrzeżenie. */
+    const sygnaly = r.sygnaly.filter((s) => s !== "termin" && !ukryjSygnaly.includes(s));
+    const numer = r.numer ?? r.externalId;
+    const oczekiwanie = r.oczekiwanie ? (OCZEKIWANIA[r.oczekiwanie] ?? r.oczekiwanie) : null;
+    const powod = r.powodTyp ? (POWODY[r.powodTyp] ?? r.powodTyp) : null;
+    const kwota = kwotaWiersza(r);
+    const moja = mojaSprawa(r.prowadziId, mojeId);
+    const werdykt = r.werdyktNazwa && r.werdyktStatus !== "send_failed";
+    const czipy = werdykt || r.tagi.length > 0 || sygnaly.length > 0;
+    return <li key={r.id}>
+      <button
+        /* Enter na wierszu prowadzi do pola odpowiedzi, jak w skrzynce. */
+        data-wiersz-kolejki=""
+        aria-current={aktywna ? "true" : undefined}
+        ref={aktywna ? aktywnyWiersz : null}
+        onClick={() => onWybierz(r.id)}
+        /* ZAZNACZENIE SZARE I BEZ BURSZTYNU: belka 3 px stoi przy każdym
+           wierszu, a przy wybranym zmienia tylko barwę na grafit. Bursztyn
+           w tej kolejce znaczy „uwaga", więc nie może znaczyć „wybrane". */
+        className={`flex w-full gap-3 border-l-[3px] px-4 py-2.5 text-left ${aktywna
+          ? "wiersz-wybrany border-l-slate-600 bg-slate-200"
+          : "border-l-transparent hover:bg-slate-50"}`}>
+        <ZdjecieOferty externalId={r.offerId} stan={r.ofertaZdjecie} rozmiar={44}
+          nazwa={r.ofertaNazwa ?? numer} />
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <div className="flex items-baseline gap-2">
+            {/* Bez snapshotu oferty tytułem zostaje numer — wiersz ma dalej
+                mówić, o jaką sprawę chodzi, zamiast udawać, że zna towar. */}
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-slate-900">
+              {r.ofertaNazwa ?? numer}</span>
+            {zKubelkiem && <span className="shrink-0 text-podpis font-semibold text-slate-600">
+              {KUBELKI.find((k) => k.id === r.kubelek)?.etykieta}</span>}
+            <Termin dni={r.dniDoTerminu} wGrupie={r.poTerminie} />
+          </div>
+          <div className="flex items-baseline gap-2 text-sm">
+            <span className="min-w-0 flex-1 truncate">
+              {oczekiwanie && <b className="font-semibold text-slate-800">{oczekiwanie}</b>}
+              {powod && <span className="text-slate-600">{oczekiwanie ? " · " : ""}{powod}</span>}
+            </span>
+            {/* Kwota z prawej, jak kolumna: oko porównuje ją z sąsiednimi
+                wierszami, a w środku zdania musiałoby jej szukać. */}
+            {kwota !== null && <span className="shrink-0 text-xs tabular-nums text-slate-700"
+              title={r.kwotaZrodlo ? ZRODLO_KWOTY[r.kwotaZrodlo] : undefined}>
+              {zlote(kwota, r.waluta)}</span>}
+          </div>
+          <div className="flex min-w-0 items-baseline gap-1 text-podpis text-slate-600">
+            {r.ofertaNazwa && <>
+              <span className="shrink-0 tabular-nums">{numer}</span>
+              <span aria-hidden="true">·</span>
+            </>}
+            <span className="min-w-0 truncate">{r.kupujacyLogin ?? "bez loginu"}</span>
+            {/* ── „PROWADZISZ", GDY SPRAWA JEST MOJA ──────────────────────────
                 Właściciel pytał wprost: „które reklamacje są moje". Samo imię
                 na to nie odpowiada — dwie osoby w biurze bywają imienniczkami,
                 a przy własnym nazwisku i tak trzeba je przeczytać. Rozstrzyga
-                NUMER KONTA, ten sam, po którym liczy się sito.
-
-                Odpowiedź stoi na wierszu, bez włączania jakiegokolwiek filtru:
-                sito zawęża listę, a to jest pytanie zadawane przy przeglądaniu
-                całej kolejki. */}
-            {r.prowadzi && <span
-              title={mojaSprawa(r.prowadziId, mojeId)
-                ? `Prowadzisz tę sprawę (${r.prowadzi})` : `Prowadzi: ${r.prowadzi}`}
-              className={`shrink-0 rounded px-1.5 py-0.5 text-xs font-bold ${
-                mojaSprawa(r.prowadziId, mojeId)
-                  ? "bg-emerald-700 text-white" : "bg-emerald-100 text-emerald-800"}`}>
-              {mojaSprawa(r.prowadziId, mojeId) ? "Ty" : r.prowadzi}</span>}
-            <span className="ml-auto" />
-            {zKubelkiem && <span className="shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold text-slate-600">
-              {KUBELKI.find((k) => k.id === r.kubelek)?.etykieta}</span>}
-            <Termin dni={r.dniDoTerminu} />
+                NUMER KONTA, ten sam, po którym liczy się sito. Odpowiedź stoi
+                na wierszu bez włączania filtru, bo pytanie zadaje się przy
+                przeglądaniu całej kolejki. */}
+            {r.prowadzi && <>
+              <span aria-hidden="true">·</span>
+              <span title={moja ? `Prowadzisz tę sprawę (${r.prowadzi})` : `Prowadzi: ${r.prowadzi}`}
+                className={`shrink-0 font-semibold ${moja ? "text-emerald-800" : "text-slate-700"}`}>
+                {moja ? "prowadzisz" : r.prowadzi}</span>
+            </>}
           </div>
-          {/* Nazwa oferty PRZED loginem: agent szuka oczami towaru, nie
-              klienta. Bez snapshotu zostaje sam login i powód. */}
-          {r.ofertaNazwa && <div className="truncate text-sm text-slate-800">
-            {r.ofertaNazwa}</div>}
-          <div className="truncate text-sm text-slate-600">
-            {r.kupujacyLogin ?? "bez loginu"}
-            {r.powodTyp ? ` · ${POWODY[r.powodTyp] ?? r.powodTyp}` : ""}
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {r.oczekiwanie && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-xs font-bold">
-              {OCZEKIWANIA[r.oczekiwanie] ?? r.oczekiwanie}
-              {r.oczekiwanaKwotaGrosze !== null
-                ? ` · ${zlote(r.oczekiwanaKwotaGrosze, r.waluta)}` : ""}</span>}
+          {czipy && <div className="mt-1 flex flex-wrap items-center gap-1.5">
             {/* Werdykt z PANELU na wierszu rozstrzygniętym — zdanie pisze serwer.
                 Sprawa rozstrzygnięta w Centrum Sprzedaży czipa nie ma: „pochodzenie
                 decyzji jest informacją", a udawanie jej naszą byłoby kłamstwem. */}
-            {r.werdyktNazwa && r.werdyktStatus !== "send_failed" &&
+            {werdykt &&
               <span title={`Werdykt z panelu${r.werdyktPrzez ? `: ${r.werdyktPrzez}` : ""}`}
                 className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-bold text-emerald-800">
                 <Gavel size={13} />{r.werdyktNazwa}</span>}
@@ -221,10 +287,26 @@ export function Kolejka({ reklamacje, wybrana, zKubelkiem = false, onWybierz, mo
                 {SYGNALY[s].ikona}{SYGNALY[s].krotko}
               </span>
             ))}
-          </div>
-          </div>
-        </button>
-      </li>;
-    })}
-  </ul>;
+          </div>}
+        </div>
+      </button>
+    </li>;
+  };
+
+  const po = reklamacje.filter((r) => r.poTerminie);
+  if (po.length === 0) return <ul className="divide-y divide-slate-200">{reklamacje.map(wiersz)}</ul>;
+  const reszta = reklamacje.filter((r) => !r.poTerminie);
+  /* Dwie listy pod dwoma nagłówkami, nie nagłówek wciśnięty w jedną: lista
+     ma prawo nieść wyłącznie swoje pozycje, a czytnik ekranu ogłasza wtedy
+     grupę i liczbę spraw w niej. */
+  return <div>
+    <NaglowekSekcji jako="h3" ton="text-ranga-zle" className="px-4 pb-1 pt-2">
+      Po terminie decyzji</NaglowekSekcji>
+    <ul className="divide-y divide-slate-200">{po.map(wiersz)}</ul>
+    {reszta.length > 0 && <>
+      <NaglowekSekcji jako="h3" className="border-t border-slate-200 px-4 pb-1 pt-2">
+        Pozostałe</NaglowekSekcji>
+      <ul className="divide-y divide-slate-200">{reszta.map(wiersz)}</ul>
+    </>}
+  </div>;
 }

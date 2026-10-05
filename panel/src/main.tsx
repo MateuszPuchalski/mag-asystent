@@ -21,7 +21,7 @@ import { Zadania } from "./ekrany/Zadania";
 import { SzukajIKlawisze } from "./nawigacja/Klawisze";
 import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
 import { PasekPolaczenia } from "./nawigacja/Polaczenie";
-import { PasekAlarmuDyskusji } from "./nawigacja/AlarmDyskusji";
+import { LicznikAlarmuDyskusji, PasekAlarmuDyskusji } from "./nawigacja/AlarmDyskusji";
 import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej";
 import { Wiedza } from "./ekrany/Wiedza";
 import { Ustawienia } from "./ekrany/Ustawienia";
@@ -187,7 +187,11 @@ function Naglowek({ wyloguj }: { wyloguj: () => void }) {
                 aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
               {z.ikona}<span className="max-[899px]:sr-only">{z.etykieta}</span>
               {z.do === "/obsluga/" && <LicznikDoZrobienia />}
-              {z.do === "/obsluga/wiedza" && <LicznikWiedzy />}</Link>
+              {z.do === "/obsluga/wiedza" && <LicznikWiedzy />}
+              {/* Czerwony alarm dyskusji stoi przy zakładce na każdym ekranie,
+                  także na reklamacjach, gdzie paska nad pracą nie ma. Powód
+                  i barwa przy `nawigacja/AlarmDyskusji.tsx`. */}
+              {z.do === "/obsluga/dyskusje" && <LicznikAlarmuDyskusji />}</Link>
           </React.Fragment>;
         })}
       </nav>
@@ -276,7 +280,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         Pasek braku połączenia stoi NAD nim: awaria jest ważniejsza niż nowość. */}
     <PasekPolaczenia />
     {/* Dyskusja bez odpowiedzi grozi blokadą konta Allegro, więc alarm stoi
-        nad nowościami: nowość może poczekać, odpowiedź nie. */}
+        nad nowościami: nowość może poczekać, odpowiedź nie. Na reklamacjach
+        pasek milknie sam, a alarm niesie czerwony licznik zakładki „Dyskusje".
+        Warunek mieszka w komponencie, bo tam sprawdza go test. */}
     <PasekAlarmuDyskusji />
     <CoNowego />
     {/* BEZ `max-w` i bez `mx-auto` (0.198.0). Ogranicznik 1500 px przyszedł

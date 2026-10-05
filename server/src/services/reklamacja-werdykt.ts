@@ -9,7 +9,7 @@ import {
   BladReklamacji, NAZWA_WERDYKTU, ReklamacjaConflict, type StatusWerdyktu,
 } from "./reklamacje.js";
 import {
-  odpowiedzWSprawie, type WynikOdpowiedzi, type WyslijWiadomosc,
+  LIMIT_ZNAKOW, odpowiedzWSprawie, type StatusWysylki, type WynikOdpowiedzi, type WyslijWiadomosc,
 } from "./reklamacje-wysylka.js";
 
 /* ── Werdykt reklamacji (przyrost trzeci) ────────────────────────────────────
@@ -268,6 +268,14 @@ export interface ZadanieZwrotuTowaru {
   expectedLastMessageId: number | null;
   mimoNowejWiadomosci?: boolean;
   autor: { id: number; name: string };
+  /**
+   * Wpuszcza WYŁĄCZNIE po werdykcie `sent`. Ścieżka łączona z werdyktem
+   * wymaga pewności: po `send_uncertain` uznanie mogło nie dojść, a wiadomość
+   * „proszę odesłać towar" przy sprawie bez uznania byłaby obietnicą bez
+   * pokrycia. Krok zapasowy po werdykcie zostaje przy obu stanach, bo tam
+   * człowiek widzi niepewność na ekranie i decyduje sam.
+   */
+  tylkoPoWyslanym?: boolean;
   database?: Db;
   wyslij?: WyslijWiadomosc;
 }
@@ -293,8 +301,9 @@ export async function zdecydujZwrotTowaru(z: ZadanieZwrotuTowaru): Promise<Wynik
   ).get(z.reklamacjaId) as
     { werdykt: string | null; werdykt_status: string | null; zwrot_towaru: string | null } | undefined;
   if (!w) throw new BladReklamacji(`Reklamacja ${z.reklamacjaId} nie istnieje`, 404);
+  const wydany = z.tylkoPoWyslanym ? ["sent"] : ["sent", "send_uncertain"];
   const uznana = (w.werdykt ?? "").startsWith("ACCEPTED")
-    && ["sent", "send_uncertain"].includes(w.werdykt_status ?? "");
+    && wydany.includes(w.werdykt_status ?? "");
   if (!uznana) {
     throw new ReklamacjaConflict({ werdykt: w.werdykt, werdyktStatus: w.werdykt_status },
       "O towarze decyduje się dopiero po uznaniu reklamacji z tego panelu");
@@ -324,4 +333,128 @@ export async function zdecydujZwrotTowaru(z: ZadanieZwrotuTowaru): Promise<Wynik
       undefined, database);
   })();
   return wynik;
+}
+
+/* ── WERDYKT I TOWAR JEDNYM KLIKNIĘCIEM ──────────────────────────────────────
+   Agent wybiera przy uznaniu, czy towar zostaje u klienta, czy wraca, i jedna
+   zgoda wysyła oba stanowiska. Dwa osobne żądania z panelu miały dwie wady:
+   dwa wpisy `privileged` za jedną decyzję człowieka i wyścig z odświeżeniem
+   po werdykcie, które potrafi wciągnąć wiadomość systemu Allegro i zrobić
+   z kroku o towarze fałszywe „ktoś dopisał".
+
+   Kolejność jest nienegocjowalna, bo werdykt jest NIEODWRACALNY:
+   1. Stanowisko o towarze sprawdzamy PRZED werdyktem. Zła decyzja albo pusta
+      treść wykryta po werdykcie zostawiłaby uznanie bez stanowiska.
+   2. Werdykt idzie pierwszy i jego wynik zawsze wraca do panelu.
+   3. Towar idzie tylko po `sent`, z wersją zwróconą przez werdykt, bo werdykt
+      ją podbił, a ekran zna starszą.
+   4. Porażka towaru NIGDY nie wywraca odpowiedzi. Panel dostaje ją w polu
+      `towar` i pokazuje krok zapasowy po werdykcie.                          */
+
+/** Stanowisko o towarze z ciała werdyktu — sprawdzone, zanim cokolwiek wyjdzie. */
+export interface ZadanieTowaru {
+  decyzja: DecyzjaOTowarze;
+  tresc: string;
+  expectedLastMessageId: number | null;
+  mimoNowejWiadomosci: boolean;
+}
+
+/** Los stanowiska o towarze przy werdykcie; każdy wariant to inne zdanie na ekranie. */
+export type WynikTowaru =
+  | { status: StatusWysylki }
+  | { pominiety: string }
+  | { blad: string }
+  | { konflikt: Record<string, unknown> };
+
+export type WynikWerdyktuZTowarem = WynikWerdyktu & { towar?: WynikTowaru };
+
+/**
+ * Walidacja pola `towar` z ciała werdyktu. `null`, gdy agent o towarze nie
+ * decyduje; wtedy werdykt idzie sam, jak dotąd. Czysta funkcja, bo trasa woła
+ * ją przed `autoryzuj()`: złe ciało nie ma zostawiać wpisu `privileged`.
+ */
+export function towarZCiala(werdykt: unknown, towar: unknown): ZadanieTowaru | null {
+  if (towar === undefined || towar === null) return null;
+  if (typeof towar !== "object" || Array.isArray(towar)) {
+    throw new BladReklamacji("Stanowisko o towarze to decyzja z treścią wiadomości");
+  }
+  if (!String(werdykt ?? "").startsWith("ACCEPTED")) {
+    throw new BladReklamacji("O towarze decyduje się tylko przy uznaniu — przy odrzuceniu nie ma czego odsyłać");
+  }
+  const t = towar as Record<string, unknown>;
+  if (typeof t.decyzja !== "string" || !(t.decyzja in TYP_DECYZJI)) {
+    throw new BladReklamacji("Decyzja o towarze to „wymagany” albo „niewymagany”");
+  }
+  const tresc = typeof t.tresc === "string" ? t.tresc.trim() : "";
+  if (!tresc) {
+    throw new BladReklamacji("Wiadomość o towarze jest pusta — kupujący ma wiedzieć, co zrobić z towarem");
+  }
+  if (tresc.length > LIMIT_ZNAKOW) {
+    throw new BladReklamacji(
+      `Wiadomość o towarze ma najwyżej ${LIMIT_ZNAKOW} znaków, a ta ma ${tresc.length}`);
+  }
+  /* Numer wiadomości przychodzi z panelu jako liczba; tekst z cyframi też
+     przyjmujemy, bo ścisłe porównanie liczby z napisem dałoby fałszywe 409
+     „ktoś dopisał" przy każdej wysyłce. */
+  const ostatnia = t.expectedLastMessageId;
+  let expectedLastMessageId: number | null = null;
+  if (ostatnia !== undefined && ostatnia !== null) {
+    const n = Number(ostatnia);
+    if ((typeof ostatnia !== "number" && typeof ostatnia !== "string") || !Number.isInteger(n)) {
+      throw new BladReklamacji("Ostatnią wiadomość wskazuje się jej numerem albo wcale");
+    }
+    expectedLastMessageId = n;
+  }
+  return {
+    decyzja: t.decyzja as DecyzjaOTowarze, tresc, expectedLastMessageId,
+    mimoNowejWiadomosci: t.mimoNowejWiadomosci === true,
+  };
+}
+
+/** Zdanie dla panelu, gdy werdykt nie wyszedł na pewno, więc towar nie poszedł. */
+const POMINIETY: Record<Exclude<StatusWerdyktu, "sent">, string> = {
+  send_uncertain: "Werdykt mógł nie dojść do Allegro, więc stanowiska o towarze nie wysłaliśmy. "
+    + "Wyślij je krokiem po werdykcie.",
+  send_failed: "Werdykt nie wyszedł, więc stanowisko o towarze też nie.",
+  sending: "Werdykt jest jeszcze w drodze, więc stanowiska o towarze nie wysłaliśmy.",
+};
+
+/**
+ * Werdykt, a po nim — gdy agent wybrał — stanowisko o towarze. Jedno żądanie,
+ * jedna operacja uprzywilejowana, dwa strzały do Allegro w ustalonej kolejności.
+ */
+export async function wydajWerdyktZTowarem(
+  database: Db, id: number, z: ZadanieWerdyktu & { towar?: unknown },
+  kto: { id: number; name: string },
+  wyslijWerdykt?: WyslijWerdykt, wyslijWiadomosc?: WyslijWiadomosc,
+): Promise<WynikWerdyktuZTowarem> {
+  const towar = towarZCiala(z.werdykt, z.towar);
+  const wynik = await wydajWerdykt(database, id, z, kto, wyslijWerdykt);
+  if (!towar) return wynik;
+  if (wynik.status !== "sent") return { ...wynik, towar: { pominiety: POMINIETY[wynik.status] } };
+
+  let losTowaru: WynikTowaru;
+  try {
+    const odp = await zdecydujZwrotTowaru({
+      reklamacjaId: id, decyzja: towar.decyzja, tresc: towar.tresc,
+      expectedWersja: wynik.wersja, expectedLastMessageId: towar.expectedLastMessageId,
+      mimoNowejWiadomosci: towar.mimoNowejWiadomosci, autor: kto, tylkoPoWyslanym: true,
+      database, wyslij: wyslijWiadomosc,
+    });
+    losTowaru = { status: odp.status };
+  } catch (e) {
+    losTowaru = e instanceof ReklamacjaConflict
+      ? { konflikt: { error: e.message, ...e.szczegoly } }
+      : { blad: (e instanceof Error ? e.message : String(e)).slice(0, 500) };
+  }
+  /* Wersja w odpowiedzi to wersja sprawy PO całym żądaniu: udane stanowisko
+     o towarze podbija ją jeszcze raz, a panel pisze następny zapis od niej.
+     Odczyt nie ma prawa wywrócić odpowiedzi po nieodwracalnym werdykcie. */
+  let wersja = wynik.wersja;
+  try {
+    const w = database.prepare("SELECT wersja FROM reklamacja_klienta WHERE id=? AND typ='CLAIM'")
+      .get(id) as { wersja: number } | undefined;
+    if (w) wersja = Number(w.wersja);
+  } catch { /* zostaje wersja z werdyktu */ }
+  return { ...wynik, wersja, towar: losTowaru };
 }

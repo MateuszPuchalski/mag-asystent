@@ -27,6 +27,7 @@ const karta = vi.fn();
 vi.mock("../api/rozmowy", () => ({ useKartaTowaru: (twId: number | null) => karta(twId) }));
 
 const { Dowody } = await import("./Dowody");
+const { Glowica } = await import("./Glowica");
 
 const CENY = [
   { poziom: 0, nazwa: "", nettoGrosze: 1864, bruttoGrosze: 0, waluta: "PLN" },
@@ -225,7 +226,9 @@ describe("Jeden dom na fakt (0.414.0)", () => {
      pasma decyzji, wychodzi z warstwy szczegółu. */
 
   it("cena NIE stoi przy wierszu towaru — tam pytanie brzmi „co to jest”", () => {
-    render(<Dowody {...props()} />);
+    /* Wiersz towaru stoi w głowicy sprawy, nad kolumnami — i tam też zostaje
+       bez ceny. Kwota z paragonu ma swój dom w kostce „Klient zapłacił". */
+    render(<Glowica szczegol={props().szczegol} trwa={false} onProwadze={vi.fn()} />);
     const symbol = screen.getByText("14-31051");
     expect(symbol.parentElement!.textContent).not.toContain("49,90");
   });

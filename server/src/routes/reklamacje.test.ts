@@ -101,6 +101,9 @@ const TRASY = () => [
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/notatka/cofnij` },
   { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/tagi/1` },
   { method: "DELETE" as const, url: `/api/obsluga/reklamacje/${reklamacja}/tagi/1` },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/dowody` },
+  { method: "DELETE" as const, url: `/api/obsluga/reklamacje/${reklamacja}/dowody/1` },
+  { method: "POST" as const, url: `/api/obsluga/reklamacje/${reklamacja}/u-dostawcy` },
 ];
 
 test("bez sesji żadna trasa reklamacji nie odpowiada danymi", async () => {
@@ -119,7 +122,7 @@ test("hala nie widzi reklamacji — bramka roli stoi też na odczycie", async ()
   }
 });
 
-test("DZIESIĘĆ ZAPISÓW po dołożeniu cofnięcia notatki — licznik jest umową", () => {
+test("TRZYNAŚCIE ZAPISÓW po dołożeniu dowodów i reklamacji u dostawcy — licznik jest umową", () => {
   /* Ta liczba jest kontraktem, nie obserwacją. Rosła z dwóch na trzy razem
      z odpowiedzią w czacie (0.224.0) i z trzech na pięć z werdyktem: czwarty
      zapis to werdykt (uznanie albo odrzucenie do Allegro), piąty — decyzja
@@ -145,6 +148,13 @@ test("DZIESIĘĆ ZAPISÓW po dołożeniu cofnięcia notatki — licznik jest umo
      i stanowisko o towarze cofnięcia NIE DOSTANĄ: Allegro ich nie cofnie,
      więc przycisk byłby obietnicą bez pokrycia (§25b.8).
 
+     Jedenasty, dwunasty i trzynasty to dowody biura i reklamacja u dostawcy:
+     dopisanie dowodu, jego usunięcie i zapis zgłoszenia u dostawcy z wynikiem.
+     Wszystkie trzy zostają WYŁĄCZNIE u nas, bo do Allegro nie idzie z nich
+     żadne pole, więc żaden nie stoi za `autoryzuj()`. Żaden nie podbija też
+     wersji sprawy: kolega dopisujący dowód nie może zrobić 409 komuś, kto
+     właśnie wysyła odpowiedź albo werdykt.
+
      `synchronizuj` i `odswiez` NIE SĄ zapisami do Allegro: to odczyty na
      żądanie, które zapisują wynik u nas. `POST`-em idą dlatego, że `GET`
      z takim skutkiem ubocznym łamałby „zero zapisu przy patrzeniu" ciszej,
@@ -153,8 +163,8 @@ test("DZIESIĘĆ ZAPISÓW po dołożeniu cofnięcia notatki — licznik jest umo
   const DOCIAGNIECIA = ["synchronizuj", "odswiez"];
   const zapisy = TRASY().filter((t) => (t.method === "POST" || t.method === "DELETE")
     && !DOCIAGNIECIA.some((d) => t.url.endsWith(d)));
-  assert.equal(zapisy.length, 10,
-    "prowadzę, notatka z cofnięciem i dwa tagi u nas; odpowiedź, werdykt, towar i dwa załączniki dalej");
+  assert.equal(zapisy.length, 13,
+    "prowadzę, notatka z cofnięciem, dwa tagi i trzy zapisy dowodów u nas; odpowiedź, werdykt, towar i dwa załączniki dalej");
 });
 
 test("werdykt: wersja obowiązkowa, wpis `privileged` z nazwą operacji, dziennik bez treści", async () => {
@@ -267,7 +277,8 @@ test("otwarcie kolejki i otwarcie sprawy nie zapisują NICZEGO", async () => {
   const licz = () => {
     const d = db();
     return ["events", "reklamacja_klienta", "reklamacja_wiadomosc", "reklamacja_zalacznik",
-      "allegro_reklamacja", "allegro_reklamacje_sync_state"]
+      "allegro_reklamacja", "allegro_reklamacje_sync_state", "reklamacja_dowod",
+      "reklamacja_u_dostawcy"]
       .map((t) => (d.prepare(`SELECT count(*) n FROM ${t}`).get() as { n: number }).n)
       .join("/");
   };
@@ -584,4 +595,128 @@ test("kolejka niesie próg, a `od=wszystko` go zdejmuje", async () => {
   assert.equal(b.prog.zdjety, true);
   /* Próg jedzie ZAWSZE, także po zdjęciu: panel musi umieć wrócić. */
   assert.ok(b.prog.od, "bez tej daty przełącznik nie miałby dokąd wracać");
+});
+
+/* ── Dowody biura, reklamacja u dostawcy i towar przy werdykcie ──────────────
+   Serwisy pilnują reguł; tu pilnujemy tego, co mieszka w trasie: pola ciała
+   dojeżdżają do serwisu, błędy wracają kodem ze zdaniem, a werdykt z towarem
+   zostawia JEDEN wpis `privileged`.                                          */
+
+test("dowód przez trasę: dopisanie, 400 ze zdaniem, usunięcie — bez ruszania wersji sprawy", async () => {
+  const { naglowki } = login("biuro", "Ala dowody");
+  const url = `/api/obsluga/reklamacje/${reklamacja}/dowody`;
+  const zdjecie = Number(db().prepare(
+    "INSERT INTO reklamacja_zalacznik(reklamacja_id,wiadomosc_id,nazwa,url) VALUES (?,NULL,'noz.jpg',?)")
+    .run(reklamacja, "https://api.allegro.pl/sale/issues/attachments/a-3").lastInsertRowid);
+
+  const r = await app.inject({ method: "POST", url, headers: naglowki,
+    payload: { tresc: "Nóż wyszczerbiony od kamienia.", zalacznikId: zdjecie } });
+  assert.equal(r.statusCode, 200, r.body);
+  const [dowod] = r.json().dowody;
+  assert.equal(dowod.tresc, "Nóż wyszczerbiony od kamienia.");
+  assert.equal(dowod.zalacznikId, zdjecie, "pole ciała dojechało do serwisu");
+  assert.equal(dowod.autor, "Ala dowody");
+
+  const pusty = await app.inject({ method: "POST", url, headers: naglowki, payload: { tresc: "  " } });
+  assert.equal(pusty.statusCode, 400);
+  assert.match(pusty.json().error, /Pusty dowód/);
+  /* Puste ciało to brak treści, nie gołe „Bad Request" i nie 500. */
+  const bezCiala = await app.inject({ method: "POST", url, headers: naglowki, payload: {} });
+  assert.equal(bezCiala.statusCode, 400);
+
+  const usun = await app.inject({ method: "DELETE", url: `${url}/${dowod.id}`, headers: naglowki });
+  assert.equal(usun.statusCode, 200);
+  assert.deepEqual(usun.json().dowody, []);
+  const brak = await app.inject({ method: "DELETE", url: `${url}/${dowod.id}`, headers: naglowki });
+  assert.equal(brak.statusCode, 404);
+
+  assert.equal((db().prepare("SELECT wersja FROM reklamacja_klienta WHERE id=?")
+    .get(reklamacja) as { wersja: number }).wersja, 1);
+  /* Zapis tylko u nas — wpisu `privileged` nie ma. */
+  assert.equal((db().prepare("SELECT COUNT(*) n FROM events WHERE type='privileged'").get() as { n: number }).n, 0);
+});
+
+test("dyskusja nie ma dowodów ani reklamacji u dostawcy — 404 na obu trasach", async () => {
+  const { naglowki } = login("biuro", "Ala dyskusja");
+  const dyskusja = Number(db().prepare(`INSERT INTO reklamacja_klienta(channel_account_id,
+    external_id,typ,otwarto_at,synced_at)
+    SELECT channel_account_id,'d-1','DISPUTE','2026-09-06T10:00:00Z','2026-09-07T10:00:00Z'
+      FROM reklamacja_klienta WHERE id=?`).run(reklamacja).lastInsertRowid);
+  const a = await app.inject({ method: "POST", url: `/api/obsluga/reklamacje/${dyskusja}/dowody`,
+    headers: naglowki, payload: { tresc: "Coś" } });
+  assert.equal(a.statusCode, 404);
+  const b = await app.inject({ method: "POST", url: `/api/obsluga/reklamacje/${dyskusja}/u-dostawcy`,
+    headers: naglowki, payload: { dostawca: "AGRO", wersja: 0 } });
+  assert.equal(b.statusCode, 404);
+});
+
+test("reklamacja u dostawcy przez trasę: wersja 0 zakłada, drugi raz 409 z rekordem obok zdania", async () => {
+  const { naglowki } = login("biuro", "Ala dostawca");
+  const url = `/api/obsluga/reklamacje/${reklamacja}/u-dostawcy`;
+  const bezWersji = await app.inject({ method: "POST", url, headers: naglowki, payload: { dostawca: "AGRO" } });
+  assert.equal(bezWersji.statusCode, 400);
+  assert.match(bezWersji.json().error, /wersji/);
+
+  const r = await app.inject({ method: "POST", url, headers: naglowki,
+    payload: { dostawca: "AGRO", nrUDostawcy: "RMA-1", wersja: 0 } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.deepEqual(
+    (({ dostawca, nrUDostawcy, wynik, wersja }) => ({ dostawca, nrUDostawcy, wynik, wersja }))(r.json().uDostawcy),
+    { dostawca: "AGRO", nrUDostawcy: "RMA-1", wynik: null, wersja: 1 });
+
+  const drugi = await app.inject({ method: "POST", url, headers: naglowki,
+    payload: { dostawca: "HUSQ", wersja: 0 } });
+  assert.equal(drugi.statusCode, 409);
+  /* Ładunek PŁASKO obok `error`, jak przy każdym 409 tego modułu. */
+  assert.equal(drugi.json().uDostawcy.dostawca, "AGRO");
+
+  const wynik = await app.inject({ method: "POST", url, headers: naglowki,
+    payload: { dostawca: "AGRO", wynik: "uznal", wersja: 1 } });
+  assert.equal(wynik.statusCode, 200);
+  assert.equal(wynik.json().uDostawcy.wynik, "uznal");
+  assert.equal(wynik.json().uDostawcy.nrUDostawcy, "RMA-1");
+});
+
+test("werdykt z towarem: zły towar to 400 BEZ wpisu `privileged`, dobry — jeden wpis na oba strzały", async () => {
+  const { naglowki } = login("biuro", "Ala towar");
+  const url = `/api/obsluga/reklamacje/${reklamacja}/werdykt`;
+  const uprzywilejowane = () => Number((db().prepare(
+    "SELECT COUNT(*) n FROM events WHERE type='privileged' AND user_id='Ala towar'").get() as { n: number }).n);
+
+  const przyOdrzuceniu = await app.inject({ method: "POST", url, headers: naglowki, payload: {
+    werdykt: "REJECTED_OTHER", wiadomosc: "Nie.", wersja: 1,
+    towar: { decyzja: "wymagany", tresc: "Odeślij.", expectedLastMessageId: null } } });
+  assert.equal(przyOdrzuceniu.statusCode, 400);
+  assert.match(przyOdrzuceniu.json().error, /tylko przy uznaniu/);
+  const pustyTowar = await app.inject({ method: "POST", url, headers: naglowki, payload: {
+    werdykt: "ACCEPTED_REFUND", wiadomosc: "Tak.", wersja: 1,
+    towar: { decyzja: "wymagany", tresc: " ", expectedLastMessageId: null } } });
+  assert.equal(pustyTowar.statusCode, 400);
+  assert.equal(uprzywilejowane(), 0, "złe ciało nie jest decyzją człowieka");
+  assert.equal((db().prepare("SELECT werdykt_status FROM reklamacja_klienta WHERE id=?")
+    .get(reklamacja) as { werdykt_status: string | null }).werdykt_status, null, "werdykt nie wyszedł");
+
+  /* Testy chodzą bez konta Allegro, więc werdykt kończy się porażką, a towar
+     — pominięciem. To dowodzi, że pole `towar` dojechało do serwisu, i że
+     towar nie idzie po werdykcie, który nie wyszedł na pewno. */
+  const r = await app.inject({ method: "POST", url, headers: naglowki, payload: {
+    werdykt: "ACCEPTED_REFUND", wiadomosc: "Zwracamy.", wersja: 1,
+    towar: { decyzja: "niewymagany", tresc: "Towar zostaje u Pana.", expectedLastMessageId: 1 } } });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.ok(["send_failed", "send_uncertain"].includes(r.json().status));
+  assert.equal(typeof r.json().towar.pominiety, "string");
+  assert.equal(uprzywilejowane(), 1, "jedna decyzja, jedna zgoda, jeden wpis");
+});
+
+test("Copilot nie ma już drogi do reklamacji z ekranu — trasy rozpoznania nie ma", async () => {
+  /* Decyzja właściciela: Copilot znika z ekranu reklamacji. Trasa bez
+     przycisku byłaby kosztem u dostawcy dostępnym spoza panelu. Zapisane
+     karty zostają i jadą w szczegółach sprawy. */
+  const { naglowki } = login("biuro", "Ala Copilot");
+  const r = await app.inject({ method: "POST",
+    url: `/api/obsluga/reklamacje/${reklamacja}/rozpoznaj`, headers: naglowki, payload: {} });
+  assert.equal(r.statusCode, 404);
+  assert.match(String(r.json().message), /^Route /);
+  const s = await app.inject({ method: "GET", url: `/api/obsluga/reklamacje/${reklamacja}`, headers: naglowki });
+  assert.ok("karta" in s.json());
 });

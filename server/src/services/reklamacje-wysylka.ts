@@ -123,6 +123,14 @@ function kontekst(database: Db, reklamacjaId: number, rodzaj: TypSprawy): Kontek
   };
 }
 
+/** Zdanie przy drugim stanowisku o towarze — inne dla każdego losu pierwszego. */
+const ZDANIE_DRUGIEGO_ZWROTU: Record<Exclude<StatusWysylki, "send_failed">, string> = {
+  sent: "Stanowisko o towarze już wyszło do kupującego — drugiego nie wysyłamy",
+  sending: "Stanowisko o towarze właśnie idzie do Allegro — poczekaj na wynik",
+  send_uncertain: "Poprzednie stanowisko o towarze mogło dojść do kupującego — "
+    + "zsynchronizuj sprawę i sprawdź w Allegro, zanim napiszesz drugie",
+};
+
 type WierszOutboxu = {
   id: number; status: StatusWysylki; external_message_id: string | null;
 };
@@ -182,10 +190,36 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
      prawa oddać poprzedniej próby zamiast wysłać nową. Wspólny rdzeń
      `kluczWysylki` przyjmuje listę i sortuje ją sam — kolejność dodawania
      plików nie jest zamiarem agenta. */
-  const zalaczniki = zalacznikiDoWyslania(database, z.reklamacjaId);
+  /* STANOWISKO O TOWARZE NIE ZABIERA PLIKÓW ZE SZKICU. Spinacz należy do
+     odpowiedzi, którą agent pisze w czacie; stanowisko o towarze idzie
+     z innego miejsca ekranu, a przy werdykcie nawet tym samym kliknięciem.
+     Plik dołączony do szkicu odpowiedzi poleciałby wtedy do kupującego
+     z wiadomością, przy której nikt go nie widział. */
+  const zwrotny = typ.startsWith("RETURN_");
+  const zalaczniki = zwrotny ? [] : zalacznikiDoWyslania(database, z.reklamacjaId);
   const idZalacznikow = zalaczniki.map((a) => a.allegroId);
   const klucz = kluczWysylki("rkl-", z.reklamacjaId, k.lastMessageId,
     typ === "REGULAR" ? tresc : `${typ}\u0000${tresc}`, idZalacznikow);
+
+  /* JEDNO STANOWISKO O TOWARZE NA SPRAWĘ. Strażnik dubletu niżej pilnuje
+     klucza, a klucz zmienia się z każdą literą treści. Po timeoucie panel
+     znów proponuje krok o towarze; poprawione zdanie dostałoby nowy klucz
+     i drugie „proszę odesłać towar" poszłoby obok pierwszego. Ta sama treść
+     zostaje przy strażniku dubletu, bo ten zna jej los dokładniej. */
+  if (zwrotny) {
+    const wczesniejsze = database.prepare(
+      `SELECT id, typ, status FROM reklamacja_outbox
+        WHERE reklamacja_id=? AND typ LIKE 'RETURN_%' AND idempotency_key <> ?
+          AND status IN ('sending','sent','send_uncertain')
+        ORDER BY id DESC LIMIT 1`,
+    ).get(z.reklamacjaId, klucz) as { id: number; typ: string; status: StatusWysylki } | undefined;
+    if (wczesniejsze) {
+      throw new ReklamacjaConflict(
+        { outboxId: wczesniejsze.id, typ: wczesniejsze.typ, status: wczesniejsze.status },
+        ZDANIE_DRUGIEGO_ZWROTU[wczesniejsze.status as Exclude<StatusWysylki, "send_failed">]
+          ?? ZDANIE_DRUGIEGO_ZWROTU.sent);
+    }
+  }
 
   if (k.lastMessageId !== (z.expectedLastMessageId ?? null) && !z.mimoNowejWiadomosci) {
     /* Ktoś dopisał, odkąd agent zaczął pisać — klient albo doradca. Ładunek
@@ -310,9 +344,14 @@ export async function odpowiedzWSprawie(z: ZadanieOdpowiedzi): Promise<WynikOdpo
 
     /* ZAŁĄCZNIKI ZNIKAJĄ ZE SZKICU, bo właśnie poszły (0.274.0). Wiersz, który
        by został, wisiałby przy NASTĘPNEJ odpowiedzi i dosłałby ten sam plik
-       drugi raz — cicho, bo nikt by go tam nie szukał. */
-    database.prepare("DELETE FROM reklamacja_zalacznik_wysylki WHERE reklamacja_id=?")
-      .run(z.reklamacjaId);
+       drugi raz — cicho, bo nikt by go tam nie szukał. Znikają TYLKO te, które
+       poszły: stanowisko o towarze nie bierze plików, więc szkic odpowiedzi
+       ma przeżyć jego wysyłkę. */
+    if (idZalacznikow.length > 0) {
+      database.prepare(`DELETE FROM reklamacja_zalacznik_wysylki
+        WHERE reklamacja_id=? AND allegro_id IN (${idZalacznikow.map(() => "?").join(",")})`)
+        .run(z.reklamacjaId, ...idZalacznikow);
+    }
 
     /* Do dziennika idzie DŁUGOŚĆ, nigdy treść: `events` nie ma retencji.
        Załączniki liczbą i numerami — nazwy poszły już przy dodawaniu. */

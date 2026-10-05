@@ -243,7 +243,7 @@ z firmy nie wychodzi ani jeden znak. Klasyfikacja nie pisze do klienta.
   bywa tytułem oferty. **Nagłówek klasyfikacji piszemy my**: czy jest
   zamówienie, oferta i ile załączników, bez numerów. Typ i podtyp wątku idą
   jako enumy Allegro. Loginów uczestników z `beta.v1` nie zapisujemy.
-- **Szkice, dopytanie i reklamacje robi Claude. Klasyfikację robi Jev
+- **Szkice i dopytanie robi Claude. Klasyfikację robi Jev
   z TypeSafe**, gdy stoi `TYPESAFE_API_KEY`, a bez klucza też Claude. Oba
   dostają to samo maskowane wejście. Z kluczem treść wątku wychodzi do dwóch
   podmiotów. Przed włączeniem trzeba przeczytać DPA i politykę prywatności
@@ -402,13 +402,33 @@ a ulica rozstrzyga to w jednym spojrzeniu.
   na nie nie ma. Plików załączników nie trzymamy; pobranie idzie przez nasz
   serwer. Na oś idą wyłącznie JPEG, PNG i GIF, rozpoznane po sygnaturze,
   z `nosniff`, bo załącznik nie ma pola `SAFE`. Hala reklamacji nie widzi.
-- **Do dostawcy modelu idzie ZAMASKOWANA rozmowa** (§14.4 projektu panelu),
+- **Dowody biura** (`reklamacja_dowod`) to słowa BIURA o towarze: co widać na
+  zdjęciu, czego brakuje i co ustaliliśmy. Zostaje treść do 2000 znaków,
+  numer powiązanego zdjęcia klienta, imię i konto autora oraz czas. Danych
+  osobowych klienta się tam nie pisze; to reguła dla człowieka, bo pole jest
+  wolnym tekstem. Dziennik dostaje numery wpisu i zdjęcia oraz długość, bez
+  treści.
+- **Reklamacja u dostawcy** (`reklamacja_u_dostawcy`) trzyma symbol dostawcy
+  z Subiekta, numer nadany przez dostawcę, datę zgłoszenia i wynik z datą.
+  Danych osobowych nie ma, ani klienta, ani człowieka po stronie dostawcy.
+  Autor ma klucz do `app_user` z `SET NULL`, więc kasowanie kont działa.
+  Dziennik dostaje wersję, wynik i to, czy numer jest, bez samego numeru.
+- **Dowody i reklamacja u dostawcy zostają u nas.** Allegro, Copilot, CSV,
+  migawka i raport tygodnia ich nie dostają. Retencja idzie za sprawą
+  (kaskada). Ostatnia dostawa towaru w sprawie to odczyt dokumentów dostaw
+  firmy, bez nowego zapisu.
+- **Od @wydanie ekran reklamacji nie woła modelu** (decyzja właściciela). Nie
+  ma przycisku ani trasy rozpoznania, więc z reklamacji nic nie wychodzi do
+  dostawcy modelu. Zapisane karty zostają w `reklamacja_karta` i jadą
+  w szczegółach sprawy. Reguły niżej mówią, co wychodziło, i wrócą razem
+  z Copilotem.
+- **Do dostawcy modelu szła ZAMASKOWANA rozmowa** (§14.4 projektu panelu),
   z tym samym sufitem co w skrzynce. Login podmienia się po ZNANEJ wartości.
-- **Wychodzą FAKTY ZE SPRAWY**: temat, opis zgłoszenia (przycięty), powód,
+- **Wychodziły FAKTY ZE SPRAWY**: temat, opis zgłoszenia (przycięty), powód,
   podstawa prawna, oczekiwanie z kwotą, ilość, nazwa towaru, numery oferty
   i zamówienia, data zakupu, otwarcia i termin decyzji, zamaskowane. Nie
-  wychodzą fakty o NAS: notatka, „kto prowadzi", tagi, kartoteka ani kwoty.
-- **Wychodzą ZDJĘCIA klienta, a pikseli zamaskować się nie da.** Typ nazywa
+  wychodziły fakty o NAS: notatka, „kto prowadzi", tagi, kartoteka ani kwoty.
+- **Wychodziły ZDJĘCIA klienta, a pikseli zamaskować się nie da.** Typ nazywa
   się `ZdjecieZBramki`, nie „bezpieczne". Obiecuje trzy rzeczy: bajty z TEJ
   sprawy, obraz rozpoznany po SYGNATURZE i mieszczący się w suficie. Bajtów
   nie trzymamy, a dziennik dostaje liczby, nie nazwy plików.
@@ -417,7 +437,7 @@ a ulica rozstrzyga to w jednym spojrzeniu.
 - **Pytanie agenta przy dopytaniu idzie bez maskowania**, bo pisze je
   pracownik o towarze, a numer części jest jego sensem. **W pytaniu do
   Copilota nie pisze się o kliencie.** Dziennik zapisuje wyłącznie długość.
-- **Wraca karta faktów i RADA** z uzasadnieniem, pewnością i niewiadomymi.
+- **Wracała karta faktów i RADA** z uzasadnieniem, pewnością i niewiadomymi.
   Bramka pilnuje, żeby opinia nie trafiła do pól o słowach klienta. Rada nie
   wychodzi do kupującego i nie dotyka werdyktu. Rachunek trafia do księgi
   Copilota także przy błędzie, bo nieudana próba też bywa płatna.
@@ -434,6 +454,10 @@ a ulica rozstrzyga to w jednym spojrzeniu.
   kopia wiadomości na `reklamacja_klienta`, kwota, kto i kiedy oraz los próby
   (`werdykt_status`), także niepewny. Dziennik dostaje długości, kody HTTP
   i nazwę operacji uprzywilejowanej.
+- **Stanowisko o towarze może iść razem z werdyktem**, za jedną zgodą i z
+  jednym wpisem uprzywilejowanym. Wychodzi tylko po werdykcie wysłanym na
+  pewno. Nie zabiera plików ze szkicu odpowiedzi, a drugiego stanowiska w tej
+  samej sprawie serwer nie wyśle.
 
 ## Polityka danych dyskusji
 

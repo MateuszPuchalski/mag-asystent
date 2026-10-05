@@ -14,6 +14,10 @@ import { ROZMOWA_ZAMOWIENIA, drogaZakupu, sprawyZakupu, type PrzystanekDrogi, ty
   from "./droga-klienta.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { STATUSY_KONCOWE } from "./statusy-spraw.js";
+import { ostatniaDostawa, type OstatniaDostawa } from "./ostatnia-dostawa.js";
+import {
+  dowodyReklamacji, uDostawcyReklamacji, type DowodReklamacji, type ReklamacjaUDostawcy,
+} from "./reklamacja-dowody.js";
 
 /* ── Reklamacje klienckie — model pracy biura (0.222.0) ──────────────────────
    TEN PLIK PROWADZI WYŁĄCZNIE REKLAMACJE (`typ = 'CLAIM'`) i od 0.245.0 musi
@@ -362,6 +366,19 @@ export interface WierszReklamacji {
      „W09-0804" bez różnicy, czy to sygnatura z chwili zakupu, czy z półki.
      Agent czytający wiersz towaru ma prawo wiedzieć, czemu ufa. */
   twZParagonu: boolean;
+  /* ── ILE JEST W GRZE ─────────────────────────────────────────────────────
+     Właściciel o cenach: „są kluczowe do szybkiego oceniania, czy warto
+     rozpatrywać reklamację". Kolejka pokazuje kwotę przy każdym wierszu, więc
+     liczy ją serwer: panel nie zna paragonu, a druga kopia reguły w panelu
+     rozjechałaby się z tą przy pierwszej poprawce. */
+  /** Cena brutto ZA SZTUKĘ z pozycji zamówienia tej oferty; `null` = paragonu nie mamy. */
+  cenaParagonuGrosze: number | null;
+  /** Kwota sprawy wg `kwotaSprawy`; `null` = nie wiemy, nigdy „zero". */
+  kwotaGrosze: number | null;
+  /** Skąd kwota: żądanie klienta czy paragon. Ekran podpisuje ją różnie. */
+  kwotaZrodlo: "zadanie" | "paragon" | null;
+  /** Pełne dni od zakupu do zgłoszenia; patrz `dniZakupuDoZgloszenia`. */
+  zgloszonoPoDniach: number | null;
 }
 
 type Wiersz = Record<string, unknown>;
@@ -542,6 +559,53 @@ export function sygnaly(w: {
   return s;
 }
 
+/**
+ * Kwota w grze — czysta funkcja, osobno od bazy.
+ *
+ * KOLEJNOŚĆ JEST TREŚCIĄ. Kwota, o którą prosi klient, wygrywa, bo o nią
+ * toczy się spór. Bez niej liczy paragon: cena za sztukę razy liczba sztuk
+ * w sprawie. Bez liczby sztuk paragon wystarcza tylko wtedy, gdy klient
+ * kupił jedną — przy trzech sztukach „jedna" byłaby zgadywaniem, a „trzy"
+ * przesadą. Ta sama odmowa zgadywania stoi w `sufitKwoty`.
+ *
+ * Zero w żądaniu czytamy jak brak żądania: Allegro nie prosi o zwrot zera.
+ */
+export function kwotaSprawy(w: {
+  oczekiwanaKwotaGrosze: number | null;
+  cenaParagonuGrosze: number | null;
+  ilosc: number | null;
+  iloscParagonu: number | null;
+}): { grosze: number | null; zrodlo: "zadanie" | "paragon" | null } {
+  if (w.oczekiwanaKwotaGrosze != null && w.oczekiwanaKwotaGrosze > 0) {
+    return { grosze: w.oczekiwanaKwotaGrosze, zrodlo: "zadanie" };
+  }
+  const cena = w.cenaParagonuGrosze;
+  if (cena == null || !Number.isFinite(cena)) return { grosze: null, zrodlo: null };
+  if (w.ilosc != null && w.ilosc > 0) return { grosze: Math.round(cena * w.ilosc), zrodlo: "paragon" };
+  if (w.iloscParagonu === 1) return { grosze: cena, zrodlo: "paragon" };
+  return { grosze: null, zrodlo: null };
+}
+
+/**
+ * Ile pełnych dni minęło od zakupu do zgłoszenia. `null` = nie mierzymy.
+ *
+ * `otwarto_at` to `openedDate`, czyli otwarcie ALBO ponowne otwarcie sprawy,
+ * więc przy sprawie wznowionej liczba wychodzi zawyżona. Lepszej daty Allegro
+ * nie daje, a zawyżenie działa na korzyść ostrożności: dłuższy czas używania
+ * nie podsuwa uznania. Wynik ujemny znaczy złe dane, nie liczbę.
+ */
+export function dniZakupuDoZgloszenia(
+  kupionoAt: string | null, otwartoAt: string | null,
+): number | null {
+  if (!kupionoAt || !otwartoAt) return null;
+  const k = Date.parse(kupionoAt);
+  const o = Date.parse(otwartoAt);
+  if (!Number.isFinite(k) || !Number.isFinite(o) || o < k) return null;
+  return Math.floor((o - k) / DZIEN_MS);
+}
+
+const liczba = (v: unknown): number | null => (v == null ? null : Number(v));
+
 function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
   const statusAllegro = tekst(w.status_allegro);
   const decyzjaDo = tekst(w.decyzja_do);
@@ -553,6 +617,16 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
   const werdyktStatus = tekst(w.werdykt_status) as StatusWerdyktu | null;
   const zwrotTowaru = tekst(w.zwrot_towaru) as "wymagany" | "niewymagany" | null;
   const kupiono = tekst(w.kupiono_at) ?? tekst(w.zamowienie_at);
+  /* Kolumny paragonu niesie wyłącznie `wierszeReklamacji`. Odpowiedź zapisu
+     czyta goły wiersz sprawy, więc tam wychodzą `null` — panel i tak
+     odświeża po zapisie kolejkę i szczegół. */
+  const cenaParagonu = liczba(w.cena_paragonu_grosze);
+  const oczekiwanaKwota = liczba(w.oczekiwana_kwota_grosze);
+  const ilosc = liczba(w.ilosc);
+  const kwota = kwotaSprawy({
+    oczekiwanaKwotaGrosze: oczekiwanaKwota, cenaParagonuGrosze: cenaParagonu,
+    ilosc, iloscParagonu: liczba(w.ilosc_paragonu),
+  });
   const rdzen = {
     statusAllegro, dniDoTerminu: dni, ostatniaWiadomoscStatus: ostatnia,
     ostatniaWiadomoscAt: tekst(w.ostatnia_wiadomosc_at),
@@ -571,8 +645,7 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     temat: tekst(w.temat),
     opis: tekst(w.opis),
     oczekiwanie: tekst(w.oczekiwanie),
-    oczekiwanaKwotaGrosze: w.oczekiwana_kwota_grosze == null
-      ? null : Number(w.oczekiwana_kwota_grosze),
+    oczekiwanaKwotaGrosze: oczekiwanaKwota,
     waluta: String(w.waluta ?? "PLN"),
     statusAllegro,
     decyzjaDo,
@@ -610,7 +683,7 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     werdyktBlad: tekst(w.werdykt_blad),
     zwrotTowaru,
     zwrotTowaruAt: tekst(w.zwrot_towaru_at),
-    ilosc: w.ilosc == null ? null : Number(w.ilosc),
+    ilosc,
     wersja: Number(w.wersja ?? 1),
     kubelek: kubelek(rdzen, teraz),
     sygnaly: sygnaly(rdzen, teraz),
@@ -631,6 +704,10 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     twId: w.tw_id == null ? null : Number(w.tw_id),
     twSymbol: tekst(w.tw_symbol),
     twZParagonu: false,
+    cenaParagonuGrosze: cenaParagonu,
+    kwotaGrosze: kwota.grosze,
+    kwotaZrodlo: kwota.zrodlo,
+    zgloszonoPoDniach: dniZakupuDoZgloszenia(kupiono, tekst(w.otwarto_at)),
   };
 }
 
@@ -716,61 +793,71 @@ function zParagonuNaWiersz(
   r.twZParagonu = true;
 }
 
-export function listaReklamacji(
-  database: Db = defaultDb(), teraz = Date.now(),
-  od: string | null = config.allegro.reklamacjeOd,
-): WierszReklamacji[] {
-  /* Dwa złączenia LEWE po tej samej ofercie: snapshot Allegro (nazwa i adres
-     zdjęcia) oraz potwierdzona kartoteka Subiekta. Oba po `channel_account_id`
-     RAZEM z `offer_id` — identyfikator oferty jest unikalny w obrębie konta,
-     nie globalnie, a dwa konta sprzedawcy to nie jest przypadek niemożliwy.
+/* ── SKŁAD WIERSZA REKLAMACJI — JEDEN DLA KOLEJKI I SZCZEGÓŁU ────────────────
+   Kolejka i szczegół składały wiersz dwoma kopiami tego samego zapytania,
+   a komentarz przy drugiej prosił, żeby się nie rozjechały. Kwota przy
+   wierszu wymaga nowego złączenia; dołożone do jednej kopii pokazałoby inną
+   liczbę w kolejce i w głowicy sprawy. Stąd jedno zapytanie i dwa warunki.
 
-     Propozycji kartoteki tu NIE liczymy. `kartotekaOferty` chodzi po pamięci
-     wskazań i po SKU, czyli kilka zapytań NA WIERSZ; kolejka ma pokazać, co
-     wiadomo na pewno, a proponowanie kartoteki jest pracą przy jednej
-     otwartej sprawie (szczegół). */
-  const wiersze = database.prepare(`
-    SELECT r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
+   Złączenia LEWE, każde po koncie RAZEM z numerem: identyfikator oferty
+   i zamówienia jest unikalny w obrębie konta, nie globalnie.
+   - Snapshot Allegro daje nazwę i adres zdjęcia oferty.
+   - Potwierdzona kartoteka Subiekta daje dzisiejsze mapowanie oferty.
+     Propozycji kartoteki tu NIE liczymy: `kartotekaOferty` to kilka zapytań
+     na wiersz, a proponowanie jest pracą przy jednej otwartej sprawie.
+   - Zamówienie daje datę zakupu. Wiersz bywa go pozbawiony, bo Allegro
+     odmawia 404 przy zamówieniach starszych niż jego retencja; wtedy zostaje
+     data z ładunku sprawy.
+   - PARAGON, czyli pozycja zamówienia z tą ofertą, daje sygnaturę z chwili
+     zakupu (patrz `zParagonu`) i cenę za sztukę. Ta sama oferta bywa na
+     zamówieniu dwa razy, więc bierzemy pozycję o najniższym numerze — obie
+     wartości z TEJ SAMEJ pozycji, żeby cena nie przyszła z innej linii niż
+     symbol.
+
+   Złączenia stoją w stałej, a FROM z warunkiem na typ w samym zapytaniu.
+   Dzięki temu strażnik źródła w `dyskusje.test.ts` widzi warunek, a nie
+   musi wierzyć komentarzowi. W stałych nie ma backticków, bo to literały
+   szablonowe. */
+const KOLUMNY_WIERSZA = `r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
            k.tw_id, k.tw_symbol, zk.kupiono_at,
-           /* ── SYGNATURA Z PARAGONU (0.400.0) ──────────────────────────────
-              Zgłoszenie właściciela: „symbol towaru w reklamacji powinno
-              ściągać z paragonu do danego zamówienia".
+           zp.sku AS sku_paragonu, zp.cena_grosze AS cena_paragonu_grosze,
+           zp.ilosc AS ilosc_paragonu`;
 
-              Pozycja zamówienia niesie sygnaturę sprzedawcy Z CHWILI ZAKUPU —
-              to jest paragon. Tabela oferta_kartoteka niesie DZISIEJSZE
-              mapowanie oferty, a sprzedawca przepina sygnaturę, gdy towar od
-              jednego dostawcy się wyczerpie (powód przy pamiecAktualna).
-              Reklamacja dotyczy rzeczy, którą klient DOSTAŁ, więc pyta
-              paragonu, nie dzisiejszej półki.
-
-              Ograniczenie do jednej pozycji: ten sam numer oferty bywa na
-              zamówieniu dwa razy, ale sygnaturę niesie tę samą.
-              Backticków tu nie ma — blok stoi w literale szablonowym. */
-           (SELECT zp.sku FROM zamowienie_klienta_pozycja zp
-             WHERE zp.zamowienie_id = zk.id AND zp.offer_id = r.offer_id
-             ORDER BY zp.id LIMIT 1) AS sku_paragonu
-      FROM reklamacja_klienta r
+const ZLACZENIA_WIERSZA = `
       LEFT JOIN offer_snapshot o
         ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
       LEFT JOIN oferta_kartoteka k
         ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
-      /* Zamówienie po numerze z reklamacji — wzorzec ze złączenia faktur.
-         Wiersz bywa go pozbawiony: kolejka dociągania zna sprawy dopiero od
-         0.282.0, a Allegro odmawia 404 przy zamówieniach starszych niż jego
-         własna retencja. Wtedy zostaje data z ładunku sprawy.
-         Backticków tu nie ma — blok stoi w literale szablonowym. */
       LEFT JOIN zamowienie_klienta zk
         ON zk.channel_account_id = r.channel_account_id AND zk.external_id = r.order_id
-     WHERE r.typ = 'CLAIM' AND (? IS NULL OR r.otwarto_at >= ?)
+      LEFT JOIN zamowienie_klienta_pozycja zp
+        ON zp.id = (SELECT MIN(x.id) FROM zamowienie_klienta_pozycja x
+                     WHERE x.zamowienie_id = zk.id AND x.offer_id = r.offer_id)`;
+
+/** Wiersze reklamacji z ofertą, kartoteką i paragonem; `warunek` zawęża listę. */
+function wierszeReklamacji(
+  database: Db, warunek: string, ...parametry: Array<string | number | null>
+): Wiersz[] {
+  return database.prepare(`
+    SELECT ${KOLUMNY_WIERSZA}
+      FROM reklamacja_klienta r ${ZLACZENIA_WIERSZA}
+     WHERE r.typ = 'CLAIM' AND (${warunek})
      ORDER BY r.decyzja_do IS NULL, r.decyzja_do ASC, r.otwarto_at DESC`)
-    .all(od, od) as Wiersz[];
+    .all(...parametry) as Wiersz[];
+}
+
+export function listaReklamacji(
+  database: Db = defaultDb(), teraz = Date.now(),
+  od: string | null = config.allegro.reklamacjeOd,
+): WierszReklamacji[] {
+  const wiersze = wierszeReklamacji(database, "? IS NULL OR r.otwarto_at >= ?", od, od);
   const tagi = tagiWszystkichSpraw(database, TAGI_REKLAMACJI);
-  /* Sygnatury z paragonów JEDNYM zapytaniem na całą kolejkę (0.400.0). */
-  const zParagonow = zParagonu(database, wiersze.map((w) => (w as Wiersz).sku_paragonu as string | null));
+  /* Sygnatury z paragonów JEDNYM zapytaniem na całą kolejkę. */
+  const zParagonow = zParagonu(database, wiersze.map((w) => w.sku_paragonu as string | null));
   return wiersze.map((w) => {
     const r = zWiersza(w, teraz);
     r.tagi = tagi.get(r.id) ?? [];
-    zParagonuNaWiersz(r, (w as Wiersz).sku_paragonu, zParagonow);
+    zParagonuNaWiersz(r, w.sku_paragonu, zParagonow);
     return r;
   });
 }
@@ -899,13 +986,19 @@ export interface SzczegolReklamacji {
   przesylka: StanPrzesylkiZamowienia | null;
   /** Kartoteka Subiekta wywiedziona z oferty, gdy reklamacja ją niesie. */
   kartoteka: ReturnType<typeof kartotekaOferty> | null;
-  /* Karta faktów Copilota (0.275.0); `null`, gdy nikt jeszcze nie prosił.
-     Jedzie razem ze szczegółem, bo jest CZYTANIEM sprawy, a nie osobnym
-     ekranem — a drugie zapytanie przy każdym otwarciu byłoby kosztem bez
-     zysku (spraw w pracy są dziesiątki). */
+  /* Karta faktów Copilota; `null`, gdy nikt o nią nie prosił. Ekran
+     reklamacji jej nie pokazuje i nie zamawia nowej (decyzja właściciela),
+     ale zapisane karty zostają i jadą dalej: to dane biura, nie ekranu,
+     a powrót Copilota nie będzie wtedy wymagał zmiany odpowiedzi. */
   karta: ReturnType<typeof kartaSprawy>;
   /* Ile razy TO SAMO już się zdarzyło (0.413.0) — patrz `historiaSprawy`. */
   historia: HistoriaSprawy;
+  /** Od kogo przyszedł ten towar — patrz `ostatniaDostawa`; `null` = nie wiemy. */
+  dostawa: OstatniaDostawa | null;
+  /** Dowody biura od najstarszego; pusta lista znaczy „nikt nic nie dopisał". */
+  dowody: DowodReklamacji[];
+  /** Reklamacja u dostawcy; `null`, dopóki biuro jej nie zgłosiło. */
+  uDostawcy: ReklamacjaUDostawcy | null;
 }
 
 /**
@@ -1078,43 +1171,8 @@ export function historiaSprawy(
 export function szczegolReklamacji(
   database: Db, id: number, teraz = Date.now(),
 ): SzczegolReklamacji {
-  /* Skład wiersza jest TEN SAM, co w kolejce — `listaReklamacji` z filtrem po
-     identyfikatorze. Druga funkcja składająca reklamację rozjechałaby się
-     z pierwszą przy pierwszym nowym polu; dokładnie tak zrobiono przy zwrocie
-     w rozmowie (0.221.0). */
-  const w = database.prepare(`
-    SELECT r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
-           k.tw_id, k.tw_symbol, zk.kupiono_at,
-           /* ── SYGNATURA Z PARAGONU (0.400.0) ──────────────────────────────
-              Zgłoszenie właściciela: „symbol towaru w reklamacji powinno
-              ściągać z paragonu do danego zamówienia".
-
-              Pozycja zamówienia niesie sygnaturę sprzedawcy Z CHWILI ZAKUPU —
-              to jest paragon. Tabela oferta_kartoteka niesie DZISIEJSZE
-              mapowanie oferty, a sprzedawca przepina sygnaturę, gdy towar od
-              jednego dostawcy się wyczerpie (powód przy pamiecAktualna).
-              Reklamacja dotyczy rzeczy, którą klient DOSTAŁ, więc pyta
-              paragonu, nie dzisiejszej półki.
-
-              Ograniczenie do jednej pozycji: ten sam numer oferty bywa na
-              zamówieniu dwa razy, ale sygnaturę niesie tę samą.
-              Backticków tu nie ma — blok stoi w literale szablonowym. */
-           (SELECT zp.sku FROM zamowienie_klienta_pozycja zp
-             WHERE zp.zamowienie_id = zk.id AND zp.offer_id = r.offer_id
-             ORDER BY zp.id LIMIT 1) AS sku_paragonu
-      FROM reklamacja_klienta r
-      LEFT JOIN offer_snapshot o
-        ON o.channel_account_id = r.channel_account_id AND o.external_id = r.offer_id
-      LEFT JOIN oferta_kartoteka k
-        ON k.channel_account_id = r.channel_account_id AND k.offer_id = r.offer_id
-      /* Zamówienie po numerze z reklamacji — wzorzec ze złączenia faktur.
-         Wiersz bywa go pozbawiony: kolejka dociągania zna sprawy dopiero od
-         0.282.0, a Allegro odmawia 404 przy zamówieniach starszych niż jego
-         własna retencja. Wtedy zostaje data z ładunku sprawy.
-         Backticków tu nie ma — blok stoi w literale szablonowym. */
-      LEFT JOIN zamowienie_klienta zk
-        ON zk.channel_account_id = r.channel_account_id AND zk.external_id = r.order_id
-     WHERE r.id=? AND r.typ = 'CLAIM'`).get(id) as Wiersz | undefined;
+  /* Skład wiersza jest TEN SAM, co w kolejce — `wierszeReklamacji`. */
+  const w = wierszeReklamacji(database, "r.id = ?", id)[0];
   /* Dyskusja pod tym identyfikatorem to dla TEGO ekranu brak, a nie sprawa
      bez werdyktu: `/api/reklamacje/7` przy dyskusji ma oddać 404, żeby nie
      dało się jej otworzyć ekranem, który obiecuje uznanie i odrzucenie. */
@@ -1150,6 +1208,7 @@ export function szczegolReklamacji(
     ?? (kartoteka && (kartoteka.pewnosc === "sku" || kartoteka.pewnosc === "pamiec")
       ? kartoteka.twId : null);
 
+
   return {
     reklamacja,
     czat: czatReklamacji(database, id),
@@ -1157,6 +1216,12 @@ export function szczegolReklamacji(
     zwroty, rozmowy, sprawy, droga, zamowienie, przesylka, kartoteka,
     karta: kartaSprawy(database, id),
     historia: historiaSprawy(database, konto, id, twIdTowaru, reklamacja.kupujacyLogin),
+    /* Dostawa liczy się dla tej samej kartoteki co licznik: propozycja
+       niejednoznaczna nie wchodzi, bo dostawca podany do niej byłby
+       zgadywaniem. */
+    dostawa: ostatniaDostawa(database, twIdTowaru, reklamacja.kupionoAt),
+    dowody: dowodyReklamacji(database, id),
+    uDostawcy: uDostawcyReklamacji(database, id),
   };
 }
 

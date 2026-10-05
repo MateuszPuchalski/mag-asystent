@@ -50,8 +50,8 @@ export function zawieraOpis(wiadomosc: string, opis: string): boolean {
 /* ── FORMULARZ ALLEGRO (0.415.0) ─────────────────────────────────────────────
    Pierwsza wiadomość kupującego w reklamacji nie jest jego wiadomością: to
    formularz Allegro z etykietami, w którym jedno pole niesie jego własne
-   słowa. Trzy z pięciu etykiet powtarzają to, co głowica kolumny dowodów
-   mówi już po polsku — powód, oczekiwanie i tytuł prawny.
+   słowa. Trzy z pięciu etykiet powtarzają to, co ekran mówi już po polsku:
+   powód i oczekiwanie w głowicy sprawy, tytuł prawny w zwijce „Sprawa".
 
    ROZPOZNAJEMY PO ETYKIETACH, NIE PO KOLEJNOŚCI ANI PO POZYCJI. Allegro
    kiedyś te teksty zmieni i wtedy wiadomość zostaje w całości — tak ma być.

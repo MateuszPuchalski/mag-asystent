@@ -6,7 +6,8 @@ import { migrate } from "../db/db.js";
 import { BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { BladReklamacji, ReklamacjaConflict, kubelek, listaReklamacji, sygnaly } from "./reklamacje.js";
 import {
-  LIMIT_WIADOMOSCI, ODMOWY, UZNANIA, WERDYKTY, sufitKwoty, wydajWerdykt, zdecydujZwrotTowaru,
+  LIMIT_WIADOMOSCI, ODMOWY, UZNANIA, WERDYKTY, sufitKwoty, towarZCiala, wydajWerdykt,
+  wydajWerdyktZTowarem, zdecydujZwrotTowaru,
 } from "./reklamacja-werdykt.js";
 
 /* Ten plik pilnuje rzeczy, których na ekranie nie widać: że odrzucony werdykt
@@ -308,4 +309,147 @@ test("towar: odmowa Allegro kodem zostawia decyzję pustą — wolno spróbować
   assert.equal(wynik.status, "sent");
   assert.equal(wiersz(d, id).zwrot_towaru, "niewymagany");
   assert.equal((d.prepare("SELECT typ FROM reklamacja_outbox").get() as { typ: string }).typ, "RETURN_NOT_REQUIRED");
+});
+
+/* ── WERDYKT I TOWAR JEDNYM ŻĄDANIEM ─────────────────────────────────────────
+   Werdykt jest nieodwracalny, więc te testy pilnują kolejności: stanowisko
+   o towarze sprawdzone przed werdyktem, wysłane tylko po pewnym `sent`,
+   z wersją, którą zwrócił werdykt, a jego porażka nie gubi wyniku werdyktu. */
+
+/** Atrapa obu końcówek Allegro, z jedną wspólną kolejnością strzałów. */
+function dwieKoncowki(n: {
+  werdykt?: () => Promise<void>;
+  wiadomosc?: () => Promise<{ id?: string; createdAt?: string } | null>;
+} = {}) {
+  const kolejnosc: string[] = [];
+  const wiadomosci: Array<{ typ: string; zalaczniki: readonly string[] }> = [];
+  const wyslijWerdykt = async () => { kolejnosc.push("werdykt"); await n.werdykt?.(); };
+  const wyslijWiadomosc = async (_id: string, _t: string, typ: string, zal?: readonly string[]) => {
+    kolejnosc.push(typ); wiadomosci.push({ typ, zalaczniki: zal ?? [] });
+    return n.wiadomosc ? n.wiadomosc() : { id: `m-${wiadomosci.length}`, createdAt: "2026-09-07T12:00:00.000Z" };
+  };
+  return { kolejnosc, wiadomosci, wyslijWerdykt, wyslijWiadomosc };
+}
+
+const TOWAR = (pytanie: number, n: Record<string, unknown> = {}) => ({
+  decyzja: "wymagany", tresc: "Proszę odesłać kosiarkę na nasz adres.",
+  expectedLastMessageId: pytanie, ...n,
+});
+
+test("towar przy werdykcie: zła decyzja, pusta treść albo odrzucenie odpadają PRZED werdyktem", async () => {
+  const { d, id, pytanie } = stanowisko();
+  const a = dwieKoncowki();
+  const przypadki: Array<[Record<string, unknown>, RegExp]> = [
+    [{ werdykt: "REJECTED_OTHER", wiadomosc: "Nie.", towar: TOWAR(pytanie) }, /tylko przy uznaniu/],
+    [{ werdykt: "ACCEPTED_REFUND", wiadomosc: "Tak.", towar: TOWAR(pytanie, { decyzja: "moze" }) }, /wymagany/],
+    [{ werdykt: "ACCEPTED_REFUND", wiadomosc: "Tak.", towar: TOWAR(pytanie, { tresc: "  " }) }, /pusta/],
+    [{ werdykt: "ACCEPTED_REFUND", wiadomosc: "Tak.", towar: TOWAR(pytanie, { tresc: "x".repeat(20_001) }) },
+      /najwyżej 20000 znaków/],
+    [{ werdykt: "ACCEPTED_REFUND", wiadomosc: "Tak.", towar: "wymagany" }, /decyzja z treścią/],
+    [{ werdykt: "ACCEPTED_REFUND", wiadomosc: "Tak.", towar: TOWAR(pytanie, { expectedLastMessageId: "w-1" }) },
+      /numerem/],
+  ];
+  for (const [zadanie, wzor] of przypadki) {
+    await assert.rejects(() => wydajWerdyktZTowarem(d, id, { ...zadanie, wersja: 1 } as never, KTO,
+      a.wyslijWerdykt, a.wyslijWiadomosc), (e: unknown) =>
+      e instanceof BladReklamacji && e.kod === 400 && wzor.test(e.message));
+  }
+  assert.deepEqual(a.kolejnosc, [], "zły towar wykryty po werdykcie zostawiłby uznanie bez stanowiska");
+  assert.equal(wiersz(d, id).werdykt_status, null);
+  assert.equal(wiersz(d, id).wersja, 1);
+  /* Bez pola `towar` nie ma czego sprawdzać — werdykt idzie sam, jak dotąd. */
+  assert.equal(towarZCiala("REJECTED_OTHER", undefined), null);
+  assert.equal(towarZCiala("REJECTED_OTHER", null), null);
+});
+
+test("werdykt z towarem: najpierw werdykt, potem towar z WERSJĄ Z WERDYKTU — 1, 2, 3", async () => {
+  const { d, id, pytanie } = stanowisko();
+  const a = dwieKoncowki();
+  const wynik = await wydajWerdyktZTowarem(d, id, {
+    werdykt: "ACCEPTED_EXCHANGE", wiadomosc: "Wymienimy.", wersja: 1, towar: TOWAR(pytanie),
+  }, KTO, a.wyslijWerdykt, a.wyslijWiadomosc);
+  assert.deepEqual(a.kolejnosc, ["werdykt", "RETURN_REQUIRED_CUSTOM"]);
+  assert.equal(wynik.status, "sent");
+  assert.deepEqual(wynik.towar, { status: "sent" });
+  /* Werdykt podniósł wersję do 2 i od niej liczył towar; udane stanowisko
+     podnosi ją do 3, a panel pisze następny zapis od tej, którą dostał. */
+  assert.equal(wynik.wersja, 3);
+  const w = wiersz(d, id);
+  assert.equal(w.wersja, 3);
+  assert.equal(w.zwrot_towaru, "wymagany");
+  assert.deepEqual(zdarzenia(d, "reklamacja_zwrot_towaru").map((z) => z.decyzja), ["wymagany"]);
+  const [r] = listaReklamacji(d, Date.parse("2026-09-07T12:00:00Z"));
+  assert.equal(r!.sygnaly.includes("towar_do_decyzji"), false, "jedno kliknięcie gasi drugi krok");
+});
+
+test("werdykt bez pewnego `sent` NIE ciągnie za sobą towaru — pominięcie ze zdaniem", async () => {
+  for (const [blad, status] of [
+    [new Error("fetch failed: timeout"), "send_uncertain"],
+    [new BladOdpowiedziAllegro("Allegro odpowiedziało 400", 400), "send_failed"],
+  ] as const) {
+    const { d, id, pytanie } = stanowisko();
+    const a = dwieKoncowki({ werdykt: async () => { throw blad; } });
+    const wynik = await wydajWerdyktZTowarem(d, id, {
+      werdykt: "ACCEPTED_REFUND", wiadomosc: "Zwracamy.", wersja: 1, towar: TOWAR(pytanie),
+    }, KTO, a.wyslijWerdykt, a.wyslijWiadomosc);
+    assert.equal(wynik.status, status);
+    assert.ok(wynik.towar && "pominiety" in wynik.towar, JSON.stringify(wynik.towar));
+    assert.deepEqual(a.kolejnosc, ["werdykt"], `po ${status} wiadomość o towarze nie wychodzi`);
+    assert.equal(wiersz(d, id).zwrot_towaru, null);
+  }
+});
+
+test("porażka towaru nie wywraca odpowiedzi — werdykt wraca, a towar mówi, co się stało", async () => {
+  /* Odmowa Allegro kodem przy wiadomości o towarze. */
+  const { d, id, pytanie } = stanowisko();
+  const a = dwieKoncowki({ wiadomosc: async () => { throw new BladOdpowiedziAllegro("Allegro odpowiedziało 422", 422); } });
+  const wynik = await wydajWerdyktZTowarem(d, id, {
+    werdykt: "ACCEPTED_REFUND", wiadomosc: "Zwracamy.", wersja: 1, towar: TOWAR(pytanie),
+  }, KTO, a.wyslijWerdykt, a.wyslijWiadomosc);
+  assert.equal(wynik.status, "sent", "werdykt wyszedł i panel musi to wiedzieć");
+  assert.deepEqual(wynik.towar, { blad: "Allegro odpowiedziało 422" });
+  assert.equal(wynik.wersja, 2, "nic poza werdyktem nie podniosło wersji");
+  assert.equal(wiersz(d, id).zwrot_towaru, null, "krok zapasowy po werdykcie zostaje otwarty");
+
+  /* Klient dopisał, odkąd agent otworzył sprawę: 409 świeżości wraca jako
+     ładunek konfliktu, ten sam, który zna dialog „ktoś dopisał". */
+  const b = stanowisko();
+  const nowa = Number(b.d.prepare(`INSERT INTO reklamacja_wiadomosc(reklamacja_id,external_id,autor_rola,
+    tresc,utworzono_at) VALUES (?,'w-2','BUYER','A jednak działa','2026-09-07T11:00:00Z')`)
+    .run(b.id).lastInsertRowid);
+  const c = dwieKoncowki();
+  const zKonfliktem = await wydajWerdyktZTowarem(b.d, b.id, {
+    werdykt: "ACCEPTED_REFUND", wiadomosc: "Zwracamy.", wersja: 1, towar: TOWAR(b.pytanie),
+  }, KTO, c.wyslijWerdykt, c.wyslijWiadomosc);
+  assert.equal(zKonfliktem.status, "sent");
+  const konflikt = (zKonfliktem.towar as { konflikt: Record<string, unknown> }).konflikt;
+  assert.match(String(konflikt.error), /dopisał/);
+  assert.equal(konflikt.lastMessageId, nowa);
+  assert.deepEqual(c.kolejnosc, ["werdykt"]);
+});
+
+test("werdykt bez towaru oddaje dokładnie to, co dotąd — bez pola `towar`", async () => {
+  const { d, id } = stanowisko();
+  const a = dwieKoncowki();
+  const wynik = await wydajWerdyktZTowarem(d, id, { werdykt: "REJECTED_OTHER", wiadomosc: "Nie.", wersja: 1 },
+    KTO, a.wyslijWerdykt, a.wyslijWiadomosc);
+  assert.deepEqual(wynik, {
+    werdykt: "REJECTED_OTHER", werdyktNazwa: "Odrzucona — inny powód", status: "sent", blad: null, wersja: 2,
+  });
+});
+
+test("brama ścieżki łączonej wpuszcza wyłącznie po `sent`; krok zapasowy dalej po obu", async () => {
+  const { d, id, pytanie } = stanowisko();
+  await wydajWerdykt(d, id, { werdykt: "ACCEPTED_REPAIR", wiadomosc: "Naprawimy." }, KTO,
+    allegro(async () => { throw new Error("fetch failed: timeout"); }).wyslij);
+  const a = dwieKoncowki();
+  const zadanie = {
+    reklamacjaId: id, decyzja: "niewymagany", tresc: "Towar zostaje u Pana.",
+    expectedWersja: 2, expectedLastMessageId: pytanie, autor: KTO, database: d, wyslij: a.wyslijWiadomosc,
+  };
+  await assert.rejects(() => zdecydujZwrotTowaru({ ...zadanie, tylkoPoWyslanym: true }),
+    (e: unknown) => e instanceof ReklamacjaConflict && /po uznaniu/.test(e.message));
+  assert.deepEqual(a.kolejnosc, []);
+  /* Człowiek widzi niepewność na ekranie i decyduje sam — tamta droga zostaje. */
+  assert.equal((await zdecydujZwrotTowaru(zadanie)).status, "sent");
 });
