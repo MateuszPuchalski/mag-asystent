@@ -42,7 +42,7 @@ oznaczone. Ekran nie uzupełnia go z kartoteki, bo to mieszałoby źródła.
 ## Poprawki po decyzjach właściciela
 
 **Makieta doboru zeszła.** Dobór części i baza wiedzy wyszły z WERTIS
-w @wydanie, więc ekran, który je rysował, nie ma już czego pokazywać.
+w 0.565.0, więc ekran, który je rysował, nie ma już czego pokazywać.
 
 ## Skąd wzięte
 

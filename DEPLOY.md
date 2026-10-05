@@ -1220,7 +1220,7 @@ wywołań wpis ma mieć model `jev-1.13.0` i niezerowe tokeny. Wpisy
 Sufity godzinowe liczy się **razem z błędami**, bo nieudane wywołanie też
 kosztuje. Nie podnoś limitów przed przejrzeniem pierwszych wyników.
 Klucze `WIEDZA_AUTOMAT*` i `PASOWANIE_Z_SIECI*` zeszły razem z bazą wiedzy
-w @wydanie. Jeśli stoją w `wertis.env`, usuń je — serwer ostrzega o nich
+w 0.565.0. Jeśli stoją w `wertis.env`, usuń je — serwer ostrzega o nich
 w `/api/health`.
 
 **Dane u dostawcy.** Tekst wychodzi przez maskowanie telefonu i adresu.
