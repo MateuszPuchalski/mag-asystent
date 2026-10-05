@@ -35,7 +35,7 @@ process.env.SGT_MODE = "seeded";
 let app: FastifyInstance;
 let db: typeof import("../db/db.js").db;
 let createUser: typeof import("../services/users.js").createUser;
-let typPodgladu: typeof import("../services/skrzynka.js").typPodgladu;
+let typPodgladu: typeof import("../services/typ-podgladu.js").typPodgladu;
 let rozpoznajMime: typeof import("../adapters/zdjecia.sgt.js").rozpoznajMime;
 let reklamacja = 0;
 let zalacznik = 0;
@@ -43,7 +43,7 @@ let zalacznik = 0;
 before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ createUser } = await import("../services/users.js"));
-  ({ typPodgladu } = await import("../services/skrzynka.js"));
+  ({ typPodgladu } = await import("../services/typ-podgladu.js"));
   ({ rozpoznajMime } = await import("../adapters/zdjecia.sgt.js"));
   app = await (await import("../index.js")).buildApp();
 });

@@ -120,9 +120,39 @@ export function potwierdzHaslo(user: Uzytkownik, haslo: string): boolean {
   return true;
 }
 
-/** Zmiana własnego hasła — stare musi się zgadzać, nowe ma minimalną długość. */
-export function zmienHaslo(user: Uzytkownik, stare: string, nowe: string): { error?: string } {
-  if (!sprawdzSekret(stare, haszHasla(user.userId))) return { error: "Błędne hasło" };
+/**
+ * Zmiana własnego hasła — stare musi się zgadzać, nowe ma minimalną długość.
+ *
+ * Ten sam hamulec prób co logowanie i `potwierdzHaslo`, na tym samym liczniku
+ * loginu. Formularz w panelu przyjmuje stare hasło, więc bez hamulca byłby
+ * szybszą drogą zgadywania niż ekran logowania. Licznik jest jeden, bo dwie
+ * drogi z osobnymi licznikami dawałyby dwa razy więcej prób przed karą.
+ *
+ * `kod: 429` mówi trasie, że to kara, a nie błędne hasło. Ekran ma wtedy
+ * kazać czekać; kolejna próba tylko przedłużyłaby karę.
+ */
+export function zmienHaslo(
+  user: Uzytkownik,
+  stare: string,
+  nowe: string,
+): { error?: string; kod?: 429 } {
+  const login = user.login ?? "";
+  /* Konto bez loginu nie ma licznika, więc odmawia jak `potwierdzHaslo`. */
+  if (!login) return { error: "Błędne hasło" };
+  /* Kara PRZED sprawdzeniem hasła. Trafienie w trakcie kary nie może przejść,
+     inaczej kara spowalnia tylko odpowiedź „źle", a „dobrze" przepuszcza. */
+  if (karaLogowania(login) > 0) {
+    return { error: "Za dużo prób z błędnym hasłem — odczekaj minutę", kod: 429 };
+  }
+  if (!sprawdzSekret(stare ?? "", haszHasla(user.userId))) {
+    odnotujBlad(login);
+    logEvent("login_failed", normalizujLogin(login), null, { login: normalizujLogin(login), zmianaHasla: true });
+    return { error: "Błędne hasło" };
+  }
+  /* Dobre stare hasło to dowód tożsamości jak udane logowanie, więc licznik
+     znika, zanim padnie pytanie o nowe. Za krótkie nowe to pomyłka w nowym
+     haśle, nie zgadywanie starego, i próby nie dokłada. */
+  proby.delete(normalizujLogin(login));
   if ((nowe ?? "").length < HASLO_MIN) {
     return { error: `Nowe hasło musi mieć co najmniej ${HASLO_MIN} znaków` };
   }

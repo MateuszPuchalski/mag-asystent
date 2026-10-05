@@ -65,7 +65,9 @@ export async function authRoutes(app: FastifyInstance) {
       const s = sesjaZadania();
       if (!s) return reply.code(401).send({ error: "Brak sesji — zaloguj się" });
       const w = zmienHaslo(s.user, req.body?.stare ?? "", req.body?.nowe ?? "");
-      if (w.error) return reply.code(400).send({ error: w.error });
+      /* Kara to 429 jak przy logowaniu, z tego samego powodu: „odczekaj"
+         i „pomyliłeś hasło" to dwie różne instrukcje dla człowieka. */
+      if (w.error) return reply.code(w.kod ?? 400).send({ error: w.error });
       return { ok: true };
     }
   );

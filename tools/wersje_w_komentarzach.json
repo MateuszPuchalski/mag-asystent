@@ -715,7 +715,7 @@
  "server/src/services/silniki.test.ts": 1,
  "server/src/services/silniki.ts": 2,
  "server/src/services/skrzynka.test.ts": 26,
- "server/src/services/skrzynka.ts": 44,
+ "server/src/services/skrzynka.ts": 41,
  "server/src/services/sonda-zalacznik.ts": 1,
  "server/src/services/stock.ts": 4,
  "server/src/services/stopka.test.ts": 1,

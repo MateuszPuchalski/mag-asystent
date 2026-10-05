@@ -2,7 +2,8 @@ import fs from "node:fs";
 import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania, subiekt } from "../context.js";
 import { logEvent } from "../services/events.js";
-import { listaRozmow, osRozmowy, stanSkrzynki, typPodgladu, zlecPomiar } from "../services/skrzynka.js";
+import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
+import { typPodgladu } from "../services/typ-podgladu.js";
 import { ConversationConflict, dodajKomentarz, odlozRozmowe, otworzRozmowe, zakonczRozmowe, przejmijRozmowe, przekazRozmowe, ustawPriorytet,
   ustawReklamacyjna, wskazKartoteke, wskazOferte, zapiszSzkic } from "../services/conversations.js";
 import {
