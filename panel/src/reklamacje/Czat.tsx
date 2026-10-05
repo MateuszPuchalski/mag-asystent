@@ -321,16 +321,16 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
   const ostatniaKlienta = bursztynTylkoOstatniej
     ? [...czat].reverse().find((w) => w.autorRola === "BUYER")?.id ?? null : null;
 
-  /* ── ROZMOWA PRZEWIJA SIĘ, WERDYKT STOI (0.418.0) ────────────────────────
+  /* ── ROZMOWA PRZEWIJA SIĘ SAMA (0.418.0) ─────────────────────────────────
      Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony". Na
      zrzucie pasek werdyktu leżał w połowie wątku, między tekstem wiadomości
      a jej zdjęciem — bo cała kolumna była JEDNYM obszarem przewijania,
      w którym oś, pole odpowiedzi i werdykt płynęły razem.
 
-     Rozmowa z odpowiedzią przewija się w środku, a pasek werdyktu zostaje na
-     dole i nie ucieka. Werdykt stoi POD rozmową (0.412.0), więc nie trzeba do
-     niego przewijać jedenastu wiadomości. Pole odpowiedzi nie potrzebuje
-     osobnego pasa: przykleja się do krawędzi samo (niżej). */
+     Przewija się wyłącznie rozmowa z odpowiedzią. Wszystko, co ma stać
+     w miejscu — werdykt reklamacji, pasek zakończenia dyskusji — rysuje
+     ekran poza tym komponentem. Pole odpowiedzi nie potrzebuje osobnego
+     pasa: przykleja się do krawędzi samo (niżej). */
   /* ── ZDJĘCIA OBOK ROZMOWY ────────────────────────────────────────────────
      Zgłoszenie właściciela: zdjęcia zajmowały dużą część czatu. Kafel ma
      do 256 px wysokości, więc trzy zdjęcia z telefonu wypychały następną
@@ -455,8 +455,8 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
         stoi w pasie przewijania, bo pod ręką trzyma je sam edytor: pusty jest
         jednym rzędem przyklejonym do dolnej krawędzi, a pasek wysyłki pływa.
         Osobny pas pod rozmową zabierałby jej stałą wysokość przy każdej
-        sprawie. Werdykt zostaje poza przewijaniem (`Werdykt.tsx`), bo
-        nieodwracalne ma stać w jednym miejscu. */}
+        sprawie. Werdykt stoi poza rozmową (`Werdykt.tsx`), bo nieodwracalne
+        ma stać w jednym miejscu. */}
     {edytor}
     <div ref={koniec} aria-hidden="true" />
     </div>

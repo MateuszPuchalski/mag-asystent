@@ -715,12 +715,11 @@ export function Reklamacje() {
           </Karta>
 
           <div className={SIATKA_SPRAWY}>
-            {/* ── ROZMOWA PRZEWIJA SIĘ, WERDYKT STOI ──────────────────────────
-                Zgłoszenie właściciela ze zrzutem: „werdykt nie jest
-                przyklejony". Przewija się tylko rozmowa z odpowiedzią,
-                a zgłoszenie stoi przypięte nad nią i werdykt pod nią. Pole
-                odpowiedzi przykleja się do dolnej krawędzi samo, powód stoi
-                w `reklamacje/Czat.tsx`. */}
+            {/* ── ROZMOWA PRZEWIJA SIĘ, ZGŁOSZENIE STOI ───────────────────────
+                Przewija się tylko rozmowa z odpowiedzią, a zgłoszenie stoi
+                przypięte nad nią. Werdykt nie płynie z wątkiem: ma własne
+                miejsce pod faktami po prawej. Pole odpowiedzi przykleja się
+                do dolnej krawędzi samo, powód stoi w `reklamacje/Czat.tsx`. */}
             <Karta className="flex min-h-0 flex-col overflow-hidden">
               <Czat
                 sprawa={{
