@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { czyAutoresponder } from "./autoresponder.js";
+import { czyAutoodpowiedzSprawy, czyAutoresponder } from "./autoresponder.js";
 
 /* ── Autoodpowiedź biura (0.218.0) ────────────────────────────────────────────
    Reguła ma być WĄSKA. Zwinięcie prawdziwej odpowiedzi agenta kosztowałoby
@@ -50,4 +50,15 @@ test("prawdziwa odpowiedź agenta zostaje wiadomością", () => {
 
 test("pusta treść nie jest odbiciem", () => {
   assert.equal(czyAutoresponder(""), false);
+});
+
+test("autoodpowiedź w sprawie Allegro rozpoznaje się mimo interpunkcji i dopisków", () => {
+  /* Treść podał właściciel z żywej dyskusji. Podpis albo godziny pracy dopisane
+     w ustawieniach Allegro nie mają wyłączać rozpoznania. */
+  assert.ok(czyAutoodpowiedzSprawy(
+    "Dziękujemy za wiadomość, odpowiemy najszybciej jak to tylko będzie możliwe."));
+  assert.ok(czyAutoodpowiedzSprawy(
+    "DZIEKUJEMY ZA WIADOMOSC - odpowiemy najszybciej, jak to tylko bedzie mozliwe!\nZespół WERTIS"));
+  assert.ok(!czyAutoodpowiedzSprawy("Dziękujemy za wiadomość. Paczka wyszła wczoraj."),
+    "samo „dziękujemy” to zwykła grzeczność, nie automat");
 });

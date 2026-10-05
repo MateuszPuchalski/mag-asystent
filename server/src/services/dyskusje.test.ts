@@ -436,3 +436,57 @@ test("alarm ze zdrowia zgadza się z wierszami pilnymi z listy", () => {
   assert.equal(z.alarm?.najstarszaGodzin, Math.max(...pilne.map((x) => x.czekaOdGodzin ?? 0)));
   assert.deepEqual(pilne.map((x) => x.externalId).sort(), ["a", "b"]);
 });
+
+/* ── Autoodpowiedź z naszego konta ─────────────────────────────────────────
+   Zgłoszenie właściciela: Allegro wysyła z naszego konta „Dziękujemy za
+   wiadomość…", status skacze na `SELLER_REPLIED`, a dyskusja spadała do
+   „czeka na klienta". Allegro automatów nie uznaje, więc zegar blokady konta
+   biegł dalej, a sprawa zniknęła z kolejki pracy. */
+
+const AUTO = "Dziękujemy za wiadomość, odpowiemy najszybciej jak to tylko będzie możliwe.";
+
+function wpis(sprawaId: number, rola: string, at: string, tresc: string): void {
+  db().prepare(
+    `INSERT INTO reklamacja_wiadomosc(reklamacja_id, external_id, autor_rola, tresc, utworzono_at)
+     VALUES (?,?,?,?,?)`,
+  ).run(sprawaId, `a-${sprawaId}-${rola}-${at}`, rola, tresc, at);
+}
+
+test("autoodpowiedź nie przenosi dyskusji do „czeka na klienta” i nie zeruje zegara", () => {
+  const id = sprawa({ id: "auto-1", ostatniStatus: "SELLER_REPLIED", ostatniaAt: przedGodzinami(29) });
+  wpis(id, "BUYER", przedGodzinami(30), "Gdzie moja paczka?");
+  wpis(id, "SELLER", przedGodzinami(29), AUTO);
+  const [d] = D.listaDyskusji(db(), TERAZ, null);
+  assert.equal(d.kubelek, "odpowiedz");
+  assert.equal(d.ostatniaWiadomoscStatus, "BUYER_REPLIED");
+  assert.equal(d.czekaOdGodzin, 30, "zegar liczy od pytania klienta, nie od automatu");
+  assert.equal(D.stanDyskusjiHealth(db(), TERAZ, 24, null).alarm?.ile, 1,
+    "alarm widzi sprawę mimo statusu SELLER_REPLIED");
+});
+
+test("prawdziwa odpowiedź po autoodpowiedzi przenosi dyskusję do klienta", () => {
+  const id = sprawa({ id: "auto-2", ostatniStatus: "SELLER_REPLIED", ostatniaAt: przedGodzinami(1) });
+  wpis(id, "BUYER", przedGodzinami(30), "Gdzie moja paczka?");
+  wpis(id, "SELLER", przedGodzinami(29), AUTO);
+  wpis(id, "SELLER", przedGodzinami(1), "Paczka wyszła wczoraj, numer w zamówieniu.");
+  assert.equal(D.listaDyskusji(db(), TERAZ, null)[0].kubelek, "klient");
+});
+
+test("przy urwanej liście wierzymy Allegro, nie ostatniej wiadomości, jaką mamy", () => {
+  /* Rozmowa dociąga się taktem: Allegro zna już naszą odpowiedź, a lokalnie
+     ostatnie jest pytanie klienta. Przestawienie kubełka byłoby zgadywaniem. */
+  const id = sprawa({ id: "auto-3", ostatniStatus: "SELLER_REPLIED" });
+  wpis(id, "BUYER", przedGodzinami(30), "Gdzie moja paczka?");
+  assert.equal(D.listaDyskusji(db(), TERAZ, null)[0].kubelek, "klient");
+});
+
+test("status po zdjęciu automatu bierze się z ostatniej PRAWDZIWEJ wiadomości", () => {
+  assert.equal(D.statusBezAutoodpowiedzi("SELLER_REPLIED", [
+    { rola: "SELLER", at: przedGodzinami(2), auto: true },
+  ]), "NEW", "same automaty — nikt z biura jeszcze nie napisał");
+  assert.equal(D.statusBezAutoodpowiedzi("SELLER_REPLIED", [
+    { rola: "ADMIN", at: przedGodzinami(3) },
+    { rola: "SELLER", at: przedGodzinami(2), auto: true },
+  ]), "ALLEGRO_ADVISOR_REPLIED");
+  assert.equal(D.statusBezAutoodpowiedzi("BUYER_REPLIED", []), "BUYER_REPLIED");
+});

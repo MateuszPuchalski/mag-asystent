@@ -5,6 +5,7 @@ import {
   TAGI_REKLAMACJI, tagiSprawy, tagiWszystkichSpraw, type TagSprawy,
 } from "./tagi-spraw.js";
 import { linkDyskusji, linkZamowienia } from "./allegro-linki.js";
+import { czyAutoodpowiedzSprawy } from "./autoresponder.js";
 import {
   BladReklamacji,
   cofnijNotatkeSprawy,
@@ -82,6 +83,13 @@ const ZAMKNIETA = "DISPUTE_CLOSED";
  * mówiłaby dokładnie odwrotnie, niż jest.
  */
 const RUCH_NASZ = ["NEW", "BUYER_REPLIED", "ALLEGRO_ADVISOR_REPLIED"];
+
+/**
+ * Statusy, które czyta zapytanie alarmu. `SELLER_REPLIED` wchodzi, bo bywa
+ * naszą autoodpowiedzią, a ta nie zdejmuje sprawy z kolejki. Rozstrzyga
+ * `statusBezAutoodpowiedzi` w pamięci, nie SQL.
+ */
+const STATUSY_ALARMU = [...RUCH_NASZ, "SELLER_REPLIED"];
 
 /**
  * Ile dni czekania wyróżnia wiersz.
@@ -202,6 +210,45 @@ const GODZINA_MS = 3_600_000;
 export interface WiadomoscCzasu {
   rola: string | null;
   at: string | null;
+  /** Autoodpowiedź z naszego konta — Allegro nie uznaje jej za odpowiedź. */
+  auto?: boolean;
+}
+
+/** Role automatów, które niczego od nas nie żądają ani niczego nie zamykają. */
+const ROLE_AUTOMATOW: readonly string[] = ["SYSTEM", "FULFILLMENT"];
+
+/**
+ * Status ostatniej wiadomości po zdjęciu NASZEJ autoodpowiedzi z końca rozmowy.
+ *
+ * Allegro liczy `lastMessage.status` z ostatniej wiadomości jak leci, więc
+ * autoodpowiedź z naszego konta daje `SELLER_REPLIED`. Odpowiedzią jednak nie
+ * jest — Allegro samo pisze kupującym i nam, że automatów nie uznaje. Kubełek,
+ * zegar i alarm mają więc patrzeć na ostatnią PRAWDZIWĄ wiadomość.
+ *
+ * Zmieniamy status WYŁĄCZNIE wtedy, gdy ostatnią wiadomością, jaką mamy, jest
+ * właśnie autoodpowiedź. Rozmowa dociąga się taktem, więc przy niepełnej
+ * liście ostatnią może być stare pytanie klienta, a Allegro mówi już o naszej
+ * prawdziwej odpowiedzi. Wtedy wierzymy Allegro, nie urwanej liście.
+ */
+export function statusBezAutoodpowiedzi(
+  status: string | null, wiadomosci: WiadomoscCzasu[],
+): string | null {
+  if (status !== "SELLER_REPLIED") return status;
+  const wg = wiadomosci
+    .map((m) => ({ ...m, t: Date.parse(m.at ?? "") }))
+    .filter((m) => Number.isFinite(m.t))
+    .sort((a, b) => a.t - b.t);
+  const ostatnia = wg[wg.length - 1];
+  if (!ostatnia || ostatnia.rola !== NASZA_ROLA || !ostatnia.auto) return status;
+  for (let i = wg.length - 1; i >= 0; i -= 1) {
+    const m = wg[i];
+    if (m.auto || ROLE_AUTOMATOW.includes(m.rola ?? "")) continue;
+    if (m.rola === NASZA_ROLA) return "SELLER_REPLIED";
+    if (m.rola === "ADMIN") return "ALLEGRO_ADVISOR_REPLIED";
+    return "BUYER_REPLIED";
+  }
+  /* Same automaty: nikt z biura jeszcze nie napisał ani słowa. */
+  return "NEW";
 }
 
 /**
@@ -230,11 +277,13 @@ export function bezOdpowiedziOd(
 ): string | null {
   if (!ruchNasz) return null;
   const wg = wiadomosci
-    .map((m) => ({ rola: m.rola ?? "", t: Date.parse(m.at ?? "") }))
+    .map((m) => ({ rola: m.rola ?? "", auto: m.auto === true, t: Date.parse(m.at ?? "") }))
     .filter((m) => Number.isFinite(m.t))
     .sort((a, b) => a.t - b.t);
   let naszaOstatnia = -1;
-  wg.forEach((m, i) => { if (m.rola === NASZA_ROLA) naszaOstatnia = i; });
+  /* Autoodpowiedź nie jest naszą odpowiedzią i nie zeruje zegara — powód
+     przy `statusBezAutoodpowiedzi`. */
+  wg.forEach((m, i) => { if (m.rola === NASZA_ROLA && !m.auto) naszaOstatnia = i; });
   const pierwsza = wg.slice(naszaOstatnia + 1).find((m) => ROLE_CZEKAJACE.includes(m.rola));
   if (pierwsza) return new Date(pierwsza.t).toISOString();
   if (naszaOstatnia >= 0) return new Date(wg[naszaOstatnia].t).toISOString();
@@ -254,12 +303,17 @@ function wiadomosciCzasu(database: Db, ids: number[]): Map<number, WiadomoscCzas
   const wynik = new Map<number, WiadomoscCzasu[]>();
   if (ids.length === 0) return wynik;
   const wiersze = database.prepare(
-    `SELECT reklamacja_id, autor_rola, utworzono_at FROM reklamacja_wiadomosc
+    `SELECT reklamacja_id, autor_rola, utworzono_at, tresc FROM reklamacja_wiadomosc
       WHERE reklamacja_id IN (${ids.map(() => "?").join(",")})`,
-  ).all(...ids) as Array<{ reklamacja_id: number; autor_rola: string | null; utworzono_at: string | null }>;
+  ).all(...ids) as Array<{
+    reklamacja_id: number; autor_rola: string | null; utworzono_at: string | null; tresc: string | null;
+  }>;
   for (const m of wiersze) {
     const lista = wynik.get(m.reklamacja_id) ?? [];
-    lista.push({ rola: m.autor_rola, at: m.utworzono_at });
+    lista.push({
+      rola: m.autor_rola, at: m.utworzono_at,
+      auto: m.autor_rola === NASZA_ROLA && czyAutoodpowiedzSprawy(m.tresc ?? ""),
+    });
     wynik.set(m.reklamacja_id, lista);
   }
   return wynik;
@@ -314,7 +368,7 @@ export function sygnalyDyskusji(w: {
 function zWiersza(w: Wiersz, teraz: number, wiadomosci: WiadomoscCzasu[] = []): WierszDyskusji {
   const statusAllegro = tekst(w.status_allegro);
   const czatAktywny = Number(w.czat_aktywny ?? 1) === 1;
-  const ostatnia = tekst(w.ostatnia_wiadomosc_status);
+  const ostatnia = statusBezAutoodpowiedzi(tekst(w.ostatnia_wiadomosc_status), wiadomosci);
   const ostatniaAt = tekst(w.ostatnia_wiadomosc_at);
   const rdzen = { statusAllegro, ostatniaWiadomoscStatus: ostatnia, czatAktywny };
   const ruchNasz = ruchNalezyDoNas(rdzen);
@@ -360,6 +414,15 @@ function zWiersza(w: Wiersz, teraz: number, wiadomosci: WiadomoscCzasu[] = []): 
     link: linkDyskusji(tekst(w.external_id)),
     linkZamowienia: linkZamowienia(tekst(w.order_id)),
   };
+}
+
+/**
+ * Wiersz po zapisie liczony z WIADOMOŚCIAMI, jak w kolejce. Bez nich zegar
+ * i autoodpowiedź liczyłyby się inaczej niż na liście, a ekran po kliknięciu
+ * „prowadzę" pokazywałby na chwilę inny kubełek niż kolejka obok.
+ */
+function wierszPoZapisie(database: Db, id: number): WierszDyskusji {
+  return zWiersza(odczytaj(database, id), Date.now(), wiadomosciCzasu(database, [id]).get(id) ?? []);
 }
 
 /**
@@ -490,7 +553,7 @@ export function stempelProwadziDyskusje(
       zdejmuje ? null : new Date().toISOString(), id);
     logEvent("dyskusja_prowadzi", autor.name, null, { id, zdjete: zdejmuje },
       autor.id, database);
-    return zWiersza(odczytaj(database, id), Date.now());
+    return wierszPoZapisie(database, id);
   })();
 }
 
@@ -507,7 +570,7 @@ export function zapiszNotatkeDyskusji(
   return transaction(database, () => {
     doZapisu(database, id, wersja, "DISPUTE");
     pisanieNotatki(database, id, notatka, autor, "DISPUTE", "dyskusja_notatka");
-    return zWiersza(odczytaj(database, id), Date.now());
+    return wierszPoZapisie(database, id);
   })();
 }
 
@@ -525,7 +588,7 @@ export function cofnijNotatkeDyskusji(
     if (!cofnijNotatkeSprawy(database, id, autor, "DISPUTE", "dyskusja_notatka_cofnieta")) {
       throw new BladReklamacji("Ta notatka nie ma poprzedniej wersji", 409);
     }
-    return zWiersza(odczytaj(database, id), Date.now());
+    return wierszPoZapisie(database, id);
   })();
 }
 
@@ -594,8 +657,8 @@ export function stanDyskusjiHealth(
       FROM reklamacja_klienta r
      WHERE r.typ = 'DISPUTE' AND (? IS NULL OR r.otwarto_at >= ?)
        AND COALESCE(r.status_allegro, '') <> ? AND COALESCE(r.czat_aktywny, 1) = 1
-       AND r.ostatnia_wiadomosc_status IN (${RUCH_NASZ.map(() => "?").join(",")})`,
-  ).all(od, od, ZAMKNIETA, ...RUCH_NASZ) as Wiersz[];
+       AND r.ostatnia_wiadomosc_status IN (${STATUSY_ALARMU.map(() => "?").join(",")})`,
+  ).all(od, od, ZAMKNIETA, ...STATUSY_ALARMU) as Wiersz[];
   const wiadomosci = wiadomosciCzasu(database, wiersze.map((w) => Number(w.id)));
   const lista = wiersze.map((w) => zWiersza(w, teraz, wiadomosci.get(Number(w.id)) ?? []));
   return {

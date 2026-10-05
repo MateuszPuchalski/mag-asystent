@@ -51,3 +51,36 @@ export function czyAutoresponder(tresc: string): boolean {
   const plaska = zloz(tresc).replace(/\s+/g, " ");
   return PODPISY.some((p) => plaska.includes(p));
 }
+
+/**
+ * Zdanie autoodpowiedzi, którą Allegro wysyła z NASZEGO konta w sprawach
+ * posprzedażowych. Treść podał właściciel z żywej dyskusji.
+ */
+const PODPISY_SPRAWY = [
+  "dziekujemy za wiadomosc odpowiemy najszybciej jak to tylko bedzie mozliwe",
+] as const;
+
+/**
+ * Czy wiadomość SPRZEDAWCY w dyskusji albo reklamacji jest autoodpowiedzią.
+ *
+ * ── PO CO ─────────────────────────────────────────────────────────────────
+ * Allegro podpisuje ją rolą `SELLER` i przestawia status ostatniej wiadomości
+ * na `SELLER_REPLIED`. Dla nas wyglądało to jak odpowiedź biura, więc sprawa
+ * spadała do „czeka na klienta". Allegro pisze w tych samych dyskusjach, że
+ * „wiadomości automatyczne nie są uznawane" — sprawa dalej czeka na nas,
+ * a zegar blokady konta biegnie.
+ *
+ * WYSTARCZY, ŻE ZDANIE STOI W TREŚCI, nie musi być całą treścią: podpis albo
+ * godziny pracy dopisane w ustawieniach Allegro nie mają wyłączać rozpoznania.
+ * Ryzyka pomyłki nie ma, bo to zdanie OBIECUJE odpowiedź — wiadomość, która
+ * je niesie, z definicji nią nie jest. Podpisy z e-maili też się liczą, bo
+ * autoresponder bywa ustawiony jedną treścią na oba kanały.
+ *
+ * WOŁAJ TO WYŁĄCZNIE DLA WIADOMOŚCI SPRZEDAWCY — powód przy `czyAutoresponder`.
+ */
+export function czyAutoodpowiedzSprawy(tresc: string): boolean {
+  /* Interpunkcja schodzi do spacji: przecinek po „wiadomość" bywa kropką albo
+     myślnikiem po każdej korekcie tekstu w ustawieniach. */
+  const plaska = zloz(tresc).replace(/[^a-z0-9]+/g, " ").trim();
+  return PODPISY_SPRAWY.some((p) => plaska.includes(p)) || czyAutoresponder(tresc);
+}
