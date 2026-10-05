@@ -718,7 +718,10 @@ robi to admin. Rola w `POST /api/users` jest sprawdzana przeciw zamkniętej
 liście. Porzucony zalogowany kolektor pozwala na wszystko, co może jego
 właściciel, więc wylogowanie po zmianie jest obowiązkiem.
 
-**2. Hasła.** Swoje hasło każdy zmienia sam:
+**2. Hasła.** Swoje hasło każdy zmienia sam. Biuro robi to w panelu:
+Ustawienia → Ludzie i urządzenia → **Twoje hasło**
+(`/obsluga/ustawienia?karta=haslo`). Zmiana nie wylogowuje innych urządzeń.
+Magazynier panelu nie ma, więc jego hasło zmienia admin albo on sam przez API:
 
 ```bash
 curl -X POST http://<IP-serwera>:3001/api/auth/haslo \

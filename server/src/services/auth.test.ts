@@ -127,6 +127,67 @@ test("zmiana własnego hasła wymaga podania starego", () => {
   assert.ok(A.zaloguj("zmieniam", "noweeeee1", null), "nowe hasło działa");
 });
 
+/* Formularz „Twoje hasło" przyjmuje stare hasło. Bez hamulca byłby szybszą
+   drogą zgadywania niż ekran logowania — ten sam powód co przy `potwierdzHaslo`. */
+
+/** Czy w bazie stoi dokładnie to hasło — bez logowania, które kara by zatrzymała. */
+const hasloKonta = (userId: number, haslo: string) => U.sprawdzSekret(haslo, U.haszHasla(userId));
+
+test("po serii błędnych starych haseł zmiana odmawia karą, nawet z dobrym hasłem", () => {
+  const u = konto("Jan Kowalski", "zgaduje-zmiana");
+  for (let i = 0; i < 5; i++) {
+    assert.equal(A.zmienHaslo(u, "zle", "noweeeee1").error, "Błędne hasło");
+  }
+  /* Trafienie w trakcie kary nie przechodzi. Inaczej kara tylko opóźnia
+     odpowiedź „źle", a „dobrze" dalej przepuszcza z pełną prędkością. */
+  const w = A.zmienHaslo(u, "tajnehaslo", "noweeeee1");
+  assert.equal(w.kod, 429, "kara ma własny kod, nie zlewa się z błędnym hasłem");
+  assert.match(w.error ?? "", /odczekaj/);
+  assert.ok(hasloKonta(u.userId, "tajnehaslo"), "hasło zmieniło się w trakcie kary");
+  assert.equal(zdarzenia("user_haslo_changed").length, 0);
+});
+
+test("zmiana hasła i logowanie liczą próby RAZEM, na jednym liczniku loginu", () => {
+  /* Dwie drogi zgadywania z osobnymi licznikami to dwa razy więcej prób
+     przed karą. Licznik należy do loginu, nie do formularza. */
+  const u = konto("Jan Kowalski", "dwiedrogi");
+  for (let i = 0; i < 3; i++) A.zaloguj("dwiedrogi", "zle", null);
+  for (let i = 0; i < 2; i++) A.zmienHaslo(u, "zle", "noweeeee1");
+  assert.ok(A.karaLogowania("dwiedrogi") > 0, "piąta próba, tym razem przy zmianie hasła, zamyka drzwi");
+  assert.equal(A.zaloguj("dwiedrogi", "tajnehaslo", null), null, "logowanie stoi za tą samą karą");
+
+  const v = konto("Anna Nowak", "odlogowania");
+  for (let i = 0; i < 5; i++) A.zaloguj("odlogowania", "zle", null);
+  assert.equal(A.zmienHaslo(v, "tajnehaslo", "noweeeee1").kod, 429, "kara z logowania zatrzymuje zmianę");
+});
+
+test("dobre stare hasło kasuje licznik, także gdy nowe jest za krótkie", () => {
+  const u = konto("Jan Kowalski", "licznik-zmiana");
+  for (let i = 0; i < 4; i++) A.zmienHaslo(u, "zle", "noweeeee1");
+  /* Za krótkie nowe przy dobrym starym to pomyłka w nowym haśle, nie
+     zgadywanie. Gdyby liczyła się jako próba, byłaby tu piątą i zamknęła drzwi. */
+  assert.match(A.zmienHaslo(u, "tajnehaslo", "krotkie").error ?? "", /co najmniej/);
+  assert.equal(A.karaLogowania("licznik-zmiana"), 0, "za krótkie nowe policzyło się jako próba");
+
+  for (let i = 0; i < 4; i++) A.zmienHaslo(u, "zle", "noweeeee1");
+  assert.equal(A.zmienHaslo(u, "tajnehaslo", "noweeeee1").error, undefined);
+  for (let i = 0; i < 4; i++) A.zaloguj("licznik-zmiana", "zle", null);
+  assert.equal(A.karaLogowania("licznik-zmiana"), 0, "udana zmiana nie wyzerowała licznika");
+});
+
+test("błędne stare hasło zostawia `login_failed` z oznaczeniem drogi, bez hasła", () => {
+  /* Audyt ma pokazać zgadywanie także wtedy, gdy idzie przez formularz
+     zmiany. Znacznik mówi, którą drogą, bo dziennik czyta się bez kontekstu. */
+  const u = konto("Jan Kowalski", "AuDyt-Zmiana");
+  A.zmienHaslo(u, "inne_haslo", "noweeeee1");
+  const ev = zdarzenia("login_failed");
+  assert.equal(ev.length, 1, "nieudana próba MUSI być widoczna w audycie");
+  assert.deepEqual(JSON.parse(ev[0]!.payload!), { login: "audyt-zmiana", zmianaHasla: true });
+  assert.equal(ev[0]!.user_id, "audyt-zmiana");
+  assert.equal(ev[0]!.payload!.includes("inne_haslo"), false, "hasło nie ma prawa tam trafić");
+  assert.equal(ev[0]!.payload!.includes("noweeeee1"), false, "nowe hasło też nie");
+});
+
 /* ── Sesja nie wygasa sama ───────────────────────────────────────────────── */
 
 test("bezczynność NIE rusza sesji, choćby trwała dobę", () => {

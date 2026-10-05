@@ -329,3 +329,94 @@ test("ten sam tekst z załącznikiem i bez to DWIE różne wiadomości", async (
   assert.notEqual(zPlikiem.kluczIdempotencji, bez.kluczIdempotencji,
     "załącznik zmienia klucz, więc druga wysyłka naprawdę wychodzi");
 });
+
+/* ── Stanowisko o towarze: bez plików ze szkicu i tylko jedno ────────────────
+   Wiadomość `RETURN_*` wychodzi z kroku o towarze albo razem z werdyktem,
+   nie z edytora odpowiedzi. Pliki dołączone do szkicu odpowiedzi nie mają
+   z nią jechać, a drugie stanowisko o tym samym towarze nie ma wyjść nigdy. */
+
+function zeSzkicem(d: DatabaseSync, id: number) {
+  d.prepare("INSERT INTO app_user(user_id,login,name,role) VALUES (9,'ola','Ola','biuro')").run();
+  d.prepare(`INSERT INTO reklamacja_zalacznik_wysylki
+    (reklamacja_id,allegro_id,nazwa,typ,rozmiar,dodal_user_id)
+    VALUES (?,'att-1','usterka.jpg','image/jpeg',64,9)`).run(id);
+}
+
+test("stanowisko o towarze NIE zabiera plików ze szkicu odpowiedzi, a szkic je zachowuje", async () => {
+  const { d, id, pytanie } = stanowisko();
+  zeSzkicem(d, id);
+  let poszly: readonly string[] | undefined;
+  const w = await odpowiedzWSprawie(zadanie(d, id, pytanie, {
+    typ: "RETURN_NOT_REQUIRED", tresc: "Towar zostaje u Pana.",
+    wyslij: async (_i: string, _t: string, _typ: string, zal?: readonly string[]) => {
+      poszly = zal;
+      return { id: "m-1", createdAt: "2026-09-07T12:00:00.000Z" };
+    },
+  }));
+  assert.equal(w.status, "sent");
+  assert.deepEqual([...(poszly ?? [])], [], "plik ze szkicu nie jedzie z wiadomością o towarze");
+  const zostalo = d.prepare("SELECT allegro_id FROM reklamacja_zalacznik_wysylki WHERE reklamacja_id=?")
+    .all(id) as Array<{ allegro_id: string }>;
+  assert.deepEqual(zostalo.map((z) => z.allegro_id), ["att-1"], "szkic odpowiedzi przeżywa wysyłkę stanowiska");
+
+  /* Zwykła odpowiedź dalej zabiera plik i czyści szkic. */
+  let zwykla: readonly string[] | undefined;
+  await odpowiedzWSprawie(zadanie(d, id, pytanie, {
+    tresc: "Dosyłam zdjęcie.",
+    wyslij: async (_i: string, _t: string, _typ: string, zal?: readonly string[]) => {
+      zwykla = zal;
+      return { id: "m-2", createdAt: "2026-09-07T12:05:00.000Z" };
+    },
+  }));
+  assert.deepEqual([...(zwykla ?? [])], ["att-1"]);
+  assert.equal((d.prepare("SELECT COUNT(*) n FROM reklamacja_zalacznik_wysylki").get() as { n: number }).n, 0);
+});
+
+test("drugie stanowisko o towarze po niepewnym pierwszym NIE wychodzi, nawet z inną treścią", async () => {
+  /* Timeout zostawia `send_uncertain`, a panel znów proponuje krok o towarze.
+     Poprawione zdanie ma nowy klucz, więc strażnik dubletu by go przepuścił —
+     i kupujący dostałby dwa stanowiska o tym samym towarze. */
+  const { d, id, pytanie } = stanowisko();
+  await assert.rejects(() => odpowiedzWSprawie(zadanie(d, id, pytanie, {
+    typ: "RETURN_REQUIRED_CUSTOM", tresc: "Proszę odesłać towar.",
+    wyslij: async () => { throw new Error("Brak połączenia z Allegro — (The operation was aborted due to timeout)"); },
+  })));
+  let strzalow = 0;
+  const wyslij = async () => { strzalow += 1; return { id: `m-${strzalow}`, createdAt: "2026-09-07T12:00:00.000Z" }; };
+  await assert.rejects(() => odpowiedzWSprawie(zadanie(d, id, pytanie, {
+    typ: "RETURN_NOT_REQUIRED", tresc: "Jednak towar zostaje u Pana.", wyslij,
+  })), (e: unknown) => {
+    assert.ok(e instanceof ReklamacjaConflict);
+    assert.match(e.message, /mogło dojść do kupującego/);
+    assert.equal(e.szczegoly.status, "send_uncertain");
+    assert.equal(e.szczegoly.typ, "RETURN_REQUIRED_CUSTOM");
+    return true;
+  });
+  /* Ta sama treść trafia w strażnika dubletu, ale ze zdaniem blokady
+     stanowiska: synchronizacja jej nie zdejmie, więc „zsynchronizuj" by kłamało. */
+  await assert.rejects(() => odpowiedzWSprawie(zadanie(d, id, pytanie, {
+    typ: "RETURN_REQUIRED_CUSTOM", tresc: "Proszę odesłać towar.", wyslij,
+  })), (e: unknown) => {
+    assert.ok(e instanceof ReklamacjaConflict);
+    assert.ok(e.szczegoly.kluczIdempotencji, "to strażnik dubletu, nie blokada innej treści");
+    assert.match(e.message, /Centrum Sprzedaży/);
+    assert.doesNotMatch(e.message, /zsynchronizuj/);
+    return true;
+  });
+  assert.equal(strzalow, 0);
+
+  /* Zwykła odpowiedź w tej samej sprawie idzie normalnie — blokada dotyczy
+     wyłącznie drugiego stanowiska o towarze. */
+  assert.equal((await odpowiedzWSprawie(zadanie(d, id, pytanie, { wyslij }))).status, "sent");
+});
+
+test("po wysłanym stanowisku o towarze drugie dostaje 409 ze zdaniem, bez strzału", async () => {
+  const { d, id, pytanie } = stanowisko();
+  await odpowiedzWSprawie(zadanie(d, id, pytanie, { typ: "RETURN_NOT_REQUIRED", tresc: "Towar zostaje." }));
+  let strzalow = 0;
+  await assert.rejects(() => odpowiedzWSprawie(zadanie(d, id, pytanie, {
+    typ: "RETURN_REQUIRED_CUSTOM", tresc: "Jednak proszę odesłać.",
+    wyslij: async () => { strzalow += 1; return { id: "m-9" }; },
+  })), (e: unknown) => e instanceof ReklamacjaConflict && /już wyszło/.test(e.message));
+  assert.equal(strzalow, 0);
+});

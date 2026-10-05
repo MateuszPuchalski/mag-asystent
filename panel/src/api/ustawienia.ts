@@ -62,6 +62,11 @@ export function useZapiszStrefe() {
 
 /* ── Konta i sesje ─────────────────────────────────────────────────────── */
 
+/* Ta sama liczba co `HASLO_MIN` w `server/src/services/users.ts`. Jedna kopia
+   w panelu, bo czytają ją trzy formularze: reset, nowa osoba i własne hasło.
+   Przycisk nie świeci, dopóki serwer na pewno odmówi. */
+export const HASLO_MIN = 8;
+
 export interface Konto {
   userId: number;
   /** `null` = konto-ślad z historii: audyt ma na co wskazywać, zalogować się nie da. */
@@ -101,6 +106,15 @@ export function useWylogujWszedzie() {
     onSuccess: (_d, userId) => qc.invalidateQueries({ queryKey: ["sesje", userId] }),
   });
 }
+
+/* Własne hasło: serwer bierze konto z sesji, nie z adresu, więc cudzego hasła
+   tą drogą nie zmieni i trasa nie potrzebuje roli admina. Błędne stare hasło
+   to 400, nie 401, więc pomyłka nie wylogowuje. Sesji serwer nie ucina,
+   dlatego po sukcesie nie ma czego unieważniać. */
+export const useZmienSwojeHaslo = () => useMutation({
+  mutationFn: (h: { stare: string; nowe: string }) =>
+    api<{ ok: boolean }>("/api/auth/haslo", { method: "POST", body: JSON.stringify(h) }),
+});
 
 export const useResetHasla = () => useMutation({
   mutationFn: ({ userId, haslo }: { userId: number; haslo: string }) =>

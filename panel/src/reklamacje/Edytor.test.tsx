@@ -207,3 +207,18 @@ describe("sprawa odpowiada edytorem skrzynki", () => {
       .not.toMatch(/współdzielony/);
   });
 });
+
+/* ── Bez szkicu Copilota ─────────────────────────────────────────────────────
+   Decyzja właściciela przy przebudowie ekranu reklamacji: odpowiedź pisze
+   człowiek, a Copilot na tym ekranie nie układa szkicu. Wspólny edytor
+   skrzynki pokazuje przycisk i kartę szkicu tylko z propsem `copilot`, więc
+   dziś ich tu nie ma — test pilnuje, żeby nie wróciły przy przeróbce. */
+describe("Edytor reklamacji bez szkicu Copilota", () => {
+  it.each([["pusty", ""], ["z treścią", "Wymienimy nóż"]])(
+    "%s edytor nie ma przycisku ani karty szkicu", (_opis, tresc) => {
+      render(<Edytor {...props({ tresc })} />);
+      expect(screen.queryByRole("button", { name: /Ułóż|szkic|Copilot/i })).not.toBeInTheDocument();
+      expect(screen.queryByText(/Copilot/)).not.toBeInTheDocument();
+      expect(screen.queryByLabelText(/Szkic Copilota/)).not.toBeInTheDocument();
+    });
+});

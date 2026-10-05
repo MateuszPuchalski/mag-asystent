@@ -129,10 +129,15 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz, moje
           className={`flex w-full flex-col gap-1 border-l-[3px] px-4 py-3 text-left ${aktywna
             ? "wiersz-wybrany border-l-wertis-amber bg-slate-200"
             : "border-l-transparent hover:bg-slate-50"}`}>
-          <div className="flex items-center gap-2">
-            {/* TEMAT jest tożsamością sprawy — wpisał go kupujący i to jego
-                szuka się oczami. Numer zamówienia stoi niżej. */}
-            <span className="truncate font-bold">{d.temat ?? d.externalId}</span>
+          {/* `items-start`: temat bywa dwulinijkowy, a czipy i czas mają stać
+              przy jego pierwszej linii, nie w połowie wysokości. */}
+          <div className="flex items-start gap-2">
+            {/* TEMAT jest tożsamością sprawy i POWODEM — wpisał go kupujący
+                i to jego szuka się oczami. Zawija się do dwóch linii, bo
+                ucięty w pół zdania („brak zwrotu wpłaty po odesłaniu...")
+                nie mówi, o co chodzi, a to jest pierwsze pytanie agenta. */}
+            <span className="line-clamp-2 min-w-0 font-bold" title={d.temat ?? undefined}>
+              {d.temat ?? d.externalId}</span>
             {/* ── CZIP MÓWI „TY", GDY SPRAWA JEST MOJA (0.281.0) ─────────────
                 Właściciel pytał wprost: „które reklamacje są moje". Samo imię
                 na to nie odpowiada — dwie osoby w biurze bywają imienniczkami,
@@ -154,10 +159,17 @@ export function Kolejka({ dyskusje, wybrana, zKubelkiem = false, onWybierz, moje
               {KUBELKI.find((k) => k.id === d.kubelek)?.etykieta}</span>}
             <Czeka dni={d.czekaOdDni} godzin={d.czekaOdGodzin} dlugo={d.dlugoCzeka} pilna={d.pilna} />
           </div>
-          <div className="truncate text-sm text-slate-600"
+          {/* LOGIN PRZED NUMEREM, decyzją właściciela: kto pisze i o co, to
+              pytania zadawane przy każdym wierszu, a numer zamówienia —
+              dopiero w sprawie. Login jest kluczem klienta, więc stoi
+              wyraźnie. Numer zostaje drobnym dopiskiem, bo szukanie po nim
+              działa i przy telefonie od klienta trzeba go zobaczyć. */}
+          <div className="flex min-w-0 items-baseline gap-2"
             title={d.orderId ? `Zamówienie ${d.orderId}` : undefined}>
-            {d.kupujacyLogin ?? "bez loginu"}
-            {d.orderId ? ` · zamówienie ${krotkiNumerZamowienia(d.orderId)}` : ""}
+            <span className="truncate text-sm font-semibold text-slate-800">
+              {d.kupujacyLogin ?? "bez loginu"}</span>
+            {d.orderId && <span className="shrink-0 text-xs text-slate-600">
+              zam. {krotkiNumerZamowienia(d.orderId)}</span>}
           </div>
           {maCzipy && <div className="flex flex-wrap items-center gap-1.5">
             {/* Prośba o zakończenie NIE jest zamknięciem, więc czip mówi

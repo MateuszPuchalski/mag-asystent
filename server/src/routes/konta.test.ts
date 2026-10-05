@@ -211,3 +211,37 @@ test("sesje ogląda i tnie wyłącznie admin; cięcie unieważnia od zaraz", asy
     .get() as { payload: string };
   assert.match(wpis.payload, /"sesji":1/);
 });
+
+/* ── Zmiana własnego hasła ───────────────────────────────────────────────── */
+
+test("kara przy zmianie hasła to ten sam kod co przy logowaniu, a 400 zostaje dla pomyłki", async () => {
+  /* Panel czyta 429 jako „odczekaj" i pokazuje zdanie serwera. Kara oddana
+     jako 400 wyglądałaby jak kolejne błędne hasło, a człowiek zgadywałby dalej
+     i przedłużał karę. Login osobny, bo licznik prób żyje w procesie. */
+  const u = createUser("Ktoś Hasło", "biuro", "haslo-kara", "tajnehaslo");
+  const token = `tok-${u.userId}-${Math.random().toString(16).slice(2)}`;
+  const teraz = new Date().toISOString();
+  db()
+    .prepare(
+      "INSERT INTO device_session(token, user_id, device_id, created_at, last_seen) VALUES (?,?,?,?,?)"
+    )
+    .run(token, u.userId, "panel", teraz, teraz);
+  const zmien = (stare: string) => app.inject({
+    method: "POST", url: "/api/auth/haslo", headers: { "x-session": token },
+    payload: { stare, nowe: "noweeeee1" },
+  });
+
+  for (let i = 0; i < 5; i++) {
+    const r = await zmien("zle");
+    assert.equal(r.statusCode, 400, "błędne stare hasło to pomyłka w polu, nie wylogowanie");
+    assert.equal(r.json().error, "Błędne hasło");
+  }
+
+  const kara = await zmien("tajnehaslo");
+  const logowanie = await app.inject({
+    method: "POST", url: "/api/auth/login", payload: { login: "haslo-kara", haslo: "tajnehaslo" },
+  });
+  assert.equal(logowanie.statusCode, 429, "wspólny licznik: logowanie też stoi");
+  assert.equal(kara.statusCode, logowanie.statusCode, "kara zmiany hasła ma inny kod niż kara logowania");
+  assert.match(kara.json().error, /odczekaj minutę/);
+});

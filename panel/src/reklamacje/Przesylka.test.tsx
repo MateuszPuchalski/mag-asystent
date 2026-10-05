@@ -26,7 +26,10 @@ vi.mock("../api/rozmowy", () => ({
       jest nasz, czy Allegro.
    3. PYTANIE NA KLIKNIĘCIE. Otwarcie sprawy nie wysyła do Allegro ani jednego
       żądania — zasada „zero zapisu przy patrzeniu" obowiązuje też koszt
-      u dostawcy.                                                            */
+      u dostawcy.
+
+   Stan paczki stoi w PODPISIE zwijki „Paczka", więc odpowiedź widać przy
+   zamkniętej; pytanie od nowa jest w środku, jedno kliknięcie niżej.       */
 
 const rek = (): Reklamacja => ({
   id: 7, externalId: "i-7", numer: "7/2026", orderId: "zam-7", offerId: null,
@@ -96,7 +99,7 @@ describe("Ceny zamówienia w kolumnie dowodów", () => {
 describe("Stan przesyłki do klienta", () => {
   it("mówi wprost, że jeszcze NIE PYTALIŚMY — to brak wiedzy nasz, nie Allegro", () => {
     render(<Dowody {...props({ przesylka: stan() })} />);
-    expect(screen.getByText("nie pytaliśmy jeszcze Allegro")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Paczka/ })).toHaveTextContent("nie pytaliśmy jeszcze Allegro");
   });
 
   it("odróżnia BRAK NUMERU u Allegro od braku pytania", () => {
@@ -112,7 +115,8 @@ describe("Stan przesyłki do klienta", () => {
         dostarczonoAt: "2026-09-10T12:00:00.000Z", sprawdzonoAt: "2026-09-18T07:00:00.000Z",
       }),
     })} />);
-    expect(screen.getByText(/doręczona/)).toBeInTheDocument();
+    /* Doręczenie widać BEZ otwierania — to ono zamyka spór. */
+    expect(screen.getByRole("button", { name: /^Paczka/ })).toHaveTextContent("doręczona 10 września 2026");
     expect(screen.getByText("1234567890")).toBeInTheDocument();
     expect(screen.getByText(/DPD/)).toBeInTheDocument();
   });
@@ -132,12 +136,21 @@ describe("Stan przesyłki do klienta", () => {
     const onSprawdzPrzesylke = vi.fn();
     render(<Dowody {...props({ przesylka: stan() }, { onSprawdzPrzesylke })} />);
     expect(onSprawdzPrzesylke).not.toHaveBeenCalled();
+    /* Otwarcie zwijki to też patrzenie — dalej nikt nie pyta. */
+    await userEvent.click(screen.getByRole("button", { name: /^Paczka/ }));
+    expect(onSprawdzPrzesylke).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "sprawdź" }));
     expect(onSprawdzPrzesylke).toHaveBeenCalledTimes(1);
   });
 
-  it("bez procedury pytania NIE rysuje martwego przycisku", () => {
+  it("bez procedury pytania NIE rysuje martwego przycisku", async () => {
     render(<Dowody {...props({ przesylka: stan() })} />);
+    await userEvent.click(screen.getByRole("button", { name: /^Paczka/ }));
     expect(screen.queryByRole("button", { name: "sprawdź" })).not.toBeInTheDocument();
+  });
+
+  it("bez zamówienia zwijki Paczka nie ma — nie ma o co pytać", () => {
+    render(<Dowody {...props()} />);
+    expect(screen.queryByRole("button", { name: /^Paczka/ })).not.toBeInTheDocument();
   });
 });

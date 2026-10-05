@@ -2,7 +2,7 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Kolejka } from "./Kolejka";
+import { Kolejka, SYGNALY, kwotaWiersza, wGrupach, wspolneSygnaly } from "./Kolejka";
 import type { Reklamacja } from "../api/typy";
 
 /* ── Wiersz kolejki reklamacji ───────────────────────────────────────────────
@@ -36,12 +36,43 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
 describe("Kolejka reklamacji", () => {
   it("wiersz niesie numer, klienta, powód i czego klient chce", () => {
     render(<Kolejka reklamacje={[rek()]} wybrana={null} onWybierz={() => {}} />);
+    /* Numer schodzi do podpisu, ale stoi tam SAM — kopiuje się go i szuka
+       oczami jako jednej rzeczy. */
     expect(screen.getByText("123/2026")).toBeInTheDocument();
     expect(screen.getByText(/kupujacy1/)).toBeInTheDocument();
     /* Kod Allegro po polsku — słownik jest po naszej stronie, bo wiersz czyta
        człowiek przy biurku, a nie integrator. */
     expect(screen.getByText(/usterka przy używaniu/)).toBeInTheDocument();
-    expect(screen.getByText(/zwrot pieniędzy · 129,99 PLN/)).toBeInTheDocument();
+    expect(screen.getByText("zwrot pieniędzy")).toBeInTheDocument();
+  });
+
+  it("kwota stoi OSOBNO z prawej, a nie w środku zdania o oczekiwaniu", () => {
+    /* Kwota czyta się jak kolumna: oko porównuje ją z wierszem wyżej i niżej.
+       Wklejona w zdanie „zwrot pieniędzy · 129,99" musiałaby być wyszukana. */
+    render(<Kolejka reklamacje={[rek()]} wybrana={null} onWybierz={() => {}} />);
+    const kwota = screen.getByText("129,99 PLN");
+    expect(kwota).not.toHaveTextContent("zwrot pieniędzy");
+    expect(screen.getByText("zwrot pieniędzy")).not.toHaveTextContent("129,99");
+  });
+
+  it("bez żądanej kwoty wiersz bierze cenę z PARAGONU i mówi, skąd ją ma", () => {
+    render(<Kolejka reklamacje={[rek({ oczekiwanie: "EXCHANGE", oczekiwanaKwotaGrosze: null,
+      kwotaGrosze: 4990, kwotaZrodlo: "paragon" })]} wybrana={null} onWybierz={() => {}} />);
+    expect(screen.getByText("49,90 PLN")).toHaveAttribute("title", "Cena z paragonu za reklamowane sztuki");
+  });
+
+  it("kwota nieznana to BRAK kwoty, nie zero złotych", () => {
+    render(<Kolejka reklamacje={[rek({ oczekiwanaKwotaGrosze: null, kwotaGrosze: null })]}
+      wybrana={null} onWybierz={() => {}} />);
+    expect(screen.queryByText(/PLN/)).not.toBeInTheDocument();
+  });
+
+  it("kwota wiersza: pole serwera wygrywa, a bez niego zostaje żądany zwrot", () => {
+    /* `undefined` to starszy serwer, który pola nie zna; `null` to serwer,
+       który wie, że kwoty nie ma. To dwie różne odpowiedzi. */
+    expect(kwotaWiersza(rek({ kwotaGrosze: 4990 }))).toBe(4990);
+    expect(kwotaWiersza(rek())).toBe(12999);
+    expect(kwotaWiersza(rek({ kwotaGrosze: null }))).toBeNull();
   });
 
   it("wiersz niesie ZDJĘCIE oferty i jej nazwę — to tożsamość sprawy", () => {
@@ -80,10 +111,37 @@ describe("Kolejka reklamacji", () => {
     expect(screen.getByText("bez terminu")).toBeInTheDocument();
   });
 
-  it("termin przekroczony liczy się w dniach PO, nie na minusie", () => {
+  it("termin przekroczony liczy się w dniach, nie na minusie — „po” mówi nagłówek grupy", () => {
+    /* W grupie „Po terminie decyzji" słowo „po" na każdym wierszu byłoby tą
+       samą czerwoną pigułką jedenaście razy; wiersz mówi już tylko „ile". */
     render(<Kolejka reklamacje={[rek({ dniDoTerminu: -2, poTerminie: true })]}
       wybrana={null} onWybierz={() => {}} />);
+    expect(screen.getByRole("heading", { name: "Po terminie decyzji" })).toBeInTheDocument();
+    expect(screen.getByTitle("Termin decyzji: przekroczony")).toHaveTextContent(/^2 dni$/);
+  });
+
+  it("poza grupą przekroczony termin mówi „po” sam", () => {
+    render(<Kolejka reklamacje={[rek({ dniDoTerminu: -2, poTerminie: false })]}
+      wybrana={null} onWybierz={() => {}} />);
     expect(screen.getByText("2 dni po")).toBeInTheDocument();
+    expect(screen.queryByRole("heading")).not.toBeInTheDocument();
+  });
+
+  it("sprawy po terminie stoją PIERWSZE pod swoim nagłówkiem, reszta pod drugim", () => {
+    const lista = wGrupach([
+      rek({ id: 1, numer: "1/2026", ofertaNazwa: "Pierwsza" }),
+      rek({ id: 2, numer: "2/2026", ofertaNazwa: "Druga", poTerminie: true, dniDoTerminu: -5 }),
+      rek({ id: 3, numer: "3/2026", ofertaNazwa: "Trzecia" }),
+      rek({ id: 4, numer: "4/2026", ofertaNazwa: "Czwarta", poTerminie: true, dniDoTerminu: -1 }),
+    ]);
+    /* Kolejność w grupie zostaje ta, którą dał porządek — grupa jej nie tasuje. */
+    expect(lista.map((r) => r.id)).toEqual([2, 4, 1, 3]);
+    render(<Kolejka reklamacje={lista} wybrana={null} onWybierz={() => {}} />);
+    const naglowki = screen.getAllByRole("heading").map((h) => h.textContent);
+    expect(naglowki).toEqual(["Po terminie decyzji", "Pozostałe"]);
+    /* Wiersze w DOM idą tą samą kolejnością, po której ekran chodzi strzałkami. */
+    expect(screen.getAllByRole("button").map((b) => b.textContent?.match(/\d\/2026/)?.[0]))
+      .toEqual(["2/2026", "4/2026", "1/2026", "3/2026"]);
   });
 
   it("jeden dzień to „1 dzień”, dwa to „2 dni”", () => {
@@ -127,6 +185,40 @@ describe("Kolejka reklamacji", () => {
     render(<Kolejka reklamacje={[rek({ prowadzi: "A. Lewandowska" })]}
       wybrana={null} onWybierz={() => {}} />);
     expect(screen.getByText("A. Lewandowska")).toBeInTheDocument();
+  });
+
+  it("własna sprawa mówi „prowadzisz” — rozstrzyga numer konta, nie imię", () => {
+    render(<Kolejka reklamacje={[rek({ prowadzi: "A. Lewandowska", prowadziId: 7 })]}
+      wybrana={null} mojeId={7} onWybierz={() => {}} />);
+    expect(screen.getByTitle("Prowadzisz tę sprawę (A. Lewandowska)")).toHaveTextContent("prowadzisz");
+  });
+
+  it("sygnał wspólny dla kubełka znika z wiersza, a pozostałe zostają", () => {
+    /* Kolejka sama wspólnych nie liczy — lista z jednym wierszem miałaby
+       wtedy wspólne wszystko. Mówi jej o nich ekran. */
+    render(<Kolejka reklamacje={[rek({ sygnaly: ["klient_czeka", "doradca"] })]}
+      wybrana={null} ukryjSygnaly={["klient_czeka"]} onWybierz={() => {}} />);
+    expect(screen.queryByText("klient czeka")).not.toBeInTheDocument();
+    expect(screen.getByTitle(SYGNALY.doradca.tytul)).toBeInTheDocument();
+  });
+
+  it("wspólne są sygnały KAŻDEJ sprawy, i to dopiero przy dwóch; termin nigdy", () => {
+    const a = rek({ id: 1, sygnaly: ["termin", "klient_czeka", "doradca"] });
+    const b = rek({ id: 2, sygnaly: ["termin", "klient_czeka"] });
+    expect(wspolneSygnaly([a, b])).toEqual(["klient_czeka"]);
+    /* Jedna sprawa nie ma z czym się porównać. */
+    expect(wspolneSygnaly([a])).toEqual([]);
+    expect(wspolneSygnaly([])).toEqual([]);
+  });
+
+  it("zaznaczenie jest szare, bez bursztynu, a belka stoi przy każdym wierszu", () => {
+    render(<Kolejka reklamacje={[rek({ id: 1 }), rek({ id: 2, numer: "2/2026" })]} wybrana={1}
+      onWybierz={() => {}} />);
+    const [wybrany, inny] = screen.getAllByRole("button");
+    expect(wybrany.className).toContain("wiersz-wybrany");
+    expect(wybrany.className).toContain("bg-slate-200");
+    expect(wybrany.className).not.toMatch(/amber/);
+    expect(inny.className).toContain("border-l-[3px]");
   });
 
   it("wybrany wiersz jest wybrany także dla czytnika ekranu", () => {

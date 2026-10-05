@@ -30,7 +30,9 @@ export const klucze = {
 export function useJa() {
   return useQuery({
     queryKey: klucze.ja,
-    queryFn: () => api<{ user: { userId: number; name: string; role: string } }>("/api/auth/me"),
+    /* `login` czyta formularz własnego hasła: menedżer haseł zapisuje nowe
+       hasło przy właściwym koncie tylko wtedy, gdy widzi login obok pól. */
+    queryFn: () => api<{ user: { userId: number; name: string; role: string; login?: string | null } }>("/api/auth/me"),
     staleTime: Infinity,
   });
 }

@@ -807,6 +807,10 @@ CREATE TABLE IF NOT EXISTS delivery_line (
 );
 CREATE INDEX IF NOT EXISTS ix_dline_delivery ON delivery_line(delivery_id);
 CREATE INDEX IF NOT EXISTS ix_dline_tw ON delivery_line(delivery_id, tw_id);
+-- Reklamacja pyta „od kogo przyszedł TEN towar" po samym `tw_id`, w całym
+-- archiwum. Indeks wyżej zaczyna się od dostawy, więc tamtemu pytaniu nie
+-- pomaga, a archiwum dostaw nie jest nigdy czyszczone.
+CREATE INDEX IF NOT EXISTS ix_dline_towar ON delivery_line(tw_id);
 
 -- ── Notatki biura do dostawy (0.43.0) ──────────────────────────────────────
 -- Dostawca dosyła czasem brak, którego NIE MA na fakturze — biuro wie o tym
@@ -2639,6 +2643,50 @@ CREATE TABLE IF NOT EXISTS reklamacja_outbox (
 );
 CREATE INDEX IF NOT EXISTS ix_reklamacja_outbox_sprawa
   ON reklamacja_outbox(reklamacja_id, id);
+
+-- Dowody biura w reklamacji: swobodne wpisy, nie lista kroków (decyzja
+-- właściciela). Biuro pisze własnymi słowami, co widać na zdjęciu, czego
+-- brakuje i co ustaliło. To słowa BIURA o towarze, nie dane klienta, i nie
+-- wychodzą do Allegro, Copilota, CSV ani migawki (docs/obsluga-klienta.md).
+--
+-- Zdjęcie wiąże numer wiersza `reklamacja_zalacznik`, a nie etykieta „Z2":
+-- etykietę liczy panel z kolejności zdjęć i przesunęłaby się z nowym plikiem.
+-- Autor ma imię dla oka i klucz dla maszyny; `SET NULL`, bo klucz bez reguły
+-- blokowałby kasowanie kont (pułapka z `klient_prowadzenie`). Wpis nie podbija
+-- wersji sprawy: kolega dopisujący dowód nie może zrobić 409 komuś, kto
+-- właśnie wysyła odpowiedź.
+CREATE TABLE IF NOT EXISTS reklamacja_dowod (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  reklamacja_id INTEGER NOT NULL REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
+  tresc         TEXT NOT NULL,
+  zalacznik_id  INTEGER REFERENCES reklamacja_zalacznik(id) ON DELETE SET NULL,
+  autor_user_id INTEGER REFERENCES app_user(user_id) ON DELETE SET NULL,
+  autor         TEXT,
+  utworzono_at  TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now'))
+);
+CREATE INDEX IF NOT EXISTS ix_reklamacja_dowod_sprawa
+  ON reklamacja_dowod(reklamacja_id, id);
+
+-- Reklamacja U DOSTAWCY: wadę fabryczną uznajemy klientowi, sztuka wraca do
+-- nas, a my zgłaszamy ją dostawcy (decyzja właściciela). Osobny rekord, bo to
+-- osobny spór z innym rozmówcą. Jeden wiersz na sprawę klienta.
+--
+-- `dostawca` to symbol kontrahenta z Subiekta, podpowiadany z ostatniej
+-- dostawy i poprawialny. `nr_u_dostawcy` to numer, który nadał dostawca.
+-- Danych osobowych tu nie ma: ani klienta, ani człowieka po stronie dostawcy.
+-- `wersja` jest WŁASNA, z tego samego powodu co przy dowodach: zapis tutaj nie
+-- ma prawa unieważnić ekranu, na którym ktoś pisze do kupującego.
+CREATE TABLE IF NOT EXISTS reklamacja_u_dostawcy (
+  reklamacja_id INTEGER PRIMARY KEY REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
+  dostawca      TEXT NOT NULL,
+  nr_u_dostawcy TEXT,
+  zgloszono_at  TEXT NOT NULL,
+  wynik         TEXT CHECK (wynik IN ('uznal','odrzucil')),
+  wynik_at      TEXT,
+  autor_user_id INTEGER REFERENCES app_user(user_id) ON DELETE SET NULL,
+  autor         TEXT,
+  wersja        INTEGER NOT NULL DEFAULT 1
+);
 
 -- Notatka biura o KLIENCIE (24 września 2026, profil klienta). Klucz to login
 -- Allegro bez wielkości liter — ten sam kupujący bywa zapisany „Chips20"

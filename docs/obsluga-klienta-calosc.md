@@ -30,10 +30,12 @@ Ręczne wskazanie zamówienia rozmowy czyta każda strona z jednej relacji
 **Zwrot staje na osi rozmowy.** Decyzja, korekta i pieniądze zwrotu są
 zdarzeniami w pasku rozmowy i faktem w szkicu Copilota
 (`services/zwrot-na-osi.ts`). Ocena, kwota robocza i notatka biura zostają
-w zwrocie — to nasza kuchnia. Zwrot, reklamacja i dyskusja zlecają hali
-przyciskiem „Zleć hali" (`panel/src/sprawy/ZlecHali.tsx`), a karta zadania
-prowadzi z powrotem do sprawy. Dostawa zostaje przy „notatce do hali", żeby
-nie mieć dwóch kanałów o jednym dokumencie.
+w zwrocie — to nasza kuchnia. Zwrot i dyskusja zlecają hali przyciskiem
+„Zleć hali" (`panel/src/sprawy/ZlecHali.tsx`), a karta zadania prowadzi
+z powrotem do sprawy. Ekran reklamacji tego przycisku na razie nie ma, decyzją
+właściciela, a dawne zadania z reklamacji dalej do niej prowadzą. Dostawa
+zostaje przy „notatce do hali", żeby nie mieć dwóch kanałów o jednym
+dokumencie.
 
 **Drugim mostkiem jest login kupującego.** `interlocutor.login` z listy
 wątków to login, a `client:44300444` to kupujący bez konta, nie maska —

@@ -540,7 +540,9 @@ function odczytaj(database: Db, id: number): Wiersz {
    Allegro zablokowało konto za dyskusję, na którą nikt nie odpowiedział, choć
    stała w kolejce „Do odpowiedzi". Kolejka pokazuje, że sprawa jest, ale nie
    woła; w ten sposób nikt jej nie otworzył na czas. Alarm woła z każdego
-   ekranu panelu i ze stanu systemu.
+   ekranu panelu i ze stanu systemu. Na ekranie reklamacji woła czerwony
+   licznik na zakładce Dyskusje zamiast paska, bo tam pasek zabiera miejsce
+   trzem kolumnom sprawy; licznik widać z każdego ekranu.
 
    PRÓG JEST NASZĄ DECYZJĄ, NIE REGUŁĄ ALLEGRO. Dla dyskusji schemat nie ma
    terminu (`decisionDueDate` i `statusDueDate` to „Null for disputes"), a okno

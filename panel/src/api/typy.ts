@@ -1496,6 +1496,51 @@ export interface Reklamacja {
   twSymbol: string | null;
   /** Czy sygnatura przyszła Z PARAGONU (0.400.0), a nie z dzisiejszej półki. */
   twZParagonu: boolean;
+  /* ── Kwota w grze i odstęp zgłoszenia ────────────────────────────────────
+     Serwer wysyła te pola zawsze, a typ trzyma je OPCJONALNIE: panel bywa
+     przez chwilę nowszy od serwera, a `undefined` czyta się wtedy jak „nie
+     wiemy", nigdy jak zero. Fikstury testów nie muszą ich też powtarzać. */
+  /** Cena brutto za sztukę z paragonu dla reklamowanej oferty. */
+  cenaParagonuGrosze?: number | null;
+  /** Kwota sprawy: żądany zwrot albo cena z paragonu razy ilość; liczy serwer. */
+  kwotaGrosze?: number | null;
+  /** Skąd jest `kwotaGrosze` — z żądania klienta czy z paragonu. */
+  kwotaZrodlo?: "zadanie" | "paragon" | null;
+  /** Pełne dni od zakupu do zgłoszenia; `null`, gdy brakuje którejś daty. */
+  zgloszonoPoDniach?: number | null;
+}
+
+/** Ostatnia dostawa reklamowanego towaru — skąd przyszła sztuka klienta. */
+export interface OstatniaDostawaReklamacji {
+  /** Symbol kontrahenta z Subiekta; pełnej nazwy serwer nie importuje. */
+  dostawca: string;
+  data: string;
+  /** Numer faktury dostawcy; `null`, gdy biuro go nie uzupełniło. */
+  numer: string | null;
+  /** Czy to dostawa sprzed zakupu, czyli partia, z której klient dostał sztukę. */
+  przedZakupem: boolean;
+}
+
+/** Wpis biura w kolumnie dowodów: zdanie, opcjonalnie zdjęcie, autor i chwila. */
+export interface DowodReklamacji {
+  id: number;
+  tresc: string;
+  /** Zdjęcie klienta, którego dotyczy wpis. Etykietę `Z1`, `Z2` liczy panel. */
+  zalacznikId: number | null;
+  autor: string | null;
+  utworzonoAt: string;
+}
+
+/** Reklamacja wadliwej sztuki zgłoszona przez nas u dostawcy. */
+export interface ReklamacjaUDostawcy {
+  dostawca: string;
+  nrUDostawcy: string | null;
+  zgloszonoAt: string;
+  wynik: "uznal" | "odrzucil" | null;
+  wynikAt: string | null;
+  autor: string | null;
+  /** Wersja TEGO rekordu, nie sprawy klienta. */
+  wersja: number;
 }
 
 export interface ZalacznikReklamacji {
@@ -1558,6 +1603,14 @@ export interface SzczegolReklamacji {
   karta: KartaSprawy | null;
   /** Ile razy TO SAMO już się zdarzyło (0.413.0). */
   historia: HistoriaSprawy;
+  /* Trzy pola przebudowy ekranu są opcjonalne z tego samego powodu co kwota
+     na wierszu: starszy serwer ich nie zna, a brak ma znaczyć „nie wiemy". */
+  /** Ostatnia dostawa towaru; `null` = nie wiemy, skąd przyszła sztuka. */
+  dostawa?: OstatniaDostawaReklamacji | null;
+  /** Dowody dopisane przez biuro, od najstarszego. */
+  dowody?: DowodReklamacji[];
+  /** Nasza reklamacja u dostawcy; `null`, dopóki jej nie zgłosiliśmy. */
+  uDostawcy?: ReklamacjaUDostawcy | null;
 }
 
 /** Ślad w historii: ile spraw, ile skończyło się uznaniem, ile odmową. */
@@ -1749,4 +1802,23 @@ export interface WynikWerdyktu {
   status: StatusWerdyktu;
   blad: string | null;
   wersja: number;
+  /** Los stanowiska o towarze wysłanego razem z uznaniem; brak, gdy go nie było. */
+  towar?: WynikTowaruWerdyktu;
 }
+
+/** Stanowisko o towarze wysyłane tym samym żądaniem co uznanie. */
+export interface TowarWerdyktu {
+  decyzja: "wymagany" | "niewymagany";
+  tresc: string;
+  expectedLastMessageId: number | null;
+  mimoNowejWiadomosci?: boolean;
+}
+
+/* Każdy wariant to inne zdanie na ekranie, a żaden nie cofa werdyktu: ten
+   wyszedł nieodwracalnie, więc los towaru jedzie OBOK, nie zamiast niego.
+   `konflikt` to ładunek tego samego 409, który daje osobny krok o towarze. */
+export type WynikTowaruWerdyktu =
+  | { status: WynikOdpowiedziReklamacji["status"] }
+  | { pominiety: string }
+  | { blad: string }
+  | { konflikt: SzczegolyWysylki & { error?: string } };
