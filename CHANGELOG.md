@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.563.0 — 5 października 2026
+
+**W kolejce dyskusji widać cały powód i login klienta.** Temat zawija się do
+dwóch linii zamiast urywać się w pół zdania, a login stoi wyraźnie we własnej
+linii. Numer zamówienia zszedł do drobnego dopisku: szukanie dalej go
+znajduje, a pełny numer stoi w kolumnie faktów.
+
 ## 0.562.0 — 5 października 2026
 
 **Swoje hasło zmienisz sam.** Ustawienia → Ludzie i urządzenia → Twoje
