@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.565.1 — 5 października 2026
+
+**Automatyczne „Dziękujemy za wiadomość” nie zdejmuje już dyskusji z „Do
+odpowiedzi”.** Allegro nie uznaje wiadomości automatycznej za odpowiedź
+w dyskusji, więc sprawa zostaje w kolejce, a licznik czekania i alarm liczą
+dalej od pytania klienta.
+
+Serwer wstaje po aktualizacji także na bazie założonej ze świeżej instalacji
+między wersjami 0.528 a 0.564. Migracja kasująca dobór części wywracała
+na niej start, a aktualizacja wracała do poprzedniej wersji. Kolumny, których
+SQLite nie umie zdjąć, zostają teraz w bazie jako martwe.
+
 ## 0.565.0 — 5 października 2026
 
 **Zakładka Wiedza i dobór części zniknęły.** Właściciel zdecydował, że oba
