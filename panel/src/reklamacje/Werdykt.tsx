@@ -1,20 +1,31 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useId, useState } from "react";
 import { Gavel, Check, Ban, PackageSearch } from "lucide-react";
-import type { Reklamacja, WiadomoscReklamacji, Werdykt as KodWerdyktu } from "../api/typy";
-import { Przycisk, Skopiuj, czas } from "../ui";
+import type {
+  OstatniaDostawaReklamacji, Reklamacja, ReklamacjaUDostawcy, WiadomoscReklamacji,
+  Werdykt as KodWerdyktu,
+} from "../api/typy";
+import { FiltrSegmentowy, Przycisk, Skopiuj, czas } from "../ui";
 import { zlote } from "../api/zwroty";
 import { NAZWA_STANU_WERDYKTU, NAZWA_WERDYKTU, ODMOWY, UZNANIA } from "./statusy";
 import { LIMIT_ZNAKOW } from "./Edytor";
 import { DlugaTresc, scisle, zawieraOpis } from "./tresc";
+import { SztukaDoDostawcy, type ZapisUDostawcy } from "./SztukaDoDostawcy";
 
 /* ── Werdykt reklamacji (przyrost trzeci; miejsce z 0.412.0) ─────────────────
    Pasek decyzji CAŁEJ sprawy — §25a.4: „pasek decyzji zostaje przy tym, co
    dotyczy całego zwrotu". Werdykt nie jest wiadomością, tylko
    rozstrzygnięciem, więc stoi osobno, a nie w edytorze.
 
-   POD ROZMOWĄ, nie nad nią (0.412.0). Do 0.411.0 ten pasek był pierwszym
-   elementem kolumny, czyli ekran zadawał nieodwracalne pytanie przed
-   pokazaniem dowodów. Dekalog obsługi, punkt 9, i ergonomii, punkt 5.
+   W KOLUMNIE FAKTÓW, ZARAZ POD FAKTAMI. Werdykt rozstrzyga się z liczb nad
+   nim — czy mamy, kiedy kupione, ile zapłacił, od kogo sztuka — więc stoi
+   tam, gdzie kończy się ich czytanie. W kolejności strony idzie PO treści
+   zgłoszenia i dowodach: nieodwracalne pytanie nie pada przed pokazaniem,
+   o co chodzi. Dekalog obsługi, punkt 9, i ergonomii, punkt 5.
+
+   TOWAR PRZY UZNANIU, W TYM SAMYM FORMULARZU. Uznanie bez stanowiska
+   o towarze zostawiało kupującego z pytaniem „co z paczką", a drugi krok po
+   werdykcie ścigał się z odświeżeniem sprawy. Wybór nie ma domyślnego: obie
+   odpowiedzi kosztują i ekran nie zgaduje żadnej za agenta (punkt 6).
 
    PRAWO HICKA: najpierw DWA przyciski — „UZNAJĘ" albo „ODRZUCAM" — dopiero po
    kliknięciu lista czterech albo siedmiu wartości Allegro. Jedenaście pozycji
@@ -75,15 +86,25 @@ export function naGrosze(tekst: string): number | null {
   return Math.round(Number(t) * 100);
 }
 
+export type DecyzjaOTowarze = "wymagany" | "niewymagany";
+
 export interface ZadanieWerdyktu {
   werdykt: KodWerdyktu;
   wiadomosc: string;
   kwotaGrosze: number | null;
+  /** Stanowisko o towarze — tylko przy uznaniu, gdy los towaru nie zapadł. */
+  towar?: { decyzja: DecyzjaOTowarze; tresc: string };
 }
 
-export type DecyzjaOTowarze = "wymagany" | "niewymagany";
+/** Jak wybór o towarze brzmi w zdaniu zgody i w podpisie pola. */
+const TOWAR_SLOWEM: Record<DecyzjaOTowarze, string> = {
+  wymagany: "do odesłania", niewymagany: "zostaje u klienta",
+};
 
-export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladTowaru, onWerdykt, onTowar }: {
+export function Werdykt({
+  reklamacja: r, czat = [], trwa, blad, trwaTowar, bladTowaru, onWerdykt, onTowar,
+  dostawa = null, uDostawcy = null, trwaUDostawcy = false, bladUDostawcy = "", onUDostawcy,
+}: {
   reklamacja: Reklamacja;
   /** Rozmowa sprawy — tylko po to, żeby nie powtarzać wiadomości werdyktu,
       którą Allegro oddało w rozmowie. Bez niej blok pokazuje ją jak dotąd. */
@@ -95,6 +116,13 @@ export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladT
   bladTowaru: string;
   onWerdykt: (z: ZadanieWerdyktu) => void;
   onTowar: (decyzja: DecyzjaOTowarze, tresc: string) => void;
+  /* Zgłoszenie sztuki u dostawcy po uznaniu. Opcjonalne tym samym wzorcem co
+     reszta: czego nie da się zapisać, tego nie ma na ekranie. */
+  dostawa?: OstatniaDostawaReklamacji | null;
+  uDostawcy?: ReklamacjaUDostawcy | null;
+  trwaUDostawcy?: boolean;
+  bladUDostawcy?: string;
+  onUDostawcy?: (z: ZapisUDostawcy) => void;
 }) {
   const [galaz, setGalaz] = useState<"uznaje" | "odrzucam" | null>(null);
   const [kod, setKod] = useState<KodWerdyktu>("ACCEPTED_REFUND");
@@ -103,6 +131,7 @@ export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladT
   const [zgoda, setZgoda] = useState(false);
   const [towar, setTowar] = useState<DecyzjaOTowarze | null>(null);
   const [trescTowaru, setTrescTowaru] = useState("");
+  const idTowaru = useId();
 
   /* Formularz czyści się przy ZMIANIE SPRAWY — inaczej werdykt pisany do
      jednej reklamacji wyjechałby do drugiej po strzałce w kolejce. */
@@ -127,7 +156,21 @@ export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladT
     setWiadomosc(start?.wiadomosc ?? "");
     setKwota(start?.kwota != null ? (start.kwota / 100).toFixed(2).replace(".", ",") : "");
     setZgoda(false);
+    setTowar(null); setTrescTowaru("");
   };
+
+  /* Zmiana decyzji o towarze zdejmuje zgodę z tego samego powodu co zmiana
+     werdyktu: zgoda dotyczy obu wyborów naraz. Zdanie startowe przychodzi
+     z nowym wyborem, bo stare mówiłoby co innego niż decyzja. */
+  const wybierzTowar = (d: DecyzjaOTowarze | null) => {
+    if (d === null) return;
+    setTowar(d); setTrescTowaru(ZDANIE_O_TOWARZE[d]); setZgoda(false);
+  };
+
+  /* Sztuka wraca, gdy uznaliśmy (tu albo w Centrum Sprzedaży) i towar ma być
+     odesłany. Zapisane zgłoszenie stoi zawsze — raz zapisanego się nie chowa. */
+  const doDostawcy = status !== "sending" && (uznana || uAllegro === "uznana")
+    && (r.zwrotTowaru === "wymagany" || r.zwrotWymagany === true || uDostawcy !== null);
 
   /* ── Blok po werdykcie (nasz albo z Centrum Sprzedaży) ───────────────────── */
   if (wydany || (uAllegro && status !== "send_failed")) {
@@ -209,6 +252,9 @@ export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladT
         </div>}
         {bladTowaru && <p className="mt-2 text-xs font-semibold text-ranga-zle">{bladTowaru}</p>}
       </div>}
+
+      {doDostawcy && onUDostawcy && <SztukaDoDostawcy key={r.id} reklamacja={r} dostawa={dostawa}
+        uDostawcy={uDostawcy} trwa={trwaUDostawcy} blad={bladUDostawcy} onZapisz={onUDostawcy} />}
     </section>;
   }
 
@@ -218,7 +264,14 @@ export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladT
   const grosze = naGrosze(kwota);
   const znakow = wiadomosc.length;
   const zaDlugo = znakow > LIMIT_ZNAKOW;
-  const gotowe = Boolean(wiadomosc.trim()) && !zaDlugo && zgoda && (!czesciowy || (grosze !== null && grosze > 0));
+  /* O towarze pytamy tylko przy uznaniu i tylko wtedy, gdy jego los jeszcze
+     nie zapadł — ani u nas, ani w Centrum Sprzedaży. Drugie stanowisko do
+     Allegro po pierwszym byłoby sprzecznością, nie poprawką. */
+  const pytajOTowar = galaz === "uznaje" && r.zwrotTowaru === null && r.zwrotWymagany === null;
+  const towarGotowy = !pytajOTowar
+    || (towar !== null && Boolean(trescTowaru.trim()) && trescTowaru.trim().length <= LIMIT_ZNAKOW);
+  const gotowe = Boolean(wiadomosc.trim()) && !zaDlugo && zgoda && towarGotowy
+    && (!czesciowy || (grosze !== null && grosze > 0));
 
   return <section aria-label="Werdykt" className="border-t-4 border-slate-200 bg-slate-50 px-4 pb-3 pt-5">
     <div className="flex flex-wrap items-center gap-2">
@@ -272,6 +325,26 @@ export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladT
             Klient prosi o {zlote(r.oczekiwanaKwotaGrosze, r.waluta)}.</span>}
       </label>}
 
+      {/* ── TOWAR: WYBÓR BEZ DOMYŚLNEGO ───────────────────────────────────
+          Dwa przyciski tego samego kształtu co każdy wybór w panelu, żaden
+          wciśnięty na starcie. Zdanie startowe przychodzi z wyborem i da się
+          je poprawić, zanim poleci — jak przy kroku po werdykcie. */}
+      {pytajOTowar && <div className="space-y-1">
+        <p id={idTowaru} className="text-xs font-semibold text-slate-600">Towar</p>
+        <div role="group" aria-labelledby={idTowaru} className="flex gap-1">
+          <FiltrSegmentowy<DecyzjaOTowarze | null> rowne wybrany={towar} onWybierz={wybierzTowar}
+            pozycje={[
+              { klucz: "niewymagany", etykieta: "Zostaje u klienta" },
+              { klucz: "wymagany", etykieta: "Do odesłania" },
+            ]} />
+        </div>
+        {towar !== null && <label className="block text-xs font-semibold text-slate-600">
+          Wiadomość o towarze — {TOWAR_SLOWEM[towar]}
+          <textarea className="field mt-1 min-h-16 w-full text-sm" value={trescTowaru}
+            aria-label="Wiadomość o towarze" onChange={(e) => setTrescTowaru(e.target.value)} />
+        </label>}
+      </div>}
+
       <label className="block text-xs font-semibold text-slate-600">
         Wiadomość do kupującego — wymagana przez Allegro, klient ją przeczyta
         <textarea className="field mt-1 min-h-20 w-full text-sm" value={wiadomosc}
@@ -300,12 +373,17 @@ export function Werdykt({ reklamacja: r, czat = [], trwa, blad, trwaTowar, bladT
         <span>Wysyłam <b>{NAZWA_WERDYKTU[kod]}</b>
           {czesciowy && grosze !== null && grosze > 0 &&
             <> na <b className="tabular-nums">{zlote(grosze, r.waluta)}</b></>}
-          {" "}— nieodwracalnie, razem z wiadomością do kupującego.</span>
+          {pytajOTowar && towar !== null && <>, towar <b>{TOWAR_SLOWEM[towar]}</b></>}
+          {" "}— nieodwracalnie, razem z {pytajOTowar && towar !== null
+            ? "obiema wiadomościami" : "wiadomością"} do kupującego.</span>
       </label>
 
       <div className="flex items-center gap-2">
         <Przycisk wariant="glowny" className="text-xs" disabled={trwa || !gotowe}
-          onClick={() => onWerdykt({ werdykt: kod, wiadomosc: wiadomosc.trim(), kwotaGrosze: czesciowy ? grosze : null })}>
+          onClick={() => onWerdykt({
+            werdykt: kod, wiadomosc: wiadomosc.trim(), kwotaGrosze: czesciowy ? grosze : null,
+            ...(pytajOTowar && towar !== null ? { towar: { decyzja: towar, tresc: trescTowaru.trim() } } : {}),
+          })}>
           {trwa ? "Wysyłam…" : "Wyślij werdykt"}</Przycisk>
         <Przycisk className="text-xs" onClick={() => setGalaz(null)}>Anuluj</Przycisk>
       </div>
