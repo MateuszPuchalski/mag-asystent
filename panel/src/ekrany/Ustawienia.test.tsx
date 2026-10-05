@@ -730,6 +730,6 @@ describe("Ustawienia w panelu", () => {
     const zakladki = zrodloRamy.slice(zrodloRamy.indexOf("const ZAKLADKI"),
       zrodloRamy.indexOf("]", zrodloRamy.indexOf("const ZAKLADKI")));
     expect(zakladki).not.toContain("ustawienia");
-    expect(zakladki).toContain('"/obsluga/wiedza"');
+    expect(zakladki).toContain('"/obsluga/zadania"');
   });
 });

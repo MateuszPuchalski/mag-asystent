@@ -47,6 +47,10 @@ ALLOWED_MISSING = {
     # Katalog wyniku builda serwera — w świeżym klonie go nie ma, a DEPLOY
     # musi móc powiedzieć, co w nim zostaje po aktualizacji.
     "server/dist/web",
+    # Kontrakt doboru — skasowany razem z doborem i bazą wiedzy. Wpisy
+    # CHANGELOG-a i rozdziały-zapisy w panel-obslugi-klienta.md nazywają go
+    # po imieniu, bo opisują czas, w którym istniał.
+    "docs/dobor-od-zera.md",
 }
 
 # Byty usunięte z kodu — odwołanie do nich w dokumentacji znaczy, że opis

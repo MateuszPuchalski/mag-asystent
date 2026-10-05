@@ -22,7 +22,7 @@ vi.mock("../api/rozmowy", () => ({ useHistoriaKlienta: (id: number | null) => hi
 const { Klient, WidokHistorii } = await import("./Klient");
 
 const dane = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta =>
-  ({ login: "zielony_ogrod", maszyny: [], wpisy: [], ...n });
+  ({ login: "zielony_ogrod", wpisy: [], ...n });
 
 const pokaz = (d: HistoriaKlienta, onOtworz = vi.fn()) => {
   historia.mockReturnValue({ data: d, isLoading: false, error: null });
@@ -171,7 +171,7 @@ describe("zakładka klienta", () => {
   });
 
   it("gdy oś opróżniły zakupy z listy, mówi, gdzie stoją — nie „pierwszy kontakt”", () => {
-    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ maszyny: [], wpisy: [
+    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ wpisy: [
       { rodzaj: "zakup", at: "2026-05-12T09:10:00Z", tresc: "Filtr powietrza",
         zamowienieId: "z-2", link: null, rozmowaId: null, sprawaId: null },
     ] }) });
@@ -211,8 +211,8 @@ describe("zakładka klienta", () => {
     expect(screen.queryByRole("link", { name: /Sprawa klienta/ })).toBeNull();
 
     /* Profil ma własną kartę sprawy — druga, w historii, mówiłaby to samo. */
-    render(<MemoryRouter><WidokHistorii tutaj="tym profilem" bezProfilu onOtworzRozmowe={vi.fn()}
-      historia={{ login: "zielony_ogrod", maszyny: [], wpisy: [], sprawa: {
+    render(<MemoryRouter><WidokHistorii bezProfilu onOtworzRozmowe={vi.fn()}
+      historia={{ login: "zielony_ogrod", wpisy: [], sprawa: {
         id: 5, login: "zielony_ogrod", wersja: 2, stan: "zakonczona", krok: "dosłać",
         krokDo: "2026-09-25T06:00:00Z", dzis: false, poTerminie: false, prowadzi: "Bartek", prowadziId: 2,
         zakonczonoAt: "2026-09-24T12:00:00Z", zakonczyl: "Bartek", odcisk: "{}", nowe: [], dosylki: [] } }} />

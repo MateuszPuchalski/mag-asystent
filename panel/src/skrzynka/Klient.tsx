@@ -1,8 +1,8 @@
 import React from "react";
-import { ClipboardList, ExternalLink, MessageSquare, MessagesSquare, Scale, Tractor, Undo2, UserRound }
+import { ClipboardList, ExternalLink, MessageSquare, MessagesSquare, Scale, Undo2, UserRound }
   from "lucide-react";
 import { Link } from "react-router-dom";
-import type { HistoriaKlienta, MaszynaKlienta, SprawaKlienta, WpisHistorii } from "../api/typy";
+import type { HistoriaKlienta, SprawaKlienta, WpisHistorii } from "../api/typy";
 import { useHistoriaKlienta } from "../api/rozmowy";
 import { najwazniejszaDosylka } from "../api/spoiwo";
 import { barwaTonu, czas, dzien, LoginKlienta, NaglowekSekcji, Pusto, termin } from "../ui";
@@ -13,8 +13,7 @@ import { historiaPozaZakupem, historiaWierszaKlienta } from "./kokpit";
  *
  * ZAKŁADKA WRÓCIŁA Z MAKIETY decyzją właściciela. §10.1 skreślił ją w 0.198.0
  * zdaniem „nie ma bytu" — prawdziwym o TABELI, nie o danych. Kupujący ma
- * login, po którym wiążą się jego zamówienia, jego rozmowy i maszyny ustalone
- * w tych rozmowach; wszystkie trzy rzeczy leżą w bazie od E1.
+ * login, po którym wiążą się jego zamówienia, rozmowy i sprawy z kolejek.
  *
  * DLACZEGO TO JEST WARTE ZAKŁADKI. Odpowiedź „ten szarpak pasuje" waży inaczej,
  * gdy ten sam klient kupił go rok temu do tej samej kosiarki. §11.3 nazywa to
@@ -22,10 +21,7 @@ import { historiaPozaZakupem, historiaWierszaKlienta } from "./kokpit";
  * musiałby szukać tego w panelu Allegro — czyli tam, gdzie §25 obiecuje nie
  * zaglądać.
  *
- * EKRAN NICZEGO NIE ZAPISUJE. Maszyny są WYPROWADZONE z domkniętych doborów,
- * nie przypięte ręcznie: osobny rejestr trzeba by utrzymywać przy każdej
- * poprawce doboru i rozjechałby się przy pierwszej. To ten sam kształt, który
- * w 0.128.0 kosztował cztery tabele nakładki spraw.
+ * EKRAN NICZEGO NIE ZAPISUJE. Historia jest odczytem po loginie.
  */
 export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null, pomin }: {
   rozmowaId: number;
@@ -72,11 +68,11 @@ export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null, pomin 
   /* Pusta oś przy zakupie mówi „poza tym zakupem". „Pierwszy kontakt"
      byłby kłamstwem: zakup jest, tylko ma dom w karcie nad osią. Gdy oś
      opróżniły zakupy z listy, zdanie mówi, gdzie one stoją, i niczego nie
-     obiecuje o maszynach i sprawie, które stoją nad nim. */
+     obiecuje o sprawie, która stoi nad nim. */
   const pustaOs = wpisy.length < poza.wpisy.length
     ? "Zakupy tego klienta stoją w wierszu „Zamówienie”."
     : zamowienieId ? "Poza tym zakupem nie mamy u tego klienta nic więcej." : undefined;
-  return <WidokHistorii historia={{ ...poza, wpisy, login: poza.login }} tutaj="tą rozmową" wKolumnie
+  return <WidokHistorii historia={{ ...poza, wpisy, login: poza.login }} wKolumnie
     pustaOs={pustaOs} bezLoginu onOtworzRozmowe={onOtworzRozmowe} />;
 }
 
@@ -85,16 +81,14 @@ export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null, pomin 
  * historii przy zwrocie, reklamacji i dyskusji (23 września 2026). Jeden widok
  * na cztery wejścia: agent czyta klienta tak samo, skądkolwiek przyszedł.
  */
-export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = false, bezLoginu = false,
+export function WidokHistorii({ historia, onOtworzRozmowe, bezProfilu = false, bezLoginu = false,
   wKolumnie = false, pustaOs }: {
   historia: HistoriaKlienta & { login: string };
-  /** „tą rozmową", „tym zwrotem" — o czym mówi pusta oś. */
-  tutaj: string;
   /**
    * Widok w wierszu „Klient" prawej kolumny skrzynki. Profil i szuflady przy
    * zwrocie, reklamacji i dyskusji stawiają go samodzielnie, z wcięciem
-   * i nagłówkiem. W kolumnie oddech daje wiersz, tytuł wiersza mówi już
-   * „Klient", a maszyny stoją listą z kreską jak każda lista kolumny.
+   * i nagłówkiem. W kolumnie oddech daje wiersz, a tytuł wiersza mówi już
+   * „Klient".
    */
   wKolumnie?: boolean;
   /** Zdanie pustej osi zamiast obu domyślnych — gdy historia jest przycięta i „pierwszy kontakt" kłamałby. */
@@ -105,7 +99,7 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
   /** W skrzynce login stoi już w nagłówku rozmowy i przy każdej wiadomości. */
   bezLoginu?: boolean;
 }) {
-  const { login, maszyny, wpisy } = historia;
+  const { login, wpisy } = historia;
 
   return <div className={wKolumnie ? undefined : "p-3"} aria-label="Historia klienta">
     {!wKolumnie && <NaglowekSekcji jako="p">Historia u nas</NaglowekSekcji>}
@@ -126,20 +120,10 @@ export function WidokHistorii({ historia, tutaj, onOtworzRozmowe, bezProfilu = f
       {historia.sprawa && <LiniaSprawy login={login} sprawa={historia.sprawa} />}
     </>}
 
-    {maszyny.length > 0 && <section className="mt-3" aria-label="Maszyny klienta">
-      <NaglowekSekcji>Maszyny klienta</NaglowekSekcji>
-      <ul className={wKolumnie ? "mt-1 divide-y divide-slate-200" : "mt-1 space-y-1"}>
-        {maszyny.map((m) => <Maszyna key={`${m.marka}|${m.nazwa}|${m.wariant ?? ""}`} maszyna={m}
-          plasko={wKolumnie} onOtworzRozmowe={onOtworzRozmowe} />)}
-      </ul>
-    </section>}
-
     <section className="mt-3" aria-label="Oś historii klienta">
       {wpisy.length === 0
         ? <p className="text-xs text-slate-500">
-            {pustaOs ?? (maszyny.length === 0
-              ? "Pierwszy kontakt — nie mamy u tego klienta ani zakupu, ani wcześniejszej rozmowy."
-              : `Poza ${tutaj} nie mamy u tego klienta nic więcej.`)}
+            {pustaOs ?? "Pierwszy kontakt — nie mamy u tego klienta ani zakupu, ani wcześniejszej rozmowy."}
           </p>
         : <ul className="space-y-1">
             {wpisy.map((w, i) => <Wpis key={`${w.rodzaj}-${w.sprawaId ?? w.zamowienieId ?? w.rozmowaId}-${i}`}
@@ -180,35 +164,6 @@ function LiniaSprawy({ login, sprawa: s }: { login: string; sprawa: SprawaKlient
       {s.nowe[0] && <span className="block font-semibold text-slate-900">{s.nowe[0].tekst}</span>}
     </span>
   </Link>;
-}
-
-/**
- * Maszyna z odsyłaczem do rozmowy, w której ją ustalono.
- *
- * ROZMOWA JEST TU ŹRÓDŁEM, nie ozdobą: „NAC LS 46-450" bez niej to twierdzenie
- * bez pokrycia, a §4.3 żąda, żeby każdy fakt niósł swoje. Klik prowadzi do
- * rozmowy, w której ktoś to ustalił — tam stoi dobór, który za tym stoi.
- */
-function Maszyna({ maszyna, plasko, onOtworzRozmowe }: {
-  maszyna: MaszynaKlienta;
-  /** W kolumnie skrzynki bez ramki: jedyne pudełko w treści kolumny ważyło więcej niż ustalenie. */
-  plasko: boolean;
-  onOtworzRozmowe: (id: number) => void;
-}) {
-  const opis = [maszyna.marka, maszyna.nazwa, maszyna.wariant].filter(Boolean).join(" ");
-  return <li className={plasko ? "py-1.5 text-xs" : "rounded border border-slate-200 p-2 text-xs"}>
-    <p className="flex items-center gap-1.5 font-semibold text-slate-900">
-      <Tractor size={13} className="shrink-0 text-slate-400" />
-      {opis}{maszyna.rocznik && <span className="font-normal text-slate-500">({maszyna.rocznik})</span>}
-    </p>
-    {maszyna.silnik && <p className="mt-0.5 text-slate-700">silnik <span className="font-mono">{maszyna.silnik}</span></p>}
-    <p className="mt-0.5 text-slate-500">
-      ustalone w{" "}
-      <button type="button" className="underline hover:text-slate-800"
-        onClick={() => onOtworzRozmowe(maszyna.rozmowaId)}>rozmowie #{maszyna.rozmowaId}</button>
-      , {czas(maszyna.at)}
-    </p>
-  </li>;
 }
 
 /* Sprawa z trzech pozostałych kolejek: dokąd prowadzi wiersz i czym się

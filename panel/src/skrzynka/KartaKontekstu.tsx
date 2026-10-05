@@ -74,7 +74,7 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
   /* Zły ładunek historii nie wywraca rozmowy: karta jest dodatkiem do osi, a
      błąd w zapytaniu pomocniczym nie ma prawa zabrać ze sobą ekranu, na którym
      agent odpowiada klientowi. Kształt, którego nie znamy, czytamy jak brak. */
-  const zgodna = Array.isArray(historia?.wpisy) && Array.isArray(historia?.maszyny) ? historia : undefined;
+  const zgodna = Array.isArray(historia?.wpisy) ? historia : undefined;
   /* „WCZEŚNIEJ" ZNACZY PRZED TYM ZAKUPEM. Serwer oddaje historię razem z tym
      zakupem, jego zwrotem i sprawami, więc karta mówiła „Wcześniej u nas:
      1 zakup" o tym samym zakupie, a „Nowy klient" nie stawał przy pierwszym.

@@ -30,10 +30,6 @@ export interface PropsSzkicuCopilota {
   szkic: SzkicCopilota | null;
   /** Klient dopisał po tym, jak szkic powstał — propozycja odpowiada na stare pytanie. */
   nieswiezy: boolean;
-  /** Bieżąca wersja doboru; inna niż w szkicu = fakty się zmieniły od szkicu. `null` = nieznana. */
-  doborWersja: number | null;
-  /** Para „X → Y" rozpoznana w rozmowie, jeszcze bez decyzji agenta (liczy `paraPasowania`). */
-  paraPasowania: string | null;
   uklada: boolean;
   blad: string;
   /** Szkic agenta jest niepusty — przycisk mówi wtedy „Zastąp mój szkic". */
@@ -56,23 +52,11 @@ export interface PropsSzkicuCopilota {
     pracuje: boolean;
     onPytaj: (pytanie: string) => void;
     limitZnakow: number;
-    /** „Zapisz jako propozycję” przy pasowaniu z sieci (0.528.0). */
-    onZapiszPasowanie?: (wymianaId: number, nr: number) => void;
-    zapisuje?: boolean;
   };
   onUloz: () => void;
   /** Treść szkicu do pola agenta — wstawia przy pustym, zastępuje przy pełnym. */
   onPopraw: () => void;
   onOdrzuc: () => void;
-}
-
-/**
- * Czy szkic na ekranie jest nieaktualny: klient dopisał albo dobór się
- * zmienił. Zero w szkicu = wiersz sprzed migracji, o którym nic nie wiemy.
- */
-function doborZmienil(p: PropsSzkicuCopilota): boolean {
-  const s = p.szkic;
-  return s !== null && p.doborWersja !== null && s.doborWersja > 0 && s.doborWersja !== p.doborWersja;
 }
 
 /**
@@ -82,7 +66,7 @@ function doborZmienil(p: PropsSzkicuCopilota): boolean {
  * z nazwaną nieświeżością i przyciskiem „Ułóż ponownie".
  */
 export function szkicDoPola(p: PropsSzkicuCopilota): boolean {
-  return p.szkic !== null && p.szkic.ocena === null && !p.nieswiezy && !doborZmienil(p) && !p.wylaczony;
+  return p.szkic !== null && p.szkic.ocena === null && !p.nieswiezy && !p.wylaczony;
 }
 
 /* ── SZKIC WCHODZI DO POLA JAKO TEKST, NIE JAKO PODPOWIEDŹ (0.499.0) ────────
@@ -121,7 +105,6 @@ export function szkicNaStartRozmowy(dane: OsRozmowy, mojeId: number | null): str
   return szkicNaStart({
     stan: undefined, szkic: dane.szkicCopilota,
     nieswiezy: (dane.szkicCopilota?.messageId ?? null) !== ostatniaKlienta,
-    doborWersja: dane.dobor.wersja, paraPasowania: null,
     uklada: false, blad: "", maSzkicAgenta: false,
     wylaczony: wl != null && wl !== mojeId,
     onUloz: () => {}, onPopraw: () => {}, onOdrzuc: () => {},
@@ -157,7 +140,7 @@ export function PrzyciskSzkicu({ p }: { p: PropsSzkicuCopilota }) {
      „Ułóż odpowiedź" kazałby zapłacić drugi raz za to samo. Przycisk wraca,
      gdy karty nie ma (takt wyłączony, limit godzinowy, szkic odrzucony) albo
      gdy leży na starych faktach — i wtedy mówi „ponownie". */
-  const swiezy = p.szkic !== null && p.szkic.ocena === null && !p.nieswiezy && !doborZmienil(p);
+  const swiezy = p.szkic !== null && p.szkic.ocena === null && !p.nieswiezy;
   if (swiezy && !p.uklada && !p.blad) return null;
   const etykieta = p.szkic !== null ? "Ułóż ponownie" : "Ułóż odpowiedź";
   return <span className="flex min-w-0 items-center gap-2">
@@ -193,12 +176,6 @@ export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
         <Sparkles size={12} className="inline" /> Szkic Copilota{wPolu && " w polu"}</b>
       {p.nieswiezy && <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
         powstał przed nową wiadomością klienta</span>}
-      {/* Drugi rodzaj nieświeżości (przyrost trzeci): dane doboru zmieniły się
-          po szkicu — zwykle dlatego, że agent właśnie wpisał to, co Copilot
-          rozpoznał. Fakty są inne, więc szkic trzeba ułożyć jeszcze raz. */}
-      {doborZmienil(p) &&
-        <span className="rounded bg-amber-100 px-1.5 py-0.5 font-semibold text-amber-800">
-          dane doboru zmieniły się od szkicu — ułóż ponownie</span>}
       <span className="ml-auto flex flex-wrap items-center gap-2">
         {!wPolu && <Przycisk wariant="glowny" className="text-xs" disabled={p.wylaczony} onClick={p.onPopraw}
           aria-keyshortcuts="E">
@@ -208,8 +185,8 @@ export function PasekSzkicu({ p, wPolu = false }: { p: PropsSzkicuCopilota; wPol
           {p.maSzkicAgenta ? "Zastąp mój szkic" : "Wstaw do odpowiedzi"}
           {skrotyDzialaja && <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans">E</kbd>}
         </Przycisk>}
-        {/* „Odrzuć SZKIC": samo „Odrzuć" stało w panelu także przy zwrotach
-            i propozycjach wiedzy — jedno słowo, trzy różne czynności. */}
+        {/* „Odrzuć SZKIC": samo „Odrzuć" stoi w panelu także przy zwrotach
+            — jedno słowo, różne czynności. */}
         <Przycisk className="text-xs" onClick={p.onOdrzuc} aria-keyshortcuts="R">Odrzuć szkic
           {skrotyDzialaja && <kbd aria-hidden="true" className="ml-1 rounded bg-slate-100 px-1 font-sans">R</kbd>}
         </Przycisk>
@@ -233,20 +210,6 @@ export function UwagiSzkicu({ uwagi }: { uwagi: string[] }) {
 }
 
 /**
- * Tematy paska „Przy okazji" — podpis zwiniętego paska (0.517.0). Nazwy
- * mówią, GDZIE rzecz trafiła, bo po to agent rozwija: żeby sprawdzić swoje
- * miejsce, nie żeby przeczytać wszystko. Pusta lista = paska nie ma.
- */
-function przyOkazji(p: PropsSzkicuCopilota, s: SzkicCopilota): string[] {
-  const l = s.lukiKartoteki;
-  return [
-    !!p.paraPasowania && "pasowanie",
-    l.numery.length > 0 && "numery w kartotece",
-    (l.wpisane.length > 0 || l.modele.length > 0 || l.czeka > 0) && "wiedza",
-  ].filter((x): x is string => x !== false);
-}
-
-/**
  * Karta szkicu. `wPolu` znaczy, że treść stoi już w polu agenta (0.495.0,
  * od 0.499.0 jako zwykły tekst) — wtedy karta nie powtarza ani treści, ani
  * paska z przyciskami, bo oba stoją nad polem. Zostaje to, na czym szkic stoi.
@@ -263,7 +226,6 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
      zostaje z tym, na czym stoi — uwagami, odczytem zdjęć i dopytaniem —
      także po „Wstaw do odpowiedzi", bo agent właśnie go poprawia. */
   if (!s || (s.ocena !== null && !(wPolu && s.ocena !== "odrzucony"))) return null;
-  const tematy = przyOkazji(p, s);
   /* PRZYCISKI NA GÓRZE (0.232.1) — patrz `PasekSzkicu`. */
   return <section className={wPolu ? "mt-2" : "mt-3 rounded-lg border border-violet-200 bg-violet-50 p-3"}
     aria-label={wPolu ? "Na czym stoi szkic Copilota" : "Szkic Copilota"}>
@@ -298,52 +260,7 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
       <pre className="mt-1 whitespace-pre-wrap font-sans text-tresc text-slate-800"
         data-testid="szkic-copilota-tresc">{s.tresc}</pre>
     </details>}
-    <div>
-      {/* ── JEDEN PASEK „PRZY OKAZJI", NIE TRZY (0.342.0) ───────────────────
-          Do 0.341.0 stały tu dwa osobne akapity (dane doboru, pasowanie),
-          a trzeci — pokwitowanie wiedzy z oferty — pod całą kartą. Każdy
-          w ramce, każdy zjadający wiersz, wszystkie mówiące wariant tego
-          samego zdania: „Copilot zrobił coś obok szkicu".
-
-          Rozdzielone miały sens, gdy każde niosło PRZYCISK. Przycisków nie ma
-          od 0.341.0 — dane wchodzą same — więc został sam komunikat, a trzy
-          ramki na jeden komunikat to ścisk, nie porządek.
-
-          `data-testid` zostaje HISTORYCZNY (`luki-kartoteki`), bo po nim
-          sięgają testy, a zmiana nazwy kupiłaby wyłącznie ładniejsze słowo.
-
-          ── ZWINIĘTY DO JEDNEJ LINII (0.517.0) ────────────────────────────
-          Pasek bywał sześcioma zdaniami pod każdym szkicem, a żadne nie
-          prosi o ruch: dane weszły same, pasowanie czeka w wierszu Wiedza, wiedza
-          w swojej kolejce. Zwinięty mówi, CZEGO dotyczy, a treść stoi
-          o jedno kliknięcie. Ostrzeżenia modelu stoją niżej, rozwinięte. */}
-      {tematy.length > 0 &&
-        <details className="mb-2 rounded border border-sky-200 bg-white p-2 text-xs text-sky-900"
-          data-testid="luki-kartoteki">
-          <summary className="cursor-pointer">
-            <b className="text-sky-950">Przy okazji:</b> {tematy.join(", ")}</summary>
-          <p className="mt-1">
-          {p.paraPasowania && <>
-            Rozpoznane pasowanie <b>{p.paraPasowania}</b> — zaproponuj je w wierszu Wiedza po prawej.{" "}
-          </>}
-          {s.lukiKartoteki.numery.length > 0 && <>
-            Z oferty do kartoteki {s.lukiKartoteki.symbol}:{" "}
-            <b>{s.lukiKartoteki.numery.map((n) => n.wartosc).join(", ")}</b>.{" "}
-          </>}
-          {/* WPISANE PRZED ODŁOŻONYMI (0.341.0): najpierw to, co już JEST
-              w wiedzy, potem to, co dopiero czeka. */}
-          {s.lukiKartoteki.wpisane.length > 0 && <>
-            Z listy zgodności do wiedzy: <b>{s.lukiKartoteki.wpisane.join(", ")}</b>.{" "}
-          </>}
-          {s.lukiKartoteki.modele.length > 0 && <>
-            Bez rozpoznanej marki, do kolejki Wiedzy:{" "}
-            <b>{s.lukiKartoteki.modele.join(", ")}</b>.{" "}
-          </>}
-          {s.lukiKartoteki.czeka > 0 && <>Tej kartoteki czeka tam {s.lukiKartoteki.czeka}.</>}
-          </p>
-        </details>}
-      {s.zastrzezenia.length > 0 && <UwagiSzkicu uwagi={s.zastrzezenia} />}
-    </div>
+    {s.zastrzezenia.length > 0 && <UwagiSzkicu uwagi={s.zastrzezenia} />}
     {/* Rachunek POD tekstem, nie w nim (0.253.0): klient ma dostać gładką
         odpowiedź, a agent — to, na czym ona stoi. Klucz z czasu szkicu, żeby
         nowy szkic otwierał okno od nowa wg własnych twierdzeń. */}
@@ -360,8 +277,6 @@ export function KartaSzkicu({ p, wPolu = false, zwinieta = false }: {
       blad={p.dopytanie.blad}
       pracuje={p.dopytanie.pracuje}
       onPytaj={p.dopytanie.onPytaj}
-      onZapiszPasowanie={p.dopytanie.onZapiszPasowanie}
-      zapisuje={p.dopytanie.zapisuje}
       limitZnakow={p.dopytanie.limitZnakow} />}
   </section>;
 }

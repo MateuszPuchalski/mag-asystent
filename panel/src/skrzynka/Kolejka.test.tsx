@@ -10,7 +10,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, podziekowal: false, oglada: null,
-  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false, dobor: "pusty",
+  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false,
   kopilot: null, ...n,
 });
 
@@ -275,22 +275,6 @@ describe("wiersz kolejki niesie to, co §10.2 wymienia", () => {
   it("oczekujące zadanie terenowe widać przy rozmowie", () => {
     pokaz([rozmowa({ zadanieWToku: true })]);
     expect(screen.getByText(/zadanie w toku/)).toBeInTheDocument();
-  });
-
-  it("stan doboru stoi w wierszu znakiem z nazwą, ale „nie zaczęty” i „nie dotyczy” milczą", () => {
-    /* Znak mówi, na czym stanął dobór. Na wierszu bez doboru nie ma czego
-       mówić, a „nie dotyczy" to wiersz, przy którym doboru nie trzeba robić. */
-    const { rerender } = render(<Kolejka rozmowy={[rozmowa({ dobor: "dopytac" })]}
-      stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
-    expect(screen.getByText("Dopytać klienta")).toBeInTheDocument();
-    expect(screen.getByTitle("dobór: Dopytać klienta")).toHaveClass("text-ranga-zle");
-    rerender(<Kolejka rozmowy={[rozmowa({ dobor: "czesc" })]}
-      stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
-    expect(screen.getByTitle("dobór: Wybrano część")).toHaveClass("text-emerald-700");
-    rerender(<Kolejka rozmowy={[rozmowa({ dobor: "nie_dotyczy" }), rozmowa({ id: 2, dobor: "pusty" })]}
-      stan={STAN} wybranaId={null} laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
-    expect(screen.queryByText("Nie dotyczy")).not.toBeInTheDocument();
-    expect(screen.queryByText("Nie zaczęty")).not.toBeInTheDocument();
   });
 });
 

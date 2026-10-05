@@ -444,7 +444,7 @@ export function Dowody({
           </Wiersz>
           <Wiersz etykieta="Kupujący">{r.kupujacyLogin
             ? <span className="inline-flex flex-wrap items-center gap-2"><LoginKlienta login={r.kupujacyLogin} />
-                <PrzyciskHistorii rodzaj="sprawa" id={r.id} tutaj="tą reklamacją" /></span>
+                <PrzyciskHistorii rodzaj="sprawa" id={r.id} /></span>
             : "—"}</Wiersz>
           <Wiersz etykieta="Zgłoszono">{czas(r.otwartoAt)}</Wiersz>
           {/* Statusu Allegro tu NIE MA i to nie jest przeoczenie: stoi

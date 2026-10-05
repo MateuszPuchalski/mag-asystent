@@ -25,9 +25,7 @@ const dane = (n: Partial<Pomiar> = {}): Pomiar => ({
   },
   wgZadania: [],
   szkice: {
-    ile: 0, odrzuconych: 0, daneZaproponowane: 0, daneWpisane: 0, daneOdrzucone: 0,
-    pasowaniaRozpoznane: 0, pasowaniaZaproponowane: 0, pasowaniaOdrzucone: 0,
-    pasowaniaZatwierdzonePrzezBiuro: 0, wyslanychBezZmian: 0, wyslanychPoprawionych: 0,
+    ile: 0, odrzuconych: 0, wyslanychBezZmian: 0, wyslanychPoprawionych: 0,
   },
   ...n,
 });

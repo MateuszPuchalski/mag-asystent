@@ -9,23 +9,20 @@ process.env.SGT_MODE = "seeded";
 
 /* ── Identyfikatory z opisów (§11.2, E3) ─────────────────────────────────────
    Opis to pole swobodne, więc parser jest przybliżeniem — ale kosztowna jest
-   tylko jedna strona pomyłki. Numer przeoczony to kandydat mniej; numer
+   tylko jedna strona pomyłki. Numer przeoczony to trafienie mniej; numer
    ZMYŚLONY (`19` z `532 19 93-77`) prowadzi agenta do cudzej kartoteki.
    Dlatego tabela pilnuje kształtów, w których opis kusi, żeby powiedzieć za
    dużo, a strażnik na pełnym seedzie pilnuje, że reguły trafiają w dane.  */
 
 let db: typeof import("../db/db.js").db;
 let I: typeof import("./identyfikatory.js");
-let W: typeof import("./wiedza.js");
 let config: typeof import("../config.js").config;
-let biuro = 0;
 const FTC272 = 14;
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ config } = await import("../config.js"));
   I = await import("./identyfikatory.js");
-  W = await import("./wiedza.js");
   const d = db();
   const rows = JSON.parse(fs.readFileSync(config.seedProducts, "utf8")) as string[][];
   assert.ok(rows.length > 3000, `kartoteka wygląda na niekompletną: ${rows.length}`);
@@ -37,10 +34,7 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["model_z_opisu", "towar_identyfikator", "dowod_zastosowania", "zastosowanie", "model_urzadzenia", "events", "app_user"]) {
-    d.prepare(`DELETE FROM ${t}`).run();
-  }
-  biuro = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. Lewandowska','biuro')").run().lastInsertRowid);
+  for (const t of ["towar_identyfikator", "events"]) d.prepare(`DELETE FROM ${t}`).run();
 });
 
 const liczba = (t: string) => (db().prepare(`SELECT count(*) n FROM ${t}`).get() as { n: number }).n;
@@ -100,13 +94,6 @@ test("parser identyfikatorów: kształty z prawdziwych opisów", () => {
   }
 });
 
-test("sekcja Modele: to jeden wiersz, pusta sekcja nie wraca", () => {
-  assert.deepEqual(I.modeleZOpisu("OEM: 41307131600 Modele: FS200 FS250 Zamiennik: 24-04003"), ["FS200 FS250"]);
-  assert.deepEqual(I.modeleZOpisu("60 mikronów  Modele: OEM: 493629"), []);
-  assert.deepEqual(I.modeleZOpisu("Modele: HUSQVARNA 345 FR, 545 FR //JONSERED // CC2245 OEM: 1"), ["HUSQVARNA 345 FR, 545 FR //JONSERED // CC2245"]);
-  assert.deepEqual(I.modeleZOpisu("Model: 021 Zamiennik: X"), ["021"]);
-});
-
 test("na pełnej kartotece przebudowa daje setki identyfikatorów, nie zero i nie tysiące", () => {
   const w = I.przebudujIdentyfikatory(db());
   /* PROGI PODNIESIONE W 0.234.0, bo doszła rodzina „zamiennik": z 530 kartotek
@@ -119,8 +106,6 @@ test("na pełnej kartotece przebudowa daje setki identyfikatorów, nie zero i ni
     "SELECT count(*) n FROM towar_identyfikator WHERE rodzaj='zamiennik'").get() as { n: number }).n);
   assert.ok(zSekcjiZamiennikow >= 1400, `z sekcji zamienników: ${zSekcjiZamiennikow}`);
   assert.ok(w.ms < 5000, `przebudowa trwała ${w.ms} ms — rytm importu to 60 s`);
-  const m = I.przebudujModeleZOpisu(db());
-  assert.ok(m.nowych >= 25 && m.nowych <= 45, `sekcji Modele: ${m.nowych}`);
   /* Numer z pytania klienta prowadzi do kartoteki — w obu zapisach. */
   /* Zamiennik `24-04003` ma w opisie ten sam numer OEM — oba wracają, człowiek wybiera. */
   assert.ok(I.szukajPoIdentyfikatorze("41307131600").map((i) => i.symbol).includes("FTC272"));
@@ -152,55 +137,19 @@ test("z sekcji zamienników wchodzą OBCE numery, nasze kartoteki zostają zamie
   assert.ok(I.szukajPoIdentyfikatorze("15-06002").some((i) => i.twId === 1));
 });
 
-test("przebudowa jest idempotentna, omija wpisy ręczne i nie wskrzesza odrzuconych sekcji", () => {
-  I.przebudujIdentyfikatory(db()); I.przebudujModeleZOpisu(db());
-  const reczny = I.dodajIdentyfikator(FTC272, "katalog_obcy", "HQ-12345", biuro);
-  assert.equal(reczny.zrodlo, "reczne");
-  assert.throws(() => I.dodajIdentyfikator(FTC272, "katalog_obcy", "hq 12345", biuro), W.WiedzaConflict);
-  assert.throws(() => I.dodajIdentyfikator(FTC272, "oem", "12", biuro), /cztery znaki/);
-  assert.throws(() => I.dodajIdentyfikator(999999, "oem", "12345", biuro), /Nie ma takiej kartoteki/);
-
-  const wiersz = I.listaModeliZOpisow().wiersze.find((m) => m.twId === FTC272)!;
-  assert.equal(wiersz.tekst, "FS200 FS250");
-  I.odrzucModelZOpisu(wiersz.id, biuro);
-
-  const przed = [liczba("towar_identyfikator"), liczba("model_z_opisu")];
-  I.przebudujIdentyfikatory(db()); I.przebudujModeleZOpisu(db());
-  assert.deepEqual([liczba("towar_identyfikator"), liczba("model_z_opisu")], przed, "druga przebudowa nie mnoży wierszy");
-  assert.equal(I.identyfikatoryTowaru(FTC272).some((i) => i.wartosc === "HQ-12345" && i.zrodlo === "reczne"), true);
-  assert.equal(I.listaModeliZOpisow().wiersze.some((m) => m.twId === FTC272), false, "odrzucony nie wraca");
-  /* Ręczny wpis tego, co stoi w opisie: zostaje wpis ręczny z podpisem człowieka. */
-  db().prepare("DELETE FROM towar_identyfikator WHERE tw_id=? AND wartosc_norm='41307131600'").run(FTC272);
-  I.dodajIdentyfikator(FTC272, "oem", "41307131600", biuro);
+test("przebudowa jest idempotentna i omija wpisy spoza opisów", () => {
   I.przebudujIdentyfikatory(db());
-  const oem = I.identyfikatoryTowaru(FTC272).filter((i) => i.wartosc === "41307131600");
-  assert.equal(oem.length, 1); assert.equal(oem[0].zrodlo, "reczne");
-});
-
-test("przerobienie sekcji Modele: rodzi propozycję ze źródłem opis i dowodem decyzji biura", () => {
-  I.przebudujModeleZOpisu(db());
-  const wiersz = I.listaModeliZOpisow().wiersze.find((m) => m.twId === FTC272)!;
-  const z = I.przerobModelZOpisu(wiersz.id, { rodzaj: "maszyna", marka: "STIHL", nazwa: "FS 250" }, biuro);
-  assert.equal(z.stan, "propozycja", "człowiek wskazał model, ale zatwierdza osobno");
-  assert.equal(z.zrodlo, "opis");
-  assert.equal(z.dowody[0].rodzaj, "decyzja_biura");
-  assert.match(z.dowody[0].tresc, /z opisu kartoteki „FTC272”: Modele: FS200 FS250/);
-  assert.equal(z.pewnosc, "potwierdzone");
-  assert.throws(() => I.przerobModelZOpisu(wiersz.id, { rodzaj: "maszyna", marka: "STIHL", nazwa: "FS 200" }, biuro), W.WiedzaConflict);
-  assert.throws(() => I.odrzucModelZOpisu(wiersz.id, biuro), W.WiedzaConflict);
-  /* Hala nie rozstrzyga (ta sama bramka co przy zastosowaniach). */
-  const hala = Number(db().prepare("INSERT INTO app_user(login,name,role) VALUES ('m','Marek','magazynier')").run().lastInsertRowid);
-  const inny = I.listaModeliZOpisow().wiersze[0];
-  assert.throws(() => I.odrzucModelZOpisu(inny.id, hala), /człowiek z biura/);
-  const p = I.pokrycieWiedzy();
-  assert.equal(p.modeleZOpisu.przerobionych, 1);
-  assert.equal(p.zastosowania.propozycji, 1);
-  assert.equal(p.fts.dostepne, true);
+  db().prepare(`INSERT INTO towar_identyfikator(tw_id,tw_symbol,rodzaj,wartosc,wartosc_norm,zrodlo,dodal)
+    VALUES (?, 'FTC272', 'katalog_obcy', 'HQ-12345', 'HQ12345', 'reczne', 'Ala')`).run(FTC272);
+  const przed = liczba("towar_identyfikator");
+  I.przebudujIdentyfikatory(db());
+  assert.equal(liczba("towar_identyfikator"), przed, "druga przebudowa nie mnoży wierszy");
+  assert.equal(I.identyfikatoryTowaru(FTC272).some((i) => i.wartosc === "HQ-12345" && i.zrodlo === "reczne"), true);
 });
 
 test("odczyt niczego nie zapisuje", () => {
-  I.przebudujIdentyfikatory(db()); I.przebudujModeleZOpisu(db());
+  I.przebudujIdentyfikatory(db());
   const przed = liczba("events");
-  I.szukajPoIdentyfikatorze("41307131600"); I.identyfikatoryTowaru(FTC272); I.listaModeliZOpisow(); I.pokrycieWiedzy();
+  I.szukajPoIdentyfikatorze("41307131600"); I.identyfikatoryTowaru(FTC272);
   assert.equal(liczba("events"), przed);
 });

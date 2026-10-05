@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Check, ChevronRight, Package, Tag } from "lucide-react";
+import { ChevronRight, Package, Tag } from "lucide-react";
 import type { OfertaRozmowy as Dane, ZgodnoscOferty } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { KafelOferty } from "../towar/Kafel";
@@ -133,19 +133,16 @@ export function OfertaRozmowy({ oferta, zTytulem = true, cenaZakupuGrosze = null
  * Listę mieliśmy od 0.253.0 i czytał ją wyłącznie model; agent szedł po nią
  * do Allegro. Tamto wyjście zabrania §25.
  *
- * ZWINIĘTA, BO BYWA NA DWIEŚCIE POZYCJI. Na wierzchu stoi jedna rzecz, która
- * rozstrzyga: czy maszyna z doboru jest na liście. Dopasowanie liczy serwer
- * tą samą funkcją, która pisze fakt szkicu — ekran i szkic nie mogą mówić
- * o dwóch różnych pozycjach.
+ * ZWINIĘTA, BO BYWA NA DWIEŚCIE POZYCJI. Na wierzchu stoi sama liczba
+ * pozycji, a lista otwiera się kliknięciem.
  *
- * „NIE MA NA LIŚCIE" NIE JEST „NIE PASUJE". Lista to deklaracja sprzedawcy
- * i bywa niepełna; zdanie mówi to wprost, żeby nie przeszło do odpowiedzi.
+ * Lista to deklaracja sprzedawcy i bywa niepełna, więc dymek mówi to wprost,
+ * żeby brak pozycji nie przeszedł do odpowiedzi jako „nie pasuje”.
  * Treść oferty dociąga układanie szkicu, więc bez niego bloku nie ma —
  * otwarcie rozmowy niczego nie pobiera.
  */
 function PasujeDo({ z }: { z: ZgodnoscOferty }) {
   const [otwarta, setOtwarta] = useState(false);
-  const trafienia = new Set(z.trafienia);
   return <div className="text-xs" aria-label="Pasuje do">
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       <button type="button" aria-expanded={otwarta} onClick={() => setOtwarta((o) => !o)}
@@ -153,21 +150,10 @@ function PasujeDo({ z }: { z: ZgodnoscOferty }) {
         className="inline-flex items-center gap-1 font-semibold text-slate-700 hover:text-slate-900">
         <ChevronRight size={12} aria-hidden="true" className={`transition-transform ${otwarta ? "rotate-90" : ""}`} />
         Pasuje do ({z.lista.length})</button>
-      {/* Pigułka płynie jak zdanie, nie jak dwa elementy flex: w wąskiej
-          kolumnie dopisek o wariancie stawał obok w osobnej kolumnie. */}
-      {z.maszyna && (z.trafienia.length > 0
-        ? <span className="rounded bg-emerald-100 px-1.5 py-0.5 font-semibold text-emerald-900">
-            <Check size={11} aria-hidden="true" className="mr-1 inline align-middle" />{z.maszyna} jest na liście
-            {!z.wariantSprawdzony && <span className="font-normal"> · wariant niesprawdzony</span>}</span>
-        : <span className="text-slate-600">
-            {z.maszyna} — nie ma na liście; to nie dowód, że nie pasuje</span>)}
     </div>
-    {/* Trafienie ma tło z wcięciem, więc ujemny margines oddaje je w bok:
-        tekst zostaje na osi sąsiadów. */}
     {otwarta && <ul className="mt-1.5 columns-2 gap-4">
-      {z.lista.map((p, i) => <li key={`${p}-${i}`} className={`break-inside-avoid py-0.5 ${trafienia.has(p)
-        ? "-mx-1 rounded bg-emerald-100 px-1 font-semibold text-emerald-900" : "text-slate-700"}`}>
-        {p}{trafienia.has(p) && <span className="sr-only"> — maszyna klienta</span>}</li>)}
+      {z.lista.map((p, i) => <li key={`${p}-${i}`} className="break-inside-avoid py-0.5 text-slate-700">
+        {p}</li>)}
     </ul>}
   </div>;
 }

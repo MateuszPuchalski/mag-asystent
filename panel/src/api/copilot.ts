@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  Kategoria, OcenaPasowania, OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota,
+  Kategoria, OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota,
   WymianaCopilota, WynikPartii,
 } from "./typy";
 
@@ -118,28 +118,6 @@ export function useOcenSzkic() {
   });
 }
 
-/**
- * Los pasowania rozpoznanego w rozmowie (przyrost czwarty): `zaproponowane`
- * kładzie parę w kolejce wiedzy jako propozycję ze źródłem `copilot`,
- * `odrzucone` odsyła. Unieważnia rozmowę (propozycja jedzie w `osRozmowy`),
- * pomiar i KOLEJKĘ WIEDZY — para właśnie tam wylądowała — oraz kartoteki,
- * bo blok towaru w rozmowie pokazuje, co czeka.
- */
-export function useOcenPasowanie() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { rozmowaId: number; ocena: OcenaPasowania }) =>
-      api<{ szkic: SzkicCopilota }>(`/api/obsluga/copilot/szkic/${v.rozmowaId}/pasowanie`,
-        { method: "POST", body: JSON.stringify({ ocena: v.ocena }) }),
-    onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
-      qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
-      qc.invalidateQueries({ queryKey: ["wiedza", "kolejka"] });
-      qc.invalidateQueries({ queryKey: ["wiedza", "towar"] });
-    },
-  });
-}
-
 /* ── Dopytanie Copilota (0.332.0) ────────────────────────────────────────────
    Agent pyta o szkic, model odpowiada JEMU. Nie ma stąd drogi do klienta:
    żeby coś z wymiany trafiło do wiadomości, agent układa szkic od nowa.
@@ -167,21 +145,6 @@ export function useWymianyCopilota(rozmowaId: number) {
     /* Bez rozmowy nie ma czego pobierać — inaczej ekran bez wybranej rozmowy
        strzelałby po `/pytania/0` przy każdym wejściu. */
     enabled: rozmowaId > 0,
-  });
-}
-
-/** „Zapisz jako propozycję” przy pasowaniu z sieci (0.528.0). Parę bierze serwer z wiersza wymiany. */
-export function useZapiszPasowanieZDopytania() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { rozmowaId: number; wymianaId: number; nr: number }) =>
-      api<{ wymiana: WymianaCopilota }>(`/api/obsluga/copilot/pytania/${v.wymianaId}/pasowania/${v.nr}`,
-        { method: "POST" }),
-    onSettled: (_d, _e, v) => {
-      qc.invalidateQueries({ queryKey: kluczeCopilota.pytania(v.rozmowaId) });
-      /* Propozycja stanęła w Kolejce Wiedzy — jej licznik ma to widzieć. */
-      qc.invalidateQueries({ queryKey: ["wiedza"] });
-    },
   });
 }
 

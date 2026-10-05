@@ -722,9 +722,7 @@ export interface PomiarCopilota {
      */
     medianaMs: number | null; p90Ms: number | null }>;
   /**
-   * Szkice odpowiedzi: ile powstało i co agent z nimi zrobił. Od przyrostu
-   * trzeciego także los DANYCH z rozmowy — osobno, bo dobry szkic bywa ze
-   * złym modelem i odwrotnie.
+   * Szkice odpowiedzi: ile powstało i co agent z nimi zrobił.
    */
   szkice: {
     /**
@@ -733,13 +731,6 @@ export interface PomiarCopilota {
      * szkic bywał potem przepisany. Los niosą `wyslanych*` niżej.
      */
     ile: number; odrzuconych: number;
-    daneZaproponowane: number; daneWpisane: number; daneOdrzucone: number;
-    /**
-     * Pasowania z rozmowy (przyrost czwarty): ile model nazwał, co agent
-     * kliknął i — właściwa miara jakości — ile z nich biuro ZATWIERDZIŁO.
-     */
-    pasowaniaRozpoznane: number; pasowaniaZaproponowane: number; pasowaniaOdrzucone: number;
-    pasowaniaZatwierdzonePrzezBiuro: number;
     /**
      * Los szkicu PRZY WYSYŁCE (22 września 2026): ile odpowiedzi poszło ze
      * szkicu bez zmian, a ile z poprawką. Specyfikacja stawia to obok
@@ -772,8 +763,8 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
       COALESCE(SUM(wyszukiwania),0) AS wyszukiwania
     FROM copilot_wywolanie WHERE model <> '' GROUP BY model`)
     .all() as Array<Record<string, string | number>>;
-  /* Wyszukiwania w sieci (0.507.0) płaci się od sztuki — bez nich pomiar
-     zaniżałby koszt pasowania z sieci o większą część rachunku. */
+  /* Wyszukiwania w sieci płaci się od sztuki, a księga trzyma je także
+     sprzed zmian. Bez nich pomiar zaniżałby koszt o część rachunku. */
   const usd = perModel.reduce((suma, m) => suma + kosztUsd(String(m.model), {
     wej: Number(m.wej), wyj: Number(m.wyj),
     cacheZapis: Number(m.cacheZapis), cacheOdczyt: Number(m.cacheOdczyt),
@@ -825,16 +816,8 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
   }
 
   const sz = database.prepare(`SELECT COUNT(*) AS ile,
-      SUM(CASE WHEN ocena='odrzucony' THEN 1 ELSE 0 END) AS odrzuconych,
-      SUM(CASE WHEN dane_doboru IS NOT NULL THEN 1 ELSE 0 END) AS daneZaproponowane,
-      SUM(CASE WHEN dane_ocena='wpisane' THEN 1 ELSE 0 END) AS daneWpisane,
-      SUM(CASE WHEN dane_ocena='odrzucone' THEN 1 ELSE 0 END) AS daneOdrzucone,
-      SUM(CASE WHEN pasowanie_propozycja IS NOT NULL THEN 1 ELSE 0 END) AS pasowaniaRozpoznane,
-      SUM(CASE WHEN pasowanie_ocena='zaproponowane' THEN 1 ELSE 0 END) AS pasowaniaZaproponowane,
-      SUM(CASE WHEN pasowanie_ocena='odrzucone' THEN 1 ELSE 0 END) AS pasowaniaOdrzucone
+      SUM(CASE WHEN ocena='odrzucony' THEN 1 ELSE 0 END) AS odrzuconych
     FROM szkic_copilota`).get() as Record<string, number>;
-  const zatw = database.prepare(`SELECT COUNT(*) AS n FROM pasowanie_czesci
-    WHERE zrodlo_propozycji='copilot' AND stan='zatwierdzone'`).get() as { n: number };
   const wys = database.prepare(`SELECT
       SUM(CASE WHEN szkic_los='bez_zmian' THEN 1 ELSE 0 END) AS bez,
       SUM(CASE WHEN szkic_los='poprawiony' THEN 1 ELSE 0 END) AS popr
@@ -850,12 +833,6 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
     wgZadania,
     szkice: {
       ile: Number(sz.ile ?? 0), odrzuconych: Number(sz.odrzuconych ?? 0),
-      daneZaproponowane: Number(sz.daneZaproponowane ?? 0),
-      daneWpisane: Number(sz.daneWpisane ?? 0), daneOdrzucone: Number(sz.daneOdrzucone ?? 0),
-      pasowaniaRozpoznane: Number(sz.pasowaniaRozpoznane ?? 0),
-      pasowaniaZaproponowane: Number(sz.pasowaniaZaproponowane ?? 0),
-      pasowaniaOdrzucone: Number(sz.pasowaniaOdrzucone ?? 0),
-      pasowaniaZatwierdzonePrzezBiuro: Number(zatw.n ?? 0),
       wyslanychBezZmian: Number(wys.bez ?? 0), wyslanychPoprawionych: Number(wys.popr ?? 0),
     },
   };

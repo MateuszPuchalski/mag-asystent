@@ -69,9 +69,6 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/copilot/szkic", payload: { rozmowaId: rozmowa } },
   { method: "POST" as const, url: `/api/obsluga/copilot/szkic/${rozmowa}/ocena`,
     payload: { ocena: "wstawiony" } },
-  { method: "POST" as const, url: `/api/obsluga/copilot/szkic/${rozmowa}/pasowanie`,
-    payload: { ocena: "odrzucone" } },
-  { method: "POST" as const, url: "/api/obsluga/copilot/pytania/1/pasowania/0" },
 ];
 
 test("bez sesji żadna trasa Copilota nie odpowiada danymi", async () => {
@@ -90,7 +87,7 @@ test("hala nie widzi Copilota — bramka stoi też na odczycie", async () => {
   }
 });
 
-/* ── Umowa: CZTERY trasy zapisu ─────────────────────────────────────────────
+/* ── Umowa: PIĘĆ tras zapisu ─────────────────────────────────────────────
    Licznik jest umową, jak przy zwrotach. Każdy nowy zapis podnosi liczbę
    i dostaje zdanie uzasadnienia.
 
@@ -111,29 +108,22 @@ test("hala nie widzi Copilota — bramka stoi też na odczycie", async () => {
    CZWARTA to werdykt agenta o szkicu: wstawił, zastąpił, odrzucił. Ten sam
    argument co przy drugiej — bez niej „szkic z AI" byłby kosztem bez miary.
 
-   Los danych doboru nie ma trasy: dane z rozmowy wchodzą same, w puste
-   pola, a agent poprawia je w zakładce Dobór (`docs/dobor-od-zera.md` §2).
+   PIĄTA (0.332.0) to dopytanie: trasa produkuje tekst DLA AGENTA i celowo
+   nie ma sit szkicu, więc wspólna trasa z trzecią musiałaby wybrać jedno
+   zachowanie dla dwóch różnych rzeczy.
 
-   PIĄTA to los pasowania rozpoznanego w rozmowie (przyrost czwarty):
-   jedno kliknięcie agenta kładzie parę w kolejce wiedzy jako propozycję ze
-   źródłem `copilot` albo ją odsyła. Osobna od `POST wiedza/pasowania`, bo
-   tamta wywodzi źródło z kontekstu i nie zna wiersza szkicu; para, rola
-   i dowód idą z wiersza SPRAWDZONEGO przez serwer, nie z ciała żądania.
-   Rozstrzyga biuro, jak przy każdej propozycji. */
-/* SZÓSTA (0.332.0) to dopytanie. Licznik podniósł się o jeden świadomie:
-   trasa produkuje tekst DLA AGENTA i celowo nie ma sit szkicu, więc wspólna
-   trasa z tamtą musiałaby wybrać jedno zachowanie dla dwóch różnych rzeczy. */
-/* SIÓDMA (0.528.0) to „Zapisz jako propozycję” przy pasowaniu z sieci
-   znalezionym w dopytaniu. Para leży przy wymianie i przeszła sito strony;
-   trasa bierze ją z wiersza, nie z ciała żądania — jak piąta ze szkicu. */
-test("Copilot ma SIEDEM tras zapisu", async () => {
+   Szkic nie zapisuje niczego poza sobą: ani danych maszyny, ani par części.
+   Dlatego nie ma tras na ich los. */
+test("Copilot ma PIĘĆ tras zapisu", async () => {
   const zrodlo = fs.readFileSync(new URL("./copilot.ts", import.meta.url), "utf8");
   const posty = zrodlo.match(/app\.post[<(]/g) ?? [];
-  assert.equal(posty.length, 7, `tras POST jest ${posty.length}, a umowa mówi o siedmiu`);
-  for (const slowo of ["klasyfikacja", "korekta", "ocena", "szkic", "pasowanie", "pytanie", "pasowania/:nr"]) {
+  assert.equal(posty.length, 5, `tras POST jest ${posty.length}, a umowa mówi o pięciu`);
+  for (const slowo of ["klasyfikacja", "korekta", "ocena", "szkic", "pytanie"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
-  assert.equal(zrodlo.includes("/:id/dane"), false, "los danych doboru nie ma już trasy");
+  for (const nie of ["/:id/dane", "/pasowanie", "pasowania/:nr"]) {
+    assert.equal(zrodlo.includes(nie), false, `trasa ${nie} wróciła`);
+  }
 });
 
 test("patrzenie na Copilota niczego nie mutuje", async () => {
@@ -217,23 +207,6 @@ test("ocena szkicu bez szkicu odmawia zdaniem", async () => {
   });
   assert.equal(r.statusCode, 400);
   assert.match(r.json<{ error: string }>().error, /nie ma jeszcze szkicu/);
-});
-
-test("ocena pasowania bez propozycji odmawia zdaniem, a zła ocena nazywa dozwolone", async () => {
-  const b = login("biuro", "Ala");
-  let r = await app.inject({
-    method: "POST", url: `/api/obsluga/copilot/szkic/${rozmowa}/pasowanie`,
-    headers: b.naglowki, payload: { ocena: "zaproponowane" },
-  });
-  assert.equal(r.statusCode, 400);
-  assert.match(r.json<{ error: string }>().error, /nie ma propozycji pasowania/);
-  r = await app.inject({
-    method: "POST", url: `/api/obsluga/copilot/szkic/${rozmowa}/pasowanie`,
-    headers: b.naglowki, payload: { ocena: "moze" },
-  });
-  assert.equal(r.statusCode, 400);
-  assert.match(r.json<{ error: string }>().error, /„zaproponowane” albo „odrzucone”/);
-  assert.equal(liczba("szkic_copilota"), 0);
 });
 
 /* Strażnik adresów panelu (blizna 0.181.1): każdy adres wołany z

@@ -1,7 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { KONIEC_SEKCJI, sekcjeZestawu, segmentyPoEtykiecie } from "./opis-sekcje.js";
-import { modeleZOpisu } from "./identyfikatory.js";
 
 /* ── Granica sekcji i zawartość zestawu ──────────────────────────────────────
    „W zestawie" bez dwukropka to JEDYNA etykieta bez dwukropka w parserze
@@ -38,6 +37,4 @@ test("sekcjeZestawu oddaje surowy tekst dla każdego kształtu etykiety", () => 
 test("zestaw kończy się na następnej etykiecie, a literówka „zestawiie:” to granica ogólna", () => {
   assert.deepEqual(sekcjeZestawu("W zestawie Uszczelka  Zamiennie: M831402 // 520003"), ["Uszczelka"]);
   assert.deepEqual(sekcjeZestawu("Stare SKU: FTC272 W zestawiie: 3 szt"), []);
-  /* Sekcja „Modele:" też kończy się na zestawie — inaczej „uszczelka" byłaby modelem. */
-  assert.deepEqual(modeleZOpisu("Modele: FS200 W zestawie uszczelka"), ["FS200"]);
 });

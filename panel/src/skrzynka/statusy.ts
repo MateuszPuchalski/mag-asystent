@@ -1,6 +1,5 @@
 import type {
-  Akcja, GrupaKandydata, Kategoria, Pewnosc, PodstawaWyboru, PowodNegatywny, RodzajDowodu, RodzajIdentyfikatora,
-  StanDoboru, StatusRozmowy, ZrodloPropozycji, RolaPasowania, ZrodloZakonczenia } from "../api/typy";
+  Akcja, Kategoria, Pewnosc, StatusRozmowy, ZrodloZakonczenia } from "../api/typy";
 
 /* Nazwy statusów PO POLSKU w jednym miejscu. Lista jest zamknięta i pochodzi
    z §7 — `Record<StatusRozmowy, string>` sprawia, że dołożenie statusu
@@ -34,51 +33,13 @@ export const ZRODLO_ZAKONCZENIA: Record<ZrodloZakonczenia, string> = {
   allegro: "wątek zamknięty w Allegro",
 };
 
-/* Stany DOBORU (`docs/dobor-od-zera.md` §4.2). `Record` nie skompiluje się
-   bez nazwy dla nowego stanu. Nazwa mówi ODPOWIEDŹ dla klienta, bo po nią
-   agent otwiera dobór, a nie etap roboty. */
-export const NAZWA_STANU_DOBORU: Record<StanDoboru, string> = {
-  pusty: "Nie zaczęty",
-  otwarty: "Otwarty",
-  czesc: "Wybrano część",
-  brak: "Nie mamy",
-  dopytac: "Dopytać klienta",
-  nie_dotyczy: "Nie dotyczy",
-};
-
-/* Barwa znaku doboru w kolejce. Zieleń to gotowa odpowiedź, czerwień czeka
-   na klienta, bursztyn jest robotą w toku, szarość mówi „nie mamy".
-   `null` = stan bez znaku, bo nie ma w nim nic do zrobienia. */
-export const BARWA_STANU_DOBORU: Record<StanDoboru, string | null> = {
-  pusty: null,
-  otwarty: "text-amber-700",
-  czesc: "text-emerald-700",
-  brak: "text-slate-600",
-  dopytac: "text-ranga-zle",
-  nie_dotyczy: null,
-};
-
-/* Grupy kandydatów (§4.3) — trzy pytania, nie jedenaście dróg: co klient
-   wskazał, co wiedza potwierdza, co jest podobne. Te same nazwy czyta raport
-   miar, bo podstawa wyboru to grupa, z której przyszła część. */
-export const NAZWA_GRUPY: Record<GrupaKandydata, string> = {
-  numer: "Wskazane przez klienta",
-  wiedza: "Z bazy wiedzy",
-  podobne: "Podobne po nazwie",
-};
-
-export const NAZWA_PODSTAWY: Record<PodstawaWyboru, string> = {
-  ...NAZWA_GRUPY,
-  reczny: "Wskazane z wyszukiwarki",
-};
-
 /* KATEGORIE klasyfikatora (specyfikacja z 20 września 2026). Ta sama zasada,
-   co przy `NAZWA_STANU_DOBORU`: `Record<Kategoria, string>` NIE SKOMPILUJE SIĘ, gdy
+   co przy `NAZWA`: `Record<Kategoria, string>` NIE SKOMPILUJE SIĘ, gdy
    dojdzie szesnasta kategoria bez nazwy dla człowieka. Nazwy są krótkie, bo
    stoją na plakietce wiersza kolejki, a wiersz ma pokazywać pytanie klienta.
 
    „Dobór" zostaje nazwą `PRODUCT_COMPATIBILITY`, bo tak tę sprawę nazywa
-   całe biuro — i zakładka obok. */
+   całe biuro. */
 export const NAZWA_KATEGORII: Record<Kategoria, string> = {
   ORDER_STATUS: "Status zamówienia",
   DELIVERY_DELAY: "Opóźniona dostawa",
@@ -156,67 +117,3 @@ export const NAZWA_PEWNOSCI: Record<Pewnosc, string> = {
   srednia: "prawdopodobne",
   niska: "zgadywane",
 };
-
-/* Baza wiedzy (E2): powody negatywne §11.4 i rodzaje dowodów §11.3 — nazwy
-   do FORMULARZY. Zdania przy gotowych wpisach pisze serwer, panel ich nie
-   składa drugi raz. `decyzja_biura` stoi tam, gdzie projekt pisał „ekspert". */
-export const NAZWA_POWODU: Record<PowodNegatywny, string> = {
-  nie_pasuje: "nie pasuje",
-  tylko_inny_wariant: "pasuje tylko do innego wariantu",
-  niewlasciwy_rozstaw: "niewłaściwy rozstaw",
-  srednica_ok_inne_mocowanie: "właściwa średnica, inny sposób mocowania",
-  mylace_oznaczenie: "mylące oznaczenie",
-  wymaga_pomiaru: "wymaga dodatkowego pomiaru",
-};
-
-export const NAZWA_DOWODU: Record<RodzajDowodu, string> = {
-  producent: "producent",
-  katalog_dostawcy: "katalog dostawcy",
-  pomiar_wlasny: "pomiar własny",
-  sprzedaz_weryfikacja: "sprzedaż i weryfikacja",
-  decyzja_biura: "decyzja biura",
-  rozmowa: "rozmowa",
-};
-
-/* Do wyboru w formularzu ręcznym: `rozmowa` jest śladem, który zapisuje sam
-   dobór; człowiek wpisuje dowody TECHNICZNE. */
-export const DOWODY_DO_WYBORU: RodzajDowodu[] = [
-  "producent", "katalog_dostawcy", "pomiar_wlasny", "sprzedaz_weryfikacja", "decyzja_biura",
-];
-
-/* Skąd propozycja (E2/E3). Surowy klucz `opis` na ekranie mówił tyle, co nic. */
-export const NAZWA_ZRODLA: Record<ZrodloPropozycji, string> = {
-  dobor: "z doboru w rozmowie",
-  pomiar: "z pomiaru hali",
-  reczne: "wpis ręczny",
-  opis: "z opisu kartoteki",
-  copilot: "propozycja Copilota",
-  /* Nie „z oferty" samo w sobie: chodzi o NASZĄ ofertę Allegro, a nie
-     o ofertę dostawcy — na ekranie Wiedzy jedno i drugie brzmi tak samo. */
-  oferta: "z naszej oferty Allegro",
-};
-
-/* Rola części w pasowaniu (§11.2). To własność CZĘŚCI zapisana w relacji,
-   bo nazwa kartoteki to wolny tekst; lista zamknięta jak `RodzajDowodu`. */
-export const ROLE_PASOWANIA: RolaPasowania[] = [
-  "uszczelka", "membrana", "zestaw_naprawczy", "lacznik", "element_zestawu", "inne",
-];
-export const NAZWA_ROLI: Record<RolaPasowania, string> = {
-  uszczelka: "uszczelka", membrana: "membrany", zestaw_naprawczy: "zestaw naprawczy",
-  lacznik: "łącznik kolektora", element_zestawu: "element zestawu", inne: "inne",
-};
-
-export const NAZWA_RODZAJU_IDENTYFIKATORA: Record<RodzajIdentyfikatora, string> = {
-  oem: "OEM",
-  nr_oryg: "nr oryginału",
-  katalog_obcy: "katalog obcy",
-  stare_sku: "stare SKU",
-  /* 0.234.0 — numer wyczytany z sekcji „Zamiennik:". Podpis mówi SKĄD, bo ta
-     sekcja jest słabszym świadectwem niż numer producenta (§11.3). */
-  zamiennik: "z zamienników",
-};
-/* Lista do WYBORU przy wpisie ręcznym, nie do wyświetlania. `zamiennik` jej
-   nie ma i to jest decyzja: ten rodzaj znaczy „parser wyczytał z sekcji
-   zamienników". Wpisany ręką kłamałby o swoim pochodzeniu, a biuro ma do tego
-   `katalog_obcy`. */
-export const RODZAJE_IDENTYFIKATORA: RodzajIdentyfikatora[] = ["oem", "nr_oryg", "katalog_obcy", "stare_sku"];

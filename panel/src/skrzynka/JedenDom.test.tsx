@@ -87,7 +87,7 @@ const HISTORIA: HistoriaKlienta = {
 
 /* Nowy klient: serwer oddaje historię z jednym wpisem, tym zakupem. Karta
    mówi wtedy „Nowy klient", a kolumna nie mówi o kliencie nic. */
-const HISTORIA_NOWEGO: HistoriaKlienta = { ...HISTORIA, maszyny: [], wpisy: [HISTORIA.wpisy[0]] };
+const HISTORIA_NOWEGO: HistoriaKlienta = { ...HISTORIA, wpisy: [HISTORIA.wpisy[0]] };
 
 const WIEDZA_DOBORU = { zastosowanie: null, zabudowa: null, pasowanie: null, silniki: [], pomiary: [] };
 
@@ -202,7 +202,7 @@ describe("Fakt z karty zakupu nie wraca do prawej kolumny", () => {
       historiaSerwera = historia;
       const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       render(<QueryClientProvider client={qc}><MemoryRouter>
-        <Kontekst dane={dane(kandydaci)} onWstawDoSzkicu={() => {}} onZlecPomiar={() => {}}
+        <Kontekst dane={dane(kandydaci)} onWstawDoSzkicu={() => {}}
           onOtworzRozmowe={() => {}} />
       </MemoryRouter></QueryClientProvider>);
 

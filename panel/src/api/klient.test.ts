@@ -34,9 +34,9 @@ describe("api()", () => {
     }
   });
 
-  it("zamienia 429 na PrzerwaAllegro z czasem przerwy — długa zbiórka ma czekać, nie pytać od razu", async () => {
+  it("zamienia 429 na PrzerwaAllegro z czasem przerwy — ekran ma czekać, nie pytać od razu", async () => {
     vi.stubGlobal("fetch", odp(429, { error: "Allegro prosi o przerwę", poIluMs: 30000 }));
-    const blad = await api("/api/obsluga/wiedza/pasuje-do/zbierz", { method: "POST" }).catch((e) => e);
+    const blad = await api("/api/obsluga/reklamacje/1/odswiez", { method: "POST" }).catch((e) => e);
     expect(blad).toBeInstanceOf(PrzerwaAllegro);
     expect((blad as PrzerwaAllegro).poIluMs).toBe(30000);
   });

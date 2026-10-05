@@ -46,7 +46,10 @@ const zl = (usd: number) => `${(usd * 4).toFixed(2)} zł`;
    z księgi to głos programisty. */
 const NAZWA_ZADANIA: Record<string, string> = {
   szkic: "szkic odpowiedzi", klasyfikacja: "rozpoznanie kategorii", pytanie: "pytanie do Copilota",
-  rozpoznanie_reklamacji: "rozpoznanie reklamacji", pasowanie_siec: "pasowanie z sieci",
+  rozpoznanie_reklamacji: "rozpoznanie reklamacji",
+  /* Tych trzech zadań nikt już nie zleca, ale wiersze księgi z okna pomiaru
+     dalej je niosą, a koszt bez nazwy byłby kosztem bez przyczyny. */
+  pasowanie_siec: "pasowanie z sieci",
   pasowanie_siec_silnik: "pasowanie od silnika", klucz_modelu: "klucz modelu z opisu",
   /* Poranek przed pracą (26 września 2026) ma własne zadania w księdze. */
   szkic_przed_praca: "szkic przed pracą", klasyfikacja_przed_praca: "rozpoznanie przed pracą",
@@ -133,14 +136,6 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
           {" "}Wysłanych ze szkicu: bez zmian <b>{dane.szkice.wyslanychBezZmian}</b>,
           {" "}z poprawką <b>{dane.szkice.wyslanychPoprawionych}</b>;
           {" "}odrzuconych <b>{dane.szkice.odrzuconych}</b>.
-          {/* Los DANYCH osobno: dobry szkic bywa ze złym modelem i odwrotnie. */}
-          {dane.szkice.daneZaproponowane > 0 && <> Dane doboru z rozmowy w <b>{dane.szkice.daneZaproponowane}</b> szkicach:
-            {" "}wpisanych {dane.szkice.daneWpisane}, odrzuconych {dane.szkice.daneOdrzucone}.</>}
-          {/* Pasowania z rozmowy (przyrost czwarty): właściwa miara to ostatnia liczba —
-              czy biuro zatwierdza to, co model widzi. */}
-          {dane.szkice.pasowaniaRozpoznane > 0 && <> Pasowania z rozmowy w <b>{dane.szkice.pasowaniaRozpoznane}</b> szkicach:
-            {" "}zaproponowanych {dane.szkice.pasowaniaZaproponowane}, odrzuconych {dane.szkice.pasowaniaOdrzucone};
-            {" "}biuro zatwierdziło <b>{dane.szkice.pasowaniaZatwierdzonePrzezBiuro}</b>.</>}
         </p>;
       })()}
 

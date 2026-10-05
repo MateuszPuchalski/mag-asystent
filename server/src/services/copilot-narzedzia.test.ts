@@ -14,26 +14,19 @@ process.env.LOG_LEVEL = "silent";
    1. Zero zapisu. Żadne narzędzie nie zmienia ani jednego wiersza.
    2. Zero sieci. Allegro odcina za serie z jednego adresu, a model decyduje,
       ile razy sięgnie po treść oferty — więc treść idzie z kopii w bazie.
-   3. Półka nie wychodzi (§10.4), choć karta towaru ją niesie.
-   4. Propozycja jest opisana jako propozycja i niesie znacznik WP, zatwierdzone
-      zastosowanie — WZ. Na tym stoi sufit pewności po stronie serwera.    */
+   3. Półka nie wychodzi (§10.4), choć karta towaru ją niesie.             */
 
 let db: typeof import("../db/db.js").db;
 let N: typeof import("./copilot-narzedzia.js");
-let W: typeof import("./wiedza.js");
 let subiekt: typeof import("../context.js").subiekt;
-let biuro = 0;
 
 const GAZNIK = 701;
 const FILTR = 702;
-const MS250 = { rodzaj: "maszyna" as const, marka: "Stihl", nazwa: "MS 250" };
-const MS230 = { rodzaj: "maszyna" as const, marka: "Stihl", nazwa: "MS 230" };
 
 before(async () => {
   ({ db } = await import("../db/db.js"));
   ({ subiekt } = await import("../context.js"));
   N = await import("./copilot-narzedzia.js");
-  W = await import("./wiedza.js");
   const d = db();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa,ean,opis,lokalizacja) VALUES (?,?,?,?,?,?)")
     .run(GAZNIK, "GAZ-MS250", "Gaźnik Stihl MS 250", "5900000000017", "OEM: 1123 120 0650", "R-07-3");
@@ -46,11 +39,9 @@ before(async () => {
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dowod_zastosowania", "zastosowanie", "model_urzadzenia", "offer_snapshot",
-    "oferta_kartoteka", "events", "app_user", "channel_account"]) {
+  for (const t of ["offer_snapshot", "oferta_kartoteka", "events", "channel_account"]) {
     d.prepare(`DELETE FROM ${t}`).run();
   }
-  biuro = Number(d.prepare("INSERT INTO app_user(login,name,role) VALUES ('ala','A. L.','biuro')").run().lastInsertRowid);
 });
 
 const wykonaj = (nazwa: string, zapytanie: string) => N.zestawNarzedzi(subiekt).wykonaj(nazwa, { zapytanie });
@@ -63,21 +54,11 @@ function odcisk(): string {
   return tabele.map((t) => `${t}:${(d.prepare(`SELECT count(*) n FROM "${t}"`).get() as { n: number }).n}`).join(",");
 }
 
-function zastosowania() {
-  const pewne = W.zaproponujZastosowanie({
-    twId: GAZNIK, model: MS230, polaryzacja: "pasuje", zrodlo: "reczne",
-    dowod: { rodzaj: "producent", tresc: "katalog Stihl 2019" },
-  }, { userId: biuro, name: "A. L." })!;
-  W.rozstrzygnijZastosowanie(pewne.id, "zatwierdz", null, biuro);
-  const propozycja = W.zaproponujZastosowanie({
-    twId: GAZNIK, model: MS250, polaryzacja: "pasuje", zrodlo: "copilot",
-    dowod: { rodzaj: "katalog_dostawcy", tresc: "lista części", link: "https://example.com/ms250" },
-  }, { automat: "siec" })!;
-  return { pewne, propozycja };
-}
+test("zestaw to wyłącznie odczyt towaru i ofert", () => {
+  assert.deepEqual(N.DEFINICJE.map((d) => d.name), ["szukaj_towaru", "karta_towaru", "tresc_oferty"]);
+});
 
 test("żadne narzędzie nie zapisuje i nie woła sieci", () => {
-  zastosowania();
   const przed = odcisk();
   const fetchBylo = globalThis.fetch;
   let zawolano = 0;
@@ -104,23 +85,6 @@ test("szukanie po numerze OEM znajduje kartotekę, a karta nie zdradza półki",
   assert.ok(!k.includes("R-07-3"), "adres regału nie wychodzi do modelu (§10.4)");
 });
 
-test("pasowanie odróżnia zatwierdzone (WZ) od propozycji (WP) i podaje źródło propozycji", () => {
-  const { pewne, propozycja } = zastosowania();
-  const p = String(wykonaj("pasowanie_towaru", "GAZ-MS250").wynik);
-  assert.ok(p.includes(`[WZ${pewne.id}]`), p);
-  assert.ok(p.includes(`[WP${propozycja.id}]`), p);
-  assert.ok(p.includes("NIEZATWIERDZONE"), "propozycja mówi o sobie wprost");
-  assert.ok(p.includes("https://example.com/ms250"), "agent ma móc kliknąć źródło");
-});
-
-test("części do maszyny: kierunek odwrotny, tylko zatwierdzone, a „brak” to „nie wiemy”", () => {
-  const { pewne } = zastosowania();
-  const m = String(wykonaj("czesci_do_maszyny", "MS 230").wynik);
-  assert.ok(m.includes(`WZ${pewne.id}`) && m.includes("GAZ-MS250"), m);
-  const nic = String(wykonaj("czesci_do_maszyny", "Husqvarna 135").wynik);
-  assert.ok(nic.includes("nie wiemy"), nic);
-});
-
 test("treść oferty idzie z kopii w bazie, przez powiązanie oferty z kartoteką", () => {
   const d = db();
   const konto = Number(d.prepare("INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','s')")
@@ -140,15 +104,4 @@ test("zły symbol, puste zapytanie i nieznane narzędzie wracają do modelu jako
     "zły symbol podpowiada właściwe narzędzie");
   assert.equal(wykonaj("karta_towaru", "   ").blad, true);
   assert.equal(wykonaj("kasuj_wszystko", "GAZ-MS250").blad, true);
-});
-
-test("sufit pewności: WP w odwołaniu schodzi do „niepewne”, reszta zostaje", () => {
-  const [a, b, c] = N.naPropozycjiNiepewne<{ odwolanie: string | null; pewnosc: string; obnizona?: boolean }>([
-    { odwolanie: "WP12", pewnosc: "pewne" },
-    { odwolanie: "WZ12", pewnosc: "pewne" },
-    { odwolanie: null, pewnosc: "prawdopodobne" },
-  ]);
-  assert.deepEqual([a!.pewnosc, a!.obnizona], ["niepewne", true]);
-  assert.equal(b!.pewnosc, "pewne");
-  assert.equal(c!.pewnosc, "prawdopodobne");
 });

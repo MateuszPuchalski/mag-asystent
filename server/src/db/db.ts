@@ -192,29 +192,10 @@ export function migrate(database: DatabaseSync) {
   /* Sygnatura oferty w chwili wskazania (0.219.0) — patrz `oferta_kartoteka`
      w `schema.sql`. Stare wiersze zostają z NULL i obowiązują jak dotąd. */
   addColumn("oferta_kartoteka", "sku_wtedy", "TEXT");
-  /* Dane doboru rozpoznane w rozmowie przy szkicu Copilota (etap F, przyrost
-     trzeci) — patrz `szkic_copilota` w `schema.sql`. Tabela stoi na produkcji
-     od 0.231.0, więc kolumny dochodzą migracją; stare szkice mają NULL i zero,
-     czyli „nic nie rozpoznano, wersja doboru nieznana". */
-  addColumn("szkic_copilota", "dane_doboru", "TEXT");
-  addColumn("szkic_copilota", "dane_ocena",
-    "TEXT CHECK (dane_ocena IS NULL OR dane_ocena IN ('wpisane','odrzucone'))");
-  addColumn("szkic_copilota", "dane_ocena_at", "TEXT");
-  addColumn("szkic_copilota", "dobor_wersja", "INTEGER NOT NULL DEFAULT 0");
-  /* Pasowanie rozpoznane w rozmowie (etap F, przyrost czwarty) — te same
-     powody co wyżej: tabela stoi na produkcji, stare szkice mają NULL. */
-  addColumn("szkic_copilota", "pasowanie_propozycja", "TEXT");
-  addColumn("szkic_copilota", "pasowanie_ocena",
-    "TEXT CHECK (pasowanie_ocena IS NULL OR pasowanie_ocena IN ('zaproponowane','odrzucone'))");
-  addColumn("szkic_copilota", "pasowanie_ocena_at", "TEXT");
   /* Twierdzenia szkicu ze źródłem i pewnością (0.253.0) — patrz
      `szkic_copilota` w `schema.sql`. Stare szkice dostają pustą listę, i to
      jest o nich prawda: powstały, zanim model musiał się legitymować. */
   addColumn("szkic_copilota", "twierdzenia", "TEXT NOT NULL DEFAULT '[]'");
-  /* Luki w kartotece wobec oferty (0.254.0) — patrz `szkic_copilota`
-     w `schema.sql`. Stare szkice mają pustą listę: powstały, zanim ktokolwiek
-     zestawił obie listy obok siebie. */
-  addColumn("szkic_copilota", "luki_kartoteki", "TEXT NOT NULL DEFAULT '[]'");
   addColumn("szkic_copilota", "odczyt_zdjec", "TEXT NOT NULL DEFAULT '[]'");
   /* Decyzja klasyfikatora, na której szkic powstał (23 września 2026). Szkic
      po rozpoznaniu układa się sam, a poprawka kategorii tworzy NOWĄ decyzję —
@@ -242,20 +223,6 @@ export function migrate(database: DatabaseSync) {
   /* Zapytania do wyszukiwarki w księdze Copilota (0.507.0) — pasowanie
      z sieci. Stare wiersze mają zero i to jest o nich prawda. */
   addColumn("copilot_wywolanie", "wyszukiwania", "INTEGER NOT NULL DEFAULT 0");
-  /* Pasowania znalezione w sieci przy dopytaniu (0.528.0), już po sicie.
-     Leżą przy wymianie, bo „Zapisz jako propozycję” bierze parę z wiersza
-     SPRAWDZONEGO przez serwer, nie z ciała żądania — ta sama zasada co przy
-     pasowaniu ze szkicu. Stare wymiany mają pustą listę i to jest o nich prawda. */
-  addColumn("copilot_pytanie", "pasowania", "TEXT NOT NULL DEFAULT '[]'");
-  /* Skąd wziął się tekst w kolejce Wiedzy (0.264.0) — patrz `model_z_opisu`
-     w `schema.sql`. Zastane wiersze dostają `'opis'` i to jest o nich PRAWDA:
-     powstały wyłącznie z sekcji „Modele:" w opisach kartotek. Tu wystarcza
-     `addColumn`, choć dwa CHECK-i wyżej wymagały przebudowy tabeli — bo nowa
-     kolumna z CHECK-iem jest legalna, a POSZERZENIE CHECK-a na kolumnie
-     istniejącej nie. */
-  addColumn("model_z_opisu", "zrodlo",
-    "TEXT NOT NULL DEFAULT 'opis' CHECK (zrodlo IN ('opis','oferta'))");
-  addColumn("model_z_opisu", "oferta_id", "TEXT");
   /* Treść oferty dla Copilota (0.253.0) — patrz `offer_snapshot`. Wiersze
      sprzed tego wydania mają NULL w `tresc_synced_at`, czyli „nie pytaliśmy
      jeszcze"; dociągną się leniwie, przy pierwszym szkicu pod tą ofertą. */
@@ -916,24 +883,11 @@ export function migrate(database: DatabaseSync) {
   addColumn("delivery_line", "cofniecie", "TEXT");
   addColumn("problem", "zrodlo",
     "TEXT CHECK (zrodlo IS NULL OR zrodlo IN ('zakonczenie','nadmiar'))");
-  przeniesDobor(database);
   identyfikatorZamiennika(database);
   typZakonczeniaWSkrzynce(database);
   znacznikiIso(database);
   identyfikatorZOferty(database);
   identyfikatorOdDostawcy(database);
-  zrodloPropozycjiZOferty(database);
-  /* Warunki zastosowania — PO przebudowie wyżej, bo jej `CREATE TABLE` tych
-     kolumn nie zna: dodane wcześniej zniknęłyby przy przepisaniu tabeli na
-     bazie sprzed 0.264.0. Stare wpisy dostają NULL, czyli „bez warunków" —
-     dokładnie to, co twierdziły dotąd. `import_id` z tego samego powodu:
-     wskazuje wykaz części, z którego przyszła propozycja. */
-  for (const [kolumna, typ] of [["rok_od", "INTEGER"], ["rok_do", "INTEGER"], ["seryjny_od", "TEXT"],
-    ["seryjny_do", "TEXT"], ["warunek", "TEXT"], ["import_id", "INTEGER"]] as const) {
-    if (database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='zastosowanie'").get()) {
-      addColumn("zastosowanie", kolumna, typ);
-    }
-  }
   /* DOSYŁKA: EPIZODY, OKNO NUMERU I LICZNIKI PRZEJŚĆ (0.536.1). Tabela
      `klient_dosylka` stoi na produkcji od 0.536.0 bez tych czterech kolumn,
      a `CREATE TABLE IF NOT EXISTS` ich nie dołoży. Bez tej migracji każdy
@@ -1013,7 +967,7 @@ export function migrate(database: DatabaseSync) {
   bezNakladkiSpraw(database);
   przeniesKlasyfikacjeRozmow(database);
   bezSzablonowOdpowiedzi(database);
-  tabelaFts(database);
+  bezDoboruIWiedzy(database);
 }
 
 /**
@@ -1078,6 +1032,63 @@ function przeniesKlasyfikacjeRozmow(database: DatabaseSync) {
  */
 function bezSzablonowOdpowiedzi(database: DatabaseSync) {
   database.exec("DROP TABLE IF EXISTS szablon_odpowiedzi");
+}
+
+/**
+ * Dobór części i baza wiedzy znikają w całości (decyzja właściciela).
+ *
+ * Oba stały na chwiejnym fundamencie, więc nowy kształt, jeśli powstanie,
+ * zacznie od zera. Kod odszedł razem z tabelami, bo TABELA BEZ CZYTELNIKA
+ * NIE JEST ARCHIWUM, TYLKO PUŁAPKĄ —
+ * to samo zdanie co przy szablonach wyżej. Kto chce tych danych, robi kopię
+ * bazy PRZED aktualizacją; mówi o tym `DEPLOY.md`.
+ *
+ * Klucze obce schodzą PRZED transakcją, bo tabele wskazują na siebie
+ * nawzajem, a w transakcji `PRAGMA foreign_keys` jest ignorowane po cichu.
+ *
+ * Kolumny szkicu i dopytania Copilota niosły dane doboru i propozycje
+ * pasowań. Schodzą `DROP COLUMN`, bo żaden kod ich już nie czyta ani nie
+ * pisze, a stara wartość domyślna myliłaby czytającego bazę.
+ *
+ * ZDARZEŃ NIE KASUJEMY. `dobor_*`, `wiedza_*` i `pasowanie_*` zostają
+ * w `events` i `conversation_event`: dziennik audytu nie ma retencji, a „kto
+ * co wtedy rozstrzygnął" ma zostać odpowiedzią możliwą do udzielenia.
+ */
+function bezDoboruIWiedzy(database: DatabaseSync) {
+  const jest = (tabela: string) => Boolean(database.prepare(
+    "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(tabela));
+  const kolumny = (tabela: string) => new Set((database.prepare(`PRAGMA table_info(${tabela})`)
+    .all() as Array<{ name: string }>).map((c) => c.name));
+  for (const [tabela, lista] of [
+    ["szkic_copilota", ["dane_doboru", "dane_ocena", "dane_ocena_at", "dobor_wersja",
+      "pasowanie_propozycja", "pasowanie_ocena", "pasowanie_ocena_at", "luki_kartoteki"]],
+    ["copilot_pytanie", ["pasowania"]],
+  ] as const) {
+    if (!jest(tabela)) continue;
+    const ma = kolumny(tabela);
+    for (const kolumna of lista) {
+      if (ma.has(kolumna)) database.exec(`ALTER TABLE ${tabela} DROP COLUMN ${kolumna}`);
+    }
+  }
+  /* Indeks pełnotekstowy karmił wyłącznie kandydatów doboru. Tabela wirtualna
+     bez modułu FTS5 w tym buildzie nie da się nawet skasować, a skoro go nie
+     ma, to i tabela nigdy nie powstała — błąd nie ma tu nic do powiedzenia. */
+  try { database.exec("DROP TABLE IF EXISTS towar_fts"); } catch { /* bez FTS5 tabeli nie było */ }
+  database.exec("PRAGMA foreign_keys = OFF");
+  try {
+    /* NAWIASY NA KOŃCU SĄ KONIECZNE: `transaction` ZWRACA opakowaną funkcję. */
+    transaction(database, () => {
+      /* Dziecko przed rodzicem, jak przy każdym innym kasowaniu tutaj. */
+      for (const tabela of [
+        "token_silnika_kartoteka", "token_silnika", "model_z_opisu", "dowod_zastosowania",
+        "zastosowanie", "zabudowa_silnika", "alias_silnika", "model_urzadzenia",
+        "pasowanie_czesci", "zamiennosc_oem", "import_wykazu", "import_odsylaczy",
+        "pasowanie_siec_silnik", "pasowanie_siec", "dobor", "dobor_rozmowy", "wymiar_kartoteki",
+      ]) database.exec(`DROP TABLE IF EXISTS ${tabela}`);
+    })();
+  } finally {
+    database.exec("PRAGMA foreign_keys = ON");
+  }
 }
 
 /**
@@ -1408,8 +1419,7 @@ function typZakonczeniaWSkrzynce(database: DatabaseSync) {
  * dwie drogi do jednej tabeli rozjeżdżają się przy pierwszej poprawce.
  *
  * Kluczy obcych wyłączać nie trzeba: do `towar_identyfikator` nie prowadzi
- * żaden. To jedyna różnica wobec przebudowy `zastosowanie` niżej i cała
- * przyczyna, dla której tamta wygląda inaczej.
+ * żaden.
  *
  * Wiersze przepisujemy WSZYSTKIE, z `id`. Przebudowa identyfikatorów po
  * imporcie kasuje wyłącznie `zrodlo='opis'`, więc wpis biura zgubiony tutaj
@@ -1512,131 +1522,6 @@ function identyfikatorOdDostawcy(database: DatabaseSync) {
 }
 
 /**
- * Szóste źródło propozycji zastosowania: `oferta` (0.264.0).
- *
- * ── DLACZEGO TA PRZEBUDOWA WYGLĄDA INACZEJ NIŻ POPRZEDNIE ─────────────────
- * Do `zastosowanie` prowadzą CZTERY klucze obce, a jeden z nich —
- * `dowod_zastosowania.zastosowanie_id` — ma `ON DELETE CASCADE`. `DROP TABLE`
- * przy włączonych kluczach skasowałby kaskadowo cały rejestr dowodów: tabelę
- * APPEND-ONLY, której nie ma z czego odtworzyć. Dlatego klucze schodzą
- * `PRAGMA foreign_keys = OFF` PRZED transakcją (w transakcji pragma jest
- * ignorowana PO CICHU) i wracają w `finally`, także gdy przebudowa rzuci.
- * Ten sam wzór co `pozycjaZwrotuBezReadModelu`.
- *
- * `id` zachowujemy, bo wskazują na nie `dowod_zastosowania`,
- * `model_z_opisu.zastosowanie_id`, `token_silnika_kartoteka.zastosowanie_id`
- * i `zastepuje_id` w tej samej tabeli. Przenumerowanie zerwałoby historię
- * poprawek wiedzy — a to jest jedyny zapis tego, kto co rozstrzygnął.
- *
- * Na koniec `PRAGMA foreign_key_check`: przy wyłączonych kluczach SQLite
- * niczego nie sprawdza, więc jedyną kontrolą jest ta jawna. Niezerowy wynik
- * musi być GŁOŚNY — cicha niespójność w rejestrze dowodów jest gorsza od
- * wywróconego startu, bo ujawni się dopiero jako zła odpowiedź do klienta.
- */
-function zrodloPropozycjiZOferty(database: DatabaseSync) {
-  const wiersz = database.prepare(
-    "SELECT sql FROM sqlite_master WHERE type='table' AND name='zastosowanie'"
-  ).get() as { sql: string } | undefined;
-  /* Bazy testowe bywają MINIMALNE — brak tabeli nie jest awarią migracji. */
-  if (!wiersz) return;
-  if (wiersz.sql.includes("'copilot','oferta'")) return;
-
-  /* Rejestr dowodów bywa nieobecny w bazach testowych, więc liczymy go tylko
-     wtedy, gdy jest. Brak tabeli nie jest awarią migracji; brak WIERSZY po
-     przebudowie — jest. */
-  const dowody = () => (database.prepare(
-    "SELECT 1 FROM sqlite_master WHERE type='table' AND name='dowod_zastosowania'"
-  ).get()
-    ? Number((database.prepare("SELECT COUNT(*) AS ile FROM dowod_zastosowania")
-        .get() as { ile: number }).ile)
-    : null);
-  const przed = dowody();
-
-  database.exec("PRAGMA foreign_keys = OFF");
-  try {
-    transaction(database, () => {
-      /* Warunek PONOWNIE pod blokadą zapisu: `npm run seed` potrafi chodzić
-         przy żywym serwerze, a obie strony wołają `migrate()`. */
-      const teraz = database.prepare(
-        "SELECT sql FROM sqlite_master WHERE type='table' AND name='zastosowanie'"
-      ).get() as { sql: string } | undefined;
-      if (!teraz || teraz.sql.includes("'copilot','oferta'")) return;
-      database.exec(`
-        CREATE TABLE zastosowanie_nowa (
-          id                    INTEGER PRIMARY KEY AUTOINCREMENT,
-          tw_id                 INTEGER NOT NULL,
-          tw_symbol             TEXT NOT NULL,
-          model_id              INTEGER NOT NULL REFERENCES model_urzadzenia(id) ON DELETE RESTRICT,
-          polaryzacja           TEXT NOT NULL CHECK (polaryzacja IN ('pasuje','nie_pasuje')),
-          powod_negatywny       TEXT CHECK (powod_negatywny IS NULL OR powod_negatywny IN (
-                                  'nie_pasuje','tylko_inny_wariant','niewlasciwy_rozstaw',
-                                  'srednica_ok_inne_mocowanie','mylace_oznaczenie','wymaga_pomiaru')),
-          stan                  TEXT NOT NULL DEFAULT 'propozycja'
-                                  CHECK (stan IN ('propozycja','zatwierdzone','odrzucone','wycofane')),
-          zrodlo_propozycji     TEXT NOT NULL
-                                  CHECK (zrodlo_propozycji IN ('dobor','pomiar','reczne','opis','copilot','oferta')),
-          komentarz             TEXT,
-          conversation_id       INTEGER REFERENCES conversation(id) ON DELETE SET NULL,
-          zastepuje_id          INTEGER REFERENCES zastosowanie(id),
-          zaproponowal          TEXT NOT NULL,
-          zaproponowal_user_id  INTEGER REFERENCES app_user(user_id),
-          zaproponowano_at      TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
-          rozstrzygnal          TEXT,
-          rozstrzygnal_user_id  INTEGER REFERENCES app_user(user_id),
-          rozstrzygnieto_at     TEXT,
-          powod_rozstrzygniecia TEXT,
-          CHECK ((polaryzacja = 'nie_pasuje') = (powod_negatywny IS NOT NULL))
-        );
-        INSERT INTO zastosowanie_nowa
-          (id,tw_id,tw_symbol,model_id,polaryzacja,powod_negatywny,stan,zrodlo_propozycji,
-           komentarz,conversation_id,zastepuje_id,zaproponowal,zaproponowal_user_id,
-           zaproponowano_at,rozstrzygnal,rozstrzygnal_user_id,rozstrzygnieto_at,
-           powod_rozstrzygniecia)
-          SELECT id,tw_id,tw_symbol,model_id,polaryzacja,powod_negatywny,stan,zrodlo_propozycji,
-                 komentarz,conversation_id,zastepuje_id,zaproponowal,zaproponowal_user_id,
-                 zaproponowano_at,rozstrzygnal,rozstrzygnal_user_id,rozstrzygnieto_at,
-                 powod_rozstrzygniecia
-          FROM zastosowanie;
-        DROP TABLE zastosowanie;
-        ALTER TABLE zastosowanie_nowa RENAME TO zastosowanie;
-        CREATE INDEX IF NOT EXISTS ix_zastosowanie_towar ON zastosowanie(tw_id, stan);
-        CREATE INDEX IF NOT EXISTS ix_zastosowanie_model ON zastosowanie(model_id, stan);
-        CREATE INDEX IF NOT EXISTS ix_zastosowanie_stan  ON zastosowanie(stan, zaproponowano_at);
-      `);
-    })();
-  } finally {
-    database.exec("PRAGMA foreign_keys = ON");
-  }
-
-  /* Rejestr dowodów SPRAWDZANY, nie zakładany. `ON DELETE CASCADE` przy
-     włączonych kluczach zabrałby go razem z `DROP TABLE`, a objawem byłaby
-     wiedza bez uzasadnienia — czyli wiedza, której nie wolno użyć. */
-  const po = dowody();
-  if (przed !== null && po !== null && przed !== po) {
-    throw new Error(
-      `[migracja] przebudowa zastosowanie zabrała dowody: było ${przed}, ` +
-      `jest ${po}. Rejestr jest append-only i nie ma z czego go odtworzyć ` +
-      "— przywróć kopię wertis.db sprzed aktualizacji.");
-  }
-  /* Sprawdzenie ZAWĘŻONE do czterech tabel, które wskazują na `zastosowanie`.
-     Gołe `PRAGMA foreign_key_check` skanuje całą bazę i doniosłoby o zwisach,
-     których ta przebudowa nie tknęła — ostrzeżenie o cudzej sprawie uczy
-     ignorowania ostrzeżeń. */
-  for (const tabela of ["dowod_zastosowania", "model_z_opisu",
-                        "token_silnika_kartoteka", "zastosowanie"]) {
-    if (!database.prepare(
-      "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(tabela)) continue;
-    const zwisy = database.prepare(`PRAGMA foreign_key_check(${tabela})`).all() as unknown[];
-    if (zwisy.length) {
-      console.warn(
-        `[migracja] po przebudowie zastosowanie ${tabela} ma ${zwisy.length} ` +
-        "zwisających odnośników. Klucze były wyłączone na czas podmiany, więc " +
-        "to jedyna kontrola — sprawdź je, zanim baza pójdzie dalej.");
-    }
-  }
-}
-
-/**
  * Znacznik autoodpowiedzi na wiadomościach, które już leżą w bazie (0.227.0).
  *
  * ── DLACZEGO KOLUMNA, A NIE LICZENIE PRZY ODCZYCIE ────────────────────────
@@ -1718,40 +1603,6 @@ function oznaczAutoodpowiedziWZastanych(database: DatabaseSync) {
      rozmów widoczne w kolejce zaraz po wdrożeniu. */
   console.warn(`[migracja] oznaczyłem ${doOznaczenia.length} autoodpowiedzi biura ` +
     "— te wiadomości przestają liczyć się jako nasza odpowiedź.");
-}
-
-/* ── Indeks pełnotekstowy kartotek (etap E3) ────────────────────────────────
-   Tabela wirtualna FTS5, contentless (`content=''`): wiersze to same tokeny
-   z `rowid = tw_id`. Zewnętrzna treść na `sgt_towar` wymagałaby triggerów na
-   tabeli, którą import z Subiekta WYCINA co `MSSQL_SYNC_MS` — indeks
-   przebudowuje się po imporcie w `services/po-imporcie.ts`, nie triggerami.
-
-   W try/catch, bo FTS5 zależy od flag builda SQLite w Node. Instalacja bez
-   niego STARTUJE: szczebel pełnotekstowy melduje się jako niedostępny,
-   a raport pokrycia to pokazuje. `unicode61 remove_diacritics 2` zdejmuje
-   ogonki po stronie SQLite; treść i tak wchodzi przez `zloz()`, żeby JS
-   i SQL trzymały jedną prawdę normalizacji (patrz `tekst.ts`). */
-let ftsStan: "ok" | "niedostepne" | "nieznane" = "nieznane";
-
-function tabelaFts(database: DatabaseSync): void {
-  try {
-    database.exec(`CREATE VIRTUAL TABLE IF NOT EXISTS towar_fts
-      USING fts5(symbol, nazwa, opis, content='', tokenize='unicode61 remove_diacritics 2')`);
-    ftsStan = "ok";
-  } catch (e) {
-    ftsStan = "niedostepne";
-    console.warn(`[db] FTS5 niedostępne — szczebel pełnotekstowy doboru wyłączony: ${(e as Error).message}`);
-  }
-}
-
-/** Czy ta instalacja ma FTS5. `false` także PRZED migracją — odczyt bez indeksu to brak indeksu. */
-export function ftsDostepne(): boolean {
-  return ftsStan === "ok";
-}
-
-/** Wyłącznie dla testów: udawanie instalacji bez FTS5. */
-export function udawajBrakFts(brak: boolean): void {
-  ftsStan = brak ? "niedostepne" : "ok";
 }
 
 /**
@@ -2498,56 +2349,6 @@ function bezBrygadzisty(database: DatabaseSync) {
  * (pierwsza: `naLoginIHaslo`) i z tego samego powodu: SQLite nie umie zdjąć
  * NOT NULL zwykłym ALTER-em. Wiersze zostają co do jednego.
  */
-/**
- * Jednorazowa kopia `dobor_rozmowy` do `dobor` (`docs/dobor-od-zera.md` §5.4).
- *
- * Status i droga starego doboru tłumaczą się na wynik i podstawę. Biegnie
- * tylko przy pustej `dobor`: drugi start nie ma czego kopiować, a zapis
- * nowego doboru nie może zostać nadpisany starym stanem.
- *
- * STARA TABELA ZOSTAJE NIETKNIĘTA. Powrót do poprzedniej wersji musi zastać
- * jej dane, bo poprzedni serwer czyta tylko ją.
- *
- * Kolumny sprawdzamy w `PRAGMA`, bo baza klienta bywa starsza niż ostatni
- * kształt starej tabeli. Brakująca kolumna daje NULL, nie błąd startu.
- */
-function przeniesDobor(database: DatabaseSync) {
-  const jest = database
-    .prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name='dobor_rozmowy'").get();
-  if (!jest) return;
-  if (database.prepare("SELECT 1 FROM dobor LIMIT 1").get()) return;
-  const kolumny = new Set((database.prepare("PRAGMA table_info(dobor_rozmowy)").all() as Array<{ name: string }>)
-    .map((c) => c.name));
-  const k = (nazwa: string) => (kolumny.has(nazwa) ? nazwa : "NULL");
-  /* Wybrana kartoteka wygrywa z „czego brakuje": agent, który wybrał część
-     i dopytuje o tabliczkę, ma już odpowiedź do wysłania. `rejected`
-     i `not_applicable` wygrywają z wyborem, bo to ostatnie słowo agenta. */
-  const wynik = `CASE WHEN ${k("status")} = 'rejected' THEN 'brak'
-      WHEN ${k("status")} = 'not_applicable' THEN 'nie_dotyczy'
-      WHEN ${k("wybrany_tw_id")} IS NOT NULL THEN 'czesc'
-      WHEN ${k("status")} = 'missing_information' THEN 'dopytac'
-      ELSE NULL END`;
-  /* Droga bez odpowiednika w słowniku daje „reczny": wiemy tylko tyle,
-     że kartotekę wskazał agent. */
-  const podstawa = `CASE WHEN ${k("wybrany_droga")} IN ('symbol','ean','oem','oferta','zamiennik') THEN 'numer'
-      WHEN ${k("wybrany_droga")} IN ('zastosowanie','silnik','pasowanie') THEN 'wiedza'
-      WHEN ${k("wybrany_droga")} IN ('pelnotekst','wymiar') THEN 'podobne'
-      ELSE 'reczny' END`;
-  database.exec(`
-    INSERT INTO dobor(conversation_id, marka, model, wariant, rocznik, nr_seryjny, silnik, oem, nazwa_czesci,
-      wynik, tw_id, symbol, podstawa, dopytac, wersja, zmienil, zmienil_user_id, zmieniono_at)
-    SELECT conversation_id, ${k("marka")}, ${k("model")}, ${k("wariant")}, ${k("rocznik")}, ${k("nr_seryjny")},
-      ${k("silnik")}, ${k("oem")}, ${k("nazwa_czesci")}, w,
-      CASE WHEN w = 'czesc' THEN ${k("wybrany_tw_id")} END,
-      CASE WHEN w = 'czesc' THEN ${k("wybrany_symbol")} END,
-      CASE WHEN w = 'czesc' THEN ${podstawa} END,
-      CASE WHEN w = 'dopytac'
-        THEN COALESCE(NULLIF(trim(${k("brakuje")}), ''), 'czego brakuje — nie zapisano') END,
-      COALESCE(${k("wersja")}, 1), ${k("updated_by")}, ${k("updated_user_id")}, ${k("updated_at")}
-    FROM (SELECT *, ${wynik} AS w FROM dobor_rozmowy);
-  `);
-}
-
 /**
  * Indeks unikalności kodu kosza — PRZEBUDOWA, nie dopisanie (0.123.0).
  *

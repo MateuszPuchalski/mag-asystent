@@ -8,11 +8,10 @@ process.env.DB_PATH = path.join(fs.mkdtempSync(path.join(os.tmpdir(), "wertis-kl
 process.env.SGT_MODE = "seeded";
 
 /* ── Historia klienta (§10.1, zakładka KLIENT) ───────────────────────────────
-   Zakładka jest ODCZYTEM po loginie kupującego i te testy pilnują trzech
-   granic, które o tym stanowią: skąd bierze się login, co liczy się jako
-   „maszyna ustalona" i czego na osi NIE MA.
+   Zakładka jest ODCZYTEM po loginie kupującego i te testy pilnują dwóch
+   granic, które o tym stanowią: skąd bierze się login i czego na osi NIE MA.
 
-   Czwarta granica jest najważniejsza i najłatwiejsza do zgubienia przy
+   Trzecia granica jest najważniejsza i najłatwiejsza do zgubienia przy
    pierwszym refaktorze: rozmowa CUDZEGO klienta nie ma prawa wejść do
    historii tego. Pomyłka w warunku złączenia pokazałaby biuru zakupy obcej
    osoby pod nazwiskiem, które ma przed oczami.                              */
@@ -41,15 +40,6 @@ function rozmowa(watek: string, login: string | null, temat: string, kiedy: stri
     .run(konto, watek, temat, kiedy).lastInsertRowid);
 }
 
-/** Dobór z wybraną częścią; `wynik: null` to dobór otwarty, bez ustalenia. */
-function dobor(rozmowaId: number, marka: string, model: string, kiedy: string,
-  extra: { wynik?: string | null; silnik?: string; rocznik?: string } = {}): void {
-  const wynik = extra.wynik === undefined ? "czesc" : extra.wynik;
-  db().prepare(`INSERT INTO dobor(conversation_id,wynik,tw_id,marka,model,rocznik,silnik,zmieniono_at)
-    VALUES (?,?,?,?,?,?,?,?)`).run(rozmowaId, wynik, wynik === "czesc" ? 1 : null, marka, model,
-    extra.rocznik ?? null, extra.silnik ?? null, kiedy);
-}
-
 function zakup(login: string, externalId: string, nazwa: string, kiedy: string): void {
   const d = db();
   const id = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,
@@ -76,7 +66,7 @@ function sprawaKlienta(login: string, typ: string, temat: string, kiedy: string)
 
 beforeEach(() => {
   const d = db();
-  for (const t of ["dobor", "zamowienie_klienta_pozycja", "zamowienie_klienta",
+  for (const t of ["zamowienie_klienta_pozycja", "zamowienie_klienta",
     "reklamacja_klienta", "zwrot_klienta",
     "message", "conversation", "allegro_inbox_thread", "channel_account", "events"]) {
     d.prepare(`DELETE FROM ${t}`).run();
@@ -89,38 +79,6 @@ beforeEach(() => {
   starsza = rozmowa("w-3140", "zielony_ogrod", "ustalono model kosiarki i kod silnika",
     "2024-06-14T09:00:00.000Z");
   obca = rozmowa("w-999", "kto_inny", "Nóż do innej maszyny", "2025-01-01T09:00:00.000Z");
-});
-
-test("maszynę widać z rozmową, w której ją ustalono", () => {
-  dobor(starsza, "NAC", "LS 46-450", "2024-06-14T09:30:00.000Z",
-    { rocznik: "2019", silnik: "1P70FV" });
-
-  const h = historiaKlienta(biezaca);
-  assert.equal(h.login, "zielony_ogrod");
-  assert.equal(h.maszyny.length, 1);
-  assert.deepEqual(
-    { marka: h.maszyny[0].marka, nazwa: h.maszyny[0].nazwa, rocznik: h.maszyny[0].rocznik,
-      silnik: h.maszyny[0].silnik, rozmowaId: h.maszyny[0].rozmowaId },
-    { marka: "NAC", nazwa: "LS 46-450", rocznik: "2019", silnik: "1P70FV", rozmowaId: starsza },
-  );
-});
-
-test("dobór w trakcie NIE jest ustaleniem — maszyna wchodzi dopiero z domknięciem", () => {
-  /* Agent wpisuje markę, zanim cokolwiek ustali. Gdyby liczył się każdy
-     dobór z marką, zakładka mówiłaby „klient ma taką maszynę" o zgadywance
-     sprzed pięciu minut. */
-  dobor(starsza, "NAC", "LS 46-450", "2024-06-14T09:30:00.000Z", { wynik: null });
-  assert.deepEqual(historiaKlienta(biezaca).maszyny, []);
-});
-
-test("ta sama maszyna w dwóch rozmowach zostaje jedna, z NAJSTARSZĄ", () => {
-  /* Pytanie brzmi „od kiedy to wiemy", nie „gdzie ostatnio padło". */
-  dobor(starsza, "NAC", "LS 46-450", "2024-06-14T09:30:00.000Z");
-  dobor(biezaca, "nac", "ls 46-450", "2026-09-01T10:30:00.000Z");
-
-  const m = historiaKlienta(biezaca).maszyny;
-  assert.equal(m.length, 1, "wielkość liter nie robi drugiej maszyny");
-  assert.equal(m[0].rozmowaId, starsza);
 });
 
 test("oś niesie zakupy i wcześniejsze rozmowy, od najnowszych", () => {
@@ -144,10 +102,8 @@ test("cudzy klient nie wchodzi do historii tego", () => {
      nazwiskiem, które ma przed oczami — dlatego osobny test, nie asercja
      doklejona do innego. */
   zakup("kto_inny", "2025/01/0001", "Nóż NZ-999", "2025-01-01T12:00:00.000Z");
-  dobor(obca, "STIHL", "FS 350", "2025-01-01T12:30:00.000Z");
 
   const h = historiaKlienta(biezaca);
-  assert.deepEqual(h.maszyny, []);
   assert.deepEqual(h.wpisy.filter((w) => w.rodzaj === "zakup"), []);
   assert.equal(h.wpisy.some((w) => w.rozmowaId === obca), false);
 });
@@ -156,7 +112,7 @@ test("wątek bez loginu daje pustą historię, nie zgadywanie", () => {
   const bezLoginu = rozmowa("w-anon", null, "Pytanie bez konta", "2026-09-02T10:00:00.000Z");
   zakup("zielony_ogrod", "2024/06/1183", "Szarpak SZR-148/82", "2024-06-14T12:00:00.000Z");
 
-  assert.deepEqual(historiaKlienta(bezLoginu), { login: null, maszyny: [], wpisy: [] });
+  assert.deepEqual(historiaKlienta(bezLoginu), { login: null, wpisy: [] });
 });
 
 /* ── S2 spoiwa: historia przestaje pomijać trzy kolejki z czterech ───────────

@@ -740,8 +740,7 @@ curl -X POST http://<IP-serwera>:3001/api/users/migrate-history \
 ```
 
 **4. Raport wydajności per osoba — obowiązek formalny PRZED uruchomieniem.**
-Widzi go tylko admin (Analiza → Praca hali); ta sama reguła obejmuje tabelę
-osób na karcie „Skuteczność doboru”. To **monitoring pracowniczy** w rozumieniu
+Widzi go tylko admin (Analiza → Praca hali). To **monitoring pracowniczy** w rozumieniu
 Kodeksu pracy (art. 22² i nast.). Wymaga zapisu w **regulaminie pracy** albo
 **obwieszczeniu**, **uprzedzenia pracowników na 2 tygodnie** i informacji dla
 nowych osób **przed dopuszczeniem do pracy**. Kod tego nie blokuje, a raport
@@ -1184,7 +1183,7 @@ Bez uprawnień objaw na karcie jest NIEMY, a `/api/health` mówi w `problemy`,
 czego brakuje. Licznik `ceny` w `lastImport` podaje wiersze po rozwinięciu
 poziomów. Poziomy z nazwami pokazuje `tools/sonda-cen.sql`.
 
-## 6i. Copilot i automaty wiedzy
+## 6i. Copilot
 
 Copilot układa szkice odpowiedzi i rozpoznaje wiadomości. **Kosztuje
 pieniądze**, a do klienta nie idzie nic bez człowieka. Ustawienia: Ustawienia
@@ -1214,14 +1213,12 @@ wywołań wpis ma mieć model `jev-1.13.0` i niezerowe tokeny. Wpisy
 | `COPILOT_AUTO_SZKIC=1` | szkic sam dla nowego pytania | `COPILOT_AUTO_NA_PRZEBIEG`, `COPILOT_AUTO_NA_GODZINE` |
 | `COPILOT_SZKIC_PO_ROZPOZNANIU` | szkic zaraz po rozpoznaniu (`0` wyłącza) | wspólny `COPILOT_AUTO_NA_GODZINE` |
 | `COPILOT_PRZED_PRACA=1` | szkice zaległości przed biurem | `COPILOT_PRZED_PRACA_OKNO`, `COPILOT_PRZED_PRACA_LIMIT` |
-| `WIEDZA_AUTOMAT=1` | automat zatwierdza wiedzę z kolejki | `WIEDZA_AUTOMAT_NA_PRZEBIEG` |
-| `WIEDZA_AUTOMAT_MODEL=1` | model językowy jako źródło marki | ten sam |
-| `PASOWANIE_Z_SIECI=1` | nocne szukanie pasowania w sieci poza Allegro | `PASOWANIE_Z_SIECI_NA_NOC` |
 
 Sufity godzinowe liczy się **razem z błędami**, bo nieudane wywołanie też
 kosztuje. Nie podnoś limitów przed przejrzeniem pierwszych wyników.
-**`WIEDZA_AUTOMAT` odwraca zasadę**, że wiedzę zatwierdza człowiek — przejrzyj
-kartę „Co automat dopisał do wiedzy" po pierwszym przebiegu.
+Klucze `WIEDZA_AUTOMAT*` i `PASOWANIE_Z_SIECI*` zeszły razem z bazą wiedzy
+w @wydanie. Jeśli stoją w `wertis.env`, usuń je — serwer ostrzega o nich
+w `/api/health`.
 
 **Dane u dostawcy.** Tekst wychodzi przez maskowanie telefonu i adresu.
 **Zdjęć zamaskować się nie da** — idą w całości, najwyżej cztery najnowsze

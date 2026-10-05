@@ -30,9 +30,9 @@ import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
  * ── DLACZEGO TYLKO PYTANIA POD OFERTĄ (0.317.0) ─────────────────────────────
  * Rozstrzygnięcie właściciela. Wiadomość niosąca `relatesTo.offer.id` to
  * pytanie SPRZED zakupu, czyli dokładnie ten przypadek, w którym Copilot ma
- * komplet faktów: kartotekę oferty, treść aukcji, kandydatów doboru, a od
- * 0.270.0 także adres naszej aktywnej aukcji. Przy „dziękuję", zmianie adresu
- * albo reklamacji szkic z faktów doboru niewiele wnosi, a kosztuje tyle samo.
+ * komplet faktów: kartotekę oferty, treść aukcji, a od 0.270.0 także adres
+ * naszej aktywnej aukcji. Przy „dziękuję", zmianie adresu albo reklamacji
+ * szkic z faktów oferty niewiele wnosi, a kosztuje tyle samo.
  *
  * ── DWA HAMULCE, BO NIKT JUŻ NIE KLIKA ──────────────────────────────────────
  * Kliknięcie było hamulcem samo w sobie: agent prosił o pracę dla siebie
@@ -45,20 +45,8 @@ import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
  * zerowałby licznik, a rachunek u dostawcy nie.
  *
  * ── CZEGO TEN TAKT NIE ROBI ─────────────────────────────────────────────────
- * Nie nadpisuje szkicu, który już odpowiada na NAJNOWSZE pytanie klienta
- * NA AKTUALNYCH DANYCH. Świeżość mierzą dwa pola — te same, którymi ekran
- * mówi „klient dopisał" i „dane doboru zmieniły się od szkicu".
- *
- * DRUGIE POLE DOSZŁO W 0.341.0 i bez niego tamto wydanie byłoby połową
- * funkcji. Model rozpoznaje w pytaniu markę, model i nazwę części, a te dane
- * od 0.341.0 wchodzą do doboru SAME. Kandydatów liczy się jednak z danych,
- * które stały tam PRZED wywołaniem modelu, więc pierwszy szkic ich jeszcze
- * nie zna: klient pyta pod gaźnikiem A o gaźnik do innej maszyny, dane
- * wpadają, i nikt by po nie nie wrócił. Zmiana wersji doboru budzi takt,
- * a drugi szkic pisze się już z kandydatami.
- *
- * Pętli z tego nie ma: drugi przebieg zastaje pola wypełnione, więc nie
- * wpisuje nic, wersja doboru stoi i szkic przestaje być nieświeży.
+ * Nie nadpisuje szkicu, który już odpowiada na NAJNOWSZE pytanie klienta.
+ * Świeżość mierzy jedno pole, to samo, którym ekran mówi „klient dopisał".
  *
  * Nie wysyła niczego do klienta: szkic jest propozycją, a wysyła agent.
  * Do 22 września 2026 stała za tym zasada nadrzędna nr 2 („człowiek wysyła
@@ -119,7 +107,6 @@ const CZEKAJACE = `
        WHERE m2.conversation_id = c.id AND m2.auto_odpowiedz = 0
        ORDER BY m2.sent_at DESC, m2.id DESC LIMIT 1)
     LEFT JOIN szkic_copilota s ON s.conversation_id = c.id
-    LEFT JOIN dobor d ON d.conversation_id = c.id
    WHERE m.direction = 'incoming'
      AND ((m.related_object_type = 'OFFER' AND m.related_object_id IS NOT NULL)
           /* Od 22 września 2026 także KAŻDA wiadomość z rozpoznaniem, które
@@ -130,18 +117,13 @@ const CZEKAJACE = `
                         AND k.taksonomia_wersja = '${TAKSONOMIA_WERSJA}'
                         AND k.akcja <> 'NO_ACTION' AND k.zrodlo <> 'FALLBACK'))
      /* Przy włączonym takcie klasyfikacji szkic CZEKA na rozpoznanie: bez
-        niego szkic nie dostaje faktu „rozpoznanie" i pisze pod dobór także
+        niego szkic nie dostaje faktu „rozpoznanie" i pyta o maszynę także
         tam, gdzie klient pyta o paczkę. Drugi szkic po rozpoznaniu kosztowałby
         drugie wywołanie za to samo pytanie. */
      AND (? = 0 OR EXISTS (SELECT 1 FROM decyzja_klasyfikacji k2
                             WHERE k2.message_id = m.id AND k2.aktywna = 1
                               AND k2.taksonomia_wersja = '${TAKSONOMIA_WERSJA}'))
-     AND (IFNULL(s.message_id, -1) <> m.id
-        /* Jeden, nie zero: rozmowa BEZ wiersza doboru ma wersję 1, tak jak
-           mówi doborRozmowy(). Zero dawałoby wieczną nieświeżość każdej
-           rozmowy, w której nikt nic nie wpisał, czyli większości.
-           Bez odwrotnych apostrofów: to wnętrze szablonu SQL. */
-        OR IFNULL(s.dobor_wersja, 1) <> IFNULL(d.wersja, 1))
+     AND IFNULL(s.message_id, -1) <> m.id
    ORDER BY m.sent_at, m.id
    LIMIT ?`;
 

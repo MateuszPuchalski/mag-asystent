@@ -10,15 +10,6 @@
       "is_interactive": true
     },
     {
-      "file": "Dobor.dc.html",
-      "x": 1560,
-      "y": 0,
-      "w": 1040,
-      "h": 1060,
-      "title": "Dobór części",
-      "is_interactive": true
-    },
-    {
       "file": "Konflikt.dc.html",
       "x": 0,
       "y": 1290,
@@ -60,13 +51,6 @@
       "y": -190,
       "w": 480,
       "text": "Dane są przykładowe: numery ofert, symbole towarów i nazwiska zmyślone. Kształt wiersza i osi pochodzi z dokumentu, treść nie."
-    },
-    {
-      "id": "nota-dobor",
-      "x": 1560,
-      "y": -190,
-      "w": 620,
-      "text": "§11 — rozpoznane dane wejściowe z brakami, kandydaci w kolejności z §11.2, dowody wybranego kandydata, negatywne dopasowania jako ostrzeżenie, nie brak danych."
     },
     {
       "id": "nota-stany",

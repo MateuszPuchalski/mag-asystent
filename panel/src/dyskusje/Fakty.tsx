@@ -164,7 +164,7 @@ export function Fakty({
           <Wiersz etykieta="Temat">{d.temat ?? "bez tematu"}</Wiersz>
           <Wiersz etykieta="Kupujący">{d.kupujacyLogin
             ? <span className="inline-flex flex-wrap items-center gap-2"><LoginKlienta login={d.kupujacyLogin} />
-                <PrzyciskHistorii rodzaj="sprawa" id={d.id} tutaj="tą dyskusją" /></span>
+                <PrzyciskHistorii rodzaj="sprawa" id={d.id} /></span>
             : "—"}</Wiersz>
           <Wiersz etykieta="Otwarto">{czas(d.otwartoAt)}</Wiersz>
         </div>

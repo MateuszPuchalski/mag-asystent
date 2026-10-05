@@ -1,4 +1,4 @@
-# WERTIS — panel obsługi klienta i doboru części
+# WERTIS — panel obsługi klienta
 
 Status: projekt docelowy. Wersja dokumentu 1.0, 1 września 2026.
 
@@ -10,6 +10,10 @@ tutaj ich konsekwencja. Stan faktyczny kodu opisuje rozdział 28 na końcu.
 angielskich (`field_task`, `internal_comment`, `draft`, `audit_event`), a repo
 ma dla nich własne tabele. Zmieniliśmy dokument, nie bazę: równoległa nazwa dla
 istniejącego bytu dała już w tym repo dwie tabele zadań i trzeci front.
+
+**Doboru części i bazy wiedzy już nie ma.** Wyszły w całości decyzją
+właściciela w @wydanie. Rozdziały 11, 12, 7.2, 14.7, 14.8 i 19a zostają jako
+zapis powodów; reszta dokumentu wspomina je tam, gdzie wtedy stały.
 
 ## 1. Cel systemu
 
@@ -300,8 +304,7 @@ z nim dwie różne sprawy. Odhaczone zostają na liście jako dowód.
 **Rozmowa:** `new`, `open`, `waiting_for_customer`, `waiting_for_us`,
 `waiting_for_internal`, `snoozed`, `resolved`, `closed`, `spam`.
 
-**Dobór:** wynik `czesc`, `brak`, `dopytac`, `nie_dotyczy` albo brak wyniku.
-Stan dla kolejki jest wyliczany (`docs/dobor-od-zera.md`, §4.2).
+**Dobór:** usunięty w @wydanie razem z bazą wiedzy.
 
 **Szkic:** `none`, `draft`, `needs_review`, `ready`, `sending`, `sent`,
 `send_uncertain`, `send_failed`.
@@ -464,9 +467,9 @@ i `statusZKierunku`, jedną regułą dla kolejki i otwartej rozmowy.
 
 ### 7.2. Statusy doboru w kodzie (etap E1)
 
-> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
-> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
-> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
+> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
+> decyzją właściciela w @wydanie (5 października 2026), razem z kodem
+> i tabelami. Tekst zostaje jako zapis powodów i blizn.
 
 Lista doboru stoi, jak lista rozmowy, w trzech miejscach: `STATUSY_DOBORU`
 w `services/dobor.ts`, `CHECK` na kolumnie `dobor_rozmowy.status` i typ
@@ -804,10 +807,6 @@ wiadomości, status doboru i oczekujące zadanie terenowe.
 klienta i znak oczekującego zadania.** Jednej pozycji z listy wyżej dalej nie
 ma i to jest decyzja, nie przeoczenie. TERMIN odpowiedzi czeka na
 rozstrzygnięcie z §26 — bez niego byłby zmyślony.
-
-**Stan doboru na wierszu.** Wiersz milczy przy stanie `pusty` i `nie_dotyczy`:
-plakietka „nie zaczęty" na każdym wierszu nie mówiłaby niczego, a „nie
-dotyczy" to wiersz, przy którym doboru nie trzeba robić (`docs/dobor-od-zera.md`).
 
 **Licznik mówi to, co mierzy.** To liczba wiadomości klienta od NASZEJ
 ostatniej odpowiedzi, nie „nieprzeczytane przez agenta". Tamtego policzyć się
@@ -1741,9 +1740,9 @@ powrocie. Gdyby decyzja wróciła, to jest punkt wyjścia.
 
 ## 11. Dobór części
 
-> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
-> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
-> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
+> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
+> decyzją właściciela w @wydanie (5 października 2026), razem z kodem
+> i tabelami. Tekst zostaje jako zapis powodów i blizn.
 
 ### 11.1. Dane wejściowe
 
@@ -1988,6 +1987,10 @@ właściciel chce dawać klientowi, więc negatyw wszedł do tabeli od razu.
 Dołożenie go później oznaczałoby przebudowę tabeli.
 
 ## 12. Baza wiedzy
+
+> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
+> decyzją właściciela w @wydanie (5 października 2026), razem z kodem
+> i tabelami. Tekst zostaje jako zapis powodów i blizn.
 
 Projekt wymieniał dziesięć bytów: `Manufacturer`, `MachineModel`,
 `EngineModel`, `Part`, `PartIdentifier`, `Fitment`, `FitmentEvidence`,
@@ -3046,9 +3049,13 @@ jest domyślnie wyłączony, bo wydaje pieniądze bez kliknięcia.
 
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
-> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
-> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
-> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
+> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
+> decyzją właściciela w @wydanie (5 października 2026), razem z kodem
+> i tabelami. Tekst zostaje jako zapis powodów i blizn.
+
+> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
+> decyzją właściciela w @wydanie (5 października 2026), razem z kodem
+> i tabelami. Tekst zostaje jako zapis powodów i blizn.
 
 Pytanie właściciela z 8 września 2026, nad szkicem o śrubę noża do kosiarki
 Faworyt GTV51N196L-4W1 z silnikiem „Lonci v200": „dlaczego dane wejściowe nie
@@ -3087,6 +3094,10 @@ szkicu czyni go nieświeżym tak samo jak dopisek klienta: pastylka mówi
 „ułóż ponownie", bo fakty są inne.
 
 ### 14.8. Co działa: Copilot proponuje pasowania (etap F, przyrost czwarty)
+
+> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
+> decyzją właściciela w @wydanie (5 października 2026), razem z kodem
+> i tabelami. Tekst zostaje jako zapis powodów i blizn.
 
 Zapowiedź z 0.230.0 („Copilot proponujący pasowania czeka"). Od 0.230.0
 pasowanie część↔część ma tabelę, kolejkę i przycisk „Pasuje do…" w Doborze,
@@ -3287,9 +3298,9 @@ danych.
 
 ### 19a. Skuteczność doboru — raport za zębatką (0.267.0)
 
-> **Zastąpione.** Dobór opisany w tej sekcji wyszedł w całości decyzją
-> właściciela z 29 września 2026. Obecny dobór opisuje `docs/dobor-od-zera.md`.
-> Tekst zostaje jako zapis powodów i blizn, które nowy dobór przejął.
+> **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
+> decyzją właściciela w @wydanie (5 października 2026), razem z kodem
+> i tabelami. Tekst zostaje jako zapis powodów i blizn.
 
 `dobor_rozmowy.wybrany_droga` zapisuje, którym z jedenastu szczebli §11.2
 przyszedł kandydat wybrany przez agenta. Kolumna stała w bazie od 0.229.0
@@ -6731,13 +6742,13 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Autoodpowiedź nie liczy się jako nasz ruch | **działa** od 0.227.0 | `message.auto_odpowiedz`, liczone przy zapisie w `zapiszWiadomosc` |
 | Pasek o nowej wiadomości tylko przy kliencie | **działa** od 0.228.0 | kierunek w zdarzeniu `message.created` |
 | Login kopiuje się kliknięciem | **działa** od 0.228.0 | `LoginKlienta`, `ui/kopiuj.ts` — droga zapasowa dla HTTP |
-| Wynik doboru (§7) | **działa** od 0.552.0 | tabela `dobor`, `services/dobor.ts`: cztery wyniki ustawiane przez człowieka, stan wyliczany (`docs/dobor-od-zera.md`) |
-| Kandydaci doboru (§11.2) | **działa** od 0.552.0 | `services/kandydaci.ts`: trzy grupy — wskazane przez klienta, z bazy wiedzy, podobne po nazwie; numer spoza kartoteki to wiersz bez wyboru |
-| Wymiary z kartotek (§11.2) | **usunięte** w 0.552.0 | droga „zgodne wymiary" wyszła z doborem; tabela `wymiar_kartoteki` zostaje w starych bazach bez zapisu |
+| Wynik doboru (§7) | **usunięte** w @wydanie | tabela `dobor`, `services/dobor.ts`: cztery wyniki ustawiane przez człowieka, stan wyliczany (`docs/dobor-od-zera.md`) |
+| Kandydaci doboru (§11.2) | **usunięte** w @wydanie | `services/kandydaci.ts`: trzy grupy — wskazane przez klienta, z bazy wiedzy, podobne po nazwie; numer spoza kartoteki to wiersz bez wyboru |
+| Wymiary z kartotek (§11.2) | **usunięte** w 0.552.0 | droga „zgodne wymiary" wyszła z doborem; tabelę `wymiar_kartoteki` kasuje migracja od @wydanie |
 | Identyfikatory z opisów (OEM, nr oryg., stare SKU, zamienniki) | **działa** od 0.186.0 | `towar_identyfikator`, `services/identyfikatory.ts`, przebudowa po imporcie w `po-imporcie.ts`; sekcje `Zamiennik:` od 0.234.0 |
-| Sekcje „Modele:" z opisów do przerobienia | **działa** od 0.186.0 | `model_z_opisu`, ekran Wiedza → „Z opisów"; automat nie proponuje z opisu |
-| Pełny tekst kartotek (FTS5, bm25) | **działa** od 0.186.0 | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
-| Pokrycie wiedzy w ustawieniach | **działa** od 0.186.0 | `GET /api/obsluga/pokrycie-wiedzy`, `ustawienia/PokrycieWiedzy.tsx` |
+| Sekcje „Modele:" z opisów do przerobienia | **usunięte** w @wydanie | `model_z_opisu`, ekran Wiedza → „Z opisów"; automat nie proponuje z opisu |
+| Pełny tekst kartotek (FTS5, bm25) | **usunięte** w @wydanie | `towar_fts`, `services/pelnotekst.ts`; bez FTS5 szczebel pominięty z powodem |
+| Pokrycie wiedzy w ustawieniach | **usunięte** w @wydanie | `GET /api/obsluga/pokrycie-wiedzy`, `ustawienia/PokrycieWiedzy.tsx` |
 | Automatyczne zamknięcie po N dniach | **projekt** | otwarta decyzja właściciela z §26 |
 | Znacznik „sprawa reklamacyjna" na rozmowie | **działa** od 0.390.0 | `conversation.reklamacyjna`, `ustawReklamacyjna`, `POST …/rozmowy/:id/reklamacyjna`, przełącznik w `skrzynka/Status.tsx`, plakietka w kolejce; NASZ znacznik — `/sale/issues` ma wyłącznie GET, więc sprawy w Allegro sprzedawca nie założy |
 | Sprawa nad rozmowami (§6.1) | **skasowana** w 0.388.0 | działała od 0.161.0; zastąpiła ją droga zakupu (0.387.0), bo odpowiada na to samo pytanie automatycznie i przez cztery kolejki |
@@ -6746,13 +6757,13 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Kształt POST wysyłki | **potwierdzony** w 0.151.0 | specyfikacja OpenAPI; limit 2000 znaków |
 | Mapowanie odczytu skrzynki | **poprawione** w 0.151.0 | do 0.150.0 błędne w każdym polu |
 | Kontrola świeżości i dialog 409 | **działa** od 0.148.0 | `skrzynka/DialogKonfliktu.tsx` |
-| Baza wiedzy (§12) | **działa** od E2 | `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania`, `services/wiedza.ts` |
-| Zabudowa silnika (§12) | **działa** od 0.229.0 | `zabudowa_silnika`, `services/silniki.ts`, zakładka „Silniki" na ekranie Wiedza z listą luk |
-| Słownik silników (§12) | **działa** od 0.238.0 | `alias_silnika`, `silnikZTekstu` w `services/silniki.ts`, sekcja „Słownik silników" na ekranie Silniki, przycisk „Zaproponuj zabudowę" pod polem Silnik w Doborze |
-| Tokeny silników w nazwach kartotek (§12) | **działa** od 0.239.0 | `token_silnika`, `token_silnika_kartoteka`, `services/tokeny-silnikow.ts`, sekcja „Tokeny silników w nazwach kartotek" na ekranie Z opisów, hak po imporcie |
-| Pasowanie części (§12) | **działa** od 0.230.0 | `pasowanie_czesci`, `services/pasowania.ts`; przycisk „Pasuje do…" w Doborze, sekcja w kolejce Wiedza, blok przy kartotece w rozmowie |
-| Ekran Wiedza — kolejka propozycji | **działa** od E2 | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
-| Dowody i negatywy przy doborze | **działa** od E2 | `skrzynka/Dobor.tsx`: sekcja „Nie pasuje"; dowody i pomiary w wierszu „Wiedza" (`skrzynka/Wiedza.tsx`) |
+| Baza wiedzy (§12) | **usunięte** w @wydanie | `model_urzadzenia`, `zastosowanie`, `dowod_zastosowania`, `services/wiedza.ts` |
+| Zabudowa silnika (§12) | **usunięte** w @wydanie | `zabudowa_silnika`, `services/silniki.ts`, zakładka „Silniki" na ekranie Wiedza z listą luk |
+| Słownik silników (§12) | **usunięte** w @wydanie | `alias_silnika`, `silnikZTekstu` w `services/silniki.ts`, sekcja „Słownik silników" na ekranie Silniki, przycisk „Zaproponuj zabudowę" pod polem Silnik w Doborze |
+| Tokeny silników w nazwach kartotek (§12) | **usunięte** w @wydanie | `token_silnika`, `token_silnika_kartoteka`, `services/tokeny-silnikow.ts`, sekcja „Tokeny silników w nazwach kartotek" na ekranie Z opisów, hak po imporcie |
+| Pasowanie części (§12) | **usunięte** w @wydanie | `pasowanie_czesci`, `services/pasowania.ts`; przycisk „Pasuje do…" w Doborze, sekcja w kolejce Wiedza, blok przy kartotece w rozmowie |
+| Ekran Wiedza — kolejka propozycji | **usunięte** w @wydanie | `panel/src/ekrany/Wiedza.tsx`, zakładka w pasku z licznikiem |
+| Dowody i negatywy przy doborze | **usunięte** w @wydanie | `skrzynka/Dobor.tsx`: sekcja „Nie pasuje"; dowody i pomiary w wierszu „Wiedza" (`skrzynka/Wiedza.tsx`) |
 | Copilot — klasyfikacja wiadomości (§14.5) | **zastąpiona** 22 września 2026 | słownik ośmiu etykiet i kciuki; zastąpiła je decyzja z §14.5a |
 | Klasyfikacja w kształcie specyfikacji (§14.5a) | **działa** od 22 września 2026 | `services/copilot-klasyfikacja.ts`, `klasyfikacja-slownik.ts`, `klasyfikacja-polityka.ts`, tabela `decyzja_klasyfikacji`, `skrzynka/Copilot.tsx` (`EtykietaKategorii`) |
 | Takt klasyfikacji każdej nowej wiadomości (§14.5a) | **działa** od 22 września 2026, wyłączony domyślnie | `services/klasyfikacja-auto.ts`, `COPILOT_AUTO_KLASYFIKACJA` |
@@ -6762,9 +6773,9 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Los szkicu przy wysyłce i uzgodnienie `send_uncertain` (§14.6a) | **działa** od 22 września 2026 | `outbox.szkic_los`, `losSzkicu` w `wysylka.ts`, `uzgodnijNiepewna` w `allegro-inbox-sync.ts` |
 | Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa** od 22 września 2026, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
-| Wiedza z ofert w doborze (§11.2) | **działa** od 0.264.0 | `services/wiedza-z-oferty.ts`: numery z parametrów i opisu oferty wprost do `towar_identyfikator` (`zrodlo='oferta'`), pozycje listy zgodności do kolejki Wiedzy z marką; zapis przed wywołaniem modelu, bramka na pewności kartoteki, porcja 20 na kliknięcie, wąska trasa cofnięcia |
-| Copilot — propozycja pasowania z rozmowy (§14.8) | **działa** od 0.240.0 | `pasowanie` w odpowiedzi szkicu, kolumny `pasowanie_propozycja`/`pasowanie_ocena` w `szkic_copilota`, karta „Copilot rozpoznał pasowanie" w wierszu „Wiedza" (`skrzynka/Wiedza.tsx`); proponuje agent, rozstrzyga biuro |
-| Copilot — dane doboru z rozmowy (§14.7) | **działa** od przyrostu trzeciego | `daneDoboru` w odpowiedzi szkicu; automat wpisuje je sam w puste pola doboru, bez karty do kliknięcia |
+| Wiedza z ofert w doborze (§11.2) | **usunięte** w @wydanie | `services/wiedza-z-oferty.ts`: numery z parametrów i opisu oferty wprost do `towar_identyfikator` (`zrodlo='oferta'`), pozycje listy zgodności do kolejki Wiedzy z marką; zapis przed wywołaniem modelu, bramka na pewności kartoteki, porcja 20 na kliknięcie, wąska trasa cofnięcia |
+| Copilot — propozycja pasowania z rozmowy (§14.8) | **usunięte** w @wydanie | `pasowanie` w odpowiedzi szkicu, kolumny `pasowanie_propozycja`/`pasowanie_ocena` w `szkic_copilota`, karta „Copilot rozpoznał pasowanie" w wierszu „Wiedza" (`skrzynka/Wiedza.tsx`); proponuje agent, rozstrzyga biuro |
+| Copilot — dane doboru z rozmowy (§14.7) | **usunięte** w @wydanie | `daneDoboru` w odpowiedzi szkicu; automat wpisuje je sam w puste pola doboru, bez karty do kliknięcia |
 | Copilot — OCR, kandydaci, porównanie (§14.1) | **projekt** | etap F, przyrosty dalsze |
 | Front na TanStack, Router, shadcn | **działa** od 0.146.0 | `panel/src/api/`, `panel/src/ui/` |
 | Testy frontu (Vitest, Playwright) | **działa** od 0.146.0 | `panel/src/**/*.test.tsx`, `panel/e2e/` |
@@ -6776,13 +6787,13 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Pokrycie sygnatur na ekranie ustawień | **działa** od 0.169.0 | `GET /api/obsluga/sygnatury`, `panel/src/ustawienia/PokrycieSygnatur.tsx` |
 | Szkic sam dla nowego pytania (§14.6) | **działa** od 0.317.0 | `services/copilot-auto-szkic.ts`, takt `copilot-auto-szkic`: wyłącznie pytania pod ofertą, limit na przebieg i sufit godzinowy z księgi wywołań, autor `automat` bez konta; domyślnie wyłączone (`COPILOT_AUTO_SZKIC`) |
 | Zdjęcia z rozmowy w szkicu (§14.6) | **działa** od 0.484.6 (od 0.330.0 do 0.484.5 każde pobranie padało 403 na zapisanym adresie) | `services/copilot-zdjecia.ts` (`kandydaciRozmowy`, `przygotujZdjeciaRozmowy`), kolumna `szkic_copilota.odczyt_zdjec`, blok `skrzynka/OdczytZdjec.tsx`; tylko `SAFE` i tylko przychodzące, sufit sztuk, źródło twierdzenia `zdjecie` z sufitem „prawdopodobne" |
-| Kolejka wiedzy opróżnia się sama (§11.3) | **działa** od 0.331.0 | `services/wiedza-automat.ts`, takt `wiedza-automat`: cztery źródła marki, podpis `automat (wiedza)` bez konta, karta „Co automat dopisał" w ustawieniach; domyślnie wyłączone (`WIEDZA_AUTOMAT`), model językowy osobno (`WIEDZA_AUTOMAT_MODEL`) |
+| Kolejka wiedzy opróżnia się sama (§11.3) | **usunięte** w @wydanie | `services/wiedza-automat.ts`, takt `wiedza-automat`: cztery źródła marki, podpis `automat (wiedza)` bez konta, karta „Co automat dopisał" w ustawieniach; domyślnie wyłączone (`WIEDZA_AUTOMAT`), model językowy osobno (`WIEDZA_AUTOMAT_MODEL`) |
 | Karta Copilota bez ścisku (§14.6) | **działa** od 0.342.0 | `skrzynka/Zwijka.tsx` jako jedno zwijanie dla trzech bloków; szkic bez własnego przewijania, trzy paski scalone w jeden, licznik znaków w nagłówku |
 | Dane wejściowe wchodzą same (§11.2) | **działa** od 0.341.0 | `copilot-szkic.ts`: wpis w puste pola przed zapisem szkicu, podpis `automat (szkic)`; zmiana wersji doboru budzi takt `copilot-auto-szkic` |
-| Wiedza z ofert bez kolejki (§11.3) | **działa** od 0.341.0 | `wiedza-z-oferty.ts`: klucz składany przy zbieraniu z trzech źródeł deterministycznych, podpis `automat (oferta)`; bez rozpoznanej marki wiersz zostaje w kolejce |
+| Wiedza z ofert bez kolejki (§11.3) | **usunięte** w @wydanie | `wiedza-z-oferty.ts`: klucz składany przy zbieraniu z trzech źródeł deterministycznych, podpis `automat (oferta)`; bez rozpoznanej marki wiersz zostaje w kolejce |
 | Dopytanie Copilota (§14.6) | **działa** od 0.332.0 | `services/copilot-pytania.ts`, tabela `copilot_pytanie`, siódma trasa zapisu Copilota, blok `skrzynka/Dopytanie.tsx`; odpowiedź dla agenta, bez przycisku wstawiania, sufit dopytań na rozmowę |
 | Link do naszej oferty w szkicu (§14.6) | **działa** od 0.270.0 | `services/allegro-oferty-po-sygnaturze.ts`, `urlOfertPoSygnaturze`: jedno żądanie `external.id` na komplet kandydatów, tylko `ACTIVE`; fakt `oferta_link`, reguły 7d i 7e instrukcji |
-| Miary doboru w analizie | **działa** od 0.552.0 | `GET /api/obsluga/miary-doboru`, `services/miary-doboru.ts`, `analiza/MiaryDoboru.tsx`: ostatni wynik każdej rozmowy i podstawa wybranej części z księgi zdarzeń |
+| Miary doboru w analizie | **usunięte** w @wydanie | `GET /api/obsluga/miary-doboru`, `services/miary-doboru.ts`, `analiza/MiaryDoboru.tsx`: ostatni wynik każdej rozmowy i podstawa wybranej części z księgi zdarzeń |
 | Ekran przegranego przejęcia (§6.2) | **działa** od 0.147.0 | `skrzynka/KonfliktPrzejecia.tsx` |
 | Wymuszone przekazanie z powodem | **działa** od 0.147.0 | `przekazRozmowe`, rola `admin` |
 | Ręczne wskazanie oferty | **działa** od 0.147.0 | `wskazOferte`, `conversation_event` |

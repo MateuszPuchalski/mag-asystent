@@ -1,10 +1,9 @@
 import React, { useLayoutEffect, useRef, useState } from "react";
 import { Check, Database, PackageSearch, X as Krzyzyk } from "lucide-react";
-import { NaglowekSekcji, ile } from "../ui";
-import type { DopasowanieKartoteki, KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
+import { NaglowekSekcji } from "../ui";
+import type { DopasowanieKartoteki, KartaTowaru, OfertaRozmowy } from "../api/typy";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
 import { BrakPolaczenia } from "../api/klient";
-import { useWiedzaTowaru } from "../api/wiedza";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
 import { PrzyciskTowaru } from "../towar/Szuflada";
@@ -32,8 +31,7 @@ export { grupujCeny, polozenieOferty } from "./cenyNaOsi";
  *
  * ── JEDNO TRAFIENIE PO SYGNATURZE TO POWIĄZANIE (0.219.0) ──────────────────
  * Do 0.218.0 kartoteka z SKU była propozycją i czekała na „Zatwierdź", choć
- * ten sam wynik dobór brał za kandydata bez klikania, a zwroty wiązały go
- * same od 0.169.0. Właściciel zapytał, po co klikać, skoro sygnatura trafia
+ * ten sam wynik zwroty wiązały same od 0.169.0. Właściciel zapytał, po co klikać, skoro sygnatura trafia
  * jeden do jednego — i zdecydował: łączyć automatycznie. Kliknięcie było
  * zapisem pamięci wskazań; patrzenie na stan i półkę niczego nie zapisuje,
  * więc nie ma za co brać opłaty w kliknięciach. Pamięć zostaje dla wskazań
@@ -58,9 +56,6 @@ export function TowarRozmowy({ oferta, rozmowaId, skuPozycji = null }: {
      (0.219.0). Pozostałe stopnie pewności zostają propozycją z przyciskiem. */
   const potwierdzona = k.pewnosc === "pamiec" || k.pewnosc === "sku" ? k.twId : null;
   const karta = useKartaTowaru(potwierdzona);
-  /* Wiedza pyta o KAŻDĄ znaną kartotekę, także propozycję: „3 potwierdzone,
-     1 negatywne" to argument za kliknięciem albo przeciw niemu. */
-  const wiedza = useWiedzaTowaru(k.twId);
 
   const ustaw = (twId: number | null) => zapisz.mutate(
     { id: rozmowaId, ofertaId: oferta.externalId, twId },
@@ -92,14 +87,6 @@ export function TowarRozmowy({ oferta, rozmowaId, skuPozycji = null }: {
           a panel skraca je tylko przy powiązaniu po SKU (`zrodloKartoteki`). */}
       {potwierdzona !== null && <span className="text-podpis text-slate-500" title={k.zrodlo}>
         {zrodloKartoteki(k, oferta.pobrana?.sku ?? skuPozycji)}</span>}
-      {/* OSOBNE zdanie w barwie wiedzy: §4.3 nie miesza źródeł, a to jest
-          nasza baza wiedzy, nie dane z ERP. Zwykłym pismem, bo plakietka
-          w ramce i wersalikach ważyła jak ustalenie, a to liczba wpisów. */}
-      {wiedza.data && (wiedza.data.potwierdzone.length > 0 || wiedza.data.negatywne.length > 0) &&
-        <span className="text-podpis font-semibold text-ranga-ok">
-          wiedza: {ile(wiedza.data.potwierdzone.length, "potwierdzone", "potwierdzone", "potwierdzonych")}
-          {" · "}{ile(wiedza.data.negatywne.length, "negatywne", "negatywne", "negatywnych")}
-        </span>}
       {/* Powiązanie po sygnaturze nie ma czego zdjąć — wróciłoby przy
           następnym odczycie; właściwym ruchem jest wskazanie INNEJ kartoteki.
           Zdjąć da się WSKAZANIE człowieka (kasuje pamięć). */}
@@ -140,10 +127,6 @@ export function TowarRozmowy({ oferta, rozmowaId, skuPozycji = null }: {
                 odpowiedzi na najczęstsze pytania. Przy 1366 px wchodzi wtedy
                 do pierwszego kadru, a ceny i tak mają swoją oś niżej. */}
             <OpisKartoteki desc={karta.data.desc} />
-            {/* WYŁĄCZNIE ODCZYT — sekcja jest „Źródło: Subiekt GT" (§4.3 nie
-                miesza źródeł), a wiedza stoi tu jako osobny blok w swojej
-                barwie. Dopisuje się w Doborze albo w Wiedza → Sprawdź kartotekę. */}
-            {wiedza.data?.pasowania && <PasowaniaKartoteki dane={wiedza.data.pasowania} />}
             <CenyKartoteki ceny={karta.data.ceny ?? []} ramka={false}
               oferta={oferta.pobrana?.cenaGrosze != null
                 ? { grosze: oferta.pobrana.cenaGrosze, waluta: oferta.pobrana.waluta ?? "PLN" } : null} />
@@ -362,40 +345,5 @@ export function PasekStanu({ stan, wolne, rezerwacje }: { stan: number; wolne: n
       <span className="bg-amber-500" style={{ width: `${proc(rezerwacje)}%` }} />
     </div>
     <span className="sr-only">{zdanie}</span>
-  </div>;
-}
-
-/**
- * Pasowania część↔część przy kartotece (§11.2): przy gaźniku „Pasujące do
- * niego", przy uszczelce „Pasuje do". Przechodnie przez zamiennik z dopiskiem
- * (nigdy „potwierdzone"), negatywy na czerwono. Pusty blok nie renderuje się
- * wcale — brak wiedzy to nie informacja, którą warto zajmować kolumnę.
- */
-function PasowaniaKartoteki({ dane }: { dane: PasowaniaTowaru }) {
-  if (dane.pasujeDo.length + dane.pasujace.length + dane.negatywne.length === 0) return null;
-  const wiersz = (t: { czesc: { symbol: string; nazwa: string }; doCzego: { symbol: string; nazwa: string };
-    pasowanie: { nazwaRoli: string; pozycja: string | null }; pewnosc: string; przezZamiennik: string | null; zdanie: string },
-    strona: "czesc" | "doCzego") =>
-    <li key={`${t.czesc.symbol}>${t.doCzego.symbol}`} className="text-xs">
-      <b className="font-mono">{t[strona].symbol}</b> <span className="text-slate-600">{t[strona].nazwa}</span>
-      <span className="ml-1 rounded bg-slate-100 px-1 py-0.5 text-podpis">{t.pasowanie.nazwaRoli}{t.pasowanie.pozycja ? ` · ${t.pasowanie.pozycja}` : ""}</span>
-      <span className={`ml-1 rounded px-1 py-0.5 text-podpis font-bold ${t.pewnosc === "potwierdzone"
-        ? "bg-emerald-100 text-emerald-800" : "bg-amber-100 text-amber-800"}`}>{t.pewnosc}</span>
-      {t.przezZamiennik && <span className="ml-1 text-podpis text-slate-500">przez zamiennik</span>}
-      <p className="text-podpis text-slate-500">{t.zdanie}</p>
-    </li>;
-  return <div>
-    <NaglowekSekcji jako="p" ton="text-emerald-800" className="mb-1">Wiedza: pasowania części</NaglowekSekcji>
-    {dane.pasujace.length > 0 && <>
-      <p className="text-podpis font-semibold text-slate-600">Do tej części pasują</p>
-      <ul className="mb-1 space-y-1">{dane.pasujace.map((t) => wiersz(t, "czesc"))}</ul></>}
-    {dane.pasujeDo.length > 0 && <>
-      <p className="text-podpis font-semibold text-slate-600">Ta część pasuje do</p>
-      <ul className="mb-1 space-y-1">{dane.pasujeDo.map((t) => wiersz(t, "doCzego"))}</ul></>}
-    {dane.negatywne.length > 0 && <ul className="space-y-1">
-      {dane.negatywne.map((p) => <li key={p.id} className="text-xs text-red-900">
-        <b className="font-mono">{p.czesc.symbol}</b> ⇏ <b className="font-mono">{p.doCzego.symbol}</b>: {p.zdaniePowodu}
-        <span className="block text-podpis text-slate-500">{p.zdanieZrodla}</span></li>)}
-    </ul>}
   </div>;
 }

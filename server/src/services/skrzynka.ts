@@ -16,7 +16,6 @@ import { drogaZakupu, sprawyZakupu, type PrzystanekDrogi, type SprawaZakupu }
 import { linkOferty, linkZamowienia } from "./allegro-linki.js";
 import { kartotekaOferty, type Dopasowanie } from "./dopasowanie-sku.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
-import { doborRozmowy, stanDoboruSql, type Dobor, type StanDoboru } from "./dobor.js";
 import { zgodnoscOferty, type ZgodnoscOferty } from "./zgodnosc-oferty.js";
 import { szkicCopilota, type SzkicCopilota } from "./copilot-szkic.js";
 import { AKTYWNA_DECYZJA, CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
@@ -72,9 +71,6 @@ export interface RozmowaSkrzynki {
   nowychOdOdpowiedzi: number;
   /** Czy przy rozmowie stoi niezamknięte zadanie terenowe (§10.2). */
   zadanieWToku: boolean;
-  /* Stan doboru, WYLICZANY w SQL z tabeli `dobor`: lista nie robi zapytania
-     na wiersz, a brak wiersza to `pusty` bez niczego wstawionego. */
-  dobor: StanDoboru;
   odlozoneDo: string | null;
   /* Odłożenie, którego termin minął. Liczy to SERWER, bo reguła „minął termin"
      ma jedno źródło; panel dwa razy tej samej reguły nie wyprowadza (blizna
@@ -176,7 +172,7 @@ export interface WpisOsi {
   /* `odeslanie_zadania` (0.352.0) to ODPOWIEDŹ HALI BEZ WYNIKU. Osobny rodzaj,
      nie `wynik_zadania` z treścią „nie da się": agent czytający oś ma widzieć,
      że pomiaru NIE MA, a nie że pomiar brzmi jak wymówka. */
-  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania" | "komentarz" | "status" | "dobor"
+  rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania" | "komentarz" | "status"
     /* Kamień milowy zwrotu tego zamówienia (0.502.0) — `zwrot-na-osi.ts`. */
     | "zwrot";
   autor: string; odKlienta: boolean; tresc: string; at: string;
@@ -195,7 +191,7 @@ export interface WpisOsi {
     twId: number | null; symbol: string | null; nazwaTowaru: string | null;
   };
   /**
-   * Zdarzenie w postaci KLUCZY (0.243.0) — przy `status` i `dobor`.
+   * Zdarzenie w postaci KLUCZY (0.243.0) — przy `status` i `zwrot`.
    * `tresc` zostaje zdaniem dla podpowiedzi, a to pole niesie
    * to samo rozłożone na części, żeby pasek zdarzeń mógł pokazać krótką
    * etykietę po polsku. Słownik polszczyzny stoi w panelu — angielskie klucze
@@ -203,8 +199,7 @@ export interface WpisOsi {
    * to jest zdanie dla człowieka, a nie format.
    */
   zdarzenie?:
-    | { rodzaj: "status" | "dobor"; po: string | null }
-    | { rodzaj: "dobor_wybor"; wybrano: boolean; symbol: string | null }
+    | { rodzaj: "status"; po: string | null }
     | { rodzaj: "zwrot"; co: string; zwrotId: number; numer: string | null };
   /* Nazwa towaru przy ofercie — Z ZAMÓWIENIA, nie z oferty (§4.3: każdy fakt
      niesie źródło). Ofert nie pobieramy; nazwę znamy tylko dla oferty, która
@@ -248,9 +243,9 @@ export interface OfertaRozmowy {
    */
   zrodlo: "wiadomosc" | "reczne" | "zamowienie";
   /**
-   * Lista „Pasuje do" z oferty i trafienia maszyny z doboru (23 września
-   * 2026). `null`, gdy treści oferty jeszcze nie pobrano albo lista jest
-   * pusta — dociąga ją układanie szkicu, nie otwarcie rozmowy.
+   * Lista „Pasuje do" z oferty. `null`, gdy treści oferty jeszcze nie
+   * pobrano albo lista jest pusta — dociąga ją układanie szkicu, nie
+   * otwarcie rozmowy.
    */
   zgodnosc: ZgodnoscOferty | null;
   pobrana: {
@@ -347,7 +342,6 @@ const LISTA = `
          ) AS nowych,
          EXISTS(SELECT 1 FROM zadanie_terenowe z
                  WHERE z.conversation_id=c.id AND z.status IN ('nowe','w_toku')) AS zadanie,
-         ${stanDoboruSql("d")} AS dobor,
          kop.kategoria AS kopKategoria, kop.pewnosc AS kopPewnosc,
          kop.kategorie_dodatkowe AS kopDodatkowe, kop.akcja AS kopAkcja,
          kop.akcja_modelu AS kopAkcjaModelu, kop.wymaga_czlowieka AS kopWymaga,
@@ -368,7 +362,6 @@ const LISTA = `
                   AND n.direction='outgoing' AND n.auto_odpowiedz=0) AS naszaOdpowiedz
     FROM conversation c
     LEFT JOIN app_user u ON u.user_id=c.assigned_user_id
-    LEFT JOIN dobor d ON d.conversation_id=c.id
     LEFT JOIN decyzja_klasyfikacji kop ON kop.id = ${AKTYWNA_DECYZJA}
     LEFT JOIN message o ON o.id = (
       SELECT m.id FROM message m WHERE m.conversation_id=c.id
@@ -418,7 +411,6 @@ const naRozmowe = (
     czekaOdMs: w.pytanieAt == null ? null : Math.max(0, teraz - Date.parse(String(w.pytanieAt))),
     nowychOdOdpowiedzi: Number(w.nowych ?? 0),
     zadanieWToku: Boolean(Number(w.zadanie ?? 0)),
-    dobor: String(w.dobor ?? "pusty") as StanDoboru,
     odlozoneDo,
     poTerminie: String(w.status) === "snoozed" && minal,
     /* Znacznik tylko tam, gdzie reguła naprawdę zmieniła stan: przy
@@ -606,7 +598,6 @@ export function osRozmowy(id: number): {
    * się z momentów, które i tak leżą w bazie.
    */
   droga: PrzystanekDrogi[];
-  dobor: Dobor;
   /** Propozycja Copilota (§14.6) — osobny wiersz, nie szkic agenta. `null` = nikt nie prosił. */
   szkicCopilota: SzkicCopilota | null;
 } {
@@ -759,9 +750,6 @@ export function osRozmowy(id: number): {
      dróg, bo wskazanie ręczne bywa właśnie kliknięciem przy pozycji. */
   const skuZPozycji = (ofertaId: string) =>
     zamowienie?.pobrane?.pozycje.find((p) => p.offerId === ofertaId)?.sku ?? null;
-  /* Dobór czytany RAZ, przed ofertą: maszyna z jego danych podświetla listę
-     zgodności, a ten sam wiersz jedzie niżej do zakładki doboru. */
-  const dobor = doborRozmowy(id);
   const zOferty = (konto: number, ofertaId: string, zrodlo: OfertaRozmowy["zrodlo"]): OfertaRozmowy => {
     const pobrana = snapshotOferty(konto, ofertaId);
     const skuZapas = skuZPozycji(ofertaId);
@@ -769,7 +757,7 @@ export function osRozmowy(id: number): {
       externalId: ofertaId,
       link: linkOferty(ofertaId),
       zrodlo,
-      zgodnosc: zgodnoscOferty(db(), konto, ofertaId, dobor.dane),
+      zgodnosc: zgodnoscOferty(db(), konto, ofertaId),
       pobrana,
       /* `undefined` zamiast `null`, gdy snapshotu nie ma wcale: mostek odróżnia
          „oferty jeszcze nie pobrano" od „oferta nie ma sygnatury", a to dwa
@@ -778,8 +766,8 @@ export function osRozmowy(id: number): {
       kartoteka: kartotekaOferty(db(), konto, ofertaId, pobrana ? pobrana.sku : (skuZapas ?? undefined)),
     };
   };
-  /* Kolejność jak w doborze (`kandydaci.ts`): ręczne wskazanie bije numer
-     z wiadomości. Trzecia droga jest nowa (0.215.0): zamówienie z JEDNĄ
+  /* Ręczne wskazanie bije numer z wiadomości, bo człowiek widział więcej
+     niż parser. Trzecia droga jest nowa (0.215.0): zamówienie z JEDNĄ
      pozycją nie ma czego mylić, więc jego oferta jest ofertą rozmowy. Przy
      kilku pozycjach rozstrzyga człowiek — przyciskiem przy pozycji. */
   const reczna = ofertaWskazana(id);
@@ -959,38 +947,8 @@ export function osRozmowy(id: number): {
     });
   }
 
-  /* DOBÓR NA OSI: zmiana wyniku kreską, jak status rozmowy. Stare
-     `dobor_status_changed` tłumaczymy na nowe stany, więc panel zna tylko
-     nowe nazwy; historia starych wyborów zostaje, bo jest prawdziwa. */
-  const STARE_STANY: Record<string, string> = {
-    confirmed: "czesc", rejected: "brak", missing_information: "dopytac", not_applicable: "nie_dotyczy",
-  };
-  for (const z of db().prepare(`
-    SELECT id, event_type, payload, created_at FROM conversation_event
-     WHERE conversation_id=? AND event_type IN ('dobor_wynik','dobor_status_changed','dobor_wybrano','dobor_wybor_zdjety')
-     ORDER BY id
-  `).all(id) as Array<Record<string, unknown>>) {
-    const p = JSON.parse(String(z.payload ?? "{}")) as
-      { przed?: string | null; po?: string | null; symbol?: string; autor?: string };
-    const typ = String(z.event_type);
-    const wspolne = { id: `dobor-${z.id}`, autor: String(p.autor ?? "system"), odKlienta: false,
-      at: String(z.created_at), ofertaId: null } as const;
-    if (typ === "dobor_wybrano" || typ === "dobor_wybor_zdjety") {
-      const wybrano = typ === "dobor_wybrano";
-      os.push({ ...wspolne, rodzaj: "dobor",
-        tresc: wybrano ? `dobór: wybrano ${p.symbol ?? "?"}` : `dobór: zdjęto wybór ${p.symbol ?? "?"}`,
-        zdarzenie: { rodzaj: "dobor_wybor", wybrano, symbol: p.symbol ?? null } });
-      continue;
-    }
-    const nowy = (v: string | null | undefined) => typ === "dobor_wynik" ? v ?? "otwarty" : STARE_STANY[v ?? ""] ?? "otwarty";
-    const po = nowy(p.po);
-    os.push({ ...wspolne, rodzaj: "dobor",
-      tresc: `dobór: ${nowy(p.przed)} → ${po}${p.symbol && po === "czesc" ? ` (${p.symbol})` : ""}`,
-      zdarzenie: { rodzaj: "dobor", po } });
-  }
-
   /* ZWROT NA OSI (0.502.0) — decyzja, korekta i pieniądze zwrotu tego
-     zamówienia jako zdarzenia, jak status i dobór. Powód i zakres
+     zamówienia jako zdarzenia, jak status. Powód i zakres
      w `services/zwrot-na-osi.ts`. */
   for (const z of zdarzeniaZwrotowRozmowy(db(), id)) {
     os.push({
@@ -1018,10 +976,6 @@ export function osRozmowy(id: number): {
       : [],
     sprawy: sprawyZakupu(db(), kontoRozmowy, zamowienie?.externalId ?? null),
     droga: drogaZakupu(db(), kontoRozmowy, zamowienie?.externalId ?? null),
-    /* Dobór jedzie z rozmową, bo jest lekki (jeden wiersz); KANDYDACI nie —
-       to wyszukiwarka i parser opisu, a ten odczyt odświeża się na każde
-       zdarzenie szyny. */
-    dobor,
     szkicCopilota: szkicCopilota(id),
   };
 }

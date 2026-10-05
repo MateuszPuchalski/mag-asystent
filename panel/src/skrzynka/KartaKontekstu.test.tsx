@@ -32,7 +32,7 @@ const dane = (n: Record<string, unknown> = {}): OsRozmowy => ({
 } as unknown as OsRozmowy);
 
 const historia = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta =>
-  ({ login: "k", maszyny: [], wpisy: [], ...n } as HistoriaKlienta);
+  ({ login: "k", wpisy: [], ...n } as HistoriaKlienta);
 
 let zapisy: string[] = [];
 beforeEach(() => {

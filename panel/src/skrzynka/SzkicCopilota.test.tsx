@@ -14,15 +14,14 @@ import type { SzkicCopilota } from "../api/typy";
 
 const szkic = (n: Partial<SzkicCopilota> = {}): SzkicCopilota => ({
   tresc: "Dzień dobry, do gaźnika W09-0211 pasuje uszczelka LC170430140-0001 (F3).",
-  zastrzezenia: [], uzyteFakty: ["F3"], twierdzenia: [], odczytZeZdjec: [], lukiKartoteki: { symbol: null, numery: [], modele: [], wpisane: [], czeka: 0 }, messageId: 41, model: "claude-opus-5",
-  at: "2026-09-07T10:00:00Z", przez: "A. Lewandowska", ocena: null,
-  doborWersja: 1, pasowanie: null, pasowanieOcena: null, ...n,
+  zastrzezenia: [], uzyteFakty: ["F3"], twierdzenia: [], odczytZeZdjec: [], messageId: 41, model: "claude-opus-5",
+  at: "2026-09-07T10:00:00Z", przez: "A. Lewandowska", ocena: null, ...n,
 });
 
 const copilot = (n: Partial<PropsSzkicuCopilota> = {}): PropsSzkicuCopilota => ({
   stan: { wlaczony: true, powod: null, model: "claude-opus-5", modelKlasyfikacji: "claude-opus-5", maxPartia: 20,
     autoKlasyfikacja: false, autoSzkic: false },
-  szkic: null, nieswiezy: false, doborWersja: 1, paraPasowania: null,
+  szkic: null, nieswiezy: false,
   uklada: false, blad: "", maSzkicAgenta: false, wylaczony: false,
   onUloz: vi.fn(), onPopraw: vi.fn(), onOdrzuc: vi.fn(), ...n,
 });
@@ -173,7 +172,6 @@ describe("Szkic Copilota w edytorze", () => {
     expect(szkicNaStart(copilot({ szkic: szkic(), nieswiezy: true }), "")).toBeNull();
     expect(szkicNaStart(copilot({ szkic: szkic(), wylaczony: true }), "")).toBeNull();
     expect(szkicNaStart(copilot({ szkic: szkic({ ocena: "odrzucony" }) }), "")).toBeNull();
-    expect(szkicNaStart(copilot({ szkic: szkic({ doborWersja: 1 }), doborWersja: 2 }), "")).toBeNull();
     expect(szkicNaStart(copilot(), "")).toBeNull();
   });
 
@@ -248,22 +246,6 @@ describe("Szkic Copilota w edytorze", () => {
     expect(screen.getByText(/powstał przed nową wiadomością klienta/)).toBeInTheDocument();
   });
 
-  /* Dane doboru wchodzą same i agent widzi je w „Czego szuka klient", więc
-     pasek szkicu już o nich nie mówi. Zostaje nazwana druga nieświeżość:
-     fakty doboru zmieniły się od szkicu. */
-  it("nie mówi o wpisanych danych doboru; zmiana doboru po szkicu jest nazwana", () => {
-    edytor(copilot({ szkic: szkic({ doborWersja: 1 }), doborWersja: 2 }));
-    expect(screen.queryByText(/Do doboru wpisano/)).toBeNull();
-    expect(screen.queryByRole("button", { name: /Wpisz do danych/ })).toBeNull();
-    expect(screen.getByText(/dane doboru zmieniły się od szkicu/)).toBeInTheDocument();
-  });
-
-  it("szkic sprzed migracji (wersja doboru 0) nie udaje nieświeżego, a bez nowych pól nie ma zdania", () => {
-    edytor(copilot({ szkic: szkic({ doborWersja: 0 }), doborWersja: 3 }));
-    expect(screen.queryByText(/dane doboru zmieniły się/)).toBeNull();
-    expect(screen.queryByText(/Do doboru wpisano/)).toBeNull();
-  });
-
   it("oceniony szkic znika z ekranu — wiersz zostaje dla pomiaru", () => {
     edytor(copilot({ szkic: szkic({ ocena: "odrzucony" }) }));
     expect(screen.queryByRole("region", { name: "Szkic Copilota" })).toBeNull();
@@ -289,62 +271,6 @@ describe("Szkic Copilota w edytorze", () => {
     edytor(copilot({ blad: "Model użył numeru XYZ-9999, którego nie ma w faktach — szkic odrzucony." }));
     expect(screen.getByText(/XYZ-9999/)).toBeInTheDocument();
   });
-});
-
-describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
-  it("pasek mówi, CO POSZŁO DO BAZY — nie czego brakuje", () => {
-    /* Do 0.263.0 wypisywał listę braków i przy następnym szkicu liczył ją od
-       zera. Teraz kwituje trzy rzeczy: numery dopisane do kartoteki, pozycje
-       zgodności, które weszły do wiedzy OD RAZU (0.341.0), i te, przy których
-       marka milczała, więc zostały w kolejce. */
-    edytor(copilot({ szkic: szkic({ lukiKartoteki: {
-      symbol: "W09-0211", numery: [{ rodzaj: "oem", wartosc: "16100-ZH8-W61" }],
-      modele: ["HONDA GX999"], wpisane: ["STIHL FS450"], czeka: 3,
-    } }) }));
-    const pasek = screen.getByTestId("luki-kartoteki");
-    expect(pasek.textContent).toContain("W09-0211");
-    expect(pasek.textContent).toContain("16100-ZH8-W61");
-    expect(pasek.textContent).toContain("HONDA GX999");
-    expect(pasek.textContent).toContain("3");
-  });
-
-  it("sam licznik kolejki wystarcza na pasek — drugi szkic już nic nie dopisuje", () => {
-    /* Samowygaszanie: przy drugim kliknięciu numery są już zapisane, więc
-       pokwitowanie jest puste. Licznik kolejki jest STANEM, nie przyrostem,
-       i agent ma go widzieć dalej. */
-    edytor(copilot({ szkic: szkic({ lukiKartoteki:
-      { symbol: "W09-0211", numery: [], modele: [], wpisane: [], czeka: 2 } }) }));
-    expect(screen.getByTestId("luki-kartoteki").textContent).toContain("2");
-  });
-
-  it("bez zapisu i bez kolejki nie ma paska — plakietka należy się wyjątkowi, nie normie", () => {
-    edytor(copilot({ szkic: szkic() }));
-    expect(screen.queryByTestId("luki-kartoteki")).toBeNull();
-  });
-
-  it("JEDEN pasek „Przy okazji” niesie wszystko, co Copilot zrobił obok szkicu", () => {
-    /* Do 0.341.0 były to trzy osobne ramki: dane doboru, pasowanie
-       i pokwitowanie wiedzy. Rozdzielenie miało sens, gdy każda niosła
-       PRZYCISK; przycisków nie ma od 0.341.0, więc został sam komunikat. */
-    edytor(copilot({
-      paraPasowania: "W09-0211 → LC170430140-0001",
-      szkic: szkic({
-        lukiKartoteki: {
-          symbol: "W09-0211",
-          numery: [{ rodzaj: "oem", wartosc: "16100-ZH8-W61" }],
-          modele: ["FS450"], wpisane: ["STIHL MS 170"], czeka: 2,
-        },
-      }),
-    }));
-
-    const pasek = screen.getByTestId("luki-kartoteki");
-    for (const fragment of ["W09-0211 → LC170430140-0001", "wierszu Wiedza",
-      "16100-ZH8-W61", "STIHL MS 170", "FS450", "czeka tam 2"]) {
-      expect(pasek.textContent).toContain(fragment);
-    }
-    /* JEDEN pasek, nie cztery — o to w tym wydaniu chodzi. */
-    expect(screen.getAllByTestId("luki-kartoteki")).toHaveLength(1);
-  });
 
   it("licznik znaków siedzi w nagłówku, a nie w osobnym wierszu pod kartą", () => {
     edytor(copilot({ szkic: szkic({ tresc: "abcde" }) }));
@@ -354,18 +280,5 @@ describe("pokwitowanie wiedzy z oferty (0.264.0)", () => {
     expect(screen.getByText(/Treść szkicu · 5 znaków/)).toBeVisible();
     expect(screen.getByText(/Szkic Copilota/).closest("[title]"))
       .toHaveAttribute("title", expect.stringMatching(/5 znaków/));
-  });
-
-  it("pasek „Przy okazji” jest zwinięty do jednej linii z tematami", async () => {
-    /* 0.517.0: sześć zdań pod każdym szkicem, z których żadne nie prosi
-       o ruch. Podpis mówi, czego dotyczą; treść o jedno kliknięcie. */
-    edytor(copilot({ paraPasowania: "W09-0211 → LC170430140-0001", szkic: szkic({ lukiKartoteki:
-      { symbol: "W09-0211", numery: [], modele: [], wpisane: [], czeka: 2 } }) }));
-    const pasek = screen.getByTestId("luki-kartoteki");
-    expect(pasek).not.toHaveAttribute("open");
-    expect(pasek.querySelector("summary")!.textContent).toBe("Przy okazji: pasowanie, wiedza");
-    expect(screen.getByText(/Rozpoznane pasowanie/)).not.toBeVisible();
-    await userEvent.click(pasek.querySelector("summary")!);
-    expect(screen.getByText(/Rozpoznane pasowanie/)).toBeVisible();
   });
 });

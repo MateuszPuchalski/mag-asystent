@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { db as defaultDb } from "../db/db.js";
 import { logEvent } from "./events.js";
 import { linkZamowienia } from "./allegro-linki.js";
-import { historiaPoLoginie, kontaLoginu, type MaszynaKlienta, type WpisHistorii } from "./klient-historia.js";
+import { historiaPoLoginie, kontaLoginu, type WpisHistorii } from "./klient-historia.js";
 import { przesylkaZamowienia, stanPrzesylkiKrotko } from "./przesylka-zamowienia.js";
 import { sprawaOtwarta } from "./statusy-spraw.js";
 import { statusRozmowy } from "./conversations.js";
@@ -92,7 +92,6 @@ export interface ProfilKlienta {
   sygnaly: SygnalKlienta[];
   otwarte: OtwartaSprawa[];
   zamowienia: ZamowienieKlienta[];
-  maszyny: MaszynaKlienta[];
   os: WpisHistorii[];
   notatka: NotatkaKlienta | null;
   /** Sprawa klienta (S6): krok, termin, prowadzący; `null`, gdy nikt jej nie założył. */
@@ -159,11 +158,9 @@ export function profilKlienta(
   /* Login do nagłówka tak, jak zapisało go Allegro, nie jak wpisał agent. */
   const login = konta[0].login;
 
-  const maszyny: MaszynaKlienta[] = [];
   const os: WpisHistorii[] = [];
   for (const k of new Set(konta.map((w) => w.konto))) {
     const h = historiaPoLoginie(k, q, database);
-    maszyny.push(...h.maszyny);
     os.push(...h.wpisy);
   }
   os.sort((a, b) => b.at.localeCompare(a.at));
@@ -273,7 +270,7 @@ export function profilKlienta(
       rozmow: ile("rozmowa"),
       pierwszyZakup: daty[0] ?? null, ostatniZakup: daty[daty.length - 1] ?? null,
     },
-    sygnaly, otwarte, zamowienia, maszyny, os,
+    sygnaly, otwarte, zamowienia, os,
     notatka: n && tekst(n.tresc)
       ? { tresc: String(n.tresc), at: String(n.at), przez: String(n.przez), cofalna: n.poprzednia != null }
       : null,

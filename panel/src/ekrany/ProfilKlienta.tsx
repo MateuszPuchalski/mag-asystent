@@ -28,7 +28,7 @@ import {
 
    KOLEJNOŚĆ TO KOLEJNOŚĆ PYTAŃ agenta, który otwiera profil przed odpowiedzią:
    „czy coś się pali" (sygnały), „co jest otwarte", „co kupił", „kim jest"
-   (notatka, maszyny, cała oś). Liczby w nagłówku odpowiadają na „jak duży to
+   (notatka, cała oś). Liczby w nagłówku odpowiadają na „jak duży to
    klient" jednym spojrzeniem.
 
    EKRAN JEST ODCZYTEM, poza notatką i sprawą klienta (S6, 0.535.0) — oba
@@ -75,11 +75,11 @@ export function ProfilKlienta() {
         {/* Ten sam klucz z tego samego powodu: szkic notatki A nie ma prawa
             przejść na klienta B. */}
         <Notatka key={d.login.toLowerCase()} login={d.login} notatka={d.notatka} />
-        {/* Oś i maszyny w tym samym widoku co zakładka KLIENT i szuflada —
+        {/* Oś w tym samym widoku co zakładka KLIENT i szuflada —
             klienta czyta się tak samo, skądkolwiek się przyszło. */}
         <Karta className="p-0">
-          <WidokHistorii historia={{ login: d.login, maszyny: d.maszyny, wpisy: d.os }}
-            tutaj="tym profilem" bezProfilu onOtworzRozmowe={(r) => nawiguj(`/obsluga/skrzynka/${r}`)} />
+          <WidokHistorii historia={{ login: d.login, wpisy: d.os }}
+            bezProfilu onOtworzRozmowe={(r) => nawiguj(`/obsluga/skrzynka/${r}`)} />
         </Karta>
       </div>
     </div>

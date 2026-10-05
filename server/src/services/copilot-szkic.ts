@@ -8,28 +8,15 @@ import {
   zamaskujWatek, zostalyDaneOsobowe, type TrescBezpieczna, type WiadomoscWatku,
 } from "./copilot-maskowanie.js";
 import type { Tokeny } from "./copilot-koszt.js";
-import { doborRozmowy, wiedzaDoboru, zapiszDane, type DaneDoboru } from "./dobor.js";
-
-/** Podpis maszyny piszącej dane doboru. Jedno miejsce, bo po nim się poznaje. */
-const AUTOMAT_DANYCH = { automat: "szkic" } as const;
-import { kandydaciDoboru, ofertaRozmowy, PO_IDENTYFIKATORZE, type GrupaKandydata } from "./kandydaci.js";
 import { kartotekaOferty } from "./dopasowanie-sku.js";
 import { dociagnijTresc } from "./allegro-oferta-tresc.js";
 import { buildProductCard } from "./stock.js";
-import {
-  aktywnePasowanie, pasowaniaTowaru, ROLE_PASOWANIA, zaproponujPasowanie, type Kartoteka, type RolaPasowania,
-} from "./pasowania.js";
-import { wTransakcji } from "./wiedza.js";
-import { silnikZTekstu } from "./silniki.js";
 import { podzielStopke } from "./stopka.js";
 import { LIMIT_ZNAKOW } from "./wysylka.js";
 import { bezPodpisu, zwin } from "../tekst.js";
-import { identyfikatoryZOpisu, type RodzajIdentyfikatora } from "./identyfikatory.js";
-import { zapiszWiedzeZOferty } from "./wiedza-z-oferty.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 import { wzorzecOdpowiedzi } from "./wzorce-odpowiedzi.js";
 import { numerZamowieniaRozmowy } from "./zamowienia-kandydaci.js";
-import { naLiscieZgodnosci, zdanieZgodnosci } from "./zgodnosc-oferty.js";
 import {
   idZamowienia, przesylkaDoOdswiezenia, przesylkaZamowienia, sprawdzPrzesylke, zdaniePrzesylki,
   type PrzesylkaDeps,
@@ -44,16 +31,14 @@ import { faktZwrotu, zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
 
    Decyzja właściciela z 7 września 2026: „w oknie odpowiedzi powinien być
-   guzik, który konstruuje odpowiedź z pomocą AI, kartotek etc." Doktryna
-   z jego krytyki promptu doboru obowiązuje tu dosłownie: MODEL NIE ZNA
-   DOPASOWAŃ Z PAMIĘCI. Każde twierdzenie ma dowód z narzędzi, brak trafienia
-   to puste pole, a nie zgadywanie.
+   guzik, który konstruuje odpowiedź z pomocą AI, kartotek etc." Każde
+   twierdzenie ma podpisane źródło, brak trafienia to puste pole, a nie
+   zgadywanie.
 
    Stąd podział ról, który jest całą treścią tego pliku:
-   - SERWER układa FAKTY (F1, F2, …) ze zdań, które już pisze dla ekranu —
-     `zdanieDoSzkicu`, `zdanieZrodla`, `kandydat.zrodlo`. Druga kopia tych
-     zdań w prompcie rozjechałaby się z pierwszą przy pierwszej nowej drodze.
-   - MODEL pisze prozę WYŁĄCZNIE z faktów i cytuje ich identyfikatory.
+   - SERWER układa FAKTY (F1, F2, …) z kartoteki, oferty, rozpoznania,
+     przesyłki i zwrotu, czyli z danych, które już ma.
+   - MODEL pisze prozę z faktów i cytuje ich identyfikatory.
    - SERWER SPRAWDZA wynik deterministycznie: każdy numer w szkicu musi stać
      w faktach albo w rozmowie, inaczej szkic jest odrzucony. Zła proza kosztuje
      „brzmi nieładnie"; wymyślony numer kosztowałby zwrot — i tego drugiego
@@ -65,7 +50,7 @@ import { faktZwrotu, zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
    danych skrzynki: „wynik nie staje się odpowiedzią sam".                    */
 
 export type RodzajFaktu =
-  | "oferta" | "kartoteka" | "dobor" | "kandydat" | "negatyw" | "wiedza" | "pasowanie" | "intake"
+  | "oferta" | "kartoteka" | "intake"
   /* Treść oferty (0.253.0). TRZY rodzaje, nie jeden, bo mają różną wagę:
      parametr stoi w polu formularza, zgodność na liście Allegro, a opis to
      proza sprzedawcy, w której wymiar bywa sprzed dwóch wersji towaru. */
@@ -93,7 +78,7 @@ export interface Fakt { id: string; rodzaj: RodzajFaktu; zdanie: string }
 /**
  * Kategorie, przy których szkic pyta o dane maszyny i części (intake).
  * `WRONG_PRODUCT` jest na liście, bo „przyszło co innego" rozstrzyga się
- * porównaniem numerów — czyli tymi samymi pytaniami co dobór.
+ * porównaniem numerów i danych z tabliczki.
  */
 const KATEGORIE_Z_INTAKE = new Set<string>([
   "PRODUCT_COMPATIBILITY", "PRODUCT_QUESTION", "PRODUCT_AVAILABILITY", "WRONG_PRODUCT",
@@ -118,68 +103,19 @@ export interface KontekstSzkicu {
   watek: TrescBezpieczna;
   /** Ostatnia wiadomość KLIENTA — na niej liczymy świeżość propozycji. */
   ostatniaWiadomoscId: number | null;
-  /** Wersja doboru w chwili układania — zmiana danych po szkicu czyni go nieświeżym. */
-  doborWersja: number;
   /** Aktywna decyzja klasyfikatora, której fakt wszedł do szkicu; `null` — bez rozpoznania. */
   decyzjaId: number | null;
   /**
-   * BIAŁA LISTA kartotek, które serwer sam położył na stole (przyrost
-   * czwarty): kartoteka oferty, kandydaci z faktów, kotwice, strony pasowań.
-   * Klucz to `zwin(symbol)`. Tylko z niej wolno wziąć końce pary pasowania
-   * z rozmowy — nigdy z wyszukiwania po treści wiadomości (blizna szarpaka).
-   * Symbol, którego tu nie ma, nie wejdzie do bazy wiedzy, także gdy klient
-   * go napisał.
+   * Kartoteki, które serwer sam położył w faktach; dziś to kartoteka oferty.
+   * Klucz to `zwin(symbol)`. Po linki do naszych aukcji pytamy wyłącznie
+   * o nie, nigdy o symbol z treści wiadomości: klient nie wybiera, o co
+   * pytamy Allegro.
    */
   kartoteki: Map<string, Kartoteka>;
-  /**
-   * Oznaczenia, które zna OFERTA, a nie zna ich nasza kartoteka (0.254.0).
-   * Dla agenta, nie dla klienta — do faktów NIE wchodzą, więc model nie ma
-   * jak ich zdradzić. To lista okazji do uzupełnienia bazy, nie lista błędów.
-   *
-   * Od 0.264.0 STRUKTURA, nie płaska lista: numery da się zapisać od razu,
-   * pozycje listy zgodności idą do kolejki, bo klucz modelu składa człowiek.
-   */
-  luki: WiedzaZOferty;
-  /**
-   * Kartoteka, do której wolno dopisać wiedzę z tej oferty — albo `null`.
-   *
-   * `null` znaczy „nie wiadomo, o czyj towar chodzi": oferty bez SKU, SKU
-   * niecelującego w żadną kartotekę, symbolu zdublowanego. Numer wpisany do
-   * CUDZEJ kartoteki jest najdroższą awarią tego wydania, bo wraca do klienta
-   * jako zły towar — więc bramka stoi TU, przy źródle, nie przy przycisku.
-   */
-  docelowaKartoteka: { twId: number; symbol: string; ofertaId: string } | null;
 }
 
-/** Surowa treść oferty — trzy pola, z których liczy się luki i wiedzę do zapisu. */
-export interface TrescOferty {
-  parametry: Array<{ nazwa: string; wartosci: string[] }>;
-  zgodnosc: string[];
-  opis: string;
-}
-
-/**
- * Wiedza z oferty w kształcie, który DA SIĘ ZAPISAĆ (0.264.0).
- *
- * Do 0.263.0 była to płaska lista oznaczeń: pasek pod szkicem wypisywał ją
- * i na tym się kończyło, a przy następnym szkicu liczyła się od zera. System
- * zauważał lukę za każdym razem i za każdym razem o niej zapominał.
- *
- * Dwa pola, bo dwie różne drogi. Numer trafia do `towar_identyfikator` OD RAZU
- * — jest wyszukiwalny sam z siebie i nie wymaga niczyjej decyzji. Pozycja
- * listy zgodności idzie do kolejki Wiedzy, bo klucz modelu (marka + nazwa)
- * składa CZŁOWIEK; automat nie zgaduje marki od 0.186.0.
- */
-export interface WiedzaZOferty {
-  numery: Array<{ rodzaj: RodzajIdentyfikatora; wartosc: string }>;
-  modele: string[];
-}
-
-/**
- * Pasowanie, które model ODCZYTAŁ z rozmowy (przyrost czwarty): SYMBOLE
- * cytowane z faktów, nie identyfikatory. Surowe — sprawdza `sprawdzPasowanie`.
- */
-export interface PasowanieZRozmowy { czesc: string; doCzego: string; rola: string; pozycja: string | null }
+/** Kartoteka w faktach: tyle, ile trzeba, żeby ją nazwać i znaleźć jej aukcję. */
+export interface Kartoteka { twId: number; symbol: string; nazwa: string }
 
 /* ── SKĄD MODEL TO WIE (0.253.0) ─────────────────────────────────────────────
    Do 0.252.0 reguła brzmiała „nie znasz dopasowań z pamięci", a `numery
@@ -193,11 +129,7 @@ export interface PasowanieZRozmowy { czesc: string; doCzego: string; rola: strin
    sprawdzić, kosztuje dokładnie tyle, co szkic zmyślony.                    */
 
 /** Skąd wzięło się twierdzenie. Kolejność ma znaczenie: od najmocniejszego. */
-export const ZRODLA_TWIERDZENIA = ["fakty", "oferta", "zdjecie", "siec", "model"] as const;
-/* Szkic nie czyta sieci, więc jego schemat nie zna źródła `siec` (0.528.0).
-   Model, który nazwałby tak własną wiedzę, dostałby sufit o stopień wyżej
-   za samo słowo — a sufit stoi w kodzie, nie w dyscyplinie modelu. */
-export const ZRODLA_TWIERDZENIA_SZKICU = ["fakty", "oferta", "zdjecie", "model"] as const;
+export const ZRODLA_TWIERDZENIA = ["fakty", "oferta", "zdjecie", "model"] as const;
 export type ZrodloTwierdzenia = (typeof ZRODLA_TWIERDZENIA)[number];
 
 /** Ile temu twierdzeniu wolno ufać. Też od najmocniejszej. */
@@ -211,7 +143,7 @@ export type PoziomPewnosci = (typeof POZIOMY_PEWNOSCI)[number];
  * z którego czerpie. Bez sufitu ocena byłaby jego zdaniem o sobie samym:
  * „pewne", bo brzmi pewnie. Z sufitem jest funkcją tego, na czym stoi.
  *
- * `fakty` — nasza baza: kartoteka, pasowania, pomiary z hali. Wolno „pewne".
+ * `fakty` — nasza baza: kartoteka, stan, zamówienia, przesyłka. Wolno „pewne".
  * `oferta` — słowa sprzedawcy sprzed lat; najwyżej „prawdopodobne", bo towar
  *   u dostawcy zmienia się bez zmiany opisu.
  * `zdjecie` — odczytane z fotografii przysłanej przez klienta; najwyżej
@@ -221,10 +153,6 @@ export type PoziomPewnosci = (typeof POZIOMY_PEWNOSCI)[number];
  *   zdjęciu widać tabliczkę, NIE wynika, że to tabliczka maszyny, o którą
  *   klient pyta. Zdjęcie bywa z internetu, z maszyny sąsiada albo z drugiej
  *   kosiarki w garażu. „Pewne" zostaje dla naszej bazy.
- * `siec` (0.528.0) — strona przeczytana w dopytaniu przez `web_fetch`;
- *   najwyżej „prawdopodobne”. Cudza strona bywa błędna, a tego, że mówi
- *   o NASZEJ części, nikt u nas jeszcze nie sprawdził. Wyżej wchodzi dopiero
- *   po zatwierdzeniu w Wiedzy — wtedy jest już faktem z naszej bazy.
  * `model` — wiedza własna modelu, bez pokrycia w naszych danych; „niepewne"
  *   i ani stopnia wyżej. To nie jest opinia o modelu, tylko o tym, że nikt
  *   tego u nas nie sprawdził.
@@ -233,7 +161,7 @@ export type PoziomPewnosci = (typeof POZIOMY_PEWNOSCI)[number];
  * której nie mamy powodu poprawiać.
  */
 const SUFIT_PEWNOSCI: Record<ZrodloTwierdzenia, PoziomPewnosci> = {
-  fakty: "pewne", oferta: "prawdopodobne", zdjecie: "prawdopodobne", siec: "prawdopodobne", model: "niepewne",
+  fakty: "pewne", oferta: "prawdopodobne", zdjecie: "prawdopodobne", model: "niepewne",
 };
 
 /** Twierdzenie tak, jak oddał je model — przed obcięciem pewności do sufitu. */
@@ -309,14 +237,6 @@ export interface OdpowiedzSzkicu {
   uzyteFakty: string[];
   zastrzezenia: string[];
   /**
-   * Dane maszyny i części, które model ODCZYTAŁ z rozmowy (przyrost trzeci).
-   * `null` = nadawca ich nie oddaje (atrapy w testach). Surowe: sprawdzenie
-   * przeciw rozmowie robi `oczyscPropozycje`, nie adapter.
-   */
-  daneDoboru: DaneZRozmowy | null;
-  /** Para część→część z rozmowy (przyrost czwarty); `null` = nic albo nadawca nie oddaje. */
-  pasowanie: PasowanieZRozmowy | null;
-  /**
    * Skąd model wie to, co napisał (0.253.0). Surowe — pewność obcina do sufitu
    * źródła `ocenTwierdzenia`, nie adapter. Pusta lista przy nadawcy-atrapie.
    */
@@ -345,19 +265,6 @@ export type NadawcaSzkicu = (
 export const OCENY_SZKICU = ["wstawiony", "zastapiony", "odrzucony"] as const;
 export type OcenaSzkicu = (typeof OCENY_SZKICU)[number];
 
-/** Los propozycji DANYCH — osobny od losu szkicu, bo bywają różne. */
-export const OCENY_DANYCH = ["wpisane", "odrzucone"] as const;
-export type OcenaDanych = (typeof OCENY_DANYCH)[number];
-
-/** Los propozycji PASOWANIA (przyrost czwarty) — trzeci osobny los z tego samego wywołania. */
-export const OCENY_PASOWANIA = ["zaproponowane", "odrzucone"] as const;
-export type OcenaPasowania = (typeof OCENY_PASOWANIA)[number];
-
-/** Para po sprawdzeniu: oba końce to kartoteki z kontekstu rozmowy. */
-export interface PropozycjaPasowaniaCopilota {
-  czesc: Kartoteka; doCzego: Kartoteka; rola: RolaPasowania; pozycja: string | null;
-}
-
 export interface SzkicCopilota {
   tresc: string;
   zastrzezenia: string[];
@@ -368,42 +275,12 @@ export interface SzkicCopilota {
   przez: string;
   ocena: OcenaSzkicu | null;
   /**
-   * Dane doboru rozpoznane w rozmowie i SPRAWDZONE przeciw niej. `null` = nic
-   * nie rozpoznano. Do tabeli `dobor` weszły same, wyłącznie w puste pola
-   * i bez parametrów; tu zostaje pełny odczyt modelu dla pomiaru.
-   */
-  daneDoboru: DaneZRozmowy | null;
-  daneOcena: OcenaDanych | null;
-  /** Wersja doboru, na której szkic powstał — inna dziś = szkic nieświeży. */
-  doborWersja: number;
-  /**
-   * Pasowanie rozpoznane w rozmowie i SPRAWDZONE po kartotekach z kontekstu
-   * (przyrost czwarty). `null` = nic. To propozycja: do kolejki wiedzy wchodzi
-   * na kliknięcie agenta (`przyjmijPasowanie`), rozstrzyga biuro.
-   */
-  pasowanie: PropozycjaPasowaniaCopilota | null;
-  pasowanieOcena: OcenaPasowania | null;
-  /**
    * SKĄD MODEL TO WIE (0.253.0) — po ocenie serwera, czyli z pewnością już
    * obciętą do sufitu źródła. Panel pokazuje tę listę agentowi OBOK szkicu:
    * tekst dla klienta ma być gładki, a rachunek za niego stoi osobno.
    * Pusta lista przy szkicach sprzed tego wydania — i to o nich prawda.
    */
   twierdzenia: Twierdzenie[];
-  /**
-   * POKWITOWANIE wiedzy z oferty (0.264.0), widziane WYŁĄCZNIE przez agenta.
-   *
-   * Do 0.263.0 stała tu lista braków: oznaczenia znane ofercie, nieznane
-   * kartotece. Powstawała przy każdym szkicu od nowa i nic z niej nie
-   * wynikało. Teraz mówi, co przy tym szkicu FAKTYCZNIE dopisano do kartoteki
-   * i ile pozycji czeka w kolejce Wiedzy — a lista braków skróciła się o to,
-   * co właśnie przestało być brakiem.
-   *
-   * Szkice sprzed 0.264.0 trzymają w tej kolumnie gołą tablicę oznaczeń;
-   * odczyt czyta ją jako `modele`, bo tym była. Dorabianie im `rodzaju`
-   * byłoby zmyśleniem danych.
-   */
-  lukiKartoteki: PokwitowanieSzkicu;
   /**
    * CO MODEL ODCZYTAŁ ZE ZDJĘĆ — dla agenta, obok miniatur.
    *
@@ -413,50 +290,6 @@ export interface SzkicCopilota {
    * ma się na co powołać, a to jest jedyne, co z tego pola wynika.
    */
   odczytZeZdjec: OdczytZdjecia[];
-}
-
-/**
- * Co przy tym szkicu poszło do bazy. `symbol` mówi DO KTÓREJ kartoteki —
- * bez niego pokwitowanie jest zdaniem bez podmiotu, a numer wpisany do
- * cudzej kartoteki wraca do klienta jako zły towar.
- */
-export interface PokwitowanieSzkicu {
-  symbol: string | null;
-  numery: Array<{ rodzaj: string; wartosc: string }>;
-  /** Pozycje zgodności ODŁOŻONE do kolejki — te, przy których marka milczała. */
-  modele: string[];
-  /**
-   * Pozycje, które weszły do wiedzy OD RAZU (0.341.0), bo markę dało się
-   * odczytać. Rozłączne z `modele`: wiersz albo dostał klucz, albo czeka.
-   * Szkice sprzed tego wydania mają tu pustą listę i to jest o nich prawda.
-   */
-  wpisane: string[];
-  czeka: number;
-}
-
-const PUSTE_POKWITOWANIE: PokwitowanieSzkicu =
-  { symbol: null, numery: [], modele: [], wpisane: [], czeka: 0 };
-
-/**
- * Odczyt kolumny `luki_kartoteki` w obu kształtach, jakie tam stoją.
- *
- * Gołą tablicę zostawiły szkice sprzed 0.264.0 i była listą OZNACZEŃ, więc
- * wraca jako `modele` — z zerowym licznikiem kolejki, bo wtedy nikt niczego
- * do kolejki nie odkładał.
- */
-function czytajPokwitowanie(json: string | null): PokwitowanieSzkicu {
-  let v: unknown;
-  try { v = JSON.parse(json ?? "[]"); } catch { return PUSTE_POKWITOWANIE; }
-  if (Array.isArray(v)) return { ...PUSTE_POKWITOWANIE, modele: v.map(String) };
-  if (!v || typeof v !== "object") return PUSTE_POKWITOWANIE;
-  const o = v as Partial<PokwitowanieSzkicu>;
-  return {
-    symbol: o.symbol == null ? null : String(o.symbol),
-    numery: Array.isArray(o.numery) ? o.numery : [],
-    modele: Array.isArray(o.modele) ? o.modele.map(String) : [],
-    wpisane: Array.isArray(o.wpisane) ? o.wpisane.map(String) : [],
-    czeka: Number(o.czeka ?? 0),
-  };
 }
 
 /* ── Pytania z intake per typ części (krytyka właściciela, punkt 4) ──────────
@@ -535,9 +368,9 @@ export function numerySpozaFaktow(tresc: string, dozwolone: string): string[] {
  * ma numer 503 28 32-08", ale musi się pod tym podpisać, a agent musi to
  * zobaczyć w oknie „skąd to wiem", zanim wyśle.
  *
- * Porównanie po `zwin`, tak jak przy danych doboru: „503 28 32-08" w szkicu
- * i „503283208" w tezie to ten sam numer, a różnica w spacjach nie jest
- * powodem do odrzucenia dobrego szkicu.
+ * Porównanie po `zwin`: „503 28 32-08" w szkicu i „503283208" w tezie to
+ * ten sam numer, a różnica w spacjach nie jest powodem do odrzucenia
+ * dobrego szkicu.
  */
 export function numeryNiezadeklarowane(
   tresc: string, dozwolone: string, twierdzenia: TwierdzenieSurowe[],
@@ -552,125 +385,26 @@ export function numeryNiezadeklarowane(
     .filter((n) => !zWiedzy.includes(zwin(n).toUpperCase()));
 }
 
-/* ── Dane doboru z rozmowy: sprawdzenie przeciw temu, co model widział ──────
-   Model może POMYLIĆ pole (wpisać silnik jako model), ale nie może DOPISAĆ
-   wartości, której w rozmowie nie ma — a to drugie kosztowałoby zły dobór,
-   bo dane doboru karmią szczeble wyszukiwania. Reguła jest deterministyczna
-   jak `numerySpozaFaktow`: każdy token z cyfrą musi stać w rozmowie po `zwin`
-   („532 19 93-77" = „532199377"), a każde słowo bez cyfry musi mieć swoje
-   pierwsze cztery litery w rozmowie — „śrubę do noża" pokrywa „śruba noża",
-   „linki napędowej" pokrywa „linka napędu". Sprawdzamy przeciw ZAMASKOWANEMU
-   wątkowi, bo to on poszedł do modelu: wartość, która zniknęła jako
-   `[telefon]`, nie ma jak wrócić do danych.                                  */
-
-/**
- * Dane maszyny i części, które model odczytał z rozmowy. Kształt modelu,
- * nie doboru: `parametry` zostają, bo prompt i schemat odpowiedzi je znają,
- * a dobór ich nie przyjmuje (droga „zgodne wymiary" wyszła). Osobny typ,
- * żeby zmiana doboru nie zmieniała po cichu kontraktu z modelem.
- */
-export interface DaneZRozmowy {
-  marka: string | null; model: string | null; wariant: string | null;
-  rocznik: string | null; nrSeryjny: string | null; silnik: string | null;
-  oem: string | null; nazwaCzesci: string | null;
-  parametry: Record<string, string>;
-}
-
-/* Pola, które przechodzą do doboru. Typ z doboru pilnuje, że każde z nich
-   tam istnieje; parametrów na tej liście nie ma. */
-const KLUCZE_DANYCH: Array<keyof DaneDoboru & keyof DaneZRozmowy> = [
-  "marka", "model", "wariant", "rocznik", "nrSeryjny", "silnik", "oem", "nazwaCzesci",
-];
-
-export function wartoscZRozmowy(wartosc: string, watek: string): boolean {
-  const w = wartosc.trim();
-  if (!w || w.length > 120) return false;
-  const tekst = watek.toLowerCase();
-  const zwiniety = zwin(watek).toLowerCase();
-  const tokeny = w.split(/[\s,;:()]+/).filter(Boolean);
-  if (tokeny.length === 0) return false;
-  for (const t of tokeny) {
-    if (/\d/.test(t)) {
-      if (!zwiniety.includes(zwin(t).toLowerCase())) return false;
-    } else {
-      const rdzen = t.toLowerCase().replace(/[^\p{L}]/gu, "").slice(0, 4);
-      if (rdzen && !tekst.includes(rdzen)) return false;
-    }
+/** Oferta, o którą chodzi: ręczne wskazanie bije numer z wiadomości. */
+function ofertaRozmowy(database: DatabaseSync, conversationId: number): { konto: number; ofertaId: string } | null {
+  const konto = database.prepare("SELECT channel_account_id AS konto FROM conversation WHERE id=?")
+    .get(conversationId) as { konto: number } | undefined;
+  if (!konto) throw new Error("Nie znaleziono rozmowy");
+  const reczna = database.prepare(`SELECT payload FROM conversation_event
+    WHERE conversation_id=? AND event_type='offer_linked_manually' ORDER BY id DESC LIMIT 1`)
+    .get(conversationId) as { payload: string | null } | undefined;
+  if (reczna?.payload) {
+    const p = JSON.parse(reczna.payload) as { ofertaId?: string };
+    if (p.ofertaId) return { konto: Number(konto.konto), ofertaId: p.ofertaId };
   }
-  return true;
-}
-
-/**
- * Propozycja po sprawdzeniu: zostają wyłącznie wartości, które stoją
- * w rozmowie. `null`, gdy nie zostało nic. Druga liczba to ile wypadło —
- * idzie do dziennika jako miara, ile model zmyśla.
- */
-export function oczyscPropozycje(
-  dane: DaneZRozmowy | null, watek: string,
-): { dane: DaneZRozmowy | null; odrzuconych: number } {
-  if (!dane) return { dane: null, odrzuconych: 0 };
-  let odrzuconych = 0;
-  let cokolwiek = false;
-  const czyste: DaneZRozmowy = {
-    marka: null, model: null, wariant: null, rocznik: null, nrSeryjny: null,
-    silnik: null, oem: null, nazwaCzesci: null, parametry: {},
-  };
-  for (const k of KLUCZE_DANYCH) {
-    const v = (dane[k] ?? "").trim();
-    if (!v) continue;
-    if (wartoscZRozmowy(v, watek)) { czyste[k] = v; cokolwiek = true; } else odrzuconych += 1;
-  }
-  for (const [nazwa, wartosc] of Object.entries(dane.parametry ?? {})) {
-    const n = nazwa.trim(); const v = String(wartosc ?? "").trim();
-    if (!n || !v) continue;
-    if (wartoscZRozmowy(v, watek)) { czyste.parametry[n] = v; cokolwiek = true; } else odrzuconych += 1;
-  }
-  return { dane: cokolwiek ? czyste : null, odrzuconych };
-}
-
-/* Powody, dla których para z rozmowy nie stała się propozycją. Etykieta do
-   dziennika — nigdy treść (§19). Cztery, bo tyle jest bram: symbol musi
-   być z kontekstu, para nie może być jedną kartoteką, rola z listy, a para
-   jeszcze nieznana bazie. */
-export const POWODY_ODRZUCENIA_PASOWANIA = ["symbol_spoza_kontekstu", "ta_sama_kartoteka", "zla_rola", "juz_jest"] as const;
-export type PowodOdrzuceniaPasowania = (typeof POWODY_ODRZUCENIA_PASOWANIA)[number];
-
-/**
- * Sprawdzenie pary z rozmowy (przyrost czwarty). Kontrakt jak przy danych:
- * odrzucona para NIE odrzuca szkicu — szkic jest wart pieniędzy sam w sobie —
- * tylko wypada z propozycji, a powód idzie do dziennika.
- *
- * Oba końce muszą stać na BIAŁEJ LIŚCIE kartotek z kontekstu (decyzja
- * właściciela): model widział tylko je, więc tylko one mogą być tym, o czym
- * mówi. Dopasowanie symbolu po `zwin`, tą samą normalizacją, co wszędzie.
- * Para już żywa w bazie — w dowolnej polaryzacji — wypada: pozytyw wobec
- * negatywu to to, czego §14.2 automatowi zabrania, a dubel pozytywu
- * i tak nie wszedłby do kolejki.
- *
- * POZYCJA zostaje tylko, gdy stoi w rozmowie (`wartoscZRozmowy`): fakt intake
- * wymienia „od strony filtra / kolektora", więc model mógłby przepisać ją
- * z faktu, nie z rozmowy — a pozycja jest jedynym, co rozróżnia trzy
- * uszczelki jednego gaźnika. Zmyślona pozycja to zły fakt w bazie; para
- * bez pozycji to prawda, tylko mniejsza.
- */
-export function sprawdzPasowanie(
-  p: PasowanieZRozmowy | null, kartoteki: Map<string, Kartoteka>, watek: string, database: DatabaseSync = db(),
-): { propozycja: PropozycjaPasowaniaCopilota | null; powod: PowodOdrzuceniaPasowania | null } {
-  if (!p) return { propozycja: null, powod: null };
-  const czesc = kartoteki.get(zwin(p.czesc ?? ""));
-  const doCzego = kartoteki.get(zwin(p.doCzego ?? ""));
-  if (!czesc || !doCzego) return { propozycja: null, powod: "symbol_spoza_kontekstu" };
-  if (czesc.twId === doCzego.twId) return { propozycja: null, powod: "ta_sama_kartoteka" };
-  if (!(ROLE_PASOWANIA as readonly string[]).includes(p.rola)) return { propozycja: null, powod: "zla_rola" };
-  if (aktywnePasowanie(czesc.twId, doCzego.twId, database)) return { propozycja: null, powod: "juz_jest" };
-  const pozycja = (p.pozycja ?? "").trim();
-  return {
-    propozycja: {
-      czesc, doCzego, rola: p.rola as RolaPasowania,
-      pozycja: pozycja && pozycja.length <= 80 && wartoscZRozmowy(pozycja, watek) ? pozycja : null,
-    },
-    powod: null,
-  };
+  /* Ta sama reguła co w `osRozmowy`: numer z najnowszej wiadomości KLIENTA,
+     a gdy klient go nie podał — z najnowszej naszej. Najnowszej PO CZASIE:
+     `id` starych wierszy nie rośnie z czasem. */
+  const m = database.prepare(`SELECT related_object_id AS oferta FROM message
+    WHERE conversation_id=? AND related_object_type='OFFER' AND related_object_id IS NOT NULL
+    ORDER BY (direction='incoming') DESC, sent_at DESC, id DESC LIMIT 1`)
+    .get(conversationId) as { oferta: string } | undefined;
+  return m ? { konto: Number(konto.konto), ofertaId: String(m.oferta) } : null;
 }
 
 /** Login rozmówcy z WĄTKU Allegro — nie z tematu, bo temat bywa tytułem oferty. */
@@ -681,12 +415,6 @@ function loginRozmowcy(conversationId: number): string | null {
   const l = String(w?.login ?? "").trim();
   return l || null;
 }
-
-const zdanieSilnika = (tekst: string | null): string | null => {
-  if (!tekst) return null;
-  const alias = silnikZTekstu(tekst);
-  return alias ? `${tekst} (wg słownika: ${alias.silnik.etykieta})` : tekst;
-};
 
 /**
  * Ile znaków opisu oferty wchodzi do faktów.
@@ -728,11 +456,11 @@ const LIMIT_ZGODNOSCI = 30;
 function faktyZTresciOferty(
   database: DatabaseSync, konto: number, ofertaId: string,
   dodaj: (rodzaj: RodzajFaktu, zdanie: string) => void,
-): TrescOferty {
+): void {
   const w = database.prepare(`SELECT opis, parametry_json, pasuje_do_json FROM offer_snapshot
       WHERE channel_account_id=? AND external_id=?`).get(konto, ofertaId) as
     { opis: string | null; parametry_json: string | null; pasuje_do_json: string | null } | undefined;
-  if (!w) return { parametry: [], zgodnosc: [], opis: "" };
+  if (!w) return;
 
   const parametry = czytajListe<{ nazwa: string; wartosci: string[] }>(w.parametry_json);
   if (parametry.length) {
@@ -755,108 +483,6 @@ function faktyZTresciOferty(
     dodaj("oferta_opis", `Opis oferty — SŁOWA SPRZEDAWCY, nie kartoteka; gdy przeczy `
       + `kartotece, rację ma kartoteka: ${przyciety}${ogon}`);
   }
-  /* Surowe listy wracają do wołającego po jedno: policzenie luk w kartotece
-     (0.254.0). Robi się to na KOŃCU kontekstu, bo korpus porównania to
-     wszystko, co już wiemy — także wiedza i kandydaci, którzy dochodzą niżej.
-     Od 0.264.0 wraca też OPIS w całości, nie przycięty do promptu: numery
-     stoją w nim po etykietach („OEM: 698083"), a `identyfikatoryZOpisu`
-     czyta dokładnie takie etykiety. Przycięcie do 1200 znaków gubiłoby te
-     spod końca opisu, i to bez śladu. */
-  return { parametry, zgodnosc, opis };
-}
-
-/**
- * LUKI W KARTOTECE (0.254.0) — oznaczenia, które oferta zna, a kartoteka nie.
- *
- * Właściciel, czytając szkic o cewce do FS56: „jeśli jakieś numery są w ofercie,
- * a nie ma w kartotece, zaznacz — to jest organiczna okazja do uzupełnienia
- * danych". Ta cewka miała w liście zgodności jedenaście modeli, a kartoteka
- * znała dwa. Dziewięć pozostałych nikt nigdy nie wpisał, bo nikt ich nie
- * zobaczył obok siebie.
- *
- * DETERMINISTYCZNIE, NIE MODELEM. To jest porównanie dwóch list, więc robi je
- * kod. Model umiałby to zauważyć, ale zauważałby RÓŻNIE przy każdym kliknięciu,
- * a lista braków, która raz jest a raz jej nie ma, przestaje być listą braków.
- *
- * DLA AGENTA, NIE DLA KLIENTA — i dlatego NIE WCHODZI DO FAKTÓW. Czego nam
- * brakuje w danych, to jest zdanie o nas (reguła 6a instrukcji); model, który
- * tego nie dostaje, nie ma jak tego napisać klientowi.
- *
- * PARAMETR I POZYCJA ZGODNOŚCI CZYTA SIĘ INACZEJ, i to nie jest niekonsekwencja.
- * Parametr to POLE, które sprzedawca wypełnił jedną wartością — bierzemy ją
- * w całości, bo „4134 400 1306" jest numerem katalogowym i rozbicie go na trzy
- * liczby gubi dokładnie tę daną, po której szuka człowiek. Pozycja listy
- * zgodności to ZDANIE („STIHL FS250", „CITROËN C6 (TD_) 2005/09-2011/12"),
- * więc wyjmujemy z niego tokeny z cyfrą ORAZ literą: bez tego warunku zakres
- * lat wchodziłby na listę braków przy każdej ofercie motoryzacyjnej.
- *
- * Porównanie po `zwin`, tak jak przy danych doboru: „STIHL FS 120" i „FS120"
- * to ten sam model, a spacja sprzedawcy nie jest brakiem w naszej bazie.
- */
-export function lukiZOferty(zrodla: TrescOferty, kartotekaTekst: string): WiedzaZOferty {
-  const korpus = zwin(kartotekaTekst).toUpperCase();
-  const zna = (tekst: string) => {
-    const klucz = zwin(tekst).toUpperCase();
-    return !klucz || korpus.includes(klucz);
-  };
-
-  const numery = new Map<string, { rodzaj: RodzajIdentyfikatora; wartosc: string }>();
-  const dodajNumer = (rodzaj: RodzajIdentyfikatora, wartosc: string) => {
-    const klucz = zwin(wartosc).toUpperCase();
-    if (!klucz || korpus.includes(klucz) || numery.has(klucz)) return;
-    numery.set(klucz, { rodzaj, wartosc: wartosc.trim() });
-  };
-
-  /* Parametr: cała wartość pola, bez rozbierania — ale TYLKO z pola, którego
-     nazwa obiecuje numer katalogowy. */
-  for (const p of zrodla.parametry) {
-    const rodzaj = rodzajPola(p.nazwa);
-    if (!rodzaj) continue;
-    for (const w of p.wartosci) if (/\d/.test(w)) dodajNumer(rodzaj, w);
-  }
-  /* Numery z OPISU oferty — tym samym parserem, którym czytamy opisy kartotek.
-     Wymaga etykiety z dwukropkiem, więc na prozie sprzedażowej („najlepszy
-     filtr w tej cenie") nie znajduje nic. `wlasnySymbol` pusty, bo opis
-     oferty nie jest autoreferencyjny w tym sensie co opis kartoteki. */
-  for (const i of identyfikatoryZOpisu(zrodla.opis, "")) dodajNumer(i.rodzaj, i.wartosc);
-
-  /* Pozycja zgodności wchodzi W CAŁOŚCI, nie tokenami. Człowiek w kolejce
-     Wiedzy potrzebuje MARKI, żeby złożyć klucz modelu: `FS250` sam z siebie
-     nie mówi, czyj to model, a decyzja z 0.186.0 („automat nie zgaduje marki")
-     zostaje nietknięta. Wykrywanie zostaje tokenowe — pozycja jest luką, gdy
-     choć jeden jej token z cyfrą I literą jest korpusowi nieznany. */
-  const modele: string[] = [];
-  const widziane = new Set<string>();
-  for (const z of zrodla.zgodnosc) {
-    const tokeny = (z.match(NUMER) ?? []).filter((m) => /\d/.test(m) && /[A-Za-z]/.test(m));
-    if (!tokeny.length || tokeny.every(zna)) continue;
-    const calosc = z.trim().replace(/\s+/g, " ").slice(0, 200);
-    const klucz = zwin(calosc).toUpperCase();
-    if (!klucz || widziane.has(klucz)) continue;
-    widziane.add(klucz);
-    modele.push(calosc);
-  }
-  return { numery: [...numery.values()], modele };
-}
-
-/**
- * Czy nazwa pola parametru obiecuje NUMER KATALOGOWY — i jaki.
- *
- * Filtr zapisu MUSI być węższy od dzisiejszego filtru wyświetlania. Do 0.263.0
- * na pasek luk wchodziła każda wartość z cyfrą, bo pasek był akapitem i nic
- * z niego nie wynikało. Od 0.264.0 z tej samej listy powstają wiersze
- * `towar_identyfikator`, przeszukiwane szczeblem OEM — a „Moc [KM]: 204"
- * w tej tabeli znaczy, że pytanie o numer 204 prowadzi do kosiarki.
- *
- * `ean` i `gtin` odpadają, choć są numerami: EAN ma własną drogę do kartoteki
- * i własny szczebel doboru, drugi z jedenastu. Wpisanie go tutaj jako `oem`
- * osłabiłoby trafienie, zamiast je dodać.
- */
-function rodzajPola(nazwa: string): RodzajIdentyfikatora | null {
-  const n = (nazwa ?? "").toLowerCase();
-  if (/ean|gtin/.test(n)) return null;
-  if (!/num|kod|katalog|indeks|symbol|oem|part/.test(n)) return null;
-  return /oryg/.test(n) ? "nr_oryg" : "oem";
 }
 
 /** Lista z kolumny JSON. Uszkodzony wpis to pusta lista, nie wywrócony szkic. */
@@ -869,12 +495,6 @@ function czytajListe<T>(json: string | null): T[] {
     return [];
   }
 }
-
-/* Grupa kandydata słowami: model ma wiedzieć, czy część wskazał klient,
-   czy tylko wygląda podobnie. */
-const GRUPA_SLOWAMI: Record<GrupaKandydata, string> = {
-  numer: "wskazane przez klienta", wiedza: "z bazy wiedzy", podobne: "podobne po nazwie",
-};
 
 const dostepnosc = (ile: number | null, jednostka: string | null) =>
   ile != null && ile > 0 ? `dostępne dziś: ${ile} ${jednostka ?? "szt."}` : "dziś brak na stanie";
@@ -934,37 +554,26 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
   const fakty: Fakt[] = [];
   const dodaj = (rodzaj: RodzajFaktu, zdanie: string) =>
     fakty.push({ id: `F${fakty.length + 1}`, rodzaj, zdanie: bezPodpisu(zdanie.replace(/\s+/g, " ").trim()) });
-  /* Biała lista kartotek dla pary z rozmowy: dopisuje się tu KAŻDA kartoteka,
-     której symbol trafia do faktów. Zbiera ją ten sam przebieg, który układa
-     fakty, bo drugi przebieg po to samo rozjechałby się z pierwszym. */
+  /* Kartoteki z faktów zbiera ten sam przebieg, który układa fakty, bo drugi
+     przebieg po to samo rozjechałby się z pierwszym. */
   const kartoteki = new Map<string, Kartoteka>();
-  const zapamietaj = (k: Kartoteka | null | undefined) => { if (k) kartoteki.set(zwin(k.symbol), k); };
 
-  /* Treść oferty przechwycona do policzenia luk w kartotece — patrz niżej. */
-  let trescOferty: TrescOferty = { parametry: [], zgodnosc: [], opis: "" };
-  let docelowaKartoteka: KontekstSzkicu["docelowaKartoteka"] = null;
-  /* Oferta i jej kartoteka — tą samą regułą, którą czyta je dobór. */
   const oferta = ofertaRozmowy(db(), conversationId);
-  let kartotekaTwId: number | null = null;
+  let nazwaOferty: string | null = null;
   if (oferta) {
     const snap = db().prepare(`SELECT nazwa, sku FROM offer_snapshot
         WHERE channel_account_id=? AND external_id=?`).get(oferta.konto, oferta.ofertaId) as
       { nazwa: string; sku: string | null } | undefined;
-    if (snap) dodaj("oferta", `Oferta, o którą pyta klient: „${snap.nazwa}"`);
-    trescOferty = faktyZTresciOferty(db(), oferta.konto, oferta.ofertaId, dodaj);
+    if (snap) {
+      nazwaOferty = snap.nazwa;
+      dodaj("oferta", `Oferta, o którą pyta klient: „${snap.nazwa}"`);
+    }
+    faktyZTresciOferty(db(), oferta.konto, oferta.ofertaId, dodaj);
     const k = kartotekaOferty(db(), oferta.konto, oferta.ofertaId, snap?.sku ?? undefined);
     if (k.twId !== null) {
       const karta = buildProductCard(subiekt, k.twId);
       if (karta) {
-        kartotekaTwId = k.twId;
-        /* BRAMKA ZAPISU WIEDZY Z OFERTY (0.264.0). Tylko dopasowanie po
-           sygnaturze albo wcześniejsze wskazanie człowieka — domysł po nazwie
-           wystarcza, żeby POKAZAĆ kartotekę obok oferty, ale nie żeby dopisać
-           jej cudzy numer. */
-        if (k.pewnosc === "sku" || k.pewnosc === "pamiec") {
-          docelowaKartoteka = { twId: k.twId, symbol: karta.sym, ofertaId: oferta.ofertaId };
-        }
-        zapamietaj({ twId: k.twId, symbol: karta.sym, nazwa: karta.name });
+        kartoteki.set(zwin(karta.sym), { twId: k.twId, symbol: karta.sym, nazwa: karta.name });
         const numery = karta.identyfikatory.map((i) => i.wartosc).join(", ");
         dodaj("kartoteka", `Kartoteka oferty: ${karta.sym} — ${karta.name}; EAN ${karta.ean || "brak"};`
           + ` numery: ${numery || "brak"}; ${dostepnosc(karta.mag.avail, karta.unit)}`
@@ -972,85 +581,6 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
       }
     } else {
       dodaj("oferta", `Oferta bez kartoteki w Subiekcie: ${k.zrodlo}`);
-    }
-  }
-
-  /* Dane doboru: to, co agent sprawdził albo poprawił po automacie. Kandydaci
-     rosną wyłącznie z nich, nigdy z treści wiadomości (blizna szarpaka). */
-  const dobor = doborRozmowy(conversationId);
-  const d = dobor.dane;
-  const pola = [
-    ["marka", d.marka], ["model", d.model], ["wariant", d.wariant], ["rocznik", d.rocznik],
-    /* Silnik z aliasu słownika (0.238.0): model dostaje KANONICZNĄ nazwę
-       do zdania „mają Państwo silnik…", zamiast zgadywać, co znaczy „Lonci". */
-    ["numer seryjny", d.nrSeryjny], ["silnik", zdanieSilnika(d.silnik)], ["numer OEM lub symbol", d.oem],
-    ["szukana część", d.nazwaCzesci],
-  ].filter((p): p is [string, string] => Boolean(p[1]));
-  if (pola.length) dodaj("dobor", `Dane doboru wpisane przez agenta: ${pola.map(([k, v]) => `${k} ${v}`).join("; ")}`);
-
-  /* ── JEST / NIE MA NA LIŚCIE ZGODNOŚCI (23 września 2026) ───────────────────
-     Decyzja właściciela. Lista z oferty szła do modelu surowa i przycięta do
-     trzydziestu pozycji, a model miał sam wypatrzyć w niej maszynę klienta.
-     Na zrzucie HECHT 1803S stał na liście — i nikt tego nie powiedział.
-     Serwer sprawdza to sam, całą listą, i daje jedno zdanie. Maszyna idzie
-     WYŁĄCZNIE z danych wpisanych przez agenta — nigdy z treści pytania
-     (blizna szarpaka). Dopasowanie jest to samo, co podświetlenie w panelu. */
-  if (d.marka && d.model && trescOferty.zgodnosc.length) {
-    const z = naLiscieZgodnosci(trescOferty.zgodnosc, d);
-    const zdanie = zdanieZgodnosci({ lista: trescOferty.zgodnosc, ...z }, d.wariant);
-    if (zdanie) dodaj("oferta_zgodnosc", zdanie);
-  }
-  /* Wynik doboru to odpowiedź, którą agent już wybrał. Zdanie przy części
-     pisze serwer doboru, ze źródłem — szkic go nie wzmacnia. */
-  if (dobor.wybrany) {
-    dodaj("dobor", `Część wybrana przez agenta: ${dobor.wybrany.zdanieDoSzkicu}`);
-    /* Wybrany bywa z wyszukiwarki, poza listą kandydatów — nazwa z kartoteki. */
-    const w = db().prepare("SELECT nazwa FROM sgt_towar WHERE tw_id=?").get(dobor.wybrany.twId) as { nazwa: string } | undefined;
-    zapamietaj({ twId: dobor.wybrany.twId, symbol: dobor.wybrany.symbol, nazwa: w?.nazwa ?? dobor.wybrany.symbol });
-  }
-  if (dobor.wynik === "brak") dodaj("dobor", "Agent ustalił: nie mamy tej części");
-  if (dobor.dopytac) dodaj("dobor", `Agent zaznaczył, czego brakuje do doboru: ${dobor.dopytac}`);
-  if (dobor.wynik === "nie_dotyczy") dodaj("dobor", "Agent uznał, że rozmowa nie jest pytaniem o dobór części");
-
-  const kand = kandydaciDoboru(conversationId, subiekt);
-  /* Reguła 7a promptu mówi modelowi, że pierwszy kandydat jest najmocniejszy.
-     Ekran układa kandydatów w grupy, a grupa „numer" niesie też kartotekę
-     oferty i zamienniki, słabsze od potwierdzonej wiedzy. Fakty idą więc
-     osobnym porządkiem: trafienie po identyfikatorze (blizna TC38), potem
-     pewność. Sortowanie jest stabilne, więc w remisie zostaje kolejność ekranu. */
-  const sila = (k: (typeof kand.kandydaci)[number]) =>
-    k.powod.includes(PO_IDENTYFIKATORZE) ? 0 : { potwierdzone: 1, prawdopodobne: 2, do_sprawdzenia: 3 }[k.pewnosc];
-  for (const k of [...kand.kandydaci].sort((a, b) => sila(a) - sila(b)).slice(0, 6)) {
-    dodaj("kandydat", `Kandydat ${k.symbol} — ${k.nazwa}; ${GRUPA_SLOWAMI[k.grupa]}; pewność: ${k.pewnosc}; ${k.powod}`
-      + `${k.takze.length ? `; także: ${k.takze.join("; ")}` : ""}; ${dostepnosc(k.stan, null)}`
-      + `${k.ostrzezenia.length ? `; ostrzeżenia: ${k.ostrzezenia.join("; ")}` : ""}`);
-    zapamietaj({ twId: k.twId, symbol: k.symbol, nazwa: k.nazwa });
-  }
-  /* Numer bez kartoteki to materiał na uczciwe „nie mamy", nie kandydat. */
-  for (const b of kand.bezKartoteki) dodaj("kandydat", `Numer ${b.numer} z danych doboru: ${b.zdanie}`);
-  for (const k of kand.kotwice) zapamietaj(k);
-  for (const n of kand.negatywne) {
-    dodaj("negatyw", `NIE PASUJE: ${n.symbol}${n.nazwa ? ` (${n.nazwa})` : ""} — ${n.powod}; ${n.zrodlo}`);
-  }
-
-  const wiedza = wiedzaDoboru(conversationId);
-  if (wiedza.zastosowanie) dodaj("wiedza", `Wybrana część: ${wiedza.zastosowanie.zdanieZrodla}`);
-  if (wiedza.zabudowa) dodaj("wiedza", `Silnik maszyny: ${wiedza.zabudowa.zdanieZrodla}`);
-  for (const z of wiedza.silniki) dodaj("wiedza", `Silnik maszyny wg bazy: ${z.zdanieZrodla}`);
-  for (const p of wiedza.pomiary) dodaj("wiedza", `Pomiar z hali „${p.tytul}": ${p.wynik}`);
-  if (wiedza.pasowanie) {
-    dodaj("pasowanie", `Wybrana część: ${wiedza.pasowanie.zdanie}`);
-    zapamietaj(wiedza.pasowanie.czesc); zapamietaj(wiedza.pasowanie.doCzego);
-  }
-
-  if (kartotekaTwId !== null) {
-    const pas = pasowaniaTowaru(kartotekaTwId);
-    for (const t of [...pas.pasujace, ...pas.pasujeDo]) {
-      dodaj("pasowanie", t.zdanie);
-      zapamietaj(t.czesc); zapamietaj(t.doCzego);
-    }
-    for (const n of pas.negatywne) {
-      dodaj("negatyw", `NIE PASUJE: ${n.czesc.symbol} do ${n.doCzego.symbol} — ${n.zdaniePowodu}; ${n.zdanieZrodla}`);
     }
   }
 
@@ -1091,18 +621,14 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
   const zdanieZ = faktZwrotu(zdarzeniaZwrotowRozmowy(db(), conversationId));
   if (zdanieZ) dodaj("zwrot", zdanieZ);
 
-  /* Intake dopiero, gdy nie ma wyboru POTWIERDZONEGO: przy dowodzie w bazie
-     pytania o wymiary byłyby udawaniem, że nie wiemy. I tylko przy prośbie
-     o TOWAR (22 września 2026): pytania o maszynę przy „gdzie paczka"
-     odpowiadają na pytanie, którego klient nie zadał. Bez rozpoznania intake
-     zostaje, jak był — szkic pod ofertą to najczęściej dobór. */
-  const wybranyPewny = dobor.wybrany
-    && kand.kandydaci.some((k) => k.twId === dobor.wybrany!.twId && k.pewnosc === "potwierdzone");
+  /* Intake tylko przy prośbie o TOWAR (22 września 2026): pytania o maszynę
+     przy „gdzie paczka" odpowiadają na pytanie, którego klient nie zadał.
+     Bez rozpoznania intake zostaje, bo szkic pod ofertą to najczęściej
+     pytanie o część. Typ części czytamy z tytułu oferty: to jedyna nazwa
+     części, którą serwer zna, a nie wymyśla. */
   const oTowar = !rozpoznanie || KATEGORIE_Z_INTAKE.has(rozpoznanie.kategoria);
-  /* „Nie dotyczy" to słowo agenta, że to nie dobór: pytania o maszynę
-     odpowiadałyby na pytanie, którego klient nie zadał. */
-  if (!wybranyPewny && oTowar && dobor.wynik !== "nie_dotyczy") {
-    const i = pytaniaIntake(d.nazwaCzesci);
+  if (oTowar) {
+    const i = pytaniaIntake(nazwaOferty);
     /* „TYLKO o to, czego jeszcze nie podał" stoi w FAKCIE, nie tylko w
        instrukcji (0.232.2): klientka podała komplet danych z tabliczki,
        a szkic poprosił o tabliczkę raz jeszcze, bo fakt brzmiał „zapytaj o…". */
@@ -1110,25 +636,11 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
       + ` (${i.typ}): ${i.pytania.join("; ")}; to, co już podał, potwierdź jednym zdaniem`);
   }
 
-  /* LUKI W KARTOTECE (0.254.0) na samym końcu, bo korpus porównania to
-     wszystko, co JUŻ WIEMY: kartoteka, wiedza, pasowania, kandydaci, dane
-     doboru. Fakty z oferty są z niego wyłączone — inaczej lista zgodności
-     pokrywałaby samą siebie i braków nie byłoby nigdy.
-
-     Lista NIE wchodzi do `tekstFaktow`: to zdanie o naszych danych, nie
-     o maszynie klienta (reguła 6a). Model, który go nie dostaje, nie ma jak
-     go klientowi napisać. */
-  const znane = fakty
-    .filter((f) => !f.rodzaj.startsWith("oferta"))
-    .map((f) => f.zdanie).join(" ");
-  const luki = lukiZOferty(trescOferty, znane);
-
   const tekstFaktow = fakty.map((f) => `${f.id}: ${f.zdanie}`).join("\n") as FaktyBezpieczne;
   return {
-    fakty, tekstFaktow, luki, docelowaKartoteka,
+    fakty, tekstFaktow,
     watek: zamaskujWatek(watek, login),
     ostatniaWiadomoscId: ostatniaKlienta ? Number(ostatniaKlienta.id) : null,
-    doborWersja: dobor.wersja,
     decyzjaId: rozpoznanie ? Number(rozpoznanie.id) : null,
     kartoteki,
   };
@@ -1142,10 +654,8 @@ export function kontekstSzkicu(conversationId: number, subiekt: SubiektAdapter):
  * też dlatego, że numeracja faktów musi biec dalej, a nie od nowa — `F12`
  * w odwołaniu modelu ma znaczyć jedno zdanie, nie dwa.
  *
- * Pytamy o symbole z BIAŁEJ LISTY kartotek, czyli o to, co serwer sam położył
- * na stole: kartotekę oferty, wybranego kandydata, kandydatów, kotwice. Nigdy
- * o symbol z treści wiadomości — ta granica jest tu ta sama, co wszędzie
- * indziej w doborze.
+ * Pytamy wyłącznie o kartoteki, które serwer sam położył w faktach. Nigdy
+ * o symbol z treści wiadomości: klient nie wybiera, o co pytamy Allegro.
  *
  * Pusta mapa nie dokłada ani jednego faktu i to jest właściwe zachowanie:
  * „nie znamy aktywnej aukcji na tę kartotekę" ma wyglądać jak cisza, a nie
@@ -1205,9 +715,6 @@ export async function odswiezPrzesylke(
  * zostaje wtedy puste, a `przez` niesie słowo „automat". Podpisanie
  * automatycznego szkicu kontem agenta, który akurat był zalogowany,
  * zafałszowałoby jedyny pomiar, jaki mamy — ocenę szkicu przez człowieka.
- *
- * Ten sam wzorzec, co przy wiedzy z ofert w 0.264.0: `dodal='oferta'`,
- * `dodal_user_id` NULL, a kto kliknął, mówi dziennik.
  */
 export type AutorSzkicu = {
   id: number | null; name: string;
@@ -1250,42 +757,15 @@ export async function ulozSzkic(
      zrobioną. Powód nie był w instrukcji: `offer_snapshot` zna wyłącznie
      aukcje, pod którymi ktoś napisał, a odwrotnego wyszukania nie było wcale.
 
-     JEDNO żądanie na komplet kandydatów (`external.id` jest tablicą) i dopiero
+     JEDNO żądanie na komplet kartotek (`external.id` jest tablicą) i dopiero
      TU, nie w `kontekstSzkicu` — tamten zostaje czystym odczytem. Błąd, także
      limit, nie przerywa szkicu: to ostatnie żądanie do Allegro na tej drodze,
      więc nie ma czego chronić przed pogłębieniem przerwy. */
   const k = dopiszLinkiOfert(kontekst, await ofertyPoSygnaturze(
     [...kontekst.kartoteki.values()].map((x) => x.symbol)));
 
-  /* ZAPIS WIEDZY Z OFERTY PRZED WYWOŁANIEM MODELU (0.264.0) — i to jest cała
-     treść tego wydania. Wiedza ma zostać w bazie także wtedy, gdy dostawca
-     odmówi, gdy model wyjdzie poza fakty albo gdy szkic padnie na walidacji.
-     Za tamtymi porażkami stoi jedno kliknięcie i agent kliknie ponownie;
-     za utratą tych numerów nie stoi nic — nie ma z czego ich odtworzyć.
-
-     MASKOWANIE. Zapis stoi PRZED asercją danych osobowych i to jest bezpieczne
-     z powodu, który trzeba napisać, bo jest pierwszym pytaniem recenzenta:
-     zapisywane dane pochodzą wyłącznie z NASZEJ oferty i z NASZEJ kartoteki.
-     Ani jeden znak nie przechodzi tędy z wiadomości klienta, więc nie ma tu
-     drogi wycieku, którą asercja miałaby zamknąć.
-
-     `kontekstSzkicu` zostaje przy tym CZYSTYM ODCZYTEM — otwarcie rozmowy
-     dalej niczego nie mutuje (blizna 0.18.0). Zapis wisi na kliknięciu
-     „Ułóż odpowiedź", tam gdzie zapis i tak już był. */
-  let pokwitowanie: PokwitowanieSzkicu = PUSTE_POKWITOWANIE;
-  if (k.docelowaKartoteka) {
-    const cel = k.docelowaKartoteka;
-    const zapis = zapiszWiedzeZOferty(cel, k.luki, kto, db());
-    pokwitowanie = { symbol: cel.symbol, ...zapis };
-  }
-  /* Bez pewnej kartoteki nie zapisujemy NIC i nie pokwitowujemy niczego.
-     Licznik kolejki „przy tej kartotece" wymagałby wskazania kartoteki, a to
-     jest dokładnie to, czego w tym przypadku nie wiemy. */
-
   /* ── ZDJĘCIA Z ROZMOWY ────────────────────────────────────────────────────
-     Pobranie stoi PO zapisie wiedzy i PRZED asercją maskowania, bo ta
-     kolejność jest jedyną, która nie traci niczego cennego: wiedza z oferty
-     ma zostać nawet gdy Allegro odmówi bajtów, a bajty nie mają prawa wyjść,
+     Pobranie stoi PRZED asercją maskowania, bo bajty nie mają prawa wyjść,
      zanim tekst przejdzie kontrolę.
 
      PIKSELI ZAMASKOWAĆ SIĘ NIE DA i asercja niżej ich nie dotyczy — to nie
@@ -1369,88 +849,27 @@ export async function ulozSzkic(
 
   /* Dopiero TERAZ, po sprawdzeniu: odwołania były potrzebne kontroli, klientowi nie. */
   const tresc = bezZnacznikow(odp.tresc);
-  /* Dane z rozmowy: zmyślona wartość NIE odrzuca szkicu (szkic jest wart
-     pieniędzy sam w sobie), tylko wypada z propozycji; liczbę notujemy. */
-  /* Dane doboru z TABLICZKI to najcenniejsze, co daje to wydanie: marka
-     i model maszyny wpadają do doboru bez przepisywania ich ręcznie ze
-     zdjęcia. Sprawdzenie zostaje deterministyczne — wartość musi stać
-     w odczycie, który model zadeklarował i który agent widzi obok miniatury. */
-  const propozycja = oczyscPropozycje(
-    odp.daneDoboru, `${String(k.watek)}${zOdczytu ? `\n${zOdczytu}` : ""}`);
-  /* Para z rozmowy tą samą regułą: wypada, szkic zostaje, powód do dziennika. */
-  const para = sprawdzPasowanie(odp.pasowanie, k.kartoteki, String(k.watek));
-
-  /* ── DANE WEJŚCIOWE WCHODZĄ SAME (0.341.0) ────────────────────────────────
-     Właściciel: „dane wejściowe po rozpoznaniu powinny wchodzić
-     automatycznie". Do 0.338.0 stała tu propozycja i zdanie „wpisz je
-     w zakładce Dobór" — agent przepisywał klikiem to, co model już odczytał.
-
-     PRZED ZAPISEM SZKICU, i to nie jest szczegół porządkowy. Wpis podnosi
-     `dobor.wersja`, a szkic pamięta wersję, na której powstał. Zapis
-     w odwrotnej kolejności dawałby szkic nieświeży w chwili narodzin: ekran
-     mówiłby „dane doboru zmieniły się od szkicu — ułóż ponownie" o zmianie,
-     którą sam ten szkic właśnie wprowadził.
-
-     TYLKO W PUSTE POLA i bez parametrów, których dobór nie przyjmuje.
-     Cofnięcie jest tam, gdzie zawsze: agent poprawia pole w zakładce Dobór,
-     a `zmienilAutomat` mówi, że poprzednią wartość wpisała maszyna. Wynik
-     zostaje nietknięty: automat nigdy nie wybiera części. */
-  let wersjaDoboru = k.doborWersja;
-  let wpisanePol = 0;
-  if (propozycja.dane) {
-    const { czesc, pol } = tylkoWPuste(propozycja.dane, doborRozmowy(conversationId).dane);
-    if (pol > 0) {
-      try {
-        wersjaDoboru = zapiszDane(conversationId, czesc, wersjaDoboru, AUTOMAT_DANYCH).wersja;
-        wpisanePol = pol;
-      } catch {
-        /* Wyścig z agentem piszącym ręcznie w tej samej chwili kończy się
-           `ConversationConflict`. Szkic zostaje — jest wart pieniędzy sam
-           w sobie — a dane agent ma i tak, bo to on właśnie je wpisał. */
-      }
-    }
-  }
-
   transaction(db(), () => {
     db().prepare(`INSERT INTO szkic_copilota
       (conversation_id,tresc,zastrzezenia,uzyte_fakty,message_id,model,at,przez,przez_user_id,
-       dane_doboru,dobor_wersja,pasowanie_propozycja,twierdzenia,luki_kartoteki,odczyt_zdjec,decyzja_id)
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       twierdzenia,odczyt_zdjec,decyzja_id)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
       ON CONFLICT(conversation_id) DO UPDATE SET
         tresc=excluded.tresc, zastrzezenia=excluded.zastrzezenia, uzyte_fakty=excluded.uzyte_fakty,
         message_id=excluded.message_id, model=excluded.model, at=excluded.at,
         przez=excluded.przez, przez_user_id=excluded.przez_user_id,
-        dane_doboru=excluded.dane_doboru, dobor_wersja=excluded.dobor_wersja,
-        pasowanie_propozycja=excluded.pasowanie_propozycja,
-        twierdzenia=excluded.twierdzenia, luki_kartoteki=excluded.luki_kartoteki,
+        twierdzenia=excluded.twierdzenia,
         odczyt_zdjec=excluded.odczyt_zdjec, decyzja_id=excluded.decyzja_id,
-        /* Nowa propozycja — stara ocena jej nie dotyczy; danych i pasowania też. */
-        ocena=NULL, ocena_at=NULL, dane_ocena=NULL, dane_ocena_at=NULL,
-        pasowanie_ocena=NULL, pasowanie_ocena_at=NULL`)
+        /* Nowa propozycja — stara ocena jej nie dotyczy. */
+        ocena=NULL, ocena_at=NULL`)
       .run(conversationId, tresc, JSON.stringify(odp.zastrzezenia), JSON.stringify(odp.uzyteFakty),
         k.ostatniaWiadomoscId, odp.model, teraz.toISOString(), kto.name, kto.id,
-        propozycja.dane ? JSON.stringify(propozycja.dane) : null, wersjaDoboru,
-        para.propozycja ? JSON.stringify(para.propozycja) : null,
-        JSON.stringify(twierdzenia), JSON.stringify(pokwitowanie),
-        JSON.stringify(odp.odczytZeZdjec), k.decyzjaId);
-    /* Los propozycji danych ustawiamy OD RAZU, bo nie ma już czego klikać.
-       `dane_ocena_at` niesie czas, a KTO wpisał, mówi tabela `dobor`:
-       `zmienil='automat (szkic)'` przy pustym `zmienil_user_id`. */
-    if (wpisanePol > 0) {
-      db().prepare(`UPDATE szkic_copilota SET dane_ocena='wpisane', dane_ocena_at=?
-        WHERE conversation_id=?`).run(teraz.toISOString(), conversationId);
-    }
+        JSON.stringify(twierdzenia), JSON.stringify(odp.odczytZeZdjec), k.decyzjaId);
     zapiszWywolanie(conversationId, odp, "ok", null, kto, teraz);
     /* Ładunki niosą identyfikatory i DŁUGOŚCI, nigdy treść (§19). */
     logEvent("copilot_szkic", kto.name, null, {
       conversationId, znakow: tresc.length, zastrzezen: odp.zastrzezenia.length,
       faktow: k.fakty.length, model: odp.model, tokeny: odp.zuzycie,
-      polDoboru: propozycja.dane ? liczbaPol(propozycja.dane) : 0,
-      polOdrzuconych: propozycja.odrzuconych,
-      pasowanie: para.propozycja ? 1 : 0, pasowanieOdrzucone: para.powod,
-      /* Ile wiedzy odzyskaliśmy z oferty przy tym kliknięciu — jedyna liczba
-         mówiąca, czy to wydanie robi cokolwiek. */
-      zOfertyNumerow: pokwitowanie.numery.length, zOfertyModeli: pokwitowanie.modele.length,
       /* Zdjęcia LICZBAMI, jak przy reklamacji (0.484.6). Od 0.330.0 żadne
          zdjęcie rozmowy nie doszło do modelu, a dziennik tego nie pokazał,
          bo liczby błędów nikt nie zapisywał. */
@@ -1482,79 +901,10 @@ export function ocenSzkic(
   return { ocena: ocena as OcenaSzkicu };
 }
 
-const liczbaPol = (d: DaneZRozmowy) =>
-  KLUCZE_DANYCH.filter((k) => d[k]).length + Object.keys(d.parametry).length;
-
-/**
- * TYLKO W PUSTE POLA. To, co agent wpisał sam, jest jego słowem i zostaje:
- * nadpisanie pola wpisanego ręką byłoby jedyną rzeczą w tym module, której
- * agent nie cofnąłby bez pamiętania, co tam było.
- */
-function tylkoWPuste(propozycja: DaneZRozmowy, biezace: DaneDoboru): { czesc: Partial<DaneDoboru>; pol: number } {
-  const czesc: Partial<DaneDoboru> = {};
-  for (const k of KLUCZE_DANYCH) if (propozycja[k] && !biezace[k]) czesc[k] = propozycja[k];
-  return { czesc, pol: Object.keys(czesc).length };
-}
-
-/**
- * Agent kliknął „Zaproponuj pasowanie" (przyrost czwarty). Para idzie do
- * kolejki wiedzy drogą `zaproponujPasowanie` — ten sam wiersz, ten sam cykl
- * i to samo rozstrzygnięcie biura, co przy „Pasuje do…" z Doboru. AUTOREM
- * jest klikający: za wpis odpowiada człowiek (§14.2), a `zrodlo: copilot`
- * niesie pochodzenie dla pomiaru i plakietki w kolejce. Dowód `rozmowa`
- * daje pewność „prawdopodobne" — jak przy każdej parze z rozmowy.
- *
- * DUBEL NIE JEST BŁĘDEM: gdy ktoś zdążył wpisać tę parę ręcznie, ocena
- * i tak brzmi `zaproponowane`, tylko dziennik dostaje `dubel: true`. 409
- * znaczy w tym kodzie „wyścig — odśwież i kliknij ponownie", a tu drugie
- * kliknięcie dawałoby 409 na zawsze i karta wisiałaby bez wyjścia. Para
- * w kolejce to skutek, którego agent chciał.
- */
-export function przyjmijPasowanie(
-  conversationId: number, kto: { id: number; name: string }, teraz = new Date(),
-): SzkicCopilota {
-  const s = szkicCopilota(conversationId);
-  if (!s || !s.pasowanie) throw new Error("Ta rozmowa nie ma propozycji pasowania");
-  if (s.pasowanieOcena !== null) throw new Error("Propozycja pasowania została już oceniona");
-  const p = s.pasowanie;
-  /* Jedna transakcja przez `wTransakcji`: `zaproponujPasowanie` sam ją
-     otwiera, a `node:sqlite` nie zagnieżdża BEGIN (blizna z tokenów 0.239.0). */
-  wTransakcji(db(), () => {
-    const z = zaproponujPasowanie({
-      twId: p.czesc.twId, doTwId: p.doCzego.twId, rola: p.rola, pozycja: p.pozycja,
-      polaryzacja: "pasuje", rodzajDowodu: "rozmowa",
-      dowodTresc: `Copilot rozpoznał w rozmowie #${conversationId}: ${p.czesc.symbol} pasuje do ${p.doCzego.symbol}`
-        + (p.pozycja ? ` (${p.pozycja})` : ""),
-      zrodlo: "copilot", conversationId,
-    }, { userId: kto.id, name: kto.name });
-    db().prepare("UPDATE szkic_copilota SET pasowanie_ocena='zaproponowane', pasowanie_ocena_at=? WHERE conversation_id=?")
-      .run(teraz.toISOString(), conversationId);
-    logEvent("copilot_pasowanie", kto.name, p.czesc.twId,
-      { conversationId, ocena: "zaproponowane", pasowanieId: z?.id ?? null, dubel: z === null }, kto.id, db());
-  });
-  return szkicCopilota(conversationId)!;
-}
-
-/** Agent odesłał parę. Wiersz zostaje dla pomiaru. */
-export function odrzucPasowanie(
-  conversationId: number, kto: { id: number; name: string }, teraz = new Date(),
-): SzkicCopilota {
-  const s = szkicCopilota(conversationId);
-  if (!s || !s.pasowanie) throw new Error("Ta rozmowa nie ma propozycji pasowania");
-  if (s.pasowanieOcena !== null) throw new Error("Propozycja pasowania została już oceniona");
-  transaction(db(), () => {
-    db().prepare("UPDATE szkic_copilota SET pasowanie_ocena='odrzucone', pasowanie_ocena_at=? WHERE conversation_id=?")
-      .run(teraz.toISOString(), conversationId);
-    logEvent("copilot_pasowanie", kto.name, null, { conversationId, ocena: "odrzucone" }, kto.id, db());
-  })();
-  return szkicCopilota(conversationId)!;
-}
-
 /** Odczyt propozycji dla osi rozmowy. `null` = nikt jeszcze nie prosił. */
 export function szkicCopilota(conversationId: number): SzkicCopilota | null {
   const w = db().prepare(`SELECT tresc, zastrzezenia, uzyte_fakty, message_id, model, at, przez, ocena,
-      dane_doboru, dane_ocena, dobor_wersja, pasowanie_propozycja, pasowanie_ocena,
-      twierdzenia, luki_kartoteki, odczyt_zdjec
+      twierdzenia, odczyt_zdjec
       FROM szkic_copilota WHERE conversation_id=?`).get(conversationId) as Record<string, unknown> | undefined;
   if (!w) return null;
   return {
@@ -1564,14 +914,7 @@ export function szkicCopilota(conversationId: number): SzkicCopilota | null {
     messageId: w.message_id == null ? null : Number(w.message_id),
     model: String(w.model), at: String(w.at), przez: String(w.przez),
     ocena: w.ocena == null ? null : String(w.ocena) as OcenaSzkicu,
-    daneDoboru: w.dane_doboru == null ? null : JSON.parse(String(w.dane_doboru)) as DaneZRozmowy,
-    daneOcena: w.dane_ocena == null ? null : String(w.dane_ocena) as OcenaDanych,
-    doborWersja: Number(w.dobor_wersja ?? 0),
-    pasowanie: w.pasowanie_propozycja == null
-      ? null : JSON.parse(String(w.pasowanie_propozycja)) as PropozycjaPasowaniaCopilota,
-    pasowanieOcena: w.pasowanie_ocena == null ? null : String(w.pasowanie_ocena) as OcenaPasowania,
     twierdzenia: JSON.parse(String(w.twierdzenia ?? "[]")) as Twierdzenie[],
-    lukiKartoteki: czytajPokwitowanie(w.luki_kartoteki == null ? null : String(w.luki_kartoteki)),
     odczytZeZdjec: JSON.parse(String(w.odczyt_zdjec ?? "[]")) as OdczytZdjecia[],
   };
 }

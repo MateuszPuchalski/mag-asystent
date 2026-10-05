@@ -5,8 +5,9 @@ import { DatabaseSync } from "node:sqlite";
 import { migrate } from "./db.js";
 
 /* ── Źródło identyfikatora `dostawca`: trzecia przebudowa tabeli ────────────
-   Import odsyłaczy dokłada `dostawca` do CHECK-a na `towar_identyfikator.zrodlo`
-   i dwie kolumny. SQLite nie rozszerza CHECK-a w miejscu, więc tabela idzie
+   Import odsyłaczy dołożył `dostawca` do CHECK-a na `towar_identyfikator.zrodlo`
+   i dwie kolumny. Importu już nie ma, ale jego wiersze zostają wyszukiwalne,
+   a baza sprzed tamtej przebudowy dalej musi przez nią przejść. SQLite nie rozszerza CHECK-a w miejscu, więc tabela idzie
    przez przepisanie. Pilnujemy trzech rzeczy: każdy wiersz przeżywa z `id`
    (wpis biura i numer z oferty nie mają z czego wrócić), nowe źródło da się
    zapisać, a druga migracja niczego już nie rusza.                         */
@@ -78,5 +79,4 @@ test("druga migracja niczego nie rusza, a świeża baza ze schematu jest od razu
   swieza.exec(schema);
   migrate(swieza);
   assert.match(sqlTabeli(swieza), /'dostawca'/);
-  assert.ok(swieza.prepare("SELECT 1 FROM sqlite_master WHERE name='import_odsylaczy'").get(), "historia importów stoi");
 });

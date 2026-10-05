@@ -31,7 +31,7 @@ const wiersz = (id: number, n: Record<string, unknown> = {}) => ({
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "waiting_for_us", priorytet: "normalny", reklamacyjna: false,
   czekaOdMs: (10 - id) * 60_000, nowychOdOdpowiedzi: 1, zadanieWToku: false,
-  dobor: "pusty", odlozoneDo: null, poTerminie: false, podziekowal: false,
+  odlozoneDo: null, poTerminie: false, podziekowal: false,
   zakonczenie: null, kopilot: null, oglada: null, ...n,
 });
 

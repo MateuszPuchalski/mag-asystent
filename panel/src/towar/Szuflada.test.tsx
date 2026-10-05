@@ -27,8 +27,6 @@ beforeEach(() => {
       otwarteSprawy: bezSpraw ? [] : [{ id: 9, typ: "CLAIM", numer: "12/2026", at: "2026-09-21T08:00:00Z" }],
       otwarteRozmowy: [],
       okno: { dni: 90, sprzedanych: 10, zwroconych: 3, reklamacji: 1, udzialZwrotow: 0.3 } }));
-    if (url === "/api/obsluga/wiedza/towar/501") return new Response(JSON.stringify({
-      potwierdzone: [{}, {}], negatywne: [], propozycje: [], pasowania: {}, zamiennosciOem: [] }));
     return new Response("{}", { status: 404 });
   }));
 });
@@ -54,7 +52,6 @@ describe("szuflada towaru", () => {
     expect(await within(s).findByText(/sprzedane 10 · zwrócone 3 \(30%\)/)).toBeInTheDocument();
     expect(within(s).getByRole("link", { name: /Z-7/ })).toHaveAttribute("href", "/obsluga/zwroty/7");
     expect(within(s).getByRole("link", { name: /reklamacja 12\/2026/ })).toHaveAttribute("href", "/obsluga/reklamacje/9");
-    expect(await within(s).findByText(/2 potwierdzonych zastosowań/)).toBeInTheDocument();
     /* Pusta lista się nie rysuje (0.514.0): rozmów o tym towarze nie ma,
        więc nie ma też ich nagłówka ani „brak" pod nim. */
     expect(within(s).queryByRole("region", { name: /Otwarte rozmowy/ })).toBeNull();

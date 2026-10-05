@@ -49,11 +49,11 @@ describe("dopytanie Copilota", () => {
     render(<Dopytanie {...props({ wymiany: [
       w({ id: 1, narzedzia: [
         { nazwa: "szukaj_towaru", argument: "1123 120 0650", znakow: 120 },
-        { nazwa: "pasowanie_towaru", argument: "GAZ-MS250", znakow: 300 },
+        { nazwa: "karta_towaru", argument: "GAZ-MS250", znakow: 300 },
       ] }),
       w({ id: 2, narzedzia: [] }),
     ] })} />);
-    expect(screen.getByText(/Sprawdził w bazie: szukanie w kartotece „1123 120 0650”, pasowanie „GAZ-MS250”/))
+    expect(screen.getByText(/Sprawdził w bazie: szukanie w kartotece „1123 120 0650”, karta towaru „GAZ-MS250”/))
       .toBeTruthy();
     expect(screen.getAllByText(/Sprawdził w bazie/)).toHaveLength(1);
   });
@@ -133,33 +133,5 @@ describe("zwijanie dopytania (0.342.0)", () => {
   test("liczebnik jest odmieniony — „3 wymian”, nie „3 wymiana”", () => {
     render(<Dopytanie {...props({ wymiany: [w(), w({ id: 2 }), w({ id: 3 })] })} />);
     expect(screen.getByText(/3 wymian/)).toBeVisible();
-  });
-});
-
-/* ── Znalezione w sieci (0.528.0) ───────────────────────────────────────────
-   Pasowanie z przeczytanej strony idzie jednym kliknięciem do Kolejki Wiedzy,
-   nie do klienta. Zapisane nie ma już przycisku — mówi, gdzie czeka. */
-describe("znalezione w sieci", () => {
-  const pas = (n: Partial<NonNullable<WymianaCopilota["pasowania"]>[number]> = {}) => ({
-    twId: 7, symbol: "W30-754", rodzaj: "maszyna" as const, marka: "Cub Cadet", model: "LT1050", wariant: null,
-    url: "https://www.partstree.com/x", cytat: "Fits Cub Cadet LT1050", zrodloStrony: "katalog_dostawcy" as const,
-    warunek: "strona: „Will not fit manual gearbox models.”", zapis: null, ...n,
-  });
-
-  test("pasowanie ze strony ma cytat, źródło, warunek i „Zapisz jako propozycję”", () => {
-    const onZapiszPasowanie = vi.fn();
-    render(<Dopytanie {...props({ wymiany: [w({ id: 4, pasowania: [pas()] })], onZapiszPasowanie })} />);
-    const blok = screen.getByLabelText("Znalezione w sieci");
-    expect(blok).toHaveTextContent("W30-754 → Cub Cadet LT1050");
-    expect(blok).toHaveTextContent("Will not fit manual");
-    expect(screen.getByRole("link", { name: /źródło/ })).toHaveAttribute("href", "https://www.partstree.com/x");
-    fireEvent.click(screen.getByRole("button", { name: /Zapisz jako propozycję/ }));
-    expect(onZapiszPasowanie).toHaveBeenCalledWith(4, 0);
-  });
-
-  test("zapisane mówi, gdzie czeka, i nie daje drugiego kliknięcia", () => {
-    render(<Dopytanie {...props({ wymiany: [w({ pasowania: [pas({ zapis: "nowa" })] })], onZapiszPasowanie: vi.fn() })} />);
-    expect(screen.getByLabelText("Znalezione w sieci")).toHaveTextContent("W Kolejce Wiedzy");
-    expect(screen.queryByRole("button", { name: /Zapisz jako propozycję/ })).toBeNull();
   });
 });

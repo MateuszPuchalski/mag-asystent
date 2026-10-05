@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
-import type { DosylkaSprawy, HistoriaKlienta, MaszynaKlienta, SprawaKlienta, WpisHistorii } from "./typy";
+import type { DosylkaSprawy, HistoriaKlienta, SprawaKlienta, WpisHistorii } from "./typy";
 
 export type { DosylkaSprawy, NoweZdarzenie, SprawaKlienta } from "./typy";
 
@@ -68,7 +68,6 @@ export interface ProfilKlienta {
     waluta: string | null; pozycje: Array<{ nazwa: string; ilosc: number; cenaGrosze: number }>;
     przesylka: string | null; link: string | null;
   }>;
-  maszyny: MaszynaKlienta[];
   os: WpisHistorii[];
   notatka: { tresc: string; at: string; przez: string; cofalna: boolean } | null;
   /** Sprawa klienta (S6, 0.535.0); `null`, dopóki nikt nie ustawił kroku. */

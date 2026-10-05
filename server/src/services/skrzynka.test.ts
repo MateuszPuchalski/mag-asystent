@@ -1177,15 +1177,11 @@ test("oś podaje zdarzenia rozłożone na klucze, obok gotowego zdania", () => {
   const zdarzenie = (rodzaj: string) => wpisy.find((w) => w.rodzaj === rodzaj)?.zdarzenie;
 
   assert.deepEqual(zdarzenie("status"), { rodzaj: "status", po: "open" });
-  /* Wybór i wynik dają DWA różne kształty — panel rysuje z nich co innego.
-     Stare statusy oś tłumaczy na nowe stany, więc panel zna tylko nowe nazwy. */
-  const dobory = wpisy.filter((w) => w.rodzaj === "dobor").map((w) => w.zdarzenie);
-  assert.deepEqual(dobory, [
-    { rodzaj: "dobor", po: "czesc" },
-    { rodzaj: "dobor_wybor", wybrano: true, symbol: "W09-0513" },
-    { rodzaj: "dobor", po: "otwarty" },
-    { rodzaj: "dobor", po: "dopytac" },
-  ]);
+  /* Doboru już nie ma, więc oś go nie rysuje. Zdarzenia zostają w dzienniku
+     audytu, bo `conversation_event` nie ma retencji. */
+  assert.equal(wpisy.some((w) => String(w.rodzaj) === "dobor"), false);
+  assert.equal(Number(d.prepare(`SELECT COUNT(*) AS n FROM conversation_event
+    WHERE conversation_id=? AND event_type LIKE 'dobor%'`).get(r)!.n), 4);
   /* Nakładka spraw odeszła w 0.388.0, więc oś jej nie rysuje — ale wiersz
      w dzienniku audytu ZOSTAJE i ten test pilnuje obu połów naraz. */
   assert.equal(zdarzenie("sprawa"), undefined);
