@@ -341,7 +341,10 @@ export async function buildApp() {
       bez("aktualizacja", () => problemAktualizacji(stanZadania())),
       ...awarie,
       /* Dyskusja bez odpowiedzi grozi blokadą konta Allegro. Zdanie wchodzi do
-         `problemy`, bo to stąd panel rysuje pasek na każdym ekranie. Instalator
+         `problemy` dla ekranu stanu, a pole `dyskusje` niżej karmi pasek na
+         każdym ekranie poza reklamacjami i czerwony licznik na zakładce
+         Dyskusje. Na reklamacjach alarm niesie sam licznik, bo pasek nad
+         trzema kolumnami zabiera miejsce pracy. Instalator
          wycofuje wydanie po wersji w odpowiedzi, nie po `ok`, więc zaległa
          dyskusja nie zatrzyma aktualizacji. NA KOŃCU listy: baner awarii
          synchronizacji czyta `problemy[0]` i nie ma brać za jej powód zdania

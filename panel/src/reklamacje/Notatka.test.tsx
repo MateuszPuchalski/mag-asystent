@@ -104,24 +104,24 @@ describe("Notatka i jej droga powrotna", () => {
     expect(cofniecia[0]).toHaveAccessibleName("cofnij zmianę");
   });
 
-  it("data zakupu MÓWI, KTÓRY TO ZEGAR — od 0.414.0 w kostce, nie w wierszu", () => {
+  it("data zakupu MÓWI, KTÓRY TO ZEGAR — w kostce „Kupione”, nie w wierszu", () => {
     /* Zasada z 0.282.0 obowiązuje dalej: „Kupiono" bierze się z pozycji
        zamówienia, „Zamówienie złożone" z ładunku sprawy i bywa wcześniejsze —
-       nazwanie jednego drugim to blizna 0.121.0. Zmieniło się MIEJSCE: data
-       stała w trzech blokach naraz, więc wiersz w zwijce Zakup wyszedł,
-       a zegar nazywa kostka „Kupione". */
+       nazwanie jednego drugim to blizna 0.121.0. Podpis kostki mówi dziś, po
+       ilu dniach klient się zgłosił, więc zegar z datą nazywa jej podpowiedź. */
     const { rerender } = render(<Dowody {...props(rek({
       orderId: "ord-1", kupionoAt: "2026-03-15T07:00:00.000Z",
       kupionoZrodlo: "zamowienie", dniOdZakupu: 191,
     } as Partial<Reklamacja>))} />);
-    expect(screen.getByText("data z zamówienia")).toBeInTheDocument();
+    const kostka = () => screen.getByText("Kupione").parentElement!;
+    expect(kostka()).toHaveAttribute("title", "Data zakupu: 15 marca 2026, data z zamówienia");
     expect(screen.queryByText("Kupiono")).not.toBeInTheDocument();
 
     rerender(<Dowody {...props(rek({
       orderId: "ord-1", kupionoAt: "2026-03-14T09:12:00.000Z", kupionoZrodlo: "sprawa",
       dniOdZakupu: 192,
     } as Partial<Reklamacja>))} />);
-    expect(screen.getByText("data z ładunku sprawy")).toBeInTheDocument();
+    expect(kostka()).toHaveAttribute("title", expect.stringContaining("data z ładunku sprawy"));
   });
 
   it("bez daty wiersza NIE MA — pusty nie mówi nic, a zajmuje kolumnę", () => {
@@ -141,8 +141,12 @@ describe("Kolumna faktów bez pustych czynności (0.511.0)", () => {
     expect(onNotatka).toHaveBeenCalledWith("ustalono wymianę i zwrot");
   });
 
-  it("nad „Zleć hali” nie stoi już nagłówek „Hala”", () => {
+  it("reklamacja nie zleca pracy hali — ani przycisku, ani nagłówka „Hala”", () => {
+    /* Decyzja właściciela przy przebudowie ekranu reklamacji. Zlecenie hali
+       zostaje w zwrotach i dyskusjach; tutaj kolumna nie obiecuje go wcale. */
     render(<Dowody {...props(rek())} />);
+    expect(screen.queryByRole("button", { name: /Zleć hali/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Zleć hali/)).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Hala" })).not.toBeInTheDocument();
   });
 });

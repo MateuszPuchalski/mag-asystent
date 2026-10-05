@@ -147,7 +147,8 @@ export function Fakty({
           rozmowie liczba czytałaby się jak zaległość.
 
           Czerwień bierze `pilna` z serwera (próg `DYSKUSJE_ALARM_GODZIN`), więc
-          blok, wiersz kolejki i pasek alarmu mówią tą samą liczbą. */}
+          blok, wiersz kolejki, pasek alarmu i czerwony licznik zakładki
+          „Dyskusje" mówią tą samą liczbą. */}
       {zegarWidoczny(d) && <div role="group" aria-label="Czas bez naszej odpowiedzi"
         className={`mb-2 mt-2 rounded-lg border px-3 py-2 ${d.pilna
           ? "border-red-200 bg-red-50" : "border-slate-200 bg-slate-50"}`}>

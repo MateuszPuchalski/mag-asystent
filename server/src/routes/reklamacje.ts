@@ -15,11 +15,12 @@ import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.
 import {
   dodajZalacznikSprawy, usunZalacznikSprawy, zalacznikiDoWyslania,
 } from "../services/reklamacje-zalaczniki.js";
-import { nadawcaRozpoznaniaAnthropic } from "../adapters/copilot.anthropic.js";
-import { rozpoznajSprawe } from "../services/copilot-reklamacja.js";
 import { odswiezSprawe, synchronizujAllegroReklamacje } from "../services/allegro-reklamacje-sync.js";
 import { odpowiedzWSprawie } from "../services/reklamacje-wysylka.js";
-import { wydajWerdykt, zdecydujZwrotTowaru } from "../services/reklamacja-werdykt.js";
+import {
+  towarZCiala, wydajWerdyktZTowarem, zdecydujZwrotTowaru,
+} from "../services/reklamacja-werdykt.js";
+import { dodajDowod, usunDowod, zapiszUDostawcy } from "../services/reklamacja-dowody-zapis.js";
 import { autoryzuj } from "../services/auth.js";
 import { trasyTagowSprawy } from "./tagi.js";
 import { TAGI_REKLAMACJI } from "../services/tagi-spraw.js";
@@ -75,17 +76,6 @@ const kto = () => {
   return { id: s.user.userId, name: s.user.name };
 };
 
-/** Jedno zdanie o tym, dlaczego Copilota nie ma — pisze je SERWER (§21). */
-function czemuCopilotWylaczony(): string | null {
-  if (config.copilot.mode === "off") {
-    return "Copilot jest wyłączony. Włącz go w wertis.env (COPILOT_MODE=anthropic).";
-  }
-  if (!config.copilot.klucz) {
-    return "Copilot nie ma klucza. Ustaw ANTHROPIC_API_KEY w wertis.env i zrestartuj usługę.";
-  }
-  return null;
-}
-
 export async function reklamacjeRoutes(app: FastifyInstance) {
   /* Tagi sprawy: przypięcie i zdjęcie. Trasy wspólne dla obu ekranów,
      bo klucz jest tym samym wierszem tej samej tabeli. */
@@ -138,10 +128,9 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
      pytanie pierwsze — „czy on to w ogóle dostał".
 
      NA JAWNE KLIKNIĘCIE, nie taktem i nie przy otwarciu ekranu. Odpowiedź
-     kosztuje DWA żądania u Allegro (numer przesyłki, potem jej historia)
-     i obowiązuje tu ta sama zasada, co przy rozpoznaniu Copilota: żądanie
-     u dostawcy nie ma prawa wyjść z samego patrzenia. Otwarcie sprawy czyta
-     wyłącznie to, co już zapisaliśmy. */
+     kosztuje DWA żądania u Allegro (numer przesyłki, potem jej historia),
+     a żądanie do cudzego API nie ma prawa wyjść z samego patrzenia. Otwarcie
+     sprawy czyta wyłącznie to, co już zapisaliśmy. */
   app.post<{ Params: { id: string } }>(
     "/api/obsluga/reklamacje/:id/przesylka", async (req, reply) => {
       const nie = odmowa(reply);
@@ -319,38 +308,6 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       } catch (e) { return bladPobrania(reply, e); }
     });
 
-  /* Znacznik „prowadzę", nie zamek: ponowne kliknięcie go zdejmuje. Bez
-     `autoryzuj()` — to zwykła praca biura, a nie operacja uprzywilejowana. */
-  /**
-   * Copilot reklamacyjny: karta faktów ze sprawy (0.275.0).
-   *
-   * ZBIERA DANE, NIE RADZI — i to jest cała treść tej trasy. Werdykt stoi
-   * osobno, za `autoryzuj()` i za jawną zgodą; gdyby maszyna miała cokolwiek
-   * do powiedzenia o rozstrzygnięciu, byłby to ten sam przycisk, a nie ten.
-   *
-   * Zapisem jest, bo zapisuje kartę i wiersz w księdze Copilota. Dlaczego
-   * `POST`, a nie `GET` mimo braku decyzji człowieka: żądanie KOSZTUJE
-   * pieniądze u dostawcy, a przeglądarka powtarza i wstępnie pobiera `GET`-y
-   * bez pytania. Rachunek za odruch nawigacji byłby złym sposobem, żeby się
-   * o tym dowiedzieć.
-   */
-  app.post<{ Params: { id: string } }>(
-    "/api/obsluga/reklamacje/:id/rozpoznaj", async (req, reply) => {
-      const nie = odmowa(reply);
-      if (nie) return nie;
-      const powod = czemuCopilotWylaczony();
-      if (powod) return reply.code(400).send({ error: powod });
-      const s = sesjaZadania()!;
-      try {
-        const karta = await rozpoznajSprawe({
-          reklamacjaId: Number(req.params.id),
-          kto: { id: s.user.userId, name: s.user.name },
-          nadaj: nadawcaRozpoznaniaAnthropic,
-        });
-        return { karta };
-      } catch (e) { return blad(reply, e); }
-    });
-
   /* ── Załączniki WYCHODZĄCE przy odpowiedzi (0.274.0) ───────────────────────
      Plik jedzie base64 w JSON, jak w skrzynce i jak zdjęcia z kolektora —
      `bodyLimit` API stoi na 6 MiB i to on wyznacza próg 4 MiB na plik.
@@ -399,6 +356,52 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
       return { ok: true };
     });
 
+  /* ── Dowody biura i reklamacja u dostawcy ──────────────────────────────────
+     Trzy zapisy WYŁĄCZNIE u nas: dowód dopisany, dowód usunięty i zgłoszenie
+     u dostawcy z jego wynikiem. Do Allegro nie idzie żadne pole, więc bez
+     `autoryzuj()`. Odpowiedź niesie świeżą listę albo rekord, żeby panel nie
+     musiał dociągać całego szczegółu po jednym zdaniu. */
+  app.post<{ Params: { id: string }; Body: { tresc?: unknown; zalacznikId?: number | null } }>(
+    "/api/obsluga/reklamacje/:id/dowody", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return {
+          dowody: dodajDowod(db(), Number(req.params.id),
+            { tresc: req.body?.tresc, zalacznikId: req.body?.zalacznikId }, kto()),
+        };
+      } catch (e) { return blad(reply, e); }
+    });
+
+  app.delete<{ Params: { id: string; did: string } }>(
+    "/api/obsluga/reklamacje/:id/dowody/:did", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return { dowody: usunDowod(db(), Number(req.params.id), Number(req.params.did), kto()) };
+      } catch (e) { return blad(reply, e); }
+    });
+
+  /* Każde pole ciała jawnie w typie, z tego samego powodu co przy odpowiedzi:
+     pole niezadeklarowane ginie po drodze bez słowa. Brak `nrUDostawcy` albo
+     `wynik` zostawia zapisaną wartość, `null` ją czyści. */
+  app.post<{ Params: { id: string }; Body: {
+    dostawca?: string; nrUDostawcy?: string | null; wynik?: string | null; wersja?: number;
+  } }>("/api/obsluga/reklamacje/:id/u-dostawcy", async (req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    try {
+      return {
+        uDostawcy: zapiszUDostawcy(db(), Number(req.params.id), {
+          dostawca: req.body?.dostawca, nrUDostawcy: req.body?.nrUDostawcy,
+          wynik: req.body?.wynik, wersja: req.body?.wersja,
+        }, kto()),
+      };
+    } catch (e) { return blad(reply, e); }
+  });
+
+  /* Znacznik „prowadzę", nie zamek: ponowne kliknięcie go zdejmuje. Bez
+     `autoryzuj()` — to zwykła praca biura, a nie operacja uprzywilejowana. */
   app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
     "/api/obsluga/reklamacje/:id/prowadze", async (req, reply) => {
       const nie = odmowa(reply);
@@ -458,26 +461,42 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
    *
    * Każde pole ciała jawnie w typie (blizna 0.224.1). Wersja z ekranu jest
    * OBOWIĄZKOWA: werdykt bez wiedzy, na co agent patrzył, to werdykt w ciemno.
+   *
+   * `towar` to opcjonalne stanowisko o towarze przy uznaniu, wysyłane po
+   * werdykcie tym samym żądaniem. JEDNO `autoryzuj()` na oba strzały, bo to
+   * jedna decyzja człowieka za jedną zgodą. Los towaru wraca w polu `towar`
+   * i nigdy nie zmienia kodu odpowiedzi: werdykt już wyszedł i panel musi
+   * się o tym dowiedzieć niezależnie od tego, co stało się z towarem.
    */
   app.post<{ Params: { id: string }; Body: {
     werdykt?: string; wiadomosc?: string; kwotaGrosze?: number | null; wersja?: number;
+    towar?: {
+      decyzja?: string; tresc?: string; expectedLastMessageId?: number | null;
+      mimoNowejWiadomosci?: boolean;
+    } | null;
   } }>("/api/obsluga/reklamacje/:id/werdykt", async (req, reply) => {
     const nie = odmowa(reply);
     if (nie) return nie;
     const s = sesjaZadania()!;
     /* Kształt ciała PRZED `autoryzuj()`: wpis `privileged` ma znaczyć „człowiek
-       wydał werdykt", a nie „panel wysłał ciało bez wersji". */
+       wydał werdykt", a nie „panel wysłał ciało bez wersji". Stanowisko
+       o towarze tak samo — i tym bardziej, bo wykryte po werdykcie zostawiłoby
+       uznanie bez stanowiska. */
     if (!Number.isInteger(Number(req.body?.wersja))) {
       return reply.code(400).send({ error: "Werdykt wymaga wersji sprawy z ekranu" });
     }
+    try {
+      towarZCiala(req.body?.werdykt, req.body?.towar);
+    } catch (e) { return blad(reply, e); }
     const w = autoryzuj(s.user, "reklamacja_werdykt");
     if (!w.ok) return reply.code(403).send({ error: w.powod });
     try {
-      return await wydajWerdykt(db(), Number(req.params.id), {
+      return await wydajWerdyktZTowarem(db(), Number(req.params.id), {
         werdykt: String(req.body?.werdykt ?? ""),
         wiadomosc: String(req.body?.wiadomosc ?? ""),
         kwotaGrosze: req.body?.kwotaGrosze ?? null,
         wersja: Number(req.body?.wersja),
+        towar: req.body?.towar,
       }, { id: s.user.userId, name: s.user.name });
     } catch (e) { return blad(reply, e); }
   });

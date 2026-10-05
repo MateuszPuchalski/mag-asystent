@@ -1,11 +1,14 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Konflikt } from "../api/klient";
-import type { KubelekReklamacji, Reklamacja, WiadomoscReklamacji } from "../api/typy";
+import type {
+  DowodReklamacji, KubelekReklamacji, OstatniaDostawaReklamacji, Reklamacja, ReklamacjaUDostawcy,
+  WiadomoscReklamacji, WynikWerdyktu,
+} from "../api/typy";
 
 /* ── Ekran reklamacji ────────────────────────────────────────────────────────
    Trzy rzeczy warte testu, bo żadnej nie widać w serwisie:
@@ -68,6 +71,18 @@ const scena = vi.hoisted(() => ({
   /* Czym kończy się wysyłka w danym teście: `Error` idzie do `onError`,
      cokolwiek innego do `onSuccess`, `null` nie woła żadnego z nich. */
   wynikWysylki: null as unknown,
+  /* Błąd ręcznej synchronizacji — `null` znaczy, że przycisk nie zawiódł. */
+  bladSynchronizacji: null as Error | null,
+  /* Dowody biura w szczególe sprawy; domyślnie żadnych. */
+  dowody: [] as DowodReklamacji[],
+  /* Ostatnia dostawa i nasze zgłoszenie u dostawcy w szczególe sprawy. */
+  dostawa: null as OstatniaDostawaReklamacji | null,
+  uDostawcy: null as ReklamacjaUDostawcy | null,
+  /* Czym kończy się werdykt: `Error` do `onError`, wynik do `onSuccess`,
+     `null` nie woła żadnego. `poWerdykcie` udaje dociągnięcie sprawy, zanim
+     ekran dostanie wynik — tak jak robi to `onSettled` prawdziwego haka. */
+  wynikWerdyktu: null as unknown,
+  poWerdykcie: null as null | (() => void),
 }));
 
 /* Tożsamość zalogowanego: bez niej sita „Moje" nie ma w drzewie, bo filtr
@@ -113,6 +128,7 @@ vi.mock("../api/reklamacje", async () => {
         reklamacja: REKLAMACJE.find((r) => r.id === id) ?? REKLAMACJE[0],
         czat: scena.czat,
         zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [], kartoteka: null,
+        dowody: scena.dowody, dostawa: scena.dostawa, uDostawcy: scena.uDostawcy,
       },
     }),
     /* Wysyłka ma WŁASNY podrabiacz, bo jako jedyna oddaje sterowanie z
@@ -132,9 +148,35 @@ vi.mock("../api/reklamacje", async () => {
     useOdswiez: mutacja("odswiez"),
     useProwadze: mutacja("prowadze"),
     useNotatka: mutacja("notatka"),
-    useSynchronizuj: mutacja("synchronizuj"),
-    useWerdykt: mutacja("werdykt"),
+    /* Synchronizacja ma własny podrabiacz z tego samego powodu co wysyłka:
+       błąd wraca do ekranu przez `onError`, a test pilnuje, że go widać. */
+    useSynchronizuj: () => ({
+      mutate: (v: unknown, opcje?: { onError?: (e: unknown) => void }) => {
+        scena.mutacje.push(`synchronizuj:${JSON.stringify(v)}`);
+        if (scena.bladSynchronizacji) opcje?.onError?.(scena.bladSynchronizacji);
+      },
+      isPending: false, error: null,
+    }),
+    /* Werdykt ma własny podrabiacz: los stanowiska o towarze wraca do ekranu
+       w `onSuccess` i to on rozstrzyga, czy staje krok zapasowy albo dialog. */
+    useWerdykt: () => ({
+      mutate: (v: unknown, opcje?: {
+        onSuccess?: (w: unknown) => void; onError?: (e: unknown) => void;
+      }) => {
+        scena.mutacje.push(`werdykt:${JSON.stringify(v)}`);
+        const w = scena.wynikWerdyktu;
+        if (w instanceof Error) opcje?.onError?.(w);
+        else if (w) { scena.poWerdykcie?.(); opcje?.onSuccess?.(w); }
+      },
+      isPending: false, error: null,
+    }),
     useZwrotTowaru: mutacja("zwrot-towaru"),
+    /* Zgłoszenie u dostawcy to nasz zapis — test zera zapisu ma je widzieć. */
+    useZapiszUDostawcy: mutacja("u-dostawcy"),
+    /* Dowody biura to zapisy, więc test zera zapisu ma je WIDZIEĆ — prawdziwy
+       hak wysłałby żądanie obok licznika `mutacje`. */
+    useDodajDowod: mutacja("dodaj-dowod"),
+    useUsunDowod: mutacja("usun-dowod"),
   };
 });
 
@@ -147,15 +189,18 @@ const wiad = (n: Partial<WiadomoscReklamacji> = {}): WiadomoscReklamacji => ({
   zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "usterka.jpg", podglad: true }], ...n,
 });
 
-function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wiad()]) {
+function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wiad()],
+  stan: Record<string, unknown> = {}) {
   scena.mutacje = [];
   scena.czat = czat;
   scena.wynikWysylki = null;
+  scena.wynikWerdyktu = null;
+  scena.bladSynchronizacji = null;
   scena.stan = {
     status: "current", alarm: false, ostatniaProba: null,
     ostatniaUdanaSynchronizacja: "2026-09-07T11:00:00.000Z", kodOstatniegoBledu: null,
     liczbaBledow: 0, opoznienieMs: 0, nastepnaProba: null, interwalMs: 180000,
-    pozostaloDoPobrania: 0, dyskusjiPominietych: 35,
+    pozostaloDoPobrania: 0, dyskusjiPominietych: 35, ...stan,
   };
   const klient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -173,6 +218,10 @@ function pokaz(adres = "/obsluga/reklamacje", czat: WiadomoscReklamacji[] = [wia
    test włączałby filtr następnemu — a objawem byłaby lista, która „gubi"
    sprawy w teście nie mającym z sitem nic wspólnego. */
 afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
+/* Dowody ustawia test PRZED renderem, więc sprząta się je po nim. */
+afterEach(() => {
+  scena.dowody = []; scena.dostawa = null; scena.uDostawcy = null; scena.poWerdykcie = null;
+});
 
 /* ── MUTACJE BEZ ODŚWIEŻENIA WEJŚCIOWEGO (0.410.0) ──────────────────────────
    Od tego wydania wejście w sprawę wysyła JEDNĄ mutację: `odswiez` (decyzja
@@ -184,6 +233,9 @@ afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } })
    dołożona kiedyś „przy okazji" do otwarcia sprawy wywali te testy, zamiast
    przejść niezauważona. */
 const bezOdswiezenia = () => scena.mutacje.filter((m) => !m.startsWith("odswiez:"));
+
+/** Stopka karty kolejki: próg, stan synchronizacji i jej przycisk. */
+const stopka = () => screen.getByRole("group", { name: "Zakres i synchronizacja kolejki" });
 
 describe("Ekran reklamacji", () => {
   /* ── ZERO ZAPISU PRZY PATRZENIU, Z JEDNYM WYJĄTKIEM (0.410.0) ──────────────
@@ -265,24 +317,82 @@ describe("Ekran reklamacji", () => {
        jest krótsze — ale liczba zostaje. Nikt nie ma szukać „zaginionej"
        reklamacji, która nigdy reklamacją nie była. */
     pokaz();
-    expect(screen.getByText(/pominiętych dyskusji 35/)).toBeInTheDocument();
+    expect(within(stopka()).getByText(/pominiętych dyskusji 35/)).toBeInTheDocument();
   });
 
-  it("pasek werdyktu stoi POD rozmową, bo nieodwracalne pyta po dowodach", () => {
+  /* ── TŁO PRACY W STOPCE KOLEJKI ───────────────────────────────────────────
+     Decyzja właściciela: rząd progu i synchronizacji stoi pod ostatnim
+     wierszem kolejki, bo mówi o zakresie tej listy, a sprawie oddaje pełną
+     wysokość. Teksty są te same co w paskach strony; testy niżej pilnują
+     MIEJSCA. */
+  it("stopka stoi W KARCIE KOLEJKI, pod ostatnim wierszem, a nie nad kolumnami", () => {
+    pokaz();
+    const pasek = stopka();
+    /* Ta sama karta co pole szukania — czyli kolejka, nie pas strony. */
+    expect(pasek.parentElement).toContainElement(screen.getByLabelText("Szukaj reklamacji"));
+    const wiersze = screen.getAllByRole("button", { name: /\/2026/ });
+    expect(wiersze[wiersze.length - 1].compareDocumentPosition(pasek)
+      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    /* Nad siatką kolumn nie zostało nic z dawnego rzędu. */
+    expect(screen.getAllByText(/pominiętych dyskusji/)).toHaveLength(1);
+  });
+
+  it("w ALARMIE stopka niesie głośny pasek i dalej JEDEN przycisk synchronizacji", async () => {
+    pokaz("/obsluga/reklamacje", [wiad()], { status: "failed", kodOstatniegoBledu: 503 });
+    const pasek = stopka();
+    expect(within(pasek).getByText(/Synchronizacja reklamacji:/)).toBeInTheDocument();
+    expect(within(pasek).getByText("nie działa")).toBeInTheDocument();
+    expect(within(pasek).getByText(/dyskusji pominiętych:/)).toBeInTheDocument();
+    /* Cichy wiersz ustępuje głośnemu — dwa przyciski to dwie drogi do 429. */
+    expect(screen.getAllByRole("button", { name: /synchronizuj/i })).toHaveLength(1);
+    expect(scena.mutacje).toEqual([]);
+    await userEvent.click(within(pasek).getByRole("button", { name: /synchronizuj/i }));
+    expect(scena.mutacje).toEqual(["synchronizuj:undefined"]);
+  });
+
+  it("niekompletna lista woła w stopce pełnym zdaniem", () => {
+    pokaz("/obsluga/reklamacje", [wiad()], { pozostaloDoPobrania: 12 });
+    expect(within(stopka()).getByText(/Ta kolejka nie jest kompletna: 12 spraw/)).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /synchronizuj/i })).toHaveLength(1);
+  });
+
+  it("w pełnej ciszy przycisk synchronizacji zostaje — dyskusje odsyłają tutaj", () => {
+    /* Bez progu i bez odsianych dyskusji cichy wiersz nie ma nic do
+       powiedzenia. Ekran dyskusji nie ma własnego przycisku i mówi, że
+       synchronizację odświeża się w reklamacjach — więc tu nie może zniknąć. */
+    pokaz("/obsluga/reklamacje", [wiad()], { dyskusjiPominietych: 0 });
+    expect(within(stopka()).getAllByRole("button", { name: /synchronizuj/i })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: /synchronizuj/i })).toHaveLength(1);
+  });
+
+  it.each([["w ciszy", {}], ["w alarmie", { status: "delayed" }]])(
+    "błąd synchronizacji widać zawsze — %s", async (_opis, stan) => {
+      pokaz("/obsluga/reklamacje", [wiad()], stan);
+      scena.bladSynchronizacji = new Error("Allegro odmówiło: limit zapytań");
+      await userEvent.click(screen.getByRole("button", { name: /synchronizuj/i }));
+      expect(within(stopka()).getByText("Allegro odmówiło: limit zapytań")).toBeInTheDocument();
+    });
+
+  it("pasek werdyktu stoi ZA rozmową i pod faktami, bo nieodwracalne pyta po dowodach", () => {
     /* Od przyrostu trzeciego werdykt wychodzi STĄD. Napis odsyłający do
        Centrum Sprzedaży byłby nieprawdą — tak samo jak w 0.224.0 napis
        o odpowiedzi.
 
-       KOLEJNOŚĆ JEST UMOWĄ od 0.412.0. Do 0.411.0 ten pasek był pierwszym
-       elementem środkowej kolumny, czyli ekran pytał „uznać czy odrzucić",
-       zanim pokazał treść zgłoszenia. Dekalog obsługi, punkt 9: nieodwracalne
-       pyta — a pytanie zadaje się PO dowodach, nie przed nimi. */
+       KOLEJNOŚĆ JEST UMOWĄ. Pasek będący pierwszym elementem kolumny pytał
+       „uznać czy odrzucić", zanim ekran pokazał treść zgłoszenia. Dekalog
+       obsługi, punkt 9: nieodwracalne pyta — a pytanie zadaje się PO
+       dowodach, nie przed nimi. Stoi w kolumnie faktów, zaraz pod liczbami,
+       z których się go wydaje, i nad zwijkami ze szczegółem. */
     pokaz("/obsluga/reklamacje/1");
     const pasek = screen.getByRole("region", { name: "Werdykt" });
     expect(pasek).toBeInTheDocument();
     const rozmowa = screen.getByText("Opis sprawy 1");
     /* `DOCUMENT_POSITION_FOLLOWING` liczone OD rozmowy: pasek ma stać za nią. */
     expect(rozmowa.compareDocumentPosition(pasek)
+      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const fakty = screen.getByText("Klient zapłacił");
+    expect(fakty.compareDocumentPosition(pasek) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pasek.compareDocumentPosition(screen.getByRole("button", { name: /Zakup i oferta/ }))
       & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("button", { name: /Uznaję/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Odrzucam/ })).toBeInTheDocument();
@@ -314,6 +424,8 @@ describe("Ekran reklamacji", () => {
   it("„synchronizuj teraz” jest JAWNYM kliknięciem, nie skutkiem otwarcia", async () => {
     pokaz();
     expect(scena.mutacje).toEqual([]);
+    /* Przycisk jest jeden na ekran i stoi w stopce kolejki. */
+    expect(within(stopka()).getByRole("button", { name: /synchronizuj/i })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /synchronizuj/i }));
     expect(scena.mutacje).toEqual(["synchronizuj:undefined"]);
   });
@@ -625,11 +737,11 @@ describe("Ekran reklamacji", () => {
   /* ── „Które są moje" bez włączania filtru (0.281.0) ───────────────────────
      Właściciel pytał wprost. Sito odpowiada po włączeniu; czip odpowiada
      od razu, przy przeglądaniu całej kolejki. */
-  it("czip mówi „Ty”, gdy sprawa jest moja, i IMIĘ, gdy cudza", () => {
+  it("wiersz mówi „prowadzisz”, gdy sprawa jest moja, i IMIĘ, gdy cudza", () => {
     pokaz();
     /* 444 prowadzę ja (konto 7), 555 — imienniczka o koncie 9. Obie noszą
        to samo imię, więc imię na wierszu na to pytanie nie odpowiada. */
-    expect(screen.getByTitle(/Prowadzisz tę sprawę/)).toHaveTextContent("Ty");
+    expect(screen.getByTitle(/Prowadzisz tę sprawę/)).toHaveTextContent("prowadzisz");
     expect(screen.getByTitle("Prowadzi: A. Lewandowska")).toHaveTextContent("A. Lewandowska");
   });
 
@@ -669,6 +781,272 @@ describe("Ekran reklamacji", () => {
       expect(screen.getByText(k, { selector: "kbd" })).toBeInTheDocument();
     }
     expect(screen.getByText("ruch po liście")).toBeInTheDocument();
+  });
+});
+
+
+/* ── Przebudowa ekranu: kolejka, głowica, dowody ─────────────────────────────
+   Decyzja właściciela z projektu ekranu. Testy niżej pilnują tego, co
+   zmieniło się CELOWO — każdy razem z regułą, która za zmianą stoi. */
+
+/** Zmienia fikstury na czas jednego testu i oddaje je w `finally`. */
+async function zmienionymi(zmiany: Array<[number, Partial<Reklamacja>]>, test: () => Promise<void> | void) {
+  const kopie = zmiany.map(([i]) => ({ ...REKLAMACJE[i] }));
+  zmiany.forEach(([i, z]) => Object.assign(REKLAMACJE[i], z));
+  try { await test(); } finally { zmiany.forEach(([i], k) => { REKLAMACJE[i] = kopie[k]; }); }
+}
+
+/** Numery spraw z wierszy kolejki w kolejności DOM. */
+const numeryWierszy = () => screen.getAllByRole("button")
+  .filter((b) => b.hasAttribute("data-wiersz-kolejki"))
+  .map((b) => b.textContent!.match(/\d{3}\/2026/)![0]);
+
+describe("Kolejka po przebudowie", () => {
+  it("sygnał wspólny CAŁEMU kubełkowi schodzi z wierszy i staje raz nad listą", async () => {
+    /* Jedenaście identycznych czipów nie rozróżnia niczego. Sygnał, który ma
+       tylko część spraw, zostaje na wierszu — tylko on coś mówi. */
+    const czeka = "Ostatnie słowo było klienta — ruch należy do nas";
+    await zmienionymi([
+      [0, { sygnaly: ["klient_czeka"] }],
+      [2, { sygnaly: ["klient_czeka", "doradca"] }],
+      [3, { sygnaly: ["klient_czeka"] }],
+      [4, { sygnaly: ["klient_czeka"] }],
+    ], async () => {
+      pokaz();
+      expect(screen.queryByTitle(czeka)).not.toBeInTheDocument();
+      expect(screen.getByTitle("W rozmowie jest doradca Allegro")).toBeInTheDocument();
+      expect(screen.getByText("Na każdej sprawie tutaj: klient czeka")).toBeInTheDocument();
+      /* Szukanie miesza kubełki — wspólnego wtedy nie ma i wiersz mówi swoje. */
+      await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "444");
+      expect(screen.getByTitle(czeka)).toBeInTheDocument();
+      expect(screen.queryByText(/Na każdej sprawie tutaj/)).not.toBeInTheDocument();
+    });
+  });
+
+  it("sprawy PO TERMINIE stoją pierwsze pod nagłówkiem, a strzałki idą tą samą drogą", async () => {
+    /* 555 jest trzecia w porządku terminu, ale jedyna po terminie — staje
+       pierwsza. Strzałka w dół z niej prowadzi do 111, nie do 666: kursor
+       chodzi po liście, którą widać, a nie po kolejności sprzed grupowania. */
+    await zmienionymi([[3, { poTerminie: true, dniDoTerminu: -3 }]], async () => {
+      pokaz("/obsluga/reklamacje/5");
+      expect(screen.getByRole("heading", { name: "Po terminie decyzji" })).toBeInTheDocument();
+      expect(numeryWierszy()).toEqual(["555/2026", "111/2026", "444/2026", "666/2026"]);
+      await userEvent.keyboard("j");
+      expect(await screen.findByRole("button", { name: /111\/2026/, current: true })).toBeInTheDocument();
+      await userEvent.keyboard("k");
+      expect(await screen.findByRole("button", { name: /555\/2026/, current: true })).toBeInTheDocument();
+    });
+  });
+
+  it("kwota stoi z prawej i porządek „kwota” idzie po TEJ SAMEJ liczbie", async () => {
+    /* Wszystkie fikstury żądają 50 zł. Gdyby porządek szedł po żądaniu,
+       a wiersz pokazywał kwotę z paragonu, lista stałaby w kolejności,
+       której na ekranie nie widać. */
+    await zmienionymi([
+      [0, { kwotaGrosze: null }],
+      [2, { kwotaGrosze: 9000, kwotaZrodlo: "paragon" }],
+      [4, { kwotaGrosze: 7000, kwotaZrodlo: "paragon" }],
+    ], () => {
+      localStorage.setItem("wertis.reklamacje.porzadek", "kwota");
+      pokaz();
+      expect(screen.getByText("90,00 PLN")).toBeInTheDocument();
+      /* `null` od serwera to „kwoty nie znamy" i spada na koniec, nie na zero. */
+      expect(numeryWierszy()).toEqual(["444/2026", "666/2026", "555/2026", "111/2026"]);
+    });
+  });
+
+  it("szukanie znajduje sprawę po NAZWIE TOWARU — to tytuł wiersza", async () => {
+    await zmienionymi([[3, { ofertaNazwa: "Gaźnik do Stihl MS181" }]], async () => {
+      pokaz();
+      await userEvent.type(screen.getByLabelText("Szukaj reklamacji"), "gaźnik stihl");
+      expect(screen.getByRole("button", { name: /555\/2026/ })).toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
+    });
+  });
+});
+
+describe("Sprawa po przebudowie", () => {
+  it("głowica stoi NAD rozmową: towar, czego klient chce i kto ma ostatnie słowo", () => {
+    pokaz("/obsluga/reklamacje/1");
+    const tytul = screen.getByRole("heading", { name: "Towar 1" });
+    expect(screen.getByText(/Ostatnie słowo: klient/)).toBeInTheDocument();
+    /* Głowica przed rozmową w DOM — czyta się ją pierwszą. */
+    expect(tytul.compareDocumentPosition(screen.getByText("Opis sprawy 1"))
+      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("zdjęcie klienta stoi w kolumnie dowodów jako Z1, a w wątku zostaje odnośnik", () => {
+    pokaz("/obsluga/reklamacje/1");
+    expect(screen.getByRole("region", { name: /^Zdjęcia: Klient · / })).toHaveTextContent("Z1");
+    expect(screen.getByRole("button", { name: "Z1 usterka.jpg — pokaż zdjęcie w kolumnie" }))
+      .toHaveTextContent("Z1");
+  });
+
+  it("dowód biura dopisuje się i usuwa JAWNYM kliknięciem, z wybranym zdjęciem", async () => {
+    scena.dowody = [{ id: 3, tresc: "Tabliczka znamionowa nieczytelna", zalacznikId: 9,
+      autor: "A. Lewandowska", utworzonoAt: "2026-09-07T09:00:00.000Z" }];
+    pokaz("/obsluga/reklamacje/1");
+    /* Otwarcie sprawy z dowodami nie zapisuje niczego poza odświeżeniem. */
+    expect(bezOdswiezenia()).toEqual([]);
+    expect(screen.getByText("Tabliczka znamionowa nieczytelna")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Pokaż zdjęcie Z1" })).toBeInTheDocument();
+
+    await userEvent.type(screen.getByLabelText("Nowy dowód"), "Bok szczotki krzywy");
+    await userEvent.selectOptions(screen.getByRole("combobox", { name: "Powiąż ze zdjęciem" }), "9");
+    await userEvent.click(screen.getByRole("button", { name: "Dodaj" }));
+    expect(bezOdswiezenia()).toEqual([
+      `dodaj-dowod:${JSON.stringify({ id: 1, tresc: "Bok szczotki krzywy", zalacznikId: 9 })}`,
+    ]);
+
+    scena.mutacje = [];
+    await userEvent.click(screen.getByRole("button", { name: /^Usuń dowód: Tabliczka/ }));
+    /* Kosz chowa wpis i daje „Cofnij"; żądanie czeka, aż okno się zamknie. */
+    expect(bezOdswiezenia()).toEqual([]);
+    const pasek = screen.getByText("Wpis usunięty.").closest<HTMLElement>("[role=status]")!;
+    expect(screen.queryByText("Tabliczka znamionowa nieczytelna")).not.toBeInTheDocument();
+    await userEvent.click(within(pasek).getByRole("button", { name: "Zamknij" }));
+    expect(bezOdswiezenia()).toEqual([`usun-dowod:${JSON.stringify({ id: 1, dowodId: 3 })}`]);
+  });
+});
+
+/* ── Werdykt z towarem i sztuka do dostawcy ─────────────────────────────────
+   Uznanie niesie stanowisko o towarze TYM SAMYM żądaniem, a serwer oddaje
+   jego los obok werdyktu. Werdykt jest nieodwracalny, więc porażka towaru
+   nie może go cofnąć — ekran zostawia krok zapasowy albo dialog dopisku,
+   ten sam co przy osobnym kroku. Sprawę „dociągniętą" po werdykcie udaje
+   `poWerdykcie`, bo atrapa szczegółu czyta tablicę spraw przy każdym renderze. */
+describe("Werdykt z towarem i sztuka do dostawcy", () => {
+  const WYNIK: WynikWerdyktu = {
+    werdykt: "ACCEPTED_REPAIR", werdyktNazwa: "Uznana — naprawa", status: "sent", blad: null, wersja: 2,
+  };
+  /* Sprawa po werdykcie, tak jak przyjdzie z serwera po odświeżeniu. */
+  const uznana = (n: Partial<Reklamacja> = {}): Partial<Reklamacja> => ({
+    werdykt: "ACCEPTED_REPAIR", werdyktNazwa: "Uznana — naprawa", werdyktStatus: "sent",
+    werdyktWiadomosc: "Naprawimy.", wersja: 2, ...n,
+  });
+  /** Podmienia pola sprawy 111 na czas jednego testu. */
+  const zSprawa = async (n: Partial<Reklamacja>, test: () => Promise<void>) => {
+    const r = REKLAMACJE[0];
+    const kopia = { ...r };
+    Object.assign(r, n);
+    try { await test(); } finally {
+      for (const k of Object.keys(r)) delete (r as unknown as Record<string, unknown>)[k];
+      Object.assign(r, kopia);
+    }
+  };
+
+  const uznaj = async (towar: RegExp) => {
+    await userEvent.click(screen.getByRole("button", { name: /Uznaję/ }));
+    await userEvent.click(screen.getByRole("button", { name: towar }));
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Naprawimy.");
+    await userEvent.click(within(screen.getByRole("region", { name: "Werdykt" })).getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: /Wyślij werdykt/ }));
+  };
+
+  it("uznanie niesie TOWAR tym samym żądaniem, z ostatnią NIE naszą wiadomością", async () => {
+    pokaz("/obsluga/reklamacje/1");
+    await uznaj(/Do odesłania/);
+    expect(bezOdswiezenia()).toEqual([`werdykt:${JSON.stringify({
+      id: 1, werdykt: "ACCEPTED_REPAIR", wiadomosc: "Naprawimy.", kwotaGrosze: null, wersja: 1,
+      towar: {
+        decyzja: "wymagany",
+        tresc: "Prosimy o odesłanie reklamowanego towaru na adres sklepu. Po otrzymaniu paczki zrealizujemy uznaną reklamację.",
+        expectedLastMessageId: 1,
+      },
+    })}`]);
+  });
+
+  it("porażka towaru zostawia KROK ZAPASOWY z tą samą treścią i zdaniem serwera", async () => {
+    pokaz("/obsluga/reklamacje/1");
+    await zSprawa({}, async () => {
+      scena.wynikWerdyktu = { ...WYNIK, towar: { blad: "Allegro nie przyjęło wiadomości o towarze" } };
+      scena.poWerdykcie = () => Object.assign(REKLAMACJE[0], uznana());
+      await uznaj(/Zostaje u klienta/);
+      expect(screen.getByText("Allegro nie przyjęło wiadomości o towarze")).toBeInTheDocument();
+      expect(screen.getByText("Towar do odesłania?")).toBeInTheDocument();
+      /* Werdykt NIE wraca do formularza — wyszedł i drugi raz nie poleci. */
+      expect(screen.queryByRole("button", { name: /Uznaję/ })).not.toBeInTheDocument();
+      expect(screen.getByLabelText("Wiadomość o towarze")).toHaveValue(
+        "Towaru nie trzeba odsyłać. Uznaną reklamację zrealizujemy bez zwrotu przesyłki.");
+    });
+  });
+
+  it("niepewny los towaru wskazuje Centrum Sprzedaży i nie proponuje drugiego stanowiska", async () => {
+    /* Serwer zapisuje decyzję przy „mogło dojść”, więc sprawa wraca z nią,
+       a krok zapasowy nie ma czego proponować. Synchronizacja blokady nie
+       zdejmuje, więc zdanie o niej nie pada. */
+    pokaz("/obsluga/reklamacje/1");
+    await zSprawa({}, async () => {
+      scena.wynikWerdyktu = { ...WYNIK, towar: { status: "send_uncertain" } };
+      scena.poWerdykcie = () => Object.assign(REKLAMACJE[0], uznana({ zwrotTowaru: "wymagany" }));
+      await uznaj(/Do odesłania/);
+      expect(screen.getByText(/mogło nie dojść do kupującego.*Centrum Sprzedaży/)).toBeInTheDocument();
+      expect(screen.queryByText(/zsynchronizuj/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Towar do odesłania$/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: /^Bez odsyłania$/ })).not.toBeInTheDocument();
+    });
+  });
+
+  it("werdykt niepewny pomija towar i MÓWI to, zamiast milczeć", async () => {
+    pokaz("/obsluga/reklamacje/1");
+    await zSprawa({}, async () => {
+      scena.wynikWerdyktu = { ...WYNIK, status: "send_uncertain",
+        towar: { pominiety: "Werdykt mógł nie dojść do Allegro, więc stanowiska o towarze nie wysłaliśmy." } };
+      scena.poWerdykcie = () => Object.assign(REKLAMACJE[0], uznana({ werdyktStatus: "send_uncertain" }));
+      await uznaj(/Do odesłania/);
+      expect(screen.getByText(/stanowiska o towarze nie wysłaliśmy/)).toBeInTheDocument();
+    });
+  });
+
+  it("dopisek klienta przy towarze otwiera TEN SAM dialog, a „wyślij mimo to” idzie krokiem o towarze", async () => {
+    pokaz("/obsluga/reklamacje/1");
+    await zSprawa({}, async () => {
+      scena.wynikWerdyktu = { ...WYNIK, towar: { konflikt: {
+        error: "Ktoś dopisał wiadomość", lastMessageId: 7,
+        nowaWiadomosc: { id: 7, tresc: "A co z paczką?", at: null, rola: "BUYER" },
+      } } };
+      scena.poWerdykcie = () => Object.assign(REKLAMACJE[0], uznana());
+      await uznaj(/Zostaje u klienta/);
+      const dialog = screen.getByRole("dialog", { name: "Wysyłka zatrzymana" });
+      expect(within(dialog).getByText(/klient dopisał wiadomość/)).toBeInTheDocument();
+      await userEvent.click(within(dialog).getByRole("checkbox"));
+      scena.mutacje = [];
+      await userEvent.click(within(dialog).getByRole("button", { name: "WYŚLIJ MIMO TO" }));
+      expect(bezOdswiezenia()).toEqual([`zwrot-towaru:${JSON.stringify({
+        id: 1, decyzja: "niewymagany",
+        tresc: "Towaru nie trzeba odsyłać. Uznaną reklamację zrealizujemy bez zwrotu przesyłki.",
+        expectedWersja: 2, expectedLastMessageId: 1, mimoNowejWiadomosci: true,
+      })}`]);
+    });
+  });
+
+  it("po uznaniu z odesłaniem sztuka idzie do dostawcy — otwarcie nie zapisuje niczego", async () => {
+    scena.dostawa = { dostawca: "HURT-OGR", data: "2026-08-20T00:00:00.000Z", numer: "FV 12/08", przedZakupem: true };
+    await zSprawa(uznana({ zwrotTowaru: "wymagany", kubelek: "decyzja" }), async () => {
+      pokaz("/obsluga/reklamacje/1");
+      expect(bezOdswiezenia()).toEqual([]);
+      const krok = screen.getByRole("group", { name: "Dalej: sztuka do dostawcy" });
+      await userEvent.click(within(krok).getByRole("button", { name: "Zgłoś u dostawcy" }));
+      expect(within(krok).getByLabelText("Dostawca")).toHaveValue("HURT-OGR");
+      await userEvent.type(within(krok).getByLabelText(/Nr u dostawcy/), "RK-77");
+      await userEvent.click(within(krok).getByRole("button", { name: "Zapisz" }));
+      expect(bezOdswiezenia()).toEqual([`u-dostawcy:${JSON.stringify({
+        id: 1, dostawca: "HURT-OGR", nrUDostawcy: "RK-77", wersja: 0,
+      })}`]);
+    });
+  });
+
+  it("wynik u dostawcy zapisuje się z WERSJĄ rekordu, nie sprawy", async () => {
+    scena.uDostawcy = { dostawca: "HURT-OGR", nrUDostawcy: "RK-77", zgloszonoAt: "2026-09-08T10:00:00.000Z",
+      wynik: null, wynikAt: null, autor: "A. Lewandowska", wersja: 4 };
+    await zSprawa(uznana({ zwrotTowaru: "wymagany", kubelek: "decyzja" }), async () => {
+      pokaz("/obsluga/reklamacje/1");
+      expect(bezOdswiezenia()).toEqual([]);
+      await userEvent.click(screen.getByRole("button", { name: /Dostawca uznał/ }));
+      expect(bezOdswiezenia()).toEqual([`u-dostawcy:${JSON.stringify({
+        id: 1, dostawca: "HURT-OGR", wynik: "uznal", wersja: 4,
+      })}`]);
+    });
   });
 });
 

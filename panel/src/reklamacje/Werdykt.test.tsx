@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import type { Reklamacja } from "../api/typy";
@@ -10,7 +10,9 @@ import { Werdykt, naGrosze } from "./Werdykt";
    w serwisie: dwa przyciski przed listą (prawo Hicka), lista zależna od gałęzi,
    kwota tylko przy częściowym, przycisk MARTWY bez wiadomości i bez zgody,
    ładunek w groszach, blok po wysłaniu z kopiowaniem i stanem, krok o towarze
-   tylko po naszym uznaniu, ponowienie wyłącznie po `send_failed`.           */
+   tylko po naszym uznaniu, ponowienie wyłącznie po `send_failed`. Przy
+   uznaniu los towaru wybiera się W FORMULARZU, bez domyślnego, a zgoda
+   nazywa oba wybory.                                                       */
 
 const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   id: 1, externalId: "i-1", numer: "123/2026", orderId: "ord-1", offerId: "of-1",
@@ -63,7 +65,7 @@ describe("Werdykt", () => {
     expect(screen.getByText(/Klient prosi o 50,00 PLN/)).toBeInTheDocument();
   });
 
-  it("przycisk stoi martwy bez wiadomości, bez zgody i bez kwoty przy częściowym; ładunek idzie w groszach", async () => {
+  it("przycisk stoi martwy bez wiadomości, bez zgody, bez kwoty przy częściowym i bez TOWARU; ładunek idzie w groszach", async () => {
     const { onWerdykt } = pokaz();
     await userEvent.click(przycisk(/Uznaję/));
     await userEvent.selectOptions(screen.getByLabelText("Wartość werdyktu"), "ACCEPTED_PARTIAL_REFUND");
@@ -73,16 +75,26 @@ describe("Werdykt", () => {
     expect(wyslij()).toBeDisabled();
     await userEvent.type(screen.getByLabelText("Kwota zwrotu"), "40,00");
     expect(wyslij()).toBeDisabled();
+    /* Bez wyboru towaru przycisk stoi martwy nawet przy zgodzie. */
+    await userEvent.click(screen.getByRole("checkbox"));
+    expect(wyslij()).toBeDisabled();
+    await userEvent.click(przycisk(/Zostaje u klienta/));
     /* ZGODA JEST OSTATNIA, i od 0.424.0 inaczej być nie może: wpisanie kwoty
        zdejmuje ptaszek, bo „na 40 zł" potwierdzone, a wysłane „na 400 zł"
        byłoby tą samą pomyłką, przed którą ta zgoda stoi. Do 0.424.0 ten test
        klikał ją przed kwotą i przechodził — potwierdzał wtedy liczbę, której
        jeszcze nie było na ekranie. */
+    /* Wybór towaru zdjął zgodę — ona dotyczy obu decyzji naraz. */
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
     await userEvent.click(screen.getByRole("checkbox"));
     expect(wyslij()).toBeEnabled();
     await userEvent.click(wyslij());
     expect(onWerdykt).toHaveBeenCalledWith({
       werdykt: "ACCEPTED_PARTIAL_REFUND", wiadomosc: "Zwracamy 40 zł.", kwotaGrosze: 4000,
+      towar: {
+        decyzja: "niewymagany",
+        tresc: "Towaru nie trzeba odsyłać. Uznaną reklamację zrealizujemy bez zwrotu przesyłki.",
+      },
     });
   });
 
@@ -185,6 +197,7 @@ describe("Zgoda dotyczy KONKRETNEGO werdyktu", () => {
 
   const doZgody = async () => {
     await userEvent.click(przycisk(/Uznaję/));
+    await userEvent.click(przycisk(/Do odesłania/));
     await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Naprawimy.");
     await userEvent.click(ptaszek());
   };
@@ -205,6 +218,7 @@ describe("Zgoda dotyczy KONKRETNEGO werdyktu", () => {
       "ACCEPTED_PARTIAL_REFUND");
     await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Oddajemy część.");
     await userEvent.type(screen.getByLabelText("Kwota zwrotu"), "40,00");
+    await userEvent.click(przycisk(/Zostaje u klienta/));
     await userEvent.click(ptaszek());
     expect(wyslij()).toBeEnabled();
     await userEvent.type(screen.getByLabelText("Kwota zwrotu"), "0");
@@ -331,5 +345,199 @@ describe("Werdykt bez nadmiaru (0.511.0)", () => {
     await userEvent.click(przycisk(/Odrzucam/));
     await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Krótko");
     expect(screen.queryByText(/znaków|\/ 20000/)).not.toBeInTheDocument();
+  });
+});
+
+/* ── TOWAR PRZY UZNANIU, W TYM SAMYM FORMULARZU ──────────────────────────────
+   Stanowisko o towarze wychodzi razem z uznaniem, za jedną zgodą. Wybór nie
+   ma domyślnego, bo obie odpowiedzi kosztują: „zostaje u klienta" oddaje
+   sztukę, „do odesłania" każe klientowi pakować paczkę. Ekran nie zgaduje
+   żadnej z nich za agenta.                                                 */
+describe("Towar wybiera się przy uznaniu", () => {
+  const zgoda = () => screen.getByRole("checkbox").closest("label")?.textContent ?? "";
+
+  it("dwa wybory, żaden wciśnięty na starcie — i nie ma ich przy odmowie", async () => {
+    pokaz();
+    await userEvent.click(przycisk(/Uznaję/));
+    const grupa = screen.getByRole("group", { name: "Towar" });
+    for (const n of [/Zostaje u klienta/, /Do odesłania/]) {
+      expect(within(grupa).getByRole("button", { name: n })).toHaveAttribute("aria-pressed", "false");
+    }
+    expect(screen.queryByLabelText("Wiadomość o towarze")).not.toBeInTheDocument();
+    await userEvent.click(przycisk(/Anuluj/));
+    await userEvent.click(przycisk(/Odrzucam/));
+    expect(screen.queryByRole("group", { name: "Towar" })).not.toBeInTheDocument();
+  });
+
+  it("wybór daje zdanie startowe do poprawki, a zgoda nazywa OBA wybory", async () => {
+    const { onWerdykt } = pokaz();
+    await userEvent.click(przycisk(/Uznaję/));
+    await userEvent.click(przycisk(/Do odesłania/));
+    expect(przycisk(/Do odesłania/)).toHaveAttribute("aria-pressed", "true");
+    const pole = screen.getByLabelText("Wiadomość o towarze");
+    expect((pole as HTMLTextAreaElement).value).toMatch(/odesłanie reklamowanego towaru/);
+    await userEvent.clear(pole);
+    await userEvent.type(pole, "Odeślij na Ogrodową 1.");
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Naprawimy.");
+    expect(zgoda()).toContain("Uznana — naprawa");
+    expect(zgoda()).toContain("towar do odesłania");
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(przycisk(/Wyślij werdykt/));
+    expect(onWerdykt).toHaveBeenCalledWith({
+      werdykt: "ACCEPTED_REPAIR", wiadomosc: "Naprawimy.", kwotaGrosze: null,
+      towar: { decyzja: "wymagany", tresc: "Odeślij na Ogrodową 1." },
+    });
+  });
+
+  it("zmiana wyboru o towarze zdejmuje zgodę — tak jak zmiana werdyktu", async () => {
+    pokaz();
+    await userEvent.click(przycisk(/Uznaję/));
+    await userEvent.click(przycisk(/Do odesłania/));
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Naprawimy.");
+    await userEvent.click(screen.getByRole("checkbox"));
+    expect(przycisk(/Wyślij werdykt/)).toBeEnabled();
+    await userEvent.click(przycisk(/Zostaje u klienta/));
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+    expect(przycisk(/Wyślij werdykt/)).toBeDisabled();
+    expect(zgoda()).toContain("towar zostaje u klienta");
+  });
+
+  it("klik w wybór, który już jest wciśnięty, nie kasuje poprawionej wiadomości ani zgody", async () => {
+    pokaz();
+    await userEvent.click(przycisk(/Uznaję/));
+    await userEvent.click(przycisk(/Do odesłania/));
+    const pole = screen.getByLabelText("Wiadomość o towarze");
+    await userEvent.clear(pole);
+    await userEvent.type(pole, "Odeślij na Ogrodową 1.");
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Naprawimy.");
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(przycisk(/Do odesłania/));
+    expect(pole).toHaveValue("Odeślij na Ogrodową 1.");
+    expect(screen.getByRole("checkbox")).toBeChecked();
+    expect(przycisk(/Wyślij werdykt/)).toBeEnabled();
+  });
+
+  it("rozmowa zamknięta przez Allegro: zamiast wyboru zdanie, a werdykt idzie bez towaru", async () => {
+    /* Serwer i tak odmówiłby wiadomości o towarze — tyle że po uznaniu. */
+    const { onWerdykt } = pokaz({ czatAktywny: false });
+    await userEvent.click(przycisk(/Uznaję/));
+    expect(screen.queryByRole("group", { name: "Towar" })).not.toBeInTheDocument();
+    expect(screen.getByText(/Allegro zamknęło rozmowę/)).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Naprawimy, towar proszę odesłać.");
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(przycisk(/Wyślij werdykt/));
+    expect(onWerdykt).toHaveBeenCalledWith({
+      werdykt: "ACCEPTED_REPAIR", wiadomosc: "Naprawimy, towar proszę odesłać.", kwotaGrosze: null,
+    });
+  });
+
+  it("pusta wiadomość o towarze trzyma przycisk martwy", async () => {
+    pokaz();
+    await userEvent.click(przycisk(/Uznaję/));
+    await userEvent.click(przycisk(/Zostaje u klienta/));
+    await userEvent.clear(screen.getByLabelText("Wiadomość o towarze"));
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Naprawimy.");
+    await userEvent.click(screen.getByRole("checkbox"));
+    expect(przycisk(/Wyślij werdykt/)).toBeDisabled();
+  });
+
+  it("gdy los towaru ZAPADŁ w Centrum Sprzedaży, formularz o niego nie pyta", async () => {
+    /* Drugie stanowisko po pierwszym byłoby sprzecznością, nie poprawką. */
+    const { onWerdykt } = pokaz({ zwrotWymagany: true });
+    await userEvent.click(przycisk(/Uznaję/));
+    expect(screen.queryByRole("group", { name: "Towar" })).not.toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Wiadomość do kupującego"), "Naprawimy.");
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(przycisk(/Wyślij werdykt/));
+    expect(onWerdykt).toHaveBeenCalledWith({
+      werdykt: "ACCEPTED_REPAIR", wiadomosc: "Naprawimy.", kwotaGrosze: null,
+    });
+  });
+
+  it("krok zapasowy po werdykcie mówi zdanie serwera, gdy towar nie wyszedł razem z nim", () => {
+    pokaz({ werdykt: "ACCEPTED_REFUND", werdyktNazwa: "Uznana — zwrot pieniędzy",
+      werdyktStatus: "sent", kubelek: "zamknieta" },
+    { bladTowaru: "Allegro nie przyjęło wiadomości o towarze" });
+    expect(screen.getByText("Towar do odesłania?")).toBeInTheDocument();
+    expect(przycisk(/Towar do odesłania/)).toBeInTheDocument();
+    expect(screen.getByText("Allegro nie przyjęło wiadomości o towarze")).toBeInTheDocument();
+  });
+});
+
+/* ── DALEJ: SZTUKA DO DOSTAWCY ───────────────────────────────────────────────
+   Decyzja właściciela: wady fabryczne reklamujemy u dostawcy. Krok stoi po
+   uznaniu z odesłaniem i prowadzi przez dwa etapy, a każdy zapis idzie
+   jawnym kliknięciem z wersją REKORDU zgłoszenia.                          */
+describe("Sztuka do dostawcy po uznaniu", () => {
+  const ZGLOSZENIE = {
+    dostawca: "HURT-OGR", nrUDostawcy: "RK-77", zgloszonoAt: "2026-09-08T10:00:00.000Z",
+    wynik: null, wynikAt: null, autor: "Ala", wersja: 3,
+  } as const;
+  const DOSTAWA = { dostawca: "HURT-OGR", data: "2026-08-20T00:00:00.000Z", numer: null, przedZakupem: true };
+  const uznana = (n: Partial<Reklamacja> = {}): Partial<Reklamacja> => ({
+    werdykt: "ACCEPTED_REPAIR", werdyktNazwa: "Uznana — naprawa", werdyktStatus: "sent",
+    zwrotTowaru: "wymagany", kubelek: "zamknieta", ...n,
+  });
+  const krok = () => screen.getByRole("group", { name: "Dalej: sztuka do dostawcy" });
+
+  it("stoi tylko po UZNANIU z odesłaniem — nie przy towarze u klienta ani przy odmowie", () => {
+    const onUDostawcy = vi.fn();
+    const { unmount } = pokaz(uznana(), { onUDostawcy, dostawa: DOSTAWA });
+    expect(krok()).toHaveTextContent("Sztuka wraca do nas");
+    expect(krok()).toHaveTextContent("HURT-OGR");
+    unmount();
+    const drugi = pokaz(uznana({ zwrotTowaru: "niewymagany", zwrotWymagany: false }), { onUDostawcy });
+    expect(screen.queryByRole("group", { name: "Dalej: sztuka do dostawcy" })).not.toBeInTheDocument();
+    drugi.unmount();
+    pokaz({ werdykt: "REJECTED_OTHER", werdyktNazwa: "Odrzucona — inny powód", werdyktStatus: "sent",
+      kubelek: "zamknieta" }, { onUDostawcy });
+    expect(screen.queryByRole("group", { name: "Dalej: sztuka do dostawcy" })).not.toBeInTheDocument();
+  });
+
+  it("paczki zwrotnej nie udaje — mówi, że jej nie śledzimy", () => {
+    pokaz(uznana(), { onUDostawcy: vi.fn() });
+    expect(krok()).toHaveTextContent(/Paczki zwrotnej nie śledzimy/);
+  });
+
+  it("bez znanej dostawy mówi „nie wiemy”, a formularz startuje pusty i martwy", async () => {
+    const onUDostawcy = vi.fn();
+    pokaz(uznana(), { onUDostawcy });
+    expect(krok()).toHaveTextContent("nie wiemy");
+    await userEvent.click(within(krok()).getByRole("button", { name: "Zgłoś u dostawcy" }));
+    expect(within(krok()).getByLabelText("Dostawca")).toHaveValue("");
+    expect(within(krok()).getByRole("button", { name: "Zapisz" })).toBeDisabled();
+  });
+
+  it("zgłoszenie zakłada rekord: dostawca z ostatniej dostawy, numer nieobowiązkowy", async () => {
+    const onUDostawcy = vi.fn();
+    pokaz(uznana(), { onUDostawcy, dostawa: DOSTAWA });
+    expect(onUDostawcy).not.toHaveBeenCalled();
+    await userEvent.click(within(krok()).getByRole("button", { name: "Zgłoś u dostawcy" }));
+    expect(within(krok()).getByLabelText("Dostawca")).toHaveValue("HURT-OGR");
+    await userEvent.click(within(krok()).getByRole("button", { name: "Zapisz" }));
+    expect(onUDostawcy).toHaveBeenCalledWith({ dostawca: "HURT-OGR", nrUDostawcy: null, wersja: 0 });
+  });
+
+  it("po zgłoszeniu: kto, kiedy, numer i dwa równe przyciski wyniku z wersją rekordu", async () => {
+    const onUDostawcy = vi.fn();
+    pokaz(uznana(), { onUDostawcy, dostawa: DOSTAWA, uDostawcy: ZGLOSZENIE });
+    expect(krok()).toHaveTextContent(/Zgłoszone u HURT-OGR · 8 września 2026 · nr RK-77/);
+    expect(within(krok()).queryByRole("button", { name: "Zgłoś u dostawcy" })).not.toBeInTheDocument();
+    await userEvent.click(within(krok()).getByRole("button", { name: /Dostawca odrzucił/ }));
+    expect(onUDostawcy).toHaveBeenCalledWith({ dostawca: "HURT-OGR", wynik: "odrzucil", wersja: 3 });
+  });
+
+  it("zapisany wynik da się zmienić jednym kliknięciem — to nasza pamięć, nie wiadomość", async () => {
+    const onUDostawcy = vi.fn();
+    pokaz(uznana(), { onUDostawcy, uDostawcy: { ...ZGLOSZENIE, wynik: "uznal",
+      wynikAt: "2026-09-20T10:00:00.000Z", wersja: 4 } });
+    expect(krok()).toHaveTextContent(/Dostawca uznał · 20 września 2026/);
+    await userEvent.click(within(krok()).getByRole("button", { name: "zmień wynik" }));
+    expect(onUDostawcy).toHaveBeenCalledWith({ dostawca: "HURT-OGR", wynik: null, wersja: 4 });
+  });
+
+  it("bez obsługi zapisu kroku nie ma — martwy formularz byłby obietnicą bez pokrycia", () => {
+    pokaz(uznana());
+    expect(screen.queryByRole("group", { name: "Dalej: sztuka do dostawcy" })).not.toBeInTheDocument();
   });
 });
