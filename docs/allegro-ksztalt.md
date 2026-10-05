@@ -842,7 +842,7 @@ Schemat `CheckoutForm`. Bierzemy `id`, `status`, `updatedAt`,
 `summary.totalToPay`, `delivery.cost`, `delivery.method.name` oraz
 `lineItems[]`.
 
-Od @wydanie także `fulfillment.status` i `delivery.time.dispatch.to`, pod
+Od 0.566.0 także `fulfillment.status` i `delivery.time.dispatch.to`, pod
 pytanie „czy paczka wyjdzie dziś". Oba pola leżą poza `required`, więc brak
 to zwykły stan:
 

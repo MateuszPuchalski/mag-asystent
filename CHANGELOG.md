@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.566.0 — 5 października 2026
+
+**Szkic odpowiada na „czy paczka wyjdzie dziś?”.** Zanim paczka ma numer
+przesyłki, szkic widzi płatność, termin nadania z Allegro, dokument sprzedaży
+z Subiekta i stan pozycji zamówienia. Gdy termin nadania przypada dziś,
+szkic pisze, że wyślemy dziś. Wysyła dalej człowiek.
+
 ## 0.565.1 — 5 października 2026
 
 **Automatyczne „Dziękujemy za wiadomość” nie zdejmuje już dyskusji z „Do
