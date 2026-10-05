@@ -6,6 +6,7 @@ import { useSkokDoKarty } from "../ui/useSkokDoKarty";
 import { DaneFirmy } from "../ustawienia/DaneFirmy";
 import { RegulyStrefy } from "../ustawienia/RegulyStrefy";
 import { Konta } from "../ustawienia/Konta";
+import { WlasneHaslo } from "../ustawienia/WlasneHaslo";
 import { SlownikTagow } from "../ustawienia/SlownikTagow";
 import { LogoDostawcow } from "../ustawienia/LogoDostawcow";
 import { KluczeWlasciciela, Konfiguracja } from "../ustawienia/Konfiguracja";
@@ -25,7 +26,8 @@ import { NowyKolektor } from "../ustawienia/NowyKolektor";
 
      Firma                — to, co wychodzi na papier do dostawcy
      Magazyn              — strefa złota, magazyny, dokumenty, zdjęcia
-     Ludzie i urządzenia  — konta i nowy kolektor: ta sama chwila w firmie
+     Ludzie i urządzenia  — twoje hasło; konta i nowy kolektor, bo to ta sama
+                            chwila w firmie
      Obsługa klienta      — tagi, zwroty, Allegro, Copilot
      Serwer               — wersja, automat, kopie; na dnie klucze instalatora
 
@@ -50,14 +52,14 @@ type IdGrupy = "firma" | "magazyn" | "ludzie" | "obsluga" | "serwer";
 const GRUPY: Array<{ id: IdGrupy; nazwa: string; opis: string; admin?: true }> = [
   { id: "firma", nazwa: "Firma", opis: "Protokoły i logo dostawców" },
   { id: "magazyn", nazwa: "Magazyn", opis: "Strefa złota, magazyny, dokumenty, zdjęcia" },
-  { id: "ludzie", nazwa: "Ludzie i urządzenia", opis: "Konta, sesje, nowy kolektor" },
+  { id: "ludzie", nazwa: "Ludzie i urządzenia", opis: "Twoje hasło, konta, sesje, nowy kolektor" },
   { id: "obsluga", nazwa: "Obsługa klienta", opis: "Tagi, zwroty, Allegro, Copilot" },
   { id: "serwer", nazwa: "Serwer", opis: "Wersja, automat, kopie, zaawansowane", admin: true },
 ];
 
 /** Karta z głębokiego linku → grupa, w której stoi. */
 const GRUPA_KARTY: Record<string, IdGrupy> = {
-  firma: "firma", logo: "firma", strefa: "magazyn", konta: "ludzie", kolektor: "ludzie",
+  firma: "firma", logo: "firma", strefa: "magazyn", haslo: "ludzie", konta: "ludzie", kolektor: "ludzie",
   tagi: "obsluga", konfiguracja: "serwer", aktualizacja: "serwer",
 };
 
@@ -104,6 +106,10 @@ export function Ustawienia() {
           <KluczeWlasciciela admin={admin} grupy={["magazyn", "zdjecia"]} />
         </>}
         {grupa === "ludzie" && <>
+          {/* Własne hasło NAD kontami. To jedyna karta grupy, z której każda
+              rola korzysta dla siebie, a zamknięta to tytuł i jeden przycisk.
+              Szuka się jej przy kontach, stąd ta grupa. */}
+          <WlasneHaslo />
           <Konta admin={admin} biuro={biuro} />
           {/* Obok kont: nowa osoba i nowe urządzenie to ta sama chwila w firmie. */}
           <NowyKolektor biuro={admin || biuro} />

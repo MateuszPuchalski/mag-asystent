@@ -54,6 +54,7 @@ import {
   importFromMssql,
   lastImport,
   przyjeciaBezPozycji,
+  type ImportStats,
 } from "./adapters/subiekt.mssql.js";
 import { problemAllegro, problemUserAgenta, stanPolaczenia } from "./services/allegro-token.js";
 import { nienazwaneTypyDostaw } from "./adapters/typy-dokumentow.js";
@@ -120,6 +121,43 @@ import { poImporcie, pochodnePuste } from "./services/po-imporcie.js";
  */
 let bladImportuStartowego: string | null = null;
 
+export type EtapOdswiezenia = "start" | "cykl" | "reczny";
+
+/**
+ * Wynik odświeżenia. Awaria to zdanie, nie wyjątek: to samo zdanie stoi
+ * w `/api/health`, więc przycisk w panelu i lista problemów mówią jednym głosem.
+ */
+export type WynikOdswiezenia =
+  | { ok: true; stats: ImportStats }
+  | { ok: false; error: string };
+
+/* Etap trafia do zdania dla człowieka, więc z polskimi znakami. */
+const NAZWA_ETAPU: Record<EtapOdswiezenia, string> = {
+  start: "start", cykl: "cykl", reczny: "ręczny",
+};
+
+/**
+ * Odświeżenie w toku albo `null`.
+ *
+ * JEDNO NARAZ, bo każdy import czyta całą kartotekę z MSSQL biura, którego
+ * `docs/architektura.md` §4 każe nie obciążać. Takt nie czeka na poprzedni
+ * przebieg, a przycisk w panelu może dołożyć drugi.
+ */
+let odswiezanieWToku: Promise<WynikOdswiezenia> | null = null;
+
+/**
+ * Ręczne odświeżenie czekające na koniec biegnącego albo `null`.
+ *
+ * Istnieje wyłącznie razem z `odswiezanieWToku`: rusza w `finally` biegnącego,
+ * w tym samym kroku, w którym tamto znika. Nie ma więc chwili, w której takt
+ * zobaczyłby pustkę i zaczął trzeci import obok oczekującego.
+ */
+let reczneNastepne: {
+  obietnica: Promise<WynikOdswiezenia>;
+  rusz: (biegnace: Promise<WynikOdswiezenia>) => void;
+  imp: () => Promise<ImportStats>;
+} | null = null;
+
 /**
  * Odświeżenie read-modelu, którego awaria NIE kładzie serwera.
  *
@@ -136,15 +174,62 @@ let bladImportuStartowego: string | null = null;
  * wycofuje), więc kolektor pracuje na danych sprzed awarii zamiast na niczym,
  * a `/api/health` mówi zdaniem, że tak jest.
  */
-export async function odswiezReadModel(
-  etap: "start" | "cykl",
+export function odswiezReadModel(
+  etap: EtapOdswiezenia,
   /* Import wstrzykiwany, żeby dało się sprawdzić NIEBLOKUJĄCOŚĆ bez serwera
      MSSQL. Bez tego jedyną drogą do tego zachowania byłoby wywrócenie
      produkcji — a właśnie tak się o nim dowiedzieliśmy. */
-  imp: () => Promise<unknown> = importFromMssql,
-): Promise<void> {
+  imp: () => Promise<ImportStats> = importFromMssql,
+): Promise<WynikOdswiezenia> {
+  if (!odswiezanieWToku) return uruchom(etap, imp);
+
+  /* PRZYCISK NIE DOŁĄCZA DO BIEGNĄCEGO. Biuro klika, żeby zobaczyć Subiekt
+     PO swojej zmianie, np. po przyjęciu dostawy. Biegnący import mógł ruszyć
+     przed nią, więc przycisk czeka na jeden dodatkowy, bez względu na wynik
+     biegnącego. Kilka kliknięć w trakcie skleja się w ten jeden. */
+  if (etap === "reczny") {
+    if (!reczneNastepne) {
+      let rusz!: (biegnace: Promise<WynikOdswiezenia>) => void;
+      const obietnica = new Promise<WynikOdswiezenia>((r) => { rusz = r; });
+      reczneNastepne = { obietnica, rusz, imp };
+    }
+    return reczneNastepne.obietnica;
+  }
+
+  /* Takt dołącza do BIEGNĄCEGO, także gdy czeka już ręczny. To prostsze
+     i wystarcza: takt nie obiecuje świeżości po żadnym kliknięciu, a wynik
+     dostaje najwcześniej, jak się da. Dołączający nie przynosi własnego
+     etapu ani importu, więc zdanie o awarii mówi o przebiegu, który biegł. */
+  return odswiezanieWToku;
+}
+
+function uruchom(
+  etap: EtapOdswiezenia,
+  imp: () => Promise<ImportStats>,
+): Promise<WynikOdswiezenia> {
+  const biezace = (async (): Promise<WynikOdswiezenia> => {
+    try {
+      return await odswiezRaz(etap, imp);
+    } finally {
+      /* Oczekujący ręczny rusza TU, zanim ktokolwiek dostanie wynik
+         biegnącego. Łańcuch `.then` zostawiłby przerwę bez importu w toku,
+         a w nią wszedłby takt z drugim importem obok ręcznego. */
+      const nastepne = reczneNastepne;
+      reczneNastepne = null;
+      odswiezanieWToku = null;
+      if (nastepne) nastepne.rusz(uruchom("reczny", nastepne.imp));
+    }
+  })();
+  odswiezanieWToku = biezace;
+  return biezace;
+}
+
+async function odswiezRaz(
+  etap: EtapOdswiezenia,
+  imp: () => Promise<ImportStats>,
+): Promise<WynikOdswiezenia> {
   try {
-    await imp();
+    const stats = await imp();
     bladImportuStartowego = null;
     /* KOREKTA WCHODZI Z SUBIEKTA, więc wiąże się ZARAZ PO imporcie (audyt
        zwrotów, 15 września 2026). Do tego wydania czekała na takt Allegro, a
@@ -152,16 +237,22 @@ export async function odswiezReadModel(
        nieudany zostawia stare dokumenty i nie ma czego wiązać. Każdy krok ma
        własny parasol w `wiazania.ts`, więc wiązanie nie udaje awarii importu. */
     powiazPoImporcieSubiekta(db());
+    return { ok: true, stats };
   } catch (e) {
     const powod = e instanceof Error ? e.message : String(e);
     bladImportuStartowego =
-      `Import z Subiekta nie powiódł się (${etap}): ${powod}. ` +
+      `Import z Subiekta nie powiódł się (${NAZWA_ETAPU[etap]}): ${powod}. ` +
       "Kartoteki i stany pochodzą z ostatniego udanego odświeżenia.";
     console.error("[mssql] odświeżenie nieudane:", powod);
+    return { ok: false, error: bladImportuStartowego };
   }
 }
 
-export async function buildApp() {
+export async function buildApp(opcje: {
+  /* Import dla przycisku resync. Wstrzykiwany z tego samego powodu co `imp`
+     w `odswiezReadModel`: test trasy nie ma prawa strzelać do MSSQL biura. */
+  importSubiekta?: () => Promise<ImportStats>;
+} = {}) {
   const app = Fastify({
     logger: { level: process.env.LOG_LEVEL ?? "info" },
     // zdjęcia dowodowe lecą jako base64 w JSON (~300 KB → ~400 KB po kodowaniu)
@@ -454,15 +545,20 @@ export async function buildApp() {
     return { ok: true, zapomniano: zapomnijBrakiZdjec() };
   });
 
-  // wymuszenie odświeżenia read-modelu (mssql): np. po przyjęciu dostawy w Subiekcie
+  /* Wymuszenie odświeżenia read-modelu (mssql), np. po przyjęciu dostawy
+     w Subiekcie. Ta sama droga co takt: przycisk też wiąże korekty, czyści
+     zdanie w zdrowiu i nie zaczyna drugiego importu obok biegnącego, tylko
+     czeka na własny po nim. Awaria to 502 ze zdaniem, bo zawiódł Subiekt
+     za nami, nie żądanie. */
   app.post("/api/admin/resync", async (_req, reply) => {
     const nie = odmowaRatunku();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
     if (config.sgtMode !== "mssql") {
       return reply.code(400).send({ error: "resync dostępny tylko w SGT_MODE=mssql" });
     }
-    const stats = await importFromMssql();
-    return { ok: true, stats };
+    const w = await odswiezReadModel("reczny", opcje.importSubiekta);
+    if (!w.ok) return reply.code(502).send({ error: w.error });
+    return { ok: true, stats: w.stats };
   });
 
   await app.register(productRoutes);
@@ -511,8 +607,9 @@ async function main() {
   zamelduj("api");
 
   /* SGT_MODE=mssql: read-model sgt_* zasilany z bazy Subiekta — import przy
-     starcie, potem co MSSQL_SYNC_MS. Awaria NIE kończy procesu; uzasadnienie
-     przy `odswiezReadModel`. */
+     starcie, potem co MSSQL_SYNC_MS. Awaria NIE kończy procesu, a takt
+     trafiający w biegnący import dołącza do niego; uzasadnienie przy
+     `odswiezReadModel`. */
   if (config.sgtMode === "mssql") {
     await odswiezReadModel("start");
     setInterval(() => void odswiezReadModel("cykl"), config.mssql.syncMs);

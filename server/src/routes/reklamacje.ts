@@ -6,7 +6,7 @@ import { logEvent } from "../services/events.js";
 import { pobierzZalacznik } from "../adapters/allegro.http.js";
 import { sprawdzPrzesylke } from "../services/przesylka-zamowienia.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
-import { typPodgladu } from "../services/skrzynka.js";
+import { typPodgladu } from "../services/typ-podgladu.js";
 import {
   adresZalacznika, BladReklamacji, licznikiKubelkow, listaReklamacji, progKolejki,
   cofnijNotatke, ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
@@ -262,7 +262,7 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
    *
    * Nie zgadujemy więc kształtu i nie wymyślamy pola, którego nie ma:
    * `rozpoznajMime` czyta sygnaturę pliku (ta sama funkcja, co przy zdjęciach
-   * z Subiekta), a `typPodgladu` przecina wynik z listą ze skrzynki. Przejdą
+   * z Subiekta), a `typPodgladu` przecina wynik z listą podglądu. Przejdą
    * trzy typy — JPEG, PNG i GIF — bo tyle jest we WSPÓLNEJ części tego, co
    * Allegro przy tym zasobie przyjmuje (`png`, `gif`, `bmp`, `tiff`, `jpeg`,
    * `pdf`) i co przeglądarka rysuje. BMP, TIFF i PDF zostają przy pobieraniu.

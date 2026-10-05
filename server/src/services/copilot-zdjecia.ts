@@ -2,7 +2,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { pobierzZalacznik, pobierzZalacznikWiadomosci } from "../adapters/allegro.http.js";
 import { config } from "../config.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
-import { typPodgladu } from "./skrzynka.js";
+import { typPodgladu } from "./typ-podgladu.js";
 
 /* ── Zdjęcia sprawy dla Copilota (0.283.0) ───────────────────────────────────
    Zlecenie właściciela brzmiało wprost: „copilot powinien czytać zdjęcia".

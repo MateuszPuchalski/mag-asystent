@@ -9,7 +9,6 @@ import {
 } from "../services/delivery.js";
 import {
   dodajNotatke,
-  notatkiDokumentu,
   odpowiedziNieprzeczytane,
   oznaczOdpowiedzPrzeczytana,
 } from "../services/notatki.js";
@@ -170,12 +169,6 @@ export async function biuroRoutes(app: FastifyInstance) {
       if ("error" in r) return reply.code(400).send(r);
       return r;
     }
-  );
-
-  /** Notatki dokumentu wraz z odpowiedziami — biuro czyta, czy już wiadomo. */
-  app.get<{ Params: { dokId: string } }>(
-    "/api/biuro/dokument/:dokId/notatki",
-    async (req) => ({ notatki: notatkiDokumentu(Number(req.params.dokId)) })
   );
 
   /* ── Odpowiedzi na notatki wracają do biura (0.57.0) ──────────────────────
