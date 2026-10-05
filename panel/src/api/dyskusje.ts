@@ -61,38 +61,6 @@ export function useProwadzeDyskusje() {
   });
 }
 
-export function useNotatkaDyskusji() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: number; notatka: string | null; wersja: number }) =>
-      api<{ dyskusja: Dyskusja }>(`/api/obsluga/dyskusje/${v.id}/notatka`,
-        { method: "POST", body: JSON.stringify({ notatka: v.notatka, wersja: v.wersja }) }),
-    onSettled: (_d, _e, v) => {
-      void qc.invalidateQueries({ queryKey: kluczeDyskusji.kolejka });
-      void qc.invalidateQueries({ queryKey: kluczeDyskusji.dyskusja(v.id) });
-    },
-  });
-}
-
-/**
- * Cofnięcie zmiany notatki. §25a.5: cofnięcie zamiast potwierdzenia.
- *
- * Notatka zostaje wyłącznie u nas i niczego nie obiecuje kupującemu, więc jako
- * jedyna dostaje drogę powrotną. Odpowiedzi Allegro nie cofnie.
- */
-export function useCofnijNotatkeDyskusji() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: { id: number; wersja: number }) =>
-      api<{ dyskusja: Dyskusja }>(`/api/obsluga/dyskusje/${v.id}/notatka/cofnij`,
-        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
-    onSettled: (_d, _e, v) => {
-      void qc.invalidateQueries({ queryKey: kluczeDyskusji.kolejka });
-      void qc.invalidateQueries({ queryKey: kluczeDyskusji.dyskusja(v.id) });
-    },
-  });
-}
-
 /**
  * Odpowiedź w rozmowie.
  *

@@ -1,12 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { Activity, ExternalLink, MessagesSquare } from "lucide-react";
-import type { Dyskusja, SzczegolDyskusji, Tag } from "../api/typy";
+import type { Dyskusja, SzczegolDyskusji } from "../api/typy";
 import { zlote } from "../api/zwroty";
-import { TagiSprawy } from "../sprawy/Tagi";
 import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { ZlecHali } from "../sprawy/ZlecHali";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
-import { EtykietaWartosci, NaglowekSekcji, czas, dzien, dniSlowo, ile, LoginKlienta, Przycisk, Skopiuj } from "../ui";
+import { EtykietaWartosci, NaglowekSekcji, czas, dzien, dniSlowo, ile, LoginKlienta, Skopiuj } from "../ui";
 import { Zwijka } from "../skrzynka/Zwijka";
 
 /* ── Kolumna faktów o dyskusji ───────────────────────────────────────────────
@@ -24,8 +23,11 @@ import { Zwijka } from "../skrzynka/Zwijka";
    zamówienie. Adres dyskusji jest sprawdzony kliknięciem, nie wywiedziony
    z `/claims/{id}` reklamacji, bo taka analogia dała już raz 404.
 
-   Wszystko poniżej to ODCZYT. Dwa zapisy tego ekranu — „prowadzę" i notatka —
-   są jawnymi kliknięciami, nie skutkiem ubocznym patrzenia.                 */
+   Wszystko poniżej to ODCZYT. Zapisy z tej kolumny — zlecenie hali i pytanie
+   o paczkę — są jawnymi kliknięciami, nie skutkiem ubocznym patrzenia.
+
+   BEZ „PRACY BIURA". Decyzja właściciela: tagi i notatka sprawy zeszły z ekranu
+   dyskusji tak samo jak z reklamacji, bo oba ekrany mają zostać bliźniacze. */
 
 const Wiersz = ({ etykieta, children }: { etykieta: string; children: React.ReactNode }) =>
   <div className="flex items-baseline gap-2 py-1 text-sm">
@@ -46,88 +48,15 @@ const Link = ({ href, children }: { href: string | null; children: React.ReactNo
         {children}<ExternalLink size={12} /></a>
     : <>{children}</>;
 
-/**
- * Notatka biura — nasze ustalenia, których Allegro nie zna.
- *
- * Zapis JAWNYM przyciskiem, nie przy każdym znaku: notatka pisze się zdaniami,
- * a zapis po każdej literze podnosiłby wersję rekordu i wywracał kontrolę
- * świeżości u kolegi przy drugim biurku.
- */
-function Notatka({ dyskusja, trwa, blad, onZapisz, onCofnij }: {
-  dyskusja: Dyskusja;
-  trwa: boolean;
-  blad: string;
-  onZapisz: (tekst: string) => void;
-  /* Cofnięcie jest OPCJONALNE tym samym wzorcem co reszta: czego nie da się
-     zrobić, tego nie ma na ekranie. */
-  onCofnij?: () => void;
-}) {
-  const [tekst, setTekst] = useState(dyskusja.notatka ?? "");
-  /* Przełączenie sprawy podmienia treść pola. Bez tego notatka poprzedniej
-     zostawałaby w edytorze i dało się ją zapisać na cudzej dyskusji. */
-  useEffect(() => { setTekst(dyskusja.notatka ?? ""); }, [dyskusja.id, dyskusja.notatka]);
-  const zmienione = tekst.trim() !== (dyskusja.notatka ?? "").trim();
-  return <div className="flex flex-col gap-2">
-    <label className="sr-only" htmlFor="notatka-dyskusji">Notatka biura</label>
-    <textarea id="notatka-dyskusji" rows={3} value={tekst}
-      onChange={(e) => setTekst(e.target.value)}
-      placeholder="Ustalenia, których Allegro nie zna"
-      className="field resize-y text-sm" />
-    {blad && <p className="text-xs text-red-700">{blad}</p>}
-    {/* Przycisk staje dopiero przy ZMIANIE (0.520.0). Główny, bursztynowy
-        guzik stał pod pustym polem przy każdej dyskusji i był najgłośniejszą
-        rzeczą w kolumnie faktów, choć nie było czego zapisać. Wyszarzony
-        zaprasza do kliknięcia i odmawia; zapis i tak zaczyna się od pisania. */}
-    {zmienione && <Przycisk wariant="glowny" disabled={trwa}
-      onClick={() => onZapisz(tekst)}>
-      {trwa ? "Zapisuję…" : "Zapisz notatkę"}
-    </Przycisk>}
-    {/* ── CO SIĘ Z NIĄ STAŁO I JAK TO COFNĄĆ (0.280.0) ─────────────────────
-        §25a.5: cofnięcie zamiast potwierdzenia, i to jest ZDANIE, nie ramka
-        z decyzją. Notatka jest polem swobodnym, które nadpisuje ten, kto pisze
-        ostatni — do tego wydania skasowanego zdania nie dało się odzyskać
-        niczym, bo do dziennika idzie świadomie sama długość.
-
-        Autor i godzina stoją TU, a nie w osobnej sekcji: pytanie „kto to
-        napisał" zadaje się patrząc na notatkę, nie szukając jej autora. */}
-    {dyskusja.notatkaPrzez && <p className="text-podpis text-slate-600">
-      Zmiana: {dyskusja.notatkaPrzez}, {czas(dyskusja.notatkaAt)}
-      {onCofnij && dyskusja.maPoprzedniaNotatke && <>
-        {" · "}
-        <button type="button" disabled={trwa} onClick={onCofnij}
-          className="py-1 font-semibold text-slate-700 underline disabled:opacity-50">
-          cofnij zmianę</button>
-      </>}
-    </p>}
-  </div>;
-}
-
 export function Fakty({
-  szczegol, trwa, bladZapisu, onNotatka, onCofnijNotatke, tagi,
-  onSprawdzPrzesylke, sprawdzaPrzesylke = false, bladPrzesylki = "",
+  szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke = false, bladPrzesylki = "",
 }: {
   szczegol: SzczegolDyskusji;
-  trwa: boolean;
-  bladZapisu: string;
-  onNotatka: (tekst: string) => void;
-  /** Cofnięcie ZMIANY notatki (0.280.0) — §25a.5. */
-  onCofnijNotatke?: () => void;
-  /* Pytanie o paczkę (0.393.0). Opcjonalne tym samym wzorcem co tagi: bez
-     procedury zapytania przycisku nie rysujemy wcale, a nie rysujemy
-     martwego. */
+  /* Pytanie o paczkę. Opcjonalne: bez procedury zapytania przycisku nie
+     rysujemy wcale, a nie rysujemy martwego. */
   onSprawdzPrzesylke?: () => void;
   sprawdzaPrzesylke?: boolean;
   bladPrzesylki?: string;
-  /* Opcjonalne tym samym wzorcem co przy reklamacji: czego nie da się zrobić,
-     tego nie ma na ekranie. */
-  tagi?: {
-    slownik: Tag[];
-    trwa: boolean;
-    blad: string;
-    onPrzypnij: (tagId: number) => void;
-    onOdepnij: (tagId: number) => void;
-    onNowy: (nazwa: string) => void;
-  };
 }) {
   const d = szczegol.dyskusja;
   return <div className="flex min-h-0 flex-col">
@@ -294,19 +223,6 @@ export function Fakty({
     {/* „Prowadzi" zeszło do ŚRODKOWEJ kolumny (0.392.0) — ten sam ruch i ten
         sam powód co przy reklamacji: wzięcie sprawy jest czynnością, a ta
         kolumna niesie fakty. Oba ekrany mają zostać bliźniacze. */}
-    <Sekcja tytul="Praca biura">
-      {/* Tagi nad notatką, bo odpowiadają na pytanie zadawane częściej: „czego
-          ta sprawa czeka". Notatkę czyta się, gdy tag nie wystarczy. */}
-      {tagi && <div className="mt-3">
-        <TagiSprawy przypiete={d.tagi} slownik={tagi.slownik} trwa={tagi.trwa}
-          blad={tagi.blad} onPrzypnij={tagi.onPrzypnij} onOdepnij={tagi.onOdepnij}
-          onNowy={tagi.onNowy} />
-      </div>}
-      <div className="mt-3">
-        <Notatka dyskusja={d} trwa={trwa} blad={bladZapisu} onZapisz={onNotatka}
-          onCofnij={onCofnijNotatke} />
-      </div>
-    </Sekcja>
   </div>;
 }
 

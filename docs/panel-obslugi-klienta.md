@@ -6085,11 +6085,14 @@ stać nad całą sprawą, a nie w kolumnie, którą trzeba przewijać.
 - **Zeszło:** „Praca biura" (tagi i notatka sprawy) oraz wskaźnik „jeszcze
   N spraw tego zakupu ↓". Dane i trasy serwera zostają.
 
-**Otwarte do decyzji właściciela.** Kolejka reklamacji dalej pokazuje tagi
-przypięte wcześniej i szuka po starych notatkach. Notatki tej na ekranie
-sprawy nie widać, a numeru sprawy Allegro biuro nie ma już gdzie zapisać tak,
-żeby kolejka go znalazła. Ekran dyskusji ma dalej własną „Pracę biura",
-choć oba ekrany miały być bliźniacze.
+**Dyskusja tak samo.** Decyzją właściciela „Praca biura" zeszła też z ekranu
+dyskusji, bo oba ekrany mają zostać bliźniacze. Błąd „prowadzę" stoi tam przy
+samym przycisku, bo dotąd wypisywało go tylko pole notatki.
+
+**Otwarte do decyzji właściciela.** Kolejki reklamacji i dyskusji dalej
+pokazują tagi przypięte wcześniej i szukają po starych notatkach. Notatki tej
+na ekranie sprawy nie widać, a numeru sprawy Allegro biuro nie ma już gdzie
+zapisać tak, żeby kolejka go znalazła.
 
 ## 25c. Dyskusje
 
@@ -6114,8 +6117,8 @@ ostatniej wypowiedzi w 61 sprawach na 100. To przypadek typowy, nie brzegowy.
 
 ### 25c.2. Co panel dokłada
 
-To samo, czego Centrum Sprzedaży nie daje: kolejkę z porządkiem, właściciela
-sprawy i notatkę z ustaleń. Panel niczego tu nie spina z Subiektem — dyskusja
+To samo, czego Centrum Sprzedaży nie daje: kolejkę z porządkiem i właściciela
+sprawy. Notatka z ustaleń zeszła w @wydanie (§25b.10). Panel niczego tu nie spina z Subiektem — dyskusja
 żyje w całości w Allegro.
 
 ### 25c.3. Kolejka bramek
@@ -6206,8 +6209,8 @@ jako nieobecne przy dyskusji. Zamiast obrazu stoi numer zamówienia.
 
 **Kolumna faktów jest chudsza i ma to powiedzieć.** Dyskusja nie niesie powodu,
 oczekiwania, prawa ani kwoty. Zostaje kupujący, zamówienie razem ze zwrotami
-tego samego zamówienia, data otwarcia, status, załączniki, notatka biura i „kto
-prowadzi". Puste miejsce po polach, których nie ma, byłoby gorsze od zdania.
+tego samego zamówienia, data otwarcia, status i załączniki. Notatka biura
+zeszła w @wydanie (§25b.10), a „kto prowadzi" stoi nad rozmową. Puste miejsce po polach, których nie ma, byłoby gorsze od zdania.
 
 ### 25c.7. Odpowiedź w rozmowie
 
