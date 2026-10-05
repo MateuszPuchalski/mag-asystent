@@ -454,7 +454,7 @@ function Triaz({ szczegol, pozycja, twId, karta, zakup }: {
          nie ma, ostatnia dostawa w ogóle jest tylko tropem i tak się nazywa. */
       pod={dostawa
         ? `${dostawa.przedZakupem ? "dostawa przed zakupem" : "ostatnia dostawa"} ${dzien(dostawa.data)}`
-        : twId === null ? "sprawa bez kartoteki" : "nie znamy dostawy tego towaru"} />
+        : twId === null ? "bez kartoteki nie znamy dostaw" : "nie znamy dostawy tego towaru"} />
   </div>;
 }
 
