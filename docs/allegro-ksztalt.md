@@ -842,6 +842,19 @@ Schemat `CheckoutForm`. Bierzemy `id`, `status`, `updatedAt`,
 `summary.totalToPay`, `delivery.cost`, `delivery.method.name` oraz
 `lineItems[]`.
 
+Od 0.566.0 także `fulfillment.status` i `delivery.time.dispatch.to`, pod
+pytanie „czy paczka wyjdzie dziś". Oba pola leżą poza `required`, więc brak
+to zwykły stan:
+
+- `fulfillment.status` (`CheckoutFormFulfillmentStatus`): `NEW`,
+  `PROCESSING`, `READY_FOR_SHIPMENT`, `READY_FOR_PICKUP`, `SENT`,
+  `PICKED_UP`, `CANCELLED`, `SUSPENDED`, `RETURNED`. Ustawia go SPRZEDAWCA,
+  u nas Sellasist, więc opisuje, a nie rozstrzyga.
+- `delivery.time.dispatch.to` (`CheckoutFormDeliveryTimeDispatch`, `date-time`)
+  to najpóźniejsze nadanie. `delivery.time.from` i `to` mówią o DORĘCZENIU,
+  a `guaranteed` jest `deprecated`. Sonda z 2 września 2026 widziała
+  `dispatch` w 85 zamówieniach na 100.
+
 Pozycja (`CheckoutFormLineItem`) ma `id`, `offer`, `quantity`, `price`
 i `boughtAt`. Data zakupu stoi przy POZYCJI, nie przy zamówieniu — bierzemy
 najwcześniejszą, bo zamówienie scalone z kilku zakupów miałoby inaczej datę

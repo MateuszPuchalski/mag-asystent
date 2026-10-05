@@ -304,6 +304,10 @@ rachunek w oknie „Skąd to wiem", otwartym, gdy pada zdanie spoza bazy.
   Login stoi też przy zwrocie, bo Allegro przysyła go z każdym zwrotem.
 - **Forma płatności i ŻĄDANIE faktury, bez danych firmy.** Bierzemy
   `payment.type` i flagę `invoice.required`; `invoice.address` nie przechodzi.
+- **Status realizacji i termin nadania** (`fulfillment.status`,
+  `delivery.time.dispatch.to`). Szkic odpowiada z nich na „czy paczka wyjdzie
+  dziś", zanim jest numer przesyłki. Żadne z tych pól nie opisuje osoby:
+  to stan zamówienia i termin nadania z formularza zamówienia.
 
 ### Nazwa odbiorcy z naklejki
 

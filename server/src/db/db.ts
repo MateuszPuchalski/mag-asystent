@@ -422,6 +422,10 @@ export function migrate(database: DatabaseSync) {
     ["przesylka_status", "TEXT"], ["przesylka_dostarczono_at", "TEXT"],
     ["przesylka_sprawdzono_at", "TEXT"],
   ] as const) addColumn("zamowienie_klienta", kol, typ);
+  /* Realizacja przed nadaniem — powód przy kolumnach w `schema.sql`. NULL
+     znaczy „Allegro nie podało albo zamówienia od tej pory nie czytaliśmy". */
+  addColumn("zamowienie_klienta", "realizacja_status", "TEXT");
+  addColumn("zamowienie_klienta", "nadanie_do", "TEXT");
   /* Decyzje biura przy zwrocie (0.156.0). Do niego kolejka bramek routowała
      po kolumnach, których nic nie zapisywało — każdy zwrot stał w DO DECYZJI
      na zawsze. Te dwie kolumny domykają zapis kwoty: co weszło do sumy. */
@@ -1071,7 +1075,20 @@ function bezDoboruIWiedzy(database: DatabaseSync) {
     if (!jest(tabela)) continue;
     const ma = kolumny(tabela);
     for (const kolumna of lista) {
-      if (ma.has(kolumna)) database.exec(`ALTER TABLE ${tabela} DROP COLUMN ${kolumna}`);
+      if (!ma.has(kolumna)) continue;
+      /* KOLUMNA, KTÓREJ SQLITE NIE UMIE ZDJĄĆ, ZOSTAJE. Baza założona ze
+         `schema.sql`, w którym przed ostatnią kolumną stał komentarz `--`,
+         kończy DROP COLUMN błędem „incomplete input": SQLite wycina definicję
+         razem z przecinkiem i zostawia nawias w komentarzu. Wywrócenie startu
+         cofnęłoby aktualizację i zablokowało każde następne wydanie. Martwa
+         kolumna ma wartość domyślną i nikt do niej nie pisze, więc nic nie psuje. */
+      try {
+        database.exec(`ALTER TABLE ${tabela} DROP COLUMN ${kolumna}`);
+      } catch (e) {
+        if (!/after drop column/i.test((e as Error).message)) throw e;
+        console.warn(`[migracja] kolumna ${tabela}.${kolumna} zostaje: SQLite nie umie jej zdjąć ` +
+          `(${(e as Error).message})`);
+      }
     }
   }
   /* Indeks pełnotekstowy karmił wyłącznie kandydatów doboru. Tabela wirtualna
