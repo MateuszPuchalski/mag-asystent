@@ -1,10 +1,10 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { Bot, Image, LifeBuoy, Store, User, type LucideIcon } from "lucide-react";
+import { Bot, ChevronUp, Image, LifeBuoy, Store, User, type LucideIcon } from "lucide-react";
 import type { Reklamacja, WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
 import { pobierzZalacznik } from "../api/reklamacje";
 import { useZdjecieZalacznikaReklamacji } from "../towar/useZdjecie";
 import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
-import { czas, NaglowekSekcji, Pusto } from "../ui";
+import { czas, ile, NaglowekSekcji, Pusto } from "../ui";
 import { DlugaTresc, rozbierzFormularz, Tresc, zawieraOpis } from "./tresc";
 
 /* ── Rozmowa w sprawie reklamacyjnej ─────────────────────────────────────────
@@ -95,7 +95,7 @@ const ROLE: Record<string, {
  * Opakowanie per źródło, bo obraz wisi na haku REKLAMACJI, a haka nie wolno
  * wołać w pętli ani warunkowo.
  */
-function ZalacznikReklamacji({ reklamacjaId, z }: {
+export function ZalacznikSprawy({ reklamacjaId, z }: {
   reklamacjaId: number; z: ZalacznikReklamacji;
 }) {
   const obraz = useZdjecieZalacznikaReklamacji(reklamacjaId, z.podglad ? z.id : null);
@@ -110,7 +110,7 @@ function Zalaczniki({ reklamacjaId, lista }: {
 }) {
   if (!lista.length) return null;
   return <ListaZalacznikow>
-    {lista.map((z) => <ZalacznikReklamacji key={z.id} reklamacjaId={reklamacjaId} z={z} />)}
+    {lista.map((z) => <ZalacznikSprawy key={z.id} reklamacjaId={reklamacjaId} z={z} />)}
   </ListaZalacznikow>;
 }
 
@@ -119,23 +119,37 @@ function Zalaczniki({ reklamacjaId, lista }: {
  *
  * Wiadomość zachowuje MIEJSCE zdjęcia w wątku, ale nie jego wysokość. Agent
  * widzi, że klient coś przysłał właśnie tu, a kliknięcie pokazuje to zdjęcie
- * w kolumnie i przenosi na nie fokus.
+ * w kolumnie i przenosi na nie fokus. Znak `Z1` jest tym samym, którym
+ * dowody biura odsyłają do zdjęcia, więc wątek i wpis mówią jednym numerem.
  */
-function OdnosnikiZdjec({ lista, onPokaz }: {
+function OdnosnikiZdjec({ lista, onPokaz, znak }: {
   lista: ZalacznikReklamacji[]; onPokaz: (id: number) => void;
+  znak?: (id: number) => string | null;
 }) {
   if (!lista.length) return null;
   return <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
-    {lista.map((z) => <li key={z.id} className="min-w-0">
-      <button type="button" onClick={() => onPokaz(z.id)}
-        aria-label={`Pokaż zdjęcie w kolumnie: ${z.nazwa || "zdjęcie"}`}
-        className="inline-flex max-w-full items-center gap-1 font-semibold text-slate-700
-          underline underline-offset-2 hover:text-slate-900">
-        <Image size={12} aria-hidden="true" className="shrink-0 text-slate-500" />
-        <span className="truncate">{z.nazwa || "zdjęcie"}</span>
-        <span aria-hidden="true">→</span>
-      </button>
-    </li>)}
+    {lista.map((z) => {
+      const nazwa = z.nazwa || "zdjęcie";
+      const numer = znak?.(z.id) ?? null;
+      /* WIDOCZNY TEKST NA POCZĄTKU NAZWY (WCAG 2.5.3). Z numerem przycisk
+         pokazuje „Z1 usterka.jpg", więc tak zaczyna się jego nazwa, a sterujący
+         głosem mówi „kliknij Z1". Bez numeru nazwa zostaje jak w dyskusjach,
+         bo tam widoczny tekst to sama nazwa pliku i reguła jest spełniona. */
+      const etykieta = numer ? `${numer} ${nazwa} — pokaż zdjęcie w kolumnie`
+        : `Pokaż zdjęcie w kolumnie: ${nazwa}`;
+      return <li key={z.id} className="min-w-0">
+        <button type="button" onClick={() => onPokaz(z.id)} aria-label={etykieta}
+          className="inline-flex min-h-6 max-w-full items-center gap-1 font-semibold text-slate-700
+            underline underline-offset-2 hover:text-slate-900">
+          <Image size={12} aria-hidden="true" className="shrink-0 text-slate-500" />
+          {/* Spacja jest dla tekstu przycisku, nie dla układu: flex jej nie
+              rysuje, a „Z1 usterka.jpg" czyta się jako dwa słowa. */}
+          {numer && <><span className="shrink-0 tabular-nums">{numer}</span>{" "}</>}
+          <span className="truncate">{nazwa}</span>
+          <span aria-hidden="true">→</span>
+        </button>
+      </li>;
+    })}
   </ul>;
 }
 
@@ -143,6 +157,19 @@ function OdnosnikiZdjec({ lista, onPokaz }: {
 const rolaWiadomosci = (w: WiadomoscReklamacji) => ROLE[w.autorRola ?? ""] ?? {
   etykieta: w.autorRola ?? "Nieznany autor", Ikona: User, nasza: false,
   klasa: "bg-white border-slate-200", listwa: "border-l-4 border-dotted border-l-slate-400",
+};
+
+/** Kto napisał wiadomość — ten sam podpis w wątku i w kolumnie zdjęć ekranu. */
+export const etykietaRoli = (w: WiadomoscReklamacji) => rolaWiadomosci(w).etykieta;
+
+/* ── STARSZA WIADOMOŚĆ KLIENTA CICHNIE (na życzenie ekranu) ─────────────────
+   Przy długiej rozmowie każda karta klienta świeciła tym samym bursztynem,
+   więc ten jeden odcień nie mówił już, która wypowiedź czeka na nas. Ekran
+   reklamacji prosi o bursztyn wyłącznie przy OSTATNIEJ wiadomości klienta.
+   Starsze dostają neutralne tło i szarą listwę, a strona, ikona i podpis
+   zostają — barwa nigdy nie była jedynym znakiem autora (WCAG 1.4.1). */
+const STARSZA_KLIENTA = {
+  klasa: "bg-white border-slate-200", listwa: "border-l-4 border-l-slate-400",
 };
 
 /**
@@ -170,8 +197,8 @@ export interface SprawaCzatu {
 /* ── JEDNA WIADOMOŚĆ (0.415.0) ───────────────────────────────────────────────
    Formularz Allegro składa się pod zdanie klienta, a „pokaż całość" rozwija go
    słowo w słowo — z adresem do zwrotu włącznie. Chowamy POWTÓRZENIE, nigdy
-   treść: powód, oczekiwanie i tytuł prawny stoją już w głowicy kolumny
-   dowodów, po polsku i w jednym miejscu.
+   treść: powód i oczekiwanie stoją już w głowicy sprawy, a tytuł prawny
+   w zwijce „Sprawa" — po polsku i każde w jednym miejscu.
 
    STAN JEST NA WIADOMOŚCI, nie na osi: rozwinięcie jednego formularza nie ma
    prawa rozwijać drugiego, a oś bywa jedenastowiadomościowa. */
@@ -201,7 +228,24 @@ function TrescKarty({ tekst, nasza }: { tekst: string; nasza: boolean }) {
   </>;
 }
 
-export function Czat({ sprawa, czat, zalaczniki, edytor, kolumnaZdjec = false }: {
+/** Zdjęcia w kolumnie ekranu: `pokaz` przewija do zdjęcia, `znak` podaje numer `Z1`. */
+export interface ZdjeciaObok {
+  pokaz: (zalacznikId: number) => void;
+  znak?: (zalacznikId: number) => string | null;
+}
+
+/* ── DWIE DROGI ZDJĘĆ, NIGDY OBIE NARAZ ─────────────────────────────────────
+   `kolumnaZdjec` rysuje kolumnę zdjęć SAMA rozmowa — tak ma ją ekran dyskusji,
+   który poza zdjęciami nie ma obok czego postawić. `zdjeciaObok` oddaje
+   kolumnę ekranowi reklamacji, bo tam obok zdjęć stoją dowody biura i to, co
+   wysłaliśmy. Obie naraz dałyby dwie kolumny tych samych zdjęć, więc typ
+   pozwala na jedną z nich. */
+type ZdjeciaCzatu =
+  | { kolumnaZdjec?: boolean; zdjeciaObok?: undefined }
+  | { kolumnaZdjec?: false; zdjeciaObok?: ZdjeciaObok };
+
+export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = false,
+  zwinStarsze, bursztynTylkoOstatniej = false, kolumnaZdjec = false, zdjeciaObok }: ZdjeciaCzatu & {
   sprawa: SprawaCzatu;
   czat: WiadomoscReklamacji[];
   /** Załączniki SAMEJ sprawy — te spoza rozmowy. */
@@ -209,8 +253,15 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, kolumnaZdjec = false }:
   /* Edytor wstrzykiwany, nie wołany stąd: cały katalog `reklamacje/` trzyma
      komponenty czyste, a mutacje mieszkają w ekranie (wzorzec `skrzynka/`). */
   edytor?: React.ReactNode;
-  /** Zdjęcia w kolumnie obok rozmowy, a w wątku tylko odnośnik do nich. */
-  kolumnaZdjec?: boolean;
+  /* ── TRZY ZACHOWANIA NA ŻYCZENIE EKRANU ───────────────────────────────────
+     Rozmowę rysuje też ekran dyskusji i tam nic się nie zmienia: każde z nich
+     jest domyślnie wyłączone, a włącza je wyłącznie ekran reklamacji. */
+  /** Zgłoszenie stoi nad rozmową, poza przewijaniem — objaw zawsze w zasięgu oka. */
+  przypnijZgloszenie?: boolean;
+  /** Ile OSTATNICH wiadomości widać od razu; starsze chowa jeden przycisk. */
+  zwinStarsze?: number;
+  /** Bursztyn tylko na ostatniej wiadomości klienta, starsze cichną. */
+  bursztynTylkoOstatniej?: boolean;
 }) {
   /* Ile wiadomości Allegro widzi, a ilu jeszcze nie mamy. Rozmowa dociąga się
      taktem synchronizacji, więc świeża sprawa bywa przez chwilę niepełna —
@@ -240,6 +291,19 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, kolumnaZdjec = false }:
     koniec.current?.scrollIntoView?.({ block: "nearest" });
   }, [sprawa.id, czat.length]);
 
+  /* ── STARSZE WIADOMOŚCI ZWINIĘTE ─────────────────────────────────────────
+     Rozmowę czyta się od końca, a przy dwudziestu wiadomościach pierwszych
+     osiemnaście to historia, którą agent zna. Zwinięte zostają za JEDNYM
+     przyciskiem z liczbą — nic nie znika, a ostatnie słowa stoją na wierzchu.
+     Jedna schowana wiadomość nie dostaje przycisku, bo przycisk zająłby jej
+     miejsce i niczego by nie oszczędził. Rozwinięcie pamięta sprawę, więc
+     przejście do następnej znów pokazuje ją zwiniętą. */
+  const [rozwinieta, setRozwinieta] = useState<number | null>(null);
+  const nadmiar = zwinStarsze === undefined || rozwinieta === sprawa.id
+    ? 0 : Math.max(0, czat.length - zwinStarsze);
+  const schowanych = nadmiar >= 2 ? nadmiar : 0;
+  const widoczne = czat.slice(schowanych);
+
   /* ── ZGŁOSZENIE RAZ, NIE DWA (0.412.0) ──────────────────────────────────
      Allegro przy części spraw wpisuje ten sam tekst w dwa miejsca ładunku:
      w opis zgłoszenia i w pierwszą wiadomość kupującego. Ekran pokazywał oba,
@@ -258,40 +322,47 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, kolumnaZdjec = false }:
 
      ZAŁĄCZNIKI SPRAWY nie są dublem NIGDY: wiszą na sprawie, nie na
      wiadomości. Dubel zdejmuje więc zdanie, a nie sekcję. */
-  const pierwszaKlienta = czat.find((w) => w.autorRola === "BUYER")?.tresc ?? null;
-  const dubel = sprawa.opisZgloszenia !== null && pierwszaKlienta !== null
-    && zawieraOpis(pierwszaKlienta, sprawa.opisZgloszenia);
+  /* Przy zwiniętej rozmowie dublem jest tylko to, co WIDAĆ: gdy pierwsza
+     wiadomość klienta siedzi pod przyciskiem, zgłoszenie jest jedynym miejscem,
+     w którym ten objaw w ogóle stoi na ekranie. */
+  const pierwszaKlienta = czat.findIndex((w) => w.autorRola === "BUYER");
+  const dubel = sprawa.opisZgloszenia !== null && pierwszaKlienta >= schowanych
+    && pierwszaKlienta >= 0 && zawieraOpis(czat[pierwszaKlienta].tresc, sprawa.opisZgloszenia);
   const opisWart = !dubel;
+  const ostatniaKlienta = bursztynTylkoOstatniej
+    ? [...czat].reverse().find((w) => w.autorRola === "BUYER")?.id ?? null : null;
 
-  /* ── ROZMOWA PRZEWIJA SIĘ, WERDYKT STOI (0.418.0) ────────────────────────
+  /* ── ROZMOWA PRZEWIJA SIĘ SAMA (0.418.0) ─────────────────────────────────
      Zgłoszenie właściciela ze zrzutem: „werdykt nie jest przyklejony". Na
      zrzucie pasek werdyktu leżał w połowie wątku, między tekstem wiadomości
      a jej zdjęciem — bo cała kolumna była JEDNYM obszarem przewijania,
      w którym oś, pole odpowiedzi i werdykt płynęły razem.
 
-     Rozmowa z odpowiedzią przewija się w środku, a pasek werdyktu zostaje na
-     dole i nie ucieka. Werdykt stoi POD rozmową (0.412.0), więc nie trzeba do
-     niego przewijać jedenastu wiadomości. Pole odpowiedzi nie potrzebuje
-     osobnego pasa: przykleja się do krawędzi samo (niżej). */
-  /* ── ZDJĘCIA W KOLUMNIE OBOK ROZMOWY ─────────────────────────────────────
+     Przewija się wyłącznie rozmowa z odpowiedzią. Wszystko, co ma stać
+     w miejscu — werdykt reklamacji, pasek zakończenia dyskusji — rysuje
+     ekran poza tym komponentem. Pole odpowiedzi nie potrzebuje osobnego
+     pasa: przykleja się do krawędzi samo (niżej). */
+  /* ── ZDJĘCIA OBOK ROZMOWY ────────────────────────────────────────────────
      Zgłoszenie właściciela: zdjęcia zajmowały dużą część czatu. Kafel ma
      do 256 px wysokości, więc trzy zdjęcia z telefonu wypychały następną
      wiadomość poza ekran, a rozmowę czyta się od końca.
 
-     Zdjęcie idzie do prawej ćwiartki, a w wątku zostaje odnośnik w tym
-     samym miejscu. Kolejność czytania się nie zmienia, zmienia się tylko
-     wysokość wiadomości. Kolumna przewija się osobno, bo zdjęć bywa więcej
-     niż wiadomości.
+     Zdjęcie idzie do kolumny obok, a w wątku zostaje odnośnik w tym samym
+     miejscu. Kolejność czytania się nie zmienia, zmienia się tylko wysokość
+     wiadomości. Plik bez podglądu zostaje w wątku: to jedna linia z nazwą,
+     a odnośnik do niej byłby tej samej wysokości.
 
-     Plik bez podglądu zostaje w wątku: to jedna linia z nazwą, a odnośnik
-     do niej byłby tej samej wysokości. Bez zdjęć kolumny nie ma wcale, żeby
-     rozmowa nie traciła ćwiartki na pustkę. */
+     Kolumnę rysuje rozmowa (`kolumnaZdjec`, prawa ćwiartka) albo ekran
+     (`zdjeciaObok`). Własna kolumna rozmowy przewija się osobno, bo zdjęć
+     bywa więcej niż wiadomości, a bez zdjęć nie ma jej wcale, żeby rozmowa
+     nie traciła ćwiartki na pustkę. */
   const przedrostek = useId();
   const idZdjecia = (z: number) => `${przedrostek}-zdjecie-${z}`;
+  const wlasnaKolumna = kolumnaZdjec && !zdjeciaObok;
   const zdjecia = (lista: ZalacznikReklamacji[]) => lista.filter((z) => z.podglad);
   const pliki = (lista: ZalacznikReklamacji[]) =>
-    kolumnaZdjec ? lista.filter((z) => !z.podglad) : lista;
-  const grupyZdjec = !kolumnaZdjec ? [] : [
+    wlasnaKolumna || zdjeciaObok ? lista.filter((z) => !z.podglad) : lista;
+  const grupyZdjec = !wlasnaKolumna ? [] : [
     { klucz: "zgloszenie", podpis: "Zgłoszenie", lista: zdjecia(zalaczniki) },
     ...czat.map((w) => ({
       klucz: `w-${w.id}`,
@@ -307,24 +378,34 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, kolumnaZdjec = false }:
     el?.scrollIntoView?.({ block: "nearest" });
     el?.focus();
   };
+  const odnosniki = (lista: ZalacznikReklamacji[]) => zdjeciaObok
+    ? <OdnosnikiZdjec lista={zdjecia(lista)} onPokaz={zdjeciaObok.pokaz} znak={zdjeciaObok.znak} />
+    : zKolumna ? <OdnosnikiZdjec lista={zdjecia(lista)} onPokaz={pokazZdjecie} /> : null;
   const sekcjaZgloszenia = opisWart || pliki(zalaczniki).length > 0
-    || (zKolumna && zdjecia(zalaczniki).length > 0);
+    || ((zKolumna || Boolean(zdjeciaObok)) && zdjecia(zalaczniki).length > 0);
 
-  return <div className={zKolumna
-    ? "grid min-h-0 flex-1 grid-cols-[minmax(0,3fr)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)]"
-    : "flex min-h-0 flex-1 flex-col gap-3"}>
-    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
-    {sekcjaZgloszenia &&
-      <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-        <NaglowekSekcji jako="h3">
-          {opisWart ? "Zgłoszenie" : "Załączniki zgłoszenia"}</NaglowekSekcji>
-        {opisWart && (sprawa.opisZgloszenia === null
-          ? <p className="mt-1 text-sm text-slate-800">
-              Klient nie opisał sprawy własnymi słowami.</p>
+  const zgloszenie = sekcjaZgloszenia &&
+    <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <NaglowekSekcji jako="h3">
+        {opisWart ? "Zgłoszenie" : "Załączniki zgłoszenia"}</NaglowekSekcji>
+      {opisWart && (sprawa.opisZgloszenia === null
+        ? <p className="mt-1 text-sm text-slate-800">
+            Klient nie opisał sprawy własnymi słowami.</p>
+        /* Przypięte zgłoszenie stoi poza przewijaniem, więc długie zwija się
+           do czterech linii — inaczej zabrałoby rozmowie całą wysokość. */
+        : przypnijZgloszenie
+          ? <DlugaTresc tekst={sprawa.opisZgloszenia} className="mt-1 text-sm text-slate-800"
+              etykieta="Pokaż całe zgłoszenie" />
           : <Tresc tekst={sprawa.opisZgloszenia} className="mt-1 text-sm text-slate-800" />)}
-        {zKolumna && <OdnosnikiZdjec lista={zdjecia(zalaczniki)} onPokaz={pokazZdjecie} />}
-        <Zalaczniki reklamacjaId={sprawa.id} lista={pliki(zalaczniki)} />
-      </section>}
+      {odnosniki(zalaczniki)}
+      <Zalaczniki reklamacjaId={sprawa.id} lista={pliki(zalaczniki)} />
+    </section>;
+
+  const rozmowa = <div className="flex min-h-0 flex-1 flex-col">
+    {przypnijZgloszenie && zgloszenie &&
+      <div className="shrink-0 border-b border-slate-200 px-4 py-3">{zgloszenie}</div>}
+    <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 py-3">
+    {!przypnijZgloszenie && zgloszenie}
 
     {/* DWA POWODY NIEPEŁNEJ ROZMOWY I DWA RÓŻNE ZDANIA (0.273.0). Do 0.272.0
         stało tu jedno: „Reszta dojdzie następną synchronizacją". Przy rozmowie
@@ -342,14 +423,24 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, kolumnaZdjec = false }:
     {czat.length === 0
       ? <Pusto waga="lista">
           Rozmowy jeszcze nie pobrano.</Pusto>
-      : <ol className="flex flex-col gap-2">
-          {czat.map((w) => {
+      : <>
+        {schowanych > 0 && <button type="button" aria-expanded="false"
+          onClick={() => setRozwinieta(sprawa.id)}
+          className="inline-flex min-h-6 items-center gap-1 self-start text-xs font-semibold
+            text-slate-700 underline underline-offset-2 hover:text-slate-900">
+          <ChevronUp size={14} aria-hidden="true" />
+          {ile(schowanych, "wcześniejsza wiadomość", "wcześniejsze wiadomości", "wcześniejszych wiadomości")}
+        </button>}
+        <ol className="flex flex-col gap-2">
+          {widoczne.map((w) => {
             /* Rola spoza zbioru dostaje kształt NIEZNANEGO, a nie kształt
                klienta: schemat Allegro może dołożyć wartość, a wtedy ekran ma
                powiedzieć „nie wiem, kto to", zamiast zgadywać stronę. */
             const rola = rolaWiadomosci(w);
+            const cicha = ostatniaKlienta !== null && w.autorRola === "BUYER" && w.id !== ostatniaKlienta;
+            const wyglad = cicha ? STARSZA_KLIENTA : rola;
             return <li key={w.id}
-              className={`rounded-lg border p-3 ${rola.klasa} ${rola.listwa} ${
+              className={`rounded-lg border p-3 ${wyglad.klasa} ${wyglad.listwa} ${
                 rola.nasza ? "ml-8" : "mr-8"}`}>
               <div className="flex items-center gap-2 text-xs">
                 <rola.Ikona size={13} aria-hidden="true" className="shrink-0 text-slate-600" />
@@ -363,24 +454,29 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, kolumnaZdjec = false }:
                 <span className="ml-auto text-slate-600">{czas(w.utworzonoAt)}</span>
               </div>
               <TrescKarty tekst={w.tresc} nasza={rola.nasza} />
-              {zKolumna && <OdnosnikiZdjec lista={zdjecia(w.zalaczniki)} onPokaz={pokazZdjecie} />}
+              {odnosniki(w.zalaczniki)}
               <Zalaczniki reklamacjaId={sprawa.id} lista={pliki(w.zalaczniki)} />
             </li>;
           })}
-        </ol>}
+        </ol>
+      </>}
 
     {/* ── ODPOWIEDŹ JEST OSTATNIĄ WYPOWIEDZIĄ WĄTKU (0.549.0) ──────────────
         Decyzja właściciela z 28 września, ten sam układ co w skrzynce. Pole
         stoi w pasie przewijania, bo pod ręką trzyma je sam edytor: pusty jest
         jednym rzędem przyklejonym do dolnej krawędzi, a pasek wysyłki pływa.
         Osobny pas pod rozmową zabierałby jej stałą wysokość przy każdej
-        sprawie. Werdykt zostaje poza przewijaniem (`Werdykt.tsx`), bo
-        nieodwracalne ma stać w jednym miejscu. */}
+        sprawie. Werdykt stoi poza rozmową (`Werdykt.tsx`), bo nieodwracalne
+        ma stać w jednym miejscu. */}
     {edytor}
     <div ref={koniec} aria-hidden="true" />
     </div>
+  </div>;
 
-    {zKolumna && <aside aria-label="Zdjęcia w sprawie"
+  if (!zKolumna) return rozmowa;
+  return <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,3fr)_minmax(0,1fr)] grid-rows-[minmax(0,1fr)]">
+    {rozmowa}
+    <aside aria-label="Zdjęcia w sprawie"
       className="flex min-h-0 flex-col gap-3 overflow-y-auto border-l border-slate-200 bg-slate-50 px-2 py-3">
       <NaglowekSekcji jako="h3">Zdjęcia</NaglowekSekcji>
       {grupyZdjec.map((g) => <section key={g.klucz} aria-label={`Zdjęcia: ${g.podpis}`}>
@@ -392,12 +488,12 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, kolumnaZdjec = false }:
             <div id={idZdjecia(z.id)} tabIndex={-1}
               className="rounded focus:outline-none focus:ring-2 focus:ring-slate-400">
               <ListaZalacznikow className="!mt-0">
-                <ZalacznikReklamacji reklamacjaId={sprawa.id} z={z} />
+                <ZalacznikSprawy reklamacjaId={sprawa.id} z={z} />
               </ListaZalacznikow>
             </div>
           </React.Fragment>)}
         </div>
       </section>)}
-    </aside>}
+    </aside>
   </div>;
 }

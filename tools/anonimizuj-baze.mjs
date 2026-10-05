@@ -198,6 +198,7 @@ const JAWNE = {
   "decyzja_klasyfikacji.kategoria_czlowieka": [R.ZOSTAJE, "słownik"],
   "decyzja_klasyfikacji.akcja_modelu": [R.ZOSTAJE, "słownik"],
   "delivery.dostawca": [R.ZOSTAJE, "nazwa dostawcy firmy"],
+  "reklamacja_u_dostawcy.dostawca": [R.ZOSTAJE, "symbol dostawcy firmy z Subiekta"],
   "delivery.data_dok": [R.ZOSTAJE, "data dokumentu"],
   "delivery_line.tw_nazwa": [R.ZOSTAJE, "nazwa towaru z kartoteki"],
   "delivery_line.lok_oczekiwana": [R.ZOSTAJE, "lokalizacja w magazynie"],

@@ -19,6 +19,14 @@ describe("powłoka panelu", () => {
     expect(tsx.match(/rounded-full bg-wertis-amber/g)).toHaveLength(1);
   });
 
+  it("zakładka „Dyskusje” niesie czerwony licznik alarmu", () => {
+    /* Rama nie wykonuje się w testach, więc wpięcie sprawdzamy w tekście.
+       Na reklamacjach pasek alarmu milknie i tylko ten licznik woła o
+       dyskusje bez odpowiedzi; jego zachowanie liczy `AlarmDyskusji.test.tsx`. */
+    expect(tsx).toContain('{z.do === "/obsluga/dyskusje" && <LicznikAlarmuDyskusji />}');
+    expect(tsx).toContain("<PasekAlarmuDyskusji />");
+  });
+
   it("znaczek klawisza i strażnik pola nie mają lokalnych kopii", () => {
     for (const zrodlo of [zrodloSkrotow, zrodloKlawiszy]) {
       expect(zrodlo).not.toMatch(/const Klawisz\b/);
