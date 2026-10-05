@@ -1,14 +1,16 @@
-import React, { useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import { Check, Database, PackageSearch, X as Krzyzyk } from "lucide-react";
-import { EtykietaWartosci, NaglowekSekcji, odmien } from "../ui";
-import type { CenaPoziomu, KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
+import { EtykietaWartosci, NaglowekSekcji, ile, odmien } from "../ui";
+import type { CenaPoziomu, DopasowanieKartoteki, KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
+import { BrakPolaczenia } from "../api/klient";
 import { useWiedzaTowaru } from "../api/wiedza";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
 import { PrzyciskTowaru } from "../towar/Szuflada";
-import { PROG_ZNAKOW } from "./DlugiTekst";
+import { dlugi } from "./DlugiTekst";
+import { ODNOSNIK_CICHY } from "./odnosniki";
 
 /**
  * Towar z Subiekta przy rozmowie (0.179.0).
@@ -36,9 +38,12 @@ import { PROG_ZNAKOW } from "./DlugiTekst";
  * z Subiekta, a podpis przy kartotece mówi, czy stoi za nią SKU z Allegro,
  * czy decyzja człowieka.
  */
-export function TowarRozmowy({ oferta, rozmowaId }: {
+export function TowarRozmowy({ oferta, rozmowaId, skuPozycji = null }: {
   oferta: OfertaRozmowy;
   rozmowaId: number;
+  /** SKU pozycji zamówienia tej oferty. Serwer bez treści oferty dopasowuje
+   *  kartotekę właśnie po nim i pisze to samo zdanie „SKU oferty „X"". */
+  skuPozycji?: string | null;
 }) {
   const [szukam, setSzukam] = useState(false);
   const zapisz = useWskazKartoteke();
@@ -58,7 +63,7 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
   /* ── JEDEN RAZ KAŻDY FAKT (23 września 2026) ──────────────────────────────
      Zrzut właściciela: „prawa kolumna jest wciąż chaotyczna". Nazwa towaru
      stała na ekranie trzy razy, symbol cztery, stan i półka dwa. Pasmo
-     odpowiedzi nad zakładkami (`PasmoOdpowiedzi.tsx`) mówi już „to jest",
+     odpowiedzi nad kolumną (`PasmoOdpowiedzi.tsx`) mówi już „to jest",
      „mamy" i półkę — pod tym samym warunkiem, pod którym rysuje się ta sekcja:
      kartoteka potwierdzona i odczytana. Tu zostaje więc to, czego pasmo NIE
      mówi: zdjęcie z półki, proporcja wolne–zarezerwowane, identyfikatory,
@@ -66,28 +71,35 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
 
      ŹRÓDŁO I RUCH W NAGŁÓWKU. „SKU oferty…" i „wskaż inną kartotekę" stały
      każde w osobnym wierszu pod nazwą. Stoją teraz w linii nagłówka: źródło
-     jest podpisem sekcji (§4.3), a zmiana kartoteki — jej jedynym ruchem. */
-  return <div className="space-y-3 p-4">
+     jest podpisem sekcji (§4.3), a zmiana kartoteki — jej jedynym ruchem.
+
+     BEZ WŁASNEGO WCIĘCIA. Oddech daje treść wiersza „Oferta i towar", więc
+     tekst stoi na tej samej osi co cała kolumna. Własne `p-4` dokładało drugie
+     szesnaście pikseli i treść stała prawie dwa razy dalej od krawędzi. */
+  return <div className="space-y-3">
     <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
       {/* Ten sam kształt, co „Oferta" i „Zamówienie" wyżej (0.249.0): trzy
           sekcje tej samej rangi miały trzy różne kształty, więc nie było jak
           odczytać, że stoją na jednym poziomie. */}
       <NaglowekSekcji ikona={<Database size={13} />}>Subiekt GT</NaglowekSekcji>
-      {/* Puste `sku` w pamięci znaczy „wskazał człowiek". Serwer pisze to
-          zdanie; panel go nie układa drugi raz. */}
-      {potwierdzona !== null && <span className="text-podpis text-slate-500">{k.zrodlo}</span>}
-      {/* OSOBNA plakietka: §4.3 nie miesza źródeł, a to jest nasza baza
-          wiedzy, nie dane z ERP. */}
+      {/* Puste `sku` w pamięci znaczy „wskazał człowiek". Zdanie pisze serwer,
+          a panel skraca je tylko przy powiązaniu po SKU (`zrodloKartoteki`). */}
+      {potwierdzona !== null && <span className="text-podpis text-slate-500" title={k.zrodlo}>
+        {zrodloKartoteki(k, oferta.pobrana?.sku ?? skuPozycji)}</span>}
+      {/* OSOBNE zdanie w barwie wiedzy: §4.3 nie miesza źródeł, a to jest
+          nasza baza wiedzy, nie dane z ERP. Zwykłym pismem, bo plakietka
+          w ramce i wersalikach ważyła jak ustalenie, a to liczba wpisów. */}
       {wiedza.data && (wiedza.data.potwierdzone.length > 0 || wiedza.data.negatywne.length > 0) &&
-        <span className="rounded border border-emerald-300 bg-emerald-50 px-1.5 py-0.5 text-podpis font-bold uppercase tracking-wide text-emerald-800">
-          Wiedza: {wiedza.data.potwierdzone.length} potwierdzonych · {wiedza.data.negatywne.length} negatywnych
+        <span className="text-podpis font-semibold text-ranga-ok">
+          wiedza: {ile(wiedza.data.potwierdzone.length, "potwierdzone", "potwierdzone", "potwierdzonych")}
+          {" · "}{ile(wiedza.data.negatywne.length, "negatywne", "negatywne", "negatywnych")}
         </span>}
       {/* Powiązanie po sygnaturze nie ma czego zdjąć — wróciłoby przy
           następnym odczycie; właściwym ruchem jest wskazanie INNEJ kartoteki.
           Zdjąć da się WSKAZANIE człowieka (kasuje pamięć). */}
       {potwierdzona !== null && k.pewnosc === "sku" && !szukam && <button type="button"
         onClick={() => setSzukam(true)}
-        className="ml-auto text-podpis text-slate-500 underline underline-offset-2 hover:text-slate-800">
+        className={`ml-auto text-podpis ${ODNOSNIK_CICHY}`}>
         wskaż inną kartotekę</button>}
       {potwierdzona !== null && k.pewnosc === "pamiec" && <button type="button" title="Zdejmij powiązanie"
         disabled={zapisz.isPending} onClick={() => ustaw(null)}
@@ -105,25 +117,32 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
               symbol={k.symbol} />
             <div className="min-w-0 flex-1">
               {karta.isLoading && <p className="text-xs text-slate-500">Wczytuję stan z Subiekta…</p>}
-              {karta.error && <p className="text-xs text-red-700">{(karta.error as Error).message}</p>}
-              {/* Wejście do przekroju towaru (0.502.0) — `towar/Szuflada.tsx`. */}
-              {karta.data && <PrzyciskTowaru twId={potwierdzona} className="text-xs font-semibold text-sky-800">
+              {/* Brak połączenia ogłasza raz pasek pod nagłówkiem (`Polaczenie.tsx`),
+                  a pasmo nad kolumną mówi przy nim „nie wiemy". Trzeci, czerwony
+                  zapis tej samej awarii tutaj byłby sprzeczny z nimi. */}
+              {karta.error && !(karta.error instanceof BrakPolaczenia)
+                && <p className="text-xs text-ranga-zle">{(karta.error as Error).message}</p>}
+              {/* Wejście do przekroju towaru — `towar/Szuflada.tsx`. Błękit, bo to
+                  praca w panelu, jak każdy taki ruch w kolumnie (`odnosniki.tsx`). */}
+              {karta.data && <PrzyciskTowaru twId={potwierdzona} className="text-xs font-semibold text-sky-700 hover:text-sky-900">
                 przekrój towaru</PrzyciskTowaru>}
               {karta.data && <StanTowaru karta={karta.data} />}
             </div>
           </div>
           {karta.data && <>
+            {/* OPIS PRZED CENAMI: w opisie stoją wymiary i gwinty, czyli
+                odpowiedzi na najczęstsze pytania. Przy 1366 px wchodzi wtedy
+                do pierwszego kadru, a ceny i tak mają swoją oś niżej. */}
+            <OpisKartoteki desc={karta.data.desc} />
+            {/* WYŁĄCZNIE ODCZYT — sekcja jest „Źródło: Subiekt GT" (§4.3 nie
+                miesza źródeł), a wiedza stoi tu jako osobny blok w swojej
+                barwie. Dopisuje się w Doborze albo w Wiedza → Sprawdź kartotekę. */}
+            {wiedza.data?.pasowania && <PasowaniaKartoteki dane={wiedza.data.pasowania} />}
             <CenyKartoteki ceny={karta.data.ceny ?? []} ramka={false}
               oferta={oferta.pobrana?.cenaGrosze != null
                 ? { grosze: oferta.pobrana.cenaGrosze, waluta: oferta.pobrana.waluta ?? "PLN" } : null} />
-            {/* WYŁĄCZNIE ODCZYT — sekcja jest „Źródło: Subiekt GT" (§4.3 nie
-                miesza źródeł), a wiedza stoi tu jako osobna plakietka.
-                Dopisuje się w Doborze albo w Wiedza → Sprawdź kartotekę. */}
-            {wiedza.data?.pasowania && <PasowaniaKartoteki dane={wiedza.data.pasowania} />}
-            <OpisKartoteki desc={karta.data.desc} />
-            {/* Wstawki do szkicu tu NIE MA od 0.404.0 — stoi w paśmie
-                odpowiedzi nad zakładkami. Dwoje drzwi do jednego pola to
-                usterka, którą tamto wydanie naprawiło. */}
+            {/* Wstawki do szkicu tu NIE MA — stoi w paśmie odpowiedzi nad
+                kolumną. Dwoje drzwi do jednego pola to usterka. */}
           </>}
         </>
       : <div className="text-xs">
@@ -161,12 +180,30 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
                   onWybierz={(t: TowarZWyszukiwarki | null) => t && ustaw(t.id)} />
               </div>
             : <button type="button" onClick={() => setSzukam(true)}
-                className="mt-2 block text-slate-500 underline underline-offset-2 hover:text-slate-800">
+                className={`mt-2 block ${ODNOSNIK_CICHY}`}>
                 wskaż kartotekę</button>}
         </div>}
 
-    {zapisz.error && <p className="text-xs text-red-700">{(zapisz.error as Error).message}</p>}
+    {zapisz.error && <p className="text-xs text-ranga-zle">{(zapisz.error as Error).message}</p>}
   </div>;
+}
+
+/**
+ * Podpis źródła kartoteki (§4.3).
+ *
+ * BEZ DRUGIEGO SKU. Przy powiązaniu po sygnaturze serwer pisze „SKU oferty
+ * „X"", a to samo X stoi w karcie zakupu, a przy zamówieniu także w paśmie
+ * przy „Zamówił". Podpis
+ * mówi wtedy samą regułę, a pełne zdanie zostaje w dymku. Zdanie z czymkolwiek
+ * więcej, np. z dopiskiem o zmienionej sygnaturze, stoi w całości, bo dopisek
+ * jest ostrzeżeniem, a nie powtórzeniem. Nieznany kształt zdania też.
+ */
+export function zrodloKartoteki(k: Pick<DopasowanieKartoteki, "pewnosc" | "zrodlo">,
+  sku: string | null | undefined): string {
+  const s = sku?.trim();
+  if (k.pewnosc !== "sku" || !s) return k.zrodlo;
+  const reszta = k.zrodlo.replace(s, "").replace(/[„”"]/g, "").trim();
+  return reszta === "SKU oferty" ? "SKU oferty = symbol kartoteki" : k.zrodlo;
 }
 
 /**
@@ -193,22 +230,47 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
  */
 function OpisKartoteki({ desc }: { desc?: string }) {
   const [calosc, setCalosc] = useState(false);
+  /* `null` znaczy „nie zmierzono": element bez wysokości (jsdom, ukryty
+     rodzic) nie mówi nic o obcięciu. */
+  const [przyciete, setPrzyciete] = useState<boolean | null>(null);
+  const ref = useRef<HTMLParagraphElement>(null);
   const tresc = (desc ?? "").trim();
+  /* OBCIĘCIE MIERZY PRZEGLĄDARKA. Sam próg znaków przepuszczał opis krótszy
+     od progu, który i tak nie mieścił się w sześciu liniach: zawinięta
+     pierwsza linia zjadała szóstą, a wielokropek urywał moment dokręcenia
+     śruby bez niczego do kliknięcia. W wąskiej kolumnie to częsty przypadek,
+     a szerokość kolumny zmienia się z oknem, więc pomiar idzie też po niej. */
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || calosc) return;
+    const zmierz = () => {
+      if (el.clientHeight > 0) setPrzyciete(el.scrollHeight > el.clientHeight + 1);
+    };
+    zmierz();
+    if (typeof ResizeObserver === "undefined") return;
+    const obserwator = new ResizeObserver(zmierz);
+    obserwator.observe(el);
+    return () => obserwator.disconnect();
+  }, [tresc, calosc]);
   if (!tresc) return null;
 
-  return <div className="border-t border-slate-200 pt-3">
-    <NaglowekSekcji jako="p" className="mb-1">Opis kartoteki</NaglowekSekcji>
-    <p className={`whitespace-pre-wrap text-tresc text-slate-700 ${calosc ? "" : "line-clamp-6"}`}>
+  /* Przełącznik stoi tylko wtedy, gdy jest co rozwijać. Bez pomiaru
+     rozstrzyga próg znaków i linii wspólny z osią rozmowy (`dlugi`).
+     Przełącznik stoi w linii nagłówka, więc nie dokłada wysokości bloku. */
+  const pokazPrzelacznik = calosc || (przyciete ?? dlugi(tresc));
+  /* Pismo nie większe od tytułu wiersza: opis jest treścią bloku, a nie
+     nagłówkiem nad nim, więc stoi w tym samym rozmiarze co reszta kolumny.
+     Sześć linii, a nie osiem, bo domyślna skala Tailwinda kończy się na
+     sześciu, a `line-clamp-8` nie powstałoby w arkuszu i opis jechałby CAŁY. */
+  return <div>
+    <div className="mb-1 flex items-baseline gap-2">
+      <NaglowekSekcji jako="p">Opis kartoteki</NaglowekSekcji>
+      {pokazPrzelacznik && <button type="button" aria-expanded={calosc} onClick={() => setCalosc((c) => !c)}
+        className={`ml-auto text-xs ${ODNOSNIK_CICHY}`}>
+        {calosc ? "zwiń opis" : "pokaż cały opis"}</button>}
+    </div>
+    <p ref={ref} className={`whitespace-pre-wrap text-sm text-slate-700 ${calosc ? "" : "line-clamp-6"}`}>
       {tresc}</p>
-    {/* Przycisk tylko wtedy, gdy jest co rozwijać. Linii nie liczymy w kodzie
-        — `line-clamp` robi to w przeglądarce. Sześć, a nie osiem, bo domyślna
-        skala Tailwinda kończy się na sześciu, a `line-clamp-8` nie powstałoby
-        w arkuszu i opis jechałby CAŁY. Próg znaków jest wspólny z osią
-        rozmowy (0.523.0): dwa zapisy tej samej liczby rozjechałyby się
-        przy pierwszej poprawce. Wierszy nie liczymy, bo sześć się mieści. */}
-    {tresc.length > PROG_ZNAKOW && <button type="button" onClick={() => setCalosc((c) => !c)}
-      className="mt-1 text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
-      {calosc ? "zwiń opis" : "pokaż cały opis"}</button>}
   </div>;
 }
 
@@ -228,6 +290,7 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
         + (karta.zamienniki.obce.length ? ` (+${karta.zamienniki.obce.length} numery obce w opisie)` : "")
       : karta.zamienniki?.obce.length ? `brak naszych; ${karta.zamienniki.obce.length} numery obce w opisie` : "brak"],
   ];
+  const braki = pozostale.filter(([, w]) => w === "brak").map(([nazwa]) => (nazwa === "EAN" ? nazwa : nazwa.toLowerCase()));
   /* ── ODPOWIEDŹ WYCHODZI PRZED DANE (0.249.0) ────────────────────────────────
      Osiem wierszy stało w jednej wadze 12 px, a dwa z nich są odpowiedzią na
      pytanie, po które agent w ogóle otwiera tę kolumnę: CZY MAMY i GDZIE.
@@ -260,17 +323,15 @@ function StanTowaru({ karta }: { karta: KartaTowaru }) {
       {pozostale.filter(([, w]) => w !== "brak").map(([nazwa, wartosc]) =>
         <div key={nazwa} className="flex items-baseline gap-2 text-xs">
           <span className="w-24 shrink-0 text-slate-500">{nazwa}</span>
-          <span className="font-semibold text-slate-900">{wartosc}</span>
+          {/* `min-w-0` i łamanie słów: przy kolumnie 256 px EAN wychodził
+              poza krawędź i kolumna przewijała się w bok. */}
+          <span className="min-w-0 break-words font-semibold text-slate-900">{wartosc}</span>
         </div>)}
-      {/* BRAK JAKO OBRYS, NIE WIERSZ (23 września 2026). Trzy wiersze „brak"
-          zajmowały tyle miejsca co wartości. Zostają przerywane plakietki
-          z nazwą — fakt „tego nie mamy" widać, ale nie waży jak ustalenie. */}
-      {pozostale.some(([, w]) => w === "brak") && <div className="flex flex-wrap gap-1.5 pt-0.5">
-        {pozostale.filter(([, w]) => w === "brak").map(([nazwa]) =>
-          <span key={nazwa} title={`${nazwa}: brak`}
-            className="rounded-full border border-dashed border-slate-300 px-2 py-0.5 text-podpis text-slate-600">
-            {nazwa}<span className="sr-only">: brak</span></span>)}
-      </div>}
+      {/* BRAK JEDNĄ LINIĄ, NIE WIERSZAMI. Trzy wiersze „brak" zajmowały tyle
+          miejsca co wartości. Fakt „tego nie mamy" zostaje, znika obrys, który
+          ważył jak ustalenie. Nazwy małą literą, bo to ciąg zdania, a „EAN"
+          jest skrótem i zostaje wersalikami. */}
+      {braki.length > 0 && <p className="pt-0.5 text-podpis text-slate-500">brak: {braki.join(" · ")}</p>}
       {karta.magazyny.length > 0 && <p className="pt-0.5 text-podpis text-slate-500">
         Inne magazyny: {karta.magazyny.map((m) => `${m.kod} ${m.stan}`).join(" · ")}
       </p>}
@@ -367,12 +428,14 @@ export function polozenieOferty(ceny: CenaPoziomu[], oferta: { grosze: number; w
   if (brutto.length === 0) return null;
   const najnizszy = brutto.reduce((a, b) => (b.grosze < a.grosze ? b : a));
   const najwyzszy = brutto.reduce((a, b) => (b.grosze > a.grosze ? b : a));
-  const o = zlote(oferta.grosze, oferta.waluta);
+  /* Zdanie mówi samo POŁOŻENIE. Kwotę oferty mówi karta zakupu, dymek
+     kropki i nazwa figury dla czytnika ekranu; czwarty zapis tej samej
+     liczby w jednym zdaniu zasłaniał to, co zdanie ma powiedzieć. */
   const zdanie = oferta.grosze > najwyzszy.grosze
-    ? `Oferta ${o} stoi ${Math.round((oferta.grosze / najwyzszy.grosze - 1) * 100)}% nad najwyższym poziomem (${najwyzszy.nazwa} ${zlote(najwyzszy.grosze, oferta.waluta)}).`
+    ? `Oferta stoi ${Math.round((oferta.grosze / najwyzszy.grosze - 1) * 100)}% nad najwyższym poziomem (${najwyzszy.nazwa} ${zlote(najwyzszy.grosze, oferta.waluta)}).`
     : oferta.grosze < najnizszy.grosze
-      ? `Oferta ${o} stoi ${Math.round((1 - oferta.grosze / najnizszy.grosze) * 100)}% pod najniższym poziomem (${najnizszy.nazwa} ${zlote(najnizszy.grosze, oferta.waluta)}).`
-      : `Oferta ${o} mieści się między poziomami kartoteki.`;
+      ? `Oferta stoi ${Math.round((1 - oferta.grosze / najnizszy.grosze) * 100)}% pod najniższym poziomem (${najnizszy.nazwa} ${zlote(najnizszy.grosze, oferta.waluta)}).`
+      : "Oferta mieści się między poziomami kartoteki.";
   return { min: Math.min(najnizszy.grosze, oferta.grosze), max: Math.max(najwyzszy.grosze, oferta.grosze), zdanie };
 }
 
@@ -383,7 +446,7 @@ function OsCen({ ceny, oferta }: { ceny: CenaPoziomu[]; oferta: { grosze: number
   /* Margines 4% z obu stron, żeby skrajna kropka nie wisiała na krawędzi. */
   const x = (g: number) => `${4 + ((g - p.min) / rozpietosc) * 92}%`;
   const poziomy = grupujCeny(ceny).filter(({ cena: c }) => !brakBrutto(c) && c.waluta === oferta.waluta);
-  return <figure className="mt-2" aria-label="Cena oferty na tle poziomów kartoteki">
+  return <figure className="mt-2" aria-label={`Cena oferty ${zlote(oferta.grosze, oferta.waluta)} na tle poziomów kartoteki`}>
     <div className="relative h-6" aria-hidden>
       <div className="absolute inset-x-0 top-1/2 h-px bg-slate-300" />
       {poziomy.map(({ cena: c, nazwy }) => <span key={c.poziom} title={`${nazwy.join(", ")} · ${zlote(c.bruttoGrosze, c.waluta)}`}
@@ -410,7 +473,9 @@ export function CenyKartoteki({ ceny, ramka = true, oferta = null }: {
   oferta?: { grosze: number; waluta: string } | null;
 }) {
   if (ceny.length === 0) return null;
-  return <div className={ramka ? "rounded-lg border border-slate-200 p-3" : "border-t border-slate-200 pt-3"}>
+  /* W skrzynce bez klasy: odstęp od bloku wyżej daje rodzic, a kreski
+     wewnątrz bloku kolumna nie ma. Reklamacje zostawiają ramkę. */
+  return <div className={ramka ? "rounded-lg border border-slate-200 p-3" : undefined}>
     {ramka
       ? <EtykietaWartosci className="block">Ceny · Subiekt GT</EtykietaWartosci>
       : <NaglowekSekcji jako="p">Ceny</NaglowekSekcji>}
@@ -472,7 +537,7 @@ function PasowaniaKartoteki({ dane }: { dane: PasowaniaTowaru }) {
       {t.przezZamiennik && <span className="ml-1 text-podpis text-slate-500">przez zamiennik</span>}
       <p className="text-podpis text-slate-500">{t.zdanie}</p>
     </li>;
-  return <div className="border-t border-slate-200 pt-3">
+  return <div>
     <NaglowekSekcji jako="p" ton="text-emerald-800" className="mb-1">Wiedza: pasowania części</NaglowekSekcji>
     {dane.pasujace.length > 0 && <>
       <p className="text-podpis font-semibold text-slate-600">Do tej części pasują</p>

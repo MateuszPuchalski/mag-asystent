@@ -171,9 +171,14 @@ describe("dobór — kandydaci", () => {
     expect(within(numer).getByText("Szarpak rozrusznika NAC")).toBeInTheDocument();
     expect(within(screen.getByRole("region", { name: "Z bazy wiedzy" })).getByText("Linka rozrusznika"))
       .toBeInTheDocument();
-    const podobne = screen.getByText("Podobne po nazwie (1)").closest("details")!;
-    expect(podobne).not.toHaveAttribute("open");
-    expect(within(podobne).getByText("Szarpak uniwersalny")).not.toBeVisible();
+    /* Przycisk z `aria-expanded`, nie `<details>`: jeden idiom rozwijania
+       w całej kolumnie, a stan słyszy czytnik ekranu. */
+    const podobne = screen.getByRole("button", { name: /Podobne po nazwie \(1\)/ });
+    expect(podobne).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Szarpak uniwersalny")).toBeNull();
+    await userEvent.click(podobne);
+    expect(podobne).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Szarpak uniwersalny")).toBeInTheDocument();
   });
 
   it("same podobne stoją otwarte — zwinięcie schowałoby wszystko", async () => {
@@ -196,6 +201,9 @@ describe("dobór — kandydaci", () => {
     expect(powod).toHaveAttribute("title", expect.stringContaining("zastosowanie do NAC LS 46-450"));
     const linka = screen.getByText("Linka rozrusznika").closest("li")!;
     expect(within(linka).getByText(/kilkoma silnikami/)).toBeInTheDocument();
+    /* Pismo nie większe od tytułu wiersza kolumny. */
+    expect(screen.getByText("Szarpak rozrusznika NAC")).not.toHaveClass("text-tresc");
+    await userEvent.click(screen.getByRole("button", { name: /Podobne po nazwie/ }));
     const zero = screen.getByText("Szarpak uniwersalny").closest("li")!;
     expect(within(zero).getByText("dostępne 0")).toHaveClass("text-ranga-zle");
   });

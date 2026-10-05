@@ -368,8 +368,8 @@ export function useWskazOferte() {
  * Gdzie jest paczka zamówienia tej rozmowy (23 września 2026).
  *
  * Bliźniak `useSprawdzPrzesylke` z reklamacji: dwa żądania u Allegro, więc
- * na jawne kliknięcie. Unieważniamy samą rozmowę — stan paczki stoi w jej
- * bloku zamówienia, nie w kolejce.
+ * na jawne kliknięcie. Unieważniamy samą rozmowę — stan paczki jest częścią
+ * jej zamówienia (`zamowienie.przesylka`), nie kolejki.
  */
 export function useSprawdzPrzesylkeRozmowy() {
   const qc = useQueryClient();

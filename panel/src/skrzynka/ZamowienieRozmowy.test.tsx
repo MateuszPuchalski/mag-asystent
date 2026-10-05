@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { PozycjaZamowienia, WpisOsi, ZamowienieRozmowy as Dane } from "../api/typy";
@@ -6,10 +6,8 @@ import type { PozycjaZamowienia, WpisOsi, ZamowienieRozmowy as Dane } from "../a
 /* Kafle zdjęć zastępujemy płytkami z ich wejściem: test pilnuje, ŻE oba
    źródła stoją przy pozycji i co dostają, a nie jak wygląda obraz. */
 const wskaz = vi.fn();
-const sprawdz = vi.fn();
 vi.mock("../api/rozmowy", () => ({
   useWskazOferte: () => ({ mutate: wskaz, isPending: false, error: null }),
-  useSprawdzPrzesylkeRozmowy: () => ({ mutate: sprawdz, isPending: false, error: null }),
 }));
 vi.mock("../towar/Kafel", () => ({
   Kafel: ({ twId }: { twId: number | null }) => <div data-testid="kafel-subiekt" data-tw={twId ?? "brak"} />,
@@ -19,24 +17,18 @@ vi.mock("../towar/Kafel", () => ({
 const { ZamowienieRozmowy } = await import("./ZamowienieRozmowy");
 const { brakPowiazania } = await import("./Rozmowa");
 
-/* Blok zamówienia nad osią (0.166.0). Trzy stany i każdy mówi co innego:
-   numer z odnośnikiem, treść z pozycjami, albo zdanie, że treść dopiero
-   przyjedzie — milczenie w tym miejscu wyglądałoby jak usterka. */
+/* Lista pozycji zamówienia w kolumnie. Dwa stany i każdy mówi co innego:
+   pozycje z nazwą i ceną albo zdanie, że treść dopiero przyjedzie —
+   milczenie w tym miejscu wyglądałoby jak usterka. Numer, odnośnik, sumę
+   i paczkę mówią karta zakupu i blok paczki, więc lista ich nie powtarza. */
 const dane = (n: Partial<Dane> = {}): Dane => ({
   externalId: "2f8c1a3e-9b7d-4c1e-8a2b-000000000001",
   link: "https://salescenter.allegro.com/orders/2f8c1a3e", pobrane: null, przesylka: null, ...n,
 });
 
 describe("Zamówienie przy rozmowie", () => {
-  it("przed dociągnięciem: numer, odnośnik i zdanie o synchronizacji, bez przycisku zapisu", () => {
+  it("przed dociągnięciem: zdanie o synchronizacji, bez przycisku zapisu", () => {
     render(<ZamowienieRozmowy zamowienie={dane()} rozmowaId={1} />);
-    /* UUID jest SKRÓCONY od 0.249.0: pełne trzydzieści sześć znaków zjadało
-       pół wiersza nagłówka, a nikt ich z ekranu nie przepisuje. Całość zostaje
-       w podpowiedzi i pod przyciskiem kopiowania — nie znika. */
-    expect(screen.getByText("2f8c1a3e…")).toHaveAttribute(
-      "title", "2f8c1a3e-9b7d-4c1e-8a2b-000000000001");
-    expect(screen.getByRole("link", { name: /Otwórz w Allegro/ }))
-      .toHaveAttribute("href", "https://salescenter.allegro.com/orders/2f8c1a3e");
     expect(screen.getByText(/jeszcze nie pobrano/)).toBeInTheDocument();
     /* „Zero zapisu przy patrzeniu": ekran rozmowy nie dociąga niczego sam. */
     expect(screen.queryByRole("button", { name: /Dociągnij/ })).toBeNull();
@@ -54,14 +46,16 @@ describe("Zamówienie przy rozmowie", () => {
     sumaGrosze: 6098, waluta: "PLN", kupionoAt: "2026-08-30T11:00:00Z", link: null, pozycje,
   });
 
-  it("po dociągnięciu: pozycje z nazwą, SKU i ceną oraz suma", () => {
+  it("po dociągnięciu: pozycje z nazwą, SKU i ceną, bez sumy i „zapłacono”", () => {
     render(<ZamowienieRozmowy zamowienie={dane({ pobrane: pobrane([pozycja()]) })} rozmowaId={1} />);
     expect(screen.getByText("Szarpak do NAC LS 46-450")).toBeInTheDocument();
     /* Selektor niesie barwę, bo SKU ma być drugoplanowe wobec nazwy towaru.
        Od 0.255.0 to slate-500 — slate-400 nie przechodziło progu kontrastu. */
     expect(screen.getByText("SZR-NAC-46", { selector: ".text-slate-500" })).toBeInTheDocument();
     expect(screen.getByText(/1 × 45,99/)).toBeInTheDocument();
-    expect(screen.getByText(/zapłacono 60,98/)).toBeInTheDocument();
+    /* Sumę i kroki mówi karta zakupu; „zapłacono" kłamało przy zakupie
+       nieopłaconym i anulowanym, a metoda dostawy stoi przy paczce. */
+    expect(screen.queryByText(/zapłacono|Kupione/)).toBeNull();
     expect(screen.queryByText(/jeszcze nie pobrano/)).toBeNull();
   });
 
@@ -103,36 +97,6 @@ describe("Zamówienie przy rozmowie", () => {
   });
 });
 
-/* ── Kopiowanie numeru zamówienia po zwykłym HTTP ────────────────────────────
-   Biuro pracuje pod `http://serwer:3001`, gdzie `navigator.clipboard` jest
-   `undefined`. Przycisk wołał go wprost i po cichu nie robił nic. Test stawia
-   dokładnie takie okno: klik ma pójść drogą zapasową albo powiedzieć, że się
-   nie udało — nigdy nie milczeć. Wzór: `ui/kopiuj.test.tsx`. */
-describe("Kopiowanie numeru zamówienia", () => {
-  const exec = (f: unknown) => { (document as unknown as { execCommand: unknown }).execCommand = f; };
-  beforeEach(() => vi.stubGlobal("navigator", { ...navigator, clipboard: undefined }));
-  afterEach(() => { vi.unstubAllGlobals(); exec(undefined); });
-
-  it("bez `navigator.clipboard` kopiuje drogą zapasową i mówi, że skopiował", async () => {
-    const kopiuj = vi.fn().mockReturnValue(true);
-    exec(kopiuj);
-    render(<ZamowienieRozmowy zamowienie={dane()} rozmowaId={1} />);
-
-    await userEvent.click(screen.getByTitle("Kopiuj numer zamówienia"));
-    expect(kopiuj).toHaveBeenCalledWith("copy");
-    expect(await screen.findByText("Skopiowano")).toBeInTheDocument();
-  });
-
-  it("gdy nic nie działa, MÓWI o porażce zamiast udawać sukces albo milczeć", async () => {
-    exec(undefined);
-    render(<ZamowienieRozmowy zamowienie={dane()} rozmowaId={1} />);
-
-    await userEvent.click(screen.getByTitle("Kopiuj numer zamówienia"));
-    expect(await screen.findByText("Nie udało się skopiować")).toBeInTheDocument();
-    expect(screen.queryByText("Skopiowano")).toBeNull();
-  });
-});
-
 describe("brak powiązania z towarem", () => {
   const w = (n: Partial<WpisOsi>): WpisOsi => ({
     id: "msg-1", rodzaj: "wiadomosc", autor: "k", odKlienta: true, tresc: "?",
@@ -157,50 +121,5 @@ describe("brak powiązania z towarem", () => {
     expect(brakPowiazania([w({})], zam)).toBe(false);
     expect(brakPowiazania([w({})], of)).toBe(false);
     expect(brakPowiazania([w({})], { zamowienie: null, oferta: null })).toBe(true);
-  });
-});
-
-/* ── Paczka przy zamówieniu (23 września 2026) ───────────────────────────────
-   Klient pod zamówieniem pyta najczęściej „gdzie paczka". Pilnujemy, że stan
-   mówi po polsku i z perspektywy klienta, a Allegro pytamy wyłącznie
-   kliknięciem — otwarcie rozmowy niczego nie woła. */
-describe("Paczka przy zamówieniu rozmowy", () => {
-  const stan = (n: Partial<NonNullable<Dane["przesylka"]>> = {}): NonNullable<Dane["przesylka"]> => ({
-    waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null, ...n,
-  });
-
-  it("bez zamówienia w bazie linijki nie ma wcale", () => {
-    render(<ZamowienieRozmowy zamowienie={dane()} rozmowaId={1} />);
-    expect(screen.queryByLabelText("Przesyłka")).toBeNull();
-  });
-
-  it("status słowem z perspektywy klienta, a pytanie Allegro dopiero na kliknięcie", async () => {
-    sprawdz.mockClear();
-    render(<ZamowienieRozmowy rozmowaId={7} zamowienie={dane({ przesylka: stan({
-      waybill: "620012345678", przewoznik: "INPOST", status: "IN_TRANSIT",
-      sprawdzonoAt: "2026-09-23T10:00:00Z" }) })} />);
-    const p = screen.getByLabelText("Przesyłka");
-    expect(p).toHaveTextContent("w drodze do klienta");
-    expect(p).toHaveTextContent("INPOST 620012345678");
-    expect(sprawdz).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "sprawdź" }));
-    expect(sprawdz).toHaveBeenCalledWith({ id: 7 });
-  });
-
-  it("„nie pytaliśmy” i „Allegro nie ma numeru” to dwa różne zdania", () => {
-    const { rerender } = render(<ZamowienieRozmowy rozmowaId={1} zamowienie={dane({ przesylka: stan() })} />);
-    expect(screen.getByLabelText("Przesyłka")).toHaveTextContent("nie pytaliśmy jeszcze Allegro");
-    rerender(<ZamowienieRozmowy rozmowaId={1}
-      zamowienie={dane({ przesylka: stan({ sprawdzonoAt: "2026-09-23T10:00:00Z" }) })} />);
-    expect(screen.getByLabelText("Przesyłka")).toHaveTextContent("Allegro nie ma numeru");
-  });
-
-  /* Soczewka paczki (0.531.0) pokazuje paczkę nad kolumną — karta zamówienia
-     jej nie powtarza, ale pozycje i numer zamówienia zostają. */
-  it("gdy paczkę pokazuje soczewka, linijki paczki nie ma, a reszta karty stoi", () => {
-    render(<ZamowienieRozmowy rozmowaId={1} bezPaczki
-      zamowienie={dane({ przesylka: stan({ waybill: "X1", przewoznik: "DPD", status: "IN_TRANSIT" }) })} />);
-    expect(screen.queryByLabelText("Przesyłka")).toBeNull();
-    expect(screen.getByText("2f8c1a3e…")).toBeInTheDocument();
   });
 });

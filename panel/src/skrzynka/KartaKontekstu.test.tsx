@@ -3,6 +3,7 @@ import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MemoryRouter } from "react-router-dom";
 import { KartaKontekstu } from "./KartaKontekstu";
 import { ustawKadr } from "../test/kadr";
 import type { HistoriaKlienta, OsRozmowy } from "../api/typy";
@@ -46,7 +47,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const pokaz = (d: OsRozmowy, h?: HistoriaKlienta) => render(
   <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-    <KartaKontekstu dane={d} historia={h} /></QueryClientProvider>);
+    <MemoryRouter><KartaKontekstu dane={d} historia={h} /></MemoryRouter></QueryClientProvider>);
 
 describe("KartaKontekstu", () => {
   it("pokazuje towar, SKU, ilość z ceną, numer zamówienia i sumę", () => {
@@ -105,10 +106,107 @@ describe("KartaKontekstu", () => {
     expect(screen.getByText("Nowy klient")).toBeInTheDocument();
   });
 
+  /* Wiersz „Klient" w kolumnie nie staje przy pierwszym zakupie, a tylko na
+     profilu zakłada się sprawę klienta. Karta jest domem klienta, więc to
+     ona prowadzi na profil — i robi to także wtedy, gdy klient ma historię. */
+  it("linia klienta prowadzi na profil — przy pierwszym zakupie też", () => {
+    pokaz(dane(), historia({ wpisy: [{ rodzaj: "zakup", zamowienieId: "17147703077" } as never] }));
+    expect(screen.getByText("Nowy klient")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Profil klienta" })).toHaveAttribute("href", "/obsluga/klient/k");
+  });
+
+  it("bez loginu odnośnika do profilu nie ma — nie wiemy, czyj to profil", () => {
+    pokaz(dane(), historia({ login: null, wpisy: [{ rodzaj: "zakup", zamowienieId: "inne" } as never] }));
+    expect(screen.getByText(/Wcześniej u nas: 1 zakup/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Profil klienta" })).toBeNull();
+  });
+
+  /* Serwer podaje numer i odnośnik od razu, a treść dojeżdża synchronizacją.
+     Kolumna numeru nie powtarza, więc w tym oknie karta jest jedynym miejscem,
+     skąd agent poda klientowi numer i otworzy zamówienie w Allegro. */
+  it("numer, kopiowanie i Allegro stoją, zanim przyjedzie treść zamówienia", () => {
+    const d = dane();
+    (d.zamowienie as never as { pobrane: unknown }).pobrane = null;
+    pokaz(d);
+    const karta = screen.getByRole("region", { name: "Kontekst zakupu" });
+    expect(karta).toHaveTextContent("17147703077");
+    expect(screen.getByTitle("Kopiuj numer zamówienia")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Otwórz zamówienie w Allegro" }))
+      .toHaveAttribute("href", "https://allegro.example/zam");
+  });
+
+  it("przy samej ofercie i niepobranym zamówieniu nie twierdzi, że zamówienia nie powiązano", () => {
+    const d = dane({ oferta: { externalId: "o-9", pobrana: {
+      nazwa: "Kosiarka testowa", sku: "KT-1", cenaGrosze: 1000, waluta: "PLN", zdjecie: "brak" } } });
+    (d.zamowienie as never as { pobrane: unknown }).pobrane = null;
+    pokaz(d);
+    const karta = screen.getByRole("region", { name: "Kontekst zakupu" });
+    expect(karta).toHaveTextContent("treść zamówienia jeszcze nie pobrana");
+    expect(karta).not.toHaveTextContent("zamówienia jeszcze nie powiązano");
+    expect(karta).toHaveTextContent("17147703077");
+    /* Obok numeru miejsce sumy czyta się jak suma zamówienia. Cena oferty
+       stoi więc przy ofercie, podpisana, i tylko tam. */
+    expect(karta).toHaveTextContent("cena w ofercie 10,00");
+    expect(karta.textContent?.match(/10,00/g) ?? []).toHaveLength(1);
+  });
+
   it("pasek klienta: wcześniejsze sprawy słowem, bez „nowy klient”", () => {
     pokaz(dane(), historia({ wpisy: [{ rodzaj: "zwrot" } as never, { rodzaj: "zwrot" } as never] }));
     expect(screen.getByText(/Wcześniej u nas: 2 zwroty/)).toBeInTheDocument();
     expect(screen.queryByText("Nowy klient")).toBeNull();
+  });
+
+  /* Serwer oddaje historię razem z tym zakupem. „Wcześniej" znaczy przed nim,
+     więc zakup rozmowy i jego sprawy nie liczą się jako wcześniejsze. */
+  it("nie liczy bieżącego zakupu jako „wcześniej”", () => {
+    pokaz(dane(), historia({ wpisy: [{ rodzaj: "zakup", zamowienieId: "17147703077" } as never] }));
+    expect(screen.getByText("Nowy klient")).toBeInTheDocument();
+    expect(screen.queryByText(/Wcześniej u nas/)).toBeNull();
+  });
+
+  it("zwrot tego zakupu też nie robi z klienta stałego", () => {
+    pokaz(dane(), historia({ wpisy: [{ rodzaj: "zwrot", zamowienieId: "17147703077" } as never] }));
+    expect(screen.getByText("Nowy klient")).toBeInTheDocument();
+  });
+
+  it("inny zakup to historia", () => {
+    pokaz(dane(), historia({ wpisy: [{ rodzaj: "zakup", zamowienieId: "inne" } as never] }));
+    expect(screen.getByText(/Wcześniej u nas: 1 zakup/)).toBeInTheDocument();
+    expect(screen.queryByText("Nowy klient")).toBeNull();
+  });
+
+  /* Linijka „Nowy klient" zeszła z kolumny obok. Przy 1366 px karta bywa
+     poza kadrem i zwinięta, więc fakt musi stać także w jednej linii. */
+  it("„Nowy klient” stoi w karcie zwiniętej i w pasku nad osią", async () => {
+    const { unmount } = pokaz(dane(), historia());
+    await userEvent.click(screen.getByRole("button", { name: "Zwiń kartę zakupu" }));
+    expect(screen.getByRole("button", { name: /rozwiń/ })).toHaveTextContent("Nowy klient");
+    unmount();
+    window.localStorage.clear();
+    pokaz(dane(), historia());
+    act(() => ustawKadr(false));
+    expect(screen.getByRole("button", { name: /Pokaż kartę zakupu/ })).toHaveTextContent("Nowy klient");
+  });
+
+  it("pozycja, o którą pyta klient, stoi pierwsza", () => {
+    const d = dane({ oferta: { externalId: "o3", pobrana: null } });
+    ((d.zamowienie as never as { pobrane: { pozycje: unknown[] } }).pobrane).pozycje =
+      [pozycja(), pozycja({ offerId: "o2", nazwa: "Drugi" }), pozycja({ offerId: "o3", nazwa: "Trzeci" })];
+    pokaz(d);
+    const lista = screen.getByText("Trzeci").closest("ul")!;
+    expect(lista.firstElementChild).toHaveTextContent("Trzeci");
+    expect(lista).toHaveTextContent("+ 1 pozycja");
+  });
+
+  it("kilka pozycji bez oferty: karta mówi ich liczbę, nie zgaduje towaru", async () => {
+    const d = dane({ oferta: null });
+    ((d.zamowienie as never as { pobrane: { pozycje: unknown[] } }).pobrane).pozycje =
+      [pozycja(), pozycja({ offerId: "o2", nazwa: "Drugi" }), pozycja({ offerId: "o3", nazwa: "Trzeci" })];
+    pokaz(d);
+    await userEvent.click(screen.getByRole("button", { name: "Zwiń kartę zakupu" }));
+    const zwinieta = screen.getByRole("button", { name: /rozwiń/ });
+    expect(zwinieta).toHaveTextContent("3 pozycje");
+    expect(zwinieta).not.toHaveTextContent("NÓŻ TRAKTORKA");
   });
 
   it("zły ładunek historii nie wywraca karty", () => {

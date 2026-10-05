@@ -7,7 +7,7 @@ import React from "react";
    „przytłacza" — trzy wyglądy jednej czynności to trzy rzeczy do nauczenia.
    Próg i przełącznik mają więc jeden zapis; wołający podaje tylko treść. */
 
-/** Ile znaków znaczy „długie". Czyta go też opis kartoteki w `TowarRozmowy`. */
+/** Ile znaków znaczy „długie". Przez `dlugi` czyta go też opis kartoteki w `TowarRozmowy`. */
 export const PROG_ZNAKOW = 320;
 /** Ile wierszy mieści się bez zwijania — krótka lista kroków nie jest ścianą. */
 export const PROG_LINII = 5;

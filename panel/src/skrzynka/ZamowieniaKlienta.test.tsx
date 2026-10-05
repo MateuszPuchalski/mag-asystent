@@ -68,6 +68,18 @@ describe("zakupy tego klienta", () => {
     expect(screen.getByRole("button", { name: /to ta paczka/ })).toBeInTheDocument();
   });
 
+  it("przy związanej rozmowie to „Inne zakupy klienta”, a przełącznik mówi, czy lista stoi", async () => {
+    /* Zakup rozmowy mówi karta nad osią, więc lista niesie inne zakupy
+       i tak się nazywa. Przełącznik bez stanu dla czytnika ekranu byłby
+       przyciskiem, który nie mówi, co zrobił. */
+    render(<ZamowieniaKlienta kandydaci={[kandydat()]} rozmowaId={1} maZamowienie />);
+    expect(screen.getByRole("region", { name: "Inne zakupy klienta" })).toHaveTextContent("Inne zakupy klienta");
+    const przelacznik = screen.getByRole("button", { name: /to nie ta paczka/ });
+    expect(przelacznik).toHaveAttribute("aria-expanded", "false");
+    await userEvent.click(przelacznik);
+    expect(screen.getByRole("button", { name: "zwiń" })).toHaveAttribute("aria-expanded", "true");
+  });
+
   it("bez kandydatów nie rysuje pustej sekcji", () => {
     /* Klient bez ani jednego zakupu u nas: pusty blok byłby obietnicą, że coś
        da się tu wskazać. */

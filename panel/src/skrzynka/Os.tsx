@@ -189,9 +189,9 @@ export function Os({
    */
   naGorze?: React.ReactNode;
   /**
-   * Oferta i zamówienie CAŁEJ rozmowy (0.523.0) — te, które pokazuje pasmo
-   * odpowiedzi i kolumna kontekstu. Wiadomość powtarza je w nagłówku tylko
-   * wtedy, gdy wskazuje coś INNEGO. Bez tej wartości oś pokazuje każde.
+   * Oferta i zamówienie CAŁEJ rozmowy — te, które pokazuje karta zakupu nad
+   * osią, a ofertę także kolumna kontekstu. Wiadomość powtarza je w nagłówku
+   * tylko wtedy, gdy wskazuje coś INNEGO. Bez tej wartości oś pokazuje każde.
    */
   powiazanie?: { ofertaId: string | null; zamowienieId: string | null };
 }) {
@@ -418,9 +418,9 @@ export function Os({
                 szukać towaru drugi raz. Zamówienie skracamy: UUID w całości
                 nikomu nic nie mówi, a całość niesie blok nad osią.
 
-                TYLKO GDY INNE NIŻ ROZMOWY (0.523.0). Ta sama oferta i to samo
+                TYLKO GDY INNE NIŻ ROZMOWY. Ta sama oferta i to samo
                 zamówienie stały w nagłówku każdej wiadomości klienta, choć
-                pasmo odpowiedzi i kolumna kontekstu mówią je raz na rozmowę.
+                karta zakupu nad osią mówi je raz na rozmowę.
                 Nie zdejmujemy ich w ogóle, bo wiadomość spod INNEJ oferty to
                 sygnał: klient pyta o dwa towary w jednym wątku. */}
             {w.ofertaId && w.ofertaId !== powiazanie?.ofertaId

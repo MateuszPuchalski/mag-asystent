@@ -4,6 +4,7 @@ import type { KandydatZamowienia } from "../api/typy";
 import { useWskazZamowienie } from "../api/rozmowy";
 import { zlote } from "../api/zwroty";
 import { NaglowekSekcji, czas } from "../ui";
+import { ODNOSNIK, ODNOSNIK_CICHY } from "./odnosniki";
 
 /**
  * Zakupy tego kupującego — kandydaci do powiązania z rozmową (0.397.0).
@@ -26,6 +27,10 @@ import { NaglowekSekcji, czas } from "../ui";
  * automat pomyliłby się cicho, i to przy sprawie o brak w zestawie, czyli
  * tam, gdzie pomyłka kosztuje pieniądze. Lista mówi, co ją ułożyło —
  * plakietka przy zakupie niosącym ofertę z rozmowy.
+ *
+ * PRZY ZWIĄZANEJ ROZMOWIE TO „INNE ZAKUPY". Kolumna podaje wtedy listę bez
+ * zamówienia rozmowy: ten zakup mówi karta nad osią, a „to nie ta paczka?"
+ * nie ma prawa wskazywać samego siebie. Nazwa bloku mówi to samo.
  */
 export function ZamowieniaKlienta({ kandydaci, rozmowaId, maZamowienie }: {
   kandydaci: KandydatZamowienia[];
@@ -39,13 +44,15 @@ export function ZamowieniaKlienta({ kandydaci, rozmowaId, maZamowienie }: {
   if (kandydaci.length === 0) return null;
 
   const widoczne = !maZamowienie || otwarte;
+  const nazwa = maZamowienie ? "Inne zakupy klienta" : "Zakupy tego klienta";
 
-  return <section className="border-b px-4 py-3 text-sm" aria-label="Zakupy tego klienta">
+  return <section className="text-sm" aria-label={nazwa}>
     <div className="flex flex-wrap items-center gap-2">
-      <NaglowekSekcji ikona={<ShoppingBag size={13} />}>Zakupy tego klienta</NaglowekSekcji>
-      <span className="text-podpis text-slate-500">{kandydaci.length}</span>
-      {maZamowienie && <button type="button" onClick={() => setOtwarte((o) => !o)}
-        className="ml-auto text-xs text-slate-500 underline underline-offset-2 hover:text-slate-800">
+      {/* Liczba w nagłówku tym samym kształtem co „Wymaga Ciebie · N":
+          luźna cyfra obok była trzecim zapisem liczenia w jednej kolumnie. */}
+      <NaglowekSekcji ikona={<ShoppingBag size={13} />}>{nazwa} · {kandydaci.length}</NaglowekSekcji>
+      {maZamowienie && <button type="button" aria-expanded={otwarte} onClick={() => setOtwarte((o) => !o)}
+        className={`ml-auto text-xs ${ODNOSNIK_CICHY}`}>
         {otwarte ? "zwiń" : "to nie ta paczka?"}</button>}
     </div>
 
@@ -56,9 +63,10 @@ export function ZamowieniaKlienta({ kandydaci, rozmowaId, maZamowienie }: {
       Wskaż paczkę, o którą pyta — pozycje, kwoty i status przesyłki pojawią się wtedy tutaj.
     </p>}
 
-    {widoczne && <ul className="mt-2 space-y-1">
-      {kandydaci.map((k) => <li key={k.externalId}
-        className="rounded border border-slate-200 bg-white p-2">
+    {/* Kreska listy, bez ramek: każdy zakup w pudełku był pudełkiem
+        w pudełku kolumny. */}
+    {widoczne && <ul className="mt-2 divide-y divide-slate-200">
+      {kandydaci.map((k) => <li key={k.externalId} className="py-2">
         <div className="flex flex-wrap items-baseline gap-2">
           <span className="font-mono text-podpis text-slate-500" title={k.externalId}>
             {k.externalId.slice(0, 8)}…</span>
@@ -77,11 +85,11 @@ export function ZamowieniaKlienta({ kandydaci, rozmowaId, maZamowienie }: {
             wskaz.mutate({ id: rozmowaId, externalId: k.externalId },
               { onError: (e) => setBlad((e as Error).message) });
           }}
-          className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-wertis-ink underline underline-offset-2 disabled:opacity-50">
+          className={`mt-1 inline-flex items-center gap-1 text-xs ${ODNOSNIK}`}>
           <Link2 size={12} />{wskaz.isPending ? "wiążę…" : "to ta paczka"}</button>
       </li>)}
     </ul>}
 
-    {blad && <p className="mt-1 text-xs text-red-700">{blad}</p>}
+    {blad && <p className="mt-1 text-xs text-ranga-zle">{blad}</p>}
   </section>;
 }

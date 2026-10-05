@@ -2,8 +2,9 @@ import React from "react";
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { KartaTowaru, OsRozmowy } from "../api/typy";
+import { BrakPolaczenia } from "../api/klient";
 
-/* ── Pasmo odpowiedzi (0.404.0) ──────────────────────────────────────────────
+/* ── Pasmo odpowiedzi ────────────────────────────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: „popraw skrzynkę odpowiadania pytań".
    Prawa kolumna niosła około czterdziestu faktów w jednej wadze, a trzy
    rozstrzygające — co zamówił, czym to jest, czy mamy — leżały wśród nich,
@@ -14,6 +15,8 @@ import type { KartaTowaru, OsRozmowy } from "../api/typy";
    1. TRZY FAKTY BEZ PRZEWIJANIA I BEZ WYBORU ZAKŁADKI.
    2. BRAK WIEDZY TO NIE ZERO. Wiersz, którego nie ma z czego złożyć, nie
       staje wcale — pusta etykieta „Mamy" czytałaby się jak „nie mamy".
+      Wiersz, który czeka na Subiekta, mówi „wczytuję…" i trzyma miejsce,
+      żeby pasmo nie dorastało pod okiem agenta.
    3. PROPOZYCJA KARTOTEKI NIE JEST FAKTEM. Pasmo mówi tylko o kartotece
       potwierdzonej (§4.3, §11.3); niepewne dopasowanie zostaje propozycją
       z przyciskiem w sekcji niżej.
@@ -36,12 +39,15 @@ const PELNA: KartaTowaru = {
 
 const dane = (n: {
   pewnosc?: string; twId?: number | null; pozycje?: boolean; kupiono?: string | null;
+  bezOferty?: boolean; skuOferty?: string;
 } = {}): OsRozmowy => ({
   rozmowa: { id: 5 },
   os: [], szkic: null, ofertaWskazana: null, zwroty: [], sprawy: [], droga: [],
   kandydaciZamowien: [], dobor: {}, szkicCopilota: null,
-  oferta: {
-    externalId: "of-1", link: null, zrodlo: "zamowienie", pobrana: null,
+  oferta: n.bezOferty ? null : {
+    externalId: "of-1", link: null, zrodlo: "zamowienie",
+    pobrana: n.skuOferty ? { nazwa: "Prowadnica", sku: n.skuOferty, cenaGrosze: 4500, waluta: "PLN",
+      status: "ACTIVE", syncedAt: "2026-09-17T06:28:00.000Z", zdjecie: "brak" } : null,
     kartoteka: {
       pewnosc: n.pewnosc ?? "pamiec", twId: n.twId === undefined ? 7701 : n.twId,
       symbol: "MFG163856", zrodlo: "Wskazane", powod: null,
@@ -66,7 +72,9 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
   it("mówi, CO klient zamówił — ilość i sygnaturę z chwili zakupu", () => {
     render(<PasmoOdpowiedzi dane={dane()} />);
     expect(screen.getByText("3 × MFG163856")).toBeInTheDocument();
-    expect(screen.getByText(/17 września 2026/)).toBeInTheDocument();
+    /* Datę zakupu mówi krok „Złożone" w karcie i linia osi. Tu byłaby
+       drugim domem tego samego faktu. */
+    expect(screen.queryByText(/17 września 2026/)).toBeNull();
   });
 
   it("mówi, CZYM to jest u nas — nazwą kartoteki, nie numerem oferty", () => {
@@ -81,8 +89,8 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
   });
 
   it("symbol kartoteki staje tylko wtedy, gdy różni się od sygnatury zamówienia", () => {
-    /* Runda krytyki (0.506.0): ten sam symbol stał w „Zamówił" i w „To jest".
-       Równy to powtórzenie; różny mówi, że oferta wskazuje inną kartotekę. */
+    /* Ten sam symbol stał w „Zamówił" i w „To jest". Równy to powtórzenie;
+       różny mówi, że oferta wskazuje inną kartotekę. */
     const { unmount } = render(<PasmoOdpowiedzi dane={dane()} />);
     expect(screen.getAllByText(/MFG163856/)).toHaveLength(1);
     unmount();
@@ -98,7 +106,7 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
     expect(screen.getByText("brak na stanie")).toBeInTheDocument();
   });
 
-  /* „Kiedy będzie" (0.502.0): przy braku — co zamówione i na kiedy, przy
+  /* „Kiedy będzie": przy braku — co zamówione i na kiedy, przy
      stanie — ile stoi w przyjęciach. W wierszu „Mamy", nie w czwartym. */
   it("przy braku mówi, co zamówione u dostawcy i na kiedy — w wierszu „Mamy”", () => {
     const zam = (termin: string | null, ilosc: number) => ({ dokId: 1, nrPelny: "ZD 1", dataWyst: "2026-09-20",
@@ -118,13 +126,43 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
     expect(dopisekDostaw(PELNA)).toBeNull();
   });
 
-  it("bez pobranej kartoteki NIE pisze pustego wiersza — brak wiedzy to nie zero", () => {
-    karta.mockReturnValue({ isLoading: true, error: null, data: undefined });
+  it("bez symbolu przy samej ofercie, gdy kartoteka ma jej SKU", () => {
+    /* Bez zamówienia sygnaturę niesie oferta, a karta zakupu pokazuje ją
+       nad osią. Ten sam symbol w „To jest" byłby drugim zapisem. */
+    render(<PasmoOdpowiedzi dane={dane({ pozycje: false, skuOferty: "MFG163856" })} />);
+    expect(screen.getByText(/Zestaw prowadnica/)).toBeInTheDocument();
+    expect(screen.queryByText(/MFG163856/)).toBeNull();
+  });
+
+  it("w trakcie odczytu Subiekta wiersze stoją od razu z „wczytuję…” — pasmo nie dorasta", () => {
+    /* Wiersze dochodziły po odczycie i spychały kolumnę o 45 px w chwili,
+       w której agent ją czytał. Brak wiedzy dalej nie udaje zera: wartość
+       mówi wprost, że jest w drodze. */
+    karta.mockReturnValue({ isLoading: true, isError: false, error: null, data: undefined });
     render(<PasmoOdpowiedzi dane={dane()} />);
-    expect(screen.queryByText("Mamy")).not.toBeInTheDocument();
-    expect(screen.queryByText("To jest")).not.toBeInTheDocument();
+    expect(screen.getByText("To jest")).toBeInTheDocument();
+    expect(screen.getByText("Mamy")).toBeInTheDocument();
+    expect(screen.getAllByText("wczytuję…")).toHaveLength(2);
+    expect(screen.getByRole("complementary", { name: "Do tej odpowiedzi" })).toHaveAttribute("aria-busy", "true");
     /* Zamówienie zostaje: ono nie zależy od Subiekta. */
     expect(screen.getByText("3 × MFG163856")).toBeInTheDocument();
+  });
+
+  it("gdy odczyt kartoteki padł, mówi to wprost — „nie wiemy” zamiast zera", () => {
+    karta.mockReturnValue({ isLoading: false, isError: true, error: new Error("Nie znaleziono towaru"), data: undefined });
+    render(<PasmoOdpowiedzi dane={dane()} />);
+    expect(screen.getByText("odczyt kartoteki nie przeszedł")).toHaveClass("text-ranga-zle");
+    expect(screen.getByText("nie wiemy")).toBeInTheDocument();
+    expect(screen.queryByText("brak na stanie")).toBeNull();
+  });
+
+  /* Brak połączenia ogłasza pasek pod nagłówkiem. Pasmo nie podaje innej
+     przyczyny: „Subiekt nie odpowiedział" kazało zgłaszać awarię, której nie było. */
+  it("przy braku połączenia z serwerem nie obwinia Subiekta — samo „nie wiemy”", () => {
+    karta.mockReturnValue({ isLoading: false, isError: true, error: new BrakPolaczenia(), data: undefined });
+    render(<PasmoOdpowiedzi dane={dane()} />);
+    expect(screen.getAllByText("nie wiemy")).toHaveLength(2);
+    expect(screen.queryByText(/Subiekt|nie przeszedł/)).toBeNull();
   });
 
   it("PROPOZYCJI kartoteki nie podaje jako faktu — o kartotekę pyta dopiero pewność", () => {
@@ -135,7 +173,7 @@ describe("Pasmo odpowiedzi nad zakładkami", () => {
   it("bez oferty i bez zamówienia nie rysuje się WCALE — pasek bez treści to koszt", () => {
     karta.mockReturnValue({ isLoading: false, error: null, data: undefined });
     const { container } = render(
-      <PasmoOdpowiedzi dane={dane({ pozycje: false })} />);
+      <PasmoOdpowiedzi dane={dane({ pozycje: false, bezOferty: true })} />);
     expect(container).toBeEmptyDOMElement();
   });
 
