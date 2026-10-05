@@ -10,6 +10,17 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.560.1 — 5 października 2026
+
+**Reklamacja z kartoteką znalezioną po SKU oferty pokazuje stan, cenę zakupu
+i zdjęcie z półki.** Do tej pory kolumna dowodów pokazywała symbol, a obok
+„Mamy: nie wiadomo · sprawa bez kartoteki”, bez kostki „Nasz zakup”. Przycisk
+przekroju towaru nie działał. Teraz każdy element kolumny bierze jedną
+kartotekę: z paragonu, z mapowania oferty albo z SKU.
+
+Licznik „Ten towar: N reklamacji” liczy też reklamacje z ofert powiązanych
+po SKU. Oferty towaru wybiera ta sama funkcja, co przekrój towaru.
+
 ## 0.560.0 — 5 października 2026
 
 **Ceny z Subiekta zajmują mniej miejsca: od 30% w wąskiej kolumnie do 45%
