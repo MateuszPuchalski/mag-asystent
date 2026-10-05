@@ -439,4 +439,13 @@ describe("Pas faktów w stałej kolejności", () => {
     }
     expect(screen.queryByRole("textbox")).toBeNull();
   });
+
+  it("reklamacja nie zleca pracy hali — ani przycisku, ani nagłówka „Hala”", () => {
+    /* Decyzja właściciela przy przebudowie ekranu reklamacji. Zlecenie hali
+       zostaje w zwrotach i dyskusjach; tutaj pas nie obiecuje go wcale. */
+    render(<Fakty {...props()} />);
+    expect(screen.queryByRole("button", { name: /Zleć hali/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Zleć hali/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Hala" })).not.toBeInTheDocument();
+  });
 });

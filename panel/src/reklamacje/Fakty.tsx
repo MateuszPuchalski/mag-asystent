@@ -27,7 +27,13 @@ import type { KartotekaKolumny } from "./Glowica";
    Odnośniki do Allegro stoją przy numerze reklamacji w prawej szczelinie.
 
    Wszystko tu jest ODCZYTEM. Jedynym zapisem jest pytanie o paczkę, i to
-   jawnym kliknięciem, nie skutkiem ubocznym patrzenia. */
+   jawnym kliknięciem, nie skutkiem ubocznym patrzenia.
+
+   BEZ COPILOTA I BEZ „ZLEĆ HALI". Decyzja właściciela przy przebudowie ekranu
+   reklamacji: karta „Co wyczytał Copilot", jego rada i zlecenie dla hali na
+   razie tu nie stoją. Dlatego nic w pasie nie woła modelu ani nie zleca pracy
+   hali. Zapisane karty zostają w bazie, a `ZlecHali` dalej służy zwrotom
+   i dyskusjom. Strażnik: `BezCopilota.test.tsx` i `Triaz.test.tsx`. */
 
 /** Kartoteka sprawy przychodzi z głowicy — ta sama, której symbol tam stoi. */
 export function FaktySprawy({ szczegol, towar, onSprawdzPrzesylke, sprawdzaPrzesylke = false, bladPrzesylki = "" }: {
