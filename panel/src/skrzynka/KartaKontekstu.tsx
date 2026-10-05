@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, ChevronRight, ChevronUp, CircleDashed, ExternalLink, UserRound } from "lucide-react";
+import { Link } from "react-router-dom";
 import type { HistoriaKlienta, OsRozmowy } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { Skopiuj, dzienMiesiac, ile } from "../ui";
 import { KafelOferty } from "../towar/Kafel";
-import { klientMaHistorie, nowyKlient } from "./kokpit";
+import { historiaPozaZakupem, klientMaHistorie, nowyKlient } from "./kokpit";
 import { streszczenieKlienta } from "./Kontekst";
+import { ODNOSNIK } from "./odnosniki";
 import { stanZakupu, type KrokZakupu } from "./zakup";
 
 /* ── KARTA ZAKUPU I KLIENTA NAD ROZMOWĄ ─────────────────────────────────────
@@ -25,8 +27,8 @@ import { stanZakupu, type KrokZakupu } from "./zakup";
    stanowiska, nie decyzja na jedno otwarcie (jak kolejność kolejki).
 
    ZERO ZAPISU. Karta niczego nie odpytuje u przewoźnika ani u Allegro:
-   „nie sprawdzano przesyłki" mówi wprost, a sprawdzenie zostaje tam, gdzie
-   było, w kolumnie zamówienia.
+   „nie sprawdzano przesyłki" mówi wprost, a sprawdzenie stoi w bloku paczki
+   w prawej kolumnie (`Paczka.tsx`), wyłącznie na kliknięcie.
 
    PRYWATNOŚĆ. Tylko to, co panel już dostaje: towar, cena, numer zamówienia,
    login kupującego pokazuje nagłówek rozmowy. Adresu dostawy, telefonu i
@@ -72,12 +74,25 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
   /* Zły ładunek historii nie wywraca rozmowy: karta jest dodatkiem do osi, a
      błąd w zapytaniu pomocniczym nie ma prawa zabrać ze sobą ekranu, na którym
      agent odpowiada klientowi. Kształt, którego nie znamy, czytamy jak brak. */
-  const h = Array.isArray(historia?.wpisy) && Array.isArray(historia?.maszyny) ? historia : undefined;
+  const zgodna = Array.isArray(historia?.wpisy) && Array.isArray(historia?.maszyny) ? historia : undefined;
+  /* „WCZEŚNIEJ" ZNACZY PRZED TYM ZAKUPEM. Serwer oddaje historię razem z tym
+     zakupem, jego zwrotem i sprawami, więc karta mówiła „Wcześniej u nas:
+     1 zakup" o tym samym zakupie, a „Nowy klient" nie stawał przy pierwszym.
+     Kolumna obok nie mówi już tego faktu wcale, więc jedyny dom musi mówić
+     prawdę. Reguła w `kokpit.ts`, wspólna z wierszem „Klient". */
+  const h = historiaPozaZakupem(zgodna, dane.zamowienie?.externalId ?? null);
   const znaczniki: string[] = [];
   if (nowyKlient(h)) znaczniki.push("Nowy klient");
   const wczesniej = h && klientMaHistorie(h) ? streszczenieKlienta(h) : null;
+  /* NUMER Z POWIĄZANIA, NIE Z TREŚCI. Serwer podaje numer i odnośnik od razu,
+     a treść zamówienia dojeżdża synchronizacją (do 10 minut, dłużej przy
+     nieudanym pobraniu). Kolumna obok numeru już nie powtarza, więc karta
+     musi go mieć także w tym oknie: agent podaje go klientowi i otwiera
+     zamówienie w Allegro. */
+  const numer = dane.zamowienie?.externalId ?? null;
+  const linkZamowienia = dane.zamowienie?.link ?? zam?.link ?? null;
 
-  const jestKarta = Boolean(zam || oferta || znaczniki.length > 0 || wczesniej);
+  const jestKarta = Boolean(numer || zam || oferta || znaczniki.length > 0 || wczesniej);
   /* Zależność od `zwinieta`: rozwinięta i zwinięta karta to dwa różne elementy
      pod tym samym refem, więc obserwator musi złapać nowy. */
   useEffect(() => {
@@ -95,15 +110,36 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
      jest częsta, a pusta ramka mówiłaby, że czegoś brakuje. */
   if (!jestKarta) return null;
 
-  const pozycje = zam?.pozycje ?? [];
-  const nazwa = pozycje[0]?.nazwa ?? oferta?.nazwa ?? null;
-  const suma = zam ? zlote(zam.sumaGrosze, zam.waluta) : oferta ? zlote(oferta.cenaGrosze, oferta.waluta ?? "PLN") : null;
+  /* POZYCJA ROZMOWY PIERWSZA. Karta pokazuje dwie pozycje, a ta, o którą
+     pyta klient, bywała trzecia i nie stała w karcie wcale. Bez wskazanej
+     oferty karta nie zgaduje: przy kilku pozycjach mówi ich liczbę, bo
+     pierwsza podana jako towar rozmowy przeczyłaby ramie „Wymaga Ciebie",
+     która prosi właśnie o wskazanie. */
+  const ofertaId = dane.oferta?.externalId ?? null;
+  const pozycje = [...(zam?.pozycje ?? [])].sort((a, b) =>
+    Number(ofertaId !== null && b.offerId === ofertaId) - Number(ofertaId !== null && a.offerId === ofertaId));
+  const pozycjaRozmowy = ofertaId === null ? undefined : pozycje.find((p) => p.offerId === ofertaId);
+  const nazwa = pozycjaRozmowy?.nazwa ?? (pozycje.length === 1 ? pozycje[0].nazwa
+    : pozycje.length > 1 ? ile(pozycje.length, "pozycja", "pozycje", "pozycji") : oferta?.nazwa ?? null);
+  /* Cena oferty staje w miejscu sumy tylko bez numeru zamówienia. Obok numeru
+     to miejsce czyta się jak suma tego zamówienia, a cena oferty nią nie jest:
+     wtedy stoi przy ofercie, podpisana. */
+  const cenaOferty = oferta ? zlote(oferta.cenaGrosze, oferta.waluta ?? "PLN") : null;
+  const suma = zam ? zlote(zam.sumaGrosze, zam.waluta) : numer ? null : cenaOferty;
   const przelacz = () => setZwinieta((z) => { zapiszZwinieta(!z); return !z; });
 
+  /* PROFIL KLIENTA Z KARTY. Karta jest domem klienta, a wiersz „Klient"
+     w kolumnie staje tylko z historią poza tym zakupem. Przy pierwszym
+     zakupie rozmowa nie miałaby więc żadnej drogi do profilu, a tylko tam
+     zakłada się sprawę klienta z krokiem i terminem. Profil prowadzi do
+     rozmowy, więc rozmowa prowadzi do profilu: wiązanie w obie strony. */
+  const login = h?.login ?? null;
   const klient = (znaczniki.length > 0 || wczesniej) && <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-podpis text-slate-600">
     <UserRound size={13} aria-hidden="true" className="shrink-0 text-slate-500" />
     {znaczniki.map((t) => <span key={t} className="rounded bg-slate-100 px-1.5 py-0.5 font-semibold text-slate-700">{t}</span>)}
     {wczesniej && <span>Wcześniej u nas: {wczesniej}</span>}
+    {login && <Link to={`/obsluga/klient/${encodeURIComponent(login)}`} className={`ml-auto ${ODNOSNIK}`}>
+      Profil klienta</Link>}
   </div>;
 
   /* Skraca się NAZWA towaru, a cena, anulowanie i historia zostają: to one są
@@ -114,7 +150,14 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
     {suma && <span className="shrink-0">· {suma}</span>}
     {stan?.anulowane && <span className="shrink-0 font-semibold text-ranga-zle">· anulowane</span>}
     {wczesniej && <span className="shrink-0 text-slate-500">· {wczesniej}</span>}
-    {!nazwa && znaczniki.length > 0 && <span>{znaczniki.join(" · ")}</span>}
+    {/* „Nowy klient" stoi w każdej postaci karty. Przy oknie 1366 px karta
+        jest zwykle poza kadrem i widać tylko pasek, a fakt zdjęty z kolumny
+        nie może stać się kliknięciem. */}
+    {/* Bez treści zamówienia nie ma ani nazwy, ani sumy. Numer mówi wtedy,
+        czego karta dotyczy, zamiast pustego paska z samym „rozwiń". */}
+    {!nazwa && !suma && numer && <span className="min-w-0 truncate">zamówienie <span className="font-mono">{numer}</span></span>}
+    {znaczniki.length > 0 && <span className="shrink-0 font-semibold text-slate-700">
+      {nazwa || suma || numer ? "· " : ""}{znaczniki.join(" · ")}</span>}
   </span>;
 
   /* Przewija OŚ, nie `scrollIntoView`: ten przewija też stronę i wypchnął
@@ -160,10 +203,10 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
       <button type="button" aria-expanded onClick={przelacz} aria-label="Zwiń kartę zakupu"
         className="-ml-1 rounded p-1 hover:bg-slate-100"><ChevronDown size={14} /></button>
       <span className="font-semibold uppercase tracking-wide">Zakup</span>
-      {zam && <>
-        <span className="font-mono text-slate-700">{zam.externalId}</span>
-        <Skopiuj tekst={zam.externalId} tytul="Kopiuj numer zamówienia" />
-        {(dane.zamowienie?.link ?? zam.link) && <a href={(dane.zamowienie?.link ?? zam.link) ?? undefined} target="_blank" rel="noopener noreferrer"
+      {numer && <>
+        <span className="font-mono text-slate-700">{numer}</span>
+        <Skopiuj tekst={numer} tytul="Kopiuj numer zamówienia" />
+        {linkZamowienia && <a href={linkZamowienia} target="_blank" rel="noopener noreferrer"
           aria-label="Otwórz zamówienie w Allegro"
           className="inline-flex items-center gap-1 font-semibold text-slate-500 hover:text-slate-800">
           Allegro <ExternalLink size={11} /></a>}
@@ -195,7 +238,10 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
             <div className="line-clamp-2 font-semibold text-slate-800">{oferta.nazwa}</div>
             <div className="mt-0.5 text-podpis text-slate-500">
               {oferta.sku && <span className="mr-2 font-mono text-slate-600">{oferta.sku}</span>}
-              oferta, o którą pyta klient — zamówienia jeszcze nie powiązano</div>
+              {numer && cenaOferty && <span className="mr-2 tabular-nums">cena w ofercie {cenaOferty}</span>}
+              {/* Zamówienie powiązane, a treść w drodze, to co innego niż brak
+                  zamówienia: pierwsze naprawi synchronizacja, drugie agent. */}
+              oferta, o którą pyta klient — {numer ? "treść zamówienia jeszcze nie pobrana" : "zamówienia jeszcze nie powiązano"}</div>
           </div>
         </div>}
 

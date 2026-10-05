@@ -37,7 +37,9 @@ describe("blok oferty przy rozmowie", () => {
     expect(screen.getByText(/NÓŻ DO KOSIARKI STIGA 43cm/)).toBeInTheDocument();
     expect(screen.getByText("NOZ-STIGA-43")).toBeInTheDocument();
     expect(screen.getByText(/48,90/)).toBeInTheDocument();
-    expect(screen.getByText("ACTIVE")).toBeInTheDocument();
+    /* Status słowem stoi w streszczeniu wiersza; surowy kod Allegro obok
+       numeru był drugim zapisem tego samego faktu. */
+    expect(screen.queryByText("ACTIVE")).toBeNull();
   });
 
   /* Numer jest ZAWSZE, bo mamy go z wiadomości — czekamy tylko na tytuł. */
@@ -134,5 +136,35 @@ describe("lista zgodności oferty", () => {
     expect(screen.getByText(/nie ma na liście; to nie dowód, że nie pasuje/)).toBeInTheDocument();
     rerender(<OfertaRozmowy oferta={dane(null)} />);
     expect(screen.queryByLabelText("Pasuje do")).toBeNull();
+  });
+});
+
+/* ── Oferta pokazana w karcie zakupu ─────────────────────────────────────────
+   Gdy karta nad osią mówi tytuł, SKU i zdjęcie oferty, blok ich nie powtarza.
+   Cena oferty wraca wtedy wyłącznie przy różnicy z ceną zakupu, bo tylko
+   wtedy jest odpowiedzią, a nie drugim zapisem tej samej liczby. */
+describe("oferta, którą pokazuje karta zakupu", () => {
+  const SNAPSHOT: Dane["pobrana"] = {
+    nazwa: "NÓŻ DO KOSIARKI STIGA 43cm 46S CASTELGARDEN NG464",
+    sku: "NOZ-STIGA-43", cenaGrosze: 4890, waluta: "PLN", status: "ACTIVE",
+    syncedAt: "2026-09-02T14:50:00Z", zdjecie: "jest",
+  };
+
+  it("bez tytułu, SKU i zdjęcia; odnośnik do Allegro zostaje", () => {
+    render(<OfertaRozmowy oferta={dane(SNAPSHOT)} zTytulem={false} />);
+    expect(screen.queryByText(/NÓŻ DO KOSIARKI STIGA/)).toBeNull();
+    expect(screen.queryByText("NOZ-STIGA-43")).toBeNull();
+    expect(screen.queryByAltText(/NÓŻ DO KOSIARKI STIGA/)).toBeNull();
+    expect(screen.getByRole("link", { name: /Otwórz w Allegro/ })).toBeInTheDocument();
+  });
+
+  it("cena w ofercie staje przy różnicy z ceną zakupu", () => {
+    render(<OfertaRozmowy oferta={dane(SNAPSHOT)} zTytulem={false} cenaZakupuGrosze={5990} />);
+    expect(screen.getByText(/cena w ofercie/)).toHaveTextContent(/48,90/);
+  });
+
+  it("przy cenie równej zakupowi milczy", () => {
+    render(<OfertaRozmowy oferta={dane(SNAPSHOT)} zTytulem={false} cenaZakupuGrosze={4890} />);
+    expect(screen.queryByText(/cena w ofercie/)).toBeNull();
   });
 });

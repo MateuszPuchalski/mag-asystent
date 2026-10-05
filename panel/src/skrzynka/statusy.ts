@@ -97,6 +97,21 @@ export const NAZWA_KATEGORII: Record<Kategoria, string> = {
   OTHER: "Inne",
 };
 
+/* Kody przewoźnika słowem, z perspektywy KLIENTA, bo paczka jedzie do niego.
+   Słownik zwrotów mówi „w drodze do nas" i tu dałby zdanie odwrotne. Jeden
+   słownik dla streszczenia wiersza „Zamówienie", soczewki i bloku paczki:
+   trzy kopie rozjechałyby się przy pierwszym nowym kodzie. Nieznany kod
+   stoi surowy, jak u przewoźnika. */
+export const STATUS_PACZKI: Record<string, string> = {
+  PENDING: "czeka na nadanie",
+  IN_TRANSIT: "w drodze do klienta",
+  RELEASED_FOR_DELIVERY: "wydana do doręczenia",
+  AVAILABLE_FOR_PICKUP: "czeka w punkcie odbioru",
+  NOTICE_LEFT: "awizo — nieudana próba doręczenia",
+  ISSUE: "problem z przesyłką",
+  RETURNED: "wraca do nadawcy",
+};
+
 /* Następny krok jako polecenie dla człowieka. To PODPOWIEDŹ — panel żadnej
    z tych czynności nie wykonuje sam i nazwa nie może tego sugerować. */
 export const NAZWA_AKCJI: Record<Akcja, string> = {

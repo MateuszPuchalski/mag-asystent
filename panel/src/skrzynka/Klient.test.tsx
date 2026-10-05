@@ -135,6 +135,77 @@ describe("zakładka klienta", () => {
     expect(screen.getByText("po terminie").className).toContain("text-ranga-zle");
   });
 
+  /* Wpisy tego zakupu mają dom w karcie zakupu, w ramie „Wymaga Ciebie",
+     w „Zamkniętych sprawach" i w osi. Historia w kolumnie mówi resztę. */
+  it("w kolumnie rozmowy historia nie powtarza tego zakupu; rozmowy zostają", () => {
+    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ wpisy: [
+      { rodzaj: "zakup", at: "2026-09-14T12:00:00Z", tresc: "Szarpak SZR-148/82",
+        zamowienieId: "z-1", link: null, rozmowaId: null, sprawaId: null },
+      { rodzaj: "rozmowa", at: "2026-09-14T09:00:00Z", tresc: "ustalono model kosiarki",
+        zamowienieId: null, link: null, rozmowaId: 3140, sprawaId: null },
+    ] }) });
+    render(<MemoryRouter><Klient rozmowaId={4821} onOtworzRozmowe={vi.fn()} zamowienieId="z-1" /></MemoryRouter>);
+    expect(screen.queryByText(/Zakup:/)).toBeNull();
+    expect(screen.getByRole("button", { name: /ustalono model kosiarki/ })).toBeInTheDocument();
+  });
+
+  /* Rozmowa bez zamówienia: lista „Zakupy tego klienta" stoi otwarta
+     w wierszu „Zamówienie" i to jej dom. W historii zakup stał drugi raz,
+     z inną walutą i innym zapisem numeru. */
+  it("bez zamówienia zakupy z otwartej listy nie stoją drugi raz w historii; zwrot i rozmowa zostają", () => {
+    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ wpisy: [
+      { rodzaj: "zakup", at: "2026-05-12T09:10:00Z", tresc: "Filtr powietrza",
+        zamowienieId: "z-2", link: null, rozmowaId: null, sprawaId: null },
+      { rodzaj: "zwrot", at: "2026-05-20T09:10:00Z", tresc: "ZW/2026/05/0003",
+        zamowienieId: "z-2", link: null, rozmowaId: null, sprawaId: 3 },
+      { rodzaj: "rozmowa", at: "2026-05-11T09:00:00Z", tresc: "ustalono model kosiarki",
+        zamowienieId: null, link: null, rozmowaId: 3140, sprawaId: null },
+    ] }) });
+    render(<MemoryRouter><Klient rozmowaId={4821} onOtworzRozmowe={vi.fn()} zamowienieId={null}
+      pomin={new Set(["z-2"])} /></MemoryRouter>);
+    expect(screen.queryByText(/Filtr powietrza/)).toBeNull();
+    expect(screen.getByText("ZW/2026/05/0003")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /ustalono model kosiarki/ })).toBeInTheDocument();
+    /* Tytuł wiersza mówi już „Klient", więc drugiego nagłówka nie ma. */
+    expect(screen.queryByText("Historia u nas")).toBeNull();
+  });
+
+  it("gdy oś opróżniły zakupy z listy, mówi, gdzie stoją — nie „pierwszy kontakt”", () => {
+    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ maszyny: [], wpisy: [
+      { rodzaj: "zakup", at: "2026-05-12T09:10:00Z", tresc: "Filtr powietrza",
+        zamowienieId: "z-2", link: null, rozmowaId: null, sprawaId: null },
+    ] }) });
+    render(<MemoryRouter><Klient rozmowaId={4821} onOtworzRozmowe={vi.fn()} zamowienieId={null}
+      pomin={new Set(["z-2"])} /></MemoryRouter>);
+    expect(screen.getByText("Zakupy tego klienta stoją w wierszu „Zamówienie”.")).toBeInTheDocument();
+    expect(screen.queryByText(/Pierwszy kontakt/)).toBeNull();
+    expect(screen.getByRole("link", { name: "Profil klienta" })).toBeInTheDocument();
+  });
+
+  /* Przy powiązanym zamówieniu lista innych zakupów chowa się za „to nie ta
+     paczka?", bo służy do przepięcia. Wycięty zakup nie stałby wtedy nigdzie
+     na widoku — więc zostaje w historii, nawet gdy ktoś poda `pomin`. */
+  it("przy zamówieniu rozmowy inny zakup zostaje w historii", () => {
+    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ wpisy: [
+      { rodzaj: "zakup", at: "2026-05-12T09:10:00Z", tresc: "Filtr powietrza",
+        zamowienieId: "z-2", link: null, rozmowaId: null, sprawaId: null },
+    ] }) });
+    render(<MemoryRouter><Klient rozmowaId={4821} onOtworzRozmowe={vi.fn()} zamowienieId="z-1"
+      pomin={new Set(["z-2"])} /></MemoryRouter>);
+    expect(screen.getByText(/Filtr powietrza/)).toBeInTheDocument();
+    expect(screen.queryByText(/stoją w wierszu „Zamówienie”/)).toBeNull();
+  });
+
+  it("przy samej sprawie i zakupie pusta oś nie mówi „pierwszy kontakt”", () => {
+    historia.mockReturnValue({ isLoading: false, error: null, data: dane({ sprawa: {
+      id: 5, login: "zielony_ogrod", wersja: 2, stan: "w_toku", krok: "czekamy na zwrot",
+      krokDo: "2026-09-25T06:00:00Z", dzis: false, poTerminie: false, prowadzi: "Bartek", prowadziId: 2,
+      zakonczonoAt: null, zakonczyl: null, odcisk: "{}", nowe: [], dosylki: [] } }) });
+    render(<MemoryRouter><Klient rozmowaId={4821} onOtworzRozmowe={vi.fn()} zamowienieId="z-1" /></MemoryRouter>);
+    expect(screen.queryByText(/Pierwszy kontakt/)).toBeNull();
+    expect(screen.getByText(/Poza tym zakupem nie mamy/)).toBeInTheDocument();
+  });
+
   it("bez sprawy i na samym profilu linijki sprawy nie ma", () => {
     pokaz(dane({ sprawa: null }));
     expect(screen.queryByRole("link", { name: /Sprawa klienta/ })).toBeNull();

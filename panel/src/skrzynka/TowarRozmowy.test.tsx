@@ -15,7 +15,7 @@ vi.mock("../api/wiedza", () => ({ useWiedzaTowaru: () => wiedza() }));
 vi.mock("../towar/Zdjecie", () => ({ Zdjecie: () => <div data-testid="zdjecie" /> }));
 vi.mock("../towar/Powiekszenie", () => ({ Powiekszenie: () => null }));
 
-const { TowarRozmowy } = await import("./TowarRozmowy");
+const { TowarRozmowy, zrodloKartoteki } = await import("./TowarRozmowy");
 
 const oferta = (kartoteka: DopasowanieKartoteki): OfertaRozmowy => ({
   externalId: "12096815384", link: null, zrodlo: "wiadomosc", zgodnosc: null, pobrana: null, kartoteka,
@@ -153,6 +153,74 @@ describe("towar przy rozmowie", () => {
     expect(screen.getByRole("button", { name: /zwiń opis/ })).toBeInTheDocument();
   });
 
+  /* Opis krótszy od progu znaków bywał obcięty i tak: zawinięta linia
+     zjadała szóstą, a wielokropek urywał moment dokręcenia bez przycisku. */
+  it("sześć linii poniżej progu znaków też dostaje przycisk rozwijania", () => {
+    const desc = ["Nóż tnący 53 cm.", "Otwór 5/8\".", "Gwint M41.", "Pasuje bez podkładki dystansowej.",
+      "Hartowany.", "Montaż: śruba 5/8\" momentem 60 Nm."].join("\n");
+    expect(desc.length).toBeLessThan(320);
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, desc } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    expect(screen.getByRole("button", { name: /pokaż cały opis/ })).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("krótki opis obcięty w wąskiej kolumnie dostaje przycisk — rozstrzyga pomiar przeglądarki", () => {
+    /* jsdom nie liczy układu, więc wysokości podstawiamy: treść wyższa niż
+       sześć linii, które widać. */
+    const wys = vi.spyOn(Element.prototype, "scrollHeight", "get").mockReturnValue(160);
+    const widac = vi.spyOn(Element.prototype, "clientHeight", "get").mockReturnValue(120);
+    try {
+      karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, desc: "Gwint M41 x 1,5. Pasuje bez podkładki." } });
+      render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+        pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+      })} />);
+      expect(screen.getByRole("button", { name: /pokaż cały opis/ })).toBeInTheDocument();
+    } finally {
+      wys.mockRestore();
+      widac.mockRestore();
+    }
+  });
+
+  /* SKU oferty stoi w paśmie przy „Zamówił" i w karcie zakupu. Podpis źródła
+     mówi więc samą regułę, a pełne zdanie serwera zostaje w dymku. */
+  it("podpis źródła po SKU nie powtarza samego SKU; zdanie z dopiskiem stoi w całości", () => {
+    expect(zrodloKartoteki({ pewnosc: "sku", zrodlo: 'SKU oferty „NOZ-STIGA-43"' }, "NOZ-STIGA-43"))
+      .toBe("SKU oferty = symbol kartoteki");
+    const zDopiskiem = 'SKU oferty „NOZ-STIGA-43" — sygnatura zmieniła się z „NOZ-43”, dawne wskazanie (Ola) nie obowiązuje';
+    expect(zrodloKartoteki({ pewnosc: "sku", zrodlo: zDopiskiem }, "NOZ-STIGA-43")).toBe(zDopiskiem);
+    expect(zrodloKartoteki({ pewnosc: "pamiec", zrodlo: "Wskazane wcześniej przez: Ola" }, "X"))
+      .toBe("Wskazane wcześniej przez: Ola");
+    expect(zrodloKartoteki({ pewnosc: "sku", zrodlo: 'SKU oferty „A"' }, null)).toBe('SKU oferty „A"');
+  });
+
+  /* Bez treści oferty serwer dopasowuje kartotekę po SKU pozycji zamówienia
+     i pisze to samo zdanie. To SKU stoi w paśmie przy „Zamówił", więc podpis
+     skraca się tak samo jak przy SKU oferty. */
+  it("bez treści oferty podpis źródła skraca się po SKU pozycji zamówienia", () => {
+    karta.mockReturnValue({ isLoading: false, error: null, data: PELNA });
+    render(<TowarRozmowy rozmowaId={1} skuPozycji="NOZ-STIGA-43" oferta={oferta({
+      pewnosc: "sku", twId: 7701, symbol: "NOZ-STIGA-43",
+      zrodlo: 'SKU oferty „NOZ-STIGA-43"', powod: null,
+    })} />);
+    expect(screen.getByText("SKU oferty = symbol kartoteki")).toBeInTheDocument();
+  });
+
+  /* Brak połączenia ogłasza pasek pod nagłówkiem, a pasmo mówi przy nim
+     „nie wiemy". Blok Subiektu nie dokłada trzeciego, czerwonego zapisu. */
+  it("brak połączenia nie daje czerwonego komunikatu w bloku Subiektu; inny błąd — daje", async () => {
+    const { BrakPolaczenia } = await import("../api/klient");
+    const k = oferta({ pewnosc: "sku", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "SKU", powod: null });
+    karta.mockReturnValue({ isLoading: false, error: new BrakPolaczenia(), data: undefined });
+    const { unmount } = render(<TowarRozmowy rozmowaId={1} oferta={k} />);
+    expect(screen.queryByText("Brak połączenia z serwerem.")).toBeNull();
+    unmount();
+    karta.mockReturnValue({ isLoading: false, error: new Error("Nie znaleziono towaru"), data: undefined });
+    render(<TowarRozmowy rozmowaId={1} oferta={k} />);
+    expect(screen.getByText("Nie znaleziono towaru")).toHaveClass("text-ranga-zle");
+  });
+
   /* Opis to WOLNY TEKST, w którym bywa notatka dla magazynu. Wstawka
      parametrów wybiera pola świadomie, bo szkic idzie do klienta.
 
@@ -242,6 +310,45 @@ describe("towar przy rozmowie", () => {
       pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
     })} />);
     expect(screen.getByText("EX055 · 10-02001 (+2 numery obce w opisie)")).toBeInTheDocument();
+  });
+
+  /* ── Jedna gramatyka kolumny ─────────────────────────────────────────────
+     Opis stoi przed cenami, bo w nim są wymiary i gwinty. Pismo nie jest
+     większe od tytułu wiersza, braki stoją jedną linią zamiast obrysów,
+     a liczba wpisów wiedzy — zwykłym tekstem, nie plakietką w wersalikach. */
+  it("opis kartoteki stoi przed cenami, pismem nie większym od tytułu wiersza", () => {
+    wiedza.mockReturnValue({ data: undefined });
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA,
+      desc: "Korek wlewu paliwa. Gwint M41 x 1,5.",
+      ceny: [{ poziom: 1, nazwa: "Detaliczna", nettoGrosze: 4062, bruttoGrosze: 4996, waluta: "PLN" }] } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    const opis = screen.getByText(/Gwint M41/);
+    expect(opis.compareDocumentPosition(screen.getByText("Ceny")) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(opis).toHaveClass("text-sm");
+    expect(opis).not.toHaveClass("text-tresc");
+  });
+
+  it("braki stoją jedną linią, bez przerywanych obrysów", () => {
+    wiedza.mockReturnValue({ data: undefined });
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, ean: null } });
+    const { container } = render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "pamiec", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "Wskazane", powod: null,
+    })} />);
+    expect(screen.getByText(/^brak: EAN · identyfikatory · zamienniki$/)).toBeInTheDocument();
+    expect(container.querySelector(".border-dashed")).toBeNull();
+  });
+
+  it("wiedza o kartotece stoi zwykłym tekstem w linii Subiekt GT, bez wersalików", () => {
+    karta.mockReturnValue({ isLoading: false, error: null, data: PELNA });
+    wiedza.mockReturnValue({ data: { potwierdzone: [{}, {}] as never[], negatywne: [], propozycje: [],
+      pasowania: { pasujace: [], pasujeDo: [], negatywne: [], propozycje: [] } as never } });
+    render(<TowarRozmowy rozmowaId={1} oferta={oferta({
+      pewnosc: "sku", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: 'SKU oferty „NOZ-STIGA-43"', powod: null,
+    })} />);
+    expect(screen.getByText(/wiedza: 2 potwierdzone · 0 negatywnych/)).not.toHaveClass("uppercase");
+    wiedza.mockReturnValue({ data: undefined });
   });
 
   it("każdy fakt magazynowy jest podpisany źródłem", () => {
@@ -344,6 +451,9 @@ describe("położenie ceny oferty", () => {
     const { polozenieOferty } = await import("./TowarRozmowy");
     const p = polozenieOferty(kartoteka, { grosze: 4500, waluta: "PLN" });
     expect(p?.zdanie).toMatch(/43% nad najwyższym poziomem \(Serwisanci 31,49/);
+    /* Kwotę oferty mówi karta, dymek kropki i nazwa figury — zdanie mówi
+       samo położenie. */
+    expect(p?.zdanie).not.toContain("45,00");
     /* Poziom zakupowy (brutto 0) nie wchodzi na oś: zero to brak, nie cena. */
     expect(p?.min).toBe(2422);
     expect(p?.max).toBe(4500);
@@ -355,6 +465,15 @@ describe("położenie ceny oferty", () => {
       .toMatch(/17% pod najniższym poziomem \(Bazowa 24,22/);
     expect(polozenieOferty(kartoteka, { grosze: 3000, waluta: "PLN" })?.zdanie)
       .toMatch(/mieści się między poziomami/);
+  });
+
+  it("figura niesie kwotę oferty w nazwie dla czytnika ekranu", () => {
+    karta.mockReturnValue({ isLoading: false, error: null, data: { ...PELNA, ceny: kartoteka } });
+    render(<TowarRozmowy rozmowaId={1} oferta={{ ...oferta({
+      pewnosc: "sku", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: 'SKU oferty „NOZ-STIGA-43"', powod: null,
+    }), pobrana: { nazwa: "Nóż", sku: "NOZ-STIGA-43", cenaGrosze: 4500, waluta: "PLN", status: "ACTIVE",
+      syncedAt: "2026-09-02T14:50:00Z", zdjecie: "brak" } }} />);
+    expect(screen.getByRole("figure", { name: /Cena oferty 45,00/ })).toBeInTheDocument();
   });
 
   it("bez poziomu brutto w tej walucie nie ma osi", async () => {

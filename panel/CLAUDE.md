@@ -47,6 +47,12 @@ opisuje nagłówek każdego strażnika — zwykle komentarz `<nazwa>: <powód>`
 z co najmniej trzema wyrazami powodu. Odmowa strażnika zwykle znaczy, że
 łamiesz zasadę.
 
+Prawa kolumna skrzynki ma dwóch własnych strażników w `src/skrzynka/`.
+`Gramatyka.test.ts` zatrzymuje w plikach kolumny własne kreski bloków, szare
+tła, ręczne wersaliki i pismo większe od tytułu wiersza (zwolnienie
+`gramatyka: <powód>`). `JedenDom.test.tsx` pilnuje, że fakty karty zakupu
+nie wracają do kolumny. Powody: `docs/panel-obslugi-klienta.md` §10.2g.
+
 ## Dostępność
 
 - **Ekran przechodzi WCAG 2.2 A i AA w strukturze.** Po każdym teście

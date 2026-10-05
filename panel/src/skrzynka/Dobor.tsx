@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { AlertTriangle, FileText, MessageCircleQuestion, Pencil, Ruler, Search } from "lucide-react";
+import { AlertTriangle, ChevronRight, FileText, MessageCircleQuestion, Pencil, Ruler, Search } from "lucide-react";
 import type {
   DaneDoboru, Dobor as DoborTyp, GrupaKandydata, KandydaciDoboru, KandydatDoboru, PewnoscKandydata,
   PodstawaWyboru, WynikDoboru,
@@ -107,10 +107,13 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
   const zmianaMaszyny = dobor.wynik === "czesc"
     && POLA_MASZYNY.some((k) => (formularz[k].trim() || null) !== dobor.dane[k]);
 
-  return <div className="flex min-h-0 flex-col text-sm">
+  /* Bez własnych kresek i wcięć: oddech daje treść wiersza „Dobór", a części
+     dzieli odstęp i nagłówek sekcji. Kreska wewnątrz bloku czytała się jak
+     granica między dwoma blokami kolumny. */
+  return <div className="space-y-4 text-sm">
     {/* Bez własnego nagłówka: wiersz „Dobór" w kolumnie kontekstu niesie
         tytuł i stan w streszczeniu, a drugi raz tuż pod nim to szum. */}
-    <section className="border-b p-3" aria-label="Czego szuka klient">
+    <section aria-label="Czego szuka klient">
       <div className="mb-1.5 flex items-center gap-2">
         {/* Numer wersji w dymku: pilnuje zapisu, a agentowi mówi coś
             dopiero przy konflikcie, który nazywa się wtedy sam. */}
@@ -140,7 +143,7 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
       </form>}
     </section>
 
-    <div className="p-3">
+    <div>
       {dobor.wynik === null && <>
         {kandydaci.isLoading && <p className="text-xs text-slate-600">Szukam…</p>}
         {kandydaci.error && <p className="text-xs text-ranga-zle">{(kandydaci.error as Error).message}</p>}
@@ -149,7 +152,7 @@ export function Dobor({ dobor, rozmowaId, onWstawDoSzkicu, onZlecPomiar }: {
 
         {/* Cztery odpowiedzi w jednym rzędzie pod listą: trzy bez kandydata
             i wyszukiwarka, gdy lista nie ma właściwej części. */}
-        <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+        <div className="mt-3 flex flex-wrap items-center gap-2">
           <Przycisk className="text-xs" disabled={wynik.isPending} onClick={() => ustaw("brak")}>Nie mamy</Przycisk>
           <Przycisk className="text-xs" aria-expanded={dopytuje} onClick={() => setDopytuje((d) => !d)}>
             <MessageCircleQuestion size={14} aria-hidden />Dopytaj o…</Przycisk>
@@ -241,12 +244,13 @@ function Kandydaci({ dane, trwa, onWybierz, onPopraw }: {
 }) {
   const wGrupie = (g: GrupaKandydata) => dane.kandydaci.filter((k) => k.grupa === g);
   const niepuste = GRUPY.filter((g) => wGrupie(g).length > 0 || (g === "numer" && dane.bezKartoteki.length > 0));
-  const lista = (g: GrupaKandydata) => <ul className="mt-1.5 space-y-2">
+  /* Kandydaci jak każda lista kolumny: kreska między pozycjami, bez ramek.
+     Ramka wokół każdego kandydata była pudełkiem w pudełku wiersza. */
+  const lista = (g: GrupaKandydata) => <ul className="mt-1.5 divide-y divide-slate-200">
     {wGrupie(g).map((k) => <Kandydat key={k.twId} k={k} trwa={trwa} onWybierz={() => onWybierz(k)} />)}
     {/* Numer bez kartoteki nie znika, bo „nie mamy" też jest odpowiedzią.
         Nie ma przycisku: nie ma czego wybrać. */}
-    {g === "numer" && dane.bezKartoteki.map((b) => <li key={b.numer}
-      className="rounded-lg border border-dashed border-slate-300 p-2 text-xs text-slate-700">
+    {g === "numer" && dane.bezKartoteki.map((b) => <li key={b.numer} className="py-2 text-xs text-slate-700">
       <b className="font-mono">{b.numer}</b> · {b.zdanie}</li>)}
   </ul>;
 
@@ -260,11 +264,7 @@ function Kandydaci({ dane, trwa, onWybierz, onPopraw }: {
       <Przycisk className="mt-2 text-xs" onClick={onPopraw}><Pencil size={12} aria-hidden />Popraw dane</Przycisk>
     </div>}
     {niepuste.map((g) => g === "podobne" && niepuste.length > 1
-      ? <details key={g} className="mt-3">
-          <summary className="min-h-6 cursor-pointer text-xs font-semibold text-slate-700 hover:text-slate-900">
-            {NAZWA_GRUPY[g]} ({wGrupie(g).length})</summary>
-          {lista(g)}
-        </details>
+      ? <PodobneZwiniete key={g} ile={wGrupie(g).length}>{lista(g)}</PodobneZwiniete>
       : <section key={g} className="mt-3 first:mt-0" aria-label={NAZWA_GRUPY[g]}>
           <NaglowekSekcji jako="h3">{NAZWA_GRUPY[g]}</NaglowekSekcji>
           {lista(g)}
@@ -273,8 +273,25 @@ function Kandydaci({ dane, trwa, onWybierz, onPopraw }: {
   </>;
 }
 
+/**
+ * „Podobne po nazwie" zwinięte, gdy jest coś mocniejszego. Przycisk
+ * z `aria-expanded` zamiast `<details>`: kolumna rozwija wszystko jednym
+ * idiomem, szewronem przed słowem, a czytnik ekranu słyszy stan tak samo
+ * jak przy „Pasuje do".
+ */
+function PodobneZwiniete({ ile, children }: { ile: number; children: React.ReactNode }) {
+  const [otwarte, setOtwarte] = useState(false);
+  return <div className="mt-3">
+    <button type="button" aria-expanded={otwarte} onClick={() => setOtwarte((o) => !o)}
+      className="inline-flex min-h-6 items-center gap-1 text-xs font-semibold text-slate-700 hover:text-slate-900">
+      <ChevronRight size={12} aria-hidden className={`transition-transform ${otwarte ? "rotate-90" : ""}`} />
+      {NAZWA_GRUPY.podobne} ({ile})</button>
+    {otwarte && children}
+  </div>;
+}
+
 function Kandydat({ k, trwa, onWybierz }: { k: KandydatDoboru; trwa: boolean; onWybierz: () => void }) {
-  return <li className="rounded-lg border border-slate-200 p-2">
+  return <li className="py-2">
     {/* CO CZYTA SIĘ PIERWSZE. Dobór rozstrzyga „czy TO jest ta część", a na
         to odpowiada kształt i nazwa. Zdjęcie idzie więc na lewo, nazwa
         dostaje pierwszy plan, symbol i pewność schodzą do podpisu. Symbol
@@ -286,7 +303,9 @@ function Kandydat({ k, trwa, onWybierz }: { k: KandydatDoboru; trwa: boolean; on
       <Kafel twId={k.twId} rozmiar={56} nazwa={k.nazwa} symbol={k.symbol} />
       <div className="min-w-0 flex-1">
         <div className="flex items-start gap-2">
-          <b className="min-w-0 flex-1 text-tresc text-slate-900">{k.nazwa}</b>
+          {/* Pismo nie większe od tytułu wiersza: nazwa prowadzi kartę
+              kandydata wagą, a kafel obok niesie kształt. */}
+          <b className="min-w-0 flex-1 text-sm font-semibold text-slate-900">{k.nazwa}</b>
           {/* DOSTĘPNOŚĆ MA BARWĘ W OBIE STRONY: „mamy 28 sztuk" kończy
               rozmowę jednym zdaniem, a zero każe szukać dalej. */}
           {k.stan === null
@@ -311,7 +330,9 @@ function Kandydat({ k, trwa, onWybierz }: { k: KandydatDoboru; trwa: boolean; on
         className="min-h-6 shrink-0 rounded border border-emerald-600 px-2 py-0.5 text-xs font-bold text-emerald-800 hover:bg-emerald-50 disabled:opacity-50">
         Wybierz</button>
     </div>
-    {k.ostrzezenia.map((o) => <p key={o} className="mt-1 flex items-center gap-1 rounded border border-dashed border-amber-400 bg-amber-50 px-2 py-1 text-podpis text-amber-900">
+    {/* Ostrzeżenie w rodzinie „uwaga", bez przerywanej ramki: ikona i barwa
+        mówią „sprawdź", a obrys ważył więcej niż sam kandydat. */}
+    {k.ostrzezenia.map((o) => <p key={o} className="mt-1 flex items-center gap-1 text-podpis text-ranga-uwaga">
       <AlertTriangle size={12} aria-hidden className="shrink-0" />{o}</p>)}
   </li>;
 }
