@@ -179,7 +179,7 @@ describe("Ustawienia w panelu", () => {
     expect(tytuly()).toEqual(["Reguły strefy złotej"]);
     await userEvent.click(within(nav).getByRole("button", { name: /^Ludzie i urządzenia/ }));
     await screen.findByText("Jan Wrona");
-    expect(tytuly()).toEqual(["Konta i sesje", "Nowy kolektor"]);
+    expect(tytuly()).toEqual(["Twoje hasło", "Konta i sesje", "Nowy kolektor"]);
     await userEvent.click(within(nav).getByRole("button", { name: /^Obsługa klienta/ }));
     await screen.findByText("Termin na zwrot");
     expect(tytuly()).toEqual(["Tagi spraw", "Zwroty i reklamacje"]);
@@ -575,6 +575,27 @@ describe("Ustawienia w panelu", () => {
        adminowe i ich przyciski dalej nie istnieją. */
     expect(within(k).getAllByRole("button").map((b) => b.textContent)).toEqual(["Dodaj osobę"]);
     expect(within(k).getByText(/Reset hasła, wyłączenie konta i sesje są po stronie administratora/)).toBeInTheDocument();
+  });
+
+  /* Własne hasło nie jest operacją admina: biuro widzi kartę i zmienia hasło
+     samo. Otwarcie grupy i formularza nic nie wysyła — dopiero przycisk. */
+  it("biuro zmienia własne hasło w grupie Ludzie — otwarcie formularza to zero zapisu", async () => {
+    rola = "biuro";
+    pokaz("/obsluga/ustawienia?karta=haslo");
+    const k = await waitFor(() => karta("Twoje hasło"));
+    expect(within(screen.getByRole("navigation", { name: "Grupy ustawień" }))
+      .getByRole("button", { name: /^Ludzie i urządzenia/ })).toHaveAttribute("aria-current", "page");
+    await userEvent.click(within(k).getByRole("button", { name: "Zmień hasło" }));
+    expect(wyslane).toEqual([]);
+    const f = within(k).getByRole("form", { name: "Zmiana hasła" });
+    await userEvent.type(within(f).getByLabelText("Obecne hasło"), "stare-haslo");
+    await userEvent.type(within(f).getByLabelText("Nowe hasło"), "nowe-haslo-1");
+    await userEvent.type(within(f).getByLabelText("Powtórz nowe hasło"), "nowe-haslo-1");
+    await userEvent.click(within(f).getByRole("button", { name: "Zmień hasło" }));
+    await waitFor(() => expect(wyslane).toHaveLength(1));
+    expect(wyslane[0]).toMatchObject({ metoda: "POST", url: "/api/auth/haslo", typ: "application/json" });
+    expect(JSON.parse(wyslane[0].body!)).toEqual({ stare: "stare-haslo", nowe: "nowe-haslo-1" });
+    expect(await within(k).findByText("Hasło zmienione.")).toHaveAttribute("role", "status");
   });
 
   it("biuro zakłada wyłącznie magazyniera — innej roli formularz nie proponuje", async () => {

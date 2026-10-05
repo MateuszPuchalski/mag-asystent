@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { KeyRound, LogOut, MoreHorizontal, Power, UserPlus, Users } from "lucide-react";
 import {
-  useAktywnosc, useKonta, useResetHasla, useSesje, useWylogujWszedzie, useZalozKonto,
+  HASLO_MIN, useAktywnosc, useKonta, useResetHasla, useSesje, useWylogujWszedzie, useZalozKonto,
   type Konto, type RolaKonta,
 } from "../api/ustawienia";
 import { Blad, Pole, Przycisk, stempel } from "../ui";
@@ -37,8 +37,6 @@ import { useOkienko } from "../skrzynka/MenuRozmowy";
    Czynności rozwijają się W WIERSZU, nie w pływającym okienku. `Tabela`
    przewija się w poziomie, a karta ucina, co wystaje: okienko nad ostatnim
    wierszem zniknęłoby pod krawędzią karty. */
-
-const HASLO_MIN = 8;
 
 function WierszKonta({ k, admin, sesjeOtwarte, onSesje }: {
   k: Konto; admin: boolean; sesjeOtwarte: boolean; onSesje: () => void;
