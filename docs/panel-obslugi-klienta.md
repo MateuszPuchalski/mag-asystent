@@ -1034,6 +1034,17 @@ chodzi teraz tylko przy statusach naszego ruchu. Data ostatniej wiadomości
 ustępuje mu miejsca, bo przy „czeka na nas" oba znaczniki opisują tę samą
 wiadomość. Gdy zegara nie ma, data wraca.
 
+**Wiersz trzyma dwie krawędzie (@wydanie).** Kolejkę czyta się w dół: lewą
+krawędzią po loginach, prawą po wieku. Kropka nieprzeczytanego stała w linii
+i przesuwała znak oraz login o 16 px, więc lewa krawędź skakała. Kropka wisi
+teraz na lewym marginesie, bliżej znaku niż belki zaznaczenia. Otwarcie rozmowy
+nie zdejmuje flagi, więc wybrany wiersz bywa nieprzeczytany. Data bez zegara
+jest krótka: „15:32", „wczoraj" albo „04.10". Pełna data ścinała login o rok
+i godzinę sprzed dni, których w tej kolumnie nikt nie czyta. Rok wraca przy
+wiadomości z poprzedniego roku, bo bez niego to inna data. Pełną chwilę
+pokazuje dymek. Ładny wiersz jest tu tym samym, co wiersz czytany jednym
+ruchem oka.
+
 **Stan spoczynku Copilota nie dostaje pasma (0.251.0).** Wyłączony Copilot i
 rozpoznany kubełek zajmowały po pełnym paśmie, żeby donieść o braku roboty.
 Oba fakty niesie teraz znak w nagłówku kolejki, w podpowiedzi i w `aria-label`.
