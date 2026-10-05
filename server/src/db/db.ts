@@ -422,6 +422,10 @@ export function migrate(database: DatabaseSync) {
     ["przesylka_status", "TEXT"], ["przesylka_dostarczono_at", "TEXT"],
     ["przesylka_sprawdzono_at", "TEXT"],
   ] as const) addColumn("zamowienie_klienta", kol, typ);
+  /* Realizacja przed nadaniem — powód przy kolumnach w `schema.sql`. NULL
+     znaczy „Allegro nie podało albo zamówienia od tej pory nie czytaliśmy". */
+  addColumn("zamowienie_klienta", "realizacja_status", "TEXT");
+  addColumn("zamowienie_klienta", "nadanie_do", "TEXT");
   /* Decyzje biura przy zwrocie (0.156.0). Do niego kolejka bramek routowała
      po kolumnach, których nic nie zapisywało — każdy zwrot stał w DO DECYZJI
      na zawsze. Te dwie kolumny domykają zapis kwoty: co weszło do sumy. */

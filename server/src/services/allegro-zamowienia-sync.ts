@@ -6,6 +6,7 @@ import { kontoKanalu } from "./kanal-konto.js";
 import { logEvent } from "./events.js";
 import { oczyscSurowy } from "./allegro-oczyszczanie.js";
 import { naGrosze } from "./allegro-zwroty-sync.js";
+import { chwilaUtc } from "../czas.js";
 
 /* ── Uzupełnianie zamówień do zwrotów (0.152.0) ──────────────────────────────
    Zwrot niesie sam numer zamówienia. Decyzja potrzebuje jego treści i to
@@ -79,7 +80,14 @@ type Zamowienie = {
       firstName?: string; lastName?: string; companyName?: string;
       street?: string; city?: string; zipCode?: string; phoneNumber?: string;
     } | null;
+    /* Z okna dostawy wyłącznie najpóźniejsze NADANIE: `time.from`/`time.to`
+       mówią o doręczeniu, a `guaranteed` jest wycofane ze specyfikacji. */
+    time?: { dispatch?: { to?: string } | null } | null;
   } | null;
+  /* Status realizacji ustawiany przez sprzedawcę (`CheckoutFormFulfillment`,
+     bez `required`). `shipmentSummary` mówi o numerach przesyłek, które
+     i tak czytamy osobną końcówką, więc go nie deklarujemy. */
+  fulfillment?: { status?: string } | null;
   /* Płatność i żądanie faktury (0.169.0). Z `payment` bierzemy TYP i moment
      zapłaty; identyfikatora ani kwoty nie — kwotę mamy już z `summary`.
      Z `invoice` bierzemy SAMĄ FLAGĘ `required`: `invoice.address` niesie
@@ -246,6 +254,40 @@ export async function uzupelnijZamowienia(deps: ZamowieniaSyncDeps = {}): Promis
     for (const z of pobrane) zapisz(database, z, konto, at);
   })();
   return pobrane.length;
+}
+
+/** Zamówienie czytane dawniej niż tyle odświeżamy przed szkicem. */
+export const SWIEZOSC_ZAMOWIENIA_MS = 30 * 60_000;
+
+/**
+ * Jedno zamówienie od nowa, przed szkicem odpowiedzi.
+ *
+ * Ticker dociąga zamówienie RAZ, zwykle gdy przychodzi pierwsza wiadomość.
+ * Płatność, status sprzedawcy i termin nadania zmieniają się później, a szkic
+ * na „czy wyjdzie dziś?" stoi właśnie na nich. Stąd jedno żądanie, wołane
+ * wyłącznie z ułożenia szkicu — nigdy z otwarcia rozmowy.
+ *
+ * Nie pytamy o zamówienie nadane, doręczone ani anulowane: na te pytania
+ * odpowiada fakt o przesyłce albo nic się już nie zmieni. Odmowa Allegro
+ * zostawia stan zapisany wcześniej i nie przerywa szkicu.
+ */
+export async function odswiezZamowienie(
+  database: Db, zamowienieId: number,
+  deps: { query?: (url: string) => Promise<unknown | null>; apiUrl?: string } = {},
+  teraz = Date.now(),
+): Promise<void> {
+  const w = database.prepare(`SELECT channel_account_id, external_id, status, synced_at,
+      przesylka_waybill, przesylka_dostarczono_at FROM zamowienie_klienta WHERE id=?`)
+    .get(zamowienieId) as Record<string, unknown> | undefined;
+  if (!w || w.status === "CANCELLED" || w.przesylka_waybill || w.przesylka_dostarczono_at) return;
+  if (teraz - chwilaUtc(String(w.synced_at)) < SWIEZOSC_ZAMOWIENIA_MS) return;
+
+  const query = deps.query ?? zapytajAllegro;
+  const body = await query(urlZamowienia(deps.apiUrl ?? config.allegro.apiUrl, String(w.external_id)))
+    .catch(() => null) as Zamowienie | null;
+  if (!body || body.id !== String(w.external_id)) return;
+  const at = new Date(teraz).toISOString();
+  transaction(database, () => zapisz(database, body, Number(w.channel_account_id), at))();
 }
 
 /**
@@ -481,8 +523,8 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
      odbiorca_telefon,odbiorca_telefon_cyfry,odbiorca_ulica,odbiorca_miasto,odbiorca_kod,
      dostawa_grosze,dostawa_metoda,
      platnosc_typ,platnosc_at,platnosc_id,faktura_zadana,
-     suma_grosze,waluta,kupiono_at,zmieniono_at,synced_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+     suma_grosze,waluta,kupiono_at,zmieniono_at,realizacja_status,nadanie_do,synced_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     ON CONFLICT(channel_account_id, external_id) DO UPDATE SET
       status=excluded.status, kupujacy_login=excluded.kupujacy_login,
       odbiorca_nazwa=excluded.odbiorca_nazwa,
@@ -497,6 +539,7 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
       faktura_zadana=excluded.faktura_zadana,
       suma_grosze=excluded.suma_grosze, waluta=excluded.waluta,
       kupiono_at=excluded.kupiono_at, zmieniono_at=excluded.zmieniono_at,
+      realizacja_status=excluded.realizacja_status, nadanie_do=excluded.nadanie_do,
       synced_at=excluded.synced_at`).run(
     konto, z.id, z.status ?? null, z.buyer?.login ?? null, adres.nazwa,
     adres.telefon, adres.telefonCyfry, adres.ulica, adres.miasto, adres.kod,
@@ -510,7 +553,8 @@ function zapisz(database: Db, z: Zamowienie, konto: number, at: string): void {
        „klient nie chciał faktury". Ekran ma prawo powiedzieć „nie wiadomo". */
     z.invoice?.required == null ? null : (z.invoice.required ? 1 : 0),
     z.summary?.totalToPay?.amount == null ? null : naGrosze(z.summary.totalToPay.amount),
-    waluta, kupiono, z.updatedAt ?? null, at);
+    waluta, kupiono, z.updatedAt ?? null,
+    tekst(z.fulfillment?.status), tekst(z.delivery?.time?.dispatch?.to), at);
 
   const id = Number((database.prepare(
     "SELECT id FROM zamowienie_klienta WHERE channel_account_id=? AND external_id=?",

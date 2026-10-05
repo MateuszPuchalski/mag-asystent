@@ -177,6 +177,43 @@ test("kontekst niczego nie zapisuje", () => {
     liczba("conversation_event"), liczba("towar_identyfikator")], przed);
 });
 
+test("rozmowa z nienadanym zamówieniem dostaje fakt o realizacji z werdyktem „wyślemy dziś”", () => {
+  /* Klient pyta „czy wyjdzie dziś?". Bez tego faktu szkic znał tylko
+     „Allegro nie ma numeru przesyłki" i odpowiadał „sprawdzamy". */
+  db().prepare("UPDATE message SET related_order_id='ord-1' WHERE id=?").run(pytanie);
+  db().prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,realizacja_status,
+    nadanie_do,synced_at) VALUES (?,'ord-1','READY_FOR_PROCESSING','PROCESSING','2026-10-06T15:00:00Z',
+    '2026-10-06T07:00:00Z')`).run(konto);
+  const k = S.kontekstSzkicu(rozmowa, subiekt, new Date("2026-10-06T08:00:00Z"));
+  const fakt = k.fakty.find((f) => f.rodzaj === "realizacja");
+  assert.ok(fakt, "brak faktu o realizacji");
+  assert.match(fakt.zdanie, /wyślemy ją dziś/);
+});
+
+test("ułożenie szkicu odświeża stare zamówienie, zanim złoży fakty", async () => {
+  /* Ticker czyta zamówienie raz, przy pierwszej wiadomości. Bez odświeżenia
+     szkic stałby na płatności i terminie sprzed godzin. */
+  db().prepare("UPDATE message SET related_order_id='ord-1' WHERE id=?").run(pytanie);
+  db().prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,status,synced_at)
+    VALUES (?,'ord-1','FILLED_IN','2026-10-05T07:00:00Z')`).run(konto);
+  const wolane: string[] = [];
+  let fakty = "";
+  await S.ulozSzkic(rozmowa, KTO(), async (w, f, z) => { fakty = String(f); return nadawca()(w, f, z); },
+    subiekt, new Date("2026-10-06T08:00:00Z"), undefined, {
+      apiUrl: "https://api.test", teraz: () => "2026-10-06T08:00:00Z",
+      query: async (url) => {
+        wolane.push(url);
+        if (url.endsWith("/order/checkout-forms/ord-1")) {
+          return { id: "ord-1", status: "READY_FOR_PROCESSING",
+            delivery: { time: { dispatch: { to: "2026-10-06T15:00:00Z" } } }, lineItems: [] };
+        }
+        return { shipments: [] };
+      },
+    });
+  assert.ok(wolane.some((u) => u.endsWith("/order/checkout-forms/ord-1")), "zamówienie nieodświeżone");
+  assert.match(fakty, /wyślemy ją dziś/);
+});
+
 /* ── Linki do naszych aktywnych aukcji (0.270.0) ─────────────────────────── */
 
 test("link do NASZEJ oferty wchodzi do faktów, z numeracją biegnącą dalej", () => {
