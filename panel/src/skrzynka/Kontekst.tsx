@@ -17,7 +17,7 @@ import { Soczewka } from "./Soczewki";
 import { useHistoriaKlienta, useWiedzaDoboru } from "../api/rozmowy";
 import type { Towar } from "../wyszukiwarka";
 import { NAZWA_STANU_DOBORU, STATUS_PACZKI } from "./statusy";
-import { bramkaDoboru, coSwieci, historiaPozaZakupem, klientWKolumnie, ofertaWKarcie, paczkaWyzej,
+import { bramkaDoboru, coSwieci, historiaWierszaKlienta, klientWKolumnie, ofertaWKarcie, paczkaWyzej,
   paraPasowania, pozycjeWKolumnie, pozycjiDoWskazania, towarOtwartyNaStart, wiedzaMaTresc,
   zwrotWToku } from "./kokpit";
 
@@ -149,8 +149,11 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
      stałoby drugi raz, a „to nie ta paczka?" wskazywałoby samo siebie. */
   const inneZakupy = dane.kandydaciZamowien.filter((k) => k.externalId !== zamowienieId);
   const zamowienieMaTresc = paczkaWRzedzie || pozycjeWRzedzie || inneZakupy.length > 0;
-  const klient = historia.data && klientWKolumnie(historia.data, zamowienieId)
-    ? historiaPozaZakupem(historia.data, zamowienieId) ?? null : null;
+  /* Zakupy z listy schodzą z historii tylko wtedy, gdy lista stoi otwarta,
+     czyli bez zamówienia rozmowy. Reguła w `kokpit.ts` przy `historiaWierszaKlienta`. */
+  const zakupyNaLiscie = zamowienieId === null ? new Set(inneZakupy.map((k) => k.externalId)) : undefined;
+  const klient = historia.data && klientWKolumnie(historia.data, zamowienieId, zakupyNaLiscie)
+    ? historiaWierszaKlienta(historia.data, zamowienieId, zakupyNaLiscie) ?? null : null;
 
   const dobor = <Dobor key={dane.rozmowa.id} dobor={dane.dobor} rozmowaId={dane.rozmowa.id}
     onWstawDoSzkicu={onWstawDoSzkicu} onZlecPomiar={onZlecPomiar} />;
@@ -221,7 +224,8 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
               wyłącznie różnicę. */}
           <OfertaRozmowy oferta={oferta} zTytulem={!ofertaWKarcie(dane)}
             cenaZakupuGrosze={pozycjaRozmowy?.cenaGrosze ?? null} />
-          <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id} />
+          <TowarRozmowy oferta={oferta} rozmowaId={dane.rozmowa.id}
+            skuPozycji={pozycjaRozmowy?.sku ?? null} />
           {/* „Szukaj innego towaru mimo to" stoi tutaj, a nie we własnym
               wierszu „Dobór: zbędny", który przy każdej takiej rozmowie mówił,
               że czegoś NIE trzeba robić. Kliknięcie OTWIERA dobór: bez tego
@@ -283,13 +287,13 @@ function Kolumna({ dane, onWstawDoSzkicu, onZlecPomiar, onOtworzRozmowe }: {
 
       {/* Klient staje tylko z treścią POZA tym zakupem. Wpisy tego zakupu mają
           dom w karcie, w ramie, w „Zamkniętych sprawach" i w osi; reguła stoi
-          w `kokpit.ts` przy `klientWKolumnie`. Inne zakupy klienta mają dom
-          w wierszu „Zamówienie", gdzie da się je powiązać, więc historia ich
-          nie powtarza. */}
+          w `kokpit.ts` przy `klientWKolumnie`. Inne zakupy schodzą z historii
+          tylko w rozmowie bez zamówienia, gdy lista „Zakupy tego klienta"
+          stoi otwarta w wierszu „Zamówienie". */}
       {klient && <Wiersz tytul="Klient" streszczenie={streszczenieWierszaKlienta(klient)}
         otwarty={otwarte.has("klient")} onPrzelacz={() => przelacz("klient")}>
         <Klient key={dane.rozmowa.id} rozmowaId={dane.rozmowa.id} onOtworzRozmowe={onOtworzRozmowe}
-          zamowienieId={zamowienieId} pomin={new Set(inneZakupy.map((k) => k.externalId))} />
+          zamowienieId={zamowienieId} pomin={zakupyNaLiscie} />
       </Wiersz>}
 
       {/* Maszyna z DANYCH DOBORU, nie z historii klienta: pomiar ma pasować do

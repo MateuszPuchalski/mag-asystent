@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { HistoriaKlienta, OsRozmowy, StanDoboru, SzkicCopilota, WiedzaDoboru } from "../api/typy";
-import { bramkaDoboru, coSwieci, doborWToku, historiaPozaZakupem, klientMaHistorie, klientWKolumnie, nowyKlient,
+import { bramkaDoboru, coSwieci, doborWToku, historiaPozaZakupem, historiaWierszaKlienta, klientMaHistorie, klientWKolumnie, nowyKlient,
   ofertaWKarcie, paczkaWyzej, paraPasowania, pozycjeWKolumnie, towarOtwartyNaStart, towarZnany, wiedzaMaTresc }
   from "./kokpit";
 
@@ -235,6 +235,24 @@ describe("historia bez tego zakupu", () => {
     expect(klientWKolumnie(h({ maszyny: [{ marka: "NAC" } as never] }), "z")).toBe(true);
     /* Bez loginu historii nie ma, ale sprawa klienta tak — rozmowa ma do niej odsyłać. */
     expect(klientWKolumnie(h({ login: null, sprawa }), "z")).toBe(true);
+  });
+
+  /* Para: zakup z listy schodzi z historii tylko przy OTWARTEJ liście (bez
+     zamówienia rozmowy). Przy zamówieniu lista stoi za „to nie ta paczka?",
+     a zakup wycięty z historii nie stałby nigdzie na widoku. */
+  it("historia wiersza bez zamówienia wycina zakupy z listy, zostawia ich zwroty i rozmowy", () => {
+    const pelna = h({ wpisy: [wpis("zakup", "inne"), wpis("zwrot", "inne"), wpis("rozmowa", null)] });
+    const naLiscie = new Set(["inne"]);
+    expect(historiaWierszaKlienta(pelna, null, naLiscie)!.wpisy.map((w) => w.rodzaj)).toEqual(["zwrot", "rozmowa"]);
+    expect(historiaWierszaKlienta(pelna, "z", naLiscie)!.wpisy.map((w) => w.rodzaj))
+      .toEqual(["zakup", "zwrot", "rozmowa"]);
+    expect(historiaWierszaKlienta(pelna, null)).toBe(pelna);
+  });
+
+  it("wiersz Klient nie staje dla samych zakupów z otwartej listy; przy zamówieniu staje", () => {
+    const tylkoInny = h({ wpisy: [wpis("zakup", "inne")] });
+    expect(klientWKolumnie(tylkoInny, null, new Set(["inne"]))).toBe(false);
+    expect(klientWKolumnie(tylkoInny, "z", new Set(["inne"]))).toBe(true);
   });
 });
 

@@ -144,6 +144,10 @@ describe("KartaKontekstu", () => {
     expect(karta).toHaveTextContent("treść zamówienia jeszcze nie pobrana");
     expect(karta).not.toHaveTextContent("zamówienia jeszcze nie powiązano");
     expect(karta).toHaveTextContent("17147703077");
+    /* Obok numeru miejsce sumy czyta się jak suma zamówienia. Cena oferty
+       stoi więc przy ofercie, podpisana, i tylko tam. */
+    expect(karta).toHaveTextContent("cena w ofercie 10,00");
+    expect(karta.textContent?.match(/10,00/g) ?? []).toHaveLength(1);
   });
 
   it("pasek klienta: wcześniejsze sprawy słowem, bez „nowy klient”", () => {

@@ -195,6 +195,32 @@ describe("towar przy rozmowie", () => {
     expect(zrodloKartoteki({ pewnosc: "sku", zrodlo: 'SKU oferty „A"' }, null)).toBe('SKU oferty „A"');
   });
 
+  /* Bez treści oferty serwer dopasowuje kartotekę po SKU pozycji zamówienia
+     i pisze to samo zdanie. To SKU stoi w paśmie przy „Zamówił", więc podpis
+     skraca się tak samo jak przy SKU oferty. */
+  it("bez treści oferty podpis źródła skraca się po SKU pozycji zamówienia", () => {
+    karta.mockReturnValue({ isLoading: false, error: null, data: PELNA });
+    render(<TowarRozmowy rozmowaId={1} skuPozycji="NOZ-STIGA-43" oferta={oferta({
+      pewnosc: "sku", twId: 7701, symbol: "NOZ-STIGA-43",
+      zrodlo: 'SKU oferty „NOZ-STIGA-43"', powod: null,
+    })} />);
+    expect(screen.getByText("SKU oferty = symbol kartoteki")).toBeInTheDocument();
+  });
+
+  /* Brak połączenia ogłasza pasek pod nagłówkiem, a pasmo mówi przy nim
+     „nie wiemy". Blok Subiektu nie dokłada trzeciego, czerwonego zapisu. */
+  it("brak połączenia nie daje czerwonego komunikatu w bloku Subiektu; inny błąd — daje", async () => {
+    const { BrakPolaczenia } = await import("../api/klient");
+    const k = oferta({ pewnosc: "sku", twId: 7701, symbol: "NOZ-STIGA-43", zrodlo: "SKU", powod: null });
+    karta.mockReturnValue({ isLoading: false, error: new BrakPolaczenia(), data: undefined });
+    const { unmount } = render(<TowarRozmowy rozmowaId={1} oferta={k} />);
+    expect(screen.queryByText("Brak połączenia z serwerem.")).toBeNull();
+    unmount();
+    karta.mockReturnValue({ isLoading: false, error: new Error("Nie znaleziono towaru"), data: undefined });
+    render(<TowarRozmowy rozmowaId={1} oferta={k} />);
+    expect(screen.getByText("Nie znaleziono towaru")).toHaveClass("text-ranga-zle");
+  });
+
   /* Opis to WOLNY TEKST, w którym bywa notatka dla magazynu. Wstawka
      parametrów wybiera pola świadomie, bo szkic idzie do klienta.
 

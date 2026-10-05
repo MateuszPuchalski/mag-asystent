@@ -4,6 +4,7 @@ import { EtykietaWartosci, NaglowekSekcji, ile, odmien } from "../ui";
 import type { CenaPoziomu, DopasowanieKartoteki, KartaTowaru, OfertaRozmowy, PasowaniaTowaru } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { useKartaTowaru, useWskazKartoteke } from "../api/rozmowy";
+import { BrakPolaczenia } from "../api/klient";
 import { useWiedzaTowaru } from "../api/wiedza";
 import { Wyszukiwarka, type Towar as TowarZWyszukiwarki } from "../wyszukiwarka";
 import { Kafel } from "../towar/Kafel";
@@ -37,9 +38,12 @@ import { ODNOSNIK_CICHY } from "./odnosniki";
  * z Subiekta, a podpis przy kartotece mówi, czy stoi za nią SKU z Allegro,
  * czy decyzja człowieka.
  */
-export function TowarRozmowy({ oferta, rozmowaId }: {
+export function TowarRozmowy({ oferta, rozmowaId, skuPozycji = null }: {
   oferta: OfertaRozmowy;
   rozmowaId: number;
+  /** SKU pozycji zamówienia tej oferty. Serwer bez treści oferty dopasowuje
+   *  kartotekę właśnie po nim i pisze to samo zdanie „SKU oferty „X"". */
+  skuPozycji?: string | null;
 }) {
   const [szukam, setSzukam] = useState(false);
   const zapisz = useWskazKartoteke();
@@ -81,7 +85,7 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
       {/* Puste `sku` w pamięci znaczy „wskazał człowiek". Zdanie pisze serwer,
           a panel skraca je tylko przy powiązaniu po SKU (`zrodloKartoteki`). */}
       {potwierdzona !== null && <span className="text-podpis text-slate-500" title={k.zrodlo}>
-        {zrodloKartoteki(k, oferta.pobrana?.sku)}</span>}
+        {zrodloKartoteki(k, oferta.pobrana?.sku ?? skuPozycji)}</span>}
       {/* OSOBNE zdanie w barwie wiedzy: §4.3 nie miesza źródeł, a to jest
           nasza baza wiedzy, nie dane z ERP. Zwykłym pismem, bo plakietka
           w ramce i wersalikach ważyła jak ustalenie, a to liczba wpisów. */}
@@ -113,7 +117,11 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
               symbol={k.symbol} />
             <div className="min-w-0 flex-1">
               {karta.isLoading && <p className="text-xs text-slate-500">Wczytuję stan z Subiekta…</p>}
-              {karta.error && <p className="text-xs text-ranga-zle">{(karta.error as Error).message}</p>}
+              {/* Brak połączenia ogłasza raz pasek pod nagłówkiem (`Polaczenie.tsx`),
+                  a pasmo nad kolumną mówi przy nim „nie wiemy". Trzeci, czerwony
+                  zapis tej samej awarii tutaj byłby sprzeczny z nimi. */}
+              {karta.error && !(karta.error instanceof BrakPolaczenia)
+                && <p className="text-xs text-ranga-zle">{(karta.error as Error).message}</p>}
               {/* Wejście do przekroju towaru — `towar/Szuflada.tsx`. Błękit, bo to
                   praca w panelu, jak każdy taki ruch w kolumnie (`odnosniki.tsx`). */}
               {karta.data && <PrzyciskTowaru twId={potwierdzona} className="text-xs font-semibold text-sky-700 hover:text-sky-900">
@@ -184,7 +192,8 @@ export function TowarRozmowy({ oferta, rozmowaId }: {
  * Podpis źródła kartoteki (§4.3).
  *
  * BEZ DRUGIEGO SKU. Przy powiązaniu po sygnaturze serwer pisze „SKU oferty
- * „X"", a to samo X stoi w paśmie przy „Zamówił" i w karcie zakupu. Podpis
+ * „X"", a to samo X stoi w karcie zakupu, a przy zamówieniu także w paśmie
+ * przy „Zamówił". Podpis
  * mówi wtedy samą regułę, a pełne zdanie zostaje w dymku. Zdanie z czymkolwiek
  * więcej, np. z dopiskiem o zmienionej sygnaturze, stoi w całości, bo dopisek
  * jest ostrzeżeniem, a nie powtórzeniem. Nieznany kształt zdania też.

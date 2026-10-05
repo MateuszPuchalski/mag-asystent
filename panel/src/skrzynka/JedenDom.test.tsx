@@ -236,10 +236,14 @@ describe("Fakt z karty zakupu nie wraca do prawej kolumny", () => {
       expect(obroty).toBeGreaterThanOrEqual(2);
       expect(within(kolumna()).getByLabelText("Paczka zamówienia")).toBeInTheDocument();
       sprawdzDomy();
-      /* Inny zakup klienta ma dom w „Innych zakupach klienta", skąd się go
-         wiąże z rozmową. Historia w wierszu „Klient" mówiła go drugi raz,
-         z inną walutą i innym zapisem numeru. */
-      expect(kolumna().textContent?.match(/FILTR POWIETRZA/g) ?? []).toHaveLength(innychZakupow);
+      /* Inny zakup klienta stoi RAZ do czytania: w historii wiersza „Klient".
+         Lista za „to nie ta paczka?" służy do przepięcia zamówienia, nie do
+         czytania, więc liczymy go poza nią. Bez zamówienia rozmowy jest
+         odwrotnie: lista stoi otwarta, a historia go nie powtarza
+         (`historiaWierszaKlienta`, test-para w `kokpit.test.ts`). */
+      const lista = within(kolumna()).queryByRole("region", { name: "Inne zakupy klienta" });
+      const pozaLista = (kolumna().textContent ?? "").replace(lista?.textContent ?? "\u0000", "");
+      expect(pozaLista.match(/FILTR POWIETRZA/g) ?? []).toHaveLength(innychZakupow);
 
       expect(zadania.filter((z) => z.metoda !== "GET")).toEqual([]);
     });

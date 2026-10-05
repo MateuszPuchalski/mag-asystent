@@ -1269,7 +1269,7 @@ mamy w Subiekcie, gdzie jest paczka i co czeka na ruch.
 
 | fakt | dom | co zeszło z kolumny |
 |---|---|---|
-| numer zamówienia, suma, data zakupu | karta i linie osi; numer z kopiowaniem i Allegro także przed treścią zamówienia | nagłówek bloku zamówienia, „Kupione · zapłacono”, daty w streszczeniu i w „Zamówił” |
+| numer zamówienia, suma, data zakupu | karta i linie osi; numer z kopiowaniem i Allegro także przed treścią zamówienia, a cena oferty stoi wtedy przy ofercie, nie w miejscu sumy | nagłówek bloku zamówienia, „Kupione · zapłacono”, daty w streszczeniu i w „Zamówił” |
 | nazwa, SKU, zdjęcie i cena oferty | karta | tytuł, kafel i cena w „Oferta i towar”, kwota w zdaniu osi cen, nazwa i SKU w bramce doboru |
 | stan oferty | słowo w streszczeniu „Oferta i towar” | plakietka „ACTIVE” |
 | „Nowy klient” i „Wcześniej u nas” | karta, także zwinięta i w pasku | linijka pod pasmem i liczniki w wierszu „Klient” |
@@ -1306,9 +1306,12 @@ mówi ich liczbę, zamiast podawać pierwszą jako towar rozmowy.
 **Wiersz „Klient” staje tylko z treścią spoza tego zakupu.** Jego streszczenie
 mówi sprawę klienta z krokiem i terminem, maszynę i datę ostatniego wpisu.
 Liczników nie mówi, bo mówi je karta. Sprawa po terminie stoi na początku
-streszczenia, bo skracany koniec wiersza mógłby ją uciąć. Inne zakupy klienta
-nie stoją w jego historii drugi raz. Ich dom to „Inne zakupy klienta”
-w wierszu „Zamówienie”, skąd się je wiąże z rozmową.
+streszczenia, bo skracany koniec wiersza mógłby ją uciąć. W rozmowie bez
+zamówienia zakupy klienta stoją otwarte w wierszu „Zamówienie”, skąd się je
+wiąże z rozmową, więc historia ich nie powtarza. Przy powiązanym zamówieniu ta
+lista chowa się za „to nie ta paczka?”, bo służy do przepięcia. Zakupy zostają
+wtedy w historii, inaczej nie stałyby nigdzie na widoku. Wiersz staje
+i streszcza się z tej samej historii, którą pokazuje (`historiaWierszaKlienta`).
 
 **„Wymaga Ciebie” ma jedną bursztynową ramę.** Nagłówek stoi w ramie, a pozycje
 dzieli kreska. Licznik liczy każdą narysowaną pozycję: zwrot, sprawę, paczkę,
@@ -1347,7 +1350,8 @@ zaczyna się na 16 px, także w ramie. Szewron wiersza stoi po prawej.
 Odnośniki mają trzy kształty: praca w panelu, cicha poprawka i wyjście do
 Allegro (`skrzynka/odnosniki.tsx`). Nic nie jest większe od tytułu wiersza,
 a każde rozwijanie niesie `aria-expanded`. Przy kartotece po SKU podpis
-źródła mówi „SKU oferty = symbol kartoteki”, bo symbol stoi już w paśmie.
+źródła mówi „SKU oferty = symbol kartoteki”, bo symbol stoi w karcie zakupu,
+a przy zamówieniu także w paśmie.
 Pełne zdanie serwera stoi w dymku.
 
 **Strażnicy.** `skrzynka/JedenDom.test.tsx` stawia kolumnę na prawdziwych

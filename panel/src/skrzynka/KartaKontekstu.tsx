@@ -121,7 +121,11 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
   const pozycjaRozmowy = ofertaId === null ? undefined : pozycje.find((p) => p.offerId === ofertaId);
   const nazwa = pozycjaRozmowy?.nazwa ?? (pozycje.length === 1 ? pozycje[0].nazwa
     : pozycje.length > 1 ? ile(pozycje.length, "pozycja", "pozycje", "pozycji") : oferta?.nazwa ?? null);
-  const suma = zam ? zlote(zam.sumaGrosze, zam.waluta) : oferta ? zlote(oferta.cenaGrosze, oferta.waluta ?? "PLN") : null;
+  /* Cena oferty staje w miejscu sumy tylko bez numeru zamówienia. Obok numeru
+     to miejsce czyta się jak suma tego zamówienia, a cena oferty nią nie jest:
+     wtedy stoi przy ofercie, podpisana. */
+  const cenaOferty = oferta ? zlote(oferta.cenaGrosze, oferta.waluta ?? "PLN") : null;
+  const suma = zam ? zlote(zam.sumaGrosze, zam.waluta) : numer ? null : cenaOferty;
   const przelacz = () => setZwinieta((z) => { zapiszZwinieta(!z); return !z; });
 
   /* PROFIL KLIENTA Z KARTY. Karta jest domem klienta, a wiersz „Klient"
@@ -234,6 +238,7 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
             <div className="line-clamp-2 font-semibold text-slate-800">{oferta.nazwa}</div>
             <div className="mt-0.5 text-podpis text-slate-500">
               {oferta.sku && <span className="mr-2 font-mono text-slate-600">{oferta.sku}</span>}
+              {numer && cenaOferty && <span className="mr-2 tabular-nums">cena w ofercie {cenaOferty}</span>}
               {/* Zamówienie powiązane, a treść w drodze, to co innego niż brak
                   zamówienia: pierwsze naprawi synchronizacja, drugie agent. */}
               oferta, o którą pyta klient — {numer ? "treść zamówienia jeszcze nie pobrana" : "zamówienia jeszcze nie powiązano"}</div>

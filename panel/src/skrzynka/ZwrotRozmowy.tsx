@@ -79,15 +79,20 @@ export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
       </>}
     </dl>
 
-    {/* Stała jest tylko cena. Nazwa, symbol i powód skracają się razem, bo
-        przy kolumnie 256 px trzy sztywne kawałki zjadały całą nazwę, a cena
-        wychodziła na bursztynową ramę i za nią. */}
-    <ul className="space-y-0.5">
-      {wracaja.map((p) => <li key={p.id} className="flex items-baseline gap-2 text-xs">
-        <span className="min-w-0 truncate">{p.nazwa}</span>
-        {p.twSymbol && <span className="min-w-0 truncate font-mono text-slate-500">{p.twSymbol}</span>}
-        {p.powod && <span className="min-w-0 truncate text-slate-500">{p.powod}</span>}
-        <span className="ml-auto shrink-0 tabular-nums">{p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
+    {/* DWIE LINIE: skraca się wyłącznie nazwa, z pełną treścią w dymku.
+        Symbol, powód i cena stoją w całości w drugiej linii i zawijają się,
+        zamiast się ucinać. W jednej linii przy kolumnie 256 px sztywne
+        kawałki zjadały nazwę i wypychały cenę za ramę, a ściśnięte razem
+        ucinały powód („nie p…") przy każdej szerokości. Powód rozstrzyga
+        decyzję o zwrocie, więc nie wolno go skracać. */}
+    <ul className="space-y-1">
+      {wracaja.map((p) => <li key={p.id} className="text-xs">
+        <span className="block truncate" title={p.nazwa}>{p.nazwa}</span>
+        <span className="flex flex-wrap items-baseline gap-x-2 text-slate-500">
+          {p.twSymbol && <span className="font-mono">{p.twSymbol}</span>}
+          {p.powod && <span>{p.powod}</span>}
+          <span className="ml-auto tabular-nums text-slate-900">{p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>
+        </span>
       </li>)}
     </ul>
     {zwrot.notatka && <p className="text-xs text-slate-600">{zwrot.notatka}</p>}

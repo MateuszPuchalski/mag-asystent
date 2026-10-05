@@ -131,9 +131,29 @@ export function historiaPozaZakupem(h: HistoriaKlienta | undefined, zamowienieId
  * inny wpis, maszyna albo sprawa klienta. Sprawa liczy się także bez loginu,
  * bo serwer bierze jej login z zamówienia, a rozmowa ma do niej odsyłać.
  */
-export function klientWKolumnie(h: HistoriaKlienta | undefined, zamowienieId: string | null): boolean {
-  const p = historiaPozaZakupem(h, zamowienieId);
+export function klientWKolumnie(h: HistoriaKlienta | undefined, zamowienieId: string | null,
+  zakupyNaLiscie?: ReadonlySet<string>): boolean {
+  const p = historiaWierszaKlienta(h, zamowienieId, zakupyNaLiscie);
   return Boolean(p && (p.wpisy.length > 0 || p.maszyny.length > 0 || p.sprawa));
+}
+
+/**
+ * Historia, którą mówi wiersz „Klient": bez tego zakupu, a w rozmowie BEZ
+ * zamówienia także bez zakupów z listy „Zakupy tego klienta". Ta lista stoi
+ * wtedy otwarta w wierszu „Zamówienie" i z niej się wiąże zakup z rozmową,
+ * więc to jej dom. Przy powiązanym zamówieniu lista chowa się za „to nie ta
+ * paczka?", bo służy do przepięcia, a nie do czytania. Wycięte z historii
+ * nie stałyby wtedy nigdzie na widoku, więc zostają.
+ *
+ * Wiersz staje i streszcza się z TEJ historii, nie z pełnej. Inaczej stawałby
+ * dla wpisów, których pod nim nie ma, i podawał datę zakupu, którego nie widać.
+ */
+export function historiaWierszaKlienta(h: HistoriaKlienta | undefined, zamowienieId: string | null,
+  zakupyNaLiscie?: ReadonlySet<string>): HistoriaKlienta | undefined {
+  const poza = historiaPozaZakupem(h, zamowienieId);
+  if (!poza || zamowienieId !== null || !zakupyNaLiscie?.size) return poza;
+  return { ...poza, wpisy: poza.wpisy.filter((w) =>
+    !(w.rodzaj === "zakup" && w.zamowienieId !== null && zakupyNaLiscie.has(w.zamowienieId))) };
 }
 
 /**

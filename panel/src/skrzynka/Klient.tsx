@@ -6,7 +6,7 @@ import type { HistoriaKlienta, MaszynaKlienta, SprawaKlienta, WpisHistorii } fro
 import { useHistoriaKlienta } from "../api/rozmowy";
 import { najwazniejszaDosylka } from "../api/spoiwo";
 import { barwaTonu, czas, dzien, LoginKlienta, NaglowekSekcji, Pusto, termin } from "../ui";
-import { historiaPozaZakupem } from "./kokpit";
+import { historiaPozaZakupem, historiaWierszaKlienta } from "./kokpit";
 
 /**
  * Zakładka KLIENT — historia u nas (makieta „Klient", §10.1).
@@ -32,7 +32,8 @@ export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null, pomin 
   onOtworzRozmowe: (id: number) => void;
   /** Zamówienie rozmowy — jego wpisy schodzą z historii, bo mają dom gdzie indziej. */
   zamowienieId?: string | null;
-  /** Inne zakupy klienta, które stoją w wierszu „Zamówienie" — historia ich nie powtarza. */
+  /** Zakupy z otwartej listy „Zakupy tego klienta" (rozmowa bez zamówienia) — historia ich nie
+   *  powtarza. Reguła i powód w `kokpit.ts` przy `historiaWierszaKlienta`. */
   pomin?: ReadonlySet<string>;
 }) {
   const h = useHistoriaKlienta(rozmowaId);
@@ -65,17 +66,15 @@ export function Klient({ rozmowaId, onOtworzRozmowe, zamowienieId = null, pomin 
     </div>;
   }
 
-  /* INNE ZAKUPY RAZ. Ten sam drugi zakup stał w „Innych zakupach klienta"
-     i tutaj, raz z „PLN" i uciętym numerem, raz z „zł" i pełnym. Dom ma tam,
-     bo stamtąd się go wiąże z rozmową. Zwroty i sprawy innych zakupów
-     zostają, bo w tamtej liście ich nie ma. */
-  const wpisy = poza.wpisy.filter((w) =>
-    !(w.rodzaj === "zakup" && w.zamowienieId !== null && pomin?.has(w.zamowienieId)));
+  /* Zwroty i sprawy innych zakupów zostają zawsze, bo lista zakupów ich nie
+     niesie. Same zakupy schodzą tylko z OTWARTEJ listy (`historiaWierszaKlienta`). */
+  const wpisy = historiaWierszaKlienta(h.data, zamowienieId, pomin)?.wpisy ?? poza.wpisy;
   /* Pusta oś przy zakupie mówi „poza tym zakupem". „Pierwszy kontakt"
      byłby kłamstwem: zakup jest, tylko ma dom w karcie nad osią. Gdy oś
-     opróżniły inne zakupy, zdanie mówi, gdzie one stoją. */
+     opróżniły zakupy z listy, zdanie mówi, gdzie one stoją, i niczego nie
+     obiecuje o maszynach i sprawie, które stoją nad nim. */
   const pustaOs = wpisy.length < poza.wpisy.length
-    ? "Zakupy klienta stoją w wierszu „Zamówienie”, a poza nimi nie mamy u niego nic więcej."
+    ? "Zakupy tego klienta stoją w wierszu „Zamówienie”."
     : zamowienieId ? "Poza tym zakupem nie mamy u tego klienta nic więcej." : undefined;
   return <WidokHistorii historia={{ ...poza, wpisy, login: poza.login }} tutaj="tą rozmową" wKolumnie
     pustaOs={pustaOs} bezLoginu onOtworzRozmowe={onOtworzRozmowe} />;
