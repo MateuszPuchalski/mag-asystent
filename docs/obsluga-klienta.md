@@ -418,7 +418,7 @@ a ulica rozstrzyga to w jednym spojrzeniu.
   migawka i raport tygodnia ich nie dostają. Retencja idzie za sprawą
   (kaskada). Ostatnia dostawa towaru w sprawie to odczyt dokumentów dostaw
   firmy, bez nowego zapisu.
-- **Od @wydanie ekran reklamacji nie woła modelu** (decyzja właściciela). Nie
+- **Od 0.564.0 ekran reklamacji nie woła modelu** (decyzja właściciela). Nie
   ma przycisku ani trasy rozpoznania, więc z reklamacji nic nie wychodzi do
   dostawcy modelu. Zapisane karty zostają w `reklamacja_karta` i jadą
   w szczegółach sprawy. Reguły niżej mówią, co wychodziło, i wrócą razem

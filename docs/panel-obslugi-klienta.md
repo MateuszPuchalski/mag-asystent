@@ -5884,7 +5884,7 @@ założeniem — `[WERYFIKUJ]` w `docs/allegro-ksztalt.md`: specyfikacja nie
 
 ### 25b.8a. Copilot reklamacyjny: zbiera dane, nie radzi (0.275.0)
 
-**Od @wydanie karty i rady nie ma na ekranie reklamacji** (decyzja
+**Od 0.564.0 karty i rady nie ma na ekranie reklamacji** (decyzja
 właściciela, „na razie"). Zniknął przycisk „Przeczytaj sprawę" i trasa
 `…/rozpoznaj`, więc z reklamacji nic nie idzie do dostawcy modelu. Zapisane
 karty zostają w `reklamacja_karta` i jadą w szczegółach sprawy, a serwisy
@@ -6878,16 +6878,16 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Sprawy otwarte przed bezpiecznikiem stron | **działa** od 0.273.0 | filtr `status` ze specyfikacji; przelot otwartych przed przelotem pełnym |
 | Język odpowiedzi Allegro | **działa** od 0.273.0 | `accept-language: pl-PL` w `zapytajAllegro` — jedno miejsce dla całej rodziny końcówek |
 | Odświeżenie JEDNEJ sprawy | **działa** od 0.273.0 | `GET /sale/issues/{id}`, trasa `…/odswiez`; wołane po wysyłce i po werdykcie |
-| Copilot RADZI w reklamacji | **zdjęte z ekranu** od @wydanie | działało od 0.276.0; rekomendacja typowana słownikiem werdyktu plus POPROSIC_O_DOWODY; zapisane rady zostają, trafność dalej liczy się z wysłanego werdyktu |
-| Copilot reklamacyjny: karta faktów | **zdjęte z ekranu** od @wydanie | działało od 0.275.0; `services/copilot-reklamacja.ts` zostaje, trasy `…/rozpoznaj` nie ma, zapisane karty jadą w szczegółach sprawy |
-| Dowody biura w reklamacji | **działa** od @wydanie | `services/reklamacja-dowody.ts`, `reklamacja_dowod`; swobodne wpisy z opcjonalnym zdjęciem, bez wersji sprawy |
-| Reklamacja u dostawcy | **działa** od @wydanie | `services/reklamacja-dowody-zapis.ts`, `reklamacja_u_dostawcy`; własna wersja rekordu, wynik „uznał” albo „odrzucił” z datą |
-| Ostatnia dostawa towaru w sprawie | **działa** od @wydanie | `services/ostatnia-dostawa.ts`; read-model i archiwum dostaw, najpierw partia sprzed zakupu, brak danych to „nie wiemy” |
-| Kwota sprawy w kolejce | **działa** od @wydanie | `kwotaSprawy` w `services/reklamacje.ts`; żądanie klienta, potem cena z paragonu razy liczba sztuk, bez zgadywania jednej sztuki |
+| Copilot RADZI w reklamacji | **zdjęte z ekranu** od 0.564.0 | działało od 0.276.0; rekomendacja typowana słownikiem werdyktu plus POPROSIC_O_DOWODY; zapisane rady zostają, trafność dalej liczy się z wysłanego werdyktu |
+| Copilot reklamacyjny: karta faktów | **zdjęte z ekranu** od 0.564.0 | działało od 0.275.0; `services/copilot-reklamacja.ts` zostaje, trasy `…/rozpoznaj` nie ma, zapisane karty jadą w szczegółach sprawy |
+| Dowody biura w reklamacji | **działa** od 0.564.0 | `services/reklamacja-dowody.ts`, `reklamacja_dowod`; swobodne wpisy z opcjonalnym zdjęciem, bez wersji sprawy |
+| Reklamacja u dostawcy | **działa** od 0.564.0 | `services/reklamacja-dowody-zapis.ts`, `reklamacja_u_dostawcy`; własna wersja rekordu, wynik „uznał” albo „odrzucił” z datą |
+| Ostatnia dostawa towaru w sprawie | **działa** od 0.564.0 | `services/ostatnia-dostawa.ts`; read-model i archiwum dostaw, najpierw partia sprzed zakupu, brak danych to „nie wiemy” |
+| Kwota sprawy w kolejce | **działa** od 0.564.0 | `kwotaSprawy` w `services/reklamacje.ts`; żądanie klienta, potem cena z paragonu razy liczba sztuk, bez zgadywania jednej sztuki |
 | Załączniki WYCHODZĄCE w sprawie | **działa** od 0.274.0 | `services/reklamacje-zalaczniki.ts`; deklaracja z polem `fileName`, adres wgrania z nagłówka `Location`, spinacz wspólny ze skrzynką |
 | Werdykt reklamacji do Allegro | **działa** od 0.242.0 | `services/reklamacja-werdykt.ts`, `reklamacje/Werdykt.tsx`; `POST /sale/issues/{id}/status`, jedenaście wartości, kwota przy częściowym, `autoryzuj("reklamacja_werdykt")`, los na wierszu |
 | Krok „towar do odesłania?" po uznaniu | **działa** od 0.242.0 | `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
-| Towar razem z werdyktem | **działa** od @wydanie | pole `towar` w `…/werdykt`; walidacja przed werdyktem, wysyłka tylko po `sent`, jedno `autoryzuj()`; krok po werdykcie zostaje jako droga zapasowa |
+| Towar razem z werdyktem | **działa** od 0.564.0 | pole `towar` w `…/werdykt`; walidacja przed werdyktem, wysyłka tylko po `sent`, jedno `autoryzuj()`; krok po werdykcie zostaje jako droga zapasowa |
 | Podgląd załącznika reklamacji na osi | **działa** od 0.223.0, wyrównane w 0.246.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF; od 0.246.0 ta sama powłoka co w skrzynce (`towar/Zalacznik.tsx`), odmowa Allegro 502 / awaria drogi 503 ze zdaniem i „Spróbuj ponownie" (`routes/pobranie.ts`), błąd pobrania widoczny |
 | Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |
 | Spoiwo czterech kolejek — sprawy i droga zakupu | **działa** od 0.387.0 | `services/droga-klienta.ts`, `panel/src/sprawy/Spoiwo.tsx`; mostek po `order_id`, blok wspólny dla skrzynki, zwrotów, reklamacji i dyskusji; w skrzynce od 0.558.0 bez czipów drogi, bo mówią ją linie zakupu w osi (§10.2g) |
