@@ -427,7 +427,8 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
 
   /* PRZEPŁYW KATEGORII, tryb cienia. Werdykt agenta o tym, co automat BY
      zrobił. Zgoda wykonuje krok ręką agenta, sprzeciw tylko się zapisuje.
-     „Wyslij" odpada 400, bo ocenia go wysyłka szkicu. */
+     „Wyslij" odpada 400, bo ocenia go wysyłka szkicu. Wyjątkiem jest szkic
+     wysłany przez automat: ten agent ocenia po fakcie, bez wykonania. */
   app.post<{ Params: { id: string; propozycjaId: string }; Body: { werdykt?: string } }>(
     "/api/obsluga/rozmowy/:id/przeplyw/:propozycjaId", async (req, reply) => {
       const nie = odmowa(reply);

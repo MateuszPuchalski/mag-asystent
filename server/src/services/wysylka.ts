@@ -30,6 +30,13 @@ export interface ZadanieWysylki {
   wyslij?: WyslijDoAllegro;
   /** Znacznik „przeczytane" w Allegro. Wstrzykiwany, żeby test nie szedł w sieć. */
   oznaczPrzeczytany?: OznaczPrzeczytany;
+  /**
+   * Wysyła automat przepływu kategorii (`przeplyw-na-zywo.ts`), nie człowiek.
+   * Wtedy odpowiedź nie przydziela rozmowy, nie daje werdyktu ani losu
+   * szkicu, a wpisy dziennika wskazują konto automatu. Flag „mimo to"
+   * `przeplyw-na-zywo.ts` nie ustawia: każdy konflikt to dla niego pominięcie.
+   */
+  automat?: true;
 }
 
 export type StatusWysylki = "sending" | "sent" | "send_uncertain" | "send_failed";
@@ -159,6 +166,10 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
   }
 
   const k = kontekst(database, z.conversationId);
+  /* Konto wpisów dziennika. Automat bywa wołany z łańcucha, który ruszył
+     w żądaniu agenta, a sesja tego żądania podpisałaby jego wysyłkę cudzym
+     kontem. Człowiek zostaje przy sesji, jak dotąd. */
+  const ref = z.automat ? z.autor.id : undefined;
 
   /* ── Kto ma prawo odpowiedzieć (0.159.0) ──────────────────────────────────
      Do 0.158.0 wysyłka wymagała WCZEŚNIEJSZEGO przejęcia rozmowy: agent, który
@@ -222,7 +233,7 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       { id: number; body: string; sent_at: string } | undefined;
     logEvent("rozmowa_wysylka_konflikt", z.autor.name, null,
       { conversationId: z.conversationId, oczekiwana: z.expectedLastMessageId,
-        biezaca: k.lastMessageId }, undefined, database);
+        biezaca: k.lastMessageId }, ref, database);
     throw new ConversationConflict("Klient dopisał wiadomość — wysyłka wymaga zatwierdzenia", {
       lastMessageId: k.lastMessageId,
       nowaWiadomosc: nowa ? { id: nowa.id, tresc: nowa.body, at: nowa.sent_at } : null,
@@ -272,7 +283,7 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
   logEvent("rozmowa_wysylka_proba", z.autor.name, null,
     { conversationId: z.conversationId, outboxId, kluczIdempotencji: klucz, znakow: tresc.length,
       zalacznikow: idZalacznikow.length },
-    undefined, database);
+    ref, database);
 
   let wynik;
   try {
@@ -284,7 +295,7 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?`).run(status, komunikat, outboxId);
     logEvent(status === "send_uncertain" ? "rozmowa_wysylka_niepewna" : "rozmowa_wysylka_blad",
       z.autor.name, null, { conversationId: z.conversationId, outboxId, blad: komunikat },
-      undefined, database);
+      ref, database);
     throw e;
   }
 
@@ -297,7 +308,7 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
         blad='Allegro nie podało numeru wiadomości',
         finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?`).run(outboxId);
       logEvent("rozmowa_wysylka_niepewna", z.autor.name, null,
-        { conversationId: z.conversationId, outboxId }, undefined, database);
+        { conversationId: z.conversationId, outboxId }, ref, database);
       return { outboxId, status: "send_uncertain" as StatusWysylki, kluczIdempotencji: klucz,
         externalMessageId: null };
     }
@@ -308,7 +319,10 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       ON CONFLICT(channel_account_id, external_message_id) DO NOTHING`)
       .run(z.conversationId, k.channelAccountId, wynik.externalMessageId, tresc);
 
-    const szkic = losSzkicu(database, z.conversationId, k.lastMessageId, tresc);
+    /* Szkic wysłany przez automat to nie decyzja człowieka. Liczony jako
+       „bez zmian" zawyżałby w pomiarze Copilota zgodę agentów. Bez losu nie
+       ma też werdyktu propozycji niżej: ten da agent przy przeglądzie. */
+    const szkic = z.automat ? null : losSzkicu(database, z.conversationId, k.lastMessageId, tresc);
     database.prepare(`UPDATE outbox SET status='sent', external_message_id=?, szkic_los=?,
       finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?`)
       .run(wynik.externalMessageId, szkic?.los ?? null, outboxId);
@@ -343,13 +357,15 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
 
        Zapis idzie razem z wiadomością, w tej samej transakcji: przypisanie
        bez wysłanej odpowiedzi albo odwrotnie to dwa różne rodzaje kłamstwa. */
-    if (k.assignedUserId === null) {
+    /* Automat nie prowadzi spraw. Rozmowa przydzielona jemu odbijałaby
+       każdego agenta zdaniem „Rozmowę prowadzi Automat — poproś o przekazanie”. */
+    if (k.assignedUserId === null && !z.automat) {
       database.prepare(`UPDATE conversation SET assigned_user_id=?, version=version+1
         WHERE id=?`).run(z.autor.id, z.conversationId);
       database.prepare(`INSERT INTO conversation_assignment(conversation_id, assigned_to, assigned_by)
         VALUES (?,?,?)`).run(z.conversationId, z.autor.id, z.autor.id);
       logEvent("rozmowa_przypisana_odpowiedzia", z.autor.name, null,
-        { conversationId: z.conversationId, outboxId }, undefined, database);
+        { conversationId: z.conversationId, outboxId }, ref, database);
     }
 
     logEvent("rozmowa_wyslana", z.autor.name, null,
@@ -357,7 +373,7 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
         externalMessageId: wynik.externalMessageId, znakow: tresc.length,
         zalacznikow: idZalacznikow.length,
         ...(z.msOdOtwarcia != null ? { msOdOtwarcia: z.msOdOtwarcia } : {}),
-        ...(szkic ? { szkicDoSprawdzenia: szkic.doSprawdzenia } : {}) }, undefined, database);
+        ...(szkic ? { szkicDoSprawdzenia: szkic.doSprawdzenia } : {}) }, ref, database);
 
     publishConversationEvent("message.created", z.conversationId, { outboxId });
     return { outboxId, status: "sent" as StatusWysylki, kluczIdempotencji: klucz,
@@ -395,7 +411,7 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
       if (e instanceof PomijamOznaczenie) return wynikWysylki;
       logEvent("rozmowa_przeczytana_blad", z.autor.name, null,
         { conversationId: z.conversationId, outboxId: wynikWysylki.outboxId,
-          blad: e instanceof Error ? e.message : String(e) }, undefined, database);
+          blad: e instanceof Error ? e.message : String(e) }, ref, database);
     }
   }
 

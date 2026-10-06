@@ -189,9 +189,35 @@ test("pomiar liczy per kategoria i rodzaj, tylko bieżącą wersję przepływów
   db().prepare("UPDATE propozycja_przeplywu SET przeplyw_wersja='w0' WHERE conversation_id=? AND rodzaj='krok'")
     .run(b.r);
 
+  /* Wysyłka automatu liczy się osobno: werdykt da agent dopiero przy przeglądzie. */
+  db().prepare("UPDATE propozycja_przeplywu SET wykonana_at=? WHERE conversation_id=? AND rodzaj='wyslij'")
+    .run(new Date().toISOString(), c.r);
+
   assert.deepEqual(P.pomiarPrzeplywu(db()), [
-    { kategoria: "ORDER_STATUS", rodzaj: "wyslij", propozycji: 1, zgod: 0, sprzeciwow: 0, bezWerdyktu: 1 },
-    { kategoria: "WRONG_PRODUCT", rodzaj: "krok", propozycji: 1, zgod: 0, sprzeciwow: 0, bezWerdyktu: 1 },
-    { kategoria: "WRONG_PRODUCT", rodzaj: "pilne", propozycji: 2, zgod: 1, sprzeciwow: 1, bezWerdyktu: 0 },
+    { kategoria: "ORDER_STATUS", rodzaj: "wyslij", propozycji: 1, zgod: 0, sprzeciwow: 0, bezWerdyktu: 1,
+      wyslanychNaZywo: 1 },
+    { kategoria: "WRONG_PRODUCT", rodzaj: "krok", propozycji: 1, zgod: 0, sprzeciwow: 0, bezWerdyktu: 1,
+      wyslanychNaZywo: 0 },
+    { kategoria: "WRONG_PRODUCT", rodzaj: "pilne", propozycji: 2, zgod: 1, sprzeciwow: 1, bezWerdyktu: 0,
+      wyslanychNaZywo: 0 },
   ]);
+});
+
+test("karta pokazuje wysyłkę automatu także po dopisku klienta, ale nie starszą niż tydzień", () => {
+  const a = rozpoznana("ORDER_STATUS");
+  szkic(a.r, a.m, a.k);
+  P.zapiszPropozycje(db(), [a.r]);
+  const teraz = new Date("2026-10-06T10:00:00.000Z");
+  db().prepare("UPDATE propozycja_przeplywu SET wykonana_at=? WHERE conversation_id=?")
+    .run("2026-10-06T09:00:00.000Z", a.r);
+  /* Poprawka kategorii robi nową decyzję, jak dopisek klienta po wysyłce. */
+  poprawKlasyfikacje(db(), a.r, "INVOICE", null, Ola());
+  const [p] = P.propozycjeRozmowy(db(), a.r, teraz);
+  assert.equal(p?.rodzaj, "wyslij");
+  assert.equal(p?.wykonanaAt, "2026-10-06T09:00:00.000Z");
+  assert.equal(p?.wykonanieBlad, null);
+
+  db().prepare("UPDATE propozycja_przeplywu SET wykonana_at=? WHERE conversation_id=?")
+    .run("2026-09-28T09:00:00.000Z", a.r);
+  assert.deepEqual(P.propozycjeRozmowy(db(), a.r, teraz), []);
 });

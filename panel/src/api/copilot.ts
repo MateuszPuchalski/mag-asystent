@@ -163,9 +163,10 @@ export function useZadajPytanie() {
   });
 }
 
-/* ── Werdykt o propozycji przepływu (tryb cienia) ────────────────────────────
+/* ── Werdykt o propozycji przepływu ──────────────────────────────────────────
    Agent mówi „tak" albo „nie" temu, co automat BY zrobił. Zgoda wykonuje krok
    po stronie serwera: zleca weryfikację hali albo oznacza rozmowę jako pilną.
+   Przy szkicu, który automat wysłał sam, werdykt jest tylko oceną po fakcie.
    Unieważniamy więc wszystko, co ten krok zmienia na ekranie: rozmowę, listę
    z priorytetem, zadania hali i pomiar zgodności. `onSettled`, a nie
    `onSuccess`, bo przy 409 („rozpoznanie się zmieniło") karta ma pokazać

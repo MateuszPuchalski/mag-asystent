@@ -139,7 +139,7 @@ describe("Brakujący zakup w ekranie rozmowy", () => {
 describe("Propozycje przepływu w ekranie rozmowy", () => {
   const pilne: PropozycjaPrzeplywu = { id: 41, rodzaj: "pilne", kategoria: "COMPLAINT",
     instrukcja: null, at: "2026-10-06T08:00:00.000Z", werdykt: null, werdyktZrodlo: null,
-    werdyktPrzez: null, werdyktAt: null };
+    werdyktPrzez: null, werdyktAt: null, wykonanaAt: null, wykonanieBlad: null };
   const qc = () => new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
 
   it("stoi przed polem odpowiedzi, a otwarcie rozmowy nic nie zapisuje", () => {

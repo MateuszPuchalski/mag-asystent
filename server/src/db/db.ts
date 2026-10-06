@@ -202,6 +202,12 @@ export function migrate(database: DatabaseSync) {
      bez tej kolumny nie dałoby się poznać, że szkic pisano pod starą. Stare
      szkice mają NULL, czyli „nie wiadomo" — i pierwsza poprawka je odświeży. */
   addColumn("szkic_copilota", "decyzja_id", "INTEGER");
+  /* Wykonanie propozycji na żywo — patrz `propozycja_przeplywu` w `schema.sql`.
+     Tabela mogła już stać z trybu cienia, a stare wiersze mają NULL, czyli
+     „automat niczego nie wysłał", co jest o nich prawdą. */
+  addColumn("propozycja_przeplywu", "wykonana_at", "TEXT");
+  addColumn("propozycja_przeplywu", "outbox_id", "INTEGER");
+  addColumn("propozycja_przeplywu", "wykonanie_blad", "TEXT");
   /* Dopytanie Copilota (0.332.0). Tabela nowa, więc `schema.sql` załatwia
      świeże bazy; ta linia jest dla istniejących instalacji. */
   database.exec(`CREATE TABLE IF NOT EXISTS copilot_pytanie (

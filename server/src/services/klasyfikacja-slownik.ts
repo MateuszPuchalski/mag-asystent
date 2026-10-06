@@ -125,10 +125,10 @@ export const KODY = {
 } as const;
 
 /**
- * Tryb wysyłki zapisywany przy decyzji. Dziś jedyny, bo innej drogi wysyłki
- * w kodzie nie ma — nie dlatego, że zabrania jej zasada: punkt 2 z §27
- * („człowiek wysyła odpowiedź") właściciel usunął 22 września 2026. Drugi
- * tryb dojdzie razem z kodem wysyłki bez człowieka, i dopiero wtedy.
+ * Tryb wysyłki zapisywany przy decyzji. Jedna wartość, choć wysyłka bez
+ * człowieka istnieje (`services/przeplyw-na-zywo.ts`). Jej ślad to
+ * `propozycja_przeplywu.wykonana_at` i `outbox.created_by` z kontem automatu.
+ * Drugi tryb wymagałby przebudowy kolumny, a do tego śladu nie dodałby nic.
  */
 export const TRYB = "HUMAN_APPROVED";
 

@@ -153,3 +153,22 @@ test("sufit godzinowy nie zatrzymuje propozycji niezależnych od szkicu", async 
   assert.equal(w.przerwane, "sufit godzinowy wyczerpany");
   assert.deepEqual(propozycje(r), ["pilne"]);
 });
+
+/* ── Na żywo: wysyłka idzie po propozycji, w tym samym przebiegu ────────────
+   Test powyżej („i nic nie wysyła”) to droga z pustą `PRZEPLYW_NA_ZYWO`,
+   czyli każda instalacja po aktualizacji. Tu kategoria jest włączona,
+   a Allegro to atrapa. */
+test("kategoria na żywo: szkic po rozpoznaniu wychodzi do klienta bez kliknięcia", async () => {
+  const r = rozpoznana("ORDER_STATUS", "GET_SHIPMENT");
+  db().prepare("UPDATE decyzja_klasyfikacji SET pewnosc='wysoka' WHERE conversation_id=?").run(r);
+  const strzaly: string[] = [];
+  await P.szkicujPoRozpoznaniu([r], { database: db(), nadaj, subiekt, naGodzine: 30, naZywo: {
+    naZywo: ["ORDER_STATUS"], oznaczPrzeczytany: async () => {},
+    wyslij: async (_w, tresc) => { strzaly.push(tresc); return { externalMessageId: "ext-1" }; },
+  } });
+  assert.deepEqual(strzaly, ["Dzień dobry, paczka jest w drodze."]);
+  const p = db().prepare("SELECT wykonana_at, werdykt FROM propozycja_przeplywu WHERE conversation_id=?")
+    .get(r) as { wykonana_at: string | null; werdykt: string | null };
+  assert.ok(p.wykonana_at);
+  assert.equal(p.werdykt, null);
+});

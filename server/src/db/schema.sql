@@ -252,9 +252,9 @@ CREATE TABLE IF NOT EXISTS decyzja_klasyfikacji (
   taksonomia_wersja      TEXT NOT NULL,
   mapowanie_wersja       TEXT,
   polityka_wersja        TEXT NOT NULL,
-  -- Dziś jedyny tryb, bo wysyłki bez człowieka w kodzie nie ma. Zasada, która
-  -- jej zabraniała (§27, punkt 2), odeszła 22 września 2026. Drugi tryb wejdzie
-  -- przebudową tej kolumny razem z kodem, który będzie go używał.
+  -- Jedna wartość, choć wysyłka bez człowieka już istnieje. Jej ślad to
+  -- `propozycja_przeplywu.wykonana_at` i `outbox.created_by` wskazujące konto
+  -- automatu. Przebudowa tej kolumny nie dodałaby do tego śladu nic.
   tryb                   TEXT NOT NULL DEFAULT 'HUMAN_APPROVED' CHECK (tryb IN ('HUMAN_APPROVED')),
   at                     TEXT NOT NULL,
   przez                  TEXT NOT NULL,
@@ -300,7 +300,15 @@ CREATE TABLE IF NOT EXISTS propozycja_przeplywu (
   werdykt_zrodlo   TEXT CHECK (werdykt_zrodlo IS NULL OR werdykt_zrodlo IN ('agent','wysylka')),
   werdykt_at       TEXT,
   werdykt_przez    TEXT,
-  werdykt_user_id  INTEGER REFERENCES app_user(user_id)
+  werdykt_user_id  INTEGER REFERENCES app_user(user_id),
+  -- ── Wykonanie na żywo (6 października 2026) ──────────────────────────────
+  -- Tylko przy 'wyslij' kategorii włączonej w `PRZEPLYW_NA_ZYWO`. Kiedy
+  -- automat wysłał szkic sam, którym wierszem kolejki i co poszło nie tak.
+  -- Błąd zostaje na stałe, bo ponowienie co takt szłoby na koszt klienta.
+  -- Kolumny dochodzą też migracją w `db.ts`, więc bez klucza obcego.
+  wykonana_at      TEXT,
+  outbox_id        INTEGER,
+  wykonanie_blad   TEXT
 );
 -- Jedna propozycja danego rodzaju na decyzję. Na tym stoi idempotencja zapisu:
 -- drugi przebieg po tej samej decyzji niczego nie dubluje.

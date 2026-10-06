@@ -87,9 +87,9 @@ z przypuszczenia maszyny, dlatego każdy warunek jest wąski.
 ### 5. Czym jest odpowiedź i gdzie stoi granica automatu?
 
 Właściciel usunął zasadę „człowiek wysyła każdą odpowiedź" (§27 projektu
-panelu, punkt 2), ale kodu wysyłki bez człowieka nie ma. Kod działa według
-granicy **automat proponuje, do klienta mówi człowiek** (§14.2 projektu
-panelu). Według §14.3 każde twierdzenie techniczne w szkicu wskazuje źródło.
+panelu, punkt 2). Kod działa według granicy **automat proponuje, do klienta
+mówi człowiek** (§14.2 projektu panelu). Jedyny wyjątek to kategoria włączona
+na żywo w `wertis.env` (§14.6f), dziś wyłącznie stan zamówienia. Według §14.3 każde twierdzenie techniczne w szkicu wskazuje źródło.
 
 **Doboru części i bazy wiedzy nie ma** od 0.565.0, decyzją właściciela:
 stały na chwiejnym fundamencie. Ich tabele skasowała migracja, a dane

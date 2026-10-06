@@ -13,6 +13,7 @@ import { AUTOMAT, zuzyteWGodzinie } from "./copilot-auto-szkic.js";
 import { CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 import { zapiszPropozycje } from "./przeplyw-kategorii.js";
+import { wyslijNaZywo, type NaZywoDeps } from "./przeplyw-na-zywo.js";
 
 /* ── Szkic zaraz po rozpoznaniu (23 września 2026) ───────────────────────────
    Właściciel: „ułóż odpowiedź automatycznie po klasyfikacji, gotową do
@@ -25,9 +26,10 @@ import { zapiszPropozycje } from "./przeplyw-kategorii.js";
    szkic napisany pod starą kategorię jest nieświeży i układa się od nowa —
    `szkic_copilota.decyzja_id` mówi, pod którą decyzję powstał.
 
-   SZKIC CZEKA NA AGENTA. Nic nie idzie do klienta: karta szkicu stoi
-   z oceną pustą, agent ją wstawia (E), poprawia i wysyła. To jest to
-   „gotowe do zatwierdzenia". Wysyłki bez człowieka w kodzie nie ma.
+   SZKIC CZEKA NA AGENTA. Karta szkicu stoi z oceną pustą, agent ją wstawia
+   (E), poprawia i wysyła. To jest to „gotowe do zatwierdzenia". Jedyny
+   wyjątek to kategoria włączona na żywo: wtedy po zapisie propozycji szkic
+   wysyła `przeplyw-na-zywo.ts`, za własnymi bramkami.
 
    KOSZT TRZYMA TEN SAM SUFIT co szkic z taktu (`autoNaGodzine`), liczony
    z księgi wywołań razem z błędami. Rozpoznanie, które nie każe nic robić
@@ -62,6 +64,8 @@ export interface SzkicPoRozpoznaniuDeps {
   subiekt?: SubiektAdapter;
   naGodzine?: number;
   now?: () => Date;
+  /** Wysyłka na żywo po propozycjach. Domyślnie z konfiguracji, czyli zwykle nic. */
+  naZywo?: Omit<NaZywoDeps, "database" | "now">;
 }
 
 export interface WynikSzkicuPoRozpoznaniu {
@@ -92,6 +96,15 @@ export async function szkicujPoRozpoznaniu(
       zapiszPropozycje(database, rozmowyId, (deps.now ?? (() => new Date()))());
     } catch (e) {
       console.warn(`[przeplyw-kategorii] ${e instanceof Error ? e.message : String(e)}`);
+    }
+    /* Na żywo dopiero PO zapisie, bo kandydatem jest zapisana propozycja.
+       Osobny `try`: awaria wysyłki nie ma prawa wywrócić szkicowania,
+       a jej powód zostaje przy propozycji i w dzienniku. */
+    try {
+      const z = await wyslijNaZywo(rozmowyId, { ...deps.naZywo, database, now: deps.now });
+      if (z.przerwane) console.warn(`[przeplyw-na-zywo] przebieg przerwany: ${z.przerwane}`);
+    } catch (e) {
+      console.warn(`[przeplyw-na-zywo] ${e instanceof Error ? e.message : String(e)}`);
     }
   }
 }
