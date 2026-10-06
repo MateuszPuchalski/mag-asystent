@@ -4,7 +4,8 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Rozmowa as EkranRozmowy } from "./Rozmowa";
-import type { OsRozmowy, Rozmowa } from "../api/typy";
+import type { OsRozmowy, PropozycjaPrzeplywu, Rozmowa } from "../api/typy";
+import { atrapaZapisow } from "../test/zapisy";
 
 /* ── Nagłówek rozmowy w skrzynce (0.395.0) ───────────────────────────────────
    Zgłoszenie właściciela ze zrzutem: „usuń guzik przejmuję rozmowę, to powinno
@@ -30,7 +31,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
 
 const dane = (n: Partial<Rozmowa> = {}): OsRozmowy => ({
   rozmowa: rozmowa(n), os: [],
-  szkicCopilota: null, ofertaWskazana: null,
+  szkicCopilota: null, ofertaWskazana: null, przeplyw: [],
 } as unknown as OsRozmowy);
 
 /* Atrapa pełnego kształtu: ekran rozmowy bierze ponad czterdzieści rekwizytów,
@@ -128,5 +129,35 @@ describe("Brakujący zakup w ekranie rozmowy", () => {
       expect(screen.getByRole("region", { name: "Rozmowa bez zamówienia" })).toBeInTheDocument();
       expect(screen.queryByText("Zakup należy do innego loginu")).toBeNull();
     } finally { vi.unstubAllGlobals(); }
+  });
+});
+
+/* ── „Automat by…" — wpięcie w ekran rozmowy (tryb cienia) ────────────────
+   Komponent ma własne testy. Te pilnują wpięcia: karta stoi przed polem
+   odpowiedzi, otwarcie rozmowy z propozycjami nic nie zapisuje, a rozmowa
+   bez propozycji nie ma karty wcale. */
+describe("Propozycje przepływu w ekranie rozmowy", () => {
+  const pilne: PropozycjaPrzeplywu = { id: 41, rodzaj: "pilne", kategoria: "COMPLAINT",
+    instrukcja: null, at: "2026-10-06T08:00:00.000Z", werdykt: null, werdyktZrodlo: null,
+    werdyktPrzez: null, werdyktAt: null };
+  const qc = () => new QueryClient({ defaultOptions: { queries: { retry: false }, mutations: { retry: false } } });
+
+  it("stoi przed polem odpowiedzi, a otwarcie rozmowy nic nie zapisuje", () => {
+    const zapisy = atrapaZapisow(() => undefined);
+    try {
+      const p = props({ id: 4821 });
+      render(<QueryClientProvider client={qc()}>
+        <EkranRozmowy {...p} dane={{ ...p.dane, przeplyw: [pilne] }} /></QueryClientProvider>);
+      const karta = screen.getByRole("region", { name: "Automat by" });
+      expect(karta).toHaveTextContent("oznaczył jako pilne");
+      const pole = screen.getAllByRole("textbox").at(-1)!;
+      expect(karta.compareDocumentPosition(pole) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(zapisy.wyslane).toEqual([]);
+    } finally { vi.unstubAllGlobals(); }
+  });
+
+  it("rozmowa bez propozycji nie ma karty", () => {
+    render(<EkranRozmowy {...props()} />);
+    expect(screen.queryByRole("region", { name: "Automat by" })).toBeNull();
   });
 });

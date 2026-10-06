@@ -27,6 +27,9 @@ const AUTOMATY = new Set([
      zapisuje wyłącznie ticker. Numer wpisany ręką ma własny typ
      (`klient_dosylka_numer`) i zostaje w raporcie — to czynność człowieka. */
   "klient_dosylka_doreczona", "klient_dosylka_problem", "klient_dosylka_stan", "klient_dosylka_wykryta",
+  /* Propozycje przepływu kategorii zapisuje automat po szkicu. Werdykt
+     zostaje w raporcie, bo to klik agenta albo jego wysyłka. */
+  "przeplyw_propozycje",
 ]);
 
 /* Obszar po PRZEDROSTKU typu. Typy nazywa się od bytu, którego dotyczą,
@@ -35,7 +38,7 @@ const OBSZARY: Array<[string, string]> = [
   ["rozmowa_", "Skrzynka"], ["skrzynka_", "Skrzynka"], ["wzmianka_", "Skrzynka"],
   ["obsluga.", "Skrzynka"], ["zamowienie_", "Skrzynka"], ["przesylka_", "Skrzynka"],
   ["klient_notatka", "Profil klienta"], ["klient_sprawa", "Profil klienta"], ["klient_dosylka", "Profil klienta"],
-  ["klient_", "Skrzynka"], ["copilot_", "Copilot"], ["klasyfikacja_", "Copilot"],
+  ["klient_", "Skrzynka"], ["copilot_", "Copilot"], ["klasyfikacja_", "Copilot"], ["przeplyw_", "Copilot"],
   ["kosz_", "Kosze"], ["zwrot", "Zwroty"], ["oferta_komplet", "Zwroty"],
   ["reklamacj", "Reklamacje"], ["dyskusja_", "Dyskusje"], ["sprawa_tag", "Tagi spraw"],
   ["delivery_", "Dostawy"], ["przyjecie_", "Dostawy"], ["notatka_", "Dostawy"],

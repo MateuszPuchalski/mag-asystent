@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import React from "react";
 import { render, screen, within } from "@testing-library/react";
-import { PomiarCopilota } from "./PomiarCopilota";
+import { PomiarCopilota, zgodnoscPrzeplywu } from "./PomiarCopilota";
 import type { PomiarCopilota as Pomiar } from "../api/typy";
 
 /* ── Pomiar Copilota (uproszczony 0.519.0) ──────────────────────────────────
@@ -27,6 +27,7 @@ const dane = (n: Partial<Pomiar> = {}): Pomiar => ({
   szkice: {
     ile: 0, odrzuconych: 0, wyslanychBezZmian: 0, wyslanychPoprawionych: 0,
   },
+  przeplyw: [],
   ...n,
 });
 
@@ -114,5 +115,35 @@ describe("PomiarCopilota", () => {
   it("cisza cache przy wywołaniach zostaje objawem — tonem, bez wykładu", () => {
     render(<PomiarCopilota dane={dane()} />);
     expect(screen.getByText("0 %")).toHaveClass("text-ranga-uwaga");
+  });
+  /* Przepływy w trybie cienia: zgodność liczy tylko rozstrzygnięte, `n` stoi
+     obok, a zero rozstrzygnięć to kreska, nie 0 %. */
+  it("zgodność przepływu to zgody przez rozstrzygnięte, z n; przy n = 0 kreska", () => {
+    expect(zgodnoscPrzeplywu({ zgod: 7, sprzeciwow: 2 })).toBe("7 z 9 · 78 %");
+    expect(zgodnoscPrzeplywu({ zgod: 0, sprzeciwow: 3 })).toBe("0 z 3 · 0 %");
+    expect(zgodnoscPrzeplywu({ zgod: 0, sprzeciwow: 0 })).toBe("—");
+  });
+
+  it("tabela przepływów stoi na wierzchu, z polską kategorią, rodzajem i n", () => {
+    render(<PomiarCopilota dane={dane({ przeplyw: [
+      { kategoria: "ORDER_STATUS", rodzaj: "wyslij", propozycji: 12, zgod: 7, sprzeciwow: 2, bezWerdyktu: 3 },
+      { kategoria: "COMPLAINT", rodzaj: "pilne", propozycji: 4, zgod: 0, sprzeciwow: 0, bezWerdyktu: 4 },
+    ] })} />);
+    const sekcja = screen.getByLabelText("Przepływy kategorii");
+    expect(screen.getByText("Szczegóły").closest("details")).not.toContainElement(sekcja);
+    expect(within(sekcja).getByText("Przepływy kategorii (tryb cienia)")).toBeInTheDocument();
+    const wiersze = within(sekcja).getAllByRole("row").slice(1);
+    expect(wiersze.map((w) => [...w.querySelectorAll("td")].map((td) => td.textContent))).toEqual([
+      ["Status zamówienia", "wysłałby odpowiedź", "12", "7", "2", "3", "7 z 9 · 78 %"],
+      ["Reklamacja", "oznaczyłby pilne", "4", "0", "0", "4", "—"],
+    ]);
+    expect(sekcja.textContent).not.toContain("0 %");
+  });
+
+  it("bez propozycji tabela mówi zdaniem, nie zerami", () => {
+    render(<PomiarCopilota dane={dane()} />);
+    const sekcja = screen.getByLabelText("Przepływy kategorii");
+    expect(sekcja.textContent).toContain("Automat jeszcze nic nie zaproponował.");
+    expect(within(sekcja).queryByRole("table")).toBeNull();
   });
 });

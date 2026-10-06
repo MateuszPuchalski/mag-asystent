@@ -77,6 +77,7 @@ import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
 import { sklasyfikujNowe } from "./services/klasyfikacja-auto.js";
 import { szkicujPoRozpoznaniu } from "./services/copilot-szkic-po-rozpoznaniu.js";
+import { zapiszPropozycje } from "./services/przeplyw-kategorii.js";
 import { przedPracaTrwa, szkicePrzedPraca, TAKT_PRZED_PRACA_MS } from "./services/copilot-przed-praca.js";
 import { sondujRzeczywistosc } from "./services/sonda-rzeczywistosci.js";
 import { uruchomTakt } from "./services/takt.js";
@@ -753,6 +754,10 @@ async function main() {
       if (config.copilot.szkicPoRozpoznaniu && w.rozmowy.length > 0) {
         const s = await szkicujPoRozpoznaniu(w.rozmowy);
         if (s.przerwane) console.warn(`[szkic-po-rozpoznaniu] przebieg przerwany: ${s.przerwane}`);
+      } else if (w.rozmowy.length > 0) {
+        /* Bez szkiców propozycje przepływu zapisuje sam takt rozpoznania.
+           „pilne" i „krok" nie zależą od szkicu, więc nie mogą od niego zależeć. */
+        zapiszPropozycje(db(), w.rozmowy);
       }
     });
   }

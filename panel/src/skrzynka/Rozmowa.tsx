@@ -15,6 +15,7 @@ import { WierszMenu } from "./MenuRozmowy";
 import { ProwadziZnak } from "./ProwadziZnak";
 import { Obecni } from "./Obecni";
 import { KartaKontekstu } from "./KartaKontekstu";
+import { PropozycjePrzeplywu } from "./PropozycjePrzeplywu";
 import { scalOs, zdarzeniaZakupu } from "./zakup";
 
 /**
@@ -295,6 +296,12 @@ export function Rozmowa(p: {
             disabled={!p.wskazowka.trim()}>
             <Ruler size={16} />Zleć pomiar</Przycisk>
         </div>}
+
+        {/* „Automat by…" stoi po pomiarze, a przed zakupem i edytorem: zlecenie
+            dla hali i „pilne" rozstrzyga się przed odpowiedzią. `key` po
+            rozmowie, żeby błąd werdyktu nie przeszedł na następną. */}
+        <PropozycjePrzeplywu key={`przeplyw-${rozmowa.id}`} rozmowaId={rozmowa.id}
+          propozycje={p.dane.przeplyw} />
 
         {/* `key` po rozmowie, z tego samego powodu co przy edytorze niżej:
             błąd wiązania z jednej rozmowy nie może stać w pasku następnej.

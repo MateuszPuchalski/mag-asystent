@@ -10,6 +10,7 @@ import {
   type OznaczPrzeczytany, type WyslijDoAllegro,
 } from "./allegro-wysylka.js";
 import { zalacznikiRozmowy } from "./zalaczniki-wysylki.js";
+import { werdyktWysylki } from "./przeplyw-kategorii.js";
 
 export interface ZadanieWysylki {
   conversationId: number;
@@ -311,6 +312,9 @@ export async function wyslijOdpowiedz(z: ZadanieWysylki) {
     database.prepare(`UPDATE outbox SET status='sent', external_message_id=?, szkic_los=?,
       finished_at=strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id=?`)
       .run(wynik.externalMessageId, szkic?.los ?? null, outboxId);
+    /* Los szkicu jest też werdyktem dla propozycji „wyslij" (tryb cienia).
+       W tej samej transakcji: werdykt bez wysłanej odpowiedzi byłby fałszywy. */
+    werdyktWysylki(database, z.conversationId, k.lastMessageId, szkic?.los ?? null, z.autor);
 
     /* Szkic znika dopiero po UDANEJ wysyłce. Przy każdym innym końcu zostaje
        nietknięty — odrzucona wysyłka nie ma prawa skasować pracy agenta. */

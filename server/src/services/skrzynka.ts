@@ -1,5 +1,5 @@
 import { db } from "../db/db.js";
-import { utworzZadanie } from "./zadania-terenowe.js";
+import { utworzZadanie, type RodzajZadania } from "./zadania-terenowe.js";
 import { uchwyty } from "./conversation-realtime.js";
 import { klientPodziekowal, ustawStatus, wyliczStatus, type ZrodloZakonczenia } from "./conversations.js";
 import type { StatusRozmowy } from "./conversations.js";
@@ -19,6 +19,7 @@ import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { zgodnoscOferty, type ZgodnoscOferty } from "./zgodnosc-oferty.js";
 import { szkicCopilota, type SzkicCopilota } from "./copilot-szkic.js";
 import { AKTYWNA_DECYZJA, CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
+import { propozycjeRozmowy, type PropozycjaPrzeplywu } from "./przeplyw-kategorii.js";
 import type {
   Akcja, Kategoria, Pewnosc, StatusDecyzji, Zrodlo,
 } from "./klasyfikacja-slownik.js";
@@ -566,6 +567,12 @@ export function osRozmowy(id: number): {
   droga: PrzystanekDrogi[];
   /** Propozycja Copilota (§14.6) — osobny wiersz, nie szkic agenta. `null` = nikt nie prosił. */
   szkicCopilota: SzkicCopilota | null;
+  /**
+   * Co automat BY zrobił przy bieżącym rozpoznaniu (tryb cienia,
+   * `services/przeplyw-kategorii.ts`). Odczyt: propozycje zapisuje
+   * szkicowanie po rozpoznaniu, nie otwarcie rozmowy.
+   */
+  przeplyw: PropozycjaPrzeplywu[];
 } {
   const wiersz = db().prepare(`${LISTA} WHERE c.id=?`).get(id) as Record<string, unknown> | undefined;
   if (!wiersz) throw new Error("Nie znaleziono rozmowy");
@@ -943,6 +950,7 @@ export function osRozmowy(id: number): {
     sprawy: sprawyZakupu(db(), kontoRozmowy, zamowienie?.externalId ?? null),
     droga: drogaZakupu(db(), kontoRozmowy, zamowienie?.externalId ?? null),
     szkicCopilota: szkicCopilota(id),
+    przeplyw: propozycjeRozmowy(db(), id),
   };
 }
 
@@ -977,6 +985,10 @@ export function szkicRozmowy(id: number): Szkic | null {
 export function zlecPomiar(
   rozmowaId: number, messageId: number, instrukcja: string, autor: { id: number; name: string },
   twId: number | null = null,
+  /* Rodzaj i tytuł z zewnątrz, bo tą samą drogą idzie krok przepływu
+     kategorii. Kontekst, powiązanie z osią i status rozmowy są te same,
+     a druga kopia tej funkcji rozjechałaby się przy pierwszej poprawce. */
+  zadanie: { rodzaj: RodzajZadania; tytul: string } | null = null,
 ) {
   const m = db().prepare(`
     SELECT m.body, m.related_object_type AS typ, m.related_object_id AS oferta, c.subject AS klient
@@ -1025,13 +1037,13 @@ export function zlecPomiar(
     twId != null ? `Kartotekę wskazał(a) ${autor.name}, nie wynika z oferty.` : "",
   ].filter(Boolean).join("\n");
 
-  const zadanie = utworzZadanie({
-    rodzaj: "pomiar",
+  const utworzone = utworzZadanie({
+    rodzaj: zadanie?.rodzaj ?? "pomiar",
     /* Tytuł jest etykietą DLA BIURA — po nim odnajduje się zadanie na liście
        wśród kilkunastu innych. Kolektor go nie pokazuje: na halę idzie towar
        i polecenie, a „Pomiar z rozmowy — Client:128497280" nie jest ani
        jednym, ani drugim. */
-    tytul: `Pomiar z rozmowy — ${String(m.klient ?? "klient")}`,
+    tytul: zadanie?.tytul ?? `Pomiar z rozmowy — ${String(m.klient ?? "klient")}`,
     instrukcja: dodatkowa, kontekst,
     twId, zrodlo: SKRZYNKA, zrodloRef: String(rozmowaId),
   }, autor);
@@ -1039,12 +1051,12 @@ export function zlecPomiar(
   /* Powiązanie idzie kluczami obcymi modelu kanonicznego (0.144.0), a nie samym
      `zrodlo_ref` — dzięki temu wynik wraca na oś TEJ rozmowy i tej wiadomości. */
   db().prepare("UPDATE zadanie_terenowe SET conversation_id=?, message_id=? WHERE id=?")
-    .run(rozmowaId, messageId, zadanie.id);
+    .run(rozmowaId, messageId, utworzone.id);
   /* ZLECONY POMIAR PRZESTAWIA STATUS (0.159.0). Bez tego `waiting_for_internal`
      z §7 stał w liście dopuszczonych wartości i nie miał ani jednego nadawcy:
      agent musiałby wybrać go ręcznie z listy, choć fakt już się wydarzył.
      Wyjście z tego stanu jest równie automatyczne — zdejmuje go wynik z hali
      (`dopiszZdarzenieWyniku`). */
   ustawStatus(db(), rozmowaId, "waiting_for_internal", autor.id, null);
-  return { ...zadanie, conversationId: rozmowaId, messageId };
+  return { ...utworzone, conversationId: rozmowaId, messageId };
 }

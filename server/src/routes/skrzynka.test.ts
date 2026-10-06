@@ -122,6 +122,10 @@ const TRASY = () => [
     payload: { priorytet: "pilny" } },
   { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/reklamacyjna`,
     payload: { reklamacyjna: true } },
+  /* Werdykt o propozycji przepływu — zgoda zleca hali zadanie i przestawia
+     priorytet, więc ta sama bramka co reszta zapisów skrzynki. */
+  { method: "POST" as const, url: `/api/obsluga/rozmowy/${rozmowa}/przeplyw/1`,
+    payload: { werdykt: "zgoda" } },
   { method: "GET" as const, url: "/api/obsluga/wzmianki" },
   /* Jedno „Moje" ponad kolejkami (S4 spoiwa) — ta sama bramka, bo lista
      niesie tematy rozmów i spraw klientów. */
@@ -913,4 +917,47 @@ test("pominięcie: sam licznik doby i klasy — bez wpisu w dzienniku, bez czło
     Array<Record<string, unknown>>;
   assert.deepEqual(wiersze.map((w) => [w.kategoria, w.ile]), [["RETURN", 2], ["bez rozpoznania", 2]]);
   assert.deepEqual(Object.keys(wiersze[0]!).sort(), ["dzien", "ile", "kategoria"]);
+});
+
+/* ── Werdykt o propozycji przepływu kategorii (tryb cienia) ─────────────────
+   Trasa jest cienka, reguły pilnuje `services/przeplyw-kategorii.test.ts`.
+   Tu sprawdzamy granicę HTTP: kody błędów i to, że zgoda naprawdę wykonuje
+   krok, a werdykt drugi raz go nie powtarza. */
+test("werdykt przepływu: 400, 404, 409, a zgoda ustawia pilne i zleca weryfikację", async () => {
+  const b = login("biuro", "Anna");
+  const d = db();
+  d.prepare(`INSERT INTO decyzja_klasyfikacji(conversation_id,message_id,wersja,aktywna,zrodlo,status,
+    kategoria,akcja,wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,pewnosc,
+    taksonomia_wersja,polityka_wersja,at,przez)
+    VALUES (?,?,1,1,'MODEL','SUCCESS','WRONG_PRODUCT','HUMAN_REVIEW',0,0,0,'wysoka','v2','p1',?,'automat')`)
+    .run(rozmowa, pytanie, new Date().toISOString());
+  const { zapiszPropozycje } = await import("../services/przeplyw-kategorii.js");
+  assert.equal(zapiszPropozycje(d, [rozmowa]), 2);
+  const os = await app.inject({ method: "GET", url: `/api/obsluga/rozmowy/${rozmowa}`, headers: b.naglowki });
+  const lista = os.json().przeplyw as Array<{ id: number; rodzaj: string; werdykt: string | null }>;
+  assert.deepEqual(lista.map((p) => p.rodzaj), ["krok", "pilne"]);
+  const [krok, pilne] = lista;
+  const werdykt = (id: number, tresc: unknown, rozmowaId = rozmowa) => app.inject({ method: "POST",
+    url: `/api/obsluga/rozmowy/${rozmowaId}/przeplyw/${id}`, headers: b.naglowki, payload: tresc as object });
+
+  assert.equal((await werdykt(pilne!.id, { werdykt: "moze" })).statusCode, 400);
+  assert.equal((await werdykt(pilne!.id, {})).statusCode, 400);
+  assert.equal((await werdykt(pilne!.id, { werdykt: "zgoda" }, rozmowa + 1000)).statusCode, 404);
+
+  let r = await werdykt(pilne!.id, { werdykt: "zgoda" });
+  assert.equal(r.statusCode, 200, r.body);
+  assert.equal(r.json().propozycja.werdykt, "zgoda");
+  assert.equal(r.json().propozycja.werdyktPrzez, "Anna");
+  assert.equal((d.prepare("SELECT priorytet FROM conversation WHERE id=?").get(rozmowa) as
+    { priorytet: string }).priorytet, "pilny");
+
+  r = await werdykt(krok!.id, { werdykt: "zgoda" });
+  assert.equal(r.statusCode, 200, r.body);
+  const z = d.prepare("SELECT rodzaj, conversation_id, message_id FROM zadanie_terenowe").all() as
+    Array<{ rodzaj: string; conversation_id: number; message_id: number }>;
+  assert.deepEqual(z.map((x) => ({ ...x })), [{ rodzaj: "weryfikacja", conversation_id: rozmowa, message_id: pytanie }]);
+
+  r = await werdykt(krok!.id, { werdykt: "zgoda" });
+  assert.equal(r.statusCode, 409, "drugi werdykt nie zleca drugiego zadania");
+  assert.equal((d.prepare("SELECT count(*) n FROM zadanie_terenowe").get() as { n: number }).n, 1);
 });

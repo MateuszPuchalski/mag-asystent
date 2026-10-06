@@ -189,6 +189,37 @@ export type PomiarCopilota = {
     /** Los szkicu przy wysyłce: poszedł bez zmian albo z poprawką. */
     wyslanychBezZmian: number; wyslanychPoprawionych: number;
   };
+  /** Zgodność automatu z agentem per kategoria i rodzaj — na tych liczbach zapadnie żywe wykonanie. */
+  przeplyw: WierszPomiaruPrzeplywu[];
+};
+
+/* ── Przepływ kategorii w trybie cienia ──────────────────────────────────────
+   Automat zapisuje, co BY zrobił, a agent potwierdza albo odrzuca. Nic nie
+   idzie do klienta i nic nie zmienia się samo, bo najpierw mają być dowody.
+   Kształty są lustrem serwera (`services/przeplyw-kategorii.ts`). */
+export type RodzajPropozycji = "wyslij" | "krok" | "pilne";
+
+export type PropozycjaPrzeplywu = {
+  id: number;
+  rodzaj: RodzajPropozycji;
+  kategoria: string;
+  /** Polecenie dla hali; tylko przy „krok". */
+  instrukcja: string | null;
+  at: string;
+  werdykt: "zgoda" | "sprzeciw" | null;
+  /** „wysylka" przy „wyslij": werdykt wynika z losu szkicu, nie z kliknięcia. */
+  werdyktZrodlo: "agent" | "wysylka" | null;
+  werdyktPrzez: string | null;
+  werdyktAt: string | null;
+};
+
+export type WierszPomiaruPrzeplywu = {
+  kategoria: string;
+  rodzaj: RodzajPropozycji;
+  propozycji: number;
+  zgod: number;
+  sprzeciwow: number;
+  bezWerdyktu: number;
 };
 
 /** Załącznik wiadomości. `doPobrania` liczy serwer — panel go nie wylicza. */
@@ -493,6 +524,8 @@ export type OsRozmowy = {
   droga: PrzystanekDrogi[];
   /** Propozycja Copilota (§14.6) — osobny byt, nie szkic agenta. `null` = nikt nie prosił. */
   szkicCopilota: SzkicCopilota | null;
+  /** Co automat BY zrobił przy bieżącym rozpoznaniu; pusta, gdy nic. */
+  przeplyw: PropozycjaPrzeplywu[];
 };
 
 /* ── Szkic odpowiedzi z Copilota (§14.6, 0.231.0) ────────────────────────────

@@ -42,7 +42,7 @@ const szczegoly = (id: number, n: Record<string, unknown> = {}) => ({
     ofertaId: null, nazwaOferty: null, zamowienieId: null }],
   szkic: null, ofertaWskazana: null, zamowienie: null, oferta: null,
   kandydaciZamowien: [], zwroty: [], sprawy: [], droga: [],
-  szkicCopilota: null, ...n,
+  szkicCopilota: null, przeplyw: [], ...n,
 });
 
 const SZKIC = (id: number) => ({

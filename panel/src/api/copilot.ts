@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { klucze } from "./rozmowy";
 import type {
-  Kategoria, OcenaSzkicu, PomiarCopilota, StanCopilota, SzkicCopilota,
+  Kategoria, OcenaSzkicu, PomiarCopilota, PropozycjaPrzeplywu, StanCopilota, SzkicCopilota,
   WymianaCopilota, WynikPartii,
 } from "./typy";
 
@@ -158,6 +158,29 @@ export function useZadajPytanie() {
       qc.invalidateQueries({ queryKey: kluczeCopilota.pytania(v.rozmowaId) });
       /* Pomiar TAK, oś rozmowy NIE: każde pytanie kosztuje i ma stanąć
          w rachunku, ale szkicu ani wiadomości nie rusza ani o znak. */
+      qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
+    },
+  });
+}
+
+/* ── Werdykt o propozycji przepływu (tryb cienia) ────────────────────────────
+   Agent mówi „tak" albo „nie" temu, co automat BY zrobił. Zgoda wykonuje krok
+   po stronie serwera: zleca weryfikację hali albo oznacza rozmowę jako pilną.
+   Unieważniamy więc wszystko, co ten krok zmienia na ekranie: rozmowę, listę
+   z priorytetem, zadania hali i pomiar zgodności. `onSettled`, a nie
+   `onSuccess`, bo przy 409 („rozpoznanie się zmieniło") karta ma pokazać
+   propozycje nowej decyzji, a nie zostać przy starych. */
+export function useWerdyktPrzeplywu() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { rozmowaId: number; propozycjaId: number; werdykt: "zgoda" | "sprzeciw" }) =>
+      api<{ propozycja: PropozycjaPrzeplywu }>(
+        `/api/obsluga/rozmowy/${v.rozmowaId}/przeplyw/${v.propozycjaId}`,
+        { method: "POST", body: JSON.stringify({ werdykt: v.werdykt }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: klucze.rozmowa(v.rozmowaId) });
+      qc.invalidateQueries({ queryKey: klucze.rozmowy });
+      qc.invalidateQueries({ queryKey: klucze.zadania });
       qc.invalidateQueries({ queryKey: kluczeCopilota.pomiar });
     },
   });

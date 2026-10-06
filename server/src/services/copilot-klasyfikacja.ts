@@ -21,6 +21,7 @@ import {
   decyzjaZModelu, decyzjaZastepcza, walidujOdpowiedz, type Decyzja,
 } from "./klasyfikacja-polityka.js";
 import { MAPOWANIE_WERSJA, mapujStrukture, type WynikMapowania } from "./klasyfikacja-mapowanie.js";
+import { pomiarPrzeplywu, type WierszPomiaruPrzeplywu } from "./przeplyw-kategorii.js";
 
 export { KATEGORIE, PEWNOSCI, AKCJE } from "./klasyfikacja-slownik.js";
 export type { Kategoria, Pewnosc, Akcja } from "./klasyfikacja-slownik.js";
@@ -738,6 +739,12 @@ export interface PomiarCopilota {
      */
     wyslanychBezZmian: number; wyslanychPoprawionych: number;
   };
+  /**
+   * Przepływy kategorii w trybie cienia: ile propozycji automatu, ile zgód
+   * i sprzeciwów, per kategoria i rodzaj. Na tych liczbach właściciel
+   * włączy żywe wykonanie, kategoria po kategorii.
+   */
+  przeplyw: WierszPomiaruPrzeplywu[];
 }
 
 /** Pomiar do ekranu ustawień. Czysty odczyt — nie zapisuje niczego. */
@@ -835,5 +842,6 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
       ile: Number(sz.ile ?? 0), odrzuconych: Number(sz.odrzuconych ?? 0),
       wyslanychBezZmian: Number(wys.bez ?? 0), wyslanychPoprawionych: Number(wys.popr ?? 0),
     },
+    przeplyw: pomiarPrzeplywu(database),
   };
 }

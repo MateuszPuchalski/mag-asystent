@@ -97,7 +97,7 @@ describe("Os: linie zakupu w czasie", () => {
 });
 
 const dane = (n: Partial<Rozmowa> = {}): OsRozmowy => ({
-  rozmowa: rozmowa(n), os: [], szkicCopilota: null, ofertaWskazana: null,
+  rozmowa: rozmowa(n), os: [], szkicCopilota: null, ofertaWskazana: null, przeplyw: [],
 } as unknown as OsRozmowy);
 
 /* Atrapa pełnego kształtu: ekran rozmowy bierze ponad czterdzieści rekwizytów,
@@ -136,7 +136,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
 describe("Rozmowa: karta i zdarzenia zakupu", () => {
   it("składa kartę nad rozmową i wsuwa zdarzenia zakupu między wiadomości", () => {
     const d = {
-      rozmowa: rozmowa(), szkicCopilota: null, ofertaWskazana: null,
+      rozmowa: rozmowa(), szkicCopilota: null, ofertaWskazana: null, przeplyw: [],
       os: [wiadomosc("m1", "2026-10-03T10:00:00.000Z")],
       droga: [{ rodzaj: "dyskusja", id: 7, at: "2026-10-03T12:00:00.000Z", opis: null }],
       oferta: null,

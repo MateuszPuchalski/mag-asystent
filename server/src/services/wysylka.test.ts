@@ -7,6 +7,7 @@ import { ConversationConflict, przejmijRozmowe, zapiszSzkic } from "./conversati
 import { kluczIdempotencji, LIMIT_ZNAKOW, wyslijOdpowiedz } from "./wysylka.js";
 import { _wyczyscObecnosc, wejdzDoRozmowy, wyjdzZRozmowy } from "./conversation-realtime.js";
 import type { WyslijDoAllegro } from "./allegro-wysylka.js";
+import { zapiszPropozycje } from "./przeplyw-kategorii.js";
 
 /* Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na zewnątrz.
    Ten plik pilnuje ośmiu warunków z §8.5 oraz dwóch blizn naraz: 0.110.0
@@ -602,3 +603,47 @@ test("wyślij i zakończ: udana wysyłka kończy rozmowę, nieudana — nie", as
   assert.deepEqual(statusIZakonczenie(d, rozmowa), { status: "resolved", zakonczenie: "agent" });
 });
 
+
+/* ── Werdykt „wyslij” z losu szkicu (przepływ kategorii, tryb cienia) ───────
+   Automat proponował wysłać szkic bez zmian. Agent, który go tak wysłał,
+   zgodził się z automatem; ten, który poprawił, zaprotestował. Werdykt jedzie
+   w transakcji wysyłki, więc nieudana wysyłka nie zostawia go wcale. */
+function zPropozycjaWyslij(s: ReturnType<typeof stanowisko>, tresc: string) {
+  const decyzja = Number(s.d.prepare(`INSERT INTO decyzja_klasyfikacji(conversation_id,message_id,wersja,
+    aktywna,zrodlo,status,kategoria,akcja,wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,
+    pewnosc,taksonomia_wersja,polityka_wersja,at,przez)
+    VALUES (?,?,1,1,'MODEL','SUCCESS','ORDER_STATUS','GET_SHIPMENT',0,0,0,'wysoka','v2','p1',
+      '2026-09-01T07:12:30Z','automat')`).run(s.rozmowa, s.pytanie).lastInsertRowid);
+  szkic(s.d, s.rozmowa, tresc, s.pytanie);
+  s.d.prepare("UPDATE szkic_copilota SET decyzja_id=? WHERE conversation_id=?").run(decyzja, s.rozmowa);
+  assert.equal(zapiszPropozycje(s.d, [s.rozmowa]), 1);
+}
+const werdyktWyslij = (d: DatabaseSync) => d.prepare(
+  "SELECT werdykt, werdykt_zrodlo, werdykt_przez FROM propozycja_przeplywu WHERE rodzaj='wyslij'").get() as
+  { werdykt: string | null; werdykt_zrodlo: string | null; werdykt_przez: string | null };
+
+test("szkic wysłany bez zmian to zgoda z automatem, poprawiony — sprzeciw", async () => {
+  const a = stanowisko();
+  zPropozycjaWyslij(a, "Dzień dobry, paczka jest w drodze.");
+  await wyslijOdpowiedz({ conversationId: a.rozmowa, autor: autorAli(a.ala),
+    body: "Dzień dobry,  paczka jest w drodze.", expectedVersion: 1, expectedLastMessageId: a.pytanie,
+    database: a.d, wyslij: udany(), oznaczPrzeczytany: async () => {} });
+  assert.deepEqual({ ...werdyktWyslij(a.d) },
+    { werdykt: "zgoda", werdykt_zrodlo: "wysylka", werdykt_przez: "A. Lewandowska" });
+
+  const b = stanowisko();
+  zPropozycjaWyslij(b, "Dzień dobry, paczka jest w drodze.");
+  await wyslijOdpowiedz({ conversationId: b.rozmowa, autor: autorAli(b.ala),
+    body: "Dzień dobry, paczka dojdzie jutro.", expectedVersion: 1, expectedLastMessageId: b.pytanie,
+    database: b.d, wyslij: udany(), oznaczPrzeczytany: async () => {} });
+  assert.equal(werdyktWyslij(b.d).werdykt, "sprzeciw");
+});
+
+test("nieudana wysyłka nie wystawia werdyktu propozycji „wyslij”", async () => {
+  const s = stanowisko();
+  zPropozycjaWyslij(s, "Dzień dobry, paczka jest w drodze.");
+  await assert.rejects(() => wyslijOdpowiedz({ conversationId: s.rozmowa, autor: autorAli(s.ala),
+    body: "Dzień dobry, paczka jest w drodze.", expectedVersion: 1, expectedLastMessageId: s.pytanie,
+    database: s.d, wyslij: async () => { throw new Error("400 Bad Request"); } }));
+  assert.equal(werdyktWyslij(s.d).werdykt, null);
+});

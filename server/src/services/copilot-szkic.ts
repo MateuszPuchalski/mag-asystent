@@ -29,6 +29,7 @@ import {
 import { faktZwrotu, zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
 import { ocenRealizacji, stanRealizacji } from "./realizacja-zamowienia.js";
 import { odswiezZamowienie } from "./allegro-zamowienia-sync.js";
+import { werdyktOdrzucenia } from "./przeplyw-kategorii.js";
 
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
 
@@ -929,6 +930,9 @@ export function ocenSzkic(
   transaction(db(), () => {
     db().prepare("UPDATE szkic_copilota SET ocena=?, ocena_at=? WHERE conversation_id=?")
       .run(ocena, teraz.toISOString(), conversationId);
+    /* Odrzucony szkic to sprzeciw wobec „wyslij" przepływu kategorii:
+       automat wysłałby właśnie ten tekst. */
+    if (ocena === "odrzucony") werdyktOdrzucenia(db(), conversationId, kto);
     logEvent("copilot_szkic_ocena", kto.name, null, { conversationId, ocena }, kto.id, db());
   })();
   return { ocena: ocena as OcenaSzkicu };

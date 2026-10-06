@@ -253,6 +253,8 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   copilot_klasyfikacja: "Rozpoznanie rozmowy przez Copilota",
   copilot_auto_klasyfikacja: "Rozpoznanie w tle",
   copilot_auto_klasyfikacja_sufit: "Rozpoznania w tle wstrzymane limitem",
+  przeplyw_propozycje: "Propozycje automatu w trybie cienia",
+  przeplyw_werdykt: "Werdykt wobec propozycji automatu",
   copilot_klasyfikacja_niepoprawna: "Rozpoznanie Copilota poprawione",
   copilot_korekta: "Poprawka odpowiedzi Copilota",
   copilot_dane_doboru: "Dane doboru dla Copilota",
