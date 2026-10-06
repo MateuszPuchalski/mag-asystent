@@ -3067,7 +3067,7 @@ Szkic nieudany z winy rozmowy nie wraca na tę samą wiadomość tego ranka.
 Przeciążenie dostawcy rozmowy nie skreśla. Przełącznik `COPILOT_PRZED_PRACA`
 jest domyślnie wyłączony, bo wydaje pieniądze bez kliknięcia.
 
-### 14.6e. Przepływ kategorii w trybie cienia (@wydanie)
+### 14.6e. Przepływ kategorii w trybie cienia (0.569.0)
 
 Decyzja właściciela z 6 października 2026: każda kategoria pytania dostaje
 swój przepływ automatyzacji. Przepływ może wysłać odpowiedź bez człowieka,
@@ -6868,7 +6868,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Rozpoznanie w faktach szkicu, intake tylko przy towarze (§14.6a) | **działa** od 22 września 2026 | `kontekstSzkicu`, `zRozpoznaniaNiepewne` w `services/copilot-szkic.ts` |
 | Szkic z taktu dla rozmów bez oferty (§14.6a) | **działa** od 22 września 2026, przy `COPILOT_AUTO_SZKIC=1` | `services/copilot-auto-szkic.ts` |
 | Szkic zaraz po rozpoznaniu (§14.6c) | **działa** od 0.477.0, domyślnie włączony (`COPILOT_SZKIC_PO_ROZPOZNANIU`) | `services/copilot-szkic-po-rozpoznaniu.ts`, `szkic_copilota.decyzja_id` |
-| Przepływ kategorii w trybie cienia (§14.6e) | **działa** od @wydanie, tylko propozycje i pomiar; wysyłki bez człowieka nie ma | `services/przeplyw-kategorii.ts`, tabela `propozycja_przeplywu`, karta „Automat by…" w rozmowie, pomiar za zębatką |
+| Przepływ kategorii w trybie cienia (§14.6e) | **działa** od 0.569.0, tylko propozycje i pomiar; wysyłki bez człowieka nie ma | `services/przeplyw-kategorii.ts`, tabela `propozycja_przeplywu`, karta „Automat by…" w rozmowie, pomiar za zębatką |
 | Los szkicu przy wysyłce i uzgodnienie `send_uncertain` (§14.6a) | **działa** od 22 września 2026 | `outbox.szkic_los`, `losSzkicu` w `wysylka.ts`, `uzgodnijNiepewna` w `allegro-inbox-sync.ts` |
 | Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa** od 22 września 2026, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
