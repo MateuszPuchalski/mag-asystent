@@ -301,6 +301,25 @@ describe("Produkty ze zwrotu", () => {
       .toEqual([false, true, false]);
   });
 
+  it("drobne działania stoją w JEDNYM rzędzie pod oceną, nie w słupku", () => {
+    /* Trzy linie samych odnośników przytłaczały decyzję. Wspólny rodzic to
+       rząd decyzji; formularze i bloki biorą w nim całą szerokość. */
+    lista(zwrot({ kubelek: "zwrot", pozycje: [POZYCJA({ ocena: "stan", ilosc: 2 })] }),
+      { onPotracenie: vi.fn(), onIlosc: vi.fn() });
+    const rzad = screen.getByRole("button", { name: /oddaj mniej/ }).parentElement!;
+    expect(rzad).toContainElement(screen.getByRole("button", { name: /cofnij ocenę/ }));
+    expect(rzad).toContainElement(screen.getByRole("button", { name: /wróciło mniej/ }));
+    /* Rodzic był kiedyś słupkiem; rząd poznaje się po zawijaniu. */
+    expect(rzad.className).toMatch(/\bflex-wrap\b/);
+  });
+
+  it("brak kartoteki stoi znacznikiem w rzędzie stanów, obok rabatu", () => {
+    lista(zwrot({ pozycje: [POZYCJA()] }));
+    const rzad = screen.getByText("Bez kartoteki").parentElement!.parentElement!;
+    expect(rzad).toContainElement(screen.getByRole("button", { name: "ZGŁOŚ RABAT" }));
+    expect(rzad).toContainElement(screen.getByRole("button", { name: "wskaż kartotekę" }));
+  });
+
   it("kartoteka zawsze niesie źródło: zatwierdzona, proponowana albo żadna", () => {
     /* §11.3 żąda widocznego źródła i pewności, a §4.3 nie pozwala, żeby wybór
        automatu udawał fakt z Allegro. */
