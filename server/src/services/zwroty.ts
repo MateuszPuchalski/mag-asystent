@@ -7,8 +7,9 @@ import { iloscLiczona } from "./ilosc-zwrotu.js";
 import { naZamowienie, type Zamowienie } from "./zamowienia.js";
 import { logEvent } from "./events.js";
 import type { FakturaZwrotu } from "./faktury.js";
-import { dolozDoKosza, wypuscGotoweKoszyki, zamknietyKoszPozycji, zdejmijZKosza }
-  from "./kosze-zwrotow.js";
+import {
+  dolozDoKosza, skasujOutletSkladnikow, wypuscGotoweKoszyki, zamknietyKoszPozycji, zdejmijZKosza,
+} from "./kosze-zwrotow.js";
 import { STATUSY_ODDANE } from "./zwrot-pieniedzy.js";
 import { zapiszSkladRecznie, type SkladPozycji } from "./komplety.js";
 import { odsunZwPrzedRecznym, zakolejkujZw } from "./zw-automat.js";
@@ -1506,8 +1507,9 @@ export function ocenPozycje(
   koszId?: number | null,
 ): { wersja: number; koszyk: number | null } {
   const p = database.prepare(
-    "SELECT id, zwrot_id, nazwa FROM zwrot_klienta_pozycja WHERE id=?")
-    .get(pozycjaId) as { id: number; zwrot_id: number; nazwa: string } | undefined;
+    "SELECT id, zwrot_id, nazwa, ocena FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(pozycjaId) as
+    { id: number; zwrot_id: number; nazwa: string; ocena: string | null } | undefined;
   if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
   return transaction(database, () => {
     const z = podKlucz(database, Number(p.zwrot_id), wersja);
@@ -1541,6 +1543,11 @@ export function ocenPozycje(
        którego nikt już nie chce na regale. Kosza z DOKUMENTEM to nie rusza —
        tamten pojechał na halę z wystawionym papierem (bramka wyżej). */
     zdejmijZKosza(database, pozycjaId, kto);
+    /* ZMIANA OCENY KASUJE ODŁOŻONE SKŁADNIKI, zanim cokolwiek wróci do pudła.
+       Odłożenie części ma sens tylko przy „na stan", a nowa ocena to nowa
+       decyzja o całej pozycji. Ta sama ocena drugi raz niczego nie zmienia,
+       więc oznaczenia zostają, a `dolozDoKosza` je pominie. */
+    if ((p.ocena ?? null) !== ocena) skasujOutletSkladnikow(database, pozycjaId, kto);
     /* Każda ocena do SWOJEGO koszyka. `zdejmijZKosza` wyżej zdejmuje
        z dowolnego kosza bez dokumentu, więc „na stan", potem „utylizacja"
        przenosi pozycję z jednego pudła do drugiego, a nie zostawia jej w obu. */
@@ -1576,6 +1583,13 @@ export function ocenPozycje(
 
 export interface PozycjaNaOutlet {
   pozycjaId: number;
+  /**
+   * Kartoteka składnika kompletu odłożonego na outlet; `null` to cała pozycja.
+   *
+   * Po nim odklikanie wie, który wiersz zdjąć: z jednej pozycji na regał
+   * bywa niesiona sama część zestawu, a reszta jedzie MM-em na stan.
+   */
+  skladnikTwId: number | null;
   zwrotId: number;
   /** Numer zwrotu — po nim człowiek wraca do sprawy, gdy coś się nie zgadza. */
   numer: string;
@@ -1602,7 +1616,7 @@ export interface PozycjaNaOutlet {
  * leżący przy biurku od tygodnia jest jedyną rzeczą, o którą tu chodzi.
  */
 export function pozycjeNaOutlet(database: Db = defaultDb()): PozycjaNaOutlet[] {
-  return (database.prepare(
+  const cale: PozycjaNaOutlet[] = (database.prepare(
     `SELECT p.id, p.zwrot_id, p.nazwa, p.tw_id, p.tw_symbol, p.ilosc, p.ilosc_zwrocona,
             p.potracenie_grosze, p.ocena_at,
             COALESCE(z.reference_number, z.external_id) AS numer
@@ -1611,7 +1625,8 @@ export function pozycjeNaOutlet(database: Db = defaultDb()): PozycjaNaOutlet[] {
       WHERE p.ocena='outlet' AND p.outlet_at IS NULL
       ORDER BY p.ocena_at, p.id`).all() as Array<Record<string, unknown>>)
     .map((w) => ({
-      pozycjaId: Number(w.id), zwrotId: Number(w.zwrot_id), numer: String(w.numer),
+      pozycjaId: Number(w.id), skladnikTwId: null,
+      zwrotId: Number(w.zwrot_id), numer: String(w.numer),
       nazwa: String(w.nazwa),
       twId: w.tw_id === null ? null : Number(w.tw_id),
       symbol: (w.tw_symbol as string) ?? null,
@@ -1622,6 +1637,35 @@ export function pozycjeNaOutlet(database: Db = defaultDb()): PozycjaNaOutlet[] {
       potracenieGrosze: w.potracenie_grosze === null ? null : Number(w.potracenie_grosze),
       ocenionoAt: (w.ocena_at as string) ?? null,
     }));
+
+  /* SKŁADNIKI KOMPLETU czekają na tej samej liście, bo niesie je ta sama ręka
+     do tego samego regału. Potrącenia nie mają: klient dostał za komplet
+     całość, więc żadna liczba nie mówi, o ile ta część potaniała. */
+  const skladniki: PozycjaNaOutlet[] = (database.prepare(
+    `SELECT o.pozycja_id, o.tw_id, o.symbol, o.nazwa, o.ilosc, o.oznaczono_at,
+            p.zwrot_id, COALESCE(z.reference_number, z.external_id) AS numer
+       FROM zwrot_skladnik_outlet o
+       JOIN zwrot_klienta_pozycja p ON p.id = o.pozycja_id
+       JOIN zwrot_klienta z ON z.id = p.zwrot_id
+      WHERE o.outlet_at IS NULL
+      ORDER BY o.oznaczono_at, o.id`).all() as Array<Record<string, unknown>>)
+    .map((w) => ({
+      pozycjaId: Number(w.pozycja_id), skladnikTwId: Number(w.tw_id),
+      zwrotId: Number(w.zwrot_id), numer: String(w.numer),
+      nazwa: String(w.nazwa ?? ""),
+      twId: Number(w.tw_id),
+      symbol: (w.symbol as string) ?? null,
+      ilosc: Number(w.ilosc),
+      potracenieGrosze: null,
+      ocenionoAt: String(w.oznaczono_at),
+    }));
+
+  /* Od najstarszej decyzji, bez względu na to, czy dotyczy całej pozycji,
+     czy części — przy regale liczy się tylko, co leży najdłużej. */
+  return [...cale, ...skladniki].sort((a, b) =>
+    (a.ocenionoAt ?? "").localeCompare(b.ocenionoAt ?? "")
+    || a.pozycjaId - b.pozycjaId
+    || (a.skladnikTwId ?? 0) - (b.skladnikTwId ?? 0));
 }
 
 /**
@@ -1634,7 +1678,9 @@ export function pozycjeNaOutlet(database: Db = defaultDb()): PozycjaNaOutlet[] {
  */
 export function przeniesionoNaOutlet(
   database: Db, pozycjaId: number, kto: { id: number; name: string }, teraz = new Date(),
+  twId: number | null = null,
 ): { pozycjaId: number; outletAt: string } {
+  if (twId != null) return przeniesionoSkladnik(database, pozycjaId, twId, kto, teraz);
   const p = database.prepare(
     "SELECT id, zwrot_id, nazwa, ocena, outlet_at FROM zwrot_klienta_pozycja WHERE id=?")
     .get(pozycjaId) as
@@ -1655,6 +1701,39 @@ export function przeniesionoNaOutlet(
       `${p.nazwa} — przeniesiono na regał outletowy`, { pozycjaId }, kto, at);
     logEvent("zwrot_outlet_przeniesiony", kto.name, null,
       { zwrotId: Number(p.zwrot_id), pozycjaId }, kto.id, database);
+    return { pozycjaId, outletAt: at };
+  })();
+}
+
+/**
+ * Odklikanie jednego składnika kompletu — ta sama reguła co dla pozycji.
+ *
+ * Bez wersji zwrotu i po cichu przy powtórzeniu, bo to meldunek o pracy
+ * fizycznej, a nie decyzja. Pierwszy podpis zostaje.
+ */
+function przeniesionoSkladnik(
+  database: Db, pozycjaId: number, twId: number, kto: { id: number; name: string },
+  teraz: Date,
+): { pozycjaId: number; outletAt: string } {
+  const w = database.prepare(
+    `SELECT o.symbol, o.outlet_at, p.zwrot_id, p.nazwa
+       FROM zwrot_skladnik_outlet o
+       JOIN zwrot_klienta_pozycja p ON p.id = o.pozycja_id
+      WHERE o.pozycja_id=? AND o.tw_id=?`).get(pozycjaId, twId) as
+    { symbol: string | null; outlet_at: string | null; zwrot_id: number; nazwa: string }
+    | undefined;
+  if (!w) throw new Error("Ten składnik nie jest odłożony na outlet — nie ma czego przenosić.");
+  if (w.outlet_at) return { pozycjaId, outletAt: w.outlet_at };
+
+  const at = teraz.toISOString();
+  return transaction(database, () => {
+    database.prepare(`UPDATE zwrot_skladnik_outlet SET outlet_at=?, outlet_przez=?
+      WHERE pozycja_id=? AND tw_id=?`).run(at, kto.name, pozycjaId, twId);
+    zdarzenie(database, Number(w.zwrot_id), "outlet",
+      `${w.symbol ?? twId} z „${w.nazwa}” — przeniesiono na regał outletowy`,
+      { pozycjaId, twId }, kto, at);
+    logEvent("zwrot_outlet_przeniesiony", kto.name, twId,
+      { zwrotId: Number(w.zwrot_id), pozycjaId, twId }, kto.id, database);
     return { pozycjaId, outletAt: at };
   })();
 }

@@ -338,6 +338,7 @@ export function usunKoszyk(
         { zwrot_id: number; nazwa: string } | undefined;
       database.prepare(`UPDATE zwrot_klienta_pozycja
         SET ocena=NULL, ocena_at=NULL, ocena_przez=NULL WHERE id=?`).run(poz);
+      skasujOutletSkladnikow(database, poz, kto);
       if (!z) continue;
       zwroty.add(Number(z.zwrot_id));
       database.prepare("UPDATE zwrot_klienta SET wersja=wersja+1 WHERE id=?")
@@ -415,6 +416,11 @@ export function dolozDoKosza(
     }
   }
 
+  /* Wszystko na outlecie to nic do pudła. Ścieżka odkładania na to nie
+     pozwala (ostatni składnik), ale pustego koszyka nie zakładamy nawet wtedy. */
+  const naOutletPrzed = outletSkladnikow(database, pozycjaId);
+  if (sklad.skladniki.every((s) => naOutletPrzed.has(s.twId))) return null;
+
   const kosz = koszDoDolozenia(database, kto, teraz, rodzaj, koszId);
   /* Dwa razy ta sama pozycja to jeden wiersz. Operator bywa poprawiany:
      cofnięcie oceny i ponowne „na stan" nie ma prawa podwoić sztuk na MM.
@@ -431,7 +437,10 @@ export function dolozDoKosza(
   const wstaw = database.prepare(
     `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, zwrot_pozycja_id)
      VALUES (?,?,?,?,?,?)`);
+  /* SKŁADNIK NA OUTLECIE NIE WRACA DO PUDŁA. To decyzja człowieka o tej
+     sztuce, a nie ptaszek, więc ponowne dołożenie jej nie kasuje. */
   for (const s of sklad.skladniki) {
+    if (naOutletPrzed.has(s.twId)) continue;
     wstaw.run(kosz, s.twId, s.symbol, s.nazwa, s.ilosc, pozycjaId);
   }
   /* Skład policzony z dokumentu ZAPAMIĘTUJE SIĘ dopiero tutaj, na drodze
@@ -637,6 +646,7 @@ export function zdejmijTowar(
         WHERE kosz_id=? AND zwrot_pozycja_id=?`).run(koszId, poz);
       database.prepare(`UPDATE zwrot_klienta_pozycja
         SET ocena=NULL, ocena_at=NULL, ocena_przez=NULL WHERE id=?`).run(poz);
+      skasujOutletSkladnikow(database, poz, kto);
       if (z) {
         const at = new Date().toISOString();
         database.prepare(`UPDATE zwrot_klienta SET wersja=wersja+1 WHERE id=?`)
@@ -773,7 +783,13 @@ export function zdejmijZKosza(
  * ekran milczy.
  */
 export interface SkladDoZaznaczenia extends Omit<SkladPozycji, "skladniki"> {
-  skladniki: Array<Skladnik & { wKoszyku: boolean }>;
+  skladniki: Array<Skladnik & {
+    wKoszyku: boolean;
+    /** Składnik odłożony na outlet zamiast do koszyka, także już przeniesiony. */
+    naOutlet: boolean;
+    /** Kiedy stanął na regale outletowym; `null`, gdy jeszcze czeka albo nie dotyczy. */
+    outletAt: string | null;
+  }>;
 }
 
 export function skladDoZaznaczenia(database: Db, pozycjaId: number): SkladDoZaznaczenia {
@@ -783,23 +799,89 @@ export function skladDoZaznaczenia(database: Db, pozycjaId: number): SkladDoZazn
       WHERE zwrot_pozycja_id=? ORDER BY id`)
     .all(pozycjaId) as Array<{ tw_id: number; symbol: string; nazwa: string; ilosc: number }>;
   const leza = new Map(wKoszyku.map((w) => [Number(w.tw_id), w]));
+  const naOutlet = outletSkladnikow(database, pozycjaId);
 
   const skladniki = sklad.skladniki.map((s) => ({
     ...s,
     /* ILOŚĆ Z KOSZYKA, gdy wiersz tam stoi. To ona pojedzie na dokument MM,
-       a rozbieżność z dzisiejszym wyliczeniem jest informacją, nie błędem. */
-    ilosc: leza.get(s.twId)?.ilosc ?? s.ilosc,
+       a rozbieżność z dzisiejszym wyliczeniem jest informacją, nie błędem.
+       Przy składniku na outlecie liczy się ilość zapisana przy odłożeniu. */
+    ilosc: leza.get(s.twId)?.ilosc ?? naOutlet.get(s.twId)?.ilosc ?? s.ilosc,
     wKoszyku: leza.has(s.twId),
+    naOutlet: naOutlet.has(s.twId),
+    outletAt: naOutlet.get(s.twId)?.outlet_at ?? null,
   }));
   const znane = new Set(skladniki.map((s) => s.twId));
   for (const w of wKoszyku) {
     if (znane.has(Number(w.tw_id))) continue;
+    znane.add(Number(w.tw_id));
     skladniki.push({
       twId: Number(w.tw_id), symbol: w.symbol, nazwa: w.nazwa,
-      ilosc: Number(w.ilosc), wKoszyku: true,
+      ilosc: Number(w.ilosc), wKoszyku: true, naOutlet: false, outletAt: null,
+    });
+  }
+  /* Składnik na outlecie spoza dzisiejszego składu też stoi na liście.
+     Skład bywa poprawiony ręką po odłożeniu, a ukryty wiersz byłby decyzją,
+     której nie da się cofnąć z ekranu. */
+  for (const [twId, o] of naOutlet) {
+    if (znane.has(twId)) continue;
+    skladniki.push({
+      twId, symbol: o.symbol ?? "", nazwa: o.nazwa ?? "", ilosc: Number(o.ilosc),
+      wKoszyku: false, naOutlet: true, outletAt: o.outlet_at,
     });
   }
   return { ...sklad, skladniki };
+}
+
+/** Wiersz składnika odłożonego na outlet, tak jak leży w bazie. */
+interface OutletSkladnika {
+  tw_id: number; symbol: string | null; nazwa: string | null; ilosc: number;
+  outlet_at: string | null;
+}
+
+/** Składniki tej pozycji odłożone na outlet, po kartotece. */
+function outletSkladnikow(database: Db, pozycjaId: number): Map<number, OutletSkladnika> {
+  const wiersze = database.prepare(
+    `SELECT tw_id, symbol, nazwa, ilosc, outlet_at FROM zwrot_skladnik_outlet
+      WHERE pozycja_id=? ORDER BY id`).all(pozycjaId) as unknown as OutletSkladnika[];
+  return new Map(wiersze.map((w) => [Number(w.tw_id), { ...w, ilosc: Number(w.ilosc) }]));
+}
+
+/**
+ * Kasuje oznaczenia outletu, które jeszcze nie stoją na regale.
+ *
+ * Woła to każda zmiana oceny pozycji. Odłożenie składnika ma sens wyłącznie
+ * przy „na stan": przy innej ocenie cała pozycja idzie jedną drogą, a stare
+ * oznaczenie zostawiłoby na liście outletu sztukę, której nikt tam nie niesie.
+ * Przeniesione zostają, bo opisują towar, który fizycznie stoi na regale.
+ */
+export function skasujOutletSkladnikow(
+  database: Db, pozycjaId: number, kto: { id: number; name: string },
+): number {
+  const ile = Number(database.prepare(
+    "DELETE FROM zwrot_skladnik_outlet WHERE pozycja_id=? AND outlet_at IS NULL")
+    .run(pozycjaId).changes);
+  if (ile > 0) {
+    logEvent("zwrot_skladnik_outlet", kto.name, null,
+      { pozycjaId, naOutlet: false, skasowano: ile, powod: "zmiana oceny" }, kto.id, database);
+  }
+  return ile;
+}
+
+/**
+ * Zdanie na osi zwrotu, do którego należy pozycja.
+ *
+ * Surowy SQL, bo `zwroty.ts` importuje ten plik i import w drugą stronę
+ * zamknąłby cykl modułów — ten sam powód co przy `zdejmijTowar`.
+ */
+function zdarzenieSkladnika(
+  database: Db, zwrotId: number, rodzaj: string, tresc: string,
+  dane: Record<string, unknown>, kto: { id: number; name: string }, at: string,
+): void {
+  database.prepare(`INSERT INTO zwrot_zdarzenie
+    (zwrot_id, rodzaj, tresc, dane_json, kiedy_at, kto, kto_user_id)
+    VALUES (?,?,?,?,?,?,?)`)
+    .run(zwrotId, rodzaj, tresc, JSON.stringify(dane), at, kto.name, kto.id);
 }
 
 /**
@@ -818,84 +900,210 @@ export function zaznaczSkladnik(
   database: Db, pozycjaId: number, twId: number, wKoszyku: boolean,
   kto: { id: number; name: string },
 ): SkladDoZaznaczenia {
+  return transaction(database, () =>
+    zaznaczSkladnikBezTransakcji(database, pozycjaId, twId, wKoszyku, kto))();
+}
+
+/** Ciało `zaznaczSkladnik` dla wołającego, który już trzyma transakcję. */
+function zaznaczSkladnikBezTransakcji(
+  database: Db, pozycjaId: number, twId: number, wKoszyku: boolean,
+  kto: { id: number; name: string },
+): SkladDoZaznaczenia {
+  const wiersze = database.prepare(
+    `SELECT id, kosz_id, tw_id FROM kosz_pozycja WHERE zwrot_pozycja_id=? ORDER BY id`)
+    .all(pozycjaId) as Array<{ id: number; kosz_id: number; tw_id: number }>;
+  if (!wiersze.length) {
+    /* OCENA JUŻ STOI, A POZYCJI W PUDLE NIE MA (0.484.7). Wtedy „oceń ją na
+       stan" odsyłało do ruchu, który przed chwilą dał ten sam wynik:
+       `dolozDoKosza` znowu zwróci `null` z tego samego powodu. Zdanie mówi
+       więc powód — ten sam, który zatrzymał dołożenie. */
+    const o = database.prepare("SELECT ocena FROM zwrot_klienta_pozycja WHERE id=?")
+      .get(pozycjaId) as { ocena: string | null } | undefined;
+    if (o?.ocena === "stan") {
+      const sklad = skladPozycji(database, pozycjaId);
+      const powod = magazynDocelowy("zwroty") <= 0
+        ? "w wertis.env nie ma magazynu zwrotów"
+        : !sklad.skladniki.length
+          ? sklad.powod
+          : sklad.skladniki.map((s) => powodPozaMagazynem(database, s.twId)).find(Boolean) ?? null;
+      throw new Error(`Pozycja jest „na stan”, ale do koszyka nie weszła${
+        powod ? `: ${powod}` : ""}. Ponowna ocena tego nie zmieni.`);
+    }
+    throw new Error("Ta pozycja nie leży w żadnym koszyku — najpierw oceń ją „na stan”.");
+  }
+  const koszId = Number(wiersze[0].kosz_id);
+  const kod = (database.prepare("SELECT kod FROM kosz WHERE id=?").get(koszId) as
+    { kod: string }).kod;
+  /* TA SAMA BRAMKA CO WSZĘDZIE (0.334.0): dokument zamyka drogę, samo
+     zamknięcie kosza nie. Własny warunek rozjechałby się z resztą pliku. */
+  if (!koszDoEdycji(database, koszId)) {
+    throw new Error(`Koszyk ${kod} ma już dokument MM — jego zawartości aplikacja nie zmieni.`);
+  }
+
+  const stoi = wiersze.filter((w) => Number(w.tw_id) === twId);
+  if (wKoszyku) {
+    /* PTASZEK ZDEJMUJE OUTLET, bo sztuka leży albo w pudle, albo przy
+       regale outletowym, nigdy w obu. Przeniesionej nie wkładamy: stoi już
+       na regale, więc wiersz MM przesunąłby towar, którego w pudle nie ma. */
+    const outlet = outletSkladnikow(database, pozycjaId).get(twId);
+    if (outlet?.outlet_at) {
+      throw new Error(`„${outlet.symbol ?? twId}” stoi już na regale outletowym — ` +
+        "do koszyka nie wróci.");
+    }
+    if (outlet) cofnijOutletSkladnika(database, pozycjaId, twId, outlet, kto);
+    if (stoi.length) return skladDoZaznaczenia(database, pozycjaId);
+    /* WYŁĄCZNIE SKŁADNIK TEJ POZYCJI. Dowolna kartoteka z żądania byłaby
+       drugą drogą dopisywania wierszy do MM — obok `skladPozycji` i bez
+       żadnego dokumentu za sobą. Towar, którego nikt nie zwrócił, trafiałby
+       wtedy na papier przez zwykłą literówkę w numerze. */
+    const s = skladPozycji(database, pozycjaId).skladniki.find((x) => x.twId === twId);
+    if (!s) throw new Error("Tej kartoteki nie ma w składzie pozycji — nie wolno jej dopisać.");
+    /* TA SAMA BRAMKA CO PRZY DOKŁADANIU (0.377.0). Bez niej ptaszek byłby
+       obejściem: koszyk napełniony przed 0.374.0 dostawał wiersz usługowy
+       z powrotem przez odznaczenie i zaznaczenie go na nowo. */
+    const powod = powodPozaMagazynem(database, twId);
+    if (powod) throw new Error(`„${s.symbol}" nie wejdzie do pudła: ${powod}.`);
+    database.prepare(
+      `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, zwrot_pozycja_id)
+       VALUES (?,?,?,?,?,?)`).run(koszId, s.twId, s.symbol, s.nazwa, s.ilosc, pozycjaId);
+  } else {
+    if (!stoi.length) return skladDoZaznaczenia(database, pozycjaId);
+    /* OSTATNIEGO NIE ZDEJMIEMY, i to nie jest brak funkcji. Pozycja bez
+       żadnego wiersza w koszyku znaczy „nic z niej nie jedzie na MM" — a na
+       to jest starsza i czytelniejsza droga: cofnięcie oceny. Dwa sposoby na
+       ten sam skutek kosztowałyby pytanie, czym się różnią. */
+    if (stoi.length === wiersze.length) {
+      /* Cofnięcie oceny odmawia na zwrocie z korektą (`podKlucz`) — wtedy
+         zdanie musi nazwać krok, który je odblokowuje (0.484.7). */
+      const zam = database.prepare(`SELECT z.zamkniety_at FROM zwrot_klienta z
+        JOIN zwrot_klienta_pozycja p ON p.zwrot_id = z.id WHERE p.id=?`).get(pozycjaId) as
+        { zamkniety_at: string | null } | undefined;
+      throw new Error(zam?.zamkniety_at
+        ? "To ostatni składnik tej pozycji w koszyku — zdejmuje się ją cofnięciem oceny, "
+          + "a zwrot ma już korektę: najpierw cofnij korektę na karcie zwrotu."
+        : "To ostatni składnik tej pozycji w koszyku — zdejmuje się ją cofnięciem oceny.");
+    }
+    const usun = database.prepare("DELETE FROM kosz_pozycja WHERE id=?");
+    for (const w of stoi) usun.run(w.id);
+  }
+
+  /* Zadanie MM ułożone dla starej zawartości traci ważność — tak samo jak
+     przy zdjęciu całej pozycji. Bez tego papier pojechałby z ptaszkami
+     sprzed poprawki. */
+  uniewaznijZadanieMm(database, koszId, kto);
+  logEvent("kosz_zwrotow_skladnik", kto.name, null,
+    { koszId, kod, pozycjaId, twId, wKoszyku }, kto.id, database);
+  return skladDoZaznaczenia(database, pozycjaId);
+}
+
+/**
+ * Odkłada składnik kompletu na outlet zamiast do koszyka albo to cofa.
+ *
+ * Zgłoszenie właściciela: z kompletu jeden składnik wraca w porządku, drugi
+ * jest używany. Odznaczony ptaszkiem nie trafia na żadną listę, a ocena
+ * „na outlet" zabiera z pudła cały zestaw. Pieniędzy to nie rusza: klient dostaje
+ * całość, więc kwota i potrącenia stoją przy pozycji jak dotąd.
+ *
+ * TYLKO PRZY OCENIE „NA STAN". Przy innej ocenie cała pozycja idzie jedną
+ * drogą, a odłożenie części byłoby drugą decyzją o tym samym towarze.
+ *
+ * Bramka dokumentu ta sama co przy ptaszku: po wystawieniu MM zawartości
+ * pudła się nie poprawia, więc i składnika z niego nie odłożymy.
+ */
+export function skladnikNaOutlet(
+  database: Db, pozycjaId: number, twId: number, naOutlet: boolean,
+  kto: { id: number; name: string }, teraz = new Date(),
+): SkladDoZaznaczenia {
   return transaction(database, () => {
-    const wiersze = database.prepare(
-      `SELECT id, kosz_id, tw_id FROM kosz_pozycja WHERE zwrot_pozycja_id=? ORDER BY id`)
-      .all(pozycjaId) as Array<{ id: number; kosz_id: number; tw_id: number }>;
-    if (!wiersze.length) {
-      /* OCENA JUŻ STOI, A POZYCJI W PUDLE NIE MA (0.484.7). Wtedy „oceń ją na
-         stan" odsyłało do ruchu, który przed chwilą dał ten sam wynik:
-         `dolozDoKosza` znowu zwróci `null` z tego samego powodu. Zdanie mówi
-         więc powód — ten sam, który zatrzymał dołożenie. */
-      const o = database.prepare("SELECT ocena FROM zwrot_klienta_pozycja WHERE id=?")
-        .get(pozycjaId) as { ocena: string | null } | undefined;
-      if (o?.ocena === "stan") {
-        const sklad = skladPozycji(database, pozycjaId);
-        const powod = magazynDocelowy("zwroty") <= 0
-          ? "w wertis.env nie ma magazynu zwrotów"
-          : !sklad.skladniki.length
-            ? sklad.powod
-            : sklad.skladniki.map((s) => powodPozaMagazynem(database, s.twId)).find(Boolean) ?? null;
-        throw new Error(`Pozycja jest „na stan”, ale do koszyka nie weszła${
-          powod ? `: ${powod}` : ""}. Ponowna ocena tego nie zmieni.`);
+    const p = database.prepare(
+      "SELECT id, zwrot_id, nazwa, ocena FROM zwrot_klienta_pozycja WHERE id=?")
+      .get(pozycjaId) as
+      { id: number; zwrot_id: number; nazwa: string; ocena: string | null } | undefined;
+    if (!p) throw new Error("Nie znaleziono pozycji zwrotu");
+    const outlet = outletSkladnikow(database, pozycjaId).get(twId);
+
+    if (!naOutlet) {
+      if (!outlet) return skladDoZaznaczenia(database, pozycjaId);
+      if (outlet.outlet_at) {
+        throw new Error(`„${outlet.symbol ?? twId}” stoi już na regale outletowym — ` +
+          "tego się nie cofa.");
       }
-      throw new Error("Ta pozycja nie leży w żadnym koszyku — najpierw oceń ją „na stan”.");
+      /* Z POWROTEM DO PUDŁA tą samą drogą co ptaszek. Ona trzyma bramkę
+         dokumentu, skład pozycji i kartotekę poza magazynem — i sama zdejmie
+         oznaczenie, w tej samej transakcji. */
+      return zaznaczSkladnikBezTransakcji(database, pozycjaId, twId, true, kto);
+    }
+
+    if (p.ocena !== "stan") {
+      throw new Error("Składnik odkłada się na outlet przy ocenie „na stan”. " +
+        "Przy innej ocenie oceń całą pozycję.");
+    }
+    if (outlet) return skladDoZaznaczenia(database, pozycjaId);
+    /* WYŁĄCZNIE SKŁADNIK TEJ POZYCJI, z tego samego powodu co przy ptaszku:
+       kartoteka z żądania dopisywałaby na listę outletu towar, którego nikt
+       nie zwrócił. */
+    const s = skladPozycji(database, pozycjaId).skladniki.find((x) => x.twId === twId);
+    if (!s) throw new Error("Tej kartoteki nie ma w składzie pozycji — nie wolno jej odłożyć.");
+
+    const wiersze = database.prepare(
+      `SELECT id, kosz_id, tw_id, ilosc FROM kosz_pozycja WHERE zwrot_pozycja_id=? ORDER BY id`)
+      .all(pozycjaId) as Array<{ id: number; kosz_id: number; tw_id: number; ilosc: number }>;
+    if (!wiersze.length) {
+      throw new Error("Ta pozycja nie leży w żadnym koszyku — nie ma z czego odłożyć składnika.");
     }
     const koszId = Number(wiersze[0].kosz_id);
     const kod = (database.prepare("SELECT kod FROM kosz WHERE id=?").get(koszId) as
       { kod: string }).kod;
-    /* TA SAMA BRAMKA CO WSZĘDZIE (0.334.0): dokument zamyka drogę, samo
-       zamknięcie kosza nie. Własny warunek rozjechałby się z resztą pliku. */
     if (!koszDoEdycji(database, koszId)) {
       throw new Error(`Koszyk ${kod} ma już dokument MM — jego zawartości aplikacja nie zmieni.`);
     }
-
     const stoi = wiersze.filter((w) => Number(w.tw_id) === twId);
-    if (wKoszyku) {
-      if (stoi.length) return skladDoZaznaczenia(database, pozycjaId);
-      /* WYŁĄCZNIE SKŁADNIK TEJ POZYCJI. Dowolna kartoteka z żądania byłaby
-         drugą drogą dopisywania wierszy do MM — obok `skladPozycji` i bez
-         żadnego dokumentu za sobą. Towar, którego nikt nie zwrócił, trafiałby
-         wtedy na papier przez zwykłą literówkę w numerze. */
-      const s = skladPozycji(database, pozycjaId).skladniki.find((x) => x.twId === twId);
-      if (!s) throw new Error("Tej kartoteki nie ma w składzie pozycji — nie wolno jej dopisać.");
-      /* TA SAMA BRAMKA CO PRZY DOKŁADANIU (0.377.0). Bez niej ptaszek byłby
-         obejściem: koszyk napełniony przed 0.374.0 dostawał wiersz usługowy
-         z powrotem przez odznaczenie i zaznaczenie go na nowo. */
-      const powod = powodPozaMagazynem(database, twId);
-      if (powod) throw new Error(`„${s.symbol}" nie wejdzie do pudła: ${powod}.`);
-      database.prepare(
-        `INSERT INTO kosz_pozycja(kosz_id, tw_id, symbol, nazwa, ilosc, zwrot_pozycja_id)
-         VALUES (?,?,?,?,?,?)`).run(koszId, s.twId, s.symbol, s.nazwa, s.ilosc, pozycjaId);
-    } else {
-      if (!stoi.length) return skladDoZaznaczenia(database, pozycjaId);
-      /* OSTATNIEGO NIE ZDEJMIEMY, i to nie jest brak funkcji. Pozycja bez
-         żadnego wiersza w koszyku znaczy „nic z niej nie jedzie na MM" — a na
-         to jest starsza i czytelniejsza droga: cofnięcie oceny. Dwa sposoby na
-         ten sam skutek kosztowałyby pytanie, czym się różnią. */
-      if (stoi.length === wiersze.length) {
-        /* Cofnięcie oceny odmawia na zwrocie z korektą (`podKlucz`) — wtedy
-           zdanie musi nazwać krok, który je odblokowuje (0.484.7). */
-        const zam = database.prepare(`SELECT z.zamkniety_at FROM zwrot_klienta z
-          JOIN zwrot_klienta_pozycja p ON p.zwrot_id = z.id WHERE p.id=?`).get(pozycjaId) as
-          { zamkniety_at: string | null } | undefined;
-        throw new Error(zam?.zamkniety_at
-          ? "To ostatni składnik tej pozycji w koszyku — zdejmuje się ją cofnięciem oceny, "
-            + "a zwrot ma już korektę: najpierw cofnij korektę na karcie zwrotu."
-          : "To ostatni składnik tej pozycji w koszyku — zdejmuje się ją cofnięciem oceny.");
-      }
+    /* OSTATNIEGO NIE ODKŁADAMY. Pusta pozycja w pudle i reszta na outlecie
+       to po prostu ocena „na outlet" — a na nią jest jeden przycisk. */
+    if (stoi.length === wiersze.length) {
+      throw new Error("To ostatni składnik w koszyku — całą pozycję oceń „na outlet”.");
+    }
+    /* ILOŚĆ Z PUDŁA, gdy tam leżała — to ją człowiek wyjmuje i niesie. */
+    const ilosc = stoi.length ? stoi.reduce((a, w) => a + Number(w.ilosc), 0) : s.ilosc;
+    if (stoi.length) {
       const usun = database.prepare("DELETE FROM kosz_pozycja WHERE id=?");
       for (const w of stoi) usun.run(w.id);
+      /* Zadanie MM ułożone dla starej zawartości traci ważność, jak przy
+         ptaszku: inaczej papier pojechałby ze składnikiem, który wyjęto. */
+      uniewaznijZadanieMm(database, koszId, kto);
     }
-
-    /* Zadanie MM ułożone dla starej zawartości traci ważność — tak samo jak
-       przy zdjęciu całej pozycji. Bez tego papier pojechałby z ptaszkami
-       sprzed poprawki. */
-    uniewaznijZadanieMm(database, koszId, kto);
-    logEvent("kosz_zwrotow_skladnik", kto.name, null,
-      { koszId, kod, pozycjaId, twId, wKoszyku }, kto.id, database);
+    const at = teraz.toISOString();
+    database.prepare(`INSERT INTO zwrot_skladnik_outlet
+      (pozycja_id, tw_id, symbol, nazwa, ilosc, oznaczono_at, oznaczono_przez)
+      VALUES (?,?,?,?,?,?,?)`).run(pozycjaId, s.twId, s.symbol, s.nazwa, ilosc, at, kto.name);
+    zdarzenieSkladnika(database, Number(p.zwrot_id), "skladnik_outlet",
+      `${s.symbol} z „${p.nazwa}” — na outlet`,
+      { pozycjaId, twId, ilosc, koszId }, kto, at);
+    logEvent("zwrot_skladnik_outlet", kto.name, twId,
+      { zwrotId: Number(p.zwrot_id), pozycjaId, twId, naOutlet: true, ilosc, koszId, kod },
+      kto.id, database);
     return skladDoZaznaczenia(database, pozycjaId);
   })();
+}
+
+/** Zdejmuje oznaczenie outletu z osią i dziennikiem; wołający trzyma transakcję. */
+function cofnijOutletSkladnika(
+  database: Db, pozycjaId: number, twId: number, outlet: OutletSkladnika,
+  kto: { id: number; name: string },
+): void {
+  database.prepare(
+    "DELETE FROM zwrot_skladnik_outlet WHERE pozycja_id=? AND tw_id=? AND outlet_at IS NULL")
+    .run(pozycjaId, twId);
+  const p = database.prepare("SELECT zwrot_id, nazwa FROM zwrot_klienta_pozycja WHERE id=?")
+    .get(pozycjaId) as { zwrot_id: number; nazwa: string } | undefined;
+  if (p) {
+    zdarzenieSkladnika(database, Number(p.zwrot_id), "skladnik_outlet_cofniety",
+      `${outlet.symbol ?? twId} z „${p.nazwa}” — cofnięto outlet`,
+      { pozycjaId, twId }, kto, new Date().toISOString());
+  }
+  logEvent("zwrot_skladnik_outlet", kto.name, twId,
+    { zwrotId: p ? Number(p.zwrot_id) : null, pozycjaId, twId, naOutlet: false },
+    kto.id, database);
 }
 
 /**
@@ -953,7 +1161,11 @@ export function przeliczKosz(
          zniknięcie z dokumentu jest widoczne, a wiersz z jedną kartoteką
          zamiast trzech — nie. Zdanie o niej idzie do dziennika. */
       if (!sklad.skladniki.length) { pominiete.push(pozycjaId); continue; }
+      /* Ptaszki przeliczenie kasuje, outletu nie. Odłożenie składnika to
+         decyzja o sztuce, która leży już przy regale, nie w pudle. */
+      const naOutlet = outletSkladnikow(database, pozycjaId);
       for (const sk of sklad.skladniki) {
+        if (naOutlet.has(sk.twId)) continue;
         wstaw.run(koszId, sk.twId, sk.symbol, sk.nazwa, sk.ilosc, pozycjaId);
         kartotek++;
       }

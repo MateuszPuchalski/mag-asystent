@@ -4,7 +4,7 @@ import {
 } from "lucide-react";
 import type { DoDopisania, Ocena, PozycjaZwrotu, SkladPozycji, WierszDokumentu, Zwrot } from "../api/typy";
 import {
-  useKosz, usePotwierdzKartoteke, useWskazSklad, useZaznaczSkladnik, zlote,
+  useKosz, usePotwierdzKartoteke, useSkladnikNaOutlet, useWskazSklad, useZaznaczSkladnik, zlote,
 } from "../api/zwroty";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { Blad, Przycisk, Pusto } from "../ui";
@@ -83,6 +83,11 @@ function PowodZwrotu({ p }: { p: PozycjaZwrotu }) {
     {komentarz && <blockquote className="mt-1 break-words text-tresc">
       <span className="sr-only">Klient pisze: </span>„{komentarz}"</blockquote>}
   </div>;
+}
+
+/** Ile składników kompletu odłożono na outlet zamiast na MM. */
+function naOutlet(sklad: SkladPozycji | undefined): number {
+  return sklad?.skladniki.filter((s) => s.naOutlet).length ?? 0;
 }
 
 /** Barwa znacznika zapisanej oceny: na stan dobrze, utylizacja źle, outlet obok. */
@@ -314,14 +319,19 @@ function Skladniki({ p, sklad, zwrotId }: {
   p: PozycjaZwrotu; sklad: SkladPozycji; zwrotId: number;
 }) {
   const zaznacz = useZaznaczSkladnik();
+  const outlet = useSkladnikNaOutlet();
+  const trwa = zaznacz.isPending || outlet.isPending;
+  const blad = zaznacz.error ?? outlet.error;
   return <div className="mt-1 w-full text-xs">
-    <p className="text-slate-500">Z paragonu — odznacz, co NIE jedzie na MM:</p>
+    <p className="text-slate-500">Z paragonu — odznacz, co NIE jedzie na MM; używane odłóż na outlet:</p>
     <ul className="mt-1 space-y-0.5">
       {sklad.skladniki.map((s) => (
-        <li key={s.twId}>
-          {/* Cała etykieta jest celem kliknięcia, nie sam kwadracik. */}
-          <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-slate-100">
-            <input type="checkbox" checked={s.wKoszyku} disabled={zaznacz.isPending}
+        <li key={s.twId} className="flex items-center gap-2">
+          {/* Cała etykieta jest celem kliknięcia, nie sam kwadracik. Ptaszek
+              składnika na outlecie milknie: z regału na MM wraca się
+              wyłącznie przez „cofnij”, więc droga powrotu jest jedna. */}
+          <label className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-0.5 hover:bg-slate-100">
+            <input type="checkbox" checked={s.wKoszyku && !s.naOutlet} disabled={trwa || s.naOutlet}
               className="h-4 w-4 accent-emerald-600"
               onChange={(e) => zaznacz.mutate({
                 pozycjaId: p.id, twId: s.twId, wKoszyku: e.target.checked, zwrotId,
@@ -330,11 +340,32 @@ function Skladniki({ p, sklad, zwrotId }: {
             <span className="text-slate-500">× {s.ilosc}</span>
             <span className="min-w-0 flex-1 truncate text-slate-500">{s.nazwa}</span>
           </label>
+          {/* OUTLET SKŁADNIKA, bo komplet wraca nieraz pół na pół: jedna
+              część fabryczna na MM, druga używana na regał. Samo odznaczenie
+              gubi tę drugą, bo lista regału jej nie widzi. */}
+          {s.naOutlet
+            ? <>
+                <span className="inline-flex h-6 items-center rounded-full bg-sky-50 px-2 font-semibold text-sky-900">
+                  na outlet</span>
+                {/* Po meldunku z regału cofnięcie kłamałoby: towar już tam stoi. */}
+                {s.outletAt
+                  ? <span className="text-slate-500">stoi na regale</span>
+                  : <button type="button" disabled={trwa}
+                      className="text-slate-500 underline underline-offset-2 hover:text-slate-800 disabled:opacity-50"
+                      aria-label={`cofnij outlet ${s.symbol}`}
+                      onClick={() => outlet.mutate({ pozycjaId: p.id, twId: s.twId, naOutlet: false, zwrotId })}>
+                      cofnij</button>}
+              </>
+            : <button type="button" disabled={trwa} aria-label={`${s.symbol} na outlet`}
+                onClick={() => outlet.mutate({ pozycjaId: p.id, twId: s.twId, naOutlet: true, zwrotId })}
+                className="inline-flex h-6 shrink-0 items-center rounded-full border border-slate-300 bg-white px-2
+                  font-bold text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50">
+                na outlet</button>}
         </li>))}
     </ul>
     {/* ODMOWA SERWERA JEST ZDANIEM („to ostatni składnik — zdejmuje się ją
         cofnięciem oceny"), więc pokazujemy ją wprost, przy ptaszkach. */}
-    {zaznacz.error && <p className="mt-1 text-red-700">{(zaznacz.error as Error).message}</p>}
+    {blad && <p className="mt-1 text-red-700">{(blad as Error).message}</p>}
   </div>;
 }
 
@@ -685,7 +716,11 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               <Check size={12} aria-hidden="true" />
               <span>Ocena: {OCENY.find(([k]) => k === p.ocena)?.[2] ?? p.ocena}</span>
               {p.ocena === "stan" && p.wKoszyku && <span className="font-normal">
-                · w koszyku zwrotów</span>}</span>
+                · w koszyku zwrotów</span>}
+              {/* Liczba składników na outlecie stoi w znaczniku, bo „na stan”
+                  bez niej obiecywałby cały komplet na półce. */}
+              {p.ocena === "stan" && naOutlet(sklady[p.id]) > 0 && <span className="font-normal">
+                · {naOutlet(sklady[p.id])} na outlet</span>}</span>
             {/* COFNIĘCIE ZAMIAST POTWIERDZENIA (§25a.5). Do 0.202.0 przyciski
                 oceny znikały po pierwszym kliknięciu, więc pomyłkowa
                 „Utylizacja" na złym wierszu była z ekranu nie do odkręcenia.
@@ -732,6 +767,9 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             : <p className="mt-1 w-full text-xs text-slate-500">
                 Do koszyka z paragonu: {sklady[p.id]!.skladniki
                   .map((s) => `${s.symbol} × ${s.ilosc}`).join(", ")}
+                {/* Droga ma być znana PRZED kliknięciem oceny, inaczej
+                    operator oceni komplet „na outlet” w całości. */}
+                {!p.ocena && ". Po ocenie „na stan” używany składnik odłożysz na outlet."}
               </p>)}
 
           {/* Liczba sztuk pada PRZY ROZPAKOWANIU, czyli w kubełku DO OCENY —

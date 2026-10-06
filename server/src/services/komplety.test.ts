@@ -4,10 +4,10 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import { skladPozycji, wierszeDokumentuZwrotu } from "./komplety.js";
-import { wskazSklad } from "./zwroty.js";
+import { ocenPozycje, pozycjeNaOutlet, przeniesionoNaOutlet, wskazSklad } from "./zwroty.js";
 import {
-  dolozDoKosza, przeliczKosz, skladDoZaznaczenia, wypuscGotoweKoszyki, zamknijKosz,
-  zaznaczSkladnik, zdejmijZKosza,
+  dolozDoKosza, przeliczKosz, skladDoZaznaczenia, skladnikNaOutlet, wypuscGotoweKoszyki,
+  zamknijKosz, zaznaczSkladnik, zdejmijZKosza,
 } from "./kosze-zwrotow.js";
 
 /* ── Komplet rozbity na paragonie (0.328.0) ─────────────────────────────────
@@ -633,3 +633,224 @@ test("wiersze dokumentu to MATERIAŁ dla człowieka, a bez dokumentu jest pusto"
   const bezDok = zwrot(d, null, [{ offerId: "of-X", twId: null, ilosc: 1 }]);
   assert.deepEqual(wierszeDokumentuZwrotu(d, bezDok.id), []);
 });
+
+/* ── Składnik kompletu na outlet ─────────────────────────────────────────────
+   Zgłoszenie właściciela: z zestawu jedna część wraca w porządku i jedzie MM
+   na stan, druga jest używana i idzie na regał outletowy. Odznaczona
+   ptaszkiem znikała donikąd — nie było jej ani w pudle, ani na liście
+   outletu, więc nikt jej nie niósł.                                         */
+
+/** Komplet w koszyku z oceną „na stan", tak jak zostawia go ocena. */
+function kompletNaStan(d: Db, kto: { id: number; name: string }, dokId: number) {
+  const k = kompletWKoszyku(d, kto, dokId);
+  d.prepare("UPDATE zwrot_klienta_pozycja SET ocena='stan', ocena_at=? WHERE id=?")
+    .run("2026-09-03T08:00:00Z", k.pozycjaId);
+  return k;
+}
+
+const naOutlecie = (d: Db, pozycjaId: number) =>
+  (d.prepare("SELECT tw_id, outlet_at FROM zwrot_skladnik_outlet WHERE pozycja_id=? ORDER BY tw_id")
+    .all(pozycjaId) as Array<{ tw_id: number; outlet_at: string | null }>)
+    .map((x) => [Number(x.tw_id), x.outlet_at !== null]);
+
+test("składnik na outlet schodzi z koszyka i STAJE na liście outletu", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { id, pozycjaId, koszId } = kompletNaStan(d, kto, 940);
+
+  const sklad = skladnikNaOutlet(d, pozycjaId, 22, true, kto, new Date("2026-09-04T08:00:00Z"));
+
+  assert.deepEqual(wKoszyku(d, koszId), [21, 23], "na MM jedzie reszta zestawu");
+  assert.deepEqual(sklad.skladniki.map((s) => [s.twId, s.wKoszyku, s.naOutlet, s.outletAt]),
+    [[21, true, false, null], [22, false, true, null], [23, true, false, null]]);
+  const lista = pozycjeNaOutlet(d);
+  assert.equal(lista.length, 1, "część nie znika donikąd");
+  assert.deepEqual(
+    { ...lista[0], numer: undefined },
+    { pozycjaId, skladnikTwId: 22, zwrotId: id, numer: undefined, nazwa: "Towar 22",
+      twId: 22, symbol: "SYM-22", ilosc: 1, potracenieGrosze: null,
+      ocenionoAt: "2026-09-04T08:00:00.000Z" });
+  const os = d.prepare("SELECT rodzaj, tresc FROM zwrot_zdarzenie WHERE zwrot_id=?")
+    .all(id) as Array<{ rodzaj: string; tresc: string }>;
+  assert.deepEqual(os.map((w) => w.tresc), ["SYM-22 z „Pozycja 0” — na outlet"]);
+  const { n } = d.prepare("SELECT COUNT(*) AS n FROM events WHERE type='zwrot_skladnik_outlet'")
+    .get() as { n: number };
+  assert.equal(n, 1, "dziennik biura ma ślad, kto odłożył");
+
+  /* Drugie kliknięcie w tę samą stronę niczego nie dubluje. */
+  skladnikNaOutlet(d, pozycjaId, 22, true, kto);
+  assert.equal(pozycjeNaOutlet(d).length, 1);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 23]);
+});
+
+test("cała pozycja i składnik stoją na JEDNEJ liście, od najstarszej decyzji", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId } = kompletNaStan(d, kto, 941);
+  skladnikNaOutlet(d, pozycjaId, 21, true, kto, new Date("2026-09-05T08:00:00Z"));
+  const inny = zwrot(d, null, [{ offerId: "of-X", twId: 31, ilosc: 1 }]);
+  d.prepare("UPDATE zwrot_klienta_pozycja SET ocena='outlet', ocena_at=? WHERE id=?")
+    .run("2026-09-04T08:00:00Z", inny.poz[0]);
+
+  assert.deepEqual(pozycjeNaOutlet(d).map((p) => [p.pozycjaId, p.skladnikTwId]),
+    [[inny.poz[0], null], [pozycjaId, 21]]);
+});
+
+test("składnik odkłada się na outlet WYŁĄCZNIE przy ocenie „na stan”", () => {
+  /* Przy innej ocenie cała pozycja idzie jedną drogą — odłożenie części
+     byłoby drugą decyzją o tym samym towarze. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletWKoszyku(d, kto, 942);
+  assert.throws(() => skladnikNaOutlet(d, pozycjaId, 22, true, kto), /przy ocenie „na stan”/);
+  d.prepare("UPDATE zwrot_klienta_pozycja SET ocena='utylizacja' WHERE id=?").run(pozycjaId);
+  assert.throws(() => skladnikNaOutlet(d, pozycjaId, 22, true, kto), /oceń całą pozycję/);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
+  assert.deepEqual(naOutlecie(d, pozycjaId), []);
+});
+
+test("OSTATNIEGO składnika nie odłożysz — od tego jest ocena „na outlet”", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletNaStan(d, kto, 943);
+  skladnikNaOutlet(d, pozycjaId, 21, true, kto);
+  skladnikNaOutlet(d, pozycjaId, 22, true, kto);
+  assert.throws(() => skladnikNaOutlet(d, pozycjaId, 23, true, kto),
+    /To ostatni składnik w koszyku — całą pozycję oceń „na outlet”/);
+  assert.deepEqual(wKoszyku(d, koszId), [23], "odmowa niczego nie rusza");
+  /* Ptaszek też nie zdejmie ostatniego, choć reszta poszła na outlet. */
+  assert.throws(() => zaznaczSkladnik(d, pozycjaId, 23, false, kto), /cofnięciem oceny/);
+});
+
+test("kartoteki SPOZA składu nie wolno odłożyć na outlet", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletNaStan(d, kto, 944);
+  towar(d, 77);
+  assert.throws(() => skladnikNaOutlet(d, pozycjaId, 77, true, kto), /nie ma w składzie/);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
+  assert.equal(pozycjeNaOutlet(d).length, 0);
+});
+
+test("po wystawieniu MM składnika nie odłożysz i odmowa nazywa koszyk", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletNaStan(d, kto, 945);
+  zamknijKosz(d, koszId, kto);
+  d.prepare("UPDATE kosz SET mm_numer='MM 1334/MAG/2026' WHERE id=?").run(koszId);
+  assert.throws(() => skladnikNaOutlet(d, pozycjaId, 22, true, kto), /dokument MM/);
+  assert.deepEqual(naOutlecie(d, pozycjaId), []);
+});
+
+test("odłożenie z zamkniętego kosza UNIEWAŻNIA jego zadanie MM", () => {
+  /* Zadanie ułożone dla starej zawartości wystawiłoby papier ze składnikiem,
+     który właśnie wyjęto i niesie się na regał outletowy. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { id, pozycjaId, koszId } = kompletNaStan(d, kto, 946);
+  d.prepare("UPDATE zwrot_klienta SET korekta_numer='KFS 2/2026' WHERE id=?").run(id);
+  const { queueId } = zamknijKosz(d, koszId, kto);
+  assert.notEqual(queueId, null);
+
+  skladnikNaOutlet(d, pozycjaId, 22, true, kto);
+  assert.equal((d.prepare("SELECT status FROM sfera_queue WHERE id=?")
+    .get(queueId!) as { status: string }).status, "cancelled");
+});
+
+test("cofnięcie outletu wkłada składnik z powrotem do pudła", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { id, pozycjaId, koszId } = kompletNaStan(d, kto, 947);
+  skladnikNaOutlet(d, pozycjaId, 22, true, kto);
+
+  const sklad = skladnikNaOutlet(d, pozycjaId, 22, false, kto);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
+  assert.equal(sklad.skladniki.find((s) => s.twId === 22)?.naOutlet, false);
+  assert.equal(pozycjeNaOutlet(d).length, 0);
+  const os = (d.prepare("SELECT tresc FROM zwrot_zdarzenie WHERE zwrot_id=? ORDER BY id")
+    .all(id) as Array<{ tresc: string }>).map((w) => w.tresc);
+  assert.deepEqual(os, ["SYM-22 z „Pozycja 0” — na outlet",
+    "SYM-22 z „Pozycja 0” — cofnięto outlet"]);
+  /* Cofnięcie bez oznaczenia jest ciche. */
+  skladnikNaOutlet(d, pozycjaId, 22, false, kto);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
+});
+
+test("ptaszek przy składniku na outlecie KASUJE oznaczenie zamiast dublować sztukę", () => {
+  /* Sztuka leży albo w pudle, albo przy regale — nigdy w obu. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletNaStan(d, kto, 948);
+  skladnikNaOutlet(d, pozycjaId, 22, true, kto);
+
+  zaznaczSkladnik(d, pozycjaId, 22, true, kto);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 22, 23]);
+  assert.deepEqual(naOutlecie(d, pozycjaId), []);
+});
+
+test("przeniesiony składnik zostaje na regale: ani cofnięcie, ani ptaszek go nie wezmą", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { id, pozycjaId, koszId } = kompletNaStan(d, kto, 949);
+  skladnikNaOutlet(d, pozycjaId, 22, true, kto);
+
+  const wynik = przeniesionoNaOutlet(d, pozycjaId, kto, new Date("2026-09-06T08:00:00Z"), 22);
+  assert.equal(wynik.outletAt, "2026-09-06T08:00:00.000Z");
+  assert.equal(pozycjeNaOutlet(d).length, 0, "odklikane schodzi z listy");
+  assert.equal(przeniesionoNaOutlet(d, pozycjaId, kto, new Date(), 22).outletAt,
+    wynik.outletAt, "powtórzenie jest ciche i zostawia PIERWSZY podpis");
+  assert.equal(skladDoZaznaczenia(d, pozycjaId).skladniki.find((s) => s.twId === 22)?.outletAt,
+    "2026-09-06T08:00:00.000Z");
+  const os = (d.prepare("SELECT tresc FROM zwrot_zdarzenie WHERE zwrot_id=? ORDER BY id")
+    .all(id) as Array<{ tresc: string }>).map((w) => w.tresc);
+  assert.equal(os.at(-1), "SYM-22 z „Pozycja 0” — przeniesiono na regał outletowy");
+
+  assert.throws(() => skladnikNaOutlet(d, pozycjaId, 22, false, kto), /stoi już na regale/);
+  assert.throws(() => zaznaczSkladnik(d, pozycjaId, 22, true, kto), /stoi już na regale/);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 23]);
+  /* Składnik bez oznaczenia nie ma czego meldować. */
+  assert.throws(() => przeniesionoNaOutlet(d, pozycjaId, kto, new Date(), 21),
+    /nie jest odłożony na outlet/);
+});
+
+test("przeliczenie kosza i ponowne dołożenie NIE wkładają składnika z outletu", () => {
+  /* Outlet to decyzja o sztuce, nie ptaszek. Przeliczenie kasuje ptaszki,
+     bo to jedna droga wyjścia z pomyłki — ale sztuka przy regale nie wraca
+     przez to do pudła. */
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { pozycjaId, koszId } = kompletNaStan(d, kto, 950);
+  skladnikNaOutlet(d, pozycjaId, 22, true, kto);
+
+  przeliczKosz(d, koszId, kto);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 23]);
+  zdejmijZKosza(d, pozycjaId, kto);
+  dolozDoKosza(d, pozycjaId, kto);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 23]);
+  assert.deepEqual(naOutlecie(d, pozycjaId), [[22, false]]);
+});
+
+test("zmiana oceny kasuje NIEPRZENIESIONE składniki, a ta sama ocena je zostawia", () => {
+  const d = stanowisko();
+  const kto = biuro(d);
+  const { id, pozycjaId, koszId } = kompletWKoszyku(d, kto, 951);
+  d.prepare("UPDATE zwrot_klienta SET werdykt='przyjety' WHERE id=?").run(id);
+  const wersja = () => Number((d.prepare("SELECT wersja FROM zwrot_klienta WHERE id=?")
+    .get(id) as { wersja: number }).wersja);
+  ocenPozycje(d, pozycjaId, "stan", wersja(), kto, new Date(), koszId);
+  skladnikNaOutlet(d, pozycjaId, 22, true, kto);
+  przeniesionoNaOutlet(d, pozycjaId, kto, new Date(), 22);
+  skladnikNaOutlet(d, pozycjaId, 21, true, kto);
+
+  /* Ta sama ocena drugi raz to nie zmiana — decyzje o częściach zostają. */
+  ocenPozycje(d, pozycjaId, "stan", wersja(), kto, new Date(), koszId);
+  assert.deepEqual(naOutlecie(d, pozycjaId), [[21, false], [22, true]]);
+  assert.deepEqual(wKoszyku(d, koszId), [23]);
+
+  /* Cofnięcie oceny zdejmuje czekające; przeniesiony stoi na regale. */
+  ocenPozycje(d, pozycjaId, null, wersja(), kto);
+  assert.deepEqual(naOutlecie(d, pozycjaId), [[22, true]]);
+  ocenPozycje(d, pozycjaId, "stan", wersja(), kto, new Date(), koszId);
+  assert.deepEqual(wKoszyku(d, koszId), [21, 23], "z regału nic nie wraca do pudła");
+});
+

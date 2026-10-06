@@ -930,6 +930,8 @@ export interface PozycjaNaOutlet {
   /** Ile wartości sztuka straciła — tyle mniej dostał klient za nią. */
   potracenieGrosze: number | null;
   ocenionoAt: string | null;
+  /** Składnik kompletu odłożony na outlet; `null` znaczy całą pozycję. */
+  skladnikTwId: number | null;
 }
 export type Sygnal = "termin" | "brak_dowodu" | "odrzucony_w_allegro"
   | "pieniadze_niepotwierdzone" | "pieniadze_poza_panelem" | "kwota_nieaktualna"
@@ -1202,6 +1204,13 @@ export interface SkladPozycji {
    */
   skladniki: Array<{
     twId: number; symbol: string; nazwa: string; ilosc: number; wKoszyku: boolean;
+    /**
+     * Składnik odłożony na regał outletowy zamiast na MM. Klient i tak dostaje
+     * całą kwotę, więc to droga TOWARU, nie pieniędzy.
+     */
+    naOutlet: boolean;
+    /** Kiedy ktoś zameldował, że składnik stoi na regale; wtedy nie da się cofnąć. */
+    outletAt: string | null;
   }>;
   zrodlo: "oferta" | "paragon" | "biuro" | null;
   powod: string | null;
