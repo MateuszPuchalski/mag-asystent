@@ -1,6 +1,6 @@
 import React from "react";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
-import type { PomiarCopilota as Pomiar, Udzial } from "../api/typy";
+import type { PomiarCopilota as Pomiar, RodzajPropozycji, Udzial, WierszPomiaruPrzeplywu } from "../api/typy";
 import { Liczba } from "./PokrycieSygnatur";
 import { NAZWA_KATEGORII } from "../skrzynka/statusy";
 
@@ -56,6 +56,43 @@ const NAZWA_ZADANIA: Record<string, string> = {
 };
 const sek = (ms: number | null) => (ms === null ? "—" : `${(ms / 1000).toFixed(1).replace(".", ",")} s`);
 
+/* ── Przepływy kategorii w trybie cienia ─────────────────────────────────
+   Automat zapisuje, co BY zrobił, a agent albo wysyłka to rozstrzyga. Żywe
+   wykonanie wejdzie per kategoria i per rodzaj, więc tabela ma dokładnie
+   ten przekrój. Zgodność liczy tylko rozstrzygnięte: propozycja bez werdyktu
+   nie jest ani zgodą, ani sprzeciwem. `n` stoi obok procentu, bo dwie zgody
+   na dwie to nie jest powód do włączenia automatu. */
+const RODZAJ_PRZEPLYWU: Record<RodzajPropozycji, string> = {
+  wyslij: "wysłałby odpowiedź", krok: "zleciłby hali", pilne: "oznaczyłby pilne",
+};
+
+/** „k z n · p %"; kreska przy n = 0, bo zero rozstrzygnięć to brak pomiaru, nie 0 %. */
+export function zgodnoscPrzeplywu(w: Pick<WierszPomiaruPrzeplywu, "zgod" | "sprzeciwow">): string {
+  const n = w.zgod + w.sprzeciwow;
+  if (n === 0) return "—";
+  return `${w.zgod} z ${n} · ${Math.round((w.zgod / n) * 100)} %`;
+}
+
+function PrzeplywyKategorii({ wiersze }: { wiersze: WierszPomiaruPrzeplywu[] }) {
+  return <section className="mt-4 border-t pt-4 text-sm" aria-label="Przepływy kategorii">
+    <h3 className="font-bold">Przepływy kategorii (tryb cienia)</h3>
+    <p className="mb-2 text-slate-600">Co automat by zrobił i czy agent się z nim zgodził.
+      {" "}Nic z tego nie wykonało się samo.</p>
+    <Tabela naglowki={["kategoria", "automat", "propozycji", "zgód", "sprzeciwów", "bez werdyktu", "zgodność"]}
+      pusto="Automat jeszcze nic nie zaproponował.">
+      {wiersze.map((w) => <tr key={`${w.kategoria} ${w.rodzaj}`}>
+        <Td>{(NAZWA_KATEGORII as Record<string, string>)[w.kategoria] ?? w.kategoria}</Td>
+        <Td>{RODZAJ_PRZEPLYWU[w.rodzaj] ?? w.rodzaj}</Td>
+        <Td className="tabular-nums">{w.propozycji}</Td>
+        <Td className="tabular-nums">{w.zgod}</Td>
+        <Td className="tabular-nums">{w.sprzeciwow}</Td>
+        <Td className="tabular-nums">{w.bezWerdyktu}</Td>
+        <Td className="tabular-nums">{zgodnoscPrzeplywu(w)}</Td>
+      </tr>)}
+    </Tabela>
+  </section>;
+}
+
 export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
   if (!dane) return null;
   /* Zero udziału cache przy niezerowej liczbie wywołań to objaw, nie stan
@@ -85,6 +122,10 @@ export function PomiarCopilota({ dane }: { dane: Pomiar | undefined }) {
       {czekanie && <> Na szkic czeka się zwykle <b>{sek(czekanie.medianaMs)}</b>,
         {" "}co dziesiąty dłużej niż <b>{sek(czekanie.p90Ms)}</b>.</>}
     </p>
+
+    {/* Przepływy NA WIERZCHU, nie w szczegółach: to jedyna tabela tej karty,
+        na której zapada decyzja o włączeniu automatu w danej kategorii. */}
+    <PrzeplywyKategorii wiersze={dane.przeplyw} />
 
     {/* Decyzje, szkice i tabela precyzji zwinięte (0.519.0): to raport
         czytany raz na tydzień, a otwarty zajmował pół ekranu analizy. */}

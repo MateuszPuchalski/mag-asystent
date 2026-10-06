@@ -59,7 +59,7 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
     kopilot: null,
   },
   os: [], szkic: null, ofertaWskazana: null, zamowienie: null, zwroty: [],
-  sprawy: [], droga: [], szkicCopilota: null, kandydaciZamowien: [],
+  sprawy: [], droga: [], szkicCopilota: null, kandydaciZamowien: [], przeplyw: [],
   oferta: { externalId: "12096815384", link: null, zrodlo: "wiadomosc", zgodnosc: null, pobrana: null,
     kartoteka: { pewnosc: "brak", twId: null, symbol: null, zrodlo: "—", powod: null } },
   ...n,
