@@ -1034,7 +1034,7 @@ chodzi teraz tylko przy statusach naszego ruchu. Data ostatniej wiadomości
 ustępuje mu miejsca, bo przy „czeka na nas" oba znaczniki opisują tę samą
 wiadomość. Gdy zegara nie ma, data wraca.
 
-**Wiersz trzyma dwie krawędzie (@wydanie).** Kolejkę czyta się w dół: lewą
+**Wiersz trzyma dwie krawędzie (0.568.0).** Kolejkę czyta się w dół: lewą
 krawędzią po loginach, prawą po wieku. Kropka nieprzeczytanego stała w linii
 i przesuwała znak oraz login o 16 px, więc lewa krawędź skakała. Kropka wisi
 teraz na lewym marginesie, bliżej znaku niż belki zaznaczenia. Otwarcie rozmowy
@@ -5604,7 +5604,7 @@ a schowane przypomnienie to znowu pamiętanie.
 
 ### 25b.3b. Tagi spraw (0.279.0)
 
-Od @wydanie tagu reklamacji nie przypina się na ekranie sprawy — patrz
+Od 0.568.0 tagu reklamacji nie przypina się na ekranie sprawy — patrz
 §25b.10. Kolejka dalej pokazuje tagi przypięte wcześniej.
 
 Ta sama prośba właściciela, co przy sicie: łatwiej znaleźć swoje sprawy. Sito
@@ -5653,7 +5653,7 @@ tłem marki i zaznaczeniem wiersza.
 
 ### 25b.3c. Notatka i jej droga powrotna (0.280.0)
 
-Od @wydanie notatki reklamacji nie pisze się na ekranie sprawy — patrz
+Od 0.568.0 notatki reklamacji nie pisze się na ekranie sprawy — patrz
 §25b.10. Szukanie w kolejce dalej czyta notatki zapisane wcześniej.
 
 §25a.5 mówi: cofnięcie zamiast potwierdzenia, wszędzie, gdzie da się cofnąć.
@@ -6065,7 +6065,7 @@ Odpowiedź: wzorzec zgadnięty z analogii do zwrotu NIE otwierał niczego —
 sprawa ma własną stronę `/claims/{uuid}?sellerId={id}`, a numer czytelny
 w adresie jest bezużyteczny.
 
-### 25b.10. Fakty w głowicy, werdykt pod dowodami (@wydanie)
+### 25b.10. Fakty w głowicy, werdykt pod dowodami (0.568.0)
 
 Decyzja właściciela: „Praca biura" odchodzi, fakty z prawej kolumny idą do
 głowicy, a te same informacje łączą się w jedną. Powód: fakt do decyzji ma
@@ -6118,7 +6118,7 @@ ostatniej wypowiedzi w 61 sprawach na 100. To przypadek typowy, nie brzegowy.
 ### 25c.2. Co panel dokłada
 
 To samo, czego Centrum Sprzedaży nie daje: kolejkę z porządkiem i właściciela
-sprawy. Notatka z ustaleń zeszła w @wydanie (§25b.10). Panel niczego tu nie spina z Subiektem — dyskusja
+sprawy. Notatka z ustaleń zeszła w 0.568.0 (§25b.10). Panel niczego tu nie spina z Subiektem — dyskusja
 żyje w całości w Allegro.
 
 ### 25c.3. Kolejka bramek
@@ -6210,7 +6210,7 @@ jako nieobecne przy dyskusji. Zamiast obrazu stoi numer zamówienia.
 **Kolumna faktów jest chudsza i ma to powiedzieć.** Dyskusja nie niesie powodu,
 oczekiwania, prawa ani kwoty. Zostaje kupujący, zamówienie razem ze zwrotami
 tego samego zamówienia, data otwarcia, status i załączniki. Notatka biura
-zeszła w @wydanie (§25b.10), a „kto prowadzi" stoi nad rozmową. Puste miejsce po polach, których nie ma, byłoby gorsze od zdania.
+zeszła w 0.568.0 (§25b.10), a „kto prowadzi" stoi nad rozmową. Puste miejsce po polach, których nie ma, byłoby gorsze od zdania.
 
 ### 25c.7. Odpowiedź w rozmowie
 
