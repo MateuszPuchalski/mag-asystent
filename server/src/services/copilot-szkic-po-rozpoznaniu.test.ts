@@ -128,3 +128,28 @@ test("zlecenie w tle idzie po kolei i nie układa tej samej rozmowy dwa razy", a
   assert.equal(b?.ulozonych, 0);
   assert.equal(wywolan, 1);
 });
+
+/* ── Przepływ kategorii w trybie cienia ──────────────────────────────────────
+   Propozycje zapisują się na KAŻDYM wyjściu szkicowania. „Wyslij" patrzy na
+   szkic, więc powstaje po nim; „pilne" nie zależy od szkicu i staje także
+   przy wyczerpanym suficie. Nic przy tym nie idzie do klienta. */
+const propozycje = (r: number) => (db().prepare(
+  "SELECT rodzaj FROM propozycja_przeplywu WHERE conversation_id=? ORDER BY rodzaj").all(r) as
+  Array<{ rodzaj: string }>).map((p) => p.rodzaj);
+
+test("po szkicu automat zapisuje, że BY go wysłał — i nic nie wysyła", async () => {
+  const r = rozpoznana("ORDER_STATUS", "GET_SHIPMENT");
+  db().prepare("UPDATE decyzja_klasyfikacji SET pewnosc='wysoka' WHERE conversation_id=?").run(r);
+  await biegnij([r]);
+  assert.deepEqual(propozycje(r), ["wyslij"]);
+  const wyslanych = db().prepare("SELECT count(*) n FROM message WHERE direction='outgoing'").get() as { n: number };
+  assert.equal(wyslanych.n, 0);
+});
+
+test("sufit godzinowy nie zatrzymuje propozycji niezależnych od szkicu", async () => {
+  const r = rozpoznana("COMPLAINT", "START_COMPLAINT");
+  db().prepare(`INSERT INTO copilot_wywolanie(zadanie,model,wynik,at) VALUES ('szkic','atrapa','ok',?)`).run(new Date().toISOString());
+  const w = await biegnij([r], 1);
+  assert.equal(w.przerwane, "sufit godzinowy wyczerpany");
+  assert.deepEqual(propozycje(r), ["pilne"]);
+});

@@ -104,7 +104,7 @@ describe("PropozycjePrzeplywu", () => {
   it("szkic poprawiony przy wysyłce to sprzeciw wobec automatu", () => {
     atrapaZapisow(() => undefined);
     rysuj([prop({ id: 31, rodzaj: "wyslij", werdykt: "sprzeciw", werdyktZrodlo: "wysylka", werdyktPrzez: "Ola" })]);
-    expect(wiersz("wyslij").textContent).toContain("sprzeciw — poprawiony · Ola");
+    expect(wiersz("wyslij").textContent).toContain("sprzeciw — poprawiony albo odrzucony · Ola");
   });
 
   it("pusta lista i brak pola nic nie rysują", () => {

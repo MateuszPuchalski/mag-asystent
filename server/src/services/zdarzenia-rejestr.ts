@@ -51,7 +51,7 @@ export const ZDARZENIA: readonly string[] = [
   "logo_dostawcy_usuniecie", "logo_dostawcy_zapis", "magazyny_widocznosc", "manual_entry",
   "migawka_dnia", "notatka_odpowiedz_przeczytana", "obsluga.zalacznik.pobrany",
   "oferta_komplet_ustalony", "privileged", "problem_raised", "problem_resolved",
-  "problem_wycofany", "przesuniecie", "przesylka_zapisana", "przyjecie_otwarte",
+  "problem_wycofany", "przeplyw_propozycje", "przeplyw_werdykt", "przesuniecie", "przesylka_zapisana", "przyjecie_otwarte",
   "przyjecie_poza_aplikacja", "putaway_cofniete", "putaway_line_done", "putaway_polka_zmieniona",
   "putaway_qty_fixed", "queue_anulowane_recznie", "queue_applied", "queue_failed",
   "queue_ponowione_recznie", "queue_retry", "raport_tygodnia", "read_model_po_imporcie",

@@ -34,6 +34,7 @@ import { mojaLista } from "../services/prowadzenie-klienta.js";
 import { zeSprawa } from "./spoiwo.js";
 import { dokumentySprzedazyZamowienia } from "../services/faktury.js";
 import { ROLE_BIUROWE } from "../services/users.js";
+import { BladPrzeplywu, werdyktPropozycji } from "../services/przeplyw-werdykt.js";
 
 const BIURO = ROLE_BIUROWE;
 const blad = (reply: FastifyReply, e: unknown) =>
@@ -422,6 +423,27 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       try {
         return ustawPriorytet(db(), Number(req.params.id), p, sesjaZadania()!.user.userId);
       } catch (e) { return blad(reply, e); }
+    });
+
+  /* PRZEPŁYW KATEGORII, tryb cienia. Werdykt agenta o tym, co automat BY
+     zrobił. Zgoda wykonuje krok ręką agenta, sprzeciw tylko się zapisuje.
+     „Wyslij" odpada 400, bo ocenia go wysyłka szkicu. */
+  app.post<{ Params: { id: string; propozycjaId: string }; Body: { werdykt?: string } }>(
+    "/api/obsluga/rozmowy/:id/przeplyw/:propozycjaId", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const w = req.body?.werdykt;
+      if (w !== "zgoda" && w !== "sprzeciw") {
+        return reply.code(400).send({ error: "Werdykt to „zgoda” albo „sprzeciw”." });
+      }
+      const u = sesjaZadania()!.user;
+      try {
+        return { propozycja: werdyktPropozycji(db(), Number(req.params.id),
+          Number(req.params.propozycjaId), w, { id: u.userId, name: u.name }) };
+      } catch (e) {
+        if (e instanceof BladPrzeplywu) return reply.code(e.kod).send({ error: e.message });
+        return blad(reply, e);
+      }
     });
 
   /* ZNACZNIK „SPRAWA REKLAMACYJNA" (0.390.0) — NASZ, nie Allegro.

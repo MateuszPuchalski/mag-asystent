@@ -56,7 +56,7 @@ const SPRZECIW: Record<"krok" | "pilne", string> = { krok: "Nie zlecaj hali", pi
  * naprawdę się wykonał, bo zgoda go wykonuje.
  */
 function werdyktSlowem(pr: PropozycjaPrzeplywu): string {
-  if (pr.rodzaj === "wyslij") return pr.werdykt === "zgoda" ? "zgoda — wysłany bez zmian" : "sprzeciw — poprawiony";
+  if (pr.rodzaj === "wyslij") return pr.werdykt === "zgoda" ? "zgoda — wysłany bez zmian" : "sprzeciw — poprawiony albo odrzucony";
   if (pr.werdykt === "sprzeciw") return "sprzeciw";
   return pr.rodzaj === "krok" ? "zgoda — zlecone hali" : "zgoda — oznaczone jako pilne";
 }

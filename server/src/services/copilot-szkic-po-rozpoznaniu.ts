@@ -12,6 +12,7 @@ import { ulozSzkic, type NadawcaSzkicu } from "./copilot-szkic.js";
 import { AUTOMAT, zuzyteWGodzinie } from "./copilot-auto-szkic.js";
 import { CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
+import { zapiszPropozycje } from "./przeplyw-kategorii.js";
 
 /* ── Szkic zaraz po rozpoznaniu (23 września 2026) ───────────────────────────
    Właściciel: „ułóż odpowiedź automatycznie po klasyfikacji, gotową do
@@ -79,6 +80,25 @@ export async function szkicujPoRozpoznaniu(
   rozmowyId: number[], deps: SzkicPoRozpoznaniuDeps = {},
 ): Promise<WynikSzkicuPoRozpoznaniu> {
   const database = deps.database ?? defaultDb();
+  try {
+    return await szkicuj(database, rozmowyId, deps);
+  } finally {
+    /* PRZEPŁYW KATEGORII, tryb cienia. Na KAŻDYM wyjściu, także przy suficie
+       i braku pracy: „pilne" i „krok" nie zależą od szkicu, a „wyslij" patrzy
+       na szkic, więc idzie po nim. Zapis tylko notuje, co automat BY zrobił.
+       Jego błąd nie wywraca szkicowania, bo szkic jest pracą dla agenta,
+       a propozycja tylko pomiarem. */
+    try {
+      zapiszPropozycje(database, rozmowyId, (deps.now ?? (() => new Date()))());
+    } catch (e) {
+      console.warn(`[przeplyw-kategorii] ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+}
+
+async function szkicuj(
+  database: DatabaseSync, rozmowyId: number[], deps: SzkicPoRozpoznaniuDeps,
+): Promise<WynikSzkicuPoRozpoznaniu> {
   const czekaja = czekajaNaSzkic(database, rozmowyId);
   if (czekaja.length === 0) return { ulozonych: 0, bledow: 0, przerwane: null };
 

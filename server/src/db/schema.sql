@@ -271,6 +271,42 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_decyzja_wersja
 CREATE INDEX IF NOT EXISTS ix_decyzja_rozmowa
   ON decyzja_klasyfikacji(conversation_id, aktywna, message_id);
 
+-- ── Przepływ kategorii w trybie cienia (6 października 2026) ───────────────
+-- Co automat BY zrobił przy decyzji klasyfikatora: wysłał szkic, zlecił krok
+-- hali albo oznaczył sprawę jako pilną. Nic z tego nie dzieje się samo.
+-- Werdykt agenta albo los szkicu przy wysyłce daje pomiar zgodności per
+-- kategoria. Powód i tabela przepływów: `services/przeplyw-kategorii.ts`.
+--
+-- Wiersz należy do DECYZJI, nie do rozmowy. Poprawka kategorii tworzy nową
+-- decyzję, więc propozycje starej zostają w pomiarze, a karta ich nie
+-- pokazuje. Danych klienta tu nie ma: `instrukcja` to stały tekst z kodu.
+CREATE TABLE IF NOT EXISTS propozycja_przeplywu (
+  id               INTEGER PRIMARY KEY AUTOINCREMENT,
+  conversation_id  INTEGER NOT NULL REFERENCES conversation(id) ON DELETE CASCADE,
+  message_id       INTEGER NOT NULL REFERENCES message(id) ON DELETE CASCADE,
+  decyzja_id       INTEGER NOT NULL REFERENCES decyzja_klasyfikacji(id) ON DELETE CASCADE,
+  -- Bez `CHECK`, z tego samego powodu co `decyzja_klasyfikacji.kategoria`:
+  -- słownik rośnie od pomiaru, a `CHECK` zamieniłby to w przebudowę tabeli.
+  kategoria        TEXT NOT NULL,
+  rodzaj           TEXT NOT NULL CHECK (rodzaj IN ('wyslij','krok','pilne')),
+  -- Tylko przy 'krok': zdanie dla hali, przepisane z tabeli przepływów.
+  instrukcja       TEXT,
+  -- Pomiar porównuje wyłącznie propozycje jednej wersji tabeli przepływów.
+  przeplyw_wersja  TEXT NOT NULL,
+  at               TEXT NOT NULL,
+  werdykt          TEXT CHECK (werdykt IS NULL OR werdykt IN ('zgoda','sprzeciw')),
+  -- 'agent' to klik na karcie, 'wysylka' to los szkicu: wysłany bez zmian,
+  -- poprawiony albo odrzucony. Oba źródła mierzą co innego, więc stoją osobno.
+  werdykt_zrodlo   TEXT CHECK (werdykt_zrodlo IS NULL OR werdykt_zrodlo IN ('agent','wysylka')),
+  werdykt_at       TEXT,
+  werdykt_przez    TEXT,
+  werdykt_user_id  INTEGER REFERENCES app_user(user_id)
+);
+-- Jedna propozycja danego rodzaju na decyzję. Na tym stoi idempotencja zapisu:
+-- drugi przebieg po tej samej decyzji niczego nie dubluje.
+CREATE UNIQUE INDEX IF NOT EXISTS ux_propozycja_decyzja ON propozycja_przeplywu(decyzja_id, rodzaj);
+CREATE INDEX IF NOT EXISTS ix_propozycja_rozmowa ON propozycja_przeplywu(conversation_id, decyzja_id);
+
 -- Księga wywołań Copilota. OSOBNO od klasyfikacji, bo zużycie należy do
 -- WYWOŁANIA, nie do odpowiedzi: próba zakończona błędem nie daje wiersza
 -- klasyfikacji, a kosztować może (429 po wysłaniu wejścia, ucięcie na

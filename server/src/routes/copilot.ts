@@ -11,6 +11,7 @@ import {
 import { modelKlasyfikatora, nadawcaKlasyfikacji } from "../adapters/copilot.klasyfikator.js";
 import { wymianyRozmowy, zadajPytanie } from "../services/copilot-pytania.js";
 import { czekajaNaSzkic, zlecSzkicPoRozpoznaniu } from "../services/copilot-szkic-po-rozpoznaniu.js";
+import { zapiszPropozycje } from "../services/przeplyw-kategorii.js";
 import { ocenSzkic, ulozSzkic } from "../services/copilot-szkic.js";
 import {
   BladKluczaCopilota, BladLacznosciCopilota, BladLimituCopilota,
@@ -73,6 +74,9 @@ const kto = () => {
  * prawa wołać dostawcy modelu w tle.
  */
 function szkicPoRozpoznaniu(ids: number[]): number {
+  /* Propozycje przepływu od razu, także bez szkiców: „pilne" i „krok" nie
+     czekają na szkic. „wyslij" dopisze droga szkicu, gdy go ułoży. */
+  zapiszPropozycje(db(), ids);
   if (!config.copilot.szkicPoRozpoznaniu || czemuWylaczony() !== null) return 0;
   const czekaja = czekajaNaSzkic(db(), ids);
   if (czekaja.length > 0) void zlecSzkicPoRozpoznaniu(czekaja);

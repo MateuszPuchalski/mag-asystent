@@ -14,6 +14,7 @@ import {
   CEL_KLASYFIKACJI, sklasyfikujRozmowy, type Autor, type NadawcaKlasyfikacji,
 } from "./copilot-klasyfikacja.js";
 import { ulozSzkic, type AutorSzkicu, type NadawcaSzkicu } from "./copilot-szkic.js";
+import { zapiszPropozycje } from "./przeplyw-kategorii.js";
 import { czekajaNaSzkic } from "./copilot-szkic-po-rozpoznaniu.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 
@@ -212,9 +213,11 @@ export async function szkicePrzedPraca(deps: PrzedPracaDeps = {}): Promise<Wynik
      liczby przebieg, który skończył kolejkę na samym pominięciu, mówiłby
      „doszedł do końca", choć zostawił rozmowy bez szkicu. */
   let poLimicie = 0;
+  const obejrzane: number[] = [];
   for (const { rozmowa, wiadomosc, rozpoznana } of kolejka) {
     const r = Number(rozmowa);
     const m = Number(wiadomosc);
+    obejrzane.push(r);
     /* Zegar sprawdzany przy KAŻDEJ rozmowie: szkic trwa sekundy, a setka
        zaległości przebiegu nie ma prawa wejść w godziny biura. */
     if (!wOkniePrzedPraca(now(), okno)) { w.przerwane = "koniec okna przed pracą"; break; }
@@ -245,6 +248,16 @@ export async function szkicePrzedPraca(deps: PrzedPracaDeps = {}): Promise<Wynik
   }
 
   if (!w.przerwane && poLimicie > 0) w.przerwane = "limit poranka wyczerpany";
+
+  /* Przepływ kategorii w trybie cienia — ta sama reguła co po rozpoznaniu
+     w ciągu dnia. Bez tego poranne rozmowy, rozpoznane i szkicowane tutaj,
+     nie miałyby propozycji, a pomiar pomijałby całą noc. Błąd zapisu nie
+     wywraca przebiegu, bo propozycja jest tylko pomiarem. */
+  try {
+    zapiszPropozycje(database, obejrzane, now());
+  } catch (e) {
+    console.warn(`[przeplyw-kategorii] ${e instanceof Error ? e.message : String(e)}`);
+  }
 
   /* Zdarzenie zbiorcze na przebieg, gdy było co liczyć. Pojedyncze decyzje
      i szkice zapisują już ich serwisy. */
