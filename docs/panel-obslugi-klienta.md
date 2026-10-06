@@ -3056,6 +3056,46 @@ Szkic nieudany z winy rozmowy nie wraca na tę samą wiadomość tego ranka.
 Przeciążenie dostawcy rozmowy nie skreśla. Przełącznik `COPILOT_PRZED_PRACA`
 jest domyślnie wyłączony, bo wydaje pieniądze bez kliknięcia.
 
+### 14.6e. Przepływ kategorii w trybie cienia (@wydanie)
+
+Decyzja właściciela z 6 października 2026: każda kategoria pytania dostaje
+swój przepływ automatyzacji. Przepływ może wysłać odpowiedź bez człowieka,
+wykonać następny krok i oznaczyć sprawę jako pilną.
+
+**Tabela w kodzie, nie w ustawieniach** (`services/przeplyw-kategorii.ts`).
+`Record<Kategoria, Przeplyw>` nie skompiluje się bez kompletu, jak wzorce
+odpowiedzi. Zmiana przepływu idzie przez PR i CI, bo scalenie jest wydaniem.
+
+**Wysyłka tylko tam, gdzie odpowiedź zamyka pytanie.** Dziś: stan zamówienia,
+pytanie o towar, dostępność i zwrot. Gdy wzorzec obiecuje dalszą pracę
+człowieka, ktoś musi tę obietnicę zobaczyć. Dobór zostaje u człowieka (§27,
+punkt 3), reklamacja też (§14.2).
+
+**Następny krok to dziś zadanie dla hali.** Brak w paczce i inny towar
+proponują weryfikację w magazynie. Prośba o zdjęcie albo model jest treścią
+odpowiedzi, więc należy do wysyłki.
+
+**Pilne** proponują sprawy z zegarem albo stratą: zaginięcie, szkoda
+w transporcie, inny towar, brak w paczce, reklamacja i anulowanie.
+
+**Tryb cienia: automat tylko zapisuje, co BY zrobił.** Nic nie wychodzi do
+klienta i nic nie zmienia się samo. Propozycje leżą w `propozycja_przeplywu`,
+po jednej na decyzję i rodzaj. Zapisuje je ta sama droga, która układa szkic
+po rozpoznaniu (§14.6c), więc nie kosztują ani jednego wywołania modelu.
+
+**Werdykt.** Wysyłkę ocenia sama wysyłka: szkic wysłany bez zmian to zgoda,
+poprawiony to sprzeciw. Krok i pilne ocenia agent na karcie „Automat by…".
+„Zleć" i „Oznacz" wykonują krok pod nazwiskiem agenta, „Nie" zapisuje sprzeciw.
+
+**Pomiar** za zębatką, w karcie pomiaru Copilota: zgodność osobno dla każdej
+kategorii i rodzaju, zawsze z liczbą przypadków. Kategoria wchodzi na żywo
+osobnym wydaniem dopiero po liczbach. Dopiero wtedy powstanie kod wysyłki
+bez człowieka i drugi tryb w `decyzja_klasyfikacji.tryb`.
+
+**Pilne a kolejność kolejki.** Propozycja „pilne" w cieniu kolejki nie
+przestawia. Żywe „pilne" zmieni zasadę z §14.5, że przypuszczenie maszyny
+kolejki nie rusza, i wymaga osobnej zgody właściciela przy wejściu na żywo.
+
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
 > **Usunięte.** Dobór części i baza wiedzy wyszły z WERTIS w całości
@@ -6782,6 +6822,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Rozpoznanie w faktach szkicu, intake tylko przy towarze (§14.6a) | **działa** od 22 września 2026 | `kontekstSzkicu`, `zRozpoznaniaNiepewne` w `services/copilot-szkic.ts` |
 | Szkic z taktu dla rozmów bez oferty (§14.6a) | **działa** od 22 września 2026, przy `COPILOT_AUTO_SZKIC=1` | `services/copilot-auto-szkic.ts` |
 | Szkic zaraz po rozpoznaniu (§14.6c) | **działa** od 0.477.0, domyślnie włączony (`COPILOT_SZKIC_PO_ROZPOZNANIU`) | `services/copilot-szkic-po-rozpoznaniu.ts`, `szkic_copilota.decyzja_id` |
+| Przepływ kategorii w trybie cienia (§14.6e) | **działa** od @wydanie, tylko propozycje i pomiar; wysyłki bez człowieka nie ma | `services/przeplyw-kategorii.ts`, tabela `propozycja_przeplywu`, karta „Automat by…" w rozmowie, pomiar za zębatką |
 | Los szkicu przy wysyłce i uzgodnienie `send_uncertain` (§14.6a) | **działa** od 22 września 2026 | `outbox.szkic_los`, `losSzkicu` w `wysylka.ts`, `uzgodnijNiepewna` w `allegro-inbox-sync.ts` |
 | Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa** od 22 września 2026, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
