@@ -39,11 +39,22 @@ export function werdyktPropozycji(
   if (!p || Number(p.conversation_id) !== conversationId) {
     throw new BladPrzeplywu("Nie znaleziono propozycji w tej rozmowie", 404);
   }
-  /* „Wyślij" ocenia wysyłka: los szkicu jest twardszym dowodem niż klik. */
-  if (p.rodzaj === "wyslij") {
+  /* „Wyślij" ocenia wysyłka: los szkicu jest twardszym dowodem niż klik.
+     Wyjątek to szkic wysłany przez automat. Tam losu nie ma, bo nikt go nie
+     poprawiał, więc jedynym dowodem jest przegląd agenta po fakcie. */
+  const wyslanaSama = p.rodzaj === "wyslij" && p.wykonana_at != null;
+  if (p.rodzaj === "wyslij" && !wyslanaSama) {
     throw new BladPrzeplywu("Wysyłkę ocenia sama wysyłka szkicu, nie przycisk", 400);
   }
   if (p.werdykt != null) throw new BladPrzeplywu("Ta propozycja ma już werdykt", 409);
+  if (wyslanaSama) {
+    /* Bez sprawdzenia bieżącej decyzji: odpowiedź już poszła, a dopisek
+       klienta po niej nie zmienia, czy automat odpisał dobrze. Zgoda niczego
+       nie wykonuje, bo wykonał ją automat. */
+    zapiszWerdykt(database, conversationId, propozycjaId, p, werdykt, autor, teraz);
+    return naPropozycje(database.prepare("SELECT * FROM propozycja_przeplywu WHERE id=?")
+      .get(propozycjaId) as Record<string, unknown>);
+  }
   const biezaca = database.prepare(`SELECT k.id ${biezacaDecyzja()} WHERE c.id = ?`)
     .get(conversationId) as { id: number } | undefined;
   /* Krok pod stare rozpoznanie zleciłby hali coś, czego klient już nie chce. */
@@ -64,15 +75,23 @@ export function werdyktPropozycji(
       { rodzaj: "weryfikacja", tytul: `Weryfikacja z rozmowy — ${r.subject ?? "klient"}` });
   }
 
+  zapiszWerdykt(database, conversationId, propozycjaId, p, werdykt, autor, teraz);
+  return naPropozycje(database.prepare("SELECT * FROM propozycja_przeplywu WHERE id=?")
+    .get(propozycjaId) as Record<string, unknown>);
+}
+
+function zapiszWerdykt(
+  database: DatabaseSync, conversationId: number, propozycjaId: number, p: Record<string, unknown>,
+  werdykt: "zgoda" | "sprzeciw", autor: { id: number; name: string }, teraz: Date,
+): void {
   transaction(database, () => {
     database.prepare(`UPDATE propozycja_przeplywu SET werdykt=?, werdykt_zrodlo='agent',
       werdykt_at=?, werdykt_przez=?, werdykt_user_id=? WHERE id=? AND werdykt IS NULL`)
       .run(werdykt, teraz.toISOString(), autor.name, autor.id, propozycjaId);
     logEvent("przeplyw_werdykt", autor.name, null, {
       conversationId, propozycjaId, rodzaj: String(p.rodzaj), kategoria: String(p.kategoria), werdykt,
+      ...(p.wykonana_at != null ? { naZywo: true } : {}),
     }, autor.id, database);
   })();
   publishConversationEvent("assignment.changed", conversationId, { przeplyw: true });
-  return naPropozycje(database.prepare("SELECT * FROM propozycja_przeplywu WHERE id=?")
-    .get(propozycjaId) as Record<string, unknown>);
 }

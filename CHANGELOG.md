@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.570.0 — 6 października 2026
+
+**Automat może sam odpowiedzieć na pytanie o stan zamówienia.** Działa
+dopiero po włączeniu przez właściciela. Wysyła szkic tylko wtedy, gdy nikt
+nie prowadzi rozmowy, nikt przy niej nie siedzi i nikt jeszcze nie odpisał.
+Karta „Automat by…" pokazuje, że automat odpisał, a agent ocenia to
+przyciskiem „W porządku" albo „Źle wysłane".
+
+Włącza się kluczem `PRZEPLYW_NA_ZYWO=ORDER_STATUS` w `wertis.env` albo na
+ekranie konfiguracji. Bez tego klucza nic się nie zmienia. Sufit `PRZEPLYW_NA_ZYWO_NA_GODZINE`, domyślnie 10
+wysyłek na godzinę. Projekt: §14.6f `docs/panel-obslugi-klienta.md`.
+
 ## 0.569.0 — 6 października 2026
 
 **Rozmowa pokazuje, co automat zrobiłby sam.** Karta „Automat by…" mówi,

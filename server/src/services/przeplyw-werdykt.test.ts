@@ -125,3 +125,41 @@ test("sprzeciw zapisuje tylko werdykt — ani zadania, ani priorytetu", () => {
   assert.equal((db().prepare("SELECT priorytet FROM conversation WHERE id=?").get(a.r) as
     { priorytet: string }).priorytet, "normalny");
 });
+
+/* ── Przegląd po fakcie: szkic wysłany przez automat ────────────────────────
+   Losu szkicu tu nie ma, bo nikt go nie poprawiał. Werdykt daje agent na
+   karcie i to jest jedyny dowód, czy automat odpisał dobrze. */
+test("wysłaną przez automat agent ocenia zgodą albo sprzeciwem, bez żadnego wykonania", () => {
+  const a = rozpoznana("ORDER_STATUS");
+  szkic(a.r, a.m, a.k);
+  const b = rozpoznana("ORDER_STATUS");
+  szkic(b.r, b.m, b.k);
+  P.zapiszPropozycje(db(), [a.r, b.r]);
+  db().prepare("UPDATE propozycja_przeplywu SET wykonana_at=? WHERE rodzaj='wyslij'").run(new Date().toISOString());
+  const [wa] = P.propozycjeRozmowy(db(), a.r);
+  const [wb] = P.propozycjeRozmowy(db(), b.r);
+
+  /* Dopisek klienta po wysyłce zmienia decyzję, a przegląd i tak ma sens. */
+  poprawKlasyfikacje(db(), a.r, "INVOICE", null, Ola());
+  const p = P.werdyktPropozycji(db(), a.r, wa!.id, "zgoda", Ola());
+  assert.deepEqual([p.werdykt, p.werdyktZrodlo, p.werdyktPrzez], ["zgoda", "agent", "Ola"]);
+  assert.equal(P.werdyktPropozycji(db(), b.r, wb!.id, "sprzeciw", Ola()).werdykt, "sprzeciw");
+
+  assert.equal(Number((db().prepare("SELECT count(*) n FROM zadanie_terenowe").get() as { n: number }).n), 0);
+  assert.equal(Number((db().prepare("SELECT count(*) n FROM outbox").get() as { n: number }).n), 0);
+  assert.throws(() => P.werdyktPropozycji(db(), b.r, wb!.id, "zgoda", Ola()),
+    (e: unknown) => e instanceof P.BladPrzeplywu && e.kod === 409);
+  const w = db().prepare("SELECT payload FROM events WHERE type='przeplyw_werdykt' ORDER BY id").all() as
+    Array<{ payload: string }>;
+  assert.equal(JSON.parse(w[0]!.payload).naZywo, true);
+});
+
+test("„wyslij” bez wysyłki automatu dalej odpada 400", () => {
+  const a = rozpoznana("ORDER_STATUS");
+  szkic(a.r, a.m, a.k);
+  P.zapiszPropozycje(db(), [a.r]);
+  db().prepare("UPDATE propozycja_przeplywu SET wykonanie_blad='niepewna' WHERE rodzaj='wyslij'").run();
+  const [w] = P.propozycjeRozmowy(db(), a.r);
+  assert.throws(() => P.werdyktPropozycji(db(), a.r, w!.id, "zgoda", Ola()),
+    (e: unknown) => e instanceof P.BladPrzeplywu && e.kod === 400);
+});

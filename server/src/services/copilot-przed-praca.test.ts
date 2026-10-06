@@ -245,3 +245,19 @@ test("okno: czas magazynu także zimą, zły zapis znaczy „nigdy”, a zwykłe
   assert.equal(P.przedPracaTrwa(RANO, false), false);
   assert.equal(P.przedPracaTrwa(PO_OKNIE, true), false);
 });
+
+/* Kategoria na żywo działa także rano: klient czekający od nocy dostaje
+   odpowiedź przed biurem. Bez tej drogi poranek byłby wyjątkiem. */
+test("kategoria na żywo: poranny szkic wychodzi do klienta, a zwykły przebieg nic nie wysyła", async () => {
+  const r = rozmowa("2026-09-27T18:00:00Z");
+  await biegnij();
+  assert.equal(Number((db().prepare("SELECT count(*) n FROM outbox").get() as { n: number }).n), 0);
+
+  db().prepare("DELETE FROM szkic_copilota").run();
+  const strzaly: string[] = [];
+  await biegnij({ naZywo: { naZywo: ["ORDER_STATUS"], oznaczPrzeczytany: async () => {},
+    wyslij: async (_w, tresc) => { strzaly.push(tresc); return { externalMessageId: "ext-rano" }; } } });
+  assert.deepEqual(strzaly, ["Dzień dobry, paczka jest w drodze."]);
+  assert.ok((db().prepare("SELECT wykonana_at FROM propozycja_przeplywu WHERE conversation_id=? AND rodzaj='wyslij'")
+    .get(r) as { wykonana_at: string | null }).wykonana_at);
+});

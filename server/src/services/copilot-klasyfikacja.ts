@@ -21,7 +21,8 @@ import {
   decyzjaZModelu, decyzjaZastepcza, walidujOdpowiedz, type Decyzja,
 } from "./klasyfikacja-polityka.js";
 import { MAPOWANIE_WERSJA, mapujStrukture, type WynikMapowania } from "./klasyfikacja-mapowanie.js";
-import { pomiarPrzeplywu, type WierszPomiaruPrzeplywu } from "./przeplyw-kategorii.js";
+import { config } from "../config.js";
+import { kategorieNaZywo, pomiarPrzeplywu, type WierszPomiaruPrzeplywu } from "./przeplyw-kategorii.js";
 
 export { KATEGORIE, PEWNOSCI, AKCJE } from "./klasyfikacja-slownik.js";
 export type { Kategoria, Pewnosc, Akcja } from "./klasyfikacja-slownik.js";
@@ -745,6 +746,8 @@ export interface PomiarCopilota {
    * włączy żywe wykonanie, kategoria po kategorii.
    */
   przeplyw: WierszPomiaruPrzeplywu[];
+  /** Kategorie wysyłane na żywo: plik przecięty z listą przejrzaną w kodzie. */
+  naZywo: string[];
 }
 
 /** Pomiar do ekranu ustawień. Czysty odczyt — nie zapisuje niczego. */
@@ -843,5 +846,6 @@ export function pomiarCopilota(database: DatabaseSync = defaultDb()): PomiarCopi
       wyslanychBezZmian: Number(wys.bez ?? 0), wyslanychPoprawionych: Number(wys.popr ?? 0),
     },
     przeplyw: pomiarPrzeplywu(database),
+    naZywo: kategorieNaZywo(config.przeplyw.naZywo),
   };
 }

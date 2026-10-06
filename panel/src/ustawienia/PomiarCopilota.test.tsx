@@ -27,7 +27,7 @@ const dane = (n: Partial<Pomiar> = {}): Pomiar => ({
   szkice: {
     ile: 0, odrzuconych: 0, wyslanychBezZmian: 0, wyslanychPoprawionych: 0,
   },
-  przeplyw: [],
+  przeplyw: [], naZywo: [],
   ...n,
 });
 
@@ -126,18 +126,44 @@ describe("PomiarCopilota", () => {
 
   it("tabela przepływów stoi na wierzchu, z polską kategorią, rodzajem i n", () => {
     render(<PomiarCopilota dane={dane({ przeplyw: [
-      { kategoria: "ORDER_STATUS", rodzaj: "wyslij", propozycji: 12, zgod: 7, sprzeciwow: 2, bezWerdyktu: 3 },
-      { kategoria: "COMPLAINT", rodzaj: "pilne", propozycji: 4, zgod: 0, sprzeciwow: 0, bezWerdyktu: 4 },
+      { kategoria: "ORDER_STATUS", rodzaj: "wyslij", propozycji: 12, zgod: 7, sprzeciwow: 2, bezWerdyktu: 3, wyslanychNaZywo: 0 },
+      { kategoria: "COMPLAINT", rodzaj: "pilne", propozycji: 4, zgod: 0, sprzeciwow: 0, bezWerdyktu: 4, wyslanychNaZywo: 0 },
     ] })} />);
     const sekcja = screen.getByLabelText("Przepływy kategorii");
     expect(screen.getByText("Szczegóły").closest("details")).not.toContainElement(sekcja);
-    expect(within(sekcja).getByText("Przepływy kategorii (tryb cienia)")).toBeInTheDocument();
+    expect(within(sekcja).getByText("Przepływy kategorii")).toBeInTheDocument();
     const wiersze = within(sekcja).getAllByRole("row").slice(1);
     expect(wiersze.map((w) => [...w.querySelectorAll("td")].map((td) => td.textContent))).toEqual([
-      ["Status zamówienia", "wysłałby odpowiedź", "12", "7", "2", "3", "7 z 9 · 78 %"],
-      ["Reklamacja", "oznaczyłby pilne", "4", "0", "0", "4", "—"],
+      ["Status zamówienia", "wysłałby odpowiedź", "12", "0", "7", "2", "3", "7 z 9 · 78 %"],
+      ["Reklamacja", "oznaczyłby pilne", "4", "—", "0", "0", "4", "—"],
     ]);
     expect(sekcja.textContent).not.toContain("0 %");
+  });
+
+  /* Na żywo: zdanie nad tabelą mówi, co dziś odpisuje bez człowieka, a kolumna
+     „wysłane same" — ile razy. Bez włączonej kategorii zdanie mówi „nic". */
+  it("w cieniu zdanie mówi „nic”, a tabela, że nic nie wykonało się samo", () => {
+    render(<PomiarCopilota dane={dane({ przeplyw: [
+      { kategoria: "ORDER_STATUS", rodzaj: "wyslij", propozycji: 3, zgod: 1, sprzeciwow: 0, bezWerdyktu: 2, wyslanychNaZywo: 0 },
+    ] })} />);
+    const sekcja = screen.getByLabelText("Przepływy kategorii");
+    expect(sekcja.textContent).toContain("Na żywo: nic — wszystkie kategorie w cieniu.");
+    expect(sekcja.textContent).toContain("Nic z tego nie wykonało się samo.");
+    expect(within(sekcja).getByRole("columnheader", { name: "wysłane same" })).toBeInTheDocument();
+  });
+
+  it("na żywo zdanie nazywa kategorię po polsku, a kolumna liczy wysłane same", () => {
+    render(<PomiarCopilota dane={dane({ naZywo: ["ORDER_STATUS"], przeplyw: [
+      { kategoria: "ORDER_STATUS", rodzaj: "wyslij", propozycji: 20, zgod: 9, sprzeciwow: 1, bezWerdyktu: 10, wyslanychNaZywo: 14 },
+    ] })} />);
+    const sekcja = screen.getByLabelText("Przepływy kategorii");
+    expect(sekcja.textContent).toContain("Na żywo: Status zamówienia.");
+    expect(sekcja.textContent).not.toContain("ORDER_STATUS");
+    expect(sekcja.textContent).not.toContain("w cieniu");
+    expect(sekcja.textContent).not.toContain("Nic z tego nie wykonało się samo.");
+    const [w] = within(sekcja).getAllByRole("row").slice(1);
+    expect([...w.querySelectorAll("td")].map((td) => td.textContent)).toEqual(
+      ["Status zamówienia", "wysłałby odpowiedź", "20", "14", "9", "1", "10", "9 z 10 · 90 %"]);
   });
 
   it("bez propozycji tabela mówi zdaniem, nie zerami", () => {

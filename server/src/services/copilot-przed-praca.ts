@@ -15,6 +15,7 @@ import {
 } from "./copilot-klasyfikacja.js";
 import { ulozSzkic, type AutorSzkicu, type NadawcaSzkicu } from "./copilot-szkic.js";
 import { zapiszPropozycje } from "./przeplyw-kategorii.js";
+import { wyslijNaZywo, type NaZywoDeps } from "./przeplyw-na-zywo.js";
 import { czekajaNaSzkic } from "./copilot-szkic-po-rozpoznaniu.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
 
@@ -159,6 +160,8 @@ export interface PrzedPracaDeps {
   okno?: string;
   limit?: number;
   oknoDni?: number;
+  /** Wysyłka na żywo po propozycjach. Domyślnie z konfiguracji, czyli zwykle nic. */
+  naZywo?: Omit<NaZywoDeps, "database" | "now">;
 }
 
 export interface WynikPrzedPraca {
@@ -257,6 +260,15 @@ export async function szkicePrzedPraca(deps: PrzedPracaDeps = {}): Promise<Wynik
     zapiszPropozycje(database, obejrzane, now());
   } catch (e) {
     console.warn(`[przeplyw-kategorii] ${e instanceof Error ? e.message : String(e)}`);
+  }
+  /* Kategorie na żywo — ta sama droga co po rozpoznaniu w ciągu dnia, bo
+     klient czekający od nocy ma dostać odpowiedź przed biurem. Bez tego
+     poranek byłby jedynym miejscem, gdzie włączona kategoria nie działa. */
+  try {
+    const z = await wyslijNaZywo(obejrzane, { ...deps.naZywo, database, now });
+    if (z.przerwane) console.warn(`[przeplyw-na-zywo] przebieg przerwany: ${z.przerwane}`);
+  } catch (e) {
+    console.warn(`[przeplyw-na-zywo] ${e instanceof Error ? e.message : String(e)}`);
   }
 
   /* Zdarzenie zbiorcze na przebieg, gdy było co liczyć. Pojedyncze decyzje
