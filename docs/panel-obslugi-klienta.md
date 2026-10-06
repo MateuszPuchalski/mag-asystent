@@ -3114,7 +3114,8 @@ Decyzja właściciela z 6 października 2026: tryb na żywo dla kategorii
 klienta bez kliknięcia człowieka.
 
 **Wyłącznik w `wertis.env`, domyślnie wyłączony.** `PRZEPLYW_NA_ZYWO`
-to lista kategorii po przecinku. Kod przyjmuje z niej tylko kategorie
+to lista kategorii po przecinku. Właściciel zmienia go też na ekranie
+konfiguracji. Kod przyjmuje z niej tylko kategorie
 z listy `NA_ZYWO_MOZLIWE`, dziś jedną: `ORDER_STATUS`. Dopisanie innej
 kategorii w `wertis.env` niczego nie włącza. Kolejna kategoria to osobne
 wydanie, które dopisuje ją do listy po przejrzeniu jej liczb.

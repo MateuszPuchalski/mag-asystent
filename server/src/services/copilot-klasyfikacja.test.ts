@@ -520,6 +520,11 @@ test("pomiar liczy udział cache — zero w całej partii znaczy, że prefiks ni
   assert.ok(p.kosztUsd > 0, "dwa wywołania nie mogą kosztować zera");
 });
 
+test("pomiar mówi, co działa na żywo — bez wpisu w pliku nic", () => {
+  /* Testy chodzą bez `PRZEPLYW_NA_ZYWO`, jak instalacja po aktualizacji. */
+  assert.deepEqual(pomiarCopilota(stanowisko()).naZywo, []);
+});
+
 
 /* ── Struktura Allegro w klasyfikacji (22 września 2026) ─────────────────── */
 

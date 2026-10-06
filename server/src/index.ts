@@ -77,7 +77,7 @@ import { uzupelnijOferty } from "./services/allegro-oferty-sync.js";
 import { ulozZalegleSzkice } from "./services/copilot-auto-szkic.js";
 import { sklasyfikujNowe } from "./services/klasyfikacja-auto.js";
 import { szkicujPoRozpoznaniu } from "./services/copilot-szkic-po-rozpoznaniu.js";
-import { zapiszPropozycje } from "./services/przeplyw-kategorii.js";
+import { ostrzezeniaNaZywo, zapiszPropozycje } from "./services/przeplyw-kategorii.js";
 import { przedPracaTrwa, szkicePrzedPraca, TAKT_PRZED_PRACA_MS } from "./services/copilot-przed-praca.js";
 import { sondujRzeczywistosc } from "./services/sonda-rzeczywistosci.js";
 import { uruchomTakt } from "./services/takt.js";
@@ -602,6 +602,9 @@ async function main() {
      sesji", który by przy gotowym koncie zniknął. */
   ziarnoKontaDemo();
   zamelduj("api");
+  /* Wpis w `PRZEPLYW_NA_ZYWO`, którego tryb na żywo nie obsłuży, mówi o sobie
+     przy starcie. Inaczej właściciel czekałby na odpowiedzi, które nie wyjdą. */
+  for (const o of ostrzezeniaNaZywo(config.przeplyw.naZywo)) console.warn(`[przeplyw-na-zywo] ${o}`);
 
   /* SGT_MODE=mssql: read-model sgt_* zasilany z bazy Subiekta — import przy
      starcie, potem co MSSQL_SYNC_MS. Awaria NIE kończy procesu, a takt

@@ -30,6 +30,10 @@ const AUTOMATY = new Set([
   /* Propozycje przepływu kategorii zapisuje automat po szkicu. Werdykt
      zostaje w raporcie, bo to klik agenta albo jego wysyłka. */
   "przeplyw_propozycje",
+  /* Tryb na żywo pisze wyłącznie automat: wysyłkę, błąd, sufit, konto
+     i podsumowanie przebiegu. Przegląd agenta idzie jako `przeplyw_werdykt`. */
+  "przeplyw_na_zywo", "przeplyw_na_zywo_blad", "przeplyw_na_zywo_konto", "przeplyw_na_zywo_sufit",
+  "przeplyw_wyslane_na_zywo",
 ]);
 
 /* Obszar po PRZEDROSTKU typu. Typy nazywa się od bytu, którego dotyczą,

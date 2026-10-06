@@ -15,8 +15,9 @@ import { KATEGORIE, TAKSONOMIA_WERSJA, czyKategoria, type Kategoria } from "./kl
    odrzuca, a pomiar liczy zgodność osobno dla każdej kategorii. Powód stoi
    w §27 punkt 1 projektu panelu: najpierw dane i dowody, potem automatyzacja.
 
-   W TYM PLIKU NIE MA DROGI WYSYŁKI. Żywe wykonanie wejdzie osobną zmianą,
-   kategoria po kategorii, dopiero gdy liczby pokażą, że automat trafia.
+   W TYM PLIKU NIE MA DROGI WYSYŁKI. Żywe wykonanie mieszka osobno,
+   w `przeplyw-na-zywo.ts`, i obejmuje tylko kategorie z `NA_ZYWO_MOZLIWE`.
+   Tutaj stoi wyłącznie lista tych kategorii, bo czyta ją też pomiar.
 
    UWAGA NA CYKL IMPORTÓW. `copilot-klasyfikacja.ts` czyta ten moduł, a on
    czyta jej `CEL_KLASYFIKACJI`. Dlatego stała idzie wyłącznie do wnętrza
@@ -114,6 +115,26 @@ export const PRZEPLYWY: Readonly<Record<Kategoria, Przeplyw>> = {
   OTHER: { wysylka: false, krok: null, pilne: false },
 };
 
+/**
+ * Kategorie, których wysyłkę na żywo ktoś przejrzał w kodzie. Wpis w
+ * `PRZEPLYW_NA_ZYWO` spoza tej listy nie włącza niczego: dopisanie słowa do
+ * pliku nie może otworzyć drogi do klienta, której nikt nie sprawdził.
+ * Każda następna kategoria to osobna zmiana, dopisująca ją tutaj.
+ */
+export const NA_ZYWO_MOZLIWE: readonly Kategoria[] = ["ORDER_STATUS"];
+
+/** Kategorie faktycznie wysyłane na żywo: wpis z pliku przecięty z listą przejrzanych. */
+export function kategorieNaZywo(surowe: readonly string[]): Kategoria[] {
+  return NA_ZYWO_MOZLIWE.filter((k) => surowe.includes(k) && PRZEPLYWY[k].wysylka);
+}
+
+/** Zdania na start serwera o wpisach, które tryb na żywo pomija. */
+export function ostrzezeniaNaZywo(surowe: readonly string[]): string[] {
+  const wlaczone = kategorieNaZywo(surowe) as readonly string[];
+  return surowe.filter((k) => !wlaczone.includes(k)).map((k) =>
+    `PRZEPLYW_NA_ZYWO: „${k}” pominięte, bo wysyłki tej kategorii nikt jeszcze nie przejrzał.`);
+}
+
 /** Kolejność na karcie i w pomiarze: od najmocniejszego działania. */
 const KOLEJNOSC: Record<RodzajPropozycji, number> = { wyslij: 0, krok: 1, pilne: 2 };
 
@@ -160,6 +181,10 @@ export interface PropozycjaPrzeplywu {
   werdyktZrodlo: "agent" | "wysylka" | null;
   werdyktPrzez: string | null;
   werdyktAt: string | null;
+  /** Automat wysłał szkic sam o tej godzinie. Tylko przy „wyslij”. */
+  wykonanaAt: string | null;
+  /** Dlaczego automat nie wysłał; `niepewna` = mogło dojść, rozstrzyga synchronizacja. */
+  wykonanieBlad: string | null;
 }
 
 export interface WierszPomiaruPrzeplywu {
@@ -169,6 +194,8 @@ export interface WierszPomiaruPrzeplywu {
   zgod: number;
   sprzeciwow: number;
   bezWerdyktu: number;
+  /** Ile z tych propozycji automat wysłał sam. Zero poza „wyslij”. */
+  wyslanychNaZywo: number;
 }
 
 export const naPropozycje = (w: Record<string, unknown>): PropozycjaPrzeplywu => ({
@@ -181,6 +208,8 @@ export const naPropozycje = (w: Record<string, unknown>): PropozycjaPrzeplywu =>
   werdyktZrodlo: w.werdykt_zrodlo == null ? null : String(w.werdykt_zrodlo) as "agent" | "wysylka",
   werdyktPrzez: w.werdykt_przez == null ? null : String(w.werdykt_przez),
   werdyktAt: w.werdykt_at == null ? null : String(w.werdykt_at),
+  wykonanaAt: w.wykonana_at == null ? null : String(w.wykonana_at),
+  wykonanieBlad: w.wykonanie_blad == null ? null : String(w.wykonanie_blad),
 });
 
 /** Aktywna decyzja OSTATNIEJ wiadomości klienta — ta sama reguła co przy szkicu. */
@@ -257,14 +286,31 @@ export function zapiszPropozycje(database: DatabaseSync, rozmowyId: number[], te
   return nowych;
 }
 
-/** Propozycje bieżącej decyzji rozmowy — dla osi rozmowy. Czyta, nic nie pisze. */
-export function propozycjeRozmowy(database: DatabaseSync, conversationId: number): PropozycjaPrzeplywu[] {
-  const wiersze = database.prepare(`
+/** Ile dni wstecz karta pokazuje odpowiedź wysłaną przez automat. */
+const WYSLANE_NA_KARCIE_DNI = 7;
+
+/**
+ * Propozycje bieżącej decyzji rozmowy — dla osi rozmowy. Czyta, nic nie pisze.
+ *
+ * Do tego wysyłki automatu z ostatniego tygodnia, także spod starej decyzji.
+ * Dopisek klienta po auto-wysyłce zmienia decyzję, a agent i tak musi
+ * zobaczyć, że automat już odpisał, i móc to ocenić.
+ */
+export function propozycjeRozmowy(
+  database: DatabaseSync, conversationId: number, teraz = new Date(),
+): PropozycjaPrzeplywu[] {
+  const biezace = database.prepare(`
     SELECT p.* ${biezacaDecyzja()}
     JOIN propozycja_przeplywu p ON p.decyzja_id = k.id
     WHERE c.id = ?`).all(conversationId) as Array<Record<string, unknown>>;
-  return wiersze.map(naPropozycje)
-    .sort((a, b) => KOLEJNOSC[a.rodzaj] - KOLEJNOSC[b.rodzaj]);
+  const od = new Date(teraz.getTime() - WYSLANE_NA_KARCIE_DNI * 86_400_000).toISOString();
+  const wyslane = database.prepare(`SELECT * FROM propozycja_przeplywu
+    WHERE conversation_id = ? AND wykonana_at IS NOT NULL AND wykonana_at >= ?`)
+    .all(conversationId, od) as Array<Record<string, unknown>>;
+  const poId = new Map<number, PropozycjaPrzeplywu>();
+  for (const w of [...biezace, ...wyslane]) poId.set(Number(w.id), naPropozycje(w));
+  return [...poId.values()].sort((a, b) => KOLEJNOSC[a.rodzaj] - KOLEJNOSC[b.rodzaj]
+    || b.at.localeCompare(a.at));
 }
 
 /**
@@ -273,6 +319,9 @@ export function propozycjeRozmowy(database: DatabaseSync, conversationId: number
  *
  * Decyzja SZKICU, nie aktywna decyzja rozmowy: werdykt dotyczy dokładnie
  * tego szkicu, który porównano z wysłaną treścią albo który odrzucono.
+ *
+ * Propozycję wysłaną przez automat pomija. Jej werdykt to przegląd agenta
+ * po fakcie, a późniejsza wysyłka człowieka ocenia już inną odpowiedź.
  */
 function werdyktSzkicu(
   database: DatabaseSync, conversationId: number, messageId: number,
@@ -281,6 +330,7 @@ function werdyktSzkicu(
   const r = database.prepare(`UPDATE propozycja_przeplywu SET werdykt=?, werdykt_zrodlo='wysylka',
       werdykt_at=strftime('%Y-%m-%dT%H:%M:%fZ','now'), werdykt_przez=?, werdykt_user_id=?
     WHERE conversation_id=? AND message_id=? AND rodzaj='wyslij' AND werdykt IS NULL
+      AND wykonana_at IS NULL
       AND decyzja_id = (SELECT s.decyzja_id FROM szkic_copilota s
                          WHERE s.conversation_id=? AND s.message_id=?)`)
     .run(werdykt, autor.name, autor.id, conversationId, messageId, conversationId, messageId);
@@ -331,7 +381,8 @@ export function pomiarPrzeplywu(database: DatabaseSync): WierszPomiaruPrzeplywu[
   const wiersze = database.prepare(`SELECT kategoria, rodzaj, COUNT(*) AS propozycji,
       SUM(CASE WHEN werdykt='zgoda' THEN 1 ELSE 0 END) AS zgod,
       SUM(CASE WHEN werdykt='sprzeciw' THEN 1 ELSE 0 END) AS sprzeciwow,
-      SUM(CASE WHEN werdykt IS NULL THEN 1 ELSE 0 END) AS bezWerdyktu
+      SUM(CASE WHEN werdykt IS NULL THEN 1 ELSE 0 END) AS bezWerdyktu,
+      SUM(CASE WHEN wykonana_at IS NOT NULL THEN 1 ELSE 0 END) AS wyslanychNaZywo
     FROM propozycja_przeplywu WHERE przeplyw_wersja=?
     GROUP BY kategoria, rodzaj`).all(PRZEPLYW_WERSJA) as Array<Record<string, unknown>>;
   const pozycja = (k: string) => {
@@ -342,6 +393,7 @@ export function pomiarPrzeplywu(database: DatabaseSync): WierszPomiaruPrzeplywu[
     kategoria: String(w.kategoria), rodzaj: String(w.rodzaj) as RodzajPropozycji,
     propozycji: Number(w.propozycji), zgod: Number(w.zgod ?? 0),
     sprzeciwow: Number(w.sprzeciwow ?? 0), bezWerdyktu: Number(w.bezWerdyktu ?? 0),
+    wyslanychNaZywo: Number(w.wyslanychNaZywo ?? 0),
   })).sort((a, b) => pozycja(a.kategoria) - pozycja(b.kategoria)
     || KOLEJNOSC[a.rodzaj] - KOLEJNOSC[b.rodzaj]);
 }

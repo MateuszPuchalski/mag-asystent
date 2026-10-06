@@ -1148,6 +1148,25 @@ export const config = {
     przedPracaLimit: Math.max(1,
       Number(process.env.COPILOT_PRZED_PRACA_LIMIT ?? 100) || 100),
   },
+
+  /* ── Przepływ kategorii na żywo (6 października 2026) ──────────────────────
+     Jedyna droga, którą odpowiedź idzie do klienta bez kliknięcia człowieka.
+     Powód i bramki stoją w `services/przeplyw-na-zywo.ts`. */
+  przeplyw: {
+    /**
+     * Kategorie wysyłane na żywo, po przecinku. Domyślnie pusto, bo wysyłka
+     * bez człowieka to decyzja właściciela przy `wertis.env`, nie skutek
+     * aktualizacji. Lista jest SUROWA: przecięcie z kategoriami przejrzanymi
+     * w kodzie (`NA_ZYWO_MOZLIWE`) robi serwis, więc literówka nic nie włączy.
+     */
+    naZywo: (process.env.PRZEPLYW_NA_ZYWO ?? "").split(",")
+      .map((k) => k.trim().toUpperCase()).filter(Boolean) as string[],
+    /**
+     * Sufit wysyłek automatu na godzinę, liczony z bazy. Hamuje awarię, która
+     * powtarza wiadomości, zanim klient dostanie dziesięć odpowiedzi naraz.
+     */
+    naZywoNaGodzine: Math.max(1, Number(process.env.PRZEPLYW_NA_ZYWO_NA_GODZINE ?? 10) || 10),
+  },
 };
 
 /**
