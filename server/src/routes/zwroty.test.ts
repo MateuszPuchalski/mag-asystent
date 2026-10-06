@@ -38,7 +38,7 @@ beforeEach(() => {
   /* `klient_prowadzenie` pierwszy (0.536.0): odmowa z kodem dosyłki zakłada
      sprawę klienta, a jej prowadzący to klucz obcy do `app_user` bez kaskady.
      Kaskada zabiera przy okazji `klient_dosylka`. */
-  for (const t of ["klient_prowadzenie", "zwrot_zdarzenie", "zwrot_klienta_pozycja", "zwrot_klienta", "allegro_zwrot",
+  for (const t of ["klient_prowadzenie", "zwrot_zdarzenie", "zwrot_skladnik_outlet", "zwrot_klienta_pozycja", "zwrot_klienta", "allegro_zwrot",
     "zamowienie_klienta_pozycja", "zamowienie_klienta", "allegro_zamowienie",
     "oferta_kartoteka", "sgt_faktura_pozycja", "sgt_faktura", "sgt_towar",
     "channel_account", "events", "device_session", "app_user"]) {
@@ -110,6 +110,8 @@ const TRASY = () => [
   { method: "POST" as const, url: "/api/obsluga/zwroty/przyjmij-nieodebrana" },
   /* „Śledź dosyłkę” (0.536.0) zakłada krok w sprawie klienta — praca biura. */
   { method: "POST" as const, url: `/api/obsluga/zwroty/${zwrot}/dosylka` },
+  /* Składnik kompletu na outlet — przesunięcie towaru, praca biura. */
+  { method: "POST" as const, url: "/api/obsluga/zwroty/pozycje/1/skladnik/outlet" },
 ];
 
 test("bez sesji żadna trasa zwrotów nie odpowiada danymi", async () => {
@@ -388,15 +390,21 @@ test("zwroty mają trzydzieści siedem tras POST, każda z uzasadnieniem", async
      PONOWIENIEM, gdy odmowa przeszła, a zapis dosyłki nie — odmowy w Allegro
      nie da się powtórzyć, więc bez niej dosyłka takiego zwrotu przepadałaby.
      Pieniędzy nie rusza i nie ma ciała. */
-  assert.equal(posty.length, 37,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu siedmiu`);
+  /* Trzydziesta ósma: składnik kompletu odłożony na outlet zamiast do
+     koszyka. Zgłoszenie właściciela: z zestawu jedna część wraca na stan,
+     druga jest używana. Do Subiekta nie idzie nic więcej — trasa wyjmuje
+     wiersz z koszyka bez dokumentu i stawia go na liście outletu. Pieniędzy
+     klienta nie rusza. */
+  assert.equal(posty.length, 38,
+    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu ośmiu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
     "korekta", "cofnij", "skan", "dociagnij", "rabat", "potracenie",
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
     "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono",
-    "kosz/nowy", "kosz/usun", "paczki-klienta/allegro", "przyjmij-nieodebrana", ":id/dosylka"]) {
+    "kosz/nowy", "kosz/usun", "paczki-klienta/allegro", "przyjmij-nieodebrana", ":id/dosylka",
+    "skladnik/outlet"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
   /* Formularza rejestracji nie ma i nie ma wrócić przypadkiem — np. przy
@@ -1132,3 +1140,62 @@ test("porażka zapisu dosyłki nie zamienia odmowy w błąd: 200, `zalozona: fal
     db().exec("ALTER TABLE klient_dosylka_na_bok RENAME TO klient_dosylka");
   }
 });
+
+test("składnik na outlet: trasa tłumaczy odmowę serwisu na 400 ze zdaniem", async () => {
+  const { naglowki } = login("biuro", "Ala odkłada");
+  const poz = (db().prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(zwrot) as { id: number }).id;
+  const url = `/api/obsluga/zwroty/pozycje/${poz}/skladnik/outlet`;
+
+  const bezTw = await app.inject({ method: "POST", url, headers: naglowki,
+    payload: { naOutlet: true } });
+  assert.equal(bezTw.statusCode, 400);
+  assert.match(bezTw.json().error, /twId/);
+  /* Brak stanu docelowego to 400, a nie ciche „zdejmij z outletu". */
+  const bezStanu = await app.inject({ method: "POST", url, headers: naglowki,
+    payload: { twId: 11 } });
+  assert.equal(bezStanu.statusCode, 400);
+  assert.match(bezStanu.json().error, /naOutlet/);
+
+  const bezOceny = await app.inject({ method: "POST", url, headers: naglowki,
+    payload: { twId: 11, naOutlet: true } });
+  assert.equal(bezOceny.statusCode, 400);
+  assert.match(bezOceny.json().error, /przy ocenie „na stan”/);
+});
+
+test("składnik na outlet przechodzi przez szczegół, listę i odklikanie", async () => {
+  /* Kształt pilnujemy tutaj, bo panel czyta `sklady` ze szczegółu i listę
+     outletu z osobnej trasy — serwis bez tego mógłby zgubić pole w drodze. */
+  const d = db();
+  d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (11,'SYM-11','Tarcza')").run();
+  const poz = (d.prepare("SELECT id FROM zwrot_klienta_pozycja WHERE zwrot_id=?")
+    .get(zwrot) as { id: number }).id;
+  d.prepare("UPDATE zwrot_klienta_pozycja SET tw_id=11, tw_symbol='SYM-11' WHERE id=?").run(poz);
+  d.prepare(`INSERT INTO zwrot_skladnik_outlet
+    (pozycja_id,tw_id,symbol,nazwa,ilosc,oznaczono_at,oznaczono_przez)
+    VALUES (?,11,'SYM-11','Tarcza',1,'2026-09-04T08:00:00.000Z','Ala')`).run(poz);
+  const { naglowki } = login("biuro", "Ala przenosi");
+
+  const szczegol = await app.inject({
+    method: "GET", url: `/api/obsluga/zwroty/${zwrot}`, headers: naglowki });
+  const skladnik = szczegol.json().sklady[poz].skladniki[0];
+  assert.equal(skladnik.naOutlet, true);
+  assert.equal(skladnik.outletAt, null);
+
+  const lista = await app.inject({
+    method: "GET", url: "/api/obsluga/zwroty/outlet", headers: naglowki });
+  assert.deepEqual(lista.json().pozycje.map((p: { pozycjaId: number; skladnikTwId: number }) =>
+    [p.pozycjaId, p.skladnikTwId]), [[poz, 11]]);
+
+  const zlyTw = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/outlet/przeniesiono",
+    headers: naglowki, payload: { pozycjaId: poz, twId: "abc" } });
+  assert.equal(zlyTw.statusCode, 400, "zły numer to nie meldunek o całej pozycji");
+
+  const r = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/outlet/przeniesiono",
+    headers: naglowki, payload: { pozycjaId: poz, twId: 11 } });
+  assert.equal(r.statusCode, 200);
+  const po = await app.inject({
+    method: "GET", url: "/api/obsluga/zwroty/outlet", headers: naglowki });
+  assert.equal(po.json().pozycje.length, 0, "odklikane schodzi z listy");
+});
+

@@ -478,6 +478,24 @@ export function migrate(database: DatabaseSync) {
      „outlet" znaczy „czeka" — na tym stoi lista robocza biura. */
   addColumn("zwrot_klienta_pozycja", "outlet_at", "TEXT");
   addColumn("zwrot_klienta_pozycja", "outlet_przez", "TEXT");
+  /* Składnik kompletu odłożony na outlet, gdy reszta zestawu wraca na stan.
+     Osobna tabela, bo ocena stoi na POZYCJI, a ta decyzja dotyczy jednej
+     kartoteki z paragonu. Puste `outlet_at` znaczy „czeka na regał”, tak samo
+     jak przy całej pozycji. Bez danych klienta: kartoteka, ilość i podpisy biura.
+     Bez klucza obcego, bo `zwrot_klienta_pozycja` bywa przebudowywana
+     migracją; osierocony wiersz odpada na złączeniu w każdym odczycie. */
+  database.exec(`CREATE TABLE IF NOT EXISTS zwrot_skladnik_outlet (
+    id              INTEGER PRIMARY KEY,
+    pozycja_id      INTEGER NOT NULL,
+    tw_id           INTEGER NOT NULL,
+    symbol          TEXT,
+    nazwa           TEXT,
+    ilosc           REAL NOT NULL,
+    oznaczono_at    TEXT NOT NULL,
+    oznaczono_przez TEXT,
+    outlet_at       TEXT,
+    outlet_przez    TEXT,
+    UNIQUE (pozycja_id, tw_id))`);
   addColumn("zwrot_klienta_pozycja", "potracenie_grosze", "INTEGER");
   addColumn("zwrot_klienta_pozycja", "potracenie_powod", "TEXT");
   addColumn("zwrot_klienta_pozycja", "potracenie_at", "TEXT");

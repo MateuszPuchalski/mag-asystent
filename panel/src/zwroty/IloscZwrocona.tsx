@@ -43,7 +43,7 @@ export function IloscZwrocona({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt
      tak samo jak ocenę i potrącenie. Po zamknięciu zwrotu to ona tłumaczy,
      czemu wypłata była niższa, niż wynikałoby ze zgłoszenia. */
   if (p.iloscZwrocona != null && p.iloscZwrocona !== p.ilosc) {
-    return <div className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
+    return <div className="mt-2 w-full rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
       {/* Liczba sztuk też jest liczbą czytaną w pionie — po jednej na pozycję. */}
       <span className="font-bold tabular-nums">
         Wróciło {p.iloscZwrocona} z {p.ilosc} szt.</span>
@@ -74,7 +74,7 @@ export function IloscZwrocona({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt
       <Sigma size={12} /> wróciło mniej, niż zgłosił</button>;
   }
 
-  return <div className="mt-2 space-y-1 rounded-lg border border-slate-300 bg-white p-2">
+  return <div className="mt-2 w-full space-y-1 rounded-lg border border-slate-300 bg-white p-2">
     <label className="block text-xs font-bold text-slate-600" htmlFor={`ilosc-${p.id}`}>
       Ile sztuk wróciło w kartonie — zgłoszono {p.ilosc}
     </label>

@@ -78,8 +78,14 @@ export function Rabat({ rabat, trwa, blad, onZglos }: {
       {rabat.typ === "AUTOMATIC" && <span className="font-normal"> · automat Allegro</span>}
     </span>
 
-    {rabat.stan === "brak" && !pytam && <Przycisk className="text-xs" disabled={trwa}
-      onClick={() => setPytam(true)}>ZGŁOŚ RABAT</Przycisk>}
+    {/* Przycisk w ROZMIARZE ZNACZNIKA, nie pełny. Stoi w rzędzie stanów pozycji,
+        a rabat jest sprawą poboczną wobec oceny towaru. Pełny przycisk przebija
+        wagą przyciski oceny niżej, choć naciska się go rzadziej. */}
+    {rabat.stan === "brak" && !pytam && <button type="button" disabled={trwa}
+      onClick={() => setPytam(true)}
+      className="inline-flex h-6 items-center rounded-full border border-slate-300 bg-white px-2
+        text-xs font-bold text-slate-700 hover:border-slate-400 hover:bg-slate-50
+        disabled:opacity-50">ZGŁOŚ RABAT</button>}
 
     {/* Zdanie mówi SKUTEK, nie „czy na pewno": pytanie bez treści uczy tylko
         odruchu klikania „tak". Po złożeniu przycisk i tak znika, więc to jedyny

@@ -4,7 +4,7 @@ import {
 } from "lucide-react";
 import type { DoDopisania, Ocena, PozycjaZwrotu, SkladPozycji, WierszDokumentu, Zwrot } from "../api/typy";
 import {
-  useKosz, usePotwierdzKartoteke, useWskazSklad, useZaznaczSkladnik, zlote,
+  useKosz, usePotwierdzKartoteke, useSkladnikNaOutlet, useWskazSklad, useZaznaczSkladnik, zlote,
 } from "../api/zwroty";
 import { Wyszukiwarka, type Towar } from "../wyszukiwarka";
 import { Blad, Przycisk, Pusto } from "../ui";
@@ -85,6 +85,11 @@ function PowodZwrotu({ p }: { p: PozycjaZwrotu }) {
   </div>;
 }
 
+/** Ile składników kompletu odłożono na outlet zamiast na MM. */
+function naOutlet(sklad: SkladPozycji | undefined): number {
+  return sklad?.skladniki.filter((s) => s.naOutlet).length ?? 0;
+}
+
 /** Barwa znacznika zapisanej oceny: na stan dobrze, utylizacja źle, outlet obok. */
 const TON_OCENY: Record<string, string> = {
   stan: "bg-emerald-50 text-emerald-800",
@@ -154,7 +159,33 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
   }
 
   const prop = p.propozycja;
-  /* `w-full`: propozycja i brak kartoteki to BLOKI z treścią do przeczytania
+  const blad = zapisz.error && <p className="mt-1 w-full text-red-700">{(zapisz.error as Error).message}</p>;
+  const wskaz = <button type="button" onClick={() => setSzukam(true)}
+    className="text-slate-500 underline underline-offset-2 hover:text-slate-800">
+    wskaż kartotekę</button>;
+
+  /* ── BRAK KARTOTEKI TO ZNACZNIK, NIE DWIE LINIE ZDAŃ ───────────────────────
+     Stoi w rzędzie stanów obok rabatu, w tej samej formie co powiązana
+     kartoteka: przerywana ramka mówi „tu czegoś brakuje". `contents` wpuszcza
+     znacznik, powód i odnośnik wprost do rzędu, więc nie zajmują osobnych
+     linii nad rabatem.
+
+     POWÓD, nie samo „Bez kartoteki". Bez niego sześć różnych zerwań łańcucha
+     wygląda identycznie, a operator nie odróżni „sprzedawca nie wypełnił
+     SKU" od „kod ma błąd". Zdanie pisze SERWER
+     (`dopasowanie-sku.ts`) — druga kopia tej reguły w panelu rozjechałaby
+     się przy pierwszej poprawce jednej z nich. */
+  if (prop?.twId == null && !szukam) {
+    return <div className="contents text-xs">
+      <span className="inline-flex h-6 items-center rounded-full border border-dashed border-slate-400
+        px-2 font-semibold text-slate-700">Bez kartoteki</span>
+      {prop?.zrodlo && <span className="text-slate-600">{prop.zrodlo}</span>}
+      {wskaz}
+      {blad}
+    </div>;
+  }
+
+  /* `w-full`: propozycja i wyszukiwarka to BLOKI z treścią do przeczytania
      i przyciskiem — w rzędzie znaczników zawijają się pod nie, zamiast
      ściskać znacznik rabatu obok. */
   return <div className="w-full text-xs">
@@ -181,11 +212,6 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
               <Check size={12} />Zatwierdź</button>
           </div>
         </div>
-      /* POWÓD, nie samo „Bez kartoteki". Do 0.153.1 sześć różnych zerwań
-         łańcucha wyglądało tu identycznie i operator nie miał jak odróżnić
-         „sprzedawca nie wypełnił SKU" od „kod ma błąd". Zdanie pisze SERWER
-         (`dopasowanie-sku.ts`) — druga kopia tej reguły w panelu rozjechałaby
-         się przy pierwszej poprawce jednej z nich. */
       : <p className="text-slate-500">
           Bez kartoteki{prop?.zrodlo ? <> · <span className="text-slate-600">{prop.zrodlo}</span></> : null}</p>}
 
@@ -194,12 +220,10 @@ function Kartoteka({ p }: { p: PozycjaZwrotu }) {
           <Wyszukiwarka wybrany={null} etykieta="Wskazana przez Ciebie"
             onWybierz={(t: Towar | null) => t && ustaw(t.id, "reczne")} />
         </div>
-      /* Własny wiersz, nie doklejka do zdania o powodzie: „…jeszcze nie
-         pobranowskaż kartotekę" czytało się jak jedno słowo. */
-      : <button type="button" onClick={() => setSzukam(true)}
-          className="mt-1 block text-slate-500 underline underline-offset-2 hover:text-slate-800">
-          wskaż kartotekę</button>}
-    {zapisz.error && <p className="mt-1 text-red-700">{(zapisz.error as Error).message}</p>}
+      /* Własny wiersz pod propozycją: to druga droga obok „Zatwierdź",
+         a doklejona do zdania o źródle czytałaby się jak jego część. */
+      : <div className="mt-1">{wskaz}</div>}
+    {blad}
   </div>;
 }
 
@@ -237,7 +261,7 @@ function WskazSklad({ p, wiersze, zwrotId, onKoniec }: {
     .map(([twId, ile]) => ({ twId: Number(twId), naKomplet: Number(ile.replace(",", ".")) }));
   const gotowe = skladniki.length > 0 && skladniki.every((x) => x.naKomplet > 0);
 
-  return <div className="mt-1 rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs">
+  return <div className="mt-1 w-full rounded-lg border border-amber-300 bg-amber-50 p-2 text-xs">
     <p className="text-amber-900">
       Zaznacz wiersze paragonu, które wchodzą w skład tej oferty, i podaj
       sztuki <b>na jeden komplet</b>.</p>
@@ -295,14 +319,19 @@ function Skladniki({ p, sklad, zwrotId }: {
   p: PozycjaZwrotu; sklad: SkladPozycji; zwrotId: number;
 }) {
   const zaznacz = useZaznaczSkladnik();
-  return <div className="mt-1 text-xs">
-    <p className="text-slate-500">Z paragonu — odznacz, co NIE jedzie na MM:</p>
+  const outlet = useSkladnikNaOutlet();
+  const trwa = zaznacz.isPending || outlet.isPending;
+  const blad = zaznacz.error ?? outlet.error;
+  return <div className="mt-1 w-full text-xs">
+    <p className="text-slate-500">Z paragonu — odznacz, co NIE jedzie na MM; używane odłóż na outlet:</p>
     <ul className="mt-1 space-y-0.5">
       {sklad.skladniki.map((s) => (
-        <li key={s.twId}>
-          {/* Cała etykieta jest celem kliknięcia, nie sam kwadracik. */}
-          <label className="flex items-center gap-2 rounded px-1 py-0.5 hover:bg-slate-100">
-            <input type="checkbox" checked={s.wKoszyku} disabled={zaznacz.isPending}
+        <li key={s.twId} className="flex items-center gap-2">
+          {/* Cała etykieta jest celem kliknięcia, nie sam kwadracik. Ptaszek
+              składnika na outlecie milknie: z regału na MM wraca się
+              wyłącznie przez „cofnij”, więc droga powrotu jest jedna. */}
+          <label className="flex min-w-0 flex-1 items-center gap-2 rounded px-1 py-0.5 hover:bg-slate-100">
+            <input type="checkbox" checked={s.wKoszyku && !s.naOutlet} disabled={trwa || s.naOutlet}
               className="h-4 w-4 accent-emerald-600"
               onChange={(e) => zaznacz.mutate({
                 pozycjaId: p.id, twId: s.twId, wKoszyku: e.target.checked, zwrotId,
@@ -311,11 +340,32 @@ function Skladniki({ p, sklad, zwrotId }: {
             <span className="text-slate-500">× {s.ilosc}</span>
             <span className="min-w-0 flex-1 truncate text-slate-500">{s.nazwa}</span>
           </label>
+          {/* OUTLET SKŁADNIKA, bo komplet wraca nieraz pół na pół: jedna
+              część fabryczna na MM, druga używana na regał. Samo odznaczenie
+              gubi tę drugą, bo lista regału jej nie widzi. */}
+          {s.naOutlet
+            ? <>
+                <span className="inline-flex h-6 items-center rounded-full bg-sky-50 px-2 font-semibold text-sky-900">
+                  na outlet</span>
+                {/* Po meldunku z regału cofnięcie kłamałoby: towar już tam stoi. */}
+                {s.outletAt
+                  ? <span className="text-slate-500">stoi na regale</span>
+                  : <button type="button" disabled={trwa}
+                      className="text-slate-500 underline underline-offset-2 hover:text-slate-800 disabled:opacity-50"
+                      aria-label={`cofnij outlet ${s.symbol}`}
+                      onClick={() => outlet.mutate({ pozycjaId: p.id, twId: s.twId, naOutlet: false, zwrotId })}>
+                      cofnij</button>}
+              </>
+            : <button type="button" disabled={trwa} aria-label={`${s.symbol} na outlet`}
+                onClick={() => outlet.mutate({ pozycjaId: p.id, twId: s.twId, naOutlet: true, zwrotId })}
+                className="inline-flex h-6 shrink-0 items-center rounded-full border border-slate-300 bg-white px-2
+                  font-bold text-slate-700 hover:border-slate-400 hover:bg-slate-50 disabled:opacity-50">
+                na outlet</button>}
         </li>))}
     </ul>
     {/* ODMOWA SERWERA JEST ZDANIEM („to ostatni składnik — zdejmuje się ją
         cofnięciem oceny"), więc pokazujemy ją wprost, przy ptaszkach. */}
-    {zaznacz.error && <p className="mt-1 text-red-700">{(zaznacz.error as Error).message}</p>}
+    {blad && <p className="mt-1 text-red-700">{(blad as Error).message}</p>}
   </div>;
 }
 
@@ -614,8 +664,16 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               to, co z nim robimy: ocena, sztuki, potrącenie, skład. Bez kreski
               znacznik oceny zlewa się z kodami i rabatem, a link „oddaj mniej"
               wygląda jak dopisek do nich. `empty:hidden` zdejmuje kreskę tam,
-              gdzie żadnej decyzji nie ma. */}
-          <div className="mt-2 border-t border-slate-200 empty:hidden">
+              gdzie żadnej decyzji nie ma.
+
+              Pod kreską RZĄD, nie słupek. Drobne działania — cofnij, wróciło
+              mniej, oddaj mniej, wskaż skład — stają obok siebie, a całą
+              szerokość biorą tylko bloki do czytania i formularze (`w-full`).
+              Trzy linie samych odnośników przytłaczają decyzję, choć każdy
+              z nich jest wyjątkiem. `[&>*]:mt-0` zeruje odstępy dzieci, bo
+              w rzędzie odstęp daje `gap`. */}
+          <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-200
+            pt-2 empty:hidden [&>*]:mt-0">
           {/* Ocena towaru: pytanie kubełka DO OCENY, zadane przy towarze,
               którego dotyczy. Zapisana ocena zostaje widoczna w każdym
               kubełku — to fakt o tej pozycji, nie stan ekranu. */}
@@ -658,7 +716,11 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               <Check size={12} aria-hidden="true" />
               <span>Ocena: {OCENY.find(([k]) => k === p.ocena)?.[2] ?? p.ocena}</span>
               {p.ocena === "stan" && p.wKoszyku && <span className="font-normal">
-                · w koszyku zwrotów</span>}</span>
+                · w koszyku zwrotów</span>}
+              {/* Liczba składników na outlecie stoi w znaczniku, bo „na stan”
+                  bez niej obiecywałby cały komplet na półce. */}
+              {p.ocena === "stan" && naOutlet(sklady[p.id]) > 0 && <span className="font-normal">
+                · {naOutlet(sklady[p.id])} na outlet</span>}</span>
             {/* COFNIĘCIE ZAMIAST POTWIERDZENIA (§25a.5). Do 0.202.0 przyciski
                 oceny znikały po pierwszym kliknięciu, więc pomyłkowa
                 „Utylizacja" na złym wierszu była z ekranu nie do odkręcenia.
@@ -677,7 +739,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               Bez tego zdania karton pojechałby na halę z towarem, którego nie
               ma na żadnym papierze, a magazynier zobaczyłby to dopiero przy
               rozkładaniu. */}
-          {p.ocena === "stan" && !p.wKoszyku && <p className="mt-1 text-xs font-semibold text-ranga-uwaga">
+          {p.ocena === "stan" && !p.wKoszyku && <p className="mt-1 w-full text-xs font-semibold text-ranga-uwaga">
             {/* POWÓD PISZE SERWER (0.328.0). Do tego wydania stało tu jedno
                 zdanie o braku kartoteki — jedyna wtedy przyczyna. Odkąd skład
                 bierze się z paragonu, przyczyny są trzy i prowadzą w różne
@@ -693,7 +755,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             ? <WskazSklad p={p} wiersze={wierszeDokumentu} zwrotId={zwrot.id}
                 onKoniec={() => setSkladamy(null)} />
             : <button type="button" onClick={() => setSkladamy(p.id)}
-                className="mr-3 mt-1 text-xs text-slate-600 underline underline-offset-2
+                className="mt-1 text-xs text-slate-600 underline underline-offset-2
                   hover:text-slate-900">wskaż skład ręcznie</button>)}
           {/* KOMPLET ROZBITY NA PARAGONIE. Pokazujemy go tylko wtedy, gdy
               kartotek jest więcej niż jedna: przy zwykłym towarze wiersz
@@ -702,9 +764,12 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             ? <Skladniki p={p} sklad={sklady[p.id]!} zwrotId={zwrot.id} />
             /* Zanim pozycja trafi do koszyka, skład jest PLANEM: mówimy, co
                wejdzie, ale nie dajemy ptaszka, bo nie ma czego zdjąć. */
-            : <p className="mt-1 text-xs text-slate-500">
+            : <p className="mt-1 w-full text-xs text-slate-500">
                 Do koszyka z paragonu: {sklady[p.id]!.skladniki
                   .map((s) => `${s.symbol} × ${s.ilosc}`).join(", ")}
+                {/* Droga ma być znana PRZED kliknięciem oceny, inaczej
+                    operator oceni komplet „na outlet” w całości. */}
+                {!p.ocena && ". Po ocenie „na stan” używany składnik odłożysz na outlet."}
               </p>)}
 
           {/* Liczba sztuk pada PRZY ROZPAKOWANIU, czyli w kubełku DO OCENY —

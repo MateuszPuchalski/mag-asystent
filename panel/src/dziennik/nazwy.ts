@@ -146,6 +146,7 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   zwrot_rabat_zgloszony: "Rabat do zwrotu zgłoszony",
   zwrot_rabat_automat_blad: "Automat rabatu zwrotu zawiódł",
   zwrot_outlet_przeniesiony: "Zwrot przeniesiony na outlet",
+  zwrot_skladnik_outlet: "Składnik kompletu na outlet",
   zwrot_notatka: "Notatka do zwrotu",
   zwrot_notatka_cofnieta: "Notatka do zwrotu cofnięta",
   zwrot_notatka_zdjeta: "Notatka do zwrotu zdjęta",

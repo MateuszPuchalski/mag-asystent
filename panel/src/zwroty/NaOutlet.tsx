@@ -49,17 +49,21 @@ export function NaOutlet() {
       </button>
       {rozwiniete && <ul className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-white p-3">
         {pozycje.map((p) => (
-          <li key={p.pozycjaId}
+          /* Klucz z numerem składnika, bo jedna pozycja kompletu może
+             wysłać na regał kilka części, każdą osobnym wierszem. */
+          <li key={`${p.pozycjaId}-${p.skladnikTwId ?? "cala"}`}
             className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-1 text-xs first:border-t-0 first:pt-0">
             <span className="font-bold">{p.symbol ?? p.nazwa}</span>
             {p.symbol && <span className="text-slate-500">{p.nazwa}</span>}
+            {/* Bez dopisku regał szukałby całego kompletu, a niesie się część. */}
+            {p.skladnikTwId !== null && <span className="text-slate-500">z kompletu</span>}
             <span className="text-slate-500">{p.ilosc} szt.</span>
             <span className="text-slate-500">zwrot {p.numer}</span>
             {p.potracenieGrosze !== null && p.potracenieGrosze > 0 &&
               <span className="text-slate-500">potrącono {zlote(p.potracenieGrosze)}</span>}
             <Przycisk className="ml-auto text-xs"
               disabled={przeniesiono.isPending}
-              onClick={() => przeniesiono.mutate({ pozycjaId: p.pozycjaId })}>
+              onClick={() => przeniesiono.mutate({ pozycjaId: p.pozycjaId, twId: p.skladnikTwId ?? undefined })}>
               Stoi na regale
             </Przycisk>
           </li>))}

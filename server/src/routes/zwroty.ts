@@ -6,7 +6,7 @@ import { db } from "../db/db.js";
 import {
   koszykiBezDokumentu, otwarteKoszyki, skladDoZaznaczenia, wypuscMmMimoKorekt,
   zalozKoszyk, usunKoszyk, WyborKoszyka,
-  zamknijKosz, zaznaczSkladnik,
+  zamknijKosz, zaznaczSkladnik, skladnikNaOutlet,
   dolozTowar, zdejmijTowar,
 } from "../services/kosze-zwrotow.js";
 import { koszeZwrotu, towarZKodu } from "../services/kosze.js";
@@ -298,7 +298,7 @@ export async function zwrotyRoutes(app: FastifyInstance) {
     return { pozycje: pozycjeNaOutlet(db()) };
   });
 
-  app.post<{ Body: { pozycjaId?: number } }>(
+  app.post<{ Body: { pozycjaId?: number; twId?: number | null } }>(
     "/api/obsluga/zwroty/outlet/przeniesiono", async (req, reply) => {
       const nie = odmowa(reply);
       if (nie) return nie;
@@ -306,8 +306,15 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       if (!Number.isFinite(id) || id <= 0) {
         return reply.code(400).send({ error: "Wskaż pozycję, którą przeniesiono." });
       }
+      /* `twId` wskazuje składnik kompletu; bez niego meldunek dotyczy całej
+         pozycji. Zły numer to 400, a nie cichy meldunek o całości. */
+      const surowy = req.body?.twId;
+      const twId = surowy == null ? null : Number(surowy);
+      if (twId !== null && (!Number.isFinite(twId) || twId <= 0)) {
+        return reply.code(400).send({ error: "Zły numer kartoteki składnika (`twId`)." });
+      }
       try {
-        return przeniesionoNaOutlet(db(), id, kto());
+        return przeniesionoNaOutlet(db(), id, kto(), new Date(), twId);
       } catch (e) { return reply.code(400).send({ error: (e as Error).message }); }
     });
 
@@ -365,6 +372,33 @@ export async function zwrotyRoutes(app: FastifyInstance) {
       } catch (e) {
         /* Odmowa serwisu jest ZDANIEM dla człowieka („koszyk Z-3 ma już
            dokument"), a nie kodem — panel pokazuje ją wprost. */
+        return reply.code(400).send({ error: (e as Error).message });
+      }
+    });
+
+  /* Składnik kompletu na outlet zamiast do koszyka. Zgłoszenie właściciela:
+     z zestawu jedna część wraca w porządku, druga jest używana.
+
+     Przełącznik jak ptaszek obok, z tego samego powodu: ciało niesie stan
+     DOCELOWY (`naOutlet`), więc panel nie musi wiedzieć, co dziś stoi.
+     Bramka też ta sama, samo `odmowa()`: to przesunięcie towaru we własnym
+     magazynie, a pieniędzy klienta nie rusza. */
+  app.post<{ Params: { id: string }; Body: { twId?: number; naOutlet?: boolean } }>(
+    "/api/obsluga/zwroty/pozycje/:id/skladnik/outlet", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      const twId = Number(req.body?.twId);
+      if (!Number.isFinite(twId) || twId <= 0) {
+        return reply.code(400).send({ error: "Brak numeru kartoteki (`twId`)." });
+      }
+      if (typeof req.body?.naOutlet !== "boolean") {
+        return reply.code(400).send({ error: "Brak stanu docelowego (`naOutlet`)." });
+      }
+      try {
+        return {
+          sklad: skladnikNaOutlet(db(), Number(req.params.id), twId, req.body.naOutlet, kto()),
+        };
+      } catch (e) {
         return reply.code(400).send({ error: (e as Error).message });
       }
     });

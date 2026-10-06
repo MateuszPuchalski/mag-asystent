@@ -49,7 +49,7 @@ export function Potracenie({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt = 
   /* Zapisane potrącenie jest FAKTEM o pozycji, więc widać je w każdym kubełku
      — tak samo jak ocenę hali. Obok stoi kwota, która naprawdę wyjdzie. */
   if (p.potracenieGrosze != null) {
-    return <div className="mt-2 rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
+    return <div className="mt-2 w-full rounded-lg bg-amber-50 px-2 py-1 text-xs text-amber-900">
       {/* `tabular-nums` jak przy każdej innej kwocie w panelu: te dwie stoją
           przy KAŻDEJ potrąconej pozycji, więc czyta się je w pionie — a cyfry
           o różnej szerokości rozjeżdżają wtedy przecinek między wierszami. */}
@@ -80,7 +80,7 @@ export function Potracenie({ p, trwa, blad, onZapisz, otworz = 0, tylkoOdczyt = 
     if (e.key === "Escape") { e.preventDefault(); zamknij(); }
   };
 
-  return <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs">
+  return <div className="mt-2 w-full rounded-lg border border-amber-200 bg-amber-50 p-2 text-xs">
     <div className="flex flex-wrap items-center gap-2">
       <label className="flex items-center gap-1">
         Potrąć

@@ -26,7 +26,7 @@ vi.mock("../api/zwroty", async (orig) => ({
 const POZYCJA = (n: Partial<PozycjaNaOutlet> = {}): PozycjaNaOutlet => ({
   pozycjaId: 7, zwrotId: 3, numer: "Z-2026-9", nazwa: "Sekator ogrodowy",
   twId: 11, symbol: "SEK-01", ilosc: 1, potracenieGrosze: 1500,
-  ocenionoAt: "2026-09-16T08:00:00Z", ...n,
+  ocenionoAt: "2026-09-16T08:00:00Z", skladnikTwId: null, ...n,
 });
 
 beforeEach(() => {
@@ -79,6 +79,29 @@ describe("Lista robocza regału outletowego", () => {
 
     await userEvent.click(screen.getAllByRole("button", { name: "Stoi na regale" })[1]);
 
-    expect(przeniesiono).toHaveBeenCalledWith({ pozycjaId: 8 });
+    expect(przeniesiono).toHaveBeenCalledWith({ pozycjaId: 8, twId: undefined });
+  });
+
+  it("składnik kompletu stoi osobnym wierszem z dopiskiem i odklikuje się sam", async () => {
+    /* Jedna pozycja może wysłać na regał kilka części. Bez dopisku regał
+       szukałby całego kompletu, a bez `twId` meldunek domknąłby całą pozycję. */
+    stan.pozycje = [
+      POZYCJA({ skladnikTwId: 21, twId: 21, symbol: "SEK-01" }),
+      POZYCJA({ skladnikTwId: 23, twId: 23, symbol: "REK-02" }),
+    ];
+    render(<NaOutlet />);
+    await userEvent.click(screen.getByRole("button", { name: /Na regał outletowy 2/ }));
+    expect(screen.getAllByText("z kompletu")).toHaveLength(2);
+
+    await userEvent.click(screen.getAllByRole("button", { name: "Stoi na regale" })[1]);
+
+    expect(przeniesiono).toHaveBeenCalledWith({ pozycjaId: 7, twId: 23 });
+  });
+
+  it("cała pozycja nie dostaje dopisku o komplecie", async () => {
+    stan.pozycje = [POZYCJA()];
+    render(<NaOutlet />);
+    await userEvent.click(screen.getByRole("button", { name: /Na regał outletowy/ }));
+    expect(screen.queryByText("z kompletu")).toBeNull();
   });
 });

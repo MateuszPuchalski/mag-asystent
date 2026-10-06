@@ -69,6 +69,9 @@ export const NAZWA_ZDARZENIA_ZWROTU: Record<string, string> = {
   notatka: "notatka",
   notatka_zdjeta: "notatka",
   notatka_cofnieta: "notatka",
+  outlet: "outlet",
+  skladnik_outlet: "outlet",
+  skladnik_outlet_cofniety: "outlet cofnięty",
 };
 
 /**

@@ -190,6 +190,33 @@ export function useZaznaczSkladnik() {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.zwrotId) });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+      /* Ptaszek na składniku odłożonym na outlet zdejmuje go z listy regału. */
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.outlet });
+    },
+  });
+}
+
+/**
+ * Składnik kompletu na regał outletowy zamiast na MM.
+ *
+ * Osobna trasa, a nie trzeci stan ptaszka: odznaczony składnik nie trafia
+ * nigdzie, a outlet ma czytelnika, czyli listę roboczą regału. `naOutlet` to stan
+ * docelowy, jak przy ptaszku, więc cofnięcie idzie tą samą drogą.
+ *
+ * Unieważnia też listę outletu, bo składnik właśnie na nią wszedł albo zszedł.
+ */
+export function useSkladnikNaOutlet() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { pozycjaId: number; twId: number; naOutlet: boolean; zwrotId: number }) =>
+      api<{ sklad: SkladPozycji }>(
+        `/api/obsluga/zwroty/pozycje/${v.pozycjaId}/skladnik/outlet`,
+        { method: "POST", body: JSON.stringify({ twId: v.twId, naOutlet: v.naOutlet }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.zwrotId) });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kosz });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.outlet });
     },
   });
 }
@@ -305,7 +332,8 @@ export function useOutlet() {
 export function usePrzeniesionoNaOutlet() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { pozycjaId: number }) =>
+    /* `twId` odklikuje jeden składnik kompletu; bez niego całą pozycję. */
+    mutationFn: (v: { pozycjaId: number; twId?: number }) =>
       api<{ pozycjaId: number; outletAt: string }>(
         "/api/obsluga/zwroty/outlet/przeniesiono",
         { method: "POST", body: JSON.stringify(v) }),

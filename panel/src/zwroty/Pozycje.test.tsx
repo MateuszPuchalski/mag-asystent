@@ -10,6 +10,7 @@ import type { PozycjaZwrotu, Zwrot } from "../api/typy";
    `fetch`: test pilnuje, CO panel wysyła, a nie jak wygląda żądanie — od tego
    jest `api/klient.test.ts`. */
 const zaznacz = vi.fn();
+const naOutlet = vi.fn();
 const wskaz = vi.fn();
 const potwierdz = vi.fn(async (_v: { pozycjaId: number; twId: number | null; zrodlo: string }) => ({}));
 /* Otwarte pudła — przy kilku ocena pyta, do którego (0.379.0). Stan jest
@@ -20,6 +21,7 @@ const pudla: { kosze: Array<{ id: number; kod: string; rodzaj: "zwroty" | "odpad
 vi.mock("../api/zwroty", async (orig) => ({
   ...(await orig<Record<string, unknown>>()),
   useZaznaczSkladnik: () => ({ mutate: zaznacz, isPending: false, error: null }),
+  useSkladnikNaOutlet: () => ({ mutate: naOutlet, isPending: false, error: null }),
   useWskazSklad: () => ({ mutate: wskaz, isPending: false, error: null }),
   useKosz: () => ({ data: pudla }),
   usePotwierdzKartoteke: () => ({ mutate: vi.fn(), mutateAsync: potwierdz, isPending: false, error: null }),
@@ -301,6 +303,25 @@ describe("Produkty ze zwrotu", () => {
       .toEqual([false, true, false]);
   });
 
+  it("drobne działania stoją w JEDNYM rzędzie pod oceną, nie w słupku", () => {
+    /* Trzy linie samych odnośników przytłaczały decyzję. Wspólny rodzic to
+       rząd decyzji; formularze i bloki biorą w nim całą szerokość. */
+    lista(zwrot({ kubelek: "zwrot", pozycje: [POZYCJA({ ocena: "stan", ilosc: 2 })] }),
+      { onPotracenie: vi.fn(), onIlosc: vi.fn() });
+    const rzad = screen.getByRole("button", { name: /oddaj mniej/ }).parentElement!;
+    expect(rzad).toContainElement(screen.getByRole("button", { name: /cofnij ocenę/ }));
+    expect(rzad).toContainElement(screen.getByRole("button", { name: /wróciło mniej/ }));
+    /* Rodzic był kiedyś słupkiem; rząd poznaje się po zawijaniu. */
+    expect(rzad.className).toMatch(/\bflex-wrap\b/);
+  });
+
+  it("brak kartoteki stoi znacznikiem w rzędzie stanów, obok rabatu", () => {
+    lista(zwrot({ pozycje: [POZYCJA()] }));
+    const rzad = screen.getByText("Bez kartoteki").parentElement!.parentElement!;
+    expect(rzad).toContainElement(screen.getByRole("button", { name: "ZGŁOŚ RABAT" }));
+    expect(rzad).toContainElement(screen.getByRole("button", { name: "wskaż kartotekę" }));
+  });
+
   it("kartoteka zawsze niesie źródło: zatwierdzona, proponowana albo żadna", () => {
     /* §11.3 żąda widocznego źródła i pewności, a §4.3 nie pozwala, żeby wybór
        automatu udawał fakt z Allegro. */
@@ -512,8 +533,8 @@ describe("Pozycja dopisana przez biuro", () => {
     lista(zwrot({ kubelek: "zwrot", pozycje: [
       POZYCJA({ id: 1, ocena: "stan", wKoszyku: false, twId: null }),
     ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
-      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: false },
-      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2, wKoszyku: false },
+      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: false, naOutlet: false, outletAt: null },
+      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2, wKoszyku: false, naOutlet: false, outletAt: null },
     ] } } });
     expect(screen.getByText(/SEK-01 × 1, REK-02 × 2/)).toBeInTheDocument();
     /* Po nazwie, nie po liczbie: w wierszu stoją też pola wyboru pozycji
@@ -530,8 +551,8 @@ describe("Pozycja dopisana przez biuro", () => {
     lista(zwrot({ kubelek: "zwrot", pozycje: [
       POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: null }),
     ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
-      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true },
-      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2, wKoszyku: true },
+      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true, naOutlet: false, outletAt: null },
+      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2, wKoszyku: true, naOutlet: false, outletAt: null },
     ] } } });
     const sekator = screen.getByRole("checkbox", { name: /SEK-01/ }) as HTMLInputElement;
     const rekawice = screen.getByRole("checkbox", { name: /REK-02/ }) as HTMLInputElement;
@@ -548,8 +569,8 @@ describe("Pozycja dopisana przez biuro", () => {
     lista(zwrot({ kubelek: "zwrot", pozycje: [
       POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: null }),
     ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
-      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true },
-      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2, wKoszyku: false },
+      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true, naOutlet: false, outletAt: null },
+      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2, wKoszyku: false, naOutlet: false, outletAt: null },
     ] } } });
     expect(screen.getByText("REK-02")).toBeInTheDocument();
     expect((screen.getByRole("checkbox", { name: /SEK-01/ }) as HTMLInputElement).checked)
@@ -563,7 +584,7 @@ describe("Pozycja dopisana przez biuro", () => {
     lista(zwrot({ kubelek: "zwrot", pozycje: [
       POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: 55, twSymbol: "SEK-01" }),
     ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
-      { twId: 55, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true },
+      { twId: 55, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true, naOutlet: false, outletAt: null },
     ] } } });
     expect(screen.queryByText(/Do koszyka z paragonu/)).toBeNull();
   });
@@ -645,9 +666,71 @@ describe("Ręczne wskazanie składu (0.336.0)", () => {
     lista(zwrot({ kubelek: "zwrot", pozycje: [
       POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: 55, twSymbol: "SEK-01" }),
     ] }), { sklady: { 1: { zrodlo: "paragon", powod: null, skladniki: [
-      { twId: 55, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true },
+      { twId: 55, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true, naOutlet: false, outletAt: null },
     ] } }, wierszeDokumentu: WIERSZE });
     expect(screen.queryByRole("button", { name: /wskaż skład ręcznie/ })).toBeNull();
+  });
+});
+
+/* Komplet wraca nieraz pół na pół: jedna część fabryczna na MM, druga używana
+   na regał. Pieniądze idą w całości, więc to wyłącznie droga towaru. */
+describe("Składnik kompletu na outlet", () => {
+  const SKLAD = (rek: { naOutlet?: boolean; outletAt?: string | null } = {}) => ({
+    1: { zrodlo: "paragon" as const, powod: null, skladniki: [
+      { twId: 21, symbol: "SEK-01", nazwa: "Sekator", ilosc: 1, wKoszyku: true,
+        naOutlet: false, outletAt: null },
+      { twId: 23, symbol: "REK-02", nazwa: "Rękawice", ilosc: 2, wKoszyku: !rek.naOutlet,
+        naOutlet: rek.naOutlet ?? false, outletAt: rek.outletAt ?? null },
+    ] },
+  });
+  const wKoszyku = () => zwrot({ kubelek: "zwrot", pozycje: [
+    POZYCJA({ id: 1, ocena: "stan", wKoszyku: true, twId: null }),
+  ] });
+
+  it("przycisk „na outlet” woła hak ze składnikiem i stanem docelowym", async () => {
+    naOutlet.mockClear();
+    lista(wKoszyku(), { sklady: SKLAD() });
+    await userEvent.click(screen.getByRole("button", { name: "REK-02 na outlet" }));
+    expect(naOutlet).toHaveBeenCalledWith(
+      { pozycjaId: 1, twId: 23, naOutlet: true, zwrotId: 1 });
+  });
+
+  it("składnik na outlecie ma znacznik, wyłączony ptaszek i „cofnij”", async () => {
+    naOutlet.mockClear();
+    lista(wKoszyku(), { sklady: SKLAD({ naOutlet: true }) });
+    const rekawice = screen.getByRole("checkbox", { name: /REK-02/ }) as HTMLInputElement;
+    expect([rekawice.checked, rekawice.disabled]).toEqual([false, true]);
+    expect(screen.queryByRole("button", { name: "REK-02 na outlet" })).toBeNull();
+    /* Drugi składnik dalej może iść na regał — przycisk zostaje przy nim. */
+    expect(screen.getByRole("button", { name: "SEK-01 na outlet" })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /cofnij outlet REK-02/ }));
+    expect(naOutlet).toHaveBeenCalledWith(
+      { pozycjaId: 1, twId: 23, naOutlet: false, zwrotId: 1 });
+  });
+
+  it("składnik, który już stoi na regale, nie daje się cofnąć", () => {
+    lista(wKoszyku(), { sklady: SKLAD({ naOutlet: true, outletAt: "2026-10-06T09:00:00Z" }) });
+    expect(screen.getByText("stoi na regale")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /cofnij outlet/ })).toBeNull();
+  });
+
+  it("znacznik oceny liczy składniki odłożone na outlet", () => {
+    lista(wKoszyku(), { sklady: SKLAD({ naOutlet: true }) });
+    expect(screen.getByText(/Ocena: Na stan/).parentElement)
+      .toHaveTextContent(/w koszyku zwrotów\s*· 1 na outlet/);
+  });
+
+  it("bez składnika na outlecie znacznik oceny o outlecie milczy", () => {
+    lista(wKoszyku(), { sklady: SKLAD() });
+    expect(screen.getByText(/Ocena: Na stan/).parentElement).not.toHaveTextContent(/na outlet/);
+  });
+
+  it("plan składu przed oceną mówi, że używany składnik pójdzie na outlet", () => {
+    lista(zwrot({ kubelek: "ocena", pozycje: [POZYCJA({ id: 1, twId: null })] }),
+      { sklady: SKLAD() });
+    expect(screen.getByText(/Do koszyka z paragonu/))
+      .toHaveTextContent(/Po ocenie „na stan” używany składnik odłożysz na outlet/);
   });
 });
 
