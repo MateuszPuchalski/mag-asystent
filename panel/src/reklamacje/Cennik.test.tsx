@@ -20,7 +20,8 @@ import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 const karta = vi.fn();
 vi.mock("../api/rozmowy", () => ({ useKartaTowaru: (twId: number | null) => karta(twId) }));
 
-const { Dowody } = await import("./Dowody");
+const { Fakty } = await import("../test/fakty");
+
 
 const CENY = [
   { poziom: 1, nazwa: "Detaliczna", nettoGrosze: 690, bruttoGrosze: 849, waluta: "PLN" },
@@ -47,7 +48,6 @@ const props = (r: Partial<Reklamacja> = {}) => ({
     reklamacja: rek(r), czat: [], zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [],
     droga: [], kartoteka: null, karta: null, zamowienie: null, przesylka: null,
   } as unknown as SzczegolReklamacji,
-  trwa: false, bladZapisu: "", onNotatka: vi.fn(),
 });
 
 beforeEach(() => {
@@ -55,9 +55,9 @@ beforeEach(() => {
   karta.mockReturnValue({ data: { ceny: CENY }, isLoading: false, error: null });
 });
 
-describe("Cennik Subiekta w kolumnie dowodów", () => {
-  it("stoi na wierzchu — BEZ otwierania zwijki, bo służy do triażu", () => {
-    render(<Dowody {...props()} />);
+describe("Cennik Subiekta w komórce „Klient zapłacił”", () => {
+  it("stoi na wierzchu — BEZ klikania, bo służy do triażu", () => {
+    render(<Fakty {...props()} />);
     /* Żadnego kliknięcia przed tą asercją i to jest cały jej sens. */
     expect(screen.getByText("Detaliczna")).toBeInTheDocument();
     expect(screen.getByText("8,49 PLN")).toBeInTheDocument();
@@ -68,18 +68,19 @@ describe("Cennik Subiekta w kolumnie dowodów", () => {
     /* Decyzja właściciela z 0.396.0: „wszystkie poziomy cen". Wybranie
        jednego za niego byłoby zgadywaniem, który cennik jest tym właściwym
        przy tej konkretnej reklamacji. */
-    render(<Dowody {...props()} />);
+    render(<Fakty {...props()} />);
     expect(screen.getAllByText(/PLN/).length).toBeGreaterThanOrEqual(4);
   });
 
   it("bez kartoteki MILCZY — pusta ramka to nie jest informacja", () => {
     karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
-    render(<Dowody {...props({ twId: null })} />);
-    expect(screen.queryByText(/Ceny · Subiekt GT/)).not.toBeInTheDocument();
+    render(<Fakty {...props({ twId: null })} />);
+    expect(screen.queryByText("Ceny")).not.toBeInTheDocument();
+    expect(screen.queryByText("Detaliczna")).not.toBeInTheDocument();
   });
 
   it("pyta o kartotekę POTWIERDZONĄ tej sprawy, a nie o cokolwiek", () => {
-    render(<Dowody {...props()} />);
+    render(<Fakty {...props()} />);
     expect(karta).toHaveBeenCalledWith(11);
   });
 });

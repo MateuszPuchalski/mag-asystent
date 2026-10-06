@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Kolejka } from "./Kolejka";
 import type { Kategoria, Kopilot, Rozmowa } from "../api/typy";
@@ -226,9 +226,13 @@ describe("plakietka należy się WYJĄTKOWI, nie normie", () => {
        wraca wtedy, gdy zegara nie ma i jest jedynym czasem w wierszu. */
     /* Pytamy WIERSZ, nie ekran: data synchronizacji stoi w nagłówku kolejki
        i ma tam zostać — to inny fakt niż wiek ostatniej wiadomości. */
+    /* Data w wierszu jest krótka (`kiedy`), a pełna stoi w jej dymku — więc
+       pytamy o napis i dymki naraz. Rok w dymku nie zależy od dnia testu. */
     const wiersz = async (r: Rozmowa) => {
       const { container, unmount } = await pokazWszystkie([r]);
-      const tekst = container.querySelector("button[aria-current]")?.textContent ?? "";
+      const w = container.querySelector("button[aria-current]");
+      const dymki = [...(w?.querySelectorAll("[title]") ?? [])].map((e) => e.getAttribute("title"));
+      const tekst = `${w?.textContent ?? ""} ${dymki.join(" ")}`;
       unmount();
       return tekst;
     };
@@ -724,7 +728,7 @@ describe("wiersz w wariancie C", () => {
 
   it("bez zegara wiekiem jest data — w linii loginu, nie pod pytaniem", async () => {
     await pokazWszystkie([rozmowa({ status: "closed", czekaOdMs: null })]);
-    expect(screen.getByText("Kupujący 44300444").parentElement).toHaveTextContent(/2026/);
+    expect(within(screen.getByText("Kupujący 44300444").parentElement!).getByTitle(/2026/)).toBeInTheDocument();
   });
 
   it("pytanie ma do DWÓCH linii pod loginem, nie jedną uciętą", () => {
@@ -859,5 +863,43 @@ describe("Kolejka: ruch", () => {
     expect(klasa).toContain("motion-safe:animate-spin");
     expect(klasa).toContain("motion-reduce:opacity-40");
     expect(ikona().getAttribute("aria-busy")).toBe("true");
+  });
+});
+
+/* ── WIERSZ TRZYMA KRAWĘDZIE ─────────────────────────────────────────────────
+   Kolejkę czyta się w dół po dwóch krawędziach: lewej (znak i login) i prawej
+   (wiek albo data). Kropka w linii przesuwała lewą, a pełna data rozpychała
+   prawą i ścinała login. jsdom nie liczy układu, więc lewą krawędź pilnujemy
+   parą klas, która ją niesie. */
+describe("wiersz trzyma krawędzie", () => {
+  afterEach(() => { vi.useRealTimers(); });
+
+  it("kropka nieprzeczytanej wisi na marginesie, nie w linii loginu", () => {
+    pokaz([rozmowa({ nieprzeczytana: true })]);
+    const kropka = screen.getByTitle("Nieprzeczytana wiadomość");
+    /* Ujemny margines wyciąga kropkę przed znak, a szerszy lewy margines
+       wiersza daje jej miejsce. Jedno bez drugiego wbija ją w belkę. */
+    expect(kropka.className).toMatch(/(^|\s)-ml-3(\s|$)/);
+    expect(kropka.className).toMatch(/(^|\s)-mr-1(\s|$)/);
+    expect(kropka.closest("button")!.className).toMatch(/\bpl-5\b/);
+    /* Rachunek marginesów zakłada odstęp linii `gap-2`. Inny odstęp rozjedzie
+       krawędź loginów przy zielonych klasach kropki. */
+    expect(kropka.parentElement!.className).toMatch(/\bgap-2\b/);
+  });
+
+  it("data bez zegara jest krótka, a pełna stoi w dymku", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date(2026, 8, 2, 10, 0));
+    const o = (rok: number, m: number, d: number, g: number, min: number) =>
+      new Date(rok, m, d, g, min).toISOString();
+    await pokazWszystkie([
+      rozmowa({ id: 1, klient: "klient_dzis", status: "closed", ostatniaWiadomoscAt: o(2026, 8, 2, 7, 5) }),
+      rozmowa({ id: 2, klient: "klient_wczoraj", status: "closed", ostatniaWiadomoscAt: o(2026, 8, 1, 23, 50) }),
+      rozmowa({ id: 3, klient: "klient_dawny", status: "closed", ostatniaWiadomoscAt: o(2026, 7, 28, 9, 0) }),
+    ]);
+    const data = (login: string) => within(screen.getByText(login).parentElement!).getByTitle(/2026/);
+    expect(data("klient_dzis")).toHaveTextContent(/^07:05$/);
+    expect(data("klient_wczoraj")).toHaveTextContent(/^wczoraj$/);
+    expect(data("klient_dawny")).toHaveTextContent(/^28\.08$/);
   });
 });

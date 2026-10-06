@@ -10,6 +10,30 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.568.0 — 6 października 2026
+
+**Sekcja „Praca biura" zeszła też z dyskusji.** Tagów i notatki nie zmienia
+się już na ekranie dyskusji, tak samo jak przy reklamacji.
+
+**Błąd przy „Prowadzę tę sprawę" widać przy samym przycisku.**
+
+**Loginy w skrzynce stoją w jednej linii.** Pomarańczowa kropka nowej
+wiadomości przeszła na lewy margines, więc nie przesuwa już loginu. Listę
+czyta się w dół jednym ruchem oka.
+
+**Krótsza data w wierszu.** Zamiast „5.10.2026, 15:32" stoi „15:32",
+„wczoraj" albo „04.10". Pełna data pokazuje się po najechaniu kursorem.
+
+**Fakty reklamacji stoją na górze sprawy.** Stan, data zakupu, kwota,
+dostawca, paczka i zamówienie stoją jednym pasem nad rozmową, bez klikania.
+Te same informacje nie powtarzają się już w kilku miejscach.
+
+**Rozmowa w reklamacji jest szersza.** Prawa kolumna to dowody, a pod nimi
+werdykt.
+
+**Sekcja „Praca biura" zeszła z reklamacji.** Tagów i notatki nie zmienia się
+już na ekranie reklamacji.
+
 ## 0.567.0 — 5 października 2026
 
 **Klient na czele reklamacji.** Głowica sprawy zaczyna się od loginu klienta,

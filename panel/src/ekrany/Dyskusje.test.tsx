@@ -55,6 +55,8 @@ const scena = vi.hoisted(() => ({
   mutacje: [] as string[],
   stan: {} as Record<string, unknown>,
   czat: [] as unknown[],
+  /* Błąd „prowadzę" — `null` znaczy, że serwer przyjął. */
+  bladProwadze: null as Error | null,
 }));
 
 /* Tożsamość zalogowanego — bez niej sita „Moje" nie ma w drzewie. */
@@ -65,13 +67,6 @@ vi.mock("../api/rozmowy", async () => {
     useJa: () => ({ data: { user: { userId: 7, name: "A. Lewandowska", role: "biuro" } } }),
   };
 });
-
-vi.mock("../api/tagi", () => ({
-  useTagi: () => ({ data: { tagi: [{ id: 11, nazwa: "czeka na część", aktywny: true }] } }),
-  useNowyTag: () => ({ mutate: () => {}, isPending: false }),
-  usePrzypnijTag: () => ({ mutate: () => {}, isPending: false }),
-  useOdepnijTag: () => ({ mutate: () => {}, isPending: false }),
-}));
 
 /* Załączniki wychodzące dyskusji idą trasami reklamacji (0.486.0). Atrapa
    notuje wywołania w tej samej scenie, więc „zero zapisu przy otwarciu”
@@ -122,8 +117,15 @@ vi.mock("../api/dyskusje", async () => {
         zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [],
       },
     }),
-    useProwadzeDyskusje: mutacja("prowadze"),
-    useNotatkaDyskusji: mutacja("notatka"),
+    /* „Prowadzę" ma własny podrabiacz: jego błąd wraca do ekranu przez
+       `onError`, a test pilnuje, gdzie go widać. */
+    useProwadzeDyskusje: () => ({
+      mutate: (v: unknown, o?: { onError?: (e: Error) => void }) => {
+        scena.mutacje.push(`prowadze:${JSON.stringify(v)}`);
+        if (scena.bladProwadze) o?.onError?.(scena.bladProwadze);
+      },
+      isPending: false, error: null,
+    }),
     useOdpowiedzWDyskusji: mutacja("odpowiedz"),
     useZakoncz: mutacja("zakoncz"),
     useOdswiezDyskusje: mutacja("odswiez"),
@@ -161,7 +163,10 @@ function pokaz(adres = "/obsluga/dyskusje", czat: WiadomoscReklamacji[] = [wiad(
 
 /* Sito „Moje" pamięta wybór w przeglądarce — bez sprzątania jeden test
    włączałby filtr następnemu. */
-afterEach(() => { try { localStorage.clear(); } catch { /* prywatne okno */ } });
+afterEach(() => {
+  scena.bladProwadze = null;
+  try { localStorage.clear(); } catch { /* prywatne okno */ }
+});
 
 describe("Ekran dyskusji", () => {
   /* ── ZERO ZAPISU PRZY PATRZENIU, Z TYM SAMYM WYJĄTKIEM CO REKLAMACJE ─────
@@ -210,6 +215,16 @@ describe("Ekran dyskusji", () => {
     const wiersz = odswiez.parentElement!;
     expect(wiersz).toContainElement(screen.getByRole("button", { name: /Prowadzę tę sprawę/ }));
     expect(wiersz).toContainElement(screen.getByRole("button", { name: /Poproś o zakończenie/ }));
+  });
+
+  it("błąd „prowadzę” stoi przy samym przycisku, nie w kolumnie faktów", async () => {
+    /* Do zdjęcia „Pracy biura" ten błąd wypisywało tylko pole notatki. Bez
+       niego odmowa serwera zniknęłaby po cichu, a agent myślałby, że prowadzi. */
+    scena.bladProwadze = new Error("Sprawę prowadzi już ktoś inny.");
+    pokaz("/obsluga/dyskusje/1", [wiad()]);
+    const przycisk = screen.getByRole("button", { name: /Prowadzę tę sprawę/ });
+    await userEvent.click(przycisk);
+    expect(przycisk.parentElement!.parentElement!).toHaveTextContent("Sprawę prowadzi już ktoś inny.");
   });
 
   it("odpowiedź w dyskusji niesie załączniki: spinacz i zdjęcie pliku z tej sprawy", async () => {

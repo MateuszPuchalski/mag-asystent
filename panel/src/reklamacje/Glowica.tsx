@@ -3,7 +3,7 @@ import { Link as RouterLink } from "react-router-dom";
 import { ExternalLink, UserRound } from "lucide-react";
 import type { SzczegolReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
-import { czas, ile, LoginKlienta, Skopiuj } from "../ui";
+import { czas, LoginKlienta, Skopiuj } from "../ui";
 import { Prowadzi } from "../sprawy/Prowadzi";
 import { mojaSprawa } from "../sprawy/Moje";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
@@ -11,10 +11,11 @@ import { PrzyciskTowaru } from "../towar/Szuflada";
 import { OCZEKIWANIA, POWODY } from "./Kolejka";
 import { PRAWO } from "./statusy";
 import { coSieDzieje, ileReklamacji, tytulStatusu, type Czlon, type Ton } from "./etap";
+import { FaktySprawy } from "./Fakty";
 
-/* ── Głowica sprawy: kto, co się dzieje, o co chodzi ─────────────────────────
+/* ── Głowica sprawy: kto, co się dzieje, o co chodzi, fakty ──────────────────
    Jeden pas na całą szerokość obszaru sprawy, nad rozmową, dowodami
-   i faktami. Czyta się go z góry na dół w trzech warstwach.
+   i werdyktem. Czyta się go z góry na dół w czterech warstwach.
 
    KTO. Uwaga właściciela: „Client powinien być bardziej widoczny". Login
    stoi pierwszy, w 17 px, bo to klucz klienta w całej drodze, a nie podpis
@@ -25,17 +26,19 @@ import { coSieDzieje, ileReklamacji, tytulStatusu, type Czlon, type Ton } from "
    i termin, potem rozmowa i towar. Surowy status Allegro zostaje pod
    kursorem zdania A, bo na ekranie stoją słowa, nie kody.
 
-   O CO CHODZI. Pod kreską towar z symbolem i żądanie klienta. Nazwa towaru
-   stoi w 14 px, bo 17 px należy do klienta, a tożsamość towaru niesie też
-   zdjęcie w kolumnie dowodów.
+   O CO CHODZI. Pod kreską towar z symbolem i jego historią reklamacji oraz
+   żądanie klienta. Nazwa towaru stoi w 14 px, bo 17 px należy do klienta,
+   a tożsamość towaru niesie też zdjęcie w kolumnie dowodów.
 
-   Numer reklamacji i data zgłoszenia stoją w prawej szczelinie pod
-   „Prowadzi”. To ich jedyny dom: kolumna faktów ich nie powtarza, bo
-   uwaga właściciela brzmiała „informacje powtarzają się”.
+   FAKTY. Pas komórek z `Fakty.tsx` na całą szerokość. Decyzja właściciela:
+   fakty do decyzji stoją tutaj, a te same informacje łączą się w jedną.
+
+   Numer reklamacji, data zgłoszenia i odnośniki do Allegro stoją w prawej
+   szczelinie pod „Prowadzi”. To ich jedyny dom, bo uwaga właściciela
+   brzmiała „informacje powtarzają się”.
 
    ZDJĘĆ TU NIE MA. Obraz oferty i kartoteki stoi w kolumnie zdjęć pod
-   „Wysłaliśmy", obok tego, co przysłał klient — tam się je porównuje.
-   Cena też nie: ile kosztowało, mówią kostki faktów po prawej. */
+   „Wysłaliśmy", obok tego, co przysłał klient — tam się je porównuje. */
 
 /* ── JEDNA KARTOTEKA NA CAŁĄ SPRAWĘ ──────────────────────────────────────────
    Symbol w głowicy z przekrojem towaru, kafel pod „Wysłaliśmy", fakty
@@ -104,17 +107,20 @@ const Czlony = ({ czlony }: { czlony: Czlon[] }) => <>
 /** Kropka między członami — dla oka, nie dla czytnika ekranu. */
 const Kropka = () => <span aria-hidden="true" className="text-slate-500">·</span>;
 
-export function Glowica({ szczegol, mojeId = null, trwa, blad = "", onProwadze, onPokazZakup }: {
+export function Glowica({
+  szczegol, mojeId = null, trwa, blad = "", onProwadze,
+  onSprawdzPrzesylke, sprawdzaPrzesylke = false, bladPrzesylki = "",
+}: {
   szczegol: SzczegolReklamacji;
   /** Konto patrzącego — po nim „Ty" i „Odłóż sprawę" zamiast cudzego imienia. */
   mojeId?: number | null;
   trwa: boolean;
   blad?: string;
   onProwadze: () => void;
-  /* Przewinięcie do zwijki „Ten zakup u nas" i jej otwarcie. Opcjonalne tym
-     samym wzorcem co reszta: bez procedury wskaźnik zostaje zdaniem, a nie
-     martwym przyciskiem. */
-  onPokazZakup?: () => void;
+  /** Pytanie Allegro o paczkę — jawnym kliknięciem w komórce „Paczka". */
+  onSprawdzPrzesylke?: () => void;
+  sprawdzaPrzesylke?: boolean;
+  bladPrzesylki?: string;
 }) {
   const r = szczegol.reklamacja;
   const numer = r.numer ?? r.externalId;
@@ -128,10 +134,10 @@ export function Glowica({ szczegol, mojeId = null, trwa, blad = "", onProwadze, 
      „nie wiemy", nie wywracać głowicy. `null` serwer daje też przy zerze,
      więc ekran nigdy nie mówi „pierwsza reklamacja". */
   const historiaKlienta = szczegol.historia?.klient ?? null;
-  const otwarteRodzenstwo = (szczegol.sprawy ?? []).filter((s) => s.otwarta).length;
-  const rodzenstwo = otwarteRodzenstwo > 0
-    ? `jeszcze ${ile(otwarteRodzenstwo, "otwarta sprawa", "otwarte sprawy", "otwartych spraw")} tego zakupu`
-    : null;
+  /* Historia TOWARU stoi przy jego nazwie, klienta — przy loginie. Jeden dom
+     na fakt, a każdy obok tego, czego dotyczy. Brak historii nie rysuje się:
+     pierwsza sprawa przy tym towarze nie jest informacją o towarze. */
+  const historiaTowaru = szczegol.historia?.towar ?? null;
 
   return <div className="flex flex-wrap items-start gap-x-6 gap-y-2 px-5 py-3">
     <div className="flex min-w-0 flex-[999_1_24rem] flex-col gap-1">
@@ -157,17 +163,6 @@ export function Glowica({ szczegol, mojeId = null, trwa, blad = "", onProwadze, 
             {historiaKlienta && <>
               <Kropka />
               <span>jeszcze {ileReklamacji(historiaKlienta, " u nas")}</span>
-            </>}
-            {rodzenstwo && <>
-              <Kropka />
-              {/* Inna otwarta sprawa tego zakupu to klient, który czeka też
-                  gdzie indziej. Wskaźnik tylko przewija do listy i ją otwiera,
-                  niczego nie zapisuje. */}
-              {onPokazZakup
-                ? <button type="button" onClick={onPokazZakup}
-                    className="min-h-6 font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
-                    {rodzenstwo} <span aria-hidden="true">↓</span></button>
-                : <span className="font-semibold">{rodzenstwo}</span>}
             </>}
           </div>
         /* Brak loginu mówi o sobie: pusty slot czytałby się jak awaria, a to
@@ -201,6 +196,7 @@ export function Glowica({ szczegol, mojeId = null, trwa, blad = "", onProwadze, 
             /* Przy braku stoi ZDANIE serwera, nie kod powodu: `powod` jest
                kluczem dla liczników, a agent ma przeczytać, które ogniwo pękło. */
             : <span>{szczegol.kartoteka?.zrodlo ?? "bez kartoteki"}</span>}
+          {historiaTowaru && <><Kropka /><span>ten towar: {ileReklamacji(historiaTowaru)}</span></>}
         </span>
       </p>
       <p className="text-sm text-slate-700">
@@ -214,7 +210,7 @@ export function Glowica({ szczegol, mojeId = null, trwa, blad = "", onProwadze, 
     </div>
 
     {/* ── PRAWA SZCZELINA: KTO PROWADZI, NUMER I ZGŁOSZENIE ────────────────
-        Wzięcie sprawy jest CZYNNOŚCIĄ, więc stoi w głowicy, a nie w kolumnie
+        Wzięcie sprawy jest CZYNNOŚCIĄ, więc stoi w szczelinie, a nie w pasie
         faktów. Własną sprawę da się odłożyć tym samym przyciskiem, bo serwer
         zdejmuje znacznik drugim kliknięciem. Numer i data zgłoszenia stoją
         pod spodem: to fakty do skopiowania, nie do decyzji. */}
@@ -233,6 +229,43 @@ export function Glowica({ szczegol, mojeId = null, trwa, blad = "", onProwadze, 
           <ExternalLink size={12} aria-hidden="true" /></a>}
       </p>
       <p className="text-xs text-slate-600">zgłoszona {czas(r.otwartoAt)}</p>
+      {/* Odnośniki do Allegro stoją przy numerze, bo to ten sam rodzaj
+          rzeczy: identyfikator do skopiowania i drzwi do panelu Allegro.
+          Bez łącza numer stoi na widoku — identyfikator tylko w podpowiedzi
+          nie istnieje dla klawiatury i dotyku. */}
+      <p className="flex flex-wrap items-center justify-end gap-x-3 text-xs">
+        {r.orderId
+          ? <span className="inline-flex items-center gap-1">
+              <LinkAllegro href={r.linkZamowienia} title={`Zamówienie ${r.orderId}`} nazwa="zamówienie w Allegro">
+                {r.linkZamowienia ? "zamówienie" : <span className="font-mono">{r.orderId}</span>}</LinkAllegro>
+              <Skopiuj tekst={r.orderId} tytul="Kopiuj numer zamówienia" />
+            </span>
+          : <span className="text-slate-600">bez numeru zamówienia</span>}
+        {r.offerId && (r.linkOferty
+          ? <LinkAllegro href={r.linkOferty} title={`Oferta ${r.offerId}`} nazwa="oferta w Allegro">oferta</LinkAllegro>
+          : <span>oferta <span className="font-mono">{r.offerId}</span></span>)}
+      </p>
+    </div>
+
+    <div className="min-w-0 basis-full">
+      <FaktySprawy szczegol={szczegol} towar={towar} onSprawdzPrzesylke={onSprawdzPrzesylke}
+        sprawdzaPrzesylke={sprawdzaPrzesylke} bladPrzesylki={bladPrzesylki} />
     </div>
   </div>;
 }
+
+/**
+ * Odnośnik do Allegro z ikoną wyjścia; bez adresu zostaje sam tekst.
+ *
+ * Na widoku krótko, bo szczelina jest wąska. Czytnik ekranu dostaje pełną
+ * nazwę z celem: na liście odnośników samo „oferta" nie mówi, dokąd prowadzi.
+ * Pełna nazwa zaczyna się od widocznego słowa (WCAG 2.5.3).
+ */
+const LinkAllegro = ({ href, title, nazwa, children }: {
+  href: string | null; title?: string; nazwa?: string; children: React.ReactNode;
+}) =>
+  href
+    ? <a href={href} target="_blank" rel="noopener noreferrer" title={title} aria-label={nazwa}
+        className="inline-flex min-h-6 items-center gap-1 font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
+        {children}<ExternalLink size={12} aria-hidden="true" /></a>
+    : <span title={title}>{children}</span>;

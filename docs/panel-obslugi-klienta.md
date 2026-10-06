@@ -1034,6 +1034,17 @@ chodzi teraz tylko przy statusach naszego ruchu. Data ostatniej wiadomości
 ustępuje mu miejsca, bo przy „czeka na nas" oba znaczniki opisują tę samą
 wiadomość. Gdy zegara nie ma, data wraca.
 
+**Wiersz trzyma dwie krawędzie (0.568.0).** Kolejkę czyta się w dół: lewą
+krawędzią po loginach, prawą po wieku. Kropka nieprzeczytanego stała w linii
+i przesuwała znak oraz login o 16 px, więc lewa krawędź skakała. Kropka wisi
+teraz na lewym marginesie, bliżej znaku niż belki zaznaczenia. Otwarcie rozmowy
+nie zdejmuje flagi, więc wybrany wiersz bywa nieprzeczytany. Data bez zegara
+jest krótka: „15:32", „wczoraj" albo „04.10". Pełna data ścinała login o rok
+i godzinę sprzed dni, których w tej kolumnie nikt nie czyta. Rok wraca przy
+wiadomości z poprzedniego roku, bo bez niego to inna data. Pełną chwilę
+pokazuje dymek. Ładny wiersz jest tu tym samym, co wiersz czytany jednym
+ruchem oka.
+
 **Stan spoczynku Copilota nie dostaje pasma (0.251.0).** Wyłączony Copilot i
 rozpoznany kubełek zajmowały po pełnym paśmie, żeby donieść o braku roboty.
 Oba fakty niesie teraz znak w nagłówku kolejki, w podpowiedzi i w `aria-label`.
@@ -5633,6 +5644,9 @@ a schowane przypomnienie to znowu pamiętanie.
 
 ### 25b.3b. Tagi spraw (0.279.0)
 
+Od 0.568.0 tagu reklamacji nie przypina się na ekranie sprawy — patrz
+§25b.10. Kolejka dalej pokazuje tagi przypięte wcześniej.
+
 Ta sama prośba właściciela, co przy sicie: łatwiej znaleźć swoje sprawy. Sito
 odpowiada na pytanie „czyje to", tag na pytanie „o czym to" — najczęściej
 „czego ta sprawa czeka".
@@ -5678,6 +5692,9 @@ panelu przypuszczenie maszyny, a tag jest zdaniem człowieka; bursztyn jest
 tłem marki i zaznaczeniem wiersza.
 
 ### 25b.3c. Notatka i jej droga powrotna (0.280.0)
+
+Od 0.568.0 notatki reklamacji nie pisze się na ekranie sprawy — patrz
+§25b.10. Szukanie w kolejce dalej czyta notatki zapisane wcześniej.
 
 §25a.5 mówi: cofnięcie zamiast potwierdzenia, wszędzie, gdzie da się cofnąć.
 Przy reklamacji ta zasada stała dotąd odwrócona (§25b.8), bo wszystko, co
@@ -6088,6 +6105,35 @@ Odpowiedź: wzorzec zgadnięty z analogii do zwrotu NIE otwierał niczego —
 sprawa ma własną stronę `/claims/{uuid}?sellerId={id}`, a numer czytelny
 w adresie jest bezużyteczny.
 
+### 25b.10. Fakty w głowicy, werdykt pod dowodami (0.568.0)
+
+Decyzja właściciela: „Praca biura" odchodzi, fakty z prawej kolumny idą do
+głowicy, a te same informacje łączą się w jedną. Powód: fakt do decyzji ma
+stać nad całą sprawą, a nie w kolumnie, którą trzeba przewijać.
+
+- **Pas komórek w głowicy** (`reklamacje/Fakty.tsx`): Mamy, Kupione, Klient
+  zapłacił, Dostawca, Paczka do klienta i Zamówienie. Pod nim „Ten zakup
+  u nas". Zwijek nie ma, więc wszystko widać bez klikania.
+- **Połączone fakty.** Bez kartoteki „Mamy" i „Dostawca" stają jedną komórką,
+  bo brak kartoteki mówi już wiersz towaru. Kwota równa żądaniu stoi raz,
+  w zdaniu „Chce:", a komórka mówi „tyle, ile żąda". Historia towaru stoi przy
+  jego nazwie. Odnośniki do zamówienia i oferty stoją przy numerze reklamacji.
+- **Cenniki sprzedaży** stoją w komórce „Klient zapłacił", obok naszego
+  zakupu. Półka stoi pod stanem w komórce „Mamy".
+- **Prawa kolumna** to dowody, a pod nimi werdykt. Rozmowa dostała szerokość,
+  którą zajmowała kolumna faktów.
+- **Zeszło:** „Praca biura" (tagi i notatka sprawy) oraz wskaźnik „jeszcze
+  N spraw tego zakupu ↓". Dane i trasy serwera zostają.
+
+**Dyskusja tak samo.** Decyzją właściciela „Praca biura" zeszła też z ekranu
+dyskusji, bo oba ekrany mają zostać bliźniacze. Błąd „prowadzę" stoi tam przy
+samym przycisku, bo dotąd wypisywało go tylko pole notatki.
+
+**Otwarte do decyzji właściciela.** Kolejki reklamacji i dyskusji dalej
+pokazują tagi przypięte wcześniej i szukają po starych notatkach. Notatki tej
+na ekranie sprawy nie widać, a numeru sprawy Allegro biuro nie ma już gdzie
+zapisać tak, żeby kolejka go znalazła.
+
 ## 25c. Dyskusje
 
 Zaprojektowane 9 września 2026, zbudowane w 0.245.0. Jeden przyrost, nie trzy:
@@ -6111,8 +6157,8 @@ ostatniej wypowiedzi w 61 sprawach na 100. To przypadek typowy, nie brzegowy.
 
 ### 25c.2. Co panel dokłada
 
-To samo, czego Centrum Sprzedaży nie daje: kolejkę z porządkiem, właściciela
-sprawy i notatkę z ustaleń. Panel niczego tu nie spina z Subiektem — dyskusja
+To samo, czego Centrum Sprzedaży nie daje: kolejkę z porządkiem i właściciela
+sprawy. Notatka z ustaleń zeszła w 0.568.0 (§25b.10). Panel niczego tu nie spina z Subiektem — dyskusja
 żyje w całości w Allegro.
 
 ### 25c.3. Kolejka bramek
@@ -6203,8 +6249,8 @@ jako nieobecne przy dyskusji. Zamiast obrazu stoi numer zamówienia.
 
 **Kolumna faktów jest chudsza i ma to powiedzieć.** Dyskusja nie niesie powodu,
 oczekiwania, prawa ani kwoty. Zostaje kupujący, zamówienie razem ze zwrotami
-tego samego zamówienia, data otwarcia, status, załączniki, notatka biura i „kto
-prowadzi". Puste miejsce po polach, których nie ma, byłoby gorsze od zdania.
+tego samego zamówienia, data otwarcia, status i załączniki. Notatka biura
+zeszła w 0.568.0 (§25b.10), a „kto prowadzi" stoi nad rozmową. Puste miejsce po polach, których nie ma, byłoby gorsze od zdania.
 
 ### 25c.7. Odpowiedź w rozmowie
 
