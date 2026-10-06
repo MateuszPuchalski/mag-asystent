@@ -268,6 +268,39 @@ describe("Produkty ze zwrotu", () => {
     expect(screen.getByText(/za ciężki/)).toBeInTheDocument();
   });
 
+  /* ── POWÓD, KTÓRY COŚ ZARZUCA, NIE GINIE W RZĘDZIE KODÓW ───────────────
+     Zgłoszenie właściciela: zdanie klienta stało szarą kursywą pod EAN-em
+     i oko je przeskakiwało, choć mówiło, czego szukać w kartonie. */
+  it("słowa klienta stoją w ramce powodu, także przy zwykłym powodzie", () => {
+    lista(zwrot({ pozycje: [POZYCJA({ powod: "MISTAKE",
+      powodKomentarz: "mam dwa złącza CDI" })] }));
+    const cytat = screen.getByText(/mam dwa złącza CDI/);
+    expect(cytat.tagName).toBe("BLOCKQUOTE");
+    expect(screen.getByText(/Powód zwrotu: pomyłka klienta/)).toBeInTheDocument();
+    /* Jeden powód, nie dwa: rząd szczegółów nie powtarza go obok ramki. */
+    expect(screen.getAllByText(/pomyłka klienta/)).toHaveLength(1);
+  });
+
+  it("powód-zarzut dostaje ramkę nawet bez słów klienta", () => {
+    lista(zwrot({ pozycje: [POZYCJA({ powod: "NOT_AS_DESCRIBED" })] }));
+    expect(screen.getByText(/Powód zwrotu: niezgodny z opisem/)).toBeInTheDocument();
+    expect(screen.getByText(/zarzut, nie rezygnacja/)).toBeInTheDocument();
+  });
+
+  it("zwykły powód bez słów klienta zostaje słowem w rzędzie szczegółów", () => {
+    lista(zwrot({ pozycje: [POZYCJA({ powod: "DONT_LIKE_IT" })] }));
+    expect(screen.getByTitle("Powód zwrotu")).toHaveTextContent("nie spodobał się");
+    expect(screen.queryByText(/Powód zwrotu:/)).toBeNull();
+  });
+
+  it("odznaczona przy wycenie pozycja ma przekreśloną cenę", async () => {
+    lista(zwrot({ kubelek: "zwrot" }));
+    await userEvent.click(screen.getByRole("checkbox", { name: "Oddaj: Filtr" }));
+    /* Trzecie „49,99" to suma do oddania pod listą — ona przekreślona nie jest. */
+    expect(screen.getAllByText("49,99 PLN").map((e) => e.className.includes("line-through")))
+      .toEqual([false, true, false]);
+  });
+
   it("kartoteka zawsze niesie źródło: zatwierdzona, proponowana albo żadna", () => {
     /* §11.3 żąda widocznego źródła i pewności, a §4.3 nie pozwala, żeby wybór
        automatu udawał fakt z Allegro. */

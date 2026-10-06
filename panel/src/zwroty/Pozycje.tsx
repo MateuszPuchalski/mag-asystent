@@ -1,5 +1,7 @@
 import React, { useMemo, useState, type MutableRefObject } from "react";
-import { Barcode, Check, CircleHelp, ExternalLink, Layers, Link2, Tag, X as Krzyzyk } from "lucide-react";
+import {
+  Barcode, Check, CircleHelp, ExternalLink, Layers, Link2, MessageSquareWarning, Tag, X as Krzyzyk,
+} from "lucide-react";
 import type { DoDopisania, Ocena, PozycjaZwrotu, SkladPozycji, WierszDokumentu, Zwrot } from "../api/typy";
 import {
   useKosz, usePotwierdzKartoteke, useWskazSklad, useZaznaczSkladnik, zlote,
@@ -41,6 +43,53 @@ const POWODY: Record<string, string> = {
   DIFFERENT: "inny towar", COUNTERFEIT: "podróbka", NOT_NEW: "towar nienowy",
   TOO_LARGE: "za duży", TOO_SMALL: "za mały", NOT_AS_EXPECTED: "inny niż oczekiwany",
   ORDERED_FOR_COMPARISON: "zamówiony na przymiarkę",
+};
+
+/* Powody ZWYKŁE: klient się rozmyślił i nic nie zarzuca towarowi. Przy nich
+   wystarczy słowo w rzędzie szczegółów, bo ocena idzie zwykłą drogą.
+
+   Każdy inny powód — wada, uszkodzenie, inny towar, spóźniona dostawa albo
+   kod, którego nie znamy — jest zarzutem wobec nas i zmienia to, jak ogląda
+   się karton. Szary rząd obok EAN-u gubi go w biegu, więc dostaje ramkę
+   pod kodami. Tak samo własne słowa klienta, bo bywają ważniejsze od pozycji
+   wybranej z listy. */
+const POWODY_ZWYKLE = new Set([
+  "NONE", "MISTAKE", "DONT_LIKE_IT", "TOO_LARGE", "TOO_SMALL",
+  "NOT_AS_EXPECTED", "ORDERED_FOR_COMPARISON",
+]);
+
+/** Czy powód pozycji zasługuje na ramkę zamiast słowa w rzędzie szczegółów. */
+export function powodWyrozniony(p: Pick<PozycjaZwrotu, "powod" | "powodKomentarz">): boolean {
+  return !!p.powodKomentarz?.trim() || (p.powod != null && !POWODY_ZWYKLE.has(p.powod));
+}
+
+/**
+ * Powód zwrotu w ramce: nazwa powodu i, gdy jest, zdanie klienta.
+ *
+ * Słowa klienta stoją pismem treści, nie podpisu: to najczęściej jedyne
+ * miejsce, z którego operator dowie się, czego szukać w kartonie
+ * („mam dwa złącza zamiast pięciu"). Kursywa i szarość czyta się jak
+ * przypis, a przypis oko przeskakuje.
+ */
+function PowodZwrotu({ p }: { p: PozycjaZwrotu }) {
+  const zarzut = p.powod != null && !POWODY_ZWYKLE.has(p.powod);
+  const komentarz = p.powodKomentarz?.trim();
+  return <div className="mt-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-950">
+    <p className="flex items-center gap-1.5 text-xs font-bold">
+      <MessageSquareWarning size={14} aria-hidden="true" className="shrink-0" />
+      <span>Powód zwrotu: {p.powod ? POWODY[p.powod] ?? p.powod : "nie podany"}</span>
+      {zarzut && <span className="font-normal">· zarzut, nie rezygnacja</span>}
+    </p>
+    {komentarz && <blockquote className="mt-1 break-words text-tresc">
+      <span className="sr-only">Klient pisze: </span>„{komentarz}"</blockquote>}
+  </div>;
+}
+
+/** Barwa znacznika zapisanej oceny: na stan dobrze, utylizacja źle, outlet obok. */
+const TON_OCENY: Record<string, string> = {
+  stan: "bg-emerald-50 text-emerald-800",
+  utylizacja: "bg-red-50 text-red-800",
+  outlet: "bg-sky-50 text-sky-900",
 };
 
 import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
@@ -466,12 +515,18 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
         </Przycisk>
       </div>}
     <ul className="space-y-2">
-      {zwrot.pozycje.map((p) => <li key={p.id} className="flex items-start gap-3 rounded-lg bg-slate-50 p-3">
+      {zwrot.pozycje.map((p) => {
+        /* Odznaczona przy wycenie pozycja NIE idzie do kwoty. Przerywana
+           ramka i przekreślona cena mówią to przy samym towarze, zanim suma
+           na dole zdąży zaskoczyć. */
+        const oddawana = !wycena || wybrane.includes(p.id);
+        return <li key={p.id} className={`flex items-start gap-3 rounded-xl border p-3 ${oddawana
+          ? "border-slate-200 bg-white" : "border-dashed border-slate-300 bg-slate-50"}`}>
         {/* Pole zaznaczenia stoi PRZED zdjęciem, w jednej kolumnie dla całej
             listy: odhaczanie idzie wtedy w dół jednym ruchem oka. */}
         {wycena && <input type="checkbox" className="mt-1 h-4 w-4 shrink-0"
           aria-label={`Oddaj: ${p.nazwa}`}
-          checked={wybrane.includes(p.id)} onChange={() => przelacz(p.id)} />}
+          checked={oddawana} onChange={() => przelacz(p.id)} />}
         {/* ── DWA ZDJĘCIA, DWA PYTANIA (0.213.0) ──────────────────────────
             Kafel kartoteki odpowiada „co mamy na półce", kafel oferty — „co
             klient widział, kupując". To nie jest powtórzenie: różnica między
@@ -503,8 +558,14 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             {p.zrodlo === "biuro" && <span
               className="shrink-0 rounded bg-sky-100 px-1.5 py-0.5 text-xs font-semibold text-sky-800">
               dopisane przez biuro</span>}
-            <span className="ml-auto shrink-0 tabular-nums">
-              {zlote(Math.round(p.cenaGrosze * p.ilosc), p.waluta)}</span>
+            {/* Cena jednostkowa pod sumą tylko przy kilku sztukach: przy jednej
+                to ta sama liczba drugi raz. */}
+            <span className="ml-auto shrink-0 text-right tabular-nums">
+              <span className={oddawana ? "font-semibold" : "text-slate-600 line-through"}>
+                {zlote(Math.round(p.cenaGrosze * p.ilosc), p.waluta)}</span>
+              {p.ilosc > 1 && <span className="block text-xs text-slate-500">
+                {p.ilosc} × {zlote(p.cenaGrosze, p.waluta)}</span>}
+            </span>
           </div>
           {/* ── SZCZEGÓŁY Z IKONAMI, JEDEN RZĄD (0.455.0) ─────────────────────
               Do 0.454.0 trzy linijki: „2 szt. · powód", „EAN … SKU …"
@@ -519,7 +580,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-600">
             <span title="Ilość w zwrocie" className="inline-flex items-center gap-1">
               <Layers size={13} aria-hidden="true" />{p.ilosc} szt</span>
-            {p.powod && <span title="Powód zwrotu" className="inline-flex items-center gap-1">
+            {p.powod && !powodWyrozniony(p) && <span title="Powód zwrotu" className="inline-flex items-center gap-1">
               <CircleHelp size={13} aria-hidden="true" />{POWODY[p.powod] ?? p.powod}</span>}
             {p.ean && <span title="EAN" className="inline-flex items-center gap-1">
               <Barcode size={13} aria-hidden="true" /><span className="sr-only">EAN </span>
@@ -538,8 +599,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                   <ExternalLink size={13} aria-hidden="true" />oferta</a>
               : <span title="Allegro nie podało adresu oferty" className="text-slate-500">bez adresu oferty</span>}
           </div>
-          {p.powodKomentarz && <p className="mt-1 text-xs italic text-slate-600">
-            „{p.powodKomentarz}"</p>}
+          {powodWyrozniony(p) && <PowodZwrotu p={p} />}
           {/* Kartoteka i rabat W JEDNYM RZĘDZIE znaczników (0.455.0). Rabat
               stoi przy POZYCJI, nie przy zwrocie: wniosek składa się na pozycję
               zamówienia, więc zwrot z dwiema pozycjami ma dwa osobne rabaty. */}
@@ -549,6 +609,13 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
               onZglos={() => onZglosRabat?.(p.id)} />
           </div>
 
+          {/* ── DECYZJA POD KRESKĄ ──────────────────────────────────────────
+              Nad kreską stoi to, CZYM jest towar i co o nim mówi klient. Pod nią
+              to, co z nim robimy: ocena, sztuki, potrącenie, skład. Bez kreski
+              znacznik oceny zlewa się z kodami i rabatem, a link „oddaj mniej"
+              wygląda jak dopisek do nich. `empty:hidden` zdejmuje kreskę tam,
+              gdzie żadnej decyzji nie ma. */}
+          <div className="mt-2 border-t border-slate-200 empty:hidden">
           {/* Ocena towaru: pytanie kubełka DO OCENY, zadane przy towarze,
               którego dotyczy. Zapisana ocena zostaje widoczna w każdym
               kubełku — to fakt o tej pozycji, nie stan ekranu. */}
@@ -583,9 +650,14 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                 </Przycisk>);
             })}
           </div>}
-          {p.ocena && <p className="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-ranga-ok">
-            <span>Ocena: {OCENY.find(([k]) => k === p.ocena)?.[2] ?? p.ocena}
-              {p.ocena === "stan" && p.wKoszyku && <span className="ml-1 font-normal text-slate-500">
+          {/* Zapisana ocena to ZNACZNIK, jak kartoteka i rabat: stan, który się
+              czyta, a nie zdanie. Barwa mówi kierunek — półka, złom, outlet. */}
+          {p.ocena && <p className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <span className={`inline-flex h-6 items-center gap-1 rounded-full px-2 font-semibold ${
+              TON_OCENY[p.ocena] ?? "bg-slate-100 text-slate-700"}`}>
+              <Check size={12} aria-hidden="true" />
+              <span>Ocena: {OCENY.find(([k]) => k === p.ocena)?.[2] ?? p.ocena}</span>
+              {p.ocena === "stan" && p.wKoszyku && <span className="font-normal">
                 · w koszyku zwrotów</span>}</span>
             {/* COFNIĘCIE ZAMIAST POTWIERDZENIA (§25a.5). Do 0.202.0 przyciski
                 oceny znikały po pierwszym kliknięciu, więc pomyłkowa
@@ -595,7 +667,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
                 koszyka dostanie zdanie z nazwą kosza dopiero po kliknięciu —
                 bo tego panel z listy pozycji nie wie. */}
             {edytowalny && <button type="button" disabled={trwa}
-              className="font-normal text-slate-500 underline underline-offset-2
+              className="text-slate-500 underline underline-offset-2 hover:text-slate-800
                 disabled:opacity-50"
               onClick={() => onOcena(p.id, null)}>cofnij ocenę</button>}</p>}
           {/* CICHA STRATA JEST TU NAJGORSZYM WYJŚCIEM (0.192.0). Ocena „na
@@ -621,7 +693,7 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             ? <WskazSklad p={p} wiersze={wierszeDokumentu} zwrotId={zwrot.id}
                 onKoniec={() => setSkladamy(null)} />
             : <button type="button" onClick={() => setSkladamy(p.id)}
-                className="mt-1 text-xs text-slate-600 underline underline-offset-2
+                className="mr-3 mt-1 text-xs text-slate-600 underline underline-offset-2
                   hover:text-slate-900">wskaż skład ręcznie</button>)}
           {/* KOMPLET ROZBITY NA PARAGONIE. Pokazujemy go tylko wtedy, gdy
               kartotek jest więcej niż jedna: przy zwykłym towarze wiersz
@@ -658,8 +730,9 @@ export function Pozycje({ zwrot, trwa, blad, trwaRabat = false, bladRabatu = "",
             onClick={() => onZdejmij(p.id)}
             className="mt-1 text-xs text-slate-500 underline underline-offset-2
               hover:text-slate-800">zdejmij ze zwrotu</button>}
+          </div>
         </div>
-      </li>)}
+      </li>; })}
     </ul>
 
     {/* Pod listą, bo TAM operator zauważa różnicę: przelicza karton, patrzy
