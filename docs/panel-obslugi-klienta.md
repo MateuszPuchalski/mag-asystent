@@ -2996,7 +2996,7 @@ Specyfikacja mierzy to obok odrzuceń, które niesie `szkic_copilota.ocena`.
 naszą wiadomość o treści niepewnej wysyłki, wiersz `send_uncertain` przechodzi
 na `sent` z numerem od Allegro. Szkicu i statusu rozmowy to nie rusza.
 
-**Wysyłka bez człowieka** stoi od @wydanie, wyłącznie w przepływie kategorii
+**Wysyłka bez człowieka** stoi od 0.570.0, wyłącznie w przepływie kategorii
 na żywo (§14.6f). Zasada nadrzędna nr 2, która jej zabraniała, odeszła
 22 września 2026 decyzją właściciela (§27). Specyfikacja z 20 września
 stawiała trzy warunki: bramkę per klasa, dowody z pracy i wyłącznik awaryjny.
@@ -3107,7 +3107,7 @@ osobnym wydaniem (§14.6f).
 przestawia. Żywe „pilne" zmieni zasadę z §14.5, że przypuszczenie maszyny
 kolejki nie rusza, i wymaga osobnej zgody właściciela przy wejściu na żywo.
 
-### 14.6f. Przepływ kategorii na żywo: stan zamówienia (@wydanie)
+### 14.6f. Przepływ kategorii na żywo: stan zamówienia (0.570.0)
 
 Decyzja właściciela z 6 października 2026: tryb na żywo dla kategorii
 „Stan zamówienia". To pierwsza droga w kodzie, którą odpowiedź wychodzi do
@@ -6919,7 +6919,7 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Szkic z taktu dla rozmów bez oferty (§14.6a) | **działa** od 22 września 2026, przy `COPILOT_AUTO_SZKIC=1` | `services/copilot-auto-szkic.ts` |
 | Szkic zaraz po rozpoznaniu (§14.6c) | **działa** od 0.477.0, domyślnie włączony (`COPILOT_SZKIC_PO_ROZPOZNANIU`) | `services/copilot-szkic-po-rozpoznaniu.ts`, `szkic_copilota.decyzja_id` |
 | Przepływ kategorii w trybie cienia (§14.6e) | **działa** od 0.569.0, propozycje i pomiar; wysyłka na żywo w §14.6f | `services/przeplyw-kategorii.ts`, tabela `propozycja_przeplywu`, karta „Automat by…" w rozmowie, pomiar za zębatką |
-| Przepływ kategorii na żywo, stan zamówienia (§14.6f) | **działa** od @wydanie, wyłączony domyślnie (`PRZEPLYW_NA_ZYWO`) | `services/przeplyw-na-zywo.ts`, konto „Automat", `propozycja_przeplywu.wykonana_at` |
+| Przepływ kategorii na żywo, stan zamówienia (§14.6f) | **działa** od 0.570.0, wyłączony domyślnie (`PRZEPLYW_NA_ZYWO`) | `services/przeplyw-na-zywo.ts`, konto „Automat", `propozycja_przeplywu.wykonana_at` |
 | Los szkicu przy wysyłce i uzgodnienie `send_uncertain` (§14.6a) | **działa** od 22 września 2026 | `outbox.szkic_los`, `losSzkicu` w `wysylka.ts`, `uzgodnijNiepewna` w `allegro-inbox-sync.ts` |
 | Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa** od 22 września 2026, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |
