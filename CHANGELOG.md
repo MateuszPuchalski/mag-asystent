@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.572.0 — 6 października 2026
+
+**Wiersz pozycji zwrotu czyta się od góry.** Nazwa i cena stoją najwyżej,
+kody i rabat schodzą na drugi plan, a drobne działania przy towarze zebrały
+się w jednym rzędzie pod oceną.
+
+**Składnik kompletu może pójść na outlet.** Gdy z zestawu jedna część wraca
+cała, a druga używana, pozycję ocenia się „na stan”, a przy używanym
+składniku klika „na outlet”. Składnik schodzi wtedy z dokumentu MM i staje
+na liście regału outletowego obok całych pozycji. Kwota dla klienta się nie
+zmienia.
+
 ## 0.571.0 — 6 października 2026
 
 **Słowa klienta przy zwrocie widać od razu.** Gdy klient opisał powód
