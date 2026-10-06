@@ -19,10 +19,8 @@ import {
    niczego tu nie zapisuje, a każdą gałąź da się sprawdzić testem
    tabelarycznym (`etap.test.ts`).
 
-   STOJĄ W GŁOWICY, NIE W KOLUMNIE FAKTÓW. Między `lg` a `2xl` kolumna faktów
-   schodzi pod dowody, więc nie zawsze ją widać. Głowicę widać pierwszą
-   zawsze. Prawa kolumna trzyma dane do decyzji i czynność, a o etapie
-   milczy. Jeden dom na fakt.
+   STOJĄ W GŁOWICY, NAD PASEM FAKTÓW. Głowicę widać pierwszą zawsze, a prawa
+   kolumna trzyma dowody i werdykt, więc o etapie milczy. Jeden dom na fakt.
 
    Daty idą przez `czas()` z `ui`, bo format pilnuje `Czas.test.ts`.
    Liczbę dni do terminu podaje serwer: zegar przeglądarki bywa przestawiony. */
@@ -265,7 +263,7 @@ export function coSieDzieje(s: SzczegolReklamacji): CoSieDzieje {
 /**
  * „3 reklamacje (2 uznane, 1 odrzucona)" — licznik historii jednym zdaniem.
  *
- * Głowica mówi tak o kliencie, a kolumna faktów o towarze. Jedna funkcja,
+ * Głowica mówi tak o kliencie przy loginie i o towarze przy jego nazwie. Jedna funkcja,
  * żeby ta sama liczba nie brzmiała w dwóch miejscach inaczej. `dopisek`
  * staje przed nawiasem: „2 reklamacje u nas (1 uznana, 1 odrzucona)".
  */

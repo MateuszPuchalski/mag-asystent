@@ -2,8 +2,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { MessagesSquare, RefreshCw } from "lucide-react";
 import {
-  useDyskusja, useDyskusje, useNotatkaDyskusji, useOdpowiedzWDyskusji, useOdswiezDyskusje,
-  useProwadzeDyskusje, useSprawdzPrzesylkeDyskusji, useZakoncz, useCofnijNotatkeDyskusji
+  useDyskusja, useDyskusje, useOdpowiedzWDyskusji, useOdswiezDyskusje,
+  useProwadzeDyskusje, useSprawdzPrzesylkeDyskusji, useZakoncz,
 } from "../api/dyskusje";
 import { useJa } from "../api/rozmowy";
 import {
@@ -27,7 +27,6 @@ import { PasekProgu } from "../sprawy/Prog";
 import { PasekTla, tloAlarmuje } from "../sprawy/PasekTla";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
-import { useNowyTag, useOdepnijTag, usePrzypnijTag, useTagi } from "../api/tagi";
 import { Fakty } from "../dyskusje/Fakty";
 import { Zakonczenie } from "../dyskusje/Zakonczenie";
 import { Prowadzi } from "../sprawy/Prowadzi";
@@ -101,22 +100,16 @@ export function Dyskusje() {
   const { porzadek, ustaw: ustawPorzadek } = usePorzadek(
     "wertis.dyskusje.porzadek", OSIE, "czekanie");
   const [tag, setTag] = useState<number | null>(null);
-  const slownikTagow = useTagi();
-  const nowyTag = useNowyTag();
-  const przypnij = usePrzypnijTag();
-  const odepnij = useOdepnijTag();
-  const [bladTagu, setBladTagu] = useState("");
-  const cofnijNotatke = useCofnijNotatkeDyskusji();
   const sprawdzPrzesylke = useSprawdzPrzesylkeDyskusji();
   const [bladPrzesylki, setBladPrzesylki] = useState("");
-  const [bladZapisu, setBladZapisu] = useState("");
+  /* Błąd „prowadzę" stoi przy samym przycisku — tam, gdzie agent kliknął. */
+  const [bladProwadze, setBladProwadze] = useState("");
 
   /* Próg daty ten sam co przy reklamacjach; wybór nie przeżywa zamknięcia
      ekranu z tego samego powodu. */
   const [bezProgu, setBezProgu] = useState(false);
   const { data, isLoading, error } = useDyskusje(bezProgu);
   const prowadze = useProwadzeDyskusje();
-  const notatka = useNotatkaDyskusji();
   const odpowiedz = useOdpowiedzWDyskusji();
   const zakoncz = useZakoncz();
   const odswiez = useOdswiezDyskusje();
@@ -129,7 +122,6 @@ export function Dyskusje() {
   const usunZalacznik = useUsunZalacznikSprawy();
   const [bladZalacznika, setBladZalacznika] = useState("");
   const [bladOdswiezenia, setBladOdswiezenia] = useState("");
-  const trwa = prowadze.isPending || notatka.isPending;
 
   const [bladWysylki, setBladWysylki] = useState("");
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
@@ -492,11 +484,12 @@ export function Dyskusje() {
                 <div className="mr-auto">
                   <Prowadzi wWierszu prowadzi={szczegol.data.dyskusja.prowadzi} trwa={prowadze.isPending}
                     onProwadze={() => {
-                      setBladZapisu("");
+                      setBladProwadze("");
                       prowadze.mutate(
                         { id: szczegol.data!.dyskusja.id, wersja: szczegol.data!.dyskusja.wersja },
-                        { onError: (e) => setBladZapisu((e as Error).message) });
+                        { onError: (e) => setBladProwadze((e as Error).message) });
                     }} />
+                  {bladProwadze && <p className="text-xs text-red-700">{bladProwadze}</p>}
                 </div>
                 {/* Przycisk ZOSTAJE obok odświeżenia przy wejściu, decyzją
                     właściciela. Agent, który czeka w sprawie na odpowiedź
@@ -570,48 +563,13 @@ export function Dyskusje() {
 
       <Karta className="flex min-h-0 flex-col overflow-y-auto">
         {szczegol.data
-          ? <Fakty szczegol={szczegol.data} trwa={trwa} bladZapisu={bladZapisu}
+          ? <Fakty szczegol={szczegol.data}
               sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
               bladPrzesylki={bladPrzesylki}
               onSprawdzPrzesylke={() => {
                 setBladPrzesylki("");
                 sprawdzPrzesylke.mutate({ id: szczegol.data!.dyskusja.id },
                   { onError: (e) => setBladPrzesylki((e as Error).message) });
-              }}
-              onCofnijNotatke={szczegol.data.dyskusja.maPoprzedniaNotatke
-                ? () => {
-                  setBladZapisu("");
-                  cofnijNotatke.mutate(
-                    { id: szczegol.data!.dyskusja.id, wersja: szczegol.data!.dyskusja.wersja },
-                    { onError: (e) => setBladZapisu((e as Error).message) });
-                }
-                : undefined}
-              tagi={{
-                slownik: slownikTagow.data?.tagi ?? [],
-                trwa: nowyTag.isPending || przypnij.isPending || odepnij.isPending,
-                blad: bladTagu,
-                onPrzypnij: (tagId) => {
-                  setBladTagu("");
-                  przypnij.mutate({ id: szczegol.data!.dyskusja.id, rodzaj: "dyskusje", tagId },
-                    { onError: (e) => setBladTagu((e as Error).message) });
-                },
-                onOdepnij: (tagId) => {
-                  setBladTagu("");
-                  odepnij.mutate({ id: szczegol.data!.dyskusja.id, rodzaj: "dyskusje", tagId },
-                    { onError: (e) => setBladTagu((e as Error).message) });
-                },
-                onNowy: (nazwa) => {
-                  setBladTagu("");
-                  nowyTag.mutate({ id: szczegol.data!.dyskusja.id, rodzaj: "dyskusje", nazwa },
-                    { onError: (e) => setBladTagu((e as Error).message) });
-                },
-              }}
-              onNotatka={(tekst) => {
-                setBladZapisu("");
-                notatka.mutate({
-                  id: szczegol.data!.dyskusja.id, notatka: tekst,
-                  wersja: szczegol.data!.dyskusja.wersja,
-                }, { onError: (e) => setBladZapisu((e as Error).message) });
               }} />
           : <Pusto waga="lista">
               Fakty o sprawie pokażą się po wybraniu dyskusji.</Pusto>}

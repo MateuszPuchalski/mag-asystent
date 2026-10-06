@@ -98,18 +98,6 @@ vi.mock("../api/rozmowy", async () => {
   };
 });
 
-/* Tagi: atrapa bez klienta zapytań, bo ten ekran stawia własny `QueryClient`
-   tylko dla haków reklamacji. */
-vi.mock("../api/tagi", () => ({
-  useTagi: () => ({ data: { tagi: [
-    { id: 11, nazwa: "czeka na część", aktywny: true },
-    { id: 12, nazwa: "u producenta", aktywny: true },
-  ] } }),
-  useNowyTag: () => ({ mutate: () => {}, isPending: false }),
-  usePrzypnijTag: () => ({ mutate: () => {}, isPending: false }),
-  useOdepnijTag: () => ({ mutate: () => {}, isPending: false }),
-}));
-
 vi.mock("../api/reklamacje", async () => {
   const rzeczywisty = await vi.importActual<typeof import("../api/reklamacje")>("../api/reklamacje");
   const mutacja = (nazwa: string) => () => ({
@@ -150,7 +138,6 @@ vi.mock("../api/reklamacje", async () => {
     }),
     useOdswiez: mutacja("odswiez"),
     useProwadze: mutacja("prowadze"),
-    useNotatka: mutacja("notatka"),
     /* Synchronizacja ma własny podrabiacz z tego samego powodu co wysyłka:
        błąd wraca do ekranu przez `onError`, a test pilnuje, że go widać. */
     useSynchronizuj: () => ({
@@ -380,16 +367,16 @@ describe("Ekran reklamacji", () => {
       expect(within(stopka()).getByText("Allegro odmówiło: limit zapytań")).toBeInTheDocument();
     });
 
-  it("pasek werdyktu stoi ZA rozmową i pod faktami, bo nieodwracalne pyta po dowodach", () => {
+  it("pasek werdyktu stoi ZA rozmową i dowodami, a fakty nad nim w głowicy", () => {
     /* Od przyrostu trzeciego werdykt wychodzi STĄD. Napis odsyłający do
        Centrum Sprzedaży byłby nieprawdą — tak samo jak w 0.224.0 napis
        o odpowiedzi.
 
        KOLEJNOŚĆ JEST UMOWĄ. Pasek będący pierwszym elementem kolumny pytał
        „uznać czy odrzucić", zanim ekran pokazał treść zgłoszenia. Dekalog
-       obsługi, punkt 9: nieodwracalne pyta — a pytanie zadaje się PO
-       dowodach, nie przed nimi. Stoi w kolumnie faktów, zaraz pod liczbami,
-       z których się go wydaje, i nad zwijkami ze szczegółem. */
+       obsługi: nieodwracalne pyta — a pytanie zadaje się PO dowodach, nie
+       przed nimi. Fakty, z których się go wydaje, stoją w głowicy nad całą
+       sprawą, a sam werdykt — w prawej kolumnie pod dowodami. */
     pokaz("/obsluga/reklamacje/1");
     const pasek = screen.getByRole("region", { name: "Werdykt" });
     expect(pasek).toBeInTheDocument();
@@ -399,8 +386,8 @@ describe("Ekran reklamacji", () => {
       & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const fakty = screen.getByText("Klient zapłacił");
     expect(fakty.compareDocumentPosition(pasek) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-    expect(pasek.compareDocumentPosition(screen.getByRole("button", { name: /^Zamówienie/ }))
-      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    const dowody = screen.getByText("Dowody");
+    expect(dowody.compareDocumentPosition(pasek) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByRole("button", { name: /Uznaję/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Odrzucam/ })).toBeInTheDocument();
     expect(screen.queryByText(/Centrum Sprzedaży/)).not.toBeInTheDocument();
@@ -925,19 +912,16 @@ describe("Sprawa po przebudowie", () => {
     }
   });
 
-  it("wskaźnik innej otwartej sprawy przewija do „Ten zakup u nas” i ją otwiera — bez zapisu", async () => {
+  it("inna otwarta sprawa tego zakupu stoi w głowicy bez klikania — i bez zapisu", () => {
+    /* Decyzja właściciela: fakty z prawej kolumny poszły do głowicy. Sprawy
+       tego zakupu widać więc od razu, a wskaźnik „↓", który do nich przewijał,
+       odszedł razem ze zwijką. */
     scena.sprawy = [{ id: 8, typ: "DISPUTE", numer: null, temat: "gdzie paczka", statusAllegro: null,
       decyzjaDo: null, otwartoAt: "2026-09-07T10:00:00.000Z", prowadzi: null, otwarta: true }];
     pokaz("/obsluga/reklamacje/1");
-    const zwijka = screen.getByRole("button", { name: /^Ten zakup u nas/ });
-    /* Otwiera się sama, bo inna sprawa tego zakupu jest otwarta. */
-    expect(zwijka).toHaveAttribute("aria-expanded", "true");
-    await userEvent.click(zwijka);
-    expect(zwijka).toHaveAttribute("aria-expanded", "false");
-    await userEvent.click(screen.getByRole("button", { name: /jeszcze 1 otwarta sprawa tego zakupu/ }));
-    expect(zwijka).toHaveAttribute("aria-expanded", "true");
-    expect(zwijka).toHaveFocus();
-    expect(screen.getByText("gdzie paczka")).toBeVisible();
+    const zakup = screen.getByRole("region", { name: "Ten zakup u nas" });
+    expect(within(zakup).getByText("gdzie paczka")).toBeVisible();
+    expect(screen.queryByText(/otwarta sprawa tego zakupu/)).not.toBeInTheDocument();
     expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
   });
 

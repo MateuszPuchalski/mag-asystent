@@ -4,12 +4,12 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 
-/* ── Triaż reklamacji: cztery kostki w siatce dwa na dwa ─────────────────────
+/* ── Triaż reklamacji: komórki pasa faktów w głowicy ────────────────────────
    Zgłoszenie właściciela ze zrzutem: „potrzebujemy wyraźnej hierarchii, żeby
    podjąć decyzję o reklamacji". Kolumna niosła sześć równorzędnych poziomów
    cen i ani jednej sztuki stanu — przy sprawie, w której klient żąda WYMIANY.
-   Dziś cztery kostki: Mamy, Kupione, Klient zapłacił, Dostawca — zawsze
-   w tym samym miejscu, a brak wiedzy mówi w nich słowami.
+   Dziś komórki pasa w głowicy: Mamy, Kupione, Klient zapłacił, Dostawca —
+   zawsze w tym samym miejscu, a brak wiedzy mówi w nich słowami.
 
    Testy pilnują TEGO, co rozstrzyga decyzję, a nie wyglądu pasma:
 
@@ -27,7 +27,8 @@ import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 const karta = vi.fn();
 vi.mock("../api/rozmowy", () => ({ useKartaTowaru: (twId: number | null) => karta(twId) }));
 
-const { Dowody } = await import("./Dowody");
+const { Fakty } = await import("../test/fakty");
+
 const { Glowica } = await import("./Glowica");
 
 const CENY = [
@@ -69,7 +70,6 @@ const props = (n: Partial<Reklamacja> = {}, zPozycja = true,
         cenaGrosze: 4990, waluta: "PLN" }],
     } : null,
   } as unknown as SzczegolReklamacji,
-  trwa: false, bladZapisu: "", onNotatka: vi.fn(),
 });
 
 beforeEach(() => {
@@ -77,30 +77,33 @@ beforeEach(() => {
   karta.mockReturnValue({ data: KARTA, isLoading: false, error: null });
 });
 
-describe("Triaż w kolumnie dowodów", () => {
-  it("mówi, CZY MAMY bez otwierania czegokolwiek, a półka stoi w podpisie cen", () => {
+describe("Triaż w pasie faktów", () => {
+  it("mówi, CZY MAMY bez otwierania czegokolwiek, a półka stoi w podpisie komórki", () => {
     /* Żadnego kliknięcia przed tą asercją i to jest cały jej sens: przy
-       żądaniu wymiany ta liczba rozstrzyga sprawę. Podpis kostki mówi dziś
-       o dostawach, więc półka zeszła do zwijki — i widać ją w jej podpisie. */
-    render(<Dowody {...props()} />);
+       żądaniu wymiany ta liczba rozstrzyga sprawę. Półka stoi pod stanem,
+       bo zwijki „Ceny i półka" już nie ma. */
+    render(<Fakty {...props()} />);
     expect(screen.getByText("7 szt.")).toBeVisible();
-    /* Podpis liczy cenniki SPRZEDAŻY — poziom 0 to zakup i stoi w kostce. */
-    expect(screen.getByRole("button", { name: /^Ceny i półka/ }))
-      .toHaveTextContent("2 ceny sprzedaży · półka D02-01-04");
+    expect(screen.getByText("Mamy").parentElement!.textContent).toContain("półka D02-01-04");
   });
 
   it("BRAK NA STANIE mówi o sobie wprost — to zmienia decyzję, nie tylko liczbę", () => {
     karta.mockReturnValue({ data: { ...KARTA, mag: { stan: 0, rez: 0, avail: 0 } },
       isLoading: false, error: null });
-    render(<Dowody {...props()} />);
+    render(<Fakty {...props()} />);
     expect(screen.getByText("brak na stanie")).toBeInTheDocument();
   });
 
-  it("bez kartoteki mówi „nie wiadomo”, a nie zero — zasada nadrzędna 9", () => {
+  it("bez kartoteki mówi „nie wiadomo”, a nie zero — i mówi to RAZ za stan i dostawcę", () => {
+    /* Brak kartoteki mówi wiersz towaru w głowicy. „Mamy" i „Dostawca"
+       powtarzałyby go dwa razy, więc stają jedną komórką: czego nie wiemy. */
     karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
-    render(<Dowody {...props({ twId: null })} />);
+    render(<Fakty {...props({ twId: null })} />);
     expect(screen.getByText("nie wiadomo")).toBeInTheDocument();
-    expect(screen.getByText(/sprawa bez kartoteki/)).toBeInTheDocument();
+    expect(screen.getByText("Mamy · dostawca").parentElement!.textContent)
+      .toContain("stanu ani dostaw nie znamy");
+    expect(screen.queryByText("Dostawca")).not.toBeInTheDocument();
+    expect(screen.queryByText(/bez kartoteki/)).not.toBeInTheDocument();
   });
 
   it("KOSZT bierze z poziomu 0, bo to cena zakupu — nie z najtańszej sprzedaży", () => {
@@ -111,16 +114,18 @@ describe("Triaż w kolumnie dowodów", () => {
       { poziom: 0, nazwa: "", nettoGrosze: 1500, bruttoGrosze: 0, waluta: "PLN" },
       { poziom: 2, nazwa: "Hurtowa", nettoGrosze: 1400, bruttoGrosze: 1722, waluta: "PLN" },
     ] }, isLoading: false, error: null });
-    render(<Dowody {...props()} />);
-    const kostka = screen.getByText("Klient zapłacił").parentElement!;
-    expect(kostka.textContent).toContain("nasz zakup 15,00 PLN netto");
-    expect(kostka.textContent).not.toContain("14,00");
+    render(<Fakty {...props()} />);
+    /* Pytamy ZDANIA o koszt, nie całej komórki: cennik sprzedaży stoi w niej
+       obok i ma prawo pokazać „Hurtową" — byle nie jako nasz zakup. */
+    const koszt = screen.getByText(/nasz zakup/);
+    expect(koszt.textContent).toContain("nasz zakup 15,00 PLN netto");
+    expect(koszt.textContent).not.toContain("14,00");
   });
 
   it("stawia kwotę Z PARAGONU obok naszego zakupu i nie odejmuje jednej od drugiej", () => {
     /* Zapłacone jest brutto, zakup netto. Wyliczona z nich „marża" byłaby
        nieprawdą z dokładnością do stawki VAT, której ten ładunek nie niesie. */
-    render(<Dowody {...props()} />);
+    render(<Fakty {...props()} />);
     const kostka = screen.getByText("Klient zapłacił").parentElement!;
     expect(kostka.textContent).toContain("49,90 PLN");
     expect(screen.getByText("brutto · nasz zakup 18,64 PLN netto")).toBeInTheDocument();
@@ -128,24 +133,46 @@ describe("Triaż w kolumnie dowodów", () => {
     expect(kostka.textContent).not.toContain("31,26");
   });
 
-  it("bez zamówienia bierze cenę z PARAGONU z wiersza sprawy", () => {
-    render(<Dowody {...props({ cenaParagonuGrosze: 4590 }, false)} />);
-    expect(screen.getByText("Klient zapłacił").parentElement!.textContent).toContain("45,90 PLN");
+  it("kwota równa żądaniu stoi RAZ — w zdaniu „Chce:”, a komórka mówi, że to ta sama", () => {
+    render(<Fakty {...props({ oczekiwanie: "REFUND", oczekiwanaKwotaGrosze: 4990 })} />);
+    const kostka = screen.getByText("Klient zapłacił").parentElement!;
+    expect(kostka.textContent).toContain("tyle, ile żąda");
+    expect(kostka.textContent).not.toContain("49,90");
+    /* Nasz zakup zostaje — tej liczby zdanie „Chce:" nie niesie. */
+    expect(kostka.textContent).toContain("nasz zakup 18,64 PLN netto");
   });
 
-  it("poziom zakupu NIE wchodzi drugi raz do listy pozostałych cen", () => {
-    render(<Dowody {...props()} />);
+  it("tę jedną kwotę niesie zdanie „Chce:” w głowicy — dokładnie raz na ekranie sprawy", () => {
+    /* „Tyle, ile żąda" wskazuje na zdanie wyżej. Bez kwoty w nim komórka
+       wskazywałaby w próżnię, więc pilnujemy obu połówek naraz. */
+    render(<MemoryRouter><Glowica szczegol={props({ oczekiwanie: "REFUND", oczekiwanaKwotaGrosze: 4990 }).szczegol}
+      trwa={false} onProwadze={vi.fn()} /></MemoryRouter>);
+    expect(screen.getByText("tyle, ile żąda")).toBeInTheDocument();
+    expect(screen.getAllByText("49,90 PLN")).toHaveLength(1);
+    expect(screen.getByText("Chce:").parentElement!.textContent).toContain("49,90 PLN");
+  });
+
+  it("poziom zakupu NIE wchodzi drugi raz do listy cen sprzedaży", () => {
+    /* Poziom 0 to zakup i stoi w zdaniu „nasz zakup". W cenniku obok byłby
+       drugim domem tej samej liczby, i to bez nazwy. */
+    render(<Fakty {...props()} />);
     expect(screen.getByText("Detaliczna")).toBeInTheDocument();
     expect(screen.getByText("Hurtowa")).toBeInTheDocument();
     expect(screen.queryByText("poziom 0")).not.toBeInTheDocument();
   });
+
+  it("bez zamówienia bierze cenę z PARAGONU z wiersza sprawy", () => {
+    render(<Fakty {...props({ cenaParagonuGrosze: 4590 }, false)} />);
+    expect(screen.getByText("Klient zapłacił").parentElement!.textContent).toContain("45,90 PLN");
+  });
+
 
   it("bez wiedzy kostka mówi „nie wiemy” — nie zero i nie pustka", () => {
     /* Kostki stoją zawsze w tych samych miejscach, więc brak danych nie
        zabiera kostki, tylko mówi o sobie. Zero czytałoby się jak „nie mamy",
        a pusty slot jak awaria ekranu. */
     karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
-    render(<Dowody {...props({ twId: 11 }, false)} />);
+    render(<Fakty {...props({ twId: 11 }, false)} />);
     const mamy = screen.getByText("Mamy").parentElement!;
     expect(mamy.textContent).toContain("nie wiemy");
     expect(mamy.textContent).not.toMatch(/\b0\b/);
@@ -154,7 +181,7 @@ describe("Triaż w kolumnie dowodów", () => {
   });
 
   it("cztery kostki w STAŁEJ kolejności: Mamy, Kupione, Klient zapłacił, Dostawca", () => {
-    render(<Dowody {...props()} />);
+    render(<Fakty {...props()} />);
     const etykiety = ["Mamy", "Kupione", "Klient zapłacił", "Dostawca"].map((t) => screen.getByText(t));
     for (let i = 1; i < etykiety.length; i += 1) {
       expect(etykiety[i - 1].compareDocumentPosition(etykiety[i])
@@ -168,12 +195,12 @@ describe("Wiek zakupu w triażu (0.413.0)", () => {
      już leży", nie „który to był dzień". Przy rękojmi liczba dni jest
      argumentem, a agent nie ma jej odejmować w głowie. */
   it("do dwóch miesięcy liczy DNI — przy „uszkodzone w transporcie” to cała sprawa", () => {
-    render(<Dowody {...props({ dniOdZakupu: 4 })} />);
+    render(<Fakty {...props({ dniOdZakupu: 4 })} />);
     expect(screen.getByText("4 dni temu")).toBeInTheDocument();
   });
 
   it("dalej liczy MIESIĄCE, bo nikt nie liczy czterystu dni w głowie", () => {
-    render(<Dowody {...props({ dniOdZakupu: 430 })} />);
+    render(<Fakty {...props({ dniOdZakupu: 430 })} />);
     expect(screen.getByText("14 miesięcy temu")).toBeInTheDocument();
   });
 
@@ -182,14 +209,14 @@ describe("Wiek zakupu w triażu (0.413.0)", () => {
        a nasz zegar startuje od zamówienia albo od złożenia koszyka — obie daty
        są wcześniejsze. Kostka podaje WIEK i źródło zegara; wyroku „po
        rękojmi" nie wydaje, bo nie ma z czego. */
-    render(<Dowody {...props({ dniOdZakupu: 900 })} />);
+    render(<Fakty {...props({ dniOdZakupu: 900 })} />);
     const wartosc = screen.getByText("2 lata temu");
     expect(wartosc.className).toContain("text-ranga-uwaga");
     expect(wartosc.parentElement).toHaveAttribute("title", expect.stringContaining("data z zamówienia"));
   });
 
   it("mówi, KTÓRY to zegar — dwie daty pod jedną etykietą to blizna 0.121.0", () => {
-    render(<Dowody {...props({ dniOdZakupu: 30, kupionoZrodlo: "sprawa" })} />);
+    render(<Fakty {...props({ dniOdZakupu: 30, kupionoZrodlo: "sprawa" })} />);
     expect(screen.getByText("Kupione").parentElement)
       .toHaveAttribute("title", expect.stringContaining("data z ładunku sprawy"));
   });
@@ -197,17 +224,17 @@ describe("Wiek zakupu w triażu (0.413.0)", () => {
   it("pod wiekiem mówi, PO ILU DNIACH od zakupu klient się zgłosił", () => {
     /* „Uszkodzone w transporcie" zgłoszone po dwóch dniach i po trzech
        miesiącach to dwie różne sprawy, a z samego wieku tego nie widać. */
-    const { unmount } = render(<Dowody {...props({ dniOdZakupu: 30, zgloszonoPoDniach: 12 })} />);
+    const { unmount } = render(<Fakty {...props({ dniOdZakupu: 30, zgloszonoPoDniach: 12 })} />);
     /* Data zakupu stoi na widoku przed liczbą dni, nie tylko w podpowiedzi. */
     expect(screen.getByText(/^\d{1,2} \S+ \d{4} · zgłoszone 12 dni po zakupie$/)).toBeInTheDocument();
     unmount();
     /* Starszy serwer pola nie zna — liczymy je z jego własnych dwóch dat. */
-    render(<Dowody {...props({ dniOdZakupu: 30 })} />);
+    render(<Fakty {...props({ dniOdZakupu: 30 })} />);
     expect(screen.getByText(/ · zgłoszone 2 dni po zakupie$/)).toBeInTheDocument();
   });
 
   it("bez daty zakupu kostka mówi „nie wiemy” — brak wiedzy to nie „dziś”", () => {
-    render(<Dowody {...props({ dniOdZakupu: null, kupionoAt: null })} />);
+    render(<Fakty {...props({ dniOdZakupu: null, kupionoAt: null })} />);
     const kostka = screen.getByText("Kupione").parentElement!;
     expect(kostka.textContent).toContain("nie wiemy");
     expect(kostka.textContent).not.toContain("dziś");
@@ -221,46 +248,43 @@ describe("Ilość objęta sprawą (0.413.0)", () => {
   it("stan czyta się PRZECIW żądaniu — dwie sztuki przy sprawie o trzy to za mało", () => {
     karta.mockReturnValue({ data: { ...KARTA, mag: { stan: 2, rez: 0, avail: 2 } },
       isLoading: false, error: null });
-    render(<Dowody {...props({ ilosc: 3 })} />);
-    expect(screen.getByText("sprawa o 3 szt.")).toBeInTheDocument();
+    render(<Fakty {...props({ ilosc: 3 })} />);
+    expect(screen.getByText("Mamy").parentElement!.textContent).toContain("sprawa o 3 szt.");
     expect(screen.getByText("2 szt.").className).toContain("text-ranga-zle");
   });
 
   it("starczy na całą sprawę — ta sama liczba czyta się wtedy inaczej", () => {
-    render(<Dowody {...props({ ilosc: 3 })} />);
+    render(<Fakty {...props({ ilosc: 3 })} />);
     expect(screen.getByText("7 szt.").className).toContain("text-ranga-ok");
   });
 
   it("jedna sztuka nie dokłada zdania — to domyślny przypadek", () => {
-    render(<Dowody {...props({ ilosc: 1 })} />);
+    render(<Fakty {...props({ ilosc: 1 })} />);
     expect(screen.queryByText(/sprawa o/)).not.toBeInTheDocument();
   });
 });
 
-describe("Historia towaru w kolumnie, klienta w głowicy", () => {
-  it("mówi, ile razy TEN TOWAR już się sypał i jak się skończyło", () => {
-    render(<Dowody {...props({}, true, {
-      towar: { ile: 3, uznanych: 2, odrzuconych: 1 },
-      klient: { ile: 1, uznanych: 0, odrzuconych: 1 },
-    })} />);
-    expect(screen.getByText(
-      /Ten towar: 3 reklamacje \(2 uznane, 1 odrzucona\)/)).toBeInTheDocument();
-    /* O kliencie mówi rząd klienta w głowicy, obok loginu — jeden dom na fakt. */
-    expect(screen.queryByText(/Ten klient/)).not.toBeInTheDocument();
+describe("Historia towaru przy towarze, klienta przy loginie", () => {
+  /* Obie stoją w głowicy, każda obok tego, czego dotyczy — jeden dom na fakt. */
+  const glowica = (historia: SzczegolReklamacji["historia"]) =>
+    render(<MemoryRouter><Glowica szczegol={props({}, true, historia).szczegol}
+      trwa={false} onProwadze={vi.fn()} /></MemoryRouter>);
+
+  it("mówi, ile razy TEN TOWAR już się sypał i jak się skończyło — w wierszu towaru", () => {
+    glowica({ towar: { ile: 3, uznanych: 2, odrzuconych: 1 }, klient: null });
+    const wiersz = screen.getByText(/ten towar: 3 reklamacje \(2 uznane, 1 odrzucona\)/);
+    expect(wiersz.closest("p")!.textContent).toContain("NÓŻ do kosiarki 46 cm");
   });
 
-  it("bez historii nie rysuje wiersza — pierwsza sprawa to nie informacja o towarze", () => {
-    render(<Dowody {...props()} />);
-    expect(screen.queryByText(/Ten towar/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/Ten klient/)).not.toBeInTheDocument();
+  it("bez historii nie rysuje nic — pierwsza sprawa to nie informacja o towarze", () => {
+    glowica({ towar: null, klient: null });
+    expect(screen.queryByText(/ten towar: /i)).not.toBeInTheDocument();
   });
 
-  it("bez historii towaru linii nie ma, choć klient ją ma — nie udaje zera", () => {
-    render(<Dowody {...props({}, true, {
-      towar: null, klient: { ile: 2, uznanych: 2, odrzuconych: 0 },
-    })} />);
-    expect(screen.queryByText(/Ten towar/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/2 reklamacje/)).not.toBeInTheDocument();
+  it("bez historii towaru jej nie ma, choć klient ją ma — nie udaje zera", () => {
+    glowica({ towar: null, klient: { ile: 2, uznanych: 2, odrzuconych: 0 } });
+    expect(screen.queryByText(/ten towar: /i)).not.toBeInTheDocument();
+    expect(screen.getByText(/jeszcze 2 reklamacje u nas/)).toBeInTheDocument();
   });
 });
 
@@ -280,39 +304,26 @@ describe("Jeden dom na fakt (0.414.0)", () => {
   });
 
   it("wiersza „Kupiono” nie ma — datę niesie wyłącznie kostka „Kupione”", () => {
-    render(<Dowody {...props({ dniOdZakupu: 3 })} />);
+    render(<Fakty {...props({ dniOdZakupu: 3 })} />);
     expect(screen.queryByText("Kupiono")).not.toBeInTheDocument();
     expect(screen.queryByText("Zamówienie złożone")).not.toBeInTheDocument();
   });
 
-  it("przy jednej pozycji podpis zamówienia nie powtarza kostki „Klient zapłacił”", () => {
-    /* Suma jednopozycyjnego zamówienia to ta sama liczba, co kostka piętro
-       wyżej. Podpis mówi więc, CO jest w środku, a nie ile kosztowało. */
-    render(<Dowody {...props()} />);
-    const zwijka = screen.getByRole("button", { name: /^Zamówienie/ });
-    expect(zwijka.textContent).toContain("tylko ten towar");
-    expect(zwijka.textContent).not.toContain("49,90");
-  });
-
-  it("ZAMÓWIENIE przy wymianie startuje zamknięte, bo jego kwoty stoją już w kostkach", () => {
-    render(<Dowody {...props()} />);
-    expect(screen.getByRole("button", { name: /^Zamówienie/ }))
-      .toHaveAttribute("aria-expanded", "false");
-  });
-
-  it("CENY I PÓŁKA startują zamknięte — koszt mówi kostka „Klient zapłacił”", () => {
-    render(<Dowody {...props()} />);
-    expect(screen.getByRole("button", { name: /^Ceny i półka/ }))
-      .toHaveAttribute("aria-expanded", "false");
-    /* A liczba, dla której ten blok w ogóle powstał, stoi bez kliknięcia. */
-    expect(screen.getByText("Klient zapłacił").parentElement!.textContent).toContain("18,64");
+  it("przy jednej pozycji komórka zamówienia nie powtarza „Klient zapłacił”", () => {
+    /* Cena spornej pozycji stoi komórkę obok. Zamówienie mówi więc, CO jest
+       w środku, i dokłada tylko to, czego tamta nie niesie: dostawę i sumę. */
+    render(<Fakty {...props()} />);
+    const kostka = screen.getByText("Zamówienie").parentElement!;
+    expect(kostka.textContent).toContain("tylko ten towar");
+    expect(kostka.textContent).toContain("dostawa 10,00 PLN, DPD · razem 59,90 PLN");
+    expect(kostka.textContent).not.toContain("49,90");
   });
 
   it("wiek zakupu staje NAWET wtedy, gdy nie wiemy o sprawie nic więcej", () => {
     /* Do 0.413.0 pasek znikał w całości, gdy nie było kartoteki ani pozycji
        paragonu — i zabierał ze sobą datę, którą mieliśmy. */
     karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
-    render(<Dowody {...props({ twId: null, dniOdZakupu: 400 }, false)} />);
+    render(<Fakty {...props({ twId: null, dniOdZakupu: 400 }, false)} />);
     expect(screen.getByText("13 miesięcy temu")).toBeInTheDocument();
   });
 });
@@ -339,11 +350,11 @@ describe("Jedna sekcja zamiast czterech (0.416.0)", () => {
         sprawy: [{ id: 8, typ: "DISPUTE", numer: null, temat: "mam problem z odesłaniem",
           otwarta: true, decyzjaDo: null, prowadzi: null }],
       },
-    } as unknown as React.ComponentProps<typeof Dowody>;
+    } as unknown as React.ComponentProps<typeof Fakty>;
   };
 
   it("nie ma już czterech nagłówków o jednym zakupie", () => {
-    render(<MemoryRouter><Dowody {...zeSpoiwem()} /></MemoryRouter>);
+    render(<Fakty {...zeSpoiwem()} />);
     expect(screen.getByText("Ten zakup u nas")).toBeInTheDocument();
     for (const stary of ["Zwroty tego zamówienia", "Droga tego zakupu",
       "Rozmowy o tym zakupie", "Inne sprawy tego zakupu"]) {
@@ -354,7 +365,7 @@ describe("Jedna sekcja zamiast czterech (0.416.0)", () => {
   it("z drogi da się wejść wszędzie tam, gdzie prowadziły tamte sekcje", () => {
     /* To jest warunek, pod którym wolno je było zdjąć: każdy przystanek
        niesie odnośnik do swojej kolejki. */
-    render(<MemoryRouter><Dowody {...zeSpoiwem()} /></MemoryRouter>);
+    render(<Fakty {...zeSpoiwem()} />);
     expect(screen.getByRole("link", { name: /pytanie/ }))
       .toHaveAttribute("href", "/obsluga/skrzynka/3");
     expect(screen.getByRole("link", { name: /dyskusja/ }))
@@ -364,7 +375,7 @@ describe("Jedna sekcja zamiast czterech (0.416.0)", () => {
   it("rodzeństwo spraw ZOSTAJE — niesie to, czego droga nie ma", () => {
     /* Przystanek mówi „dyskusja, 21 września"; wiersz mówi, czy tamta sprawa
        jest otwarta, kto ją prowadzi i o co w niej chodzi. */
-    render(<MemoryRouter><Dowody {...zeSpoiwem()} /></MemoryRouter>);
+    render(<Fakty {...zeSpoiwem()} />);
     expect(screen.getByText("mam problem z odesłaniem")).toBeInTheDocument();
   });
 });
@@ -374,20 +385,20 @@ describe("Podpisy kostek: co jedzie, od kogo i kiedy", () => {
     karta.mockReturnValue({ data: { ...KARTA, mag: { stan: 0, rez: 0, avail: 0 },
       zamowione: [{ dokId: 1, nrPelny: "ZD 4/10", dataWyst: "2026-10-01", termin: "2026-10-15T00:00:00.000Z",
         dostawca: "HURT-OGR", ilosc: 5, szacunek: false }] }, isLoading: false, error: null });
-    render(<Dowody {...props()} />);
+    render(<Fakty {...props()} />);
     expect(screen.getByText(/zamówione 5 szt\. u HURT-OGR, termin 15 października 2026/)).toBeInTheDocument();
   });
 
   it("przy stanie „Mamy” mówi, ile z niego stoi jeszcze w przyjęciach", () => {
     karta.mockReturnValue({ data: { ...KARTA, wDostawie: [{ dokId: 2, nrPelny: "PZ 9/10",
       dataWyst: "2026-10-02", ilosc: 3, dostawca: "HURT-OGR" }] }, isLoading: false, error: null });
-    render(<Dowody {...props({ ilosc: 2 })} />);
-    expect(screen.getByText("sprawa o 2 szt. · w tym 3 szt. w przyjęciach, jeszcze nie na półce"))
+    render(<Fakty {...props({ ilosc: 2 })} />);
+    expect(screen.getByText("sprawa o 2 szt. · w tym 3 szt. w przyjęciach, jeszcze nie na półce · półka D02-01-04"))
       .toBeInTheDocument();
   });
 
   it("„Dostawca” mówi, od kogo jest PARTIA sprzed zakupu", () => {
-    render(<Dowody {...props()} szczegol={{ ...props().szczegol,
+    render(<Fakty {...props()} szczegol={{ ...props().szczegol,
       dostawa: { dostawca: "HURT-OGR", data: "2026-08-20T00:00:00.000Z", numer: "FV 12/08", przedZakupem: true },
     }} />);
     const kostka = screen.getByText("Dostawca").parentElement!;
@@ -397,7 +408,7 @@ describe("Podpisy kostek: co jedzie, od kogo i kiedy", () => {
   });
 
   it("bez partii sprzed zakupu ostatnia dostawa jest tylko TROPEM i tak się nazywa", () => {
-    render(<Dowody {...props()} szczegol={{ ...props().szczegol,
+    render(<Fakty {...props()} szczegol={{ ...props().szczegol,
       dostawa: { dostawca: "INNY", data: "2026-09-30T00:00:00.000Z", numer: null, przedZakupem: false },
     }} />);
     expect(screen.getByText("Dostawca").parentElement!.textContent)
@@ -405,35 +416,46 @@ describe("Podpisy kostek: co jedzie, od kogo i kiedy", () => {
   });
 
   it("bez dostawy „Dostawca” mówi „nie wiemy” — także na starszym serwerze", () => {
-    const { unmount } = render(<Dowody {...props()} szczegol={{ ...props().szczegol, dostawa: null }} />);
+    const { unmount } = render(<Fakty {...props()} szczegol={{ ...props().szczegol, dostawa: null }} />);
     expect(screen.getByText("Dostawca").parentElement!.textContent).toContain("nie wiemy");
     unmount();
-    render(<Dowody {...props()} />);
+    render(<Fakty {...props()} />);
     expect(screen.getByText("Dostawca").parentElement!.textContent).toContain("nie wiemy");
   });
 });
 
-describe("Kolumna w stałej kolejności", () => {
-  it("fakty, historia, werdykt, a pod nimi zwijki — zawsze w tym porządku", () => {
-    const p = props({}, true, { towar: { ile: 2, uznanych: 1, odrzuconych: 1 }, klient: null });
-    render(<MemoryRouter><Dowody {...p}
+describe("Pas faktów w stałej kolejności", () => {
+  /* Decyzja właściciela: fakty z prawej kolumny stoją w głowicy jednym pasem.
+     Komórki mają stałe miejsca, więc oko szuka faktu tam, gdzie był, a droga
+     zakupu stoi pod pasem. Werdyktu ani notatki w pasie nie ma. */
+  it("Mamy, Kupione, Klient zapłacił, Dostawca, Paczka, Zamówienie, a pod nimi ten zakup", () => {
+    const p = props();
+    render(<Fakty {...p}
       szczegol={{ ...p.szczegol,
         przesylka: { waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null },
         sprawy: [{ id: 8, typ: "DISPUTE", numer: null, temat: "inna", otwarta: true, decyzjaDo: null, prowadzi: null }],
-      } as unknown as SzczegolReklamacji}
-      decyzja={<section aria-label="Werdykt">werdykt</section>} /></MemoryRouter>);
+      } as unknown as SzczegolReklamacji} />);
     const kolejnosc = [
-      screen.getByText("Dostawca"),
-      screen.getByText(/Ten towar: 2 reklamacje/),
-      screen.getByRole("region", { name: "Werdykt" }),
-      /* „Ten zakup u nas" stoi pierwsza pod werdyktem: inna otwarta sprawa
-         tego zakupu to klient, który czeka też gdzie indziej. */
-      ...["Ten zakup u nas", "Paczka do klienta", "Zamówienie", "Ceny i półka", "Praca biura"]
-        .map((t) => screen.getByRole("button", { name: new RegExp(`^${t}`) })),
+      ...["Mamy", "Kupione", "Klient zapłacił", "Dostawca", "Paczka do klienta", "Zamówienie"]
+        .map((t) => screen.getByText(t, { selector: "span" })),
+      screen.getByRole("region", { name: "Ten zakup u nas" }),
     ];
     for (let i = 1; i < kolejnosc.length; i += 1) {
       expect(kolejnosc[i - 1].compareDocumentPosition(kolejnosc[i])
         & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     }
+    for (const nieMa of ["Praca biura", "Ceny i półka", "Werdykt"]) {
+      expect(screen.queryByText(nieMa)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByRole("textbox")).toBeNull();
+  });
+
+  it("reklamacja nie zleca pracy hali — ani przycisku, ani nagłówka „Hala”", () => {
+    /* Decyzja właściciela przy przebudowie ekranu reklamacji. Zlecenie hali
+       zostaje w zwrotach i dyskusjach; tutaj pas nie obiecuje go wcale. */
+    render(<Fakty {...props()} />);
+    expect(screen.queryByRole("button", { name: /Zleć hali/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Zleć hali/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Hala" })).not.toBeInTheDocument();
   });
 });

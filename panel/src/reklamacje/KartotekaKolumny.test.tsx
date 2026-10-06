@@ -33,7 +33,6 @@ vi.mock("../sprawy/ZlecHali", () => ({
   ZlecHali: (p: { twId?: number | null }) => { zlecHali(p.twId ?? null); return null; },
 }));
 
-const { Dowody } = await import("./Dowody");
 const { Glowica } = await import("./Glowica");
 const { KolumnaDowodow } = await import("./KolumnaDowodow");
 const { SzufladaTowaru } = await import("../towar/Szuflada");
@@ -70,7 +69,7 @@ const PO_SKU: SzczegolReklamacji["kartoteka"] = {
   pewnosc: "sku", twId: TW_SKU, symbol: SYMBOL, zrodlo: `SKU oferty „${SYMBOL}"`, powod: null,
 };
 
-/** Głowica, kolumna dowodów i fakty jednej sprawy — tak jak stoją na ekranie. */
+/** Głowica z pasem faktów i kolumna dowodów jednej sprawy — tak jak stoją na ekranie. */
 const rysuj = (r: Partial<Reklamacja>, kartoteka: SzczegolReklamacji["kartoteka"]) => {
   const szczegol = {
     reklamacja: rek(r), czat: [], zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [],
@@ -82,7 +81,6 @@ const rysuj = (r: Partial<Reklamacja>, kartoteka: SzczegolReklamacji["kartoteka"
     <Glowica szczegol={szczegol} trwa={false} onProwadze={vi.fn()} />
     <KolumnaDowodow szczegol={szczegol} trwa={false} blad="" idZdjecia={(z) => `zdjecie-${z}`}
       onPokaz={vi.fn()} onDodaj={vi.fn()} onUsun={vi.fn()} />
-    <Dowody szczegol={szczegol} trwa={false} bladZapisu="" onNotatka={vi.fn()} />
   </SzufladaTowaru></MemoryRouter>);
 };
 
@@ -106,7 +104,7 @@ describe("Sprawa bez r.twId, z kartoteką po SKU oferty", () => {
     expect(screen.getByText("Klient zapłacił").parentElement!.textContent)
       .toContain("nasz zakup 18,64 PLN netto");
     expect(screen.queryByText("nie wiadomo")).not.toBeInTheDocument();
-    expect(screen.queryByText(/sprawa bez kartoteki/)).not.toBeInTheDocument();
+    expect(screen.queryByText("stanu ani dostaw nie znamy")).not.toBeInTheDocument();
   });
 
   it("symbol w głowicy otwiera przekrój towaru — przycisk żyje", () => {

@@ -5,7 +5,7 @@ import {
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
 } from "../api/typy";
-import { Blad, czas, Plakietka, Pusto } from "../ui";
+import { Blad, czas, kiedy, Plakietka, Pusto } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { klawiszZajety } from "../nawigacja/fokus";
 import { NAZWA } from "./statusy";
@@ -500,8 +500,11 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
 
              `border-l-[3px]` stoi PRZY KAŻDYM wierszu, nie tylko przy wybranym:
              dokładana dopiero przy zaznaczeniu przesuwała treść o trzy piksele
-             w prawo, więc kliknięcie w wiersz szarpało tekstem. */
-          className={`flex w-full flex-col gap-1 border-b border-l-[3px] px-3 py-2 text-left ${
+             w prawo, więc kliknięcie w wiersz szarpało tekstem.
+
+             LEWY MARGINES JEST SZERSZY OD PRAWEGO, bo mieszka w nim kropka
+             nieprzeczytanej — patrz komentarz przy niej. */
+          className={`flex w-full flex-col gap-1 border-b border-l-[3px] py-2 pl-5 pr-3 text-left ${
             wybranaId === r.id
               ? "wiersz-wybrany border-l-wertis-amber bg-slate-200"
               : "border-l-transparent hover:bg-slate-50"} ${
@@ -523,9 +526,18 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
                 statusu, „NOWA" — dwa różne fakty jednym wyrazem. Kropka to znak
                 nieprzeczytanego znany ze wszystkich skrzynek; nazwę niesie
                 `title` i tekst dla czytnika ekranu. Stoi tam, gdzie wzrok
-                wchodzi w wiersz — od wariantu C to pierwsza linia. */}
+                wchodzi w wiersz — od wariantu C to pierwsza linia.
+
+                KROPKA WISI NA MARGINESIE, nie w linii. W linii odpychała znak
+                kategorii i login o 16 px, więc lewa krawędź loginów skakała
+                z wiersza na wiersz. Oko szukało wtedy początku każdego loginu
+                osobno, zamiast zjechać w dół po jednej krawędzi. `-ml-3 -mr-1`
+                przy odstępie `gap-2` i marginesie `pl-5` stawia kropkę 4 px od
+                znaku i 8 px od belki. Bliżej znaku, bo otwarcie rozmowy nie
+                zdejmuje flagi: wybrany wiersz bywa nieprzeczytany, a bursztyn
+                kropki tuż przy bursztynie belki czytałby się jak jej zgrubienie. */}
             {r.nieprzeczytana && <span title="Nieprzeczytana wiadomość"
-              className="inline-block h-2 w-2 shrink-0 rounded-full bg-wertis-amber">
+              className="-ml-3 -mr-1 inline-block h-2 w-2 shrink-0 rounded-full bg-wertis-amber">
               <span className="sr-only">NOWE</span></span>}
             {/* ZNAK KATEGORII NA POCZĄTKU (23 września 2026). Kategoria, prośba
                 o człowieka i podziękowanie czytają się, zanim wzrok dojdzie do
@@ -542,11 +554,14 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
             {/* WIEK NA PRAWEJ KRAWĘDZI, w barwie pilności — `Czekanie`. Stoi
                 w jednej kolumnie przez całą przewijaną listę. Data ustępuje
                 zegarowi (0.251.0), bo przy „czeka na nas" oba mierzą tę samą
-                wiadomość; gdy zegara nie ma, data jest jedynym czasem wiersza. */}
+                wiadomość; gdy zegara nie ma, data jest jedynym czasem wiersza.
+                Data jest KRÓTKA (`kiedy`), bo pełna ścinała login o rok
+                i godzinę sprzed dni, których w tej kolumnie nikt nie czyta. */}
             <span className="ml-auto shrink-0 pl-1">
               {zegar !== null
                 ? <Czekanie ms={zegar} />
-                : <span className="text-podpis text-slate-500">{czas(r.ostatniaWiadomoscAt)}</span>}
+                : <span title={czas(r.ostatniaWiadomoscAt)}
+                  className="text-podpis tabular-nums text-slate-500">{kiedy(r.ostatniaWiadomoscAt)}</span>}
             </span>
           </span>
           {/* ── WIERSZ MÓWI, NA CZYM TRAFIŁ (0.425.0) ──────────────────────

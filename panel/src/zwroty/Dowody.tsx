@@ -421,7 +421,7 @@ export function Dowody({ zwrot, kandydaciFaktury = [], fakturaTrwa = false,
         naprawiły to samo w 0.387.0.
 
         Kształt i powód są te same co w reklamacji 0.416.0
-        (`reklamacje/Dowody.tsx`): droga jest nadzbiorem. Rozmowy wchodzą na
+        (`reklamacje/Fakty.tsx`): droga jest nadzbiorem. Rozmowy wchodzą na
         nią po tej samej relacji `ROZMOWA_ZAMOWIENIA`, z której serwer bierze
         `zwrot.rozmowy`, a każdy przystanek prowadzi do skrzynki. Najnowszą
         rozmowę z treścią i stanem niesie nagłówek. Rodzeństwo spraw zostaje,

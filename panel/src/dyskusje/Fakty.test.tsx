@@ -35,9 +35,9 @@ const szczegol = (n: Partial<SzczegolDyskusji> = {}, dn: Partial<Dyskusja> = {})
   zamowienie: null, przesylka: null, ...n,
 });
 
-function pokaz(s: SzczegolDyskusji, onNotatka = vi.fn()) {
+function pokaz(s: SzczegolDyskusji) {
   return render(<MemoryRouter>
-    <Fakty szczegol={s} trwa={false} bladZapisu="" onNotatka={onNotatka} />
+    <Fakty szczegol={s} />
   </MemoryRouter>);
 }
 
@@ -147,12 +147,13 @@ describe("Kolumna faktów o dyskusji", () => {
     expect(screen.queryByRole("heading", { name: "Hala" })).not.toBeInTheDocument();
   });
 
-  it("„Zapisz notatkę” staje dopiero przy zmianie treści", async () => {
-    const onNotatka = vi.fn();
-    pokaz(szczegol(), onNotatka);
-    expect(screen.queryByRole("button", { name: "Zapisz notatkę" })).not.toBeInTheDocument();
-    await userEvent.type(screen.getByLabelText("Notatka biura"), "ALG-1");
-    await userEvent.click(screen.getByRole("button", { name: "Zapisz notatkę" }));
-    expect(onNotatka).toHaveBeenCalledWith("ALG-1");
+  it("„Pracy biura” nie ma — ani tagów, ani notatki, jak w reklamacji", () => {
+    /* Decyzja właściciela: oba ekrany mają zostać bliźniacze, więc sekcja
+       zeszła z dyskusji razem z reklamacją. Stara notatka nie wraca na widok. */
+    pokaz(szczegol({}, { notatka: "ALG-1", tagi: [{ id: 1, nazwa: "czeka na część" }] } as Partial<Dyskusja>));
+    expect(screen.queryByText("Praca biura")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Notatka biura")).not.toBeInTheDocument();
+    expect(screen.queryByText("ALG-1")).not.toBeInTheDocument();
+    expect(screen.queryByText("czeka na część")).not.toBeInTheDocument();
   });
 });

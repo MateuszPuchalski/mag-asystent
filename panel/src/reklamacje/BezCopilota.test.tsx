@@ -2,10 +2,11 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
-import { Dowody } from "./Dowody";
+import { Fakty } from "../test/fakty";
+
 /* Źródła przez `?raw`, jak w strażnikach z `src/`: wywołanie, które ekran
    wpiąłby kiedyś bez karty, nie narysuje się w teście, a w tekście stanie. */
-import zrodloDowodow from "./Dowody.tsx?raw";
+import zrodloDowodow from "./Fakty.tsx?raw";
 import zrodloEdytora from "./Edytor.tsx?raw";
 import zrodloEkranu from "../ekrany/Reklamacje.tsx?raw";
 import zrodloApi from "../api/reklamacje.ts?raw";
@@ -64,7 +65,7 @@ const szczegol = (): SzczegolReklamacji => ({
 
 describe("kolumna reklamacji nie ma Copilota", () => {
   it("zapisana karta nie wraca na ekran: ani faktów maszyny, ani rady", () => {
-    render(<Dowody szczegol={szczegol()} trwa={false} bladZapisu="" onNotatka={vi.fn()} />);
+    render(<Fakty szczegol={szczegol()} />);
     expect(screen.queryByText("Co wyczytał Copilot")).not.toBeInTheDocument();
     expect(screen.queryByText("Copilot radzi")).not.toBeInTheDocument();
     expect(screen.queryByText("Brakuje do rozstrzygnięcia")).not.toBeInTheDocument();
@@ -73,7 +74,7 @@ describe("kolumna reklamacji nie ma Copilota", () => {
   });
 
   it("nie ma przycisku, który woła model", () => {
-    render(<Dowody szczegol={szczegol()} trwa={false} bladZapisu="" onNotatka={vi.fn()} />);
+    render(<Fakty szczegol={szczegol()} />);
     expect(screen.queryByRole("button", { name: /Przeczytaj|Copilot|Czytam/ })).not.toBeInTheDocument();
   });
 

@@ -465,6 +465,29 @@ export const dzienMiesiac = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleDateString("pl", { day: "2-digit", month: "2-digit" }) : "—";
 
 /**
+ * Chwila w wierszu listy — „15:32", „wczoraj", „04.10" albo „04.10.2025".
+ *
+ * Dla prawej krawędzi kolejki, którą oko przebiega w dół. Pełne „5.10.2026,
+ * 15:32" było czterokrotnie szersze od wieku obok i ścinało login, czyli
+ * klucz sprawy. Rok i godzina sprzed dni niczego tam nie rozstrzygają.
+ * Dokładną chwilę niesie `title` z `czas()`.
+ *
+ * Dzień liczy się od lokalnej północy, nie co 24 godziny. Inaczej wiadomość
+ * z 23:50 pokazałaby rano samą godzinę, czyli fałszywe „dzisiaj". `Math.round`
+ * łyka dobę 23- i 25-godzinną przy zmianie czasu.
+ */
+export function kiedy(v: string | null | undefined, teraz: Date = new Date()): string {
+  if (!v) return "—";
+  const d = new Date(v);
+  const polnoc = (x: Date) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+  const dni = Math.round((polnoc(teraz) - polnoc(d)) / 86_400_000);
+  if (dni === 0) return godzina(v);
+  if (dni === 1) return "wczoraj";
+  if (d.getFullYear() === teraz.getFullYear()) return dzienMiesiac(v);
+  return d.toLocaleDateString("pl", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
+/**
  * Wiersz kolejki biura — rama wspólna dla dostaw i koszy (0.438.0).
  *
  * Belka 3 px przy KAŻDYM wierszu, bursztynowa przy wybranym, i szare tło —
