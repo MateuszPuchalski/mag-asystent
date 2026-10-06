@@ -255,6 +255,8 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   copilot_auto_klasyfikacja_sufit: "Rozpoznania w tle wstrzymane limitem",
   przeplyw_propozycje: "Propozycje automatu w trybie cienia",
   przeplyw_werdykt: "Werdykt wobec propozycji automatu",
+  przeplyw_wyslane_na_zywo: "Automat odpisał klientowi sam",
+  przeplyw_na_zywo_blad: "Automat nie wysłał odpowiedzi",
   copilot_klasyfikacja_niepoprawna: "Rozpoznanie Copilota poprawione",
   copilot_korekta: "Poprawka odpowiedzi Copilota",
   copilot_dane_doboru: "Dane doboru dla Copilota",

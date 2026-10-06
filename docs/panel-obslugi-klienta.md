@@ -2470,7 +2470,7 @@ przerabianiem historii. Decyzji `FAILED` takt nie ponawia — ponawia człowiek
 przyciskiem nad kolejką.
 
 **Czego ten przyrost nie robi.** Nie wysyła niczego do klienta i nie zmienia
-trybu wysyłki: drogi wysyłki bez człowieka w kodzie nie ma.
+trybu wysyłki. Jedyną drogę wysyłki bez człowieka opisuje §14.6f.
 
 **Własny model klasyfikacji** (`COPILOT_MODEL_KLASYFIKACJA`, 22 września
 2026). Puste pole dziedziczy `COPILOT_MODEL`. Rozdział jest po to, żeby
@@ -2679,9 +2679,9 @@ w 0.107.0, i stał na zerze na wyraźną prośbę właściciela. Wraca na jego
 prośbę, ale wraca wyłączony: rzecz, która wydaje pieniądze bez kliknięcia,
 ma się włączać decyzją przy `wertis.env`, a nie skutkiem ubocznym aktualizacji.
 
-Do klienta **nie idzie nic** bez człowieka: szkic z taktu jest propozycją,
-a drogi wysyłki bez kliknięcia w kodzie nie ma. Zasada nadrzędna nr 2, która
-tego wymagała, odeszła 22 września 2026 (§27).
+Szkic z taktu jest propozycją i sam do klienta nie idzie. Jedyna droga
+wysyłki bez kliknięcia to przepływ kategorii na żywo (§14.6f), domyślnie
+wyłączony. Zasada nadrzędna nr 2 odeszła 22 września 2026 (§27).
 
 **Copilot widzi zdjęcia z rozmowy (0.330.0).** Właściciel pokazał zdjęcie
 tabliczki znamionowej kosiarki PARKSIDE i powiedział, że model nie umiał
@@ -2996,10 +2996,10 @@ Specyfikacja mierzy to obok odrzuceń, które niesie `szkic_copilota.ocena`.
 naszą wiadomość o treści niepewnej wysyłki, wiersz `send_uncertain` przechodzi
 na `sent` z numerem od Allegro. Szkicu i statusu rozmowy to nie rusza.
 
-**Czego nie ma:** wysyłki bez człowieka. Zasada nadrzędna nr 2, która jej
-zabraniała, odeszła 22 września 2026 decyzją właściciela (§27). Kodu takiej
-wysyłki jednak nie ma. Specyfikacja z 20 września opisuje warunki, na jakich
-ma powstać: bramka per klasa, dowody z tygodnia pracy i wyłącznik awaryjny.
+**Wysyłka bez człowieka** stoi od @wydanie, wyłącznie w przepływie kategorii
+na żywo (§14.6f). Zasada nadrzędna nr 2, która jej zabraniała, odeszła
+22 września 2026 decyzją właściciela (§27). Specyfikacja z 20 września
+stawiała trzy warunki: bramkę per klasa, dowody z pracy i wyłącznik awaryjny.
 
 ### 14.6b. Wzorzec odpowiedzi dla kategorii (0.474.0)
 
@@ -3037,8 +3037,8 @@ tworzy nową decyzję, więc szkic pod starą jest nieświeży i układa się od
 Drugi przebieg na tej samej decyzji nie płaci drugi raz.
 
 **Gotowy do zatwierdzenia, nie wysłany.** Karta szkicu czeka z pustą oceną.
-Agent wstawia go klawiszem `E`, poprawia i wysyła. Wysyłki bez człowieka
-w kodzie nie ma.
+Agent wstawia go klawiszem `E`, poprawia i wysyła. Wyjątek to kategoria
+włączona na żywo (§14.6f): tam szkic po wszystkich bramkach wychodzi sam.
 
 **Koszt.** Ten sam sufit godzinowy co szkic z taktu (`autoNaGodzine`).
 „Nic do zrobienia" i rozpoznanie zastępcze szkicu nie dają. Włączone
@@ -3100,12 +3100,60 @@ poprawiony to sprzeciw. Krok i pilne ocenia agent na karcie „Automat by…".
 
 **Pomiar** za zębatką, w karcie pomiaru Copilota: zgodność osobno dla każdej
 kategorii i rodzaju, zawsze z liczbą przypadków. Kategoria wchodzi na żywo
-osobnym wydaniem dopiero po liczbach. Dopiero wtedy powstanie kod wysyłki
-bez człowieka i drugi tryb w `decyzja_klasyfikacji.tryb`.
+przełącznikiem w `wertis.env`, a nowa kategoria dochodzi do listy możliwych
+osobnym wydaniem (§14.6f).
 
 **Pilne a kolejność kolejki.** Propozycja „pilne" w cieniu kolejki nie
 przestawia. Żywe „pilne" zmieni zasadę z §14.5, że przypuszczenie maszyny
 kolejki nie rusza, i wymaga osobnej zgody właściciela przy wejściu na żywo.
+
+### 14.6f. Przepływ kategorii na żywo: stan zamówienia (@wydanie)
+
+Decyzja właściciela z 6 października 2026: tryb na żywo dla kategorii
+„Stan zamówienia". To pierwsza droga w kodzie, którą odpowiedź wychodzi do
+klienta bez kliknięcia człowieka.
+
+**Wyłącznik w `wertis.env`, domyślnie wyłączony.** `PRZEPLYW_NA_ZYWO`
+to lista kategorii po przecinku. Kod przyjmuje z niej tylko kategorie
+z listy `NA_ZYWO_MOZLIWE`, dziś jedną: `ORDER_STATUS`. Dopisanie innej
+kategorii w `wertis.env` niczego nie włącza. Kolejna kategoria to osobne
+wydanie, które dopisuje ją do listy po przejrzeniu jej liczb.
+
+**Sufit** `PRZEPLYW_NA_ZYWO_NA_GODZINE`, domyślnie dziesięć wysyłek.
+Liczy się z bazy, więc restart usługi go nie zeruje.
+
+**Bramka cienia plus siedem warunków chwili wysyłki.** Najpierw propozycja
+„wyslij" z §14.6e: wysoka pewność, szkic bez zastrzeżeń, nikt nie prosi
+o człowieka. Potem, w chwili wysyłki:
+
+1. decyzja jest dalej decyzją ostatniej wiadomości klienta;
+2. nikt jeszcze nie odpisał;
+3. szkic powstał pod tę wiadomość i tę decyzję, a agent go nie odrzucił;
+4. agent nie pisze własnego szkicu;
+5. rozmowy nie prowadzi człowiek;
+6. nikt przy niej nie siedzi;
+7. sufit godzinowy nie jest wyczerpany.
+
+Każdy niespełniony warunek oznacza „nie wysyłaj", a rozmowa czeka na agenta
+jak dotąd.
+
+**Konto „Automat".** Wysyłka potrzebuje autora, więc automat ma konto bez
+loginu i hasła, którym nie da się zalogować. Jego odpowiedź NIE przydziela
+rozmowy na stałe. Inaczej każdy agent dostałby „Rozmowę prowadzi Automat".
+
+**Błąd nie wraca.** Nieudana albo niepewna wysyłka zapisuje powód przy
+propozycji i nie ponawia się co takt. Niepewną rozstrzyga synchronizacja
+wątku (§8.5), jak przy wysyłce agenta.
+
+**Przegląd po fakcie.** Karta „Automat by…" mówi „Automat wysłał szkic"
+z godziną. Agent ocenia go przyciskiem „W porządku" albo „Źle wysłane".
+Auto-wysyłka sama werdyktu nie daje, bo szkic wysłany przez automat bez
+zmian nie jest zgodą człowieka.
+
+**Ślad.** Wysyłkę automatu niosą `propozycja_przeplywu.wykonana_at`
+i `outbox.created_by` wskazujący konto automatu. Kolumna
+`decyzja_klasyfikacji.tryb` zostaje przy jednej wartości, bo przebudowa
+tabeli nie dodałaby do tego śladu nic.
 
 ### 14.7. Co działa: dane doboru z rozmowy (etap F, przyrost trzeci)
 
@@ -3491,7 +3539,8 @@ synchronizowane; agent widzi ofertę albo jawny brak powiązania; agent widzi
 dane produktu; dwóch agentów nie odpowie przypadkowo jednocześnie; komentarz
 wewnętrzny nie może trafić do klienta; wynik magazyniera wraca do właściwej
 rozmowy; nowa wiadomość zatrzymuje nieaktualną wysyłkę; podwójne kliknięcie nie
-tworzy dwóch odpowiedzi; automat nie wysyła bez człowieka; rekomendacja
+tworzy dwóch odpowiedzi; automat nie wysyła bez człowieka poza kategorią
+włączoną na żywo (§14.6f); rekomendacja
 techniczna pokazuje źródło; negatywne dopasowania są widoczne; awaria
 synchronizacji jest jawna; każda mutacja ma autora i czas; system działa bez
 Teamsa i Slacka; agent obsłuży typowe pytanie bez otwierania panelu Allegro.
@@ -6795,8 +6844,8 @@ klienta". Właściciel go usunął po specyfikacji z 20 września, która
 przewiduje wysyłkę bez człowieka dla klas z dowodami. Numer zostaje pusty,
 a reszta się nie przesuwa: kod i dekalog cytują punkty 9, 11 i 12 po numerze.
 
-Usunięcie zasady nie jest funkcją. Kodu wysyłki bez człowieka dziś nie ma,
-a każda odpowiedź dalej wychodzi na kliknięcie agenta.
+Usunięcie zasady nie było funkcją. Funkcją jest przepływ kategorii na żywo
+(§14.6f): dziś tylko stan zamówienia i tylko po włączeniu w `wertis.env`.
 
 ## 28. Stan faktyczny — co już działa
 
@@ -6868,7 +6917,8 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Rozpoznanie w faktach szkicu, intake tylko przy towarze (§14.6a) | **działa** od 22 września 2026 | `kontekstSzkicu`, `zRozpoznaniaNiepewne` w `services/copilot-szkic.ts` |
 | Szkic z taktu dla rozmów bez oferty (§14.6a) | **działa** od 22 września 2026, przy `COPILOT_AUTO_SZKIC=1` | `services/copilot-auto-szkic.ts` |
 | Szkic zaraz po rozpoznaniu (§14.6c) | **działa** od 0.477.0, domyślnie włączony (`COPILOT_SZKIC_PO_ROZPOZNANIU`) | `services/copilot-szkic-po-rozpoznaniu.ts`, `szkic_copilota.decyzja_id` |
-| Przepływ kategorii w trybie cienia (§14.6e) | **działa** od 0.569.0, tylko propozycje i pomiar; wysyłki bez człowieka nie ma | `services/przeplyw-kategorii.ts`, tabela `propozycja_przeplywu`, karta „Automat by…" w rozmowie, pomiar za zębatką |
+| Przepływ kategorii w trybie cienia (§14.6e) | **działa** od 0.569.0, propozycje i pomiar; wysyłka na żywo w §14.6f | `services/przeplyw-kategorii.ts`, tabela `propozycja_przeplywu`, karta „Automat by…" w rozmowie, pomiar za zębatką |
+| Przepływ kategorii na żywo, stan zamówienia (§14.6f) | **działa** od @wydanie, wyłączony domyślnie (`PRZEPLYW_NA_ZYWO`) | `services/przeplyw-na-zywo.ts`, konto „Automat", `propozycja_przeplywu.wykonana_at` |
 | Los szkicu przy wysyłce i uzgodnienie `send_uncertain` (§14.6a) | **działa** od 22 września 2026 | `outbox.szkic_los`, `losSzkicu` w `wysylka.ts`, `uzgodnijNiepewna` w `allegro-inbox-sync.ts` |
 | Typ i podtyp wątku z `beta.v1` w klasyfikacji (§14.5b) | **działa** od 22 września 2026, `[WERYFIKUJ]` dostępność bety na koncie | `allegro-inbox-sync.ts` (`czytajStrukture`), kolumny `watek_*` w `allegro_inbox_thread`, `services/klasyfikacja-mapowanie.ts` |
 | Copilot — szkic odpowiedzi z faktów (§14.6) | **działa** od 0.231.0 | `services/copilot-szkic.ts`, `szkic_copilota`, przycisk „Ułóż odpowiedź" w edytorze, karta `skrzynka/SzkicCopilota.tsx`; od 0.253.0 wiedza własna modelu wolna, ale każde twierdzenie ma źródło, a pewność przyznaje serwer |

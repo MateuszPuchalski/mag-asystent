@@ -4,6 +4,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropozycjaPrzeplywu } from "../api/typy";
+import { czas } from "../ui";
 import { atrapaZapisow } from "../test/zapisy";
 import { naruszeniaWcag } from "../test/dostepnosc";
 import { PropozycjePrzeplywu } from "./PropozycjePrzeplywu";
@@ -15,14 +16,17 @@ import { PropozycjePrzeplywu } from "./PropozycjePrzeplywu";
    2. Przyciski stoją tylko tam, gdzie agent jest sędzią: przy kroku i pilnym
       bez werdyktu. „Wysłałby szkic" ocenia wysyłka.
    3. Kliknięcie wysyła jeden POST z ciałem `{ werdykt }` na trasę propozycji.
-   4. Po werdykcie wiersz mówi, co rozstrzygnięto i kto, już bez przycisków. */
+   4. Po werdykcie wiersz mówi, co rozstrzygnięto i kto, już bez przycisków.
+
+   Na żywo dochodzi piąta: szkic wysłany przez automat ma chwilę wysyłki
+   i ocenę po fakcie, a nieudana wysyłka nie ma czego oceniać. */
 
 afterEach(() => vi.unstubAllGlobals());
 
 const prop = (n: Partial<PropozycjaPrzeplywu>): PropozycjaPrzeplywu => ({
   id: 1, rodzaj: "pilne", kategoria: "WRONG_PRODUCT", instrukcja: null,
   at: "2026-10-06T08:00:00.000Z", werdykt: null, werdyktZrodlo: null,
-  werdyktPrzez: null, werdyktAt: null, ...n,
+  werdyktPrzez: null, werdyktAt: null, wykonanaAt: null, wykonanieBlad: null, ...n,
 });
 
 const TRZY = [
@@ -124,5 +128,75 @@ describe("PropozycjePrzeplywu", () => {
     rysuj(TRZY);
     await userEvent.click(screen.getByRole("button", { name: "Oznacz" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Rozpoznanie się zmieniło");
+  });
+
+  /* ── Na żywo ────────────────────────────────────────────────────────────── */
+  const WYSLANA = "2026-10-06T10:04:00.000Z";
+
+  it("szkic wysłany przez automat: chwila wysyłki, nagłówek na żywo, dwa przyciski oceny", async () => {
+    const zapisy = atrapaZapisow(() => undefined);
+    rysuj([prop({ id: 51, rodzaj: "wyslij", kategoria: "ORDER_STATUS", wykonanaAt: WYSLANA })]);
+    const karta = screen.getByRole("region", { name: "Automat by" });
+    expect(karta.textContent).toContain("na żywo — automat odpisał sam");
+    expect(karta.textContent).not.toContain("tryb cienia");
+    expect(wiersz("wyslij").textContent).toContain(`Automat wysłał szkic · ${czas(WYSLANA)}`);
+    expect(wiersz("wyslij").textContent).not.toContain("oceni to wysyłka");
+    expect(within(wiersz("wyslij")).getByRole("button", { name: "W porządku" })).toBeInTheDocument();
+    expect(within(wiersz("wyslij")).getByRole("button", { name: "Źle wysłane" })).toBeInTheDocument();
+    /* Otwarcie karty z wysłanym szkicem też nic nie zapisuje. */
+    expect(zapisy.wyslane).toEqual([]);
+    expect(zapisy.nieznane).toEqual([]);
+    expect(await naruszeniaWcag()).toBe("");
+  });
+
+  it("„W porządku” to zgoda, „Źle wysłane” to sprzeciw, oba jednym POST-em na trasę propozycji", async () => {
+    const zapisy = atrapaZapisow(() => undefined);
+    rysuj([
+      prop({ id: 52, rodzaj: "wyslij", kategoria: "ORDER_STATUS", wykonanaAt: WYSLANA }),
+    ]);
+    await userEvent.click(screen.getByRole("button", { name: "W porządku" }));
+    await waitFor(() => expect(zapisy.wyslane).toEqual(["POST /api/obsluga/rozmowy/5/przeplyw/52"]));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Źle wysłane" })).toBeEnabled());
+    await userEvent.click(screen.getByRole("button", { name: "Źle wysłane" }));
+    await waitFor(() => expect(zapisy.wyslane).toHaveLength(2));
+    const posty = (fetch as Mock).mock.calls.filter(([, init]) => init?.method === "POST");
+    expect(posty.map(([, init]) => JSON.parse(init.body))).toEqual([
+      { werdykt: "zgoda" }, { werdykt: "sprzeciw" }]);
+  });
+
+  it("po ocenie wysłanego wiersz mówi wynik i kto, bez przycisków", () => {
+    atrapaZapisow(() => undefined);
+    rysuj([
+      prop({ id: 53, rodzaj: "wyslij", kategoria: "ORDER_STATUS", wykonanaAt: WYSLANA,
+        werdykt: "zgoda", werdyktZrodlo: "agent", werdyktPrzez: "Ola" }),
+      prop({ id: 54, rodzaj: "wyslij", kategoria: "ORDER_STATUS", wykonanaAt: WYSLANA,
+        werdykt: "sprzeciw", werdyktZrodlo: "agent", werdyktPrzez: "Jan" }),
+    ]);
+    expect(screen.queryAllByRole("button")).toEqual([]);
+    const [dobry, zly] = document.querySelectorAll<HTMLElement>('li[data-rodzaj="wyslij"]');
+    expect(dobry.textContent).toContain("w porządku · Ola");
+    expect(zly.textContent).toContain("źle wysłane · Jan");
+    expect(dobry.textContent).not.toContain("wysłany bez zmian");
+  });
+
+  it("nieudana wysyłka mówi błąd, bez przycisków, a nagłówek nie udaje cienia", () => {
+    atrapaZapisow(() => undefined);
+    rysuj([prop({ id: 55, rodzaj: "wyslij", kategoria: "ORDER_STATUS",
+      wykonanieBlad: "Allegro odrzuciło wiadomość (422)" })]);
+    expect(wiersz("wyslij").textContent).toContain("Automat nie wysłał: Allegro odrzuciło wiadomość (422)");
+    expect(within(wiersz("wyslij")).queryAllByRole("button")).toEqual([]);
+    expect(wiersz("wyslij").textContent).not.toContain("oceni to wysyłka");
+    const karta = screen.getByRole("region", { name: "Automat by" });
+    expect(karta.textContent).toContain("na żywo — wysyłka automatu się nie udała");
+    expect(karta.textContent).not.toContain("tryb cienia");
+  });
+
+  /* Niepewna wysyłka mogła dojść. „Nie wysłał" namówiłoby agenta na drugi list. */
+  it("niepewna wysyłka nie mówi „nie wysłał”, tylko każe sprawdzić oś", () => {
+    atrapaZapisow(() => undefined);
+    rysuj([prop({ id: 56, rodzaj: "wyslij", kategoria: "ORDER_STATUS", wykonanieBlad: "niepewna" })]);
+    expect(wiersz("wyslij").textContent).toContain("Automat nie wie, czy szkic doszedł — sprawdź oś rozmowy");
+    expect(wiersz("wyslij").textContent).not.toContain("nie wysłał");
+    expect(within(wiersz("wyslij")).queryAllByRole("button")).toEqual([]);
   });
 });

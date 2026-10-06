@@ -191,11 +191,13 @@ export type PomiarCopilota = {
   };
   /** Zgodność automatu z agentem per kategoria i rodzaj — na tych liczbach zapadnie żywe wykonanie. */
   przeplyw: WierszPomiaruPrzeplywu[];
+  /** Kategorie, w których automat naprawdę odpisuje sam. Liczy serwer: włącznik przecięty z listą dozwolonych. */
+  naZywo: string[];
 };
 
-/* ── Przepływ kategorii w trybie cienia ──────────────────────────────────────
-   Automat zapisuje, co BY zrobił, a agent potwierdza albo odrzuca. Nic nie
-   idzie do klienta i nic nie zmienia się samo, bo najpierw mają być dowody.
+/* ── Przepływ kategorii: tryb cienia i na żywo ───────────────────────────────
+   Automat zapisuje, co BY zrobił, a agent potwierdza albo odrzuca. W kategorii
+   włączonej na żywo automat wysyła szkic sam, a agent ocenia to po fakcie.
    Kształty są lustrem serwera (`services/przeplyw-kategorii.ts`). */
 export type RodzajPropozycji = "wyslij" | "krok" | "pilne";
 
@@ -211,6 +213,10 @@ export type PropozycjaPrzeplywu = {
   werdyktZrodlo: "agent" | "wysylka" | null;
   werdyktPrzez: string | null;
   werdyktAt: string | null;
+  /** Automat wysłał szkic sam o tej chwili; tylko przy „wyslij" w kategorii na żywo. */
+  wykonanaAt: string | null;
+  /** Wysyłka automatu padła; „niepewna" znaczy, że nie wiemy, czy dotarła. */
+  wykonanieBlad: string | null;
 };
 
 export type WierszPomiaruPrzeplywu = {
@@ -220,6 +226,8 @@ export type WierszPomiaruPrzeplywu = {
   zgod: number;
   sprzeciwow: number;
   bezWerdyktu: number;
+  /** Ile z tych propozycji automat wysłał sam; poza „wyslij" zawsze zero. */
+  wyslanychNaZywo: number;
 };
 
 /** Załącznik wiadomości. `doPobrania` liczy serwer — panel go nie wylicza. */

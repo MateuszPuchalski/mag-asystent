@@ -2,16 +2,20 @@ import React, { useState } from "react";
 import { Bot } from "lucide-react";
 import type { PropozycjaPrzeplywu } from "../api/typy";
 import { useWerdyktPrzeplywu } from "../api/copilot";
-import { Przycisk } from "../ui";
+import { Przycisk, czas } from "../ui";
 import { NAZWA_KATEGORII } from "./statusy";
 
 /**
- * „AUTOMAT BY…" — PRZEPŁYW KATEGORII W TRYBIE CIENIA.
+ * „AUTOMAT BY…" — PRZEPŁYW KATEGORII W TRYBIE CIENIA I NA ŻYWO.
  *
  * Automat zapisuje, co BY zrobił przy tym rozpoznaniu, a agent mówi „tak"
- * albo „nie". Nic nie idzie do klienta i nic nie zmienia się samo. Żywe
- * wykonanie wejdzie per kategoria dopiero po liczbach z pomiaru, więc każdy
- * werdykt tutaj jest głosem w tamtej decyzji.
+ * albo „nie". W cieniu nic nie idzie do klienta i nic nie zmienia się samo.
+ * Każdy werdykt jest głosem w decyzji, czy kategorię włączyć na żywo.
+ *
+ * NA ŻYWO automat wysyła szkic sam. Wtedy karta mówi to wprost, w nagłówku
+ * i w wierszu z chwilą wysyłki, bo agent musi wiedzieć, że klient już coś
+ * dostał. Ocena „W porządku" albo „Źle wysłane" niczego nie wykonuje, tylko
+ * zasila pomiar, na którym kategoria zostaje na żywo albo z niego schodzi.
  *
  * KARTA STOI NAD ODPOWIEDZIĄ, obok formularza pomiaru. Zlecenie dla hali
  * i znacznik „pilne" to kroki przed odpowiedzią klientowi, nie po niej.
@@ -19,6 +23,9 @@ import { NAZWA_KATEGORII } from "./statusy";
  * PRZYCISKI TYLKO TAM, GDZIE AGENT JEST SĘDZIĄ. „Wysłałby szkic" ocenia
  * wysyłka: szkic poszedł bez zmian albo z poprawką. Drugi przycisk przy tym
  * samym pytaniu kazałby agentowi decydować dwa razy (dekalog, punkt 5).
+ * Szkic wysłany przez automat nie przejdzie już przez wysyłkę agenta,
+ * więc tam sędzią jest agent i przyciski wracają. Wysyłka nieudana
+ * przycisków nie ma: oceniać nie ma czego, agent po prostu odpowiada sam.
  * Wiersz z werdyktem traci przyciski i mówi, kto rozstrzygnął.
  *
  * Hak mutacji stoi w osobnym komponencie, za warunkiem pustej listy, jak
@@ -36,8 +43,24 @@ export function PropozycjePrzeplywu(p: Wlasciwosci) {
   return <Karta rozmowaId={p.rozmowaId} propozycje={p.propozycje} />;
 }
 
-/** Czym automat BY się zajął — zdanie w trybie przypuszczającym, bo nic się nie stało. */
+/** Szkic, który automat wysłał sam. Pierwszeństwo przed błędem, bo klient go dostał. */
+const wyslana = (pr: PropozycjaPrzeplywu) => pr.rodzaj === "wyslij" && !!pr.wykonanaAt;
+/** Wysyłka automatu padła albo jej los jest niepewny; agent odpowiada sam. */
+const nieudana = (pr: PropozycjaPrzeplywu) => pr.rodzaj === "wyslij" && !pr.wykonanaAt && !!pr.wykonanieBlad;
+
+/**
+ * Czym automat BY się zajął — zdanie w trybie przypuszczającym, bo nic się
+ * nie stało. Wysyłkę na żywo opisuje zdanie pełne, w czasie przeszłym.
+ * Pełna data, nie sama godzina: wysłana propozycja zostaje na karcie
+ * przez kilka dni, a „10:04" bez dnia kłamałoby od jutra.
+ */
 function opis(pr: PropozycjaPrzeplywu): string {
+  if (wyslana(pr)) return `Automat wysłał szkic · ${czas(pr.wykonanaAt)}`;
+  /* „Niepewna" to wysyłka, której los zna dopiero Allegro. Nie piszemy
+     „nie wysłał", bo klient mógł ją dostać i drugi list byłby dublem. */
+  if (nieudana(pr) && pr.wykonanieBlad === "niepewna")
+    return "Automat nie wie, czy szkic doszedł — sprawdź oś rozmowy";
+  if (nieudana(pr)) return `Automat nie wysłał: ${pr.wykonanieBlad}`;
   if (pr.rodzaj === "wyslij") return "wysłał szkic bez zmian";
   if (pr.rodzaj === "krok") return `zlecił hali: ${pr.instrukcja ?? "weryfikację"}`;
   return "oznaczył jako pilne";
@@ -56,6 +79,7 @@ const SPRZECIW: Record<"krok" | "pilne", string> = { krok: "Nie zlecaj hali", pi
  * naprawdę się wykonał, bo zgoda go wykonuje.
  */
 function werdyktSlowem(pr: PropozycjaPrzeplywu): string {
+  if (wyslana(pr)) return pr.werdykt === "zgoda" ? "w porządku" : "źle wysłane";
   if (pr.rodzaj === "wyslij") return pr.werdykt === "zgoda" ? "zgoda — wysłany bez zmian" : "sprzeciw — poprawiony albo odrzucony";
   if (pr.werdykt === "sprzeciw") return "sprzeciw";
   return pr.rodzaj === "krok" ? "zgoda — zlecone hali" : "zgoda — oznaczone jako pilne";
@@ -69,6 +93,14 @@ function Karta({ rozmowaId, propozycje }: { rozmowaId: number; propozycje: Propo
      rozpoznanie trafiło, a kategoria w nagłówku rozmowy siedzi pod „⋯". */
   const kat = propozycje[0].kategoria;
   const nazwa = (NAZWA_KATEGORII as Record<string, string>)[kat] ?? kat;
+  /* Dopisek „tryb cienia" kłamałby, gdy klient już coś dostał od automatu.
+     Nieudana wysyłka też jest na żywo, ale nic nie odpisała, więc mówi to
+     osobnym zdaniem: agent ma odpowiedzieć sam. */
+  const tryb = propozycje.some(wyslana)
+    ? "na żywo — automat odpisał sam"
+    : propozycje.some(nieudana)
+      ? "na żywo — wysyłka automatu się nie udała"
+      : "tryb cienia — nic nie dzieje się samo";
 
   const rozstrzygnij = (pr: PropozycjaPrzeplywu, w: "zgoda" | "sprzeciw") => {
     setBlad("");
@@ -82,15 +114,24 @@ function Karta({ rozmowaId, propozycje }: { rozmowaId: number; propozycje: Propo
       <Bot size={14} className="shrink-0 self-center text-slate-600" aria-hidden="true" />
       <b>Automat by…</b>
       <span className="text-slate-600">{nazwa}</span>
-      <span className="text-xs text-slate-600">· tryb cienia — nic nie dzieje się samo</span>
+      <span className="text-xs text-slate-600">· {tryb}</span>
     </p>
     <ul className="mt-1 space-y-1">
       {propozycje.map((pr) => <li key={pr.id} data-rodzaj={pr.rodzaj}
         className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="min-w-0">{opis(pr)}</span>
+        <span className={nieudana(pr) ? "min-w-0 text-ranga-zle" : "min-w-0"}>{opis(pr)}</span>
         {pr.werdykt
           ? <span className="text-xs text-slate-600">
               {werdyktSlowem(pr)}{pr.werdyktPrzez && ` · ${pr.werdyktPrzez}`}</span>
+          : wyslana(pr)
+            ? <span className="ml-auto flex gap-2">
+                <Przycisk className="px-3 py-1 text-xs" disabled={werdykt.isPending}
+                  onClick={() => rozstrzygnij(pr, "zgoda")}>W porządku</Przycisk>
+                <Przycisk className="px-3 py-1 text-xs" disabled={werdykt.isPending}
+                  onClick={() => rozstrzygnij(pr, "sprzeciw")}>Źle wysłane</Przycisk>
+              </span>
+          : nieudana(pr)
+            ? null
           : pr.rodzaj === "wyslij"
             ? <span className="text-xs text-slate-600">oceni to wysyłka</span>
             : <span className="ml-auto flex gap-2">
