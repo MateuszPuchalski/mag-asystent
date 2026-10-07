@@ -106,6 +106,19 @@ test("treść oferty wchodzi do faktów i mówi o sobie, że jest słowem SPRZED
   assert.match(f, /HONDA GX160 \| HONDA GX200/);
 });
 
+test("szkic widzi doradcę Allegro jako ALLEGRO i odpowiada na wiadomość kupującego", () => {
+  /* W Problemie z zakupem doradca pisze jak strona przychodząca. Pod etykietą
+     KLIENT szkic odpowiadałby kupującemu na słowa Allegro, a szkic zapisany
+     pod wiadomością doradcy nigdy nie byłby świeży. */
+  db().prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    sent_at,autor_rola) VALUES (?,?,'m-doradca','incoming','Prosimy sprzedawcę o stanowisko',
+    '2026-09-07T11:00:00Z','CONSULTANT')`).run(rozmowa, konto);
+  const k = S.kontekstSzkicu(rozmowa, subiekt);
+  assert.match(String(k.watek), /\nALLEGRO: Prosimy sprzedawcę o stanowisko$/);
+  assert.match(String(k.watek), /^KLIENT: /);
+  assert.equal(k.ostatniaWiadomoscId, pytanie, "szkic odpowiada na pytanie kupującego");
+});
+
 test("długa lista zgodności wchodzi przycięta i mówi, ile jej było", () => {
   const wersje = Array.from({ length: 214 }, (_, i) => `HONDA GX${100 + i}`);
   db().prepare("UPDATE offer_snapshot SET pasuje_do_json=? WHERE external_id='of-1'")

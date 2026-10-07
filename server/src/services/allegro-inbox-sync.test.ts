@@ -1126,6 +1126,29 @@ test("rola USER z loginem sprzedawcy wątku to nasza wiadomość", async () => {
   assert.equal((database.prepare("SELECT direction d FROM message").get() as any).d, "outgoing");
 });
 
+test("zamykające zdanie doradcy nie budzi rozmowy zakończonej przez agenta", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  await przebiegBety(database, atrapaBety([[problemBeta("p-1", { lastMessageDateTime: "2026-10-02T11:00:00Z" })]],
+    { "p-1": { beta: [wiadomoscBeta("pm-1", "BUYER", "kupujacy-anon")] } }).query);
+  const rozmowa = Number((database.prepare("SELECT id FROM conversation").get() as any).id);
+  database.prepare("UPDATE conversation SET status='resolved' WHERE id=?").run(rozmowa);
+  const zdarzenia: Array<Record<string, unknown>> = [];
+  const wypisz = onConversationEvent((e) => { zdarzenia.push(e as unknown as Record<string, unknown>); });
+  try {
+    await przebiegBety(database, atrapaBety([[problemBeta("p-1", { status: "CLOSED" })]], { "p-1": { beta: [
+      wiadomoscBeta("pm-2", "CONSULTANT", "doradca", { createdAt: "2026-10-02T11:30:00Z" }),
+      wiadomoscBeta("pm-1", "BUYER", "kupujacy-anon"),
+    ] } }).query);
+  } finally {
+    wypisz();
+  }
+  assert.equal((database.prepare("SELECT status FROM conversation WHERE id=?").get(rozmowa) as any).status,
+    "resolved", "zamknięty wątek: głos Allegro nie jest ruchem");
+  const nowa = zdarzenia.find((e) => e.type === "message.created") as any;
+  assert.equal(nowa?.data?.odKlienta, false, "pasek nowej wiadomości klienta się nie zapala");
+});
+
 test("Problem z zakupem z kilkoma zamówieniami nie zgaduje numeru", async () => {
   _zdejmijWstrzymanieStruktury();
   const database = mkDb();

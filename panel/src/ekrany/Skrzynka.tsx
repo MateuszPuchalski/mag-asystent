@@ -19,7 +19,7 @@ import {
 } from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
-import { szkicNaStartRozmowy } from "../skrzynka/SzkicCopilota";
+import { ostatniaKupujacego, szkicNaStartRozmowy } from "../skrzynka/SzkicCopilota";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
@@ -335,6 +335,10 @@ export function Skrzynka() {
      w ogóle — inaczej własna odpowiedź blokowałaby kolejną w tej rozmowie. */
   const ostatniaKlienta = [...(rozmowa.data?.os ?? [])].reverse()
     .find((w) => w.rodzaj === "wiadomosc" && w.odKlienta)?.messageId ?? null;
+  /* Szkic Copilota odpowiada KUPUJĄCEMU, więc jego świeżość pomija słowa
+     doradcy Allegro (`ostatniaKupujacego` w `SzkicCopilota.tsx`). Wysyłka
+     dalej porównuje z każdą przychodzącą: agent ma zobaczyć i doradcę. */
+  const ostatniaDoSzkicu = ostatniaKupujacego(rozmowa.data?.os ?? []);
 
   const zmienOdlozona = (klucz: number, zmiana: Partial<Wpis>) =>
     setOdlozone((l) => l.map((o) => (o.klucz === klucz ? { ...o, ...zmiana } : o)));
@@ -665,7 +669,7 @@ export function Skrzynka() {
         szkic: rozmowa.data?.szkicCopilota ?? null,
         /* Nieświeży = klient dopisał po tym, jak model czytał wątek. Porównanie
            po identyfikatorze ostatniej wiadomości KLIENTA, tak jak przy wysyłce. */
-        nieswiezy: (rozmowa.data?.szkicCopilota?.messageId ?? null) !== ostatniaKlienta,
+        nieswiezy: (rozmowa.data?.szkicCopilota?.messageId ?? null) !== ostatniaDoSzkicu,
         uklada: ulozSzkic.isPending,
         blad: bladSzkicu,
         maSzkicAgenta: szkic.trim() !== "",

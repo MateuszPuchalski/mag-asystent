@@ -190,6 +190,10 @@ export interface WpisOsi {
      zwija taki wpis do jednej linijki. Flaga stoi wyłącznie przy wiadomościach
      WYCHODZĄCYCH — uzasadnienie w `czyAutoresponder`. */
   automatyczna?: boolean;
+  /* Wiadomość doradcy albo komunikat Allegro w Problemie z zakupem
+     (`glos-allegro.ts`). Stoi po stronie przychodzącej, ale klientem nie
+     jest: świeżość szkicu Copilota liczy się od słów KUPUJĄCEGO. */
+  odAllegro?: true;
   /* Blok firmowy odcięty od treści (0.219.1): nazwa spółki, adres, NIP, KRS,
      REGON, telefon. `tresc` jest wtedy BEZ niego, a panel chowa go pod
      przyciskiem. Też tylko przy wychodzących — patrz `podzielStopke`. */
@@ -306,6 +310,11 @@ const LISTA = `
            WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
              AND NOT ${glosAllegroPoZamknieciu("m")}
            ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuchAt,
+         -- Kto napisał ten ruch: głos Allegro nie jest podziękowaniem klienta.
+         (SELECT m.autor_rola FROM message m
+           WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
+             AND NOT ${glosAllegroPoZamknieciu("m")}
+           ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuchRola,
          (SELECT t.watek_status FROM allegro_inbox_thread t
            WHERE t.id = c.external_conversation_id) AS watekStatus,
          (SELECT t.watek_typ FROM allegro_inbox_thread t
@@ -365,7 +374,10 @@ const naRozmowe = (
   const odlozoneDo = w.odlozoneDo === null ? null : String(w.odlozoneDo);
   const minal = Boolean(odlozoneDo && Date.parse(odlozoneDo) <= teraz);
   const ostatniRuch = w.ostatniRuch == null ? null : String(w.ostatniRuch);
-  const podziekowal = ostatniRuch === "incoming" && w.kopKategoria != null && klientPodziekowal({
+  /* Bramka roli jak w `statusIZakonczenie`: po „dziękuję” klienta doradca
+     Allegro może jeszcze prosić o stanowisko, a to nie kończy rozmowy. */
+  const podziekowal = ostatniRuch === "incoming" && !ROLE_ALLEGRO.has(String(w.ostatniRuchRola ?? ""))
+    && w.kopKategoria != null && klientPodziekowal({
     kategoria: String(w.kopKategoria), akcja: String(w.kopAkcja), status: String(w.kopStatus),
     pewnosc: w.kopPewnosc == null ? null : String(w.kopPewnosc),
     wymagaCzlowieka: Boolean(Number(w.kopWymaga ?? 0)),
@@ -712,6 +724,7 @@ export function osRozmowy(id: number): {
        czyta kolejka przy wyliczaniu, kto ma ruch, a jedno źródło znaczy, że
        oba miejsca nie mogą się rozejść. */
     ...(Number(m.auto ?? 0) ? { automatyczna: true } : {}),
+    ...(ROLE_ALLEGRO.has(String(m.rola)) ? { odAllegro: true as const } : {}),
     ...(stopka == null ? {} : { stopka }),
     };
   });

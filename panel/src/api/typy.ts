@@ -302,6 +302,10 @@ export type WpisOsi = {
   wzmianki?: Array<{ userId: number; name: string }>;
   /* Nasze automatyczne „Dziękujemy za kontakt" (0.218.0) — wpis zwinięty. */
   automatyczna?: boolean;
+  /* Doradca albo komunikat Allegro w Problemie z zakupem. Przychodzi jak
+     klient, ale szkic Copilota odpowiada kupującemu, więc jego świeżość
+     liczy się bez tych wpisów. */
+  odAllegro?: boolean;
   /* Blok firmowy odcięty od treści (0.219.1) — `tresc` jest bez niego. */
   stopka?: string;
 };

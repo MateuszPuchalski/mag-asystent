@@ -11,6 +11,7 @@ import { flagaAutoodpowiedzi, obudzPrzychodzaca } from "./conversations.js";
 import { odkodujEncje } from "../tekst.js";
 import { kontoKanalu } from "./kanal-konto.js";
 import { zapiszZalaczniki } from "./zalaczniki-wiadomosci.js";
+import { ROLE_ALLEGRO } from "./glos-allegro.js";
 
 /* Kształt ze SPECYFIKACJI Allegro — patrz docs/allegro-ksztalt.md. Do 0.151.0
    stały tu nazwy wymyślone razem z kodem (`lastMessageDate`, `author.role`,
@@ -213,8 +214,9 @@ export function rozmowcaWatku(
  * bez uprawnienia (403) odmówi tak samo przy każdym żądaniu, a specyfikacja
  * mówi wprost, że dostępność bety trzeba sprawdzić na koncie — tu jest
  * `[WERYFIKUJ]`. Jedno wstrzymanie dla listy i dla pojedynczego wątku, bo
- * odmowa opisuje konto, nie końcówkę. Pamięć procesu, nie baza: restart to
- * naturalna chwila, żeby spróbować jeszcze raz.
+ * odmowa opisuje konto, nie końcówkę. DECYZJA żyje w pamięci procesu:
+ * restart to naturalna chwila, żeby spróbować jeszcze raz. Baza trzyma
+ * tylko kopię dla panelu (`beta_wstrzymana_do`), czytaną bez skutków.
  */
 const WSTRZYMANIE_PO_ODMOWIE_MS = 6 * 3_600_000;
 const WSTRZYMANIE_PO_LIMICIE_MS = 15 * 60_000;
@@ -726,6 +728,11 @@ function zapiszKanonicznie(
        rozmowy i o tym, czy zdarzenie ma zapalić pasek w panelu. Trzy odczyty
        tego samego pola dawałyby trzy okazje, żeby któryś się rozjechał. */
     const przychodzaca = flaga(message.author.isInterlocutor, "author.isInterlocutor");
+    /* Głos Allegro w zamkniętym wątku nie jest ruchem (`glos-allegro.ts`):
+       nie budzi rozmowy i nie zapala paska nowej wiadomości. Status liczy
+       to samo przy odczycie, a budzenie zapisuje — oba muszą mówić jedno. */
+    const ruchKlienta = przychodzaca
+      && !(ROLE_ALLEGRO.has(message.rola ?? "") && st?.status === "CLOSED");
     const kierunek = przychodzaca ? "incoming" as const : "outgoing" as const;
     const tresc = odkodujEncje(message.text);
     const auto = flagaAutoodpowiedzi(kierunek, tresc);
@@ -760,8 +767,8 @@ function zapiszKanonicznie(
          sprawy uznanej za załatwioną musi ją z powrotem otworzyć — inaczej
          rozmowa zostaje na liście „rozwiązane" i nikt do niej nie zagląda.
          Wychodzące pomijamy: to nasza własna odpowiedź wracająca z Allegro. */
-      if (przychodzaca) obudzPrzychodzaca(database, rozmowa);
-      else uzgodnijNiepewna(database, rozmowa, message.id, tresc);
+      if (ruchKlienta) obudzPrzychodzaca(database, rozmowa);
+      else if (!przychodzaca) uzgodnijNiepewna(database, rozmowa, message.id, tresc);
       /* ZDARZENIE NIESIE KIERUNEK (0.257.0, dług z 0.228.0). Panel zapala pasek
          „Klient dopisał nową wiadomość" wyłącznie przy `odKlienta`. Tą drogą
          pole nie jechało nigdy, bo ustawiał je tylko `zapiszWiadomosc`, którego
@@ -769,7 +776,7 @@ function zapiszKanonicznie(
          prawdziwej wiadomości z Allegro. */
       publishConversationEvent("message.created", rozmowa, {
         messageId: Number(wynik.lastInsertRowid), external: message.id,
-        odKlienta: przychodzaca,
+        odKlienta: ruchKlienta,
         automatyczna: auto === 1,
       });
     }

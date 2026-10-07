@@ -217,8 +217,14 @@ model pracy nie kasuje.
    wiadomość KUPUJĄCEGO (`CEL_KLASYFIKACJI`), a w wątku dla modelu doradca
    ma etykietę `ALLEGRO:` zamiast `KLIENT:`.
 2. Głos Allegro w wątku ze `status: CLOSED` nie jest ruchem w rozmowie.
-   Zamykające zdanie doradcy nie stawia rozmowy w „Czeka na nas”. Pytanie
-   klienta bez odpowiedzi dalej czeka, jak każe reguła `wyliczStatus`.
+   Zamykające zdanie doradcy nie stawia rozmowy w „Czeka na nas”, nie budzi
+   jej przy synchronizacji i nie budzi sprawy klienta. Pytanie klienta bez
+   odpowiedzi dalej czeka, jak każe reguła `wyliczStatus`.
+
+Podziękowanie kończy rozmowę tylko wtedy, gdy ostatni pisał KLIENT. Inaczej
+„dziękuję” kupującego zamknęłoby prośbę doradcy, która przyszła po nim.
+Świeżość szkicu Copilota liczy się od wiadomości kupującego (`odAllegro`
+na osi rozmowy), a wysyłka dalej sprawdza każdą przychodzącą.
 
 W otwartym wątku doradca liczy się jak strona przychodząca: pyta sprzedawcę
 o stanowisko, więc rozmowa czeka na nas. Edytor nie pozwala wysłać
