@@ -55,7 +55,7 @@ const dane = (n: Partial<OsRozmowy> = {}): OsRozmowy => ({
     id: 4821, klient: "Kupujący 44300444", ostatniaWiadomosc: "", ostatniaWiadomoscAt: "",
     ostatniaOdKlienta: true, nieprzeczytana: false, wlascicielId: null, wlasciciel: null,
     wersja: 1, status: "open", odlozoneDo: null, poTerminie: false, podziekowal: false, oglada: null,
-    priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false,
+    priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, problemZakupu: null, nowychOdOdpowiedzi: 0, zadanieWToku: false,
     kopilot: null,
   },
   os: [], szkic: null, ofertaWskazana: null, zamowienie: null, zwroty: [],

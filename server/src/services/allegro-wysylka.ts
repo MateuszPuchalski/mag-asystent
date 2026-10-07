@@ -1,8 +1,9 @@
 import {
-  urlDeklaracjiZalacznika, urlPrzeczytaniaWatku, urlWgraniaZalacznika, urlWiadomosci,
+  AKCEPT_BETA, urlDeklaracjiZalacznika, urlPrzeczytaniaWatku, urlWgraniaZalacznika, urlWiadomosci,
   zapytajAllegro,
 } from "../adapters/allegro.http.js";
 import { config } from "../config.js";
+import { db as defaultDb, type Db } from "../db/db.js";
 
 /**
  * Wysyłka wiadomości do Centrum Wiadomości Allegro.
@@ -51,9 +52,29 @@ export function numerWiadomosci(odpowiedz: unknown): string | null {
   return id == null ? null : String(id);
 }
 
+/**
+ * Wersja zasobu do zapisu w wątku: `beta.v1` dla Problemu z zakupem,
+ * negocjowana dla reszty.
+ *
+ * Allegro obsługuje Problemy z zakupem wyłącznie w `beta.v1` i każe
+ * wtedy podawać ten nagłówek. Zwykły wątek zostaje przy negocjacji, którą
+ * chodził zawsze — nowa funkcja nie zmienia kształtu żądań, które jej nie
+ * dotyczą. Typ wątku zapisuje synchronizacja skrzynki, więc pytamy bazę,
+ * a nie Allegro: wysyłka nie płaci za niego dodatkowym żądaniem.
+ */
+export function wersjaWatku(threadId: string, database: Db = defaultDb()): typeof AKCEPT_BETA | undefined {
+  const w = database.prepare("SELECT watek_typ FROM allegro_inbox_thread WHERE id=?")
+    .get(threadId) as { watek_typ: string | null } | undefined;
+  return w?.watek_typ === "POST_PURCHASE_ISSUE" ? AKCEPT_BETA : undefined;
+}
+
 export const wyslijDoAllegro: WyslijDoAllegro = async (threadId, tresc, zalaczniki = []) => {
   const odp = await zapytajAllegro(urlWiadomosci(config.allegro.apiUrl, threadId), {
     metoda: "POST",
+    /* Ciało `NewMessageInThread` jest w obu wersjach to samo; różni się
+       nagłówek. Zamknięty Problem z zakupem Allegro odrzuca 422
+       `THREAD_CLOSED`, a `zapytajAllegro` zamienia to na zdanie dla agenta. */
+    akcept: wersjaWatku(threadId),
     /* Pola `attachments` NIE wysyłamy pustego. Schemat dopuszcza `nullable`,
        ale wiadomość bez załączników ma wyglądać dokładnie tak, jak wyglądała
        przez cztery wydania — nowa funkcja nie zmienia kształtu żądań, które
@@ -82,7 +103,10 @@ export const oznaczPrzeczytanyWAllegro: OznaczPrzeczytany = async (threadId) => 
      „missing flag in the request body", co wprost stoi w specyfikacji. */
   await zapytajAllegro(urlPrzeczytaniaWatku(config.allegro.apiUrl, threadId), {
     metoda: "PUT",
+    /* `ThreadReadFlagVBeta1` ma ten sam kształt `{ read }`, więc ciało
+       zostaje; wersja idzie za typem wątku, jak przy wysyłce. */
     body: { read: true },
+    akcept: wersjaWatku(threadId),
   });
 };
 

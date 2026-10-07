@@ -3,6 +3,30 @@ rodzaj: minor
 tytul: Problemy z zakupem w skrzynce
 ---
 
-**Problemy z zakupem trafiają do skrzynki.** Od 28 października 2026 Allegro
+**Problemy z zakupem trafiają do skrzynki.** Od 28 października Allegro
 zakłada nowe sprawy kupujących jako Problemy z zakupem w Centrum Wiadomości,
-a nie jako dyskusje. Skrzynka czyta je razem ze zwykłymi wątkami.
+a nie jako dyskusje. Rozmowa ma w kolejce i w nagłówku plakietkę „Problem
+z zakupem” z powodem i stanem „zamknięty”, gdy Allegro ją zamknie.
+Wiadomość doradcy Allegro podpisuje się „Allegro”, nie loginem klienta.
+Stare dyskusje zostają w swojej kolejce.
+
+Skrzynka czyta listę wątków w `beta.v1` (`/messaging`, kursor `nextPage`),
+bo tylko tam Allegro pokazuje Problemy z zakupem. Typ i podtyp wątku idą
+z listy, bez osobnego żądania o wątek. Wiadomości Problemu z zakupem idą
+betą, a kierunek daje `author.role`. Wiadomości zwykłego wątku zostają
+na `public.v1`. Rozmówcę wątku z bety wylicza `rozmowcaWatku` z uczestników.
+Gdy beta odmawia przy pierwszej stronie, przebieg czyta `public.v1`, a beta
+czeka sześć godzin. Wysyłka i znacznik „przeczytany” w Problemie z zakupem
+idą betą, a zamknięty Problem (422 `THREAD_CLOSED`) mówi o tym zdaniem.
+Wiadomość Problemu bez własnego numeru zamówienia dostaje numer wątku, gdy
+zamówienie jest jedno. Nowa kolumna `message.autor_rola`. Kształt
+i znaczniki weryfikacji: `docs/allegro-ksztalt.md`.
+
+**[wymaga działania]** Przed kliknięciem aktualizacji sprawdź na bazie
+serwera, czy beta przyjmuje nasze identyfikatory wątków:
+`SELECT COUNT(*) FROM allegro_inbox_thread WHERE struktura_at IS NOT NULL;`.
+Wynik większy od zera to zgoda na aktualizację. Wynik zero przy wątkach
+w skrzynce: najpierw `ALLEGRO_WATKI_BETA=0` w `wertis.env`, potem aktualizacja.
+Po pierwszym przebiegu liczba rozmów nie może skoczyć, a stare wątki mają
+dostawać `watek_typ`. Inaczej wpisz `ALLEGRO_WATKI_BETA=0` i uruchom usługę
+ponownie. Sprawdzenie musi się skończyć przed 28 października.

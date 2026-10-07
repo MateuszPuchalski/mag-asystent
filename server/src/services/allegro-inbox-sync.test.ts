@@ -4,9 +4,9 @@ import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
 import {
-  _zdejmijWstrzymanieStruktury, strukturaZOdpowiedzi, synchronizujAllegroInbox,
+  _zdejmijWstrzymanieStruktury, rozmowcaWatku, strukturaZOdpowiedzi, synchronizujAllegroInbox,
 } from "./allegro-inbox-sync.js";
-import { BladLimituAllegro } from "../adapters/allegro.js";
+import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { onConversationEvent } from "./conversation-realtime.js";
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
@@ -1001,4 +1001,317 @@ test("wątek bez daty i data, której nie da się odczytać, nie kończą przebi
   assert.ok(api.urls.some((u) => u.includes("/threads/zla-data/messages")), "nieczytelna data nie jest progiem");
   assert.ok(api.urls.some((u) => u.includes("/threads/t-1/messages")), "przebieg doszedł do wątku pod nimi");
   assert.ok(!api.urls.some((u) => u.includes("/threads/t-2/messages")), "wątek starszy od kursora kończy przebieg");
+});
+
+/* ── Lista wątków w beta.v1: Problemy z zakupem ──────────────────────────────
+   Od 28 października 2026 Allegro zakłada nowe sprawy kupujących jako
+   Problemy z zakupem w Centrum Wiadomości i pokazuje je wyłącznie w `beta.v1`.
+   Kształty niżej idą WPROST ze schematów `ThreadsListVBeta1`, `ThreadVBeta1`
+   i `MessageVBeta1` w docs/allegro/swagger.yaml. Wiadomość bety nie ma pola
+   `thread`, a autora opisuje rolą, nie `isInterlocutor`. */
+
+const BETA = "application/vnd.allegro.beta.v1+json";
+
+const watekBeta = (id: string, n: Record<string, unknown> = {}) => ({
+  id, type: "COMMON", read: false,
+  createdAt: "2026-10-01T10:00:00Z", lastMessageDateTime: "2026-10-02T12:00:00Z",
+  participants: [{ role: "USER", login: "my-sklep" }, { role: "USER", login: "Kupujacy-Anon" }],
+  status: "OPEN", ...n,
+});
+const problemBeta = (id: string, n: Record<string, unknown> = {}) => watekBeta(id, {
+  type: "POST_PURCHASE_ISSUE",
+  participants: [{ role: "BUYER", login: "kupujacy-anon" }, { role: "SELLER", login: "my-sklep" }],
+  orders: [{ id: "zam-1", offers: [{ id: "of-1", quantity: 1 }] }],
+  subType: "PRODUCT_ARRIVED_DAMAGED", ...n,
+});
+const wiadomoscBeta = (id: string, role: unknown, login: string | null, n: Record<string, unknown> = {}) => ({
+  id, status: "DELIVERED", type: "MESSAGE_CENTER", createdAt: "2026-10-02T11:00:00Z",
+  author: { role, login }, text: `treść ${id}`, subject: null,
+  relatesTo: { offer: null, order: null }, hasAdditionalAttachments: false,
+  attachments: [], additionalInformation: null, ...n,
+});
+
+type Wiadomosci = Record<string, { beta?: object[]; public?: object[] }>;
+
+/** Atrapa konta, które zna betę: lista tylko w `beta.v1`, kursorem `page.id`. */
+function atrapaBety(strony: object[][], wiadomosci: Wiadomosci = {}) {
+  const zadania: Array<{ url: string; akcept: string | null }> = [];
+  const query = async (url: string, opcje?: { akcept?: string }): Promise<unknown> => {
+    zadania.push({ url, akcept: opcje?.akcept ?? null });
+    if (url.includes("/messages")) {
+      const w = wiadomosci[decodeURIComponent(url.split("/").at(-2)!)] ?? {};
+      return opcje?.akcept === BETA
+        ? { messages: w.beta ?? [], nextPage: null }
+        : { messages: w.public ?? [], offset: 0, limit: 20 };
+    }
+    assert.equal(opcje?.akcept, BETA, "lista idzie betą");
+    const strona = Number(new URL(url).searchParams.get("page.id") ?? "0");
+    return { threads: strony[strona] ?? [],
+      nextPage: strona + 1 < strony.length ? { id: String(strona + 1) } : null };
+  };
+  return { zadania, query };
+}
+
+const przebiegBety = (database: DatabaseSync, query: unknown) => synchronizujAllegroInbox({
+  database, query: query as never, apiUrl: "https://api.test", listaBeta: true, inboxOd: null,
+});
+
+test("lista w beta.v1 idzie kursorem page.id, a strukturę bierze z listy, bez żądania o wątek", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const strona1 = Array.from({ length: 20 }, (_, i) => watekBeta(`w-${i}`,
+    { lastMessageDateTime: `2026-10-02T12:${String(59 - i).padStart(2, "0")}:00Z` }));
+  const a = atrapaBety([strona1, [problemBeta("p-1", { lastMessageDateTime: "2026-10-02T11:00:00Z" })]], {
+    "p-1": { beta: [wiadomoscBeta("pm-1", "BUYER", "kupujacy-anon")] },
+  });
+  let pytanOWatek = 0;
+  await synchronizujAllegroInbox({ database, query: a.query as never, apiUrl: "https://api.test",
+    listaBeta: true, inboxOd: null, struktura: async () => { pytanOWatek++; return null; } });
+
+  const listy = a.zadania.filter((z) => !z.url.includes("/messages")).map((z) => z.url);
+  assert.deepEqual(listy, ["https://api.test/messaging/threads?limit=20",
+    "https://api.test/messaging/threads?limit=20&page.id=1"]);
+  assert.equal(pytanOWatek, 0, "lista bety niesie typ i podtyp — osobne żądanie byłoby zbędne");
+  const w = database.prepare("SELECT * FROM allegro_inbox_thread WHERE id='p-1'").get() as any;
+  assert.equal(w.watek_typ, "POST_PURCHASE_ISSUE");
+  assert.equal(w.watek_podtyp, "PRODUCT_ARRIVED_DAMAGED");
+  assert.equal(w.watek_status, "OPEN");
+  assert.deepEqual(JSON.parse(w.watek_zamowienia), ["zam-1"]);
+  assert.equal(w.interlocutor_login, "kupujacy-anon", "rozmówcą Problemu z zakupem jest kupujący");
+  assert.doesNotMatch(w.surowe_json, /participants|my-sklep/, "loginów uczestników nie zapisujemy");
+  assert.equal((database.prepare("SELECT COUNT(*) n FROM allegro_inbox_thread").get() as any).n, 21);
+});
+
+test("Problem z zakupem: wiadomości w beta.v1, kierunek z roli, doradca podpisany rolą", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const a = atrapaBety([[problemBeta("p-1")]], { "p-1": { beta: [
+    wiadomoscBeta("pm-3", "CONSULTANT", "doradca-allegro", { createdAt: "2026-10-02T11:30:00Z" }),
+    wiadomoscBeta("pm-2", "SELLER", "my-sklep", { createdAt: "2026-10-02T11:10:00Z" }),
+    wiadomoscBeta("pm-1", "BUYER", "kupujacy-anon", { createdAt: "2026-10-02T11:00:00Z",
+      relatesTo: { offer: { id: "of-1" }, order: null } }),
+  ] } });
+  await przebiegBety(database, a.query);
+
+  const pytanie = a.zadania.find((z) => z.url.includes("/threads/p-1/messages"));
+  assert.equal(pytanie?.akcept, BETA, "Problem z zakupem czytamy wersją, którą Allegro go obsługuje");
+  const w = database.prepare(`SELECT external_message_id x, direction, autor_rola, related_order_id
+    FROM message ORDER BY sent_at`).all() as any[];
+  assert.deepEqual(w.map((m) => [m.x, m.direction, m.autor_rola]), [
+    ["pm-1", "incoming", "BUYER"], ["pm-2", "outgoing", "SELLER"], ["pm-3", "incoming", "CONSULTANT"],
+  ]);
+  assert.ok(w.every((m) => m.related_order_id === "zam-1"),
+    "zamówienie wątku wiąże każdą wiadomość, bo `relatesTo.order` w becie bywa puste");
+  const l = database.prepare("SELECT author_login, author_is_interlocutor i FROM allegro_inbox_message WHERE id='pm-2'")
+    .get() as any;
+  assert.equal(l.i, 0, "nasza wiadomość w lądowisku ma ten sam znacznik co z public.v1");
+});
+
+test("wiadomość od Allegro bez loginu wchodzi jako przychodząca", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const a = atrapaBety([[problemBeta("p-1")]], { "p-1": { beta: [wiadomoscBeta("pm-1", "ALLEGRO", null)] } });
+  await przebiegBety(database, a.query);
+  const m = database.prepare("SELECT direction, autor_rola FROM message").get() as any;
+  assert.deepEqual([m.direction, m.autor_rola], ["incoming", "ALLEGRO"]);
+  assert.equal((database.prepare("SELECT author_login l FROM allegro_inbox_message").get() as any).l, "");
+});
+
+test("rola USER z loginem sprzedawcy wątku to nasza wiadomość", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const a = atrapaBety([[problemBeta("p-1")]], { "p-1": { beta: [wiadomoscBeta("pm-1", "USER", "MY-SKLEP")] } });
+  await przebiegBety(database, a.query);
+  assert.equal((database.prepare("SELECT direction d FROM message").get() as any).d, "outgoing");
+});
+
+test("Problem z zakupem z kilkoma zamówieniami nie zgaduje numeru", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const a = atrapaBety([[problemBeta("p-1", { orders: [
+    { id: "zam-1", offers: [] }, { id: "zam-2", offers: [] }] })]],
+  { "p-1": { beta: [
+    wiadomoscBeta("pm-1", "BUYER", "kupujacy-anon"),
+    wiadomoscBeta("pm-2", "BUYER", "kupujacy-anon", { relatesTo: { offer: null, order: { id: "zam-2" } } }),
+  ] } });
+  await przebiegBety(database, a.query);
+  const w = database.prepare("SELECT external_message_id x, related_order_id z FROM message ORDER BY x").all() as any[];
+  assert.deepEqual(w.map((m) => [m.x, m.z]), [["pm-1", null], ["pm-2", "zam-2"]]);
+});
+
+test("wiadomość bety bez roli pomija wątek, zamiast zgadywać kierunek", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const ostrzezenia: string[] = [];
+  const oryginal = console.warn;
+  console.warn = (...x: unknown[]) => { ostrzezenia.push(x.join(" ")); };
+  try {
+    const a = atrapaBety([[problemBeta("p-1"), problemBeta("p-2", { lastMessageDateTime: "2026-10-02T10:00:00Z" })]],
+      { "p-1": { beta: [wiadomoscBeta("pm-1", undefined, "kupujacy-anon")] },
+        "p-2": { beta: [wiadomoscBeta("pm-2", "BUYER", "kupujacy-anon")] } });
+    await przebiegBety(database, a.query);
+  } finally {
+    console.warn = oryginal;
+  }
+  assert.deepEqual((database.prepare("SELECT id FROM allegro_inbox_thread").all() as any[]).map((w) => w.id), ["p-2"]);
+  assert.equal((database.prepare("SELECT error_thread_count n FROM allegro_inbox_sync_state").get() as any).n, 1);
+  assert.ok(ostrzezenia.some((z) => z.includes("p-1")));
+});
+
+test("zwykły wątek z listy bety: wiadomości w public.v1, rozmówca z uczestników", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const a = atrapaBety([[watekBeta("w-1"), watekBeta("w-2", { lastMessageDateTime: "2026-10-02T11:00:00Z" })]], {
+    /* Odpisaliśmy: rozmówcą jest jedyny uczestnik, który nie pisał naszych wiadomości. */
+    "w-1": { public: [message("m-1", { author: { login: "my-sklep", isInterlocutor: false }, thread: { id: "w-1" } })] },
+    /* Jeszcze nie odpisaliśmy: rozmówcą jest ten, kto pisał przychodzące. */
+    "w-2": { public: [message("m-2", { author: { login: "Kupujacy-Anon", isInterlocutor: true }, thread: { id: "w-2" } })] },
+  });
+  await przebiegBety(database, a.query);
+  for (const id of ["w-1", "w-2"]) {
+    const z = a.zadania.find((x) => x.url.includes(`/threads/${id}/messages`));
+    assert.equal(z?.akcept, null, "zwykły wątek zostaje na public.v1 i jego isInterlocutor");
+  }
+  const loginy = database.prepare("SELECT id, interlocutor_login l FROM allegro_inbox_thread ORDER BY id").all() as any[];
+  assert.deepEqual(loginy.map((w) => [w.id, w.l]), [["w-1", "Kupujacy-Anon"], ["w-2", "Kupujacy-Anon"]]);
+  assert.equal((database.prepare("SELECT autor_rola r FROM message WHERE external_message_id='m-1'").get() as any).r, null);
+});
+
+test("rozmówca, którego nie da się ustalić, nie kasuje loginu z poprzedniego przebiegu", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  await synchronizujAllegroInbox({ database, query: fake([[{ ...thread(1), id: "w-1",
+    lastMessageDateTime: "2026-10-01T12:00:00Z", interlocutor: { login: "Kupujacy-Anon" } }]]).query,
+  apiUrl: "https://api.test", inboxOd: null });
+  /* Dwóch uczestników z rolą USER i żadnej wiadomości, która by ich rozdzieliła. */
+  const a = atrapaBety([[watekBeta("w-1")]], { "w-1": { public: [] } });
+  await przebiegBety(database, a.query);
+  assert.equal((database.prepare("SELECT interlocutor_login l FROM allegro_inbox_thread").get() as any).l,
+    "Kupujacy-Anon");
+});
+
+test("odmowa listy w beta.v1 schodzi na public.v1 w tym samym przebiegu i wstrzymuje betę", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const zadania: Array<string | null> = [];
+  const query = async (url: string, opcje?: { akcept?: string }) => {
+    zadania.push(opcje?.akcept ?? null);
+    if (opcje?.akcept === BETA) throw new Error("Allegro nie akceptuje żadnej znanej wersji zasobu (406/415) dla threads.");
+    return fake([[thread(1)]]).query(url);
+  };
+  const ostrzezenia: string[] = [];
+  const oryginal = console.warn;
+  console.warn = (...x: unknown[]) => { ostrzezenia.push(x.join(" ")); };
+  try {
+    await przebiegBety(database, query);
+    assert.equal((database.prepare("SELECT COUNT(*) n FROM allegro_inbox_thread").get() as any).n, 1,
+      "skrzynka działa dalej na public.v1");
+    assert.equal(ostrzezenia.filter((z) => z.includes("lista wątków z beta.v1 wstrzymana")).length, 1);
+    assert.equal(zadania.filter((a) => a === BETA).length, 1);
+    /* Ta sama atrapa: gdyby wstrzymanie nie działało, drugi przebieg
+       zapytałby betę znowu i dostał tę samą odmowę. */
+    await przebiegBety(database, query);
+    assert.equal(zadania.filter((a) => a === BETA).length, 1, "wstrzymana beta nie jest pytana przy każdym przebiegu");
+    assert.equal(ostrzezenia.filter((z) => z.includes("wstrzymana")).length, 1);
+  } finally {
+    console.warn = oryginal;
+    _zdejmijWstrzymanieStruktury();
+  }
+});
+
+test("błąd serwera Allegro na liście bety: ten przebieg idzie public.v1, następny pyta betę znowu", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const zadania: Array<string | null> = [];
+  const query = async (url: string, opcje?: { akcept?: string }) => {
+    zadania.push(opcje?.akcept ?? null);
+    if (opcje?.akcept === BETA) throw new BladOdpowiedziAllegro("Allegro odpowiedziało 503: chwilowo", 503);
+    return fake([[thread(1)]]).query(url);
+  };
+  const oryginal = console.warn;
+  console.warn = () => {};
+  try {
+    await przebiegBety(database, query);
+    await przebiegBety(database, query);
+  } finally {
+    console.warn = oryginal;
+    _zdejmijWstrzymanieStruktury();
+  }
+  assert.equal(zadania.filter((a) => a === BETA).length, 2, "chwilowa awaria nie wstrzymuje bety na sześć godzin");
+  assert.equal((database.prepare("SELECT COUNT(*) n FROM allegro_inbox_thread").get() as any).n, 1);
+});
+
+test("odmowa tokena i limit na liście bety przerywają przebieg, nie schodzą na public.v1", async () => {
+  for (const blad of [new BladOdpowiedziAllegro("Allegro odrzuciło token (401)", 401),
+    new BladLimituAllegro("429", 10_000)]) {
+    _zdejmijWstrzymanieStruktury();
+    const database = mkDb();
+    let publicznych = 0;
+    await assert.rejects(przebiegBety(database, async (_url: string, opcje?: { akcept?: string }) => {
+      if (opcje?.akcept === BETA) throw blad;
+      publicznych++;
+      return { threads: [], offset: 0, limit: 20 };
+    }));
+    assert.equal(publicznych, 0, "public.v1 skończyłoby tak samo — przebieg zapisuje prawdziwy powód");
+    assert.equal((database.prepare("SELECT error_count n FROM allegro_inbox_sync_state").get() as any).n, 1);
+  }
+});
+
+test("lista bety bez nextPage to inny kształt — przebieg schodzi na public.v1", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const pub = fake([[thread(1)]]);
+  const oryginal = console.warn;
+  console.warn = () => {};
+  try {
+    await przebiegBety(database, async (url: string, opcje?: { akcept?: string }) =>
+      opcje?.akcept === BETA && !url.includes("/messages")
+        ? { threads: [watekBeta("w-1")] } : pub.query(url));
+  } finally {
+    console.warn = oryginal;
+    _zdejmijWstrzymanieStruktury();
+  }
+  assert.deepEqual((database.prepare("SELECT id FROM allegro_inbox_thread").all() as any[]).map((w) => w.id), ["t-1"]);
+});
+
+test("odmowa bety na drugiej stronie przerywa przebieg, nie zmienia wersji w połowie listy", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const strona1 = Array.from({ length: 20 }, (_, i) => watekBeta(`w-${i}`,
+    { lastMessageDateTime: `2026-10-02T12:${String(59 - i).padStart(2, "0")}:00Z` }));
+  const a = atrapaBety([strona1, []]);
+  await assert.rejects(przebiegBety(database, async (url: string, opcje?: { akcept?: string }) => {
+    if (url.includes("page.id=")) throw new Error("Allegro nie akceptuje żadnej znanej wersji zasobu (406/415) dla threads.");
+    return a.query(url, opcje);
+  }), /406\/415/);
+  assert.equal((database.prepare("SELECT cursor_id c FROM allegro_inbox_sync_state").get() as any).c, null);
+  _zdejmijWstrzymanieStruktury();
+});
+
+test("dociąg załącznika NEW w Problemie z zakupem pyta betą", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const zal = (status: string) => [{ id: "z-1", fileName: "zdjecie.jpg", mimeType: "image/jpeg",
+    url: "https://upload.allegro.pl/message-center/message-attachments/z-1", status }];
+  await przebiegBety(database, atrapaBety([[problemBeta("p-1")]], { "p-1": { beta: [
+    wiadomoscBeta("pm-1", "BUYER", "kupujacy-anon", { attachments: zal("NEW") })] } }).query);
+  const a = atrapaBety([[problemBeta("p-1")]], { "p-1": { beta: [
+    wiadomoscBeta("pm-1", "BUYER", "kupujacy-anon", { attachments: zal("SAFE") })] } });
+  await przebiegBety(database, a.query);
+  const dociag = a.zadania.filter((z) => z.url.includes("/threads/p-1/messages"));
+  assert.deepEqual(dociag.map((z) => z.akcept), [BETA]);
+  assert.equal((database.prepare("SELECT status s FROM message_attachment").get() as any).s, "SAFE");
+});
+
+test("rozmówca wątku: kupujący, potem ten, kto nie pisał naszych, potem jedyny piszący", () => {
+  const w = (login: string, isInterlocutor: boolean) =>
+    ({ author: { login, isInterlocutor } }) as unknown as Parameters<typeof rozmowcaWatku>[1][number];
+  assert.equal(rozmowcaWatku([{ rola: "SELLER", login: "my" }, { rola: "BUYER", login: "kup" }], []), "kup");
+  assert.equal(rozmowcaWatku([{ rola: "USER", login: "my" }, { rola: "USER", login: "kup" }],
+    [w("MY", false)]), "kup", "login porównuje się bez wielkości liter");
+  assert.equal(rozmowcaWatku([{ rola: "USER", login: "my" }, { rola: "USER", login: "kup" }],
+    [w("kup", true)]), "kup");
+  assert.equal(rozmowcaWatku([{ rola: "USER", login: "my" }, { rola: "USER", login: "kup" }],
+    [w("doradca", true)]), null, "doradca nie jest uczestnikiem, więc nie zostaje rozmówcą");
+  assert.equal(rozmowcaWatku([{ rola: "SELLER", login: "my" }, { rola: "USER", login: "kup" }], []), "kup");
 });

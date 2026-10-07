@@ -10,7 +10,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, podziekowal: false, oglada: null,
-  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false,
+  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, problemZakupu: null, nowychOdOdpowiedzi: 0, zadanieWToku: false,
   kopilot: null, ...n,
 });
 
@@ -211,5 +211,58 @@ describe("Status: klawiatura i odłożenie", () => {
     expect(screen.getByLabelText("Status rozmowy")).toHaveTextContent(/Odłożona do/);
     await userEvent.click(screen.getByRole("button", { name: /Wróć teraz/ }));
     expect(onWroc).toHaveBeenCalled();
+  });
+});
+
+/* ── PROBLEM Z ZAKUPEM W NAGŁÓWKU ROZMOWY ─────────────────────────────────────
+   Ten sam fakt co w wierszu kolejki, ale jako STAN: sprawę zakłada kupujący
+   w Centrum Wiadomości Allegro i biuro jej nie zdejmie, więc nie ma przycisku. */
+describe("problem z zakupem w nagłówku", () => {
+  const pokaz = (n: Partial<Rozmowa>) => render(<Status rozmowa={rozmowa(n)} blad=""
+    onPriorytet={vi.fn()} zapisujePriorytet={false} onReklamacyjna={vi.fn()} />);
+
+  it("stoi stanem z powodem po polsku, nie przyciskiem", () => {
+    pokaz({ problemZakupu: { powod: "MISSING_PRODUCT_ELEMENTS", zamkniety: false } });
+    const stan = screen.getByText("Problem z zakupem");
+    expect(stan).toHaveTextContent("Problem z zakupem· brak elementów towaru");
+    expect(stan.closest("button")).toBeNull();
+    expect(screen.queryByRole("button", { name: /problem z zakupem/i })).not.toBeInTheDocument();
+    expect(stan).not.toHaveTextContent("MISSING_PRODUCT_ELEMENTS");
+  });
+
+  it("dymek mówi, czyja to sprawa i że Allegro może dołączyć", () => {
+    pokaz({ problemZakupu: { powod: "OTHER", zamkniety: false } });
+    const dymek = screen.getByText("Problem z zakupem").getAttribute("title") ?? "";
+    expect(dymek).toMatch(/założona przez kupującego/);
+    expect(dymek).toMatch(/Centrum Wiadomości/);
+    expect(dymek).toMatch(/Allegro może do niej dołączyć/);
+  });
+
+  it("wartość spoza słownika: bez powodu, surowy klucz w dymku", () => {
+    pokaz({ problemZakupu: { powod: "NOWY_POWOD_Z_PRZYSZLOSCI", zamkniety: false } });
+    const stan = screen.getByText("Problem z zakupem");
+    expect(stan).toHaveTextContent(/^Problem z zakupem$/);
+    expect(stan).toHaveAttribute("title", expect.stringContaining("NOWY_POWOD_Z_PRZYSZLOSCI"));
+  });
+
+  it("zamknięty: „zamknięty przez Allegro”, a źródło zakończenia nie powtarza tego samego", () => {
+    pokaz({ status: "resolved", zakonczenie: "allegro",
+      problemZakupu: { powod: "NO_REFUND", zamkniety: true } });
+    expect(screen.getByText("zamknięty przez Allegro")).toBeInTheDocument();
+    expect(screen.queryByText("wątek zamknięty w Allegro")).not.toBeInTheDocument();
+    /* Fakt nie znika: plakietka statusu trzyma źródło w dymku. */
+    expect(screen.getByLabelText("Status rozmowy")).toHaveAttribute("title", "wątek zamknięty w Allegro");
+  });
+
+  it("zamknięty przy pytaniu klienta: zakaz odpowiedzi widać także w „Czeka na nas”", () => {
+    pokaz({ status: "waiting_for_us", problemZakupu: { powod: null, zamkniety: true } });
+    expect(screen.getByText("zamknięty przez Allegro")).toBeInTheDocument();
+  });
+
+  it("zwykły wątek: ani stanu, ani zamknięcia; źródło zakończenia z Allegro zostaje", () => {
+    pokaz({ status: "resolved", zakonczenie: "allegro" });
+    expect(screen.queryByText("Problem z zakupem")).not.toBeInTheDocument();
+    expect(screen.queryByText("zamknięty przez Allegro")).not.toBeInTheDocument();
+    expect(screen.getByText("wątek zamknięty w Allegro")).toBeInTheDocument();
   });
 });

@@ -1,5 +1,5 @@
 import type {
-  Akcja, Kategoria, Pewnosc, StatusRozmowy, ZrodloZakonczenia } from "../api/typy";
+  Akcja, Kategoria, Pewnosc, Rozmowa, StatusRozmowy, ZrodloZakonczenia } from "../api/typy";
 
 /* Nazwy statusów PO POLSKU w jednym miejscu. Lista jest zamknięta i pochodzi
    z §7 — `Record<StatusRozmowy, string>` sprawia, że dołożenie statusu
@@ -32,6 +32,52 @@ export const ZRODLO_ZAKONCZENIA: Record<ZrodloZakonczenia, string> = {
   cisza: "2 dni bez odpowiedzi klienta",
   allegro: "wątek zamknięty w Allegro",
 };
+
+/* ── POWODY PROBLEMU Z ZAKUPEM ──────────────────────────────────────────────
+   `subType` wątku `POST_PURCHASE_ISSUE` z Centrum Wiadomości: dziesięć
+   wartości ze schematu `beta.v1` w `docs/allegro/swagger.yaml`. Klucze
+   zostają angielskie w API, na ekran idzie polszczyzna — jak przy `NAZWA`.
+
+   Słownik jest OTWARTY, jak `NAZWA_KODU`, bo Allegro dokłada wartości bez
+   zapowiedzi. Nieznanej nie tłumaczymy. Zgadnięty powód kierowałby pierwszym
+   ruchem agenta, a surowy klucz w dymku da się sprawdzić w specyfikacji. */
+export const POWOD_PROBLEMU_ZAKUPU: Record<string, string> = {
+  PRODUCT_INCONSISTENT_WITH_THE_OFFER: "towar niezgodny z ofertą",
+  PRODUCT_ARRIVED_DAMAGED: "towar dotarł uszkodzony",
+  DEFECT_DETECTED_DURING_USE: "wada wykryta w użyciu",
+  NO_PRODUCT_IN_THE_SHIPMENT: "brak towaru w przesyłce",
+  MISSING_PRODUCT_ELEMENTS: "brak elementów towaru",
+  OTHER: "inny problem",
+  NO_REFUND: "brak zwrotu pieniędzy",
+  SELLER_DOES_NOT_WANT_TO_ACCEPT_RETURN: "sprzedawca nie przyjmuje zwrotu",
+  PROBLEM_WITH_SENDING_PRODUCT_BACK: "problem z odesłaniem towaru",
+  NO_DOCUMENTATIONS: "brak dokumentów",
+};
+
+/* Dymek mówi, CZYJA to sprawa. Bez niego znacznik czytałby się jak nasza
+   flaga, którą da się zdjąć — a sprawę zakłada kupujący, nie biuro. */
+const DYMEK_PROBLEMU =
+  "Sprawa założona przez kupującego w Centrum Wiadomości Allegro. Allegro może do niej dołączyć.";
+
+/** Zdanie do dymku przy wątku zamkniętym. Wspólne dla kolejki i nagłówka rozmowy. */
+export const DYMEK_ZAMKNIETEGO_PROBLEMU = "Allegro zamknęło ten wątek i nie przyjmie w nim nowej wiadomości.";
+
+/**
+ * Problem z zakupem słowami: powód po polsku (`null`, gdy brak albo spoza
+ * słownika) i treść dymku. Jedna funkcja dla kolejki i nagłówka, żeby oba
+ * miejsca nazywały ten sam wątek tymi samymi słowami.
+ */
+export function opisProblemuZakupu(p: NonNullable<Rozmowa["problemZakupu"]>): {
+  powod: string | null; dymek: string;
+} {
+  if (p.powod === null) return { powod: null, dymek: DYMEK_PROBLEMU };
+  /* `hasOwnProperty`, nie samo `[klucz]`: klucz przychodzi z zewnątrz,
+     a `constructor` czy `toString` znalazłyby coś w prototypie. */
+  if (Object.prototype.hasOwnProperty.call(POWOD_PROBLEMU_ZAKUPU, p.powod)) {
+    return { powod: POWOD_PROBLEMU_ZAKUPU[p.powod], dymek: DYMEK_PROBLEMU };
+  }
+  return { powod: null, dymek: `${DYMEK_PROBLEMU} Powód od Allegro spoza słownika: ${p.powod}.` };
+}
 
 /* KATEGORIE klasyfikatora (specyfikacja z 20 września 2026). Ta sama zasada,
    co przy `NAZWA`: `Record<Kategoria, string>` NIE SKOMPILUJE SIĘ, gdy

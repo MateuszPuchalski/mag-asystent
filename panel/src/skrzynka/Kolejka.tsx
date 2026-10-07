@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AlarmClock, Bell, BellOff, Eye, Inbox, MessageSquare, RefreshCw, Ruler, Search, UserCheck, X,
+  AlarmClock, Bell, BellOff, Eye, Inbox, Lock, MessageSquare, RefreshCw, Ruler, Search, UserCheck, X,
 } from "lucide-react";
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
@@ -8,7 +8,7 @@ import type {
 import { Blad, czas, kiedy, Plakietka, Pusto } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { klawiszZajety } from "../nawigacja/fokus";
-import { NAZWA } from "./statusy";
+import { DYMEK_ZAMKNIETEGO_PROBLEMU, NAZWA, opisProblemuZakupu } from "./statusy";
 import { CZESTE, PasekCopilota, ZnakCopilota, ZnakKategorii, doRozpoznania, nazwaNaPlakietce } from "./Copilot";
 import { Czekanie } from "./Czekanie";
 import { SlownikZnakow } from "./SlownikZnakow";
@@ -434,6 +434,28 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         if (r.reklamacyjna) znaczniki.push(<span key="rekl"
           className="rounded bg-violet-100 px-1.5 py-0.5 text-podpis font-bold text-violet-900">
           REKLAMACYJNA</span>);
+        /* PROBLEM Z ZAKUPEM tuż obok, ale w BŁĘKICIE, nie w fiolecie. Fiolet
+           to nasza flaga i przypuszczenie Copilota. Błękit niesie w kolejkach
+           reklamacji i dyskusji obecność Allegro, a ta sprawa też jest Allegro:
+           zakłada ją kupujący i biuro jej nie zdejmie.
+
+           Powód stoi SŁOWEM, nie w dymku, bo od niego zależy pierwszy ruch,
+           a dymek wymaga kursora. Słowo w barwie źródła, jak kategoria Copilota.
+           Jedna grupa, żeby zawinięcie nie oderwało powodu od znacznika. */
+        if (r.problemZakupu) {
+          const problem = opisProblemuZakupu(r.problemZakupu);
+          znaczniki.push(<span key="problem" title={problem.dymek}
+            className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-1">
+            <span className="rounded bg-sky-100 px-1.5 py-0.5 font-bold text-sky-900">PROBLEM Z ZAKUPEM</span>
+            {problem.powod && <span className="font-semibold text-sky-800">{problem.powod}</span>}
+            {/* Zamknięty przez Allegro: odpowiedź w tym wątku nie przejdzie.
+                Szarość jak przy czacie zamkniętym w reklamacjach: wątek
+                wygasł, ale fakt zostaje widoczny. */}
+            {r.problemZakupu.zamkniety && <span title={DYMEK_ZAMKNIETEGO_PROBLEMU}
+              className="inline-flex items-center gap-0.5 text-slate-600">
+              <Lock size={12} aria-hidden="true" />zamknięty</span>}
+          </span>);
+        }
         /* Statusy z decyzji człowieka albo z ruchu hali dalej są plakietką —
            patrz `WYJATKOWE`. */
         if (wyjatkowy) znaczniki.push(<Plakietka key="status" status={r.status}>{NAZWA[r.status]}</Plakietka>);

@@ -46,8 +46,10 @@ obok renderuje `'false'` jako tekst. Wymagalność pola mówi wyłącznie lista
 
 Uwaga na dwie wersje zasobu. `public.v1` i `beta.v1` to bywają **różne
 kształty tej samej rzeczy**, a nie warianty. W Centrum wiadomości różnią się
-autorem wiadomości, stronicowaniem i polami wątku. Chodzimy wersją stabilną —
-patrz `zapytajAllegro` w `server/src/adapters/allegro.http.ts`.
+autorem wiadomości, stronicowaniem i polami wątku. Listę wątków i Problemy
+z zakupem czytamy betą, wiadomości zwykłego wątku — wersją stabilną. Powód
+stoi w `docs/allegro-ksztalt.md`, a nagłówki ustawia `zapytajAllegro`
+w `server/src/adapters/allegro.http.ts`.
 
 ## Jak odświeżyć
 

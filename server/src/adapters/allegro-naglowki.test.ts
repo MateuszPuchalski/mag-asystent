@@ -145,10 +145,10 @@ test("prosimy o POLSKI — `accept-language` jedzie przy każdym żądaniu (0.27
 });
 
 /* ── Wymuszona beta nie przestawia rodziny (22 września 2026) ───────────────
-   Pojedynczy wątek czytamy w `beta.v1`, bo tylko ta wersja niesie typ
-   i podtyp. Lista wątków i wiadomości chodzą po `public.v1` i ich mapowanie
-   stoi na tamtym kształcie — a to ta sama rodzina `threads`. Gdyby wymuszona
-   beta zapisała się jako nauczony nagłówek, następna strona listy przyszłaby
+   Listę wątków i Problem z zakupem czytamy w `beta.v1`. Wiadomości zwykłego
+   wątku chodzą po negocjowanym `public.v1` i ich mapowanie stoi na tamtym
+   kształcie — a to ta sama rodzina `threads`. Gdyby wymuszona beta zapisała
+   się jako nauczony nagłówek, wiadomości zwykłego wątku przyszłyby
    w kształcie, którego synchronizacja nie rozumie. */
 test("wymuszona beta idzie jedną próbą i nie zmienia nauczonej wersji rodziny", async () => {
   const najpierw = podstaw([{ status: 200, body: { threads: [] } }]);
@@ -178,4 +178,60 @@ test("wymuszona beta idzie jedną próbą i nie zmienia nauczonej wersji rodziny
   await zapytajAllegro("https://api.test/messaging/threads?limit=20&offset=40");
   assert.equal(poOdmowie.length, 1, "nauczona wersja przeżyła odmowę bety — jedna próba, nie dwie");
   assert.equal(poOdmowie[0].headers.accept, PUBLIC);
+});
+
+/* ── Problem z zakupem: zapis w beta.v1 ───────────────────────────────────────
+   Allegro obsługuje Problemy z zakupem wyłącznie w `beta.v1` i każe podawać
+   ten nagłówek. Typ wątku zna baza (zapisuje go synchronizacja), więc
+   wysyłka nie pyta o niego Allegro. Zwykły wątek zostaje przy negocjacji. */
+test("wysyłka i „przeczytany” w Problemie z zakupem idą betą, w zwykłym wątku — jak dotąd", async () => {
+  const { wyslijDoAllegro, oznaczPrzeczytanyWAllegro } = await import("../services/allegro-wysylka.js");
+  const watek = db().prepare(`INSERT INTO allegro_inbox_thread(id,read,surowe_json,synced_at,watek_typ)
+    VALUES (?,0,'{}','2026-10-07T00:00:00Z',?)`);
+  watek.run("ppi-1", "POST_PURCHASE_ISSUE");
+  watek.run("zwykly-1", "COMMON");
+
+  mock.restoreAll();
+  const problem = podstaw([{ status: 201, body: { id: "m-9" } }, { status: 200, body: { read: true } }]);
+  assert.deepEqual(await wyslijDoAllegro("ppi-1", "Dzień dobry"), { externalMessageId: "m-9" });
+  await oznaczPrzeczytanyWAllegro("ppi-1");
+  assert.equal(problem.length, 2, "wymuszona beta to jedna próba na żądanie");
+  for (const z of problem) {
+    assert.equal(z.headers.accept, BETA, `${z.url} poszedł bez bety`);
+    assert.equal(z.headers["content-type"], BETA);
+  }
+  assert.equal(problem[0].body, JSON.stringify({ text: "Dzień dobry" }), "ciało NewMessageInThread bez zmian");
+
+  mock.restoreAll();
+  const zwykly = podstaw([{ status: 201, body: { id: "m-10" } }]);
+  await wyslijDoAllegro("zwykly-1", "Dzień dobry");
+  assert.equal(zwykly[0].headers.accept, PUBLIC, "zwykły wątek negocjuje jak dotąd");
+});
+
+test("zamknięty Problem z zakupem (422 THREAD_CLOSED) mówi zdaniem, nie surowym JSON-em", async () => {
+  mock.restoreAll();
+  podstaw([{ status: 422, body: { errors: [{ code: "THREAD_CLOSED",
+    message: "Cannot add a message to a closed POST_PURCHASE_ISSUE thread." }] } }]);
+  await assert.rejects(
+    zapytajAllegro("https://api.test/messaging/threads/ppi-1/messages",
+      { metoda: "POST", body: { text: "x" }, akcept: BETA }),
+    (e: Error & { status?: number }) => {
+      assert.match(e.message, /zamknęło ten Problem z zakupem/);
+      assert.doesNotMatch(e.message, /errors/);
+      assert.equal(e.status, 422);
+      return true;
+    });
+
+  /* Inne 422 zostaje surowe — tam treść odpowiedzi jest jedyną wskazówką. */
+  mock.restoreAll();
+  podstaw([{ status: 422, body: { errors: [{ code: "VALIDATION_ERROR" }] } }]);
+  await assert.rejects(zapytajAllegro("https://api.test/messaging/threads/w-1/messages",
+    { metoda: "POST", body: { text: "x" } }), /Allegro odpowiedziało 422: .*VALIDATION_ERROR/);
+});
+
+test("adres listy w beta.v1 niesie kursor strony, nie offset", async () => {
+  const { urlWatkowBeta } = await import("./allegro.http.js");
+  assert.equal(urlWatkowBeta("https://api.test", null), "https://api.test/messaging/threads?limit=20");
+  assert.equal(urlWatkowBeta("https://api.test", "cD0y+MDI2/LTA="),
+    "https://api.test/messaging/threads?limit=20&page.id=cD0y%2BMDI2%2FLTA%3D");
 });

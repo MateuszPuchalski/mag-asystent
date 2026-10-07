@@ -915,6 +915,41 @@ test("wątek bez loginu spada na temat, a potem na słowo „Klient”", () => {
   assert.equal(osRozmowy(rozmowa).os.find((w) => w.rodzaj === "wiadomosc")!.autor, "Pytanie o gwint");
 });
 
+/* ── Problem z zakupem (`POST_PURCHASE_ISSUE` z `beta.v1`) ─────────────────
+   Od 28 października 2026 nowe sprawy kupujących przychodzą do skrzynki jako
+   wątki tego typu. Agent ma to widzieć w kolejce i w nagłówku, a słowa
+   doradcy Allegro nie mogą podpisać się loginem klienta. */
+test("Problem z zakupem niesie powód i zamknięcie, a doradca podpisuje się „Allegro”", () => {
+  const d = db();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','problem')")
+    .run().lastInsertRowid);
+  const watek = d.prepare(`INSERT INTO allegro_inbox_thread(id,read,last_message_at,interlocutor_login,
+    surowe_json,synced_at,watek_typ,watek_podtyp,watek_status)
+    VALUES (?,0,'2026-10-02T10:00:00.000Z','kupujacy-anon','{}','2026-10-02T10:00:00.000Z',?,?,?)`);
+  watek.run("w-ppi", "POST_PURCHASE_ISSUE", "PRODUCT_ARRIVED_DAMAGED", "CLOSED");
+  watek.run("w-zwykly", "COMMON", null, "OPEN");
+  const rozmowa = (x: string) => Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject,unread,updated_at) VALUES (?,?,'temat',1,'2026-10-02T10:00:00.000Z')`)
+    .run(konto, x).lastInsertRowid);
+  const ppi = rozmowa("w-ppi");
+  const zwykla = rozmowa("w-zwykly");
+  const wiadomosc = d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,sent_at,autor_rola) VALUES (?,?,?,'incoming',?,?,?)`);
+  wiadomosc.run(ppi, konto, "m-ppi-1", "Paczka przyszła zgnieciona", "2026-10-02T09:00:00.000Z", "BUYER");
+  wiadomosc.run(ppi, konto, "m-ppi-2", "Prosimy sprzedawcę o odpowiedź", "2026-10-02T10:00:00.000Z", "CONSULTANT");
+  wiadomosc.run(zwykla, konto, "m-zw-1", "Pytanie", "2026-10-02T10:00:00.000Z", null);
+
+  const lista = listaRozmow();
+  assert.deepEqual(lista.find((x) => x.id === ppi)!.problemZakupu,
+    { powod: "PRODUCT_ARRIVED_DAMAGED", zamkniety: true });
+  assert.equal(lista.find((x) => x.id === zwykla)!.problemZakupu, null, "zwykły wątek nie jest Problemem");
+  const otwarta = osRozmowy(ppi);
+  assert.deepEqual(otwarta.rozmowa.problemZakupu, { powod: "PRODUCT_ARRIVED_DAMAGED", zamkniety: true });
+  assert.deepEqual(otwarta.os.filter((w) => w.rodzaj === "wiadomosc").map((w) => w.autor),
+    ["kupujacy-anon", "Allegro"]);
+});
+
 test("zwrot tego zamówienia jedzie z rozmową — po numerze zamówienia, nigdy po loginie", () => {
   /* Właściciel (0.221.0): klient pyta pod zamówieniem o zwrot, którego dokonał,
      a agent szukał go ręcznie na ekranie Zwroty. Mostek jest ten sam, którym

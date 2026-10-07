@@ -56,6 +56,14 @@ export interface RozmowaSkrzynki {
    */
   reklamacyjna: boolean;
   /**
+   * Problem z zakupem Allegro — wątek `POST_PURCHASE_ISSUE` z Centrum
+   * Wiadomości. `null` przy zwykłym wątku. To JEST sprawa w Allegro, inaczej
+   * niż `reklamacyjna`: założył ją kupujący, a Allegro może do niej dołączyć.
+   * `powod` to surowy `subType` (słownik po polsku stoi w panelu) albo `null`.
+   * `zamkniety` — Allegro oddało wątek jako `CLOSED` i nie przyjmie odpowiedzi.
+   */
+  problemZakupu: { powod: string | null; zamkniety: boolean } | null;
+  /**
    * Ile czeka pytanie klienta, w milisekundach. `null`, gdy klient nie napisał
    * nic — wątek zaczęty przez nas nie ma na co czekać, a zegar liczony od
    * NASZEJ wiadomości kłamałby o cudzej cierpliwości.
@@ -291,6 +299,10 @@ const LISTA = `
            ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuchAt,
          (SELECT t.watek_status FROM allegro_inbox_thread t
            WHERE t.id = c.external_conversation_id) AS watekStatus,
+         (SELECT t.watek_typ FROM allegro_inbox_thread t
+           WHERE t.id = c.external_conversation_id) AS watekTyp,
+         (SELECT t.watek_podtyp FROM allegro_inbox_thread t
+           WHERE t.id = c.external_conversation_id) AS watekPodtyp,
          c.otwarta_recznie_at AS otwartaRecznieAt,
          -- Czas oczekiwania liczy się od ostatniej wiadomości KLIENTA, nie od
          -- ostatniaWiadomoscAt: tamto ma COALESCE na updated_at, więc wątek
@@ -334,6 +346,9 @@ const LISTA = `
       SELECT m.id FROM message m WHERE m.conversation_id=c.id
        ORDER BY (m.direction='incoming') DESC, m.sent_at DESC, m.id DESC LIMIT 1)`;
 
+/** Role `author.role` z `beta.v1`, które nie są ani klientem, ani nami. */
+const ROLE_ALLEGRO = new Set(["CONSULTANT", "ALLEGRO"]);
+
 const naRozmowe = (
   w: Record<string, unknown>,
   teraz = Date.now(),
@@ -375,6 +390,10 @@ const naRozmowe = (
     status,
     priorytet: String(w.priorytet ?? "normalny") === "pilny" ? "pilny" : "normalny",
     reklamacyjna: Boolean(Number(w.reklamacyjna ?? 0)),
+    problemZakupu: w.watekTyp !== "POST_PURCHASE_ISSUE" ? null : {
+      powod: w.watekPodtyp == null ? null : String(w.watekPodtyp),
+      zamkniety: w.watekStatus === "CLOSED",
+    },
     czekaOdMs: w.pytanieAt == null ? null : Math.max(0, teraz - Date.parse(String(w.pytanieAt))),
     nowychOdOdpowiedzi: Number(w.nowych ?? 0),
     zadanieWToku: Boolean(Number(w.zadanie ?? 0)),
@@ -588,7 +607,7 @@ export function osRozmowy(id: number): {
     SELECT m.id, m.direction, m.body, m.sent_at, m.auto_odpowiedz AS auto,
            m.related_object_type AS typ,
            m.related_object_id AS oferta, m.related_order_id AS zamowienie,
-           m.channel_account_id AS konto,
+           m.channel_account_id AS konto, m.autor_rola AS rola,
            /* ── PODPIS TO LOGIN, NIE TEMAT (0.219.2) ────────────────────────
               Do 0.219.1 stała tu kolumna c.subject i przez to podpis
               wiadomości niósł TEMAT WĄTKU. Na koncie właściciela temat bywa
@@ -669,7 +688,11 @@ export function osRozmowy(id: number): {
       : { tresc: String(m.body), stopka: null };
     return {
     id: `msg-${m.id}`, rodzaj: "wiadomosc" as const, messageId: Number(m.id),
-    autor: String(m.direction) === "incoming" ? String(m.klient ?? "Klient") : "Biuro",
+    /* Doradca Allegro w Problemie z zakupem pisze jako strona
+       przychodząca. Podpis loginem klienta wkładałby mu w usta słowa
+       Allegro, więc ta wiadomość podpisuje się „Allegro". */
+    autor: String(m.direction) !== "incoming" ? "Biuro"
+      : ROLE_ALLEGRO.has(String(m.rola)) ? "Allegro" : String(m.klient ?? "Klient"),
     odKlienta: String(m.direction) === "incoming",
     tresc, at: String(m.sent_at),
     ofertaId: String(m.typ ?? "") === "OFFER" ? String(m.oferta) : null,

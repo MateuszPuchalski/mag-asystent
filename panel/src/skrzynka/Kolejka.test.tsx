@@ -10,7 +10,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, podziekowal: false, oglada: null,
-  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false,
+  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, problemZakupu: null, nowychOdOdpowiedzi: 0, zadanieWToku: false,
   kopilot: null, ...n,
 });
 
@@ -901,5 +901,78 @@ describe("wiersz trzyma krawędzie", () => {
     expect(data("klient_dzis")).toHaveTextContent(/^07:05$/);
     expect(data("klient_wczoraj")).toHaveTextContent(/^wczoraj$/);
     expect(data("klient_dawny")).toHaveTextContent(/^28\.08$/);
+  });
+});
+
+/* ── PROBLEM Z ZAKUPEM W WIERSZU ─────────────────────────────────────────────
+   Wątek `POST_PURCHASE_ISSUE` z Centrum Wiadomości. Agent wybiera pracę
+   w kolejce, więc tu ma zobaczyć, że to sprawa kupującego, z jakiego powodu
+   i czy Allegro ją zamknęło — nie dopiero po otwarciu rozmowy. */
+describe("problem z zakupem w kolejce", () => {
+  const wiersz = () => screen.getByText("Kupujący 44300444").closest("button")!;
+  const problem = (powod: string | null, zamkniety = false) =>
+    rozmowa({ problemZakupu: { powod, zamkniety } });
+
+  it("plakietka stoi w rzędzie znaczników, obok REKLAMACYJNA", () => {
+    pokaz([rozmowa({ reklamacyjna: true,
+      problemZakupu: { powod: "PRODUCT_ARRIVED_DAMAGED", zamkniety: false } })]);
+    const znaczniki = wiersz().lastElementChild!;
+    expect(znaczniki).toContainElement(screen.getByText("PROBLEM Z ZAKUPEM"));
+    expect(znaczniki).toContainElement(screen.getByText("REKLAMACYJNA"));
+  });
+
+  it("nie jest fioletowa — fiolet to nasza flaga i przypuszczenie Copilota", () => {
+    pokaz([problem("PRODUCT_ARRIVED_DAMAGED")]);
+    expect(screen.getByText("PROBLEM Z ZAKUPEM").className).not.toMatch(/violet/);
+  });
+
+  it("powód stoi po polsku i słowem, bez angielskiego klucza", () => {
+    pokaz([problem("PRODUCT_ARRIVED_DAMAGED")]);
+    expect(screen.getByText("towar dotarł uszkodzony")).toBeInTheDocument();
+    expect(wiersz()).not.toHaveTextContent("PRODUCT_ARRIVED_DAMAGED");
+    /* Dymek mówi, czyja to sprawa — bez niego znacznik czytałby się jak nasz. */
+    expect(screen.getByText("PROBLEM Z ZAKUPEM").closest("[title]"))
+      .toHaveAttribute("title", expect.stringContaining("kupującego"));
+  });
+
+  it("wartość spoza słownika: plakietka bez powodu, surowy klucz tylko w dymku", () => {
+    /* Allegro dokłada wartości bez zapowiedzi. Zgadnięty powód kierowałby
+       pierwszym ruchem agenta, a surowy klucz w dymku da się sprawdzić. */
+    pokaz([problem("NOWY_POWOD_Z_PRZYSZLOSCI")]);
+    const grupa = screen.getByText("PROBLEM Z ZAKUPEM").closest("[title]")!;
+    expect(grupa).toHaveTextContent(/^PROBLEM Z ZAKUPEM$/);
+    expect(grupa).toHaveAttribute("title", expect.stringContaining("NOWY_POWOD_Z_PRZYSZLOSCI"));
+    expect(wiersz()).not.toHaveTextContent("NOWY_POWOD_Z_PRZYSZLOSCI");
+  });
+
+  it("klucz z prototypu obiektu nie udaje powodu", () => {
+    pokaz([problem("constructor")]);
+    expect(screen.getByText("PROBLEM Z ZAKUPEM").closest("[title]")).toHaveTextContent(/^PROBLEM Z ZAKUPEM$/);
+  });
+
+  it("bez powodu od Allegro: sama plakietka, dymek bez klucza", () => {
+    pokaz([problem(null)]);
+    const grupa = screen.getByText("PROBLEM Z ZAKUPEM").closest("[title]")!;
+    expect(grupa).toHaveTextContent(/^PROBLEM Z ZAKUPEM$/);
+    expect(grupa.getAttribute("title")).not.toMatch(/spoza słownika/);
+  });
+
+  it("zamknięty przez Allegro mówi to słowem, bo odpowiedź w wątku nie przejdzie", () => {
+    pokaz([problem("NO_REFUND", true)]);
+    const zamkniety = screen.getByText("zamknięty");
+    expect(wiersz().lastElementChild!).toContainElement(zamkniety);
+    expect(zamkniety).toHaveAttribute("title", expect.stringContaining("nie przyjmie"));
+    expect(screen.getByText("brak zwrotu pieniędzy")).toBeInTheDocument();
+  });
+
+  it("otwarty problem nie mówi „zamknięty”", () => {
+    pokaz([problem("NO_REFUND")]);
+    expect(screen.queryByText("zamknięty")).not.toBeInTheDocument();
+  });
+
+  it("zwykły wątek nie nosi plakietki ani pustego rzędu", () => {
+    pokaz([rozmowa({ status: "waiting_for_us", czekaOdMs: 3600_000 })]);
+    expect(screen.queryByText("PROBLEM Z ZAKUPEM")).not.toBeInTheDocument();
+    expect(wiersz().children).toHaveLength(2);
   });
 });

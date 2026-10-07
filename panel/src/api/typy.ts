@@ -43,6 +43,17 @@ export type Rozmowa = {
    * prowadzi tę rozmowę jak reklamację — zegara ustawowego nie dokłada.
    */
   reklamacyjna: boolean;
+  /**
+   * Problem z zakupem Allegro — wątek `POST_PURCHASE_ISSUE` z Centrum Wiadomości.
+   * `null` przy zwykłym wątku. `powod` to surowy `subType` z Allegro (angielski
+   * klucz, np. `PRODUCT_ARRIVED_DAMAGED`) albo `null`, gdy Allegro go nie podało.
+   * `zamkniety` — Allegro oddało wątek jako `CLOSED`; nowej wiadomości nie przyjmie.
+   *
+   * W przeciwieństwie do `reklamacyjna` to fakt ALLEGRO, nie nasza flaga:
+   * sprawę zakłada kupujący, a my jej nie zdejmiemy. Polskie nazwy powodów
+   * stoją w `skrzynka/statusy.ts`, bo klucz przychodzi otwarty.
+   */
+  problemZakupu: { powod: string | null; zamkniety: boolean } | null;
   /** Ile czeka pytanie klienta. `null` = klient nic nie napisał, nikt nie czeka. */
   czekaOdMs: number | null;
   /**
