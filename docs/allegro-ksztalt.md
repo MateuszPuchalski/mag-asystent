@@ -84,7 +84,7 @@ to nie są warianty tej samej odpowiedzi. Wersja beta ma `participants` zamiast
 `offset`, a autora wiadomości opisuje polem `role` (`BUYER`, `SELLER`, `USER`,
 `CONSULTANT`, `ALLEGRO`) zamiast `isInterlocutor`.
 
-Od wydania @wydanie **lista wątków idzie betą**, bo tylko w niej Allegro
+Od wydania 0.573.0 **lista wątków idzie betą**, bo tylko w niej Allegro
 pokazuje Problemy z zakupem (sekcja niżej). Wiadomości zwykłego wątku zostają
 na `public.v1`. W zwykłym wątku obie strony mogą mieć rolę `USER`, więc kierunek
 wiadomości daje pewnie tylko `isInterlocutor`.
