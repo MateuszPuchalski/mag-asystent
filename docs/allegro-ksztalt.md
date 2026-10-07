@@ -159,8 +159,11 @@ idzie tylko ten jeden przebieg. 401, 429 i brak sieci przerywają przebieg jak
 dotąd. Skrzynka bez Problemów z zakupem dalej odpowiada klientom. Odmowa
 w połowie listy przerywa przebieg, bo obie wersje stronicują inaczej.
 
-Wstrzymanie widać dziś tylko w dzienniku serwera. Po 28 października znaczy
-ono, że Problemy z zakupem nie dochodzą.
+Po 28 października wstrzymanie znaczy, że Problemy z zakupem nie dochodzą.
+Dlatego zapisuje się w `allegro_inbox_sync_state` (`beta_wstrzymana_do`,
+`beta_powod`), a panel pokazuje je w nagłówku skrzynki i w karcie Allegro
+(`problemyZakupu`, `stanProblemowZakupu`). Tak samo panel mówi o becie
+wyłączonej przez `ALLEGRO_WATKI_BETA=0`. Udany przebieg betą zdejmuje stan.
 
 `[WERYFIKUJ]` **Te same identyfikatory wątków w obu wersjach.** Przebieg
 dopasowuje wątek z listy bety do zapisanego z `public.v1` po `id` i po nim
@@ -208,11 +211,18 @@ i reklamacji tego zakupu.
 Jak przy `public.v1` czytamy tylko pierwszą stronę wiadomości. Starszych
 model pracy nie kasuje.
 
-**Poza zakresem, do decyzji właściciela.** Wiadomość doradcy liczy się
-w statusie rozmowy jak wiadomość klienta. Zamknięty Problem z ostatnią
-wiadomością doradcy stoi więc w „Czeka na nas”, choć odpowiedzieć się nie da.
-Copilot też dostaje słowa doradcy jako słowa klienta. Reguła statusu
-(`wyliczStatus`) jest decyzją właściciela, więc jej nie ruszamy bez niego.
+**Głos Allegro** (`services/glos-allegro.ts`) — dwie reguły:
+
+1. Słowa doradcy nie są słowami klienta. Copilot rozpoznaje ostatnią
+   wiadomość KUPUJĄCEGO (`CEL_KLASYFIKACJI`), a w wątku dla modelu doradca
+   ma etykietę `ALLEGRO:` zamiast `KLIENT:`.
+2. Głos Allegro w wątku ze `status: CLOSED` nie jest ruchem w rozmowie.
+   Zamykające zdanie doradcy nie stawia rozmowy w „Czeka na nas”. Pytanie
+   klienta bez odpowiedzi dalej czeka, jak każe reguła `wyliczStatus`.
+
+W otwartym wątku doradca liczy się jak strona przychodząca: pyta sprzedawcę
+o stanowisko, więc rozmowa czeka na nas. Edytor nie pozwala wysłać
+odpowiedzi w zamkniętym Problemie, bo Allegro odrzuci ją kodem 422.
 
 ### Wysyłka i „przeczytany" w Problemie z zakupem
 

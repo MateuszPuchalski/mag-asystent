@@ -162,3 +162,14 @@ test("wątek: sufit znaków też liczy się od najnowszej", () => {
   assert.match(t, /krótko/);
   assert.match(t, /i jeszcze/);
 });
+
+test("wątek podpisuje doradcę Allegro własną etykietą, nie KLIENT", () => {
+  /* W Problemie z zakupem doradca pisze jak strona przychodząca. Pod etykietą
+     KLIENT szkic odpowiadałby kupującemu na słowa Allegro. */
+  const t = String(zamaskujWatek([
+    { odKlienta: true, tresc: "Gaźnik nie pasuje" },
+    { odKlienta: false, tresc: "Prosimy o zdjęcie" },
+    { odKlienta: true, odAllegro: true, tresc: "Sprzedawco, prosimy o stanowisko" },
+  ], null));
+  assert.equal(t, "KLIENT: Gaźnik nie pasuje\nMY: Prosimy o zdjęcie\nALLEGRO: Sprzedawco, prosimy o stanowisko");
+});

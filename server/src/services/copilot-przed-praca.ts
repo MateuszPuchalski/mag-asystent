@@ -18,6 +18,7 @@ import { zapiszPropozycje } from "./przeplyw-kategorii.js";
 import { wyslijNaZywo, type NaZywoDeps } from "./przeplyw-na-zywo.js";
 import { czekajaNaSzkic } from "./copilot-szkic-po-rozpoznaniu.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
+import { glosAllegro } from "./glos-allegro.js";
 
 /* ── Szkice przed pracą (26 września 2026, decyzja właściciela) ──────────────
    PROBLEM. Rozpoznanie i szkic z taktu mają sufity godzinowe: sześćdziesiąt
@@ -145,6 +146,7 @@ const KOLEJKA = `
    WHERE m.sent_at >= ?
      AND m.id = (SELECT m2.id FROM message m2
                   WHERE m2.conversation_id = c.id AND m2.auto_odpowiedz = 0
+                    AND NOT ${glosAllegro("m2")}
                   ORDER BY m2.sent_at DESC, m2.id DESC LIMIT 1)
      AND (TRIM(COALESCE(m.body,'')) <> ''
           OR EXISTS (SELECT 1 FROM message_attachment a WHERE a.message_id = m.id))

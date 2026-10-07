@@ -1436,7 +1436,12 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_sync_state (
   -- czasu albo do końca historii. NULL znaczy „jeszcze nigdy", a to jedyny
   -- stan, w którym sufit stron nie obowiązuje — inaczej instalacja
   -- z zaległością większą niż sufit nigdy by jej nie nadrobiła.
-  dno_at TEXT
+  dno_at TEXT,
+  -- Do kiedy czeka `beta.v1` Centrum Wiadomości po odmowie Allegro, i zdanie
+  -- odmowy. Bez bety Problemy z zakupem nie dochodzą, a skrzynka czyta wtedy
+  -- `public.v1` i wygląda zdrowo — panel musi to powiedzieć sam.
+  beta_wstrzymana_do TEXT,
+  beta_powod TEXT
 );
 
 -- ── Zwroty klienckie z Allegro (0.150.0) ────────────────────────────────────

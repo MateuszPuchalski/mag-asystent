@@ -9,6 +9,8 @@ import {
   stanPolaczenia,
 } from "../services/allegro-token.js";
 import { ROLE_BIUROWE } from "../services/users.js";
+import { stanProblemowZakupu } from "../services/allegro-inbox-sync-state.js";
+import { db } from "../db/db.js";
 
 /* ── Konto Allegro — parowanie i stan (0.140.0) ──────────────────────────────
    Te cztery trasy mieszkały do 0.137.2 w `routes/zwroty.ts` i odeszłyby razem
@@ -35,7 +37,10 @@ export async function allegroRoutes(app: FastifyInstance) {
   app.get("/api/biuro/allegro/status", async (_req, reply) => {
     const nie = odmowa();
     if (nie) return reply.code(nie.kod).send({ error: nie.error });
-    return { ...stanPolaczenia(), tryb: allegroTryb(), sandbox: config.allegro.sandbox };
+    /* Problemy z zakupem obok połączenia: konto sparowane i zdrowe nie
+       znaczy, że beta Centrum Wiadomości działa (`stanProblemowZakupu`). */
+    return { ...stanPolaczenia(), tryb: allegroTryb(), sandbox: config.allegro.sandbox,
+      problemyZakupu: stanProblemowZakupu(db()) };
   });
 
   app.post("/api/biuro/allegro/parowanie", async (_req, reply) => {

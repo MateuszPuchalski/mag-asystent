@@ -109,8 +109,13 @@ export function zamaskuj(tresc: string, login: string | null): TrescBezpieczna {
   return out as TrescBezpieczna;
 }
 
-/** Jedna wiadomość wątku do zamaskowania — kierunek i treść BEZ stopki. */
-export interface WiadomoscWatku { odKlienta: boolean; tresc: string }
+/**
+ * Jedna wiadomość wątku do zamaskowania — kierunek i treść BEZ stopki.
+ * `odAllegro` — doradca albo komunikat Allegro w Problemie z zakupem
+ * (`glos-allegro.ts`). Przychodzi jak klient, ale klientem nie jest, więc
+ * model dostaje go pod własną etykietą.
+ */
+export interface WiadomoscWatku { odKlienta: boolean; tresc: string; odAllegro?: boolean }
 
 /**
  * Sufit wątku wysyłanego dostawcy (polityka danych skrzynki, 0.231.0).
@@ -149,7 +154,8 @@ export function zamaskujWatekZeSladem(
   let znakow = 0;
   let pominieto = false;
   for (const w of [...wiadomosci].reverse()) {
-    const linia = `${w.odKlienta ? "KLIENT" : "MY"}: ${String(zamaskuj(w.tresc, login)).trim()}`;
+    const kto = w.odAllegro ? "ALLEGRO" : w.odKlienta ? "KLIENT" : "MY";
+    const linia = `${kto}: ${String(zamaskuj(w.tresc, login)).trim()}`;
     if (linie.length >= SUFIT_WATKU.wiadomosci || znakow + linia.length > SUFIT_WATKU.znakow) {
       pominieto = true;
       break;

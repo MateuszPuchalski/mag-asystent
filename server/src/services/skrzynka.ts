@@ -27,6 +27,8 @@ import { podzielStopke } from "./stopka.js";
 import { czyObrazZNazwy } from "./reklamacje.js";
 import { zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
 import { typPodgladu } from "./typ-podgladu.js";
+import { ROLE_ALLEGRO, glosAllegroPoZamknieciu } from "./glos-allegro.js";
+import { stanProblemowZakupu, type StanProblemowZakupu } from "./allegro-inbox-sync-state.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -193,7 +195,11 @@ export interface WpisOsi {
      przyciskiem. Też tylko przy wychodzących — patrz `podzielStopke`. */
   stopka?: string;
 }
-export interface StanSkrzynki { ostatniaSynchronizacja: string | null; bledy: number }
+export interface StanSkrzynki {
+  ostatniaSynchronizacja: string | null; bledy: number;
+  /** Czy Problemy z zakupem mogą dochodzić — `stanProblemowZakupu`. */
+  problemyZakupu: StanProblemowZakupu | null;
+}
 
 /* Zamówienie przy rozmowie. `pobrane` jest `null`, dopóki ticker
    `uzupelnijZamowienia` go nie dociągnie — numer i odnośnik są od razu. */
@@ -289,13 +295,16 @@ const LISTA = `
          -- PO CZASIE, NIE PO id (23 września 2026): synchronizacja wpisywała
          -- paczkę od najnowszej, więc id nie rośnie z czasem. Ta sama reguła
          -- co kontrola świeżości wysyłki i klasyfikator.
+         -- Głos Allegro po zamknięciu wątku nie jest ruchem (glos-allegro.ts).
          (SELECT m.direction FROM message m
            WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
+             AND NOT ${glosAllegroPoZamknieciu("m")}
            ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuch,
          -- Chwila tego ruchu i stan wątku u Allegro: z nich zakończenie
          -- liczy się samo (23 września 2026, reguła w wyliczStatus).
          (SELECT m.sent_at FROM message m
            WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
+             AND NOT ${glosAllegroPoZamknieciu("m")}
            ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuchAt,
          (SELECT t.watek_status FROM allegro_inbox_thread t
            WHERE t.id = c.external_conversation_id) AS watekStatus,
@@ -308,13 +317,15 @@ const LISTA = `
          -- ostatniaWiadomoscAt: tamto ma COALESCE na updated_at, więc wątek
          -- zaczęty przez nas dostałby zegar, którego nikt nie odmierza.
          (SELECT MAX(k.sent_at) FROM message k
-           WHERE k.conversation_id=c.id AND k.direction='incoming') AS pytanieAt,
+           WHERE k.conversation_id=c.id AND k.direction='incoming'
+             AND NOT ${glosAllegroPoZamknieciu("k")}) AS pytanieAt,
          -- Licznik dopisków liczy się OD NASZEJ PRAWDZIWEJ ODPOWIEDZI
          -- (0.227.0). Autoodpowiedź stojąca po pytaniu zerowała go, więc
          -- wiersz kolejki mówił „zero dopisków" o rozmowie, w której klient
          -- napisał i nikt mu nie odpowiedział.
          (SELECT COUNT(*) FROM message k
            WHERE k.conversation_id=c.id AND k.direction='incoming'
+             AND NOT ${glosAllegroPoZamknieciu("k")}
              AND k.id > COALESCE((SELECT MAX(n.id) FROM message n
                                    WHERE n.conversation_id=c.id
                                      AND n.direction='outgoing' AND n.auto_odpowiedz=0), 0)
@@ -345,9 +356,6 @@ const LISTA = `
     LEFT JOIN message o ON o.id = (
       SELECT m.id FROM message m WHERE m.conversation_id=c.id
        ORDER BY (m.direction='incoming') DESC, m.sent_at DESC, m.id DESC LIMIT 1)`;
-
-/** Role `author.role` z `beta.v1`, które nie są ani klientem, ani nami. */
-const ROLE_ALLEGRO = new Set(["CONSULTANT", "ALLEGRO"]);
 
 const naRozmowe = (
   w: Record<string, unknown>,
@@ -430,7 +438,8 @@ export function stanSkrzynki(): StanSkrzynki {
   const s = db().prepare(
     "SELECT last_success_at, error_count FROM allegro_inbox_sync_state WHERE id=1",
   ).get() as { last_success_at: string | null; error_count: number } | undefined;
-  return { ostatniaSynchronizacja: s?.last_success_at ?? null, bledy: s?.error_count ?? 0 };
+  return { ostatniaSynchronizacja: s?.last_success_at ?? null, bledy: s?.error_count ?? 0,
+    problemyZakupu: stanProblemowZakupu(db()) };
 }
 
 /**

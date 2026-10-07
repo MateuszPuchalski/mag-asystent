@@ -8,6 +8,7 @@ import {
 } from "./allegro-inbox-sync.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
 import { onConversationEvent } from "./conversation-realtime.js";
+import { stanProblemowZakupu } from "./allegro-inbox-sync-state.js";
 
 const schema = fs.readFileSync(new URL("../db/schema.sql", import.meta.url), "utf8");
 /* Schemat PLUS dostawki: `events.user_ref` i część indeksów dochodzą dopiero
@@ -1217,6 +1218,43 @@ test("odmowa listy w beta.v1 schodzi na public.v1 w tym samym przebiegu i wstrzy
     console.warn = oryginal;
     _zdejmijWstrzymanieStruktury();
   }
+});
+
+test("wstrzymanie bety widać w stanie skrzynki, a udana lista bety je zdejmuje", async () => {
+  _zdejmijWstrzymanieStruktury();
+  const database = mkDb();
+  const teraz = Date.parse("2026-10-07T10:00:00Z");
+  const oryginal = console.warn;
+  console.warn = () => {};
+  try {
+    await synchronizujAllegroInbox({ database, apiUrl: "https://api.test", listaBeta: true, inboxOd: null,
+      now: () => new Date(teraz),
+      query: async (url: string, opcje?: { akcept?: string }) => {
+        if (opcje?.akcept === BETA) throw new Error("Allegro nie akceptuje żadnej znanej wersji zasobu (406/415) dla threads.");
+        return fake([[thread(1)]]).query(url);
+      } });
+  } finally {
+    console.warn = oryginal;
+  }
+  const st = stanProblemowZakupu(database, true, teraz);
+  assert.equal(st?.przyczyna, "wstrzymana");
+  assert.equal(st?.doKiedy, "2026-10-07T16:00:00.000Z", "sześć godzin od odmowy");
+  assert.match(st?.szczegol ?? "", /406\/415/);
+  assert.equal(stanProblemowZakupu(database, true, teraz + 6 * 3_600_000 + 1), null,
+    "po terminie beta jest pytana znowu, więc stan nie straszy");
+
+  /* Restart procesu zdejmuje wstrzymanie z pamięci; udany przebieg betą
+     zdejmuje je też z bazy. */
+  _zdejmijWstrzymanieStruktury();
+  await przebiegBety(database, atrapaBety([[watekBeta("w-1")]], { "w-1": { public: [] } }).query);
+  assert.equal(stanProblemowZakupu(database, true, teraz), null);
+});
+
+test("wyłączona beta to stan „wyłączona”, niezależnie od bazy", () => {
+  const database = mkDb();
+  assert.deepEqual(stanProblemowZakupu(database, false),
+    { przyczyna: "wylaczona", doKiedy: null, szczegol: null });
+  assert.equal(stanProblemowZakupu(database, true), null, "pusta baza: nic nie wstrzymane");
 });
 
 test("błąd serwera Allegro na liście bety: ten przebieg idzie public.v1, następny pyta betę znowu", async () => {

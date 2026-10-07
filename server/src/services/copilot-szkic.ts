@@ -30,6 +30,7 @@ import { faktZwrotu, zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
 import { ocenRealizacji, stanRealizacji } from "./realizacja-zamowienia.js";
 import { odswiezZamowienie } from "./allegro-zamowienia-sync.js";
 import { werdyktOdrzucenia } from "./przeplyw-kategorii.js";
+import { glosAllegro } from "./glos-allegro.js";
 
 /* ── Copilot: szkic odpowiedzi z faktów (§14.6, etap F, przyrost drugi) ──────
 
@@ -545,20 +546,23 @@ export function kiedyBedzie(
 export function kontekstSzkicu(
   conversationId: number, subiekt: SubiektAdapter, teraz = new Date(),
 ): KontekstSzkicu {
-  const wiadomosci = db().prepare(`SELECT id, direction, body FROM message
-      WHERE conversation_id=? ORDER BY sent_at, id`).all(conversationId) as
-    Array<{ id: number; direction: string; body: string | null }>;
+  const wiadomosci = db().prepare(`SELECT id, direction, body, ${glosAllegro("message")} AS od_allegro
+      FROM message WHERE conversation_id=? ORDER BY sent_at, id`).all(conversationId) as
+    Array<{ id: number; direction: string; body: string | null; od_allegro: number }>;
   if (wiadomosci.length === 0) {
     throw new Error("Rozmowa nie ma żadnej wiadomości — nie ma na co odpowiadać");
   }
   const login = loginRozmowcy(conversationId);
   const watek: WiadomoscWatku[] = wiadomosci.map((m) => ({
     odKlienta: m.direction === "incoming",
+    /* Doradca Allegro dostaje własną etykietę — szkic odpowiada kupującemu. */
+    odAllegro: Boolean(Number(m.od_allegro)),
     /* Stopka firmowa wycięta tą samą funkcją, którą czyta ją oś rozmowy —
        model nie ma się uczyć naszego podpisu, a znaki kosztują. */
     tresc: m.direction === "outgoing" ? podzielStopke(String(m.body ?? "")).tresc : String(m.body ?? ""),
   }));
-  const ostatniaKlienta = [...wiadomosci].reverse().find((m) => m.direction === "incoming");
+  const ostatniaKlienta = [...wiadomosci].reverse()
+    .find((m) => m.direction === "incoming" && !Number(m.od_allegro));
 
   const fakty: Fakt[] = [];
   const dodaj = (rodzaj: RodzajFaktu, zdanie: string) =>

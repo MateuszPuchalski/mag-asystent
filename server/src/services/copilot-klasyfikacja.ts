@@ -21,6 +21,7 @@ import {
   decyzjaZModelu, decyzjaZastepcza, walidujOdpowiedz, type Decyzja,
 } from "./klasyfikacja-polityka.js";
 import { MAPOWANIE_WERSJA, mapujStrukture, type WynikMapowania } from "./klasyfikacja-mapowanie.js";
+import { glosAllegro } from "./glos-allegro.js";
 import { config } from "../config.js";
 import { kategorieNaZywo, pomiarPrzeplywu, type WierszPomiaruPrzeplywu } from "./przeplyw-kategorii.js";
 
@@ -99,8 +100,10 @@ export type Autor = {
  * miały go przepisanego „co do znaku", a rozjazd dawał rozmowę wiecznie
  * nieaktualną, klasyfikowaną w kółko przy każdym kliknięciu. Wymaga aliasu `c`.
  */
+/* Głos Allegro nie jest celem: rozpoznajemy prośbę KUPUJĄCEGO, a słowa
+   doradcy w Problemie z zakupem są dla modelu kontekstem (`glos-allegro.ts`). */
 export const CEL_KLASYFIKACJI = `(SELECT m.id FROM message m WHERE m.conversation_id=c.id
-  AND m.direction='incoming' ORDER BY m.sent_at DESC, m.id DESC LIMIT 1)`;
+  AND m.direction='incoming' AND NOT ${glosAllegro("m")} ORDER BY m.sent_at DESC, m.id DESC LIMIT 1)`;
 
 /**
  * Aktywna decyzja rozmowy w bieżącym słowniku — ta, którą widzi kolejka.
@@ -134,7 +137,8 @@ const CEL = `
          t.interlocutor_login AS login,
          t.watek_typ, t.watek_podtyp, t.watek_zamowienia, t.struktura_at,
          (m.id = (SELECT p.id FROM message p WHERE p.conversation_id = c.id
-                     AND p.direction = 'incoming' ORDER BY p.sent_at, p.id LIMIT 1)) AS pierwsza,
+                     AND p.direction = 'incoming' AND NOT ${glosAllegro("p")}
+                   ORDER BY p.sent_at, p.id LIMIT 1)) AS pierwsza,
          m.id AS message_id, m.body,
          (SELECT COUNT(*) FROM message_attachment a WHERE a.message_id = m.id) AS zalacznikow,
          (SELECT k.status FROM decyzja_klasyfikacji k
@@ -177,12 +181,13 @@ interface Kontekst {
  */
 function kontekstRozmowy(database: DatabaseSync, cel: Cel): Kontekst {
   const wiadomosci = database.prepare(`SELECT id, direction, body,
-      related_object_type, related_object_id, related_order_id
+      related_object_type, related_object_id, related_order_id,
+      ${glosAllegro("message")} AS od_allegro
     FROM message WHERE conversation_id=? AND auto_odpowiedz=0
     ORDER BY sent_at, id`).all(cel.id) as Array<{
       id: number; direction: string; body: string | null;
       related_object_type: string | null; related_object_id: string | null;
-      related_order_id: string | null }>;
+      related_order_id: string | null; od_allegro: number }>;
 
   const zamowienia = [...new Set([...wiadomosci.map((w) => w.related_order_id)
     .filter((x): x is string => !!x), ...zamowieniaWatku(cel)])];
@@ -194,7 +199,8 @@ function kontekstRozmowy(database: DatabaseSync, cel: Cel): Kontekst {
      wątku, bo temat bywa tytułem oferty z loginem w środku. */
   const login = String(cel.login ?? "").trim() || cel.subject;
   const slad = zamaskujWatekZeSladem(
-    wiadomosci.map((w) => ({ odKlienta: w.direction === "incoming", tresc: String(w.body ?? "") })),
+    wiadomosci.map((w) => ({ odKlienta: w.direction === "incoming", tresc: String(w.body ?? ""),
+      odAllegro: Boolean(Number(w.od_allegro)) })),
     login);
   const naglowek = [
     "DANE Z SYSTEMU (nie od klienta):",

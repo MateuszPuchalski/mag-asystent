@@ -247,12 +247,18 @@ function poOdmowieListy(e: unknown): "przerwij" | "przebieg" | "wstrzymaj" {
   return /406\/415|nextPage|tablicy threads/.test(tresc) ? "wstrzymaj" : "przerwij";
 }
 
-function wstrzymajBete(teraz: Date, e: unknown, co: string): void {
+function wstrzymajBete(database: Db, teraz: Date, e: unknown, co: string): void {
   betaWstrzymanaDo = teraz.getTime() + WSTRZYMANIE_PO_ODMOWIE_MS;
+  const tekst = e instanceof Error ? e.message : String(e);
   /* Głośno RAZ na wstrzymanie, nie przy każdym wątku: odmowa opisuje
      konto, nie wątek. */
-  console.warn(`[allegro-inbox] ${co} z beta.v1 wstrzymana na 6 h:`,
-    e instanceof Error ? e.message : e);
+  console.warn(`[allegro-inbox] ${co} z beta.v1 wstrzymana na 6 h:`, tekst);
+  /* I w bazie, bo dziennik serwera czyta tylko admin, a brak Problemów
+     z zakupem ma zobaczyć biuro (`stanProblemowZakupu`). Obcięcie chroni
+     kolumnę przed odpowiedzią Allegro wklejoną w całości. */
+  database.prepare(`INSERT INTO allegro_inbox_sync_state(id, beta_wstrzymana_do, beta_powod)
+    VALUES (1,?,?) ON CONFLICT(id) DO UPDATE SET beta_wstrzymana_do=excluded.beta_wstrzymana_do,
+    beta_powod=excluded.beta_powod`).run(new Date(betaWstrzymanaDo).toISOString(), tekst.slice(0, 300));
 }
 
 export interface InboxSyncDeps {
@@ -423,7 +429,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
       } catch (e) {
         const co = stron > 0 ? "przerwij" : poOdmowieListy(e);
         if (co === "przerwij") throw e;
-        if (co === "wstrzymaj") wstrzymajBete(now(), e, "lista wątków");
+        if (co === "wstrzymaj") wstrzymajBete(database, now(), e, "lista wątków");
         else console.warn("[allegro-inbox] lista wątków z beta.v1 — błąd Allegro, ten przebieg idzie public.v1:",
           e instanceof Error ? e.message : e);
         beta = false;
@@ -486,7 +492,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
           /* Struktura z samej listy, gdy lista szła betą — dodatkowe żądanie
              o wątek jest potrzebne wyłącznie przy liście `public.v1`. */
           const st = thread.beta ? thread.beta.struktura
-            : await czytajStrukture(struktura, thread.id, now());
+            : await czytajStrukture(database, struktura, thread.id, now());
           messages.set(thread.id, await czytajWiadomosci(query, apiUrl, thread));
           threads.push(thread);
           przeczytane.add(thread.id);
@@ -560,6 +566,12 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
         next_attempt_at=excluded.next_attempt_at,dno_at=excluded.dno_at`).run(
           kursor?.lastMessageDateTime ?? startState.cursorAt, kursor?.id ?? startState.cursorId,
           at, at, zepsute.size, new Date(Date.parse(at) + interval).toISOString(), dno);
+      /* Lista przeszła betą do końca przebiegu — wstrzymanie, jeśli wisiało
+         z poprzedniego procesu, już nie jest prawdą. */
+      if (beta) {
+        database.prepare(`UPDATE allegro_inbox_sync_state SET beta_wstrzymana_do=NULL, beta_powod=NULL
+          WHERE id=1`).run();
+      }
     })();
   } catch (error) {
     const wait = error instanceof BladLimituAllegro
@@ -834,7 +846,7 @@ async function dociagnijZalacznikiNew(
  * żądanie tego przebiegu i tak dostałoby 429.
  */
 async function czytajStrukture(
-  odczyt: OdczytStruktury | null, threadId: string, teraz: Date,
+  database: Db, odczyt: OdczytStruktury | null, threadId: string, teraz: Date,
 ): Promise<StrukturaWatku | null> {
   if (!odczyt || teraz.getTime() < betaWstrzymanaDo) return null;
   try {
@@ -843,7 +855,7 @@ async function czytajStrukture(
     if (e instanceof BladLimituAllegro) {
       betaWstrzymanaDo = teraz.getTime() + WSTRZYMANIE_PO_LIMICIE_MS;
     } else if (odmowaBety(e)) {
-      wstrzymajBete(teraz, e, "struktura wątków");
+      wstrzymajBete(database, teraz, e, "struktura wątków");
     }
     return null;
   }
