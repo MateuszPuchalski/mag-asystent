@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Kolejka } from "./Kolejka";
-import type { Kategoria, Kopilot, Rozmowa } from "../api/typy";
+import { czas } from "../ui";
+import type { Kategoria, Kopilot, Rozmowa, StanSkrzynki } from "../api/typy";
 
 const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   id: 4821, klient: "Kupujący 44300444",
@@ -14,7 +15,7 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   kopilot: null, ...n,
 });
 
-const STAN = { ostatniaSynchronizacja: "2026-09-01T07:05:00.000Z", bledy: 0 };
+const STAN: StanSkrzynki = { ostatniaSynchronizacja: "2026-09-01T07:05:00.000Z", bledy: 0, problemyZakupu: null };
 
 describe("Kolejka", () => {
   it("pusta lista mówi o sobie, ale data synchronizacji zostaje", () => {
@@ -974,5 +975,56 @@ describe("problem z zakupem w kolejce", () => {
     pokaz([rozmowa({ status: "waiting_for_us", czekaOdMs: 3600_000 })]);
     expect(screen.queryByText("PROBLEM Z ZAKUPEM")).not.toBeInTheDocument();
     expect(wiersz().children).toHaveLength(2);
+  });
+});
+
+/* ── PROBLEMY Z ZAKUPEM NIE DOCHODZĄ — nagłówek kolejki ──────────────────────
+   Gdy beta Centrum Wiadomości nie działa, skrzynka czyta wersję bez Problemów
+   z zakupem. Agent ma to zobaczyć tam, gdzie wybiera pracę, bo lista tej
+   sprawy kupującego nie pokaże. */
+describe("problemy z zakupem nie dochodzą — nagłówek kolejki", () => {
+  const pokazStan = (stan: StanSkrzynki) => render(<Kolejka rozmowy={[]} stan={stan} wybranaId={null}
+    laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+  const ostrzezenie = () => screen.queryByText("Problemy z zakupem nie dochodzą");
+  const DO_KIEDY = "2026-10-07T12:30:00.000Z";
+
+  it("`null`: beta działa, nagłówek milczy", () => {
+    pokazStan(STAN);
+    expect(ostrzezenie()).toBeNull();
+  });
+
+  it("starszy serwer bez pola: milczy, jak przy `null`", () => {
+    const bezPola = { ostatniaSynchronizacja: STAN.ostatniaSynchronizacja, bledy: 0 };
+    pokazStan(bezPola as StanSkrzynki);
+    expect(ostrzezenie()).toBeNull();
+    expect(screen.getByText(/synchronizacja/)).toBeInTheDocument();
+  });
+
+  it("wyłączona w konfiguracji: zdanie w barwie uwagi, przyczyna w dymku i dla czytnika", () => {
+    pokazStan({ ...STAN, problemyZakupu: { przyczyna: "wylaczona", doKiedy: null, szczegol: null } });
+    const zdanie = ostrzezenie()!;
+    expect(zdanie).toHaveClass("text-ranga-uwaga");
+    expect(zdanie).toHaveAttribute("title", expect.stringContaining("ALLEGRO_WATKI_BETA=0"));
+    expect(zdanie).toHaveTextContent(/ALLEGRO_WATKI_BETA=0/);
+    /* Co zrobić teraz, nie tylko co jest nie tak (dekalog, p. 6). */
+    expect(zdanie.getAttribute("title")).toMatch(/Sprawdzaj je w Centrum Wiadomości/);
+    /* Data synchronizacji zostaje — ostrzeżenie staje obok, nie zamiast. */
+    expect(screen.getByText(/synchronizacja/)).toBeInTheDocument();
+  });
+
+  it("wstrzymana przez Allegro: termin następnej próby i odmowa w dymku", () => {
+    pokazStan({ ...STAN, problemyZakupu: { przyczyna: "wstrzymana", doKiedy: DO_KIEDY,
+      szczegol: "Access to beta resource denied" } });
+    const dymek = ostrzezenie()!.getAttribute("title")!;
+    expect(dymek).toContain(`następna próba ${czas(DO_KIEDY)}`);
+    expect(dymek).toContain("„Access to beta resource denied”");
+    expect(dymek).not.toMatch(/ALLEGRO_WATKI_BETA/);
+  });
+
+  it("wstrzymana bez terminu nie obiecuje próby", () => {
+    pokazStan({ ...STAN, problemyZakupu: { przyczyna: "wstrzymana", doKiedy: null, szczegol: null } });
+    const dymek = ostrzezenie()!.getAttribute("title")!;
+    expect(dymek).toContain("Allegro odmówiło beta.v1.");
+    expect(dymek).not.toMatch(/następna próba|Odmowa Allegro/);
   });
 });

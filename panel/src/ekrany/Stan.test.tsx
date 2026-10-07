@@ -29,6 +29,10 @@ let odczyty: string[] = [];
 let rola = "admin";
 let parowanie: Array<{ stan: string; nastepnyPollMs?: number }> = [];
 let sondaBlad = true;
+/* Odpowiedź `allegro/status`. Domyślnie kształt starszego serwera, bez
+   `problemyZakupu` — ekran ma go czytać jak `null`. */
+const ALLEGRO_NIEPOLACZONE = { stan: "niepolaczone", srodowisko: "produkcja", wygasa: null };
+let allegro: Record<string, unknown> = ALLEGRO_NIEPOLACZONE;
 
 const KOLEJKA = { summary: { pending: 1, error: 1, done: 3 }, items: [
   { id: 7, time: "12:00", status: "pending", label: "Lokalizacja RP-4120", detail: "P-01-3 → P-02-1", errMsg: null },
@@ -37,7 +41,7 @@ const KOLEJKA = { summary: { pending: 1, error: 1, done: 3 }, items: [
 ] };
 
 beforeEach(() => {
-  wyslane = []; odczyty = []; rola = "admin"; parowanie = []; sondaBlad = true;
+  wyslane = []; odczyty = []; rola = "admin"; parowanie = []; sondaBlad = true; allegro = ALLEGRO_NIEPOLACZONE;
   Element.prototype.scrollIntoView = vi.fn();
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     const metoda = init?.method ?? "GET";
@@ -54,7 +58,7 @@ beforeEach(() => {
       twIds: [11, 12], lastSeen: "2026-09-22T12:00:00.000Z", rozstrzygniecie: null, trafienPoDecyzji: 0 }] });
     if (url.startsWith("/api/biuro/wymiana")) return odp({ wiersze: [] });
     if (url === "/api/biuro/alarm-wymiany") return odp({ dni: 30, minSpraw: 5, spoznionychRazem: 0, kanaly: [] });
-    if (url === "/api/biuro/allegro/status") return odp({ stan: "niepolaczone", srodowisko: "produkcja", wygasa: null });
+    if (url === "/api/biuro/allegro/status") return odp(allegro);
     if (url === "/api/biuro/allegro/parowanie") return odp(parowanie.shift() ?? { stan: "czekam", nastepnyPollMs: 5000 });
     if (url === "/api/reconcile") return odp({ at: "2026-09-23T06:00:00.000Z", sprawdzono: { kartotek: 10, zadan: 4 },
       rozjazdy: [{ rodzaj: "zwrot_rozliczony_bez_korekty", klucz: "ZW-501", opis: "brak korekty", odKiedy: null }] });
@@ -317,5 +321,31 @@ describe("parowanie Allegro — jedna pętla (z biura 0.106.0 i 0.114.0)", () =>
     await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
     expect(ilePytan()).toBe(1);
     expect(wyslane).toEqual(["POST /api/biuro/allegro/parowanie"]);
+  });
+});
+
+/* ── Problemy z zakupem nie dochodzą ────────────────────────────────────────
+   Połączone konto bez Problemów z zakupem czeka na biuro: kupujący pisze,
+   a skrzynka tego nie pokaże. Kafelek mówi to bursztynem, więc karta
+   z przyczyną stoi otwarta od wejścia, bez szukania jej pod zielenią. */
+describe("Problemy z zakupem w stanie systemu", () => {
+  const POLACZONE = { stan: "polaczone", srodowisko: "produkcja", wygasa: null };
+
+  it("wstrzymana beta: kafelek do uwagi, karta otwarta z przyczyną, zero zapisu", async () => {
+    allegro = { ...POLACZONE, problemyZakupu: { przyczyna: "wstrzymana",
+      doKiedy: "2026-10-07T12:30:00.000Z", szczegol: "Access to beta resource denied" } };
+    pokaz();
+    const karta = (await screen.findByRole("heading", { name: "Konto Allegro" })).closest(".card") as HTMLElement;
+    expect(await within(karta).findByText(/Allegro odmówiło beta\.v1, następna próba/)).toBeInTheDocument();
+    expect(kafelek("Konto Allegro")).toHaveTextContent("Problemy z zakupem nie dochodzą");
+    expect(kafelek("Konto Allegro").querySelector(".text-ranga-uwaga")).not.toBeNull();
+    expect(wyslane).toEqual([]);
+  });
+
+  it("`null`: połączone konto zostaje zielone, a jego karta zwinięta", async () => {
+    allegro = { ...POLACZONE, problemyZakupu: null };
+    pokaz();
+    await waitFor(() => expect(kafelek("Konto Allegro")).toHaveTextContent("połączone · produkcja"));
+    expect(screen.queryByRole("heading", { name: "Konto Allegro" })).toBeNull();
   });
 });

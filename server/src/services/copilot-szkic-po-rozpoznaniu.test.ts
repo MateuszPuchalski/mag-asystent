@@ -109,6 +109,22 @@ test("„nic do zrobienia” i rozpoznanie zastępcze nie dają szkicu", async (
   assert.equal(wywolan, 0);
 });
 
+test("zamknięty Problem z zakupem nie dostaje szkicu — Allegro i tak odrzuci odpowiedź", async () => {
+  const d = db();
+  const r = rozpoznana("DELIVERY_DAMAGED", "REQUEST_PHOTO");
+  const otwarty = rozpoznana("DELIVERY_DAMAGED", "REQUEST_PHOTO");
+  const watek = d.prepare(`INSERT INTO allegro_inbox_thread(id,read,surowe_json,synced_at,watek_typ,watek_status)
+    VALUES (?,0,'{}','2026-10-07T00:00:00Z','POST_PURCHASE_ISSUE',?)`);
+  for (const [id, status] of [[r, "CLOSED"], [otwarty, "OPEN"]] as const) {
+    const x = (d.prepare("SELECT external_conversation_id x FROM conversation WHERE id=?").get(id) as { x: string }).x;
+    d.prepare("DELETE FROM allegro_inbox_thread WHERE id=?").run(x);
+    watek.run(x, status);
+  }
+  assert.deepEqual(P.czekajaNaSzkic(d, [r, otwarty]), [otwarty]);
+  assert.equal((await biegnij([r])).ulozonych, 0);
+  assert.equal(wywolan, 0, "zamknięty wątek nie kosztuje wywołania modelu");
+});
+
 test("sufit godzinowy trzyma koszt i zostawia ślad w dzienniku", async () => {
   const r = rozpoznana("ORDER_STATUS", "GET_SHIPMENT");
   db().prepare(`INSERT INTO copilot_wywolanie(zadanie,model,wynik,at) VALUES ('szkic','atrapa','ok',?)`).run(new Date().toISOString());

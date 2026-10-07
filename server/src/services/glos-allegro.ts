@@ -38,3 +38,12 @@ export const glosAllegroPoZamknieciu = (m: string): string =>
   `(${glosAllegro(m)} AND EXISTS (SELECT 1 FROM conversation cz
       JOIN allegro_inbox_thread tz ON tz.id = cz.external_conversation_id
      WHERE cz.id = ${m}.conversation_id AND tz.watek_status = 'CLOSED'))`;
+
+/**
+ * SQL: rozmowa jest zamkniętym Problemem z zakupem. `c` to alias tabeli
+ * `conversation`. Automat nie układa tu szkicu: Allegro odrzuci odpowiedź
+ * (422 `THREAD_CLOSED`), panel szkicu nie pokaże, a wywołanie modelu kosztuje.
+ */
+export const zamknietyProblem = (c: string): string =>
+  `EXISTS (SELECT 1 FROM allegro_inbox_thread tp WHERE tp.id = ${c}.external_conversation_id
+      AND tp.watek_typ = 'POST_PURCHASE_ISSUE' AND tp.watek_status = 'CLOSED')`;

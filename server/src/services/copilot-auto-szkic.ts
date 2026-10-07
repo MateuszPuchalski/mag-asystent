@@ -10,6 +10,7 @@ import {
 import { nadawcaSzkicuAnthropic } from "../adapters/copilot.anthropic.js";
 import { ulozSzkic, type AutorSzkicu, type NadawcaSzkicu } from "./copilot-szkic.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
+import { zamknietyProblem } from "./glos-allegro.js";
 
 /**
  * Szkic sam dla nowego pytania pod ofertą (0.317.0).
@@ -124,6 +125,7 @@ const CZEKAJACE = `
                             WHERE k2.message_id = m.id AND k2.aktywna = 1
                               AND k2.taksonomia_wersja = '${TAKSONOMIA_WERSJA}'))
      AND IFNULL(s.message_id, -1) <> m.id
+     AND NOT ${zamknietyProblem("c")}
    ORDER BY m.sent_at, m.id
    LIMIT ?`;
 

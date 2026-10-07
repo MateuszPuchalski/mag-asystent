@@ -321,7 +321,28 @@ export type WpisWzmianki = {
 
 export type Szkic = { body: string; wersja: number; expectedLastMessageId: number | null };
 
-export type StanSkrzynki = { ostatniaSynchronizacja: string | null; bledy: number };
+/**
+ * Czy Problemy z zakupem Allegro mogą dochodzić do skrzynki. `null` — beta
+ * Centrum Wiadomości działa albo jeszcze jej nie próbowano.
+ * `wylaczona` — `ALLEGRO_WATKI_BETA=0` w konfiguracji.
+ * `wstrzymana` — Allegro odmówiło `beta.v1`; skrzynka czyta wtedy starą wersję
+ * bez Problemów z zakupem, a beta czeka do `doKiedy`.
+ *
+ * Ten sam kształt niosą `StanSkrzynki` i `StanAllegro`, bo kolejka i stan
+ * systemu mają mówić o tym samym tymi samymi słowami. Starszy serwer pola
+ * nie wysyła — ekran czyta wtedy `null`.
+ */
+export type ProblemyZakupu = null | {
+  przyczyna: "wylaczona" | "wstrzymana";
+  /** ISO, tylko przy `wstrzymana`. */
+  doKiedy: string | null;
+  /** Krótkie zdanie odmowy Allegro, tylko przy `wstrzymana`. */
+  szczegol: string | null;
+};
+
+export type StanSkrzynki = {
+  ostatniaSynchronizacja: string | null; bledy: number; problemyZakupu: ProblemyZakupu;
+};
 
 export type OfertaWskazana = { ofertaId: string; autor: string };
 

@@ -17,6 +17,7 @@ import { Obecni } from "./Obecni";
 import { KartaKontekstu } from "./KartaKontekstu";
 import { PropozycjePrzeplywu } from "./PropozycjePrzeplywu";
 import { scalOs, zdarzeniaZakupu } from "./zakup";
+import { ZAMKNIETY_PROBLEM_W_EDYTORZE } from "./statusy";
 
 /**
  * Pytanie bez żadnego powiązania z towarem (§4.3).
@@ -324,7 +325,10 @@ export function Rozmowa(p: {
           zalaczniki={p.zalaczniki} dodajeZalacznik={p.dodajeZalacznik}
           bladZalacznika={p.bladZalacznika}
           onDodajZalacznik={p.onDodajZalacznik} onUsunZalacznik={p.onUsunZalacznik}
-          copilot={p.copilot} />
+          copilot={p.copilot}
+          /* Zamknięty Problem z zakupem: Allegro odrzuci odpowiedź, więc
+             wysyłki nie ma, a notatka zespołu zostaje. Powód w `Edytor`. */
+          zamkniete={rozmowa.problemZakupu?.zamkniety ? ZAMKNIETY_PROBLEM_W_EDYTORZE : null} />
       </>} />
   </section>;
 }

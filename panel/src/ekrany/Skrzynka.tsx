@@ -515,8 +515,11 @@ export function Skrzynka() {
      swój przycisk (`!wPolu` w `SzkicCopilota.tsx`), ale klawisz działał dalej:
      poprawiony szkic, klik obok pola, „e" — i poprawki znikały bez cofnięcia,
      a pomiar zapisywał „zastąpiony". Klawisz ma robić to, co widać. */
+  /* Zamknięty Problem z zakupem chowa całą odpowiedź razem z kartą szkicu
+     (`Edytor`, `zamkniete`), więc E i R milkną tym samym warunkiem. */
   const kartaWidoczna = Boolean(rozmowa.data?.szkicCopilota && rozmowa.data.szkicCopilota.ocena === null)
     && !(zCopilota && szkic !== "")
+    && !rozmowa.data?.rozmowa.problemZakupu?.zamkniety
     && !(rozmowa.data?.rozmowa.wlascicielId != null
       && rozmowa.data.rozmowa.wlascicielId !== (ja.data?.user.userId ?? null));
   const skrot = useRef({ popraw: poprawSzkicem, odrzuc: odrzucSzkic, widoczna: kartaWidoczna });
@@ -602,7 +605,7 @@ export function Skrzynka() {
       }}
       onRozpoznaj={(rozmowyId) => klasyfikuj.mutate({ rozmowyId })}
       rozmowy={lista.data?.rozmowy ?? []}
-      stan={lista.data?.stan ?? { ostatniaSynchronizacja: null, bledy: 0 }}
+      stan={lista.data?.stan ?? { ostatniaSynchronizacja: null, bledy: 0, problemyZakupu: null }}
       wybranaId={wybranaId}
       mojeId={ja.data?.user.userId ?? null}
       laduje={lista.isLoading}

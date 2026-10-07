@@ -133,7 +133,8 @@ export function Edytor({
   podpowiedzZwinieta?: string;
   /** Zdanie o nieudanej wysyłce, pod polem. */
   blad?: string;
-  /** Zdanie, gdy odbiorca nie przyjmie już wiadomości. Pola wtedy nie ma. */
+  /** Zdanie, gdy odbiorca nie przyjmie już wiadomości. Pola odpowiedzi wtedy
+      nie ma; notatka zespołu, jeśli edytor ją niesie, zostaje. */
   zamkniete?: string | null;
 }) {
   const [tryb, setTryb] = useState<"odpowiedz" | "komentarz">("odpowiedz");
@@ -276,13 +277,36 @@ export function Edytor({
   const przelacz = (id: number) => onWzmianki?.(
     wzmianki.includes(id) ? wzmianki.filter((x) => x !== id) : [...wzmianki, id]);
 
+  /* Ten sam przycisk w zwiniętym rzędzie i przy zamkniętej rozmowie, żeby
+     notatka miała jedno miejsce i jeden wygląd, niezależnie od stanu wątku. */
+  const przyciskNotatki = zNotatka && <button type="button"
+    onClick={() => { setTryb("komentarz"); setFokusNotatki(true); }}
+    aria-keyshortcuts="N" aria-label="Notatka wewnętrzna"
+    title="Notatka wewnętrzna — zobaczy ją tylko zespół (N)"
+    className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">
+    <MessageSquare size={15} />Notatka
+    {/* Znaczek klawisza tylko wtedy, gdy klawisz działa (0.500.0). */}
+    {skrotyDzialaja && <kbd aria-hidden="true" className="rounded border border-slate-300 px-1 font-sans text-podpis text-slate-600">N</kbd>}
+  </button>;
+
   /* ZAMKNIĘTEJ ROZMOWY NIE DA SIĘ NAPISAĆ, więc edytora NIE MA — nie jest
      wyłączony, tylko go nie ma w drzewie. Pole, w które wolno pisać, a którego
      nie da się wysłać, jest obietnicą bez pokrycia. Warunek stoi po hakach,
-     bo te muszą biec przy każdym rysowaniu. */
-  if (zamkniete) {
-    return <p className="ml-auto w-full max-w-[75ch] rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600">
-      {zamkniete}</p>;
+     bo te muszą biec przy każdym rysowaniu.
+
+     Notatka zespołu nie idzie do Allegro, więc zamknięcie jej nie dotyczy.
+     W skrzynce zamknięty Problem z zakupem dalej bywa tematem zespołu.
+     Zdanie zajmuje więc miejsce pola, a obok stoi „Notatka”, jak w zwiniętym
+     rzędzie. Tryb notatki rysuje się zwyczajnie, bez wysyłki w drzewie. */
+  if (zamkniete && !wKomentarzu) {
+    if (!przyciskNotatki) {
+      return <p className="ml-auto w-full max-w-[75ch] rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600">
+        {zamkniete}</p>;
+    }
+    return <div className="ml-auto flex w-full max-w-[75ch] items-center gap-2 rounded-lg border border-dashed border-slate-300 py-1 pl-3 pr-1">
+      <p className="min-w-0 flex-1 py-1 text-xs text-slate-600">{zamkniete}</p>
+      {przyciskNotatki}
+    </div>;
   }
 
   /* SIATKI 60vh JUŻ NIE MA (0.495.0). Stała od 0.232.1, bo edytor był
@@ -425,14 +449,7 @@ export function Edytor({
             {/* Copilot w rzędzie tylko jako czynność. Zdanie o wyłączonym
                 Copilocie zjadłoby rząd, a nic się z nim nie zrobi. */}
             {copilot?.stan?.wlaczony && <PrzyciskSzkicu p={copilot} />}
-            {zNotatka && <button type="button" onClick={() => { setTryb("komentarz"); setFokusNotatki(true); }}
-              aria-keyshortcuts="N" aria-label="Notatka wewnętrzna"
-              title="Notatka wewnętrzna — zobaczy ją tylko zespół (N)"
-              className="inline-flex min-h-10 shrink-0 items-center gap-1 rounded-lg px-2 text-xs font-semibold text-slate-700 hover:bg-slate-100">
-              <MessageSquare size={15} />Notatka
-              {/* Znaczek klawisza tylko wtedy, gdy klawisz działa (0.500.0). */}
-              {skrotyDzialaja && <kbd aria-hidden="true" className="rounded border border-slate-300 px-1 font-sans text-podpis text-slate-600">N</kbd>}
-            </button>}
+            {przyciskNotatki}
             {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
               onDodaj={onDodajZalacznik} wylaczone={cudza || wysyla} />}
             {/* Martwa, dopóki pole jest puste — jak w pasku. Stoi, żeby było

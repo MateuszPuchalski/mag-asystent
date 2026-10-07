@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
-  AlarmClock, Bell, BellOff, Eye, Inbox, Lock, MessageSquare, RefreshCw, Ruler, Search, UserCheck, X,
+  AlarmClock, AlertTriangle, Bell, BellOff, Eye, Inbox, Lock, MessageSquare, RefreshCw, Ruler, Search, UserCheck, X,
 } from "lucide-react";
 import type {
   Rozmowa, StanCopilota, StanSkrzynki, StatusRozmowy, WynikPartii,
@@ -8,7 +8,7 @@ import type {
 import { Blad, czas, kiedy, Plakietka, Pusto } from "../ui";
 import { FiltrZWiecej } from "../ui/FiltrZWiecej";
 import { klawiszZajety } from "../nawigacja/fokus";
-import { DYMEK_ZAMKNIETEGO_PROBLEMU, NAZWA, opisProblemuZakupu } from "./statusy";
+import { DYMEK_ZAMKNIETEGO_PROBLEMU, NAZWA, dymekProblemowZakupu, opisProblemuZakupu } from "./statusy";
 import { CZESTE, PasekCopilota, ZnakCopilota, ZnakKategorii, doRozpoznania, nazwaNaPlakietce } from "./Copilot";
 import { Czekanie } from "./Czekanie";
 import { SlownikZnakow } from "./SlownikZnakow";
@@ -167,6 +167,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
   bladBezDanych?: string | null;
 }) {
   const [kubelek, setKubelek] = useState<Kubelek>("doOdpowiedzi");
+  /* Starszy serwer pola nie wysyła. Brak wiedzy to nie alarm, więc milczymy. */
+  const problemyZakupu = stan.problemyZakupu ?? null;
   /* Wiersze, które WESZŁY do „Do odpowiedzi" po pierwszym odczycie: nowy wątek
      albo wątek, który wrócił po odpowiedzi klienta. Klucz liczy się z CAŁEJ
      listy, nie z widocznego kubełka, więc przełączanie zakładek niczego nie
@@ -288,7 +290,8 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         klienta. Data ZOSTAJE (patrz akapit wyżej: pusta lista o 9:00 znaczy co
         innego przy stojącym synchronizatorze), tylko schodzi obok tytułu,
         w rozmiar podpisu, i ustępuje mu miejsca przy wąskiej kolumnie. */}
-    <header className="flex shrink-0 items-center gap-2 border-b px-4 py-2.5">
+    <header className="shrink-0 border-b px-4 py-2.5">
+    <div className="flex items-center gap-2">
       <Inbox size={16} className="shrink-0" />
       <b className="text-naglowek shrink-0">Rozmowy</b>
       <p className="mr-auto min-w-0 truncate text-podpis font-normal text-slate-500">
@@ -322,6 +325,21 @@ export function Kolejka({ rozmowy, stan, copilot, klasyfikacja, onRozpoznaj = ()
         {/* Kręci się tylko z `motion-safe:`; bez animacji w systemie ikona
             ciemnieje, żeby kliknięcie nadal coś pokazywało. */}
         <RefreshCw size={16} className={odswieza ? "motion-safe:animate-spin motion-reduce:opacity-40" : ""} /></button>
+    </div>
+    {/* ── PROBLEMY Z ZAKUPEM NIE DOCHODZĄ ─────────────────────────────────
+        Osobna linijka pod datą, nie dopisek do niej. Zdanie o synchronizacji
+        ucina się wielokropkiem przy kolumnie 21 rem, a dopisek na jego końcu
+        znikałby pierwszy. Linijka staje tylko wtedy, gdy beta nie działa.
+
+        Agent ma wiedzieć, że ta lista nie pokaże sprawy kupującego. Przyczyna,
+        termin i co zrobić stoją w dymku i dla czytnika, bo konfiguracji
+        z tego miejsca i tak nikt nie naprawi. */}
+    {problemyZakupu && <p className="mt-1 flex items-center gap-1.5 text-podpis font-semibold text-ranga-uwaga"
+      title={dymekProblemowZakupu(problemyZakupu)}>
+      <AlertTriangle size={13} className="shrink-0" aria-hidden="true" />
+      Problemy z zakupem nie dochodzą
+      <span className="sr-only"> — {dymekProblemowZakupu(problemyZakupu)}</span>
+    </p>}
     </header>
     {/* ── CEL KLIKALNY MA 24 px, A ZA WYSOKOŚĆ PŁACI PASMO (0.255.0) ─────────
         0.251.0 ścisnęło pigułki z `py-1` do `py-0.5`, żeby odzyskać wysokość

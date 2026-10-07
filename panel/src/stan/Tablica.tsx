@@ -82,7 +82,12 @@ export function useObszary(admin: boolean, zdrowie: Zdrowie | undefined): Obszar
     : alarm.spoznionychRazem > 0 ? { stan: `${alarm.spoznionychRazem} stoi dłużej niż zwykle`, ton: "uwaga" as const }
       : { stan: "nic nie stoi dłużej", ton: "ok" as const }) });
 
+  /* Połączone konto bez Problemów z zakupem czeka na biuro: kupujący pisze,
+     a skrzynka tego nie pokaże. Bez bursztynu karta z przyczyną zostałaby
+     zwinięta pod zielonym kafelkiem. Starszy serwer pola nie wysyła. */
   obszary.push({ id: "allegro", nazwa: "Konto Allegro", ...(!allegro ? { stan: CZEKA, ton: "nic" as const }
+    : allegro.stan === "polaczone" && allegro.problemyZakupu
+      ? { stan: "Problemy z zakupem nie dochodzą", ton: "uwaga" as const }
     : allegro.stan === "polaczone" ? { stan: `połączone · ${allegro.srodowisko}`, ton: "ok" as const }
       : allegro.stan === "dev" ? { stan: "tryb demo", ton: "nic" as const }
         : allegro.stan === "wylaczone" ? { stan: "wyłączone", ton: "nic" as const }

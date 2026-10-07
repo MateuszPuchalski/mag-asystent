@@ -223,6 +223,8 @@ model pracy nie kasuje.
 W otwartym wątku doradca liczy się jak strona przychodząca: pyta sprzedawcę
 o stanowisko, więc rozmowa czeka na nas. Edytor nie pozwala wysłać
 odpowiedzi w zamkniętym Problemie, bo Allegro odrzuci ją kodem 422.
+Z tego samego powodu automat nie układa tam szkicu Copilota
+(`zamknietyProblem`). Notatka zespołu działa dalej.
 
 ### Wysyłka i „przeczytany" w Problemie z zakupem
 

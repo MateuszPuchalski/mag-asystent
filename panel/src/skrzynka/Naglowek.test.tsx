@@ -161,3 +161,29 @@ describe("Propozycje przepływu w ekranie rozmowy", () => {
     expect(screen.queryByRole("region", { name: "Automat by" })).toBeNull();
   });
 });
+
+/* ── Zamknięty Problem z zakupem — wpięcie w ekran rozmowy ────────────────
+   Edytor ma własne testy (`EdytorZamkniety.test.tsx`). Te pilnują, że ekran
+   rozmowy podaje mu zamknięcie z `problemZakupu`, i tylko z niego. */
+describe("Zamknięty Problem z zakupem w ekranie rozmowy", () => {
+  const ZDANIE = "Allegro zamknęło ten Problem z zakupem i nie przyjmie tu odpowiedzi.";
+
+  it("zamknięty: zdanie zamiast pola, bez wysyłki, z notatką", () => {
+    render(<EkranRozmowy {...props({ problemZakupu: { powod: "OTHER", zamkniety: true } })}
+      szkic="Szkic sprzed zamknięcia" />);
+    expect(screen.getByText(ZDANIE)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Szkic odpowiedzi")).toBeNull();
+    expect(screen.queryAllByRole("button", { name: /Wyślij/ })).toEqual([]);
+    expect(screen.getByRole("button", { name: "Notatka wewnętrzna" })).toBeInTheDocument();
+  });
+
+  it.each([
+    ["otwarty Problem z zakupem", { problemZakupu: { powod: "OTHER", zamkniety: false } }],
+    ["zwykły wątek", { problemZakupu: null }],
+  ] as const)("%s: pole i wysyłka jak dotąd", (_, n) => {
+    render(<EkranRozmowy {...props(n)} szkic="Dzień dobry" />);
+    expect(screen.queryByText(ZDANIE)).toBeNull();
+    expect(screen.getByLabelText("Szkic odpowiedzi")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Wyślij do klienta/ })).toBeEnabled();
+  });
+});

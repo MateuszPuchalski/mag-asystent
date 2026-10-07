@@ -1,5 +1,6 @@
 import type {
-  Akcja, Kategoria, Pewnosc, Rozmowa, StatusRozmowy, ZrodloZakonczenia } from "../api/typy";
+  Akcja, Kategoria, Pewnosc, ProblemyZakupu, Rozmowa, StatusRozmowy, ZrodloZakonczenia } from "../api/typy";
+import { czas } from "../ui";
 
 /* Nazwy statusów PO POLSKU w jednym miejscu. Lista jest zamknięta i pochodzi
    z §7 — `Record<StatusRozmowy, string>` sprawia, że dołożenie statusu
@@ -61,6 +62,34 @@ const DYMEK_PROBLEMU =
 
 /** Zdanie do dymku przy wątku zamkniętym. Wspólne dla kolejki i nagłówka rozmowy. */
 export const DYMEK_ZAMKNIETEGO_PROBLEMU = "Allegro zamknęło ten wątek i nie przyjmie w nim nowej wiadomości.";
+
+/* Zdanie w miejscu odpowiedzi. Allegro odrzuca wiadomość w zamkniętym
+   Problemie (`422 THREAD_CLOSED`), więc edytor chowa wysyłkę i mówi dlaczego.
+   Notatka zespołu zostaje, bo nie wychodzi do Allegro. */
+export const ZAMKNIETY_PROBLEM_W_EDYTORZE = "Allegro zamknęło ten Problem z zakupem i nie przyjmie tu odpowiedzi.";
+
+/**
+ * Dlaczego Problemy z zakupem nie dochodzą — jedno zdanie dla kolejki skrzynki
+ * i karty Allegro w stanie systemu. Wspólne, żeby agent i administrator
+ * czytali tę samą przyczynę tymi samymi słowami.
+ */
+export function przyczynaProblemowZakupu(p: NonNullable<ProblemyZakupu>): string {
+  if (p.przyczyna === "wylaczona") {
+    return "Beta Centrum Wiadomości wyłączona w konfiguracji (ALLEGRO_WATKI_BETA=0).";
+  }
+  return p.doKiedy ? `Allegro odmówiło beta.v1, następna próba ${czas(p.doKiedy)}.` : "Allegro odmówiło beta.v1.";
+}
+
+/**
+ * Dymek ostrzeżenia w kolejce. Mówi trzy rzeczy po kolei (dekalog, p. 6):
+ * czego brakuje, dlaczego i co zrobić teraz. Agent nie naprawi konfiguracji,
+ * ale może zajrzeć do Allegro, zanim kupujący poczeka za długo.
+ */
+export function dymekProblemowZakupu(p: NonNullable<ProblemyZakupu>): string {
+  const odmowa = p.szczegol ? ` Odmowa Allegro: „${p.szczegol}”.` : "";
+  return `Nowe Problemy z zakupem nie trafią do skrzynki. ${przyczynaProblemowZakupu(p)}${odmowa}`
+    + " Sprawdzaj je w Centrum Wiadomości na stronie Allegro.";
+}
 
 /**
  * Problem z zakupem słowami: powód po polsku (`null`, gdy brak albo spoza
