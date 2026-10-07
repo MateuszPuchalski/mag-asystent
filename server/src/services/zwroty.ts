@@ -15,6 +15,7 @@ import { zapiszSkladRecznie, type SkladPozycji } from "./komplety.js";
 import { odsunZwPrzedRecznym, zakolejkujZw } from "./zw-automat.js";
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { ROZMOWA_ZAMOWIENIA } from "./droga-klienta.js";
+import { glosAllegroPoZamknieciu } from "./glos-allegro.js";
 
 /* ── Kubełki zwrotów (0.150.0) ───────────────────────────────────────────────
    Panel zwrotów jest KOLEJKĄ BRAMEK, nie rejestrem. Rejestr każe najpierw
@@ -980,9 +981,11 @@ export function listaZwrotow(
               Podzapytanie idzie po indeksie (conversation_id, sent_at). */
            (SELECT substr(x.body, 1, 280) FROM message x
              WHERE x.conversation_id = c.id AND x.auto_odpowiedz = 0
+               AND NOT ${glosAllegroPoZamknieciu("x")}
              ORDER BY x.sent_at DESC LIMIT 1) AS tresc,
            (SELECT x.direction FROM message x
              WHERE x.conversation_id = c.id AND x.auto_odpowiedz = 0
+               AND NOT ${glosAllegroPoZamknieciu("x")}
              ORDER BY x.sent_at DESC LIMIT 1) AS kierunek
       FROM ${ROZMOWA_ZAMOWIENIA} rz JOIN conversation c ON c.id = rz.conversation_id
       /* Konto rozmowy musi być kontem zwrotu (0.502.0) — do tego wydania

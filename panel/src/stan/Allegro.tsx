@@ -1,6 +1,8 @@
 import React from "react";
 import { Link2, Unlink } from "lucide-react";
 import { useRozlaczAllegro, useStanAllegro } from "../api/stan";
+import type { ProblemyZakupu } from "../api/typy";
+import { przyczynaProblemowZakupu } from "../skrzynka/statusy";
 import { Blad, Przycisk, czas } from "../ui";
 import { KartaWgladu } from "../ui/wglad";
 import { Potwierdz } from "../ui/Potwierdz";
@@ -75,8 +77,29 @@ export function KartaAllegro({ admin }: { admin: boolean }) {
     }
   }
 
+  /* Starszy serwer pola nie wysyła; brak wiedzy to nie alarm. Wiersz stoi
+     przy każdym stanie konta, bo wyłączona beta jest decyzją konfiguracji,
+     a nie skutkiem połączenia. */
+  const problemy = s?.problemyZakupu ?? null;
+
   return <KartaWgladu id="karta-allegro" tytul="Konto Allegro">
     {tresc}
+    {problemy && <WierszProblemowZakupu p={problemy} />}
     <Blad>{stan.error?.message || rozlacz.error?.message}</Blad>
   </KartaWgladu>;
+}
+
+/* ── PROBLEMY Z ZAKUPEM NIE DOCHODZĄ ──────────────────────────────────────
+   Jeden wiersz pod stanem konta, tym samym wzorem: plakietka i zdanie.
+   Bursztyn, nie czerwień, bo konto działa, a brakuje jednego rodzaju spraw.
+   Przyczyna to to samo zdanie co w dymku kolejki skrzynki. Agent
+   i administrator czytają je tymi samymi słowami. */
+function WierszProblemowZakupu({ p }: { p: NonNullable<ProblemyZakupu> }) {
+  return <p className="mt-3 text-sm">
+    <span className="rounded bg-amber-100 px-1.5 py-0.5 text-xs font-bold text-ranga-uwaga">
+      Problemy z zakupem nie dochodzą</span>{" "}
+    {przyczynaProblemowZakupu(p)}
+    {/* Zdanie Allegro w cudzysłowie, bo to cytat odmowy, nie nasza ocena. */}
+    {p.szczegol && <span className="text-slate-600"> Allegro: „{p.szczegol}”</span>}
+  </p>;
 }

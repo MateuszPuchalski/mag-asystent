@@ -10,6 +10,7 @@ import {
 import { nadawcaSzkicuAnthropic } from "../adapters/copilot.anthropic.js";
 import { ulozSzkic, type AutorSzkicu, type NadawcaSzkicu } from "./copilot-szkic.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
+import { glosAllegro, zamknietyProblem } from "./glos-allegro.js";
 
 /**
  * Szkic sam dla nowego pytania pod ofertą (0.317.0).
@@ -105,6 +106,9 @@ const CZEKAJACE = `
     JOIN message m ON m.id = (
       SELECT m2.id FROM message m2
        WHERE m2.conversation_id = c.id AND m2.auto_odpowiedz = 0
+         -- Szkic odpowiada kupującemu: słowa doradcy nie są jego wiadomością,
+         -- a szkic pod nie nigdy by się nie zrównał i powstawał co takt.
+         AND NOT ${glosAllegro("m2")}
        ORDER BY m2.sent_at DESC, m2.id DESC LIMIT 1)
     LEFT JOIN szkic_copilota s ON s.conversation_id = c.id
    WHERE m.direction = 'incoming'
@@ -124,6 +128,7 @@ const CZEKAJACE = `
                             WHERE k2.message_id = m.id AND k2.aktywna = 1
                               AND k2.taksonomia_wersja = '${TAKSONOMIA_WERSJA}'))
      AND IFNULL(s.message_id, -1) <> m.id
+     AND NOT ${zamknietyProblem("c")}
    ORDER BY m.sent_at, m.id
    LIMIT ?`;
 

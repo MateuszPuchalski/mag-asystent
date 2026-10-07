@@ -94,13 +94,25 @@ export function szkicNaStart(p: PropsSzkicuCopilota, zapisanySzkic: string): str
 }
 
 /**
+ * Ostatnia wiadomość KUPUJĄCEGO na osi — od niej liczy się świeżość szkicu.
+ *
+ * Bez wpisów doradcy Allegro (`odAllegro`): Copilot odpowiada kupującemu
+ * i zapisuje szkic pod jego wiadomością. Liczona od każdej przychodzącej,
+ * świeżość mówiłaby „nieświeży” po każdym zdaniu doradcy, a „Ułóż ponownie”
+ * płaciłoby za model i dawało znów szkic nieświeży.
+ */
+export function ostatniaKupujacego(os: OsRozmowy["os"]): number | null {
+  return [...os].reverse()
+    .find((w) => w.rodzaj === "wiadomosc" && w.odKlienta && !w.odAllegro)?.messageId ?? null;
+}
+
+/**
  * To samo, liczone wprost z rozmowy — tak woła to ekran skrzynki. Świeżość
  * i cudzość tą samą regułą, co karta: szkic świeży, gdy odpowiada na
  * OSTATNIĄ wiadomość klienta; cudza rozmowa to cudzy szkic.
  */
 export function szkicNaStartRozmowy(dane: OsRozmowy, mojeId: number | null): string | null {
-  const ostatniaKlienta = [...dane.os].reverse()
-    .find((w) => w.rodzaj === "wiadomosc" && w.odKlienta)?.messageId ?? null;
+  const ostatniaKlienta = ostatniaKupujacego(dane.os);
   const wl = dane.rozmowa.wlascicielId;
   return szkicNaStart({
     stan: undefined, szkic: dane.szkicCopilota,

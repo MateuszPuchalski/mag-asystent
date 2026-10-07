@@ -578,6 +578,24 @@ test("dopisek w wątku z podtypem idzie do modelu, a struktura stoi w nagłówku
   assert.equal(k.status, "SUCCESS", "dopisek nie wchodzi w spór z podtypem wątku");
 });
 
+test("słowa doradcy Allegro nie są celem rozpoznania — model widzi je jako ALLEGRO", async () => {
+  const d = stanowisko();
+  const id = wStrukturze(d, "POST_PURCHASE_ISSUE", "PRODUCT_INCONSISTENT_WITH_THE_OFFER", "Przyszedł zły gaźnik");
+  const klienta = Number((d.prepare("SELECT id FROM message WHERE conversation_id=?").get(id) as any).id);
+  d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,body,
+    sent_at,autor_rola) VALUES (?,1,?,'incoming','Prosimy sprzedawcę o stanowisko','2026-09-03T09:00:00Z','CONSULTANT')`)
+    .run(id, `m-${Math.random()}`);
+  let widziane = "";
+  await sklasyfikujRozmowy(d, [id], KTO, async (t) => {
+    widziane = String(t);
+    return odpowiedz({ kategoria: "WRONG_PRODUCT", akcja: "REQUEST_PHOTO" });
+  });
+  assert.equal(aktywna(d, id).message_id, klienta, "rozpoznajemy prośbę kupującego, nie doradcy");
+  assert.match(widziane, /KLIENT: Przyszedł zły gaźnik/);
+  assert.match(widziane, /ALLEGRO: Prosimy sprzedawcę o stanowisko/);
+  assert.match(widziane, /to pierwsza wiadomość klienta w wątku/);
+});
+
 test("szeroki podtyp: istotny spór z modelem idzie do człowieka", async () => {
   const d = stanowisko();
   const id = wStrukturze(d, "POST_PURCHASE_ISSUE", "PRODUCT_INCONSISTENT_WITH_THE_OFFER", "Poproszę fakturę");

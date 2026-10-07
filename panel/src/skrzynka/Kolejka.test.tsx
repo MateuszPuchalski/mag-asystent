@@ -2,7 +2,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Kolejka } from "./Kolejka";
-import type { Kategoria, Kopilot, Rozmowa } from "../api/typy";
+import { czas } from "../ui";
+import type { Kategoria, Kopilot, Rozmowa, StanSkrzynki } from "../api/typy";
 
 const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   id: 4821, klient: "Kupujący 44300444",
@@ -10,11 +11,11 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   ostatniaWiadomoscAt: "2026-09-01T07:12:00.000Z", ostatniaOdKlienta: true,
   nieprzeczytana: false, wlascicielId: null, wlasciciel: null, wersja: 1,
   status: "new", odlozoneDo: null, poTerminie: false, podziekowal: false, oglada: null,
-  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, nowychOdOdpowiedzi: 0, zadanieWToku: false,
+  priorytet: "normalny", czekaOdMs: null, reklamacyjna: false, problemZakupu: null, nowychOdOdpowiedzi: 0, zadanieWToku: false,
   kopilot: null, ...n,
 });
 
-const STAN = { ostatniaSynchronizacja: "2026-09-01T07:05:00.000Z", bledy: 0 };
+const STAN: StanSkrzynki = { ostatniaSynchronizacja: "2026-09-01T07:05:00.000Z", bledy: 0, problemyZakupu: null };
 
 describe("Kolejka", () => {
   it("pusta lista mówi o sobie, ale data synchronizacji zostaje", () => {
@@ -901,5 +902,129 @@ describe("wiersz trzyma krawędzie", () => {
     expect(data("klient_dzis")).toHaveTextContent(/^07:05$/);
     expect(data("klient_wczoraj")).toHaveTextContent(/^wczoraj$/);
     expect(data("klient_dawny")).toHaveTextContent(/^28\.08$/);
+  });
+});
+
+/* ── PROBLEM Z ZAKUPEM W WIERSZU ─────────────────────────────────────────────
+   Wątek `POST_PURCHASE_ISSUE` z Centrum Wiadomości. Agent wybiera pracę
+   w kolejce, więc tu ma zobaczyć, że to sprawa kupującego, z jakiego powodu
+   i czy Allegro ją zamknęło — nie dopiero po otwarciu rozmowy. */
+describe("problem z zakupem w kolejce", () => {
+  const wiersz = () => screen.getByText("Kupujący 44300444").closest("button")!;
+  const problem = (powod: string | null, zamkniety = false) =>
+    rozmowa({ problemZakupu: { powod, zamkniety } });
+
+  it("plakietka stoi w rzędzie znaczników, obok REKLAMACYJNA", () => {
+    pokaz([rozmowa({ reklamacyjna: true,
+      problemZakupu: { powod: "PRODUCT_ARRIVED_DAMAGED", zamkniety: false } })]);
+    const znaczniki = wiersz().lastElementChild!;
+    expect(znaczniki).toContainElement(screen.getByText("PROBLEM Z ZAKUPEM"));
+    expect(znaczniki).toContainElement(screen.getByText("REKLAMACYJNA"));
+  });
+
+  it("nie jest fioletowa — fiolet to nasza flaga i przypuszczenie Copilota", () => {
+    pokaz([problem("PRODUCT_ARRIVED_DAMAGED")]);
+    expect(screen.getByText("PROBLEM Z ZAKUPEM").className).not.toMatch(/violet/);
+  });
+
+  it("powód stoi po polsku i słowem, bez angielskiego klucza", () => {
+    pokaz([problem("PRODUCT_ARRIVED_DAMAGED")]);
+    expect(screen.getByText("towar dotarł uszkodzony")).toBeInTheDocument();
+    expect(wiersz()).not.toHaveTextContent("PRODUCT_ARRIVED_DAMAGED");
+    /* Dymek mówi, czyja to sprawa — bez niego znacznik czytałby się jak nasz. */
+    expect(screen.getByText("PROBLEM Z ZAKUPEM").closest("[title]"))
+      .toHaveAttribute("title", expect.stringContaining("kupującego"));
+  });
+
+  it("wartość spoza słownika: plakietka bez powodu, surowy klucz tylko w dymku", () => {
+    /* Allegro dokłada wartości bez zapowiedzi. Zgadnięty powód kierowałby
+       pierwszym ruchem agenta, a surowy klucz w dymku da się sprawdzić. */
+    pokaz([problem("NOWY_POWOD_Z_PRZYSZLOSCI")]);
+    const grupa = screen.getByText("PROBLEM Z ZAKUPEM").closest("[title]")!;
+    expect(grupa).toHaveTextContent(/^PROBLEM Z ZAKUPEM$/);
+    expect(grupa).toHaveAttribute("title", expect.stringContaining("NOWY_POWOD_Z_PRZYSZLOSCI"));
+    expect(wiersz()).not.toHaveTextContent("NOWY_POWOD_Z_PRZYSZLOSCI");
+  });
+
+  it("klucz z prototypu obiektu nie udaje powodu", () => {
+    pokaz([problem("constructor")]);
+    expect(screen.getByText("PROBLEM Z ZAKUPEM").closest("[title]")).toHaveTextContent(/^PROBLEM Z ZAKUPEM$/);
+  });
+
+  it("bez powodu od Allegro: sama plakietka, dymek bez klucza", () => {
+    pokaz([problem(null)]);
+    const grupa = screen.getByText("PROBLEM Z ZAKUPEM").closest("[title]")!;
+    expect(grupa).toHaveTextContent(/^PROBLEM Z ZAKUPEM$/);
+    expect(grupa.getAttribute("title")).not.toMatch(/spoza słownika/);
+  });
+
+  it("zamknięty przez Allegro mówi to słowem, bo odpowiedź w wątku nie przejdzie", () => {
+    pokaz([problem("NO_REFUND", true)]);
+    const zamkniety = screen.getByText("zamknięty");
+    expect(wiersz().lastElementChild!).toContainElement(zamkniety);
+    expect(zamkniety).toHaveAttribute("title", expect.stringContaining("nie przyjmie"));
+    expect(screen.getByText("brak zwrotu pieniędzy")).toBeInTheDocument();
+  });
+
+  it("otwarty problem nie mówi „zamknięty”", () => {
+    pokaz([problem("NO_REFUND")]);
+    expect(screen.queryByText("zamknięty")).not.toBeInTheDocument();
+  });
+
+  it("zwykły wątek nie nosi plakietki ani pustego rzędu", () => {
+    pokaz([rozmowa({ status: "waiting_for_us", czekaOdMs: 3600_000 })]);
+    expect(screen.queryByText("PROBLEM Z ZAKUPEM")).not.toBeInTheDocument();
+    expect(wiersz().children).toHaveLength(2);
+  });
+});
+
+/* ── PROBLEMY Z ZAKUPEM NIE DOCHODZĄ — nagłówek kolejki ──────────────────────
+   Gdy beta Centrum Wiadomości nie działa, skrzynka czyta wersję bez Problemów
+   z zakupem. Agent ma to zobaczyć tam, gdzie wybiera pracę, bo lista tej
+   sprawy kupującego nie pokaże. */
+describe("problemy z zakupem nie dochodzą — nagłówek kolejki", () => {
+  const pokazStan = (stan: StanSkrzynki) => render(<Kolejka rozmowy={[]} stan={stan} wybranaId={null}
+    laduje={false} onWybierz={() => {}} onOdswiez={() => {}} />);
+  const ostrzezenie = () => screen.queryByText("Problemy z zakupem nie dochodzą");
+  const DO_KIEDY = "2026-10-07T12:30:00.000Z";
+
+  it("`null`: beta działa, nagłówek milczy", () => {
+    pokazStan(STAN);
+    expect(ostrzezenie()).toBeNull();
+  });
+
+  it("starszy serwer bez pola: milczy, jak przy `null`", () => {
+    const bezPola = { ostatniaSynchronizacja: STAN.ostatniaSynchronizacja, bledy: 0 };
+    pokazStan(bezPola as StanSkrzynki);
+    expect(ostrzezenie()).toBeNull();
+    expect(screen.getByText(/synchronizacja/)).toBeInTheDocument();
+  });
+
+  it("wyłączona w konfiguracji: zdanie w barwie uwagi, przyczyna w dymku i dla czytnika", () => {
+    pokazStan({ ...STAN, problemyZakupu: { przyczyna: "wylaczona", doKiedy: null, szczegol: null } });
+    const zdanie = ostrzezenie()!;
+    expect(zdanie).toHaveClass("text-ranga-uwaga");
+    expect(zdanie).toHaveAttribute("title", expect.stringContaining("ALLEGRO_WATKI_BETA=0"));
+    expect(zdanie).toHaveTextContent(/ALLEGRO_WATKI_BETA=0/);
+    /* Co zrobić teraz, nie tylko co jest nie tak (dekalog, p. 6). */
+    expect(zdanie.getAttribute("title")).toMatch(/Sprawdzaj je w Centrum Wiadomości/);
+    /* Data synchronizacji zostaje — ostrzeżenie staje obok, nie zamiast. */
+    expect(screen.getByText(/synchronizacja/)).toBeInTheDocument();
+  });
+
+  it("wstrzymana przez Allegro: termin następnej próby i odmowa w dymku", () => {
+    pokazStan({ ...STAN, problemyZakupu: { przyczyna: "wstrzymana", doKiedy: DO_KIEDY,
+      szczegol: "Access to beta resource denied" } });
+    const dymek = ostrzezenie()!.getAttribute("title")!;
+    expect(dymek).toContain(`następna próba ${czas(DO_KIEDY)}`);
+    expect(dymek).toContain("„Access to beta resource denied”");
+    expect(dymek).not.toMatch(/ALLEGRO_WATKI_BETA/);
+  });
+
+  it("wstrzymana bez terminu nie obiecuje próby", () => {
+    pokazStan({ ...STAN, problemyZakupu: { przyczyna: "wstrzymana", doKiedy: null, szczegol: null } });
+    const dymek = ostrzezenie()!.getAttribute("title")!;
+    expect(dymek).toContain("Allegro odmówiło beta.v1.");
+    expect(dymek).not.toMatch(/następna próba|Odmowa Allegro/);
   });
 });

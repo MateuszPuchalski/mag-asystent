@@ -282,3 +282,25 @@ describe("Szkic Copilota w edytorze", () => {
       .toHaveAttribute("title", expect.stringMatching(/5 znaków/));
   });
 });
+
+/* ── Świeżość szkicu w Problemie z zakupem ──────────────────────────────────
+   Szkic odpowiada KUPUJĄCEMU i serwer zapisuje go pod jego wiadomością.
+   Licząc świeżość od każdej przychodzącej, karta mówiłaby „nieświeży” po
+   każdym zdaniu doradcy Allegro, a „Ułóż ponownie” płaciłoby za model w kółko. */
+describe("ostatniaKupujacego", () => {
+  const wpis = (messageId: number, odKlienta: boolean, odAllegro?: boolean) => ({
+    id: `msg-${messageId}`, rodzaj: "wiadomosc" as const, messageId, autor: "x", odKlienta,
+    tresc: "t", at: "2026-10-07T10:00:00Z", ofertaId: null, ...(odAllegro ? { odAllegro } : {}),
+  });
+
+  it("pomija doradcę Allegro i naszą odpowiedź", async () => {
+    const { ostatniaKupujacego } = await import("./SzkicCopilota");
+    expect(ostatniaKupujacego([wpis(1, true), wpis(2, false), wpis(3, true, true)])).toBe(1);
+  });
+
+  it("bez doradcy bierze ostatnią wiadomość klienta, jak dotąd", async () => {
+    const { ostatniaKupujacego } = await import("./SzkicCopilota");
+    expect(ostatniaKupujacego([wpis(1, true), wpis(4, true)])).toBe(4);
+    expect(ostatniaKupujacego([wpis(2, false)])).toBeNull();
+  });
+});

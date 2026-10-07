@@ -19,7 +19,7 @@ import {
 } from "../api/copilot";
 import { Rozmowa } from "../skrzynka/Rozmowa";
 import { Kontekst } from "../skrzynka/Kontekst";
-import { szkicNaStartRozmowy } from "../skrzynka/SzkicCopilota";
+import { ostatniaKupujacego, szkicNaStartRozmowy } from "../skrzynka/SzkicCopilota";
 import { AlarmSynchronizacji } from "../skrzynka/AlarmSynchronizacji";
 import type { SzczegolyKonfliktu, SzczegolyWysylki } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
@@ -335,6 +335,10 @@ export function Skrzynka() {
      w ogóle — inaczej własna odpowiedź blokowałaby kolejną w tej rozmowie. */
   const ostatniaKlienta = [...(rozmowa.data?.os ?? [])].reverse()
     .find((w) => w.rodzaj === "wiadomosc" && w.odKlienta)?.messageId ?? null;
+  /* Szkic Copilota odpowiada KUPUJĄCEMU, więc jego świeżość pomija słowa
+     doradcy Allegro (`ostatniaKupujacego` w `SzkicCopilota.tsx`). Wysyłka
+     dalej porównuje z każdą przychodzącą: agent ma zobaczyć i doradcę. */
+  const ostatniaDoSzkicu = ostatniaKupujacego(rozmowa.data?.os ?? []);
 
   const zmienOdlozona = (klucz: number, zmiana: Partial<Wpis>) =>
     setOdlozone((l) => l.map((o) => (o.klucz === klucz ? { ...o, ...zmiana } : o)));
@@ -515,8 +519,11 @@ export function Skrzynka() {
      swój przycisk (`!wPolu` w `SzkicCopilota.tsx`), ale klawisz działał dalej:
      poprawiony szkic, klik obok pola, „e" — i poprawki znikały bez cofnięcia,
      a pomiar zapisywał „zastąpiony". Klawisz ma robić to, co widać. */
+  /* Zamknięty Problem z zakupem chowa całą odpowiedź razem z kartą szkicu
+     (`Edytor`, `zamkniete`), więc E i R milkną tym samym warunkiem. */
   const kartaWidoczna = Boolean(rozmowa.data?.szkicCopilota && rozmowa.data.szkicCopilota.ocena === null)
     && !(zCopilota && szkic !== "")
+    && !rozmowa.data?.rozmowa.problemZakupu?.zamkniety
     && !(rozmowa.data?.rozmowa.wlascicielId != null
       && rozmowa.data.rozmowa.wlascicielId !== (ja.data?.user.userId ?? null));
   const skrot = useRef({ popraw: poprawSzkicem, odrzuc: odrzucSzkic, widoczna: kartaWidoczna });
@@ -602,7 +609,7 @@ export function Skrzynka() {
       }}
       onRozpoznaj={(rozmowyId) => klasyfikuj.mutate({ rozmowyId })}
       rozmowy={lista.data?.rozmowy ?? []}
-      stan={lista.data?.stan ?? { ostatniaSynchronizacja: null, bledy: 0 }}
+      stan={lista.data?.stan ?? { ostatniaSynchronizacja: null, bledy: 0, problemyZakupu: null }}
       wybranaId={wybranaId}
       mojeId={ja.data?.user.userId ?? null}
       laduje={lista.isLoading}
@@ -662,7 +669,7 @@ export function Skrzynka() {
         szkic: rozmowa.data?.szkicCopilota ?? null,
         /* Nieświeży = klient dopisał po tym, jak model czytał wątek. Porównanie
            po identyfikatorze ostatniej wiadomości KLIENTA, tak jak przy wysyłce. */
-        nieswiezy: (rozmowa.data?.szkicCopilota?.messageId ?? null) !== ostatniaKlienta,
+        nieswiezy: (rozmowa.data?.szkicCopilota?.messageId ?? null) !== ostatniaDoSzkicu,
         uklada: ulozSzkic.isPending,
         blad: bladSzkicu,
         maSzkicAgenta: szkic.trim() !== "",

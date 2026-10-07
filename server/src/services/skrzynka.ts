@@ -27,6 +27,8 @@ import { podzielStopke } from "./stopka.js";
 import { czyObrazZNazwy } from "./reklamacje.js";
 import { zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
 import { typPodgladu } from "./typ-podgladu.js";
+import { ROLE_ALLEGRO, glosAllegroPoZamknieciu } from "./glos-allegro.js";
+import { stanProblemowZakupu, type StanProblemowZakupu } from "./allegro-inbox-sync-state.js";
 
 /* Skrzynka CZYTA model kanoniczny (`conversation`/`message`), zasilany przez
    `allegro-inbox-sync`. Nie odpytuje Allegro sama: rytm i limity API pilnuje
@@ -55,6 +57,14 @@ export interface RozmowaSkrzynki {
    * reklamację, i nic poza tym — zegara ustawowego rozmowa nie dostaje.
    */
   reklamacyjna: boolean;
+  /**
+   * Problem z zakupem Allegro — wątek `POST_PURCHASE_ISSUE` z Centrum
+   * Wiadomości. `null` przy zwykłym wątku. To JEST sprawa w Allegro, inaczej
+   * niż `reklamacyjna`: założył ją kupujący, a Allegro może do niej dołączyć.
+   * `powod` to surowy `subType` (słownik po polsku stoi w panelu) albo `null`.
+   * `zamkniety` — Allegro oddało wątek jako `CLOSED` i nie przyjmie odpowiedzi.
+   */
+  problemZakupu: { powod: string | null; zamkniety: boolean } | null;
   /**
    * Ile czeka pytanie klienta, w milisekundach. `null`, gdy klient nie napisał
    * nic — wątek zaczęty przez nas nie ma na co czekać, a zegar liczony od
@@ -180,12 +190,20 @@ export interface WpisOsi {
      zwija taki wpis do jednej linijki. Flaga stoi wyłącznie przy wiadomościach
      WYCHODZĄCYCH — uzasadnienie w `czyAutoresponder`. */
   automatyczna?: boolean;
+  /* Wiadomość doradcy albo komunikat Allegro w Problemie z zakupem
+     (`glos-allegro.ts`). Stoi po stronie przychodzącej, ale klientem nie
+     jest: świeżość szkicu Copilota liczy się od słów KUPUJĄCEGO. */
+  odAllegro?: true;
   /* Blok firmowy odcięty od treści (0.219.1): nazwa spółki, adres, NIP, KRS,
      REGON, telefon. `tresc` jest wtedy BEZ niego, a panel chowa go pod
      przyciskiem. Też tylko przy wychodzących — patrz `podzielStopke`. */
   stopka?: string;
 }
-export interface StanSkrzynki { ostatniaSynchronizacja: string | null; bledy: number }
+export interface StanSkrzynki {
+  ostatniaSynchronizacja: string | null; bledy: number;
+  /** Czy Problemy z zakupem mogą dochodzić — `stanProblemowZakupu`. */
+  problemyZakupu: StanProblemowZakupu | null;
+}
 
 /* Zamówienie przy rozmowie. `pobrane` jest `null`, dopóki ticker
    `uzupelnijZamowienia` go nie dociągnie — numer i odnośnik są od razu. */
@@ -281,28 +299,42 @@ const LISTA = `
          -- PO CZASIE, NIE PO id (23 września 2026): synchronizacja wpisywała
          -- paczkę od najnowszej, więc id nie rośnie z czasem. Ta sama reguła
          -- co kontrola świeżości wysyłki i klasyfikator.
+         -- Głos Allegro po zamknięciu wątku nie jest ruchem (glos-allegro.ts).
          (SELECT m.direction FROM message m
            WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
+             AND NOT ${glosAllegroPoZamknieciu("m")}
            ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuch,
          -- Chwila tego ruchu i stan wątku u Allegro: z nich zakończenie
          -- liczy się samo (23 września 2026, reguła w wyliczStatus).
          (SELECT m.sent_at FROM message m
            WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
+             AND NOT ${glosAllegroPoZamknieciu("m")}
            ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuchAt,
+         -- Kto napisał ten ruch: głos Allegro nie jest podziękowaniem klienta.
+         (SELECT m.autor_rola FROM message m
+           WHERE m.conversation_id=c.id AND m.auto_odpowiedz=0
+             AND NOT ${glosAllegroPoZamknieciu("m")}
+           ORDER BY m.sent_at DESC, m.id DESC LIMIT 1) AS ostatniRuchRola,
          (SELECT t.watek_status FROM allegro_inbox_thread t
            WHERE t.id = c.external_conversation_id) AS watekStatus,
+         (SELECT t.watek_typ FROM allegro_inbox_thread t
+           WHERE t.id = c.external_conversation_id) AS watekTyp,
+         (SELECT t.watek_podtyp FROM allegro_inbox_thread t
+           WHERE t.id = c.external_conversation_id) AS watekPodtyp,
          c.otwarta_recznie_at AS otwartaRecznieAt,
          -- Czas oczekiwania liczy się od ostatniej wiadomości KLIENTA, nie od
          -- ostatniaWiadomoscAt: tamto ma COALESCE na updated_at, więc wątek
          -- zaczęty przez nas dostałby zegar, którego nikt nie odmierza.
          (SELECT MAX(k.sent_at) FROM message k
-           WHERE k.conversation_id=c.id AND k.direction='incoming') AS pytanieAt,
+           WHERE k.conversation_id=c.id AND k.direction='incoming'
+             AND NOT ${glosAllegroPoZamknieciu("k")}) AS pytanieAt,
          -- Licznik dopisków liczy się OD NASZEJ PRAWDZIWEJ ODPOWIEDZI
          -- (0.227.0). Autoodpowiedź stojąca po pytaniu zerowała go, więc
          -- wiersz kolejki mówił „zero dopisków" o rozmowie, w której klient
          -- napisał i nikt mu nie odpowiedział.
          (SELECT COUNT(*) FROM message k
            WHERE k.conversation_id=c.id AND k.direction='incoming'
+             AND NOT ${glosAllegroPoZamknieciu("k")}
              AND k.id > COALESCE((SELECT MAX(n.id) FROM message n
                                    WHERE n.conversation_id=c.id
                                      AND n.direction='outgoing' AND n.auto_odpowiedz=0), 0)
@@ -342,7 +374,10 @@ const naRozmowe = (
   const odlozoneDo = w.odlozoneDo === null ? null : String(w.odlozoneDo);
   const minal = Boolean(odlozoneDo && Date.parse(odlozoneDo) <= teraz);
   const ostatniRuch = w.ostatniRuch == null ? null : String(w.ostatniRuch);
-  const podziekowal = ostatniRuch === "incoming" && w.kopKategoria != null && klientPodziekowal({
+  /* Bramka roli jak w `statusIZakonczenie`: po „dziękuję” klienta doradca
+     Allegro może jeszcze prosić o stanowisko, a to nie kończy rozmowy. */
+  const podziekowal = ostatniRuch === "incoming" && !ROLE_ALLEGRO.has(String(w.ostatniRuchRola ?? ""))
+    && w.kopKategoria != null && klientPodziekowal({
     kategoria: String(w.kopKategoria), akcja: String(w.kopAkcja), status: String(w.kopStatus),
     pewnosc: w.kopPewnosc == null ? null : String(w.kopPewnosc),
     wymagaCzlowieka: Boolean(Number(w.kopWymaga ?? 0)),
@@ -375,6 +410,10 @@ const naRozmowe = (
     status,
     priorytet: String(w.priorytet ?? "normalny") === "pilny" ? "pilny" : "normalny",
     reklamacyjna: Boolean(Number(w.reklamacyjna ?? 0)),
+    problemZakupu: w.watekTyp !== "POST_PURCHASE_ISSUE" ? null : {
+      powod: w.watekPodtyp == null ? null : String(w.watekPodtyp),
+      zamkniety: w.watekStatus === "CLOSED",
+    },
     czekaOdMs: w.pytanieAt == null ? null : Math.max(0, teraz - Date.parse(String(w.pytanieAt))),
     nowychOdOdpowiedzi: Number(w.nowych ?? 0),
     zadanieWToku: Boolean(Number(w.zadanie ?? 0)),
@@ -411,7 +450,8 @@ export function stanSkrzynki(): StanSkrzynki {
   const s = db().prepare(
     "SELECT last_success_at, error_count FROM allegro_inbox_sync_state WHERE id=1",
   ).get() as { last_success_at: string | null; error_count: number } | undefined;
-  return { ostatniaSynchronizacja: s?.last_success_at ?? null, bledy: s?.error_count ?? 0 };
+  return { ostatniaSynchronizacja: s?.last_success_at ?? null, bledy: s?.error_count ?? 0,
+    problemyZakupu: stanProblemowZakupu(db()) };
 }
 
 /**
@@ -588,7 +628,7 @@ export function osRozmowy(id: number): {
     SELECT m.id, m.direction, m.body, m.sent_at, m.auto_odpowiedz AS auto,
            m.related_object_type AS typ,
            m.related_object_id AS oferta, m.related_order_id AS zamowienie,
-           m.channel_account_id AS konto,
+           m.channel_account_id AS konto, m.autor_rola AS rola,
            /* ── PODPIS TO LOGIN, NIE TEMAT (0.219.2) ────────────────────────
               Do 0.219.1 stała tu kolumna c.subject i przez to podpis
               wiadomości niósł TEMAT WĄTKU. Na koncie właściciela temat bywa
@@ -669,7 +709,11 @@ export function osRozmowy(id: number): {
       : { tresc: String(m.body), stopka: null };
     return {
     id: `msg-${m.id}`, rodzaj: "wiadomosc" as const, messageId: Number(m.id),
-    autor: String(m.direction) === "incoming" ? String(m.klient ?? "Klient") : "Biuro",
+    /* Doradca Allegro w Problemie z zakupem pisze jako strona
+       przychodząca. Podpis loginem klienta wkładałby mu w usta słowa
+       Allegro, więc ta wiadomość podpisuje się „Allegro". */
+    autor: String(m.direction) !== "incoming" ? "Biuro"
+      : ROLE_ALLEGRO.has(String(m.rola)) ? "Allegro" : String(m.klient ?? "Klient"),
     odKlienta: String(m.direction) === "incoming",
     tresc, at: String(m.sent_at),
     ofertaId: String(m.typ ?? "") === "OFFER" ? String(m.oferta) : null,
@@ -680,6 +724,7 @@ export function osRozmowy(id: number): {
        czyta kolejka przy wyliczaniu, kto ma ruch, a jedno źródło znaczy, że
        oba miejsca nie mogą się rozejść. */
     ...(Number(m.auto ?? 0) ? { automatyczna: true } : {}),
+    ...(ROLE_ALLEGRO.has(String(m.rola)) ? { odAllegro: true as const } : {}),
     ...(stopka == null ? {} : { stopka }),
     };
   });

@@ -43,6 +43,17 @@ export type Rozmowa = {
    * prowadzi tę rozmowę jak reklamację — zegara ustawowego nie dokłada.
    */
   reklamacyjna: boolean;
+  /**
+   * Problem z zakupem Allegro — wątek `POST_PURCHASE_ISSUE` z Centrum Wiadomości.
+   * `null` przy zwykłym wątku. `powod` to surowy `subType` z Allegro (angielski
+   * klucz, np. `PRODUCT_ARRIVED_DAMAGED`) albo `null`, gdy Allegro go nie podało.
+   * `zamkniety` — Allegro oddało wątek jako `CLOSED`; nowej wiadomości nie przyjmie.
+   *
+   * W przeciwieństwie do `reklamacyjna` to fakt ALLEGRO, nie nasza flaga:
+   * sprawę zakłada kupujący, a my jej nie zdejmiemy. Polskie nazwy powodów
+   * stoją w `skrzynka/statusy.ts`, bo klucz przychodzi otwarty.
+   */
+  problemZakupu: { powod: string | null; zamkniety: boolean } | null;
   /** Ile czeka pytanie klienta. `null` = klient nic nie napisał, nikt nie czeka. */
   czekaOdMs: number | null;
   /**
@@ -291,6 +302,10 @@ export type WpisOsi = {
   wzmianki?: Array<{ userId: number; name: string }>;
   /* Nasze automatyczne „Dziękujemy za kontakt" (0.218.0) — wpis zwinięty. */
   automatyczna?: boolean;
+  /* Doradca albo komunikat Allegro w Problemie z zakupem. Przychodzi jak
+     klient, ale szkic Copilota odpowiada kupującemu, więc jego świeżość
+     liczy się bez tych wpisów. */
+  odAllegro?: boolean;
   /* Blok firmowy odcięty od treści (0.219.1) — `tresc` jest bez niego. */
   stopka?: string;
 };
@@ -310,7 +325,28 @@ export type WpisWzmianki = {
 
 export type Szkic = { body: string; wersja: number; expectedLastMessageId: number | null };
 
-export type StanSkrzynki = { ostatniaSynchronizacja: string | null; bledy: number };
+/**
+ * Czy Problemy z zakupem Allegro mogą dochodzić do skrzynki. `null` — beta
+ * Centrum Wiadomości działa albo jeszcze jej nie próbowano.
+ * `wylaczona` — `ALLEGRO_WATKI_BETA=0` w konfiguracji.
+ * `wstrzymana` — Allegro odmówiło `beta.v1`; skrzynka czyta wtedy starą wersję
+ * bez Problemów z zakupem, a beta czeka do `doKiedy`.
+ *
+ * Ten sam kształt niosą `StanSkrzynki` i `StanAllegro`, bo kolejka i stan
+ * systemu mają mówić o tym samym tymi samymi słowami. Starszy serwer pola
+ * nie wysyła — ekran czyta wtedy `null`.
+ */
+export type ProblemyZakupu = null | {
+  przyczyna: "wylaczona" | "wstrzymana";
+  /** ISO, tylko przy `wstrzymana`. */
+  doKiedy: string | null;
+  /** Krótkie zdanie odmowy Allegro, tylko przy `wstrzymana`. */
+  szczegol: string | null;
+};
+
+export type StanSkrzynki = {
+  ostatniaSynchronizacja: string | null; bledy: number; problemyZakupu: ProblemyZakupu;
+};
 
 export type OfertaWskazana = { ofertaId: string; autor: string };
 

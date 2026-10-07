@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { AlarmClock, CheckCircle2, Flame, RotateCcw, Scale } from "lucide-react";
+import { AlarmClock, CheckCircle2, Flame, Lock, RotateCcw, Scale, ShieldAlert } from "lucide-react";
 import type { Rozmowa } from "../api/typy";
 import { KLASA_STATUSU } from "../ui";
-import { NAZWA, ZRODLO_ZAKONCZENIA } from "./statusy";
+import { DYMEK_ZAMKNIETEGO_PROBLEMU, NAZWA, ZRODLO_ZAKONCZENIA, opisProblemuZakupu } from "./statusy";
 import { klawiszZajety, useSkrotyDzialaja } from "../nawigacja/fokus";
 import { MenuRozmowy, WierszMenu } from "./MenuRozmowy";
 import { dzienZKalendarza, opisTerminu, poDniachRoboczych, terminyOdlozenia } from "./terminOdlozenia";
@@ -59,6 +59,7 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
   const [kalendarz, setKalendarz] = useState("");
   const odlozDo = (kiedy: Date) => onOdloz?.(kiedy.toISOString(), `do ${opisTerminu(kiedy)}`);
   const zrodlo = zakonczona && rozmowa.zakonczenie ? ZRODLO_ZAKONCZENIA[rozmowa.zakonczenie] : null;
+  const problem = rozmowa.problemZakupu ? opisProblemuZakupu(rozmowa.problemZakupu) : null;
 
   /* KLAWISZ Z — ta sama droga co przycisk, łącznie z pytaniem, gdy klient
      czeka. Nasłuch mieszka TU, a nie w ekranie, bo to tu stoi pytanie; ten
@@ -116,6 +117,22 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
       onClick={() => onReklamacyjna(false)}
       className="inline-flex items-center gap-1 rounded bg-violet-100 px-2 py-1 text-xs font-bold text-violet-900 hover:bg-violet-200 disabled:opacity-50">
       <Scale size={13} />REKLAMACYJNA</button>}
+    {/* PROBLEM Z ZAKUPEM JAKO STAN, NIE PRZYCISK. Sprawę zakłada kupujący
+        w Centrum Wiadomości Allegro i biuro jej nie zdejmie, więc nie ma
+        czego przełączać. Błękit ten sam co w wierszu kolejki. Tarcza, bo to
+        sprawa z ochrony kupującego, a nie nasza waga reklamacji.
+
+        Zdaniem, nie wersalikami jak PILNE: powód bywa kilkuwyrazowy, a długie
+        wersaliki czyta się wolniej niż zwykłe zdanie. */}
+    {problem && <span title={problem.dymek}
+      className="inline-flex items-center gap-1 rounded bg-sky-100 px-2 py-1 text-xs font-bold text-sky-900">
+      <ShieldAlert size={13} aria-hidden="true" />Problem z zakupem
+      {problem.powod && <span className="font-semibold">· {problem.powod}</span>}</span>}
+    {/* Zamknięcie osobnym faktem: mówi, że odpowiedź w tym wątku nie przejdzie,
+        także gdy klient napisał ostatni i rozmowa wisi w „Czeka na nas”. */}
+    {rozmowa.problemZakupu?.zamkniety && <span title={DYMEK_ZAMKNIETEGO_PROBLEMU}
+      className="inline-flex items-center gap-1 text-xs text-slate-600">
+      <Lock size={13} aria-hidden="true" />zamknięty przez Allegro</span>}
 
     {/* STATUS RAZ, NIE DWA (0.193.0): jedna plakietka z barwą stanu, bez
         podpisu „Status" — nazwa stanu mówi to samo jednym wyrazem mniej. */}
@@ -127,7 +144,11 @@ export function Status({ rozmowa, blad, onPriorytet, zapisujePriorytet,
     </span>
     {/* Źródło zakończenia SAMEGO stoi słowem: „zakończona" bez „dlaczego"
         przy regule, której nikt nie kliknął, wyglądałaby na pomyłkę. */}
-    {zrodlo && rozmowa.zakonczenie !== "agent" && <span className="text-xs text-slate-600">{zrodlo}</span>}
+    {/* Przy zamkniętym problemie z zakupem to samo mówi już „zamknięty przez
+        Allegro” obok. Jeden fakt stoi raz; plakietka zachowuje go w dymku. */}
+    {zrodlo && rozmowa.zakonczenie !== "agent"
+      && !(rozmowa.zakonczenie === "allegro" && rozmowa.problemZakupu?.zamkniety)
+      && <span className="text-xs text-slate-600">{zrodlo}</span>}
 
     <MenuRozmowy>
       {menu}

@@ -900,6 +900,13 @@ export function migrate(database: DatabaseSync) {
   addColumn("allegro_inbox_thread", "watek_status", "TEXT");
   addColumn("allegro_inbox_thread", "watek_zamowienia", "TEXT");
   addColumn("allegro_inbox_thread", "struktura_at", "TEXT");
+  /* Rola autora z `beta.v1` — patrz `message` w `schema.sql`. Stare
+     wiadomości mają NULL, czyli „przyszła z `public.v1`", i to jest prawda. */
+  addColumn("message", "autor_rola", "TEXT");
+  /* Wstrzymanie bety skrzynki — patrz `allegro_inbox_sync_state`. NULL znaczy
+     „nie wstrzymana", i tak było przed tą kolumną. */
+  addColumn("allegro_inbox_sync_state", "beta_wstrzymana_do", "TEXT");
+  addColumn("allegro_inbox_sync_state", "beta_powod", "TEXT");
   /* Los szkicu przy wysyłce (22 września 2026) — patrz `outbox` w
      `schema.sql`. Stare wysyłki mają NULL: wtedy nikt tego nie liczył. */
   addColumn("outbox", "szkic_los",

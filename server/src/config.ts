@@ -423,11 +423,11 @@ export const config = {
      */
     inboxOd: data(process.env.ALLEGRO_INBOX_OD, "2026-08-31T22:00:00Z", "ALLEGRO_INBOX_OD"),
     /**
-     * Struktura wątku z `beta.v1` przy synchronizacji skrzynki (22 września
-     * 2026): typ, podtyp i zamówienia, z których klasyfikacja bierze
-     * wskazówkę. Jedno dodatkowe żądanie na wątek, w którym coś się zmieniło —
-     * nie na każdy wątek listy. Włączone domyślnie, bo to odczyt, a odmowa
-     * Allegro (406, 403) wstrzymuje go sama na sześć godzin. `0` wyłącza.
+     * `beta.v1` Centrum Wiadomości przy synchronizacji skrzynki: lista wątków
+     * (jedyna z Problemami z zakupem) i struktura wątku — typ, podtyp,
+     * zamówienia. Włączone domyślnie, bo bez bety Problemy z zakupem nie
+     * dochodzą wcale. Odmowa Allegro (406, 403) wstrzymuje betę sama na sześć
+     * godzin, a lista schodzi wtedy na `public.v1`. `0` wyłącza betę całą.
      */
     watkiBeta: process.env.ALLEGRO_WATKI_BETA !== "0",
     /**

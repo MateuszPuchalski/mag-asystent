@@ -244,3 +244,27 @@ test("przy włączonym takcie klasyfikacji szkic czeka na rozpoznanie", async ()
   await biegnij({ czekajNaRozpoznanie: true });
   assert.equal(wywolan, 1);
 });
+
+/* ── Problem z zakupem ───────────────────────────────────────────────────────
+   Szkic odpowiada KUPUJĄCEMU. Słowa doradcy Allegro nie są jego wiadomością,
+   więc nie wyzwalają szkicu, a szkic pod nie nigdy by się nie zrównał i takt
+   płaciłby za niego co przebieg. Zamknięty Problem nie dostaje szkicu wcale:
+   Allegro odrzuci tam odpowiedź. */
+test("doradca Allegro po pytaniu kupującego: szkic idzie pod pytanie i drugi raz nie płaci", async () => {
+  const r = rozmowa("ppi-doradca");
+  const doradca = dopisz(r, "ppi-doradca", { oferta: "of-1", kiedy: new Date(Date.now() + 1000).toISOString() });
+  db().prepare("UPDATE message SET autor_rola='CONSULTANT' WHERE id=?").run(doradca);
+  assert.equal((await biegnij()).ulozonych, 1);
+  assert.equal((await biegnij()).ulozonych, 0, "szkic pod pytaniem kupującego jest świeży");
+  assert.equal(wywolan, 1);
+});
+
+test("zamknięty Problem z zakupem nie dostaje szkicu automatu", async () => {
+  const d = db();
+  d.prepare("DELETE FROM allegro_inbox_thread").run();
+  rozmowa("ppi-zamkniety");
+  d.prepare(`INSERT INTO allegro_inbox_thread(id,read,surowe_json,synced_at,watek_typ,watek_status)
+    VALUES ('ppi-zamkniety',0,'{}','2026-10-07T00:00:00Z','POST_PURCHASE_ISSUE','CLOSED')`).run();
+  assert.equal((await biegnij()).ulozonych, 0);
+  assert.equal(wywolan, 0);
+});

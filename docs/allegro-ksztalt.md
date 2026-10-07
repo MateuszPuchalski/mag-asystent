@@ -84,11 +84,14 @@ to nie są warianty tej samej odpowiedzi. Wersja beta ma `participants` zamiast
 `offset`, a autora wiadomości opisuje polem `role` (`BUYER`, `SELLER`, `USER`,
 `CONSULTANT`, `ALLEGRO`) zamiast `isInterlocutor`.
 
-Mapowanie stoi na wersji STABILNEJ. `zapytajAllegro` próbuje nagłówków po
-kolei i zapamiętuje działający — `public.v1` jest pierwszy, więc dostajemy jego
-kształt. Gdyby Allegro odpowiedziało na niego 406, klient zszedłby na betę
-i dostał odpowiedź, której to mapowanie nie rozumie. Wtedy wątki wpadają do
-`error_thread_count`, a nie zapisują się po cichu w złym kształcie.
+Od wydania @wydanie **lista wątków idzie betą**, bo tylko w niej Allegro
+pokazuje Problemy z zakupem (sekcja niżej). Wiadomości zwykłego wątku zostają
+na `public.v1`. W zwykłym wątku obie strony mogą mieć rolę `USER`, więc kierunek
+wiadomości daje pewnie tylko `isInterlocutor`.
+
+Wymuszona beta nie zapisuje się jako nauczony nagłówek rodziny `threads`
+(`zapytajAllegro`, opcja `akcept`). Wiadomości zwykłego wątku dalej negocjują
+wersję i dostają `public.v1`.
 
 ### Struktura wątku z `beta.v1`
 
@@ -97,16 +100,16 @@ Mówi to wyłącznie `beta.v1`: schemat `ThreadVBeta1` ma wymagane `type`
 (`COMMON` albo `POST_PURCHASE_ISSUE`) oraz opcjonalne `subType`, `orders`
 i `status`. Lista `public.v1` tych pól nie ma.
 
-**Czytamy je OSOBNYM żądaniem** `GET /messaging/threads/{threadId}` z nagłówkiem
-`beta.v1`, tylko dla wątku, w którym coś się zmieniło. Lista i wiadomości
-zostają na `public.v1` — ich mapowanie stoi na tamtym kształcie. Wymuszona
-wersja nie zapisuje się jako nauczony nagłówek rodziny `threads`
-(`zapytajAllegro`, opcja `akcept`).
+Przy liście w becie strukturę niesie **sama lista** — osobne żądanie o wątek
+odpada. Gdy przebieg zszedł na `public.v1` (niżej), struktura idzie dalej
+OSOBNYM żądaniem `GET /messaging/threads/{threadId}` z nagłówkiem `beta.v1`,
+tylko dla wątku, w którym coś się zmieniło.
 
 Zapisujemy `type`, `subType`, `status` i identyfikatory z `orders`, w kolumnach
-`watek_*` tabeli `allegro_inbox_thread`. `participants` NIE wchodzi: login
-kupującego ma już `interlocutor_login`, a lądowisko nie bierze nic ponad to,
-po co przyszliśmy. Wartość spoza znanego słownika zostaje, jak przyszła.
+`watek_*` tabeli `allegro_inbox_thread`. `participants` NIE wchodzi do
+`surowe_json` ani do żadnej kolumny. Login kupującego niesie
+`interlocutor_login`, a lądowisko nie bierze nic ponad to, po co przyszliśmy.
+Wartość spoza znanego słownika zostaje, jak przyszła.
 
 `subType` ma w schemacie dziesięć wartości:
 `PRODUCT_INCONSISTENT_WITH_THE_OFFER`, `PRODUCT_ARRIVED_DAMAGED`,
@@ -118,10 +121,132 @@ i `NO_DOCUMENTATIONS`. Co z każdą robi klasyfikacja, mówi rejestr
 
 `[WERYFIKUJ]` **Czy nasze konto dostaje `beta.v1` przy wątkach i czy podtyp
 bywa wypełniony.** Specyfikacja klasyfikacji mówi wprost, że dostępność trzeba
-sprawdzić na koncie. Odmowa (406 albo 403) wstrzymuje odczyt struktury na
-sześć godzin i zostawia jedno zdanie w dzienniku. Do sprawdzenia: kolumna
-`struktura_at` wypełnia się po pierwszej zmianie w wątku, a `watek_typ` nie
-jest pusty.
+sprawdzić na koncie. Odmowa (406 albo 403) wstrzymuje betę na sześć godzin
+i zostawia jedno zdanie w dzienniku. Do sprawdzenia: kolumna `struktura_at`
+wypełnia się po pierwszej zmianie w wątku, a `watek_typ` nie jest pusty.
+
+## Problemy z zakupem — `beta.v1`, od 28 października 2026
+
+Allegro zapowiedziało: 28 października 2026 sprzedający z kontem firmowym
+dostają Problemy z zakupem jako nowy typ komunikacji w Centrum Wiadomości.
+Obsługuje je wyłącznie ścieżka `/messaging` w `beta.v1`. Dotychczasowe
+dyskusje zostają na `/sale/issues` i Allegro ich nie przenosi. `/sale/issues`
+docelowo służy tylko reklamacjom.
+
+Problem z zakupem to wątek z `type: POST_PURCHASE_ISSUE`. Wchodzi do skrzynki
+jak każdy wątek. Panel pokazuje przy nim plakietkę z powodem (`subType`)
+i stan „zamknięty", gdy `status` to `CLOSED`.
+
+### Lista: `GET /messaging/threads` w `beta.v1`
+
+Schemat `ThreadsListVBeta1`: wymagane `threads` i `nextPage` (nullable),
+a `nextPage.id` jest kursorem następnej strony (`page.id`). `offset` działa
+wyłącznie w `public.v1`. Koniec listy to `nextPage: null`.
+
+Brak pola `nextPage` traktujemy jak inny kształt, nie jak koniec listy.
+Inaczej przebieg przeczytałby jedną stronę i uznał ją za całą skrzynkę.
+
+`ThreadVBeta1` wymaga `id`, `read`, `type`, `createdAt`,
+`lastMessageDateTime`, `participants` i `status`. Uczestnik
+(`ThreadParticipantVBeta1`) ma wymagane `role` (`BUYER`, `SELLER`, `USER`)
+i `login`. W przykładzie zwykły wątek ma dwóch uczestników z rolą `USER`,
+a Problem z zakupem — `BUYER` i `SELLER`.
+
+**Zejście na `public.v1`.** Gdy pierwsza strona bety odmawia (406, 415, 403,
+inne 4xx) albo ma inny kształt, przebieg czyta listę `public.v1`. Beta czeka
+wtedy sześć godzin, a dziennik dostaje jedno zdanie. Przy 5xx `public.v1`
+idzie tylko ten jeden przebieg. 401, 429 i brak sieci przerywają przebieg jak
+dotąd. Skrzynka bez Problemów z zakupem dalej odpowiada klientom. Odmowa
+w połowie listy przerywa przebieg, bo obie wersje stronicują inaczej.
+
+Po 28 października wstrzymanie znaczy, że Problemy z zakupem nie dochodzą.
+Dlatego zapisuje się w `allegro_inbox_sync_state` (`beta_wstrzymana_do`,
+`beta_powod`), a panel pokazuje je w nagłówku skrzynki i w karcie Allegro
+(`problemyZakupu`, `stanProblemowZakupu`). Tak samo panel mówi o becie
+wyłączonej przez `ALLEGRO_WATKI_BETA=0`. Udany przebieg betą zdejmuje stan.
+
+`[WERYFIKUJ]` **Te same identyfikatory wątków w obu wersjach.** Przebieg
+dopasowuje wątek z listy bety do zapisanego z `public.v1` po `id` i po nim
+stoi kursor. Za tym przemawia jedna ścieżka `/messaging/threads/{threadId}`
+dla obu wersji. Przykłady w specyfikacji mają identyfikatory różnej postaci.
+Do sprawdzenia po pierwszym przebiegu z betą: liczba rozmów nie podwoiła się,
+a stare wątki dostały `watek_typ`.
+
+### Rozmówca wątku z bety
+
+`interlocutor` w becie nie ma, a rozmówca to klucz klienta. Rozstrzyga
+`rozmowcaWatku` (`services/allegro-inbox-sync.ts`), kolejno:
+
+1. uczestnik z rolą `BUYER`;
+2. jedyny uczestnik, który nie jest `SELLER` i nie pisał naszych wiadomości;
+3. jedyny z nich, który pisał wiadomości przychodzące.
+
+Rozmówcą jest zawsze UCZESTNIK. Doradca Allegro pisze w wątku, ale nim nie
+jest. Gdy nic nie rozstrzyga, zostaje login z poprzedniego przebiegu
+(`COALESCE` w zapisie). Zgadnięty login przypiąłby rozmowę cudzemu klientowi.
+
+### Wiadomości Problemu z zakupem
+
+Czytamy je w `beta.v1` (`MessagesListVBeta1`: `messages`, `nextPage`).
+Wiadomość (`MessageVBeta1`) nie ma pola `thread`. Autor
+(`MessageAuthorVBeta1`) ma wymagane `role` i **nullable** `login` — wiadomość
+od Allegro loginu nie ma.
+
+**Kierunek z roli.** Nasza jest wiadomość z rolą `SELLER` albo z loginem
+uczestnika-sprzedawcy wątku. Drugi warunek łapie rolę `USER`, gdyby Allegro
+dało ją także nam. Każda inna rola — `BUYER`, `CONSULTANT`, `ALLEGRO` — jest
+przychodząca. Rola, która nie jest tekstem, pomija wątek i liczy go
+w `error_thread_count`.
+
+**Rola zostaje przy wiadomości** w kolumnie `message.autor_rola`. Oś
+rozmowy podpisuje `CONSULTANT` i `ALLEGRO` słowem „Allegro", a nie loginem
+klienta. Lądowisko trzyma pusty `author_login`, gdy Allegro loginu nie dało.
+
+**Zamówienie wątku.** `relatesTo.order` jest w becie nullable, a Problem
+z zakupem wiąże zamówienie z całym wątkiem (`orders`). Wiadomość bez własnego
+numeru dostaje w `message.related_order_id` numer wątku, gdy zamówienie jest
+JEDNO. Przy kilku numer zostaje pusty. To jest mostek drogi klienta do zwrotu
+i reklamacji tego zakupu.
+
+Jak przy `public.v1` czytamy tylko pierwszą stronę wiadomości. Starszych
+model pracy nie kasuje.
+
+**Głos Allegro** (`services/glos-allegro.ts`) — dwie reguły:
+
+1. Słowa doradcy nie są słowami klienta. Copilot rozpoznaje ostatnią
+   wiadomość KUPUJĄCEGO (`CEL_KLASYFIKACJI`), a w wątku dla modelu doradca
+   ma etykietę `ALLEGRO:` zamiast `KLIENT:`.
+2. Głos Allegro w wątku ze `status: CLOSED` nie jest ruchem w rozmowie.
+   Zamykające zdanie doradcy nie stawia rozmowy w „Czeka na nas”, nie budzi
+   jej przy synchronizacji i nie budzi sprawy klienta. Pytanie klienta bez
+   odpowiedzi dalej czeka, jak każe reguła `wyliczStatus`.
+
+Podziękowanie kończy rozmowę tylko wtedy, gdy ostatni pisał KLIENT. Inaczej
+„dziękuję” kupującego zamknęłoby prośbę doradcy, która przyszła po nim.
+Świeżość szkicu Copilota liczy się od wiadomości kupującego (`odAllegro`
+na osi rozmowy), a wysyłka dalej sprawdza każdą przychodzącą.
+
+W otwartym wątku doradca liczy się jak strona przychodząca: pyta sprzedawcę
+o stanowisko, więc rozmowa czeka na nas. Edytor nie pozwala wysłać
+odpowiedzi w zamkniętym Problemie, bo Allegro odrzuci ją kodem 422.
+Z tego samego powodu automat nie układa tam szkicu Copilota
+(`zamknietyProblem`). Notatka zespołu działa dalej.
+
+### Wysyłka i „przeczytany" w Problemie z zakupem
+
+`POST /messaging/threads/{id}/messages` i `PUT /messaging/threads/{id}/read`
+idą w Problemie z zakupem wymuszoną `beta.v1`. Ciała są te same
+(`NewMessageInThread`, `ThreadReadFlagVBeta1` z polem `read`). Typ wątku bierze
+się z bazy (`wersjaWatku`), więc wysyłka nie płaci dodatkowym żądaniem.
+Zwykły wątek negocjuje wersję jak dotąd.
+
+Zamknięty Problem z zakupem odrzuca wiadomość: 422 z kodem `THREAD_CLOSED`
+(`ErrorsHolder`). `zapytajAllegro` zamienia to na zdanie dla agenta, a kolejka
+`outbox` zapisuje `send_failed`.
+
+`[WERYFIKUJ]` **Cała droga Problemu z zakupem na koncie testowym.** Allegro
+udostępnia nową wersję na sandboxie od 26 sierpnia 2026. Do sprawdzenia:
+lista bety z Problemem, role autorów, `orders`, wysyłka i 422 po zamknięciu.
 
 ## `GET /messaging/threads/{id}/messages`
 

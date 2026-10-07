@@ -302,7 +302,12 @@ const Szkic = z.object({
    przypada tego samego dnia, piszemy, że wyślemy. Werdykt liczy serwer
    (`realizacja-zamowienia.ts`) z płatności, terminu nadania Allegro,
    dokumentu z Subiekta i stanu pozycji; model go tylko wykonuje. Termin
-   DORĘCZENIA dalej jest zakazany, bo zależy od przewoźnika, nie od nas. */
+   DORĘCZENIA dalej jest zakazany, bo zależy od przewoźnika, nie od nas.
+
+   ── WIERSZ ALLEGRO: ─────────────────────────────────────────────────────────
+   W Problemie z zakupem pisze też doradca Allegro. Bez własnej etykiety jego
+   zdanie stałoby w wierszu KLIENT:, a szkic odpowiadałby kupującemu na słowa
+   Allegro. Etykietę stawia `zamaskujWatekZeSladem`, regułę — `glos-allegro.ts`. */
 const INSTRUKCJA_SZKICU = [
   "Układasz SZKIC odpowiedzi dla agenta obsługi klienta w sklepie z częściami",
   "do sprzętu ogrodniczego (kosiarki, pilarki, kosy, gaźniki, uszczelki).",
@@ -310,6 +315,8 @@ const INSTRUKCJA_SZKICU = [
   "",
   "DOSTAJESZ dwie części: FAKTY (ponumerowane F1, F2, …) ułożone przez system",
   "z bazy sklepu oraz ROZMOWĘ (wiersze KLIENT: i MY:, od najstarszej).",
+  "Wiersz ALLEGRO: to doradca Allegro w Problemie z zakupem, nie klient. Odpowiadasz klientowi,",
+  "a słowa doradcy traktujesz jako kontekst sprawy.",
   "Fakt „Rozpoznanie bieżącej prośby” jest PRZYPUSZCZENIEM automatu, nie danymi",
   "sklepu: mówi, na jaką prośbę odpowiadasz i jaki jest następny krok. Odpowiadaj",
   "na tę prośbę: przy pytaniu o przesyłkę nie pytaj o maszynę. Gdy następnym",

@@ -1,7 +1,7 @@
 import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import {
-  AKCEPT_BETA, urlWatku, urlWatkow, urlWiadomosci, zapytajAllegro,
+  AKCEPT_BETA, urlWatku, urlWatkow, urlWatkowBeta, urlWiadomosci, zapytajAllegro,
 } from "../adapters/allegro.http.js";
 import { stanSynchronizacji } from "./allegro-inbox-sync-state.js";
 import { BladLimituAllegro, BladOdpowiedziAllegro } from "../adapters/allegro.js";
@@ -11,19 +11,38 @@ import { flagaAutoodpowiedzi, obudzPrzychodzaca } from "./conversations.js";
 import { odkodujEncje } from "../tekst.js";
 import { kontoKanalu } from "./kanal-konto.js";
 import { zapiszZalaczniki } from "./zalaczniki-wiadomosci.js";
+import { ROLE_ALLEGRO } from "./glos-allegro.js";
 
 /* Kształt ze SPECYFIKACJI Allegro — patrz docs/allegro-ksztalt.md. Do 0.151.0
    stały tu nazwy wymyślone razem z kodem (`lastMessageDate`, `author.role`,
    `relatedObject`) i przez to skrzynka nie zapisała ani jednego wątku:
    `undefined` na trzecim parametrze wstawki wywracał każdy z nich.
    Pola, których świadomie nie mapujemy, są wymienione w kontrakcie —
-   `surowe_json` i tak trzyma całą odpowiedź. */
+   `surowe_json` i tak trzyma całą odpowiedź. Wyjątek: wątek z `beta.v1`
+   idzie tam bez `participants`, bo loginów uczestników nie zapisujemy. */
 type Thread = { id: string; read: unknown; lastMessageDateTime?: string | null;
-  interlocutor?: { login: string } | null };
+  interlocutor?: { login: string } | null;
+  /** Tylko wątek z listy `beta.v1` — patrz `watekZBety`. */
+  beta?: WatekBeta };
 type Message = { id: string; author: { login: string; isInterlocutor: unknown };
-  text: string; subject?: string; status?: string; createdAt: string;
-  relatesTo?: { offer?: { id: string }; order?: { id: string } } | null;
-  attachments?: Array<{ fileName: string; mimeType?: string; url?: string; status: string }> };
+  text: string; subject?: string | null; status?: string; createdAt: string;
+  relatesTo?: { offer?: { id: string } | null; order?: { id: string } | null } | null;
+  attachments?: Array<{ fileName: string; mimeType?: string; url?: string; status: string }>;
+  /** `author.role` z `beta.v1`, dosłownie. Wiadomość z `public.v1` roli nie ma. */
+  rola?: string | null;
+  /** Odpowiedź Allegro w kształcie, w jakim przyszła — do `surowe_json`. */
+  surowe?: unknown };
+
+/** Część wątku `beta.v1`, której nie ma w kształcie wspólnym obu wersji. */
+interface WatekBeta {
+  struktura: StrukturaWatku | null;
+  /** `participants` — do rozmówcy i do rozpoznania naszych wiadomości, nie do bazy. */
+  uczestnicy: Array<{ rola: string; login: string }>;
+  surowe: unknown;
+}
+
+/** Typ wątku Problemu z zakupem w `ThreadVBeta1.type`. */
+export const PROBLEM_Z_ZAKUPEM = "POST_PURCHASE_ISSUE";
 
 /* Schemat mówi `type: boolean`, ale opublikowany PRZYKŁAD renderuje `read`
    jako tekst („false"). Ta funkcja przyjmuje obie postaci — kosztuje trzy
@@ -73,7 +92,9 @@ function tablica<T>(value: unknown, pole: string): T[] {
    ale to jest założenie, nie prawo, i dlatego stoi tu wypisane. */
 const MAKS_STRON = 25;
 
-type InboxQuery = (url: string) => Promise<unknown | null>;
+/* Drugi argument niesie wymuszoną wersję zasobu. Atrapa w teście może go
+   pominąć, a wtedy dostaje wyłącznie żądania w `public.v1`. */
+type InboxQuery = (url: string, opcje?: { akcept?: typeof AKCEPT_BETA }) => Promise<unknown | null>;
 
 /** Struktura wątku z `beta.v1` — tylko pola, po które przychodzimy. */
 export interface StrukturaWatku {
@@ -109,20 +130,137 @@ export function strukturaZOdpowiedzi(x: unknown): StrukturaWatku | null {
   };
 }
 
+const tekstLubNull = (v: unknown): string | null => typeof v === "string" && v !== "" ? v : null;
+
+/** Login porównuje się bez wielkości liter — zasada z `docs/allegro-ksztalt.md`. */
+const tenSamLogin = (a: string | null | undefined, b: string | null | undefined): boolean =>
+  !!a && !!b && a.toLocaleLowerCase("pl") === b.toLocaleLowerCase("pl");
+
+/**
+ * Wątek z listy `beta.v1` w kształcie, który zapisuje przebieg.
+ *
+ * Rozmówcy tu NIE MA: `ThreadVBeta1` zamiast `interlocutor` niesie listę
+ * `participants`, a w zwykłym wątku obie strony mogą mieć rolę `USER`.
+ * Rozmówcę wylicza `rozmowcaWatku`, gdy wiadomości są już przeczytane.
+ * Do `surowe_json` idzie wątek BEZ `participants` — loginów uczestników
+ * nie zapisujemy (`docs/obsluga-klienta.md`).
+ */
+export function watekZBety(x: Record<string, unknown>): Thread {
+  const uczestnicy = (Array.isArray(x.participants) ? x.participants : [])
+    .map((u) => u && typeof u === "object" ? u as Record<string, unknown> : {})
+    .flatMap((u) => typeof u.role === "string" && tekstLubNull(u.login)
+      ? [{ rola: u.role, login: String(u.login) }] : []);
+  const { participants: _pominiete, ...bezUczestnikow } = x;
+  return {
+    id: x.id as string, read: x.read,
+    lastMessageDateTime: typeof x.lastMessageDateTime === "string" ? x.lastMessageDateTime : null,
+    interlocutor: null,
+    beta: { struktura: strukturaZOdpowiedzi(x), uczestnicy, surowe: bezUczestnikow },
+  };
+}
+
+/**
+ * Wiadomość z `beta.v1` w kształcie `public.v1`, na którym stoi zapis.
+ *
+ * KIERUNEK Z ROLI, nie z `isInterlocutor`, którego beta nie ma. Nasza jest
+ * wiadomość z rolą `SELLER` albo z loginem uczestnika-sprzedawcy wątku —
+ * drugi warunek łapie rolę `USER`, gdyby Allegro dało ją także nam. Każda
+ * inna rola (kupujący, doradca, Allegro) to strona, która NIE jest nami.
+ * Rola nie będąca tekstem zostawia `isInterlocutor` pusty, a `flaga()` przy
+ * zapisie pomija wtedy wątek, zamiast zgadywać kierunek.
+ */
+export function wiadomoscZBety(x: Record<string, unknown>, sprzedawca: string | null): Message {
+  const autor = x.author && typeof x.author === "object" ? x.author as Record<string, unknown> : {};
+  const rola = typeof autor.role === "string" ? autor.role : null;
+  const login = tekstLubNull(autor.login);
+  return {
+    ...(x as unknown as Message),
+    /* `author.login` jest w `beta.v1` nullable — wiadomość od Allegro go
+       nie ma. Lądowisko trzyma pusty napis, a rolę niesie `surowe_json`. */
+    author: { login: login ?? "",
+      isInterlocutor: rola === null ? undefined : !(rola === "SELLER" || tenSamLogin(login, sprzedawca)) },
+    rola, surowe: x,
+  };
+}
+
+/**
+ * Rozmówca wątku z `beta.v1` — kupujący, czyli klucz klienta.
+ *
+ * Kolejno: uczestnik z rolą `BUYER`; jedyny uczestnik, który nie jest
+ * sprzedawcą i nie pisał naszych wiadomości; jedyny uczestnik, który pisał
+ * wiadomości przychodzące. Rozmówcą może być wyłącznie UCZESTNIK — doradca
+ * Allegro pisze w wątku, ale nim nie jest. Gdy nic nie rozstrzyga, `null`,
+ * a zapis zostawia login z poprzedniego przebiegu. Zgadnięty login
+ * przypiąłby rozmowę cudzemu klientowi.
+ */
+export function rozmowcaWatku(
+  uczestnicy: Array<{ rola: string; login: string }>, wiadomosci: Message[],
+): string | null {
+  const kupujacy = uczestnicy.find((u) => u.rola === "BUYER");
+  if (kupujacy) return kupujacy.login;
+  /* Ta sama tolerancja co w `flaga()`: przykład Allegro renderuje flagi
+     tekstem. Tu nie rzucamy — nieczytelna flaga po prostu nie rozstrzyga. */
+  const kierunek = (v: unknown) => v === true || v === "true" ? true : v === false || v === "false" ? false : null;
+  const pisal = (przychodzaca: boolean, login: string) => wiadomosci.some((m) =>
+    kierunek(m.author.isInterlocutor) === przychodzaca && tenSamLogin(m.author.login, login));
+  const kandydaci = uczestnicy.filter((u) => u.rola !== "SELLER" && !pisal(false, u.login));
+  if (kandydaci.length === 1) return kandydaci[0]!.login;
+  const piszacy = kandydaci.filter((u) => pisal(true, u.login));
+  return piszacy.length === 1 ? piszacy[0]!.login : null;
+}
+
 /*
- * Wstrzymanie odczytu struktury po odmowie. Konto bez dostępu do `beta.v1`
- * (406) albo bez uprawnienia (403) odmówi tak samo przy każdym wątku, a
- * specyfikacja mówi wprost, że dostępność bety trzeba sprawdzić na koncie
- * — tu jest `[WERYFIKUJ]`. Pamięć procesu, nie baza: restart to naturalna
- * chwila, żeby spróbować jeszcze raz.
+ * Wstrzymanie bety po odmowie. Konto bez dostępu do `beta.v1` (406) albo
+ * bez uprawnienia (403) odmówi tak samo przy każdym żądaniu, a specyfikacja
+ * mówi wprost, że dostępność bety trzeba sprawdzić na koncie — tu jest
+ * `[WERYFIKUJ]`. Jedno wstrzymanie dla listy i dla pojedynczego wątku, bo
+ * odmowa opisuje konto, nie końcówkę. DECYZJA żyje w pamięci procesu:
+ * restart to naturalna chwila, żeby spróbować jeszcze raz. Baza trzyma
+ * tylko kopię dla panelu (`beta_wstrzymana_do`), czytaną bez skutków.
  */
 const WSTRZYMANIE_PO_ODMOWIE_MS = 6 * 3_600_000;
 const WSTRZYMANIE_PO_LIMICIE_MS = 15 * 60_000;
-let strukturaWstrzymanaDo = 0;
+let betaWstrzymanaDo = 0;
 
 /** Wyłącznie dla testów: zdjęcie wstrzymania między przypadkami. */
 export function _zdejmijWstrzymanieStruktury(): void {
-  strukturaWstrzymanaDo = 0;
+  betaWstrzymanaDo = 0;
+}
+
+/** Odmowa wersji zasobu albo uprawnienia — ta, po której beta czeka sześć godzin. */
+const odmowaBety = (e: unknown): boolean =>
+  kodHttp(e) === 403 || /406\/415/.test(String((e as Error)?.message));
+
+/**
+ * Co zrobić, gdy PIERWSZA strona listy bety się nie udała.
+ *
+ * `przerwij` — 401, limit i brak sieci: `public.v1` skończyłoby tak samo,
+ * a przebieg ma zapisać prawdziwy powód porażki. `przebieg` — błąd serwera
+ * Allegro: ten jeden przebieg idzie `public.v1`, następny spróbuje bety
+ * znowu. `wstrzymaj` — każda inna odmowa i inny kształt odpowiedzi: powtórzy
+ * się przy każdym przebiegu, więc beta czeka sześć godzin.
+ */
+function poOdmowieListy(e: unknown): "przerwij" | "przebieg" | "wstrzymaj" {
+  if (e instanceof BladLimituAllegro) return "przerwij";
+  const kod = kodHttp(e);
+  if (kod === 401) return "przerwij";
+  if (kod !== null) return kod >= 500 ? "przebieg" : "wstrzymaj";
+  const tresc = e instanceof Error ? e.message : String(e);
+  return /406\/415|nextPage|tablicy threads/.test(tresc) ? "wstrzymaj" : "przerwij";
+}
+
+function wstrzymajBete(database: Db, teraz: Date, e: unknown, co: string): void {
+  betaWstrzymanaDo = teraz.getTime() + WSTRZYMANIE_PO_ODMOWIE_MS;
+  const tekst = e instanceof Error ? e.message : String(e);
+  /* Głośno RAZ na wstrzymanie, nie przy każdym wątku: odmowa opisuje
+     konto, nie wątek. */
+  console.warn(`[allegro-inbox] ${co} z beta.v1 wstrzymana na 6 h:`, tekst);
+  /* I w bazie, bo dziennik serwera czyta tylko admin, a brak Problemów
+     z zakupem ma zobaczyć biuro (`stanProblemowZakupu`). Obcięcie chroni
+     kolumnę przed odpowiedzią Allegro wklejoną w całości. */
+  database.prepare(`INSERT INTO allegro_inbox_sync_state(id, beta_wstrzymana_do, beta_powod)
+    VALUES (1,?,?) ON CONFLICT(id) DO UPDATE SET beta_wstrzymana_do=excluded.beta_wstrzymana_do,
+    beta_powod=excluded.beta_powod`).run(new Date(betaWstrzymanaDo).toISOString(), tekst.slice(0, 300));
 }
 
 export interface InboxSyncDeps {
@@ -140,6 +278,13 @@ export interface InboxSyncDeps {
    * prawdziwego żądania do Allegro.
    */
   struktura?: OdczytStruktury | null;
+  /**
+   * Lista wątków w `beta.v1` — jedyna, w której Allegro pokazuje Problemy
+   * z zakupem. Domyślnie wyłączona, gdy test podstawia `query`: atrapy
+   * listy mówią `public.v1` i mają nim mówić dalej. `ALLEGRO_WATKI_BETA=0`
+   * wyłącza ją w produkcji razem z odczytem struktury.
+   */
+  listaBeta?: boolean;
 }
 
 /** Jeden przebieg. Sieć kończy się przed zapisem, więc wolne API nie blokuje SQLite. */
@@ -165,6 +310,12 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
   const struktura: OdczytStruktury | null = deps.struktura !== undefined ? deps.struktura
     : deps.query || !config.allegro.watkiBeta ? null
       : (id) => zapytajAllegro(urlWatku(apiUrl, id), { akcept: AKCEPT_BETA });
+  /* Wersja listy na CAŁY przebieg. Stronicowanie obu wersji jest inne
+     (kursor `page.id` wobec `offset`), więc zmiana w połowie listy nie ma
+     sensu — zejście na `public.v1` wolno tylko przy pierwszej stronie. */
+  let beta = (deps.listaBeta ?? (!deps.query && config.allegro.watkiBeta))
+    && now().getTime() >= betaWstrzymanaDo;
+  let stronaBety: string | null = null;
   let offset = 0;
   let stron = 0;
   let reachedCursor = false;
@@ -204,14 +355,19 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
       for (const thread of threads) {
         try {
           transaction(database, () => {
+            /* Rozmówca NIE ZNIKA przy pustej wartości. Wątek nie zmienia
+               kupującego, a lista bety podaje go tylko pośrednio — gdy
+               `rozmowcaWatku` nie rozstrzyga, zostaje login z poprzedniego
+               przebiegu, nie NULL odpinający klienta od rozmowy. */
             database.prepare(`INSERT INTO allegro_inbox_thread
               (id,read,last_message_at,interlocutor_login,surowe_json,synced_at)
               VALUES (?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET read=excluded.read,
-              last_message_at=excluded.last_message_at, interlocutor_login=excluded.interlocutor_login,
+              last_message_at=excluded.last_message_at,
+              interlocutor_login=COALESCE(excluded.interlocutor_login, allegro_inbox_thread.interlocutor_login),
               surowe_json=excluded.surowe_json, synced_at=excluded.synced_at`).run(
               thread.id, Number(flaga(thread.read, "thread.read")),
               thread.lastMessageDateTime ?? null, thread.interlocutor?.login ?? null,
-              JSON.stringify(thread), at);
+              JSON.stringify(thread.beta?.surowe ?? thread), at);
             /* Struktura TYLKO wtedy, gdy przyszła. Nieudany odczyt bety nie ma
                prawa zamazać wartości z poprzedniego przebiegu — typ wątku się
                nie zmienia, a NULL udawałby „wątek bez typu". */
@@ -231,9 +387,9 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
                 Number(flaga(message.author.isInterlocutor, "author.isInterlocutor")),
                 message.text, message.subject ?? null, message.status ?? null,
                 message.createdAt, oferta(message)[0], oferta(message)[1],
-                JSON.stringify(message));
+                JSON.stringify(message.surowe ?? message));
             }
-            zapiszKanonicznie(database, thread, messages.get(thread.id) ?? [], konto);
+            zapiszKanonicznie(database, thread, messages.get(thread.id) ?? [], konto, st ?? null);
           })();
         } catch (e) {
           /* Wątek zostaje poza skrzynką, ale przebieg leci dalej. Dziennik niesie
@@ -247,13 +403,52 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
       }
   };
 
+  /**
+   * Jedna strona listy w wersji tego przebiegu. `koniec` mówi, że dalszej
+   * strony nie ma: w becie `nextPage` jest `null`, w `public.v1` strona ma
+   * mniej niż 20 wątków.
+   *
+   * ZEJŚCIE NA `public.v1` przy pierwszej stronie, gdy beta odmawia albo
+   * oddaje inny kształt. Skrzynka bez Problemów z zakupem dalej odpowiada
+   * klientom; skrzynka stojąca na odmowie bety nie odpowiada nikomu.
+   * Wstrzymanie bety mówi o tym w dzienniku. Co przerywa przebieg, a co
+   * schodzi na `public.v1`, rozstrzyga `poOdmowieListy`.
+   */
+  const pobierzStrone = async (): Promise<{ watki: Thread[]; koniec: boolean }> => {
+    if (beta) {
+      try {
+        const odp = await query(urlWatkowBeta(apiUrl, stronaBety), { akcept: AKCEPT_BETA });
+        const surowe = tablica<Record<string, unknown>>(odp, "threads");
+        /* `nextPage` jest w `ThreadsListVBeta1` WYMAGANE (nullable). Jego brak
+           znaczy odpowiedź w innym kształcie, nie koniec listy — po cichu
+           czytalibyśmy wtedy jedną stronę i uznali ją za całą skrzynkę. */
+        if (!("nextPage" in (odp as object))) {
+          throw new Error("Lista wątków beta.v1 bez pola nextPage opisanego w docs/allegro-ksztalt.md");
+        }
+        const dalej = (odp as { nextPage: { id?: unknown } | null }).nextPage;
+        stronaBety = tekstLubNull(dalej?.id);
+        return { watki: surowe.map(watekZBety), koniec: stronaBety === null || surowe.length === 0 };
+      } catch (e) {
+        const co = stron > 0 ? "przerwij" : poOdmowieListy(e);
+        if (co === "przerwij") throw e;
+        if (co === "wstrzymaj") wstrzymajBete(database, now(), e, "lista wątków");
+        else console.warn("[allegro-inbox] lista wątków z beta.v1 — błąd Allegro, ten przebieg idzie public.v1:",
+          e instanceof Error ? e.message : e);
+        beta = false;
+      }
+    }
+    const page = tablica<Thread>(await query(urlWatkow(apiUrl, offset)), "threads");
+    offset += page.length;
+    return { watki: page, koniec: page.length < 20 };
+  };
+
   try {
     do {
       if (stron >= limitStron) {
         obciety = true;
         break;
       }
-      const page = tablica<Thread>(await query(urlWatkow(apiUrl, offset)), "threads");
+      const { watki: page, koniec } = await pobierzStrone();
       stron++;
       /* Partia jednej strony, nie całego przebiegu — patrz zapis niżej. */
       const threads: Thread[] = [];
@@ -296,11 +491,13 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
           "SELECT last_message_at FROM allegro_inbox_thread WHERE id=?"
         ).get(thread.id) as { last_message_at: string } | undefined;
         if (!known || known.last_message_at !== thread.lastMessageDateTime) {
-          const body = await query(urlWiadomosci(apiUrl, thread.id));
-          messages.set(thread.id, tablica<Message>(body, "messages"));
+          /* Struktura z samej listy, gdy lista szła betą — dodatkowe żądanie
+             o wątek jest potrzebne wyłącznie przy liście `public.v1`. */
+          const st = thread.beta ? thread.beta.struktura
+            : await czytajStrukture(database, struktura, thread.id, now());
+          messages.set(thread.id, await czytajWiadomosci(query, apiUrl, thread));
           threads.push(thread);
           przeczytane.add(thread.id);
-          const st = await czytajStrukture(struktura, thread.id, now());
           if (st) struktury.set(thread.id, st);
         }
       }
@@ -315,8 +512,7 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
          „awaria sieci przy pobieraniu wiadomości kończy przebieg bez zapisu"
          pilnuje, że wątki strony NIEDOCZYTANEJ nie wchodzą pojedynczo. */
       zapiszPartie(threads, messages, struktury);
-      offset += page.length;
-      if (poniżejGranicy || page.length < 20) {
+      if (poniżejGranicy || koniec) {
         doDna = true;
         break;
       }
@@ -372,6 +568,12 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
         next_attempt_at=excluded.next_attempt_at,dno_at=excluded.dno_at`).run(
           kursor?.lastMessageDateTime ?? startState.cursorAt, kursor?.id ?? startState.cursorId,
           at, at, zepsute.size, new Date(Date.parse(at) + interval).toISOString(), dno);
+      /* Lista przeszła betą do końca przebiegu — wstrzymanie, jeśli wisiało
+         z poprzedniego procesu, już nie jest prawdą. */
+      if (beta) {
+        database.prepare(`UPDATE allegro_inbox_sync_state SET beta_wstrzymana_do=NULL, beta_powod=NULL
+          WHERE id=1`).run();
+      }
     })();
   } catch (error) {
     const wait = error instanceof BladLimituAllegro
@@ -395,6 +597,33 @@ export async function synchronizujAllegroInbox(deps: InboxSyncDeps = {}): Promis
       next_attempt_at=excluded.next_attempt_at`).run(now().toISOString(), kod, tekst, next);
     throw error;
   }
+}
+
+/**
+ * Wiadomości jednego wątku, w wersji zależnej od jego typu.
+ *
+ * Problem z zakupem czytamy w `beta.v1`, bo Allegro obsługuje go wyłącznie
+ * tą wersją. Zwykły wątek zostaje na `public.v1`: tylko tam kierunek niesie
+ * `isInterlocutor`, a w becie obie strony zwykłego wątku mogą mieć rolę
+ * `USER`. Wiadomości obu wersji czytamy tylko z pierwszej strony: wątek
+ * czyta się przy każdej zmianie, więc nowa wiadomość zawsze jest na górze.
+ * Starszych nie kasujemy — model pracy ich nie usuwa.
+ *
+ * Wątek z listy bety dostaje tu rozmówcę: lista podaje uczestników, a kto
+ * z nich jest klientem, rozstrzygają dopiero wiadomości.
+ */
+async function czytajWiadomosci(query: InboxQuery, apiUrl: string, thread: Thread): Promise<Message[]> {
+  const b = thread.beta;
+  const lista = b?.struktura?.typ === PROBLEM_Z_ZAKUPEM
+    ? tablica<Record<string, unknown>>(
+      await query(urlWiadomosci(apiUrl, thread.id), { akcept: AKCEPT_BETA }), "messages")
+      .map((m) => wiadomoscZBety(m, b.uczestnicy.find((u) => u.rola === "SELLER")?.login ?? null))
+    : tablica<Message>(await query(urlWiadomosci(apiUrl, thread.id)), "messages");
+  if (b) {
+    const login = rozmowcaWatku(b.uczestnicy, lista);
+    thread.interlocutor = login ? { login } : null;
+  }
+  return lista;
 }
 
 /* ── Model kanoniczny (0.144.0) ─────────────────────────────────────────────
@@ -439,7 +668,7 @@ function najnowsza(messages: Message[]): string | null {
    w `conversation.subject` do 0.151.0. */
 function temat(messages: Message[]): string | null {
   const s = messages.find((m) => typeof m.subject === "string" && m.subject !== "")?.subject;
-  return s === undefined ? null : odkodujEncje(s);
+  return s == null ? null : odkodujEncje(s);
 }
 
 /* ENCJE HTML SCHODZĄ TUTAJ, przy wjeździe do modelu pracy — nie przy
@@ -458,7 +687,17 @@ function temat(messages: Message[]): string | null {
    LĄDOWISKO ZOSTAJE SUROWE. `allegro_inbox_message.text` i `surowe_json` niosą
    odpowiedź w kształcie, w jakim przyszła — to jedyny ślad, gdyby dekodowanie
    kiedyś skrzywdziło cudzy tekst. */
-function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], konto: number): void {
+function zapiszKanonicznie(
+  database: Db, thread: Thread, messages: Message[], konto: number, st: StrukturaWatku | null,
+): void {
+  /* ZAMÓWIENIE PROBLEMU Z ZAKUPEM wiąże się z całym wątkiem
+     (`ThreadVBeta1.orders`), a gałąź `relatesTo.order` wiadomości jest
+     w becie nullable. Bez tego numeru droga klienta nie połączyłaby sprawy
+     ze zwrotem i reklamacją tego zakupu — mostkiem jest wyłącznie
+     `message.related_order_id`. Tylko przy JEDNYM zamówieniu: z kilku nie
+     wiadomo, którego dotyczy wiadomość, a zgadnięty numer pokazałby inny zakup. */
+  const zamowienieWatku = st?.typ === PROBLEM_Z_ZAKUPEM && st.zamowienia.length === 1
+    ? st.zamowienia[0]! : null;
   database.prepare(`INSERT INTO conversation(channel_account_id, external_conversation_id, subject, unread, updated_at)
     VALUES (?,?,?,?,?) ON CONFLICT(channel_account_id, external_conversation_id)
     DO UPDATE SET unread=excluded.unread, updated_at=excluded.updated_at`).run(
@@ -489,6 +728,11 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
        rozmowy i o tym, czy zdarzenie ma zapalić pasek w panelu. Trzy odczyty
        tego samego pola dawałyby trzy okazje, żeby któryś się rozjechał. */
     const przychodzaca = flaga(message.author.isInterlocutor, "author.isInterlocutor");
+    /* Głos Allegro w zamkniętym wątku nie jest ruchem (`glos-allegro.ts`):
+       nie budzi rozmowy i nie zapala paska nowej wiadomości. Status liczy
+       to samo przy odczycie, a budzenie zapisuje — oba muszą mówić jedno. */
+    const ruchKlienta = przychodzaca
+      && !(ROLE_ALLEGRO.has(message.rola ?? "") && st?.status === "CLOSED");
     const kierunek = przychodzaca ? "incoming" as const : "outgoing" as const;
     const tresc = odkodujEncje(message.text);
     const auto = flagaAutoodpowiedzi(kierunek, tresc);
@@ -497,11 +741,11 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
        Konflikt na unikalnym kluczu jest tu poprawnym końcem pracy. */
     const wynik = database.prepare(`INSERT INTO message(conversation_id, channel_account_id,
       external_message_id, direction, body, related_object_type, related_object_id,
-      related_order_id, sent_at, auto_odpowiedz)
-      VALUES (?,?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_account_id, external_message_id) DO NOTHING`).run(
+      related_order_id, sent_at, auto_odpowiedz, autor_rola)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(channel_account_id, external_message_id) DO NOTHING`).run(
       rozmowa, konto, message.id,
       kierunek,
-      tresc, oferta(message)[0], oferta(message)[1], zamowienie(message),
+      tresc, oferta(message)[0], oferta(message)[1], zamowienie(message) ?? zamowienieWatku,
       /* Data POJEDYNCZEJ wiadomości. Do 0.151.0 wszystkie wiadomości wątku
          dostawały tu jedną datę — datę wątku — bo kod twierdził, że Allegro
          daty wiadomości nie podaje. Podaje: `createdAt`. */
@@ -512,14 +756,19 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
          za kontakt" liczyło się jako ruch biura i przestawiało rozmowę na
          „czeka na klienta" — pytanie klienta gasło przez to, że skrzynka
          grzecznie potwierdziła jego odbiór. */
-      auto);
+      auto,
+      /* Rola autora z `beta.v1`. Doradca Allegro pisze w Problemie
+         z zakupem jako strona przychodząca, a oś rozmowy podpisywała
+         przychodzące loginem klienta — bez roli jego słowa stałyby
+         na ekranie jako słowa kupującego. */
+      message.rola ?? null);
     if (wynik.changes > 0) {
       /* PRZYCHODZĄCA BUDZI ROZMOWĘ (§7, 0.158.0). Klient dopisujący pytanie do
          sprawy uznanej za załatwioną musi ją z powrotem otworzyć — inaczej
          rozmowa zostaje na liście „rozwiązane" i nikt do niej nie zagląda.
          Wychodzące pomijamy: to nasza własna odpowiedź wracająca z Allegro. */
-      if (przychodzaca) obudzPrzychodzaca(database, rozmowa);
-      else uzgodnijNiepewna(database, rozmowa, message.id, tresc);
+      if (ruchKlienta) obudzPrzychodzaca(database, rozmowa);
+      else if (!przychodzaca) uzgodnijNiepewna(database, rozmowa, message.id, tresc);
       /* ZDARZENIE NIESIE KIERUNEK (0.257.0, dług z 0.228.0). Panel zapala pasek
          „Klient dopisał nową wiadomość" wyłącznie przy `odKlienta`. Tą drogą
          pole nie jechało nigdy, bo ustawiał je tylko `zapiszWiadomosc`, którego
@@ -527,7 +776,7 @@ function zapiszKanonicznie(database: Db, thread: Thread, messages: Message[], ko
          prawdziwej wiadomości z Allegro. */
       publishConversationEvent("message.created", rozmowa, {
         messageId: Number(wynik.lastInsertRowid), external: message.id,
-        odKlienta: przychodzaca,
+        odKlienta: ruchKlienta,
         automatyczna: auto === 1,
       });
     }
@@ -563,16 +812,22 @@ async function dociagnijZalacznikiNew(
   database: Db, query: InboxQuery, apiUrl: string, konto: number, pominiete: Set<string>,
 ): Promise<void> {
   const watki = (database.prepare(`
-    SELECT DISTINCT c.external_conversation_id AS id
+    SELECT DISTINCT c.external_conversation_id AS id,
+           (SELECT t.watek_typ FROM allegro_inbox_thread t
+             WHERE t.id = c.external_conversation_id) AS typ
       FROM message_attachment a
       JOIN message m ON m.id = a.message_id
       JOIN conversation c ON c.id = m.conversation_id
      WHERE a.status = 'NEW' AND c.channel_account_id = ?
-     LIMIT ?`).all(konto, MAKS_DOCIAGU_NEW) as Array<{ id: string }>)
-    .map((w) => w.id).filter((id) => !pominiete.has(id));
-  for (const id of watki) {
+     LIMIT ?`).all(konto, MAKS_DOCIAGU_NEW) as Array<{ id: string; typ: string | null }>)
+    .filter((w) => !pominiete.has(w.id));
+  for (const { id, typ } of watki) {
     try {
-      const wiadomosci = tablica<Message>(await query(urlWiadomosci(apiUrl, id)), "messages");
+      /* Ta sama wersja co przy czytaniu wątku. Załącznik `beta.v1` ma te
+         same pola, po które tu przychodzimy, plus `id`, którego nie czytamy. */
+      const wiadomosci = tablica<Message>(typ === PROBLEM_Z_ZAKUPEM
+        ? await query(urlWiadomosci(apiUrl, id), { akcept: AKCEPT_BETA })
+        : await query(urlWiadomosci(apiUrl, id)), "messages");
       transaction(database, () => {
         for (const m of wiadomosci) {
           const w = database.prepare(
@@ -598,20 +853,16 @@ async function dociagnijZalacznikiNew(
  * żądanie tego przebiegu i tak dostałoby 429.
  */
 async function czytajStrukture(
-  odczyt: OdczytStruktury | null, threadId: string, teraz: Date,
+  database: Db, odczyt: OdczytStruktury | null, threadId: string, teraz: Date,
 ): Promise<StrukturaWatku | null> {
-  if (!odczyt || teraz.getTime() < strukturaWstrzymanaDo) return null;
+  if (!odczyt || teraz.getTime() < betaWstrzymanaDo) return null;
   try {
     return strukturaZOdpowiedzi(await odczyt(threadId));
   } catch (e) {
     if (e instanceof BladLimituAllegro) {
-      strukturaWstrzymanaDo = teraz.getTime() + WSTRZYMANIE_PO_LIMICIE_MS;
-    } else if (kodHttp(e) === 403 || /406\/415/.test(String((e as Error)?.message))) {
-      strukturaWstrzymanaDo = teraz.getTime() + WSTRZYMANIE_PO_ODMOWIE_MS;
-      /* Głośno RAZ na wstrzymanie, nie przy każdym wątku: odmowa opisuje
-         konto, nie wątek. */
-      console.warn("[allegro-inbox] struktura wątków z beta.v1 wstrzymana na 6 h:",
-        e instanceof Error ? e.message : e);
+      betaWstrzymanaDo = teraz.getTime() + WSTRZYMANIE_PO_LIMICIE_MS;
+    } else if (odmowaBety(e)) {
+      wstrzymajBete(database, teraz, e, "struktura wątków");
     }
     return null;
   }

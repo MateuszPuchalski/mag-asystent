@@ -27,6 +27,13 @@ idą przez `services/droga-klienta.ts` i jeden blok `panel/src/sprawy/Spoiwo.tsx
 Ręczne wskazanie zamówienia rozmowy czyta każda strona z jednej relacji
 `ROZMOWA_ZAMOWIENIA` (test o tej nazwie w `droga-klienta.test.ts`).
 
+**Problem z zakupem jest rozmową w skrzynce, nie piątą kolejką.** Od
+28 października 2026 Allegro zakłada nowe sprawy kupujących w Centrum
+Wiadomości zamiast w dyskusjach. Stare dyskusje zostają w swojej kolejce.
+Problem wiąże się z drogą przez ten sam mostek: wiadomość bez numeru dostaje
+numer zamówienia wątku, gdy jest jedno. Kształt i powody stoją
+w `docs/allegro-ksztalt.md`, rozdział o Problemach z zakupem.
+
 **Zwrot staje na osi rozmowy.** Decyzja, korekta i pieniądze zwrotu są
 zdarzeniami w pasku rozmowy i faktem w szkicu Copilota
 (`services/zwrot-na-osi.ts`). Ocena, kwota robocza i notatka biura zostają

@@ -144,6 +144,10 @@ CREATE TABLE IF NOT EXISTS message (
   -- drugi raz w SQL-u. Dwie kopie tej reguły rozjechałyby się przy pierwszej
   -- poprawce, a objawem byłaby rozmowa uznana za odpisaną, bo odbiła się echem.
   auto_odpowiedz      INTEGER NOT NULL DEFAULT 0,
+  -- Rola autora z `beta.v1` Centrum Wiadomości (`author.role`), dosłownie.
+  -- Wiadomość z `public.v1` ma NULL. Doradca Allegro pisze w Problemie
+  -- z zakupem jako strona przychodząca i bez roli podpisałby się loginem klienta.
+  autor_rola          TEXT,
   created_at          TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   -- Ponowne pobranie tej samej strony kanału ma skończyć się konfliktem,
   -- który importer zamienia na no-op, a nie drugim wierszem wiadomości.
@@ -1432,7 +1436,12 @@ CREATE TABLE IF NOT EXISTS allegro_inbox_sync_state (
   -- czasu albo do końca historii. NULL znaczy „jeszcze nigdy", a to jedyny
   -- stan, w którym sufit stron nie obowiązuje — inaczej instalacja
   -- z zaległością większą niż sufit nigdy by jej nie nadrobiła.
-  dno_at TEXT
+  dno_at TEXT,
+  -- Do kiedy czeka `beta.v1` Centrum Wiadomości po odmowie Allegro, i zdanie
+  -- odmowy. Bez bety Problemy z zakupem nie dochodzą, a skrzynka czyta wtedy
+  -- `public.v1` i wygląda zdrowo — panel musi to powiedzieć sam.
+  beta_wstrzymana_do TEXT,
+  beta_powod TEXT
 );
 
 -- ── Zwroty klienckie z Allegro (0.150.0) ────────────────────────────────────

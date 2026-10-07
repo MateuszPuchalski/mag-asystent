@@ -52,6 +52,34 @@ export function stanSynchronizacji(db: Db): AllegroInboxSyncState {
 }
 
 /**
+ * Czy Problemy z zakupem mogą dochodzić do skrzynki. `null` — beta Centrum
+ * Wiadomości działa albo jeszcze jej nie próbowano.
+ *
+ * Bez bety skrzynka czyta `public.v1` i wygląda zdrowo: synchronizacja
+ * świeża, błędów zero. A Problemów z zakupem po prostu nie ma. Brak danych
+ * to nie zero (`panel/CLAUDE.md`), więc ten stan idzie do panelu osobno.
+ */
+export interface StanProblemowZakupu {
+  przyczyna: "wylaczona" | "wstrzymana";
+  /** Do kiedy beta czeka (ISO), tylko przy `wstrzymana`. */
+  doKiedy: string | null;
+  /** Zdanie odmowy Allegro, tylko przy `wstrzymana`. */
+  szczegol: string | null;
+}
+
+export function stanProblemowZakupu(
+  db: Db, wlaczona = config.allegro.watkiBeta, teraz = Date.now(),
+): StanProblemowZakupu | null {
+  if (!wlaczona) return { przyczyna: "wylaczona", doKiedy: null, szczegol: null };
+  const row = db.prepare(`SELECT beta_wstrzymana_do AS doKiedy, beta_powod AS szczegol
+    FROM allegro_inbox_sync_state WHERE id=1`).get() as { doKiedy: string | null; szczegol: string | null } | undefined;
+  /* Wstrzymanie po terminie już nie obowiązuje: następny przebieg pyta betę
+     znowu. Wiersza nie czyścimy przy odczycie — zero zapisu przy patrzeniu. */
+  if (!row?.doKiedy || Date.parse(row.doKiedy) <= teraz) return null;
+  return { przyczyna: "wstrzymana", doKiedy: row.doKiedy, szczegol: row.szczegol ?? null };
+}
+
+/**
  * Ile nieudanych przebiegów Z RZĘDU uzasadnia trwały alarm.
  *
  * §21: „Panel pokazuje trwały alarm, gdy synchronizacja nie powiodła się przez

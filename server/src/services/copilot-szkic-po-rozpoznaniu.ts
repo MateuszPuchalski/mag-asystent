@@ -12,6 +12,7 @@ import { ulozSzkic, type NadawcaSzkicu } from "./copilot-szkic.js";
 import { AUTOMAT, zuzyteWGodzinie } from "./copilot-auto-szkic.js";
 import { CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
 import { TAKSONOMIA_WERSJA } from "./klasyfikacja-slownik.js";
+import { zamknietyProblem } from "./glos-allegro.js";
 import { zapiszPropozycje } from "./przeplyw-kategorii.js";
 import { wyslijNaZywo, type NaZywoDeps } from "./przeplyw-na-zywo.js";
 
@@ -52,6 +53,7 @@ export function czekajaNaSzkic(database: DatabaseSync, rozmowyId: number[]): num
       LEFT JOIN szkic_copilota s ON s.conversation_id = c.id
      WHERE c.id IN (${rozmowyId.map(() => "?").join(",")})
        AND k.akcja <> 'NO_ACTION' AND k.zrodlo <> 'FALLBACK' AND k.status <> 'FAILED'
+       AND NOT ${zamknietyProblem("c")}
        AND (s.conversation_id IS NULL OR IFNULL(s.message_id, -1) <> m.id
             OR IFNULL(s.decyzja_id, -1) <> k.id)
      ORDER BY m.sent_at, m.id`).all(...rozmowyId) as Array<{ rozmowa: number }>)

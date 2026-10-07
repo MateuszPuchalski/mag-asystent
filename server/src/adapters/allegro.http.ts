@@ -379,6 +379,18 @@ export function urlWatkow(apiUrl: string, offset: number): string {
 }
 
 /**
+ * Lista wątków w `beta.v1`. Stronicuje KURSOREM `page.id` z `nextPage.id`
+ * poprzedniej strony, nie offsetem: specyfikacja pisze przy `offset`
+ * „Available only for content version public.v1". Pierwsza strona idzie
+ * bez kursora. Tylko ta wersja pokazuje Problemy z zakupem, więc
+ * synchronizacja skrzynki czyta listę właśnie nią.
+ */
+export function urlWatkowBeta(apiUrl: string, stronaId: string | null): string {
+  const dalej = stronaId ? `&page.id=${encodeURIComponent(stronaId)}` : "";
+  return `${apiUrl}/messaging/threads?limit=20${dalej}`;
+}
+
+/**
  * Jeden wątek (`GET /messaging/threads/{threadId}`). Czytany WYŁĄCZNIE w
  * `beta.v1` (klasyfikacja, 22 września 2026): tylko ta wersja niesie `type`,
  * `subType` i `orders` — kształt w `docs/allegro-ksztalt.md`.
@@ -560,12 +572,13 @@ export async function zapytajAllegro(
      * Wersja zasobu WYMUSZONA, bez negocjacji (22 września 2026).
      *
      * Wątek w `beta.v1` ma inny kształt niż w `public.v1` (`participants`
-     * zamiast `interlocutor`, `role` zamiast `isInterlocutor`). Synchronizacja
-     * skrzynki czyta `public.v1` i jej mapowanie stoi na tym kształcie, a
-     * pojedynczy wątek należy do TEJ SAMEJ rodziny `threads`. Nauczony nagłówek
-     * jest wspólny dla rodziny, więc wymuszona beta NIE MA PRAWA go zapisać ani
-     * skasować — inaczej następna strona listy przyszłaby w kształcie, którego
-     * mapowanie nie rozumie.
+     * zamiast `interlocutor`, `role` zamiast `isInterlocutor`). Listę wątków
+     * i Problem z zakupem czytamy betą, a wiadomości zwykłego wątku —
+     * `public.v1`, bo tylko tam kierunek daje `isInterlocutor`. Wszystko to
+     * jest JEDNA rodzina `threads`, a nauczony nagłówek jest wspólny dla
+     * rodziny. Wymuszona beta NIE MA PRAWA go zapisać ani skasować — inaczej
+     * wiadomości zwykłego wątku przyszłyby w kształcie, którego mapowanie
+     * nie rozumie.
      */
     akcept?: typeof AKCEPT_BETA;
   } = {}
@@ -686,6 +699,14 @@ export async function zapytajAllegro(
     }
     if (!odp.ok) {
       const tresc = await odp.text().catch(() => "");
+      /* Zamknięty Problem z zakupem. Specyfikacja opisuje przy wysyłce
+         w wątku 422 z kodem `THREAD_CLOSED`: „Cannot add a message to
+         a closed POST_PURCHASE_ISSUE thread". Bez tego zdania agent
+         dostałby surowy JSON przy rozmowie, która wygląda na otwartą. */
+      if (odp.status === 422 && tresc.includes("THREAD_CLOSED")) {
+        throw new BladOdpowiedziAllegro(
+          "Allegro zamknęło ten Problem z zakupem i nie przyjmie nowej wiadomości (422).", 422);
+      }
       throw new BladOdpowiedziAllegro(
         `Allegro odpowiedziało ${odp.status}: ${tresc.slice(0, 300)}`, odp.status);
     }

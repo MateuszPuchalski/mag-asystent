@@ -4,6 +4,7 @@ import { czyAutoresponder } from "./autoresponder.js";
 import { logEvent } from "./events.js";
 import { publishConversationEvent } from "./conversation-realtime.js";
 import { AKTYWNA_DECYZJA, CEL_KLASYFIKACJI } from "./copilot-klasyfikacja.js";
+import { ROLE_ALLEGRO, glosAllegroPoZamknieciu } from "./glos-allegro.js";
 
 /**
  * Imię do dziennika bierzemy z konta, nie z parametru.
@@ -685,17 +686,23 @@ export function statusIZakonczenie(
   database: DatabaseSync, conversationId: number, teraz = Date.now(),
 ): { status: StatusRozmowy; zakonczenie: ZrodloZakonczenia | null } {
   const zapisany = statusZapisany(database, conversationId, teraz);
+  /* Głos Allegro po zamknięciu wątku nie jest ruchem — `glos-allegro.ts`. */
   const ost = database.prepare(
-    `SELECT direction, sent_at FROM message WHERE conversation_id=? AND auto_odpowiedz=0
+    `SELECT direction, sent_at, autor_rola FROM message WHERE conversation_id=? AND auto_odpowiedz=0
+        AND NOT ${glosAllegroPoZamknieciu("message")}
       ORDER BY sent_at DESC, id DESC LIMIT 1`,
-  ).get(conversationId) as { direction: string; sent_at: string } | undefined;
+  ).get(conversationId) as { direction: string; sent_at: string; autor_rola: string | null } | undefined;
   const watek = database.prepare(`SELECT c.otwarta_recznie_at AS otwarta,
       (SELECT t.watek_status FROM allegro_inbox_thread t WHERE t.id = c.external_conversation_id) AS s
       FROM conversation c WHERE c.id=?`)
     .get(conversationId) as { s: string | null; otwarta: string | null } | undefined;
   return wyliczStatus({
     zapisany, ostatniKierunek: ost?.direction ?? null,
-    podziekowal: ost?.direction === "incoming" && podziekowanieWRozmowie(database, conversationId),
+    /* Podziękowanie kończy rozmowę tylko wtedy, gdy to KLIENT pisał ostatni.
+       Rozpoznanie celuje w kupującego, więc po jego „dziękuję” prośba
+       doradcy o stanowisko zostałaby zamknięta razem z rozmową. */
+    podziekowal: ost?.direction === "incoming" && !ROLE_ALLEGRO.has(ost.autor_rola ?? "")
+      && podziekowanieWRozmowie(database, conversationId),
     ostatniRuchAt: ost?.sent_at ?? null,
     watekZamkniety: watek?.s === "CLOSED",
     otwartaRecznieAt: watek?.otwarta ?? null,
@@ -715,10 +722,13 @@ export function statusIZakonczenie(
  */
 export function podziekowanieKlienta(database: DatabaseSync, conversationId: number): number | null {
   const ost = database.prepare(
-    `SELECT id, direction FROM message WHERE conversation_id=? AND auto_odpowiedz=0
+    `SELECT id, direction, autor_rola FROM message WHERE conversation_id=? AND auto_odpowiedz=0
+        AND NOT ${glosAllegroPoZamknieciu("message")}
       ORDER BY sent_at DESC, id DESC LIMIT 1`,
-  ).get(conversationId) as { id: number; direction: string } | undefined;
-  if (ost?.direction !== "incoming") return null;
+  ).get(conversationId) as { id: number; direction: string; autor_rola: string | null } | undefined;
+  /* Ta sama bramka co `podziekowal` w `statusIZakonczenie`: słowa Allegro
+     nie są podziękowaniem klienta. */
+  if (ost?.direction !== "incoming" || ROLE_ALLEGRO.has(ost.autor_rola ?? "")) return null;
   return podziekowanieWRozmowie(database, conversationId) ? Number(ost.id) : null;
 }
 

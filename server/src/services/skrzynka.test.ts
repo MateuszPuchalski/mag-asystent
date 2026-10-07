@@ -915,6 +915,131 @@ test("wątek bez loginu spada na temat, a potem na słowo „Klient”", () => {
   assert.equal(osRozmowy(rozmowa).os.find((w) => w.rodzaj === "wiadomosc")!.autor, "Pytanie o gwint");
 });
 
+/* ── Problem z zakupem (`POST_PURCHASE_ISSUE` z `beta.v1`) ─────────────────
+   Od 28 października 2026 nowe sprawy kupujących przychodzą do skrzynki jako
+   wątki tego typu. Agent ma to widzieć w kolejce i w nagłówku, a słowa
+   doradcy Allegro nie mogą podpisać się loginem klienta. */
+test("Problem z zakupem niesie powód i zamknięcie, a doradca podpisuje się „Allegro”", () => {
+  const d = db();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','problem')")
+    .run().lastInsertRowid);
+  const watek = d.prepare(`INSERT INTO allegro_inbox_thread(id,read,last_message_at,interlocutor_login,
+    surowe_json,synced_at,watek_typ,watek_podtyp,watek_status)
+    VALUES (?,0,'2026-10-02T10:00:00.000Z','kupujacy-anon','{}','2026-10-02T10:00:00.000Z',?,?,?)`);
+  watek.run("w-ppi", "POST_PURCHASE_ISSUE", "PRODUCT_ARRIVED_DAMAGED", "CLOSED");
+  watek.run("w-zwykly", "COMMON", null, "OPEN");
+  const rozmowa = (x: string) => Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject,unread,updated_at) VALUES (?,?,'temat',1,'2026-10-02T10:00:00.000Z')`)
+    .run(konto, x).lastInsertRowid);
+  const ppi = rozmowa("w-ppi");
+  const zwykla = rozmowa("w-zwykly");
+  const wiadomosc = d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,
+    direction,body,sent_at,autor_rola) VALUES (?,?,?,'incoming',?,?,?)`);
+  wiadomosc.run(ppi, konto, "m-ppi-1", "Paczka przyszła zgnieciona", "2026-10-02T09:00:00.000Z", "BUYER");
+  wiadomosc.run(ppi, konto, "m-ppi-2", "Prosimy sprzedawcę o odpowiedź", "2026-10-02T10:00:00.000Z", "CONSULTANT");
+  wiadomosc.run(zwykla, konto, "m-zw-1", "Pytanie", "2026-10-02T10:00:00.000Z", null);
+
+  const lista = listaRozmow();
+  assert.deepEqual(lista.find((x) => x.id === ppi)!.problemZakupu,
+    { powod: "PRODUCT_ARRIVED_DAMAGED", zamkniety: true });
+  assert.equal(lista.find((x) => x.id === zwykla)!.problemZakupu, null, "zwykły wątek nie jest Problemem");
+  const otwarta = osRozmowy(ppi);
+  assert.deepEqual(otwarta.rozmowa.problemZakupu, { powod: "PRODUCT_ARRIVED_DAMAGED", zamkniety: true });
+  assert.deepEqual(otwarta.os.filter((w) => w.rodzaj === "wiadomosc").map((w) => w.autor),
+    ["kupujacy-anon", "Allegro"]);
+});
+
+test("głos Allegro po zamknięciu nie jest ruchem; pytanie klienta dalej czeka, a w otwartym doradca czeka na nas", async () => {
+  const { statusIZakonczenie } = await import("./conversations.js");
+  const d = db();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','glos-allegro')")
+    .run().lastInsertRowid);
+  const watek = (id: string, status: string) => d.prepare(`INSERT INTO allegro_inbox_thread(id,read,
+    last_message_at,interlocutor_login,surowe_json,synced_at,watek_typ,watek_status)
+    VALUES (?,1,'2026-10-03T10:00:00.000Z','kupujacy-anon','{}','2026-10-03T10:00:00.000Z',
+    'POST_PURCHASE_ISSUE',?)`).run(id, status);
+  const rozmowa = (x: string) => Number(d.prepare(`INSERT INTO conversation(channel_account_id,
+    external_conversation_id,subject,unread,updated_at) VALUES (?,?,'t',0,'2026-10-03T10:00:00.000Z')`)
+    .run(konto, x).lastInsertRowid);
+  const wiad = (r: number, id: string, dir: string, at: string, rola: string | null) =>
+    d.prepare(`INSERT INTO message(conversation_id,channel_account_id,external_message_id,direction,
+      body,sent_at,autor_rola) VALUES (?,?,?,?,?,?,?)`).run(r, konto, id, dir, `treść ${id}`, at, rola);
+  /* Wiadomości stoją w przeszłości, ale nie dalej niż dwa dni od teraz
+     odliczone „ciszą” nie mieszają się z regułą zamknięcia. */
+  const t = (godz: number) => new Date(Date.now() - (5 - godz) * 3_600_000).toISOString();
+
+  watek("ga-odpisane", "CLOSED");
+  const odpisane = rozmowa("ga-odpisane");
+  wiad(odpisane, "ga-1", "incoming", t(1), "BUYER");
+  wiad(odpisane, "ga-2", "outgoing", t(2), "SELLER");
+  wiad(odpisane, "ga-3", "incoming", t(3), "CONSULTANT");
+
+  watek("ga-pytanie", "CLOSED");
+  const pytanie = rozmowa("ga-pytanie");
+  wiad(pytanie, "gp-1", "incoming", t(1), "BUYER");
+  wiad(pytanie, "gp-2", "incoming", t(3), "ALLEGRO");
+
+  watek("ga-otwarty", "OPEN");
+  const otwarty = rozmowa("ga-otwarty");
+  wiad(otwarty, "go-1", "incoming", t(1), "BUYER");
+  wiad(otwarty, "go-2", "outgoing", t(2), "SELLER");
+  wiad(otwarty, "go-3", "incoming", t(3), "CONSULTANT");
+
+  const lista = listaRozmow();
+  const wiersz = (id: number) => lista.find((x) => x.id === id)!;
+  for (const [id, status, zakonczenie] of [
+    [odpisane, "resolved", "allegro"], [pytanie, "waiting_for_us", null], [otwarty, "waiting_for_us", null],
+  ] as const) {
+    assert.equal(wiersz(id).status, status, `kolejka, rozmowa ${id}`);
+    assert.equal(wiersz(id).zakonczenie, zakonczenie);
+    assert.deepEqual(statusIZakonczenie(d, id), { status, zakonczenie }, "otwarta rozmowa mówi to samo");
+  }
+  /* Zegar pytania liczy się od słów KLIENTA, nie od zamykającego zdania Allegro. */
+  const czeka = wiersz(pytanie).czekaOdMs!;
+  assert.ok(czeka >= 3.9 * 3_600_000, `zegar od pytania klienta, a jest ${czeka} ms`);
+  assert.equal(wiersz(pytanie).nowychOdOdpowiedzi, 1, "dopiskiem jest tylko wiadomość klienta");
+});
+
+test("„dziękuję” kupującego nie zamyka otwartego Problemu, w którym doradca prosi o stanowisko", async () => {
+  /* Rozpoznanie celuje w kupującego, więc decyzja dla jego „dziękuję” zostaje
+     aktualna także wtedy, gdy po nim napisał doradca. Prośba Allegro czeka
+     na nas i nie wolno jej zamknąć podziękowaniem klienta. */
+  const { statusIZakonczenie, podziekowanieKlienta } = await import("./conversations.js");
+  const d = db();
+  const konto = Number(d.prepare(
+    "INSERT INTO channel_account(channel,external_account_id) VALUES ('allegro','dzieki-doradca')")
+    .run().lastInsertRowid);
+  d.prepare(`INSERT INTO allegro_inbox_thread(id,read,last_message_at,interlocutor_login,surowe_json,
+    synced_at,watek_typ,watek_status) VALUES ('w-dd',0,'2026-10-03T10:00:00.000Z','kupujacy-anon','{}',
+    '2026-10-03T10:00:00.000Z','POST_PURCHASE_ISSUE','OPEN')`).run();
+  const r = Number(d.prepare(`INSERT INTO conversation(channel_account_id,external_conversation_id,subject,
+    unread,updated_at) VALUES (?,'w-dd','t',0,'2026-10-03T10:00:00.000Z')`).run(konto).lastInsertRowid);
+  const t = (godz: number) => new Date(Date.now() - (5 - godz) * 3_600_000).toISOString();
+  const wiad = (ext: string, kier: string, at: string, rola: string) => Number(d.prepare(`INSERT INTO
+    message(conversation_id,channel_account_id,external_message_id,direction,body,sent_at,autor_rola)
+    VALUES (?,?,?,?,?,?,?)`).run(r, konto, ext, kier, `treść ${ext}`, at, rola).lastInsertRowid);
+  wiad("dd-1", "incoming", t(1), "BUYER");
+  wiad("dd-2", "outgoing", t(2), "SELLER");
+  const dzieki = wiad("dd-3", "incoming", t(3), "BUYER");
+  wiad("dd-4", "incoming", t(4), "CONSULTANT");
+  d.prepare(`INSERT INTO decyzja_klasyfikacji(conversation_id,message_id,wersja,aktywna,zrodlo,status,
+    kategoria,akcja,wymaga_czlowieka,brak_danych_zamowienia,brak_danych_produktu,pewnosc,
+    taksonomia_wersja,polityka_wersja,at,przez)
+    VALUES (?,?,1,1,'MODEL','SUCCESS','OTHER','NO_ACTION',0,0,0,'wysoka','v2','p1',?,'automat')`)
+    .run(r, dzieki, t(3));
+
+  const wiersz = listaRozmow().find((x) => x.id === r)!;
+  assert.equal(wiersz.status, "waiting_for_us");
+  assert.equal(wiersz.podziekowal, false);
+  assert.deepEqual(statusIZakonczenie(d, r), { status: "waiting_for_us", zakonczenie: null });
+  assert.equal(podziekowanieKlienta(d, r), null, "słowa doradcy nie są podziękowaniem klienta");
+  /* Oś znaczy wpis doradcy, żeby panel liczył świeżość szkicu bez niego. */
+  const os = osRozmowy(r).os.filter((w) => w.rodzaj === "wiadomosc");
+  assert.deepEqual(os.map((w) => Boolean(w.odAllegro)), [false, false, false, true]);
+});
+
 test("zwrot tego zamówienia jedzie z rozmową — po numerze zamówienia, nigdy po loginie", () => {
   /* Właściciel (0.221.0): klient pyta pod zamówieniem o zwrot, którego dokonał,
      a agent szukał go ręcznie na ekranie Zwroty. Mostek jest ten sam, którym

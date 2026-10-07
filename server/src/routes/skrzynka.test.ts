@@ -168,6 +168,27 @@ test("patrzenie na skrzynkę niczego nie zapisuje", async () => {
   assert.equal((db().prepare("SELECT count(*) n FROM conversation_assignment").get() as {n:number}).n, 0);
 });
 
+test("skrzynka i status konta Allegro mówią, że Problemy z zakupem nie dochodzą", async () => {
+  /* Bez bety skrzynka czyta `public.v1` i wygląda zdrowo, więc wstrzymanie
+     musi dojść do panelu obiema trasami, którymi panel o nie pyta. */
+  const b = login("biuro", "Anna");
+  const doKiedy = new Date(Date.now() + 3_600_000).toISOString();
+  db().prepare(`INSERT INTO allegro_inbox_sync_state(id,beta_wstrzymana_do,beta_powod) VALUES (1,?,?)
+    ON CONFLICT(id) DO UPDATE SET beta_wstrzymana_do=excluded.beta_wstrzymana_do,
+    beta_powod=excluded.beta_powod`).run(doKiedy, "Allegro odmówiło (406/415)");
+  try {
+    const oczekiwane = { przyczyna: "wstrzymana", doKiedy, szczegol: "Allegro odmówiło (406/415)" };
+    const lista = await app.inject({ method: "GET", url: "/api/obsluga/rozmowy", headers: b.naglowki });
+    assert.equal(lista.statusCode, 200, lista.body);
+    assert.deepEqual(lista.json().stan.problemyZakupu, oczekiwane);
+    const konto = await app.inject({ method: "GET", url: "/api/biuro/allegro/status", headers: b.naglowki });
+    assert.equal(konto.statusCode, 200, konto.body);
+    assert.deepEqual(konto.json().problemyZakupu, oczekiwane);
+  } finally {
+    db().prepare("UPDATE allegro_inbox_sync_state SET beta_wstrzymana_do=NULL, beta_powod=NULL").run();
+  }
+});
+
 test("przegrany wyścig o przejęcie dostaje 409 z właścicielem i wersją", async () => {
   const ala = login("biuro", "A. Lewandowska");
   const marek = login("biuro", "M. Wójcik");

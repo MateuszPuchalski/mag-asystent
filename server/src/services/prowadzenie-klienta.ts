@@ -5,6 +5,7 @@ import { chwilaUtc, czasLokalny, dataLokalna } from "../czas.js";
 import { kontaLoginu, rozmowyPoLoginie } from "./klient-historia.js";
 import { podziekowanieKlienta } from "./conversations.js";
 import { mojeSprawy, ROZMOWA_ZAMOWIENIA, type MojaSprawa } from "./droga-klienta.js";
+import { glosAllegroPoZamknieciu } from "./glos-allegro.js";
 import {
   DOSYLKI_SQL, dzienMiesiac, naDosylkeSprawy, najwazniejszaDosylka, OKNO_SLEDZENIA_MS, pilnaDosylka,
   type DosylkaSprawy,
@@ -195,6 +196,8 @@ function ostatniaWiadomoscKlienta(database: DatabaseSync, login: string): Wiadom
   const kandydaci = database.prepare(`
     SELECT id, conversation_id, created_at, sent_at FROM message
      WHERE direction = 'incoming' AND conversation_id IN (${id.map(() => "?").join(",")})
+       -- Zamykające zdanie Allegro nie jest ruchem klienta (glos-allegro.ts).
+       AND NOT ${glosAllegroPoZamknieciu("message")}
      ORDER BY julianday(created_at) DESC, id DESC`).all(...id) as Wiersz[];
 
   /* PODZIĘKOWANIE NIE BUDZI (S5a) — ale rozstrzyga o tym WIADOMOŚĆ, nie

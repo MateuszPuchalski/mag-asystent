@@ -1015,7 +1015,8 @@ biura: <https://ifconfig.me>. Ten sam adres w obu miejscach znaczy wspólne
   odnośników do panelu sprzedawcy. Odnośnik w 404 poprawia się wzorcem.
 - `ALLEGRO_SELLER_ID` — zmienia się tylko przy innym koncie (`sellerId=`
   w adresie Centrum Sprzedaży).
-- `ALLEGRO_WATKI_BETA=0` wyłącza odczyt typu wątku z `beta.v1`.
+- `ALLEGRO_WATKI_BETA=0` wyłącza `beta.v1` skrzynki: listę z Problemami
+  z zakupem i typ wątku. Problemy z zakupem przestają wtedy dochodzić.
 - `ALLEGRO_DOSYLKI_SYNC_MS=0` wyłącza śledzenie dosyłek.
 - `ALLEGRO_ZWROTY_DNI_WSTECZ` zatrzymuje start z komunikatem — usuń wpis.
 

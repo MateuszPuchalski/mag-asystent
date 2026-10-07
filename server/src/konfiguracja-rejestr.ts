@@ -204,7 +204,7 @@ export const KLUCZE: readonly Klucz[] = [
   { klucz: "ALLEGRO_API_URL", grupa: "allegro", kto: "zaawansowane",
     opis: "Host API Allegro." },
   { klucz: "ALLEGRO_WATKI_BETA", grupa: "allegro", kto: "zaawansowane",
-    opis: "0 wyłącza dociąganie struktury wątku do klasyfikacji." },
+    opis: "0 wyłącza beta.v1 skrzynki: listę z Problemami z zakupem i strukturę wątku." },
   { klucz: "ALLEGRO_INBOX_SYNC_MS", grupa: "allegro", kto: "zaawansowane",
     opis: "Takt skrzynki w milisekundach; 0 wyłącza." },
   { klucz: "ALLEGRO_OFERTY_SYNC_MS", grupa: "allegro", kto: "zaawansowane",

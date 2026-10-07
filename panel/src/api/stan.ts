@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
+import type { ProblemyZakupu } from "./typy";
 
 /* ── Stan systemu (0.441.0) ─────────────────────────────────────────────
    Przeniesiony z NADZORU w `biuro.html`. Trasy są TE SAME, którymi jeździło
@@ -150,6 +151,8 @@ export interface StanAllegro {
   stan: "polaczone" | "niepolaczone" | "zle_srodowisko" | "dev" | "wylaczone" | string;
   srodowisko: string;
   wygasa: string | null;
+  /** Czy Problemy z zakupem dochodzą — opis kształtu przy typie w `typy.ts`. */
+  problemyZakupu: ProblemyZakupu;
 }
 
 export const useStanAllegro = () => useQuery({
