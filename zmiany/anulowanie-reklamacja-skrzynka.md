@@ -1,11 +1,13 @@
 ---
 rodzaj: minor
-tytul: przycisk zamówienia przy anulowaniu i tag Reklamacja w skrzynce
+tytul: przycisk zamówienia przy anulowaniu i znacznik reklamacyjny z rozpoznania
 ---
 
-**Prośba o anulowanie pokazuje zamówienie od razu.** W rozmowie rozpoznanej
-jako anulowanie stoi przycisk „Otwórz zamówienie w Allegro” z informacją,
-czy zamówienie jest już opłacone. Opłacone znaczy, że trzeba oddać pieniądze.
+**Prośba o anulowanie pokazuje zamówienie od razu.** W karcie zakupu rozmowy
+rozpoznanej jako anulowanie stoi przycisk „Otwórz zamówienie do anulowania”.
+Obok jest zdanie o płatności: opłacone znaczy, że po anulowaniu trzeba oddać
+pieniądze w Allegro.
 
-**Reklamacje w skrzynce mają tag „Reklamacja”.** Rozmowa rozpoznana jako
-reklamacja dostaje go sama, więc da się ją odfiltrować.
+**Reklamacje w skrzynce oznaczają się same.** Rozmowa rozpoznana jako
+reklamacja dostaje znacznik „REKLAMACYJNA”, także po poprawce kategorii przez
+agenta. Znacznik zdjęty ręcznie nie wraca.
