@@ -9,6 +9,7 @@ import { historiaPozaZakupem, klientMaHistorie, nowyKlient } from "./kokpit";
 import { streszczenieKlienta } from "./Kontekst";
 import { ODNOSNIK } from "./odnosniki";
 import { stanZakupu, type KrokZakupu } from "./zakup";
+import { Anulowanie } from "./Anulowanie";
 
 /* ── KARTA ZAKUPU I KLIENTA NAD ROZMOWĄ ─────────────────────────────────────
    Zgłoszenie właściciela: „więcej informacji osadzonych w rozmowie w środkowym
@@ -93,6 +94,10 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
   const linkZamowienia = dane.zamowienie?.link ?? zam?.link ?? null;
 
   const jestKarta = Boolean(numer || zam || oferta || znaczniki.length > 0 || wczesniej);
+  /* Przy prośbie o anulowanie zamówienie stoi pod ręką w każdej postaci
+     karty, także zwiniętej. Bez numeru nie ma czego otworzyć. */
+  const anulowanie = dane.rozmowa.kopilot?.kategoria === "CANCEL_ORDER" && numer
+    ? <Anulowanie link={linkZamowienia} zam={zam} stan={stan} /> : null;
   /* Zależność od `zwinieta`: rozwinięta i zwinięta karta to dwa różne elementy
      pod tym samym refem, więc obserwator musi złapać nowy. */
   useEffect(() => {
@@ -194,6 +199,7 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
         {streszczenie}
         <span className="shrink-0 text-podpis font-semibold text-sky-800">rozwiń</span>
       </button>
+      {anulowanie && <div className="mt-1.5">{anulowanie}</div>}
     </section>{pasek}</>;
   }
 
@@ -214,6 +220,7 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
       {stan?.anulowane && <span className="rounded bg-red-50 px-1.5 py-0.5 font-semibold text-ranga-zle">anulowane</span>}
       {suma && <span className="ml-auto text-xs font-semibold tabular-nums text-slate-800">{suma}</span>}
     </div>
+    {anulowanie}
 
     {pozycje.length > 0
       ? <ul className="space-y-1.5">

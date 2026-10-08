@@ -24,6 +24,7 @@ import { MAPOWANIE_WERSJA, mapujStrukture, type WynikMapowania } from "./klasyfi
 import { glosAllegro } from "./glos-allegro.js";
 import { config } from "../config.js";
 import { kategorieNaZywo, pomiarPrzeplywu, type WierszPomiaruPrzeplywu } from "./przeplyw-kategorii.js";
+import { oznaczReklamacyjnaPoRozpoznaniu } from "./klasyfikacja-reklamacyjna.js";
 
 export { KATEGORIE, PEWNOSCI, AKCJE } from "./klasyfikacja-slownik.js";
 export type { Kategoria, Pewnosc, Akcja } from "./klasyfikacja-slownik.js";
@@ -248,6 +249,7 @@ function zapiszDecyzje(
   database: DatabaseSync, rozmowaId: number, messageId: number, d: Decyzja, m: Meta,
   kto: Autor, teraz: Date, dodatkowo: () => void = () => {},
 ): number {
+  let oznaczona = false;
   const id = transaction(database, () => {
     const wersja = Number((database.prepare(
       "SELECT COALESCE(MAX(wersja),0)+1 AS w FROM decyzja_klasyfikacji WHERE message_id=?")
@@ -281,6 +283,7 @@ function zapiszDecyzje(
          inaczej decyzja udawałaby, że stała na mapowaniu, którego nie było. */
       m.struktura ? "beta.v1" : null, m.struktura ? MAPOWANIE_WERSJA : null).lastInsertRowid);
     dodatkowo();
+    oznaczona = oznaczReklamacyjnaPoRozpoznaniu(database, rozmowaId, d.kategoria, kto);
     logEvent("copilot_klasyfikacja", kto.name, null, {
       conversationId: rozmowaId, decyzjaId: nowa, wersja, zrodlo: d.zrodlo, status: d.status,
       kategoria: d.kategoria, akcja: d.akcja, wymagaCzlowieka: d.wymagaCzlowieka,
@@ -292,6 +295,9 @@ function zapiszDecyzje(
      odświeżyć listę po nic. Takt klasyfikuje w tle, więc bez tego zdarzenia
      plakietka pojawiałaby się dopiero przy następnym ruchu w kolejce. */
   publishConversationEvent("classification.updated", rozmowaId, { decyzjaId: id });
+  /* To samo zdarzenie co przy ręcznym znaczniku: kolejka odświeża plakietkę
+     i licznik reklamacyjnych, a nie tylko kategorię. */
+  if (oznaczona) publishConversationEvent("assignment.changed", rozmowaId, { reklamacyjna: true });
   return id;
 }
 
@@ -518,6 +524,7 @@ export function poprawKlasyfikacje(
   if (c.kategoria_czlowieka === kategoria) return { kategoria, decyzjaId: Number(c.id) };
 
   const messageId = Number(c.message_id);
+  let oznaczona = false;
   const id = transaction(database, () => {
     const wersja = Number((database.prepare(
       "SELECT COALESCE(MAX(wersja),0)+1 AS w FROM decyzja_klasyfikacji WHERE message_id=?")
@@ -545,9 +552,13 @@ export function poprawKlasyfikacje(
       conversationId, decyzjaId: nowa, poprzedniaId: Number(c.id),
       bylo: c.kategoria, jest: kategoria, model: c.kategoria_modelu,
     }, kto.id, database);
+    /* Poprawka na reklamację stawia znacznik tak samo jak rozpoznanie modelu.
+       Autorem jest agent, bo to jego etykieta. */
+    oznaczona = oznaczReklamacyjnaPoRozpoznaniu(database, conversationId, kategoria, kto);
     return nowa;
   })();
   publishConversationEvent("classification.updated", conversationId, { decyzjaId: id });
+  if (oznaczona) publishConversationEvent("assignment.changed", conversationId, { reklamacyjna: true });
   return { kategoria, decyzjaId: id };
 }
 
