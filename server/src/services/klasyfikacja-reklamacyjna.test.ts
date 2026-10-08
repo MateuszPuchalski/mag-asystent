@@ -116,4 +116,7 @@ test("poprawka agenta na reklamację stawia znacznik z agentem jako autorem", as
 
   assert.equal(znacznik(d, id), 1);
   assert.deepEqual(osZnacznika(d, id), [{ na: 1, autor: "A. Lewandowska" }]);
+  const wpis = d.prepare("SELECT user_ref FROM events WHERE type='rozmowa_reklamacyjna'").get() as
+    { user_ref: number | null };
+  assert.equal(wpis.user_ref, 1, "dziennik ma znać konto agenta, nie konto z sesji");
 });

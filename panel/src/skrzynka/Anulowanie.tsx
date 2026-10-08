@@ -26,10 +26,15 @@ export function zdaniePlatnosci(
     return { tekst: "Treść zamówienia jeszcze nie pobrana. Płatność sprawdź w Allegro.", ton: "nic" };
   }
   if (stan.anulowane) return { tekst: "Zamówienie jest już anulowane w Allegro.", ton: "nic" };
-  if (zam.platnoscTyp === "CASH_ON_DELIVERY") {
-    return { tekst: "Za pobraniem. Nic jeszcze nie wpłynęło, więc nie ma czego oddawać.", ton: "ok" };
-  }
   const krok = stan.kroki.find((k) => k.klucz === "oplacone");
+  /* „Nieznane" przy płatności stawia `stanZakupu` wyłącznie pobraniu.
+     Klient płaci przy odbiorze, więc o zwrocie mówi dopiero doręczenie. */
+  if (krok?.stan === "nieznane") {
+    const doreczone = stan.kroki.some((k) => k.klucz === "dostarczone" && k.stan === "tak");
+    return doreczone
+      ? { tekst: "Za pobraniem i już doręczone. Pobranie zapłacone, zwrot sprawdź w Allegro.", ton: "zle" }
+      : { tekst: "Za pobraniem. Klient płaci przy odbiorze, więc przed doręczeniem nie ma czego oddawać.", ton: "ok" };
+  }
   if (krok?.stan === "tak") {
     const kiedy = krok.at ? ` ${dzienMiesiac(krok.at)}` : "";
     return { tekst: `Opłacone${kiedy}. Po anulowaniu oddaj pieniądze w Allegro.`, ton: "zle" };

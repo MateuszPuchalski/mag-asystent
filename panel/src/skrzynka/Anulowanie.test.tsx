@@ -78,9 +78,17 @@ describe("zdaniePlatnosci", () => {
       .toBe("Nieopłacone. Zwrot pieniędzy nie będzie potrzebny.");
   });
 
-  it("za pobraniem nie ma czego oddawać", () => {
-    expect(zdanie(zamowienie({ platnoscTyp: "CASH_ON_DELIVERY", platnoscAt: null })).tekst)
-      .toMatch(/^Za pobraniem/);
+  it("za pobraniem przed doręczeniem nie ma czego oddawać", () => {
+    expect(zdanie(zamowienie({ platnoscTyp: "CASH_ON_DELIVERY", platnoscAt: null })))
+      .toEqual({ tekst: "Za pobraniem. Klient płaci przy odbiorze, więc przed doręczeniem nie ma czego oddawać.", ton: "ok" });
+  });
+
+  it("za pobraniem po doręczeniu nie udaje, że nic nie wpłynęło", () => {
+    const z = zamowienie({ platnoscTyp: "CASH_ON_DELIVERY", platnoscAt: null });
+    const s = stanZakupu(z, { waybill: "JJD1", dostarczonoAt: "2026-10-04T10:00:00.000Z",
+      sprawdzonoAt: "2026-10-04T12:00:00.000Z" } as never);
+    expect(zdaniePlatnosci(z, s).ton).toBe("zle");
+    expect(zdaniePlatnosci(z, s).tekst).toMatch(/już doręczone/);
   });
 
   it("anulowane już zamówienie mówi to wprost", () => {

@@ -283,7 +283,7 @@ function zapiszDecyzje(
          inaczej decyzja udawałaby, że stała na mapowaniu, którego nie było. */
       m.struktura ? "beta.v1" : null, m.struktura ? MAPOWANIE_WERSJA : null).lastInsertRowid);
     dodatkowo();
-    oznaczona = oznaczReklamacyjnaPoRozpoznaniu(database, rozmowaId, d.kategoria, kto.name);
+    oznaczona = oznaczReklamacyjnaPoRozpoznaniu(database, rozmowaId, d.kategoria, kto);
     logEvent("copilot_klasyfikacja", kto.name, null, {
       conversationId: rozmowaId, decyzjaId: nowa, wersja, zrodlo: d.zrodlo, status: d.status,
       kategoria: d.kategoria, akcja: d.akcja, wymagaCzlowieka: d.wymagaCzlowieka,
@@ -554,7 +554,7 @@ export function poprawKlasyfikacje(
     }, kto.id, database);
     /* Poprawka na reklamację stawia znacznik tak samo jak rozpoznanie modelu.
        Autorem jest agent, bo to jego etykieta. */
-    oznaczona = oznaczReklamacyjnaPoRozpoznaniu(database, conversationId, kategoria, kto.name);
+    oznaczona = oznaczReklamacyjnaPoRozpoznaniu(database, conversationId, kategoria, kto);
     return nowa;
   })();
   publishConversationEvent("classification.updated", conversationId, { decyzjaId: id });

@@ -16,11 +16,13 @@ import type { Kategoria } from "./klasyfikacja-slownik.js";
    kliknięciem — ta sama zasada co przy fladze „pilne" w przepływie kategorii.
 
    AUTOMAT ZNACZNIKA NIE ZDEJMUJE. Podziękowanie po reklamacji dostaje
-   kategorię OTHER, a sprawa dalej jest reklamacją.
+   kategorię OTHER, a sprawa dalej jest reklamacją. Poprawka kategorii
+   z reklamacji na inną też go nie zdejmuje: agent zdejmuje go sam, jednym
+   kliknięciem w menu rozmowy, bo tylko on wie, czy sprawa przestała nią być.
 
-   Moduł osobno, a nie w `conversations.ts`, bo tamten czyta stałe
-   `copilot-klasyfikacja.ts` przy ładowaniu, a ta woła ten plik. Import
-   w drugą stronę dałby cykl ze stałą jeszcze niezainicjowaną.            */
+   Moduł osobno, a nie w `conversations.ts`, bo tamten importuje
+   `copilot-klasyfikacja.ts`, a ta woła ten plik. Osobny moduł nie robi
+   cyklu importów między nimi.                                              */
 
 /** Kategorie, które stawiają znacznik. Jedna, ale nazwana, nie wpisana w warunek. */
 export const KATEGORIE_REKLAMACYJNE: readonly Kategoria[] = ["COMPLAINT"];
@@ -31,7 +33,8 @@ export const KATEGORIE_REKLAMACYJNE: readonly Kategoria[] = ["COMPLAINT"];
  * zapis decyzji ze swojej, żeby znacznik i decyzja weszły razem albo wcale.
  */
 export function oznaczReklamacyjnaPoRozpoznaniu(
-  database: DatabaseSync, conversationId: number, kategoria: string, autor: string,
+  database: DatabaseSync, conversationId: number, kategoria: string,
+  autor: { id: number | null; name: string },
 ): boolean {
   if (!(KATEGORIE_REKLAMACYJNE as readonly string[]).includes(kategoria)) return false;
   const r = database.prepare("SELECT reklamacyjna FROM conversation WHERE id=?")
@@ -45,8 +48,10 @@ export function oznaczReklamacyjnaPoRozpoznaniu(
   database.prepare("UPDATE conversation SET reklamacyjna=1 WHERE id=?").run(conversationId);
   database.prepare(`INSERT INTO conversation_event(conversation_id, message_id, event_type, payload)
     VALUES (?, NULL, 'reklamacyjna_changed', json_object('na', 1, 'autor', ?))`)
-    .run(conversationId, autor);
-  logEvent("rozmowa_reklamacyjna", autor, null,
-    { conversationId, na: true, zrodlo: "klasyfikacja", kategoria }, undefined, database);
+    .run(conversationId, autor.name);
+  /* Konto jawnie, jak przy samej decyzji. Bez niego dziennik wziąłby konto
+     z sesji, a rozpoznanie automatu bywa wołane w żądaniu agenta. */
+  logEvent("rozmowa_reklamacyjna", autor.name, null,
+    { conversationId, na: true, zrodlo: "klasyfikacja", kategoria }, autor.id, database);
   return true;
 }
