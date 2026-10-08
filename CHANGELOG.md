@@ -10,6 +10,18 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.574.0 — 8 października 2026
+
+**Prośba o anulowanie pokazuje zamówienie od razu.** W karcie zakupu rozmowy
+rozpoznanej jako anulowanie stoi przycisk „Otwórz zamówienie do anulowania”.
+Obok jest zdanie o płatności: opłacone znaczy, że po anulowaniu trzeba oddać
+pieniądze w Allegro.
+
+**Reklamacje w skrzynce oznaczają się same.** Rozmowa rozpoznana jako
+reklamacja dostaje znacznik „REKLAMACYJNA”, także po poprawce kategorii przez
+agenta. Znacznik zdjęty ręcznie nie wraca, a poprawka kategorii na inną go
+nie zdejmuje. Zdejmuje go agent w menu rozmowy.
+
 ## 0.573.0 — 7 października 2026
 
 **Problemy z zakupem trafiają do skrzynki.** Od 28 października Allegro
