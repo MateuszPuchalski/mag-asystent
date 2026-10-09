@@ -3,8 +3,8 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter, Link, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { nowyKlientZapytan } from "./api/klient-zapytan";
-import { ClipboardList, Inbox, ListChecks, MessagesSquare, ShieldQuestion, Truck, Undo2 } from "lucide-react";
-import logo from "./assets/wertis-logo.png";
+import { ClipboardList, Inbox, ListChecks, MessagesSquare, PanelLeftClose, PanelLeftOpen, ShieldQuestion, Truck, Undo2 } from "lucide-react";
+import logoBiale from "./assets/wertis-logo-biale.png";
 import { SESJA_WYGASLA, token, wyczyscToken } from "./api/klient";
 import { useJa, useWzmianki } from "./api/rozmowy";
 import { BrakDostepu } from "./ekrany/BrakDostepu";
@@ -22,6 +22,7 @@ import { WskaznikSynchronizacji } from "./nawigacja/Synchronizacja";
 import { PasekPolaczenia } from "./nawigacja/Polaczenie";
 import { LicznikAlarmuDyskusji, PasekAlarmuDyskusji } from "./nawigacja/AlarmDyskusji";
 import { USTAWIENIA, Wiecej } from "./nawigacja/Wiecej";
+import { useZwinietyPasek } from "./nawigacja/ZwinietyPasek";
 import { Ustawienia } from "./ekrany/Ustawienia";
 import { DoDecyzji } from "./ekrany/DoDecyzji";
 import { ProfilKlienta } from "./ekrany/ProfilKlienta";
@@ -97,6 +98,11 @@ function LicznikDoZrobienia() {
 
 function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
   const { pathname } = useLocation();
+  const [zwiniety, przelaczZwiniecie] = useZwinietyPasek();
+  /* Zwinięty pasek i okno węższe niż 900 px wyglądają tak samo: same ikony
+     i liczniki. Klasy wąskiego okna stoją więc obok klas zwinięcia, a nie
+     zamiast nich — ręczny wybór nie może przegrać z szerokością okna.
+     Klasy są pisane w całości, bo Tailwind nie widzi tych, które sklejamy. */
   /* ── MENU PO LEWEJ, NIE NA GÓRZE ──────────────────────────────────────────
      Zakładki stoją pionowo, bo dziesięć nazw w poziomym rzędzie wymagało
      ~1280 px, a laptop obok Subiekta ma 1180. Pion zabiera szerokość, której
@@ -106,8 +112,10 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
      szukanie, stan synchronizacji i menu „Więcej". Menu otwiera się w górę,
      bo pod nim nie ma już miejsca na ekranie.
 
-     Poniżej 900 px pasek zwęża się do samych ikon i liczników. Nazwa zostaje
-     dla czytnika ekranu i w dymku (`max-[899px]:sr-only`).
+     Pasek można zwinąć do ikon przyciskiem na dole (`useZwinietyPasek`).
+     Poniżej 900 px zwija się sam, a przycisk znika, bo rozwinięty pasek
+     zjadłby tam trzecią część pracy. Nazwa zakładki zostaje dla czytnika
+     ekranu i w dymku (`sr-only`).
 
      Przewija się tylko lista zakładek. Dolny blok nie może mieć `overflow`,
      bo przycięłoby okienko „Więcej", które wystaje poza pasek.
@@ -115,15 +123,17 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
      Ramka okna jest `overflow-hidden`: to, co wyjdzie poza kadr, nie ma paska
      przewijania i przestaje istnieć dla myszy. Dlatego każdy element paska
      musi mieścić się w jego szerokości albo zawijać się w niej. */
-  return <aside aria-label="Menu panelu"
-    className="sticky top-0 z-20 flex w-56 shrink-0 flex-col gap-3 self-start border-r border-slate-200 bg-wertis-ink p-2 text-white max-[899px]:w-20 lg:static lg:self-stretch">
-    {/* Znak ma grafitowe litery na przezroczystym tle, więc na grafitowym
-        pasku zniknąłby — stoi na białej tabliczce, tak jak na szyldzie
-        sklepu. W wąskim pasku tabliczka nie ma gdzie się zmieścić. */}
-    <span className="rounded-md bg-white px-2 py-1 max-[899px]:hidden"><img src={logo} alt="WERTIS — sklep z częściami"
-      className="mx-auto block h-7 w-auto" /></span>
+  return <aside aria-label="Menu panelu" data-zwiniety={zwiniety}
+    className={`sticky top-0 z-20 flex shrink-0 flex-col gap-3 self-start border-r border-slate-200 bg-wertis-ink p-2 text-white lg:static lg:self-stretch ${
+      zwiniety ? "w-20" : "w-56 max-[899px]:w-20"}`}>
+    {/* BIAŁE LOGO NA GRAFITOWYM PASKU. Znak w barwach marki ma grafitowe litery
+        i na tym tle znikał, więc stał na białej tabliczce. Wersja dla ciemnego
+        tła z księgi znaku nie potrzebuje tabliczki. W wąskim pasku logo nie ma
+        gdzie się zmieścić, więc ustępuje miejsca zakładkom. */}
+    <img src={logoBiale} alt="WERTIS — sklep z częściami"
+      className={`mx-auto block h-12 w-auto ${zwiniety ? "hidden" : "max-[899px]:hidden"}`} />
     {/* Nazwa „Praca" odróżnia ten blok od menu „Więcej" dla czytnika ekranu. */}
-    <nav aria-label="Praca" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+    <nav id="pasek-zakladki" aria-label="Praca" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
       {ZAKLADKI.map((z) => {
         const aktywna = z.korzen ? pathname === z.do : pathname.startsWith(z.do);
         return <React.Fragment key={z.do}>
@@ -136,9 +146,11 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
 
                bursztyn: zakładka na ciemnym tle jest marką */
             aria-current={aktywna ? "page" : undefined} title={z.etykieta}
-            className={`flex min-h-10 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold max-[899px]:flex-wrap max-[899px]:justify-center max-[899px]:px-1.5 ${
+            className={`flex min-h-10 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold ${
+              zwiniety ? "flex-wrap justify-center px-1.5"
+                : "max-[899px]:flex-wrap max-[899px]:justify-center max-[899px]:px-1.5"} ${
               aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
-            {z.ikona}<span className="max-[899px]:sr-only">{z.etykieta}</span>
+            {z.ikona}<span className={zwiniety ? "sr-only" : "max-[899px]:sr-only"}>{z.etykieta}</span>
             {z.do === "/obsluga/" && <LicznikDoZrobienia />}
             {/* Czerwony alarm dyskusji stoi przy zakładce na każdym ekranie,
                 także na reklamacjach, gdzie paska nad pracą nie ma. Powód
@@ -161,6 +173,13 @@ function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
       <div className="flex flex-wrap items-center gap-2">
         <SzukajIKlawisze />
         <Wiecej wyloguj={wyloguj} />
+        {/* Przycisk zwinięcia stoi na końcu, z dala od zakładek: pomyłka
+            w kliku w zakładkę nie może zwijać paska. */}
+        <button type="button" onClick={przelaczZwiniecie} aria-expanded={!zwiniety} aria-controls="pasek-zakladki"
+          aria-label={zwiniety ? "Rozwiń menu" : "Zwiń menu"} title={zwiniety ? "Rozwiń menu" : "Zwiń menu"}
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white/10 text-slate-300 hover:bg-white/15 max-[899px]:hidden">
+          {zwiniety ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+        </button>
       </div>
     </div>
   </aside>;

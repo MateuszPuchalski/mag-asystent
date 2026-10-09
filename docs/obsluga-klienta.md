@@ -133,8 +133,9 @@ wgląd na dolnym" obowiązuje jako podział treści. Praca to zakładki ułożon
 pionowo pod logo, a szukanie, synchronizacja, wgląd, ustawienia i wyjście
 stoją na dole paska, w menu „Więcej". Dostawy są ostatnią zakładką, za
 kreską, bo to praca dzienna. Pion oddaje pracy całą wysokość okna i nie
-wymaga ~1280 px szerokości, której laptop obok Subiekta nie ma. Poniżej
-900 px pasek zwęża się do ikon.
+wymaga ~1280 px szerokości, której laptop obok Subiekta nie ma. Pasek da się
+zwinąć do ikon przyciskiem na dole, a wybór zostaje w przeglądarce. Poniżej
+900 px zwija się sam.
 
 **Co to kosztuje.** Wdrożenie wymaga `npm run build`, który buduje panel,
 zanim serwer skopiuje go do `dist/web/obsluga`. Dochodzi drzewo zależności
