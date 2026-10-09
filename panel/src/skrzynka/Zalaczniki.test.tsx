@@ -46,7 +46,7 @@ describe("Załączniki na osi rozmowy", () => {
     /* Adres Allegro nie ma prawa trafić do przeglądarki: pobranie wymaga
        tokena konta firmy, a ten zostaje po stronie serwera. */
     os(wiadomosc([{ id: 7, nazwa: "szarpak.jpeg", typ: "image/jpeg",
-      status: "SAFE", doPobrania: true, podglad: true }]));
+      status: "SAFE", doPobrania: true, podglad: true, pdf: false }]));
 
     /* PRZYCISK, nie odnośnik: `<a href>` nie niesie nagłówka `x-session`. */
     expect(screen.queryByRole("link", { name: /szarpak\.jpeg/ })).toBeNull();
@@ -59,7 +59,7 @@ describe("Załączniki na osi rozmowy", () => {
   it("nieudane pobranie mówi o sobie zamiast milczeć", async () => {
     pobierz.mockRejectedValue(new Error("Sesja wygasła — zaloguj się"));
     os(wiadomosc([{ id: 7, nazwa: "szarpak.jpeg", typ: "image/jpeg",
-      status: "SAFE", doPobrania: true, podglad: false }]));
+      status: "SAFE", doPobrania: true, podglad: false, pdf: false }]));
 
     await userEvent.click(screen.getByRole("button", { name: /szarpak\.jpeg/ }));
     expect(await screen.findByText(/Sesja wygasła/)).toBeTruthy();
@@ -69,7 +69,7 @@ describe("Załączniki na osi rozmowy", () => {
     /* Ukrycie kłamałoby, że klient nic nie przysłał. Allegro uznało plik za
        niebezpieczny i nie mamy powodu wiedzieć lepiej. */
     os(wiadomosc([{ id: 8, nazwa: "faktura.exe", typ: null,
-      status: "UNSAFE", doPobrania: false, podglad: false }]));
+      status: "UNSAFE", doPobrania: false, podglad: false, pdf: false }]));
 
     expect(screen.getByText(/faktura\.exe/)).toBeTruthy();
     expect(screen.queryByRole("button", { name: /faktura\.exe/ })).toBeNull();
@@ -87,7 +87,7 @@ describe("Załączniki na osi rozmowy", () => {
   it("zdjęcie klienta rysuje się na osi z pobranego obrazu", () => {
     zdjecie.mockReturnValue(wynikHaka("blob:podglad-7"));
     os(wiadomosc([{ id: 7, nazwa: "szarpak.jpeg", typ: "image/jpeg",
-      status: "SAFE", doPobrania: true, podglad: true }]));
+      status: "SAFE", doPobrania: true, podglad: true, pdf: false }]));
 
     /* `alt` to nazwa pliku: czytnik ekranu ma powiedzieć, co tu stoi. */
     const obraz = screen.getByRole("img", { name: "szarpak.jpeg" });
@@ -100,7 +100,7 @@ describe("Załączniki na osi rozmowy", () => {
        bywa niewidoczne w 256 px, a agent nie ma po co zapisywać pliku na dysk. */
     zdjecie.mockReturnValue(wynikHaka("blob:podglad-7"));
     os(wiadomosc([{ id: 7, nazwa: "szarpak.jpeg", typ: "image/jpeg",
-      status: "SAFE", doPobrania: true, podglad: true }]));
+      status: "SAFE", doPobrania: true, podglad: true, pdf: false }]));
     await userEvent.click(screen.getByRole("button", { name: "Powiększ: szarpak.jpeg" }));
     expect(screen.getByRole("dialog", { name: "Zdjęcie: szarpak.jpeg" })).toBeTruthy();
   });
@@ -109,7 +109,7 @@ describe("Załączniki na osi rozmowy", () => {
     /* `podglad` liczy SERWER. Panel nie zgaduje po typie i nie dobija trasy
        podglądu o PDF, którego ona i tak nie odda. */
     os(wiadomosc([{ id: 9, nazwa: "gwarancja.pdf", typ: "application/pdf",
-      status: "SAFE", doPobrania: true, podglad: false }]));
+      status: "SAFE", doPobrania: true, podglad: false, pdf: false }]));
 
     expect(zdjecie).toHaveBeenCalledWith(null);
     expect(screen.queryByRole("img")).toBeNull();
@@ -121,7 +121,7 @@ describe("Załączniki na osi rozmowy", () => {
   it("w trakcie pobierania stoi ramka, żeby oś nie skakała", () => {
     zdjecie.mockReturnValue(wynikHaka(undefined));
     os(wiadomosc([{ id: 7, nazwa: "szarpak.jpeg", typ: "image/jpeg",
-      status: "SAFE", doPobrania: true, podglad: true }]));
+      status: "SAFE", doPobrania: true, podglad: true, pdf: false }]));
     expect(screen.getByText(/wczytuję/)).toBeTruthy();
     expect(screen.queryByRole("img")).toBeNull();
   });
@@ -129,7 +129,7 @@ describe("Załączniki na osi rozmowy", () => {
   it("odmowa Allegro stoi pod nazwą pliku zdaniem z serwera i daje „Spróbuj ponownie”", async () => {
     zdjecie.mockReturnValue(wynikHaka(null, "Allegro nie oddało załącznika — końcówka API: 403; zapisany adres: 403."));
     os(wiadomosc([{ id: 7, nazwa: "szarpak.jpeg", typ: "image/jpeg",
-      status: "SAFE", doPobrania: true, podglad: true }]));
+      status: "SAFE", doPobrania: true, podglad: true, pdf: false }]));
     expect(screen.getByText(/Allegro nie oddało załącznika/)).toBeTruthy();
     expect(screen.queryByRole("img")).toBeNull();
     expect(screen.queryByText(/wczytuję/)).toBeNull();
@@ -142,7 +142,7 @@ describe("Załączniki na osi rozmowy", () => {
   it("`null` bez zdania to odpowiedź „nie obraz” — sama nazwa, bez ponowienia", () => {
     zdjecie.mockReturnValue(wynikHaka(null));
     os(wiadomosc([{ id: 7, nazwa: "usterka.jpg", typ: null,
-      status: "SAFE", doPobrania: true, podglad: true }]));
+      status: "SAFE", doPobrania: true, podglad: true, pdf: false }]));
     expect(screen.queryByRole("img")).toBeNull();
     expect(screen.queryByText(/wczytuję/)).toBeNull();
     expect(screen.queryByRole("button", { name: /Spróbuj ponownie/ })).toBeNull();

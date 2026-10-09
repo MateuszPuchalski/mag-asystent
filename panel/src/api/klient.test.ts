@@ -147,3 +147,45 @@ describe("brak połączenia z serwerem (0.546.0)", () => {
     window.removeEventListener(POLACZENIE_ZERWANE, licz);
   });
 });
+
+describe("pobierzBajty() — bajty pliku zza sesji (podgląd PDF-a)", () => {
+  /* Podgląd PDF-a rysuje dokument z pamięci, więc potrzebuje bajtów, a nie
+     adresu. Reguła klienta HTTP obowiązuje i tu: GET bez ciała nie deklaruje
+     typu treści. Odmowa o pliku ma własny typ, bo ekran zostawia wtedy kafel
+     z nazwą, a awaria drogi dostaje „Spróbuj ponownie”. */
+  it("GET z sesją, bez typu treści, oddaje bajty", async () => {
+    const f = vi.fn(async () => new Response(new Uint8Array([0x25, 0x50, 0x44, 0x46]), { status: 200 }));
+    vi.stubGlobal("fetch", f);
+    const { pobierzBajty } = await import("./klient");
+    const bajty = await pobierzBajty("/api/obsluga/zalaczniki/7/podglad");
+    expect([...bajty]).toEqual([0x25, 0x50, 0x44, 0x46]);
+    const init = (f.mock.calls[0] as unknown as [string, RequestInit])[1];
+    expect(init.method).toBeUndefined();
+    expect(init.body).toBeUndefined();
+    expect((init.headers as Record<string, string>)["content-type"]).toBeUndefined();
+    expect(init.headers).toHaveProperty("x-session");
+  });
+
+  it("404, 413 i 415 to OdmowaPodgladu z kodem i zdaniem serwera", async () => {
+    const { OdmowaPodgladu, pobierzBajty } = await import("./klient");
+    for (const status of [404, 413, 415]) {
+      vi.stubGlobal("fetch", odp(status, { error: `zdanie ${status}` }));
+      const blad = await pobierzBajty("/x").catch((e) => e);
+      expect(blad).toBeInstanceOf(OdmowaPodgladu);
+      expect(blad.status).toBe(status);
+      expect(blad.message).toBe(`zdanie ${status}`);
+    }
+  });
+
+  it("401 to BrakSesji, 502 bez pola error to BrakPolaczenia, 502 z polem — zwykły błąd", async () => {
+    const { BrakPolaczenia, OdmowaPodgladu, pobierzBajty } = await import("./klient");
+    vi.stubGlobal("fetch", odp(401, {}));
+    await expect(pobierzBajty("/x")).rejects.toBeInstanceOf(BrakSesji);
+    vi.stubGlobal("fetch", odp(502, {}));
+    await expect(pobierzBajty("/x")).rejects.toBeInstanceOf(BrakPolaczenia);
+    vi.stubGlobal("fetch", odp(502, { error: "Allegro nie oddało załącznika" }));
+    const blad = await pobierzBajty("/x").catch((e) => e);
+    expect(blad).not.toBeInstanceOf(OdmowaPodgladu);
+    expect(blad.message).toBe("Allegro nie oddało załącznika");
+  });
+});

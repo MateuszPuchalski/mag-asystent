@@ -5,7 +5,7 @@ import type { StatusRozmowy, WpisOsi, ZalacznikOsi } from "../api/typy";
 import { NAZWA } from "./statusy";
 import { LoginKlienta, Przycisk, czas, dzienMiesiac, godzina } from "../ui";
 import { pobierzPlik } from "../api/klient";
-import { useZdjecieZalacznika } from "../towar/useZdjecie";
+import { sciezkaPodgladuSkrzynki, useZdjecieZalacznika } from "../towar/useZdjecie";
 import { Kafel } from "../towar/Kafel";
 import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
 import { PrzypietePytanie } from "./PrzypietePytanie";
@@ -60,8 +60,11 @@ function Zalaczniki({ lista }: { lista: ZalacznikOsi[] }) {
     Wygląd — ramka, zdanie odmowy, ponowienie, powiększenie — mieszka
     w `towar/Zalacznik.tsx`, wspólnie z czatem reklamacji. */
 function Zalacznik({ z }: { z: ZalacznikOsi }) {
-  const obraz = useZdjecieZalacznika(z.podglad ? z.id : null);
-  return <KartaZalacznika nazwa={z.nazwa} podglad={z.podglad} obraz={obraz}
+  /* PDF nie idzie do kolejki obrazów. Ta sama trasa oddaje go z sukcesem,
+     a `<img>` z bajtami PDF-a to ikona zepsutego obrazu. */
+  const obraz = useZdjecieZalacznika(z.podglad && !z.pdf ? z.id : null);
+  return <KartaZalacznika nazwa={z.nazwa} podglad={z.podglad && !z.pdf} obraz={obraz}
+    pdf={z.pdf ? sciezkaPodgladuSkrzynki(z.id) : null}
     pobierz={z.doPobrania ? () => pobierzPlik(`/api/obsluga/zalaczniki/${z.id}`, z.nazwa) : null}
     powodBrakuPobrania={POWOD[z.status] ?? `stan ${z.status}`} />;
 }

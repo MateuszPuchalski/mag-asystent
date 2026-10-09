@@ -215,6 +215,13 @@ export function useZdjecieOferty(externalId: string | null | undefined): string 
   return useObraz(id === "" ? null : `/api/obsluga/oferta/${encodeURIComponent(id)}/zdjecie`);
 }
 
+/* Trasy podglądu w JEDNYM miejscu: zdjęcie i PDF czytają ten sam adres, bo
+   rodzaj pliku rozstrzyga serwer po bajtach. Dwa zapisy adresu rozjechałyby
+   się przy pierwszej zmianie trasy, a objawem byłby PDF pytający o 404. */
+export const sciezkaPodgladuSkrzynki = (id: number) => `/api/obsluga/zalaczniki/${id}/podglad`;
+export const sciezkaPodgladuReklamacji = (reklamacjaId: number, zalacznikId: number) =>
+  `/api/obsluga/reklamacje/${reklamacjaId}/zalaczniki/${zalacznikId}/podglad`;
+
 /**
  * Podgląd załącznika wiadomości (0.219.1).
  *
@@ -229,7 +236,7 @@ export function useZdjecieOferty(externalId: string | null | undefined): string 
 export function useZdjecieZalacznika(id: number | null | undefined): {
   url: string | null | undefined; blad: string | null; ponow: () => void;
 } {
-  const sciezka = id == null ? null : `/api/obsluga/zalaczniki/${id}/podglad`;
+  const sciezka = id == null ? null : sciezkaPodgladuSkrzynki(id);
   const url = useObraz(sciezka);
   /* Zdanie i ponowienie WYŁĄCZNIE tutaj: w skrzynce brak zdjęcia to sama
      nazwa pliku bez powodu, a właściciel patrzył na to od 0.219.2. Kartoteka
@@ -260,8 +267,7 @@ export function useZdjecieZalacznika(id: number | null | undefined): {
 export function useZdjecieZalacznikaReklamacji(
   reklamacjaId: number, zalacznikId: number | null | undefined,
 ): { url: string | null | undefined; blad: string | null; ponow: () => void } {
-  const sciezka = zalacznikId == null
-    ? null : `/api/obsluga/reklamacje/${reklamacjaId}/zalaczniki/${zalacznikId}/podglad`;
+  const sciezka = zalacznikId == null ? null : sciezkaPodgladuReklamacji(reklamacjaId, zalacznikId);
   const url = useObraz(sciezka);
   const { blad, ponow } = useBladObrazu(sciezka);
   return { url, blad, ponow };

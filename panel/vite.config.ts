@@ -31,6 +31,19 @@ function pieczatkaWersji(): Plugin {
 export default defineConfig({
   plugins: [react(), pieczatkaWersji(), wtyczkaZmian(path.join(tutaj, ".."))],
   base: "/obsluga/",
+  build: {
+    rolldownOptions: {
+      output: {
+        /* Worker pdf.js przychodzi w paczce jako `.mjs`, a serwer podaje typ
+           treści po rozszerzeniu i `.mjs` nie zna. Przeglądarka odrzuca
+           skrypt workera bez typu JavaScript, więc każdy PDF w czacie
+           kończyłby się zdaniem „nie umiem otworzyć”. Ten sam plik, bez
+           zmiany bajtu, wychodzi więc jako `.js`. */
+        assetFileNames: (zasob) => (zasob.names.some((n) => n.endsWith(".mjs"))
+          ? "assets/[name]-[hash].js" : "assets/[name]-[hash][extname]"),
+      },
+    },
+  },
   server: {
     port: 5174,
     /* `strictPort`, bo test dymny Playwrighta czeka pod konkretnym adresem.

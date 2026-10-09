@@ -42,7 +42,7 @@ const sprawa = (n: Partial<React.ComponentProps<typeof Czat>["sprawa"]> = {}) =>
 });
 
 const zal = (id: number, nazwa: string, podglad: boolean): ZalacznikReklamacji =>
-  ({ id, wiadomoscId: 1, nazwa, podglad });
+  ({ id, wiadomoscId: 1, nazwa, podglad, pdf: false });
 
 const wiad = (n: Partial<WiadomoscReklamacji> = {}): WiadomoscReklamacji => ({
   id: 1, externalId: "w-1", autorLogin: "kupujacy1", autorRola: "BUYER",
@@ -198,7 +198,7 @@ describe("Zdjęcia stoją w dymku", () => {
        przy każdym otwarciu sprawy z paragonem. */
     scena.obrazy = {};
     render(<Czat sprawa={sprawa()} czat={[]}
-      zalaczniki={[{ id: 5, wiadomoscId: null, nazwa: "paragon.pdf", podglad: false }]} />);
+      zalaczniki={[{ id: 5, wiadomoscId: null, nazwa: "paragon.pdf", podglad: false, pdf: false }]} />);
     expect(screen.getByRole("button", { name: /paragon\.pdf/ })).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
