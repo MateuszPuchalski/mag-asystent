@@ -399,6 +399,37 @@ test("podgląd załącznika: SAFE z adresem i obraz z pola ALBO z nazwy pliku", 
   db().prepare("DELETE FROM message_attachment WHERE message_id=?").run(msg);
 });
 
+test("miniatura PDF: ta sama bramka SAFE, typ ALBO nazwa, i nigdy razem z `podglad`", () => {
+  /* `pdf` mówi panelowi, którym kaflem narysować plik. `UNSAFE` zostaje przy
+     nazwie, jak przy zdjęciach: rysowanie podejrzanego pliku to wpuszczenie
+     go do biura. O wydaniu i tak rozstrzyga sygnatura `%PDF-` na trasie. */
+  const msg = Number((db().prepare("SELECT id FROM message WHERE conversation_id=? ORDER BY id LIMIT 1")
+    .get(rozmowaId) as { id: number }).id);
+  const url = "https://upload.allegro.pl/message-center/message-attachments/97dc0b60-2da4-4247-92ba-b748630ba0f6";
+  const ins = db().prepare("INSERT INTO message_attachment(message_id,file_name,mime_type,url,status) VALUES (?,?,?,?,?)");
+  const przypadki: Array<[string, string | null, string, string | null, boolean]> = [
+    ["p1.pdf", "application/pdf", "SAFE", url, true],
+    ["p2.PDF", null, "SAFE", url, true],
+    ["p3.pdf", "application/octet-stream", "SAFE", url, true],
+    ["skan", "application/pdf", "SAFE", url, true],
+    ["p4.pdf", "application/pdf", "UNSAFE", url, false],
+    ["p5.pdf", "application/pdf", "NEW", url, false],
+    ["p6.pdf", "application/pdf", "SAFE", null, false],
+    /* Obraz ma pierwszeństwo: kafel ma jeden układ. */
+    ["p7.pdf", "image/jpeg", "SAFE", url, false],
+    ["z.jpg", "application/pdf", "SAFE", url, false],
+    ["dok.docx", null, "SAFE", url, false],
+  ];
+  for (const [nazwa, mime, status, adres] of przypadki) ins.run(msg, nazwa, mime, adres, status);
+  const zal = osRozmowy(rozmowaId).os.find((w) => w.rodzaj === "wiadomosc" && w.zalaczniki?.length)!.zalaczniki!;
+  for (const [nazwa, , , , oczekiwane] of przypadki) {
+    const z = zal.find((x) => x.nazwa === nazwa)!;
+    assert.equal(z.pdf, oczekiwane, nazwa);
+    assert.equal(z.pdf && z.podglad, false, `${nazwa}: pdf i podglad naraz`);
+  }
+  db().prepare("DELETE FROM message_attachment WHERE message_id=?").run(msg);
+});
+
 test("nieznana rozmowa nie udaje pustej", () => {
   assert.throws(() => osRozmowy(9999), /Nie znaleziono rozmowy/);
 });

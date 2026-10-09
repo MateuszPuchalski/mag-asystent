@@ -817,18 +817,30 @@ export async function pobierzZalacznik(
   if (opcje.maksBajtow !== undefined) {
     const zapowiedziane = Number(odp.headers.get("content-length") ?? NaN);
     if (Number.isFinite(zapowiedziane) && zapowiedziane > opcje.maksBajtow) {
-      throw new Error(
-        `Załącznik ma ${(zapowiedziane / 1024 / 1024).toFixed(1)} MB, ` +
-        `a przyjmujemy ${(opcje.maksBajtow / 1024 / 1024).toFixed(1)} MB`);
+      /* Nie czytamy treści, której nie przyjmiemy — zwalniamy połączenie. */
+      await odp.body?.cancel().catch(() => {});
+      throw new BladRozmiaruZalacznika(zapowiedziane, opcje.maksBajtow);
     }
   }
   const bajty = await odp.arrayBuffer();
   if (opcje.maksBajtow !== undefined && bajty.byteLength > opcje.maksBajtow) {
-    throw new Error(
-      `Załącznik ma ${(bajty.byteLength / 1024 / 1024).toFixed(1)} MB, ` +
-      `a przyjmujemy ${(opcje.maksBajtow / 1024 / 1024).toFixed(1)} MB`);
+    throw new BladRozmiaruZalacznika(bajty.byteLength, opcje.maksBajtow);
   }
   return bajty;
+}
+
+/**
+ * Załącznik większy niż sufit wołającego. Osobna klasa, bo to nie awaria.
+ *
+ * Allegro plik oddało, a sieć działa: to MY go nie przyjmujemy. Trasa
+ * podglądu odpowiada wtedy 413, nie 503, żeby panel nie pisał
+ * „sprawdź internet" przy pliku, który po prostu jest za duży.
+ */
+export class BladRozmiaruZalacznika extends Error {
+  constructor(public readonly bajtow: number, public readonly sufit: number) {
+    super(`Załącznik ma ${(bajtow / 1024 / 1024).toFixed(1)} MB, ` +
+      `a przyjmujemy ${(sufit / 1024 / 1024).toFixed(1)} MB`);
+  }
 }
 
 /* ── Załącznik CENTRUM WIADOMOŚCI: droga API z zapasem (przyrost „zdjęcia w rozmowach") ──

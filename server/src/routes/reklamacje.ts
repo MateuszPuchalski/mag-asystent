@@ -6,7 +6,7 @@ import { logEvent } from "../services/events.js";
 import { pobierzZalacznik } from "../adapters/allegro.http.js";
 import { sprawdzPrzesylke } from "../services/przesylka-zamowienia.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
-import { typPodgladu } from "../services/typ-podgladu.js";
+import { SUFIT_PODGLADU_BAJTOW, typPodgladuOsi } from "../services/typ-podgladu.js";
 import {
   adresZalacznika, BladReklamacji, licznikiKubelkow, listaReklamacji, progKolejki,
   cofnijNotatke, ReklamacjaConflict, statystykiReklamacji, stempelProwadzi, szczegolReklamacji,
@@ -25,7 +25,7 @@ import { dodajDowod, usunDowod, zapiszUDostawcy } from "../services/reklamacja-d
 import { autoryzuj } from "../services/auth.js";
 import { trasyTagowSprawy } from "./tagi.js";
 import { TAGI_REKLAMACJI } from "../services/tagi-spraw.js";
-import { bladPobrania } from "./pobranie.js";
+import { bladPobrania, bladPodgladu, wyslijPodglad } from "./pobranie.js";
 import { ROLE_BIUROWE } from "../services/users.js";
 
 /* ── Trasy reklamacji klienckich (0.222.0) ───────────────────────────────────
@@ -247,31 +247,33 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
     });
 
   /**
-   * Podgląd załącznika WPROST na osi (0.223.0).
+   * Podgląd załącznika WPROST na osi: obraz albo PDF.
    *
-   * ── DLACZEGO TERAZ, SKORO 0.222.0 MÓWIŁO „NIE DA SIĘ" ─────────────────────
-   * Tamto zdanie było prawdziwe co do POWODU i fałszywe co do wniosku.
-   * `PostPurchaseIssueAttachment` faktycznie nie ma ani `mimeType`, ani
-   * `status`, więc bramki ze skrzynki (0.218.0) nie da się tu POWTÓRZYĆ.
-   * Ale bramka pilnowała jednej rzeczy: żeby na osi rysowały się wyłącznie
-   * cztery typy rastrowe i nic innego. Tego można dopilnować bez pola —
-   * po BAJTACH, które i tak mamy w ręku, bo plik przechodzi przez nasz serwer.
+   * ── BRAMKA PO BAJTACH, BO POLA NIE MA ─────────────────────────────────────
+   * `PostPurchaseIssueAttachment` nie ma ani `mimeType`, ani `status`, więc
+   * bramki `SAFE` ze skrzynki nie da się tu powtórzyć. Da się powtórzyć jej
+   * SKUTEK: na oś idzie wyłącznie to, co z listy, rozpoznane po BAJTACH,
+   * które i tak mamy w ręku, bo plik przechodzi przez nasz serwer.
    *
-   * Nie zgadujemy więc kształtu i nie wymyślamy pola, którego nie ma:
-   * `rozpoznajMime` czyta sygnaturę pliku (ta sama funkcja, co przy zdjęciach
-   * z Subiekta), a `typPodgladu` przecina wynik z listą podglądu. Przejdą
-   * trzy typy — JPEG, PNG i GIF — bo tyle jest we WSPÓLNEJ części tego, co
-   * Allegro przy tym zasobie przyjmuje (`png`, `gif`, `bmp`, `tiff`, `jpeg`,
-   * `pdf`) i co przeglądarka rysuje. BMP, TIFF i PDF zostają przy pobieraniu.
+   * `rozpoznajMime` czyta sygnaturę pliku, a `typPodgladuOsi` przecina wynik
+   * z dwiema listami: obrazów (`TYPY_PODGLADU`) i dokumentów
+   * (`TYPY_DOKUMENTU`). Allegro przy tym zasobie przyjmuje `png`, `gif`,
+   * `bmp`, `tiff`, `jpeg` i `pdf`. BMP i TIFF przeglądarki rysują nierówno
+   * albo wcale, więc zostają przy pobieraniu.
+   *
+   * PDF rysuje pdf.js w panelu, bez skryptów pliku. Piaskownicę CSP dokłada
+   * `wyslijPodglad` — na wypadek wejścia na ten adres paskiem przeglądarki.
    *
    * NAZWA PLIKU NICZEGO NIE ROZSTRZYGA. Decyduje o UKŁADZIE po stronie panelu
-   * (`podglad` przy załączniku), a tutaj rozstrzygają bajty: plik nazwany
-   * `usterka.jpg`, który nie zaczyna się sygnaturą obrazu, dostaje 415.
+   * (`podglad` i `pdf` przy załączniku), a tutaj rozstrzygają bajty: plik
+   * `usterka.jpg` albo `paragon.pdf` bez właściwej sygnatury dostaje 415.
    *
    * W sklepie z częściami zdjęcie pękniętego elementu bywa CAŁYM zgłoszeniem,
-   * a sonda widziała załączniki przy 57 sprawach na 100. Kazanie agentowi
-   * zapisywać każdy z nich na dysk to ta sama usterka, którą skrzynka
-   * naprawiła w 0.218.0.
+   * a paragon w PDF — dowodem zakupu. Kazanie agentowi zapisywać każdy plik
+   * na dysk to ta sama usterka, którą skrzynka naprawiła wcześniej.
+   *
+   * SUFIT 20 MiB (`SUFIT_PODGLADU_BAJTOW`), bo podgląd wciąga plik bez
+   * kliknięcia. Większy dostaje 413 i zostaje przy pobraniu na dysk.
    *
    * ETAG PRZED POBRANIEM OD ALLEGRO. Treść załącznika jest niezmienna (nowy
    * plik to nowy wiersz), więc identyfikator wystarcza za odcisk — bez tego
@@ -291,29 +293,23 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
         z = adresZalacznika(db(), Number(req.params.id), Number(req.params.zid));
       } catch (e) { return blad(reply, e); }
       try {
-        const odp = await pobierzZalacznik(z.url);
+        const odp = await pobierzZalacznik(z.url, { maksBajtow: SUFIT_PODGLADU_BAJTOW });
         const bajty = Buffer.from(odp);
-        const typ = typPodgladu(rozpoznajMime(bajty));
+        const typ = typPodgladuOsi(rozpoznajMime(bajty));
         if (typ === null) {
-          /* 415, nie 404: plik JEST, tylko nie jest obrazem, który narysujemy.
-             Panel zostaje wtedy przy nazwie z pobraniem — to odpowiedź, nie
-             awaria; awaria drogi do Allegro wychodzi niżej jako 502/503. */
+          /* 415, nie 404: plik JEST, tylko nie jest obrazem ani PDF-em, który
+             pokażemy. Panel zostaje wtedy przy nazwie z pobraniem — to
+             odpowiedź, nie awaria; awaria drogi do Allegro wychodzi niżej
+             jako 502/503. */
           return reply.code(415).send({
-            error: `Załącznik „${z.nazwa}" nie jest obrazem do pokazania na osi (sygnatura pliku).`,
+            error: `Załącznik „${z.nazwa}" nie jest obrazem ani PDF-em do pokazania na osi (sygnatura pliku).`,
           });
         }
         /* BEZ `logEvent`. Podgląd rysuje się sam przy otwarciu sprawy, więc wpis
            w dzienniku nie znaczyłby „ktoś wziął plik", tylko „ktoś spojrzał na
            ekran". Pobranie na dysk, czyli czynność agenta, ślad zostawia. */
-        return reply
-          .header("content-type", typ)
-          .header("x-content-type-options", "nosniff")
-          .header("content-disposition", "inline")
-          .header("etag", etag)
-          .header("cache-control", "private, max-age=86400")
-          .header("content-length", String(bajty.length))
-          .send(bajty);
-      } catch (e) { return bladPobrania(reply, e); }
+        return wyslijPodglad(reply, typ, bajty, etag);
+      } catch (e) { return bladPodgladu(reply, e, z.nazwa); }
     });
 
   /* ── Załączniki WYCHODZĄCE przy odpowiedzi (0.274.0) ───────────────────────
