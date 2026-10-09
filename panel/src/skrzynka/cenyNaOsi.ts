@@ -15,13 +15,13 @@ import { odmien } from "../ui";
 export type Mierz = (tekst: string, waga: 400 | 700, rozmiar: 11 | 12) => number;
 
 export type PunktOsi = {
-  /** `p${poziom}` albo "oferta". */
+  /** `p${poziom}`, "oferta" albo "zakup". */
   id: string;
-  rodzaj: "poziom" | "oferta";
+  rodzaj: "poziom" | "oferta" | "zakup";
   grosze: number;
   netto: number | null;
   nazwy: string[];
-  /** `nazwaGrupy(nazwy)` albo "oferta". */
+  /** `nazwaGrupy(nazwy)`, "oferta" albo „Kupił za”. */
   nazwa: string;
   /** "49,51" bez waluty; dla oferty pusta. */
   kwota: string;
@@ -89,6 +89,8 @@ export const GEOMETRIA = {
   KARA_GLEBIA: 6,
   KARA_OFERTA_POD: 40,
   KARA_POZIOM_NAD: 4,
+  /** Zakup chce stać pod osią, jak na makiecie: nad nią stoi oferta. */
+  KARA_ZAKUP_NAD: 4,
   /** Klucz poza pierwszym pasem pod osią kosztuje więcej niż oferta pod osią. */
   KARA_KLUCZ: 50,
   /** Etykieta nie na środku znacznika. */
@@ -287,7 +289,11 @@ function rozbij(klucz: string): readonly [number, number] {
 }
 
 /* Prowadnica do pasa 2 przechodzi przez pas 1 — nie może przeciąć etykiety,
-   bo wtedy kreska wyglądałaby jak podkreślenie cudzej kwoty. */
+   bo wtedy kreska wyglądałaby jak podkreślenie cudzej kwoty. Etykieta tego
+   samego miejsca nie jest cudza: zakup równy detalicznej stoi w jednym
+   punkcie z nią, a ogonek zaczyna się dopiero za jej etykietą
+   (`poczatekOgonka`). Bez tego wyjątku najczęstsza reklamacja, kupiona po
+   cenie z cennika, nie dostałaby osi. */
 function prowadniceWolne(pasy: Map<string, number[]>, poz: number[], el: El[], s: number): boolean {
   for (const [klucz, czl] of pasy) {
     const [ks, d] = rozbij(klucz);
@@ -295,6 +301,7 @@ function prowadniceWolne(pasy: Map<string, number[]>, poz: number[], el: El[], s
     for (const j of czl) {
       for (let d2 = 1; d2 < d; d2++) {
         for (const q of pasy.get(`${s}:${d2}`) || []) {
+          if (Math.abs(el[q].x - el[j].x) < 1.5) continue;
           if (el[j].x >= poz[q] - 2 && el[j].x <= poz[q] + el[q].w + 2) return false;
         }
       }
@@ -334,6 +341,7 @@ function ocena(st: Omit<Stan, "koszt">, el: El[]): number {
       k += G.KARA_GLEBIA * (d - 1);
       if (q.p.rodzaj === "oferta" && s > 0) k += G.KARA_OFERTA_POD;
       if (q.p.rodzaj === "poziom" && s < 0) k += G.KARA_POZIOM_NAD;
+      if (q.p.rodzaj === "zakup" && s < 0) k += G.KARA_ZAKUP_NAD;
       if (q.p.klucz && !(s > 0 && d === 1)) k += G.KARA_KLUCZ;
     }
   }
@@ -398,20 +406,36 @@ function ulozPasy(punkty: PunktOsi[], W: number, linie: Linie, mierz: Mierz): Pa
   return { linie, osY, wysokosc, etykiety };
 }
 
+/* ── CENA ZAKUPU NA TEJ SAMEJ OSI ────────────────────────────────────────────
+   Makieta właściciela dla reklamacji: zielony romb „Kupił za …” między
+   poziomami. Agent widzi jednym spojrzeniem, ile klient zapłacił wobec
+   cennika i dzisiejszej oferty, a to rozstrzyga o kwocie zwrotu.
+
+   ROMB, NIE KROPKA ANI PIERŚCIEŃ, bo kształt rozróżnia znaczniki bez barwy
+   (WCAG 1.4.1). Kwota zakupu stoi w etykiecie, bo w reklamacji nie ma karty
+   zakupu, która byłaby jej domem. Skrzynka zakupu nie podaje. */
+
+/** Zdanie o zakupie przed zdaniem o ofercie — kwota zakupu nie ma tu innego domu. */
+const zdanieZakupu = (z: { grosze: number; waluta: string }) => `Klient zapłacił ${zlote(z.grosze, z.waluta)}.`;
+
 /**
  * Układ bloku cen przy danej szerokości kolumny.
  *
- * Bez oferty oś nie ma o co pytać (reklamacje, oferta niepobrana) — zostaje
+ * Bez oferty i bez zakupu oś nie ma o co pytać (oferta niepobrana) — zostaje
  * dzisiejsza lista, bez zmian. Ta sama lista staje, gdy etykiet nie da się
  * ułożyć w kolumnie: lista, nie nachodzące napisy.
  */
 export function ulozOsCen(ceny: CenaPoziomu[], oferta: { grosze: number; waluta: string } | null,
-  szerokosc: number, mierz: Mierz): UkladOsi {
+  szerokosc: number, mierz: Mierz, zakup: { grosze: number; waluta: string } | null = null): UkladOsi {
   const grupy = grupujCeny(ceny);
-  const polozenie = oferta ? polozenieOferty(ceny, oferta) : null;
-  if (!oferta || !polozenie) return { tryb: "lista", grupy, polozenie };
+  const polozenieO = oferta ? polozenieOferty(ceny, oferta) : null;
+  /* Zakup w innej walucie niż oś nie ma na niej miejsca: zostaje w zdaniu. */
+  const waluta = polozenieO && oferta ? oferta.waluta : zakup?.waluta ?? null;
+  const zakupNaOsi = zakup !== null && zakup.waluta === waluta
+    && grupy.some((g) => !brakBrutto(g.cena) && g.cena.waluta === waluta) ? zakup : null;
+  const polozenie = zakup ? polozenieZZakupem(polozenieO, zakup, zakupNaOsi !== null) : polozenieO;
+  if (waluta === null || (!polozenieO && !zakupNaOsi) || !polozenie) return { tryb: "lista", grupy, polozenie };
   const W = szerokosc;
-  const waluta = oferta.waluta;
   const naOsi = grupy.filter((g) => !brakBrutto(g.cena) && g.cena.waluta === waluta);
   const pozaOsia = grupy.filter((g) => !naOsi.includes(g));
   const klucz = kluczowa(naOsi);
@@ -421,8 +445,14 @@ export function ulozOsCen(ceny: CenaPoziomu[], oferta: { grosze: number; waluta:
   }));
   /* Etykieta oferty bez kwoty: kwota to fakt karty zakupu (każdy fakt stoi
      raz), a tu niesie ją dymek i nazwa figury. */
-  punkty.push({ id: "oferta", rodzaj: "oferta", grosze: oferta.grosze, netto: null, nazwy: ["oferta"],
-    nazwa: "oferta", kwota: "", klucz: false, x: 0 });
+  if (polozenieO && oferta) {
+    punkty.push({ id: "oferta", rodzaj: "oferta", grosze: oferta.grosze, netto: null, nazwy: ["oferta"],
+      nazwa: "oferta", kwota: "", klucz: false, x: 0 });
+  }
+  if (zakupNaOsi) {
+    punkty.push({ id: "zakup", rodzaj: "zakup", grosze: zakupNaOsi.grosze, netto: null, nazwy: ["zakup"],
+      nazwa: "Kupił za", kwota: "", klucz: false, x: 0 });
+  }
   const gr = punkty.map((q) => q.grosze);
   const min = Math.min(...gr), max = Math.max(...gr);
   const x0 = G.PAD, x1 = W - G.PAD;
@@ -441,6 +471,31 @@ export function ulozOsCen(ceny: CenaPoziomu[], oferta: { grosze: number; waluta:
      bo nazwę i kwotę czyta się wtedy jednym spojrzeniem. */
   kandydaci.sort((a, b) => a.wysokosc - b.wysokosc || a.linie - b.linie);
   return { tryb: "os", grupy, polozenie, waluta, punkty, pozaOsia, zakres, min, max, szerokosc: W, ...kandydaci[0] };
+}
+
+/* Położenie z zakupem: zdanie zaczyna się od ceny zakupu. Skala obejmuje
+   zakup tylko wtedy, gdy stoi na osi. `krotko` zostaje przy ofercie, bo
+   czyta je wyłącznie dymek i opis pierścienia. */
+function polozenieZZakupem(o: Polozenie | null, zakup: { grosze: number; waluta: string },
+  naOsi: boolean): Polozenie {
+  const zdanie = `${zdanieZakupu(zakup)}${o ? ` ${o.zdanie}` : ""}`;
+  const baza = o ?? { min: zakup.grosze, max: zakup.grosze, krotko: "" };
+  return naOsi
+    ? { ...baza, zdanie, min: Math.min(baza.min, zakup.grosze), max: Math.max(baza.max, zakup.grosze) }
+    : { ...baza, zdanie };
+}
+
+/**
+ * Skąd ogonek zaczyna się po stronie osi: od znacznika albo, w miejscu
+ * wspólnym, od brzegu płytszej etykiety tego samego miejsca. Kreska przez
+ * cudzy napis czytałaby się jak jego podkreślenie.
+ */
+export function poczatekOgonka(u: UkladNaOsi, e: EtykietaOsi, odZnacznika: number): number {
+  const plytsze = u.etykiety.filter((f) => f !== e && f.strona === e.strona && f.pas < e.pas
+    && Math.abs(f.punkt.x - e.punkt.x) < 1.5);
+  if (plytsze.length === 0) return odZnacznika;
+  return e.strona < 0 ? Math.min(...plytsze.map((f) => f.gora)) - G.ODSTEP_PASOW
+    : Math.max(...plytsze.map((f) => f.gora + f.wys)) + G.ODSTEP_PASOW;
 }
 
 /** Etykiety w kolejności osi; przy remisie oferta pierwsza. Tak czyta je klawiatura i czytnik. */

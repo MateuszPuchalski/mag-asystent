@@ -465,6 +465,17 @@ export const dzienMiesiac = (v: string | null | undefined) =>
   v ? new Date(v).toLocaleDateString("pl", { day: "2-digit", month: "2-digit" }) : "—";
 
 /**
+ * Data cyframi z rokiem — „28.09.2026”.
+ *
+ * Dla dat, które agent przepisuje klientowi albo porównuje z Allegro: dnia
+ * zgłoszenia i zakupu. Allegro pisze je w tym kształcie, więc słowne
+ * „28 września 2026” obok numeru sprawy kazałoby tłumaczyć w głowie.
+ */
+export const dataCyfrowa = (v: string | null | undefined) =>
+  v ? new Date(v).toLocaleDateString("pl", { day: "2-digit", month: "2-digit", year: "numeric" })
+    : "—";
+
+/**
  * Chwila w wierszu listy — „15:32", „wczoraj", „04.10" albo „04.10.2025".
  *
  * Dla prawej krawędzi kolejki, którą oko przebiega w dół. Pełne „5.10.2026,

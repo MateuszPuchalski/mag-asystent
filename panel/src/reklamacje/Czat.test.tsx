@@ -244,10 +244,13 @@ describe("Formularz Allegro na osi rozmowy", () => {
 describe("Adresy w treści są odnośnikami", () => {
   const LINK = "https://allegro.pl/moje-allegro/reklamacje/produkt/wysylka/a695a1ac-b22e";
 
-  it("automat Allegro odsyła do formularza — jednym kliknięciem, nie kopiowaniem", () => {
+  it("automat Allegro odsyła do formularza — jednym kliknięciem, nie kopiowaniem", async () => {
     render(<Czat sprawa={sprawa()} zalaczniki={[]}
       czat={[wiad({ autorRola: "SYSTEM", autorLogin: null,
         tresc: `konieczne jest wypełnienie formularza pod linkiem: ${LINK}` })]} />);
+    /* Automat stoi cienkim wierszem; pełna treść z odnośnikiem jest pod
+       rozwinięciem, czyli jedno kliknięcie dalej. */
+    await userEvent.click(screen.getByRole("button", { name: /Automat Allegro/ }));
     const a = screen.getByRole("link", { name: LINK });
     expect(a).toHaveAttribute("href", LINK);
     expect(a).toHaveAttribute("target", "_blank");
@@ -319,7 +322,7 @@ describe("Kto mówi, widać bez czytania (0.416.0, barwy z 0.418.0)", () => {
     render(<Czat sprawa={sprawa({ wiadomosciIle: 4 })} zalaczniki={[]} czat={[
       wiad({ id: 1, autorRola: "BUYER", tresc: "od klienta" }),
       wiad({ id: 2, autorRola: "SELLER", autorLogin: null, tresc: "od nas" }),
-      wiad({ id: 3, autorRola: "SYSTEM", autorLogin: null, tresc: "od automatu" }),
+      wiad({ id: 3, autorRola: "FULFILLMENT", autorLogin: null, tresc: "od automatu" }),
       wiad({ id: 4, autorRola: "ADMIN", autorLogin: null, tresc: "od doradcy" }),
     ]} />);
     const tla = ["od klienta", "od nas", "od automatu", "od doradcy"]
@@ -333,12 +336,13 @@ describe("Kto mówi, widać bez czytania (0.416.0, barwy z 0.418.0)", () => {
     render(<Czat sprawa={sprawa({ wiadomosciIle: 3 })} zalaczniki={[]} czat={[
       wiad({ id: 1, autorRola: "BUYER", tresc: "od klienta" }),
       wiad({ id: 2, autorRola: "SELLER", autorLogin: null, tresc: "od nas" }),
-      wiad({ id: 3, autorRola: "SYSTEM", autorLogin: null, tresc: "od automatu" }),
+      wiad({ id: 3, autorRola: "FULFILLMENT", autorLogin: null, tresc: "od automatu" }),
     ]} />);
     expect(karta("od klienta").className).toContain("border-l-wertis-amber");
     expect(karta("od nas").className).toContain("border-r-4");
     expect(karta("od nas").className).not.toContain("border-l-4");
-    /* Automat nie jest człowiekiem i ma tak wyglądać. */
+    /* Magazyn Allegro nie jest człowiekiem i ma tak wyglądać. Automat
+       `SYSTEM` nie ma karty wcale — stoi wierszem zdarzenia (niżej). */
     expect(karta("od automatu").className).toContain("border-dashed");
   });
 
@@ -645,5 +649,153 @@ describe("Bursztyn tylko na ostatniej wiadomości klienta", () => {
     expect(starsza.className).toContain("mr-8");
     expect(starsza.className).toContain("border-l-4");
     expect(within(starsza).getByText("Klient")).toBeInTheDocument();
+  });
+});
+
+/* ── AUTOMAT ALLEGRO TO WIERSZ ZDARZENIA (makieta właściciela) ───────────────
+   Automat nie jest rozmówcą, więc nie dostaje dymka. Stoi cienkim wierszem:
+   ikona w kółku, krótka nazwa z faktem i czas po prawej. Kolejne automaty
+   pod rząd składają się w jeden wiersz, a pełna treść stoi pod rozwinięciem. */
+describe("Automat Allegro jako wiersz zdarzenia", () => {
+  const automat = (id: number, tresc: string, utworzonoAt: string) =>
+    wiad({ id, autorRola: "SYSTEM", autorLogin: null, tresc, utworzonoAt });
+
+  it("nie rysuje dymka: wiersz z nazwą i czasem, pełna treść pod rozwinięciem", async () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[
+      automat(1, "Kupujący wygenerował etykietę zwrotną.", "2026-09-30T11:39:00.000Z")]} />);
+    const wiersz = screen.getByRole("button", { name: /Etykieta wygenerowana/ });
+    expect(wiersz).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Kupujący wygenerował etykietę zwrotną.")).not.toBeInTheDocument();
+    /* Bez dymka znaczy bez podpisu roli, który mają karty rozmówców. */
+    expect(screen.queryByText("Allegro (automat)")).not.toBeInTheDocument();
+    await userEvent.click(wiersz);
+    expect(wiersz).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Kupujący wygenerował etykietę zwrotną.")).toBeInTheDocument();
+  });
+
+  it("kolejne automaty pod rząd składają się w JEDEN wiersz, z rozwinięciem na każdy", async () => {
+    render(<Czat sprawa={sprawa({ wiadomosciIle: 3 })} zalaczniki={[]} czat={[
+      automat(1, "Wygenerowano etykietę zwrotną.", "2026-09-30T11:39:00.000Z"),
+      automat(2, "Paczka została nadana. Numer przesyłki: 600000727616070019994306", "2026-09-30T12:16:00.000Z"),
+      wiad({ id: 3, tresc: "Wysłałem", utworzonoAt: "2026-09-30T16:40:00.000Z" }),
+    ]} />);
+    const wiersze = screen.getAllByRole("button", { expanded: false });
+    expect(wiersze).toHaveLength(1);
+    expect(wiersze[0]).toHaveTextContent("Etykieta wygenerowana → paczka nadana");
+    await userEvent.click(wiersze[0]);
+    expect(screen.getByText(/Paczka została nadana/)).toBeInTheDocument();
+    expect(screen.getByText("Wygenerowano etykietę zwrotną.")).toBeInTheDocument();
+  });
+
+  it("numer przesyłki z treści staje chipem, skrócony w środku i kopiowany przez pomocnika", async () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[
+      automat(1, "Paczka została nadana. Numer: 600000727616070019994306.", "2026-09-30T12:16:00.000Z")]} />);
+    const chip = screen.getByRole("button", { name: "Kopiuj numer przesyłki 600000727616070019994306" });
+    expect(chip).toHaveTextContent("6000007276…994306");
+    expect(chip.className).toContain("font-mono");
+    /* jsdom nie ma ani schowka, ani `execCommand`, więc pomocnik oddaje
+       porażkę — i chip ma ją powiedzieć, zamiast mrugać „skopiowano”. */
+    await userEvent.click(chip);
+    expect(await screen.findByText("Nie udało się skopiować numeru")).toBeInTheDocument();
+  });
+
+  it("krótki ciąg cyfr nie jest numerem przesyłki — to bywa kwota albo kod", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[
+      automat(1, "Paczka nadana z punktu 12345.", "2026-09-30T12:16:00.000Z")]} />);
+    expect(screen.queryByRole("button", { name: /Kopiuj numer przesyłki/ })).not.toBeInTheDocument();
+  });
+
+  it("przypomnienie o terminie stoi w barwie uwagi, z wyciągniętą liczbą dni", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[
+      automat(1, "Przypominamy: na decyzję w sprawie reklamacji zostało 7 dni.", "2026-10-05T07:00:00.000Z")]} />);
+    const wiersz = screen.getByRole("button", { name: /Przypomnienie Allegro/ });
+    expect(wiersz).toHaveTextContent("do decyzji zostało 7 dni");
+    expect(wiersz.querySelector(".text-ranga-uwaga")).not.toBeNull();
+  });
+
+  it("przypomnienie nie skleja się z sąsiednim automatem — zgubiłoby barwę uwagi", () => {
+    render(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]} czat={[
+      automat(1, "Wygenerowano etykietę zwrotną.", "2026-09-30T11:39:00.000Z"),
+      automat(2, "Na decyzję zostały 2 dni.", "2026-10-10T07:00:00.000Z"),
+    ]} />);
+    expect(screen.getAllByRole("button", { expanded: false })).toHaveLength(2);
+    expect(screen.getByRole("button", { name: /Przypomnienie Allegro/ }))
+      .toHaveTextContent("do decyzji zostały 2 dni");
+  });
+
+  it("doradca Allegro zostaje dymkiem — to człowiek, nie automat", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ autorRola: "ADMIN", autorLogin: null, tresc: "Proszę o zdjęcia" })]} />);
+    expect(screen.getByText("Proszę o zdjęcia")).toBeInTheDocument();
+    expect(screen.getByText("Doradca Allegro")).toBeInTheDocument();
+  });
+});
+
+describe("Przesyłki na osi rozmowy", () => {
+  const odKlienta = {
+    klucz: "zwrot-1", kierunek: "od_klienta" as const, moment: "2026-10-03T08:12:00.000Z",
+    plakietka: "doreczona" as const, stanAt: "2026-10-03T08:12:00.000Z", nadanoAt: "2026-09-30T12:16:00.000Z",
+    waybill: "600000727616070019994306", przewoznik: "InPost", opis: "zwrot", uwaga: null,
+  };
+  const odNas = {
+    klucz: "dosylka", kierunek: "od_nas" as const, moment: null, plakietka: "w_drodze" as const,
+    stanAt: null, nadanoAt: null, waybill: null, przewoznik: null, opis: "dosyłka", uwaga: "bez numeru przesyłki",
+  };
+  const os = () => [...screen.getByText("pierwsza").closest("ol")!.children] as HTMLElement[];
+
+  it("przesyłka staje między wiadomościami według chwili, a bez chwili na końcu", () => {
+    render(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]} zdarzenia={[odNas, odKlienta]} czat={[
+      wiad({ id: 1, tresc: "pierwsza", utworzonoAt: "2026-09-28T12:32:00.000Z" }),
+      wiad({ id: 2, autorRola: "SELLER", tresc: "druga", utworzonoAt: "2026-10-05T09:05:00.000Z" }),
+    ]} />);
+    const etykiety = os().map((li) => li.getAttribute("aria-label") ?? li.textContent ?? "");
+    expect(etykiety[0]).toMatch(/pierwsza/);
+    expect(etykiety[1]).toBe("Przesyłka od klienta do nas");
+    expect(etykiety[2]).toMatch(/druga/);
+    expect(etykiety[3]).toBe("Przesyłka od nas do klienta");
+  });
+
+  it("od klienta po lewej, od nas po prawej — strona, kształt i słowo, nie sama barwa", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]} zdarzenia={[odKlienta, odNas]}
+      czat={[wiad({ tresc: "pierwsza", utworzonoAt: "2026-09-28T12:32:00.000Z" })]} />);
+    const klient = screen.getByRole("listitem", { name: "Przesyłka od klienta do nas" });
+    const my = screen.getByRole("listitem", { name: "Przesyłka od nas do klienta" });
+    expect(klient.className).toContain("self-start");
+    expect(my.className).toContain("self-end");
+    expect(klient).toHaveTextContent("Od klienta · zwrot · InPost");
+    expect(my).toHaveTextContent("Od nas · dosyłka");
+    expect(my.querySelector(".bg-blue-700")).not.toBeNull();
+    expect(klient.querySelector(".border-slate-400")).not.toBeNull();
+  });
+
+  it("plakietka mówi stan z czasem, numer jest chipem, a brak numeru dopiskiem", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]} zdarzenia={[odKlienta, odNas]}
+      czat={[wiad({ tresc: "pierwsza", utworzonoAt: "2026-09-28T12:32:00.000Z" })]} />);
+    const klient = screen.getByRole("listitem", { name: "Przesyłka od klienta do nas" });
+    expect(within(klient).getByText(/^Doręczona do nas \d{2}\.\d{2}, \d{2}:\d{2}$/)).toBeInTheDocument();
+    expect(within(klient).getByRole("button", { name: /Kopiuj numer przesyłki 6000/ })).toBeInTheDocument();
+    expect(klient).toHaveTextContent(/nadana \d{2}\.\d{2}, \d{2}:\d{2}/);
+    const my = screen.getByRole("listitem", { name: "Przesyłka od nas do klienta" });
+    /* Bez chwili stanu plakietka nie dostaje godziny z innego stanu. */
+    expect(within(my).getByText("W drodze")).toBeInTheDocument();
+    expect(my).toHaveTextContent("bez numeru przesyłki");
+  });
+
+  it("przesyłka starsza od widocznych wiadomości chowa się razem ze zwiniętymi", async () => {
+    render(<Czat sprawa={sprawa({ wiadomosciIle: 4 })} zalaczniki={[]} zwinStarsze={1}
+      zdarzenia={[{ ...odKlienta, moment: "2026-09-29T08:00:00.000Z" }]} czat={[
+        wiad({ id: 1, tresc: "a", utworzonoAt: "2026-09-28T12:32:00.000Z" }),
+        wiad({ id: 2, tresc: "b", utworzonoAt: "2026-09-30T12:32:00.000Z" }),
+        wiad({ id: 3, tresc: "c", utworzonoAt: "2026-10-01T12:32:00.000Z" }),
+        wiad({ id: 4, tresc: "ostatnia", utworzonoAt: "2026-10-02T12:32:00.000Z" }),
+      ]} />);
+    expect(screen.queryByRole("listitem", { name: "Przesyłka od klienta do nas" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /wcześniejsze wiadomości/ }));
+    expect(screen.getByRole("listitem", { name: "Przesyłka od klienta do nas" })).toBeInTheDocument();
+  });
+
+  it("bez przesyłek oś jest taka jak dotąd (dyskusje)", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[wiad({ tresc: "pierwsza" })]} />);
+    expect(screen.queryByRole("listitem", { name: /Przesyłka/ })).not.toBeInTheDocument();
   });
 });

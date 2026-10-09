@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api, pobierzPlik } from "./klient";
 import type { ZalacznikSzkicu } from "./rozmowy";
 import type {
-  DowodReklamacji, KolejkaReklamacji, Reklamacja, ReklamacjaUDostawcy, StanPrzesylki,
+  KolejkaReklamacji, Reklamacja, StanPrzesylki,
   SzczegolReklamacji, TowarWerdyktu, WynikOdpowiedziReklamacji, WynikWerdyktu,
 } from "./typy";
 
@@ -281,61 +281,35 @@ export function useSprawdzPrzesylke() {
   });
 }
 
-/* ── Dowody biura ────────────────────────────────────────────────────────────
-   Swobodne wpisy w kolumnie obok rozmowy: co widać na zdjęciu, czego brakuje,
-   co ustaliliśmy. Zostają wyłącznie u nas, więc bez `autoryzuj()` i bez
-   wersji sprawy — dopisanie zdania nie ma wywracać kontroli świeżości koledze,
-   który właśnie pisze odpowiedź.
+/* ── Notatka wewnętrzna ──────────────────────────────────────────────────────
+   Ustalenia biura, których klient nie widzi. Zapis jedzie z WERSJĄ sprawy,
+   bo notatkę nadpisuje ten, kto pisze ostatni: konflikt wersji wraca jako 409
+   i ekran mówi go zdaniem z serwera, zamiast cicho nadpisać kolegę.
+   Unieważniamy też kolejkę, bo szukanie w kolejce czyta treść notatki. */
 
-   Unieważniamy wyłącznie SPRAWĘ: dowody nie wchodzą do wiersza kolejki, więc
-   przeładowanie listy byłoby robotą bez skutku na ekranie. */
-
-export function useDodajDowod() {
+export function useNotatkaReklamacji() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (v: { id: number; tresc: string; zalacznikId: number | null }) =>
-      api<{ dowody: DowodReklamacji[] }>(`/api/obsluga/reklamacje/${v.id}/dowody`, {
-        method: "POST",
-        body: JSON.stringify({ tresc: v.tresc, zalacznikId: v.zalacznikId }),
-      }),
-    onSettled: (_d, _e, v) =>
-      qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) }),
+    mutationFn: (v: { id: number; notatka: string | null; wersja: number }) =>
+      api<{ reklamacja: Reklamacja }>(`/api/obsluga/reklamacje/${v.id}/notatka`,
+        { method: "POST", body: JSON.stringify({ notatka: v.notatka, wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
+    },
   });
 }
 
-export function useUsunDowod() {
+/** Cofnięcie ostatniej zmiany notatki — droga powrotna zamiast pytania o zgodę. */
+export function useCofnijNotatkeReklamacji() {
   const qc = useQueryClient();
   return useMutation({
-    /* DELETE bez ciała, więc i bez typu treści — reguła klienta HTTP. */
-    mutationFn: (v: { id: number; dowodId: number }) =>
-      api<{ dowody: DowodReklamacji[] }>(`/api/obsluga/reklamacje/${v.id}/dowody/${v.dowodId}`,
-        { method: "DELETE" }),
-    onSettled: (_d, _e, v) =>
-      qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) }),
-  });
-}
-
-/**
- * Nasza reklamacja u dostawcy — zgłoszenie i jego wynik.
- *
- * `wersja: 0` zakłada rekord, każda inna musi zgadzać się z zapisaną. To
- * wersja TEGO rekordu, nie sprawy klienta: zgłoszenie u dostawcy nie ma
- * prawa wywracać kontroli świeżości przy odpowiedzi klientowi. Pole
- * pominięte zostaje na serwerze bez zmian, `null` je czyści.
- */
-export function useZapiszUDostawcy() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (v: {
-      id: number; dostawca: string; nrUDostawcy?: string | null;
-      wynik?: "uznal" | "odrzucil" | null; wersja: number;
-    }) => api<{ uDostawcy: ReklamacjaUDostawcy }>(`/api/obsluga/reklamacje/${v.id}/u-dostawcy`, {
-      method: "POST",
-      body: JSON.stringify({
-        dostawca: v.dostawca, nrUDostawcy: v.nrUDostawcy, wynik: v.wynik, wersja: v.wersja,
-      }),
-    }),
-    onSettled: (_d, _e, v) =>
-      qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) }),
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ reklamacja: Reklamacja }>(`/api/obsluga/reklamacje/${v.id}/notatka/cofnij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.kolejka });
+      void qc.invalidateQueries({ queryKey: kluczeReklamacji.reklamacja(v.id) });
+    },
   });
 }

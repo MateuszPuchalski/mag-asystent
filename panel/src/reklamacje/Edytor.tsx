@@ -9,7 +9,8 @@ import { Edytor as EdytorOdpowiedzi } from "../skrzynka/Edytor";
 
    Ten plik trzyma tylko to, co w sprawie jest naprawdę inne:
    - napis „Wyślij odpowiedź”, bo rozmowa jest trójstronna i odbiorcą bywa
-     doradca Allegro, więc „do klienta” bywałoby nieprawdą;
+     doradca Allegro, więc „do klienta” bywałoby nieprawdą. Ekran reklamacji
+     podaje „Wyślij do klienta”, bo tak mówi makieta właściciela;
    - sufit 20 000 znaków z `MessageRequest.text`, nie 2000 z Centrum
      Wiadomości, bo to inny zasób;
    - brak notatki z wzmiankami: sprawa ma własną notatkę w kolumnie faktów;
@@ -24,7 +25,7 @@ export const LIMIT_ZNAKOW = 20_000;
 export function Edytor({
   tresc, wysyla, blad, czatAktywny, onZmiana, onWyslij,
   zalaczniki = [], dodajeZalacznik = false, bladZalacznika = "",
-  onDodajZalacznik, onUsunZalacznik,
+  onDodajZalacznik, onUsunZalacznik, etykietaWyslij = "Wyślij odpowiedź",
 }: {
   tresc: string;
   wysyla: boolean;
@@ -40,12 +41,14 @@ export function Edytor({
   czatAktywny: boolean;
   onZmiana: (v: string) => void;
   onWyslij: () => void;
+  /** Napis przycisku wysyłki; domyślny zostaje dla dyskusji. */
+  etykietaWyslij?: string;
 }) {
   return <EdytorOdpowiedzi szkic={tresc} wysyla={wysyla} blad={blad}
     onZmiana={onZmiana} onWyslij={onWyslij}
     zalaczniki={zalaczniki} dodajeZalacznik={dodajeZalacznik} bladZalacznika={bladZalacznika}
     onDodajZalacznik={onDodajZalacznik} onUsunZalacznik={onUsunZalacznik}
-    etykietaWyslij="Wyślij odpowiedź" limitZnakow={LIMIT_ZNAKOW}
+    etykietaWyslij={etykietaWyslij} limitZnakow={LIMIT_ZNAKOW}
     etykietaPola="Odpowiedź w sprawie"
     podpowiedz="Odpowiedź w tej sprawie — przeczyta ją kupujący, a bywa że i doradca Allegro"
     podpowiedzZwinieta="Odpowiedz w sprawie…"

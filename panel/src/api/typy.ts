@@ -521,6 +521,21 @@ export interface StanPrzesylki {
   status: string | null;
   dostarczonoAt: string | null;
   sprawdzonoAt: string | null;
+  /**
+   * Druga paczka zamówienia, dosyłka — bez numeru. Lustro `DosylkaZamowienia`
+   * z `services/przesylka-zamowienia.ts`. Numer stoi na profilu klienta, a tu
+   * idzie tylko los towaru. Opcjonalne, bo brak ma znaczyć „nie wiemy".
+   */
+  dosylka?: DosylkaPrzesylki | null;
+}
+
+/** Los dosyłki: kod przewoźnika, doręczenie i skąd znamy jej numer. */
+export interface DosylkaPrzesylki {
+  status: string | null;
+  dostarczonoAt: string | null;
+  maNumer: boolean;
+  /** `allegro` — numer stoi przy zamówieniu w Allegro; `recznie` — wpisało go biuro. */
+  zrodlo: "allegro" | "recznie" | null;
 }
 
 /** Jeden przystanek drogi zakupu przez kolejki, z momentem wejścia. */
@@ -1594,6 +1609,8 @@ export interface Reklamacja {
   kwotaZrodlo?: "zadanie" | "paragon" | null;
   /** Pełne dni od zakupu do zgłoszenia; `null`, gdy brakuje którejś daty. */
   zgloszonoPoDniach?: number | null;
+  /** Dzisiejsza cena oferty z jej migawki; `null`, gdy migawki nie ma. */
+  ofertaCenaGrosze?: number | null;
 }
 
 /** Ostatnia dostawa reklamowanego towaru — skąd przyszła sztuka klienta. */
@@ -1660,11 +1677,30 @@ export interface StanReklamacji extends StanZwrotow {
   dyskusjiPominietych: number | null;
 }
 
+/**
+ * Liczba w kaflu i to, ile było tydzień temu.
+ *
+ * `tydzienTemu: null` znaczy, że serwer nie umie uczciwie odtworzyć stanu
+ * sprzed tygodnia. Panel mówi wtedy zdanie opisowe, nigdy trendu od zera.
+ */
+export interface LicznikZTrendem { teraz: number; tydzienTemu: number | null }
+
+/** Kafle nad kolejką, liczone na całej tabeli, niezależnie od progu daty. */
+export interface StatystykiReklamacji {
+  doDecyzji: LicznikZTrendem;
+  doOdpowiedzi: LicznikZTrendem;
+  poTerminie: LicznikZTrendem;
+  /** Średnia w dniach; `null`, gdy w okresie nie zapadł żaden werdykt. */
+  sredniDniDoWerdyktu: { teraz: number | null; poprzednio: number | null; okresDni: number };
+}
+
 export interface KolejkaReklamacji {
   reklamacje: Reklamacja[];
   liczniki: Record<KubelekReklamacji, number>;
   prog: ProgKolejki;
   stan: StanReklamacji;
+  /** Opcjonalne, bo starszy serwer go nie niesie, a brak ma znaczyć „nie wiemy". */
+  statystyki?: StatystykiReklamacji;
 }
 
 export interface SzczegolReklamacji {

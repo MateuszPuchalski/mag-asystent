@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { CenaPoziomu } from "../api/typy";
 import {
-  kluczowa, grupujCeny, polozenieOferty, trafienie, ulozOsCen, wspolneMiejsce,
+  kluczowa, grupujCeny, poczatekOgonka, polozenieOferty, trafienie, ulozOsCen, wspolneMiejsce,
   type Mierz, type UkladNaOsi, type UkladOsi,
 } from "./cenyNaOsi";
 
@@ -58,7 +58,10 @@ function naruszenia(u: UkladNaOsi): string[] {
       if (f === e) continue;
       if (e.lewo < f.lewo + f.szer && f.lewo < e.lewo + e.szer && e.gora < f.gora + f.wys && f.gora < e.gora + e.wys
         && id < f.punkt.id) bledy.push(`${id} nachodzi na ${f.punkt.id}`);
-      if (f.strona === e.strona && f.pas < e.pas && x >= f.lewo && x <= f.lewo + f.szer) {
+      /* Etykieta tego samego miejsca nie jest cudza: ogonek zaczyna się za
+         nią (`poczatekOgonka`), więc kreska jej nie przecina. */
+      if (f.strona === e.strona && f.pas < e.pas && x >= f.lewo && x <= f.lewo + f.szer
+        && Math.abs(f.punkt.x - x) >= 1.5) {
         bledy.push(`prowadnica ${id} tnie ${f.punkt.id}`);
       }
     }
@@ -222,4 +225,78 @@ it("układ jest deterministyczny", () => {
         .toEqual(ulozOsCen(ZESTAWY[d].ceny, ZESTAWY[d].oferta, w, mierz));
     }
   }
+});
+
+/* ── CENA ZAKUPU NA OSI (reklamacje) ─────────────────────────────────────────
+   Zielony romb „Kupił za …” stoi na tej samej skali co poziomy i oferta.
+   Pilnujemy, że skala go obejmuje, że etykiety dalej nie nachodzą i że oś
+   rysuje się także bez oferty. Bez zakupu wszystko zostaje jak dotąd.     */
+const ZAKUPY: Record<string, { grosze: number; waluta: string }> = {
+  D1: of(4500), D2: of(6000), D3: of(4500), D4: of(2906), D5: of(1999), D6: of(17900),
+};
+
+describe("cena zakupu na osi", () => {
+  const przypadki = Object.keys(ZESTAWY).flatMap((d) => SZEROKOSCI.map((w) => ({ d, w })));
+  it.each(przypadki)("$d z zakupem przy $w px: bez kolizji albo lista", ({ d, w }) => {
+    const u = ulozOsCen(ZESTAWY[d].ceny, ZESTAWY[d].oferta, w, mierz, ZAKUPY[d]);
+    /* Układ niewykonalny w wąskiej kolumnie wolno oddać listą — nachodzić nie wolno. */
+    if (u.tryb === "lista") return;
+    expect(naruszenia(u)).toEqual([]);
+    expect(u.punkty.filter((p) => p.rodzaj === "zakup")).toHaveLength(1);
+  });
+
+  it("zakup niesie kwotę w etykiecie, bo w reklamacji nie ma karty zakupu", () => {
+    const u = naOsi(ulozOsCen(ZESTAWY.D1.ceny, ZESTAWY.D1.oferta, 350, mierz, ZAKUPY.D1));
+    const zakup = u.punkty.find((p) => p.rodzaj === "zakup");
+    expect(zakup).toMatchObject({ id: "zakup", nazwa: "Kupił za", kwota: "45,00" });
+  });
+
+  it("skala obejmuje zakup: tańszy od wszystkiego stoi na lewym brzegu", () => {
+    const u = naOsi(ulozOsCen(ZESTAWY.D1.ceny, ZESTAWY.D1.oferta, 350, mierz, of(2000)));
+    expect(u.punkty.find((p) => p.rodzaj === "zakup")?.x).toBe(10);
+    expect(u.min).toBe(2000);
+  });
+
+  it("oś rysuje się także bez oferty, gdy jest zakup", () => {
+    const u = naOsi(ulozOsCen(ZESTAWY.D1.ceny, null, 350, mierz, ZAKUPY.D1));
+    expect(u.punkty.some((p) => p.rodzaj === "oferta")).toBe(false);
+    expect(u.punkty.some((p) => p.rodzaj === "zakup")).toBe(true);
+    expect(u.polozenie.zdanie).toBe("Klient zapłacił 45,00 PLN.");
+  });
+
+  it("zdanie pod osią zaczyna się od ceny zakupu, a potem mówi o ofercie", () => {
+    const u = naOsi(ulozOsCen(ZESTAWY.D4.ceny, ZESTAWY.D4.oferta, 350, mierz, ZAKUPY.D4));
+    expect(u.polozenie.zdanie).toMatch(/^Klient zapłacił 29,06 PLN\. Oferta stoi /);
+  });
+
+  it("zakup w innej walucie nie staje na osi, ale zostaje w zdaniu", () => {
+    const u = naOsi(ulozOsCen(ZESTAWY.D1.ceny, ZESTAWY.D1.oferta, 350, mierz, of(4500, "EUR")));
+    expect(u.punkty.some((p) => p.rodzaj === "zakup")).toBe(false);
+    expect(u.polozenie.zdanie).toMatch(/^Klient zapłacił 45,00 EUR\./);
+    expect(ulozOsCen(ZESTAWY.D1.ceny, null, 350, mierz, of(4500, "EUR")).tryb).toBe("lista");
+  });
+
+  it("zakup po cenie z cennika i oferty — trzy znaczniki w jednym miejscu dalej dają oś", () => {
+    /* Najczęstsza reklamacja: klient kupił po detalicznej, a oferta się nie
+       zmieniła. Ogonek zakupu zaczyna się za płytszą etykietą tego miejsca. */
+    const ceny = [c(1, "Detaliczna", 18900, 15366), c(2, "Hurtowa", 13900, 11301), c(3, "Specjalna", 15900, 12927)];
+    for (const w of [335, 350, 414]) {
+      const u = naOsi(ulozOsCen(ceny, of(18900), w, mierz, of(18900)));
+      expect(naruszenia(u), `${w}`).toEqual([]);
+      const zakup = u.etykiety.find((e) => e.punkt.rodzaj === "zakup")!;
+      const start = poczatekOgonka(u, zakup, zakup.strona < 0 ? u.osY - 7 : u.osY + 7);
+      const plytsze = u.etykiety.filter((f) => f !== zakup && f.strona === zakup.strona && f.pas < zakup.pas
+        && Math.abs(f.punkt.x - zakup.punkt.x) < 1.5);
+      for (const f of plytsze) {
+        expect(zakup.strona > 0 ? start >= f.gora + f.wys : start <= f.gora, `${w}: ogonek przez etykietę`).toBe(true);
+      }
+    }
+  });
+
+  it("bez zakupu układ jest dokładnie taki jak dotąd", () => {
+    for (const d of ["D1", "D2", "D6"]) {
+      expect(ulozOsCen(ZESTAWY[d].ceny, ZESTAWY[d].oferta, 350, mierz, null))
+        .toEqual(ulozOsCen(ZESTAWY[d].ceny, ZESTAWY[d].oferta, 350, mierz));
+    }
+  });
 });

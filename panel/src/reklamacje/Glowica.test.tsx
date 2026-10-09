@@ -3,36 +3,17 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import userEvent from "@testing-library/user-event";
-import type {
-  DopasowanieKartoteki, Reklamacja, SzczegolReklamacji, WiadomoscReklamacji, Zamowienie,
-} from "../api/typy";
-import { Fakty } from "../test/fakty";
-
-import { Glowica, kartotekaKolumny } from "./Glowica";
-
-/* Kolumna faktów pyta o cennik kartoteki (`useKartaTowaru`), a ten plik nie
-   stawia klienta TanStacka — pilnuje UKŁADU głowicy i pasa faktów, nie cen. Własne
-   testy cennik ma w `skrzynka/TowarRozmowy.test.tsx`. */
-vi.mock("../api/rozmowy", () => ({
-  useKartaTowaru: () => ({ data: undefined, isLoading: false, error: null }),
-}));
+import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
+import { Glowica, stanSprawy } from "./Glowica";
 
 /* ── Głowica sprawy ──────────────────────────────────────────────────────────
-   Pas na całą szerokość obszaru sprawy, nad rozmową, dowodami i faktami.
-   Te testy pilnują reguł głowicy. Gałęzie zdań A i B sprawdza tabela
-   w `etap.test.ts`; tu sprawdzamy, że głowica je pokazuje.
+   Dwa rzędy nad drogą sprawy i rozmową. Testy pilnują tego, co głowica MA
+   mówić, i tego, czego mówić już nie ma, bo ma to dom gdzie indziej.
 
-   1. KLIENT NA CZELE. Uwaga właściciela: „Client powinien być bardziej
-      widoczny". Login jest nagłówkiem sprawy, a obok stoją profil, historia
-      i liczba jego innych reklamacji.
-   2. TO, CO ROZSTRZYGA, STOI NA WIERZCHU. Czego klient chce i za ile, do kiedy
-      decydować — bez otwierania czegokolwiek. Termin mówi „za ile", nie
-      „którego", bo odejmowanie dat w głowie to praca, którą ekran ma zdjąć.
-   3. TERMIN TYLKO PRZED WERDYKTEM. Po nim liczba dni nie rozstrzyga niczego.
-   4. SŁOWA, NIE KODY. Surowy status Allegro stoi w podpowiedzi zdania.
-   5. SYGNATURA MÓWI, SKĄD JEST — z paragonu albo z dzisiejszego mapowania
-      oferty. To dwie różne rzeczy i ekran je rozróżnia.
-   6. KOLUMNA FAKTÓW NIE POWTARZA GŁOWICY — jeden dom na fakt.            */
+   1. NUMER JEST DRZWIAMI DO ALLEGRO — w nowej karcie, z nazwą dla czytnika.
+   2. KLIENT DA SIĘ SKOPIOWAĆ, a profil domyka drogę klienta w obie strony.
+   3. JEDNA CZYNNOŚĆ NA WIERZCHU: wzięcie sprawy. Reszta pod „⋮”.
+   4. BEZ POWTÓREK: etap rysuje droga, żądanie i zamówienie prawa kolumna.  */
 
 const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   id: 5, externalId: "i-5", numer: "2743634/2026", orderId: "ord-5", offerId: "of-1",
@@ -46,29 +27,17 @@ const rek = (n: Partial<Reklamacja> = {}): Reklamacja => ({
   otwartoAt: "2026-09-10T06:03:00.000Z", kupionoAt: null, kupionoZrodlo: null,
   prowadzi: null, prowadziId: null, prowadziAt: null, tagi: [],
   notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, notatka: null,
-  wersja: 1, kubelek: "decyzja", sygnaly: [], link: null, linkZamowienia: null,
-  linkOferty: null, ofertaNazwa: "GAŹNIK DO STIHL MS181", ofertaZdjecie: "brak",
-  twId: 11, twSymbol: "W09-0804", twZParagonu: true, ...n,
+  wersja: 1, kubelek: "decyzja", sygnaly: [], link: "https://allegro.pl/reklamacja/5",
+  linkZamowienia: "https://allegro.pl/zamowienie/5", linkOferty: "https://allegro.pl/oferta/1",
+  ofertaNazwa: "GAŹNIK DO STIHL MS181", ofertaZdjecie: "brak",
+  twId: 11, twSymbol: "W09-0804", twZParagonu: true,
+  werdykt: null, werdyktNazwa: null, werdyktStatus: null, ...n,
 } as unknown as Reklamacja);
-
-const ZAMOWIENIE = {
-  externalId: "ord-5", dostawaGrosze: 0, dostawaMetoda: "Allegro Paczkomaty InPost",
-  sumaGrosze: 7874, waluta: "PLN", kupionoAt: "2026-09-03T05:57:00.000Z",
-  pozycje: [
-    { offerId: "of-9", sku: null, nazwa: "FILTR PALIWA", ilosc: 1, cenaGrosze: 1049, waluta: "PLN" },
-    { offerId: "of-1", sku: "W09-0804", nazwa: "GAŹNIK DO STIHL MS181", ilosc: 1,
-      cenaGrosze: 6825, waluta: "PLN" },
-  ],
-} as unknown as Zamowienie;
-
-const wiad = (n: Partial<WiadomoscReklamacji>): WiadomoscReklamacji => ({
-  id: 1, externalId: "w-1", autorLogin: "Client:43897233", autorRola: "BUYER",
-  tresc: "Gaźnik nie trzyma obrotów", utworzonoAt: "2026-09-12T08:15:00.000Z", zalaczniki: [], ...n,
-});
 
 const szczegol = (n: Partial<SzczegolReklamacji> = {}, r: Partial<Reklamacja> = {}) => ({
   reklamacja: rek(r), czat: [], zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [],
-  droga: [], kartoteka: null, karta: null, zamowienie: null, przesylka: null, ...n,
+  droga: [], kartoteka: null, karta: null, zamowienie: null, przesylka: null,
+  historia: { towar: null, klient: null }, ...n,
 } as unknown as SzczegolReklamacji);
 
 /* Router, bo głowica prowadzi łączem na profil klienta. */
@@ -76,343 +45,154 @@ const glowica = (n: Partial<SzczegolReklamacji> = {}, r: Partial<Reklamacja> = {
   inne: Partial<React.ComponentProps<typeof Glowica>> = {}) =>
   render(<MemoryRouter><Glowica szczegol={szczegol(n, r)} trwa={false} onProwadze={vi.fn()} {...inne} /></MemoryRouter>);
 
-/** Zdanie A głowicy — rozpoznajemy je po podpowiedzi ze statusem Allegro. */
-const zdanieA = () => screen.getByTitle(/^Status w Allegro|^Allegro nie podało statusu/);
+const PRZESYLKA = { waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null };
 
-const props = (n: Partial<SzczegolReklamacji> = {}, r: Partial<Reklamacja> = {}) => ({
-  szczegol: szczegol(n, r),
+describe("Rząd pierwszy: która to sprawa", () => {
+  it("numer jest nagłówkiem i łączem do Allegro w nowej karcie, z ikoną i nazwą dla czytnika", () => {
+    glowica();
+    const tytul = screen.getByRole("heading", { name: /Reklamacja 2743634\/2026/ });
+    const lacze = within(tytul).getByRole("link");
+    expect(lacze).toHaveAttribute("href", "https://allegro.pl/reklamacja/5");
+    expect(lacze).toHaveAttribute("target", "_blank");
+    expect(lacze).toHaveAttribute("rel", expect.stringContaining("noopener"));
+    expect(within(lacze).getByText("(otwiera się w Allegro)").className).toContain("sr-only");
+  });
+
+  it("bez adresu w Allegro numer stoi sam — bez martwego łącza", () => {
+    glowica({}, { link: null });
+    expect(screen.getByRole("heading", { name: "Reklamacja 2743634/2026" })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Reklamacja/ })).not.toBeInTheDocument();
+  });
+
+  it("plakietka statusu mówi słowem, a surowy kod zostaje w podpowiedzi", () => {
+    glowica();
+    const p = screen.getByText("Czeka na decyzję");
+    expect(p.getAttribute("title")).toMatch(/CLAIM_SUBMITTED/);
+  });
+
+  it("nasz werdykt przed potwierdzeniem Allegro wygrywa ze statusem Allegro", () => {
+    expect(stanSprawy({ statusAllegro: "CLAIM_SUBMITTED", werdyktStatus: "sent", poTerminie: false }).tekst)
+      .toBe("Werdykt czeka na Allegro");
+    expect(stanSprawy({ statusAllegro: "CLAIM_SUBMITTED", werdyktStatus: "send_uncertain", poTerminie: false }).tekst)
+      .toBe("Werdykt niepewny");
+    expect(stanSprawy({ statusAllegro: "CLAIM_ACCEPTED", werdyktStatus: "send_failed", poTerminie: false }).tekst)
+      .toBe("Werdykt nie przeszedł");
+    expect(stanSprawy({ statusAllegro: "CLAIM_SUBMITTED", werdyktStatus: null, poTerminie: true }).tekst)
+      .toBe("Po terminie decyzji");
+    expect(stanSprawy({ statusAllegro: "CLAIM_ACCEPTED", werdyktStatus: null, poTerminie: false }).tekst)
+      .toBe("Uznana");
+  });
+
+  it("status spoza słownika stoi surowo, zamiast zniknąć", () => {
+    glowica({}, { statusAllegro: "COS_NOWEGO" });
+    expect(screen.getByText("Status: COS_NOWEGO")).toBeInTheDocument();
+  });
 });
 
-describe("Klient na czele głowicy", () => {
-  it("login jest nagłówkiem sprawy i da się go skopiować kliknięciem", () => {
+describe("Kto prowadzi — jedyna czynność na wierzchu", () => {
+  it("niczyja sprawa daje „Prowadzę”, a klik idzie do ekranu", async () => {
+    const onProwadze = vi.fn();
+    glowica({}, {}, { onProwadze });
+    const przycisk = screen.getByRole("button", { name: "Prowadzę" });
+    expect(przycisk).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(przycisk);
+    expect(onProwadze).toHaveBeenCalledTimes(1);
+  });
+
+  it("własna sprawa mówi „Prowadzisz” i jest wciśnięta — tym samym kliknięciem się ją odkłada", () => {
+    glowica({}, { prowadzi: "A. Lewandowska", prowadziId: 7 }, { mojeId: 7 });
+    expect(screen.getByRole("button", { name: "Prowadzisz" })).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("cudzej sprawy nie da się odebrać jednym kliknięciem — stoi imię, nie przycisk", () => {
+    glowica({}, { prowadzi: "B. Nowak", prowadziId: 9 }, { mojeId: 7 });
+    expect(screen.getByText("B. Nowak")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Prowadz/ })).not.toBeInTheDocument();
+  });
+});
+
+describe("Menu „⋮”: rzadkie czynności na jawne kliknięcie", () => {
+  it("niesie odświeżenie i pytanie o przesyłkę; nic nie woła się samo", async () => {
+    const onOdswiez = vi.fn();
+    const onSprawdzPrzesylke = vi.fn();
+    glowica({ przesylka: PRZESYLKA }, {}, { onOdswiez, onSprawdzPrzesylke });
+    expect(onOdswiez).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Więcej działań" }));
+    const menu = screen.getByRole("menu", { name: "Więcej działań" });
+    await userEvent.click(within(menu).getByRole("menuitem", { name: "Odśwież z Allegro" }));
+    expect(onOdswiez).toHaveBeenCalledTimes(1);
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Więcej działań" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Sprawdź przesyłkę" }));
+    expect(onSprawdzPrzesylke).toHaveBeenCalledTimes(1);
+  });
+
+  it("bez zamówienia nie ma przesyłki, o którą można zapytać", async () => {
+    glowica({ przesylka: null }, {}, { onOdswiez: vi.fn(), onSprawdzPrzesylke: vi.fn() });
+    await userEvent.click(screen.getByRole("button", { name: "Więcej działań" }));
+    expect(screen.queryByRole("menuitem", { name: "Sprawdź przesyłkę" })).not.toBeInTheDocument();
+  });
+
+  it("Escape zamyka menu i oddaje fokus przyciskowi", async () => {
+    glowica({}, {}, { onOdswiez: vi.fn() });
+    const przycisk = screen.getByRole("button", { name: "Więcej działań" });
+    await userEvent.click(przycisk);
+    expect(screen.getByRole("menuitem", { name: "Odśwież z Allegro" })).toHaveFocus();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+    expect(przycisk).toHaveFocus();
+  });
+});
+
+describe("Rząd drugi: czyja to sprawa", () => {
+  it("login kopiuje się kliknięciem", () => {
     glowica();
-    expect(screen.getByRole("heading", { name: /Client:43897233/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Client:43897233/ }))
       .toHaveAttribute("title", "Kopiuj login: Client:43897233");
   });
 
-  it("obok loginu stoją profil i historia — osobne cele, nie klik w login", () => {
+  it("„Profil klienta” prowadzi na profil — wiązanie drogi klienta w obie strony", () => {
     glowica();
-    expect(screen.getByRole("link", { name: "profil" }))
+    expect(screen.getByRole("link", { name: "Profil klienta" }))
       .toHaveAttribute("href", "/obsluga/klient/Client%3A43897233");
-    expect(screen.getByRole("button", { name: "Historia" })).toBeInTheDocument();
   });
 
-  it("liczba innych reklamacji klienta stoi tylko wtedy, gdy serwer ją podał", () => {
+  it("liczba innych reklamacji stoi tylko wtedy, gdy serwer ją podał — nigdy „pierwsza”", () => {
     const { unmount } = glowica({ historia: { towar: null, klient: { ile: 2, uznanych: 1, odrzuconych: 1 } } });
-    expect(screen.getByText("jeszcze 2 reklamacje u nas (1 uznana, 1 odrzucona)")).toBeInTheDocument();
+    expect(screen.getByText("2 inne reklamacje")).toBeInTheDocument();
     unmount();
-    /* `null` miesza zero z „nie wiemy", więc nic nie dochodzi — nigdy „pierwsza". */
     glowica({ historia: { towar: null, klient: null } });
-    expect(screen.queryByText(/u nas/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/inn[ea] reklamacj/)).not.toBeInTheDocument();
     expect(screen.queryByText(/pierwsza/)).not.toBeInTheDocument();
   });
 
-  it("bez loginu mówi, że Allegro go nie podało — bez profilu, historii i liczby", () => {
+  it("data zgłoszenia stoi cyframi z rokiem", () => {
+    glowica();
+    expect(screen.getByText(/^Zgłoszono \d{2}\.\d{2}\.2026$/)).toBeInTheDocument();
+  });
+
+  it("bez loginu mówi, że Allegro go nie podało — bez profilu i bez liczby", () => {
     glowica({ historia: { towar: null, klient: { ile: 2, uznanych: 0, odrzuconych: 0 } } },
       { kupujacyLogin: null });
-    expect(screen.getByRole("heading", { name: "kupujący: Allegro nie podało loginu" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "profil" })).not.toBeInTheDocument();
+    expect(screen.getByText("kupujący: Allegro nie podało loginu")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Profil klienta" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/inne reklamacje/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Głowica nie powtarza reszty ekranu", () => {
+  it("nie ma zdań etapu, „Chce:” ani łączy zamówienia i oferty", () => {
+    glowica();
+    expect(screen.queryByText(/Chce:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Czeka na naszą decyzję/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /zamówienie/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /oferta/i })).not.toBeInTheDocument();
+    expect(screen.queryByText("GAŹNIK DO STIHL MS181")).not.toBeInTheDocument();
+  });
+
+  it("nie ma historii klienta ani tagów — głowica trzyma tylko kto i która", () => {
+    glowica();
     expect(screen.queryByRole("button", { name: "Historia" })).not.toBeInTheDocument();
-    expect(screen.queryByText(/u nas/)).not.toBeInTheDocument();
-  });
-
-  it("inna sprawa tego zakupu stoi w głowicy z odnośnikiem — bez wskaźnika „↓”", () => {
-    /* Decyzja właściciela: fakty z prawej kolumny idą do głowicy. „Ten zakup
-       u nas" stoi więc w niej, a wskaźnik, który do niego przewijał, odszedł. */
-    const sprawy = [
-      { id: 8, typ: "DISPUTE", numer: null, temat: "inna", statusAllegro: null, decyzjaDo: null,
-        otwartoAt: "2026-09-12T08:15:00.000Z", prowadzi: null, otwarta: true },
-      { id: 9, typ: "CLAIM", numer: "9/2026", temat: "stara", statusAllegro: null, decyzjaDo: null,
-        otwartoAt: "2026-09-01T08:15:00.000Z", prowadzi: null, otwarta: false },
-    ];
-    glowica({ sprawy } as Partial<SzczegolReklamacji>);
-    const zakup = screen.getByRole("region", { name: "Ten zakup u nas" });
-    expect(within(zakup).getByText("inna")).toBeInTheDocument();
-    expect(within(zakup).getByText("stara")).toBeInTheDocument();
-    expect(within(zakup).getAllByRole("link").length).toBeGreaterThan(0);
-    expect(screen.queryByText(/tego zakupu/)).not.toBeInTheDocument();
-  });
-});
-
-describe("Głowica niesie to, co rozstrzyga", () => {
-  it("czego klient chce i ZA ILE stoi na wierzchu, bez otwierania czegokolwiek", () => {
-    glowica();
-    expect(screen.getByText("zwrot pieniędzy")).toBeInTheDocument();
-    expect(screen.getByText("68,25 PLN")).toBeInTheDocument();
-  });
-
-  it("bez kwoty zostaje SŁOWO oczekiwania, a nie puste miejsce po liczbie", () => {
-    glowica({}, { oczekiwanaKwotaGrosze: null });
-    expect(screen.getByText("zwrot pieniędzy")).toBeInTheDocument();
-    expect(screen.queryByText(/PLN/)).not.toBeInTheDocument();
-  });
-
-  it("linia „Chce:” niesie powód i tytuł prawny słowem, nie kodem Allegro", () => {
-    const { unmount } = glowica();
-    const chce = screen.getByText("Chce:").parentElement!;
-    expect(chce).toHaveTextContent("usterka przy używaniu");
-    expect(chce).toHaveTextContent("rękojmia");
-    expect(screen.queryByText("COMPLAINT")).not.toBeInTheDocument();
-    unmount();
-    glowica({}, { prawo: "WARRANTY" });
-    expect(screen.getByText("gwarancja")).toBeInTheDocument();
-  });
-
-  it("nazwa towaru stoi pod kreską jako zdanie, nie jako nagłówek — nagłówkiem jest klient", () => {
-    glowica();
-    expect(screen.getByText("GAŹNIK DO STIHL MS181")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "GAŹNIK DO STIHL MS181" })).not.toBeInTheDocument();
-  });
-
-  it("numer i data zgłoszenia stoją pod „Prowadzi”, a numer da się skopiować", () => {
-    glowica({}, { link: "https://allegro.pl/reklamacja/5" });
-    expect(screen.getByText("2743634/2026")).toBeInTheDocument();
-    expect(screen.getByText(/^zgłoszona /)).toBeInTheDocument();
-    /* Przycisk kopiowania nie niesie numeru w nazwie — kolejka szuka wierszy
-       po numerze i drugi przycisk z nim w nazwie byłby drugim wierszem. */
-    expect(screen.getByTitle("Kopiuj numer reklamacji")).toHaveAccessibleName("Kopiuj");
-    expect(screen.queryByRole("button", { name: /2743634/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Reklamacja w Allegro" }))
-      .toHaveAttribute("href", "https://allegro.pl/reklamacja/5");
-  });
-
-  it("bez adresu w Allegro nie ma martwego łącza", () => {
-    glowica();
-    expect(screen.queryByRole("link", { name: "Reklamacja w Allegro" })).not.toBeInTheDocument();
-  });
-
-  it("termin mówi ZA ILE, a datę zostawia obok", () => {
-    glowica();
-    expect(zdanieA()).toHaveTextContent(/^Czeka na naszą decyzję — termin za 6 dni \(24\.09\.2026, /);
-    expect(screen.getByText("za 6 dni")).toBeInTheDocument();
-  });
-
-  it("PO TERMINIE mówi o sobie wprost — to nie jest „za −1 dzień”", () => {
-    glowica({}, { poTerminie: true, dniDoTerminu: -1 });
-    expect(screen.getByText("minął").className).toContain("text-ranga-zle");
-  });
-
-  it("po NASZYM werdykcie termin znika, a etap mówi jego nazwą", () => {
-    glowica({}, { werdykt: "ACCEPTED_REFUND", werdyktNazwa: "Uznana — zwrot pieniędzy",
-      werdyktStatus: "sent", poTerminie: true, dniDoTerminu: -3 });
-    expect(zdanieA()).toHaveTextContent(
-      "Werdykt „Uznana — zwrot pieniędzy” wysłany — czekamy, aż Allegro potwierdzi.");
-    expect(zdanieA()).not.toHaveTextContent(/termin/);
-  });
-
-  it("nieudany werdykt werdyktem nie jest — termin zostaje", () => {
-    glowica({}, { werdykt: "ACCEPTED_REFUND", werdyktNazwa: "Uznana — zwrot pieniędzy",
-      werdyktStatus: "send_failed" });
-    expect(zdanieA()).toHaveTextContent(/^Werdykt nie przeszedł/);
-    expect(screen.getByText("za 6 dni")).toBeInTheDocument();
-  });
-
-  it("werdykt z Centrum Sprzedaży mówi, skąd jest — i też zdejmuje termin", () => {
-    glowica({}, { statusAllegro: "CLAIM_ACCEPTED", kubelek: "zamknieta" });
-    expect(zdanieA()).toHaveTextContent("Uznana w Centrum Sprzedaży, poza panelem.");
-    expect(zdanieA()).not.toHaveTextContent(/termin/);
-  });
-
-  it("status Allegro stoi słowem, a dokładna wartość zostaje pod kursorem", () => {
-    glowica();
-    expect(screen.queryByText(/CLAIM_SUBMITTED/)).not.toBeInTheDocument();
-    expect(zdanieA()).toHaveAttribute("title", "Status w Allegro: CLAIM_SUBMITTED");
-  });
-
-  it("status, którego nic nie tłumaczy, stoi jawnie zamiast zniknąć", () => {
-    glowica({}, { statusAllegro: "CLAIM_COS_NOWEGO" });
-    expect(zdanieA()).toHaveTextContent("Allegro podało status, którego nie znamy: CLAIM_COS_NOWEGO");
-  });
-
-  it("ostatnie słowo mówi, czyj jest ruch — automat Allegro go nie przejmuje", () => {
-    glowica({ czat: [
-      wiad({ id: 1, autorRola: "SELLER", autorLogin: "sklep" }),
-      wiad({ id: 2, autorRola: "BUYER" }),
-      wiad({ id: 3, autorRola: "SYSTEM", autorLogin: null }),
-    ] });
-    expect(screen.getByText(/^Ostatnia wiadomość od klienta: /)).toBeInTheDocument();
-  });
-
-  it("po naszej odpowiedzi ostatnie słowo jest NASZE", () => {
-    glowica({ czat: [wiad({ id: 1 }), wiad({ id: 2, autorRola: "SELLER", autorLogin: "sklep" })] });
-    expect(screen.getByText(/^Ostatnia wiadomość nasza: /)).toBeInTheDocument();
-  });
-
-  it("klient czekający na nas dostaje bursztyn i kropkę — ten sam sygnał co czip kolejki", () => {
-    glowica({ czat: [wiad({ id: 1 })] }, { sygnaly: ["klient_czeka"] });
-    const zdanie = screen.getByText(/czeka na naszą odpowiedź/);
-    expect(zdanie.className).toContain("text-ranga-uwaga");
-    expect(zdanie.querySelector(".rounded-full")).not.toBeNull();
-  });
-
-  it("los towaru wg Allegro stoi zdaniem przed werdyktem", () => {
-    glowica();
-    expect(screen.getByText(/Towar ma wrócić do nas \(tak podaje Allegro\)\./)).toBeInTheDocument();
-  });
-});
-
-describe("Wiersz towaru mówi, skąd jest sygnatura", () => {
-  it("sygnatura Z PARAGONU jest tak podpisana", () => {
-    glowica();
-    expect(screen.getByText("W09-0804")).toBeInTheDocument();
-    expect(screen.getByText("z paragonu")).toBeInTheDocument();
-  });
-
-  it("sygnatura z dzisiejszego mapowania NIE udaje paragonu", () => {
-    glowica({}, { twZParagonu: false });
-    expect(screen.getByText("z mapowania oferty")).toBeInTheDocument();
-    expect(screen.queryByText("z paragonu")).not.toBeInTheDocument();
-  });
-
-  it("bez kartoteki mówi ZDANIEM serwera, czemu jej nie ma — nie kodem powodu", () => {
-    glowica({ kartoteka: { pewnosc: "brak", twId: null, symbol: null,
-      zrodlo: "oferta nie ma SKU", powod: "brak_sku" } }, { twId: null, twSymbol: null });
-    expect(screen.getByText("oferta nie ma SKU")).toBeInTheDocument();
-    expect(screen.queryByText("brak_sku")).not.toBeInTheDocument();
-  });
-
-  it("sygnatura z SKU oferty mówi, że stoi za nią SKU, a nie paragon ani człowiek", () => {
-    glowica({ kartoteka: { pewnosc: "sku", twId: 42, symbol: "14-25001",
-      zrodlo: "SKU oferty", powod: null } }, { twId: null, twSymbol: null });
-    expect(screen.getByText("14-25001")).toBeInTheDocument();
-    expect(screen.getByText("z SKU oferty")).toBeInTheDocument();
-  });
-
-  it("bez oferty mówi to wprost, zamiast pustej linii", () => {
-    glowica({}, { ofertaNazwa: null });
-    expect(screen.getByText("Oferty nie pobrano")).toBeInTheDocument();
-  });
-});
-
-describe("Kartoteka efektywna", () => {
-  /* Symbol z sugestii po SKU, a stan z samego `twId` sprawy, to dwa różne
-     towary na jednym ekranie. Paragon i mapowanie wygrywają; bez nich liczy
-     się wyłącznie kartoteka wywiedziona pewnie — ta sama reguła co na serwerze. */
-  const k = (pewnosc: DopasowanieKartoteki["pewnosc"], twId: number | null): DopasowanieKartoteki =>
-    ({ pewnosc, twId, symbol: "X", zrodlo: "zdanie serwera", powod: null });
-  const sprawa = (twId: number | null, kartoteka: DopasowanieKartoteki | null) =>
-    ({ reklamacja: rek({ twId, twSymbol: twId === null ? null : "W09-0804" }), kartoteka });
-
-  it("paragon albo mapowanie wygrywa z każdą kartoteką wywiedzioną", () => {
-    expect(kartotekaKolumny(sprawa(11, k("sku", 99))))
-      .toEqual({ twId: 11, symbol: "W09-0804", zrodlo: "paragon" });
-  });
-
-  it("bez nich bierze kartotekę PEWNĄ — z pamięci wskazań albo jedynego trafienia po SKU", () => {
-    expect(kartotekaKolumny(sprawa(null, k("sku", 99)))).toEqual({ twId: 99, symbol: "X", zrodlo: "sku" });
-    expect(kartotekaKolumny(sprawa(null, k("pamiec", 98))))
-      .toEqual({ twId: 98, symbol: "X", zrodlo: "mapowanie" });
-  });
-
-  it("trafienie niepewne nie wchodzi — zgadywanie to nie kartoteka", () => {
-    const brak = { twId: null, symbol: null, zrodlo: null };
-    expect(kartotekaKolumny(sprawa(null, k("jedyna_pozycja", 97)))).toEqual(brak);
-    expect(kartotekaKolumny(sprawa(null, k("nazwa_w_zamowieniu", 96)))).toEqual(brak);
-    expect(kartotekaKolumny(sprawa(null, k("niejednoznaczne", null)))).toEqual(brak);
-    expect(kartotekaKolumny(sprawa(null, null))).toEqual(brak);
-  });
-});
-
-describe("Kto prowadzi — czynność stoi w głowicy", () => {
-  it("niczyja sprawa daje „Prowadzę tę sprawę”, a klik idzie do ekranu", async () => {
-    const onProwadze = vi.fn();
-    glowica({}, {}, { onProwadze });
-    await userEvent.click(screen.getByRole("button", { name: "Prowadzę tę sprawę" }));
-    expect(onProwadze).toHaveBeenCalledTimes(1);
-  });
-
-  it("własną sprawę da się odłożyć, a cudzej — nie odebrać jednym kliknięciem", () => {
-    const { unmount } = glowica({}, { prowadzi: "A. Lewandowska", prowadziId: 7 }, { mojeId: 7 });
-    expect(screen.getByText("Ty")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Odłóż sprawę" })).toBeInTheDocument();
-    unmount();
-    glowica({}, { prowadzi: "A. Lewandowska", prowadziId: 9 }, { mojeId: 7 });
-    expect(screen.getByText("A. Lewandowska")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Odłóż|Prowadzę/ })).not.toBeInTheDocument();
-  });
-});
-
-describe("Pas faktów nie powtarza reszty głowicy", () => {
-  it("kwoty żądania i terminu w pasie faktów nie ma — mówi je zdanie wyżej", () => {
-    render(<Fakty {...props()} />);
-    expect(screen.queryByText("za 6 dni")).not.toBeInTheDocument();
-    expect(screen.queryByText("68,25 PLN")).not.toBeInTheDocument();
-  });
-
-  it("zwijki „Sprawa” nie ma — numer, login, zgłoszenie, tytuł i status mają dom w głowicy", () => {
-    render(<Fakty {...props()} />);
-    expect(screen.queryByRole("button", { name: /^Sprawa/ })).not.toBeInTheDocument();
-    for (const fakt of ["2743634/2026", "Client:43897233", "rękojmia", "CLAIM_SUBMITTED"]) {
-      expect(screen.queryByText(new RegExp(fakt))).not.toBeInTheDocument();
-    }
-  });
-});
-
-describe("Komórka zamówienia i odnośniki do Allegro", () => {
-  const zamowienie = () => screen.getByText("Zamówienie").parentElement!;
-
-  it("cenę spornej pozycji niesie „Klient zapłacił”, a zamówienie pokazuje tylko resztę", () => {
-    render(<Fakty {...props({ zamowienie: ZAMOWIENIE }, { oczekiwanie: "EXCHANGE", oczekiwanaKwotaGrosze: null })} />);
-    expect(screen.getByText("Klient zapłacił").parentElement!).toHaveTextContent("68,25 PLN");
-    expect(screen.getByText("1 × 10,49 PLN")).toBeVisible();
-    expect(screen.queryByText("1 × 68,25 PLN")).not.toBeInTheDocument();
-  });
-
-  it("komórka liczy inne pozycje, a suma ma w niej JEDEN dom", () => {
-    render(<Fakty {...props({ zamowienie: ZAMOWIENIE }, { oczekiwanie: "EXCHANGE" })} />);
-    expect(zamowienie()).toHaveTextContent("+1 inna pozycja");
-    expect(zamowienie()).toHaveTextContent("razem 78,74 PLN");
-    expect(screen.getAllByText(/78,74 PLN/)).toHaveLength(1);
-  });
-
-  it("przy jednej pozycji z darmową dostawą suma nie powtarza „Klient zapłacił”", () => {
-    const jedna = { ...ZAMOWIENIE, pozycje: [ZAMOWIENIE.pozycje[1]], sumaGrosze: 6825 } as unknown as Zamowienie;
-    render(<Fakty {...props({ zamowienie: jedna }, { oczekiwanie: "EXCHANGE", oczekiwanaKwotaGrosze: null })} />);
-    expect(zamowienie()).toHaveTextContent("tylko ten towar");
-    expect(zamowienie()).toHaveTextContent("dostawa 0,00 PLN, Allegro Paczkomaty InPost");
-    expect(zamowienie()).not.toHaveTextContent("68,25");
-  });
-
-  it("przy kilku sztukach suma zostaje — komórka obok niesie cenę jednej sztuki", () => {
-    const dwie = { ...ZAMOWIENIE, pozycje: [{ ...ZAMOWIENIE.pozycje[1], ilosc: 2 }], sumaGrosze: 13650 } as unknown as Zamowienie;
-    render(<Fakty {...props({ zamowienie: dwie }, { oczekiwanaKwotaGrosze: null })} />);
-    expect(zamowienie()).toHaveTextContent("razem 136,50 PLN");
-  });
-
-  it("nieznana dostawa to nie zero — suma zostaje", () => {
-    const jedna = { ...ZAMOWIENIE, pozycje: [ZAMOWIENIE.pozycje[1]], dostawaGrosze: null, sumaGrosze: 6825 } as unknown as Zamowienie;
-    render(<Fakty {...props({ zamowienie: jedna }, { oczekiwanaKwotaGrosze: null })} />);
-    expect(zamowienie()).toHaveTextContent("razem 68,25 PLN");
-  });
-
-  it("z płatną dostawą suma zostaje — koszt dostawy kształtuje kwotę zwrotu", () => {
-    const jedna = { ...ZAMOWIENIE, pozycje: [ZAMOWIENIE.pozycje[1]], dostawaGrosze: 999, sumaGrosze: 7824 } as unknown as Zamowienie;
-    render(<Fakty {...props({ zamowienie: jedna })} />);
-    expect(zamowienie()).toHaveTextContent("dostawa 9,99 PLN, Allegro Paczkomaty InPost · razem 78,24 PLN");
-  });
-
-  it("identyfikatory zamówienia i oferty stoją w łączach przy numerze reklamacji, nie jako tekst", () => {
-    glowica({}, { linkZamowienia: "https://allegro.pl/z/ord-5", linkOferty: "https://allegro.pl/oferta/of-1" });
-    /* Czytnik ekranu dostaje cel odnośnika, na widoku stoi krótko. */
-    expect(screen.getByRole("link", { name: "zamówienie w Allegro" })).toHaveAttribute("title", "Zamówienie ord-5");
-    expect(screen.getByRole("link", { name: "oferta w Allegro" })).toHaveAttribute("title", "Oferta of-1");
-    expect(screen.getByTitle("Kopiuj numer zamówienia")).toBeInTheDocument();
-    expect(screen.queryByText("ord-5")).not.toBeInTheDocument();
-  });
-});
-
-describe("Pracy biura nie ma", () => {
-  /* Decyzja właściciela: sekcja „Praca biura" — tagi i notatka — odeszła
-     z ekranu reklamacji. Zapiski o sprawie stoją w kolumnie dowodów. */
-  it("głowica z pasem faktów nie niesie ani tagów, ani notatki", () => {
-    glowica({}, {
-      tagi: [{ id: 1, nazwa: "czeka na część" }],
-      notatka: "Klient dzwonił, prosi o szybką wymianę",
-    } as Partial<Reklamacja>);
-    expect(screen.queryByText(/Praca biura/)).not.toBeInTheDocument();
-    expect(screen.queryByText("czeka na część")).not.toBeInTheDocument();
-    expect(screen.queryByText(/Klient dzwonił/)).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox")).toBeNull();
+    expect(screen.queryByText(/Tag/)).not.toBeInTheDocument();
   });
 });

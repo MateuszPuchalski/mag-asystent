@@ -1,52 +1,6 @@
-import type { StatusWerdyktu, Werdykt } from "../api/typy";
-
-/* Nazwy werdyktów PO POLSKU — wzór `skrzynka/statusy.ts`: `Record<Werdykt, string>`
-   sprawia, że nowa wartość w typie nie skompiluje się bez etykiety. Serwer ma
-   swoją kopię tych zdań (`werdyktNazwa` na wierszu) — ta służy WYŁĄCZNIE liście
-   wyboru, zanim werdykt istnieje. Kolejność w listach jest kolejnością ze
-   schematu Allegro, nie częstością użycia: agent uczy się jednego porządku. */
-export const NAZWA_WERDYKTU: Record<Werdykt, string> = {
-  ACCEPTED_REPAIR: "Uznana — naprawa",
-  ACCEPTED_REFUND: "Uznana — zwrot pieniędzy",
-  ACCEPTED_EXCHANGE: "Uznana — wymiana",
-  ACCEPTED_PARTIAL_REFUND: "Uznana — częściowy zwrot pieniędzy",
-  REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED: "Odrzucona — kupujący nie spełnił dodatkowych wymagań",
-  REJECTED_PRODUCT_NOT_RETURNED: "Odrzucona — towar nie wrócił",
-  REJECTED_PRODUCT_DAMAGED_BY_USER: "Odrzucona — uszkodzenie z winy użytkownika",
-  REJECTED_PRODUCT_CONFORMS_TO_CONTRACT: "Odrzucona — towar zgodny z umową",
-  REJECTED_MINOR_DEFECT: "Odrzucona — wada nieistotna",
-  REJECTED_OTHER: "Odrzucona — inny powód",
-  REJECTED_CLAIM_WITHDRAWN_BY_BUYER: "Odrzucona — kupujący wycofał reklamację",
-};
-
-/* Dwie gałęzie po dwóch przyciskach (prawo Hicka): najpierw „UZNAJĘ" albo
-   „ODRZUCAM", dopiero potem lista czterech albo siedmiu. Jedenaście pozycji
-   w jednym `select` to jedenaście decyzji naraz. */
-export const UZNANIA: Werdykt[] = [
-  "ACCEPTED_REPAIR", "ACCEPTED_REFUND", "ACCEPTED_EXCHANGE", "ACCEPTED_PARTIAL_REFUND",
-];
-export const ODMOWY: Werdykt[] = [
-  "REJECTED_ADDITIONAL_REQUIREMENTS_NOT_COMPLETED", "REJECTED_PRODUCT_NOT_RETURNED",
-  "REJECTED_PRODUCT_DAMAGED_BY_USER", "REJECTED_PRODUCT_CONFORMS_TO_CONTRACT",
-  "REJECTED_MINOR_DEFECT", "REJECTED_OTHER", "REJECTED_CLAIM_WITHDRAWN_BY_BUYER",
-];
-
-/* ── SŁOWA ZDANIA „CO SIĘ DZIEJE” ────────────────────────────────────────────
-   Głowica mówi etap sprawy zdaniem, a nie kodem (`etap.ts`). Słowa stoją
-   w mapach `Record`, więc nowy stan werdyktu albo nowy status Allegro
-   dopisany do typu nie skompiluje się bez swojego zdania. Łańcuch `?:`
-   przy renderze podpisałby nowość ostatnią gałęzią, czyli skłamałby. */
-
-/** Los próby werdyktu zdaniem. `send_uncertain` mówi wprost, czego NIE robić. */
-export const ZDANIE_STANU_WERDYKTU: Record<StatusWerdyktu, (nazwa: string, kwota: string | null) => string> = {
-  sending: (nazwa) => `Werdykt „${nazwa}” jest w drodze do Allegro.`,
-  sent: (nazwa, kwota) => `Werdykt „${nazwa}”${kwota ? ` ${kwota}` : ""} wysłany — czekamy, aż Allegro potwierdzi.`,
-  send_uncertain: (nazwa) =>
-    `Nie wiemy, czy werdykt „${nazwa}” doszedł — sprawdź w Centrum Sprzedaży i nie wysyłaj go drugi raz.`,
-  /* Bez kropki, bo za tym zdaniem idzie termin: werdyktu nie ma, więc zegar
-     dalej biegnie. Treść błędu stoi w bloku werdyktu, przy ponowieniu. */
-  send_failed: () => "Werdykt nie przeszedł — popraw go w bloku Werdykt i wyślij jeszcze raz",
-};
+/* Słowniki stanu reklamacji wspólne dla głowicy, drogi i karty decyzji.
+   Stoją w mapach `Record`, więc nowy kod dopisany do typu nie skompiluje
+   się bez swojego słowa. */
 
 /** Statusy reklamacji ze specyfikacji Allegro (`PostPurchaseIssueStatus`). */
 export type StatusAllegro =

@@ -1,87 +1,66 @@
-import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ShieldQuestion } from "lucide-react";
+import { Search, ShieldQuestion } from "lucide-react";
 import {
-  useDodajZalacznikSprawy, useOdpowiedz, useOdswiez,
-  useSprawdzPrzesylke, useUsunZalacznikSprawy, useZalacznikiSprawy,
-  useProwadze, useReklamacja, useReklamacje, useSynchronizuj,
-  useWerdykt, useZwrotTowaru, useDodajDowod, useUsunDowod, useZapiszUDostawcy,
+  useCofnijNotatkeReklamacji, useDodajZalacznikSprawy, useNotatkaReklamacji, useOdpowiedz,
+  useOdswiez, useProwadze, useReklamacja, useReklamacje, useSprawdzPrzesylke, useSynchronizuj,
+  useUsunZalacznikSprawy, useWerdykt, useZalacznikiSprawy, useZwrotTowaru,
 } from "../api/reklamacje";
 import { useJa } from "../api/rozmowy";
 import { Konflikt } from "../api/klient";
 import { naBase64 } from "../api/plik";
 import type {
-  KubelekReklamacji, ProgKolejki, Reklamacja, StanReklamacji, SzczegolyWysylki, WiadomoscReklamacji,
+  KubelekReklamacji, Reklamacja, SzczegolyWysylki, WiadomoscReklamacji,
 } from "../api/typy";
 import { DialogKonfliktu } from "../skrzynka/DialogKonfliktu";
 import { Edytor } from "../reklamacje/Edytor";
 import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamacje/Werdykt";
 import { useSzkicSprawy } from "../sprawy/useSzkicSprawy";
-import { Blad, Karta, Przycisk, Pusto } from "../ui";
-import { FiltrZWiecej } from "../ui/FiltrZWiecej";
-import {
-  KUBELKI, Kolejka, SYGNALY, kwotaWiersza, wGrupach, wspolneSygnaly,
-} from "../reklamacje/Kolejka";
+import { Blad, Karta, Pusto } from "../ui";
+import { KUBELKI, Kolejka, kwotaWiersza, wGrupach } from "../reklamacje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
-import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
+import { posortuj, usePorzadek, type OsPorzadku } from "../sprawy/Porzadek";
 import { PasekProgu } from "../sprawy/Prog";
-import { PasekTla, tloAlarmuje } from "../sprawy/PasekTla";
-import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
-import { SkrotyKlawiszy } from "../sprawy/Skroty";
+import { tagiWgLiczby } from "../sprawy/Tagi";
 import { Czat } from "../reklamacje/Czat";
 import { Glowica } from "../reklamacje/Glowica";
-import { KolumnaDowodow, zdjeciaSprawy } from "../reklamacje/KolumnaDowodow";
+import { DrogaSprawy } from "../reklamacje/DrogaSprawy";
+import { zdarzeniaPrzesylek } from "../reklamacje/przesylki";
+import { Kafle } from "../reklamacje/Kafle";
+import { PrzelacznikKubelkow } from "../reklamacje/Przelacznik";
+import { FiltrKolejki } from "../reklamacje/Filtr";
+import { Produkt } from "../reklamacje/Produkt";
+import { Notatka } from "../reklamacje/Notatka";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 import { klawiszZajety } from "../nawigacja/fokus";
 
-/* ── Ekran reklamacji (0.222.0, odpowiedź od 0.224.0, werdykt od przyrostu trzeciego) ──
-   KOLEJKA PO LEWEJ, SPRAWA PO PRAWEJ. Sprawa to głowica na całą szerokość,
-   a pod nią trzy kolumny: rozmowa, która rośnie, dowody ze zdjęciami tuż
-   obok niej i fakty do decyzji. Dowody stoją przy rozmowie, bo czyta się je
-   razem — klient pisze „na zdjęciu widać", a zdjęcie stoi obok, nie pod
-   trzema zwijkami. Na węższym oknie fakty schodzą pod dowody, a na wąskim
-   wszystko łamie się w dół. Wspólna siatka trzech kolumn zostaje dla
-   pozostałych ekranów obsługi bez zmian.
+/* ── Ekran reklamacji: kafle i trzy kolumny ──────────────────────────────────
+   Na górze cztery liczby dnia i stan synchronizacji. Pod nimi kolejka,
+   sprawa i decyzja. Kolejka po lewej, bo od niej zaczyna się każda praca.
+   Sprawa w środku rośnie, bo rozmowę czyta się najdłużej. Decyzja z faktami
+   stoi po prawej, bo nieodwracalne pytanie zadaje się PO rozmowie.
 
-   OD 0.224.0 ODPOWIEDŹ WYCHODZI STĄD, a od przyrostu trzeciego także WERDYKT
-   i stanowisko o towarze — w kolumnie faktów, pod faktami, z których się go
-   wydaje (`reklamacje/Werdykt.tsx`). Kryterium §25 „bez otwierania panelu
-   Allegro" jest przy reklamacji spełnione.
+   UKŁAD ŁAMIE SIĘ W DÓŁ, NIE W BOK. Na szerokim oknie każda kolumna przewija
+   się osobno, a na wąskim albo przy powiększeniu 200% kolumny spadają pod
+   siebie i przewija się cały ekran. Nic nie wychodzi za kadr (WCAG 1.4.4).
 
    TRZY RODZAJE 409 i każdy każe co innego zrobić: dopisek klienta albo doradcy
    otwiera dialog z jawną zgodą, zamknięta rozmowa kończy temat, a rozjazd
    wersji każe odświeżyć. Rozróżnia je EKRAN, nie hak — ten sam podział co
-   w skrzynce, bo tam ta sama sztuczka kosztowała blizna 0.110.0. Stanowisko
-   o towarze idzie tą samą kolejką, więc dostaje TEN SAM triage (`dopisek()`),
-   a nie drugą kopię.
+   w skrzynce. Stanowisko o towarze dostaje TEN SAM triage (`dopisek()`).
 
-   Klawiatura DZIAŁA JUŻ TERAZ w tej części, która niczego nie zapisuje:
-   strzałki chodzą po kolejce, cyfry przełączają kubełek. Odruch buduje się od
-   pierwszego wydania, a nie po dołożeniu zapisu.                            */
+   Klawiatura działa bez podpowiedzi na ekranie: strzałki i j/k chodzą po
+   kolejce, cyfry przełączają kubełek, m i n — sito. Odruch zostaje, a miejsce
+   po podpowiedziach oddaliśmy liście. */
 
-/* ── SIATKA EKRANU: KOLEJKA I SPRAWA ─────────────────────────────────────────
-   Kolejka ma tę samą szerokość co w pozostałych ekranach obsługi — ręka
-   i oko znają ją z nich. Resztę bierze sprawa, a jej kolumny układa
-   `SIATKA_SPRAWY`. Wspólnej siatki trzech kolumn tu nie ma, bo głowica
-   sprawy biegnie nad trzema kolumnami, a tamta siatka ma ich trzy obok
-   kolejki i używają jej inne ekrany. */
-const SIATKA_REKLAMACJI =
-  "grid gap-4 lg:min-h-0 lg:flex-1 lg:grid-rows-[minmax(0,1fr)] " +
-  "lg:grid-cols-[21rem_minmax(0,1fr)] xl:grid-cols-[23rem_minmax(0,1fr)]";
-
-/* ROZMOWA ROŚNIE, a dowody z werdyktem stoją w jednej wąskiej kolumnie.
-   Fakty stoją w głowicy, więc werdykt sam w drugiej kolumnie zostawiałby
-   pod sobą pustą kartę na całą wysokość. Jedna kolumna oddaje tę szerokość
-   rozmowie. Na wąskim oknie wszystko łamie się w dół. */
-const SIATKA_SPRAWY =
-  "grid min-h-0 gap-4 lg:flex-1 lg:grid-rows-[minmax(0,1fr)] " +
-  "lg:grid-cols-[minmax(0,1fr)_20rem] 2xl:grid-cols-[minmax(0,1fr)_22rem]";
-const KOLUMNY_OBOK_ROZMOWY = "flex min-h-0 flex-col gap-4 lg:overflow-y-auto";
-/* Karta w kolumnie NIE KURCZY SIĘ. Kolumna jest flexem o stałej wysokości
-   i to ona przewija obie karty razem. Kurcząca się karta oddawałaby treść
-   poza swoją ramkę, pod sąsiednią kartę, a odnośnik „Z1" z wątku przewijałby
-   do zdjęcia, którego nie widać. */
-const KARTA_OBOK_ROZMOWY = "shrink-0";
+/* Na szerokim oknie trzy kolumny w siatce, każda z własnym przewijaniem.
+   Poniżej `xl` ten sam kontener jest flexem z zawijaniem, więc kolumny same
+   spadają pod siebie, a sprawa bierze resztę szerokości. */
+const UKLAD = "flex flex-wrap items-start gap-4 "
+  + "xl:grid xl:min-h-0 xl:flex-1 xl:grid-cols-[22rem_minmax(0,1fr)_22rem] "
+  + "xl:grid-rows-[minmax(0,1fr)] xl:items-stretch 2xl:grid-cols-[24rem_minmax(0,1fr)_24rem]";
+const KOLUMNA = "min-w-0 xl:min-h-0";
+const KARTA = "rounded-xl border border-slate-200 bg-white shadow-sm";
 
 /* Niepewny los stanowiska o towarze. Serwer drugiego nie wyśle, a nic
    w panelu tej próby nie rozstrzyga, więc zdanie wskazuje Centrum Sprzedaży
@@ -89,127 +68,17 @@ const KARTA_OBOK_ROZMOWY = "shrink-0";
 const TOWAR_NIEPEWNY = "Stanowisko o towarze mogło nie dojść do kupującego. "
   + "Sprawdź w Centrum Sprzedaży, czy je dostał — panel drugiego nie wyśle.";
 
-/* Statusy synchronizacji po polsku. Słownik z §7 mówi je po angielsku, bo
-   dzieli je ze skrzynką i ze zwrotami — a pasek czyta człowiek przy biurku. */
-const STANY: Record<StanReklamacji["status"], string> = {
-  current: "działa",
-  delayed: "opóźniona",
-  rate_limited: "wstrzymana limitem Allegro",
-  authentication_error: "odmowa logowania do Allegro",
-  failed: "nie działa",
+/** Osie porządku tej kolejki; pierwsza jest domyślna. */
+const OSIE: OsPorzadku[] = ["termin", "otwarto", "ruch", "kwota"];
+
+/* Porządek słowami pod przełącznikiem kubełków. Wybiera się go w filtrze,
+   a zdanie mówi bez otwierania filtra, w jakiej kolejności stoi lista. */
+const OPIS_PORZADKU: Partial<Record<OsPorzadku, string>> = {
+  termin: "Najpilniejsze na górze",
+  otwarto: "Najnowsze na górze",
+  ruch: "Ostatni ruch na górze",
+  kwota: "Najdroższe na górze",
 };
-
-/**
- * Ile spraw NIE WESZŁO do tej kolejki.
- *
- * Bezpiecznik stron urywa listę cicho: przebieg kończy się sukcesem, a reszta
- * zostaje po tamtej stronie. Kolejka ustawia się według terminu decyzji, więc
- * brakujące wiersze byłyby w większości tymi najbardziej spóźnionymi — czyli
- * dokładnie tymi, dla których ten ekran istnieje.
- *
- * Zero i `null` MILCZĄ: zero znaczy „lista skończyła się sama", `null` — że
- * Allegro nie podało liczby.
- */
-function PasekOgona({ stan }: { stan: StanReklamacji }) {
-  if (!stan.pozostaloDoPobrania) return null;
-  return <div className="shrink-0 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-900">
-    <b>Ta kolejka nie jest kompletna: {stan.pozostaloDoPobrania} spraw czeka
-      po stronie Allegro.</b>{" "}
-    Ostatni przebieg stanął na bezpieczniku stron. Dociągną się kolejnymi
-    przebiegami — ale dopóki liczba tu stoi, najstarszych reklamacji może
-    w tej liście nie być.
-  </div>;
-}
-
-/** Pasek synchronizacji z przyciskiem — mówi też, ile dyskusji odsialiśmy. */
-function PasekSynchronizacji({ stan, trwa, blad, onSynchronizuj }: {
-  stan: StanReklamacji; trwa: boolean; blad: string; onSynchronizuj: () => void;
-}) {
-  const zle = stan.status !== "current";
-  return <div className={`flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1 rounded-lg
-    px-3 py-2 text-xs ${zle ? "border border-red-200 bg-red-50 text-red-900"
-      : "border border-slate-200 bg-slate-50 text-slate-600"}`}>
-    <span>Synchronizacja reklamacji: <b>{STANY[stan.status]}</b>
-      {stan.kodOstatniegoBledu ? `, kod ${stan.kodOstatniegoBledu}` : ""}</span>
-    {/* Liczba odsianych dyskusji NIE JEST błędem — to zakres panelu, decyzja
-        właściciela. Stoi tu, żeby nikt nie szukał „zaginionej" reklamacji,
-        która nigdy reklamacją nie była. */}
-    {stan.dyskusjiPominietych !== null && stan.dyskusjiPominietych > 0 &&
-      <span title="Panel prowadzi wyłącznie reklamacje; dyskusje zostają w Allegro">
-        dyskusji pominiętych: <b className="tabular-nums">{stan.dyskusjiPominietych}</b></span>}
-    {blad && <span className="w-full text-red-800">{blad}</span>}
-    <Przycisk className="ml-auto !px-2 !py-1 !text-xs" disabled={trwa} onClick={onSynchronizuj}>
-      {trwa ? "Pobieram…" : "Synchronizuj teraz"}
-    </Przycisk>
-  </div>;
-}
-
-/**
- * Stopka kolejki — zakres listy i stan synchronizacji pod ostatnim wierszem.
- *
- * W CISZY JEDNA LINIA: `PasekTla` z progiem i liczbą odsianych dyskusji
- * oraz cichy przycisk „synchronizuj". W ALARMIE wracają pełne, kolorowe
- * paski — próg z żywym terminem, niekompletna lista, zła synchronizacja.
- * Schowanie alarmu w stopce byłoby kupieniem pikseli za pracę, której nikt
- * nie zobaczy, więc paski są te same co dotąd, tylko niżej.
- *
- * PRZYCISK SYNCHRONIZACJI JEST ZAWSZE I DOKŁADNIE JEDEN. Ekran dyskusji
- * swojego nie ma i odsyła tutaj, więc reklamacje nie mogą go zgubić także
- * w pełnej ciszy, gdy `PasekTla` nie ma nic do powiedzenia. Drugi przycisk
- * obok głośnego paska byłby drugą drogą do limitu 429. Dlatego cichy stoi
- * poza `PasekTla` i znika, gdy pojawia się głośny pasek z własnym.
- *
- * Błąd synchronizacji nie chowa się nigdy: stoi w głośnym pasku albo,
- * gdy tego nie ma, osobną linią pod spodem.
- */
-function StopkaKolejki({ prog, stan, alarm, trwa, blad, onPrzelaczProg, onSynchronizuj }: {
-  prog?: ProgKolejki | null;
-  stan?: StanReklamacji;
-  alarm: boolean;
-  trwa: boolean;
-  blad: string;
-  onPrzelaczProg: (zdejmij: boolean) => void;
-  onSynchronizuj: () => void;
-}) {
-  const glosnaSynchronizacja = alarm && Boolean(stan);
-  /* ── CISZA NIE MA CO MÓWIĆ (0.402.0) ─────────────────────────
-     Do 0.401.0 stało tu „synchronizacja: działa" — zdanie, które
-     w stanie normalnym jest prawdziwe ZAWSZE i przez to nie niesie
-     nic. Zgłoszenie właściciela o chaosie ekranu trafia w to wprost:
-     zasada 10 projektu żąda widocznej AWARII, nie widocznego spokoju.
-
-     Zostaje wyłącznie to, co odstaje: stan inny niż `current` (wtedy
-     i tak alarmuje `tloAlarmuje`) oraz pominięte dyskusje, których
-     liczba jest faktem o niekompletnej liście. Gdy nie ma ani jednego,
-     pole jest puste i wiersz kurczy się do samego progu. */
-  const stanTekst = stan && (stan.status !== "current" || stan.dyskusjiPominietych)
-    ? [
-      stan.status === "current" ? null
-        : `synchronizacja: ${STANY[stan.status] ?? stan.status}`,
-      stan.dyskusjiPominietych ? `pominiętych dyskusji ${stan.dyskusjiPominietych}` : null,
-    ].filter(Boolean).join(" · ")
-    : undefined;
-  return <div role="group" aria-label="Zakres i synchronizacja kolejki"
-    className="flex shrink-0 flex-col gap-1.5 border-t border-slate-200 px-2 py-1.5">
-    {alarm && <>
-      {prog && <PasekProgu prog={prog} onPrzelacz={onPrzelaczProg} />}
-      {stan && <PasekOgona stan={stan} />}
-      {stan && <PasekSynchronizacji stan={stan} blad={blad} trwa={trwa}
-        onSynchronizuj={onSynchronizuj} />}
-    </>}
-    {!glosnaSynchronizacja && <div className="flex items-center gap-x-3 text-podpis text-slate-600">
-      <div className="min-w-0 flex-1">
-        {!alarm && <PasekTla prog={prog} onPrzelaczProg={onPrzelaczProg} stanTekst={stanTekst} />}
-      </div>
-      <button type="button" disabled={trwa} onClick={onSynchronizuj}
-        className="shrink-0 px-1 font-semibold underline underline-offset-2 hover:text-slate-800
-          disabled:opacity-50">
-        {trwa ? "pobieram…" : "synchronizuj"}
-      </button>
-    </div>}
-    {blad && !glosnaSynchronizacja && <p className="px-1 text-podpis text-red-700">{blad}</p>}
-  </div>;
-}
 
 /**
  * Dopisek klienta albo doradcy w chwili wysyłki — jedyny 409, który wymaga
@@ -220,24 +89,30 @@ const dopisek = (e: unknown): SzczegolyWysylki | null =>
   e instanceof Konflikt && (e.szczegoly as SzczegolyWysylki).nowaWiadomosc !== undefined
     ? (e.szczegoly as SzczegolyWysylki) : null;
 
-/** Kody, po których człowiek szuka reklamacji — wszystkie, jakie sprawa niesie. */
+/**
+ * Kody, po których człowiek szuka reklamacji — wszystkie, jakie sprawa niesie.
+ *
+ * Prowadzący, bo „gdzie jest sprawa, którą wzięła Ala” nie ma innej drogi.
+ * Notatka, bo numer sprawy u Allegro nie ma własnego pola i ląduje tam.
+ * Login i nazwa oferty, bo stoją na wierszu: pole, które nie znajduje tego,
+ * co widać na liście, kłamałoby.
+ */
 const kody = (r: Reklamacja) =>
-  /* Prowadzący WCHODZI do szukania (0.278.0). Skrzynka szuka po nim od
-     0.195.0, a tutaj „gdzie jest sprawa, którą wzięła Ala" nie miało dotąd
-     żadnej drogi — ani sita, ani pola. */
-  /* NOTATKA WCHODZI DO SZUKANIA (0.394.0). Zgłoszenie właściciela: gdy paczka
-     nie dotarła, zgłaszamy to Allegro i dostajemy NUMER SPRAWY, który nie ma
-     w naszych danych żadnego własnego pola — ląduje w notatce biura. Pole
-     szukało po treści sprawy i po loginie, więc po tym numerze nie znajdowało
-     NICZEGO, choć stał on na ekranie obok. Notatka jest zresztą jedynym
-     miejscem, gdzie biuro pisze WŁASNYMI słowami; wykluczenie jej z szukania
-     znaczyło, że im lepiej ktoś opisał sprawę, tym trudniej ją znaleźć. */
-  /* LOGIN I NAZWA OFERTY WCHODZĄ DO SZUKANIA, bo stoją na wierszu w dwóch
-     pierwszych liniach: pole, które nie znajduje tego, co widać na liście,
-     kłamałoby. Numeru nie ma na wierszu, ale szukanie po nim trafia, bo
-     przepisuje się go z rozmowy z klientem i z Allegro. */
   [r.numer, r.externalId, r.orderId, r.kupujacyLogin, r.prowadzi, r.notatka, r.ofertaNazwa]
     .filter((k): k is string => Boolean(k)).map((k) => k.toLowerCase());
+
+/**
+ * Ostatnia NIE nasza wiadomość — punkt odniesienia dla kontroli świeżości.
+ *
+ * Liczy go panel z osi, a serwer sprawdza po swojemu i to on rozstrzyga.
+ * Panel musi mieć CO wysłać, zanim serwer powie, czy się zgadza.
+ */
+const ostatniaNieNasza = (czat: WiadomoscReklamacji[]): number | null => {
+  for (let i = czat.length - 1; i >= 0; i -= 1) {
+    if (czat[i].autorRola !== "SELLER") return czat[i].id;
+  }
+  return null;
+};
 
 export function Reklamacje() {
   const { id } = useParams();
@@ -247,17 +122,14 @@ export function Reklamacje() {
   const ja = useJa();
   const mojeId = ja.data?.user.userId ?? null;
   const { sito, przelacz: przelaczSito } = useSito();
-  /* Reklamacja ma wszystkie cztery osie: termin decyzji i oczekiwaną kwotę
-     niosą jej pola z Allegro. Domyślny zostaje TERMIN — to jest kolejność,
-     którą ekran miał zaszytą, więc wydanie niczego nie przestawia pod ręką. */
-  const { porzadek, ustaw: ustawPorzadek } = usePorzadek(
-    "wertis.reklamacje.porzadek", ["termin", "otwarto", "ruch", "kwota"], "termin");
+  /* Domyślny porządek to TERMIN — kolejność, którą ekran miał zawsze. */
+  const { porzadek, ustaw: ustawPorzadek } = usePorzadek("wertis.reklamacje.porzadek", OSIE, "termin");
   const [tag, setTag] = useState<number | null>(null);
   const [bladSync, setBladSync] = useState("");
 
-  /* Próg daty jest zdejmowany NA ŻĄDANIE i wybór nie przeżywa zamknięcia
-     ekranu. Zapamiętanie go w `localStorage` byłoby pułapką: biuro zobaczyłoby
-     komplet archiwum po tygodniu i nie wiedziało, czemu. */
+  /* Próg daty zdejmuje się NA ŻĄDANIE i wybór nie przeżywa zamknięcia
+     ekranu. Zapamiętany w przeglądarce pokazałby po tygodniu całe archiwum
+     bez śladu, skąd się wzięło. */
   const [bezProgu, setBezProgu] = useState(false);
   const { data, isLoading, error } = useReklamacje(bezProgu);
   const prowadze = useProwadze();
@@ -267,33 +139,20 @@ export function Reklamacje() {
   const dodajZalacznik = useDodajZalacznikSprawy();
   const usunZalacznik = useUsunZalacznikSprawy();
   const sprawdzPrzesylke = useSprawdzPrzesylke();
-  const [bladPrzesylki, setBladPrzesylki] = useState("");
-  const [bladZalacznika, setBladZalacznika] = useState("");
   const werdykt = useWerdykt();
   const zwrotTowaru = useZwrotTowaru();
-  const dodajDowod = useDodajDowod();
-  const usunDowod = useUsunDowod();
-  const [bladDowodu, setBladDowodu] = useState("");
-  const zapiszUDostawcy = useZapiszUDostawcy();
-  const [bladUDostawcy, setBladUDostawcy] = useState("");
+  const notatka = useNotatkaReklamacji();
+  const cofnijNotatke = useCofnijNotatkeReklamacji();
+  const [bladPrzesylki, setBladPrzesylki] = useState("");
+  const [bladZalacznika, setBladZalacznika] = useState("");
   const [bladProwadze, setBladProwadze] = useState("");
-  /* Miejsce zdjęcia w kolumnie dowodów. Odnośnik z wątku i numer przy wpisie
-     prowadzą w to samo miejsce, a fokus — nie samo przewinięcie — pokazuje,
-     KTÓRE zdjęcie jest tym z wiadomości, i czytnik ekranu idzie za nim. */
-  const przedrostek = useId();
-  const idZdjecia = (z: number) => `${przedrostek}-zdjecie-${z}`;
-  const pokazZdjecie = (z: number) => {
-    const el = document.getElementById(idZdjecia(z));
-    el?.scrollIntoView?.({ block: "nearest" });
-    el?.focus();
-  };
-
+  const [bladNotatki, setBladNotatki] = useState("");
   const [bladWysylki, setBladWysylki] = useState("");
   const [konfliktWysylki, setKonfliktWysylki] = useState<SzczegolyWysylki | null>(null);
   const [bladWerdyktu, setBladWerdyktu] = useState("");
   const [bladTowaru, setBladTowaru] = useState("");
   /* Dopisek przy stanowisku o towarze niesie DECYZJĘ i treść, żeby „wyślij
-     mimo to" poszło z tym samym zamiarem, a nie z pustym formularzem. */
+     mimo to” poszło z tym samym zamiarem, a nie z pustym formularzem. */
   const [konfliktTowaru, setKonfliktTowaru] = useState<
     { szczegoly: SzczegolyWysylki; decyzja: DecyzjaOTowarze; tresc: string } | null>(null);
 
@@ -301,51 +160,34 @@ export function Reklamacje() {
     ? (data?.reklamacje ?? [])
     : (data?.reklamacje ?? []).filter((r) => r.kubelek === kubelek), [data, kubelek]);
 
-  /* Filtr liczy się TUTAJ, w pamięci ekranu — tą samą drogą co filtr kubełka
-     i z tego samego powodu: lista przyjeżdża w całości, bo spraw w pracy są
-     dziesiątki, nie tysiące.
-
-     DOPASOWANIE JEST WSPÓLNE dla trzech ekranów obsługi (0.367.0) — ten sam
-     `useMemo` stał tu przepisany znak w znak. Od tego wydania fraza dzieli się
-     po spacjach i każdy człon musi trafić, więc „numer login" zawęża zamiast
-     nie znajdować nic. */
+  /* Filtry liczą się w pamięci ekranu: lista przyjeżdża w całości, bo spraw
+     w pracy są dziesiątki, nie tysiące. Fraza dzieli się po spacjach i każdy
+     człon musi trafić, więc „numer login” zawęża zamiast nie znajdować nic. */
   const pasujace = useMemo(() => {
     if (!rozbij(fraza).length) return null;
     return (data?.reklamacje ?? []).filter((r) => pasujeDoFrazy(kody(r), fraza));
   }, [data, fraza]);
 
-  /* SZUKANIE PRZEBIJA SITO, tak samo jak przebija kubełek (§25a.9). Wpisany
-     numer ma znaleźć sprawę także wtedy, gdy prowadzi ją kolega — inaczej pole
-     szukania kłamałoby pustką przy sprawie, która jest tuż obok. */
-  /* Pigułki tagów liczą skład KUBEŁKA, nie tego, co zostało po sitach.
-     Licznik malejący do zera przy każdym kliknięciu mówiłby o własnym
-     filtrze, a nie o pracy, która czeka. */
+  /* Tagi liczą skład KUBEŁKA, nie tego, co zostało po sitach. Licznik
+     malejący przy każdym kliknięciu mówiłby o filtrze, a nie o pracy. */
   const wgTagow = useMemo(() => tagiWgLiczby(wKubelku), [wKubelku]);
 
   const moi = useMemo(
     () => wKubelku.filter((r) => wSicie(r.prowadziId, mojeId, sito)),
     [wKubelku, sito, mojeId]);
 
-  /* Tag NAKŁADA SIĘ na „Moje", a nie zastępuje go: pytania „czyje to"
-     i „o czym to" zadaje się naraz, więc odpowiedzi mają się mnożyć,
-     nie wykluczać. */
+  /* Tag NAKŁADA SIĘ na sito: pytania „czyje to” i „o czym to” zadaje się
+     naraz, więc odpowiedzi mają się mnożyć, nie wykluczać. */
   const poSitach = useMemo(
     () => (tag === null ? moi : moi.filter((r) => r.tagi.some((t) => t.id === tag))),
     [moi, tag]);
 
-  /* ── PORZĄDEK WYBIERA AGENT (0.401.0) ────────────────────────────────────
-     Zgłoszenie właściciela: „dodaj sortowanie po dacie etc". Kolejność była
-     zaszyta — najpierw termin, potem data otwarcia malejąco — i nie dało się
-     jej ruszyć. Sortowanie stoi NA KOŃCU łańcucha, po kubełku, sitach, tagu
-     i szukaniu: najpierw ustala się, CO jest na liście, potem w jakiej
-     kolejności. Odwrotnie byłoby sortowaniem rzeczy, które i tak odpadną. */
-  /* Kwota sortuje się po TEJ SAMEJ liczbie, którą wiersz pokazuje z prawej.
-     Sortowanie po żądanym zwrocie przy wierszu z ceną paragonu ustawiałoby
-     listę w porządku, którego na ekranie nie widać.
+  /* SZUKANIE PRZEBIJA SITO I KUBEŁEK (§25a.9): wpisany numer ma znaleźć
+     sprawę także wtedy, gdy prowadzi ją kolega.
 
-     GRUPA „PO TERMINIE" stoi na końcu łańcucha: sortowanie układa każdą
-     grupę z osobna, a strzałki chodzą po tej samej tablicy, którą rysuje
-     kolejka — inaczej kursor skakałby między grupami. */
+     Sortowanie stoi NA KOŃCU łańcucha: najpierw ustala się, CO jest na liście,
+     potem w jakiej kolejności. Grupa „Po terminie” idzie po sortowaniu, bo
+     strzałki chodzą po tej samej tablicy, którą rysuje kolejka. */
   const widoczne = useMemo(
     () => wGrupach(posortuj(pasujace ?? poSitach, porzadek, {
       otwarto: (r) => r.otwartoAt,
@@ -354,21 +196,15 @@ export function Reklamacje() {
       kwota: kwotaWiersza,
     })),
     [pasujace, poSitach, porzadek]);
-  /* Sygnał wspólny dla CAŁEGO kubełka nie rozróżnia wierszy, więc schodzi
-     z nich i staje raz nad listą. Przy szukaniu lista miesza kubełki, a wtedy
-     wspólnego nie ma — każdy wiersz mówi swoje. */
-  const wspolne = useMemo(() => (pasujace ? [] : wspolneSygnaly(wKubelku)), [pasujace, wKubelku]);
-  /* Zdanie liczy WYŁĄCZNIE to, co chowa „Moje". Doliczenie tu spraw odsianych
-     tagiem byłoby kłamstwem o przyczynie: tag zdejmuje się kliknięciem w tę
-     samą pigułkę i widać go na ekranie, a pamiętane „Moje" nie widać. */
+  /* Zdanie liczy WYŁĄCZNIE to, co chowa sito. Tag widać w zdaniu obok,
+     a pamiętanego sita nie widać nigdzie indziej. */
   const ukrytych = pasujace || sito === null ? 0 : wKubelku.length - moi.length;
   const wybrana = id ? Number(id) : null;
   /* Szkic stoi ZARAZ ZA numerem sprawy, bo jest do niego przypisany. */
   const { tresc, ustaw: setTresc, wyczysc: wyczyscSzkic } = useSzkicSprawy("reklamacja", wybrana);
   const reklamacja = data?.reklamacje.find((r) => r.id === wybrana) ?? null;
   const szczegol = useReklamacja(wybrana);
-  /* Załączniki szkicu wiszą przy SPRAWIE, nie przy przeglądarce —
-     odświeżenie karty niczego nie gubi, a kolega widzi to samo. */
+  /* Załączniki szkicu wiszą przy SPRAWIE, nie przy przeglądarce. */
   const zalacznikiWysylki = useZalacznikiSprawy(wybrana);
 
   /* Wejście z paska adresu na sprawę z innego kubełka ma pokazać TĘ sprawę,
@@ -382,10 +218,8 @@ export function Reklamacje() {
   /**
    * Przełączenie kubełka PRZESTAWIA TEŻ KURSOR.
    *
-   * Bez tego jeden klawisz zmieniałby listę, a zaznaczenie zostawałoby na
-   * sprawie z poprzedniego kubełka — środkowa kolumna pokazywałaby wtedy
-   * pytanie nowego kubełka nad rozmową ze starego. Ta sama poprawka co przy
-   * zwrotach.
+   * Bez tego lista by się zmieniła, a zaznaczenie zostałoby na sprawie
+   * z poprzedniego kubełka — środek pokazywałby rozmowę spoza listy.
    */
   const przelacz = (k: KubelekReklamacji | null) => {
     setKubelek(k);
@@ -394,9 +228,8 @@ export function Reklamacje() {
     nawiguj(pierwsza ? `/obsluga/reklamacje/${pierwsza.id}` : "/obsluga/reklamacje");
   };
 
-  /* Kursor chodzi po liście WIDOCZNEJ, nie po kubełku: przy włączonym filtrze
-     strzałka ma iść do następnego wyniku, a nie do sprawy schowanej przed
-     oczami. */
+  /* Kursor chodzi po liście WIDOCZNEJ, nie po kubełku: przy filtrze strzałka
+     idzie do następnego wyniku, a nie do sprawy schowanej przed oczami. */
   const idz = (o: number) => {
     if (!widoczne.length) return;
     const i = widoczne.findIndex((r) => r.id === wybrana);
@@ -404,28 +237,15 @@ export function Reklamacje() {
     if (nast) nawiguj(`/obsluga/reklamacje/${nast.id}`);
   };
 
-  /* ── WEJŚCIE W SPRAWĘ JĄ ODŚWIEŻA (0.410.0) ────────────────────────────────
-     Zgłoszenie właściciela: „reklamacje w aplikacji mają nieaktualny stan",
-     a potem wprost: „możesz po prostu odświeżyć reklamację, jak w nią wejdę?".
+  /* ── WEJŚCIE W SPRAWĘ JĄ ODŚWIEŻA ──────────────────────────────────────────
+     Świadomy wyjątek od „zera zapisu przy patrzeniu”, decyzją właściciela.
+     Przebieg synchronizacji czyta najwyżej tysiąc spraw, więc ogona archiwum
+     nie odświeża nigdy, a agent patrzy na sprawę teraz. Trasa `/odswiez` jest
+     POST-em po to, żeby ten wyjątek był GŁOŚNY.
 
-     TO JEST ŚWIADOME ZŁAMANIE „ZERO ZAPISU PRZY PATRZENIU" i tak ma być
-     zapisane, a nie przemilczane. Reguła stoi w CLAUDE.md, a trasa
-     `/odswiez` jest POST-em właśnie po to, żeby łamać ją GŁOŚNO. Decyzja
-     właściciela z 19 września 2026 mówi, że nieaktualny stan sprawy kosztuje
-     więcej niż żądanie wychodzące przy otwarciu ekranu — i to jest prawda
-     mierzalna: przebieg synchronizacji czyta najwyżej tysiąc spraw, więc
-     ogona archiwum nie odświeża NIGDY, a nie „za trzy minuty".
-
-     CENA JEST ZNANA I MAŁA. `odswiezSprawe` to JEDNO żądanie do Allegro;
-     drugie idzie wyłącznie wtedy, gdy licznik wiadomości rozjechał się
-     z tym, co mamy. Przeglądanie kolejki strzałkami zapłaci więc po jednym
-     żądaniu za sprawę — dlatego `ostatnioOdswiezona` pilnuje, żeby nie
-     powtórzyć go przy każdym renderze ani drugi raz w trybie ścisłym Reacta.
-
-     BŁĄD ZOSTAWIA EKRAN W SPOKOJU (patrz `useOdswiez`): odświeżenie jest
-     dopiskiem do tego, co agent i tak widzi, a nie czynnością, o którą
-     prosił. Gdy Allegro odmówi, zostaje stan z ostatniego taktu — czyli
-     dokładnie to, co było przed tym wydaniem. */
+     Jedno żądanie na sprawę: `ostatnioOdswiezona` pilnuje, żeby nie powtórzyć
+     go przy renderze ani drugi raz w trybie ścisłym Reacta. Błąd zostawia
+     ekran w spokoju, bo odświeżenie jest dopiskiem, nie czynnością agenta. */
   const ostatnioOdswiezona = useRef<number | null>(null);
   useEffect(() => {
     if (wybrana === null || ostatnioOdswiezona.current === wybrana) return;
@@ -433,36 +253,19 @@ export function Reklamacje() {
     odswiez.mutate({ id: wybrana });
   }, [wybrana]);
 
-  /* ── SZKIC PRZEŻYWA ZMIANĘ SPRAWY (0.423.0) ───────────────────────────────
-     Do 0.422.0 stało tu `setTresc("")` i to kasowało napisaną odpowiedź, gdy
-     agent przełączył się na sprawę pilniejszą. Broniło przed wyjazdem szkicu
-     do cudzej sprawy — i tej obrony nie tracimy: `useSzkicSprawy` przypisuje
-     treść do NUMERU sprawy, więc każda ma własną. Czyszczą się tu za to
-     wszystkie błędy i konflikty, bo one należą do próby, nie do sprawy. */
+  /* Szkic przeżywa zmianę sprawy, bo `useSzkicSprawy` przypisuje treść do
+     NUMERU sprawy. Czyszczą się błędy i konflikty: należą do próby, nie do
+     sprawy. */
   useEffect(() => {
     setBladWysylki("");
     setKonfliktWysylki(null);
     setBladWerdyktu("");
     setBladTowaru("");
     setKonfliktTowaru(null);
-    setBladDowodu("");
     setBladProwadze("");
-    setBladUDostawcy("");
+    setBladPrzesylki("");
+    setBladNotatki("");
   }, [wybrana]);
-
-  /**
-   * Ostatnia NIE nasza wiadomość — punkt odniesienia dla kontroli świeżości.
-   *
-   * Liczy go panel z osi, a serwer sprawdza po swojemu i to on rozstrzyga.
-   * Dwie kopie tej reguły są tu świadome: panel musi mieć CO wysłać, zanim
-   * serwer powie, czy się zgadza.
-   */
-  const ostatniaNieNasza = (czat: WiadomoscReklamacji[]): number | null => {
-    for (let i = czat.length - 1; i >= 0; i -= 1) {
-      if (czat[i].autorRola !== "SELLER") return czat[i].id;
-    }
-    return null;
-  };
 
   const wyslij = (mimoNowejWiadomosci = false) => {
     const d = szczegol.data;
@@ -480,32 +283,27 @@ export function Reklamacje() {
         if (w.status === "sent") wyczyscSzkic();
         else setBladWysylki(
           "Wysyłka nie dała jednoznacznej odpowiedzi — zsynchronizuj sprawę, zanim spróbujesz znowu.");
-        /* Stan sprawy po stronie Allegro ZMIENIŁ SIĘ przed chwilą, a takt
-           przyjdzie za trzy minuty (0.273.0). Przy wyniku niejednoznacznym to
-           jedno żądanie rozstrzyga, czy wiadomość poszła — czyli dokładnie to,
-           po co pasek odsyłał do Centrum Sprzedaży. */
+        /* Stan sprawy u Allegro zmienił się przed chwilą, a takt przyjdzie za
+           trzy minuty. Przy wyniku niejednoznacznym to jedno żądanie
+           rozstrzyga, czy wiadomość poszła. */
         odswiez.mutate({ id: d.reklamacja.id });
       },
       onError: (e) => {
-        /* Dopisek ma WŁASNY ekran, bo wymaga decyzji. Reszta — zamknięta
-           rozmowa, rozjazd wersji, odmowa Allegro — to jedno zdanie pod polem;
-           serwer przysyła je gotowe i panel go nie układa od nowa. */
-        const d = dopisek(e);
-        if (d) setKonfliktWysylki(d);
+        /* Dopisek ma WŁASNY ekran, bo wymaga decyzji. Reszta to jedno zdanie
+           pod polem, które serwer przysyła gotowe. */
+        const k = dopisek(e);
+        if (k) setKonfliktWysylki(k);
         else setBladWysylki((e as Error).message);
       },
     });
   };
 
   /* Werdykt: los próby przychodzi w odpowiedzi, a po `onSettled` sprawa
-     dociąga się z kolumnami `werdykt_*` i pasek pokazuje stan z WIERSZA.
-     Tu zostaje tylko zdanie o porażce, żeby agent nie czekał na odświeżenie.
+     dociąga się z kolumnami `werdykt_*`. Tu zostaje tylko zdanie o porażce.
 
      STANOWISKO O TOWARZE jedzie tym samym żądaniem, a jego los w polu
-     `towar` — werdykt wyszedł nieodwracalnie, więc porażka towaru nie jest
-     porażką werdyktu. Każdy los kończy się tak samo jak osobny krok: dopisek
-     klienta otwiera ten sam dialog, reszta to zdanie pod krokiem zapasowym
-     „Towar do odesłania?", który po werdykcie zostaje na ekranie. */
+     `towar`. Werdykt wyszedł nieodwracalnie, więc porażka towaru nie jest
+     porażką werdyktu: dopisek otwiera ten sam dialog, reszta to zdanie. */
   const wyslijWerdykt = (z: ZadanieWerdyktu) => {
     const d = szczegol.data;
     if (!d) return;
@@ -529,9 +327,8 @@ export function Reklamacje() {
           else if ("pominiety" in los) setBladTowaru(los.pominiety);
           else if (los.status !== "sent") setBladTowaru(TOWAR_NIEPEWNY);
         }
-        /* Werdykt zmienia `status_allegro`, a zieleń „Potwierdzony przez
-           Allegro" należy się dopiero statusowi z synchronizacji — więc
-           dociągamy go od razu, zamiast kazać czekać na takt. */
+        /* Zieleń „potwierdzony przez Allegro” należy się dopiero statusowi
+           z synchronizacji, więc dociągamy go od razu, zamiast czekać na takt. */
         odswiez.mutate({ id: d.reklamacja.id });
       },
       onError: (e) => setBladWerdyktu((e as Error).message),
@@ -560,27 +357,22 @@ export function Reklamacje() {
     });
   };
 
-  /* Skróty milkną, gdy ognisko stoi w polu tekstowym — inaczej cyfra wpisana
-     w notatkę przełączałaby kubełek. Od 0.546.0 także pod oknem modalnym,
-     wspólnym strażnikiem z `nawigacja/fokus.ts`. Własna kopia nie znała
-     SELECT-a, tak jak ta, którą kolejka skrzynki zrzuciła w 0.522.0. */
+  /* Skróty milkną w polu tekstowym i pod oknem modalnym — inaczej cyfra
+     wpisana w notatkę przełączałaby kubełek. Strażnik jest wspólny, bo własna
+     kopia nie znała SELECT-a. */
   useEffect(() => {
     const nasluch = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.altKey || e.metaKey || klawiszZajety(e.target)) return;
       if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); idz(1); }
       else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); idz(-1); }
-      /* Cyfry liczą się z długości `KUBELKI` (0.525.1), jak podpowiedzi przy
-         kubełkach. Stało tu na sztywno 1–3 i „4 = Wszystkie", a kubełki są
-         cztery: „Bez ruchu" nie miał klawisza, choć podpowiedź obiecywała 4,
-         a „Wszystkie" 5. Dopisanie kubełka nie może znów rozjechać klawiszy. */
+      /* Cyfry liczą się z długości `KUBELKI`, więc dopisanie kubełka nie
+         rozjedzie klawiszy. Ostatnia cyfra to „Wszystkie”. */
       else if (/^[1-9]$/.test(e.key)) {
         const n = Number(e.key);
         if (n <= KUBELKI.length) przelacz(KUBELKI[n - 1].id);
         else if (n === KUBELKI.length + 1) przelacz(null);
       }
-      /* `m` jak „moje" — sito ma być jednym ruchem, bo o to właściciel
-         prosił. Litera, nie cyfra: cyfry należą do kubełków i piąta z nich
-         obiecywałaby piąty kubełek. */
+      /* `m` jak „moje”: litera, nie cyfra, bo cyfry należą do kubełków. */
       else if (e.key === "m" && mojeId !== null) przelaczSito(sito === "moje" ? null : "moje");
       else if (e.key === "n") przelaczSito(sito === "niczyje" ? null : "niczyje");
     };
@@ -588,245 +380,188 @@ export function Reklamacje() {
     return () => window.removeEventListener("keydown", nasluch);
   });
 
-  if (error) return <Blad>{(error as Error).message}</Blad>;
+  const synchronizujTeraz = () => {
+    setBladSync("");
+    synchronizuj.mutate(undefined, { onError: (e) => setBladSync((e as Error).message) });
+  };
 
-  const opis = KUBELKI.find((k) => k.id === kubelek);
-  const alarmTla = tloAlarmuje({
-    prog: data?.prog, zlaSynchronizacja: Boolean(data?.stan && data.stan.status !== "current"),
-    pozostaloDoPobrania: data?.stan?.pozostaloDoPobrania ?? null,
-  });
-  /* ── PYTANIE KUBEŁKA JEST NAGŁÓWKIEM LISTY ───────────────────────────────
-     Dekalog, punkt 5 — pytanie ZASTĘPUJE menu akcji, więc mówi, po co ten
-     kubełek istnieje, a pigułka mówi tylko, jak się nazywa. Przy szukaniu
-     i przy „Wszystkie" lista nie jest kubełkiem, więc nagłówek mówi, czym
-     jest, zamiast udawać pytanie. */
-  const naglowekListy = pasujace ? "Wyniki szukania"
-    : kubelek === null ? "Wszystkie reklamacje" : (opis?.pytanie ?? "");
+  /* Nagłówek grupy spraw w terminie mówi, czym jest lista. Przy szukaniu
+     lista miesza kubełki, więc nie udaje żadnego z nich. */
+  const nazwaGrupy = pasujace ? "Wyniki szukania"
+    : kubelek === null ? "Wszystkie" : (KUBELKI.find((k) => k.id === kubelek)?.etykieta ?? "");
+  /* PRÓG, KTÓRY CHOWA PRACĘ, WOŁA NAD LISTĄ. W ciszy próg mieszka w filtrze,
+     ale sprawy sprzed progu z żywym terminem to praca, a nie archiwum. */
+  const progAlarmuje = Boolean(data?.prog && !data.prog.zdjety && data.prog.ukrytychZTerminem > 0);
+  const stanTekst = data?.stan?.dyskusjiPominietych
+    ? `pominiętych dyskusji ${data.stan.dyskusjiPominietych}` : undefined;
+  const nazwaTagu = tag === null ? null : wgTagow.find(([t]) => t.id === tag)?.[0].nazwa ?? null;
 
   const d = szczegol.data;
-  /* Numery zdjęć liczy JEDNA funkcja dla wątku i dla kolumny dowodów —
-     „Z2" przy wiadomości i „Z2" przy wpisie biura to ma być to samo zdjęcie. */
-  const znaki = d ? zdjeciaSprawy(d).znaki : null;
+  const r = d?.reklamacja;
 
-  return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0">
-    <div className={SIATKA_REKLAMACJI}>
-      <Karta className="flex min-h-0 flex-col overflow-hidden">
-        {/* `shrink-0` na blokach nad listą nie jest kosmetyką: lista ma bazę 0,
-            więc przy ciasnym oknie kurczyłyby się WYŁĄCZNIE one. */}
-        <nav className="flex shrink-0 flex-wrap gap-1 border-b border-slate-200 p-2">
-          {/* ── JEDEN KSZTAŁT WYBORU (0.262.0) ─────────────────────────────────
-              Ten rząd stał w trzech ekranach przepisany znak w znak, w bursztynie,
-              bez tła pigułki niewybranej i bez `aria-pressed`. Kształt jest teraz
-              jeden dla całego panelu — powód stoi przy `FiltrSegmentowy`.
+  return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0 lg:overflow-y-auto xl:overflow-hidden">
+    <Kafle statystyki={data?.statystyki} kubelek={kubelek} onKubelek={przelacz}
+      stan={data?.stan} trwaSync={synchronizuj.isPending} bladSync={bladSync}
+      onSynchronizuj={synchronizujTeraz} />
 
-              „Wszystkie" WCHODZI DO TABLICY, zamiast wisieć osobnym przyciskiem
-              pod pętlą: to jest ten sam wybór, co każdy kubełek, tylko bez
-              zawężenia. Numer klawisza liczy się z długości listy, więc dopisanie
-              kubełka nie zostawia w podpowiedzi nieaktualnej cyfry. */}
-          {/* Rozstrzygnięte i Bez ruchu pod „Więcej" (0.522.0): oba mówią
-              „tylko wgląd", więc nie stoją w wadze kubełka pracy. Cyfry dalej
-              je wybierają — powód przy `ui/FiltrZWiecej.tsx`.
-
-              „Wszystkie" też: to widok, nie kubełek pracy, a z nim na wierzchu
-              zwarte „Więcej" nie mieściło się w rzędzie pigułek i zajmowało
-              własny. Dwie pigułki pracy i lista mieszczą się w jednym rzędzie. */}
-          <FiltrZWiecej<KubelekReklamacji | null> zwarty wybrany={kubelek} onWybierz={przelacz}
-            wiecej={["zamknieta", "bez_ruchu", null]}
-            pozycje={[
-              ...KUBELKI.map((k, i) => ({ klucz: k.id, etykieta: k.etykieta,
-                ile: data?.liczniki?.[k.id] ?? 0,
-                podpowiedz: `${k.pytanie} (klawisz ${i + 1})` })),
-              { klucz: null, etykieta: "Wszystkie", ile: data?.reklamacje?.length ?? 0,
-                podpowiedz: `Wszystkie reklamacje (klawisz ${KUBELKI.length + 1})` },
-            ]} />
-        </nav>
-
-        {/* ── JEDEN RZĄD ZAWĘŻEŃ: SZUKANIE I SITA ────────────────────────────
-            Szukanie i „Moje/Niczyje" odpowiadają na jedno pytanie — „które
-            sprawy chcę widzieć" — więc stoją w jednym rzędzie. Szukanie jest
-            pierwsze i rośnie, bo to jedyne pole, do którego się pisze.
-            Kubełek mówi „na jakim to etapie", sito „czyje to" — zlanie ich
-            w jedno odebrałoby pytanie „moje sprawy do decyzji", czyli to,
-            które właściciel zadaje najczęściej. */}
-        <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-slate-200 px-2 py-1.5">
-          <label className="sr-only" htmlFor="szukaj-reklamacji">Szukaj reklamacji</label>
-          <input id="szukaj-reklamacji" className="field min-w-0 flex-[1_1_8rem] !py-1 text-xs" value={fraza}
-            onChange={(e) => setFraza(e.target.value)}
-            placeholder="Login, towar, numer, notatka" />
-          <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
-            moich={wKubelku.filter((r) => mojaSprawa(r.prowadziId, mojeId)).length}
-            niczyich={wKubelku.filter((r) => r.prowadziId === null).length} />
-        </div>
-
-        {/* Linia nagłówka listy: pytanie kubełka, tagi („o czym to") i porządek.
-            Tagi stoją tutaj, bo zawężają TĘ listę, a porządek — bo ją układa. */}
-        <div className="flex shrink-0 flex-wrap items-center gap-x-2 gap-y-1 border-b border-slate-200 bg-slate-50 px-3 py-1.5">
-          <h2 className="text-xs font-semibold text-slate-700">{naglowekListy}</h2>
-          {/* Kreska oddziela pytanie od pigułek tagów, które wyglądają jak
-              przyciski sit. Pusty filtr tagów nie zostawia po sobie kreski. */}
-          {wgTagow.length > 0 && <span className="flex items-center gap-1 border-l border-slate-200 pl-2">
-            <FiltrTagow wgLiczby={wgTagow} wybrany={tag} onWybierz={setTag} /></span>}
-          <span className="ml-auto flex items-center gap-1">
-            <PasekPorzadku porzadek={porzadek}
-              dozwolone={["termin", "otwarto", "ruch", "kwota"]} onZmien={ustawPorzadek} />
-            <SkrotyKlawiszy zMoje={mojeId !== null} kubelkow={KUBELKI.length} />
-          </span>
-          {wspolne.length > 0 && <p className="w-full text-podpis text-slate-600">
-            Na każdej sprawie tutaj: {wspolne.map((s) => SYGNALY[s].krotko).join(", ")}</p>}
-        </div>
-
-        <ZdanieOUkrytych ile={ukrytych} nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
-          onPokazWszystkie={() => przelaczSito(null)} />
-
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          {isLoading
-            ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
-            : <Kolejka reklamacje={widoczne} wybrana={wybrana}
-                mojeId={mojeId} ukryjSygnaly={wspolne}
-                zKubelkiem={Boolean(pasujace) || kubelek === null}
-                onWybierz={(r) => nawiguj(`/obsluga/reklamacje/${r}`)} />}
-        </div>
-
-        {/* ── TŁO PRACY W STOPCE KOLEJKI ─────────────────────────────────────
-            Decyzja właściciela: rząd „od 1 lipca · starszych · pominiętych
-            dyskusji · synchronizuj" stoi pod ostatnim wierszem kolejki.
-            Mówi o zakresie TEJ listy, więc stoi przy niej, a sprawie oddaje
-            pełną wysokość. Regułę ciszy i alarmu tłumaczy `StopkaKolejki`. */}
-        <StopkaKolejki prog={data?.prog} stan={data?.stan} alarm={alarmTla}
-          onPrzelaczProg={setBezProgu} trwa={synchronizuj.isPending} blad={bladSync}
-          onSynchronizuj={() => {
-            setBladSync("");
-            synchronizuj.mutate(undefined, { onError: (e) => setBladSync((e as Error).message) });
-          }} />
-      </Karta>
-
-      {d
-        ? <div className="flex min-h-0 min-w-0 flex-col gap-4">
-          <Karta className="shrink-0">
-            <Glowica szczegol={d} mojeId={mojeId} trwa={prowadze.isPending} blad={bladProwadze}
-              sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
-              bladPrzesylki={bladPrzesylki}
-              onSprawdzPrzesylke={() => {
-                setBladPrzesylki("");
-                sprawdzPrzesylke.mutate({ id: d.reklamacja.id },
-                  { onError: (e) => setBladPrzesylki((e as Error).message) });
-              }}
-              onProwadze={() => {
-                setBladProwadze("");
-                prowadze.mutate({ id: d.reklamacja.id, wersja: d.reklamacja.wersja },
-                  { onError: (e) => setBladProwadze((e as Error).message) });
-              }} />
-          </Karta>
-
-          <div className={SIATKA_SPRAWY}>
-            {/* ── ROZMOWA PRZEWIJA SIĘ, ZGŁOSZENIE STOI ───────────────────────
-                Przewija się tylko rozmowa z odpowiedzią, a zgłoszenie stoi
-                przypięte nad nią. Werdykt nie płynie z wątkiem: ma własne
-                miejsce pod faktami po prawej. Pole odpowiedzi przykleja się
-                do dolnej krawędzi samo, powód stoi w `reklamacje/Czat.tsx`. */}
-            <Karta className="flex min-h-0 flex-col overflow-hidden">
-              <Czat
-                sprawa={{
-                  id: d.reklamacja.id,
-                  /* `powodOpis` PIERWSZY: to zdanie klienta o usterce, a `opis`
-                     bywa przy reklamacji pusty. Skleja to wołający, bo tylko on
-                     wie, jaki rodzaj sprawy trzyma. */
-                  opisZgloszenia: d.reklamacja.powodOpis ?? d.reklamacja.opis,
-                  wiadomosciIle: d.reklamacja.wiadomosciIle,
-                  czatUrwany: d.reklamacja.czatUrwany,
-                }}
-                czat={d.czat}
-                zalaczniki={d.zalaczniki}
-                /* Objaw słowami klienta stoi zawsze na wierzchu, starsze
-                   wiadomości zwijają się za przyciskiem, a bursztyn mówi
-                   wyłącznie o tym, na co klient czeka TERAZ. */
-                przypnijZgloszenie
-                zwinStarsze={5}
-                bursztynTylkoOstatniej
-                /* Zdjęcia stoją w kolumnie dowodów obok, w wątku zostaje
-                   odnośnik z tym samym numerem, którym odsyła wpis biura. */
-                zdjeciaObok={{ pokaz: pokazZdjecie, znak: (z) => znaki?.get(z) ?? null }}
-                /* Klucz sprawy: edytor trzyma własny stan (cofnięcie wyczyszczenia,
-                   zwłokę Ctrl+Enter), a ekran nie montuje go od nowa przy przejściu. */
-                edytor={<Edytor key={d.reklamacja.id} tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
-                  zalaczniki={zalacznikiWysylki.data?.zalaczniki ?? []}
-                  dodajeZalacznik={dodajZalacznik.isPending}
-                  bladZalacznika={bladZalacznika}
-                  /* Plik czytamy TU, nie w komponencie: katalog `reklamacje/`
-                     trzyma komponenty czyste, a base64 to sprawa klienta HTTP. */
-                  onDodajZalacznik={(plik) => {
-                    setBladZalacznika("");
-                    void naBase64(plik).then((dane) => {
-                      if (!wybrana) return;
-                      dodajZalacznik.mutate(
-                        { id: wybrana, nazwa: plik.name, typ: plik.type, dane },
-                        { onError: (e) => setBladZalacznika((e as Error).message) });
-                    });
-                  }}
-                  onUsunZalacznik={(zid) => wybrana && usunZalacznik.mutate(
-                    { id: wybrana, zalacznikId: zid },
-                    { onError: (e) => setBladZalacznika((e as Error).message) })}
-                  czatAktywny={d.reklamacja.czatAktywny}
-                  onZmiana={setTresc} onWyslij={() => wyslij()} />} />
-            </Karta>
-
-            {/* Dowody i werdykt jedne pod drugimi, przewijają się razem,
-                a rozmowa nie traci szerokości na trzecią kolumnę. */}
-            <div className={KOLUMNY_OBOK_ROZMOWY}>
-              <Karta className={KARTA_OBOK_ROZMOWY}>
-                {/* Klucz sprawy czyści niedokończony wpis — dowód napisany do
-                    jednej reklamacji nie ma prawa wyjechać do drugiej. */}
-                <KolumnaDowodow key={d.reklamacja.id} szczegol={d} blad={bladDowodu}
-                  trwa={dodajDowod.isPending || usunDowod.isPending}
-                  idZdjecia={idZdjecia} onPokaz={pokazZdjecie}
-                  onDodaj={(trescDowodu, zalacznikId, gotowe) => {
-                    setBladDowodu("");
-                    dodajDowod.mutate({ id: d.reklamacja.id, tresc: trescDowodu, zalacznikId },
-                      { onSuccess: gotowe, onError: (e) => setBladDowodu((e as Error).message) });
-                  }}
-                  onUsun={(dowodId, nieudane) => {
-                    setBladDowodu("");
-                    usunDowod.mutate({ id: d.reklamacja.id, dowodId }, {
-                      onError: (e) => { setBladDowodu((e as Error).message); nieudane(); },
-                    });
-                  }} />
-              </Karta>
-
-              <Karta className={KARTA_OBOK_ROZMOWY}>
-                {/* ── WERDYKT SAM W PRAWEJ KARCIE ────────────────────────────
-                    Fakty, z których się go wydaje, stoją w głowicy nad całą
-                    sprawą, więc karta trzyma już tylko decyzję. Pytanie
-                    nieodwracalne zadaje się PO dowodach: w kolejności strony
-                    stoi za rozmową i dowodami. Zgoda przed wysłaniem zostaje
-                    przy OBU gałęziach — uznanie kosztuje pieniądze i jest
-                    równie nieodwracalne co odmowa. */}
-                <Werdykt reklamacja={d.reklamacja}
-                  czat={d.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
-                  trwaTowar={zwrotTowaru.isPending} bladTowaru={bladTowaru}
-                  onWerdykt={wyslijWerdykt} onTowar={(dec, t) => wyslijTowar(dec, t)}
-                  dostawa={d.dostawa ?? null} uDostawcy={d.uDostawcy ?? null}
-                  trwaUDostawcy={zapiszUDostawcy.isPending} bladUDostawcy={bladUDostawcy}
-                  onUDostawcy={(z) => {
-                    setBladUDostawcy("");
-                    zapiszUDostawcy.mutate({ id: d.reklamacja.id, ...z },
-                      { onError: (e) => setBladUDostawcy((e as Error).message) });
-                  }} />
-              </Karta>
+    {/* Zapytanie padło i nie ma danych: błąd zamiast kolumn, a kafle mówią
+        „—”. Pusta lista przy awarii czytałaby się jako „nic nie czeka”. */}
+    {error && !data
+      ? <Blad>{(error as Error).message}</Blad>
+      : <div className={UKLAD}>
+        <section aria-label="Kolejka reklamacji"
+          className={`${KOLUMNA} ${KARTA} flex flex-[1_1_340px] flex-col xl:overflow-hidden`}>
+          <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 px-4 pb-3 pt-4">
+            <div className="flex items-center justify-between gap-2">
+              <h1 className="text-tytul font-bold text-slate-900">Reklamacje</h1>
+              <FiltrKolejki wgTagow={wgTagow} tag={tag} onTag={setTag}
+                porzadek={porzadek} osie={OSIE} onPorzadek={ustawPorzadek}
+                prog={data?.prog} onPrzelaczProg={setBezProgu} stanTekst={stanTekst} />
+            </div>
+            <label className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3">
+              <Search size={18} aria-hidden="true" className="shrink-0 text-slate-600" />
+              <span className="sr-only">Szukaj reklamacji</span>
+              <input type="search" className="h-10 min-w-0 flex-1 bg-transparent text-tresc outline-none"
+                value={fraza} onChange={(e) => setFraza(e.target.value)}
+                placeholder="Login, numer, zamówienie, towar, notatka" />
+            </label>
+            <PrzelacznikKubelkow wybrany={kubelek} onWybierz={przelacz}
+              liczniki={data?.liczniki} wszystkich={data?.reklamacje.length} />
+            <div className="flex flex-wrap items-center gap-1.5">
+              <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
+                moich={wKubelku.filter((x) => mojaSprawa(x.prowadziId, mojeId)).length}
+                niczyich={wKubelku.filter((x) => x.prowadziId === null).length} />
+              <span className="ml-auto text-xs text-slate-600">{OPIS_PORZADKU[porzadek]}</span>
             </div>
           </div>
-        </div>
-        : <Karta className="flex min-h-0 flex-col">
-            <div className="flex min-h-0 flex-1 items-center px-4">
-              <Pusto ikona={ShieldQuestion}>
-                {wybrana ? "Wczytuję sprawę…" : "Wybierz reklamację z kolejki po lewej"}
-              </Pusto>
-            </div>
-          </Karta>}
-    </div>
+
+          {progAlarmuje && data?.prog && <div className="shrink-0 px-3 pt-3">
+            <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} /></div>}
+          {/* Tag schowany w filtrze zawęża listę po cichu, więc zdanie mówi
+              o nim nad wierszami i daje drogę powrotną jednym kliknięciem. */}
+          {nazwaTagu && !pasujace && <p className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 text-podpis text-slate-600">
+            <span>Tylko sprawy z tagiem „{nazwaTagu}”.</span>
+            <button type="button" onClick={() => setTag(null)}
+              className="py-1 font-semibold text-slate-700 underline">pokaż wszystkie</button>
+          </p>}
+          <ZdanieOUkrytych ile={ukrytych} nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
+            onPokazWszystkie={() => przelaczSito(null)} />
+
+          <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+            {isLoading
+              ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
+              : <Kolejka reklamacje={widoczne} wybrana={wybrana} mojeId={mojeId}
+                  nazwaGrupy={nazwaGrupy}
+                  zKubelkiem={Boolean(pasujace) || kubelek === null}
+                  onWybierz={(x) => nawiguj(`/obsluga/reklamacje/${x}`)} />}
+          </div>
+        </section>
+
+        {d && r
+          ? <>
+            <section aria-label={`Reklamacja ${r.numer ?? r.externalId}`}
+              className={`${KOLUMNA} ${KARTA} flex flex-[999_1_560px] flex-col xl:overflow-y-auto`}>
+              <Glowica szczegol={d} mojeId={mojeId} trwa={prowadze.isPending} blad={bladProwadze}
+                onProwadze={() => {
+                  setBladProwadze("");
+                  prowadze.mutate({ id: r.id, wersja: r.wersja },
+                    { onError: (e) => setBladProwadze((e as Error).message) });
+                }}
+                onOdswiez={() => odswiez.mutate({ id: r.id })} odswieza={odswiez.isPending}
+                sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
+                onSprawdzPrzesylke={() => {
+                  setBladPrzesylki("");
+                  sprawdzPrzesylke.mutate({ id: r.id },
+                    { onError: (e) => setBladPrzesylki((e as Error).message) });
+                }} />
+              <DrogaSprawy szczegol={d} />
+              <div className="flex min-h-0 flex-1 flex-col border-t border-slate-200">
+                <Czat
+                  sprawa={{
+                    id: r.id,
+                    /* `powodOpis` PIERWSZY: to zdanie klienta o usterce, a `opis`
+                       bywa przy reklamacji pusty. */
+                    opisZgloszenia: r.powodOpis ?? r.opis,
+                    wiadomosciIle: r.wiadomosciIle,
+                    czatUrwany: r.czatUrwany,
+                  }}
+                  czat={d.czat}
+                  zalaczniki={d.zalaczniki}
+                  /* Przesyłki od klienta i od nas stają na osi rozmowy według
+                     chwili, bo „odesłał, a potem napisał” czyta się po kolei. */
+                  zdarzenia={zdarzeniaPrzesylek(d)}
+                  przypnijZgloszenie
+                  zwinStarsze={5}
+                  bursztynTylkoOstatniej
+                  /* Klucz sprawy: edytor trzyma własny stan (cofnięcie
+                     wyczyszczenia, zwłokę Ctrl+Enter), a ekran nie montuje go
+                     od nowa przy przejściu. */
+                  edytor={<Edytor key={r.id} etykietaWyslij="Wyślij do klienta" tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
+                    zalaczniki={zalacznikiWysylki.data?.zalaczniki ?? []}
+                    dodajeZalacznik={dodajZalacznik.isPending}
+                    bladZalacznika={bladZalacznika}
+                    /* Plik czytamy TU, nie w komponencie: base64 to sprawa
+                       klienta HTTP, a katalog `reklamacje/` trzyma komponenty czyste. */
+                    onDodajZalacznik={(plik) => {
+                      setBladZalacznika("");
+                      void naBase64(plik).then((dane) => {
+                        if (!wybrana) return;
+                        dodajZalacznik.mutate(
+                          { id: wybrana, nazwa: plik.name, typ: plik.type, dane },
+                          { onError: (e) => setBladZalacznika((e as Error).message) });
+                      });
+                    }}
+                    onUsunZalacznik={(zid) => wybrana && usunZalacznik.mutate(
+                      { id: wybrana, zalacznikId: zid },
+                      { onError: (e) => setBladZalacznika((e as Error).message) })}
+                    czatAktywny={r.czatAktywny}
+                    onZmiana={setTresc} onWyslij={() => wyslij()} />} />
+              </div>
+            </section>
+
+            <aside aria-label="Decyzja i dane zamówienia"
+              className={`${KOLUMNA} flex flex-[1_1_360px] flex-col gap-4 xl:overflow-y-auto`}>
+              {/* Decyzja pierwsza: z niej wychodzi się z ekranu. Zgoda przed
+                  wysłaniem zostaje przy OBU gałęziach, bo uznanie kosztuje
+                  pieniądze i jest równie nieodwracalne co odmowa. */}
+              <Werdykt reklamacja={r}
+                czat={d.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
+                bladTowaru={bladTowaru} onWerdykt={wyslijWerdykt}
+                /* Niepewny los werdyktu rozstrzyga jedno odświeżenie sprawy,
+                   nie drugi werdykt — ten sam hak co wejście w sprawę. */
+                onSprawdz={() => odswiez.mutate({ id: r.id })} sprawdza={odswiez.isPending} />
+              <Produkt szczegol={d} sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
+                bladPrzesylki={bladPrzesylki}
+                onSprawdzPrzesylke={() => {
+                  setBladPrzesylki("");
+                  sprawdzPrzesylke.mutate({ id: r.id },
+                    { onError: (e) => setBladPrzesylki((e as Error).message) });
+                }} />
+              <Notatka reklamacja={r} trwa={notatka.isPending || cofnijNotatke.isPending}
+                blad={bladNotatki}
+                onZapisz={(tekst, gotowe) => {
+                  setBladNotatki("");
+                  notatka.mutate({ id: r.id, notatka: tekst.trim() || null, wersja: r.wersja },
+                    { onSuccess: gotowe, onError: (e) => setBladNotatki((e as Error).message) });
+                }}
+                onCofnij={() => {
+                  setBladNotatki("");
+                  cofnijNotatke.mutate({ id: r.id, wersja: r.wersja },
+                    { onError: (e) => setBladNotatki((e as Error).message) });
+                }} />
+            </aside>
+          </>
+          : <Karta className={`${KOLUMNA} flex flex-[999_1_560px] flex-col xl:col-span-2`}>
+              <div className="flex min-h-[12rem] flex-1 items-center px-4">
+                <Pusto ikona={ShieldQuestion}>
+                  {wybrana ? "Wczytuję sprawę…" : "Wybierz reklamację z kolejki po lewej"}
+                </Pusto>
+              </div>
+            </Karta>}
+      </div>}
 
     {/* Jawna zgoda po dopisku — dialog ze skrzynki, bez kopiowania. Autora
-        nazywa `ktoDopisal`, bo przy reklamacji bywa nim doradca Allegro,
-        a nie kupujący. */}
+        nazywa `ktoDopisal`, bo przy reklamacji bywa nim doradca Allegro. */}
     {konfliktWysylki && <DialogKonfliktu
       szczegoly={konfliktWysylki}
       szkic={tresc}
@@ -837,8 +572,8 @@ export function Reklamacje() {
       onWyslijMimoTo={() => wyslij(true)}
       onPopraw={() => setKonfliktWysylki(null)} />}
 
-    {/* Ten sam dialog przy stanowisku o towarze — to ta sama kolejka i ten
-        sam rodzaj konfliktu, więc drugiego okna nie ma. */}
+    {/* Ten sam dialog przy stanowisku o towarze — ta sama kolejka i ten sam
+        rodzaj konfliktu, więc drugiego okna nie ma. */}
     {konfliktTowaru && <DialogKonfliktu
       szczegoly={konfliktTowaru.szczegoly}
       szkic={konfliktTowaru.tresc}
