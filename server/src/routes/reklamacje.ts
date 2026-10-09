@@ -9,7 +9,8 @@ import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { typPodgladu } from "../services/typ-podgladu.js";
 import {
   adresZalacznika, BladReklamacji, licznikiKubelkow, listaReklamacji, progKolejki,
-  cofnijNotatke, ReklamacjaConflict, stempelProwadzi, szczegolReklamacji, zapiszNotatke,
+  cofnijNotatke, ReklamacjaConflict, statystykiReklamacji, stempelProwadzi, szczegolReklamacji,
+  zapiszNotatke,
 } from "../services/reklamacje.js";
 import { stanReklamacjiHealth } from "../services/allegro-reklamacje-sync-state.js";
 import {
@@ -92,11 +93,18 @@ export async function reklamacjeRoutes(app: FastifyInstance) {
        Trasa zostaje `GET` i niczego nie zapisuje: umowa „zero zapisu przy
        patrzeniu" jest nietknięta. */
     const bezProgu = req.query?.od === "wszystko";
-    const prog = progKolejki(db());
-    const reklamacje = listaReklamacji(db(), Date.now(), bezProgu ? null : prog.od);
+    /* Jedna chwila na całą odpowiedź: kafel i licznik kubełka liczone o dwie
+       różne milisekundy potrafią się różnić o sprawę, której termin właśnie
+       minął. */
+    const teraz = Date.now();
+    const prog = progKolejki(db(), teraz);
+    const reklamacje = listaReklamacji(db(), teraz, bezProgu ? null : prog.od);
     return {
       reklamacje,
       liczniki: licznikiKubelkow(reklamacje),
+      /* Kafle liczą CAŁĄ tabelę, niezależnie od progu i od `od=wszystko`:
+         obowiązek nie znika z kafla dlatego, że lista go schowała. */
+      statystyki: statystykiReklamacji(db(), teraz),
       /* `prog` jedzie ZAWSZE, także przy `od=wszystko`: panel musi umieć
          narysować przełącznik w obie strony, a po zdjęciu progu wciąż ma
          powiedzieć, do czego wraca. */

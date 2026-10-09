@@ -6,7 +6,7 @@ import { migrate } from "../db/db.js";
 import {
   adresZalacznika, BladReklamacji, czyObrazZNazwy, dniDoTerminu, dniOdZakupu,
   dniZakupuDoZgloszenia, klientCzeka, kubelek, kwotaSprawy, cofnijNotatke, licznikiKubelkow,
-  listaReklamacji, progKolejki, ReklamacjaConflict, stempelProwadzi, sygnaly,
+  listaReklamacji, progKolejki, ReklamacjaConflict, statystykiReklamacji, stempelProwadzi, sygnaly,
   szczegolReklamacji, zapiszNotatke,
 } from "./reklamacje.js";
 
@@ -925,4 +925,174 @@ test("szczegół bez dowodów, zgłoszenia u dostawcy i dostawy mówi „nie wie
   /* Karta Copilota zostaje w odpowiedzi, choć ekran jej już nie czyta:
      zapisane dane są własnością biura, nie ekranu. */
   assert.ok("karta" in s);
+});
+
+/* ── Dzisiejsza cena oferty i kafle nad kolejką ──────────────────────────────
+   Cena oferty stoi obok paragonu i pilnujemy tu waluty: kwota w euro obok
+   kwoty w złotych wyglądałaby na porównywalną. Kafle pilnują dwóch rzeczy:
+   „do decyzji" na kaflu to TEN SAM predykat co licznik kubełka, a trend
+   tydzień temu milknie (`null`), gdy nie da się go policzyć bez zgadywania. */
+
+function zOferta(cena: number | null, waluta: string | null) {
+  const s = stanowisko();
+  const id = s.dodaj({ ext: "z-oferta" });
+  s.d.prepare("UPDATE reklamacja_klienta SET offer_id='of-1', waluta='PLN' WHERE id=?").run(id);
+  s.d.prepare(`INSERT INTO offer_snapshot(channel_account_id,external_id,nazwa,cena_grosze,waluta,synced_at)
+    VALUES (?,'of-1','Kosiarka',?,?,'2026-09-07T11:00:00Z')`).run(s.konto, cena, waluta);
+  return { ...s, id };
+}
+
+test("dzisiejsza cena oferty jedzie w kolejce i w szczególe, w walucie sprawy", () => {
+  const { d, id } = zOferta(129_900, "PLN");
+  assert.equal(listaReklamacji(d, TERAZ, null)[0].ofertaCenaGrosze, 129_900);
+  assert.equal(szczegolReklamacji(d, id, TERAZ).reklamacja.ofertaCenaGrosze, 129_900);
+  /* Odpowiedź zapisu czyta goły wiersz bez snapshotu: pole jest, wartości nie. */
+  const poZapisie = zapiszNotatke(d, id, "sprawdzić", ALA);
+  assert.ok("ofertaCenaGrosze" in poZapisie, "kształt wiersza po zapisie jest ten sam");
+  assert.equal(poZapisie.ofertaCenaGrosze, null);
+});
+
+test("cena oferty w innej walucie albo bez waluty to brak ceny, nie liczba", () => {
+  assert.equal(listaReklamacji(zOferta(3_000, "EUR").d, TERAZ, null)[0].ofertaCenaGrosze, null,
+    "euro obok złotówek wyglądałoby na porównywalne");
+  assert.equal(listaReklamacji(zOferta(3_000, null).d, TERAZ, null)[0].ofertaCenaGrosze, null,
+    "`Price` wymaga waluty, więc jej brak to uszkodzony wiersz, nie „pewnie PLN”");
+  assert.equal(listaReklamacji(zOferta(null, "PLN").d, TERAZ, null)[0].ofertaCenaGrosze, null);
+  /* Waluta porównywana bez wielkości liter — kod ISO to nie zdanie. */
+  assert.equal(listaReklamacji(zOferta(500, "pln").d, TERAZ, null)[0].ofertaCenaGrosze, 500);
+  const { d, dodaj } = stanowisko();
+  dodaj({ ext: "bez-oferty" });
+  assert.equal(listaReklamacji(d, TERAZ, null)[0].ofertaCenaGrosze, null, "bez snapshotu nie ma ceny");
+});
+
+const TYDZIEN_TEMU = new Date(TERAZ - 7 * 86_400_000).toISOString();
+const dniPrzed = (dni: number) => new Date(TERAZ - dni * 86_400_000).toISOString();
+
+/** Werdykt z panelu na wierszu — kolumny, których `dodaj` nie zna. */
+function werdykt(d: DatabaseSync, id: number, at: string, status = "sent") {
+  d.prepare(`UPDATE reklamacja_klienta SET werdykt='ACCEPTED_REFUND', werdykt_status=?, werdykt_at=?
+    WHERE id=?`).run(status, at, id);
+}
+
+test("kafle: kształt i null-e na pustej tabeli", () => {
+  const { d } = stanowisko();
+  assert.deepEqual(statystykiReklamacji(d, TERAZ), {
+    doDecyzji: { teraz: 0, tydzienTemu: 0 },
+    doOdpowiedzi: { teraz: 0, tydzienTemu: null },
+    poTerminie: { teraz: 0, tydzienTemu: 0 },
+    sredniDniDoWerdyktu: { teraz: null, poprzednio: null, okresDni: 30 },
+  });
+});
+
+test("kafle: „do decyzji” i „do odpowiedzi” to liczniki kubełków całej tabeli, bez progu", () => {
+  const { d, dodaj } = stanowisko();
+  dodaj({ ext: "otwarta" });
+  dodaj({ ext: "sprzed-progu", otwarto: "2026-01-10T08:00:00Z" });
+  dodaj({ ext: "odpowiedz", status: "CLAIM_ACCEPTED", ostatnia: "BUYER_REPLIED" });
+  dodaj({ ext: "zamknieta", status: "CLAIM_REJECTED" });
+  dodaj({ ext: "bez-ruchu", czat: 0, termin: "2026-06-01T10:00:00Z" });
+  dodaj({ ext: "dyskusja" });
+  d.prepare("UPDATE reklamacja_klienta SET typ='DISPUTE', status_allegro='DISPUTE_ONGOING' WHERE external_id='dyskusja'").run();
+
+  const s = statystykiReklamacji(d, TERAZ);
+  const liczniki = licznikiKubelkow(listaReklamacji(d, TERAZ, null));
+  assert.equal(s.doDecyzji.teraz, liczniki.decyzja, "jeden predykat dla kafla i kubełka");
+  assert.equal(s.doDecyzji.teraz, 2, "sprawa sprzed progu dalej jest obowiązkiem; dyskusja nie");
+  assert.equal(s.doOdpowiedzi.teraz, liczniki.odpowiedz);
+  assert.equal(s.doOdpowiedzi.teraz, 1);
+  assert.equal(s.doOdpowiedzi.tydzienTemu, null, "statusu czatu z przeszłości nie zapisujemy");
+  /* Próg kolejki chowa sprawę z listy, ale nie z kafla. */
+  assert.equal(licznikiKubelkow(listaReklamacji(d, TERAZ, "2026-08-01T00:00:00Z")).decyzja, 1);
+});
+
+test("kafle: „po terminie” to DO DECYZJI z minionym terminem — bez terminu i bez ruchu się nie liczą", () => {
+  const { d, dodaj } = stanowisko();
+  dodaj({ ext: "po", termin: "2026-09-05T10:00:00Z" });
+  dodaj({ ext: "przed", termin: "2026-09-20T10:00:00Z" });
+  dodaj({ ext: "bez-terminu", termin: null });
+  dodaj({ ext: "bez-ruchu", czat: 0, termin: "2026-06-01T10:00:00Z" });
+  const rozstrz = dodaj({ ext: "po-ale-rozstrzygnieta", termin: "2026-09-05T10:00:00Z" });
+  werdykt(d, rozstrz, "2026-09-06T10:00:00Z");
+
+  const s = statystykiReklamacji(d, TERAZ);
+  assert.equal(s.poTerminie.teraz, 1);
+  /* Ta sama grupa, którą panel rysuje w kubełku DO DECYZJI. */
+  const grupa = listaReklamacji(d, TERAZ, null).filter((r) => r.kubelek === "decyzja" && r.poTerminie);
+  assert.equal(s.poTerminie.teraz, grupa.length);
+});
+
+test("kafle tydzień temu: nasz werdykt po T−7 liczy się, przed — nie; sprawa młodsza nie istniała", () => {
+  const { d, dodaj } = stanowisko();
+  const poTygodniu = dodaj({ ext: "werdykt-po", otwarto: dniPrzed(20), termin: dniPrzed(8) });
+  werdykt(d, poTygodniu, dniPrzed(3));
+  const przedTygodniem = dodaj({ ext: "werdykt-przed", otwarto: dniPrzed(20) });
+  werdykt(d, przedTygodniem, dniPrzed(10));
+  /* Granica: werdykt dokładnie w chwili T−7 to rozstrzygnięcie, które już zapadło. */
+  const naGranicy = dodaj({ ext: "werdykt-na-granicy", otwarto: dniPrzed(20) });
+  werdykt(d, naGranicy, TYDZIEN_TEMU);
+  dodaj({ ext: "otwarta", otwarto: dniPrzed(20), termin: "2026-09-20T10:00:00Z" });
+  /* Granica: otwarta dokładnie w T−7 już tydzień temu istniała. */
+  dodaj({ ext: "otwarta-na-granicy", otwarto: TYDZIEN_TEMU });
+  dodaj({ ext: "mloda", otwarto: dniPrzed(2) });
+  /* Nieudany werdykt nie rozstrzyga — sprawa była i jest otwarta. */
+  const nieudany = dodaj({ ext: "nieudany", otwarto: dniPrzed(20) });
+  werdykt(d, nieudany, dniPrzed(1), "send_failed");
+
+  const s = statystykiReklamacji(d, TERAZ);
+  assert.equal(s.doDecyzji.tydzienTemu, 4, "werdykt-po, otwarta, otwarta-na-granicy, nieudany");
+  assert.equal(s.doDecyzji.teraz, 4, "otwarta, otwarta-na-granicy, mloda, nieudany");
+  assert.equal(s.poTerminie.tydzienTemu, 1, "termin werdykt-po minął dzień przed T−7");
+});
+
+test("kafle tydzień temu: rozstrzygnięcie Allegro bez daty wycisza trend, a nie zgaduje", () => {
+  const { d, dodaj } = stanowisko();
+  dodaj({ ext: "otwarta", otwarto: dniPrzed(20) });
+  /* Uznana w Centrum Sprzedaży: kiedy — nie wiemy. Tydzień temu mogła być do decyzji. */
+  dodaj({ ext: "allegro", status: "CLAIM_ACCEPTED", otwarto: dniPrzed(20), termin: "2026-09-20T10:00:00Z" });
+  const s = statystykiReklamacji(d, TERAZ);
+  assert.equal(s.doDecyzji.tydzienTemu, null);
+  /* Jej termin tydzień temu był w przyszłości, więc „po terminie” liczy się dalej. */
+  assert.equal(s.poTerminie.tydzienTemu, 0);
+  assert.equal(s.doDecyzji.teraz, 1);
+
+  const p = stanowisko();
+  p.dodaj({ ext: "allegro-po-terminie", status: "CLAIM_ACCEPTED", otwarto: dniPrzed(20), termin: dniPrzed(9) });
+  assert.equal(statystykiReklamacji(p.d, TERAZ).poTerminie.tydzienTemu, null,
+    "tydzień temu mogła stać w grupie po terminie");
+});
+
+test("kafle tydzień temu: rozstrzygnięcie bez daty, które i tak nie trafiłoby do kubełka, nie wycisza trendu", () => {
+  const { d, dodaj } = stanowisko();
+  dodaj({ ext: "otwarta", otwarto: dniPrzed(20) });
+  /* Archiwum: czat zamknięty, termin minął grubo ponad miesiąc przed T−7 —
+     tydzień temu była BEZ RUCHU, więc moment rozstrzygnięcia nic nie zmienia. */
+  dodaj({ ext: "archiwum", status: "CLAIM_REJECTED", czat: 0, otwarto: "2026-03-01T08:00:00Z",
+    termin: "2026-03-15T10:00:00Z" });
+  /* Rozstrzygnięta przez Allegro, ale otwarta po T−7 — tydzień temu jej nie było. */
+  dodaj({ ext: "allegro-mloda", status: "CLAIM_ACCEPTED", otwarto: dniPrzed(3) });
+  const s = statystykiReklamacji(d, TERAZ);
+  assert.equal(s.doDecyzji.tydzienTemu, 1);
+});
+
+test("średni czas do werdyktu: nasze werdykty w oknie 30 dni i w poprzednim, granice okien", () => {
+  const { d, dodaj } = stanowisko();
+  const w = (ext: string, otwarto: number, at: number, status = "sent") => {
+    const id = dodaj({ ext, otwarto: dniPrzed(otwarto) });
+    werdykt(d, id, dniPrzed(at), status);
+  };
+  w("a", 14, 10);            // 4 dni
+  w("b", 31.25, 29, "send_uncertain"); // 2,25 dnia — wydany jak `sent`
+  w("granica", 40, 30);      // dokładnie T−30: już okno poprzednie, 10 dni
+  w("stara", 70, 59);        // 11 dni, okno poprzednie
+  w("za-stara", 90, 61);     // poza oboma oknami
+  w("nieudany", 20, 5, "send_failed");
+  /* Wznowiona po naszym werdykcie: ujemny czas niczego nie mierzy. */
+  w("wznowiona", 2, 6);
+  /* Rozstrzygnięta przez Allegro — nie nasz werdykt, nie nasz czas. */
+  dodaj({ ext: "allegro", status: "CLAIM_ACCEPTED", otwarto: dniPrzed(10) });
+
+  const s = statystykiReklamacji(d, TERAZ).sredniDniDoWerdyktu;
+  assert.equal(s.okresDni, 30);
+  assert.equal(s.teraz, 3.1, "(4 + 2,25) / 2 = 3,125 → 3,1");
+  assert.equal(s.poprzednio, 10.5, "(10 + 11) / 2");
 });

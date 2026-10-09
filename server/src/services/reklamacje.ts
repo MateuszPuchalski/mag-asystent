@@ -373,6 +373,16 @@ export interface WierszReklamacji {
      rozjechałaby się z tą przy pierwszej poprawce. */
   /** Cena brutto ZA SZTUKĘ z pozycji zamówienia tej oferty; `null` = paragonu nie mamy. */
   cenaParagonuGrosze: number | null;
+  /**
+   * DZISIEJSZA cena oferty ze snapshotu Allegro, za sztukę.
+   *
+   * Obok paragonu, nie zamiast niego: paragon mówi, ile klient zapłacił,
+   * a ta liczba — ile ta sama rzecz kosztuje dziś. Różnica między nimi
+   * podpowiada, czy wymiana albo zwrot pieniędzy wyjdzie taniej.
+   * `null` = snapshotu nie ma albo jego waluta jest inna niż waluta sprawy:
+   * dwie kwoty w różnych walutach obok siebie wyglądałyby na porównywalne.
+   */
+  ofertaCenaGrosze: number | null;
   /** Kwota sprawy wg `kwotaSprawy`; `null` = nie wiemy, nigdy „zero". */
   kwotaGrosze: number | null;
   /** Skąd kwota: żądanie klienta czy paragon. Ekran podpisuje ją różnie. */
@@ -606,20 +616,55 @@ export function dniZakupuDoZgloszenia(
 
 const liczba = (v: unknown): number | null => (v == null ? null : Number(v));
 
+/** Po terminie decyzji: termin znany i już minął. Brak terminu to nie „po". */
+const poTerminieDni = (dni: number | null): boolean => dni !== null && dni < 0;
+
+/**
+ * Stan sprawy, z którego liczą się kubełek i sygnały.
+ *
+ * Osobno od `zWiersza`, bo czytają go DWA miejsca: wiersz kolejki i statystyki
+ * kafli. Gdyby statystyki składały ten stan po swojemu, „do decyzji" na kaflu
+ * i licznik kubełka rozjechałyby się przy pierwszej nowej regule kubełka.
+ */
+function rdzenWiersza(w: Wiersz, teraz: number) {
+  return {
+    statusAllegro: tekst(w.status_allegro),
+    dniDoTerminu: dniDoTerminu(tekst(w.decyzja_do), teraz),
+    ostatniaWiadomoscStatus: tekst(w.ostatnia_wiadomosc_status),
+    ostatniaWiadomoscAt: tekst(w.ostatnia_wiadomosc_at),
+    czatAktywny: Number(w.czat_aktywny ?? 1) === 1,
+    zwrotWymagany: w.zwrot_wymagany == null ? null : Number(w.zwrot_wymagany) === 1,
+    werdykt: tekst(w.werdykt),
+    werdyktStatus: tekst(w.werdykt_status) as StatusWerdyktu | null,
+    zwrotTowaru: tekst(w.zwrot_towaru) as "wymagany" | "niewymagany" | null,
+  };
+}
+
+/**
+ * Dzisiejsza cena oferty, ale tylko w walucie sprawy.
+ *
+ * Waluta snapshotu bez wartości to też `null`: `Price` w specyfikacji wymaga
+ * `currency`, więc jej brak znaczy uszkodzony wiersz, a nie „pewnie PLN".
+ */
+function cenaOfertyWWalucie(w: Wiersz, walutaSprawy: string): number | null {
+  const cena = liczba(w.oferta_cena_grosze);
+  const waluta = tekst(w.oferta_waluta);
+  if (cena === null || !Number.isFinite(cena) || waluta === null) return null;
+  return waluta.trim().toUpperCase() === walutaSprawy.trim().toUpperCase() ? cena : null;
+}
+
 function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
-  const statusAllegro = tekst(w.status_allegro);
+  const rdzen = rdzenWiersza(w, teraz);
+  const {
+    statusAllegro, dniDoTerminu: dni, czatAktywny, ostatniaWiadomoscStatus: ostatnia,
+    zwrotWymagany, werdykt, werdyktStatus, zwrotTowaru,
+  } = rdzen;
   const decyzjaDo = tekst(w.decyzja_do);
-  const dni = dniDoTerminu(decyzjaDo, teraz);
-  const czatAktywny = Number(w.czat_aktywny ?? 1) === 1;
-  const ostatnia = tekst(w.ostatnia_wiadomosc_status);
-  const zwrotWymagany = w.zwrot_wymagany == null ? null : Number(w.zwrot_wymagany) === 1;
-  const werdykt = tekst(w.werdykt);
-  const werdyktStatus = tekst(w.werdykt_status) as StatusWerdyktu | null;
-  const zwrotTowaru = tekst(w.zwrot_towaru) as "wymagany" | "niewymagany" | null;
+  const waluta = String(w.waluta ?? "PLN");
   const kupiono = tekst(w.kupiono_at) ?? tekst(w.zamowienie_at);
-  /* Kolumny paragonu niesie wyłącznie `wierszeReklamacji`. Odpowiedź zapisu
-     czyta goły wiersz sprawy, więc tam wychodzą `null` — panel i tak
-     odświeża po zapisie kolejkę i szczegół. */
+  /* Kolumny paragonu i snapshotu oferty niesie wyłącznie `wierszeReklamacji`.
+     Odpowiedź zapisu czyta goły wiersz sprawy, więc tam wychodzą `null` —
+     panel i tak odświeża po zapisie kolejkę i szczegół. */
   const cenaParagonu = liczba(w.cena_paragonu_grosze);
   const oczekiwanaKwota = liczba(w.oczekiwana_kwota_grosze);
   const ilosc = liczba(w.ilosc);
@@ -627,11 +672,6 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     oczekiwanaKwotaGrosze: oczekiwanaKwota, cenaParagonuGrosze: cenaParagonu,
     ilosc, iloscParagonu: liczba(w.ilosc_paragonu),
   });
-  const rdzen = {
-    statusAllegro, dniDoTerminu: dni, ostatniaWiadomoscStatus: ostatnia,
-    ostatniaWiadomoscAt: tekst(w.ostatnia_wiadomosc_at),
-    czatAktywny, zwrotWymagany, werdykt, werdyktStatus, zwrotTowaru,
-  };
   return {
     id: Number(w.id),
     externalId: String(w.external_id),
@@ -646,11 +686,11 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     opis: tekst(w.opis),
     oczekiwanie: tekst(w.oczekiwanie),
     oczekiwanaKwotaGrosze: oczekiwanaKwota,
-    waluta: String(w.waluta ?? "PLN"),
+    waluta,
     statusAllegro,
     decyzjaDo,
     dniDoTerminu: dni,
-    poTerminie: dni !== null && dni < 0,
+    poTerminie: poTerminieDni(dni),
     zwrotWymagany,
     czatAktywny,
     wiadomosciIle: Number(w.wiadomosci_ile ?? 0),
@@ -705,6 +745,7 @@ function zWiersza(w: Wiersz, teraz: number): WierszReklamacji {
     twSymbol: tekst(w.tw_symbol),
     twZParagonu: false,
     cenaParagonuGrosze: cenaParagonu,
+    ofertaCenaGrosze: cenaOfertyWWalucie(w, waluta),
     kwotaGrosze: kwota.grosze,
     kwotaZrodlo: kwota.zrodlo,
     zgloszonoPoDniach: dniZakupuDoZgloszenia(kupiono, tekst(w.otwarto_at)),
@@ -801,7 +842,8 @@ function zParagonuNaWiersz(
 
    Złączenia LEWE, każde po koncie RAZEM z numerem: identyfikator oferty
    i zamówienia jest unikalny w obrębie konta, nie globalnie.
-   - Snapshot Allegro daje nazwę i adres zdjęcia oferty.
+   - Snapshot Allegro daje nazwę, adres zdjęcia i dzisiejszą cenę oferty
+     (cenę razem z walutą, bo bez niej kwoty nie da się z niczym porównać).
    - Potwierdzona kartoteka Subiekta daje dzisiejsze mapowanie oferty.
      Propozycji kartoteki tu NIE liczymy: `kartotekaOferty` to kilka zapytań
      na wiersz, a proponowanie jest pracą przy jednej otwartej sprawie.
@@ -819,6 +861,7 @@ function zParagonuNaWiersz(
    musi wierzyć komentarzowi. W stałych nie ma backticków, bo to literały
    szablonowe. */
 const KOLUMNY_WIERSZA = `r.*, o.nazwa AS oferta_nazwa, o.primary_image_url AS oferta_zdjecie,
+           o.cena_grosze AS oferta_cena_grosze, o.waluta AS oferta_waluta,
            k.tw_id, k.tw_symbol, zk.kupiono_at,
            zp.sku AS sku_paragonu, zp.cena_grosze AS cena_paragonu_grosze,
            zp.ilosc AS ilosc_paragonu`;
@@ -924,6 +967,155 @@ export function progKolejki(
     od,
     ukrytych: Number(w?.ile ?? 0),
     ukrytychZTerminem: Number(w?.z_terminem ?? 0),
+  };
+}
+
+/** Liczba na kaflu i ta sama liczba tydzień temu; `null` = nie da się odtworzyć. */
+export interface TrendLicznika {
+  teraz: number;
+  tydzienTemu: number | null;
+}
+
+/**
+ * Kafle nad kolejką reklamacji.
+ *
+ * `null` w trendzie znaczy „nie umiemy tego uczciwie odtworzyć" i panel
+ * pokazuje wtedy zdanie zamiast strzałki. Zero znaczy zero. Trend zmyślony
+ * z niepełnej historii jest gorszy od braku trendu, bo wygląda na pomiar.
+ */
+export interface StatystykiReklamacji {
+  doDecyzji: TrendLicznika;
+  doOdpowiedzi: TrendLicznika;
+  poTerminie: TrendLicznika;
+  sredniDniDoWerdyktu: { teraz: number | null; poprzednio: number | null; okresDni: number };
+}
+
+/** Okno średniego czasu do werdyktu; miesiąc wyrównuje tydzień z urlopem. */
+const OKRES_WERDYKTU_DNI = 30;
+/** Jak daleko wstecz patrzy trend kafli. */
+const TREND_DNI = 7;
+
+const czas = (v: unknown): number | null => {
+  const t = typeof v === "string" ? Date.parse(v) : NaN;
+  return Number.isFinite(t) ? t : null;
+};
+
+/**
+ * Średnia z dni, zaokrąglona do jednej dziesiątej; pusta lista daje `null`.
+ * Zero spraw to brak pomiaru, a nie średnia równa zeru.
+ */
+function sredniaDni(dni: number[]): number | null {
+  if (dni.length === 0) return null;
+  return Math.round((dni.reduce((a, b) => a + b, 0) / dni.length) * 10) / 10;
+}
+
+/**
+ * Statystyki kafli — CZYSTY ODCZYT całej tabeli reklamacji, bez progu kolejki.
+ *
+ * BEZ PROGU, bo kafel odpowiada na pytanie o obowiązek, a nie o widok. Próg
+ * daty chowa archiwum z listy, ale sprawa z żywym terminem sprzed progu dalej
+ * jest do decyzji (patrz `ukrytychZTerminem`).
+ *
+ * TERAZ liczy się tym samym `kubelek`, co kolejka, ze stanu złożonego przez
+ * `rdzenWiersza`. Dwie reguły „do decyzji" rozjechałyby kafel z licznikiem
+ * kubełka przy pierwszej poprawce jednej z nich. „Po terminie" to podzbiór
+ * DO DECYZJI z minionym terminem: ta sama grupa, którą panel rysuje
+ * w kubełku. Sprawa bez terminu się nie liczy, bo „Allegro terminu nie
+ * podało" nie znaczy „minął". Sprawa BEZ RUCHU też nie, bo zeszła z pracy.
+ *
+ * TYDZIEŃ TEMU to ten sam `kubelek` zapytany o chwilę T−7 dni, z czterema
+ * założeniami, bo historii stanu nie zapisujemy:
+ * 1. Moment rozstrzygnięcia znamy WYŁĄCZNIE przy naszym werdykcie
+ *    (`werdykt_at`). Rozstrzygnięcie po stronie Allegro (Centrum Sprzedaży,
+ *    wycofanie przez kupującego) nie zostawia daty. Gdy choć jedna taka sprawa
+ *    mogła tydzień temu leżeć w liczonym kubełku, trend jest `null`. Liczba
+ *    z takim założeniem byłaby zgadywaniem.
+ * 2. Stan czatu bierzemy dzisiejszy. Rozstrzyga on tylko o BEZ RUCHU
+ *    (czat zamknięty i termin minął ponad miesiąc wcześniej); sprawa, której
+ *    czat zamknięto w ostatnim tygodniu, liczy się tydzień temu jako bez ruchu.
+ * 3. `otwarto_at` to otwarcie ALBO ponowne otwarcie, więc sprawa wznowiona
+ *    w ostatnim tygodniu tydzień temu nie istniała.
+ * 4. Termin decyzji bierzemy dzisiejszy, bo poprzedniego nie zapisujemy.
+ *    Termin przesunięty przez Allegro w ostatnim tygodniu przesuwa też trend.
+ *
+ * DO ODPOWIEDZI tydzień temu jest zawsze `null`. Ten kubełek zależy od statusu
+ * ostatniej wiadomości u Allegro i od tego, czy sprawa była już rozstrzygnięta.
+ * Statusu z przeszłości nie zapisujemy. Rozmów spraw rozstrzygniętych
+ * synchronizacja nie dociąga, więc `reklamacja_wiadomosc` jest dla nich niepełna.
+ *
+ * ŚREDNI CZAS DO WERDYKTU liczy tylko NASZE werdykty, wydane tak, jak liczy je
+ * `rozstrzygnieta` (`sent` i `send_uncertain`): to moment, w którym sprawa
+ * zeszła z DO DECYZJI. Werdykt sprzed `otwarto_at` (sprawa wznowiona po nim)
+ * wypada, bo ujemny czas nie mierzy niczego.
+ */
+export function statystykiReklamacji(
+  database: Db = defaultDb(), teraz = Date.now(),
+): StatystykiReklamacji {
+  const wiersze = database.prepare(
+    "SELECT r.* FROM reklamacja_klienta r WHERE r.typ = 'CLAIM'").all() as Wiersz[];
+  const przedTygodniem = teraz - TREND_DNI * DZIEN_MS;
+  const odOkresu = teraz - OKRES_WERDYKTU_DNI * DZIEN_MS;
+  const odPoprzedniego = teraz - 2 * OKRES_WERDYKTU_DNI * DZIEN_MS;
+
+  let doDecyzji = 0, doOdpowiedzi = 0, poTerminie = 0;
+  let decyzjaTydzien = 0, poTerminieTydzien = 0;
+  let decyzjaNiepewna = false, poTerminieNiepewna = false;
+  const dniTeraz: number[] = [];
+  const dniPoprzednio: number[] = [];
+
+  for (const w of wiersze) {
+    const rdzen = rdzenWiersza(w, teraz);
+    const k = kubelek(rdzen, teraz);
+    if (k === "decyzja") {
+      doDecyzji += 1;
+      if (poTerminieDni(rdzen.dniDoTerminu)) poTerminie += 1;
+    } else if (k === "odpowiedz") {
+      doOdpowiedzi += 1;
+    }
+
+    const otwarto = czas(w.otwarto_at);
+    const nasz = WERDYKT_WYDANY.includes(rdzen.werdyktStatus ?? "");
+    const werdyktAt = nasz ? czas(w.werdykt_at) : null;
+
+    if (nasz && werdyktAt !== null && otwarto !== null && werdyktAt >= otwarto) {
+      const dni = (werdyktAt - otwarto) / DZIEN_MS;
+      if (werdyktAt > odOkresu && werdyktAt <= teraz) dniTeraz.push(dni);
+      else if (werdyktAt > odPoprzedniego && werdyktAt <= odOkresu) dniPoprzednio.push(dni);
+    }
+
+    /* Tydzień temu sprawy jeszcze nie było (albo jej nie wznowiono). */
+    if (otwarto === null || otwarto > przedTygodniem) continue;
+    /* Kiedy zapadło rozstrzygnięcie: `Infinity` = jeszcze nie zapadło,
+       `null` = zapadło, ale nie wiemy kiedy (założenie 1). */
+    const rozstrzygnietoAt: number | null = !rozstrzygnieta(rdzen) ? Infinity
+      : nasz ? werdyktAt
+      : null;
+    if (rozstrzygnietoAt !== null && rozstrzygnietoAt <= przedTygodniem) continue;
+    /* Ten sam kubełek, zapytany o chwilę sprzed tygodnia jak o sprawę otwartą. */
+    const dniWtedy = dniDoTerminu(tekst(w.decyzja_do), przedTygodniem);
+    const wtedy = kubelek(
+      { ...rdzen, statusAllegro: null, werdyktStatus: null, dniDoTerminu: dniWtedy },
+      przedTygodniem);
+    if (wtedy !== "decyzja") continue;
+    const poWtedy = poTerminieDni(dniWtedy);
+    if (rozstrzygnietoAt === null) {
+      decyzjaNiepewna = true;
+      if (poWtedy) poTerminieNiepewna = true;
+      continue;
+    }
+    decyzjaTydzien += 1;
+    if (poWtedy) poTerminieTydzien += 1;
+  }
+
+  return {
+    doDecyzji: { teraz: doDecyzji, tydzienTemu: decyzjaNiepewna ? null : decyzjaTydzien },
+    doOdpowiedzi: { teraz: doOdpowiedzi, tydzienTemu: null },
+    poTerminie: { teraz: poTerminie, tydzienTemu: poTerminieNiepewna ? null : poTerminieTydzien },
+    sredniDniDoWerdyktu: {
+      teraz: sredniaDni(dniTeraz),
+      poprzednio: sredniaDni(dniPoprzednio),
+      okresDni: OKRES_WERDYKTU_DNI,
+    },
   };
 }
 
