@@ -26,7 +26,7 @@ import type {
 import { podzielStopke } from "./stopka.js";
 import { czyObrazZNazwy } from "./reklamacje.js";
 import { zdarzeniaZwrotowRozmowy } from "./zwrot-na-osi.js";
-import { typPodgladu } from "./typ-podgladu.js";
+import { czyPdfZNazwy, typPodgladu, typPodgladuOsi } from "./typ-podgladu.js";
 import { ROLE_ALLEGRO, glosAllegroPoZamknieciu } from "./glos-allegro.js";
 import { stanProblemowZakupu, type StanProblemowZakupu } from "./allegro-inbox-sync-state.js";
 
@@ -139,6 +139,9 @@ export interface ZalacznikOsi {
      listę typów, które trasa podglądu odda — panel zgadujący po `typ`
      rysowałby zepsuty obrazek przy każdym rozjeździe tych dwóch list. */
   podglad: boolean;
+  /* Czy pokazać miniaturę PDF-a. Wyklucza się z `podglad`: kafel ma jeden
+     układ, a o wydaniu i tak rozstrzyga sygnatura na trasie podglądu. */
+  pdf: boolean;
 }
 
 /** Wzmianka w komentarzu — kto ma to przeczytać. */
@@ -667,6 +670,10 @@ export function osRozmowy(id: number): {
      WHERE m.conversation_id=? ORDER BY a.id
   `).all(id) as Array<Record<string, unknown>>) {
     const lista = zalaczniki.get(Number(z.message_id)) ?? [];
+    const doPodgladu = String(z.status) === "SAFE" && z.url != null;
+    const obraz = doPodgladu
+      && (typPodgladu(z.mime_type as string | null) !== null
+        || czyObrazZNazwy(String(z.file_name)));
     lista.push({
       id: Number(z.id), nazwa: String(z.file_name),
       typ: z.mime_type == null ? null : String(z.mime_type),
@@ -688,9 +695,12 @@ export function osRozmowy(id: number): {
          dostaje 415, panel to zapamiętuje i zostaje przy nazwie z pobraniem.
          0.244.0 patrzyło na nazwę tylko przy PUSTYM polu, więc `image/jpg`
          zostawiało zdjęcie samą nazwą i trasa z bajtami nie była pytana. */
-      podglad: String(z.status) === "SAFE" && z.url != null
-        && (typPodgladu(z.mime_type as string | null) !== null
-          || czyObrazZNazwy(String(z.file_name))),
+      podglad: obraz,
+      /* PDF tą samą bramką: `SAFE`, adres i typ ALBO nazwa. Pierwszeństwo ma
+         obraz, bo `podglad` zostaje bez zmian, a kafel ma jeden układ. */
+      pdf: doPodgladu && !obraz
+        && (typPodgladuOsi(z.mime_type as string | null) === "application/pdf"
+          || czyPdfZNazwy(String(z.file_name))),
     });
     zalaczniki.set(Number(z.message_id), lista);
   }

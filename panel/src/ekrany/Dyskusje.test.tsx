@@ -422,7 +422,7 @@ describe("Kolejność, zdjęcia i wyjście do Allegro", () => {
 
   it("zdjęcia stoją kaflem w dymku wiadomości, bez kolumny obok", () => {
     pokaz("/obsluga/dyskusje/1", [wiad({
-      zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "paczka.jpg", podglad: true }],
+      zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "paczka.jpg", podglad: true, pdf: false }],
     })]);
     expect(screen.queryByRole("complementary", { name: "Zdjęcia w sprawie" })).not.toBeInTheDocument();
     const lista = screen.getByRole("list", { name: "Wiadomości" });

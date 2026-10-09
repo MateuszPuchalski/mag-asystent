@@ -6246,6 +6246,33 @@ Oba ekrany rysuje wspólny `reklamacje/Czat.tsx`, więc zmiana jest jedna.
 - **Zeszło z ekranu:** zwijanie starszych wiadomości, pasek „rozmowa jest
   niepełna”, bursztyn ostatniej wiadomości klienta, ikony i słowa ról oraz
   zwijanie długich treści.
+
+**PDF w czacie (@wydanie).** Prośba właściciela: PDF od klienta ma być widać
+w rozmowie. Kafel PDF-a pokazuje miniaturę pierwszej strony ze znaczkiem
+„PDF”. Klik otwiera cały dokument w oknie panelu, z licznikiem „Strona N z M”
+i przyciskiem „Pobierz”. Pasek nazwy dalej pobiera plik na dysk. To samo
+dotyczy dyskusji i skrzynki, gdzie miniatura stoi nad nazwą w karcie
+załącznika, tylko dla plików `SAFE`.
+
+- **O układzie mówi pole `pdf` z serwera,** podpowiedź z nazwy pliku, a w
+  skrzynce także z typu. Rozstrzygają bajty: plik bez sygnatury `%PDF-`
+  dostaje 415 i zostaje kaflem z nazwą.
+- **Bajty idą GET-em z trasy podglądu,** tej samej co dla zdjęć. Miniatura
+  i okno czytają jeden wpis zapytania, więc klik nie pobiera pliku drugi raz.
+- **Rysuje pdf.js w przeglądarce,** ładowany dopiero przy pierwszym PDF-ie,
+  w osobnym kawałku pakietu. Rysujemy samo płótno: bez warstwy tekstu,
+  adnotacji, formularzy, XFA i skryptów dokumentu. Bierzemy wersję `legacy`,
+  bo zwykła nie otwiera plików w Chromium sprzed kilku miesięcy.
+- **Skany mają dekodery obok panelu.** Obraz JBIG2 i JPEG2000 pdf.js czyta
+  modułami WASM z `assets/pdfjs-<wersja>/`. Bez nich skan paragonu wychodzi
+  białą stroną, bez żadnego błędu. Wersja w katalogu chroni przed starym
+  dekoderem w pamięci przeglądarki.
+- **Strony okna rysują się po kolei,** każda przy zbliżeniu do kadru. Długi
+  protokół serwisu nie zajmuje pamięci karty stronami, których nikt nie czyta.
+- **Porażka nie zostawia pustego prostokąta.** 404 i 415 dają kafel z nazwą.
+  Za duży plik (413) i PDF, którego pdf.js nie otworzy, mówią zdaniem bez
+  ponowienia. Awaria drogi mówi zdaniem z „Spróbuj ponownie”.
+
 ### 25c.1. Czym jest dyskusja
 
 Rozmową posprzedażową, którą kupujący otwiera przy zamówieniu, gdy coś poszło

@@ -101,7 +101,13 @@ async function pobierz(sciezka: string): Promise<string | null> {
   } catch {
     throw new Error("Serwer nie odpowiada — sprawdź połączenie z siecią firmy.");
   }
-  if (odp.ok) return URL.createObjectURL(await odp.blob());
+  if (odp.ok) {
+    /* Trasa podglądu oddaje też PDF. Plik nazwany `usterka.jpg` z bajtami
+       PDF-a nie ma trafić do `<img>`: agent zobaczyłby zepsuty obraz zamiast
+       kafla z nazwą i pobraniem. Typ podał serwer z bajtów, nie z nazwy. */
+    if (odp.headers.get("content-type")?.startsWith("application/pdf")) return null;
+    return URL.createObjectURL(await odp.blob());
+  }
   /* 404 znaczy „potwierdzony brak" i jest ODPOWIEDZIĄ, nie awarią — serwer
      nie zapisuje go nawet w audycie; 415 to „plik nie jest obrazem". */
   if (KODY_BRAKU.has(odp.status)) return null;
@@ -215,6 +221,13 @@ export function useZdjecieOferty(externalId: string | null | undefined): string 
   return useObraz(id === "" ? null : `/api/obsluga/oferta/${encodeURIComponent(id)}/zdjecie`);
 }
 
+/* Trasy podglądu w JEDNYM miejscu: zdjęcie i PDF czytają ten sam adres, bo
+   rodzaj pliku rozstrzyga serwer po bajtach. Dwa zapisy adresu rozjechałyby
+   się przy pierwszej zmianie trasy, a objawem byłby PDF pytający o 404. */
+export const sciezkaPodgladuSkrzynki = (id: number) => `/api/obsluga/zalaczniki/${id}/podglad`;
+export const sciezkaPodgladuReklamacji = (reklamacjaId: number, zalacznikId: number) =>
+  `/api/obsluga/reklamacje/${reklamacjaId}/zalaczniki/${zalacznikId}/podglad`;
+
 /**
  * Podgląd załącznika wiadomości (0.219.1).
  *
@@ -229,7 +242,7 @@ export function useZdjecieOferty(externalId: string | null | undefined): string 
 export function useZdjecieZalacznika(id: number | null | undefined): {
   url: string | null | undefined; blad: string | null; ponow: () => void;
 } {
-  const sciezka = id == null ? null : `/api/obsluga/zalaczniki/${id}/podglad`;
+  const sciezka = id == null ? null : sciezkaPodgladuSkrzynki(id);
   const url = useObraz(sciezka);
   /* Zdanie i ponowienie WYŁĄCZNIE tutaj: w skrzynce brak zdjęcia to sama
      nazwa pliku bez powodu, a właściciel patrzył na to od 0.219.2. Kartoteka
@@ -260,8 +273,7 @@ export function useZdjecieZalacznika(id: number | null | undefined): {
 export function useZdjecieZalacznikaReklamacji(
   reklamacjaId: number, zalacznikId: number | null | undefined,
 ): { url: string | null | undefined; blad: string | null; ponow: () => void } {
-  const sciezka = zalacznikId == null
-    ? null : `/api/obsluga/reklamacje/${reklamacjaId}/zalaczniki/${zalacznikId}/podglad`;
+  const sciezka = zalacznikId == null ? null : sciezkaPodgladuReklamacji(reklamacjaId, zalacznikId);
   const url = useObraz(sciezka);
   const { blad, ponow } = useBladObrazu(sciezka);
   return { url, blad, ponow };

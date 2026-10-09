@@ -525,6 +525,53 @@ test("podgląd na osi: stan przed ETagiem, 304 przed Allegro, typ z sygnatury ba
     "SVG jest obrazem i dokumentem ze skryptem — nie przechodzi po bajtach");
 });
 
+const PDF = Buffer.from("%PDF-1.7\n%\u00e2\u00e3\u00cf\u00d3\n1 0 obj\n", "latin1");
+
+test("podgląd PDF-a: 200 w piaskownicy CSP, 415 bez sygnatury i przy UNSAFE, 413 ponad sufit", async () => {
+  mock.restoreAll();
+  tokenAllegro(true);
+  const biuro = login("biuro", "Biuro");
+  const podglad = (id: number) => app.inject({
+    method: "GET", url: `/api/obsluga/zalaczniki/${id}/podglad`, headers: biuro.naglowki });
+
+  /* Faktura od klienta. Panel rysuje ją przez pdf.js; CSP `sandbox` odbiera
+     skryptowi pliku nasz origin, gdyby ktoś wszedł na adres paskiem. */
+  allegroOddaje({ status: 200, bajty: PDF });
+  const przed = liczbaZdarzen();
+  const faktura = zalacznik("faktura.pdf", "application/pdf");
+  const ok = await podglad(faktura);
+  assert.equal(ok.statusCode, 200, ok.body);
+  assert.equal(ok.headers["content-type"], "application/pdf");
+  assert.equal(ok.headers["x-content-type-options"], "nosniff");
+  assert.equal(ok.headers["content-disposition"], "inline");
+  assert.equal(ok.headers["content-security-policy"], "sandbox");
+  assert.equal(ok.headers.etag, `"zal-${faktura}"`);
+  assert.equal(Number(ok.headers["content-length"]), PDF.byteLength);
+  assert.equal(liczbaZdarzen(), przed, "podgląd PDF-a nie zostawia śladu w dzienniku");
+
+  /* Nazwa i pole obiecują PDF, bajty nie: 415, plik zostaje przy pobraniu. */
+  allegroOddaje({ status: 200, bajty: Buffer.from("<html><script>1</script></html>") });
+  const udawany = await podglad(zalacznik("udawany.pdf", "application/pdf"));
+  assert.equal(udawany.statusCode, 415);
+  assert.match(udawany.json().error, /sygnatura pliku/);
+
+  /* `UNSAFE` zatrzymuje PDF przed Allegro, jak zdjęcie. */
+  const bez = allegroOddaje({ status: 200, bajty: PDF });
+  const brudny = await podglad(zalacznik("brudny.pdf", "application/pdf", "UNSAFE"));
+  assert.equal(brudny.statusCode, 415);
+  assert.match(brudny.json().error, /stan UNSAFE/);
+  assert.equal(bez.strzalow, 0);
+
+  /* Ponad 20 MiB: 413 ze zdaniem, bez kolejnej drogi pobrania. */
+  const duzy = Buffer.concat([PDF, Buffer.alloc(20 * 1024 * 1024)]);
+  const jedna = allegroOddaje({ status: 200, bajty: duzy });
+  const zaDuzy = await podglad(zalacznik("katalog.pdf", "application/pdf"));
+  assert.equal(zaDuzy.statusCode, 413);
+  assert.match(zaDuzy.json().error, /katalog\.pdf.*podgląd przyjmuje do 20 MB\. Pobierz go na dysk\./);
+  assert.equal(jedna.strzalow, 1, "za duży plik nie jest powodem do drugiej drogi");
+  mock.restoreAll();
+});
+
 test("odmowa Allegro wraca jako 502 ze zdaniem, awaria sieci i brak konta jako 503", async () => {
   mock.restoreAll();
   tokenAllegro(true);

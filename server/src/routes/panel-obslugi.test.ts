@@ -45,7 +45,8 @@ test("wejście bez ukośnika prowadzi do panelu, a nie w pustkę", async () => {
 test("zasoby nie wychodzą poza katalog builda", async () => {
   /* Gwiazdka `/obsluga/*` łapie wszystko, więc bez białej listy nazwa pliku
      z `..` czytałaby cudze pliki serwera. */
-  for (const zly of ["../../../etc/passwd", "..%2f..%2fpackage.json", "nie-ma-takiego.js"]) {
+  for (const zly of ["../../../etc/passwd", "..%2f..%2fpackage.json", "nie-ma-takiego.js",
+    "pdfjs-1.0.0/..%2f..%2fpackage.json", "..%2f/package.json"]) {
     const r = await app.inject({ method: "GET", url: `/obsluga/assets/${zly}` });
     assert.ok(r.statusCode === 404 || r.statusCode === 200 && !r.body.includes("root:"),
       `zasób ${zly} nie został odrzucony`);
@@ -108,4 +109,23 @@ test("panel oddaje ikonę jako obraz, nie jako strumień bajtów", () => {
     new URL("./panel-obslugi.ts", import.meta.url), "utf8");
   assert.match(zrodlo, /"\.webp":\s*"image\/webp"/,
     "`.webp` wypadło z tabeli typów panelu");
+});
+
+/* Dekodery skanów pdf.js leżą w podkatalogu z wersją, bo biblioteka żąda
+   katalogu, a zasoby są niezmienne na rok. Test na katalogu tymczasowym,
+   bo w CI testy serwera biegną przed buildem panelu. */
+test("zasób z jednego poziomu podkatalogu przechodzi, wyjście z builda nie", async () => {
+  const { plikZasobu } = await import("./panel-obslugi.js");
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "wertis-zasoby-"));
+  fs.mkdirSync(path.join(dir, "assets", "pdfjs-6.3.289"), { recursive: true });
+  fs.writeFileSync(path.join(dir, "assets", "pdfjs-6.3.289", "jbig2.wasm"), "x");
+  fs.writeFileSync(path.join(dir, "assets", "a.js"), "x");
+  fs.writeFileSync(path.join(dir, "index.html"), "x");
+  assert.equal(plikZasobu(dir, ["pdfjs-6.3.289", "jbig2.wasm"]),
+    path.join(dir, "assets", "pdfjs-6.3.289", "jbig2.wasm"));
+  assert.equal(plikZasobu(dir, ["a.js"]), path.join(dir, "assets", "a.js"));
+  for (const zle of [["..", "index.html"], ["..", ".."], [".hidden"], ["pdfjs-6.3.289"],
+    ["a", "b", "c"], [], ["pdfjs-6.3.289", "nie-ma.wasm"]]) {
+    assert.equal(plikZasobu(dir, zle), null, `zasób ${zle.join("/")} nie został odrzucony`);
+  }
 });

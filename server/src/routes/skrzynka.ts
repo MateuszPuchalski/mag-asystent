@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyReply } from "fastify";
 import { sesjaZadania } from "../context.js";
 import { logEvent } from "../services/events.js";
 import { listaRozmow, osRozmowy, stanSkrzynki, zlecPomiar } from "../services/skrzynka.js";
-import { typPodgladu } from "../services/typ-podgladu.js";
+import { SUFIT_PODGLADU_BAJTOW, typPodgladuOsi } from "../services/typ-podgladu.js";
 import { ConversationConflict, dodajKomentarz, odlozRozmowe, otworzRozmowe, zakonczRozmowe, przejmijRozmowe, przekazRozmowe, ustawPriorytet,
   ustawReklamacyjna, wskazKartoteke, wskazOferte, zapiszSzkic } from "../services/conversations.js";
 import {
@@ -23,7 +23,7 @@ import {
   dodajZalacznik, usunZalacznik, zalacznikiRozmowy,
 } from "../services/zalaczniki-wysylki.js";
 import { pobierzZalacznikWiadomosci } from "../adapters/allegro.http.js";
-import { bladPobrania } from "./pobranie.js";
+import { bladPobrania, bladPodgladu, wyslijPodglad } from "./pobranie.js";
 import { rozpoznajMime } from "../adapters/zdjecia.sgt.js";
 import { sciezkaZdjeciaOferty, zapewnijZdjecieOferty } from "../services/zdjecia-ofert.js";
 import { kontoKanalu } from "../services/kanal-konto.js";
@@ -131,21 +131,24 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
   });
 
   /**
-   * Podgląd załącznika WPROST na osi (0.218.0).
+   * Podgląd załącznika WPROST na osi: obraz albo PDF.
    *
    * ── DLACZEGO OSOBNA TRASA, A NIE PARAMETR PRZY POBRANIU ───────────────────
    * Trasa wyżej odsyła `content-disposition: attachment` i to jest DECYZJA,
    * nie szczegół: cudzy plik nie ma się otwierać w naszym origin, gdy agent
-   * wejdzie na ten adres paskiem przeglądarki. Zdjęcie w `<img>` to inna
-   * sytuacja — nie nawigacja, tylko podzasób — ale rozstrzyganie tego jednym
-   * nagłówkiem dla obu przypadków znaczyłoby, że jeden z nich jest ustawiony
-   * źle. Dwa adresy, dwie odpowiedzi, każda mówi prawdę o sobie.
+   * wejdzie na ten adres paskiem przeglądarki. Zdjęcie w `<img>` i PDF
+   * rysowany przez pdf.js to inna sytuacja — nie nawigacja, tylko bajty dla
+   * panelu. Dwa adresy, dwie odpowiedzi, każda mówi prawdę o sobie.
    *
-   * WĄSKIE GARDŁO JEST CELOWE. Oddajemy WYŁĄCZNIE cztery typy rastrowe
-   * (`TYPY_PODGLADU`) i wyłącznie przy `SAFE`; `content-type` bierzemy z tej
-   * listy, nie z bazy, a `nosniff` zabrania przeglądarce zgadywać lepiej.
-   * Plik spoza listy dostaje 415 i zostaje przy pobieraniu — to nie awaria,
-   * tylko odpowiedź „tego nie pokażę".
+   * WĄSKIE GARDŁO JEST CELOWE. Oddajemy WYŁĄCZNIE typy z dwóch list
+   * (`TYPY_PODGLADU` i `TYPY_DOKUMENTU`) i wyłącznie przy `SAFE`;
+   * `content-type` bierzemy z listy, nie z bazy. Na wejście paskiem
+   * odpowiedź ma piaskownicę CSP (`wyslijPodglad`), więc skrypt PDF-a nie
+   * dostanie naszego origin. Plik spoza list dostaje 415 i zostaje przy
+   * pobieraniu — to nie awaria, tylko odpowiedź „tego nie pokażę".
+   *
+   * SUFIT 20 MiB (`SUFIT_PODGLADU_BAJTOW`), bo podgląd wciąga plik bez
+   * kliknięcia. Większy dostaje 413 i zostaje przy pobraniu na dysk.
    *
    * ETAG PRZED POBRANIEM OD ALLEGRO, jak przy zdjęciu oferty. Treść załącznika
    * jest niezmienna (nowy plik = nowy wiersz), więc identyfikator wystarcza za
@@ -161,10 +164,9 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
       .get(Number(req.params.id)) as Record<string, unknown> | undefined;
     if (!z) return reply.code(404).send({ error: "Nie znaleziono załącznika" });
 
-    /* Bramka STANU przed ETagiem. Do tego wydania 304 wypadało przed odczytem
-       wiersza, więc załącznik, któremu synchronizacja zmieniła status,
-       dostawał z przeglądarki starą odpowiedź. Sam 304 dalej stoi PRZED
-       pytaniem Allegro o plik — to on oszczędza łącze, na którym zależy. */
+    /* Bramka STANU przed ETagiem: załącznik, któremu synchronizacja zmieniła
+       status, nie może dostać z przeglądarki starej odpowiedzi. Sam 304 dalej
+       stoi PRZED pytaniem Allegro o plik — to on oszczędza łącze. */
     if (String(z.status) !== "SAFE" || z.url == null) {
       return reply.code(415).send({
         error: `Załącznik „${String(z.file_name)}" nie jest do pokazania (stan ${String(z.status)}).`,
@@ -177,30 +179,24 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
 
     let bajty: Buffer;
     try {
-      bajty = Buffer.from((await pobierzZalacznikWiadomosci(config.allegro.apiUrl, String(z.url))).bajty);
-    } catch (e) { return bladPobrania(reply, e); }
+      bajty = Buffer.from((await pobierzZalacznikWiadomosci(config.allegro.apiUrl, String(z.url),
+        { maksBajtow: SUFIT_PODGLADU_BAJTOW })).bajty);
+    } catch (e) { return bladPodgladu(reply, e, String(z.file_name)); }
 
-    /* TYP Z BAJTÓW, nie z pola (port z reklamacji, 0.223.0). `mimeType`
-       w schemacie Allegro jest opcjonalne i bywa cudzym zdaniem o pliku;
-       sygnatura jest nasza. `nosniff` zabrania przeglądarce zgadywać lepiej. */
-    const typ = typPodgladu(rozpoznajMime(bajty));
+    /* TYP Z BAJTÓW, nie z pola, jak w reklamacjach. `mimeType` w schemacie
+       Allegro jest opcjonalne i bywa cudzym zdaniem o pliku; sygnatura jest
+       nasza. */
+    const typ = typPodgladuOsi(rozpoznajMime(bajty));
     if (typ == null) {
       return reply.code(415).send({
-        error: `Załącznik „${String(z.file_name)}" nie jest obrazem do pokazania na osi (sygnatura pliku).`,
+        error: `Załącznik „${String(z.file_name)}" nie jest obrazem ani PDF-em do pokazania na osi (sygnatura pliku).`,
       });
     }
     /* BEZ `logEvent`. Podgląd rysuje się sam przy otwarciu rozmowy, więc wpis
        w dzienniku nie znaczyłby „ktoś wziął plik", tylko „ktoś spojrzał na
        oś" — a to już mówi audyt otwarcia rozmowy. Pobranie na dysk, czyli
        czynność agenta, dalej zostawia ślad na trasie wyżej. */
-    return reply
-      .header("content-type", typ)
-      .header("content-length", String(bajty.byteLength))
-      .header("x-content-type-options", "nosniff")
-      .header("content-disposition", "inline")
-      .header("etag", etag)
-      .header("cache-control", "private, max-age=86400")
-      .send(bajty);
+    return wyslijPodglad(reply, typ, bajty, etag);
   });
 
   /**

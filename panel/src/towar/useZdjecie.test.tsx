@@ -9,7 +9,8 @@ import {
 /* Trzy lekcje z `biuro.html`, każda kupiona tam osobno. Ten plik pilnuje, żeby
    panel obsługi nie kupił ich drugi raz. */
 
-let odpowiedzi: Array<{ url: string; init?: RequestInit; rozwiaz: (ok: boolean, status?: number, tresc?: unknown) => void }> = [];
+let odpowiedzi: Array<{ url: string; init?: RequestInit;
+  rozwiaz: (ok: boolean, status?: number, tresc?: unknown, typ?: string) => void }> = [];
 
 beforeEach(() => {
   _wyczyscPamiecZdjec();
@@ -22,8 +23,8 @@ beforeEach(() => {
       url, init,
       /* Atrapa mówi PRAWDĘ o kodzie: `ok:false` bez statusu było do tego
          wydania „jakąś porażką", a hak od dziś rozróżnia 404 od 503. */
-      rozwiaz: (ok, status = ok ? 200 : 404, tresc = {}) => resolve({
-        ok, status, blob: async () => Object.assign(new Blob(), { __id: url }), json: async () => tresc,
+      rozwiaz: (ok, status = ok ? 200 : 404, tresc = {}, typ) => resolve({
+        ok, status, headers: new Headers(typ ? { "content-type": typ } : {}), blob: async () => Object.assign(new Blob(), { __id: url }), json: async () => tresc,
       } as any),
     });
   }));
@@ -152,6 +153,16 @@ describe("Załącznik wiadomości — zdanie i ponowienie", () => {
     odpowiedzi[1].rozwiaz(true);
     await waitFor(() => expect(screen.getByRole("img")).toBeInTheDocument());
     zegar.mockRestore();
+  });
+
+  it("PDF z trasy podglądu nie trafia do <img>: brak bez zdania", async () => {
+    /* Plik nazwany `usterka.jpg` z bajtami PDF-a serwer oddaje jako PDF.
+       Zepsuty obraz w kaflu byłby gorszy niż nazwa z pobraniem. */
+    render(<Zalacznik id={11} />);
+    await waitFor(() => expect(odpowiedzi).toHaveLength(1));
+    odpowiedzi[0].rozwiaz(true, 200, {}, "application/pdf");
+    await waitFor(() => expect(screen.getByText("brak")).toBeInTheDocument());
+    expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
   it("415 to odpowiedź „nie obraz”: brak bez zdania, zapamiętany jak 404", async () => {

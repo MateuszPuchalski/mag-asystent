@@ -157,8 +157,8 @@ beforeEach(() => {
     /* Obiekt zamiast `Response`: `Blob` z jsdom nie wchodzi do `Response` z Node
        (brak `stream()`) — ten sam kształt, co w `useZdjecie.test.tsx`. */
     if (/\/(zdjecie|photo|logo)$/.test(url)) pytaniaOObrazy.push(url);
-    if (url === "/api/problems/1/photo") return { ok: true, status: 200, blob: async () => new Blob() };
-    if (url === "/api/dostawcy/5/logo") return { ok: true, status: 200, blob: async () => new Blob() };
+    if (url === "/api/problems/1/photo") return { ok: true, status: 200, headers: new Headers({ "content-type": "image/png" }), blob: async () => new Blob() };
+    if (url === "/api/dostawcy/5/logo") return { ok: true, status: 200, headers: new Headers({ "content-type": "image/png" }), blob: async () => new Blob() };
     if (/\/(zdjecie|photo|logo)$/.test(url)) return new Response("{}", { status: 404 });
     return new Response(JSON.stringify(odpowiedz(url, init)), { status: 200 });
   }));

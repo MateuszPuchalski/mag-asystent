@@ -1,6 +1,7 @@
 import { config } from "../config.js";
 import { db as defaultDb, transaction, type Db } from "../db/db.js";
 import { logEvent } from "./events.js";
+import { czyPdfZNazwy } from "./typ-podgladu.js";
 import {
   TAGI_REKLAMACJI, tagiSprawy, tagiWszystkichSpraw, type TagSprawy,
 } from "./tagi-spraw.js";
@@ -237,6 +238,12 @@ export interface ZalacznikReklamacji {
    * nazwa kłamie, dostaje 415 i zostaje przy pobieraniu.
    */
   podglad: boolean;
+  /**
+   * Czy nazwa obiecuje PDF: panel rysuje wtedy miniaturę pierwszej strony.
+   * Ta sama PODPOWIEDŹ UKŁADU co `podglad`, z tego samego powodu: bez typu
+   * MIME o wydaniu rozstrzyga sygnatura `%PDF-` na trasie podglądu.
+   */
+  pdf: boolean;
 }
 
 /**
@@ -1159,6 +1166,7 @@ export function czatReklamacji(database: Db, reklamacjaId: number): WiadomoscRek
       .map((z) => ({
         id: Number(z.id), wiadomoscId: Number(z.wiadomosc_id), nazwa: String(z.nazwa ?? ""),
         podglad: czyObrazZNazwy(z.nazwa as string),
+        pdf: czyPdfZNazwy(z.nazwa as string),
       })),
   }));
 }
@@ -1171,6 +1179,7 @@ export function zalacznikiSprawy(database: Db, reklamacjaId: number): ZalacznikR
   ).all(reklamacjaId) as Wiersz[]).map((z) => ({
     id: Number(z.id), wiadomoscId: null, nazwa: String(z.nazwa ?? ""),
     podglad: czyObrazZNazwy(z.nazwa as string),
+    pdf: czyPdfZNazwy(z.nazwa as string),
   }));
 }
 

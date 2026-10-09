@@ -74,6 +74,11 @@ export function rozpoznajMime(b: Buffer): string | null {
   if (b.length >= 12 && b.toString("latin1", 0, 4) === "RIFF" && b.toString("latin1", 8, 12) === "WEBP") {
     return "image/webp";
   }
+  /* PDF: `%PDF-` na samym początku. Funkcja nazywa FORMAT, nie obiecuje
+     obrazu — PDF rozpoznajemy dla podglądu dokumentu na osi rozmowy.
+     Wołający, któremu wolno przyjąć tylko obraz, sprawdza typ sam
+     (`wybierzObraz`, `typPodgladu`, zdjęcia z kolektora). */
+  if (b.length >= 5 && b.toString("latin1", 0, 5) === "%PDF-") return "application/pdf";
   return null;
 }
 
@@ -163,7 +168,9 @@ export function wybierzObraz(kandydaci: Array<Buffer | null>, twId = 0): Zdjecie
   for (const bajty of kandydaci) {
     if (!bajty || bajty.length === 0) continue;
     const mime = rozpoznajMime(bajty.subarray(0, NAGLOWEK));
-    if (mime) {
+    /* Tylko `image/*`: zakładka „Opis" przyjmuje też PDF, a `rozpoznajMime`
+       go zna. PDF wysłany na kolektor to ten sam pusty prostokąt, co OLE. */
+    if (mime?.startsWith("image/")) {
       if (odrzuconych > 0) {
         console.warn(
           `[zdjecia] tw_id=${twId}: pierwsze ${odrzuconych} zdjęć nie jest obrazem — biorę kolejne`

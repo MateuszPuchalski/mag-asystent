@@ -247,6 +247,9 @@ export type ZalacznikOsi = {
   /* Czy obraz rysuje się WPROST na osi (0.218.0). Liczy SERWER — panel nie
      zgaduje po `typ`, bo lista typów, które trasa podglądu odda, jest tam. */
   podglad: boolean;
+  /* Czy rysować miniaturę PDF-a. Też liczy serwer, z nazwy i typu, tylko dla
+     pliku `SAFE`. Rozstrzygają bajty: plik bez sygnatury PDF dostaje 415. */
+  pdf: boolean;
 };
 
 export type WpisOsi = {
@@ -1637,6 +1640,8 @@ export interface ZalacznikReklamacji {
    * z powrotem na przycisk pobrania.
    */
   podglad: boolean;
+  /** Czy rysować miniaturę PDF-a — ta sama PODPOWIEDŹ z nazwy, rozstrzygają bajty (415). */
+  pdf: boolean;
 }
 
 export interface WiadomoscReklamacji {
