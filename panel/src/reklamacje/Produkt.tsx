@@ -75,8 +75,8 @@ const DoAllegro = ({ href, nazwa, children }: { href: string | null; nazwa: stri
         {children} →<span className="sr-only"> ({nazwa}, otwiera się w Allegro)</span></a>
     : null;
 
-/* Pytanie o paczkę stoi na drodze sprawy (`DrogaSprawy`). Typ zostaje tu,
-   dopóki ekran podaje je karcie; karta go nie czyta. */
+/* Pytania o paczkę karta nie niesie: stoi ono przy kroku doręczenia na
+   drodze sprawy (`DrogaSprawy`), obok stanu paczki. */
 export function Produkt({ szczegol }: { szczegol: SzczegolReklamacji }) {
   const r = szczegol.reklamacja;
   const towar = kartotekaSprawy(szczegol);

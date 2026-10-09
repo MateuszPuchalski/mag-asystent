@@ -37,7 +37,8 @@ const { Czat } = await import("./Czat");
 /* Czat czyta ze sprawy kształt strukturalny — ten sam komponent rysuje
    dyskusję, która nie ma ani powodu, ani oferty, ani terminu. */
 const sprawa = (n: Partial<React.ComponentProps<typeof Czat>["sprawa"]> = {}) => ({
-  id: 1, opisZgloszenia: "Pękła obudowa po tygodniu" as string | null, czatAktywny: true, ...n,
+  id: 1, opisZgloszenia: "Pękła obudowa po tygodniu" as string | null, czatAktywny: true,
+  wiadomosciIle: 1, ...n,
 });
 
 const zal = (id: number, nazwa: string, podglad: boolean): ZalacznikReklamacji =>
@@ -127,6 +128,22 @@ describe("Nagłówek czatu", () => {
       czat={[wiad()]} />);
     expect(screen.getByRole("heading", { name: "Czat dyskusji" })).toBeInTheDocument();
     expect(screen.getByText("1 wiadomość · czat zamknięty")).toBeInTheDocument();
+  });
+
+  it("niepobrana rozmowa nie mówi „0 wiadomości” — sam stan czatu", () => {
+    /* Zero agent czyta jak ciszę klienta, a serwer zna trzy wiadomości. */
+    render(<Czat sprawa={sprawa({ wiadomosciIle: 3 })} zalaczniki={[]} czat={[]} />);
+    expect(screen.queryByText(/0 wiadomości/)).not.toBeInTheDocument();
+    expect(screen.getByText("czat otwarty")).toBeInTheDocument();
+  });
+
+  it("niedociągnięta rozmowa mówi „N z M wiadomości”, pełna — samo N", () => {
+    const dwie = [wiad({ id: 1 }), wiad({ id: 2, autorRola: "SELLER", tresc: "Odpowiedź" })];
+    const { rerender } = render(<Czat sprawa={sprawa({ wiadomosciIle: 5 })} zalaczniki={[]} czat={dwie} />);
+    expect(screen.getByText("2 z 5 wiadomości · czat otwarty")).toBeInTheDocument();
+    /* Serwer liczy taktem, więc bywa w tyle za pobraną rozmową. */
+    rerender(<Czat sprawa={sprawa({ wiadomosciIle: 1 })} zalaczniki={[]} czat={dwie} />);
+    expect(screen.getByText("2 wiadomości · czat otwarty")).toBeInTheDocument();
   });
 
   it("wiadomości stoją listą z nazwą dla czytnika", () => {

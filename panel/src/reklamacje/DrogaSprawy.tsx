@@ -178,17 +178,22 @@ export type PozycjaDrogi =
  *
  * Przystanek mija krok tylko wtedy, gdy WIEMY, że krok był wcześniej. Krok bez
  * daty zatrzymuje go przed sobą, bo zgadnięta kolejność byłaby zmyśloną
- * historią klienta. Sprawy o równej chwili zostają w kolejności z serwera.
+ * historią klienta. Wyjątek: dalszy krok z datą nie późniejszą od przystanku.
+ * Kroki stoją po kolei, więc wtedy wiemy, że i krok bez daty był wcześniej.
+ * Sprawy o równej chwili zostają w kolejności z serwera.
  */
 export function drogaZPrzystankami(kroki: KrokDrogi[], inne: InnaSprawaZakupu[]): PozycjaDrogi[] {
   const czekaja = [...inne].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   const wynik: PozycjaDrogi[] = [];
   let i = 0;
-  for (const krok of kroki) {
-    const minal = (s: InnaSprawaZakupu) => krok.chwila === null || Date.parse(krok.chwila) > Date.parse(s.at);
-    while (i < czekaja.length && minal(czekaja[i])) wynik.push({ typ: "sprawa", sprawa: czekaja[i++] });
+  kroki.forEach((krok, k) => {
+    /* Granica kroku bez daty to najwcześniejsza znana chwila kroków po nim.
+       Bez żadnej granica jest w nieskończoności i krok zatrzymuje wszystko. */
+    const granica = krok.chwila !== null ? Date.parse(krok.chwila)
+      : Math.min(Infinity, ...kroki.slice(k + 1).flatMap((x) => (x.chwila === null ? [] : [Date.parse(x.chwila)])));
+    while (i < czekaja.length && granica > Date.parse(czekaja[i].at)) wynik.push({ typ: "sprawa", sprawa: czekaja[i++] });
     wynik.push({ typ: "krok", krok });
-  }
+  });
   while (i < czekaja.length) wynik.push({ typ: "sprawa", sprawa: czekaja[i++] });
   return wynik;
 }

@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const { Edytor, LIMIT_ZNAKOW } = await import("./Edytor");
@@ -63,12 +63,16 @@ describe("Edytor odpowiedzi w reklamacji", () => {
     expect(podpis).toHaveTextContent(/^Twoja odpowiedź · szkic$/);
   });
 
-  it("Ctrl+Enter nie stoi znaczkiem na przycisku, tylko w podpowiedzi i skrócie", () => {
+  it("Ctrl+Enter stoi cichym napisem obok licznika, nie znaczkiem na przycisku", () => {
     render(<Edytor {...props({ tresc: "Dzień dobry" })} />);
     const wyslij = screen.getByRole("button", { name: "Wyślij odpowiedź" });
     expect(wyslij.querySelector("kbd")).toBeNull();
     expect(wyslij).toHaveAttribute("aria-keyshortcuts", "Control+Enter");
     expect(wyslij).toHaveAttribute("title", expect.stringMatching(/Ctrl\+Enter/));
+    /* Widoczny w rzędzie działań, bo skrótu nie trzeba pamiętać. */
+    const napis = within(screen.getByRole("group", { name: "Działania odpowiedzi" })).getByText("Ctrl+Enter");
+    expect(wyslij).not.toContainElement(napis);
+    expect(napis).toHaveClass("text-xs", "text-slate-600", "sm:inline");
   });
 
   it("działania stoją W dymku odpowiedzi, pod polem", () => {

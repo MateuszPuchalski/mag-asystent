@@ -483,6 +483,7 @@ export function Reklamacje() {
                        bywa przy reklamacji pusty. */
                     opisZgloszenia: r.powodOpis ?? r.opis,
                     czatAktywny: r.czatAktywny,
+                    wiadomosciIle: r.wiadomosciIle,
                     login: r.kupujacyLogin,
                     zgloszonoAt: r.otwartoAt,
                     powod: liniaPowodu(r),

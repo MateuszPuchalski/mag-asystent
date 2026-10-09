@@ -524,6 +524,7 @@ export function Dyskusje() {
                      prawnego nie niesie, bo Allegro ich przy niej nie oddaje. */
                   opisZgloszenia: szczegol.data.dyskusja.opis,
                   czatAktywny: szczegol.data.dyskusja.czatAktywny,
+                  wiadomosciIle: szczegol.data.dyskusja.wiadomosciIle,
                   login: szczegol.data.dyskusja.kupujacyLogin,
                   zgloszonoAt: szczegol.data.dyskusja.otwartoAt,
                 }}

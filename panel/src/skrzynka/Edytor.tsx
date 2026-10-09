@@ -316,8 +316,8 @@ export function Edytor({
      dymkiem po prawej, jak nasze odpowiedzi, z tym samym „ogonkiem” w rogu.
      Pełna ramka i błękitna poświata mówią, że to miejsce pisania, a podpis
      nad dymkiem, kto zobaczy szkic. Pasek działań stoi w dymku, pod treścią,
-     bo należy do tej jednej wiadomości. Pływający pasek obok pola wyglądał
-     jak osobny element ekranu.
+     bo należy do tej jednej wiadomości. Pasek obok pola czytałby się jak
+     osobny element ekranu.
 
      Wysoki szkic wydłuża przewijanie, zamiast ściskać rozmowę: dymek i wątek
      przewijają się razem. Szerokość 86% jak dymki rozmowy, z progiem 75ch,
@@ -505,12 +505,18 @@ export function Edytor({
               zaDlugo ? "font-semibold text-ranga-zle" : blisko ? "font-semibold text-ranga-uwaga" : "text-slate-600"}`}>
               {LICZBA.format(szkic.length)} / {LICZBA.format(limitZnakow)}
               {zaDlugo ? ` — o ${LICZBA.format(szkic.length - limitZnakow)} za dużo` : ""}</span>
+            {/* ── SKRÓT WIDAĆ OBOK, NIE NA PRZYCISKU ───────────────────────
+                Rozpoznanie jest tańsze od pamiętania (dekalog, punkt 2), więc
+                skrót stoi cichym napisem przy liczniku. Na przycisku zabierałby
+                miejsce napisowi wysyłki. Poniżej `sm` znika, bo wąski rząd
+                łamałby się pod wysyłkę. Czytnik dostaje skrót z
+                `aria-keyshortcuts`, więc napis jest dla niego ukryty. */}
+            <span aria-hidden="true"
+              className="hidden whitespace-nowrap text-xs text-slate-600 sm:inline">Ctrl+Enter</span>
             {/* ── JEDNO DZIAŁANIE MA BYĆ NAJGŁOŚNIEJSZE ─────────────────────
                 Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na
                 zewnątrz, i idzie WYŁĄCZNIE na kliknięcie człowieka. Stoi na
-                prawym końcu dymka, tam, gdzie kończy się czytanie odpowiedzi.
-                Skrót mówi podpowiedź i `aria-keyshortcuts`: znaczek na
-                przycisku zabierał miejsce w rzędzie, który dzieli licznik. */}
+                prawym końcu dymka, tam, gdzie kończy się czytanie odpowiedzi. */}
             <Przycisk wariant="glowny" onClick={onWyslij} disabled={!mozeWyslac}
               aria-keyshortcuts="Control+Enter" title="Ctrl+Enter wysyła także spoza pola"
               className="whitespace-nowrap shadow-sm">

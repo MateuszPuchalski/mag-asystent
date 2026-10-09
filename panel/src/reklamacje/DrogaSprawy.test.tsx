@@ -254,4 +254,19 @@ describe("Inne sprawy tego zakupu stoją na drodze", () => {
       .map((p) => (p.typ === "krok" ? p.krok.klucz : p.sprawa.rodzaj));
     expect(ulozone).toEqual(["zakup", "doreczono", "zgloszenie", "zwrot", "rozmowa", "decyzja", "rozliczenie"]);
   });
+
+  it("krok bez daty nie cofa przystanku przed dalszy krok, który był przed nim", () => {
+    /* Paczka bez daty doręczenia, zwrot z 01.10, zgłoszenie z 28.09: zwrot
+       stoi po zgłoszeniu, bo to wiemy, a nie przed „Doręczono”. */
+    const s = szczegol({}, { przesylka: przesylka({ dostarczonoAt: null, sprawdzonoAt: "2026-09-20T10:00:00.000Z" }) });
+    const kroki = krokiDrogi(s);
+    expect(kroki.find((k) => k.klucz === "doreczono")!.chwila).toBeNull();
+    const ulozone = (at: string) => drogaZPrzystankami(kroki, [{ rodzaj: "zwrot" as const, id: 7, at }])
+      .map((p) => (p.typ === "krok" ? p.krok.klucz : p.sprawa.rodzaj));
+    expect(ulozone("2026-10-01T10:00:00.000Z"))
+      .toEqual(["zakup", "doreczono", "zgloszenie", "zwrot", "rozmowa", "decyzja", "rozliczenie"]);
+    /* Przed zgłoszeniem nic nie wiemy o doręczeniu, więc zwrot czeka przed nim. */
+    expect(ulozone("2026-09-19T10:00:00.000Z"))
+      .toEqual(["zakup", "zwrot", "doreczono", "zgloszenie", "rozmowa", "decyzja", "rozliczenie"]);
+  });
 });

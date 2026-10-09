@@ -23,9 +23,10 @@ import { rozbierzFormularz, Tresc, zawieraOpis } from "./tresc";
    i `ADMIN`, czyli doradca Allegro. Bez podpisu agent odpowiadałby doradcy
    tak jak klientowi.
 
-   ZE STARYCH KART ZESZŁO TO, CO DUBLOWAŁO STRONĘ I PODPIS: ikony i słowa ról,
-   bursztyn ostatniej wiadomości i zwijanie długich treści. Zdanie klienta albo
-   doradcy jest tym, po co agent przyszedł, więc stoi w całości. */
+   DYMEK NIE MA IKON ANI SŁÓW RÓL, bo autora mówią już strona i podpis.
+   Nie ma też bursztynu ostatniej wiadomości ani zwijania długich treści.
+   Zdanie klienta albo doradcy jest tym, po co agent przyszedł, więc stoi
+   w całości. */
 
 /** Chwila w podpisie i w wierszu zdarzenia — „05.10, 09:00”, jak na makiecie. */
 const chwila = (v: string | null | undefined) => (v ? `${dzienMiesiac(v)}, ${godzina(v)}` : "");
@@ -73,6 +74,11 @@ export interface SprawaCzatu {
   opisZgloszenia: string | null;
   /** Czy Allegro przyjmie jeszcze wiadomość — mówi o tym nagłówek czatu. */
   czatAktywny: boolean;
+  /**
+   * Ile wiadomości zna serwer z Allegro. Liczy nagłówek, bo pobrana rozmowa
+   * bywa krótsza: dociąga się taktem synchronizacji.
+   */
+  wiadomosciIle: number;
   /** Login kupującego: podpis dymka zgłoszenia, gdy rozmowa go nie niesie. */
   login?: string | null;
   /** Kiedy klient zgłosił sprawę — chwila dymka zgłoszenia spoza rozmowy. */
@@ -471,6 +477,19 @@ function TrescZgloszenia({ powod, tekst, reklamacjaId, zalaczniki }: {
   </>;
 }
 
+/**
+ * Liczba wiadomości w nagłówku, z kropką za nią; pusty napis bez rozmowy.
+ *
+ * Niepobrana rozmowa nie mówi „0 wiadomości”, bo tę liczbę agent czyta jak
+ * ciszę klienta, a pusty pas mówi już, że rozmowy nie pobrano. Niepełna mówi
+ * „N z M”, bo urwana rozmowa udawałaby całą. Słowa jak w kroku Rozmowa.
+ */
+function liczbaWNaglowku(mamy: number, wszystkich: number): string {
+  if (mamy === 0) return "";
+  if (mamy < wszystkich) return `${mamy} z ${wszystkich} wiadomości · `;
+  return `${ile(mamy, "wiadomość", "wiadomości", "wiadomości")} · `;
+}
+
 export function Czat({ sprawa, czat, zalaczniki, edytor, zdarzenia = [], tytul = "Czat" }: {
   sprawa: SprawaCzatu;
   czat: WiadomoscReklamacji[];
@@ -545,8 +564,8 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, zdarzenia = [], tytul =
     <div className="flex shrink-0 flex-wrap items-center justify-between gap-x-3 gap-y-1 px-5 py-3.5">
       <h3 className="text-naglowek font-bold text-wertis-ink">{tytul}</h3>
       <span className="text-sm text-slate-600">
-        {ile(czat.length, "wiadomość", "wiadomości", "wiadomości")}
-        {" · "}{sprawa.czatAktywny ? "czat otwarty" : "czat zamknięty"}</span>
+        {liczbaWNaglowku(czat.length, sprawa.wiadomosciIle)}
+        {sprawa.czatAktywny ? "czat otwarty" : "czat zamknięty"}</span>
     </div>
     {/* ── ROZMOWA PRZEWIJA SIĘ SAMA ─────────────────────────────────────────
         Przewija się wyłącznie rozmowa z odpowiedzią. Wszystko, co ma stać
