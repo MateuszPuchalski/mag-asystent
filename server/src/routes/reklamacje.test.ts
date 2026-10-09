@@ -746,3 +746,32 @@ test("Copilot nie ma już drogi do reklamacji z ekranu — trasy rozpoznania nie
   const s = await app.inject({ method: "GET", url: `/api/obsluga/reklamacje/${reklamacja}`, headers: naglowki });
   assert.ok("karta" in s.json());
 });
+
+test("czat reklamacji mówi, kto z biura wysłał nasz dymek, a cudzym zostawia null", async () => {
+  /* Imię agenta zna wyłącznie skrzynka nadawcza, bo Allegro podpisuje każdą
+     naszą wiadomość tym samym kontem. Wiązanie idzie po numerze wiadomości. */
+  const { naglowki } = login("biuro", "Ala patrzy na czat");
+  const wysylajacy = createUser("Marek Wójcik", "biuro", `marek${Math.random()}`, "tajnehaslo");
+  const d = db();
+  const wiad = (ext: string, at: string) => d.prepare(`INSERT INTO reklamacja_wiadomosc
+    (reklamacja_id,external_id,autor_login,autor_rola,tresc,utworzono_at)
+    VALUES (?,?,'sklep-wertis','SELLER','Dzień dobry, sprawdzamy.',?)`).run(reklamacja, ext, at);
+  wiad("m-panel", "2026-09-06T11:00:00Z");
+  wiad("m-allegro", "2026-09-06T12:00:00Z");
+  d.prepare(`INSERT INTO reklamacja_outbox(reklamacja_id,idempotency_key,body,expected_wersja,
+    status,external_message_id,created_by) VALUES (?,'rkl-t','Dzień dobry, sprawdzamy.',1,'sent',
+    'm-panel',?)`).run(reklamacja, wysylajacy.userId);
+
+  const czat = async () => (await app.inject({
+    method: "GET", url: `/api/obsluga/reklamacje/${reklamacja}`, headers: naglowki })).json().czat as
+    Array<{ externalId: string; wyslalNazwa: string | null }>;
+  assert.deepEqual((await czat()).map((w) => [w.externalId, w.wyslalNazwa]), [
+    ["w-1", null],
+    ["m-panel", "Marek Wójcik"],
+    ["m-allegro", null],
+  ]);
+
+  d.prepare("DELETE FROM app_user WHERE user_id=?").run(wysylajacy.userId);
+  assert.equal((await czat()).find((w) => w.externalId === "m-panel")?.wyslalNazwa, null,
+    "skasowane konto nie ma już imienia do pokazania");
+});

@@ -544,7 +544,10 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, zdarzenia = [], tytul =
     const wyglad = wygladWiadomosci(w);
     /* Login bywa PUSTY i to jest udokumentowane: schemat mówi „not present
        if role is ADMIN, SYSTEM or FULFILLMENT”. */
-    const kto = wyglad.kto ?? kupujacy(w);
+    /* Nasz dymek mówi, KTO z biura pisał, bo kolega pyta o ustalenia tę
+       osobę. Wiadomość spoza panelu zostaje przy samym „Sklep”, bez zgadywania. */
+    const kto = w.autorRola === "SELLER" && w.wyslalNazwa
+      ? `${wyglad.kto} · ${w.wyslalNazwa}` : wyglad.kto ?? kupujacy(w);
     if (w.id === wiadomoscZgloszenia?.id) {
       const formularz = rozbierzFormularz(w.tresc);
       return <Dymek key={w.id} {...wyglad} kto={kto} kiedy={w.utworzonoAt} zgloszenie>

@@ -238,6 +238,18 @@ describe("Kto mówi: strona, tło i podpis", () => {
     expect(document.querySelector("li svg")).toBeNull();
   });
 
+  it("nasz dymek z panelu mówi, kto z biura pisał; spoza panelu zostaje „Sklep”", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]} czat={[
+      wiad({ id: 2, autorRola: "SELLER", autorLogin: "sklep", tresc: "z panelu", wyslalNazwa: "Tomasz Nowak" }),
+      wiad({ id: 3, autorRola: "SELLER", autorLogin: "sklep", tresc: "spoza panelu", wyslalNazwa: null }),
+      wiad({ id: 4, autorRola: "BUYER", tresc: "klient", wyslalNazwa: "Ktoś" }),
+    ]} />);
+    expect(dymek("z panelu").li).toHaveTextContent(/^Sklep · Tomasz Nowak · /);
+    expect(dymek("spoza panelu").li).toHaveTextContent(/^Sklep · /);
+    expect(dymek("spoza panelu").li).not.toHaveTextContent("Tomasz");
+    expect(dymek("klient").li).not.toHaveTextContent("Ktoś");
+  });
+
   it("doradca Allegro zostaje dymkiem po lewej, z bielą i ramką", () => {
     render(<Czat sprawa={sprawa()} zalaczniki={[]}
       czat={[wiad({ autorRola: "ADMIN", autorLogin: null, tresc: "od doradcy" })]} />);

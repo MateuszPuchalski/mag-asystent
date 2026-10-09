@@ -260,6 +260,14 @@ export interface WiadomoscReklamacji {
   autorRola: string | null;
   tresc: string;
   utworzonoAt: string | null;
+  /**
+   * Imię agenta, który wysłał tę wiadomość z panelu, z `app_user`.
+   *
+   * NULL przy wiadomości spoza panelu, przy skasowanym koncie i przy każdej
+   * nie naszej. Wiązanie idzie po numerze wiadomości z Allegro, bo treść
+   * i czas powtarzają się między wiadomościami.
+   */
+  wyslalNazwa: string | null;
   zalaczniki: ZalacznikReklamacji[];
 }
 
@@ -1121,8 +1129,20 @@ export function statystykiReklamacji(
 
 /** Czat sprawy w kolejności czasu, z załącznikami przy wiadomościach. */
 export function czatReklamacji(database: Db, reklamacjaId: number): WiadomoscReklamacji[] {
-  const wiersze = database.prepare(`SELECT * FROM reklamacja_wiadomosc
-    WHERE reklamacja_id=? ORDER BY utworzono_at IS NULL, utworzono_at ASC, id ASC`)
+  /* Autora zna wyłącznie skrzynka nadawcza: Allegro podpisuje każdą naszą
+     wiadomość tym samym kontem sprzedawcy. Para (sprawa, numer z Allegro)
+     to ten sam klucz, po którym synchronizacja scala wiadomość z osią.
+     Wiadomość wysłana z Allegro wprost nie ma wiersza w kolejce, więc
+     zostaje bez imienia, zamiast dostać cudze. */
+  const wiersze = database.prepare(`SELECT w.*,
+      CASE WHEN w.autor_rola = 'SELLER' THEN (
+        SELECT u.name FROM reklamacja_outbox o
+          JOIN app_user u ON u.user_id = o.created_by
+         WHERE o.reklamacja_id = w.reklamacja_id
+           AND o.external_message_id = w.external_id
+         ORDER BY o.id LIMIT 1) END AS wyslal_nazwa
+    FROM reklamacja_wiadomosc w
+    WHERE w.reklamacja_id=? ORDER BY w.utworzono_at IS NULL, w.utworzono_at ASC, w.id ASC`)
     .all(reklamacjaId) as Wiersz[];
   const zalaczniki = database.prepare(
     "SELECT id, wiadomosc_id, nazwa FROM reklamacja_zalacznik WHERE reklamacja_id=? ORDER BY id",
@@ -1134,6 +1154,7 @@ export function czatReklamacji(database: Db, reklamacjaId: number): WiadomoscRek
     autorRola: tekst(w.autor_rola),
     tresc: String(w.tresc ?? ""),
     utworzonoAt: tekst(w.utworzono_at),
+    wyslalNazwa: tekst(w.wyslal_nazwa),
     zalaczniki: zalaczniki.filter((z) => Number(z.wiadomosc_id) === Number(w.id))
       .map((z) => ({
         id: Number(z.id), wiadomoscId: Number(z.wiadomosc_id), nazwa: String(z.nazwa ?? ""),

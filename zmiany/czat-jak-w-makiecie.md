@@ -8,6 +8,9 @@ prawej, a zdjęcia stoją w samej wiadomości. Zgłoszenie jest pierwszym dymkie
 Odpowiedź piszesz w dymku na końcu rozmowy, z licznikiem i wysyłką w środku.
 Edytor skrzynki wygląda tak samo.
 
+**Nasz dymek mówi, kto z biura pisał** („Sklep · Imię Nazwisko”). Wiadomość
+wysłana spoza panelu zostaje przy samym „Sklep”.
+
 **Zamówienie na drodze sprawy.** Kwota zakupu, płatność, numer zamówienia
 i przesyłka stoją przy krokach drogi, każdy krok ma własną ikonę. Pytanie,
 zwrot albo dyskusja z tego zakupu to przystanek na drodze, a klik otwiera
@@ -15,3 +18,6 @@ tę sprawę.
 
 Z czatu zniknęły zwijanie starszych wiadomości, pasek o niepełnej rozmowie,
 kolumna zdjęć i wyróżnienie ostatniej wiadomości klienta.
+
+Kolejka wysyłek reklamacji nie blokuje już kasowania kont: autor wysyłki
+staje się pusty po usunięciu konta. Migracja biegnie sama przy starcie.
