@@ -5,7 +5,7 @@ import { zlote } from "../api/zwroty";
 import { ODNOSNIK_CICHY } from "./odnosniki";
 import { zapamietaj, zapamietane } from "./Zwijka";
 import {
-  GEOMETRIA as G, brakBrutto, grupujCeny, kwota, nazwaGrupy, poKolejnosciOsi, polozenieOferty, trafienie,
+  GEOMETRIA as G, brakBrutto, grupujCeny, kwota, nazwaGrupy, poczatekOgonka, poKolejnosciOsi, polozenieOferty, trafienie,
   ulozOsCen, wspolneMiejsce, type Mierz, type PunktOsi, type UkladNaOsi,
 } from "./cenyNaOsi";
 
@@ -36,8 +36,10 @@ import {
    wybór na stanowisku, jak zwinięcie w `Zwijka`: to nawyk agenta, nie
    decyzja na jedną rozmowę.
 
-   BEZ OFERTY LISTA. Reklamacje i rozmowa bez pobranej oferty dostają
-   dotychczasową listę, bo oś bez oferty nie ma o co pytać.
+   BEZ OFERTY I BEZ ZAKUPU LISTA. Rozmowa bez pobranej oferty dostaje
+   dotychczasową listę, bo oś bez punktu odniesienia nie ma o co pytać.
+   Reklamacja podaje cenę zakupu: zielony romb „Kupił za …” rysuje oś
+   także bez oferty, bo tam pytanie brzmi „ile zapłacił wobec cennika”.
 
    PIERŚCIEŃ W AMBER-600, bo obiekt graficzny potrzebuje 3:1 na bieli
    (WCAG 1.4.11), a amber-500 daje 2,15:1. Bursztyn zostaje znacznikiem,
@@ -68,28 +70,34 @@ type Oferta = { grosze: number; waluta: string };
  * Rozjazd jest jeden: z ceną oferty blok staje osią, bez niej zostaje listą.
  * O trybie decyduje to, czy jest z czym porównać, a nie szerokość kolumny.
  */
-export function CenyKartoteki({ ceny, ramka = true, oferta = null }: {
+export function CenyKartoteki({ ceny, ramka = true, oferta = null, zakup = null }: {
   ceny: CenaPoziomu[];
   /* `false` w skrzynce i w reklamacjach: ceny stoją tam W sekcji albo
      w komórce faktów, więc ramka byłaby pudełkiem w pudełku. */
   ramka?: boolean;
-  /** Cena oferty rozmowy — wtedy blok staje osią. Reklamacje jej nie podają. */
+  /** Cena oferty — wtedy blok staje osią. */
   oferta?: Oferta | null;
+  /** Cena zakupu klienta — zielony romb na osi. Skrzynka jej nie podaje. */
+  zakup?: Oferta | null;
 }) {
   /* PUSTY BLOK NIE RYSUJE SIĘ WCALE: brak danych nie jest informacją
      wartą kolumny. Na produkcji blok milczy,
      dopóki import nie dostanie nazw cennika i nowego GRANT-u
      (`tools/sonda-cen.sql`). */
   if (ceny.length === 0) return null;
-  const naOsi = oferta !== null && polozenieOferty(ceny, oferta) !== null;
+  const zOferta = oferta !== null && polozenieOferty(ceny, oferta) !== null;
+  const zZakupem = zakup !== null && ceny.some((c) => !brakBrutto(c) && c.waluta === zakup.waluta);
+  const naOsi = zOferta || zZakupem;
   /* Bez ramki bez klasy: odstęp od bloku wyżej daje rodzic, a kreski
      wewnątrz bloku kolumna nie ma. */
   return <div className={ramka ? "rounded-lg border border-slate-200 p-3" : undefined}>
-    {naOsi && oferta
-      ? <OsCenKartoteki ceny={ceny} oferta={oferta} ramka={ramka} />
+    {naOsi
+      ? <OsCenKartoteki ceny={ceny} oferta={zOferta ? oferta : null} zakup={zakup} ramka={ramka} />
       : <>
           <NaglowekCen ramka={ramka} tresc="Ceny" />
           <ListaCen ceny={ceny} />
+          {/* Zakup w walucie bez poziomów nie ma osi, ale kwota zostaje. */}
+          {zakup && <p className="mt-1 text-xs text-slate-700">Klient zapłacił {zlote(zakup.grosze, zakup.waluta)}.</p>}
         </>}
   </div>;
 }
@@ -214,20 +222,24 @@ function mierzTekst(tekst: string, waga: 400 | 700, rozmiar: 11 | 12, kroj: stri
   return k.measureText(tekst).width;
 }
 
-function OsCenKartoteki({ ceny, oferta, ramka }: { ceny: CenaPoziomu[]; oferta: Oferta; ramka: boolean }) {
+function OsCenKartoteki({ ceny, oferta, zakup, ramka }: {
+  ceny: CenaPoziomu[]; oferta: Oferta | null; zakup: Oferta | null; ramka: boolean;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const W = useSzerokosc(ref);
   const kroj = useWersjaKroju();
-  const { grosze, waluta } = oferta;
-  /* Zależność od kwoty i waluty, nie od obiektu oferty: skrzynka składa ten
-     obiekt przy każdym renderze, a układ liczy się wiązką stanów. `kroj`
-     tylko wyzwala przeliczenie po załadowaniu kroju. */
+  const grosze = oferta?.grosze ?? null, waluta = oferta?.waluta ?? null;
+  const zakupGrosze = zakup?.grosze ?? null, zakupWaluta = zakup?.waluta ?? null;
+  /* Zależność od kwot i walut, nie od obiektów: skrzynka składa je przy
+     każdym renderze, a układ liczy się wiązką stanów. `kroj` tylko wyzwala
+     przeliczenie po załadowaniu kroju. */
   const u = useMemo(() => {
     if (W === null) return null;
     const krojPisma = ref.current ? getComputedStyle(ref.current).fontFamily : "";
     const mierz: Mierz = (t, w, r) => mierzTekst(t, w, r, krojPisma);
-    return ulozOsCen(ceny, { grosze, waluta }, W, mierz);
-  }, [ceny, grosze, waluta, W, kroj]);
+    return ulozOsCen(ceny, grosze !== null && waluta !== null ? { grosze, waluta } : null, W, mierz,
+      zakupGrosze !== null && zakupWaluta !== null ? { grosze: zakupGrosze, waluta: zakupWaluta } : null);
+  }, [ceny, grosze, waluta, zakupGrosze, zakupWaluta, W, kroj]);
   const [otwarta, setOtwarta] = useState(() => zapamietane(KLUCZ_TABELI) ?? false);
   const idTabeli = useId();
   /* Układ, którego etykiety przeglądarka narysowała szerzej, niż je
@@ -245,9 +257,12 @@ function OsCenKartoteki({ ceny, oferta, ramka }: { ceny: CenaPoziomu[]; oferta: 
     setOtwarta(nowe);
     zapamietaj(KLUCZ_TABELI, nowe);
   };
-  /* Ten sam tekst co przy dawnej osi: kwotę oferty czytnik słyszy w nazwie
-     figury, bo etykieta oferty jej nie powtarza. */
-  const nazwaFigury = `Cena oferty ${zlote(grosze, waluta)} na tle poziomów kartoteki`;
+  /* Kwotę oferty czytnik słyszy w nazwie figury, bo etykieta oferty jej nie
+     powtarza. Zakup mówi swoją kwotę także w etykiecie. */
+  const nazwaFigury = `${[
+    oferta && `Cena oferty ${zlote(oferta.grosze, oferta.waluta)}`,
+    zakup && `${oferta ? "cena" : "Cena"} zakupu ${zlote(zakup.grosze, zakup.waluta)}`,
+  ].filter(Boolean).join(" i ")} na tle poziomów kartoteki`;
 
   return <div ref={ref}>
     <div className="flex flex-wrap items-baseline gap-x-2">
@@ -285,13 +300,22 @@ function OsCenKartoteki({ ceny, oferta, ramka }: { ceny: CenaPoziomu[]; oferta: 
    jakby to on był jej znacznikiem. */
 const PROG_PIERSCIENIA = G.R_OFERTA + G.GRUBOSC_OFERTY / 2 + 2 + G.R_POZIOM;
 
+/* Pół przekątnej rombu zakupu: 12 px boku jak na makiecie, obrócone o 45°. */
+const R_ROMBU = 7;
+const romb = (x: number, y: number, r: number) => `${x},${y - r} ${x + r},${y} ${x},${y + r} ${x - r},${y}`;
+
+/* Ogonek w barwie swojego znacznika — mówi, czyja jest etykieta. */
+const OGONEK: Record<PunktOsi["rodzaj"], string> = {
+  poziom: "stroke-slate-500", oferta: "stroke-amber-600", zakup: "stroke-ranga-ok",
+};
+
 function WykresOsi({ u, nazwaFigury, onPrzelew }: { u: UkladNaOsi; nazwaFigury: string; onPrzelew: () => void }) {
   const [kursor, setKursor] = useState<string | null>(null);
   const [fokus, setFokus] = useState<string | null>(null);
   const [zamkniety, setZamkniety] = useState(false);
   /* Wędrujący tabindex: cały wykres to jeden przystanek tabulatora, a po
      etykietach chodzą strzałki. Pełny dostęp bez strzałek daje tabela. */
-  const [przystanek, setPrzystanek] = useState("oferta");
+  const [przystanek, setPrzystanek] = useState<string | null>(null);
   const etykiety = useRef(new Map<string, HTMLLIElement>());
   const wykres = useRef<HTMLDivElement>(null);
   /* Fokus z kliknięcia. Etykieta z tabindeksem bierze fokus także od myszy,
@@ -305,7 +329,10 @@ function WykresOsi({ u, nazwaFigury, onPrzelew }: { u: UkladNaOsi; nazwaFigury: 
   /* Oferta i poziom w jej pierścieniu to jedno miejsce, więc świecą razem. */
   const miejsce = wspolneMiejsce(u, aktywne);
   const wMiejscu = new Set(miejsce.map((p) => p.id));
-  const stoi = porzadek.some((e) => e.punkt.id === przystanek) ? przystanek : "oferta";
+  /* Przystanek startowy: oferta, a bez niej zakup — to punkty, o które
+     wykres pyta. */
+  const startowy = u.punkty.find((p) => p.rodzaj === "oferta")?.id ?? u.punkty.find((p) => p.rodzaj === "zakup")?.id;
+  const stoi = porzadek.some((e) => e.punkt.id === przystanek) ? przystanek : startowy;
   const punktAktywny = u.punkty.find((p) => p.id === aktywne);
   const dymekWidac = punktAktywny !== undefined && miejsce.length > 0;
 
@@ -341,17 +368,19 @@ function WykresOsi({ u, nazwaFigury, onPrzelew }: { u: UkladNaOsi; nazwaFigury: 
     };
   }, [dymekWidac]);
 
-  const oferta = u.punkty.find((p) => p.rodzaj === "oferta") as PunktOsi;
+  const oferta = u.punkty.find((p) => p.rodzaj === "oferta");
+  const zakup = u.punkty.find((p) => p.rodzaj === "zakup");
   const osY = u.osY;
   const xs = u.punkty.map((p) => p.x);
   const xPoziomu = (g: number) => u.punkty.find((p) => p.grosze === g)?.x ?? 0;
   const zx0 = xPoziomu(u.zakres.od), zx1 = xPoziomu(u.zakres.do);
   const R_PIERSCIEN = G.R_OFERTA + G.GRUBOSC_OFERTY / 2;
-  const odOferty = (p: PunktOsi) => Math.abs(p.x - oferta.x);
+  const odOferty = (p: PunktOsi) => (oferta ? Math.abs(p.x - oferta.x) : Infinity);
   /* Poziom o cenie oferty siedzi w pierścieniu jak tarcza, więc jego ogonek
      zaczyna się od brzegu pierścienia, nie od kropki. */
   const wPierscieniu = (p: PunktOsi) => p.rodzaj === "poziom" && odOferty(p) < 1.5;
-  const promien = (p: PunktOsi) => (p.rodzaj === "oferta" || wPierscieniu(p) ? R_PIERSCIEN : G.R_POZIOM);
+  const promien = (p: PunktOsi) => (p.rodzaj === "zakup" ? R_ROMBU
+    : p.rodzaj === "oferta" || wPierscieniu(p) ? R_PIERSCIEN : G.R_POZIOM);
   const poziomy = u.punkty.filter((p) => p.rodzaj === "poziom");
   const daleko = poziomy.filter((p) => odOferty(p) >= PROG_PIERSCIENIA);
   const blisko = poziomy.filter((p) => odOferty(p) < PROG_PIERSCIENIA);
@@ -363,7 +392,8 @@ function WykresOsi({ u, nazwaFigury, onPrzelew }: { u: UkladNaOsi; nazwaFigury: 
 
   const tekstDlaCzytnika = (p: PunktOsi) => (p.rodzaj === "oferta"
     ? `, ${u.polozenie.krotko}`
-    : ` ${u.waluta} brutto, netto ${zlote(p.netto, u.waluta)}${p.nazwy.length > 1 ? ` (${p.nazwy.join(", ")})` : ""}`);
+    : p.rodzaj === "zakup" ? ` ${u.waluta} brutto, tyle zapłacił klient`
+      : ` ${u.waluta} brutto, netto ${zlote(p.netto, u.waluta)}${p.nazwy.length > 1 ? ` (${p.nazwy.join(", ")})` : ""}`);
 
   /* Klawisze obsłużone tutaj nie idą dalej. Kolejka skrzynki słucha strzałek
      na `window` i bez tego strzałka w wykresie przerzucałaby rozmowę spod
@@ -409,24 +439,31 @@ function WykresOsi({ u, nazwaFigury, onPrzelew }: { u: UkladNaOsi; nazwaFigury: 
             osi za jego końcem, więc rozjazd widać bez czytania liczb. */}
         {zx1 - zx0 > 0.5 && <line x1={zx0} x2={zx1} y1={osY} y2={osY} className="stroke-slate-300"
           strokeWidth={4} strokeLinecap="round" />}
-        <circle cx={oferta.x} cy={osY} r={R_PIERSCIEN + 2} className="fill-white" />
+        {oferta && <circle cx={oferta.x} cy={osY} r={R_PIERSCIEN + 2} className="fill-white" />}
         {/* Daleko od oferty otoczka i kropka idą parami. Otoczka następnej
             wcina się w poprzednią kropkę, więc dwie bliskie ceny to dwie
             kropki, a nie jedna plama. */}
         {daleko.map((p) => [otoczka(p), kropka(p)])}
         {blisko.filter((p) => !wPierscieniu(p)).map(otoczka)}
-        <circle data-znacznik="oferta" cx={oferta.x} cy={osY} r={G.R_OFERTA} className="fill-white stroke-amber-600"
-          strokeWidth={wMiejscu.has(oferta.id) ? G.GRUBOSC_OFERTY + 1 : G.GRUBOSC_OFERTY} />
+        {oferta && <circle data-znacznik="oferta" cx={oferta.x} cy={osY} r={G.R_OFERTA}
+          className="fill-white stroke-amber-600"
+          strokeWidth={wMiejscu.has(oferta.id) ? G.GRUBOSC_OFERTY + 1 : G.GRUBOSC_OFERTY} />}
         {blisko.map(kropka)}
+        {/* Romb zakupu na wierzchu znaczników, w białej obwódce: inny kształt
+            niż kropka poziomu i pierścień oferty, więc nie myli się z nimi
+            także bez barwy. */}
+        {zakup && <polygon data-znacznik="zakup" className="fill-ranga-ok stroke-white" strokeWidth={2}
+          strokeLinejoin="round" points={romb(zakup.x, osY, wMiejscu.has(zakup.id) ? R_ROMBU + 1 : R_ROMBU)} />}
         {/* Ogonek: od brzegu znacznika do etykiety, w barwie znacznika.
             Wskazuje stronę, po której stoi JEGO etykieta, więc cudzy znacznik
             pod etykietą nie myli — jego ogonek idzie w drugą stronę. */}
         {u.etykiety.map((e) => {
           const x = Math.round(e.punkt.x) + 0.5;
           const r = promien(e.punkt);
-          const [y1, y2] = e.strona < 0 ? [e.gora + e.wys, osY - r] : [osY + r, e.gora];
+          const [y1, y2] = e.strona < 0 ? [e.gora + e.wys, poczatekOgonka(u, e, osY - r)]
+            : [poczatekOgonka(u, e, osY + r), e.gora];
           return <line key={`ogonek-${e.punkt.id}`} data-ogonek={e.punkt.id} x1={x} x2={x} y1={y1} y2={y2}
-            strokeWidth={1} className={e.punkt.rodzaj === "oferta" ? "stroke-amber-600" : "stroke-slate-500"} />;
+            strokeWidth={e.punkt.rodzaj === "zakup" ? 2 : 1} className={OGONEK[e.punkt.rodzaj]} />;
         })}
       </svg>
       <ul aria-label="Ceny brutto na osi, od najniższej" onKeyDown={naKlawisz}
@@ -446,11 +483,13 @@ function WykresOsi({ u, nazwaFigury, onPrzelew }: { u: UkladNaOsi; nazwaFigury: 
             }}
             onBlur={() => setFokus(null)}
             style={{ left: e.lewo, top: e.gora, width: e.szer, height: e.wys }}
-            className={`absolute flex whitespace-nowrap rounded px-0.5 text-podpis leading-none text-slate-600 ${
+            className={`absolute flex whitespace-nowrap rounded px-0.5 text-podpis leading-none ${
               u.linie === 2 ? "h-7 flex-col items-center justify-center gap-0.5" : "h-3.5 items-center"} ${
-              wMiejscu.has(p.id) ? "bg-slate-100" : ""}`}>
+              p.rodzaj === "zakup" ? `font-bold text-ranga-ok ${wMiejscu.has(p.id) ? "bg-emerald-100" : "bg-emerald-50"}`
+                : `text-slate-600 ${wMiejscu.has(p.id) ? "bg-slate-100" : ""}`}`}>
             <span>{p.nazwa}</span>
-            {p.kwota && <span className={`text-xs font-bold leading-none text-slate-900 ${u.linie === 1 ? "ml-1" : ""}`}>
+            {p.kwota && <span className={`text-xs font-bold leading-none ${
+              p.rodzaj === "zakup" ? "text-ranga-ok" : "text-slate-900"} ${u.linie === 1 ? "ml-1" : ""}`}>
               {p.kwota}</span>}
             <span className="sr-only">{tekstDlaCzytnika(p)}</span>
           </li>;
@@ -513,7 +552,11 @@ function DymekOsi({ punkty, x, szerokosc, wysokosc, waluta, krotko, onZamknij }:
     style={{ left: polozenie.lewo, maxWidth: szerokosc, ...(polozenie.nad ? { bottom: wysokosc } : { top: wysokosc }) }}
     className={`absolute z-10 w-max ${polozenie.nad ? "pb-1" : "pt-1"}`}>
     <div className="space-y-1 rounded-md bg-white px-2 py-1 text-podpis text-slate-600 shadow-lg ring-1 ring-slate-200">
-      {punkty.map((q) => q.rodzaj === "oferta"
+      {punkty.map((q) => q.rodzaj === "zakup"
+        ? <div key={q.id} className="whitespace-nowrap">
+            <span className="mr-1 inline-block h-2 w-2 rotate-45 bg-ranga-ok" />
+            <b className="text-xs text-slate-900">{zlote(q.grosze, waluta)}</b> zapłacił klient</div>
+        : q.rodzaj === "oferta"
         ? <div key={q.id}>
             <div className="whitespace-nowrap"><span className="mr-1 inline-block h-2.5 w-2.5 rounded-full border-2 border-amber-600" />
               <b className="text-xs text-slate-900">{zlote(q.grosze, waluta)}</b> oferta Allegro</div>

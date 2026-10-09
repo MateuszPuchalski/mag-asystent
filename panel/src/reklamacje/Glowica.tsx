@@ -1,271 +1,157 @@
 import React from "react";
 import { Link as RouterLink } from "react-router-dom";
-import { ExternalLink, UserRound } from "lucide-react";
-import type { SzczegolReklamacji } from "../api/typy";
-import { zlote } from "../api/zwroty";
-import { czas, LoginKlienta, Skopiuj } from "../ui";
-import { Prowadzi } from "../sprawy/Prowadzi";
+import { Check, EllipsisVertical, ExternalLink } from "lucide-react";
+import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
+import { dataCyfrowa, ile, LoginKlienta } from "../ui";
 import { mojaSprawa } from "../sprawy/Moje";
-import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
-import { PrzyciskTowaru } from "../towar/Szuflada";
-import { OCZEKIWANIA, POWODY } from "./Kolejka";
-import { PRAWO } from "./statusy";
-import { coSieDzieje, ileReklamacji, tytulStatusu, type Czlon, type Ton } from "./etap";
-import { FaktySprawy } from "./Fakty";
+import { tytulStatusu } from "./etap";
+import { MenuPrzycisku } from "./Menu";
 
-/* ── Głowica sprawy: kto, co się dzieje, o co chodzi, fakty ──────────────────
-   Jeden pas na całą szerokość obszaru sprawy, nad rozmową, dowodami
-   i werdyktem. Czyta się go z góry na dół w czterech warstwach.
+/* ── Głowica sprawy: która to reklamacja i czyja ─────────────────────────────
+   Dwa rzędy nad drogą sprawy i rozmową. Pierwszy mówi, KTÓRA to sprawa i w
+   jakim jest stanie, a obok stoi jedyna czynność głowicy: wzięcie sprawy.
+   Drugi mówi, CZYJA: login do skopiowania, profil i inne sprawy klienta.
 
-   KTO. Uwaga właściciela: „Client powinien być bardziej widoczny". Login
-   stoi pierwszy, w 17 px, bo to klucz klienta w całej drodze, a nie podpis
-   przy numerze. Obok profil, historia i liczba jego innych reklamacji, a po
-   prawej, kto u nas prowadzi sprawę.
+   NUMER JEST DRZWIAMI DO ALLEGRO. Agent porównuje sprawę z Centrum Sprzedaży
+   po numerze, więc numer sam otwiera ją w nowej karcie. Osobny przycisk obok
+   byłby drugim celem do jednej czynności.
 
-   CO SIĘ DZIEJE. Dwa zdania z `etap.ts` zamiast czterech etykiet. Etap
-   i termin, potem rozmowa i towar. Surowy status Allegro zostaje pod
-   kursorem zdania A, bo na ekranie stoją słowa, nie kody.
+   Fakty o towarze i zamówieniu stoją w prawej kolumnie, a etap sprawy rysuje
+   droga pod głowicą. Głowica ich nie powtarza: jeden dom na fakt.
 
-   O CO CHODZI. Pod kreską towar z symbolem i jego historią reklamacji oraz
-   żądanie klienta. Nazwa towaru stoi w 14 px, bo 17 px należy do klienta,
-   a tożsamość towaru niesie też zdjęcie w kolumnie dowodów.
+   Profil klienta domyka wiązanie drogi klienta w obie strony: profil prowadzi
+   do reklamacji, a reklamacja do profilu (`docs/obsluga-klienta-calosc.md`). */
 
-   FAKTY. Pas komórek z `Fakty.tsx` na całą szerokość. Decyzja właściciela:
-   fakty do decyzji stoją tutaj, a te same informacje łączą się w jedną.
+type Ton = "decyzja" | "zle" | "uwaga" | "ok" | "nic";
 
-   Numer reklamacji, data zgłoszenia i odnośniki do Allegro stoją w prawej
-   szczelinie pod „Prowadzi”. To ich jedyny dom, bo uwaga właściciela
-   brzmiała „informacje powtarzają się”.
-
-   ZDJĘĆ TU NIE MA. Obraz oferty i kartoteki stoi w kolumnie zdjęć pod
-   „Wysłaliśmy", obok tego, co przysłał klient — tam się je porównuje. */
-
-/* ── JEDNA KARTOTEKA NA CAŁĄ SPRAWĘ ──────────────────────────────────────────
-   Symbol w głowicy z przekrojem towaru, kafel pod „Wysłaliśmy", fakty
-   „Mamy" i „nasz zakup" oraz kartoteka cen pytają o TĘ SAMĄ rzecz: która to
-   kartoteka u nas. Każdy element pyta tej funkcji, bo osobne pytania się
-   rozjeżdżają. Symbol z dopasowania po SKU obok „sprawa bez kartoteki" to
-   dwie sprzeczne odpowiedzi na jednym ekranie.
-
-   KOLEJNOŚĆ ZA SERWEREM: najpierw `r.twId`, który niesie paragon albo
-   wskazanie człowieka, potem `kartotekaOferty`. Z niej bierzemy wyłącznie
-   POWIĄZANIE, czyli `sku` i `pamiec`. Jedno trafienie po sygnaturze to
-   decyzja właściciela, nie propozycja (`services/dopasowanie-sku.ts`).
-   Symbol zdublowany przychodzi bez `twId` i zostaje brakiem, bo dwie
-   kartoteki pod jednym symbolem rozstrzyga człowiek. */
-export type ZrodloKartoteki = "paragon" | "mapowanie" | "sku";
-
-export interface KartotekaKolumny {
-  twId: number | null;
-  symbol: string | null;
-  zrodlo: ZrodloKartoteki | null;
-}
-
-export const NAPIS_ZRODLA: Record<ZrodloKartoteki, string> = {
-  paragon: "z paragonu",
-  mapowanie: "z mapowania oferty",
-  sku: "z SKU oferty",
-};
-
-export function kartotekaKolumny(szczegol: Pick<SzczegolReklamacji, "reklamacja" | "kartoteka">): KartotekaKolumny {
-  const r = szczegol.reklamacja;
-  if (r.twId !== null) {
-    return { twId: r.twId, symbol: r.twSymbol, zrodlo: r.twZParagonu ? "paragon" : "mapowanie" };
-  }
-  const k = szczegol.kartoteka;
-  if (k && k.twId !== null && (k.pewnosc === "sku" || k.pewnosc === "pamiec")) {
-    return { twId: k.twId, symbol: k.symbol, zrodlo: k.pewnosc === "sku" ? "sku" : "mapowanie" };
-  }
-  return { twId: null, symbol: null, zrodlo: null };
-}
-
-/* Rola członu zdania na barwę i wagę — w jednym miejscu, żeby czysta funkcja
-   w `etap.ts` nie znała Tailwinda. Bursztyn („czeka", „uwaga") znaczy
-   wyłącznie „uwaga”; czerwień tylko błąd albo termin od trzech dni w dół. */
 const KLASA_TONU: Record<Ton, string> = {
-  glowny: "font-semibold text-slate-900",
-  zle: "font-semibold text-ranga-zle",
-  uwaga: "font-semibold text-ranga-uwaga",
-  ok: "font-semibold text-ranga-ok",
-  spokojny: "font-semibold text-slate-700",
-  tekst: "",
-  termin: "font-bold text-slate-900",
-  terminPilny: "font-bold text-ranga-zle",
-  data: "tabular-nums text-slate-600",
-  cichy: "text-slate-600",
-  czeka: "font-semibold text-ranga-uwaga",
+  decyzja: "bg-sky-50 text-sky-800",
+  zle: "bg-red-50 text-ranga-zle",
+  uwaga: "bg-orange-50 text-ranga-uwaga",
+  ok: "bg-emerald-50 text-ranga-ok",
+  nic: "bg-slate-100 text-ranga-nic",
 };
 
-/** Człony zdania jeden za drugim; klient czekający na nas dostaje kropkę przed swoim zdaniem. */
-const Czlony = ({ czlony }: { czlony: Czlon[] }) => <>
-  {czlony.map((c, i) => <span key={i} className={KLASA_TONU[c.ton] || undefined}>
-    {c.ton === "czeka" &&
-      <span aria-hidden="true" className="mr-1.5 inline-block h-2 w-2 rounded-full bg-amber-500" />}
-    {c.tekst}</span>)}
-</>;
+/* Status w mapie, nie w łańcuchu `?:` — nowy kod Allegro dopisany do mapy
+   dostaje własne słowo, a nieznany stoi surowo, zamiast udawać ostatnią gałąź. */
+const STATUS: Record<string, { tekst: string; ton: Ton }> = {
+  CLAIM_SUBMITTED: { tekst: "Czeka na decyzję", ton: "decyzja" },
+  CLAIM_ACCEPTED: { tekst: "Uznana", ton: "ok" },
+  CLAIM_REJECTED: { tekst: "Odrzucona", ton: "nic" },
+  DISPUTE_ONGOING: { tekst: "Spór w Allegro", ton: "uwaga" },
+  DISPUTE_CLOSED: { tekst: "Spór zamknięty", ton: "nic" },
+  DISPUTE_UNRESOLVED: { tekst: "Spór nierozstrzygnięty", ton: "uwaga" },
+};
 
-/** Kropka między członami — dla oka, nie dla czytnika ekranu. */
-const Kropka = () => <span aria-hidden="true" className="text-slate-500">·</span>;
+/**
+ * Stan sprawy jednym słowem do plakietki.
+ *
+ * NASZ werdykt przed potwierdzeniem Allegro wygrywa ze statusem Allegro:
+ * status zmieni się dopiero po synchronizacji, a agent ma wiedzieć teraz,
+ * że decyzja wyszła albo że nie przeszła.
+ */
+export function stanSprawy(r: Pick<Reklamacja, "statusAllegro" | "werdyktStatus" | "poTerminie">):
+  { tekst: string; ton: Ton } {
+  if (r.werdyktStatus === "send_failed") return { tekst: "Werdykt nie przeszedł", ton: "zle" };
+  if (r.statusAllegro === "CLAIM_SUBMITTED") {
+    if (r.werdyktStatus === "send_uncertain") return { tekst: "Werdykt niepewny", ton: "uwaga" };
+    if (r.werdyktStatus === "sending" || r.werdyktStatus === "sent") {
+      return { tekst: "Werdykt czeka na Allegro", ton: "uwaga" };
+    }
+    if (r.poTerminie) return { tekst: "Po terminie decyzji", ton: "zle" };
+  }
+  if (r.statusAllegro === null) return { tekst: "Bez statusu Allegro", ton: "nic" };
+  return STATUS[r.statusAllegro] ?? { tekst: `Status: ${r.statusAllegro}`, ton: "nic" };
+}
+
+/**
+ * Wzięcie sprawy — znacznik, nie zamek.
+ *
+ * Niczyją sprawę bierze się jednym kliknięciem, a własną tym samym odkłada.
+ * Cudzej się tu nie odbiera: przekazanie z powodem to osobna droga.
+ */
+function Prowadze({ prowadzi, moja, trwa, onProwadze }: {
+  prowadzi: string | null; moja: boolean; trwa: boolean; onProwadze: () => void;
+}) {
+  const rama = "inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-900 hover:bg-slate-50 disabled:opacity-50";
+  if (prowadzi && !moja) {
+    return <span className="text-sm text-slate-700">Prowadzi <b className="text-slate-900">{prowadzi}</b></span>;
+  }
+  return <button type="button" aria-pressed={moja} disabled={trwa} onClick={onProwadze}
+    title={moja ? "Prowadzisz tę sprawę — kliknij, żeby ją odłożyć" : "Weź tę sprawę na siebie"}
+    className={rama}>
+    {moja && <Check size={14} aria-hidden="true" className="text-ranga-ok" />}
+    {moja ? "Prowadzisz" : "Prowadzę"}</button>;
+}
 
 export function Glowica({
   szczegol, mojeId = null, trwa, blad = "", onProwadze,
-  onSprawdzPrzesylke, sprawdzaPrzesylke = false, bladPrzesylki = "",
+  onOdswiez, odswieza = false,
 }: {
   szczegol: SzczegolReklamacji;
-  /** Konto patrzącego — po nim „Ty" i „Odłóż sprawę" zamiast cudzego imienia. */
+  /** Konto patrzącego — po nim „Prowadzisz” zamiast cudzego imienia. */
   mojeId?: number | null;
   trwa: boolean;
   blad?: string;
   onProwadze: () => void;
-  /** Pytanie Allegro o paczkę — jawnym kliknięciem w komórce „Paczka". */
-  onSprawdzPrzesylke?: () => void;
-  sprawdzaPrzesylke?: boolean;
-  bladPrzesylki?: string;
+  /** Jawne odświeżenie sprawy z Allegro, z menu „⋮”. */
+  onOdswiez?: () => void;
+  odswieza?: boolean;
 }) {
   const r = szczegol.reklamacja;
   const numer = r.numer ?? r.externalId;
   const login = r.kupujacyLogin;
-  const powod = r.powodTyp ? (POWODY[r.powodTyp] ?? r.powodTyp) : null;
-  const oczekiwanie = r.oczekiwanie ? (OCZEKIWANIA[r.oczekiwanie] ?? r.oczekiwanie) : null;
-  const kwota = r.oczekiwanaKwotaGrosze !== null ? zlote(r.oczekiwanaKwotaGrosze, r.waluta) : null;
-  const towar = kartotekaKolumny(szczegol);
-  const etap = coSieDzieje(szczegol);
-  /* Czytamy ostrożnie: starszy serwer historii nie zna, a jej brak ma znaczyć
-     „nie wiemy", nie wywracać głowicy. `null` serwer daje też przy zerze,
-     więc ekran nigdy nie mówi „pierwsza reklamacja". */
-  const historiaKlienta = szczegol.historia?.klient ?? null;
-  /* Historia TOWARU stoi przy jego nazwie, klienta — przy loginie. Jeden dom
-     na fakt, a każdy obok tego, czego dotyczy. Brak historii nie rysuje się:
-     pierwsza sprawa przy tym towarze nie jest informacją o towarze. */
-  const historiaTowaru = szczegol.historia?.towar ?? null;
+  const stan = stanSprawy(r);
+  /* `null` serwer daje i przy zerze, i przy „nie wiemy”, więc wtedy nic nie
+     stoi — ekran nigdy nie mówi „pierwsza reklamacja”. */
+  const inne = szczegol.historia?.klient ?? null;
 
-  return <div className="flex flex-wrap items-start gap-x-6 gap-y-2 px-5 py-3">
-    <div className="flex min-w-0 flex-[999_1_24rem] flex-col gap-1">
-      {/* ── KTO ─────────────────────────────────────────────────────────────
-          Login KOPIUJE po kliknięciu, więc profil i historia są osobnymi
-          celami po 24 px z odstępem 8 px (WCAG 2.5.8). W nagłówku stoi sam
-          login: szuflada historii nie może wylądować w środku `h2`. */}
+  /* Rzadkie czynności stoją pod „⋮”: każda to jawne kliknięcie, bo żądanie
+     u Allegro nie wychodzi z samego patrzenia. Pytanie o paczkę stoi przy
+     przesyłce w karcie zamówienia, bo tam widać też jego błąd. */
+  const pozycje = onOdswiez ? [{ klucz: "odswiez", napis: odswieza ? "Odświeżam…" : "Odśwież z Allegro",
+    onWybierz: onOdswiez, wylaczona: odswieza }] : [];
+
+  return <div className="flex flex-col gap-2.5 px-5 py-4">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <h2 className="min-w-0 text-tytul font-bold text-slate-900">
+        {r.link
+          ? <a href={r.link} target="_blank" rel="noopener noreferrer" title="Otwórz tę reklamację w Allegro"
+              className="inline-flex flex-wrap items-center gap-1.5 text-slate-900 hover:underline">
+              Reklamacja {numer}
+              <ExternalLink size={16} aria-hidden="true" className="text-slate-600" />
+              <span className="sr-only">(otwiera się w Allegro)</span></a>
+          : <>Reklamacja {numer}</>}
+      </h2>
+      {/* Surowy kod Allegro zostaje w podpowiedzi, dla dokładnej wartości. */}
+      <span title={tytulStatusu(r.statusAllegro)}
+        className={`rounded-full px-2.5 text-xs font-bold leading-6 ${KLASA_TONU[stan.ton]}`}>
+        {stan.tekst}</span>
+      <div className="ml-auto flex items-center gap-1.5">
+        <Prowadze prowadzi={r.prowadzi} moja={mojaSprawa(r.prowadziId, mojeId)} trwa={trwa}
+          onProwadze={onProwadze} />
+        <MenuPrzycisku etykieta="Więcej działań" nazwaPrzycisku="Więcej działań" pozycje={pozycje}
+          przycisk={<EllipsisVertical size={16} aria-hidden="true" />}
+          klasaPrzycisku="flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-900 hover:bg-slate-50" />
+      </div>
+    </div>
+    <div className="flex flex-wrap items-center gap-x-3.5 gap-y-2 text-sm text-slate-600">
       {login
-        ? <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-slate-700">
-            <h2 className="flex min-w-0 items-center gap-1.5">
-              <UserRound size={16} aria-hidden="true" className="shrink-0 text-slate-600" />
-              <LoginKlienta login={login} className="font-mono text-naglowek font-bold text-slate-900" />
-            </h2>
-            <Kropka />
-            {/* Profil domyka wiązanie klienta w obie strony: profil prowadzi
-                do reklamacji, a reklamacja do profilu. Słowa i kolejność jak
-                w nagłówku zwrotu, żeby ręka znała je z tamtego ekranu. */}
+        ? <>
+            <LoginKlienta login={login}
+              className="min-h-8 rounded-lg border border-slate-200 bg-slate-100 px-2.5 font-mono text-tresc font-bold text-slate-900" />
             <RouterLink to={`/obsluga/klient/${encodeURIComponent(login)}`}
               title="Profil klienta — zakupy, zwroty, reklamacje i rozmowy"
-              className="inline-flex min-h-6 items-center gap-1 font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
-              <UserRound size={12} aria-hidden="true" />profil</RouterLink>
-            <PrzyciskHistorii rodzaj="sprawa" id={r.id} />
-            {historiaKlienta && <>
-              <Kropka />
-              <span>jeszcze {ileReklamacji(historiaKlienta, " u nas")}</span>
-            </>}
-          </div>
+              className="inline-flex min-h-6 items-center font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
+              Profil klienta</RouterLink>
+          </>
         /* Brak loginu mówi o sobie: pusty slot czytałby się jak awaria, a to
-           Allegro go nie podało. Bez loginu nie ma czyjego profilu ani historii. */
-        : <h2 className="text-tresc text-slate-600">kupujący: Allegro nie podało loginu</h2>}
-
-      {/* ── CO SIĘ DZIEJE ─────────────────────────────────────────────────── */}
-      <p className="mt-1 text-tresc text-slate-700" title={tytulStatusu(etap.kodAllegro)}>
-        <Czlony czlony={etap.a} /></p>
-      {/* Zdanie B o szczebel niżej niż A: A mówi, co mamy zrobić, B tylko
-          tłumaczy tło, więc oko ma najpierw trafić na A. */}
-      {etap.b.length > 0 && <p className="text-sm text-slate-700"><Czlony czlony={etap.b} /></p>}
-      <hr className="my-0.5 border-slate-200" />
-
-      {/* ── O CO CHODZI ─────────────────────────────────────────────────────
-          SYGNATURA MÓWI, SKĄD JEST. Symbol bywa wzięty z PARAGONU, a bywa
-          z dzisiejszego mapowania oferty — to dwie różne rzeczy, gdy sprzedawca
-          przepiął sygnaturę po wyczerpaniu dostawy. Bez tej adnotacji ekran
-          kazałby ufać jednakowo obu. */}
-      <p className="text-sm">
-        {r.ofertaNazwa
-          ? <span className="font-semibold text-slate-900">{r.ofertaNazwa}</span>
-          : <span className="text-slate-600">Oferty nie pobrano</span>}
-        <span className="ml-2 inline-flex flex-wrap items-baseline gap-x-1.5 text-xs text-slate-600">
-          {towar.symbol
-            ? <>
-                <PrzyciskTowaru twId={towar.twId}>
-                  <span className="font-mono font-semibold text-slate-800">{towar.symbol}</span></PrzyciskTowaru>
-                {towar.zrodlo && <><Kropka /><span>{NAPIS_ZRODLA[towar.zrodlo]}</span></>}
-              </>
-            /* Przy braku stoi ZDANIE serwera, nie kod powodu: `powod` jest
-               kluczem dla liczników, a agent ma przeczytać, które ogniwo pękło. */
-            : <span>{szczegol.kartoteka?.zrodlo ?? "bez kartoteki"}</span>}
-          {historiaTowaru && <><Kropka /><span>ten towar: {ileReklamacji(historiaTowaru)}</span></>}
-        </span>
-      </p>
-      <p className="text-sm text-slate-700">
-        <span className="text-slate-600">Chce:</span>{" "}
-        <b className="font-bold text-slate-900">{oczekiwanie ?? "nie podał"}</b>
-        {kwota && <>{" "}<b className="font-bold tabular-nums text-slate-900">{kwota}</b></>}
-        {powod && <>{" "}<Kropka />{" "}<span>{powod}</span></>}
-        {" "}<Kropka />{" "}
-        <span>{r.prawo ? (PRAWO[r.prawo] ?? "tytuł nieznany") : "tytuł nieznany"}</span>
-      </p>
+           Allegro go nie podało. Bez loginu nie ma czyjego profilu. */
+        : <span>kupujący: Allegro nie podało loginu</span>}
+      {login && inne && inne.ile > 0 &&
+        <span>{ile(inne.ile, "inna reklamacja", "inne reklamacje", "innych reklamacji")}</span>}
+      <span>Zgłoszono {dataCyfrowa(r.otwartoAt)}</span>
     </div>
-
-    {/* ── PRAWA SZCZELINA: KTO PROWADZI, NUMER I ZGŁOSZENIE ────────────────
-        Wzięcie sprawy jest CZYNNOŚCIĄ, więc stoi w szczelinie, a nie w pasie
-        faktów. Własną sprawę da się odłożyć tym samym przyciskiem, bo serwer
-        zdejmuje znacznik drugim kliknięciem. Numer i data zgłoszenia stoją
-        pod spodem: to fakty do skopiowania, nie do decyzji. */}
-    <div className="ml-auto flex min-w-0 flex-col items-end gap-1">
-      <Prowadzi wWierszu prowadzi={r.prowadzi} trwa={trwa} onProwadze={onProwadze}
-        jaProwadze={mojaSprawa(r.prowadziId, mojeId)} />
-      {blad && <p className="text-xs text-red-700">{blad}</p>}
-      <p className="flex items-center gap-1 text-xs text-slate-600">
-        reklamacja <b className="font-bold tabular-nums text-slate-900">{numer}</b>
-        {/* Przycisk kopiowania nie niesie numeru w nazwie: kolejka szuka
-            wierszy po numerze, a drugi przycisk z nim byłby drugim wierszem. */}
-        <Skopiuj tekst={numer} tytul="Kopiuj numer reklamacji" />
-        {r.link && <a href={r.link} target="_blank" rel="noopener noreferrer"
-          aria-label="Reklamacja w Allegro" title="Reklamacja w Allegro"
-          className="inline-flex h-6 w-6 items-center justify-center rounded text-slate-600 hover:bg-slate-100 hover:text-slate-900">
-          <ExternalLink size={12} aria-hidden="true" /></a>}
-      </p>
-      <p className="text-xs text-slate-600">zgłoszona {czas(r.otwartoAt)}</p>
-      {/* Odnośniki do Allegro stoją przy numerze, bo to ten sam rodzaj
-          rzeczy: identyfikator do skopiowania i drzwi do panelu Allegro.
-          Bez łącza numer stoi na widoku — identyfikator tylko w podpowiedzi
-          nie istnieje dla klawiatury i dotyku. */}
-      <p className="flex flex-wrap items-center justify-end gap-x-3 text-xs">
-        {r.orderId
-          ? <span className="inline-flex items-center gap-1">
-              <LinkAllegro href={r.linkZamowienia} title={`Zamówienie ${r.orderId}`} nazwa="zamówienie w Allegro">
-                {r.linkZamowienia ? "zamówienie" : <span className="font-mono">{r.orderId}</span>}</LinkAllegro>
-              <Skopiuj tekst={r.orderId} tytul="Kopiuj numer zamówienia" />
-            </span>
-          : <span className="text-slate-600">bez numeru zamówienia</span>}
-        {r.offerId && (r.linkOferty
-          ? <LinkAllegro href={r.linkOferty} title={`Oferta ${r.offerId}`} nazwa="oferta w Allegro">oferta</LinkAllegro>
-          : <span>oferta <span className="font-mono">{r.offerId}</span></span>)}
-      </p>
-    </div>
-
-    <div className="min-w-0 basis-full">
-      <FaktySprawy szczegol={szczegol} towar={towar} onSprawdzPrzesylke={onSprawdzPrzesylke}
-        sprawdzaPrzesylke={sprawdzaPrzesylke} bladPrzesylki={bladPrzesylki} />
-    </div>
+    {blad && <p className="text-sm text-ranga-zle">{blad}</p>}
   </div>;
 }
-
-/**
- * Odnośnik do Allegro z ikoną wyjścia; bez adresu zostaje sam tekst.
- *
- * Na widoku krótko, bo szczelina jest wąska. Czytnik ekranu dostaje pełną
- * nazwę z celem: na liście odnośników samo „oferta" nie mówi, dokąd prowadzi.
- * Pełna nazwa zaczyna się od widocznego słowa (WCAG 2.5.3).
- */
-const LinkAllegro = ({ href, title, nazwa, children }: {
-  href: string | null; title?: string; nazwa?: string; children: React.ReactNode;
-}) =>
-  href
-    ? <a href={href} target="_blank" rel="noopener noreferrer" title={title} aria-label={nazwa}
-        className="inline-flex min-h-6 items-center gap-1 font-semibold text-sky-700 underline underline-offset-2 hover:text-sky-900">
-        {children}<ExternalLink size={12} aria-hidden="true" /></a>
-    : <span title={title}>{children}</span>;

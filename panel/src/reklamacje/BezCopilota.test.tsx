@@ -2,17 +2,18 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
-import { Fakty } from "../test/fakty";
+import { MemoryRouter } from "react-router-dom";
 
 /* Źródła przez `?raw`, jak w strażnikach z `src/`: wywołanie, które ekran
    wpiąłby kiedyś bez karty, nie narysuje się w teście, a w tekście stanie. */
-import zrodloDowodow from "./Fakty.tsx?raw";
+import zrodloProduktu from "./Produkt.tsx?raw";
+import zrodloGlowicy from "./Glowica.tsx?raw";
 import zrodloEdytora from "./Edytor.tsx?raw";
 import zrodloEkranu from "../ekrany/Reklamacje.tsx?raw";
 import zrodloApi from "../api/reklamacje.ts?raw";
 
-/* Kolumna dowodów pyta o cennik kartoteki (`useKartaTowaru`), a ten plik nie
-   stawia klienta TanStacka — pilnuje tego, czego w kolumnie NIE MA. */
+/* Karta produktu pyta o cennik kartoteki (`useKartaTowaru`), a ten plik nie
+   stawia klienta TanStacka — pilnuje tego, czego w prawej kolumnie NIE MA. */
 vi.mock("../api/rozmowy", () => ({
   useKartaTowaru: () => ({ data: undefined, isLoading: false, error: null }),
 }));
@@ -60,12 +61,21 @@ const KARTA: SzczegolReklamacji["karta"] = {
 
 const szczegol = (): SzczegolReklamacji => ({
   reklamacja: rek(), czat: [], zalaczniki: [], zwroty: [], rozmowy: [], sprawy: [], droga: [],
-  kartoteka: null, karta: KARTA,
+  kartoteka: null, karta: KARTA, zamowienie: null, przesylka: null,
+  historia: { towar: null, klient: null },
 } as unknown as SzczegolReklamacji);
+
+/* Prawa kolumna i głowica naraz — to tam karta Copilota stała przed zmianą. */
+const { Produkt } = await import("./Produkt");
+const { Glowica } = await import("./Glowica");
+const Sprawa = () => <MemoryRouter>
+  <Glowica szczegol={szczegol()} trwa={false} onProwadze={() => {}} />
+  <Produkt szczegol={szczegol()} />
+</MemoryRouter>;
 
 describe("kolumna reklamacji nie ma Copilota", () => {
   it("zapisana karta nie wraca na ekran: ani faktów maszyny, ani rady", () => {
-    render(<Fakty szczegol={szczegol()} />);
+    render(<Sprawa />);
     expect(screen.queryByText("Co wyczytał Copilot")).not.toBeInTheDocument();
     expect(screen.queryByText("Copilot radzi")).not.toBeInTheDocument();
     expect(screen.queryByText("Brakuje do rozstrzygnięcia")).not.toBeInTheDocument();
@@ -74,7 +84,7 @@ describe("kolumna reklamacji nie ma Copilota", () => {
   });
 
   it("nie ma przycisku, który woła model", () => {
-    render(<Fakty szczegol={szczegol()} />);
+    render(<Sprawa />);
     expect(screen.queryByRole("button", { name: /Przeczytaj|Copilot|Czytam/ })).not.toBeInTheDocument();
   });
 
@@ -82,7 +92,7 @@ describe("kolumna reklamacji nie ma Copilota", () => {
     /* Trasę usuwa serwer w tej samej zmianie, a jego strażnik adresów
        (`panel-adresy.test.ts`) odmówiłby hakowi bez trasy. Ten test pilnuje
        drugiej strony: że ekran nie wpina rozpoznania z powrotem. */
-    for (const zrodlo of [zrodloDowodow, zrodloEkranu, zrodloApi]) {
+    for (const zrodlo of [zrodloProduktu, zrodloGlowicy, zrodloEkranu, zrodloApi]) {
       expect(zrodlo).not.toMatch(/useRozpoznaj|\/rozpoznaj\b|onRozpoznaj/);
     }
   });

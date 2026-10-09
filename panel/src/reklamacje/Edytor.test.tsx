@@ -143,6 +143,14 @@ describe("sprawa odpowiada edytorem skrzynki", () => {
       expect.stringMatching(/^Odpowiedz w sprawie…/));
   });
 
+  it("ekran reklamacji podaje napis z makiety — „Wyślij do klienta”", () => {
+    /* Dyskusje zostają przy domyślnym napisie; zmienia go tylko ekran, który
+       o to prosi, bo odbiorcą w dyskusji bywa doradca Allegro. */
+    render(<Edytor {...props()} etykietaWyslij="Wyślij do klienta" />);
+    expect(screen.getByRole("button", { name: "Wyślij do klienta" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Wyślij odpowiedź" })).toBeNull();
+  });
+
   it("N z tła strony zostaje dla ekranu — edytor go nie przechwytuje", async () => {
     /* Nasłuch ekranu dopięty PO edytorze, więc widzi, co edytor zrobił. */
     render(<Edytor {...props()} />);

@@ -252,6 +252,26 @@ test("biuro dostaje kolejkę z kubełkiem, terminem, sygnałami i licznikami", a
   assert.ok(body.stan.status, "stan synchronizacji jedzie razem z kolejką");
 });
 
+test("kolejka niesie kafle z całej tabeli i cenę oferty na wierszu", async () => {
+  /* Kafle liczy serwis; trasa ma je dowieźć ZAWSZE i liczyć bez progu.
+     Sprawa sprzed progu znika z listy, ale nie z kafla „do decyzji". */
+  const { naglowki } = login("biuro", "Ala kafle");
+  db().prepare(`INSERT INTO reklamacja_klienta(channel_account_id,external_id,typ,
+    status_allegro,decyzja_do,otwarto_at,synced_at)
+    SELECT channel_account_id,'i-stara','CLAIM','CLAIM_SUBMITTED','2126-01-01T10:00:00Z',
+      '2026-02-01T10:00:00Z','2026-09-07T10:00:00Z'
+      FROM reklamacja_klienta WHERE external_id='i-1'`).run();
+  for (const url of ["/api/obsluga/reklamacje", "/api/obsluga/reklamacje?od=wszystko"]) {
+    const body = (await app.inject({ method: "GET", url, headers: naglowki })).json();
+    assert.deepEqual(Object.keys(body.statystyki).sort(),
+      ["doDecyzji", "doOdpowiedzi", "poTerminie", "sredniDniDoWerdyktu"], url);
+    assert.equal(body.statystyki.doDecyzji.teraz, 2, `${url}: kafel nie zna progu`);
+    assert.equal(body.statystyki.doOdpowiedzi.tydzienTemu, null);
+    assert.equal(body.statystyki.sredniDniDoWerdyktu.okresDni, 30);
+    assert.equal(body.reklamacje[0].ofertaCenaGrosze, null, "bez snapshotu oferty ceny nie ma");
+  }
+});
+
 test("szczegół niesie czat i załączniki sprawy", async () => {
   const { naglowki } = login("biuro", "Ala druga");
   const r = await app.inject({

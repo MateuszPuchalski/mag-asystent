@@ -1,10 +1,15 @@
 import React, { useEffect, useId, useRef, useState } from "react";
-import { Bot, ChevronUp, Image, LifeBuoy, Store, User, type LucideIcon } from "lucide-react";
-import type { Reklamacja, WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
+import {
+  ArrowDownLeft, ArrowUpRight, Bot, Check, ChevronRight, ChevronUp, Clock, Copy, Image, LifeBuoy,
+  Package, PackageCheck, Store, Ticket, User, type LucideIcon,
+} from "lucide-react";
+import type { WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
 import { pobierzZalacznik } from "../api/reklamacje";
 import { useZdjecieZalacznikaReklamacji } from "../towar/useZdjecie";
 import { KartaZalacznika, ListaZalacznikow } from "../towar/Zalacznik";
-import { czas, ile, NaglowekSekcji, Pusto } from "../ui";
+import { czas, dniSlowo, dzienMiesiac, godzina, ile, NaglowekSekcji, odmien, Pusto } from "../ui";
+import { kopiujDoSchowka } from "../ui/kopiuj";
+import { PLAKIETKA_PRZESYLKI, type ZdarzeniePrzesylki } from "./przesylki";
 import { DlugaTresc, rozbierzFormularz, Tresc, zawieraOpis } from "./tresc";
 
 /* ── Rozmowa w sprawie reklamacyjnej ─────────────────────────────────────────
@@ -119,32 +124,23 @@ function Zalaczniki({ reklamacjaId, lista }: {
  *
  * Wiadomość zachowuje MIEJSCE zdjęcia w wątku, ale nie jego wysokość. Agent
  * widzi, że klient coś przysłał właśnie tu, a kliknięcie pokazuje to zdjęcie
- * w kolumnie i przenosi na nie fokus. Znak `Z1` jest tym samym, którym
- * dowody biura odsyłają do zdjęcia, więc wątek i wpis mówią jednym numerem.
+ * w kolumnie i przenosi na nie fokus.
  */
-function OdnosnikiZdjec({ lista, onPokaz, znak }: {
+function OdnosnikiZdjec({ lista, onPokaz }: {
   lista: ZalacznikReklamacji[]; onPokaz: (id: number) => void;
-  znak?: (id: number) => string | null;
 }) {
   if (!lista.length) return null;
   return <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
     {lista.map((z) => {
       const nazwa = z.nazwa || "zdjęcie";
-      const numer = znak?.(z.id) ?? null;
-      /* WIDOCZNY TEKST NA POCZĄTKU NAZWY (WCAG 2.5.3). Z numerem przycisk
-         pokazuje „Z1 usterka.jpg", więc tak zaczyna się jego nazwa, a sterujący
-         głosem mówi „kliknij Z1". Bez numeru nazwa zostaje jak w dyskusjach,
-         bo tam widoczny tekst to sama nazwa pliku i reguła jest spełniona. */
-      const etykieta = numer ? `${numer} ${nazwa} — pokaż zdjęcie w kolumnie`
-        : `Pokaż zdjęcie w kolumnie: ${nazwa}`;
+      /* Widoczny tekst to sama nazwa pliku i nazwa przycisku ją zawiera,
+         więc sterujący głosem trafia w przycisk (WCAG 2.5.3). */
+      const etykieta = `Pokaż zdjęcie w kolumnie: ${nazwa}`;
       return <li key={z.id} className="min-w-0">
         <button type="button" onClick={() => onPokaz(z.id)} aria-label={etykieta}
           className="inline-flex min-h-6 max-w-full items-center gap-1 font-semibold text-slate-700
             underline underline-offset-2 hover:text-slate-900">
           <Image size={12} aria-hidden="true" className="shrink-0 text-slate-500" />
-          {/* Spacja jest dla tekstu przycisku, nie dla układu: flex jej nie
-              rysuje, a „Z1 usterka.jpg" czyta się jako dwa słowa. */}
-          {numer && <><span className="shrink-0 tabular-nums">{numer}</span>{" "}</>}
           <span className="truncate">{nazwa}</span>
           <span aria-hidden="true">→</span>
         </button>
@@ -228,26 +224,255 @@ function TrescKarty({ tekst, nasza }: { tekst: string; nasza: boolean }) {
   </>;
 }
 
-/** Zdjęcia w kolumnie ekranu: `pokaz` przewija do zdjęcia, `znak` podaje numer `Z1`. */
-export interface ZdjeciaObok {
-  pokaz: (zalacznikId: number) => void;
-  znak?: (zalacznikId: number) => string | null;
+/* ── AUTOMAT ALLEGRO TO ZDARZENIE, NIE WYPOWIEDŹ ─────────────────────────────
+   Makieta właściciela: wiadomość automatu stoi cienkim wierszem z ikoną
+   w kółku, krótką nazwą i czasem po prawej, bez dymka. Automat nie jest
+   rozmówcą, więc dymek obok klienta i doradcy udawałby trzecią osobę
+   w rozmowie i zabierał jej wysokość.
+
+   NAZWA Z TREŚCI, PEŁNA TREŚĆ POD ROZWINIĘCIEM. Rozpoznajemy po słowach,
+   bo Allegro nie nadaje automatom rodzaju. Wzorców nie sprawdzono na żywych
+   treściach, więc pomyłka kosztuje najwyżej ogólną nazwę: pełne zdanie,
+   z odnośnikiem do formularza, stoi zawsze jedno kliknięcie dalej.
+
+   KOLEJNE AUTOMATY POD RZĄD TO JEDEN WIERSZ. Etykieta i nadanie tej samej
+   paczki to jedna historia, a dwa wiersze to dwa miejsca do przeczytania.
+   Przypomnienie o terminie stoi osobno, bo niesie barwę uwagi, a w złożonym
+   wierszu by ją zgubiło. */
+
+export type RodzajAutomatu = "termin" | "etykieta" | "nadanie" | "doreczenie" | "inny";
+
+export interface Automat {
+  rodzaj: RodzajAutomatu;
+  nazwa: string;
+  /** Fakt wyciągnięty z treści, gdy jest; inaczej `null`. */
+  fakt: string | null;
+  /** Numer przesyłki: pierwszy ciąg co najmniej dziesięciu cyfr. */
+  numer: string | null;
 }
 
-/* ── DWIE DROGI ZDJĘĆ, NIGDY OBIE NARAZ ─────────────────────────────────────
-   `kolumnaZdjec` rysuje kolumnę zdjęć SAMA rozmowa — tak ma ją ekran dyskusji,
-   który poza zdjęciami nie ma obok czego postawić. `zdjeciaObok` oddaje
-   kolumnę ekranowi reklamacji, bo tam obok zdjęć stoją dowody biura i to, co
-   wysłaliśmy. Obie naraz dałyby dwie kolumny tych samych zdjęć, więc typ
-   pozwala na jedną z nich. */
-type ZdjeciaCzatu =
-  | { kolumnaZdjec?: boolean; zdjeciaObok?: undefined }
-  | { kolumnaZdjec?: false; zdjeciaObok?: ZdjeciaObok };
+/* Dziesięć cyfr to najkrótszy numer listu przewoźników w Polsce. Krótszy
+   ciąg bywa kwotą, kodem pocztowym albo numerem sprawy. */
+const NUMER = /(?<!\d)\d{10,}(?!\d)/;
+const DNI = /(\d+)\s*(?:dni|dzień|dnia)\b/i;
+
+/** Co mówi wiadomość automatu: rodzaj, krótka nazwa, wyciągnięty fakt i numer paczki. */
+export function rozpoznajAutomat(tresc: string): Automat {
+  const t = tresc.toLowerCase();
+  const numer = tresc.match(NUMER)?.[0] ?? null;
+  if (/etykiet/.test(t)) return { rodzaj: "etykieta", nazwa: "Etykieta wygenerowana", fakt: null, numer };
+  if (/nadan|nadał/.test(t)) return { rodzaj: "nadanie", nazwa: "Paczka nadana", fakt: null, numer };
+  const dni = tresc.match(DNI);
+  if (dni && /decyzj|rozpatrz|odpowied|termin/.test(t)) {
+    const n = Number(dni[1]);
+    return { rodzaj: "termin", nazwa: "Przypomnienie Allegro", numer,
+      fakt: `do decyzji ${odmien(n, "został", "zostały", "zostało")} ${dniSlowo(n)}` };
+  }
+  if (/doręcz|dostarcz/.test(t)) return { rodzaj: "doreczenie", nazwa: "Paczka doręczona", fakt: null, numer };
+  /* Pierwsze zdanie jako fakt: tyle mieści się w wierszu, a resztę ucina
+     klasa `truncate`, nie nożyczki na napisie. */
+  const zdanie = tresc.trim().split(/(?<=[.!?])\s/)[0] ?? "";
+  return { rodzaj: "inny", nazwa: "Automat Allegro", fakt: zdanie || null, numer };
+}
+
+const IKONA_AUTOMATU: Record<RodzajAutomatu, LucideIcon> = {
+  termin: Clock, etykieta: Ticket, nadanie: Package, doreczenie: PackageCheck, inny: Bot,
+};
+
+/** Chwila w wierszu zdarzenia — „05.10, 09:00”, jak na makiecie. */
+const chwila = (v: string | null | undefined) => (v ? `${dzienMiesiac(v)}, ${godzina(v)}` : "");
+
+/* Grupa w jednym dniu mówi dzień raz: „30.09, 13:39–14:16”. */
+function zakresChwil(od: string | null, doo: string | null): string {
+  if (!od || !doo || od === doo) return chwila(od ?? doo);
+  return dzienMiesiac(od) === dzienMiesiac(doo)
+    ? `${dzienMiesiac(od)}, ${godzina(od)}–${godzina(doo)}` : `${chwila(od)} – ${chwila(doo)}`;
+}
+
+/**
+ * Numer przesyłki jako chip do skopiowania.
+ *
+ * Skrócony W ŚRODKU, bo numer listu rozpoznaje się po początku (przewoźnik)
+ * i po końcu (to, co dyktuje klient). Pełny numer stoi w nazwie i w dymku.
+ * Kopiuje `kopiujDoSchowka`, bo biuro pracuje po zwykłym HTTP.
+ */
+export function NumerPrzesylki({ numer }: { numer: string }) {
+  const [stan, setStan] = useState<"gotowe" | "zrobione" | "blad">("gotowe");
+  const kopiuj = () => {
+    void kopiujDoSchowka(numer).then((udalo) => {
+      setStan(udalo ? "zrobione" : "blad");
+      setTimeout(() => setStan("gotowe"), udalo ? 1500 : 3000);
+    });
+  };
+  const skrot = numer.length > 16 ? `${numer.slice(0, 10)}…${numer.slice(-6)}` : numer;
+  return <>
+    <button type="button" onClick={kopiuj} title={numer} aria-label={`Kopiuj numer przesyłki ${numer}`}
+      className={`inline-flex min-h-6 items-center gap-1.5 rounded-md border px-2 font-mono text-xs text-wertis-ink ${
+        stan === "zrobione" ? "border-ranga-ok bg-emerald-50"
+          : stan === "blad" ? "border-ranga-zle bg-white" : "border-slate-200 bg-white"}`}>
+      <span>{skrot}</span>
+      {stan === "zrobione" ? <Check size={13} aria-hidden="true" /> : <Copy size={13} aria-hidden="true" />}
+    </button>
+    {/* Skutek kliknięcia mówi się poza przyciskiem: nazwa przycisku z
+        `aria-label` zasłoniłaby zmianę w jego środku. */}
+    <span className="sr-only" aria-live="polite">
+      {stan === "zrobione" ? "Numer skopiowany" : stan === "blad" ? "Nie udało się skopiować numeru" : ""}</span>
+  </>;
+}
+
+function WierszAutomatow({ lista, dodatki }: {
+  lista: WiadomoscReklamacji[];
+  /** Załączniki automatu: odnośniki i pliki rysuje rozmowa, bo zna kolumnę zdjęć. */
+  dodatki: (w: WiadomoscReklamacji) => React.ReactNode;
+}) {
+  const [otwarty, setOtwarty] = useState(false);
+  const rozpoznane = lista.map((w) => rozpoznajAutomat(w.tresc));
+  const pierwszy = rozpoznane[0];
+  const termin = pierwszy.rodzaj === "termin";
+  const Ikona = IKONA_AUTOMATU[pierwszy.rodzaj];
+  const nazwa = rozpoznane.map((a, i) => (i ? a.nazwa.toLowerCase() : a.nazwa)).join(" → ");
+  const fakt = lista.length === 1 ? pierwszy.fakt : null;
+  const numer = rozpoznane.find((a) => a.numer)?.numer ?? null;
+  return <li className="flex flex-col gap-0.5">
+    <button type="button" aria-expanded={otwarty} onClick={() => setOtwarty((o) => !o)}
+      className="flex min-h-9 w-full items-center gap-2.5 rounded-lg px-1 py-0.5 text-left hover:bg-slate-50">
+      <span aria-hidden="true" className={`flex h-7 w-7 flex-none items-center justify-center rounded-full border ${
+        termin ? "border-amber-200 bg-amber-50 text-ranga-uwaga" : "border-slate-200 bg-white text-slate-600"}`}>
+        <Ikona size={15} />
+      </span>
+      <span className={`min-w-0 truncate text-sm ${termin ? "text-ranga-uwaga" : "text-slate-600"}`}>
+        <b className={`font-semibold ${termin ? "" : "text-wertis-ink"}`}>{nazwa}</b>
+        {fakt && <> · {fakt}</>}
+      </span>
+      <span className="flex-1" />
+      <span className="whitespace-nowrap text-xs text-slate-600">
+        {zakresChwil(lista[0].utworzonoAt, lista[lista.length - 1].utworzonoAt)}</span>
+      <ChevronRight size={16} aria-hidden="true"
+        className={`flex-none text-slate-500 transition-transform ${otwarty ? "rotate-90" : ""}`} />
+    </button>
+    {numer && <div className="flex items-center gap-2 pl-[42px] text-xs text-slate-600">
+      <span>Nr przesyłki</span><NumerPrzesylki numer={numer} />
+    </div>}
+    {otwarty && <ol className="ml-[17px] mt-1 flex flex-col gap-2 border-l-2 border-slate-200 pl-6">
+      {lista.map((w, i) => {
+        const a = rozpoznane[i];
+        const IkonaWpisu = IKONA_AUTOMATU[a.rodzaj];
+        return <li key={w.id} className="text-sm">
+          <div className="flex min-h-7 items-center gap-2">
+            <IkonaWpisu size={14} aria-hidden="true" className="flex-none text-slate-500" />
+            <span className="font-semibold text-wertis-ink">{a.nazwa}</span>
+            <span className="flex-1" />
+            <span className="whitespace-nowrap text-xs text-slate-600">{chwila(w.utworzonoAt)}</span>
+          </div>
+          <Tresc tekst={w.tresc} className="text-sm text-slate-700" />
+          {dodatki(w)}
+        </li>;
+      })}
+    </ol>}
+  </li>;
+}
+
+/* ── PRZESYŁKI NA OSI (makieta „Przesyłki”) ─────────────────────────────────
+   Od nas: pełne niebieskie koło ze strzałką na zewnątrz, po prawej, po
+   stronie sklepu. Od klienta: puste szare koło ze strzałką do środka, po
+   lewej. Kierunek niosą strona, kształt i słowo, więc barwa nie stoi sama. */
+
+const TLO_RANGI = {
+  nic: "bg-slate-100 text-slate-700",
+  uwaga: "bg-amber-50 text-ranga-uwaga",
+  ok: "bg-emerald-50 text-ranga-ok",
+  zle: "bg-red-50 text-ranga-zle",
+} as const;
+
+function napisPlakietki(z: ZdarzeniePrzesylki): string | null {
+  if (!z.plakietka) return null;
+  const { etykieta } = PLAKIETKA_PRZESYLKI[z.plakietka];
+  if (z.plakietka !== "doreczona") return etykieta;
+  /* Czas stanu znamy tylko przy doręczeniu. Inne plakietki zostają bez
+     godziny, bo godzina nadania pod nimi opisywałaby inny stan. */
+  const komu = z.kierunek === "od_nas" ? "klientowi" : "do nas";
+  return `${etykieta} ${komu}${z.stanAt ? ` ${chwila(z.stanAt)}` : ""}`;
+}
+
+function WierszPrzesylki({ z }: { z: ZdarzeniePrzesylki }) {
+  const odNas = z.kierunek === "od_nas";
+  const napis = napisPlakietki(z);
+  const ranga = z.plakietka ? PLAKIETKA_PRZESYLKI[z.plakietka].ranga : "nic";
+  const plakietka = napis && <span className={`whitespace-nowrap rounded-full px-2 py-px text-xs font-bold ${
+    TLO_RANGI[ranga]}`}>{napis}</span>;
+  const kolo = odNas
+    ? <span aria-hidden="true" title="Przesyłka od nas do klienta"
+        className="flex h-7 w-7 flex-none items-center justify-center rounded-full bg-blue-700 text-white">
+        <ArrowUpRight size={14} strokeWidth={2.6} /></span>
+    : <span aria-hidden="true" title="Przesyłka od klienta do nas"
+        className="flex h-7 w-7 flex-none items-center justify-center rounded-full border-2 border-slate-400 bg-white text-slate-700">
+        <ArrowDownLeft size={14} strokeWidth={2.6} /></span>;
+  const opis = <span className={`text-sm text-slate-600 ${odNas ? "text-right" : ""}`}>
+    <b className="font-semibold text-wertis-ink">{odNas ? "Od nas" : "Od klienta"}</b>
+    {` · ${z.opis}`}{z.przewoznik && ` · ${z.przewoznik}`}</span>;
+  const dopiski = [z.nadanoAt && `nadana ${chwila(z.nadanoAt)}`, z.uwaga].filter(Boolean).join(" · ");
+  return <li aria-label={odNas ? "Przesyłka od nas do klienta" : "Przesyłka od klienta do nas"}
+    className={`flex max-w-[86%] flex-col gap-1 ${odNas ? "items-end self-end" : "items-start self-start"}`}>
+    <div className="flex min-h-8 flex-wrap items-center gap-2.5">
+      {odNas ? <>{plakietka}{opis}{kolo}</> : <>{kolo}{opis}{plakietka}</>}
+    </div>
+    {(z.waybill || dopiski) && <div className={`flex flex-wrap items-center gap-2 text-xs text-slate-600 ${
+      odNas ? "pr-[38px]" : "pl-[38px]"}`}>
+      {z.waybill && <><span>Nr</span><NumerPrzesylki numer={z.waybill} /></>}
+      {dopiski && <span>{z.waybill ? `· ${dopiski}` : dopiski}</span>}
+    </div>}
+  </li>;
+}
+
+/* Wpis osi: wiadomość, złożony wiersz automatów albo przesyłka. */
+type WpisOsi =
+  | { typ: "wiadomosc"; w: WiadomoscReklamacji }
+  | { typ: "automaty"; lista: WiadomoscReklamacji[] }
+  | { typ: "przesylka"; z: ZdarzeniePrzesylki };
+
+const msOd = (v: string | null) => (v ? Date.parse(v) : NaN);
+
+/**
+ * Oś po czasie: wiadomości w kolejności rozmowy, przesyłki wstawione między
+ * nie według chwili, automaty pod rząd złożone w jeden wiersz.
+ *
+ * Przesyłka bez chwili stoi na końcu, bo to stan bieżący. Przesyłka starsza
+ * od pierwszej widocznej wiadomości chowa się razem ze zwiniętymi, inaczej
+ * stanęłaby na górze w złym miejscu historii.
+ */
+export function ulozOs(wiadomosci: WiadomoscReklamacji[], zdarzenia: ZdarzeniePrzesylki[],
+  odChwili: string | null = null): WpisOsi[] {
+  const prog = msOd(odChwili);
+  const zDatą = zdarzenia.filter((z) => z.moment !== null && !(msOd(z.moment) < prog))
+    .sort((a, b) => msOd(a.moment) - msOd(b.moment));
+  const bezDaty = zdarzenia.filter((z) => z.moment === null);
+  const os: WpisOsi[] = [];
+  let k = 0;
+  for (const w of wiadomosci) {
+    const t = msOd(w.utworzonoAt);
+    /* Równa chwila zostawia wiadomość pierwszą: to ona zwykle ogłasza paczkę. */
+    while (k < zDatą.length && msOd(zDatą[k].moment) < t) os.push({ typ: "przesylka", z: zDatą[k++] });
+    const poprzedni = os[os.length - 1];
+    const automat = w.autorRola === "SYSTEM";
+    if (automat && poprzedni?.typ === "automaty"
+      && rozpoznajAutomat(poprzedni.lista[0].tresc).rodzaj !== "termin"
+      && rozpoznajAutomat(w.tresc).rodzaj !== "termin") {
+      poprzedni.lista.push(w);
+    } else {
+      os.push(automat ? { typ: "automaty", lista: [w] } : { typ: "wiadomosc", w });
+    }
+  }
+  for (; k < zDatą.length; k++) os.push({ typ: "przesylka", z: zDatą[k] });
+  for (const z of bezDaty) os.push({ typ: "przesylka", z });
+  return os;
+}
 
 export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = false,
-  zwinStarsze, bursztynTylkoOstatniej = false, kolumnaZdjec = false, zdjeciaObok }: ZdjeciaCzatu & {
+  zwinStarsze, bursztynTylkoOstatniej = false, kolumnaZdjec = false, zdarzenia = [] }: {
   sprawa: SprawaCzatu;
   czat: WiadomoscReklamacji[];
+  /** Przesyłki sprawy (`zdarzeniaPrzesylek`) — staną na osi według chwili. */
+  zdarzenia?: ZdarzeniePrzesylki[];
   /** Załączniki SAMEJ sprawy — te spoza rozmowy. */
   zalaczniki: ZalacznikReklamacji[];
   /* Edytor wstrzykiwany, nie wołany stąd: cały katalog `reklamacje/` trzyma
@@ -262,6 +487,9 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
   zwinStarsze?: number;
   /** Bursztyn tylko na ostatniej wiadomości klienta, starsze cichną. */
   bursztynTylkoOstatniej?: boolean;
+  /* Kolumnę zdjęć rysuje sama rozmowa, bo ekran dyskusji poza zdjęciami nie
+     ma obok czego postawić. */
+  kolumnaZdjec?: boolean;
 }) {
   /* Ile wiadomości Allegro widzi, a ilu jeszcze nie mamy. Rozmowa dociąga się
      taktem synchronizacji, więc świeża sprawa bywa przez chwilę niepełna —
@@ -352,17 +580,15 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
      wiadomości. Plik bez podglądu zostaje w wątku: to jedna linia z nazwą,
      a odnośnik do niej byłby tej samej wysokości.
 
-     Kolumnę rysuje rozmowa (`kolumnaZdjec`, prawa ćwiartka) albo ekran
-     (`zdjeciaObok`). Własna kolumna rozmowy przewija się osobno, bo zdjęć
-     bywa więcej niż wiadomości, a bez zdjęć nie ma jej wcale, żeby rozmowa
-     nie traciła ćwiartki na pustkę. */
+     Kolumnę rysuje rozmowa (`kolumnaZdjec`, prawa ćwiartka). Przewija się
+     osobno, bo zdjęć bywa więcej niż wiadomości. Bez zdjęć nie ma jej wcale,
+     żeby rozmowa nie traciła ćwiartki na pustkę. */
   const przedrostek = useId();
   const idZdjecia = (z: number) => `${przedrostek}-zdjecie-${z}`;
-  const wlasnaKolumna = kolumnaZdjec && !zdjeciaObok;
   const zdjecia = (lista: ZalacznikReklamacji[]) => lista.filter((z) => z.podglad);
   const pliki = (lista: ZalacznikReklamacji[]) =>
-    wlasnaKolumna || zdjeciaObok ? lista.filter((z) => !z.podglad) : lista;
-  const grupyZdjec = !wlasnaKolumna ? [] : [
+    kolumnaZdjec ? lista.filter((z) => !z.podglad) : lista;
+  const grupyZdjec = !kolumnaZdjec ? [] : [
     { klucz: "zgloszenie", podpis: "Zgłoszenie", lista: zdjecia(zalaczniki) },
     ...czat.map((w) => ({
       klucz: `w-${w.id}`,
@@ -378,11 +604,10 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
     el?.scrollIntoView?.({ block: "nearest" });
     el?.focus();
   };
-  const odnosniki = (lista: ZalacznikReklamacji[]) => zdjeciaObok
-    ? <OdnosnikiZdjec lista={zdjecia(lista)} onPokaz={zdjeciaObok.pokaz} znak={zdjeciaObok.znak} />
-    : zKolumna ? <OdnosnikiZdjec lista={zdjecia(lista)} onPokaz={pokazZdjecie} /> : null;
+  const odnosniki = (lista: ZalacznikReklamacji[]) =>
+    zKolumna ? <OdnosnikiZdjec lista={zdjecia(lista)} onPokaz={pokazZdjecie} /> : null;
   const sekcjaZgloszenia = opisWart || pliki(zalaczniki).length > 0
-    || ((zKolumna || Boolean(zdjeciaObok)) && zdjecia(zalaczniki).length > 0);
+    || (zKolumna && zdjecia(zalaczniki).length > 0);
 
   const zgloszenie = sekcjaZgloszenia &&
     <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">
@@ -432,7 +657,12 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
           {ile(schowanych, "wcześniejsza wiadomość", "wcześniejsze wiadomości", "wcześniejszych wiadomości")}
         </button>}
         <ol className="flex flex-col gap-2">
-          {widoczne.map((w) => {
+          {ulozOs(widoczne, zdarzenia, schowanych > 0 ? widoczne[0]?.utworzonoAt ?? null : null).map((wpis) => {
+            if (wpis.typ === "przesylka") return <WierszPrzesylki key={wpis.z.klucz} z={wpis.z} />;
+            if (wpis.typ === "automaty") return <WierszAutomatow key={`a-${wpis.lista[0].id}`} lista={wpis.lista}
+              dodatki={(w) => <>{odnosniki(w.zalaczniki)}
+                <Zalaczniki reklamacjaId={sprawa.id} lista={pliki(w.zalaczniki)} /></>} />;
+            const { w } = wpis;
             /* Rola spoza zbioru dostaje kształt NIEZNANEGO, a nie kształt
                klienta: schemat Allegro może dołożyć wartość, a wtedy ekran ma
                powiedzieć „nie wiem, kto to", zamiast zgadywać stronę. */
