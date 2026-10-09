@@ -124,32 +124,23 @@ function Zalaczniki({ reklamacjaId, lista }: {
  *
  * Wiadomość zachowuje MIEJSCE zdjęcia w wątku, ale nie jego wysokość. Agent
  * widzi, że klient coś przysłał właśnie tu, a kliknięcie pokazuje to zdjęcie
- * w kolumnie i przenosi na nie fokus. Znak `Z1` jest tym samym, którym
- * dowody biura odsyłają do zdjęcia, więc wątek i wpis mówią jednym numerem.
+ * w kolumnie i przenosi na nie fokus.
  */
-function OdnosnikiZdjec({ lista, onPokaz, znak }: {
+function OdnosnikiZdjec({ lista, onPokaz }: {
   lista: ZalacznikReklamacji[]; onPokaz: (id: number) => void;
-  znak?: (id: number) => string | null;
 }) {
   if (!lista.length) return null;
   return <ul className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs">
     {lista.map((z) => {
       const nazwa = z.nazwa || "zdjęcie";
-      const numer = znak?.(z.id) ?? null;
-      /* WIDOCZNY TEKST NA POCZĄTKU NAZWY (WCAG 2.5.3). Z numerem przycisk
-         pokazuje „Z1 usterka.jpg", więc tak zaczyna się jego nazwa, a sterujący
-         głosem mówi „kliknij Z1". Bez numeru nazwa zostaje jak w dyskusjach,
-         bo tam widoczny tekst to sama nazwa pliku i reguła jest spełniona. */
-      const etykieta = numer ? `${numer} ${nazwa} — pokaż zdjęcie w kolumnie`
-        : `Pokaż zdjęcie w kolumnie: ${nazwa}`;
+      /* Widoczny tekst to sama nazwa pliku i nazwa przycisku ją zawiera,
+         więc sterujący głosem trafia w przycisk (WCAG 2.5.3). */
+      const etykieta = `Pokaż zdjęcie w kolumnie: ${nazwa}`;
       return <li key={z.id} className="min-w-0">
         <button type="button" onClick={() => onPokaz(z.id)} aria-label={etykieta}
           className="inline-flex min-h-6 max-w-full items-center gap-1 font-semibold text-slate-700
             underline underline-offset-2 hover:text-slate-900">
           <Image size={12} aria-hidden="true" className="shrink-0 text-slate-500" />
-          {/* Spacja jest dla tekstu przycisku, nie dla układu: flex jej nie
-              rysuje, a „Z1 usterka.jpg" czyta się jako dwa słowa. */}
-          {numer && <><span className="shrink-0 tabular-nums">{numer}</span>{" "}</>}
           <span className="truncate">{nazwa}</span>
           <span aria-hidden="true">→</span>
         </button>
@@ -232,22 +223,6 @@ function TrescKarty({ tekst, nasza }: { tekst: string; nasza: boolean }) {
       pokaż całość — formularz Allegro z adresem do zwrotu</button>
   </>;
 }
-
-/** Zdjęcia w kolumnie ekranu: `pokaz` przewija do zdjęcia, `znak` podaje numer `Z1`. */
-export interface ZdjeciaObok {
-  pokaz: (zalacznikId: number) => void;
-  znak?: (zalacznikId: number) => string | null;
-}
-
-/* ── DWIE DROGI ZDJĘĆ, NIGDY OBIE NARAZ ─────────────────────────────────────
-   `kolumnaZdjec` rysuje kolumnę zdjęć SAMA rozmowa — tak ma ją ekran dyskusji,
-   który poza zdjęciami nie ma obok czego postawić. `zdjeciaObok` oddaje
-   kolumnę ekranowi reklamacji, bo tam obok zdjęć stoją dowody biura i to, co
-   wysłaliśmy. Obie naraz dałyby dwie kolumny tych samych zdjęć, więc typ
-   pozwala na jedną z nich. */
-type ZdjeciaCzatu =
-  | { kolumnaZdjec?: boolean; zdjeciaObok?: undefined }
-  | { kolumnaZdjec?: false; zdjeciaObok?: ZdjeciaObok };
 
 /* ── AUTOMAT ALLEGRO TO ZDARZENIE, NIE WYPOWIEDŹ ─────────────────────────────
    Makieta właściciela: wiadomość automatu stoi cienkim wierszem z ikoną
@@ -493,7 +468,7 @@ export function ulozOs(wiadomosci: WiadomoscReklamacji[], zdarzenia: ZdarzeniePr
 }
 
 export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = false,
-  zwinStarsze, bursztynTylkoOstatniej = false, kolumnaZdjec = false, zdjeciaObok, zdarzenia = [] }: ZdjeciaCzatu & {
+  zwinStarsze, bursztynTylkoOstatniej = false, kolumnaZdjec = false, zdarzenia = [] }: {
   sprawa: SprawaCzatu;
   czat: WiadomoscReklamacji[];
   /** Przesyłki sprawy (`zdarzeniaPrzesylek`) — staną na osi według chwili. */
@@ -512,6 +487,9 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
   zwinStarsze?: number;
   /** Bursztyn tylko na ostatniej wiadomości klienta, starsze cichną. */
   bursztynTylkoOstatniej?: boolean;
+  /* Kolumnę zdjęć rysuje sama rozmowa, bo ekran dyskusji poza zdjęciami nie
+     ma obok czego postawić. */
+  kolumnaZdjec?: boolean;
 }) {
   /* Ile wiadomości Allegro widzi, a ilu jeszcze nie mamy. Rozmowa dociąga się
      taktem synchronizacji, więc świeża sprawa bywa przez chwilę niepełna —
@@ -602,17 +580,15 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
      wiadomości. Plik bez podglądu zostaje w wątku: to jedna linia z nazwą,
      a odnośnik do niej byłby tej samej wysokości.
 
-     Kolumnę rysuje rozmowa (`kolumnaZdjec`, prawa ćwiartka) albo ekran
-     (`zdjeciaObok`). Własna kolumna rozmowy przewija się osobno, bo zdjęć
-     bywa więcej niż wiadomości, a bez zdjęć nie ma jej wcale, żeby rozmowa
-     nie traciła ćwiartki na pustkę. */
+     Kolumnę rysuje rozmowa (`kolumnaZdjec`, prawa ćwiartka). Przewija się
+     osobno, bo zdjęć bywa więcej niż wiadomości. Bez zdjęć nie ma jej wcale,
+     żeby rozmowa nie traciła ćwiartki na pustkę. */
   const przedrostek = useId();
   const idZdjecia = (z: number) => `${przedrostek}-zdjecie-${z}`;
-  const wlasnaKolumna = kolumnaZdjec && !zdjeciaObok;
   const zdjecia = (lista: ZalacznikReklamacji[]) => lista.filter((z) => z.podglad);
   const pliki = (lista: ZalacznikReklamacji[]) =>
-    wlasnaKolumna || zdjeciaObok ? lista.filter((z) => !z.podglad) : lista;
-  const grupyZdjec = !wlasnaKolumna ? [] : [
+    kolumnaZdjec ? lista.filter((z) => !z.podglad) : lista;
+  const grupyZdjec = !kolumnaZdjec ? [] : [
     { klucz: "zgloszenie", podpis: "Zgłoszenie", lista: zdjecia(zalaczniki) },
     ...czat.map((w) => ({
       klucz: `w-${w.id}`,
@@ -628,11 +604,10 @@ export function Czat({ sprawa, czat, zalaczniki, edytor, przypnijZgloszenie = fa
     el?.scrollIntoView?.({ block: "nearest" });
     el?.focus();
   };
-  const odnosniki = (lista: ZalacznikReklamacji[]) => zdjeciaObok
-    ? <OdnosnikiZdjec lista={zdjecia(lista)} onPokaz={zdjeciaObok.pokaz} znak={zdjeciaObok.znak} />
-    : zKolumna ? <OdnosnikiZdjec lista={zdjecia(lista)} onPokaz={pokazZdjecie} /> : null;
+  const odnosniki = (lista: ZalacznikReklamacji[]) =>
+    zKolumna ? <OdnosnikiZdjec lista={zdjecia(lista)} onPokaz={pokazZdjecie} /> : null;
   const sekcjaZgloszenia = opisWart || pliki(zalaczniki).length > 0
-    || ((zKolumna || Boolean(zdjeciaObok)) && zdjecia(zalaczniki).length > 0);
+    || (zKolumna && zdjecia(zalaczniki).length > 0);
 
   const zgloszenie = sekcjaZgloszenia &&
     <section className="rounded-lg border border-slate-200 bg-slate-50 p-3">

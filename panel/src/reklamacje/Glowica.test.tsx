@@ -112,25 +112,22 @@ describe("Kto prowadzi — jedyna czynność na wierzchu", () => {
 });
 
 describe("Menu „⋮”: rzadkie czynności na jawne kliknięcie", () => {
-  it("niesie odświeżenie i pytanie o przesyłkę; nic nie woła się samo", async () => {
+  it("niesie odświeżenie z Allegro; nic nie woła się samo", async () => {
     const onOdswiez = vi.fn();
-    const onSprawdzPrzesylke = vi.fn();
-    glowica({ przesylka: PRZESYLKA }, {}, { onOdswiez, onSprawdzPrzesylke });
+    glowica({ przesylka: PRZESYLKA }, {}, { onOdswiez });
     expect(onOdswiez).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Więcej działań" }));
     const menu = screen.getByRole("menu", { name: "Więcej działań" });
     await userEvent.click(within(menu).getByRole("menuitem", { name: "Odśwież z Allegro" }));
     expect(onOdswiez).toHaveBeenCalledTimes(1);
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Więcej działań" }));
-    await userEvent.click(screen.getByRole("menuitem", { name: "Sprawdź przesyłkę" }));
-    expect(onSprawdzPrzesylke).toHaveBeenCalledTimes(1);
   });
 
-  it("bez zamówienia nie ma przesyłki, o którą można zapytać", async () => {
-    glowica({ przesylka: null }, {}, { onOdswiez: vi.fn(), onSprawdzPrzesylke: vi.fn() });
+  it("pytania o przesyłkę w menu nie ma — stoi raz, przy przesyłce", async () => {
+    glowica({ przesylka: PRZESYLKA }, {}, { onOdswiez: vi.fn() });
     await userEvent.click(screen.getByRole("button", { name: "Więcej działań" }));
-    expect(screen.queryByRole("menuitem", { name: "Sprawdź przesyłkę" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("menuitem")).toHaveLength(1);
+    expect(screen.queryByRole("menuitem", { name: /przesyłk/ })).not.toBeInTheDocument();
   });
 
   it("Escape zamyka menu i oddaje fokus przyciskowi", async () => {

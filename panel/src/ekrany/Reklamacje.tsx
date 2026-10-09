@@ -50,8 +50,8 @@ import { klawiszZajety } from "../nawigacja/fokus";
    w skrzynce. Stanowisko o towarze dostaje TEN SAM triage (`dopisek()`).
 
    Klawiatura działa bez podpowiedzi na ekranie: strzałki i j/k chodzą po
-   kolejce, cyfry przełączają kubełek, m i n — sito. Odruch zostaje, a miejsce
-   po podpowiedziach oddaliśmy liście. */
+   kolejce, cyfry przełączają kubełek, m i n — sito. Podpowiedzi nie stoją,
+   bo skrót zna się z odruchu, a ich miejsce należy do listy. */
 
 /* Na szerokim oknie trzy kolumny w siatce, każda z własnym przewijaniem.
    Poniżej `xl` ten sam kontener jest flexem z zawijaniem, więc kolumny same
@@ -467,13 +467,7 @@ export function Reklamacje() {
                   prowadze.mutate({ id: r.id, wersja: r.wersja },
                     { onError: (e) => setBladProwadze((e as Error).message) });
                 }}
-                onOdswiez={() => odswiez.mutate({ id: r.id })} odswieza={odswiez.isPending}
-                sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
-                onSprawdzPrzesylke={() => {
-                  setBladPrzesylki("");
-                  sprawdzPrzesylke.mutate({ id: r.id },
-                    { onError: (e) => setBladPrzesylki((e as Error).message) });
-                }} />
+                onOdswiez={() => odswiez.mutate({ id: r.id })} odswieza={odswiez.isPending} />
               <DrogaSprawy szczegol={d} />
               <div className="flex min-h-0 flex-1 flex-col border-t border-slate-200">
                 <Czat

@@ -2,9 +2,9 @@ import type { SladHistorii } from "../api/typy";
 import { ile, odmien } from "../ui";
 
 /* ── Słowa o stanie sprawy, wspólne dla głowicy i karty produktu ─────────────
-   Zostały tu dwie funkcje, bo każda ma więcej niż jednego czytelnika albo
-   regułę języka, której nie wolno przepisywać na miejscu. Etap sprawy rysuje
-   droga pod głowicą (`DrogaSprawy.tsx`), więc zdań etapu tu już nie ma. */
+   Stoją tu funkcje, które mają więcej niż jednego czytelnika albo regułę
+   języka, której nie wolno przepisywać na miejscu. Zdania o etapie sprawy
+   mieszkają w `DrogaSprawy.tsx`, bo etap rysuje wyłącznie droga pod głowicą. */
 
 /** Podpowiedź plakietki statusu: dokładna wartość Allegro zostaje pod kursorem. */
 export const tytulStatusu = (kod: string | null): string =>

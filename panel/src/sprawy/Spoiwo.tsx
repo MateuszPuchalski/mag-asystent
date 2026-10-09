@@ -120,3 +120,55 @@ export function DrogaZakupu({ droga, tutaj, wSekcji = false }: {
     {pasek}
   </section>;
 }
+
+/** Inna sprawa tego zakupu: z której kolejki, która i od kiedy. */
+export interface InnaSprawaZakupu {
+  rodzaj: PrzystanekDrogi["rodzaj"];
+  id: number;
+  at: string;
+}
+
+/**
+ * Wszystkie sprawy tego zakupu poza bieżącą, każda raz.
+ *
+ * Droga i rodzeństwo pokrywają się przy dyskusjach i reklamacjach, więc
+ * sprawa z obu list staje jeden raz. Kolejność idzie za drogą, bo ta jest
+ * już ułożona w czasie; rodzeństwo spoza drogi dochodzi na końcu.
+ */
+export function inneSprawyZakupu(droga: PrzystanekDrogi[], sprawy: SprawaZakupu[],
+  tutaj: { rodzaj: PrzystanekDrogi["rodzaj"]; id: number }): InnaSprawaZakupu[] {
+  const byly = new Set([`${tutaj.rodzaj}-${tutaj.id}`]);
+  const wynik: InnaSprawaZakupu[] = [];
+  const dodaj = (s: InnaSprawaZakupu) => {
+    const klucz = `${s.rodzaj}-${s.id}`;
+    if (byly.has(klucz)) return;
+    byly.add(klucz);
+    wynik.push(s);
+  };
+  for (const p of droga) dodaj({ rodzaj: p.rodzaj, id: p.id, at: p.at });
+  for (const s of sprawy) dodaj({ rodzaj: rodzajSprawy(s.typ), id: s.id, at: s.otwartoAt });
+  return wynik;
+}
+
+/**
+ * Sprawy tego zakupu w jednym wierszu karty, bez własnego nagłówka.
+ *
+ * Ten sam kształt odnośnika co na drodze zakupu, żeby agent poznawał go
+ * bez nauki. Pustej listy nie rysuje: brak innych spraw nie jest faktem
+ * wartym wiersza.
+ */
+export function SprawyWWierszu({ lista }: { lista: InnaSprawaZakupu[] }) {
+  if (lista.length === 0) return null;
+  return <ul className="flex flex-wrap items-center gap-1 text-xs">
+    {lista.map((s) => {
+      const { nazwa, ikona: Ikona, sciezka } = KOLEJKI[s.rodzaj];
+      return <li key={`${s.rodzaj}-${s.id}`}>
+        <Link to={`${sciezka}/${s.id}`}
+          className="inline-flex min-h-6 items-center gap-1 rounded bg-slate-100 px-1.5 text-slate-700 hover:bg-slate-200">
+          {/* Spacja jest dla nazwy łącza, nie dla układu: flex jej nie rysuje. */}
+          <Ikona size={12} aria-hidden="true" />{nazwa}{" "}
+          <span className="text-slate-600">{czas(s.at)}</span></Link>
+      </li>;
+    })}
+  </ul>;
+}

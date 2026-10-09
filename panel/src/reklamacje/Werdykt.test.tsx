@@ -52,10 +52,9 @@ describe("Zwinięta karta: dwa duże przyciski", () => {
     expect(screen.getByRole("form", { name: "Werdykt" })).toBeInTheDocument();
   });
 
-  /* ZMIANA ŚWIADOMA. Do tej pory test pilnował, że „Uznaję” i „Odrzucam”
-     nie noszą `btn-primary`, bo bursztyn należy do wysyłki odpowiedzi. Makieta
-     właściciela daje gałęziom PEŁNE barwy rangi: zieleń i czerwień. Bursztynu
-     dalej nie ma, więc pierwsza połowa reguły zostaje; dochodzi pełna barwa. */
+  /* Gałęzie werdyktu niosą pełne barwy rangi, zieleń i czerwień, bo makieta
+     właściciela tak rozróżnia uznanie od odmowy. Bursztynu nie noszą, bo
+     należy do wysyłki odpowiedzi. */
   it("pełne barwy gałęzi z makiety, bez bursztynu wysyłki i bez prawej krawędzi", () => {
     pokaz();
     expect(przycisk("Uznaj reklamację…").className).toContain("bg-ranga-ok");

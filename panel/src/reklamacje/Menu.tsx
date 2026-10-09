@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 /* ── Menu pod przyciskiem ────────────────────────────────────────────────────
    Krótka lista czynności albo widoków, które nie zasługują na stałe miejsce
-   na ekranie. Głowica chowa tu odświeżenie i pytanie o paczkę, przełącznik
+   na ekranie. Głowica chowa tu odświeżenie z Allegro, przełącznik
    kubełków — widoki „tylko wgląd”. Jeden kształt, żeby ręka nie uczyła się
    dwóch menu na jednym ekranie.
 

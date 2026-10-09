@@ -7,6 +7,7 @@ import { STATUS_PACZKI } from "../skrzynka/statusy";
 import { PRZEWOZNICY } from "../zwroty/Dowody";
 import { ZdjecieOferty } from "../towar/Zdjecie";
 import { PrzyciskTowaru } from "../towar/Szuflada";
+import { inneSprawyZakupu, SprawyWWierszu } from "../sprawy/Spoiwo";
 import { czas, dataCyfrowa, dniSlowo, kiedy, Skopiuj } from "../ui";
 import { OCZEKIWANIA, POWODY } from "./Kolejka";
 import { PRAWO } from "./statusy";
@@ -138,6 +139,9 @@ export function Produkt({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke = fals
   const z = szczegol.zamowienie;
   const p = szczegol.przesylka;
   const poDniach = zgloszonoPoDniach(r);
+  /* Jedna droga klienta w obie strony: z reklamacji do zwrotu, pytania
+     i dyskusji tego zamówienia (`docs/obsluga-klienta-calosc.md`). */
+  const inneSprawy = inneSprawyZakupu(szczegol.droga, szczegol.sprawy, { rodzaj: "reklamacja", id: r.id });
 
   return <section aria-label="Produkt i zamówienie" className="card flex flex-col">
     <div className="flex flex-col gap-3 px-5 py-4">
@@ -161,7 +165,8 @@ export function Produkt({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke = fals
                     className="font-mono text-slate-800">{towar.symbol}</span></PrzyciskTowaru>
               /* Przy braku stoi ZDANIE serwera, nie kod powodu. */
               : <span>{szczegol.kartoteka?.zrodlo ?? "bez kartoteki"}</span>}
-            {" · "}{r.ilosc ?? 1} szt.
+            {/* Nieznana ilość milczy: jedna sztuka z domysłu udawałaby fakt. */}
+            {r.ilosc !== null && <>{" · "}{r.ilosc} szt.</>}
           </span>
           {/* Wiersz stoi wyłącznie przy karcie z Subiekta: bez niej nie wiemy,
               a „nie wiemy” przy każdej sprawie bez kartoteki to szum. */}
@@ -246,6 +251,8 @@ export function Produkt({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke = fals
             /* Bez zamówienia nie ma przesyłki, o którą można zapytać. */
             : "bez danych o przesyłce"}
         </Wiersz>
+        {/* Bez innych spraw wiersz nie staje, bo pusty nie mówi nic nowego. */}
+        {inneSprawy.length > 0 && <Wiersz nazwa="Ten zakup"><SprawyWWierszu lista={inneSprawy} /></Wiersz>}
       </dl>
     </div>
   </section>;

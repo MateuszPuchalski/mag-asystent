@@ -1624,28 +1624,6 @@ export interface OstatniaDostawaReklamacji {
   przedZakupem: boolean;
 }
 
-/** Wpis biura w kolumnie dowodów: zdanie, opcjonalnie zdjęcie, autor i chwila. */
-export interface DowodReklamacji {
-  id: number;
-  tresc: string;
-  /** Zdjęcie klienta, którego dotyczy wpis. Etykietę `Z1`, `Z2` liczy panel. */
-  zalacznikId: number | null;
-  autor: string | null;
-  utworzonoAt: string;
-}
-
-/** Reklamacja wadliwej sztuki zgłoszona przez nas u dostawcy. */
-export interface ReklamacjaUDostawcy {
-  dostawca: string;
-  nrUDostawcy: string | null;
-  zgloszonoAt: string;
-  wynik: "uznal" | "odrzucil" | null;
-  wynikAt: string | null;
-  autor: string | null;
-  /** Wersja TEGO rekordu, nie sprawy klienta. */
-  wersja: number;
-}
-
 export interface ZalacznikReklamacji {
   id: number;
   wiadomoscId: number | null;
@@ -1725,14 +1703,10 @@ export interface SzczegolReklamacji {
   karta: KartaSprawy | null;
   /** Ile razy TO SAMO już się zdarzyło (0.413.0). */
   historia: HistoriaSprawy;
-  /* Trzy pola przebudowy ekranu są opcjonalne z tego samego powodu co kwota
-     na wierszu: starszy serwer ich nie zna, a brak ma znaczyć „nie wiemy". */
+  /* Pole opcjonalne z tego samego powodu co kwota na wierszu: starszy serwer
+     go nie zna, a brak ma znaczyć „nie wiemy". */
   /** Ostatnia dostawa towaru; `null` = nie wiemy, skąd przyszła sztuka. */
   dostawa?: OstatniaDostawaReklamacji | null;
-  /** Dowody dopisane przez biuro, od najstarszego. */
-  dowody?: DowodReklamacji[];
-  /** Nasza reklamacja u dostawcy; `null`, dopóki jej nie zgłosiliśmy. */
-  uDostawcy?: ReklamacjaUDostawcy | null;
 }
 
 /** Ślad w historii: ile spraw, ile skończyło się uznaniem, ile odmową. */

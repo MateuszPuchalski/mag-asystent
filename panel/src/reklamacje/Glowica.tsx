@@ -86,7 +86,7 @@ function Prowadze({ prowadzi, moja, trwa, onProwadze }: {
 
 export function Glowica({
   szczegol, mojeId = null, trwa, blad = "", onProwadze,
-  onOdswiez, odswieza = false, onSprawdzPrzesylke, sprawdzaPrzesylke = false,
+  onOdswiez, odswieza = false,
 }: {
   szczegol: SzczegolReklamacji;
   /** Konto patrzącego — po nim „Prowadzisz” zamiast cudzego imienia. */
@@ -97,9 +97,6 @@ export function Glowica({
   /** Jawne odświeżenie sprawy z Allegro, z menu „⋮”. */
   onOdswiez?: () => void;
   odswieza?: boolean;
-  /** Pytanie Allegro o paczkę do klienta; bez zamówienia nie ma o co pytać. */
-  onSprawdzPrzesylke?: () => void;
-  sprawdzaPrzesylke?: boolean;
 }) {
   const r = szczegol.reklamacja;
   const numer = r.numer ?? r.externalId;
@@ -110,15 +107,10 @@ export function Glowica({
   const inne = szczegol.historia?.klient ?? null;
 
   /* Rzadkie czynności stoją pod „⋮”: każda to jawne kliknięcie, bo żądanie
-     u Allegro nie wychodzi z samego patrzenia. Paczki bez zamówienia nie ma
-     o co pytać, więc tej pozycji wtedy nie ma. */
-  const pozycje = [
-    ...(onOdswiez ? [{ klucz: "odswiez", napis: odswieza ? "Odświeżam…" : "Odśwież z Allegro",
-      onWybierz: onOdswiez, wylaczona: odswieza }] : []),
-    ...(onSprawdzPrzesylke && szczegol.przesylka ? [{ klucz: "przesylka",
-      napis: sprawdzaPrzesylke ? "Pytam o przesyłkę…" : "Sprawdź przesyłkę",
-      onWybierz: onSprawdzPrzesylke, wylaczona: sprawdzaPrzesylke }] : []),
-  ];
+     u Allegro nie wychodzi z samego patrzenia. Pytanie o paczkę stoi przy
+     przesyłce w karcie zamówienia, bo tam widać też jego błąd. */
+  const pozycje = onOdswiez ? [{ klucz: "odswiez", napis: odswieza ? "Odświeżam…" : "Odśwież z Allegro",
+    onWybierz: onOdswiez, wylaczona: odswieza }] : [];
 
   return <div className="flex flex-col gap-2.5 px-5 py-4">
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2">

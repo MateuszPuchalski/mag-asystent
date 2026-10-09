@@ -2,6 +2,7 @@ import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import type {
   DopasowanieKartoteki, Reklamacja, StanPrzesylki, SzczegolReklamacji, Zamowienie,
 } from "../api/typy";
@@ -15,7 +16,8 @@ import type {
    2. BRAK KARTY TO BRAK WIERSZA, nie „0 szt.” — zero przy braku wiedzy kłamie.
    3. CENY BEZ KLIKANIA, bo służą do triażu; poziom 0 (zakup) poza osią.
    4. PACZKA PYTA NA KLIKNIĘCIE — patrzenie nie wysyła żądań do Allegro.
-   5. ZAMÓWIENIE BEZ PARAGONU: numeru paragonu nie ma w danych.            */
+   5. ZAMÓWIENIE BEZ PARAGONU: numeru paragonu nie ma w danych.
+   6. JEDNA DROGA KLIENTA: z reklamacji do innych spraw tego zamówienia.  */
 
 const karta = vi.fn();
 vi.mock("../api/rozmowy", () => ({ useKartaTowaru: (twId: number | null) => karta(twId) }));
@@ -127,6 +129,13 @@ describe("Produkt: co to jest, czy mamy i ile kosztuje", () => {
     expect(screen.getByText("14-31051")).toBeInTheDocument();
     expect(screen.getByText(/1 szt\./)).toBeInTheDocument();
     expect(screen.getByText(/W Subiekcie:/)).toHaveTextContent("W Subiekcie: 7 szt. · półka D02-01-04");
+  });
+
+  it("nieznana ilość milczy — sztuka z domysłu nie staje przy symbolu", () => {
+    karta.mockReturnValue({ data: undefined, isLoading: false, error: null });
+    render(<Produkt szczegol={szczegol({}, { ilosc: null })} />);
+    expect(screen.getByText("14-31051").closest("span.text-sm")).toHaveTextContent(/^14-31051$/);
+    expect(screen.queryByText(/szt\./)).not.toBeInTheDocument();
   });
 
   it("brak na stanie mówi o sobie wprost — przy wymianie to cała decyzja", () => {
@@ -259,5 +268,33 @@ describe("Przesyłka do klienta", () => {
     render(<Produkt szczegol={szczegol({ przesylka: przesylka() })} onSprawdzPrzesylke={vi.fn()}
       bladPrzesylki="Allegro nie odpowiedziało" />);
     expect(screen.getByText("Allegro nie odpowiedziało")).toBeInTheDocument();
+  });
+});
+
+describe("Ten zakup: inne sprawy tego zamówienia", () => {
+  const przystanek = (rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot", id: number) =>
+    ({ rodzaj, id, at: "2026-09-20T10:00:00.000Z", opis: null });
+  const naTrasie = (n: Partial<SzczegolReklamacji>) =>
+    render(<MemoryRouter><Produkt szczegol={szczegol(n)} /></MemoryRouter>);
+
+  it("przystanek zwrotu i rozmowy prowadzi do swojej kolejki, bez tej reklamacji", () => {
+    naTrasie({ droga: [przystanek("rozmowa", 3), przystanek("reklamacja", 5), przystanek("zwrot", 7)] });
+    expect(screen.getByText("Ten zakup")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /^zwrot/ })).toHaveAttribute("href", "/obsluga/zwroty/7");
+    expect(screen.getByRole("link", { name: /^pytanie/ })).toHaveAttribute("href", "/obsluga/skrzynka/3");
+    expect(screen.queryByRole("link", { name: /^reklamacja/ })).not.toBeInTheDocument();
+  });
+
+  it("dyskusja z rodzeństwa i z drogi staje raz", () => {
+    const dyskusja = { id: 8, typ: "DISPUTE", numer: null, temat: null, statusAllegro: null,
+      decyzjaDo: null, otwartoAt: "2026-09-21T10:00:00.000Z", prowadzi: null, otwarta: true };
+    naTrasie({ droga: [przystanek("dyskusja", 8), przystanek("reklamacja", 5)], sprawy: [dyskusja] });
+    expect(screen.getAllByRole("link", { name: /^dyskusja/ })).toHaveLength(1);
+    expect(screen.getByRole("link", { name: /^dyskusja/ })).toHaveAttribute("href", "/obsluga/dyskusje/8");
+  });
+
+  it("bez innych spraw wiersz nie staje — także gdy droga zna tylko tę reklamację", () => {
+    naTrasie({ droga: [przystanek("reklamacja", 5)], sprawy: [] });
+    expect(screen.queryByText("Ten zakup")).not.toBeInTheDocument();
   });
 });
