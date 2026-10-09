@@ -2,18 +2,19 @@ import React from "react";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { StanReklamacji, StatystykiReklamacji } from "../api/typy";
+import type { StatystykiReklamacji } from "../api/typy";
 import { Kafle } from "./Kafle";
 
-/* ── Kafle nad kolumnami reklamacji ──────────────────────────────────────────
-   Cztery liczby dnia. Testy pilnują trzech reguł, których nie widać okiem:
+/* ── Kafle w kolejce reklamacji ──────────────────────────────────────────────
+   Cztery liczby dnia w siatce 2×2. Testy pilnują reguł, których nie widać okiem:
 
    1. BRAK DANYCH TO „—”, NIGDY ZERO. Zero przy awarii serwera agent czyta
       jako „nic nie czeka” i kończy pracę (`panel/CLAUDE.md`).
    2. TREND TYLKO PRAWDZIWY. `tydzienTemu: null` daje zdanie opisowe, a nie
       „+18 od zeszłego tygodnia” liczone od zera.
-   3. KAFEL KUBEŁKA JEST FILTREM — klik przestawia kolejkę, kafel bez
-      kubełka niczego nie udaje.                                           */
+   3. KAFEL PRACY JEST FILTREM — klik przestawia kolejkę, a średni czas
+      niczego nie udaje.
+   4. WYBÓR TO CIEMNA RAMKA, nie bursztyn.                                   */
 
 const STAT: StatystykiReklamacji = {
   doDecyzji: { teraz: 18, tydzienTemu: 12 },
@@ -22,29 +23,28 @@ const STAT: StatystykiReklamacji = {
   sredniDniDoWerdyktu: { teraz: 2.4, poprzednio: 3.3, okresDni: 30 },
 };
 
-const STAN = {
-  status: "current", alarm: false, ostatniaProba: null,
-  ostatniaUdanaSynchronizacja: "2026-10-09T12:05:00.000Z", kodOstatniegoBledu: null,
-  liczbaBledow: 0, opoznienieMs: 0, nastepnaProba: null, interwalMs: 180000,
-  pozostaloDoPobrania: 0, dyskusjiPominietych: 0,
-} as unknown as StanReklamacji;
-
 const pokaz = (p: Partial<React.ComponentProps<typeof Kafle>> = {}) => {
-  const onKubelek = vi.fn();
-  const onSynchronizuj = vi.fn();
-  render(<Kafle statystyki={STAT} kubelek="decyzja" onKubelek={onKubelek} stan={STAN}
-    trwaSync={false} bladSync="" onSynchronizuj={onSynchronizuj} {...p} />);
-  return { onKubelek, onSynchronizuj };
+  const onWybierz = vi.fn();
+  render(<Kafle statystyki={STAT} wybrany="decyzja" onWybierz={onWybierz} {...p} />);
+  return { onWybierz };
 };
 
 describe("Kafle reklamacji", () => {
-  it("cztery kafle w kolejności z makiety, z liczbą na wierzchu", () => {
+  it("siatka 2×2 w kolejności z makiety: liczba, nazwa, podpis", () => {
     pokaz();
-    expect(screen.getByRole("button", { name: /^Do decyzji\s*18/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^Do odpowiedzi\s*11/ })).toBeInTheDocument();
-    expect(screen.getByText("Po terminie")).toBeInTheDocument();
+    const siatka = screen.getByRole("group", { name: "Reklamacje w liczbach" });
+    expect(siatka.className).toMatch(/grid-cols-2/);
+    expect(screen.getByRole("button", { name: /^18 Do decyzji/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^11 Do odpowiedzi/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^1 Po terminie/ })).toBeInTheDocument();
     expect(screen.getByText("Średni czas do werdyktu")).toBeInTheDocument();
     expect(screen.getByText("2,4 dnia")).toBeInTheDocument();
+  });
+
+  it("liczba stoi na nazwanym szczeblu drabiny, podpis drobnym pismem", () => {
+    pokaz();
+    expect(screen.getByText("18").className).toMatch(/text-naglowek/);
+    expect(screen.getByText("+6 od zeszłego tygodnia").className).toMatch(/text-xs/);
   });
 
   it("trend tygodniowy mówi znak i liczbę, minus typograficzny", () => {
@@ -67,11 +67,11 @@ describe("Kafle reklamacji", () => {
   it("średnia bez werdyktów w okresie to „—”, a nie zero dni", () => {
     pokaz({ statystyki: { ...STAT, sredniDniDoWerdyktu: { teraz: null, poprzednio: 2, okresDni: 30 } } });
     expect(screen.getByText("brak werdyktów w ostatnich 30 dni")).toBeInTheDocument();
+    expect(screen.getByText("—")).toBeInTheDocument();
   });
 
   it("po terminie z pracą świeci czerwienią, bez pracy — nie", () => {
-    const { unmount } = render(<Kafle statystyki={STAT} kubelek={null} onKubelek={vi.fn()} stan={STAN}
-      trwaSync={false} bladSync="" onSynchronizuj={vi.fn()} />);
+    const { unmount } = render(<Kafle statystyki={STAT} wybrany={null} onWybierz={vi.fn()} />);
     expect(screen.getByText("1").className).toMatch(/text-ranga-zle/);
     unmount();
     pokaz({ statystyki: { ...STAT, poTerminie: { teraz: 0, tydzienTemu: 0 } } });
@@ -85,36 +85,39 @@ describe("Kafle reklamacji", () => {
     expect(screen.queryByText("0")).not.toBeInTheDocument();
   });
 
-  it("kafel kubełka jest filtrem: klik przestawia kubełek, wybrany jest wciśnięty", async () => {
-    const { onKubelek } = pokaz();
-    expect(screen.getByRole("button", { name: /^Do decyzji/ })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: /^Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "false");
-    await userEvent.click(screen.getByRole("button", { name: /^Do odpowiedzi/ }));
-    expect(onKubelek).toHaveBeenCalledWith("odpowiedz");
+  it("kafel pracy jest filtrem: klik oddaje filtr, wybrany wciśnięty ciemną ramką", async () => {
+    const { onWybierz } = pokaz();
+    const decyzja = screen.getByRole("button", { name: /Do decyzji/ });
+    expect(decyzja).toHaveAttribute("aria-pressed", "true");
+    expect(decyzja.className).toMatch(/border-wertis-ink/);
+    expect(decyzja.className).not.toMatch(/amber/);
+    expect(screen.getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "false");
+    await userEvent.click(screen.getByRole("button", { name: /Do odpowiedzi/ }));
+    expect(onWybierz).toHaveBeenCalledWith("odpowiedz");
+    await userEvent.click(screen.getByRole("button", { name: /Po terminie/ }));
+    expect(onWybierz).toHaveBeenCalledWith("po_terminie");
   });
 
-  it("kafel bez kubełka nie jest przyciskiem — nie obiecuje filtra, którego nie ma", () => {
+  it("„Po terminie” wciska się sam, a „Do decyzji” wtedy NIE", () => {
+    pokaz({ wybrany: "po_terminie" });
+    expect(screen.getByRole("button", { name: /Po terminie/ })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: /Do decyzji/ })).toHaveAttribute("aria-pressed", "false");
+  });
+
+  it("podpowiedź kafla zna klawisz skrótu jego kubełka", () => {
     pokaz();
-    expect(screen.queryByRole("button", { name: /Po terminie/ })).not.toBeInTheDocument();
+    expect(screen.getByTitle("Pokaż w kolejce: Do decyzji (klawisz 1)")).toBeInTheDocument();
+    expect(screen.getByTitle("Pokaż w kolejce: Do odpowiedzi (klawisz 2)")).toBeInTheDocument();
+  });
+
+  it("średni czas nie jest przyciskiem — nie obiecuje filtra, którego nie ma", () => {
+    pokaz();
     expect(screen.queryByRole("button", { name: /Średni czas/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button")).toHaveLength(3);
   });
 
-  it("stan synchronizacji z godziną i jeden przycisk „Synchronizuj” na jawne kliknięcie", async () => {
-    const { onSynchronizuj } = pokaz();
-    expect(screen.getByText(/^Allegro: zsynchronizowano \d{2}:\d{2}$/)).toBeInTheDocument();
-    expect(onSynchronizuj).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "Synchronizuj" }));
-    expect(onSynchronizuj).toHaveBeenCalledTimes(1);
-  });
-
-  it("zła synchronizacja mówi stan i kod czerwienią, a błąd przycisku stoi pod nim", () => {
-    pokaz({ stan: { ...STAN, status: "failed", kodOstatniegoBledu: 503 }, bladSync: "Allegro odmówiło: limit" });
-    expect(screen.getByText("Synchronizacja Allegro: nie działa, kod 503").className).toMatch(/text-ranga-zle/);
-    expect(screen.getByText("Allegro odmówiło: limit")).toBeInTheDocument();
-  });
-
-  it("niekompletna lista woła pełnym zdaniem", () => {
-    pokaz({ stan: { ...STAN, pozostaloDoPobrania: 12 } });
-    expect(screen.getByText(/Ta kolejka nie jest kompletna: 12 spraw/)).toBeInTheDocument();
+  it("kafle nie niosą synchronizacji — ta stoi przy tytule kolejki", () => {
+    pokaz();
+    expect(screen.queryByRole("button", { name: /synchronizuj/i })).not.toBeInTheDocument();
   });
 });

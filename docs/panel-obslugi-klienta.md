@@ -6211,6 +6211,18 @@ makiecie, a reszta schodzi z ekranu. Dane zostają w bazie.
 - **Zeszło z ekranu:** pas faktów (`reklamacje/Fakty.tsx`), dowody biura,
   reklamacja u dostawcy, ostatnia dostawa i krok towaru po werdykcie.
 
+**Kafle w kolejce (@wydanie).** Rząd kafli nad kolumnami zszedł do lewej
+kolumny jako siatka 2×2 i zastąpił przełącznik kubełków, więc liczby stoją
+raz. Do decyzji, Do odpowiedzi i Po terminie to przyciski-filtry
+z `aria-pressed`, a wybrany ma ciemną ramkę, nie bursztyn. Po terminie
+pokazuje kubełek do decyzji zawężony do spraw po terminie, bo tak liczy go
+serwer. Średni czas tylko mówi. Bez ruchu, Rozstrzygnięte i Wszystkie stoją
+wąskim rzędem pigułek pod siatką (`reklamacje/Przelacznik.tsx`). Brak danych
+to „—”, nigdy zero. Synchronizacja to przycisk-ikona przy tytule
+„Reklamacje”, a pod tytułem drobne „Allegro: 15:10”. Awaria, błąd przycisku
+i niekompletna lista stoją tam zdaniem w kolorze zle
+(`reklamacje/Synchronizacja.tsx`). Cyfry 1–5 przełączają kubełki jak dotąd.
+
 ### 25b.12. Czat jak na makiecie (0.578.0)
 
 Decyzja właściciela: czat reklamacji i dyskusji wygląda jak na makiecie.

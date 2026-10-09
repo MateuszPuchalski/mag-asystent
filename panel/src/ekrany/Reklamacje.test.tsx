@@ -22,8 +22,8 @@ import type {
       reklamacji, która nigdy reklamacją nie była.
    4. PUNKT ODNIESIENIA ŚWIEŻOŚCI liczy się z osi, a własna odpowiedź go NIE
       przesuwa — inaczej druga wiadomość z rzędu wyglądałaby na spóźnioną.
-   5. BRAK DANYCH TO „—”, nie zero: przy awarii serwera kafle i pola kubełków
-      nie mówią „nic nie czeka”.                                            */
+   5. BRAK DANYCH TO „—”, nie zero: przy awarii serwera kafle i pigułki
+      kubełków nie mówią „nic nie czeka”.                                            */
 
 const rek = (id: number, kubelek: KubelekReklamacji, numer: string): Reklamacja => ({
   id, externalId: `i-${id}`, numer, orderId: `ord-${id}`, offerId: null,
@@ -76,7 +76,7 @@ const scena = vi.hoisted(() => ({
   bladSynchronizacji: null as Error | null,
   /* Ostatnia dostawa w szczególe sprawy. */
   dostawa: null as OstatniaDostawaReklamacji | null,
-  /* Kafle nad kolumnami; `undefined` udaje starszy serwer. */
+  /* Kafle w kolejce; `undefined` udaje starszy serwer. */
   statystyki: undefined as StatystykiReklamacji | undefined,
   /* Lista padła: `Error` zamiast danych, jak przy braku połączenia. */
   bladListy: null as Error | null,
@@ -231,9 +231,9 @@ afterEach(() => {
    otwarcia sprawy wywali te testy, zamiast przejść niezauważona. */
 const bezOdswiezenia = () => scena.mutacje.filter((m) => !m.startsWith("odswiez:"));
 
-/** Przełącznik kubełków i jego pole „Więcej”. */
-const kubelki = () => screen.getByRole("group", { name: "Kubełek" });
-const wiecej = () => within(kubelki()).getByRole("button", { name: /Więcej|Rozstrzygnięte|Wszystkie/ });
+/** Kafle-filtry i wąski rząd pozostałych kubełków w kolejce. */
+const kafle = () => screen.getByRole("group", { name: "Reklamacje w liczbach" });
+const pozostale = () => screen.getByRole("group", { name: "Pozostałe kubełki" });
 
 /** Otwiera okno filtra przy tytule kolejki. */
 const otworzFiltr = async () => {
@@ -292,66 +292,147 @@ describe("Ekran reklamacji", () => {
   });
 });
 
-describe("Kafle nad kolumnami", () => {
+describe("Kafle w kolejce zamiast przełącznika", () => {
+  it("kafle stoją W KOLEJCE pod szukaniem, a nad kolumnami nie ma rzędu", () => {
+    scena.statystyki = STATYSTYKI;
+    pokaz();
+    const kolejka = screen.getByRole("region", { name: "Kolejka reklamacji" });
+    expect(within(kolejka).getByRole("group", { name: "Reklamacje w liczbach" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Reklamacje w liczbach" })).not.toBeInTheDocument();
+    /* Kolejność z makiety: szukanie, kafle, pozostałe kubełki, sito. */
+    const szukaj = screen.getByLabelText("Szukaj reklamacji");
+    const sito = screen.getByRole("button", { name: /^Moje/ });
+    expect(szukaj.compareDocumentPosition(kafle()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(kafle().compareDocumentPosition(pozostale()) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(pozostale().compareDocumentPosition(sito) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("przełącznika kubełków z „Więcej” już nie ma — liczby stoją raz", () => {
+    scena.statystyki = STATYSTYKI;
+    pokaz();
+    expect(screen.queryByRole("group", { name: "Kubełek" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Więcej kubełków" })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Do decyzji/ })).toHaveLength(1);
+  });
+
   it("cztery liczby z serwera, a kafel kubełka przestawia kolejkę i kursor", async () => {
     scena.statystyki = STATYSTYKI;
     pokaz("/obsluga/reklamacje/1");
-    const kafle = screen.getByRole("region", { name: "Reklamacje w liczbach" });
-    expect(within(kafle).getByText("18")).toBeInTheDocument();
-    expect(within(kafle).getByText("+6 od zeszłego tygodnia")).toBeInTheDocument();
-    expect(within(kafle).getByText("2,4 dnia")).toBeInTheDocument();
-    await userEvent.click(within(kafle).getByRole("button", { name: /^Do odpowiedzi/ }));
+    expect(within(kafle()).getByText("18")).toBeInTheDocument();
+    expect(within(kafle()).getByText("+6 od zeszłego tygodnia")).toBeInTheDocument();
+    expect(within(kafle()).getByText("2,4 dnia")).toBeInTheDocument();
+    expect(within(kafle()).getByRole("button", { name: /Do decyzji/ })).toHaveAttribute("aria-pressed", "true");
+    await userEvent.click(within(kafle()).getByRole("button", { name: /Do odpowiedzi/ }));
     /* „Do odpowiedzi” jest w atrapie pusty, więc kursor schodzi ze sprawy. */
     expect(screen.getByText(/Ten kubełek jest pusty/)).toBeInTheDocument();
-    expect(within(kubelki()).getByRole("button", { name: /Do odpowiedzi/ }))
-      .toHaveAttribute("aria-pressed", "true");
+    expect(within(kafle()).getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(kafle()).getByRole("button", { name: /Do decyzji/ })).toHaveAttribute("aria-pressed", "false");
     expect(bezOdswiezenia()).toEqual([]);
+  });
+
+  it("„Po terminie” to DO DECYZJI zawężone do spóźnionych, z kursorem na pierwszej", async () => {
+    scena.statystyki = STATYSTYKI;
+    await zmienionymi([[3, { poTerminie: true, dniDoTerminu: -3 }]], async () => {
+      pokaz("/obsluga/reklamacje/1");
+      await userEvent.click(within(kafle()).getByRole("button", { name: /Po terminie/ }));
+      expect(numeryWierszy()).toEqual(["555/2026"]);
+      expect(await screen.findByRole("button", { name: /555\/2026/, current: true })).toBeInTheDocument();
+      expect(within(kafle()).getByRole("button", { name: /Po terminie/ })).toHaveAttribute("aria-pressed", "true");
+      expect(within(kafle()).getByRole("button", { name: /Do decyzji/ })).toHaveAttribute("aria-pressed", "false");
+      /* Drugi klik zdejmuje zawężenie, jak każdy przełącznik z `aria-pressed`. */
+      await userEvent.click(within(kafle()).getByRole("button", { name: /Po terminie/ }));
+      expect(numeryWierszy()).toEqual(["555/2026", "111/2026", "444/2026", "666/2026"]);
+      expect(within(kafle()).getByRole("button", { name: /Do decyzji/ })).toHaveAttribute("aria-pressed", "true");
+    });
+  });
+
+  it("cyfra po „Po terminie” wraca do całego kubełka, nie do zawężenia", async () => {
+    scena.statystyki = STATYSTYKI;
+    await zmienionymi([[3, { poTerminie: true, dniDoTerminu: -3 }]], async () => {
+      pokaz();
+      await userEvent.click(within(kafle()).getByRole("button", { name: /Po terminie/ }));
+      await userEvent.keyboard("1");
+      expect(numeryWierszy()).toEqual(["555/2026", "111/2026", "444/2026", "666/2026"]);
+    });
+  });
+
+  it("wejście w sprawę spoza zawężenia zdejmuje „Po terminie”, zamiast chować ją z listy", async () => {
+    scena.statystyki = STATYSTYKI;
+    await zmienionymi([[3, { poTerminie: true, dniDoTerminu: -3 }]], async () => {
+      pokaz();
+      await userEvent.click(within(kafle()).getByRole("button", { name: /Po terminie/ }));
+      /* Szukanie przebija kubełek, więc tędy wchodzi się w sprawę w terminie. */
+      const pole = screen.getByLabelText("Szukaj reklamacji");
+      await userEvent.type(pole, "111/2026");
+      await userEvent.click(screen.getByRole("button", { name: /111\/2026/ }));
+      await userEvent.clear(pole);
+      expect(screen.getByRole("button", { name: /111\/2026/, current: true })).toBeInTheDocument();
+      expect(within(kafle()).getByRole("button", { name: /Do decyzji/ })).toHaveAttribute("aria-pressed", "true");
+    });
+  });
+
+  it("pozostałe kubełki to wąski rząd pigułek z liczbą: Bez ruchu, Rozstrzygnięte, Wszystkie", async () => {
+    pokaz();
+    const g = pozostale();
+    expect(within(g).getAllByRole("button").map((b) => b.textContent))
+      .toEqual(["Bez ruchu 0", "Rozstrzygnięte 1", "Wszystkie 5"]);
+    expect(within(g).getByTitle("Tylko wgląd. (klawisz 3)")).toBeInTheDocument();
+    await userEvent.click(within(g).getByRole("button", { name: /Wszystkie/ }));
+    expect(within(g).getByRole("button", { name: /Wszystkie/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(kafle()).getByRole("button", { name: /Do decyzji/ })).toHaveAttribute("aria-pressed", "false");
   });
 
   it("starszy serwer bez statystyk: kafle mówią „—”, nie zero", () => {
     pokaz();
-    const kafle = screen.getByRole("region", { name: "Reklamacje w liczbach" });
-    expect(within(kafle).getAllByText("—")).toHaveLength(4);
-    expect(within(kafle).queryByText("0")).not.toBeInTheDocument();
+    expect(within(kafle()).getAllByText("—")).toHaveLength(4);
+    expect(within(kafle()).queryByText("0")).not.toBeInTheDocument();
   });
 
-  it("BRAK POŁĄCZENIA: błąd zamiast kolejki, a kafle mówią „—”, nie „nic nie czeka”", () => {
+  it("BRAK POŁĄCZENIA: błąd zamiast listy, a kafle i pigułki mówią „—”, nie „nic nie czeka”", () => {
     scena.bladListy = new Error("Brak połączenia z serwerem");
     pokaz();
     expect(screen.getByText("Brak połączenia z serwerem")).toBeInTheDocument();
     expect(screen.queryByText(/Ten kubełek jest pusty/)).not.toBeInTheDocument();
-    const kafle = screen.getByRole("region", { name: "Reklamacje w liczbach" });
-    expect(within(kafle).getAllByText("—")).toHaveLength(4);
-    expect(within(kafle).queryByText("0")).not.toBeInTheDocument();
+    expect(within(kafle()).getAllByText("—")).toHaveLength(4);
+    expect(within(kafle()).queryByText("0")).not.toBeInTheDocument();
+    expect(within(pozostale()).getAllByRole("button").map((b) => b.textContent))
+      .toEqual(["Bez ruchu —", "Rozstrzygnięte —", "Wszystkie —"]);
+    /* Sito liczyłoby z pustej listy i mówiłoby „Moje 0”. */
+    expect(screen.queryByRole("button", { name: /^Moje/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/Wybierz reklamację z kolejki/)).not.toBeInTheDocument();
   });
 });
 
-describe("Synchronizacja w rzędzie kafli", () => {
-  it("„Synchronizuj” jest JEDEN na ekranie i działa na jawne kliknięcie, nie z otwarcia", async () => {
+describe("Synchronizacja przy tytule kolejki", () => {
+  const rzadTytulu = () => screen.getByRole("heading", { name: "Reklamacje", level: 1 }).parentElement!;
+
+  it("przycisk-ikona stoi obok tytułu, jest JEDEN i działa na jawne kliknięcie", async () => {
     pokaz();
     expect(scena.mutacje).toEqual([]);
     expect(screen.getAllByRole("button", { name: /synchronizuj/i })).toHaveLength(1);
-    expect(screen.getByText(/^Allegro: zsynchronizowano \d{2}:\d{2}$/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Synchronizuj" }));
+    const przycisk = within(rzadTytulu()).getByRole("button", { name: "Synchronizuj z Allegro" });
+    expect(screen.getByText(/^Allegro: \d{2}:\d{2}$/)).toBeInTheDocument();
+    await userEvent.click(przycisk);
     expect(scena.mutacje).toEqual(["synchronizuj:undefined"]);
   });
 
-  it("w ALARMIE zdanie mówi stan i kod, a przycisk dalej jest jeden", () => {
+  it("w ALARMIE zdanie mówi stan i kod czerwienią, a przycisk dalej jest jeden", () => {
     pokaz("/obsluga/reklamacje", [wiad()], { status: "failed", kodOstatniegoBledu: 503 });
-    expect(screen.getByText("Synchronizacja Allegro: nie działa, kod 503")).toBeInTheDocument();
+    expect(screen.getByText("Synchronizacja Allegro: nie działa, kod 503").className).toMatch(/text-ranga-zle/);
     expect(screen.getAllByRole("button", { name: /synchronizuj/i })).toHaveLength(1);
   });
 
-  it("niekompletna lista woła pełnym zdaniem", () => {
+  it("niekompletna lista woła pełnym zdaniem pod tytułem", () => {
     pokaz("/obsluga/reklamacje", [wiad()], { pozostaloDoPobrania: 12 });
-    expect(screen.getByText(/Ta kolejka nie jest kompletna: 12 spraw/)).toBeInTheDocument();
+    const kolejka = screen.getByRole("region", { name: "Kolejka reklamacji" });
+    expect(within(kolejka).getByText(/Ta kolejka nie jest kompletna: 12 spraw/)).toBeInTheDocument();
   });
 
-  it("błąd synchronizacji widać przy przycisku", async () => {
+  it("błąd synchronizacji widać pod tytułem", async () => {
     pokaz();
     scena.bladSynchronizacji = new Error("Allegro odmówiło: limit zapytań");
-    await userEvent.click(screen.getByRole("button", { name: "Synchronizuj" }));
-    expect(screen.getByText("Allegro odmówiło: limit zapytań")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Synchronizuj z Allegro" }));
+    expect(screen.getByText("Allegro odmówiło: limit zapytań").className).toMatch(/text-ranga-zle/);
   });
 
   it("starej stopki kolejki nie ma", () => {
@@ -360,30 +441,7 @@ describe("Synchronizacja w rzędzie kafli", () => {
   });
 });
 
-describe("Przełącznik kubełków", () => {
-  it("cztery pola równej szerokości: trzy kubełki i „Więcej”, każde z liczbą", () => {
-    pokaz();
-    const g = kubelki();
-    expect(g.className).toMatch(/grid-cols-4/);
-    expect(within(g).getAllByRole("button")).toHaveLength(4);
-    expect(within(g).getByRole("button", { name: /4\s*Do decyzji/ })).toHaveAttribute("aria-pressed", "true");
-    expect(within(g).getByRole("button", { name: /0\s*Do odpowiedzi/ })).toBeInTheDocument();
-    expect(within(g).getByRole("button", { name: /0\s*Bez ruchu/ })).toBeInTheDocument();
-    expect(within(g).getByTitle("Uznać czy odrzucić? (klawisz 1)")).toBeInTheDocument();
-    expect(wiecej()).toHaveTextContent("Więcej");
-  });
-
-  it("„Więcej” niesie Rozstrzygnięte i Wszystkie z liczbą, a wybór staje w polu", async () => {
-    pokaz();
-    await userEvent.click(wiecej());
-    const menu = screen.getByRole("menu", { name: "Więcej kubełków" });
-    expect(within(menu).getByRole("menuitemradio", { name: "Rozstrzygnięte · 1" })).toBeInTheDocument();
-    expect(within(menu).getByRole("menuitemradio", { name: "Wszystkie · 5" })).toBeInTheDocument();
-    await userEvent.click(within(menu).getByRole("menuitemradio", { name: /Wszystkie/ }));
-    expect(wiecej()).toHaveTextContent(/5\s*Wszystkie/);
-    expect(wiecej()).toHaveAttribute("aria-pressed", "true");
-  });
-
+describe("Kubełki i skróty", () => {
   it("kubełek DO DECYZJI pokazuje tylko sprawy przed werdyktem", () => {
     pokaz();
     expect(screen.getByRole("button", { name: /111\/2026/ })).toBeInTheDocument();
@@ -392,25 +450,26 @@ describe("Przełącznik kubełków", () => {
 
   it("przełączenie kubełka przestawia KURSOR na jego pierwszą sprawę", async () => {
     pokaz("/obsluga/reklamacje/1");
-    await userEvent.click(wiecej());
-    await userEvent.click(screen.getByRole("menuitemradio", { name: /^Rozstrzygnięte/ }));
+    await userEvent.click(within(pozostale()).getByRole("button", { name: /^Rozstrzygnięte/ }));
     const wiersz = await screen.findByRole("button", { name: /222\/2026/, current: true });
     expect(wiersz).toHaveAttribute("aria-current", "true");
     expect(screen.queryByRole("button", { name: /111\/2026/ })).not.toBeInTheDocument();
   });
 
-  it("cyfry idą za kubełkami: 3 to „Rozstrzygnięte”, 4 „Bez ruchu”, 5 „Wszystkie”", async () => {
+  it("cyfry idą za kubełkami: 2 „Do odpowiedzi”, 3 „Rozstrzygnięte”, 4 „Bez ruchu”, 5 „Wszystkie”", async () => {
     pokaz();
+    await userEvent.keyboard("2");
+    expect(within(kafle()).getByRole("button", { name: /Do odpowiedzi/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.keyboard("3");
-    expect(wiecej()).toHaveTextContent(/Rozstrzygnięte/);
+    expect(within(pozostale()).getByRole("button", { name: /Rozstrzygnięte/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.keyboard("4");
-    expect(within(kubelki()).getByRole("button", { name: /Bez ruchu/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(pozostale()).getByRole("button", { name: /Bez ruchu/ })).toHaveAttribute("aria-pressed", "true");
     await userEvent.keyboard("5");
-    expect(wiecej()).toHaveTextContent(/Wszystkie/);
+    expect(within(pozostale()).getByRole("button", { name: /Wszystkie/ })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getAllByRole("button", { name: /111\/2026/ }).length).toBeGreaterThan(0);
     expect(screen.getAllByRole("button", { name: /222\/2026/ }).length).toBeGreaterThan(0);
     await userEvent.keyboard("1");
-    expect(within(kubelki()).getByRole("button", { name: /Do decyzji/ })).toHaveAttribute("aria-pressed", "true");
+    expect(within(kafle()).getByRole("button", { name: /Do decyzji/ })).toHaveAttribute("aria-pressed", "true");
   });
 
   it("cyfra przełącza kubełek, ale NIE wtedy, gdy piszesz w polu", async () => {
