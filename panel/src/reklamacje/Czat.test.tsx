@@ -193,13 +193,13 @@ describe("Zdjęcia stoją w dymku", () => {
     expect(screen.getByRole("button", { name: "Powiększ: usterka.jpg" })).toBeInTheDocument();
   });
 
-  it("PDF nie udaje zdjęcia — dostaje przycisk od razu, bez pytania serwera", () => {
-    /* `podglad: false` znaczy, że nawet nie próbujemy: jedno żądanie mniej
-       przy każdym otwarciu sprawy z paragonem. */
+  it("plik bez podglądu dostaje przycisk od razu, bez pytania serwera", () => {
+    /* `podglad: false` i `pdf: false` znaczą, że nawet nie próbujemy: jedno
+       żądanie mniej przy każdym otwarciu sprawy z takim plikiem. */
     scena.obrazy = {};
     render(<Czat sprawa={sprawa()} czat={[]}
-      zalaczniki={[{ id: 5, wiadomoscId: null, nazwa: "paragon.pdf", podglad: false, pdf: false }]} />);
-    expect(screen.getByRole("button", { name: /paragon\.pdf/ })).toBeInTheDocument();
+      zalaczniki={[{ id: 5, wiadomoscId: null, nazwa: "umowa.docx", podglad: false, pdf: false }]} />);
+    expect(screen.getByRole("button", { name: /umowa\.docx/ })).toBeInTheDocument();
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 

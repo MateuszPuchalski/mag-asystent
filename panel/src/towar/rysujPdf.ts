@@ -43,6 +43,16 @@ function pdfjs(): Promise<PdfJs> {
   return ladowanie;
 }
 
+/**
+ * Katalog dekoderów obrazów skanu, z wersją biblioteki w nazwie.
+ *
+ * pdf.js dokleja do niego nazwę pliku i żąda ukośnika na końcu. Wtyczka
+ * `dekoderyPdf` w `vite.config.ts` kładzie pliki pod tymi samymi nazwami.
+ * Adres jest bezwzględny, bo worker liczyłby względny od własnego pliku.
+ */
+export const adresDekoderow = (wersja: string): string =>
+  new URL(`${import.meta.env.BASE_URL}assets/pdfjs-${wersja}/`, location.href).href;
+
 /** Otwarty dokument i jego sprzątanie; `zniszcz` działa też przed końcem ładowania. */
 export type OtwieranyPdf = { dokument: Promise<PDFDocumentProxy>; zniszcz: () => void };
 
@@ -59,7 +69,7 @@ export function otworzPdf(bajty: Uint8Array): OtwieranyPdf {
   let zniszczone = false;
   const dokument = pdfjs().then((m) => {
     if (zniszczone) throw new Error("Podgląd zamknięty przed otwarciem dokumentu.");
-    zadanie = m.getDocument({ data: bajty.slice(), enableXfa: false });
+    zadanie = m.getDocument({ data: bajty.slice(), enableXfa: false, wasmUrl: adresDekoderow(m.version) });
     return zadanie.promise;
   });
   return {

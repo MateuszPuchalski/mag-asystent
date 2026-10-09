@@ -130,7 +130,7 @@ beforeEach(() => {
       { khId: 6, nazwa: "Hydro-Mat", dokumentow: 3, maLogo: false }] });
     /* Obraz jako atrapa odpowiedzi, jak w `Dostawy.test.tsx`: `Response`
        z Node'a nie przyjmuje `Blob` z jsdom. */
-    if (url === "/api/dostawcy/5/logo") return { ok: true, status: 200, blob: async () => new Blob() } as unknown as Response;
+    if (url === "/api/dostawcy/5/logo") return { ok: true, status: 200, headers: new Headers({ "content-type": "image/png" }), blob: async () => new Blob() } as unknown as Response;
     if (url === "/api/obsluga/tagi") return odp({ tagi: [
       { id: 1, nazwa: "u producenta / u dostawcy", aktywny: true },
       { id: 2, nazwa: "stary tag", aktywny: false }] });

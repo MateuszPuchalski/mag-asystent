@@ -9,8 +9,8 @@ import { otworzPdf, proporcja, przerwane, rysujStrone } from "./rysujPdf";
 
 /* ── PDF przysłany przez klienta: miniatura w czacie i cały dokument ────────
    Klient reklamujący kosiarkę przysyła fakturę, protokół z serwisu albo skan
-   paragonu. Do tej pory agent widział samą nazwę „dokument.pdf” i musiał
-   ściągnąć plik na dysk, żeby wiedzieć, o czym mowa. Miniatura pierwszej
+   paragonu. Sama nazwa „dokument.pdf” nic nie mówi, a ściąganie pliku na
+   dysk przy każdej sprawie to strata czasu agenta. Miniatura pierwszej
    strony mówi „to faktura z pieczątką” bez klikania, a klik otwiera całość
    w panelu, bez wychodzenia z rozmowy.
 

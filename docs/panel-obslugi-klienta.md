@@ -6263,6 +6263,10 @@ załącznika, tylko dla plików `SAFE`.
   w osobnym kawałku pakietu. Rysujemy samo płótno: bez warstwy tekstu,
   adnotacji, formularzy, XFA i skryptów dokumentu. Bierzemy wersję `legacy`,
   bo zwykła nie otwiera plików w Chromium sprzed kilku miesięcy.
+- **Skany mają dekodery obok panelu.** Obraz JBIG2 i JPEG2000 pdf.js czyta
+  modułami WASM z `assets/pdfjs-<wersja>/`. Bez nich skan paragonu wychodzi
+  białą stroną, bez żadnego błędu. Wersja w katalogu chroni przed starym
+  dekoderem w pamięci przeglądarki.
 - **Strony okna rysują się po kolei,** każda przy zbliżeniu do kadru. Długi
   protokół serwisu nie zajmuje pamięci karty stronami, których nikt nie czyta.
 - **Porażka nie zostawia pustego prostokąta.** 404 i 415 dają kafel z nazwą.

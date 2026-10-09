@@ -61,8 +61,8 @@ export const TYPY_DOKUMENTU = ["application/pdf"] as const;
 /**
  * Typ do odesłania na osi: obraz z `TYPY_PODGLADU` albo PDF; reszta `null`.
  *
- * Czytają go WYŁĄCZNIE trasy podglądu. Copilot zostaje przy `typPodgladu`,
- * bo tam PDF nie ma prawa przejść.
+ * Czytają go trasy podglądu i podpowiedź `pdf` w skrzynce. Copilot zostaje
+ * przy `typPodgladu`, bo tam PDF nie ma prawa przejść.
  */
 export function typPodgladuOsi(mime: string | null | undefined): string | null {
   const obraz = typPodgladu(mime);

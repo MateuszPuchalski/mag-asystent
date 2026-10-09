@@ -32,6 +32,7 @@ const pdf = vi.hoisted(() => ({
 
 vi.mock("pdfjs-dist/legacy/build/pdf.mjs", () => ({
   GlobalWorkerOptions: { workerSrc: "" },
+  version: "9.9.9",
   getDocument: (o: Record<string, unknown>) => pdf.getDocument(o),
 }));
 
@@ -116,6 +117,17 @@ describe("Miniatura PDF-a w kaflu czatu", () => {
     expect([...pdf.dane[1]!]).toEqual([...pdf.dane[0]!]);
     expect(pdf.dane[0]!.length).toBeGreaterThan(0);
     for (const o of pdf.opcje) expect(o.enableXfa).toBe(false);
+  });
+
+  it("pdf.js dostaje dekodery skanów z katalogu z wersją biblioteki", async () => {
+    /* Bez `wasmUrl` obraz JBIG2 i JPEG2000 znika ze strony po cichu, a skan
+       paragonu wychodzi białym prostokątem. Wersja w nazwie pilnuje pamięci
+       przeglądarki, bo zasoby panelu są niezmienne na rok. */
+    atrapaZapisow((url) => (url === SCIEZKA ? "%PDF-1.7" : undefined));
+    kafel();
+    await screen.findByRole("button", { name: "Otwórz PDF: faktura.pdf" });
+    await waitFor(() => expect(pdf.opcje.length).toBeGreaterThan(0));
+    expect(pdf.opcje[0]!.wasmUrl).toBe(new URL(`${import.meta.env.BASE_URL}assets/pdfjs-9.9.9/`, location.href).href);
   });
 
   it("klik otwiera cały dokument w oknie bez drugiego pobrania; Escape zamyka", async () => {
@@ -266,5 +278,27 @@ describe("PDF w czacie reklamacji i dyskusji", () => {
     expect(screen.queryByRole("button", { name: /Otwórz PDF/ })).not.toBeInTheDocument();
     expect(fetch).not.toHaveBeenCalled();
     expect(stan.wyslane).toEqual([]);
+  });
+});
+
+/* Strażnik leniwego ładowania. Atrapa wyżej podmienia moduł, więc import
+   statyczny przeszedłby resztę testów, a dołożyłby pdf.js do głównego
+   pakietu każdego ekranu panelu. */
+const ZRODLA = import.meta.glob(["../**/*.ts", "../**/*.tsx", "!../**/*.test.ts", "!../**/*.test.tsx"],
+  { query: "?raw", eager: true, import: "default" }) as Record<string, string>;
+
+describe("pdf.js zostaje poza głównym pakietem", () => {
+  it("biblioteka wchodzi tylko importem typów albo dynamicznym `import()`", () => {
+    const zle: string[] = [];
+    for (const [plik, tresc] of Object.entries(ZRODLA)) {
+      for (const wiersz of tresc.split("\n")) {
+        if (!wiersz.includes("pdfjs-dist")) continue;
+        if (/^\s*import type /.test(wiersz) || /import\(\s*"pdfjs-dist/.test(wiersz)) continue;
+        if (/^\s*(\/\/|\/?\*)/.test(wiersz)) continue;
+        zle.push(`${plik}: ${wiersz.trim()}`);
+      }
+    }
+    expect(zle).toEqual([]);
+    expect(Object.keys(ZRODLA).length).toBeGreaterThan(50);
   });
 });

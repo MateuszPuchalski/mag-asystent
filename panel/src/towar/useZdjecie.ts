@@ -101,7 +101,13 @@ async function pobierz(sciezka: string): Promise<string | null> {
   } catch {
     throw new Error("Serwer nie odpowiada — sprawdź połączenie z siecią firmy.");
   }
-  if (odp.ok) return URL.createObjectURL(await odp.blob());
+  if (odp.ok) {
+    /* Trasa podglądu oddaje też PDF. Plik nazwany `usterka.jpg` z bajtami
+       PDF-a nie ma trafić do `<img>`: agent zobaczyłby zepsuty obraz zamiast
+       kafla z nazwą i pobraniem. Typ podał serwer z bajtów, nie z nazwy. */
+    if (odp.headers.get("content-type")?.startsWith("application/pdf")) return null;
+    return URL.createObjectURL(await odp.blob());
+  }
   /* 404 znaczy „potwierdzony brak" i jest ODPOWIEDZIĄ, nie awarią — serwer
      nie zapisuje go nawet w audycie; 415 to „plik nie jest obrazem". */
   if (KODY_BRAKU.has(odp.status)) return null;

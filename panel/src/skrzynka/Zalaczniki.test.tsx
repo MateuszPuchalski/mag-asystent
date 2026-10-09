@@ -106,14 +106,14 @@ describe("Załączniki na osi rozmowy", () => {
   });
 
   it("plik, którego nie umiemy pokazać, w ogóle nie pyta o obraz", () => {
-    /* `podglad` liczy SERWER. Panel nie zgaduje po typie i nie dobija trasy
-       podglądu o PDF, którego ona i tak nie odda. */
-    os(wiadomosc([{ id: 9, nazwa: "gwarancja.pdf", typ: "application/pdf",
+    /* `podglad` i `pdf` liczy SERWER. Panel nie zgaduje po typie i nie dobija
+       trasy podglądu o plik, którego ona i tak nie odda. */
+    os(wiadomosc([{ id: 9, nazwa: "umowa.docx", typ: "application/msword",
       status: "SAFE", doPobrania: true, podglad: false, pdf: false }]));
 
     expect(zdjecie).toHaveBeenCalledWith(null);
     expect(screen.queryByRole("img")).toBeNull();
-    expect(screen.getByRole("button", { name: /gwarancja\.pdf/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /umowa\.docx/ })).toBeTruthy();
   });
   /* ── Porażka podglądu MÓWI (przyrost „zdjęcia w rozmowach") ────────────────
      Do tego wydania nieudany podgląd rysował nic: agent widział samą nazwę
