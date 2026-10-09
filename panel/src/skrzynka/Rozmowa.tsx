@@ -326,6 +326,8 @@ export function Rozmowa(p: {
           bladZalacznika={p.bladZalacznika}
           onDodajZalacznik={p.onDodajZalacznik} onUsunZalacznik={p.onUsunZalacznik}
           copilot={p.copilot}
+          /* Szkic skrzynki stoi na serwerze, więc widzi go cały zespół. */
+          podpis="Twoja odpowiedź · szkic, widzi go zespół"
           /* Zamknięty Problem z zakupem: Allegro odrzuci odpowiedź, więc
              wysyłki nie ma, a notatka zespołu zostaje. Powód w `Edytor`. */
           zamkniete={rozmowa.problemZakupu?.zamkniety ? ZAMKNIETY_PROBLEM_W_EDYTORZE : null} />

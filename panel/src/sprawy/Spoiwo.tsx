@@ -20,12 +20,14 @@ import type { PrzystanekDrogi, SprawaZakupu } from "../api/typy";
    właściwej kolejki, bo tam stoją ich bramki; stąd prowadzi wyłącznie
    odnośnik. Praca rozlana po czterech ekranach byłaby piątą kolejką. */
 
-/** Jak nazywa się przystanek i dokąd prowadzi — jedno miejsce na cztery. */
-const KOLEJKI = {
-  rozmowa: { nazwa: "pytanie", ikona: MessageSquare, sciezka: "/obsluga/skrzynka" },
-  dyskusja: { nazwa: "dyskusja", ikona: MessagesSquare, sciezka: "/obsluga/dyskusje" },
-  reklamacja: { nazwa: "reklamacja", ikona: Scale, sciezka: "/obsluga/reklamacje" },
-  zwrot: { nazwa: "zwrot", ikona: Undo2, sciezka: "/obsluga/zwroty" },
+/** Jak nazywa się przystanek i dokąd prowadzi — jedno miejsce na cztery.
+    `cel` to biernik do nazwy łącza („otwórz rozmowę”): czytnik ma usłyszeć,
+    dokąd prowadzi klik, a nie tylko rodzaj sprawy. */
+export const KOLEJKI = {
+  rozmowa: { nazwa: "pytanie", cel: "rozmowę", ikona: MessageSquare, sciezka: "/obsluga/skrzynka" },
+  dyskusja: { nazwa: "dyskusja", cel: "dyskusję", ikona: MessagesSquare, sciezka: "/obsluga/dyskusje" },
+  reklamacja: { nazwa: "reklamacja", cel: "reklamację", ikona: Scale, sciezka: "/obsluga/reklamacje" },
+  zwrot: { nazwa: "zwrot", cel: "zwrot", ikona: Undo2, sciezka: "/obsluga/zwroty" },
 } as const;
 
 /** Dyskusja czy reklamacja — rozstrzyga kolumna `typ`, nigdy jedna plakietka. */
@@ -148,27 +150,4 @@ export function inneSprawyZakupu(droga: PrzystanekDrogi[], sprawy: SprawaZakupu[
   for (const p of droga) dodaj({ rodzaj: p.rodzaj, id: p.id, at: p.at });
   for (const s of sprawy) dodaj({ rodzaj: rodzajSprawy(s.typ), id: s.id, at: s.otwartoAt });
   return wynik;
-}
-
-/**
- * Sprawy tego zakupu w jednym wierszu karty, bez własnego nagłówka.
- *
- * Ten sam kształt odnośnika co na drodze zakupu, żeby agent poznawał go
- * bez nauki. Pustej listy nie rysuje: brak innych spraw nie jest faktem
- * wartym wiersza.
- */
-export function SprawyWWierszu({ lista }: { lista: InnaSprawaZakupu[] }) {
-  if (lista.length === 0) return null;
-  return <ul className="flex flex-wrap items-center gap-1 text-xs">
-    {lista.map((s) => {
-      const { nazwa, ikona: Ikona, sciezka } = KOLEJKI[s.rodzaj];
-      return <li key={`${s.rodzaj}-${s.id}`}>
-        <Link to={`${sciezka}/${s.id}`}
-          className="inline-flex min-h-6 items-center gap-1 rounded bg-slate-100 px-1.5 text-slate-700 hover:bg-slate-200">
-          {/* Spacja jest dla nazwy łącza, nie dla układu: flex jej nie rysuje. */}
-          <Ikona size={12} aria-hidden="true" />{nazwa}{" "}
-          <span className="text-slate-600">{czas(s.at)}</span></Link>
-      </li>;
-    })}
-  </ul>;
 }

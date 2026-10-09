@@ -99,6 +99,30 @@ export const OCZEKIWANIA: Record<string, string> = {
   PARTIAL_REFUND: "częściowy zwrot",
 };
 
+/* To samo w dopełniaczu, bo w dymku zgłoszenia stoi po „chce”. */
+const CHCE: Record<string, string> = {
+  REPAIR: "naprawy",
+  EXCHANGE: "wymiany",
+  REFUND: "zwrotu pieniędzy",
+  PARTIAL_REFUND: "częściowego zwrotu",
+};
+
+/**
+ * Linia nad zdaniem klienta w dymku zgłoszenia: „Powód: … · chce …”.
+ *
+ * Kod spoza słownika zostaje kodem, bo zgadnięte słowo byłoby nieprawdą.
+ * Brak obu daje `null`, a dymek stoi wtedy bez tej linii.
+ */
+export function liniaPowodu(r: Pick<Reklamacja, "powodTyp" | "oczekiwanie">): string | null {
+  const czesci: string[] = [];
+  if (r.powodTyp) czesci.push(`Powód: ${POWODY[r.powodTyp] ?? r.powodTyp}`);
+  if (r.oczekiwanie) {
+    const chce = CHCE[r.oczekiwanie] ?? r.oczekiwanie;
+    czesci.push(czesci.length ? `chce ${chce}` : `Chce ${chce}`);
+  }
+  return czesci.length ? czesci.join(" · ") : null;
+}
+
 /* `dniSlowo` mieszka w `ui/` od audytu z 15 września 2026 — stało w trzech
    kolejkach przepisane znak w znak. Re-eksport zostaje, bo wołają je stąd
    sąsiednie pliki i test tej kolejki. */
