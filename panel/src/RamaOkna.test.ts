@@ -48,15 +48,17 @@ describe("Rama okna nie może stać na jednostce okna", () => {
     /* Okienko menu jest `absolute` i wychodzi poza pasek w prawo. Pasek z
        `overflow` przyciąłby je do własnej szerokości, więc przewija się
        wyłącznie lista zakładek, a sam `<aside>` overflow nie dostaje. */
-    const pasek = tsx.match(/<aside[^>]*className="[^"]*"/)?.[0];
+    const pasek = tsx.match(/<aside[^>]*className=\{`[^`]*`\}/)?.[0];
     expect(pasek).toBeDefined();
     expect(pasek).not.toMatch(/overflow/);
-    expect(tsx).toMatch(/<nav aria-label="Praca" className="[^"]*overflow-y-auto/);
+    expect(tsx).toMatch(/<nav id="pasek-zakladki" aria-label="Praca" className="[^"]*overflow-y-auto/);
   });
 
   it("pasek boczny zwęża się do ikon, zamiast wypychać stronę w bok", () => {
     /* Przy powiększeniu 200% okno ma 640 px CSS; pasek o stałej szerokości
        zjadłby trzecią część pracy. Poniżej 900 px zostają ikony. */
-    expect(tsx).toMatch(/<aside[^>]*max-\[899px\]:w-20/);
+    expect(tsx).toMatch(/<aside[^>]*"w-56 max-\[899px\]:w-20"/);
+    /* Ręczne zwinięcie dostaje te same ikony bez względu na szerokość. */
+    expect(tsx).toMatch(/<aside[^>]*zwiniety \? "w-20"/);
   });
 });
