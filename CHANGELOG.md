@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.579.0 — 9 października 2026
+
+**Kafle reklamacji w kolejce.** Do decyzji, do odpowiedzi, po terminie
+i średni czas do werdyktu stoją w lewej kolumnie zamiast przełącznika
+kubełków. Synchronizacja z Allegro jest przy tytule kolejki, a ekran zyskał
+wysokość.
+
 ## 0.578.0 — 9 października 2026
 
 **Czat reklamacji i dyskusji w dymkach.** Klient pisze po lewej, sklep po

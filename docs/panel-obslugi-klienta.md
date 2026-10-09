@@ -6211,7 +6211,7 @@ makiecie, a reszta schodzi z ekranu. Dane zostają w bazie.
 - **Zeszło z ekranu:** pas faktów (`reklamacje/Fakty.tsx`), dowody biura,
   reklamacja u dostawcy, ostatnia dostawa i krok towaru po werdykcie.
 
-**Kafle w kolejce (@wydanie).** Rząd kafli nad kolumnami zszedł do lewej
+**Kafle w kolejce (0.579.0).** Rząd kafli nad kolumnami zszedł do lewej
 kolumny jako siatka 2×2 i zastąpił przełącznik kubełków, więc liczby stoją
 raz. Do decyzji, Do odpowiedzi i Po terminie to przyciski-filtry
 z `aria-pressed`, a wybrany ma ciemną ramkę, nie bursztyn. Po terminie
