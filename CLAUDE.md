@@ -57,8 +57,8 @@ Każda zasada: co robić, dlaczego i kto tego pilnuje.
 
 - **Jeden front: `panel/`.** Całe biuro mieszka w `panel/`, a `/` i `/biuro`
   przekierowują do `/obsluga/`. Nowy ekran biura, magazynowy czy obsługi,
-  idzie do `panel/`. Kształt ekranu: praca na górnym rzędzie, wgląd na dolnym,
-  ustawienia za zębatką (`docs/obsluga-klienta.md` §7).
+  idzie do `panel/`. Kształt ekranu: praca w zakładkach bocznego paska, wgląd
+  i ustawienia w menu „Więcej" (`docs/obsluga-klienta.md` §7).
   *Strażnik: konwencja.*
 
 - **Zero zapisu przy patrzeniu.** Otwarcie ekranu niczego nie mutuje.

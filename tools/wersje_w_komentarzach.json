@@ -168,7 +168,7 @@
  "panel/src/lib/logo.ts": 1,
  "panel/src/lib/xlsx.test.ts": 1,
  "panel/src/lib/xlsx.ts": 2,
- "panel/src/main.tsx": 11,
+ "panel/src/main.tsx": 7,
  "panel/src/nawigacja/Klawisz.tsx": 1,
  "panel/src/nawigacja/Klawisze.test.tsx": 1,
  "panel/src/nawigacja/Klawisze.tsx": 9,

@@ -95,102 +95,75 @@ function LicznikDoZrobienia() {
     opis={`do zrobienia: ${decyzje} do decyzji, ${wzmianki} wzmianek`} />;
 }
 
-function Naglowek({ wyloguj }: { wyloguj: () => void }) {
+function PasekBoczny({ wyloguj }: { wyloguj: () => void }) {
   const { pathname } = useLocation();
-  /* ── JEDEN RZĄD (0.538.0, decyzja właściciela z 27 września 2026) ─────────
-     Od 0.431.0 nagłówek miał dwa rzędy: dziewięć zakładek z pigułką stanu,
-     zębatką i wyjściem potrzebowało ~1280 px, a laptop obok Subiekta ma 1180.
-     Drugi rząd kosztował ~50 px wysokości na każdym ekranie pracy, czyli dwa
-     wiersze kolejki przez cały dzień, za rzeczy otwierane kilka razy w miesiącu.
+  /* ── MENU PO LEWEJ, NIE NA GÓRZE ──────────────────────────────────────────
+     Zakładki stoją pionowo, bo dziesięć nazw w poziomym rzędzie wymagało
+     ~1280 px, a laptop obok Subiekta ma 1180. Pion zabiera szerokość, której
+     kolejki i tak nie wykorzystują, a oddaje pracy całą wysokość okna.
 
-     Miejsce oddały trzy rzeczy. Wgląd, zębatka i wyjście zeszły do menu
-     „Więcej" (`nawigacja/Wiecej.tsx`). Szukanie jest samą ikoną, a pigułka
-     synchronizacji — kropką z godziną (`nawigacja/Synchronizacja.tsx`).
-     Zakładki mają węższe wypełnienie: `px-2` i `gap-1.5` zamiast `px-3`
-     i `gap-2`, a elementy rzędu stoją co `gap-2`. Tyle trzeba było, żeby
-     alarm „Stanęła" nie spychał menu do drugiego rzędu. Pomiar przy 1180 px
-     stoi w `docs/obsluga-klienta.md` §7.
+     Na dole stoją rzeczy, które rzadko się klika albo tylko się czyta:
+     szukanie, stan synchronizacji i menu „Więcej". Menu otwiera się w górę,
+     bo pod nim nie ma już miejsca na ekranie.
 
-     ── NAGŁÓWEK ZAWIJA, ZAMIAST ZNIKAĆ POZA KADREM (0.233.0) ────────────────
-     Rama okna jest `overflow-hidden`, więc to, co nie zmieści się w szerokości,
-     nie daje paska przewijania — po prostu PRZESTAJE ISTNIEĆ dla myszy.
-     Zmierzone wtedy: poniżej ~1150 px zębatka ustawień i wylogowanie leżały
-     poza kadrem i nie dało się w nie kliknąć. Nie było o tym żadnego sygnału.
+     Poniżej 900 px pasek zwęża się do samych ikon i liczników. Nazwa zostaje
+     dla czytnika ekranu i w dymku (`max-[899px]:sr-only`).
 
-     `flex-wrap` zostaje i przy jednym rzędzie. Kosztuje drugi rząd na oknie
-     węższym niż 1180 px, przy plakietce spóźnień albo przy etykiecie „DEV"
-     razem z alarmem. To cena świadoma: rząd zabiera kilkadziesiąt pikseli wysokości,
-     brak menu z wylogowaniem zabiera całą funkcję.
+     Przewija się tylko lista zakładek. Dolny blok nie może mieć `overflow`,
+     bo przycięłoby okienko „Więcej", które wystaje poza pasek.
 
-     PODPIS „BIURO" ZESZEDŁ (0.515.0). Stał obok logo i nie mówił nic, czego
-     agent by nie wiedział — panel jest wyłącznie biurowy. Jego rolę odstępu
-     przejęło `mr-auto` na tabliczce logo: szukanie i zakładki dalej stoją
-     z prawej. */
-  return <header className="sticky top-0 z-20 shrink-0 border-b border-slate-200 bg-wertis-ink text-white">
-    <div className="flex flex-wrap items-center gap-2 px-5 py-3">
-      {/* LOGO ZAMIAST IKONY MAGAZYNU (23 września 2026). Znak ma grafitowe
-          litery na przezroczystym tle, więc na grafitowym pasku zniknąłby —
-          stoi na białej tabliczce, tak jak na szyldzie sklepu. */}
-      <span className="mr-auto rounded-md bg-white px-2 py-1"><img src={logo} alt="WERTIS — sklep z częściami"
-        className="block h-7 w-auto" /></span>
-      {/* Szukanie PRZED zakładkami (23 września 2026): pytanie „gdzie to jest"
-          pada, zanim wiadomo, do której zakładki iść. */}
-      <SzukajIKlawisze />
-      {/* ── POWIĘKSZENIE 200% NIE WYPYCHA ZAKŁADEK ZA KADR (0.546.0) ─────────
-          Przy powiększeniu 200% (1280 px okna to 640 px CSS) bieżnia z `shrink-0`
-          była o 180 px szersza od okna: „Zadania" i „Dostawy" wychodziły za
-          prawą krawędź, a cała strona przewijała się w bok. To ta sama usterka,
-          co w 0.233.0, tylko przy powiększeniu, którego wtedy nie mierzono.
-
-          Poniżej 900 px zakładka pokazuje samą ikonę i licznik. Nazwa zostaje
-          dla czytnika ekranu i w dymku. `flex-wrap` łapie resztę, np. 400%.
-          Od 900 px w górę nic się nie zmienia, także przy 1180 px z §7. */}
-      <nav aria-label="Praca" className="flex min-w-0 flex-wrap rounded-lg bg-white/10 p-1">
-        {ZAKLADKI.map((z) => {
-          const aktywna = z.korzen ? pathname === z.do : pathname.startsWith(z.do);
-          return <React.Fragment key={z.do}>
-            {z.kreska && <span aria-hidden="true" className="mx-1 my-1 w-px bg-white/15" />}
-            <Link to={z.do}
-            /* ── PROMIEŃ KAFELKA = PROMIEŃ BIEŻNI MINUS JEJ WYPEŁNIENIE (0.272.0) ──
-               Bieżnia wyżej ma `rounded-lg p-1`, czyli 8 px zaokrąglenia i 4 px
-               odstępu. Kafelek współśrodkowy z nią ma więc 8 − 4 = 4 px, czyli
-               `rounded`. Stało tu `rounded-md` (6 px) i łuk kafelka rozjeżdżał
-               się z łukiem bieżni o dwa piksele w każdym rogu.
-
-               Ta sama reguła obowiązuje w przełączniku edytora i TAM JEST
-               SPEŁNIONA: bieżnia `rounded-lg p-0.5` to 8 − 2 = 6 px, czyli
-               `rounded-md`. Audyt policzył pięć promieni w panelu i uznał to za
-               rozrzut; rozrzutu nie ma, jest jedna reguła spełniona raz na dwa
-               miejsca. `rounded-md` nie jest odpadem do zamiecenia. */
-            /* Kolizja, którą naprawia ustalenie 02, dotyczy pasm `bg-amber-50`
-               na BIAŁYCH listach: tam zaznaczenie myli się z ostrzeżeniem, bo
-               ostrzeżenia też są bursztynowe i też mają biel dookoła.
-               Na ciemnym pasku żadnego ostrzeżenia nie ma i nie będzie.
+     Ramka okna jest `overflow-hidden`: to, co wyjdzie poza kadr, nie ma paska
+     przewijania i przestaje istnieć dla myszy. Dlatego każdy element paska
+     musi mieścić się w jego szerokości albo zawijać się w niej. */
+  return <aside aria-label="Menu panelu"
+    className="sticky top-0 z-20 flex w-56 shrink-0 flex-col gap-3 self-start border-r border-slate-200 bg-wertis-ink p-2 text-white max-[899px]:w-20 lg:static lg:self-stretch">
+    {/* Znak ma grafitowe litery na przezroczystym tle, więc na grafitowym
+        pasku zniknąłby — stoi na białej tabliczce, tak jak na szyldzie
+        sklepu. W wąskim pasku tabliczka nie ma gdzie się zmieścić. */}
+    <span className="rounded-md bg-white px-2 py-1 max-[899px]:hidden"><img src={logo} alt="WERTIS — sklep z częściami"
+      className="mx-auto block h-7 w-auto" /></span>
+    {/* Nazwa „Praca" odróżnia ten blok od menu „Więcej" dla czytnika ekranu. */}
+    <nav aria-label="Praca" className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto">
+      {ZAKLADKI.map((z) => {
+        const aktywna = z.korzen ? pathname === z.do : pathname.startsWith(z.do);
+        return <React.Fragment key={z.do}>
+          {z.kreska && <span aria-hidden="true" className="mx-1 my-1 h-px bg-white/15" />}
+          <Link to={z.do}
+            /* Zaznaczenie zakładki jest barwą marki: na ciemnym pasku nie ma
+               ostrzeżeń, z którymi bursztyn mógłby się pomylić. Kolizję
+               z pasmami `bg-amber-50` opisuje ustalenie 02 i dotyczy białych
+               list, nie tego paska.
 
                bursztyn: zakładka na ciemnym tle jest marką */
-              aria-current={aktywna ? "page" : undefined} title={z.etykieta}
-              className={`flex items-center gap-1.5 whitespace-nowrap rounded px-2 py-1.5 text-sm font-semibold ${
-                aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
-              {z.ikona}<span className="max-[899px]:sr-only">{z.etykieta}</span>
-              {z.do === "/obsluga/" && <LicznikDoZrobienia />}
-              {/* Czerwony alarm dyskusji stoi przy zakładce na każdym ekranie,
-                  także na reklamacjach, gdzie paska nad pracą nie ma. Powód
-                  i barwa przy `nawigacja/AlarmDyskusji.tsx`. */}
-              {z.do === "/obsluga/dyskusje" && <LicznikAlarmuDyskusji />}</Link>
-          </React.Fragment>;
-        })}
-      </nav>
-      {/* Plakietka spóźnień STOI OBOK wskaźnika, a nie w nim: wskaźnik mówi,
-          czy system działa, plakietka — że praca idzie wolniej niż zwykle.
-          Powód w `stan/Spoznione.tsx`. Etykieta instancji stoi przy nich,
-          bo odpowiada na to samo pytanie „na co patrzę". Obie pojawiają się
-          rzadko, więc ich miejsca w rzędzie nie rezerwujemy. */}
+            aria-current={aktywna ? "page" : undefined} title={z.etykieta}
+            className={`flex min-h-10 items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-sm font-semibold max-[899px]:flex-wrap max-[899px]:justify-center max-[899px]:px-1.5 ${
+              aktywna ? "bg-wertis-amber text-wertis-ink" : "text-slate-300 hover:bg-white/10"}`}>
+            {z.ikona}<span className="max-[899px]:sr-only">{z.etykieta}</span>
+            {z.do === "/obsluga/" && <LicznikDoZrobienia />}
+            {/* Czerwony alarm dyskusji stoi przy zakładce na każdym ekranie,
+                także na reklamacjach, gdzie paska nad pracą nie ma. Powód
+                i barwa przy `nawigacja/AlarmDyskusji.tsx`. */}
+            {z.do === "/obsluga/dyskusje" && <LicznikAlarmuDyskusji />}</Link>
+        </React.Fragment>;
+      })}
+    </nav>
+    {/* Plakietka spóźnień stoi OBOK wskaźnika, a nie w nim: wskaźnik mówi,
+        czy system działa, plakietka — że praca idzie wolniej niż zwykle.
+        Powód w `stan/Spoznione.tsx`. Etykieta instancji odpowiada na to samo
+        pytanie „na co patrzę". Wszystkie trzy pojawiają się rzadko, więc ich
+        miejsca nie rezerwujemy. */}
+    <div className="flex flex-col gap-2">
       <EtykietaInstancji />
       <PlakietkaSpoznien />
       <WskaznikSynchronizacji />
-      <Wiecej wyloguj={wyloguj} />
+      {/* Szukanie przed menu: pytanie „gdzie to jest" pada, zanim wiadomo,
+          do której zakładki iść. */}
+      <div className="flex flex-wrap items-center gap-2">
+        <SzukajIKlawisze />
+        <Wiecej wyloguj={wyloguj} />
+      </div>
     </div>
-  </header>;
+  </aside>;
 }
 
 function App() {
@@ -239,8 +212,8 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
      Blokada zaczyna się dopiero od `lg`. Niżej grid i tak jest jednokolumnowy,
      a trzy scrollery po dwieście pikseli czytałoby się gorzej niż przewijaną
      stronę; widok wąski jest osobnym ekranem (projekt §10.5), nie tym samym
-     w miniaturze. Nagłówek zostaje `sticky` właśnie dla tego widoku — powyżej
-     `lg` nic pod nim nie przewija strony, więc `sticky` jest tam bezczynne.
+     w miniaturze. Pasek boczny zostaje `sticky` właśnie dla tego widoku — od `lg`
+     w górę nic pod nim nie przewija strony, więc `sticky` jest tam bezczynne.
 
      `lg:` w tym pliku znaczy zawsze i tylko WYSOKOŚĆ. Cała mechanika flexa
      stoi bezwarunkowo, bo bez związanej wysokości jest bezczynna: `flex-1`
@@ -258,10 +231,13 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
      i `dvh` po kolei, czego jedna klasa Tailwinda zapisać nie umie. */
   /* Szuflada towaru (0.502.0) obejmuje całą ramę: przycisk towaru stoi na
      dziewięciu ekranach, a szuflada ma otwierać się nad każdym z nich. */
-  return <SzufladaTowaru><div className="rama-okna min-h-screen lg:flex lg:min-h-0 lg:flex-col lg:overflow-hidden">
-    <Naglowek wyloguj={wyloguj} />
-    {/* „Nowe w panelu" (0.500.0) — pod nagłówkiem, nad pracą, tylko przy
-        pierwszym wejściu po wydaniu. Powód w `coNowego/CoNowego.tsx`.
+  return <SzufladaTowaru><div className="rama-okna flex min-h-screen lg:min-h-0 lg:overflow-hidden">
+    <PasekBoczny wyloguj={wyloguj} />
+    {/* Prawa kolumna trzyma pasy nad pracą i samą pracę. `min-w-0` pozwala jej
+        się zwęzić, zamiast wypychać stronę w bok przy dużym powiększeniu. */}
+    <div className="flex min-w-0 flex-1 flex-col lg:min-h-0">
+    {/* „Nowe w panelu" stoi nad pracą, tylko przy pierwszym wejściu po
+        wydaniu. Powód w `coNowego/CoNowego.tsx`.
         Pasek braku połączenia stoi NAD nim: awaria jest ważniejsza niż nowość. */}
     <PasekPolaczenia />
     {/* Dyskusja bez odpowiedzi grozi blokadą konta Allegro, więc alarm stoi
@@ -320,6 +296,7 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         <Route path="*" element={<Navigate to="/obsluga/" replace />} />
       </Routes>
     </main>
+    </div>
   </div></SzufladaTowaru>;
 }
 
