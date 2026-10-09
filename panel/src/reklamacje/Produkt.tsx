@@ -1,25 +1,20 @@
 import React from "react";
-import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
+import type { SzczegolReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { useKartaTowaru } from "../api/rozmowy";
 import { CenyKartoteki } from "../skrzynka/OsCenKartoteki";
-import { STATUS_PACZKI } from "../skrzynka/statusy";
-import { PRZEWOZNICY } from "../zwroty/Dowody";
 import { ZdjecieOferty } from "../towar/Zdjecie";
 import { PrzyciskTowaru } from "../towar/Szuflada";
-import { inneSprawyZakupu, SprawyWWierszu } from "../sprawy/Spoiwo";
-import { czas, dataCyfrowa, dniSlowo, kiedy, Skopiuj } from "../ui";
 import { OCZEKIWANIA, POWODY } from "./Kolejka";
 import { PRAWO } from "./statusy";
 import { ileReklamacji } from "./etap";
 
-/* ── Produkt i zamówienie: o co jest spór ────────────────────────────────────
-   Jedna karta, dwie sekcje. Produkt odpowiada na „co to jest, czy mamy i ile
-   kosztuje”, zamówienie na „kiedy kupił, ile zapłacił i czy to dostał”.
-   Stoi pod decyzją, bo z tych faktów decyzję się wydaje.
+/* ── Produkt: o co jest spór ─────────────────────────────────────────────────
+   Karta odpowiada na „co to jest, czy mamy i ile kosztuje”. Stoi pod decyzją,
+   bo z tych faktów decyzję się wydaje. Fakty zamówienia („kiedy kupił, ile
+   zapłacił i czy dostał”) stoją na drodze sprawy, przy swoich krokach.
 
-   Wszystko tu jest ODCZYTEM. Jedynym zapisem jest pytanie o paczkę, i to
-   jawnym kliknięciem, nie skutkiem ubocznym patrzenia.
+   Wszystko tu jest ODCZYTEM i nic nie wysyła żądań poza odczytem karty.
 
    BRAK WIEDZY MILCZY ALBO MÓWI SŁOWEM, nigdy zerem. Wiersz stanu bez karty
    Subiekta nie staje wcale, bo „0 szt.” przy braku karty to kłamstwo, a nie
@@ -64,41 +59,8 @@ export function kartotekaSprawy(szczegol: Pick<SzczegolReklamacji, "reklamacja" 
   return { twId: null, symbol: null, zrodlo: null };
 }
 
-/** Formy płatności po polsku; nieznana zostaje surowa, bo Allegro nie zamyka listy. */
-const PLATNOSCI: Record<string, string> = {
-  ONLINE: "online", CASH_ON_DELIVERY: "za pobraniem", WIRE_TRANSFER: "przelew",
-  SPLIT_PAYMENT: "podzielona", EXTENDED_TERM: "odroczona",
-};
-
 /** Wielka litera na początku pozycji listy — słownik trzyma słowa małymi. */
 const zWielkiej = (t: string) => t.charAt(0).toLocaleUpperCase("pl") + t.slice(1);
-
-/**
- * Po ilu pełnych dniach od zakupu klient zgłosił sprawę.
- *
- * Serwer liczy to sam; starszy go nie zna, więc wtedy liczymy z jego dwóch
- * dat. Obie są z serwera, więc zegar przeglądarki w tym nie bierze udziału.
- */
-function zgloszonoPoDniach(r: Reklamacja): number | null {
-  if (r.zgloszonoPoDniach !== undefined) return r.zgloszonoPoDniach;
-  if (!r.kupionoAt || !r.otwartoAt) return null;
-  const dni = Math.floor((Date.parse(r.otwartoAt) - Date.parse(r.kupionoAt)) / 86_400_000);
-  return Number.isFinite(dni) && dni >= 0 ? dni : null;
-}
-
-/**
- * Stan paczki jednym zdaniem — to jest odpowiedź, którą widać bez otwierania.
- *
- * Trzy różne braki mówią trzy różne zdania, bo każdy każe co innego zrobić:
- * „nie pytaliśmy”, „Allegro nie ma numeru” i „przewoźnik milczy”.
- */
-function stanPaczki(p: NonNullable<SzczegolReklamacji["przesylka"]>): string {
-  if (p.dostarczonoAt && p.waybill !== null) return `doręczona ${dataCyfrowa(p.dostarczonoAt)}`;
-  if (p.sprawdzonoAt === null) return "nie pytaliśmy jeszcze Allegro";
-  if (p.waybill === null) return "Allegro nie ma numeru przesyłki";
-  if (p.status === null) return "przewoźnik nie podał statusu";
-  return STATUS_PACZKI[p.status] ?? `przewoźnik podał: ${p.status}`;
-}
 
 const Wiersz = ({ nazwa, children }: { nazwa: string; children: React.ReactNode }) => <>
   <dt className="text-slate-600">{nazwa}</dt>
@@ -113,14 +75,9 @@ const DoAllegro = ({ href, nazwa, children }: { href: string | null; nazwa: stri
         {children} →<span className="sr-only"> ({nazwa}, otwiera się w Allegro)</span></a>
     : null;
 
-export function Produkt({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke = false, bladPrzesylki = "" }: {
-  szczegol: SzczegolReklamacji;
-  /* Pytanie o paczkę jest opcjonalne: czego nie da się zrobić, tego nie ma
-     na ekranie. */
-  onSprawdzPrzesylke?: () => void;
-  sprawdzaPrzesylke?: boolean;
-  bladPrzesylki?: string;
-}) {
+/* Pytania o paczkę karta nie niesie: stoi ono przy kroku doręczenia na
+   drodze sprawy (`DrogaSprawy`), obok stanu paczki. */
+export function Produkt({ szczegol }: { szczegol: SzczegolReklamacji }) {
   const r = szczegol.reklamacja;
   const towar = kartotekaSprawy(szczegol);
   /* Ten sam hak, co w skrzynce — TanStack trzyma kartę pod jednym kluczem,
@@ -136,14 +93,8 @@ export function Produkt({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke = fals
   const powod = r.powodTyp ? (POWODY[r.powodTyp] ?? r.powodTyp) : null;
   const prawo = r.prawo ? (PRAWO[r.prawo] ?? r.prawo) : null;
   const historiaTowaru = szczegol.historia?.towar ?? null;
-  const z = szczegol.zamowienie;
-  const p = szczegol.przesylka;
-  const poDniach = zgloszonoPoDniach(r);
-  /* Jedna droga klienta w obie strony: z reklamacji do zwrotu, pytania
-     i dyskusji tego zamówienia (`docs/obsluga-klienta-calosc.md`). */
-  const inneSprawy = inneSprawyZakupu(szczegol.droga, szczegol.sprawy, { rodzaj: "reklamacja", id: r.id });
 
-  return <section aria-label="Produkt i zamówienie" className="card flex flex-col">
+  return <section aria-label="Produkt" className="card flex flex-col">
     <div className="flex flex-col gap-3 px-5 py-4">
       <div className="flex items-center justify-between gap-3">
         <h2 className="text-naglowek font-bold text-slate-900">Produkt</h2>
@@ -198,62 +149,5 @@ export function Produkt({ szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke = fals
       </dl>
     </div>
 
-    <div className="flex flex-col gap-3 border-t border-slate-200 px-5 py-4">
-      <div className="flex items-center justify-between gap-3">
-        <h2 className="text-naglowek font-bold text-slate-900">Zamówienie</h2>
-        {r.orderId && <span className="flex min-w-0 items-center gap-1">
-          {r.linkZamowienia
-            ? <DoAllegro href={r.linkZamowienia} nazwa="zamówienie w Allegro">
-                <span className="font-mono">{r.orderId}</span></DoAllegro>
-            : <span className="min-w-0 truncate font-mono text-sm text-slate-700">{r.orderId}</span>}
-          <Skopiuj tekst={r.orderId} tytul="Kopiuj numer zamówienia" />
-        </span>}
-      </div>
-      <dl className="m-0 grid grid-cols-[6.25rem_minmax(0,1fr)] gap-x-3 gap-y-2 text-sm">
-        <Wiersz nazwa="Kupiono">
-          {r.kupionoAt
-            ? <>{dataCyfrowa(r.kupionoAt)}{poDniach !== null &&
-                <> · {poDniach === 0 ? "w dniu zgłoszenia" : `${dniSlowo(poDniach)} przed zgłoszeniem`}</>}</>
-            : "nie wiemy"}
-        </Wiersz>
-        <Wiersz nazwa="Płatność">
-          {/* Kwota z zamówienia, nie z żądania: żądanie stoi przy „Chce”. */}
-          {z
-            ? <>
-                <b className={`font-semibold ${z.platnoscAt ? "text-ranga-ok" : "text-slate-900"}`}>
-                  {z.platnoscAt ? "Opłacono " : ""}{z.sumaGrosze !== null ? zlote(z.sumaGrosze, z.waluta) : "kwota nieznana"}</b>
-                {[z.platnoscTyp ? (PLATNOSCI[z.platnoscTyp] ?? z.platnoscTyp) : null,
-                  z.platnoscAt ? dataCyfrowa(z.platnoscAt) : null].filter(Boolean).map((t) => ` · ${t}`).join("")}
-              </>
-            : "zamówienia jeszcze nie pobraliśmy"}
-        </Wiersz>
-        <Wiersz nazwa="Przesyłka">
-          {p
-            ? <span className="flex flex-col gap-0.5">
-                <span>{stanPaczki(p)}
-                  {p.waybill !== null && p.przewoznik && <> · {PRZEWOZNICY[p.przewoznik] ?? p.przewoznik}</>}</span>
-                {/* Numer listu mono, bo czyta się go znak po znaku z naklejki. */}
-                {p.waybill !== null && <span className="flex items-center gap-1 text-xs">
-                  <span className="min-w-0 break-all font-mono text-slate-800">{p.waybill}</span>
-                  <Skopiuj tekst={p.waybill} tytul="Kopiuj numer przesyłki" />
-                </span>}
-                <span className="text-xs text-slate-600"
-                  title={p.sprawdzonoAt ? `Pytaliśmy Allegro ${czas(p.sprawdzonoAt)}` : undefined}>
-                  {p.sprawdzonoAt ? `sprawdzone ${kiedy(p.sprawdzonoAt)}` : null}
-                  {onSprawdzPrzesylke && <>{p.sprawdzonoAt ? " · " : ""}
-                    <button type="button" disabled={sprawdzaPrzesylke} onClick={onSprawdzPrzesylke}
-                      className="min-h-6 font-semibold text-slate-700 underline underline-offset-2 disabled:opacity-50">
-                      {sprawdzaPrzesylke ? "pytam…" : p.sprawdzonoAt ? "sprawdź jeszcze raz" : "sprawdź"}</button>
-                  </>}
-                </span>
-                {bladPrzesylki && <span className="text-xs text-ranga-zle">{bladPrzesylki}</span>}
-              </span>
-            /* Bez zamówienia nie ma przesyłki, o którą można zapytać. */
-            : "bez danych o przesyłce"}
-        </Wiersz>
-        {/* Bez innych spraw wiersz nie staje, bo pusty nie mówi nic nowego. */}
-        {inneSprawy.length > 0 && <Wiersz nazwa="Ten zakup"><SprawyWWierszu lista={inneSprawy} /></Wiersz>}
-      </dl>
-    </div>
   </section>;
 }

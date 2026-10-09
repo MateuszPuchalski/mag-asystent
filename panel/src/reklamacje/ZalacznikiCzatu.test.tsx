@@ -5,11 +5,9 @@ import userEvent from "@testing-library/user-event";
 import type { WiadomoscReklamacji } from "../api/typy";
 
 /* ── Załączniki w czacie reklamacji — opakowanie na wspólnej powłoce ─────────
-   OSOBNY PLIK od `Czat.test.tsx` celowo: tamten pilnuje rozmowy (role,
-   niepełny czat, edytor), ten — tego, czego czat reklamacji do tego wydania
-   NIE robił: porażka podglądu milczała (spadała na przycisk), a błąd
-   pobrania był połykany. Skrzynka miała oba zdania od 0.244.0; teraz mają
-   je oba miejsca z jednej powłoki.                                          */
+   OSOBNY PLIK od `Czat.test.tsx` celowo: tamten pilnuje rozmowy (strony,
+   podpisy, zgłoszenie, edytor), ten — mówienia o porażce. Porażka podglądu
+   nie może milczeć, a błąd pobrania nie może być połykany.               */
 
 const scena = vi.hoisted(() => ({
   haki: [] as Array<[number, number | null]>,
@@ -29,8 +27,8 @@ vi.mock("../api/reklamacje", () => ({
 
 const { Czat } = await import("./Czat");
 
-/* Kształt strukturalny z 0.245.0: czat czyta o sprawie tylko tyle. */
-const sprawa = () => ({ id: 3, opisZgloszenia: "Pękła obudowa", wiadomosciIle: 1, czatUrwany: false });
+/* Kształt strukturalny: czat czyta o sprawie tylko tyle. */
+const sprawa = () => ({ id: 3, opisZgloszenia: "Pękła obudowa", czatAktywny: true, wiadomosciIle: 1 });
 const wiad = (zalaczniki: WiadomoscReklamacji["zalaczniki"]): WiadomoscReklamacji => ({
   id: 1, externalId: "w-1", autorLogin: "kupujacy1", autorRola: "BUYER",
   tresc: "Kosiarka przestała ciąć", utworzonoAt: "2026-09-06T10:01:00.000Z", zalaczniki,
@@ -68,7 +66,7 @@ describe("Załączniki w czacie reklamacji", () => {
     expect(await screen.findByText(/sprawdź internet na serwerze/)).toBeInTheDocument();
   });
 
-  it("zdjęcie widać w linii i da się je powiększyć — jak w skrzynce", async () => {
+  it("zdjęcie widać kaflem w dymku i da się je powiększyć", async () => {
     scena.wynik = { url: "blob:usterka", blad: null };
     czat(true);
     expect(screen.getByRole("img", { name: "usterka.jpg" })).toHaveAttribute("src", "blob:usterka");

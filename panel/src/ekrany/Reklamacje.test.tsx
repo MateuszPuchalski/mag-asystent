@@ -649,6 +649,15 @@ describe("Środek: głowica, droga i rozmowa", () => {
     });
   });
 
+  it("czat reklamacji: nagłówek, a zgłoszenie jest pierwszym dymkiem z powodem", () => {
+    pokaz("/obsluga/reklamacje/1");
+    expect(screen.getByRole("heading", { name: "Czat reklamacji" })).toBeInTheDocument();
+    const zgloszenie = screen.getByText("Opis sprawy 1").closest("li")!;
+    expect(zgloszenie).toHaveTextContent(/klient1 · .* · zgłoszenie/);
+    expect(within(zgloszenie).getByText("Powód: niezgodny z opisem · chce zwrotu pieniędzy"))
+      .toBeInTheDocument();
+  });
+
   it("droga sprawy stoi między głowicą a rozmową", () => {
     pokaz("/obsluga/reklamacje/1");
     const droga = screen.getByRole("list", { name: "Droga sprawy" });
@@ -813,10 +822,10 @@ describe("Odpowiedź w rozmowie", () => {
 });
 
 describe("Prawa kolumna: decyzja, produkt, notatka", () => {
-  it("kolejność: decyzja, potem produkt z zamówieniem, potem notatka — wszystko za rozmową", () => {
+  it("kolejność: decyzja, potem produkt, potem notatka — wszystko za rozmową", () => {
     pokaz("/obsluga/reklamacje/1");
-    const kolumna = screen.getByRole("complementary", { name: "Decyzja i dane zamówienia" });
-    const produkt = within(kolumna).getByRole("region", { name: "Produkt i zamówienie" });
+    const kolumna = screen.getByRole("complementary", { name: "Decyzja i produkt" });
+    const produkt = within(kolumna).getByRole("region", { name: "Produkt" });
     const notatka = within(kolumna).getByRole("region", { name: "Notatka wewnętrzna" });
     expect(produkt.compareDocumentPosition(notatka) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.getByText("Opis sprawy 1").compareDocumentPosition(kolumna)

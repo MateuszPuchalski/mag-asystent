@@ -51,7 +51,8 @@ export function zawieraOpis(wiadomosc: string, opis: string): boolean {
    Pierwsza wiadomość kupującego w reklamacji nie jest jego wiadomością: to
    formularz Allegro z etykietami, w którym jedno pole niesie jego własne
    słowa. Trzy z pięciu etykiet powtarzają to, co ekran mówi już po polsku:
-   powód i oczekiwanie w głowicy sprawy, tytuł prawny w zwijce „Sprawa".
+   powód i oczekiwanie w linii nad zdaniem klienta, tytuł prawny w karcie
+   produktu.
 
    ROZPOZNAJEMY PO ETYKIETACH, NIE PO KOLEJNOŚCI ANI PO POZYCJI. Allegro
    kiedyś te teksty zmieni i wtedy wiadomość zostaje w całości — tak ma być.
@@ -68,7 +69,7 @@ const PROG_FORMULARZA = 2;
 export interface Formularz {
   /** Wartość pola „Opis" — jedyne zdanie, które napisał człowiek. */
   opis: string;
-  /** Cała wiadomość bez zmian; pokazuje ją „pokaż całość". */
+  /** Cała wiadomość bez zmian. */
   calosc: string;
 }
 
@@ -77,8 +78,8 @@ export interface Formularz {
  * jest formularz albo gdy nie ma w nim pola „Opis".
  *
  * Bez pola „Opis" NIE ZWRACAMY NICZEGO, choć etykiety trafiły: składanie
- * wiadomości, z której nie umiemy wyjąć treści, zostawiłoby na ekranie samą
- * zapowiedź „pokaż całość" nad pustym miejscem.
+ * wiadomości, z której nie umiemy wyjąć treści, zostawiłoby na ekranie puste
+ * miejsce zamiast całej wiadomości.
  */
 export function rozbierzFormularz(tekst: string): Formularz | null {
   const trafione = ETYKIETY.filter((e) => tekst.includes(e));

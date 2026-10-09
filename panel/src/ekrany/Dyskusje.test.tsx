@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -420,11 +420,19 @@ describe("Kolejność, zdjęcia i wyjście do Allegro", () => {
     } finally { Object.assign(stara, kopia); }
   });
 
-  it("zdjęcia z rozmowy stoją w kolumnie obok, jak w reklamacjach", () => {
+  it("zdjęcia stoją kaflem w dymku wiadomości, bez kolumny obok", () => {
     pokaz("/obsluga/dyskusje/1", [wiad({
       zalaczniki: [{ id: 9, wiadomoscId: 1, nazwa: "paczka.jpg", podglad: true }],
     })]);
-    expect(screen.getByRole("complementary", { name: "Zdjęcia w sprawie" })).toBeInTheDocument();
+    expect(screen.queryByRole("complementary", { name: "Zdjęcia w sprawie" })).not.toBeInTheDocument();
+    const lista = screen.getByRole("list", { name: "Wiadomości" });
+    expect(within(lista).getByRole("button", { name: "paczka.jpg" })).toBeInTheDocument();
+  });
+
+  it("czat ma nagłówek „Czat dyskusji” ze stanem rozmowy", () => {
+    pokaz("/obsluga/dyskusje/1", [wiad()]);
+    expect(screen.getByRole("heading", { name: "Czat dyskusji" })).toBeInTheDocument();
+    expect(screen.getByText(/1 wiadomość · czat (otwarty|zamknięty)/)).toBeInTheDocument();
   });
 
   it("dyskusja prowadzi do swojej strony w Centrum Sprzedaży", () => {

@@ -1,23 +1,21 @@
 import React from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import type {
   DopasowanieKartoteki, Reklamacja, StanPrzesylki, SzczegolReklamacji, Zamowienie,
 } from "../api/typy";
 
-/* ── Karta Produkt i Zamówienie ──────────────────────────────────────────────
-   Fakty, z których wydaje się werdykt, w jednej karcie pod decyzją. Testy
+/* ── Karta Produkt ───────────────────────────────────────────────────────────
+   Fakty towaru, z których wydaje się werdykt, w karcie pod decyzją. Testy
    pilnują tego, co rozstrzyga decyzję, a nie wyglądu karty:
 
    1. JEDNA KARTOTEKA NA SPRAWĘ. Paragon bije sygnaturę, SKU i pamięć wskazań
       wchodzą, zgadywanie nie. Stan, półka i cennik pytają o tę samą kartę.
    2. BRAK KARTY TO BRAK WIERSZA, nie „0 szt.” — zero przy braku wiedzy kłamie.
    3. CENY BEZ KLIKANIA, bo służą do triażu; poziom 0 (zakup) poza osią.
-   4. PACZKA PYTA NA KLIKNIĘCIE — patrzenie nie wysyła żądań do Allegro.
-   5. ZAMÓWIENIE BEZ PARAGONU: numeru paragonu nie ma w danych.
-   6. JEDNA DROGA KLIENTA: z reklamacji do innych spraw tego zamówienia.  */
+   4. ZAMÓWIENIE, PACZKA I INNE SPRAWY ZAKUPU STOJĄ NA DRODZE SPRAWY, nie
+      w karcie. Ich fakty i odnośniki pilnuje `DrogaSprawy.test.tsx`.  */
 
 const karta = vi.fn();
 vi.mock("../api/rozmowy", () => ({ useKartaTowaru: (twId: number | null) => karta(twId) }));
@@ -195,106 +193,16 @@ describe("Produkt: co to jest, czy mamy i ile kosztuje", () => {
   });
 });
 
-describe("Zamówienie: kiedy, za ile i czy dotarło", () => {
-  it("kupiono z datą i odstępem do zgłoszenia, płatność z kwotą, typem i datą", () => {
-    render(<Produkt szczegol={szczegol()} />);
-    expect(screen.getByText(/^\d{2}\.09\.2026 · 10 dni przed zgłoszeniem$/)).toBeInTheDocument();
-    expect(screen.getByText("Opłacono 27,99 PLN")).toBeInTheDocument();
-    expect(screen.getByText(/· online · \d{2}\.09\.2026/)).toBeInTheDocument();
-  });
-
-  it("wiersza „Paragon” nie ma — numeru paragonu nie ma w danych", () => {
-    render(<Produkt szczegol={szczegol()} />);
-    expect(screen.queryByText("Paragon")).not.toBeInTheDocument();
-  });
-
-  it("bez daty zakupu i bez zamówienia mówi „nie wiemy”, nie zero", () => {
-    render(<Produkt szczegol={szczegol({ zamowienie: null }, { kupionoAt: null, zgloszonoPoDniach: null })} />);
-    expect(screen.getByText("nie wiemy")).toBeInTheDocument();
-    expect(screen.getByText("zamówienia jeszcze nie pobraliśmy")).toBeInTheDocument();
-  });
-
-  it("numer zamówienia jest łączem do Allegro z kopiowaniem obok", () => {
-    render(<Produkt szczegol={szczegol()} />);
-    expect(screen.getByRole("link", { name: /ord-5/ })).toHaveAttribute("href", "https://allegro.pl/z/5");
-    expect(screen.getByTitle("Kopiuj numer zamówienia")).toBeInTheDocument();
-  });
-});
-
-describe("Przesyłka do klienta", () => {
-  it("mówi wprost, że jeszcze NIE PYTALIŚMY — to brak wiedzy nasz, nie Allegro", () => {
-    render(<Produkt szczegol={szczegol({ przesylka: przesylka() })} onSprawdzPrzesylke={vi.fn()} />);
-    expect(screen.getByText("nie pytaliśmy jeszcze Allegro")).toBeInTheDocument();
-  });
-
-  it("odróżnia BRAK NUMERU u Allegro od braku pytania", () => {
-    render(<Produkt szczegol={szczegol({ przesylka: przesylka({ sprawdzonoAt: "2026-09-29T10:00:00.000Z" }) })} />);
-    expect(screen.getByText("Allegro nie ma numeru przesyłki")).toBeInTheDocument();
-  });
-
-  it("doręczenie stoi z datą, a numer listu da się skopiować", () => {
-    render(<Produkt szczegol={szczegol({ przesylka: przesylka({
-      waybill: "600000727616", przewoznik: "INPOST", status: "DELIVERED",
-      dostarczonoAt: "2026-09-20T10:00:00.000Z", sprawdzonoAt: "2026-09-29T10:00:00.000Z" }) })} />);
-    expect(screen.getByText(/^doręczona \d{2}\.09\.2026/)).toHaveTextContent(/InPost/);
-    expect(screen.getByText("600000727616")).toBeInTheDocument();
-    expect(screen.getByTitle("Kopiuj numer przesyłki")).toBeInTheDocument();
-  });
-
-  it("w drodze mówi SŁOWEM, nie kodem przewoźnika", () => {
-    render(<Produkt szczegol={szczegol({ przesylka: przesylka({
-      waybill: "6000", przewoznik: "DPD", status: "IN_TRANSIT", sprawdzonoAt: "2026-09-29T10:00:00.000Z" }) })} />);
-    expect(screen.getByText(/w drodze do klienta/)).toBeInTheDocument();
-    expect(screen.queryByText(/IN_TRANSIT/)).not.toBeInTheDocument();
-  });
-
-  it("pyta Allegro TYLKO na kliknięcie — samo otwarcie karty nie pyta", async () => {
-    const onSprawdz = vi.fn();
-    render(<Produkt szczegol={szczegol({ przesylka: przesylka() })} onSprawdzPrzesylke={onSprawdz} />);
-    expect(onSprawdz).not.toHaveBeenCalled();
-    await userEvent.click(screen.getByRole("button", { name: "sprawdź" }));
-    expect(onSprawdz).toHaveBeenCalledTimes(1);
-  });
-
-  it("bez procedury pytania nie ma martwego przycisku, a bez zamówienia — przesyłki", () => {
-    const { unmount } = render(<Produkt szczegol={szczegol({ przesylka: przesylka() })} />);
+describe("Fakty zamówienia stoją na drodze sprawy, nie w karcie", () => {
+  it("karta nie ma zamówienia, przesyłki, „Paragonu” ani „Tego zakupu”", () => {
+    const zwrot = { rodzaj: "zwrot" as const, id: 7, at: "2026-09-20T10:00:00.000Z", opis: null };
+    render(<MemoryRouter><Produkt szczegol={szczegol({ droga: [zwrot],
+      przesylka: przesylka({ waybill: "600000727616" }) })} /></MemoryRouter>);
+    for (const t of ["Zamówienie", "Płatność", "Przesyłka", "Paragon", "Ten zakup"]) {
+      expect(screen.queryByText(t)).not.toBeInTheDocument();
+    }
+    expect(screen.queryByText(/27,99 PLN/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /ord-5|zwrot/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /sprawdź/ })).not.toBeInTheDocument();
-    unmount();
-    render(<Produkt szczegol={szczegol({ przesylka: null })} onSprawdzPrzesylke={vi.fn()} />);
-    expect(screen.getByText("bez danych o przesyłce")).toBeInTheDocument();
-  });
-
-  it("błąd pytania o paczkę stoi przy przesyłce", () => {
-    render(<Produkt szczegol={szczegol({ przesylka: przesylka() })} onSprawdzPrzesylke={vi.fn()}
-      bladPrzesylki="Allegro nie odpowiedziało" />);
-    expect(screen.getByText("Allegro nie odpowiedziało")).toBeInTheDocument();
-  });
-});
-
-describe("Ten zakup: inne sprawy tego zamówienia", () => {
-  const przystanek = (rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot", id: number) =>
-    ({ rodzaj, id, at: "2026-09-20T10:00:00.000Z", opis: null });
-  const naTrasie = (n: Partial<SzczegolReklamacji>) =>
-    render(<MemoryRouter><Produkt szczegol={szczegol(n)} /></MemoryRouter>);
-
-  it("przystanek zwrotu i rozmowy prowadzi do swojej kolejki, bez tej reklamacji", () => {
-    naTrasie({ droga: [przystanek("rozmowa", 3), przystanek("reklamacja", 5), przystanek("zwrot", 7)] });
-    expect(screen.getByText("Ten zakup")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /^zwrot/ })).toHaveAttribute("href", "/obsluga/zwroty/7");
-    expect(screen.getByRole("link", { name: /^pytanie/ })).toHaveAttribute("href", "/obsluga/skrzynka/3");
-    expect(screen.queryByRole("link", { name: /^reklamacja/ })).not.toBeInTheDocument();
-  });
-
-  it("dyskusja z rodzeństwa i z drogi staje raz", () => {
-    const dyskusja = { id: 8, typ: "DISPUTE", numer: null, temat: null, statusAllegro: null,
-      decyzjaDo: null, otwartoAt: "2026-09-21T10:00:00.000Z", prowadzi: null, otwarta: true };
-    naTrasie({ droga: [przystanek("dyskusja", 8), przystanek("reklamacja", 5)], sprawy: [dyskusja] });
-    expect(screen.getAllByRole("link", { name: /^dyskusja/ })).toHaveLength(1);
-    expect(screen.getByRole("link", { name: /^dyskusja/ })).toHaveAttribute("href", "/obsluga/dyskusje/8");
-  });
-
-  it("bez innych spraw wiersz nie staje — także gdy droga zna tylko tę reklamację", () => {
-    naTrasie({ droga: [przystanek("reklamacja", 5)], sprawy: [] });
-    expect(screen.queryByText("Ten zakup")).not.toBeInTheDocument();
   });
 });

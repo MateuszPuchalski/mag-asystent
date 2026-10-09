@@ -14,8 +14,8 @@ import { Edytor as EdytorOdpowiedzi } from "../skrzynka/Edytor";
    - sufit 20 000 znaków z `MessageRequest.text`, nie 2000 z Centrum
      Wiadomości, bo to inny zasób;
    - brak notatki z wzmiankami: sprawa ma własną notatkę w kolumnie faktów;
-   - szkic żyje w sesji przeglądarki, nie na serwerze, więc podpowiedź nie
-     mówi o współdzieleniu z zespołem i nie ma „Zapisz szkic”;
+   - szkic żyje w sesji przeglądarki, nie na serwerze, więc ani podpis nad
+     dymkiem, ani podpowiedź nie mówią o zespole i nie ma „Zapisz szkic”;
    - zamknięty czat, przy którym pola nie ma wcale. */
 
 /** Limit z `MessageRequest.text` (`maxLength: 20000`) — dziesięć razy więcej
@@ -52,6 +52,7 @@ export function Edytor({
     etykietaPola="Odpowiedź w sprawie"
     podpowiedz="Odpowiedź w tej sprawie — przeczyta ją kupujący, a bywa że i doradca Allegro"
     podpowiedzZwinieta="Odpowiedz w sprawie…"
+    podpis="Twoja odpowiedź · szkic"
     zamkniete={czatAktywny ? null
       : "Allegro zamknęło rozmowę w tej sprawie — nowej wiadomości nie przyjmie."} />;
 }

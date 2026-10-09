@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { DatabaseSync } from "node:sqlite";
 import fs from "node:fs";
 import { migrate } from "../db/db.js";
-import { BladReklamacji, ReklamacjaConflict } from "./reklamacje.js";
+import { BladReklamacji, ReklamacjaConflict, czatReklamacji } from "./reklamacje.js";
 import {
   LIMIT_ZNAKOW, odpowiedzWSprawie, stanKolejkiOdpowiedzi,
 } from "./reklamacje-wysylka.js";
@@ -419,4 +419,67 @@ test("po wysłanym stanowisku o towarze drugie dostaje 409 ze zdaniem, bez strza
     wyslij: async () => { strzalow += 1; return { id: "m-9" }; },
   })), (e: unknown) => e instanceof ReklamacjaConflict && /już wyszło/.test(e.message));
   assert.equal(strzalow, 0);
+});
+
+/* ── Kto wysłał nasz dymek ───────────────────────────────────────────────────
+   Allegro podpisuje każdą naszą wiadomość tym samym kontem sprzedawcy, więc
+   imię agenta zna wyłącznie skrzynka nadawcza. Wiązanie idzie po numerze
+   wiadomości z Allegro. Treść i czas powtarzają się, więc wiązanie po nich
+   dałoby imię cudzemu dymkowi. */
+
+const imiona = (d: DatabaseSync, id: number) =>
+  czatReklamacji(d, id).map((w) => [w.externalId, w.autorRola, w.wyslalNazwa]);
+
+test("wiadomość wysłana z panelu niesie imię agenta, wiadomość klienta — null", async () => {
+  const { d, id, pytanie } = stanowisko();
+  await odpowiedzWSprawie(zadanie(d, id, pytanie));
+  assert.deepEqual(imiona(d, id), [
+    ["w-1", "BUYER", null],
+    ["m-1", "SELLER", "A. Lewandowska"],
+  ]);
+});
+
+test("imię przeżywa synchronizację, która nadpisuje wiadomość po numerze", async () => {
+  const { d, id, pytanie } = stanowisko();
+  await odpowiedzWSprawie(zadanie(d, id, pytanie));
+  /* Ten sam kształt zapisu co `zapiszWiadomosc` w synchronizacji. */
+  d.prepare(`INSERT INTO reklamacja_wiadomosc
+      (reklamacja_id,external_id,autor_login,autor_rola,tresc,utworzono_at)
+    VALUES (?,'m-1','sklep-wertis','SELLER','Proszę o zdjęcie noża.','2026-09-07T12:00:01Z')
+    ON CONFLICT(reklamacja_id, external_id) DO UPDATE SET
+      autor_login=excluded.autor_login, utworzono_at=excluded.utworzono_at`).run(id);
+  assert.equal(czatReklamacji(d, id)[1].wyslalNazwa, "A. Lewandowska");
+});
+
+test("wiadomość sprzedawcy spoza panelu zostaje bez imienia, choć treść jest ta sama", async () => {
+  const { d, id, pytanie, wiad } = stanowisko();
+  await odpowiedzWSprawie(zadanie(d, id, pytanie));
+  /* Ktoś odpisał z Centrum Sprzedaży tym samym zdaniem. Wiersza w kolejce
+     nie ma, więc imię byłoby zgadywaniem. */
+  wiad("m-allegro", "SELLER", "Proszę o zdjęcie noża.");
+  const czat = czatReklamacji(d, id);
+  assert.equal(czat.find((w) => w.externalId === "m-allegro")?.wyslalNazwa, null);
+  assert.equal(czat.find((w) => w.externalId === "m-1")?.wyslalNazwa, "A. Lewandowska");
+});
+
+test("niejednoznaczny timeout nie daje imienia wiadomości, którą przyniosła synchronizacja", async () => {
+  const { d, id, pytanie, wiad } = stanowisko();
+  await assert.rejects(() => odpowiedzWSprawie(zadanie(d, id, pytanie, {
+    wyslij: async () => { throw Object.assign(new Error("timeout"), { name: "TimeoutError" }); },
+  })));
+  /* Kolejka nie zna numeru, więc nie ma po czym związać. */
+  wiad("m-1", "SELLER", "Proszę o zdjęcie noża.");
+  assert.equal(czatReklamacji(d, id).find((w) => w.externalId === "m-1")?.wyslalNazwa, null);
+});
+
+test("skasowane konto zdejmuje imię, a próba wysyłki zostaje w kolejce", async () => {
+  const { d, id, pytanie } = stanowisko();
+  d.prepare("INSERT INTO app_user(user_id,login,name,role) VALUES (2,'marek','M. Wójcik','biuro')").run();
+  await odpowiedzWSprawie(zadanie(d, id, pytanie, { autor: { id: 2, name: "M. Wójcik" } }));
+  assert.equal(czatReklamacji(d, id)[1].wyslalNazwa, "M. Wójcik");
+
+  d.prepare("DELETE FROM app_user WHERE user_id=2").run();
+  assert.equal(czatReklamacji(d, id)[1].wyslalNazwa, null);
+  assert.deepEqual(outbox(d).map((o) => o.status), ["sent"],
+    "kasowanie konta nie zabiera śladu wysyłki");
 });

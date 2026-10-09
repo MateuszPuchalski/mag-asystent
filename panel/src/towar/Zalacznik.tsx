@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Paperclip } from "lucide-react";
+import { Paperclip, Play } from "lucide-react";
 import { Powiekszenie } from "./Powiekszenie";
 
 /* ── Wspólny załącznik rozmowy (skrzynka i reklamacje) ───────────────────────
@@ -107,5 +107,66 @@ export function KartaZalacznika({ nazwa, podglad, obraz, pobierz, powodBrakuPobr
     {/* Nieudane POBRANIE też mówi — w reklamacjach do tego wydania było
         połykane (`void`), więc kliknięcie bez pliku nie zostawiało nic. */}
     {bladPobrania && <p className="mt-0.5 text-ranga-zle">{bladPobrania}</p>}
+  </li>;
+}
+
+/* ── Kafel w dymku rozmowy ───────────────────────────────────────────────────
+   Makieta właściciela stawia zdjęcia W DYMKU wiadomości, kaflami 112×84.
+   Pełne zdjęcie do 256 px wypychało następną wiadomość poza ekran, a osobna
+   kolumna rozrywała wiadomość od jej zdjęcia. Kafel mówi „co klient przysłał”,
+   a szczegół daje powiększenie jednym kliknięciem.
+
+   DWA CELE W JEDNYM KAFLU: obraz powiększa, pasek z nazwą pobiera. Pobranie
+   zostaje, bo plik na dysku to inne pytanie niż podgląd. Pasek ma 24 px,
+   czyli próg celu WCAG 2.2 (2.5.8).
+
+   Film nie ma podglądu w przeglądarce bez pobrania, więc stoi ciemnym kaflem
+   z nazwą. Rozpoznajemy go po rozszerzeniu, bo Allegro nie podaje typu. */
+const FILM = /\.(mp4|mov|m4v|avi|webm|3gp|mkv)$/i;
+
+export function KafelZalacznika({ nazwa, podglad, obraz, pobierz }: {
+  nazwa: string;
+  podglad: boolean;
+  obraz: ObrazZalacznika;
+  pobierz: () => Promise<void>;
+}) {
+  const [powiekszone, setPowiekszone] = useState(false);
+  const [bladPobrania, setBladPobrania] = useState<string | null>(null);
+  const { url, blad, ponow } = obraz;
+  const film = FILM.test(nazwa);
+  const pobieraj = () => {
+    setBladPobrania(null);
+    pobierz().catch((e: unknown) =>
+      setBladPobrania(e instanceof Error ? e.message : "Nie udało się pobrać"));
+  };
+  /* PRZYCISK, nie odnośnik: `<a href>` nie niesie nagłówka `x-session`. */
+  const pasekNazwy = <button type="button" onClick={pobieraj} title={`${nazwa} — kliknij, żeby pobrać`}
+    className={`absolute inset-x-0 bottom-0 flex min-h-6 items-center gap-1 px-2 text-left text-xs underline-offset-2 hover:underline ${
+      film ? "text-white" : "bg-white/90 text-slate-700"}`}>
+    {film ? <Play size={12} className="shrink-0" /> : <Paperclip size={12} className="shrink-0 text-slate-500" />}
+    <span className="truncate">{nazwa}</span>
+  </button>;
+
+  return <li className="flex max-w-56 flex-col gap-1">
+    <div className={`relative h-[84px] w-28 overflow-hidden rounded-lg ${
+      film ? "bg-slate-700" : "border border-slate-200 bg-white"}`}>
+      {url && !film && <button type="button" onClick={() => setPowiekszone(true)}
+        aria-label={`Powiększ: ${nazwa}`} title={`${nazwa} — kliknij, żeby powiększyć`}
+        className="block h-full w-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-slate-400">
+        <img src={url} alt={nazwa} loading="lazy" className="h-full w-full object-cover" />
+      </button>}
+      {/* Stałe miejsce PRZED pobraniem, żeby oś nie skakała przy doładowaniu. */}
+      {podglad && !film && url === undefined &&
+        <span className="flex h-full items-start justify-center pt-5 text-xs text-slate-600">wczytuję…</span>}
+      {pasekNazwy}
+    </div>
+    {powiekszone && url && <Powiekszenie url={url} nazwa={nazwa} symbol={null}
+      zamknij={() => setPowiekszone(false)} />}
+    {/* Nieudany PODGLĄD mówi zdaniem z serwera i daje ponowienie. */}
+    {podglad && url === null && blad &&
+      <p className="text-xs text-ranga-zle">{blad}{" "}
+        <button type="button" className="font-bold underline" onClick={ponow}>Spróbuj ponownie</button>
+      </p>}
+    {bladPobrania && <p className="text-xs text-ranga-zle">{bladPobrania}</p>}
   </li>;
 }

@@ -1647,6 +1647,8 @@ export interface WiadomoscReklamacji {
   autorRola: string | null;
   tresc: string;
   utworzonoAt: string | null;
+  /** Kto z biura wysłał wiadomość z panelu; null spoza panelu, po skasowaniu konta i przy innych rolach. */
+  wyslalNazwa?: string | null;
   zalaczniki: ZalacznikReklamacji[];
 }
 

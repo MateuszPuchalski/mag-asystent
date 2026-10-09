@@ -46,11 +46,10 @@ export const ZWLOKA_KLAWISZA_MS = 1000;
  * pustym polem i kartą z treścią. Żaden odstęp tego nie naprawiał.
  *
  * Decyzja właściciela z kanwy („A + B"), dwie zmiany naraz:
- * A — szkic Copilota stoi W POLU jako podpowiedź, Tab go przyjmuje;
- * B — edytor jest ostatnią wypowiedzią osi, z jednym przewijaniem na całość,
- *     a przyciski wysyłki pływają przy dolnej krawędzi.
- * Komponent zwraca więc DWA elementy: dymek i pływający pasek działań.
- * Wołający (`Os` przez `Rozmowa`) wstawia oba na koniec listy wypowiedzi.
+ * A — szkic Copilota stoi W POLU, jako zwykły tekst do poprawiania;
+ * B — edytor jest ostatnią wypowiedzią osi, z jednym przewijaniem na całość.
+ * Komponent zwraca podpis i dymek z działaniami w środku. Wołający wstawia
+ * je na koniec listy wypowiedzi.
  *
  * ── WĄTEK PIERWSZY: PUSTY EDYTOR TO JEDNA LINIJKA (0.548.0) ───────────────
  * Wariant C z płótna „Skrzynka — warianty”, decyzja właściciela z 28 września.
@@ -84,6 +83,7 @@ export function Edytor({
   etykietaWyslij = "Wyślij do klienta", limitZnakow = LIMIT_ALLEGRO, etykietaPola = "Szkic odpowiedzi",
   podpowiedz = "Szkic odpowiedzi — współdzielony z zespołem",
   podpowiedzZwinieta = "Odpowiedz klientowi…", blad = "", zamkniete = null,
+  podpis = "Twoja odpowiedź · szkic, widzi go zespół",
 }: {
   szkic: string;
   /** Rozmowę prowadzi ktoś inny — szkic zapisze tylko on. Tylko skrzynka. */
@@ -136,6 +136,8 @@ export function Edytor({
   /** Zdanie, gdy odbiorca nie przyjmie już wiadomości. Pola odpowiedzi wtedy
       nie ma; notatka zespołu, jeśli edytor ją niesie, zostaje. */
   zamkniete?: string | null;
+  /** Podpis nad dymkiem: kto pisze i kto zobaczy szkic, przed pierwszym „ · ” pogrubiony. */
+  podpis?: string;
 }) {
   const [tryb, setTryb] = useState<"odpowiedz" | "komentarz">("odpowiedz");
   const zNotatka = onDodajKomentarz !== undefined;
@@ -300,47 +302,57 @@ export function Edytor({
      rzędzie. Tryb notatki rysuje się zwyczajnie, bez wysyłki w drzewie. */
   if (zamkniete && !wKomentarzu) {
     if (!przyciskNotatki) {
-      return <p className="ml-auto w-full max-w-[75ch] rounded-lg border border-dashed border-slate-300 px-3 py-2 text-xs text-slate-600">
+      return <p className="ml-auto w-[86%] max-w-[75ch] rounded-xl rounded-br border border-dashed border-slate-300 px-3.5 py-2 text-xs text-slate-600">
         {zamkniete}</p>;
     }
-    return <div className="ml-auto flex w-full max-w-[75ch] items-center gap-2 rounded-lg border border-dashed border-slate-300 py-1 pl-3 pr-1">
+    return <div className="ml-auto flex w-[86%] max-w-[75ch] items-center gap-2 rounded-xl rounded-br border border-dashed border-slate-300 py-1 pl-3.5 pr-1">
       <p className="min-w-0 flex-1 py-1 text-xs text-slate-600">{zamkniete}</p>
       {przyciskNotatki}
     </div>;
   }
 
-  /* SIATKI 60vh JUŻ NIE MA (0.495.0). Stała od 0.232.1, bo edytor był
-     `shrink-0` pod osią i rozepchnięty zjadał rozmowę. Na końcu osi nie ma
-     czego zjadać: dymek i wątek przewijają się razem, a wysoki szkic
-     wydłuża przewijanie, zamiast ściskać rozmowę do jednej linii.
+  /* ── DYMEK PO NASZEJ STRONIE, DZIAŁANIA W ŚRODKU ─────────────────────────
+     Makieta właściciela: edytor jest następną naszą wypowiedzią, więc stoi
+     dymkiem po prawej, jak nasze odpowiedzi, z tym samym „ogonkiem” w rogu.
+     Pełna ramka i błękitna poświata mówią, że to miejsce pisania, a podpis
+     nad dymkiem, kto zobaczy szkic. Pasek działań stoi w dymku, pod treścią,
+     bo należy do tej jednej wiadomości. Pasek obok pola czytałby się jak
+     osobny element ekranu.
 
-     Dymek stoi po NASZEJ stronie osi (`ml-auto`, jak nasze odpowiedzi),
-     bo jest następną naszą wypowiedzią. Przerywana ramka mówi, że jeszcze
-     nie wyszła. Pełna szerokość progu 75ch, bo w nim się pisze. */
-  return <>
+     Wysoki szkic wydłuża przewijanie, zamiast ściskać rozmowę: dymek i wątek
+     przewijają się razem. Szerokość 86% jak dymki rozmowy, z progiem 75ch,
+     bo dłuższy wiersz czyta się gorzej. */
+  const [kto, ...reszta] = (wKomentarzu ? "Twoja notatka · zobaczy ją tylko zespół" : podpis).split(" · ");
+  const narzedzia = !wKomentarzu
+    && (Boolean(copilot) || (szkic !== "" && !cudza) || (szkic === "" && wyczyszczone !== null));
+  const ramka = wKomentarzu ? "border-amber-300 bg-amber-50 ring-amber-100"
+    : wPolu ? "border-violet-300 bg-white ring-violet-50" : "border-blue-300 bg-white ring-blue-50";
+  /* Licznik stoi zawsze, bo makieta tak go pokazuje, i mówi pełną liczbą
+     po polsku. Barwę dostaje dopiero przy progu, bo dopiero tam zmienia
+     decyzję. Próg rośnie z sufitem, ale najwyżej do 500 znaków przed nim. */
+  const blisko = szkic.length >= limitZnakow - Math.min(500, limitZnakow / 5);
+  /* OPAKOWANIE STOI ZAWSZE, bo pole nie ma prawa zmienić rodziców przy
+     pierwszej literze. Zwinięte przykleja się do dolnej krawędzi, a podpis
+     staje w nim dopiero po rozwinięciu: rząd ma zostać jedną linijką. */
+  return <div className={zwiniety ? "sticky bottom-2 z-10 ml-auto w-[86%] max-w-[75ch]"
+    : "ml-auto flex w-[86%] max-w-[75ch] flex-col gap-1"}>
+  {!zwiniety && <span className="text-right text-xs text-slate-600">
+    <b className="font-semibold text-wertis-ink">{kto}</b>{reszta.length > 0 && ` · ${reszta.join(" · ")}`}</span>}
   <article ref={dymek} aria-label={wKomentarzu ? "Twoja notatka" : "Twoja odpowiedź"}
     className={zwiniety
       /* `focus-within`: pole w rzędzie nie ma własnej ramki, więc fokus
-         pokazuje rama rzędu, tą samą barwą co `.field` (WCAG 2.4.7). */
-      ? "sticky bottom-2 z-10 ml-auto w-full max-w-[75ch] rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-1.5 shadow-lg focus-within:border-wertis-amber focus-within:ring-2 focus-within:ring-amber-100"
-      : `ml-auto w-full max-w-[75ch] rounded-lg border-2 border-dashed p-3 ${wKomentarzu
-      ? "border-amber-300 bg-amber-50" : wPolu ? "border-violet-300 bg-white" : "border-slate-300 bg-white"}`}>
-    {/* ── PRZEŁĄCZNIK JEST JEDNYM ELEMENTEM, NIE DWOMA (0.247.0) ──────────────
+         pokazuje rama rzędu (WCAG 2.4.7). */
+      ? "rounded-xl rounded-br border border-blue-300 bg-white py-1.5 pl-3.5 pr-1.5 shadow-lg ring-[3px] ring-blue-50 focus-within:border-blue-600"
+      : `flex flex-col rounded-xl rounded-br border ring-[3px] focus-within:border-blue-600 ${ramka}`}>
+    {/* ── PRZEŁĄCZNIK JEST JEDNYM ELEMENTEM, NIE DWOMA ─────────────────────
         Dwa luźne przyciski o tej samej wadze nie mówiły, że wybiera się JEDEN
-        z dwóch — mówiły, że są dwie rzeczy do kliknięcia. Bieżnia z tłem
-        i wyniesiony kafelek aktywny to ten sam kształt, co przełącznik
-        w każdym innym programie, więc nie wymaga czytania.
+        z dwóch. Bieżnia z tłem i wyniesiony kafelek to kształt przełącznika
+        z każdego innego programu, więc nie wymaga czytania. Stoi NAD polem,
+        żeby było widać, gdzie się pisze, zanim się zacznie pisać.
 
-        Przełącznik stoi NAD polem, żeby było widać, gdzie się pisze, zanim
-        się zacznie pisać.
-
-        Nieaktywna połowa ma `slate-600` (0.546.0). `slate-500` na bieżni
-        `slate-100` dawało 4.34:1, na bursztynowej około 4.3:1, przy progu
-        4.5:1 — zmierzone axe w Chromium przy otwartej rozmowie. */}
-    {!zwiniety && <div className="mb-2.5 flex items-center gap-2">
-      {/* Bez notatki zakładek nie ma, a jest nazwa tego, co się pisze —
-          w tym samym miejscu, żeby oko szukało jej tam, gdzie w skrzynce. */}
-      {!zNotatka && <span className="text-xs font-semibold text-slate-700">Odpowiedź</span>}
+        Nieaktywna połowa ma `slate-600`: `slate-500` na bieżni `slate-100`
+        daje 4.34:1 przy progu 4.5:1. */}
+    {!zwiniety && (zNotatka || narzedzia) && <div className="flex items-center gap-2 px-3.5 pt-2.5">
       {zNotatka && <div className={`flex gap-0.5 rounded-lg p-0.5 ${wKomentarzu ? "bg-amber-100" : "bg-slate-100"}`}>
         <button className={`whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${!wKomentarzu
           ? "bg-white font-semibold text-slate-900 shadow-sm" : "font-medium text-slate-600"}`}
@@ -348,25 +360,15 @@ export function Edytor({
         <button className={`flex items-center gap-1.5 whitespace-nowrap rounded-md px-2.5 py-1 text-xs ${wKomentarzu
           ? "bg-white font-semibold text-amber-900 shadow-sm" : "font-medium text-slate-600"}`}
           onClick={() => setTryb("komentarz")}>
-          {/* ── JEDNA NAZWA, NIE DWIE (0.260.0) ──────────────────────────────
-              Edytor mówił „Komentarz wewnętrzny" i „Dodaj komentarz", a oś
-              rozmowy dwa centymetry wyżej — „NOTATKA WEWNĘTRZNA". To samo
-              okno, ta sama rzecz, dwa słowa. Decyzja właściciela: notatka.
-              Reklamacje i dyskusje mają zresztą `notatka` już w API, więc
-              „komentarz" był tu ostatnim śladem, nie regułą. Nazwy w kodzie
-              (`komentarz`, `onDodajKomentarz`, token `os-komentarz`) zostają:
-              ekran ich nie pokazuje, a przemianowanie ich w tym samym wydaniu
-              utopiłoby trzy widoczne zmiany w diffie bez jednej widocznej. */}
+          {/* JEDNA NAZWA, NIE DWIE: „notatka”, jak na osi rozmowy. Nazwy
+              w kodzie (`komentarz`, `onDodajKomentarz`) zostają, bo ekran
+              ich nie pokazuje. */}
           <MessageSquare size={13} />Notatka wewnętrzna
         </button>
       </div>}
-      {/* ── COPILOT W TYM SAMYM RZĘDZIE (0.249.0) ────────────────────────────
-          Zgłoszenie właściciela: „niepotrzebnie ułóż odpowiedź i add
-          attachment mają swój własny rząd". 0.247.0 próbowało już tego i
-          zostało wycofane, bo z Copilotem WYŁĄCZONYM komponent renderował
-          akapit, nie przycisk, i łamał rząd. Naprawiona jest przyczyna:
-          `PrzyciskSzkicu` nie zajmuje już nigdy więcej niż jednej linii. */}
-      {!wKomentarzu && <div className="ml-auto flex min-w-0 items-center justify-end gap-2">
+      {/* Copilot w tym samym rzędzie co czyszczenie: własny rząd zabierał
+          wysokość, a `PrzyciskSzkicu` nie zajmuje więcej niż jednej linii. */}
+      {narzedzia && <div className="ml-auto flex min-w-0 items-center justify-end gap-2">
         {copilot && <PrzyciskSzkicu p={copilot} />}
         {szkic !== "" && !cudza && <button type="button" onClick={wyczysc}
           className="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md px-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900">
@@ -379,8 +381,10 @@ export function Edytor({
     </div>}
 
     {wKomentarzu
-      ? <>
-          <textarea ref={poleNotatki} className="field min-h-[88px] text-tresc [field-sizing:content]" value={komentarz}
+      ? <div className="px-3.5 pt-2.5">
+          <textarea ref={poleNotatki}
+            className="block min-h-[88px] w-full resize-y bg-transparent py-1 text-tresc text-wertis-ink outline-none [field-sizing:content]"
+            value={komentarz}
             aria-label="Notatka wewnętrzna — zobaczy ją tylko zespół"
             onChange={(e) => onKomentarz?.(e.target.value)}
             placeholder="Notatka dla zespołu — klient tego nie zobaczy" />
@@ -394,46 +398,38 @@ export function Edytor({
               </label>)}
             </div>
           </fieldset>}
-        </>
+        </div>
       : <>
-          {cudza && <p className="mb-2 flex items-center gap-2 text-xs text-slate-500">
+          {cudza && <p className="flex items-center gap-2 px-3.5 pt-2.5 text-xs text-slate-500">
             <Lock size={13} />Rozmowę prowadzi {wlasciciel} — szkic zapisze tylko właściciel.</p>}
-          {wPolu && copilot && <PasekSzkicu p={copilot} wPolu />}
-          {/* POLE MA WYGLĄDAĆ NA MIEJSCE DO PISANIA (0.247.0). Miało 80 px
-              wysokości i tekst 14 px — tyle samo, co każdy inny wiersz ekranu,
-              choć agent spędza w nim najwięcej czasu z całego panelu. */}
-          {/* ── POLE ROŚNIE Z TREŚCIĄ, NIE STOI NA 200 PX (0.495.0) ─────────
-              0.404.0 dało polu stałe 200 px i powiedziało wprost, czemu nie
-              elastyczne: przy DŁUGIM wątku rozciągnięty edytor zwijał oś do
-              `min-h-40`. Ten powód odszedł razem z osobnym pasem — pole stoi
-              w tym samym przewijaniu co rozmowa i niczego jej nie odejmuje.
-              Zostało to, co 200 px robiło źle: puste pole zajmowało ćwierć
-              kolumny, zanim agent napisał choć słowo.
-
-              `field-sizing: content` rośnie z tekstem od progu 120 px, bez
-              skryptu mierzącego wysokość. Przeglądarka bez tej własności
-              dostaje próg i `resize-y`, czyli to, co było, tylko niższe. */}
+          {wPolu && copilot && <div className="px-3.5 pt-2.5"><PasekSzkicu p={copilot} wPolu /></div>}
+          {/* ── POLE ROŚNIE Z TREŚCIĄ ────────────────────────────────────────
+              Pole stoi w tym samym przewijaniu co rozmowa i niczego jej nie
+              odejmuje. `field-sizing: content` rośnie z tekstem od progu
+              120 px, bez skryptu mierzącego wysokość. Przeglądarka bez tej
+              własności dostaje próg i `resize-y`. Ramki pole nie ma, bo
+              ramką jest dymek. */}
           {/* STAŁY RODZIC POLA: zwinięty rząd i rozwinięty dymek różnią się
               klasami, a nie drzewem. Inny rodzic przemontowałby pole
               i zabrał mu fokus przy pierwszej literze. */}
           <div className={zwiniety ? "flex items-center gap-2" : ""}>
           <textarea ref={pole} className={zwiniety
             /* Stała wysokość jednej linii, bez `field-sizing`: puste pole
-               mierzyło się podpowiedzią i zawijało rząd na dwie linie
-               (74 px w Chromium przy 1180 px). Zwinięte pole jest zawsze
-               puste, bo pierwsza litera je rozwija. */
+               mierzyło się podpowiedzią i zawijało rząd na dwie linie.
+               Zwinięte pole jest zawsze puste, bo pierwsza litera je rozwija. */
             ? "h-10 min-w-0 flex-1 resize-none overflow-hidden bg-transparent py-2 text-tresc outline-none"
-            : `field min-h-[7.5rem] resize-y text-tresc [field-sizing:content] ${wPolu ? "bg-violet-50" : ""}`}
+            : `block min-h-[7.5rem] w-full resize-y px-3.5 pb-1.5 pt-3 text-tresc text-wertis-ink outline-none [field-sizing:content] ${
+              wPolu ? "bg-violet-50" : "bg-transparent"}`}
             rows={zwiniety ? 1 : undefined} value={szkic}
             aria-label={etykietaPola} aria-keyshortcuts="Control+Enter"
             onChange={(e) => { if (e.target.value !== "") setWyczyszczone(null); onZmiana(e.target.value); }}
-            /* CTRL+ENTER WYSYŁA (23 września 2026). Ten sam warunek co przycisk
-               niżej — skrót nie ma prawa ominąć blokady cudzej rozmowy. Sam
-               Enter zostaje nową linią, bo odpowiedź ma akapity. */
+            /* CTRL+ENTER WYSYŁA. Ten sam warunek co przycisk niżej — skrót
+               nie ma prawa ominąć blokady cudzej rozmowy. Sam Enter zostaje
+               nową linią, bo odpowiedź ma akapity. */
             onKeyDown={(e) => {
               if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey)) return;
               e.preventDefault();
-              /* Ctrl+Shift+Enter — „Wyślij i zakończ" (23 września 2026). */
+              /* Ctrl+Shift+Enter — „Wyślij i zakończ”. */
               if (mozeWyslac) {
                 if (e.shiftKey && onWyslijIZakoncz) onWyslijIZakoncz(); else onWyslij();
               }
@@ -452,16 +448,15 @@ export function Edytor({
             {przyciskNotatki}
             {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
               onDodaj={onDodajZalacznik} wylaczone={cudza || wysyla} />}
-            {/* Martwa, dopóki pole jest puste — jak w pasku. Stoi, żeby było
-                widać, gdzie wysyłka będzie, zanim padnie pierwsze słowo. */}
-            {/* „Wyślij”, nie „Wyślij do klienta”: rząd dzieli szerokość
-                z polem, a podpowiedź pola ma się zmieścić w jednej linii.
-                Pełna nazwa zostaje dla czytnika i zawiera widoczne słowo. */}
+            {/* Martwa, dopóki pole jest puste. Stoi, żeby było widać, gdzie
+                wysyłka będzie, zanim padnie pierwsze słowo. „Wyślij”, nie
+                pełna nazwa: rząd dzieli szerokość z polem. Pełna nazwa
+                zostaje dla czytnika i zawiera widoczne słowo. */}
             <Przycisk wariant="glowny" disabled aria-label={etykietaWyslij} className="shrink-0 whitespace-nowrap">
               <Send size={16} />Wyślij</Przycisk>
           </>}
           </div>
-          {!zwiniety && <>
+          {!zwiniety && <div className="flex flex-col px-3.5">
           {/* Błąd wysyłki PRZY POLU, nie w rogu ekranu: tu agent patrzy,
               gdy wysyłka nie wyszła, i tu poprawia treść. */}
           {blad && <p role="alert" className="mt-2 text-xs text-red-700">{blad}</p>}
@@ -469,9 +464,8 @@ export function Edytor({
           {/* Po „Wyczyść wszystko" karta stoi zwinięta: pusty znaczy pusty,
               a szkic wraca jednym kliknięciem „Wstaw do odpowiedzi". */}
           {copilot && <KartaSzkicu p={copilot} wPolu={wPolu} zwinieta={wyczyszczone !== null} />}
-          {/* Lista dołożonych plików stoi POD treścią (0.247.0): należy do
-              komponowanej wiadomości, nie do przycisków. Sam spinacz jedzie
-              w pasku działań — nie zasługuje na własny rząd.
+          {/* Lista dołożonych plików stoi POD treścią: należy do komponowanej
+              wiadomości, a spinacz jedzie w pasku działań.
               W trakcie wysyłki lista i spinacz stoją: serwer bierze pliki
               na początku wysyłki i czyści listę po niej, więc plik dodany
               w tym oknie wgrałby się do Allegro i zniknął bez słowa. */}
@@ -485,93 +479,75 @@ export function Edytor({
             </ul>
             {niesprawdzone.length > 3 && <p className="mt-1">i {niesprawdzone.length - 3} więcej w „Skąd to wiem".</p>}
           </section>}
+          </div>}
+        </>}
+
+    {!zwiniety && <div ref={pasek} role="group" aria-label={wKomentarzu ? "Działania notatki" : "Działania odpowiedzi"}
+      className={`mt-2 flex flex-wrap items-center gap-2 border-t py-2 pl-3.5 pr-2.5 ${
+        wKomentarzu ? "border-amber-200" : "border-blue-50"}`}>
+      {wKomentarzu
+        ? <>
+            {/* Notatka nie ma limitu znaków, bo serwer żadnego nie trzyma,
+                więc licznik nie miałby progu, przy którym coś znaczy.
+                Komentowanie NIE wymaga prowadzenia rozmowy: kolega ma prawo
+                dopisać „to ten sam klient co wczoraj” bez przejmowania. */}
+            <Przycisk wariant="glowny" disabled={komentuje || !komentarz.trim()}
+              title="Widoczna tylko dla zespołu — klient jej nie zobaczy"
+              onClick={() => onDodajKomentarz?.()} className="ml-auto whitespace-nowrap">
+              <MessageSquare size={16} />{komentuje ? "Zapisuję…" : "Dodaj notatkę"}
+            </Przycisk>
+          </>
+        : <>
+            {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
+              onDodaj={onDodajZalacznik} wylaczone={cudza || wysyla} />}
+            {/* Za sufitem licznik mówi, ile skrócić, bo wysyłka jest wtedy martwa. */}
+            <span className={`ml-auto whitespace-nowrap text-xs tabular-nums ${
+              zaDlugo ? "font-semibold text-ranga-zle" : blisko ? "font-semibold text-ranga-uwaga" : "text-slate-600"}`}>
+              {LICZBA.format(szkic.length)} / {LICZBA.format(limitZnakow)}
+              {zaDlugo ? ` — o ${LICZBA.format(szkic.length - limitZnakow)} za dużo` : ""}</span>
+            {/* ── SKRÓT WIDAĆ OBOK, NIE NA PRZYCISKU ───────────────────────
+                Rozpoznanie jest tańsze od pamiętania (dekalog, punkt 2), więc
+                skrót stoi cichym napisem przy liczniku. Na przycisku zabierałby
+                miejsce napisowi wysyłki. Poniżej `sm` znika, bo wąski rząd
+                łamałby się pod wysyłkę. Czytnik dostaje skrót z
+                `aria-keyshortcuts`, więc napis jest dla niego ukryty. */}
+            <span aria-hidden="true"
+              className="hidden whitespace-nowrap text-xs text-slate-600 sm:inline">Ctrl+Enter</span>
+            {/* ── JEDNO DZIAŁANIE MA BYĆ NAJGŁOŚNIEJSZE ─────────────────────
+                Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na
+                zewnątrz, i idzie WYŁĄCZNIE na kliknięcie człowieka. Stoi na
+                prawym końcu dymka, tam, gdzie kończy się czytanie odpowiedzi. */}
+            <Przycisk wariant="glowny" onClick={onWyslij} disabled={!mozeWyslac}
+              aria-keyshortcuts="Control+Enter" title="Ctrl+Enter wysyła także spoza pola"
+              className="whitespace-nowrap shadow-sm">
+              <Send size={16} />{wysyla ? "Wysyłam…" : niesprawdzone.length ? "Wyślij bez zmian" : etykietaWyslij}
+              {/* Przy tarciu obok napisu staje liczba twierdzeń do sprawdzenia. */}
+              {niesprawdzone.length > 0 && <span className="ml-1 rounded bg-white/70 px-1 text-podpis text-amber-950">
+                {niesprawdzone.length} do sprawdzenia</span>}
+            </Przycisk>
+            {/* Strzałka tylko wtedy, gdy ma co pokazać: pusta lista pod
+                przyciskiem to obietnica bez pokrycia. */}
+            {(onZapisz || onWyslijIZakoncz) && <InneWysylki onZapisz={onZapisz} zapisuje={zapisuje}
+              cudza={cudza} onWyslijIZakoncz={onWyslijIZakoncz} mozeWyslac={mozeWyslac} />}
           </>}
-        </>}
+    </div>}
   </article>
-
-  {/* ── PASEK DZIAŁAŃ PŁYWA (0.495.0) ───────────────────────────────────────
-      `sticky bottom-2` na końcu listy wypowiedzi: gdy agent stoi na dole,
-      pasek leży zwyczajnie pod dymkiem; gdy przewinie w górę, żeby doczytać
-      wątek, pasek zostaje przy krawędzi. Wysłać można więc z każdego miejsca
-      rozmowy, a pasek nie zabiera jej stałego pasma, jak robił rząd pod polem.
-
-      Białe tło z cieniem, nie ciemne: przyciski niosą swoje barwy z reszty
-      panelu, a na grafitowym tle trzeba by każdą przemalować. */}
-  {/* JEDEN RZĄD ZAWSZE. Zawinięty na dwa wiersze pasek zakrywał przy
-      przewiniętym wątku dwa razy więcej rozmowy, niż zakrywa rząd. Na węższej
-      kolumnie (ekran 1440 px) chowają się więc rzeczy wtórne: licznik znaków
-      i podpis drugiego skrótu. Skrót ZOSTAJE w podpowiedzi i w nazwie
-      dostępnej, a podpis głównego — Ctrl+Enter — nie chowa się nigdy. */}
-  {!zwiniety && <div className={`sticky bottom-2 z-10 ml-auto flex w-fit max-w-full items-center gap-3 rounded-xl border px-2 py-1.5 shadow-lg ${
-    wKomentarzu ? "border-amber-300 bg-amber-50" : "border-slate-200 bg-white"}`}
-    ref={pasek} role="group" aria-label={wKomentarzu ? "Działania notatki" : "Działania odpowiedzi"}>
-    {wKomentarzu
-      ? <>
-          {/* LICZNIK I ZDANIE ZESZŁY (0.523.0), tą samą regułą co licznik
-              odpowiedzi w 0.506.0: stoi tylko to, co zmienia decyzję. Notatka
-              nie ma limitu znaków — serwer żadnego nie trzyma — więc licznik
-              nie miał progu, przy którym by coś znaczył. „Widoczna tylko dla
-              zespołu" mówią już zakładka, pole i jego podpis; zostaje
-              w podpowiedzi przycisku, tuż przed kliknięciem. */}
-          {/* Komentowanie NIE wymaga prowadzenia rozmowy: notatka zespołu to
-              nie odpowiedź, a kolega ma prawo dopisać „to ten sam klient co
-              wczoraj" bez przejmowania sprawy. */}
-          <Przycisk wariant="glowny" disabled={komentuje || !komentarz.trim()}
-            title="Widoczna tylko dla zespołu — klient jej nie zobaczy"
-            onClick={() => onDodajKomentarz?.()} className="px-5 py-2.5 text-tresc shadow-sm">
-            <MessageSquare size={17} />{komentuje ? "Zapisuję…" : "Dodaj notatkę"}
-          </Przycisk>
-        </>
-      : <>
-          {/* LICZNIK TYLKO PRZY LIMICIE (0.506.0). „0 znaków" stało przy każdej
-              odpowiedzi, a liczy się wyłącznie blisko progu Allegro — tam, gdzie
-              zmienia decyzję. Wtedy staje, a za progiem czerwienieje. */}
-          {/* Próg rośnie z sufitem, ale nie dalej niż 500 znaków przed nim:
-              przy 20 000 dwadzieścia procent to cała odpowiedź. Za sufitem
-              licznik mówi, ile skrócić, bo wysyłka jest wtedy martwa. */}
-          {szkic.length >= limitZnakow - Math.min(500, limitZnakow / 5) && <span className={`whitespace-nowrap text-podpis font-semibold tabular-nums ${
-            zaDlugo ? "text-ranga-zle" : "text-ranga-uwaga"}`}>
-            {szkic.length} / {limitZnakow}{zaDlugo ? ` — o ${szkic.length - limitZnakow} za dużo` : ""}</span>}
-          {onDodajZalacznik && <PrzyciskZalacznika dodaje={dodajeZalacznik}
-            onDodaj={onDodajZalacznik} wylaczone={cudza || wysyla} />}
-          {/* ── JEDNO DZIAŁANIE MA BYĆ NAJGŁOŚNIEJSZE (0.247.0) ───────────────
-              Wysyłka jest jedyną drogą, którą treść wychodzi z WERTIS na
-              zewnątrz, i idzie WYŁĄCZNIE na kliknięcie człowieka — innej drogi
-              wysyłki w kodzie nie ma. Dostaje większy stopień pisma, wyższy
-              padding i cień; zapis szkicu schodzi do zwykłego tekstu.
-              Od 0.495.0 stoi NA PRAWYM KOŃCU paska, pod kciukiem myszy
-              przesuwanej od dymka — tam, gdzie kończy się czytanie odpowiedzi. */}
-          <Przycisk wariant="glowny" onClick={onWyslij} disabled={!mozeWyslac}
-            className="whitespace-nowrap px-5 py-2.5 text-tresc shadow-sm">
-            <Send size={17} />{wysyla ? "Wysyłam…" : niesprawdzone.length ? "Wyślij bez zmian" : etykietaWyslij}
-            {/* Skrót NA PRZYCISKU (dekalog, punkt 2): o skrócie, o którym nikt
-                nie wie, nikt nie skorzysta. Poza nazwą dostępną przycisku. */}
-            {/* Przy tarciu w miejscu podpisu skrótu staje liczba twierdzeń:
-                pasek ma zostać w jednym rzędzie, a skrót działa dalej
-                i zostaje w `aria-keyshortcuts`. */}
-            {niesprawdzone.length
-              ? <span className="ml-1 rounded bg-white/70 px-1 text-podpis text-amber-950">
-                  {niesprawdzone.length} do sprawdzenia</span>
-              : <kbd aria-hidden="true" className="ml-1 rounded bg-black/10 px-1 font-sans text-podpis">Ctrl+Enter</kbd>}
-          </Przycisk>
-          {/* Strzałka tylko wtedy, gdy ma co pokazać: pusta lista pod
-              przyciskiem to obietnica bez pokrycia. */}
-          {(onZapisz || onWyslijIZakoncz) && <InneWysylki onZapisz={onZapisz} zapisuje={zapisuje}
-            cudza={cudza} onWyslijIZakoncz={onWyslijIZakoncz} mozeWyslac={mozeWyslac} />}
-        </>}
-  </div>}
-  </>;
+  </div>;
 }
 
 /** Limit treści `NewMessageInThread` w Allegro — ten sam, którego pilnuje serwer (`LIMIT_ZNAKOW`). */
 const LIMIT_ALLEGRO = 2000;
+
+/* Licznik po polsku: „20 000”, nie „20000”. Polska norma grupuje dopiero od
+   pięciu cyfr, więc sufit skrzynki stoi jako „2000”. */
+const LICZBA = new Intl.NumberFormat("pl-PL");
 
 /* ── „▾" OBOK WYSYŁKI (0.506.0) ─────────────────────────────────────────────
    Pasek niósł pięć rzeczy: licznik, spinacz, „Zapisz szkic", „Wyślij
    i zakończ" z napisem skrótu i „Wyślij do klienta" z drugim. Najgłośniejsze
    ma zostać jedno — wysyłka (0.247.0). Dwie rzadsze drogi stoją pod
    strzałką, a „Wyślij i zakończ" dalej chodzi z klawiatury Ctrl+Shift+Enter.
-   Okienko otwiera się W GÓRĘ, bo pasek pływa przy dolnej krawędzi osi. */
+   Okienko otwiera się W GÓRĘ, bo dymek edytora stoi na dole osi rozmowy. */
 function InneWysylki({ onZapisz, zapisuje, cudza, onWyslijIZakoncz, mozeWyslac }: {
   onZapisz?: () => void; zapisuje: boolean; cudza: boolean;
   onWyslijIZakoncz?: () => void; mozeWyslac: boolean;

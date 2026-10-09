@@ -457,9 +457,8 @@ export function Dyskusje() {
         </div>
       </Karta>
 
-      {/* Karta się NIE przewija, przewija się rozmowa. Kolumna zdjęć potrzebuje
-          ograniczonej wysokości, żeby przewijać się osobno — przy przewijanej
-          karcie urosłaby razem z rozmową i zdjęcia uciekałyby z rozmową. */}
+      {/* Karta się NIE przewija, przewija się rozmowa. Nagłówek czatu i wiersz
+          czynności stoją wtedy w miejscu, a pod ręką zostaje pole odpowiedzi. */}
       <Karta className="flex min-h-0 flex-col overflow-hidden">
         {szczegol.data
           ? <>
@@ -518,21 +517,19 @@ export function Dyskusje() {
                   blad={bladZakonczenia} onZakoncz={wyslijZakonczenie} />
                 {bladOdswiezenia && <p className="basis-full text-xs text-red-800">{bladOdswiezenia}</p>}
               </div>
-              <Czat
+              <Czat tytul="Czat dyskusji"
                 sprawa={{
                   id: szczegol.data.dyskusja.id,
                   /* Dyskusja ma tylko `opis` — powodu, oczekiwania i tytułu
                      prawnego nie niesie, bo Allegro ich przy niej nie oddaje. */
                   opisZgloszenia: szczegol.data.dyskusja.opis,
+                  czatAktywny: szczegol.data.dyskusja.czatAktywny,
                   wiadomosciIle: szczegol.data.dyskusja.wiadomosciIle,
-                  czatUrwany: szczegol.data.dyskusja.czatUrwany,
+                  login: szczegol.data.dyskusja.kupujacyLogin,
+                  zgloszonoAt: szczegol.data.dyskusja.otwartoAt,
                 }}
                 czat={szczegol.data.czat}
                 zalaczniki={szczegol.data.zalaczniki}
-                /* Zdjęcia w kolumnie obok, jak w reklamacjach: kupujący wysyła
-                   je seriami z telefonu, a kafel w wątku wypychał następną
-                   wiadomość poza ekran. Rozmowę czyta się od końca. */
-                kolumnaZdjec
                 /* Klucz sprawy: edytor trzyma własny stan (cofnięcie wyczyszczenia,
                    zwłokę Ctrl+Enter), a ekran nie montuje go od nowa przy przejściu. */
                 edytor={<Edytor key={szczegol.data.dyskusja.id} tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}

@@ -5869,8 +5869,8 @@ Allegro stoi pod nazwą pliku zdaniem z serwera i daje „Spróbuj ponownie",
 a nieudane pobranie mówi o sobie zamiast milczeć.
 
 Rozmowa dociąga się taktem, nie wejściem na ekran, więc świeża sprawa bywa
-przez chwilę niepełna. Ekran mówi to wprost, zamiast pokazywać urwaną rozmowę
-jak całą.
+przez chwilę niepełna. Pasek „rozmowa jest niepełna” zszedł z ekranu decyzją
+właściciela (§25b.12).
 
 ### 25b.6a. Kompletność: kolejka i rozmowa (0.273.0)
 
@@ -5887,8 +5887,8 @@ bezpiecznikiem niezależnie od tego, jak długie jest archiwum.
 **Rozmowa.** Do 0.272.0 pobieraliśmy pierwszą setkę wiadomości i tyle, a pod
 spodem stało zdanie „Reszta dojdzie następną synchronizacją". Nie dochodziła
 nigdy. Rozmowa stronicuje się teraz do pięciuset wiadomości; dłuższa dostaje
-znak `czat_urwany` i wtedy ekran mówi wprost, że resztę widać w Centrum
-Sprzedaży.
+znak `czat_urwany`. Serwer dalej go liczy, choć ekran od §25b.12 o nim
+nie mówi.
 
 Ten sam znak leczy drugą, niewidoczną usterkę: sprawa z rozmową dłuższą niż
 budżet spełniała warunek dociągania po KAŻDYM przebiegu i stała na czele
@@ -6210,6 +6210,30 @@ makiecie, a reszta schodzi z ekranu. Dane zostają w bazie.
   sprawami tego zakupu i notatka wewnętrzna.
 - **Zeszło z ekranu:** pas faktów (`reklamacje/Fakty.tsx`), dowody biura,
   reklamacja u dostawcy, ostatnia dostawa i krok towaru po werdykcie.
+
+### 25b.12. Czat jak na makiecie (@wydanie)
+
+Decyzja właściciela: czat reklamacji i dyskusji wygląda jak na makiecie.
+Oba ekrany rysuje wspólny `reklamacje/Czat.tsx`, więc zmiana jest jedna.
+
+- **Nagłówek:** „Czat reklamacji” albo „Czat dyskusji”, liczba wiadomości
+  i stan czatu, otwarty albo zamknięty.
+- **Dymki:** klient po lewej na szarym tle, sklep po prawej na błękicie.
+  Nad dymkiem stoi linia „login · chwila” albo „Sklep · chwila”. Doradca
+  Allegro zostaje dymkiem po lewej, z bielą i ramką.
+- **Zgłoszenie to pierwszy dymek klienta.** Ma linię „Powód: … · chce …”,
+  zdanie klienta i zdjęcia sprawy. Przypiętej karty „Zgłoszenie” już nie ma.
+- **Zdjęcia w dymku:** kafle 112×84, obraz powiększa, pasek z nazwą pobiera.
+  Film stoi ciemnym kaflem z nazwą. Osobnej kolumny zdjęć nie ma.
+- **Przesyłka i jej automaty to jeden wiersz,** gdy numer listu w treści
+  automatu pasuje do przesyłki sprawy. Przypomnienie o terminie stoi
+  statycznie, bez rozwinięcia.
+- **Edytor jest dymkiem po prawej** z działaniami w środku: spinacz, licznik
+  „N / 20 000” i wysyłka. Ctrl+Enter działa dalej, a mówi o nim podpowiedź
+  przycisku. Skrzynka dostała ten sam kształt, z własnym sufitem 2000 znaków.
+- **Zeszło z ekranu:** zwijanie starszych wiadomości, pasek „rozmowa jest
+  niepełna”, bursztyn ostatniej wiadomości klienta, ikony i słowa ról oraz
+  zwijanie długich treści.
 ### 25c.1. Czym jest dyskusja
 
 Rozmową posprzedażową, którą kupujący otwiera przy zamówieniu, gdy coś poszło

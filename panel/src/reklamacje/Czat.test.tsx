@@ -4,17 +4,17 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { WiadomoscReklamacji, ZalacznikReklamacji } from "../api/typy";
 
-/* ── Oś rozmowy reklamacyjnej ────────────────────────────────────────────────
-   Trzy rzeczy warte testu:
+/* ── Czat sprawy Allegro ─────────────────────────────────────────────────────
+   Cztery rzeczy warte testu:
 
-   1. ZDJĘCIE WIDAĆ, NIE KLIKA SIĘ W NIE (0.223.0). W sklepie z częściami
-      zdjęcie pękniętego elementu bywa całym zgłoszeniem, a nazwa pliku nie
-      mówi o nim nic. To ta sama lekcja, którą skrzynka kupiła w 0.218.0.
+   1. ZDJĘCIE WIDAĆ W DYMKU. W sklepie z częściami zdjęcie pękniętego elementu
+      bywa całym zgłoszeniem, a nazwa pliku nie mówi o nim nic.
    2. SPADEK NA PRZYCISK JEST CZĘŚCIĄ PROJEKTU. `podglad` to podpowiedź
       z nazwy pliku, więc bywa nieprawdziwa — a ekran nie ma prawa pokazać
       zepsutej ikony obrazu.
-   3. ROLA AUTORA JEST PODPISEM. Rozmowa bywa trójstronna i doradcy Allegro
-      nie odpowiada się tak, jak klientowi.                                  */
+   3. KTO MÓWI, MÓWI STRONA I PODPIS. Rozmowa bywa trójstronna i doradcy
+      Allegro nie odpowiada się tak, jak klientowi.
+   4. ZGŁOSZENIE JEST PIERWSZYM DYMKIEM KLIENTA, nie kartą nad rozmową.     */
 
 const scena = vi.hoisted(() => ({ obrazy: {} as Record<number, string | null | undefined> }));
 
@@ -34,10 +34,11 @@ vi.mock("../api/reklamacje", () => ({
 
 const { Czat } = await import("./Czat");
 
-/* Czat czyta ze sprawy TRZY pola i tyle bierze — od 0.245.0 ten sam komponent
-   rysuje dyskusję, która nie ma ani powodu, ani oferty, ani terminu. */
+/* Czat czyta ze sprawy kształt strukturalny — ten sam komponent rysuje
+   dyskusję, która nie ma ani powodu, ani oferty, ani terminu. */
 const sprawa = (n: Partial<React.ComponentProps<typeof Czat>["sprawa"]> = {}) => ({
-  id: 1, opisZgloszenia: "Pękła obudowa po tygodniu", wiadomosciIle: 1, czatUrwany: false, ...n,
+  id: 1, opisZgloszenia: "Pękła obudowa po tygodniu" as string | null, czatAktywny: true,
+  wiadomosciIle: 1, ...n,
 });
 
 const zal = (id: number, nazwa: string, podglad: boolean): ZalacznikReklamacji =>
@@ -49,55 +50,125 @@ const wiad = (n: Partial<WiadomoscReklamacji> = {}): WiadomoscReklamacji => ({
   zalaczniki: [], ...n,
 });
 
-describe("Zgłoszenie a pierwsza wiadomość", () => {
-  /* ── DUBEL (0.412.0) ──────────────────────────────────────────────────────
-     Allegro przy części spraw wpisuje ten sam tekst w dwa miejsca ładunku:
-     opis zgłoszenia i pierwszą wiadomość kupującego. Ekran pokazywał oba, więc
-     agent czytał to samo zdanie dwa razy, zanim doszedł do czegokolwiek, co je
-     rozstrzyga. Zostaje ROZMOWA: ma autora, godzinę i miejsce w wątku. */
-  it("nie powtarza zgłoszenia, gdy jest dosłownie pierwszą wiadomością klienta", () => {
+/** Dymek wiadomości: `li` po stronie autora i jego tło pod podpisem. */
+const dymek = (tresc: string) => {
+  const li = screen.getByText(tresc).closest("li")!;
+  return { li, tlo: screen.getByText(tresc).parentElement! };
+};
+
+describe("Zgłoszenie to pierwszy dymek klienta", () => {
+  /* Allegro przy części spraw wpisuje ten sam tekst w opis zgłoszenia i w
+     pierwszą wiadomość kupującego. Dymkiem zgłoszenia jest wtedy ta
+     wiadomość: ma autora, godzinę i miejsce w wątku. */
+  it("dubel: zdanie stoi raz, a pierwsza wiadomość klienta jest zgłoszeniem", () => {
     render(<Czat sprawa={sprawa({ opisZgloszenia: "Pękła obudowa po tygodniu" })}
       zalaczniki={[]} czat={[wiad({ tresc: "Pękła obudowa po tygodniu" })]} />);
     expect(screen.getAllByText("Pękła obudowa po tygodniu")).toHaveLength(1);
-    expect(screen.queryByText("Zgłoszenie")).not.toBeInTheDocument();
+    expect(dymek("Pękła obudowa po tygodniu").li).toHaveTextContent(/kupujacy1 · \d{2}\.\d{2}, \d{2}:\d{2} · zgłoszenie/);
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
   });
 
   it("dublem jest też tekst inaczej złamany — porównujemy treść, nie oddech", () => {
     render(<Czat sprawa={sprawa({ opisZgloszenia: "Pękła obudowa\n po tygodniu" })}
       zalaczniki={[]} czat={[wiad({ tresc: "Pękła obudowa po tygodniu" })]} />);
-    expect(screen.queryByText("Zgłoszenie")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
   });
 
-  it("ZAŁĄCZNIKI SPRAWY zostają nawet przy dublu — wiszą na sprawie, nie na wiadomości", () => {
+  it("ZAŁĄCZNIKI SPRAWY stają kaflami w dymku zgłoszenia — wiszą na sprawie", () => {
     scena.obrazy = {};
     render(<Czat sprawa={sprawa({ opisZgloszenia: "Pękła obudowa po tygodniu" })}
       zalaczniki={[zal(4, "paragon.pdf", false)]}
       czat={[wiad({ tresc: "Pękła obudowa po tygodniu" })]} />);
-    expect(screen.getByText("Załączniki zgłoszenia")).toBeInTheDocument();
-    expect(screen.getByText("paragon.pdf")).toBeInTheDocument();
+    expect(within(dymek("Pękła obudowa po tygodniu").li)
+      .getByRole("button", { name: "paragon.pdf" })).toBeInTheDocument();
   });
 
-  it("RÓŻNY opis zostaje na ekranie — to nie jest dubel, tylko druga treść", () => {
-    render(<Czat sprawa={sprawa({ opisZgloszenia: "Niezgodny z opisem: 56 cm zamiast 46" })}
+  it("RÓŻNY opis staje osobnym dymkiem zgłoszenia na górze osi", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: "Niezgodny z opisem: 56 cm zamiast 46",
+      login: "jan_kowal_88", zgloszonoAt: "2026-09-05T08:00:00.000Z" })}
       zalaczniki={[]} czat={[wiad({ tresc: "Kosiarka przestała ciąć" })]} />);
-    expect(screen.getByText("Zgłoszenie")).toBeInTheDocument();
-    expect(screen.getByText("Niezgodny z opisem: 56 cm zamiast 46")).toBeInTheDocument();
+    const [pierwszy, drugi] = screen.getAllByRole("listitem");
+    expect(pierwszy).toHaveTextContent("Niezgodny z opisem: 56 cm zamiast 46");
+    expect(pierwszy).toHaveTextContent(/^jan_kowal_88 · \d{2}\.\d{2}, \d{2}:\d{2} · zgłoszenie/);
+    expect(drugi).toHaveTextContent("Kosiarka przestała ciąć");
+    expect(drugi).not.toHaveTextContent("zgłoszenie");
   });
 
   it("bez pobranej rozmowy zgłoszenie zostaje — nie ma z czym go porównać", () => {
     render(<Czat sprawa={sprawa({ opisZgloszenia: "Pękła obudowa po tygodniu" })}
       zalaczniki={[]} czat={[]} />);
-    expect(screen.getByText("Zgłoszenie")).toBeInTheDocument();
+    expect(dymek("Pękła obudowa po tygodniu").li).toHaveTextContent("zgłoszenie");
+    expect(screen.getByText("Rozmowy jeszcze nie pobrano.")).toBeInTheDocument();
+  });
+
+  it("bez opisu zgłoszeniem jest pierwsza wiadomość klienta", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]} czat={[
+      wiad({ id: 1, tresc: "pierwsza" }), wiad({ id: 2, tresc: "druga" })]} />);
+    expect(dymek("pierwsza").li).toHaveTextContent("zgłoszenie");
+    expect(dymek("druga").li).not.toHaveTextContent("zgłoszenie");
+  });
+
+  it("linia „Powód: … · chce …” stoi w dymku nad zdaniem klienta", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null, powod: "Powód: usterka przy używaniu · chce wymiany" })}
+      zalaczniki={[]} czat={[wiad({ tresc: "Wycieka paliwo" })]} />);
+    const powod = screen.getByText("Powód: usterka przy używaniu · chce wymiany");
+    const zdanie = screen.getByText("Wycieka paliwo");
+    expect(powod.parentElement).toBe(zdanie.parentElement);
+    expect(powod.compareDocumentPosition(zdanie)).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 });
 
-describe("Oś rozmowy reklamacyjnej", () => {
-  it("zdjęcie klienta rysuje się WPROST, bez zapisywania pliku na dysk", () => {
+describe("Nagłówek czatu", () => {
+  it("mówi, czym jest pas, ile ma wiadomości i czy Allegro je przyjmie", () => {
+    const { rerender } = render(<Czat tytul="Czat reklamacji" sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ id: 1 }), wiad({ id: 2, autorRola: "SELLER", tresc: "Odpowiedź" })]} />);
+    expect(screen.getByRole("heading", { name: "Czat reklamacji" })).toBeInTheDocument();
+    expect(screen.getByText("2 wiadomości · czat otwarty")).toBeInTheDocument();
+    rerender(<Czat tytul="Czat dyskusji" sprawa={sprawa({ czatAktywny: false })} zalaczniki={[]}
+      czat={[wiad()]} />);
+    expect(screen.getByRole("heading", { name: "Czat dyskusji" })).toBeInTheDocument();
+    expect(screen.getByText("1 wiadomość · czat zamknięty")).toBeInTheDocument();
+  });
+
+  it("niepobrana rozmowa nie mówi „0 wiadomości” — sam stan czatu", () => {
+    /* Zero agent czyta jak ciszę klienta, a serwer zna trzy wiadomości. */
+    render(<Czat sprawa={sprawa({ wiadomosciIle: 3 })} zalaczniki={[]} czat={[]} />);
+    expect(screen.queryByText(/0 wiadomości/)).not.toBeInTheDocument();
+    expect(screen.getByText("czat otwarty")).toBeInTheDocument();
+  });
+
+  it("niedociągnięta rozmowa mówi „N z M wiadomości”, pełna — samo N", () => {
+    const dwie = [wiad({ id: 1 }), wiad({ id: 2, autorRola: "SELLER", tresc: "Odpowiedź" })];
+    const { rerender } = render(<Czat sprawa={sprawa({ wiadomosciIle: 5 })} zalaczniki={[]} czat={dwie} />);
+    expect(screen.getByText("2 z 5 wiadomości · czat otwarty")).toBeInTheDocument();
+    /* Serwer liczy taktem, więc bywa w tyle za pobraną rozmową. */
+    rerender(<Czat sprawa={sprawa({ wiadomosciIle: 1 })} zalaczniki={[]} czat={dwie} />);
+    expect(screen.getByText("2 wiadomości · czat otwarty")).toBeInTheDocument();
+  });
+
+  it("wiadomości stoją listą z nazwą dla czytnika", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[wiad()]} />);
+    expect(screen.getByRole("list", { name: "Wiadomości" })).toBeInTheDocument();
+  });
+});
+
+describe("Zdjęcia stoją w dymku", () => {
+  it("zdjęcie klienta rysuje się kaflem w dymku jego wiadomości", () => {
     scena.obrazy = { 9: "blob:obraz" };
     render(<Czat sprawa={sprawa()} zalaczniki={[]}
       czat={[wiad({ zalaczniki: [zal(9, "usterka.jpg", true)] })]} />);
     const obraz = screen.getByRole("img", { name: "usterka.jpg" });
     expect(obraz).toHaveAttribute("src", "blob:obraz");
+    expect(dymek("Kosiarka przestała ciąć").tlo).toContainElement(obraz);
+    /* Kafel 112×84 z makiety, nie zdjęcie do 256 px wysokości. */
+    expect(obraz.closest(".h-\\[84px\\]")).toHaveClass("w-28");
+  });
+
+  it("kolumny zdjęć obok rozmowy nie ma", () => {
+    scena.obrazy = { 9: "blob:obraz" };
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ zalaczniki: [zal(9, "usterka.jpg", true)] })]} />);
+    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
   });
 
   it("plik, którego trasa nie narysuje, spada na przycisk pobrania", async () => {
@@ -112,6 +183,16 @@ describe("Oś rozmowy reklamacyjnej", () => {
     expect(pobrania.lista).toEqual(["usterka.jpg"]);
   });
 
+  it("zdjęcie się powiększa, a pasek z nazwą dalej pobiera plik", async () => {
+    scena.obrazy = { 9: "blob:obraz" };
+    pobrania.lista = [];
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ zalaczniki: [zal(9, "usterka.jpg", true)] })]} />);
+    await userEvent.click(screen.getByRole("button", { name: "usterka.jpg" }));
+    expect(pobrania.lista).toEqual(["usterka.jpg"]);
+    expect(screen.getByRole("button", { name: "Powiększ: usterka.jpg" })).toBeInTheDocument();
+  });
+
   it("PDF nie udaje zdjęcia — dostaje przycisk od razu, bez pytania serwera", () => {
     /* `podglad: false` znaczy, że nawet nie próbujemy: jedno żądanie mniej
        przy każdym otwarciu sprawy z paragonem. */
@@ -122,56 +203,107 @@ describe("Oś rozmowy reklamacyjnej", () => {
     expect(screen.queryByRole("img")).not.toBeInTheDocument();
   });
 
-  it("załącznik SAMEJ sprawy stoi przy zgłoszeniu, nie w rozmowie", () => {
-    scena.obrazy = { 5: "blob:paragon" };
-    render(<Czat sprawa={sprawa()} czat={[]}
-      zalaczniki={[zal(5, "dowod.png", true)]} />);
-    expect(screen.getByRole("img", { name: "dowod.png" })).toBeInTheDocument();
-  });
-
-  it("rola autora jest PODPISEM — doradca Allegro to nie klient", () => {
+  it("film stoi ciemnym kaflem z nazwą, bez prośby o podgląd", () => {
     scena.obrazy = {};
-    render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[
-      wiad(),
-      wiad({ id: 2, externalId: "w-2", autorRola: "ADMIN", autorLogin: null,
-        tresc: "Proszę o zdjęcie noża" }),
-      wiad({ id: 3, externalId: "w-3", autorRola: "SELLER", autorLogin: "sprzedawca",
-        tresc: "Załączam" }),
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ zalaczniki: [zal(7, "wyciek.mp4", false)] })]} />);
+    const kafel = screen.getByRole("button", { name: "wyciek.mp4" }).parentElement!;
+    expect(kafel).toHaveClass("bg-slate-700");
+  });
+});
+
+describe("Kto mówi: strona, tło i podpis", () => {
+  it("klient po lewej na szarym tle, sklep po prawej na błękicie", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]} czat={[
+      wiad({ id: 1, autorRola: "BUYER", tresc: "od klienta" }),
+      wiad({ id: 2, autorRola: "SELLER", autorLogin: "sklep", tresc: "od nas" }),
     ]} />);
-    expect(screen.getByText("Klient")).toBeInTheDocument();
-    expect(screen.getByText("Doradca Allegro")).toBeInTheDocument();
-    expect(screen.getByText("My")).toBeInTheDocument();
+    const klient = dymek("od klienta");
+    const my = dymek("od nas");
+    expect(klient.li).toHaveClass("self-start");
+    expect(klient.tlo).toHaveClass("bg-slate-100");
+    expect(my.li).toHaveClass("self-end");
+    expect(my.tlo).toHaveClass("bg-blue-50");
   });
 
-  it("niepełna rozmowa MÓWI o sobie, zamiast udawać całą", () => {
-    scena.obrazy = {};
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 5 })} zalaczniki={[]} czat={[wiad()]} />);
-    expect(screen.getByText(/Ta rozmowa jest niepełna/)).toBeInTheDocument();
+  it("podpis mówi login klienta i „Sklep”, bez ikon i słów ról", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]} czat={[
+      wiad({ id: 1, tresc: "od klienta" }),
+      wiad({ id: 2, autorRola: "SELLER", autorLogin: "sklep", tresc: "od nas" }),
+    ]} />);
+    expect(dymek("od klienta").li).toHaveTextContent(/^kupujacy1 · /);
+    expect(dymek("od nas").li).toHaveTextContent(/^Sklep · /);
+    expect(screen.queryByText("Klient")).not.toBeInTheDocument();
+    expect(screen.queryByText("My")).not.toBeInTheDocument();
+    expect(document.querySelector("li svg")).toBeNull();
   });
 
-  it("urwana rozmowa NIE obiecuje, że reszta dojdzie sama (0.273.0)", () => {
-    /* Dwa powody niepełnej rozmowy i dwa różne zdania. Do 0.272.0 stało tu
-       jedno — „Reszta dojdzie następną synchronizacją" — i przy rozmowie
-       urwanej naszym bezpiecznikiem stron było nieprawdą: po drugą stronę
-       rozmowy nikt nie szedł, więc nie dochodziła nigdy. */
-    scena.obrazy = {};
-    const { rerender } = render(
-      <Czat sprawa={sprawa({ wiadomosciIle: 900 })} zalaczniki={[]} czat={[wiad()]} />);
-    expect(screen.getByText(/Reszta dojdzie następną synchronizacją/)).toBeInTheDocument();
-
-    rerender(
-      <Czat sprawa={sprawa({ wiadomosciIle: 900, czatUrwany: true })}
-        zalaczniki={[]} czat={[wiad()]} />);
-    expect(screen.queryByText(/Reszta dojdzie następną synchronizacją/)).not.toBeInTheDocument();
-    expect(screen.getByText(/przeczytasz w Centrum Sprzedaży/)).toBeInTheDocument();
+  it("nasz dymek z panelu mówi, kto z biura pisał; spoza panelu zostaje „Sklep”", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]} czat={[
+      wiad({ id: 2, autorRola: "SELLER", autorLogin: "sklep", tresc: "z panelu", wyslalNazwa: "Tomasz Nowak" }),
+      wiad({ id: 3, autorRola: "SELLER", autorLogin: "sklep", tresc: "spoza panelu", wyslalNazwa: null }),
+      wiad({ id: 4, autorRola: "BUYER", tresc: "klient", wyslalNazwa: "Ktoś" }),
+    ]} />);
+    expect(dymek("z panelu").li).toHaveTextContent(/^Sklep · Tomasz Nowak · /);
+    expect(dymek("spoza panelu").li).toHaveTextContent(/^Sklep · /);
+    expect(dymek("spoza panelu").li).not.toHaveTextContent("Tomasz");
+    expect(dymek("klient").li).not.toHaveTextContent("Ktoś");
   });
 
+  it("doradca Allegro zostaje dymkiem po lewej, z bielą i ramką", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ autorRola: "ADMIN", autorLogin: null, tresc: "od doradcy" })]} />);
+    const d = dymek("od doradcy");
+    expect(d.li).toHaveClass("self-start");
+    expect(d.li).toHaveTextContent(/^Doradca Allegro · \d{2}\.\d{2}, \d{2}:\d{2}/);
+    expect(d.tlo).toHaveClass("bg-white", "border");
+  });
+
+  it("magazyn Allegro to maszyna: przerywana ramka i własny podpis", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ autorRola: "FULFILLMENT", autorLogin: null, tresc: "od magazynu" })]} />);
+    expect(dymek("od magazynu").tlo).toHaveClass("border-dashed");
+    expect(dymek("od magazynu").li).toHaveTextContent(/^Magazyn Allegro/);
+  });
+
+  it("rola spoza zbioru mówi „nie wiem, kto to”, zamiast udawać klienta", () => {
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ autorRola: "COURIER", autorLogin: null, tresc: "nowa rola" })]} />);
+    expect(dymek("nowa rola").li).toHaveTextContent(/^COURIER/);
+    expect(dymek("nowa rola").tlo).toHaveClass("border-dotted");
+  });
+
+  it("ostatnia wiadomość klienta nie dostaje bursztynu — wszystkie mają to samo tło", () => {
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]} czat={[
+      wiad({ id: 1, tresc: "pierwsza klienta" }),
+      wiad({ id: 2, tresc: "ostatnia klienta" }),
+    ]} />);
+    expect(dymek("pierwsza klienta").tlo.className).not.toMatch(/amber/);
+    expect(dymek("ostatnia klienta").tlo.className).not.toMatch(/amber/);
+  });
+
+  it("długiej wypowiedzi nie zwija — ani naszej, ani klienta", () => {
+    const dluga = "Dzień dobry, " + "sprawdziliśmy zgłoszenie dokładnie. ".repeat(12);
+    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
+      czat={[wiad({ autorRola: "SELLER", autorLogin: "sklep", tresc: dluga })]} />);
+    expect(screen.getByText(/Dzień dobry/).className).not.toContain("line-clamp-4");
+    expect(screen.queryByRole("button", { name: "Pokaż całą wiadomość" })).not.toBeInTheDocument();
+  });
+
+  it("starszych wiadomości nie chowa i nie mówi o rozmowie niepełnej", () => {
+    const czat = Array.from({ length: 8 }, (_, i) => wiad({ id: i + 1, tresc: `wiadomość ${i + 1}` }));
+    render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={czat} />);
+    expect(screen.getByText("wiadomość 1")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /wcześniejsz/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/niepełna/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Edytor na końcu rozmowy", () => {
   it("edytor jest WSTRZYKIWANY i stoi POD rozmową, a nie nad nią", () => {
-    /* Do 0.223.0 stało tu zdanie „odpowiedź wysyła się w Centrum Sprzedaży".
-       Przestało być prawdą razem z przyrostem drugim, więc zniknęło — a oś
-       rozmowy sama nadal nic nie wysyła: mutacje mieszkają w ekranie.
-       Kolejność ma znaczenie: pole do pisania pod ostatnią wiadomością to
-       jedyny układ, w którym czyta się przed pisaniem. */
+    /* Oś rozmowy sama nic nie wysyła: mutacje mieszkają w ekranie. Pole do
+       pisania pod ostatnią wiadomością to jedyny układ, w którym czyta się
+       przed pisaniem. */
     scena.obrazy = {};
     render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[wiad()]}
       edytor={<button type="button">WYŚLIJ ODPOWIEDŹ</button>} />);
@@ -186,12 +318,33 @@ describe("Oś rozmowy reklamacyjnej", () => {
     render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[wiad()]} />);
     expect(screen.queryByRole("button")).not.toBeInTheDocument();
   });
+
+  it("pole odpowiedzi stoi w pasie przewijania, za ostatnią wiadomością", () => {
+    const { container } = render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ tresc: "wiadomość" })]}
+      edytor={<div data-testid="edytor">pole</div>} />);
+    const przewijany = container.querySelector(".overflow-y-auto")!;
+    const pole = screen.getByTestId("edytor");
+    expect(przewijany.contains(screen.getByText("wiadomość"))).toBe(true);
+    expect(przewijany.contains(pole)).toBe(true);
+    expect(przewijany.contains(screen.getByRole("heading"))).toBe(false);
+  });
+
+  it("kotwica stoi ZA edytorem — przyklejony rząd nie zakrywa ostatniej wiadomości", () => {
+    const cele: Element[] = [];
+    Element.prototype.scrollIntoView = function (this: Element) { cele.push(this); };
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
+      czat={[wiad({ tresc: "wiadomość" })]}
+      edytor={<div data-testid="edytor">pole</div>} />);
+    expect(cele).toHaveLength(1);
+    expect(screen.getByTestId("edytor").compareDocumentPosition(cele[0]))
+      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
 });
 
-/* ── Rozmowa po 0.415.0 ──────────────────────────────────────────────────────
-   Trzy zmiany na osi, każda sprawdzana na treści ze zrzutu właściciela:
-   formularz Allegro składa się pod zdanie klienta, adresy są odnośnikami,
-   a ramka „Zgłoszenie” znika także wtedy, gdy opis siedzi w formularzu.    */
+/* ── Formularz Allegro w dymku zgłoszenia ────────────────────────────────────
+   Allegro wkłada zdanie klienta w swój formularz. Powód i oczekiwanie mówi
+   linia nad zdaniem, więc z formularza stoi samo zdanie klienta.          */
 
 const OPIS_ZE_ZRZUTU = "Po kilku użyciach szarpak przestał wciągać sznurek do środka .";
 const FORMULARZ_ZE_ZRZUTU = [
@@ -206,38 +359,26 @@ const FORMULARZ_ZE_ZRZUTU = [
   "Starowiejska 10",
 ].join("\n");
 
-describe("Formularz Allegro na osi rozmowy", () => {
-  it("pokazuje ZDANIE KLIENTA, a formularz chowa pod przyciskiem", () => {
+describe("Formularz Allegro w dymku zgłoszenia", () => {
+  it("pokazuje samo ZDANIE KLIENTA, bez przełącznika „pokaż całość”", () => {
     render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
       czat={[wiad({ tresc: FORMULARZ_ZE_ZRZUTU })]} />);
     expect(screen.getByText(OPIS_ZE_ZRZUTU)).toBeInTheDocument();
     expect(screen.queryByText(/Oczekiwane rozwiązanie/)).not.toBeInTheDocument();
-  });
-
-  it("„pokaż całość” oddaje formularz SŁOWO W SŁOWO, z adresem do zwrotu", async () => {
-    /* Chowamy powtórzenie, nigdy treść — adres do zwrotu bywa jedyną rzeczą,
-       po którą agent w tę wiadomość wchodzi. */
-    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
-      czat={[wiad({ tresc: FORMULARZ_ZE_ZRZUTU })]} />);
-    await userEvent.click(screen.getByRole("button", { name: /pokaż całość/ }));
-    expect(screen.getByText(/Starowiejska 10/)).toBeInTheDocument();
-    expect(screen.getByText(/Warunki reklamacji/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /pokaż całość/ })).not.toBeInTheDocument();
   });
 
   it("ZWYKŁEJ wiadomości nie rusza — nie ma czego składać", () => {
     render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
       czat={[wiad({ tresc: "Kosiarka przestała ciąć" })]} />);
     expect(screen.getByText("Kosiarka przestała ciąć")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /pokaż całość/ })).not.toBeInTheDocument();
   });
 
-  it("ramka ZGŁOSZENIE znika, gdy opis siedzi w formularzu (blizna 0.412.0)", () => {
-    /* To jest przypadek, który 0.412.0 przepuszczało: teksty nie są równe,
-       a dublem są. Test tamtego wydania karmiono wymyśloną parą. */
+  it("opis siedzący w formularzu to dubel — zdanie stoi raz", () => {
     render(<Czat sprawa={sprawa({ opisZgloszenia: OPIS_ZE_ZRZUTU })} zalaczniki={[]}
       czat={[wiad({ tresc: FORMULARZ_ZE_ZRZUTU })]} />);
-    expect(screen.queryByText("Zgłoszenie")).not.toBeInTheDocument();
     expect(screen.getAllByText(OPIS_ZE_ZRZUTU)).toHaveLength(1);
+    expect(screen.getAllByRole("listitem")).toHaveLength(1);
   });
 });
 
@@ -273,15 +414,14 @@ describe("Adresy w treści są odnośnikami", () => {
 });
 
 describe("Kotwica przy najnowszej wiadomości", () => {
-  /* Rozmowa reklamacyjna czyta się od KOŃCA: pierwsze pytanie agenta brzmi
-     „co on napisał ostatnio". Ostrożność całego ruchu siedzi w drugim teście:
-     od 0.410.0 wejście w sprawę odświeża ją z Allegro, więc oś przerysowuje
-     się sekundę po otwarciu — przewijanie przy każdej zmianie wyrywałoby
+  /* Rozmowa czyta się od KOŃCA. Ostrożność całego ruchu siedzi w drugim
+     teście: wejście w sprawę odświeża ją z Allegro, więc oś przerysowuje się
+     sekundę po otwarciu — przewijanie przy każdej zmianie wyrywałoby
      agentowi miejsce czytania spod oka. */
   it("otwarcie sprawy pokazuje ostatnią wiadomość, nie pierwszą", () => {
     const skok = vi.fn();
     Element.prototype.scrollIntoView = skok;
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]}
+    render(<Czat sprawa={sprawa()} zalaczniki={[]}
       czat={[wiad({ id: 1, tresc: "pierwsza" }), wiad({ id: 2, tresc: "ostatnia" })]} />);
     expect(skok).toHaveBeenCalledTimes(1);
   });
@@ -289,10 +429,10 @@ describe("Kotwica przy najnowszej wiadomości", () => {
   it("odświeżenie TEJ SAMEJ sprawy nie przewija drugi raz", () => {
     const skok = vi.fn();
     Element.prototype.scrollIntoView = skok;
-    const { rerender } = render(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]}
+    const { rerender } = render(<Czat sprawa={sprawa()} zalaczniki={[]}
       czat={[wiad({ id: 1, tresc: "pierwsza" })]} />);
     expect(skok).toHaveBeenCalledTimes(1);
-    rerender(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]}
+    rerender(<Czat sprawa={sprawa()} zalaczniki={[]}
       czat={[wiad({ id: 1, tresc: "pierwsza" }), wiad({ id: 2, tresc: "dociągnięta" })]} />);
     expect(skok).toHaveBeenCalledTimes(1);
   });
@@ -308,297 +448,20 @@ describe("Kotwica przy najnowszej wiadomości", () => {
   });
 });
 
-describe("Kto mówi, widać bez czytania (0.416.0, barwy z 0.418.0)", () => {
-  /* Dwa zgłoszenia właściciela ze zrzutami. Podstawa doboru jest z badań, nie
-     z gustu: cecha POJEDYNCZA — barwa — jest kodowana równolegle na całym polu
-     widzenia (teoria integracji cech, Treisman i Gelade 1980), więc czas
-     znalezienia „ostatniej wiadomości klienta" nie rośnie z długością wątku.
-     Barwa nie może jednak zostać sama (WCAG 1.4.1, około jeden mężczyzna na
-     dwunastu z zaburzeniem widzenia barw), więc kodujemy TRZY razy: tłem,
-     stroną karty i ikoną. */
-  const karta = (tresc: string) => screen.getByText(tresc).closest("li")!;
-
-  it("każda rola ma INNE TŁO — to jest cecha, którą oko łapie równolegle", () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 4 })} zalaczniki={[]} czat={[
-      wiad({ id: 1, autorRola: "BUYER", tresc: "od klienta" }),
-      wiad({ id: 2, autorRola: "SELLER", autorLogin: null, tresc: "od nas" }),
-      wiad({ id: 3, autorRola: "FULFILLMENT", autorLogin: null, tresc: "od automatu" }),
-      wiad({ id: 4, autorRola: "ADMIN", autorLogin: null, tresc: "od doradcy" }),
-    ]} />);
-    const tla = ["od klienta", "od nas", "od automatu", "od doradcy"]
-      .map((t) => karta(t).className.match(/bg-[a-z0-9-]+/)![0]);
-    expect(new Set(tla).size).toBe(4);
-  });
-
-  it("nasza listwa stoi po DRUGIEJ stronie niż cudza", () => {
-    /* Odsunięcie w prawo plus listwa przy prawej krawędzi to układ znany
-       z każdego komunikatora — „to moje" nie wymaga uczenia się niczego. */
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 3 })} zalaczniki={[]} czat={[
-      wiad({ id: 1, autorRola: "BUYER", tresc: "od klienta" }),
-      wiad({ id: 2, autorRola: "SELLER", autorLogin: null, tresc: "od nas" }),
-      wiad({ id: 3, autorRola: "FULFILLMENT", autorLogin: null, tresc: "od automatu" }),
-    ]} />);
-    expect(karta("od klienta").className).toContain("border-l-wertis-amber");
-    expect(karta("od nas").className).toContain("border-r-4");
-    expect(karta("od nas").className).not.toContain("border-l-4");
-    /* Magazyn Allegro nie jest człowiekiem i ma tak wyglądać. Automat
-       `SYSTEM` nie ma karty wcale — stoi wierszem zdarzenia (niżej). */
-    expect(karta("od automatu").className).toContain("border-dashed");
-  });
-
-  it("strona karty mówi, czyja to wypowiedź — nasza odsunięta, cudza nie", () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]} czat={[
-      wiad({ id: 1, autorRola: "BUYER", tresc: "od klienta" }),
-      wiad({ id: 2, autorRola: "SELLER", autorLogin: null, tresc: "od nas" }),
-    ]} />);
-    expect(karta("od nas").className).toContain("ml-8");
-    expect(karta("od klienta").className).toContain("mr-8");
-  });
-
-  it("doradca Allegro to CZŁOWIEK, ale nie nasz klient — własny błękit", () => {
-    /* Odpowiada mu się inaczej niż kupującemu, więc nie ma prawa wyglądać
-       jak on ani jak automat. */
-    render(<Czat sprawa={sprawa()} zalaczniki={[]}
-      czat={[wiad({ autorRola: "ADMIN", autorLogin: null, tresc: "od doradcy" })]} />);
-    expect(karta("od doradcy").className).toContain("border-l-sky-500");
-    expect(screen.getByText("Doradca Allegro")).toBeInTheDocument();
-  });
-
-  it("rola spoza zbioru mówi „nie wiem, kto to”, zamiast udawać klienta", () => {
-    render(<Czat sprawa={sprawa()} zalaczniki={[]}
-      czat={[wiad({ autorRola: "COURIER", autorLogin: null, tresc: "nowa rola" })]} />);
-    expect(screen.getByText("COURIER")).toBeInTheDocument();
-    expect(karta("nowa rola").className).toContain("border-dotted");
-  });
-});
-
-describe("Odpowiedź jest ostatnią wypowiedzią wątku (0.549.0)", () => {
-  /* Decyzja właściciela z 28 września: ten sam układ co w skrzynce. Pole
-     stoi W pasie przewijania, za ostatnią wiadomością, a pod ręką trzyma je
-     przyklejenie do krawędzi. Werdykt zostaje poza pasem, w ekranie. */
-  it("pole odpowiedzi stoi w pasie przewijania, za ostatnią wiadomością", () => {
-    const { container } = render(<Czat sprawa={sprawa()} zalaczniki={[]}
-      czat={[wiad({ tresc: "wiadomość" })]}
-      edytor={<div data-testid="edytor">pole</div>} />);
-    const przewijany = container.querySelector(".overflow-y-auto")!;
-    const pole = screen.getByTestId("edytor");
-    expect(przewijany.contains(screen.getByText("wiadomość"))).toBe(true);
-    expect(przewijany.contains(pole)).toBe(true);
-    expect(screen.getByText("wiadomość").compareDocumentPosition(pole))
-      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-  });
-
-  it("kotwica stoi ZA edytorem — przyklejony rząd nie zakrywa ostatniej wiadomości", () => {
-    const cele: Element[] = [];
-    Element.prototype.scrollIntoView = function (this: Element) { cele.push(this); };
-    render(<Czat sprawa={sprawa()} zalaczniki={[]}
-      czat={[wiad({ tresc: "wiadomość" })]}
-      edytor={<div data-testid="edytor">pole</div>} />);
-    expect(cele).toHaveLength(1);
-    expect(screen.getByTestId("edytor").compareDocumentPosition(cele[0]))
-      .toBe(Node.DOCUMENT_POSITION_FOLLOWING);
-  });
-});
-
-describe("Nasza długa wypowiedź zwija się do czterech linii (0.511.0)", () => {
-  /* Wzorzec skrzynki z 0.506.0: własną odpowiedź agent zna, a długa zajmowała
-     całą oś. Cudzej nie zwijamy — po nią agent przyszedł. */
-  const dluga = "Dzień dobry, " + "sprawdziliśmy zgłoszenie dokładnie. ".repeat(12);
-
-  it("nasza długa: cztery linie i „Pokaż całą wiadomość”", async () => {
-    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
-      czat={[wiad({ autorRola: "SELLER", autorLogin: "sklep", tresc: dluga })]} />);
-    const tekst = screen.getByText(/Dzień dobry/);
-    expect(tekst.className).toContain("line-clamp-4");
-    await userEvent.click(screen.getByRole("button", { name: "Pokaż całą wiadomość" }));
-    expect(tekst.className).not.toContain("line-clamp-4");
-    expect(screen.getByRole("button", { name: "Zwiń" })).toHaveAttribute("aria-expanded", "true");
-  });
-
-  it("puste wiersze ponad jeden ściska na ekranie; krótkiej nie zwija", () => {
-    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
-      czat={[wiad({ autorRola: "SELLER", tresc: "Wysłane.\n\n\n\nPozdrawiamy" })]} />);
-    expect(screen.getByText(/Wysłane\./).textContent).toBe("Wysłane.\n\nPozdrawiamy");
-    expect(screen.queryByRole("button", { name: "Pokaż całą wiadomość" })).not.toBeInTheDocument();
-  });
-
-  it("długiej wiadomości klienta NIE zwija", () => {
-    render(<Czat sprawa={sprawa({ opisZgloszenia: null })} zalaczniki={[]}
-      czat={[wiad({ autorRola: "BUYER", tresc: dluga })]} />);
-    expect(screen.getByText(/Dzień dobry/).className).not.toContain("line-clamp-4");
-    expect(screen.queryByRole("button", { name: "Pokaż całą wiadomość" })).not.toBeInTheDocument();
-  });
-});
-
-describe("Kolumna zdjęć obok rozmowy (dyskusje)", () => {
-  /* Zgłoszenie właściciela: zdjęcia zajmowały dużą część czatu. Ekran
-     dyskusji nie ma obok czego postawić, więc kolumnę rysuje sama rozmowa:
-     zdjęcie stoi w kolumnie, a w wątku zostaje odnośnik w miejscu wiadomości. */
-  const zZdjeciami = () => render(<Czat sprawa={sprawa()} kolumnaZdjec
-    zalaczniki={[zal(5, "dowod.png", true), zal(6, "paragon.pdf", false)]}
-    czat={[wiad({ zalaczniki: [zal(9, "usterka.jpg", true)] })]} />);
-
-  it("zdjęcia stoją w kolumnie, w wątku zostaje sam odnośnik", () => {
-    scena.obrazy = { 5: "blob:dowod", 9: "blob:usterka" };
-    zZdjeciami();
-    const kolumna = screen.getByRole("complementary", { name: "Zdjęcia w sprawie" });
-    expect(within(kolumna).getByRole("img", { name: "usterka.jpg" })).toBeInTheDocument();
-    expect(within(kolumna).getByRole("img", { name: "dowod.png" })).toBeInTheDocument();
-    expect(screen.getAllByRole("img")).toHaveLength(2);
-    expect(screen.getByRole("button", { name: "Pokaż zdjęcie w kolumnie: usterka.jpg" }))
-      .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Pokaż zdjęcie w kolumnie: dowod.png" }))
-      .toBeInTheDocument();
-  });
-
-  it("plik bez podglądu zostaje w wątku, nie w kolumnie", () => {
-    scena.obrazy = { 5: "blob:dowod", 9: "blob:usterka" };
-    zZdjeciami();
-    const kolumna = screen.getByRole("complementary", { name: "Zdjęcia w sprawie" });
-    expect(within(kolumna).queryByText("paragon.pdf")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "paragon.pdf" })).toBeInTheDocument();
-  });
-
-  it("kolumna podpisuje zdjęcie autorem wiadomości", () => {
-    scena.obrazy = { 5: "blob:dowod", 9: "blob:usterka" };
-    zZdjeciami();
-    expect(screen.getByRole("region", { name: /^Zdjęcia: Klient · / })).toBeInTheDocument();
-    expect(screen.getByRole("region", { name: "Zdjęcia: Zgłoszenie" })).toBeInTheDocument();
-  });
-
-  it("odnośnik przenosi fokus na swoje zdjęcie w kolumnie", async () => {
-    scena.obrazy = { 5: "blob:dowod", 9: "blob:usterka" };
-    zZdjeciami();
-    await userEvent.click(screen.getByRole("button", { name: "Pokaż zdjęcie w kolumnie: usterka.jpg" }));
-    expect(document.activeElement).toContainElement(screen.getByRole("img", { name: "usterka.jpg" }));
-  });
-
-  it("bez zdjęć kolumny nie ma — rozmowa nie traci ćwiartki na pustkę", () => {
-    scena.obrazy = {};
-    render(<Czat sprawa={sprawa()} kolumnaZdjec zalaczniki={[zal(6, "paragon.pdf", false)]}
-      czat={[wiad()]} />);
-    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
-  });
-
-  it("bez włączenia kolumny zdjęcie stoi w wątku jak dotąd", () => {
-    scena.obrazy = { 9: "blob:usterka" };
-    render(<Czat sprawa={sprawa()} zalaczniki={[]}
-      czat={[wiad({ zalaczniki: [zal(9, "usterka.jpg", true)] })]} />);
-    expect(screen.queryByRole("complementary")).not.toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "usterka.jpg" })).toBeInTheDocument();
-  });
-});
-
-/* ── Trzy zachowania na życzenie ekranu reklamacji ──────────────────────────
-   Ten sam komponent rysuje dyskusje i tam nic się nie zmienia, więc każde
-   z nich jest DOMYŚLNIE WYŁĄCZONE — i to pierwsze pilnujemy w każdej grupie. */
-const dluga = (n: number) => Array.from({ length: n }, (_, i) => wiad({
-  id: i + 1, externalId: `w-${i + 1}`, autorRola: i % 2 ? "SELLER" : "BUYER",
-  autorLogin: i % 2 ? "sklep" : "kupujacy1", tresc: `wiadomość ${i + 1}`,
-}));
-
-describe("Przypięte zgłoszenie", () => {
-  const przewijany = (c: HTMLElement) => c.querySelector(".overflow-y-auto")!;
-
-  it("domyślnie zgłoszenie przewija się razem z rozmową (dyskusje)", () => {
-    const { container } = render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={dluga(3)} />);
-    expect(przewijany(container).contains(screen.getByText("Pękła obudowa po tygodniu"))).toBe(true);
-  });
-
-  it("przypięte stoi NAD rozmową, poza przewijaniem — objaw zawsze w zasięgu oka", () => {
-    const { container } = render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={dluga(3)}
-      przypnijZgloszenie />);
-    const zgloszenie = screen.getByText("Pękła obudowa po tygodniu");
-    expect(przewijany(container).contains(zgloszenie)).toBe(false);
-    expect(zgloszenie.compareDocumentPosition(screen.getByText("wiadomość 1"))
-      & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
-  });
-});
-
-describe("Starsze wiadomości zwinięte", () => {
-  it("domyślnie widać całą rozmowę i nie ma przycisku (dyskusje)", () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 8 })} zalaczniki={[]} czat={dluga(8)} />);
-    expect(screen.getByText("wiadomość 1")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /wcześniejsz/ })).not.toBeInTheDocument();
-  });
-
-  it("widać OSTATNIE wiadomości, a starsze chowa jeden przycisk z liczbą", async () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 8 })} zalaczniki={[]} czat={dluga(8)} zwinStarsze={5} />);
-    expect(screen.queryByText("wiadomość 3")).not.toBeInTheDocument();
-    expect(screen.getByText("wiadomość 4")).toBeInTheDocument();
-    expect(screen.getByText("wiadomość 8")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "3 wcześniejsze wiadomości" }));
-    expect(screen.getByText("wiadomość 1")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /wcześniejsz/ })).not.toBeInTheDocument();
-  });
-
-  it("liczba mówi poprawną formą: pięć wcześniejszych, nie pięć wcześniejsze", () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 10 })} zalaczniki={[]} czat={dluga(10)} zwinStarsze={5} />);
-    expect(screen.getByRole("button", { name: "5 wcześniejszych wiadomości" })).toBeInTheDocument();
-  });
-
-  it("JEDNEJ wiadomości nie chowa — przycisk zająłby jej miejsce", () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 6 })} zalaczniki={[]} czat={dluga(6)} zwinStarsze={5} />);
-    expect(screen.getByText("wiadomość 1")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /wcześniejsz/ })).not.toBeInTheDocument();
-  });
-
-  it("zgłoszenie WRACA, gdy jego dubel schował się pod przyciskiem", () => {
-    /* Zgłoszenie raz, nie dwa — ale gdy pierwsza wiadomość klienta jest
-       zwinięta, zgłoszenie to jedyne miejsce, gdzie objaw stoi na ekranie. */
-    const czat = dluga(8);
-    czat[0] = { ...czat[0], tresc: "Pękła obudowa po tygodniu" };
-    const { rerender } = render(<Czat sprawa={sprawa({ wiadomosciIle: 8 })} zalaczniki={[]} czat={czat}
-      zwinStarsze={5} przypnijZgloszenie />);
-    expect(screen.getByText("Zgłoszenie")).toBeInTheDocument();
-    rerender(<Czat sprawa={sprawa({ wiadomosciIle: 8 })} zalaczniki={[]} czat={czat} przypnijZgloszenie />);
-    expect(screen.queryByText("Zgłoszenie")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Pękła obudowa po tygodniu")).toHaveLength(1);
-  });
-});
-
-describe("Bursztyn tylko na ostatniej wiadomości klienta", () => {
-  const karta = (tresc: string) => screen.getByText(tresc).closest("li")!;
-  const rozmowa = [
-    wiad({ id: 1, tresc: "pierwsza klienta" }),
-    wiad({ id: 2, autorRola: "SELLER", autorLogin: "sklep", tresc: "nasza" }),
-    wiad({ id: 3, tresc: "ostatnia klienta" }),
-  ];
-
-  it("domyślnie każda wiadomość klienta jest bursztynowa (dyskusje)", () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 3 })} zalaczniki={[]} czat={rozmowa} />);
-    expect(karta("pierwsza klienta").className).toContain("bg-amber-50");
-    expect(karta("ostatnia klienta").className).toContain("bg-amber-50");
-  });
-
-  it("starsza cichnie do neutralnego tła, a strona, ikona i podpis zostają", () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 3 })} zalaczniki={[]} czat={rozmowa}
-      bursztynTylkoOstatniej />);
-    expect(karta("ostatnia klienta").className).toContain("bg-amber-50");
-    const starsza = karta("pierwsza klienta");
-    expect(starsza.className).not.toMatch(/amber/);
-    /* Barwa nigdy nie była jedynym znakiem autora (WCAG 1.4.1). */
-    expect(starsza.className).toContain("mr-8");
-    expect(starsza.className).toContain("border-l-4");
-    expect(within(starsza).getByText("Klient")).toBeInTheDocument();
-  });
-});
-
 /* ── AUTOMAT ALLEGRO TO WIERSZ ZDARZENIA (makieta właściciela) ───────────────
    Automat nie jest rozmówcą, więc nie dostaje dymka. Stoi cienkim wierszem:
    ikona w kółku, krótka nazwa z faktem i czas po prawej. Kolejne automaty
    pod rząd składają się w jeden wiersz, a pełna treść stoi pod rozwinięciem. */
-describe("Automat Allegro jako wiersz zdarzenia", () => {
-  const automat = (id: number, tresc: string, utworzonoAt: string) =>
-    wiad({ id, autorRola: "SYSTEM", autorLogin: null, tresc, utworzonoAt });
+const automat = (id: number, tresc: string, utworzonoAt: string) =>
+  wiad({ id, autorRola: "SYSTEM", autorLogin: null, tresc, utworzonoAt });
 
+describe("Automat Allegro jako wiersz zdarzenia", () => {
   it("nie rysuje dymka: wiersz z nazwą i czasem, pełna treść pod rozwinięciem", async () => {
     render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[
       automat(1, "Kupujący wygenerował etykietę zwrotną.", "2026-09-30T11:39:00.000Z")]} />);
     const wiersz = screen.getByRole("button", { name: /Etykieta wygenerowana/ });
     expect(wiersz).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Kupujący wygenerował etykietę zwrotną.")).not.toBeInTheDocument();
-    /* Bez dymka znaczy bez podpisu roli, który mają karty rozmówców. */
     expect(screen.queryByText("Allegro (automat)")).not.toBeInTheDocument();
     await userEvent.click(wiersz);
     expect(wiersz).toHaveAttribute("aria-expanded", "true");
@@ -606,7 +469,7 @@ describe("Automat Allegro jako wiersz zdarzenia", () => {
   });
 
   it("kolejne automaty pod rząd składają się w JEDEN wiersz, z rozwinięciem na każdy", async () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 3 })} zalaczniki={[]} czat={[
+    render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[
       automat(1, "Wygenerowano etykietę zwrotną.", "2026-09-30T11:39:00.000Z"),
       automat(2, "Paczka została nadana. Numer przesyłki: 600000727616070019994306", "2026-09-30T12:16:00.000Z"),
       wiad({ id: 3, tresc: "Wysłałem", utworzonoAt: "2026-09-30T16:40:00.000Z" }),
@@ -637,29 +500,24 @@ describe("Automat Allegro jako wiersz zdarzenia", () => {
     expect(screen.queryByRole("button", { name: /Kopiuj numer przesyłki/ })).not.toBeInTheDocument();
   });
 
-  it("przypomnienie o terminie stoi w barwie uwagi, z wyciągniętą liczbą dni", () => {
+  it("przypomnienie o terminie stoi statycznie, w barwie uwagi, z liczbą dni", () => {
     render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[
       automat(1, "Przypominamy: na decyzję w sprawie reklamacji zostało 7 dni.", "2026-10-05T07:00:00.000Z")]} />);
-    const wiersz = screen.getByRole("button", { name: /Przypomnienie Allegro/ });
+    const wiersz = screen.getByText("Przypomnienie Allegro").closest("li")!;
     expect(wiersz).toHaveTextContent("do decyzji zostało 7 dni");
     expect(wiersz.querySelector(".text-ranga-uwaga")).not.toBeNull();
+    /* Bez rozwinięcia: liczba dni mówi całą treść przypomnienia. */
+    expect(within(wiersz).queryByRole("button")).toBeNull();
   });
 
   it("przypomnienie nie skleja się z sąsiednim automatem — zgubiłoby barwę uwagi", () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]} czat={[
+    render(<Czat sprawa={sprawa()} zalaczniki={[]} czat={[
       automat(1, "Wygenerowano etykietę zwrotną.", "2026-09-30T11:39:00.000Z"),
       automat(2, "Na decyzję zostały 2 dni.", "2026-10-10T07:00:00.000Z"),
     ]} />);
-    expect(screen.getAllByRole("button", { expanded: false })).toHaveLength(2);
-    expect(screen.getByRole("button", { name: /Przypomnienie Allegro/ }))
+    expect(screen.getAllByRole("button", { expanded: false })).toHaveLength(1);
+    expect(screen.getByText("Przypomnienie Allegro").closest("li"))
       .toHaveTextContent("do decyzji zostały 2 dni");
-  });
-
-  it("doradca Allegro zostaje dymkiem — to człowiek, nie automat", () => {
-    render(<Czat sprawa={sprawa()} zalaczniki={[]}
-      czat={[wiad({ autorRola: "ADMIN", autorLogin: null, tresc: "Proszę o zdjęcia" })]} />);
-    expect(screen.getByText("Proszę o zdjęcia")).toBeInTheDocument();
-    expect(screen.getByText("Doradca Allegro")).toBeInTheDocument();
   });
 });
 
@@ -673,10 +531,11 @@ describe("Przesyłki na osi rozmowy", () => {
     klucz: "dosylka", kierunek: "od_nas" as const, moment: null, plakietka: "w_drodze" as const,
     stanAt: null, nadanoAt: null, waybill: null, przewoznik: null, opis: "dosyłka", uwaga: "bez numeru przesyłki",
   };
-  const os = () => [...screen.getByText("pierwsza").closest("ol")!.children] as HTMLElement[];
+  const os = () => [...screen.getByRole("list", { name: "Wiadomości" }).children] as HTMLElement[];
+  const bezOpisu = sprawa({ opisZgloszenia: null });
 
   it("przesyłka staje między wiadomościami według chwili, a bez chwili na końcu", () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 2 })} zalaczniki={[]} zdarzenia={[odNas, odKlienta]} czat={[
+    render(<Czat sprawa={bezOpisu} zalaczniki={[]} zdarzenia={[odNas, odKlienta]} czat={[
       wiad({ id: 1, tresc: "pierwsza", utworzonoAt: "2026-09-28T12:32:00.000Z" }),
       wiad({ id: 2, autorRola: "SELLER", tresc: "druga", utworzonoAt: "2026-10-05T09:05:00.000Z" }),
     ]} />);
@@ -688,7 +547,7 @@ describe("Przesyłki na osi rozmowy", () => {
   });
 
   it("od klienta po lewej, od nas po prawej — strona, kształt i słowo, nie sama barwa", () => {
-    render(<Czat sprawa={sprawa()} zalaczniki={[]} zdarzenia={[odKlienta, odNas]}
+    render(<Czat sprawa={bezOpisu} zalaczniki={[]} zdarzenia={[odKlienta, odNas]}
       czat={[wiad({ tresc: "pierwsza", utworzonoAt: "2026-09-28T12:32:00.000Z" })]} />);
     const klient = screen.getByRole("listitem", { name: "Przesyłka od klienta do nas" });
     const my = screen.getByRole("listitem", { name: "Przesyłka od nas do klienta" });
@@ -701,7 +560,7 @@ describe("Przesyłki na osi rozmowy", () => {
   });
 
   it("plakietka mówi stan z czasem, numer jest chipem, a brak numeru dopiskiem", () => {
-    render(<Czat sprawa={sprawa()} zalaczniki={[]} zdarzenia={[odKlienta, odNas]}
+    render(<Czat sprawa={bezOpisu} zalaczniki={[]} zdarzenia={[odKlienta, odNas]}
       czat={[wiad({ tresc: "pierwsza", utworzonoAt: "2026-09-28T12:32:00.000Z" })]} />);
     const klient = screen.getByRole("listitem", { name: "Przesyłka od klienta do nas" });
     expect(within(klient).getByText(/^Doręczona do nas \d{2}\.\d{2}, \d{2}:\d{2}$/)).toBeInTheDocument();
@@ -713,16 +572,37 @@ describe("Przesyłki na osi rozmowy", () => {
     expect(my).toHaveTextContent("bez numeru przesyłki");
   });
 
-  it("przesyłka starsza od widocznych wiadomości chowa się razem ze zwiniętymi", async () => {
-    render(<Czat sprawa={sprawa({ wiadomosciIle: 4 })} zalaczniki={[]} zwinStarsze={1}
-      zdarzenia={[{ ...odKlienta, moment: "2026-09-29T08:00:00.000Z" }]} czat={[
-        wiad({ id: 1, tresc: "a", utworzonoAt: "2026-09-28T12:32:00.000Z" }),
-        wiad({ id: 2, tresc: "b", utworzonoAt: "2026-09-30T12:32:00.000Z" }),
-        wiad({ id: 3, tresc: "c", utworzonoAt: "2026-10-01T12:32:00.000Z" }),
-        wiad({ id: 4, tresc: "ostatnia", utworzonoAt: "2026-10-02T12:32:00.000Z" }),
-      ]} />);
-    expect(screen.queryByRole("listitem", { name: "Przesyłka od klienta do nas" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /wcześniejsze wiadomości/ }));
+  /* Makieta: automaty tej samej paczki i jej wiersz to JEDEN wiersz.
+     Wiążemy po numerze listu, bo tylko on jest wspólny. */
+  it("automaty z numerem znanej przesyłki scalają się z nią w jeden wiersz", async () => {
+    render(<Czat sprawa={bezOpisu} zalaczniki={[]} zdarzenia={[odKlienta]} czat={[
+      wiad({ id: 1, tresc: "pierwsza", utworzonoAt: "2026-09-28T12:32:00.000Z" }),
+      automat(2, "Wygenerowano etykietę zwrotną nr 600000727616070019994306.", "2026-09-30T11:39:00.000Z"),
+      automat(3, "Paczka została nadana. Numer: 600000727616070019994306", "2026-09-30T12:16:00.000Z"),
+      wiad({ id: 4, tresc: "Wysłałem", utworzonoAt: "2026-10-04T16:40:00.000Z" }),
+    ]} />);
+    const wiersze = screen.getAllByRole("listitem", { name: "Przesyłka od klienta do nas" });
+    expect(wiersze).toHaveLength(1);
+    const [wiersz] = wiersze;
+    /* Stoi w miejscu automatów, nie w chwili doręczenia. */
+    expect(os()[1]).toBe(wiersz);
+    const przycisk = within(wiersz).getByRole("button", { expanded: false });
+    expect(przycisk).toHaveTextContent("Od klienta · zwrot · etykieta → nadana · InPost");
+    expect(within(przycisk).getByText(/^Doręczona do nas /)).toBeInTheDocument();
+    expect(przycisk).toHaveTextContent(/30\.09, \d{2}:\d{2}–\d{2}:\d{2}/);
+    expect(within(wiersz).getByRole("button", { name: /Kopiuj numer przesyłki 6000/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Etykieta wygenerowana/ })).not.toBeInTheDocument();
+    await userEvent.click(przycisk);
+    expect(screen.getByText(/Paczka została nadana/)).toBeInTheDocument();
+    expect(screen.getByText(/Wygenerowano etykietę zwrotną/)).toBeInTheDocument();
+  });
+
+  it("automat z innym numerem zostaje wierszem automatu obok wiersza przesyłki", () => {
+    render(<Czat sprawa={bezOpisu} zalaczniki={[]} zdarzenia={[odKlienta]} czat={[
+      wiad({ id: 1, tresc: "pierwsza", utworzonoAt: "2026-09-28T12:32:00.000Z" }),
+      automat(2, "Paczka została nadana. Numer: 999999999999999", "2026-09-30T12:16:00.000Z"),
+    ]} />);
+    expect(screen.getByRole("button", { name: /Paczka nadana/ })).toBeInTheDocument();
     expect(screen.getByRole("listitem", { name: "Przesyłka od klienta do nas" })).toBeInTheDocument();
   });
 

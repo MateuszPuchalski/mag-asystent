@@ -1,6 +1,6 @@
 import React from "react";
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 const { Edytor, LIMIT_ZNAKOW } = await import("./Edytor");
@@ -13,8 +13,9 @@ const { Edytor, LIMIT_ZNAKOW } = await import("./Edytor");
    2. LIMIT BLOKUJE PRZED WYSŁANIEM. Limit znamy ze specyfikacji
       (`MessageRequest.text`, maxLength 20000), więc agent nie czeka na
       odmowę serwera.
-   3. LICZNIK MILCZY, DOPÓKI NIE MA CO POWIEDZIEĆ. Czerwony napis stojący
-      cały czas przestaje być czytany — dekalog, punkt 5.
+   3. LICZNIK MÓWI PEŁNĄ LICZBĄ, A BARWĘ DOSTAJE PRZY PROGU. Stoi zawsze,
+      jak na makiecie, ale czerwony napis stojący cały czas przestaje być
+      czytany — dekalog, punkt 5.
    4. PRZY ZAMKNIĘTEJ ROZMOWIE EDYTORA NIE MA W DRZEWIE. Nie „disabled":
       pole, w które wolno pisać, a którego nie da się wysłać, jest obietnicą
       bez pokrycia. Ten sam wzorzec co tryb komentarza w skrzynce.          */
@@ -42,16 +43,43 @@ describe("Edytor odpowiedzi w reklamacji", () => {
     expect(screen.getByText(/o 7 za dużo/)).toBeInTheDocument();
   });
 
-  it("licznika NIE MA daleko od sufitu, staje dopiero przy progu", () => {
-    /* Od 0.511.0 licznik milczy zupełnie, jak w skrzynce od 0.506.0. Szary
-       „100 znaków" przy każdej odpowiedzi był tłem, którego nikt nie czytał —
-       liczba zmienia decyzję dopiero 500 znaków przed sufitem Allegro. */
-    const { rerender } = render(<Edytor {...props({ tresc: "x".repeat(100) })} />);
-    expect(screen.queryByText(/\/ 20000/)).not.toBeInTheDocument();
+  it("licznik stoi zawsze po polsku, a barwę dostaje dopiero przy progu", () => {
+    /* „171 / 20 000”, jak na makiecie. Daleko od sufitu jest szary, bo liczba
+       zmienia decyzję dopiero 500 znaków przed sufitem Allegro. */
+    const { rerender } = render(<Edytor {...props({ tresc: "x".repeat(171) })} />);
+    const licznik = () => screen.getByText(/\/ 20\s000/);
+    expect(licznik()).toHaveTextContent(/^171 \/ 20\s000$/);
+    expect(licznik()).toHaveClass("text-slate-600");
     rerender(<Edytor {...props({ tresc: "x".repeat(LIMIT_ZNAKOW - 10) })} />);
-    expect(screen.getByText(`${LIMIT_ZNAKOW - 10} / ${LIMIT_ZNAKOW}`)).toHaveClass("text-ranga-uwaga");
+    expect(licznik()).toHaveTextContent(/^19\s990 \/ 20\s000$/);
+    expect(licznik()).toHaveClass("text-ranga-uwaga");
     rerender(<Edytor {...props({ tresc: "x".repeat(LIMIT_ZNAKOW + 3) })} />);
     expect(screen.getByText(/o 3 za dużo/)).toHaveClass("text-ranga-zle");
+  });
+
+  it("podpis nad dymkiem nie mówi o zespole — szkic sprawy żyje w tej przeglądarce", () => {
+    render(<Edytor {...props({ tresc: "Dzień dobry" })} />);
+    const podpis = screen.getByText("Twoja odpowiedź").parentElement!;
+    expect(podpis).toHaveTextContent(/^Twoja odpowiedź · szkic$/);
+  });
+
+  it("Ctrl+Enter stoi cichym napisem obok licznika, nie znaczkiem na przycisku", () => {
+    render(<Edytor {...props({ tresc: "Dzień dobry" })} />);
+    const wyslij = screen.getByRole("button", { name: "Wyślij odpowiedź" });
+    expect(wyslij.querySelector("kbd")).toBeNull();
+    expect(wyslij).toHaveAttribute("aria-keyshortcuts", "Control+Enter");
+    expect(wyslij).toHaveAttribute("title", expect.stringMatching(/Ctrl\+Enter/));
+    /* Widoczny w rzędzie działań, bo skrótu nie trzeba pamiętać. */
+    const napis = within(screen.getByRole("group", { name: "Działania odpowiedzi" })).getByText("Ctrl+Enter");
+    expect(wyslij).not.toContainElement(napis);
+    expect(napis).toHaveClass("text-xs", "text-slate-600", "sm:inline");
+  });
+
+  it("działania stoją W dymku odpowiedzi, pod polem", () => {
+    render(<Edytor {...props({ tresc: "Dzień dobry" })} />);
+    const dymek = screen.getByRole("article", { name: "Twoja odpowiedź" });
+    expect(dymek).toContainElement(screen.getByRole("group", { name: "Działania odpowiedzi" }));
+    expect(dymek).toHaveClass("border-blue-300", "rounded-br");
   });
 
   it("kliknięcie woła wysyłkę RAZ, a w trakcie przycisk jest martwy", async () => {

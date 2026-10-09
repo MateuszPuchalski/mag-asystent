@@ -99,6 +99,26 @@ describe("pusty edytor to jedna linijka", () => {
     expect(screen.getByText(/o 3 za dużo/)).toBeInTheDocument();
   });
 
+  it("licznik mówi pełną liczbą przy suficie skrzynki: „5 / 2000”", () => {
+    render(<Edytor {...props} szkic="Dzień" onZmiana={() => {}} />);
+    expect(screen.getByText("5 / 2000")).toBeInTheDocument();
+  });
+
+  it("podpis nad dymkiem mówi, że szkic widzi zespół, a zwinięty rząd go nie ma", () => {
+    const { rerender } = render(<Edytor {...props} szkic="" onZmiana={() => {}} />);
+    expect(screen.queryByText("Twoja odpowiedź")).toBeNull();
+    rerender(<Edytor {...props} szkic="Dzień dobry" onZmiana={() => {}} />);
+    expect(screen.getByText("Twoja odpowiedź").parentElement)
+      .toHaveTextContent(/^Twoja odpowiedź · szkic, widzi go zespół$/);
+  });
+
+  it("zwinięty rząd ma kształt dymka: ta sama ramka i ogonek co rozwinięty", () => {
+    render(<Sterowany />);
+    const dymek = screen.getByRole("article", { name: "Twoja odpowiedź" });
+    expect(dymek).toHaveClass("border-blue-300", "rounded-br");
+    expect(dymek.parentElement).toHaveClass("sticky");
+  });
+
   it("Enter z wybranego wiersza kolejki idzie do pola, z innego otwiera ten wiersz", async () => {
     const otworz = vi.fn();
     render(<>

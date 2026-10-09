@@ -17,7 +17,7 @@ import { Edytor } from "../reklamacje/Edytor";
 import { Werdykt, type DecyzjaOTowarze, type ZadanieWerdyktu } from "../reklamacje/Werdykt";
 import { useSzkicSprawy } from "../sprawy/useSzkicSprawy";
 import { Blad, Karta, Pusto } from "../ui";
-import { KUBELKI, Kolejka, kwotaWiersza, wGrupach } from "../reklamacje/Kolejka";
+import { KUBELKI, Kolejka, kwotaWiersza, liniaPowodu, wGrupach } from "../reklamacje/Kolejka";
 import { PasekSita, ZdanieOUkrytych, mojaSprawa, useSito, wSicie } from "../sprawy/Moje";
 import { posortuj, usePorzadek, type OsPorzadku } from "../sprawy/Porzadek";
 import { PasekProgu } from "../sprawy/Prog";
@@ -468,25 +468,31 @@ export function Reklamacje() {
                     { onError: (e) => setBladProwadze((e as Error).message) });
                 }}
                 onOdswiez={() => odswiez.mutate({ id: r.id })} odswieza={odswiez.isPending} />
-              <DrogaSprawy szczegol={d} />
+              <DrogaSprawy szczegol={d} sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
+                bladPrzesylki={bladPrzesylki}
+                onSprawdzPrzesylke={() => {
+                  setBladPrzesylki("");
+                  sprawdzPrzesylke.mutate({ id: r.id },
+                    { onError: (e) => setBladPrzesylki((e as Error).message) });
+                }} />
               <div className="flex min-h-0 flex-1 flex-col border-t border-slate-200">
-                <Czat
+                <Czat tytul="Czat reklamacji"
                   sprawa={{
                     id: r.id,
                     /* `powodOpis` PIERWSZY: to zdanie klienta o usterce, a `opis`
                        bywa przy reklamacji pusty. */
                     opisZgloszenia: r.powodOpis ?? r.opis,
+                    czatAktywny: r.czatAktywny,
                     wiadomosciIle: r.wiadomosciIle,
-                    czatUrwany: r.czatUrwany,
+                    login: r.kupujacyLogin,
+                    zgloszonoAt: r.otwartoAt,
+                    powod: liniaPowodu(r),
                   }}
                   czat={d.czat}
                   zalaczniki={d.zalaczniki}
                   /* Przesyłki od klienta i od nas stają na osi rozmowy według
                      chwili, bo „odesłał, a potem napisał” czyta się po kolei. */
                   zdarzenia={zdarzeniaPrzesylek(d)}
-                  przypnijZgloszenie
-                  zwinStarsze={5}
-                  bursztynTylkoOstatniej
                   /* Klucz sprawy: edytor trzyma własny stan (cofnięcie
                      wyczyszczenia, zwłokę Ctrl+Enter), a ekran nie montuje go
                      od nowa przy przejściu. */
@@ -513,7 +519,7 @@ export function Reklamacje() {
               </div>
             </section>
 
-            <aside aria-label="Decyzja i dane zamówienia"
+            <aside aria-label="Decyzja i produkt"
               className={`${KOLUMNA} flex flex-[1_1_360px] flex-col gap-4 xl:overflow-y-auto`}>
               {/* Decyzja pierwsza: z niej wychodzi się z ekranu. Zgoda przed
                   wysłaniem zostaje przy OBU gałęziach, bo uznanie kosztuje
@@ -524,13 +530,7 @@ export function Reklamacje() {
                 /* Niepewny los werdyktu rozstrzyga jedno odświeżenie sprawy,
                    nie drugi werdykt — ten sam hak co wejście w sprawę. */
                 onSprawdz={() => odswiez.mutate({ id: r.id })} sprawdza={odswiez.isPending} />
-              <Produkt szczegol={d} sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
-                bladPrzesylki={bladPrzesylki}
-                onSprawdzPrzesylke={() => {
-                  setBladPrzesylki("");
-                  sprawdzPrzesylke.mutate({ id: r.id },
-                    { onError: (e) => setBladPrzesylki((e as Error).message) });
-                }} />
+              <Produkt szczegol={d} />
               <Notatka reklamacja={r} trwa={notatka.isPending || cofnijNotatke.isPending}
                 blad={bladNotatki}
                 onZapisz={(tekst, gotowe) => {

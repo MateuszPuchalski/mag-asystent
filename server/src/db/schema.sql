@@ -2699,7 +2699,11 @@ CREATE TABLE IF NOT EXISTS reklamacja_outbox (
   -- i dopiero synchronizacja rozstrzyga, czy wiadomość tam jest.
   external_message_id TEXT,
   blad TEXT,
-  created_by INTEGER NOT NULL REFERENCES app_user(user_id),
+  -- Agent, który wysłał. Z parą `external_message_id` mówi czatowi, czyje
+  -- imię stoi przy naszym dymku, bez zgadywania po treści i czasie.
+  -- `SET NULL`, bo klucz bez reguły blokowałby kasowanie kont, a skasowane
+  -- konto nie ma już imienia do pokazania.
+  created_by INTEGER REFERENCES app_user(user_id) ON DELETE SET NULL,
   created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
   finished_at TEXT
 );

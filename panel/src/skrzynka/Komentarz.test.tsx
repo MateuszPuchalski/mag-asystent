@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Edytor } from "./Edytor";
 import { Os } from "./Os";
@@ -135,6 +135,19 @@ describe("Ctrl+Enter w polu odpowiedzi", () => {
     expect(onWyslij).not.toHaveBeenCalled();
     await userEvent.keyboard("{Control>}{Enter}{/Control}");
     expect(onWyslij).toHaveBeenCalledTimes(1);
+  });
+
+  it("skrót widać cichym napisem w rzędzie działań, nie na przycisku", () => {
+    /* Rozpoznanie tańsze od pamiętania (dekalog, punkt 2). Wąski rząd go
+       chowa, a czytnik zna skrót z `aria-keyshortcuts` przycisku. */
+    edytor({ szkic: "Dzień dobry" });
+    const rzad = screen.getByRole("group", { name: "Działania odpowiedzi" });
+    const napis = within(rzad).getByText("Ctrl+Enter");
+    const wyslij = screen.getByRole("button", { name: "Wyślij do klienta" });
+    expect(wyslij).not.toContainElement(napis);
+    expect(wyslij).toHaveAttribute("aria-keyshortcuts", "Control+Enter");
+    expect(napis).toHaveAttribute("aria-hidden", "true");
+    expect(napis).toHaveClass("text-xs", "text-slate-600", "hidden", "sm:inline");
   });
 
   it("cudza rozmowa i pusty szkic nie wysyłają skrótem", async () => {

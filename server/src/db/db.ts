@@ -920,6 +920,7 @@ export function migrate(database: DatabaseSync) {
     "TEXT CHECK (zrodlo IS NULL OR zrodlo IN ('zakonczenie','nadmiar'))");
   identyfikatorZamiennika(database);
   typZakonczeniaWSkrzynce(database);
+  autorWysylkiBezBlokadyKont(database);
   znacznikiIso(database);
   identyfikatorZOferty(database);
   identyfikatorOdDostawcy(database);
@@ -1456,6 +1457,76 @@ function typZakonczeniaWSkrzynce(database: DatabaseSync) {
                expected_last_message_id,status,external_message_id,blad,
                created_by,created_at,finished_at
         FROM reklamacja_outbox;
+      DROP TABLE reklamacja_outbox;
+      ALTER TABLE reklamacja_outbox_nowa RENAME TO reklamacja_outbox;
+      CREATE INDEX IF NOT EXISTS ix_reklamacja_outbox_sprawa
+        ON reklamacja_outbox(reklamacja_id, id);
+    `);
+  })();
+}
+
+/**
+ * Autor wysyłki w sprawie przestaje blokować kasowanie konta.
+ *
+ * Czat pokazuje przy naszym dymku imię agenta z `created_by`. Klucz był
+ * `NOT NULL` bez reguły kasowania, więc konto, które choć raz odpisało
+ * w sprawie, nie dawało się skasować. `SET NULL` zostawia próbę wysyłki
+ * i zdejmuje z niej tylko imię.
+ *
+ * SQLite nie zmienia klucza obcego w miejscu, stąd przebudowa tabeli tą samą
+ * drogą co przy `END_REQUEST`. Na `reklamacja_outbox` nic nie wskazuje,
+ * więc klucze obce mogą zostać włączone.
+ */
+function autorWysylkiBezBlokadyKont(database: DatabaseSync) {
+  const juzJest = () => {
+    const klucze = database.prepare("PRAGMA foreign_key_list(reklamacja_outbox)")
+      .all() as Array<{ from: string; on_delete: string }>;
+    /* Brak tabeli daje pustą listę. Bazy testowe bywają minimalne,
+       a pusta lista nie jest awarią migracji. */
+    if (klucze.length === 0) return true;
+    return klucze.some((k) => k.from === "created_by" && k.on_delete === "SET NULL");
+  };
+  if (juzJest()) return;
+
+  transaction(database, () => {
+    /* Warunek PONOWNIE pod blokadą zapisu: `npm run seed` potrafi chodzić
+       przy żywym serwerze, a obie strony wołają `migrate()`. */
+    if (juzJest()) return;
+    /* Osierocone klucze dostają to, co dałaby im reguła kasowania: NULL
+       przy koncie i ostatniej wiadomości, a próba bez sprawy odchodzi.
+       Bez tego jeden stary wiersz zatrzymałby start serwera na kluczu obcym. */
+    database.exec(`
+      CREATE TABLE reklamacja_outbox_nowa (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reklamacja_id INTEGER NOT NULL
+          REFERENCES reklamacja_klienta(id) ON DELETE CASCADE,
+        idempotency_key TEXT NOT NULL UNIQUE,
+        body TEXT NOT NULL,
+        typ TEXT NOT NULL DEFAULT 'REGULAR' CHECK (typ IN
+          ('REGULAR','RETURN_REQUIRED_SELLER_LABEL','RETURN_REQUIRED_CUSTOM',
+           'RETURN_NOT_REQUIRED','END_REQUEST')),
+        expected_wersja INTEGER NOT NULL,
+        expected_last_message_id INTEGER
+          REFERENCES reklamacja_wiadomosc(id) ON DELETE SET NULL,
+        status TEXT NOT NULL
+          CHECK (status IN ('sending','sent','send_uncertain','send_failed')),
+        external_message_id TEXT,
+        blad TEXT,
+        created_by INTEGER REFERENCES app_user(user_id) ON DELETE SET NULL,
+        created_at TEXT NOT NULL DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ','now')),
+        finished_at TEXT
+      );
+      INSERT INTO reklamacja_outbox_nowa
+        (id,reklamacja_id,idempotency_key,body,typ,expected_wersja,
+         expected_last_message_id,status,external_message_id,blad,
+         created_by,created_at,finished_at)
+        SELECT o.id,o.reklamacja_id,o.idempotency_key,o.body,o.typ,o.expected_wersja,
+               (SELECT w.id FROM reklamacja_wiadomosc w WHERE w.id = o.expected_last_message_id),
+               o.status,o.external_message_id,o.blad,
+               (SELECT u.user_id FROM app_user u WHERE u.user_id = o.created_by),
+               o.created_at,o.finished_at
+        FROM reklamacja_outbox o
+        WHERE o.reklamacja_id IN (SELECT id FROM reklamacja_klienta);
       DROP TABLE reklamacja_outbox;
       ALTER TABLE reklamacja_outbox_nowa RENAME TO reklamacja_outbox;
       CREATE INDEX IF NOT EXISTS ix_reklamacja_outbox_sprawa
