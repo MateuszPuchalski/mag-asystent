@@ -6211,7 +6211,7 @@ makiecie, a reszta schodzi z ekranu. Dane zostają w bazie.
 - **Zeszło z ekranu:** pas faktów (`reklamacje/Fakty.tsx`), dowody biura,
   reklamacja u dostawcy, ostatnia dostawa i krok towaru po werdykcie.
 
-### 25b.12. Czat jak na makiecie (@wydanie)
+### 25b.12. Czat jak na makiecie (0.578.0)
 
 Decyzja właściciela: czat reklamacji i dyskusji wygląda jak na makiecie.
 Oba ekrany rysuje wspólny `reklamacje/Czat.tsx`, więc zmiana jest jedna.

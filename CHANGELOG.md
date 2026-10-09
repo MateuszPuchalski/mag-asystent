@@ -10,6 +10,27 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.578.0 — 9 października 2026
+
+**Czat reklamacji i dyskusji w dymkach.** Klient pisze po lewej, sklep po
+prawej, a zdjęcia stoją w samej wiadomości. Zgłoszenie jest pierwszym dymkiem.
+Odpowiedź piszesz w dymku na końcu rozmowy, z licznikiem i wysyłką w środku.
+Edytor skrzynki wygląda tak samo.
+
+**Nasz dymek mówi, kto z biura pisał** („Sklep · Imię Nazwisko”). Wiadomość
+wysłana spoza panelu zostaje przy samym „Sklep”.
+
+**Zamówienie na drodze sprawy.** Kwota zakupu, płatność, numer zamówienia
+i przesyłka stoją przy krokach drogi, każdy krok ma własną ikonę. Pytanie,
+zwrot albo dyskusja z tego zakupu to przystanek na drodze, a klik otwiera
+tę sprawę.
+
+Z czatu zniknęły zwijanie starszych wiadomości, pasek o niepełnej rozmowie,
+kolumna zdjęć i wyróżnienie ostatniej wiadomości klienta.
+
+Kolejka wysyłek reklamacji nie blokuje już kasowania kont: autor wysyłki
+staje się pusty po usunięciu konta. Migracja biegnie sama przy starcie.
+
 ## 0.577.0 — 9 października 2026
 
 **Boczny pasek menu da się zwinąć.** Przycisk na dole paska zwija go do samych ikon i liczników, a drugi klik rozwija. Panel pamięta wybór na tym komputerze. Na ciemnym pasku stoi teraz białe logo WERTIS zamiast znaku na białej tabliczce.
