@@ -26,17 +26,19 @@ import { Czat } from "../reklamacje/Czat";
 import { Glowica } from "../reklamacje/Glowica";
 import { DrogaSprawy } from "../reklamacje/DrogaSprawy";
 import { zdarzeniaPrzesylek } from "../reklamacje/przesylki";
-import { Kafle } from "../reklamacje/Kafle";
-import { PrzelacznikKubelkow } from "../reklamacje/Przelacznik";
+import { Kafle, type FiltrKafla } from "../reklamacje/Kafle";
+import { PozostaleKubelki } from "../reklamacje/Przelacznik";
+import { PrzyciskSynchronizacji, StanSynchronizacji } from "../reklamacje/Synchronizacja";
 import { FiltrKolejki } from "../reklamacje/Filtr";
 import { Produkt } from "../reklamacje/Produkt";
 import { Notatka } from "../reklamacje/Notatka";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
 import { klawiszZajety } from "../nawigacja/fokus";
 
-/* ── Ekran reklamacji: kafle i trzy kolumny ──────────────────────────────────
-   Na górze cztery liczby dnia i stan synchronizacji. Pod nimi kolejka,
-   sprawa i decyzja. Kolejka po lewej, bo od niej zaczyna się każda praca.
+/* ── Ekran reklamacji: trzy kolumny ──────────────────────────────────────────
+   Kolejka, sprawa i decyzja. Kolejka po lewej, bo od niej zaczyna się każda
+   praca. Niesie też liczby dnia jako kafle-filtry i synchronizację przy
+   tytule, więc nad kolumnami nic nie zabiera wysokości.
    Sprawa w środku rośnie, bo rozmowę czyta się najdłużej. Decyzja z faktami
    stoi po prawej, bo nieodwracalne pytanie zadaje się PO rozmowie.
 
@@ -71,7 +73,7 @@ const TOWAR_NIEPEWNY = "Stanowisko o towarze mogło nie dojść do kupującego. 
 /** Osie porządku tej kolejki; pierwsza jest domyślna. */
 const OSIE: OsPorzadku[] = ["termin", "otwarto", "ruch", "kwota"];
 
-/* Porządek słowami pod przełącznikiem kubełków. Wybiera się go w filtrze,
+/* Porządek słowami obok sita. Wybiera się go w filtrze,
    a zdanie mówi bez otwierania filtra, w jakiej kolejności stoi lista. */
 const OPIS_PORZADKU: Partial<Record<OsPorzadku, string>> = {
   termin: "Najpilniejsze na górze",
@@ -118,6 +120,9 @@ export function Reklamacje() {
   const { id } = useParams();
   const nawiguj = useNavigate();
   const [kubelek, setKubelek] = useState<KubelekReklamacji | null>("decyzja");
+  /* Kafel „Po terminie” zawęża kubełek DO DECYZJI do spraw po terminie, bo
+     tak liczy go serwer. Stan osobny, bo kubełka „po terminie” nie ma. */
+  const [poTerminie, setPoTerminie] = useState(false);
   const [fraza, setFraza] = useState("");
   const ja = useJa();
   const mojeId = ja.data?.user.userId ?? null;
@@ -156,9 +161,9 @@ export function Reklamacje() {
   const [konfliktTowaru, setKonfliktTowaru] = useState<
     { szczegoly: SzczegolyWysylki; decyzja: DecyzjaOTowarze; tresc: string } | null>(null);
 
-  const wKubelku = useMemo(() => kubelek === null
-    ? (data?.reklamacje ?? [])
-    : (data?.reklamacje ?? []).filter((r) => r.kubelek === kubelek), [data, kubelek]);
+  const wKubelku = useMemo(() => (data?.reklamacje ?? []).filter((r) =>
+    (kubelek === null || r.kubelek === kubelek) && (!poTerminie || r.poTerminie)),
+  [data, kubelek, poTerminie]);
 
   /* Filtry liczą się w pamięci ekranu: lista przyjeżdża w całości, bo spraw
      w pracy są dziesiątki, nie tysiące. Fraza dzieli się po spacjach i każdy
@@ -210,8 +215,10 @@ export function Reklamacje() {
   /* Wejście z paska adresu na sprawę z innego kubełka ma pokazać TĘ sprawę,
      a nie pustą listę. Adres jest tu źródłem prawdy, kubełek za nim idzie. */
   useEffect(() => {
-    if (reklamacja && kubelek !== null && reklamacja.kubelek !== kubelek) {
+    if (!reklamacja) return;
+    if ((kubelek !== null && reklamacja.kubelek !== kubelek) || (poTerminie && !reklamacja.poTerminie)) {
       setKubelek(reklamacja.kubelek);
+      setPoTerminie(false);
     }
   }, [reklamacja?.id]);
 
@@ -221,12 +228,24 @@ export function Reklamacje() {
    * Bez tego lista by się zmieniła, a zaznaczenie zostałoby na sprawie
    * z poprzedniego kubełka — środek pokazywałby rozmowę spoza listy.
    */
-  const przelacz = (k: KubelekReklamacji | null) => {
+  const przelacz = (k: KubelekReklamacji | null, tylkoPoTerminie = false) => {
     setKubelek(k);
+    setPoTerminie(tylkoPoTerminie);
     setFraza("");
-    const pierwsza = (data?.reklamacje ?? []).find((r) => k === null || r.kubelek === k);
+    const pierwsza = (data?.reklamacje ?? []).find((r) =>
+      (k === null || r.kubelek === k) && (!tylkoPoTerminie || r.poTerminie));
     nawiguj(pierwsza ? `/obsluga/reklamacje/${pierwsza.id}` : "/obsluga/reklamacje");
   };
+
+  /* Wciśnięty „Po terminie” klikany drugi raz wraca do całego „Do decyzji”,
+     jak każdy przełącznik z `aria-pressed`. */
+  const wybierzKafel = (f: FiltrKafla) => {
+    if (f === "po_terminie") przelacz("decyzja", !(kubelek === "decyzja" && poTerminie));
+    else przelacz(f);
+  };
+  const kafelWybrany: FiltrKafla | null = kubelek === "decyzja"
+    ? (poTerminie ? "po_terminie" : "decyzja")
+    : kubelek === "odpowiedz" ? "odpowiedz" : null;
 
   /* Kursor chodzi po liście WIDOCZNEJ, nie po kubełku: przy filtrze strzałka
      idzie do następnego wyniku, a nie do sprawy schowanej przed oczami. */
@@ -388,6 +407,7 @@ export function Reklamacje() {
   /* Nagłówek grupy spraw w terminie mówi, czym jest lista. Przy szukaniu
      lista miesza kubełki, więc nie udaje żadnego z nich. */
   const nazwaGrupy = pasujace ? "Wyniki szukania"
+    : poTerminie ? "Po terminie"
     : kubelek === null ? "Wszystkie" : (KUBELKI.find((k) => k.id === kubelek)?.etykieta ?? "");
   /* PRÓG, KTÓRY CHOWA PRACĘ, WOŁA NAD LISTĄ. W ciszy próg mieszka w filtrze,
      ale sprawy sprzed progu z żywym terminem to praca, a nie archiwum. */
@@ -399,160 +419,171 @@ export function Reklamacje() {
   const d = szczegol.data;
   const r = d?.reklamacja;
 
+  /* Zapytanie padło i nie ma danych: błąd zamiast listy, a kafle i pigułki
+     mówią „—”. Pusta lista przy awarii czytałaby się jako „nic nie czeka”. */
+  const bezDanych = Boolean(error && !data);
+
   return <div className="flex flex-col gap-4 lg:h-full lg:min-h-0 lg:overflow-y-auto xl:overflow-hidden">
-    <Kafle statystyki={data?.statystyki} kubelek={kubelek} onKubelek={przelacz}
-      stan={data?.stan} trwaSync={synchronizuj.isPending} bladSync={bladSync}
-      onSynchronizuj={synchronizujTeraz} />
-
-    {/* Zapytanie padło i nie ma danych: błąd zamiast kolumn, a kafle mówią
-        „—”. Pusta lista przy awarii czytałaby się jako „nic nie czeka”. */}
-    {error && !data
-      ? <Blad>{(error as Error).message}</Blad>
-      : <div className={UKLAD}>
-        <section aria-label="Kolejka reklamacji"
-          className={`${KOLUMNA} ${KARTA} flex flex-[1_1_340px] flex-col xl:overflow-hidden`}>
-          <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 px-4 pb-3 pt-4">
-            <div className="flex items-center justify-between gap-2">
-              <h1 className="text-tytul font-bold text-slate-900">Reklamacje</h1>
-              <FiltrKolejki wgTagow={wgTagow} tag={tag} onTag={setTag}
-                porzadek={porzadek} osie={OSIE} onPorzadek={ustawPorzadek}
-                prog={data?.prog} onPrzelaczProg={setBezProgu} stanTekst={stanTekst} />
+    <div className={UKLAD}>
+      <section aria-label="Kolejka reklamacji"
+        className={`${KOLUMNA} ${KARTA} flex flex-[1_1_340px] flex-col xl:overflow-hidden`}>
+        {/* Porządek z makiety: tytuł z synchronizacją i filtrem, szukanie,
+            kafle-filtry, pozostałe kubełki, sito, lista. Liczby stoją raz,
+            w kaflach, bo drugi licznik tej samej pracy to druga decyzja. */}
+        <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 px-4 pb-3 pt-4">
+          <div className="flex items-start gap-1">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1">
+                <h1 className="text-tytul font-bold text-slate-900">Reklamacje</h1>
+                <PrzyciskSynchronizacji trwa={synchronizuj.isPending} onSynchronizuj={synchronizujTeraz} />
+              </div>
+              <StanSynchronizacji stan={data?.stan} blad={bladSync} />
             </div>
-            <label className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3">
-              <Search size={18} aria-hidden="true" className="shrink-0 text-slate-600" />
-              <span className="sr-only">Szukaj reklamacji</span>
-              <input type="search" className="h-10 min-w-0 flex-1 bg-transparent text-tresc outline-none"
-                value={fraza} onChange={(e) => setFraza(e.target.value)}
-                placeholder="Login, numer, zamówienie, towar, notatka" />
-            </label>
-            <PrzelacznikKubelkow wybrany={kubelek} onWybierz={przelacz}
-              liczniki={data?.liczniki} wszystkich={data?.reklamacje.length} />
-            <div className="flex flex-wrap items-center gap-1.5">
-              <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
-                moich={wKubelku.filter((x) => mojaSprawa(x.prowadziId, mojeId)).length}
-                niczyich={wKubelku.filter((x) => x.prowadziId === null).length} />
-              <span className="ml-auto text-xs text-slate-600">{OPIS_PORZADKU[porzadek]}</span>
-            </div>
+            <FiltrKolejki wgTagow={wgTagow} tag={tag} onTag={setTag}
+              porzadek={porzadek} osie={OSIE} onPorzadek={ustawPorzadek}
+              prog={data?.prog} onPrzelaczProg={setBezProgu} stanTekst={stanTekst} />
           </div>
+          <label className="flex h-11 min-w-0 items-center gap-2 rounded-lg border border-slate-200 bg-slate-100 px-3">
+            <Search size={18} aria-hidden="true" className="shrink-0 text-slate-600" />
+            <span className="sr-only">Szukaj reklamacji</span>
+            <input type="search" className="h-10 min-w-0 flex-1 bg-transparent text-tresc outline-none"
+              value={fraza} onChange={(e) => setFraza(e.target.value)}
+              placeholder="Login, numer, zamówienie, towar, notatka" />
+          </label>
+          <Kafle statystyki={data?.statystyki} wybrany={kafelWybrany} onWybierz={wybierzKafel} />
+          <PozostaleKubelki wybrany={kubelek} onWybierz={(k) => przelacz(k)}
+            liczniki={data?.liczniki} wszystkich={data?.reklamacje.length} />
+          {/* Sito bez danych mówiłoby „Moje 0”, czyli „nic nie czeka”. */}
+          {!bezDanych && <div className="flex flex-wrap items-center gap-1.5">
+            <PasekSita sito={sito} mojeId={mojeId} onPrzelacz={przelaczSito}
+              moich={wKubelku.filter((x) => mojaSprawa(x.prowadziId, mojeId)).length}
+              niczyich={wKubelku.filter((x) => x.prowadziId === null).length} />
+            <span className="ml-auto text-xs text-slate-600">{OPIS_PORZADKU[porzadek]}</span>
+          </div>}
+        </div>
 
-          {progAlarmuje && data?.prog && <div className="shrink-0 px-3 pt-3">
-            <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} /></div>}
-          {/* Tag schowany w filtrze zawęża listę po cichu, więc zdanie mówi
-              o nim nad wierszami i daje drogę powrotną jednym kliknięciem. */}
-          {nazwaTagu && !pasujace && <p className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 text-podpis text-slate-600">
-            <span>Tylko sprawy z tagiem „{nazwaTagu}”.</span>
-            <button type="button" onClick={() => setTag(null)}
-              className="py-1 font-semibold text-slate-700 underline">pokaż wszystkie</button>
-          </p>}
-          <ZdanieOUkrytych ile={ukrytych} nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
-            onPokazWszystkie={() => przelaczSito(null)} />
+        {progAlarmuje && data?.prog && <div className="shrink-0 px-3 pt-3">
+          <PasekProgu prog={data.prog} onPrzelacz={setBezProgu} /></div>}
+        {/* Tag schowany w filtrze zawęża listę po cichu, więc zdanie mówi
+            o nim nad wierszami i daje drogę powrotną jednym kliknięciem. */}
+        {nazwaTagu && !pasujace && <p className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 text-podpis text-slate-600">
+          <span>Tylko sprawy z tagiem „{nazwaTagu}”.</span>
+          <button type="button" onClick={() => setTag(null)}
+            className="py-1 font-semibold text-slate-700 underline">pokaż wszystkie</button>
+        </p>}
+        <ZdanieOUkrytych ile={ukrytych} nazwa={sito === "niczyje" ? "Niczyje" : "Moje"}
+          onPokazWszystkie={() => przelaczSito(null)} />
 
-          <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
-            {isLoading
-              ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
-              : <Kolejka reklamacje={widoczne} wybrana={wybrana} mojeId={mojeId}
-                  nazwaGrupy={nazwaGrupy}
-                  zKubelkiem={Boolean(pasujace) || kubelek === null}
-                  onWybierz={(x) => nawiguj(`/obsluga/reklamacje/${x}`)} />}
-          </div>
-        </section>
+        <div className="xl:min-h-0 xl:flex-1 xl:overflow-y-auto">
+          {bezDanych
+            ? <div className="p-3"><Blad>{(error as Error).message}</Blad></div>
+            : isLoading
+            ? <Pusto waga="lista">Wczytuję kolejkę…</Pusto>
+            : <Kolejka reklamacje={widoczne} wybrana={wybrana} mojeId={mojeId}
+                nazwaGrupy={nazwaGrupy}
+                zKubelkiem={Boolean(pasujace) || kubelek === null}
+                onWybierz={(x) => nawiguj(`/obsluga/reklamacje/${x}`)} />}
+        </div>
+      </section>
 
-        {d && r
-          ? <>
-            <section aria-label={`Reklamacja ${r.numer ?? r.externalId}`}
-              className={`${KOLUMNA} ${KARTA} flex flex-[999_1_560px] flex-col xl:overflow-y-auto`}>
-              <Glowica szczegol={d} mojeId={mojeId} trwa={prowadze.isPending} blad={bladProwadze}
-                onProwadze={() => {
-                  setBladProwadze("");
-                  prowadze.mutate({ id: r.id, wersja: r.wersja },
-                    { onError: (e) => setBladProwadze((e as Error).message) });
+      {/* Bez kolejki nie ma czego otworzyć, więc środek milczy zamiast
+          obiecywać sprawę, która nie przyjdzie. */}
+      {bezDanych ? null : d && r
+        ? <>
+          <section aria-label={`Reklamacja ${r.numer ?? r.externalId}`}
+            className={`${KOLUMNA} ${KARTA} flex flex-[999_1_560px] flex-col xl:overflow-y-auto`}>
+            <Glowica szczegol={d} mojeId={mojeId} trwa={prowadze.isPending} blad={bladProwadze}
+              onProwadze={() => {
+                setBladProwadze("");
+                prowadze.mutate({ id: r.id, wersja: r.wersja },
+                  { onError: (e) => setBladProwadze((e as Error).message) });
+              }}
+              onOdswiez={() => odswiez.mutate({ id: r.id })} odswieza={odswiez.isPending} />
+            <DrogaSprawy szczegol={d} sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
+              bladPrzesylki={bladPrzesylki}
+              onSprawdzPrzesylke={() => {
+                setBladPrzesylki("");
+                sprawdzPrzesylke.mutate({ id: r.id },
+                  { onError: (e) => setBladPrzesylki((e as Error).message) });
+              }} />
+            <div className="flex min-h-0 flex-1 flex-col border-t border-slate-200">
+              <Czat tytul="Czat reklamacji"
+                sprawa={{
+                  id: r.id,
+                  /* `powodOpis` PIERWSZY: to zdanie klienta o usterce, a `opis`
+                     bywa przy reklamacji pusty. */
+                  opisZgloszenia: r.powodOpis ?? r.opis,
+                  czatAktywny: r.czatAktywny,
+                  wiadomosciIle: r.wiadomosciIle,
+                  login: r.kupujacyLogin,
+                  zgloszonoAt: r.otwartoAt,
+                  powod: liniaPowodu(r),
                 }}
-                onOdswiez={() => odswiez.mutate({ id: r.id })} odswieza={odswiez.isPending} />
-              <DrogaSprawy szczegol={d} sprawdzaPrzesylke={sprawdzPrzesylke.isPending}
-                bladPrzesylki={bladPrzesylki}
-                onSprawdzPrzesylke={() => {
-                  setBladPrzesylki("");
-                  sprawdzPrzesylke.mutate({ id: r.id },
-                    { onError: (e) => setBladPrzesylki((e as Error).message) });
-                }} />
-              <div className="flex min-h-0 flex-1 flex-col border-t border-slate-200">
-                <Czat tytul="Czat reklamacji"
-                  sprawa={{
-                    id: r.id,
-                    /* `powodOpis` PIERWSZY: to zdanie klienta o usterce, a `opis`
-                       bywa przy reklamacji pusty. */
-                    opisZgloszenia: r.powodOpis ?? r.opis,
-                    czatAktywny: r.czatAktywny,
-                    wiadomosciIle: r.wiadomosciIle,
-                    login: r.kupujacyLogin,
-                    zgloszonoAt: r.otwartoAt,
-                    powod: liniaPowodu(r),
+                czat={d.czat}
+                zalaczniki={d.zalaczniki}
+                /* Przesyłki od klienta i od nas stają na osi rozmowy według
+                   chwili, bo „odesłał, a potem napisał” czyta się po kolei. */
+                zdarzenia={zdarzeniaPrzesylek(d)}
+                /* Klucz sprawy: edytor trzyma własny stan (cofnięcie
+                   wyczyszczenia, zwłokę Ctrl+Enter), a ekran nie montuje go
+                   od nowa przy przejściu. */
+                edytor={<Edytor key={r.id} etykietaWyslij="Wyślij do klienta" tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
+                  zalaczniki={zalacznikiWysylki.data?.zalaczniki ?? []}
+                  dodajeZalacznik={dodajZalacznik.isPending}
+                  bladZalacznika={bladZalacznika}
+                  /* Plik czytamy TU, nie w komponencie: base64 to sprawa
+                     klienta HTTP, a katalog `reklamacje/` trzyma komponenty czyste. */
+                  onDodajZalacznik={(plik) => {
+                    setBladZalacznika("");
+                    void naBase64(plik).then((dane) => {
+                      if (!wybrana) return;
+                      dodajZalacznik.mutate(
+                        { id: wybrana, nazwa: plik.name, typ: plik.type, dane },
+                        { onError: (e) => setBladZalacznika((e as Error).message) });
+                    });
                   }}
-                  czat={d.czat}
-                  zalaczniki={d.zalaczniki}
-                  /* Przesyłki od klienta i od nas stają na osi rozmowy według
-                     chwili, bo „odesłał, a potem napisał” czyta się po kolei. */
-                  zdarzenia={zdarzeniaPrzesylek(d)}
-                  /* Klucz sprawy: edytor trzyma własny stan (cofnięcie
-                     wyczyszczenia, zwłokę Ctrl+Enter), a ekran nie montuje go
-                     od nowa przy przejściu. */
-                  edytor={<Edytor key={r.id} etykietaWyslij="Wyślij do klienta" tresc={tresc} wysyla={odpowiedz.isPending} blad={bladWysylki}
-                    zalaczniki={zalacznikiWysylki.data?.zalaczniki ?? []}
-                    dodajeZalacznik={dodajZalacznik.isPending}
-                    bladZalacznika={bladZalacznika}
-                    /* Plik czytamy TU, nie w komponencie: base64 to sprawa
-                       klienta HTTP, a katalog `reklamacje/` trzyma komponenty czyste. */
-                    onDodajZalacznik={(plik) => {
-                      setBladZalacznika("");
-                      void naBase64(plik).then((dane) => {
-                        if (!wybrana) return;
-                        dodajZalacznik.mutate(
-                          { id: wybrana, nazwa: plik.name, typ: plik.type, dane },
-                          { onError: (e) => setBladZalacznika((e as Error).message) });
-                      });
-                    }}
-                    onUsunZalacznik={(zid) => wybrana && usunZalacznik.mutate(
-                      { id: wybrana, zalacznikId: zid },
-                      { onError: (e) => setBladZalacznika((e as Error).message) })}
-                    czatAktywny={r.czatAktywny}
-                    onZmiana={setTresc} onWyslij={() => wyslij()} />} />
-              </div>
-            </section>
+                  onUsunZalacznik={(zid) => wybrana && usunZalacznik.mutate(
+                    { id: wybrana, zalacznikId: zid },
+                    { onError: (e) => setBladZalacznika((e as Error).message) })}
+                  czatAktywny={r.czatAktywny}
+                  onZmiana={setTresc} onWyslij={() => wyslij()} />} />
+            </div>
+          </section>
 
-            <aside aria-label="Decyzja i produkt"
-              className={`${KOLUMNA} flex flex-[1_1_360px] flex-col gap-4 xl:overflow-y-auto`}>
-              {/* Decyzja pierwsza: z niej wychodzi się z ekranu. Zgoda przed
-                  wysłaniem zostaje przy OBU gałęziach, bo uznanie kosztuje
-                  pieniądze i jest równie nieodwracalne co odmowa. */}
-              <Werdykt reklamacja={r}
-                czat={d.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
-                bladTowaru={bladTowaru} onWerdykt={wyslijWerdykt}
-                /* Niepewny los werdyktu rozstrzyga jedno odświeżenie sprawy,
-                   nie drugi werdykt — ten sam hak co wejście w sprawę. */
-                onSprawdz={() => odswiez.mutate({ id: r.id })} sprawdza={odswiez.isPending} />
-              <Produkt szczegol={d} />
-              <Notatka reklamacja={r} trwa={notatka.isPending || cofnijNotatke.isPending}
-                blad={bladNotatki}
-                onZapisz={(tekst, gotowe) => {
-                  setBladNotatki("");
-                  notatka.mutate({ id: r.id, notatka: tekst.trim() || null, wersja: r.wersja },
-                    { onSuccess: gotowe, onError: (e) => setBladNotatki((e as Error).message) });
-                }}
-                onCofnij={() => {
-                  setBladNotatki("");
-                  cofnijNotatke.mutate({ id: r.id, wersja: r.wersja },
-                    { onError: (e) => setBladNotatki((e as Error).message) });
-                }} />
-            </aside>
-          </>
-          : <Karta className={`${KOLUMNA} flex flex-[999_1_560px] flex-col xl:col-span-2`}>
-              <div className="flex min-h-[12rem] flex-1 items-center px-4">
-                <Pusto ikona={ShieldQuestion}>
-                  {wybrana ? "Wczytuję sprawę…" : "Wybierz reklamację z kolejki po lewej"}
-                </Pusto>
-              </div>
-            </Karta>}
-      </div>}
+          <aside aria-label="Decyzja i produkt"
+            className={`${KOLUMNA} flex flex-[1_1_360px] flex-col gap-4 xl:overflow-y-auto`}>
+            {/* Decyzja pierwsza: z niej wychodzi się z ekranu. Zgoda przed
+                wysłaniem zostaje przy OBU gałęziach, bo uznanie kosztuje
+                pieniądze i jest równie nieodwracalne co odmowa. */}
+            <Werdykt reklamacja={r}
+              czat={d.czat} trwa={werdykt.isPending} blad={bladWerdyktu}
+              bladTowaru={bladTowaru} onWerdykt={wyslijWerdykt}
+              /* Niepewny los werdyktu rozstrzyga jedno odświeżenie sprawy,
+                 nie drugi werdykt — ten sam hak co wejście w sprawę. */
+              onSprawdz={() => odswiez.mutate({ id: r.id })} sprawdza={odswiez.isPending} />
+            <Produkt szczegol={d} />
+            <Notatka reklamacja={r} trwa={notatka.isPending || cofnijNotatke.isPending}
+              blad={bladNotatki}
+              onZapisz={(tekst, gotowe) => {
+                setBladNotatki("");
+                notatka.mutate({ id: r.id, notatka: tekst.trim() || null, wersja: r.wersja },
+                  { onSuccess: gotowe, onError: (e) => setBladNotatki((e as Error).message) });
+              }}
+              onCofnij={() => {
+                setBladNotatki("");
+                cofnijNotatke.mutate({ id: r.id, wersja: r.wersja },
+                  { onError: (e) => setBladNotatki((e as Error).message) });
+              }} />
+          </aside>
+        </>
+        : <Karta className={`${KOLUMNA} flex flex-[999_1_560px] flex-col xl:col-span-2`}>
+            <div className="flex min-h-[12rem] flex-1 items-center px-4">
+              <Pusto ikona={ShieldQuestion}>
+                {wybrana ? "Wczytuję sprawę…" : "Wybierz reklamację z kolejki po lewej"}
+              </Pusto>
+            </div>
+          </Karta>}
+    </div>
 
     {/* Jawna zgoda po dopisku — dialog ze skrzynki, bez kopiowania. Autora
         nazywa `ktoDopisal`, bo przy reklamacji bywa nim doradca Allegro. */}

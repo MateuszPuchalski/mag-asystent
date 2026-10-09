@@ -150,8 +150,11 @@ const TON_FILTRA: [string, string] =
 export type PozycjaFiltra<T> = {
   klucz: T;
   etykieta: string;
-  /** Licznik obok etykiety. `undefined` znaczy „bez licznika", `0` znaczy zero. */
-  ile?: number;
+  /**
+   * Licznik obok etykiety. `undefined` znaczy „bez licznika", `0` znaczy zero,
+   * a „—” znaczy „nie wiemy”: zero przy awarii czytałoby się jak koniec pracy.
+   */
+  ile?: number | "—";
   /** Podpowiedź pod kursorem — pytanie kubełka i jego klawisz skrótu. */
   podpowiedz?: string;
   /** Ikona pozycji — rysuje się wyłącznie w trybie `kafle`. */
