@@ -128,12 +128,13 @@ decyzją biura, której hala nie podejmie? Tak znaczy pracę na górnym rzędzie
 Coś, co trzeba sprawdzać, to wgląd na dolnym rzędzie. Rzadka zmiana idzie za
 zębatkę. Reszta wypada.
 
-**Nagłówek ma jeden rząd.** Podział „praca na górnym rzędzie, wgląd na
-dolnym" obowiązuje jako podział treści. Praca to zakładki, a wgląd,
-ustawienia i wyjście stoją w menu „Więcej", bo drugi rząd kosztował ~50 px na
-każdym ekranie pracy. Dostawy są ósmą zakładką, za kreską, bo to praca
-dzienna. Pomiar przy 1180 px: 65 px zamiast 117 px; `flex-wrap` zostaje, bo
-menu niesie wylogowanie.
+**Menu stoi w bocznym pasku po lewej.** Podział „praca na górnym rzędzie,
+wgląd na dolnym" obowiązuje jako podział treści. Praca to zakładki ułożone
+pionowo pod logo, a szukanie, synchronizacja, wgląd, ustawienia i wyjście
+stoją na dole paska, w menu „Więcej". Dostawy są ostatnią zakładką, za
+kreską, bo to praca dzienna. Pion oddaje pracy całą wysokość okna i nie
+wymaga ~1280 px szerokości, której laptop obok Subiekta nie ma. Poniżej
+900 px pasek zwęża się do ikon.
 
 **Co to kosztuje.** Wdrożenie wymaga `npm run build`, który buduje panel,
 zanim serwer skopiuje go do `dist/web/obsluga`. Dochodzi drzewo zależności
