@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.577.0 — 9 października 2026
+
+**Boczny pasek menu da się zwinąć.** Przycisk na dole paska zwija go do samych ikon i liczników, a drugi klik rozwija. Panel pamięta wybór na tym komputerze. Na ciemnym pasku stoi teraz białe logo WERTIS zamiast znaku na białej tabliczce.
+
 ## 0.576.0 — 9 października 2026
 
 **Menu panelu stoi po lewej, w bocznym pasku.** Zakładki pracy (Do zrobienia, Skrzynka, Zwroty, Reklamacje, Dyskusje, Zadania, Dostawy) ułożyły się pionowo pod logo, a na dole paska stoją szukanie, stan synchronizacji i menu „Więcej". Praca dostaje całą wysokość okna zamiast pozbawiać ją pasa nad kolejką. Liczniki i czerwony alarm dyskusji stoją przy zakładkach jak dotąd.
