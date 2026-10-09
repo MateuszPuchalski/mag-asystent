@@ -11,8 +11,8 @@ TanStack Query, build do `dist/web/obsluga` na serwerze.
    innych niż GET. Najprościej atrapą `atrapaZapisow` z `src/test/zapisy.ts`,
    która liczy zapisy na samym `fetch`. Bez tego testu CI zatrzyma
    `src/ZeroZapisu.test.ts`.
-3. **Kształt z celu biura** (`docs/obsluga-klienta.md` §7): praca na górnym
-   rzędzie, wgląd na dolnym, ustawienia za zębatką.
+3. **Kształt z celu biura** (`docs/obsluga-klienta.md` §7): praca w zakładkach
+   bocznego paska, wgląd i ustawienia w menu „Więcej".
 
 Test, który podmienia moduł `../api/...`, widzi tylko haki, które sam
 podstawił. Zapisu wołanego z pominięciem haka nie zobaczy. Dlatego test zera

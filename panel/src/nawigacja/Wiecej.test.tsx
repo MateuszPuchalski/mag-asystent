@@ -126,7 +126,7 @@ describe("wskaźnik synchronizacji", () => {
   });
 });
 
-describe("nagłówek w jednym rzędzie", () => {
+describe("boczny pasek menu", () => {
   it("nie ma drugiego rzędu ani osobnego paska wglądu", () => {
     expect(tsx).not.toContain('aria-label="Magazyn i wgląd"');
     expect(tsx).not.toContain("px-5 pb-3");
@@ -134,12 +134,12 @@ describe("nagłówek w jednym rzędzie", () => {
   });
 
   it("przy powiększeniu 200% zakładki nie wychodzą za kadr", () => {
-    /* Bieżnia z `shrink-0` była przy 640 px CSS o 180 px szersza od okna
-       (0.546.0). jsdom nie liczy układu, więc strażnik pilnuje obu przyczyn:
-       bieżnia może się zwęzić i zawinąć, a nazwa zakładki chowa się poniżej
-       900 px, zostając dla czytnika ekranu. */
+    /* Poziomy rząd zakładek z `shrink-0` był przy 640 px CSS szerszy od okna.
+       jsdom nie liczy układu, więc strażnik pilnuje obu przyczyn: lista może
+       się zwęzić i przewinąć, a nazwa zakładki chowa się poniżej 900 px,
+       zostając dla czytnika ekranu. */
     const bieznia = tsx.slice(tsx.indexOf('<nav aria-label="Praca"'), tsx.indexOf("</nav>"));
-    expect(bieznia).toContain('className="flex min-w-0 flex-wrap');
+    expect(bieznia).toContain('className="flex min-h-0 flex-1 flex-col');
     expect(bieznia).not.toContain("shrink-0 rounded-lg");
     expect(bieznia).toContain('<span className="max-[899px]:sr-only">{z.etykieta}</span>');
     expect(bieznia).toContain("title={z.etykieta}");

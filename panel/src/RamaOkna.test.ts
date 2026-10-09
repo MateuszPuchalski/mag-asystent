@@ -44,11 +44,19 @@ describe("Rama okna nie może stać na jednostce okna", () => {
     expect(klasy).toContain("lg:overflow-hidden");
   });
 
-  it("nagłówek zawija się, zamiast chować przyciski poza kadrem", () => {
-    /* Rama przycina nadmiar szerokości bez paska przewijania, więc poniżej
-       ~1150 px zębatka i wylogowanie były nieklikalne (0.233.0). Od 0.538.0
-       nagłówek ma jeden rząd, a menu z wylogowaniem stoi na jego końcu —
-       zawijanie chroni je tak samo, jak chroniło zębatkę. */
-    expect(tsx).toMatch(/<div className="flex flex-wrap items-center gap-2 px-5 py-3">/);
+  it("pasek boczny nie obcina okienka „Więcej”, które z niego wystaje", () => {
+    /* Okienko menu jest `absolute` i wychodzi poza pasek w prawo. Pasek z
+       `overflow` przyciąłby je do własnej szerokości, więc przewija się
+       wyłącznie lista zakładek, a sam `<aside>` overflow nie dostaje. */
+    const pasek = tsx.match(/<aside[^>]*className="[^"]*"/)?.[0];
+    expect(pasek).toBeDefined();
+    expect(pasek).not.toMatch(/overflow/);
+    expect(tsx).toMatch(/<nav aria-label="Praca" className="[^"]*overflow-y-auto/);
+  });
+
+  it("pasek boczny zwęża się do ikon, zamiast wypychać stronę w bok", () => {
+    /* Przy powiększeniu 200% okno ma 640 px CSS; pasek o stałej szerokości
+       zjadłby trzecią część pracy. Poniżej 900 px zostają ikony. */
+    expect(tsx).toMatch(/<aside[^>]*max-\[899px\]:w-20/);
   });
 });

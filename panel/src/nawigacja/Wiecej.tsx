@@ -56,9 +56,10 @@ export function Wiecej({ wyloguj }: { wyloguj: () => void }) {
             : "border-white/15 bg-white/5 text-slate-300 hover:bg-white/10"}`}>
       <Menu size={18} /><ChevronDown size={12} /></button>
     {otwarte && <div role="group" aria-label="Więcej"
-      /* Własny kolor tekstu, bo okienko rysuje się w `<header>` z `text-white`
-         — ta sama pułapka co przy oknie szukania (0.515.0). */
-      className="absolute right-0 top-full z-30 mt-2 flex w-72 flex-col gap-0.5 rounded-xl border border-slate-200 bg-white p-2 text-slate-900 shadow-lg">
+      /* Własny kolor tekstu, bo okienko rysuje się w pasku bocznym z
+         `text-white` — ta sama pułapka co przy oknie szukania. Otwiera się
+         w górę i w prawo: menu stoi na dole paska, a pod nim nie ma ekranu. */
+      className="absolute bottom-full left-0 z-30 mb-2 flex w-72 flex-col gap-0.5 rounded-xl border border-slate-200 bg-white p-2 text-slate-900 shadow-lg">
       <span className="px-2.5 pb-0.5 pt-1.5 text-podpis font-bold uppercase tracking-wide text-slate-600">Wgląd</span>
       {WGLAD.map((p) => <Link key={p.do} to={p.do} onClick={zamknij}
         aria-current={tu(p.do) ? "page" : undefined} className={klasaPozycji(p.do)}>

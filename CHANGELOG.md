@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.576.0 — 9 października 2026
+
+**Menu panelu stoi po lewej, w bocznym pasku.** Zakładki pracy (Do zrobienia, Skrzynka, Zwroty, Reklamacje, Dyskusje, Zadania, Dostawy) ułożyły się pionowo pod logo, a na dole paska stoją szukanie, stan synchronizacji i menu „Więcej". Praca dostaje całą wysokość okna zamiast pozbawiać ją pasa nad kolejką. Liczniki i czerwony alarm dyskusji stoją przy zakładkach jak dotąd.
+
 ## 0.575.0 — 9 października 2026
 
 **Reklamacje w trzech kolumnach.** Kolejka po lewej, sprawa z drogą i czatem
