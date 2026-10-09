@@ -138,10 +138,10 @@ describe("boczny pasek menu", () => {
        jsdom nie liczy układu, więc strażnik pilnuje obu przyczyn: lista może
        się zwęzić i przewinąć, a nazwa zakładki chowa się poniżej 900 px,
        zostając dla czytnika ekranu. */
-    const bieznia = tsx.slice(tsx.indexOf('<nav aria-label="Praca"'), tsx.indexOf("</nav>"));
+    const bieznia = tsx.slice(tsx.indexOf('<nav id="pasek-zakladki"'), tsx.indexOf("</nav>"));
     expect(bieznia).toContain('className="flex min-h-0 flex-1 flex-col');
     expect(bieznia).not.toContain("shrink-0 rounded-lg");
-    expect(bieznia).toContain('<span className="max-[899px]:sr-only">{z.etykieta}</span>');
+    expect(bieznia).toContain('<span className={zwiniety ? "sr-only" : "max-[899px]:sr-only"}>{z.etykieta}</span>');
     expect(bieznia).toContain("title={z.etykieta}");
   });
 
