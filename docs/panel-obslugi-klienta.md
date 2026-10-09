@@ -6191,7 +6191,7 @@ maszyneria reklamacji stała już gotowa, więc do napisania został model pracy
 i ekran, a nie integracja.
 
 
-### 25b.11. Reklamacje w trzech kolumnach (@wydanie)
+### 25b.11. Reklamacje w trzech kolumnach (0.575.0)
 
 Decyzja właściciela z kanwy „Panel reklamacji": na ekranie jest to, co na
 makiecie, a reszta schodzi z ekranu. Dane zostają w bazie.
@@ -7055,13 +7055,13 @@ stoi. W tym repo zdarzyło się to już dwa razy.
 | Odświeżenie JEDNEJ sprawy | **działa** od 0.273.0 | `GET /sale/issues/{id}`, trasa `…/odswiez`; wołane po wysyłce i po werdykcie |
 | Copilot RADZI w reklamacji | **zdjęte z ekranu** od 0.564.0 | działało od 0.276.0; rekomendacja typowana słownikiem werdyktu plus POPROSIC_O_DOWODY; zapisane rady zostają, trafność dalej liczy się z wysłanego werdyktu |
 | Copilot reklamacyjny: karta faktów | **zdjęte z ekranu** od 0.564.0 | działało od 0.275.0; `services/copilot-reklamacja.ts` zostaje, trasy `…/rozpoznaj` nie ma, zapisane karty jadą w szczegółach sprawy |
-| Dowody biura w reklamacji | **zdjęte z ekranu** od @wydanie | działało od 0.564.0; `services/reklamacja-dowody.ts` i `reklamacja_dowod` zostają, zapisane wpisy jadą w szczegółach sprawy |
-| Reklamacja u dostawcy | **zdjęte z ekranu** od @wydanie | działało od 0.564.0; `services/reklamacja-dowody-zapis.ts` i `reklamacja_u_dostawcy` zostają, trasa `…/u-dostawcy` także |
-| Ostatnia dostawa towaru w sprawie | **zdjęte z ekranu** od @wydanie | działało od 0.564.0; `services/ostatnia-dostawa.ts` dalej liczy `dostawa` w szczegółach sprawy |
+| Dowody biura w reklamacji | **zdjęte z ekranu** od 0.575.0 | działało od 0.564.0; `services/reklamacja-dowody.ts` i `reklamacja_dowod` zostają, zapisane wpisy jadą w szczegółach sprawy |
+| Reklamacja u dostawcy | **zdjęte z ekranu** od 0.575.0 | działało od 0.564.0; `services/reklamacja-dowody-zapis.ts` i `reklamacja_u_dostawcy` zostają, trasa `…/u-dostawcy` także |
+| Ostatnia dostawa towaru w sprawie | **zdjęte z ekranu** od 0.575.0 | działało od 0.564.0; `services/ostatnia-dostawa.ts` dalej liczy `dostawa` w szczegółach sprawy |
 | Kwota sprawy w kolejce | **działa** od 0.564.0 | `kwotaSprawy` w `services/reklamacje.ts`; żądanie klienta, potem cena z paragonu razy liczba sztuk, bez zgadywania jednej sztuki |
 | Załączniki WYCHODZĄCE w sprawie | **działa** od 0.274.0 | `services/reklamacje-zalaczniki.ts`; deklaracja z polem `fileName`, adres wgrania z nagłówka `Location`, spinacz wspólny ze skrzynką |
 | Werdykt reklamacji do Allegro | **działa** od 0.242.0 | `services/reklamacja-werdykt.ts`, `reklamacje/Werdykt.tsx`; `POST /sale/issues/{id}/status`, jedenaście wartości, kwota przy częściowym, `autoryzuj("reklamacja_werdykt")`, los na wierszu |
-| Krok „towar do odesłania?" po uznaniu | **zdjęte z ekranu** od @wydanie | działało od 0.242.0; wybór towaru stoi w formularzu werdyktu, a ponowienie idzie z okna konfliktu. `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
+| Krok „towar do odesłania?" po uznaniu | **zdjęte z ekranu** od 0.575.0 | działało od 0.242.0; wybór towaru stoi w formularzu werdyktu, a ponowienie idzie z okna konfliktu. `RETURN_REQUIRED_CUSTOM` / `RETURN_NOT_REQUIRED` przez `reklamacja_outbox.typ`; `[WERYFIKUJ]` mapowanie na `returnRequired` |
 | Towar razem z werdyktem | **działa** od 0.564.0 | pole `towar` w `…/werdykt`; walidacja przed werdyktem, wysyłka tylko po `sent`, jedno `autoryzuj()`; krok po werdykcie zostaje jako droga zapasowa |
 | Podgląd załącznika reklamacji na osi | **działa** od 0.223.0, wyrównane w 0.246.0 | typ z SYGNATURY pliku (`rozpoznajMime` × `TYPY_PODGLADU`); przechodzą JPEG, PNG, GIF; od 0.246.0 ta sama powłoka co w skrzynce (`towar/Zalacznik.tsx`), odmowa Allegro 502 / awaria drogi 503 ze zdaniem i „Spróbuj ponownie" (`routes/pobranie.ts`), błąd pobrania widoczny |
 | Zdjęcie oferty i kartoteki przy reklamacji | **działa** od 0.223.0 | `offer_snapshot` i `oferta_kartoteka` w kolejce, dwa kafle w dowodach |

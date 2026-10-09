@@ -413,7 +413,7 @@ a ulica rozstrzyga to w jednym spojrzeniu.
   Danych osobowych nie ma, ani klienta, ani człowieka po stronie dostawcy.
   Autor ma klucz do `app_user` z `SET NULL`, więc kasowanie kont działa.
   Dziennik dostaje wersję, wynik i to, czy numer jest, bez samego numeru.
-- **Od @wydanie panel ich nie pokazuje** (decyzja właściciela), ale rekordy
+- **Od 0.575.0 panel ich nie pokazuje** (decyzja właściciela), ale rekordy
   zostają i dalej jadą w szczegółach sprawy.
 - **Dowody i reklamacja u dostawcy zostają u nas.** Allegro, Copilot, CSV,
   migawka i raport tygodnia ich nie dostają. Retencja idzie za sprawą
