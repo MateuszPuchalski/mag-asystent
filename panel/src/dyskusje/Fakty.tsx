@@ -149,9 +149,12 @@ export function Fakty({
             <span className="text-slate-500"> · {szczegol.zamowienie.dostawaMetoda}</span>}
         </Wiersz>
         {/* „Razem" mówi kwota w kroku Zakup paska drogi, ale ta staje tylko
-            przy płatności z datą. Bez daty (pobranie, nieopłacone) suma nie
-            ma innego domu, więc wiersz zostaje. */}
-        {!szczegol.zamowienie.platnoscAt && <Wiersz etykieta="Razem">
+            przy płatności z datą ORAZ sumą (ten sam warunek co w `krokiDrogi`).
+            W każdym innym wypadku (pobranie, nieopłacone) suma nie ma innego
+            domu, więc wiersz zostaje. Suma `null` nie daje wiersza: nie ma
+            czego pokazać, a „0 zł" byłoby zmyślone. */}
+        {!(szczegol.zamowienie.platnoscAt && szczegol.zamowienie.sumaGrosze != null)
+          && szczegol.zamowienie.sumaGrosze != null && <Wiersz etykieta="Razem">
           <b className="tabular-nums">
             {zlote(szczegol.zamowienie.sumaGrosze, szczegol.zamowienie.waluta)}</b>
         </Wiersz>}

@@ -273,7 +273,7 @@ const LINIA = (przebyta: boolean) => `mx-1.5 h-0.5 min-w-3 flex-1 ${przebyta ? "
 
 /* Druga linia podpisu: numer w chipie mono, bo czyta się go znak po znaku.
    Pełny numer ma czytnik i podpowiedź, a schowek kopiuje go w całości. */
-function Numer({ numer, href, nazwa, tytulKopii }: {
+export function Numer({ numer, href, nazwa, tytulKopii }: {
   numer: string; href?: string | null; nazwa: string; tytulKopii: string;
 }) {
   const chip = "rounded bg-white px-1 font-mono text-xs";
@@ -361,8 +361,7 @@ function Przystanek({ sprawa, ostatni, przebyta, tutaj }: {
      Stan, numer, temat i prowadzący stoją w niej i w podpowiedzi, bo na
      wąskim przystanku mieści się tylko data i jedno słowo stanu. */
   const opis = opisPrzystanku(sprawa, nazwa, cel);
-  const zamknieta = sprawa.otwarta === false;
-  const termin = sprawa.otwarta === true && sprawa.decyzjaDo ? sprawa.decyzjaDo : null;
+  const stan = stanPrzystanku(sprawa);
   return <li data-przystanek={sprawa.rodzaj} className="flex min-w-[88px] flex-[1_0_88px] flex-col">
     <Link to={`${sciezka}/${sprawa.id}`} aria-label={opis} title={opis}
       className="flex flex-col gap-1.5 rounded text-sky-700 hover:text-sky-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">
@@ -377,15 +376,29 @@ function Przystanek({ sprawa, ostatni, przebyta, tutaj }: {
       </span>
       <span className="flex flex-col whitespace-nowrap pr-2">
         <span className="text-sm font-semibold underline underline-offset-2">{wielka(nazwa)}</span>
-        {/* Stan SŁOWEM, nie samą barwą (WCAG 1.4.1): zamknięta albo termin
-            do dnia. Termin tylko przy otwartej, bo przy zamkniętej nie biegnie. */}
-        <span className="text-xs">{dzienMiesiac(sprawa.at)}
-          {zamknieta && " · zamknięta"}
-          {termin && <>{" · "}<span className="font-semibold text-ranga-zle">do {dzienMiesiac(termin)}</span></>}
-        </span>
+        <span className="text-xs text-slate-600">{dzienMiesiac(sprawa.at)}</span>
+        {/* Stan SŁOWEM pod datą, nie samą barwą ani samą nazwą łącza (WCAG 1.4.1).
+            Zwrot i rozmowa nie mają wiersza stanu, więc zostają same z datą:
+            zgadnięte „otwarta" byłoby nieprawdą o sprawie zamkniętej. */}
+        {stan && <span className={`text-xs ${stan.pilne ? "font-semibold text-ranga-zle" : "text-slate-600"}`}>
+          {stan.slowo}</span>}
       </span>
     </Link>
   </li>;
+}
+
+/**
+ * Stan sprawy na przystanku jednym słowem; `null`, gdy go nie znamy.
+ * Termin biegnie tylko otwartej sprawie, a przeterminowany jest pilniejszy
+ * od przyszłego, więc oba są czerwone, ale mówią co innego.
+ */
+function stanPrzystanku(s: InnaSprawaZakupu): { slowo: string; pilne: boolean } | null {
+  if (s.otwarta === undefined) return null;
+  if (!s.otwarta) return { slowo: "zamknięta", pilne: false };
+  if (!s.decyzjaDo) return { slowo: "otwarta", pilne: false };
+  return Date.parse(s.decyzjaDo) < Date.now()
+    ? { slowo: "po terminie", pilne: true }
+    : { slowo: `do ${dzienMiesiac(s.decyzjaDo)}`, pilne: true };
 }
 
 /** Nazwa łącza przystanku: rodzaj, data, numer albo temat, stan, prowadzący i cel. */
@@ -393,7 +406,9 @@ export function opisPrzystanku(s: InnaSprawaZakupu, nazwa: string, cel: string):
   const co = s.numer ? ` ${s.numer}`
     : s.opis ? (s.rodzaj === "zwrot" ? ` nr ${s.opis}` : `: ${s.opis}`) : "";
   const stan = s.otwarta === false ? ", zamknięta"
-    : s.otwarta === true && s.decyzjaDo ? `, termin ${czas(s.decyzjaDo)}` : "";
+    : s.otwarta === true && s.decyzjaDo
+      ? (Date.parse(s.decyzjaDo) < Date.now() ? `, po terminie ${czas(s.decyzjaDo)}` : `, termin ${czas(s.decyzjaDo)}`)
+      : s.otwarta === true ? ", otwarta" : "";
   const prowadzi = s.prowadzi ? `, prowadzi ${s.prowadzi}` : "";
   return `${wielka(nazwa)} z ${dataCyfrowa(s.at)}${co}${stan}${prowadzi} — otwórz ${cel}`;
 }

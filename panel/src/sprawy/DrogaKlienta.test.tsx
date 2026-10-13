@@ -18,9 +18,9 @@ const DROGA = {
   przesylka: null, droga: [],
 };
 
-const pokaz = (orderId: string | null | undefined) => render(
+const pokaz = (orderId: string | null | undefined, opcje: Partial<React.ComponentProps<typeof DrogaKlienta>> = {}) => render(
   <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-    <MemoryRouter><DrogaKlienta orderId={orderId} /></MemoryRouter>
+    <MemoryRouter><DrogaKlienta orderId={orderId} {...opcje} /></MemoryRouter>
   </QueryClientProvider>);
 
 afterEach(() => vi.unstubAllGlobals());
@@ -58,5 +58,47 @@ describe("DrogaKlienta", () => {
     await new Promise((r) => setTimeout(r, 20));
     expect(container).toBeEmptyDOMElement();
     expect(stan.wyslane).toEqual([]);
+  });
+
+  /* Numer zamówienia mieszka w kroku Zakup paska. Gdy pasek się wczytuje albo
+     padł, ekran bez własnego numeru nie może go zgubić. */
+  describe("numer zamówienia, gdy pasek go jeszcze nie niesie", () => {
+    const numery = () => screen.queryAllByText(/ord-1/, { selector: "span.sr-only" });
+
+    it("w trakcie wczytywania stoi raz, z kopiowaniem i bez łącza", () => {
+      /* Odpowiedź, która nie nadchodzi: zapytanie zostaje w stanie wczytywania. */
+      vi.stubGlobal("fetch", vi.fn(() => new Promise(() => {})));
+      pokaz("ord-1");
+      expect(screen.getByRole("status")).toHaveTextContent("Wczytuję drogę klienta");
+      expect(numery()).toHaveLength(1);
+      expect(screen.getAllByTitle("Kopiuj numer zamówienia")).toHaveLength(1);
+      expect(screen.queryByRole("link")).toBeNull();
+    });
+
+    it("po awarii stoi raz obok błędu, a z łączem, gdy ekran je zna", async () => {
+      atrapaZapisow(() => undefined);
+      pokaz("ord-1", { linkZamowienia: "https://allegro.pl/moje-allegro/sprzedaz/zamowienia/ord-1" });
+      expect(await screen.findByRole("alert")).toHaveTextContent("Nie udało się wczytać");
+      expect(numery()).toHaveLength(1);
+      expect(screen.getAllByTitle("Kopiuj numer zamówienia")).toHaveLength(1);
+      expect(screen.getByRole("link")).toHaveAttribute("href", expect.stringContaining("ord-1"));
+    });
+
+    it("po wczytaniu stoi raz: tylko w kroku Zakup paska", async () => {
+      atrapaZapisow(() => DROGA);
+      pokaz("ord-1");
+      await screen.findByRole("list", { name: "Droga sprawy" });
+      expect(numery()).toHaveLength(1);
+      expect(screen.getAllByTitle("Kopiuj numer zamówienia")).toHaveLength(1);
+      expect(screen.queryByRole("status")).toBeNull();
+    });
+
+    it("ekran z bezNumerow sam pokazuje numer, więc pasek go nie dubluje w ładowaniu ani w błędzie", async () => {
+      atrapaZapisow(() => undefined);
+      pokaz("ord-1", { bezNumerow: true });
+      expect(await screen.findByRole("alert")).toBeInTheDocument();
+      expect(numery()).toHaveLength(0);
+      expect(screen.queryByTitle("Kopiuj numer zamówienia")).toBeNull();
+    });
   });
 });

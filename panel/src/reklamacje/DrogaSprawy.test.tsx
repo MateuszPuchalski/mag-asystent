@@ -1,5 +1,5 @@
 import React from "react";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -370,6 +370,10 @@ describe("Przystanek ze stanem sprawy", () => {
   const pokazDane = (d: import("./DrogaSprawy").DaneDrogi, p: Partial<React.ComponentProps<typeof DrogaSprawy>> = {}) =>
     render(<MemoryRouter><DrogaSprawy dane={d} {...p} /></MemoryRouter>);
 
+  /* Termin liczy się od teraz, więc zegar stoi w miejscu. */
+  beforeEach(() => { vi.useFakeTimers({ toFake: ["Date"] }); vi.setSystemTime(new Date("2026-10-01T10:00:00.000Z")); });
+  afterEach(() => vi.useRealTimers());
+
   it("zamknięta sprawa mówi o tym słowem i nie ma terminu", () => {
     pokazDane(bez({ droga: [droga("dyskusja", 8)],
       sprawy: [sprawa({ otwarta: false, decyzjaDo: "2026-09-30T00:00:00.000Z" })] as never }));
@@ -393,10 +397,24 @@ describe("Przystanek ze stanem sprawy", () => {
     expect(nazwa).toContain("termin");
   });
 
-  it("dyskusja bez terminu jest otwarta bez żadnego zegara", () => {
+  it("otwarta sprawa po terminie mówi „po terminie” czerwonym słowem pod datą", () => {
+    pokazDane(bez({ droga: [droga("reklamacja", 8)],
+      sprawy: [sprawa({ typ: "CLAIM", numer: "REK-8/2026", decyzjaDo: "2026-09-28T00:00:00.000Z" })] as never }));
+    const li = document.querySelector('[data-przystanek="reklamacja"]') as HTMLElement;
+    const stan = within(li).getByText("po terminie");
+    expect(stan.className).toContain("text-ranga-zle");
+    expect(li.textContent).not.toMatch(/do \d/);
+    expect(within(li).getByRole("link").getAttribute("aria-label")).toContain("po terminie");
+    /* Słowo stoi w osobnej linii pod datą, a przystanek się nie rozrasta. */
+    expect(stan.previousElementSibling).toHaveTextContent(dzienMiesiac("2026-09-25T10:00:00.000Z"));
+    expect(stan.className).toContain("text-xs");
+  });
+
+  it("dyskusja bez terminu jest po prostu „otwarta”, bez zegara", () => {
     pokazDane(bez({ droga: [droga("dyskusja", 8)], sprawy: [sprawa({})] as never }));
     const li = document.querySelector('[data-przystanek="dyskusja"]') as HTMLElement;
-    expect(li.textContent).not.toMatch(/zamknięta|do \d/);
+    expect(within(li).getByText("otwarta")).toBeVisible();
+    expect(li.textContent).not.toMatch(/zamknięta|do \d|po terminie/);
     expect(within(li).getByRole("link").getAttribute("aria-label")).toContain("Gdzie paczka");
   });
 
@@ -404,7 +422,7 @@ describe("Przystanek ze stanem sprawy", () => {
     pokazDane(bez({ droga: [droga("zwrot", 7, "ZW/2026/10/0077"), droga("rozmowa", 3, "Pytanie o dostawę")] }));
     const zwrot = document.querySelector('[data-przystanek="zwrot"]') as HTMLElement;
     expect(within(zwrot).getByRole("link").getAttribute("aria-label")).toContain("nr ZW/2026/10/0077");
-    expect(zwrot.textContent).not.toMatch(/zamknięta|do \d/);
+    expect(zwrot.textContent).not.toMatch(/zamknięta|otwarta|po terminie|do \d/);
     const rozmowa = document.querySelector('[data-przystanek="rozmowa"]') as HTMLElement;
     expect(within(rozmowa).getByRole("link").getAttribute("aria-label")).toContain("Pytanie o dostawę");
   });

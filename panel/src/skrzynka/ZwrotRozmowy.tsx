@@ -31,9 +31,11 @@ export function ZwrotRozmowy({ zwrot }: { zwrot: Zwrot }) {
      w wierszu „Zamknięte zwroty", a kreskę i oddech daje mu tamto miejsce. */
   return <section aria-label="Zwrot" className="space-y-2 text-sm">
     <div className="flex flex-wrap items-center gap-2">
-      {/* Tytuł zostaje, żeby plakietki miały podmiot. Numer zwrotu mówi
-          nazwa przystanku na pasku drogi i nagłówek ekranu Zwroty. */}
+      {/* Numer stoi widocznie w tytule: przystanek paska niesie go tylko
+          w nazwie łącza, a dwa zamknięte zwroty tego samego klienta agent
+          odróżnia na oko właśnie po numerze. */}
       <b className="text-wertis-ink">Zwrot</b>
+      {zwrot.numer && <span className="font-mono text-xs text-slate-600">{zwrot.numer}</span>}
       {zwrot.zrodlo === "nieodebrana" && <span className="rounded bg-slate-200 px-1.5 py-0.5 text-podpis font-bold text-slate-700">
         paczka nieodebrana</span>}
       {/* Kubełek i sygnały tymi samymi słowami, co w kolejce zwrotów: agent ma

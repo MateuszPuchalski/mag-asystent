@@ -522,7 +522,8 @@ export function Dyskusje() {
                   listu przewozowego z pytaniem o paczkę stoi w kolumnie faktów,
                   więc pasek go nie powtarza. */}
               <div className="shrink-0 border-b border-slate-200 bg-wertis-paper px-4 py-3 empty:hidden">
-                <DrogaKlienta plaska orderId={szczegol.data.dyskusja.orderId} bezPrzesylki
+                <DrogaKlienta plaska orderId={szczegol.data.dyskusja.orderId}
+                  linkZamowienia={szczegol.data.dyskusja.linkZamowienia} bezPrzesylki
                   biezaca={{ rodzaj: "dyskusja", id: szczegol.data.dyskusja.id }} />
               </div>
               <Czat tytul="Czat dyskusji"

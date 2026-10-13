@@ -181,6 +181,18 @@ describe("Kolumna faktów o dyskusji", () => {
       pokaz(szczegol({ zamowienie: zam({ platnoscAt: null }) }));
       expect(screen.getByText("Razem")).toBeInTheDocument();
     });
+
+    it("„Razem” staje dokładnie wtedy, gdy pigułka paska nie staje, a suma jest znana", () => {
+      /* Pobranie: bez daty płatności pigułki nie będzie, suma ma dom tutaj. */
+      const { unmount } = pokaz(szczegol({ zamowienie: zam({ platnoscAt: null, platnoscTyp: "CASH_ON_DELIVERY" }) }));
+      expect(screen.getByText("Razem")).toBeInTheDocument();
+      unmount();
+      /* Opłacone, ale bez sumy: pigułki nie ma, a wiersz nie ma czego pokazać.
+         Nie ma wyjątku ani pustego wiersza „Razem". */
+      pokaz(szczegol({ zamowienie: zam({ sumaGrosze: null }) }));
+      expect(screen.queryByText("Razem")).not.toBeInTheDocument();
+      expect(screen.getByText("Dostawa")).toBeInTheDocument();
+    });
   });
 
   it("zlecenie hali stoi bez nagłówka nad jednym przyciskiem", () => {

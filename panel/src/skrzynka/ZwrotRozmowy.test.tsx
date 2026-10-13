@@ -34,10 +34,19 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
 const pokaz = (z: Zwrot) => render(<MemoryRouter><ZwrotRozmowy zwrot={z} /></MemoryRouter>);
 
 describe("zwrot przy rozmowie", () => {
+  it("dwa zamknięte zwroty różnią się widocznym numerem", () => {
+    const { unmount } = pokaz(zwrot({ id: 1, numer: "1111/Z04A", kubelek: "zamkniety" }));
+    expect(screen.getByText("1111/Z04A")).toBeVisible();
+    unmount();
+    pokaz(zwrot({ id: 2, numer: "2222/Z09B", kubelek: "zamkniety" }));
+    expect(screen.getByText("2222/Z09B")).toBeVisible();
+    expect(screen.queryByText("1111/Z04A")).toBeNull();
+  });
+
   it("mówi, że paczki jeszcze nie ma, i prowadzi do zwrotu w panelu i w Allegro", () => {
     pokaz(zwrot());
-    /* Numeru zwrotu blok nie powtarza: mówi go przystanek paska drogi. */
-    expect(screen.queryByText("1111/Z04A")).toBeNull();
+    /* Numer stoi widocznie w tytule, bo przystanek paska ma go tylko w nazwie łącza. */
+    expect(screen.getByText("1111/Z04A")).toBeVisible();
     expect(screen.getByText("Do decyzji")).toBeInTheDocument();
     expect(screen.getByText(/klient jeszcze nie nadał paczki/)).toBeInTheDocument();
     expect(screen.getByText(/za 9 dni/)).toBeInTheDocument();

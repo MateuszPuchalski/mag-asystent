@@ -278,12 +278,13 @@ describe("Sprawy zakupu nie wracają do kolumny", () => {
     expect(within(k).queryByRole("link", { name: "Otwórz" })).toBeNull();
   });
 
-  it("zwrot w toku zostaje bez nazwy i numeru, ale z terminem; licznik liczy tylko jego", async () => {
+  it("zwrot w toku zostaje z numerem i terminem; licznik liczy tylko jego", async () => {
     await otworz({ ...dane([BIEZACY_ZAKUP]), sprawy, zwroty: [zwrot({})] } as unknown as OsRozmowy);
     const rama = within(kolumna()).getByRole("region", { name: "Wymaga Ciebie" });
     expect(rama).toHaveTextContent("Wymaga Ciebie · 1");
     expect(within(rama).getByLabelText("Zwrot")).toHaveTextContent("Termin");
-    expect(rama.textContent).not.toContain("ZW/2026/10/0077");
+    /* Numer widoczny w tytule: przystanek paska ma go tylko w nazwie łącza. */
+    expect(within(rama).getByText("ZW/2026/10/0077")).toBeVisible();
   });
 
   it("zamknięty zwrot zostaje w wierszu „Zamknięte zwroty”, bo przystanek nie ma jego wyniku", async () => {
@@ -291,6 +292,7 @@ describe("Sprawy zakupu nie wracają do kolumny", () => {
       kwotaGrosze: 7798 })] } as unknown as OsRozmowy);
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: /^Zamknięte zwroty/ }));
+    expect(within(kolumna()).getByLabelText("Zwrot")).toHaveTextContent("ZW/2026/10/0077");
     expect(within(kolumna()).getByLabelText("Zwrot")).toHaveTextContent("przyjęty");
     expect(within(kolumna()).getByLabelText("Zwrot")).toHaveTextContent("77,98");
     expect(within(kolumna()).queryByText(/Zamknięte sprawy/)).toBeNull();

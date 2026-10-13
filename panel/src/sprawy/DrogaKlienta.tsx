@@ -2,7 +2,7 @@ import React from "react";
 import { useDrogaSprawy } from "../api/droga";
 import type { OdpowiedzDrogi } from "../api/typy";
 import { Blad } from "../ui";
-import { DrogaSprawy, type BiezacaSprawa } from "../reklamacje/DrogaSprawy";
+import { DrogaSprawy, Numer, type BiezacaSprawa } from "../reklamacje/DrogaSprawy";
 
 /* ── PASEK DROGI KLIENTA NA EKRANIE SPRAWY ───────────────────────────────────
    Cienka powłoka: pobiera drogę po numerze zamówienia i oddaje ją jednemu
@@ -23,8 +23,10 @@ import { DrogaSprawy, type BiezacaSprawa } from "../reklamacje/DrogaSprawy";
 const jestDroga = (d: OdpowiedzDrogi | undefined): d is OdpowiedzDrogi =>
   Boolean(d) && Array.isArray(d!.droga) && Array.isArray(d!.sprawy);
 
-export function DrogaKlienta({ orderId, biezaca, bezNumerow = false, bezPrzesylki = false, plaska = false }: {
+export function DrogaKlienta({ orderId, linkZamowienia, biezaca, bezNumerow = false, bezPrzesylki = false, plaska = false }: {
   orderId: string | null | undefined;
+  /** Odnośnik do Allegro, jeśli ekran zna go przed wczytaniem drogi; bez niego sam numer i kopiowanie. */
+  linkZamowienia?: string | null;
   biezaca?: BiezacaSprawa;
   /** Ekran sam pokazuje numer zamówienia i przesyłki, więc pasek ich nie powtarza. */
   bezNumerow?: boolean;
@@ -35,13 +37,24 @@ export function DrogaKlienta({ orderId, biezaca, bezNumerow = false, bezPrzesylk
   const numer = orderId ? orderId : null;
   const droga = useDrogaSprawy(numer);
   if (numer === null) return null;
+  /* Numer zamówienia mieszka w kroku Zakup paska. Gdy pasek się wczytuje albo
+     padł, ekran, który numeru sam nie pokazuje, zostałby bez niego, a agent
+     nie mógłby go skopiować ani otworzyć zamówienia. Na szczęśliwej ścieżce
+     tego wiersza nie ma: numer stoi wtedy tylko w pasku. */
+  const numerZastepczy = bezNumerow ? null
+    : <div className="px-4 pb-1"><Numer numer={numer} href={linkZamowienia} nazwa="Zamówienie"
+        tytulKopii="Kopiuj numer zamówienia" /></div>;
   if (droga.error) {
-    return <div role="alert" className="px-4 py-2 text-xs">
-      <Blad>Nie udało się wczytać drogi klienta: {(droga.error as Error).message}</Blad></div>;
+    return <>
+      <div role="alert" className="px-4 py-2 text-xs">
+        <Blad>Nie udało się wczytać drogi klienta: {(droga.error as Error).message}</Blad></div>
+      {numerZastepczy}</>;
   }
   if (droga.isLoading) {
-    return <p role="status" className={`text-xs text-slate-600 ${plaska ? "pb-1" : "px-5 py-3"}`}>
-      Wczytuję drogę klienta…</p>;
+    return <>
+      <p role="status" className={`text-xs text-slate-600 ${plaska ? "pb-1" : "px-5 py-3"}`}>
+        Wczytuję drogę klienta…</p>
+      {numerZastepczy}</>;
   }
   if (!jestDroga(droga.data)) return null;
   return <DrogaSprawy dane={droga.data} biezaca={biezaca} bezNumerow={bezNumerow}
