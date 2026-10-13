@@ -21,6 +21,7 @@
     "reconcile": "tsx src/reconcile-run.ts",
     "reslot": "tsx src/reslot-run.ts",
     "sonda": "tsx src/sonda-run.ts",
+    "sellasist:sonda": "tsx src/sellasist-sonda-run.ts",
     "sonda:zalacznik": "tsx src/sonda-zalacznik-run.ts",
     "sonda:jev": "tsx src/jev-sonda-run.ts",
     "inwentarz": "tsx src/inwentarz-run.ts",

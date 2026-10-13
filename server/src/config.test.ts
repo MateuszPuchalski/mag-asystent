@@ -393,3 +393,16 @@ test("próg alarmu dyskusji ma domyślnie dobę i jest dodatni", () => {
   assert.equal(config.allegro.dyskusjeAlarmGodzin, 24);
   assert.ok(config.allegro.dyskusjeAlarmGodzin > 0);
 });
+
+test("Sellasist: połowa pary, zła subdomena i zły numer statusu to błędy; klucz nie trafia do zdania", () => {
+  const z = (s: Partial<typeof config.sellasist>) =>
+    bledyKonfiguracji({ ...config, sellasist: { ...config.sellasist, ...s } } as typeof config);
+  assert.deepEqual(z({ konto: "", apiKey: "" }), []);
+  assert.deepEqual(z({ konto: "firma", apiKey: "tajny-klucz-sellasist" }), []);
+  assert.match(z({ konto: "firma", apiKey: "" })[0], /idą w parze/);
+  const subdomena = z({ konto: "https://firma.sellasist.pl", apiKey: "tajny-klucz-sellasist" });
+  assert.equal(subdomena.length, 1);
+  assert.match(subdomena[0], /sama subdomena/);
+  assert.ok(!z({ konto: "firma", apiKey: "" }).join(" ").includes("tajny"));
+  assert.match(z({ konto: "firma", apiKey: "k", statusyZebrane: [5, Number.NaN] })[0], /SELLASIST_STATUSY_ZEBRANE/);
+});

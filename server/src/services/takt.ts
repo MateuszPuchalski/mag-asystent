@@ -1,4 +1,4 @@
-import { BladLimituAllegro } from "../adapters/allegro.js";
+import { BladLimitu } from "../adapters/limit.js";
 
 /* ── Takt tickerów Allegro — jeden rytm, trzy pętle ──────────────────────────
    Zapowiedzi, pytania i dyskusje tykały dotąd trzema `setInterval` o wspólnej
@@ -10,7 +10,7 @@ import { BladLimituAllegro } from "../adapters/allegro.js";
    Ten moduł daje trzem pętlom wspólny takt z dwiema poprawkami:
    1. ROZRZUT ±10% na każdym odstępie i losowe opóźnienie startu — pętle
       rozjeżdżają się od pierwszej minuty i nie wracają do synchronizacji.
-   2. RESPEKT DLA 429 — gdy przebieg skończy się `BladLimituAllegro`, następny
+   2. RESPEKT DLA 429 — gdy przebieg skończy się `BladLimitu`, następny
       czeka co najmniej tyle, ile prosi `Retry-After`. Ponowień w środku
       przebiegu nadal NIE MA; wydłuża się wyłącznie odstęp do kolejnego.     */
 
@@ -47,7 +47,9 @@ export function uruchomTakt(
       try {
         await przebieg();
       } catch (e) {
-        if (e instanceof BladLimituAllegro) {
+        /* Klasa wspólna dla Allegro i Sellasist: każdy dostawca, który
+           prosi o przerwę, dostaje ją w odstępie do następnego przebiegu. */
+        if (e instanceof BladLimitu) {
           poLimicieMs = e.poIluMs ?? bazaMs * 2;
           console.warn(`[${etykieta}] ${e.message} — następny przebieg później.`);
         } else {

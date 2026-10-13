@@ -179,3 +179,57 @@ test("odpowiedź o INNYM zamówieniu albo odmowa Allegro zostawia zapisany stan"
     .get(zamowienie) as Record<string, string>;
   assert.deepEqual({ ...w }, { status: "READY_FOR_PROCESSING", nadanie_do: "2026-10-06T15:00:00Z" });
 });
+
+/* ── Sellasist: status, etykieta i braki do skompletowania ──────────────── */
+
+const sa = (z: Partial<import("./realizacja-zamowienia.js").RealizacjaSellasist> = {}) =>
+  ({ status: "W realizacji", etykietaAt: null, braki: [], ...z });
+
+test("etykieta wydrukowana dziś: wyślemy dziś, nawet gdy termin z Allegro jest późniejszy albo go nie ma", () => {
+  for (const nadanieDo of ["2026-10-08T15:00:00Z", null]) {
+    const o = R.ocenRealizacji(stan({ nadanieDo, sellasist: sa({ etykietaAt: "2026-10-06T07:30:00Z" }) }), TERAZ)!;
+    assert.equal(o.wyslemyDzis, true, String(nadanieDo));
+    assert.match(o.zdanie, /etykieta przewoźnika wydrukowana w Sellasist dziś/);
+    assert.match(o.zdanie, /status w Sellasist: W realizacji/);
+  }
+});
+
+test("etykieta z wczoraj: paczka spakowana, bez obietnicy „dziś”, nawet przy terminie dziś", () => {
+  const o = R.ocenRealizacji(stan({ sellasist: sa({ etykietaAt: "2026-10-05T12:00:00Z" }) }), TERAZ)!;
+  assert.equal(o.wyslemyDzis, false);
+  assert.match(o.zdanie, /paczka spakowana 2026-10-05; napisz, że paczka wyszła albo czeka na kuriera/);
+});
+
+test("anulowanie wygrywa z etykietą", () => {
+  const o = R.ocenRealizacji(stan({ status: "CANCELLED", sellasist: sa({ etykietaAt: "2026-10-06T07:30:00Z" }) }),
+    TERAZ)!;
+  assert.equal(o.wyslemyDzis, false);
+  assert.match(o.zdanie, /nie czeka na wysyłkę/);
+});
+
+test("brak do skompletowania według Sellasist zdejmuje obietnicę i mówi, czego brakuje", () => {
+  const o = R.ocenRealizacji(stan({ sellasist: sa({ braki: [{ nazwa: "Pasek", potrzeba: 2, jest: 1 }] }) }), TERAZ)!;
+  assert.equal(o.wyslemyDzis, false);
+  assert.match(o.zdanie, /brak do skompletowania według Sellasist: Pasek \(potrzeba 2, jest 1\)/);
+  assert.match(o.zdanie, /brakuje towaru na stanie, terminu nie podawaj/);
+  assert.doesNotMatch(o.zdanie, /—/);
+});
+
+test("odczyt z bazy: oryginał z lustra Sellasist, kopia (dosyłka) się nie liczy", () => {
+  const d = db();
+  d.exec("DELETE FROM sellasist_pozycja; DELETE FROM sellasist_zamowienie;");
+  d.prepare(`INSERT INTO sellasist_zamowienie(id, external_id, status_nazwa, spakowano_at, pobrano_at)
+    VALUES (1, 'ord-1', 'Spakowane', '2026-10-06T07:30:00.000Z', '2026-10-06T07:31:00.000Z')`).run();
+  d.prepare(`INSERT INTO sellasist_zamowienie(id, external_id, status_nazwa, skopiowane_z, pobrano_at)
+    VALUES (2, 'ord-1', 'Nowe', 1, '2026-10-06T07:31:00.000Z')`).run();
+  d.prepare(`INSERT INTO sellasist_pozycja(koszyk_id, zamowienie_id, symbol, nazwa, ilosc, brakuje)
+    VALUES (10, 1, 'P', 'Pasek', 3, 1), (11, 1, 'N', 'Nóż', 1, 0)`).run();
+  const s = R.stanRealizacji(zamowienie, false, subiekt, d)!;
+  assert.deepEqual(s.sellasist, { status: "Spakowane", etykietaAt: "2026-10-06T07:30:00.000Z",
+    braki: [{ nazwa: "Pasek", potrzeba: 3, jest: 2 }] });
+});
+
+test("bez lustra Sellasist stan jest taki jak dotąd", () => {
+  db().exec("DELETE FROM sellasist_pozycja; DELETE FROM sellasist_zamowienie;");
+  assert.equal(R.stanRealizacji(zamowienie, false, subiekt, db())!.sellasist, null);
+});

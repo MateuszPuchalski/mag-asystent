@@ -22,6 +22,10 @@ import { buildProductCard } from "./stock.js";
    - dokument sprzedaży z Subiekta z numerem zamówienia — magazyn je obsłużył.
    - stan pozycji w kartotece — tylko bez dokumentu, bo po wydaniu towar już
      zszedł ze stanu i zero na półce niczego wtedy nie znaczy.
+   - lustro Sellasist (`sellasist-sync.ts`) — status realizacji nadany przez
+     firmę, braki do skompletowania i ETYKIETA PRZEWOŹNIKA. Etykieta to
+     paczka spakowana: wydrukowana dziś znaczy, że wychodzi dziś, zanim
+     numer dojdzie do Allegro. Brak Sellasist niczego nie zmienia w regułach.
 
    „DZIŚ" TO TERMIN NADANIA PRZYPADAJĄCY DZIŚ na zegarze magazynu. Godziny
    odjazdu kuriera nie znamy, a właściciel jej nie podał. Termin, który minął,
@@ -54,6 +58,15 @@ const WYSLANE = "SENT";
 
 export interface BrakPozycji { nazwa: string; potrzeba: number; jest: number }
 
+/** Co wie Sellasist o tym zamówieniu; `null`, gdy integracji nie ma albo lustro go nie zna. */
+export interface RealizacjaSellasist {
+  status: string | null;
+  /** Pierwsza etykieta przewoźnika, ISO UTC — paczka spakowana. */
+  etykietaAt: string | null;
+  /** Pozycje z `quantityMissing` > 0: tego magazyn nie ma czym skompletować. */
+  braki: BrakPozycji[];
+}
+
 export interface StanRealizacji {
   /** `CheckoutFormStatus`: `BOUGHT`, `FILLED_IN`, `READY_FOR_PROCESSING`, `CANCELLED`. */
   status: string | null;
@@ -67,6 +80,8 @@ export interface StanRealizacji {
   dokumenty: DokumentZamowienia[];
   /** `null`: nie sprawdzaliśmy, bo dokument już jest albo pozycji brak w kartotece. */
   braki: BrakPozycji[] | null;
+  /** Pole opcjonalne: bez integracji stan wygląda dokładnie jak dotąd. */
+  sellasist?: RealizacjaSellasist | null;
 }
 
 export interface OcenaRealizacji {
@@ -108,18 +123,36 @@ export function ocenRealizacji(s: StanRealizacji, teraz: Date): OcenaRealizacji 
   if (s.braki?.length) {
     czesci.push(`brak na stanie: ${s.braki.map((b) => `${b.nazwa} (potrzeba ${b.potrzeba}, jest ${b.jest})`).join(", ")}`);
   }
+  const sa = s.sellasist ?? null;
+  const etykieta = sa?.etykietaAt ? dataLokalna(sa.etykietaAt) : null;
+  if (sa?.status) czesci.push(`status w Sellasist: ${sa.status}`);
+  if (etykieta) czesci.push(`etykieta przewoźnika wydrukowana w Sellasist ${etykieta === dzis ? "dziś" : etykieta}`);
+  if (sa?.braki.length) {
+    czesci.push(`brak do skompletowania według Sellasist: ${sa.braki.map((b) => `${b.nazwa} (potrzeba ${b.potrzeba}, `
+      + `jest ${b.jest})`).join(", ")}`);
+  }
+  const braki = Boolean(s.braki?.length || sa?.braki.length);
 
-  /* Powód odmowy idzie do zdania, bo bez niego model dopisze własny. */
+  /* Powód odmowy idzie do zdania, bo bez niego model dopisze własny.
+     ETYKIETA Z WCZORAJ to paczka spakowana, która czeka na kuriera albo już
+     pojechała, a numer nie doszedł do Allegro. „Wyślemy dziś" byłoby wtedy
+     nieprawdą w drugą stronę, jak przy `SENT`. */
   const powod = s.status === "CANCELLED" || (s.realizacja !== null && BEZ_WYSYLKI.has(s.realizacja))
     ? "zamówienie nie czeka na wysyłkę"
+    : etykieta !== null && etykieta < dzis
+      ? `paczka spakowana ${etykieta}; napisz, że paczka wyszła albo czeka na kuriera, a numer przesyłki pojawi się `
+        + "w Allegro"
+    : etykieta === dzis ? null
     : s.realizacja === WYSLANE
       ? "sprzedawca oznaczył paczkę jako wysłaną, a numeru przesyłki jeszcze nie widać; napisz, że paczka wyszła"
     : !oplacone ? "płatność niezakończona"
       : termin === null ? "brak terminu nadania"
         : termin < dzis ? "termin nadania minął, napisz, że sprawdzamy w magazynie, bez daty"
-          : s.braki?.length ? "brakuje towaru na stanie, terminu nie podawaj"
+          : braki ? "brakuje towaru na stanie, terminu nie podawaj"
             : null;
-  const wyslemyDzis = powod === null && termin === dzis;
+  /* Etykieta wydrukowana dziś przesądza bez terminu z Allegro: paczka jest
+     spakowana, a kurier odbiera ją tego samego dnia. */
+  const wyslemyDzis = powod === null && (termin === dzis || etykieta === dzis);
   const werdykt = wyslemyDzis
     ? "WERDYKT: paczka wychodzi dziś; gdy klient pyta o wysyłkę, napisz, że wyślemy ją dziś"
     : powod === null
@@ -127,6 +160,26 @@ export function ocenRealizacji(s: StanRealizacji, teraz: Date): OcenaRealizacji 
       : `WERDYKT: nie obiecuj wysyłki dziś (${powod})`;
 
   return { zdanie: `Realizacja zamówienia: ${czesci.join("; ")}. ${werdykt}`, wyslemyDzis };
+}
+
+/**
+ * Oryginał zamówienia z lustra Sellasist. Kopia (dosyłka) odpada: pytanie
+ * „czy wyjdzie dziś" dotyczy zamówienia klienta, a nie drugiej paczki.
+ */
+function realizacjaSellasist(database: Db, externalId: string): RealizacjaSellasist | null {
+  const z = database.prepare(`SELECT id, status_nazwa, spakowano_at FROM sellasist_zamowienie
+      WHERE external_id = ? AND skopiowane_z IS NULL ORDER BY id LIMIT 1`).get(externalId) as
+    Record<string, unknown> | undefined;
+  if (!z) return null;
+  const braki = (database.prepare(`SELECT nazwa, symbol, ilosc, brakuje FROM sellasist_pozycja
+      WHERE zamowienie_id = ? AND brakuje > 0 ORDER BY koszyk_id`).all(Number(z.id)) as Array<Record<string, unknown>>)
+    .map((p) => ({ nazwa: String(p.nazwa ?? p.symbol ?? "pozycja"), potrzeba: Number(p.ilosc),
+      jest: Math.max(0, Number(p.ilosc) - Number(p.brakuje)) }));
+  return {
+    status: z.status_nazwa == null ? null : String(z.status_nazwa),
+    etykietaAt: z.spakowano_at == null ? null : String(z.spakowano_at),
+    braki,
+  };
 }
 
 /**
@@ -163,6 +216,7 @@ export function stanRealizacji(
   }
 
   return {
+    sellasist: realizacjaSellasist(database, String(z.external_id)),
     status: tekst(z.status),
     realizacja: tekst(z.realizacja_status),
     platnoscTyp: tekst(z.platnosc_typ),

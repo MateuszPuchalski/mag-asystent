@@ -53,7 +53,7 @@ export interface DosylkaSprawy {
    * dostaje `waybill: null` zawsze (`zeSprawa`), więc brak numeru poznaje
    * po tym polu.
    */
-  zrodlo: "allegro" | "recznie" | null;
+  zrodlo: "allegro" | "sellasist" | "recznie" | null;
   /** Ostatni kod przewoźnika. */
   status: string | null;
   /** Pierwsze DELIVERED; zapisane raz, nigdy nadpisane. */
@@ -271,7 +271,7 @@ export function naDosylkeSprawy(w: Record<string, unknown>, teraz: Date): Dosylk
     zwrotId: w.zwrot_id == null ? null : Number(w.zwrot_id),
     ...stan,
     przewoznikZamowienia: tekst(w.przewoznik_zamowienia),
-    zrodlo: zrodlo === "allegro" || zrodlo === "recznie" ? zrodlo : null,
+    zrodlo: zrodlo === "allegro" || zrodlo === "sellasist" || zrodlo === "recznie" ? zrodlo : null,
     ...opisDosylki(stan, teraz),
   };
 }

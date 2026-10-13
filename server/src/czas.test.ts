@@ -93,3 +93,22 @@ test("dodajDni przechodzi przez koniec miesiąca i roku", () => {
   assert.equal(C.dodajDni("2026-12-28", 7), "2027-01-04");
   assert.equal(C.dodajDni("2026-03-01", -1), "2026-02-28");
 });
+
+/* ── Stempel Sellasist (czas konta, bez strefy) ─────────────────────────────── */
+
+test("stempel lokalny na UTC: latem minus dwie godziny, zimą minus jedna", () => {
+  assert.equal(C.lokalnyNaUtc("2026-07-20 15:20:07"), "2026-07-20T13:20:07.000Z");
+  assert.equal(C.lokalnyNaUtc("2026-01-20 00:30:00"), "2026-01-19T23:30:00.000Z");
+});
+
+test("stempel lokalny wraca przez stempelLokalny bez zmiany", () => {
+  // to samo przejście robi adapter: data do filtra Sellasist i z powrotem
+  assert.equal(C.stempelLokalny(C.lokalnyNaUtc("2026-10-13 08:05:09")!), "2026-10-13 08:05:09");
+});
+
+test("stempel lokalny: śmieci i pusty napis dają null, nie zgadnięcie", () => {
+  assert.equal(C.lokalnyNaUtc(""), null);
+  assert.equal(C.lokalnyNaUtc(null), null);
+  assert.equal(C.lokalnyNaUtc("2026-07-20T13:20:07Z"), null);
+  assert.equal(C.lokalnyNaUtc("wczoraj"), null);
+});

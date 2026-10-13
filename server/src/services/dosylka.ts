@@ -1,5 +1,6 @@
 import type { DatabaseSync } from "node:sqlite";
 import { urlPrzesylekZamowienia, zapytajAllegro } from "../adapters/allegro.http.js";
+import { sellasistWlaczony } from "../adapters/sellasist.http.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
 import { config } from "../config.js";
 import { chwilaUtc } from "../czas.js";
@@ -14,6 +15,7 @@ import {
   BladSprawy, KonfliktSprawy, loginZAllegro, odciskTeraz, potwierdzPoZapisie, sprawaKlienta,
   sprawdzSwiezosc, wierszSprawy, wyrownajZnane, zapiszKrokSprawy, type SprawaKlienta,
 } from "./prowadzenie-klienta.js";
+import { przesylkiDosylkiSellasist } from "./sellasist-dosylka.js";
 
 /* ── Dosyłka ze śledzeniem (0.536.0, drugi przyrost S6) ─────────────────────
    Fakty właściciela z 27 września 2026 — jedyne, które podał:
@@ -51,7 +53,9 @@ import {
 
    NUMER WYKRYWA AUTOMAT, WPISANY JEST DROGĄ ZAPASOWĄ. Wykrycie stoi na
    niesprawdzonym fakcie właściciela o numerze przy zamówieniu, więc woli
-   nie zgadnąć niż zgadnąć źle (`wybierzNumer`).
+   nie zgadnąć niż zgadnąć źle (`wybierzNumer`). Kandydatów daje Allegro
+   i — gdy integracja stoi — Sellasist, gdzie etykieta dosyłki powstaje
+   (`sellasist-dosylka.ts`). Obie listy przechodzą tę samą regułę wyboru.
 
    DO DZIENNIKA IDZIE NUMER SPRAWY. Nigdy numer przesyłki, login ani treść
    kroku: `events` nie ma retencji, a numer przesyłki prowadzi do adresu
@@ -438,10 +442,41 @@ function zgloszenieZwrotu(database: DatabaseSync, zwrotId: unknown): string | nu
 
 /* ── Ticker ─────────────────────────────────────────────────────────────── */
 
+/** Kandydaci na dosyłkę spoza Allegro: zamówienie, login kupującego, chwila zgłoszenia zwrotu. */
+export type KandydaciDosylki = (zamowienie: string, login: string, zwrotAt: string) => Promise<PrzesylkaZamowienia[]>;
+
 export interface DosylkaDeps {
   query?: (url: string) => Promise<unknown | null>;
   apiUrl?: string;
   teraz?: () => Date;
+  /** `null` wyłącza Sellasist; brak pola bierze go z konfiguracji. */
+  sellasist?: KandydaciDosylki | null;
+}
+
+/**
+ * Numery z Sellasist dopisane do listy z Allegro. DEGRADUJE: Sellasist,
+ * który nie odpowie (także 429), nie zabiera wykrycia z samego Allegro ani
+ * śledzenia innych dosyłek — dlatego limitu nie podnosimy do taktu.
+ */
+async function dopiszZSellasist(
+  database: DatabaseSync, sprawa: number, zamowienie: string, zwrotAt: string,
+  przesylki: PrzesylkaZamowienia[], sellasist: KandydaciDosylki,
+): Promise<Set<string>> {
+  const dopisane = new Set<string>();
+  const w = database.prepare("SELECT login FROM klient_prowadzenie WHERE id = ?").get(sprawa) as Wiersz | undefined;
+  const login = tekst(w?.login);
+  if (!login) return dopisane;
+  try {
+    for (const p of await sellasist(zamowienie, login, zwrotAt)) {
+      if (przesylki.some((a) => a.waybill === p.waybill)) continue;
+      przesylki.push(p);
+      dopisane.add(p.waybill);
+    }
+  } catch {
+    /* Stałe zdanie, nie `e.message`: odpowiedź Sellasist bywa czymkolwiek. */
+    console.warn("[dosylki] pytanie do Sellasist nie doszło — numer szukam w samym Allegro");
+  }
+  return dopisane;
 }
 
 type Klucz = { sprawa: number; zamowienie: string };
@@ -514,7 +549,7 @@ const TRACKING_DOSYLEK = { limitWyzej: true, pojedynczoPoBledzie: true } as cons
  */
 async function wykryj(
   database: DatabaseSync, w: Wiersz, query: (url: string) => Promise<unknown | null>, apiUrl: string,
-  teraz: Date,
+  teraz: Date, sellasist: KandydaciDosylki | null,
 ): Promise<{ znaleziono: boolean } & Przejscie | null> {
   const k: Klucz = { sprawa: Number(w.sprawa_id), zamowienie: String(w.zamowienie) };
   /* Bez chwili zgłoszenia zwrotu nie da się odróżnić oryginału od dosyłki,
@@ -535,6 +570,9 @@ async function wykryj(
     .filter((p) => typeof p?.waybill === "string" && p.waybill !== ""
       && typeof p?.carrierId === "string" && p.carrierId !== "")
     .map((p) => ({ waybill: String(p.waybill), carrierId: String(p.carrierId), createdAt: tekst(p.createdAt) }));
+  const zSellasist = sellasist
+    ? await dopiszZSellasist(database, k.sprawa, k.zamowienie, zwrotAt, przesylki, sellasist)
+    : new Set<string>();
 
   const wykluczone = numeryZwrotow(database, Number(w.konto), k.zamowienie);
   for (const d of database.prepare("SELECT waybill FROM klient_dosylka WHERE sprawa_id = ? AND waybill IS NOT NULL")
@@ -566,16 +604,18 @@ async function wykryj(
     const p = przejscie(undefined, stan);
     /* COMPARE-AND-SET po chwili założenia i pustym numerze: dosyłka
        zastąpiona albo numer wpisany ręką w czasie żądania wygrywają. */
-    const r = database.prepare(`UPDATE klient_dosylka SET waybill = ?, przewoznik = ?, zrodlo = 'allegro',
+    const r = database.prepare(`UPDATE klient_dosylka SET waybill = ?, przewoznik = ?, zrodlo = ?,
         status = ?, dostarczono_at = COALESCE(dostarczono_at, ?), sprawdzono_at = ?, numer_at = ?,
         doreczen = doreczen + ?, problemow = problemow + ?
       WHERE sprawa_id = ? AND zamowienie = ? AND zalozono_at = ? AND waybill IS NULL ${STRAZ_TICKERA}`)
-      .run(wybrana.waybill, wybrana.carrierId, stan.status, stan.dostarczonoAt, at, at,
+      .run(wybrana.waybill, wybrana.carrierId, zSellasist.has(wybrana.waybill) ? "sellasist" : "allegro",
+        stan.status, stan.dostarczonoAt, at, at,
         p.doreczona ? 1 : 0, p.problem ? 1 : 0, k.sprawa, k.zamowienie, String(w.zalozono_at));
     if (Number(r.changes) !== 1) return { znaleziono: false, ...BEZ_PRZEJSCIA };
     /* Osobny typ od numeru wpisanego ręką: miara z S6 porównuje jeden z drugim,
        a raport użycia liczy ruch człowieka, nie automatu. */
-    logEvent("klient_dosylka_wykryta", "automat", null, { sprawa: k.sprawa }, undefined, database);
+    logEvent("klient_dosylka_wykryta", "automat", null,
+      { sprawa: k.sprawa, ...(zSellasist.has(wybrana.waybill) ? { zrodlo: "sellasist" } : {}) }, undefined, database);
     /* Stan z wykrycia to pierwszy stan tej paczki — wpis `klient_dosylka_stan`
        powtórzyłby tylko wykrycie, więc zostają doręczenie i kłopot. */
     zapiszPrzejscie(database, k.sprawa, { ...p, zmiana: false }, stan);
@@ -605,6 +645,8 @@ export async function sledzDosylki(
   const query = deps.query ?? zapytajAllegro;
   const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
   const teraz = (deps.teraz ?? (() => new Date()))();
+  const sellasist = deps.sellasist !== undefined ? deps.sellasist
+    : sellasistWlaczony() ? (z: string, l: string, a: string) => przesylkiDosylkiSellasist(z, l, a) : null;
   const wynik = { wykryte: 0, doreczone: 0, problemy: 0 };
   const dolicz = (x: Przejscie) => {
     if (x.doreczona) wynik.doreczone++;
@@ -623,7 +665,7 @@ export async function sledzDosylki(
     if (w.waybill != null) continue;
     const ostatnio = chwilaUtc(tekst(w.sprawdzono_at));
     if (Number.isFinite(ostatnio) && teraz.getTime() - ostatnio < PRZERWA_WYKRYCIA_MS) continue;
-    const r = await wykryj(database, w, query, apiUrl, teraz);
+    const r = await wykryj(database, w, query, apiUrl, teraz, sellasist);
     if (!r) continue;
     if (r.znaleziono) wynik.wykryte++;
     dolicz(r);

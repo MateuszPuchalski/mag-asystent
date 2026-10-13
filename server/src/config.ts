@@ -673,6 +673,34 @@ export const config = {
   },
 
   /**
+   * Sellasist REST API — system, przez który przechodzą zamówienia firmy.
+   * Domyślnie WYŁĄCZONY: bez `SELLASIST_KONTO` i `SELLASIST_API_KEY` serwer
+   * nie wysyła tam ani jednego żądania. Klucz generuje się w Sellasist,
+   * w zakładce Integracje > Klucze API. Kształt API: `docs/sellasist/api.yaml`.
+   */
+  sellasist: {
+    /** Subdomena konta: `firma` z adresu `https://firma.sellasist.pl`. */
+    konto: (process.env.SELLASIST_KONTO ?? "").trim().toLowerCase(),
+    apiKey: (process.env.SELLASIST_API_KEY ?? "").trim(),
+    /** Host REST API; pusty bierze się z konta. Nadpisywalny dla testów. */
+    apiUrl: (process.env.SELLASIST_API_URL ?? "").trim(),
+    /**
+     * Takt lustra zamówień: dziennik zmian, potem szczegół zmienionych;
+     * 0 wyłącza ticker. Cztery minuty z sekundami, bo Allegro ma już minutę,
+     * trzy i pięć, a równy chór pętli to sygnatura maszyny (`services/takt.ts`).
+     */
+    syncMs: num(process.env.SELLASIST_SYNC_MS, 251_000, "SELLASIST_SYNC_MS"),
+    /**
+     * Identyfikatory statusów zamówienia, które u tej firmy znaczą „zebrane".
+     * Lista statusów jest per konto, więc w kodzie jej nie zgadujemy. Pusta
+     * lista: dniem zbiórki jest dzień pierwszej etykiety przewoźnika.
+     * Statusy konta wypisuje `npm --prefix server run sellasist:sonda`.
+     */
+    statusyZebrane: (process.env.SELLASIST_STATUSY_ZEBRANE ?? "")
+      .split(",").map((s) => s.trim()).filter((s) => s !== "").map(Number),
+  },
+
+  /**
    * Kartoteka demo dla `npm run seed`. Leżała pod `web/public/data`, bo
    * serwowała ją skasowana już PWA — po usunięciu aplikacji webowej to są
    * po prostu DANE SERWERA i mieszkają razem z nim.
@@ -1251,6 +1279,19 @@ export function bledyKonfiguracji(c: Config = config): string[] {
   }
   if (a.kanarek && !/^https?:\/\/[^\s/]+/.test(a.kanarek)) {
     bledy.push(`AKTUALIZACJA_KANAREK=${a.kanarek} — oczekuję adresu, np. http://localhost:3002.`);
+  }
+
+  /* Sellasist: połowa pary to literówka, nie wyłączenie. Konto bez klucza
+     (albo odwrotnie) milczałoby po cichu, a biuro czekałoby na numery. */
+  const s = c.sellasist;
+  if (Boolean(s.konto) !== Boolean(s.apiKey)) {
+    bledy.push("SELLASIST_KONTO i SELLASIST_API_KEY idą w parze — ustaw oba albo żadnego.");
+  }
+  if (s.konto && !/^[a-z0-9-]+$/.test(s.konto)) {
+    bledy.push(`SELLASIST_KONTO=${bezpiecznaWartosc(s.konto)} — sama subdomena, np. firma z firma.sellasist.pl.`);
+  }
+  if (s.statusyZebrane.some((n) => !Number.isInteger(n) || n <= 0)) {
+    bledy.push("SELLASIST_STATUSY_ZEBRANE — oczekuję numerów statusów po przecinku, np. 5,7.");
   }
 
   /* Magazyn skutku rozstrzyga, którym trybem idzie dokument. Dwa te same id
