@@ -1711,6 +1711,24 @@ export interface SzczegolReklamacji {
   dostawa?: OstatniaDostawaReklamacji | null;
 }
 
+/**
+ * Droga klienta po numerze zamówienia — odpowiedź `GET /api/obsluga/droga/:orderId`.
+ *
+ * Pola `zamowienie`, `przesylka`, `droga`, `sprawy` i `reklamacja` mają ten sam
+ * kształt co w szczególe reklamacji, żeby jeden pasek czytał oba. Różnica:
+ * tu `sprawy` i `droga` niosą CAŁY zakup, bez wycinania sprawy, na której
+ * stoi ekran, a `reklamacja` to najnowsza reklamacja zamówienia albo `null`.
+ */
+export interface OdpowiedzDrogi {
+  orderId: string;
+  linkZamowienia: string | null;
+  zamowienie: Zamowienie | null;
+  przesylka: StanPrzesylki | null;
+  droga: PrzystanekDrogi[];
+  sprawy: SprawaZakupu[];
+  reklamacja: Reklamacja | null;
+}
+
 /** Ślad w historii: ile spraw, ile skończyło się uznaniem, ile odmową. */
 export interface SladHistorii {
   ile: number;

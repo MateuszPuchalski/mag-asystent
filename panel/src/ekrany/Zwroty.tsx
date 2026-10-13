@@ -21,6 +21,7 @@ import { wygladaNaEan } from "../zwroty/rodzajKodu";
 import { Blad, FiltrSegmentowy, Karta, Pusto, SIATKA_TRZECH_KOLUMN } from "../ui";
 import { PrzelacznikZwrotow } from "../zwroty/Przelacznik";
 import { Naglowek } from "../zwroty/Naglowek";
+import { DrogaKlienta } from "../sprawy/DrogaKlienta";
 import { Etapy, IKONA_KUBELKA } from "../zwroty/Etapy";
 import { KUBELKI, Kolejka } from "../zwroty/Kolejka";
 import { Dowody } from "../zwroty/Dowody";
@@ -1258,6 +1259,13 @@ export function Zwroty() {
             Wybierz zwrot z kolejki — strzałkami albo kliknięciem.</Pusto>
         : <>
             <Naglowek zwrot={zwrot} />
+            {/* Droga klienta pod nagłówkiem: gdzie ten zakup jest i jakie inne
+                sprawy już miał. Ten zwrot stoi na niej jako „tu jesteś”, nie
+                jako łącze do siebie. Poza `Naglowek`, bo jego testy nie mają
+                klienta zapytań, a pasek pyta serwer. */}
+            <div className="shrink-0 border-b border-slate-200 bg-wertis-paper px-4 py-3 empty:hidden">
+              <DrogaKlienta plaska orderId={zwrot.orderId} biezaca={{ rodzaj: "zwrot", id: zwrot.id }} />
+            </div>
             {/* Oś etapów (0.453.0): gdzie jest sprawa i co jeszcze przed nią —
                 zamiast zdań rozsianych po sekcjach. */}
             <Etapy kubelek={zwrot.kubelek} poKorekcie={Boolean(zwrot.korektaNumer)} />

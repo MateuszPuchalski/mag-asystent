@@ -28,6 +28,7 @@ import { PasekTla, tloAlarmuje } from "../sprawy/PasekTla";
 import { FiltrTagow, tagiWgLiczby } from "../sprawy/Tagi";
 import { SkrotyKlawiszy } from "../sprawy/Skroty";
 import { Fakty } from "../dyskusje/Fakty";
+import { DrogaKlienta } from "../sprawy/DrogaKlienta";
 import { Zakonczenie } from "../dyskusje/Zakonczenie";
 import { Prowadzi } from "../sprawy/Prowadzi";
 import { pasujeDoFrazy, rozbij } from "../sprawy/szukanie";
@@ -516,6 +517,12 @@ export function Dyskusje() {
                 <Zakonczenie dyskusja={szczegol.data.dyskusja} wysyla={zakoncz.isPending}
                   blad={bladZakonczenia} onZakoncz={wyslijZakonczenie} />
                 {bladOdswiezenia && <p className="basis-full text-xs text-red-800">{bladOdswiezenia}</p>}
+              </div>
+              {/* Droga klienta nad rozmową. Numer zamówienia i przesyłki stoją już
+                  w kolumnie faktów, więc pasek ich nie powtarza. */}
+              <div className="shrink-0 border-b border-slate-200 bg-wertis-paper px-4 py-3 empty:hidden">
+                <DrogaKlienta plaska orderId={szczegol.data.dyskusja.orderId} bezNumerow
+                  biezaca={{ rodzaj: "dyskusja", id: szczegol.data.dyskusja.id }} />
               </div>
               <Czat tytul="Czat dyskusji"
                 sprawa={{

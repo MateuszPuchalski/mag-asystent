@@ -3,7 +3,7 @@ import {
   Coins, Flag, Gavel, MessageCircle, Package, ShoppingCart, type LucideIcon,
 } from "lucide-react";
 import { Link } from "react-router-dom";
-import type { SzczegolReklamacji } from "../api/typy";
+import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
 import { zlote } from "../api/zwroty";
 import { STATUS_PACZKI } from "../skrzynka/statusy";
 import { inneSprawyZakupu, KOLEJKI, type InnaSprawaZakupu } from "../sprawy/Spoiwo";
@@ -44,7 +44,41 @@ import { rozstrzygniecie } from "./statusy";
    w obie strony: przystanek jest łączem do tamtej sprawy.
 
    PRZYSTANEK NIE JEST KROKIEM tej sprawy. Ma mniejszą kropkę z ikoną rodzaju
-   w barwie łącza i nie ma stanu, bo nie mówi, ile tej reklamacji zostało. */
+   w barwie łącza i nie ma stanu, bo nie mówi, ile tej reklamacji zostało.
+
+   PASEK NIE NALEŻY DO REKLAMACJI. Czytają go też zwroty, dyskusje, skrzynka
+   i profil klienta, więc karmi go `DaneDrogi`, a nie szczegół reklamacji.
+   Szczegół reklamacji spełnia ten kształt wprost, więc ekran reklamacji nie
+   pyta serwera o nic drugi raz.
+
+   BEZ REKLAMACJI SĄ TYLKO ZAKUP I DORĘCZONO. Szare Zgłoszenie, Rozmowa,
+   Decyzja i Rozliczenie obiecywałyby sprawę, której klient nie założył.
+   Brak danych nie jest zerem, a pusta droga reklamacji to nie droga.
+
+   SPRAWA EKRANU ZOSTAJE NA PASKU JAKO PRZYSTANEK „TU JESTEŚ”. Zwrot na
+   ekranie zwrotu zniknąłby z historii zakupu, którą ten pasek opowiada.
+   Nie jest łączem, bo agent już tam stoi, a klik odświeżałby ten sam ekran.
+   Reklamacja, której kroki rysuje pasek, nie staje przystankiem w ogóle:
+   stałaby na nim dwa razy. */
+
+/** Wszystko, czego pasek potrzebuje. Szczegół reklamacji spełnia to kształtem. */
+export interface DaneDrogi {
+  /* Opcjonalne, bo szczegół reklamacji niesie je w `reklamacja`. */
+  orderId?: string | null;
+  linkZamowienia?: string | null;
+  zamowienie: SzczegolReklamacji["zamowienie"];
+  przesylka: SzczegolReklamacji["przesylka"];
+  droga: SzczegolReklamacji["droga"];
+  sprawy: SzczegolReklamacji["sprawy"];
+  /** `null`: zakup bez reklamacji — pasek kończy się na doręczeniu. */
+  reklamacja: Reklamacja | null;
+}
+
+/** Sprawa, na której stoi ekran — rodzaj jak w `KOLEJKI`. */
+export interface BiezacaSprawa {
+  rodzaj: "rozmowa" | "dyskusja" | "reklamacja" | "zwrot";
+  id: number;
+}
 
 type StanKroku = "zrobiony" | "biezacy" | "przyszly";
 
@@ -105,15 +139,24 @@ const sklej = (...czesci: Array<string | null | false | undefined>) =>
   czesci.filter((c): c is string => Boolean(c)).join(" · ");
 
 /** Kroki drogi z danych sprawy — czysta funkcja, żeby test nie potrzebował DOM-u. */
-export function krokiDrogi(s: SzczegolReklamacji): KrokDrogi[] {
+export function krokiDrogi(s: DaneDrogi): KrokDrogi[] {
   const r = s.reklamacja;
-  const kupiono = s.zamowienie?.kupionoAt ?? r.kupionoAt;
+  const kupiono = s.zamowienie?.kupionoAt ?? r?.kupionoAt;
   const doreczono = s.przesylka?.dostarczonoAt ?? null;
   const z = s.zamowienie;
   /* Pigułka staje tylko przy płatności z datą. Bez niej nie wiemy, czy
      zapłacił, a zielona kwota twierdziłaby, że tak. */
   const kwota = z?.platnoscAt && z.sumaGrosze != null ? zlote(z.sumaGrosze, z.waluta) : undefined;
   const platnosc = z?.platnoscTyp ? (PLATNOSCI[z.platnoscTyp] ?? z.platnoscTyp) : null;
+  const zakup: KrokDrogi = { klucz: "zakup", etykieta: "Zakup", stan: "zrobiony", chwila: kupiono ?? null, kwota,
+    podpis: sklej(kupiono && dzienMiesiac(kupiono), platnosc) };
+  /* Zielone koło obiecuje doręczenie, więc staje dopiero z datą od
+     przewoźnika. Paczka w drodze albo niesprawdzona zostaje szara. */
+  const doreczonoKrok: KrokDrogi = { klucz: "doreczono", etykieta: "Doręczono",
+    stan: doreczono ? "zrobiony" : "przyszly", chwila: doreczono,
+    podpis: s.przesylka ? stanPaczki(s.przesylka) : "" };
+  /* Bez reklamacji kroków reklamacji nie ma: szare byłyby obietnicą sprawy. */
+  if (!r) return [zakup, doreczonoKrok];
   const naszWerdykt = r.werdykt !== null && WYSZEDL.has(r.werdyktStatus ?? "");
   const zAllegro = rozstrzygniecie(r.statusAllegro);
   const zapadla = naszWerdykt || zAllegro !== null;
@@ -144,12 +187,8 @@ export function krokiDrogi(s: SzczegolReklamacji): KrokDrogi[] {
   const rozmowaBylo = r.wiadomosciIle > 0;
 
   return [
-    { klucz: "zakup", etykieta: "Zakup", stan: "zrobiony", chwila: kupiono ?? null, kwota,
-      podpis: sklej(kupiono && dzienMiesiac(kupiono), platnosc) },
-    /* Zielone koło obiecuje doręczenie, więc staje dopiero z datą od
-       przewoźnika. Paczka w drodze albo niesprawdzona zostaje szara. */
-    { klucz: "doreczono", etykieta: "Doręczono", stan: doreczono ? "zrobiony" : "przyszly", chwila: doreczono,
-      podpis: s.przesylka ? stanPaczki(s.przesylka) : "" },
+    zakup,
+    doreczonoKrok,
     { klucz: "zgloszenie", etykieta: "Zgłoszenie", stan: "zrobiony", chwila: r.otwartoAt ?? null,
       podpis: sklej(r.otwartoAt && dzienMiesiac(r.otwartoAt), odstep) },
     /* Rozmowa trwa do ostatniej wiadomości, więc dopiero sprawa po niej
@@ -267,12 +306,17 @@ function SprawdzPaczke({ p, onSprawdzPrzesylke, sprawdzaPrzesylke = false }: Pyt
 }
 
 /** Druga linia kroku: to, czego nie da się powiedzieć samym tekstem. */
-function Dopisek({ k, szczegol, pytanie }: { k: KrokDrogi; szczegol: SzczegolReklamacji; pytanie: PytanieOPaczke }) {
-  const r = szczegol.reklamacja;
-  const p = szczegol.przesylka;
-  if (k.klucz === "zakup" && r.orderId) {
-    return <Numer numer={r.orderId} href={r.linkZamowienia} nazwa="Zamówienie"
-      tytulKopii="Kopiuj numer zamówienia" />;
+function Dopisek({ k, dane, pytanie, bezNumerow }: {
+  k: KrokDrogi; dane: DaneDrogi; pytanie: PytanieOPaczke; bezNumerow: boolean;
+}) {
+  const p = dane.przesylka;
+  /* Ekran, który sam pokazuje numer zamówienia i przesyłki, wyłącza oba
+     dopiski: fakt stoi raz. */
+  if (bezNumerow) return null;
+  const orderId = dane.orderId ?? dane.reklamacja?.orderId ?? null;
+  if (k.klucz === "zakup" && orderId) {
+    return <Numer numer={orderId} href={dane.linkZamowienia ?? dane.reklamacja?.linkZamowienia}
+      nazwa="Zamówienie" tytulKopii="Kopiuj numer zamówienia" />;
   }
   if (k.klucz !== "doreczono" || !p) return null;
   /* Błąd pytania zastępuje drugą linię, żeby podpis nie urósł do trzech. */
@@ -289,10 +333,29 @@ function Dopisek({ k, szczegol, pytanie }: { k: KrokDrogi; szczegol: SzczegolRek
 }
 
 /** Inna sprawa tego zakupu na drodze — łącze, nie krok tej reklamacji. */
-function Przystanek({ sprawa, ostatni, przebyta }: {
-  sprawa: InnaSprawaZakupu; ostatni: boolean; przebyta: boolean;
+function Przystanek({ sprawa, ostatni, przebyta, tutaj }: {
+  sprawa: InnaSprawaZakupu; ostatni: boolean; przebyta: boolean; tutaj: boolean;
 }) {
   const { nazwa, cel, ikona: Ikona, sciezka } = KOLEJKI[sprawa.rodzaj];
+  if (tutaj) {
+    /* Sprawa ekranu: kropka z pierścieniem jak bieżący krok, napis pogrubiony
+       i słowo dla czytnika. Barwa sama nie niosłaby stanu (WCAG 1.4.1). */
+    return <li data-przystanek={sprawa.rodzaj} data-tutaj="tak" aria-current="location"
+      className="flex min-w-[88px] flex-[1_0_88px] flex-col gap-1.5">
+      <span className="flex h-6 items-center" aria-hidden="true">
+        <span className="flex h-6 w-6 flex-none items-center justify-center">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full border-[3px] border-ranga-uwaga bg-white text-ranga-uwaga">
+            <Ikona size={9} strokeWidth={2.75} /></span>
+        </span>
+        {!ostatni && <span className={LINIA(przebyta)} />}
+      </span>
+      <span className="flex flex-col whitespace-nowrap pr-2">
+        <span className="text-sm font-bold text-ranga-uwaga">{wielka(nazwa)}
+          <span className="sr-only"> z {dataCyfrowa(sprawa.at)}, ta sprawa</span></span>
+        <span className="text-xs text-slate-600">{dzienMiesiac(sprawa.at)} · tu jesteś</span>
+      </span>
+    </li>;
+  }
   /* Nazwa łącza mówi rok i cel kliku: obok kroków bez roku czytnik
      nie ma skąd wziąć, którego roku jest data ani dokąd prowadzi łącze. */
   const opis = `${wielka(nazwa)} z ${dataCyfrowa(sprawa.at)} — otwórz ${cel}`;
@@ -316,24 +379,29 @@ function Przystanek({ sprawa, ostatni, przebyta }: {
   </li>;
 }
 
-export function DrogaSprawy({ szczegol, ...pytanie }: { szczegol: SzczegolReklamacji } & PytanieOPaczke) {
-  const r = szczegol.reklamacja;
-  const inne = inneSprawyZakupu(szczegol.droga, szczegol.sprawy, { rodzaj: "reklamacja", id: r.id });
-  const pozycje = drogaZPrzystankami(krokiDrogi(szczegol), inne);
+export function DrogaSprawy({ dane, biezaca, bezNumerow = false, plaska = false, ...pytanie }:
+  { dane: DaneDrogi; biezaca?: BiezacaSprawa; bezNumerow?: boolean;
+    /** Wariant bez własnej kreski i tła — dla karty, która ma już swoje. */
+    plaska?: boolean } & PytanieOPaczke) {
+  const r = dane.reklamacja;
+  /* Reklamacja z krokami pasku nie jest przystankiem, bo stałaby dwa razy. */
+  const inne = inneSprawyZakupu(dane.droga, dane.sprawy, r ? { rodzaj: "reklamacja", id: r.id } : null);
+  const pozycje = drogaZPrzystankami(krokiDrogi(dane), inne);
   /* Stan ostatniego kroku przed pozycją — przystanek nie ma własnego. */
   let poprzedni: StanKroku | null = null;
   return <ol aria-label="Droga sprawy"
-    className="flex list-none overflow-x-auto border-t border-slate-200 bg-wertis-paper px-5 pb-4 pt-3.5">
+    className={`flex list-none overflow-x-auto ${plaska ? "pb-1" : "border-t border-slate-200 bg-wertis-paper px-5 pb-4 pt-3.5"}`}>
     {pozycje.map((p, i) => {
       const ostatni = i === pozycje.length - 1;
       if (p.typ === "sprawa") {
         return <Przystanek key={`${p.sprawa.rodzaj}-${p.sprawa.id}`} sprawa={p.sprawa} ostatni={ostatni}
-          przebyta={poprzedni === "zrobiony"} />;
+          przebyta={poprzedni === "zrobiony"}
+          tutaj={biezaca?.rodzaj === p.sprawa.rodzaj && biezaca.id === p.sprawa.id} />;
       }
       const k = p.krok;
       poprzedni = k.stan;
       const Ikona = IKONA_KROKU[k.klucz];
-      const dopisek = <Dopisek k={k} szczegol={szczegol} pytanie={pytanie} />;
+      const dopisek = <Dopisek k={k} dane={dane} pytanie={pytanie} bezNumerow={bezNumerow} />;
       return <li key={k.klucz} data-stan={k.stan} aria-current={k.stan === "biezacy" ? "step" : undefined}
         className="flex min-w-[104px] flex-[1_0_104px] flex-col gap-1.5">
         <span className="flex h-6 items-center" aria-hidden="true">
@@ -349,9 +417,9 @@ export function DrogaSprawy({ szczegol, ...pytanie }: { szczegol: SzczegolReklam
             {k.etykieta}<span className="sr-only">{k.kwota ? ` opłacony: ${k.kwota}` : ""}, {STAN_SLOWEM[k.stan]}</span></span>
           {k.podpis && <span className="text-xs text-slate-600">{k.podpis}
             {/* Bez pytania o paczkę „sprawdź” staje w tej samej linii. */}
-            {k.klucz === "doreczono" && szczegol.przesylka?.sprawdzonoAt === null && !pytanie.bladPrzesylki
+            {k.klucz === "doreczono" && dane.przesylka?.sprawdzonoAt === null && !pytanie.bladPrzesylki
               && pytanie.onSprawdzPrzesylke && <>{" · "}
-                <SprawdzPaczke p={szczegol.przesylka} {...pytanie} /></>}</span>}
+                <SprawdzPaczke p={dane.przesylka} {...pytanie} /></>}</span>}
           <span className="text-xs text-slate-600 empty:hidden">{dopisek}</span>
         </span>
       </li>;

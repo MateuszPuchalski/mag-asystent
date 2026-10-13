@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { atrapaZapisow } from "../test/zapisy";
 import type { Dyskusja, KubelekDyskusji, WiadomoscReklamacji } from "../api/typy";
 
 /* ── Ekran dyskusji (0.245.0) ────────────────────────────────────────────────
@@ -182,6 +183,30 @@ describe("Ekran dyskusji", () => {
     expect(scena.mutacje).toEqual([]);
     await userEvent.click(screen.getByRole("button", { name: /Przesyłka nie dotarła/ }));
     expect(scena.mutacje).toEqual(['odswiez:{"id":1}']);
+  });
+
+  it("otwarcie dyskusji czyta drogę klienta jednym GET-em, bez zapisu i bez powtórki numerów", async () => {
+    /* Zapis liczymy na samym `fetch`: hak drogi nie jest podmieniony, więc
+       zapis z pominięciem haków też by tu wpadł. */
+    const stan = atrapaZapisow((url) => (url === "/api/obsluga/droga/ord-1" ? {
+      orderId: "ord-1", linkZamowienia: "https://allegro.pl/z/1", reklamacja: null, sprawy: [],
+      zamowienie: { kupionoAt: "2026-08-30T10:00:00.000Z", platnoscAt: "2026-08-30T10:02:00.000Z",
+        platnoscTyp: "ONLINE", sumaGrosze: 4999, waluta: "PLN" },
+      przesylka: { waybill: "620001", przewoznik: "InPost", status: "IN_TRANSIT", dostarczonoAt: null,
+        sprawdzonoAt: "2026-09-01T10:00:00.000Z" },
+      droga: [{ rodzaj: "dyskusja", id: 1, at: "2026-09-01T10:00:00.000Z", opis: null },
+        { rodzaj: "zwrot", id: 9, at: "2026-09-02T10:00:00.000Z", opis: null }],
+    } : undefined));
+    try {
+      pokaz("/obsluga/dyskusje/1");
+      const pasek = await screen.findByRole("list", { name: "Droga sprawy" });
+      expect(pasek.querySelector('[aria-current="location"]')).toHaveAttribute("data-przystanek", "dyskusja");
+      expect(within(pasek).getByRole("link", { name: /^Zwrot z/ })).toHaveAttribute("href", "/obsluga/zwroty/9");
+      /* Numer zamówienia i listu stoją w kolumnie faktów, więc nie w pasku. */
+      expect(pasek).not.toHaveTextContent(/ord-1|620001/);
+      expect(stan.nieznane).toEqual([]);
+      expect(stan.wyslane).toEqual([]);
+    } finally { vi.unstubAllGlobals(); }
   });
 
   it("powrót do TEJ SAMEJ sprawy nie pyta Allegro drugi raz", async () => {

@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Check, ChevronDown, ChevronRight, ChevronUp, CircleDashed, ExternalLink, UserRound } from "lucide-react";
+import { ChevronDown, ChevronRight, ChevronUp, ExternalLink, UserRound } from "lucide-react";
 import { Link } from "react-router-dom";
 import type { HistoriaKlienta, OsRozmowy } from "../api/typy";
 import { zlote } from "../api/zwroty";
-import { Skopiuj, dzienMiesiac, ile } from "../ui";
+import { Skopiuj, ile } from "../ui";
 import { KafelOferty } from "../towar/Kafel";
 import { historiaPozaZakupem, klientMaHistorie, nowyKlient } from "./kokpit";
 import { streszczenieKlienta } from "./Kontekst";
 import { ODNOSNIK } from "./odnosniki";
-import { stanZakupu, type KrokZakupu } from "./zakup";
+import { stanZakupu } from "./zakup";
 import { Anulowanie } from "./Anulowanie";
+import { DrogaKlienta } from "../sprawy/DrogaKlienta";
 
 /* ── KARTA ZAKUPU I KLIENTA NAD ROZMOWĄ ─────────────────────────────────────
    Zgłoszenie właściciela: „więcej informacji osadzonych w rozmowie w środkowym
@@ -42,23 +43,6 @@ function odczytajZwinieta(): boolean {
 }
 function zapiszZwinieta(v: boolean): void {
   try { window.localStorage.setItem(KLUCZ, v ? "1" : "0"); } catch { /* przeglądarka bez pamięci */ }
-}
-
-function Krok({ krok }: { krok: KrokZakupu }) {
-  const tak = krok.stan === "tak";
-  return <li className="flex min-w-0 flex-1 flex-col items-center gap-0.5 text-center"
-    title={krok.uwaga ?? undefined}>
-    <span aria-hidden="true" className={`flex h-5 w-5 items-center justify-center rounded-full border ${
-      tak ? "border-ranga-ok bg-ranga-ok text-white"
-        : krok.stan === "nie" ? "border-slate-300 bg-white text-slate-300"
-          : "border-dashed border-slate-400 bg-white text-slate-400"}`}>
-      {tak ? <Check size={12} /> : krok.stan === "nieznane" ? <CircleDashed size={12} /> : null}
-    </span>
-    <span className={`text-podpis ${tak ? "font-semibold text-slate-800" : "text-slate-500"}`}>{krok.etykieta}</span>
-    <span className="text-podpis tabular-nums text-slate-500">
-      {krok.at ? dzienMiesiac(krok.at) : krok.stan === "nieznane" ? "nie sprawdzono" : "—"}
-    </span>
-  </li>;
 }
 
 export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?: HistoriaKlienta }) {
@@ -252,9 +236,14 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
           </div>
         </div>}
 
-    {stan && !stan.anulowane && <ol aria-label="Status zakupu" className="flex items-start gap-1 border-t border-slate-100 pt-2">
-      {stan.kroki.map((k) => <Krok key={k.klucz} krok={k} />)}
-    </ol>}
+    {/* DROGA KLIENTA ZAMIAST CZTERECH KROKÓW ZAKUPU. Złożone, opłacone,
+        nadane i dostarczone mówiły sam zakup, a pasek mówi też, jakie inne
+        sprawy ten zakup już miał. Numer zamówienia stoi wyżej, a przesyłka
+        w bloku „Paczka zamówienia”, więc pasek ich nie powtarza. Anulowane
+        zamówienie nie ma drogi do opowiadania. */}
+    {numer && stan && !stan.anulowane && <div className="border-t border-slate-100 pt-2">
+      <DrogaKlienta plaska bezNumerow orderId={numer}
+        biezaca={{ rodzaj: "rozmowa", id: dane.rozmowa.id }} /></div>}
     {klient && <div className="border-t border-slate-100 pt-2">{klient}</div>}
   </section>{pasek}</>;
 }

@@ -131,15 +131,19 @@ export interface InnaSprawaZakupu {
 }
 
 /**
- * Wszystkie sprawy tego zakupu poza bieżącą, każda raz.
+ * Wszystkie sprawy tego zakupu poza wskazaną, każda raz.
+ *
+ * `pomin` to sprawa, której kroki rysuje sam pasek (reklamacja): stoi na
+ * nim jako kroki, więc przystankiem byłaby drugi raz. `null`, gdy pasek
+ * nie rysuje żadnej sprawy i wszystkie zostają przystankami.
  *
  * Droga i rodzeństwo pokrywają się przy dyskusjach i reklamacjach, więc
  * sprawa z obu list staje jeden raz. Kolejność idzie za drogą, bo ta jest
  * już ułożona w czasie; rodzeństwo spoza drogi dochodzi na końcu.
  */
 export function inneSprawyZakupu(droga: PrzystanekDrogi[], sprawy: SprawaZakupu[],
-  tutaj: { rodzaj: PrzystanekDrogi["rodzaj"]; id: number }): InnaSprawaZakupu[] {
-  const byly = new Set([`${tutaj.rodzaj}-${tutaj.id}`]);
+  pomin: { rodzaj: PrzystanekDrogi["rodzaj"]; id: number } | null): InnaSprawaZakupu[] {
+  const byly = new Set(pomin ? [`${pomin.rodzaj}-${pomin.id}`] : []);
   const wynik: InnaSprawaZakupu[] = [];
   const dodaj = (s: InnaSprawaZakupu) => {
     const klucz = `${s.rodzaj}-${s.id}`;

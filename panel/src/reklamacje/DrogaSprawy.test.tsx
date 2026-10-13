@@ -34,7 +34,7 @@ const szczegol = (r: Partial<Reklamacja> = {}, reszta: Partial<SzczegolReklamacj
 const krok = (s: SzczegolReklamacji, klucz: string) => krokiDrogi(s).find((k) => k.klucz === klucz)!;
 
 const pokaz = (s: SzczegolReklamacji, pytanie: PytanieOPaczke = {}) =>
-  render(<MemoryRouter><DrogaSprawy szczegol={s} {...pytanie} /></MemoryRouter>);
+  render(<MemoryRouter><DrogaSprawy dane={s} {...pytanie} /></MemoryRouter>);
 
 const przesylka = (n: Partial<StanPrzesylki> = {}): StanPrzesylki => ({
   waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null, ...n,
@@ -268,5 +268,89 @@ describe("Inne sprawy tego zakupu stoją na drodze", () => {
     /* Przed zgłoszeniem nic nie wiemy o doręczeniu, więc zwrot czeka przed nim. */
     expect(ulozone("2026-09-19T10:00:00.000Z"))
       .toEqual(["zakup", "zwrot", "doreczono", "zgloszenie", "rozmowa", "decyzja", "rozliczenie"]);
+  });
+});
+
+/* ── Pasek bez szczegółu reklamacji ──────────────────────────────────────────
+   Zwroty, dyskusje, skrzynka i profil karmią pasek `DaneDrogi` z drogi
+   klienta, a nie szczegółem reklamacji. Pilnujemy trzech rzeczy: brak
+   reklamacji nie udaje reklamacji, sprawa ekranu zostaje na pasku jako
+   „tu jesteś” bez łącza, a reklamacja z krokami nie staje drugi raz. */
+describe("Droga klienta bez szczegółu reklamacji", () => {
+  const przystanek = (rodzaj: PrzystanekDrogi["rodzaj"], id: number, at = "2026-09-25T10:00:00.000Z") =>
+    ({ rodzaj, id, at, opis: null });
+  const bezReklamacji = (n: Partial<SzczegolReklamacji> = {}) =>
+    ({ ...szczegol({}, n), reklamacja: null }) as unknown as import("./DrogaSprawy").DaneDrogi;
+  const pokazDane = (d: import("./DrogaSprawy").DaneDrogi, p: Partial<React.ComponentProps<typeof DrogaSprawy>> = {}) =>
+    render(<MemoryRouter><DrogaSprawy dane={d} {...p} /></MemoryRouter>);
+
+  it("bez reklamacji stoją tylko Zakup i Doręczono, bez szarych kroków reklamacji", () => {
+    pokazDane(bezReklamacji());
+    const nazwy = screen.getAllByRole("listitem").map((li) => li.textContent ?? "");
+    expect(nazwy).toHaveLength(2);
+    expect(nazwy[0]).toContain("Zakup");
+    expect(nazwy[1]).toContain("Doręczono");
+    expect(screen.queryByText(/Zgłoszenie|Rozmowa|Decyzja|Rozliczenie/)).toBeNull();
+    expect(krokiDrogi(bezReklamacji()).map((k) => k.klucz)).toEqual(["zakup", "doreczono"]);
+  });
+
+  it("bez reklamacji zakup bierze numer z danych drogi, nie z reklamacji", () => {
+    pokazDane({ ...bezReklamacji(), orderId: "ord-77", linkZamowienia: "https://allegro.pl/z/77" });
+    expect(screen.getByRole("link", { name: /ord-77/ })).toHaveAttribute("href", "https://allegro.pl/z/77");
+  });
+
+  it("bezNumerow wyłącza numer zamówienia i przesyłki, bo ekran pokazuje je sam", () => {
+    pokazDane({ ...bezReklamacji({ przesylka: przesylka({ waybill: "600000727616", przewoznik: "INPOST",
+      sprawdzonoAt: "2026-09-29T10:00:00.000Z" }) }), orderId: "ord-77" }, { bezNumerow: true });
+    expect(screen.queryByText(/ord-77|6000/)).toBeNull();
+    expect(screen.queryByTitle("Kopiuj numer zamówienia")).toBeNull();
+    expect(screen.queryByTitle("Kopiuj numer przesyłki")).toBeNull();
+  });
+
+  it("sprawa ekranu zostaje na pasku jako przystanek „tu jesteś”, bez łącza do siebie", () => {
+    pokazDane(bezReklamacji({ droga: [przystanek("rozmowa", 3), przystanek("zwrot", 7, "2026-09-26T10:00:00.000Z")] }),
+      { biezaca: { rodzaj: "zwrot", id: 7 } });
+    const tu = screen.getAllByRole("listitem").filter((li) => li.getAttribute("aria-current") === "location");
+    expect(tu).toHaveLength(1);
+    expect(tu[0]).toHaveAttribute("data-przystanek", "zwrot");
+    expect(tu[0]).toHaveTextContent("tu jesteś");
+    expect(within(tu[0]).queryByRole("link")).toBeNull();
+    /* Pozostałe przystanki dalej prowadzą do swoich kolejek. */
+    expect(screen.getByRole("link", { name: /^Pytanie z/ })).toHaveAttribute("href", "/obsluga/skrzynka/3");
+    expect(screen.queryByRole("link", { name: /^Zwrot/ })).toBeNull();
+  });
+
+  it("bez biezaca wszystkie przystanki są łączami, a nic nie jest „tu”", () => {
+    pokazDane(bezReklamacji({ droga: [przystanek("zwrot", 7)] }));
+    expect(screen.getByRole("link", { name: /^Zwrot z/ })).toHaveAttribute("href", "/obsluga/zwroty/7");
+    expect(document.querySelector("[aria-current]")).toBeNull();
+  });
+
+  it("reklamacja z krokami nie staje przystankiem, nawet gdy jest na drodze i wśród spraw", () => {
+    const sprawaReklamacji = { id: 5, typ: "CLAIM", numer: null, temat: null, statusAllegro: null,
+      decyzjaDo: null, otwartoAt: "2026-09-28T12:32:00.000Z", prowadzi: null, otwarta: true };
+    const dane = { ...szczegol({}, { droga: [przystanek("reklamacja", 5, "2026-09-28T12:32:00.000Z"),
+      przystanek("zwrot", 7, "2026-09-30T10:00:00.000Z")], sprawy: [sprawaReklamacji] }) };
+    /* Ekran zwrotu: reklamacja 5 ma kroki, zwrot 7 jest „tu jesteś”. */
+    pokazDane(dane, { biezaca: { rodzaj: "zwrot", id: 7 } });
+    expect(document.querySelectorAll('[data-przystanek="reklamacja"]')).toHaveLength(0);
+    expect(screen.getAllByText("Zgłoszenie")).toHaveLength(1);
+    expect(document.querySelectorAll('[data-przystanek="zwrot"][aria-current="location"]')).toHaveLength(1);
+    expect(screen.getAllByRole("listitem")).toHaveLength(7);
+  });
+
+  it("na ekranie reklamacji sprawa bieżąca to ta z krokami, więc przystanku „tu” nie ma", () => {
+    pokazDane(szczegol({}, { droga: [przystanek("reklamacja", 5), przystanek("zwrot", 7)] }),
+      { biezaca: { rodzaj: "reklamacja", id: 5 } });
+    expect(document.querySelector('[aria-current="location"]')).toBeNull();
+    expect(document.querySelectorAll('[data-przystanek="reklamacja"]')).toHaveLength(0);
+    expect(screen.getAllByRole("listitem")).toHaveLength(7);
+  });
+
+  it("wariant płaski nie rysuje własnej kreski ani tła, bo karta ma swoje", () => {
+    pokazDane(bezReklamacji(), { plaska: true });
+    const lista = screen.getByRole("list", { name: "Droga sprawy" });
+    expect(lista.className).not.toMatch(/border-t|bg-wertis-paper/);
+    expect(lista.className).toContain("overflow-x-auto");
   });
 });

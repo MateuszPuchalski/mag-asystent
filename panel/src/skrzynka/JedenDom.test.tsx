@@ -18,7 +18,9 @@ vi.mock("../towar/useZdjecie", () => ({ useZdjecie: () => null, useZdjecieOferty
    sam fakt stawał w trzech miejscach. Agent porównywał wtedy trzy zapisy,
    zamiast przeczytać jeden, a zasada „fakt ma jeden dom" była konwencją.
 
-   Podział domów: karta zakupu nad osią mówi, co klient KUPIŁ i KIM jest.
+   Podział domów: karta zakupu nad osią mówi, co klient KUPIŁ i KIM jest, a jej
+   pasek drogi klienta (`sprawy/DrogaKlienta.tsx`) mówi, gdzie ten zakup jest:
+   zakup, doręczenie i inne sprawy tego zamówienia.
    Kolumna mówi, co MAMY w Subiekcie, gdzie jest paczka i co czeka na ruch.
    Fakt z karty wraca do kolumny tylko jako wyjątek opisany w `Kontekst.tsx`:
    pasmo „Zamówił" (dlatego SKU stoi raz, właśnie tam) i data doręczenia
@@ -48,7 +50,8 @@ const FAKTY_KARTY: Array<[RegExp, string]> = [
   [/28 września|28\.09/, "data zakupu — krok „Złożone” w karcie i linia osi"],
   [/a7f3c2e0/, "numer zamówienia — karta"],
   [/Nowy klient|Wcześniej u nas/, "historia klienta — plakietka w karcie i w pasku"],
-  [/kupione|zapłacono/i, "kroki zakupu — karta"],
+  [/kupione|zapłacono/i, "stan płatności — pasek drogi klienta w karcie"],
+  [/Doręczono|Droga sprawy/, "kroki Zakup i Doręczono — pasek drogi klienta w karcie"],
   [/NÓŻ DO KOSIARKI MTD SMART/, "tytuł oferty — karta"],
   [/\bACTIVE\b/, "surowy status oferty — słowo w streszczeniu wiersza"],
 ];
@@ -168,6 +171,8 @@ function sprawdzDomy() {
     .map(([wzor, dom]) => `${wzor} (${dom})`);
   expect(przecieki).toEqual([]);
   expect(within(k).queryByRole("region", { name: "Droga tego zakupu" })).toBeNull();
+  /* Pasek drogi klienta mieszka w karcie, nie w kolumnie. */
+  expect(within(k).queryByRole("list", { name: "Droga sprawy" })).toBeNull();
 }
 
 /* Dwa przypadki, bo fakt o kliencie wraca dwiema drogami: licznikami przy
