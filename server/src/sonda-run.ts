@@ -204,7 +204,7 @@ async function main(): Promise<void> {
   sekcje.push(
     (
       await sekcja("`/payments/refunds` — zwroty płatności (konto)", async () =>
-        tablica(await zapytajAllegro(urlZwrotowPlatnosci(api, null, 0)), "refunds")
+        tablica(await zapytajAllegro(urlZwrotowPlatnosci(api)), "refunds")
       )
     ).md
   );
@@ -218,7 +218,7 @@ async function main(): Promise<void> {
           .filter((v): v is string => typeof v === "string")
           .slice(0, ROZMOW);
         for (const id of zamowienia) {
-          zebrane.push(...tablica(await zapytajAllegro(urlZwrotowPlatnosci(api, id, 0)), "refunds"));
+          zebrane.push(...tablica(await zapytajAllegro(urlZwrotowPlatnosci(api, { orderId: id })), "refunds"));
         }
         return zebrane;
       })

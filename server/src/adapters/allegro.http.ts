@@ -229,9 +229,15 @@ export function urlOperacjiPlatnosci(
  * filtrujemy po nim: czytamy wszystko i mapujemy po stronie wołającego.
  * `orderId` pusty daje listę całego konta.
  */
-export function urlZwrotowPlatnosci(apiUrl: string, orderId: string | null, offset: number): string {
-  const zamowienie = orderId ? `&order.id=${encodeURIComponent(orderId)}` : "";
-  return `${apiUrl}/payments/refunds?limit=100&offset=${Math.max(0, Math.trunc(offset))}${zamowienie}`;
+export function urlZwrotowPlatnosci(
+  apiUrl: string,
+  filtr: { orderId?: string | null; refundId?: string | null; od?: string | null; offset?: number } = {},
+): string {
+  const q = [`limit=100`, `offset=${Math.max(0, Math.trunc(filtr.offset ?? 0))}`];
+  if (filtr.orderId) q.push(`order.id=${encodeURIComponent(filtr.orderId)}`);
+  if (filtr.refundId) q.push(`id=${encodeURIComponent(filtr.refundId)}`);
+  if (filtr.od) q.push(`occurredAt.gte=${encodeURIComponent(filtr.od)}`);
+  return `${apiUrl}/payments/refunds?${q.join("&")}`;
 }
 
 /**

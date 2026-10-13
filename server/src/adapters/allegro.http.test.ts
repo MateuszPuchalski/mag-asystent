@@ -392,9 +392,12 @@ test("załącznik Centrum Wiadomości: droga API z UUID z ogona `url`, zapisany 
   assert.equal(idZalacznikaZUrl("https://upload.allegro.pl/message-attachments/nie-uuid"), null);
 });
 
-test("urlZwrotowPlatnosci: lista konta albo jedno zamówienie, bez filtra statusu", () => {
-  assert.equal(urlZwrotowPlatnosci("https://api.allegro.pl", null, -3),
-    "https://api.allegro.pl/payments/refunds?limit=100&offset=0");
-  assert.equal(urlZwrotowPlatnosci("https://api.allegro.pl", "a b", 5),
-    "https://api.allegro.pl/payments/refunds?limit=100&offset=5&order.id=a%20b");
+test("urlZwrotowPlatnosci: filtry składają się w zapytanie, bez filtra statusu", () => {
+  const api = "https://api.allegro.pl";
+  assert.equal(urlZwrotowPlatnosci(api), `${api}/payments/refunds?limit=100&offset=0`);
+  assert.equal(urlZwrotowPlatnosci(api, { orderId: "a b", offset: -3 }),
+    `${api}/payments/refunds?limit=100&offset=0&order.id=a%20b`);
+  assert.equal(urlZwrotowPlatnosci(api, { refundId: "r1", od: "2026-09-01T00:00:00Z", offset: 100 }),
+    `${api}/payments/refunds?limit=100&offset=100&id=r1&occurredAt.gte=2026-09-01T00%3A00%3A00Z`);
+  assert.doesNotMatch(urlZwrotowPlatnosci(api, { orderId: "x" }), /status=/);
 });
