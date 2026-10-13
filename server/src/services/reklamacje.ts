@@ -1374,6 +1374,39 @@ export function historiaSprawy(
 }
 
 /**
+ * Wiersz reklamacji w kształcie szczegółu: z sygnaturą z paragonu i tagami.
+ *
+ * Wspólny dla ekranu reklamacji i dla drogi zakupu, bo dwa składania tej samej
+ * reklamacji rozjechałyby się przy pierwszym nowym polu. Czysty odczyt.
+ * Sygnatura z paragonu bije dzisiejsze mapowanie oferty — powód przy `zParagonu`.
+ */
+export function reklamacjaZeSzczegolu(
+  database: Db, w: Wiersz, teraz: number,
+): WierszReklamacji {
+  const reklamacja = zWiersza(w, teraz);
+  zParagonuNaWiersz(reklamacja, w.sku_paragonu,
+    zParagonu(database, [w.sku_paragonu as string | null]));
+  reklamacja.tagi = tagiSprawy(database, TAGI_REKLAMACJI, reklamacja.id);
+  return reklamacja;
+}
+
+/**
+ * Najnowsza reklamacja (typ CLAIM) zamówienia w kształcie szczegółu; `null`,
+ * gdy zakup jej nie ma. Dyskusja, która urosła w reklamację, to dwa wiersze
+ * tego samego zamówienia — tu interesuje nas ten, który ma werdykt.
+ * Konto w warunku, bo `order_id` nie jest rozłączny między kontami.
+ */
+export function najnowszaReklamacjaZamowienia(
+  database: Db, konto: number, orderId: string, teraz: number,
+): WierszReklamacji | null {
+  const w = wierszeReklamacji(database,
+    "r.channel_account_id = ? AND r.order_id = ?", konto, orderId)
+    .sort((a, b) => String(b.otwarto_at ?? "").localeCompare(String(a.otwarto_at ?? ""))
+      || Number(b.id) - Number(a.id))[0];
+  return w ? reklamacjaZeSzczegolu(database, w, teraz) : null;
+}
+
+/**
  * Wszystko o jednej sprawie — CZYSTY ODCZYT.
  *
  * Otwarcie reklamacji niczego nie mutuje (blizna 0.18.0). Rozmowa dociąga się
@@ -1390,13 +1423,7 @@ export function szczegolReklamacji(
      bez werdyktu: `/api/reklamacje/7` przy dyskusji ma oddać 404, żeby nie
      dało się jej otworzyć ekranem, który obiecuje uznanie i odrzucenie. */
   if (!w) throw new BladReklamacji(`Reklamacja ${id} nie istnieje`, 404);
-  const reklamacja = zWiersza(w, teraz);
-  /* Sygnatura z paragonu bije dzisiejsze mapowanie oferty (0.400.0) — powód
-     przy `zParagonu`. Szczegół idzie tą samą drogą co kolejka, bo dwa
-     składania tej samej reklamacji rozjechałyby się przy pierwszym polu. */
-  zParagonuNaWiersz(reklamacja, w.sku_paragonu,
-    zParagonu(database, [w.sku_paragonu as string | null]));
-  reklamacja.tagi = tagiSprawy(database, TAGI_REKLAMACJI, id);
+  const reklamacja = reklamacjaZeSzczegolu(database, w, teraz);
   const konto = Number(w.channel_account_id);
 
   const { zwroty, rozmowy, sprawy, droga, zamowienie, przesylka } =

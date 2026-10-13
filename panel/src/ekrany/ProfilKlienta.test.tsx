@@ -4,7 +4,7 @@ import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ProfilKlienta } from "./ProfilKlienta";
+import { ProfilKlienta, najnowszeZamowienie } from "./ProfilKlienta";
 import type { DosylkaSprawy, ProfilKlienta as Profil, SprawaKlienta, WidokSellasist } from "../api/spoiwo";
 import { dataLokalna } from "../ui";
 
@@ -56,6 +56,19 @@ const SPRAWA: SprawaKlienta = {
 const SWIEZA: SprawaKlienta = {
   ...SPRAWA, wersja: 7, odcisk: "{\"m\":\"2026-09-26T12:00:00Z\",\"z\":1,\"d\":1}",
   nowe: [{ rodzaj: "rozmowa", tekst: "Klient napisał 26.09 14:00", at: null, cel: "/obsluga/skrzynka/41" }],
+};
+
+/* Droga ostatniego zamówienia, jak ją oddaje serwer po numerze zamówienia:
+   zakup bez reklamacji, z jedną rozmową i jednym zwrotem. */
+const DROGA = {
+  orderId: "z-1", linkZamowienia: "https://allegro.pl/z-1", reklamacja: null, sprawy: [],
+  zamowienie: { kupionoAt: "2026-09-19T10:00:00Z", platnoscAt: "2026-09-19T10:02:00Z", platnoscTyp: "ONLINE",
+    sumaGrosze: 5000, waluta: "PLN" },
+  przesylka: { waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null },
+  droga: [
+    { rodzaj: "rozmowa", id: 41, at: "2026-09-23T10:00:00Z", opis: null },
+    { rodzaj: "zwrot", id: 11, at: "2026-09-24T10:00:00Z", opis: null },
+  ],
 };
 
 let zadania: Array<{ metoda: string; url: string; body: string | null }> = [];
@@ -114,6 +127,7 @@ beforeEach(() => {
       return new Response(JSON.stringify({ sprawa: po }));
     }
     if (metoda !== "GET") return new Response(JSON.stringify({ ok: true }));
+    if (url === "/api/obsluga/droga/z-1") return new Response(JSON.stringify(DROGA));
     if (wstrzymanie) await wstrzymanie;
     const login = /\/api\/obsluga\/klient\/([^/?]+)$/.exec(url)?.[1]?.toLowerCase() ?? "";
     return new Response(JSON.stringify(profile[login] ?? profil));
@@ -150,6 +164,16 @@ describe("PROFIL KLIENTA", () => {
     expect(await screen.findByText("Chrzanowski1234")).toBeTruthy();
     expect(zadania.every((z) => z.metoda === "GET")).toBe(true);
     expect(zadania[0].url).toBe("/api/obsluga/klient/chrzanowski1234");
+    /* Droga ostatniego zamówienia to jeden odczyt po numerze zamówienia. */
+    const droga = await screen.findByRole("list", { name: "Droga sprawy" });
+    expect(zadania.filter((z) => z.url === "/api/obsluga/droga/z-1")).toEqual(
+      [{ metoda: "GET", url: "/api/obsluga/droga/z-1", body: null }]);
+    expect(zadania.every((z) => z.metoda === "GET")).toBe(true);
+    /* Przystanki prowadzą do kolejek: profil wiąże się z nimi w obie strony. */
+    expect(within(droga).getByRole("link", { name: /Pytanie z .* — otwórz rozmowę/ }))
+      .toHaveAttribute("href", "/obsluga/skrzynka/41");
+    expect(within(droga).getByRole("link", { name: /Zwrot z .* — otwórz zwrot/ }))
+      .toHaveAttribute("href", "/obsluga/zwroty/11");
     expect(screen.getByRole("link", { name: /Otwarta reklamacja/ })).toHaveAttribute("href", "/obsluga/reklamacje/3");
     /* „Otwarte w kolejkach", nie „Otwarte sprawy" (0.535.0): słowo „sprawa"
        znaczy na tym ekranie już tylko sprawę klienta. */
@@ -853,5 +877,19 @@ describe("źródło numeru dosyłki", () => {
     expect(within(reczna).getByText("numer wpisany ręcznie")).toBeInTheDocument();
     expect(within(bez).queryByText(/^numer /)).toBeNull();
     expect(zapisy()).toEqual([]);
+  });
+});
+
+describe("Najnowsze zamówienie na pasku drogi", () => {
+  const z = (id: string, kupionoAt: string | null) => ({ ...PROFIL.zamowienia[0], id, kupionoAt });
+
+  it("wybiera po dacie zakupu, nie po miejscu na liście", () => {
+    expect(najnowszeZamowienie([z("stare", "2026-08-01T10:00:00Z"), z("nowe", "2026-09-30T10:00:00Z"),
+      z("srodek", "2026-09-01T10:00:00Z")])?.id).toBe("nowe");
+  });
+
+  it("zamówienie bez daty przegrywa z każdym z datą, a pusta lista nie ma zamówienia", () => {
+    expect(najnowszeZamowienie([z("bez", null), z("z-data", "2026-08-01T10:00:00Z")])?.id).toBe("z-data");
+    expect(najnowszeZamowienie([])).toBeNull();
   });
 });

@@ -70,6 +70,15 @@ function odpowiedz(url: string, metoda: string): Response {
   if (url === "/api/obsluga/rozmowy") return json({ rozmowy, stan: { ostatniaSynchronizacja: null, bledy: 0 } });
   const m = /^\/api\/obsluga\/rozmowy\/(\d+)$/.exec(url);
   if (m) return json(dane[Number(m[1])] ?? szczegoly(Number(m[1])));
+  const droga = /^\/api\/obsluga\/droga\/(.+)$/.exec(url)?.[1];
+  if (droga) {
+    return json({ orderId: droga, linkZamowienia: null, reklamacja: null, sprawy: [],
+      zamowienie: { kupionoAt: "2026-09-20T10:00:00.000Z", platnoscAt: "2026-09-20T10:02:00.000Z",
+        platnoscTyp: "ONLINE", sumaGrosze: 4999, waluta: "PLN" },
+      przesylka: { waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null },
+      droga: [{ rodzaj: "rozmowa", id: 1, at: "2026-09-26T08:00:00.000Z", opis: null },
+        { rodzaj: "zwrot", id: 9, at: "2026-09-27T08:00:00.000Z", opis: null }] });
+  }
   if (url === "/api/obsluga/copilot") return json({ wlaczony: false, powod: "wyłączony" });
   if (url === "/api/health") return json({ allegroInbox: { status: "current", alarm: false } });
   if (url === "/api/users") return json({ users: [] });
@@ -122,6 +131,20 @@ describe("EKRAN SKRZYNKI: zero zapisu przy patrzeniu", () => {
     pokaz();
     expect(await screen.findByText("Pytanie 1")).toBeInTheDocument();
     expect(nieGet()).toEqual([]);
+  });
+
+  it("otwarcie rozmowy z zakupem czyta drogę klienta jednym GET-em i nic nie zapisuje", async () => {
+    dane[1] = szczegoly(1, { zamowienie: { externalId: "ORD-1", link: null, przesylka: null,
+      pobrane: { externalId: "ORD-1", status: "READY_FOR_PROCESSING", platnoscTyp: "ONLINE",
+        platnoscAt: "2026-09-20T10:02:00.000Z", kupionoAt: "2026-09-20T10:00:00.000Z",
+        sumaGrosze: 4999, waluta: "PLN", pozycje: [] } } });
+    pokaz("/obsluga/skrzynka/1");
+    const pasek = await screen.findByRole("list", { name: "Droga sprawy" });
+    /* Ta rozmowa stoi na drodze jako „tu jesteś”, zwrot jest łączem. */
+    expect(pasek.querySelector('[aria-current="location"]')).toHaveAttribute("data-przystanek", "rozmowa");
+    expect(pasek.querySelector('a[href="/obsluga/zwroty/9"]')).not.toBeNull();
+    expect(zadania.filter((z) => z.url === "/api/obsluga/droga/ORD-1").map((z) => z.metoda)).toEqual(["GET"]);
+    expect(nieGet().map((z) => z.url)).toEqual(nieGet().map(() => "/api/conversations/1/presence"));
   });
 
   it("otwarcie rozmowy wysyła tylko uchwyt obecności — i nic, co pisze do bazy", async () => {

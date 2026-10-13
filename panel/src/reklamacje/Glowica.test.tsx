@@ -163,9 +163,9 @@ describe("Rząd drugi: czyja to sprawa", () => {
     expect(screen.queryByText(/pierwsza/)).not.toBeInTheDocument();
   });
 
-  it("data zgłoszenia stoi cyframi z rokiem", () => {
+  it("daty zgłoszenia głowica nie powtarza: mówi ją krok „Zgłoszenie” paska drogi", () => {
     glowica();
-    expect(screen.getByText(/^Zgłoszono \d{2}\.\d{2}\.2026$/)).toBeInTheDocument();
+    expect(screen.queryByText(/Zgłoszono/)).not.toBeInTheDocument();
   });
 
   it("bez loginu mówi, że Allegro go nie podało — bez profilu i bez liczby", () => {

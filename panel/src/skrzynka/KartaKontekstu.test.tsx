@@ -34,13 +34,29 @@ const dane = (n: Record<string, unknown> = {}): OsRozmowy => ({
 const historia = (n: Partial<HistoriaKlienta> = {}): HistoriaKlienta =>
   ({ login: "k", wpisy: [], ...n } as HistoriaKlienta);
 
+/* Droga klienta, jak ją odda serwer dla tego zamówienia: zakup bez reklamacji,
+   z rozmową tej karty i z jedną inną sprawą. */
+const droga = (n: Record<string, unknown> = {}) => ({
+  orderId: "17147703077", linkZamowienia: null, reklamacja: null, sprawy: [],
+  zamowienie: { kupionoAt: "2026-10-02T14:10:00.000Z", platnoscAt: "2026-10-02T14:12:00.000Z",
+    platnoscTyp: "ONLINE", sumaGrosze: 8999, waluta: "PLN" },
+  przesylka: { waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null },
+  droga: [
+    { rodzaj: "rozmowa", id: 10, at: "2026-10-03T08:00:00.000Z", opis: null },
+    { rodzaj: "zwrot", id: 77, at: "2026-10-04T08:00:00.000Z", opis: null },
+  ],
+  ...n,
+});
+
 let zapisy: string[] = [];
+let drogaSerwera: unknown = droga();
 beforeEach(() => {
   zapisy = [];
+  drogaSerwera = droga();
   window.localStorage.clear();
   vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
     zapisy.push(`${init?.method ?? "GET"} ${url}`);
-    return new Response("{}");
+    return new Response(JSON.stringify(url.includes("/api/obsluga/droga/") ? drogaSerwera : {}));
   }));
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -60,31 +76,47 @@ describe("KartaKontekstu", () => {
     expect(screen.getByRole("link", { name: "Otwórz zamówienie w Allegro" })).toHaveAttribute("href", "https://allegro.example/zam");
   });
 
-  it("pasek statusu: złożone i opłacone z datą, przesyłka NIE SPRAWDZONA zamiast zmyślonego „nie”", () => {
+  it("pasek drogi: zakup i doręczono bez zmyślonego „nie”, a ta rozmowa stoi jako „tu jesteś”", async () => {
     pokaz(dane());
-    const pasek = screen.getByRole("list", { name: "Status zakupu" });
-    expect(pasek).toHaveTextContent("Złożone");
+    const pasek = await screen.findByRole("list", { name: "Droga sprawy" });
+    expect(pasek).toHaveTextContent("Zakup");
     expect(pasek).toHaveTextContent("02.10");
-    expect(pasek).toHaveTextContent("Opłacone");
-    expect(pasek.textContent?.match(/nie sprawdzono/g)).toHaveLength(2);
+    /* Przesyłki nie sprawdzano — pasek mówi to, zamiast datą doręczenia. */
+    expect(pasek).toHaveTextContent("Doręczono");
+    expect(pasek).toHaveTextContent("nie sprawdzono");
+    expect(pasek).not.toHaveTextContent("Zgłoszenie");
+    const tu = pasek.querySelector('[aria-current="location"]');
+    expect(tu).toHaveAttribute("data-przystanek", "rozmowa");
+    expect(tu?.querySelector("a")).toBeNull();
+    expect(screen.getByRole("link", { name: /Zwrot z .* — otwórz zwrot/ })).toHaveAttribute("href", "/obsluga/zwroty/77");
+    /* Numer stoi w nagłówku karty, nie drugi raz w pasku. */
+    expect(pasek).not.toHaveTextContent("17147703077");
   });
 
-  it("po sprawdzeniu przesyłki mówi, co wiemy: numer to nadane, brak daty dostarczenia", () => {
-    const d = dane();
-    (d.zamowienie as never as { przesylka: unknown }).przesylka =
-      { waybill: "JJD1", przewoznik: "dpd", status: "IN_TRANSIT", dostarczonoAt: null, sprawdzonoAt: "2026-10-03T08:00:00.000Z" };
-    pokaz(d);
-    const pasek = screen.getByRole("list", { name: "Status zakupu" });
+  it("po sprawdzeniu przesyłki pasek mówi, co wiemy o doręczeniu", async () => {
+    drogaSerwera = droga({ przesylka: { waybill: "JJD1", przewoznik: "DPD", status: "IN_TRANSIT",
+      dostarczonoAt: null, sprawdzonoAt: "2026-10-03T08:00:00.000Z" } });
+    pokaz(dane());
+    const pasek = await screen.findByRole("list", { name: "Droga sprawy" });
+    expect(pasek).toHaveTextContent("w drodze do klienta · DPD");
     expect(pasek).not.toHaveTextContent("nie sprawdzono");
-    expect(pasek).toHaveTextContent("Nadane");
+    /* Numeru listu pasek tu nie powtarza: ma go blok „Paczka zamówienia”. */
+    expect(pasek).not.toHaveTextContent("JJD1");
   });
 
-  it("anulowane zamówienie jest nazwane i nie ma paska statusu", () => {
+  it("anulowane zamówienie jest nazwane, a pasek drogi zostaje: anulowany zakup też ma sprawy", async () => {
     const d = dane();
     ((d.zamowienie as never as { pobrane: { status: string } }).pobrane).status = "CANCELLED";
     pokaz(d);
     expect(screen.getByText("anulowane")).toBeInTheDocument();
-    expect(screen.queryByRole("list", { name: "Status zakupu" })).toBeNull();
+    expect(await screen.findByRole("list", { name: "Droga sprawy" })).toBeInTheDocument();
+  });
+
+  it("zamówienie powiązane, ale niepobrane, też ma pasek drogi", async () => {
+    const d = dane();
+    (d.zamowienie as never as { pobrane: unknown }).pobrane = null;
+    pokaz(d);
+    expect(await screen.findByRole("list", { name: "Droga sprawy" })).toBeInTheDocument();
   });
 
   it("nie stoi pustą ramką, gdy nie ma ani zakupu, ani historii", () => {
@@ -221,12 +253,12 @@ describe("KartaKontekstu", () => {
     const zwinieta = screen.getByRole("button", { name: /rozwiń/ });
     expect(zwinieta).toHaveTextContent("NÓŻ TRAKTORKA KOSIARKI DO MTD 54cm");
     expect(zwinieta).toHaveTextContent("89,99 PLN");
-    expect(screen.queryByRole("list", { name: "Status zakupu" })).toBeNull();
+    expect(screen.queryByRole("list", { name: "Droga sprawy" })).toBeNull();
     unmount();
     pokaz(dane());
     expect(screen.getByRole("button", { name: /rozwiń/ })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /rozwiń/ }));
-    expect(screen.getByRole("list", { name: "Status zakupu" })).toBeInTheDocument();
+    expect(await screen.findByRole("list", { name: "Droga sprawy" })).toBeInTheDocument();
   });
 
   it("pokazuje dwie pozycje i liczy resztę, zamiast rozpychać oś", () => {

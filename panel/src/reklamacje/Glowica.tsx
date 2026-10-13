@@ -2,7 +2,7 @@ import React from "react";
 import { Link as RouterLink } from "react-router-dom";
 import { Check, EllipsisVertical, ExternalLink } from "lucide-react";
 import type { Reklamacja, SzczegolReklamacji } from "../api/typy";
-import { dataCyfrowa, ile, LoginKlienta } from "../ui";
+import { ile, LoginKlienta } from "../ui";
 import { mojaSprawa } from "../sprawy/Moje";
 import { tytulStatusu } from "./etap";
 import { MenuPrzycisku } from "./Menu";
@@ -150,7 +150,7 @@ export function Glowica({
         : <span>kupujący: Allegro nie podało loginu</span>}
       {login && inne && inne.ile > 0 &&
         <span>{ile(inne.ile, "inna reklamacja", "inne reklamacje", "innych reklamacji")}</span>}
-      <span>Zgłoszono {dataCyfrowa(r.otwartoAt)}</span>
+      {/* Daty zgłoszenia tu nie ma: mówi ją krok „Zgłoszenie” paska drogi. */}
     </div>
     {blad && <p className="text-sm text-ranga-zle">{blad}</p>}
   </div>;

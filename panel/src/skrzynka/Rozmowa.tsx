@@ -16,7 +16,6 @@ import { ProwadziZnak } from "./ProwadziZnak";
 import { Obecni } from "./Obecni";
 import { KartaKontekstu } from "./KartaKontekstu";
 import { PropozycjePrzeplywu } from "./PropozycjePrzeplywu";
-import { scalOs, zdarzeniaZakupu } from "./zakup";
 import { ZAMKNIETY_PROBLEM_W_EDYTORZE } from "./statusy";
 
 /**
@@ -258,7 +257,7 @@ export function Rozmowa(p: {
     {/* ── EDYTOR NA KOŃCU OSI (0.495.0) — powód w `Edytor.tsx`. ─────────────
         Formularz pomiaru jedzie tą samą drogą i stoi PRZED edytorem: zlecenie
         dla hali to zwykle krok przed odpowiedzią klientowi, nie po niej. */}
-    <Os wpisy={scalOs(os, zdarzeniaZakupu(p.dane))} rozmowaId={rozmowa.id} skokNaDol={zjazdy}
+    <Os wpisy={os} rozmowaId={rozmowa.id} skokNaDol={zjazdy}
       naGorze={<KartaKontekstu dane={p.dane} historia={p.historiaKlienta} />}
       zrodloPomiaru={p.zrodloPomiaru} mozeZlecac={!cudza}
       onZrodlo={p.onZrodlo}

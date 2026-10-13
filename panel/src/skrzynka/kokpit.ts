@@ -125,17 +125,17 @@ export function historiaWierszaKlienta(h: HistoriaKlienta | undefined, zamowieni
     !(w.rodzaj === "zakup" && w.zamowienieId !== null && zakupyNaLiscie.has(w.zamowienieId))) };
 }
 
-export type Swiatlo = "zwrot" | "sprawa" | "paczka" | "pozycja";
+export type Swiatlo = "zwrot" | "paczka" | "pozycja";
 
 /**
- * Co świeci, w kolejności pilności. Zwrot i sprawa mają zegar Allegro, więc
- * idą pierwsze; paczka poza zwykłą drogą — za nimi. Wskazanie pozycji
- * to praca bez terminu.
+ * Co świeci, w kolejności pilności. Zwrot ma zegar Allegro, więc idzie
+ * pierwszy; paczka poza zwykłą drogą — za nim. Wskazanie pozycji to praca
+ * bez terminu. Reklamacji i dyskusji tu nie ma: ich stan, termin i prowadzącego
+ * mówi przystanek paska drogi, a ich praca stoi na własnych ekranach.
  */
 export function coSwieci(dane: OsRozmowy): Swiatlo[] {
   const s: Swiatlo[] = [];
   if (dane.zwroty.some(zwrotWToku)) s.push("zwrot");
-  if (dane.sprawy.some((x) => x.otwarta)) s.push("sprawa");
   /* Paczkę poza zwykłą drogą pokazuje soczewka paczki, gdy stoi (0.531.0).
      Stoi NAD „Wymaga Ciebie", więc druga karta tej samej paczki niżej
      byłaby powtórzeniem, a nie drugim sygnałem. */
@@ -149,11 +149,12 @@ export function coSwieci(dane: OsRozmowy): Swiatlo[] {
    bo klient pytał kiedyś o gwint, a parametr leżał w niewidocznej zakładce.
    Niewidoczne znaczyło wtedy „nieistniejące".
 
-   Zwija się wyłącznie przy zwrocie albo sprawie w toku. Wtedy temat rozmowy
-   to decyzja z terminem, a karta towaru jest tłem, które spychało decyzję
-   w połowę przewijania. */
+   Zwija się wyłącznie przy zwrocie w toku. Wtedy temat rozmowy to decyzja
+   z terminem, a karta towaru jest tłem, które spychało decyzję w połowę
+   przewijania. Otwarta reklamacja czy dyskusja towaru nie zwija: kolumna nie
+   niesie już ich wierszy, więc zwinięcie nie miałoby na ekranie powodu. */
 export function towarOtwartyNaStart(swiatla: Swiatlo[], kategoria: Kategoria | null = null): boolean {
-  if (swiatla.includes("zwrot") || swiatla.includes("sprawa")) return false;
+  if (swiatla.includes("zwrot")) return false;
   /* ── TYLKO PRZY PYTANIU O TOWAR (0.506.0) ────────────────────────────────
      Zgłoszenie agenta: „przytłacza". Na zrzucie klient pisał o odesłaniu
      części, a karta oferty z cenami, EAN i opisem stała otwarta nad

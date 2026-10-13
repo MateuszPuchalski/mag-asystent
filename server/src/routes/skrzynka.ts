@@ -30,6 +30,7 @@ import { kontoKanalu } from "../services/kanal-konto.js";
 import { liczbaNowychWzmianek, odhaczWzmianke, wzmiankiDlaMnie } from "../services/wzmianki.js";
 import { historiaKlienta, loginSprawyRozmowy } from "../services/klient-historia.js";
 import { mojeSprawy } from "../services/droga-klienta.js";
+import { drogaZamowienia } from "../services/droga-zakupu.js";
 import { mojaLista } from "../services/prowadzenie-klienta.js";
 import { zeSprawa } from "./spoiwo.js";
 import { dokumentySprzedazyZamowienia } from "../services/faktury.js";
@@ -83,6 +84,17 @@ export async function skrzynkaRoutes(app: FastifyInstance) {
     const ja = sesjaZadania()!.user.userId;
     const sprawy = mojeSprawy(db(), ja);
     return { sprawy, lista: mojaLista(db(), ja, new Date(), sprawy) };
+  });
+
+  /* Droga jednego zakupu przez kolejki, po numerze zamówienia. ODCZYT: bez
+     zapisu i bez Allegro. Numer nieznany w naszej bazie to 404, nie pusta
+     droga — pusta wyglądałaby jak zakup bez żadnych spraw. */
+  app.get<{ Params: { orderId: string } }>("/api/obsluga/droga/:orderId", async (req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    const droga = drogaZamowienia(req.params.orderId);
+    if (!droga) return reply.code(404).send({ error: "Nie znamy zamówienia o tym numerze" });
+    return droga;
   });
 
   app.get<{ Params: { id: string } }>("/api/obsluga/rozmowy/:id", async (req, reply) => {
