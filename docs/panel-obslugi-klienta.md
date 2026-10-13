@@ -1288,14 +1288,14 @@ mamy w Subiekcie, gdzie jest paczka i co czeka na ruch.
 
 | fakt | dom | co zeszło z kolumny |
 |---|---|---|
-| numer zamówienia, suma, data zakupu | karta i linie osi; numer z kopiowaniem i Allegro także przed treścią zamówienia, a cena oferty stoi wtedy przy ofercie, nie w miejscu sumy | nagłówek bloku zamówienia, „Kupione · zapłacono”, daty w streszczeniu i w „Zamówił” |
+| numer zamówienia, suma, data zakupu | karta; numer z kopiowaniem i Allegro także przed treścią zamówienia, a cena oferty stoi wtedy przy ofercie, nie w miejscu sumy | nagłówek bloku zamówienia, „Kupione · zapłacono”, daty w streszczeniu i w „Zamówił” |
 | nazwa, SKU, zdjęcie i cena oferty | karta | tytuł, kafel i cena w „Oferta i towar”, kwota w zdaniu osi cen, nazwa i SKU w bramce doboru |
 | stan oferty | słowo w streszczeniu „Oferta i towar” | plakietka „ACTIVE” |
 | „Nowy klient” i „Wcześniej u nas” | karta, także zwinięta i w pasku | linijka pod pasmem i liczniki w wierszu „Klient” |
 | zamówienie rozmowy wśród zakupów klienta | karta | pozycja na liście, która nazywa się teraz „Inne zakupy klienta” |
 | droga zakupu przez kolejki | wyłącznie pasek drogi klienta w karcie | czipy „Droga tego zakupu” |
-| data doręczenia | krok „Doręczono” paska drogi w karcie i linia osi | data w streszczeniu „Zamówienie” i zdanie w soczewce zwrotu |
-| zgłoszenie zwrotu | linia osi „Zwrot zgłoszony” | „Zgłoszony …” w bloku zwrotu |
+| data doręczenia | krok „Doręczono” paska drogi w karcie | data w streszczeniu „Zamówienie” i zdanie w soczewce zwrotu |
+| zgłoszenie zwrotu | przystanek paska drogi i pasek zdarzeń osi | „Zgłoszony …” w bloku zwrotu |
 | przesyłka | jeden blok „Paczka zamówienia” | druga linijka paczki z innym „sprawdź” w bloku zamówienia |
 
 **Karta niesie pasek drogi klienta.** Pasek (`sprawy/DrogaKlienta.tsx`) stoi
