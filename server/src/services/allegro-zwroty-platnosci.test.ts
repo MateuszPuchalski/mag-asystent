@@ -126,3 +126,20 @@ test("lista zwrotów płatności zwrotu łączy po zamówieniu, a bez zamówieni
       utworzono_at, sprawdzono_at) VALUES (1,'obca','pay9','inne','SUCCESS','2026-09-10T00:00:00Z','x')`).run();
   assert.deepEqual(zwrotyPlatnosciZwrotu(d, id).map((z) => z.refundId), ["bez-zam"]);
 });
+
+test("pozycje zwrotu płatności dostają nazwę z pozycji zamówienia o tym samym id", () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  const m = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, synced_at)
+    VALUES (1,'ord1','2026-09-22T08:00:00Z')`).run().lastInsertRowid);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id, external_id, nazwa, ilosc, cena_grosze, waluta)
+    VALUES (?,?,?,?,?,?)`).run(m, "li1", "Sekator Gardena", 2, 2995, "PLN");
+  d.prepare(`INSERT INTO zwrot_platnosci(channel_account_id, refund_id, order_id, status, utworzono_at,
+      pozycje_json, sprawdzono_at) VALUES (1,'r1','ord1','SUCCESS','2026-09-10T00:00:00Z',?, 'x')`)
+    .run(JSON.stringify([
+      { id: "li1", type: "QUANTITY", quantity: 2, kwotaGrosze: null },
+      { id: "obca", type: "AMOUNT", quantity: null, kwotaGrosze: 100 },
+    ]));
+  const [z] = zwrotyPlatnosciZwrotu(d, id);
+  assert.deepEqual(z.pozycje.map((x) => x.nazwa), ["Sekator Gardena", null]);
+});

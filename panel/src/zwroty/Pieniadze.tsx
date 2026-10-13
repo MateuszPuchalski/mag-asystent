@@ -1,8 +1,8 @@
 import React, { useState, type MutableRefObject } from "react";
 import { Link } from "react-router-dom";
 import { Banknote, Ban, Check, Lock, Truck, Undo2, UserRound } from "lucide-react";
-import type { StanZwrotuPieniedzy, WynikDosylki } from "../api/typy";
-import { Przycisk, barwaTonu } from "../ui";
+import type { StanZwrotuPieniedzy, WynikDosylki, ZwrotPlatnosciAllegro } from "../api/typy";
+import { Przycisk, barwaTonu, dataCyfrowa } from "../ui";
 import { zlote } from "../api/zwroty";
 import { useAkcjaKlawisza, type AkcjeKlawiszy } from "./klawisze";
 
@@ -85,8 +85,59 @@ const LIMIT_POWODU = 250;
 /** `LIMIT_REFERENCJI` z `services/zwrot-pieniedzy.ts` — tytuł przelewu bywa długi. */
 const LIMIT_REFERENCJI = 140;
 
+/** Status zwrotu płatności słowami; ton mówi, czy pieniądze już wyszły. */
+const STATUS_WYPLATY: Record<string, { slowa: string; ton: "ok" | "uwaga" | "zle" }> = {
+  SUCCESS: { slowa: "Wypłacone", ton: "ok" },
+  PARTIAL: { slowa: "Wypłacone częściowo", ton: "uwaga" },
+  NEW: { slowa: "W toku", ton: "uwaga" },
+  VALIDATED: { slowa: "W toku", ton: "uwaga" },
+  IN_PROGRESS: { slowa: "W toku", ton: "uwaga" },
+  CANCELED: { slowa: "Anulowane", ton: "zle" },
+  VALIDATE_FAILED: { slowa: "Odrzucone przez Allegro", ton: "zle" },
+};
+
+/**
+ * Wypłata tak, jak widzi ją Sales Center: wiersz na zwrot płatności, pod nim
+ * pozycje i dostawa. Status Allegro to jedyne źródło prawdy o tym, czy
+ * pieniądze wyszły, więc stoi tu słowami, a nie samym „Oddano" z paska.
+ *
+ * Nazwę niesie pozycja z serwera; gdy zamówienia nie ma, ekran próbuje jeszcze
+ * pozycji zwrotu (klucz to `lineItemId`).
+ * Pozycji bez nazwy nie zgadujemy po kolejności — pokazujemy końcówkę id,
+ * po której da się ją znaleźć w Allegro.
+ */
+function WyplatyAllegro({ platnosci, nazwy, waluta }: {
+  platnosci: ZwrotPlatnosciAllegro[]; nazwy: Record<string, string>; waluta: string;
+}) {
+  return <ul className="mt-2 space-y-2 border-t pt-2" aria-label="Wypłaty z Allegro">
+    {platnosci.map((p) => {
+      const st = STATUS_WYPLATY[p.status];
+      const w = p.waluta ?? waluta;
+      return <li key={p.refundId} className="text-xs">
+        <div className="flex flex-wrap items-center gap-x-2">
+          <span className={`font-semibold ${barwaTonu(st?.ton ?? null)}`}>{st?.slowa ?? p.status}</span>
+          <span className="tabular-nums">{zlote(p.kwotaGrosze, w)}</span>
+          <span className="text-slate-500">{dataCyfrowa(p.utworzonoAt)}</span>
+        </div>
+        <ul className="mt-1 space-y-0.5 pl-3 text-slate-600">
+          {p.pozycje.map((x) => <li key={x.id} className="flex flex-wrap gap-x-2">
+            <span>{x.nazwa ?? nazwy[x.id] ?? `Pozycja zamówienia …${x.id.slice(-6)}`}</span>
+            <span className="tabular-nums text-slate-500">
+              {x.type === "QUANTITY" ? `${x.quantity ?? 0} szt.` : zlote(x.kwotaGrosze, w)}</span>
+          </li>)}
+          {(p.dostawaGrosze ?? 0) > 0 && <li className="flex flex-wrap gap-x-2">
+            <span>Dostawa</span>
+            <span className="tabular-nums text-slate-500">{zlote(p.dostawaGrosze, w)}</span>
+          </li>}
+        </ul>
+      </li>;
+    })}
+  </ul>;
+}
+
 export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCofnijPrzelew,
-  akcje, przedWerdyktem = false, wynikDosylki = null, onSledzDosylke, kodAllegro = null }: {
+  akcje, przedWerdyktem = false, wynikDosylki = null, onSledzDosylke, kodAllegro = null,
+  nazwyPozycji = {} }: {
   stan: StanZwrotuPieniedzy;
   /**
    * Zwrot czeka jeszcze na werdykt (0.453.0). Przeszkoda jest wtedy jedna
@@ -118,6 +169,8 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
    * tylko naszą. Bez tego kodu linijka dosyłki wisiałaby bez powodu.
    */
   kodAllegro?: string | null;
+  /** Nazwy produktów po `lineItemId` pozycji zamówienia — do rozbicia wypłaty. */
+  nazwyPozycji?: Record<string, string>;
 }) {
   const [odmawiam, setOdmawiam] = useState(false);
   /* Odmowa złożona w panelu Allegro, przy której jest dosyłka do pokazania. */
@@ -199,6 +252,9 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
         <Przycisk className={`text-xs ${stan.moznaZwrocic ? "" : "ml-auto"}`}
           onClick={() => setOdmawiam(true)}>Odmów wypłaty</Przycisk>}
     </div>
+
+    {(stan.platnosci ?? []).length > 0 &&
+      <WyplatyAllegro platnosci={stan.platnosci} nazwy={nazwyPozycji} waluta={stan.waluta} />}
 
     {/* Przeszkoda mówi, CO zrobić — i stoi także wtedy, gdy odmowa jest
         możliwa, bo to dwie różne drogi, nie dwa warianty jednej. Przy odmowie

@@ -1320,6 +1320,8 @@ export function Zwroty() {
               stan={szczegol.data.pieniadze}
               przedWerdyktem={zwrot.kubelek === "decyzja"}
               kodAllegro={zwrot.rejectionCode}
+              nazwyPozycji={Object.fromEntries(zwrot.pozycje.flatMap((p) =>
+                p.rabat.lineItemId ? [[p.rabat.lineItemId, p.nazwa]] : []))}
               akcje={akcje}
               trwa={pieniadze.isPending || odmowaPlatnosci.isPending
                 || przelew.isPending || cofnijPrzelew.isPending || sledzDosylke.isPending}

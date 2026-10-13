@@ -1421,6 +1421,35 @@ export type StanZwrotuPieniedzy = {
   przelew: { kiedy: string; przez: string | null; referencja: string | null } | null;
   moznaZapisacPrzelew: boolean;
   powodPrzelewu: string | null;
+  /**
+   * Zwroty płatności z lustra Allegro, najnowszy pierwszy; puste, gdy lustro
+   * nic nie zna. Tak biuro widzi wypłatę w Sales Center: status, kwota
+   * i rozbicie na pozycje zamówienia.
+   */
+  platnosci: ZwrotPlatnosciAllegro[];
+};
+
+/** Jeden zwrot płatności z Allegro (`ZwrotPlatnosci` na serwerze). */
+export type ZwrotPlatnosciAllegro = {
+  refundId: string;
+  paymentId: string | null;
+  orderId: string | null;
+  /** Surowo: SUCCESS, PARTIAL, NEW, VALIDATED, IN_PROGRESS, CANCELED, VALIDATE_FAILED… */
+  status: string;
+  reason: string | null;
+  utworzonoAt: string;
+  kwotaGrosze: number | null;
+  waluta: string | null;
+  dostawaGrosze: number | null;
+  pozycje: Array<{
+    /** Identyfikator pozycji zamówienia (`lineItems[].id`). */
+    id: string;
+    type: "QUANTITY" | "AMOUNT";
+    quantity: number | null;
+    kwotaGrosze: number | null;
+    /** Nazwa z pozycji zamówienia; `null`, gdy zamówienia nie mamy. */
+    nazwa?: string | null;
+  }>;
 };
 
 /**

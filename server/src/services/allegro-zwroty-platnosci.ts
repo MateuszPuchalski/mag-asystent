@@ -46,6 +46,12 @@ export interface PozycjaZwrotuPlatnosci {
   type: "QUANTITY" | "AMOUNT";
   quantity: number | null;
   kwotaGrosze: number | null;
+  /**
+   * Nazwa z pozycji zamówienia o tym `id`. Dokładamy ją przy odczycie, nie
+   * przy zapisie lustra: zamówienie bywa dociągnięte później niż zwrot
+   * płatności, a nazwa nie ma prawa utknąć w bazie jako pusta.
+   */
+  nazwa?: string | null;
 }
 
 export interface ZwrotPlatnosci {
@@ -156,6 +162,14 @@ export function zwrotyPlatnosciZwrotu(database: Db, zwrotId: number): Array<Zwro
      WHERE z.id = ? AND z.order_id IS NOT NULL
      ORDER BY p.utworzono_at DESC, p.refund_id`)
     .all(zwrotId) as Array<Record<string, unknown>>;
+  const nazwy = new Map(
+    (database.prepare(`SELECT p.external_id AS id, p.nazwa AS nazwa
+        FROM zwrot_klienta z
+        JOIN zamowienie_klienta m
+          ON m.channel_account_id = z.channel_account_id AND m.external_id = z.order_id
+        JOIN zamowienie_klienta_pozycja p ON p.zamowienie_id = m.id
+       WHERE z.id = ? AND p.external_id IS NOT NULL`)
+      .all(zwrotId) as Array<{ id: string; nazwa: string }>).map((n) => [n.id, n.nazwa]));
   return wiersze.map((w) => ({
     refundId: String(w.refund_id),
     paymentId: (w.payment_id as string | null) ?? null,
@@ -166,7 +180,8 @@ export function zwrotyPlatnosciZwrotu(database: Db, zwrotId: number): Array<Zwro
     kwotaGrosze: w.kwota_grosze == null ? null : Number(w.kwota_grosze),
     waluta: (w.waluta as string | null) ?? null,
     dostawaGrosze: w.dostawa_grosze == null ? null : Number(w.dostawa_grosze),
-    pozycje: JSON.parse(String(w.pozycje_json ?? "[]")) as PozycjaZwrotuPlatnosci[],
+    pozycje: (JSON.parse(String(w.pozycje_json ?? "[]")) as PozycjaZwrotuPlatnosci[])
+      .map((x) => ({ ...x, nazwa: nazwy.get(x.id) ?? null })),
   }));
 }
 
