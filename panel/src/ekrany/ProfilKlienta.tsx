@@ -2,13 +2,14 @@ import React, { useEffect, useId, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   AlertTriangle, BellDot, CalendarClock, ChevronDown, ChevronRight, ClipboardList, ExternalLink,
-  MessageSquare, MessagesSquare, Scale, ShoppingBag, StickyNote, Truck, Undo2, UserRound,
+  MessageSquare, MessagesSquare, Scale, ShoppingBag, StickyNote, Truck, Undo2, UserRound, Warehouse,
 } from "lucide-react";
 import { useJa } from "../api/rozmowy";
 import {
   useCofnijNotatkeKlienta, useKrokSprawy, useNotatkaKlienta, useNumerDosylki, useProfilKlienta,
-  usePrzejmijSprawe, useSledzDosylke, useWznowSprawe, useZakonczSprawe, type DosylkaSprawy,
-  type NoweZdarzenie, type ProfilKlienta as Profil, type RodzajSprawyKlienta, type SprawaKlienta,
+  useNotatkaSellasist, usePrzejmijSprawe, useSellasistZamowienia, useSledzDosylke, useWznowSprawe,
+  useZakonczSprawe, type DosylkaSprawy, type NoweZdarzenie, type ProfilKlienta as Profil,
+  type RodzajSprawyKlienta, type SprawaKlienta, type ZrodloNumeruDosylki,
 } from "../api/spoiwo";
 import { zlote } from "../api/zwroty";
 import { Cofniecie, type DoCofniecia } from "../skrzynka/Cofniecie";
@@ -31,8 +32,9 @@ import {
    (notatka, cała oś). Liczby w nagłówku odpowiadają na „jak duży to
    klient" jednym spojrzeniem.
 
-   EKRAN JEST ODCZYTEM, poza notatką i sprawą klienta (S6, 0.535.0) — oba
-   zapisy idą wyłącznie na kliknięcie, otwarcie nie mutuje niczego. Sprawy
+   EKRAN JEST ODCZYTEM, poza notatką, sprawą klienta (S6, 0.535.0) i notatką
+   do Sellasist — każdy zapis idzie wyłącznie na kliknięcie, otwarcie nie
+   mutuje niczego. Sprawy
    z kolejek załatwia się na ich ekranach; tu każdy wiersz do nich prowadzi.
    Sprawa klienta mieszka TUTAJ, bo jej kluczem jest login, a login ma
    dokładnie jeden ekran. */
@@ -346,6 +348,13 @@ function KartaSprawy({ d }: { d: Profil }) {
 /** Lustro `LIMIT_NUMERU` z `services/dosylka.ts` — dłuższy numer serwer odrzuca. */
 const LIMIT_NUMERU = 64;
 
+/** Źródło numeru dosyłki słowami panelu — powód przy `WierszDosylki`. */
+const ZRODLO_NUMERU: Record<ZrodloNumeruDosylki, string> = {
+  allegro: "numer z Allegro",
+  sellasist: "numer z etykiety w Sellasist",
+  recznie: "numer wpisany ręcznie",
+};
+
 /** Zamówienie Allegro skrótem — ten sam zapis co przy rozmowie (`skrzynka/Os.tsx`). */
 const krotkoZamowienie = (id: string) => id.slice(0, 8);
 
@@ -360,10 +369,12 @@ const krotkoZamowienie = (id: string) => id.slice(0, 8);
    ręcznie, bez odmowy, zwrotu nie ma i odnośnika też nie.
 
    „wpisz numer” jest CICHYM odnośnikiem, nie przyciskiem. Numer ma znaleźć
-   automat w przesyłkach zamówienia — ale to, że nowa etykieta z Sellasist
-   pokazuje się na tym samym zamówieniu w Allegro, jest niezweryfikowane
-   (`[WERYFIKUJ]` w `docs/allegro-ksztalt.md`). Droga ręczna ma być pod
-   ręką, a nie wołać przy każdej dosyłce.
+   automat: w przesyłkach zamówienia w Allegro albo na etykiecie w Sellasist.
+   Droga ręczna ma być pod ręką, a nie wołać przy każdej dosyłce.
+
+   ŹRÓDŁO NUMERU STOI PRZY NUMERZE. Numer z Sellasist albo wpisany ręcznie
+   może nie istnieć w Allegro, a klient widzi tylko tamten. Agent, który
+   podaje numer klientowi, ma wiedzieć, skąd go ma.
 
    Warunku „sprawa w toku” przy numerze tu nie ma: zakończona sprawa
    przychodzi z pustą listą dosyłek (`prowadzenie-klienta.ts`). */
@@ -396,6 +407,7 @@ function WierszDosylki({ dosylka: x, przewoznicy, pracuje, onZapisz }: {
         <Undo2 size={12} aria-hidden="true" />zwrot</Link>}
       {x.waybill && <span className="inline-flex items-center gap-0.5 font-mono text-xs text-slate-700">
         {x.waybill}<Skopiuj tekst={x.waybill} tytul="Kopiuj numer dosyłki" /></span>}
+      {x.waybill && x.zrodlo && <span className="text-xs text-slate-600">{ZRODLO_NUMERU[x.zrodlo]}</span>}
       {!forma && <button ref={otwiera} type="button" disabled={pracuje} onClick={() => setForma(true)}
         aria-label={`${czynnosc} dosyłki zamówienia ${krotko}`}
         className="text-xs text-slate-600 underline underline-offset-2 hover:text-slate-900 disabled:opacity-50">
@@ -611,10 +623,117 @@ function Zamowienia({ d }: { d: Profil }) {
               {z.link && <a href={z.link} target="_blank" rel="noreferrer"
                 className="mt-1 inline-flex items-center gap-1 text-xs text-slate-600 underline hover:text-slate-900">
                 zamówienie {z.id} w Allegro<ExternalLink size={11} /></a>}
+              <SellasistZamowienia zamowienie={z.id} rozwiniete={rozwiniete} />
             </div>}
           </li>;
         })}</ul>}
   </Karta>;
+}
+
+/* ── ZAMÓWIENIE W SELLASIST ─────────────────────────────────────────────────
+   Agent odpowiada klientowi tutaj, a paczkę pakuje magazyn w Sellasist.
+   Pytanie „czemu paczka jeszcze nie wyszła” miało odpowiedź tylko tam,
+   a prośba do pakującego szła telefonem. Sekcja przynosi jedno i drugie.
+
+   ODCZYT DOPIERO PO ROZWINIĘCIU. Notatki serwer czyta z Sellasist na żywo,
+   a stały klient ma kilkanaście zakupów, z których pytanie dotyczy jednego.
+   Bez integracji nie ma nic: pusta sekcja przy każdym zamówieniu uczyłaby
+   ją pomijać, zanim integracja ruszy.
+
+   BRAKI NA GÓRZE, bo to one zatrzymują wysyłkę (dekalog p. 2). Daty
+   zebrania i pakowania stoją jednym zdaniem: po spakowaniu zebranie
+   niczego już nie rozstrzyga.
+
+   Podpis autora notatki dokłada serwer. Panel go nie dopisuje, bo dwa
+   podpisy w jednej notatce pakujący czytałby jak dwie osoby. */
+
+/** Lustro `LIMIT_NOTATKI` z `services/sellasist-notatki.ts` — dłuższą serwer odrzuca. */
+const LIMIT_NOTATKI_SELLASIST = 1000;
+
+/** Termin bywa samym dniem; dzień czytany w południe nie przeskoczy przez strefę. */
+const terminSellasist = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) ? dzien(`${v}T12:00:00`) : czas(v);
+
+function SellasistZamowienia({ zamowienie, rozwiniete }: { zamowienie: string; rozwiniete: boolean }) {
+  const w = useSellasistZamowienia(zamowienie, rozwiniete);
+  const dodaj = useNotatkaSellasist(zamowienie);
+  const [tekst, setTekst] = useState("");
+  const idPola = useId();
+  if (w.isLoading) return <p className="mt-2 text-xs text-slate-600">Sprawdzam zamówienie w Sellasist…</p>;
+  if (w.error) return <div className="mt-2"><Blad>{(w.error as Error).message}</Blad></div>;
+  const d = w.data;
+  if (!d?.wlaczony) return null;
+  const z = d.zamowienie;
+  const tresc = tekst.trim();
+  const blad = dodaj.error as Error | null;
+  const wyslij = () => {
+    if (!tresc || dodaj.isPending) return;
+    dodaj.mutate(tresc, { onSuccess: () => setTekst("") });
+  };
+
+  return <section aria-label="Sellasist" className="mt-2 space-y-2 border-t border-slate-200 pt-2">
+    <p className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+      <Warehouse size={14} aria-hidden="true" className="shrink-0 text-slate-500" />
+      <b>Sellasist</b>
+      {z && <>
+        <span className="text-xs text-slate-600">zamówienie {z.id}</span>
+        <span className="font-semibold">{z.status ?? "bez statusu"}</span>
+        {z.statusAt && <span className="text-xs text-slate-600">od {czas(z.statusAt)}</span>}
+      </>}
+      {/* Przy błędzie odczytu nie wiemy, czy zna — mówi o tym zdanie błędu niżej. */}
+      {!z && !d.notatkiBlad && <span className="text-slate-600">nie zna tego zamówienia.</span>}
+    </p>
+    <Blad>{d.notatkiBlad}</Blad>
+    {z && <>
+      {z.braki.length > 0 && <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
+        <p className="flex items-center gap-1.5 font-semibold">
+          <AlertTriangle size={14} aria-hidden="true" className="shrink-0" />Brakuje do spakowania — paczka nie wyjdzie</p>
+        <ul className="mt-1 space-y-0.5" aria-label="Braki do spakowania">
+          {z.braki.map((b, i) => <li key={i} className="flex gap-3">
+            <span className="min-w-0 flex-1">{b.nazwa}</span>
+            <span className="shrink-0 tabular-nums">jest {b.jest} z {b.potrzeba}</span>
+          </li>)}
+        </ul>
+      </div>}
+      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5">
+        <dt className="text-slate-600">Magazyn</dt>
+        <dd>{z.spakowanoAt ? `spakowano ${czas(z.spakowanoAt)}`
+          : z.zebranoAt ? `zebrano ${czas(z.zebranoAt)}, jeszcze bez etykiety` : "jeszcze nie zebrano"}</dd>
+        {z.termin && <><dt className="text-slate-600">Termin wysyłki</dt><dd>{terminSellasist(z.termin)}</dd></>}
+        {z.przesylki.length > 0 && <><dt className="text-slate-600">Etykiety</dt>
+          <dd><ul className="space-y-0.5">{z.przesylki.map((p) => <li key={p.waybill}
+            className="flex flex-wrap items-center gap-x-2">
+            <span className="inline-flex items-center gap-0.5 font-mono text-xs text-slate-700">
+              {p.waybill}<Skopiuj tekst={p.waybill} tytul="Kopiuj numer etykiety" /></span>
+            {p.usluga && <span className="text-xs text-slate-600">{p.usluga}</span>}
+            {p.utworzonoAt && <span className="text-xs text-slate-600">{czas(p.utworzonoAt)}</span>}
+          </li>)}</ul></dd></>}
+        {z.kopie.length > 0 && <><dt className="text-slate-600">Kopie</dt>
+          <dd>{z.kopie.length} (nr {z.kopie.join(", ")}) — zwykle dosyłki</dd></>}
+      </dl>
+      <div>
+        <p className="text-xs font-semibold text-slate-700">Notatki w Sellasist</p>
+        {d.notatki.length > 0
+          ? <ul className="mt-1 space-y-1" aria-label="Notatki w Sellasist">
+              {d.notatki.map((n, i) => <li key={i}>
+                {n.data && <span className="mr-2 text-xs text-slate-600">{czas(n.data)}</span>}
+                <span className="whitespace-pre-line">{n.tekst}</span>
+              </li>)}
+            </ul>
+          /* Przy błędzie odczytu „brak notatek” byłby nieprawdą — zdanie błędu stoi wyżej. */
+          : !d.notatkiBlad && <p className="text-xs text-slate-600">Brak notatek.</p>}
+      </div>
+      <form aria-label="Notatka do Sellasist" onSubmit={(e) => { e.preventDefault(); wyslij(); }}>
+        <label htmlFor={idPola} className="text-xs font-semibold text-slate-700">Notatka dla magazynu</label>
+        <textarea id={idPola} rows={2} value={tekst} maxLength={LIMIT_NOTATKI_SELLASIST}
+          onChange={(e) => { setTekst(e.target.value); if (dodaj.isError) dodaj.reset(); }}
+          placeholder="Widzi ją pakujący w Sellasist, np. dołożyć pasek do tej paczki"
+          className="field mt-1 w-full resize-y text-sm" />
+        <Blad>{blad?.message}</Blad>
+        <Przycisk type="submit" wariant="glowny" className="mt-2" disabled={!tresc || dodaj.isPending}>
+          {dodaj.isPending ? "Wysyłam…" : "Dodaj notatkę do Sellasist"}</Przycisk>
+      </form>
+    </>}
+  </section>;
 }
 
 /* NOTATKA ZAPISUJE SIĘ NA KLIKNIĘCIE, nie przy każdym znaku: każdy zapis to

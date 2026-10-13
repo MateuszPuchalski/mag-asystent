@@ -5,7 +5,7 @@ import React from "react";
 import { MemoryRouter, Route, Routes, useNavigate } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ProfilKlienta } from "./ProfilKlienta";
-import type { DosylkaSprawy, ProfilKlienta as Profil, SprawaKlienta } from "../api/spoiwo";
+import type { DosylkaSprawy, ProfilKlienta as Profil, SprawaKlienta, WidokSellasist } from "../api/spoiwo";
 import { dataLokalna } from "../ui";
 
 /* ── PROFIL KLIENTA (24 września 2026) ───────────────────────────────────────
@@ -67,8 +67,14 @@ let profile: Record<string, Profil> = {};
 /* Wstrzymuje odczyt profilu: tak widać, co karta robi, zanim świeży dojdzie. */
 let wstrzymanie: Promise<void> | null = null;
 let jaId = 1;
+/* Sellasist domyślnie wyłączony — tak stoi każdy test sprzed integracji. */
+const BEZ_SELLASIST: WidokSellasist = { wlaczony: false, zamowienie: null, notatki: [], notatkiBlad: null };
+let sellasist: WidokSellasist = BEZ_SELLASIST;
+/* Zdanie błędu, którym serwer odpowie na notatkę; `null` — notatka przechodzi. */
+let bladNotatki: string | null = null;
 beforeEach(() => {
   zadania = []; odpowiedz404 = false; konflikt = false; profil = PROFIL; profile = {}; wstrzymanie = null; jaId = 1;
+  sellasist = BEZ_SELLASIST; bladNotatki = null;
   localStorage.setItem("wertis-panel-token", "t");
   /* Atrapa ROZDZIELA po adresie: karta sprawy pyta o zalogowanego
      (`/api/auth/me`), a zapisy sprawy oddają `{ sprawa }` z nową wersją
@@ -80,6 +86,14 @@ beforeEach(() => {
     if (odpowiedz404) return new Response(JSON.stringify({ error: "Nie znamy klienta o takim loginie" }), { status: 404 });
     if (url === "/api/auth/me") {
       return new Response(JSON.stringify({ user: { userId: jaId, name: jaId === 1 ? "Ola" : "Bartek", role: "biuro" } }));
+    }
+    /* Notatka wraca jak z serwera: odświeżony widok z podpisem autora w treści. */
+    if (url.startsWith("/api/obsluga/sellasist/zamowienie/")) {
+      if (metoda !== "POST") return new Response(JSON.stringify(sellasist));
+      if (bladNotatki) return new Response(JSON.stringify({ error: bladNotatki }), { status: 502 });
+      const { tekst } = JSON.parse(init?.body as string) as { tekst: string };
+      sellasist = { ...sellasist, notatki: [...sellasist.notatki, { data: "2026-10-13T08:00:00Z", tekst: `${tekst} — Ola` }] };
+      return new Response(JSON.stringify(sellasist));
     }
     const sprawa = /\/sprawa\/(krok|zakoncz|wznow|przejmij|dosylka|dosylka\/numer)$/.exec(url)?.[1];
     if (sprawa && konflikt) {
@@ -695,5 +709,136 @@ describe("DOSYŁKA na karcie sprawy", () => {
     pokaz();
     expect(await within(await screen.findByRole("region", { name: "Sprawa klienta" }))
       .findByText(/Nic nie czeka w kolejkach, a termin kroku „czekamy na zwrot” minął/)).toBeInTheDocument();
+  });
+});
+
+/* ── SELLASIST przy zamówieniu ───────────────────────────────────────────────
+   Pilnujemy: otwarcie profilu nie pyta Sellasist, dopiero rozwinięcie
+   zamówienia — jednym GET-em i bez zapisu; bez integracji sekcji nie ma;
+   nieznane zamówienie to jedno zdanie; braki stoją na górze; notatka idzie
+   jako `{ tekst }` przycięty i rysuje widok z odpowiedzi, bez drugiego odczytu;
+   błąd notatek nie udaje „brak notatek”. */
+
+const W_SELLASIST: WidokSellasist = {
+  wlaczony: true,
+  zamowienie: {
+    id: 48211, status: "Czeka na towar", statusAt: "2026-10-12T07:30:00Z",
+    zebranoAt: "2026-10-12T08:00:00Z", spakowanoAt: null, termin: "2026-10-14",
+    przesylki: [{ waybill: "6201112223334", usluga: "InPost Paczkomaty", utworzonoAt: "2026-10-12T09:00:00Z" }],
+    braki: [{ nazwa: "Pasek klinowy 13x1000", potrzeba: 2, jest: 1 }],
+    kopie: [48300, 48301],
+  },
+  notatki: [{ data: "2026-10-12T07:45:00Z", tekst: "Klient prosi o dwa paski" }],
+  notatkiBlad: null,
+};
+
+const odczytySellasist = () => zadania.filter((z) => z.url.startsWith("/api/obsluga/sellasist/"));
+const rozwin = async () => userEvent.click(await screen.findByRole("button", { name: /Nóż kosiarki HECHT 1803S/ }));
+
+describe("SELLASIST przy zamówieniu", () => {
+  it("otwarcie profilu nie pyta Sellasist; rozwinięcie pyta raz i niczego nie zapisuje", async () => {
+    sellasist = W_SELLASIST;
+    pokaz();
+    await screen.findByText("Chrzanowski1234");
+    expect(odczytySellasist()).toEqual([]);
+    await rozwin();
+    const sekcja = await screen.findByRole("region", { name: "Sellasist" });
+    expect(within(sekcja).getByText("Czeka na towar")).toBeInTheDocument();
+    expect(odczytySellasist()).toEqual([{ metoda: "GET", url: "/api/obsluga/sellasist/zamowienie/z-1", body: null }]);
+    expect(zapisy()).toEqual([]);
+  });
+
+  it("bez integracji sekcji nie ma wcale", async () => {
+    pokaz();
+    await rozwin();
+    await waitFor(() => expect(odczytySellasist()).toHaveLength(1));
+    await waitFor(() => expect(screen.queryByText(/Sprawdzam zamówienie w Sellasist/)).toBeNull());
+    expect(screen.queryByRole("region", { name: "Sellasist" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Dodaj notatkę do Sellasist" })).toBeNull();
+  });
+
+  it("nieznane zamówienie to jedno zdanie, bez formularza notatki", async () => {
+    sellasist = { ...BEZ_SELLASIST, wlaczony: true };
+    pokaz();
+    await rozwin();
+    const sekcja = await screen.findByRole("region", { name: "Sellasist" });
+    expect(within(sekcja).getByText("nie zna tego zamówienia.")).toBeInTheDocument();
+    expect(within(sekcja).queryByRole("textbox")).toBeNull();
+  });
+
+  it("pokazuje braki, stan magazynu, termin, etykiety, kopie i notatki", async () => {
+    sellasist = W_SELLASIST;
+    pokaz();
+    await rozwin();
+    const sekcja = await screen.findByRole("region", { name: "Sellasist" });
+    const braki = within(sekcja).getByRole("list", { name: "Braki do spakowania" });
+    expect(within(braki).getByText("Pasek klinowy 13x1000")).toBeInTheDocument();
+    expect(within(braki).getByText("jest 1 z 2")).toBeInTheDocument();
+    expect(within(sekcja).getByText(/^zebrano .*, jeszcze bez etykiety$/)).toBeInTheDocument();
+    expect(within(sekcja).getByText("14 października 2026")).toBeInTheDocument();
+    expect(within(sekcja).getByText("6201112223334")).toBeInTheDocument();
+    expect(within(sekcja).getByText("InPost Paczkomaty")).toBeInTheDocument();
+    expect(within(sekcja).getByText("2 (nr 48300, 48301) — zwykle dosyłki")).toBeInTheDocument();
+    const notatki = within(sekcja).getByRole("list", { name: "Notatki w Sellasist" });
+    expect(within(notatki).getByText("Klient prosi o dwa paski")).toBeInTheDocument();
+  });
+
+  it("notatka idzie jako { tekst } przycięty i rysuje notatki z odpowiedzi", async () => {
+    sellasist = W_SELLASIST;
+    pokaz();
+    await rozwin();
+    const sekcja = await screen.findByRole("region", { name: "Sellasist" });
+    const przycisk = within(sekcja).getByRole("button", { name: "Dodaj notatkę do Sellasist" });
+    expect(przycisk).toBeDisabled();
+    const pole = within(sekcja).getByLabelText("Notatka dla magazynu");
+    expect(pole).toHaveAttribute("maxLength", "1000");
+    await userEvent.type(pole, "  Dołożyć drugi pasek  ");
+    await userEvent.click(przycisk);
+    expect(await within(sekcja).findByText("Dołożyć drugi pasek — Ola")).toBeInTheDocument();
+    expect(zapisy()).toEqual([{ metoda: "POST", url: "/api/obsluga/sellasist/zamowienie/z-1/notatka",
+      body: JSON.stringify({ tekst: "Dołożyć drugi pasek" }) }]);
+    /* Widok z odpowiedzi wystarcza — drugiego odczytu Sellasist nie ma. */
+    expect(odczytySellasist().filter((z) => z.metoda === "GET")).toHaveLength(1);
+    expect(pole).toHaveValue("");
+  });
+
+  it("odmowa notatki mówi zdanie serwera i zostawia wpisany tekst", async () => {
+    sellasist = W_SELLASIST;
+    bladNotatki = "Sellasist nie odpowiedział.";
+    pokaz();
+    await rozwin();
+    const sekcja = await screen.findByRole("region", { name: "Sellasist" });
+    const pole = within(sekcja).getByLabelText("Notatka dla magazynu");
+    await userEvent.type(pole, "Pilne");
+    await userEvent.click(within(sekcja).getByRole("button", { name: "Dodaj notatkę do Sellasist" }));
+    expect(await within(sekcja).findByText("Sellasist nie odpowiedział.")).toBeInTheDocument();
+    expect(pole).toHaveValue("Pilne");
+  });
+
+  it("błąd odczytu notatek nie udaje braku notatek; stan zamówienia zostaje", async () => {
+    sellasist = { ...W_SELLASIST, notatki: [], notatkiBlad: "Sellasist prosi o przerwę." };
+    pokaz();
+    await rozwin();
+    const sekcja = await screen.findByRole("region", { name: "Sellasist" });
+    expect(within(sekcja).getByText("Sellasist prosi o przerwę.")).toBeInTheDocument();
+    expect(within(sekcja).queryByText("Brak notatek.")).toBeNull();
+    expect(within(sekcja).getByText("Czeka na towar")).toBeInTheDocument();
+  });
+});
+
+describe("źródło numeru dosyłki", () => {
+  it("numer mówi, skąd go znamy — także z etykiety w Sellasist", async () => {
+    const Z_SELLASIST = dosylka({ zamowienie: "z-5", waybill: "SEL-777", przewoznik: "DPD", zrodlo: "sellasist",
+      opis: "Dosyłka nadana" });
+    const RECZNA = dosylka({ zamowienie: "z-6", waybill: "R-1", przewoznik: "DPD", zrodlo: "recznie", opis: "Dosyłka w drodze" });
+    profil = { ...PROFIL, przewoznicy: Z_BAZY, sprawa: { ...DOSLAC, dosylki: [W_DRODZE, Z_SELLASIST, RECZNA, BEZ_NUMERU] } };
+    pokaz();
+    await screen.findByRole("list", { name: "Dosyłki" });
+    const [allegro, sellasistowa, reczna, bez] = within(listaDosylek()).getAllByRole("listitem");
+    expect(within(allegro).getByText("numer z Allegro")).toBeInTheDocument();
+    expect(within(sellasistowa).getByText("numer z etykiety w Sellasist")).toBeInTheDocument();
+    expect(within(reczna).getByText("numer wpisany ręcznie")).toBeInTheDocument();
+    expect(within(bez).queryByText(/^numer /)).toBeNull();
+    expect(zapisy()).toEqual([]);
   });
 });

@@ -2,20 +2,56 @@ import React, { useRef, useState } from "react";
 import { Download, Upload } from "lucide-react";
 import { Link } from "react-router-dom";
 import { pobierzPlik } from "../api/klient";
-import { useImportZbiorek, useKandydaci, type WynikImportuZbiorek } from "../api/wglad";
-import { Blad, Przycisk } from "../ui";
+import { useImportZbiorek, useKandydaci, useStanSellasist, type WynikImportuZbiorek } from "../api/wglad";
+import { Blad, Przycisk, czas, dzienMiesiac } from "../ui";
 import { KartaWgladu, Tabela, Td } from "../ui/wglad";
 
 /* ── Strefa złota — kandydaci do przeniesienia (0.440.0) ────────────────
    Towary z górnych 15% rotacji, które stoją poza strefą złotą. Dane bierzemy
-   z eksportu zbiórek (Sellasist, CSV); wgranie tego samego okresu drugi raz
-   niczego nie zdubluje. Kandydat dostaje też adnotację na karcie towaru
-   w kolektorze.
+   ze zbiórek, które serwer sam przepisuje z Sellasist, gdy integracja stoi.
+   Wgranie CSV zostaje drogą zapasową: na czas bez integracji i na okres
+   sprzed niej. Ten sam okres wgrany drugi raz niczego nie zdubluje.
+   Kandydat dostaje też adnotację na karcie towaru w kolektorze.
+
+   STAN AUTOMATU STOI NAD LISTĄ. Pusta lista kandydatów nie mówi, czy
+   zbiórki przestały płynąć, czy rotacja się nie zmieniła. Data ostatniego
+   udanego przebiegu i liczby z siedmiu dób rozstrzygają to bez zgadywania.
 
    REGUŁY STOJĄ ZA ZĘBATKĄ PANELU (od 0.444.0, wcześniej w `/biuro`).
    Zdanie o nich jest drogowskazem, nie ozdobą: pusta lista bez niego wygląda
    na awarię, a nie na brak reguł. Dlatego prowadzi wprost do karty reguł
    (`?karta=strefa`), zamiast opisywać, gdzie kliknąć. */
+
+/** Doba magazynu `RRRR-MM-DD` czytana w południe — strefa nie przesunie jej na sąsiednią. */
+const doba = (d: string) => dzienMiesiac(`${d}T12:00:00`);
+
+/* Stan drogi automatycznej. Bez integracji jedno ciche zdanie: CSV jest wtedy
+   jedynym źródłem, a karta mówi, co włącza automat. Błąd odczytu stanu nie
+   zasłania kandydatów, bo ci przychodzą osobną trasą. */
+function ZbiorkiSellasist() {
+  const stan = useStanSellasist();
+  const s = stan.data;
+  if (stan.error) return <Blad>{(stan.error as Error).message}</Blad>;
+  if (!s) return null;
+  if (!s.wlaczony) return <p className="mb-3 text-sm text-slate-600">
+    Jedynym źródłem zbiórek jest wgrany CSV. Automat z Sellasist włącza się kluczami
+    {" "}<code>SELLASIST_KONTO</code> i <code>SELLASIST_API_KEY</code> w <code>wertis.env</code>.</p>;
+  return <section aria-label="Zbiórki z Sellasist" className="mb-4 space-y-2">
+    <p className="text-sm text-slate-700">
+      Zbiórki płyną same z Sellasist; CSV zostaje na wypadek przerwy.
+      {" "}Ostatni udany przebieg: <b>{s.ostatniSukcesAt ? czas(s.ostatniSukcesAt) : "jeszcze żadnego"}</b>
+      {s.wKolejce > 0 && <> · czeka na szczegóły: {s.wKolejce}</>}</p>
+    <Blad>{s.blad}</Blad>
+    <Tabela naglowki={["Doba", "Zebrane zamówienia", "Spakowane zamówienia"]}
+      pusto="Sellasist nie oddał jeszcze żadnej doby.">
+      {s.dni.map((d) => <tr key={d.data}>
+        <Td className="tabular-nums">{doba(d.data)}</Td>
+        <Td className="tabular-nums">{d.zebranych}</Td>
+        <Td className="tabular-nums">{d.spakowanych}</Td>
+      </tr>)}
+    </Tabela>
+  </section>;
+}
 
 export function Strefa() {
   const kandydaci = useKandydaci(true);
@@ -34,7 +70,7 @@ export function Strefa() {
   };
 
   return <KartaWgladu tytul="Strefa złota — kandydaci do przeniesienia"
-    opis="Towary z górnych 15% rotacji, które stoją poza strefą złotą. Dane z eksportu zbiórek (CSV); ten sam okres wgrany drugi raz niczego nie zdubluje."
+    opis="Towary z górnych 15% rotacji, które stoją poza strefą złotą. Zbiórki przychodzą z Sellasist, gdy integracja działa; CSV zbiórek to droga zapasowa, a ten sam okres wgrany drugi raz niczego nie zdubluje."
     akcje={<>
       <Przycisk disabled={wgraj.isPending} onClick={() => plik.current?.click()}><Upload size={16} />Wgraj CSV zbiórek</Przycisk>
       <input ref={plik} type="file" accept=".csv,text/csv" hidden aria-label="Plik CSV zbiórek"
@@ -46,6 +82,7 @@ export function Strefa() {
       <Przycisk onClick={() => pobierzPlik("/api/biuro/zbiorki/kandydaci/csv", "wertis-strefa-kandydaci.csv")
         .catch((e: Error) => setBlad(e.message))}><Download size={16} />CSV</Przycisk>
     </>}>
+    <ZbiorkiSellasist />
     {wgraj.isPending && <p className="mb-2 text-sm text-slate-600">Wysyłam plik…</p>}
     {wynik && <p className="mb-2 text-sm text-slate-700">
       Wgrano {wynik.wierszy} wierszy{wynik.okres ? ` (${wynik.okres.od} – ${wynik.okres.do})` : ""}: nowych {wynik.nowych},

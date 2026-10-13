@@ -505,3 +505,37 @@ export function useImportZbiorek() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["kandydaciStrefy"] }),
   });
 }
+
+/* ── Lustro Sellasist (`routes/sellasist.ts`) ───────────────────────────────
+   Serwer sam przepisuje z Sellasist zbiórki do tej samej tabeli, którą
+   karmi CSV. Strefa złota pokazuje stan tej drogi, bo bez niego pusta lista
+   kandydatów nie mówi, czy automat stoi, czy nic się nie zmieniło. */
+
+export interface DzienSellasist {
+  /** Doba magazynu `RRRR-MM-DD`, czas lokalny. */
+  data: string;
+  /** Zamówienia, nie pozycje. */
+  zebranych: number;
+  /** Zamówienia z pierwszą etykietą przewoźnika tej doby. */
+  spakowanych: number;
+}
+
+export interface StanSellasist {
+  /** `false`: brak `SELLASIST_KONTO` albo `SELLASIST_API_KEY` w `wertis.env`. */
+  wlaczony: boolean;
+  ostatniaProbaAt: string | null;
+  ostatniSukcesAt: string | null;
+  /** Stałe zdanie z ostatniej nieudanej synchronizacji. */
+  blad: string | null;
+  /** Zamówienia czekające na pobranie szczegółów. */
+  wKolejce: number;
+  /** Ostatnie siedem dób, od najstarszej. */
+  dni: DzienSellasist[];
+}
+
+export function useStanSellasist() {
+  return useQuery({
+    queryKey: ["stanSellasist"],
+    queryFn: () => api<StanSellasist>("/api/biuro/sellasist/stan"),
+  });
+}
