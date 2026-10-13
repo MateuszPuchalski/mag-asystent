@@ -258,11 +258,7 @@ export type WpisOsi = {
   rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania"
     | "komentarz" | "status"
     /* Kamień milowy zwrotu (0.502.0) — zdarzenie, nie wypowiedź; `Os.tsx` ZDARZENIE. */
-    | "zwrot"
-    /* Zdarzenie ZAKUPU wstawione do osi po stronie panelu (`skrzynka/zakup.ts`):
-       złożone, opłacone, dostarczone, zwrot, reklamacja, dyskusja. Nie przychodzi
-       z serwera, nie jest wypowiedzią i nie wchodzi do paska przebiegu. */
-    | "zakup";
+    | "zwrot";
   autor: string;
   odKlienta: boolean;
   tresc: string;

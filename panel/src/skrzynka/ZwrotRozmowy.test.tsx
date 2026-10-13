@@ -36,7 +36,8 @@ const pokaz = (z: Zwrot) => render(<MemoryRouter><ZwrotRozmowy zwrot={z} /></Mem
 describe("zwrot przy rozmowie", () => {
   it("mówi, że paczki jeszcze nie ma, i prowadzi do zwrotu w panelu i w Allegro", () => {
     pokaz(zwrot());
-    expect(screen.getByText("1111/Z04A")).toBeInTheDocument();
+    /* Numeru zwrotu blok nie powtarza: mówi go przystanek paska drogi. */
+    expect(screen.queryByText("1111/Z04A")).toBeNull();
     expect(screen.getByText("Do decyzji")).toBeInTheDocument();
     expect(screen.getByText(/klient jeszcze nie nadał paczki/)).toBeInTheDocument();
     expect(screen.getByText(/za 9 dni/)).toBeInTheDocument();

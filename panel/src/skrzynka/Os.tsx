@@ -1,9 +1,8 @@
 import React from "react";
 import { ArrowRight, Bot, Camera, ClipboardList, Lock, Paperclip, Ruler, ScanSearch, Send, User, Undo2 } from "lucide-react";
-import { Link } from "react-router-dom";
 import type { StatusRozmowy, WpisOsi, ZalacznikOsi } from "../api/typy";
 import { NAZWA } from "./statusy";
-import { LoginKlienta, Przycisk, czas, dzienMiesiac, godzina } from "../ui";
+import { LoginKlienta, Przycisk, czas } from "../ui";
 import { pobierzPlik } from "../api/klient";
 import { useZdjecieZalacznika } from "../towar/useZdjecie";
 import { Kafel } from "../towar/Kafel";
@@ -198,13 +197,7 @@ export function Os({
   const listaRef = React.useRef<HTMLDivElement>(null);
   const [podswietlony, setPodswietlony] = React.useState<string | null>(null);
 
-  const { wypowiedzi, zdarzenia, linie } = React.useMemo(() => rozdziel(wpisy), [wpisy]);
-  /* Linie zakupu pogrupowane po wypowiedzi, PRZED którą stają; `null` to koniec. */
-  const liniePrzed = React.useMemo(() => {
-    const m = new Map<string | null, LiniaZakupu[]>();
-    for (const l of linie) m.set(l.przed, [...(m.get(l.przed) ?? []), l]);
-    return m;
-  }, [linie]);
+  const { wypowiedzi, zdarzenia } = React.useMemo(() => rozdziel(wpisy), [wpisy]);
   /* Wsuwa się TYLKO wiadomość, która doszła do otwartej rozmowy. Otwarcie
      rozmowy (zmiana `rozmowaId`) zaczyna od zera, więc pięćdziesiąt starych
      wypowiedzi nie animuje się naraz. */
@@ -322,7 +315,6 @@ export function Os({
     className="min-h-40 flex-1 space-y-3 overflow-y-auto p-4">
     {naGorze}
     {wypowiedzi.map((w) => <React.Fragment key={w.id}>
-      {(liniePrzed.get(w.id) ?? []).map((l) => <LiniaZakupuWiersz key={l.id} wpis={l} />)}
     <div data-wpis={w.id}
       className={`${podswietlony === w.id
         ? "rounded-lg ring-2 ring-amber-400 ring-offset-2 transition-shadow" : "transition-shadow"} ${
@@ -451,7 +443,6 @@ export function Os({
             {zrodloPomiaru === w.messageId ? "✓ źródło pomiaru" : "Zleć z tej wiadomości"}</button>}
         </article>}
     </div></React.Fragment>)}
-    {(liniePrzed.get(null) ?? []).map((l) => <LiniaZakupuWiersz key={l.id} wpis={l} />)}
     {koniec}
   </div>
 
@@ -496,58 +487,30 @@ const ZDARZENIE: ReadonlySet<string> = new Set(["status", "zwrot"]);
 
 type Zdarzenie = WpisOsi & { cel: string | null };
 
-/* ── ZDARZENIA ZAKUPU STOJĄ NA OSI, ALE NIE SĄ WYPOWIEDZIĄ (świadoma decyzja) ──
-   Pasek przebiegu przejął zdarzenia sprawy na prośbę właściciela, bo statusy
-   na osi zasłaniały rozmowę. Zdarzenia ZAKUPU (złożone, opłacone, dostarczone,
-   zwrot, reklamacja, dyskusja) właściciel poprosił zostawić wprost na osi, w
-   miejscu w czasie, bo to one tłumaczą, dlaczego klient pisze. Jest ich kilka
-   na rozmowę, nie kilkanaście.
-
-   Wpis `zakup` jest więc ani wypowiedzią, ani zdarzeniem paska:
-   - nie może wejść do `wypowiedzi`, bo na tej liście liczy się „pytanie bez
-     odpowiedzi" (ostatnia wypowiedź), a „Paczka dostarczona" po pytaniu
-     klienta zdjęłaby z niego znacznik;
-   - nie może być celem skoku z paska, bo nie ma `data-wpis`.             */
-const LINIA: ReadonlySet<string> = new Set(["zakup"]);
-const NIE_WYPOWIEDZ = (rodzaj: string) => ZDARZENIE.has(rodzaj) || LINIA.has(rodzaj);
-
-export type LiniaZakupu = WpisOsi & { przed: string | null };
-
-export function rozdziel(wpisy: WpisOsi[]): {
-  wypowiedzi: WpisOsi[]; zdarzenia: Zdarzenie[]; linie: LiniaZakupu[];
-} {
+/* ── ZDARZEŃ ZAKUPU NA OSI NIE MA ────────────────────────────────────────────
+   Złożone, opłacone, doręczone i inne sprawy tego zakupu (zwrot, reklamacja,
+   dyskusja, druga rozmowa) mówi wyłącznie pasek drogi klienta w karcie nad
+   osią. Ten sam fakt w dwóch domach kazał sprawdzać, czy oba mówią to samo.
+   Oś zostaje chronologią tej rozmowy: wiadomości, komentarze, zlecenia,
+   wyniki hali i zmiany stanu w pasku przebiegu. */
+export function rozdziel(wpisy: WpisOsi[]): { wypowiedzi: WpisOsi[]; zdarzenia: Zdarzenie[] } {
   const wypowiedzi: WpisOsi[] = [];
   const zdarzenia: Zdarzenie[] = [];
-  const linie: LiniaZakupu[] = [];
   for (let i = 0; i < wpisy.length; i++) {
     const w = wpisy[i];
-    if (!NIE_WYPOWIEDZ(w.rodzaj)) { wypowiedzi.push(w); continue; }
+    if (!ZDARZENIE.has(w.rodzaj)) { wypowiedzi.push(w); continue; }
+    /* Celem skoku jest pierwsza wypowiedź PO zdarzeniu, a gdy jej nie ma —
+       ostatnia przed nim. */
     let cel: string | null = null;
     for (let j = i + 1; j < wpisy.length && cel === null; j++) {
-      if (!NIE_WYPOWIEDZ(wpisy[j].rodzaj)) cel = wpisy[j].id;
+      if (!ZDARZENIE.has(wpisy[j].rodzaj)) cel = wpisy[j].id;
     }
-    /* Linia zakupu staje PRZED następną wypowiedzią; bez następnej — na końcu. */
-    if (LINIA.has(w.rodzaj)) { linie.push({ ...w, przed: cel }); continue; }
     for (let j = i - 1; j >= 0 && cel === null; j--) {
-      if (!NIE_WYPOWIEDZ(wpisy[j].rodzaj)) cel = wpisy[j].id;
+      if (!ZDARZENIE.has(wpisy[j].rodzaj)) cel = wpisy[j].id;
     }
     zdarzenia.push({ ...w, cel });
   }
-  return { wypowiedzi, zdarzenia, linie };
-}
-
-/** Cienka linia zdarzenia zakupu — kropka, zdanie i data. Nie jest wypowiedzią. */
-function LiniaZakupuWiersz({ wpis }: { wpis: WpisOsi }) {
-  const tresc = <span className="min-w-0 truncate">{wpis.tresc}</span>;
-  return <div role="note" data-zakup={wpis.id}
-    className="flex items-center gap-2 px-2 text-podpis text-slate-500">
-    <span aria-hidden="true" className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400" />
-    {wpis.adres
-      ? <Link to={wpis.adres} className="min-w-0 truncate font-semibold underline underline-offset-2 hover:text-slate-800">
-          {wpis.tresc}</Link>
-      : tresc}
-    <span className="shrink-0 tabular-nums" title={czas(wpis.at)}>{dzienMiesiac(wpis.at)} · {godzina(wpis.at)}</span>
-  </div>;
+  return { wypowiedzi, zdarzenia };
 }
 
 /* ── KRÓTKA ETYKIETA I BARWA RODZAJU ────────────────────────────────────────

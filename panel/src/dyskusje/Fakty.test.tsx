@@ -119,7 +119,7 @@ describe("Kolumna faktów o dyskusji", () => {
     expect(stan).not.toHaveTextContent("ruch klienta");
   });
 
-  it("zakup u nas to JEDNA sekcja z jednym nagłówkiem, bez osobnych zwrotów i rozmów", () => {
+  it("sekcji „Ten zakup u nas” nie ma: inne sprawy zakupu mówi tylko pasek drogi", () => {
     pokaz(szczegol({
       droga: [
         { rodzaj: "rozmowa", id: 8, at: "2026-08-30T10:00:00.000Z", opis: "Pytanie o dostawę" },
@@ -130,15 +130,57 @@ describe("Kolumna faktów o dyskusji", () => {
         decyzjaDo: null, otwartoAt: "2026-09-03T10:00:00.000Z", prowadzi: null, otwarta: true }],
       rozmowy: [{ id: 8, temat: "Pytanie o dostawę", status: "OPEN", ostatniaAt: null }],
     }));
-    const sekcja = screen.getByRole("heading", { name: "Ten zakup u nas" }).closest("section")!;
-    /* Droga prowadzi do zwrotu i do rozmowy — tamte dwie listy były jej podzbiorem. */
-    expect(within(sekcja).getByRole("link", { name: /zwrot/ })).toBeInTheDocument();
-    expect(within(sekcja).getByRole("link", { name: /pytanie/ })).toBeInTheDocument();
-    expect(within(sekcja).getByText("Uszkodzony")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Ten zakup u nas" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Uszkodzony")).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /zwrot|pytanie|Otwórz/ })).not.toBeInTheDocument();
     for (const stary of ["Zwroty tego zamówienia", "Inne sprawy tego zakupu",
       "Droga tego zakupu", "Rozmowy o tym zakupie", "Sprawy tego zakupu"]) {
       expect(screen.queryByText(stary)).not.toBeInTheDocument();
     }
+  });
+
+  describe("kontekst zakupu: każdy fakt raz", () => {
+    const zam = (n: Record<string, unknown> = {}) => ({
+      externalId: "zam-3", pozycje: [{ offerId: "o1", sku: "S1", nazwa: "Nóż", ilosc: 1, cenaGrosze: 7798, waluta: "PLN" }],
+      dostawaGrosze: 1299, dostawaMetoda: "InPost", sumaGrosze: 9097, waluta: "PLN",
+      platnoscAt: "2026-09-01T10:00:00.000Z", ...n,
+    }) as never;
+    const przes = (n: Record<string, unknown> = {}) => ({
+      waybill: "620001234", przewoznik: "InPost", status: "DELIVERED", sprawdzonoAt: "2026-09-04T10:00:00.000Z",
+      dostarczonoAt: "2026-09-03T12:18:00.000Z", ...n,
+    }) as never;
+
+    it("numeru zamówienia nie ma, bo stoi na pasku; brak numeru nadal mówi słowem", () => {
+      const { unmount } = pokaz(szczegol({ zamowienie: zam() }));
+      expect(screen.queryByText("zam-3")).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Kopiuj numer zamówienia" })).not.toBeInTheDocument();
+      expect(screen.queryByText("dyskusja bez numeru zamówienia")).not.toBeInTheDocument();
+      unmount();
+      pokaz(szczegol({}, { orderId: null }));
+      expect(screen.getByText("dyskusja bez numeru zamówienia")).toBeInTheDocument();
+    });
+
+    it("doręczenia nie ma w wierszu przesyłki, ale numer listu i „sprawdź” zostają", () => {
+      render(<MemoryRouter><Fakty szczegol={szczegol({ zamowienie: zam(), przesylka: przes() })}
+        onSprawdzPrzesylke={() => {}} /></MemoryRouter>);
+      expect(screen.queryByText(/doręczona/)).not.toBeInTheDocument();
+      expect(screen.getByText("620001234")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "sprawdź" })).toBeInTheDocument();
+    });
+
+    it("paczka w drodze zachowuje status w wierszu", () => {
+      pokaz(szczegol({ zamowienie: zam(), przesylka: przes({ status: "IN_TRANSIT", dostarczonoAt: null }) }));
+      expect(screen.getByText("IN_TRANSIT")).toBeInTheDocument();
+    });
+
+    it("„Razem” znika przy opłaconym zamówieniu (mówi je pigułka kroku Zakup), ale zostaje bez daty płatności", () => {
+      const { unmount } = pokaz(szczegol({ zamowienie: zam() }));
+      expect(screen.queryByText("Razem")).not.toBeInTheDocument();
+      expect(screen.getByText("Dostawa")).toBeInTheDocument();
+      unmount();
+      pokaz(szczegol({ zamowienie: zam({ platnoscAt: null }) }));
+      expect(screen.getByText("Razem")).toBeInTheDocument();
+    });
   });
 
   it("zlecenie hali stoi bez nagłówka nad jednym przyciskiem", () => {

@@ -21,7 +21,8 @@ vi.mock("../towar/useZdjecie", () => ({ useZdjecie: () => null, useZdjecieOferty
    Podział domów: karta zakupu nad osią mówi, co klient KUPIŁ i KIM jest, a jej
    pasek drogi klienta (`sprawy/DrogaKlienta.tsx`) mówi, gdzie ten zakup jest:
    zakup, doręczenie i inne sprawy tego zamówienia.
-   Kolumna mówi, co MAMY w Subiekcie, gdzie jest paczka i co czeka na ruch.
+   Oś rozmowy mówi tylko rozmowę. Kolumna mówi, co MAMY w Subiekcie, gdzie
+   jest paczka i co czeka na ruch.
    Fakt z karty wraca do kolumny tylko jako wyjątek opisany w `Kontekst.tsx`:
    pasmo „Zamówił" (dlatego SKU stoi raz, właśnie tam) i data doręczenia
    w bloku paczki.
@@ -47,7 +48,7 @@ const TW_ID = 7701;
 /** Fakty z domem poza kolumną: wzorzec i to, gdzie fakt stoi. Kolumna nie mówi żadnego. */
 const FAKTY_KARTY: Array<[RegExp, string]> = [
   [/77,98/, "suma zakupu — karta"],
-  [/28 września|28\.09/, "data zakupu — krok „Złożone” w karcie i linia osi"],
+  [/28 września|28\.09/, "data zakupu — krok Zakup paska drogi w karcie"],
   [/a7f3c2e0/, "numer zamówienia — karta"],
   [/Nowy klient|Wcześniej u nas/, "historia klienta — plakietka w karcie i w pasku"],
   [/kupione|zapłacono/i, "stan płatności — pasek drogi klienta w karcie"],
@@ -145,8 +146,8 @@ const dane = (kandydaci: unknown[]): OsRozmowy => ({
   },
   kandydaciZamowien: kandydaci,
   zwroty: [], sprawy: [],
-  /* Droga zakupu przez kolejki ma dom w liniach osi. Trzy przystanki, bo
-     dawny blok drogi stawał dopiero od dwóch. */
+  /* Droga zakupu przez kolejki ma dom w pasku drogi karty. Kolumna i oś nie
+     powtarzają jej przystanków. */
   droga: [
     { rodzaj: "rozmowa", id: 4821, at: "2026-09-29T08:00:00.000Z", opis: null },
     { rodzaj: "zwrot", id: 77, at: "2026-09-30T15:05:00.000Z", opis: "ZW/2026/10/0077" },
@@ -235,4 +236,63 @@ describe("Fakt z karty zakupu nie wraca do prawej kolumny", () => {
 
       expect(zadania.filter((z) => z.metoda !== "GET")).toEqual([]);
     });
+});
+
+/* ── Sprawy zakupu mówi pasek, nie kolumna ───────────────────────────────────
+   Reklamacja, dyskusja i zwrot tego zakupu mają dom w przystankach paska drogi
+   w karcie: rodzaj, data, stan, termin i prowadzący. Kolumna zostawia sobie
+   tylko to, czego przystanek nie powie: plakietki, termin i pozycje zwrotu
+   w toku oraz wynik zamkniętego zwrotu. */
+describe("Sprawy zakupu nie wracają do kolumny", () => {
+  const zwrot = (n: Record<string, unknown>) => ({
+    id: 77, numer: "ZW/2026/10/0077", kubelek: "decyzja", sygnaly: [], zrodlo: "allegro", pozycje: [],
+    terminAt: "2026-10-20T09:00:00.000Z", dniDoTerminu: 6, paczkaAt: null, dostarczonoAt: null,
+    przesylkaStatus: null, przewoznik: null, werdykt: null, rejectionCode: null, kwotaGrosze: null,
+    notatka: null, linkZwrotu: null, waluta: "PLN", ...n,
+  });
+  const sprawy = [
+    { id: 311, typ: "DISPUTE", numer: null, temat: "Zwrot pieniędzy za nóż", statusAllegro: null,
+      decyzjaDo: null, otwartoAt: "2026-10-03T19:20:00.000Z", prowadzi: "Ola Kowalska", otwarta: true },
+    { id: 12, typ: "CLAIM", numer: "REK-12/2026", temat: "Pęknięta rączka", statusAllegro: null,
+      decyzjaDo: "2026-10-17T00:00:00.000Z", otwartoAt: "2026-10-01T10:00:00.000Z", prowadzi: null, otwarta: false },
+  ];
+
+  async function otworz(d: OsRozmowy) {
+    historiaSerwera = HISTORIA;
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    render(<QueryClientProvider client={qc}><MemoryRouter>
+      <Kontekst dane={d} onWstawDoSzkicu={() => {}} onOtworzRozmowe={() => {}} />
+    </MemoryRouter></QueryClientProvider>);
+    await screen.findByRole("complementary", { name: "Do tej odpowiedzi" });
+    await waitFor(() => expect(qc.isFetching()).toBe(0));
+  }
+
+  it("reklamacje i dyskusje nie mają w kolumnie wierszy ani w ramie, ani jako zamknięte", async () => {
+    await otworz({ ...dane([BIEZACY_ZAKUP]), sprawy } as unknown as OsRozmowy);
+    const k = kolumna();
+    expect(within(k).queryByText(/Zamknięte sprawy/)).toBeNull();
+    expect(within(k).queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
+    for (const fakt of ["Zwrot pieniędzy za nóż", "REK-12/2026", "Pęknięta rączka", "Ola Kowalska", "zamknięta"]) {
+      expect(k.textContent).not.toContain(fakt);
+    }
+    expect(within(k).queryByRole("link", { name: "Otwórz" })).toBeNull();
+  });
+
+  it("zwrot w toku zostaje bez nazwy i numeru, ale z terminem; licznik liczy tylko jego", async () => {
+    await otworz({ ...dane([BIEZACY_ZAKUP]), sprawy, zwroty: [zwrot({})] } as unknown as OsRozmowy);
+    const rama = within(kolumna()).getByRole("region", { name: "Wymaga Ciebie" });
+    expect(rama).toHaveTextContent("Wymaga Ciebie · 1");
+    expect(within(rama).getByLabelText("Zwrot")).toHaveTextContent("Termin");
+    expect(rama.textContent).not.toContain("ZW/2026/10/0077");
+  });
+
+  it("zamknięty zwrot zostaje w wierszu „Zamknięte zwroty”, bo przystanek nie ma jego wyniku", async () => {
+    await otworz({ ...dane([BIEZACY_ZAKUP]), zwroty: [zwrot({ kubelek: "zamkniety", werdykt: "przyjety",
+      kwotaGrosze: 7798 })] } as unknown as OsRozmowy);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /^Zamknięte zwroty/ }));
+    expect(within(kolumna()).getByLabelText("Zwrot")).toHaveTextContent("przyjęty");
+    expect(within(kolumna()).getByLabelText("Zwrot")).toHaveTextContent("77,98");
+    expect(within(kolumna()).queryByText(/Zamknięte sprawy/)).toBeNull();
+  });
 });

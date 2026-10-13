@@ -354,3 +354,74 @@ describe("Droga klienta bez szczegółu reklamacji", () => {
     expect(lista.className).toContain("overflow-x-auto");
   });
 });
+
+/* ── Przystanek niesie stan sprawy ───────────────────────────────────────────
+   Pasek jest jedynym domem innych spraw zakupu, więc przystanek mówi to, co
+   mówił osobny blok: zamknięta słowem, termin otwartej, temat i numer oraz
+   prowadzącego w nazwie łącza. Zwrot i rozmowa nie mają wiersza stanu, więc
+   przystanek nie zgaduje, że są otwarte. */
+describe("Przystanek ze stanem sprawy", () => {
+  const droga = (rodzaj: PrzystanekDrogi["rodzaj"], id: number, opis: string | null = null): PrzystanekDrogi =>
+    ({ rodzaj, id, at: "2026-09-25T10:00:00.000Z", opis });
+  const sprawa = (n: Record<string, unknown>) => ({ id: 8, typ: "DISPUTE", numer: null, temat: "Gdzie paczka",
+    statusAllegro: null, decyzjaDo: null, otwartoAt: "2026-09-25T10:00:00.000Z", prowadzi: null, otwarta: true, ...n });
+  const bez = (n: Partial<SzczegolReklamacji>) =>
+    ({ ...szczegol({}, n), reklamacja: null }) as unknown as import("./DrogaSprawy").DaneDrogi;
+  const pokazDane = (d: import("./DrogaSprawy").DaneDrogi, p: Partial<React.ComponentProps<typeof DrogaSprawy>> = {}) =>
+    render(<MemoryRouter><DrogaSprawy dane={d} {...p} /></MemoryRouter>);
+
+  it("zamknięta sprawa mówi o tym słowem i nie ma terminu", () => {
+    pokazDane(bez({ droga: [droga("dyskusja", 8)],
+      sprawy: [sprawa({ otwarta: false, decyzjaDo: "2026-09-30T00:00:00.000Z" })] as never }));
+    const li = document.querySelector('[data-przystanek="dyskusja"]') as HTMLElement;
+    expect(li).toHaveTextContent("zamknięta");
+    expect(li.textContent).not.toMatch(/do \d/);
+    expect(within(li).getByRole("link").getAttribute("aria-label")).toContain("zamknięta");
+  });
+
+  it("otwarta sprawa z terminem pokazuje czerwone „do dd.mm”, prowadzącego i temat w nazwie łącza", () => {
+    pokazDane(bez({ droga: [droga("reklamacja", 8)],
+      sprawy: [sprawa({ typ: "CLAIM", numer: "REK-8/2026", decyzjaDo: "2026-10-12T00:00:00.000Z",
+        prowadzi: "Ola Kowalska" })] as never }));
+    const li = document.querySelector('[data-przystanek="reklamacja"]') as HTMLElement;
+    const termin = within(li).getByText(`do ${dzienMiesiac("2026-10-12T00:00:00.000Z")}`);
+    expect(termin.className).toContain("text-ranga-zle");
+    expect(li.textContent).not.toContain("zamknięta");
+    const nazwa = within(li).getByRole("link").getAttribute("aria-label")!;
+    expect(nazwa).toContain("REK-8/2026");
+    expect(nazwa).toContain("prowadzi Ola Kowalska");
+    expect(nazwa).toContain("termin");
+  });
+
+  it("dyskusja bez terminu jest otwarta bez żadnego zegara", () => {
+    pokazDane(bez({ droga: [droga("dyskusja", 8)], sprawy: [sprawa({})] as never }));
+    const li = document.querySelector('[data-przystanek="dyskusja"]') as HTMLElement;
+    expect(li.textContent).not.toMatch(/zamknięta|do \d/);
+    expect(within(li).getByRole("link").getAttribute("aria-label")).toContain("Gdzie paczka");
+  });
+
+  it("zwrot i rozmowa niosą numer i temat w nazwie łącza, ale bez stanu", () => {
+    pokazDane(bez({ droga: [droga("zwrot", 7, "ZW/2026/10/0077"), droga("rozmowa", 3, "Pytanie o dostawę")] }));
+    const zwrot = document.querySelector('[data-przystanek="zwrot"]') as HTMLElement;
+    expect(within(zwrot).getByRole("link").getAttribute("aria-label")).toContain("nr ZW/2026/10/0077");
+    expect(zwrot.textContent).not.toMatch(/zamknięta|do \d/);
+    const rozmowa = document.querySelector('[data-przystanek="rozmowa"]') as HTMLElement;
+    expect(within(rozmowa).getByRole("link").getAttribute("aria-label")).toContain("Pytanie o dostawę");
+  });
+
+  it("przystanek „tu jesteś” nie niesie stanu, bo agent stoi na tej sprawie", () => {
+    pokazDane(bez({ droga: [droga("dyskusja", 8)],
+      sprawy: [sprawa({ decyzjaDo: "2026-10-12T00:00:00.000Z" })] as never }),
+      { biezaca: { rodzaj: "dyskusja", id: 8 } });
+    const li = document.querySelector('[data-przystanek="dyskusja"]') as HTMLElement;
+    expect(li.textContent).not.toMatch(/zamknięta|do \d/);
+  });
+
+  it("bezPrzesylki wyłącza tylko numer listu: numer zamówienia zostaje na pasku", () => {
+    pokazDane({ ...bez({ przesylka: przesylka({ waybill: "600000727616", przewoznik: "INPOST",
+      sprawdzonoAt: "2026-09-29T10:00:00.000Z" }) }), orderId: "ord-77" } as never, { bezPrzesylki: true });
+    expect(screen.getByTitle("Kopiuj numer zamówienia")).toBeInTheDocument();
+    expect(screen.queryByText(/6000/)).toBeNull();
+    expect(screen.queryByTitle("Kopiuj numer przesyłki")).toBeNull();
+  });
+});

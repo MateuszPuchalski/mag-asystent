@@ -1,8 +1,9 @@
-import type { OsRozmowy, StanPrzesylki, WpisOsi, Zamowienie } from "../api/typy";
+import type { StanPrzesylki, Zamowienie } from "../api/typy";
 
 /* ── CO WIEMY O ZAKUPIE, A CZEGO NIE ─────────────────────────────────────────
-   Karta nad rozmową i zdarzenia w osi czytają te same fakty z jednego miejsca,
-   żeby pasek statusu i linie w osi nie mogły się rozjechać.
+   Karta nad rozmową czyta fakty zakupu z jednego miejsca. Zdarzeń zakupu
+   na osi rozmowy nie ma: złożone, opłacone, doręczone i inne sprawy mówi
+   wyłącznie pasek drogi klienta.
 
    CZEGO TU NIE MA, I TO JEST CAŁA RÓŻNICA WOBEC MAKIETY:
 
@@ -74,64 +75,4 @@ export function stanZakupu(z: Zamowienie, przesylka: StanPrzesylki | null): Stan
       oplacone, nadane, dostarczone,
     ],
   };
-}
-
-const ETYKIETA_DROGI: Record<string, string> = {
-  dyskusja: "Dyskusja otwarta", reklamacja: "Reklamacja otwarta",
-  zwrot: "Zwrot zgłoszony", rozmowa: "Inna rozmowa o tym zakupie",
-};
-const SCIEZKA_DROGI: Record<string, string> = {
-  dyskusja: "dyskusje", reklamacja: "reklamacje", zwrot: "zwroty", rozmowa: "skrzynka",
-};
-
-const wazne = (v: string | null | undefined): v is string =>
-  typeof v === "string" && Number.isFinite(Date.parse(v));
-
-/**
- * Zdarzenia zakupu jako wpisy osi: złożone, opłacone, dostarczone oraz zwroty,
- * reklamacje, dyskusje i inne rozmowy o tym zakupie. Nie dokładamy „nadane":
- * nie ma daty, a linia bez miejsca na osi czasu nie ma gdzie stać.
- */
-export function zdarzeniaZakupu(dane: Pick<OsRozmowy, "rozmowa" | "zamowienie" | "droga">): WpisOsi[] {
-  const wpisy: WpisOsi[] = [];
-  const dodaj = (id: string, tresc: string, at: string | null | undefined, adres?: string) => {
-    if (!wazne(at)) return;
-    wpisy.push({ id: `zakup:${id}`, rodzaj: "zakup", autor: "", odKlienta: false, tresc, at, ofertaId: null,
-      ...(adres ? { adres } : {}) });
-  };
-  const z = dane.zamowienie?.pobrane ?? null;
-  if (z) {
-    dodaj("zlozone", `Zamówienie ${z.externalId} złożone`, z.kupionoAt);
-    if (z.platnoscTyp !== "CASH_ON_DELIVERY") dodaj("oplacone", "Zamówienie opłacone", z.platnoscAt);
-    dodaj("dostarczone", "Paczka dostarczona", dane.zamowienie?.przesylka?.dostarczonoAt);
-  }
-  /* `?? []`: starsza odpowiedź albo atrapa bez drogi zakupu to brak zdarzeń, nie wyjątek
-     w ekranie, na którym agent odpisuje klientowi. */
-  for (const p of dane.droga ?? []) {
-    if (p.rodzaj === "rozmowa" && p.id === dane.rozmowa.id) continue;
-    const etykieta = ETYKIETA_DROGI[p.rodzaj] ?? p.rodzaj;
-    dodaj(`${p.rodzaj}-${p.id}`, p.opis ? `${etykieta}: ${p.opis}` : etykieta, p.at,
-      `/obsluga/${SCIEZKA_DROGI[p.rodzaj] ?? p.rodzaj}/${p.id}`);
-  }
-  return wpisy;
-}
-
-/**
- * Wsuwa zdarzenia do osi w kolejności czasu. Wpisy osi zostają w swojej
- * kolejności (serwer sortuje po identyfikatorze wiadomości), a zdarzenie
- * ląduje przed pierwszym wpisem NOWSZYM od siebie. Stabilne: dwa zdarzenia
- * z tej samej chwili zostają w kolejności, w jakiej przyszły.
- */
-export function scalOs(os: WpisOsi[], zdarzenia: WpisOsi[]): WpisOsi[] {
-  if (zdarzenia.length === 0) return os;
-  const posortowane = [...zdarzenia].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
-  const wynik: WpisOsi[] = [];
-  let k = 0;
-  for (const w of os) {
-    const t = Date.parse(w.at);
-    while (k < posortowane.length && Date.parse(posortowane[k].at) <= t) wynik.push(posortowane[k++]);
-    wynik.push(w);
-  }
-  while (k < posortowane.length) wynik.push(posortowane[k++]);
-  return wynik;
 }

@@ -36,14 +36,16 @@ describe("co świeci w kolumnie kontekstu", () => {
     }
   });
 
-  it("otwarta reklamacja albo dyskusja świeci, zamknięta nie", () => {
-    expect(coSwieci(dane({ sprawy: [{ otwarta: true } as never] }))).toEqual(["sprawa"]);
-    expect(coSwieci(dane({ sprawy: [{ otwarta: false } as never] }))).toEqual([]);
+  /* Reklamację i dyskusję mówi przystanek paska drogi, ze stanem i terminem.
+     Kolumna nie ma już ich wierszy, więc nie ma czym świecić ani czego zwijać. */
+  it("otwarta reklamacja albo dyskusja nie świeci w kolumnie i nie zwija towaru", () => {
+    const otwarta = dane({ sprawy: [{ otwarta: true } as never] });
+    expect(coSwieci(otwarta)).toEqual([]);
+    expect(towarOtwartyNaStart(coSwieci(otwarta))).toBe(true);
   });
 
-  it("zwrot i sprawa zwijają kartę towaru, paczka i pozycja jej nie zwijają", () => {
+  it("zwrot zwija kartę towaru, paczka i pozycja jej nie zwijają", () => {
     expect(towarOtwartyNaStart(["zwrot"])).toBe(false);
-    expect(towarOtwartyNaStart(["sprawa"])).toBe(false);
     expect(towarOtwartyNaStart(["pozycja", "paczka"])).toBe(true);
   });
 

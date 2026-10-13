@@ -306,8 +306,8 @@ function SprawdzPaczke({ p, onSprawdzPrzesylke, sprawdzaPrzesylke = false }: Pyt
 }
 
 /** Druga linia kroku: to, czego nie da się powiedzieć samym tekstem. */
-function Dopisek({ k, dane, pytanie, bezNumerow }: {
-  k: KrokDrogi; dane: DaneDrogi; pytanie: PytanieOPaczke; bezNumerow: boolean;
+function Dopisek({ k, dane, pytanie, bezNumerow, bezPrzesylki }: {
+  k: KrokDrogi; dane: DaneDrogi; pytanie: PytanieOPaczke; bezNumerow: boolean; bezPrzesylki: boolean;
 }) {
   const p = dane.przesylka;
   /* Ekran, który sam pokazuje numer zamówienia i przesyłki, wyłącza oba
@@ -318,7 +318,7 @@ function Dopisek({ k, dane, pytanie, bezNumerow }: {
     return <Numer numer={orderId} href={dane.linkZamowienia ?? dane.reklamacja?.linkZamowienia}
       nazwa="Zamówienie" tytulKopii="Kopiuj numer zamówienia" />;
   }
-  if (k.klucz !== "doreczono" || !p) return null;
+  if (k.klucz !== "doreczono" || !p || bezPrzesylki) return null;
   /* Błąd pytania zastępuje drugą linię, żeby podpis nie urósł do trzech. */
   if (pytanie.bladPrzesylki) {
     return <span className="inline-flex items-center gap-1">
@@ -357,8 +357,12 @@ function Przystanek({ sprawa, ostatni, przebyta, tutaj }: {
     </li>;
   }
   /* Nazwa łącza mówi rok i cel kliku: obok kroków bez roku czytnik
-     nie ma skąd wziąć, którego roku jest data ani dokąd prowadzi łącze. */
-  const opis = `${wielka(nazwa)} z ${dataCyfrowa(sprawa.at)} — otwórz ${cel}`;
+     nie ma skąd wziąć, którego roku jest data ani dokąd prowadzi łącze.
+     Stan, numer, temat i prowadzący stoją w niej i w podpowiedzi, bo na
+     wąskim przystanku mieści się tylko data i jedno słowo stanu. */
+  const opis = opisPrzystanku(sprawa, nazwa, cel);
+  const zamknieta = sprawa.otwarta === false;
+  const termin = sprawa.otwarta === true && sprawa.decyzjaDo ? sprawa.decyzjaDo : null;
   return <li data-przystanek={sprawa.rodzaj} className="flex min-w-[88px] flex-[1_0_88px] flex-col">
     <Link to={`${sciezka}/${sprawa.id}`} aria-label={opis} title={opis}
       className="flex flex-col gap-1.5 rounded text-sky-700 hover:text-sky-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sky-700">
@@ -373,14 +377,31 @@ function Przystanek({ sprawa, ostatni, przebyta, tutaj }: {
       </span>
       <span className="flex flex-col whitespace-nowrap pr-2">
         <span className="text-sm font-semibold underline underline-offset-2">{wielka(nazwa)}</span>
-        <span className="text-xs">{dzienMiesiac(sprawa.at)}</span>
+        {/* Stan SŁOWEM, nie samą barwą (WCAG 1.4.1): zamknięta albo termin
+            do dnia. Termin tylko przy otwartej, bo przy zamkniętej nie biegnie. */}
+        <span className="text-xs">{dzienMiesiac(sprawa.at)}
+          {zamknieta && " · zamknięta"}
+          {termin && <>{" · "}<span className="font-semibold text-ranga-zle">do {dzienMiesiac(termin)}</span></>}
+        </span>
       </span>
     </Link>
   </li>;
 }
 
-export function DrogaSprawy({ dane, biezaca, bezNumerow = false, plaska = false, ...pytanie }:
+/** Nazwa łącza przystanku: rodzaj, data, numer albo temat, stan, prowadzący i cel. */
+export function opisPrzystanku(s: InnaSprawaZakupu, nazwa: string, cel: string): string {
+  const co = s.numer ? ` ${s.numer}`
+    : s.opis ? (s.rodzaj === "zwrot" ? ` nr ${s.opis}` : `: ${s.opis}`) : "";
+  const stan = s.otwarta === false ? ", zamknięta"
+    : s.otwarta === true && s.decyzjaDo ? `, termin ${czas(s.decyzjaDo)}` : "";
+  const prowadzi = s.prowadzi ? `, prowadzi ${s.prowadzi}` : "";
+  return `${wielka(nazwa)} z ${dataCyfrowa(s.at)}${co}${stan}${prowadzi} — otwórz ${cel}`;
+}
+
+export function DrogaSprawy({ dane, biezaca, bezNumerow = false, bezPrzesylki = false, plaska = false, ...pytanie }:
   { dane: DaneDrogi; biezaca?: BiezacaSprawa; bezNumerow?: boolean;
+    /** Ekran sam pokazuje numer listu (i pytanie o paczkę), a numer zamówienia zostawia pasku. */
+    bezPrzesylki?: boolean;
     /** Wariant bez własnej kreski i tła — dla karty, która ma już swoje. */
     plaska?: boolean } & PytanieOPaczke) {
   const r = dane.reklamacja;
@@ -401,7 +422,8 @@ export function DrogaSprawy({ dane, biezaca, bezNumerow = false, plaska = false,
       const k = p.krok;
       poprzedni = k.stan;
       const Ikona = IKONA_KROKU[k.klucz];
-      const dopisek = <Dopisek k={k} dane={dane} pytanie={pytanie} bezNumerow={bezNumerow} />;
+      const dopisek = <Dopisek k={k} dane={dane} pytanie={pytanie} bezNumerow={bezNumerow}
+        bezPrzesylki={bezPrzesylki} />;
       return <li key={k.klucz} data-stan={k.stan} aria-current={k.stan === "biezacy" ? "step" : undefined}
         className="flex min-w-[104px] flex-[1_0_104px] flex-col gap-1.5">
         <span className="flex h-6 items-center" aria-hidden="true">

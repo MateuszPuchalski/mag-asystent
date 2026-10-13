@@ -1293,7 +1293,7 @@ mamy w Subiekcie, gdzie jest paczka i co czeka na ruch.
 | stan oferty | słowo w streszczeniu „Oferta i towar” | plakietka „ACTIVE” |
 | „Nowy klient” i „Wcześniej u nas” | karta, także zwinięta i w pasku | linijka pod pasmem i liczniki w wierszu „Klient” |
 | zamówienie rozmowy wśród zakupów klienta | karta | pozycja na liście, która nazywa się teraz „Inne zakupy klienta” |
-| droga zakupu przez kolejki | pasek drogi klienta w karcie; oś nadal niesie linie zakupu (do decyzji) | czipy „Droga tego zakupu” |
+| droga zakupu przez kolejki | wyłącznie pasek drogi klienta w karcie | czipy „Droga tego zakupu” |
 | data doręczenia | krok „Doręczono” paska drogi w karcie i linia osi | data w streszczeniu „Zamówienie” i zdanie w soczewce zwrotu |
 | zgłoszenie zwrotu | linia osi „Zwrot zgłoszony” | „Zgłoszony …” w bloku zwrotu |
 | przesyłka | jeden blok „Paczka zamówienia” | druga linijka paczki z innym „sprawdź” w bloku zamówienia |
@@ -1303,6 +1303,12 @@ zamiast czterech kroków zakupu. Mówi zakup, doręczenie i inne sprawy
 zamówienia. Sprawa tej rozmowy stoi na nim jako „tu jesteś”. Numer zamówienia
 zostaje w nagłówku karty, a przesyłka w bloku „Paczka zamówienia”. Pasek czyta
 jedno GET po numerze zamówienia.
+
+**Inne sprawy zakupu mają jeden dom: pasek.** Przystanek mówi, czy sprawa jest
+otwarta, jej termin na czerwono, a numer, temat i prowadzącego w nazwie łącza.
+Oś wiadomości nie niesie już linii zakupu. Kolumna nie ma otwartych reklamacji
+ani dyskusji, a „Zamknięte zwroty” zostają, bo przystanek zwrotu nie ma stanu.
+Pasek stoi także przy zamówieniu anulowanym i jeszcze niepobranym.
 
 **Dwa świadome wyjątki.** Pasmo zostaje z wierszem „Zamówił”, bo karta bywa
 poza kadrem. Wiersz mówi już tylko ilość i SKU, bez daty. Blok paczki mówi
@@ -1343,8 +1349,8 @@ dzieli kreska. Licznik liczy każdą narysowaną pozycję: zwrot, sprawę, paczk
 wskazanie pozycji i dobór. Świecący dobór stoi w ramie zwinięty, bo kandydaci
 zajmują kilkaset pikseli.
 
-**Kolejność wierszy:** Oferta i towar, Dobór, Zamówienie, Zamknięte sprawy,
-Klient, Wiedza. Dobór stoi pod towarem, bo „Szukaj innego towaru mimo to”
+**Kolejność wierszy:** Oferta i towar, Zamówienie, Zamknięte zwroty, Klient.
+Dobór stoi pod towarem, bo „Szukaj innego towaru mimo to”
 otwiera go tuż pod przyciskiem. W bloku towaru opis kartoteki stoi przed
 cenami, bo niesie wymiary i gwinty. Wiersz „Zamówienie” mówi paczkę słowem
 i metodę dostawy, a liczbę pozycji tylko wtedy, gdy ich lista stoi pod nim.

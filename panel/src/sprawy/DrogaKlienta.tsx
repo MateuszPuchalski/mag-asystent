@@ -23,11 +23,13 @@ import { DrogaSprawy, type BiezacaSprawa } from "../reklamacje/DrogaSprawy";
 const jestDroga = (d: OdpowiedzDrogi | undefined): d is OdpowiedzDrogi =>
   Boolean(d) && Array.isArray(d!.droga) && Array.isArray(d!.sprawy);
 
-export function DrogaKlienta({ orderId, biezaca, bezNumerow = false, plaska = false }: {
+export function DrogaKlienta({ orderId, biezaca, bezNumerow = false, bezPrzesylki = false, plaska = false }: {
   orderId: string | null | undefined;
   biezaca?: BiezacaSprawa;
   /** Ekran sam pokazuje numer zamówienia i przesyłki, więc pasek ich nie powtarza. */
   bezNumerow?: boolean;
+  /** Ekran sam pokazuje numer listu przewozowego; numer zamówienia zostaje na pasku. */
+  bezPrzesylki?: boolean;
   plaska?: boolean;
 }) {
   const numer = orderId ? orderId : null;
@@ -42,5 +44,6 @@ export function DrogaKlienta({ orderId, biezaca, bezNumerow = false, plaska = fa
       Wczytuję drogę klienta…</p>;
   }
   if (!jestDroga(droga.data)) return null;
-  return <DrogaSprawy dane={droga.data} biezaca={biezaca} bezNumerow={bezNumerow} plaska={plaska} />;
+  return <DrogaSprawy dane={droga.data} biezaca={biezaca} bezNumerow={bezNumerow}
+    bezPrzesylki={bezPrzesylki} plaska={plaska} />;
 }

@@ -104,13 +104,19 @@ describe("KartaKontekstu", () => {
     expect(pasek).not.toHaveTextContent("JJD1");
   });
 
-  it("anulowane zamówienie jest nazwane i nie ma paska drogi ani pytania o nią", async () => {
+  it("anulowane zamówienie jest nazwane, a pasek drogi zostaje: anulowany zakup też ma sprawy", async () => {
     const d = dane();
     ((d.zamowienie as never as { pobrane: { status: string } }).pobrane).status = "CANCELLED";
     pokaz(d);
     expect(screen.getByText("anulowane")).toBeInTheDocument();
-    expect(screen.queryByRole("list", { name: "Droga sprawy" })).toBeNull();
-    expect(zapisy.some((z) => z.includes("/api/obsluga/droga/"))).toBe(false);
+    expect(await screen.findByRole("list", { name: "Droga sprawy" })).toBeInTheDocument();
+  });
+
+  it("zamówienie powiązane, ale niepobrane, też ma pasek drogi", async () => {
+    const d = dane();
+    (d.zamowienie as never as { pobrane: unknown }).pobrane = null;
+    pokaz(d);
+    expect(await screen.findByRole("list", { name: "Droga sprawy" })).toBeInTheDocument();
   });
 
   it("nie stoi pustą ramką, gdy nie ma ani zakupu, ani historii", () => {

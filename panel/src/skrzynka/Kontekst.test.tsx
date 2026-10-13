@@ -126,8 +126,9 @@ describe("kolumna kontekstu", () => {
     expect(screen.queryByText("W normie")).toBeNull();
     /* Decyzja z terminem jest tematem — karta towaru schodzi pod kliknięcie. */
     expect(screen.queryByTestId("oferta")).toBeNull();
-    await userEvent.click(wiersz(/^Zamknięte sprawy/));
+    await userEvent.click(wiersz(/^Zamknięte zwroty/));
     expect(screen.getByText("zwrot 9")).toBeInTheDocument();
+    expect(screen.queryByText(/Zamknięte sprawy/)).toBeNull();
   });
 
   it("paczka z awizo świeci w ramie, a wiersz zamówienia mówi tylko „paczka wyżej”", () => {
@@ -318,14 +319,26 @@ describe("kolumna kontekstu", () => {
     expect(screen.queryByRole("region", { name: "Droga tego zakupu" })).toBeNull();
   });
 
-  /* Dwie sprawy pod jedną pozycją dawały licznik „1", a agent szukał drugiej. */
+  /* Dwa zwroty pod jedną pozycją dawały licznik „1", a agent szukał drugiego. */
   it("licznik „Wymaga Ciebie” liczy każdą pozycję osobno", () => {
-    const sprawa = (id: number) => ({ id, typ: "CLAIM", numer: `R-${id}`, temat: "Uszkodzony nóż",
-      statusAllegro: null, decyzjaDo: null, otwartoAt: "2026-09-28T10:00:00Z", prowadzi: null, otwarta: true });
-    rysuj(dane({ zamowienie: pusteZamowienie, sprawy: [sprawa(1), sprawa(2)],
-      zwroty: [{ id: 5, kubelek: "decyzja" } as never] }));
-    expect(within(swieci()).getByRole("heading", { name: "Wymaga Ciebie · 3" })).toBeInTheDocument();
-    expect(within(swieci()).getAllByRole("link", { name: "Otwórz" })).toHaveLength(2);
+    rysuj(dane({ zamowienie: pusteZamowienie,
+      zwroty: [{ id: 5, kubelek: "decyzja" } as never, { id: 6, kubelek: "ocena" } as never] }));
+    expect(within(swieci()).getByRole("heading", { name: "Wymaga Ciebie · 2" })).toBeInTheDocument();
+  });
+
+  /* Reklamacje i dyskusje mówi przystanek paska drogi w karcie. W kolumnie
+     nie świecą, nie wchodzą do licznika i nie mają wiersza „Zamknięte". */
+  it("sprawy zakupu, otwarte i zamknięte, nie mają w kolumnie żadnego domu", () => {
+    const sprawa = (id: number, otwarta: boolean) => ({ id, typ: "CLAIM", numer: `R-${id}`,
+      temat: "Uszkodzony nóż", statusAllegro: null, decyzjaDo: "2026-10-20T00:00:00Z",
+      otwartoAt: "2026-09-28T10:00:00Z", prowadzi: "Ola", otwarta });
+    rysuj(dane({ zamowienie: pusteZamowienie, sprawy: [sprawa(1, true), sprawa(2, false)] }));
+    expect(screen.queryByRole("region", { name: "Wymaga Ciebie" })).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Zamknięte/ })).toBeNull();
+    expect(screen.queryByText(/Uszkodzony nóż|R-1|R-2/)).toBeNull();
+    expect(screen.queryByRole("link", { name: "Otwórz" })).toBeNull();
+    /* Otwarta reklamacja nie zwija już towaru: kolumna nie ma jej wiersza. */
+    expect(wiersz(/^Oferta i towar/)).toHaveAttribute("aria-expanded", "true");
   });
 
   /* Od tego, co klient kupował, do tego, kim jest — wiersze nie skaczą. */
@@ -334,9 +347,9 @@ describe("kolumna kontekstu", () => {
       zamowienieId: "inne", link: null, rozmowaId: null, sprawaId: null }] } satisfies HistoriaKlienta;
     rysuj(dane({ zamowienie: pusteZamowienie, zwroty: [{ id: 9, kubelek: "zamkniety" } as never] }));
     const nazwy = screen.getAllByRole("button",
-      { name: /^(Oferta i towar|Zamówienie|Zamknięte sprawy|Klient)/ })
+      { name: /^(Oferta i towar|Zamówienie|Zamknięte zwroty|Klient)/ })
       .map((b) => b.querySelector("b")?.textContent);
-    expect(nazwy).toEqual(["Oferta i towar", "Zamówienie", "Zamknięte sprawy", "Klient"]);
+    expect(nazwy).toEqual(["Oferta i towar", "Zamówienie", "Zamknięte zwroty", "Klient"]);
   });
 });
 

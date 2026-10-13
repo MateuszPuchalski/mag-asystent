@@ -518,10 +518,11 @@ export function Dyskusje() {
                   blad={bladZakonczenia} onZakoncz={wyslijZakonczenie} />
                 {bladOdswiezenia && <p className="basis-full text-xs text-red-800">{bladOdswiezenia}</p>}
               </div>
-              {/* Droga klienta nad rozmową. Numer zamówienia i przesyłki stoją już
-                  w kolumnie faktów, więc pasek ich nie powtarza. */}
+              {/* Droga klienta nad rozmową. Numer zamówienia mówi tylko pasek, a numer
+                  listu przewozowego z pytaniem o paczkę stoi w kolumnie faktów,
+                  więc pasek go nie powtarza. */}
               <div className="shrink-0 border-b border-slate-200 bg-wertis-paper px-4 py-3 empty:hidden">
-                <DrogaKlienta plaska orderId={szczegol.data.dyskusja.orderId} bezNumerow
+                <DrogaKlienta plaska orderId={szczegol.data.dyskusja.orderId} bezPrzesylki
                   biezaca={{ rodzaj: "dyskusja", id: szczegol.data.dyskusja.id }} />
               </div>
               <Czat tytul="Czat dyskusji"

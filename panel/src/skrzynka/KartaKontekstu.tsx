@@ -236,12 +236,15 @@ export function KartaKontekstu({ dane, historia }: { dane: OsRozmowy; historia?:
           </div>
         </div>}
 
-    {/* DROGA KLIENTA ZAMIAST CZTERECH KROKÓW ZAKUPU. Złożone, opłacone,
-        nadane i dostarczone mówiły sam zakup, a pasek mówi też, jakie inne
-        sprawy ten zakup już miał. Numer zamówienia stoi wyżej, a przesyłka
-        w bloku „Paczka zamówienia”, więc pasek ich nie powtarza. Anulowane
-        zamówienie nie ma drogi do opowiadania. */}
-    {numer && stan && !stan.anulowane && <div className="border-t border-slate-100 pt-2">
+    {/* DROGA KLIENTA JEST JEDYNYM DOMEM ZDARZEŃ ZAKUPU. Złożone, opłacone,
+        doręczone i inne sprawy tego zakupu (zwrot, reklamacja, dyskusja,
+        druga rozmowa) stoją tylko tutaj, ze stanem i terminem na przystanku.
+        Numer zamówienia stoi wyżej, a przesyłka w bloku „Paczka zamówienia”,
+        więc pasek ich nie powtarza. Staje przy samym numerze, także gdy treść
+        zamówienia nie jest pobrana albo zamówienie anulowano: pasek pyta serwer
+        po numerze, a anulowany zakup też może mieć sprawę, której nigdzie
+        indziej już nie widać. */}
+    {numer && <div className="border-t border-slate-100 pt-2">
       <DrogaKlienta plaska bezNumerow orderId={numer}
         biezaca={{ rodzaj: "rozmowa", id: dane.rozmowa.id }} /></div>}
     {klient && <div className="border-t border-slate-100 pt-2">{klient}</div>}

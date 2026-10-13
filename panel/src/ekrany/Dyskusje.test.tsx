@@ -202,8 +202,9 @@ describe("Ekran dyskusji", () => {
       const pasek = await screen.findByRole("list", { name: "Droga sprawy" });
       expect(pasek.querySelector('[aria-current="location"]')).toHaveAttribute("data-przystanek", "dyskusja");
       expect(within(pasek).getByRole("link", { name: /^Zwrot z/ })).toHaveAttribute("href", "/obsluga/zwroty/9");
-      /* Numer zamówienia i listu stoją w kolumnie faktów, więc nie w pasku. */
-      expect(pasek).not.toHaveTextContent(/ord-1|620001/);
+      /* Numer zamówienia mówi tylko pasek, a numer listu stoi w kolumnie faktów. */
+      expect(pasek).toHaveTextContent("ord-1");
+      expect(pasek).not.toHaveTextContent("620001");
       expect(stan.nieznane).toEqual([]);
       expect(stan.wyslane).toEqual([]);
     } finally { vi.unstubAllGlobals(); }

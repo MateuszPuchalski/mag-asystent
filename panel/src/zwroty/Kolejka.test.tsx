@@ -256,15 +256,14 @@ describe("Dowody", () => {
     expect(screen.getByText(/dociągnij je, żeby pozycje dostały kartotekę/)).toBeInTheDocument();
   });
 
-  it("odnośnik zamówienia wychodzi w nowej karcie i nie wynosi naszego adresu", () => {
-    /* Numer zwrotu i login kupującego przeprowadziły się w 0.207.0 do
-       nagłówka sprawy — pilnuje ich `Naglowek.test.tsx`. Tutaj zostaje to,
-       co dalej należy do prawej kolumny. */
+  it("numeru zamówienia i odnośnika do Allegro kolumna nie powtarza: stoją na pasku drogi", () => {
+    /* Numer zwrotu i login kupującego mieszkają w nagłówku sprawy (`Naglowek.test.tsx`),
+       a numer zamówienia z odnośnikiem i kopiowaniem w kroku Zakup paska drogi. */
     render(zKlientem(<Dowody zwrot={zwrot({ zamowienie: ZAMOWIENIE })} />));
-    const link = screen.getByRole("link", { name: /Otwórz w Allegro/ });
-    expect(link).toHaveAttribute("href", "https://allegro.pl/moje-allegro/zam/ord-1");
-    expect(link).toHaveAttribute("target", "_blank");
-    expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    expect(screen.queryByRole("link", { name: /Otwórz w Allegro/ })).toBeNull();
+    expect(screen.queryByText("ord-1")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Kopiuj/ })).toBeNull();
+    expect(screen.getByRole("heading", { name: /Zamówienie/ })).toBeInTheDocument();
   });
 
   it("przewoźnik stoi przy PACZCE, nie przy zwrocie jako sprawie", () => {
@@ -352,23 +351,14 @@ describe("Dowody", () => {
     expect(screen.getByText(/Doręczona do nas/)).toBeInTheDocument();
   });
 
-  it("wiadomości o zakupie prowadzą do skrzynki, a ich BRAK MILCZY", () => {
-    /* Do 0.368.0 pusta sekcja pisała „Allegro nic nie powiązało" — zdanie
-       o Allegro, nie o tej sprawie, powtarzane przy prawie każdym zwrocie.
-       Od 0.370.0 sekcji wtedy po prostu nie ma (dekalog p. 2).
-
-       Od 0.518.0 rozmowa stoi przystankiem drogi w „Ten zakup u nas" —
-       osobna lista wiadomości powtarzała to, co droga już niesie. */
-    const { rerender } = render(zKlientem(<Dowody zwrot={zwrot()} />));
-    expect(screen.queryByText(/Ten zakup u nas/)).toBeNull();
-
-    rerender(zKlientem(<Dowody zwrot={zwrot({ rozmowy: [
+  it("kolumna dowodów nie ma sekcji o innych sprawach zakupu: mówi je tylko pasek drogi", () => {
+    /* Do tego wydania stała tu sekcja „Ten zakup u nas" z przystankami drogi
+       i rodzeństwem spraw. Pasek pod nagłówkiem niesie to samo ze stanem. */
+    render(zKlientem(<Dowody zwrot={zwrot({ rozmowy: [
       { id: 7, temat: "Kiedy zwrot pieniędzy?", status: "open",
-        ostatniaAt: "2026-09-01T10:00:00.000Z" }] })} droga={[
-      { rodzaj: "rozmowa", id: 7, at: "2026-08-24T10:00:00.000Z", opis: "Kiedy zwrot pieniędzy?" },
-      { rodzaj: "zwrot", id: 1, at: "2026-08-25T09:00:00.000Z", opis: "REF-1" }]} />));
-    const link = screen.getByRole("link", { name: /pytanie/ });
-    expect(link).toHaveAttribute("href", "/obsluga/skrzynka/7");
+        ostatniaAt: "2026-09-01T10:00:00.000Z" }] })} />));
+    expect(screen.queryByText(/Ten zakup u nas/)).toBeNull();
+    expect(screen.queryByRole("link", { name: /pytanie/ })).toBeNull();
   });
 
   it("bez pobranego zamówienia ekran daje drogę wyjścia, nie samo czekanie", () => {
