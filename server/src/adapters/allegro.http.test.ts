@@ -8,6 +8,7 @@ import {
   urlListyZwrotow,
   urlOdswiezeniaZwrotow,
   urlRoszczenProwizji,
+  urlZwrotowPlatnosci,
   urlOpinii,
   urlOstatnichZamowien,
   urlWatkow,
@@ -389,4 +390,11 @@ test("załącznik Centrum Wiadomości: droga API z UUID z ogona `url`, zapisany 
   assert.deepEqual(kandydaciPobrania("https://api.allegro.pl", "https://api.allegro.pl/sale/issues/attachments/a-1"),
     [{ droga: "url", adres: "https://api.allegro.pl/sale/issues/attachments/a-1" }]);
   assert.equal(idZalacznikaZUrl("https://upload.allegro.pl/message-attachments/nie-uuid"), null);
+});
+
+test("urlZwrotowPlatnosci: lista konta albo jedno zamówienie, bez filtra statusu", () => {
+  assert.equal(urlZwrotowPlatnosci("https://api.allegro.pl", null, -3),
+    "https://api.allegro.pl/payments/refunds?limit=100&offset=0");
+  assert.equal(urlZwrotowPlatnosci("https://api.allegro.pl", "a b", 5),
+    "https://api.allegro.pl/payments/refunds?limit=100&offset=5&order.id=a%20b");
 });

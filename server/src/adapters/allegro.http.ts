@@ -217,6 +217,24 @@ export function urlOperacjiPlatnosci(
 }
 
 /**
+ * Lista zwrotów płatności (`GET /payments/refunds`, `public.v1`).
+ *
+ * To jedyna końcówka, której rekord (`RefundDetails`) niesie ROZBICIE zwrotu
+ * pieniędzy na pozycje (`lineItems`), dostawę i kaucję — czyli to, co biuro
+ * widzi w Sales Center. Obiekt zwrotu klienta tego nie ma. Sonda pyta o nią,
+ * żeby sprawdzić na żywym koncie, czy trafiają tu także zwroty zrobione ręką
+ * w Sales Center; schemat tego nie rozstrzyga.
+ *
+ * `status` w zapytaniu ma INNY zestaw wartości niż w odpowiedzi, więc nie
+ * filtrujemy po nim: czytamy wszystko i mapujemy po stronie wołającego.
+ * `orderId` pusty daje listę całego konta.
+ */
+export function urlZwrotowPlatnosci(apiUrl: string, orderId: string | null, offset: number): string {
+  const zamowienie = orderId ? `&order.id=${encodeURIComponent(orderId)}` : "";
+  return `${apiUrl}/payments/refunds?limit=100&offset=${Math.max(0, Math.trunc(offset))}${zamowienie}`;
+}
+
+/**
  * Numery przesyłek zamówienia (0.393.0).
  *
  * `GET /order/checkout-forms/{id}/shipments` — „list of parcel tracking
