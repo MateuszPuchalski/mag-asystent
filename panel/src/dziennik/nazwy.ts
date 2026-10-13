@@ -314,6 +314,8 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   odsylacze_wycofanie: "Odsyłacze wycofane",
   oferta_komplet_ustalony: "Komplet oferty ustalony",
   zbiorki_import: "Zbiórki wczytane",
+  zbiorki_z_sellasist: "Zbiórki z Sellasist",
+  sellasist_notatka: "Notatka do zamówienia w Sellasist",
 
   /* Konta, ustawienia, system */
   login: "Logowanie",
