@@ -92,7 +92,7 @@ beforeEach(() => {
       if (metoda !== "POST") return new Response(JSON.stringify(sellasist));
       if (bladNotatki) return new Response(JSON.stringify({ error: bladNotatki }), { status: 502 });
       const { tekst } = JSON.parse(init?.body as string) as { tekst: string };
-      sellasist = { ...sellasist, notatki: [...sellasist.notatki, { data: "2026-10-13T08:00:00Z", tekst: `${tekst} — Ola` }] };
+      sellasist = { ...sellasist, notatki: [...sellasist.notatki, { data: "2026-10-13T08:00:00Z", tekst: `${tekst}\n(Ola, WERTIS)` }] };
       return new Response(JSON.stringify(sellasist));
     }
     const sprawa = /\/sprawa\/(krok|zakoncz|wznow|przejmij|dosylka|dosylka\/numer)$/.exec(url)?.[1];
@@ -722,7 +722,7 @@ describe("DOSYŁKA na karcie sprawy", () => {
 const W_SELLASIST: WidokSellasist = {
   wlaczony: true,
   zamowienie: {
-    id: 48211, status: "Czeka na towar", statusAt: "2026-10-12T07:30:00Z",
+    id: 48211, wLustrze: true, status: "Czeka na towar", statusAt: "2026-10-12T07:30:00Z",
     zebranoAt: "2026-10-12T08:00:00Z", spakowanoAt: null, termin: "2026-10-14",
     przesylki: [{ waybill: "6201112223334", usluga: "InPost Paczkomaty", utworzonoAt: "2026-10-12T09:00:00Z" }],
     braki: [{ nazwa: "Pasek klinowy 13x1000", potrzeba: 2, jest: 1 }],
@@ -794,7 +794,7 @@ describe("SELLASIST przy zamówieniu", () => {
     expect(pole).toHaveAttribute("maxLength", "1000");
     await userEvent.type(pole, "  Dołożyć drugi pasek  ");
     await userEvent.click(przycisk);
-    expect(await within(sekcja).findByText("Dołożyć drugi pasek — Ola")).toBeInTheDocument();
+    expect(await within(sekcja).findByText(/Dołożyć drugi pasek\s+\(Ola, WERTIS\)/)).toBeInTheDocument();
     expect(zapisy()).toEqual([{ metoda: "POST", url: "/api/obsluga/sellasist/zamowienie/z-1/notatka",
       body: JSON.stringify({ tekst: "Dołożyć drugi pasek" }) }]);
     /* Widok z odpowiedzi wystarcza — drugiego odczytu Sellasist nie ma. */
@@ -813,6 +813,19 @@ describe("SELLASIST przy zamówieniu", () => {
     await userEvent.click(within(sekcja).getByRole("button", { name: "Dodaj notatkę do Sellasist" }));
     expect(await within(sekcja).findByText("Sellasist nie odpowiedział.")).toBeInTheDocument();
     expect(pole).toHaveValue("Pilne");
+  });
+
+  it("zamówienie spoza lustra: stan nieznany, bez „jeszcze nie zebrano”; notatki i formularz zostają", async () => {
+    sellasist = { ...W_SELLASIST, zamowienie: { ...W_SELLASIST.zamowienie!, wLustrze: false, status: null,
+      statusAt: null, zebranoAt: null, spakowanoAt: null, termin: null, przesylki: [], braki: [], kopie: [] } };
+    pokaz();
+    await rozwin();
+    const sekcja = await screen.findByRole("region", { name: "Sellasist" });
+    expect(within(sekcja).getByText("stan zamówienia jeszcze nie dotarł z Sellasist.")).toBeInTheDocument();
+    expect(within(sekcja).queryByText("jeszcze nie zebrano")).toBeNull();
+    expect(within(sekcja).queryByText("bez statusu")).toBeNull();
+    expect(within(sekcja).getByText("Klient prosi o dwa paski")).toBeInTheDocument();
+    expect(within(sekcja).getByRole("button", { name: "Dodaj notatkę do Sellasist" })).toBeInTheDocument();
   });
 
   it("błąd odczytu notatek nie udaje braku notatek; stan zamówienia zostaje", async () => {

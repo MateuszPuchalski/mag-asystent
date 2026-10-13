@@ -239,16 +239,23 @@ test("429 idzie wyżej i zostaje w stanie jako stałe zdanie", async () => {
     last_attempt_at: TERAZ.toISOString() });
 });
 
+test("stan przed pierwszym udanym przebiegiem nie ma dób — brak danych to nie zero", () => {
+  assert.deepEqual(S.stanSellasist(db(), true, TERAZ).dni, []);
+});
+
 test("stan dla panelu: siedem dób magazynu, zamówienia zebrane i spakowane", async () => {
   await przebieg(atrapa({
     "/orders_logs": [{ id: 7, order_id: 200, operation_tag: "order_edit", date: "2026-10-13 11:00:00" }],
     "/orders/200": zamowienie(200, { shipments: [{ service: "DPD", tracking_number: "DPD1" }] }),
     "/ordersshipments": [{ tracking_number: "DPD1", created_date: "2026-10-13 10:15:00" }],
   }).query);
+  /* Lustro ruszyło dziś, więc doby sprzed dziś nie istnieją — nie są zerami. */
   const s = S.stanSellasist(db(), true, TERAZ);
-  assert.equal(s.dni.length, 7);
-  assert.equal(s.dni[0].data, "2026-10-07");
-  assert.deepEqual(s.dni[6], { data: "2026-10-13", zebranych: 1, spakowanych: 1 });
+  assert.deepEqual(s.dni, [{ data: "2026-10-13", zebranych: 1, spakowanych: 1 }]);
+  db().prepare("UPDATE sellasist_sync_state SET pierwszy_sukces_at = '2026-10-01T00:00:00.000Z'").run();
+  const tydzien = S.stanSellasist(db(), true, TERAZ);
+  assert.equal(tydzien.dni.length, 7);
+  assert.equal(tydzien.dni[0].data, "2026-10-07");
   assert.equal(s.blad, null);
   assert.equal(s.wKolejce, 0);
 });

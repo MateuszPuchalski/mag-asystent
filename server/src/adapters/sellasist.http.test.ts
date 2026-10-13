@@ -54,6 +54,9 @@ test("zamówienie: daty w UTC, termin-dzień zostaje dniem, oryginał nie jest k
   assert.equal(z.termin, "2026-07-30");
   assert.equal(z.skopiowaneZ, null);
   assert.equal(S.mapujZamowienie({ ...ZAMOWIENIE, is_copied: "1", copied_order_id: 1000 })!.skopiowaneZ, 1000);
+  /* Przykład w schemacie niesie „false" — to oryginał, nawet z numerem obok. */
+  assert.equal(S.mapujZamowienie({ ...ZAMOWIENIE, is_copied: "false", copied_order_id: 1000 })!.skopiowaneZ, null);
+  assert.equal(S.mapujZamowienie({ ...ZAMOWIENIE, is_copied: "TRUE", copied_order_id: 1000 })!.skopiowaneZ, 1000);
 });
 
 test("zamówienie: pozycje bez numeru koszyka odpadają, brak liczy się z quantityMissing", () => {

@@ -1125,3 +1125,17 @@ test("Sellasist, który nie odpowiada (także 429), nie zabiera wykrycia z Alleg
   assert.equal(w.wykryte, 1);
   assert.deepEqual([wiersz()!.waybill, wiersz()!.zrodlo], ["D1", "allegro"]);
 });
+
+test("po 429 z Sellasist przebieg nie pyta go o następne dosyłki — limit jest wspólny z lustrem", async () => {
+  zamowienie("z-1", "kl");
+  zamowienie("z-2", "k2");
+  D.zalozDosylkeZOdmowy(db(), zwrot("kl", { zamowienie: "z-1", zgloszono: "2026-09-22T10:00:00.000Z" }), ala, TERAZ);
+  D.zalozDosylkeZOdmowy(db(), zwrot("k2", { zamowienie: "z-2", zgloszono: "2026-09-22T10:00:00.000Z" }), ala, TERAZ);
+  const { BladLimituSellasist } = await import("../adapters/sellasist.http.js");
+  let pytan = 0;
+  const a = allegro();
+  await D.sledzDosylki(db(), { ...a.deps(za(2)),
+    sellasist: async () => { pytan++; throw new BladLimituSellasist("Sellasist prosi o przerwę (429).", 1000); } });
+  assert.equal(pytan, 1);
+  assert.equal(a.wolane.filter((u) => u.endsWith("/shipments")).length, 2, "Allegro pyta dalej o obie dosyłki");
+});

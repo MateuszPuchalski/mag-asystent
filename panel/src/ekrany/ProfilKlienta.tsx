@@ -32,10 +32,10 @@ import {
    (notatka, cała oś). Liczby w nagłówku odpowiadają na „jak duży to
    klient" jednym spojrzeniem.
 
-   EKRAN JEST ODCZYTEM, poza notatką, sprawą klienta (S6, 0.535.0) i notatką
-   do Sellasist — każdy zapis idzie wyłącznie na kliknięcie, otwarcie nie
-   mutuje niczego. Sprawy
-   z kolejek załatwia się na ich ekranach; tu każdy wiersz do nich prowadzi.
+   EKRAN JEST ODCZYTEM, poza notatką, sprawą klienta (S6) i notatką do
+   Sellasist — każdy zapis idzie wyłącznie na kliknięcie, otwarcie nie mutuje
+   niczego. Sprawy z kolejek załatwia się na ich ekranach; tu każdy wiersz do
+   nich prowadzi.
    Sprawa klienta mieszka TUTAJ, bo jej kluczem jest login, a login ma
    dokładnie jeden ekran. */
 
@@ -676,15 +676,19 @@ function SellasistZamowienia({ zamowienie, rozwiniete }: { zamowienie: string; r
       <b>Sellasist</b>
       {z && <>
         <span className="text-xs text-slate-600">zamówienie {z.id}</span>
-        <span className="font-semibold">{z.status ?? "bez statusu"}</span>
-        {z.statusAt && <span className="text-xs text-slate-600">od {czas(z.statusAt)}</span>}
+        {/* Zamówienie spoza lustra ma stan NIEZNANY. „Jeszcze nie zebrano” przy
+            paczce dawno doręczonej byłoby nieprawdą, a nie brakiem danych. */}
+        {z.wLustrze
+          ? <span className="font-semibold">{z.status ?? "bez statusu"}</span>
+          : <span className="text-slate-600">stan zamówienia jeszcze nie dotarł z Sellasist.</span>}
+        {z.wLustrze && z.statusAt && <span className="text-xs text-slate-600">od {czas(z.statusAt)}</span>}
       </>}
       {/* Przy błędzie odczytu nie wiemy, czy zna — mówi o tym zdanie błędu niżej. */}
       {!z && !d.notatkiBlad && <span className="text-slate-600">nie zna tego zamówienia.</span>}
     </p>
     <Blad>{d.notatkiBlad}</Blad>
     {z && <>
-      {z.braki.length > 0 && <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
+      {z.wLustrze && z.braki.length > 0 && <div className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900">
         <p className="flex items-center gap-1.5 font-semibold">
           <AlertTriangle size={14} aria-hidden="true" className="shrink-0" />Brakuje do spakowania — paczka nie wyjdzie</p>
         <ul className="mt-1 space-y-0.5" aria-label="Braki do spakowania">
@@ -694,7 +698,7 @@ function SellasistZamowienia({ zamowienie, rozwiniete }: { zamowienie: string; r
           </li>)}
         </ul>
       </div>}
-      <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5">
+      {z.wLustrze && <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-3 gap-y-0.5">
         <dt className="text-slate-600">Magazyn</dt>
         <dd>{z.spakowanoAt ? `spakowano ${czas(z.spakowanoAt)}`
           : z.zebranoAt ? `zebrano ${czas(z.zebranoAt)}, jeszcze bez etykiety` : "jeszcze nie zebrano"}</dd>
@@ -709,7 +713,7 @@ function SellasistZamowienia({ zamowienie, rozwiniete }: { zamowienie: string; r
           </li>)}</ul></dd></>}
         {z.kopie.length > 0 && <><dt className="text-slate-600">Kopie</dt>
           <dd>{z.kopie.length} (nr {z.kopie.join(", ")}) — zwykle dosyłki</dd></>}
-      </dl>
+      </dl>}
       <div>
         <p className="text-xs font-semibold text-slate-700">Notatki w Sellasist</p>
         {d.notatki.length > 0

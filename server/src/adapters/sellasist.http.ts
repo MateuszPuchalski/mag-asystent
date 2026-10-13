@@ -237,6 +237,16 @@ function przesylkiZamowienia(z: Obiekt): PrzesylkaSellasist[] {
   return [...wynik.values()];
 }
 
+/**
+ * `is_copied` jest w schemacie tekstem, a przykład obok niesie „false".
+ * Oryginałem jest więc puste, „0" i „false": oryginał uznany za kopię
+ * wypadłby z realizacji, notatek i dosyłki.
+ */
+export function jestKopia(v: unknown): boolean {
+  const s = tekst(v)?.toLowerCase() ?? "";
+  return !["", "0", "false"].includes(s);
+}
+
 /** Szczegół zamówienia (`GET /orders/{order_id}`) na nasz typ. `null`, gdy brak `id`. */
 export function mapujZamowienie(v: unknown): ZamowienieSellasist | null {
   const z = obiekt(v);
@@ -244,7 +254,6 @@ export function mapujZamowienie(v: unknown): ZamowienieSellasist | null {
   if (!z || id === null) return null;
   const zew = obiekt(z.external_data);
   const status = obiekt(z.status);
-  const kopia = tekst(z.is_copied);
   return {
     id,
     externalId: tekst(zew?.external_id),
@@ -255,8 +264,7 @@ export function mapujZamowienie(v: unknown): ZamowienieSellasist | null {
     statusAt: dataSellasist(z.last_status_change),
     termin: dataSellasist(z.deadline),
     utworzonoAt: dataSellasist(z.date),
-    /* `is_copied` jest w schemacie tekstem; „0" i puste znaczą oryginał. */
-    skopiowaneZ: kopia && kopia !== "0" ? calkowita(z.copied_order_id) : null,
+    skopiowaneZ: jestKopia(z.is_copied) ? calkowita(z.copied_order_id) : null,
     pozycje: lista(z.carts).flatMap((c): PozycjaSellasist[] => {
       const koszykId = calkowita(c.id);
       if (koszykId === null) return [];

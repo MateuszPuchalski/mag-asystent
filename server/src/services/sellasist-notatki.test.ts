@@ -100,6 +100,15 @@ test("notatka do zamówienia spoza lustra szuka go po numerze źródła", async 
   assert.equal(await N.dodajNotatkeSellasist(db(), "ord-2", "x", ala, a.query, true), 80);
 });
 
+test("wgląd w zamówienie spoza lustra: stan nieznany, nie zerowy; notatki dalej są", async () => {
+  const a = atrapa({ "/orders?external_id=ord-2&limit=100": [{ id: 80 }], "/notes/80": [{ text: "Stara", date: "2026-01-02 10:00:00" }] });
+  const w = await N.widokSellasist(db(), "ord-2", a.query, true);
+  assert.equal(w.zamowienie!.wLustrze, false);
+  assert.equal(w.zamowienie!.id, 80);
+  assert.equal(w.notatki.length, 1);
+  assert.equal((await N.widokSellasist(db(), "ord-1", atrapa({ "/notes/50": [] }).query, true)).zamowienie!.wLustrze, true);
+});
+
 test("odmowy: wyłączona, pusta, za długa, nieznane zamówienie, błąd Sellasist stałym zdaniem", async () => {
   const kod = async (p: Promise<unknown>) => {
     try { await p; return null; } catch (e) { return [(e as { kod: number }).kod, (e as Error).message]; }
@@ -115,4 +124,12 @@ test("odmowy: wyłączona, pusta, za długa, nieznane zamówienie, błąd Sellas
   assert.deepEqual(await kod(N.dodajNotatkeSellasist(db(), "ord-1", "x", ala,
     atrapa({ "/notes": new Error("<html>stack trace</html>") }).query, true)), [502, "Sellasist nie odpowiedział."]);
   assert.equal(db().prepare("SELECT COUNT(*) AS n FROM events").get()!.n, 0, "odmowa nie trafia do dziennika");
+});
+
+test("odpowiedź bez numeru notatki (także 404) to odmowa, bez wpisu w dzienniku", async () => {
+  for (const odp of [null, {}, { id: "" }]) {
+    await assert.rejects(N.dodajNotatkeSellasist(db(), "ord-1", "x", ala, atrapa({ "/notes": odp }).query, true),
+      (e: unknown) => (e as { kod: number }).kod === 502 && (e as Error).message === "Sellasist nie przyjął notatki.");
+  }
+  assert.equal(db().prepare("SELECT COUNT(*) AS n FROM events").get()!.n, 0);
 });

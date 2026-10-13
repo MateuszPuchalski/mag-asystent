@@ -2958,6 +2958,7 @@ CREATE TABLE IF NOT EXISTS sellasist_sync_state (
   kursor_at       TEXT,                 -- data ostatniego wpisu dziennika, ISO UTC
   kursor_id       INTEGER,              -- jego numer; wpisy z tą samą datą i niższym numerem już były
   last_success_at TEXT,
+  pierwszy_sukces_at TEXT,              -- od tej doby liczby dzienne są pełne; wcześniej lustra nie było
   last_attempt_at TEXT,
   blad            TEXT,                 -- stałe zdanie ostatniej porażki, nigdy treść odpowiedzi
   blad_kod        INTEGER

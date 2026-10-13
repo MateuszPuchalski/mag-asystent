@@ -233,3 +233,14 @@ test("bez lustra Sellasist stan jest taki jak dotąd", () => {
   db().exec("DELETE FROM sellasist_pozycja; DELETE FROM sellasist_zamowienie;");
   assert.equal(R.stanRealizacji(zamowienie, false, subiekt, db())!.sellasist, null);
 });
+
+test("etykieta z dziś przy brakach albo bez płatności nie obiecuje wysyłki dziś", () => {
+  const etykieta = { etykietaAt: "2026-10-06T07:30:00Z" };
+  const zBrakami = R.ocenRealizacji(stan({ sellasist: sa({ ...etykieta,
+    braki: [{ nazwa: "Pasek", potrzeba: 1, jest: 0 }] }) }), TERAZ)!;
+  assert.equal(zBrakami.wyslemyDzis, false);
+  assert.match(zBrakami.zdanie, /brakuje towaru na stanie/);
+  const bezPlatnosci = R.ocenRealizacji(stan({ status: "FILLED_IN", sellasist: sa(etykieta) }), TERAZ)!;
+  assert.equal(bezPlatnosci.wyslemyDzis, false);
+  assert.match(bezPlatnosci.zdanie, /płatność niezakończona/);
+});

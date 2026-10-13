@@ -1,6 +1,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import { urlPrzesylekZamowienia, zapytajAllegro } from "../adapters/allegro.http.js";
 import { sellasistWlaczony } from "../adapters/sellasist.http.js";
+import { BladLimitu } from "../adapters/limit.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
 import { config } from "../config.js";
 import { chwilaUtc } from "../czas.js";
@@ -453,26 +454,32 @@ export interface DosylkaDeps {
   sellasist?: KandydaciDosylki | null;
 }
 
+/** Sellasist na jeden przebieg; 429 zeruje go do końca przebiegu. */
+type SellasistPrzebiegu = { pytaj: KandydaciDosylki | null };
+
 /**
  * Numery z Sellasist dopisane do listy z Allegro. DEGRADUJE: Sellasist,
- * który nie odpowie (także 429), nie zabiera wykrycia z samego Allegro ani
- * śledzenia innych dosyłek — dlatego limitu nie podnosimy do taktu.
+ * który nie odpowie, nie zabiera wykrycia z samego Allegro ani śledzenia
+ * innych dosyłek. Limitu nie podnosimy do taktu, bo zatrzymałby Allegro.
+ * Po 429 nie pytamy go jednak do końca przebiegu: limit jest wspólny
+ * z lustrem zamówień, a każde kolejne pytanie tylko go przedłuża.
  */
 async function dopiszZSellasist(
   database: DatabaseSync, sprawa: number, zamowienie: string, zwrotAt: string,
-  przesylki: PrzesylkaZamowienia[], sellasist: KandydaciDosylki,
+  przesylki: PrzesylkaZamowienia[], sellasist: SellasistPrzebiegu,
 ): Promise<Set<string>> {
   const dopisane = new Set<string>();
   const w = database.prepare("SELECT login FROM klient_prowadzenie WHERE id = ?").get(sprawa) as Wiersz | undefined;
   const login = tekst(w?.login);
-  if (!login) return dopisane;
+  if (!login || !sellasist.pytaj) return dopisane;
   try {
-    for (const p of await sellasist(zamowienie, login, zwrotAt)) {
+    for (const p of await sellasist.pytaj(zamowienie, login, zwrotAt)) {
       if (przesylki.some((a) => a.waybill === p.waybill)) continue;
       przesylki.push(p);
       dopisane.add(p.waybill);
     }
-  } catch {
+  } catch (e) {
+    if (e instanceof BladLimitu) sellasist.pytaj = null;
     /* Stałe zdanie, nie `e.message`: odpowiedź Sellasist bywa czymkolwiek. */
     console.warn("[dosylki] pytanie do Sellasist nie doszło — numer szukam w samym Allegro");
   }
@@ -549,7 +556,7 @@ const TRACKING_DOSYLEK = { limitWyzej: true, pojedynczoPoBledzie: true } as cons
  */
 async function wykryj(
   database: DatabaseSync, w: Wiersz, query: (url: string) => Promise<unknown | null>, apiUrl: string,
-  teraz: Date, sellasist: KandydaciDosylki | null,
+  teraz: Date, sellasist: SellasistPrzebiegu,
 ): Promise<{ znaleziono: boolean } & Przejscie | null> {
   const k: Klucz = { sprawa: Number(w.sprawa_id), zamowienie: String(w.zamowienie) };
   /* Bez chwili zgłoszenia zwrotu nie da się odróżnić oryginału od dosyłki,
@@ -570,9 +577,7 @@ async function wykryj(
     .filter((p) => typeof p?.waybill === "string" && p.waybill !== ""
       && typeof p?.carrierId === "string" && p.carrierId !== "")
     .map((p) => ({ waybill: String(p.waybill), carrierId: String(p.carrierId), createdAt: tekst(p.createdAt) }));
-  const zSellasist = sellasist
-    ? await dopiszZSellasist(database, k.sprawa, k.zamowienie, zwrotAt, przesylki, sellasist)
-    : new Set<string>();
+  const zSellasist = await dopiszZSellasist(database, k.sprawa, k.zamowienie, zwrotAt, przesylki, sellasist);
 
   const wykluczone = numeryZwrotow(database, Number(w.konto), k.zamowienie);
   for (const d of database.prepare("SELECT waybill FROM klient_dosylka WHERE sprawa_id = ? AND waybill IS NOT NULL")
@@ -645,8 +650,8 @@ export async function sledzDosylki(
   const query = deps.query ?? zapytajAllegro;
   const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
   const teraz = (deps.teraz ?? (() => new Date()))();
-  const sellasist = deps.sellasist !== undefined ? deps.sellasist
-    : sellasistWlaczony() ? (z: string, l: string, a: string) => przesylkiDosylkiSellasist(z, l, a) : null;
+  const sellasist: SellasistPrzebiegu = { pytaj: deps.sellasist !== undefined ? deps.sellasist
+    : sellasistWlaczony() ? (z: string, l: string, a: string) => przesylkiDosylkiSellasist(z, l, a) : null };
   const wynik = { wykryte: 0, doreczone: 0, problemy: 0 };
   const dolicz = (x: Przejscie) => {
     if (x.doreczona) wynik.doreczone++;

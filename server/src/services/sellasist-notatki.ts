@@ -9,7 +9,7 @@ import { logEvent } from "./events.js";
 /* ── Zamówienie w Sellasist na profilu klienta: wgląd i notatka ──────────────
    Agent prowadzi sprawę w WERTIS, a magazyn pakuje w Sellasist. Notatka do
    zamówienia jest drogą od biura do pakującego („dosłać pasek do tej
-   paczki"), która dotąd wymagała przełączenia się do Sellasist.
+   paczki") bez przełączania się do Sellasist w środku rozmowy z klientem.
 
    WGLĄD TO CZYSTY ODCZYT. Stan zamówienia czytamy z lustra (`sellasist-sync.ts`),
    a notatki z Sellasist na żywo i NIE ZAPISUJEMY ich: piszą je ludzie, więc
@@ -33,6 +33,12 @@ export interface WidokSellasist {
   wlaczony: boolean;
   zamowienie: null | {
     id: number;
+    /**
+     * Lustro ma to zamówienie. Bez wiersza (zamówienie starsze niż start
+     * lustra) stan jest NIEZNANY, a nie zerowy: puste pola znaczyłyby wtedy
+     * „jeszcze nie zebrano" o paczce dawno doręczonej.
+     */
+    wLustrze: boolean;
     status: string | null;
     statusAt: string | null;
     zebranoAt: string | null;
@@ -76,7 +82,7 @@ function zLustra(database: DatabaseSync, id: number): WidokSellasist["zamowienie
   const kopie = (database.prepare("SELECT id FROM sellasist_zamowienie WHERE skopiowane_z = ? ORDER BY id")
     .all(id) as Wiersz[]).map((k) => Number(k.id));
   return {
-    id, status: tekst(z?.status_nazwa), statusAt: tekst(z?.status_at), zebranoAt: tekst(z?.zebrano_at),
+    id, wLustrze: z !== undefined, status: tekst(z?.status_nazwa), statusAt: tekst(z?.status_at), zebranoAt: tekst(z?.zebrano_at),
     spakowanoAt: tekst(z?.spakowano_at), termin: tekst(z?.termin), przesylki, braki, kopie,
   };
 }
@@ -131,7 +137,11 @@ export async function dodajNotatkeSellasist(
   try {
     const id = await idSellasist(database, zamowienie, query);
     if (id === null) throw new BladNotatki("Sellasist nie zna tego zamówienia.", 404);
-    await query(SCIEZKA_NOTATEK, { metoda: "POST", body: { order_id: id, text: `${t}\n(${autor.name}, WERTIS)` } });
+    const odp = await query(SCIEZKA_NOTATEK, { metoda: "POST", body: { order_id: id, text: `${t}\n(${autor.name}, WERTIS)` } });
+    /* Odpowiedź bez numeru notatki (także 404, które adapter oddaje jako
+       `null`) to notatka, której nie ma. Agent nie może uznać jej za wysłaną. */
+    const nowa = odp !== null && typeof odp === "object" ? (odp as Record<string, unknown>).id : null;
+    if (nowa == null || nowa === "") throw new BladNotatki("Sellasist nie przyjął notatki.", 502);
     logEvent("sellasist_notatka", autor.name, null, { zamowienieSellasist: id }, autor.id, database);
     return id;
   } catch (e) {

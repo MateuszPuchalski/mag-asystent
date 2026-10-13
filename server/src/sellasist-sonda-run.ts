@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import {
-  lista, mapujZamowienie, sciezkaPrzesylek, sciezkaZamowienia, SCIEZKA_STATUSOW, sellasistWlaczony,
+  jestKopia, lista, mapujZamowienie, sciezkaPrzesylek, sciezkaZamowienia, SCIEZKA_STATUSOW, sellasistWlaczony,
   zapytajSellasist,
 } from "./adapters/sellasist.http.js";
 import { opiszKsztalt, raportKoncowki } from "./services/ksztalt.js";
@@ -85,7 +85,7 @@ async function main(): Promise<void> {
   raport.push(`3. Ostatnia zmiana statusu w dzienniku a bieżący status zamówienia: zgodne ×${
     pary.filter(([id, o]) => Number(o) === statusZam.get(id)).length}, różne ×${
     pary.filter(([id, o]) => Number(o) !== statusZam.get(id)).length} (zamówień w obu: ${pary.length}).`);
-  const kopie = szczegoly.filter((z) => String(z.is_copied ?? "0") !== "0").length;
+  const kopie = szczegoly.filter((z) => jestKopia(z.is_copied)).length;
   const mapowane = szczegoly.map(mapujZamowienie).filter((z) => z !== null);
   raport.push(`4. Kopii zamówień w próbce: ${kopie}. Zamówień z etykietą: ${
     mapowane.filter((z) => z!.przesylki.length).length}. Usługi przewoźników: ${

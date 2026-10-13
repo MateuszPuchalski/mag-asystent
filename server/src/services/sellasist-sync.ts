@@ -189,6 +189,9 @@ async function czytajDziennik(
       for (const w of wpisy) {
         const at = w.at ?? kursor.at;
         if (at === kursor.at && w.id <= kursor.id) continue;
+        /* Wpis „sprzed kursora" bywa tylko w godzinie cofnięcia zegara
+           (stempel bez strefy jest wtedy dwuznaczny). Odpada, a zamówienie
+           wraca do lustra przy swojej następnej zmianie. */
         if (chwilaUtc(at) < chwilaUtc(kursor.at)) continue;
         const zebrane = w.tag === "order_status_change" && w.obiekt !== null && statusyZebrane.includes(w.obiekt);
         kolejka.run(w.zamowienieId, teraz.toISOString(), zebrane ? at : null);
@@ -240,7 +243,8 @@ export async function synchronizujSellasist(
        złotej, jak import pliku (`zbiorki_import`). Lustro to księgowość
        odczytu, a nie zdarzenie biura. */
     if (zbiorek) logEvent("zbiorki_z_sellasist", "automat", null, { nowych: zbiorek }, undefined, database);
-    database.prepare(`UPDATE sellasist_sync_state SET last_success_at = ?, blad = NULL, blad_kod = NULL
+    database.prepare(`UPDATE sellasist_sync_state SET last_success_at = ?1,
+        pierwszy_sukces_at = COALESCE(pierwszy_sukces_at, ?1), blad = NULL, blad_kod = NULL
         WHERE id = 1`).run(teraz.toISOString());
     return { zmian, pobranych, zbiorek };
   } catch (e) {
@@ -282,7 +286,11 @@ export interface StanSellasist {
   ostatniSukcesAt: string | null;
   blad: string | null;
   wKolejce: number;
-  /** Ostatnie siedem dób magazynu, od najstarszej; zamówienia, nie pozycje. */
+  /**
+   * Ostatnie siedem dób magazynu, od najstarszej; zamówienia, nie pozycje.
+   * Tylko doby od pierwszego udanego przebiegu: doba sprzed lustra miałaby
+   * zero, które znaczy „nie wiemy", a czyta się jak „nic nie wyszło".
+   */
   dni: DzienSellasist[];
 }
 
@@ -290,7 +298,9 @@ export interface StanSellasist {
 export function stanSellasist(database: DatabaseSync, wlaczony: boolean, teraz = new Date()): StanSellasist {
   const s = database.prepare("SELECT * FROM sellasist_sync_state WHERE id = 1").get() as Wiersz | undefined;
   const dzis = dataLokalna(teraz.toISOString());
-  const dni = Array.from({ length: 7 }, (_, i) => dodajDni(dzis, i - 6));
+  const pierwszy = tekst(s?.pierwszy_sukces_at);
+  const dni = pierwszy === null ? []
+    : Array.from({ length: 7 }, (_, i) => dodajDni(dzis, i - 6)).filter((d) => d >= dataLokalna(pierwszy));
   const licznik = new Map(dni.map((d) => [d, { data: d, zebranych: 0, spakowanych: 0 }]));
   const od = new Date(teraz.getTime() - 8 * 24 * 60 * 60_000).toISOString();
   for (const w of database.prepare(`SELECT zebrano_at, spakowano_at FROM sellasist_zamowienie

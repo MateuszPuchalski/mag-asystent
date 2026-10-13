@@ -80,7 +80,7 @@ export interface StanRealizacji {
   dokumenty: DokumentZamowienia[];
   /** `null`: nie sprawdzaliśmy, bo dokument już jest albo pozycji brak w kartotece. */
   braki: BrakPozycji[] | null;
-  /** Pole opcjonalne: bez integracji stan wygląda dokładnie jak dotąd. */
+  /** Bez integracji pole jest puste, a reguły werdyktu się nie zmieniają. */
   sellasist?: RealizacjaSellasist | null;
 }
 
@@ -142,7 +142,11 @@ export function ocenRealizacji(s: StanRealizacji, teraz: Date): OcenaRealizacji 
     : etykieta !== null && etykieta < dzis
       ? `paczka spakowana ${etykieta}; napisz, że paczka wyszła albo czeka na kuriera, a numer przesyłki pojawi się `
         + "w Allegro"
-    : etykieta === dzis ? null
+    /* Etykieta z dziś obiecuje wysyłkę tylko przy komplecie i opłaceniu:
+       etykietę drukuje się też przed zbieraniem, więc brak towaru przy niej
+       znaczy paczkę, która dziś nie wyjdzie. */
+    : etykieta === dzis
+      ? (braki ? "brakuje towaru na stanie, terminu nie podawaj" : !oplacone ? "płatność niezakończona" : null)
     : s.realizacja === WYSLANE
       ? "sprzedawca oznaczył paczkę jako wysłaną, a numeru przesyłki jeszcze nie widać; napisz, że paczka wyszła"
     : !oplacone ? "płatność niezakończona"

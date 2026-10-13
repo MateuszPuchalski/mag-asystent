@@ -527,8 +527,8 @@ Lustro zamówień Sellasist (@wydanie) to tabele `sellasist_*`. Szczegóły
 działania stoją w `docs/sellasist.md`.
 
 - **Zapisujemy** numer zamówienia w Sellasist i w źródle, login kupującego
-  w serwisie źródła, źródło, status z nazwą nadaną przez firmę, terminy oraz
-  dzień zebrania i spakowania. Z koszyka: numer pozycji, symbol, EAN, nazwę
+  w serwisie źródła, źródło, status z nazwą nadaną przez firmę i terminy.
+  Do tego dzień zebrania i spakowania. Z koszyka: numer pozycji, symbol, EAN, nazwę
   towaru, ilość i brak do skompletowania. Z etykiet: numer przesyłki, usługę
   przewoźnika i datę wydruku.
 - **Login to jedyne pole kupującego.** Ten sam powód co przy Allegro: login

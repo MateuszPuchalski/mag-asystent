@@ -300,6 +300,8 @@ export interface WidokSellasist {
   /** `null`: Sellasist nie zna zamówienia albo nie dało się go zapytać (`notatkiBlad`). */
   zamowienie: null | {
     id: number;
+    /** `false`: zamówienie starsze niż lustro — stan nieznany, pola poniżej puste, nie zerowe. */
+    wLustrze: boolean;
     /** Nazwa statusu nadana przez firmę w Sellasist — pokazujemy ją bez tłumaczenia. */
     status: string | null;
     statusAt: string | null;
