@@ -11,6 +11,7 @@ import {
   type NoweZdarzenie, type ProfilKlienta as Profil, type RodzajSprawyKlienta, type SprawaKlienta,
 } from "../api/spoiwo";
 import { zlote } from "../api/zwroty";
+import { DrogaKlienta } from "../sprawy/DrogaKlienta";
 import { Cofniecie, type DoCofniecia } from "../skrzynka/Cofniecie";
 import { WidokHistorii } from "../skrzynka/Klient";
 import { dzienZKalendarza, opisTerminu, terminyOdlozenia } from "../skrzynka/terminOdlozenia";
@@ -95,6 +96,7 @@ function Liczba({ ile, podpis }: { ile: React.ReactNode; podpis: string }) {
 
 function Naglowek({ d }: { d: Profil }) {
   const l = d.liczby;
+  const ostatnie = najnowszeZamowienie(d.zamowienia ?? []);
   return <Karta className="p-4">
     <div className="flex flex-wrap items-center gap-3">
       <UserRound size={20} className="text-slate-500" />
@@ -110,7 +112,28 @@ function Naglowek({ d }: { d: Profil }) {
       <Liczba ile={l.reklamacji} podpis="reklamacje" />
       <Liczba ile={l.dyskusji} podpis="dyskusje" />
     </div>
+    {ostatnie && <div className="mt-3 border-t border-slate-200 pt-3">
+      <p className="mb-2 text-podpis text-slate-600">Ostatnie zamówienie</p>
+      {/* Numer zamówienia stoi niżej na liście zamówień, więc pasek go nie
+          powtarza. Przystanki prowadzą do kolejek, a profil do nich wraca. */}
+      <DrogaKlienta plaska bezNumerow orderId={ostatnie.id} />
+    </div>}
   </Karta>;
+}
+
+/**
+ * Najnowsze zamówienie klienta. Kolejność listy to sprawa serwera, a pasek
+ * ma pokazać zakup najświeższy, więc wybieramy po dacie. Zamówienie bez daty
+ * przegrywa z każdym z datą: nie wiemy, że jest nowsze.
+ */
+export function najnowszeZamowienie(zamowienia: Profil["zamowienia"]): Profil["zamowienia"][number] | null {
+  let wynik: Profil["zamowienia"][number] | null = null;
+  for (const z of zamowienia) {
+    const t = z.kupionoAt ? Date.parse(z.kupionoAt) : NaN;
+    const tWyniku = wynik?.kupionoAt ? Date.parse(wynik.kupionoAt) : NaN;
+    if (wynik === null || (Number.isFinite(t) && (!Number.isFinite(tWyniku) || t > tWyniku))) wynik = z;
+  }
+  return wynik;
 }
 
 /* Sygnały na górze, bo odpowiadają na „czy coś się pali". Czerwień WYŁĄCZNIE

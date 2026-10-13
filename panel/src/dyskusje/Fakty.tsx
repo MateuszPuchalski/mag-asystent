@@ -1,11 +1,10 @@
 import React from "react";
-import { Activity, ExternalLink, MessagesSquare } from "lucide-react";
+import { Activity, MessagesSquare } from "lucide-react";
 import type { Dyskusja, SzczegolDyskusji } from "../api/typy";
 import { zlote } from "../api/zwroty";
-import { DrogaZakupu, SprawyZakupu } from "../sprawy/Spoiwo";
 import { ZlecHali } from "../sprawy/ZlecHali";
 import { PrzyciskHistorii } from "../sprawy/HistoriaKlienta";
-import { EtykietaWartosci, NaglowekSekcji, czas, dzien, dniSlowo, ile, LoginKlienta, Skopiuj } from "../ui";
+import { EtykietaWartosci, NaglowekSekcji, czas, dzien, dniSlowo, ile, LoginKlienta } from "../ui";
 import { Zwijka } from "../skrzynka/Zwijka";
 
 /* ── Kolumna faktów o dyskusji ───────────────────────────────────────────────
@@ -40,13 +39,6 @@ const Sekcja = ({ tytul, children }: { tytul: string; children: React.ReactNode 
     <NaglowekSekcji jako="h3" className="mb-1">{tytul}</NaglowekSekcji>
     {children}
   </section>;
-
-const Link = ({ href, children }: { href: string | null; children: React.ReactNode }) =>
-  href
-    ? <a href={href} target="_blank" rel="noopener noreferrer"
-        className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-wertis-ink">
-        {children}<ExternalLink size={12} /></a>
-    : <>{children}</>;
 
 export function Fakty({
   szczegol, onSprawdzPrzesylke, sprawdzaPrzesylke = false, bladPrzesylki = "",
@@ -128,16 +120,14 @@ export function Fakty({
     </div>
 
     <Sekcja tytul="Kontekst zakupu">
-      <Wiersz etykieta="Zamówienie">
-        {d.orderId
-          ? <><Link href={d.linkZamowienia}>{d.orderId}</Link>
-              <Skopiuj tekst={d.orderId} tytul="Kopiuj numer zamówienia" /></>
-          : "dyskusja bez numeru zamówienia"}
-      </Wiersz>
+      {/* NUMER ZAMÓWIENIA Z ODNOŚNIKIEM I KOPIOWANIEM stoi na pasku drogi pod
+          nagłówkiem (krok Zakup). Wiersz zostaje tylko dla dyskusji bez numeru,
+          bo pasek nie rysuje się wtedy wcale i nic innego nie powie, czemu. */}
+      {!d.orderId && <Wiersz etykieta="Zamówienie">dyskusja bez numeru zamówienia</Wiersz>}
 
       {/* ── CENY I PACZKA (0.393.0) ─────────────────────────────────────────
-          Te same fakty co w `reklamacje/Fakty.tsx` i stoją tu z tego samego
-          powodu: dyskusja zwykle POPRZEDZA reklamację, więc pytanie „ile on
+          Te same fakty, które agent widzi przy reklamacji, i stoją tu z tego
+          samego powodu: dyskusja zwykle POPRZEDZA reklamację, więc pytanie „ile on
           zapłacił" i „czy to w ogóle dostał" pada tu wcześniej, nie później.
           Dwie kolejki mają odpowiadać jednakowo — doktryna jednej drogi.
 
@@ -158,10 +148,16 @@ export function Fakty({
           {szczegol.zamowienie.dostawaMetoda &&
             <span className="text-slate-500"> · {szczegol.zamowienie.dostawaMetoda}</span>}
         </Wiersz>
-        <Wiersz etykieta="Razem">
+        {/* „Razem" mówi kwota w kroku Zakup paska drogi, ale ta staje tylko
+            przy płatności z datą ORAZ sumą (ten sam warunek co w `krokiDrogi`).
+            W każdym innym wypadku (pobranie, nieopłacone) suma nie ma innego
+            domu, więc wiersz zostaje. Suma `null` nie daje wiersza: nie ma
+            czego pokazać, a „0 zł" byłoby zmyślone. */}
+        {!(szczegol.zamowienie.platnoscAt && szczegol.zamowienie.sumaGrosze != null)
+          && szczegol.zamowienie.sumaGrosze != null && <Wiersz etykieta="Razem">
           <b className="tabular-nums">
             {zlote(szczegol.zamowienie.sumaGrosze, szczegol.zamowienie.waluta)}</b>
-        </Wiersz>
+        </Wiersz>}
       </>}
 
       {szczegol.przesylka && <Wiersz etykieta="Przesyłka">
@@ -171,9 +167,10 @@ export function Fakty({
             ? <span className="text-slate-500">Allegro nie ma numeru — paczka
                 jeszcze nienadana albo nadana poza Allegro</span>
             : <>
-                {szczegol.przesylka.dostarczonoAt
-                  ? <b className="text-ranga-ok">doręczona {czas(szczegol.przesylka.dostarczonoAt)}</b>
-                  : <span>{szczegol.przesylka.status ?? "przewoźnik nie podał statusu"}</span>}
+                {/* Doręczenie mówi krok „Doręczono” paska; wiersz nie powtarza
+                    daty, tylko status paczki w drodze. */}
+                {!szczegol.przesylka.dostarczonoAt &&
+                  <span>{szczegol.przesylka.status ?? "przewoźnik nie podał statusu"}</span>}
                 <span className="text-slate-500"> · {szczegol.przesylka.przewoznik}{" "}
                   <span className="font-mono">{szczegol.przesylka.waybill}</span></span>
               </>}
@@ -185,31 +182,11 @@ export function Fakty({
       </Wiersz>}
     </Sekcja>
 
-    {/* ── JEDNA SEKCJA ZAMIAST CZTERECH (0.520.0) ────────────────────────────
-        Ten sam ruch, który kolumna reklamacji zrobiła w 0.416.0; pełny powód
-        stoi tam, w `reklamacje/Fakty.tsx`. Pod kolumną dyskusji zostały
-        CZTERY sekcje o jednym zakupie: zwroty, inne sprawy, droga i rozmowy.
-        Dwie ostatnie miały przy tym podwójny nagłówek — sekcja nad blokiem,
-        który rysował własny, bo nie dostał `wSekcji`.
-
-        DROGA JEST NADZBIOREM: `services/droga-klienta.ts` składa przystanki
-        z tych samych tabel, z których serwis dyskusji bierze zwroty i rozmowy
-        (wspólne `kontekstZamowienia`). Każdy przystanek prowadzi do swojej
-        kolejki, więc z drogi da się wejść wszędzie tam, gdzie prowadziły
-        tamte listy.
-
-        ZOSTAJE RODZEŃSTWO SPRAW, i przy dyskusji jest ważniejsze niż gdzie
-        indziej. Dyskusja zwykle poprzedza reklamację, więc agent ma widzieć,
-        czy sprawa poszła już dalej, i nie obiecywać w tym kanale
-        rozstrzygnięcia, nad którym kanał stracił władzę. */}
-    {(szczegol.droga.length > 1 || szczegol.sprawy.length > 0) &&
-      <Sekcja tytul="Ten zakup u nas">
-        {szczegol.droga.length > 1 && <DrogaZakupu droga={szczegol.droga}
-          tutaj={{ rodzaj: "dyskusja", id: d.id }} wSekcji />}
-        {szczegol.sprawy.length > 0 && <div className={szczegol.droga.length > 1 ? "mt-1.5" : ""}>
-          <SprawyZakupu sprawy={szczegol.sprawy} wSekcji />
-        </div>}
-      </Sekcja>}
+    {/* SEKCJI „TEN ZAKUP U NAS" TU JUŻ NIE MA. Zwroty, inne sprawy i rozmowy
+        tego zakupu, razem z rodzeństwem dyskusji (czy sprawa poszła już
+        w reklamację), mówi wyłącznie pasek drogi pod nagłówkiem: każdy
+        przystanek niesie stan, termin i prowadzącego i prowadzi do swojej
+        kolejki. */}
 
     {/* Zlecenie hali z dyskusji (0.502.0) — powód w `sprawy/ZlecHali.tsx`.
         Dyskusja nie ma numeru od Allegro (§25c.1), więc tytuł niesie temat.

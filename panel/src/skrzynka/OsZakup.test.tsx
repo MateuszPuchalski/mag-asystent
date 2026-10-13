@@ -8,47 +8,28 @@ import { Os, rozdziel } from "./Os";
 import type { OsRozmowy, Rozmowa, WpisOsi } from "../api/typy";
 import { ustawKadr } from "../test/kadr";
 
-/* ── Zakup w osi rozmowy ─────────────────────────────────────────────────────
-   Karta nad rozmową i linie zakupu między wiadomościami. Najważniejsze: linia
-   zakupu NIE jest wypowiedzią. Gdyby była, „Paczka dostarczona" po pytaniu
-   klienta zdjęłaby z pytania znacznik „bez odpowiedzi", a skok z paska
-   przebiegu trafiłby w wpis, którego nie ma w DOM. */
+/* ── Zakup poza osią rozmowy ────────────────────────────────────────────────
+   Złożone, opłacone, doręczone i inne sprawy zakupu mówi wyłącznie pasek
+   drogi klienta w karcie. Oś zostaje chronologią rozmowy, więc testy pilnują,
+   że takich linii na niej nie ma i że karta nadal stoi nad pierwszą wiadomością. */
 
 void ustawKadr;
 
 const wiadomosc = (id: string, at: string, n: Partial<WpisOsi> = {}): WpisOsi => ({
   id, rodzaj: "wiadomosc", autor: "k", odKlienta: true, tresc: `tekst ${id}`, at, ofertaId: null, ...n,
 });
-const zakup = (id: string, at: string, n: Partial<WpisOsi> = {}): WpisOsi => ({
-  id: `zakup:${id}`, rodzaj: "zakup", autor: "", odKlienta: false, tresc: `Zdarzenie ${id}`, at, ofertaId: null, ...n,
-});
 const status = (id: string, at: string): WpisOsi => ({
   id, rodzaj: "status", autor: "system", odKlienta: false, tresc: "status", at, ofertaId: null,
 });
 
-describe("rozdziel: linie zakupu", () => {
-  it("linia zakupu nie jest ani wypowiedzią, ani zdarzeniem paska", () => {
-    const { wypowiedzi, zdarzenia, linie } = rozdziel([
-      zakup("a", "2026-10-02T10:00:00Z"), wiadomosc("m1", "2026-10-03T10:00:00Z"),
+describe("rozdziel: oś bez linii zakupu", () => {
+  it("wiadomości są wypowiedziami, a status zdarzeniem paska", () => {
+    const wynik = rozdziel([
+      wiadomosc("m1", "2026-10-03T10:00:00Z"), status("s1", "2026-10-03T11:00:00Z"),
     ]);
-    expect(wypowiedzi.map((w) => w.id)).toEqual(["m1"]);
-    expect(zdarzenia).toEqual([]);
-    expect(linie.map((l) => [l.id, l.przed])).toEqual([["zakup:a", "m1"]]);
-  });
-
-  it("linia po ostatniej wypowiedzi stoi na końcu, a pytanie dalej jest ostatnią wypowiedzią", () => {
-    const { wypowiedzi, linie } = rozdziel([
-      wiadomosc("m1", "2026-10-03T10:00:00Z"), zakup("dostarczone", "2026-10-04T10:00:00Z"),
-    ]);
-    expect(wypowiedzi[wypowiedzi.length - 1].id).toBe("m1");
-    expect(linie[0].przed).toBeNull();
-  });
-
-  it("skok z paska przebiegu nie trafia w linię zakupu", () => {
-    const { zdarzenia } = rozdziel([
-      wiadomosc("m1", "2026-10-03T10:00:00Z"), zakup("a", "2026-10-03T11:00:00Z"), status("s1", "2026-10-03T12:00:00Z"),
-    ]);
-    expect(zdarzenia[0].cel).toBe("m1");
+    expect(wynik.wypowiedzi.map((w) => w.id)).toEqual(["m1"]);
+    expect(wynik.zdarzenia.map((z) => [z.id, z.cel])).toEqual([["s1", "m1"]]);
+    expect(Object.keys(wynik).sort()).toEqual(["wypowiedzi", "zdarzenia"]);
   });
 });
 
@@ -56,30 +37,21 @@ const os = (wpisy: WpisOsi[], mozeZlecac = false) => render(
   <MemoryRouter><Os wpisy={wpisy} rozmowaId={1} zrodloPomiaru={null} mozeZlecac={mozeZlecac}
     onZrodlo={() => {}} onWstawDoSzkicu={() => {}} /></MemoryRouter>);
 
-describe("Os: linie zakupu w czasie", () => {
-  it("linia stoi między wiadomościami w kolejności czasu", () => {
+describe("Os: tylko rozmowa", () => {
+  it("oś rysuje wiadomości w kolejności i nie ma na niej linii zakupu", () => {
     const { container } = os([
-      wiadomosc("m1", "2026-10-03T10:00:00Z"), zakup("a", "2026-10-03T10:30:00Z"), wiadomosc("m2", "2026-10-03T11:00:00Z"),
+      wiadomosc("m1", "2026-10-03T10:00:00Z"), wiadomosc("m2", "2026-10-03T11:00:00Z"),
     ]);
-    const kolejnosc = Array.from(container.querySelectorAll("[data-wpis], [data-zakup]"))
-      .map((e) => (e as HTMLElement).dataset.wpis ?? (e as HTMLElement).dataset.zakup);
-    expect(kolejnosc).toEqual(["m1", "zakup:a", "m2"]);
+    const kolejnosc = Array.from(container.querySelectorAll("[data-wpis]"))
+      .map((e) => (e as HTMLElement).dataset.wpis);
+    expect(kolejnosc).toEqual(["m1", "m2"]);
+    expect(container.querySelector("[data-zakup]")).toBeNull();
   });
 
-  it("linia z adresem jest odnośnikiem do ekranu sprawy, a bez adresu zwykłym zdaniem", () => {
-    os([wiadomosc("m1", "2026-10-03T10:00:00Z"),
-      zakup("zwrot", "2026-10-03T10:30:00Z", { adres: "/obsluga/zwroty/5", tresc: "Zwrot zgłoszony" }),
-      zakup("zlozone", "2026-10-03T10:40:00Z", { tresc: "Zamówienie złożone" })]);
-    expect(screen.getByRole("link", { name: "Zwrot zgłoszony" })).toHaveAttribute("href", "/obsluga/zwroty/5");
-    expect(screen.queryByRole("link", { name: "Zamówienie złożone" })).toBeNull();
-    expect(screen.getByText("Zamówienie złożone")).toBeInTheDocument();
-  });
-
-  it("linia po pytaniu klienta NIE zdejmuje znacznika pytania bez odpowiedzi", () => {
-    /* „Zleć z tej wiadomości" jest stale widoczne tylko przy pytaniu, na które
+  it("pytanie klienta zostaje ostatnią wypowiedzią, więc ma znacznik „bez odpowiedzi”", () => {
+    /* „Zleć z tej wiadomości” jest stale widoczne tylko przy pytaniu, na które
        nikt nie odpowiedział; przy starszych wychodzi pod myszą (`opacity-0`). */
-    os([wiadomosc("m0", "2026-10-03T09:00:00Z"), wiadomosc("m1", "2026-10-03T10:00:00Z"),
-      zakup("dostarczone", "2026-10-04T10:00:00Z")], true);
+    os([wiadomosc("m0", "2026-10-03T09:00:00Z"), wiadomosc("m1", "2026-10-03T10:00:00Z")], true);
     const przyciski = screen.getAllByRole("button", { name: /Zleć z tej wiadomości/ });
     expect(przyciski).toHaveLength(2);
     expect(przyciski[0].className).toContain("opacity-0");
@@ -133,8 +105,8 @@ const rozmowa = (n: Partial<Rozmowa> = {}): Rozmowa => ({
   nowychOdOdpowiedzi: 0, zadanieWToku: false, kopilot: null, ...n,
 } as unknown as Rozmowa);
 
-describe("Rozmowa: karta i zdarzenia zakupu", () => {
-  it("składa kartę nad rozmową i wsuwa zdarzenia zakupu między wiadomości", () => {
+describe("Rozmowa: karta nad osią i oś bez zdarzeń zakupu", () => {
+  it("składa kartę nad rozmową, a na osi zostają same wiadomości", () => {
     const d = {
       rozmowa: rozmowa(), szkicCopilota: null, ofertaWskazana: null, przeplyw: [],
       os: [wiadomosc("m1", "2026-10-03T10:00:00.000Z")],
@@ -152,6 +124,9 @@ describe("Rozmowa: karta i zdarzenia zakupu", () => {
     expect(screen.getByRole("region", { name: "Kontekst zakupu" })).toHaveTextContent("NÓŻ DO MTD");
     const kolejnosc = Array.from(container.querySelectorAll("[data-wpis], [data-zakup]"))
       .map((e) => (e as HTMLElement).dataset.wpis ?? (e as HTMLElement).dataset.zakup);
-    expect(kolejnosc).toEqual(["zakup:zlozone", "zakup:oplacone", "m1", "zakup:dyskusja-7"]);
+    expect(kolejnosc).toEqual(["m1"]);
+    expect(screen.queryByText(/Zamówienie 17147703077 złożone/)).toBeNull();
+    expect(screen.queryByText(/Paczka dostarczona/)).toBeNull();
+    expect(screen.queryByText(/Dyskusja otwarta/)).toBeNull();
   });
 });

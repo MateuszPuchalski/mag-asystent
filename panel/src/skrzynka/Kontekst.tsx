@@ -6,7 +6,6 @@ import { OfertaRozmowy } from "./OfertaRozmowy";
 import { ZamowienieRozmowy } from "./ZamowienieRozmowy";
 import { ZamowieniaKlienta } from "./ZamowieniaKlienta";
 import { ZwrotRozmowy } from "./ZwrotRozmowy";
-import { SprawyZakupu } from "../sprawy/Spoiwo";
 import { TowarRozmowy } from "./TowarRozmowy";
 import { Klient } from "./Klient";
 import { Paczka } from "./Paczka";
@@ -45,15 +44,16 @@ import { coSwieci, historiaWierszaKlienta, klientWKolumnie, ofertaWKarcie, paczk
  * stała cztery razy, zwrot do decyzji — jedyna rzecz z terminem — w połowie
  * przewijania, a zakładka z zerem kazała kliknąć, żeby usłyszeć „nic tu nie ma".
  *
- * Świeci to, co ma zegar albo czeka na ruch agenta: zwrot i sprawa w toku,
+ * Świeci to, co ma zegar albo czeka na ruch agenta: zwrot w toku,
  * paczka poza zwykłą drogą i pozycja do wskazania. Stoi w jednej ramie
  * „Wymaga Ciebie". Reszta to jedna linia na temat ze streszczeniem, rozwijana
  * kliknięciem. Reguły świecenia stoją w `kokpit.ts`, każda z testem, bo szara
  * linia jest bezpieczna tylko wtedy, gdy reguła „w normie" nie kłamie.
  *
  * ── JEDEN DOM FAKTU ─────────────────────────────────────────────────────────
- * Karta zakupu nad osią mówi zakup i klienta: towar, numer, sumę, kroki
- * z datami i historię w liczbach. Kolumna mówi Subiekt, paczkę i robotę.
+ * Karta zakupu nad osią mówi zakup i klienta: towar, numer, sumę, pasek
+ * drogi klienta (kroki zakupu i inne sprawy ze stanem) i historię w liczbach.
+ * Kolumna mówi Subiekt, paczkę i robotę.
  * Ten sam fakt w dwóch domach kazał sprawdzać, czy oba mówią to samo.
  * Fakt z karty wraca tu tylko jako odpowiedź, którą agent musi mieć bez
  * przewijania osi: wiersz „Zamówił" w paśmie i data doręczenia w bloku
@@ -104,14 +104,12 @@ function Kolumna({ dane, onWstawDoSzkicu, onOtworzRozmowe }: {
 
   const zwrotyWToku = dane.zwroty.filter(zwrotWToku);
   const zwrotyZamkniete = dane.zwroty.filter((z) => !zwrotWToku(z));
-  const sprawyOtwarte = dane.sprawy.filter((x) => x.otwarta);
-  const sprawyZamkniete = dane.sprawy.filter((x) => !x.otwarta);
   const paczkaSwieci = swiatla.includes("paczka");
   const pozycjaSwieci = swiatla.includes("pozycja");
-  /* Licznik liczy każdą narysowaną pozycję osobno. Dwie sprawy pod jedną
-     liczbą mówiły „1", a agent szukał drugiej na ślepo. */
-  const ileSwieci = zwrotyWToku.length + sprawyOtwarte.length + (paczkaSwieci ? 1 : 0)
-    + (pozycjaSwieci ? 1 : 0);
+  /* Licznik liczy każdą narysowaną pozycję osobno. Dwa zwroty pod jedną
+     liczbą mówiły „1", a agent szukał drugiego na ślepo. Reklamacji i dyskusji
+     nie liczy: ich wiersze zeszły z kolumny, a stan niesie pasek drogi. */
+  const ileSwieci = zwrotyWToku.length + (paczkaSwieci ? 1 : 0) + (pozycjaSwieci ? 1 : 0);
 
   const zamowienieId = dane.zamowienie?.externalId ?? null;
   /* Pozycja tej oferty w zamówieniu: jej cena z chwili zakupu pozwala
@@ -157,15 +155,11 @@ function Kolumna({ dane, onWstawDoSzkicu, onOtworzRozmowe }: {
         <section aria-label="Wymaga Ciebie" className="rounded-lg border-2 border-amber-400">
           <NaglowekSekcji jako="h3" ton="text-ranga-uwaga" className="px-2 pb-1 pt-2.5">
             Wymaga Ciebie · {ileSwieci}</NaglowekSekcji>
-          {/* Kolejność zegara: zwrot i sprawa mają termin Allegro, paczka
-              czeka na klienta, wskazanie to praca bez terminu. */}
+          {/* Kolejność zegara: zwrot ma termin Allegro, paczka czeka na
+              klienta, wskazanie to praca bez terminu. */}
           <div className="divide-y divide-slate-200">
             {zwrotyWToku.map((z) => <div key={`zwrot-${z.id}`} className="px-2 py-2.5">
               <ZwrotRozmowy zwrot={z} /></div>)}
-            {/* Każda sprawa osobno, ta sama linijka co na zwrotach, reklamacjach
-                i dyskusjach. Spoiwo daje elementowi `px-2`, więc tu go nie ma. */}
-            {sprawyOtwarte.map((s) => <div key={`sprawa-${s.id}`} className="py-1.5">
-              <SprawyZakupu sprawy={[s]} wSekcji /></div>)}
             {/* Zdanie prowadzące paczki jest tytułem tej pozycji. */}
             {paczkaSwieci && dane.zamowienie && <div className="px-2 py-2.5">
               <Paczka zamowienie={dane.zamowienie} rozmowaId={dane.rozmowa.id} /></div>}
@@ -180,7 +174,7 @@ function Kolumna({ dane, onWstawDoSzkicu, onOtworzRozmowe }: {
         </section>
       </div>}
 
-      {/* KOLEJNOŚĆ: oferta i towar, zamówienie, sprawy zamknięte, klient.
+      {/* KOLEJNOŚĆ: oferta i towar, zamówienie, zamknięte zwroty, klient.
           Od tego, co klient kupował, do tego, kim jest. */}
       {/* BRAK OFERTY MÓWI SIĘ RAZ (decyzja właściciela z 28 września 2026).
           Baner nad rozmową mówi o braku razem z czynnościami, a przy
@@ -223,24 +217,20 @@ function Kolumna({ dane, onWstawDoSzkicu, onOtworzRozmowe }: {
           maZamowienie={dane.zamowienie !== null} />
       </Wiersz>
 
-      {(zwrotyZamkniete.length > 0 || sprawyZamkniete.length > 0) &&
-        <Wiersz tytul="Zamknięte sprawy" streszczenie={streszczenieZamknietych(
-          zwrotyZamkniete.length, sprawyZamkniete.length)}
+      {/* ZAMKNIĘTE ZWROTY ZOSTAJĄ, bo ich werdykt, kwotę i numer korekty mówi
+          tylko ten wiersz: przystanek paska drogi zwrotu nie ma stanu. Zamknięte
+          reklamacje i dyskusje zeszły stąd: pasek mówi, że są zamknięte, a ich
+          przebieg stoi na własnych ekranach, jedno kliknięcie dalej. */}
+      {zwrotyZamkniete.length > 0 &&
+        <Wiersz tytul="Zamknięte zwroty" streszczenie={streszczenieZamknietych(zwrotyZamkniete.length)}
           otwarty={otwarte.has("zamkniete")} onPrzelacz={() => przelacz("zamkniete")}>
-          {zwrotyZamkniete.length > 0 && <ul className="divide-y divide-slate-200">
+          <ul className="divide-y divide-slate-200">
             {zwrotyZamkniete.map((z) => <li key={z.id} className="py-2"><ZwrotRozmowy zwrot={z} /></li>)}
-          </ul>}
-          {/* Bez drugiego nagłówka: tytuł wiersza mówi już, co leży pod nim.
-              Ujemny margines, bo Spoiwo daje każdej linijce własne `px-2`,
-              a oś tekstu kolumny to 16 px: bez niego sprawy stałyby o 8 px
-              na prawo od zwrotów nad nimi. Rama robi to samo opakowaniem
-              bez `px`. */}
-          {sprawyZamkniete.length > 0 && <div className="-mx-2">
-            <SprawyZakupu sprawy={sprawyZamkniete} wSekcji /></div>}
+          </ul>
         </Wiersz>}
 
       {/* Klient staje tylko z treścią POZA tym zakupem. Wpisy tego zakupu mają
-          dom w karcie, w ramie, w „Zamkniętych sprawach" i w osi; reguła stoi
+          dom w pasku drogi karty, w ramie i w zamkniętych zwrotach; reguła stoi
           w `kokpit.ts` przy `klientWKolumnie`. Inne zakupy schodzą z historii
           tylko w rozmowie bez zamówienia, gdy lista „Zakupy tego klienta"
           stoi otwarta w wierszu „Zamówienie". */}
@@ -345,9 +335,8 @@ export function streszczenieZamowienia(dane: OsRozmowy): string {
     .filter(Boolean).join(" · ") || "paczka wyżej";
 }
 
-export function streszczenieZamknietych(zwrotow: number, spraw: number): string {
-  return [zwrotow ? `${zwrotow} ${odmien(zwrotow, "zwrot", "zwroty", "zwrotów")}` : null,
-    spraw ? `${spraw} ${odmien(spraw, "sprawa", "sprawy", "spraw")}` : null].filter(Boolean).join(" · ");
+export function streszczenieZamknietych(zwrotow: number): string {
+  return `${zwrotow} ${odmien(zwrotow, "zwrot", "zwroty", "zwrotów")}`;
 }
 
 /**

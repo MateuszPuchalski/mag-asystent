@@ -4,7 +4,7 @@ import { render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Dowody } from "./Dowody";
-import type { PrzystanekDrogi, SprawaZakupu, WpisOsiZwrotu, Zwrot } from "../api/typy";
+import type { WpisOsiZwrotu, Zwrot } from "../api/typy";
 
 /* ── Kolumna dowodów po uproszczeniu (0.518.0) ──────────────────────────────
    Zgłoszenie agentów: „aplikacja przytłacza". Te testy pilnują, żeby to,
@@ -31,44 +31,28 @@ const zwrot = (n: Partial<Zwrot> = {}): Zwrot => ({
   ...n,
 });
 
-const DROGA: PrzystanekDrogi[] = [
-  { rodzaj: "rozmowa", id: 7, at: "2026-08-24T10:00:00.000Z", opis: "Kiedy zwrot?" },
-  { rodzaj: "zwrot", id: 1, at: "2026-08-25T09:00:00.000Z", opis: "REF-1" },
-];
-
-const SPRAWA: SprawaZakupu = {
-  id: 3, typ: "CLAIM", numer: "R-3", temat: "Pęknięta rączka", statusAllegro: null,
-  decyzjaDo: null, otwartoAt: "2026-08-26T09:00:00.000Z", prowadzi: null, otwarta: true,
-};
-
 const pokaz = (opcje: Partial<React.ComponentProps<typeof Dowody>> = {}) =>
   render(<QueryClientProvider client={new QueryClient()}><MemoryRouter>
     <Dowody zwrot={zwrot()} {...opcje} />
   </MemoryRouter></QueryClientProvider>);
 
-describe("Dowody zwrotu — jedna sekcja o zakupie", () => {
-  it("droga i sprawy stoją pod JEDNYM nagłówkiem, bez drugiego nad listą", () => {
-    pokaz({ droga: DROGA, sprawy: [SPRAWA] });
-    expect(screen.getByRole("heading", { name: /Ten zakup u nas/ })).toBeInTheDocument();
-    /* Nagłówki, które spoiwo rysuje samo, gdy rodzic nie da `wSekcji`. */
+describe("Dowody zwrotu — zakup mówi pasek drogi", () => {
+  it("kolumna nie ma sekcji „Ten zakup u nas” ani list przystanków i spraw", () => {
+    pokaz({ zwrot: zwrot({ rozmowy: [{ id: 7, temat: "Kiedy zwrot?", status: "open",
+      ostatniaAt: "2026-08-24T10:00:00.000Z" }] }) });
+    expect(screen.queryByRole("heading", { name: /Ten zakup u nas/ })).toBeNull();
     expect(screen.queryByText("Sprawy tego zakupu")).toBeNull();
     expect(screen.queryByLabelText("Droga tego zakupu")).toBeNull();
-    expect(screen.queryByText(/Wiadomości o tym zakupie/)).toBeNull();
-    expect(screen.getByRole("link", { name: /pytanie/ }))
-      .toHaveAttribute("href", "/obsluga/skrzynka/7");
-    expect(screen.getByRole("link", { name: "Otwórz" }))
-      .toHaveAttribute("href", "/obsluga/reklamacje/3");
+    expect(screen.queryByRole("link", { name: /pytanie|Otwórz/ })).toBeNull();
   });
 
-  it("same sprawy bez drogi dalej mają sekcję", () => {
-    pokaz({ sprawy: [SPRAWA] });
-    expect(screen.getByRole("heading", { name: /Ten zakup u nas/ })).toBeInTheDocument();
-    expect(screen.getByText("Pęknięta rączka")).toBeInTheDocument();
-  });
-
-  it("zwrot bez rodzeństwa nie rysuje sekcji — droga z jednego punktu nie jest drogą", () => {
-    pokaz({ droga: [DROGA[1]!] });
-    expect(screen.queryByText(/Ten zakup u nas/)).toBeNull();
+  it("numer zamówienia nie jest powtórzony w sekcji „Zamówienie”, gdy zamówienie jest pobrane", () => {
+    pokaz({ zwrot: zwrot({ zamowienie: {
+      externalId: "ord-1", link: "https://allegro.pl/moje-allegro/zam/ord-1", pozycje: [],
+      kupionoAt: "2026-08-20T09:00:00.000Z", sumaGrosze: 1000, waluta: "PLN", platnoscTyp: "ONLINE",
+      dostawaMetoda: null, dostawaGrosze: null, fakturaZadana: null } as never }) });
+    expect(screen.queryByText("ord-1")).toBeNull();
+    expect(screen.queryByRole("link", { name: /Otwórz w/ })).toBeNull();
   });
 });
 

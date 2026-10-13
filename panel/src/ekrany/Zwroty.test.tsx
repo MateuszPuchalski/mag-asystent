@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -1250,10 +1250,26 @@ describe("Dosyłka pod odmową wypłaty", () => {
      mają atrapy, więc tu trafiłby tylko zapis spoza nich — np. zapytanie,
      które przy otwarciu coś zmienia. */
   let zapisy: string[] = [];
+  let odczyty: string[] = [];
+  /* Droga klienta tego zakupu: zwrot 6 stoi na niej obok pytania i bez reklamacji. */
+  const droga = (orderId: string) => ({
+    orderId, linkZamowienia: null, reklamacja: null, sprawy: [],
+    zamowienie: { kupionoAt: "2026-08-20T10:00:00.000Z", platnoscAt: "2026-08-20T10:02:00.000Z",
+      platnoscTyp: "ONLINE", sumaGrosze: 4999, waluta: "PLN" },
+    przesylka: { waybill: null, przewoznik: null, status: null, dostarczonoAt: null, sprawdzonoAt: null },
+    droga: [
+      { rodzaj: "rozmowa", id: 3, at: "2026-08-22T10:00:00.000Z", opis: null },
+      { rodzaj: "zwrot", id: 6, at: "2026-08-25T09:00:00.000Z", opis: "ZK-6" },
+    ],
+  });
   beforeEach(() => {
     zapisy = [];
+    odczyty = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
       if ((init?.method ?? "GET") !== "GET") zapisy.push(`${init?.method} ${url}`);
+      else odczyty.push(url);
+      const zamowienie = /\/api\/obsluga\/droga\/(.+)$/.exec(url)?.[1];
+      if (zamowienie) return new Response(JSON.stringify(droga(zamowienie)));
       return new Response("{}", { status: 404 });
     }));
   });
@@ -1305,6 +1321,14 @@ describe("Dosyłka pod odmową wypłaty", () => {
       expect(await screen.findByText("Dosyłka w drodze (stan z 14:10)")).toBeInTheDocument();
       expect(screen.getByText("Odmówiono: „Wysłaliśmy nowy towar”")).toBeInTheDocument();
       expect(screen.getByRole("link", { name: /profil klienta/ })).toHaveAttribute("href", "/obsluga/klient/zielony");
+      /* Droga klienta: ten zwrot stoi na niej jako „tu jesteś”, nie jako łącze
+         do siebie, a pytanie prowadzi do rozmowy. Jeden odczyt, zero zapisów. */
+      const pasek = await screen.findByRole("list", { name: "Droga sprawy" });
+      expect(pasek.querySelector('[aria-current="location"]')).toHaveAttribute("data-przystanek", "zwrot");
+      expect(within(pasek).queryByRole("link", { name: /^Zwrot/ })).toBeNull();
+      expect(within(pasek).getByRole("link", { name: /^Pytanie z .* — otwórz rozmowę/ }))
+        .toHaveAttribute("href", "/obsluga/skrzynka/3");
+      expect(odczyty.filter((u) => u.startsWith("/api/obsluga/droga/"))).toEqual(["/api/obsluga/droga/ord-6"]);
       expect(scena.wolano).toEqual([]);
       expect(zapisy).toEqual([]);
     } finally { sprzatnij(); }

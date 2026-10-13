@@ -258,11 +258,7 @@ export type WpisOsi = {
   rodzaj: "wiadomosc" | "zlecenie" | "wynik_zadania" | "odeslanie_zadania"
     | "komentarz" | "status"
     /* Kamień milowy zwrotu (0.502.0) — zdarzenie, nie wypowiedź; `Os.tsx` ZDARZENIE. */
-    | "zwrot"
-    /* Zdarzenie ZAKUPU wstawione do osi po stronie panelu (`skrzynka/zakup.ts`):
-       złożone, opłacone, dostarczone, zwrot, reklamacja, dyskusja. Nie przychodzi
-       z serwera, nie jest wypowiedzią i nie wchodzi do paska przebiegu. */
-    | "zakup";
+    | "zwrot";
   autor: string;
   odKlienta: boolean;
   tresc: string;
@@ -1709,6 +1705,24 @@ export interface SzczegolReklamacji {
      go nie zna, a brak ma znaczyć „nie wiemy". */
   /** Ostatnia dostawa towaru; `null` = nie wiemy, skąd przyszła sztuka. */
   dostawa?: OstatniaDostawaReklamacji | null;
+}
+
+/**
+ * Droga klienta po numerze zamówienia — odpowiedź `GET /api/obsluga/droga/:orderId`.
+ *
+ * Pola `zamowienie`, `przesylka`, `droga`, `sprawy` i `reklamacja` mają ten sam
+ * kształt co w szczególe reklamacji, żeby jeden pasek czytał oba. Różnica:
+ * tu `sprawy` i `droga` niosą CAŁY zakup, bez wycinania sprawy, na której
+ * stoi ekran, a `reklamacja` to najnowsza reklamacja zamówienia albo `null`.
+ */
+export interface OdpowiedzDrogi {
+  orderId: string;
+  linkZamowienia: string | null;
+  zamowienie: Zamowienie | null;
+  przesylka: StanPrzesylki | null;
+  droga: PrzystanekDrogi[];
+  sprawy: SprawaZakupu[];
+  reklamacja: Reklamacja | null;
 }
 
 /** Ślad w historii: ile spraw, ile skończyło się uznaniem, ile odmową. */
