@@ -718,6 +718,26 @@ test("wiek zakupu jedzie NA WIERSZU, licząc od daty, którą ekran nazywa", () 
   assert.equal(s.reklamacja.dniOdZakupu, 549, "półtora roku — rękojmia biegnie dwa lata");
 });
 
+/**
+ * Paragon Subiekta dla sprawy: zamówienie z tą ofertą i dokument z jedną
+ * kartoteką. Towar sprawy w szczególe to sporna pozycja paragonu, więc
+ * historia „ten towar" bez dokumentu milczy z założenia.
+ */
+function paragonSprawy(d: DatabaseSync, konto: number, sprawaId: number, offer: string, tw: number) {
+  const nr = `5a1e0000-0000-4000-8000-${String(sprawaId).padStart(12, "0")}`;
+  d.prepare("UPDATE reklamacja_klienta SET order_id=? WHERE id=?").run(nr, sprawaId);
+  const zam = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id,external_id,
+    kupiono_at,synced_at) VALUES (?,?,'2026-09-01T08:00:00Z','2026-09-01T08:00:00Z')`)
+    .run(konto, nr).lastInsertRowid);
+  d.prepare(`INSERT INTO zamowienie_klienta_pozycja(zamowienie_id,offer_id,nazwa,ilosc,
+    cena_grosze,waluta) VALUES (?,?,'Nóż',1,5000,'PLN')`).run(zam, offer);
+  d.prepare("INSERT OR IGNORE INTO sgt_towar(tw_id,symbol,nazwa) VALUES (?,?,'Towar')")
+    .run(tw, `SYM-${tw}`);
+  d.prepare(`INSERT INTO sgt_faktura(dok_id,typ,nr_pelny,nr_oryg,data_wyst)
+    VALUES (?,'PA',?,?,'2026-09-01')`).run(sprawaId, `PA ${sprawaId}/2026`, nr.slice(0, 30));
+  d.prepare("INSERT INTO sgt_faktura_pozycja(dok_id,tw_id,ilosc) VALUES (?,?,1)").run(sprawaId, tw);
+}
+
 test("historia liczy się po KARTOTECE, więc łapie ten sam towar w dwóch ofertach", () => {
   const { d, konto } = stanowisko();
   const kartoteka = (offer: string, tw: number) => d.prepare(
@@ -741,6 +761,7 @@ test("historia liczy się po KARTOTECE, więc łapie ten sam towar w dwóch ofer
   sprawa("w-3", "of-1", "inny3", "CLAIM_REJECTED", null);
   /* Inny towar tego samego klienta — liczy się do klienta, nie do towaru. */
   sprawa("w-4", "of-9", "ekk69", "CLAIM_REJECTED", null);
+  paragonSprawy(d, konto, ta, "of-1", 77);
 
   const s = szczegolReklamacji(d, ta, TERAZ);
   assert.deepEqual(s.historia.towar, { ile: 3, uznanych: 2, odrzuconych: 1 });
@@ -756,7 +777,9 @@ test("historia NIE liczy samej siebie — inaczej każda sprawa byłaby „drug�
     (channel_account_id,external_id,offer_id,kupujacy_login,otwarto_at,synced_at)
     VALUES (?,'w-0','of-1','ekk69','2026-09-01T08:00:00Z','2026-09-07T11:00:00Z')`)
     .run(konto).lastInsertRowid);
+  paragonSprawy(d, konto, id, "of-1", 77);
   const s = szczegolReklamacji(d, id, TERAZ);
+  assert.equal(s.paragon.spornaTwId, 77, "towar jest rozpoznany, więc brak to brak historii");
   assert.equal(s.historia.towar, null, "pierwsza sprawa przy tym towarze to nie zero, to brak");
   assert.equal(s.historia.klient, null);
 });
@@ -772,10 +795,10 @@ test("bez kartoteki historia towaru MILCZY, zamiast pisać zero", () => {
 });
 
 /* ── HISTORIA ZNA TE SAME OFERTY, CO EKRAN SPRAWY ────────────────────────────
-   Licznik „ten towar" liczy po kartotece, którą pokazuje kolumna dowodów,
-   a oferty towaru wybiera `ofertyKartoteki`, wspólna z przekrojem. Sprawa
-   z ofertą powiązaną wyłącznie sygnaturą nie ma `r.twId` i też dostaje
-   licznik. Oferta przepięta przez człowieka liczy się tylko do wskazanej. */
+   Licznik „ten towar" liczy po spornej pozycji paragonu, tej samej, z której
+   karta „Produkt" rysuje stan i ceny. Oferty towaru wybiera `ofertyKartoteki`,
+   wspólna z przekrojem. Inna sprawa z ofertą powiązaną wyłącznie sygnaturą
+   też się liczy. Oferta przepięta przez człowieka liczy się tylko do wskazanej. */
 
 function zOfertami() {
   const s = stanowisko();
@@ -795,7 +818,7 @@ function zOfertami() {
 }
 
 test("historia łapie oferty powiązane SAMĄ sygnaturą, także przy spacji i wielkości liter", () => {
-  const { d, oferta, sprawa, wskaz } = zOfertami();
+  const { d, konto, oferta, sprawa, wskaz } = zOfertami();
   /* Import Subiekta nie trimuje `tw_Symbol`, a sprzedawca pisze sygnaturę
      jak chce — reguła `kartotekaPoSku` wybacza oba. */
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'NZ-46 ','Nóż 46')").run();
@@ -807,9 +830,10 @@ test("historia łapie oferty powiązane SAMĄ sygnaturą, także przy spacji i w
   sprawa("w-1", "of-2", "CLAIM_ACCEPTED");
   sprawa("w-2", "of-3", "CLAIM_REJECTED");
   sprawa("w-3", "of-9", "CLAIM_REJECTED");
+  paragonSprawy(d, konto, ta, "of-1", 77);
 
   const s = szczegolReklamacji(d, ta, TERAZ);
-  assert.equal(s.reklamacja.twId, null, "pamięci ani paragonu ta sprawa nie ma");
+  assert.equal(s.reklamacja.twId, null, "pamięci ani sygnatury z zamówienia ta sprawa nie ma");
   assert.equal(s.kartoteka?.pewnosc, "sku");
   assert.equal(s.kartoteka?.twId, 77);
   assert.deepEqual(s.historia.towar, { ile: 2, uznanych: 1, odrzuconych: 1 });
@@ -818,7 +842,7 @@ test("historia łapie oferty powiązane SAMĄ sygnaturą, także przy spacji i w
 test("oferta przepięta przez człowieka liczy się tylko do WSKAZANEJ kartoteki", () => {
   /* SKU oferty trafia w 77, ale człowiek przepiął ją na 88 — ekran jej
      reklamacji pokazuje 88. Licznik przy 77 nie ma prawa jej doliczyć. */
-  const { d, oferta, sprawa, wskaz } = zOfertami();
+  const { d, konto, oferta, sprawa, wskaz } = zOfertami();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'NZ-46','Nóż 46')").run();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (88,'NZ-46-B','Nóż 46 B')").run();
   oferta("of-1", "NZ-46");
@@ -827,6 +851,7 @@ test("oferta przepięta przez człowieka liczy się tylko do WSKAZANEJ kartoteki
   const ta = sprawa("w-0", "of-1", "CLAIM_SUBMITTED");
   const przepieta = sprawa("w-1", "of-przepieta", "CLAIM_ACCEPTED");
   sprawa("w-2", "of-1", "CLAIM_REJECTED");
+  paragonSprawy(d, konto, ta, "of-1", 77);
 
   assert.deepEqual(szczegolReklamacji(d, ta, TERAZ).historia.towar,
     { ile: 1, uznanych: 0, odrzuconych: 1 });
@@ -834,10 +859,10 @@ test("oferta przepięta przez człowieka liczy się tylko do WSKAZANEJ kartoteki
 });
 
 test("symbol pod dwiema kartotekami nie wiąże ofert po SKU — wskazania zostają", () => {
-  /* Ta sprawa ma kartotekę z pamięci, więc licznik pyta `ofertyKartoteki`.
+  /* Paragon tej sprawy wskazuje 77, więc licznik pyta `ofertyKartoteki`.
      Oferta z samą sygnaturą, która trafia w dwie kartoteki, nie należy do
      żadnej: przypisanie jej jednej zgadywałoby za człowieka. */
-  const { d, oferta, sprawa, wskaz } = zOfertami();
+  const { d, konto, oferta, sprawa, wskaz } = zOfertami();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (77,'NZ-46','Raz')").run();
   d.prepare("INSERT INTO sgt_towar(tw_id,symbol,nazwa) VALUES (78,'nz-46 ','Dwa')").run();
   wskaz("of-pamiec", 77);
@@ -846,6 +871,7 @@ test("symbol pod dwiema kartotekami nie wiąże ofert po SKU — wskazania zosta
   const ta = sprawa("w-0", "of-pamiec", "CLAIM_SUBMITTED");
   sprawa("w-1", "of-pamiec-2", "CLAIM_ACCEPTED");
   sprawa("w-2", "of-sku", "CLAIM_REJECTED");
+  paragonSprawy(d, konto, ta, "of-pamiec", 77);
 
   const s = szczegolReklamacji(d, ta, TERAZ);
   assert.equal(s.reklamacja.twId, 77);

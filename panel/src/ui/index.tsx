@@ -619,6 +619,29 @@ export function LoginKlienta({ login, className = "" }: { login: string; classNa
   </button>;
 }
 
+/**
+ * Symbol towaru z Subiekta, który kopiuje się kliknięciem.
+ *
+ * Symbol wpisuje się potem w Subiekcie albo w zamówieniu u dostawcy, a „14-31051"
+ * i „14-31015" przepisane z ekranu różnią się jedną zamianą cyfr. Klikalne jest
+ * całe słowo, jak przy loginie, bo większy cel to mniej chybień.
+ */
+export function SymbolTowaru({ symbol }: { symbol: string }) {
+  const { stan, kopiuj } = useKopiowanie(symbol);
+  return <button type="button" onClick={kopiuj}
+    title={stan === "blad" ? "Nie udało się skopiować" : `Kopiuj symbol: ${symbol}`}
+    className={`group inline-flex min-h-6 max-w-full items-center gap-1 rounded font-mono hover:bg-slate-200 ${
+      stan === "blad" ? "text-ranga-zle" : "text-slate-800"}`}>
+    <span className="break-all text-left">{symbol}</span>
+    {stan === "zrobione"
+      ? <Check size={12} className="shrink-0 text-ranga-ok" />
+      : <Copy size={12} className="shrink-0 text-slate-300 group-hover:text-slate-500" />}
+    <span className="sr-only">{
+      stan === "zrobione" ? "Skopiowano symbol" : stan === "blad"
+        ? "Nie udało się skopiować symbolu" : "Kopiuj symbol"}</span>
+  </button>;
+}
+
 /* ── Trzy formy liczby mnogiej (audyt zwrotów, 15 września 2026) ─────────────
    Polszczyzna ma przy liczebniku TRZY formy, nie dwie: „1 pozycja",
    „2 pozycje", „5 pozycji". Panel liczył dwie w ośmiu miejscach i wychodziło

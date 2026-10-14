@@ -1739,6 +1739,52 @@ export interface SzczegolReklamacji {
      go nie zna, a brak ma znaczyć „nie wiemy". */
   /** Ostatnia dostawa towaru; `null` = nie wiemy, skąd przyszła sztuka. */
   dostawa?: OstatniaDostawaReklamacji | null;
+  /* Opcjonalne, bo brak pola znaczy „serwer jeszcze nie powiedział", a nie
+     „dokumentu nie ma". Brak dokumentu niesie `paragon.brak`. */
+  /** Paragony i faktury zamówienia z Subiekta, ze wskazaniem reklamowanej pozycji. */
+  paragon?: ParagonReklamacji;
+}
+
+/**
+ * Dokumenty sprzedaży zamówienia z Subiekta — „co klient naprawdę kupił".
+ *
+ * Symbol bierze się WYŁĄCZNIE stąd. Decyzja właściciela: bez dokumentu karta
+ * mówi „brak paragonu", a nie symbol z oferty czy mapowania, bo oferta
+ * przepięta na inną dostawę wskazuje dziś inny towar niż ten z paczki.
+ */
+export interface ParagonReklamacji {
+  /** FS i PA tego zamówienia z okna kopii, od najstarszego. Korekty nie wchodzą. */
+  dokumenty: DokumentParagonu[];
+  /** Kartoteka spornej pozycji, gdy wskazana jednoznacznie; inaczej `null`. */
+  spornaTwId: number | null;
+  /** Dlaczego `dokumenty` są puste; `null`, gdy dokument jest. */
+  brak: null | "bez-zamowienia" | "poza-oknem" | "nie-znaleziono";
+  /** Ile dni wstecz serwer kopiuje dokumenty z Subiekta. */
+  oknoDni: number;
+}
+
+export interface DokumentParagonu {
+  dokId: number;
+  /** Pełny numer z Subiekta, np. „PA 1234/10/2026". */
+  numer: string;
+  typ: "FS" | "PA";
+  /** Dzień wystawienia, `YYYY-MM-DD`. */
+  data: string;
+  pozycje: PozycjaParagonu[];
+}
+
+export interface PozycjaParagonu {
+  twId: number;
+  /* `null`, gdy kartoteki nie ma w kopii Subiekta: pozycja dokumentu jest,
+     ale nie wiemy, jak się nazywa. Panel mówi to słowem, nie zgaduje. */
+  symbol: string | null;
+  nazwa: string | null;
+  /** Suma ilości tej kartoteki w dokumencie. */
+  ilosc: number;
+  /** Pozycja usługowa, np. przesyłka — nie jest towarem z paczki. */
+  usluga: boolean;
+  /** To jest reklamowany towar. */
+  sporna: boolean;
 }
 
 /**
