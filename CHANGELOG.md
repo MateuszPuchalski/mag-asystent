@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.582.1 — 14 października 2026
+
+Na pasku drogi klienta „Zgłoszenie” jest teraz łączem do reklamacji, gdy ekran nie jest samą reklamacją. Wcześniej z rozmowy, zwrotu czy dyskusji nie dało się na nią kliknąć, bo jej kroki stały na pasku jako zwykły tekst.
+
 ## 0.582.0 — 14 października 2026
 
 **PDF-y z czatu otwierają się na miejscu.** Załącznik PDF w reklamacji,
