@@ -33,6 +33,11 @@ export function NieOdeslany({ zwrot, trwa, blad, onOdmow }: {
     <p className="flex items-center gap-2 text-sm font-semibold text-ranga-zle">
       <PackageX size={16} aria-hidden="true" />
       Klient zgłosił zwrot, ale przez 14 dni nie nadał paczki — pieniądze się nie należą.</p>
+    {/* Odmowa idzie do Allegro jako oświadczenie i nie da się jej cofnąć, a lustro
+        bywa starsze od Sales Center. Przycisk sprawdzenia stoi w sekcji Pieniądze
+        niżej, tu jest tylko przypomnienie. */}
+    <p className="mt-2 text-xs text-slate-700">
+      Zanim odmówisz: sprawdź w Allegro, czy pieniądze nie zostały już oddane.</p>
     <Przycisk wariant="glowny" disabled={trwa} onClick={onOdmow} className="mt-2">
       <kbd className="rounded border border-black/20 px-1 text-xs">N</kbd>
       {trwa ? "Odmawiam…" : "Odrzuć i odmów wypłaty w Allegro"}

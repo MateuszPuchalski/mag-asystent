@@ -410,3 +410,66 @@ describe("Pieniądze przy zwrocie", () => {
     expect(screen.queryByText(/brak/i)).toBeNull();
   });
 });
+
+/* „Sprawdź w Allegro”: lustro bywa starsze od Sales Center (zwrot GM9Q/2026
+   miał w Allegro 308 CZK, a panel mówił, że pieniądze się nie należą). */
+describe("Sprawdzenie w Allegro", () => {
+  const potwierdzone = { id: "r1", status: "SUCCESS", kiedy: null, potwierdzone: true };
+
+  it("klik woła onSprawdz, a przycisk jest drugorzędny", async () => {
+    const onSprawdz = vi.fn();
+    ekran({ onSprawdz });
+    const przycisk = screen.getByRole("button", { name: "Sprawdź w Allegro" });
+    await userEvent.click(przycisk);
+    expect(onSprawdz).toHaveBeenCalledTimes(1);
+    expect(przycisk.className).not.toBe(screen.getByRole("button", { name: /Oddaj pieniądze/ }).className);
+  });
+
+  it("stoi także przed werdyktem, gdy samo oddanie jest zamknięte", () => {
+    ekran({ onSprawdz: vi.fn(), przedWerdyktem: true,
+      stan: stan({ moznaZwrocic: false, powod: "Najpierw przyjmij zwrot." }) });
+    expect(screen.getByRole("button", { name: "Sprawdź w Allegro" })).toBeEnabled();
+  });
+
+  it("w trakcie żądania jest wyłączony i mówi „Sprawdzam…”", () => {
+    ekran({ onSprawdz: vi.fn(), sprawdzam: true });
+    expect(screen.getByRole("button", { name: "Sprawdzam…" })).toBeDisabled();
+  });
+
+  it("znika, gdy Allegro potwierdziło wypłatę", () => {
+    ekran({ onSprawdz: vi.fn(), stan: stan({ oddane: potwierdzone }) });
+    expect(screen.queryByRole("button", { name: /Sprawdź w Allegro/ })).toBeNull();
+  });
+
+  it("zostaje przy zleceniu, którego Allegro jeszcze nie potwierdziło", () => {
+    ekran({ onSprawdz: vi.fn(), stan: stan({ oddane: { ...potwierdzone, potwierdzone: false } }) });
+    expect(screen.getByRole("button", { name: "Sprawdź w Allegro" })).toBeInTheDocument();
+  });
+
+  it("bez wyniku nie ma linii statusu", () => {
+    ekran({ onSprawdz: vi.fn() });
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
+  it("zero zwrotów płatności: mówi, że pieniądze mogły pójść inną drogą", () => {
+    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: { znaleziono: 0, wyplacone: false } });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Allegro nie zwraca zwrotu płatności dla tego zamówienia. Pieniądze mogły pójść inną drogą — sprawdź w Sales Center.");
+  });
+
+  it("wypłacone: Allegro potwierdza wypłatę", () => {
+    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: { znaleziono: 1, wyplacone: true } });
+    expect(screen.getByRole("status")).toHaveTextContent("Allegro potwierdza wypłatę.");
+  });
+
+  it("jest zwrot płatności, ale niewypłacony w pełni", () => {
+    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: { znaleziono: 2, wyplacone: false } });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Allegro ma zwrot płatności, ale jeszcze nie w pełni wypłacony — zobacz status poniżej.");
+  });
+
+  it("błąd sprawdzenia stoi jak błąd innych akcji sekcji", () => {
+    ekran({ onSprawdz: vi.fn(), blad: "Allegro odpowiada zbyt wolno, spróbuj za chwilę." });
+    expect(screen.getByText("Allegro odpowiada zbyt wolno, spróbuj za chwilę.")).toBeInTheDocument();
+  });
+});

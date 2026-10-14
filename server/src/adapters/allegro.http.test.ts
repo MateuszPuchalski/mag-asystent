@@ -400,4 +400,6 @@ test("urlZwrotowPlatnosci: filtry składają się w zapytanie, bez filtra status
   assert.equal(urlZwrotowPlatnosci(api, { refundId: "r1", od: "2026-09-01T00:00:00Z", offset: 100 }),
     `${api}/payments/refunds?limit=100&offset=100&id=r1&occurredAt.gte=2026-09-01T00%3A00%3A00Z`);
   assert.doesNotMatch(urlZwrotowPlatnosci(api, { orderId: "x" }), /status=/);
+  assert.equal(urlZwrotowPlatnosci(api, { paymentId: "p1" }),
+    `${api}/payments/refunds?limit=100&offset=0&payment.id=p1`);
 });
