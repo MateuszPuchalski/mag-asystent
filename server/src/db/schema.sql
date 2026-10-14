@@ -1605,6 +1605,14 @@ CREATE TABLE IF NOT EXISTS zwrot_klienta (
   -- przepisał numer. Bez CHECK: kolumna dochodzi migracją do istniejących baz,
   -- a ALTER TABLE w SQLite nie umie dołożyć ograniczenia.
   korekta_zrodlo TEXT,
+  -- Ręczne zamknięcie BEZ korekty: biuro uznaje sprawę za załatwioną poza tą
+  -- aplikacją (pieniądze oddane gdzie indziej, zwrot bez towaru, historia).
+  -- Zapisujemy też `zamkniety_at`, żeby reszta aplikacji widziała zwrot jako
+  -- zamknięty, a te kolumny mówią, że zamknął go CZŁOWIEK i dlaczego.
+  zamkniecie_reczne_at TEXT,
+  zamkniecie_reczne_przez TEXT,
+  zamkniecie_reczne_user_id INTEGER REFERENCES app_user(user_id),
+  zamkniecie_reczne_powod TEXT,
   zamkniety_at TEXT,
   -- Ocena towaru wraca z hali. `zadanie_terenowe` niesie ją w `wynik`;
   -- tu stoi samo powiązanie, żeby oś zwrotu miała po czym trafić do zadania.

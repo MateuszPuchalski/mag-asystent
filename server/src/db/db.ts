@@ -625,6 +625,12 @@ export function migrate(database: DatabaseSync) {
      otwieraniem i procesowaniem zwrotów". */
   addColumn("zwrot_klienta_pozycja", "ilosc_zwrocona", "REAL");
   addColumn("zwrot_klienta", "korekta_zrodlo", "TEXT");
+  /* Ręczne zamknięcie zwrotu bez korekty. Stare wiersze mają NULL, czyli „nikt
+     tego zwrotu ręcznie nie zamykał". */
+  addColumn("zwrot_klienta", "zamkniecie_reczne_at", "TEXT");
+  addColumn("zwrot_klienta", "zamkniecie_reczne_przez", "TEXT");
+  addColumn("zwrot_klienta", "zamkniecie_reczne_user_id", "INTEGER REFERENCES app_user(user_id)");
+  addColumn("zwrot_klienta", "zamkniecie_reczne_powod", "TEXT");
   /* ŚLAD PO PRZELEWIE ODDANYM POZA ALLEGRO (0.269.0). Przy pobraniu Allegro
      nigdy nie trzymało tych pieniędzy — wracają przelewem z banku firmy, więc
      `zwrot_pieniedzy_id` zostaje pusty i zwrot zamyka się bez śladu po

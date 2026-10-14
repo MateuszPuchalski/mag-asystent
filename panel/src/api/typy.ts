@@ -1121,6 +1121,11 @@ export interface Zwrot {
    * w DO ZWROTU także po korekcie — do dnia, w którym Allegro oddaje samo.
    */
   pieniadzeCzekaja?: boolean;
+  /**
+   * Niepuste = zwrot zamknięty ręcznie, bez korekty. Taki zwrot ma kubełek
+   * `zamkniety`, a zamknięty korektą ma tu `null`.
+   */
+  zamknietyRecznie: { kiedy: string; przez: string | null; powod: string | null } | null;
   sygnaly: Sygnal[];
   /**
    * Termin OBSŁUGI: siedem dni od paczki u nas (0.341.0).

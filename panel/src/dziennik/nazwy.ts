@@ -137,6 +137,8 @@ export const NAZWA_ZDARZENIA: Record<string, string> = {
   zwrot_pieniadze_odmowa: "Odmowa oddania pieniędzy",
   zwrot_wyplata_potwierdzona: "Wypłata zwrotu potwierdzona",
   zwrot_platnosci_sprawdzone: "Zwroty płatności sprawdzone w Allegro",
+  zwrot_zamkniecie_reczne: "Zwrot zamknięty ręcznie",
+  zwrot_zamkniecie_reczne_cofniete: "Ręczne zamknięcie zwrotu cofnięte",
   zwrot_platnosci_sprawdzone_masowo: "Zwroty płatności sprawdzone masowo w Allegro",
   zwrot_przelew: "Przelew zwrotu",
   zwrot_przelew_cofniety: "Przelew zwrotu cofnięty",

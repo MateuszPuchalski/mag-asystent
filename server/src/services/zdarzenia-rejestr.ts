@@ -88,7 +88,7 @@ export const ZDARZENIA: readonly string[] = [
   "zwrot_przelew_cofniety", "zwrot_rabat_automat_blad", "zwrot_rabat_zgloszony",
   "zwrot_skan_dociagniecie", "zwrot_skladnik_outlet", "zwrot_werdykt_cofniety",
   "zwrot_werdykt_odrzucony",
-  "zwrot_werdykt_przyjety", "zwrot_wyplata_potwierdzona", "zwrot_platnosci_sprawdzone", "zwrot_platnosci_sprawdzone_masowo", "zwrot_zamowienia_kupujacego",
+  "zwrot_werdykt_przyjety", "zwrot_wyplata_potwierdzona", "zwrot_platnosci_sprawdzone", "zwrot_platnosci_sprawdzone_masowo", "zwrot_zamkniecie_reczne", "zwrot_zamkniecie_reczne_cofniete", "zwrot_zamowienia_kupujacego",
   "zwrot_zw_zlecony", "zwroty_rozliczone_skasowane", "zwroty_synchronizacja_reczna",
   "zwroty_wyczyszczone", "zwroty_zamowienia_reczne",
 ];

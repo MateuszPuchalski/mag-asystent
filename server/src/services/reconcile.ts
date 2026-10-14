@@ -336,6 +336,9 @@ function zwrotyRozliczoneBezKorekty(): Rozjazd[] {
       return od === null || z.utworzono >= od;
     })
     .filter((z) => !z.rejectionCode && z.werdykt !== "odrzucony")
+    /* Zamknięcie ręczne to jawna decyzja „bez korekty" z powodem i nazwiskiem
+       w dzienniku, więc brak korekty nie jest tu rozjazdem. */
+    .filter((z) => !z.zamknietyRecznie)
     .map((z) => ({
       z,
       /* DWA BRAKI, JEDEN WIERSZ. Osobne rozjazdy na ten sam zwrot kazałyby
