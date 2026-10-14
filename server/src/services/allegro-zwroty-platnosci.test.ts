@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
-  groszeZKwoty, sprawdzZwrotPlatnosci, SprawdzenieZwrotuBlad, synchronizujZwrotyPlatnosci,
+  groszeZKwoty, powodBrakuZatrzasku, sprawdzZwrotPlatnosci, SprawdzenieZwrotuBlad, synchronizujZwrotyPlatnosci,
   zwrotyPlatnosciZwrotu, zwrotZOdpowiedzi,
 } from "./allegro-zwroty-platnosci.js";
 
@@ -214,4 +214,48 @@ test("sprawdzenie odmawia przy paczce nieodebranej i zwrocie bez zamówienia", a
   const deps = { apiUrl: "https://x", query: async () => { throw new Error("nie wolno pytać"); } };
   await assert.rejects(sprawdzZwrotPlatnosci(d, nieodebrana, biuro, deps), SprawdzenieZwrotuBlad);
   await assert.rejects(sprawdzZwrotPlatnosci(d, bez, biuro, deps), SprawdzenieZwrotuBlad);
+});
+
+test("powód braku zatrzasku nazywa warunek, który zatrzymał wypłatę", async () => {
+  const d = stanowisko();
+  const inny = zwrot(d, "a", "o-powod");
+  const stary = zwrot(d, "b", "o-stary", "2026-09-20T08:00:00Z");
+  const dwa = zwrot(d, "c1", "o-dwa");
+  zwrot(d, "c2", "o-dwa");
+  const odrzucony = zwrot(d, "d", "o-odrz");
+  d.prepare("UPDATE zwrot_klienta SET werdykt='odrzucony' WHERE id=?").run(odrzucony);
+  await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(
+      rekord({ id: "r1", order: { id: "o-powod" }, reason: "NOT_COLLECTED" }),
+      rekord({ id: "r2", order: { id: "o-stary" } }),
+      rekord({ id: "r3", order: { id: "o-dwa" } }),
+      rekord({ id: "r4", order: { id: "o-odrz" } }),
+    ),
+  });
+  assert.match(powodBrakuZatrzasku(d, inny)!, /NOT_COLLECTED.*REFUND/);
+  assert.match(powodBrakuZatrzasku(d, stary)!, /wcześniejsza niż zgłoszenie/);
+  assert.match(powodBrakuZatrzasku(d, dwa)!, /więcej niż jeden zwrot/);
+  assert.match(powodBrakuZatrzasku(d, odrzucony)!, /odrzucony/);
+});
+
+test("paczka nieodebrana przy zamówieniu nie blokuje zatrzasku zwrotu z Allegro", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  zwrot(d, "nieodebrana:9", "ord1");
+  const wynik = await sprawdzZwrotPlatnosci(d, id, biuro, {
+    apiUrl: "https://x", query: async () => odpowiedz(rekord()),
+  });
+  assert.equal(wynik.wyplacone, true);
+  assert.equal(wynik.powodBraku, null);
+});
+
+test("sprawdzenie oddaje powód, gdy Allegro oddało pieniądze, a zatrzask się wstrzymał", async () => {
+  const d = stanowisko();
+  const id = zwrot(d, "ret1", "ord1");
+  const wynik = await sprawdzZwrotPlatnosci(d, id, biuro, {
+    apiUrl: "https://x", query: async () => odpowiedz(rekord({ reason: "OVERPAID" })),
+  });
+  assert.equal(wynik.wyplacone, false);
+  assert.match(wynik.powodBraku!, /OVERPAID/);
 });

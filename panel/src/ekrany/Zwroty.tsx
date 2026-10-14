@@ -396,7 +396,8 @@ export function Zwroty() {
   /* Wynik sprawdzenia niesie numer zwrotu z tego samego powodu co błąd wyżej:
      odpowiedź może przyjść, gdy agent stoi już przy następnym zwrocie. */
   const [wynikSprawdzenia, setWynikSprawdzenia] = useState<
-    { zwrotId: number; znaleziono: number; wyplacone: boolean } | null>(null);
+    { zwrotId: number; znaleziono: number; wyplacone: boolean; udane: number;
+      powodBraku: string | null } | null>(null);
   const potracenie = usePotracenie();
   const faktura = useFaktura();
   const dopisz = useDopiszPozycje();
@@ -1339,7 +1340,8 @@ export function Zwroty() {
                 const zwrotId = zwrot.id;
                 sprawdzPlatnosci.mutate({ id: zwrotId }, {
                   onSuccess: (w) => setWynikSprawdzenia({ zwrotId, znaleziono: w.znaleziono,
-                    wyplacone: w.wyplacone }),
+                    wyplacone: w.wyplacone, powodBraku: w.powodBraku ?? null,
+                    udane: (w.platnosci ?? []).filter((p) => p.status === "SUCCESS").length }),
                   onError: bladPieniedzyDla(zwrotId),
                 });
               }}

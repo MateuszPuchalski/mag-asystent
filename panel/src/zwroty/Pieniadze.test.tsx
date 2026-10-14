@@ -462,10 +462,26 @@ describe("Sprawdzenie w Allegro", () => {
     expect(screen.getByRole("status")).toHaveTextContent("Allegro potwierdza wypłatę.");
   });
 
-  it("jest zwrot płatności, ale niewypłacony w pełni", () => {
-    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: { znaleziono: 2, wyplacone: false } });
+  it("jest zwrot płatności, ale pieniądze jeszcze nie wyszły", () => {
+    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: { znaleziono: 2, wyplacone: false, udane: 0 } });
     expect(screen.getByRole("status")).toHaveTextContent(
-      "Allegro ma zwrot płatności, ale jeszcze nie w pełni wypłacony — zobacz status poniżej.");
+      "Allegro ma zwrot płatności, ale pieniądze jeszcze nie wyszły — zobacz status poniżej.");
+  });
+
+  it("Allegro oddało pieniądze, a zwrot nie został dopasowany: mówi dlaczego", () => {
+    /* Obok listy „Wypłacone” zdanie „jeszcze nie wypłacony” wyglądało jak sprzeczność. */
+    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: {
+      znaleziono: 1, wyplacone: false, udane: 1,
+      powodBraku: "Allegro podaje powód NOT_COLLECTED, a zatrzask uznaje tylko zwrot towaru (REFUND)" } });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "Allegro oddało pieniądze, ale ten zwrot nie został dopasowany automatycznie: " +
+      "Allegro podaje powód NOT_COLLECTED, a zatrzask uznaje tylko zwrot towaru (REFUND).");
+  });
+
+  it("wypłata bez znanego powodu braku nie zgaduje", () => {
+    ekran({ onSprawdz: vi.fn(), wynikSprawdzenia: { znaleziono: 1, wyplacone: false, udane: 1 } });
+    expect(screen.getByRole("status")).toHaveTextContent(
+      "ale ten zwrot nie został dopasowany automatycznie: powód nieznany.");
   });
 
   it("błąd sprawdzenia stoi jak błąd innych akcji sekcji", () => {

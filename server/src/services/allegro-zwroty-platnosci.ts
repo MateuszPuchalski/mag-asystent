@@ -203,8 +203,10 @@ export function zwrotyPlatnosciZwrotu(database: Db, zwrotId: number): Array<Zwro
  *   chodzą u nas osobną drogą i nie zamykają zwrotu;
  * - zwrot płatności musi być NOWSZY od zgłoszenia zwrotu — wcześniejszy
  *   dotyczył czegoś innego na tym samym zamówieniu;
- * - tylko gdy zamówienie ma JEDEN zwrot klienta. Przy dwóch nie wiadomo,
- *   któremu z nich należy się dany przelew, a zgadywanie zamknęłoby oba;
+ * - tylko gdy zamówienie ma JEDEN zwrot klienta z Allegro. Przy dwóch nie
+ *   wiadomo, któremu należy się dany przelew, a zgadywanie zamknęłoby oba.
+ *   Paczka nieodebrana, dodana ręcznie, nie liczy się: Allegro nie zna jej
+ *   i nie ma dla niej zwrotu płatności, więc o przelew nie konkuruje;
  * - `PARTIAL` nie zatrzaskuje: wyszła część, a nie całość.
  *
  * Zatrzask trzyma PIERWSZĄ datę (`rozliczony_allegro_at IS NULL`), tak jak
@@ -230,7 +232,8 @@ export function zatrzaskZLustra(database: Db, konto: number, tylkoZwrot: number 
        AND p.utworzono_at >= z.created_at
        AND (SELECT COUNT(*) FROM zwrot_klienta d
              WHERE d.channel_account_id = z.channel_account_id
-               AND d.order_id = z.order_id) = 1
+               AND d.order_id = z.order_id
+               AND d.external_id NOT LIKE 'nieodebrana:%') = 1
      GROUP BY z.id`)
     .all(konto, tylkoZwrot, tylkoZwrot) as Array<{ zwrot_id: number; kiedy: string; refund_id: string }>;
 
@@ -245,6 +248,53 @@ export function zatrzaskZLustra(database: Db, konto: number, tylkoZwrot: number 
         zrodlo: "payments/refunds" }, undefined, database);
   }
   return zatrzasniete;
+}
+
+/**
+ * Dlaczego zwrot płatności `SUCCESS` NIE zatrzasnął zwrotu klienta — jedno
+ * zdanie po polsku, albo `null`, gdy nie ma czego tłumaczyć.
+ *
+ * Zatrzask jest ostrożny celowo, ale ostrożność bez wyjaśnienia wygląda jak
+ * błąd: agent widzi „Wypłacone 308 zł", a zwrot dalej stoi w kolejce.
+ * Sprawdzamy te same warunki, w tej samej kolejności co `zatrzaskZLustra`,
+ * i oddajemy pierwszy, który zatrzymał.
+ */
+export function powodBrakuZatrzasku(database: Db, zwrotId: number): string | null {
+  const z = database.prepare(`SELECT z.channel_account_id AS konto, z.order_id, z.created_at,
+      z.werdykt, z.rozliczony_allegro_at AS rozliczony, m.platnosc_id
+      FROM zwrot_klienta z
+      LEFT JOIN zamowienie_klienta m
+        ON m.channel_account_id = z.channel_account_id AND m.external_id = z.order_id
+     WHERE z.id = ?`).get(zwrotId) as
+    { konto: number; order_id: string | null; created_at: string; werdykt: string | null;
+      rozliczony: string | null; platnosc_id: string | null } | undefined;
+  if (!z || z.rozliczony || !z.order_id) return null;
+
+  const udane = database.prepare(`SELECT reason, utworzono_at FROM zwrot_platnosci
+      WHERE channel_account_id = ? AND status = 'SUCCESS'
+        AND (order_id = ? OR (order_id IS NULL AND ? IS NOT NULL AND payment_id = ?))`)
+    .all(z.konto, z.order_id, z.platnosc_id, z.platnosc_id) as
+    Array<{ reason: string | null; utworzono_at: string }>;
+  if (!udane.length) return null;
+
+  if (z.werdykt === "odrzucony") {
+    return "zwrot jest u nas odrzucony, więc wypłaty nie zatrzaskujemy samoczynnie";
+  }
+  const zwrotu = udane.filter((u) => u.reason === "REFUND");
+  if (!zwrotu.length) {
+    const powody = [...new Set(udane.map((u) => u.reason ?? "brak powodu"))].join(", ");
+    return `Allegro podaje powód ${powody}, a zatrzask uznaje tylko zwrot towaru (REFUND)`;
+  }
+  if (!zwrotu.some((u) => u.utworzono_at >= z.created_at)) {
+    return "wypłata jest wcześniejsza niż zgłoszenie tego zwrotu, więc dotyczy czegoś innego";
+  }
+  const innych = Number((database.prepare(`SELECT COUNT(*) AS n FROM zwrot_klienta
+      WHERE channel_account_id = ? AND order_id = ? AND id <> ?
+        AND external_id NOT LIKE 'nieodebrana:%'`).get(z.konto, z.order_id, zwrotId) as { n: number }).n);
+  if (innych > 0) {
+    return "to zamówienie ma więcej niż jeden zwrot klienta i nie wiadomo, któremu należy się wypłata";
+  }
+  return "zwrot nie spełnił warunków zatrzasku z powodu, którego nie umiem nazwać";
 }
 
 export interface ZwrotyPlatnosciDeps {
@@ -309,6 +359,8 @@ export interface WynikSprawdzenia {
   /** Czy zwrot ma po tym sprawdzeniu potwierdzoną wypłatę. */
   wyplacone: boolean;
   platnosci: ZwrotPlatnosci[];
+  /** Gdy Allegro oddało pieniądze, a zwrot nie został zatrzaśnięty: dlaczego. */
+  powodBraku: string | null;
 }
 
 /**
@@ -357,5 +409,8 @@ export async function sprawdzZwrotPlatnosci(
     "SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id = ?").get(zwrotId) as { r: string | null }).r);
   logEvent("zwrot_platnosci_sprawdzone", kto.name, null,
     { zwrotId, znaleziono: zwroty.length, zatrzasniete, wyplacone }, kto.id, database);
-  return { znaleziono: zwroty.length, wyplacone, platnosci: zwrotyPlatnosciZwrotu(database, zwrotId) };
+  return {
+    znaleziono: zwroty.length, wyplacone, platnosci: zwrotyPlatnosciZwrotu(database, zwrotId),
+    powodBraku: wyplacone ? null : powodBrakuZatrzasku(database, zwrotId),
+  };
 }
