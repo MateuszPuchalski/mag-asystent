@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.586.0 — 14 października 2026
+
+**Liczba sprzedanych w karcie towaru pochodzi z Subiekta.** Szuflada towaru
+liczy sprzedane sztuki z paragonów i faktur w Subiekcie, ze wszystkich
+kanałów, a nie z jednej oferty Allegro. Udział zwrotów porównuje wtedy ten
+sam towar. Serwer kopiuje dokumenty sprzedaży z 90 dni zamiast 60.
+
 ## 0.585.0 — 14 października 2026
 
 **Reklamacja pokazuje, co klient naprawdę kupił.** Panel reklamacji bierze
