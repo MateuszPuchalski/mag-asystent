@@ -10,6 +10,12 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.582.0 — 14 października 2026
+
+**PDF-y z czatu otwierają się na miejscu.** Załącznik PDF w reklamacji,
+dyskusji i skrzynce pokazuje miniaturę pierwszej strony, a klik otwiera cały
+dokument w panelu. Pobranie pliku działa jak dotąd.
+
 ## 0.581.0 — 14 października 2026
 
 **Zwrot znika z kolejki, gdy Allegro potwierdzi wypłatę.** Serwer czyta teraz `GET /payments/refunds`, czyli zwroty płatności z kwotą, statusem i rozbiciem na pozycje, także te zrobione ręką w Sales Center. Zwrot klienta, za który wyszedł zwrot płatności ze statusem `SUCCESS`, dostaje potwierdzenie wypłaty bez pytania o każdą płatność osobno.

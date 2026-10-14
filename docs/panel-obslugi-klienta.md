@@ -6259,7 +6259,7 @@ Oba ekrany rysuje wspólny `reklamacje/Czat.tsx`, więc zmiana jest jedna.
   niepełna”, bursztyn ostatniej wiadomości klienta, ikony i słowa ról oraz
   zwijanie długich treści.
 
-**PDF w czacie (@wydanie).** Prośba właściciela: PDF od klienta ma być widać
+**PDF w czacie (0.582.0).** Prośba właściciela: PDF od klienta ma być widać
 w rozmowie. Kafel PDF-a pokazuje miniaturę pierwszej strony ze znaczkiem
 „PDF”. Klik otwiera cały dokument w oknie panelu, z licznikiem „Strona N z M”
 i przyciskiem „Pobierz”. Pasek nazwy dalej pobiera plik na dysk. To samo
