@@ -20,7 +20,7 @@ const zwrot = (id: number, kubelek: Kubelek, numer: string): Zwrot => ({
   sumaPozycjiGrosze: 4999, kwotaPelnaGrosze: null, waluta: "PLN",
   linkZwrotu: null, zamowienie: null, werdykt: null, werdyktPowod: null, kwotaGrosze: null,
   kwotaWariant: null, korektaNumer: null, korektaZrodlo: null, rejectionCode: null, wersja: 1, zrodlo: "allegro",
-  notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, odbiorcaNazwa: null, przewoznik: null, rozmowy: [],
+  notatka: null, notatkaAt: null, notatkaPrzez: null, maPoprzedniaNotatke: false, kupujacyLogin: null, odbiorcaNazwa: null, przewoznik: null, rozmowy: [], zamknietyRecznie: null,
   faktura: { dokId: null, numer: null, typ: null, zrodlo: null, at: null, przez: null },
   pozycje: [{ id, zrodlo: "allegro", offerId: "1", ofertaZamowienia: null, ofertaZdjecie: "nieznane" as const, nazwa: "Sekator", ilosc: 1, cenaGrosze: 4999,
     waluta: "PLN", powod: null, powodKomentarz: null, ocena: kubelek === "zwrot" ? "stan" : null,
@@ -1566,5 +1566,65 @@ describe("Sprawdzenie WSZYSTKICH zwrotów w Allegro", () => {
     await userEvent.click(await przycisk());
     expect(await screen.findByText("Allegro ogranicza zapytania.")).toBeInTheDocument();
     expect(screen.queryByRole("status")).toBeNull();
+  });
+});
+
+describe("Ręczne zamknięcie zwrotu", () => {
+  afterEach(() => { vi.unstubAllGlobals(); scena.zwroty = null; scena.szczegol = undefined; });
+  const odczyt = (url: string) => url === "/api/biuro/kosze/pominiete" ? { pominiete: [] } : undefined;
+  const ZAMKNIJ = "POST /api/obsluga/zwroty/6/zamkniecie-reczne";
+  const otworz = (z: Partial<Zwrot> = {}) => {
+    scena.zwroty = [{ ...zwrot(6, "zwrot", "ZR-6"), ...z }];
+    pokaz("/obsluga/zwroty/6");
+  };
+  const wyslaneCialo = () => JSON.parse(String((vi.mocked(fetch).mock.calls
+    .find((c) => (c[1] as RequestInit | undefined)?.method === "POST")?.[1] as RequestInit).body));
+
+  it("otwarcie ekranu niczego nie zapisuje", async () => {
+    const zapisy = atrapaZapisow(odczyt);
+    otworz();
+    expect(await screen.findByRole("button", { name: "Zamknij ręcznie" })).toBeInTheDocument();
+    expect(zapisy.wyslane).toEqual([]);
+  });
+
+  it("klik robi jeden POST na właściwy adres z wersją i powodem", async () => {
+    const zapisy = atrapaZapisow(odczyt, () => ({ status: 200,
+      cialo: { zamknietyAt: "2026-09-20T10:00:00Z", wersja: 2 } }));
+    otworz();
+    await userEvent.click(await screen.findByRole("button", { name: "Zamknij ręcznie" }));
+    await userEvent.type(screen.getByLabelText("Powód (opcjonalnie)"), "oddane przelewem");
+    await userEvent.click(screen.getByRole("button", { name: "Zamknij" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(zapisy.wyslane).toEqual([ZAMKNIJ]);
+    expect(wyslaneCialo()).toEqual({ wersja: 1, powod: "oddane przelewem" });
+  });
+
+  it("błąd 400 pokazuje treść serwera, a okno zostaje", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 400,
+      cialo: { error: "Towar z tego zwrotu leży w koszyku czekającym na korektę." } }));
+    otworz();
+    await userEvent.click(await screen.findByRole("button", { name: "Zamknij ręcznie" }));
+    await userEvent.click(screen.getByRole("button", { name: "Zamknij" }));
+    expect(await within(screen.getByRole("dialog"))
+      .findByText("Towar z tego zwrotu leży w koszyku czekającym na korektę.")).toBeInTheDocument();
+  });
+
+  it("konflikt 409 pokazuje komunikat o zmianie zwrotu", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 409,
+      cialo: { error: "Zwrot zmienił się w międzyczasie — odśwież i spróbuj ponownie.",
+        wersja: 5, przyslana: 1 } }));
+    otworz();
+    await userEvent.click(await screen.findByRole("button", { name: "Zamknij ręcznie" }));
+    await userEvent.click(screen.getByRole("button", { name: "Zamknij" }));
+    expect(await screen.findByText(/Zwrot zmienił się w międzyczasie/)).toBeInTheDocument();
+  });
+
+  it("zwrot zamknięty ręcznie: Otwórz ponownie to jeden POST z samą wersją", async () => {
+    const zapisy = atrapaZapisow(odczyt, () => ({ status: 200, cialo: { wersja: 3 } }));
+    otworz({ kubelek: "zamkniety", wersja: 2,
+      zamknietyRecznie: { kiedy: "2026-09-20T10:00:00Z", przez: "Ewa", powod: null } });
+    await userEvent.click(await screen.findByRole("button", { name: "Otwórz ponownie" }));
+    await waitFor(() => expect(zapisy.wyslane).toEqual([`${ZAMKNIJ}/cofnij`]));
+    expect(wyslaneCialo()).toEqual({ wersja: 2 });
   });
 });

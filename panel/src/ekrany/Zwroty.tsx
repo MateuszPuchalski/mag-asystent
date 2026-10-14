@@ -6,6 +6,7 @@ import { Konflikt } from "../api/klient";
 import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, WynikDosylki, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
 import { Pieniadze } from "../zwroty/Pieniadze";
+import { ZamkniecieReczne } from "../zwroty/ZamkniecieReczne";
 import { Pozycje } from "../zwroty/Pozycje";
 import { DolozTowar } from "../zwroty/DolozTowar";
 import {
@@ -13,7 +14,7 @@ import {
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
   usePaczkiKlienta, useZamowieniaZAllegro, usePrzyjmijNieodebrana, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
   useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci, useSledzDosylkeZwrotu, useSprawdzPlatnosci,
-  useZapiszPrzelew, useCofnijPrzelew,
+  useZapiszPrzelew, useCofnijPrzelew, useZamknijRecznie, useOtworzPonownie,
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
   useDolozTowar, szukajTowaruDoKosza, type TowarDoKosza, useKosz, usePotwierdzKartoteke,
 } from "../api/zwroty";
@@ -483,6 +484,11 @@ export function Zwroty() {
   const [bladWszystkich, setBladWszystkich] = useState("");
   const przelew = useZapiszPrzelew();
   const cofnijPrzelew = useCofnijPrzelew();
+  const zamknijRecznie = useZamknijRecznie();
+  const otworzPonownie = useOtworzPonownie();
+  /* Błąd zamknięcia niesie numer zwrotu z tego samego powodu co `bladPieniedzy`:
+     odpowiedź bywa spóźniona, a operator stoi już przy następnym zwrocie. */
+  const [bladZamkniecia, setBladZamkniecia] = useState<{ zwrotId: number; tekst: string } | null>(null);
   const notatka = useNotatkaZwrotu();
   const cofnijNotatke = useCofnijNotatkeZwrotu();
   const [bladNotatki, setBladNotatki] = useState("");
@@ -1331,6 +1337,28 @@ export function Zwroty() {
                 cofnijKwote.mutate({ id: zwrot.id, wersja: zwrot.wersja })}
               onCofnijWerdykt={() =>
                 cofnijWerdykt.mutate({ id: zwrot.id, wersja: zwrot.wersja })} />
+            {/* `key` na zwrocie: otwarte okno i wpisany powód nie przechodzą
+                na następny zwrot. */}
+            <ZamkniecieReczne key={`zamkniecie-${zwrot.id}`} zwrot={zwrot}
+              pieniadzeCzekaja={pieniadzeCzekaja}
+              trwa={zamknijRecznie.isPending || otworzPonownie.isPending}
+              blad={bladZamkniecia?.zwrotId === zwrot.id ? bladZamkniecia.tekst : ""}
+              onZamknij={(powod, poSukcesie) => {
+                setBladZamkniecia(null);
+                const zwrotId = zwrot.id;
+                zamknijRecznie.mutate({ id: zwrotId, wersja: zwrot.wersja, powod }, {
+                  /* Jak po korekcie: zamknięty zwrot schodzi z kubełka, więc
+                     kursor idzie na następny, a nie zostaje na pustym miejscu. */
+                  onSuccess: () => { poSukcesie(); idz(1); },
+                  onError: (e) => setBladZamkniecia({ zwrotId, tekst: (e as Error).message }),
+                });
+              }}
+              onOtworz={() => {
+                setBladZamkniecia(null);
+                const zwrotId = zwrot.id;
+                otworzPonownie.mutate({ id: zwrotId, wersja: zwrot.wersja },
+                  { onError: (e) => setBladZamkniecia({ zwrotId, tekst: (e as Error).message }) });
+              }} />
             {/* Pieniądze STOJĄ POD DECYZJAMI, nie w kolumnie dowodów: to jest
                 ostatni krok tej pracy i ma być tam, gdzie operator właśnie
                 patrzy, a nie o kolumnę dalej. */}

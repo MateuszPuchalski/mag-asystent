@@ -922,6 +922,40 @@ export function useCofnijPrzelew() {
 }
 
 /**
+ * Ręczne zamknięcie zwrotu bez korekty i jego cofnięcie.
+ *
+ * Dotyczy WYŁĄCZNIE naszej kolejki: nic nie idzie do Allegro ani do Subiekta.
+ * Unieważniamy po sukcesie i po błędzie, bo odmowa (towar w koszyku, zwrot już
+ * zamknięty) znaczy zwykle, że ekran widzi stary stan zwrotu.
+ */
+export function useZamknijRecznie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number; powod?: string }) =>
+      api<{ zamknietyAt: string; wersja: number }>(
+        `/api/obsluga/zwroty/${v.id}/zamkniecie-reczne`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja, powod: v.powod }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
+export function useOtworzPonownie() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number; wersja: number }) =>
+      api<{ wersja: number }>(`/api/obsluga/zwroty/${v.id}/zamkniecie-reczne/cofnij`,
+        { method: "POST", body: JSON.stringify({ wersja: v.wersja }) }),
+    onSettled: (_d, _e, v) => {
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
+    },
+  });
+}
+
+/**
  * „Sprawdź w Allegro” przy pieniądzach zwrotu: serwer pyta Allegro o zwroty
  * płatności tego zamówienia i zapisuje je w lustrze.
  *
