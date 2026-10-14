@@ -10,6 +10,12 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.584.1 — 14 października 2026
+
+Zwrot, za który Allegro oddało pieniądze z powodem „anulowanie przez kupującego” albo „nieodebrane zamówienie”, dostaje potwierdzenie wypłaty tak samo jak zwrot towaru. Wcześniej takie zwroty zostawały w kolejce, choć kupujący miał już pieniądze. Reklamacje i pozostałe powody (nadpłata, zbyt niska kwota, brak produktu) nadal nie zamykają zwrotu, bo dotyczą innej sytuacji na tym samym zamówieniu.
+
+Zwroty już sprawdzone wymagają jednego kliknięcia „Sprawdź wszystkie w Allegro”.
+
 ## 0.584.0 — 14 października 2026
 
 **„Sprawdź wszystkie w Allegro” na kolejce zwrotów.** Jedno kliknięcie sprawdza wszystkie zwroty w pracy w liście zwrotów płatności Allegro i przypina wypłaty tam, gdzie Allegro oddało pieniądze. Raport mówi, przy ilu zwrotach przypięto wypłatę, ilu Allegro nie zna i ile zwrotów nie przypięto mimo wypłaty, z powodem.
