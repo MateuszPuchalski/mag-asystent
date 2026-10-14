@@ -10,6 +10,16 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.587.1 — 14 października 2026
+
+Przy zamówieniu z kilkoma zwrotami klienta wypłata z Allegro nie zdejmowała z kolejki żadnego z nich. Teraz aplikacja przypisuje wypłatę po pozycjach: zwrot jest rozliczony, gdy zwrot płatności wymienia wszystkie jego pozycje, a inny zwrot tego zamówienia nie dzieli z nim pozycji. Zwrot całego zamówienia (anulowanie przez kupującego, nieodebrana paczka) rozlicza wszystkie jego zwroty.
+
+Gdy dopasowania nie da się zrobić pewnie, zwrot zostaje w kolejce, a „Sprawdź w Allegro” mówi dlaczego: dwa zwroty tej samej pozycji, pozycji nie da się przypiąć do zamówienia albo wypłata nie wymienia pozycji zwrotu. Dla takich zwrotów zostaje ręczne zamknięcie.
+
+Starsza droga przez operacje płatnicze nie rozlicza już zwrotów przy zamówieniach z kilkoma zwrotami: pierwsza wypłata zdejmowała wtedy z kolejki także drugi, niezapłacony zwrot.
+
+Zwroty już sprawdzone wymagają jednego kliknięcia „Sprawdź wszystkie w Allegro”.
+
 ## 0.587.0 — 14 października 2026
 
 **Ręczne zamykanie zwrotów.** Zwrot, którego nic nie domknie (pieniądze oddane poza aplikacją, historia sprzed panelu), można zamknąć jednym kliknięciem, z krótkim powodem. Zamyka tylko u nas: nic nie idzie do Allegro ani do Subiekta. Zwrot schodzi z kolejki, także gdy pieniądze za niego jeszcze nie wyszły, a nazwisko i powód zostają w dzienniku i na osi zwrotu. Zamknięcie można cofnąć, wtedy zwrot wraca tam, gdzie stał.
