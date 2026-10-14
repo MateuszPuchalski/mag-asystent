@@ -64,6 +64,42 @@ type WierszPozycji = {
 
 const PUSTY = (powod: string): SkladPozycji => ({ skladniki: [], zrodlo: null, powod });
 
+/** Wiersz dokumentu sprzedaży zsumowany po kartotece, razem z usługami. */
+export interface PozycjaDokumentuSprzedazy {
+  twId: number;
+  symbol: string;
+  nazwa: string;
+  ilosc: number;
+  /** Pozycja usługowa (`pomijane.ts`), np. przesyłka — nie jest towarem. */
+  usluga: boolean;
+}
+
+/**
+ * Wszystkie wiersze dokumentu sprzedaży, zsumowane po kartotece, Z usługami.
+ *
+ * Usługa zostaje na liście z flagą, a nie wypada, bo reklamacja pokazuje
+ * CAŁY dokument: agent porównuje go z paragonem klienta, a brakujący wiersz
+ * przesyłki wyglądałby jak inny dokument. Koszyk zwrotów filtruje flagę sam
+ * (`pozycjeDokumentu`), więc obie drogi czytają to samo zapytanie.
+ *
+ * Kartoteka spoza kopii Subiekta dostaje zastępczy symbol i nazwę jak
+ * w `kartoteka`; usługą nie jest, bo brak symbolu to towar bez nazwy.
+ */
+export function wierszeDokumentuSprzedazy(database: Db, dokId: number): PozycjaDokumentuSprzedazy[] {
+  const w = database.prepare(
+    `SELECT p.tw_id, SUM(p.ilosc) AS ilosc, MIN(t.symbol) AS symbol, MIN(t.nazwa) AS nazwa
+       FROM sgt_faktura_pozycja p LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
+      WHERE p.dok_id=? GROUP BY p.tw_id ORDER BY MIN(p.id)`)
+    .all(dokId) as Array<{ tw_id: number; ilosc: number; symbol: string | null; nazwa: string | null }>;
+  return w.map((x) => ({
+    twId: Number(x.tw_id),
+    symbol: x.symbol ?? String(x.tw_id),
+    nazwa: x.nazwa ?? `kartoteka ${x.tw_id}`,
+    ilosc: Number(x.ilosc),
+    usluga: pomijanaPozycja(x.symbol),
+  }));
+}
+
 /**
  * Wiersze dokumentu sprzedaży, zsumowane po kartotece — BEZ pozycji usługowych.
  *
@@ -75,13 +111,8 @@ const PUSTY = (powod: string): SkladPozycji => ({ skladniki: [], zrodlo: null, p
  * Filtr ten sam, którym rozkładanie dostaw pomija usługi (`pomijane.ts`).
  */
 function pozycjeDokumentu(database: Db, dokId: number): Map<number, number> {
-  const w = database.prepare(
-    `SELECT p.tw_id, SUM(p.ilosc) AS ilosc, MIN(t.symbol) AS symbol
-       FROM sgt_faktura_pozycja p LEFT JOIN sgt_towar t ON t.tw_id = p.tw_id
-      WHERE p.dok_id=? GROUP BY p.tw_id`)
-    .all(dokId) as Array<{ tw_id: number; ilosc: number; symbol: string | null }>;
-  return new Map(w.filter((x) => !pomijanaPozycja(x.symbol))
-    .map((x) => [Number(x.tw_id), Number(x.ilosc)]));
+  return new Map(wierszeDokumentuSprzedazy(database, dokId).filter((x) => !x.usluga)
+    .map((x) => [x.twId, x.ilosc]));
 }
 
 /** Symbol i nazwa kartoteki — na ekran i na dokument MM. */
@@ -207,37 +238,42 @@ function kartotekaOferty(
   return poSku.stan === "jedno" && poSku.twId !== null ? { tw_id: poSku.twId } : undefined;
 }
 
-/**
- * Rozbicie kompletu: wiersze dokumentu, których nie zabrała żadna inna oferta.
- *
- * Liczymy po OFERTACH ZAMÓWIENIA, nie po pozycjach zwrotu, i to jest sedno.
- * Paragon niesie całe zamówienie: gdyby odejmować tylko to, co klient oddał,
- * do kompletu doliczyłby się towar, który klient zatrzymał.
- */
-function zKompletu(
-  database: Db, p: WierszPozycji, ile: number, naDokumencie: Map<number, number>,
-): SkladPozycji {
-  if (!p.order_id || !p.offer_id) {
-    return PUSTY("Bez numeru zamówienia nie da się przypisać wierszy paragonu do oferty");
-  }
+/** Wynik odejmowania: co z dokumentu zostało dla oferty i kto nie miał kartoteki. */
+export interface PoOdjeciu {
+  oferty: Array<{ offer_id: string; ilosc: number; sku: string | null }>;
+  /** Kartoteka → sztuki, których nie zabrała żadna INNA oferta zamówienia. */
+  zostalo: Map<number, number>;
+  /** Oferty bez kartoteki na dokumencie; nasza oferta jest tu zawsze. */
+  bezKartoteki: string[];
+}
 
+/**
+ * Odejmowanie: inne oferty zamówienia zabierają z dokumentu swoje sztuki.
+ *
+ * Wspólne dla rozbicia kompletu i dla spornej pozycji w reklamacji, bo obie
+ * pytają o to samo: „który wiersz dokumentu jest z tej oferty". Druga kopia
+ * tej reguły pomyliłaby się przy pierwszej poprawce w jednej z nich.
+ * `null`, gdy zamówienia nie ma w kopii — wtedy nie ma czego odejmować.
+ */
+export function odejmijInneOferty(
+  database: Db, kontoId: number, orderId: string, offerId: string,
+  naDokumencie: Map<number, number>,
+): PoOdjeciu | null {
   const oferty = database.prepare(
     `SELECT o.offer_id, SUM(o.ilosc) AS ilosc, MIN(o.sku) AS sku
        FROM zamowienie_klienta_pozycja o
        JOIN zamowienie_klienta z ON z.id = o.zamowienie_id
       WHERE z.channel_account_id=? AND z.external_id=? AND o.offer_id IS NOT NULL
       GROUP BY o.offer_id`)
-    .all(Number(p.channel_account_id), p.order_id) as
+    .all(kontoId, orderId) as
       Array<{ offer_id: string; ilosc: number; sku: string | null }>;
-  if (!oferty.length) {
-    return PUSTY("Zamówienia nie ma jeszcze w kopii — bez niego nie wiadomo, co jeszcze było na paragonie");
-  }
+  if (!oferty.length) return null;
 
   const zostalo = new Map(naDokumencie);
   const bezKartoteki: string[] = [];
   for (const o of oferty) {
-    const m = kartotekaOferty(database, Number(p.channel_account_id), o.offer_id, o.sku);
-    if (o.offer_id === p.offer_id) {
+    const m = kartotekaOferty(database, kontoId, o.offer_id, o.sku);
+    if (o.offer_id === offerId) {
       /* Nasza oferta NIE zabiera sobie nic, nawet gdy ma mapowanie: trafiłaby
          tu tylko wtedy, gdy jej kartoteki na dokumencie NIE MA. */
       bezKartoteki.push(o.offer_id);
@@ -253,6 +289,29 @@ function zKompletu(
     const reszta = Number(zostalo.get(twId)) - Number(o.ilosc);
     if (reszta > 0) zostalo.set(twId, reszta); else zostalo.delete(twId);
   }
+  return { oferty, zostalo, bezKartoteki };
+}
+
+/**
+ * Rozbicie kompletu: wiersze dokumentu, których nie zabrała żadna inna oferta.
+ *
+ * Liczymy po OFERTACH ZAMÓWIENIA, nie po pozycjach zwrotu, i to jest sedno.
+ * Paragon niesie całe zamówienie: gdyby odejmować tylko to, co klient oddał,
+ * do kompletu doliczyłby się towar, który klient zatrzymał.
+ */
+function zKompletu(
+  database: Db, p: WierszPozycji, ile: number, naDokumencie: Map<number, number>,
+): SkladPozycji {
+  if (!p.order_id || !p.offer_id) {
+    return PUSTY("Bez numeru zamówienia nie da się przypisać wierszy paragonu do oferty");
+  }
+
+  const odjete = odejmijInneOferty(
+    database, Number(p.channel_account_id), p.order_id, p.offer_id, naDokumencie);
+  if (!odjete) {
+    return PUSTY("Zamówienia nie ma jeszcze w kopii — bez niego nie wiadomo, co jeszcze było na paragonie");
+  }
+  const { oferty, zostalo, bezKartoteki } = odjete;
 
   if (bezKartoteki.length > 1) {
     /* Bez odmiany przez przypadki: „są 5 oferty" czytało się jak usterka

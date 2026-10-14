@@ -16,6 +16,7 @@ import { ROZMOWA_ZAMOWIENIA, drogaZakupu, sprawyZakupu, type PrzystanekDrogi, ty
 import { stanZdjeciaOferty, type StanZdjeciaOferty } from "./zdjecia-ofert.js";
 import { STATUSY_KONCOWE } from "./statusy-spraw.js";
 import { ostatniaDostawa, type OstatniaDostawa } from "./ostatnia-dostawa.js";
+import { paragonReklamacji, type ParagonReklamacji } from "./paragon-reklamacji.js";
 import {
   dowodyReklamacji, uDostawcyReklamacji, type DowodReklamacji, type ReklamacjaUDostawcy,
 } from "./reklamacja-dowody.js";
@@ -1221,6 +1222,12 @@ export interface SzczegolReklamacji {
   dowody: DowodReklamacji[];
   /** Reklamacja u dostawcy; `null`, dopóki biuro jej nie zgłosiło. */
   uDostawcy: ReklamacjaUDostawcy | null;
+  /**
+   * FS i PA zamówienia z Subiekta z pozycjami i sporną pozycją; bez dokumentu
+   * sam powód braku. Tylko w szczególe: kolejka czytałaby pozycje setek
+   * dokumentów, a symbol z dokumentu jest potrzebny przy jednej sprawie.
+   */
+  paragon: ParagonReklamacji;
 }
 
 /**
@@ -1470,6 +1477,17 @@ export function szczegolReklamacji(
     dostawa: ostatniaDostawa(database, twIdTowaru, reklamacja.kupionoAt),
     dowody: dowodyReklamacji(database, id),
     uDostawcy: uDostawcyReklamacji(database, id),
+    /* Kandydaci na sporną pozycję to mapowanie oferty i sygnatura z pozycji
+       zamówienia. Obie są tylko podpowiedzią: rozstrzyga obecność na
+       dokumencie, a symbol na ekran idzie wyłącznie z dokumentu. */
+    paragon: paragonReklamacji(database, {
+      konto, orderId: reklamacja.orderId, offerId: reklamacja.offerId,
+      kupionoAt: reklamacja.kupionoAt,
+      kandydaci: [
+        w.tw_id == null ? null : Number(w.tw_id),
+        reklamacja.twZParagonu ? reklamacja.twId : null,
+      ],
+    }, teraz),
   };
 }
 

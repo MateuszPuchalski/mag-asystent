@@ -461,31 +461,56 @@ export interface DokumentZamowienia {
 /** Ile dni po zakupie szukać dokumentu — tyle, ile przy zwrocie. */
 const OKNO_DOKUMENTU_DNI = OKNO_DNI;
 
+/** Dokument sprzedaży z kluczem Subiekta — po nim czyta się jego pozycje. */
+export interface DokumentSprzedazy extends DokumentZamowienia {
+  dokId: number;
+}
+
 /**
- * Dokumenty sprzedaży z numerem tego zamówienia, od najstarszego.
+ * Dokumenty sprzedaży z numerem tego zamówienia, od najstarszego, z `dokId`.
+ *
+ * Jedno dopasowanie dla skrzynki i reklamacji, bo dwie kopie reguły
+ * `numerWskazuje` rozjechałyby się przy pierwszej poprawce, a reklamacja
+ * pokazałaby wtedy inny paragon niż rozmowa o tym samym zakupie.
  * Czysty odczyt: niczego nie wiąże i nie zapisuje.
  */
-export function dokumentySprzedazyZamowienia(
-  orderId: string, kupiono: string | null, database: Db = defaultDb(),
-): DokumentZamowienia[] {
+export function dokumentySprzedazyZId(
+  orderId: string, kupiono: string | null, database: Db = defaultDb(), teraz = Date.now(),
+): DokumentSprzedazy[] {
   const szukane = [orderId.trim().toLowerCase()].filter((s) => s !== "");
   if (szukane.length === 0) return [];
   /* Okno od dnia przed zakupem (UTC kontra czas lokalny Subiekta — powód
      przy `dolnaGranicaOkna`). Bez daty zakupu szukamy od dziś wstecz. */
   const odDnia = kupiono
     ? new Date(Date.parse(kupiono.slice(0, 10)) - 86_400_000).toISOString().slice(0, 10)
-    : new Date(Date.now() - OKNO_DOKUMENTU_DNI * 86_400_000).toISOString().slice(0, 10);
+    : new Date(teraz - OKNO_DOKUMENTU_DNI * 86_400_000).toISOString().slice(0, 10);
   const doDnia = kupiono
     ? new Date(Date.parse(kupiono.slice(0, 10)) + OKNO_DOKUMENTU_DNI * 86_400_000).toISOString().slice(0, 10)
-    : new Date().toISOString().slice(0, 10);
+    : new Date(teraz).toISOString().slice(0, 10);
   const dokumenty = database.prepare(
-    `SELECT typ, nr_pelny, nr_oryg, zamowienie_z_uwag, data_wyst FROM sgt_faktura
+    `SELECT dok_id, typ, nr_pelny, nr_oryg, zamowienie_z_uwag, data_wyst FROM sgt_faktura
      WHERE typ IN ('FS','PA') AND data_wyst >= ? AND data_wyst <= ?
      ORDER BY data_wyst, dok_id`)
     .all(odDnia, doDnia) as Array<{
-      typ: string; nr_pelny: string; nr_oryg: string | null; zamowienie_z_uwag: string | null; data_wyst: string;
+      dok_id: number; typ: string; nr_pelny: string; nr_oryg: string | null;
+      zamowienie_z_uwag: string | null; data_wyst: string;
     }>;
   return dokumenty
     .filter((d) => numerWskazuje(d.nr_oryg, szukane) || numerWskazuje(d.zamowienie_z_uwag, szukane))
-    .map((d) => ({ numer: String(d.nr_pelny), typ: String(d.typ), data: String(d.data_wyst) }));
+    .map((d) => ({
+      dokId: Number(d.dok_id), numer: String(d.nr_pelny), typ: String(d.typ), data: String(d.data_wyst),
+    }));
+}
+
+/**
+ * Dokumenty sprzedaży z numerem tego zamówienia, od najstarszego — bez klucza.
+ *
+ * Skrzynka i realizacja oddają panelowi numer, typ i datę; klucz Subiekta
+ * zostaje po stronie serwera, bo tam nikt go nie czyta.
+ */
+export function dokumentySprzedazyZamowienia(
+  orderId: string, kupiono: string | null, database: Db = defaultDb(),
+): DokumentZamowienia[] {
+  return dokumentySprzedazyZId(orderId, kupiono, database)
+    .map(({ numer, typ, data }) => ({ numer, typ, data }));
 }
