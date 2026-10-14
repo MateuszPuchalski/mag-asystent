@@ -947,6 +947,42 @@ export function useSprawdzPlatnosci() {
   });
 }
 
+/** Podsumowanie hurtowego sprawdzenia płatności — kształt odpowiedzi serwera. */
+export interface WynikSprawdzeniaWszystkich {
+  sprawdzonych: number;
+  zapisane: number;
+  zatrzasniete: number;
+  bezZwrotuPlatnosci: number;
+  /** `powod` to gotowe zdanie serwera; ekran pokazuje je wprost. */
+  zPowodem: Array<{ powod: string; ile: number }>;
+  /** Lista Allegro dłuższa niż jedno wejście (limit stron) — trzeba kliknąć jeszcze raz. */
+  urwane: boolean;
+}
+
+/**
+ * „Sprawdź wszystkie w Allegro” na kolejce: ten sam ruch co `useSprawdzPlatnosci`,
+ * ale dla wszystkich zwrotów w pracy naraz.
+ *
+ * Sprawdzanie po jednym przyciskiem z sekcji pieniędzy było za wolne przy
+ * setkach zwrotów. Żądanie bywa długie (serwer czyta do dwudziestu stron
+ * Allegro), więc ekran blokuje przycisk na czas żądania.
+ *
+ * IDZIE BEZ CIAŁA (reguła klienta HTTP). Unieważniamy kolejkę I SZCZEGÓŁ także
+ * po błędzie: przerwane sprawdzanie mogło część zwrotów już przestawić, a liczniki
+ * kubełków mają pokazać stan faktyczny, nie sprzed kliknięcia.
+ */
+export function useSprawdzWszystkiePlatnosci() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<WynikSprawdzeniaWszystkich>(
+      "/api/obsluga/zwroty/platnosci/sprawdz-wszystkie", { method: "POST" }),
+    onSettled: () => Promise.all([
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true }),
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.szczegoly }),
+    ]),
+  });
+}
+
 /**
  * Odmowa wypłaty. Przy kodach dosyłki (0.536.0) ta sama trasa zakłada też
  * śledzenie dosyłki i krok sprawy klienta — odpowiedź niesie wtedy `dosylka`.

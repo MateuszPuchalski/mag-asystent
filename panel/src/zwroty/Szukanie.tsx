@@ -32,7 +32,7 @@ export function Szukanie({
   wynik, kod, fraza, szuka, dociaga, blad, ile,
   paczki = null, szukaPaczek = false, pytaAllegro = false, bladAllegro = "",
   synchronizuje = false, bladSync = "", towar = null,
-  przyjmuje = null, bladPrzyjecia = "",
+  przyjmuje = null, bladPrzyjecia = "", pod = null,
   onFraza, onSzukaj, onSkan, onDociagnij, onWybierz, onLogin, onSynchronizuj, onPrzyjmij,
 }: {
   wynik: WynikSkanu | null;
@@ -87,6 +87,8 @@ export function Szukanie({
   /** Zamówienie, którego przyjęcie właśnie trwa. */
   przyjmuje?: string | null;
   bladPrzyjecia?: string;
+  /** Akcja kolejki pod polem szukania (np. hurtowe sprawdzenie w Allegro). */
+  pod?: React.ReactNode;
 }) {
   /* Seria żyje MIĘDZY zdarzeniami klawiszy, więc nie może być stanem: zmiana
      stanu przerysowuje ekran, a czytnik wysyła kolejny znak po kilku
@@ -306,6 +308,8 @@ export function Szukanie({
           {/* Obrót ikony mówi „pobieram" — napis przestał być potrzebny. */}
           <RefreshCw size={16} aria-hidden="true" className={synchronizuje ? "animate-spin" : ""} /></button>}
     </div>
+
+    {pod}
 
     {/* Skan towaru mówi, CO SIĘ STAŁO z produktem — koszyk i liczba sztuk.
         Bez tego zdania skan EAN-u wyglądałby jak skan, który nic nie zrobił. */}

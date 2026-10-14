@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { List, RefreshCw, Undo2 } from "lucide-react";
-import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, type WynikSkanu } from "../api/zwroty";
+import { useDociagnijPoSkanie, useSkanZwrotu, useSynchronizujZwroty, useZwroty, useSprawdzWszystkiePlatnosci, type WynikSkanu, type WynikSprawdzeniaWszystkich } from "../api/zwroty";
 import { Konflikt } from "../api/klient";
 import type { BilansKartotek, Kubelek, Ocena, StanZwrotow, WynikDosylki, Zwrot } from "../api/typy";
 import { Decyzje } from "../zwroty/Decyzje";
@@ -31,6 +31,7 @@ import { NieOdeslany, POWOD_NIE_ODESLAL } from "../zwroty/NieOdeslany";
 import { pewnaPropozycja, szybkaSciezka } from "../zwroty/regulaSzybkiej";
 import { SITA_DECYZJI, sitoDecyzji, type SitoDecyzji } from "../zwroty/sita";
 import { Szukanie } from "../zwroty/Szukanie";
+import { SprawdzWszystkie } from "../zwroty/SprawdzWszystkie";
 import { PasekPorzadku, posortuj, usePorzadek } from "../sprawy/Porzadek";
 import { Koszyk, NowyKoszyk } from "../zwroty/Koszyk";
 import { NaOutlet } from "../zwroty/NaOutlet";
@@ -475,6 +476,11 @@ export function Zwroty() {
   const skan = useSkanZwrotu();
   const dociagnij = useDociagnijPoSkanie();
   const synchronizuj = useSynchronizujZwroty();
+  /* Wynik hurtowego sprawdzenia żyje TU, nie w pasku szukania: przełączenie
+     kubełka nie może go zgasić, bo agent czyta go, przeglądając kolejkę. */
+  const sprawdzWszystkie = useSprawdzWszystkiePlatnosci();
+  const [wynikWszystkich, setWynikWszystkich] = useState<WynikSprawdzeniaWszystkich | null>(null);
+  const [bladWszystkich, setBladWszystkich] = useState("");
   const przelew = useZapiszPrzelew();
   const cofnijPrzelew = useCofnijPrzelew();
   const notatka = useNotatkaZwrotu();
@@ -1143,6 +1149,16 @@ export function Zwroty() {
         onSzukaj={(v) => { kodZCzytnika.current = ""; szukaj(v); }}
         onSkan={(v) => { void naSkan(v); }}
         towar={skanTowaru}
+        pod={<SprawdzWszystkie
+          trwa={sprawdzWszystkie.isPending} blad={bladWszystkich} wynik={wynikWszystkich}
+          onZamknij={() => { setWynikWszystkich(null); setBladWszystkich(""); }}
+          onSprawdz={() => {
+            setWynikWszystkich(null); setBladWszystkich("");
+            sprawdzWszystkie.mutate(undefined, {
+              onSuccess: (w) => setWynikWszystkich(w),
+              onError: (e) => setBladWszystkich((e as Error).message),
+            });
+          }} />}
         onDociagnij={(v) => dociagnij.mutate(v, {
           onSuccess: przyjmij, onError: (e) => setBladSkanu((e as Error).message) })}
         onWybierz={(x) => { setWynikSkanu(null); nawiguj(`/obsluga/zwroty/${x}`); }}
