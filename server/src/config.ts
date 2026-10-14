@@ -311,14 +311,20 @@ export const config = {
     dokTypMM: 9,
     /**
      * Ile dni wstecz czytać dokumenty sprzedaży (FS/PA) do read-modelu
-     * `sgt_faktura` (0.174.0).
+     * `sgt_faktura`.
      *
-     * Zwrot z Allegro wraca zwykle w ustawowych czternastu dniach, ale paczka
-     * potrafi poleżeć w „do wyjaśnienia", a odstąpienie liczy się od
-     * DORĘCZENIA. Sześćdziesiąt dni to zapas nad tym oknem; wyżej rośnie już
-     * tylko koszt zapytania do bazy firmy.
+     * Kopia ma trzech czytelników. Zwrot z Allegro wraca zwykle w czternastu
+     * dniach, ale odstąpienie liczy się od DORĘCZENIA, a paczka potrafi
+     * poleżeć w „do wyjaśnienia". Paragon reklamacji sięga dalej, bo
+     * reklamacja przychodzi tygodnie po zakupie. Najdłużej patrzy przekrój
+     * towaru: dziewięćdziesiąt dni sprzedaży obok zwrotów z tego samego okna
+     * (`OKNO_PRZEKROJU_DNI`). Krótsza kopia skraca jego okno, więc
+     * dziewięćdziesiąt to najmniejsza wartość, przy której przekrój jest pełny.
+     *
+     * Import czyta całe okno przy każdym takcie, więc koszt rośnie z nim
+     * liniowo. Ile wierszy to daje, pokazuje `lastSync` w `/api/health`.
      */
-    fakturyDniWstecz: num(process.env.DOK_SPRZEDAZ_DNI_WSTECZ, 60, "DOK_SPRZEDAZ_DNI_WSTECZ"),
+    fakturyDniWstecz: num(process.env.DOK_SPRZEDAZ_DNI_WSTECZ, 90, "DOK_SPRZEDAZ_DNI_WSTECZ"),
     /**
      * Kolumna `dok__Dokument` z numerem obcym — tym, który integracja
      * sprzedażowa wpisuje na dokument.

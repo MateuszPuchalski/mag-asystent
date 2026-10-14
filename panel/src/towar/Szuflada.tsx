@@ -77,15 +77,18 @@ function Szuflada({ twId, onZamknij }: { twId: number; onZamknij: () => void }) 
         {dopisek && <p className="text-slate-700">{dopisek}</p>}
       </section>}
 
-      {/* LICZBY Z 90 DNI: udział zwrotów to sygnał dla zakupów i opisu oferty.
-          Bez koloru oceny — przy kilku sztukach sprzedaży jeden zwrot to 50%. */}
-      {p && <section aria-label="Ostatnie 90 dni" className="rounded-lg bg-slate-50 p-3">
+      {/* LICZBY Z OKNA: udział zwrotów to sygnał dla zakupów i opisu oferty.
+          Bez koloru oceny — przy kilku sztukach sprzedaży jeden zwrot to 50%.
+          Podpis mówi, skąd która liczba: sprzedaż idzie z dokumentów Subiekta,
+          a reklamacje wciąż z ofert Allegro powiązanych z kartoteką. */}
+      {p && <section aria-label={`Ostatnie ${p.okno.dni} dni`} className="rounded-lg bg-slate-50 p-3">
         <h3 className="mb-1 text-podpis font-bold uppercase tracking-wide text-slate-700">Ostatnie {p.okno.dni} dni</h3>
         <p>sprzedane {p.okno.sprzedanych} · zwrócone {p.okno.zwroconych} ({procent(p.okno.udzialZwrotow)})
           · reklamacje {p.okno.reklamacji}</p>
         <p className="text-podpis text-slate-600">
-          {p.oferty.length ? `Z ${p.oferty.length} ofert powiązanych z kartoteką.`
-            : "Żadna oferta nie jest powiązana z tą kartoteką — sprzedaży nie znamy."}</p>
+          Sprzedaż z paragonów i faktur w Subiekcie, ze wszystkich kanałów.
+          {p.oferty.length ? ` Reklamacje z ${p.oferty.length} ofert powiązanych z kartoteką.`
+            : " Żadna oferta nie jest powiązana z kartoteką, więc reklamacji nie liczymy."}</p>
       </section>}
 
       {/* PUSTA LISTA NIE STOI (0.514.0). Trzy nagłówki z „brak" pod każdym

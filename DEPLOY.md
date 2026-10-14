@@ -849,7 +849,7 @@ przed pierwszą pracą na produkcji:
 | `MAG_ID_ZWROTY` | magazyn, na który biuro wystawia MM ZWROTY (§6a) | lista przyjęć pusta, bez błędu |
 | `MAG_ID_ODP` | magazyn odpadu dla oceny „utylizacja" | brak wpisu wyłącza koszyk odpadu |
 | `MAG_ID_SERWIS` | magazyn na braki w dostawie | brak wpisu wyłącza przesunięcie braku |
-| `DOK_SPRZEDAZ_DNI_WSTECZ` | okno importu dokumentów sprzedaży (domyślnie 60) | starsza sprzedaż nie pokaże się przy zwrocie |
+| `DOK_SPRZEDAZ_DNI_WSTECZ` | okno importu dokumentów sprzedaży (domyślnie 90) | starsza sprzedaż nie pokaże się przy zwrocie ani w reklamacji; poniżej 90 przekrój towaru liczy krótsze okno |
 | `MSSQL_SPRZEDAZ_NR_ORYG_COLUMN` | kolumna z numerem obcym na dokumencie | dokument wskaże człowiek, nie automat |
 
 Każdy z tych odczytów DEGRADUJE, a nie przerywa importu, a `/api/health` mówi

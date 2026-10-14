@@ -6307,7 +6307,7 @@ towar niż ten, który wyjechał w paczce.
 - **Symbol kopiuje się kliknięciem** przez `ui/kopiuj.ts`, bo biuro pracuje
   po zwykłym HTTP. Nazwa pozycji otwiera przekrój towaru.
 - **Bez dokumentu** stoi „Brak paragonu ani faktury w Subiekcie” i powód:
-  zakup starszy niż okno kopii (`DOK_SPRZEDAZ_DNI_WSTECZ`, dziś 60 dni),
+  zakup starszy niż okno kopii (`DOK_SPRZEDAZ_DNI_WSTECZ`, domyślnie 90 dni),
   dokument niewystawiony albo bez numeru zamówienia, albo reklamacja bez
   zamówienia. Żadnego symbolu zastępczego.
 - **Stan, półka i oś cen** dotyczą tylko reklamowanej pozycji. Bez

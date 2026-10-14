@@ -168,7 +168,7 @@ export const KLUCZE: readonly Klucz[] = [
   { klucz: "DOK_DNI_WSTECZ", grupa: "magazyn", kto: "zaawansowane",
     opis: "Ile dni wstecz importować dostawy." },
   { klucz: "DOK_SPRZEDAZ_DNI_WSTECZ", grupa: "magazyn", kto: "zaawansowane",
-    opis: "Ile dni wstecz importować sprzedaż do wiązania zwrotów." },
+    opis: "Ile dni wstecz importować sprzedaż: do zwrotów, paragonu reklamacji i sprzedaży w przekroju towaru." },
   { klucz: "MM_ZWROTY_DNI_WSTECZ", grupa: "magazyn", kto: "zaawansowane",
     opis: "Ile dni wstecz czytać przesunięcia MM na regał zwrotów." },
   { klucz: "LOC_FIELD_LIMIT", grupa: "magazyn", kto: "zaawansowane",

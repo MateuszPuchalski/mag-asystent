@@ -6,7 +6,7 @@ wersja bazy 1.8731.31.6933** — czyli dokładnie tej, którą ma firma (Subiekt
 poniżej jest cytatem ze struktury, a nie domysłem z innej wersji.
 
 To, czego dokumentacja **nie** zawiera (bo zależy od konkretnego podmiotu),
-zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały trzydzieści dwie.
+zostało wyraźnie oznaczone `[WERYFIKUJ]` — takich rzeczy zostały trzydzieści trzy.
 Licznik obejmuje też `docs/allegro-ksztalt.md`: §8.2 projektu panelu kieruje
 tutaj znaczniki z mapowania Allegro, żeby lista czekających na sprawdzenie
 była jedna, a nie dwie.
@@ -67,6 +67,27 @@ Przesłanka z bazy firmy: w zbiorze dokumentów z niepustym `dok_DoDokId` jest
 i w podobnej skali, przy czterokrotnej przewadze paragonów nad fakturami.
 Znacznik zostaje, bo to nie dowód, że `ZW` wskazuje wtedy paragon zwracany —
 rozstrzygnie pierwszy zwrot przepuszczony przez automat.
+
+`[WERYFIKUJ]` **Która strona pary „faktura do paragonu" niesie odnośnik.**
+Zdanie wyżej mówi, że faktura wskazuje paragon. Liczby ze zrzutu dotyczą jednak
+paragonów i WZ, a nie faktur, więc kierunek nie jest zmierzony. Na tej parze
+stoi sprzedaż w przekroju towaru (`services/przekroj-towaru.ts`): faktura
+związana z paragonem z kopii nie dodaje sztuk drugi raz.
+
+Przekrój rozpoznaje parę w obie strony, więc pomyłka kierunku niczego nie psuje. Zostaje pytanie,
+czy odnośnik stoi na parze w ogóle. Gdy nie stoi, sprzedaż jest zawyżona
+o każdą fakturę do paragonu. Sprawdzi to jedno zapytanie na bazie firmy:
+
+```sql
+SELECT TOP 20 f.dok_NrPelny, f.dok_DoDokId, p.dok_NrPelny AS paragon, p.dok_DoDokId AS paragon_do
+FROM dok__Dokument f
+JOIN dok__Dokument p ON p.dok_Typ = 21
+  AND (p.dok_Id = f.dok_DoDokId OR p.dok_DoDokId = f.dok_Id)
+WHERE f.dok_Typ = 2 ORDER BY f.dok_DataWyst DESC
+```
+
+Puste przy znanej fakturze do paragonu znaczy, że odnośnika nie ma i przekrój
+liczy taką sprzedaż podwójnie.
 
 ## Numer obcy na dokumencie sprzedaży — arytmetyka, nie domysł
 
