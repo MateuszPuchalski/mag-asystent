@@ -6285,6 +6285,39 @@ załącznika, tylko dla plików `SAFE`.
   Za duży plik (413) i PDF, którego pdf.js nie otworzy, mówią zdaniem bez
   ponowienia. Awaria drogi mówi zdaniem z „Spróbuj ponownie”.
 
+### 25b.13. Kupiony towar z paragonu (@wydanie)
+
+Prośba właściciela: w reklamacji ma być widać, jaki produkt klient naprawdę
+kupił, z dokładnym symbolem z paragonu albo faktury zamówienia.
+
+**Skąd symbol.** Karta Produkt bierze symbol WYŁĄCZNIE z dokumentu sprzedaży
+w Subiekcie (FS albo PA), który wskazuje zamówienie. Serwer niesie je w polu
+`paragon` szczegółu reklamacji. Symbol z oferty, z mapowania i SKU Allegro
+z karty zeszły. Powód: oferta przepięta na inną dostawę wskazuje dziś inny
+towar niż ten, który wyjechał w paczce.
+
+- **Z dokumentem** stoi nagłówek „Paragon PA 1234/10/2026 · 03.10.2026”
+  albo „Faktura …” i pod nim WSZYSTKIE pozycje: symbol, nazwa, ilość. Kilka
+  dokumentów stoi po kolei, od najstarszego.
+- **Reklamowana pozycja** ma szare tło i napis „reklamowany”, nie bursztyn.
+  Wskazuje ją serwer, tylko gdy jest jednoznaczna. Inaczej nic nie świeci,
+  a zdanie mówi, że dokument tego nie rozstrzyga.
+- **Usługa**, na przykład przesyłka, stoi wyciszona i bez kopiowania.
+- **Symbol kopiuje się kliknięciem** przez `ui/kopiuj.ts`, bo biuro pracuje
+  po zwykłym HTTP. Nazwa pozycji otwiera przekrój towaru.
+- **Bez dokumentu** stoi „Brak paragonu ani faktury w Subiekcie” i powód:
+  zakup starszy niż okno kopii (`DOK_SPRZEDAZ_DNI_WSTECZ`, dziś 60 dni),
+  dokument niewystawiony albo bez numeru zamówienia, albo reklamacja bez
+  zamówienia. Żadnego symbolu zastępczego.
+- **Stan, półka i oś cen** dotyczą tylko reklamowanej pozycji. Bez
+  jednoznacznego wskazania ich nie ma, bo cennik innego towaru z paragonu
+  prowadziłby werdykt w złą stronę.
+- **Nazwa i zdjęcie oferty zostają** nad dokumentem. To oferta, którą klient
+  widział w Allegro, a nie towar z paczki.
+
+Brak pola `paragon` znaczy, że serwer jeszcze nie odpowiedział. Karta wtedy
+milczy, zamiast mówić „brak paragonu”. Dyskusje tej karty nie mają.
+
 ### 25c.1. Czym jest dyskusja
 
 Rozmową posprzedażową, którą kupujący otwiera przy zamówieniu, gdy coś poszło
