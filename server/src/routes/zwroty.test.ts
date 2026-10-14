@@ -186,7 +186,7 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("zwroty mają czterdzieści tras POST, każda z uzasadnieniem", async () => {
+test("zwroty mają czterdzieści dwie trasy POST, każda z uzasadnieniem", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -406,8 +406,13 @@ test("zwroty mają czterdzieści tras POST, każda z uzasadnieniem", async () =>
      kazałby klikać każdy. Lista zwrotów płatności jest jedna na konto, więc
      kilka stron pokrywa całość. Czyta z Allegro i zapisuje wynik w lustrze;
      pieniędzy nie rusza i do Subiekta nic nie wysyła, dlatego bez `autoryzuj()`. */
-  assert.equal(posty.length, 40,
-    `tras POST jest ${posty.length}, a umowa mówi o czterdziestu`);
+  /* Czterdziesta pierwsza i druga: ręczne zamknięcie zwrotu bez korekty i jego
+     cofnięcie. Zgłoszenie właściciela: setki zwrotów, których nic nie domknie
+     (pieniądze oddane poza aplikacją, historia sprzed panelu), stały w kolejce
+     bez końca. Zamyka TYLKO u nas — nic nie idzie do Allegro ani do Subiekta —
+     dlatego bez `autoryzuj()`; cofnięcie jest drugą trasą, nie osobną funkcją. */
+  assert.equal(posty.length, 42,
+    `tras POST jest ${posty.length}, a umowa mówi o czterdziestu dwóch`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
@@ -415,7 +420,7 @@ test("zwroty mają czterdzieści tras POST, każda z uzasadnieniem", async () =>
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
     "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono",
     "kosz/nowy", "kosz/usun", "paczki-klienta/allegro", "przyjmij-nieodebrana", ":id/dosylka",
-    "skladnik/outlet", "platnosci/sprawdz", "platnosci/sprawdz-wszystkie"]) {
+    "skladnik/outlet", "platnosci/sprawdz", "platnosci/sprawdz-wszystkie", "zamkniecie-reczne"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
   /* Formularza rejestracji nie ma i nie ma wrócić przypadkiem — np. przy
@@ -1229,4 +1234,16 @@ test("masowe sprawdzenie zwrotów płatności: bez sesji 401, bez sparowanego ko
     method: "POST", url: "/api/obsluga/zwroty/platnosci/sprawdz-wszystkie", headers: naglowki });
   assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /nie jest sparowane/);
+});
+
+test("ręczne zamknięcie zwrotu: bez sesji 401, rola magazynu 403", async () => {
+  const bez = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/1/zamkniecie-reczne" });
+  assert.equal(bez.statusCode, 401);
+  const { naglowki } = login("magazynier", "Marek zamyka");
+  const r = await app.inject({
+    method: "POST", url: "/api/obsluga/zwroty/1/zamkniecie-reczne", headers: naglowki });
+  assert.equal(r.statusCode, 403);
+  const c = await app.inject({
+    method: "POST", url: "/api/obsluga/zwroty/1/zamkniecie-reczne/cofnij", headers: naglowki });
+  assert.equal(c.statusCode, 403);
 });

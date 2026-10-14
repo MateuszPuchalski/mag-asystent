@@ -36,6 +36,7 @@ import {
 import { paczkiKlienta } from "../services/zamowienia.js";
 import { powiazZaleglosci } from "../services/wiazania.js";
 import { kandydaciFaktury, wskazFakture } from "../services/faktury.js";
+import { otworzZwrotPoRecznymZamknieciu, zamknijZwrotRecznie } from "../services/zwrot-zamkniecie.js";
 import { SprawdzenieZwrotuBlad, sprawdzWszystkieZwrotyPlatnosci, sprawdzZwrotPlatnosci } from "../services/allegro-zwroty-platnosci.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
 import { dociagnijZwrotPoLiscie, synchronizujAllegroZwroty } from "../services/allegro-zwroty-sync.js";
@@ -964,6 +965,30 @@ export async function zwrotyRoutes(app: FastifyInstance) {
         }
         return reply.code(400).send({ error: (e as Error).message });
       }
+    });
+
+  /* RĘCZNE ZAMKNIĘCIE ZWROTU. Tylko u nas: nic nie wychodzi do Allegro ani do
+     Subiekta, więc bez `autoryzuj()` — zamknięcie da się cofnąć jednym ruchem
+     (druga trasa), a nazwisko i powód zostają w dzienniku. Bramka roli stoi,
+     bo zwrot niesie dane sprawy klienta. */
+  app.post<{ Params: { id: string }; Body: { wersja?: number; powod?: string } }>(
+    "/api/obsluga/zwroty/:id/zamkniecie-reczne", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return zamknijZwrotRecznie(db(), Number(req.params.id), Number(req.body?.wersja),
+          req.body?.powod ?? null, kto());
+      } catch (e) { return konflikt(reply, e); }
+    });
+
+  app.post<{ Params: { id: string }; Body: { wersja?: number } }>(
+    "/api/obsluga/zwroty/:id/zamkniecie-reczne/cofnij", async (req, reply) => {
+      const nie = odmowa(reply);
+      if (nie) return nie;
+      try {
+        return otworzZwrotPoRecznymZamknieciu(db(), Number(req.params.id),
+          Number(req.body?.wersja), kto());
+      } catch (e) { return konflikt(reply, e); }
     });
 
   /* MASOWE SPRAWDZENIE: te same zasady co przy jednym zwrocie, ale lista konta

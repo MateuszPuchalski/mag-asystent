@@ -494,7 +494,7 @@ export async function sprawdzWszystkieZwrotyPlatnosci(
               OR (z.werdykt = 'przyjety' AND z.kwota_grosze > 0
                   AND z.zwrot_pieniedzy_id IS NULL AND z.zwrot_pieniedzy_command_id IS NULL
                   AND z.przelew_at IS NULL AND z.odmowa_kod IS NULL
-                  AND z.zamkniety_at >= ?))`)
+                  AND z.zamkniety_at >= ? AND z.zamkniecie_reczne_at IS NULL))`)
       .all(konto, zamknietyOd) as Array<{ id: number; created_at: string }>;
     if (!kandydaci.length) continue;
     wynik.sprawdzonych += kandydaci.length;
