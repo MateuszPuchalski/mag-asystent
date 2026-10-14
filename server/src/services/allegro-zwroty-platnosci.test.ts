@@ -235,7 +235,7 @@ test("powód braku zatrzasku nazywa warunek, który zatrzymał wypłatę", async
   });
   assert.match(powodBrakuZatrzasku(d, inny)!, /OVERPAID.*REFUND, CANCELLED_BY_BUYER, NOT_COLLECTED/);
   assert.match(powodBrakuZatrzasku(d, stary)!, /wcześniejsza niż zgłoszenie/);
-  assert.match(powodBrakuZatrzasku(d, dwa)!, /więcej niż jeden zwrot/);
+  assert.match(powodBrakuZatrzasku(d, dwa)!, /kilka zwrotów klienta/);
   assert.match(powodBrakuZatrzasku(d, odrzucony)!, /odrzucony/);
 });
 
@@ -343,4 +343,115 @@ test("anulowanie przez kupującego i nieodebrana paczka zatrzaskują zwrot, rekl
   assert.ok(r(nieodebrane));
   assert.equal(r(reklamacja), null);
   assert.equal(r(nadplata), null);
+});
+
+/** Zamówienie z dwiema pozycjami i dwa zwroty klienta, każdy o jedną pozycję. */
+function zamowienieZDwomaZwrotami(d: Db, order = "o-2z", wspolnaPozycja = false) {
+  const m = Number(d.prepare(`INSERT INTO zamowienie_klienta(channel_account_id, external_id, synced_at)
+    VALUES (1,?,'2026-09-22T08:00:00Z')`).run(order).lastInsertRowid);
+  const linia = (ext: string, oferta: string, nazwa: string) => d.prepare(
+    `INSERT INTO zamowienie_klienta_pozycja(zamowienie_id, external_id, offer_id, nazwa, ilosc, cena_grosze, waluta)
+     VALUES (?,?,?,?,?,?,?)`).run(m, ext, oferta, nazwa, 1, 1000, "PLN");
+  linia("li-a", "of-a", "Sekator");
+  linia("li-b", "of-b", "Nożyce");
+  const zwrotZPozycja = (ext: string, oferta: string, nazwa: string) => {
+    const id = zwrot(d, ext, order);
+    d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id, klucz, offer_id, nazwa, ilosc, cena_grosze, waluta)
+      VALUES (?,?,?,?,?,?,?)`).run(id, `k-${ext}`, oferta, nazwa, 1, 1000, "PLN");
+    return id;
+  };
+  const a = zwrotZPozycja("ret-a", "of-a", "Sekator");
+  const b = zwrotZPozycja("ret-b", wspolnaPozycja ? "of-a" : "of-b", wspolnaPozycja ? "Sekator" : "Nożyce");
+  return { a, b, order };
+}
+
+const rozliczony = (d: Db, id: number) => (d.prepare(
+  "SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id=?").get(id) as { r: string | null }).r;
+
+test("dwa zwroty tego samego zamówienia: wypłata trafia do zwrotu, którego pozycje wymienia", async () => {
+  const d = stanowisko();
+  const { a, b } = zamowienieZDwomaZwrotami(d);
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({
+      id: "r1", order: { id: "o-2z" }, createdAt: "2026-09-10T10:00:00Z",
+      lineItems: [{ id: "li-a", type: "QUANTITY", quantity: 1 }],
+    })),
+  });
+  assert.equal(wynik.zatrzasniete, 1);
+  assert.ok(rozliczony(d, a), "zwrot z sekatorem rozliczony");
+  assert.equal(rozliczony(d, b), null, "zwrot z nożycami czeka na swoją wypłatę");
+  assert.match(powodBrakuZatrzasku(d, b)!, /nie wymienia wszystkich pozycji/);
+});
+
+test("jedna wypłata za obie pozycje rozlicza oba zwroty tego zamówienia", async () => {
+  const d = stanowisko();
+  const { a, b } = zamowienieZDwomaZwrotami(d);
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({
+      id: "r1", order: { id: "o-2z" },
+      lineItems: [
+        { id: "li-a", type: "QUANTITY", quantity: 1 },
+        { id: "li-b", type: "AMOUNT", value: { amount: "9.50", currency: "PLN" } },
+      ],
+    })),
+  });
+  assert.equal(wynik.zatrzasniete, 2);
+  assert.ok(rozliczony(d, a));
+  assert.ok(rozliczony(d, b));
+});
+
+test("dwa zwroty tej samej pozycji nie dostają wypłaty na zgadywanie", async () => {
+  const d = stanowisko();
+  const { a, b } = zamowienieZDwomaZwrotami(d, "o-2z", true);
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({
+      id: "r1", order: { id: "o-2z" }, lineItems: [{ id: "li-a", type: "QUANTITY", quantity: 1 }],
+    })),
+  });
+  assert.equal(wynik.zatrzasniete, 0);
+  assert.equal(rozliczony(d, a), null);
+  assert.match(powodBrakuZatrzasku(d, b)!, /tej samej pozycji/);
+});
+
+test("zwrot całego zamówienia rozlicza wszystkie zwroty klienta przy nim", async () => {
+  const d = stanowisko();
+  const { a, b } = zamowienieZDwomaZwrotami(d);
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({
+      id: "r1", order: { id: "o-2z" }, reason: "CANCELLED_BY_BUYER", lineItems: [],
+    })),
+  });
+  assert.equal(wynik.zatrzasniete, 2);
+  assert.ok(rozliczony(d, a));
+  assert.ok(rozliczony(d, b));
+});
+
+test("zwrot towaru bez wskazanych pozycji przy dwóch zwrotach niczego nie rozlicza", async () => {
+  const d = stanowisko();
+  const { a } = zamowienieZDwomaZwrotami(d);
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({ id: "r1", order: { id: "o-2z" }, lineItems: [] })),
+  });
+  assert.equal(wynik.zatrzasniete, 0);
+  assert.match(powodBrakuZatrzasku(d, a)!, /nie wymienia wszystkich pozycji/);
+});
+
+test("pozycji, której nie da się przypiąć do zamówienia, nie zgadujemy", async () => {
+  const d = stanowisko();
+  zwrot(d, "x1", "o-bez");
+  const drugi = zwrot(d, "x2", "o-bez");
+  d.prepare(`INSERT INTO zwrot_klienta_pozycja(zwrot_id, klucz, offer_id, nazwa, ilosc, cena_grosze, waluta)
+    VALUES (?,?,?,?,?,?,?)`).run(drugi, "k", "nieznana", "Coś", 1, 1000, "PLN");
+  await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(rekord({ id: "r1", order: { id: "o-bez" },
+      lineItems: [{ id: "li-a", type: "QUANTITY", quantity: 1 }] })),
+  });
+  assert.equal(rozliczony(d, drugi), null);
+  assert.match(powodBrakuZatrzasku(d, drugi)!, /nie wiem, których pozycji/);
 });

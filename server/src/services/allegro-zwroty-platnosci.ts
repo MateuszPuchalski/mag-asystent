@@ -1,5 +1,6 @@
 import { urlZwrotowPlatnosci, zapytajAllegro } from "../adapters/allegro.http.js";
 import { config } from "../config.js";
+import { dopasujPozycjeZamowienia } from "./dopasowanie-sku.js";
 import { logEvent } from "./events.js";
 import type { Db } from "../db/db.js";
 
@@ -56,6 +57,8 @@ const W_TOKU_NA_PRZEBIEG = 20;
  */
 export const POWODY_WYPLATY = ["REFUND", "CANCELLED_BY_BUYER", "NOT_COLLECTED"] as const;
 const POWODY_SQL = POWODY_WYPLATY.map((p) => `'${p}'`).join(",");
+/** Powody, które znaczą zwrot CAŁEGO zamówienia — dotyczą wszystkich zwrotów klienta przy nim. */
+const POWODY_CALEGO_ZAMOWIENIA = ["CANCELLED_BY_BUYER", "NOT_COLLECTED"];
 
 export interface PozycjaZwrotuPlatnosci {
   /** Identyfikator pozycji zamówienia (`lineItems[].id`). */
@@ -256,16 +259,129 @@ export function zatrzaskZLustra(database: Db, konto: number, tylkoZwrot: number 
     .all(konto, tylkoZwrot, tylkoZwrot) as Array<{ zwrot_id: number; kiedy: string; refund_id: string }>;
 
   let zatrzasniete = 0;
-  for (const k of kandydaci) {
+  const zatrzasnij = (zwrotId: number, kiedy: string, refundId: string, zrodlo: string) => {
     const r = database.prepare(`UPDATE zwrot_klienta SET rozliczony_allegro_at=?
-        WHERE id=? AND rozliczony_allegro_at IS NULL`).run(k.kiedy, k.zwrot_id);
-    if (Number(r.changes) === 0) continue;
+        WHERE id=? AND rozliczony_allegro_at IS NULL`).run(kiedy, zwrotId);
+    if (Number(r.changes) === 0) return;
     zatrzasniete++;
     logEvent("zwrot_wyplata_potwierdzona", "automat (zwroty płatności)", null,
-      { zwrotId: k.zwrot_id, wyplataAt: k.kiedy, refundId: k.refund_id,
-        zrodlo: "payments/refunds" }, undefined, database);
+      { zwrotId, wyplataAt: kiedy, refundId, zrodlo }, undefined, database);
+  };
+  for (const k of kandydaci) zatrzasnij(k.zwrot_id, k.kiedy, k.refund_id, "payments/refunds");
+
+  /* Zamówienia z KILKOMA zwrotami: wypłatę przypisuje się po pozycjach. */
+  const wielu = database.prepare(`
+    SELECT z.id FROM zwrot_klienta z
+     WHERE z.channel_account_id = ? AND (? IS NULL OR z.id = ?)
+       AND z.rozliczony_allegro_at IS NULL AND z.order_id IS NOT NULL
+       AND z.external_id NOT LIKE 'nieodebrana:%'
+       AND (z.werdykt IS NULL OR z.werdykt <> 'odrzucony')
+       AND (SELECT COUNT(*) FROM zwrot_klienta d
+             WHERE d.channel_account_id = z.channel_account_id
+               AND d.order_id = z.order_id
+               AND d.external_id NOT LIKE 'nieodebrana:%') > 1`)
+    .all(konto, tylkoZwrot, tylkoZwrot) as Array<{ id: number }>;
+  for (const { id } of wielu) {
+    const o = ocenaWieluZwrotow(database, Number(id));
+    if (o.data && o.refundId) zatrzasnij(Number(id), o.data, o.refundId, "payments/refunds (pozycje)");
   }
   return zatrzasniete;
+}
+
+/**
+ * Identyfikatory pozycji ZAMÓWIENIA (`lineItems[].id`), których dotyczy zwrot
+ * klienta. `null`, gdy którejś pozycji nie da się przypiąć do zamówienia — wtedy
+ * nie wiemy, czego zwrot dotyczy, i niczego nie zgadujemy.
+ */
+function liniePozycjiZwrotu(database: Db, zwrotId: number): Set<string> | null {
+  const z = database.prepare(
+    "SELECT channel_account_id AS konto, order_id FROM zwrot_klienta WHERE id = ?")
+    .get(zwrotId) as { konto: number; order_id: string | null } | undefined;
+  if (!z?.order_id) return null;
+  const pozycje = database.prepare(
+    "SELECT offer_id, nazwa FROM zwrot_klienta_pozycja WHERE zwrot_id = ?")
+    .all(zwrotId) as Array<{ offer_id: string | null; nazwa: string }>;
+  if (!pozycje.length) return null;
+  const linie = new Set<string>();
+  for (const p of pozycje) {
+    const id = dopasujPozycjeZamowienia(database, z.konto, z.order_id, p.offer_id, String(p.nazwa))
+      .pozycja?.external_id;
+    if (!id) return null;
+    linie.add(id);
+  }
+  return linie;
+}
+
+/**
+ * Wypłata dla zwrotu przy zamówieniu, które ma KILKA zwrotów klienta.
+ *
+ * Wypłata na zamówienie nie mówi, któremu zwrotowi się należy, ale zwrot
+ * płatności wymienia pozycje (`lineItems`), a zwrot klienta zna swoje. Zwrot
+ * jest rozliczony, gdy zwrot płatności obejmuje WSZYSTKIE jego pozycje i żaden
+ * inny zwrot tego zamówienia nie dzieli z nim pozycji. Zwrot całego zamówienia
+ * (anulowanie, nieodebrana paczka) rozlicza wszystkie zwroty naraz.
+ *
+ * Gdzie dopasowanie nie jest pewne, zwrot zostaje w pracy z powodem w zdaniu:
+ * zatrzask zdejmuje sprawę z kolejki, a pomyłka oznaczałaby klienta bez pieniędzy.
+ */
+function ocenaWieluZwrotow(
+  database: Db, zwrotId: number,
+): { data: string | null; refundId: string | null; powod: string | null } {
+  const nic = { data: null, refundId: null, powod: null };
+  const z = database.prepare(`SELECT z.channel_account_id AS konto, z.order_id, z.created_at,
+      m.platnosc_id FROM zwrot_klienta z
+      LEFT JOIN zamowienie_klienta m
+        ON m.channel_account_id = z.channel_account_id AND m.external_id = z.order_id
+     WHERE z.id = ?`).get(zwrotId) as
+    { konto: number; order_id: string | null; created_at: string; platnosc_id: string | null } | undefined;
+  if (!z?.order_id) return nic;
+
+  const refundy = (database.prepare(`SELECT refund_id, reason, utworzono_at, pozycje_json
+      FROM zwrot_platnosci
+     WHERE channel_account_id = ? AND status = 'SUCCESS' AND reason IN (${POWODY_SQL})
+       AND utworzono_at >= ?
+       AND (order_id = ? OR (order_id IS NULL AND ? IS NOT NULL AND payment_id = ?))
+     ORDER BY utworzono_at`)
+    .all(z.konto, z.created_at, z.order_id, z.platnosc_id, z.platnosc_id) as
+    Array<{ refund_id: string; reason: string | null; utworzono_at: string; pozycje_json: string | null }>)
+    .map((r) => ({ ...r, pozycje: JSON.parse(r.pozycje_json ?? "[]") as PozycjaZwrotuPlatnosci[] }));
+  if (!refundy.length) return nic;
+
+  /* Zwrot całego zamówienia zamyka każdy zwrot klienta przy nim. */
+  const calosc = refundy.find((r) => !r.pozycje.length
+    && POWODY_CALEGO_ZAMOWIENIA.includes(r.reason ?? ""));
+  if (calosc) return { data: calosc.utworzono_at, refundId: calosc.refund_id, powod: null };
+
+  const moje = liniePozycjiZwrotu(database, zwrotId);
+  if (!moje) {
+    return { ...nic, powod: "nie wiem, których pozycji zamówienia dotyczy ten zwrot, więc nie przypiszę mu wypłaty" };
+  }
+  const inne = database.prepare(`SELECT id FROM zwrot_klienta
+      WHERE channel_account_id = ? AND order_id = ? AND id <> ?
+        AND external_id NOT LIKE 'nieodebrana:%'`).all(z.konto, z.order_id, zwrotId) as Array<{ id: number }>;
+  for (const { id } of inne) {
+    const cudze = liniePozycjiZwrotu(database, Number(id));
+    if (!cudze) {
+      return { ...nic, powod: "nie wiem, których pozycji dotyczy drugi zwrot tego zamówienia, więc nie rozdzielę wypłaty" };
+    }
+    if ([...moje].some((l) => cudze.has(l))) {
+      return { ...nic, powod: "dwa zwroty tego zamówienia dotyczą tej samej pozycji, więc nie wiadomo, któremu należy się wypłata" };
+    }
+  }
+
+  /* Każda pozycja zwrotu musi mieć wypłatę, która ją WYMIENIA, z niezerową
+     ilością albo kwotą. */
+  const pokrywajace = new Map<string, typeof refundy[number]>();
+  for (const linia of moje) {
+    const r = refundy.find((x) => x.pozycje.some((p) => p.id === linia
+      && ((p.quantity ?? 0) > 0 || (p.kwotaGrosze ?? 0) > 0)));
+    if (!r) {
+      return { ...nic, powod: "Allegro oddało pieniądze, ale zwrot płatności nie wymienia wszystkich pozycji tego zwrotu" };
+    }
+    pokrywajace.set(r.refund_id, r);
+  }
+  const pierwsza = [...pokrywajace.values()].sort((a, b) => a.utworzono_at.localeCompare(b.utworzono_at))[0];
+  return { data: pierwsza.utworzono_at, refundId: pierwsza.refund_id, powod: null };
 }
 
 /**
@@ -310,7 +426,8 @@ export function powodBrakuZatrzasku(database: Db, zwrotId: number): string | nul
       WHERE channel_account_id = ? AND order_id = ? AND id <> ?
         AND external_id NOT LIKE 'nieodebrana:%'`).get(z.konto, z.order_id, zwrotId) as { n: number }).n);
   if (innych > 0) {
-    return "to zamówienie ma więcej niż jeden zwrot klienta i nie wiadomo, któremu należy się wypłata";
+    const o = ocenaWieluZwrotow(database, zwrotId);
+    return `to zamówienie ma kilka zwrotów klienta: ${o.powod ?? "wypłata czeka na następne sprawdzenie"}`;
   }
   return "zwrot nie spełnił warunków zatrzasku z powodu, którego nie umiem nazwać";
 }
