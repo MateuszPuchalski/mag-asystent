@@ -937,7 +937,8 @@ export function useSprawdzPlatnosci() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (v: { id: number }) =>
-      api<{ znaleziono: number; wyplacone: boolean; platnosci: ZwrotPlatnosciAllegro[] }>(
+      api<{ znaleziono: number; wyplacone: boolean; platnosci: ZwrotPlatnosciAllegro[];
+        powodBraku: string | null }>(
         `/api/obsluga/zwroty/${v.id}/platnosci/sprawdz`, { method: "POST" }),
     onSettled: (_d, _e, v) => Promise.all([
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true }),

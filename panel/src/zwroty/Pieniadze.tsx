@@ -180,7 +180,13 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
   /** Sprawdzenie trwa — przycisk gaśnie, żeby nie wysłać drugiego żądania. */
   sprawdzam?: boolean;
   /** Wynik ostatniego sprawdzenia TEGO zwrotu; `null`, gdy jeszcze nie sprawdzano. */
-  wynikSprawdzenia?: { znaleziono: number; wyplacone: boolean } | null;
+  wynikSprawdzenia?: {
+    znaleziono: number; wyplacone: boolean;
+    /** Ile zwrotów płatności ma status SUCCESS. */
+    udane?: number;
+    /** Dlaczego zwrot nie został zatrzaśnięty mimo wypłaty; `null`, gdy nie dotyczy. */
+    powodBraku?: string | null;
+  } | null;
 }) {
   const [odmawiam, setOdmawiam] = useState(false);
   /* Odmowa złożona w panelu Allegro, przy której jest dosyłka do pokazania. */
@@ -274,7 +280,11 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
           ? "Allegro nie zwraca zwrotu płatności dla tego zamówienia. Pieniądze mogły pójść inną drogą — sprawdź w Sales Center."
           : wynikSprawdzenia.wyplacone
             ? "Allegro potwierdza wypłatę."
-            : "Allegro ma zwrot płatności, ale jeszcze nie w pełni wypłacony — zobacz status poniżej."}</p>}
+            /* Wypłata JEST, a zatrzask jej nie przypiął: mówimy to wprost i podajemy powód,
+               bo „jeszcze nie wypłacony" obok listy „Wypłacone" wyglądał jak sprzeczność. */
+            : (wynikSprawdzenia.udane ?? 0) > 0
+              ? `Allegro oddało pieniądze, ale ten zwrot nie został dopasowany automatycznie: ${wynikSprawdzenia.powodBraku ?? "powód nieznany"}.`
+              : "Allegro ma zwrot płatności, ale pieniądze jeszcze nie wyszły — zobacz status poniżej."}</p>}
     </div>}
 
     {(stan.platnosci ?? []).length > 0 &&
