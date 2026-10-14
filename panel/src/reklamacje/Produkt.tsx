@@ -74,11 +74,20 @@ function Dokument({ d }: { d: DokumentParagonu }) {
         className={p.sporna ? "bg-slate-100 font-semibold text-slate-900"
           : p.usluga ? "text-slate-500" : "text-slate-800"}>
         <td className="py-1 pl-1 pr-2 align-top">
-          {/* Usługa nie ma czego szukać w Subiekcie, więc nie dostaje celu. */}
-          {p.usluga ? <span className="font-mono">{p.symbol}</span> : <SymbolTowaru symbol={p.symbol} />}
+          {/* Usługa nie ma czego szukać w Subiekcie, więc nie dostaje celu.
+              Brak symbolu to kreska z opisem, bo kolumna jest wąska, a pusty
+              przycisk kopiowania obiecywałby coś, czego nie ma. */}
+          {p.symbol === null
+            ? <span className="text-slate-600" title="Brak symbolu w kopii kartoteki">
+                <span aria-hidden="true">—</span><span className="sr-only">brak symbolu w kopii kartoteki</span></span>
+            : p.usluga ? <span className="font-mono">{p.symbol}</span> : <SymbolTowaru symbol={p.symbol} />}
         </td>
         <td className="min-w-0 break-words py-1 pr-2 align-top">
-          {p.usluga ? p.nazwa : <PrzyciskTowaru twId={p.twId}>{p.nazwa}</PrzyciskTowaru>}
+          {/* Bez nazwy nie ma też karty, więc szuflada przekroju nie otworzyłaby
+              niczego i przycisk byłby martwym celem. */}
+          {p.nazwa === null
+            ? <span className="font-normal text-slate-600">nazwa nieznana</span>
+            : p.usluga ? p.nazwa : <PrzyciskTowaru twId={p.twId}>{p.nazwa}</PrzyciskTowaru>}
           {p.sporna && <span className="ml-1.5 whitespace-nowrap rounded border border-slate-400 bg-white px-1 text-xs font-semibold text-slate-700">
             reklamowany</span>}
         </td>

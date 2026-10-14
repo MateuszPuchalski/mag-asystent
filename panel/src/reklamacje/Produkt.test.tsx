@@ -159,6 +159,30 @@ describe("Kupiony towar: symbol tylko z paragonu albo faktury", () => {
     expect(await within(wiersz("14-31051")).findByText("Skopiowano symbol")).toBeInTheDocument();
   });
 
+  it("faktura do paragonu: ta sama sporna kartoteka w dwóch dokumentach świeci w obu", () => {
+    const sporny = (n: Partial<DokumentParagonu>) => dokument({
+      pozycje: [pozycja(), pozycja({ twId: 12, symbol: "14-20007", nazwa: "Śruba noża M10", sporna: false })], ...n });
+    render(<Produkt szczegol={szczegol({ paragon: paragon({ spornaTwId: 11, dokumenty: [
+      sporny({}), sporny({ dokId: 901, numer: "FS 77/10/2026", typ: "FS", data: "2026-10-05" }),
+    ] }) })} />);
+    const wiersze = screen.getAllByText("reklamowany").map((e) => e.closest("tr"));
+    expect(wiersze).toHaveLength(2);
+    for (const w of wiersze) expect(w).toHaveTextContent("14-31051");
+    expect(screen.queryByText(/Dokument nie wskazuje/)).not.toBeInTheDocument();
+    expect(karta).toHaveBeenCalledWith(11);
+    expect(screen.getByText("Ceny tego towaru w Subiekcie")).toBeInTheDocument();
+  });
+
+  it("kartoteki brak w kopii: bez symbolu do kopiowania i bez zmyślonej nazwy", () => {
+    render(<Produkt szczegol={szczegol({ paragon: paragon({ dokumenty: [dokument({ pozycje: [
+      pozycja(), pozycja({ twId: 77, symbol: null, nazwa: null, sporna: false }),
+    ] })] }) })} />);
+    const bezKarty = screen.getByText("nazwa nieznana").closest("tr") as HTMLElement;
+    expect(within(bezKarty).getByText("brak symbolu w kopii kartoteki")).toBeInTheDocument();
+    expect(within(bezKarty).queryByRole("button")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /Kopiuj symbol/ })).toHaveLength(1);
+  });
+
   it("bez jednoznacznego wskazania nic nie świeci, a zdanie mówi, że wybór należy do agenta", () => {
     const bezSpornej = dokument({ pozycje: dokument().pozycje.map((p) => ({ ...p, sporna: false })) });
     render(<Produkt szczegol={szczegol({ paragon: paragon({ dokumenty: [bezSpornej], spornaTwId: null }) })} />);
@@ -200,6 +224,12 @@ describe("Dostępność karty z dokumentem i bez niego", () => {
      pozycji i przycisk symbolu to struktura, o którą łatwo się potknąć. */
   it("dokument z kilkoma pozycjami przechodzi WCAG 2.2 AA w strukturze", async () => {
     const { container } = render(<Produkt szczegol={szczegol()} />);
+    expect(await naruszeniaWcag(container)).toBe("");
+  });
+
+  it("pozycja bez kartoteki w kopii przechodzi WCAG 2.2 AA w strukturze", async () => {
+    const { container } = render(<Produkt szczegol={szczegol({ paragon: paragon({ dokumenty: [dokument({
+      pozycje: [pozycja(), pozycja({ twId: 77, symbol: null, nazwa: null, sporna: false })] })] }) })} />);
     expect(await naruszeniaWcag(container)).toBe("");
   });
 

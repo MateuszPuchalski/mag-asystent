@@ -1775,8 +1775,10 @@ export interface DokumentParagonu {
 
 export interface PozycjaParagonu {
   twId: number;
-  symbol: string;
-  nazwa: string;
+  /* `null`, gdy kartoteki nie ma w kopii Subiekta: pozycja dokumentu jest,
+     ale nie wiemy, jak się nazywa. Panel mówi to słowem, nie zgaduje. */
+  symbol: string | null;
+  nazwa: string | null;
   /** Suma ilości tej kartoteki w dokumencie. */
   ilosc: number;
   /** Pozycja usługowa, np. przesyłka — nie jest towarem z paczki. */
