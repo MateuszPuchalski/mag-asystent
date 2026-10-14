@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./klient";
 import { poZapisieSprawy } from "./spoiwo";
-import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, Ocena, PozycjaNaOutlet, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, WynikDosylki, DosylkaZalozona, Zwrot, SprawaZakupu, PrzystanekDrogi } from "./typy";
+import type { DoDopisania, FakturaZwrotu, KandydatFaktury, KolejkaZwrotow, KoszZwrotow, Ocena, PozycjaNaOutlet, SkladPozycji, StanZwrotow, StanZwrotuPieniedzy, WierszDokumentu, WpisOsiZwrotu, WynikDosylki, ZwrotPlatnosciAllegro, DosylkaZalozona, Zwrot, SprawaZakupu, PrzystanekDrogi } from "./typy";
 
 /* Zwroty jadą JEDNYM zapytaniem razem z licznikami. Zwrotów w pracy są
    dziesiątki, nie tysiące, a dzięki temu przełączenie kubełka nie kosztuje
@@ -918,6 +918,31 @@ export function useCofnijPrzelew() {
       qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true });
       qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) });
     },
+  });
+}
+
+/**
+ * „Sprawdź w Allegro” przy pieniądzach zwrotu: serwer pyta Allegro o zwroty
+ * płatności tego zamówienia i zapisuje je w lustrze.
+ *
+ * PRZYCISK, NIE AUTOMAT. Zapytanie zmienia lustro, a otwarcie ekranu niczego
+ * nie zapisuje. Agent klika wtedy, gdy Sales Center pokazuje już oddane
+ * pieniądze, a nasz stan jeszcze o nich nie wie.
+ *
+ * IDZIE BEZ CIAŁA (reguła klienta HTTP): serwer bierze zamówienie ze zwrotu.
+ * Unieważniamy kolejkę i szczegół, bo po sprawdzeniu zwrot może zmienić
+ * kubełek, a sekcja pieniędzy ma pokazać wypłatę z Allegro.
+ */
+export function useSprawdzPlatnosci() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { id: number }) =>
+      api<{ znaleziono: number; wyplacone: boolean; platnosci: ZwrotPlatnosciAllegro[] }>(
+        `/api/obsluga/zwroty/${v.id}/platnosci/sprawdz`, { method: "POST" }),
+    onSettled: (_d, _e, v) => Promise.all([
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.kolejka, exact: true }),
+      qc.invalidateQueries({ queryKey: kluczeZwrotow.zwrot(v.id) }),
+    ]),
   });
 }
 

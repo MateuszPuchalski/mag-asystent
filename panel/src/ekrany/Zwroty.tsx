@@ -12,7 +12,7 @@ import {
   useCofnijKorekte, useCofnijKwote, useCofnijWerdykt, useDopiszPozycje,
   useIloscZwrocona, useFaktura, useKorekta, useKwota,
   usePaczkiKlienta, useZamowieniaZAllegro, usePrzyjmijNieodebrana, wygladaNaLogin, useOcena, usePotracenie, useWerdykt, useZdejmijPozycje,
-  useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci, useSledzDosylkeZwrotu,
+  useZglosRabat, useZwrot, useZwrocPieniadze, useOdmowPlatnosci, useSledzDosylkeZwrotu, useSprawdzPlatnosci,
   useZapiszPrzelew, useCofnijPrzelew,
   useNotatkaZwrotu, useCofnijNotatkeZwrotu, useRozjazdyZwrotow,
   useDolozTowar, szukajTowaruDoKosza, type TowarDoKosza, useKosz, usePotwierdzKartoteke,
@@ -392,6 +392,11 @@ export function Zwroty() {
   const pieniadze = useZwrocPieniadze();
   const odmowaPlatnosci = useOdmowPlatnosci();
   const sledzDosylke = useSledzDosylkeZwrotu();
+  const sprawdzPlatnosci = useSprawdzPlatnosci();
+  /* Wynik sprawdzenia niesie numer zwrotu z tego samego powodu co błąd wyżej:
+     odpowiedź może przyjść, gdy agent stoi już przy następnym zwrocie. */
+  const [wynikSprawdzenia, setWynikSprawdzenia] = useState<
+    { zwrotId: number; znaleziono: number; wyplacone: boolean } | null>(null);
   const potracenie = usePotracenie();
   const faktura = useFaktura();
   const dopisz = useDopiszPozycje();
@@ -1324,7 +1329,20 @@ export function Zwroty() {
                 p.rabat.lineItemId ? [[p.rabat.lineItemId, p.nazwa]] : []))}
               akcje={akcje}
               trwa={pieniadze.isPending || odmowaPlatnosci.isPending
-                || przelew.isPending || cofnijPrzelew.isPending || sledzDosylke.isPending}
+                || przelew.isPending || cofnijPrzelew.isPending || sledzDosylke.isPending
+                || sprawdzPlatnosci.isPending}
+              sprawdzam={sprawdzPlatnosci.isPending && sprawdzPlatnosci.variables?.id === zwrot.id}
+              wynikSprawdzenia={wynikSprawdzenia?.zwrotId === zwrot.id ? wynikSprawdzenia : null}
+              onSprawdz={() => {
+                setBladPieniedzy(null);
+                setWynikSprawdzenia(null);
+                const zwrotId = zwrot.id;
+                sprawdzPlatnosci.mutate({ id: zwrotId }, {
+                  onSuccess: (w) => setWynikSprawdzenia({ zwrotId, znaleziono: w.znaleziono,
+                    wyplacone: w.wyplacone }),
+                  onError: bladPieniedzyDla(zwrotId),
+                });
+              }}
               blad={bladPieniedzy?.zwrotId === zwrot.id ? bladPieniedzy.tekst : ""}
               wynikDosylki={wynikDosylki?.zwrotId === zwrot.id ? wynikDosylki.wynik : null}
               onZwroc={() => {

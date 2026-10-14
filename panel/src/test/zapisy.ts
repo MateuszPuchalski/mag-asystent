@@ -15,7 +15,9 @@ import { vi } from "vitest";
  * zastąpi: zapytanie połyka go jako własny błąd, a test dalej świeci na
  * zielono, choć ekran nie narysował połowy danych.
  */
-export function atrapaZapisow(odczyt: (url: string) => unknown): {
+export function atrapaZapisow(odczyt: (url: string) => unknown,
+  /** Odpowiedź na zapis (np. błąd serwera); domyślnie 200 z pustym ciałem. */
+  zapis?: (url: string) => { status: number; cialo: unknown } | undefined): {
   wyslane: string[]; nieznane: string[];
 } {
   const stan = { wyslane: [] as string[], nieznane: [] as string[] };
@@ -23,7 +25,8 @@ export function atrapaZapisow(odczyt: (url: string) => unknown): {
     const metoda = init?.method ?? "GET";
     if (metoda !== "GET") {
       stan.wyslane.push(`${metoda} ${url}`);
-      return new Response("{}", { status: 200 });
+      const o = zapis?.(url);
+      return new Response(JSON.stringify(o?.cialo ?? {}), { status: o?.status ?? 200 });
     }
     const cialo = odczyt(url);
     if (cialo === undefined) {

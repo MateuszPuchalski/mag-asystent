@@ -137,7 +137,7 @@ function WyplatyAllegro({ platnosci, nazwy, waluta }: {
 
 export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCofnijPrzelew,
   akcje, przedWerdyktem = false, wynikDosylki = null, onSledzDosylke, kodAllegro = null,
-  nazwyPozycji = {} }: {
+  nazwyPozycji = {}, onSprawdz, sprawdzam = false, wynikSprawdzenia = null }: {
   stan: StanZwrotuPieniedzy;
   /**
    * Zwrot czeka jeszcze na werdykt (0.453.0). Przeszkoda jest wtedy jedna
@@ -171,6 +171,16 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
   kodAllegro?: string | null;
   /** Nazwy produktów po `lineItemId` pozycji zamówienia — do rozbicia wypłaty. */
   nazwyPozycji?: Record<string, string>;
+  /**
+   * „Sprawdź w Allegro”: lustro bywa starsze od Sales Center, więc agent może
+   * zapytać Allegro o zwrot płatności, zanim odmówi albo odda drugi raz.
+   * Nie rusza pieniędzy, dlatego stoi także przed werdyktem.
+   */
+  onSprawdz?: () => void;
+  /** Sprawdzenie trwa — przycisk gaśnie, żeby nie wysłać drugiego żądania. */
+  sprawdzam?: boolean;
+  /** Wynik ostatniego sprawdzenia TEGO zwrotu; `null`, gdy jeszcze nie sprawdzano. */
+  wynikSprawdzenia?: { znaleziono: number; wyplacone: boolean } | null;
 }) {
   const [odmawiam, setOdmawiam] = useState(false);
   /* Odmowa złożona w panelu Allegro, przy której jest dosyłka do pokazania. */
@@ -252,6 +262,20 @@ export function Pieniadze({ stan, trwa, blad, onZwroc, onOdmow, onPrzelew, onCof
         <Przycisk className={`text-xs ${stan.moznaZwrocic ? "" : "ml-auto"}`}
           onClick={() => setOdmawiam(true)}>Odmów wypłaty</Przycisk>}
     </div>
+
+    {/* Znika, gdy Allegro już potwierdziło wypłatę: nie ma wtedy czego sprawdzać.
+        Zdanie wyniku jest jedno i żyje pod przyciskiem, żeby agent nie szukał
+        odpowiedzi w innym miejscu ekranu. */}
+    {onSprawdz && !stan.oddane?.potwierdzone && <div className="mt-2">
+      <Przycisk className="text-xs" disabled={trwa || sprawdzam} onClick={onSprawdz}>
+        {sprawdzam ? "Sprawdzam…" : "Sprawdź w Allegro"}</Przycisk>
+      {wynikSprawdzenia && <p role="status" className="mt-1 text-xs text-slate-600">
+        {wynikSprawdzenia.znaleziono === 0
+          ? "Allegro nie zwraca zwrotu płatności dla tego zamówienia. Pieniądze mogły pójść inną drogą — sprawdź w Sales Center."
+          : wynikSprawdzenia.wyplacone
+            ? "Allegro potwierdza wypłatę."
+            : "Allegro ma zwrot płatności, ale jeszcze nie w pełni wypłacony — zobacz status poniżej."}</p>}
+    </div>}
 
     {(stan.platnosci ?? []).length > 0 &&
       <WyplatyAllegro platnosci={stan.platnosci} nazwy={nazwyPozycji} waluta={stan.waluta} />}

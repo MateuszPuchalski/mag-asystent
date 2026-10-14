@@ -5,6 +5,7 @@ import React from "react";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { Kubelek, Zwrot } from "../api/typy";
+import { atrapaZapisow } from "../test/zapisy";
 
 /* Ten plik istnieje przez usterkę znalezioną OKIEM, nie testem: przełączenie
    kubełka zmieniało listę, ale zostawiało kursor na zwrocie z poprzedniego
@@ -1458,5 +1459,44 @@ describe("Dosyłka pod odmową wypłaty", () => {
       expect(await screen.findByRole("heading", { name: "ZK-6" })).toBeInTheDocument();
       expect(screen.getByText("Allegro nie przyjęło odmowy.")).toBeInTheDocument();
     } finally { sprzatnij(); }
+  });
+});
+
+describe("Sprawdzenie zwrotu płatności w Allegro", () => {
+  afterEach(() => { vi.unstubAllGlobals(); scena.zwroty = null; scena.szczegol = undefined; });
+  const stanPieniedzy = {
+    pieniadze: { moznaZwrocic: false, moznaOdmowic: true, powod: null, kwotaGrosze: 4999,
+      waluta: "PLN", oddane: null, odmowa: null, przelew: null, moznaZapisacPrzelew: false,
+      powodPrzelewu: null, dosylka: null, sledzicDosylke: false, platnosci: [] },
+  };
+  /* Przełącznik zwrotów odpytuje pominięte kosze; reszta GET-ów idzie przez mocki hooków. */
+  const odczyt = (url: string) => url === "/api/biuro/kosze/pominiete" ? { pominiete: [] } : undefined;
+  const otworz = () => {
+    scena.zwroty = [{ ...zwrot(6, "korekta", "ZK-6"), werdykt: "przyjety" as const, kwotaGrosze: 4999 }];
+    scena.szczegol = stanPieniedzy;
+    pokaz("/obsluga/zwroty/6");
+  };
+
+  it("otwarcie ekranu niczego nie zapisuje", async () => {
+    const zapisy = atrapaZapisow(odczyt);
+    otworz();
+    expect(await screen.findByRole("button", { name: "Sprawdź w Allegro" })).toBeInTheDocument();
+    expect(zapisy.wyslane).toEqual([]);
+  });
+
+  it("klik robi dokładnie jeden POST na właściwy adres i pokazuje wynik", async () => {
+    const zapisy = atrapaZapisow(odczyt, () => ({ status: 200,
+      cialo: { znaleziono: 1, wyplacone: true, platnosci: [] } }));
+    otworz();
+    await userEvent.click(await screen.findByRole("button", { name: "Sprawdź w Allegro" }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Allegro potwierdza wypłatę.");
+    expect(zapisy.wyslane).toEqual(["POST /api/obsluga/zwroty/6/platnosci/sprawdz"]);
+  });
+
+  it("błąd serwera trafia pod przycisk", async () => {
+    atrapaZapisow(odczyt, () => ({ status: 429, cialo: { error: "Allegro ogranicza zapytania." } }));
+    otworz();
+    await userEvent.click(await screen.findByRole("button", { name: "Sprawdź w Allegro" }));
+    expect(await screen.findByText("Allegro ogranicza zapytania.")).toBeInTheDocument();
   });
 });
