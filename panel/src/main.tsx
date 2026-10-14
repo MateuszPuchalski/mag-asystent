@@ -260,8 +260,9 @@ function Rama({ wyloguj }: { wyloguj: () => void }) {
         Pasek braku połączenia stoi NAD nim: awaria jest ważniejsza niż nowość. */}
     <PasekPolaczenia />
     {/* Dyskusja bez odpowiedzi grozi blokadą konta Allegro, więc alarm stoi
-        nad nowościami: nowość może poczekać, odpowiedź nie. Na reklamacjach
-        pasek milknie sam, a alarm niesie czerwony licznik zakładki „Dyskusje".
+        nad nowościami: nowość może poczekać, odpowiedź nie. Pasek pokazuje
+        się sam tylko na ekranach dyskusji, a na pozostałych alarm niesie
+        czerwony licznik zakładki „Dyskusje".
         Warunek mieszka w komponencie, bo tam sprawdza go test. */}
     <PasekAlarmuDyskusji />
     <CoNowego />

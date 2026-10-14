@@ -6,14 +6,15 @@ import { ile, odmien } from "../ui";
 /* ── PASEK ALARMU: DYSKUSJA BEZ ODPOWIEDZI ──────────────────────────────
    Allegro zablokowało konto za dyskusję, która stała w kolejce „Do
    odpowiedzi" i której nikt nie otworzył. Kolejka pokazuje, że sprawa jest,
-   ale nie woła. Ten pasek woła z każdego ekranu poza reklamacjami, bo nikt
-   nie siedzi cały dzień na jednej zakładce.
+   ale nie woła. Pasek stoi na ekranach dyskusji, tam, gdzie agent może
+   od razu odpowiedzieć.
 
-   REKLAMACJE GO NIE MAJĄ, decyzją właściciela. Pasek pełnej szerokości
-   zabiera rząd ekranowi, na którym liczy się każdy piksel trzech kolumn.
-   Alarm nie znika jednak z oczu: niesie go czerwony licznik na zakładce
-   „Dyskusje", widoczny także z reklamacji. Warunek stoi TUTAJ, a nie
-   w ramie, bo tylko tu da się go sprawdzić testem.
+   TYLKO W DYSKUSJACH, decyzją właściciela. Pasek pełnej szerokości zabiera
+   rząd ekranowi, na którym liczy się każdy piksel kolumn, a na zwrotach,
+   w skrzynce czy w profilu klienta nikt nie odpisuje w dyskusji. Alarm nie
+   znika jednak z oczu: niesie go czerwony licznik na zakładce „Dyskusje",
+   widoczny na każdym ekranie. Warunek stoi TUTAJ, a nie w ramie, bo tylko
+   tu da się go sprawdzić testem.
 
    ŹRÓDŁO. Blok `dyskusje` z `/api/health`, który panel i tak odpytuje co
    30 sekund. Próg liczy serwer (`DYSKUSJE_ALARM_GODZIN`), więc pasek, licznik
@@ -23,8 +24,8 @@ import { ile, odmien } from "../ui";
 
    ZERO ZAPISU. Pasek i licznik tylko czytają, a link prowadzi do kolejki. */
 
-/** Ekrany bez paska: sama kolejka reklamacji i każda jej sprawa. */
-const BEZ_PASKA = /^\/obsluga\/reklamacje(?:\/|$)/;
+/** Jedyne ekrany z paskiem: kolejka dyskusji i każda jej sprawa. */
+const TYLKO_W_DYSKUSJACH = /^\/obsluga\/dyskusje(?:\/|$)/;
 
 /** „2 dyskusje czekają" — ta sama odmiana w pasku i w liczniku. */
 const ileCzeka = (n: number) =>
@@ -33,7 +34,7 @@ const ileCzeka = (n: number) =>
 export function PasekAlarmuDyskusji() {
   const alarm = useZdrowie().data?.dyskusje?.alarm;
   const { pathname } = useLocation();
-  if (!alarm || BEZ_PASKA.test(pathname)) return null;
+  if (!alarm || !TYLKO_W_DYSKUSJACH.test(pathname)) return null;
   return <section role="alert" aria-label="Dyskusje bez odpowiedzi"
     className="flex items-start gap-3 border-b border-red-200 bg-red-50 px-5 py-2 text-sm text-red-950">
     <AlarmClock size={16} className="mt-0.5 shrink-0" aria-hidden="true" />

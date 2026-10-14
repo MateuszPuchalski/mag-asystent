@@ -10,6 +10,10 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.583.1 — 14 października 2026
+
+Czerwony pasek „dyskusje czekają na odpowiedź dłużej niż 24 godz." pokazuje się teraz tylko na ekranach dyskusji. Na pozostałych ekranach alarm niesie czerwony licznik przy zakładce „Dyskusje".
+
 ## 0.583.0 — 14 października 2026
 
 **Przycisk „Sprawdź w Allegro” przy zwrocie.** Gdy zwrot stoi w kolejce, a w Sales Center pieniądze są już oddane, jedno kliknięcie pyta Allegro o zwroty płatności tego zamówienia i od razu zapisuje wynik. Panel mówi wprost, czy Allegro potwierdza wypłatę, czy ma zwrot w toku, czy w ogóle nie zna zwrotu płatności dla tego zamówienia. Przy komunikacie „klient nie nadał paczki” pojawia się przypomnienie, żeby sprawdzić to przed odmową.
