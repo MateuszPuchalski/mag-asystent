@@ -227,13 +227,13 @@ test("powód braku zatrzasku nazywa warunek, który zatrzymał wypłatę", async
   await synchronizujZwrotyPlatnosci(d, 1, {
     apiUrl: "https://x",
     query: async () => odpowiedz(
-      rekord({ id: "r1", order: { id: "o-powod" }, reason: "NOT_COLLECTED" }),
+      rekord({ id: "r1", order: { id: "o-powod" }, reason: "OVERPAID" }),
       rekord({ id: "r2", order: { id: "o-stary" } }),
       rekord({ id: "r3", order: { id: "o-dwa" } }),
       rekord({ id: "r4", order: { id: "o-odrz" } }),
     ),
   });
-  assert.match(powodBrakuZatrzasku(d, inny)!, /NOT_COLLECTED.*REFUND/);
+  assert.match(powodBrakuZatrzasku(d, inny)!, /OVERPAID.*REFUND, CANCELLED_BY_BUYER, NOT_COLLECTED/);
   assert.match(powodBrakuZatrzasku(d, stary)!, /wcześniejsza niż zgłoszenie/);
   assert.match(powodBrakuZatrzasku(d, dwa)!, /więcej niż jeden zwrot/);
   assert.match(powodBrakuZatrzasku(d, odrzucony)!, /odrzucony/);
@@ -275,7 +275,7 @@ test("masowe sprawdzenie: jedna lista na wiele zwrotów, raport z powodami reszt
       adresy.push(u);
       return odpowiedz(
         rekord({ id: "r1", order: { id: "o-ok" } }),
-        rekord({ id: "r2", order: { id: "o-powod" }, reason: "NOT_COLLECTED" }),
+        rekord({ id: "r2", order: { id: "o-powod" }, reason: "OVERPAID" }),
         rekord({ id: "r3", order: { id: "o-dwa" } }),
         rekord({ id: "r4", order: { id: "o-wtoku" }, status: "IN_PROGRESS" }),
       );
@@ -289,8 +289,8 @@ test("masowe sprawdzenie: jedna lista na wiele zwrotów, raport z powodami reszt
   assert.equal(wynik.bezZwrotuPlatnosci, 1);
   assert.equal(wynik.urwane, false);
   const sumaPowodow = wynik.zPowodem.reduce((n, p) => n + p.ile, 0);
-  assert.equal(sumaPowodow, 4, "powód-reszta: NOT_COLLECTED, dwa zwroty przy zamówieniu, zwrot w toku");
-  assert.ok(wynik.zPowodem.some((p) => /NOT_COLLECTED/.test(p.powod)));
+  assert.equal(sumaPowodow, 4, "powód-reszta: nadpłata, dwa zwroty przy zamówieniu, zwrot w toku");
+  assert.ok(wynik.zPowodem.some((p) => /OVERPAID/.test(p.powod)));
   assert.ok(wynik.zPowodem.some((p) => /jeszcze nie wyszły/.test(p.powod)));
   const w = d.prepare("SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id=?").get(dobry) as { r: string };
   assert.equal(w.r, "2026-09-10T10:00:00Z");
@@ -319,4 +319,28 @@ test("masowe sprawdzenie bez zwrotów w pracy nie pyta Allegro", async () => {
     apiUrl: "https://x", query: async () => { throw new Error("nie wolno pytać"); },
   });
   assert.equal(wynik.sprawdzonych, 0);
+});
+
+test("anulowanie przez kupującego i nieodebrana paczka zatrzaskują zwrot, reklamacja i nadpłata nie", async () => {
+  const d = stanowisko();
+  const anulowane = zwrot(d, "a", "o-anul");
+  const nieodebrane = zwrot(d, "b", "o-nieod");
+  const reklamacja = zwrot(d, "c", "o-rekl");
+  const nadplata = zwrot(d, "d", "o-nadp");
+  const wynik = await synchronizujZwrotyPlatnosci(d, 1, {
+    apiUrl: "https://x",
+    query: async () => odpowiedz(
+      rekord({ id: "r1", order: { id: "o-anul" }, reason: "CANCELLED_BY_BUYER" }),
+      rekord({ id: "r2", order: { id: "o-nieod" }, reason: "NOT_COLLECTED" }),
+      rekord({ id: "r3", order: { id: "o-rekl" }, reason: "COMPLAINT" }),
+      rekord({ id: "r4", order: { id: "o-nadp" }, reason: "OVERPAID" }),
+    ),
+  });
+  assert.equal(wynik.zatrzasniete, 2);
+  const r = (id: number) => (d.prepare("SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id=?")
+    .get(id) as { r: string | null }).r;
+  assert.ok(r(anulowane));
+  assert.ok(r(nieodebrane));
+  assert.equal(r(reklamacja), null);
+  assert.equal(r(nadplata), null);
 });

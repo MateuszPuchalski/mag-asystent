@@ -40,6 +40,23 @@ const MAKS_STRON = 5;
 /** Ile zwrotów w toku odpytujemy po `id` w jednym przebiegu. */
 const W_TOKU_NA_PRZEBIEG = 20;
 
+/**
+ * Powody zwrotu płatności, które znaczą „pieniądze za TEN zwrot są u klienta".
+ *
+ * `REFUND` to zwrot towaru. `CANCELLED_BY_BUYER` i `NOT_COLLECTED` to zwroty
+ * CAŁEGO zamówienia (anulowanie przez kupującego, nieodebrana paczka): kupujący
+ * dostał pieniądze, więc zwrot klienta przy tym zamówieniu nie ma czego
+ * wypłacać. Do pierwszego masowego sprawdzenia stały tu tylko `REFUND`,
+ * a pozostałe dwa zatrzymywały 49 z 697 zwrotów w kolejce bez powodu.
+ *
+ * Poza listą zostaje reszta: `COMPLAINT` należy do reklamacji, a `OVERPAID`,
+ * `PAID_VALUE_TOO_LOW` i `PRODUCT_NOT_AVAILABLE` dotyczą cudzej sytuacji na tym
+ * samym zamówieniu. Zatrzask zdejmuje sprawę z kolejki, więc przy powodzie
+ * o niejasnym zasięgu zwrot zostaje w pracy, zamiast po cichu zniknąć.
+ */
+export const POWODY_WYPLATY = ["REFUND", "CANCELLED_BY_BUYER", "NOT_COLLECTED"] as const;
+const POWODY_SQL = POWODY_WYPLATY.map((p) => `'${p}'`).join(",");
+
 export interface PozycjaZwrotuPlatnosci {
   /** Identyfikator pozycji zamówienia (`lineItems[].id`). */
   id: string;
@@ -199,8 +216,9 @@ export function zwrotyPlatnosciZwrotu(database: Db, zwrotId: number): Array<Zwro
  *
  * KONSERWATYWNIE, bo zatrzask zdejmuje sprawę z kolejki, a niezatrzaśnięty
  * zwrot tylko zostaje w pracy. Dlatego:
- * - tylko `reason = REFUND` (zwrot towaru); `COMPLAINT` to reklamacje, a te
- *   chodzą u nas osobną drogą i nie zamykają zwrotu;
+ * - tylko powody z `POWODY_WYPLATY` (zwrot towaru, anulowanie, nieodebrana
+ *   paczka); `COMPLAINT` to reklamacje, a te chodzą u nas osobną drogą
+ *   i nie zamykają zwrotu;
  * - zwrot płatności musi być NOWSZY od zgłoszenia zwrotu — wcześniejszy
  *   dotyczył czegoś innego na tym samym zamówieniu;
  * - tylko gdy zamówienie ma JEDEN zwrot klienta z Allegro. Przy dwóch nie
@@ -228,7 +246,7 @@ export function zatrzaskZLustra(database: Db, konto: number, tylkoZwrot: number 
        AND z.order_id IS NOT NULL
        AND z.external_id NOT LIKE 'nieodebrana:%'
        AND (z.werdykt IS NULL OR z.werdykt <> 'odrzucony')
-       AND p.status = 'SUCCESS' AND p.reason = 'REFUND'
+       AND p.status = 'SUCCESS' AND p.reason IN (${POWODY_SQL})
        AND p.utworzono_at >= z.created_at
        AND (SELECT COUNT(*) FROM zwrot_klienta d
              WHERE d.channel_account_id = z.channel_account_id
@@ -280,10 +298,10 @@ export function powodBrakuZatrzasku(database: Db, zwrotId: number): string | nul
   if (z.werdykt === "odrzucony") {
     return "zwrot jest u nas odrzucony, więc wypłaty nie zatrzaskujemy samoczynnie";
   }
-  const zwrotu = udane.filter((u) => u.reason === "REFUND");
+  const zwrotu = udane.filter((u) => (POWODY_WYPLATY as readonly string[]).includes(u.reason ?? ""));
   if (!zwrotu.length) {
     const powody = [...new Set(udane.map((u) => u.reason ?? "brak powodu"))].join(", ");
-    return `Allegro podaje powód ${powody}, a zatrzask uznaje tylko zwrot towaru (REFUND)`;
+    return `Allegro podaje powód ${powody}, a zatrzask uznaje tylko ${POWODY_WYPLATY.join(", ")}`;
   }
   if (!zwrotu.some((u) => u.utworzono_at >= z.created_at)) {
     return "wypłata jest wcześniejsza niż zgłoszenie tego zwrotu, więc dotyczy czegoś innego";
