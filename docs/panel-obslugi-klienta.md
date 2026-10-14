@@ -6285,7 +6285,7 @@ załącznika, tylko dla plików `SAFE`.
   Za duży plik (413) i PDF, którego pdf.js nie otworzy, mówią zdaniem bez
   ponowienia. Awaria drogi mówi zdaniem z „Spróbuj ponownie”.
 
-### 25b.13. Kupiony towar z paragonu (@wydanie)
+### 25b.13. Kupiony towar z paragonu (0.585.0)
 
 Prośba właściciela: w reklamacji ma być widać, jaki produkt klient naprawdę
 kupił, z dokładnym symbolem z paragonu albo faktury zamówienia.

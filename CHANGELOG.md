@@ -10,6 +10,13 @@ z wersją monorepo" — i właśnie tak przestał być zgodny: `0.3.0` przetrwa�
 sześć zmergowanych zmian, w tym takie, które wymagały nowego uprawnienia SQL.
 Komentarz nie jest mechanizmem.
 
+## 0.585.0 — 14 października 2026
+
+**Reklamacja pokazuje, co klient naprawdę kupił.** Panel reklamacji bierze
+paragon albo fakturę zamówienia z Subiekta i pokazuje cały dokument, z
+wyróżnionym reklamowanym towarem i jego symbolem. Gdy dokumentu w Subiekcie
+nie ma, panel mówi „brak paragonu” zamiast zgadywać symbol z oferty.
+
 ## 0.584.1 — 14 października 2026
 
 Zwrot, za który Allegro oddało pieniądze z powodem „anulowanie przez kupującego” albo „nieodebrane zamówienie”, dostaje potwierdzenie wypłaty tak samo jak zwrot towaru. Wcześniej takie zwroty zostawały w kolejce, choć kupujący miał już pieniądze. Reklamacje i pozostałe powody (nadpłata, zbyt niska kwota, brak produktu) nadal nie zamykają zwrotu, bo dotyczą innej sytuacji na tym samym zamówieniu.
