@@ -36,7 +36,7 @@ import {
 import { paczkiKlienta } from "../services/zamowienia.js";
 import { powiazZaleglosci } from "../services/wiazania.js";
 import { kandydaciFaktury, wskazFakture } from "../services/faktury.js";
-import { SprawdzenieZwrotuBlad, sprawdzZwrotPlatnosci } from "../services/allegro-zwroty-platnosci.js";
+import { SprawdzenieZwrotuBlad, sprawdzWszystkieZwrotyPlatnosci, sprawdzZwrotPlatnosci } from "../services/allegro-zwroty-platnosci.js";
 import { BladLimituAllegro } from "../adapters/allegro.js";
 import { dociagnijZwrotPoLiscie, synchronizujAllegroZwroty } from "../services/allegro-zwroty-sync.js";
 import { config } from "../config.js";
@@ -965,6 +965,27 @@ export async function zwrotyRoutes(app: FastifyInstance) {
         return reply.code(400).send({ error: (e as Error).message });
       }
     });
+
+  /* MASOWE SPRAWDZENIE: te same zasady co przy jednym zwrocie, ale lista konta
+     od najstarszego zwrotu w pracy zamiast jednego zamówienia. Stoi PRZED trasą
+     z `:id`, żeby „sprawdz-wszystkie" nie wpadło pod parametr. */
+  app.post("/api/obsluga/zwroty/platnosci/sprawdz-wszystkie", async (_req, reply) => {
+    const nie = odmowa(reply);
+    if (nie) return nie;
+    if (!config.allegro.clientId) {
+      return reply.code(400).send({ error: "Konto Allegro nie jest sparowane" });
+    }
+    try {
+      return await sprawdzWszystkieZwrotyPlatnosci(db(), kto());
+    } catch (e) {
+      if (e instanceof BladLimituAllegro) {
+        return reply.code(429).send({ error: "Allegro prosi o chwilę przerwy — spróbuj za minutę." });
+      }
+      return reply.code(502).send({
+        error: `Allegro nie odpowiedziało: ${(e as Error).message}. Spróbuj jeszcze raz za chwilę.`,
+      });
+    }
+  });
 
   /* SPRAWDZENIE ZWROTU PŁATNOŚCI NA ŻĄDANIE. POST, bo klik zapisuje wynik
      w lustrze i w dzienniku — nie jest patrzeniem, więc nie łamie umowy, że

@@ -4,7 +4,7 @@ import fs from "node:fs";
 import { DatabaseSync } from "node:sqlite";
 import { migrate, type Db } from "../db/db.js";
 import {
-  groszeZKwoty, powodBrakuZatrzasku, sprawdzZwrotPlatnosci, SprawdzenieZwrotuBlad, synchronizujZwrotyPlatnosci,
+  groszeZKwoty, powodBrakuZatrzasku, sprawdzWszystkieZwrotyPlatnosci, sprawdzZwrotPlatnosci, SprawdzenieZwrotuBlad, synchronizujZwrotyPlatnosci,
   zwrotyPlatnosciZwrotu, zwrotZOdpowiedzi,
 } from "./allegro-zwroty-platnosci.js";
 
@@ -258,4 +258,65 @@ test("sprawdzenie oddaje powód, gdy Allegro oddało pieniądze, a zatrzask się
   });
   assert.equal(wynik.wyplacone, false);
   assert.match(wynik.powodBraku!, /OVERPAID/);
+});
+
+test("masowe sprawdzenie: jedna lista na wiele zwrotów, raport z powodami reszty", async () => {
+  const d = stanowisko();
+  const dobry = zwrot(d, "ok", "o-ok");
+  zwrot(d, "powod", "o-powod");
+  zwrot(d, "dwa1", "o-dwa");
+  zwrot(d, "dwa2", "o-dwa");
+  zwrot(d, "brak", "o-brak");
+  zwrot(d, "wtoku", "o-wtoku");
+  const adresy: string[] = [];
+  const wynik = await sprawdzWszystkieZwrotyPlatnosci(d, biuro, {
+    apiUrl: "https://x",
+    query: async (u) => {
+      adresy.push(u);
+      return odpowiedz(
+        rekord({ id: "r1", order: { id: "o-ok" } }),
+        rekord({ id: "r2", order: { id: "o-powod" }, reason: "NOT_COLLECTED" }),
+        rekord({ id: "r3", order: { id: "o-dwa" } }),
+        rekord({ id: "r4", order: { id: "o-wtoku" }, status: "IN_PROGRESS" }),
+      );
+    },
+  }, new Date("2026-09-30T10:00:00Z"));
+
+  assert.equal(adresy.length, 1, "jedno żądanie na całą listę, nie na zwrot");
+  assert.match(adresy[0], /occurredAt\.gte=/);
+  assert.equal(wynik.sprawdzonych, 6);
+  assert.equal(wynik.zatrzasniete, 1);
+  assert.equal(wynik.bezZwrotuPlatnosci, 1);
+  assert.equal(wynik.urwane, false);
+  const sumaPowodow = wynik.zPowodem.reduce((n, p) => n + p.ile, 0);
+  assert.equal(sumaPowodow, 4, "powód-reszta: NOT_COLLECTED, dwa zwroty przy zamówieniu, zwrot w toku");
+  assert.ok(wynik.zPowodem.some((p) => /NOT_COLLECTED/.test(p.powod)));
+  assert.ok(wynik.zPowodem.some((p) => /jeszcze nie wyszły/.test(p.powod)));
+  const w = d.prepare("SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id=?").get(dobry) as { r: string };
+  assert.equal(w.r, "2026-09-10T10:00:00Z");
+});
+
+test("masowe sprawdzenie idzie po stronach i mówi, gdy lista była dłuższa niż bierzemy", async () => {
+  const d = stanowisko();
+  zwrot(d, "a", "o-a");
+  let strony = 0;
+  const wynik = await sprawdzWszystkieZwrotyPlatnosci(d, biuro, {
+    apiUrl: "https://x",
+    query: async () => {
+      strony++;
+      return odpowiedz(...Array.from({ length: 100 }, (_, i) =>
+        rekord({ id: `s${strony}-${i}`, order: { id: `inne-${strony}-${i}` } })));
+    },
+  }, new Date("2026-09-30T10:00:00Z"));
+  assert.equal(strony, 20, "bezpiecznik stron, nie pętla bez końca");
+  assert.equal(wynik.urwane, true);
+  assert.equal(wynik.zapisane, 2000);
+});
+
+test("masowe sprawdzenie bez zwrotów w pracy nie pyta Allegro", async () => {
+  const d = stanowisko();
+  const wynik = await sprawdzWszystkieZwrotyPlatnosci(d, biuro, {
+    apiUrl: "https://x", query: async () => { throw new Error("nie wolno pytać"); },
+  });
+  assert.equal(wynik.sprawdzonych, 0);
 });

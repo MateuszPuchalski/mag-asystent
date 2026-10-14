@@ -186,7 +186,7 @@ test("otwarcie kolejki nie zapisuje NICZEGO", async () => {
   assert.equal(licz(), przed, "patrzenie na zwroty niczego nie mutuje");
 });
 
-test("zwroty mają trzydzieści dziewięć tras POST, każda z uzasadnieniem", async () => {
+test("zwroty mają czterdzieści tras POST, każda z uzasadnieniem", async () => {
   /* Ta liczba jest UMOWĄ, jak licznik `method:` w `biuro.test.ts`.
      Do 0.151.0 stało tu zero, w 0.152.0 jeden, do 0.155.0 dwa, w 0.156.0 pięć,
      w 0.162.0 siedem (korekta i jej cofnięcie). Dziś jest dziewięć.
@@ -401,8 +401,13 @@ test("zwroty mają trzydzieści dziewięć tras POST, każda z uzasadnieniem", a
      CZYTA z Allegro (zwroty płatności jednego zamówienia) i zapisuje wynik
      w lustrze i dzienniku. Pieniędzy nie rusza i do Subiekta nic nie wysyła,
      dlatego bez `autoryzuj()`. POST, bo zapisuje — otwarcie ekranu nie. */
-  assert.equal(posty.length, 39,
-    `tras POST jest ${posty.length}, a umowa mówi o trzydziestu dziewięciu`);
+  /* Czterdziesta: to samo sprawdzenie dla WSZYSTKICH zwrotów w pracy. Zgłoszenie
+     właściciela: 383 zwroty do sprawdzenia, a przycisk przy jednym zwrocie
+     kazałby klikać każdy. Lista zwrotów płatności jest jedna na konto, więc
+     kilka stron pokrywa całość. Czyta z Allegro i zapisuje wynik w lustrze;
+     pieniędzy nie rusza i do Subiekta nic nie wysyła, dlatego bez `autoryzuj()`. */
+  assert.equal(posty.length, 40,
+    `tras POST jest ${posty.length}, a umowa mówi o czterdziestu`);
 
   for (const slowo of ["kartoteka", "werdykt", "ocena", "kwota", "ilosc", "zamowienia",
     "synchronizuj", "przelew",
@@ -410,7 +415,7 @@ test("zwroty mają trzydzieści dziewięć tras POST, każda z uzasadnieniem", a
     "faktura", "pozycje", "zdejmij", "pieniadze", "odmowa-platnosci", "skladnik",
     "sklad", "kosz/towar", "mm-mimo-korekt", "outlet/przeniesiono",
     "kosz/nowy", "kosz/usun", "paczki-klienta/allegro", "przyjmij-nieodebrana", ":id/dosylka",
-    "skladnik/outlet", "platnosci/sprawdz"]) {
+    "skladnik/outlet", "platnosci/sprawdz", "platnosci/sprawdz-wszystkie"]) {
     assert.equal(zrodlo.includes(slowo), true, `brak trasy ${slowo}`);
   }
   /* Formularza rejestracji nie ma i nie ma wrócić przypadkiem — np. przy
@@ -1213,5 +1218,15 @@ test("sprawdzenie zwrotu płatności: bez sesji 401, bez sparowanego konta 400",
   const r = await app.inject({
     method: "POST", url: "/api/obsluga/zwroty/1/platnosci/sprawdz", headers: naglowki });
   assert.equal(r.statusCode, 400, "w teście konto Allegro nie jest sparowane");
+  assert.match(r.json().error, /nie jest sparowane/);
+});
+
+test("masowe sprawdzenie zwrotów płatności: bez sesji 401, bez sparowanego konta 400", async () => {
+  const bez = await app.inject({ method: "POST", url: "/api/obsluga/zwroty/platnosci/sprawdz-wszystkie" });
+  assert.equal(bez.statusCode, 401);
+  const { naglowki } = login("biuro", "Ala masowo");
+  const r = await app.inject({
+    method: "POST", url: "/api/obsluga/zwroty/platnosci/sprawdz-wszystkie", headers: naglowki });
+  assert.equal(r.statusCode, 400);
   assert.match(r.json().error, /nie jest sparowane/);
 });

@@ -414,3 +414,106 @@ export async function sprawdzZwrotPlatnosci(
     powodBraku: wyplacone ? null : powodBrakuZatrzasku(database, zwrotId),
   };
 }
+
+/** Ile stron listy (po sto rekordów) bierzemy w jednym masowym sprawdzeniu. */
+const MAKS_STRON_MASOWO = 20;
+/** Najdalej wstecz sięgamy przy masowym sprawdzeniu, niezależnie od najstarszego zwrotu. */
+const MASOWO_MAKS_DNI = 400;
+/** Jak długo zwrot zamknięty korektą, a niezapłacony, liczy się jeszcze jako praca. */
+const MASOWO_ZAMKNIETY_DNI = 60;
+
+export interface WynikMasowegoSprawdzenia {
+  /** Ile zwrotów klienta było do sprawdzenia. */
+  sprawdzonych: number;
+  /** Ile zwrotów płatności Allegro oddało i zapisaliśmy w lustrze. */
+  zapisane: number;
+  /** Przy ilu zwrotach przypięliśmy wypłatę. */
+  zatrzasniete: number;
+  /** Ile zwrotów nie ma w Allegro żadnego zwrotu płatności. */
+  bezZwrotuPlatnosci: number;
+  /** Zwroty, przy których Allegro oddało pieniądze, a nie przypięliśmy ich: powód i liczba. */
+  zPowodem: Array<{ powod: string; ile: number }>;
+  /** Lista Allegro była dłuższa, niż bierzemy naraz: powtórz sprawdzenie, żeby dojść dalej. */
+  urwane: boolean;
+}
+
+/**
+ * Sprawdzenie WSZYSTKICH zwrotów w pracy jednym ruchem.
+ *
+ * Nie jedno żądanie na zwrot. Lista zwrotów płatności jest jedna na całe
+ * konto, więc kilka stron od daty najstarszego zwrotu w pracy pokrywa setki
+ * spraw naraz — taki sam zapis, jaki robi takt, tyle że wstecz i na żądanie.
+ *
+ * Raport mówi też, czego NIE przypięliśmy i dlaczego. Przy setkach zwrotów
+ * odpowiedź „przypięto 300" bez słowa o reszcie kazałaby klikać każdy z osobna,
+ * żeby się dowiedzieć, że wszystkie stoją na tym samym powodzie.
+ */
+export async function sprawdzWszystkieZwrotyPlatnosci(
+  database: Db, kto: { id: number; name: string },
+  deps: ZwrotyPlatnosciDeps = {}, teraz = new Date(),
+): Promise<WynikMasowegoSprawdzenia> {
+  const query = deps.query ?? zapytajAllegro;
+  const apiUrl = deps.apiUrl ?? config.allegro.apiUrl;
+
+  const wynik: WynikMasowegoSprawdzenia = {
+    sprawdzonych: 0, zapisane: 0, zatrzasniete: 0, bezZwrotuPlatnosci: 0, zPowodem: [], urwane: false,
+  };
+  const powody = new Map<string, number>();
+
+  const konta = database.prepare(`SELECT DISTINCT channel_account_id AS konto FROM zwrot_klienta
+      WHERE order_id IS NOT NULL`).all() as Array<{ konto: number }>;
+  const zamknietyOd = new Date(teraz.getTime() - MASOWO_ZAMKNIETY_DNI * 86_400_000).toISOString();
+
+  for (const { konto } of konta) {
+    /* Zbiór „w pracy" jak przy pytaniu o operacje płatnicze: bez zamknięcia albo
+       zamknięty, przyjęty i niezapłacony. Reszta to historia i nie kosztuje stron. */
+    const kandydaci = database.prepare(`SELECT z.id, z.created_at FROM zwrot_klienta z
+       WHERE z.channel_account_id = ? AND z.order_id IS NOT NULL
+         AND z.external_id NOT LIKE 'nieodebrana:%'
+         AND z.rozliczony_allegro_at IS NULL
+         AND (z.werdykt IS NULL OR z.werdykt <> 'odrzucony')
+         AND (z.zamkniety_at IS NULL
+              OR (z.werdykt = 'przyjety' AND z.kwota_grosze > 0
+                  AND z.zwrot_pieniedzy_id IS NULL AND z.zwrot_pieniedzy_command_id IS NULL
+                  AND z.przelew_at IS NULL AND z.odmowa_kod IS NULL
+                  AND z.zamkniety_at >= ?))`)
+      .all(konto, zamknietyOd) as Array<{ id: number; created_at: string }>;
+    if (!kandydaci.length) continue;
+    wynik.sprawdzonych += kandydaci.length;
+
+    const najstarszy = kandydaci.reduce((m, k) => (k.created_at < m ? k.created_at : m),
+      kandydaci[0].created_at);
+    const granica = new Date(teraz.getTime() - MASOWO_MAKS_DNI * 86_400_000).toISOString();
+    /* Doba zapasu: zwrot płatności powstaje po zgłoszeniu, ale strefy czasu
+       w `createdAt` bywają różne i lepiej wziąć dzień za dużo niż pominąć rekord. */
+    const od = new Date(Math.max(Date.parse(najstarszy) - 86_400_000, Date.parse(granica))).toISOString();
+
+    for (let strona = 0; strona < MAKS_STRON_MASOWO; strona++) {
+      const surowe = lista(await query(urlZwrotowPlatnosci(apiUrl, { od, offset: strona * 100 })));
+      wynik.zapisane += zapiszZwrotyPlatnosci(database, konto,
+        surowe.map(zwrotZOdpowiedzi).filter((z): z is ZwrotPlatnosci => z !== null), teraz);
+      if (surowe.length < 100) break;
+      if (strona === MAKS_STRON_MASOWO - 1) wynik.urwane = true;
+    }
+
+    wynik.zatrzasniete += zatrzaskZLustra(database, konto);
+
+    const stan = database.prepare(
+      "SELECT rozliczony_allegro_at AS r FROM zwrot_klienta WHERE id = ?");
+    for (const k of kandydaci) {
+      if ((stan.get(k.id) as { r: string | null }).r) continue;
+      const platnosci = zwrotyPlatnosciZwrotu(database, k.id);
+      if (!platnosci.length) { wynik.bezZwrotuPlatnosci++; continue; }
+      const powod = platnosci.some((p) => p.status === "SUCCESS")
+        ? powodBrakuZatrzasku(database, k.id) ?? "powód nieznany"
+        : "Allegro ma zwrot płatności, ale pieniądze jeszcze nie wyszły";
+      powody.set(powod, (powody.get(powod) ?? 0) + 1);
+    }
+  }
+
+  wynik.zPowodem = [...powody].map(([powod, ile]) => ({ powod, ile })).sort((a, b) => b.ile - a.ile);
+  logEvent("zwrot_platnosci_sprawdzone_masowo", kto.name, null,
+    { sprawdzonych: wynik.sprawdzonych, zapisane: wynik.zapisane, zatrzasniete: wynik.zatrzasniete,
+      bezZwrotuPlatnosci: wynik.bezZwrotuPlatnosci, urwane: wynik.urwane }, kto.id, database);
+  return wynik;
+}
